@@ -22,6 +22,8 @@
 
 ![Read / Search 定稿图](image/read-search-final.png)
 
+![左侧会话栏定稿图](image/sidebar-chat-final.png)
+
 ![右侧 Markdown 定稿图](image/right-panel-markdown-final.png)
 
 ![右侧 HTML 定稿图](image/right-panel-html-final.png)
@@ -35,11 +37,13 @@
 ## 目录结构
 
 - `前端设计文档.md`：总目标、布局原则、消息语法、输入区原则。
-- `左侧会话栏规范.md`：左侧轻量列表与基础操作。
+- `工作台布局与面板交互规范.md`：自研 SplitView、左右面板 resize、左侧 rail 和未来拖动边界。
+- `左侧会话栏规范.md`：左侧轻量列表、分区规则与聊天态定稿图。
 - `设置页规范.md`：设置态布局、导航与聊天态切换规则。
 - `中间消息区规范.md`：消息语法、类型规则、顺序原则。
 - `聊天输入框规范.md`：composer、模式、模型、附件、context 弹窗、发送。
 - `右侧面板与文件渲染规范.md`：文件预览、会话级 diff、右侧定稿图。
+- `prototype/actspace-deepseek-workbench.html`：基于当前规范整理的单文件桌面端高保真原型。
 - `image/`：当前阶段的设计图。
 
 ## 设计方式
@@ -47,6 +51,7 @@
 - 先定大纲，再逐个组件细化。
 - 每次只把一个组件打透，不一次性堆所有状态。
 - 左侧先轻量，右侧先够用，中间聊天区优先级最高。
+- 工作台布局底座先把 resize、collapse 和 restore 做稳，再单独规划 tab 拖动与 dock 区域。
 - 设置页单独作为页面态处理，不挂在聊天页右侧做叠加面板。
 
 ## 图片约定

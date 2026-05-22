@@ -29,6 +29,9 @@
 
 - `docs/CICD.md`：仓库的 CI/CD 骨架以及后续如何接入真实项目。
 
+- `docs/FRONTEND.md`：前端协作入口、设计文档和验证规范导航。
+- `docs/FRONTEND_VERIFICATION.md`：桌面端前端修改后的浏览器 mock、Electron 真实验证和 Computer Use 验收方式。
+
 - `docs/CODING_BEHAVIOR.md`：编码行为纪律——改代码时的操作级约束。
 - `docs/coding-standards/README.md`：编码规范、Skill 推荐清单和团队自定义约定。
 

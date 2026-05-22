@@ -7,6 +7,12 @@
       "skillPath": "skills/frontend-design/SKILL.md",
       "computedHash": "063a0e6448123cd359ad0044cc46b0e490cc7964d45ef4bb9fd842bd2ffbca67"
     },
+    "llm-agent-dev": {
+      "source": "WakeUp-Jin/agent-harness-dev",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "a3b5592352b8e8cf6fd5d34a0ce8d5b15ae7ba52f6b810a13159f5f4b64e9a21"
+    },
     "ui-ux-pro-max": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
       "sourceType": "github",

@@ -32,5 +32,6 @@
 - `docs/design-docs/frontend-ui/index.md`
 - `docs/design-docs/frontend-ui/前端设计文档.md`
 - `docs/design-docs/frontend-ui/image/README.md`
+- `docs/design-docs/frontend-ui/image/sidebar-chat-final.png`
 - `docs/design-docs/frontend-ui/image/settings-page-final.png`
 - `docs/histories/2026-05/20260521-1818-settings-page-docs.md`

@@ -7,6 +7,7 @@
 - `context-popup-final.png`：Context 弹窗定稿图。
 - `thinking-final.png`：Thinking 组件定稿图。
 - `read-search-final.png`：Read / Search 组件定稿图。
+- `sidebar-chat-final.png`：左侧会话栏聊天态定稿图。
 - `right-panel-markdown-final.png`：右侧 Markdown 定稿图。
 - `right-panel-html-final.png`：右侧 HTML 定稿图。
 - `right-panel-image-final.png`：右侧 Image 定稿图。

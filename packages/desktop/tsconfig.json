@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "jsx": "react-jsx",
+    "strict": false,
+    "lib": [
+      "DOM",
+      "ES2022"
+    ],
+    "baseUrl": ".",
+    "paths": {},
+    "types": [
+      "vite/client"
+    ],
+    "noEmit": true
+  },
+  "include": [
+    "src/renderer",
+    "src/global.d.ts",
+    "vite.config.ts"
+  ]
+}

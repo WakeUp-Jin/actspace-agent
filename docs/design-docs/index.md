@@ -13,6 +13,7 @@
 - `core-beliefs.md`
 - `frontend-ui/index.md`
 - `frontend-ui/前端设计文档.md`
+- `frontend-ui/工作台布局与面板交互规范.md`
 - `frontend-ui/左侧会话栏规范.md`
 - `frontend-ui/中间消息区规范.md`
 - `frontend-ui/聊天输入框规范.md`

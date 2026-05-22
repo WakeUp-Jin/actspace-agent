@@ -1,10 +1,11 @@
 {
-  "name": "actspace-agent",
+  "name": "actspace",
   "private": true,
-  "bin": {
-    "code-harness-init": "./scripts/create-project.sh"
-  },
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
+    "dev": "pnpm --filter @actspace/desktop dev",
+    "build": "pnpm --filter @actspace/desktop build && pnpm --filter @actspace/shared build && pnpm --filter @actspace/agent-core build",
+    "typecheck": "pnpm -r typecheck",
     "ci": "./scripts/ci.sh",
     "check:docs": "./scripts/check-docs.sh",
     "check:repo": "./scripts/check-repo-hygiene.sh",

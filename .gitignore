@@ -31,6 +31,9 @@ target/
 bin/
 obj/
 .cache/
+dist-electron/
+apps/*/dist/
+apps/*/dist-electron/
 
 # Python
 __pycache__/

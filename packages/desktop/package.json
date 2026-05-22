@@ -1,0 +1,39 @@
+{
+  "name": "@actspace/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist-electron/main/index.js",
+  "scripts": {
+    "dev": "pnpm run build:deps && concurrently -k \"pnpm:dev:shared\" \"pnpm:dev:agent-core\" \"pnpm:dev:renderer\" \"pnpm:dev:electron:build\" \"pnpm:dev:electron:run\"",
+    "dev:shared": "pnpm --filter @actspace/shared dev",
+    "dev:agent-core": "pnpm --filter @actspace/agent-core dev",
+    "dev:renderer": "vite",
+    "dev:electron:build": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput",
+    "dev:electron:run": "wait-on tcp:5173 file:dist-electron/main/index.js && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron dist-electron/main/index.js",
+    "build:deps": "pnpm --filter @actspace/shared build && pnpm --filter @actspace/agent-core build",
+    "build": "pnpm --filter @actspace/shared build && pnpm --filter @actspace/agent-core build && pnpm build:renderer && pnpm build:electron",
+    "build:renderer": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json"
+  },
+  "dependencies": {
+    "@actspace/agent-core": "workspace:*",
+    "@actspace/shared": "workspace:*",
+    "lucide-react": "^1.16.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.5.2",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^39.8.3",
+    "esbuild": "^0.21.5",
+    "typescript": "^5.8.3",
+    "vite": "^5.4.19",
+    "wait-on": "^8.0.3"
+  }
+}
