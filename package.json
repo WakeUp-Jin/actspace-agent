@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "pnpm --filter @actspace/desktop dev",
     "build": "pnpm --filter @actspace/desktop build && pnpm --filter @actspace/shared build && pnpm --filter @actspace/agent-core build",
+    "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r typecheck",
     "ci": "./scripts/ci.sh",
     "check:docs": "./scripts/check-docs.sh",

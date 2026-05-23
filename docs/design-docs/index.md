@@ -13,6 +13,7 @@
 - `core-beliefs.md`
 - `backend-agent-design.md`
 - `llm-agent-dev-skill-fix.md`：llm-agent-dev Skill 初始版本中发现的缺陷记录，用于后续统一修复。
+- `backend-agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
 - `frontend-ui/index.md`
 - `frontend-ui/前端设计文档.md`
 - `frontend-ui/工作台布局与面板交互规范.md`

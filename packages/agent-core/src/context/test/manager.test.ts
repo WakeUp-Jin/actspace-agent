@@ -1,0 +1,109 @@
+import { describe, it, expect } from "vitest";
+import { ContextManager } from "../manager";
+import { SystemPromptContext } from "../modules/system-prompt";
+import type { UserMessage, AssistantMessage } from "../../messages";
+import { createEmptyUsage } from "../../messages";
+
+function createTestContextManager() {
+  const systemPrompt = new SystemPromptContext("You are actspace, a helpful AI assistant.");
+  return new ContextManager({ systemPromptModule: systemPrompt });
+}
+
+describe("ContextManager", () => {
+  it("should build context with system prompt", () => {
+    const cm = createTestContextManager();
+    const ctx = cm.getContext();
+
+    expect(ctx.systemPrompt).toBeDefined();
+    expect(ctx.systemPrompt).toContain("actspace");
+  });
+
+  it("should track messages via appendMessage", () => {
+    const cm = createTestContextManager();
+
+    const userMsg: UserMessage = { role: "user", content: "hello", timestamp: Date.now() };
+    cm.appendMessage(userMsg);
+
+    const ctx = cm.getContext();
+    expect(ctx.messages.length).toBe(1);
+    expect(ctx.messages[0].role).toBe("user");
+    expect(cm.getMessageCount()).toBe(1);
+  });
+
+  it("should accumulate multiple messages", () => {
+    const cm = createTestContextManager();
+
+    cm.appendMessage({ role: "user", content: "q1", timestamp: Date.now() });
+    cm.appendMessage({
+      role: "assistant",
+      content: [{ type: "text", text: "a1" }],
+      model: "test", provider: "test",
+      usage: createEmptyUsage(), stopReason: "stop", timestamp: Date.now(),
+    } as AssistantMessage);
+    cm.appendMessage({ role: "user", content: "q2", timestamp: Date.now() });
+
+    expect(cm.getMessageCount()).toBe(3);
+    const ctx = cm.getContext();
+    expect(ctx.messages[0].role).toBe("user");
+    expect(ctx.messages[1].role).toBe("assistant");
+    expect(ctx.messages[2].role).toBe("user");
+  });
+
+  it("should attach tools to context", () => {
+    const cm = createTestContextManager();
+    cm.setTools([
+      { name: "read_file", description: "Read file", parameters: { type: "object" } },
+    ]);
+
+    const ctx = cm.getContext();
+    expect(ctx.tools).toBeDefined();
+    expect(ctx.tools!.length).toBe(1);
+    expect(ctx.tools![0].name).toBe("read_file");
+  });
+
+  it("should not include tools when none set", () => {
+    const cm = createTestContextManager();
+    const ctx = cm.getContext();
+
+    expect(ctx.tools).toBeUndefined();
+  });
+
+  it("needsCompression should be false with small context", () => {
+    const cm = createTestContextManager();
+    cm.appendMessage({ role: "user", content: "short message", timestamp: Date.now() });
+
+    expect(cm.needsCompression()).toBe(false);
+  });
+
+  it("should return valid usage snapshot", () => {
+    const cm = createTestContextManager();
+    cm.appendMessage({ role: "user", content: "hello", timestamp: Date.now() });
+
+    const snapshot = cm.getUsageSnapshot();
+    expect(snapshot).toBeDefined();
+    expect(snapshot.totalTokens).toBeGreaterThan(0);
+    expect(snapshot.maxTokens).toBeGreaterThan(0);
+    expect(snapshot.percentUsed).toBeGreaterThanOrEqual(0);
+  });
+
+  it("should return compression config", () => {
+    const cm = createTestContextManager();
+    const config = cm.getConfig();
+
+    expect(config.contextWindow).toBe(200_000);
+    expect(config.compressionThreshold).toBe(0.85);
+    expect(config.compressKeepRatio).toBe(0.3);
+  });
+
+  it("should accept custom compression config", () => {
+    const systemPrompt = new SystemPromptContext("Test");
+    const cm = new ContextManager({
+      systemPromptModule: systemPrompt,
+      config: { contextWindow: 50_000, compressionThreshold: 0.7 },
+    });
+
+    const config = cm.getConfig();
+    expect(config.contextWindow).toBe(50_000);
+    expect(config.compressionThreshold).toBe(0.7);
+  });
+});
