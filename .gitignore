@@ -8,6 +8,7 @@ Thumbs.db
 *.log
 *.out
 *.err
+logs/
 tmp/
 temp/
 .tmp/

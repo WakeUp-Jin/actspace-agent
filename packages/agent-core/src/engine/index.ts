@@ -17,3 +17,11 @@ export { runAgentLoop } from "./loop";
 // Agent 入口类
 export { Agent } from "./agent";
 export type { AgentOptions } from "./agent";
+
+// IPC 桥接
+export { runTurnWithAgent } from "./bridge";
+export type {
+  RunTurnWithAgentInput,
+  RunTurnWithAgentDeps,
+  RunTurnWithAgentOptions,
+} from "./bridge";

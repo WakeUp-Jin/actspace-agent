@@ -21,7 +21,7 @@
 
 当前桌面端采用标准的 Electron 三层结构：
 
-- `main`：负责窗口生命周期、IPC 注册、本地数据目录初始化，以及调用 `agent-core` 跑 turn。
+- `main`：负责窗口生命周期、IPC 注册、本地数据目录初始化、环境变量加载（`loadEnv()`），以及调用 `agent-core` 跑 turn。
 - `preload`：负责向 renderer 暴露最小、安全、类型化的 bridge API。
 - `renderer`：负责工作台界面渲染、会话列表展示、消息流展示和用户交互。
 
@@ -68,7 +68,7 @@
 - `llm/types.ts`：LLMConfig、StreamOptions、APIMessage、LLMServiceError。
 - `llm/base.ts`：BaseLLMService 抽象基类，stream 为核心方法，complete 由 stream 聚合。
 - `llm/services/mock.ts`：MockLLMService，模拟完整 turn 事件流（含工具调用）。
-- `llm/services/deepseek.ts`：DeepSeekService 骨架，待接入真实 API。
+- `llm/services/deepseek.ts`：DeepSeekService 真实流式 provider，使用 OpenAI 兼容的 `/chat/completions` SSE 接口，映射文本、思考、工具调用和 token usage。
 - `llm/factory.ts`：createLLMService 工厂函数。
 
 ### `tools/` — 模块化工具系统
@@ -91,6 +91,7 @@
 - `engine/types.ts`：AgentEvent（discriminated union）、AgentLoopConfig、AgentLoopResult。
 - `engine/loop.ts`：runAgentLoop 纯函数双层循环（内层工具调用+转向、外层跟进）。
 - `engine/agent.ts`：Agent 入口类（run/abort），编排 ContextManager + ToolManager + LLMService。
+- `engine/bridge.ts`：IPC 桥接层，将 AgentEvent 实时映射为 RuntimeStreamEvent，并将执行结果聚合为 AgentTurnResult。
 
 ### `persistence/` — 持久化与恢复
 
@@ -99,6 +100,16 @@
 - `persistence/meta.ts`：meta.json 增量更新（turnCount/updatedAt/lastModel）。
 - `persistence/recovery.ts`：多维恢复（events→Messages/Blocks/Snapshot/DiffSummary）。
 - `persistence/session-store.ts`：会话存储生命周期（create/ensure/write/read/list）。
+
+### 环境变量管理
+
+- `env.ts`：集中式环境变量管理模块。自带轻量 `.env` 文件解析器（无第三方依赖），按 Schema 驱动验证、解析、冻结。
+  - `loadEnv()`：应用启动时调用，自动探测并加载 `.env` 文件，合并到 `process.env`（不覆盖已有值）。
+  - `env` proxy：类型安全的只读对象，任意文件 `import { env }` 后直接访问 `env.DEEPSEEK_API_KEY` 等。
+  - `envToLLMConfig()`：从 env 生成 `LLMConfig`，`MOCK_MODE=true` 时自动切换到 mock provider。
+  - `EnvValidationError`：缺失必填项或值不合法时抛出，携带所有问题列表。
+
+项目根目录的 `.env.example` 列出全部可配置项和默认值，`.env` 已被 `.gitignore` 忽略。
 
 ### 兼容层
 
@@ -135,24 +146,36 @@
 
 当前已接通的 IPC 通道包括：
 
+**请求-响应（invoke/handle）：**
+
 - `app:get-bootstrap-state`
 - `agent:run-turn`
+- `session:create`
 - `session:list`
 - `session:get`
+
+**单向推送（main → renderer）：**
+
+- `agent:stream`：在 `agent:run-turn` 执行过程中，main 进程通过此通道实时推送 `RuntimeStreamEvent`（thinking delta、text delta、tool started/finished、turn started/finished/failed）。
 
 这些契约统一由 `packages/shared` 暴露，作为 main、preload 和 renderer 之间的单一事实来源。
 
 ## 当前数据流
 
-首版主链路如下：
+采用双通道模式（invoke 返回完整结果 + send 实时推送中间事件）：
 
 1. renderer 启动后请求 bootstrap state
 2. renderer 请求 `session:list`
 3. 若存在旧会话，则请求 `session:get` 恢复
-4. 若没有旧会话，则通过 `agent:run-turn` 触发一轮 turn
-5. main 调用 `agent-core` 跑 turn
-6. 结果落盘到本地 session 目录
-7. renderer 根据 turn result 或恢复结果渲染消息流
+4. 用户点击 `New chat` 时，renderer 通过 `session:create` 创建空会话
+5. main 在本地 session 目录生成 `meta.json`、空 `session.jsonl` 和 `attachments/`，并返回 `SessionRecord`
+6. renderer 将新会话设为 active session，清空当前消息流，后续发送沿用新的 `sessionId`
+7. 用户输入消息，renderer 通过 `agent:run-turn` 发起请求
+8. main 调用 `runTurnWithAgent()`，内部使用新 Agent 引擎（Agent.run）
+9. 执行过程中，`AgentEvent` 实时通过 `engine/bridge.ts` 映射为 `RuntimeStreamEvent`，经 `agent:stream` 推送到 renderer
+10. renderer 通过 `onAgentStream` 监听实时事件，动态更新 UI（thinking、text delta、tool 状态）
+11. `agent:run-turn` 返回完整的 `AgentTurnResult`，结果落盘到本地 session 目录
+12. renderer 用最终结果替换流式中间状态，完成一轮交互
 
 ## 当前已确认的实现方向
 
@@ -161,5 +184,6 @@
 - 本地数据优先使用 `jsonl` 文件存储，直接落盘到用户电脑。
 - 更细的产品级技术选型以根目录 `README.md` 中的“技术栈”小节为准。
 - 工程骨架已开始落地为 `packages/desktop + packages/agent-core + packages/shared` 的单仓结构。
-- 当前 provider 仍为 mock 实现，真实 DeepSeek 接入仍是后续里程碑。
+- 当前同时保留 `mock` 开发 provider 与 `deepseek` 真实流式 provider；真实调用通过本地环境变量显式选择，密钥不进入 renderer 或 session 事件。
+- 环境变量统一通过 `agent-core/env.ts` 管理，项目根目录的 `.env` 文件在 main 进程启动时加载。`process.env` 已有值优先于 `.env` 文件（方便 CI / Docker 覆盖）。
 - 开发态启动需要先确保 `shared`、`agent-core` 有可消费产物，再启动 Electron main/preload 的 watch 与 renderer。

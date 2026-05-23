@@ -1,17 +1,20 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { AgentTurnResult, RunTurnInput, SessionGetInput } from "@actspace/shared";
+import type { AgentTurnResult, RunTurnInput, SessionCreateInput, SessionGetInput } from "@actspace/shared";
 import {
-  createAgentRuntime,
   createBootstrapState,
-  createDefaultTools,
-  createMockModelProvider,
+  loadEnv,
+  createLLMServiceFromEnv,
+  createToolManager,
+  ContextManager,
+  SystemPromptContext,
+  runTurnWithAgent,
+  createSessionRecord,
   createSessionStorePaths,
-  createToolRegistry,
   listSessionRecords,
   readSessionRecord,
-  writeSessionResult
+  writeSessionResult,
 } from "@actspace/agent-core";
 
 const APP_ID = "com.actspace.desktop";
@@ -83,22 +86,35 @@ async function createMainWindow() {
   }
 }
 
-function createRuntime() {
-  const toolRegistry = createToolRegistry();
-  for (const tool of createDefaultTools()) {
-    toolRegistry.register(tool);
-  }
+function createAgentDeps() {
+  const llm = createLLMServiceFromEnv();
+  const toolManager = createToolManager({ workspaceRoot: app.getPath("userData") });
+  const systemPromptModule = new SystemPromptContext(
+    "You are actspace, a helpful AI coding assistant.",
+  );
+  const contextManager = new ContextManager({ systemPromptModule });
+  return { llm, toolManager, contextManager };
+}
 
-  return createAgentRuntime({
-    provider: createMockModelProvider(),
-    tools: toolRegistry
-  });
+function getMainWindow(): BrowserWindow | undefined {
+  return BrowserWindow.getAllWindows()[0];
 }
 
 async function runAndPersistTurn(input: RunTurnInput): Promise<AgentTurnResult> {
   const roots = await ensureDataDirectories();
-  const runtime = createRuntime();
-  const result = await runtime.runTurn(input);
+  const deps = createAgentDeps();
+  const win = getMainWindow();
+
+  const result = await runTurnWithAgent(
+    { sessionId: input.sessionId, turnId: input.turnId, userInput: input.userInput },
+    deps,
+    {
+      onStreamEvent: (event) => {
+        win?.webContents.send("agent:stream", event);
+      },
+    },
+  );
+
   const sessionDir = join(roots.sessionRoot, input.sessionId);
   await writeSessionResult(createSessionStorePaths(sessionDir), result);
   return result;
@@ -129,9 +145,15 @@ async function registerIpc() {
     const roots = await ensureDataDirectories();
     return readSessionRecord(createSessionStorePaths(join(roots.sessionRoot, input.sessionId)));
   });
+
+  ipcMain.handle("session:create", async (_event, input: SessionCreateInput = {}) => {
+    const roots = await ensureDataDirectories();
+    return createSessionRecord(roots.sessionRoot, input);
+  });
 }
 
 configureAppPaths();
+loadEnv();
 
 app.whenReady().then(async () => {
   app.setAppUserModelId(APP_ID);

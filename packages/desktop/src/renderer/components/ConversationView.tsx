@@ -173,13 +173,17 @@ export function ConversationView({
   messages,
   contextSnapshot,
   rightPanelOpen,
-  onToggleRightPanel
+  onToggleRightPanel,
+  isStreaming = false,
+  onSend,
 }: {
   title: string;
   messages: MessageBlock[];
   contextSnapshot: ContextUsageSnapshot | null;
   rightPanelOpen: boolean;
   onToggleRightPanel: () => void;
+  isStreaming?: boolean;
+  onSend?: (text: string) => void;
 }) {
   const turns = groupMessagesIntoTurns(messages);
 
@@ -223,7 +227,7 @@ export function ConversationView({
       </section>
 
       <div className="composer-zone">
-        <Composer contextSnapshot={contextSnapshot} />
+        <Composer contextSnapshot={contextSnapshot} isStreaming={isStreaming} onSend={onSend} />
       </div>
     </main>
   );

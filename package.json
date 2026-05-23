@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "pnpm --filter @actspace/desktop dev",
+    "dev:log": "./scripts/dev-with-logs.sh",
     "build": "pnpm --filter @actspace/desktop build && pnpm --filter @actspace/shared build && pnpm --filter @actspace/agent-core build",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r typecheck",

@@ -59,7 +59,10 @@ export function WorkbenchLayout({
   title,
   messages,
   contextSnapshot,
-  rightPanelOpen = false
+  rightPanelOpen = false,
+  isStreaming = false,
+  onSend,
+  onNewSession,
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
@@ -67,6 +70,9 @@ export function WorkbenchLayout({
   messages: MessageBlock[];
   contextSnapshot: ContextUsageSnapshot | null;
   rightPanelOpen?: boolean;
+  isStreaming?: boolean;
+  onSend?: (text: string) => void;
+  onNewSession?: () => void;
 }) {
   const [storedLayout] = useState(loadStoredLayout);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -164,7 +170,15 @@ export function WorkbenchLayout({
 
   return (
     <SplitView
-      left={<Sidebar sessions={sessions} activeSessionId={activeSessionId} mode={leftMode} onToggleMode={toggleSidebarMode} />}
+      left={
+        <Sidebar
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          mode={leftMode}
+          onToggleMode={toggleSidebarMode}
+          onNewSession={onNewSession}
+        />
+      }
       leftWidth={displayedLeftWidth}
       leftBounds={{ minWidth: LEFT_RAIL_WIDTH, maxWidth: LEFT_MAX_WIDTH }}
       leftSeparatorLabel="Resize session sidebar"
@@ -175,6 +189,8 @@ export function WorkbenchLayout({
           contextSnapshot={contextSnapshot}
           rightPanelOpen={isRightPanelOpen}
           onToggleRightPanel={toggleRightPanel}
+          isStreaming={isStreaming}
+          onSend={onSend}
         />
       }
       minMainWidth={MAIN_MIN_WIDTH}

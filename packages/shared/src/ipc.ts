@@ -31,6 +31,10 @@ export type SessionGetInput = {
   sessionId: string;
 };
 
+export type SessionCreateInput = {
+  title?: string;
+};
+
 export type AppBootstrapStateInput = {
   appVersion: string;
   dataRoot: string;

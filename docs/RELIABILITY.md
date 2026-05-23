@@ -23,9 +23,17 @@
 ## 当前本地排障入口
 
 - `pnpm dev`：本地开发启动桌面端。
+- `pnpm dev:log`：本地开发启动桌面端，并把终端 stdout/stderr 同步写入根目录 `logs/dev-*.log`，同时更新 `logs/latest-dev.log` 供 Agent 排障读取。
 - `pnpm typecheck`：检查跨包类型契约。
 - `pnpm build`：检查当前桌面端和共享包是否可构建。
 - `pnpm ci`：运行仓库级基础门禁。
+
+## 本地开发日志约定
+
+- 根目录 `logs/` 只存本机运行日志，不提交到 Git。
+- `pnpm dev:log` 会保留最近约 2 天的 `*.log`，并自动清理更旧文件。
+- 终端日志通过 `pnpm dev 2>&1 | tee -a <log-file>` 写入文件：`2>&1` 合并错误输出，`tee` 同时显示到终端和写入日志。
+- Agent 排查启动、构建、Electron 或 provider 问题时，优先读取 `logs/latest-dev.log`。
 
 ## 当前主要可靠性缺口
 

@@ -3,7 +3,15 @@ import { Check, ChevronDown, FileText, Infinity, Paperclip, SendHorizontal, X } 
 import type { ContextUsageSnapshot } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
 
-export function Composer({ contextSnapshot }: { contextSnapshot: ContextUsageSnapshot | null }) {
+export function Composer({
+  contextSnapshot,
+  isStreaming = false,
+  onSend,
+}: {
+  contextSnapshot: ContextUsageSnapshot | null;
+  isStreaming?: boolean;
+  onSend?: (text: string) => void;
+}) {
   const [modeOpen, setModeOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
@@ -91,7 +99,17 @@ export function Composer({ contextSnapshot }: { contextSnapshot: ContextUsageSna
         aria-label="Message composer"
         placeholder="Plan, Build, / for commands, @ for context"
         value={message}
+        disabled={isStreaming}
         onChange={(event) => setMessage(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            if (message.trim() && onSend && !isStreaming) {
+              onSend(message.trim());
+              setMessage("");
+            }
+          }
+        }}
       />
 
       <div className="composer-controls">
@@ -165,7 +183,18 @@ export function Composer({ contextSnapshot }: { contextSnapshot: ContextUsageSna
         >
           <span className="context-ring" aria-hidden="true" />
         </button>
-        <button className="send-button" type="button" aria-label="Send message">
+        <button
+          className="send-button"
+          type="button"
+          aria-label="Send message"
+          disabled={isStreaming || !message.trim()}
+          onClick={() => {
+            if (message.trim() && onSend && !isStreaming) {
+              onSend(message.trim());
+              setMessage("");
+            }
+          }}
+        >
           <SendHorizontal size={18} strokeWidth={2.2} />
         </button>
       </div>

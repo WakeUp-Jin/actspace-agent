@@ -27,12 +27,14 @@ export function Sidebar({
   sessions,
   activeSessionId,
   mode,
-  onToggleMode
+  onToggleMode,
+  onNewSession,
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
   mode: "expanded" | "rail";
   onToggleMode: () => void;
+  onNewSession?: () => void;
 }) {
   const compact = mode === "rail";
 
@@ -51,7 +53,12 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-actions">
-        <button className="new-chat-button" type="button" aria-label={compact ? "New chat" : undefined}>
+        <button
+          className="new-chat-button"
+          type="button"
+          aria-label={compact ? "New chat" : undefined}
+          onClick={onNewSession}
+        >
           <SquarePen size={14} strokeWidth={1.9} />
           {compact ? null : "New chat"}
         </button>
@@ -72,7 +79,7 @@ export function Sidebar({
               <button type="button" aria-label="More chat actions">
                 <MoreHorizontal size={14} strokeWidth={1.9} />
               </button>
-              <button type="button" aria-label="New chat">
+              <button type="button" aria-label="New chat" onClick={onNewSession}>
                 <SquarePen size={13} strokeWidth={1.9} />
               </button>
             </div>

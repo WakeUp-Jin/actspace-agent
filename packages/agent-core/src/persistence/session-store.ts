@@ -5,11 +5,11 @@
  * 所有写入操作返回 WriteResult，错误不抛出。
  */
 
-import { mkdir, readdir } from "node:fs/promises";
+import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   AgentTurnResult,
-  SessionEvent,
+  SessionCreateInput,
   SessionListItem,
   SessionRecord,
 } from "@actspace/shared";
@@ -33,6 +33,27 @@ export async function ensureSessionStore(root: string): Promise<SessionStorePath
   const paths = createSessionStorePaths(root);
   await mkdir(paths.attachmentsDir, { recursive: true });
   return paths;
+}
+
+/** 创建一个空 session，并立即写入 meta.json */
+export async function createSessionRecord(
+  sessionRoot: string,
+  input: SessionCreateInput = {},
+): Promise<SessionRecord> {
+  const sessionId = createSessionId();
+  const paths = await ensureSessionStore(join(sessionRoot, sessionId));
+  const title = input.title?.trim() || "New chat";
+  const result = await createMeta(paths.metaPath, sessionId, title);
+  if (!result.ok) {
+    throw new Error(result.error ?? "Failed to create session");
+  }
+  await writeFile(paths.sessionPath, "", { flag: "a" });
+
+  const record = await readSessionRecord(paths);
+  if (!record) {
+    throw new Error(`Failed to read created session: ${sessionId}`);
+  }
+  return record;
 }
 
 /** 写入一轮完整的 turn 结果（events + meta 更新） */
@@ -97,4 +118,9 @@ export async function listSessionRecords(
   } catch {
     return [];
   }
+}
+
+function createSessionId(): string {
+  const random = Math.random().toString(36).slice(2, 8);
+  return `session-${Date.now().toString(36)}-${random}`;
 }

@@ -32,6 +32,8 @@
 - `docs/FRONTEND.md`：前端协作入口、设计文档和验证规范导航。
 - `docs/FRONTEND_VERIFICATION.md`：桌面端前端修改后的浏览器 mock、Electron 真实验证和 Computer Use 验收方式。
 
+- `docs/backend-agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
+
 - `docs/CODING_BEHAVIOR.md`：编码行为纪律——改代码时的操作级约束。
 - `docs/coding-standards/README.md`：编码规范、Skill 推荐清单和团队自定义约定。
 
@@ -57,4 +59,5 @@
 - 优先选择小而清晰、对仓库和 Agent 都友好的抽象。
 - prompt、规则、架构约束尽量都版本化落在仓库里。
 - 复杂任务不要只靠聊天上下文，应该落 execution plan。
+- 本地开发启动建议使用 `pnpm dev:log`，终端输出会同步写入根目录 `logs/`；排障时优先查看 `logs/latest-dev.log` 或最近 2 天的 `logs/dev-*.log`。
 - 完成的代码变更要记到 `docs/histories/`。

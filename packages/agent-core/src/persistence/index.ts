@@ -22,6 +22,7 @@ export { createMeta, readMeta, updateMeta, incrementTurnCount } from "./meta";
 export {
   createSessionStorePaths,
   ensureSessionStore,
+  createSessionRecord,
   writeSessionResult,
   readSessionRecord,
   listSessionRecords,

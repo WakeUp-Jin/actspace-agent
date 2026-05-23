@@ -2,7 +2,7 @@
  * LLM 工厂函数
  *
  * 根据 LLMConfig.provider 创建对应的服务实例。
- * 自动从环境变量解析 apiKey 和 baseUrl。
+ * 也可通过 createLLMServiceFromEnv() 直接从 env 配置创建。
  */
 
 import type { LLMConfig } from "./types";
@@ -10,29 +10,29 @@ import { LLMServiceError } from "./types";
 import { BaseLLMService } from "./base";
 import { MockLLMService } from "./services/mock";
 import { DeepSeekService } from "./services/deepseek";
+import { envToLLMConfig } from "../env";
 
 export function createLLMService(config: LLMConfig): BaseLLMService {
-  const resolvedConfig: LLMConfig = {
-    ...config,
-    apiKey: resolveApiKey(config),
-    baseUrl: resolveBaseUrl(config),
-  };
-
-  switch (resolvedConfig.provider.toLowerCase()) {
+  switch (config.provider.toLowerCase()) {
     case "deepseek":
-      return new DeepSeekService(resolvedConfig);
+      return new DeepSeekService(config);
 
     case "mock":
     case "deepseek-mock":
-      return new MockLLMService(resolvedConfig);
+      return new MockLLMService(config);
 
     default:
       throw new LLMServiceError(
-        `Unknown LLM provider: "${resolvedConfig.provider}". Available: deepseek, mock`,
+        `Unknown LLM provider: "${config.provider}". Available: deepseek, mock`,
         "invalid_request",
         false,
       );
   }
+}
+
+/** 直接从 env 配置创建 LLM 服务 */
+export function createLLMServiceFromEnv(): BaseLLMService {
+  return createLLMService(envToLLMConfig());
 }
 
 /** 创建 mock 配置的快捷函数 */
@@ -42,16 +42,4 @@ export function createMockLLMConfig(): LLMConfig {
     apiKey: "mock-key",
     model: "deepseek-mock",
   };
-}
-
-function resolveApiKey(config: LLMConfig): string {
-  if (config.apiKey) return config.apiKey;
-  const envKey = `${config.provider.toUpperCase()}_API_KEY`;
-  return process.env[envKey] ?? "";
-}
-
-function resolveBaseUrl(config: LLMConfig): string | undefined {
-  if (config.baseUrl) return config.baseUrl;
-  const envUrl = `${config.provider.toUpperCase()}_BASE_URL`;
-  return process.env[envUrl] || undefined;
 }

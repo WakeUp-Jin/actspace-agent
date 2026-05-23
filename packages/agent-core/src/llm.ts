@@ -77,6 +77,7 @@ export {
   MockLLMService,
   DeepSeekService,
   createLLMService,
+  createLLMServiceFromEnv,
   createMockLLMConfig,
   AssistantMessageEventStream,
   LLMServiceError,

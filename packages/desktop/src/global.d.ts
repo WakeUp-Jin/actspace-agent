@@ -11,6 +11,12 @@ declare global {
       getSession: (
         input: import("@actspace/shared").SessionGetInput
       ) => Promise<import("@actspace/shared").SessionRecord | null>;
+      createSession: (
+        input?: import("@actspace/shared").SessionCreateInput
+      ) => Promise<import("@actspace/shared").SessionRecord>;
+      onAgentStream: (
+        callback: (event: import("@actspace/shared").RuntimeStreamEvent) => void
+      ) => () => void;
     };
   }
 }

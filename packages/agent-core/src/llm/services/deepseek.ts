@@ -1,17 +1,52 @@
 /**
- * DeepSeekService — 通过 OpenAI 兼容 SDK 接入 DeepSeek API
- *
- * V0 骨架：定义类结构和配置解析，真实 HTTP 接入待后续实现。
- * 在没有 API key 时返回结构化错误，而非抛出裸异常。
+ * DeepSeekService - native streaming integration for DeepSeek's
+ * OpenAI-compatible chat completions endpoint.
  */
 
-import type { AssistantMessage, Tool } from "../../messages";
+import type {
+  AssistantMessage,
+  StopReason,
+  TextContent,
+  ThinkingContent,
+  Tool,
+  ToolCallContent,
+} from "../../messages";
 import { createEmptyUsage } from "../../messages";
 import { BaseLLMService } from "../base";
 import type { APIMessage, StreamOptions } from "../types";
 import { AssistantMessageEventStream, LLMServiceError } from "../types";
 
 const DEFAULT_BASE_URL = "https://api.deepseek.com";
+
+type DeepSeekChunk = {
+  choices?: Array<{
+    delta?: {
+      content?: string | null;
+      reasoning_content?: string | null;
+      tool_calls?: Array<{
+        index?: number;
+        id?: string;
+        function?: {
+          name?: string;
+          arguments?: string;
+        };
+      }>;
+    };
+    finish_reason?: string | null;
+  }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    prompt_cache_hit_tokens?: number;
+  };
+};
+
+type AccumulatedToolCall = {
+  id: string;
+  name: string;
+  argumentsText: string;
+};
 
 export class DeepSeekService extends BaseLLMService {
   private get baseUrl(): string {
@@ -21,16 +56,17 @@ export class DeepSeekService extends BaseLLMService {
   protected _doStream(
     messages: APIMessage[],
     tools?: Tool[],
-    _options?: StreamOptions,
+    options?: StreamOptions,
   ): AssistantMessageEventStream {
-    const self = this;
+    const config = this.config;
+    const endpoint = `${this.baseUrl.replace(/\/$/, "")}/chat/completions`;
 
     async function* generate() {
-      if (!self.config.apiKey) {
+      if (!config.apiKey) {
         yield {
           type: "error" as const,
           error: new LLMServiceError(
-            "DeepSeek API key not configured. Set DEEPSEEK_API_KEY environment variable or pass apiKey in config.",
+            "DeepSeek API key not configured. Set DEEPSEEK_API_KEY before selecting the deepseek provider.",
             "auth",
             false,
           ),
@@ -38,34 +74,260 @@ export class DeepSeekService extends BaseLLMService {
         return;
       }
 
-      // V0 骨架：返回占位消息，表明需要真实实现
-      // 真实实现会：
-      // 1. 构造 HTTP POST 到 ${baseUrl}/chat/completions
-      // 2. 设置 stream: true
-      // 3. 解析 SSE 事件流
-      // 4. 将 delta 映射为 AssistantMessageEvent
-      // 5. 在 done 事件中组装完整 AssistantMessage
-
-      const msg: AssistantMessage = {
-        role: "assistant",
-        content: [
-          {
-            type: "text",
-            text: `[DeepSeekService skeleton] Real API call to ${self.baseUrl} not yet implemented. Model: ${self.config.model}. Messages: ${messages.length}, Tools: ${tools?.length ?? 0}.`,
+      let response: Response;
+      try {
+        response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${config.apiKey}`,
+            "Content-Type": "application/json",
           },
-        ],
-        model: self.config.model,
+          body: JSON.stringify({
+            model: config.model,
+            messages,
+            ...(tools?.length
+              ? {
+                  tools: tools.map((tool) => ({
+                    type: "function",
+                    function: {
+                      name: tool.name,
+                      description: tool.description,
+                      parameters: tool.parameters,
+                    },
+                  })),
+                }
+              : {}),
+            stream: true,
+            stream_options: { include_usage: true },
+            temperature: options?.temperature ?? config.temperature,
+            max_tokens: options?.maxTokens ?? config.maxTokens,
+          }),
+          signal: options?.signal,
+        });
+      } catch (error) {
+        yield {
+          type: "error" as const,
+          error: new LLMServiceError(
+            `DeepSeek request failed: ${error instanceof Error ? error.message : String(error)}`,
+            "network",
+            true,
+          ),
+        };
+        return;
+      }
+
+      if (!response.ok) {
+        const details = await readErrorDetails(response);
+        yield {
+          type: "error" as const,
+          error: createHttpError(response.status, details),
+        };
+        return;
+      }
+
+      if (!response.body) {
+        yield {
+          type: "error" as const,
+          error: new LLMServiceError(
+            "DeepSeek response did not include a readable stream.",
+            "server_error",
+            true,
+          ),
+        };
+        return;
+      }
+
+      const content: (TextContent | ThinkingContent | ToolCallContent)[] = [];
+      const textParts: string[] = [];
+      const thinkingParts: string[] = [];
+      const toolCalls = new Map<number, AccumulatedToolCall>();
+      const usage = createEmptyUsage();
+      let stopReason: StopReason = "stop";
+
+      try {
+        for await (const data of readServerSentEvents(response.body)) {
+          if (data === "[DONE]") break;
+
+          const chunk = JSON.parse(data) as DeepSeekChunk;
+          const choice = chunk.choices?.[0];
+          const delta = choice?.delta;
+
+          if (delta?.reasoning_content) {
+            thinkingParts.push(delta.reasoning_content);
+            yield { type: "thinking_delta" as const, delta: delta.reasoning_content };
+          }
+
+          if (delta?.content) {
+            textParts.push(delta.content);
+            yield { type: "text_delta" as const, delta: delta.content };
+          }
+
+          for (const toolDelta of delta?.tool_calls ?? []) {
+            const index = toolDelta.index ?? 0;
+            const current = toolCalls.get(index) ?? {
+              id: toolDelta.id ?? `tool_${index}`,
+              name: "",
+              argumentsText: "",
+            };
+            current.id = toolDelta.id ?? current.id;
+            current.name += toolDelta.function?.name ?? "";
+            current.argumentsText += toolDelta.function?.arguments ?? "";
+            toolCalls.set(index, current);
+            yield {
+              type: "tool_call_delta" as const,
+              index,
+              delta: toolDelta.function?.arguments ?? "",
+            };
+          }
+
+          if (choice?.finish_reason) {
+            stopReason = mapStopReason(choice.finish_reason);
+          }
+
+          if (chunk.usage) {
+            usage.input = chunk.usage.prompt_tokens ?? usage.input;
+            usage.output = chunk.usage.completion_tokens ?? usage.output;
+            usage.totalTokens = chunk.usage.total_tokens ?? usage.totalTokens;
+            usage.cacheRead = chunk.usage.prompt_cache_hit_tokens ?? usage.cacheRead;
+          }
+        }
+      } catch (error) {
+        yield {
+          type: "error" as const,
+          error: new LLMServiceError(
+            `DeepSeek stream parsing failed: ${error instanceof Error ? error.message : String(error)}`,
+            "server_error",
+            true,
+          ),
+        };
+        return;
+      }
+
+      if (thinkingParts.length > 0) {
+        content.push({ type: "thinking", thinking: thinkingParts.join("") });
+      }
+      if (textParts.length > 0) {
+        content.push({ type: "text", text: textParts.join("") });
+      }
+
+      for (const toolCall of [...toolCalls.entries()].sort(([a], [b]) => a - b).map(([, value]) => value)) {
+        content.push(toToolCallContent(toolCall));
+      }
+
+      if (toolCalls.size > 0) {
+        stopReason = "toolUse";
+      }
+
+      const message: AssistantMessage = {
+        role: "assistant",
+        content,
+        model: config.model,
         provider: "deepseek",
-        usage: createEmptyUsage(),
-        stopReason: "stop",
+        usage,
+        stopReason,
         timestamp: Date.now(),
         source: "llm",
       };
 
-      yield { type: "text_delta" as const, delta: msg.content[0].type === "text" ? (msg.content[0] as { text: string }).text : "" };
-      yield { type: "done" as const, message: msg };
+      yield { type: "done" as const, message };
     }
 
     return new AssistantMessageEventStream(generate());
   }
+}
+
+function mapStopReason(reason: string): StopReason {
+  switch (reason) {
+    case "tool_calls":
+      return "toolUse";
+    case "length":
+      return "length";
+    default:
+      return "stop";
+  }
+}
+
+function toToolCallContent(toolCall: AccumulatedToolCall): ToolCallContent {
+  let args: Record<string, unknown> = {};
+  if (toolCall.argumentsText) {
+    try {
+      const parsed = JSON.parse(toolCall.argumentsText) as unknown;
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        args = parsed as Record<string, unknown>;
+      }
+    } catch {
+      args = { input: toolCall.argumentsText };
+    }
+  }
+
+  return {
+    type: "toolCall",
+    id: toolCall.id,
+    name: toolCall.name,
+    arguments: args,
+  };
+}
+
+async function* readServerSentEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+
+      const frames = buffer.split(/\r?\n\r?\n/);
+      buffer = frames.pop() ?? "";
+
+      for (const frame of frames) {
+        const data = frame
+          .split(/\r?\n/)
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).trimStart())
+          .join("\n");
+        if (data) yield data;
+      }
+
+      if (done) break;
+    }
+
+    if (buffer.trim()) {
+      const data = buffer
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      if (data) yield data;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function readErrorDetails(response: Response): Promise<string> {
+  try {
+    const text = await response.text();
+    return text.slice(0, 300);
+  } catch {
+    return "";
+  }
+}
+
+function createHttpError(status: number, details: string): LLMServiceError {
+  const suffix = details ? `: ${details}` : "";
+  if (status === 401 || status === 403) {
+    return new LLMServiceError(`DeepSeek authentication failed${suffix}`, "auth", false, status);
+  }
+  if (status === 402) {
+    return new LLMServiceError(`DeepSeek balance is insufficient${suffix}`, "insufficient_balance", false, status);
+  }
+  if (status === 429) {
+    return new LLMServiceError(`DeepSeek rate limit exceeded${suffix}`, "rate_limit", true, status);
+  }
+  if (status >= 500) {
+    return new LLMServiceError(`DeepSeek server error${suffix}`, "server_error", true, status);
+  }
+  return new LLMServiceError(`DeepSeek request rejected${suffix}`, "invalid_request", false, status);
 }
