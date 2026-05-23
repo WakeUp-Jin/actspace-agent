@@ -1,4 +1,16 @@
+/**
+ * LLM 模块兼容层
+ *
+ * 旧 API（createProviderRegistry / createMockModelProvider）保留供现有
+ * agent.ts 和 desktop/main/index.ts 消费。新代码应使用 llm/ 目录下的新 API。
+ *
+ * 后续计划 E（Execution Engine）会将 agent.ts 迁移到新 LLM 接口，届时
+ * 本文件中的旧 API 可以移除。
+ */
+
 import type { ModelProvider, ModelProviderInput, ModelTurnOutput } from "./types";
+
+// ─── 旧 API（兼容保留） ───
 
 export type ProviderRegistry = {
   register(provider: ModelProvider): void;
@@ -57,3 +69,25 @@ export function createMockModelProvider(): ModelProvider {
     }
   };
 }
+
+// ─── 新 API re-export ───
+
+export {
+  BaseLLMService,
+  MockLLMService,
+  DeepSeekService,
+  createLLMService,
+  createMockLLMConfig,
+  AssistantMessageEventStream,
+  LLMServiceError,
+} from "./llm/index";
+
+export type {
+  LLMConfig,
+  StreamOptions,
+  SimpleStreamOptions,
+  APIMessage,
+  APIToolCall,
+  AssistantMessageEvent,
+  LLMErrorKind,
+} from "./llm/index";
