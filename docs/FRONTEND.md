@@ -7,10 +7,12 @@
 当前 `actspace` 桌面端的实际界面设计与组件定稿，请优先查看：
 
 - [`docs/design-docs/frontend-ui/`](design-docs/frontend-ui/index.md)
+- [`docs/design-docs/frontend-ui/全局视觉语言规范.md`](design-docs/frontend-ui/全局视觉语言规范.md)
 - [`docs/FRONTEND_VERIFICATION.md`](FRONTEND_VERIFICATION.md)
 
 其中已经包含：
 
+- 全局字体、颜色、间距、圆角、阴影和动效 token
 - 左侧会话栏
 - 中间消息区语法
 - Composer 与 Context popup

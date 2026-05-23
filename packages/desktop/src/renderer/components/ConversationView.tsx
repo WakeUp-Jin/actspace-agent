@@ -1,4 +1,4 @@
-import { MoreHorizontal, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { MoreHorizontal, PanelRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContextUsageSnapshot, MessageBlock } from "@actspace/shared";
 import { Composer } from "./Composer";
@@ -197,11 +197,7 @@ export function ConversationView({
             aria-pressed={rightPanelOpen}
             onClick={onToggleRightPanel}
           >
-            {rightPanelOpen ? (
-              <PanelRightClose size={16} strokeWidth={2.1} />
-            ) : (
-              <PanelRightOpen size={16} strokeWidth={2.1} />
-            )}
+            <PanelRight size={16} strokeWidth={2.1} />
           </button>
         </div>
       </header>
@@ -226,7 +222,9 @@ export function ConversationView({
         </div>
       </section>
 
-      <Composer contextSnapshot={contextSnapshot} />
+      <div className="composer-zone">
+        <Composer contextSnapshot={contextSnapshot} />
+      </div>
     </main>
   );
 }

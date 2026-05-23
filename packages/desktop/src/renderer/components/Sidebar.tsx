@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Edit3, Search, Settings } from "lucide-react";
+import { ChevronDown, MoreHorizontal, PanelLeft, Search, Settings, SquarePen } from "lucide-react";
 import type { SessionListItem } from "@actspace/shared";
 
 function formatRelativeTime(timestamp: string): string {
@@ -38,11 +38,7 @@ export function Sidebar({
 
   return (
     <aside className={`sidebar${compact ? " is-rail" : ""}`}>
-      <div className="brand-lockup">
-        <div className="brand-symbol" aria-hidden="true">
-          <span />
-        </div>
-        {compact ? null : <div className="brand-wordmark">actspace</div>}
+      <div className="sidebar-chrome-row">
         <button
           className="sidebar-mode-button"
           type="button"
@@ -50,27 +46,37 @@ export function Sidebar({
           title={compact ? "Expand sidebar" : "Collapse sidebar"}
           onClick={onToggleMode}
         >
-          {compact ? <ChevronRight size={15} strokeWidth={2.2} /> : <ChevronLeft size={15} strokeWidth={2.2} />}
+          <PanelLeft size={15} strokeWidth={1.8} />
         </button>
       </div>
 
       <div className="sidebar-actions">
         <button className="new-chat-button" type="button" aria-label={compact ? "New chat" : undefined}>
-          <Edit3 size={17} strokeWidth={2.1} />
+          <SquarePen size={14} strokeWidth={1.9} />
           {compact ? null : "New chat"}
         </button>
         <button className="sidebar-icon-button" type="button" aria-label="Search">
-          <Search size={15} strokeWidth={2.2} />
+          <Search size={14} strokeWidth={1.9} />
           {compact ? null : "Search"}
         </button>
       </div>
 
       {compact ? <div className="sidebar-rail-spacer" /> : <nav className="session-nav" aria-label="Sessions">
         <section className="nav-section">
-          <button className="nav-section-title" type="button">
-            <span>Session</span>
-            <ChevronDown size={14} strokeWidth={2.2} />
-          </button>
+          <div className="nav-section-title">
+            <button className="nav-section-label" type="button">
+              <span>Chats</span>
+              <ChevronDown size={12} strokeWidth={1.9} />
+            </button>
+            <div className="nav-section-actions" aria-label="Chat actions">
+              <button type="button" aria-label="More chat actions">
+                <MoreHorizontal size={14} strokeWidth={1.9} />
+              </button>
+              <button type="button" aria-label="New chat">
+                <SquarePen size={13} strokeWidth={1.9} />
+              </button>
+            </div>
+          </div>
           <div className="session-list">
             {sessions.map((session) => (
               <button
@@ -79,17 +85,31 @@ export function Sidebar({
                 type="button"
               >
                 <strong>{formatSessionTitle(session.title)}</strong>
-                <span>{formatRelativeTime(session.updatedAt)}</span>
+                {session.id === activeSessionId ? (
+                  <span className="session-status-dot" aria-label="Active session" />
+                ) : (
+                  <span>{formatRelativeTime(session.updatedAt)}</span>
+                )}
               </button>
             ))}
           </div>
         </section>
 
         <section className="nav-section">
-          <button className="nav-section-title" type="button">
-            <span>Scheduled</span>
-            <ChevronDown size={14} strokeWidth={2.2} />
-          </button>
+          <div className="nav-section-title">
+            <button className="nav-section-label" type="button">
+              <span>Scheduled</span>
+              <ChevronDown size={12} strokeWidth={1.9} />
+            </button>
+            <div className="nav-section-actions" aria-label="Scheduled actions">
+              <button type="button" aria-label="More scheduled actions">
+                <MoreHorizontal size={14} strokeWidth={1.9} />
+              </button>
+              <button type="button" aria-label="New scheduled task">
+                <SquarePen size={13} strokeWidth={1.9} />
+              </button>
+            </div>
+          </div>
           <button className="session-row muted-row" type="button">
             <strong>Weekly context audit</strong>
             <span>Tomorrow</span>
@@ -98,7 +118,7 @@ export function Sidebar({
       </nav>}
 
       <button className="settings-entry" type="button" aria-label={compact ? "Settings" : undefined}>
-        <Settings size={15} strokeWidth={2.1} />
+        <Settings size={14} strokeWidth={1.9} />
         {compact ? null : "Settings"}
       </button>
     </aside>

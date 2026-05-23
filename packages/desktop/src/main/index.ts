@@ -57,6 +57,11 @@ async function createMainWindow() {
     minWidth: 1120,
     minHeight: 760,
     title: "actspace",
+    titleBarStyle: "hidden",
+    trafficLightPosition: {
+      x: 16,
+      y: 18
+    },
     backgroundColor: "#f7f9ff",
     webPreferences: {
       preload: preloadPath,
