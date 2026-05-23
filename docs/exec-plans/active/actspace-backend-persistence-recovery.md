@@ -150,16 +150,19 @@ session.jsonl → parse → SessionEvent[] → adapter → Message[] → Context
 
 ## 进度
 
-- [ ] 审查现有 `packages/agent-core/src/persistence.ts`
-- [ ] 稳定 session 目录结构和路径
-- [ ] 稳定 JSONL append/read
-- [ ] 完善 meta.json 写入和更新
-- [ ] 实现 SessionEvent → Message[] 恢复 adapter
-- [ ] 实现 SessionEvent → MessageBlock[] 恢复（对齐现有 session-selectors）
-- [ ] 增加坏行容错策略
-- [ ] 增加写盘失败错误传播
+- [x] 审查现有 `packages/agent-core/src/persistence.ts`
+- [x] 稳定 session 目录结构和路径（session-store.ts）
+- [x] 稳定 JSONL append/read（jsonl.ts — 坏行容错 + 结构化错误）
+- [x] 完善 meta.json 写入和增量更新（meta.ts — create/read/update/incrementTurnCount）
+- [x] 实现 SessionEvent → Message[] 恢复（recovery.ts → adapters.ts sessionEventsToMessages）
+- [x] 实现 SessionEvent → MessageBlock[] 恢复（recovery.ts → shared createMessageBlocks）
+- [x] 实现 SessionEvent → ContextUsageSnapshot 恢复（recovery.ts → shared getLatestContextSnapshot）
+- [x] 实现 SessionEvent → SessionDiffSummary 恢复（recovery.ts → shared createSessionDiffSummary）
+- [x] 坏行容错策略（JsonlParseResult.errors + RecoveryResult.recoveryErrors）
+- [x] 写盘失败错误传播（所有写入返回 WriteResult { ok, error? }）
+- [x] 迁移现有 persistence.ts 为兼容层
+- [x] 通过类型检查（agent-core + 全项目）
 - [ ] 验证恢复后 ContextManager 可正确使用
-- [ ] 通过类型检查
 - [ ] 更新架构文档和 history
 
 ## 决策记录
