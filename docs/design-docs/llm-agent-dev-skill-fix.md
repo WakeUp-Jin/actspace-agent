@@ -96,7 +96,53 @@ tool/
 
 **理由**：每个工具一个文件夹（definition + executor 各一个文件），与 Skill 自身提出的"分离模式"理念一致。definition 可以被 LLM tool list 消费而不加载 executor，executor 可以独立单元测试。
 
-### 4. llm-service.md 没有提到 mock provider 的设计要求
+### 4. Context 模块参考文档缺少 modules/ 子目录结构说明
+
+**位置**：`references/context/mgmt-context-architecture.md` + `references/context/type-system-prompt.md`
+
+**现状**：`architecture.md` 的 V0 目录结构展示了 `context/modules/` 子目录：
+
+```
+context/
+  types
+  base
+  manager
+  modules/
+    system_prompt
+    conversation
+```
+
+但 context 模块的**核心参考文档**完全没有提到这个目录结构：
+- `mgmt-context-architecture.md` 详细描述了 ContextModule 接口、SystemPart、编排流程，但没有说明各模块应该放在哪里。
+- `type-system-prompt.md` 描述了 SystemPromptContext 的分段设计，但没有提到 modules/ 目录。
+- 与 LLM 模块（问题 1）和工具模块（问题 3）的问题一致：详细参考文档缺少文件组织指引。
+
+**问题**：
+
+- 开发者读完 context 参考文档后，知道如何设计 ContextModule 接口，但不知道各模块文件应该放在哪里。
+- `architecture.md` 有目录结构，但它离 context 参考文档太远——开发者需要在两份文档间跳转才能拼凑完整画面。
+- 随着模块增多（SystemPromptContext、ConversationContext、ShortTermMemoryContext、LongTermMemoryContext），没有明确的 modules/ 目录约定会导致模块文件散落在 context/ 根目录下。
+
+**建议修复**：
+
+在 `references/context/mgmt-context-architecture.md` 的"模块接口约定"或"上下文组装流程"节增加推荐目录结构：
+
+```
+context/
+  types.ts                    # SystemPart, ContextParts, ContextModule, CompressionConfig
+  manager.ts                  # ContextManager 编排器
+  token-estimator.ts          # Token 估算工具函数
+  modules/                    # 各类上下文模块
+    system-prompt.ts          # SystemPromptContext（分段式系统提示词）
+    conversation.ts           # ConversationContext（V0 极简会话历史）
+    short-term-memory.ts      # ShortTermMemoryContext（V1 带持久化的会话历史）
+    long-term-memory.ts       # LongTermMemoryContext（V1 用户画像/偏好）
+  index.ts                    # 统一导出
+```
+
+**理由**：`modules/` 子目录将编排器（manager）和被编排的模块分离。新增模块只需在 `modules/` 下加文件并实现 `ContextModule` 接口。与 `architecture.md` 的 V0 目录结构保持一致，但应在 context 参考文档中也明确提及。
+
+### 5. llm-service.md 没有提到 mock provider 的设计要求
 
 **位置**：`references/llm/llm-service.md`
 

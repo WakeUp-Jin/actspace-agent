@@ -1,9 +1,24 @@
+/**
+ * Context 兼容层
+ *
+ * 保留旧版 ContextState/createEmptyContextState/createUsageSnapshot 接口，
+ * 供 agent.ts 等现有消费者使用。
+ *
+ * 新代码应直接使用 context/ 目录下的 ContextManager 和模块。
+ * 此文件将在所有消费者迁移后移除。
+ */
+
 import type {
   ContextUsageBucket,
   ContextUsageSnapshot,
   SessionEvent,
   SessionId
 } from "@actspace/shared";
+
+// Re-export 新 context 系统的所有导出
+export * from "./context/index";
+
+// ─── 旧版接口（向后兼容） ───
 
 export type ContextState = {
   sessionId: SessionId;
@@ -21,12 +36,12 @@ export function createEmptyContextState(sessionId: SessionId): ContextState {
       percentUsed: 0,
       compressionCount: 0,
       cumulativeTokens: 0,
-      buckets: createEmptyBuckets()
+      buckets: createLegacyBuckets()
     }
   };
 }
 
-export function createEmptyBuckets(): ContextUsageBucket[] {
+function createLegacyBuckets(): ContextUsageBucket[] {
   return [
     { key: "systemPrompt", name: "systemPrompt", label: "System prompt", tokens: 0, colorToken: "context.system" },
     { key: "tools", name: "tools", label: "Tools", tokens: 0, colorToken: "context.tools" },
@@ -46,6 +61,6 @@ export function createUsageSnapshot(totalTokens: number, maxTokens = 200_000): C
     percentUsed: Math.min(100, Math.round((totalTokens / safeMaxTokens) * 100)),
     compressionCount: 0,
     cumulativeTokens: totalTokens,
-    buckets: createEmptyBuckets()
+    buckets: createLegacyBuckets()
   };
 }
