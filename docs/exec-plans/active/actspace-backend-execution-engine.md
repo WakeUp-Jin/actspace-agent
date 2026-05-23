@@ -161,17 +161,17 @@
 
 ## 进度
 
-- [ ] 审查现有 `packages/agent-core/src/agent.ts`
-- [ ] 定义 AgentEvent 判别联合
-- [ ] 定义 AgentLoopConfig 和 AgentLoopResult
-- [ ] 实现 streamAssistantResponse（流式 LLM 消费 + 错误捕获）
-- [ ] 实现 executeToolCalls（sequential/parallel + 事件通知）
-- [ ] 实现 runAgentLoop（双层 while 循环）
-- [ ] 实现 Agent 极简入口类
-- [ ] 接入 mock LLM + ToolManager + ContextManager
-- [ ] 验证完整 turn 可跑通
+- [x] 审查现有 `packages/agent-core/src/agent.ts`
+- [x] 定义 AgentEvent 判别联合（四层级：agent/turn/message/tool）
+- [x] 定义 AgentLoopConfig（toolManager/shouldStopAfterTurn/steering/followUp）和 AgentLoopResult
+- [x] 实现 streamAssistantResponse（流式 LLM 消费 + 错误捕获 → stopReason='error'）
+- [x] 实现 executeToolCalls（sequential/parallel + tool_start/tool_end 事件）
+- [x] 实现 runAgentLoop（双层 while 循环 + AbortSignal + 安全阀）
+- [x] 实现 Agent 极简入口类（run/runAndGetText/abort）
+- [x] 迁移现有 agent.ts 为兼容层 + engine/index.ts 统一导出
+- [x] 通过类型检查（agent-core + 全项目）
+- [ ] 接入 mock LLM + ToolManager + ContextManager 验证完整 turn
 - [ ] 增加失败场景测试
-- [ ] 通过类型检查和构建
 - [ ] 更新架构文档和 history
 
 ## 决策记录

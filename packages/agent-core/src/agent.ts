@@ -1,3 +1,13 @@
+/**
+ * Agent 兼容层
+ *
+ * 保留旧版 createAgentRuntime/AgentRuntimeDeps/TurnTrace 接口，
+ * 供 desktop/main/index.ts 等现有消费者使用。
+ *
+ * 新代码应直接使用 engine/ 目录下的 Agent 类和 runAgentLoop。
+ * 此文件将在所有消费者迁移后移除。
+ */
+
 import type {
   AssistantReply,
   AgentTurnResult,
@@ -9,6 +19,11 @@ import type {
 import { createEmptyContextState, createUsageSnapshot } from "./context";
 import type { ModelProvider, ModelProviderInput } from "./types";
 import type { ToolRegistry } from "./tools";
+
+// Re-export 新引擎的所有导出
+export * from "./engine/index";
+
+// ─── 旧版接口（向后兼容） ───
 
 export type AgentRuntimeDeps = {
   provider: ModelProvider;
