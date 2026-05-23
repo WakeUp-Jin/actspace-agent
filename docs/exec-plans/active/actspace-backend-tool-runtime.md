@@ -14,119 +14,111 @@
 - `.agents/skills/llm-agent-dev/references/tools/file-tools.md`（Read/Write/Edit 设计）
 - `.agents/skills/llm-agent-dev/examples/tool-definition.ts`（InternalTool 参考）
 - `.agents/skills/llm-agent-dev/examples/tool-scheduler.ts`（ToolScheduler 参考）
-- `.agents/skills/llm-agent-dev/examples/grep-tool.ts`（搜索工具参考）
+- `docs/design-docs/llm-agent-dev-skill-fix.md`（Skill 缺少工具文件夹结构建议的补充）
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
 
+## 目标目录结构
+
+```
+packages/agent-core/src/tools/
+  types.ts                      # ToolManager 等模块级类型（计划 A 的 InternalTool/ToolResult 已在 internal-tools.ts）
+  manager.ts                    # ToolManager（V0 注册/查询/执行/硬截断）
+  workspace-guard.ts            # workspace 路径边界检查
+  tools/
+    read-file/
+      definition.ts             # name, description, parameters, isReadOnly, category
+      executor.ts               # handler 函数实现
+    search-files/
+      definition.ts
+      executor.ts
+    list-directory/
+      definition.ts
+      executor.ts
+    edit-file-diff/
+      definition.ts
+      executor.ts
+  index.ts                      # 统一导出
+```
+
+每个工具是一个文件夹，内含两个文件：definition（给 LLM 看的声明）和 executor（系统执行的逻辑）。与 Skill `tool-definition.md` 提出的 definition + executor 分离理念一致。
+
+Skill 原始 V0 目录结构将每个工具放在单文件中（`tools/read_file`），本项目将其拆为文件夹（`tools/read-file/definition.ts` + `executor.ts`），已记录到 `docs/design-docs/llm-agent-dev-skill-fix.md`。
+
 ## 相关路径
 
-- `packages/agent-core/src/tools.ts`（当前实现，需要按 Skill 重构）
-- `packages/agent-core/src/types.ts`（依赖计划 A 的 InternalTool/ToolResult 类型）
+- `packages/agent-core/src/tools.ts`（当前实现，将被拆分为上述目录结构）
+- `packages/agent-core/src/internal-tools.ts`（计划 A 产物：InternalTool/ToolResult 类型）
 - `packages/shared/src/session.ts`
 
 ## 范围
 
 **V0 骨架（首要目标）：**
 
-- 定义 `InternalTool` 统一类型：
-  - 必需：name、description、parameters（JSON Schema）、handler（async，返回 ToolResult）
-  - 可选（V0 先留接口）：check_permissions、render_result、category、is_read_only
+- 建立 `tools/` 目录结构（manager + workspace-guard + tools/每工具一个文件夹）
 - 实现 `ToolManager`（V0 版调度）：
   - 注册/查询/按名执行
-  - execute() 内部对结果做硬截断（防止大文件撑爆上下文）
-  - 工具定义导出为 LLM 可消费的 `Tool[]`（name/description/parameters 子集）
-- 定义 `ToolResult` 统一返回类型：success / data / error
-- 实现四个基础工具：read_file、search_files、list_directory、edit_file_diff
-- 增加 workspace 路径边界检查
+  - execute() 内部对结果做硬截断（默认 2000 字符）
+  - 工具定义导出为 LLM 可消费的 `Tool[]`
+  - renderResult 支持（有则用，无则默认 JSON.stringify）
+- 实现 workspace 路径边界检查（workspace-guard）
+- 实现四个基础工具（每个工具 = definition.ts + executor.ts）：
+  - read_file、search_files、list_directory、edit_file_diff
+- 迁移现有 `tools.ts` 引用到新结构
 
 **V1 增强（后续）：**
 
-- `ToolScheduler`（替换 V0 的 ToolManager.execute）：
-  - 完整生命周期状态机：validating → awaiting_approval → scheduled → executing → render_result → OutputTruncator → success/error/cancelled
-  - ToolCallRecord 记录每次状态变更的时间戳和耗时
-- `OutputTruncator`（两层裁剪）：
-  - 阈值判断（建议 2000 字符）
-  - 未超过：直接使用完整输出
-  - 超过：调用快速模型生成摘要，或保留头尾截断中间
-  - 完整输出可落临时文件，摘要中包含路径供 Agent 按需深读
-  - SummarizeFn 可注入依赖
-- 权限审批机制：
-  - YOLO 模式 / Default 模式
-  - check_permissions 函数（拒绝/通过/修正参数）
-  - AllowList 机制
-- render_result 函数（ToolResult → LLM 可读自然语言）
-- 并行调度（is_read_only 的工具并行，非只读串行）
+- ToolScheduler（完整生命周期状态机）
+- OutputTruncator（两层裁剪 + SummarizeFn 可注入）
+- 权限审批机制
+- 并行调度
 
 不包含：
 
-- 不实现 Bash 工具（V1 Tool 扩展）
+- 不实现 Bash 工具
 - 不实现真实写盘 edit/write
 - 不实现外部网络工具
 - 不实现用户审批 UI
 
-## InternalTool 类型设计（来自 Skill）
+## 工具 definition + executor 分离模式
 
-```ts
-type InternalTool = {
-  name: string;
-  description: string;               // LLM 选择工具的唯一依据
-  parameters: JSONSchema;             // 参数定义
-  handler: (args: Record<string, unknown>) => Promise<ToolResult>;
-  
-  // V1 可选字段
-  check_permissions?: (args) => Promise<PermissionResult>;
-  render_result?: (result: ToolResult) => string;
-  category?: 'system' | 'file' | 'search' | 'memory';
-  is_read_only?: boolean;
-};
+每个工具文件夹包含：
 
-type ToolResult = {
-  success: boolean;
-  data?: unknown;
-  error?: string;
-};
-```
+- **definition.ts**：导出一个常量对象，包含 name、description、parameters（JSON Schema）、isReadOnly、category。不依赖任何运行时库，可以被 LLM tool list 序列化消费。
+- **executor.ts**：导出 handler 函数，接收 `(args, workspaceRoot)` 返回 `ToolResult`。可以依赖 Node.js fs/path 等运行时能力。
 
-### description 编写要点
-
-1. 第一句说明工具做什么（功能定位）
-2. 后续说明使用约束和最佳实践（Instructions）
-3. 明确说明"不要用这个工具做什么"（负面指引）
+工具组装：ToolManager 在注册时将 definition + executor 合并为完整的 `InternalTool`。
 
 ## 工具要求
 
 ### read_file
 
-- 输入：文件路径，可选行范围
-- 输出：读取摘要、裁剪内容、文件 artifact
-- description 要明确说"读取 workspace 内文件"，引导 LLM 只用于读取
-- is_read_only: true
+- 输入：文件路径，可选行范围（offset/limit）
+- 输出：读取摘要、文件内容（带行号前缀）
+- 大文件保护：超过阈值行数时截断，返回提示使用 offset/limit
+- description 要引导 LLM 使用行范围读取而非整个大文件
+- isReadOnly: true，category: "file"
 
 ### search_files
 
 - 输入：查询文本或 glob，搜索范围
 - 输出：匹配文件和行摘要
 - description 要明确说"搜索 workspace 内文本或文件名"
-- is_read_only: true
+- isReadOnly: true，category: "search"
 
 ### list_directory
 
 - 输入：目录路径
 - 输出：目录项列表，区分文件/目录
-- is_read_only: true
+- isReadOnly: true，category: "file"
 
 ### edit_file_diff
 
-- 输入：文件路径和编辑提案
-- 输出：统一 diff、增删行统计、diff artifact
+- 输入：文件路径和编辑提案（old_string + new_string）
+- 输出：统一 diff、增删行统计
 - 首版只产物化 diff，不应用 patch
-- is_read_only: false（但不实际写盘，V0 可标记为 true）
-
-## V0 → V1 触发信号（来自 Skill architecture.md）
-
-- **工具输出太长** → 引入 OutputTruncator
-- **需要权限控制**（如引入 Bash 工具）→ 引入 ToolScheduler + check_permissions
-- **需要并行执行只读工具** → 引入 is_read_only + 并行调度策略
+- isReadOnly: true（V0 不写盘）
+- category: "file"
 
 ## 安全边界
 
@@ -161,19 +153,20 @@ type ToolResult = {
 
 ## 进度
 
-- [ ] 审查现有 `packages/agent-core/src/tools.ts`
-- [ ] 定义 InternalTool 统一类型
-- [ ] 实现 ToolManager（注册/查询/执行/硬截断）
-- [ ] 实现 read_file 工具
-- [ ] 实现 search_files 工具
-- [ ] 实现 list_directory 工具
-- [ ] 实现 edit_file_diff 工具
-- [ ] 增加 workspace 路径边界检查
-- [ ] 增加结构化工具错误
-- [ ] 通过类型检查
+- [x] 审查现有 `packages/agent-core/src/tools.ts`
+- [x] 创建 `tools/` 目录结构
+- [x] 实现 workspace-guard（路径边界检查）
+- [x] 实现 ToolManager（注册/查询/执行/硬截断/renderResult）
+- [x] 实现 read_file（definition + executor）
+- [x] 实现 search_files（definition + executor）
+- [x] 实现 list_directory（definition + executor）
+- [x] 实现 edit_file_diff（definition + executor）
+- [x] 迁移现有 tools.ts 引用到新结构（兼容层）
+- [x] 通过类型检查（agent-core + 全项目）
 - [ ] 更新架构文档和 history
 
 ## 决策记录
 
 - 2026-05-23：V1 工具优先服务文件上下文获取与 diff 预览，默认不做自动写盘。
-- 2026-05-23：按 Skill `tool-definition.md` 采用 InternalTool 统一类型和 ToolResult 统一返回值。V0 先用 ToolManager 做极简调度（注册+执行+硬截断），V1 引入 ToolScheduler 完整生命周期和 OutputTruncator 两层裁剪。触发信号：工具输出过长或需要权限控制时升级。
+- 2026-05-23：按 Skill `tool-definition.md` 采用 InternalTool 统一类型和 ToolResult 统一返回值。V0 先用 ToolManager 做极简调度，V1 引入 ToolScheduler + OutputTruncator。
+- 2026-05-23：每个工具采用文件夹结构（definition.ts + executor.ts），将 Skill 的 definition + executor 分离理念落实到文件组织层面（Skill 原始设计中未覆盖此点，已记录到 `docs/design-docs/llm-agent-dev-skill-fix.md`）。

@@ -1,3 +1,13 @@
+/**
+ * 工具系统兼容层
+ *
+ * 保留旧版 ToolRegistry/createToolRegistry/createDefaultTools 接口，
+ * 供 agent.ts、desktop/main/index.ts 等现有消费者使用。
+ *
+ * 新代码应直接使用 tools/ 目录下的 ToolManager 和 definition+executor 模式。
+ * 此文件将在所有消费者迁移后移除。
+ */
+
 import type {
   RegisteredTool,
   ToolDefinition,
@@ -5,6 +15,11 @@ import type {
   ToolExecutor
 } from "./types";
 import type { ToolExecutionResult } from "@actspace/shared";
+
+// Re-export 新工具系统的所有导出
+export * from "./tools/index";
+
+// ─── 旧版接口（向后兼容） ───
 
 export type ToolRegistry = {
   register(tool: RegisteredTool): void;

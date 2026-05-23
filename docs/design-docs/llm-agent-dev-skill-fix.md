@@ -50,7 +50,53 @@ llm/
 
 **建议修复**：在"三、V1 基础版"中增加与 V0 对应的 V1 目录结构 diff。
 
-### 3. llm-service.md 没有提到 mock provider 的设计要求
+### 3. 工具模块 definition + executor 分离理念与目录结构矛盾
+
+**位置**：`references/tools/tool-definition.md` + `references/architecture.md` V0 目录结构
+
+**现状**：`tool-definition.md` 明确提出 **definition + executor 分离模式**，并解释"这种分离使得工具定义可以独立管理、动态注册，executor 可以独立测试和替换"。但 `architecture.md` 的 V0 目录结构中，每个工具是一个**单文件**：
+
+```
+tool/
+  tools/
+    read_file     # ReadFile 工具定义 + executor（合在一个文件）
+```
+
+**问题**：
+
+- 理念层面说 definition 和 executor 应该分离，但目录结构示例把它们放在同一个文件，自相矛盾。
+- 没有给出工具文件夹内部的推荐结构——每个工具应该是一个文件夹还是一个文件？definition 和 executor 分别放哪里？
+- `references/tools/file-tools.md` 等具体工具文档描述了工具的功能设计，但完全没有提到文件组织。
+- 当工具数量增多时，每个工具一个文件会导致 definition 和 executor 逻辑混在一起，难以独立测试。
+
+**建议修复**：
+
+在 `references/tools/tool-definition.md` 或 `references/architecture.md` 中增加推荐的工具文件夹结构：
+
+```
+tool/
+  types.ts                  # InternalTool, ToolResult, PermissionResult
+  manager.ts                # ToolManager（注册/查询/执行）
+  scheduler.ts              # ToolScheduler（V1 生命周期管理）
+  output-truncator.ts       # OutputTruncator（V1 输出裁剪）
+  tools/
+    read-file/
+      definition.ts         # name, description, parameters, isReadOnly, category
+      executor.ts           # handler 函数实现
+    search-files/
+      definition.ts
+      executor.ts
+    list-directory/
+      definition.ts
+      executor.ts
+    edit-file-diff/
+      definition.ts
+      executor.ts
+```
+
+**理由**：每个工具一个文件夹（definition + executor 各一个文件），与 Skill 自身提出的"分离模式"理念一致。definition 可以被 LLM tool list 消费而不加载 executor，executor 可以独立单元测试。
+
+### 4. llm-service.md 没有提到 mock provider 的设计要求
 
 **位置**：`references/llm/llm-service.md`
 
