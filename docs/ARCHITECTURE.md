@@ -53,14 +53,56 @@
 
 ## 当前已落地的 Agent 运行层模块
 
-`packages/agent-core` 首版已经拆出这些模块：
+`packages/agent-core` 已完成模块化重构，从单文件结构升级为以下子模块：
 
-- `agent.ts`：运行一轮 turn，组装事件和最终结果。
-- `llm.ts`：provider 注册与 mock provider。
-- `tools.ts`：工具注册表与默认工具集合。
-- `context.ts`：上下文快照与相关辅助结构。
-- `persistence.ts`：session 本地落盘、列表、读取。
-- `types.ts`：agent-core 内部使用的辅助类型。
+### 顶层类型与契约
+
+- `messages.ts`：内部 Message/Content 类型体系（discriminated union），包含 Usage、StopReason、Context 等核心类型。
+- `internal-tools.ts`：统一工具定义（InternalTool）与注册表（InternalToolRegistry），支持 definition + handler + permission 组合。
+- `adapters.ts`：内部类型（Message）与 shared 契约（SessionEvent/MessageBlock）之间的双向转换。
+- `fixtures.ts`：测试用 mock 数据工厂。
+- `types.ts`：agent-core 内部辅助类型。
+
+### `llm/` — LLM 服务层（stream-first）
+
+- `llm/types.ts`：LLMConfig、StreamOptions、APIMessage、LLMServiceError。
+- `llm/base.ts`：BaseLLMService 抽象基类，stream 为核心方法，complete 由 stream 聚合。
+- `llm/services/mock.ts`：MockLLMService，模拟完整 turn 事件流（含工具调用）。
+- `llm/services/deepseek.ts`：DeepSeekService 骨架，待接入真实 API。
+- `llm/factory.ts`：createLLMService 工厂函数。
+
+### `tools/` — 模块化工具系统
+
+- `tools/types.ts`：ToolDefinitionSpec、ToolExecutorFn、ToolManagerConfig。
+- `tools/workspace-guard.ts`：路径边界守卫，防止工具访问工作区外文件。
+- `tools/manager.ts`：ToolManager（注册/获取/执行/结果裁剪）。
+- `tools/tools/{read-file,search-files,list-directory,edit-file-diff}/`：每个工具一个目录，含 `definition.ts` + `executor.ts`。
+
+### `context/` — 上下文管道
+
+- `context/types.ts`：SystemPart、ContextModule、PromptSegment、CompressionConfig。
+- `context/token-estimator.ts`：token 估算与用量快照生成。
+- `context/modules/system-prompt.ts`：分段系统提示词上下文。
+- `context/modules/conversation.ts`：会话历史上下文管理。
+- `context/manager.ts`：ContextManager 编排器（模块协调、appendMessage、getContext、用量统计）。
+
+### `engine/` — 执行引擎
+
+- `engine/types.ts`：AgentEvent（discriminated union）、AgentLoopConfig、AgentLoopResult。
+- `engine/loop.ts`：runAgentLoop 纯函数双层循环（内层工具调用+转向、外层跟进）。
+- `engine/agent.ts`：Agent 入口类（run/abort），编排 ContextManager + ToolManager + LLMService。
+
+### `persistence/` — 持久化与恢复
+
+- `persistence/types.ts`：SessionStorePaths、JsonlParseResult、WriteResult、SessionRecoveryResult。
+- `persistence/jsonl.ts`：健壮 JSONL 读写（坏行容错 + 结构化错误传播）。
+- `persistence/meta.ts`：meta.json 增量更新（turnCount/updatedAt/lastModel）。
+- `persistence/recovery.ts`：多维恢复（events→Messages/Blocks/Snapshot/DiffSummary）。
+- `persistence/session-store.ts`：会话存储生命周期（create/ensure/write/read/list）。
+
+### 兼容层
+
+原有单文件入口（`agent.ts`、`llm.ts`、`tools.ts`、`context.ts`、`persistence.ts`）保留为兼容层，内部 re-export 新模块的 API，确保 `desktop` 等现有消费方不被破坏。
 
 ## 本地存储模型
 
