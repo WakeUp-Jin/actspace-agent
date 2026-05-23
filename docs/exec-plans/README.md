@@ -9,7 +9,12 @@
 
 当前进行中的 `actspace` 初始化计划：
 
-- `active/actspace-parallel-agent-runtime-rebuild.md`
+- `active/actspace-backend-contracts-events.md`
+- `active/actspace-backend-llm-service.md`
+- `active/actspace-backend-tool-runtime.md`
+- `active/actspace-backend-context-pipeline.md`
+- `active/actspace-backend-execution-engine.md`
+- `active/actspace-backend-persistence-recovery.md`
 - `active/actspace-ui-bug-fix-plan.md`
 - `active/actspace-workbench-split-view-foundation.md`
 
@@ -21,3 +26,4 @@
 - `completed/actspace-v1-integration-and-acceptance.md`
 - `completed/actspace-parallel-contracts-and-fixtures.md`
 - `completed/actspace-parallel-ui-fidelity-rebuild.md`
+- `completed/actspace-parallel-agent-runtime-rebuild.md`
