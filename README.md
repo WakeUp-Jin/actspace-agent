@@ -21,9 +21,9 @@
 - 桌面端主界面已经实现左侧会话栏、中间消息区、底部 Composer 和右侧预览位。
 - 本地 `jsonl` 会话持久化、`meta.json` 摘要和基础会话恢复链路已经接通，数据目录固定落在系统用户数据目录下的 `actspace/`。
 
-当前仍处在 `V1 基础版` 阶段，重点未完成项包括：
+当前仍处在 `V1 基础版` 阶段，重点推进项包括：
 
-- 接入真实 DeepSeek provider，而不是 mock provider。
+- 真实 DeepSeek provider 已接入为默认运行路径；mock provider 只作为显式开发/测试开关和 UI fixture。
 - 把 UI 和真实 turn 数据链路进一步打磨成稳定闭环。
 - 补强 CI、可靠性约束、错误恢复和端到端测试。
 
@@ -56,6 +56,7 @@
 ```sh
 pnpm install            # 安装 workspace 依赖
 pnpm dev                # 启动桌面端开发环境
+pnpm dev:log            # 启动桌面端并写入 logs/latest-dev.log
 pnpm typecheck          # 运行类型检查
 pnpm build              # 构建 desktop/shared/agent-core
 pnpm ci                 # 运行当前仓库级 CI 检查（docs / hygiene / shell 校验）

@@ -6,7 +6,7 @@
 
 ## 设计来源
 
-- `docs/design-docs/backend-agent-design.md`
+- `docs/design-docs/agent-core/backend-agent-design.md`
 - `.agents/skills/llm-agent-dev/references/llm/llm-service.md`（核心：三层架构、stream-first、convertMessages）
 - `.agents/skills/llm-agent-dev/references/architecture.md`（V0/V1 LLM 模块定位）
 - `.agents/skills/llm-agent-dev/examples/llm-service.ts`（BaseLLMService 参考实现）

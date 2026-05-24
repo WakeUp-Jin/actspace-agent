@@ -11,12 +11,14 @@
 import type {
   Context,
   AssistantMessage,
+  ImageContent,
   TextContent,
   Tool,
 } from "../messages";
 import { getTextContent, getToolCalls, hasToolCalls } from "../messages";
 import type {
   APIMessage,
+  APIContentPart,
   LLMConfig,
   SimpleStreamOptions,
   StreamOptions,
@@ -75,12 +77,7 @@ export abstract class BaseLLMService {
         case "user":
           result.push({
             role: "user",
-            content: typeof msg.content === "string"
-              ? msg.content
-              : msg.content
-                  .filter((c): c is TextContent => c.type === "text")
-                  .map((c) => c.text)
-                  .join(""),
+            content: toAPIUserContent(msg.content),
           });
           break;
 
@@ -124,4 +121,24 @@ export abstract class BaseLLMService {
       signal: options.signal,
     };
   }
+}
+
+function toAPIUserContent(content: string | (TextContent | ImageContent)[]): string | APIContentPart[] {
+  if (typeof content === "string") return content;
+
+  if (content.every((part) => part.type === "text")) {
+    return content.map((part) => part.text).join("");
+  }
+
+  const parts: APIContentPart[] = content.map((part) => {
+    if (part.type === "text") {
+      return { type: "text", text: part.text };
+    }
+    return {
+      type: "image_url",
+      image_url: { url: part.data.startsWith("data:") ? part.data : `data:${part.mimeType};base64,${part.data}` },
+    };
+  });
+
+  return parts;
 }

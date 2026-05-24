@@ -10,6 +10,7 @@ import { LLMServiceError } from "./types";
 import { BaseLLMService } from "./base";
 import { MockLLMService } from "./services/mock";
 import { DeepSeekService } from "./services/deepseek";
+import { KimiService } from "./services/kimi";
 import { envToLLMConfig } from "../env";
 
 export function createLLMService(config: LLMConfig): BaseLLMService {
@@ -17,13 +18,16 @@ export function createLLMService(config: LLMConfig): BaseLLMService {
     case "deepseek":
       return new DeepSeekService(config);
 
+    case "kimi":
+      return new KimiService(config);
+
     case "mock":
     case "deepseek-mock":
       return new MockLLMService(config);
 
     default:
       throw new LLMServiceError(
-        `Unknown LLM provider: "${config.provider}". Available: deepseek, mock`,
+        `Unknown LLM provider: "${config.provider}". Available: deepseek, kimi, mock`,
         "invalid_request",
         false,
       );

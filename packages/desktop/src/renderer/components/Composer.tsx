@@ -7,19 +7,26 @@ export function Composer({
   contextSnapshot,
   isStreaming = false,
   onSend,
+  showDemoAttachments = false,
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
   isStreaming?: boolean;
   onSend?: (text: string) => void;
+  showDemoAttachments?: boolean;
 }) {
   const [modeOpen, setModeOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
-  const [imageAttached, setImageAttached] = useState(true);
-  const [fileAttached, setFileAttached] = useState(true);
+  const [imageAttached, setImageAttached] = useState(showDemoAttachments);
+  const [fileAttached, setFileAttached] = useState(showDemoAttachments);
   const [message, setMessage] = useState("");
   const composerRef = useRef<HTMLElement | null>(null);
   const hasAttachments = imageAttached || fileAttached;
+
+  useEffect(() => {
+    setImageAttached(showDemoAttachments);
+    setFileAttached(showDemoAttachments);
+  }, [showDemoAttachments]);
 
   function closeFloatingPanels() {
     setModeOpen(false);

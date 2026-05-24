@@ -47,6 +47,28 @@ describe("BaseLLMService.convertMessages", () => {
     expect(result[0]).toEqual({ role: "user", content: "part1part2" });
   });
 
+  it("should convert image content to OpenAI-compatible content parts", () => {
+    const ctx: Context = {
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: "what is this?" },
+          { type: "image", data: "abc123", mimeType: "image/png" },
+        ],
+        timestamp: Date.now(),
+      }],
+    };
+    const result = service.testConvertMessages(ctx);
+
+    expect(result[0]).toEqual({
+      role: "user",
+      content: [
+        { type: "text", text: "what is this?" },
+        { type: "image_url", image_url: { url: "data:image/png;base64,abc123" } },
+      ],
+    });
+  });
+
   it("should convert assistant message with tool calls", () => {
     const assistant: AssistantMessage = {
       role: "assistant",

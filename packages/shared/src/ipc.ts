@@ -4,6 +4,7 @@ export type BootstrapState = {
   sessionRoot: string;
   logRoot: string;
   tmpRoot: string;
+  workspaceRoot: string;
 };
 
 export type RunTurnInput = {
@@ -41,6 +42,7 @@ export type AppBootstrapStateInput = {
   sessionRoot?: string;
   logRoot?: string;
   tmpRoot?: string;
+  workspaceRoot?: string;
 };
 
 export function createBootstrapState(input: AppBootstrapStateInput): BootstrapState {
@@ -49,6 +51,7 @@ export function createBootstrapState(input: AppBootstrapStateInput): BootstrapSt
     dataRoot: input.dataRoot,
     sessionRoot: input.sessionRoot ?? `${input.dataRoot}/sessions`,
     logRoot: input.logRoot ?? `${input.dataRoot}/logs`,
-    tmpRoot: input.tmpRoot ?? `${input.dataRoot}/tmp`
+    tmpRoot: input.tmpRoot ?? `${input.dataRoot}/tmp`,
+    workspaceRoot: input.workspaceRoot ?? input.dataRoot
   };
 }

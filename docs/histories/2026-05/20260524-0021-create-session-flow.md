@@ -21,6 +21,8 @@
 - **IPC bridge**: 新增 `session:create` 通道，preload 暴露 `createSession()`。
 - **Renderer wiring**: `New chat` 和 section 小按钮接入创建逻辑，创建成功后刷新会话、切换 active session、清空旧 turn 状态。
 - **Mock fallback**: 浏览器 mock 模式下创建前端空会话，避免缺少 preload 时阻断 UI 验证。
+- **Session switching**: 补齐会话列表点击切换，把 active session 更新和会话内容恢复接到统一状态流。
+- **Demo data scope**: 将 Composer 里的图片与 `README.md` demo 附件限制到 `Learning doc plan` 示例会话，新建会话默认不再显示模拟附件。
 - **Docs**: 更新架构文档中的 IPC 和创建会话数据流。
 
 ### Design Intent (Why)

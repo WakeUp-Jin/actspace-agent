@@ -15,9 +15,9 @@
 | --- | --- | --- | --- |
 | 产品面 | B | 产品方向、界面语法、核心交互和首版技术路线都已明确，桌面端工作台骨架已出现。 | 把"可用骨架"推进到"真实可用工作流"，优先接 DeepSeek provider。 |
 | 架构文档 | A- | 三层骨架已落地，agent-core 模块化重构完成，ARCHITECTURE.md 已包含 IPC 双通道（invoke + stream）和完整数据流描述。 | 补充模块间交互时序图。 |
-| 后端 agent-core | B+ | 模块化架构已就位，DeepSeek 真实 SSE provider、mock provider、IPC bridge 与集中 env 入口均已落地，89 个测试覆盖核心模块与 E2E smoke。 | 补 provider 错误重试、真实工具工作目录配置与高级上下文策略。 |
-| 前后端对接 | B+ | 双通道流式架构已落地，Composer 可真实发送；已在 Electron 窗口完成一次 DeepSeek 真实探针回合并落盘。 | 修复会话事件合并/恢复展示问题，继续打磨 streaming UI 和工具状态。 |
-| 测试 | B+ | vitest 测试体系已有 15 个测试文件、89 个测试；新增 DeepSeek SSE 文本、tool call 重组和缺失密钥分类错误验证，并完成人工真实 API 探针。 | 补自动化的 provider integration gate、前端 UI/turn 测试和 CI。 |
-| 可观测性 | D+ | 已有应用数据 `logs/` 目录初始化，并新增根目录本地开发日志入口 `pnpm dev:log`；但还没有真正的结构化日志、故障追踪和统一错误面板。 | 补最小结构化日志格式、关键错误面板和 provider/tool 故障排查约定。 |
+| 后端 agent-core | B+ | 模块化架构已就位，DeepSeek 真实 SSE provider、mock provider、IPC bridge 与集中 env 入口均已落地；bridge 已保证每轮 turn 写入 `user_message`。 | 补 provider 错误重试和高级上下文策略。 |
+| 前后端对接 | B+ | 双通道流式架构已落地，Composer 可真实发送；普通会话默认走 DeepSeek，最终展示以恢复后的 `SessionRecord` 为事实来源。 | 继续打磨 streaming UI、工具状态和真实 Electron 回归。 |
+| 测试 | B+ | vitest 测试体系覆盖核心模块与 E2E smoke；新增 bridge 测试锁定 `user_message -> thinking/tool -> assistant -> context` 事件顺序。 | 补自动化的 provider integration gate、前端 UI/turn 测试和 CI。 |
+| 可观测性 | C | 已有应用数据 `logs/` 目录初始化、根目录本地开发日志入口 `pnpm dev:log`、即时 console 链路日志，以及每次 Agent turn 一个最近 1 天保留的 JSONL 排障文件。 | 补统一错误面板、renderer 错误按 turn 归因和 provider/tool 故障排查约定。 |
 | 安全 | B- | Electron 边界采用 `contextIsolation` + preload bridge，workspace-guard 路径守卫，env.ts 集中管密钥（.env 不提交、Object.freeze 冻结、验证前置），SECURITY.md 已补充密钥管理和进程隔离约束。 | 真实 provider 接入时补充 API Key 轮换、错误暴露策略和数据脱敏规则。 |
 | 学习沉淀 | B | 体系已经跑起来，且已有学习文档。 | 随着 DeepSeek 接入和前端对接，继续补真正有迁移价值的学习文档。 |

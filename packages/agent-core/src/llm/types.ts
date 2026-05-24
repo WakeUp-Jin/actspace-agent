@@ -27,6 +27,8 @@ export interface StreamOptions {
   temperature?: number;
   maxTokens?: number;
   signal?: AbortSignal;
+  tools?: APIRequestTool[];
+  thinking?: { type: "disabled" };
 }
 
 export interface SimpleStreamOptions {
@@ -45,9 +47,30 @@ export interface APIToolCall {
 
 export type APIMessage =
   | { role: "system"; content: string }
-  | { role: "user"; content: string }
+  | { role: "user"; content: string | APIContentPart[] }
   | { role: "assistant"; content: string | null; tool_calls?: APIToolCall[] }
-  | { role: "tool"; tool_call_id: string; content: string };
+  | { role: "tool"; tool_call_id: string; name?: string; content: string };
+
+export type APIContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } }
+  | { type: "video_url"; video_url: { url: string } };
+
+export type APIRequestTool =
+  | {
+      type: "function";
+      function: {
+        name: string;
+        description: string;
+        parameters: Record<string, unknown>;
+      };
+    }
+  | {
+      type: "builtin_function";
+      function: {
+        name: "$web_search";
+      };
+    };
 
 // ─── 流式事件 ───
 

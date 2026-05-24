@@ -65,6 +65,10 @@ function createMockEmptySession(): SessionRecord {
   };
 }
 
+function isDemoSession(sessionId: string | null): boolean {
+  return sessionId === "session-learning-doc-plan";
+}
+
 function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
   const now = new Date().toISOString();
   const blocks: MessageBlock[] = [];
@@ -117,6 +121,9 @@ export function App() {
   const [sessions, setSessions] = useState<SessionListItem[]>(hasActspaceBridge() ? [] : mockSessions);
   const [sessionRecord, setSessionRecord] = useState<SessionRecord | null>(
     hasActspaceBridge() ? null : mockSessionRecord,
+  );
+  const [mockSessionRecords, setMockSessionRecords] = useState<Record<string, SessionRecord>>(
+    hasActspaceBridge() ? {} : { [mockSessionRecord.meta.id]: mockSessionRecord },
   );
   const [turnResult, setTurnResult] = useState<AgentTurnResult | null>(
     hasActspaceBridge() ? null : mockTurnResult,
@@ -244,10 +251,20 @@ export function App() {
       if (hasActspaceBridge()) {
         const input: RunTurnInput = { sessionId, turnId, userInput: text };
         const result = await window.actspace.runTurn(input);
-        setTurnResult(result);
 
         const restored = await window.actspace.getSession({ sessionId });
-        setSessionRecord(restored);
+        setSessionRecord(restored ?? {
+          meta: {
+            id: result.sessionId,
+            title: "New chat",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            turnCount: 1,
+          },
+          events: result.events,
+          contextSnapshot: result.contextSnapshot,
+        });
+        setTurnResult(null);
         const refreshed = await window.actspace.listSessions();
         setSessions(refreshed);
       }
@@ -270,6 +287,7 @@ export function App() {
       const created = createMockEmptySession();
       activeSessionIdRef.current = created.meta.id;
       setSessionRecord(created);
+      setMockSessionRecords((current) => ({ ...current, [created.meta.id]: created }));
       setSessions((current) => [
         {
           id: created.meta.id,
@@ -292,6 +310,52 @@ export function App() {
       console.error("Failed to create session", error);
     }
   }, []);
+
+  const handleSelectSession = useCallback(
+    async (sessionId: string) => {
+      if (!sessionId || sessionId === activeSessionIdRef.current) return;
+
+      setIsStreaming(false);
+      setStreamingBlocks([]);
+      streamStateRef.current = createEmptyStreamingState();
+      setTurnResult(null);
+      activeSessionIdRef.current = sessionId;
+
+      if (!hasActspaceBridge()) {
+        const selected = mockSessionRecords[sessionId];
+        if (selected) {
+          setSessionRecord(selected);
+          return;
+        }
+
+        const listed = sessions.find((session) => session.id === sessionId);
+        if (!listed) return;
+
+        const fixture = mockSessions.find((session) => session.id === sessionId);
+        if (!fixture) return;
+
+        setSessionRecord({
+          ...mockSessionRecord,
+          meta: {
+            ...mockSessionRecord.meta,
+            id: fixture.id,
+            title: fixture.title,
+            updatedAt: fixture.updatedAt,
+            turnCount: fixture.turnCount,
+          },
+        });
+        return;
+      }
+
+      try {
+        const restored = await window.actspace.getSession({ sessionId });
+        setSessionRecord(restored);
+      } catch (error) {
+        console.error("Failed to select session", error);
+      }
+    },
+    [mockSessionRecords, sessions],
+  );
 
   const persistedEvents = sessionRecord?.events ?? turnResult?.events ?? [];
   const persistedMessages = useMemo<MessageBlock[]>(() => {
@@ -316,7 +380,8 @@ export function App() {
     mockContextSnapshot;
 
   const activeSessionId =
-    turnResult?.sessionId ?? sessionRecord?.meta.id ?? sessions[0]?.id ?? mockSessions[0]?.id ?? null;
+    sessionRecord?.meta.id ?? turnResult?.sessionId ?? sessions[0]?.id ?? mockSessions[0]?.id ?? null;
+  const showDemoAttachments = isDemoSession(activeSessionId);
   const title = getSessionTitle(sessionRecord, sessions);
 
   return (
@@ -329,6 +394,8 @@ export function App() {
       isStreaming={isStreaming}
       onSend={handleSend}
       onNewSession={handleCreateSession}
+      onSelectSession={handleSelectSession}
+      showDemoAttachments={showDemoAttachments}
     />
   );
 }

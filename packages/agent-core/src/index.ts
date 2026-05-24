@@ -2,6 +2,7 @@ export * from "./agent";
 export * from "./context";
 export * from "./env";
 export * from "./llm";
+export * from "./observability";
 export * from "./persistence";
 export * from "./tools";
 export * from "./types";

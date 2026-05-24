@@ -76,6 +76,7 @@ export {
   BaseLLMService,
   MockLLMService,
   DeepSeekService,
+  KimiService,
   createLLMService,
   createLLMServiceFromEnv,
   createMockLLMConfig,

@@ -29,12 +29,14 @@ export function Sidebar({
   mode,
   onToggleMode,
   onNewSession,
+  onSelectSession,
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
   mode: "expanded" | "rail";
   onToggleMode: () => void;
   onNewSession?: () => void;
+  onSelectSession?: (sessionId: string) => void;
 }) {
   const compact = mode === "rail";
 
@@ -90,6 +92,7 @@ export function Sidebar({
                 className={`session-row${session.id === activeSessionId ? " is-active" : ""}`}
                 key={session.id}
                 type="button"
+                onClick={() => onSelectSession?.(session.id)}
               >
                 <strong>{formatSessionTitle(session.title)}</strong>
                 {session.id === activeSessionId ? (

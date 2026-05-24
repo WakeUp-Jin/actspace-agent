@@ -17,13 +17,36 @@ import type {
 import type { BaseLLMService } from "../llm/base";
 import type { ToolManager } from "../tools/manager";
 import type { ContextManager } from "../context/manager";
+import type { AgentRunLogger } from "../observability";
 import { Agent } from "./agent";
 import type { AgentEvent, AgentLoopResult, ToolExecutionMode } from "./types";
 import {
   messageToEvents,
+  userMessageToEvents,
   toAssistantReply,
   contextSnapshotToEvent,
 } from "../adapters";
+import type { UserMessage } from "../messages";
+
+const PREVIEW_LIMIT = 160;
+
+function preview(value: unknown, limit = PREVIEW_LIMIT): string {
+  let text: string;
+  try {
+    text = typeof value === "string" ? value : JSON.stringify(value);
+  } catch {
+    text = String(value);
+  }
+  if (!text) return "";
+  return text.length > limit ? `${text.slice(0, limit)}...` : text;
+}
+
+function logAgentRun(message: string, details?: Record<string, unknown>): void {
+  console.log(
+    `[agent-run] ${message}`,
+    details ? JSON.stringify(details) : "",
+  );
+}
 
 export interface RunTurnWithAgentInput {
   sessionId: string;
@@ -40,6 +63,7 @@ export interface RunTurnWithAgentDeps {
 
 export interface RunTurnWithAgentOptions {
   onStreamEvent?: (event: RuntimeStreamEvent) => void;
+  runLogger?: AgentRunLogger;
 }
 
 /**
@@ -58,40 +82,72 @@ export async function runTurnWithAgent(
 ): Promise<AgentTurnResult> {
   const { sessionId, turnId, userInput } = input;
   const streamCb = options?.onStreamEvent;
+  const runLogger = options?.runLogger;
   let eventIdCounter = 0;
+  const streamStats = {
+    textDeltaCount: 0,
+    textChars: 0,
+    thinkingDeltaCount: 0,
+    thinkingChars: 0,
+  };
 
   function nextEventId(): string {
     return `evt_${turnId}_${++eventIdCounter}`;
   }
+
+  await writeRunLog(runLogger, "run_started", {
+    sessionId,
+    turnId,
+    userInput,
+    logFilePath: runLogger?.filePath,
+  });
 
   const agent = new Agent({
     llm: deps.llm,
     contextManager: deps.contextManager,
     toolManager: deps.toolManager,
     toolExecution: deps.toolExecution,
-    onEvent: (agentEvent) => {
+    onEvent: async (agentEvent) => {
+      logAgentEvent(agentEvent, sessionId, turnId, streamStats);
+      await writeRunLog(runLogger, getRunLogEventType(agentEvent), serializeAgentEvent(agentEvent));
       if (!streamCb) return;
       const mapped = mapAgentEventToStreamEvent(agentEvent, sessionId, turnId, nextEventId);
-      if (mapped) streamCb(mapped);
+      if (mapped) {
+        await writeRunLog(runLogger, "stream_event", mapped);
+        streamCb(mapped);
+      }
     },
   });
 
   let loopResult: AgentLoopResult;
   try {
+    logAgentRun("turn execution started", {
+      sessionId,
+      turnId,
+      userInputLength: userInput.length,
+      userInputPreview: preview(userInput),
+    });
     loopResult = await agent.run(userInput);
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
+    logAgentRun("turn execution threw", {
+      sessionId,
+      turnId,
+      error: errorMsg,
+    });
 
     if (streamCb) {
-      streamCb({
+      const failedEvent: RuntimeStreamEvent = {
         type: "turn_failed",
         sessionId,
         turnId,
         error: { code: "AGENT_ERROR", message: errorMsg, recoverable: false },
-      });
+      };
+      await writeRunLog(runLogger, "stream_event", failedEvent);
+      streamCb(failedEvent);
     }
 
-    return {
+    const failedResult: AgentTurnResult = {
       sessionId,
       turnId,
       events: [],
@@ -99,9 +155,11 @@ export async function runTurnWithAgent(
       status: "failed",
       error: { code: "AGENT_ERROR", message: errorMsg },
     };
+    await writeRunLog(runLogger, "run_failed", failedResult);
+    return failedResult;
   }
 
-  const sessionEvents = buildSessionEvents(loopResult, sessionId, turnId);
+  const sessionEvents = buildSessionEvents(loopResult, sessionId, turnId, userInput);
   const contextSnapshot = deps.contextManager.getUsageSnapshot();
   const snapshotEvent = contextSnapshotToEvent(contextSnapshot, sessionId, turnId);
   sessionEvents.push(snapshotEvent);
@@ -109,15 +167,30 @@ export async function runTurnWithAgent(
   const finalReply = toAssistantReply(loopResult.message);
 
   if (streamCb) {
-    streamCb({
+    const finishedEvent: RuntimeStreamEvent = {
       type: "turn_finished",
       sessionId,
       turnId,
       resultEventIds: sessionEvents.map((e) => e.id),
-    });
+    };
+    await writeRunLog(runLogger, "stream_event", finishedEvent);
+    streamCb(finishedEvent);
   }
 
-  return {
+  logAgentRun("turn execution completed", {
+    sessionId,
+    turnId,
+    status: loopResult.message.stopReason === "error" ? "failed" : "completed",
+    stopReason: loopResult.message.stopReason,
+    sessionEventCount: sessionEvents.length,
+    textDeltaCount: streamStats.textDeltaCount,
+    textChars: streamStats.textChars,
+    thinkingDeltaCount: streamStats.thinkingDeltaCount,
+    thinkingChars: streamStats.thinkingChars,
+    totalTokens: contextSnapshot.totalTokens,
+  });
+
+  const result: AgentTurnResult = {
     sessionId,
     turnId,
     events: sessionEvents,
@@ -128,14 +201,27 @@ export async function runTurnWithAgent(
       ? { code: "LLM_ERROR", message: loopResult.message.errorMessage }
       : undefined,
   };
+  await writeRunLog(
+    runLogger,
+    result.status === "failed" ? "run_failed" : "run_finished",
+    result,
+  );
+  return result;
 }
 
 function buildSessionEvents(
   result: AgentLoopResult,
   sessionId: string,
   turnId: string,
+  userInput: string,
 ): SessionEvent[] {
-  const events: SessionEvent[] = [];
+  const userMessage: UserMessage = {
+    role: "user",
+    content: userInput,
+    timestamp: Date.now(),
+    source: "user",
+  };
+  const events: SessionEvent[] = userMessageToEvents(userMessage, sessionId, turnId);
   for (const msg of result.messages) {
     events.push(...messageToEvents(msg, sessionId, turnId));
   }
@@ -187,4 +273,142 @@ function mapAgentEventToStreamEvent(
     case "message_end":
       return null;
   }
+}
+
+function logAgentEvent(
+  event: AgentEvent,
+  sessionId: string,
+  turnId: string,
+  stats: {
+    textDeltaCount: number;
+    textChars: number;
+    thinkingDeltaCount: number;
+    thinkingChars: number;
+  },
+): void {
+  switch (event.type) {
+    case "agent_start":
+      logAgentRun("agent started", { sessionId, turnId });
+      return;
+
+    case "agent_end":
+      logAgentRun("agent ended", { sessionId, turnId, messageCount: event.messages.length });
+      return;
+
+    case "turn_start":
+      logAgentRun("loop turn started", { sessionId, turnId, turnIndex: event.turnIndex });
+      return;
+
+    case "turn_end":
+      logAgentRun("loop turn ended", {
+        sessionId,
+        turnId,
+        turnIndex: event.turnIndex,
+        stopReason: event.message.stopReason,
+        toolResultCount: event.toolResults.length,
+      });
+      return;
+
+    case "message_start":
+      logAgentRun("message started", { sessionId, turnId, role: event.message.role });
+      return;
+
+    case "message_end":
+      logAgentRun("message ended", { sessionId, turnId, role: event.message.role });
+      return;
+
+    case "message_delta":
+      if (event.delta.type === "text_delta") {
+        stats.textDeltaCount += 1;
+        stats.textChars += event.delta.delta.length;
+        if (stats.textDeltaCount === 1 || stats.textDeltaCount % 20 === 0) {
+          logAgentRun("assistant text streaming", {
+            sessionId,
+            turnId,
+            deltaCount: stats.textDeltaCount,
+            chars: stats.textChars,
+          });
+        }
+      } else if (event.delta.type === "thinking_delta") {
+        stats.thinkingDeltaCount += 1;
+        stats.thinkingChars += event.delta.delta.length;
+        if (stats.thinkingDeltaCount === 1 || stats.thinkingDeltaCount % 20 === 0) {
+          logAgentRun("assistant thinking streaming", {
+            sessionId,
+            turnId,
+            deltaCount: stats.thinkingDeltaCount,
+            chars: stats.thinkingChars,
+          });
+        }
+      } else {
+        logAgentRun("tool call delta received", { sessionId, turnId });
+      }
+      return;
+
+    case "tool_start":
+      logAgentRun("tool started", {
+        sessionId,
+        turnId,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        argsPreview: preview(event.args),
+      });
+      return;
+
+    case "tool_end":
+      logAgentRun("tool finished", {
+        sessionId,
+        turnId,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        isError: event.isError,
+        resultPreview: preview(event.result.success ? event.result.data : event.result.error),
+      });
+      return;
+  }
+}
+
+async function writeRunLog(
+  runLogger: AgentRunLogger | undefined,
+  type: string,
+  payload: unknown,
+): Promise<void> {
+  if (!runLogger) return;
+
+  try {
+    await runLogger.write({ type, payload });
+  } catch (err) {
+    console.error("[agent-run-log] failed to write run log", err);
+  }
+}
+
+function serializeAgentEvent(event: AgentEvent): Record<string, unknown> {
+  switch (event.type) {
+    case "agent_start":
+    case "agent_end":
+    case "message_start":
+    case "message_end":
+      return event;
+
+    case "turn_start":
+      return event;
+
+    case "turn_end":
+      return event;
+
+    case "message_delta":
+      return event;
+
+    case "tool_start":
+      return event;
+
+    case "tool_end":
+      return event;
+  }
+}
+
+function getRunLogEventType(event: AgentEvent): "agent_event" | "tool_event" {
+  return event.type === "tool_start" || event.type === "tool_end"
+    ? "tool_event"
+    : "agent_event";
 }

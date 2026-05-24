@@ -6,24 +6,36 @@
  */
 
 // 模块级类型
-export type { ToolDefinitionSpec, ToolExecutorFn, ToolManagerConfig } from "./types";
+export type {
+  ToolDefinitionSpec,
+  ToolExecutorFn,
+  ToolManagerConfig,
+  ToolRuntimeConfig,
+} from "./types";
 
 // 核心组件
 export { ToolManager } from "./manager";
 export { guardWorkspacePath } from "./workspace-guard";
 export type { GuardResult } from "./workspace-guard";
+export { shouldExposeTool } from "./exposure";
 
 // 工具定义
 export { readFileDefinition } from "./tools/read-file/definition";
 export { searchFilesDefinition } from "./tools/search-files/definition";
 export { listDirectoryDefinition } from "./tools/list-directory/definition";
 export { editFileDiffDefinition } from "./tools/edit-file-diff/definition";
+export { webSearchDefinition } from "./tools/web-search/definition";
+export { webFetchDefinition } from "./tools/web-fetch/definition";
+export { analyzeMediaDefinition } from "./tools/analyze-media/definition";
 
 // 工具执行器
 export { readFileExecutor } from "./tools/read-file/executor";
 export { searchFilesExecutor } from "./tools/search-files/executor";
 export { listDirectoryExecutor } from "./tools/list-directory/executor";
 export { editFileDiffExecutor } from "./tools/edit-file-diff/executor";
+export { webSearchExecutor } from "./tools/web-search/executor";
+export { webFetchExecutor } from "./tools/web-fetch/executor";
+export { analyzeMediaExecutor } from "./tools/analyze-media/executor";
 
 // ─── 便捷函数 ───
 
@@ -37,13 +49,36 @@ import { listDirectoryDefinition } from "./tools/list-directory/definition";
 import { listDirectoryExecutor } from "./tools/list-directory/executor";
 import { editFileDiffDefinition } from "./tools/edit-file-diff/definition";
 import { editFileDiffExecutor } from "./tools/edit-file-diff/executor";
+import { webSearchDefinition } from "./tools/web-search/definition";
+import { webSearchExecutor } from "./tools/web-search/executor";
+import { webFetchDefinition } from "./tools/web-fetch/definition";
+import { webFetchExecutor } from "./tools/web-fetch/executor";
+import { analyzeMediaDefinition } from "./tools/analyze-media/definition";
+import { analyzeMediaExecutor } from "./tools/analyze-media/executor";
+import { shouldExposeTool } from "./exposure";
 
 /** 创建预装四个基础工具的 ToolManager */
 export function createToolManager(config: ToolManagerConfig): ToolManager {
   const manager = new ToolManager(config);
-  manager.registerFromSpec(readFileDefinition, readFileExecutor);
-  manager.registerFromSpec(searchFilesDefinition, searchFilesExecutor);
-  manager.registerFromSpec(listDirectoryDefinition, listDirectoryExecutor);
-  manager.registerFromSpec(editFileDiffDefinition, editFileDiffExecutor);
+  const runtime = {
+    primaryProvider: config.primaryProvider,
+    hasKimiKey: config.hasKimiKey,
+  };
+  const entries = [
+    [readFileDefinition, readFileExecutor],
+    [searchFilesDefinition, searchFilesExecutor],
+    [listDirectoryDefinition, listDirectoryExecutor],
+    [editFileDiffDefinition, editFileDiffExecutor],
+    [webSearchDefinition, webSearchExecutor],
+    [webFetchDefinition, webFetchExecutor],
+    [analyzeMediaDefinition, analyzeMediaExecutor],
+  ] as const;
+
+  for (const [definition, executor] of entries) {
+    if (shouldExposeTool(definition, runtime)) {
+      manager.registerFromSpec(definition, executor);
+    }
+  }
+
   return manager;
 }

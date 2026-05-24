@@ -1,14 +1,18 @@
 import { app, BrowserWindow, ipcMain } from "electron";
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { access, mkdir, readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { AgentTurnResult, RunTurnInput, SessionCreateInput, SessionGetInput } from "@actspace/shared";
 import {
   createBootstrapState,
+  env,
   loadEnv,
   createLLMServiceFromEnv,
   createToolManager,
   ContextManager,
   SystemPromptContext,
+  type AgentRunLogger,
+  cleanupOldAgentRunLogs,
+  createAgentRunLogger,
   runTurnWithAgent,
   createSessionRecord,
   createSessionStorePaths,
@@ -20,36 +24,143 @@ import {
 const APP_ID = "com.actspace.desktop";
 const APP_NAME = "actspace";
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
+const PREVIEW_LIMIT = 160;
 
 type AppDataRoots = {
   dataRoot: string;
   sessionRoot: string;
   logRoot: string;
   tmpRoot: string;
+  workspaceRoot: string;
 };
+
+let repoRootCache: string | undefined;
+let workspaceRootCache: string | undefined;
+
+function preview(value: unknown, limit = PREVIEW_LIMIT): string {
+  let text: string;
+  try {
+    text = typeof value === "string" ? value : JSON.stringify(value);
+  } catch {
+    text = String(value);
+  }
+  if (!text) return "";
+  return text.length > limit ? `${text.slice(0, limit)}...` : text;
+}
+
+function logMain(message: string, details?: Record<string, unknown>): void {
+  console.log(
+    `[main] ${message}`,
+    details ? JSON.stringify(details) : "",
+  );
+}
+
+function logAgentIpc(message: string, details?: Record<string, unknown>): void {
+  console.log(
+    `[agent-ipc] ${message}`,
+    details ? JSON.stringify(details) : "",
+  );
+}
+
+function logRendererConsole(
+  level: "log" | "warn" | "error" | "debug" | "info",
+  message: string,
+  details?: Record<string, unknown>,
+): void {
+  const payload = {
+    level,
+    message: preview(message, 500),
+    ...details,
+  };
+  console.log(`[renderer-console] ${JSON.stringify(payload)}`);
+}
 
 async function ensureDataDirectories(): Promise<AppDataRoots> {
   const dataRoot = app.getPath("userData");
   const sessionRoot = join(dataRoot, "sessions");
-  const logRoot = join(dataRoot, "logs");
+  const logRoot = join(await getRepoRoot(), "logs");
   const tmpRoot = join(dataRoot, "tmp");
+  const workspaceRoot = await getWorkspaceRoot();
 
   await mkdir(sessionRoot, { recursive: true });
   await mkdir(logRoot, { recursive: true });
   await mkdir(tmpRoot, { recursive: true });
 
+  logMain("data directories ensured", {
+    dataRoot,
+    sessionRoot,
+    logRoot,
+    tmpRoot,
+    workspaceRoot,
+  });
+
   return {
     dataRoot,
     sessionRoot,
     logRoot,
-    tmpRoot
+    tmpRoot,
+    workspaceRoot
   };
 }
+
+async function getRepoRoot(): Promise<string> {
+  if (repoRootCache) return repoRootCache;
+
+  const explicit = process.env.ACTSPACE_REPO_ROOT;
+  if (explicit) {
+    await access(join(explicit, "package.json"));
+    repoRootCache = explicit;
+    return repoRootCache;
+  }
+
+  let current = process.cwd();
+  while (true) {
+    if (await isActspaceRepoRoot(current)) {
+      repoRootCache = current;
+      return repoRootCache;
+    }
+
+    const parent = dirname(current);
+    if (parent === current) {
+      repoRootCache = process.cwd();
+      return repoRootCache;
+    }
+    current = parent;
+  }
+}
+
+async function isActspaceRepoRoot(dir: string): Promise<boolean> {
+  try {
+    const raw = await readFile(join(dir, "package.json"), "utf-8");
+    const pkg = JSON.parse(raw) as { name?: string };
+    return pkg.name === "actspace";
+  } catch {
+    return false;
+  }
+}
+
+async function getWorkspaceRoot(): Promise<string> {
+  if (workspaceRootCache) return workspaceRootCache;
+
+  const explicit = process.env.ACTSPACE_WORKSPACE_ROOT;
+  if (explicit) {
+    await access(explicit);
+    workspaceRootCache = explicit;
+    logMain("workspace root resolved from ACTSPACE_WORKSPACE_ROOT", { workspaceRoot: workspaceRootCache });
+    return workspaceRootCache;
+  }
+
+  workspaceRootCache = await getRepoRoot();
+  logMain("workspace root resolved from repo root", { workspaceRoot: workspaceRootCache });
+  return workspaceRootCache;
+}
+
 
 function configureAppPaths() {
   app.setName(APP_NAME);
   const userDataRoot = join(app.getPath("appData"), APP_NAME);
   app.setPath("userData", userDataRoot);
+  logMain("app paths configured", { userDataRoot });
 }
 
 async function createMainWindow() {
@@ -73,8 +184,21 @@ async function createMainWindow() {
     }
   });
 
+  win.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+    const levelName = mapConsoleLevel(level);
+    logRendererConsole(levelName, message, { line, sourceId: preview(sourceId, 240) });
+  });
+
+  win.webContents.on("render-process-gone", (_event, details) => {
+    logMain("renderer process gone", {
+      reason: details.reason,
+      exitCode: details.exitCode,
+    });
+  });
+
   if (DEV_SERVER_URL) {
     try {
+      logMain("loading dev server", { url: DEV_SERVER_URL });
       await win.loadURL(DEV_SERVER_URL);
     } catch (error) {
       console.error(`Failed to load dev server URL: ${DEV_SERVER_URL}`, error);
@@ -82,17 +206,46 @@ async function createMainWindow() {
     }
     win.webContents.openDevTools({ mode: "detach" });
   } else {
-    await win.loadFile(join(__dirname, "..", "..", "dist", "index.html"));
+    const filePath = join(__dirname, "..", "..", "dist", "index.html");
+    logMain("loading packaged renderer", { filePath });
+    await win.loadFile(filePath);
   }
 }
 
-function createAgentDeps() {
+function mapConsoleLevel(level: number): "log" | "warn" | "error" | "debug" | "info" {
+  switch (level) {
+    case 1:
+      return "warn";
+    case 2:
+      return "error";
+    case 3:
+      return "debug";
+    case 4:
+      return "info";
+    default:
+      return "log";
+  }
+}
+
+async function createAgentDeps() {
+  logAgentIpc("creating agent dependencies");
   const llm = createLLMServiceFromEnv();
-  const toolManager = createToolManager({ workspaceRoot: app.getPath("userData") });
+  const workspaceRoot = await getWorkspaceRoot();
+  const primaryProvider = env.MOCK_MODE ? "mock" : env.LLM_PROVIDER === "kimi" ? "kimi" : "deepseek";
+  const toolManager = createToolManager({
+    workspaceRoot,
+    primaryProvider,
+    hasKimiKey: Boolean(env.KIMI_API_KEY),
+  });
   const systemPromptModule = new SystemPromptContext(
     "You are actspace, a helpful AI coding assistant.",
   );
   const contextManager = new ContextManager({ systemPromptModule });
+  logAgentIpc("agent dependencies ready", {
+    workspaceRoot,
+    primaryProvider,
+    hasKimiKey: Boolean(env.KIMI_API_KEY),
+  });
   return { llm, toolManager, contextManager };
 }
 
@@ -100,9 +253,58 @@ function getMainWindow(): BrowserWindow | undefined {
   return BrowserWindow.getAllWindows()[0];
 }
 
+async function writeAgentRunLog(
+  runLogger: AgentRunLogger | undefined,
+  type: string,
+  payload: unknown,
+): Promise<void> {
+  if (!runLogger) return;
+
+  try {
+    await runLogger.write({ type, payload });
+  } catch (error) {
+    console.error("[agent-run-log] failed to write main run log", error);
+  }
+}
+
 async function runAndPersistTurn(input: RunTurnInput): Promise<AgentTurnResult> {
+  logAgentIpc("run turn requested", {
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    userInputLength: input.userInput.length,
+    userInputPreview: preview(input.userInput),
+  });
   const roots = await ensureDataDirectories();
-  const deps = createAgentDeps();
+  let runLogger: AgentRunLogger | undefined;
+  try {
+    await cleanupOldAgentRunLogs(roots.logRoot);
+    runLogger = await createAgentRunLogger({
+      logRoot: roots.logRoot,
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+    });
+  } catch (error) {
+    console.error("[agent-run-log] failed to prepare run log", error);
+  }
+  await writeAgentRunLog(runLogger, "main_event", {
+    stage: "run_turn_requested",
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    userInput: input.userInput,
+    runLogFilePath: runLogger?.filePath,
+  });
+  if (runLogger) {
+    logAgentIpc("run log created", {
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      filePath: runLogger.filePath,
+    });
+  }
+  const deps = await createAgentDeps();
+  await writeAgentRunLog(runLogger, "main_event", {
+    stage: "agent_dependencies_ready",
+    workspaceRoot: roots.workspaceRoot,
+  });
   const win = getMainWindow();
 
   const result = await runTurnWithAgent(
@@ -110,13 +312,41 @@ async function runAndPersistTurn(input: RunTurnInput): Promise<AgentTurnResult> 
     deps,
     {
       onStreamEvent: (event) => {
+        logAgentIpc("stream event sent to renderer", {
+          sessionId: "sessionId" in event ? event.sessionId : input.sessionId,
+          turnId: "turnId" in event ? event.turnId : input.turnId,
+          type: event.type,
+        });
         win?.webContents.send("agent:stream", event);
       },
+      runLogger,
     },
   );
 
   const sessionDir = join(roots.sessionRoot, input.sessionId);
+  await writeAgentRunLog(runLogger, "main_event", {
+    stage: "persisting_turn_result",
+    sessionDir,
+    status: result.status,
+    eventCount: result.events.length,
+  });
+  logAgentIpc("persisting turn result", {
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    sessionDir,
+    status: result.status,
+    eventCount: result.events.length,
+  });
   await writeSessionResult(createSessionStorePaths(sessionDir), result);
+  await writeAgentRunLog(runLogger, "main_event", {
+    stage: "turn_result_persisted",
+    status: result.status,
+  });
+  logAgentIpc("turn result persisted", {
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    status: result.status,
+  });
   return result;
 }
 
@@ -128,12 +358,28 @@ async function registerIpc() {
       dataRoot: roots.dataRoot,
       sessionRoot: roots.sessionRoot,
       logRoot: roots.logRoot,
-      tmpRoot: roots.tmpRoot
+      tmpRoot: roots.tmpRoot,
+      workspaceRoot: roots.workspaceRoot
     });
   });
 
   ipcMain.handle("agent:run-turn", async (_event, input: RunTurnInput) => {
-    return runAndPersistTurn(input);
+    try {
+      const result = await runAndPersistTurn(input);
+      logAgentIpc("run turn completed", {
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        status: result.status,
+      });
+      return result;
+    } catch (error) {
+      logAgentIpc("run turn failed before response", {
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   });
 
   ipcMain.handle("session:list", async () => {

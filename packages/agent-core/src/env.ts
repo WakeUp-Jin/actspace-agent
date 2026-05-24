@@ -31,8 +31,8 @@ export interface AppEnv {
   /** 运行环境 */
   NODE_ENV: "development" | "production" | "test";
 
-  /** LLM provider: "deepseek" | "mock" */
-  LLM_PROVIDER: string;
+  /** LLM provider: "deepseek" | "kimi" */
+  LLM_PROVIDER: "deepseek" | "kimi" | "mock" | "deepseek-mock";
   /** LLM 默认模型 */
   LLM_MODEL: string;
   /** LLM 默认温度 */
@@ -44,6 +44,13 @@ export interface AppEnv {
   DEEPSEEK_API_KEY: string;
   /** DeepSeek Base URL（自部署时使用） */
   DEEPSEEK_BASE_URL: string;
+
+  /** Kimi API Key */
+  KIMI_API_KEY: string;
+  /** Kimi Base URL */
+  KIMI_BASE_URL: string;
+  /** Kimi 默认模型 */
+  KIMI_MODEL: string;
 
   /** 日志级别 */
   LOG_LEVEL: "debug" | "info" | "warn" | "error";
@@ -86,8 +93,14 @@ const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
   LLM_PROVIDER: {
     envKey: "LLM_PROVIDER",
     required: false,
-    default: "mock",
-    parse: str,
+    default: "deepseek",
+    parse: (raw) => {
+      const valid = ["deepseek", "kimi", "mock", "deepseek-mock"] as const;
+      const v = raw.toLowerCase();
+      return (valid as readonly string[]).includes(v)
+        ? (v as AppEnv["LLM_PROVIDER"])
+        : "deepseek";
+    },
   },
   LLM_MODEL: {
     envKey: "LLM_MODEL",
@@ -120,6 +133,25 @@ const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
     envKey: "DEEPSEEK_BASE_URL",
     required: false,
     default: "https://api.deepseek.com",
+    parse: str,
+  },
+
+  KIMI_API_KEY: {
+    envKey: "KIMI_API_KEY",
+    required: false,
+    default: "",
+    parse: str,
+  },
+  KIMI_BASE_URL: {
+    envKey: "KIMI_BASE_URL",
+    required: false,
+    default: "https://api.moonshot.ai/v1",
+    parse: str,
+  },
+  KIMI_MODEL: {
+    envKey: "KIMI_MODEL",
+    required: false,
+    default: "kimi-k2.6",
     parse: str,
   },
 
@@ -301,11 +333,32 @@ export const env: AppEnv = new Proxy({} as AppEnv, {
  */
 export function envToLLMConfig() {
   const e = getEnv();
+  if (e.MOCK_MODE || e.LLM_PROVIDER === "mock" || e.LLM_PROVIDER === "deepseek-mock") {
+    return {
+      provider: "mock",
+      apiKey: "mock-key",
+      model: "deepseek-mock",
+      temperature: e.LLM_TEMPERATURE,
+      maxTokens: e.LLM_MAX_TOKENS,
+    };
+  }
+
+  if (e.LLM_PROVIDER === "kimi") {
+    return {
+      provider: "kimi",
+      apiKey: e.KIMI_API_KEY,
+      baseUrl: e.KIMI_BASE_URL || undefined,
+      model: e.KIMI_MODEL,
+      temperature: e.LLM_TEMPERATURE,
+      maxTokens: e.LLM_MAX_TOKENS,
+    };
+  }
+
   return {
-    provider: e.MOCK_MODE ? "mock" : e.LLM_PROVIDER,
-    apiKey: e.DEEPSEEK_API_KEY || "mock-key",
+    provider: "deepseek",
+    apiKey: e.DEEPSEEK_API_KEY,
     baseUrl: e.DEEPSEEK_BASE_URL || undefined,
-    model: e.MOCK_MODE ? "deepseek-mock" : e.LLM_MODEL,
+    model: e.LLM_MODEL,
     temperature: e.LLM_TEMPERATURE,
     maxTokens: e.LLM_MAX_TOKENS,
   };

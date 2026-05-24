@@ -8,7 +8,7 @@
 
 ## 设计来源
 
-- `docs/design-docs/backend-agent-design.md`
+- `docs/design-docs/agent-core/backend-agent-design.md`
 - `.agents/skills/llm-agent-dev/references/context/mgmt-context-architecture.md`（核心：Message/Content/Context 类型层次）
 - `.agents/skills/llm-agent-dev/references/llm/llm-service.md`（AssistantMessage 结构、Usage、stopReason）
 - `.agents/skills/llm-agent-dev/references/tools/tool-definition.md`（InternalTool、ToolResult）

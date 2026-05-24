@@ -15,7 +15,9 @@ export interface ToolDefinitionSpec {
   description: string;
   parameters: ToolParameterSchema;
   isReadOnly: boolean;
-  category: "file" | "search" | "system" | "memory";
+  category: string;
+  /** Missing means visible to both real providers. DeepSeek-only tools require a Kimi key. */
+  exposeOnlyTo?: "deepseek" | "kimi";
 }
 
 /** executor.ts 导出的执行函数签名 */
@@ -24,8 +26,13 @@ export type ToolExecutorFn = (
   workspaceRoot: string,
 ) => Promise<ToolResult>;
 
+export interface ToolRuntimeConfig {
+  primaryProvider?: "deepseek" | "kimi" | "mock";
+  hasKimiKey?: boolean;
+}
+
 /** ToolManager 配置 */
-export interface ToolManagerConfig {
+export interface ToolManagerConfig extends ToolRuntimeConfig {
   workspaceRoot: string;
   /** 硬截断阈值（字符数），默认 2000 */
   truncateThreshold?: number;

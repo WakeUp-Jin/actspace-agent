@@ -200,7 +200,8 @@ export const mockBootstrapState: BootstrapState = {
   dataRoot: "Mock data root",
   sessionRoot: "Mock data root/sessions",
   logRoot: "Mock data root/logs",
-  tmpRoot: "Mock data root/tmp"
+  tmpRoot: "Mock data root/tmp",
+  workspaceRoot: "Mock workspace root"
 };
 
 export const mockSessionRecord: SessionRecord = {

@@ -69,14 +69,17 @@
 - `llm/base.ts`：BaseLLMService 抽象基类，stream 为核心方法，complete 由 stream 聚合。
 - `llm/services/mock.ts`：MockLLMService，模拟完整 turn 事件流（含工具调用）。
 - `llm/services/deepseek.ts`：DeepSeekService 真实流式 provider，使用 OpenAI 兼容的 `/chat/completions` SSE 接口，映射文本、思考、工具调用和 token usage。
+- `llm/services/kimi.ts`：KimiService 真实流式 provider，复用 OpenAI-compatible 流式解析，并支持 Kimi `builtin_function.$web_search` 请求参数。
+- `llm/kimi-assistants/`：DeepSeek 专用的 Kimi 辅助调用层，包含 `web_search`、`web_fetch`、`analyze_media` 三个 wrapper 使用的内部系统提示词与调用函数。
 - `llm/factory.ts`：createLLMService 工厂函数。
 
 ### `tools/` — 模块化工具系统
 
-- `tools/types.ts`：ToolDefinitionSpec、ToolExecutorFn、ToolManagerConfig。
+- `tools/types.ts`：ToolDefinitionSpec、ToolExecutorFn、ToolManagerConfig；工具定义可用 `exposeOnlyTo?: "deepseek" | "kimi"` 做轻量暴露筛选，缺省表示两个主模型都可见。
 - `tools/workspace-guard.ts`：路径边界守卫，防止工具访问工作区外文件。
 - `tools/manager.ts`：ToolManager（注册/获取/执行/结果裁剪）。
 - `tools/tools/{read-file,search-files,list-directory,edit-file-diff}/`：每个工具一个目录，含 `definition.ts` + `executor.ts`。
+- `tools/tools/{web-search,web-fetch,analyze-media}/`：DeepSeek-only Kimi 辅助工具；只有 DeepSeek 为主模型且配置 Kimi key 时注册。
 
 ### `context/` — 上下文管道
 
@@ -101,12 +104,16 @@
 - `persistence/recovery.ts`：多维恢复（events→Messages/Blocks/Snapshot/DiffSummary）。
 - `persistence/session-store.ts`：会话存储生命周期（create/ensure/write/read/list）。
 
+### `observability/` — 本地运行排障日志
+
+- `observability/agent-run-log.ts`：每次 Agent turn 一个 JSONL 文件，记录从用户输入、main 边界、AgentEvent、RuntimeStreamEvent 到最终结果的完整链路，并清理超过 24 小时的 run 日志。
+
 ### 环境变量管理
 
 - `env.ts`：集中式环境变量管理模块。自带轻量 `.env` 文件解析器（无第三方依赖），按 Schema 驱动验证、解析、冻结。
   - `loadEnv()`：应用启动时调用，自动探测并加载 `.env` 文件，合并到 `process.env`（不覆盖已有值）。
   - `env` proxy：类型安全的只读对象，任意文件 `import { env }` 后直接访问 `env.DEEPSEEK_API_KEY` 等。
-  - `envToLLMConfig()`：从 env 生成 `LLMConfig`，`MOCK_MODE=true` 时自动切换到 mock provider。
+  - `envToLLMConfig()`：从 env 生成 `LLMConfig`，`LLM_PROVIDER=deepseek|kimi` 选择真实 provider，`MOCK_MODE=true` 时自动切换到 mock provider。
   - `EnvValidationError`：缺失必填项或值不合法时抛出，携带所有问题列表。
 
 项目根目录的 `.env.example` 列出全部可配置项和默认值，`.env` 已被 `.gitignore` 忽略。
@@ -124,11 +131,17 @@
 - `session.jsonl`：会话事件流持久化文件
 - `attachments/`：附件目录
 
-当前应用启动时会初始化：
+当前应用启动时会初始化应用数据目录：
 
 - `sessions/`
-- `logs/`
 - `tmp/`
+
+同时，开发排障日志会写入仓库根目录 `logs/`。其中 `logs/agent-runs/` 用于保存最近约 1 天的 Agent turn 运行链路 JSONL。它不同于 `session.jsonl`：
+
+- `session.jsonl` 是会话恢复事实来源，保存稳定的 SessionEvent。
+- 每轮真实 turn 的 `SessionEvent` 顺序以 `user_message -> thinking/tool_call/tool_result -> assistant_message -> context_snapshot` 为基线；即使后端内部 AgentLoopResult 不包含 user message，IPC bridge 也必须显式写入本轮用户输入事件。
+- `logs/agent-runs/*.jsonl` 是本地排障文件，允许包含完整用户输入、完整工具参数、完整工具结果和最终 AgentTurnResult，便于判断 Agent 执行、后端推送或前端渲染问题。
+- 日志目录只保存在本机，不应提交到 Git；仓库根目录 `logs/` 已在 `.gitignore` 中忽略。
 
 应用会在启动早期显式把 Electron `userData` 目录固定为产品名 `actspace`，因此安装后目录规则应稳定为：
 
@@ -139,8 +152,15 @@
 上述目录下再包含：
 
 - `sessions/`
-- `logs/`
 - `tmp/`
+
+开发态 `logRoot` 默认指向仓库根目录 `logs/`，也可以通过 `ACTSPACE_REPO_ROOT` 显式指定仓库根。
+
+Agent 文件工具的 `workspaceRoot` 与 Electron `userData` 分离：
+
+- `userData` 只用于 session、附件、tmp 等应用数据。
+- `workspaceRoot` 用于 `read_file`、`search_files`、`list_directory`、`edit_file_diff` 等文件工具。
+- 首版解析顺序为 `ACTSPACE_WORKSPACE_ROOT` -> 当前仓库根目录。
 
 ## 当前 IPC 契约
 
@@ -172,10 +192,11 @@
 6. renderer 将新会话设为 active session，清空当前消息流，后续发送沿用新的 `sessionId`
 7. 用户输入消息，renderer 通过 `agent:run-turn` 发起请求
 8. main 调用 `runTurnWithAgent()`，内部使用新 Agent 引擎（Agent.run）
-9. 执行过程中，`AgentEvent` 实时通过 `engine/bridge.ts` 映射为 `RuntimeStreamEvent`，经 `agent:stream` 推送到 renderer
-10. renderer 通过 `onAgentStream` 监听实时事件，动态更新 UI（thinking、text delta、tool 状态）
-11. `agent:run-turn` 返回完整的 `AgentTurnResult`，结果落盘到本地 session 目录
-12. renderer 用最终结果替换流式中间状态，完成一轮交互
+9. main 在仓库根目录 `logs/agent-runs/` 创建本次 turn 的 JSONL 排障文件，并清理超过 24 小时的旧 run 日志
+10. 执行过程中，`AgentEvent` 实时通过 `engine/bridge.ts` 映射为 `RuntimeStreamEvent`，经 `agent:stream` 推送到 renderer，同时写入本次 run JSONL
+11. renderer 通过 `onAgentStream` 监听实时事件，动态更新 UI（thinking、text delta、tool 状态）
+12. `agent:run-turn` 返回完整的 `AgentTurnResult`，结果落盘到本地 session 目录，并写入本次 run JSONL
+13. renderer 用最终结果替换流式中间状态，完成一轮交互
 
 ## 当前已确认的实现方向
 
@@ -184,6 +205,7 @@
 - 本地数据优先使用 `jsonl` 文件存储，直接落盘到用户电脑。
 - 更细的产品级技术选型以根目录 `README.md` 中的“技术栈”小节为准。
 - 工程骨架已开始落地为 `packages/desktop + packages/agent-core + packages/shared` 的单仓结构。
-- 当前同时保留 `mock` 开发 provider 与 `deepseek` 真实流式 provider；真实调用通过本地环境变量显式选择，密钥不进入 renderer 或 session 事件。
+- 当前同时保留 `mock` 开发 provider 与 `deepseek`、`kimi` 两个真实流式 provider；桌面端普通会话默认走 `deepseek`，也可通过 `LLM_PROVIDER=kimi` 选择 Kimi，`MOCK_MODE=true` 才显式切换到 mock。密钥不进入 renderer 或 session 事件。
+- DeepSeek 作为主模型时，如果配置 `KIMI_API_KEY`，ToolManager 会额外注册 `web_search`、`web_fetch`、`analyze_media`；没有 Kimi key 时这些工具不暴露，本地文件工具仍正常可用。
 - 环境变量统一通过 `agent-core/env.ts` 管理，项目根目录的 `.env` 文件在 main 进程启动时加载。`process.env` 已有值优先于 `.env` 文件（方便 CI / Docker 覆盖）。
 - 开发态启动需要先确保 `shared`、`agent-core` 有可消费产物，再启动 Electron main/preload 的 watch 与 renderer。

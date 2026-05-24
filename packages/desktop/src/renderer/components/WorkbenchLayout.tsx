@@ -63,6 +63,8 @@ export function WorkbenchLayout({
   isStreaming = false,
   onSend,
   onNewSession,
+  onSelectSession,
+  showDemoAttachments = false,
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
@@ -73,6 +75,8 @@ export function WorkbenchLayout({
   isStreaming?: boolean;
   onSend?: (text: string) => void;
   onNewSession?: () => void;
+  onSelectSession?: (sessionId: string) => void;
+  showDemoAttachments?: boolean;
 }) {
   const [storedLayout] = useState(loadStoredLayout);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -177,6 +181,7 @@ export function WorkbenchLayout({
           mode={leftMode}
           onToggleMode={toggleSidebarMode}
           onNewSession={onNewSession}
+          onSelectSession={onSelectSession}
         />
       }
       leftWidth={displayedLeftWidth}
@@ -191,6 +196,7 @@ export function WorkbenchLayout({
           onToggleRightPanel={toggleRightPanel}
           isStreaming={isStreaming}
           onSend={onSend}
+          showDemoAttachments={showDemoAttachments}
         />
       }
       minMainWidth={MAIN_MIN_WIDTH}

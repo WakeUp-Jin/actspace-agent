@@ -12,18 +12,21 @@
 - 应用启动后必须至少能完成两条路径之一：
   - 恢复本地已有会话
   - 在没有旧会话时，跑起一轮默认 turn
-- 即使当前 provider 还是 mock，完整链路也应保持可运行：
+- 普通桌面会话默认走真实 DeepSeek provider，也可通过 `LLM_PROVIDER=kimi` 选择 Kimi；mock 只应通过 `MOCK_MODE=true` 显式开启，用于测试、fixture 或 demo：
   - 启动应用
   - 请求 bootstrap state
   - 读取 session list
   - 执行或恢复一轮 turn
   - 渲染消息流
   - 本地落盘
+- 每轮真实 turn 的 `session.jsonl` 必须能恢复用户输入、中间执行和最终回复，至少包含 `user_message` 和 `context_snapshot`。
 
 ## 当前本地排障入口
 
 - `pnpm dev`：本地开发启动桌面端。
 - `pnpm dev:log`：本地开发启动桌面端，并把终端 stdout/stderr 同步写入根目录 `logs/dev-*.log`，同时更新 `logs/latest-dev.log` 供 Agent 排障读取。
+- 文件工具默认使用 workspace root，而不是 Electron `userData`。如需指定工作区，设置 `ACTSPACE_WORKSPACE_ROOT`。
+- DeepSeek 主模型的联网搜索、网页读取和多模态工具需要 `KIMI_API_KEY`。未配置时这些工具不会注册，避免运行中暴露一个必然失败的能力。
 - `pnpm typecheck`：检查跨包类型契约。
 - `pnpm build`：检查当前桌面端和共享包是否可构建。
 - `pnpm ci`：运行仓库级基础门禁。
@@ -34,6 +37,15 @@
 - `pnpm dev:log` 会保留最近约 2 天的 `*.log`，并自动清理更旧文件。
 - 终端日志通过 `pnpm dev 2>&1 | tee -a <log-file>` 写入文件：`2>&1` 合并错误输出，`tee` 同时显示到终端和写入日志。
 - Agent 排查启动、构建、Electron 或 provider 问题时，优先读取 `logs/latest-dev.log`。
+- Agent turn 运行时会向终端即时输出关键链路日志，`pnpm dev:log` 会同步写入 `logs/latest-dev.log`：
+  - `[agent-ipc]`：renderer 调用 main、main 推送 stream event、turn 持久化等 IPC 边界。
+  - `[agent-run]`：Agent loop 生命周期、流式 delta 计数、工具开始/结束、turn 完成状态。
+  - `[renderer-console]`：renderer console 输出转发，方便区分前端渲染错误和后端推送错误。
+- 仓库根目录 `logs/agent-runs/` 会保存最近约 1 天的 Agent turn JSONL 排障文件，每次用户输入到 Agent 最终输出对应一个文件。文件包含完整用户输入、工具调用参数、工具结果、AgentEvent、RuntimeStreamEvent 和最终 AgentTurnResult，便于区分：
+  - Agent 运行错误：看 `agent_event` / `tool_event` / `run_failed`。
+  - 后端是否推送给前端：看 `stream_event`。
+  - 会话持久化是否完成：看 `main_event` 的 `persisting_turn_result` / `turn_result_persisted`。
+- run JSONL 文件只用于本地排障，可能包含敏感输入与工具输出；不要提交到 Git。仓库根目录 `logs/` 已在 `.gitignore` 中忽略。
 
 ## 当前主要可靠性缺口
 
