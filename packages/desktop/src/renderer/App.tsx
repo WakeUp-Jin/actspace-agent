@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createMessageBlocks, getLatestContextSnapshot } from "@actspace/shared";
 import type {
   AgentTurnResult,
+  BashStatus,
   BootstrapState,
   ContextUsageSnapshot,
   MessageBlock,
@@ -70,6 +71,22 @@ function isDemoSession(sessionId: string | null): boolean {
   return sessionId === "session-learning-doc-plan";
 }
 
+function getStreamingBashStatus(tool: { isError?: boolean; finished?: boolean }): BashStatus {
+  if (!tool.finished) {
+    return "running";
+  }
+
+  return tool.isError ? "failed" : "success";
+}
+
+function getStreamingBashTitle(tool: { isError?: boolean; finished?: boolean }): string {
+  if (!tool.finished) {
+    return "Bash command";
+  }
+
+  return tool.isError ? "Bash command failed" : "Bash command";
+}
+
 function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
   const now = new Date().toISOString();
   const blocks: MessageBlock[] = [];
@@ -86,6 +103,21 @@ function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
   }
 
   for (const [toolCallId, tool] of state.activeTools) {
+    if (tool.toolName === "bash") {
+      blocks.push({
+        kind: "bash",
+        id: `streaming-tool-${toolCallId}`,
+        status: getStreamingBashStatus(tool),
+        title: getStreamingBashTitle(tool),
+        command: "Waiting for Bash result...",
+        commandPreview: "bash",
+        stdout: tool.finished ? "Completed" : "Executing...",
+        stderr: tool.isError ? "Tool execution failed" : undefined,
+        createdAt: now,
+      });
+      continue;
+    }
+
     blocks.push({
       kind: "tool",
       id: `streaming-tool-${toolCallId}`,

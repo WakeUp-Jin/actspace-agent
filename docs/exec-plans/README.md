@@ -11,10 +11,7 @@
 
 - `active/actspace-ui-bug-fix-plan.md`
 - `active/actspace-workbench-split-view-foundation.md`
-- `active/actspace-tool-permission-scheduler-plan.md`
-- `active/actspace-bash-tool-plan.md`
-- `active/actspace-bash-approval-ui-plan.md`
-- `active/actspace-tool-pause-session-boundary-plan.md`
+- `active/Bash工具和工具权限调度开发计划/README.md`
 - `active/actspace-deepseek-kimi-hybrid-capabilities.md`
 
 已完成的 `actspace` 计划：

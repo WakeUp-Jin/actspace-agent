@@ -142,9 +142,12 @@
 - [x] 实现正常 Bash Run 组件。
 - [x] 实现 Bash approval 组件。
 - [x] 更新 fixture 和前端设计文档。
-- [ ] 完成浏览器截图与 Electron 验收。
+- [x] 完成浏览器 mock 截图验收。
+- [x] 完成 Electron 真实窗口 smoke 验收。
 
 ## 决策记录
 
 - 2026-05-24：审核面板样式从权限调度计划中拆出。原因是视觉和交互需要根据 Bash 组件参考图反复校准，不应该阻塞后端状态机。
 - 2026-05-24：Bash 正常态和审核态使用同一个 `kind: "bash"` message block 承载，以状态区分 pending/running/success/failed/denied/expired/cancelled，避免同一 tool call 在消息流里分裂成多个块。
+- 2026-05-24：浏览器 mock 已完成桌面宽度和窄窗口验收，确认普通 Bash 外层保持日志行，只有展开输出使用单层容器；审核态保持单个轻量操作面板。
+- 2026-05-24：复用已运行的 `http://127.0.0.1:5173` 启动 Electron，真实窗口可加载 renderer、恢复会话并切换消息流。由于 approval runtime 尚未接通，Electron 内暂时没有真实 pending Bash 可触发；审核态样本仍以浏览器 fixture 验收为准，真实触发归入权限调度/暂停恢复计划。

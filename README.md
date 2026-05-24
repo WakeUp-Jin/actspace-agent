@@ -79,6 +79,7 @@ pnpm ci                 # 运行当前仓库级 CI 检查（docs / hygiene / she
 │   ├── FRONTEND.md            # 前端协作入口
 │   ├── RELIABILITY.md         # 稳定性与可运维性
 │   ├── SECURITY.md            # 安全默认约束
+│   ├── TODOLIST.md            # 当前仓库级任务看板
 │   ├── design-docs/           # 设计文档
 │   ├── exec-plans/            # 执行计划
 │   ├── histories/             # 变更历史
