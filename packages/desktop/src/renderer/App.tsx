@@ -11,6 +11,7 @@ import type {
   SessionRecord,
 } from "@actspace/shared";
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
+import type { ComposerProvider } from "./components/Composer";
 import {
   mockBootstrapState,
   mockContextSnapshot,
@@ -219,7 +220,10 @@ export function App() {
     setStreamingBlocks(streamingStateToBlocks(state));
   }, []);
 
-  const handleSend = useCallback(async (text: string) => {
+  const handleSend = useCallback(async (
+    text: string,
+    options: { provider: ComposerProvider; thinkingEnabled: boolean },
+  ) => {
     if (isStreaming || !text.trim()) return;
 
     const sessionId = activeSessionIdRef.current;
@@ -249,7 +253,13 @@ export function App() {
 
     try {
       if (hasActspaceBridge()) {
-        const input: RunTurnInput = { sessionId, turnId, userInput: text };
+        const input: RunTurnInput = {
+          sessionId,
+          turnId,
+          userInput: text,
+          provider: options.provider,
+          thinkingEnabled: options.thinkingEnabled,
+        };
         const result = await window.actspace.runTurn(input);
 
         const restored = await window.actspace.getSession({ sessionId });

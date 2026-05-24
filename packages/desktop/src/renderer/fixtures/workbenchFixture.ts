@@ -185,6 +185,88 @@ export const mockMessages: MessageBlock[] = [
     createdAt: now
   },
   {
+    kind: "bash",
+    id: "mock-bash-success",
+    status: "success",
+    title: "Typecheck agent-core",
+    commandPreview: "cd, pnpm",
+    command:
+      "cd /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent && pnpm --filter @actspace/agent-core typecheck",
+    cwd: "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent",
+    stdout:
+      "> @actspace/agent-core@0.1.0 typecheck /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/packages/agent-core\n> tsc --noEmit -p tsconfig.json",
+    stderr: "",
+    exitCode: 0,
+    durationMs: 1284,
+    createdAt: now
+  },
+  {
+    kind: "bash",
+    id: "mock-bash-approval",
+    status: "pending",
+    title: "Test shell with permissions echo",
+    commandPreview: "echo",
+    command: "echo \"测试需要额外权限的命令\"",
+    cwd: "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent",
+    reason: "Not in allowlist: echo \"测试需要额外权限的命令\"",
+    policyLabel: "Allowlist (with Sandbox)",
+    createdAt: now
+  },
+  {
+    kind: "bash",
+    id: "mock-bash-running",
+    status: "running",
+    title: "Build workspace",
+    commandPreview: "pnpm",
+    command: "pnpm build",
+    cwd: "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent",
+    stdout: "Building shared...\nBuilding agent-core...",
+    createdAt: now
+  },
+  {
+    kind: "bash",
+    id: "mock-bash-failed",
+    status: "failed",
+    title: "Run tests",
+    commandPreview: "pnpm",
+    command: "pnpm test",
+    cwd: "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent",
+    stderr: "src/env.ts(229,10): error TS2352: Conversion may be a mistake.",
+    exitCode: 2,
+    durationMs: 842,
+    createdAt: now
+  },
+  {
+    kind: "bash",
+    id: "mock-bash-denied",
+    status: "denied",
+    title: "Dangerous delete",
+    commandPreview: "rm",
+    command: "rm -rf /",
+    reason: "Command contains dangerous delete operation",
+    createdAt: now
+  },
+  {
+    kind: "bash",
+    id: "mock-bash-expired",
+    status: "expired",
+    title: "Install dependency",
+    commandPreview: "pnpm",
+    command: "pnpm install",
+    reason: "Approval expired before the command was allowed.",
+    createdAt: now
+  },
+  {
+    kind: "bash",
+    id: "mock-bash-cancelled",
+    status: "cancelled",
+    title: "Run script",
+    commandPreview: "pnpm",
+    command: "pnpm run seed",
+    reason: "User skipped this command.",
+    createdAt: now
+  },
+  {
     kind: "assistant",
     id: "mock-assistant-4",
     content:

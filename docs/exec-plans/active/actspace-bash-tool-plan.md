@@ -162,13 +162,15 @@ Bash 结果至少包含：
 
 ## 进度记录
 
-- [ ] 定义 Bash 参数和结果结构。
-- [ ] 实现 Bash definition。
-- [ ] 实现 Bash permissions。
-- [ ] 实现 Bash executor。
-- [ ] 实现 Bash render result。
-- [ ] 注册工具并完成测试。
+- [x] 定义 Bash 参数和结果结构。
+- [x] 实现 Bash definition。
+- [x] 实现 Bash permissions。
+- [x] 实现 Bash executor。
+- [x] 实现 Bash render result。
+- [x] 注册工具并完成测试。
 
 ## 决策记录
 
 - 2026-05-24：Bash 工具从 Bash UI 计划中拆出。原因是后端工具能力、权限检查和前端展示可以独立推进。
+- 2026-05-24：Bash 权限检查保持在单个 `permissions.ts` 文件内，用私有函数分区组织。原因是权限逻辑较多但 Agent 读取单文件更直接。
+- 2026-05-24：Bash 首版支持 `allow` 低风险开发命令、`deny` 硬拒绝危险命令、`ask` 返回结构化待审核结果；真实审核面板和恢复流程留给后续计划。

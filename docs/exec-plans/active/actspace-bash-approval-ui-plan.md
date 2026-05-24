@@ -138,12 +138,13 @@
 
 ## 进度记录
 
-- [ ] 定义 Bash/approval 展示字段。
-- [ ] 实现正常 Bash Run 组件。
-- [ ] 实现 Bash approval 组件。
-- [ ] 更新 fixture 和前端设计文档。
+- [x] 定义 Bash/approval 展示字段。
+- [x] 实现正常 Bash Run 组件。
+- [x] 实现 Bash approval 组件。
+- [x] 更新 fixture 和前端设计文档。
 - [ ] 完成浏览器截图与 Electron 验收。
 
 ## 决策记录
 
 - 2026-05-24：审核面板样式从权限调度计划中拆出。原因是视觉和交互需要根据 Bash 组件参考图反复校准，不应该阻塞后端状态机。
+- 2026-05-24：Bash 正常态和审核态使用同一个 `kind: "bash"` message block 承载，以状态区分 pending/running/success/failed/denied/expired/cancelled，避免同一 tool call 在消息流里分裂成多个块。

@@ -37,6 +37,7 @@ export interface AgentOptions {
   shouldStopAfterTurn?: AgentLoopConfig["shouldStopAfterTurn"];
   getSteeringMessages?: AgentLoopConfig["getSteeringMessages"];
   getFollowUpMessages?: AgentLoopConfig["getFollowUpMessages"];
+  thinkingEnabled?: boolean;
 }
 
 export class Agent {
@@ -49,6 +50,7 @@ export class Agent {
   private shouldStopAfterTurn?: AgentLoopConfig["shouldStopAfterTurn"];
   private getSteeringMessages?: AgentLoopConfig["getSteeringMessages"];
   private getFollowUpMessages?: AgentLoopConfig["getFollowUpMessages"];
+  private thinkingEnabled?: boolean;
 
   constructor(options: AgentOptions) {
     this.llm = options.llm;
@@ -59,6 +61,7 @@ export class Agent {
     this.shouldStopAfterTurn = options.shouldStopAfterTurn;
     this.getSteeringMessages = options.getSteeringMessages;
     this.getFollowUpMessages = options.getFollowUpMessages;
+    this.thinkingEnabled = options.thinkingEnabled;
   }
 
   /** 执行一次完整的 agent 交互 */
@@ -86,6 +89,7 @@ export class Agent {
       shouldStopAfterTurn: this.shouldStopAfterTurn,
       getSteeringMessages: this.getSteeringMessages,
       getFollowUpMessages: this.getFollowUpMessages,
+      thinkingEnabled: this.thinkingEnabled,
     };
 
     const emit: AgentEventSink = this.onEvent ?? (() => {});

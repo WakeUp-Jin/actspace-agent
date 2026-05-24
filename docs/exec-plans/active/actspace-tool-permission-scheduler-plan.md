@@ -57,11 +57,14 @@
 
 `checkPermissions` 只做安全检查和参数清洗，不做业务执行。
 
-权限结果需要表达：
+权限结果的决策只有三种：
 
 - `allow`：可直接执行。
 - `deny`：硬拒绝，不进入审核面板。
 - `ask`：可审核风险，需要生成 approval request。
+
+权限结果还可以携带随决策返回的上下文信息。它们不是额外的决策状态：
+
 - `sanitizedArgs`：清洗后的参数。
 - `reason`：给用户和日志看的原因。
 - `summary`：人类可读动作摘要。
@@ -130,12 +133,14 @@
 
 ## 进度记录
 
-- [ ] 定义 shared/agent-core 工具状态契约。
-- [ ] 抽出工具调度层。
-- [ ] 接通工具权限检查。
-- [ ] 支持 awaiting approval 事件。
+- [x] 定义 agent-core 工具权限三态决策和调度记录类型。
+- [x] 抽出工具调度层。
+- [x] 接通工具权限检查。
+- [x] 支持 awaiting approval 的结构化结果。
+- [ ] 将 approval request 扩展为 engine/runtime 事件。
 - [ ] 完成单测与文档同步。
 
 ## 决策记录
 
 - 2026-05-24：工具权限调度从审核面板计划中拆出。原因是调度状态机是后端主流程，必须先独立稳定，再让 Bash 和 UI 消费。
+- 2026-05-24：权限结果采用 `allow`、`deny`、`ask` 三态；`sanitizedArgs`、`reason`、`summary`、`riskLevel` 仅作为 metadata，不作为额外状态。

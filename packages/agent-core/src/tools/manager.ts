@@ -18,6 +18,7 @@ import type {
 import { toToolDefinition } from "../internal-tools";
 import type { Tool } from "../messages";
 import type { ToolDefinitionSpec, ToolExecutorFn, ToolManagerConfig } from "./types";
+import { ToolScheduler } from "./scheduler";
 
 const DEFAULT_TRUNCATE_THRESHOLD = 2000;
 
@@ -25,10 +26,14 @@ export class ToolManager {
   private tools = new Map<string, InternalTool>();
   private workspaceRoot: string;
   private truncateThreshold: number;
+  private scheduler: ToolScheduler;
 
   constructor(config: ToolManagerConfig) {
     this.workspaceRoot = config.workspaceRoot;
     this.truncateThreshold = config.truncateThreshold ?? DEFAULT_TRUNCATE_THRESHOLD;
+    this.scheduler = new ToolScheduler({
+      truncateThreshold: this.truncateThreshold,
+    });
   }
 
   /**
@@ -70,49 +75,10 @@ export class ToolManager {
     return this.getAll().map(toToolDefinition);
   }
 
-  /**
-   * 执行工具并对结果做硬截断
-   *
-   * 流程：handler → renderResult（可选）→ truncate
-   */
+  /** 执行工具：权限检查 → handler → renderResult（可选）→ truncate */
   async execute(toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
     const tool = this.tools.get(toolName);
-    if (!tool) {
-      return {
-        success: false,
-        error: `Tool not found: ${toolName}`,
-      };
-    }
-
-    try {
-      const result = await tool.handler(args);
-      return this.postProcess(tool, result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return {
-        success: false,
-        error: `Tool execution failed: ${message}`,
-      };
-    }
-  }
-
-  private postProcess(tool: InternalTool, result: ToolResult): ToolResult {
-    if (!result.success) return result;
-
-    let rendered: string | undefined;
-    if (tool.renderResult && result.data !== undefined) {
-      rendered = tool.renderResult(result);
-    }
-
-    const rawData = rendered ?? (typeof result.data === "string" ? result.data : JSON.stringify(result.data));
-    if (rawData && rawData.length > this.truncateThreshold) {
-      return {
-        success: true,
-        data: rawData.slice(0, this.truncateThreshold) +
-          `\n\n[Output truncated. Showing ${this.truncateThreshold} of ${rawData.length} characters]`,
-      };
-    }
-
-    return result;
+    const execution = await this.scheduler.execute(tool, toolName, args);
+    return execution.result;
   }
 }

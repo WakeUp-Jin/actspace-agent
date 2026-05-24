@@ -44,6 +44,22 @@ describe("DeepSeekService", () => {
     );
   });
 
+  it("keeps DeepSeek request model controlled by the injected config", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      streamResponse([
+        JSON.stringify({ choices: [{ delta: { content: "reasoned" }, finish_reason: "stop" }] }),
+        "[DONE]",
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const llm = new DeepSeekService({ provider: "deepseek", apiKey: "test-key", model: "deepseek-reasoner" });
+
+    await llm.complete(context, { thinkingEnabled: true });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(body.model).toBe("deepseek-reasoner");
+  });
+
   it("reassembles streamed tool calls for the execution engine", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
       streamResponse([

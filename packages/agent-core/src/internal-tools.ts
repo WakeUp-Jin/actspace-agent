@@ -24,9 +24,19 @@ export interface ToolResult {
 
 // ─── Permission（权限验证） ───
 
+export type ToolPermissionDecision = "allow" | "deny" | "ask";
+
+export type ToolRiskLevel = "low" | "medium" | "high";
+
 export interface PermissionResult {
-  passed: boolean;
-  error?: string;
+  /** 权限决策只有三种：直接执行、硬拒绝、请求用户审核 */
+  decision: ToolPermissionDecision;
+  /** 给用户、日志或模型看的解释。deny/ask 时应提供 */
+  reason?: string;
+  /** 人类可读动作摘要，用于审核面板或日志 */
+  summary?: string;
+  /** 风险分层是决策元数据，不是额外决策状态 */
+  riskLevel?: ToolRiskLevel;
   /** 验证通过后可修正参数（如路径展开、超时值清洗） */
   sanitizedArgs?: Record<string, unknown>;
 }

@@ -148,6 +148,23 @@ function messageBlockFromToolPreview(
         collapsedLines: preview.collapsedLines,
         createdAt: getDisplayTime(timestamp)
       };
+    case "bash":
+      return {
+        kind: "bash",
+        id: eventId,
+        status: preview.status,
+        title: preview.title,
+        command: preview.command,
+        commandPreview: preview.commandPreview,
+        cwd: preview.cwd,
+        stdout: preview.stdout,
+        stderr: preview.stderr,
+        exitCode: preview.exitCode,
+        durationMs: preview.durationMs,
+        reason: preview.reason,
+        policyLabel: preview.policyLabel,
+        createdAt: getDisplayTime(timestamp)
+      };
     case "generic":
       return {
         kind: "tool",

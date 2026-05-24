@@ -12,7 +12,7 @@
 - 应用启动后必须至少能完成两条路径之一：
   - 恢复本地已有会话
   - 在没有旧会话时，跑起一轮默认 turn
-- 普通桌面会话默认走真实 DeepSeek provider，也可通过 `LLM_PROVIDER=kimi` 选择 Kimi；mock 只应通过 `MOCK_MODE=true` 显式开启，用于测试、fixture 或 demo：
+- 普通桌面会话默认走真实 DeepSeek provider，也可通过 `LLM_PROVIDER=kimi` 选择 Kimi；mock 只用于测试、浏览器 fixture 或显式 demo，不允许静默替代 Electron 真实 turn：
   - 启动应用
   - 请求 bootstrap state
   - 读取 session list
@@ -41,7 +41,7 @@
   - `[agent-ipc]`：renderer 调用 main、main 推送 stream event、turn 持久化等 IPC 边界。
   - `[agent-run]`：Agent loop 生命周期、流式 delta 计数、工具开始/结束、turn 完成状态。
   - `[renderer-console]`：renderer console 输出转发，方便区分前端渲染错误和后端推送错误。
-- 仓库根目录 `logs/agent-runs/` 会保存最近约 1 天的 Agent turn JSONL 排障文件，每次用户输入到 Agent 最终输出对应一个文件。文件包含完整用户输入、工具调用参数、工具结果、AgentEvent、RuntimeStreamEvent 和最终 AgentTurnResult，便于区分：
+- 仓库根目录 `logs/agent-runs/` 会保存最近约 1 天的 Agent turn JSONL 排障文件，每次用户输入到 Agent 最终输出对应一个文件。文件包含完整用户输入、工具调用参数、工具结果、关键 AgentEvent、关键 RuntimeStreamEvent 和最终 AgentTurnResult；模型流式文本不逐 delta 入日志，而是聚合为单条 `assistant_text` / `assistant_thinking` 事件，并保留 delta 数量与字符数，便于区分：
   - Agent 运行错误：看 `agent_event` / `tool_event` / `run_failed`。
   - 后端是否推送给前端：看 `stream_event`。
   - 会话持久化是否完成：看 `main_event` 的 `persisting_turn_result` / `turn_result_persisted`。

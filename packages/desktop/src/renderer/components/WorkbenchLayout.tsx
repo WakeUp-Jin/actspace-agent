@@ -4,6 +4,7 @@ import { ConversationView } from "./ConversationView";
 import { RightPanel } from "./RightPanel";
 import { Sidebar } from "./Sidebar";
 import { SplitView } from "./SplitView";
+import type { ComposerProvider } from "./Composer";
 
 type SidebarMode = "expanded" | "rail";
 
@@ -73,7 +74,7 @@ export function WorkbenchLayout({
   contextSnapshot: ContextUsageSnapshot | null;
   rightPanelOpen?: boolean;
   isStreaming?: boolean;
-  onSend?: (text: string) => void;
+  onSend?: (text: string, options: { provider: ComposerProvider; thinkingEnabled: boolean }) => void;
   onNewSession?: () => void;
   onSelectSession?: (sessionId: string) => void;
   showDemoAttachments?: boolean;

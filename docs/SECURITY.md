@@ -23,11 +23,12 @@
 - 工具系统通过 `workspace-guard.ts` 做路径边界守卫，防止工具访问工作区外文件。
 - session 数据存储在 Electron `userData` 目录下，路径固定、可预测。
 - Agent 文件工具的工作区由 `ACTSPACE_WORKSPACE_ROOT` 或当前仓库根目录确定，不使用 `userData` 作为代码文件读取目录，避免把应用数据目录和用户工作区混淆。
+- Bash 工具当前以当前进程的 `process.env` 启动子进程，因此命令执行不会把密钥提交到 Git，但允许被执行命令读取运行时环境变量。后续如要开放更高风险命令，应改为白名单环境变量或显式脱敏环境。
 
 ## 真实模型调用
 
 - 真实 DeepSeek 与 Kimi 请求仅从 main 进程内的 Agent runtime 发起，renderer 只接收结构化事件与最终结果。
-- 普通会话默认使用真实 DeepSeek provider；`LLM_PROVIDER=kimi` 可切换 Kimi 主模型，只有显式设置 `MOCK_MODE=true` 时才使用 mock provider。
+- 普通会话默认使用真实 DeepSeek provider；`LLM_PROVIDER=kimi` 可切换 Kimi 主模型。Electron 真实 turn 不允许被 mock 配置静默替代，mock 仅用于测试、浏览器 fixture 或显式 demo。
 - DeepSeek 主模型的 `web_search`、`web_fetch`、`analyze_media` 工具由 Kimi 辅助调用实现；只有配置 Kimi key 时才注册，工具结果会被裁剪后回填给主模型。
 - 验收真实 provider 时应先发送不含仓库内容和隐私的固定探针，确认连接后再决定是否允许工具结果进入外部模型上下文。
 - API 错误仅暴露必要的结构化诊断信息，不把鉴权请求头或密钥写入日志、session 或界面。
@@ -39,3 +40,4 @@
 - 数据分级、脱敏与保留策略。
 - 对外 API、Webhook、文件上传和沙箱执行的规则。
 - API Key 轮换与更完整的错误脱敏策略。
+- Bash 工具子进程环境变量白名单。

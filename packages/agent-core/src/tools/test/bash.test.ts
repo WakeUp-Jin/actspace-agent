@@ -1,0 +1,113 @@
+import { describe, expect, it } from "vitest";
+import { mkdtemp, realpath } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { bashExecutor, bashCheckPermissions, createToolManager, renderBashResult } from "../index";
+import type { BashResult } from "../index";
+
+async function createWorkspace(): Promise<string> {
+  return realpath(await mkdtemp(join(tmpdir(), "actspace-bash-test-")));
+}
+
+describe("Bash tool permissions", () => {
+  it("allows simple development commands and sanitizes args", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashCheckPermissions({
+      command: "pwd",
+      timeoutMs: 999_999,
+    }, workspace);
+
+    expect(result.decision).toBe("allow");
+    expect(result.sanitizedArgs).toMatchObject({
+      command: "pwd",
+      cwd: workspace,
+      timeoutMs: 120_000,
+    });
+  });
+
+  it("denies empty commands", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashCheckPermissions({ command: "   " }, workspace);
+
+    expect(result.decision).toBe("deny");
+    expect(result.reason).toContain("command is required");
+  });
+
+  it("denies dangerous delete commands", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashCheckPermissions({ command: "rm -rf /" }, workspace);
+
+    expect(result.decision).toBe("deny");
+    expect(result.reason).toContain("dangerous delete");
+  });
+
+  it("denies cwd outside workspace", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashCheckPermissions({ command: "pwd", cwd: "/" }, workspace);
+
+    expect(result.decision).toBe("deny");
+    expect(result.reason).toContain("workspace boundary");
+  });
+
+  it("asks for commands outside the allowlist", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashCheckPermissions({ command: "pnpm install" }, workspace);
+
+    expect(result.decision).toBe("ask");
+    expect(result.reason).toContain("not in the Bash allowlist");
+    expect(result.sanitizedArgs).toMatchObject({ command: "pnpm install" });
+  });
+});
+
+describe("Bash executor", () => {
+  it("runs a successful command", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashExecutor({ command: "printf hello", cwd: workspace }, workspace);
+
+    expect(result.success).toBe(true);
+    const data = result.data as BashResult;
+    expect(data.cwd).toBe(workspace);
+    expect(data.stdout).toBe("hello");
+    expect(data.exitCode).toBe(0);
+    expect(data.timedOut).toBe(false);
+  });
+
+  it("returns structured output for non-zero exit code", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashExecutor({ command: "exit 2", cwd: workspace }, workspace);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("code 2");
+    const data = result.data as BashResult;
+    expect(data.exitCode).toBe(2);
+  });
+
+  it("times out long-running commands", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashExecutor({ command: "sleep 2", cwd: workspace, timeoutMs: 100 }, workspace);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("timed out");
+    const data = result.data as BashResult;
+    expect(data.timedOut).toBe(true);
+  });
+
+  it("renders Bash results for model context", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashExecutor({ command: "printf hello", cwd: workspace }, workspace);
+    const rendered = renderBashResult(result);
+
+    expect(rendered).toContain("$ printf hello");
+    expect(rendered).toContain("exitCode: 0");
+    expect(rendered).toContain("stdout:");
+  });
+});
+
+describe("Bash tool registration", () => {
+  it("is registered by createToolManager", () => {
+    const manager = createToolManager({ workspaceRoot: "/tmp" });
+
+    expect(manager.has("bash")).toBe(true);
+    expect(manager.getToolDefinitions().some((tool) => tool.name === "bash")).toBe(true);
+  });
+});

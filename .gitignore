@@ -12,11 +12,20 @@ logs/
 tmp/
 temp/
 .tmp/
+*.tmp
+*.temp
+*.bak
 
 # Environment and local overrides
 .env
+.env.*
 .env.local
 .env.*.local
+!.env.example
+*.secret
+*.secrets
+*.local
+.direnv/
 
 # Dependency caches and common build output
 node_modules/

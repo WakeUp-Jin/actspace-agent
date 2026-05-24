@@ -3,6 +3,7 @@ import { ContextManager } from "../../context/manager";
 import { SystemPromptContext } from "../../context/modules/system-prompt";
 import type { InternalTool, ToolResult } from "../../internal-tools";
 import { MockLLMService } from "../../llm/services/mock";
+import type { AgentRunLogEvent, AgentRunLogger } from "../../observability";
 import { ToolManager } from "../../tools/manager";
 import { runTurnWithAgent } from "../bridge";
 
@@ -62,5 +63,78 @@ describe("runTurnWithAgent bridge", () => {
       "context_snapshot",
     ]);
     expect(result.events.every((event) => event.turnId === "turn-test")).toBe(true);
+  });
+
+  it("writes aggregated assistant stream content to the run log", async () => {
+    const runLogEvents: AgentRunLogEvent[] = [];
+    const runLogger: AgentRunLogger = {
+      filePath: "/tmp/test-run.jsonl",
+      write: async (event) => {
+        runLogEvents.push(event);
+      },
+    };
+
+    await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Please inspect the README.",
+      },
+      createDeps(),
+      {
+        onStreamEvent: () => {},
+        runLogger,
+      },
+    );
+
+    expect(
+      runLogEvents.some(
+        (event) =>
+          event.type === "agent_event" &&
+          typeof event.payload === "object" &&
+          event.payload !== null &&
+          "type" in event.payload &&
+          event.payload.type === "message_delta",
+      ),
+    ).toBe(false);
+    expect(
+      runLogEvents.some(
+        (event) =>
+          event.type === "stream_event" &&
+          typeof event.payload === "object" &&
+          event.payload !== null &&
+          "type" in event.payload &&
+          (event.payload.type === "assistant_text_delta" ||
+            event.payload.type === "assistant_thinking_delta"),
+      ),
+    ).toBe(false);
+    expect(runLogEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "assistant_thinking",
+          payload: expect.objectContaining({
+            text: "Let me inspect the workspace and gather context.",
+            deltaCount: 2,
+            chars: 48,
+          }),
+        }),
+        expect.objectContaining({
+          type: "assistant_thinking",
+          payload: expect.objectContaining({
+            text: "I have the context. Let me summarize.",
+            deltaCount: 2,
+            chars: 37,
+          }),
+        }),
+        expect.objectContaining({
+          type: "assistant_text",
+          payload: expect.objectContaining({
+            text: "Based on my analysis, the project is well-structured.",
+            deltaCount: 2,
+            chars: 53,
+          }),
+        }),
+      ]),
+    );
   });
 });

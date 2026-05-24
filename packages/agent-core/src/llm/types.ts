@@ -29,6 +29,7 @@ export interface StreamOptions {
   signal?: AbortSignal;
   tools?: APIRequestTool[];
   thinking?: { type: "disabled" };
+  thinkingEnabled?: boolean;
 }
 
 export interface SimpleStreamOptions {

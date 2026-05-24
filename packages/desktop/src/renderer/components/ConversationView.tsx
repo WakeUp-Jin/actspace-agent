@@ -1,8 +1,9 @@
 import { MoreHorizontal, PanelRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContextUsageSnapshot, MessageBlock } from "@actspace/shared";
-import { Composer } from "./Composer";
+import { Composer, type ComposerProvider } from "./Composer";
 import { AssistantReply } from "./messages/AssistantReply";
+import { BashRunBlock } from "./messages/BashRunBlock";
 import { EditDiffBlock } from "./messages/EditDiffBlock";
 import { ThinkingBlock } from "./messages/ThinkingBlock";
 import { ToolLogLine } from "./messages/ToolLogLine";
@@ -53,6 +54,8 @@ function renderMessage(message: MessageBlock) {
       return <AssistantReply key={message.id} message={message} />;
     case "thinking":
       return <ThinkingBlock key={message.id} message={message} />;
+    case "bash":
+      return <BashRunBlock key={message.id} message={message} />;
     case "read":
     case "search":
     case "tool":
@@ -184,7 +187,7 @@ export function ConversationView({
   rightPanelOpen: boolean;
   onToggleRightPanel: () => void;
   isStreaming?: boolean;
-  onSend?: (text: string) => void;
+  onSend?: (text: string, options: { provider: ComposerProvider; thinkingEnabled: boolean }) => void;
   showDemoAttachments?: boolean;
 }) {
   const turns = groupMessagesIntoTurns(messages);

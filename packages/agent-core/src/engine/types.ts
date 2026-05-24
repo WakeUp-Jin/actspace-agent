@@ -52,6 +52,8 @@ export interface AgentLoopConfig {
   getSteeringMessages?: () => Promise<Message[]>;
   /** agent 停止前获取 follow-up 消息 */
   getFollowUpMessages?: () => Promise<Message[]>;
+  /** 本轮是否允许 provider 输出 thinking/reasoning。 */
+  thinkingEnabled?: boolean;
 }
 
 // ─── AgentLoopResult ───

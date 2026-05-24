@@ -94,9 +94,9 @@
 
 建议行为：
 
-- `MOCK_MODE=true` 时显式使用 mock provider。
 - `LLM_PROVIDER` 未配置时默认使用 `deepseek`。
-- `LLM_PROVIDER=mock` 只用于测试、浏览器 fixture 或开发者显式选择。
+- Electron 真实 turn 由 main 进程按 `deepseek|kimi` 创建真实 provider，不允许被 `MOCK_MODE` 静默替代。
+- `MOCK_MODE=true` 和 `LLM_PROVIDER=mock` 只用于测试、浏览器 fixture 或显式 demo。
 - 如果选择 `deepseek` 但缺少 `DEEPSEEK_API_KEY`，应返回清晰错误事件，不静默降级为 mock。
 
 需要检查并修改：
@@ -201,7 +201,7 @@ mock 不应该伪装成普通会话的真实 Agent。
 步骤：
 
 1. 将默认 `LLM_PROVIDER` 从 `mock` 调整为 `deepseek`。
-2. 保留 `MOCK_MODE=true` 作为显式 mock 开关。
+2. 保留 mock 能力给测试、浏览器 fixture 和显式 demo，但 Electron 真实 turn 不读取 `MOCK_MODE` 来创建 mock LLM。
 3. 确保 deepseek 缺少 API key 时返回清晰错误，不自动使用 `mock-key` 假装成功。
 4. 更新 `.env.example` 注释，说明真实桌面端默认 DeepSeek，mock 只用于测试或 demo。
 
@@ -210,7 +210,7 @@ mock 不应该伪装成普通会话的真实 Agent。
 - `pnpm --filter @actspace/agent-core test`
 - 新增或更新 env/factory 测试：
   - 默认 provider 为 `deepseek`
-  - `MOCK_MODE=true` 时 provider 为 `mock`
+  - Electron turn 即使环境中存在 `MOCK_MODE=true`，也不会静默使用 `mock`
   - deepseek 无 key 时产生可识别 auth 错误
 
 ### Task 2: 修复 user_message 事件持久化
@@ -366,7 +366,7 @@ Electron 真实验证：
 
 - DeepSeek API key 缺失：
   - 预期行为：返回清晰 auth 错误并展示错误消息，不自动降级 mock。
-  - 回退：用户显式设置 `MOCK_MODE=true` 才进入 mock。
+  - 回退：使用测试/浏览器 fixture 验证 UI；真实 Electron turn 不通过 mock 伪装成功。
 - workspace root 未识别：
   - 预期行为：日志提示 fallback 到 `process.cwd()`。
   - 回退：设置 `ACTSPACE_WORKSPACE_ROOT`。
@@ -379,7 +379,7 @@ Electron 真实验证：
 
 ## Acceptance Checklist
 
-- [x] 普通会话默认真实 DeepSeek，不再是 `deepseek-mock`。
+- [x] 普通会话默认真实 DeepSeek，不再被 `MOCK_MODE` 静默切成 `deepseek-mock`。
 - [x] `Learning doc plan` 是唯一保留 demo/mock 展示的会话。
 - [x] 新建会话为空，不显示 mock messages 或 demo attachments。
 - [x] 发送消息后 UI 显示用户输入组件。
@@ -394,7 +394,9 @@ Electron 真实验证：
 2026-05-24:
 
 - 将 `LLM_PROVIDER` 默认值从 `mock` 改为 `deepseek`，`MOCK_MODE=true` 才显式使用 mock。
+- 复查 `logs/latest-dev.log` 发现 Electron main 仍通过 `env.MOCK_MODE ? createLLMServiceFromEnv() : realProvider` 创建 mock LLM；已移除真实 turn 链路中的 mock 分支，并在依赖日志中记录 `mockModeIgnoredForElectronTurn` 便于排障。
 - `runTurnWithAgent()` 显式将本轮用户输入写为首个 `user_message` 事件，并新增 bridge 测试锁定事件顺序。
 - Electron main 将文件工具工作区从 `userData` 改为 workspace root，支持 `ACTSPACE_WORKSPACE_ROOT` 覆盖。
 - renderer 完成 turn 后以恢复后的 `SessionRecord` 为事实来源，避免 `turnResult` 覆盖 active session 或造成重复展示。
-- 已通过 `pnpm --filter @actspace/agent-core test` 和 `pnpm typecheck`。
+- 已通过 `pnpm --filter @actspace/agent-core test`、`pnpm typecheck` 和 `git diff --check`。
+- `pnpm build` 当前被并行会话新增的未跟踪 Kimi Assistants 文件阻塞：`packages/agent-core/src/llm/kimi-assistants/client.ts` 的 `APIContentPart[]` 与内部 `UserMessage.content` 类型不兼容。该文件不属于本计划修复范围，需由 Kimi 能力计划处理后再复跑全仓 build。

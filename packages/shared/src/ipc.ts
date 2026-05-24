@@ -11,6 +11,8 @@ export type RunTurnInput = {
   sessionId: string;
   turnId: string;
   userInput: string;
+  provider?: "deepseek" | "kimi";
+  thinkingEnabled?: boolean;
 };
 
 export type SessionListItem = {

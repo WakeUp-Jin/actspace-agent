@@ -2,11 +2,12 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AgentTurnResult, RunTurnInput, SessionCreateInput, SessionGetInput } from "@actspace/shared";
+import type { LLMConfig } from "@actspace/agent-core";
 import {
   createBootstrapState,
   env,
   loadEnv,
-  createLLMServiceFromEnv,
+  createLLMService,
   createToolManager,
   ContextManager,
   SystemPromptContext,
@@ -25,6 +26,7 @@ const APP_ID = "com.actspace.desktop";
 const APP_NAME = "actspace";
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const PREVIEW_LIMIT = 160;
+type RealProvider = "deepseek" | "kimi";
 
 type AppDataRoots = {
   dataRoot: string;
@@ -227,11 +229,38 @@ function mapConsoleLevel(level: number): "log" | "warn" | "error" | "debug" | "i
   }
 }
 
-async function createAgentDeps() {
+function resolvePrimaryProvider(provider?: RunTurnInput["provider"]): RealProvider {
+  if (provider === "kimi" || provider === "deepseek") return provider;
+  return env.LLM_PROVIDER === "kimi" ? "kimi" : "deepseek";
+}
+
+function createLLMConfigForTurn(provider: RealProvider, thinkingEnabled?: boolean): LLMConfig {
+  if (provider === "kimi") {
+    return {
+      provider: "kimi",
+      apiKey: env.KIMI_API_KEY,
+      baseUrl: env.KIMI_BASE_URL || undefined,
+      model: env.KIMI_MODEL,
+      temperature: env.LLM_TEMPERATURE,
+      maxTokens: env.LLM_MAX_TOKENS,
+    };
+  }
+
+  return {
+    provider: "deepseek",
+    apiKey: env.DEEPSEEK_API_KEY,
+    baseUrl: env.DEEPSEEK_BASE_URL || undefined,
+    model: thinkingEnabled ? "deepseek-reasoner" : env.LLM_MODEL,
+    temperature: env.LLM_TEMPERATURE,
+    maxTokens: env.LLM_MAX_TOKENS,
+  };
+}
+
+async function createAgentDeps(input?: Pick<RunTurnInput, "provider" | "thinkingEnabled">) {
   logAgentIpc("creating agent dependencies");
-  const llm = createLLMServiceFromEnv();
+  const primaryProvider = resolvePrimaryProvider(input?.provider);
+  const llm = createLLMService(createLLMConfigForTurn(primaryProvider, input?.thinkingEnabled));
   const workspaceRoot = await getWorkspaceRoot();
-  const primaryProvider = env.MOCK_MODE ? "mock" : env.LLM_PROVIDER === "kimi" ? "kimi" : "deepseek";
   const toolManager = createToolManager({
     workspaceRoot,
     primaryProvider,
@@ -244,9 +273,12 @@ async function createAgentDeps() {
   logAgentIpc("agent dependencies ready", {
     workspaceRoot,
     primaryProvider,
+    envProvider: env.LLM_PROVIDER,
+    mockModeIgnoredForElectronTurn: env.MOCK_MODE,
     hasKimiKey: Boolean(env.KIMI_API_KEY),
+    thinkingEnabled: Boolean(input?.thinkingEnabled),
   });
-  return { llm, toolManager, contextManager };
+  return { llm, toolManager, contextManager, thinkingEnabled: input?.thinkingEnabled };
 }
 
 function getMainWindow(): BrowserWindow | undefined {
@@ -273,6 +305,8 @@ async function runAndPersistTurn(input: RunTurnInput): Promise<AgentTurnResult> 
     turnId: input.turnId,
     userInputLength: input.userInput.length,
     userInputPreview: preview(input.userInput),
+    provider: input.provider,
+    thinkingEnabled: Boolean(input.thinkingEnabled),
   });
   const roots = await ensureDataDirectories();
   let runLogger: AgentRunLogger | undefined;
@@ -291,6 +325,8 @@ async function runAndPersistTurn(input: RunTurnInput): Promise<AgentTurnResult> 
     sessionId: input.sessionId,
     turnId: input.turnId,
     userInput: input.userInput,
+    provider: input.provider,
+    thinkingEnabled: Boolean(input.thinkingEnabled),
     runLogFilePath: runLogger?.filePath,
   });
   if (runLogger) {
@@ -300,7 +336,7 @@ async function runAndPersistTurn(input: RunTurnInput): Promise<AgentTurnResult> 
       filePath: runLogger.filePath,
     });
   }
-  const deps = await createAgentDeps();
+  const deps = await createAgentDeps(input);
   await writeAgentRunLog(runLogger, "main_event", {
     stage: "agent_dependencies_ready",
     workspaceRoot: roots.workspaceRoot,
@@ -308,7 +344,12 @@ async function runAndPersistTurn(input: RunTurnInput): Promise<AgentTurnResult> 
   const win = getMainWindow();
 
   const result = await runTurnWithAgent(
-    { sessionId: input.sessionId, turnId: input.turnId, userInput: input.userInput },
+    {
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      userInput: input.userInput,
+      thinkingEnabled: input.thinkingEnabled,
+    },
     deps,
     {
       onStreamEvent: (event) => {

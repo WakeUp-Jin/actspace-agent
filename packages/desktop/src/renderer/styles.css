@@ -744,6 +744,226 @@ svg {
   color: var(--danger);
 }
 
+.bash-run {
+  max-width: 800px;
+}
+
+.bash-run-toggle {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.42;
+  padding: 0;
+  text-align: left;
+}
+
+.bash-command-preview {
+  overflow: hidden;
+  color: var(--color-text-faint);
+  font-weight: 430;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bash-run.is-failed .bash-run-toggle,
+.bash-run.is-denied .bash-run-toggle,
+.bash-run.is-expired .bash-run-toggle,
+.bash-run.is-cancelled .bash-run-toggle {
+  color: var(--color-text-muted);
+}
+
+.bash-output-shell {
+  position: relative;
+  max-height: 236px;
+  overflow: auto;
+  border: 1px solid rgba(200, 209, 220, 0.72);
+  border-radius: var(--radius-md);
+  background: #fbfcfe;
+  margin-top: 7px;
+}
+
+.bash-output-menu {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-faint);
+}
+
+.bash-output-menu:hover,
+.bash-output-menu:focus-visible {
+  background: rgba(47, 111, 255, 0.08);
+  color: var(--accent);
+}
+
+.bash-output-text {
+  min-width: 0;
+  margin: 0;
+  color: #6d727a;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.52;
+  padding: 10px 38px 12px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bash-prompt {
+  color: var(--color-text-faint);
+}
+
+.bash-approval {
+  width: 100%;
+  max-width: 800px;
+  overflow: hidden;
+  border: 1px solid rgba(200, 209, 220, 0.88);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.bash-approval-header {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(223, 228, 234, 0.8);
+  padding: 0 9px 0 12px;
+}
+
+.bash-approval-title {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 520;
+}
+
+.bash-approval-title svg {
+  color: var(--color-text-faint);
+}
+
+.bash-approval-menu {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-faint);
+}
+
+.bash-approval-menu:hover,
+.bash-approval-menu:focus-visible {
+  background: rgba(47, 111, 255, 0.08);
+  color: var(--accent);
+}
+
+.bash-approval-command {
+  margin: 0;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid rgba(223, 228, 234, 0.72);
+  color: #5f6670;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  padding: 9px 12px;
+  white-space: pre-wrap;
+}
+
+.bash-approval-reason {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 8px 12px 0;
+}
+
+.bash-approval-reason strong {
+  color: var(--color-text-faint);
+  font-weight: 600;
+}
+
+.bash-approval-details {
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 7px 12px 0;
+  word-break: break-all;
+}
+
+.bash-approval-footer {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px 9px 12px;
+}
+
+.bash-policy-button {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  padding: 0;
+}
+
+.bash-approval-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.bash-action {
+  min-width: 0;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 540;
+  padding: 0 9px;
+}
+
+.bash-action-ghost {
+  color: var(--color-text-muted);
+}
+
+.bash-action-ghost:hover,
+.bash-action-ghost:focus-visible {
+  background: var(--color-surface-subtle);
+}
+
+.bash-action-soft {
+  background: #eeeff1;
+  color: var(--color-text);
+}
+
+.bash-action-soft:hover,
+.bash-action-soft:focus-visible {
+  background: #e4e7eb;
+}
+
+.bash-action-primary {
+  background: #2f83c9;
+  color: #fff;
+}
+
+.bash-action-primary:hover,
+.bash-action-primary:focus-visible {
+  background: #2676b8;
+}
+
 .diff-card {
   width: 100%;
   max-width: none;
@@ -1003,7 +1223,155 @@ svg {
 }
 
 .model-menu {
-  min-width: 230px;
+  min-width: 210px;
+  overflow: visible;
+}
+
+.model-menu-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+}
+
+.model-menu-row:hover,
+.model-menu-row.is-selected-row {
+  background: var(--color-brand-soft);
+}
+
+.model-select-button {
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-start;
+  background: transparent;
+  padding-right: 54px;
+}
+
+.model-menu-row.is-selected-row .model-select-button {
+  padding-right: 72px;
+}
+
+.model-select-button:hover,
+.model-select-button:focus-visible {
+  background: transparent;
+}
+
+.model-row-actions {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 42px;
+  height: 100%;
+  pointer-events: none;
+}
+
+.model-menu-row.is-selected-row .model-row-actions {
+  min-width: 62px;
+}
+
+.model-edit-button {
+  width: auto;
+  min-width: 42px;
+  height: 26px;
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.model-menu-row:hover .model-edit-button,
+.model-edit-button:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.model-edit-button:hover,
+.model-edit-button:focus-visible {
+  background: rgba(32, 33, 36, 0.08);
+  color: var(--color-text);
+}
+
+.model-check-icon {
+  color: var(--color-text);
+}
+
+.model-options-menu {
+  left: calc(100% + 8px);
+  bottom: 0;
+  width: 220px;
+  min-width: 220px;
+}
+
+.dropdown-label {
+  padding: 7px 10px 5px;
+  color: var(--color-text-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.option-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.option-toggle-row:hover {
+  background: var(--color-brand-soft);
+}
+
+.option-toggle-row span:first-child {
+  flex: 1;
+}
+
+.option-toggle-row input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle-track {
+  position: relative;
+  display: inline-flex;
+  width: 32px;
+  height: 20px;
+  border-radius: 999px;
+  background: #d5dbe4;
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(31, 45, 61, 0.22);
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+.option-toggle-row input:checked + .toggle-track {
+  background: var(--color-brand);
+}
+
+.option-toggle-row input:checked + .toggle-track .toggle-thumb {
+  transform: translateX(12px);
 }
 
 .composer-spacer {

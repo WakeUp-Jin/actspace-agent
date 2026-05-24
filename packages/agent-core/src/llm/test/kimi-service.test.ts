@@ -64,6 +64,22 @@ describe("KimiService", () => {
     expect(body.thinking).toEqual({ type: "disabled" });
   });
 
+  it("can disable thinking for ordinary Kimi requests", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      streamResponse([
+        JSON.stringify({ choices: [{ delta: { content: "plain" }, finish_reason: "stop" }] }),
+        "[DONE]",
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const llm = new KimiService({ provider: "kimi", apiKey: "test-key", model: "kimi-k2.6" });
+
+    await llm.complete(context, { thinkingEnabled: false });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(body.thinking).toEqual({ type: "disabled" });
+  });
+
   it("returns a categorized authentication error without an API key", async () => {
     const llm = new KimiService({ provider: "kimi", apiKey: "", model: "kimi-k2.6" });
 

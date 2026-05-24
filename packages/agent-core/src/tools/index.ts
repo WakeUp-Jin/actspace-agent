@@ -15,6 +15,16 @@ export type {
 
 // 核心组件
 export { ToolManager } from "./manager";
+export {
+  ToolScheduler,
+  type ToolApprovalDecision,
+  type ToolApprovalDecisionKind,
+  type ToolApprovalRequest,
+  type ToolCallRecord,
+  type ToolCallStatus,
+  type ToolSchedulerConfig,
+  type ToolSchedulerExecution,
+} from "./scheduler";
 export { guardWorkspacePath } from "./workspace-guard";
 export type { GuardResult } from "./workspace-guard";
 export { shouldExposeTool } from "./exposure";
@@ -24,6 +34,7 @@ export { readFileDefinition } from "./tools/read-file/definition";
 export { searchFilesDefinition } from "./tools/search-files/definition";
 export { listDirectoryDefinition } from "./tools/list-directory/definition";
 export { editFileDiffDefinition } from "./tools/edit-file-diff/definition";
+export { bashDefinition } from "./tools/bash/definition";
 export { webSearchDefinition } from "./tools/web-search/definition";
 export { webFetchDefinition } from "./tools/web-fetch/definition";
 export { analyzeMediaDefinition } from "./tools/analyze-media/definition";
@@ -33,6 +44,14 @@ export { readFileExecutor } from "./tools/read-file/executor";
 export { searchFilesExecutor } from "./tools/search-files/executor";
 export { listDirectoryExecutor } from "./tools/list-directory/executor";
 export { editFileDiffExecutor } from "./tools/edit-file-diff/executor";
+export { bashExecutor } from "./tools/bash/executor";
+export type { BashResult } from "./tools/bash/executor";
+export {
+  bashCheckPermissions,
+  createBashPermissionChecker,
+  createBashTool,
+  renderBashResult,
+} from "./tools/bash";
 export { webSearchExecutor } from "./tools/web-search/executor";
 export { webFetchExecutor } from "./tools/web-fetch/executor";
 export { analyzeMediaExecutor } from "./tools/analyze-media/executor";
@@ -49,6 +68,7 @@ import { listDirectoryDefinition } from "./tools/list-directory/definition";
 import { listDirectoryExecutor } from "./tools/list-directory/executor";
 import { editFileDiffDefinition } from "./tools/edit-file-diff/definition";
 import { editFileDiffExecutor } from "./tools/edit-file-diff/executor";
+import { createBashTool } from "./tools/bash";
 import { webSearchDefinition } from "./tools/web-search/definition";
 import { webSearchExecutor } from "./tools/web-search/executor";
 import { webFetchDefinition } from "./tools/web-fetch/definition";
@@ -79,6 +99,8 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
       manager.registerFromSpec(definition, executor);
     }
   }
+
+  manager.register(createBashTool(config.workspaceRoot));
 
   return manager;
 }

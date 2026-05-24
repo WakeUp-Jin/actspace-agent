@@ -30,6 +30,15 @@ import type { UserMessage } from "../messages";
 
 const PREVIEW_LIMIT = 160;
 
+type StreamLogBuffer = {
+  text: string[];
+  textDeltaCount: number;
+  textChars: number;
+  thinking: string[];
+  thinkingDeltaCount: number;
+  thinkingChars: number;
+};
+
 function preview(value: unknown, limit = PREVIEW_LIMIT): string {
   let text: string;
   try {
@@ -52,6 +61,7 @@ export interface RunTurnWithAgentInput {
   sessionId: string;
   turnId: string;
   userInput: string;
+  thinkingEnabled?: boolean;
 }
 
 export interface RunTurnWithAgentDeps {
@@ -59,6 +69,7 @@ export interface RunTurnWithAgentDeps {
   toolManager: ToolManager;
   contextManager: ContextManager;
   toolExecution?: ToolExecutionMode;
+  thinkingEnabled?: boolean;
 }
 
 export interface RunTurnWithAgentOptions {
@@ -90,6 +101,14 @@ export async function runTurnWithAgent(
     thinkingDeltaCount: 0,
     thinkingChars: 0,
   };
+  const streamLogBuffer: StreamLogBuffer = {
+    text: [],
+    textDeltaCount: 0,
+    textChars: 0,
+    thinking: [],
+    thinkingDeltaCount: 0,
+    thinkingChars: 0,
+  };
 
   function nextEventId(): string {
     return `evt_${turnId}_${++eventIdCounter}`;
@@ -107,13 +126,21 @@ export async function runTurnWithAgent(
     contextManager: deps.contextManager,
     toolManager: deps.toolManager,
     toolExecution: deps.toolExecution,
+    thinkingEnabled: input.thinkingEnabled ?? deps.thinkingEnabled,
     onEvent: async (agentEvent) => {
       logAgentEvent(agentEvent, sessionId, turnId, streamStats);
-      await writeRunLog(runLogger, getRunLogEventType(agentEvent), serializeAgentEvent(agentEvent));
+      const bufferedStreamDelta = bufferStreamLogDelta(agentEvent, streamLogBuffer);
+      if (!bufferedStreamDelta) {
+        await flushStreamLogBuffer(runLogger, streamLogBuffer);
+        await writeRunLog(runLogger, getRunLogEventType(agentEvent), serializeAgentEvent(agentEvent));
+      }
       if (!streamCb) return;
       const mapped = mapAgentEventToStreamEvent(agentEvent, sessionId, turnId, nextEventId);
       if (mapped) {
-        await writeRunLog(runLogger, "stream_event", mapped);
+        if (!isStreamDeltaEvent(mapped)) {
+          await flushStreamLogBuffer(runLogger, streamLogBuffer);
+          await writeRunLog(runLogger, "stream_event", mapped);
+        }
         streamCb(mapped);
       }
     },
@@ -129,6 +156,7 @@ export async function runTurnWithAgent(
     });
     loopResult = await agent.run(userInput);
   } catch (err) {
+    await flushStreamLogBuffer(runLogger, streamLogBuffer);
     const errorMsg = err instanceof Error ? err.message : String(err);
     logAgentRun("turn execution threw", {
       sessionId,
@@ -165,6 +193,7 @@ export async function runTurnWithAgent(
   sessionEvents.push(snapshotEvent);
 
   const finalReply = toAssistantReply(loopResult.message);
+  await flushStreamLogBuffer(runLogger, streamLogBuffer);
 
   if (streamCb) {
     const finishedEvent: RuntimeStreamEvent = {
@@ -379,6 +408,58 @@ async function writeRunLog(
     await runLogger.write({ type, payload });
   } catch (err) {
     console.error("[agent-run-log] failed to write run log", err);
+  }
+}
+
+function bufferStreamLogDelta(event: AgentEvent, buffer: StreamLogBuffer): boolean {
+  if (event.type !== "message_delta") return false;
+
+  const delta = event.delta;
+  if (delta.type === "text_delta") {
+    buffer.text.push(delta.delta);
+    buffer.textDeltaCount += 1;
+    buffer.textChars += delta.delta.length;
+    return true;
+  }
+
+  if (delta.type === "thinking_delta") {
+    buffer.thinking.push(delta.delta);
+    buffer.thinkingDeltaCount += 1;
+    buffer.thinkingChars += delta.delta.length;
+    return true;
+  }
+
+  return false;
+}
+
+function isStreamDeltaEvent(event: RuntimeStreamEvent): boolean {
+  return event.type === "assistant_text_delta" || event.type === "assistant_thinking_delta";
+}
+
+async function flushStreamLogBuffer(
+  runLogger: AgentRunLogger | undefined,
+  buffer: StreamLogBuffer,
+): Promise<void> {
+  if (buffer.thinkingDeltaCount > 0) {
+    await writeRunLog(runLogger, "assistant_thinking", {
+      text: buffer.thinking.join(""),
+      deltaCount: buffer.thinkingDeltaCount,
+      chars: buffer.thinkingChars,
+    });
+    buffer.thinking = [];
+    buffer.thinkingDeltaCount = 0;
+    buffer.thinkingChars = 0;
+  }
+
+  if (buffer.textDeltaCount > 0) {
+    await writeRunLog(runLogger, "assistant_text", {
+      text: buffer.text.join(""),
+      deltaCount: buffer.textDeltaCount,
+      chars: buffer.textChars,
+    });
+    buffer.text = [];
+    buffer.textDeltaCount = 0;
+    buffer.textChars = 0;
   }
 }
 

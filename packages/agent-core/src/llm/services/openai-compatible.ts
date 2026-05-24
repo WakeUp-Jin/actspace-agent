@@ -81,6 +81,7 @@ export function streamOpenAICompatibleChatCompletions(
           messages,
           ...(requestTools.length ? { tools: requestTools } : {}),
           ...(options?.thinking ? { thinking: options.thinking } : {}),
+          ...(options?.thinkingEnabled === false ? { thinking: { type: "disabled" } } : {}),
           stream: true,
           stream_options: { include_usage: true },
           temperature: options?.temperature ?? serviceConfig.temperature,

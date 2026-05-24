@@ -97,7 +97,32 @@ export type ToolUiPreview =
       diff: string;
       collapsedLines: number;
     }
+  | BashPreview
   | { kind: "generic"; title: string; content: string };
+
+export type BashStatus =
+  | "pending"
+  | "running"
+  | "success"
+  | "failed"
+  | "denied"
+  | "expired"
+  | "cancelled";
+
+export type BashPreview = {
+  kind: "bash";
+  status: BashStatus;
+  title: string;
+  command: string;
+  commandPreview?: string;
+  cwd?: string;
+  stdout?: string;
+  stderr?: string;
+  exitCode?: number | null;
+  durationMs?: number;
+  reason?: string;
+  policyLabel?: string;
+};
 
 export type ToolExecutionResult = {
   toolCallId?: ToolCallId;
@@ -228,6 +253,11 @@ export type MessageBlock =
       collapsedLines: number;
       createdAt: string;
     }
+  | ({
+      kind: "bash";
+      id: EventId;
+      createdAt: string;
+    } & BashPreview)
   | {
       kind: "tool";
       id: EventId;

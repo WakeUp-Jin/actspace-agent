@@ -105,7 +105,7 @@ async function runDualLoop(
       }
 
       // 流式 LLM 调用
-      const assistantMsg = await streamAssistantResponse(context, llm, signal, emit);
+      const assistantMsg = await streamAssistantResponse(context, llm, signal, emit, config.thinkingEnabled);
       newMessages.push(assistantMsg);
       accumulateUsage(totalUsage, assistantMsg.usage);
 
@@ -167,9 +167,10 @@ async function streamAssistantResponse(
   llm: BaseLLMService,
   signal: AbortSignal | undefined,
   emit: AgentEventSink,
+  thinkingEnabled: boolean | undefined,
 ): Promise<AssistantMessage> {
   try {
-    const stream = llm.streamSimple(context, { signal });
+    const stream = llm.stream(context, { signal, thinkingEnabled });
 
     for await (const event of stream) {
       switch (event.type) {

@@ -23,7 +23,7 @@
 
 当前仍处在 `V1 基础版` 阶段，重点推进项包括：
 
-- 真实 DeepSeek provider 已接入为默认运行路径；mock provider 只作为显式开发/测试开关和 UI fixture。
+- 真实 DeepSeek provider 已接入为默认运行路径；mock provider 只用于测试、浏览器 fixture 和显式 demo，不会静默替代 Electron 真实会话。
 - 把 UI 和真实 turn 数据链路进一步打磨成稳定闭环。
 - 补强 CI、可靠性约束、错误恢复和端到端测试。
 

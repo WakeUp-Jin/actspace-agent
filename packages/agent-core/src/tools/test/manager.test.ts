@@ -52,6 +52,104 @@ describe("ToolManager", () => {
     expect(result.data).toBe("hello world");
   });
 
+  it("should execute a tool when permissions allow", async () => {
+    const manager = new ToolManager({ workspaceRoot: "/tmp" });
+    let called = false;
+
+    manager.register({
+      ...createSimpleTool("allowed"),
+      checkPermissions: async () => ({ decision: "allow" }),
+      handler: async () => {
+        called = true;
+        return { success: true, data: "allowed result" };
+      },
+    });
+
+    const result = await manager.execute("allowed", {});
+    expect(result.success).toBe(true);
+    expect(result.data).toBe("allowed result");
+    expect(called).toBe(true);
+  });
+
+  it("should pass sanitized args from permissions to handler", async () => {
+    const manager = new ToolManager({ workspaceRoot: "/tmp" });
+    let receivedArgs: Record<string, unknown> | undefined;
+
+    manager.register({
+      ...createSimpleTool("sanitized"),
+      checkPermissions: async () => ({
+        decision: "allow",
+        sanitizedArgs: { input: "clean" },
+      }),
+      handler: async (args) => {
+        receivedArgs = args;
+        return { success: true, data: args.input };
+      },
+    });
+
+    const result = await manager.execute("sanitized", { input: "dirty" });
+    expect(result.success).toBe(true);
+    expect(result.data).toBe("clean");
+    expect(receivedArgs).toEqual({ input: "clean" });
+  });
+
+  it("should deny a tool without calling handler", async () => {
+    const manager = new ToolManager({ workspaceRoot: "/tmp" });
+    let called = false;
+
+    manager.register({
+      ...createSimpleTool("denied"),
+      checkPermissions: async () => ({
+        decision: "deny",
+        reason: "Dangerous operation",
+      }),
+      handler: async () => {
+        called = true;
+        return { success: true, data: "should not run" };
+      },
+    });
+
+    const result = await manager.execute("denied", {});
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Dangerous operation");
+    expect(called).toBe(false);
+  });
+
+  it("should return awaiting approval for ask without calling handler", async () => {
+    const manager = new ToolManager({ workspaceRoot: "/tmp" });
+    let called = false;
+
+    manager.register({
+      ...createSimpleTool("needs_approval"),
+      checkPermissions: async () => ({
+        decision: "ask",
+        reason: "Not in allowlist",
+        summary: "Run command",
+        riskLevel: "medium",
+        sanitizedArgs: { command: "pnpm install" },
+      }),
+      handler: async () => {
+        called = true;
+        return { success: true, data: "should not run" };
+      },
+    });
+
+    const result = await manager.execute("needs_approval", { command: "pnpm install" });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Not in allowlist");
+    expect(called).toBe(false);
+    expect(result.data).toMatchObject({
+      status: "awaiting_approval",
+      approvalRequest: {
+        toolName: "needs_approval",
+        args: { command: "pnpm install" },
+        summary: "Run command",
+        reason: "Not in allowlist",
+        riskLevel: "medium",
+      },
+    });
+  });
+
   it("should return error for unknown tool", async () => {
     const manager = new ToolManager({ workspaceRoot: "/tmp" });
     const result = await manager.execute("nonexistent", {});
