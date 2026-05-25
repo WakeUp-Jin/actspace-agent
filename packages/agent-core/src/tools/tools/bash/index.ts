@@ -16,5 +16,6 @@ export function createBashTool(workspaceRoot: string): InternalTool {
     handler: (args) => bashExecutor(args, workspaceRoot),
     checkPermissions: createBashPermissionChecker(workspaceRoot),
     renderResult: renderBashResult,
+    previewKind: "bash",
   };
 }

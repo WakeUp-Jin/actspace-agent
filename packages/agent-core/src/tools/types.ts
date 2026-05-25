@@ -8,6 +8,7 @@
  */
 
 import type { ToolParameterSchema, ToolResult } from "../internal-tools";
+import type { ToolPreviewKind } from "@actspace/shared";
 
 /** definition.ts 导出的静态声明——不含任何运行时依赖 */
 export interface ToolDefinitionSpec {
@@ -16,6 +17,7 @@ export interface ToolDefinitionSpec {
   parameters: ToolParameterSchema;
   isReadOnly: boolean;
   category: string;
+  previewKind: ToolPreviewKind;
   /** Missing means visible to both real providers. DeepSeek-only tools require a Kimi key. */
   exposeOnlyTo?: "deepseek" | "kimi";
 }

@@ -23,5 +23,6 @@ export const webFetchDefinition: ToolDefinitionSpec = {
   },
   isReadOnly: true,
   category: "search",
+  previewKind: "generic",
   exposeOnlyTo: "deepseek",
 };

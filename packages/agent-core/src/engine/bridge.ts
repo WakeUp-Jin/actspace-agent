@@ -13,11 +13,14 @@ import type {
   RuntimeStreamEvent,
   SessionEvent,
   ContextUsageSnapshot,
+  ToolExecutionResult,
+  ToolUiPreview,
 } from "@actspace/shared";
 import type { LLMService } from "../llm/types";
 import type { ToolManager } from "../tools/manager";
 import type { ContextManager } from "../context/manager";
 import type { AgentRunLogger } from "../observability";
+import type { ToolResult } from "../internal-tools";
 import { Agent } from "./agent";
 import type { AgentEvent, AgentLoopResult, ToolExecutionMode } from "./types";
 import {
@@ -26,7 +29,8 @@ import {
   toAssistantReply,
   contextSnapshotToEvent,
 } from "../adapters";
-import type { UserMessage } from "../messages";
+import { getTextContent, getThinkingContent, getToolCalls, getMessageText } from "../messages";
+import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "../messages";
 
 const PREVIEW_LIMIT = 160;
 
@@ -37,6 +41,12 @@ type StreamLogBuffer = {
   thinking: string[];
   thinkingDeltaCount: number;
   thinkingChars: number;
+};
+
+type ToolExecutionRecord = {
+  toolName: string;
+  args: Record<string, unknown>;
+  result?: ToolResult;
 };
 
 function preview(value: unknown, limit = PREVIEW_LIMIT): string {
@@ -109,6 +119,7 @@ export async function runTurnWithAgent(
     thinkingDeltaCount: 0,
     thinkingChars: 0,
   };
+  const toolExecutions = new Map<string, ToolExecutionRecord>();
 
   function nextEventId(): string {
     return `evt_${turnId}_${++eventIdCounter}`;
@@ -128,11 +139,12 @@ export async function runTurnWithAgent(
     toolExecution: deps.toolExecution,
     thinkingEnabled: input.thinkingEnabled ?? deps.thinkingEnabled,
     onEvent: async (agentEvent) => {
+      recordToolExecution(toolExecutions, agentEvent);
       logAgentEvent(agentEvent, sessionId, turnId, streamStats);
       const bufferedStreamDelta = bufferStreamLogDelta(agentEvent, streamLogBuffer);
       if (!bufferedStreamDelta) {
         await flushStreamLogBuffer(runLogger, streamLogBuffer);
-        await writeRunLog(runLogger, getRunLogEventType(agentEvent), serializeAgentEvent(agentEvent));
+        await writeAgentEventRunLog(runLogger, agentEvent);
       }
       if (!streamCb) return;
       const mapped = mapAgentEventToStreamEvent(agentEvent, sessionId, turnId, nextEventId);
@@ -187,7 +199,7 @@ export async function runTurnWithAgent(
     return failedResult;
   }
 
-  const sessionEvents = buildSessionEvents(loopResult, sessionId, turnId, userInput);
+  const sessionEvents = buildSessionEvents(loopResult, sessionId, turnId, userInput, deps.toolManager, toolExecutions);
   const contextSnapshot = deps.contextManager.getUsageSnapshot();
   const snapshotEvent = contextSnapshotToEvent(contextSnapshot, sessionId, turnId);
   sessionEvents.push(snapshotEvent);
@@ -243,6 +255,8 @@ function buildSessionEvents(
   sessionId: string,
   turnId: string,
   userInput: string,
+  toolManager: ToolManager,
+  toolExecutions: Map<string, ToolExecutionRecord>,
 ): SessionEvent[] {
   const userMessage: UserMessage = {
     role: "user",
@@ -252,9 +266,200 @@ function buildSessionEvents(
   };
   const events: SessionEvent[] = userMessageToEvents(userMessage, sessionId, turnId);
   for (const msg of result.messages) {
+    if (msg.role === "toolResult") {
+      events.push(
+        ...messageToEvents(
+          msg,
+          sessionId,
+          turnId,
+          createToolExecutionResult(msg, toolManager, toolExecutions.get(msg.toolCallId)),
+        ),
+      );
+      continue;
+    }
+
     events.push(...messageToEvents(msg, sessionId, turnId));
   }
   return events;
+}
+
+function recordToolExecution(
+  records: Map<string, ToolExecutionRecord>,
+  event: AgentEvent,
+): void {
+  if (event.type === "tool_start") {
+    records.set(event.toolCallId, {
+      toolName: event.toolName,
+      args: event.args,
+    });
+    return;
+  }
+
+  if (event.type === "tool_end") {
+    const record = records.get(event.toolCallId) ?? {
+      toolName: event.toolName,
+      args: {},
+    };
+    record.result = event.result;
+    records.set(event.toolCallId, record);
+  }
+}
+
+function createToolExecutionResult(
+  message: ToolResultMessage,
+  toolManager: ToolManager,
+  record: ToolExecutionRecord | undefined,
+): ToolExecutionResult {
+  const tool = toolManager.get(message.toolName);
+  const rawOutput = getMessageText(message);
+  const ok = !message.isError;
+  const summary = getToolSummary(message.toolName, tool?.previewKind ?? "generic", record?.args ?? {}, ok);
+
+  return {
+    toolName: message.toolName,
+    toolCallId: message.toolCallId,
+    ok,
+    summary,
+    rawOutput,
+    truncatedOutput: rawOutput,
+    rawOutputRef: {
+      kind: "inline",
+      value: rawOutput,
+    },
+    modelOutput: rawOutput,
+    uiPreview: createToolUiPreview(tool?.previewKind ?? "generic", record?.args ?? {}, rawOutput, summary, ok),
+    error: ok
+      ? undefined
+      : {
+          code: "TOOL_ERROR",
+          message: record?.result?.error ?? rawOutput,
+          recoverable: true,
+        },
+    tokenEstimate: Math.ceil(rawOutput.length / 4),
+  };
+}
+
+function createToolUiPreview(
+  previewKind: ToolUiPreview["kind"],
+  args: Record<string, unknown>,
+  output: string,
+  summary: string,
+  ok: boolean,
+): ToolUiPreview {
+  switch (previewKind) {
+    case "read": {
+      const filePath = stringArg(args.path, "Unknown file");
+      return {
+        kind: "read",
+        filePath,
+        range: getLineRange(args),
+        displayText: summary,
+      };
+    }
+
+    case "search": {
+      const query = stringArg(args.query, "unknown");
+      return {
+        kind: "search",
+        query,
+        scope: typeof args.glob === "string" ? args.glob : undefined,
+        resultCount: getSearchResultCount(output),
+        displayText: summary,
+      };
+    }
+
+    case "directory_list": {
+      const path = stringArg(args.path, "Unknown directory");
+      return {
+        kind: "directory_list",
+        path,
+        entryCount: getDirectoryEntryCount(output),
+        displayText: summary,
+      };
+    }
+
+    case "edit_diff": {
+      return {
+        kind: "edit_diff",
+        filePath: stringArg(args.path, "Unknown file"),
+        additions: countDiffLines(output, "+"),
+        deletions: countDiffLines(output, "-"),
+        diff: output,
+        collapsedLines: 5,
+      };
+    }
+
+    case "bash": {
+      const command = stringArg(args.command, "");
+      return {
+        kind: "bash",
+        status: ok ? "success" : "failed",
+        title: ok ? "Bash command" : "Bash command failed",
+        command,
+        commandPreview: command.split(/\s+/).slice(0, 3).join(" "),
+        cwd: typeof args.cwd === "string" ? args.cwd : undefined,
+        stdout: ok ? output : undefined,
+        stderr: ok ? undefined : output,
+      };
+    }
+
+    case "generic":
+      return {
+        kind: "generic",
+        title: summary,
+        content: output,
+      };
+  }
+}
+
+function getToolSummary(
+  toolName: string,
+  previewKind: ToolUiPreview["kind"],
+  args: Record<string, unknown>,
+  ok: boolean,
+): string {
+  if (!ok) return `Error in ${toolName}`;
+
+  switch (previewKind) {
+    case "read":
+      return `Read ${stringArg(args.path, "file")}`;
+    case "search":
+      return `Searched files for ${stringArg(args.query, "query")}`;
+    case "directory_list":
+      return `Listed ${stringArg(args.path, "directory")}`;
+    case "edit_diff":
+      return `Diff preview for ${stringArg(args.path, "file")}`;
+    case "bash":
+      return "Bash command";
+    case "generic":
+      return `Ran ${toolName}`;
+  }
+}
+
+function stringArg(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+function getLineRange(args: Record<string, unknown>): string | undefined {
+  if (typeof args.offset !== "number") return undefined;
+  if (typeof args.limit !== "number") return String(args.offset);
+  return `${args.offset}-${args.offset + args.limit - 1}`;
+}
+
+function getSearchResultCount(output: string): number | undefined {
+  const match = output.match(/^Found\s+(\d+)\s+match/);
+  return match ? Number(match[1]) : undefined;
+}
+
+function getDirectoryEntryCount(output: string): number {
+  if (output.trim() === "(empty directory)") return 0;
+  return output.split("\n").filter((line) => line.trim().length > 0).length;
+}
+
+function countDiffLines(diff: string, marker: "+" | "-"): number {
+  return diff
+    .split("\n")
+    .filter((line) => line.startsWith(marker) && !line.startsWith(`${marker}${marker}${marker}`)).length;
 }
 
 function mapAgentEventToStreamEvent(
@@ -369,8 +574,6 @@ function logAgentEvent(
             chars: stats.thinkingChars,
           });
         }
-      } else {
-        logAgentRun("tool call delta received", { sessionId, turnId });
       }
       return;
 
@@ -470,10 +673,27 @@ async function flushStreamLogBuffer(
 function serializeAgentEvent(event: AgentEvent): Record<string, unknown> {
   switch (event.type) {
     case "agent_start":
-    case "agent_end":
-    case "message_start":
-    case "message_end":
       return event;
+
+    case "agent_end":
+      return {
+        type: event.type,
+        messageCount: event.messages.length,
+      };
+
+    case "message_start":
+      return {
+        type: event.type,
+        role: event.message.role,
+        summary: summarizeMessage(event.message),
+      };
+
+    case "message_end":
+      return {
+        type: event.type,
+        role: event.message.role,
+        summary: summarizeMessage(event.message),
+      };
 
     case "turn_start":
       return event;
@@ -482,7 +702,10 @@ function serializeAgentEvent(event: AgentEvent): Record<string, unknown> {
       return event;
 
     case "message_delta":
-      return event;
+      return {
+        type: event.type,
+        deltaType: event.delta.type,
+      };
 
     case "tool_start":
       return event;
@@ -490,6 +713,75 @@ function serializeAgentEvent(event: AgentEvent): Record<string, unknown> {
     case "tool_end":
       return event;
   }
+}
+
+async function writeAgentEventRunLog(
+  runLogger: AgentRunLogger | undefined,
+  event: AgentEvent,
+): Promise<void> {
+  if (event.type === "message_delta") return;
+
+  if (event.type === "message_end" && event.message.role === "assistant") {
+    await writeAssistantMessageRunLog(runLogger, event.message);
+  }
+
+  if (event.type === "message_start" || event.type === "message_end") {
+    await writeRunLog(runLogger, "agent_event", serializeAgentEvent(event));
+    return;
+  }
+
+  await writeRunLog(runLogger, getRunLogEventType(event), serializeAgentEvent(event));
+}
+
+async function writeAssistantMessageRunLog(
+  runLogger: AgentRunLogger | undefined,
+  message: AssistantMessage,
+): Promise<void> {
+  const toolCalls = getToolCalls(message);
+  for (const toolCall of toolCalls) {
+    await writeRunLog(runLogger, "assistant_tool_call", {
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      arguments: toolCall.arguments,
+      model: message.model,
+      provider: message.provider,
+      stopReason: message.stopReason,
+    });
+  }
+}
+
+function summarizeMessage(message: Message): Record<string, unknown> {
+  if (message.role === "assistant") {
+    const text = getTextContent(message);
+    const thinking = getThinkingContent(message);
+    const toolCalls = getToolCalls(message);
+    return {
+      stopReason: message.stopReason,
+      model: message.model,
+      provider: message.provider,
+      textLength: text.length,
+      thinkingLength: thinking.length,
+      toolCallCount: toolCalls.length,
+      toolCalls: toolCalls.map((toolCall) => ({
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        arguments: toolCall.arguments,
+      })),
+    };
+  }
+
+  if (message.role === "toolResult") {
+    return {
+      toolCallId: message.toolCallId,
+      toolName: message.toolName,
+      isError: message.isError,
+      textLength: getMessageText(message).length,
+    };
+  }
+
+  return {
+    textLength: getMessageText(message).length,
+  };
 }
 
 function getRunLogEventType(event: AgentEvent): "agent_event" | "tool_event" {

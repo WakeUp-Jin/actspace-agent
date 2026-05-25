@@ -86,9 +86,18 @@ export type ToolOutputRef = {
   value: string;
 };
 
+export type ToolPreviewKind =
+  | "read"
+  | "search"
+  | "directory_list"
+  | "edit_diff"
+  | "bash"
+  | "generic";
+
 export type ToolUiPreview =
   | { kind: "read"; filePath: string; range?: string; displayText: string }
   | { kind: "search"; query: string; scope?: string; resultCount?: number; displayText: string }
+  | { kind: "directory_list"; path: string; entryCount?: number; displayText: string }
   | {
       kind: "edit_diff";
       filePath: string;
@@ -240,6 +249,14 @@ export type MessageBlock =
       query: string;
       scope?: string;
       resultCount?: number;
+      displayText: string;
+      createdAt: string;
+    }
+  | {
+      kind: "directory_list";
+      id: EventId;
+      path: string;
+      entryCount?: number;
       displayText: string;
       createdAt: string;
     }

@@ -288,6 +288,7 @@ export function createMockInternalTool(): InternalTool {
     },
     isReadOnly: true,
     category: "file",
+    previewKind: "read",
     handler: async (args): Promise<ToolResult> => {
       const path = args.path as string;
       if (!path) {

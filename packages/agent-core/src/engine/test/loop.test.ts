@@ -12,6 +12,7 @@ function createTestTool(name: string): InternalTool {
     description: `Test ${name}`,
     parameters: { type: "object", properties: { path: { type: "string", description: "path" } }, required: ["path"] },
     isReadOnly: true,
+    previewKind: "generic",
     handler: async (): Promise<ToolResult> => ({ success: true, data: `result from ${name}` }),
   };
 }

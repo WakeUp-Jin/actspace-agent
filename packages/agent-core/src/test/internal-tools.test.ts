@@ -7,6 +7,7 @@ function createTool(name: string): InternalTool {
     name,
     description: `Tool ${name}`,
     parameters: { type: "object", properties: { x: { type: "string", description: "x" } }, required: [] },
+    previewKind: "generic",
     handler: async (): Promise<ToolResult> => ({ success: true, data: name }),
   };
 }

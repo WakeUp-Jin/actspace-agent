@@ -8,7 +8,6 @@ import type {
   SessionEvent,
   SessionId,
   ThinkingPayload,
-  ToolExecutionResult,
   ToolUiPreview,
   UserMessagePayload
 } from "./session";
@@ -61,56 +60,6 @@ function getDisplayTime(timestamp: string): string {
   return timestamp;
 }
 
-function createGenericToolPreview(payload: ToolExecutionResult): ToolUiPreview {
-  return {
-    kind: "generic",
-    title: payload.summary || payload.toolName,
-    content: payload.modelOutput ?? payload.truncatedOutput ?? payload.rawOutput ?? ""
-  };
-}
-
-function inferToolPreview(payload: ToolExecutionResult): ToolUiPreview {
-  if (payload.uiPreview) {
-    return payload.uiPreview;
-  }
-
-  const artifact = payload.artifacts?.[0];
-  if (payload.toolName === "read_file" && artifact?.name) {
-    return {
-      kind: "read",
-      filePath: artifact.name,
-      displayText: payload.summary || `Read ${artifact.name}`
-    };
-  }
-
-  if (payload.toolName === "search_files") {
-    return {
-      kind: "search",
-      query: payload.summary.replace(/^Search for\s+/i, "") || "unknown",
-      displayText: payload.summary || "Searched files"
-    };
-  }
-
-  if (payload.toolName === "edit_file_diff" && artifact?.name) {
-    return {
-      kind: "edit_diff",
-      filePath: artifact.name,
-      additions: countDiffLines(payload.truncatedOutput ?? payload.rawOutput ?? "", "+"),
-      deletions: countDiffLines(payload.truncatedOutput ?? payload.rawOutput ?? "", "-"),
-      diff: payload.truncatedOutput ?? payload.rawOutput ?? "",
-      collapsedLines: 5
-    };
-  }
-
-  return createGenericToolPreview(payload);
-}
-
-function countDiffLines(diff: string, marker: "+" | "-"): number {
-  return diff
-    .split("\n")
-    .filter((line) => line.startsWith(marker) && !line.startsWith(`${marker}${marker}${marker}`)).length;
-}
-
 function messageBlockFromToolPreview(
   eventId: EventId,
   timestamp: string,
@@ -134,6 +83,15 @@ function messageBlockFromToolPreview(
         query: preview.query,
         scope: preview.scope,
         resultCount: preview.resultCount,
+        displayText: preview.displayText,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "directory_list":
+      return {
+        kind: "directory_list",
+        id: eventId,
+        path: preview.path,
+        entryCount: preview.entryCount,
         displayText: preview.displayText,
         createdAt: getDisplayTime(timestamp)
       };
@@ -220,9 +178,8 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
         ];
       }
       case "tool_result": {
-        const payload = event.payload as ToolExecutionResult;
-        const preview = inferToolPreview(payload);
-        return [messageBlockFromToolPreview(event.id, event.timestamp, preview, !payload.ok)];
+        const payload = event.payload as { ok: boolean; uiPreview: ToolUiPreview };
+        return [messageBlockFromToolPreview(event.id, event.timestamp, payload.uiPreview, !payload.ok)];
       }
       case "diff_preview": {
         const preview = event.payload as ToolUiPreview;
@@ -269,7 +226,7 @@ export function createSessionDiffSummary(sessionId: SessionId, events: SessionEv
 
     const preview =
       event.type === "tool_result"
-        ? inferToolPreview(event.payload as ToolExecutionResult)
+        ? (event.payload as { uiPreview: ToolUiPreview }).uiPreview
         : (event.payload as ToolUiPreview);
 
     if (preview.kind !== "edit_diff") {

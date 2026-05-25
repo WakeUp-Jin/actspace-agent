@@ -48,6 +48,7 @@ export class ToolManager {
       handler: (args) => executor(args, this.workspaceRoot),
       isReadOnly: spec.isReadOnly,
       category: spec.category,
+      previewKind: spec.previewKind,
       renderResult,
     };
     this.tools.set(tool.name, tool);

@@ -17,6 +17,7 @@ function createMockTool(name: string): InternalTool {
       required: ["path"],
     },
     isReadOnly: true,
+    previewKind: "generic",
     handler: async (args): Promise<ToolResult> => ({
       success: true,
       data: `Mock result for ${name}: ${args.path}`,

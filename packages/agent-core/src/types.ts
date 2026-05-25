@@ -3,6 +3,7 @@ import type {
   ContextUsageSnapshot,
   SessionEvent,
   SessionId,
+  ToolPreviewKind,
   TurnId,
   ToolExecutionResult
 } from "@actspace/shared";
@@ -62,6 +63,7 @@ export type ModelProvider = {
 export type ToolDefinition = {
   name: string;
   description: string;
+  previewKind: ToolPreviewKind;
   inputSchema: Record<string, unknown>;
 };
 

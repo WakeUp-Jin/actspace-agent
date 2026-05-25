@@ -24,12 +24,18 @@
   - bridge 将用户输入、AgentEvent、RuntimeStreamEvent 和最终 AgentTurnResult 写入同一个文件
   - 启动 run 前清理超过 24 小时的旧 run JSONL
   - `logRoot` 从 Electron 应用数据目录改为仓库根目录 `logs/`，方便开发时直接查看
+- 将 run JSONL 从逐 chunk 记录收敛为状态级记录：
+  - `text_delta` / `thinking_delta` 聚合为 `assistant_text` / `assistant_thinking`
+  - `tool_call_delta` 不再写入日志，模型完整工具调用指令记录为 `assistant_tool_call`
+  - `message_end` 不再写完整 message，仅保留摘要，避免日志重复和难读
 
 ## 设计动机
 
 现有 `session.jsonl` 更适合会话恢复，不覆盖完整运行诊断链路；`agent:stream` 又只用于实时 UI，不落长期日志。先补即时 console 日志，可以直接复用已有 `pnpm dev:log` 的终端文件能力，让开发排障立刻能看到用户输入入口、Agent 执行过程、工具调用、后端推送和前端 console 输出。
 
 即时 console 日志中只记录长度和短 preview，避免把完整用户输入、工具参数或模型输出大量写入终端日志。run JSONL 排障文件按用户要求保留完整输入、工具参数和工具结果，但只保存在本地日志目录，不提交到 Git。
+
+run JSONL 面向开发者和 Agent 排障阅读，不应像网络抓包一样记录每个 streaming chunk。文本、思考和工具调用参数仍然在运行时流式处理，但日志层只保留聚合后的状态级事件。
 
 ## 验证
 

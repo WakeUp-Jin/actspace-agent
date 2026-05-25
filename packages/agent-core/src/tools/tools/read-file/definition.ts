@@ -28,4 +28,5 @@ export const readFileDefinition: ToolDefinitionSpec = {
   },
   isReadOnly: true,
   category: "file",
+  previewKind: "read",
 };

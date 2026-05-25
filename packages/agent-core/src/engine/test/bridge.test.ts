@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ContextManager } from "../../context/manager";
 import { SystemPromptContext } from "../../context/modules/system-prompt";
 import type { InternalTool, ToolResult } from "../../internal-tools";
-import { MockLLMService } from "../../llm/services/mock";
+import { MockLLMService, mockText, mockToolCall } from "../../llm/services/mock";
 import type { AgentRunLogEvent, AgentRunLogger } from "../../observability";
 import { ToolManager } from "../../tools/manager";
 import { runTurnWithAgent } from "../bridge";
@@ -19,7 +19,28 @@ function createTestTool(name: string): InternalTool {
       },
     },
     isReadOnly: true,
+    previewKind: name === "read_file" ? "read" : name === "search_files" ? "search" : "generic",
     handler: async (): Promise<ToolResult> => ({ success: true, data: `ok from ${name}` }),
+  };
+}
+
+function createListDirectoryTool(): InternalTool {
+  return {
+    name: "list_directory",
+    description: "List a directory",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string" },
+      },
+      required: ["path"],
+    },
+    isReadOnly: true,
+    previewKind: "directory_list",
+    handler: async (): Promise<ToolResult> => ({
+      success: true,
+      data: "[file] a.ts\n[dir] components",
+    }),
   };
 }
 
@@ -134,5 +155,95 @@ describe("runTurnWithAgent bridge", () => {
         }),
       ]),
     );
+  });
+
+  it("records tool calls as state-level run log entries", async () => {
+    const runLogEvents: AgentRunLogEvent[] = [];
+    const runLogger: AgentRunLogger = {
+      filePath: "/tmp/test-run.jsonl",
+      write: async (event) => {
+        runLogEvents.push(event);
+      },
+    };
+
+    await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Please inspect the README.",
+      },
+      createDeps(),
+      { runLogger },
+    );
+
+    const messageDeltaEvents = runLogEvents.filter((event) => {
+      const payload = event.payload as { type?: string } | undefined;
+      return payload?.type === "message_delta";
+    });
+    const assistantToolCalls = runLogEvents.filter((event) => event.type === "assistant_tool_call");
+    const toolEvents = runLogEvents.filter((event) => event.type === "tool_event");
+    const assistantMessageEnds = runLogEvents.filter((event) => {
+      const payload = event.payload as { type?: string; role?: string; message?: unknown } | undefined;
+      return event.type === "agent_event" && payload?.type === "message_end" && payload.role === "assistant";
+    });
+
+    expect(messageDeltaEvents).toHaveLength(0);
+    expect(assistantToolCalls).toHaveLength(2);
+    expect(assistantToolCalls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            toolName: "read_file",
+            arguments: { path: "README.md" },
+          }),
+        }),
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            toolName: "search_files",
+            arguments: { query: "Please inspect the README." },
+          }),
+        }),
+      ]),
+    );
+    expect(toolEvents.filter((event) => (event.payload as { type: string }).type === "tool_start")).toHaveLength(2);
+    expect(toolEvents.filter((event) => (event.payload as { type: string }).type === "tool_end")).toHaveLength(2);
+    expect(toolEvents.map((event) => (event.payload as { toolName?: string }).toolName)).toEqual([
+      "read_file",
+      "read_file",
+      "search_files",
+      "search_files",
+    ]);
+    expect(assistantMessageEnds.length).toBeGreaterThan(0);
+    expect(assistantMessageEnds.every((event) => !("message" in ((event.payload ?? {}) as object)))).toBe(true);
+  });
+
+  it("persists list_directory results with a directory_list preview", async () => {
+    const deps = createDeps();
+    deps.toolManager.register(createListDirectoryTool());
+    deps.llm.setResponses([
+      mockToolCall("list_directory", { path: "packages/agent-core/src/llm" }),
+      mockText("Directory listed."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "List the llm folder.",
+      },
+      deps,
+    );
+
+    const toolResult = result.events.find((event) => event.type === "tool_result");
+
+    expect(toolResult?.payload).toMatchObject({
+      toolName: "list_directory",
+      uiPreview: {
+        kind: "directory_list",
+        path: "packages/agent-core/src/llm",
+        entryCount: 2,
+        displayText: "Listed packages/agent-core/src/llm",
+      },
+    });
   });
 });

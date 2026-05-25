@@ -24,4 +24,5 @@ export const searchFilesDefinition: ToolDefinitionSpec = {
   },
   isReadOnly: true,
   category: "search",
+  previewKind: "search",
 };

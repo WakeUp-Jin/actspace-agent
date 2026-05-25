@@ -13,6 +13,7 @@
  */
 
 import type { Tool } from "./messages";
+import type { ToolPreviewKind } from "@actspace/shared";
 
 // ─── ToolResult（统一返回类型） ───
 
@@ -77,6 +78,8 @@ export interface InternalTool {
   renderResult?: ResultRenderer;
   /** 工具分类 */
   category?: string;
+  /** 前端展示语义，由 shared ToolUiPreview.kind 消费 */
+  previewKind: ToolPreviewKind;
   /** 只读标记，影响审批模式和并行调度策略 */
   isReadOnly?: boolean;
 }

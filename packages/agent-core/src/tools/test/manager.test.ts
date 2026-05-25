@@ -9,6 +9,7 @@ function createSimpleTool(name: string, data = "ok"): InternalTool {
     description: `Tool ${name}`,
     parameters: { type: "object", properties: { input: { type: "string", description: "input" } }, required: [] },
     isReadOnly: true,
+    previewKind: "generic",
     handler: async (): Promise<ToolResult> => ({ success: true, data }),
   };
 }
@@ -36,6 +37,7 @@ describe("ToolManager", () => {
       parameters: { type: "object", properties: {}, required: [] },
       isReadOnly: true,
       category: "test",
+      previewKind: "generic",
     };
     const executor: ToolExecutorFn = async () => ({ success: true, data: "from spec" });
 
@@ -59,7 +61,8 @@ describe("ToolManager", () => {
     manager.register({
       ...createSimpleTool("allowed"),
       checkPermissions: async () => ({ decision: "allow" }),
-      handler: async () => {
+      previewKind: "generic",
+    handler: async () => {
         called = true;
         return { success: true, data: "allowed result" };
       },
@@ -81,7 +84,8 @@ describe("ToolManager", () => {
         decision: "allow",
         sanitizedArgs: { input: "clean" },
       }),
-      handler: async (args) => {
+      previewKind: "generic",
+    handler: async (args) => {
         receivedArgs = args;
         return { success: true, data: args.input };
       },
@@ -103,7 +107,8 @@ describe("ToolManager", () => {
         decision: "deny",
         reason: "Dangerous operation",
       }),
-      handler: async () => {
+      previewKind: "generic",
+    handler: async () => {
         called = true;
         return { success: true, data: "should not run" };
       },
@@ -128,7 +133,8 @@ describe("ToolManager", () => {
         riskLevel: "medium",
         sanitizedArgs: { command: "pnpm install" },
       }),
-      handler: async () => {
+      previewKind: "generic",
+    handler: async () => {
         called = true;
         return { success: true, data: "should not run" };
       },
@@ -162,7 +168,8 @@ describe("ToolManager", () => {
     const manager = new ToolManager({ workspaceRoot: "/tmp" });
     const tool: InternalTool = {
       ...createSimpleTool("failing"),
-      handler: async () => { throw new Error("boom"); },
+      previewKind: "generic",
+    handler: async () => { throw new Error("boom"); },
     };
     manager.register(tool);
 

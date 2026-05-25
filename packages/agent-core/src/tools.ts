@@ -99,9 +99,10 @@ function createToolResult(input: {
 
 function createReadFileTool(): RegisteredTool {
   const definition: ToolDefinition = {
-    name: "read_file",
-    description: "Read a local file and return a concise preview for the model.",
-    inputSchema: {
+        name: "read_file",
+        description: "Read a local file and return a concise preview for the model.",
+        previewKind: "read",
+        inputSchema: {
       type: "object",
       properties: {
         path: { type: "string" }
@@ -143,9 +144,10 @@ function createReadFileTool(): RegisteredTool {
 
 function createSearchFilesTool(): RegisteredTool {
   const definition: ToolDefinition = {
-    name: "search_files",
-    description: "Search for text across files in the workspace.",
-    inputSchema: {
+        name: "search_files",
+        description: "Search for text across files in the workspace.",
+        previewKind: "search",
+        inputSchema: {
       type: "object",
       properties: {
         query: { type: "string" }
@@ -186,9 +188,10 @@ function createSearchFilesTool(): RegisteredTool {
 
 function createEditFileDiffTool(): RegisteredTool {
   const definition: ToolDefinition = {
-    name: "edit_file_diff",
-    description: "Stage a unified diff preview for a file edit.",
-    inputSchema: {
+        name: "edit_file_diff",
+        description: "Stage a unified diff preview for a file edit.",
+        previewKind: "edit_diff",
+        inputSchema: {
       type: "object",
       properties: {
         path: { type: "string" },
@@ -237,9 +240,10 @@ function createEditFileDiffTool(): RegisteredTool {
 
 function createListDirectoryTool(): RegisteredTool {
   const definition: ToolDefinition = {
-    name: "list_directory",
-    description: "List files in a directory for lightweight navigation.",
-    inputSchema: {
+        name: "list_directory",
+        description: "List files in a directory for lightweight navigation.",
+        previewKind: "directory_list",
+        inputSchema: {
       type: "object",
       properties: {
         path: { type: "string" }
@@ -261,9 +265,9 @@ function createListDirectoryTool(): RegisteredTool {
         modelOutput: path ? `Directory listing for ${path}` : "",
         uiPreview: path
           ? {
-              kind: "generic",
-              title: `List ${path}`,
-              content: `Directory listing for ${path}`
+              kind: "directory_list",
+              path,
+              displayText: `Listed ${path}`
             }
           : undefined,
         artifacts: path ? [{ type: "file", name: path }] : undefined,

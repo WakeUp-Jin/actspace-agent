@@ -83,6 +83,11 @@ describe("Session recovery", () => {
         modelOutput: "file content",
         truncatedOutput: "file content",
         rawOutput: "file content",
+        uiPreview: {
+          kind: "read",
+          filePath: "test.ts",
+          displayText: "Read file",
+        },
       }, 4),
       createEvent("assistant_message", {
         content: "Here is the file content.",

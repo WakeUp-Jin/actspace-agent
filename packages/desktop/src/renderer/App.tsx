@@ -22,6 +22,8 @@ import {
   mockTurnResult,
 } from "./fixtures/workbenchFixture";
 
+const MIN_TOOL_RUNNING_MS = 300;
+
 function hasActspaceBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace);
 }
@@ -43,7 +45,7 @@ function getSessionTitle(sessionRecord: SessionRecord | null, sessions: SessionL
 type StreamingState = {
   thinkingText: string;
   assistantText: string;
-  activeTools: Map<string, { toolName: string; isError?: boolean; finished?: boolean }>;
+  activeTools: Map<string, { toolName: string; isError?: boolean; finished?: boolean; startedAt: number }>;
 };
 
 function createEmptyStreamingState(): StreamingState {
@@ -164,7 +166,22 @@ export function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingBlocks, setStreamingBlocks] = useState<MessageBlock[]>([]);
   const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
+  const streamingUserBlockRef = useRef<MessageBlock | null>(null);
+  const toolFinishTimersRef = useRef<Map<string, number>>(new Map());
   const activeSessionIdRef = useRef<string>("session-default");
+
+  const refreshStreamingBlocks = useCallback((userBlock?: MessageBlock | null) => {
+    const newStreamBlocks = streamingStateToBlocks(streamStateRef.current);
+    const currentUserBlock = userBlock ?? streamingUserBlockRef.current;
+    setStreamingBlocks(currentUserBlock ? [currentUserBlock, ...newStreamBlocks] : newStreamBlocks);
+  }, []);
+
+  const clearToolFinishTimers = useCallback(() => {
+    for (const timerId of toolFinishTimersRef.current.values()) {
+      window.clearTimeout(timerId);
+    }
+    toolFinishTimersRef.current.clear();
+  }, []);
 
   useEffect(() => {
     if (!hasActspaceBridge()) return;
@@ -232,14 +249,32 @@ export function App() {
         break;
 
       case "tool_started":
-        state.activeTools.set(event.toolCallId, { toolName: event.toolName });
+        state.activeTools.set(event.toolCallId, { toolName: event.toolName, startedAt: Date.now() });
         break;
 
       case "tool_finished": {
         const tool = state.activeTools.get(event.toolCallId);
         if (tool) {
-          tool.finished = true;
-          tool.isError = event.isError;
+          const finishTool = () => {
+            const latest = streamStateRef.current.activeTools.get(event.toolCallId);
+            if (!latest) return;
+            latest.finished = true;
+            latest.isError = event.isError;
+            toolFinishTimersRef.current.delete(event.toolCallId);
+            refreshStreamingBlocks();
+          };
+          const elapsedMs = Date.now() - tool.startedAt;
+          const remainingMs = Math.max(0, MIN_TOOL_RUNNING_MS - elapsedMs);
+          const existingTimer = toolFinishTimersRef.current.get(event.toolCallId);
+          if (existingTimer !== undefined) {
+            window.clearTimeout(existingTimer);
+          }
+          if (remainingMs > 0) {
+            const timerId = window.setTimeout(finishTool, remainingMs);
+            toolFinishTimersRef.current.set(event.toolCallId, timerId);
+          } else {
+            finishTool();
+          }
         }
         break;
       }
@@ -250,7 +285,7 @@ export function App() {
     }
 
     setStreamingBlocks(streamingStateToBlocks(state));
-  }, []);
+  }, [refreshStreamingBlocks]);
 
   const handleSend = useCallback(async (
     text: string,
@@ -262,6 +297,7 @@ export function App() {
     const turnId = nextTurnId();
 
     setIsStreaming(true);
+    clearToolFinishTimers();
     streamStateRef.current = createEmptyStreamingState();
 
     const userBlock: MessageBlock = {
@@ -270,16 +306,13 @@ export function App() {
       content: text,
       createdAt: new Date().toISOString(),
     };
+    streamingUserBlockRef.current = userBlock;
     setStreamingBlocks([userBlock]);
 
     let unsubscribe: (() => void) | undefined;
     if (hasActspaceBridge()) {
       unsubscribe = window.actspace.onAgentStream((event) => {
         handleStreamEvent(event);
-        setStreamingBlocks((prev) => {
-          const newStreamBlocks = streamingStateToBlocks(streamStateRef.current);
-          return [userBlock, ...newStreamBlocks];
-        });
       });
     }
 
@@ -314,16 +347,20 @@ export function App() {
       console.error("Failed to run turn", error);
     } finally {
       unsubscribe?.();
+      clearToolFinishTimers();
       setIsStreaming(false);
       setStreamingBlocks([]);
       streamStateRef.current = createEmptyStreamingState();
+      streamingUserBlockRef.current = null;
     }
-  }, [isStreaming, handleStreamEvent]);
+  }, [isStreaming, handleStreamEvent, refreshStreamingBlocks, clearToolFinishTimers]);
 
   const handleCreateSession = useCallback(async () => {
     setTurnResult(null);
     setStreamingBlocks([]);
+    clearToolFinishTimers();
     streamStateRef.current = createEmptyStreamingState();
+    streamingUserBlockRef.current = null;
 
     if (!hasActspaceBridge()) {
       const created = createMockEmptySession();
@@ -351,7 +388,7 @@ export function App() {
     } catch (error) {
       console.error("Failed to create session", error);
     }
-  }, []);
+  }, [clearToolFinishTimers]);
 
   const handleSelectSession = useCallback(
     async (sessionId: string) => {
@@ -359,7 +396,9 @@ export function App() {
 
       setIsStreaming(false);
       setStreamingBlocks([]);
+      clearToolFinishTimers();
       streamStateRef.current = createEmptyStreamingState();
+      streamingUserBlockRef.current = null;
       setTurnResult(null);
       activeSessionIdRef.current = sessionId;
 
@@ -396,8 +435,14 @@ export function App() {
         console.error("Failed to select session", error);
       }
     },
-    [mockSessionRecords, sessions],
+    [mockSessionRecords, sessions, clearToolFinishTimers],
   );
+
+  useEffect(() => {
+    return () => {
+      clearToolFinishTimers();
+    };
+  }, [clearToolFinishTimers]);
 
   const persistedEvents = sessionRecord?.events ?? turnResult?.events ?? [];
   const persistedMessages = useMemo<MessageBlock[]>(() => {

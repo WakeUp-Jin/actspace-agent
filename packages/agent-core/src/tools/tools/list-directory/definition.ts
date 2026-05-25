@@ -20,4 +20,5 @@ export const listDirectoryDefinition: ToolDefinitionSpec = {
   },
   isReadOnly: true,
   category: "file",
+  previewKind: "directory_list",
 };

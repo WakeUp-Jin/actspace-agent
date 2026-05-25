@@ -1,6 +1,6 @@
 import type { MessageBlock } from "@actspace/shared";
 
-type ToolLogMessage = Extract<MessageBlock, { kind: "read" | "search" | "tool" | "error" }>;
+type ToolLogMessage = Extract<MessageBlock, { kind: "read" | "search" | "directory_list" | "tool" | "error" }>;
 
 export function ToolLogLine({ message }: { message: ToolLogMessage }) {
   if (message.kind === "read") {
@@ -11,6 +11,14 @@ export function ToolLogLine({ message }: { message: ToolLogMessage }) {
     return (
       <div className="tool-log-line">
         Searched files {message.scope ? `${message.scope} ` : ""}for {message.query}
+      </div>
+    );
+  }
+
+  if (message.kind === "directory_list") {
+    return (
+      <div className="tool-log-line">
+        Listed {message.path}{message.entryCount !== undefined ? ` (${message.entryCount} entries)` : ""}
       </div>
     );
   }

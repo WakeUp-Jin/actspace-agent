@@ -19,5 +19,6 @@ export const webSearchDefinition: ToolDefinitionSpec = {
   },
   isReadOnly: true,
   category: "search",
+  previewKind: "generic",
   exposeOnlyTo: "deepseek",
 };

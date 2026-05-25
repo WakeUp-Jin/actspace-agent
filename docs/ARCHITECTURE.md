@@ -81,7 +81,7 @@
 
 ### `tools/` — 模块化工具系统
 
-- `tools/types.ts`：ToolDefinitionSpec、ToolExecutorFn、ToolManagerConfig；工具定义可用 `exposeOnlyTo?: "deepseek" | "kimi"` 做轻量暴露筛选，缺省表示两个主模型都可见。
+- `tools/types.ts`：ToolDefinitionSpec、ToolExecutorFn、ToolManagerConfig；工具定义必须声明 `previewKind` 作为前端展示语义，并可用 `exposeOnlyTo?: "deepseek" | "kimi"` 做轻量暴露筛选，缺省表示两个主模型都可见。
 - `tools/workspace-guard.ts`：路径边界守卫，防止工具访问工作区外文件。
 - `tools/manager.ts`：ToolManager（注册/获取/导出工具定义），执行入口委托给 ToolScheduler。
 - `tools/scheduler.ts`：ToolScheduler（权限三态决策、工具状态记录、执行、结果渲染与裁剪）。当前 `ask` 会返回结构化待审核结果，approve/deny IPC 和恢复流程由后续计划接入。
@@ -101,7 +101,7 @@
 - `engine/types.ts`：AgentEvent（discriminated union）、AgentLoopConfig、AgentLoopResult。
 - `engine/loop.ts`：runAgentLoop 纯函数双层循环（内层工具调用+转向、外层跟进）。
 - `engine/agent.ts`：Agent 入口类（run/abort），编排 ContextManager + ToolManager + LLMService。
-- `engine/bridge.ts`：IPC 桥接层，将 AgentEvent 实时映射为 RuntimeStreamEvent，并将执行结果聚合为 AgentTurnResult。
+- `engine/bridge.ts`：IPC 桥接层，将 AgentEvent 实时映射为 RuntimeStreamEvent，并根据工具 `previewKind` 将执行结果聚合为带 `ToolUiPreview` 的 AgentTurnResult。
 
 ### `persistence/` — 持久化与恢复
 
@@ -147,7 +147,7 @@
 
 - `session.jsonl` 是会话恢复事实来源，保存稳定的 SessionEvent。
 - 每轮真实 turn 的 `SessionEvent` 顺序以 `user_message -> thinking/tool_call/tool_result -> assistant_message -> context_snapshot` 为基线；即使后端内部 AgentLoopResult 不包含 user message，IPC bridge 也必须显式写入本轮用户输入事件。
-- `logs/agent-runs/*.jsonl` 是本地排障文件，允许包含完整用户输入、完整工具参数、完整工具结果和最终 AgentTurnResult；模型流式文本会聚合为单条 `assistant_text` / `assistant_thinking` 事件，避免逐 delta 刷屏，同时仍保留 delta 数量和字符数，便于判断 Agent 执行、后端推送或前端渲染问题。
+- `logs/agent-runs/*.jsonl` 是本地排障文件，允许包含完整用户输入、完整工具参数、完整工具结果和最终 AgentTurnResult；日志按状态记录而不是按流式 chunk 记录。模型流式文本会聚合为单条 `assistant_text` / `assistant_thinking` 事件，模型完整工具调用指令会记录为单条 `assistant_tool_call`，工具真实执行只记录开始和完成，便于判断 Agent 执行、后端推送或前端渲染问题。
 - 日志目录只保存在本机，不应提交到 Git；仓库根目录 `logs/` 已在 `.gitignore` 中忽略。
 
 应用会在启动早期显式把 Electron `userData` 目录固定为产品名 `actspace`，因此安装后目录规则应稳定为：
@@ -200,7 +200,7 @@ Agent 文件工具的 `workspaceRoot` 与 Electron `userData` 分离：
 7. 用户输入消息，renderer 通过 `agent:run-turn` 发起请求
 8. main 调用 `runTurnWithAgent()`，内部使用新 Agent 引擎（Agent.run）
 9. main 在仓库根目录 `logs/agent-runs/` 创建本次 turn 的 JSONL 排障文件，并清理超过 24 小时的旧 run 日志
-10. 执行过程中，`AgentEvent` 实时通过 `engine/bridge.ts` 映射为 `RuntimeStreamEvent`，经 `agent:stream` 推送到 renderer；本次 run JSONL 记录关键生命周期和工具事件，并将流式文本聚合成单条可读事件
+10. 执行过程中，`AgentEvent` 实时通过 `engine/bridge.ts` 映射为 `RuntimeStreamEvent`，经 `agent:stream` 推送到 renderer；本次 run JSONL 记录关键生命周期和工具事件，并将流式文本、思考和工具调用指令聚合成状态级可读事件
 11. renderer 通过 `onAgentStream` 监听实时事件，动态更新 UI（thinking、text delta、tool 状态）
 12. `agent:run-turn` 返回完整的 `AgentTurnResult`，结果落盘到本地 session 目录，并写入本次 run JSONL
 13. renderer 用最终结果替换流式中间状态，完成一轮交互

@@ -138,6 +138,11 @@ export function toolResultMessageToEvents(
     modelOutput: text,
     truncatedOutput: text,
     rawOutput: text,
+    uiPreview: {
+      kind: "generic",
+      title: msg.isError ? `Error in ${msg.toolName}` : `Ran ${msg.toolName}`,
+      content: text,
+    },
   };
 
   return [
@@ -157,6 +162,7 @@ export function messageToEvents(
   msg: Message,
   sessionId: SessionId,
   turnId: TurnId,
+  executionResult?: ToolExecutionResult,
 ): SessionEvent[] {
   switch (msg.role) {
     case "user":
@@ -164,7 +170,7 @@ export function messageToEvents(
     case "assistant":
       return assistantMessageToEvents(msg, sessionId, turnId);
     case "toolResult":
-      return toolResultMessageToEvents(msg, sessionId, turnId);
+      return toolResultMessageToEvents(msg, sessionId, turnId, executionResult);
   }
 }
 

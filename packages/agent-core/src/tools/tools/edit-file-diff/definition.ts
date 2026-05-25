@@ -29,4 +29,5 @@ export const editFileDiffDefinition: ToolDefinitionSpec = {
   },
   isReadOnly: true,
   category: "file",
+  previewKind: "edit_diff",
 };

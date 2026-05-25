@@ -41,7 +41,11 @@
   - `[agent-ipc]`：renderer 调用 main、main 推送 stream event、turn 持久化等 IPC 边界。
   - `[agent-run]`：Agent loop 生命周期、流式 delta 计数、工具开始/结束、turn 完成状态。
   - `[renderer-console]`：renderer console 输出转发，方便区分前端渲染错误和后端推送错误。
-- 仓库根目录 `logs/agent-runs/` 会保存最近约 1 天的 Agent turn JSONL 排障文件，每次用户输入到 Agent 最终输出对应一个文件。文件包含完整用户输入、工具调用参数、工具结果、关键 AgentEvent、关键 RuntimeStreamEvent 和最终 AgentTurnResult；模型流式文本不逐 delta 入日志，而是聚合为单条 `assistant_text` / `assistant_thinking` 事件，并保留 delta 数量与字符数，便于区分：
+- 仓库根目录 `logs/agent-runs/` 会保存最近约 1 天的 Agent turn JSONL 排障文件，每次用户输入到 Agent 最终输出对应一个文件。文件包含完整用户输入、工具调用参数、工具结果、关键 AgentEvent、关键 RuntimeStreamEvent 和最终 AgentTurnResult；日志按状态记录，不按流式 chunk 逐行记录：
+  - 模型流式文本聚合为单条 `assistant_text` / `assistant_thinking` 事件，并保留 delta 数量与字符数。
+  - 模型输出的完整工具调用指令记录为单条 `assistant_tool_call`，不记录 `tool_call_delta` 碎片。
+  - 工具真实执行只记录 `tool_event` 的开始和完成。
+  这些状态级记录便于区分：
   - Agent 运行错误：看 `agent_event` / `tool_event` / `run_failed`。
   - 后端是否推送给前端：看 `stream_event`。
   - 会话持久化是否完成：看 `main_event` 的 `persisting_turn_result` / `turn_result_persisted`。

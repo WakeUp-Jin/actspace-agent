@@ -31,4 +31,5 @@ export const bashDefinition: ToolDefinitionSpec = {
   },
   isReadOnly: false,
   category: "system",
+  previewKind: "bash",
 };

@@ -8,6 +8,7 @@ const deepseekOnlySpec: ToolDefinitionSpec = {
   parameters: { type: "object", properties: {}, required: [] },
   isReadOnly: true,
   category: "search",
+  previewKind: "generic",
   exposeOnlyTo: "deepseek",
 };
 
