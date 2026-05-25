@@ -49,9 +49,24 @@ describe("tool exposure", () => {
 
     expect(withoutKimi.has("web_search")).toBe(false);
     expect(withKimi.has("web_search")).toBe(true);
-    expect(withKimi.has("web_fetch")).toBe(true);
     expect(withKimi.has("analyze_media")).toBe(true);
     expect(kimiPrimary.has("web_search")).toBe(false);
     expect(kimiPrimary.has("read_file")).toBe(true);
+  });
+
+  it("skips tools listed in disabledTools even when they are otherwise exposable", () => {
+    const manager = createToolManager({
+      workspaceRoot: "/tmp",
+      primaryProvider: "deepseek",
+      hasKimiKey: true,
+      disabledTools: ["read_file", "bash", "web_search"],
+    });
+
+    expect(manager.has("read_file")).toBe(false);
+    expect(manager.has("bash")).toBe(false);
+    expect(manager.has("web_search")).toBe(false);
+    expect(manager.has("grep")).toBe(true);
+    expect(manager.has("glob")).toBe(true);
+    expect(manager.getToolDefinitions().some((tool) => tool.name === "bash")).toBe(false);
   });
 });

@@ -10,11 +10,20 @@ export type SessionError = {
   details?: string;
 };
 
+export type LlmUsageCost = {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  total: number;
+  currency: "USD" | "CNY";
+};
+
 export type RuntimeStreamEvent =
   | { type: "turn_started"; sessionId: SessionId; turnId: TurnId }
   | { type: "assistant_text_delta"; messageId: EventId; delta: string }
   | { type: "assistant_thinking_delta"; messageId: EventId; delta: string }
-  | { type: "tool_started"; toolCallId: ToolCallId; toolName: string; argsPreview: string }
+  | { type: "tool_started"; toolCallId: ToolCallId; toolName: string; argsPreview: string; preview?: ToolUiPreview }
   | { type: "tool_finished"; toolCallId: ToolCallId; toolName: string; resultEventId: EventId; isError: boolean }
   | { type: "turn_finished"; sessionId: SessionId; turnId: TurnId; resultEventIds: EventId[] }
   | { type: "turn_failed"; sessionId: SessionId; turnId: TurnId; error: SessionError };
@@ -26,6 +35,7 @@ export type SessionEventType =
   | "thinking"
   | "tool_call"
   | "tool_result"
+  | "llm_usage"
   | "diff_preview"
   | "context_snapshot"
   | "error";
@@ -58,6 +68,21 @@ export type ToolCallPayload = {
   id: ToolCallId;
   name: string;
   arguments: Record<string, unknown>;
+};
+
+export type LlmUsagePayload = {
+  callId: string;
+  provider: string;
+  model: string;
+  modelId?: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  reasoningTokens?: number;
+  cacheHitTokens?: number;
+  cacheMissTokens?: number;
+  cost: LlmUsageCost;
+  relatedEventIds?: EventId[];
 };
 
 export type ContextSnapshotPayload = ContextUsageSnapshot;
@@ -174,7 +199,46 @@ export type ContextUsageSnapshot = {
   percentUsed: number;
   compressionCount?: number;
   cumulativeTokens?: number;
+  estimator?: {
+    name: string;
+    version: string;
+  };
   buckets: ContextUsageBucket[];
+};
+
+export type ContextStateEntry = {
+  id: string;
+  kind:
+    | "systemPrompt"
+    | "toolDefinitions"
+    | "rules"
+    | "skills"
+    | "mcp"
+    | "subagentDefinitions"
+    | "conversation";
+  title: string;
+  estimatedTokens: number;
+  included: boolean;
+  pinned?: boolean;
+  removable?: boolean;
+  sourceEventIds?: EventId[];
+  contentHash?: string;
+  preview?: string;
+};
+
+export type ContextState = {
+  sessionId: SessionId;
+  activeTurnId?: TurnId;
+  updatedAt: string;
+  estimator: {
+    name: string;
+    version: string;
+  };
+  totalEstimatedTokens: number;
+  maxTokens: number;
+  percentUsed: number;
+  buckets: ContextUsageBucket[];
+  entries: ContextStateEntry[];
 };
 
 export type AssistantReply = {
@@ -182,10 +246,15 @@ export type AssistantReply = {
   stopReason: "stop" | "toolUse" | "length" | "error" | "aborted";
   model: string;
   provider: string;
+  modelId?: string;
   usage?: {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
+    reasoningTokens?: number;
+    cacheHitTokens?: number;
+    cacheMissTokens?: number;
+    cost?: LlmUsageCost;
   };
 };
 
@@ -195,7 +264,8 @@ export type AgentTurnResult = {
   events: SessionEvent[];
   finalReply?: AssistantReply;
   contextSnapshot: ContextUsageSnapshot;
-  status: "completed" | "failed";
+  contextState?: ContextState;
+  status: "completed" | "failed" | "aborted";
   error?: {
     code: string;
     message: string;
@@ -242,6 +312,7 @@ export type MessageBlock =
       range?: string;
       displayText: string;
       createdAt: string;
+      status?: "running" | "completed";
     }
   | {
       kind: "search";
@@ -251,6 +322,7 @@ export type MessageBlock =
       resultCount?: number;
       displayText: string;
       createdAt: string;
+      status?: "running" | "completed";
     }
   | {
       kind: "directory_list";
@@ -259,6 +331,7 @@ export type MessageBlock =
       entryCount?: number;
       displayText: string;
       createdAt: string;
+      status?: "running" | "completed";
     }
   | {
       kind: "edit_diff";
@@ -290,6 +363,13 @@ export type MessageBlock =
       content: string;
       createdAt: string;
       recoverable: boolean;
+    }
+  | {
+      kind: "status";
+      id: EventId;
+      content: string;
+      createdAt: string;
+      tone?: "muted" | "error";
     };
 
 export type SessionDiffSummary = {

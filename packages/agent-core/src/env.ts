@@ -56,6 +56,8 @@ export interface AppEnv {
   LOG_LEVEL: "debug" | "info" | "warn" | "error";
   /** 是否在 mock 模式下运行（快捷开关） */
   MOCK_MODE: boolean;
+  /** 逗号分隔的禁用工具名列表 */
+  ACTSPACE_DISABLED_TOOLS: string[];
 }
 
 type EnvField<T> = {
@@ -75,6 +77,11 @@ const num = (raw: string) => {
   return n;
 };
 const bool = (raw: string) => raw === "true" || raw === "1" || raw === "yes";
+const csv = (raw: string) =>
+  raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 
 const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
   NODE_ENV: {
@@ -172,6 +179,12 @@ const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
     required: false,
     default: false,
     parse: bool,
+  },
+  ACTSPACE_DISABLED_TOOLS: {
+    envKey: "ACTSPACE_DISABLED_TOOLS",
+    required: false,
+    default: [],
+    parse: csv,
   },
 };
 
@@ -329,7 +342,10 @@ export const env: AppEnv = new Proxy({} as AppEnv, {
 });
 
 /**
- * 从当前 env 生成 LLMConfig（供 createLLMService 使用）。
+ * 从当前 env 生成 LLMConfig。
+ *
+ * 仅用于测试和 mock fallback 场景。
+ * Electron 真实 turn 使用 engine/create-agent-deps.ts 中的 buildAgentConfig() + createAgentFromConfig()。
  */
 export function envToLLMConfig() {
   const e = getEnv();

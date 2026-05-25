@@ -1,7 +1,8 @@
 /**
- * Kimi 辅助能力：web_search / web_fetch / analyze_media
+ * Kimi 辅助能力：web_search / analyze_media
  *
- * DeepSeek 作为主模型时，通过 Kimi 提供联网搜索、网页抓取和多模态分析。
+ * DeepSeek 作为主模型时，通过 Kimi 提供联网搜索和多模态分析。
+ * web_search 统一处理关键词搜索和 URL 读取（利用 $web_search 内置的 search + crawl 能力）。
  */
 
 import { getTextContent, getToolCalls } from "../messages";
@@ -10,7 +11,6 @@ import { KimiService } from "./services/kimi";
 import type { APIContentPart, APIMessage, LLMConfig } from "./types";
 import {
   ANALYZE_MEDIA_SYSTEM_PROMPT,
-  WEB_FETCH_SYSTEM_PROMPT,
   WEB_SEARCH_SYSTEM_PROMPT,
 } from "../prompt/kimi-assistants";
 
@@ -20,8 +20,6 @@ export interface KimiAssistantConfig {
   apiKey: string;
   baseUrl?: string;
   model: string;
-  temperature?: number;
-  maxTokens?: number;
 }
 
 export interface WebSearchResult {
@@ -30,12 +28,6 @@ export interface WebSearchResult {
   searchedAt: string;
 }
 
-export interface WebFetchResult {
-  url: string;
-  title?: string;
-  summary: string;
-  fetchedAt: string;
-}
 
 export interface AnalyzeMediaInput {
   source: string;
@@ -50,16 +42,12 @@ export interface AnalyzeMediaResult {
 
 // ─── 配置 ───
 
-const DEFAULT_TIMEOUT_MS = 15_000;
-const MAX_PAGE_TEXT_CHARS = 24_000;
 
 export function createKimiAssistantConfigFromEnv(): KimiAssistantConfig {
   return {
     apiKey: env.KIMI_API_KEY,
-    baseUrl: env.KIMI_BASE_URL || "https://api.moonshot.ai/v1",
+    baseUrl: env.KIMI_BASE_URL || "https://api.moonshot.cn/v1",
     model: env.KIMI_MODEL || "kimi-k2.6",
-    temperature: 0,
-    maxTokens: 2048,
   };
 }
 
@@ -75,81 +63,71 @@ export async function searchWithKimi(
     { role: "user", content: query },
   ];
 
-  const first = await service.streamWithBuiltinWebSearch(messages, {
-    temperature: config.temperature,
-    maxTokens: config.maxTokens,
-  }).result();
+  const first = await service.streamWithBuiltinWebSearch(messages, {}).result();
 
+  // If the first response has an error, propagate it
+  if (first.stopReason === "error") {
+    return {
+      query,
+      answer: "",
+      searchedAt: new Date().toISOString(),
+    };
+  }
+
+  // If the first response already has text content, use it directly
+  const firstText = getTextContent(first);
+  if (firstText) {
+    return {
+      query,
+      answer: firstText,
+      searchedAt: new Date().toISOString(),
+    };
+  }
+
+  // If Kimi returned builtin tool_calls (server-side search was executed),
+  // acknowledge with empty tool results and request final answer
   const toolCalls = getToolCalls(first);
   if (toolCalls.length > 0) {
     messages.push({
       role: "assistant",
-      content: getTextContent(first) || null,
-      tool_calls: toolCalls.map((toolCall) => ({
-        id: toolCall.id,
+      content: null,
+      tool_calls: toolCalls.map((tc) => ({
+        id: tc.id,
         type: "function",
         function: {
-          name: toolCall.name,
-          arguments: JSON.stringify(toolCall.arguments),
+          name: tc.name,
+          arguments: JSON.stringify(tc.arguments),
         },
       })),
     });
 
-    for (const toolCall of toolCalls) {
+    // 文档要求：将 tool_call.function.arguments 原封不动地提交给 Kimi
+    for (const tc of toolCalls) {
       messages.push({
         role: "tool",
-        tool_call_id: toolCall.id,
-        name: toolCall.name,
-        content: JSON.stringify(toolCall.arguments),
+        tool_call_id: tc.id,
+        name: tc.name,
+        content: JSON.stringify(tc.arguments),
       });
     }
-  }
 
-  const finalMessage = toolCalls.length > 0
-    ? await service.streamWithBuiltinWebSearch(messages, {
-        temperature: config.temperature,
-        maxTokens: config.maxTokens,
-      }).result()
-    : first;
+    const finalMessage = await service.streamWithBuiltinWebSearch(messages, {}).result();
+
+    const finalText = getTextContent(finalMessage);
+    return {
+      query,
+      answer: finalText || `No search results found for "${query}".`,
+      searchedAt: new Date().toISOString(),
+    };
+  }
 
   return {
     query,
-    answer: getTextContent(finalMessage),
+    answer: `No search results found for "${query}".`,
     searchedAt: new Date().toISOString(),
   };
 }
 
-// ─── 网页抓取 ───
-
-export async function fetchAndSummarizeWithKimi(
-  url: string,
-  prompt?: string,
-  config = createKimiAssistantConfigFromEnv(),
-): Promise<WebFetchResult> {
-  const page = await fetchPageText(url);
-  const service = createKimiService(config);
-  const userPrompt = [
-    prompt ? `User focus:\n${prompt}` : "User focus:\nSummarize the page for a downstream coding assistant.",
-    `URL:\n${url}`,
-    page.title ? `Title:\n${page.title}` : "",
-    `Page text:\n${page.text.slice(0, MAX_PAGE_TEXT_CHARS)}`,
-  ].filter(Boolean).join("\n\n");
-
-  const message = await service.completeMessages([
-    { role: "system", content: WEB_FETCH_SYSTEM_PROMPT },
-    { role: "user", content: userPrompt },
-  ], {
-    temperature: config.temperature,
-    maxTokens: config.maxTokens,
-  });
-
-  return {
-    url,
-    title: page.title,
-    summary: getTextContent(message),
-    fetchedAt: new Date().toISOString(),
-  };
-}
 
 // ─── 多模态分析 ───
 
@@ -169,10 +147,7 @@ export async function analyzeMediaWithKimi(
   const message = await service.completeMessages([
     { role: "system", content: ANALYZE_MEDIA_SYSTEM_PROMPT },
     { role: "user", content },
-  ], {
-    temperature: config.temperature,
-    maxTokens: config.maxTokens,
-  });
+  ], {});
 
   return {
     summary: getTextContent(message),
@@ -188,70 +163,10 @@ function createKimiService(config: KimiAssistantConfig): KimiService {
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
     model: config.model,
-    temperature: config.temperature,
-    maxTokens: config.maxTokens,
   };
   return new KimiService(llmConfig);
 }
 
-async function fetchPageText(url: string): Promise<{ title?: string; text: string }> {
-  const parsed = new URL(url);
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new Error("Only http and https URLs are supported");
-  }
-  if (parsed.username || parsed.password) {
-    throw new Error("URLs with embedded credentials are not supported");
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(parsed.toString(), {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "actspace-agent/0.1",
-        Accept: "text/html,text/plain,application/xhtml+xml",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Fetch failed with HTTP ${response.status}`);
-    }
-
-    const raw = (await response.text()).slice(0, MAX_PAGE_TEXT_CHARS * 2);
-    return htmlToText(raw);
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function htmlToText(raw: string): { title?: string; text: string } {
-  const title = raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
-  const withoutScripts = raw
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ");
-  const text = withoutScripts
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|section|article|li|h[1-6])>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, "\"")
-    .replace(/&#39;/g, "'")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n\s+/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-
-  return {
-    title: title?.replace(/\s+/g, " ").trim(),
-    text,
-  };
-}
 
 function toMediaPart(input: AnalyzeMediaInput): APIContentPart {
   const isVideo = input.mimeType?.startsWith("video/") || /\.(mp4|mov|webm|mkv)$/i.test(input.source);

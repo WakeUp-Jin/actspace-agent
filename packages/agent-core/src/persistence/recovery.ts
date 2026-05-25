@@ -15,6 +15,7 @@ import {
   createSessionDiffSummary,
   getLatestContextSnapshot,
 } from "@actspace/shared";
+import { readFile } from "node:fs/promises";
 import type {
   ContextUsageSnapshot,
   MessageBlock,
@@ -35,6 +36,7 @@ export async function recoverSession(
 ): Promise<SessionRecoveryResult> {
   const meta = await readMeta(paths.metaPath);
   const parseResult = await parseJsonl(paths.sessionPath);
+  const contextState = await readContextStateFile(paths.contextStatePath);
 
   const { messages, errors: recoveryErrors } = sessionEventsToMessages(parseResult.events);
   const contextSnapshot = getLatestContextSnapshot(parseResult.events);
@@ -47,10 +49,24 @@ export async function recoverSession(
     events: parseResult.events,
     messages,
     contextSnapshot,
+    contextState,
     diffSummary,
     parseErrors: parseResult.errors,
     recoveryErrors,
   };
+}
+
+async function readContextStateFile(
+  contextStatePath: string,
+): Promise<import("@actspace/shared").ContextState | null> {
+  try {
+    const raw = await readFile(contextStatePath, "utf-8");
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as import("@actspace/shared").ContextState;
+  } catch {
+    return null;
+  }
 }
 
 /** 仅恢复 Message[]（用于灌入 ContextManager） */

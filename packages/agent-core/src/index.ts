@@ -7,6 +7,7 @@ export * from "./persistence";
 export * from "./prompt";
 export * from "./tools";
 export * from "./types";
+export * from "./usage";
 
 export * from "./messages";
 export * from "./internal-tools";

@@ -32,7 +32,7 @@
 
 当前实现中：
 
-- `packages/shared/src/ipc.ts` 包含 `MODEL_REGISTRY`。
+- `packages/shared/src/model-config.ts` 包含 `MODEL_REGISTRY`，`packages/shared/src/ipc.ts` re-export 兼容旧调用。
 - `packages/shared/src/session.ts` 定义 `SessionEvent`、`AssistantReply`、`ContextUsageSnapshot`。
 - `packages/agent-core/src/messages.ts` 定义内部 `Usage`。
 - `packages/agent-core/src/llm/convert.ts` 从 OpenAI-compatible stream usage 中读取部分 usage 字段。
@@ -392,13 +392,22 @@ export type ContextState = {
 ## 进度记录
 
 - [x] 2026-05-25：确认设计边界：usage 写入事件流；cost 写入 usage；pricingSnapshot 不写入；轻量 context_snapshot 保留；完整 context state 存每会话单独文件。
-- [ ] 拆出模型配置。
-- [ ] 扩展 session usage 契约。
-- [ ] 补齐 provider usage 映射和成本计算。
-- [ ] 生成 per-call `llm_usage` 事件。
-- [ ] 写入并读取 `context-state.json`。
+- [x] 拆出模型配置。
+- [x] 扩展 session usage 契约。
+- [x] 补齐 provider usage 映射和成本计算。
+- [x] 生成 per-call `llm_usage` 事件。
+- [x] 写入并读取 `context-state.json`。
 - [ ] 前端 Context popup 只读展示 context state。
-- [ ] 完成测试、文档、history 和必要 learning。
+- [x] 完成后端数据地基的测试、文档、history 和必要 learning。
+- [ ] 完成前端只读展示后的测试、文档、history 和必要 learning。
+
+## 验收记录
+
+- 2026-05-25：后端数据地基通过 `pnpm --filter @actspace/shared build`。
+- 2026-05-25：后端数据地基通过 `pnpm --filter @actspace/shared typecheck`。
+- 2026-05-25：后端数据地基通过 `pnpm --filter @actspace/agent-core typecheck`。
+- 2026-05-25：后端数据地基通过 `pnpm --filter @actspace/agent-core test`。
+- 2026-05-25：后端数据地基通过 `pnpm --filter @actspace/desktop typecheck`。
 
 ## 决策记录
 

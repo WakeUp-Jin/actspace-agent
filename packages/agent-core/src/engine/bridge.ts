@@ -13,9 +13,12 @@ import type {
   RuntimeStreamEvent,
   SessionEvent,
   ContextUsageSnapshot,
+  ContextState,
+  LlmUsagePayload,
   ToolExecutionResult,
   ToolUiPreview,
 } from "@actspace/shared";
+import { resolveModelSpecByApiModel } from "@actspace/shared";
 import type { LLMService } from "../llm/types";
 import type { ToolManager } from "../tools/manager";
 import type { ContextManager } from "../context/manager";
@@ -24,6 +27,7 @@ import type { ToolResult } from "../internal-tools";
 import { Agent } from "./agent";
 import type { AgentEvent, AgentLoopResult, ToolExecutionMode } from "./types";
 import {
+  createPersistedSessionEvent,
   messageToEvents,
   userMessageToEvents,
   toAssistantReply,
@@ -31,6 +35,7 @@ import {
 } from "../adapters";
 import { getTextContent, getThinkingContent, getToolCalls, getMessageText } from "../messages";
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "../messages";
+import { calculateUsageCost } from "../usage";
 
 const PREVIEW_LIMIT = 160;
 
@@ -80,6 +85,7 @@ export interface RunTurnWithAgentDeps {
   contextManager: ContextManager;
   toolExecution?: ToolExecutionMode;
   thinkingEnabled?: boolean;
+  abort?: () => void;
 }
 
 export interface RunTurnWithAgentOptions {
@@ -147,7 +153,7 @@ export async function runTurnWithAgent(
         await writeAgentEventRunLog(runLogger, agentEvent);
       }
       if (!streamCb) return;
-      const mapped = mapAgentEventToStreamEvent(agentEvent, sessionId, turnId, nextEventId);
+      const mapped = mapAgentEventToStreamEvent(agentEvent, sessionId, turnId, nextEventId, deps.toolManager);
       if (mapped) {
         if (!isStreamDeltaEvent(mapped)) {
           await flushStreamLogBuffer(runLogger, streamLogBuffer);
@@ -157,6 +163,7 @@ export async function runTurnWithAgent(
       }
     },
   });
+  deps.abort = () => agent.abort();
 
   let loopResult: AgentLoopResult;
   try {
@@ -201,6 +208,7 @@ export async function runTurnWithAgent(
 
   const sessionEvents = buildSessionEvents(loopResult, sessionId, turnId, userInput, deps.toolManager, toolExecutions);
   const contextSnapshot = deps.contextManager.getUsageSnapshot();
+  const contextState = createContextState(contextSnapshot, sessionId, turnId);
   const snapshotEvent = contextSnapshotToEvent(contextSnapshot, sessionId, turnId);
   sessionEvents.push(snapshotEvent);
 
@@ -221,7 +229,9 @@ export async function runTurnWithAgent(
   logAgentRun("turn execution completed", {
     sessionId,
     turnId,
-    status: loopResult.message.stopReason === "error" ? "failed" : "completed",
+    status: loopResult.message.stopReason === "aborted"
+      ? "aborted"
+      : loopResult.message.stopReason === "error" ? "failed" : "completed",
     stopReason: loopResult.message.stopReason,
     sessionEventCount: sessionEvents.length,
     textDeltaCount: streamStats.textDeltaCount,
@@ -237,7 +247,10 @@ export async function runTurnWithAgent(
     events: sessionEvents,
     finalReply,
     contextSnapshot,
-    status: loopResult.message.stopReason === "error" ? "failed" : "completed",
+    contextState,
+    status: loopResult.message.stopReason === "aborted"
+      ? "aborted"
+      : loopResult.message.stopReason === "error" ? "failed" : "completed",
     error: loopResult.message.errorMessage
       ? { code: "LLM_ERROR", message: loopResult.message.errorMessage }
       : undefined,
@@ -248,6 +261,34 @@ export async function runTurnWithAgent(
     result,
   );
   return result;
+}
+
+function createContextState(
+  snapshot: ContextUsageSnapshot,
+  sessionId: string,
+  turnId: string,
+): ContextState {
+  return {
+    sessionId,
+    activeTurnId: turnId,
+    updatedAt: new Date().toISOString(),
+    estimator: snapshot.estimator ?? { name: "unknown", version: "0" },
+    totalEstimatedTokens: snapshot.totalTokens,
+    maxTokens: snapshot.maxTokens,
+    percentUsed: snapshot.percentUsed,
+    buckets: snapshot.buckets,
+    entries: snapshot.buckets.map((bucket) => {
+      const kind = bucket.key ?? bucket.name ?? "conversation";
+      return {
+        id: `context_${kind}`,
+        kind: kind === "tools" ? "toolDefinitions" : kind === "subagents" ? "subagentDefinitions" : kind,
+        title: bucket.label ?? kind,
+        estimatedTokens: bucket.tokens,
+        included: bucket.tokens > 0,
+        removable: false,
+      };
+    }),
+  };
 }
 
 function buildSessionEvents(
@@ -265,6 +306,7 @@ function buildSessionEvents(
     source: "user",
   };
   const events: SessionEvent[] = userMessageToEvents(userMessage, sessionId, turnId);
+  let usageCallIndex = 0;
   for (const msg of result.messages) {
     if (msg.role === "toolResult") {
       events.push(
@@ -278,9 +320,52 @@ function buildSessionEvents(
       continue;
     }
 
-    events.push(...messageToEvents(msg, sessionId, turnId));
+    const messageEvents = messageToEvents(msg, sessionId, turnId);
+    events.push(...messageEvents);
+
+    if (msg.role === "assistant") {
+      const usageCall = result.usageCalls[usageCallIndex++];
+      const relatedEventIds = messageEvents.map((event) => event.id);
+      events.push(createLlmUsageEvent(usageCall?.callId ?? `llm_call_${turnId}_${usageCallIndex}`, msg, sessionId, turnId, relatedEventIds));
+    }
   }
   return events;
+}
+
+function createLlmUsageEvent(
+  callId: string,
+  message: AssistantMessage,
+  sessionId: string,
+  turnId: string,
+  relatedEventIds: string[],
+): SessionEvent<LlmUsagePayload> {
+  const modelSpec = resolveModelSpecByApiModel(message.model, message.provider as "deepseek" | "kimi" | undefined);
+  const payload: LlmUsagePayload = {
+    callId,
+    provider: message.provider,
+    model: message.model,
+    modelId: modelSpec?.id,
+    promptTokens: message.usage.input,
+    completionTokens: message.usage.output,
+    totalTokens: message.usage.totalTokens,
+    reasoningTokens: message.usage.reasoning || undefined,
+    cacheHitTokens: message.usage.cacheHit || message.usage.cacheRead || undefined,
+    cacheMissTokens: message.usage.cacheMiss || undefined,
+    cost: calculateUsageCost(
+      {
+        inputTokens: message.usage.input,
+        outputTokens: message.usage.output,
+        totalTokens: message.usage.totalTokens,
+        reasoningTokens: message.usage.reasoning,
+        cacheHitTokens: message.usage.cacheHit || message.usage.cacheRead,
+        cacheMissTokens: message.usage.cacheMiss,
+      },
+      modelSpec?.pricing,
+    ),
+    relatedEventIds,
+  };
+
+  return createPersistedSessionEvent(sessionId, turnId, "llm_usage", payload);
 }
 
 function recordToolExecution(
@@ -349,11 +434,12 @@ function createToolUiPreview(
   switch (previewKind) {
     case "read": {
       const filePath = stringArg(args.path, "Unknown file");
+      const displayPath = displayFileName(filePath);
       return {
         kind: "read",
-        filePath,
+        filePath: displayPath,
         range: getLineRange(args),
-        displayText: summary,
+        displayText: getReadPreviewText(displayPath, getLineRange(args)),
       };
     }
 
@@ -370,18 +456,20 @@ function createToolUiPreview(
 
     case "directory_list": {
       const path = stringArg(args.path, "Unknown directory");
+      const displayPath = displayPathTail(path);
       return {
         kind: "directory_list",
-        path,
+        path: displayPath,
         entryCount: getDirectoryEntryCount(output),
-        displayText: summary,
+        displayText: `Listed ${displayPath}`,
       };
     }
 
     case "edit_diff": {
+      const filePath = stringArg(args.path, "Unknown file");
       return {
         kind: "edit_diff",
-        filePath: stringArg(args.path, "Unknown file"),
+        filePath: displayFileName(filePath),
         additions: countDiffLines(output, "+"),
         deletions: countDiffLines(output, "-"),
         diff: output,
@@ -422,22 +510,41 @@ function getToolSummary(
 
   switch (previewKind) {
     case "read":
-      return `Read ${stringArg(args.path, "file")}`;
+      return `Read ${displayFileName(stringArg(args.path, "file"))}`;
     case "search":
       return `Searched files for ${stringArg(args.query, "query")}`;
     case "directory_list":
-      return `Listed ${stringArg(args.path, "directory")}`;
+      return `Listed ${displayPathTail(stringArg(args.path, "directory"))}`;
     case "edit_diff":
-      return `Diff preview for ${stringArg(args.path, "file")}`;
+      return `Edited ${displayFileName(stringArg(args.path, "file"))}`;
     case "bash":
       return "Bash command";
     case "generic":
+      if (toolName === "web_search") {
+        const url = stringArg(args.url, "");
+        const query = stringArg(args.query, "");
+        return url ? `Fetching: ${url}` : `Searching: ${query || "..."}`;
+      }
       return `Ran ${toolName}`;
   }
 }
 
 function stringArg(value: unknown, fallback: string): string {
   return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+function displayFileName(path: string): string {
+  const normalized = path.replace(/[\\/]+$/, "");
+  return normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized ?? path;
+}
+
+function displayPathTail(path: string): string {
+  const normalized = path.replace(/[\\/]+$/, "");
+  return normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized ?? path;
+}
+
+function getReadPreviewText(filePath: string, range?: string): string {
+  return `Read ${filePath}${range ? ` ${range}` : ""}`;
 }
 
 function getLineRange(args: Record<string, unknown>): string | undefined {
@@ -467,6 +574,7 @@ function mapAgentEventToStreamEvent(
   sessionId: string,
   turnId: string,
   nextId: () => string,
+  toolManager: ToolManager,
 ): RuntimeStreamEvent | null {
   switch (event.type) {
     case "agent_start":
@@ -484,12 +592,21 @@ function mapAgentEventToStreamEvent(
     }
 
     case "tool_start":
-      return {
-        type: "tool_started",
-        toolCallId: event.toolCallId,
-        toolName: event.toolName,
-        argsPreview: JSON.stringify(event.args).slice(0, 200),
-      };
+      {
+        const tool = toolManager.get(event.toolName);
+        const previewKind = tool?.previewKind ?? "generic";
+        const summary = getToolSummary(event.toolName, previewKind, event.args, true);
+        const preview = createToolUiPreview(previewKind, event.args, "", summary, true);
+        const startedEvent: RuntimeStreamEvent = {
+          type: "tool_started",
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+          argsPreview: JSON.stringify(event.args).slice(0, 200),
+          preview,
+        };
+
+        return startedEvent;
+      }
 
     case "tool_end":
       return {

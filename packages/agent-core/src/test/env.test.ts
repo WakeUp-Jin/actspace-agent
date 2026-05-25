@@ -9,6 +9,7 @@ const ENV_KEYS = [
   "KIMI_MODEL",
   "DEEPSEEK_API_KEY",
   "DEEPSEEK_BASE_URL",
+  "ACTSPACE_DISABLED_TOOLS",
 ];
 const EMPTY_ENV_PATH = "/private/tmp/actspace-agent-env-test-does-not-exist";
 
@@ -58,5 +59,13 @@ describe("envToLLMConfig", () => {
       apiKey: "mock-key",
       model: "deepseek-mock",
     });
+  });
+
+  it("parses disabled tools from a comma-separated env var", async () => {
+    process.env.ACTSPACE_DISABLED_TOOLS = "read_file, bash,web_search ,,";
+    const { loadEnv, env } = await import("../env");
+
+    loadEnv({ envPath: EMPTY_ENV_PATH, mergeToProcessEnv: false });
+    expect(env.ACTSPACE_DISABLED_TOOLS).toEqual(["read_file", "bash", "web_search"]);
   });
 });

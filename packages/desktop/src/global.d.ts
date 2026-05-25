@@ -7,6 +7,9 @@ declare global {
       runTurn: (
         input: import("@actspace/shared").RunTurnInput
       ) => Promise<import("@actspace/shared").AgentTurnResult>;
+      abortTurn: (
+        input: import("@actspace/shared").AbortTurnInput
+      ) => Promise<boolean>;
       listSessions: () => Promise<import("@actspace/shared").SessionListItem[]>;
       getSession: (
         input: import("@actspace/shared").SessionGetInput

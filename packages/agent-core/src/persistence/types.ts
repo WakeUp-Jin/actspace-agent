@@ -4,6 +4,7 @@
 
 import type {
   ContextUsageSnapshot,
+  ContextState,
   SessionDiffSummary,
   SessionEvent,
   SessionId,
@@ -15,6 +16,7 @@ export interface SessionStorePaths {
   root: string;
   metaPath: string;
   sessionPath: string;
+  contextStatePath: string;
   attachmentsDir: string;
 }
 
@@ -43,6 +45,7 @@ export interface SessionRecoveryResult {
   events: SessionEvent[];
   messages: Message[];
   contextSnapshot: ContextUsageSnapshot | null;
+  contextState: ContextState | null;
   diffSummary: SessionDiffSummary | null;
   parseErrors: JsonlParseError[];
   recoveryErrors: Array<{ index: number; error: string }>;

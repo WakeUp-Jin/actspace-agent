@@ -1,7 +1,7 @@
 import type { ToolDefinitionSpec } from "../../types";
 
 export const editFileDiffDefinition: ToolDefinitionSpec = {
-  name: "edit_file_diff",
+  name: "edit-file",
   description:
     "Generate a unified diff preview for a file edit. " +
     "Finds old_string in the file and shows what the replacement with new_string would look like. " +

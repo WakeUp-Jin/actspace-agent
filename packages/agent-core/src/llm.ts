@@ -52,7 +52,7 @@ export function createMockModelProvider(): ModelProvider {
           },
           {
             id: "tool_diff_1",
-            name: "edit_file_diff",
+            name: "edit-file",
             arguments: {
               path: "docs/ARCHITECTURE.md",
               diff: "@@ -1,3 +1,5 @@\n- Old architecture notes\n+ actspace desktop workbench skeleton\n+ typed agent runtime contracts\n+ local session persistence wiring\n"

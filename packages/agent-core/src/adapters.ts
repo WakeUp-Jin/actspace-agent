@@ -51,6 +51,15 @@ function createSessionEvent<TPayload>(
   };
 }
 
+export function createPersistedSessionEvent<TPayload>(
+  sessionId: SessionId,
+  turnId: TurnId,
+  type: SessionEvent["type"],
+  payload: TPayload,
+): SessionEvent<TPayload> {
+  return createSessionEvent(sessionId, turnId, type, payload);
+}
+
 // ─── 方向 1：Message → SessionEvent[] ───
 
 export function userMessageToEvents(
@@ -265,10 +274,19 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
             usage: {
               input: payload.usage?.inputTokens ?? 0,
               output: payload.usage?.outputTokens ?? 0,
-              cacheRead: 0,
+              cacheRead: payload.usage?.cacheHitTokens ?? 0,
               cacheWrite: 0,
+              reasoning: payload.usage?.reasoningTokens ?? 0,
+              cacheHit: payload.usage?.cacheHitTokens ?? 0,
+              cacheMiss: payload.usage?.cacheMissTokens ?? 0,
               totalTokens: payload.usage?.totalTokens ?? 0,
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+              cost: {
+                input: payload.usage?.cost?.input ?? 0,
+                output: payload.usage?.cost?.output ?? 0,
+                cacheRead: payload.usage?.cost?.cacheRead ?? 0,
+                cacheWrite: payload.usage?.cost?.cacheWrite ?? 0,
+                total: payload.usage?.cost?.total ?? 0,
+              },
             },
             stopReason: payload.stopReason,
             timestamp: new Date(event.timestamp).getTime() || now,
@@ -277,6 +295,7 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
         }
 
         case "error":
+        case "llm_usage":
         case "context_snapshot":
         case "diff_preview":
           break;
@@ -313,7 +332,14 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
         model: "unknown",
         provider: "unknown",
         usage: {
-          input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          reasoning: 0,
+          cacheHit: 0,
+          cacheMiss: 0,
+          totalTokens: 0,
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
         },
         stopReason: "toolUse",
@@ -335,6 +361,9 @@ export function toAssistantReply(msg: AssistantMessage): AssistantReply {
       inputTokens: msg.usage.input,
       outputTokens: msg.usage.output,
       totalTokens: msg.usage.totalTokens,
+      reasoningTokens: msg.usage.reasoning,
+      cacheHitTokens: msg.usage.cacheHit,
+      cacheMissTokens: msg.usage.cacheMiss,
     },
   };
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createMessageBlocks, getLatestContextSnapshot } from "@actspace/shared";
 import type {
+  AbortTurnInput,
   AgentTurnResult,
   BashStatus,
   BootstrapState,
@@ -10,6 +11,7 @@ import type {
   RuntimeStreamEvent,
   SessionListItem,
   SessionRecord,
+  ToolUiPreview,
 } from "@actspace/shared";
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import type { ComposerSendOptions } from "./components/Composer";
@@ -45,7 +47,13 @@ function getSessionTitle(sessionRecord: SessionRecord | null, sessions: SessionL
 type StreamingState = {
   thinkingText: string;
   assistantText: string;
-  activeTools: Map<string, { toolName: string; isError?: boolean; finished?: boolean; startedAt: number }>;
+  activeTools: Map<string, {
+    toolName: string;
+    preview?: ToolUiPreview;
+    isError?: boolean;
+    finished?: boolean;
+    startedAt: number;
+  }>;
 };
 
 function createEmptyStreamingState(): StreamingState {
@@ -81,12 +89,24 @@ function getStreamingBashStatus(tool: { isError?: boolean; finished?: boolean })
   return tool.isError ? "failed" : "success";
 }
 
-function getStreamingBashTitle(tool: { isError?: boolean; finished?: boolean }): string {
-  if (!tool.finished) {
-    return "Bash command";
+function getStreamingReadText(preview: Extract<ToolUiPreview, { kind: "read" }>): string {
+  return `Read ${preview.filePath}${preview.range ? ` ${preview.range}` : ""}`;
+}
+
+function getStreamingSearchText(preview: Extract<ToolUiPreview, { kind: "search" }>): string {
+  const scope = preview.scope ? `${preview.scope} ` : "";
+  return `Searched files ${scope}for ${preview.query}`;
+}
+
+function getStreamingDirectoryText(
+  preview: Extract<ToolUiPreview, { kind: "directory_list" }>,
+  finished?: boolean,
+): string {
+  if (finished && preview.entryCount !== undefined) {
+    return `Listed ${preview.path} (${preview.entryCount} entries)`;
   }
 
-  return tool.isError ? "Bash command failed" : "Bash command";
+  return `Listed ${preview.path}`;
 }
 
 function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
@@ -105,17 +125,58 @@ function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
   }
 
   for (const [toolCallId, tool] of state.activeTools) {
-    if (tool.toolName === "bash") {
+    if (tool.preview?.kind === "bash") {
       blocks.push({
         kind: "bash",
         id: `streaming-tool-${toolCallId}`,
         status: getStreamingBashStatus(tool),
-        title: getStreamingBashTitle(tool),
-        command: "Waiting for Bash result...",
-        commandPreview: "bash",
-        stdout: tool.finished ? "Completed" : "Executing...",
+        title: tool.preview.title,
+        command: tool.preview.command || "Waiting for Bash result...",
+        commandPreview: tool.preview.commandPreview || "bash",
+        cwd: tool.preview.cwd,
+        stdout: tool.finished ? tool.preview.stdout : undefined,
         stderr: tool.isError ? "Tool execution failed" : undefined,
         createdAt: now,
+      });
+      continue;
+    }
+
+    if (tool.preview?.kind === "read") {
+      blocks.push({
+        kind: "read",
+        id: `streaming-tool-${toolCallId}`,
+        filePath: tool.preview.filePath,
+        range: tool.preview.range,
+        displayText: getStreamingReadText(tool.preview),
+        createdAt: now,
+        status: tool.finished ? "completed" : "running",
+      });
+      continue;
+    }
+
+    if (tool.preview?.kind === "search") {
+      blocks.push({
+        kind: "search",
+        id: `streaming-tool-${toolCallId}`,
+        query: tool.preview.query,
+        scope: tool.preview.scope,
+        resultCount: tool.finished ? tool.preview.resultCount : undefined,
+        displayText: getStreamingSearchText(tool.preview),
+        createdAt: now,
+        status: tool.finished ? "completed" : "running",
+      });
+      continue;
+    }
+
+    if (tool.preview?.kind === "directory_list") {
+      blocks.push({
+        kind: "directory_list",
+        id: `streaming-tool-${toolCallId}`,
+        path: tool.preview.path,
+        entryCount: tool.finished ? tool.preview.entryCount : undefined,
+        displayText: getStreamingDirectoryText(tool.preview, tool.finished),
+        createdAt: now,
+        status: tool.finished ? "completed" : "running",
       });
       continue;
     }
@@ -123,10 +184,14 @@ function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
     blocks.push({
       kind: "tool",
       id: `streaming-tool-${toolCallId}`,
-      title: tool.finished ? `${tool.toolName}` : `Running ${tool.toolName}...`,
-      content: tool.finished
-        ? tool.isError ? "Tool execution failed" : "Completed"
-        : "Executing...",
+      title: tool.preview?.kind === "generic"
+        ? tool.preview.title
+        : tool.finished ? `${tool.toolName}` : `Running ${tool.toolName}...`,
+      content: tool.preview?.kind === "generic"
+        ? tool.preview.content
+        : tool.finished
+          ? tool.isError ? "Tool execution failed" : "Completed"
+          : "Executing...",
       createdAt: now,
       isError: tool.isError,
     });
@@ -149,6 +214,16 @@ function nextTurnId(): string {
   return `turn-${Date.now()}-${++turnCounter}`;
 }
 
+function createStoppedBlock(turnId: string): MessageBlock {
+  return {
+    kind: "status",
+    id: `stopped-${turnId}`,
+    content: "Stopped",
+    createdAt: new Date().toISOString(),
+    tone: "muted",
+  };
+}
+
 export function App() {
   const [bootstrapState, setBootstrapState] = useState<BootstrapState | null>(
     hasActspaceBridge() ? null : mockBootstrapState,
@@ -164,7 +239,10 @@ export function App() {
     hasActspaceBridge() ? null : mockTurnResult,
   );
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isAborting, setIsAborting] = useState(false);
+  const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   const [streamingBlocks, setStreamingBlocks] = useState<MessageBlock[]>([]);
+  const [sendScrollRequestId, setSendScrollRequestId] = useState(0);
   const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
   const toolFinishTimersRef = useRef<Map<string, number>>(new Map());
@@ -249,7 +327,11 @@ export function App() {
         break;
 
       case "tool_started":
-        state.activeTools.set(event.toolCallId, { toolName: event.toolName, startedAt: Date.now() });
+        state.activeTools.set(event.toolCallId, {
+          toolName: event.toolName,
+          preview: event.preview,
+          startedAt: Date.now(),
+        });
         break;
 
       case "tool_finished": {
@@ -284,7 +366,7 @@ export function App() {
         return;
     }
 
-    setStreamingBlocks(streamingStateToBlocks(state));
+    refreshStreamingBlocks();
   }, [refreshStreamingBlocks]);
 
   const handleSend = useCallback(async (
@@ -297,6 +379,8 @@ export function App() {
     const turnId = nextTurnId();
 
     setIsStreaming(true);
+    setIsAborting(false);
+    setActiveTurnId(turnId);
     clearToolFinishTimers();
     streamStateRef.current = createEmptyStreamingState();
 
@@ -308,6 +392,7 @@ export function App() {
     };
     streamingUserBlockRef.current = userBlock;
     setStreamingBlocks([userBlock]);
+    setSendScrollRequestId((value) => value + 1);
 
     let unsubscribe: (() => void) | undefined;
     if (hasActspaceBridge()) {
@@ -315,6 +400,8 @@ export function App() {
         handleStreamEvent(event);
       });
     }
+
+    let runWasAborted = false;
 
     try {
       if (hasActspaceBridge()) {
@@ -327,18 +414,23 @@ export function App() {
         };
         const result = await window.actspace.runTurn(input);
 
-        const restored = await window.actspace.getSession({ sessionId });
-        setSessionRecord(restored ?? {
-          meta: {
-            id: result.sessionId,
-            title: "New chat",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            turnCount: 1,
-          },
-          events: result.events,
-          contextSnapshot: result.contextSnapshot,
-        });
+        if (result.status === "aborted") {
+          runWasAborted = true;
+          setStreamingBlocks((current) => [...current, createStoppedBlock(turnId)]);
+        } else {
+          const restored = await window.actspace.getSession({ sessionId });
+          setSessionRecord(restored ?? {
+            meta: {
+              id: result.sessionId,
+              title: "New chat",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              turnCount: 1,
+            },
+            events: result.events,
+            contextSnapshot: result.contextSnapshot,
+          });
+        }
         setTurnResult(null);
         const refreshed = await window.actspace.listSessions();
         setSessions(refreshed);
@@ -349,11 +441,32 @@ export function App() {
       unsubscribe?.();
       clearToolFinishTimers();
       setIsStreaming(false);
-      setStreamingBlocks([]);
+      setIsAborting(false);
+      setActiveTurnId(null);
+      if (!runWasAborted) {
+        setStreamingBlocks([]);
+      }
       streamStateRef.current = createEmptyStreamingState();
       streamingUserBlockRef.current = null;
     }
   }, [isStreaming, handleStreamEvent, refreshStreamingBlocks, clearToolFinishTimers]);
+
+  const handleAbort = useCallback(async () => {
+    if (!hasActspaceBridge() || !activeTurnId) return;
+
+    const input: AbortTurnInput = {
+      sessionId: activeSessionIdRef.current,
+      turnId: activeTurnId,
+    };
+
+    try {
+      setIsAborting(true);
+      await window.actspace.abortTurn(input);
+    } catch (error) {
+      console.error("Failed to abort turn", error);
+      setIsAborting(false);
+    }
+  }, [activeTurnId]);
 
   const handleCreateSession = useCallback(async () => {
     setTurnResult(null);
@@ -479,7 +592,10 @@ export function App() {
       messages={messages}
       contextSnapshot={contextSnapshot}
       isStreaming={isStreaming}
+      isAborting={isAborting}
+      sendScrollRequestId={sendScrollRequestId}
       onSend={handleSend}
+      onAbort={handleAbort}
       onNewSession={handleCreateSession}
       onSelectSession={handleSelectSession}
       showDemoAttachments={showDemoAttachments}

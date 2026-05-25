@@ -19,7 +19,8 @@
   - 执行或恢复一轮 turn
   - 渲染消息流
   - 本地落盘
-- 每轮真实 turn 的 `session.jsonl` 必须能恢复用户输入、中间执行和最终回复，至少包含 `user_message` 和 `context_snapshot`。
+- 每轮真实 turn 的 `session.jsonl` 必须能恢复用户输入、中间执行和最终回复，至少包含 `user_message`、每次模型回复对应的 `llm_usage` 和轻量 `context_snapshot`。
+- 每个会话可以维护独立的 `context-state.json`，用于恢复当前 Context 面板展示；该文件是可覆盖视图，不替代 `session.jsonl` 的事实日志。
 
 ## 当前本地排障入口
 
@@ -27,6 +28,7 @@
 - `pnpm dev:log`：本地开发启动桌面端，并把终端 stdout/stderr 同步写入根目录 `logs/dev-*.log`，同时更新 `logs/latest-dev.log` 供 Agent 排障读取。
 - 文件工具默认使用 workspace root，而不是 Electron `userData`。如需指定工作区，设置 `ACTSPACE_WORKSPACE_ROOT`。
 - DeepSeek 主模型的联网搜索、网页读取和多模态工具需要 `KIMI_API_KEY`。未配置时这些工具不会注册，避免运行中暴露一个必然失败的能力。
+- 如需长期禁用某些工具，可设置 `ACTSPACE_DISABLED_TOOLS=read_file,bash`；工具会在注册阶段直接跳过，不会暴露给模型，也不会出现在运行时工具列表里。
 - `pnpm typecheck`：检查跨包类型契约。
 - `pnpm build`：检查当前桌面端和共享包是否可构建。
 - `pnpm ci`：运行仓库级基础门禁。

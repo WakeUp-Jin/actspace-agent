@@ -199,6 +199,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
         ];
       }
       case "tool_call":
+      case "llm_usage":
       case "context_snapshot":
         return [];
     }

@@ -31,6 +31,7 @@ export type ToolExecutorFn = (
 export interface ToolRuntimeConfig {
   primaryProvider?: "deepseek" | "kimi" | "mock";
   hasKimiKey?: boolean;
+  disabledTools?: string[];
 }
 
 /** ToolManager 配置 */

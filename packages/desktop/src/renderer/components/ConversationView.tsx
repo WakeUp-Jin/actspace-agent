@@ -62,6 +62,12 @@ function renderMessage(message: MessageBlock) {
     case "tool":
     case "error":
       return <ToolLogLine key={message.id} message={message} />;
+    case "status":
+      return (
+        <div key={message.id} className={`turn-status-line${message.tone === "error" ? " is-error" : ""}`}>
+          {message.content}
+        </div>
+      );
     case "edit_diff":
       return <EditDiffBlock key={message.id} message={message} />;
   }
@@ -179,7 +185,10 @@ export function ConversationView({
   rightPanelOpen,
   onToggleRightPanel,
   isStreaming = false,
+  isAborting = false,
+  sendScrollRequestId = 0,
   onSend,
+  onAbort,
   showDemoAttachments = false,
 }: {
   title: string;
@@ -188,10 +197,22 @@ export function ConversationView({
   rightPanelOpen: boolean;
   onToggleRightPanel: () => void;
   isStreaming?: boolean;
+  isAborting?: boolean;
+  sendScrollRequestId?: number;
   onSend?: (text: string, options: ComposerSendOptions) => void;
+  onAbort?: () => void;
   showDemoAttachments?: boolean;
 }) {
   const turns = groupMessagesIntoTurns(messages);
+  const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (sendScrollRequestId === 0) {
+      return;
+    }
+
+    bottomAnchorRef.current?.scrollIntoView({ block: "end" });
+  }, [sendScrollRequestId]);
 
   return (
     <main className="conversation-shell">
@@ -229,6 +250,7 @@ export function ConversationView({
               />
             </section>
           ))}
+          <div ref={bottomAnchorRef} aria-hidden="true" />
         </div>
       </section>
 
@@ -236,7 +258,9 @@ export function ConversationView({
         <Composer
           contextSnapshot={contextSnapshot}
           isStreaming={isStreaming}
+          isAborting={isAborting}
           onSend={onSend}
+          onAbort={onAbort}
           showDemoAttachments={showDemoAttachments}
         />
       </div>

@@ -320,9 +320,22 @@ export async function* processStreamChunks(
       acc.usage.input = chunk.usage.prompt_tokens ?? acc.usage.input;
       acc.usage.output = chunk.usage.completion_tokens ?? acc.usage.output;
       acc.usage.totalTokens = chunk.usage.total_tokens ?? acc.usage.totalTokens;
-      const usageAny = chunk.usage as unknown as Record<string, number | undefined>;
+      const usageAny = chunk.usage as unknown as {
+        prompt_cache_hit_tokens?: number;
+        prompt_cache_miss_tokens?: number;
+        completion_tokens_details?: { reasoning_tokens?: number };
+      };
       if (usageAny.prompt_cache_hit_tokens !== undefined) {
         acc.usage.cacheRead = usageAny.prompt_cache_hit_tokens;
+        acc.usage.cacheHit = usageAny.prompt_cache_hit_tokens;
+      }
+      if (usageAny.prompt_cache_miss_tokens !== undefined) {
+        acc.usage.cacheMiss = usageAny.prompt_cache_miss_tokens;
+      } else if (usageAny.prompt_cache_hit_tokens !== undefined && chunk.usage.prompt_tokens !== undefined) {
+        acc.usage.cacheMiss = Math.max(chunk.usage.prompt_tokens - usageAny.prompt_cache_hit_tokens, 0);
+      }
+      if (usageAny.completion_tokens_details?.reasoning_tokens !== undefined) {
+        acc.usage.reasoning = usageAny.completion_tokens_details.reasoning_tokens;
       }
     }
   }

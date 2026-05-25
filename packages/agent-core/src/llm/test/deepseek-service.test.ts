@@ -25,7 +25,17 @@ describe("DeepSeekService", () => {
     const mockStream = createMockStream([
       { choices: [{ delta: { content: "CON" }, finish_reason: null }] },
       { choices: [{ delta: { content: "NECTED" }, finish_reason: "stop" }] },
-      { choices: [], usage: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 } },
+      {
+        choices: [],
+        usage: {
+          prompt_tokens: 3,
+          completion_tokens: 2,
+          total_tokens: 5,
+          prompt_cache_hit_tokens: 1,
+          prompt_cache_miss_tokens: 2,
+          completion_tokens_details: { reasoning_tokens: 1 },
+        },
+      },
     ]);
 
     vi.spyOn(llm["client"].chat.completions, "create").mockResolvedValue(mockStream as any);
@@ -35,6 +45,9 @@ describe("DeepSeekService", () => {
     expect(result.content).toEqual([{ type: "text", text: "CONNECTED" }]);
     expect(result.provider).toBe("deepseek");
     expect(result.usage.totalTokens).toBe(5);
+    expect(result.usage.cacheHit).toBe(1);
+    expect(result.usage.cacheMiss).toBe(2);
+    expect(result.usage.reasoning).toBe(1);
   });
 
   it("keeps DeepSeek request model controlled by the injected config", async () => {

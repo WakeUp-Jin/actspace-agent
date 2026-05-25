@@ -486,3 +486,4 @@ packages/agent-core/src/prompt/kimi-assistants/
 - 2026-05-24：Kimi 辅助调用的系统提示词独立版本化。原因是这些提示词只约束工具 executor 内部的 Kimi 子调用，不应污染 DeepSeek 或 Kimi 主模型的 system prompt。2026-05-25 起路径集中为 `packages/agent-core/src/prompt/kimi-assistants/`。
 - 2026-05-24：首版 `web_fetch` 使用本地 HTTP fetch + 简单 HTML 转文本 + Kimi 摘要，不接 Formula fetch。原因是该路径最小、可测、输出能直接给 DeepSeek 阅读。
 - 2026-05-24：首版 `analyze_media` 支持 Kimi 可接受的 URL/data URL/平台引用，不在本轮实现 Moonshot 文件上传。原因是当前前端附件链路还未形成稳定契约，先把 provider content part 与 DeepSeek 工具边界打通。
+- 2026-05-25：**`web_fetch` 已废弃并合并到 `web_search`**。Kimi `$web_search` builtin 原生支持 search + crawl 双能力，独立 `web_fetch`（本地 fetch + HTML 解析 + Kimi summarize）引入了超时和内容提取质量问题。现在 `web_search` 接受 `query`（关键词搜索）或 `url`（读取网页）参数，统一由 `searchWithKimi` 处理。

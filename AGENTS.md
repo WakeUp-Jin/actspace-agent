@@ -9,7 +9,7 @@
 ## 每轮开始先读
 
 - `docs/REPO_COLLAB_GUIDE.md`：仓库级协作、提交、文档同步与测试约定。
-- `docs/ARCHITECTURE.md`：仓库整体结构和预期边界。
+- `docs/ARCHITECTURE.md`：仓库整体结构、依赖边界和架构专题导航。
 - `docs/design-docs/core-beliefs.md`：Agent-first 的工作原则和这个模板的设计出发点。
 
 ## 代码改完前要读
@@ -32,7 +32,8 @@
 - `docs/FRONTEND.md`：前端协作入口、设计文档和验证规范导航。
 - `docs/FRONTEND_VERIFICATION.md`：桌面端前端修改后的浏览器 mock、Electron 真实验证和 Computer Use 验收方式。
 
-- `docs/backend-agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
+- `docs/design-docs/index.md`：设计文档总索引；按任务需要进入 agent-core、frontend-ui 等专题。
+- `docs/design-docs/agent-core/backend-agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
 
 - `docs/CODING_BEHAVIOR.md`：编码行为纪律——改代码时的操作级约束。
 - `docs/coding-standards/README.md`：编码规范、Skill 推荐清单和团队自定义约定。

@@ -1,0 +1,199 @@
+/**
+ * Agent Turn 编排
+ *
+ * 从 main/index.ts 抽出的 Agent turn 执行逻辑。
+ * 职责：构建配置 → 创建实例 → 执行 turn → 持久化结果。
+ *
+ * main/index.ts 只负责 Electron 生命周期和 IPC 路由，
+ * Agent 相关逻辑集中在这个文件。
+ */
+
+import type { BrowserWindow } from "electron";
+import { join } from "node:path";
+import type { AgentTurnResult, RunTurnInput, RuntimeStreamEvent } from "@actspace/shared";
+import {
+  buildAgentConfig,
+  createAgentFromConfig,
+  type AgentRunLogger,
+  cleanupOldAgentRunLogs,
+  createAgentRunLogger,
+  runTurnWithAgent,
+  createSessionStorePaths,
+  writeSessionResult,
+} from "@actspace/agent-core";
+
+export type AppDataRoots = {
+  dataRoot: string;
+  sessionRoot: string;
+  logRoot: string;
+  tmpRoot: string;
+  workspaceRoot: string;
+};
+
+const PREVIEW_LIMIT = 160;
+
+function preview(value: unknown, limit = PREVIEW_LIMIT): string {
+  let text: string;
+  try {
+    text = typeof value === "string" ? value : JSON.stringify(value);
+  } catch {
+    text = String(value);
+  }
+  if (!text) return "";
+  return text.length > limit ? `${text.slice(0, limit)}...` : text;
+}
+
+function logAgentTurn(message: string, details?: Record<string, unknown>): void {
+  console.log(
+    `[agent-turn] ${message}`,
+    details ? JSON.stringify(details) : "",
+  );
+}
+
+async function writeAgentRunLog(
+  runLogger: AgentRunLogger | undefined,
+  type: string,
+  payload: unknown,
+): Promise<void> {
+  if (!runLogger) return;
+
+  try {
+    await runLogger.write({ type, payload });
+  } catch (error) {
+    console.error("[agent-run-log] failed to write main run log", error);
+  }
+}
+
+const activeTurnAborts = new Map<string, () => void>();
+
+function getTurnKey(input: { sessionId: string; turnId: string }): string {
+  return `${input.sessionId}:${input.turnId}`;
+}
+
+export function abortTurn(input: { sessionId: string; turnId: string }): boolean {
+  const abort = activeTurnAborts.get(getTurnKey(input));
+  if (!abort) return false;
+  abort();
+  return true;
+}
+
+export async function runAndPersistTurn(
+  input: RunTurnInput,
+  roots: AppDataRoots,
+  getMainWindow: () => BrowserWindow | undefined,
+): Promise<AgentTurnResult> {
+  logAgentTurn("run turn requested", {
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    userInputLength: input.userInput.length,
+    userInputPreview: preview(input.userInput),
+    model: input.model,
+    thinkingEnabled: Boolean(input.thinkingEnabled),
+  });
+
+  let runLogger: AgentRunLogger | undefined;
+  try {
+    await cleanupOldAgentRunLogs(roots.logRoot);
+    runLogger = await createAgentRunLogger({
+      logRoot: roots.logRoot,
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+    });
+  } catch (error) {
+    console.error("[agent-run-log] failed to prepare run log", error);
+  }
+  await writeAgentRunLog(runLogger, "main_event", {
+    stage: "run_turn_requested",
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    userInput: input.userInput,
+    model: input.model,
+    thinkingEnabled: Boolean(input.thinkingEnabled),
+    runLogFilePath: runLogger?.filePath,
+  });
+  if (runLogger) {
+    logAgentTurn("run log created", {
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      filePath: runLogger.filePath,
+    });
+  }
+
+  const config = buildAgentConfig(
+    { model: input.model, thinkingEnabled: input.thinkingEnabled },
+    roots.workspaceRoot,
+  );
+  const deps = createAgentFromConfig(config);
+
+  logAgentTurn("agent dependencies ready", {
+    workspaceRoot: roots.workspaceRoot,
+    modelId: deps.modelSpec.id,
+    provider: deps.modelSpec.provider,
+    apiModel: deps.modelSpec.apiModel,
+    thinkingEnabled: deps.thinkingEnabled,
+  });
+  await writeAgentRunLog(runLogger, "main_event", {
+    stage: "agent_dependencies_ready",
+    workspaceRoot: roots.workspaceRoot,
+  });
+
+  const win = getMainWindow();
+  const turnKey = getTurnKey(input);
+  const abortableDeps = {
+    ...deps,
+    abort: undefined as (() => void) | undefined,
+  };
+
+  activeTurnAborts.set(turnKey, () => abortableDeps.abort?.());
+
+  const resultPromise = runTurnWithAgent(
+    {
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      userInput: input.userInput,
+      thinkingEnabled: input.thinkingEnabled,
+    },
+    abortableDeps,
+    {
+      onStreamEvent: (event: RuntimeStreamEvent) => {
+        logAgentTurn("stream event sent to renderer", {
+          sessionId: "sessionId" in event ? event.sessionId : input.sessionId,
+          turnId: "turnId" in event ? event.turnId : input.turnId,
+          type: event.type,
+        });
+        win?.webContents.send("agent:stream", event);
+      },
+      runLogger,
+    },
+  );
+
+  const result = await resultPromise;
+
+  const sessionDir = join(roots.sessionRoot, input.sessionId);
+  await writeAgentRunLog(runLogger, "main_event", {
+    stage: "persisting_turn_result",
+    sessionDir,
+    status: result.status,
+    eventCount: result.events.length,
+  });
+  logAgentTurn("persisting turn result", {
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    sessionDir,
+    status: result.status,
+    eventCount: result.events.length,
+  });
+  await writeSessionResult(createSessionStorePaths(sessionDir), result);
+  await writeAgentRunLog(runLogger, "main_event", {
+    stage: "turn_result_persisted",
+    status: result.status,
+  });
+  logAgentTurn("turn result persisted", {
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    status: result.status,
+  });
+
+  activeTurnAborts.delete(turnKey);
+  return result;
+}

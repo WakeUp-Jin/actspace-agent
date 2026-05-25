@@ -62,7 +62,10 @@ export function WorkbenchLayout({
   contextSnapshot,
   rightPanelOpen = false,
   isStreaming = false,
+  isAborting = false,
+  sendScrollRequestId = 0,
   onSend,
+  onAbort,
   onNewSession,
   onSelectSession,
   showDemoAttachments = false,
@@ -74,7 +77,10 @@ export function WorkbenchLayout({
   contextSnapshot: ContextUsageSnapshot | null;
   rightPanelOpen?: boolean;
   isStreaming?: boolean;
+  isAborting?: boolean;
+  sendScrollRequestId?: number;
   onSend?: (text: string, options: ComposerSendOptions) => void;
+  onAbort?: () => void;
   onNewSession?: () => void;
   onSelectSession?: (sessionId: string) => void;
   showDemoAttachments?: boolean;
@@ -196,7 +202,10 @@ export function WorkbenchLayout({
           rightPanelOpen={isRightPanelOpen}
           onToggleRightPanel={toggleRightPanel}
           isStreaming={isStreaming}
+          isAborting={isAborting}
+          sendScrollRequestId={sendScrollRequestId}
           onSend={onSend}
+          onAbort={onAbort}
           showDemoAttachments={showDemoAttachments}
         />
       }

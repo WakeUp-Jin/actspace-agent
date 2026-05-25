@@ -14,7 +14,7 @@
 | 区域 | 评分 | 原因 | 下一步 |
 | --- | --- | --- | --- |
 | 产品面 | B | 产品方向、界面语法、核心交互和首版技术路线都已明确，桌面端工作台骨架已出现。 | 把"可用骨架"推进到"真实可用工作流"，优先接 DeepSeek provider。 |
-| 架构文档 | A- | 三层骨架已落地，agent-core 模块化重构完成，ARCHITECTURE.md 已包含 IPC 双通道（invoke + stream）和完整数据流描述。 | 补充模块间交互时序图。 |
+| 架构文档 | A- | 三层骨架已落地，agent-core 模块化重构完成，ARCHITECTURE.md 已收敛为顶层导航，细节拆入 agent-core 模块地图、四层职责规范与存储可观测性专题。 | 补充模块间交互时序图。 |
 | 后端 agent-core | B+ | 模块化架构已就位，DeepSeek 真实 SSE provider、mock provider、IPC bridge 与集中 env 入口均已落地；bridge 已保证每轮 turn 写入 `user_message`。 | 补 provider 错误重试和高级上下文策略。 |
 | 前后端对接 | B+ | 双通道流式架构已落地，Composer 可真实发送；普通会话默认走 DeepSeek，最终展示以恢复后的 `SessionRecord` 为事实来源。 | 继续打磨 streaming UI、工具状态和真实 Electron 回归。 |
 | 测试 | B+ | vitest 测试体系覆盖核心模块与 E2E smoke；新增 bridge 测试锁定 `user_message -> thinking/tool -> assistant -> context` 事件顺序。 | 补自动化的 provider integration gate、前端 UI/turn 测试和 CI。 |

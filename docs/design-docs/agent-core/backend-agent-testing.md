@@ -57,7 +57,7 @@ packages/agent-core/
 ### 工具系统
 
 - `tools/test/manager.test.ts`：注册/查询/执行/裁剪/未知工具错误
-- `tools/test/exposure.test.ts`：`exposeOnlyTo` 工具暴露规则；DeepSeek + Kimi key 才注册 `web_search`、`web_fetch`、`analyze_media`
+- `tools/test/exposure.test.ts`：`exposeOnlyTo` 工具暴露规则；DeepSeek + Kimi key 才注册 `web_search`、`analyze_media`
 
 ### 上下文管道
 

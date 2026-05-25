@@ -33,7 +33,7 @@ export function createLLMService(config: LLMConfig): LLMService {
   }
 }
 
-/** 直接从 env 配置创建 LLM 服务 */
+/** 直接从 env 配置创建 LLM 服务（仅用于测试/mock fallback） */
 export function createLLMServiceFromEnv(): LLMService {
   return createLLMService(envToLLMConfig());
 }

@@ -62,6 +62,9 @@ export interface Usage {
   output: number;
   cacheRead: number;
   cacheWrite: number;
+  reasoning: number;
+  cacheHit: number;
+  cacheMiss: number;
   totalTokens: number;
   cost: UsageCost;
 }
@@ -185,6 +188,9 @@ export function createEmptyUsage(): Usage {
     output: 0,
     cacheRead: 0,
     cacheWrite: 0,
+    reasoning: 0,
+    cacheHit: 0,
+    cacheMiss: 0,
     totalTokens: 0,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
   };
@@ -195,6 +201,9 @@ export function accumulateUsage(total: Usage, delta: Usage): void {
   total.output += delta.output;
   total.cacheRead += delta.cacheRead;
   total.cacheWrite += delta.cacheWrite;
+  total.reasoning += delta.reasoning;
+  total.cacheHit += delta.cacheHit;
+  total.cacheMiss += delta.cacheMiss;
   total.totalTokens += delta.totalTokens;
   total.cost.input += delta.cost.input;
   total.cost.output += delta.cost.output;

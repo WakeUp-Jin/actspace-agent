@@ -13,7 +13,7 @@ actspace 的长期产品原则之一是“上下文的绝对控制”：用户�
 - `session.jsonl`：每个会话的持久化事件流。
 - `context_snapshot`：当前较轻量的上下文用量快照。
 - `AssistantMessage.usage`：模型回复上的 usage 汇总。
-- `MODEL_REGISTRY`：当前定义在 `packages/shared/src/ipc.ts` 的模型注册表。
+- `MODEL_REGISTRY`：当前定义在 `packages/shared/src/model-config.ts`，并由 IPC 契约 re-export 的模型注册表。
 
 但当前设计仍有不足：
 

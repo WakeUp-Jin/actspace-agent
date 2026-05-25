@@ -6,6 +6,7 @@ import { MockLLMService, mockText, mockToolCall } from "../../llm/services/mock"
 import type { AgentRunLogEvent, AgentRunLogger } from "../../observability";
 import { ToolManager } from "../../tools/manager";
 import { runTurnWithAgent } from "../bridge";
+import type { RunTurnWithAgentDeps } from "../bridge";
 
 function createTestTool(name: string): InternalTool {
   return {
@@ -77,13 +78,41 @@ describe("runTurnWithAgent bridge", () => {
       "thinking",
       "tool_call",
       "tool_call",
+      "llm_usage",
       "tool_result",
       "tool_result",
       "thinking",
       "assistant_message",
+      "llm_usage",
       "context_snapshot",
     ]);
     expect(result.events.every((event) => event.turnId === "turn-test")).toBe(true);
+  });
+
+  it("persists one llm_usage event for each model response", async () => {
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Please inspect the README.",
+      },
+      createDeps(),
+    );
+
+    const usageEvents = result.events.filter((event) => event.type === "llm_usage");
+
+    expect(usageEvents).toHaveLength(2);
+    expect(usageEvents[0].payload).toMatchObject({
+      provider: "mock",
+      model: "deepseek-mock",
+      promptTokens: 820,
+      completionTokens: 340,
+      totalTokens: 1160,
+      cost: {
+        total: 0,
+      },
+    });
+    expect(usageEvents[0].payload).toHaveProperty("relatedEventIds");
   });
 
   it("writes aggregated assistant stream content to the run log", async () => {
@@ -221,7 +250,7 @@ describe("runTurnWithAgent bridge", () => {
     const deps = createDeps();
     deps.toolManager.register(createListDirectoryTool());
     deps.llm.setResponses([
-      mockToolCall("list_directory", { path: "packages/agent-core/src/llm" }),
+      mockToolCall("list_directory", { path: "/workspace/packages/agent-core/src/llm" }),
       mockText("Directory listed."),
     ]);
 
@@ -240,9 +269,104 @@ describe("runTurnWithAgent bridge", () => {
       toolName: "list_directory",
       uiPreview: {
         kind: "directory_list",
-        path: "packages/agent-core/src/llm",
+        path: "llm",
         entryCount: 2,
-        displayText: "Listed packages/agent-core/src/llm",
+        displayText: "Listed llm",
+      },
+    });
+  });
+
+  it("assigns abort closure that can cancel the running agent", async () => {
+    const deps = createDeps() as ReturnType<typeof createDeps> & { abort?: () => void };
+    // Register a slow tool that allows us to abort mid-execution
+    deps.toolManager.register({
+      name: "slow_tool",
+      description: "A tool that takes time",
+      parameters: { type: "object", properties: {} },
+      isReadOnly: true,
+      previewKind: "generic",
+      handler: async (): Promise<ToolResult> => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        return { success: true, data: "done" };
+      },
+    });
+    deps.llm.setResponses([
+      mockToolCall("slow_tool", {}),
+      mockText("Should not reach this."),
+    ]);
+
+    // Before the call, deps.abort should be undefined
+    expect(deps.abort).toBeUndefined();
+
+    const resultPromise = runTurnWithAgent(
+      { sessionId: "s-abort", turnId: "t-abort", userInput: "Do something slow." },
+      deps,
+    );
+
+    // Wait a tick for agent to start and deps.abort to be assigned
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(deps.abort).toBeDefined();
+
+    // Invoke abort
+    deps.abort!();
+
+    const result = await resultPromise;
+    // After abort, the result should exist (possibly with error status)
+    expect(result).toBeDefined();
+    expect(result.status).toMatch(/completed|error/);
+  });
+
+  it("uses short file names for read and edit tool previews", async () => {
+    const deps = createDeps();
+    deps.toolManager.register({
+      name: "edit-file",
+      description: "Edit a file",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+        },
+        required: ["path"],
+      },
+      isReadOnly: true,
+      previewKind: "edit_diff",
+      handler: async (): Promise<ToolResult> => ({
+        success: true,
+        data: "--- a/src/index.ts\n+++ b/src/index.ts\n@@ -1 +1,2 @@\n-old\n+new\n+line",
+      }),
+    });
+    deps.llm.setResponses([
+      mockToolCall("read_file", { path: "/workspace/packages/desktop/package.json" }, { id: "tc-read-short-name" }),
+      mockToolCall("edit-file", { path: "/workspace/packages/desktop/src/index.ts" }, { id: "tc-edit-short-name" }),
+      mockText("Done."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Read and edit files.",
+      },
+      deps,
+    );
+
+    const toolResults = result.events.filter((event) => event.type === "tool_result");
+
+    expect(toolResults[0].payload).toMatchObject({
+      toolName: "read_file",
+      uiPreview: {
+        kind: "read",
+        filePath: "package.json",
+        displayText: "Read package.json",
+      },
+    });
+    expect(toolResults[1].payload).toMatchObject({
+      toolName: "edit-file",
+      uiPreview: {
+        kind: "edit_diff",
+        filePath: "index.ts",
+        additions: 2,
+        deletions: 1,
       },
     });
   });

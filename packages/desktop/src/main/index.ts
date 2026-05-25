@@ -1,44 +1,37 @@
+/**
+ * Electron Main 进程入口
+ *
+ * 职责：
+ * - Electron 应用生命周期（app.whenReady / window-all-closed）
+ * - 窗口创建与管理
+ * - IPC 路由注册（把请求分发给对应模块）
+ *
+ * Agent turn 执行逻辑在 ./agent-turn.ts。
+ */
+
 import { app, BrowserWindow, ipcMain } from "electron";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AgentTurnResult, RunTurnInput, SessionCreateInput, SessionGetInput, ModelSpec } from "@actspace/shared";
-import { resolveModelSpec } from "@actspace/shared";
-import type { LLMConfig } from "@actspace/agent-core";
+import type { AbortTurnInput, RunTurnInput, SessionCreateInput, SessionGetInput } from "@actspace/shared";
 import {
   createBootstrapState,
-  env,
   loadEnv,
-  createLLMService,
-  createToolManager,
-  ContextManager,
-  SystemPromptContext,
-  MAIN_AGENT_SYSTEM_PROMPT,
-  type AgentRunLogger,
-  cleanupOldAgentRunLogs,
-  createAgentRunLogger,
-  runTurnWithAgent,
   createSessionRecord,
   createSessionStorePaths,
   listSessionRecords,
   readSessionRecord,
-  writeSessionResult,
 } from "@actspace/agent-core";
+import { runAndPersistTurn, abortTurn, type AppDataRoots } from "./agent-turn";
 
 const APP_ID = "com.actspace.desktop";
 const APP_NAME = "actspace";
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const PREVIEW_LIMIT = 160;
 
-type AppDataRoots = {
-  dataRoot: string;
-  sessionRoot: string;
-  logRoot: string;
-  tmpRoot: string;
-  workspaceRoot: string;
-};
-
 let repoRootCache: string | undefined;
 let workspaceRootCache: string | undefined;
+
+// ─── 工具函数 ───
 
 function preview(value: unknown, limit = PREVIEW_LIMIT): string {
   let text: string;
@@ -58,13 +51,6 @@ function logMain(message: string, details?: Record<string, unknown>): void {
   );
 }
 
-function logAgentIpc(message: string, details?: Record<string, unknown>): void {
-  console.log(
-    `[agent-ipc] ${message}`,
-    details ? JSON.stringify(details) : "",
-  );
-}
-
 function logRendererConsole(
   level: "log" | "warn" | "error" | "debug" | "info",
   message: string,
@@ -77,6 +63,8 @@ function logRendererConsole(
   };
   console.log(`[renderer-console] ${JSON.stringify(payload)}`);
 }
+
+// ─── 数据目录 ───
 
 async function ensureDataDirectories(): Promise<AppDataRoots> {
   const dataRoot = app.getPath("userData");
@@ -97,13 +85,7 @@ async function ensureDataDirectories(): Promise<AppDataRoots> {
     workspaceRoot,
   });
 
-  return {
-    dataRoot,
-    sessionRoot,
-    logRoot,
-    tmpRoot,
-    workspaceRoot
-  };
+  return { dataRoot, sessionRoot, logRoot, tmpRoot, workspaceRoot };
 }
 
 async function getRepoRoot(): Promise<string> {
@@ -158,12 +140,32 @@ async function getWorkspaceRoot(): Promise<string> {
   return workspaceRootCache;
 }
 
+// ─── Electron 配置 ───
 
 function configureAppPaths() {
   app.setName(APP_NAME);
   const userDataRoot = join(app.getPath("appData"), APP_NAME);
   app.setPath("userData", userDataRoot);
   logMain("app paths configured", { userDataRoot });
+}
+
+function mapConsoleLevel(level: number): "log" | "warn" | "error" | "debug" | "info" {
+  switch (level) {
+    case 1:
+      return "warn";
+    case 2:
+      return "error";
+    case 3:
+      return "debug";
+    case 4:
+      return "info";
+    default:
+      return "log";
+  }
+}
+
+function getMainWindow(): BrowserWindow | undefined {
+  return BrowserWindow.getAllWindows()[0];
 }
 
 async function createMainWindow() {
@@ -215,174 +217,7 @@ async function createMainWindow() {
   }
 }
 
-function mapConsoleLevel(level: number): "log" | "warn" | "error" | "debug" | "info" {
-  switch (level) {
-    case 1:
-      return "warn";
-    case 2:
-      return "error";
-    case 3:
-      return "debug";
-    case 4:
-      return "info";
-    default:
-      return "log";
-  }
-}
-
-function createLLMConfigFromSpec(spec: ModelSpec): LLMConfig {
-  const apiKeyMap: Record<string, string> = {
-    deepseek: env.DEEPSEEK_API_KEY,
-    kimi: env.KIMI_API_KEY,
-  };
-  const baseUrlMap: Record<string, string> = {
-    deepseek: env.DEEPSEEK_BASE_URL,
-    kimi: env.KIMI_BASE_URL,
-  };
-
-  return {
-    provider: spec.provider,
-    apiKey: apiKeyMap[spec.provider] ?? "",
-    baseUrl: baseUrlMap[spec.provider] || undefined,
-    model: spec.apiModel,
-    temperature: env.LLM_TEMPERATURE,
-    maxTokens: env.LLM_MAX_TOKENS,
-  };
-}
-
-async function createAgentDeps(input?: Pick<RunTurnInput, "model" | "thinkingEnabled">) {
-  logAgentIpc("creating agent dependencies");
-  const modelSpec = resolveModelSpec(input?.model);
-  const thinkingEnabled = input?.thinkingEnabled ?? modelSpec.thinkingDefault;
-  const llm = createLLMService(createLLMConfigFromSpec(modelSpec));
-  const workspaceRoot = await getWorkspaceRoot();
-  const toolManager = createToolManager({
-    workspaceRoot,
-    primaryProvider: modelSpec.provider,
-    hasKimiKey: Boolean(env.KIMI_API_KEY),
-  });
-  const systemPromptModule = new SystemPromptContext(MAIN_AGENT_SYSTEM_PROMPT);
-  const contextManager = new ContextManager({ systemPromptModule });
-  logAgentIpc("agent dependencies ready", {
-    workspaceRoot,
-    modelId: modelSpec.id,
-    provider: modelSpec.provider,
-    apiModel: modelSpec.apiModel,
-    hasKimiKey: Boolean(env.KIMI_API_KEY),
-    thinkingEnabled,
-  });
-  return { llm, toolManager, contextManager, thinkingEnabled };
-}
-
-function getMainWindow(): BrowserWindow | undefined {
-  return BrowserWindow.getAllWindows()[0];
-}
-
-async function writeAgentRunLog(
-  runLogger: AgentRunLogger | undefined,
-  type: string,
-  payload: unknown,
-): Promise<void> {
-  if (!runLogger) return;
-
-  try {
-    await runLogger.write({ type, payload });
-  } catch (error) {
-    console.error("[agent-run-log] failed to write main run log", error);
-  }
-}
-
-async function runAndPersistTurn(input: RunTurnInput): Promise<AgentTurnResult> {
-  logAgentIpc("run turn requested", {
-    sessionId: input.sessionId,
-    turnId: input.turnId,
-    userInputLength: input.userInput.length,
-    userInputPreview: preview(input.userInput),
-    model: input.model,
-    thinkingEnabled: Boolean(input.thinkingEnabled),
-  });
-  const roots = await ensureDataDirectories();
-  let runLogger: AgentRunLogger | undefined;
-  try {
-    await cleanupOldAgentRunLogs(roots.logRoot);
-    runLogger = await createAgentRunLogger({
-      logRoot: roots.logRoot,
-      sessionId: input.sessionId,
-      turnId: input.turnId,
-    });
-  } catch (error) {
-    console.error("[agent-run-log] failed to prepare run log", error);
-  }
-  await writeAgentRunLog(runLogger, "main_event", {
-    stage: "run_turn_requested",
-    sessionId: input.sessionId,
-    turnId: input.turnId,
-    userInput: input.userInput,
-    model: input.model,
-    thinkingEnabled: Boolean(input.thinkingEnabled),
-    runLogFilePath: runLogger?.filePath,
-  });
-  if (runLogger) {
-    logAgentIpc("run log created", {
-      sessionId: input.sessionId,
-      turnId: input.turnId,
-      filePath: runLogger.filePath,
-    });
-  }
-  const deps = await createAgentDeps(input);
-  await writeAgentRunLog(runLogger, "main_event", {
-    stage: "agent_dependencies_ready",
-    workspaceRoot: roots.workspaceRoot,
-  });
-  const win = getMainWindow();
-
-  const result = await runTurnWithAgent(
-    {
-      sessionId: input.sessionId,
-      turnId: input.turnId,
-      userInput: input.userInput,
-      thinkingEnabled: input.thinkingEnabled,
-    },
-    deps,
-    {
-      onStreamEvent: (event) => {
-        logAgentIpc("stream event sent to renderer", {
-          sessionId: "sessionId" in event ? event.sessionId : input.sessionId,
-          turnId: "turnId" in event ? event.turnId : input.turnId,
-          type: event.type,
-        });
-        win?.webContents.send("agent:stream", event);
-      },
-      runLogger,
-    },
-  );
-
-  const sessionDir = join(roots.sessionRoot, input.sessionId);
-  await writeAgentRunLog(runLogger, "main_event", {
-    stage: "persisting_turn_result",
-    sessionDir,
-    status: result.status,
-    eventCount: result.events.length,
-  });
-  logAgentIpc("persisting turn result", {
-    sessionId: input.sessionId,
-    turnId: input.turnId,
-    sessionDir,
-    status: result.status,
-    eventCount: result.events.length,
-  });
-  await writeSessionResult(createSessionStorePaths(sessionDir), result);
-  await writeAgentRunLog(runLogger, "main_event", {
-    stage: "turn_result_persisted",
-    status: result.status,
-  });
-  logAgentIpc("turn result persisted", {
-    sessionId: input.sessionId,
-    turnId: input.turnId,
-    status: result.status,
-  });
-  return result;
-}
+// ─── IPC 注册 ───
 
 async function registerIpc() {
   ipcMain.handle("app:get-bootstrap-state", async () => {
@@ -398,22 +233,27 @@ async function registerIpc() {
   });
 
   ipcMain.handle("agent:run-turn", async (_event, input: RunTurnInput) => {
+    const roots = await ensureDataDirectories();
     try {
-      const result = await runAndPersistTurn(input);
-      logAgentIpc("run turn completed", {
+      const result = await runAndPersistTurn(input, roots, getMainWindow);
+      logMain("run turn completed", {
         sessionId: input.sessionId,
         turnId: input.turnId,
         status: result.status,
       });
       return result;
     } catch (error) {
-      logAgentIpc("run turn failed before response", {
+      logMain("run turn failed", {
         sessionId: input.sessionId,
         turnId: input.turnId,
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
+  });
+
+  ipcMain.handle("agent:abort-turn", async (_event, input: AbortTurnInput) => {
+    return abortTurn(input);
   });
 
   ipcMain.handle("session:list", async () => {
@@ -431,6 +271,8 @@ async function registerIpc() {
     return createSessionRecord(roots.sessionRoot, input);
   });
 }
+
+// ─── 启动 ───
 
 configureAppPaths();
 loadEnv();

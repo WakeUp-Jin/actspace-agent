@@ -1576,12 +1576,44 @@ svg {
     box-shadow var(--motion-fast) var(--ease-standard);
 }
 
+.send-button.is-stop {
+  background: var(--color-brand);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.24),
+    0 8px 18px rgba(47, 111, 255, 0.18);
+}
+
 .send-button:hover,
 .send-button:focus-visible {
   background: var(--color-brand-strong);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.22),
     0 10px 22px rgba(47, 111, 255, 0.22);
+}
+
+.send-button.is-stop:hover,
+.send-button.is-stop:focus-visible {
+  background: var(--color-brand-strong);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 10px 22px rgba(47, 111, 255, 0.22);
+}
+
+.send-button.is-aborting {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.turn-status-line {
+  width: fit-content;
+  color: #8b95a5;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 2px 0;
+}
+
+.turn-status-line.is-error {
+  color: #b45858;
 }
 
 .context-popover {
@@ -1662,6 +1694,38 @@ svg {
   color: #9ea9b8;
   font-size: 12px;
   padding-top: 10px;
+}
+
+.tool-log-line.is-running {
+  position: relative;
+  overflow: hidden;
+}
+
+.tool-log-line.is-running::before {
+  content: "";
+  position: absolute;
+  inset: 1px -24%;
+  background: linear-gradient(
+    108deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.04) 36%,
+    rgba(255, 255, 255, 0.28) 50%,
+    rgba(255, 255, 255, 0.04) 64%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-100%);
+  animation: tool-log-shimmer 1.45s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes tool-log-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
 }
 
 .right-panel {

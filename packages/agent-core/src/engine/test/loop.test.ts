@@ -46,6 +46,7 @@ describe("runAgentLoop", () => {
 
     expect(result.message.stopReason).toBe("stop");
     expect(result.totalUsage.totalTokens).toBeGreaterThan(0);
+    expect(result.usageCalls).toHaveLength(2);
 
     // 至少 2 轮 turn
     const turnStarts = events.filter((e) => e.type === "turn_start");
@@ -68,6 +69,7 @@ describe("runAgentLoop", () => {
 
     // 第一轮就被强制停止（stopReason 是 toolUse 因为还没跑到 final reply）
     expect(result.message.stopReason).toBe("toolUse");
+    expect(result.usageCalls).toHaveLength(1);
     const turnStarts = events.filter((e) => e.type === "turn_start");
     expect(turnStarts.length).toBe(1);
   });

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, FileText, Infinity, Paperclip, SendHorizontal, X } from "lucide-react";
+import { Check, ChevronDown, FileText, Infinity, Paperclip, SendHorizontal, Square, X } from "lucide-react";
 import type { ContextUsageSnapshot, ModelId } from "@actspace/shared";
 import { MODEL_LIST, DEFAULT_MODEL_ID } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
@@ -12,12 +12,16 @@ export type ComposerSendOptions = {
 export function Composer({
   contextSnapshot,
   isStreaming = false,
+  isAborting = false,
   onSend,
+  onAbort,
   showDemoAttachments = false,
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
   isStreaming?: boolean;
+  isAborting?: boolean;
   onSend?: (text: string, options: ComposerSendOptions) => void;
+  onAbort?: () => void;
   showDemoAttachments?: boolean;
 }) {
   const [modeOpen, setModeOpen] = useState(false);
@@ -273,13 +277,13 @@ export function Composer({
           <span className="context-ring" aria-hidden="true" />
         </button>
         <button
-          className="send-button"
+          className={`send-button${isStreaming ? " is-stop" : ""}${isAborting ? " is-aborting" : ""}`}
           type="button"
-          aria-label="Send message"
-          disabled={isStreaming || !message.trim()}
-          onClick={sendCurrentMessage}
+          aria-label={isStreaming ? "Stop agent" : "Send message"}
+          disabled={isAborting || (!isStreaming && !message.trim())}
+          onClick={isStreaming ? onAbort : sendCurrentMessage}
         >
-          <SendHorizontal size={18} strokeWidth={2.2} />
+          {isStreaming ? <Square size={14} strokeWidth={2.6} fill="currentColor" /> : <SendHorizontal size={18} strokeWidth={2.2} />}
         </button>
       </div>
     </footer>

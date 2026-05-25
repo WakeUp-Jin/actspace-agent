@@ -26,6 +26,9 @@ export function createMockUsage(overrides?: Partial<Usage>): Usage {
     output: 480,
     cacheRead: 0,
     cacheWrite: 0,
+    reasoning: 0,
+    cacheHit: 0,
+    cacheMiss: 0,
     totalTokens: 1680,
     cost: { input: 0.0012, output: 0.0048, cacheRead: 0, cacheWrite: 0, total: 0.006 },
     ...overrides,
@@ -129,7 +132,7 @@ export function createMockAssistantWithEditDiff(): AssistantMessage {
       {
         type: "toolCall",
         id: "tc_diff_1",
-        name: "edit_file_diff",
+        name: "edit-file",
         arguments: {
           path: "docs/ARCHITECTURE.md",
           diff: "@@ -1,3 +1,5 @@\n- Old architecture notes\n+ actspace desktop workbench skeleton\n+ typed agent runtime contracts\n+ local session persistence wiring\n",
@@ -149,16 +152,16 @@ export function createMockEditDiffResult(): ToolResultMessage {
   return {
     role: "toolResult",
     toolCallId: "tc_diff_1",
-    toolName: "edit_file_diff",
+    toolName: "edit-file",
     content: [
       {
         type: "text",
-        text: "Diff preview for docs/ARCHITECTURE.md: +3 additions, -1 deletion",
+        text: "Edited ARCHITECTURE.md: +3 additions, -1 deletion",
       },
     ],
     isError: false,
     timestamp: Date.now(),
-    source: "tool:edit_file_diff",
+    source: "tool:edit-file",
   };
 }
 
@@ -241,8 +244,8 @@ export function createMockAbortedReply(): AssistantMessage {
  * 2. AssistantMessage (thinking + read_file + search_files tool calls)
  * 3. ToolResultMessage (read_file result)
  * 4. ToolResultMessage (search_files result)
- * 5. AssistantMessage (thinking + edit_file_diff tool call)
- * 6. ToolResultMessage (edit_file_diff result)
+ * 5. AssistantMessage (thinking + edit-file tool call)
+ * 6. ToolResultMessage (edit-file result)
  * 7. AssistantMessage (thinking + final text reply)
  */
 export function createMockFullTurnMessages(): Message[] {
@@ -268,7 +271,7 @@ export function createMockFullTurnContext(): Context {
       { name: "read_file", description: "Read a local file.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
       { name: "search_files", description: "Search for text across files.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
       { name: "list_directory", description: "List files in a directory.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
-      { name: "edit_file_diff", description: "Stage a diff preview.", parameters: { type: "object", properties: { path: { type: "string" }, diff: { type: "string" } }, required: ["path", "diff"] } },
+      { name: "edit-file", description: "Stage a diff preview.", parameters: { type: "object", properties: { path: { type: "string" }, diff: { type: "string" } }, required: ["path", "diff"] } },
     ],
   };
 }

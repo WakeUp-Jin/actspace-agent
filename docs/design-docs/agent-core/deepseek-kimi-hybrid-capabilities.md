@@ -52,8 +52,7 @@
 DeepSeek 是低成本主力模型。它应看到稳定、供应商无关的工具：
 
 - 本地文件工具：默认可见。
-- `web_search`：只有配置 Kimi API Key 时可见。
-- `web_fetch`：只有配置 Kimi API Key 时可见。
+- `web_search`：只有配置 Kimi API Key 时可见。支持 `query`（关键词搜索）和 `url`（读取网页）两种模式。
 - `analyze_media`：只有配置 Kimi API Key 时可见。
 
 DeepSeek 不直接处理 Kimi 的内置工具协议，也不直接消费 Kimi Formula 的 encrypted output。
@@ -151,20 +150,15 @@ packages/agent-core/src/prompt/kimi-assistants/
 
 这个函数可以叫“搜索子代理”，但它不是独立 Agent runtime：没有独立记忆、没有工具调度器、没有上下文压缩。
 
-### web_fetch
+### URL 读取（已合并到 web_search）
 
-`web_fetch` 的职责是给 DeepSeek 提供 URL 阅读能力。
+> **已废弃**：`web_fetch` 工具已移除。URL 阅读能力现在统一由 `web_search` 工具的 `url` 参数提供。
 
-首版可采用本地抓取 + Kimi 摘要：
+Kimi `$web_search` builtin 内置了 search + crawl 双能力。独立的 `web_fetch` 工具（本地 fetch HTML → Kimi summarize）引入了复杂的 htmlToText 链路，容易超时且结果质量差。合并后：
 
-1. 校验 URL。
-2. 禁止 credentials URL。
-3. 限制超时和响应大小。
-4. HTML 转 Markdown。
-5. 截断后交给 Kimi 按 `prompts/web-fetch.ts` 和用户 prompt 摘要。
-6. 返回 DeepSeek 可读结果。
-
-后续如果接入 Kimi Formula `moonshot/fetch:latest`，也要保持 executor 返回纯文本/JSON，不能把 Formula 私有结构直接给 DeepSeek。
+1. `web_search` executor 接收 `url` 参数时，构造读取 prompt 传给 `searchWithKimi`。
+2. Kimi 通过 `$web_search` builtin 原生 crawl URL，返回内容摘要。
+3. 无需本地 HTTP fetch、HTML 解析或额外 summarize 调用。
 
 ### analyze_media
 

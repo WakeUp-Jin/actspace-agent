@@ -37,6 +37,7 @@ import type {
   AgentEventSink,
   AgentLoopConfig,
   AgentLoopResult,
+  LLMUsageCall,
   ToolExecutionMode,
 } from "./types";
 
@@ -51,10 +52,11 @@ export async function runAgentLoop(
 ): Promise<AgentLoopResult> {
   const totalUsage = createEmptyUsage();
   const newMessages: Message[] = [];
+  const usageCalls: LLMUsageCall[] = [];
 
   await emit({ type: "agent_start" });
 
-  await runDualLoop(context, newMessages, totalUsage, llm, config, emit, signal);
+  await runDualLoop(context, newMessages, totalUsage, usageCalls, llm, config, emit, signal);
 
   await emit({ type: "agent_end", messages: newMessages });
 
@@ -63,7 +65,7 @@ export async function runAgentLoop(
     throw new Error("Agent loop ended without producing an assistant message");
   }
 
-  return { message: lastAssistant, totalUsage, messages: newMessages };
+  return { message: lastAssistant, totalUsage, usageCalls, messages: newMessages };
 }
 
 // ─── 双层循环 ───
@@ -72,6 +74,7 @@ async function runDualLoop(
   context: Context,
   newMessages: Message[],
   totalUsage: ReturnType<typeof createEmptyUsage>,
+  usageCalls: LLMUsageCall[],
   llm: LLMService,
   config: AgentLoopConfig,
   emit: AgentEventSink,
@@ -105,9 +108,11 @@ async function runDualLoop(
       }
 
       // 流式 LLM 调用
+      const callId = `llm_call_${Date.now()}_${turnIndex}`;
       const assistantMsg = await streamAssistantResponse(context, llm, signal, emit, config.thinkingEnabled);
       newMessages.push(assistantMsg);
       accumulateUsage(totalUsage, assistantMsg.usage);
+      usageCalls.push({ callId, message: assistantMsg, usage: assistantMsg.usage });
 
       // 错误/中止 → 直接退出
       if (assistantMsg.stopReason === "error" || assistantMsg.stopReason === "aborted") {
@@ -142,6 +147,11 @@ async function runDualLoop(
 
       // 安全阀检查
       if (config.shouldStopAfterTurn?.({ message: assistantMsg, turnIndex })) {
+        return;
+      }
+
+      // maxTurns 硬限制，防止无限循环
+      if (turnIndex >= (config.maxTurns ?? 50)) {
         return;
       }
 

@@ -24,6 +24,8 @@ export {
   ensureSessionStore,
   createSessionRecord,
   writeSessionResult,
+  writeContextState,
+  readContextState,
   readSessionRecord,
   listSessionRecords,
 } from "./session-store";

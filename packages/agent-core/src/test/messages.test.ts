@@ -125,7 +125,8 @@ describe("Message utility functions", () => {
     it("accumulateUsage should add values", () => {
       const total = createEmptyUsage();
       const delta: Usage = {
-        input: 100, output: 50, cacheRead: 10, cacheWrite: 5, totalTokens: 165,
+        input: 100, output: 50, cacheRead: 10, cacheWrite: 5,
+        reasoning: 0, cacheHit: 10, cacheMiss: 90, totalTokens: 165,
         cost: { input: 0.01, output: 0.005, cacheRead: 0.001, cacheWrite: 0.0005, total: 0.0165 },
       };
 

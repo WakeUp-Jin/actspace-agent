@@ -5,10 +5,11 @@
  * 所有写入操作返回 WriteResult，错误不抛出。
  */
 
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   AgentTurnResult,
+  ContextState,
   SessionCreateInput,
   SessionListItem,
   SessionRecord,
@@ -24,6 +25,7 @@ export function createSessionStorePaths(root: string): SessionStorePaths {
     root,
     metaPath: join(root, "meta.json"),
     sessionPath: join(root, "session.jsonl"),
+    contextStatePath: join(root, "context-state.json"),
     attachmentsDir: join(root, "attachments"),
   };
 }
@@ -76,7 +78,43 @@ export async function writeSessionResult(
 
   // 增量更新 meta
   const model = result.finalReply?.model;
-  return incrementTurnCount(paths.metaPath, model);
+  const metaResult = await incrementTurnCount(paths.metaPath, model);
+  if (!metaResult.ok) return metaResult;
+
+  if (result.contextState) {
+    return writeContextState(paths, result.contextState);
+  }
+
+  return metaResult;
+}
+
+export async function writeContextState(
+  paths: SessionStorePaths,
+  state: ContextState,
+): Promise<WriteResult> {
+  try {
+    await ensureSessionStore(paths.root);
+    await writeFile(paths.contextStatePath, JSON.stringify(state, null, 2));
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Failed to write context-state.json: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+export async function readContextState(
+  paths: SessionStorePaths,
+): Promise<ContextState | null> {
+  try {
+    const raw = await readFile(paths.contextStatePath, "utf-8");
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as ContextState;
+  } catch {
+    return null;
+  }
 }
 
 /** 读取完整 session record（meta + events） */
@@ -89,6 +127,7 @@ export async function readSessionRecord(
   return {
     meta: recovery.meta,
     events: recovery.events,
+    contextState: recovery.contextState,
   };
 }
 

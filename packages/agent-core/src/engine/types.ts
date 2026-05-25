@@ -24,6 +24,12 @@ import type { ToolManager } from "../tools/manager";
 
 export type ToolExecutionMode = "sequential" | "parallel";
 
+export interface LLMUsageCall {
+  callId: string;
+  message: AssistantMessage;
+  usage: Usage;
+}
+
 // ─── AgentEvent 四层级事件 ───
 
 export type AgentEvent =
@@ -54,6 +60,8 @@ export interface AgentLoopConfig {
   getFollowUpMessages?: () => Promise<Message[]>;
   /** 本轮是否允许 provider 输出 thinking/reasoning。 */
   thinkingEnabled?: boolean;
+  /** 内层循环最大轮次硬限制，防止工具调用无限循环。默认 50。 */
+  maxTurns?: number;
 }
 
 // ─── AgentLoopResult ───
@@ -61,5 +69,6 @@ export interface AgentLoopConfig {
 export interface AgentLoopResult {
   message: AssistantMessage;
   totalUsage: Usage;
+  usageCalls: LLMUsageCall[];
   messages: Message[];
 }

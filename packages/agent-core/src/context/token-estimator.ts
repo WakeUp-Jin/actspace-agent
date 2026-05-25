@@ -14,6 +14,7 @@ import type { Message } from "../messages";
 import { getMessageText } from "../messages";
 
 const CHARS_PER_TOKEN = 3.5;
+const ESTIMATOR = { name: "char-ratio", version: "1" };
 
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN);
@@ -74,6 +75,7 @@ export function createContextUsageSnapshot(input: SnapshotInput): ContextUsageSn
     percentUsed: Math.min(100, Math.round((totalTokens / safeMax) * 100)),
     compressionCount: input.compressionCount ?? 0,
     cumulativeTokens: totalTokens,
+    estimator: ESTIMATOR,
     buckets,
   };
 }

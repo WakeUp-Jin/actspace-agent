@@ -188,7 +188,7 @@ function createSearchFilesTool(): RegisteredTool {
 
 function createEditFileDiffTool(): RegisteredTool {
   const definition: ToolDefinition = {
-        name: "edit_file_diff",
+        name: "edit-file",
         description: "Stage a unified diff preview for a file edit.",
         previewKind: "edit_diff",
         inputSchema: {
@@ -210,14 +210,14 @@ function createEditFileDiffTool(): RegisteredTool {
       return createToolResult({
         toolName: definition.name,
         ok: path.length > 0 && diff.length > 0,
-        summary: path ? `Diff preview for ${path}` : "Missing path",
+        summary: path ? `Edited ${getPathTail(path)}` : "Missing path",
         rawOutput: diff,
         modelOutput: diff.slice(0, 600),
         uiPreview:
           path.length > 0 && diff.length > 0
             ? {
                 kind: "edit_diff",
-                filePath: path,
+                filePath: getPathTail(path),
                 additions: countDiffLines(diff, "+"),
                 deletions: countDiffLines(diff, "-"),
                 diff: diff.slice(0, 600),
@@ -260,14 +260,14 @@ function createListDirectoryTool(): RegisteredTool {
       return createToolResult({
         toolName: definition.name,
         ok: path.length > 0,
-        summary: path ? `List ${path}` : "Missing path",
+        summary: path ? `List ${getPathTail(path)}` : "Missing path",
         rawOutput: path ? `Directory listing for ${path}` : "",
         modelOutput: path ? `Directory listing for ${path}` : "",
         uiPreview: path
           ? {
               kind: "directory_list",
-              path,
-              displayText: `Listed ${path}`
+              path: getPathTail(path),
+              displayText: `Listed ${getPathTail(path)}`
             }
           : undefined,
         artifacts: path ? [{ type: "file", name: path }] : undefined,
@@ -287,6 +287,11 @@ function countDiffLines(diff: string, marker: "+" | "-"): number {
   return diff
     .split("\n")
     .filter((line) => line.startsWith(marker) && !line.startsWith(`${marker}${marker}${marker}`)).length;
+}
+
+function getPathTail(path: string): string {
+  const normalized = path.replace(/[\\/]+$/, "");
+  return normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized ?? path;
 }
 
 export function createDefaultTools(): RegisteredTool[] {
