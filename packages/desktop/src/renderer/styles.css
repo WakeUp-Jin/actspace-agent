@@ -490,7 +490,7 @@ svg {
 .conversation-shell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  height: 100vh;
+  height: 100%;
   min-height: 0;
   background: #fff;
 }
@@ -1201,9 +1201,8 @@ svg {
 .composer-zone {
   display: grid;
   width: 100%;
-  overflow: auto;
+  overflow: visible;
   padding: 0 0 20px;
-  scrollbar-gutter: stable both-edges;
 }
 
 .composer-wrap {
@@ -1384,8 +1383,9 @@ svg {
 }
 
 .model-menu {
-  min-width: 210px;
-  overflow: visible;
+  min-width: 280px;
+  max-height: calc(5 * 42px + 12px);
+  overflow-y: auto;
 }
 
 .model-menu-row {
