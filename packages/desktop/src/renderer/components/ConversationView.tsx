@@ -1,7 +1,7 @@
 import { MoreHorizontal, PanelRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContextUsageSnapshot, MessageBlock } from "@actspace/shared";
-import { Composer, type ComposerProvider } from "./Composer";
+import { Composer, type ComposerSendOptions } from "./Composer";
 import { AssistantReply } from "./messages/AssistantReply";
 import { BashRunBlock } from "./messages/BashRunBlock";
 import { EditDiffBlock } from "./messages/EditDiffBlock";
@@ -187,7 +187,7 @@ export function ConversationView({
   rightPanelOpen: boolean;
   onToggleRightPanel: () => void;
   isStreaming?: boolean;
-  onSend?: (text: string, options: { provider: ComposerProvider; thinkingEnabled: boolean }) => void;
+  onSend?: (text: string, options: ComposerSendOptions) => void;
   showDemoAttachments?: boolean;
 }) {
   const turns = groupMessagesIntoTurns(messages);

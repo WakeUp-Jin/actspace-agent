@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AgentTurnResult, RunTurnInput, SessionCreateInput, SessionGetInput } from "@actspace/shared";
+import type { AgentTurnResult, RunTurnInput, SessionCreateInput, SessionGetInput, ModelSpec } from "@actspace/shared";
+import { resolveModelSpec } from "@actspace/shared";
 import type { LLMConfig } from "@actspace/agent-core";
 import {
   createBootstrapState,
@@ -11,6 +12,7 @@ import {
   createToolManager,
   ContextManager,
   SystemPromptContext,
+  MAIN_AGENT_SYSTEM_PROMPT,
   type AgentRunLogger,
   cleanupOldAgentRunLogs,
   createAgentRunLogger,
@@ -26,7 +28,6 @@ const APP_ID = "com.actspace.desktop";
 const APP_NAME = "actspace";
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const PREVIEW_LIMIT = 160;
-type RealProvider = "deepseek" | "kimi";
 
 type AppDataRoots = {
   dataRoot: string;
@@ -229,56 +230,48 @@ function mapConsoleLevel(level: number): "log" | "warn" | "error" | "debug" | "i
   }
 }
 
-function resolvePrimaryProvider(provider?: RunTurnInput["provider"]): RealProvider {
-  if (provider === "kimi" || provider === "deepseek") return provider;
-  return env.LLM_PROVIDER === "kimi" ? "kimi" : "deepseek";
-}
-
-function createLLMConfigForTurn(provider: RealProvider, thinkingEnabled?: boolean): LLMConfig {
-  if (provider === "kimi") {
-    return {
-      provider: "kimi",
-      apiKey: env.KIMI_API_KEY,
-      baseUrl: env.KIMI_BASE_URL || undefined,
-      model: env.KIMI_MODEL,
-      temperature: env.LLM_TEMPERATURE,
-      maxTokens: env.LLM_MAX_TOKENS,
-    };
-  }
+function createLLMConfigFromSpec(spec: ModelSpec): LLMConfig {
+  const apiKeyMap: Record<string, string> = {
+    deepseek: env.DEEPSEEK_API_KEY,
+    kimi: env.KIMI_API_KEY,
+  };
+  const baseUrlMap: Record<string, string> = {
+    deepseek: env.DEEPSEEK_BASE_URL,
+    kimi: env.KIMI_BASE_URL,
+  };
 
   return {
-    provider: "deepseek",
-    apiKey: env.DEEPSEEK_API_KEY,
-    baseUrl: env.DEEPSEEK_BASE_URL || undefined,
-    model: thinkingEnabled ? "deepseek-reasoner" : env.LLM_MODEL,
+    provider: spec.provider,
+    apiKey: apiKeyMap[spec.provider] ?? "",
+    baseUrl: baseUrlMap[spec.provider] || undefined,
+    model: spec.apiModel,
     temperature: env.LLM_TEMPERATURE,
     maxTokens: env.LLM_MAX_TOKENS,
   };
 }
 
-async function createAgentDeps(input?: Pick<RunTurnInput, "provider" | "thinkingEnabled">) {
+async function createAgentDeps(input?: Pick<RunTurnInput, "model" | "thinkingEnabled">) {
   logAgentIpc("creating agent dependencies");
-  const primaryProvider = resolvePrimaryProvider(input?.provider);
-  const llm = createLLMService(createLLMConfigForTurn(primaryProvider, input?.thinkingEnabled));
+  const modelSpec = resolveModelSpec(input?.model);
+  const thinkingEnabled = input?.thinkingEnabled ?? modelSpec.thinkingDefault;
+  const llm = createLLMService(createLLMConfigFromSpec(modelSpec));
   const workspaceRoot = await getWorkspaceRoot();
   const toolManager = createToolManager({
     workspaceRoot,
-    primaryProvider,
+    primaryProvider: modelSpec.provider,
     hasKimiKey: Boolean(env.KIMI_API_KEY),
   });
-  const systemPromptModule = new SystemPromptContext(
-    "You are actspace, a helpful AI coding assistant.",
-  );
+  const systemPromptModule = new SystemPromptContext(MAIN_AGENT_SYSTEM_PROMPT);
   const contextManager = new ContextManager({ systemPromptModule });
   logAgentIpc("agent dependencies ready", {
     workspaceRoot,
-    primaryProvider,
-    envProvider: env.LLM_PROVIDER,
-    mockModeIgnoredForElectronTurn: env.MOCK_MODE,
+    modelId: modelSpec.id,
+    provider: modelSpec.provider,
+    apiModel: modelSpec.apiModel,
     hasKimiKey: Boolean(env.KIMI_API_KEY),
-    thinkingEnabled: Boolean(input?.thinkingEnabled),
+    thinkingEnabled,
   });
-  return { llm, toolManager, contextManager, thinkingEnabled: input?.thinkingEnabled };
+  return { llm, toolManager, contextManager, thinkingEnabled };
 }
 
 function getMainWindow(): BrowserWindow | undefined {
@@ -305,7 +298,7 @@ async function runAndPersistTurn(input: RunTurnInput): Promise<AgentTurnResult> 
     turnId: input.turnId,
     userInputLength: input.userInput.length,
     userInputPreview: preview(input.userInput),
-    provider: input.provider,
+    model: input.model,
     thinkingEnabled: Boolean(input.thinkingEnabled),
   });
   const roots = await ensureDataDirectories();
@@ -325,7 +318,7 @@ async function runAndPersistTurn(input: RunTurnInput): Promise<AgentTurnResult> 
     sessionId: input.sessionId,
     turnId: input.turnId,
     userInput: input.userInput,
-    provider: input.provider,
+    model: input.model,
     thinkingEnabled: Boolean(input.thinkingEnabled),
     runLogFilePath: runLogger?.filePath,
   });

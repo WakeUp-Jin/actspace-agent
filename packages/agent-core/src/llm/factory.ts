@@ -5,15 +5,14 @@
  * 也可通过 createLLMServiceFromEnv() 直接从 env 配置创建。
  */
 
-import type { LLMConfig } from "./types";
+import type { LLMConfig, LLMService } from "./types";
 import { LLMServiceError } from "./types";
-import { BaseLLMService } from "./base";
 import { MockLLMService } from "./services/mock";
 import { DeepSeekService } from "./services/deepseek";
 import { KimiService } from "./services/kimi";
 import { envToLLMConfig } from "../env";
 
-export function createLLMService(config: LLMConfig): BaseLLMService {
+export function createLLMService(config: LLMConfig): LLMService {
   switch (config.provider.toLowerCase()) {
     case "deepseek":
       return new DeepSeekService(config);
@@ -35,7 +34,7 @@ export function createLLMService(config: LLMConfig): BaseLLMService {
 }
 
 /** 直接从 env 配置创建 LLM 服务 */
-export function createLLMServiceFromEnv(): BaseLLMService {
+export function createLLMServiceFromEnv(): LLMService {
   return createLLMService(envToLLMConfig());
 }
 

@@ -1,40 +1,64 @@
-import { describe, it, expect } from "vitest";
-import { MockLLMService } from "../services/mock";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { DeepSeekService } from "../services/deepseek";
 import type { Context, AssistantMessage } from "../../messages";
 import { createEmptyUsage } from "../../messages";
-import type { APIMessage } from "../types";
 
-// MockLLMService 继承 BaseLLMService，convertMessages 是 protected。
-// 通过 stream 间接测试：构造各种 context，验证不会抛异常且结果合理。
-// 也可以用一个暴露 convertMessages 的子类做直接测试。
-class TestableService extends MockLLMService {
-  public testConvertMessages(context: Context): APIMessage[] {
-    return this.convertMessages(context);
+/**
+ * 消息格式转换测试
+ *
+ * convertMessages 现在是 DeepSeekService 的内部函数。
+ * 通过捕获 SDK create() 调用的参数来验证转换逻辑。
+ */
+
+function createMockStream(chunks: Record<string, unknown>[]) {
+  async function* gen() {
+    for (const chunk of chunks) {
+      yield chunk;
+    }
   }
+  return gen();
 }
 
-describe("BaseLLMService.convertMessages", () => {
-  const service = new TestableService({ provider: "mock", apiKey: "test", model: "test" });
+const EMPTY_RESPONSE = createMockStream([
+  { choices: [{ delta: { content: "ok" }, finish_reason: "stop" }] },
+]);
 
-  it("should convert system prompt", () => {
-    const ctx: Context = { systemPrompt: "You are helpful.", messages: [] };
-    const result = service.testConvertMessages(ctx);
+describe("Message conversion (via DeepSeekService)", () => {
+  const service = new DeepSeekService({ provider: "deepseek", apiKey: "test", model: "test" });
 
-    expect(result.length).toBe(1);
-    expect(result[0]).toEqual({ role: "system", content: "You are helpful." });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it("should convert user message (string)", () => {
+  it("should convert system prompt", async () => {
+    const ctx: Context = { systemPrompt: "You are helpful.", messages: [] };
+    const spy = vi.spyOn(service["client"].chat.completions, "create")
+      .mockResolvedValue(EMPTY_RESPONSE as any);
+
+    await service.complete(ctx);
+
+    const params = spy.mock.calls[0][0] as Record<string, unknown>;
+    const messages = params.messages as Array<{ role: string; content: string }>;
+    expect(messages[0]).toEqual({ role: "system", content: "You are helpful." });
+  });
+
+  it("should convert user message (string)", async () => {
     const ctx: Context = {
       messages: [{ role: "user", content: "hello", timestamp: Date.now() }],
     };
-    const result = service.testConvertMessages(ctx);
+    const spy = vi.spyOn(service["client"].chat.completions, "create")
+      .mockResolvedValue(createMockStream([
+        { choices: [{ delta: { content: "ok" }, finish_reason: "stop" }] },
+      ]) as any);
 
-    expect(result.length).toBe(1);
-    expect(result[0]).toEqual({ role: "user", content: "hello" });
+    await service.complete(ctx);
+
+    const params = spy.mock.calls[0][0] as Record<string, unknown>;
+    const messages = params.messages as Array<{ role: string; content: unknown }>;
+    expect(messages[0]).toEqual({ role: "user", content: "hello" });
   });
 
-  it("should convert user message (content array)", () => {
+  it("should convert user message (text-only content array) to joined string", async () => {
     const ctx: Context = {
       messages: [{
         role: "user",
@@ -42,12 +66,19 @@ describe("BaseLLMService.convertMessages", () => {
         timestamp: Date.now(),
       }],
     };
-    const result = service.testConvertMessages(ctx);
+    const spy = vi.spyOn(service["client"].chat.completions, "create")
+      .mockResolvedValue(createMockStream([
+        { choices: [{ delta: { content: "ok" }, finish_reason: "stop" }] },
+      ]) as any);
 
-    expect(result[0]).toEqual({ role: "user", content: "part1part2" });
+    await service.complete(ctx);
+
+    const params = spy.mock.calls[0][0] as Record<string, unknown>;
+    const messages = params.messages as Array<{ role: string; content: unknown }>;
+    expect(messages[0]).toEqual({ role: "user", content: "part1part2" });
   });
 
-  it("should convert image content to OpenAI-compatible content parts", () => {
+  it("should convert image content to OpenAI-compatible content parts", async () => {
     const ctx: Context = {
       messages: [{
         role: "user",
@@ -58,9 +89,16 @@ describe("BaseLLMService.convertMessages", () => {
         timestamp: Date.now(),
       }],
     };
-    const result = service.testConvertMessages(ctx);
+    const spy = vi.spyOn(service["client"].chat.completions, "create")
+      .mockResolvedValue(createMockStream([
+        { choices: [{ delta: { content: "ok" }, finish_reason: "stop" }] },
+      ]) as any);
 
-    expect(result[0]).toEqual({
+    await service.complete(ctx);
+
+    const params = spy.mock.calls[0][0] as Record<string, unknown>;
+    const messages = params.messages as Array<{ role: string; content: unknown }>;
+    expect(messages[0]).toEqual({
       role: "user",
       content: [
         { type: "text", text: "what is this?" },
@@ -69,7 +107,7 @@ describe("BaseLLMService.convertMessages", () => {
     });
   });
 
-  it("should convert assistant message with tool calls", () => {
+  it("should convert assistant message with tool calls", async () => {
     const assistant: AssistantMessage = {
       role: "assistant",
       content: [
@@ -84,17 +122,22 @@ describe("BaseLLMService.convertMessages", () => {
     };
 
     const ctx: Context = { messages: [assistant] };
-    const result = service.testConvertMessages(ctx);
+    const spy = vi.spyOn(service["client"].chat.completions, "create")
+      .mockResolvedValue(createMockStream([
+        { choices: [{ delta: { content: "ok" }, finish_reason: "stop" }] },
+      ]) as any);
 
-    expect(result.length).toBe(1);
-    const msg = result[0] as { role: "assistant"; content: string | null; tool_calls?: unknown[] };
-    expect(msg.role).toBe("assistant");
-    expect(msg.content).toBe("Let me check");
-    expect(msg.tool_calls).toBeDefined();
-    expect(msg.tool_calls!.length).toBe(1);
+    await service.complete(ctx);
+
+    const params = spy.mock.calls[0][0] as Record<string, unknown>;
+    const messages = params.messages as Array<Record<string, unknown>>;
+    expect(messages[0].role).toBe("assistant");
+    expect(messages[0].content).toBe("Let me check");
+    expect(messages[0].tool_calls).toBeDefined();
+    expect((messages[0].tool_calls as unknown[]).length).toBe(1);
   });
 
-  it("should convert tool result message", () => {
+  it("should convert tool result message", async () => {
     const ctx: Context = {
       messages: [{
         role: "toolResult",
@@ -105,13 +148,19 @@ describe("BaseLLMService.convertMessages", () => {
         timestamp: Date.now(),
       }],
     };
-    const result = service.testConvertMessages(ctx);
+    const spy = vi.spyOn(service["client"].chat.completions, "create")
+      .mockResolvedValue(createMockStream([
+        { choices: [{ delta: { content: "ok" }, finish_reason: "stop" }] },
+      ]) as any);
 
-    expect(result.length).toBe(1);
-    expect(result[0]).toEqual({ role: "tool", tool_call_id: "tc1", content: "file content" });
+    await service.complete(ctx);
+
+    const params = spy.mock.calls[0][0] as Record<string, unknown>;
+    const messages = params.messages as Array<Record<string, unknown>>;
+    expect(messages[0]).toEqual({ role: "tool", tool_call_id: "tc1", content: "file content" });
   });
 
-  it("should handle full conversation with all message types", () => {
+  it("should handle full conversation with all message types", async () => {
     const ctx: Context = {
       systemPrompt: "System",
       messages: [
@@ -124,11 +173,18 @@ describe("BaseLLMService.convertMessages", () => {
         },
       ],
     };
-    const result = service.testConvertMessages(ctx);
+    const spy = vi.spyOn(service["client"].chat.completions, "create")
+      .mockResolvedValue(createMockStream([
+        { choices: [{ delta: { content: "ok" }, finish_reason: "stop" }] },
+      ]) as any);
 
-    expect(result.length).toBe(3);
-    expect(result[0].role).toBe("system");
-    expect(result[1].role).toBe("user");
-    expect(result[2].role).toBe("assistant");
+    await service.complete(ctx);
+
+    const params = spy.mock.calls[0][0] as Record<string, unknown>;
+    const messages = params.messages as Array<Record<string, unknown>>;
+    expect(messages.length).toBe(3);
+    expect(messages[0].role).toBe("system");
+    expect(messages[1].role).toBe("user");
+    expect(messages[2].role).toBe("assistant");
   });
 });

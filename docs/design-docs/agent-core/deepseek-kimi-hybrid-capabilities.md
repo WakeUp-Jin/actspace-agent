@@ -120,7 +120,7 @@ DeepSeek 需要的是干净的应用级工具结果，而不是 Kimi 平台协�
 三个辅助工具的 Kimi 系统提示词是 executor 内部资产，统一放在：
 
 ```txt
-packages/agent-core/src/llm/kimi-assistants/prompts/
+packages/agent-core/src/prompt/kimi-assistants/
   web-search.ts
   web-fetch.ts
   analyze-media.ts
@@ -129,7 +129,7 @@ packages/agent-core/src/llm/kimi-assistants/prompts/
 边界：
 
 - `definition.description` 给 DeepSeek 看，帮助它判断何时调用工具。
-- `prompts/*` 给 Kimi 辅助调用看，约束 Kimi 如何搜索、摘要或识别。
+- `prompt/kimi-assistants/*` 给 Kimi 辅助调用看，约束 Kimi 如何搜索、摘要或识别。
 - 主 Agent 的 `ContextManager` system prompt 不包含这些内部提示词，避免把供应商实现细节暴露给主模型。
 
 ### web_search
@@ -258,4 +258,4 @@ Formula 可以作为后续扩展方向，但应单独设计“托管工具平台
 - 2026-05-24：DeepSeek 专用 Kimi 辅助工具隐含需要 Kimi API Key。缺 key 时不注册这些工具，而不是把失败工具暴露给模型反复调用。
 - 2026-05-24：Kimi 原生 `$web_search` 和多模态输入由 Kimi provider adapter 管理，不进入普通 ToolManager。
 - 2026-05-24：首版 DeepSeek 搜索工具调用 Kimi `$web_search` 并返回自然语言摘要与 sources，不直接消费 Formula `web-search` 的 protected/encrypted 结果。
-- 2026-05-24：Kimi 辅助调用的三个系统提示词放入 `packages/agent-core/src/llm/kimi-assistants/prompts/`，作为工具 executor 内部资产独立版本化。
+- 2026-05-24：Kimi 辅助调用的三个系统提示词作为工具 executor 内部资产独立版本化；2026-05-25 起统一集中到 `packages/agent-core/src/prompt/kimi-assistants/`。

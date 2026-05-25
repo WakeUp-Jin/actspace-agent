@@ -12,7 +12,7 @@ import type {
   SessionRecord,
 } from "@actspace/shared";
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
-import type { ComposerProvider } from "./components/Composer";
+import type { ComposerSendOptions } from "./components/Composer";
 import {
   mockBootstrapState,
   mockContextSnapshot,
@@ -254,7 +254,7 @@ export function App() {
 
   const handleSend = useCallback(async (
     text: string,
-    options: { provider: ComposerProvider; thinkingEnabled: boolean },
+    options: ComposerSendOptions,
   ) => {
     if (isStreaming || !text.trim()) return;
 
@@ -289,7 +289,7 @@ export function App() {
           sessionId,
           turnId,
           userInput: text,
-          provider: options.provider,
+          model: options.model,
           thinkingEnabled: options.thinkingEnabled,
         };
         const result = await window.actspace.runTurn(input);

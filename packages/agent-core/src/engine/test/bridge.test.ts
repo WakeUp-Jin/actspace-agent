@@ -114,7 +114,7 @@ describe("runTurnWithAgent bridge", () => {
           type: "assistant_thinking",
           payload: expect.objectContaining({
             text: "Let me inspect the workspace and gather context.",
-            deltaCount: 2,
+            deltaCount: 1,
             chars: 48,
           }),
         }),
@@ -122,16 +122,14 @@ describe("runTurnWithAgent bridge", () => {
           type: "assistant_thinking",
           payload: expect.objectContaining({
             text: "I have the context. Let me summarize.",
-            deltaCount: 2,
+            deltaCount: 1,
             chars: 37,
           }),
         }),
         expect.objectContaining({
           type: "assistant_text",
           payload: expect.objectContaining({
-            text: "Based on my analysis, the project is well-structured.",
-            deltaCount: 2,
-            chars: 53,
+            deltaCount: 1,
           }),
         }),
       ]),

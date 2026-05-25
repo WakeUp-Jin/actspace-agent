@@ -4,6 +4,7 @@ export * from "./env";
 export * from "./llm";
 export * from "./observability";
 export * from "./persistence";
+export * from "./prompt";
 export * from "./tools";
 export * from "./types";
 

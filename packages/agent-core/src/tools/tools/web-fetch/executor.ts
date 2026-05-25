@@ -1,5 +1,5 @@
 import type { ToolResult } from "../../../internal-tools";
-import { fetchAndSummarizeWithKimi } from "../../../llm/kimi-assistants/client";
+import { fetchAndSummarizeWithKimi } from "../../../llm/kimi-assistants";
 import type { ToolExecutorFn } from "../../types";
 
 export const webFetchExecutor: ToolExecutorFn = async (args): Promise<ToolResult> => {

@@ -1,5 +1,5 @@
 import type { ToolResult } from "../../../internal-tools";
-import { searchWithKimi } from "../../../llm/kimi-assistants/client";
+import { searchWithKimi } from "../../../llm/kimi-assistants";
 import type { ToolExecutorFn } from "../../types";
 
 export const webSearchExecutor: ToolExecutorFn = async (args): Promise<ToolResult> => {

@@ -73,9 +73,9 @@
   - `web_fetch`：首版可选择 Kimi `$web_search` 辅助或本地 HTTP fetch + Kimi 摘要，最终返回 DeepSeek 可读文本。
   - `analyze_media`：内部调用 Kimi Vision，把图片/视频理解结果转成文本或 JSON 返回 DeepSeek。
 - 新增 Kimi 辅助调用的 prompt 资产目录，三个工具的系统提示词独立版本化：
-  - `packages/agent-core/src/llm/kimi-assistants/prompts/web-search.ts`
-  - `packages/agent-core/src/llm/kimi-assistants/prompts/web-fetch.ts`
-  - `packages/agent-core/src/llm/kimi-assistants/prompts/analyze-media.ts`
+  - `packages/agent-core/src/prompt/kimi-assistants/web-search.ts`
+  - `packages/agent-core/src/prompt/kimi-assistants/web-fetch.ts`
+  - `packages/agent-core/src/prompt/kimi-assistants/analyze-media.ts`
 - Kimi 主模型请求构造时接入 Kimi 原生能力：
   - 联网问题启用 `$web_search` 并禁用 thinking。
   - 图片/视频输入直接按 Kimi 多模态格式发送。
@@ -168,7 +168,7 @@ Kimi 主模型的 `$web_search` 和多模态输入属于 provider request builde
 提示词放在：
 
 ```txt
-packages/agent-core/src/llm/kimi-assistants/prompts/
+packages/agent-core/src/prompt/kimi-assistants/
   web-search.ts
   web-fetch.ts
   analyze-media.ts
@@ -303,7 +303,7 @@ packages/agent-core/src/llm/kimi-assistants/prompts/
 - `packages/agent-core/src/tools/tools/web-search/executor.ts`
 - `packages/agent-core/src/tools/index.ts`
 - `packages/agent-core/src/llm/services/kimi.ts` 或新增 `packages/agent-core/src/llm/kimi-assistants/search.ts`
-- `packages/agent-core/src/llm/kimi-assistants/prompts/web-search.ts`
+- `packages/agent-core/src/prompt/kimi-assistants/web-search.ts`
 - `docs/ARCHITECTURE.md`
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
@@ -351,8 +351,8 @@ packages/agent-core/src/llm/kimi-assistants/prompts/
 - `packages/agent-core/src/tools/tools/analyze-media/executor.ts`
 - `packages/agent-core/src/tools/index.ts`
 - `packages/agent-core/src/llm/kimi-assistants/`（如 Task 4 已新增）
-- `packages/agent-core/src/llm/kimi-assistants/prompts/web-fetch.ts`
-- `packages/agent-core/src/llm/kimi-assistants/prompts/analyze-media.ts`
+- `packages/agent-core/src/prompt/kimi-assistants/web-fetch.ts`
+- `packages/agent-core/src/prompt/kimi-assistants/analyze-media.ts`
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
 
@@ -465,7 +465,7 @@ packages/agent-core/src/llm/kimi-assistants/prompts/
 - [x] 读 `AGENTS.md`、`docs/PLANS_GUIDE.md` 和当前 LLM/tool 代码入口。
 - [x] 收敛第一版设计：DeepSeek 主模型通过 Kimi 辅助工具补齐搜索/多模态；Kimi 主模型使用原生能力。
 - [x] 决定工具暴露只新增 `exposeOnlyTo?: "deepseek" | "kimi"`，不做复杂 Capability Router。
-- [x] 决定 Kimi 辅助调用的系统提示词放入 `packages/agent-core/src/llm/kimi-assistants/prompts/`，不混入主 Agent system prompt。
+- [x] 决定 Kimi 辅助调用的系统提示词独立版本化，不混入主 Agent system prompt；2026-05-25 起集中在 `packages/agent-core/src/prompt/kimi-assistants/`。
 - [x] Task 1: 环境变量与 provider 契约。
 - [x] Task 2: Kimi provider 服务。
 - [x] Task 3: 工具定义暴露属性。
@@ -483,6 +483,6 @@ packages/agent-core/src/llm/kimi-assistants/prompts/
 - 2026-05-24：DeepSeek 的 `web_search` 不直接调用 Formula `moonshot/web-search:latest` 作为裸结果。原因是 Kimi 官方 `web-search` Formula 是 protected，可能返回 `encrypted_output`，更适合回填给 Kimi，而不是直接给 DeepSeek 消费。
 - 2026-05-24：DeepSeek 的 `web_search` 内部调用 Kimi `$web_search` 并让 Kimi 输出纯文本摘要与 sources。这个“搜索子代理”只实现为薄函数，不创建新 Agent runtime。
 - 2026-05-24：Kimi 主模型的 `$web_search` 和多模态输入属于 provider request builder，不进入普通 ToolManager。这样可避免模型看到供应商细节，也避免普通工具系统承担 provider 原生能力。
-- 2026-05-24：Kimi 辅助调用的系统提示词独立放在 `packages/agent-core/src/llm/kimi-assistants/prompts/`。原因是这些提示词只约束工具 executor 内部的 Kimi 子调用，不应污染 DeepSeek 或 Kimi 主模型的 system prompt。
+- 2026-05-24：Kimi 辅助调用的系统提示词独立版本化。原因是这些提示词只约束工具 executor 内部的 Kimi 子调用，不应污染 DeepSeek 或 Kimi 主模型的 system prompt。2026-05-25 起路径集中为 `packages/agent-core/src/prompt/kimi-assistants/`。
 - 2026-05-24：首版 `web_fetch` 使用本地 HTTP fetch + 简单 HTML 转文本 + Kimi 摘要，不接 Formula fetch。原因是该路径最小、可测、输出能直接给 DeepSeek 阅读。
 - 2026-05-24：首版 `analyze_media` 支持 Kimi 可接受的 URL/data URL/平台引用，不在本轮实现 Moonshot 文件上传。原因是当前前端附件链路还未形成稳定契约，先把 provider content part 与 DeepSeek 工具边界打通。

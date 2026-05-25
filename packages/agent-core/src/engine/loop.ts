@@ -31,7 +31,7 @@ import {
   createEmptyUsage,
   accumulateUsage,
 } from "../messages";
-import type { BaseLLMService } from "../llm/base";
+import type { LLMService } from "../llm/types";
 import type { ToolManager } from "../tools/manager";
 import type {
   AgentEventSink,
@@ -44,7 +44,7 @@ import type {
 
 export async function runAgentLoop(
   context: Context,
-  llm: BaseLLMService,
+  llm: LLMService,
   config: AgentLoopConfig,
   emit: AgentEventSink,
   signal?: AbortSignal,
@@ -72,7 +72,7 @@ async function runDualLoop(
   context: Context,
   newMessages: Message[],
   totalUsage: ReturnType<typeof createEmptyUsage>,
-  llm: BaseLLMService,
+  llm: LLMService,
   config: AgentLoopConfig,
   emit: AgentEventSink,
   signal?: AbortSignal,
@@ -164,53 +164,41 @@ async function runDualLoop(
 
 async function streamAssistantResponse(
   context: Context,
-  llm: BaseLLMService,
+  llm: LLMService,
   signal: AbortSignal | undefined,
   emit: AgentEventSink,
   thinkingEnabled: boolean | undefined,
 ): Promise<AssistantMessage> {
-  try {
-    const stream = llm.stream(context, { signal, thinkingEnabled });
+  const stream = llm.stream(context, { signal, thinkingEnabled });
 
-    for await (const event of stream) {
-      switch (event.type) {
-        case "text_delta":
-        case "thinking_delta":
-        case "tool_call_delta":
-          await emit({ type: "message_delta", delta: event });
-          break;
+  for await (const event of stream) {
+    switch (event.type) {
+      case "text_delta":
+      case "thinking_delta":
+      case "tool_call_delta":
+        await emit({ type: "message_delta", delta: event });
+        break;
 
-        case "done": {
-          const msg = event.message;
-          if (hasToolCalls(msg)) {
-            msg.priority ??= MessagePriority.HIGH;
-          }
-          context.messages.push(msg);
-          await emit({ type: "message_end", message: msg });
-          return msg;
+      case "done": {
+        const msg = event.message;
+        if (hasToolCalls(msg)) {
+          msg.priority ??= MessagePriority.HIGH;
         }
+        context.messages.push(msg);
+        await emit({ type: "message_end", message: msg });
+        return msg;
+      }
 
-        case "error":
-          throw event.error;
+      case "error": {
+        const errMsg = event.message;
+        context.messages.push(errMsg);
+        await emit({ type: "message_end", message: errMsg });
+        return errMsg;
       }
     }
-
-    throw new Error("Stream ended without producing a message");
-  } catch (err) {
-    const errorMsg: AssistantMessage = {
-      role: "assistant",
-      content: [{ type: "text", text: "" }],
-      model: "unknown",
-      provider: "unknown",
-      usage: createEmptyUsage(),
-      stopReason: signal?.aborted ? "aborted" : "error",
-      errorMessage: err instanceof Error ? err.message : String(err),
-      timestamp: Date.now(),
-    };
-    context.messages.push(errorMsg);
-    await emit({ type: "message_end", message: errorMsg });
-    return errorMsg;
   }
+
+  throw new Error("Stream ended without producing a message");
 }
 
 // ─── 工具调用执行 ───

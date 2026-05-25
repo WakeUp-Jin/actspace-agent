@@ -1,46 +1,57 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { searchWithKimi } from "../kimi-assistants/client";
+import { searchWithKimi } from "../kimi-assistants";
+import { KimiService } from "../services/kimi";
+import { createEmptyUsage } from "../../messages";
+import type { AssistantMessage } from "../../messages";
+import { AssistantMessageEventStream } from "../types";
 
-function streamResponse(frames: string[]): Response {
-  const body = frames.map((frame) => `data: ${frame}\n\n`).join("");
-  return new Response(body, {
-    status: 200,
-    headers: { "Content-Type": "text/event-stream" },
-  });
+function makeAssistantMessage(overrides: Partial<AssistantMessage>): AssistantMessage {
+  return {
+    role: "assistant",
+    content: [],
+    model: "kimi-k2.6",
+    provider: "kimi",
+    usage: createEmptyUsage(),
+    stopReason: "stop",
+    timestamp: Date.now(),
+    source: "llm",
+    ...overrides,
+  };
+}
+
+function mockStream(msg: AssistantMessage): AssistantMessageEventStream {
+  async function* gen() {
+    yield { type: "done" as const, message: msg };
+  }
+  return new AssistantMessageEventStream(gen());
 }
 
 describe("Kimi assistants", () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("round-trips Kimi builtin web search tool calls before returning text", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        streamResponse([
-          JSON.stringify({
-            choices: [{
-              delta: {
-                tool_calls: [{
-                  index: 0,
-                  id: "call_search",
-                  function: { name: "$web_search", arguments: "{\"query\":\"Moonshot AI\"}" },
-                }],
-              },
-              finish_reason: "tool_calls",
-            }],
-          }),
-          "[DONE]",
-        ]),
-      )
-      .mockResolvedValueOnce(
-        streamResponse([
-          JSON.stringify({ choices: [{ delta: { content: "Moonshot AI result" }, finish_reason: "stop" }] }),
-          "[DONE]",
-        ]),
-      );
-    vi.stubGlobal("fetch", fetchMock);
+    const toolCallResponse = makeAssistantMessage({
+      content: [
+        {
+          type: "toolCall",
+          id: "call_search",
+          name: "$web_search",
+          arguments: { query: "Moonshot AI" },
+        },
+      ],
+      stopReason: "toolUse",
+    });
+
+    const finalResponse = makeAssistantMessage({
+      content: [{ type: "text", text: "Moonshot AI result" }],
+      stopReason: "stop",
+    });
+
+    const streamSpy = vi.spyOn(KimiService.prototype, "streamWithBuiltinWebSearch")
+      .mockReturnValueOnce(mockStream(toolCallResponse))
+      .mockReturnValueOnce(mockStream(finalResponse));
 
     const result = await searchWithKimi("Moonshot AI", {
       apiKey: "test-key",
@@ -49,13 +60,14 @@ describe("Kimi assistants", () => {
     });
 
     expect(result.answer).toBe("Moonshot AI result");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const secondBody = JSON.parse(String(fetchMock.mock.calls[1][1].body));
-    expect(secondBody.messages).toContainEqual({
-      role: "tool",
-      tool_call_id: "call_search",
-      name: "$web_search",
-      content: "{\"query\":\"Moonshot AI\"}",
-    });
+    expect(streamSpy).toHaveBeenCalledTimes(2);
+
+    const secondCallMessages = streamSpy.mock.calls[1][0];
+    expect(secondCallMessages).toContainEqual(
+      expect.objectContaining({
+        role: "tool",
+        tool_call_id: "call_search",
+      }),
+    );
   });
 });

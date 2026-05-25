@@ -1,5 +1,5 @@
 import type { ToolResult } from "../../../internal-tools";
-import { analyzeMediaWithKimi } from "../../../llm/kimi-assistants/client";
+import { analyzeMediaWithKimi } from "../../../llm/kimi-assistants";
 import type { ToolExecutorFn } from "../../types";
 
 export const analyzeMediaExecutor: ToolExecutorFn = async (args): Promise<ToolResult> => {

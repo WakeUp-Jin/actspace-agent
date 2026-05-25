@@ -14,7 +14,7 @@ import type {
   SessionEvent,
   ContextUsageSnapshot,
 } from "@actspace/shared";
-import type { BaseLLMService } from "../llm/base";
+import type { LLMService } from "../llm/types";
 import type { ToolManager } from "../tools/manager";
 import type { ContextManager } from "../context/manager";
 import type { AgentRunLogger } from "../observability";
@@ -65,7 +65,7 @@ export interface RunTurnWithAgentInput {
 }
 
 export interface RunTurnWithAgentDeps {
-  llm: BaseLLMService;
+  llm: LLMService;
   toolManager: ToolManager;
   contextManager: ContextManager;
   toolExecution?: ToolExecutionMode;
@@ -426,6 +426,10 @@ function bufferStreamLogDelta(event: AgentEvent, buffer: StreamLogBuffer): boole
     buffer.thinking.push(delta.delta);
     buffer.thinkingDeltaCount += 1;
     buffer.thinkingChars += delta.delta.length;
+    return true;
+  }
+
+  if (delta.type === "tool_call_delta") {
     return true;
   }
 

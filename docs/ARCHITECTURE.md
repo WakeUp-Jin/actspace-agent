@@ -65,13 +65,19 @@
 
 ### `llm/` — LLM 服务层（stream-first）
 
-- `llm/types.ts`：LLMConfig、StreamOptions、APIMessage、LLMServiceError。
-- `llm/base.ts`：BaseLLMService 抽象基类，stream 为核心方法，complete 由 stream 聚合。
-- `llm/services/mock.ts`：MockLLMService，模拟完整 turn 事件流（含工具调用）。
-- `llm/services/deepseek.ts`：DeepSeekService 真实流式 provider，使用 OpenAI 兼容的 `/chat/completions` SSE 接口，映射文本、思考、工具调用和 token usage。
-- `llm/services/kimi.ts`：KimiService 真实流式 provider，复用 OpenAI-compatible 流式解析，并支持 Kimi `builtin_function.$web_search` 请求参数。
-- `llm/kimi-assistants/`：DeepSeek 专用的 Kimi 辅助调用层，包含 `web_search`、`web_fetch`、`analyze_media` 三个 wrapper 使用的内部系统提示词与调用函数。
+- `llm/types.ts`：LLMConfig、StreamOptions、LLMService 接口、AssistantMessageEventStream、LLMServiceError。error 事件携带完整 `AssistantMessage`（含部分内容 + `stopReason` + `errorMessage`），而非 `Error` 对象。
+- `llm/convert.ts`：共享的消息转换、工具转换、流式 chunk 处理和 SDK 错误映射逻辑。包含防御性消息处理（跳过 error/aborted 的 assistant messages、为孤儿 tool calls 插入 synthetic toolResult）。
+- `llm/services/deepseek.ts`：DeepSeekService，使用 OpenAI SDK 直接流式调用 DeepSeek chat completions，具体实现 stream/complete/streamSimple/completeSimple 四个方法。通过 `convert.ts` 共享转换和流处理逻辑。
+- `llm/services/kimi.ts`：KimiService，使用 OpenAI SDK 直接流式调用 Kimi chat completions，支持 `builtin_function.$web_search`，并提供 `streamWithBuiltinWebSearch` / `streamMessages` / `completeMessages` 辅助方法。通过 `convert.ts` 共享转换和流处理逻辑。
+- `llm/services/mock.ts`：MockLLMService，支持 response queue 模式（通过 `setResponses`/`appendResponses` 预设响应序列）和默认行为模式（向后兼容）。提供 `mockText`、`mockToolCall`、`mockError` 辅助工厂函数。
+- `llm/kimi-assistants.ts`：DeepSeek 专用的 Kimi 辅助调用层，包含 `searchWithKimi`、`fetchAndSummarizeWithKimi`、`analyzeMediaWithKimi` 三个函数；系统提示词统一从 `prompt/kimi-assistants/` 引用。
 - `llm/factory.ts`：createLLMService 工厂函数。
+
+### `prompt/` — 提示词集中管理
+
+- `prompt/main-agent.ts`：桌面端默认主 Agent 系统提示词，供 `SystemPromptContext` 初始化使用。
+- `prompt/kimi-assistants/`：Kimi 辅助能力使用的系统提示词，包括 `web_search`、`web_fetch`、`analyze_media`。
+- 提示词文件顶部应写明使用位置、影响范围和维护边界；动态上下文、工具协议、密钥和运行时配置不应硬编码进提示词。
 
 ### `tools/` — 模块化工具系统
 
@@ -206,7 +212,7 @@ Agent 文件工具的 `workspaceRoot` 与 Electron `userData` 分离：
 - 本地数据优先使用 `jsonl` 文件存储，直接落盘到用户电脑。
 - 更细的产品级技术选型以根目录 `README.md` 中的“技术栈”小节为准。
 - 工程骨架已开始落地为 `packages/desktop + packages/agent-core + packages/shared` 的单仓结构。
-- 当前同时保留 `mock` 开发 provider 与 `deepseek`、`kimi` 两个真实流式 provider；桌面端普通会话默认走 `deepseek`，也可通过 `LLM_PROVIDER=kimi` 选择 Kimi。mock 仅用于测试、浏览器 fixture 或显式 demo，不允许静默替代 Electron 真实 turn。密钥不进入 renderer 或 session 事件。
+- 当前同时保留 `mock` 开发 provider 与 `deepseek`、`kimi` 两个真实流式 provider。桌面端主模型由前端模型选择器驱动，可选 `deepseek-v4-flash`（DeepSeek Chat）、`deepseek-v4-pro`（DeepSeek Reasoner，默认开启 thinking）、`kimi-k2.6`（Kimi K2.6）。模型注册表定义在 `packages/shared/src/ipc.ts` 的 `MODEL_REGISTRY`，前端发送具体 `ModelId`，main 进程根据注册表解析 provider、API model 和 thinking 行为。mock 仅用于测试、浏览器 fixture 或显式 demo，不允许静默替代 Electron 真实 turn。密钥不进入 renderer 或 session 事件。
 - DeepSeek 作为主模型时，如果配置 `KIMI_API_KEY`，ToolManager 会额外注册 `web_search`、`web_fetch`、`analyze_media`；没有 Kimi key 时这些工具不暴露，本地文件工具仍正常可用。
-- 环境变量统一通过 `agent-core/env.ts` 管理，项目根目录的 `.env` 文件在 main 进程启动时加载。`process.env` 已有值优先于 `.env` 文件（方便 CI / Docker 覆盖）。
+- 环境变量统一通过 `agent-core/env.ts` 管理，项目根目录的 `.env` 文件在 main 进程启动时加载。`process.env` 已有值优先于 `.env` 文件（方便 CI / Docker 覆盖）。env 中的 `LLM_MODEL`、`KIMI_MODEL` 仅用于辅助工具（kimi-assistants）和 mock/测试 fallback，主模型选择已迁移到前端 `MODEL_REGISTRY` 驱动。
 - 开发态启动需要先确保 `shared`、`agent-core` 有可消费产物，再启动 Electron main/preload 的 watch 与 renderer。

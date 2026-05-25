@@ -16,7 +16,7 @@
 
 import type { UserMessage } from "../messages";
 import { MessagePriority, getTextContent } from "../messages";
-import type { BaseLLMService } from "../llm/base";
+import type { LLMService } from "../llm/types";
 import type { ToolManager } from "../tools/manager";
 import type { ContextManager } from "../context/manager";
 import { toToolDefinition } from "../internal-tools";
@@ -29,7 +29,7 @@ import type {
 } from "./types";
 
 export interface AgentOptions {
-  llm: BaseLLMService;
+  llm: LLMService;
   contextManager: ContextManager;
   toolManager: ToolManager;
   onEvent?: AgentEventSink;
@@ -41,7 +41,7 @@ export interface AgentOptions {
 }
 
 export class Agent {
-  private llm: BaseLLMService;
+  private llm: LLMService;
   private contextManager: ContextManager;
   private toolManager: ToolManager;
   private abortController?: AbortController;

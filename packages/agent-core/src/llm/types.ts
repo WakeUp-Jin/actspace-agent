@@ -1,13 +1,14 @@
 /**
  * LLM Service 层类型定义
  *
- * 分为三类：
+ * 分为四类：
  * 1. 配置类型 — LLMConfig, StreamOptions, SimpleStreamOptions
  * 2. API 格式 — APIMessage, APIToolCall（OpenAI 兼容，供 provider 实现使用）
  * 3. 流式事件 — AssistantMessageEvent, AssistantMessageEventStream
+ * 4. 服务接口 — LLMService（取代旧的 BaseLLMService 抽象类）
  */
 
-import type { AssistantMessage, Tool } from "../messages";
+import type { AssistantMessage, Context, Tool } from "../messages";
 
 // ─── LLM 配置 ───
 
@@ -75,12 +76,16 @@ export type APIRequestTool =
 
 // ─── 流式事件 ───
 
+/**
+ * error 事件携带 AssistantMessage（含部分内容 + stopReason + errorMessage），
+ * 而非 Error 对象。这样即使出错，消费方也能拿到已收到的部分响应。
+ */
 export type AssistantMessageEvent =
   | { type: "text_delta"; delta: string }
   | { type: "thinking_delta"; delta: string }
   | { type: "tool_call_delta"; index: number; delta: string }
   | { type: "done"; message: AssistantMessage }
-  | { type: "error"; error: Error };
+  | { type: "error"; message: AssistantMessage };
 
 // ─── AssistantMessageEventStream ───
 
@@ -91,6 +96,11 @@ export class AssistantMessageEventStream {
     yield* this.source;
   }
 
+  /**
+   * 消费整个流，返回最终的 AssistantMessage。
+   * 错误时不 throw，而是返回带 stopReason "error"/"aborted" 和 errorMessage 的 AssistantMessage，
+   * 让消费方统一通过 stopReason 判断结果状态。
+   */
   async result(): Promise<AssistantMessage> {
     let finalMessage: AssistantMessage | undefined;
     for await (const event of this.source) {
@@ -98,7 +108,7 @@ export class AssistantMessageEventStream {
         finalMessage = event.message;
       }
       if (event.type === "error") {
-        throw event.error;
+        return event.message;
       }
     }
     if (!finalMessage) throw new Error("Stream ended without producing a message");
@@ -127,4 +137,13 @@ export class LLMServiceError extends Error {
     super(message);
     this.name = "LLMServiceError";
   }
+}
+
+// ─── LLM Service 接口 ───
+
+export interface LLMService {
+  stream(context: Context, options?: StreamOptions): AssistantMessageEventStream;
+  complete(context: Context, options?: StreamOptions): Promise<AssistantMessage>;
+  streamSimple(context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
+  completeSimple(context: Context, options?: SimpleStreamOptions): Promise<AssistantMessage>;
 }

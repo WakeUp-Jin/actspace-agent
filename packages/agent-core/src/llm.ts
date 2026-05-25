@@ -73,7 +73,6 @@ export function createMockModelProvider(): ModelProvider {
 // ─── 新 API re-export ───
 
 export {
-  BaseLLMService,
   MockLLMService,
   DeepSeekService,
   KimiService,
@@ -85,6 +84,7 @@ export {
 } from "./llm/index";
 
 export type {
+  LLMService,
   LLMConfig,
   StreamOptions,
   SimpleStreamOptions,

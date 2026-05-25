@@ -1,108 +1,239 @@
 /**
  * MockLLMService — 开发测试用 mock provider
  *
- * 行为设计：
- * - 第一次调用（上下文中无 ToolResultMessage）：返回 thinking + tool calls（stopReason: toolUse）
- * - 后续调用（上下文中有 ToolResultMessage）：返回 thinking + final text（stopReason: stop）
+ * 支持两种模式：
+ * 1. Response queue 模式（推荐）：通过 setResponses/appendResponses 预设响应序列，
+ *    每次 stream 调用从队列取下一个。支持静态 AssistantMessage 和动态 ResponseFactory。
+ * 2. 默认模式（向后兼容）：未设置 response queue 时，自动根据上下文是否含 toolResult
+ *    决定返回 tool calls 或 final text。
  *
- * 这确保执行引擎可以在没有真实 API 的情况下完整跑通 tool-call loop。
+ * 参考 pi-ai faux provider 设计。
  */
 
-import type { AssistantMessage, Tool } from "../../messages";
+import type { AssistantMessage, Context, TextContent, ThinkingContent, ToolCallContent } from "../../messages";
 import { createEmptyUsage } from "../../messages";
-import { BaseLLMService } from "../base";
-import type { APIMessage, StreamOptions } from "../types";
+import type { LLMService, LLMConfig, StreamOptions, SimpleStreamOptions, AssistantMessageEvent } from "../types";
 import { AssistantMessageEventStream } from "../types";
 
-export class MockLLMService extends BaseLLMService {
-  private callCount = 0;
+// ─── 公共类型 ───
 
-  protected _doStream(
-    messages: APIMessage[],
-    _tools?: Tool[],
-    _options?: StreamOptions,
-  ): AssistantMessageEventStream {
-    const hasToolResults = messages.some((m) => m.role === "tool");
+export type ResponseFactory = (
+  context: Context,
+  options: StreamOptions | undefined,
+  state: { callCount: number },
+) => AssistantMessage | Promise<AssistantMessage>;
+
+export type MockResponseStep = AssistantMessage | ResponseFactory;
+
+// ─── 辅助工厂 ───
+
+export function mockText(text: string, options?: { thinking?: string }): AssistantMessage {
+  const content: (TextContent | ThinkingContent)[] = [];
+  if (options?.thinking) {
+    content.push({ type: "thinking", thinking: options.thinking });
+  }
+  content.push({ type: "text", text });
+  return {
+    role: "assistant",
+    content,
+    model: "mock-model",
+    provider: "mock",
+    usage: createEmptyUsage(),
+    stopReason: "stop",
+    timestamp: Date.now(),
+    source: "llm",
+  };
+}
+
+export function mockToolCall(
+  name: string,
+  args: Record<string, unknown>,
+  options?: { id?: string; thinking?: string },
+): AssistantMessage {
+  const content: (ThinkingContent | ToolCallContent)[] = [];
+  if (options?.thinking) {
+    content.push({ type: "thinking", thinking: options.thinking });
+  }
+  content.push({
+    type: "toolCall",
+    id: options?.id ?? `mock_tc_${Date.now()}`,
+    name,
+    arguments: args,
+  });
+  return {
+    role: "assistant",
+    content,
+    model: "mock-model",
+    provider: "mock",
+    usage: createEmptyUsage(),
+    stopReason: "toolUse",
+    timestamp: Date.now(),
+    source: "llm",
+  };
+}
+
+export function mockError(errorMessage: string, stopReason: "error" | "aborted" = "error"): AssistantMessage {
+  return {
+    role: "assistant",
+    content: [],
+    model: "mock-model",
+    provider: "mock",
+    usage: createEmptyUsage(),
+    stopReason,
+    errorMessage,
+    timestamp: Date.now(),
+    source: "llm",
+  };
+}
+
+// ─── MockLLMService ───
+
+export class MockLLMService implements LLMService {
+  private config: LLMConfig;
+  private responses: MockResponseStep[] = [];
+  private _state = { callCount: 0 };
+
+  constructor(config: LLMConfig) {
+    this.config = config;
+  }
+
+  get state(): { callCount: number } {
+    return this._state;
+  }
+
+  setResponses(responses: MockResponseStep[]): void {
+    this.responses = [...responses];
+  }
+
+  appendResponses(responses: MockResponseStep[]): void {
+    this.responses.push(...responses);
+  }
+
+  getPendingCount(): number {
+    return this.responses.length;
+  }
+
+  stream(context: Context, options?: StreamOptions): AssistantMessageEventStream {
+    return this._doStream(context, options);
+  }
+
+  async complete(context: Context, options?: StreamOptions): Promise<AssistantMessage> {
+    return this.stream(context, options).result();
+  }
+
+  streamSimple(context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream {
+    return this.stream(context, options ? { signal: options.signal } : undefined);
+  }
+
+  async completeSimple(context: Context, options?: SimpleStreamOptions): Promise<AssistantMessage> {
+    return this.streamSimple(context, options).result();
+  }
+
+  private _doStream(context: Context, options?: StreamOptions): AssistantMessageEventStream {
     const self = this;
 
-    async function* generate() {
-      self.callCount++;
+    async function* generate(): AsyncGenerator<AssistantMessageEvent> {
+      self._state.callCount++;
 
-      if (!hasToolResults) {
-        yield { type: "thinking_delta" as const, delta: "Let me inspect the workspace" };
-        yield { type: "thinking_delta" as const, delta: " and gather context." };
+      let message: AssistantMessage;
 
-        const userContent = messages.find((m) => m.role === "user")?.content ?? "unknown request";
-
-        const msg: AssistantMessage = {
-          role: "assistant",
-          content: [
-            {
-              type: "thinking",
-              thinking: "Let me inspect the workspace and gather context.",
-            },
-            {
-              type: "toolCall",
-              id: `mock_tc_read_${self.callCount}`,
-              name: "read_file",
-              arguments: { path: "README.md" },
-            },
-            {
-              type: "toolCall",
-              id: `mock_tc_search_${self.callCount}`,
-              name: "search_files",
-              arguments: { query: String(userContent).slice(0, 50) },
-            },
-          ],
-          model: self.config.model,
-          provider: "deepseek-mock",
-          usage: {
-            ...createEmptyUsage(),
-            input: 820,
-            output: 340,
-            totalTokens: 1160,
-          },
-          stopReason: "toolUse",
-          timestamp: Date.now(),
-          source: "llm",
-        };
-
-        yield { type: "done" as const, message: msg };
+      if (self.responses.length > 0) {
+        const step = self.responses.shift()!;
+        if (typeof step === "function") {
+          message = await step(context, options, self._state);
+        } else {
+          message = { ...step, timestamp: Date.now() };
+        }
       } else {
-        yield { type: "thinking_delta" as const, delta: "I have the context. " };
-        yield { type: "thinking_delta" as const, delta: "Let me summarize." };
-        yield { type: "text_delta" as const, delta: "Based on my analysis" };
-        yield { type: "text_delta" as const, delta: ", the project is well-structured." };
+        message = self.buildDefaultResponse(context);
+      }
 
-        const msg: AssistantMessage = {
-          role: "assistant",
-          content: [
-            {
-              type: "thinking",
-              thinking: "I have the context. Let me summarize.",
-            },
-            {
-              type: "text",
-              text: "Based on my analysis, the project is well-structured. The monorepo layout with `packages/desktop`, `packages/agent-core`, and `packages/shared` follows clean separation of concerns.",
-            },
-          ],
-          model: self.config.model,
-          provider: "deepseek-mock",
-          usage: {
-            ...createEmptyUsage(),
-            input: 2100,
-            output: 520,
-            totalTokens: 2620,
-          },
-          stopReason: "stop",
-          timestamp: Date.now(),
-          source: "llm",
-        };
+      message = {
+        ...message,
+        model: self.config.model,
+        provider: message.provider === "mock" ? "mock" : message.provider,
+      };
 
-        yield { type: "done" as const, message: msg };
+      // Emit deltas for content blocks
+      for (const block of message.content) {
+        if (block.type === "thinking") {
+          yield { type: "thinking_delta", delta: block.thinking };
+        } else if (block.type === "text") {
+          yield { type: "text_delta", delta: block.text };
+        } else if (block.type === "toolCall") {
+          yield {
+            type: "tool_call_delta",
+            index: message.content.filter((b) => b.type === "toolCall").indexOf(block),
+            delta: JSON.stringify(block.arguments),
+          };
+        }
+      }
+
+      if (message.stopReason === "error" || message.stopReason === "aborted") {
+        yield { type: "error", message };
+      } else {
+        yield { type: "done", message };
       }
     }
 
     return new AssistantMessageEventStream(generate());
+  }
+
+  /**
+   * 默认行为（向后兼容）：
+   * - 无 toolResult → 返回 thinking + tool calls
+   * - 有 toolResult → 返回 thinking + final text
+   */
+  private buildDefaultResponse(context: Context): AssistantMessage {
+    const hasToolResults = context.messages.some((m) => m.role === "toolResult");
+
+    if (!hasToolResults) {
+      const userMsg = context.messages.find((m) => m.role === "user");
+      const userContent = userMsg
+        ? (typeof userMsg.content === "string" ? userMsg.content : "unknown request")
+        : "unknown request";
+
+      return {
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: "Let me inspect the workspace and gather context." },
+          {
+            type: "toolCall",
+            id: `mock_tc_read_${this._state.callCount}`,
+            name: "read_file",
+            arguments: { path: "README.md" },
+          },
+          {
+            type: "toolCall",
+            id: `mock_tc_search_${this._state.callCount}`,
+            name: "search_files",
+            arguments: { query: String(userContent).slice(0, 50) },
+          },
+        ],
+        model: this.config.model,
+        provider: "mock",
+        usage: { ...createEmptyUsage(), input: 820, output: 340, totalTokens: 1160 },
+        stopReason: "toolUse",
+        timestamp: Date.now(),
+        source: "llm",
+      };
+    }
+
+    return {
+      role: "assistant",
+      content: [
+        { type: "thinking", thinking: "I have the context. Let me summarize." },
+        {
+          type: "text",
+          text: "Based on my analysis, the project is well-structured. The monorepo layout with `packages/desktop`, `packages/agent-core`, and `packages/shared` follows clean separation of concerns.",
+        },
+      ],
+      model: this.config.model,
+      provider: "mock",
+      usage: { ...createEmptyUsage(), input: 2100, output: 520, totalTokens: 2620 },
+      stopReason: "stop",
+      timestamp: Date.now(),
+      source: "llm",
+    };
   }
 }

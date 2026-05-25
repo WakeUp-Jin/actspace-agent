@@ -1,17 +1,54 @@
-import { getTextContent, getToolCalls } from "../../messages";
-import { env } from "../../env";
-import { KimiService } from "../services/kimi";
-import type { APIContentPart, APIMessage } from "../types";
-import { WEB_SEARCH_SYSTEM_PROMPT } from "./prompts/web-search";
-import { WEB_FETCH_SYSTEM_PROMPT } from "./prompts/web-fetch";
-import { ANALYZE_MEDIA_SYSTEM_PROMPT } from "./prompts/analyze-media";
-import type {
-  AnalyzeMediaInput,
-  AnalyzeMediaResult,
-  KimiAssistantConfig,
-  WebFetchResult,
-  WebSearchResult,
-} from "./types";
+/**
+ * Kimi 辅助能力：web_search / web_fetch / analyze_media
+ *
+ * DeepSeek 作为主模型时，通过 Kimi 提供联网搜索、网页抓取和多模态分析。
+ */
+
+import { getTextContent, getToolCalls } from "../messages";
+import { env } from "../env";
+import { KimiService } from "./services/kimi";
+import type { APIContentPart, APIMessage, LLMConfig } from "./types";
+import {
+  ANALYZE_MEDIA_SYSTEM_PROMPT,
+  WEB_FETCH_SYSTEM_PROMPT,
+  WEB_SEARCH_SYSTEM_PROMPT,
+} from "../prompt/kimi-assistants";
+
+// ─── 类型定义 ───
+
+export interface KimiAssistantConfig {
+  apiKey: string;
+  baseUrl?: string;
+  model: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface WebSearchResult {
+  query: string;
+  answer: string;
+  searchedAt: string;
+}
+
+export interface WebFetchResult {
+  url: string;
+  title?: string;
+  summary: string;
+  fetchedAt: string;
+}
+
+export interface AnalyzeMediaInput {
+  source: string;
+  mimeType?: string;
+  prompt?: string;
+}
+
+export interface AnalyzeMediaResult {
+  summary: string;
+  analyzedAt: string;
+}
+
+// ─── 配置 ───
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const MAX_PAGE_TEXT_CHARS = 24_000;
@@ -25,6 +62,8 @@ export function createKimiAssistantConfigFromEnv(): KimiAssistantConfig {
     maxTokens: 2048,
   };
 }
+
+// ─── 搜索 ───
 
 export async function searchWithKimi(
   query: string,
@@ -80,6 +119,8 @@ export async function searchWithKimi(
   };
 }
 
+// ─── 网页抓取 ───
+
 export async function fetchAndSummarizeWithKimi(
   url: string,
   prompt?: string,
@@ -110,6 +151,8 @@ export async function fetchAndSummarizeWithKimi(
   };
 }
 
+// ─── 多模态分析 ───
+
 export async function analyzeMediaWithKimi(
   input: AnalyzeMediaInput,
   config = createKimiAssistantConfigFromEnv(),
@@ -137,15 +180,18 @@ export async function analyzeMediaWithKimi(
   };
 }
 
+// ─── 内部工具函数 ───
+
 function createKimiService(config: KimiAssistantConfig): KimiService {
-  return new KimiService({
+  const llmConfig: LLMConfig = {
     provider: "kimi",
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
     model: config.model,
     temperature: config.temperature,
     maxTokens: config.maxTokens,
-  });
+  };
+  return new KimiService(llmConfig);
 }
 
 async function fetchPageText(url: string): Promise<{ title?: string; text: string }> {

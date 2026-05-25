@@ -1,16 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, FileText, Infinity, Paperclip, SendHorizontal, X } from "lucide-react";
-import type { ContextUsageSnapshot } from "@actspace/shared";
+import type { ContextUsageSnapshot, ModelId } from "@actspace/shared";
+import { MODEL_LIST, DEFAULT_MODEL_ID } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
 
-export type ComposerProvider = "deepseek" | "kimi";
-
-type ComposerSendOptions = {
-  provider: ComposerProvider;
+export type ComposerSendOptions = {
+  model: ModelId;
   thinkingEnabled: boolean;
 };
-
-const MODEL_OPTIONS: ComposerProvider[] = ["deepseek", "kimi"];
 
 export function Composer({
   contextSnapshot,
@@ -26,8 +23,8 @@ export function Composer({
   const [modeOpen, setModeOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [modelOptionsOpen, setModelOptionsOpen] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<ComposerProvider>("deepseek");
-  const [editingProvider, setEditingProvider] = useState<ComposerProvider>("deepseek");
+  const [selectedModelId, setSelectedModelId] = useState<ModelId>(DEFAULT_MODEL_ID);
+  const [editingModelId, setEditingModelId] = useState<ModelId>(DEFAULT_MODEL_ID);
   const [thinkingEnabled, setThinkingEnabled] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [imageAttached, setImageAttached] = useState(showDemoAttachments);
@@ -53,7 +50,7 @@ export function Composer({
 
   function sendCurrentMessage() {
     if (!message.trim() || !onSend || isStreaming) return;
-    onSend(message.trim(), { provider: selectedProvider, thinkingEnabled });
+    onSend(message.trim(), { model: selectedModelId, thinkingEnabled });
     setMessage("");
     closeFloatingPanels();
   }
@@ -192,42 +189,45 @@ export function Composer({
               setContextOpen(false);
             }}
           >
-            {selectedProvider}
+            {selectedModelId}
             <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
           </button>
           {modelOpen ? (
             <div className="dropdown-menu model-menu" ref={modelMenuRef}>
-              {MODEL_OPTIONS.map((provider) => (
+              {MODEL_LIST.map((spec) => (
                 <div
-                  className={`model-menu-row ${provider === selectedProvider ? "is-selected-row" : ""}`}
-                  key={provider}
+                  className={`model-menu-row ${spec.id === selectedModelId ? "is-selected-row" : ""}`}
+                  key={spec.id}
                 >
                   <button
                     type="button"
                     className="model-select-button"
                     onClick={() => {
-                      setSelectedProvider(provider);
-                      setEditingProvider(provider);
+                      setSelectedModelId(spec.id);
+                      setEditingModelId(spec.id);
+                      setThinkingEnabled(spec.thinkingDefault);
                       setModelOptionsOpen(false);
                       setModelOpen(false);
                     }}
                   >
-                    <span>{provider}</span>
+                    <span>{spec.id}</span>
                   </button>
                   <div className="model-row-actions">
-                    <button
-                      type="button"
-                      className="model-edit-button"
-                      aria-label={`Edit ${provider} options`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setEditingProvider(provider);
-                        setModelOptionsOpen(true);
-                      }}
-                    >
-                      Edit
-                    </button>
-                    {provider === selectedProvider ? (
+                    {spec.supportsThinkingToggle ? (
+                      <button
+                        type="button"
+                        className="model-edit-button"
+                        aria-label={`Edit ${spec.id} options`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setEditingModelId(spec.id);
+                          setModelOptionsOpen(true);
+                        }}
+                      >
+                        Edit
+                      </button>
+                    ) : null}
+                    {spec.id === selectedModelId ? (
                       <Check className="model-check-icon" size={14} strokeWidth={2.2} />
                     ) : null}
                   </div>
@@ -244,7 +244,7 @@ export function Composer({
                   type="checkbox"
                   checked={thinkingEnabled}
                   onChange={(event) => setThinkingEnabled(event.target.checked)}
-                  aria-label={`${editingProvider} Thinking`}
+                  aria-label={`${editingModelId} Thinking`}
                 />
                 <span className="toggle-track" aria-hidden="true">
                   <span className="toggle-thumb" />

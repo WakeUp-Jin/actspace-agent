@@ -19,7 +19,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@actspace/shared": "workspace:*"
+    "@actspace/shared": "workspace:*",
+    "openai": "^6.39.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",
