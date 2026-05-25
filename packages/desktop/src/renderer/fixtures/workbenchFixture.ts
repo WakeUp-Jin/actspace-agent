@@ -99,6 +99,24 @@ export const mockMessages: MessageBlock[] = [
     createdAt: now
   },
   {
+    kind: "grep",
+    id: "mock-grep-1",
+    pattern: "ToolUiPreview",
+    scope: "*.ts",
+    displayText: "Grep ToolUiPreview in *.ts",
+    resultCount: 4,
+    createdAt: now
+  },
+  {
+    kind: "glob",
+    id: "mock-glob-1",
+    pattern: "src/**/*.ts",
+    scope: "packages/agent-core",
+    displayText: "Glob src/**/*.ts in packages/agent-core",
+    resultCount: 12,
+    createdAt: now
+  },
+  {
     kind: "edit_diff",
     id: "mock-diff-1",
     filePath: "AGENTS.md",

@@ -231,6 +231,170 @@ describe("App streaming user message", () => {
     });
   });
 
+  it("renders web search as a running WebSearch line without result content", async () => {
+    const sessionId = "session-test";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "New chat",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+      null;
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) {
+            streamHandler = null;
+          }
+        };
+      },
+      runTurn: (input: RunTurnInput) =>
+        new Promise((resolve) => {
+          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          streamHandler?.({
+            type: "tool_started",
+            toolCallId: "tool-web-search-1",
+            toolName: "web_search",
+            argsPreview: "{\"query\":\"最新新闻 今天\"}",
+            preview: {
+              kind: "web_search",
+              mode: "query",
+              query: "最新新闻 今天",
+              displayText: "Web Search 最新新闻 今天",
+            },
+          });
+          resolveRunTurn = resolve;
+        }),
+    };
+
+    render(<App />);
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "search the web");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    const webSearchLine = await screen.findByText("Web Search 最新新闻 今天");
+    expect(webSearchLine.closest(".tool-log-line")?.classList.contains("is-running")).toBe(true);
+    expect(screen.queryByText("result answer body")).toBeNull();
+
+    await act(async () => {
+      resolveRunTurn?.({
+        sessionId,
+        turnId: "turn-web-search-finished",
+        status: "completed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      });
+    });
+  });
+
+  it("renders grep and glob as independent running tool lines", async () => {
+    const sessionId = "session-test";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "New chat",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+      null;
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) {
+            streamHandler = null;
+          }
+        };
+      },
+      runTurn: (input: RunTurnInput) =>
+        new Promise((resolve) => {
+          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          streamHandler?.({
+            type: "tool_started",
+            toolCallId: "tool-grep-1",
+            toolName: "grep",
+            argsPreview: "{\"pattern\":\"ToolUiPreview\",\"glob\":\"*.ts\"}",
+            preview: {
+              kind: "grep",
+              pattern: "ToolUiPreview",
+              scope: "*.ts",
+              displayText: "Grep ToolUiPreview in *.ts",
+            },
+          });
+          streamHandler?.({
+            type: "tool_started",
+            toolCallId: "tool-glob-1",
+            toolName: "glob",
+            argsPreview: "{\"pattern\":\"src/**/*.ts\",\"path\":\"packages/agent-core\"}",
+            preview: {
+              kind: "glob",
+              pattern: "src/**/*.ts",
+              scope: "packages/agent-core",
+              displayText: "Glob src/**/*.ts in packages/agent-core",
+            },
+          });
+          resolveRunTurn = resolve;
+        }),
+    };
+
+    render(<App />);
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "inspect files");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    expect(await screen.findByText("Grep ToolUiPreview in *.ts")).toBeTruthy();
+    expect(await screen.findByText("Glob src/**/*.ts in packages/agent-core")).toBeTruthy();
+    expect(screen.queryByText("Searched files *.ts for ToolUiPreview")).toBeNull();
+
+    await act(async () => {
+      resolveRunTurn?.({
+        sessionId,
+        turnId: "turn-grep-glob-finished",
+        status: "completed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      });
+    });
+  });
+
   it("switches the send button into a stop button and calls abortTurn while streaming", async () => {
     const sessionId = "session-abort";
     const record = createEmptySessionRecord(sessionId);

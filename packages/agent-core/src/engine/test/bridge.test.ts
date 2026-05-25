@@ -45,6 +45,69 @@ function createListDirectoryTool(): InternalTool {
   };
 }
 
+function createWebSearchTool(): InternalTool {
+  return {
+    name: "web_search",
+    description: "Search the web",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        url: { type: "string" },
+      },
+    },
+    isReadOnly: true,
+    previewKind: "web_search",
+    handler: async (): Promise<ToolResult> => ({
+      success: true,
+      data: "Query: latest news\n\nresult answer body",
+    }),
+  };
+}
+
+function createGrepTool(): InternalTool {
+  return {
+    name: "grep",
+    description: "Search file contents",
+    parameters: {
+      type: "object",
+      properties: {
+        pattern: { type: "string" },
+        path: { type: "string" },
+        glob: { type: "string" },
+      },
+      required: ["pattern"],
+    },
+    isReadOnly: true,
+    previewKind: "grep",
+    handler: async (): Promise<ToolResult> => ({
+      success: true,
+      data: "Found 2 matches:\n\nsrc/a.ts:1: match\nsrc/b.ts:2: match",
+    }),
+  };
+}
+
+function createGlobTool(): InternalTool {
+  return {
+    name: "glob",
+    description: "Find files",
+    parameters: {
+      type: "object",
+      properties: {
+        pattern: { type: "string" },
+        path: { type: "string" },
+      },
+      required: ["pattern"],
+    },
+    isReadOnly: true,
+    previewKind: "glob",
+    handler: async (): Promise<ToolResult> => ({
+      success: true,
+      data: "Found 3 files matching \"src/**/*.ts\":\n\nsrc/a.ts\nsrc/b.ts\nsrc/c.ts",
+    }),
+  };
+}
+
 function createDeps() {
   const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
   const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
@@ -274,6 +337,121 @@ describe("runTurnWithAgent bridge", () => {
         displayText: "Listed llm",
       },
     });
+  });
+
+  it("persists web_search results with a WebSearch preview only", async () => {
+    const deps = createDeps();
+    deps.toolManager.register(createWebSearchTool());
+    deps.llm.setResponses([
+      mockToolCall("web_search", { query: "最新新闻 今天" }),
+      mockText("Search summarized."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Search latest news.",
+      },
+      deps,
+    );
+
+    const toolResult = result.events.find((event) => event.type === "tool_result");
+
+    expect(toolResult?.payload).toMatchObject({
+      toolName: "web_search",
+      rawOutput: "Query: latest news\n\nresult answer body",
+      uiPreview: {
+        kind: "web_search",
+        mode: "query",
+        query: "最新新闻 今天",
+        displayText: "Web Search 最新新闻 今天",
+      },
+    });
+    expect((toolResult?.payload as { uiPreview?: { displayText?: string } }).uiPreview?.displayText).not.toContain(
+      "result answer body",
+    );
+  });
+
+  it("persists web_search URL reads as WebSearch page reads", async () => {
+    const deps = createDeps();
+    deps.toolManager.register(createWebSearchTool());
+    deps.llm.setResponses([
+      mockToolCall("web_search", { url: "https://example.com/post" }),
+      mockText("Page summarized."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Read this page.",
+      },
+      deps,
+    );
+
+    const toolResult = result.events.find((event) => event.type === "tool_result");
+
+    expect(toolResult?.payload).toMatchObject({
+      toolName: "web_search",
+      uiPreview: {
+        kind: "web_search",
+        mode: "url",
+        url: "https://example.com/post",
+        displayText: "Read Web Page https://example.com/post",
+      },
+    });
+  });
+
+  it("persists grep and glob results with independent previews", async () => {
+    const deps = createDeps();
+    deps.toolManager.register(createGrepTool());
+    deps.toolManager.register(createGlobTool());
+    deps.llm.setResponses([
+      mockToolCall("grep", { pattern: "ToolUiPreview", glob: "*.ts" }, { id: "tc-grep-preview" }),
+      mockToolCall("glob", { pattern: "src/**/*.ts", path: "packages/agent-core" }, { id: "tc-glob-preview" }),
+      mockText("Search tools inspected."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Inspect search tools.",
+      },
+      deps,
+    );
+
+    const toolResults = result.events.filter((event) => event.type === "tool_result");
+
+    expect(toolResults).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            toolName: "grep",
+            uiPreview: {
+              kind: "grep",
+              pattern: "ToolUiPreview",
+              scope: "*.ts",
+              resultCount: 2,
+              displayText: "Grep ToolUiPreview in *.ts",
+            },
+          }),
+        }),
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            toolName: "glob",
+            uiPreview: {
+              kind: "glob",
+              pattern: "src/**/*.ts",
+              scope: "packages/agent-core",
+              resultCount: 3,
+              displayText: "Glob src/**/*.ts in packages/agent-core",
+            },
+          }),
+        }),
+      ]),
+    );
   });
 
   it("assigns abort closure that can cancel the running agent", async () => {

@@ -31,7 +31,7 @@
 - 完整参数保留在原始工具参数、run log 和持久化事件中。
 - 网络 URL 和搜索 query 本身通常是任务语义，可以保留完整参数。
 - 如果某个字段可能很长，优先由组件做视觉截断，不改变原始事实字段。
-- 展示文案使用产品动作词：`Read`、`Listed`、`Searched`、`Fetched`、`Edited`、`Ran`。
+- 展示文案使用产品动作词：`Read`、`Grep`、`Glob`、`Listed`、`Searched`、`Fetched`、`Edited`、`Ran`。
 - 不在前端组件里根据 `toolName` 分支推断展示；新增工具应通过 `previewKind` 和 `ToolUiPreview` 建模。
 
 ## 内置工具规范
@@ -54,16 +54,17 @@
 
 ### `grep`
 
-- `previewKind`: `search`
-- `ToolUiPreview.query`: 正则 pattern。
+- `previewKind`: `grep`
+- `ToolUiPreview.pattern`: 正则 pattern。
 - `ToolUiPreview.scope`: 搜索范围（目录或 include glob）。
-- 展示示例：`Searched for "ToolUiPreview" in src`。
+- 展示示例：`Grep ToolUiPreview in src/**/*.ts`。
 
 ### `glob`
 
-- `previewKind`: `search`
-- `ToolUiPreview.query`: glob pattern。
-- 展示示例：`Found files matching **/*.ts`。
+- `previewKind`: `glob`
+- `ToolUiPreview.pattern`: glob pattern。
+- `ToolUiPreview.scope`: 搜索根目录。
+- 展示示例：`Glob **/*.ts in packages/agent-core`。
 
 ### `edit-file`
 
@@ -82,9 +83,12 @@
 
 ### `web_search`
 
-- 当前使用 `generic`。
+- `previewKind`: `web_search`
 - 支持两种模式：`query`（关键词搜索）和 `url`（读取网页）。
-- 展示建议：`Searching: "完整 query"` 或 `Fetching: https://example.com/path`。
+- `ToolUiPreview.mode`: `query` 或 `url`。
+- query 模式展示：`Web Search 最新新闻 今天`。
+- url 模式展示：`Read Web Page https://example.com/path`。
+- 不在工具日志行里展示搜索结果正文、来源摘要或页面摘要；这些内容只保留在 `tool_result.rawOutput` / `modelOutput` 中，供模型继续推理和排障使用。
 
 ### `analyze_media`
 

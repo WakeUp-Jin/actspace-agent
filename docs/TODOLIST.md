@@ -40,6 +40,36 @@
 - `Skip` 应取消本次执行，并在消息流中显示 cancelled。
 - 会话切换或应用重启后，pending 状态不能丢失、重复执行或错误自动放行。
 
+## 待处理：工具行显示细节
+
+### Grep 前端工具行过长
+
+状态：待处理，今天先不修复。
+
+当前问题：`Grep` 工具行会直接展示完整 pattern 和绝对路径，遇到长正则或长 workspace 路径时占用过多消息区空间，影响阅读。
+
+例子：
+
+```txt
+Grep react|React|useState|useEffect|useCallback|useMemo|useRef|createContext|useContext|useReducer|useLayoutEffect|useImperativeHandle|useDebugValue|useTransition|useDeferredValue|createElement|jsx|JSX in /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/packages
+Grep from ['"]react['"]|require\(['"]react['"]\)|import.*React in /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/packages
+```
+
+可选处理方向：
+
+- 做内容简化删除：前端只展示短 pattern 摘要和 workspace-relative scope，完整内容保留在工具详情或结果里。
+- 做样式省略号：工具行保持完整字符串来源，但通过 CSS `text-overflow: ellipsis` / max-width 控制单行显示。
+
+下一步：修复前先确认工具行应该偏向“信息摘要”还是“原始命令可见性”，再决定是改数据摘要、改样式，还是两者结合。
+
+### 工具执行中闪光反馈不明显
+
+状态：待处理，今天先不修复。
+
+当前问题：工具执行中状态的闪光反馈不明显，尤其是耗时较长的 `WebSearch` / 工具日志行；后续需要加强 running 状态的视觉动效。
+
+shimmer 光带应该是这个，两种情况都已经截图啦
+
 ## 后续维护规则
 
 - 新增跨多轮任务时，先在这里加一行总控 TODO，再视复杂度落 execution plan。

@@ -1,6 +1,7 @@
-import { readdir, stat } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { stat } from "node:fs/promises";
+import { join, relative, resolve } from "node:path";
 import type { ToolResult } from "../../../internal-tools";
+import { runRipgrep, getRipgrepFailureMessage } from "../../subprocess/ripgrep";
 import { guardWorkspacePath } from "../../workspace-guard";
 import type { ToolExecutorFn } from "../../types";
 
@@ -20,131 +21,124 @@ export const globExecutor: ToolExecutorFn = async (
     return { success: false, error: "pattern is required" };
   }
 
-  const searchPath = typeof args.path === "string" && args.path
-    ? join(workspaceRoot, args.path)
+  const searchPathArg = typeof args.path === "string" && args.path
+    ? args.path
     : workspaceRoot;
+  const searchPath = resolve(workspaceRoot, searchPathArg);
 
   const guard = guardWorkspacePath(searchPath, workspaceRoot);
   if (!guard.ok) {
     return { success: false, error: guard.error };
   }
 
-  try {
-    const matcher = createGlobMatcher(pattern);
-    const entries: FileEntry[] = [];
-    await walkAndMatch(searchPath, workspaceRoot, matcher, entries);
-
-    if (entries.length === 0) {
-      return { success: true, data: `No files found matching "${pattern}"` };
-    }
-
-    // Sort by modification time, most recent first
-    entries.sort((a, b) => b.mtime - a.mtime);
-    const limited = entries.slice(0, MAX_RESULTS);
-
-    const output = limited.map((e) => e.path).join("\n");
-    const header = `Found ${entries.length} file${entries.length > 1 ? "s" : ""}${entries.length > MAX_RESULTS ? ` (showing first ${MAX_RESULTS})` : ""} matching "${pattern}":\n\n`;
-
-    return { success: true, data: header + output };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, error: `Glob search failed: ${msg}` };
+  const scope = resolveGlobScope(guard.resolvedPath, pattern);
+  const scopeGuard = guardWorkspacePath(scope.searchRoot, workspaceRoot);
+  if (!scopeGuard.ok) {
+    return { success: false, error: scopeGuard.error };
   }
+
+  const result = await runRipgrep({
+    args: ["--files", "--glob", scope.globPattern, "--color", "never", scopeGuard.resolvedPath],
+    cwd: workspaceRoot,
+  });
+
+  if (result.timedOut || result.notFound || result.exitCode === 2 || result.startError) {
+    return { success: false, error: getRipgrepFailureMessage(result) };
+  }
+
+  if (result.exitCode === 1 || !result.stdout.trim()) {
+    return { success: true, data: `No files found matching "${pattern}"` };
+  }
+
+  const entries = await collectFileEntries(result.stdout, scopeGuard.resolvedPath, workspaceRoot);
+  if (entries.length === 0) {
+    return { success: true, data: `No files found matching "${pattern}"` };
+  }
+
+  entries.sort((a, b) => b.mtime - a.mtime);
+  const limited = entries.slice(0, MAX_RESULTS);
+
+  const output = limited.map((e) => e.path).join("\n");
+  const header = `Found ${entries.length} file${entries.length > 1 ? "s" : ""}${entries.length > MAX_RESULTS ? ` (showing first ${MAX_RESULTS})` : ""} matching "${pattern}":\n\n`;
+  const suffix = result.truncated ? "\n\n[Output truncated by ripgrep runner]" : "";
+
+  return { success: true, data: header + output + suffix };
 };
 
-async function walkAndMatch(
-  dir: string,
-  workspaceRoot: string,
-  matcher: (path: string) => boolean,
-  results: FileEntry[],
-): Promise<void> {
-  let entries;
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch {
-    return;
+function normalizeGlobPattern(pattern: string): string {
+  if (pattern.startsWith("**/") || pattern.includes("/") || pattern.startsWith("!")) {
+    return pattern;
   }
 
-  for (const entry of entries) {
-    if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "dist") {
+  return `**/${pattern}`;
+}
+
+function resolveGlobScope(searchRoot: string, pattern: string): { searchRoot: string; globPattern: string } {
+  if (!pattern.includes("/") || pattern.startsWith("**/") || pattern.startsWith("!")) {
+    return {
+      searchRoot,
+      globPattern: normalizeGlobPattern(pattern),
+    };
+  }
+
+  const parts = pattern.split("/");
+  const staticParts: string[] = [];
+
+  for (const part of parts) {
+    if (hasGlobMagic(part)) break;
+    staticParts.push(part);
+  }
+
+  if (staticParts.length === 0) {
+    return {
+      searchRoot,
+      globPattern: normalizeGlobPattern(pattern),
+    };
+  }
+
+  const remaining = parts.slice(staticParts.length).join("/");
+  return {
+    searchRoot: join(searchRoot, ...staticParts),
+    globPattern: normalizeGlobPattern(remaining || "*"),
+  };
+}
+
+function hasGlobMagic(value: string): boolean {
+  return /[*?[\]{}]/.test(value);
+}
+
+async function collectFileEntries(stdout: string, searchRoot: string, workspaceRoot: string): Promise<FileEntry[]> {
+  const paths = stdout.trim().split("\n").map((line) => line.trim()).filter(Boolean);
+  const entries: FileEntry[] = [];
+
+  for (const path of paths) {
+    const absolutePath = resolveRipgrepFilePath(path, searchRoot);
+    const guard = guardWorkspacePath(absolutePath, workspaceRoot);
+    if (!guard.ok) {
       continue;
     }
 
-    const fullPath = join(dir, entry.name);
-    const relPath = relative(workspaceRoot, fullPath);
-
-    if (entry.isDirectory()) {
-      await walkAndMatch(fullPath, workspaceRoot, matcher, results);
-    } else if (entry.isFile()) {
-      if (matcher(relPath)) {
-        try {
-          const fileStat = await stat(fullPath);
-          results.push({ path: relPath, mtime: fileStat.mtimeMs });
-        } catch {
-          results.push({ path: relPath, mtime: 0 });
-        }
-      }
-    }
-  }
-}
-
-function createGlobMatcher(pattern: string): (path: string) => boolean {
-  // Normalize: if pattern doesn't start with ** and has no path separator, add **/
-  let normalizedPattern = pattern;
-  if (!pattern.startsWith("**/") && !pattern.includes("/")) {
-    normalizedPattern = `**/${pattern}`;
-  }
-
-  const regexStr = globToRegex(normalizedPattern);
-  const regex = new RegExp(`^${regexStr}$`);
-  return (path: string) => regex.test(path);
-}
-
-function globToRegex(glob: string): string {
-  let result = "";
-  let i = 0;
-
-  while (i < glob.length) {
-    const ch = glob[i];
-
-    if (ch === "*") {
-      if (glob[i + 1] === "*") {
-        if (glob[i + 2] === "/") {
-          // **/ matches zero or more directory levels
-          result += "(?:.*/)?";
-          i += 3;
-        } else {
-          // ** at end matches everything
-          result += ".*";
-          i += 2;
-        }
-      } else {
-        // * matches anything except /
-        result += "[^/]*";
-        i++;
-      }
-    } else if (ch === "?") {
-      result += "[^/]";
-      i++;
-    } else if (ch === "{") {
-      const end = glob.indexOf("}", i);
-      if (end !== -1) {
-        const alternatives = glob.slice(i + 1, end).split(",");
-        result += `(?:${alternatives.map(escapeRegex).join("|")})`;
-        i = end + 1;
-      } else {
-        result += escapeRegex(ch);
-        i++;
-      }
-    } else {
-      result += escapeRegex(ch);
-      i++;
+    try {
+      const fileStat = await stat(guard.resolvedPath);
+      entries.push({
+        path: relative(workspaceRoot, guard.resolvedPath),
+        mtime: fileStat.mtimeMs,
+      });
+    } catch {
+      entries.push({
+        path: relative(workspaceRoot, guard.resolvedPath),
+        mtime: 0,
+      });
     }
   }
 
-  return result;
+  return entries;
 }
 
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function resolveRipgrepFilePath(path: string, searchRoot: string): string {
+  if (path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path)) {
+    return path;
+  }
+
+  return join(searchRoot, path);
 }

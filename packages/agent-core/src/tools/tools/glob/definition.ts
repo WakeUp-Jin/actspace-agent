@@ -24,5 +24,5 @@ export const globDefinition: ToolDefinitionSpec = {
   },
   isReadOnly: true,
   category: "search",
-  previewKind: "search",
+  previewKind: "glob",
 };

@@ -114,6 +114,9 @@ export type ToolOutputRef = {
 export type ToolPreviewKind =
   | "read"
   | "search"
+  | "grep"
+  | "glob"
+  | "web_search"
   | "directory_list"
   | "edit_diff"
   | "bash"
@@ -122,6 +125,9 @@ export type ToolPreviewKind =
 export type ToolUiPreview =
   | { kind: "read"; filePath: string; range?: string; displayText: string }
   | { kind: "search"; query: string; scope?: string; resultCount?: number; displayText: string }
+  | { kind: "grep"; pattern: string; scope?: string; resultCount?: number; displayText: string }
+  | { kind: "glob"; pattern: string; scope?: string; resultCount?: number; displayText: string }
+  | { kind: "web_search"; mode: "query" | "url"; query?: string; url?: string; displayText: string }
   | { kind: "directory_list"; path: string; entryCount?: number; displayText: string }
   | {
       kind: "edit_diff";
@@ -320,6 +326,36 @@ export type MessageBlock =
       query: string;
       scope?: string;
       resultCount?: number;
+      displayText: string;
+      createdAt: string;
+      status?: "running" | "completed";
+    }
+  | {
+      kind: "grep";
+      id: EventId;
+      pattern: string;
+      scope?: string;
+      resultCount?: number;
+      displayText: string;
+      createdAt: string;
+      status?: "running" | "completed";
+    }
+  | {
+      kind: "glob";
+      id: EventId;
+      pattern: string;
+      scope?: string;
+      resultCount?: number;
+      displayText: string;
+      createdAt: string;
+      status?: "running" | "completed";
+    }
+  | {
+      kind: "web_search";
+      id: EventId;
+      mode: "query" | "url";
+      query?: string;
+      url?: string;
       displayText: string;
       createdAt: string;
       status?: "running" | "completed";

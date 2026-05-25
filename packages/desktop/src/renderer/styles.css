@@ -885,11 +885,21 @@ svg {
 }
 
 .tool-log-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--color-text-muted);
   font-size: 14px;
   font-weight: 430;
   line-height: 1.42;
   padding: 0 var(--conversation-text-inset);
+}
+
+.tool-log-line.web-search span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .thinking-block + .tool-log-line,

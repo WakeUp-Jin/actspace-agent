@@ -11,4 +11,5 @@
 - `deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入设计，约束 provider、工具暴露、联网搜索和多模态能力边界。
 - `token-usage-and-context-state.md`：token usage、成本统计、轻量 context snapshot 与每会话 context-state 的数据分层设计。
 - `tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约，约束 `previewKind`、`ToolUiPreview` 和用户可见工具日志。
+- `subprocess-runner-guidelines.md`：agent-core 内部受控子进程调用规范，约束 `rg` 等 CLI helper 的 timeout、退出码、输出裁剪和安全边界。
 - `权限设计规则和原则.md`：Agent 工具权限、用户审核、风险分层和权限记录的设计规则。

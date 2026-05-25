@@ -454,6 +454,48 @@ function createToolUiPreview(
       };
     }
 
+    case "grep": {
+      const pattern = stringArg(args.pattern, "unknown");
+      return {
+        kind: "grep",
+        pattern,
+        scope: getGrepScope(args),
+        resultCount: getSearchResultCount(output),
+        displayText: summary,
+      };
+    }
+
+    case "glob": {
+      const pattern = stringArg(args.pattern, "unknown");
+      return {
+        kind: "glob",
+        pattern,
+        scope: typeof args.path === "string" ? args.path : undefined,
+        resultCount: getGlobResultCount(output),
+        displayText: summary,
+      };
+    }
+
+    case "web_search": {
+      const url = stringArg(args.url, "");
+      if (url) {
+        return {
+          kind: "web_search",
+          mode: "url",
+          url,
+          displayText: `Read Web Page ${url}`,
+        };
+      }
+
+      const query = stringArg(args.query, "");
+      return {
+        kind: "web_search",
+        mode: "query",
+        query,
+        displayText: `Web Search ${query || "..."}`,
+      };
+    }
+
     case "directory_list": {
       const path = stringArg(args.path, "Unknown directory");
       const displayPath = displayPathTail(path);
@@ -513,6 +555,21 @@ function getToolSummary(
       return `Read ${displayFileName(stringArg(args.path, "file"))}`;
     case "search":
       return `Searched files for ${stringArg(args.query, "query")}`;
+    case "grep": {
+      const pattern = stringArg(args.pattern, "pattern");
+      const scope = getGrepScope(args);
+      return `Grep ${pattern}${scope ? ` in ${scope}` : ""}`;
+    }
+    case "glob": {
+      const pattern = stringArg(args.pattern, "pattern");
+      const scope = typeof args.path === "string" ? args.path : undefined;
+      return `Glob ${pattern}${scope ? ` in ${scope}` : ""}`;
+    }
+    case "web_search": {
+      const url = stringArg(args.url, "");
+      const query = stringArg(args.query, "");
+      return url ? `Read Web Page ${url}` : `Web Search ${query || "..."}`;
+    }
     case "directory_list":
       return `Listed ${displayPathTail(stringArg(args.path, "directory"))}`;
     case "edit_diff":
@@ -556,6 +613,19 @@ function getLineRange(args: Record<string, unknown>): string | undefined {
 function getSearchResultCount(output: string): number | undefined {
   const match = output.match(/^Found\s+(\d+)\s+match/);
   return match ? Number(match[1]) : undefined;
+}
+
+function getGlobResultCount(output: string): number | undefined {
+  const match = output.match(/^Found\s+(\d+)\s+file/);
+  return match ? Number(match[1]) : undefined;
+}
+
+function getGrepScope(args: Record<string, unknown>): string | undefined {
+  if (typeof args.glob === "string" && args.glob.length > 0) {
+    return args.glob;
+  }
+
+  return typeof args.path === "string" && args.path.length > 0 ? args.path : undefined;
 }
 
 function getDirectoryEntryCount(output: string): number {

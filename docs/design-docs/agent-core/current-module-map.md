@@ -32,8 +32,9 @@
 - `tools/workspace-guard.ts`：路径边界守卫，防止工具访问工作区外文件。
 - `tools/manager.ts`：ToolManager（注册/获取/导出工具定义），执行入口委托给 ToolScheduler。
 - `tools/scheduler.ts`：ToolScheduler（权限三态决策、工具状态记录、执行、结果渲染与裁剪）。当前 `ask` 会返回结构化待审核结果，approve/deny IPC 和恢复流程由后续计划接入。
+- `tools/subprocess/{run-process,ripgrep}.ts`：受控子进程执行封装。`run-process` 统一处理进程生命周期、timeout、stdout/stderr 和截断；`ripgrep` 在其上封装 `rg` 命令语义。
 - `tools/tools/{read-file,list-directory,edit-file-diff,bash}/`：每个工具一个目录，含 `definition.ts` + `executor.ts`；其中编辑 diff 工具对外工具名为 `edit-file`，目录名保留历史实现语义；Bash 额外包含 `permissions.ts` 和 `render-result.ts`。
-- `tools/tools/{grep,glob}/`：文件搜索工具。grep 支持正则搜索文件内容（优先 ripgrep），glob 按文件名模式查找。
+- `tools/tools/{grep,glob}/`：文件搜索工具。grep 通过 ripgrep 正则搜索文件内容，glob 通过 `rg --files --glob` 按文件名模式查找。
 - `tools/tools/{web-search,analyze-media}/`：DeepSeek-only Kimi 辅助工具；只有 DeepSeek 为主模型且配置 Kimi key 时注册。`web_search` 统一处理关键词搜索和 URL 读取。
 
 新增工具时，先读 `tool-preview-design-guidelines.md`，确保 `previewKind` 和 `ToolUiPreview` 语义稳定。

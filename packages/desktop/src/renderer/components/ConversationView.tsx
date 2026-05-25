@@ -58,6 +58,9 @@ function renderMessage(message: MessageBlock) {
       return <BashRunBlock key={message.id} message={message} />;
     case "read":
     case "search":
+    case "grep":
+    case "glob":
+    case "web_search":
     case "directory_list":
     case "tool":
     case "error":

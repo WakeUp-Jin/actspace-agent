@@ -86,6 +86,36 @@ function messageBlockFromToolPreview(
         displayText: preview.displayText,
         createdAt: getDisplayTime(timestamp)
       };
+    case "grep":
+      return {
+        kind: "grep",
+        id: eventId,
+        pattern: preview.pattern,
+        scope: preview.scope,
+        resultCount: preview.resultCount,
+        displayText: preview.displayText,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "glob":
+      return {
+        kind: "glob",
+        id: eventId,
+        pattern: preview.pattern,
+        scope: preview.scope,
+        resultCount: preview.resultCount,
+        displayText: preview.displayText,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "web_search":
+      return {
+        kind: "web_search",
+        id: eventId,
+        mode: preview.mode,
+        query: preview.query,
+        url: preview.url,
+        displayText: preview.displayText,
+        createdAt: getDisplayTime(timestamp)
+      };
     case "directory_list":
       return {
         kind: "directory_list",

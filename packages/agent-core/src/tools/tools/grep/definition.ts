@@ -28,5 +28,5 @@ export const grepDefinition: ToolDefinitionSpec = {
   },
   isReadOnly: true,
   category: "search",
-  previewKind: "search",
+  previewKind: "grep",
 };

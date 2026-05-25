@@ -98,6 +98,18 @@ function getStreamingSearchText(preview: Extract<ToolUiPreview, { kind: "search"
   return `Searched files ${scope}for ${preview.query}`;
 }
 
+function getStreamingGrepText(preview: Extract<ToolUiPreview, { kind: "grep" }>): string {
+  return `Grep ${preview.pattern}${preview.scope ? ` in ${preview.scope}` : ""}`;
+}
+
+function getStreamingGlobText(preview: Extract<ToolUiPreview, { kind: "glob" }>): string {
+  return `Glob ${preview.pattern}${preview.scope ? ` in ${preview.scope}` : ""}`;
+}
+
+function getStreamingWebSearchText(preview: Extract<ToolUiPreview, { kind: "web_search" }>): string {
+  return preview.displayText;
+}
+
 function getStreamingDirectoryText(
   preview: Extract<ToolUiPreview, { kind: "directory_list" }>,
   finished?: boolean,
@@ -162,6 +174,48 @@ function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
         scope: tool.preview.scope,
         resultCount: tool.finished ? tool.preview.resultCount : undefined,
         displayText: getStreamingSearchText(tool.preview),
+        createdAt: now,
+        status: tool.finished ? "completed" : "running",
+      });
+      continue;
+    }
+
+    if (tool.preview?.kind === "grep") {
+      blocks.push({
+        kind: "grep",
+        id: `streaming-tool-${toolCallId}`,
+        pattern: tool.preview.pattern,
+        scope: tool.preview.scope,
+        resultCount: tool.finished ? tool.preview.resultCount : undefined,
+        displayText: getStreamingGrepText(tool.preview),
+        createdAt: now,
+        status: tool.finished ? "completed" : "running",
+      });
+      continue;
+    }
+
+    if (tool.preview?.kind === "glob") {
+      blocks.push({
+        kind: "glob",
+        id: `streaming-tool-${toolCallId}`,
+        pattern: tool.preview.pattern,
+        scope: tool.preview.scope,
+        resultCount: tool.finished ? tool.preview.resultCount : undefined,
+        displayText: getStreamingGlobText(tool.preview),
+        createdAt: now,
+        status: tool.finished ? "completed" : "running",
+      });
+      continue;
+    }
+
+    if (tool.preview?.kind === "web_search") {
+      blocks.push({
+        kind: "web_search",
+        id: `streaming-tool-${toolCallId}`,
+        mode: tool.preview.mode,
+        query: tool.preview.query,
+        url: tool.preview.url,
+        displayText: getStreamingWebSearchText(tool.preview),
         createdAt: now,
         status: tool.finished ? "completed" : "running",
       });
