@@ -234,7 +234,7 @@ Context buckets 首版沿用前端需要的分类：
 - `grep`：正则搜索 workspace 内文件内容（优先 ripgrep）。
 - `glob`：按文件名模式查找文件，按修改时间排序。
 - `list_directory`：列出目录，支持最小文件导航。
-- `edit-file`：生成 diff preview，不自动写盘。
+- `edit_file`：生成 diff preview，不自动写盘。
 
 工具结果统一为 `ToolExecutionResult`：
 
@@ -257,7 +257,7 @@ Context buckets 首版沿用前端需要的分类：
 - 所有路径必须经过 workspace 边界检查。
 - 文件不存在、权限不足、输入非法都返回结构化错误。
 - 工具错误要精确，避免污染下一轮模型判断。
-- `edit-file` 默认只产物化 diff，不应用 patch。
+- `edit_file` 默认只产物化 diff，不应用 patch。
 
 ## Session Persistence
 
@@ -330,7 +330,7 @@ renderer 只能通过 preload 暴露的最小 API 调用后端。
 
 - 稳定 `packages/shared` 中的 `SessionEvent`、`RuntimeStreamEvent`、`ToolExecutionResult`、`ContextUsageSnapshot`、`AgentTurnResult`。
 - 定义 runtime event 到 session event 的 adapter。
-- 增加 mock fixtures，覆盖 thinking、read/search、edit-file、context snapshot、error。
+- 增加 mock fixtures，覆盖 thinking、read/grep、edit_file、context snapshot、error。
 
 可并行性：
 
@@ -356,7 +356,7 @@ renderer 只能通过 preload 暴露的最小 API 调用后端。
 目标：
 
 - 建立 tool definition、registry、scheduler、output truncator。
-- 实现 `read_file`、`grep`、`glob`、`list_directory`、`edit-file`。
+- 实现 `read_file`、`grep`、`glob`、`list_directory`、`edit_file`。
 - 增加路径边界、输入校验和结构化错误。
 
 可并行性：
@@ -410,7 +410,7 @@ renderer 只能通过 preload 暴露的最小 API 调用后端。
 - `pnpm typecheck` 通过。
 - `pnpm build` 通过。
 - mock provider 能跑完整 turn。
-- 完整 turn 至少包含 `thinking + read_file + grep/glob 或 list_directory + edit-file + assistant_message + context_snapshot`。
+- 完整 turn 至少包含 `thinking + read_file + grep/glob 或 list_directory + edit_file + assistant_message + context_snapshot`。
 - `session.jsonl` 能恢复完整消息流。
 - 工具输出进入上下文前被裁剪。
 - Context popup 可显示 token 总量、累计 token、压缩次数和 buckets。

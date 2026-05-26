@@ -78,4 +78,24 @@ describe("meta.json operations", () => {
     expect(updated!.createdAt).toBe(original!.createdAt);
     expect(updated!.turnCount).toBe(original!.turnCount + 1);
   });
+
+  it("should persist workspaceRoot when provided at creation", async () => {
+    const workspaceRoot = "/Users/test/projects/actspace-agent";
+    await createMeta(metaPath, "session-1", "Workspace-aware", { workspaceRoot });
+
+    const meta = await readMeta(metaPath);
+    expect(meta!.workspaceRoot).toBe(workspaceRoot);
+    expect(meta!.pinned).toBe(false);
+  });
+
+  it("should update pinned and workspaceRoot via updateMeta", async () => {
+    await createMeta(metaPath, "session-1");
+
+    const result = await updateMeta(metaPath, { pinned: true, workspaceRoot: "/tmp/ws" });
+    expect(result.ok).toBe(true);
+
+    const meta = await readMeta(metaPath);
+    expect(meta!.pinned).toBe(true);
+    expect(meta!.workspaceRoot).toBe("/tmp/ws");
+  });
 });

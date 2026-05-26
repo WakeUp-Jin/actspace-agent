@@ -59,4 +59,6 @@ export interface MetaUpdateFields {
   lastModel?: string;
   lastError?: string;
   lastContextSnapshot?: ContextUsageSnapshot;
+  workspaceRoot?: string;
+  pinned?: boolean;
 }

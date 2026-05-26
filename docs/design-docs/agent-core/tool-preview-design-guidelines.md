@@ -20,9 +20,19 @@
 
 示例：
 
-- 工具名：`edit-file`
+- 工具名：`edit_file`
 - 展示类型：`edit_diff`
 - 用户可见：`Edit index.ts +3 -1`（折叠态摘要，点击展开 diff）
+
+## 工具命名约定
+
+- **工具对外 `name`** 一律 **snake_case**，例如 `read_file`, `write_file`, `edit_file`, `list_directory`, `web_search`, `analyze_media`。单词工具（`bash`, `grep`, `glob`）保持单词无分隔符。
+  - LLM 工具协议（OpenAI / DeepSeek / Kimi / Anthropic）事实约定都是 snake_case，统一使用 `_` 而不是 `-` 兼容性最好。
+  - 历史上 `edit-file` 是 kebab-case 异类，已在 2026-05 统一为 `edit_file`。
+- **目录名**（`packages/agent-core/src/tools/tools/<dir>/`）一律 **kebab-case**，例如 `edit-file-diff/`, `read-file/`, `web-search/`。这是仓库整体的目录命名风格，与工具 `name` 独立。
+- **previewKind** 也用 snake_case，例如 `edit_diff`, `directory_list`, `web_search`。
+- **JS/TS 变量与函数名** 使用 camelCase，例如 `editFileDiffDefinition`、`createWebSearchTool`。
+- 新增工具时三处都要照例：kebab 目录 + snake_case `name` + snake_case `previewKind` + camelCase 导出名。
 
 ## 通用展示原则
 
@@ -69,7 +79,7 @@
 - `ToolUiPreview.scope`: 搜索根目录。
 - 展示示例：`Glob **/*.ts in packages/agent-core`。
 
-### `edit-file`
+### `edit_file`
 
 - `previewKind`: `edit_diff`
 - `ToolUiPreview.filePath`: 文件名，例如 `index.ts`
@@ -93,7 +103,7 @@
   4. finished（`tool_finished`）：streamingContent 清空，切换为折叠态 `Write config.ts +15 ›`（deletions=0 不展示），点击展开看完整 diff。
 - diff 由 `diff` 库 `createTwoFilesPatch` 生成，新建时旧内容为空字符串。
 - 磁盘写入仍在 tool execute 阶段原子写入（tmpfile → fsync → rename），**不**在 LLM 流式期间写盘，避免半文件出现或 LLM 重试导致脏写。
-- 前端复用 `FileDiffBlock` 折叠式组件（与 `edit-file` 共享），`kind: "write_diff"` 区分标题动作词，无 icon。
+- 前端复用 `FileDiffBlock` 折叠式组件（与 `edit_file` 共享），`kind: "write_diff"` 区分标题动作词，无 icon。
 
 ### `bash`
 

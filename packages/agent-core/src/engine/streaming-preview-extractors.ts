@@ -8,7 +8,7 @@
  *
  * 设计权衡（详见 docs/learnings/2026-05/llm-tool-call-streaming.md）：
  * - write_file: 提取 path + content（content 作为 streamingContent，前端边写边看）
- * - edit-file: 只提取 path（diff 需要文件上下文+替换执行才能生成，强行展示 old/new 会误导用户）
+ * - edit_file: 只提取 path（diff 需要文件上下文+替换执行才能生成，强行展示 old/new 会误导用户）
  * - 其他工具: 提取常用字段（filePath/pattern/command 等），缺失时蜕化为空字符串
  */
 

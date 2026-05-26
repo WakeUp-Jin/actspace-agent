@@ -40,7 +40,7 @@
 
 2. **应用级工具**
    - 由 `actspace` 的 ToolManager 暴露给主模型。
-   - 例如 `read_file`、`search_files`、`web_search`、`analyze_media`。
+   - 例如 `read_file`、`grep`、`glob`、`web_search`、`analyze_media`。
    - 这类工具必须有稳定名称、清晰 schema 和可裁剪结果。
 
 这两个层级不能混在一起。Provider 原生能力解决“这个 provider 如何调用自己平台能力”的问题；应用级工具解决“主模型能在 actspace 中做什么”的问题。

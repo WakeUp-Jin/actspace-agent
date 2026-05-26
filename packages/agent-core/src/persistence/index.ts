@@ -23,6 +23,7 @@ export {
   createSessionStorePaths,
   ensureSessionStore,
   createSessionRecord,
+  setSessionPinned,
   writeSessionResult,
   writeContextState,
   readContextState,

@@ -12,7 +12,7 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AbortTurnInput, RunTurnInput, SessionCreateInput, SessionGetInput, ApprovalDecideInput, ApprovalListPendingInput } from "@actspace/shared";
+import type { AbortTurnInput, RunTurnInput, SessionCreateInput, SessionGetInput, SessionPinInput, ApprovalDecideInput, ApprovalListPendingInput } from "@actspace/shared";
 import {
   createBootstrapState,
   loadEnv,
@@ -20,6 +20,7 @@ import {
   createSessionStorePaths,
   listSessionRecords,
   readSessionRecord,
+  setSessionPinned,
 } from "@actspace/agent-core";
 import { runAndPersistTurn, abortTurn, type AppDataRoots } from "./agent-turn";
 import { PendingApprovalRegistry } from "./approval-registry";
@@ -288,7 +289,19 @@ async function registerIpc() {
 
   ipcMain.handle("session:create", async (_event, input: SessionCreateInput = {}) => {
     const roots = await ensureDataDirectories();
-    return createSessionRecord(roots.sessionRoot, input);
+    return createSessionRecord(roots.sessionRoot, {
+      ...input,
+      workspaceRoot: input.workspaceRoot ?? roots.workspaceRoot,
+    });
+  });
+
+  ipcMain.handle("session:pin", async (_event, input: SessionPinInput) => {
+    const roots = await ensureDataDirectories();
+    const result = await setSessionPinned(roots.sessionRoot, input.sessionId, input.pinned);
+    if (!result.ok) {
+      logMain("session pin failed", { sessionId: input.sessionId, error: result.error });
+    }
+    return result;
   });
 
   ipcMain.handle("approval:decide", async (_event, input: ApprovalDecideInput) => {

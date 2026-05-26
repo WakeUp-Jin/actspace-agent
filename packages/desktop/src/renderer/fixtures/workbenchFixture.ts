@@ -26,24 +26,124 @@ export const mockContextSnapshot: ContextUsageSnapshot = {
   ]
 };
 
+const MOCK_WORKSPACE_PRIMARY = "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent";
+const MOCK_WORKSPACE_HARNESS = "/Users/wakeup-jin/Desktop/code-project/side-project/agent-harness-dev";
+
+function hoursAgo(hours: number): string {
+  return new Date(Date.now() - hours * 3_600_000).toISOString();
+}
+
+function daysAgo(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString();
+}
+
 export const mockSessions: SessionListItem[] = [
   {
     id: "session-learning-doc-plan",
     title: "Learning documentation plan",
     updatedAt: now,
-    turnCount: 4
+    turnCount: 4,
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY,
+    pinned: true
+  },
+  {
+    id: "session-bash-pipeline",
+    title: "Bash 工具开发与权限调度",
+    updatedAt: hoursAgo(2),
+    turnCount: 8,
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY,
+    pinned: true
+  },
+  {
+    id: "session-tool-naming",
+    title: "工具定义格式和命名规范",
+    updatedAt: daysAgo(3),
+    turnCount: 3,
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+  },
+  {
+    id: "session-tool-addition-doc",
+    title: "Tool addition and documentation",
+    updatedAt: daysAgo(1),
+    turnCount: 5,
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+  },
+  {
+    id: "session-context-lookup",
+    title: "Conversation context lookup",
+    updatedAt: daysAgo(1),
+    turnCount: 2,
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+  },
+  {
+    id: "session-key-sandtrigger",
+    title: "Enter key sand trigger behavior",
+    updatedAt: daysAgo(2),
+    turnCount: 2,
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+  },
+  {
+    id: "session-stats-prototype",
+    title: "统计页面设计",
+    updatedAt: daysAgo(2),
+    turnCount: 4,
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+  },
+  {
+    id: "session-search-tool",
+    title: "Search tool parameter handling",
+    updatedAt: daysAgo(4),
+    turnCount: 1,
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+  },
+  {
+    id: "session-agent-tool-bugs",
+    title: "Agent tool bugs and fixes",
+    updatedAt: daysAgo(5),
+    turnCount: 6,
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+  },
+  {
+    id: "session-frontend-llm-init",
+    title: "Front-end LLM initialization",
+    updatedAt: daysAgo(6),
+    turnCount: 3,
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY
+  },
+  {
+    id: "session-harness-readme",
+    title: "README file improvement",
+    updatedAt: hoursAgo(5),
+    turnCount: 3,
+    workspaceRoot: MOCK_WORKSPACE_HARNESS
+  },
+  {
+    id: "session-harness-skill",
+    title: "Skill usage and installation",
+    updatedAt: hoursAgo(8),
+    turnCount: 7,
+    workspaceRoot: MOCK_WORKSPACE_HARNESS
+  },
+  {
+    id: "session-harness-review",
+    title: "Project review and documentation",
+    updatedAt: daysAgo(2),
+    turnCount: 2,
+    workspaceRoot: MOCK_WORKSPACE_HARNESS
   },
   {
     id: "session-auth-refactor",
     title: "Authentication flow refactor",
-    updatedAt: new Date(Date.now() - 86_400_000).toISOString(),
-    turnCount: 2
+    updatedAt: daysAgo(1),
+    turnCount: 2,
+    workspaceRoot: MOCK_WORKSPACE_HARNESS
   },
   {
     id: "session-ci-design",
     title: "CI/CD pipeline design",
-    updatedAt: new Date(Date.now() - 172_800_000).toISOString(),
-    turnCount: 1
+    updatedAt: daysAgo(2),
+    turnCount: 1,
+    workspaceRoot: MOCK_WORKSPACE_HARNESS
   }
 ];
 
@@ -87,15 +187,6 @@ export const mockMessages: MessageBlock[] = [
     filePath: "docs/README.md",
     range: "L1-80",
     displayText: "Read docs/README.md L1-80",
-    createdAt: now
-  },
-  {
-    kind: "search",
-    id: "mock-search-1",
-    query: "template",
-    scope: "docs/**",
-    displayText: "Searched files in docs/** for template",
-    resultCount: 8,
     createdAt: now
   },
   {
@@ -314,7 +405,9 @@ export const mockSessionRecord: SessionRecord = {
     title: "Learning documentation plan",
     createdAt: now,
     updatedAt: now,
-    turnCount: 4
+    turnCount: 4,
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY,
+    pinned: true
   },
   events: [],
   messageBlocks: mockMessages,

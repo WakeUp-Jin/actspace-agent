@@ -15,6 +15,7 @@ export async function createMeta(
   metaPath: string,
   sessionId: SessionId,
   title?: string,
+  options: { workspaceRoot?: string } = {},
 ): Promise<WriteResult> {
   const now = new Date().toISOString();
   const meta: SessionMeta = {
@@ -23,6 +24,8 @@ export async function createMeta(
     createdAt: now,
     updatedAt: now,
     turnCount: 0,
+    ...(options.workspaceRoot ? { workspaceRoot: options.workspaceRoot } : {}),
+    pinned: false,
   };
 
   return writeMeta(metaPath, meta);
@@ -53,6 +56,8 @@ export async function updateMeta(
   if (fields.turnCount !== undefined) updated.turnCount = fields.turnCount;
   if (fields.updatedAt !== undefined) updated.updatedAt = fields.updatedAt;
   if (fields.title !== undefined) updated.title = fields.title;
+  if (fields.workspaceRoot !== undefined) updated.workspaceRoot = fields.workspaceRoot;
+  if (fields.pinned !== undefined) updated.pinned = fields.pinned;
   if (fields.lastModel !== undefined) (updated as Record<string, unknown>).lastModel = fields.lastModel;
   if (fields.lastError !== undefined) (updated as Record<string, unknown>).lastError = fields.lastError;
   if (fields.lastContextSnapshot !== undefined) {

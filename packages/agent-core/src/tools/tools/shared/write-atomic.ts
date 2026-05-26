@@ -1,5 +1,5 @@
 /**
- * Atomic text writing helper shared by edit-file and write-file tools.
+ * Atomic text writing helper shared by edit_file and write_file tools.
  *
  * Strategy: write to a temp file in the same directory, fsync, then rename.
  * This guarantees the target file is never left in a half-written state.

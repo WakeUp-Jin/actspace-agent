@@ -47,7 +47,7 @@
 Agent 文件工具的 `workspaceRoot` 与 Electron `userData` 分离：
 
 - `userData` 只用于 session、附件、tmp 等应用数据。
-- `workspaceRoot` 用于 `read_file`、`grep`、`glob`、`list_directory`、`edit-file` 等文件工具。
+- `workspaceRoot` 用于 `read_file`、`grep`、`glob`、`list_directory`、`edit_file` 等文件工具。
 - 首版解析顺序为 `ACTSPACE_WORKSPACE_ROOT` -> 当前仓库根目录。
 
 renderer 不能直接访问文件系统，所有文件与 session 读写都必须走 preload + IPC。

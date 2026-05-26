@@ -17,6 +17,9 @@ declare global {
       createSession: (
         input?: import("@actspace/shared").SessionCreateInput
       ) => Promise<import("@actspace/shared").SessionRecord>;
+      pinSession: (
+        input: import("@actspace/shared").SessionPinInput
+      ) => Promise<import("@actspace/shared").SessionPinResult>;
       onAgentStream: (
         callback: (event: import("@actspace/shared").RuntimeStreamEvent) => void
       ) => () => void;

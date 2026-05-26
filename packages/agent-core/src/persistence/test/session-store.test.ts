@@ -8,8 +8,10 @@ import {
   readContextState,
   readSessionRecord,
   createSessionStorePaths,
+  setSessionPinned,
   writeContextState,
 } from "../session-store";
+import { readMeta } from "../meta";
 
 let sessionRoot: string;
 
@@ -45,6 +47,43 @@ describe("session store", () => {
 
     const sessionFile = await readFile(join(sessionRoot, record.meta.id, "session.jsonl"), "utf-8");
     expect(sessionFile).toBe("");
+  });
+
+  it("persists workspaceRoot on session meta when creating", async () => {
+    const workspaceRoot = "/Users/test/projects/foo-repo";
+    const record = await createSessionRecord(sessionRoot, {
+      title: "Workspace-aware session",
+      workspaceRoot,
+    });
+
+    expect(record.meta.workspaceRoot).toBe(workspaceRoot);
+    expect(record.meta.pinned).toBe(false);
+
+    const listed = await listSessionRecords(sessionRoot);
+    expect(listed).toEqual([
+      expect.objectContaining({
+        id: record.meta.id,
+        workspaceRoot,
+      }),
+    ]);
+  });
+
+  it("toggles pinned via setSessionPinned and surfaces it in list/meta", async () => {
+    const record = await createSessionRecord(sessionRoot, { title: "To pin" });
+
+    await expect(setSessionPinned(sessionRoot, record.meta.id, true)).resolves.toEqual({ ok: true });
+
+    const metaAfterPin = await readMeta(join(sessionRoot, record.meta.id, "meta.json"));
+    expect(metaAfterPin?.pinned).toBe(true);
+
+    const listed = await listSessionRecords(sessionRoot);
+    expect(listed).toEqual([
+      expect.objectContaining({ id: record.meta.id, pinned: true }),
+    ]);
+
+    await expect(setSessionPinned(sessionRoot, record.meta.id, false)).resolves.toEqual({ ok: true });
+    const metaAfterUnpin = await readMeta(join(sessionRoot, record.meta.id, "meta.json"));
+    expect(metaAfterUnpin?.pinned).toBe(false);
   });
 
   it("writes and restores context-state.json independently from session events", async () => {

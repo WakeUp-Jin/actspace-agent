@@ -14,7 +14,7 @@
 一个完整的工具定义包含以下字段：
 
 **必需字段：**
-- `name`：工具名称，LLM 通过此名称调用
+- `name`：工具名称，LLM 通过此名称调用。**统一使用 snake_case**（如 `read_file`, `web_search`, `edit_file`），与 OpenAI / DeepSeek / Kimi / Anthropic 等主流 LLM 工具协议事实约定一致；目录名使用 kebab-case 是仓库整体规范，但不要把目录名直接当 `name` 用。
 - `description`：工具描述，决定 LLM 何时选择此工具
 - `parameters`：JSON Schema 格式的参数定义
 - `handler`：异步执行函数，接收参数字典，返回统一的 ToolResult

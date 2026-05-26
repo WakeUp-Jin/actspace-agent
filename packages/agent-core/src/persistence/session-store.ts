@@ -16,7 +16,7 @@ import type {
 } from "@actspace/shared";
 import type { SessionStorePaths, WriteResult } from "./types";
 import { appendEvents } from "./jsonl";
-import { createMeta, incrementTurnCount, readMeta } from "./meta";
+import { createMeta, incrementTurnCount, readMeta, updateMeta } from "./meta";
 import { recoverSession } from "./recovery";
 
 /** 构造 session 目录路径 */
@@ -45,7 +45,9 @@ export async function createSessionRecord(
   const sessionId = createSessionId();
   const paths = await ensureSessionStore(join(sessionRoot, sessionId));
   const title = input.title?.trim() || "New chat";
-  const result = await createMeta(paths.metaPath, sessionId, title);
+  const result = await createMeta(paths.metaPath, sessionId, title, {
+    workspaceRoot: input.workspaceRoot,
+  });
   if (!result.ok) {
     throw new Error(result.error ?? "Failed to create session");
   }
@@ -56,6 +58,16 @@ export async function createSessionRecord(
     throw new Error(`Failed to read created session: ${sessionId}`);
   }
   return record;
+}
+
+/** 更新 session 的 pinned 状态 */
+export async function setSessionPinned(
+  sessionRoot: string,
+  sessionId: string,
+  pinned: boolean,
+): Promise<WriteResult> {
+  const paths = createSessionStorePaths(join(sessionRoot, sessionId));
+  return updateMeta(paths.metaPath, { pinned });
 }
 
 /** 写入一轮完整的 turn 结果（events + meta 更新） */
@@ -144,12 +156,15 @@ export async function listSessionRecords(
         const paths = createSessionStorePaths(join(sessionRoot, sessionId));
         const meta = await readMeta(paths.metaPath);
         if (!meta) return null;
-        return {
+        const item: SessionListItem = {
           id: meta.id,
           title: meta.title,
           updatedAt: meta.updatedAt,
           turnCount: meta.turnCount,
-        } satisfies SessionListItem;
+        };
+        if (meta.workspaceRoot) item.workspaceRoot = meta.workspaceRoot;
+        if (meta.pinned) item.pinned = true;
+        return item;
       }),
     );
 

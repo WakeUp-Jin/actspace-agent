@@ -212,6 +212,7 @@ type ToolPreviewKind = "grep" | "glob" | ...
 
 - 风险：删除或改动 Search 影响历史 session 恢复。
 - 缓解方式：本计划只让新 Grep/Glob 使用独立 kind，Search 兼容保留；是否删除 `search_files` 另开决策。
+  - 跟进（2026-05-26）：已在「工具命名统一」一轮里把 `search_files` 工具下线，仅保留 `ToolPreviewKind: "search"` 类型与前端渲染分支供历史 session 回放使用。详见 `docs/histories/2026-05/20260526-2048-tool-naming-and-web-search-icon.md`。
 
 - 风险：通用 runner 做得过宽，变成绕过 Bash 权限的隐形命令执行入口。
 - 缓解方式：runner 不对模型暴露，不接收 shell command 字符串；所有 command 只能由具体工具代码硬编码或显式传入，权限仍在工具层。

@@ -1,8 +1,10 @@
 import type { ContextUsageSnapshot, MessageBlock, SessionListItem } from "@actspace/shared";
 import { useCallback, useEffect, useState } from "react";
+import { BarChart3, FlaskConical } from "lucide-react";
 import { ConversationView } from "./ConversationView";
+import { PlaceholderView } from "./PlaceholderView";
 import { RightPanel } from "./RightPanel";
-import { Sidebar } from "./Sidebar";
+import { Sidebar, type SidebarView } from "./Sidebar";
 import { SplitView } from "./SplitView";
 import type { ComposerSendOptions } from "./Composer";
 
@@ -64,10 +66,12 @@ export function WorkbenchLayout({
   isStreaming = false,
   isAborting = false,
   sendScrollRequestId = 0,
+  busySessionIds,
   onSend,
   onAbort,
   onNewSession,
   onSelectSession,
+  onTogglePin,
   showDemoAttachments = false,
 }: {
   sessions: SessionListItem[];
@@ -79,10 +83,12 @@ export function WorkbenchLayout({
   isStreaming?: boolean;
   isAborting?: boolean;
   sendScrollRequestId?: number;
+  busySessionIds?: Set<string>;
   onSend?: (text: string, options: ComposerSendOptions) => void;
   onAbort?: () => void;
   onNewSession?: () => void;
   onSelectSession?: (sessionId: string) => void;
+  onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   showDemoAttachments?: boolean;
 }) {
   const [storedLayout] = useState(loadStoredLayout);
@@ -91,6 +97,7 @@ export function WorkbenchLayout({
   const [leftWidth, setLeftWidth] = useState(storedLayout.leftWidth);
   const [rightWidth, setRightWidth] = useState(storedLayout.rightWidth);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(rightPanelOpen);
+  const [view, setView] = useState<SidebarView>("chat");
   const displayedLeftWidth = leftMode === "rail" ? LEFT_RAIL_WIDTH : leftWidth;
   const rightMaxWidth = containerWidth > 0 ? Math.max(RIGHT_MIN_WIDTH, Math.min(RIGHT_MAX_WIDTH, containerWidth / 2)) : RIGHT_MAX_WIDTH;
 
@@ -179,6 +186,57 @@ export function WorkbenchLayout({
     setIsRightPanelOpen(true);
   }
 
+  const handleSelectView = useCallback((next: SidebarView) => {
+    setView(next);
+  }, []);
+
+  let mainContent;
+  if (view === "lab") {
+    mainContent = (
+      <PlaceholderView
+        eyebrow="Lab"
+        title="Workflow & prompt playground"
+        description="Lab 是 actspace 的实验台，未来会承载 prompt 调试、工具沙盒和模型对比。当前仅做入口预留。"
+        bullets={[
+          "Prompt 与系统消息的可视化编辑与对比",
+          "工具调用的 dry-run 和回放",
+          "多模型并排输出，方便挑选合适的模型",
+        ]}
+        icon={<FlaskConical size={28} strokeWidth={1.6} />}
+      />
+    );
+  } else if (view === "usage") {
+    mainContent = (
+      <PlaceholderView
+        eyebrow="Usage"
+        title="Token usage & cost analytics"
+        description="Usage 页面会展示按会话、模型、工具维度的 token 与成本统计。规范见 docs/design-docs/frontend-ui/usage-statistics/。"
+        bullets={[
+          "按会话和工作区聚合的 token 与成本",
+          "对话压缩次数与上下文饱和度",
+          "近期 30 天的趋势曲线",
+        ]}
+        icon={<BarChart3 size={28} strokeWidth={1.6} />}
+      />
+    );
+  } else {
+    mainContent = (
+      <ConversationView
+        title={title}
+        messages={messages}
+        contextSnapshot={contextSnapshot}
+        rightPanelOpen={isRightPanelOpen}
+        onToggleRightPanel={toggleRightPanel}
+        isStreaming={isStreaming}
+        isAborting={isAborting}
+        sendScrollRequestId={sendScrollRequestId}
+        onSend={onSend}
+        onAbort={onAbort}
+        showDemoAttachments={showDemoAttachments}
+      />
+    );
+  }
+
   return (
     <SplitView
       left={
@@ -186,29 +244,19 @@ export function WorkbenchLayout({
           sessions={sessions}
           activeSessionId={activeSessionId}
           mode={leftMode}
+          view={view}
+          busySessionIds={busySessionIds}
           onToggleMode={toggleSidebarMode}
           onNewSession={onNewSession}
           onSelectSession={onSelectSession}
+          onTogglePin={onTogglePin}
+          onSelectView={handleSelectView}
         />
       }
       leftWidth={displayedLeftWidth}
       leftBounds={{ minWidth: LEFT_RAIL_WIDTH, maxWidth: LEFT_MAX_WIDTH }}
       leftSeparatorLabel="Resize session sidebar"
-      main={
-        <ConversationView
-          title={title}
-          messages={messages}
-          contextSnapshot={contextSnapshot}
-          rightPanelOpen={isRightPanelOpen}
-          onToggleRightPanel={toggleRightPanel}
-          isStreaming={isStreaming}
-          isAborting={isAborting}
-          sendScrollRequestId={sendScrollRequestId}
-          onSend={onSend}
-          onAbort={onAbort}
-          showDemoAttachments={showDemoAttachments}
-        />
-      }
+      main={mainContent}
       minMainWidth={MAIN_MIN_WIDTH}
       onContainerWidthChange={handleContainerWidthChange}
       onLeftKeyResize={(width) => {
@@ -224,7 +272,7 @@ export function WorkbenchLayout({
       onLeftSeparatorDoubleClick={toggleSidebarMode}
       onRightResize={(width) => setRightWidth(clamp(width, RIGHT_MIN_WIDTH, rightMaxWidth))}
       onRightSeparatorDoubleClick={() => setRightWidth(RIGHT_DEFAULT_WIDTH)}
-      right={isRightPanelOpen ? <RightPanel /> : undefined}
+      right={view === "chat" && isRightPanelOpen ? <RightPanel /> : undefined}
       rightBounds={{ minWidth: RIGHT_MIN_WIDTH, maxWidth: rightMaxWidth }}
       rightSeparatorLabel="Resize preview panel"
       rightWidth={rightWidth}

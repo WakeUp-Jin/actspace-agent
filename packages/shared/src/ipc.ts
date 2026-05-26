@@ -56,6 +56,10 @@ export type SessionListItem = {
   title: string;
   updatedAt: string;
   turnCount: number;
+  /** 创建会话时的工作区根目录；旧 session 缺这个字段时由前端视作 default workspace。 */
+  workspaceRoot?: string;
+  /** 用户是否把该会话钉到 Pinned 分区。 */
+  pinned?: boolean;
 };
 
 export type SessionRecord = {
@@ -73,6 +77,18 @@ export type SessionGetInput = {
 
 export type SessionCreateInput = {
   title?: string;
+  /** 创建时指定 workspace 根目录；不传由主进程从 BootstrapState 自动注入。 */
+  workspaceRoot?: string;
+};
+
+export type SessionPinInput = {
+  sessionId: string;
+  pinned: boolean;
+};
+
+export type SessionPinResult = {
+  ok: boolean;
+  error?: string;
 };
 
 export type AppBootstrapStateInput = {

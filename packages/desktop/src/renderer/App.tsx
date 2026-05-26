@@ -748,6 +748,34 @@ export function App() {
     sessionRecord?.meta.id ?? turnResult?.sessionId ?? sessions[0]?.id ?? mockSessions[0]?.id ?? null;
   const showDemoAttachments = isDemoSession(activeSessionId);
   const title = getSessionTitle(sessionRecord, sessions);
+  const busySessionIds = useMemo<Set<string>>(() => {
+    const set = new Set<string>();
+    if (isStreaming) {
+      const id = activeSessionIdRef.current;
+      if (id) set.add(id);
+    }
+    return set;
+  }, [isStreaming]);
+
+  const handleTogglePin = useCallback(
+    async (sessionId: string, nextPinned: boolean) => {
+      if (!hasActspaceBridge()) {
+        setSessions((current) =>
+          current.map((session) => (session.id === sessionId ? { ...session, pinned: nextPinned } : session)),
+        );
+        return;
+      }
+
+      try {
+        await window.actspace.pinSession({ sessionId, pinned: nextPinned });
+        const refreshed = await window.actspace.listSessions();
+        setSessions(refreshed);
+      } catch (error) {
+        console.error("Failed to toggle session pin", error);
+      }
+    },
+    [],
+  );
 
   return (
     <WorkbenchLayout
@@ -759,10 +787,12 @@ export function App() {
       isStreaming={isStreaming}
       isAborting={isAborting}
       sendScrollRequestId={sendScrollRequestId}
+      busySessionIds={busySessionIds}
       onSend={handleSend}
       onAbort={handleAbort}
       onNewSession={handleCreateSession}
       onSelectSession={handleSelectSession}
+      onTogglePin={handleTogglePin}
       showDemoAttachments={showDemoAttachments}
     />
   );
