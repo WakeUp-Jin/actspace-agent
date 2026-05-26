@@ -39,3 +39,6 @@ export {
   recoverContextSnapshot,
   recoverDiffSummary,
 } from "./recovery";
+
+// Usage statistics
+export { createUsageStatisticsSnapshot } from "./usage-statistics";

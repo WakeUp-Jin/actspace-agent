@@ -198,6 +198,8 @@ export type UsageStatisticsSnapshot = {
 - `pnpm typecheck`
 - 共享类型能被 desktop 与 agent-core 正常引用。
 
+状态：已完成。
+
 ### Task 2: 实现 session 聚合层
 
 修改目标：
@@ -217,6 +219,8 @@ export type UsageStatisticsSnapshot = {
 
 - `pnpm --filter @actspace/agent-core test`
 - 单测覆盖空 session、普通 session、cache hit/miss、tool call 聚合。
+
+状态：进行中。
 
 ### Task 3: 连接 desktop IPC
 

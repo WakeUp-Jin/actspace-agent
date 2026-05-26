@@ -1,20 +1,27 @@
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
+  Archive,
+  ArrowDownUp,
   BarChart3,
   ChevronDown,
   ChevronRight,
   FlaskConical,
+  Folder,
+  FolderPlus,
   MoreHorizontal,
   PanelLeft,
   Pin,
-  PinOff,
+  Plus,
   Search,
   Settings,
+  Sparkles,
   SquarePen,
 } from "lucide-react";
 import type { SessionListItem } from "@actspace/shared";
 
-export type SidebarView = "chat" | "lab" | "usage";
+export type SidebarMode = "expanded" | "hidden";
+export type SidebarView = "chat" | "lab" | "usage" | "kairos";
 
 const DEFAULT_WORKSPACE_KEY = "__default__";
 const DEFAULT_WORKSPACE_LABEL = "Default workspace";
@@ -95,52 +102,152 @@ const MOCK_SCHEDULED: ScheduledItem[] = [
   { id: "scheduled-context-audit", title: "Weekly context audit", hint: "Tomorrow" },
 ];
 
+type NavSectionHeaderProps = {
+  label: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  extraActions?: ReactNode;
+};
+
+/**
+ * 分组标题统一渲染：左侧只放纯文字 label（点击折叠），右侧 actions 区在
+ * hover 时露出 chevron（视觉指示折叠态）；额外按钮（如 Scheduled 的"新建定时"、
+ * Workspaces 的"排序"）通过 extraActions slot 注入，统一布在 chevron 之前。
+ */
+function NavSectionHeader({ label, collapsed, onToggle, extraActions }: NavSectionHeaderProps) {
+  return (
+    <div className="nav-section-title">
+      <button
+        className="nav-section-label"
+        type="button"
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+      >
+        <span>{label}</span>
+      </button>
+      <div className="nav-section-actions">
+        {extraActions}
+        <button
+          className="nav-section-chevron"
+          type="button"
+          onClick={onToggle}
+          aria-label={collapsed ? `Expand ${label}` : `Collapse ${label}`}
+        >
+          {collapsed
+            ? <ChevronRight size={13} strokeWidth={1.9} />
+            : <ChevronDown size={13} strokeWidth={1.9} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 折叠按钮 + 搜索按钮组合。
+ *
+ * 抽到 Sidebar 外面，由 WorkbenchLayout 直接挂在窗口顶部（position: fixed），
+ * 这样 sidebar 折叠到 hidden 态时这两个按钮仍然可见、可点。
+ */
+export function SidebarChromeRow({
+  mode,
+  onToggleMode,
+  onOpenSearch,
+}: {
+  mode: SidebarMode;
+  onToggleMode: () => void;
+  onOpenSearch?: () => void;
+}) {
+  const isHidden = mode === "hidden";
+
+  return (
+    <div className={`sidebar-chrome-row${isHidden ? " is-floating" : ""}`}>
+      <button
+        className="sidebar-mode-button"
+        type="button"
+        aria-label={isHidden ? "Expand session sidebar" : "Collapse session sidebar"}
+        title={isHidden ? "Expand sidebar" : "Collapse sidebar"}
+        onClick={onToggleMode}
+      >
+        <PanelLeft size={15} strokeWidth={1.8} />
+      </button>
+      <button
+        className="sidebar-chrome-button"
+        type="button"
+        aria-label="Search sessions"
+        title="Search"
+        onClick={onOpenSearch}
+      >
+        <Search size={14} strokeWidth={1.8} />
+      </button>
+    </div>
+  );
+}
+
 type SessionRowProps = {
   session: SessionListItem;
   isActive: boolean;
   isBusy: boolean;
   onSelect: () => void;
   onTogglePin?: () => void;
+  onArchive?: () => void;
 };
 
-function SessionRow({ session, isActive, isBusy, onSelect, onTogglePin }: SessionRowProps) {
-  const showDot = isActive || isBusy;
-  const dotClass = isActive ? "session-status-dot is-active" : "session-status-dot is-busy";
+function SessionRow({ session, isActive, isBusy, onSelect, onTogglePin, onArchive }: SessionRowProps) {
+  const dotClass = isActive
+    ? "session-status-dot is-active"
+    : isBusy
+      ? "session-status-dot is-busy"
+      : "session-status-dot is-muted";
 
   return (
     <div
-      className={`session-row${isActive ? " is-active" : ""}${isBusy ? " is-busy" : ""}`}
+      className={`session-row${isActive ? " is-active" : ""}${isBusy ? " is-busy" : ""}${session.pinned ? " is-pinned" : ""}`}
       role="presentation"
     >
+      <span className="session-row-marker">
+        <span className={dotClass} aria-hidden="true" />
+        {onTogglePin ? (
+          <button
+            className={`session-row-pin${session.pinned ? " is-active" : ""}`}
+            type="button"
+            aria-label={session.pinned ? "Unpin session" : "Pin session"}
+            title={session.pinned ? "Unpin session" : "Pin to top"}
+            onClick={(event) => {
+              event.stopPropagation();
+              onTogglePin();
+            }}
+          >
+            {session.pinned ? (
+              <Pin size={11} strokeWidth={1.9} fill="currentColor" />
+            ) : (
+              <Pin size={11} strokeWidth={1.9} />
+            )}
+          </button>
+        ) : null}
+      </span>
       <button
         className="session-row-main"
         type="button"
         onClick={onSelect}
         aria-current={isActive ? "page" : undefined}
       >
-        <span
-          className={`session-row-marker${showDot ? " is-visible" : ""}`}
-          aria-hidden={!showDot}
-        >
-          {showDot ? <span className={dotClass} aria-hidden="true" /> : null}
-        </span>
         <span className="session-row-title">{formatSessionTitle(session.title)}</span>
         <span className="session-row-time" aria-hidden={isActive}>{formatRelativeTime(session.updatedAt)}</span>
       </button>
-      {onTogglePin ? (
+      <div className="session-row-actions">
         <button
-          className={`session-row-pin${session.pinned ? " is-active" : ""}`}
+          className="session-row-archive"
           type="button"
-          aria-label={session.pinned ? "Unpin session" : "Pin session"}
-          title={session.pinned ? "Unpin session" : "Pin to top"}
+          aria-label="Archive session"
+          title="Archive (coming soon)"
           onClick={(event) => {
             event.stopPropagation();
-            onTogglePin();
+            onArchive?.();
           }}
         >
-          {session.pinned ? <PinOff size={12} strokeWidth={1.9} /> : <Pin size={12} strokeWidth={1.9} />}
+          <Archive size={12} strokeWidth={1.9} />
         </button>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -151,6 +258,7 @@ type CollapsibleSessionListProps = {
   busySessionIds: Set<string>;
   onSelectSession?: (sessionId: string) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
+  onArchive?: (sessionId: string) => void;
   groupKey: string;
 };
 
@@ -160,6 +268,7 @@ function CollapsibleSessionList({
   busySessionIds,
   onSelectSession,
   onTogglePin,
+  onArchive,
   groupKey,
 }: CollapsibleSessionListProps) {
   const [expanded, setExpanded] = useState(false);
@@ -176,6 +285,7 @@ function CollapsibleSessionList({
           isBusy={busySessionIds.has(session.id)}
           onSelect={() => onSelectSession?.(session.id)}
           onTogglePin={onTogglePin ? () => onTogglePin(session.id, !session.pinned) : undefined}
+          onArchive={onArchive ? () => onArchive(session.id) : undefined}
         />
       ))}
       {hasOverflow ? (
@@ -197,26 +307,30 @@ export function Sidebar({
   mode,
   view,
   busySessionIds,
-  onToggleMode,
   onNewSession,
   onSelectSession,
   onTogglePin,
   onSelectView,
-  onOpenSearch,
+  onArchive,
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
-  mode: "expanded" | "rail";
+  mode: SidebarMode;
   view: SidebarView;
   busySessionIds?: Set<string>;
-  onToggleMode: () => void;
+  /** 折叠按钮回调；目前由 WorkbenchLayout 通过 SidebarChromeRow 调用，Sidebar 内部不再渲染 chrome row。 */
+  onToggleMode?: () => void;
   onNewSession?: () => void;
   onSelectSession?: (sessionId: string) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   onSelectView?: (next: SidebarView) => void;
   onOpenSearch?: () => void;
+  /** Archive 占位回调；未传时按钮仅做视觉占位。 */
+  onArchive?: (sessionId: string) => void;
 }) {
-  const compact = mode === "rail";
+  const [pinnedCollapsed, setPinnedCollapsed] = useState(false);
+  const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
+  const [workspacesCollapsed, setWorkspacesCollapsed] = useState(false);
   const busyIds = busySessionIds ?? new Set<string>();
 
   const pinnedSessions = useMemo(
@@ -232,6 +346,10 @@ export function Sidebar({
     [unpinnedSessions],
   );
 
+  if (mode === "hidden") {
+    return null;
+  }
+
   const handleNewAgent = () => {
     onSelectView?.("chat");
     onNewSession?.();
@@ -243,133 +361,147 @@ export function Sidebar({
   };
 
   return (
-    <aside className={`sidebar${compact ? " is-rail" : ""}`}>
-      <div className="sidebar-chrome-row">
-        <button
-          className="sidebar-mode-button"
-          type="button"
-          aria-label={compact ? "Expand session sidebar" : "Collapse session sidebar"}
-          title={compact ? "Expand sidebar" : "Collapse sidebar"}
-          onClick={onToggleMode}
-        >
-          <PanelLeft size={15} strokeWidth={1.8} />
-        </button>
-        <button
-          className="sidebar-chrome-button"
-          type="button"
-          aria-label="Search sessions"
-          title="Search"
-          onClick={onOpenSearch}
-        >
-          <Search size={14} strokeWidth={1.8} />
-        </button>
-      </div>
-
+    <aside className="sidebar">
       <div className="sidebar-primary-actions">
         <button
           className={`sidebar-primary-action${view === "chat" ? " is-active" : ""}`}
           type="button"
-          aria-label={compact ? "New Agent" : undefined}
           onClick={handleNewAgent}
         >
           <SquarePen size={14} strokeWidth={1.9} />
-          {compact ? null : (
-            <>
-              <span className="sidebar-primary-action-label">New Agent</span>
-              <span className="sidebar-primary-action-shortcut" aria-hidden="true">⌘N</span>
-            </>
-          )}
+          <span className="sidebar-primary-action-label">New Agent</span>
+          <span className="sidebar-primary-action-shortcut" aria-hidden="true">⌘N</span>
         </button>
         <button
           className={`sidebar-primary-action${view === "lab" ? " is-active" : ""}`}
           type="button"
-          aria-label={compact ? "Lab" : undefined}
           onClick={() => onSelectView?.("lab")}
         >
           <FlaskConical size={14} strokeWidth={1.9} />
-          {compact ? null : <span className="sidebar-primary-action-label">Lab</span>}
+          <span className="sidebar-primary-action-label">Lab</span>
         </button>
         <button
           className={`sidebar-primary-action${view === "usage" ? " is-active" : ""}`}
           type="button"
-          aria-label={compact ? "Usage" : undefined}
           onClick={() => onSelectView?.("usage")}
         >
           <BarChart3 size={14} strokeWidth={1.9} />
-          {compact ? null : <span className="sidebar-primary-action-label">Usage</span>}
+          <span className="sidebar-primary-action-label">Usage</span>
+        </button>
+        <button
+          className={`sidebar-primary-action${view === "kairos" ? " is-active" : ""}`}
+          type="button"
+          onClick={() => onSelectView?.("kairos")}
+        >
+          <Sparkles size={14} strokeWidth={1.9} />
+          <span className="sidebar-primary-action-label">Kairos</span>
         </button>
       </div>
 
-      {compact ? <div className="sidebar-rail-spacer" /> : (
-        <nav className="session-nav" aria-label="Sessions">
-          {pinnedSessions.length > 0 ? (
-            <section className="nav-section">
-              <div className="nav-section-title">
-                <button className="nav-section-label" type="button">
-                  <ChevronDown size={12} strokeWidth={1.9} />
-                  <span>Pinned</span>
-                </button>
-              </div>
+      <nav className="session-nav" aria-label="Sessions">
+        {pinnedSessions.length > 0 ? (
+          <section className="nav-section">
+            <NavSectionHeader
+              label="Pinned"
+              collapsed={pinnedCollapsed}
+              onToggle={() => setPinnedCollapsed((value) => !value)}
+            />
+            {pinnedCollapsed ? null : (
               <CollapsibleSessionList
                 sessions={pinnedSessions}
                 activeSessionId={activeSessionId}
                 busySessionIds={busyIds}
                 onSelectSession={handleSelectChatSession}
                 onTogglePin={onTogglePin}
+                onArchive={onArchive}
                 groupKey="pinned"
               />
-            </section>
-          ) : null}
+            )}
+          </section>
+        ) : null}
 
-          <section className="nav-section">
-            <div className="nav-section-title">
-              <button className="nav-section-label" type="button">
-                <ChevronDown size={12} strokeWidth={1.9} />
-                <span>Scheduled</span>
-              </button>
-              <div className="nav-section-actions" aria-label="Scheduled actions">
+        <section className="nav-section">
+          <NavSectionHeader
+            label="Scheduled"
+            collapsed={scheduledCollapsed}
+            onToggle={() => setScheduledCollapsed((value) => !value)}
+            extraActions={
+              <>
                 <button type="button" aria-label="More scheduled actions">
                   <MoreHorizontal size={14} strokeWidth={1.9} />
                 </button>
                 <button type="button" aria-label="New scheduled task">
                   <SquarePen size={13} strokeWidth={1.9} />
                 </button>
-              </div>
-            </div>
+              </>
+            }
+          />
+          {scheduledCollapsed ? null : (
             <div className="session-list">
               {MOCK_SCHEDULED.map((item) => (
                 <div className="session-row is-muted" key={item.id} role="presentation">
+                  <span className="session-row-marker">
+                    <span className="session-status-dot is-muted" aria-hidden="true" />
+                  </span>
                   <button className="session-row-main" type="button">
-                    <span className="session-row-marker" aria-hidden="true" />
                     <span className="session-row-title">{item.title}</span>
                     <span className="session-row-time">{item.hint}</span>
                   </button>
+                  <div className="session-row-actions" />
                 </div>
               ))}
             </div>
-          </section>
+          )}
+        </section>
 
-          {workspaceGroups.map((group) => (
-            <WorkspaceSection
-              key={group.key}
-              group={group}
-              activeSessionId={activeSessionId}
-              busySessionIds={busyIds}
-              onSelectSession={handleSelectChatSession}
-              onNewSession={handleNewAgent}
-              onTogglePin={onTogglePin}
-            />
-          ))}
-        </nav>
-      )}
+        <section className="nav-section nav-section-workspaces">
+          <NavSectionHeader
+            label="Workspaces"
+            collapsed={workspacesCollapsed}
+            onToggle={() => setWorkspacesCollapsed((value) => !value)}
+            extraActions={
+              <>
+                <button
+                  type="button"
+                  aria-label="Sort workspaces"
+                  title="Sort (coming soon)"
+                >
+                  <ArrowDownUp size={13} strokeWidth={1.9} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="New workspace folder"
+                  title="New folder (coming soon)"
+                >
+                  <FolderPlus size={13} strokeWidth={1.9} />
+                </button>
+              </>
+            }
+          />
+
+          {workspacesCollapsed
+            ? null
+            : workspaceGroups.map((group) => (
+                <WorkspaceSection
+                  key={group.key}
+                  group={group}
+                  activeSessionId={activeSessionId}
+                  busySessionIds={busyIds}
+                  onSelectSession={handleSelectChatSession}
+                  onNewSession={handleNewAgent}
+                  onTogglePin={onTogglePin}
+                  onArchive={onArchive}
+                />
+              ))}
+        </section>
+      </nav>
 
       <button
         className="settings-entry"
         type="button"
-        aria-label={compact ? "Settings" : undefined}
       >
         <Settings size={14} strokeWidth={1.9} />
-        {compact ? null : "Settings"}
+        Settings
       </button>
     </aside>
   );
@@ -382,6 +514,7 @@ type WorkspaceSectionProps = {
   onSelectSession?: (sessionId: string) => void;
   onNewSession?: () => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
+  onArchive?: (sessionId: string) => void;
 };
 
 function WorkspaceSection({
@@ -391,28 +524,44 @@ function WorkspaceSection({
   onSelectSession,
   onNewSession,
   onTogglePin,
+  onArchive,
 }: WorkspaceSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <section className="nav-section nav-section-workspace">
-      <div className="nav-section-title">
+    <section className={`nav-section nav-section-workspace${collapsed ? " is-collapsed" : " is-expanded"}`}>
+      <div className="nav-section-title workspace-folder-row">
         <button
-          className="nav-section-label"
+          className="workspace-icon-slot"
+          type="button"
+          onClick={() => setCollapsed((value) => !value)}
+          aria-label={collapsed ? `Expand ${group.label}` : `Collapse ${group.label}`}
+          aria-expanded={!collapsed}
+        >
+          <Folder size={13} strokeWidth={1.9} className="workspace-folder-glyph" aria-hidden="true" />
+          {collapsed
+            ? <ChevronRight size={13} strokeWidth={1.9} className="workspace-chevron-glyph" aria-hidden="true" />
+            : <ChevronDown size={13} strokeWidth={1.9} className="workspace-chevron-glyph" aria-hidden="true" />}
+        </button>
+        <button
+          className="nav-section-label workspace-folder-label"
           type="button"
           onClick={() => setCollapsed((value) => !value)}
         >
-          {collapsed
-            ? <ChevronRight size={12} strokeWidth={1.9} />
-            : <ChevronDown size={12} strokeWidth={1.9} />}
-          <span>{group.label}</span>
+          <span className="workspace-folder-name">{group.label}</span>
         </button>
-        <div className="nav-section-actions" aria-label="Workspace actions">
-          <button type="button" aria-label="More workspace actions">
-            <MoreHorizontal size={14} strokeWidth={1.9} />
-          </button>
-          <button type="button" aria-label="New chat in workspace" onClick={onNewSession}>
-            <SquarePen size={13} strokeWidth={1.9} />
+        <div className="nav-section-actions workspace-folder-actions" aria-label="Workspace actions">
+          <button
+            className="workspace-add-button"
+            type="button"
+            aria-label="New chat in workspace"
+            title="New chat in this workspace"
+            onClick={(event) => {
+              event.stopPropagation();
+              onNewSession?.();
+            }}
+          >
+            <Plus size={13} strokeWidth={2} />
           </button>
         </div>
       </div>
@@ -423,6 +572,7 @@ function WorkspaceSection({
           busySessionIds={busySessionIds}
           onSelectSession={onSelectSession}
           onTogglePin={onTogglePin}
+          onArchive={onArchive}
           groupKey={group.key}
         />
       )}

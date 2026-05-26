@@ -14,6 +14,9 @@ declare global {
       getSession: (
         input: import("@actspace/shared").SessionGetInput
       ) => Promise<import("@actspace/shared").SessionRecord | null>;
+      getUsageStatistics: (
+        input: import("@actspace/shared").UsageStatisticsGetInput
+      ) => Promise<import("@actspace/shared").UsageStatisticsSnapshot | null>;
       createSession: (
         input?: import("@actspace/shared").SessionCreateInput
       ) => Promise<import("@actspace/shared").SessionRecord>;

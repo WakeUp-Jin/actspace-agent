@@ -14,7 +14,9 @@ import type {
   SessionListItem,
   SessionPinInput,
   SessionPinResult,
-  SessionRecord
+  SessionRecord,
+  UsageStatisticsGetInput,
+  UsageStatisticsSnapshot
 } from "@actspace/shared";
 
 contextBridge.exposeInMainWorld("actspace", {
@@ -23,6 +25,8 @@ contextBridge.exposeInMainWorld("actspace", {
   abortTurn: (input: AbortTurnInput) => ipcRenderer.invoke("agent:abort-turn", input) as Promise<boolean>,
   listSessions: () => ipcRenderer.invoke("session:list") as Promise<SessionListItem[]>,
   getSession: (input: SessionGetInput) => ipcRenderer.invoke("session:get", input) as Promise<SessionRecord | null>,
+  getUsageStatistics: (input: UsageStatisticsGetInput) =>
+    ipcRenderer.invoke("usage-statistics:get", input) as Promise<UsageStatisticsSnapshot | null>,
   createSession: (input?: SessionCreateInput) => ipcRenderer.invoke("session:create", input ?? {}) as Promise<SessionRecord>,
   pinSession: (input: SessionPinInput) => ipcRenderer.invoke("session:pin", input) as Promise<SessionPinResult>,
 

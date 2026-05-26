@@ -12,9 +12,10 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AbortTurnInput, RunTurnInput, SessionCreateInput, SessionGetInput, SessionPinInput, ApprovalDecideInput, ApprovalListPendingInput } from "@actspace/shared";
+import type { AbortTurnInput, RunTurnInput, SessionCreateInput, SessionGetInput, SessionPinInput, ApprovalDecideInput, ApprovalListPendingInput, UsageStatisticsGetInput } from "@actspace/shared";
 import {
   createBootstrapState,
+  createUsageStatisticsSnapshot,
   loadEnv,
   createSessionRecord,
   createSessionStorePaths,
@@ -285,6 +286,13 @@ async function registerIpc() {
   ipcMain.handle("session:get", async (_event, input: SessionGetInput) => {
     const roots = await ensureDataDirectories();
     return readSessionRecord(createSessionStorePaths(join(roots.sessionRoot, input.sessionId)));
+  });
+
+  ipcMain.handle("usage-statistics:get", async (_event, input: UsageStatisticsGetInput) => {
+    const roots = await ensureDataDirectories();
+    const record = await readSessionRecord(createSessionStorePaths(join(roots.sessionRoot, input.sessionId)));
+    if (!record) return null;
+    return createUsageStatisticsSnapshot(record, input.range ?? "month");
   });
 
   ipcMain.handle("session:create", async (_event, input: SessionCreateInput = {}) => {

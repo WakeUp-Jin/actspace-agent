@@ -24,6 +24,7 @@ export function SplitView({
   main,
   right,
   leftWidth,
+  leftHidden = false,
   rightWidth,
   leftBounds,
   rightBounds,
@@ -44,6 +45,8 @@ export function SplitView({
   main: ReactNode;
   right?: ReactNode;
   leftWidth: number;
+  /** 完全隐藏左侧 pane 与分隔条；Sidebar 折叠到 hidden 态时使用。 */
+  leftHidden?: boolean;
   rightWidth: number;
   leftBounds: SplitPanelBounds;
   rightBounds: SplitPanelBounds;
@@ -213,33 +216,45 @@ export function SplitView({
     rightWidth
   ]);
 
-  const columns = rightOpen ? `${leftWidth}px minmax(0, 1fr) ${rightWidth}px` : `${leftWidth}px minmax(0, 1fr)`;
+  const effectiveLeftWidth = leftHidden ? 0 : leftWidth;
+  let columns: string;
+  if (leftHidden) {
+    columns = rightOpen ? `minmax(0, 1fr) ${rightWidth}px` : `minmax(0, 1fr)`;
+  } else {
+    columns = rightOpen
+      ? `${leftWidth}px minmax(0, 1fr) ${rightWidth}px`
+      : `${leftWidth}px minmax(0, 1fr)`;
+  }
   const leftMaxWidth = getAvailableMaxWidth("left");
   const rightMaxWidth = getAvailableMaxWidth("right");
   const style = {
-    "--split-left-width": `${leftWidth}px`,
+    "--split-left-width": `${effectiveLeftWidth}px`,
     "--split-right-width": `${rightWidth}px`,
     gridTemplateColumns: columns
   } as CSSProperties;
 
   return (
-    <div className={`split-view${dragState ? " is-resizing" : ""}`} ref={rootRef} style={style}>
-      <div className="split-view-pane split-view-left">{left}</div>
-      <div
-        className="split-view-separator split-view-left-separator"
-        role="separator"
-        tabIndex={0}
-        aria-label={leftSeparatorLabel}
-        aria-orientation="vertical"
-        aria-valuemin={leftBounds.minWidth}
-        aria-valuemax={Math.round(leftMaxWidth)}
-        aria-valuenow={Math.round(leftWidth)}
-        onDoubleClick={onLeftSeparatorDoubleClick}
-        onKeyDown={(event) => handleSeparatorKeyDown("left", event)}
-        onPointerDown={(event) => handlePointerDown("left", event)}
-      >
-        <span aria-hidden="true" />
-      </div>
+    <div className={`split-view${dragState ? " is-resizing" : ""}${leftHidden ? " is-left-hidden" : ""}`} ref={rootRef} style={style}>
+      {leftHidden ? null : (
+        <>
+          <div className="split-view-pane split-view-left">{left}</div>
+          <div
+            className="split-view-separator split-view-left-separator"
+            role="separator"
+            tabIndex={0}
+            aria-label={leftSeparatorLabel}
+            aria-orientation="vertical"
+            aria-valuemin={leftBounds.minWidth}
+            aria-valuemax={Math.round(leftMaxWidth)}
+            aria-valuenow={Math.round(leftWidth)}
+            onDoubleClick={onLeftSeparatorDoubleClick}
+            onKeyDown={(event) => handleSeparatorKeyDown("left", event)}
+            onPointerDown={(event) => handlePointerDown("left", event)}
+          >
+            <span aria-hidden="true" />
+          </div>
+        </>
+      )}
       <div className="split-view-pane split-view-main">{main}</div>
       {rightOpen ? (
         <>

@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { SessionListItem } from "@actspace/shared";
-import { Sidebar } from "../components/Sidebar";
+import { Sidebar, SidebarChromeRow } from "../components/Sidebar";
 
 function makeSession(partial: Partial<SessionListItem> & Pick<SessionListItem, "id" | "title">): SessionListItem {
   return {
@@ -37,49 +37,63 @@ const SESSIONS: SessionListItem[] = [
 ];
 
 function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
-  const onToggleMode = vi.fn();
   const onNewSession = vi.fn();
   const onSelectSession = vi.fn();
   const onTogglePin = vi.fn();
   const onSelectView = vi.fn();
+  const onArchive = vi.fn();
 
-  render(
+  const result = render(
     <Sidebar
       sessions={SESSIONS}
       activeSessionId={null}
       mode="expanded"
       view="chat"
-      onToggleMode={onToggleMode}
       onNewSession={onNewSession}
       onSelectSession={onSelectSession}
       onTogglePin={onTogglePin}
       onSelectView={onSelectView}
+      onArchive={onArchive}
       {...overrides}
     />,
   );
 
-  return { onToggleMode, onNewSession, onSelectSession, onTogglePin, onSelectView };
+  return { onNewSession, onSelectSession, onTogglePin, onSelectView, onArchive, ...result };
 }
 
 describe("Sidebar (cursor-aligned layout)", () => {
-  it("renders the top primary actions (New Agent / Lab / Usage)", () => {
+  it("renders the four top primary actions (New Agent / Lab / Usage / Kairos)", () => {
     renderSidebar();
 
     expect(screen.getByText("New Agent")).toBeInTheDocument();
     expect(screen.getByText("Lab")).toBeInTheDocument();
     expect(screen.getByText("Usage")).toBeInTheDocument();
+    expect(screen.getByText("Kairos")).toBeInTheDocument();
     expect(screen.getByText("⌘N")).toBeInTheDocument();
   });
 
-  it("groups sessions by workspace and shows a Pinned section when any session is pinned", () => {
+  it("renders a Workspaces parent section above the workspace folders", () => {
     renderSidebar();
 
-    expect(screen.getByText("Pinned")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Workspaces$/ })).toBeInTheDocument();
+    // Workspace folders 在 Workspaces 父级下方仍可见
     expect(screen.getByText("actspace-agent")).toBeInTheDocument();
     expect(screen.getByText("agent-harness-dev")).toBeInTheDocument();
+  });
 
+  it("collapses all workspace folders when the Workspaces parent is toggled", async () => {
+    renderSidebar();
+
+    expect(screen.getByText("actspace-agent")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Workspaces$/ }));
+    expect(screen.queryByText("actspace-agent")).not.toBeInTheDocument();
+    expect(screen.queryByText("agent-harness-dev")).not.toBeInTheDocument();
+  });
+
+  it("shows a Pinned section when any session is pinned", () => {
+    renderSidebar();
+    expect(screen.getByText("Pinned")).toBeInTheDocument();
     expect(screen.getByText("Bash 工具开发与权限调度")).toBeInTheDocument();
-    expect(screen.getByText("README file improvement")).toBeInTheDocument();
   });
 
   it("invokes onTogglePin with the next pinned value when clicking the pin icon", async () => {
@@ -92,14 +106,36 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(onTogglePin).toHaveBeenCalledWith("s-actspace-1", true);
   });
 
-  it("calls onSelectView('lab') and ('usage') when their entries are clicked", async () => {
+  it("invokes onArchive when clicking the archive button on a session row", async () => {
+    const { onArchive } = renderSidebar();
+
+    const archiveButtons = screen.getAllByRole("button", { name: "Archive session" });
+    expect(archiveButtons.length).toBeGreaterThan(0);
+    await userEvent.click(archiveButtons[0]);
+
+    expect(onArchive).toHaveBeenCalled();
+  });
+
+  it("calls onSelectView for Lab / Usage / Kairos entries", async () => {
     const { onSelectView } = renderSidebar();
 
     await userEvent.click(screen.getByRole("button", { name: "Lab" }));
     await userEvent.click(screen.getByRole("button", { name: "Usage" }));
+    await userEvent.click(screen.getByRole("button", { name: "Kairos" }));
 
     expect(onSelectView).toHaveBeenCalledWith("lab");
     expect(onSelectView).toHaveBeenCalledWith("usage");
+    expect(onSelectView).toHaveBeenCalledWith("kairos");
+  });
+
+  it("invokes onNewSession when clicking the workspace folder + button", async () => {
+    const { onNewSession } = renderSidebar();
+
+    const addButtons = screen.getAllByRole("button", { name: "New chat in workspace" });
+    expect(addButtons.length).toBeGreaterThanOrEqual(2); // actspace-agent + agent-harness-dev
+    await userEvent.click(addButtons[0]);
+
+    expect(onNewSession).toHaveBeenCalled();
   });
 
   it("shows See more when a workspace has more than 8 sessions and expands on click", async () => {
@@ -131,7 +167,6 @@ describe("Sidebar (cursor-aligned layout)", () => {
         mode="expanded"
         view="chat"
         busySessionIds={new Set(["s-actspace-2"])}
-        onToggleMode={() => {}}
       />,
     );
 
@@ -142,5 +177,70 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(within(activeRow as HTMLElement).getByText("Conversation context lookup").closest(".session-row")).toHaveClass(
       "is-busy",
     );
+  });
+
+  it("collapses Pinned section when its label is clicked", async () => {
+    renderSidebar();
+
+    expect(screen.getByText("Bash 工具开发与权限调度")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Pinned$/ }));
+    expect(screen.queryByText("Bash 工具开发与权限调度")).not.toBeInTheDocument();
+  });
+
+  it("collapses Scheduled section when its label is clicked", async () => {
+    renderSidebar();
+
+    expect(screen.getByText("Weekly context audit")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Scheduled$/ }));
+    expect(screen.queryByText("Weekly context audit")).not.toBeInTheDocument();
+  });
+
+  it("renders a muted status dot on every session row by default", () => {
+    const { container } = renderSidebar();
+
+    const sessionRows = container.querySelectorAll(".session-row");
+    expect(sessionRows.length).toBeGreaterThan(0);
+    sessionRows.forEach((row) => {
+      expect(row.querySelector(".session-status-dot")).not.toBeNull();
+    });
+  });
+
+  it("renders nothing when mode is hidden", () => {
+    const { container } = render(
+      <Sidebar
+        sessions={SESSIONS}
+        activeSessionId={null}
+        mode="hidden"
+        view="chat"
+      />,
+    );
+
+    expect(container.querySelector(".sidebar")).toBeNull();
+  });
+});
+
+describe("SidebarChromeRow", () => {
+  it("renders collapse + search buttons and calls onToggleMode when clicking PanelLeft", async () => {
+    const onToggleMode = vi.fn();
+    const onOpenSearch = vi.fn();
+
+    render(<SidebarChromeRow mode="expanded" onToggleMode={onToggleMode} onOpenSearch={onOpenSearch} />);
+
+    const collapse = screen.getByRole("button", { name: "Collapse session sidebar" });
+    const search = screen.getByRole("button", { name: "Search sessions" });
+    expect(collapse).toBeInTheDocument();
+    expect(search).toBeInTheDocument();
+
+    await userEvent.click(collapse);
+    await userEvent.click(search);
+
+    expect(onToggleMode).toHaveBeenCalledTimes(1);
+    expect(onOpenSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("toggles the PanelLeft label to Expand when sidebar is hidden", () => {
+    render(<SidebarChromeRow mode="hidden" onToggleMode={() => {}} />);
+
+    expect(screen.getByRole("button", { name: "Expand session sidebar" })).toBeInTheDocument();
   });
 });

@@ -91,6 +91,68 @@ export type SessionPinResult = {
   error?: string;
 };
 
+export type UsageStatisticsRange = "day" | "week" | "month" | "total";
+
+export type UsageStatisticsGetInput = {
+  sessionId: string;
+  range?: UsageStatisticsRange;
+};
+
+export type UsageStatisticsSummary = {
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  cacheHitTokens: number;
+  cacheMissTokens: number;
+  reasoningTokens: number;
+  toolCallCount: number;
+  conversationCount: number;
+  costUsd: number;
+  cacheEfficiencyPercent: number;
+};
+
+export type UsageStatisticsModelEntry = {
+  name: string;
+  provider?: string;
+  totalTokens: number;
+  percent: number;
+  callCount: number;
+  costUsd: number;
+};
+
+export type UsageStatisticsToolEntry = {
+  name: string;
+  callCount: number;
+  percent: number;
+  failedCount: number;
+  averageDurationMs?: number;
+};
+
+export type UsageStatisticsDailyRow = {
+  date: string;
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  cacheHitTokens: number;
+  reasoningTokens: number;
+  conversationCount: number;
+  toolCallCount: number;
+  costUsd: number;
+};
+
+export type UsageStatisticsSnapshot = {
+  sessionId: string;
+  title: string;
+  range: UsageStatisticsRange;
+  generatedAt: string;
+  periodStart?: string;
+  periodEnd?: string;
+  summary: UsageStatisticsSummary;
+  modelDistribution: UsageStatisticsModelEntry[];
+  toolDistribution: UsageStatisticsToolEntry[];
+  dailyRows: UsageStatisticsDailyRow[];
+};
+
 export type AppBootstrapStateInput = {
   appVersion: string;
   dataRoot: string;

@@ -1,17 +1,17 @@
-import type { ContextUsageSnapshot, MessageBlock, SessionListItem } from "@actspace/shared";
+import type { ContextUsageSnapshot, MessageBlock, SessionListItem, UsageStatisticsSnapshot } from "@actspace/shared";
 import { useCallback, useEffect, useState } from "react";
-import { BarChart3, FlaskConical } from "lucide-react";
+import { FlaskConical, Sparkles } from "lucide-react";
 import { ConversationView } from "./ConversationView";
 import { PlaceholderView } from "./PlaceholderView";
 import { RightPanel } from "./RightPanel";
-import { Sidebar, type SidebarView } from "./Sidebar";
+import { Sidebar, SidebarChromeRow, type SidebarMode, type SidebarView } from "./Sidebar";
 import { SplitView } from "./SplitView";
+import { UsageStatisticsPage } from "./UsageStatisticsPage";
 import type { ComposerSendOptions } from "./Composer";
-
-type SidebarMode = "expanded" | "rail";
+import { mockUsageStatistics } from "../fixtures/usageStatisticsFixture";
 
 type StoredWorkbenchLayout = {
-  leftMode?: SidebarMode;
+  leftMode?: SidebarMode | "rail";
   leftWidth?: number;
   rightWidth?: number;
 };
@@ -20,8 +20,8 @@ const WORKBENCH_LAYOUT_STORAGE_KEY = "actspace.workbench.layout.v1";
 const LEFT_DEFAULT_WIDTH = 260;
 const LEFT_MIN_WIDTH = 200;
 const LEFT_MAX_WIDTH = 360;
-const LEFT_RAIL_WIDTH = 60;
-const LEFT_RAIL_SNAP_WIDTH = 148;
+/** 拖拽左侧分隔条到该阈值以下时，sidebar 自动 snap 到 hidden 态（rail 模式已退役）。 */
+const LEFT_HIDE_SNAP_WIDTH = 148;
 const MAIN_MIN_WIDTH = 560;
 const RIGHT_DEFAULT_WIDTH = 390;
 const RIGHT_MIN_WIDTH = 320;
@@ -31,7 +31,13 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function loadStoredLayout(): Required<StoredWorkbenchLayout> {
+type ResolvedLayout = {
+  leftMode: SidebarMode;
+  leftWidth: number;
+  rightWidth: number;
+};
+
+function loadStoredLayout(): ResolvedLayout {
   if (typeof window === "undefined") {
     return {
       leftMode: "expanded",
@@ -42,8 +48,11 @@ function loadStoredLayout(): Required<StoredWorkbenchLayout> {
 
   try {
     const stored = JSON.parse(window.localStorage.getItem(WORKBENCH_LAYOUT_STORAGE_KEY) ?? "{}") as StoredWorkbenchLayout;
+    // 老版本可能落了 leftMode: "rail"，rail 已退役，统一映射成 hidden。
+    const resolvedMode: SidebarMode =
+      stored.leftMode === "hidden" || stored.leftMode === "rail" ? "hidden" : "expanded";
     return {
-      leftMode: stored.leftMode === "rail" ? "rail" : "expanded",
+      leftMode: resolvedMode,
       leftWidth: clamp(stored.leftWidth ?? LEFT_DEFAULT_WIDTH, LEFT_MIN_WIDTH, LEFT_MAX_WIDTH),
       rightWidth: clamp(stored.rightWidth ?? RIGHT_DEFAULT_WIDTH, RIGHT_MIN_WIDTH, RIGHT_MAX_WIDTH)
     };
@@ -98,7 +107,11 @@ export function WorkbenchLayout({
   const [rightWidth, setRightWidth] = useState(storedLayout.rightWidth);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(rightPanelOpen);
   const [view, setView] = useState<SidebarView>("chat");
-  const displayedLeftWidth = leftMode === "rail" ? LEFT_RAIL_WIDTH : leftWidth;
+  const [usageSnapshot, setUsageSnapshot] = useState<UsageStatisticsSnapshot | null>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [usageError, setUsageError] = useState<string | null>(null);
+  const isSidebarHidden = leftMode === "hidden";
+  const displayedLeftWidth = isSidebarHidden ? 0 : leftWidth;
   const rightMaxWidth = containerWidth > 0 ? Math.max(RIGHT_MIN_WIDTH, Math.min(RIGHT_MAX_WIDTH, containerWidth / 2)) : RIGHT_MAX_WIDTH;
 
   const handleContainerWidthChange = useCallback((width: number) => {
@@ -126,7 +139,7 @@ export function WorkbenchLayout({
     }
 
     if (leftMode === "expanded" && containerWidth - leftWidth < MAIN_MIN_WIDTH) {
-      setLeftMode("rail");
+      setLeftMode("hidden");
       return;
     }
 
@@ -134,10 +147,10 @@ export function WorkbenchLayout({
       return;
     }
 
-    const currentLeftWidth = leftMode === "rail" ? LEFT_RAIL_WIDTH : leftWidth;
+    const currentLeftWidth = isSidebarHidden ? 0 : leftWidth;
     if (containerWidth - currentLeftWidth - RIGHT_MIN_WIDTH < MAIN_MIN_WIDTH) {
       if (leftMode === "expanded") {
-        setLeftMode("rail");
+        setLeftMode("hidden");
         return;
       }
 
@@ -149,11 +162,11 @@ export function WorkbenchLayout({
     if (rightWidth > allowedRightWidth) {
       setRightWidth(clamp(allowedRightWidth, RIGHT_MIN_WIDTH, rightMaxWidth));
     }
-  }, [containerWidth, isRightPanelOpen, leftMode, leftWidth, rightMaxWidth, rightWidth]);
+  }, [containerWidth, isRightPanelOpen, isSidebarHidden, leftMode, leftWidth, rightMaxWidth, rightWidth]);
 
   function toggleSidebarMode() {
     if (leftMode === "expanded") {
-      setLeftMode("rail");
+      setLeftMode("hidden");
       return;
     }
 
@@ -164,8 +177,8 @@ export function WorkbenchLayout({
   }
 
   function resizeLeftPanel(width: number) {
-    if (width <= LEFT_RAIL_SNAP_WIDTH) {
-      setLeftMode("rail");
+    if (width <= LEFT_HIDE_SNAP_WIDTH) {
+      setLeftMode("hidden");
       return;
     }
 
@@ -180,7 +193,7 @@ export function WorkbenchLayout({
     }
 
     if (containerWidth > 0 && containerWidth - displayedLeftWidth - RIGHT_MIN_WIDTH < MAIN_MIN_WIDTH) {
-      setLeftMode("rail");
+      setLeftMode("hidden");
     }
 
     setIsRightPanelOpen(true);
@@ -189,6 +202,41 @@ export function WorkbenchLayout({
   const handleSelectView = useCallback((next: SidebarView) => {
     setView(next);
   }, []);
+
+  const loadUsageStatistics = useCallback(async (range: UsageStatisticsSnapshot["range"] = "month") => {
+    const sessionId = activeSessionId ?? sessions[0]?.id ?? null;
+    if (!sessionId) {
+      setUsageSnapshot(null);
+      setUsageError("No session selected.");
+      return;
+    }
+
+    if (typeof window === "undefined" || !window.actspace?.getUsageStatistics) {
+      setUsageSnapshot(mockUsageStatistics);
+      setUsageError(null);
+      return;
+    }
+
+    setUsageLoading(true);
+    setUsageError(null);
+    try {
+      const snapshot = await window.actspace.getUsageStatistics({ sessionId, range });
+      setUsageSnapshot(snapshot ?? mockUsageStatistics);
+    } catch (error) {
+      console.error("Failed to load usage statistics", error);
+      setUsageSnapshot(mockUsageStatistics);
+      setUsageError(error instanceof Error ? error.message : "Failed to load usage statistics.");
+    } finally {
+      setUsageLoading(false);
+    }
+  }, [activeSessionId, sessions]);
+
+  useEffect(() => {
+    if (view !== "usage") return;
+    loadUsageStatistics().catch((error: unknown) => {
+      console.error("Failed to bootstrap usage statistics", error);
+    });
+  }, [view, loadUsageStatistics]);
 
   let mainContent;
   if (view === "lab") {
@@ -207,16 +255,26 @@ export function WorkbenchLayout({
     );
   } else if (view === "usage") {
     mainContent = (
+      <UsageStatisticsPage
+        snapshot={usageSnapshot}
+        isLoading={usageLoading}
+        error={usageError}
+        onRefresh={loadUsageStatistics}
+        onBackToChat={() => setView("chat")}
+      />
+    );
+  } else if (view === "kairos") {
+    mainContent = (
       <PlaceholderView
-        eyebrow="Usage"
-        title="Token usage & cost analytics"
-        description="Usage 页面会展示按会话、模型、工具维度的 token 与成本统计。规范见 docs/design-docs/frontend-ui/usage-statistics/。"
+        eyebrow="Kairos"
+        title="Autonomous timing & triggers"
+        description="Kairos 是 actspace 的时机引擎，负责让 Agent 在合适的时刻自主行动——包括定时任务、事件触发与自主 Agent 的运行边界。当前仅做入口预留。"
         bullets={[
-          "按会话和工作区聚合的 token 与成本",
-          "对话压缩次数与上下文饱和度",
-          "近期 30 天的趋势曲线",
+          "定时唤起 Agent 执行预设 prompt 或工作流",
+          "基于事件（文件变化、外部 webhook）触发 Agent",
+          "自主 Agent 的运行配额、节奏与安全护栏",
         ]}
-        icon={<BarChart3 size={28} strokeWidth={1.6} />}
+        icon={<Sparkles size={28} strokeWidth={1.6} />}
       />
     );
   } else {
@@ -238,44 +296,48 @@ export function WorkbenchLayout({
   }
 
   return (
-    <SplitView
-      left={
-        <Sidebar
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          mode={leftMode}
-          view={view}
-          busySessionIds={busySessionIds}
-          onToggleMode={toggleSidebarMode}
-          onNewSession={onNewSession}
-          onSelectSession={onSelectSession}
-          onTogglePin={onTogglePin}
-          onSelectView={handleSelectView}
-        />
-      }
-      leftWidth={displayedLeftWidth}
-      leftBounds={{ minWidth: LEFT_RAIL_WIDTH, maxWidth: LEFT_MAX_WIDTH }}
-      leftSeparatorLabel="Resize session sidebar"
-      main={mainContent}
-      minMainWidth={MAIN_MIN_WIDTH}
-      onContainerWidthChange={handleContainerWidthChange}
-      onLeftKeyResize={(width) => {
-        if (leftMode === "rail" && width > LEFT_RAIL_WIDTH) {
-          setLeftMode("expanded");
-          setLeftWidth(LEFT_MIN_WIDTH);
-          return;
+    <>
+      <SidebarChromeRow mode={leftMode} onToggleMode={toggleSidebarMode} />
+      <SplitView
+        left={
+          <Sidebar
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            mode={leftMode}
+            view={view}
+            busySessionIds={busySessionIds}
+            onToggleMode={toggleSidebarMode}
+            onNewSession={onNewSession}
+            onSelectSession={onSelectSession}
+            onTogglePin={onTogglePin}
+            onSelectView={handleSelectView}
+          />
         }
+        leftWidth={displayedLeftWidth}
+        leftHidden={isSidebarHidden}
+        leftBounds={{ minWidth: LEFT_MIN_WIDTH, maxWidth: LEFT_MAX_WIDTH }}
+        leftSeparatorLabel="Resize session sidebar"
+        main={mainContent}
+        minMainWidth={MAIN_MIN_WIDTH}
+        onContainerWidthChange={handleContainerWidthChange}
+        onLeftKeyResize={(width) => {
+          if (isSidebarHidden && width > LEFT_HIDE_SNAP_WIDTH) {
+            setLeftMode("expanded");
+            setLeftWidth(LEFT_MIN_WIDTH);
+            return;
+          }
 
-        resizeLeftPanel(width);
-      }}
-      onLeftResize={resizeLeftPanel}
-      onLeftSeparatorDoubleClick={toggleSidebarMode}
-      onRightResize={(width) => setRightWidth(clamp(width, RIGHT_MIN_WIDTH, rightMaxWidth))}
-      onRightSeparatorDoubleClick={() => setRightWidth(RIGHT_DEFAULT_WIDTH)}
-      right={view === "chat" && isRightPanelOpen ? <RightPanel /> : undefined}
-      rightBounds={{ minWidth: RIGHT_MIN_WIDTH, maxWidth: rightMaxWidth }}
-      rightSeparatorLabel="Resize preview panel"
-      rightWidth={rightWidth}
-    />
+          resizeLeftPanel(width);
+        }}
+        onLeftResize={resizeLeftPanel}
+        onLeftSeparatorDoubleClick={toggleSidebarMode}
+        onRightResize={(width) => setRightWidth(clamp(width, RIGHT_MIN_WIDTH, rightMaxWidth))}
+        onRightSeparatorDoubleClick={() => setRightWidth(RIGHT_DEFAULT_WIDTH)}
+        right={view === "chat" && isRightPanelOpen ? <RightPanel /> : undefined}
+        rightBounds={{ minWidth: RIGHT_MIN_WIDTH, maxWidth: rightMaxWidth }}
+        rightSeparatorLabel="Resize preview panel"
+        rightWidth={rightWidth}
+      />
+    </>
   );
 }
