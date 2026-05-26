@@ -2,7 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { SessionListItem } from "@actspace/shared";
-import { Sidebar, SidebarChromeRow } from "../components/Sidebar";
+import { Sidebar } from "../components/Sidebar";
+import { WindowChromeBar } from "../components/WindowChromeBar";
 
 function makeSession(partial: Partial<SessionListItem> & Pick<SessionListItem, "id" | "title">): SessionListItem {
   return {
@@ -219,28 +220,70 @@ describe("Sidebar (cursor-aligned layout)", () => {
   });
 });
 
-describe("SidebarChromeRow", () => {
-  it("renders collapse + search buttons and calls onToggleMode when clicking PanelLeft", async () => {
-    const onToggleMode = vi.fn();
+describe("WindowChromeBar", () => {
+  function renderChromeBar(overrides: Partial<Parameters<typeof WindowChromeBar>[0]> = {}) {
+    const onToggleLeft = vi.fn();
+    const onToggleRight = vi.fn();
     const onOpenSearch = vi.fn();
+    const result = render(
+      <WindowChromeBar
+        leftMode="expanded"
+        rightOpen={false}
+        title="New chat"
+        onToggleLeft={onToggleLeft}
+        onToggleRight={onToggleRight}
+        onOpenSearch={onOpenSearch}
+        {...overrides}
+      />,
+    );
+    return { onToggleLeft, onToggleRight, onOpenSearch, ...result };
+  }
 
-    render(<SidebarChromeRow mode="expanded" onToggleMode={onToggleMode} onOpenSearch={onOpenSearch} />);
+  it("renders the left toggle, search, and right toggle buttons + the title", () => {
+    renderChromeBar({ title: "Workspace > New chat" });
 
-    const collapse = screen.getByRole("button", { name: "Collapse session sidebar" });
-    const search = screen.getByRole("button", { name: "Search sessions" });
-    expect(collapse).toBeInTheDocument();
-    expect(search).toBeInTheDocument();
-
-    await userEvent.click(collapse);
-    await userEvent.click(search);
-
-    expect(onToggleMode).toHaveBeenCalledTimes(1);
-    expect(onOpenSearch).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Collapse session sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Search sessions" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open panel" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Workspace > New chat" })).toBeInTheDocument();
   });
 
-  it("toggles the PanelLeft label to Expand when sidebar is hidden", () => {
-    render(<SidebarChromeRow mode="hidden" onToggleMode={() => {}} />);
+  it("flips the left toggle aria-label / aria-pressed when sidebar is hidden", () => {
+    renderChromeBar({ leftMode: "hidden" });
 
-    expect(screen.getByRole("button", { name: "Expand session sidebar" })).toBeInTheDocument();
+    const left = screen.getByRole("button", { name: "Expand session sidebar" });
+    expect(left).toBeInTheDocument();
+    expect(left.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("flips the right toggle aria-label / aria-pressed when right panel is open", () => {
+    renderChromeBar({ rightOpen: true });
+
+    const right = screen.getByRole("button", { name: "Close panel" });
+    expect(right).toBeInTheDocument();
+    expect(right.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("invokes the corresponding callbacks for left toggle, search, right toggle", async () => {
+    const { onToggleLeft, onToggleRight, onOpenSearch } = renderChromeBar();
+
+    await userEvent.click(screen.getByRole("button", { name: "Collapse session sidebar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Search sessions" }));
+    await userEvent.click(screen.getByRole("button", { name: "Open panel" }));
+
+    expect(onToggleLeft).toHaveBeenCalledTimes(1);
+    expect(onOpenSearch).toHaveBeenCalledTimes(1);
+    expect(onToggleRight).toHaveBeenCalledTimes(1);
+  });
+
+  it("declares the chrome strip as a fixed overlay with pointer-events: none on the wrapper", () => {
+    const { container } = renderChromeBar();
+    const bar = container.querySelector(".window-chrome-bar") as HTMLElement | null;
+    expect(bar).not.toBeNull();
+    // 不直接读 computed style（jsdom 不解析 CSS），只断言三段子结构存在，
+    // 真正的 fixed + pointer-events 由 styles.css 提供，CDP / 真机走另一道验收。
+    expect(bar?.querySelector(".chrome-left")).not.toBeNull();
+    expect(bar?.querySelector(".chrome-center")).not.toBeNull();
+    expect(bar?.querySelector(".chrome-right")).not.toBeNull();
   });
 });

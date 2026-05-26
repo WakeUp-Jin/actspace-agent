@@ -10,10 +10,8 @@ import {
   Folder,
   FolderPlus,
   MoreHorizontal,
-  PanelLeft,
   Pin,
   Plus,
-  Search,
   Settings,
   Sparkles,
   SquarePen,
@@ -138,47 +136,6 @@ function NavSectionHeader({ label, collapsed, onToggle, extraActions }: NavSecti
             : <ChevronDown size={13} strokeWidth={1.9} />}
         </button>
       </div>
-    </div>
-  );
-}
-
-/**
- * 折叠按钮 + 搜索按钮组合。
- *
- * 抽到 Sidebar 外面，由 WorkbenchLayout 直接挂在窗口顶部（position: fixed），
- * 这样 sidebar 折叠到 hidden 态时这两个按钮仍然可见、可点。
- */
-export function SidebarChromeRow({
-  mode,
-  onToggleMode,
-  onOpenSearch,
-}: {
-  mode: SidebarMode;
-  onToggleMode: () => void;
-  onOpenSearch?: () => void;
-}) {
-  const isHidden = mode === "hidden";
-
-  return (
-    <div className={`sidebar-chrome-row${isHidden ? " is-floating" : ""}`}>
-      <button
-        className="sidebar-mode-button"
-        type="button"
-        aria-label={isHidden ? "Expand session sidebar" : "Collapse session sidebar"}
-        title={isHidden ? "Expand sidebar" : "Collapse sidebar"}
-        onClick={onToggleMode}
-      >
-        <PanelLeft size={15} strokeWidth={1.8} />
-      </button>
-      <button
-        className="sidebar-chrome-button"
-        type="button"
-        aria-label="Search sessions"
-        title="Search"
-        onClick={onOpenSearch}
-      >
-        <Search size={14} strokeWidth={1.8} />
-      </button>
     </div>
   );
 }
@@ -318,7 +275,7 @@ export function Sidebar({
   mode: SidebarMode;
   view: SidebarView;
   busySessionIds?: Set<string>;
-  /** 折叠按钮回调；目前由 WorkbenchLayout 通过 SidebarChromeRow 调用，Sidebar 内部不再渲染 chrome row。 */
+  /** 折叠按钮回调；现由 WorkbenchLayout 通过 WindowChromeBar 调用，Sidebar 内部不直接渲染 chrome row。 */
   onToggleMode?: () => void;
   onNewSession?: () => void;
   onSelectSession?: (sessionId: string) => void;

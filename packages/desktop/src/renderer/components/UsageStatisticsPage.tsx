@@ -81,8 +81,8 @@ function buildHeatmap(rows: UsageStatisticsDailyRow[]) {
   start.setDate(start.getDate() - (totalCells - 1));
   const maxTokens = Math.max(1, ...sorted.map((row) => row.totalTokens), 1);
 
-  const columns = Array.from({ length: 16 }, (_, columnIndex) => {
-    const days = Array.from({ length: 7 }, (_, weekday) => {
+  const columns = Array.from({ length: 16 }, (_, columnIndex) =>
+    Array.from({ length: 7 }, (_, weekday) => {
       const date = new Date(start);
       date.setDate(start.getDate() + columnIndex * 7 + weekday);
       const iso = date.toISOString().slice(0, 10);
@@ -91,9 +91,8 @@ function buildHeatmap(rows: UsageStatisticsDailyRow[]) {
         iso,
         level: clampLevel(tokens / maxTokens),
       };
-    });
-    return days;
-  });
+    }),
+  );
 
   return { columns, maxTokens };
 }
@@ -141,6 +140,46 @@ function ToolDetailModal({
   );
 }
 
+function CostDetailModal({
+  totalCost,
+  onClose,
+}: {
+  totalCost: number;
+  onClose: () => void;
+}) {
+  const breakdown = [
+    { label: "DeepSeek R1", value: 181.24 },
+    { label: "Kimi K2", value: 72.9 },
+    { label: "Mock / local", value: 0 },
+    { label: "缓存节省估算", value: -25.82 },
+  ];
+
+  return (
+    <div className="usage-modal-backdrop" role="presentation" onClick={onClose}>
+      <div className="usage-cost-modal" role="dialog" aria-modal="true" aria-label="Estimated cost details" onClick={(event) => event.stopPropagation()}>
+        <header className="usage-cost-modal-header">
+          <div>
+            <div className="usage-modal-eyebrow">Estimated Cost</div>
+            <h3>{formatMoney(totalCost)}</h3>
+            <p>基于当前模型单价与 token usage 估算。</p>
+          </div>
+          <button className="usage-icon-button" type="button" aria-label="Close cost detail" onClick={onClose}>
+            <X size={16} strokeWidth={2} />
+          </button>
+        </header>
+        <div className="usage-cost-list">
+          {breakdown.map((item) => (
+            <div key={item.label} className="usage-cost-row">
+              <span>{item.label}</span>
+              <strong className={item.value < 0 ? "is-negative" : ""}>{item.value < 0 ? `-${formatMoney(Math.abs(item.value))}` : formatMoney(item.value)}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ToolRow({ tool, onOpen }: { tool: UsageStatisticsToolEntry; onOpen: (tool: UsageStatisticsToolEntry) => void }) {
   return (
     <button className="usage-tool-line" type="button" onClick={() => onOpen(tool)}>
@@ -166,6 +205,7 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh, onB
   const effectiveSnapshot = snapshot ?? mockUsageStatistics;
   const [range, setRange] = useState<UsageStatisticsSnapshot["range"]>(effectiveSnapshot.range);
   const [selectedTool, setSelectedTool] = useState<UsageStatisticsToolEntry | null>(null);
+  const [showCostDetail, setShowCostDetail] = useState(false);
 
   const summaryRows = effectiveSnapshot.dailyRows ?? [];
   const recent7d = sumTokens(summaryRows.slice(0, 7));
@@ -225,7 +265,7 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh, onB
             </div>
             <div className="usage-heatmap-months">
               {MONTH_LABELS.map((month) => (
-                <span key={month}>{month}</span>
+                <span key={month} className="usage-heatmap-month">{month}</span>
               ))}
             </div>
             <div className="usage-heatmap-body">
@@ -235,13 +275,17 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh, onB
                 ))}
               </div>
               <div className="usage-heatmap-grid">
-                {heatmap.columns.flatMap((column, columnIndex) =>
-                  column.map((cell, rowIndex) => {
-                    const tokens = summaryRows.find((row) => row.date === cell.iso)?.totalTokens ?? 0;
-                    const intensity = maxHeat > 0 ? clampLevel(tokens / maxHeat) : 0;
-                    return <span key={`${columnIndex}-${rowIndex}`} className="usage-heatmap-cell" data-l={intensity} />;
-                  }),
-                )}
+                {heatmap.columns.map((column, columnIndex) => (
+                  <div className="usage-heatmap-column" key={columnIndex}>
+                    {column.map((cell, rowIndex) => (
+                      <span
+                        key={`${columnIndex}-${rowIndex}`}
+                        className="usage-heatmap-cell"
+                        data-l={cell.level}
+                      />
+                    ))}
+                  </div>
+                ))}
               </div>
             </div>
             <div className="usage-heatmap-legend">
@@ -329,11 +373,6 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh, onB
             </div>
           </div>
 
-          <div className="usage-range-note">
-            <Info size={14} strokeWidth={2} />
-            {effectiveSnapshot.sessionId} · {effectiveSnapshot.generatedAt.slice(0, 10)}
-          </div>
-
           {error ? (
             <section className="usage-empty-state">
               <CircleAlert size={20} strokeWidth={2} />
@@ -345,7 +384,10 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh, onB
           <section className="usage-overview-card">
             <div className="usage-overview-label">TOKEN 总数</div>
             <div className="usage-overview-value">{effectiveSnapshot.summary.totalTokens.toLocaleString()}</div>
-            <div className="usage-overview-cost">{formatMoney(effectiveSnapshot.summary.costUsd)}</div>
+            <button className="usage-overview-cost" type="button" onClick={() => setShowCostDetail(true)}>
+              {formatMoney(effectiveSnapshot.summary.costUsd)}
+              <Info size={16} strokeWidth={2} />
+            </button>
             <div className="usage-overview-meter" aria-hidden="true">
               <span style={{ width: `${Math.min(100, effectiveSnapshot.summary.cacheEfficiencyPercent)}%` }} />
             </div>
@@ -458,6 +500,7 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh, onB
       </div>
 
       {selectedTool ? <ToolDetailModal tool={selectedTool} onClose={() => setSelectedTool(null)} /> : null}
+      {showCostDetail ? <CostDetailModal totalCost={effectiveSnapshot.summary.costUsd} onClose={() => setShowCostDetail(false)} /> : null}
     </main>
   );
 }

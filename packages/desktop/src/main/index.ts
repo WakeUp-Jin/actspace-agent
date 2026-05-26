@@ -180,9 +180,12 @@ async function createMainWindow() {
     minHeight: 760,
     title: "actspace",
     titleBarStyle: "hidden",
+    // 红绿灯每个圆约 12px，y=16 → 圆心 Y = 22，对齐窗口顶部 chrome bar
+    // 的按钮中心（chrome bar height 44 / align-items: center → 中心 Y = 22）。
+    // 调整 y 时也要同步看 styles.css 里 --window-chrome-strip-height。
     trafficLightPosition: {
       x: 16,
-      y: 18
+      y: 16
     },
     backgroundColor: "#f7f9ff",
     webPreferences: {

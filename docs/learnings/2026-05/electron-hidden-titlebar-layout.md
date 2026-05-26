@@ -72,6 +72,42 @@ textarea,
 - **能在系统层处理就别用 CSS。** `titleBarStyle: "hidden"` 下，红绿灯所在的顶部一条窄区由 Electron 系统层负责拖动，不需要手动加 drag region。
 - **任何"fixed 浮层 + 下层 drag 父级"组合都先警惕一下。** 如果非要用，确保浮层按钮的视觉范围跟下层 drag 区域**完全不重叠**，或者把下层从 drag 改成只在它自己不会被遮挡的子区域里 drag。
 
+## 更稳的做法：pointer-events 双层 + 单一 drag region
+
+前面的陷阱是反复在「drag / no-drag」之间打补丁，每补一处都可能漏一处。读 Cursor Agent Window 的真实实现（`out/vs/workbench/workbench.desktop.main.css` 的 `.part.titlebar`），它根本不靠 `-webkit-app-region` 互相覆盖来实现浮层 hit-test 隔离，用的是 **`pointer-events: none` 浮层 + 子按钮 `pointer-events: auto`**：
+
+```css
+.window-chrome-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 44px;
+  z-index: 60;
+  pointer-events: none; /* 关键：整层对下方完全透明 */
+}
+
+.chrome-left,
+.chrome-center,
+.chrome-right {
+  pointer-events: auto; /* 只在子段内恢复事件 */
+}
+
+.chrome-center { -webkit-app-region: drag; }  /* 唯一拖窗区 */
+.chrome-button { -webkit-app-region: no-drag; }
+```
+
+这样的好处：
+
+1. **`pointer-events: none` 比 `no-drag` 更彻底。**
+   `-webkit-app-region` 只决定鼠标点击是否当成"拖窗口"，不影响普通 DOM hit-test 顺序；而 `pointer-events: none` 让整层连 DOM hit-test 都跳过，下方任何元素都能被点到。两者叠加是双保险。
+2. **下方三栏不再需要为浮层让出 drag/no-drag。**
+   只有浮层和浮层内按钮关心 `app-region`，sidebar / main / right panel 内部的所有按钮都不需要写 `no-drag`——`elementFromPoint` 测试可证。
+3. **drag region 从「散落多处 + 反向 override」收敛到「一个段」。**
+   只在 `.chrome-center` 写一处 `drag`，其它地方再也不需要 `app-region`。CSS 减法明显。
+4. **三栏背景从窗口顶端贯顶不再受 chrome 让位影响。**
+   chrome bar 没有自身背景，三栏顶部加 `padding-top: var(--chrome-strip-height)` 把内容压下来即可，浮层视觉上压在三栏顶端的 padding 区，看着像「三栏直接贯顶 + chrome 按钮浮在三栏顶部」。
+
+什么时候不能这样做：如果浮层本身有半透明背景 / blur 效果且需要遮挡下方内容，那就不能整层 `pointer-events: none`——只能用 `-webkit-app-region` + 手动管 hit-test。但对纯按钮 + 标题 + 拖动区这种 chrome strip，pointer-events 双层是最干净的方案。
+
 ## 自检问题
 
 - 关闭 DevTools 后，真实主窗口是否仍然从顶部直接显示应用三栏？

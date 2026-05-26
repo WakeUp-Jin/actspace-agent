@@ -1,4 +1,4 @@
-import { MoreHorizontal, PanelRight } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContextUsageSnapshot, MessageBlock } from "@actspace/shared";
 import { Composer, type ComposerSendOptions } from "./Composer";
@@ -183,11 +183,8 @@ function TurnActions({ assistantMessages }: { assistantMessages: AssistantMessag
 }
 
 export function ConversationView({
-  title,
   messages,
   contextSnapshot,
-  rightPanelOpen,
-  onToggleRightPanel,
   isStreaming = false,
   isAborting = false,
   sendScrollRequestId = 0,
@@ -195,11 +192,8 @@ export function ConversationView({
   onAbort,
   showDemoAttachments = false,
 }: {
-  title: string;
   messages: MessageBlock[];
   contextSnapshot: ContextUsageSnapshot | null;
-  rightPanelOpen: boolean;
-  onToggleRightPanel: () => void;
   isStreaming?: boolean;
   isAborting?: boolean;
   sendScrollRequestId?: number;
@@ -220,23 +214,6 @@ export function ConversationView({
 
   return (
     <main className="conversation-shell">
-      <header className="topbar">
-        <div className="topbar-title">
-          <h1>{title}</h1>
-        </div>
-        <div className="topbar-actions">
-          <button
-            className="topbar-panel-toggle"
-            type="button"
-            aria-label={rightPanelOpen ? "Close panel" : "Open panel"}
-            aria-pressed={rightPanelOpen}
-            onClick={onToggleRightPanel}
-          >
-            <PanelRight size={16} strokeWidth={2.1} />
-          </button>
-        </div>
-      </header>
-
       <section className="message-scroll" aria-label="Conversation messages">
         <div className="message-stack">
           {turns.map((turn) => (

@@ -4,9 +4,10 @@ import { FlaskConical, Sparkles } from "lucide-react";
 import { ConversationView } from "./ConversationView";
 import { PlaceholderView } from "./PlaceholderView";
 import { RightPanel } from "./RightPanel";
-import { Sidebar, SidebarChromeRow, type SidebarMode, type SidebarView } from "./Sidebar";
+import { Sidebar, type SidebarMode, type SidebarView } from "./Sidebar";
 import { SplitView } from "./SplitView";
 import { UsageStatisticsPage } from "./UsageStatisticsPage";
+import { WindowChromeBar } from "./WindowChromeBar";
 import type { ComposerSendOptions } from "./Composer";
 import { mockUsageStatistics } from "../fixtures/usageStatisticsFixture";
 
@@ -280,11 +281,8 @@ export function WorkbenchLayout({
   } else {
     mainContent = (
       <ConversationView
-        title={title}
         messages={messages}
         contextSnapshot={contextSnapshot}
-        rightPanelOpen={isRightPanelOpen}
-        onToggleRightPanel={toggleRightPanel}
         isStreaming={isStreaming}
         isAborting={isAborting}
         sendScrollRequestId={sendScrollRequestId}
@@ -295,9 +293,21 @@ export function WorkbenchLayout({
     );
   }
 
+  const chromeTitle =
+    view === "lab" ? "Lab"
+    : view === "usage" ? "Usage"
+    : view === "kairos" ? "Kairos"
+    : title;
+
   return (
     <>
-      <SidebarChromeRow mode={leftMode} onToggleMode={toggleSidebarMode} />
+      <WindowChromeBar
+        leftMode={leftMode}
+        rightOpen={isRightPanelOpen}
+        title={chromeTitle}
+        onToggleLeft={toggleSidebarMode}
+        onToggleRight={toggleRightPanel}
+      />
       <SplitView
         left={
           <Sidebar
