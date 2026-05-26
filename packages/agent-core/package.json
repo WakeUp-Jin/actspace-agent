@@ -20,6 +20,9 @@
   },
   "dependencies": {
     "@actspace/shared": "workspace:*",
+    "@types/diff": "^8.0.0",
+    "@vscode/ripgrep": "^1.18.0",
+    "diff": "^9.0.0",
     "openai": "^6.39.0"
   },
   "devDependencies": {

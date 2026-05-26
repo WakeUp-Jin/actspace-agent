@@ -83,7 +83,15 @@ export type APIRequestTool =
 export type AssistantMessageEvent =
   | { type: "text_delta"; delta: string }
   | { type: "thinking_delta"; delta: string }
-  | { type: "tool_call_delta"; index: number; delta: string }
+  | {
+      type: "tool_call_delta";
+      index: number;
+      /** 累积到当前的 tool_call id（首个 chunk 出现后即可用），向后兼容仍允许缺省 */
+      toolCallId?: string;
+      /** 累积到当前的 tool 名称（首个 chunk 出现后即可用） */
+      toolName?: string;
+      delta: string;
+    }
   | { type: "done"; message: AssistantMessage }
   | { type: "error"; message: AssistantMessage };
 

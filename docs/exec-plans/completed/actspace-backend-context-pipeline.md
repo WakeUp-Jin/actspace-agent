@@ -57,7 +57,8 @@ Skill 的 `architecture.md` V0 目录结构展示了 `context/modules/` 子目�
   - register/update/remove/enable/disable segment
   - `format()` 返回 ContextParts
 - 实现 `ConversationContext` 模块（modules/conversation.ts）：
-  - V0 极简：messages 数组管理，无持久化
+  - 内存中持有 messages 数组；构造函数接受可选 `initialMessages`
+  - `static async createFromSession(sessionPath)` 在构造阶段一次性完成 `parseJsonl + sessionEventsToMessages` 恢复历史，与 SystemPromptContext 的"构造时吃数据、运行期只读内存"机制对齐
   - `format()` 返回 ContextParts（messages 部分）
 - 实现 Token Estimator：字符数 / 3.5 估算
 - 生成 `ContextUsageSnapshot`（含 buckets）
@@ -65,7 +66,7 @@ Skill 的 `architecture.md` V0 目录结构展示了 `context/modules/` 子目�
 
 **V1 增强（后续）：**
 
-- ShortTermMemoryContext 替换 ConversationContext
+- ShortTermMemoryContext 接替 ConversationContext（会话历史恢复能力已在 V0+ 提前到 `createFromSession`，V1 升级只需引入 turn 标记 / 多日切片 / 压缩接入，构造入口签名不破坏）
 - LongTermMemoryContext
 - 压缩机制 + 执行策略
 - segment 优先级裁剪

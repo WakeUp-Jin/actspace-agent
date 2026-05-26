@@ -136,6 +136,17 @@ function messageBlockFromToolPreview(
         collapsedLines: preview.collapsedLines,
         createdAt: getDisplayTime(timestamp)
       };
+    case "write":
+      return {
+        kind: "write_diff",
+        id: eventId,
+        filePath: preview.filePath,
+        additions: preview.additions,
+        deletions: preview.deletions,
+        diff: preview.diff,
+        collapsedLines: preview.collapsedLines,
+        createdAt: getDisplayTime(timestamp)
+      };
     case "bash":
       return {
         kind: "bash",
@@ -260,7 +271,7 @@ export function createSessionDiffSummary(sessionId: SessionId, events: SessionEv
         ? (event.payload as { uiPreview: ToolUiPreview }).uiPreview
         : (event.payload as ToolUiPreview);
 
-    if (preview.kind !== "edit_diff") {
+    if (preview.kind !== "edit_diff" && preview.kind !== "write") {
       continue;
     }
 

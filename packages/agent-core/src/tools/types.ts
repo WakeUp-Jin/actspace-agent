@@ -9,6 +9,7 @@
 
 import type { ToolParameterSchema, ToolResult } from "../internal-tools";
 import type { ToolPreviewKind } from "@actspace/shared";
+import type { ApprovalGate } from "./scheduler";
 
 /** definition.ts 导出的静态声明——不含任何运行时依赖 */
 export interface ToolDefinitionSpec {
@@ -39,4 +40,6 @@ export interface ToolManagerConfig extends ToolRuntimeConfig {
   workspaceRoot: string;
   /** 硬截断阈值（字符数），默认 2000 */
   truncateThreshold?: number;
+  /** 审核网关，提供后 ask 权限会异步等待用户决策 */
+  approvalGate?: ApprovalGate;
 }

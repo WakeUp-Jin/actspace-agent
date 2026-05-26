@@ -22,7 +22,7 @@
 
 - 工具名：`edit-file`
 - 展示类型：`edit_diff`
-- 用户可见：`Edited index.ts +3 -1`
+- 用户可见：`Edit index.ts +3 -1`（折叠态摘要，点击展开 diff）
 
 ## 通用展示原则
 
@@ -31,8 +31,11 @@
 - 完整参数保留在原始工具参数、run log 和持久化事件中。
 - 网络 URL 和搜索 query 本身通常是任务语义，可以保留完整参数。
 - 如果某个字段可能很长，优先由组件做视觉截断，不改变原始事实字段。
-- 展示文案使用产品动作词：`Read`、`Grep`、`Glob`、`Listed`、`Searched`、`Fetched`、`Edited`、`Ran`。
+- 展示文案使用产品动作词：`Read`、`Grep`、`Glob`、`Listed`、`Searched`、`Fetched`、`Edit`、`Write`、`Ran`。
 - 不在前端组件里根据 `toolName` 分支推断展示；新增工具应通过 `previewKind` 和 `ToolUiPreview` 建模。
+- 工具调用进行中阶段（`tool_started` 之后、`tool_finished` 之前）所有工具行使用 text shimmer 视觉，详见 [中间消息区规范 - 工具执行中态规范](../frontend-ui/中间消息区规范.md#工具执行中态规范)。
+- running 阶段后端 `tool_started.preview` 只推送当前能确定的最小字段（filePath / command / query），不传未生成的数值（diff stats、entryCount 等）；完成态字段在 `tool_finished` / 持久化事件中补齐。
+- **`tool_call_streaming` 事件契约**：bridge 在 LLM 流式输出 `tool_call_delta` 时累积 partial args，按 50ms throttle emit `tool_call_streaming { toolCallId, toolName, isInitial?, preview: ToolUiPreview }`。前端**零解析**直接消费 typed preview，复用与 `tool_started` 相同的渲染分支。`isInitial=true` 是首帧（dispatched 阶段），filePath 此时可能为空字符串，前端用 `Write file…` 等 fallback 文案展示。新工具接入只需在 `engine/streaming-preview-extractors.ts` 注册按 previewKind 的 extractor，前端无需改动。详见 [docs/learnings/2026-05/llm-tool-call-streaming.md](../../learnings/2026-05/llm-tool-call-streaming.md) 的流式协议设计原则。
 
 ## 内置工具规范
 
@@ -71,8 +74,26 @@
 - `previewKind`: `edit_diff`
 - `ToolUiPreview.filePath`: 文件名，例如 `index.ts`
 - `ToolUiPreview.additions` / `deletions`: 结构化修改统计。
-- 展示：`Edited index.ts +3 -1`
-- 完整路径保留在工具参数中，不放在主消息行里。
+- 流式阶段（dispatched → argsProgress → executing）后端持续推 `tool_call_streaming` + `tool_started`，preview.filePath 从空字符串逐渐变为真实文件名，前端 `MessageBlock.status` 一直是 `running`，渲染为单行 `Edit index.ts` + shimmer 闪光，**不显示** chevron、统计或 content 预览。
+- 为什么不流式 content：edit 的 diff 需要「文件原内容 + old_string 定位 + new_string 替换」三者全齐才能生成有定位的 unified diff，LLM 流式只能拿到 old/new 两段无上下文文本，强行展示会误导用户。streaming-preview-extractors 的 `edit_diff` extractor 只提取 path。
+- 流式 `tool_finished` 后切换为 `status: completed`，渲染折叠态 `Edit index.ts +3 -1 ›`，点击展开完整 diff。
+- diff 由 `diff` 库 `createTwoFilesPatch` 生成（标准 unified diff 格式），包含上下文行。
+- 前端使用 `FileDiffBlock` 折叠式组件，与 `write_file` 共享同一组件，无 icon，左边缘与 Read / Grep 等工具行对齐。
+
+### `write_file`
+
+- `previewKind`: `write`
+- `ToolUiPreview.filePath`: 文件名，例如 `config.ts`
+- `ToolUiPreview.streamingContent?`: 流式阶段从 LLM args.content 累积出来的 partial 文本（仅 running 时存在，completed 时 undefined）。
+- `ToolUiPreview.additions` / `deletions`: 结构化修改统计。
+- 流式 4 阶段：
+  1. dispatched（首个 `tool_call_streaming` `isInitial=true`）：渲染 `Write file…` + shimmer。
+  2. argsProgress：解析出 path 后变为 `Write config.ts`，开始累积 content 时**展开 code preview + 光标动画**（cursor 风格边写边看）。
+  3. executing（`tool_started`）：保持 streamingContent 继续显示，避免闪烁消失（bridge.ts 的 `createToolUiPreview` 在 output 为空时把 args.content 当作 streamingContent 输出）。
+  4. finished（`tool_finished`）：streamingContent 清空，切换为折叠态 `Write config.ts +15 ›`（deletions=0 不展示），点击展开看完整 diff。
+- diff 由 `diff` 库 `createTwoFilesPatch` 生成，新建时旧内容为空字符串。
+- 磁盘写入仍在 tool execute 阶段原子写入（tmpfile → fsync → rename），**不**在 LLM 流式期间写盘，避免半文件出现或 LLM 重试导致脏写。
+- 前端复用 `FileDiffBlock` 折叠式组件（与 `edit-file` 共享），`kind: "write_diff"` 区分标题动作词，无 icon。
 
 ### `bash`
 
@@ -100,7 +121,9 @@
 
 - 工具 definition 必须声明 `previewKind`。
 - `createToolUiPreview()` 必须为新增展示类型生成稳定字段。
-- 流式 `tool_started.preview` 和最终 `tool_result.uiPreview` 必须使用同一套展示语义。
+- 在 `engine/streaming-preview-extractors.ts` 注册同名 previewKind 的 extractor（即便只输出空 preview），让 `tool_call_streaming` 在前端有稳定渲染。
+- 流式 `tool_call_streaming.preview`、`tool_started.preview` 和最终 `tool_result.uiPreview` 必须使用同一套展示语义。
 - `MessageBlock` / `session-selectors` 必须能从 `ToolUiPreview` 恢复前端消息。
 - 前端组件应消费 `MessageBlock` 字段，不直接读取 raw args。
 - 测试至少覆盖一次流式展示和一次持久化恢复展示。
+- 如需流式展示工具 args 的 string 字段（如 content/command），评估是否真的有意义（不会误导用户），有再用 streamingContent 字段；否则只在最终态展示。

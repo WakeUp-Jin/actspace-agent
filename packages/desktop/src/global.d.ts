@@ -20,6 +20,12 @@ declare global {
       onAgentStream: (
         callback: (event: import("@actspace/shared").RuntimeStreamEvent) => void
       ) => () => void;
+      submitApproval: (
+        input: import("@actspace/shared").ApprovalDecideInput
+      ) => Promise<import("@actspace/shared").ApprovalDecideResult>;
+      listPendingApprovals: (
+        input?: import("@actspace/shared").ApprovalListPendingInput
+      ) => Promise<import("@actspace/shared").PendingApprovalInfo[]>;
     };
   }
 }

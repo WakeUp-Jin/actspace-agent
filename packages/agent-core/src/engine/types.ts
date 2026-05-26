@@ -19,6 +19,7 @@ import type {
 import type { AssistantMessageEvent } from "../llm/types";
 import type { ToolResult } from "../internal-tools";
 import type { ToolManager } from "../tools/manager";
+import type { ToolApprovalRequest, ToolApprovalDecision } from "../tools/scheduler";
 
 // ─── 工具执行模式 ───
 
@@ -41,7 +42,9 @@ export type AgentEvent =
   | { type: "message_delta"; delta: AssistantMessageEvent }
   | { type: "message_end"; message: Message }
   | { type: "tool_start"; toolCallId: string; toolName: string; args: Record<string, unknown> }
-  | { type: "tool_end"; toolCallId: string; toolName: string; result: ToolResult; isError: boolean };
+  | { type: "tool_end"; toolCallId: string; toolName: string; result: ToolResult; isError: boolean }
+  | { type: "tool_approval_required"; toolCallId: string; toolName: string; request: ToolApprovalRequest }
+  | { type: "tool_approval_resolved"; toolCallId: string; toolName: string; decision: ToolApprovalDecision };
 
 /** 事件回调签名 */
 export type AgentEventSink = (event: AgentEvent) => Promise<void> | void;

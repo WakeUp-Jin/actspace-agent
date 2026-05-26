@@ -30,6 +30,18 @@ export interface ContextManagerOptions {
   longTermModule?: ContextModule;
   /** 压缩配置 */
   config?: Partial<CompressionConfig>;
+  /**
+   * 可选：注入已构造好的 conversation 模块（用于 async 工厂、测试或 mock 场景）。
+   * 缺省时构造一个空的 ConversationContext。
+   */
+  conversation?: ConversationContext;
+}
+
+/** createForSession 的可选输入，可选 sessionPath 用来一次性预加载历史 */
+export interface ContextManagerForSessionOptions
+  extends Omit<ContextManagerOptions, "conversation"> {
+  /** session.jsonl 路径；若不提供则构造空会话历史 */
+  sessionPath?: string;
 }
 
 const DEFAULT_CONFIG: CompressionConfig = {
@@ -48,8 +60,29 @@ export class ContextManager {
   constructor(options: ContextManagerOptions) {
     this.systemPromptModule = options.systemPromptModule;
     this.longTermModule = options.longTermModule;
-    this.conversation = new ConversationContext();
+    this.conversation = options.conversation ?? new ConversationContext();
     this.config = { ...DEFAULT_CONFIG, ...options.config };
+  }
+
+  /**
+   * async 工厂：面向特定 session 构造 ContextManager。
+   *
+   * 在构造阶段一次性完成会话历史加载（委托 ConversationContext.createFromSession），
+   * 让运行期 getContext() 始终同步可用且自然包含完整历史。
+   *
+   * 与 SystemPromptContext 在构造时吃 corePrompt 的机制保持一致：
+   * 上下文模块统一是"构造时吃数据、运行期只读内存"。
+   *
+   * @param options - sessionPath 缺省时只是普通空会话历史
+   */
+  static async createForSession(
+    options: ContextManagerForSessionOptions,
+  ): Promise<ContextManager> {
+    const { sessionPath, ...rest } = options;
+    const conversation = sessionPath
+      ? await ConversationContext.createFromSession(sessionPath)
+      : new ConversationContext();
+    return new ContextManager({ ...rest, conversation });
   }
 
   /** 追加消息到会话历史 */

@@ -4,7 +4,7 @@ import type { ContextUsageSnapshot, MessageBlock } from "@actspace/shared";
 import { Composer, type ComposerSendOptions } from "./Composer";
 import { AssistantReply } from "./messages/AssistantReply";
 import { BashRunBlock } from "./messages/BashRunBlock";
-import { EditDiffBlock } from "./messages/EditDiffBlock";
+import { FileDiffBlock } from "./messages/FileDiffBlock";
 import { ThinkingBlock } from "./messages/ThinkingBlock";
 import { ToolLogLine } from "./messages/ToolLogLine";
 import { UserMessage } from "./messages/UserMessage";
@@ -72,7 +72,8 @@ function renderMessage(message: MessageBlock) {
         </div>
       );
     case "edit_diff":
-      return <EditDiffBlock key={message.id} message={message} />;
+    case "write_diff":
+      return <FileDiffBlock key={message.id} message={message} />;
   }
 }
 

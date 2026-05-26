@@ -164,6 +164,8 @@ export class MockLLMService implements LLMService {
           yield {
             type: "tool_call_delta",
             index: message.content.filter((b) => b.type === "toolCall").indexOf(block),
+            toolCallId: block.id,
+            toolName: block.name,
             delta: JSON.stringify(block.arguments),
           };
         }
@@ -205,9 +207,9 @@ export class MockLLMService implements LLMService {
           },
           {
             type: "toolCall",
-            id: `mock_tc_search_${this._state.callCount}`,
-            name: "search_files",
-            arguments: { query: String(userContent).slice(0, 50) },
+            id: `mock_tc_grep_${this._state.callCount}`,
+            name: "grep",
+            arguments: { pattern: String(userContent).slice(0, 50) },
           },
         ],
         model: this.config.model,

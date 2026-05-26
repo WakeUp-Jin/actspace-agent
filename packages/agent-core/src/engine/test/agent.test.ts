@@ -21,7 +21,7 @@ function createTestAgent() {
   const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
   const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
   toolManager.register(createTestTool("read_file"));
-  toolManager.register(createTestTool("search_files"));
+  toolManager.register(createTestTool("grep"));
 
   const systemPrompt = new SystemPromptContext("You are a test assistant.");
   const contextManager = new ContextManager({ systemPromptModule: systemPrompt });
@@ -55,7 +55,7 @@ describe("Agent", () => {
     const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
     const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
     toolManager.register(createTestTool("read_file"));
-    toolManager.register(createTestTool("search_files"));
+    toolManager.register(createTestTool("grep"));
 
     const systemPrompt = new SystemPromptContext("Test");
     const contextManager = new ContextManager({ systemPromptModule: systemPrompt });

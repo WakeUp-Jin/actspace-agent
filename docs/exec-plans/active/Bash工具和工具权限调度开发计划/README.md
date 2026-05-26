@@ -6,10 +6,11 @@
 
 | 顺序 | 计划 | 当前状态 | 说明 |
 | --- | --- | --- | --- |
-| 1 | `actspace-tool-permission-scheduler-plan.md` | 部分完成 | 已完成权限三态、调度层、权限检查和 awaiting approval 结构化结果；还缺 approval request 扩展到 engine/runtime 事件，以及收尾测试与文档同步。 |
-| 2 | `actspace-bash-tool-plan.md` | 已完成 | Bash definition、permissions、executor、render result、注册和测试已完成。 |
+| 1 | `actspace-tool-permission-scheduler-plan.md` | 已完成 | 权限三态、调度层、权限检查、awaiting approval、ApprovalGate 异步等待、engine/runtime 事件、单测已完成。 |
+| 2 | `actspace-bash-tool-plan.md` | 已完成 | Bash definition、permissions、executor（已改用 runProcess）、render result、注册和测试已完成。 |
 | 3 | `actspace-bash-approval-ui-plan.md` | 基本完成 | Bash 普通执行 UI、审核态 UI、fixture、浏览器 mock 和 Electron smoke 已完成；真实 pending Bash 触发依赖权限调度闭环。 |
-| 4 | `actspace-tool-pause-session-boundary-plan.md` | 未开始 | 负责 pending registry、会话切换、恢复、过期、取消和幂等 decision。 |
+| 4 | `actspace-tool-pause-session-boundary-plan.md` | 大部分完成 | PendingApprovalRegistry、暂停模型、幂等 decision、IPC 通道已完成；待 Electron 手动验收。 |
+| 5 | `actspace-bash-session-allowlist-plan.md` | 待执行 | 会话级动态 allowlist + Allow 子命令拆分授权（A+B）。设计依据见 `docs/design-docs/agent-core/bash-policy-allowlist-design.md`。 |
 
 ## 当前结论
 
@@ -45,5 +46,6 @@
 
 ## 相关设计文档
 
-- `docs/design-docs/agent-core/权限设计规则和原则.md`
-- `docs/design-docs/frontend-ui/中间消息区规范.md`
+- `docs/design-docs/agent-core/权限设计规则和原则.md`：权限系统总原则。
+- `docs/design-docs/agent-core/bash-policy-allowlist-design.md`：Bash 全局策略 + 动态 allowlist 设计，含 Phase 1/2/3 路线图。
+- `docs/design-docs/frontend-ui/中间消息区规范.md`：审核面板属于消息区的一部分，遵守消息区规范。

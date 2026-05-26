@@ -1,0 +1,101 @@
+import { describe, expect, it } from "vitest";
+import { extractStreamingPreview } from "../streaming-preview-extractors";
+
+describe("extractStreamingPreview", () => {
+  it("write extractor parses path and streamingContent", () => {
+    const partial = '{"path":"/tmp/夜雨.md","content":"# 夜雨\\n半夜醒来';
+    const preview = extractStreamingPreview("write", partial);
+    expect(preview).toEqual({
+      kind: "write",
+      filePath: "/tmp/夜雨.md",
+      additions: 0,
+      deletions: 0,
+      diff: "",
+      collapsedLines: 0,
+      streamingContent: "# 夜雨\n半夜醒来",
+    });
+  });
+
+  it("write extractor handles no content yet", () => {
+    const preview = extractStreamingPreview("write", '{"path":"/tmp/a.md"');
+    expect(preview).toMatchObject({
+      kind: "write",
+      filePath: "/tmp/a.md",
+      streamingContent: undefined,
+    });
+  });
+
+  it("write extractor handles empty partial args (dispatched stage)", () => {
+    const preview = extractStreamingPreview("write", "");
+    expect(preview).toMatchObject({
+      kind: "write",
+      filePath: "",
+      streamingContent: undefined,
+    });
+  });
+
+  it("edit_diff extractor only extracts path, never content", () => {
+    const partial = '{"path":"/x.ts","old_string":"foo","new_string":"bar"}';
+    const preview = extractStreamingPreview("edit_diff", partial);
+    expect(preview).toEqual({
+      kind: "edit_diff",
+      filePath: "/x.ts",
+      additions: 0,
+      deletions: 0,
+      diff: "",
+      collapsedLines: 0,
+    });
+    expect(preview).not.toHaveProperty("streamingContent");
+  });
+
+  it("read extractor extracts path", () => {
+    const preview = extractStreamingPreview("read", '{"path":"/r.ts"}');
+    expect(preview).toMatchObject({ kind: "read", filePath: "/r.ts" });
+  });
+
+  it("grep extractor extracts pattern and scope from glob", () => {
+    const preview = extractStreamingPreview(
+      "grep",
+      '{"pattern":"foo","glob":"*.ts"}',
+    );
+    expect(preview).toMatchObject({
+      kind: "grep",
+      pattern: "foo",
+      scope: "*.ts",
+    });
+  });
+
+  it("grep extractor falls back to path for scope when glob absent", () => {
+    const preview = extractStreamingPreview(
+      "grep",
+      '{"pattern":"foo","path":"/src"}',
+    );
+    expect(preview).toMatchObject({
+      kind: "grep",
+      pattern: "foo",
+      scope: "/src",
+    });
+  });
+
+  it("web_search extractor prefers url over query", () => {
+    const url = extractStreamingPreview("web_search", '{"url":"https://x"}');
+    expect(url).toMatchObject({ kind: "web_search", mode: "url", url: "https://x" });
+
+    const query = extractStreamingPreview("web_search", '{"query":"latest news"}');
+    expect(query).toMatchObject({ kind: "web_search", mode: "query", query: "latest news" });
+  });
+
+  it("bash extractor extracts command", () => {
+    const preview = extractStreamingPreview("bash", '{"command":"ls -la"}');
+    expect(preview).toMatchObject({
+      kind: "bash",
+      status: "running",
+      command: "ls -la",
+    });
+  });
+
+  it("generic kind returns empty generic preview", () => {
+    const preview = extractStreamingPreview("generic", '{"anything":"x"}');
+    expect(preview).toEqual({ kind: "generic", title: "", content: "" });
+  });
+});

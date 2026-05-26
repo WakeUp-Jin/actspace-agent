@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { RuntimeStreamEvent } from "@actspace/shared";
 import { ContextManager } from "../../context/manager";
 import { SystemPromptContext } from "../../context/modules/system-prompt";
 import type { InternalTool, ToolResult } from "../../internal-tools";
@@ -20,7 +21,7 @@ function createTestTool(name: string): InternalTool {
       },
     },
     isReadOnly: true,
-    previewKind: name === "read_file" ? "read" : name === "search_files" ? "search" : "generic",
+    previewKind: name === "read_file" ? "read" : name === "grep" ? "grep" : "generic",
     handler: async (): Promise<ToolResult> => ({ success: true, data: `ok from ${name}` }),
   };
 }
@@ -112,7 +113,7 @@ function createDeps() {
   const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
   const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
   toolManager.register(createTestTool("read_file"));
-  toolManager.register(createTestTool("search_files"));
+  toolManager.register(createTestTool("grep"));
   const contextManager = new ContextManager({
     systemPromptModule: new SystemPromptContext("You are a test assistant."),
   });
@@ -291,8 +292,8 @@ describe("runTurnWithAgent bridge", () => {
         }),
         expect.objectContaining({
           payload: expect.objectContaining({
-            toolName: "search_files",
-            arguments: { query: "Please inspect the README." },
+            toolName: "grep",
+            arguments: { pattern: "Please inspect the README." },
           }),
         }),
       ]),
@@ -302,8 +303,8 @@ describe("runTurnWithAgent bridge", () => {
     expect(toolEvents.map((event) => (event.payload as { toolName?: string }).toolName)).toEqual([
       "read_file",
       "read_file",
-      "search_files",
-      "search_files",
+      "grep",
+      "grep",
     ]);
     expect(assistantMessageEnds.length).toBeGreaterThan(0);
     expect(assistantMessageEnds.every((event) => !("message" in ((event.payload ?? {}) as object)))).toBe(true);
@@ -494,10 +495,106 @@ describe("runTurnWithAgent bridge", () => {
     expect(result.status).toMatch(/completed|error/);
   });
 
+  it("emits tool_call_streaming with typed preview before tool_started", async () => {
+    const deps = createDeps();
+    deps.toolManager.register({
+      name: "write_file",
+      description: "Write file",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          content: { type: "string" },
+        },
+        required: ["path", "content"],
+      },
+      isReadOnly: false,
+      previewKind: "write",
+      handler: async (): Promise<ToolResult> => ({
+        success: true,
+        data: "+++ b/x.md\n+# title\n+body",
+      }),
+    });
+    deps.llm.setResponses([
+      mockToolCall(
+        "write_file",
+        { path: "/tmp/x.md", content: "# title\nbody" },
+        { id: "tc-write-streaming" },
+      ),
+      mockText("Done."),
+    ]);
+
+    const streamEvents: RuntimeStreamEvent[] = [];
+
+    await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Write the file.",
+      },
+      deps,
+      {
+        onStreamEvent: (event) => {
+          streamEvents.push(event);
+        },
+      },
+    );
+
+    const streamingEvents = streamEvents.filter(
+      (event) => event.type === "tool_call_streaming",
+    );
+    const startedEvents = streamEvents.filter((event) => event.type === "tool_started");
+
+    expect(streamingEvents.length).toBeGreaterThan(0);
+    const firstStreaming = streamingEvents[0];
+    expect(firstStreaming).toMatchObject({
+      type: "tool_call_streaming",
+      toolCallId: "tc-write-streaming",
+      toolName: "write_file",
+      isInitial: true,
+      preview: {
+        kind: "write",
+        filePath: "/tmp/x.md",
+      },
+    });
+
+    const streamingIndex = streamEvents.indexOf(firstStreaming);
+    const startedIndex = streamEvents.indexOf(startedEvents[0]);
+    expect(streamingIndex).toBeLessThan(startedIndex);
+  });
+
+  it("does not emit tool_call_streaming for unregistered tool names", async () => {
+    const deps = createDeps();
+    deps.llm.setResponses([
+      mockToolCall("not_registered", { path: "/x" }, { id: "tc-unknown" }),
+      mockText("Done."),
+    ]);
+
+    const streamEvents: RuntimeStreamEvent[] = [];
+
+    await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Use unknown tool.",
+      },
+      deps,
+      {
+        onStreamEvent: (event) => {
+          streamEvents.push(event);
+        },
+      },
+    );
+
+    expect(streamEvents.filter((event) => event.type === "tool_call_streaming")).toHaveLength(
+      0,
+    );
+  });
+
   it("uses short file names for read and edit tool previews", async () => {
     const deps = createDeps();
     deps.toolManager.register({
-      name: "edit-file",
+      name: "edit_file",
       description: "Edit a file",
       parameters: {
         type: "object",
@@ -515,7 +612,7 @@ describe("runTurnWithAgent bridge", () => {
     });
     deps.llm.setResponses([
       mockToolCall("read_file", { path: "/workspace/packages/desktop/package.json" }, { id: "tc-read-short-name" }),
-      mockToolCall("edit-file", { path: "/workspace/packages/desktop/src/index.ts" }, { id: "tc-edit-short-name" }),
+      mockToolCall("edit_file", { path: "/workspace/packages/desktop/src/index.ts" }, { id: "tc-edit-short-name" }),
       mockText("Done."),
     ]);
 
@@ -539,7 +636,7 @@ describe("runTurnWithAgent bridge", () => {
       },
     });
     expect(toolResults[1].payload).toMatchObject({
-      toolName: "edit-file",
+      toolName: "edit_file",
       uiPreview: {
         kind: "edit_diff",
         filePath: "index.ts",

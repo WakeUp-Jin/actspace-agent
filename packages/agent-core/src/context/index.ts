@@ -15,7 +15,10 @@ export type {
 
 // 核心组件
 export { ContextManager } from "./manager";
-export type { ContextManagerOptions } from "./manager";
+export type {
+  ContextManagerOptions,
+  ContextManagerForSessionOptions,
+} from "./manager";
 
 // Token 估算
 export {

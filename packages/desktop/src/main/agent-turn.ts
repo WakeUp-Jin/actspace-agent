@@ -13,7 +13,7 @@ import { join } from "node:path";
 import type { AgentTurnResult, RunTurnInput, RuntimeStreamEvent } from "@actspace/shared";
 import {
   buildAgentConfig,
-  createAgentFromConfig,
+  createAgentForSession,
   type AgentRunLogger,
   cleanupOldAgentRunLogs,
   createAgentRunLogger,
@@ -21,6 +21,7 @@ import {
   createSessionStorePaths,
   writeSessionResult,
 } from "@actspace/agent-core";
+import type { PendingApprovalRegistry } from "./approval-registry";
 
 export type AppDataRoots = {
   dataRoot: string;
@@ -81,6 +82,7 @@ export async function runAndPersistTurn(
   input: RunTurnInput,
   roots: AppDataRoots,
   getMainWindow: () => BrowserWindow | undefined,
+  approvalRegistry?: PendingApprovalRegistry,
 ): Promise<AgentTurnResult> {
   logAgentTurn("run turn requested", {
     sessionId: input.sessionId,
@@ -119,22 +121,33 @@ export async function runAndPersistTurn(
     });
   }
 
+  approvalRegistry?.setCurrentTurn(input.sessionId, input.turnId);
+
   const config = buildAgentConfig(
     { model: input.model, thinkingEnabled: input.thinkingEnabled },
     roots.workspaceRoot,
+    approvalRegistry,
   );
-  const deps = createAgentFromConfig(config);
+  const sessionDir = join(roots.sessionRoot, input.sessionId);
+  const sessionPaths = createSessionStorePaths(sessionDir);
+  const deps = await createAgentForSession(config, {
+    sessionPath: sessionPaths.sessionPath,
+  });
 
+  const priorMessageCount = deps.contextManager.getMessageCount();
   logAgentTurn("agent dependencies ready", {
     workspaceRoot: roots.workspaceRoot,
     modelId: deps.modelSpec.id,
     provider: deps.modelSpec.provider,
     apiModel: deps.modelSpec.apiModel,
     thinkingEnabled: deps.thinkingEnabled,
+    priorMessageCount,
   });
   await writeAgentRunLog(runLogger, "main_event", {
     stage: "agent_dependencies_ready",
     workspaceRoot: roots.workspaceRoot,
+    sessionPath: sessionPaths.sessionPath,
+    priorMessageCount,
   });
 
   const win = getMainWindow();
@@ -169,7 +182,6 @@ export async function runAndPersistTurn(
 
   const result = await resultPromise;
 
-  const sessionDir = join(roots.sessionRoot, input.sessionId);
   await writeAgentRunLog(runLogger, "main_event", {
     stage: "persisting_turn_result",
     sessionDir,
@@ -183,7 +195,7 @@ export async function runAndPersistTurn(
     status: result.status,
     eventCount: result.events.length,
   });
-  await writeSessionResult(createSessionStorePaths(sessionDir), result);
+  await writeSessionResult(sessionPaths, result);
   await writeAgentRunLog(runLogger, "main_event", {
     stage: "turn_result_persisted",
     status: result.status,

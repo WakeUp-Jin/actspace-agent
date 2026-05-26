@@ -18,7 +18,7 @@ import type {
 import { toToolDefinition } from "../internal-tools";
 import type { Tool } from "../messages";
 import type { ToolDefinitionSpec, ToolExecutorFn, ToolManagerConfig } from "./types";
-import { ToolScheduler } from "./scheduler";
+import { ToolScheduler, type ApprovalGate } from "./scheduler";
 
 const DEFAULT_TRUNCATE_THRESHOLD = 2000;
 
@@ -33,6 +33,7 @@ export class ToolManager {
     this.truncateThreshold = config.truncateThreshold ?? DEFAULT_TRUNCATE_THRESHOLD;
     this.scheduler = new ToolScheduler({
       truncateThreshold: this.truncateThreshold,
+      approvalGate: config.approvalGate,
     });
   }
 
@@ -77,9 +78,9 @@ export class ToolManager {
   }
 
   /** 执行工具：权限检查 → handler → renderResult（可选）→ truncate */
-  async execute(toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
+  async execute(toolName: string, args: Record<string, unknown>, toolCallId?: string): Promise<ToolResult> {
     const tool = this.tools.get(toolName);
-    const execution = await this.scheduler.execute(tool, toolName, args);
+    const execution = await this.scheduler.execute(tool, toolName, args, toolCallId);
     return execution.result;
   }
 }

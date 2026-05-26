@@ -1,6 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdir, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import type { SessionEvent } from "@actspace/shared";
 import { ContextManager } from "../manager";
 import { SystemPromptContext } from "../modules/system-prompt";
+import { appendEvents } from "../../persistence/jsonl";
 import type { UserMessage, AssistantMessage } from "../../messages";
 import { createEmptyUsage } from "../../messages";
 
@@ -105,5 +110,110 @@ describe("ContextManager", () => {
     const config = cm.getConfig();
     expect(config.contextWindow).toBe(50_000);
     expect(config.compressionThreshold).toBe(0.7);
+  });
+});
+
+describe("ContextManager.createForSession", () => {
+  let testDir: string;
+
+  beforeEach(async () => {
+    testDir = join(
+      tmpdir(),
+      `actspace-test-manager-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    await mkdir(testDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(testDir, { recursive: true, force: true });
+  });
+
+  function createEvent(type: string, payload: unknown, idx: number): SessionEvent {
+    return {
+      id: `evt_${idx}`,
+      sessionId: "test-session",
+      turnId: "turn-1",
+      type: type as SessionEvent["type"],
+      timestamp: new Date().toISOString(),
+      schemaVersion: 1,
+      payload,
+    };
+  }
+
+  it("constructs an empty conversation when sessionPath is omitted", async () => {
+    const cm = await ContextManager.createForSession({
+      systemPromptModule: new SystemPromptContext("test"),
+    });
+    expect(cm.getMessageCount()).toBe(0);
+    expect(cm.getContext().messages.length).toBe(0);
+  });
+
+  it("constructs an empty conversation when session.jsonl does not exist", async () => {
+    const missingPath = join(testDir, "no-such-session.jsonl");
+    const cm = await ContextManager.createForSession({
+      systemPromptModule: new SystemPromptContext("test"),
+      sessionPath: missingPath,
+    });
+    expect(cm.getMessageCount()).toBe(0);
+  });
+
+  it("preloads conversation history from session.jsonl", async () => {
+    const sessionPath = join(testDir, "session.jsonl");
+    const events: SessionEvent[] = [
+      createEvent("user_message", { content: "hello" }, 1),
+      createEvent(
+        "assistant_message",
+        {
+          content: "hi back",
+          stopReason: "stop",
+          model: "test",
+          provider: "test",
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        },
+        2,
+      ),
+    ];
+    await appendEvents(sessionPath, events);
+
+    const cm = await ContextManager.createForSession({
+      systemPromptModule: new SystemPromptContext("test"),
+      sessionPath,
+    });
+
+    const ctx = cm.getContext();
+    expect(ctx.messages.length).toBe(2);
+    expect(ctx.messages[0].role).toBe("user");
+    expect(ctx.messages[1].role).toBe("assistant");
+  });
+
+  it("appendMessage after createForSession yields history + new message", async () => {
+    const sessionPath = join(testDir, "session.jsonl");
+    await appendEvents(sessionPath, [
+      createEvent("user_message", { content: "first" }, 1),
+      createEvent(
+        "assistant_message",
+        {
+          content: "ack",
+          stopReason: "stop",
+          model: "test",
+          provider: "test",
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        },
+        2,
+      ),
+    ]);
+
+    const cm = await ContextManager.createForSession({
+      systemPromptModule: new SystemPromptContext("test"),
+      sessionPath,
+    });
+
+    cm.appendMessage({ role: "user", content: "second", timestamp: Date.now() });
+
+    const messages = cm.getContext().messages;
+    expect(messages.length).toBe(3);
+    expect(messages[0].role).toBe("user");
+    expect(messages[1].role).toBe("assistant");
+    expect(messages[2].role).toBe("user");
   });
 });

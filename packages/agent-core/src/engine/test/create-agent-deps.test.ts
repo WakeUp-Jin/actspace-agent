@@ -1,8 +1,12 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import type { ModelSpec } from "@actspace/shared";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mkdir, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import type { ModelSpec, SessionEvent } from "@actspace/shared";
 import { MODEL_REGISTRY } from "@actspace/shared";
 import { buildLLMConfig } from "../create-agent-deps";
 import type { AgentEnvConfig, AgentConfig } from "../create-agent-deps";
+import { appendEvents } from "../../persistence/jsonl";
 
 function createTestEnvConfig(overrides?: Partial<AgentEnvConfig>): AgentEnvConfig {
   return {
@@ -257,5 +261,74 @@ describe("createAgentFromConfig", () => {
     const deps = createAgentFromConfig(config);
 
     expect(deps.toolManager.has("web_search")).toBe(false);
+  });
+});
+
+describe("createAgentForSession", () => {
+  let testDir: string;
+
+  beforeEach(async () => {
+    testDir = join(
+      tmpdir(),
+      `actspace-test-agent-deps-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    await mkdir(testDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(testDir, { recursive: true, force: true });
+  });
+
+  function createEvent(type: string, payload: unknown, idx: number): SessionEvent {
+    return {
+      id: `evt_${idx}`,
+      sessionId: "test-session",
+      turnId: "turn-1",
+      type: type as SessionEvent["type"],
+      timestamp: new Date().toISOString(),
+      schemaVersion: 1,
+      payload,
+    };
+  }
+
+  it("creates AgentDeps with an empty conversation when sessionPath is omitted", async () => {
+    const { createAgentForSession } = await import("../create-agent-deps");
+    const deps = await createAgentForSession(createTestAgentConfig());
+
+    expect(deps.contextManager.getMessageCount()).toBe(0);
+  });
+
+  it("creates AgentDeps whose contextManager already contains session history", async () => {
+    const sessionPath = join(testDir, "session.jsonl");
+    await appendEvents(sessionPath, [
+      createEvent("user_message", { content: "remember this" }, 1),
+      createEvent(
+        "assistant_message",
+        {
+          content: "noted",
+          stopReason: "stop",
+          model: "test",
+          provider: "test",
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        },
+        2,
+      ),
+    ]);
+
+    const { createAgentForSession } = await import("../create-agent-deps");
+    const deps = await createAgentForSession(createTestAgentConfig(), { sessionPath });
+
+    expect(deps.contextManager.getMessageCount()).toBe(2);
+    const messages = deps.contextManager.getContext().messages;
+    expect(messages[0].role).toBe("user");
+    expect(messages[1].role).toBe("assistant");
+  });
+
+  it("creates an empty conversation when session.jsonl does not exist", async () => {
+    const missingPath = join(testDir, "missing.jsonl");
+    const { createAgentForSession } = await import("../create-agent-deps");
+    const deps = await createAgentForSession(createTestAgentConfig(), { sessionPath: missingPath });
+
+    expect(deps.contextManager.getMessageCount()).toBe(0);
   });
 });

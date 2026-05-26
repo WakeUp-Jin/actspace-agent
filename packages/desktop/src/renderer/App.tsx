@@ -44,20 +44,43 @@ function getSessionTitle(sessionRecord: SessionRecord | null, sessions: SessionL
     .join(" ");
 }
 
+type ToolEntry = {
+  toolName: string;
+  preview?: ToolUiPreview;
+  isError?: boolean;
+  finished?: boolean;
+  startedAt: number;
+  approvalPending?: boolean;
+  approvalRequestId?: string;
+  approvalReason?: string;
+  approvalSummary?: string;
+};
+
+type StreamingSegment =
+  | { type: "thinking"; text: string }
+  | { type: "text"; text: string }
+  | { type: "tool"; toolCallId: string };
+
 type StreamingState = {
-  thinkingText: string;
-  assistantText: string;
-  activeTools: Map<string, {
-    toolName: string;
-    preview?: ToolUiPreview;
-    isError?: boolean;
-    finished?: boolean;
-    startedAt: number;
-  }>;
+  segments: StreamingSegment[];
+  activeTools: Map<string, ToolEntry>;
 };
 
 function createEmptyStreamingState(): StreamingState {
-  return { thinkingText: "", assistantText: "", activeTools: new Map() };
+  return { segments: [], activeTools: new Map() };
+}
+
+function appendOrMergeSegment(
+  segments: StreamingSegment[],
+  segType: "thinking" | "text",
+  delta: string,
+): void {
+  const last = segments[segments.length - 1];
+  if (last && last.type === segType) {
+    last.text += delta;
+  } else {
+    segments.push({ type: segType, text: delta });
+  }
 }
 
 function createMockEmptySession(): SessionRecord {
@@ -81,7 +104,14 @@ function isDemoSession(sessionId: string | null): boolean {
   return sessionId === "session-learning-doc-plan";
 }
 
-function getStreamingBashStatus(tool: { isError?: boolean; finished?: boolean }): BashStatus {
+function getStreamingBashStatus(tool: {
+  isError?: boolean;
+  finished?: boolean;
+  approvalPending?: boolean;
+}): BashStatus {
+  if (tool.approvalPending) {
+    return "pending";
+  }
   if (!tool.finished) {
     return "running";
   }
@@ -121,143 +151,179 @@ function getStreamingDirectoryText(
   return `Listed ${preview.path}`;
 }
 
+function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): MessageBlock {
+  const blockId = `streaming-tool-${toolCallId}`;
+
+  if (tool.preview?.kind === "bash") {
+    return {
+      kind: "bash",
+      id: blockId,
+      status: getStreamingBashStatus(tool),
+      title: tool.approvalPending
+        ? (tool.approvalSummary ?? "Bash command needs approval")
+        : tool.preview.title,
+      command: tool.preview.command || "Waiting for Bash result...",
+      commandPreview: tool.preview.commandPreview || "bash",
+      cwd: tool.preview.cwd,
+      stdout: tool.finished ? tool.preview.stdout : undefined,
+      stderr: tool.isError ? "Tool execution failed" : undefined,
+      reason: tool.approvalReason ?? tool.preview.reason,
+      approvalRequestId: tool.approvalRequestId,
+      intent: tool.preview.intent,
+      createdAt: now,
+    };
+  }
+
+  if (tool.preview?.kind === "read") {
+    return {
+      kind: "read",
+      id: blockId,
+      filePath: tool.preview.filePath,
+      range: tool.preview.range,
+      displayText: getStreamingReadText(tool.preview),
+      createdAt: now,
+      status: tool.finished ? "completed" : "running",
+    };
+  }
+
+  if (tool.preview?.kind === "search") {
+    return {
+      kind: "search",
+      id: blockId,
+      query: tool.preview.query,
+      scope: tool.preview.scope,
+      resultCount: tool.finished ? tool.preview.resultCount : undefined,
+      displayText: getStreamingSearchText(tool.preview),
+      createdAt: now,
+      status: tool.finished ? "completed" : "running",
+    };
+  }
+
+  if (tool.preview?.kind === "grep") {
+    return {
+      kind: "grep",
+      id: blockId,
+      pattern: tool.preview.pattern,
+      scope: tool.preview.scope,
+      resultCount: tool.finished ? tool.preview.resultCount : undefined,
+      displayText: getStreamingGrepText(tool.preview),
+      createdAt: now,
+      status: tool.finished ? "completed" : "running",
+    };
+  }
+
+  if (tool.preview?.kind === "glob") {
+    return {
+      kind: "glob",
+      id: blockId,
+      pattern: tool.preview.pattern,
+      scope: tool.preview.scope,
+      resultCount: tool.finished ? tool.preview.resultCount : undefined,
+      displayText: getStreamingGlobText(tool.preview),
+      createdAt: now,
+      status: tool.finished ? "completed" : "running",
+    };
+  }
+
+  if (tool.preview?.kind === "web_search") {
+    return {
+      kind: "web_search",
+      id: blockId,
+      mode: tool.preview.mode,
+      query: tool.preview.query,
+      url: tool.preview.url,
+      displayText: getStreamingWebSearchText(tool.preview),
+      createdAt: now,
+      status: tool.finished ? "completed" : "running",
+    };
+  }
+
+  if (tool.preview?.kind === "directory_list") {
+    return {
+      kind: "directory_list",
+      id: blockId,
+      path: tool.preview.path,
+      entryCount: tool.finished ? tool.preview.entryCount : undefined,
+      displayText: getStreamingDirectoryText(tool.preview, tool.finished),
+      createdAt: now,
+      status: tool.finished ? "completed" : "running",
+    };
+  }
+
+  if (tool.preview?.kind === "edit_diff") {
+    return {
+      kind: "edit_diff",
+      id: blockId,
+      filePath: tool.preview.filePath,
+      additions: tool.preview.additions,
+      deletions: tool.preview.deletions,
+      diff: tool.preview.diff,
+      collapsedLines: tool.preview.collapsedLines,
+      createdAt: now,
+      status: tool.finished ? "completed" : "running",
+    };
+  }
+
+  if (tool.preview?.kind === "write") {
+    return {
+      kind: "write_diff",
+      id: blockId,
+      filePath: tool.preview.filePath,
+      additions: tool.preview.additions,
+      deletions: tool.preview.deletions,
+      diff: tool.preview.diff,
+      collapsedLines: tool.preview.collapsedLines,
+      streamingContent: tool.finished ? undefined : tool.preview.streamingContent,
+      createdAt: now,
+      status: tool.finished ? "completed" : "running",
+    };
+  }
+
+  return {
+    kind: "tool",
+    id: blockId,
+    title: tool.preview?.kind === "generic"
+      ? tool.preview.title
+      : tool.finished ? `${tool.toolName}` : `Running ${tool.toolName}...`,
+    content: tool.preview?.kind === "generic"
+      ? tool.preview.content
+      : tool.finished
+        ? tool.isError ? "Tool execution failed" : "Completed"
+        : "Executing...",
+    createdAt: now,
+    isError: tool.isError,
+  };
+}
+
 function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
   const now = new Date().toISOString();
   const blocks: MessageBlock[] = [];
+  let thinkingIdx = 0;
+  let textIdx = 0;
 
-  if (state.thinkingText) {
-    blocks.push({
-      kind: "thinking",
-      id: "streaming-thinking",
-      title: "Thinking...",
-      content: state.thinkingText,
-      createdAt: now,
-      collapsedByDefault: false,
-    });
-  }
-
-  for (const [toolCallId, tool] of state.activeTools) {
-    if (tool.preview?.kind === "bash") {
+  for (const seg of state.segments) {
+    if (seg.type === "thinking") {
       blocks.push({
-        kind: "bash",
-        id: `streaming-tool-${toolCallId}`,
-        status: getStreamingBashStatus(tool),
-        title: tool.preview.title,
-        command: tool.preview.command || "Waiting for Bash result...",
-        commandPreview: tool.preview.commandPreview || "bash",
-        cwd: tool.preview.cwd,
-        stdout: tool.finished ? tool.preview.stdout : undefined,
-        stderr: tool.isError ? "Tool execution failed" : undefined,
+        kind: "thinking",
+        id: `streaming-thinking-${thinkingIdx++}`,
+        title: "Thinking...",
+        content: seg.text,
+        createdAt: now,
+        collapsedByDefault: false,
+      });
+    } else if (seg.type === "text") {
+      blocks.push({
+        kind: "assistant",
+        id: `streaming-assistant-${textIdx++}`,
+        content: seg.text,
         createdAt: now,
       });
-      continue;
+    } else if (seg.type === "tool") {
+      const tool = state.activeTools.get(seg.toolCallId);
+      if (tool) {
+        blocks.push(toolEntryToBlock(seg.toolCallId, tool, now));
+      }
     }
-
-    if (tool.preview?.kind === "read") {
-      blocks.push({
-        kind: "read",
-        id: `streaming-tool-${toolCallId}`,
-        filePath: tool.preview.filePath,
-        range: tool.preview.range,
-        displayText: getStreamingReadText(tool.preview),
-        createdAt: now,
-        status: tool.finished ? "completed" : "running",
-      });
-      continue;
-    }
-
-    if (tool.preview?.kind === "search") {
-      blocks.push({
-        kind: "search",
-        id: `streaming-tool-${toolCallId}`,
-        query: tool.preview.query,
-        scope: tool.preview.scope,
-        resultCount: tool.finished ? tool.preview.resultCount : undefined,
-        displayText: getStreamingSearchText(tool.preview),
-        createdAt: now,
-        status: tool.finished ? "completed" : "running",
-      });
-      continue;
-    }
-
-    if (tool.preview?.kind === "grep") {
-      blocks.push({
-        kind: "grep",
-        id: `streaming-tool-${toolCallId}`,
-        pattern: tool.preview.pattern,
-        scope: tool.preview.scope,
-        resultCount: tool.finished ? tool.preview.resultCount : undefined,
-        displayText: getStreamingGrepText(tool.preview),
-        createdAt: now,
-        status: tool.finished ? "completed" : "running",
-      });
-      continue;
-    }
-
-    if (tool.preview?.kind === "glob") {
-      blocks.push({
-        kind: "glob",
-        id: `streaming-tool-${toolCallId}`,
-        pattern: tool.preview.pattern,
-        scope: tool.preview.scope,
-        resultCount: tool.finished ? tool.preview.resultCount : undefined,
-        displayText: getStreamingGlobText(tool.preview),
-        createdAt: now,
-        status: tool.finished ? "completed" : "running",
-      });
-      continue;
-    }
-
-    if (tool.preview?.kind === "web_search") {
-      blocks.push({
-        kind: "web_search",
-        id: `streaming-tool-${toolCallId}`,
-        mode: tool.preview.mode,
-        query: tool.preview.query,
-        url: tool.preview.url,
-        displayText: getStreamingWebSearchText(tool.preview),
-        createdAt: now,
-        status: tool.finished ? "completed" : "running",
-      });
-      continue;
-    }
-
-    if (tool.preview?.kind === "directory_list") {
-      blocks.push({
-        kind: "directory_list",
-        id: `streaming-tool-${toolCallId}`,
-        path: tool.preview.path,
-        entryCount: tool.finished ? tool.preview.entryCount : undefined,
-        displayText: getStreamingDirectoryText(tool.preview, tool.finished),
-        createdAt: now,
-        status: tool.finished ? "completed" : "running",
-      });
-      continue;
-    }
-
-    blocks.push({
-      kind: "tool",
-      id: `streaming-tool-${toolCallId}`,
-      title: tool.preview?.kind === "generic"
-        ? tool.preview.title
-        : tool.finished ? `${tool.toolName}` : `Running ${tool.toolName}...`,
-      content: tool.preview?.kind === "generic"
-        ? tool.preview.content
-        : tool.finished
-          ? tool.isError ? "Tool execution failed" : "Completed"
-          : "Executing...",
-      createdAt: now,
-      isError: tool.isError,
-    });
-  }
-
-  if (state.assistantText) {
-    blocks.push({
-      kind: "assistant",
-      id: "streaming-assistant",
-      content: state.assistantText,
-      createdAt: now,
-    });
   }
 
   return blocks;
@@ -373,20 +439,43 @@ export function App() {
         break;
 
       case "assistant_thinking_delta":
-        state.thinkingText += event.delta;
+        appendOrMergeSegment(state.segments, "thinking", event.delta);
         break;
 
       case "assistant_text_delta":
-        state.assistantText += event.delta;
+        appendOrMergeSegment(state.segments, "text", event.delta);
         break;
 
-      case "tool_started":
-        state.activeTools.set(event.toolCallId, {
-          toolName: event.toolName,
-          preview: event.preview,
-          startedAt: Date.now(),
-        });
+      case "tool_call_streaming": {
+        const existing = state.activeTools.get(event.toolCallId);
+        if (existing) {
+          existing.preview = event.preview;
+        } else {
+          state.activeTools.set(event.toolCallId, {
+            toolName: event.toolName,
+            preview: event.preview,
+            startedAt: Date.now(),
+          });
+          state.segments.push({ type: "tool", toolCallId: event.toolCallId });
+        }
         break;
+      }
+
+      case "tool_started": {
+        const existing = state.activeTools.get(event.toolCallId);
+        if (existing) {
+          existing.preview = event.preview;
+          existing.toolName = event.toolName;
+        } else {
+          state.activeTools.set(event.toolCallId, {
+            toolName: event.toolName,
+            preview: event.preview,
+            startedAt: Date.now(),
+          });
+          state.segments.push({ type: "tool", toolCallId: event.toolCallId });
+        }
+        break;
+      }
 
       case "tool_finished": {
         const tool = state.activeTools.get(event.toolCallId);
@@ -411,6 +500,28 @@ export function App() {
           } else {
             finishTool();
           }
+        }
+        break;
+      }
+
+      case "tool_approval_required": {
+        const tool = state.activeTools.get(event.toolCallId);
+        if (tool) {
+          tool.approvalPending = true;
+          tool.approvalRequestId = event.requestId;
+          tool.approvalReason = event.reason;
+          tool.approvalSummary = event.summary;
+          if (tool.preview?.kind === "bash" && event.command) {
+            tool.preview = { ...tool.preview, command: event.command };
+          }
+        }
+        break;
+      }
+
+      case "tool_approval_resolved": {
+        const tool = state.activeTools.get(event.toolCallId);
+        if (tool) {
+          tool.approvalPending = false;
         }
         break;
       }

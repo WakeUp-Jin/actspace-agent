@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { BootstrapState, RunTurnInput, RuntimeStreamEvent, SessionListItem, SessionRecord } from "@actspace/shared";
 import { App } from "../App";
+import { ToolLogLine } from "../components/messages/ToolLogLine";
 
 const bootstrapState: BootstrapState = {
   appVersion: "0.1.0",
@@ -30,6 +31,23 @@ function createEmptySessionRecord(sessionId: string): SessionRecord {
 }
 
 describe("App streaming user message", () => {
+  const originalScrollWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollWidth");
+  const originalClientWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+
+  afterEach(() => {
+    if (originalScrollWidthDescriptor) {
+      Object.defineProperty(HTMLElement.prototype, "scrollWidth", originalScrollWidthDescriptor);
+    } else {
+      delete (HTMLElement.prototype as unknown as { scrollWidth?: number }).scrollWidth;
+    }
+
+    if (originalClientWidthDescriptor) {
+      Object.defineProperty(HTMLElement.prototype, "clientWidth", originalClientWidthDescriptor);
+    } else {
+      delete (HTMLElement.prototype as unknown as { clientWidth?: number }).clientWidth;
+    }
+  });
+
   it("scrolls to the latest message when the user sends a new message", async () => {
     const sessionId = "session-scroll";
     const record = createEmptySessionRecord(sessionId);
@@ -58,6 +76,8 @@ describe("App streaming user message", () => {
       getSession: async () => record,
       createSession: async () => record,
       abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      listPendingApprovals: async () => [],
       onAgentStream: () => () => {},
       runTurn: () =>
         new Promise((resolve) => {
@@ -114,6 +134,8 @@ describe("App streaming user message", () => {
       getSession: async () => record,
       createSession: async () => record,
       abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      listPendingApprovals: async () => [],
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {
@@ -180,6 +202,8 @@ describe("App streaming user message", () => {
       getSession: async () => record,
       createSession: async () => record,
       abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      listPendingApprovals: async () => [],
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {
@@ -253,6 +277,8 @@ describe("App streaming user message", () => {
       getSession: async () => record,
       createSession: async () => record,
       abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      listPendingApprovals: async () => [],
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {
@@ -329,6 +355,8 @@ describe("App streaming user message", () => {
       getSession: async () => record,
       createSession: async () => record,
       abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      listPendingApprovals: async () => [],
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {
@@ -395,6 +423,75 @@ describe("App streaming user message", () => {
     });
   });
 
+  it("only renders grep and glob tooltips when the tool line is truncated", async () => {
+    const longGrepText =
+      "Grep react|React|useState|useEffect|useCallback|useMemo|useRef|createContext|useContext in /workspace/packages";
+
+    Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
+      configurable: true,
+      get() {
+        return 320;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return 640;
+      },
+    });
+
+    const { rerender } = render(
+      <ToolLogLine
+        message={{
+          kind: "grep",
+          id: "grep-short",
+          pattern: "ToolUiPreview",
+          scope: "*.ts",
+          displayText: "Grep ToolUiPreview in *.ts",
+          createdAt: new Date().toISOString(),
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Grep ToolUiPreview in *.ts")).toBeTruthy();
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
+      configurable: true,
+      get() {
+        return 860;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return 320;
+      },
+    });
+
+    rerender(
+      <ToolLogLine
+        message={{
+          kind: "glob",
+          id: "glob-long",
+          pattern: "react|React|useState|useEffect|useCallback|useMemo|useRef|createContext|useContext",
+          scope: "/workspace/packages",
+          displayText: longGrepText.replace("Grep", "Glob"),
+          createdAt: new Date().toISOString(),
+        }}
+      />,
+    );
+
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip.textContent).toBe(
+      "Glob react|React|useState|useEffect|useCallback|useMemo|useRef|createContext|useContext in /workspace/packages",
+    );
+    expect(tooltip.closest(".tool-log-line")?.classList.contains("is-tooltip-open")).toBe(false);
+
+    await userEvent.hover(tooltip.closest(".tool-log-line") as HTMLElement);
+    expect(tooltip.closest(".tool-log-line")?.classList.contains("is-tooltip-open")).toBe(true);
+  });
+
   it("switches the send button into a stop button and calls abortTurn while streaming", async () => {
     const sessionId = "session-abort";
     const record = createEmptySessionRecord(sessionId);
@@ -418,6 +515,8 @@ describe("App streaming user message", () => {
       getSession: async () => record,
       createSession: async () => record,
       abortTurn: abortTurnMock,
+      submitApproval: async () => ({ ok: true }),
+      listPendingApprovals: async () => [],
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {

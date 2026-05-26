@@ -45,7 +45,7 @@ Renderer ──IPC──▶ Main Process ──调用──▶ Bridge ──驱�
 - Electron app 生命周期（`configureAppPaths`、`createMainWindow`）
 - IPC handler 注册和路由
 - 调用 `buildAgentConfig()` 构建配置（前端参数 + 内部读 env）
-- 调用 `createAgentFromConfig()` 创建运行时实例
+- 调用 `await createAgentForSession(config, { sessionPath })` 创建运行时实例（会话历史在 ContextManager 构造阶段一次性恢复）
 - 调用 `runTurnWithAgent()` 执行 turn
 - 持久化 `AgentTurnResult` 到 session store
 - 管理 abort 闭包
@@ -53,6 +53,7 @@ Renderer ──IPC──▶ Main Process ──调用──▶ Bridge ──驱�
 **不做什么：**
 - 不直接构造 `LLMConfig`（委托给 `buildAgentConfig`）
 - 不直接读取 `process.env` 来拼 API Key（委托给 `resolveAgentEnvConfig`）
+- **不读 `session.jsonl`、不调 `recoverMessages` / `sessionEventsToMessages`、不感知任何会话恢复细节**——只把 `sessionPath` 透传给 `createAgentForSession`，由 ConversationContext 自己完成读盘 + 转换 + 灌 message。
 - 不处理 Agent 内部事件（委托给 Bridge）
 
 **关键文件：**
@@ -62,8 +63,11 @@ Renderer ──IPC──▶ Main Process ──调用──▶ Bridge ──驱�
 **配置两步法：**
 ```typescript
 const config = buildAgentConfig({ model, thinkingEnabled }, workspaceRoot);
-const deps = createAgentFromConfig(config);
+const sessionPaths = createSessionStorePaths(join(roots.sessionRoot, input.sessionId));
+const deps = await createAgentForSession(config, { sessionPath: sessionPaths.sessionPath });
 ```
+
+`createAgentFromConfig`（同步签名）保留，仅供 mock / 单元测试 / 纯内存场景使用。
 
 ## 3. Bridge 层
 
@@ -77,6 +81,7 @@ const deps = createAgentFromConfig(config);
 - 不创建 LLM/Tool 实例（接收已创建好的）
 - 不持久化数据
 - 不处理 IPC 传输
+- 不感知会话历史恢复——拿到的 `deps.contextManager` 在构造阶段就已经包含完整历史，`getContext()` 同步可见
 
 ## 4. Agent 层
 
@@ -98,8 +103,8 @@ const deps = createAgentFromConfig(config);
 用户输入 → Renderer
          → [IPC: RunTurnInput]
          → Main Process
-           → buildAgentConfig(frontendInput, workspaceRoot) → AgentConfig
-           → createAgentFromConfig(config)                  → AgentDeps
+           → buildAgentConfig(frontendInput, workspaceRoot)          → AgentConfig
+           → await createAgentForSession(config, { sessionPath })    → AgentDeps（含已恢复历史的 ContextManager）
            → runTurnWithAgent(input, deps, { onStreamEvent })
          → Bridge
            → new Agent(deps).run(userInput)
@@ -119,6 +124,7 @@ Agent 结束
 
 - [ ] 前端传递的字段是否只在 `RunTurnInput` 中定义？
 - [ ] 配置构建是否通过 `buildAgentConfig` 完成？（不要在 main 直接拼 LLMConfig）
+- [ ] Main 进程是否仅透传 `sessionPath` 给 `createAgentForSession`，没有自行读 `session.jsonl` 或调 `sessionEventsToMessages`？
 - [ ] Agent 内部新增的事件是否在 Bridge 中有对应的 `RuntimeStreamEvent` 翻译？
 - [ ] Agent 层的代码是否依赖了 Electron API？（不应该）
 - [ ] 持久化是否只在 Main Process 层完成？

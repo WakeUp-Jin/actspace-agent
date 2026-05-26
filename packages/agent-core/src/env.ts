@@ -58,6 +58,8 @@ export interface AppEnv {
   MOCK_MODE: boolean;
   /** 逗号分隔的禁用工具名列表 */
   ACTSPACE_DISABLED_TOOLS: string[];
+  /** 调试开关：所有 bash 命令都进入审核（仅绕过 allowlist，硬拒绝仍生效） */
+  ACTSPACE_BASH_ALWAYS_ASK: boolean;
 }
 
 type EnvField<T> = {
@@ -185,6 +187,12 @@ const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
     required: false,
     default: [],
     parse: csv,
+  },
+  ACTSPACE_BASH_ALWAYS_ASK: {
+    envKey: "ACTSPACE_BASH_ALWAYS_ASK",
+    required: false,
+    default: false,
+    parse: bool,
   },
 };
 

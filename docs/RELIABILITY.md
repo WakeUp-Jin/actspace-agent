@@ -60,6 +60,14 @@
 - 还没有自动化 smoke path 覆盖“启动 -> turn -> 恢复”。
 - 当前 session 持久化格式和恢复链路仍需要持续收口，避免事件格式心智漂移。
 
+## 上线前关键验收清单
+
+- Grep/Glob 不依赖用户本机安装 ripgrep：
+  - 在隔离 `PATH` 的环境中确认系统 `rg` 不可用，不要删除或卸载用户本机命令。
+  - 不设置 `ACTSPACE_RG_PATH`。
+  - 执行 Grep/Glob smoke，或直接验证 `resolveRipgrepCommand()`。
+  - 预期使用 bundled `@vscode/ripgrep`，Grep/Glob 仍可返回结果。
+
 ## 后续建议维护的内容
 
 随着真实 provider 和更多工具接入，这里建议继续补这些内容：

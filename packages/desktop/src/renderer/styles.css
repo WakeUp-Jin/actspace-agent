@@ -885,7 +885,9 @@ svg {
 }
 
 .tool-log-line {
+  position: relative;
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 6px;
   color: var(--color-text-muted);
@@ -895,11 +897,41 @@ svg {
   padding: 0 var(--conversation-text-inset);
 }
 
-.tool-log-line.web-search span {
+.tool-log-line.has-overflow-text {
+  max-width: 100%;
+  outline: none;
+}
+
+.tool-log-line-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tool-log-tooltip {
+  position: absolute;
+  z-index: 40;
+  left: var(--conversation-text-inset);
+  top: calc(100% + 6px);
+  display: none;
+  max-width: min(720px, calc(100vw - 96px));
+  border: 1px solid rgba(223, 228, 234, 0.84);
+  border-radius: var(--radius-sm);
+  background: rgba(32, 33, 36, 0.96);
+  box-shadow: var(--shadow-popover);
+  color: #f7f8fa;
+  font-size: 12px;
+  font-weight: 430;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  padding: 7px 9px;
+  pointer-events: none;
+  white-space: normal;
+}
+
+.tool-log-line.is-tooltip-open .tool-log-tooltip {
+  display: block;
 }
 
 .thinking-block + .tool-log-line,
@@ -1036,6 +1068,24 @@ svg {
   color: var(--accent);
 }
 
+.bash-intent-comment {
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.bash-intent-comment--block {
+  padding: 9px var(--conversation-card-padding) 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.bash-intent-hash {
+  color: var(--color-text-faint);
+}
+
 .bash-approval-command {
   margin: 0;
   overflow-wrap: anywhere;
@@ -1133,52 +1183,65 @@ svg {
   background: #2676b8;
 }
 
-.diff-card {
-  width: 100%;
-  max-width: none;
-  overflow: hidden;
-  border: 1px solid rgba(200, 209, 220, 0.82);
-  border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 12px 34px rgba(31, 45, 61, 0.04);
+.file-diff-block {
+  max-width: 800px;
+  margin: 2px 0 0;
+  padding: 0 var(--conversation-text-inset);
 }
 
-.diff-card-header {
-  display: flex;
+.file-diff-toggle {
+  display: inline-flex;
+  max-width: 100%;
   align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid var(--line);
-  color: var(--color-text);
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-family: inherit;
   font-size: 14px;
-  line-height: 1.25;
-  padding: 9px var(--conversation-card-padding);
+  font-weight: 430;
+  line-height: 1.42;
+  cursor: pointer;
+  text-align: left;
 }
 
-.diff-card-header strong {
-  font-weight: 600;
+.file-diff-toggle:hover {
+  color: var(--color-text);
 }
 
-.file-glyph {
-  color: var(--color-warm);
+.file-diff-toggle svg {
+  flex-shrink: 0;
+  color: var(--color-text-faint);
+}
+
+.file-diff-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .diff-additions {
   color: var(--success);
-  font-size: 14px;
-  font-weight: 620;
-  margin-left: 4px;
+  font-weight: 600;
+  margin-left: 2px;
 }
 
 .diff-deletions {
   color: var(--danger);
-  font-size: 14px;
-  font-weight: 620;
+  font-weight: 600;
+  margin-left: 2px;
 }
 
-.diff-preview {
-  margin: 0;
+.file-diff-content {
+  margin: 6px 0 0;
+  padding: 6px 0;
   overflow: hidden;
+  overflow-x: auto;
   background: var(--color-surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.55;
@@ -1186,7 +1249,7 @@ svg {
 
 .diff-line {
   display: block;
-  padding: 1px var(--conversation-card-padding);
+  padding: 1px 12px;
   white-space: pre;
 }
 
@@ -1200,12 +1263,50 @@ svg {
   color: #a43342;
 }
 
-.diff-expand {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 22px;
-  color: var(--color-text-faint);
+.thinking-block + .file-diff-block,
+.file-diff-block + .file-diff-block,
+.tool-log-line + .file-diff-block,
+.file-diff-block + .tool-log-line,
+.file-diff-block + .thinking-block {
+  margin-top: -4px;
+}
+
+.file-diff-block.is-streaming {
+  margin-top: 4px;
+  padding: 0 var(--conversation-text-inset);
+}
+
+.file-diff-streaming-header {
+  margin-bottom: 4px;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 430;
+  line-height: 1.42;
+}
+
+.file-diff-content.is-streaming-content {
+  padding: 8px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #08784f;
+  background: rgba(44, 168, 105, 0.08);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.streaming-cursor {
+  display: inline-block;
+  width: 0.55ch;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  animation: streaming-cursor-blink 1s steps(2, end) infinite;
+}
+
+@keyframes streaming-cursor-blink {
+  50% { opacity: 0; }
 }
 
 .composer-zone {
@@ -1707,34 +1808,43 @@ svg {
 }
 
 .tool-log-line.is-running {
-  position: relative;
-  overflow: hidden;
+  color: #6f7681;
 }
 
-.tool-log-line.is-running::before {
-  content: "";
-  position: absolute;
-  inset: 1px -24%;
-  background: linear-gradient(
-    108deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.04) 36%,
-    rgba(255, 255, 255, 0.28) 50%,
-    rgba(255, 255, 255, 0.04) 64%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  transform: translateX(-100%);
-  animation: tool-log-shimmer 1.45s linear infinite;
-  pointer-events: none;
+.tool-log-line.is-running .tool-log-line-text {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background:
+    linear-gradient(
+      90deg,
+      #6f7681 0%,
+      #6f7681 35%,
+      #6ea7ff 50%,
+      #6f7681 65%,
+      #6f7681 100%
+    );
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: tool-log-text-shimmer 1.1s ease-in-out infinite;
 }
 
-@keyframes tool-log-shimmer {
+@keyframes tool-log-text-shimmer {
   from {
-    transform: translateX(-100%);
+    background-position: 100% 0;
   }
 
   to {
-    transform: translateX(100%);
+    background-position: 0% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-log-line.is-running .tool-log-line-text {
+    color: #5f8fdc;
+    animation: none;
   }
 }
 

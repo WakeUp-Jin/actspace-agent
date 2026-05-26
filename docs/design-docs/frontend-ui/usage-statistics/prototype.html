@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>actspace - Usage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'SFMono-Regular', 'Cascadia Code', 'JetBrains Mono', monospace;
+  --bg: #f7f8fb;
+  --card: #ffffff;
+  --surface: #f3f6fb;
+  --surface-2: #edf3ff;
+  --border: #dfe5ee;
+  --border-soft: #edf1f6;
+  --t1: #111827;
+  --t2: #4b5565;
+  --t3: #7d8796;
+  --t4: #a8b0bd;
+  --accent: #2f6fff;
+  --accent-strong: #1f5fe8;
+  --accent-soft: #edf4ff;
+  --cyan: #28b7d8;
+  --violet: #8b5cf6;
+  --r: 14px;
+  --r-sm: 10px;
+  --shadow: 0 1px 2px rgba(17,24,39,0.03), 0 0 0 1px rgba(17,24,39,0.08);
+  --shadow-hover: 0 10px 30px rgba(32,55,93,0.08), 0 0 0 1px rgba(47,111,255,0.15);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:var(--font);color:var(--t1);background:var(--bg);-webkit-font-smoothing:antialiased}
+button{border:0;background:none;cursor:pointer;font:inherit;color:inherit}
+.shell{height:100vh;overflow:hidden}
+.main{height:100%;overflow-y:auto;background:var(--bg);padding:24px}
+.main::-webkit-scrollbar{width:8px}
+.main::-webkit-scrollbar-thumb{background:#c8d1dc;border-radius:99px}
+.grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+.left,.right{display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
+.side-summary{padding:20px}
+.metric-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.metric-tile{min-height:58px;border-radius:12px;background:#fafbfc;display:grid;place-items:center;text-align:center}
+.metric-val{font-size:16px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.metric-lbl{font-size:11px;color:var(--t4);margin-top:3px}
+.rank-list{margin-top:18px;padding-top:18px;border-top:1px solid var(--border-soft);display:flex;flex-direction:column;gap:11px}
+.rank-row{display:flex;align-items:center;gap:12px;font-size:15px}
+.rank-badge{width:24px;height:24px;border-radius:50%;background:#f1f3f5;color:#8f96a3;font-size:11px;font-weight:800;display:grid;place-items:center;flex:0 0 auto}
+.rank-name{flex:1;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-pct{min-width:58px;text-align:right;font-size:15px;font-weight:800;color:var(--t1);font-variant-numeric:tabular-nums}
+.side-foot{margin-top:18px;padding-top:14px;border-top:1px solid var(--border-soft);display:flex;justify-content:space-between;gap:14px;color:var(--t3);font-size:12px;white-space:nowrap}
+.heatmap-card{padding:20px}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.card-title{font-size:16px;font-weight:800;color:var(--t2);white-space:nowrap}
+.hm-controls{display:flex;align-items:center;gap:8px}
+.segmented{display:flex;align-items:center;border:1px solid var(--border);border-radius:10px;padding:2px;background:#fff}
+.segmented button{min-width:36px;height:26px;border-radius:8px;font-size:12px;font-weight:700;color:var(--t3)}
+.segmented button.on{background:var(--surface);color:var(--t1)}
+.tz{color:var(--t4);font-size:12px}
+.hm-months{display:flex;margin-left:28px;margin-bottom:8px;color:var(--t4);font-size:12px}
+.hm-month{display:inline-block}
+.hm-wrap{display:flex;gap:8px}
+.hm-labels{display:flex;flex-direction:column;gap:4px;padding-top:1px}
+.hm-lbl{height:14px;line-height:14px;color:var(--t3);font-size:12px}
+.hm{display:flex;gap:4px;overflow-x:auto;min-width:0;padding-bottom:6px}
+.hm::-webkit-scrollbar{height:10px}
+.hm::-webkit-scrollbar-thumb{background:#d9e0ea;border-radius:99px}
+.hm-col{display:flex;flex-direction:column;gap:4px}
+.hm-cell{width:14px;height:14px;border-radius:4px}
+.hm-cell[data-l="0"]{background:#e9edf3}
+.hm-cell[data-l="1"]{background:#cfe0ff}
+.hm-cell[data-l="2"]{background:#78a9ff}
+.hm-cell[data-l="3"]{background:#2f6fff}
+.hm-foot{display:flex;justify-content:flex-end;align-items:center;gap:5px;margin-top:12px;color:var(--t4);font-size:12px}
+.hm-sc{width:12px;height:12px;border-radius:3px}
+.trend-card{padding:20px}
+.trend{display:flex;align-items:flex-end;gap:4px;height:98px}
+.trend-col{flex:1;height:100%;display:flex;align-items:flex-end}
+.trend-b{width:100%;min-height:4px;border-radius:6px 6px 0 0;background:linear-gradient(180deg,#8bb6ff,#2f6fff);opacity:.74;transition:opacity 100ms}
+.trend-b:hover{opacity:1}
+.trend-dates{display:flex;justify-content:space-between;margin-top:12px;color:var(--t4);font-size:13px}
+.overview{min-height:416px;padding:22px 24px}
+.overview-top{display:flex;align-items:center;justify-content:space-between}
+.tabs{display:flex;align-items:center;gap:8px}
+.tab{height:34px;padding:0 12px;border-radius:10px;color:var(--t3);font-size:13px;font-weight:800;white-space:nowrap}
+.tab:hover{color:var(--t1)}
+.tab.on{background:#f1f2f4;color:var(--t1)}
+.top-actions{display:flex;gap:8px}
+.icon-btn,.share-btn{height:36px;border:1px solid #d7dbe2;border-radius:10px;background:#fff;display:inline-flex;align-items:center;justify-content:center;color:var(--t1);font-weight:800;transition:box-shadow 100ms,border-color 100ms}
+.share-btn{gap:6px;padding:0 12px;font-size:13px;white-space:nowrap}
+.icon-btn{width:36px}
+.icon-btn:hover,.share-btn:hover{border-color:#c7d5f2;box-shadow:var(--shadow-hover)}
+.icon-btn svg,.share-btn svg{width:16px;height:16px}
+.hero{text-align:center;padding:40px 20px 34px}
+.hero-lbl{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--t3);margin-bottom:18px}
+.hero-num{font-size:clamp(56px,5.1vw,72px);line-height:.9;font-weight:800;letter-spacing:-0.055em;font-variant-numeric:tabular-nums;color:#050505}
+.hero-cost{display:inline-flex;align-items:center;gap:6px;margin-top:28px;color:var(--accent);font-size:20px;font-weight:800}
+.hero-cost svg{width:16px;height:16px;opacity:.7}
+.dist{height:8px;border-radius:99px;display:flex;overflow:hidden;background:#e8edf4}
+.dist-seg{height:100%}
+.token-breakdown{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px}
+.breakdown-item{border:1px solid var(--border);border-radius:12px;padding:13px 14px;background:#fff}
+.bd-lbl{font-size:12px;color:var(--t3);font-weight:700}
+.bd-val{margin-top:6px;font-size:18px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.bd-sub{margin-top:3px;font-size:11px;color:var(--t4)}
+.tool-summary{padding:20px}
+.tool-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}
+.tool-kicker{font-size:10px;color:var(--t4);font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+.tool-title{font-size:16px;font-weight:800}
+.detail-btn{height:30px;border:1px solid #cdd9ef;border-radius:9px;background:var(--accent-soft);color:var(--accent);padding:0 10px;font-size:12px;font-weight:800}
+.tool-grid{display:block}
+.tool-meter{padding:14px;border-radius:12px;background:linear-gradient(180deg,#fbfdff,#f3f7ff);border:1px solid #dfe9fb}
+.meter-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:12px;color:var(--t3);font-weight:700}
+.meter-row strong{font-size:17px;color:var(--t1);font-variant-numeric:tabular-nums}
+.tool-bar{height:9px;border-radius:99px;overflow:hidden;background:#e8edf4;display:flex}
+.tool-seg{height:100%}
+.tool-list{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.tool-line{display:grid;grid-template-columns:14px 1fr auto;gap:8px;align-items:center;font-size:12px;color:var(--t2)}
+.tool-dot{width:8px;height:8px;border-radius:50%}
+.tool-line strong{color:var(--t1);font-variant-numeric:tabular-nums}
+.cache-card{padding:20px;background:linear-gradient(180deg,#ffffff,#f8fbff)}
+.cache-layout{display:grid;grid-template-columns:minmax(200px,.76fr) 1.24fr;gap:20px;align-items:center}
+.cache-pct{font-size:42px;line-height:1;font-weight:800;color:var(--accent);letter-spacing:-0.04em;font-variant-numeric:tabular-nums;margin-top:12px}
+.cache-bar{height:9px;border-radius:99px;background:#e7edf7;overflow:hidden;margin-top:18px}
+.cache-fill{height:100%;width:78.3%;border-radius:99px;background:linear-gradient(90deg,var(--accent),#72a5ff)}
+.cache-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cache-stat{border:1px solid var(--border-soft);border-radius:12px;background:#fff;padding:13px 14px}
+.cache-stat .val{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+.cache-stat .val.blue{color:var(--accent)}
+.cache-stat .lbl{font-size:11px;color:var(--t4);margin-top:3px}
+.table-card{padding:18px 20px 10px}
+.tbl-tabs{display:flex;gap:8px;margin-bottom:16px}
+.tbl-tab{height:34px;padding:0 16px;border-radius:10px;font-size:14px;font-weight:800;color:var(--t3)}
+.tbl-tab.on{background:#f1f2f4;color:var(--t1)}
+.table-wrap{overflow:auto;max-height:380px}
+.table-wrap::-webkit-scrollbar{width:8px;height:8px}
+.table-wrap::-webkit-scrollbar-thumb{background:#c8d1dc;border-radius:99px}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th{position:sticky;top:0;background:#fff;z-index:1;padding:12px;text-align:left;border-bottom:1px solid var(--border);font-size:12px;color:var(--t2);font-weight:800}
+th:not(:first-child){text-align:right}
+td{padding:12px;border-bottom:1px solid var(--border-soft);font-size:13px;font-variant-numeric:tabular-nums}
+td:first-child{color:var(--t3)}
+td:not(:first-child){text-align:right;font-family:var(--mono);color:var(--t2);font-size:12px}
+tr:hover td{background:#fafcff}
+.bold{font-weight:800!important;color:var(--t1)!important}
+.blue{color:var(--accent)!important;font-weight:800}
+.overlay{display:none;position:fixed;inset:0;z-index:100;background:rgba(15,23,42,.28);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:28px}
+.overlay.open{display:flex}
+.modal{width:640px;max-width:100%;max-height:calc(100vh - 56px);overflow:auto;background:#fff;border:1px solid #dce5f3;border-radius:16px;box-shadow:0 24px 70px rgba(17,24,39,.18)}
+.modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:20px 22px 16px;border-bottom:1px solid var(--border-soft)}
+.modal-kicker{font-size:11px;color:var(--t4);font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.modal-title{margin-top:4px;font-size:22px;font-weight:800}
+.modal-sub{margin-top:5px;font-size:12px;color:var(--t3)}
+.modal-close{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:var(--t3)}
+.modal-close:hover{background:var(--surface)}
+.modal-close svg{width:18px;height:18px}
+.modal-body{padding:18px 22px 22px}
+.tool-detail-list{display:flex;flex-direction:column;gap:10px}
+.detail-row{border:1px solid var(--border-soft);border-radius:12px;background:#fff;overflow:hidden}
+.detail-toggle{width:100%;display:grid;grid-template-columns:20px 1.1fr .75fr .7fr .7fr .9fr;gap:12px;align-items:center;padding:13px 14px;text-align:left}
+.detail-toggle:hover{background:#f9fbff}
+.detail-name{font-weight:800;color:var(--t1)}
+.detail-meta,.detail-num{font-size:12px;color:var(--t3);font-variant-numeric:tabular-nums}
+.detail-num{text-align:right;color:var(--t2);font-family:var(--mono)}
+.detail-extra{display:none;padding:0 14px 14px 46px;color:var(--t3);font-size:12px;line-height:1.55}
+.detail-row.open .detail-extra{display:block}
+.cost-modal{width:480px}
+.cost-groups{display:flex;flex-direction:column}
+.cost-row{display:flex;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border-soft);font-size:16px}
+.cost-row:last-child{border-bottom:0}
+.cost-row strong{font-variant-numeric:tabular-nums}
+@media(max-width:900px){
+  .main{padding:22px}
+  .grid{grid-template-columns:1fr}
+  .hero-num{font-size:62px}
+}
+@media(max-width:720px){
+  .overview{padding:22px}
+  .overview-top,.tool-head{align-items:stretch;flex-direction:column}
+  .tabs{overflow-x:auto}
+  .hero{padding:42px 0}
+  .hero-num{font-size:56px}
+  .token-breakdown,.cache-layout,.cache-stats{grid-template-columns:1fr}
+  .metric-row{grid-template-columns:repeat(2,1fr)}
+  .rank-row{font-size:16px}
+  .side-foot{font-size:14px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <main class="main">
+    <div class="grid">
+      <section class="left">
+        <div class="panel side-summary">
+          <div class="metric-row">
+            <div class="metric-tile"><div><div class="metric-val">481.4M</div><div class="metric-lbl">7d</div></div></div>
+            <div class="metric-tile"><div><div class="metric-val">539.2M</div><div class="metric-lbl">30d</div></div></div>
+            <div class="metric-tile"><div><div class="metric-val">38.5M</div><div class="metric-lbl">avg</div></div></div>
+            <div class="metric-tile"><div><div class="metric-val">3.3K</div><div class="metric-lbl">本月</div></div></div>
+          </div>
+          <div class="rank-list" id="modelList"></div>
+          <div class="side-foot"><span>排名 2025-09-01</span><span>活跃天数 139 天</span></div>
+        </div>
+
+        <div class="panel heatmap-card">
+          <div class="card-head">
+            <div class="card-title">热力图</div>
+            <div class="hm-controls">
+              <div class="segmented"><button class="on">2D</button><button>3D</button></div>
+              <span class="tz">UTC+08:00</span>
+            </div>
+          </div>
+          <div id="hmMonths" class="hm-months"></div>
+          <div class="hm-wrap">
+            <div class="hm-labels" id="hmLabels"></div>
+            <div class="hm" id="hm"></div>
+          </div>
+          <div class="hm-foot">
+            <span>少</span>
+            <div class="hm-sc" style="background:#e9edf3"></div>
+            <div class="hm-sc" style="background:#cfe0ff"></div>
+            <div class="hm-sc" style="background:#78a9ff"></div>
+            <div class="hm-sc" style="background:#2f6fff"></div>
+            <span>多</span>
+          </div>
+        </div>
+
+        <div class="panel tool-summary" id="toolSummary">
+          <div class="tool-head">
+            <div>
+              <div class="tool-kicker">Tool Calls</div>
+              <div class="tool-title">工具调用</div>
+            </div>
+            <button class="detail-btn" id="openTools" type="button">查看详情</button>
+          </div>
+          <div class="tool-grid">
+            <div class="tool-meter">
+              <div class="meter-row"><span>本月工具调用分布</span><strong>2,484 次</strong></div>
+              <div class="tool-bar" id="toolBar"></div>
+              <div class="tool-list" id="toolList"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel trend-card">
+          <div class="card-title" style="margin-bottom:18px">使用趋势</div>
+          <div class="trend" id="trend"></div>
+          <div class="trend-dates"><span>2026-05-01</span><span>2026-05-31</span></div>
+        </div>
+      </section>
+
+      <section class="right">
+        <div class="panel overview">
+          <div class="overview-top">
+            <div class="tabs" id="tabs">
+              <button class="tab" data-p="d">日</button>
+              <button class="tab" data-p="w">周</button>
+              <button class="tab on" data-p="m">月</button>
+              <button class="tab" data-p="t">总计</button>
+              <button class="tab" data-p="custom">自定义</button>
+            </div>
+            <div class="top-actions">
+              <button class="share-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h3"/><path d="M14 4h6v6"/><path d="M10 14 20 4"/></svg>
+                分享
+              </button>
+              <button class="icon-btn" type="button" onclick="location.reload()" aria-label="刷新">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="hero">
+            <div class="hero-lbl">Token 总数</div>
+            <div class="hero-num">539,108,260</div>
+            <button class="hero-cost" id="openCost" type="button">
+              $279.96
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 17v-6"/><path d="M12 7h.01"/></svg>
+            </button>
+          </div>
+          <div class="dist" id="dist"></div>
+          <div class="token-breakdown">
+            <div class="breakdown-item"><div class="bd-lbl">输入</div><div class="bd-val">18.3M</div><div class="bd-sub">直接 prompt</div></div>
+            <div class="breakdown-item"><div class="bd-lbl">输出</div><div class="bd-val">2.4M</div><div class="bd-sub">assistant 回复</div></div>
+            <div class="breakdown-item"><div class="bd-lbl">缓存</div><div class="bd-val">512.6M</div><div class="bd-sub">cache read</div></div>
+            <div class="breakdown-item"><div class="bd-lbl">推理</div><div class="bd-val">5.8M</div><div class="bd-sub">reasoning</div></div>
+          </div>
+        </div>
+
+        <div class="panel cache-card">
+          <div class="cache-layout">
+            <div>
+              <div class="card-title">缓存效率</div>
+              <div class="cache-pct">78.3%</div>
+              <div class="cache-bar"><div class="cache-fill"></div></div>
+            </div>
+            <div class="cache-stats">
+              <div class="cache-stat"><div class="val blue">9.8M</div><div class="lbl">缓存命中</div></div>
+              <div class="cache-stat"><div class="val">2.7M</div><div class="lbl">缓存未命中</div></div>
+              <div class="cache-stat"><div class="val">1.2M</div><div class="lbl">推理 Token</div></div>
+              <div class="cache-stat"><div class="val">42</div><div class="lbl">会话数</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel table-card">
+          <div class="tbl-tabs"><button class="tbl-tab on">每日细目</button><button class="tbl-tab">项目用量</button></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>日期 ▼</th><th>总计</th><th>输入</th><th>输出</th><th>缓存</th><th>推理</th><th>对话数</th></tr></thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="overlay" id="toolOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-kicker">Tool Call Detail</div>
+        <div class="modal-title">工具调用详情</div>
+        <div class="modal-sub">按调用次数排序，点击任意工具查看上下文消耗说明。</div>
+      </div>
+      <button class="modal-close" id="closeTools" type="button" aria-label="关闭工具详情">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body"><div class="tool-detail-list" id="toolDetails"></div></div>
+  </div>
+</div>
+
+<div class="overlay" id="costOverlay">
+  <div class="modal cost-modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-kicker">Estimated Cost</div>
+        <div class="modal-title">$279.96</div>
+        <div class="modal-sub">基于当前模型单价与 token usage 估算。</div>
+      </div>
+      <button class="modal-close" id="closeCost" type="button" aria-label="关闭成本详情">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="cost-groups">
+        <div class="cost-row"><span>DeepSeek R1</span><strong>$181.24</strong></div>
+        <div class="cost-row"><span>Kimi K2</span><strong>$72.90</strong></div>
+        <div class="cost-row"><span>Mock / local</span><strong>$0.00</strong></div>
+        <div class="cost-row"><span>缓存节省估算</span><strong>-$25.82</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('tabs').onclick=e=>{const t=e.target.closest('.tab');if(!t)return;document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on')};
+document.querySelectorAll('.tbl-tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tbl-tab').forEach(x=>x.classList.remove('on'));t.classList.add('on')});
+
+const models=[
+  {name:'gpt-5.5',pct:'48.0%'},
+  {name:'claude-4.6-opus-high-thinking',pct:'34.9%'},
+  {name:'gpt-5.4',pct:'12.0%'}
+];
+document.getElementById('modelList').innerHTML=models.map((m,i)=>`<div class="rank-row"><span class="rank-badge">${i+1}</span><span class="rank-name">${m.name}</span><span class="rank-pct">${m.pct}</span></div>`).join('');
+
+!function(){
+  const el=document.getElementById('hm'),lbl=document.getElementById('hmLabels'),mo=document.getElementById('hmMonths');
+  const W=22,days=['日','一','二','三','四','五','六'];
+  lbl.innerHTML=days.map(d=>`<div class="hm-lbl">${d}</div>`).join('');
+  function seeded(n){let x=Math.sin(n)*10000;return x-Math.floor(x)}
+  const today=new Date(2026,4,26),start=new Date(today);start.setDate(start.getDate()-W*7+1);
+  start.setDate(start.getDate()-start.getDay());
+  let cols='',lastMonth=-1,months=[];
+  for(let w=0;w<W;w++){
+    let cells='';
+    for(let d=0;d<7;d++){
+      const dt=new Date(start);dt.setDate(start.getDate()+w*7+d);
+      if(d===0&&dt.getMonth()!==lastMonth){months.push({w,l:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'][dt.getMonth()]});lastMonth=dt.getMonth()}
+      if(dt>today){cells+=`<div class="hm-cell" data-l="0"></div>`;continue}
+      const v=seeded(dt.getFullYear()*10000+(dt.getMonth()+1)*100+dt.getDate());
+      const lv=v>.76?3:v>.46?2:v>.18?1:0;
+      cells+=`<div class="hm-cell" data-l="${lv}" title="${dt.toISOString().slice(0,10)}"></div>`;
+    }
+    cols+=`<div class="hm-col">${cells}</div>`;
+  }
+  el.innerHTML=cols;
+  const step=18;
+  mo.innerHTML=months.map((m,i)=>{const next=i<months.length-1?months[i+1].w:W;return`<span class="hm-month" style="width:${(next-m.w)*step}px">${m.l}</span>`}).join('');
+}();
+
+const trend=[1.2,3.8,2.1,0.6,1.9,4.2,2.8,0.9,3.1,5.7,4.4,3.6,2.3,1.8,2.4,0.5,3.2,4.8,1.6,2.9,3.4,5.1,2.7,1.1,3.9,4.6,2.0,0.8,3.5,1.4,3.2];
+const maxTrend=Math.max(...trend);
+document.getElementById('trend').innerHTML=trend.map(v=>`<div class="trend-col"><div class="trend-b" style="height:${Math.max(8,(v/maxTrend)*100)}%"></div></div>`).join('');
+
+const dist=[
+  {p:60.1,c:'#2f6fff'},
+  {p:27.9,c:'#28b7d8'},
+  {p:10.7,c:'#8b5cf6'},
+  {p:1.3,c:'#cbd5e1'}
+];
+document.getElementById('dist').innerHTML=dist.map(x=>`<div class="dist-seg" style="width:${x.p}%;background:${x.c}"></div>`).join('');
+
+const tools=[
+  {name:'Bash',calls:784,tokens:'4.8M',success:'99.1%',latency:'1.9s',last:'2026-05-26 14:12',p:31.6,c:'#2f6fff',note:'构建、测试、git 与本地排障命令占比最高，平均输出较长。'},
+  {name:'Read',calls:692,tokens:'3.1M',success:'100%',latency:'0.4s',last:'2026-05-26 14:05',p:27.9,c:'#28b7d8',note:'主要用于读取源码、文档和配置文件，失败率接近零。'},
+  {name:'Grep',calls:438,tokens:'1.4M',success:'99.5%',latency:'0.7s',last:'2026-05-26 13:58',p:17.6,c:'#8b5cf6',note:'集中在跨目录定位符号、文案和样式 token。'},
+  {name:'Edit',calls:326,tokens:'2.2M',success:'97.8%',latency:'1.2s',last:'2026-05-26 13:44',p:13.1,c:'#94a3b8',note:'包含手工 patch、结构调整和小范围重写。'},
+  {name:'Browser',calls:244,tokens:'820K',success:'96.3%',latency:'2.8s',last:'2026-05-26 13:39',p:9.8,c:'#1d4ed8',note:'用于本地页面截图、交互验证和视觉回归检查。'}
+];
+document.getElementById('toolBar').innerHTML=tools.map(t=>`<div class="tool-seg" style="width:${t.p}%;background:${t.c}"></div>`).join('');
+document.getElementById('toolList').innerHTML=tools.slice(0,4).map(t=>`<div class="tool-line"><span class="tool-dot" style="background:${t.c}"></span><span>${t.name}</span><strong>${t.p}%</strong></div>`).join('');
+document.getElementById('toolDetails').innerHTML=tools.map((t,i)=>`<div class="detail-row ${i===0?'open':''}"><button class="detail-toggle" type="button"><span class="tool-dot" style="background:${t.c}"></span><span class="detail-name">${t.name}</span><span class="detail-num">${t.calls} 次</span><span class="detail-num">${t.tokens}</span><span class="detail-num">${t.success}</span><span class="detail-meta">${t.last}</span></button><div class="detail-extra">${t.note} 平均耗时 ${t.latency}，本月占比 ${t.p}%。</div></div>`).join('');
+document.getElementById('toolDetails').onclick=e=>{const btn=e.target.closest('.detail-toggle');if(!btn)return;btn.closest('.detail-row').classList.toggle('open')};
+
+const openOverlay=(id)=>document.getElementById(id).classList.add('open');
+const closeOverlay=(id)=>document.getElementById(id).classList.remove('open');
+document.getElementById('openTools').onclick=()=>openOverlay('toolOverlay');
+document.getElementById('closeTools').onclick=()=>closeOverlay('toolOverlay');
+document.getElementById('toolOverlay').onclick=e=>{if(e.target===e.currentTarget)closeOverlay('toolOverlay')};
+document.getElementById('openCost').onclick=()=>openOverlay('costOverlay');
+document.getElementById('closeCost').onclick=()=>closeOverlay('costOverlay');
+document.getElementById('costOverlay').onclick=e=>{if(e.target===e.currentTarget)closeOverlay('costOverlay')};
+
+const rows=[
+  {d:'2026-05-26',t:33596897,i:731906,o:144512,c:31804945,r:16672,s:142},
+  {d:'2026-05-25',t:141692119,i:4052695,o:690542,c:133097997,r:85004,s:676},
+  {d:'2026-05-24',t:76082620,i:5539117,o:385367,c:70126247,r:104617,s:732},
+  {d:'2026-05-23',t:93612208,i:3202240,o:457742,c:87831685,r:63544,s:363},
+  {d:'2026-05-22',t:94572584,i:6080808,o:404096,c:88087680,r:101655,s:799},
+  {d:'2026-05-21',t:32048809,i:3903036,o:291207,c:27605524,r:100463,s:383},
+  {d:'2026-05-20',t:9835932,i:195928,o:121836,c:8401122,r:0,s:49},
+  {d:'2026-05-19',t:0,i:0,o:0,c:0,r:0,s:0},
+  {d:'2026-05-18',t:0,i:0,o:0,c:0,r:0,s:0}
+];
+const fmt=n=>n===0?'—':n.toLocaleString('en-US');
+document.getElementById('tbody').innerHTML=rows.map(r=>`<tr><td>${r.d}</td><td class="bold">${fmt(r.t)}</td><td>${fmt(r.i)}</td><td>${fmt(r.o)}</td><td>${fmt(r.c)}</td><td>${fmt(r.r)}</td><td class="blue">${r.s||'—'}</td></tr>`).join('');
+</script>
+</body>
+</html>

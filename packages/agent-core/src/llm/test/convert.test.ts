@@ -117,7 +117,7 @@ describe("convertMessages", () => {
           role: "assistant",
           content: [
             { type: "toolCall", id: "tc1", name: "read_file", arguments: { path: "x" } },
-            { type: "toolCall", id: "tc2", name: "search_files", arguments: { query: "y" } },
+            { type: "toolCall", id: "tc2", name: "grep", arguments: { pattern: "y" } },
           ],
           model: "m", provider: "p",
           usage: createEmptyUsage(), stopReason: "toolUse", timestamp: Date.now(),

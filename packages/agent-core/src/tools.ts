@@ -142,17 +142,17 @@ function createReadFileTool(): RegisteredTool {
   };
 }
 
-function createSearchFilesTool(): RegisteredTool {
+function createGrepTool(): RegisteredTool {
   const definition: ToolDefinition = {
-        name: "search_files",
-        description: "Search for text across files in the workspace.",
-        previewKind: "search",
+        name: "grep",
+        description: "Search for a regex pattern across files in the workspace.",
+        previewKind: "grep",
         inputSchema: {
       type: "object",
       properties: {
-        query: { type: "string" }
+        pattern: { type: "string" }
       },
-      required: ["query"],
+      required: ["pattern"],
       additionalProperties: false
     }
   };
@@ -160,25 +160,25 @@ function createSearchFilesTool(): RegisteredTool {
   return {
     definition,
     async execute(input) {
-      const query = typeof input.query === "string" ? input.query : "";
+      const pattern = typeof input.pattern === "string" ? input.pattern : "";
       return createToolResult({
         toolName: definition.name,
-        ok: query.length > 0,
-        summary: query ? `Search for ${query}` : "Missing query",
-        rawOutput: query ? `No real search implementation yet for "${query}"` : "",
-        modelOutput: query ? `No real search implementation yet for "${query}"` : "",
-        uiPreview: query
+        ok: pattern.length > 0,
+        summary: pattern ? `Grep ${pattern}` : "Missing pattern",
+        rawOutput: pattern ? `No real grep implementation yet for "${pattern}"` : "",
+        modelOutput: pattern ? `No real grep implementation yet for "${pattern}"` : "",
+        uiPreview: pattern
           ? {
-              kind: "search",
-              query,
-              displayText: `Searched files for "${query}"`
+              kind: "grep",
+              pattern,
+              displayText: `Grep ${pattern}`
             }
           : undefined,
-        error: query
+        error: pattern
           ? undefined
           : {
               code: "INVALID_INPUT",
-              message: "query is required",
+              message: "pattern is required",
               recoverable: true
             }
       });
@@ -188,7 +188,7 @@ function createSearchFilesTool(): RegisteredTool {
 
 function createEditFileDiffTool(): RegisteredTool {
   const definition: ToolDefinition = {
-        name: "edit-file",
+        name: "edit_file",
         description: "Stage a unified diff preview for a file edit.",
         previewKind: "edit_diff",
         inputSchema: {
@@ -210,7 +210,7 @@ function createEditFileDiffTool(): RegisteredTool {
       return createToolResult({
         toolName: definition.name,
         ok: path.length > 0 && diff.length > 0,
-        summary: path ? `Edited ${getPathTail(path)}` : "Missing path",
+        summary: path ? `Edit ${getPathTail(path)}` : "Missing path",
         rawOutput: diff,
         modelOutput: diff.slice(0, 600),
         uiPreview:
@@ -297,7 +297,7 @@ function getPathTail(path: string): string {
 export function createDefaultTools(): RegisteredTool[] {
   return [
     createReadFileTool(),
-    createSearchFilesTool(),
+    createGrepTool(),
     createEditFileDiffTool(),
     createListDirectoryTool()
   ];

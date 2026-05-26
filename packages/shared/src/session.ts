@@ -23,8 +23,19 @@ export type RuntimeStreamEvent =
   | { type: "turn_started"; sessionId: SessionId; turnId: TurnId }
   | { type: "assistant_text_delta"; messageId: EventId; delta: string }
   | { type: "assistant_thinking_delta"; messageId: EventId; delta: string }
+  | {
+      type: "tool_call_streaming";
+      toolCallId: ToolCallId;
+      toolName: string;
+      /** 首帧（dispatched 阶段）为 true，后续帧 false/undefined */
+      isInitial?: boolean;
+      /** 后端按 previewKind 解析 partial args 得到的 typed preview，前端直接渲染 */
+      preview: ToolUiPreview;
+    }
   | { type: "tool_started"; toolCallId: ToolCallId; toolName: string; argsPreview: string; preview?: ToolUiPreview }
   | { type: "tool_finished"; toolCallId: ToolCallId; toolName: string; resultEventId: EventId; isError: boolean }
+  | { type: "tool_approval_required"; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string }
+  | { type: "tool_approval_resolved"; toolCallId: ToolCallId; requestId: string; decision: string }
   | { type: "turn_finished"; sessionId: SessionId; turnId: TurnId; resultEventIds: EventId[] }
   | { type: "turn_failed"; sessionId: SessionId; turnId: TurnId; error: SessionError };
 
@@ -119,6 +130,7 @@ export type ToolPreviewKind =
   | "web_search"
   | "directory_list"
   | "edit_diff"
+  | "write"
   | "bash"
   | "generic";
 
@@ -136,6 +148,16 @@ export type ToolUiPreview =
       deletions: number;
       diff: string;
       collapsedLines: number;
+    }
+  | {
+      kind: "write";
+      filePath: string;
+      additions: number;
+      deletions: number;
+      diff: string;
+      collapsedLines: number;
+      /** running 阶段从 LLM 流式 args.content 提取的部分内容；completed 阶段不使用 */
+      streamingContent?: string;
     }
   | BashPreview
   | { kind: "generic"; title: string; content: string };
@@ -162,6 +184,8 @@ export type BashPreview = {
   durationMs?: number;
   reason?: string;
   policyLabel?: string;
+  approvalRequestId?: string;
+  intent?: string;
 };
 
 export type ToolExecutionResult = {
@@ -378,6 +402,20 @@ export type MessageBlock =
       diff: string;
       collapsedLines: number;
       createdAt: string;
+      status?: "running" | "completed";
+    }
+  | {
+      kind: "write_diff";
+      id: EventId;
+      filePath: string;
+      additions: number;
+      deletions: number;
+      diff: string;
+      collapsedLines: number;
+      createdAt: string;
+      status?: "running" | "completed";
+      /** running 阶段从 LLM 流式 args.content 提取的部分内容；completed 不使用 */
+      streamingContent?: string;
     }
   | ({
       kind: "bash";

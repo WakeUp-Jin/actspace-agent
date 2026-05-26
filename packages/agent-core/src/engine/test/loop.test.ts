@@ -21,7 +21,7 @@ function createTestSetup() {
   const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
   const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
   toolManager.register(createTestTool("read_file"));
-  toolManager.register(createTestTool("search_files"));
+  toolManager.register(createTestTool("grep"));
 
   const context: Context = {
     systemPrompt: "Test assistant",

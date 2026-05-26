@@ -27,5 +27,11 @@ export type {
 } from "./bridge";
 
 // Agent 配置构建与实例创建
-export { buildAgentConfig, createAgentFromConfig, buildLLMConfig, resolveAgentEnvConfig } from "./create-agent-deps";
+export {
+  buildAgentConfig,
+  createAgentFromConfig,
+  createAgentForSession,
+  buildLLMConfig,
+  resolveAgentEnvConfig,
+} from "./create-agent-deps";
 export type { FrontendTurnInput, AgentEnvConfig, AgentConfig, AgentDeps } from "./create-agent-deps";

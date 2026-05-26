@@ -133,10 +133,10 @@
 
 ## 进度记录
 
-- [ ] 定义暂停模型和恢复语义。
-- [ ] 设计 pending registry。
-- [ ] 设计 session 恢复时 pending 处理。
-- [ ] 实现幂等 decision。
+- [x] 定义暂停模型和恢复语义。
+- [x] 设计 pending registry。
+- [x] 设计 session 恢复时 pending 处理。
+- [x] 实现幂等 decision。
 - [ ] 完成 Electron 验收记录。
 
 ## 决策记录

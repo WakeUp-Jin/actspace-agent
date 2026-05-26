@@ -137,8 +137,8 @@
 - [x] 抽出工具调度层。
 - [x] 接通工具权限检查。
 - [x] 支持 awaiting approval 的结构化结果。
-- [ ] 将 approval request 扩展为 engine/runtime 事件。
-- [ ] 完成单测与文档同步。
+- [x] 将 approval request 扩展为 engine/runtime 事件。
+- [x] 完成单测与文档同步。
 
 ## 决策记录
 

@@ -145,10 +145,12 @@ export function Composer({
         disabled={isStreaming}
         onChange={(event) => setMessage(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            sendCurrentMessage();
-          }
+          if (event.key !== "Enter" || event.shiftKey) return;
+          // IME 输入法（中文/日文等）在候选词面板按回车"上屏"时，
+          // nativeEvent.isComposing 为 true 或 keyCode 为 229，此时不应触发发送。
+          if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+          event.preventDefault();
+          sendCurrentMessage();
         }}
       />
 

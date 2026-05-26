@@ -21,6 +21,7 @@
 - `agent-core/tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约。
 - `agent-core/subprocess-runner-guidelines.md`：agent-core 内部受控子进程调用规范，约束 `rg` 等 CLI helper 的 timeout、退出码、输出裁剪和安全边界。
 - `agent-core/权限设计规则和原则.md`：Agent 工具权限、用户审核、风险分层和权限记录的设计规则。
+- `agent-core/tool-approval-pause-resume.md`：工具审核暂停恢复设计——Promise-based 暂停模型、PendingApprovalRegistry、会话边界规则。
 - `storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
 - `llm-agent-dev-skill-fix.md`：llm-agent-dev Skill 初始版本中发现的缺陷记录，用于后续统一修复。
 - `frontend-ui/index.md`

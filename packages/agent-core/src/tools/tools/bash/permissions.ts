@@ -1,5 +1,6 @@
 import type { PermissionResult } from "../../../internal-tools";
 import { guardWorkspacePath } from "../../workspace-guard";
+import { env } from "../../../env";
 
 export const DEFAULT_BASH_TIMEOUT_MS = 30_000;
 export const MIN_BASH_TIMEOUT_MS = 1_000;
@@ -184,6 +185,14 @@ function classifyCommand(segments: string[]): {
   reason?: string;
   riskLevel?: PermissionResult["riskLevel"];
 } {
+  if (env.ACTSPACE_BASH_ALWAYS_ASK) {
+    return {
+      decision: "ask",
+      reason: `Bash always-ask mode is enabled (ACTSPACE_BASH_ALWAYS_ASK=1)`,
+      riskLevel: "low",
+    };
+  }
+
   const allAllowed = segments.every(isAllowedDevelopmentCommand);
   if (allAllowed) {
     return { decision: "allow", riskLevel: "low" };

@@ -67,9 +67,9 @@ export function createMockAssistantWithToolCalls(): AssistantMessage {
       },
       {
         type: "toolCall",
-        id: "tc_search_1",
-        name: "search_files",
-        arguments: { query: "export function" },
+        id: "tc_grep_1",
+        name: "grep",
+        arguments: { pattern: "export function" },
       },
     ],
     model: "deepseek-mock",
@@ -100,11 +100,11 @@ export function createMockReadFileResult(): ToolResultMessage {
   };
 }
 
-export function createMockSearchResult(): ToolResultMessage {
+export function createMockGrepResult(): ToolResultMessage {
   return {
     role: "toolResult",
-    toolCallId: "tc_search_1",
-    toolName: "search_files",
+    toolCallId: "tc_grep_1",
+    toolName: "grep",
     content: [
       {
         type: "text",
@@ -113,7 +113,7 @@ export function createMockSearchResult(): ToolResultMessage {
     ],
     isError: false,
     timestamp: Date.now(),
-    source: "tool:search_files",
+    source: "tool:grep",
     priority: MessagePriority.HIGH,
   };
 }
@@ -132,7 +132,7 @@ export function createMockAssistantWithEditDiff(): AssistantMessage {
       {
         type: "toolCall",
         id: "tc_diff_1",
-        name: "edit-file",
+        name: "edit_file",
         arguments: {
           path: "docs/ARCHITECTURE.md",
           diff: "@@ -1,3 +1,5 @@\n- Old architecture notes\n+ actspace desktop workbench skeleton\n+ typed agent runtime contracts\n+ local session persistence wiring\n",
@@ -152,16 +152,16 @@ export function createMockEditDiffResult(): ToolResultMessage {
   return {
     role: "toolResult",
     toolCallId: "tc_diff_1",
-    toolName: "edit-file",
+    toolName: "edit_file",
     content: [
       {
         type: "text",
-        text: "Edited ARCHITECTURE.md: +3 additions, -1 deletion",
+        text: "Edit ARCHITECTURE.md: +3 additions, -1 deletion",
       },
     ],
     isError: false,
     timestamp: Date.now(),
-    source: "tool:edit-file",
+    source: "tool:edit_file",
   };
 }
 
@@ -241,11 +241,11 @@ export function createMockAbortedReply(): AssistantMessage {
  * 模拟完整 turn 的消息序列：
  *
  * 1. UserMessage
- * 2. AssistantMessage (thinking + read_file + search_files tool calls)
+ * 2. AssistantMessage (thinking + read_file + grep tool calls)
  * 3. ToolResultMessage (read_file result)
- * 4. ToolResultMessage (search_files result)
- * 5. AssistantMessage (thinking + edit-file tool call)
- * 6. ToolResultMessage (edit-file result)
+ * 4. ToolResultMessage (grep result)
+ * 5. AssistantMessage (thinking + edit_file tool call)
+ * 6. ToolResultMessage (edit_file result)
  * 7. AssistantMessage (thinking + final text reply)
  */
 export function createMockFullTurnMessages(): Message[] {
@@ -253,7 +253,7 @@ export function createMockFullTurnMessages(): Message[] {
     createMockUserMessage(),
     createMockAssistantWithToolCalls(),
     createMockReadFileResult(),
-    createMockSearchResult(),
+    createMockGrepResult(),
     createMockAssistantWithEditDiff(),
     createMockEditDiffResult(),
     createMockFinalReply(),
@@ -269,9 +269,9 @@ export function createMockFullTurnContext(): Context {
     messages: createMockFullTurnMessages(),
     tools: [
       { name: "read_file", description: "Read a local file.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
-      { name: "search_files", description: "Search for text across files.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
+      { name: "grep", description: "Search for a regex pattern across files.", parameters: { type: "object", properties: { pattern: { type: "string" } }, required: ["pattern"] } },
       { name: "list_directory", description: "List files in a directory.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
-      { name: "edit-file", description: "Stage a diff preview.", parameters: { type: "object", properties: { path: { type: "string" }, diff: { type: "string" } }, required: ["path", "diff"] } },
+      { name: "edit_file", description: "Stage a diff preview.", parameters: { type: "object", properties: { path: { type: "string" }, diff: { type: "string" } }, required: ["path", "diff"] } },
     ],
   };
 }

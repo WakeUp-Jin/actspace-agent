@@ -17,6 +17,7 @@ export type {
 export { ToolManager } from "./manager";
 export {
   ToolScheduler,
+  type ApprovalGate,
   type ToolApprovalDecision,
   type ToolApprovalDecisionKind,
   type ToolApprovalRequest,
@@ -31,22 +32,22 @@ export { shouldExposeTool } from "./exposure";
 
 // 工具定义
 export { readFileDefinition } from "./tools/read-file/definition";
-export { searchFilesDefinition } from "./tools/search-files/definition";
 export { grepDefinition } from "./tools/grep/definition";
 export { globDefinition } from "./tools/glob/definition";
 export { listDirectoryDefinition } from "./tools/list-directory/definition";
 export { editFileDiffDefinition } from "./tools/edit-file-diff/definition";
+export { writeFileDefinition } from "./tools/write-file/definition";
 export { bashDefinition } from "./tools/bash/definition";
 export { webSearchDefinition } from "./tools/web-search/definition";
 export { analyzeMediaDefinition } from "./tools/analyze-media/definition";
 
 // 工具执行器
 export { readFileExecutor } from "./tools/read-file/executor";
-export { searchFilesExecutor } from "./tools/search-files/executor";
 export { grepExecutor } from "./tools/grep/executor";
 export { globExecutor } from "./tools/glob/executor";
 export { listDirectoryExecutor } from "./tools/list-directory/executor";
-export { editFileDiffExecutor } from "./tools/edit-file-diff/executor";
+export { editFileDiffExecutor, renderEditResult } from "./tools/edit-file-diff/executor";
+export { writeFileExecutor, renderWriteResult } from "./tools/write-file/executor";
 export { bashExecutor } from "./tools/bash/executor";
 export type { BashResult } from "./tools/bash/executor";
 export {
@@ -71,7 +72,9 @@ import { globExecutor } from "./tools/glob/executor";
 import { listDirectoryDefinition } from "./tools/list-directory/definition";
 import { listDirectoryExecutor } from "./tools/list-directory/executor";
 import { editFileDiffDefinition } from "./tools/edit-file-diff/definition";
-import { editFileDiffExecutor } from "./tools/edit-file-diff/executor";
+import { editFileDiffExecutor, renderEditResult } from "./tools/edit-file-diff/executor";
+import { writeFileDefinition } from "./tools/write-file/definition";
+import { writeFileExecutor, renderWriteResult } from "./tools/write-file/executor";
 import { createBashTool } from "./tools/bash";
 import { webSearchDefinition } from "./tools/web-search/definition";
 import { webSearchExecutor } from "./tools/web-search/executor";
@@ -87,19 +90,22 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     hasKimiKey: config.hasKimiKey,
   };
   const disabledTools = new Set(config.disabledTools ?? []);
-  const entries = [
+  const entries: ReadonlyArray<
+    readonly [import("./types").ToolDefinitionSpec, import("./types").ToolExecutorFn, import("../internal-tools").ResultRenderer?]
+  > = [
     [readFileDefinition, readFileExecutor],
     [grepDefinition, grepExecutor],
     [globDefinition, globExecutor],
     [listDirectoryDefinition, listDirectoryExecutor],
-    [editFileDiffDefinition, editFileDiffExecutor],
+    [editFileDiffDefinition, editFileDiffExecutor, renderEditResult],
+    [writeFileDefinition, writeFileExecutor, renderWriteResult],
     [webSearchDefinition, webSearchExecutor],
     [analyzeMediaDefinition, analyzeMediaExecutor],
-  ] as const;
+  ];
 
-  for (const [definition, executor] of entries) {
+  for (const [definition, executor, renderResult] of entries) {
     if (!disabledTools.has(definition.name) && shouldExposeTool(definition, runtime)) {
-      manager.registerFromSpec(definition, executor);
+      manager.registerFromSpec(definition, executor, renderResult);
     }
   }
 

@@ -3,6 +3,19 @@ import { useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
 
 type BashMessage = Extract<MessageBlock, { kind: "bash" }>;
+type ApprovalDecision = "approve_once" | "deny" | "allow_similar";
+
+async function submitApproval(requestId: string, decision: ApprovalDecision): Promise<void> {
+  if (typeof window === "undefined" || !window.actspace?.submitApproval) {
+    console.warn("submitApproval bridge unavailable");
+    return;
+  }
+  try {
+    await window.actspace.submitApproval({ requestId, decision });
+  } catch (error) {
+    console.error("Failed to submit approval", error);
+  }
+}
 
 const FINAL_APPROVAL_STATUSES = new Set(["denied", "expired", "cancelled"]);
 
@@ -38,6 +51,9 @@ function BashExecutionBlock({ message }: { message: BashMessage }) {
             <MoreHorizontal size={16} strokeWidth={2.2} />
           </button>
           <pre className="bash-output-text">
+            {message.intent ? (
+              <span className="bash-intent-comment"># {message.intent}{"\n"}</span>
+            ) : null}
             <span className="bash-prompt">$ </span>{message.command}
             {message.cwd ? `\n# cwd: ${message.cwd}` : ""}
             {message.exitCode !== undefined ? `\n# exit: ${message.exitCode}` : ""}
@@ -54,6 +70,16 @@ function BashExecutionBlock({ message }: { message: BashMessage }) {
 
 function BashApprovalBlock({ message }: { message: BashMessage }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [submitting, setSubmitting] = useState<ApprovalDecision | null>(null);
+
+  const requestId = message.approvalRequestId;
+  const disabled = !requestId || submitting !== null;
+
+  const decide = async (decision: ApprovalDecision) => {
+    if (!requestId || submitting !== null) return;
+    setSubmitting(decision);
+    await submitApproval(requestId, decision);
+  };
 
   return (
     <article className="message-row bash-approval">
@@ -66,6 +92,12 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
           <MoreHorizontal size={15} strokeWidth={2.1} />
         </button>
       </header>
+
+      {message.intent ? (
+        <div className="bash-intent-comment bash-intent-comment--block">
+          <span className="bash-intent-hash"># </span>{message.intent}
+        </div>
+      ) : null}
 
       <pre className="bash-approval-command">
         <span className="bash-prompt">$ </span>{message.command}
@@ -95,9 +127,30 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
           {detailsOpen ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />}
         </button>
         <div className="bash-approval-actions">
-          <button className="bash-action bash-action-ghost" type="button">Skip</button>
-          <button className="bash-action bash-action-soft" type="button">Allow</button>
-          <button className="bash-action bash-action-primary" type="button">Run</button>
+          <button
+            className="bash-action bash-action-ghost"
+            type="button"
+            disabled={disabled}
+            onClick={() => decide("deny")}
+          >
+            {submitting === "deny" ? "Skipping..." : "Skip"}
+          </button>
+          <button
+            className="bash-action bash-action-soft"
+            type="button"
+            disabled={disabled}
+            onClick={() => decide("allow_similar")}
+          >
+            {submitting === "allow_similar" ? "Allowing..." : "Allow"}
+          </button>
+          <button
+            className="bash-action bash-action-primary"
+            type="button"
+            disabled={disabled}
+            onClick={() => decide("approve_once")}
+          >
+            {submitting === "approve_once" ? "Running..." : "Run"}
+          </button>
         </div>
       </footer>
     </article>

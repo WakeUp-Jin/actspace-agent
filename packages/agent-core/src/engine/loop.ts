@@ -227,7 +227,7 @@ async function executeToolCalls(
       args: tc.arguments,
     });
 
-    const result = await toolManager.execute(tc.name, tc.arguments);
+    const result = await toolManager.execute(tc.name, tc.arguments, tc.id);
 
     await emit({
       type: "tool_end",

@@ -23,6 +23,8 @@
 
 每轮真实 turn 的 `SessionEvent` 顺序以 `user_message -> thinking/tool_call -> llm_usage -> tool_result -> assistant_message -> llm_usage -> context_snapshot` 为基线。即使后端内部 AgentLoopResult 不包含 user message，IPC bridge 也必须显式写入本轮用户输入事件。
 
+每轮 turn 开始时，会话历史由 `ContextManager.createForSession({ sessionPath })`（实际由 `ConversationContext.createFromSession` 完成 `parseJsonl + sessionEventsToMessages`）在构造阶段一次性读回 `Message[]`，main 进程仅透传 sessionPath，不直接读 `session.jsonl`，也不接触消息转换函数。
+
 `llm_usage` 按每次模型回复写入，而不是按 turn 或 session 聚合。成本按当时共享模型配置计算后写入 usage，价格配置本身不写入事件。
 
 `context-state.json` 是当前可变视图，用于 Context 面板和未来上下文控制能力；完整设计见 `agent-core/token-usage-and-context-state.md`。

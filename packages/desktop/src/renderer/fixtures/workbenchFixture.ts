@@ -101,9 +101,11 @@ export const mockMessages: MessageBlock[] = [
   {
     kind: "grep",
     id: "mock-grep-1",
-    pattern: "ToolUiPreview",
-    scope: "*.ts",
-    displayText: "Grep ToolUiPreview in *.ts",
+    pattern:
+      "react|React|useState|useEffect|useCallback|useMemo|useRef|createContext|useContext|useReducer|useLayoutEffect|useImperativeHandle|useDebugValue|useTransition|useDeferredValue|createElement|jsx|JSX",
+    scope: "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/packages",
+    displayText:
+      "Grep react|React|useState|useEffect|useCallback|useMemo|useRef|createContext|useContext|useReducer|useLayoutEffect|useImperativeHandle|useDebugValue|useTransition|useDeferredValue|createElement|jsx|JSX in /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/packages",
     resultCount: 4,
     createdAt: now
   },
@@ -211,6 +213,7 @@ export const mockMessages: MessageBlock[] = [
     command:
       "cd /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent && pnpm --filter @actspace/agent-core typecheck",
     cwd: "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent",
+    intent: "对 agent-core 包执行 TypeScript 类型检查",
     stdout:
       "> @actspace/agent-core@0.1.0 typecheck /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/packages/agent-core\n> tsc --noEmit -p tsconfig.json",
     stderr: "",
@@ -226,6 +229,7 @@ export const mockMessages: MessageBlock[] = [
     commandPreview: "echo",
     command: "echo \"测试需要额外权限的命令\"",
     cwd: "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent",
+    intent: "在终端打印一条提示，用于验证审核流程",
     reason: "Not in allowlist: echo \"测试需要额外权限的命令\"",
     policyLabel: "Allowlist (with Sandbox)",
     createdAt: now

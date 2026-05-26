@@ -46,12 +46,12 @@ describe("Message utility functions", () => {
       const msg = createAssistantMsg([
         { type: "text", text: "checking" },
         { type: "toolCall", id: "tc1", name: "read_file", arguments: { path: "a.ts" } },
-        { type: "toolCall", id: "tc2", name: "search_files", arguments: { query: "test" } },
+        { type: "toolCall", id: "tc2", name: "grep", arguments: { pattern: "test" } },
       ]);
       const calls = getToolCalls(msg);
       expect(calls.length).toBe(2);
       expect(calls[0].name).toBe("read_file");
-      expect(calls[1].name).toBe("search_files");
+      expect(calls[1].name).toBe("grep");
     });
 
     it("should return empty array when no tool calls", () => {

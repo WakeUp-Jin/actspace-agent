@@ -11,6 +11,7 @@
 
 - `active/actspace-ui-bug-fix-plan.md`
 - `active/actspace-workbench-split-view-foundation.md`
+- `active/frontend-ui-components-foundation.md`
 - `active/Bash工具和工具权限调度开发计划/README.md`
 - `active/actspace-deepseek-kimi-hybrid-capabilities.md`
 

@@ -3,11 +3,12 @@
  *
  * 两步分离：
  * 1. buildAgentConfig() — 纯配置对象（前端参数 + 内部读 env + 模型注册表）
- * 2. createAgentFromConfig() — 根据配置创建运行时实例
+ * 2a. createAgentFromConfig() — 同步入口，构造空会话历史的运行时实例（mock / 内存场景）
+ * 2b. createAgentForSession() — async 入口，面向 sessionPath 在构造阶段一次性恢复会话历史
  *
- * 调用方（main/agent-turn.ts）只需两行：
+ * Main 进程的真实 turn 走 createAgentForSession：
  *   const config = buildAgentConfig({ model, thinkingEnabled }, workspaceRoot);
- *   const deps = createAgentFromConfig(config);
+ *   const deps = await createAgentForSession(config, { sessionPath });
  *
  * 打开本文件就能看到：前端传了什么，env 补了什么，最终 LLM 收到什么。
  */
@@ -17,6 +18,7 @@ import { resolveModelSpec } from "@actspace/shared";
 import type { LLMConfig, LLMService } from "../llm/types";
 import { createLLMService } from "../llm/factory";
 import type { ToolManagerConfig } from "../tools/types";
+import type { ApprovalGate } from "../tools/scheduler";
 import { ToolManager } from "../tools/manager";
 import { createToolManager } from "../tools/index";
 import { ContextManager } from "../context/manager";
@@ -121,6 +123,7 @@ export function buildLLMConfig(spec: ModelSpec, envConfig: AgentEnvConfig): LLMC
 export function buildAgentConfig(
   frontendInput: FrontendTurnInput,
   workspaceRoot: string,
+  approvalGate?: ApprovalGate,
 ): AgentConfig {
   const envConfig = resolveAgentEnvConfig();
   const modelSpec = resolveModelSpec(frontendInput.model);
@@ -131,20 +134,51 @@ export function buildAgentConfig(
     primaryProvider: modelSpec.provider,
     hasKimiKey: Boolean(envConfig.kimiApiKey),
     disabledTools: envConfig.disabledTools,
+    approvalGate,
   };
   return { llmConfig, toolManagerConfig, thinkingEnabled, modelSpec };
 }
 
 /**
- * 第二步：根据配置创建运行时实例。
+ * 第二步（同步入口）：根据配置创建运行时实例，会话历史为空。
  *
- * 打开这个函数就能看到 Agent 初始化了哪些组件。
+ * 主要供 mock / 单元测试 / 纯内存场景使用。Main 进程的真实 turn 应走
+ * `createAgentForSession`，让 ConversationContext 在构造阶段一次性吃完 session 历史。
  */
 export function createAgentFromConfig(config: AgentConfig): AgentDeps {
   const llm = createLLMService(config.llmConfig);
   const toolManager = createToolManager(config.toolManagerConfig);
   const systemPromptModule = new SystemPromptContext(MAIN_AGENT_SYSTEM_PROMPT);
   const contextManager = new ContextManager({ systemPromptModule });
+  return {
+    llm,
+    toolManager,
+    contextManager,
+    thinkingEnabled: config.thinkingEnabled,
+    modelSpec: config.modelSpec,
+  };
+}
+
+/**
+ * 第二步（async 入口）：面向某个 session 构造运行时实例。
+ *
+ * 会话历史在 `ContextManager.createForSession` 内部一次性从 `session.jsonl` 恢复，
+ * 与 SystemPromptContext 在构造时吃 corePrompt 的机制对齐——上下文模块统一是
+ * "构造时吃数据、运行期只读内存"，所以 `contextManager.getContext()` 仍同步可用。
+ *
+ * 调用方只需透传 sessionPath，不感知"读盘 + 转换 + 灌 message"细节。
+ */
+export async function createAgentForSession(
+  config: AgentConfig,
+  options: { sessionPath?: string } = {},
+): Promise<AgentDeps> {
+  const llm = createLLMService(config.llmConfig);
+  const toolManager = createToolManager(config.toolManagerConfig);
+  const systemPromptModule = new SystemPromptContext(MAIN_AGENT_SYSTEM_PROMPT);
+  const contextManager = await ContextManager.createForSession({
+    systemPromptModule,
+    sessionPath: options.sessionPath,
+  });
   return {
     llm,
     toolManager,

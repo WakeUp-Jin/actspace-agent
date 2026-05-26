@@ -34,13 +34,15 @@ Agent 工具可以调用少量成熟 CLI 来完成本地任务，例如 `rg` 用
 ```txt
 packages/agent-core/src/tools/subprocess/
   run-process.ts       # 通用受控子进程生命周期 helper
+  ripgrep-path.ts      # rg 可执行文件解析：显式配置、系统命令、内置二进制
   ripgrep.ts           # rg 专用参数与退出码适配
 ```
 
 分层职责：
 
 - `run-process.ts`：只处理进程生命周期，不理解 `rg`、Bash 权限或工具语义。
-- `ripgrep.ts`：封装 `rg` 可执行文件、默认 timeout、退出码解释和常用参数片段。
+- `ripgrep-path.ts`：解析 `rg` 可执行文件来源，优先级为显式配置、系统命令、内置二进制 fallback。
+- `ripgrep.ts`：封装 `rg` 默认 timeout、退出码解释和常用参数片段。
 - `tools/*/executor.ts`：负责工具参数、workspace guard、结果格式和模型可读输出。
 
 首轮 Grep/Glob 应先落 `run-process.ts` 与 `ripgrep.ts`。Bash 工具可在后续计划中迁移到 `run-process.ts`，但不应在 Grep/Glob 任务里重构 Bash 权限策略。
@@ -105,6 +107,21 @@ type RipgrepResult = {
 - `timedOut === true`：工具应返回超时错误。
 - `truncated === true`：工具输出应明确提示已裁剪。
 - `startError` 中包含 `ENOENT` 时，工具应返回 `ripgrep (rg) is required...` 这类清晰错误。
+
+## rg 可执行文件解析
+
+Grep/Glob 不应要求终端用户预先安装 ripgrep。`rg` 查找顺序为：
+
+1. `ACTSPACE_RG_PATH`：显式指定的绝对路径，主要用于调试、CI 或高级用户覆盖。
+2. 系统 `rg`：如果用户机器或开发环境已有 `rg`，优先复用。
+3. bundled `@vscode/ripgrep`：作为 App 内置 fallback，不需要运行时联网安装。
+
+约束：
+
+- 不在运行时下载或安装 `rg`。
+- 不在用户机器已有系统 `rg` 时删除 bundled binary；内置二进制保持为 fallback，避免破坏应用包完整性。
+- 解析到候选路径后，先执行 `rg --version` 小 timeout 探测，成功后才缓存使用。
+- `ACTSPACE_RG_PATH` 指向无效路径时应直接返回缺失错误，避免悄悄忽略用户显式配置。
 
 ## Bash adapter 边界
 

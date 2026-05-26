@@ -12,7 +12,7 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AbortTurnInput, RunTurnInput, SessionCreateInput, SessionGetInput } from "@actspace/shared";
+import type { AbortTurnInput, RunTurnInput, SessionCreateInput, SessionGetInput, ApprovalDecideInput, ApprovalListPendingInput } from "@actspace/shared";
 import {
   createBootstrapState,
   loadEnv,
@@ -22,6 +22,7 @@ import {
   readSessionRecord,
 } from "@actspace/agent-core";
 import { runAndPersistTurn, abortTurn, type AppDataRoots } from "./agent-turn";
+import { PendingApprovalRegistry } from "./approval-registry";
 
 const APP_ID = "com.actspace.desktop";
 const APP_NAME = "actspace";
@@ -217,6 +218,25 @@ async function createMainWindow() {
   }
 }
 
+// ─── 审核注册表（单例） ───
+
+const approvalRegistry = new PendingApprovalRegistry({
+  onApprovalRequired: (request, sessionId, turnId) => {
+    const win = getMainWindow();
+    if (!win) return;
+    win.webContents.send("agent:stream", {
+      type: "tool_approval_required",
+      toolCallId: request.toolCallId ?? request.id,
+      toolName: request.toolName,
+      requestId: request.id,
+      summary: request.summary,
+      reason: request.reason,
+      command: typeof request.args.command === "string" ? request.args.command : undefined,
+      riskLevel: request.riskLevel,
+    });
+  },
+});
+
 // ─── IPC 注册 ───
 
 async function registerIpc() {
@@ -235,7 +255,7 @@ async function registerIpc() {
   ipcMain.handle("agent:run-turn", async (_event, input: RunTurnInput) => {
     const roots = await ensureDataDirectories();
     try {
-      const result = await runAndPersistTurn(input, roots, getMainWindow);
+      const result = await runAndPersistTurn(input, roots, getMainWindow, approvalRegistry);
       logMain("run turn completed", {
         sessionId: input.sessionId,
         turnId: input.turnId,
@@ -269,6 +289,15 @@ async function registerIpc() {
   ipcMain.handle("session:create", async (_event, input: SessionCreateInput = {}) => {
     const roots = await ensureDataDirectories();
     return createSessionRecord(roots.sessionRoot, input);
+  });
+
+  ipcMain.handle("approval:decide", async (_event, input: ApprovalDecideInput) => {
+    logMain("approval decision received", { requestId: input.requestId, decision: input.decision });
+    return approvalRegistry.decide(input.requestId, input.decision);
+  });
+
+  ipcMain.handle("approval:list-pending", async (_event, input: ApprovalListPendingInput = {}) => {
+    return approvalRegistry.listPending(input.sessionId);
   });
 }
 

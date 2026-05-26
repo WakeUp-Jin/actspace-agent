@@ -32,8 +32,9 @@
 - `tools/workspace-guard.ts`：路径边界守卫，防止工具访问工作区外文件。
 - `tools/manager.ts`：ToolManager（注册/获取/导出工具定义），执行入口委托给 ToolScheduler。
 - `tools/scheduler.ts`：ToolScheduler（权限三态决策、工具状态记录、执行、结果渲染与裁剪）。当前 `ask` 会返回结构化待审核结果，approve/deny IPC 和恢复流程由后续计划接入。
-- `tools/subprocess/{run-process,ripgrep}.ts`：受控子进程执行封装。`run-process` 统一处理进程生命周期、timeout、stdout/stderr 和截断；`ripgrep` 在其上封装 `rg` 命令语义。
-- `tools/tools/{read-file,list-directory,edit-file-diff,bash}/`：每个工具一个目录，含 `definition.ts` + `executor.ts`；其中编辑 diff 工具对外工具名为 `edit-file`，目录名保留历史实现语义；Bash 额外包含 `permissions.ts` 和 `render-result.ts`。
+- `tools/subprocess/{run-process,ripgrep-path,ripgrep}.ts`：受控子进程执行封装。`run-process` 统一处理进程生命周期、timeout、stdout/stderr 和截断；`ripgrep-path` 按 `ACTSPACE_RG_PATH -> 系统 rg -> bundled @vscode/ripgrep` 解析可执行文件；`ripgrep` 在其上封装 `rg` 命令语义。
+- `tools/tools/shared/write-atomic.ts`：原子写入 helper（tmpfile → fsync → rename），Edit 和 Write 工具共用。
+- `tools/tools/{read-file,list-directory,edit-file-diff,write-file,bash}/`：每个工具一个目录，含 `definition.ts` + `executor.ts`；其中 `edit-file-diff` 对外工具名为 `edit-file`，使用 `diff` 库生成 unified diff 并原子写入；`write-file` 对外工具名为 `write_file`，创建或覆写文件并生成 diff；两者各有 `permissions.ts` 预留 AgentMode 审批扩展；Bash 额外包含 `permissions.ts` 和 `render-result.ts`。
 - `tools/tools/{grep,glob}/`：文件搜索工具。grep 通过 ripgrep 正则搜索文件内容，glob 通过 `rg --files --glob` 按文件名模式查找。
 - `tools/tools/{web-search,analyze-media}/`：DeepSeek-only Kimi 辅助工具；只有 DeepSeek 为主模型且配置 Kimi key 时注册。`web_search` 统一处理关键词搜索和 URL 读取。
 
@@ -44,16 +45,18 @@
 - `context/types.ts`：SystemPart、ContextModule、PromptSegment、CompressionConfig。
 - `context/token-estimator.ts`：token 估算与用量快照生成。
 - `context/modules/system-prompt.ts`：分段系统提示词上下文。
-- `context/modules/conversation.ts`：会话历史上下文管理。
-- `context/manager.ts`：ContextManager 编排器（模块协调、appendMessage、getContext、用量统计）。
+- `context/modules/conversation.ts`：会话历史上下文模块。构造函数接受可选 `initialMessages`；新增 `static async createFromSession(sessionPath)`，内部用 `persistence/parseJsonl + adapters/sessionEventsToMessages` 一次性恢复 `Message[]`。运行期 `format()` / `appendMessage` 仍是纯内存操作，与 `SystemPromptContext` 的"构造时吃数据、运行期只读内存"机制对齐。V1 升级为 ShortTermMemoryContext 时仅引入 turn 标记 / 多日切片 / 压缩接入，构造入口签名不破坏。
+- `context/manager.ts`：ContextManager 编排器（模块协调、appendMessage、getContext、用量统计）。`static async createForSession({ systemPromptModule, sessionPath, ... })` 是会话恢复的语义入口，委托 `ConversationContext.createFromSession`；构造期完成历史加载，`getContext()` 保持同步。普通 `new ContextManager(...)` 也可通过 `options.conversation` 注入已构造好的 ConversationContext，便于测试与 mock 场景。
 
 ## `engine/` - 执行引擎
 
 - `engine/types.ts`：AgentEvent（discriminated union）、AgentLoopConfig、AgentLoopResult。
 - `engine/loop.ts`：runAgentLoop 纯函数双层循环（内层工具调用+转向、外层跟进）。
 - `engine/agent.ts`：Agent 入口类（run/abort），编排 ContextManager + ToolManager + LLMService。
-- `engine/bridge.ts`：IPC 桥接层，将 AgentEvent 实时映射为 RuntimeStreamEvent，并根据工具 `previewKind` 将执行结果聚合为带 `ToolUiPreview` 的 AgentTurnResult。
-- `engine/create-agent-deps.ts`：Agent 配置构建与实例创建，两步分离。`buildAgentConfig(frontendInput, workspaceRoot)` 返回纯配置对象 `AgentConfig`（内部读 env + 模型注册表），`createAgentFromConfig(config)` 根据配置创建运行时实例 `AgentDeps`。
+- `engine/bridge.ts`：IPC 桥接层，将 AgentEvent 实时映射为 RuntimeStreamEvent，并根据工具 `previewKind` 将执行结果聚合为带 `ToolUiPreview` 的 AgentTurnResult。`tool_call_delta` 阶段维护 `toolCallStreaming` 状态机（按 toolCallId 累积 partial args + 50ms throttle），调用 `streaming-preview-extractors` 把 partial args 解析为 typed `ToolUiPreview`，emit `tool_call_streaming` 让前端在 tool_start 前就能展示 `Write filename` 甚至 streaming content。
+- `engine/partial-args.ts`：partial JSON 字符串字段提取状态机，正确处理 `\"` `\\` `\n` `\uXXXX` 等 JSON escape，未闭合时返回当前累积部分。仅给 streaming-preview-extractors 使用。
+- `engine/streaming-preview-extractors.ts`：按 `ToolPreviewKind` 注册的 extractor 表，把 LLM 流式 `tool_call_delta` 累积的 partial JSON 解析成 typed `ToolUiPreview`。write_file 同时提取 path 与 content（content 作为 `streamingContent` 让前端 cursor 风格边写边看）；edit-file 只提取 path（diff 需要文件上下文 + 替换执行才能生成）。新工具按 previewKind 注册一行 extractor 即可。
+- `engine/create-agent-deps.ts`：Agent 配置构建与实例创建，两步分离。`buildAgentConfig(frontendInput, workspaceRoot)` 返回纯配置对象 `AgentConfig`（内部读 env + 模型注册表）。运行时实例有两种入口：`createAgentFromConfig(config)`（同步，构造空会话历史，仅供 mock / 单元测试 / 纯内存场景）；`createAgentForSession(config, { sessionPath })`（async，main 进程使用，会话历史在构造阶段通过 `ContextManager.createForSession` 一次性恢复，`contextManager.getContext()` 之后同步可见完整历史）。
 
 Agent Turn 的跨层职责边界见 `agent-turn-layers.md`。
 

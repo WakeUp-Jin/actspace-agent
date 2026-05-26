@@ -26,6 +26,31 @@ export type AbortTurnInput = {
   turnId: string;
 };
 
+export type ApprovalDecideInput = {
+  requestId: string;
+  decision: "approve_once" | "deny" | "allow_similar";
+};
+
+export type ApprovalDecideResult = {
+  ok: boolean;
+  reason?: string;
+};
+
+export type ApprovalListPendingInput = {
+  sessionId?: string;
+};
+
+export type PendingApprovalInfo = {
+  requestId: string;
+  toolName: string;
+  summary: string;
+  reason: string;
+  riskLevel?: string;
+  command?: string;
+  createdAt: number;
+  expiresAt: number;
+};
+
 export type SessionListItem = {
   id: string;
   title: string;

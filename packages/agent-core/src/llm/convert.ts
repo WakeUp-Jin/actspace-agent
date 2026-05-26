@@ -306,6 +306,8 @@ export async function* processStreamChunks(
           yield {
             type: "tool_call_delta",
             index,
+            toolCallId: current.id || undefined,
+            toolName: current.name || undefined,
             delta: toolDelta.function?.arguments ?? "",
           };
         }

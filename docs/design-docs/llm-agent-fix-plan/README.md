@@ -9,6 +9,7 @@
 | `01-skill-llm-module-fix.md` | Skill 现有 LLM 模块指导的 5 个缺陷分析和修复建议 |
 | `02-pi-ai-core-design-extraction.md` | 从 pi-ai 源码中提取的 10 个核心设计思想，及对 skill 改进的具体建议 |
 | `04-skill-rg-tools-fix.md` | Grep/Glob 工具中 ripgrep 共享执行流的 skill 修复建议 |
+| `05-skill-file-tools-fix.md` | Edit/Write 工具、原子写入、diff 生成和权限预留的 skill 修复建议 |
 
 ## 问题根源
 

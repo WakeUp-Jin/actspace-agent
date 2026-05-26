@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { runProcess } from "../subprocess/run-process";
 import { getRipgrepFailureMessage, runRipgrep } from "../subprocess/ripgrep";
+import { clearRipgrepCommandCache, resolveRipgrepCommand } from "../subprocess/ripgrep-path";
 
 async function createWorkspace(): Promise<string> {
   return realpath(await mkdtemp(join(tmpdir(), "actspace-subprocess-test-")));
@@ -72,11 +73,52 @@ describe("runProcess", () => {
 });
 
 describe("runRipgrep", () => {
+  it("uses ACTSPACE_RG_PATH when it points to a runnable ripgrep binary", async () => {
+    let rgPath: string;
+    try {
+      rgPath = execFileSync("which", ["rg"], { encoding: "utf8" }).trim();
+    } catch {
+      return;
+    }
+
+    const cwd = await createWorkspace();
+    clearRipgrepCommandCache();
+    const command = await resolveRipgrepCommand({
+      cwd,
+      env: {
+        ...process.env,
+        ACTSPACE_RG_PATH: rgPath,
+        PATH: "",
+      },
+    });
+
+    expect(command).toMatchObject({ command: rgPath, source: "env" });
+  });
+
+  it("falls back to bundled ripgrep when PATH does not contain rg", async () => {
+    const cwd = await createWorkspace();
+    clearRipgrepCommandCache();
+    const command = await resolveRipgrepCommand({
+      cwd,
+      env: {
+        ...process.env,
+        PATH: "",
+      },
+    });
+
+    expect(command?.source).toBe("bundled");
+    expect(command?.command).toContain("rg");
+  });
+
   it("maps missing rg to a clear failure message", async () => {
     const cwd = await createWorkspace();
     const oldPath = process.env.PATH;
+    const oldRgPath = process.env.ACTSPACE_RG_PATH;
+
+    process.env.ACTSPACE_RG_PATH = join(cwd, "missing-rg");
     process.env.PATH = "";
     try {
+      clearRipgrepCommandCache();
       const result = await runRipgrep({
         args: ["--version"],
         cwd,
@@ -87,6 +129,12 @@ describe("runRipgrep", () => {
       expect(getRipgrepFailureMessage(result)).toContain("ripgrep (rg) is required");
     } finally {
       process.env.PATH = oldPath;
+      if (oldRgPath === undefined) {
+        delete process.env.ACTSPACE_RG_PATH;
+      } else {
+        process.env.ACTSPACE_RG_PATH = oldRgPath;
+      }
+      clearRipgrepCommandCache();
     }
   });
 

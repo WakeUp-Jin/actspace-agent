@@ -16,6 +16,7 @@ import type {
   ContextState,
   LlmUsagePayload,
   ToolExecutionResult,
+  ToolPreviewKind,
   ToolUiPreview,
 } from "@actspace/shared";
 import { resolveModelSpecByApiModel } from "@actspace/shared";
@@ -26,6 +27,7 @@ import type { AgentRunLogger } from "../observability";
 import type { ToolResult } from "../internal-tools";
 import { Agent } from "./agent";
 import type { AgentEvent, AgentLoopResult, ToolExecutionMode } from "./types";
+import { extractStreamingPreview } from "./streaming-preview-extractors";
 import {
   createPersistedSessionEvent,
   messageToEvents,
@@ -53,6 +55,17 @@ type ToolExecutionRecord = {
   args: Record<string, unknown>;
   result?: ToolResult;
 };
+
+type ToolCallStreamingEntry = {
+  toolName: string;
+  previewKind: ToolPreviewKind;
+  partialArgsText: string;
+  lastEmitMs: number;
+  emittedInitial: boolean;
+};
+
+/** 节流：write_file 1300 字符 content 在该间隔下约 26 帧，足够流畅且不爆事件 */
+const TOOL_CALL_STREAMING_THROTTLE_MS = 50;
 
 function preview(value: unknown, limit = PREVIEW_LIMIT): string {
   let text: string;
@@ -126,6 +139,7 @@ export async function runTurnWithAgent(
     thinkingChars: 0,
   };
   const toolExecutions = new Map<string, ToolExecutionRecord>();
+  const toolCallStreaming = new Map<string, ToolCallStreamingEntry>();
 
   function nextEventId(): string {
     return `evt_${turnId}_${++eventIdCounter}`;
@@ -153,7 +167,7 @@ export async function runTurnWithAgent(
         await writeAgentEventRunLog(runLogger, agentEvent);
       }
       if (!streamCb) return;
-      const mapped = mapAgentEventToStreamEvent(agentEvent, sessionId, turnId, nextEventId, deps.toolManager);
+      const mapped = mapAgentEventToStreamEvent(agentEvent, sessionId, turnId, nextEventId, deps.toolManager, toolCallStreaming);
       if (mapped) {
         if (!isStreamDeltaEvent(mapped)) {
           await flushStreamLogBuffer(runLogger, streamLogBuffer);
@@ -519,8 +533,26 @@ function createToolUiPreview(
       };
     }
 
+    case "write": {
+      const filePath = stringArg(args.path, "Unknown file");
+      const hasOutput = output.length > 0;
+      return {
+        kind: "write",
+        filePath: displayFileName(filePath),
+        additions: hasOutput ? countDiffLines(output, "+") : 0,
+        deletions: hasOutput ? countDiffLines(output, "-") : 0,
+        diff: hasOutput ? output : "",
+        collapsedLines: 5,
+        // tool_started 阶段（output=""）保留完整 content 作为 streamingContent，
+        // 让 step 2 → step 3 过渡时前端 code preview 不闪烁消失；
+        // tool_finished 阶段（output 含 diff）不设 streamingContent，diff 视图接管
+        streamingContent: hasOutput ? undefined : (typeof args.content === "string" ? args.content : undefined),
+      };
+    }
+
     case "bash": {
       const command = stringArg(args.command, "");
+      const intent = typeof args.intent === "string" && args.intent.trim().length > 0 ? args.intent.trim() : undefined;
       return {
         kind: "bash",
         status: ok ? "success" : "failed",
@@ -530,6 +562,7 @@ function createToolUiPreview(
         cwd: typeof args.cwd === "string" ? args.cwd : undefined,
         stdout: ok ? output : undefined,
         stderr: ok ? undefined : output,
+        intent,
       };
     }
 
@@ -573,7 +606,9 @@ function getToolSummary(
     case "directory_list":
       return `Listed ${displayPathTail(stringArg(args.path, "directory"))}`;
     case "edit_diff":
-      return `Edited ${displayFileName(stringArg(args.path, "file"))}`;
+      return `Edit ${displayFileName(stringArg(args.path, "file"))}`;
+    case "write":
+      return `Write ${displayFileName(stringArg(args.path, "file"))}`;
     case "bash":
       return "Bash command";
     case "generic":
@@ -645,6 +680,7 @@ function mapAgentEventToStreamEvent(
   turnId: string,
   nextId: () => string,
   toolManager: ToolManager,
+  toolCallStreaming: Map<string, ToolCallStreamingEntry>,
 ): RuntimeStreamEvent | null {
   switch (event.type) {
     case "agent_start":
@@ -658,11 +694,17 @@ function mapAgentEventToStreamEvent(
       if (delta.type === "thinking_delta") {
         return { type: "assistant_thinking_delta", messageId: nextId(), delta: delta.delta };
       }
+      if (delta.type === "tool_call_delta") {
+        return handleToolCallDelta(delta, toolManager, toolCallStreaming);
+      }
       return null;
     }
 
     case "tool_start":
       {
+        // tool_start 进入实际执行阶段，清理对应的 streaming 累积状态
+        toolCallStreaming.delete(event.toolCallId);
+
         const tool = toolManager.get(event.toolName);
         const previewKind = tool?.previewKind ?? "generic";
         const summary = getToolSummary(event.toolName, previewKind, event.args, true);
@@ -687,13 +729,78 @@ function mapAgentEventToStreamEvent(
         isError: event.isError,
       };
 
+    case "tool_approval_required":
+      return {
+        type: "tool_approval_required",
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        requestId: event.request.id,
+        summary: event.request.summary,
+        reason: event.request.reason,
+        command: typeof event.request.args.command === "string" ? event.request.args.command : undefined,
+        riskLevel: event.request.riskLevel,
+      };
+
+    case "tool_approval_resolved":
+      return {
+        type: "tool_approval_resolved",
+        toolCallId: event.toolCallId,
+        requestId: event.decision.requestId,
+        decision: event.decision.decision,
+      };
+
     case "agent_end":
+      // turn 结束时清空累积状态，防内存泄漏
+      toolCallStreaming.clear();
+      return null;
+
     case "turn_start":
     case "turn_end":
     case "message_start":
     case "message_end":
       return null;
   }
+}
+
+function handleToolCallDelta(
+  delta: { toolCallId?: string; toolName?: string; delta: string },
+  toolManager: ToolManager,
+  toolCallStreaming: Map<string, ToolCallStreamingEntry>,
+): RuntimeStreamEvent | null {
+  if (!delta.toolCallId || !delta.toolName) return null;
+  const spec = toolManager.get(delta.toolName);
+  if (!spec) return null;
+  const previewKind = spec.previewKind ?? "generic";
+
+  let entry = toolCallStreaming.get(delta.toolCallId);
+  if (!entry) {
+    entry = {
+      toolName: delta.toolName,
+      previewKind,
+      partialArgsText: "",
+      lastEmitMs: 0,
+      emittedInitial: false,
+    };
+    toolCallStreaming.set(delta.toolCallId, entry);
+  }
+  entry.partialArgsText += delta.delta;
+
+  const now = Date.now();
+  if (entry.emittedInitial && now - entry.lastEmitMs < TOOL_CALL_STREAMING_THROTTLE_MS) {
+    return null;
+  }
+
+  const isInitial = !entry.emittedInitial;
+  entry.emittedInitial = true;
+  entry.lastEmitMs = now;
+
+  return {
+    type: "tool_call_streaming",
+    toolCallId: delta.toolCallId,
+    toolName: delta.toolName,
+    isInitial,
+    preview: extractStreamingPreview(previewKind, entry.partialArgsText),
+  };
 }
 
 function logAgentEvent(
@@ -784,6 +891,27 @@ function logAgentEvent(
         resultPreview: preview(event.result.success ? event.result.data : event.result.error),
       });
       return;
+
+    case "tool_approval_required":
+      logAgentRun("tool approval required", {
+        sessionId,
+        turnId,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        requestId: event.request.id,
+        riskLevel: event.request.riskLevel,
+      });
+      return;
+
+    case "tool_approval_resolved":
+      logAgentRun("tool approval resolved", {
+        sessionId,
+        turnId,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        decision: event.decision.decision,
+      });
+      return;
   }
 }
 
@@ -827,7 +955,11 @@ function bufferStreamLogDelta(event: AgentEvent, buffer: StreamLogBuffer): boole
 }
 
 function isStreamDeltaEvent(event: RuntimeStreamEvent): boolean {
-  return event.type === "assistant_text_delta" || event.type === "assistant_thinking_delta";
+  return (
+    event.type === "assistant_text_delta" ||
+    event.type === "assistant_thinking_delta" ||
+    event.type === "tool_call_streaming"
+  );
 }
 
 async function flushStreamLogBuffer(
@@ -899,6 +1031,24 @@ function serializeAgentEvent(event: AgentEvent): Record<string, unknown> {
 
     case "tool_end":
       return event;
+
+    case "tool_approval_required":
+      return {
+        type: event.type,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        requestId: event.request.id,
+        summary: event.request.summary,
+        riskLevel: event.request.riskLevel,
+      };
+
+    case "tool_approval_resolved":
+      return {
+        type: event.type,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        decision: event.decision.decision,
+      };
   }
 }
 

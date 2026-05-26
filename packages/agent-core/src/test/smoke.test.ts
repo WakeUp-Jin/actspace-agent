@@ -35,7 +35,7 @@ describe("E2E Smoke: Agent.run full pipeline", () => {
 
     const toolManager = new ToolManager({ workspaceRoot: "/tmp/test" });
     toolManager.register(createMockTool("read_file"));
-    toolManager.register(createMockTool("search_files"));
+    toolManager.register(createMockTool("grep"));
 
     const systemPrompt = new SystemPromptContext("You are a test assistant.");
     const contextManager = new ContextManager({ systemPromptModule: systemPrompt });
@@ -84,7 +84,7 @@ describe("E2E Smoke: Agent.run full pipeline", () => {
 
     const toolManager = new ToolManager({ workspaceRoot: "/tmp/test" });
     toolManager.register(createMockTool("read_file"));
-    toolManager.register(createMockTool("search_files"));
+    toolManager.register(createMockTool("grep"));
 
     const systemPrompt = new SystemPromptContext("You are a test assistant.");
     const contextManager = new ContextManager({ systemPromptModule: systemPrompt });
@@ -102,7 +102,7 @@ describe("E2E Smoke: Agent.run full pipeline", () => {
     const toolStarts = events.filter((e) => e.type === "tool_start");
     const toolEnds = events.filter((e) => e.type === "tool_end");
 
-    // MockLLMService 第一轮发出 read_file + search_files 两个 tool calls
+    // MockLLMService 第一轮发出 read_file + grep 两个 tool calls
     expect(toolStarts.length).toBe(2);
     expect(toolEnds.length).toBe(2);
 
@@ -122,7 +122,7 @@ describe("E2E Smoke: Agent.run full pipeline", () => {
 
     const toolManager = new ToolManager({ workspaceRoot: "/tmp/test" });
     toolManager.register(createMockTool("read_file"));
-    toolManager.register(createMockTool("search_files"));
+    toolManager.register(createMockTool("grep"));
 
     const systemPrompt = new SystemPromptContext("You are a test assistant.");
     const contextManager = new ContextManager({ systemPromptModule: systemPrompt });

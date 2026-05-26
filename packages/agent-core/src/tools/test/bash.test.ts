@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { bashExecutor, bashCheckPermissions, createToolManager, renderBashResult } from "../index";
 import type { BashResult } from "../index";
+import { loadEnv } from "../../env";
 
 async function createWorkspace(): Promise<string> {
   return realpath(await mkdtemp(join(tmpdir(), "actspace-bash-test-")));
@@ -56,6 +57,43 @@ describe("Bash tool permissions", () => {
     expect(result.decision).toBe("ask");
     expect(result.reason).toContain("not in the Bash allowlist");
     expect(result.sanitizedArgs).toMatchObject({ command: "pnpm install" });
+  });
+
+  it("ACTSPACE_BASH_ALWAYS_ASK forces ask even for allowlisted commands", async () => {
+    const workspace = await createWorkspace();
+    const original = process.env.ACTSPACE_BASH_ALWAYS_ASK;
+    process.env.ACTSPACE_BASH_ALWAYS_ASK = "1";
+    try {
+      loadEnv();
+      const result = await bashCheckPermissions({ command: "pwd" }, workspace);
+      expect(result.decision).toBe("ask");
+      expect(result.reason).toContain("always-ask");
+    } finally {
+      if (original === undefined) {
+        delete process.env.ACTSPACE_BASH_ALWAYS_ASK;
+      } else {
+        process.env.ACTSPACE_BASH_ALWAYS_ASK = original;
+      }
+      loadEnv();
+    }
+  });
+
+  it("ACTSPACE_BASH_ALWAYS_ASK still respects hard reject", async () => {
+    const workspace = await createWorkspace();
+    const original = process.env.ACTSPACE_BASH_ALWAYS_ASK;
+    process.env.ACTSPACE_BASH_ALWAYS_ASK = "1";
+    try {
+      loadEnv();
+      const result = await bashCheckPermissions({ command: "rm -rf /" }, workspace);
+      expect(result.decision).toBe("deny");
+    } finally {
+      if (original === undefined) {
+        delete process.env.ACTSPACE_BASH_ALWAYS_ASK;
+      } else {
+        process.env.ACTSPACE_BASH_ALWAYS_ASK = original;
+      }
+      loadEnv();
+    }
   });
 });
 
