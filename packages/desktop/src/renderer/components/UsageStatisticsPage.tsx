@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { CircleAlert, Info, RefreshCw, Share2, X } from "lucide-react";
 import type {
   UsageStatisticsDailyRow,
@@ -19,6 +19,7 @@ type Props = {
 const RANGE_TABS = ["day", "week", "month", "total"] as const;
 const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 const MONTH_LABELS = ["1月", "2月", "3月", "4月", "5月"];
+const TOOL_COLORS = ["#2f6fff", "#28b7d8", "#8b5cf6", "#9aa8bb", "#4f7cff", "#93a4b8"];
 
 function formatMillions(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
@@ -180,12 +181,19 @@ function CostDetailModal({
   );
 }
 
-function ToolRow({ tool, onOpen }: { tool: UsageStatisticsToolEntry; onOpen: (tool: UsageStatisticsToolEntry) => void }) {
+function ToolRow({
+  tool,
+  color,
+  onOpen,
+}: {
+  tool: UsageStatisticsToolEntry;
+  color: string;
+  onOpen: (tool: UsageStatisticsToolEntry) => void;
+}) {
   return (
     <button className="usage-tool-line" type="button" onClick={() => onOpen(tool)}>
-      <span className="usage-tool-dot" />
+      <span className="usage-tool-dot" style={{ backgroundColor: color }} />
       <span className="usage-tool-name">{tool.name}</span>
-      <span className="usage-tool-meta">{tool.failedCount > 0 ? `${tool.failedCount} failed` : "stable"}</span>
       <strong>{formatPercent(tool.percent)}</strong>
     </button>
   );
@@ -301,7 +309,6 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh, onB
           <article className="usage-panel usage-tool-summary">
             <div className="usage-tool-head">
               <div>
-                <div className="usage-card-kicker">Tool Calls</div>
                 <div className="usage-tool-title">工具调用</div>
               </div>
               <button className="usage-tool-detail-button" type="button" onClick={() => setSelectedTool(effectiveSnapshot.toolDistribution[0] ?? null)}>
@@ -314,13 +321,20 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh, onB
                 <strong>{effectiveSnapshot.summary.toolCallCount.toLocaleString()} 次</strong>
               </div>
               <div className="usage-tool-bar" aria-hidden="true">
-                {effectiveSnapshot.toolDistribution.map((tool) => (
-                  <span key={tool.name} className="usage-tool-seg" style={{ width: `${tool.percent}%` }} />
+                {effectiveSnapshot.toolDistribution.map((tool, index) => (
+                  <span
+                    key={tool.name}
+                    className="usage-tool-seg"
+                    style={{
+                      width: `${tool.percent}%`,
+                      backgroundColor: TOOL_COLORS[index % TOOL_COLORS.length],
+                    }}
+                  />
                 ))}
               </div>
               <div className="usage-tool-list">
-                {effectiveSnapshot.toolDistribution.slice(0, 6).map((tool) => (
-                  <ToolRow key={tool.name} tool={tool} onOpen={setSelectedTool} />
+                {effectiveSnapshot.toolDistribution.slice(0, 4).map((tool, index) => (
+                  <ToolRow key={tool.name} tool={tool} color={TOOL_COLORS[index % TOOL_COLORS.length]} onOpen={setSelectedTool} />
                 ))}
               </div>
             </div>
@@ -343,36 +357,6 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh, onB
         </section>
 
         <section className="usage-right-column">
-          <div className="usage-toolbar">
-            <div className="usage-range-tabs" role="tablist" aria-label="Usage range">
-              {RANGE_TABS.map((tab) => (
-                <button
-                  key={tab}
-                  className={tab === range ? "is-active" : ""}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === range}
-                  onClick={() => {
-                    setRange(tab);
-                    onRefresh?.(tab);
-                  }}
-                >
-                  {getRangeLabel(tab)}
-                </button>
-              ))}
-            </div>
-            <div className="usage-toolbar-actions">
-              <button className="usage-action-button" type="button" onClick={() => onRefresh?.(range)}>
-                <RefreshCw size={15} strokeWidth={2} />
-                Refresh
-              </button>
-              <button className="usage-action-button" type="button">
-                <Share2 size={15} strokeWidth={2} />
-                Share
-              </button>
-            </div>
-          </div>
-
           {error ? (
             <section className="usage-empty-state">
               <CircleAlert size={20} strokeWidth={2} />
@@ -382,12 +366,43 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh, onB
           ) : null}
 
           <section className="usage-overview-card">
-            <div className="usage-overview-label">TOKEN 总数</div>
-            <div className="usage-overview-value">{effectiveSnapshot.summary.totalTokens.toLocaleString()}</div>
-            <button className="usage-overview-cost" type="button" onClick={() => setShowCostDetail(true)}>
-              {formatMoney(effectiveSnapshot.summary.costUsd)}
-              <Info size={16} strokeWidth={2} />
-            </button>
+            <div className="usage-toolbar">
+              <div className="usage-range-tabs" role="tablist" aria-label="Usage range">
+                {RANGE_TABS.map((tab) => (
+                  <button
+                    key={tab}
+                    className={tab === range ? "is-active" : ""}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === range}
+                    onClick={() => {
+                      setRange(tab);
+                      onRefresh?.(tab);
+                    }}
+                  >
+                    {getRangeLabel(tab)}
+                  </button>
+                ))}
+              </div>
+              <div className="usage-toolbar-actions">
+                <button className="usage-action-button" type="button" onClick={() => onRefresh?.(range)}>
+                  <RefreshCw size={15} strokeWidth={2} />
+                  Refresh
+                </button>
+                <button className="usage-action-button" type="button">
+                  <Share2 size={15} strokeWidth={2} />
+                  Share
+                </button>
+              </div>
+            </div>
+            <div className="usage-overview-main">
+              <div className="usage-overview-label">TOKEN 总数</div>
+              <div className="usage-overview-value">{effectiveSnapshot.summary.totalTokens.toLocaleString()}</div>
+              <button className="usage-overview-cost" type="button" onClick={() => setShowCostDetail(true)}>
+                {formatMoney(effectiveSnapshot.summary.costUsd)}
+                <Info size={16} strokeWidth={2} />
+              </button>
+            </div>
             <div className="usage-overview-meter" aria-hidden="true">
               <span style={{ width: `${Math.min(100, effectiveSnapshot.summary.cacheEfficiencyPercent)}%` }} />
             </div>
@@ -395,29 +410,28 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh, onB
               <span>缓存效率 {formatPercent(effectiveSnapshot.summary.cacheEfficiencyPercent)}</span>
               <span>{effectiveSnapshot.summary.toolCallCount.toLocaleString()} tool calls</span>
             </div>
-          </section>
-
-          <section className="usage-breakdown-grid">
-            <article className="usage-breakdown-card">
-              <span>输入</span>
-              <strong>{formatMillions(effectiveSnapshot.summary.promptTokens)}</strong>
-              <em>direct prompt</em>
-            </article>
-            <article className="usage-breakdown-card">
-              <span>输出</span>
-              <strong>{formatMillions(effectiveSnapshot.summary.completionTokens)}</strong>
-              <em>assistant reply</em>
-            </article>
-            <article className="usage-breakdown-card">
-              <span>缓存</span>
-              <strong>{formatMillions(effectiveSnapshot.summary.cacheHitTokens)}</strong>
-              <em>cache read</em>
-            </article>
-            <article className="usage-breakdown-card">
-              <span>推理</span>
-              <strong>{formatMillions(effectiveSnapshot.summary.reasoningTokens)}</strong>
-              <em>reasoning</em>
-            </article>
+            <section className="usage-breakdown-grid">
+              <article className="usage-breakdown-card">
+                <span>输入</span>
+                <strong>{formatMillions(effectiveSnapshot.summary.promptTokens)}</strong>
+                <em>direct prompt</em>
+              </article>
+              <article className="usage-breakdown-card">
+                <span>输出</span>
+                <strong>{formatMillions(effectiveSnapshot.summary.completionTokens)}</strong>
+                <em>assistant reply</em>
+              </article>
+              <article className="usage-breakdown-card">
+                <span>缓存</span>
+                <strong>{formatMillions(effectiveSnapshot.summary.cacheHitTokens)}</strong>
+                <em>cache read</em>
+              </article>
+              <article className="usage-breakdown-card">
+                <span>推理</span>
+                <strong>{formatMillions(effectiveSnapshot.summary.reasoningTokens)}</strong>
+                <em>reasoning</em>
+              </article>
+            </section>
           </section>
 
           <section className="usage-cache-card">

@@ -39,6 +39,10 @@ function isSessionEvent(value: unknown): value is SessionEvent {
   );
 }
 
+function isToolUiPreview(value: unknown): value is ToolUiPreview {
+  return isRecord(value) && typeof value.kind === "string";
+}
+
 export function normalizeSessionEvents(records: unknown[]): SessionEvent[] {
   const events: SessionEvent[] = [];
 
@@ -58,6 +62,31 @@ export function normalizeSessionEvents(records: unknown[]): SessionEvent[] {
 
 function getDisplayTime(timestamp: string): string {
   return timestamp;
+}
+
+function getOptionalString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function legacyToolResultBlock(event: SessionEvent, payload: Record<string, unknown>): MessageBlock {
+  const toolName = getOptionalString(payload, "toolName") ?? "Tool";
+  const summary = getOptionalString(payload, "summary");
+  const output =
+    getOptionalString(payload, "truncatedOutput") ??
+    getOptionalString(payload, "modelOutput") ??
+    getOptionalString(payload, "rawOutput") ??
+    "";
+  const ok = payload.ok !== false;
+
+  return {
+    kind: "tool",
+    id: event.id,
+    title: summary ?? toolName,
+    content: output,
+    createdAt: getDisplayTime(event.timestamp),
+    isError: !ok,
+  };
 }
 
 function messageBlockFromToolPreview(
@@ -219,11 +248,17 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
         ];
       }
       case "tool_result": {
-        const payload = event.payload as { ok: boolean; uiPreview: ToolUiPreview };
-        return [messageBlockFromToolPreview(event.id, event.timestamp, payload.uiPreview, !payload.ok)];
+        const payload: Record<string, unknown> = isRecord(event.payload) ? event.payload : {};
+        const preview = payload.uiPreview;
+        if (!isToolUiPreview(preview)) {
+          return [legacyToolResultBlock(event, payload)];
+        }
+
+        return [messageBlockFromToolPreview(event.id, event.timestamp, preview, payload.ok === false)];
       }
       case "diff_preview": {
-        const preview = event.payload as ToolUiPreview;
+        const preview = event.payload;
+        if (!isToolUiPreview(preview)) return [];
         return [messageBlockFromToolPreview(event.id, event.timestamp, preview)];
       }
       case "error": {
@@ -266,12 +301,12 @@ export function createSessionDiffSummary(sessionId: SessionId, events: SessionEv
       continue;
     }
 
-    const preview =
+    const preview: unknown =
       event.type === "tool_result"
-        ? (event.payload as { uiPreview: ToolUiPreview }).uiPreview
-        : (event.payload as ToolUiPreview);
+        ? (event.payload as { uiPreview?: unknown }).uiPreview
+        : event.payload;
 
-    if (preview.kind !== "edit_diff" && preview.kind !== "write") {
+    if (!isToolUiPreview(preview) || (preview.kind !== "edit_diff" && preview.kind !== "write")) {
       continue;
     }
 

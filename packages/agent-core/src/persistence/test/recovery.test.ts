@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { recoverSession, recoverMessages } from "../recovery";
+import { recoverSession, recoverMessages, recoverMessageBlocks } from "../recovery";
 import { appendEvents } from "../jsonl";
 import { createMeta } from "../meta";
 import { createSessionStorePaths } from "../session-store";
@@ -108,6 +108,43 @@ describe("Session recovery", () => {
     expect(roles).toContain("user");
     expect(roles).toContain("assistant");
     expect(roles).toContain("toolResult");
+  });
+
+  it("should recover legacy tool results without uiPreview", async () => {
+    const paths = createSessionStorePaths(testDir);
+    await mkdir(paths.attachmentsDir, { recursive: true });
+
+    const events: SessionEvent[] = [
+      createEvent("user_message", { content: "read a legacy file" }, 1),
+      createEvent("tool_call", { id: "tc1", name: "read_file", arguments: { path: "README.md" } }, 2),
+      createEvent("tool_result", {
+        toolName: "read_file",
+        toolCallId: "tc1",
+        ok: true,
+        summary: "Read README.md",
+        rawOutput: "Preview for README.md",
+        truncatedOutput: "Preview for README.md",
+        artifacts: [{ type: "file", name: "README.md" }],
+      }, 3),
+    ];
+
+    await appendEvents(paths.sessionPath, events);
+    await createMeta(paths.metaPath, "test-session");
+
+    const result = await recoverSession(paths);
+    const messageBlocks = await recoverMessageBlocks(paths.sessionPath);
+
+    expect(result.events.length).toBe(3);
+    expect(messageBlocks).toContainEqual(
+      expect.objectContaining({
+        kind: "tool",
+        title: "Read README.md",
+        content: "Preview for README.md",
+        isError: false,
+      }),
+    );
+    expect(result.diffSummary).not.toBeNull();
+    expect(result.diffSummary!.files).toEqual([]);
   });
 
   it("should handle empty session", async () => {

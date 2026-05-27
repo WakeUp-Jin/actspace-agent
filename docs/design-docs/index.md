@@ -25,6 +25,7 @@
 - `storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
 - `llm-agent-dev-skill-fix.md`：llm-agent-dev Skill 初始版本中发现的缺陷记录，用于后续统一修复。
 - `frontend-ui/index.md`
+- `frontend-ui/tailwind-style-architecture.md`：Tailwind v4 样式架构、全局样式边界、token 映射和迁移策略。
 - `frontend-ui/前端设计文档.md`
 - `frontend-ui/工作台布局与面板交互规范.md`
 - `frontend-ui/左侧会话栏规范.md`
