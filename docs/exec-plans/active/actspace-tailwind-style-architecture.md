@@ -37,7 +37,7 @@
   - `docs/design-docs/frontend-ui/usage-statistics/设计规范.md`
 - 相关代码路径：
   - `packages/desktop/package.json`
-  - `packages/desktop/vite.config.ts`
+  - `packages/desktop/vite.config.mts`
   - `packages/desktop/src/renderer/main.tsx`
   - `packages/desktop/src/renderer/styles.css`
   - `packages/desktop/src/renderer/components/UsageStatisticsPage.tsx`
@@ -66,7 +66,7 @@
 
 1. Tailwind 基础设施。
    - 安装 `tailwindcss` 和 `@tailwindcss/vite`。
-   - 在 `packages/desktop/vite.config.ts` 加入 Tailwind Vite plugin。
+   - 在 `packages/desktop/vite.config.mts` 加入 Tailwind Vite plugin。
    - 新建 `packages/desktop/src/renderer/styles/index.css`、`tokens.css`、`tailwind.css`、`base.css`。
    - 更新 `packages/desktop/src/renderer/main.tsx` 的样式入口。
    - 迁移或删除与基础层重复的旧 `styles.css` 内容。
@@ -111,11 +111,11 @@
 - [x] 确认 Tailwind 接入方向：使用 Tailwind v4、Vite plugin、Preflight、无长期 legacy CSS。
 - [x] 创建前端 Tailwind 样式架构设计文档。
 - [x] 创建 active execution plan。
-- [ ] 安装 Tailwind 依赖并接入 Vite plugin。
-- [ ] 建立 renderer 样式入口和 token 映射。
-- [ ] 迁移 Usage Statistics 页面。
-- [ ] 完成浏览器 mock 验收。
-- [ ] 完成 Electron 真实窗口验收。
+- [x] 安装 Tailwind 依赖并接入 Vite plugin。
+- [x] 建立 renderer 样式入口和 token 映射。
+- [x] 迁移 Usage Statistics 页面。
+- [x] 完成浏览器 mock 验收。
+- [x] 完成 Electron 真实窗口验收。
 - [ ] 迁移剩余主要前端区域。
 - [ ] 删除旧 CSS 并更新 history / coding standards。
 
@@ -125,3 +125,4 @@
 - 2026-05-27：启用 Preflight。原因是项目仍处开发阶段，用户明确不需要保留旧样式；全量显式样式比长期兼容旧默认更清晰。
 - 2026-05-27：不保留长期 `legacy.css`。影响是每个迁移切片必须完整落地并验证，不能留下半迁移 class。
 - 2026-05-27：Usage Statistics 作为第一个样板页面。原因是该页面已有 HTML 原型、明确视觉反馈和较完整的卡片 / 表格 / 弹窗 / 响应式需求。
+- 2026-05-27：将 desktop Vite 配置改为 `vite.config.mts`。原因是 `@tailwindcss/vite` 是 ESM-only，`.mts` 能让 Vite 配置以 ESM 方式加载，同时不影响 Electron main 的 CommonJS tsconfig。

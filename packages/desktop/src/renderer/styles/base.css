@@ -1,0 +1,78 @@
+* {
+  box-sizing: border-box;
+  scrollbar-color: var(--act-scrollbar-thumb) transparent;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 64px;
+  border: 4px solid transparent;
+  border-radius: 999px;
+  background: var(--act-scrollbar-thumb);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--act-scrollbar-thumb-hover);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--act-color-text);
+  background: var(--act-color-bg);
+  font-family: var(--act-font-ui);
+  font-feature-settings: normal;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(47, 111, 255, 0.22);
+  outline-offset: 2px;
+}
+
+svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+::selection {
+  background: rgba(47, 111, 255, 0.18);
+}

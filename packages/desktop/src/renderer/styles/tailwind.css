@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--act-font-ui);
+  --font-display: var(--act-font-display);
+  --font-mono: var(--act-font-mono);
+
+  --color-brand: var(--act-color-brand);
+  --color-brand-strong: var(--act-color-brand-strong);
+  --color-brand-soft: var(--act-color-brand-soft);
+  --color-app-bg: var(--act-color-bg);
+  --color-surface: var(--act-color-surface);
+  --color-surface-subtle: var(--act-color-surface-subtle);
+  --color-sidebar: var(--act-color-sidebar);
+  --color-sidebar-selected: var(--act-color-sidebar-selected);
+  --color-line: var(--act-color-border);
+  --color-line-strong: var(--act-color-border-strong);
+  --color-text-main: var(--act-color-text);
+  --color-text-muted: var(--act-color-text-muted);
+  --color-text-faint: var(--act-color-text-faint);
+  --color-text-subtle: var(--act-color-text-subtle);
+  --color-warm: var(--act-color-warm);
+  --color-danger: var(--act-color-danger);
+  --color-success: var(--act-color-success);
+
+  --radius-act-xs: var(--act-radius-xs);
+  --radius-act-sm: var(--act-radius-sm);
+  --radius-act-md: var(--act-radius-md);
+  --radius-act-lg: var(--act-radius-lg);
+  --radius-act-xl: var(--act-radius-xl);
+  --radius-act-pill: var(--act-radius-pill);
+
+  --shadow-act-soft: var(--act-shadow-soft);
+  --shadow-act-popover: var(--act-shadow-popover);
+}

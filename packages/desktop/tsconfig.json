@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "module": "ESNext",
+    "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "strict": false,
     "lib": [
@@ -19,6 +20,6 @@
   "include": [
     "src/renderer",
     "src/global.d.ts",
-    "vite.config.ts"
+    "vite.config.mts"
   ]
 }

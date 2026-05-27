@@ -1,0 +1,53 @@
+:root {
+  color: #202124;
+  background: #fbfcff;
+
+  --act-font-ui:
+    -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Segoe UI",
+    "Microsoft YaHei",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  --act-font-display: var(--act-font-ui);
+  --act-font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+
+  --act-color-brand: #2f6fff;
+  --act-color-brand-strong: #1f5fe8;
+  --act-color-brand-soft: #edf4ff;
+  --act-color-brand-glow: rgba(47, 111, 255, 0.18);
+
+  --act-color-bg: #fbfcff;
+  --act-color-surface: #ffffff;
+  --act-color-surface-subtle: #f7f8fa;
+  --act-color-sidebar: #f3f5f7;
+  --act-color-sidebar-selected: #e6e9ed;
+
+  --act-color-border: #dfe4ea;
+  --act-color-border-strong: #c8d1dc;
+
+  --act-color-text: #202124;
+  --act-color-text-muted: rgba(32, 33, 36, 0.72);
+  --act-color-text-faint: rgba(32, 33, 36, 0.54);
+  --act-color-text-subtle: rgba(32, 33, 36, 0.36);
+
+  --act-color-warm: #d99a20;
+  --act-color-danger: #d94d5c;
+  --act-color-success: #16a36a;
+
+  --act-radius-xs: 4px;
+  --act-radius-sm: 6px;
+  --act-radius-md: 8px;
+  --act-radius-lg: 12px;
+  --act-radius-xl: 18px;
+  --act-radius-pill: 999px;
+
+  --act-shadow-soft: 0 18px 48px rgba(31, 45, 61, 0.08);
+  --act-shadow-popover: 0 24px 64px rgba(31, 45, 61, 0.14);
+
+  --act-scrollbar-thumb: rgba(171, 177, 186, 0.46);
+  --act-scrollbar-thumb-hover: rgba(146, 153, 164, 0.56);
+}
