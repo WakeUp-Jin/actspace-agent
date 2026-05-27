@@ -21,6 +21,7 @@
 - `docs/design-docs/frontend-ui/工作台布局与面板交互规范.md`
 - `docs/design-docs/frontend-ui/右侧面板与文件渲染规范.md`
 - `docs/design-docs/frontend-ui/Kairos监控页规范.md`
+- `docs/design-docs/frontend-ui/Kairos右侧紧凑视图规范.md`
 - `docs/design-docs/agent-core/kairos-autonomous-mode.md`
 
 补充素材：
@@ -47,6 +48,8 @@
 - 不重做 Kairos 全页面；只做右侧轻量状态视图。
 - 不处理 Composer、附件或设置页样式。
 
+> Kairos 右侧轻量状态视图已拆出独立计划 `docs/exec-plans/active/20260528-kairos-right-panel-compact-view.md`，该计划负责具体组件拆分、同源数据流和窄宽适配。本计划保留右侧面板总框架与文件/Context/HTML 等对象浏览主线。
+
 ## 相关代码路径
 
 - `packages/desktop/src/renderer/App.tsx`
@@ -58,6 +61,7 @@
 - `packages/shared/src/session.ts`
 - `docs/design-docs/frontend-ui/右侧面板与文件渲染规范.md`
 - `docs/design-docs/frontend-ui/Kairos监控页规范.md`
+- `docs/design-docs/frontend-ui/Kairos右侧紧凑视图规范.md`
 - `docs/design-docs/agent-core/kairos-autonomous-mode.md`
 
 ## 并行边界
@@ -129,14 +133,13 @@
 
 修改目标：
 
-- 复用 Kairos 监控页部分组件或数据结构。
-- 右侧只展示状态、最近 tick、当前 brief、最近工具/任务，不做完整页面。
+- 由 `docs/exec-plans/active/20260528-kairos-right-panel-compact-view.md` 承接具体实现。
+- 本计划只要求右侧面板 tab 底座能够容纳 Kairos tab，不在这里重复定义 compact 布局。
 
 验收：
 
-- 可以打开 Kairos Tab。
-- Kairos 未启用时有明确空态。
-- Kairos 运行时能显示最近状态，不影响聊天输入。
+- Kairos compact plan 完成后，可以通过右侧面板打开 Kairos tab。
+- 右侧面板总框架不阻断 Kairos compact 视图接入。
 
 ### Task 6: 暂缓入口收口
 
@@ -164,7 +167,7 @@
 - [ ] 完成文件预览。
 - [ ] 完成 HTML 渲染视图。
 - [ ] 完成 Context 完整只读视图。
-- [ ] 完成 Kairos 轻量状态视图。
+- [ ] 与 `20260528-kairos-right-panel-compact-view.md` 对齐 Kairos tab 接入边界。
 - [ ] 完成暂缓入口收口。
 - [ ] 跑完验证，更新必要文档和 history。
 

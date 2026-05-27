@@ -43,8 +43,8 @@
 
 不包含：
 
-- 不修 Bash 审核态 UI、工具失败展示 UI、Markdown 表格或 Usage 页面；这些由 `20260527-bugfix-foundation.md` 负责。
-- 不做 Composer 的 Skill 菜单视觉；前端入口由 `20260527-frontend-interaction-polish.md` 负责，本计划只提供后端能力和契约。
+- 不修 Bash 审核态 UI、工具失败展示 UI、Markdown 表格或 Usage 页面；这些由 `20260527-bugfix-foundation_代码编完需手动验证.md` 负责。
+- 不做 Composer 的 Skill 菜单视觉；前端入口由 `20260527-frontend-interaction-polish/README.md` 负责，本计划只提供后端能力和契约。
 - 不实现右侧 Context 可编辑面板；只提供后端 context state / compression 所需数据与操作边界。
 - 不改变密钥读取规则，不读取 `.env` 内容。
 

@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   package-and-release:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions:
       contents: write
       attestations: write
@@ -25,7 +25,22 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: 启用 pnpm
+        run: |
+          corepack enable
+          corepack prepare "$(node -p "require('./package.json').packageManager")" --activate
+          pnpm --version
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
       - name: 打包 release 制品
+        env:
+          ACTSPACE_MAC_CODESIGN_IDENTITY: ${{ secrets.ACTSPACE_MAC_CODESIGN_IDENTITY }}
+          ACTSPACE_MAC_NOTARIZE: ${{ secrets.ACTSPACE_MAC_NOTARIZE }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: ./scripts/release-package.sh
 
       - name: 生成 SBOM
@@ -41,14 +56,14 @@ jobs:
         with:
           name: release-assets
           path: |
-            dist/repo-metadata.tgz
+            dist/actspace-desktop-*.tar.gz
             dist/release-manifest.json
             dist/sbom.spdx.json
 
       - name: 生成 build provenance
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
-          subject-path: dist/repo-metadata.tgz
+          subject-path: dist/actspace-desktop-*.tar.gz
 
       - name: 创建 GitHub Release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
@@ -56,6 +71,6 @@ jobs:
           tag_name: ${{ inputs.tag }}
           name: ${{ inputs.title || inputs.tag }}
           files: |
-            dist/repo-metadata.tgz
+            dist/actspace-desktop-*.tar.gz
             dist/release-manifest.json
             dist/sbom.spdx.json

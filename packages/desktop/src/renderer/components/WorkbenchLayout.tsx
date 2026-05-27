@@ -1,8 +1,7 @@
 import type { ContextUsageSnapshot, MessageBlock, SessionListItem, UsageStatisticsSnapshot } from "@actspace/shared";
 import { useCallback, useEffect, useState } from "react";
-import { FlaskConical } from "lucide-react";
 import { ConversationView } from "./ConversationView";
-import { PlaceholderView } from "./PlaceholderView";
+import { LabPage } from "./LabPage";
 import { RightPanel } from "./RightPanel";
 import { Sidebar, type SidebarMode, type SidebarView } from "./Sidebar";
 import { SplitView } from "./SplitView";
@@ -241,19 +240,7 @@ export function WorkbenchLayout({
 
   let mainContent;
   if (view === "lab") {
-    mainContent = (
-      <PlaceholderView
-        eyebrow="Lab"
-        title="Workflow & prompt playground"
-        description="Lab 是 actspace 的实验台，未来会承载 prompt 调试、工具沙盒和模型对比。当前仅做入口预留。"
-        bullets={[
-          "Prompt 与系统消息的可视化编辑与对比",
-          "工具调用的 dry-run 和回放",
-          "多模型并排输出，方便挑选合适的模型",
-        ]}
-        icon={<FlaskConical size={28} strokeWidth={1.6} />}
-      />
-    );
+    mainContent = <LabPage />;
   } else if (view === "usage") {
     mainContent = (
       <UsageStatisticsPage

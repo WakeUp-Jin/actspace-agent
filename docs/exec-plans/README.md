@@ -9,14 +9,18 @@
 
 当前进行中的 `actspace` 计划：
 
-- `active/20260527-bugfix-foundation.md`
+- `active/20260527-bugfix-foundation_代码编完需手动验证.md`
+- `active/开发者手动验收-20260529-bugfix-foundation-manual-acceptance.md`
 - `active/20260527-agent-tool-capabilities.md`
-- `active/20260527-frontend-interaction-polish.md`
+- `active/20260527-frontend-interaction-polish/README.md`
 - `active/20260527-right-panel-views.md`
+- `active/20260528-kairos-right-panel-compact-view.md`
 - `active/actspace-tailwind-style-architecture.md`
+- `active/20260528-tailwind-remaining-ui-migration.md`
 - `active/actspace-usage-statistics-session-jsonl-plan.md`
 - `active/actspace-token-usage-context-control-foundation.md`
 - `active/frontend-ui-components-foundation.md`
+- `active/lab-v0-frontend-mock-implementation.md`
 - `active/Bash工具和工具权限调度开发计划/README.md`
 
 已完成的 `actspace` 计划：

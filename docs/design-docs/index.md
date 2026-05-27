@@ -29,6 +29,9 @@
 - `lab/experiment-lifecycle.md`：一轮实验从创建、假说构建、实证验证、能力锻造到晋升评审的生命周期。
 - `lab/data-model.md`：Experiment、Stage、Evidence、Artifact、Review 等 Lab 核心数据对象。
 - `lab/ui-experience.md`：Lab 实验矩阵页面的信息架构、交互原则和前端设计入口。
+- `lab/frontend-page-design.md`：Lab 首页、阶段卡片、卡片详情弹窗、新实验弹窗和已完成实验弹窗的前端页面规范。
+- `lab/implementation-progress.md`：Lab 当前设计执行进度，记录 V0 renderer mock 已落地以及 Runtime / IPC / 持久化待实现边界。
+- `lab/prototype.html`：Lab V0 页面单文件交互原型，包含四栏实验矩阵、卡片详情弹窗和已完成实验弹窗。
 - `lab/runtime-architecture.md`：Lab Runtime 与 Main Agent、Kairos、ToolManager、能力产物 registry 的关系。
 - `lab/promotion-and-safety.md`：候选能力晋升、风险分层、沙箱、人工审批和失败实验保留原则。
 - `lab/versions/README.md`：Lab V0-V3 渐进式构建路线。
@@ -44,4 +47,5 @@
 - `frontend-ui/右侧面板与文件渲染规范.md`
 - `frontend-ui/设置页规范.md`：设置态布局、导航分组和聊天态切换规则。
 - `frontend-ui/Kairos监控页规范.md`：Kairos 监控页信息架构、运行轨迹、执行列表、统计区和详情区规范。
+- `frontend-ui/Kairos右侧紧凑视图规范.md`：聊天态右侧面板中的 Kairos compact view，约束同源数据流、三段布局和组件复用边界。
 - `frontend-ui/usage-statistics/设计规范.md`：Usage Statistics 页面布局、组件、数据来源和视觉规范。

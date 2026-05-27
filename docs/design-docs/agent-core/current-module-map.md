@@ -160,7 +160,7 @@ flowchart TB
 
 - `controller.ts`：单例装配中枢。`createKairos(opts)` 接收 `kairosRoot / llm / toolManagerFactory / contextWindow`，内部串起所有子模块并 emit `event` / `state`。`eventSink` 严格按"写盘 → 推 ring buffer → 回调 listener"顺序，保证消费方任何时刻看到的都是已持久化事实。
 - `scheduler.ts`：`MessageQueue` FIFO + `QueueProcessor` 主循环。`runInterruptibleSleep` 用 `Promise + setTimeout + clearTimeout` 实现可中断 sleep；`mainAgentBusy` 标志让主 Agent runTurn 期间 scheduler 暂停取下一条；连续 `errorThreshold` 次失败进 cooldown。`sleepBiasAt(now, prefs)` 按 `preferences.rhythm` 调节 sleep 系数，`clampSleep` 卡住 LLM 请求范围。
-- `runner.ts`：`KairosRunner.processTick(msg)` 执行单次 tick：刷新观察（watch diff + sessions digest）→ 加载 short-term context（token budget）→ assemble system prompt → emit `kairos_tick_injected` → `runAgentLoop({ toolExecuteOptions: { callerAgent:"kairos", kairosGuard } })` → 解析最后一次 `sleep(seconds)` 工具参数返回给 scheduler。
+- `runner.ts`：`KairosRunner.processTick(msg)` 执行单次 tick：刷新观察（watch diff + sessions digest）→ 加载 short-term context（token budget）→ assemble system prompt → emit `kairos_tick_injected` → 从 Kairos 专属 ToolManager 注入工具定义 → 直接调用共享 `runAgentLoop({ toolExecuteOptions: { callerAgent:"kairos", kairosGuard } })` → 把 `tool_start/tool_end/message_end` 转成 Kairos `SessionEvent` → 解析最后一次 `sleep(seconds)` 工具参数返回给 scheduler。
 - `prompt-assembler.ts`：把 5 段（pacing / observation / config tip / history / rule.md）拼到 `KAIROS_SYSTEM_PROMPT` 占位符；每段独立 token budget。
 - `aggregator.ts`：薄壁 re-export `@actspace/shared` 的 `aggregateKairosEvents`——agent-core 内部统一从这里 import，避免散落引用 shared。
 - `config/`：4 个文件（preferences.json / paths.json / blocklist.json / rule.md）的 schema 解析器（无 Zod，手写校验）+ tip 提取拼装。
@@ -173,8 +173,11 @@ flowchart TB
 
 与主 Agent 共用的 hooks（已在前置模块文档中说明）：
 
+- 主 Agent 和 Kairos 共享 `LLMService / ToolManager / ToolScheduler / runAgentLoop` 这套工具执行内核；差异只在外壳：主 Agent 通过 `engine/bridge.ts` 推 `RuntimeStreamEvent` 到聊天区并写主 session，Kairos 通过 `kairos/runner.ts + controller.eventSink` 推 `SessionEvent` 到 KairosPage 并写 short-term jsonl。
+- `desktop/src/main/kairos-bootstrap.ts#createKairosToolManagerFactory()` 创建 Kairos 专属 ToolManager：先注册主 Agent 同款基础工具，再按 `env.disabledTools + blocklist.toolsDenied` 过滤；`controller.ts` 之后调用 `registerKairosTools()` 追加 Kairos 专属 `sleep`。默认 `blocklist.toolsDenied` 含 `bash`，用户显式移除后才会暴露给 Kairos。
 - `engine/types.ts` 的 `AgentLoopConfig.toolExecuteOptions` 字段：让 runner 把 `callerAgent + kairosGuard` 透到 `ToolManager.execute(name, args, callId, options)`。主 Agent 不传该字段时路径零开销。
 - `tools/scheduler.ts` 的 `checkKairosGuard(toolName, args)`：仅在 `callerAgent === "kairos"` 时跑路径白名单 + blocklist 双校验。
+- Kairos 工具事件契约：`tool_start` 转 `tool_call { id, name, arguments }`，`tool_end` 转 `tool_result { toolCallId, toolName, ok, summary, modelOutput }`；前端右侧"工具结果"里的输入来自 `tool_call.payload.arguments`。
 - 4 个新 `SessionEventType`：`kairos_tick_injected` / `kairos_sleep_start` / `kairos_sleep_end` / `kairos_sleep_interrupted`。`@actspace/shared/kairos-aggregator.ts` 的 `aggregateKairosEvents(events)` 把它们和复用的 `assistant_message` / `tool_call` / `tool_result` 聚合为表格行。
 
 Desktop 集成（`packages/desktop`）：

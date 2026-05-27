@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   createKairosToolManagerFactory,
   ensureKairosScaffolding,
+  getKairosWorkspaceRoot,
 } from "../kairos-bootstrap";
 import type { KairosConfig } from "@actspace/agent-core";
 
@@ -36,10 +37,11 @@ describe("ensureKairosScaffolding", () => {
 
     for (const sub of [
       "config",
+      "workspace",
+      "workspace/notes",
       "memory/short-term",
       "observe/watch-manifests",
       "briefs/tasks",
-      "notes",
     ]) {
       const s = await stat(join(root, sub));
       expect(s.isDirectory()).toBe(true);
@@ -54,7 +56,13 @@ describe("ensureKairosScaffolding", () => {
     expect(prefs.enabled).toBe(false);
 
     const paths = JSON.parse(await readFile(join(root, "config/paths.json"), "utf8"));
-    expect(Array.isArray(paths.paths)).toBe(true);
+    expect(paths.paths).toEqual([
+      {
+        path: getKairosWorkspaceRoot(root),
+        watch: true,
+        tip: "Kairos 的默认工作空间，文件工具的相对路径会落在这里。",
+      },
+    ]);
 
     const blocklist = JSON.parse(await readFile(join(root, "config/blocklist.json"), "utf8"));
     expect(Array.isArray(blocklist.paths)).toBe(true);
@@ -69,15 +77,39 @@ describe("ensureKairosScaffolding", () => {
     const root = await makeRoot();
     await mkdir(join(root, "config"), { recursive: true });
     const customPrefs = JSON.stringify({ enabled: true, _custom: "keep-me" }, null, 2);
+    const customPaths = JSON.stringify({ tip: "custom", paths: [{ path: "/tmp/custom", watch: false }] }, null, 2);
     await writeFile(join(root, "config/preferences.json"), customPrefs, "utf8");
+    await writeFile(join(root, "config/paths.json"), customPaths, "utf8");
     await writeFile(join(root, "config/rule.md"), "# user-edited", "utf8");
 
     await ensureKairosScaffolding(root);
 
     const prefsAfter = await readFile(join(root, "config/preferences.json"), "utf8");
     expect(prefsAfter).toBe(customPrefs);
+    const pathsAfter = await readFile(join(root, "config/paths.json"), "utf8");
+    expect(pathsAfter).toBe(customPaths);
     const ruleAfter = await readFile(join(root, "config/rule.md"), "utf8");
     expect(ruleAfter).toBe("# user-edited");
+  });
+
+  it("migrates the legacy empty paths config to the Kairos workspace", async () => {
+    const root = await makeRoot();
+    await mkdir(join(root, "config"), { recursive: true });
+    await writeFile(
+      join(root, "config/paths.json"),
+      JSON.stringify(DEFAULT_PATHS_CONFIG, null, 2) + "\n",
+      "utf8",
+    );
+
+    await ensureKairosScaffolding(root);
+
+    const paths = JSON.parse(await readFile(join(root, "config/paths.json"), "utf8"));
+    expect(paths.paths).toEqual([
+      expect.objectContaining({
+        path: getKairosWorkspaceRoot(root),
+        watch: true,
+      }),
+    ]);
   });
 
   it("is safe to call twice consecutively", async () => {

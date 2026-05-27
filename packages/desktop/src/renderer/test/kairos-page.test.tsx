@@ -190,9 +190,78 @@ describe("KairosPage", () => {
     render(<KairosPage />);
 
     const trace = await screen.findByLabelText("运行轨迹（近 60 分钟）");
-    const tones = Array.from(trace.querySelectorAll<HTMLElement>(".kairos-trace__block"))
+    const tones = Array.from(trace.querySelectorAll<HTMLElement>("[data-testid='kairos-trace-block']"))
       .map((node) => node.dataset.tone);
     expect(new Set(tones)).toEqual(new Set(["reply", "sleep", "error", "other"]));
+  });
+
+  it("sizes runtime trace blocks with a capped linear duration scale", async () => {
+    const base = new Date("2026-05-27T14:10:00.000Z").getTime();
+    const events: SessionEvent[] = [
+      makeEvent({
+        id: "reply-short",
+        type: "assistant_message",
+        timestamp: new Date(base).toISOString(),
+        payload: { content: "quick", stopReason: "stop", model: "m", provider: "p" },
+      }),
+      makeEvent({
+        id: "tool-call-fast",
+        type: "tool_call",
+        timestamp: new Date(base + 1_000).toISOString(),
+        payload: { id: "tc-fast", name: "read_file", arguments: { path: "README.md" } },
+      }),
+      makeEvent({
+        id: "tool-result-fast",
+        type: "tool_result",
+        timestamp: new Date(base + 4_000).toISOString(),
+        payload: { toolCallId: "tc-fast", toolName: "read_file", ok: true, summary: "ok" },
+      }),
+      makeEvent({
+        id: "sleep-start",
+        type: "kairos_sleep_start",
+        timestamp: new Date(base + 1_000).toISOString(),
+        payload: { plannedSeconds: 120, reason: "after_tick" },
+      }),
+      makeEvent({
+        id: "sleep-end",
+        type: "kairos_sleep_end",
+        timestamp: new Date(base + 121_000).toISOString(),
+        payload: { actualSeconds: 120 },
+      }),
+    ];
+    installFakeBridge({ initialEvents: events });
+    render(<KairosPage />);
+
+    const trace = await screen.findByLabelText("运行轨迹（近 60 分钟）");
+    const blocks = Array.from(trace.querySelectorAll<HTMLElement>("[data-testid='kairos-trace-block']"));
+    const shortBlock = blocks.find((node) => node.dataset.durationMs === "0");
+    const fastToolBlock = blocks.find((node) => node.dataset.durationMs === "3000");
+    const longBlock = blocks.find((node) => node.dataset.durationMs === "120000");
+
+    expect(shortBlock?.style.width).toBe("20px");
+    expect(fastToolBlock?.style.width).toBe("35px");
+    expect(longBlock?.style.width).toBe("100px");
+  });
+
+  it("keeps all runtime trace events in the horizontal scroll viewport", async () => {
+    const base = new Date("2026-05-27T14:20:00.000Z").getTime();
+    const events = Array.from({ length: 42 }, (_, index) => makeEvent({
+      id: `trace-reply-${index + 1}`,
+      type: "assistant_message",
+      timestamp: new Date(base + index * 1_000).toISOString(),
+      payload: {
+        content: `trace reply ${index + 1}`,
+        stopReason: "stop",
+        model: "m",
+        provider: "p",
+      },
+    }));
+    installFakeBridge({ initialEvents: events });
+    render(<KairosPage />);
+
+    const trace = await screen.findByLabelText("运行轨迹（近 60 分钟）");
+    expect(trace.querySelector("[data-testid='kairos-trace-viewport']")).toBeInTheDocument();
+    expect(trace.querySelectorAll("[data-testid='kairos-trace-block']")).toHaveLength(42);
   });
 
   it("paginates execution rows at ten items per page", async () => {

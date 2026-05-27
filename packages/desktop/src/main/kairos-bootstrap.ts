@@ -1,13 +1,13 @@
 /**
  * Kairos 装配辅助：负责
- * 1. 在 `<userData>/kairos/` 下创建必备目录与缺省 config（preferences.json 等）。
+ * 1. 在 `<userData>/kairos/` 下创建必备目录、默认 workspace 与缺省 config（preferences.json 等）。
  * 2. 提供 `createKairosToolManagerFactory(...)` 工厂——按 blocklist.toolsDenied 排除主 Agent 工具，
  *    再交给 controller 注册 Sleep。
  * 3. 暴露 `createKairosLlm()` + `resolveKairosThinkingEnabled()`——按 KAIROS_MODEL_ID / KAIROS_THINKING
  *    env 决定 Kairos 自己的模型与思考链；缺省回落到主 Agent 默认。
  *    `preferences.modelId` 字段保留给 v2 由用户在文件里切换。
  */
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { KairosConfig } from "@actspace/agent-core";
 import {
@@ -31,23 +31,29 @@ const DEFAULT_RULE_MD = `# Kairos 用户规则
 - 优先复盘最近的主 Agent 会话，整理可下一步执行的小任务。
 `;
 
+const KAIROS_WORKSPACE_DIR = "workspace";
+
+export function getKairosWorkspaceRoot(kairosRoot: string): string {
+  return join(kairosRoot, KAIROS_WORKSPACE_DIR);
+}
+
 export async function ensureKairosScaffolding(kairosRoot: string): Promise<void> {
+  const kairosWorkspaceRoot = getKairosWorkspaceRoot(kairosRoot);
+
   await Promise.all([
+    mkdir(kairosWorkspaceRoot, { recursive: true }),
+    mkdir(join(kairosWorkspaceRoot, "notes"), { recursive: true }),
     mkdir(join(kairosRoot, "config"), { recursive: true }),
     mkdir(join(kairosRoot, "memory", "short-term"), { recursive: true }),
     mkdir(join(kairosRoot, "observe", "watch-manifests"), { recursive: true }),
     mkdir(join(kairosRoot, "briefs", "tasks"), { recursive: true }),
-    mkdir(join(kairosRoot, "notes"), { recursive: true }),
   ]);
 
   await writeIfMissing(
     join(kairosRoot, "config", "preferences.json"),
     JSON.stringify(DEFAULT_PREFERENCES, null, 2) + "\n",
   );
-  await writeIfMissing(
-    join(kairosRoot, "config", "paths.json"),
-    JSON.stringify(DEFAULT_PATHS_CONFIG, null, 2) + "\n",
-  );
+  await writePathsConfigIfMissingOrLegacyDefault(kairosRoot);
   await writeIfMissing(
     join(kairosRoot, "config", "blocklist.json"),
     JSON.stringify(DEFAULT_BLOCKLIST, null, 2) + "\n",
@@ -61,6 +67,44 @@ async function writeIfMissing(path: string, content: string): Promise<void> {
     return;
   } catch {
     await writeFile(path, content, "utf8");
+  }
+}
+
+function defaultPathsConfigForKairosWorkspace(kairosRoot: string) {
+  return {
+    ...DEFAULT_PATHS_CONFIG,
+    tip:
+      "Kairos 可读写的本地路径；默认只授权 Kairos 自己的 workspace，新增路径前请确认不会暴露敏感目录。",
+    paths: [
+      {
+        path: getKairosWorkspaceRoot(kairosRoot),
+        watch: true,
+        tip: "Kairos 的默认工作空间，文件工具的相对路径会落在这里。",
+      },
+    ],
+  };
+}
+
+async function writePathsConfigIfMissingOrLegacyDefault(kairosRoot: string): Promise<void> {
+  const path = join(kairosRoot, "config", "paths.json");
+  const content = JSON.stringify(defaultPathsConfigForKairosWorkspace(kairosRoot), null, 2) + "\n";
+  try {
+    const current = await readFile(path, "utf8");
+    if (isLegacyEmptyPathsConfig(current)) {
+      await writeFile(path, content, "utf8");
+    }
+    return;
+  } catch {
+    await writeFile(path, content, "utf8");
+  }
+}
+
+function isLegacyEmptyPathsConfig(content: string): boolean {
+  try {
+    const parsed = JSON.parse(content) as { tip?: unknown; paths?: unknown };
+    return parsed.tip === DEFAULT_PATHS_CONFIG.tip && Array.isArray(parsed.paths) && parsed.paths.length === 0;
+  } catch {
+    return false;
   }
 }
 
@@ -98,8 +142,8 @@ export function resolveKairosThinkingEnabled(): boolean | undefined {
  * - 把 `config.blocklist.toolsDenied` 加进 `disabledTools` → 不注册到 manager 上
  * - controller 之后会调 `registerKairosTools(manager)` 把 Sleep 工具加进来
  *
- * `workspaceRoot` 参数：传 controller 持有的 kairosRoot 的父级（即 userData 根）足够 sandbox 校验；
- * 真正 Kairos 的"允许根"在 ToolScheduler 的 kairosGuard 走 paths.json，与此处 workspaceRoot 解耦。
+ * `workspaceRoot` 参数应传 Kairos 自己的 workspace 根目录。ToolScheduler 的
+ * kairosGuard 仍会用 paths.json 做二次校验，默认 paths.json 与这里保持同一个根。
  */
 export function createKairosToolManagerFactory(opts: {
   workspaceRoot: string;

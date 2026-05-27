@@ -12,6 +12,7 @@
     "check:docs": "./scripts/check-docs.sh",
     "check:repo": "./scripts/check-repo-hygiene.sh",
     "check:actions": "./scripts/check-action-pinning.sh",
+    "package:desktop": "./scripts/release-package.sh",
     "release-package": "./scripts/release-package.sh"
   }
 }

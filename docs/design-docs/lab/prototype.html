@@ -1,0 +1,1422 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Actspace Lab Prototype</title>
+    <style>
+      :root {
+        --brand: #2f6fff;
+        --brand-strong: #1f5fe8;
+        --brand-soft: #edf4ff;
+        --bg: #fbfcff;
+        --surface: #ffffff;
+        --surface-subtle: #f7f8fa;
+        --sidebar: #f3f5f7;
+        --sidebar-selected: #e6e9ed;
+        --border: #dfe4ea;
+        --border-strong: #c8d1dc;
+        --text: #202124;
+        --text-muted: rgba(32, 33, 36, 0.72);
+        --text-faint: rgba(32, 33, 36, 0.54);
+        --text-subtle: rgba(32, 33, 36, 0.36);
+        --warm: #d99a20;
+        --danger: #d94d5c;
+        --success: #16a36a;
+        --cyan: #287783;
+        --violet: #6957d9;
+        --shadow-popover: 0 24px 64px rgba(31, 45, 61, 0.14);
+        --shadow-card: 0 1px 2px rgba(31, 45, 61, 0.05);
+        --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC",
+          "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei",
+          "Helvetica Neue", Arial, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-ui);
+        font-feature-settings: normal;
+        letter-spacing: 0;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 64px minmax(0, 1fr);
+      }
+
+      .rail {
+        position: relative;
+        border-right: 1px solid var(--border);
+        background: var(--sidebar);
+      }
+
+      .traffic {
+        position: absolute;
+        top: 18px;
+        left: 15px;
+        display: flex;
+        gap: 8px;
+      }
+
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+      }
+
+      .dot.red {
+        background: #ff5f57;
+      }
+
+      .dot.yellow {
+        background: #ffbd2e;
+      }
+
+      .rail-stack {
+        position: absolute;
+        top: 74px;
+        left: 15px;
+        right: 15px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .rail-item {
+        width: 34px;
+        height: 34px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        background: var(--surface);
+        color: var(--text-faint);
+        font-size: 16px;
+      }
+
+      .rail-item.active {
+        border-color: transparent;
+        background: var(--brand);
+        color: #fff;
+        font-weight: 700;
+      }
+
+      .stage {
+        min-width: 0;
+        padding: 28px 34px 34px;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 18px;
+      }
+
+      .topbar {
+        height: 58px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        padding: 0 26px;
+      }
+
+      .title {
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .actions {
+        margin-left: auto;
+        display: flex;
+        gap: 10px;
+      }
+
+      .btn {
+        min-width: 88px;
+        height: 32px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: background 150ms ease, border-color 150ms ease,
+          color 150ms ease, transform 150ms ease;
+      }
+
+      .btn:hover {
+        border-color: var(--border-strong);
+        background: var(--surface-subtle);
+        color: var(--text);
+      }
+
+      .btn:active {
+        transform: translateY(1px);
+      }
+
+      .btn.primary {
+        border-color: transparent;
+        background: var(--brand);
+        color: #fff;
+      }
+
+      .btn.primary:hover {
+        background: var(--brand-strong);
+        color: #fff;
+      }
+
+      .board {
+        min-height: 0;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(230px, 1fr));
+        gap: 14px;
+      }
+
+      .column {
+        min-height: 0;
+        border: 1px solid var(--stage-border);
+        border-radius: 14px;
+        background: var(--stage-bg);
+        padding: 14px;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      .column.hypothesis {
+        --stage-bg: #f3f7ff;
+        --stage-border: #dbe6ff;
+      }
+
+      .column.verify {
+        --stage-bg: #fff7ef;
+        --stage-border: #eadfd2;
+      }
+
+      .column.forge {
+        --stage-bg: #eefbfc;
+        --stage-border: #d6e8eb;
+      }
+
+      .column.review {
+        --stage-bg: #fffaf0;
+        --stage-border: #e9e1ce;
+      }
+
+      .column-head {
+        display: flex;
+        align-items: center;
+        min-height: 36px;
+        gap: 8px;
+      }
+
+      .column-title {
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .count {
+        color: var(--text-faint);
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      .add {
+        margin-left: auto;
+        width: 28px;
+        height: 28px;
+        border: 1px solid var(--stage-border);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--text-faint);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        line-height: 1;
+        transition: background 150ms ease, border-color 150ms ease,
+          color 150ms ease;
+      }
+
+      .add:hover {
+        border-color: var(--border-strong);
+        background: #fff;
+        color: var(--brand);
+      }
+
+      .cards {
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        overflow: auto;
+        padding-right: 2px;
+      }
+
+      .cards::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .cards::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: rgba(32, 33, 36, 0.14);
+      }
+
+      .card {
+        position: relative;
+        min-height: 88px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow-card);
+        padding: 12px;
+        cursor: pointer;
+        text-align: left;
+        transition: border-color 150ms ease, box-shadow 150ms ease,
+          transform 150ms ease;
+      }
+
+      .card:hover {
+        border-color: var(--border-strong);
+        box-shadow: 0 8px 24px rgba(31, 45, 61, 0.08);
+        transform: translateY(-1px);
+      }
+
+      .card.selected {
+        border-color: var(--brand);
+      }
+
+      .card.selected::before {
+        content: "";
+        position: absolute;
+        inset: 8px auto 8px 0;
+        width: 3px;
+        border-radius: 999px;
+        background: var(--brand);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        height: 22px;
+        padding: 0 9px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--tag-color) 13%, #fff);
+        color: var(--tag-color);
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .card-title {
+        margin-top: 9px;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.35;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .card-meta {
+        margin-top: 7px;
+        color: var(--text-faint);
+        font-size: 12px;
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .empty-card {
+        min-height: 88px;
+        border: 1px dashed color-mix(in srgb, var(--stage-border) 70%, #cfd6dd);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.42);
+      }
+
+      .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15, 23, 42, 0.22);
+        padding: 32px;
+      }
+
+      .overlay.open {
+        display: flex;
+      }
+
+      .modal {
+        width: min(860px, calc(100vw - 64px));
+        max-height: min(760px, calc(100vh - 64px));
+        border: 1px solid var(--border-strong);
+        border-radius: 16px;
+        background: var(--surface);
+        box-shadow: var(--shadow-popover);
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        overflow: hidden;
+      }
+
+      .modal.completed {
+        width: min(940px, calc(100vw - 64px));
+      }
+
+      .modal.new-experiment {
+        width: min(540px, calc(100vw - 64px));
+      }
+
+      .modal-head {
+        min-height: 78px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 28px;
+      }
+
+      .modal-title {
+        min-width: 0;
+        font-size: 22px;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .modal-head .tag {
+        margin-left: auto;
+      }
+
+      .icon-btn {
+        width: 32px;
+        height: 32px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--text-faint);
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .icon-btn:hover {
+        color: var(--text);
+        background: var(--surface-subtle);
+      }
+
+      .modal-body {
+        min-height: 0;
+        overflow: auto;
+        padding: 26px 28px;
+      }
+
+      .experiment-form {
+        display: grid;
+        gap: 18px;
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+
+      .field label {
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .field input,
+      .field textarea {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+        color: var(--text);
+        font: inherit;
+        font-size: 13px;
+        line-height: 1.45;
+        padding: 10px 12px;
+        outline: none;
+        transition: border-color 150ms ease, box-shadow 150ms ease;
+      }
+
+      .field input:focus,
+      .field textarea:focus {
+        border-color: #bfd4ff;
+        box-shadow: 0 0 0 3px rgba(47, 111, 255, 0.12);
+      }
+
+      .field textarea {
+        min-height: 124px;
+        resize: vertical;
+      }
+
+      .card-detail-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 246px;
+        gap: 28px;
+      }
+
+      .section + .section {
+        margin-top: 25px;
+      }
+
+      .section-title {
+        margin-bottom: 9px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .section p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .check-list {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .check-list li {
+        display: grid;
+        grid-template-columns: 18px minmax(0, 1fr);
+        gap: 8px;
+        color: var(--text-muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .check {
+        width: 16px;
+        height: 16px;
+        border-radius: 5px;
+        display: grid;
+        place-items: center;
+        background: var(--brand-soft);
+        color: var(--brand-strong);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .side-panel {
+        border-left: 1px solid var(--border);
+        padding-left: 24px;
+      }
+
+      .prop + .prop {
+        margin-top: 18px;
+      }
+
+      .prop-label {
+        color: var(--text-subtle);
+        font-size: 11px;
+      }
+
+      .prop-value {
+        margin-top: 5px;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      .modal-foot {
+        min-height: 64px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 28px;
+      }
+
+      .more-wrap {
+        position: relative;
+      }
+
+      .more-menu {
+        position: absolute;
+        right: 0;
+        bottom: calc(100% + 8px);
+        z-index: 2;
+        width: 132px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+        box-shadow: var(--shadow-popover);
+        padding: 6px;
+        display: none;
+      }
+
+      .more-menu.open {
+        display: grid;
+        gap: 2px;
+      }
+
+      .menu-item {
+        height: 32px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 13px;
+        text-align: left;
+        padding: 0 10px;
+      }
+
+      .menu-item:hover {
+        background: var(--surface-subtle);
+        color: var(--text);
+      }
+
+      .menu-item.danger {
+        color: var(--danger);
+      }
+
+      .tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 22px;
+      }
+
+      .tab {
+        height: 30px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--text-muted);
+        padding: 0 14px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+
+      .tab.active {
+        border-color: #bfd4ff;
+        background: var(--brand-soft);
+        color: var(--brand-strong);
+      }
+
+      .history-table {
+        display: grid;
+        gap: 8px;
+      }
+
+      .history-head,
+      .history-row {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) 96px 120px 112px 64px;
+        gap: 16px;
+        align-items: center;
+      }
+
+      .history-head {
+        padding: 0 16px;
+        color: var(--text-faint);
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .history-row {
+        min-height: 54px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+        padding: 0 16px;
+        font-size: 13px;
+      }
+
+      .history-row:hover {
+        border-color: var(--border-strong);
+        background: var(--surface-subtle);
+      }
+
+      .row-title {
+        font-weight: 500;
+      }
+
+      .row-muted {
+        color: var(--text-faint);
+      }
+
+      .link {
+        border: 0;
+        background: transparent;
+        color: var(--brand);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        text-align: left;
+      }
+
+      @media (max-width: 1100px) {
+        .stage {
+          padding: 24px;
+        }
+
+        .board {
+          overflow-x: auto;
+          grid-template-columns: repeat(4, minmax(260px, 1fr));
+        }
+
+        .card-detail-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .side-panel {
+          border-left: 0;
+          border-top: 1px solid var(--border);
+          padding: 22px 0 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="rail" aria-label="Actspace navigation">
+        <div class="traffic" aria-hidden="true">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+        </div>
+        <div class="rail-stack">
+          <div class="rail-item active">A</div>
+          <div class="rail-item">+</div>
+          <div class="rail-item">≡</div>
+          <div class="rail-item">⌁</div>
+        </div>
+      </aside>
+
+      <main class="stage">
+        <header class="topbar">
+          <div class="title">Lab</div>
+          <div class="actions">
+            <button class="btn" id="openCompleted">已完成实验</button>
+            <button class="btn primary" id="openNewExperiment">新实验</button>
+          </div>
+        </header>
+
+        <section class="board" aria-label="Lab experiments"></section>
+      </main>
+    </div>
+
+    <div class="overlay" id="newExperimentOverlay" aria-hidden="true">
+      <article class="modal new-experiment" role="dialog" aria-modal="true" aria-labelledby="newExperimentTitle">
+        <header class="modal-head">
+          <div class="modal-title" id="newExperimentTitle">新实验</div>
+          <button class="icon-btn" data-close aria-label="关闭">×</button>
+        </header>
+        <form id="newExperimentForm">
+          <div class="modal-body">
+            <div class="experiment-form">
+              <div class="field">
+                <label for="experimentTitle">标题</label>
+                <input id="experimentTitle" name="title" autocomplete="off" required />
+              </div>
+              <div class="field">
+                <label for="experimentIdea">问题 / 想法</label>
+                <textarea id="experimentIdea" name="idea" required></textarea>
+              </div>
+            </div>
+          </div>
+          <footer class="modal-foot">
+            <button class="btn" type="button" data-close>取消</button>
+            <button class="btn primary" type="submit">创建</button>
+          </footer>
+        </form>
+      </article>
+    </div>
+
+    <div class="overlay" id="cardOverlay" aria-hidden="true">
+      <article class="modal" role="dialog" aria-modal="true" aria-labelledby="cardModalTitle">
+        <header class="modal-head">
+          <div class="modal-title" id="cardModalTitle"></div>
+          <span class="tag" id="cardModalTag"></span>
+          <button class="icon-btn" data-close aria-label="关闭">×</button>
+        </header>
+        <div class="modal-body">
+          <div class="card-detail-grid">
+            <section id="cardMain"></section>
+            <aside class="side-panel" id="cardProps"></aside>
+          </div>
+        </div>
+        <footer class="modal-foot">
+          <button class="btn">编辑</button>
+          <button class="btn primary" id="nextAction">推进到下一阶段</button>
+          <div class="more-wrap">
+            <button class="icon-btn" id="moreAction" aria-label="更多操作" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu">⋯</button>
+            <div class="more-menu" id="moreMenu" role="menu" aria-hidden="true">
+              <button class="menu-item" type="button" role="menuitem">暂停</button>
+              <button class="menu-item danger" type="button" role="menuitem">取消</button>
+            </div>
+          </div>
+        </footer>
+      </article>
+    </div>
+
+    <div class="overlay" id="completedOverlay" aria-hidden="true">
+      <article class="modal completed" role="dialog" aria-modal="true" aria-labelledby="completedTitle">
+        <header class="modal-head">
+          <div class="modal-title" id="completedTitle">已完成实验</div>
+          <button class="icon-btn" data-close aria-label="关闭">×</button>
+        </header>
+        <div class="modal-body">
+          <div class="tabs" aria-label="completed filters">
+            <button class="tab active">全部</button>
+            <button class="tab">已晋升</button>
+            <button class="tab">已拒绝</button>
+            <button class="tab">已废弃</button>
+          </div>
+          <div class="history-table">
+            <div class="history-head">
+              <div>实验标题</div>
+              <div>结果</div>
+              <div>产物</div>
+              <div>完成时间</div>
+              <div></div>
+            </div>
+            <div id="completedRows"></div>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <script>
+      const stages = [
+        {
+          id: "hypothesis",
+          title: "假说构建",
+          className: "hypothesis",
+          addLabel: "添加假说",
+        },
+        {
+          id: "verification",
+          title: "实证验证",
+          className: "verify",
+          addLabel: "添加验证",
+        },
+        {
+          id: "forge",
+          title: "能力锻造",
+          className: "forge",
+          addLabel: "添加产物",
+        },
+        {
+          id: "promotion",
+          title: "晋升评审",
+          className: "review",
+          addLabel: "提交评审",
+        },
+      ];
+
+      const cards = [
+        {
+          id: "hyp-rust-cli",
+          stage: "hypothesis",
+          tag: "主假说",
+          color: "#1f5fe8",
+          title: "让 Agent 锻造 Rust CLI",
+          meta: "CLI · 12m 前",
+          selected: true,
+          experiment: "Agent CLI Forge",
+          creator: "User",
+          updatedAt: "12m 前",
+          evidence: "0",
+          artifacts: "0",
+          next: "进入实证验证",
+          sections: [
+            {
+              title: "问题",
+              body:
+                "Agent 经常需要重复解析日志、文件结构和命令输出，当前只能靠临时 bash 片段和聊天上下文维持。",
+            },
+            {
+              title: "能力缺口",
+              body:
+                "缺少一个可被 bash 稳定调用、可测试、可复用的 CLI 能力，用来把高频解析动作从临时步骤变成长期工具候选。",
+            },
+            {
+              title: "假说",
+              body:
+                "如果把高频解析逻辑封装成 Rust CLI，主 Agent 可以通过 bash 工具稳定复用，并且更容易记录证据、测试和错误边界。",
+            },
+          ],
+          checks: [
+            "CLI 能处理 3 组样例输入",
+            "有明确错误输出",
+            "包含最小测试",
+            "不默认启用，必须进入晋升评审",
+          ],
+        },
+        {
+          id: "hyp-skill",
+          stage: "hypothesis",
+          tag: "草稿",
+          color: "#6b7280",
+          title: "失败任务沉淀 skill",
+          meta: "Kairos · 昨天",
+          experiment: "Frontend Verification",
+          creator: "Kairos",
+          updatedAt: "昨天",
+          evidence: "0",
+          artifacts: "0",
+          next: "进入实证验证",
+          sections: [
+            {
+              title: "问题",
+              body:
+                "前端修改后经常需要重复解释验证步骤，且不同会话容易遗漏 Electron 实机检查。",
+            },
+            {
+              title: "能力缺口",
+              body:
+                "缺少一份能被 Agent 自动触发的前端验证 skill，把浏览器 mock、日志和桌面端验收固定下来。",
+            },
+            {
+              title: "假说",
+              body:
+                "把重复失败经验沉淀为 skill，可以降低后续 UI 任务漏验的概率。",
+            },
+          ],
+          checks: ["触发描述清晰", "覆盖桌面端检查", "包含反例"],
+        },
+        {
+          id: "hyp-search",
+          stage: "hypothesis",
+          tag: "阻塞",
+          color: "#d94d5c",
+          title: "评估 web_search 证据质量",
+          meta: "等待引用策略",
+          experiment: "Evidence Quality",
+          creator: "User",
+          updatedAt: "今天",
+          evidence: "0",
+          artifacts: "0",
+          next: "继续假说",
+          sections: [
+            {
+              title: "问题",
+              body:
+                "联网搜索产出的摘要不一定足够支撑能力晋升，需要明确哪些资料可以成为评审证据。",
+            },
+            {
+              title: "能力缺口",
+              body:
+                "缺少一套区分资料线索、可引用证据和晋升证据的规则。",
+            },
+          ],
+          checks: ["确认引用策略", "定义证据等级"],
+        },
+        {
+          id: "hyp-truncation",
+          stage: "hypothesis",
+          tag: "候选",
+          color: "#1f5fe8",
+          title: "长输出裁剪规则",
+          meta: "Main Agent · 2h 前",
+          experiment: "Tool Output Hygiene",
+          creator: "Main Agent",
+          updatedAt: "2h 前",
+          evidence: "2",
+          artifacts: "0",
+          next: "进入实证验证",
+          sections: [
+            {
+              title: "问题",
+              body:
+                "工具输出过长会污染上下文，让 Agent 后续判断被低价值日志淹没。",
+            },
+            {
+              title: "假说",
+              body:
+                "为不同工具定义统一裁剪规则，可以减少上下文膨胀，同时保留可审计原始输出引用。",
+            },
+          ],
+          checks: ["read / bash / grep 分别验证", "保留 raw output ref"],
+        },
+        {
+          id: "hyp-search-skill",
+          stage: "hypothesis",
+          tag: "草稿",
+          color: "#6b7280",
+          title: "沉淀多模型搜索经验",
+          meta: "User · 今天",
+          experiment: "Hybrid Search",
+          creator: "User",
+          updatedAt: "今天",
+          evidence: "0",
+          artifacts: "0",
+          next: "进入实证验证",
+          sections: [
+            {
+              title: "问题",
+              body:
+                "DeepSeek 主模型和 Kimi 辅助搜索的边界需要更稳定地沉淀，避免每次临时解释。",
+            },
+          ],
+          checks: ["区分搜索和阅读", "说明何时需要官方来源"],
+        },
+        {
+          id: "ver-cli",
+          stage: "verification",
+          tag: "验证中",
+          color: "#d99a20",
+          title: "3 组样例验证",
+          meta: "证据 5 · 1 次失败",
+          experiment: "Agent CLI Forge",
+          creator: "Main Agent",
+          updatedAt: "8m 前",
+          evidence: "5",
+          artifacts: "0",
+          next: "进入能力锻造",
+          sections: [
+            {
+              title: "验证方案",
+              body:
+                "准备三组日志和文件结构样例，验证 CLI 是否能输出稳定 JSON，并在参数错误时返回可读错误信息。",
+            },
+            {
+              title: "观察结果",
+              body:
+                "前两组样例通过，第三组因路径包含空格导致解析失败，已记录为参数边界问题。",
+            },
+          ],
+          checks: ["命令记录 5 条", "stdout 已裁剪", "失败原因已归档"],
+        },
+        {
+          id: "ver-skill",
+          stage: "verification",
+          tag: "通过",
+          color: "#16a36a",
+          title: "复盘验证记录",
+          meta: "证据 7",
+          experiment: "Frontend Verification",
+          creator: "Kairos",
+          updatedAt: "昨天",
+          evidence: "7",
+          artifacts: "0",
+          next: "进入能力锻造",
+          sections: [
+            {
+              title: "观察结果",
+              body:
+                "四次 UI 任务中有三次需要重新补浏览器或 Electron 验收，重复失败模式成立。",
+            },
+          ],
+          checks: ["证据 7 条", "引用 2 条", "结论通过"],
+        },
+        {
+          id: "ver-truncation",
+          stage: "verification",
+          tag: "验证",
+          color: "#d99a20",
+          title: "对比 6 类工具输出",
+          meta: "证据 10 · 失败 0",
+          experiment: "Tool Output Hygiene",
+          creator: "Main Agent",
+          updatedAt: "1h 前",
+          evidence: "10",
+          artifacts: "0",
+          next: "进入能力锻造",
+          sections: [
+            {
+              title: "验证方案",
+              body:
+                "对 read_file、bash、grep、glob、write_file、edit_file 六类输出分别验证裁剪前后模型可读性。",
+            },
+          ],
+          checks: ["六类工具均命中", "没有丢失关键错误原因"],
+        },
+        {
+          id: "forge-cli",
+          stage: "forge",
+          tag: "CLI",
+          color: "#287783",
+          title: "act-log-scan",
+          meta: "已验证 · 2 子命令",
+          experiment: "Agent CLI Forge",
+          creator: "Main Agent",
+          updatedAt: "6m 前",
+          evidence: "5",
+          artifacts: "1",
+          next: "提交晋升评审",
+          sections: [
+            {
+              title: "产物类型",
+              body: "Rust CLI 原型，提供 scan 和 explain 两个子命令。",
+            },
+            {
+              title: "使用契约",
+              body:
+                "主 Agent 通过 bash 调用 CLI，输入为 workspace 内文件路径，输出为稳定 JSON 摘要。",
+            },
+          ],
+          checks: ["cargo test 通过", "错误输出已定义", "不默认启用"],
+        },
+        {
+          id: "forge-skill",
+          stage: "forge",
+          tag: "skill",
+          color: "#287783",
+          title: "frontend 验证 skill",
+          meta: "草稿 · 待补充",
+          experiment: "Frontend Verification",
+          creator: "Main Agent",
+          updatedAt: "昨天",
+          evidence: "7",
+          artifacts: "1",
+          next: "提交晋升评审",
+          sections: [
+            {
+              title: "产物类型",
+              body:
+                "SKILL.md 草稿，覆盖浏览器 mock、桌面端 Electron 验收和日志检查。",
+            },
+          ],
+          checks: ["补触发描述", "补反例", "补验证命令"],
+        },
+        {
+          id: "review-cli",
+          stage: "promotion",
+          tag: "待评审",
+          color: "#946400",
+          title: "候选 CLI 晋升",
+          meta: "高风险 · 4 检查",
+          experiment: "Agent CLI Forge",
+          creator: "User",
+          updatedAt: "刚刚",
+          evidence: "5",
+          artifacts: "1",
+          next: "批准候选",
+          sections: [
+            {
+              title: "评审结论",
+              body:
+                "CLI 原型已具备候选价值，但属于可执行产物，建议先作为候选能力保留，不默认进入主 Agent 能力池。",
+            },
+            {
+              title: "风险等级",
+              body:
+                "高。需要确认路径边界、错误输出、测试覆盖和回滚方式。",
+            },
+          ],
+          checks: ["测试通过", "权限边界待确认", "错误输出通过", "需要人工批准"],
+        },
+      ];
+
+      const completed = [
+        {
+          title: "让 Agent 锻造 Rust CLI",
+          result: "已晋升",
+          color: "#16a36a",
+          artifact: "CLI",
+          date: "今天",
+        },
+        {
+          title: "失败任务沉淀为 skill",
+          result: "已晋升",
+          color: "#16a36a",
+          artifact: "skill",
+          date: "昨天",
+        },
+        {
+          title: "web_search 证据质量评估",
+          result: "已拒绝",
+          color: "#d94d5c",
+          artifact: "learning",
+          date: "5月27日",
+        },
+        {
+          title: "长输出裁剪规则",
+          result: "已晋升",
+          color: "#16a36a",
+          artifact: "doc",
+          date: "5月27日",
+        },
+        {
+          title: "多模型搜索经验沉淀",
+          result: "已废弃",
+          color: "#6b7280",
+          artifact: "none",
+          date: "5月26日",
+        },
+      ];
+
+      const board = document.querySelector(".board");
+      const newExperimentOverlay = document.querySelector("#newExperimentOverlay");
+      const cardOverlay = document.querySelector("#cardOverlay");
+      const completedOverlay = document.querySelector("#completedOverlay");
+
+      function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text) node.textContent = text;
+        return node;
+      }
+
+      function renderBoard() {
+        board.innerHTML = "";
+        stages.forEach((stage) => {
+          const column = el("section", `column ${stage.className}`);
+          const head = el("header", "column-head");
+          head.appendChild(el("div", "column-title", stage.title));
+          head.appendChild(
+            el(
+              "div",
+              "count",
+              String(cards.filter((card) => card.stage === stage.id).length),
+            ),
+          );
+          const add = el("button", "add", "+");
+          add.type = "button";
+          add.setAttribute("aria-label", stage.addLabel);
+          head.appendChild(add);
+          column.appendChild(head);
+
+          const list = el("div", "cards");
+          cards
+            .filter((card) => card.stage === stage.id)
+            .forEach((card) => list.appendChild(renderCard(card)));
+
+          const emptySlots = Math.max(
+            0,
+            5 - cards.filter((card) => card.stage === stage.id).length,
+          );
+          for (let i = 0; i < emptySlots; i += 1) {
+            list.appendChild(el("div", "empty-card"));
+          }
+          column.appendChild(list);
+          board.appendChild(column);
+        });
+      }
+
+      function renderCard(card) {
+        const button = el(
+          "button",
+          `card${card.selected ? " selected" : ""}`,
+        );
+        button.type = "button";
+        button.addEventListener("click", () => openCard(card));
+
+        const tag = el("span", "tag", card.tag);
+        tag.style.setProperty("--tag-color", card.color);
+        button.appendChild(tag);
+        button.appendChild(el("div", "card-title", card.title));
+        button.appendChild(el("div", "card-meta", card.meta));
+        return button;
+      }
+
+      function openCard(card) {
+        document.querySelector("#cardModalTitle").textContent = card.title;
+        const tag = document.querySelector("#cardModalTag");
+        tag.textContent = card.tag;
+        tag.style.setProperty("--tag-color", card.color);
+        document.querySelector("#nextAction").textContent = card.next;
+
+        const main = document.querySelector("#cardMain");
+        main.innerHTML = "";
+        card.sections.forEach((section) => {
+          const block = el("section", "section");
+          block.appendChild(el("div", "section-title", section.title));
+          const p = el("p");
+          p.textContent = section.body;
+          block.appendChild(p);
+          main.appendChild(block);
+        });
+
+        const standards = el("section", "section");
+        standards.appendChild(el("div", "section-title", "检查项"));
+        const list = el("ul", "check-list");
+        card.checks.forEach((check) => {
+          const item = el("li");
+          item.appendChild(el("span", "check", "✓"));
+          item.appendChild(el("span", "", check));
+          list.appendChild(item);
+        });
+        standards.appendChild(list);
+        main.appendChild(standards);
+
+        const props = document.querySelector("#cardProps");
+        props.innerHTML = "";
+        [
+          ["所属实验", card.experiment],
+          ["阶段", stages.find((stage) => stage.id === card.stage).title],
+          ["创建者", card.creator],
+          ["更新时间", card.updatedAt],
+          ["关联证据", card.evidence],
+          ["关联产物", card.artifacts],
+        ].forEach(([label, value]) => {
+          const prop = el("div", "prop");
+          prop.appendChild(el("div", "prop-label", label));
+          prop.appendChild(el("div", "prop-value", value));
+          props.appendChild(prop);
+        });
+
+        openOverlay(cardOverlay);
+      }
+
+      function renderCompletedRows() {
+        const root = document.querySelector("#completedRows");
+        root.innerHTML = "";
+        completed.forEach((item) => {
+          const row = el("div", "history-row");
+          row.appendChild(el("div", "row-title", item.title));
+          const status = el("span", "tag", item.result);
+          status.style.setProperty("--tag-color", item.color);
+          row.appendChild(status);
+          row.appendChild(el("div", "row-muted", item.artifact));
+          row.appendChild(el("div", "row-muted", item.date));
+          const view = el("button", "link", "查看");
+          view.type = "button";
+          row.appendChild(view);
+          root.appendChild(row);
+        });
+      }
+
+      function resetNewExperimentForm() {
+        document.querySelector("#newExperimentForm").reset();
+      }
+
+      function createDraftExperimentCard(title, idea) {
+        cards.forEach((card) => {
+          card.selected = false;
+        });
+
+        const draft = {
+          id: `hyp-draft-${Date.now()}`,
+          stage: "hypothesis",
+          tag: "草稿",
+          color: "#6b7280",
+          title,
+          meta: "User · 刚刚",
+          selected: true,
+          experiment: title,
+          creator: "User",
+          updatedAt: "刚刚",
+          evidence: "0",
+          artifacts: "0",
+          next: "进入实证验证",
+          sections: [
+            {
+              title: "问题 / 想法",
+              body: idea,
+            },
+            {
+              title: "下一步",
+              body:
+                "继续补齐能力缺口、初始假说和成功标准，然后再推进到实证验证。",
+            },
+          ],
+          checks: ["补能力缺口", "补初始假说", "定义成功标准"],
+        };
+
+        cards.unshift(draft);
+        renderBoard();
+      }
+
+      function openOverlay(overlay) {
+        overlay.classList.add("open");
+        overlay.setAttribute("aria-hidden", "false");
+      }
+
+      function closeOverlay(overlay) {
+        overlay.classList.remove("open");
+        overlay.setAttribute("aria-hidden", "true");
+        closeMoreMenu();
+        if (overlay === newExperimentOverlay) resetNewExperimentForm();
+      }
+
+      function closeMoreMenu() {
+        const menu = document.querySelector("#moreMenu");
+        const button = document.querySelector("#moreAction");
+        menu.classList.remove("open");
+        menu.setAttribute("aria-hidden", "true");
+        button.setAttribute("aria-expanded", "false");
+      }
+
+      document.querySelector("#openCompleted").addEventListener("click", () => {
+        openOverlay(completedOverlay);
+      });
+
+      document.querySelector("#openNewExperiment").addEventListener("click", () => {
+        openOverlay(newExperimentOverlay);
+        document.querySelector("#experimentTitle").focus();
+      });
+
+      document.querySelector("#newExperimentForm").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const title = form.elements.title.value.trim();
+        const idea = form.elements.idea.value.trim();
+        if (!title || !idea) return;
+        createDraftExperimentCard(title, idea);
+        closeOverlay(newExperimentOverlay);
+      });
+
+      document.querySelector("#moreAction").addEventListener("click", (event) => {
+        event.stopPropagation();
+        const menu = document.querySelector("#moreMenu");
+        const isOpen = menu.classList.toggle("open");
+        event.currentTarget.setAttribute("aria-expanded", String(isOpen));
+        menu.setAttribute("aria-hidden", String(!isOpen));
+      });
+
+      document.querySelector("#moreMenu").addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (event.target.matches(".menu-item")) closeMoreMenu();
+      });
+
+      document.querySelectorAll("[data-close]").forEach((button) => {
+        button.addEventListener("click", () => {
+          closeOverlay(button.closest(".overlay"));
+        });
+      });
+
+      document.querySelectorAll(".overlay").forEach((overlay) => {
+        overlay.addEventListener("click", (event) => {
+          if (event.target === overlay) {
+            closeOverlay(overlay);
+          } else {
+            closeMoreMenu();
+          }
+        });
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          if (document.querySelector("#moreMenu").classList.contains("open")) {
+            closeMoreMenu();
+            return;
+          }
+          document.querySelectorAll(".overlay.open").forEach(closeOverlay);
+        }
+      });
+
+      renderBoard();
+      renderCompletedRows();
+    </script>
+  </body>
+</html>

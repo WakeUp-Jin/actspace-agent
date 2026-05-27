@@ -114,7 +114,7 @@ function layout(root: string): ControllerLayout {
     manifestDir: join(root, "observe", "watch-manifests"),
     observeDir: join(root, "observe"),
     briefsDir: join(root, "briefs"),
-    notesDir: join(root, "notes"),
+    notesDir: join(root, "workspace", "notes"),
   };
 }
 

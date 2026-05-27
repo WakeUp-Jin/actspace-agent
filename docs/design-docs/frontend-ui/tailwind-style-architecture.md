@@ -2,7 +2,7 @@
 
 ## 状态
 
-- 状态：Draft，等待进入实现阶段。
+- 状态：Active / 部分迁移中。
 - 适用范围：`packages/desktop/src/renderer` 的 React / Vite / Electron 前端。
 - 关联计划：`docs/exec-plans/active/actspace-tailwind-style-architecture.md`。
 
@@ -30,6 +30,7 @@ Tailwind 官方 Vite 安装路径建议安装 `tailwindcss` 和 `@tailwindcss/vi
 3. 保留必要全局样式，但限制在 token、base、window primitives 和复杂原生渲染边界。
 4. 将 Usage Statistics 页面作为第一块完整迁移样板，后续再推广到 Sidebar、Workbench、Message、Composer、Right Panel。
 5. 让设计 token 可被 Tailwind class 使用，同时仍保留 CSS 变量作为全局主题来源。
+6. `packages/desktop/src/renderer` 中新增或重构 UI 默认使用 Tailwind utility 和 React UI primitive 表达样式；只有 base、第三方 DOM、Markdown、代码高亮、Electron window primitives、复杂 keyframes 等明确边界才继续写全局 CSS。
 
 ## 非目标
 

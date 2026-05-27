@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-- 状态：v1 代码已上线（2026-05-27）；端到端核心逻辑由 56 个 Kairos 单测保障，实机 GUI 验收待用户在本机 `pnpm dev:log` 跑一遍，见 `docs/histories/2026-05/20260527-2105-kairos-project-summary.md`。
+- 状态：v1 代码已上线（2026-05-27）；端到端核心逻辑由 Kairos 单测保障，实机 GUI 验收待用户在本机 `pnpm dev:log` 跑一遍，见 `docs/histories/2026-05/20260527-2105-kairos-project-summary.md`。2026-05-28 补强默认初始化：Kairos 会创建独立 `<userData>/kairos/workspace/`，默认 `paths.json` 只授权该目录，避免后台自治默认读写应用仓库。
 - 适用范围：`packages/agent-core`、`packages/desktop`（main / renderer）、`packages/shared` 三端联动。
 - 关联 Skill：`.agents/skills/llm-agent-dev/references/agent-runtime/cron-job-kaiors.md`（核心理念出处，actspace 实现不再复述）。
 - 参考实现：`back-code/heartclaw/apps/ruyi-api/src/core/agent/kairos_agent.py`（思路参考，actspace 不复用其代码，也不复用其"天工巡检"业务线）。
@@ -142,12 +142,15 @@ kairos/
 - 运行期保留按 token 预算（默认 75% context window）加载的 SessionEvent 序列，配合 week/month/year summary 进 system prompt。
 - 不复用 `ConversationContext`，避免与主 Agent session 互相污染。
 
-### `packages/agent-core/src/engine/agent.ts`
+### `packages/agent-core/src/engine/loop.ts`
 
-不改实现，但要新增一个工厂入口：
+Kairos 不新增 `Agent` 工厂入口，也不复用主 Agent 的 `ContextManager` 持有态实例。当前实现由 `KairosRunner.processTick()` 每次 tick 手动组装 `Context`，然后直接调用共享 `runAgentLoop`：
 
-- `createKairosAgentForLoop(deps)`：构造一个不持有 session.jsonl 的 Agent 实例（context 模块用 `KairosShortTermContext`），复用 `runAgentLoop`、ToolManager、LLMService。
-- 主 Agent 入口 `createAgentForSession` 不变。
+- `messages` 来自 Kairos short-term 记忆 + 当前 tick user message。
+- `tools` 来自 Kairos 专属 ToolManager（主 Agent 共享工具集 + `sleep`）。
+- `toolExecuteOptions` 传 `{ callerAgent: "kairos", kairosGuard }`，让 ToolScheduler 启用 Kairos 路径与 blocklist 守卫。
+
+主 Agent 入口 `createAgentForSession` 不变；它仍然通过 `Agent.run()` + `engine/bridge.ts` 处理普通会话。
 
 ### `packages/desktop/src/main/kairos-ipc.ts`
 
@@ -346,16 +349,12 @@ renderer 打开 Kairos 页 / 刷新
 IPC: kairos:get-events-recent({ limit: 200 })
         ↓
 main:
-  if ringBuffer.size >= 200:
-      return ringBuffer.tail(200)
-  else:
-      // 从 short-term 当天 jsonl 倒序读补足，跨日时继续读昨天
-      return mergeRecent(ringBuffer, jsonl, limit=200)
+  return ringBuffer.tail(limit)
         ↓
 renderer 把返回的 events 喂给 aggregator → 渲染表格
 ```
 
-加载更多历史：用户在表格底部点"加载更多" → IPC 带 `before=<最旧 event id>` → main 按 before 倒序补 200 条 → 前端 append。
+v1 当前只从 main 进程内存 ring buffer 返回最近事件，`hasMore=false`；进程重启后不会从 short-term jsonl 回填首屏。后续如要做"加载更多历史"，再扩展 `kairos:get-events-recent({ before })`，从 `memory/short-term/` 倒序读取并与 ring buffer 去重合并。
 
 ### Ring buffer 设计
 
@@ -366,9 +365,100 @@ renderer 把返回的 events 喂给 aggregator → 渲染表格
 
 ### 主 Agent 工具持久化路径
 
-主 Agent 既有的 `runAgentLoop` → `engine/bridge.ts` 把工具事件写入主 Agent session.jsonl 的逻辑**不需要改**。Kairos 走的是同一个 `runAgentLoop`，但 bridge 实例不同——Kairos 的 bridge 把同样的 AgentEvent 转换成 SessionEvent 后写入 Kairos 的 short-term jsonl，而不是主 Agent 的 session.jsonl。
+主 Agent 既有的 `runAgentLoop` → `engine/bridge.ts` 把工具事件写入主 Agent session.jsonl 的逻辑**不需要改**。Kairos 走的是同一个 `runAgentLoop`，但事件 adapter 不同：Kairos 在 runner 内把同样的 AgentEvent 转换成 SessionEvent 后写入 Kairos 的 short-term jsonl，而不是主 Agent 的 session.jsonl。
 
-> 实现方式：`createKairosAgentForLoop` 注入一个 Kairos 专属的 `eventSink` 函数（写 short-term + ring buffer + emit IPC），bridge 的现有 `onEvent` 回调被替换为该 sink。
+> 当前实现方式：`KairosRunner.processTick` 直接调用 `runAgentLoop(context, llm, loopConfig, onEvent)`。这里的 `onEvent` 是 Kairos 专属 adapter：把 `tool_start` / `tool_end` / `message_end` 这类 `AgentEvent` 转为 Kairos short-term 使用的 `SessionEvent`，再交给 controller 的 `eventSink` 做"写盘 → ring buffer → IPC 推送"。
+
+### 主 Agent vs Kairos 执行链路
+
+主 Agent 和 Kairos **共用 LLM / ToolManager / ToolScheduler / runAgentLoop**，但外壳不同。不要为 Kairos 复制一套工具执行器，也不要让 Kairos 写主 Agent 的 session。
+
+| 层 | 主 Agent | Kairos |
+|---|---|---|
+| 触发源 | 用户在 Composer 发消息 | scheduler 投递 tick / brief / wake_now |
+| 入口文件 | `desktop/src/main/agent-turn.ts` → `engine/bridge.ts` → `Agent.run()` | `kairos/controller.ts` → `kairos/scheduler.ts` → `kairos/runner.ts` |
+| user message | 真实用户输入，写入主 session | controller 注入的 tick 文本，写入 Kairos short-term |
+| system prompt | `prompt/main-agent.ts` + 主会话上下文 | `kairos/prompt.ts` + config / observation / short-term |
+| 工具注入 | `Agent.run()` 从 ToolManager 注入 tools | `KairosRunner.processTick()` 从 ToolManager 注入 tools |
+| 工具执行 | `ToolManager.execute()` | 同一个 `ToolManager.execute()`，额外传 `callerAgent: "kairos"` |
+| 工具守卫 | workspaceRoot 单根守卫 + 工具自身权限 | allowedRoots + blocklist + toolsDenied + 工具自身权限 |
+| 流式事件 | `RuntimeStreamEvent` → `agent:stream` → 聊天区 | `SessionEvent` → `kairos:event` → Kairos 事件流 |
+| 持久化 | 主会话 `session.jsonl` | `kairos/memory/short-term/<YYYY-MM>/<YYYY-MM-DD>.jsonl` |
+| 结束后语义 | 一轮对话完成 | 一次 tick 完成，scheduler 根据最后一次 `sleep(seconds)` 进入可中断 sleep |
+
+关键原则：
+
+- `runAgentLoop` 是唯一工具循环内核。主 Agent 和 Kairos 的差异只存在于调用前的 context 组装、调用时的 options、调用后的事件 adapter。
+- `engine/bridge.ts` 只服务主 Agent 的聊天流；Kairos 不走这个 bridge，以免把后台事件写进用户会话。
+- `kairos/runner.ts` 是 Kairos 的 bridge。它只把 Kairos 需要重放和展示的事件落成 `SessionEvent`：`tool_call`、`tool_result`、`assistant_message`，再配合 scheduler/controller 产生 `kairos_tick_injected`、`kairos_sleep_*`。
+
+### Kairos 工具能力矩阵
+
+Kairos 可见工具由三步决定：
+
+1. `desktop/src/main/kairos-bootstrap.ts#createKairosToolManagerFactory()` 创建 Kairos 专属 ToolManager 工厂，把 `env.disabledTools` 与 `config.blocklist.toolsDenied` 合并为 `disabledTools`。
+2. `agent-core/src/tools/index.ts#createToolManager()` 注册主 Agent 同款基础工具，并按 provider / Kimi key / disabledTools 过滤。
+3. `agent-core/src/kairos/controller.ts#createKairos()` 调用 `registerKairosTools(toolManager)` 追加 Kairos 专属 `sleep`。
+
+最终在 `agent-core/src/kairos/runner.ts#processTick()` 里执行：
+
+```ts
+const tools = this.opts.toolManager.getAll().map(toToolDefinition);
+```
+
+这行得到的工具定义数组就是本次 tick 真正传给 LLM 的 tools 段。LLM 只看到工具的 `name / description / parameters`，看不到 executor 代码。
+
+| 工具 | 来源 | 默认可见性 | 参数入口 | Kairos 额外约束 |
+|---|---|---|---|---|
+| `sleep` | Kairos 专属 | 可见 | `kairos/tools/sleep.ts` | 只记账；真正 sleep 由 scheduler 根据最后一次合法调用执行 |
+| `read_file` | 主 Agent 共享 | 可见 | `tools/tools/read-file/definition.ts` | path 必须落在 `paths.json` allowedRoots，且不命中 blocklist |
+| `list_directory` | 主 Agent 共享 | 可见 | `tools/tools/list-directory/definition.ts` | 同上 |
+| `grep` | 主 Agent 共享 | 可见 | `tools/tools/grep/definition.ts` | 同上 |
+| `glob` | 主 Agent 共享 | 可见 | `tools/tools/glob/definition.ts` | 同上 |
+| `write_file` | 主 Agent 共享 | 可见 | `tools/tools/write-file/definition.ts` | 同上；默认相对路径写到 Kairos workspace |
+| `edit_file` | 主 Agent 共享 | 可见 | `tools/tools/edit-file-diff/definition.ts` | 同上；追加内容仍走 read → edit 的普通替换路径 |
+| `bash` | 主 Agent 共享 | 取决于 env/config | `tools/tools/bash/definition.ts` | 建议默认放入 `toolsDenied`；命令字符串难精确提取路径，主要靠整工具禁用管控 |
+| `web_search` | 主 Agent 共享 | DeepSeek 主模型且配置 Kimi key 时可见 | `tools/tools/web-search/definition.ts` | 无路径参数，不走 allowedRoots；仍可被 `toolsDenied` 禁用 |
+| `analyze_media` | 主 Agent 共享 | DeepSeek 主模型且配置 Kimi key 时可见 | `tools/tools/analyze-media/definition.ts` | 无路径参数，不走 allowedRoots；仍可被 `toolsDenied` 禁用 |
+
+新增工具时必须同时回答三个问题：
+
+1. 是否应该进入 `createToolManager()` 的共享工具集？如果只服务 Kairos，放到 `kairos/tools/` 并由 `registerKairosTools()` 注册。
+2. 是否有路径参数？有则在工具 definition 上实现 `extractPaths`，否则 Kairos guard 不能可靠判断 allowedRoots / blocklist。
+3. 前端如何展示？如需 richer preview，扩展共享 `ToolUiPreview` 和主 Agent bridge；Kairos 事件流至少要能通过 `tool_call.arguments` 与 `tool_result.summary` 展示基础详情。
+
+### Kairos 工具事件推送契约
+
+Kairos 工具调用必须形成稳定的事件对：
+
+| 内部事件 | Kairos `SessionEvent` | payload 关键字段 | 前端聚合 |
+|---|---|---|---|
+| `tool_start` | `tool_call` | `{ id, name, arguments }` | 创建 `工具执行` 行，状态 `running` |
+| `tool_end` success | `tool_result` | `{ toolCallId, toolName, ok: true, summary, modelOutput }` | 匹配同 id 工具行，状态 `success` |
+| `tool_end` error/cancelled | `tool_result` | `{ toolCallId, toolName, ok: false, summary/modelOutput }` | 匹配同 id 工具行，状态 `failed` |
+
+推送顺序：
+
+```
+LLM 产生 tool call
+  -> runAgentLoop emit tool_start
+  -> KairosRunner 转为 tool_call
+  -> controller.eventSink 先写 short-term jsonl
+  -> ringBuffer.push
+  -> kairos:event 推给 renderer
+  -> ToolManager.execute
+  -> runAgentLoop emit tool_end
+  -> KairosRunner 转为 tool_result
+  -> 同样写盘、入 ring、推 IPC
+  -> renderer aggregateKairosEvents 折叠为一行工具执行
+```
+
+约束：
+
+- 只要工具真正进入执行流程，就必须先看到 `tool_call`，再看到同 `toolCallId` 的 `tool_result`。guard 拒绝、权限拒绝、工具不存在也应表现为 `tool_result.ok=false`，而不是静默消失。
+- `tool_call.payload.arguments` 是观察 Kairos 给工具传参的事实来源；KairosPage 右侧"工具结果 / 输入"直接从这里展示 compact JSON。
+- `tool_result.payload.modelOutput` 是回填给 LLM 的工具输出；`summary` 是给 UI 和快速阅读用的短摘要。后续做输出压缩时，不要把 UI 摘要、模型回填和排障日志混成一个字段。
+- Kairos v1 不推主 Agent 的 `RuntimeStreamEvent`，因此不会展示 `tool_call_delta` 级别的 partial args preview。Kairos 事件流展示的是执行开始与执行结束两个稳定点。
 
 ## Tick 调度规则
 
@@ -468,10 +558,10 @@ KairosRunner 每次 tick 由 `prompt-assembler.ts` 组装上下文。**LLM 看�
 | `Sleep` | Kairos 专属 | 仅 Kairos 注册 |
 | `read_file` / `list_directory` / `grep` / `glob` | 主 Agent 共享 | 经 ToolScheduler `callerAgent=kairos` 走 blocklist 校验 |
 | `edit_file` / `write_file` | 主 Agent 共享 | 同上 |
-| `bash` | 主 Agent 共享 | 默认启用；用户在 `blocklist.toolsDenied` 加 `"bash"` 可整体禁用 |
-| `web_search` / `analyze_media` | 主 Agent 共享 | 同上 |
+| `bash` | 主 Agent 共享 | 默认禁用；用户从 `blocklist.toolsDenied` 移除 `"bash"` 后才会暴露给 Kairos |
+| `web_search` / `analyze_media` | 主 Agent 共享 | DeepSeek 主模型且配置 Kimi key 时可见；仍可被 `toolsDenied` 禁用 |
 
-工具集**不再有 `kairos_*` 业务工具**。访问控制走 ToolScheduler 的 hook，详见后文 [工具系统扩展](#工具系统扩展callerAgent--extractPaths)。
+工具集**不再有 `kairos_*` 业务工具**。访问控制走 ToolScheduler 的 hook，完整矩阵见上文 [Kairos 工具能力矩阵](#kairos-工具能力矩阵)，实现细节见后文 [工具系统扩展](#工具系统扩展callerAgent--extractPaths)。
 
 ## actspace 版 KAIROS 系统提示词
 
@@ -490,7 +580,7 @@ KairosRunner 每次 tick 由 `prompt-assembler.ts` 组装上下文。**LLM 看�
   >
   > 观测摘要段展示了主 Agent sessions 的最近活动和巡检目录的具体变化（每条都是相对 watch 根的完整路径）；**需要详情时用 read_file / list_directory 直接读**，不要假设你已经看过原文。
   >
-  > 你可以把分析或学习要点写到 `<memory_dir>/notes/<YYYY-MM>/<title>.md`（用 write_file 新建，用 edit_file 修改/追加；追加做法是先 read_file 看末尾，再 edit_file 把"末尾段"替换为"末尾段 + 新内容"）。这些笔记只给用户在笔记 Tab 浏览，不强制注入下次 prompt——但你可以靠 short-term 记忆看到自己最近写过什么。
+  > 你的默认工作空间来自配置提示段的 paths 列表。文件工具使用相对路径时，默认只应在 Kairos workspace 内创建或修改文件；不要默认读写 actspace app 仓库、主聊天 Agent 的 workspace 或其它用户项目目录。你可以把分析或学习要点写到 workspace 内的 `notes/<YYYY-MM>/<title>.md`（用 write_file 新建，用 edit_file 修改/追加；追加做法是先 read_file 看末尾，再 edit_file 把"末尾段"替换为"末尾段 + 新内容"）。这些笔记只给用户在笔记 Tab 浏览，不强制注入下次 prompt——但你可以靠 short-term 记忆看到自己最近写过什么。
 
 `prompt.ts` 模板的占位符（由 `prompt-assembler.ts` 替换）：
 
@@ -508,6 +598,11 @@ KairosRunner 每次 tick 由 `prompt-assembler.ts` 组装上下文。**LLM 看�
 
 ```
 <userData>/kairos/
+  ├─ workspace/                     # Kairos 默认工作空间；文件工具相对路径默认落这里
+  │   └─ notes/                     # Kairos 写给自己/用户看的札记（走 write_file / edit_file）
+  │       └─ 2026-05/
+  │           └─ 2026-05-27-insight.md
+  │
   ├─ config/                        # 类别 1：长期偏好（4 份 + 1 份 rule.md）
   │   ├─ preferences.json           # 全局开关 / 模型 / sleep 范围 / tickBudget / 熔断 / 节奏偏好
   │   ├─ paths.json                 # Kairos 可访问的路径列表（含 watch 标记）
@@ -529,10 +624,6 @@ KairosRunner 每次 tick 由 `prompt-assembler.ts` 组装上下文。**LLM 看�
   │   │   ├─ 2026-04/
   │   │   │   └─ month_2026-04.summary.md
   │   │   └─ year_2025.summary.md
-  │   └─ notes/                     # Kairos 写给自己/用户看的札记（走主 Agent write_file / edit_file）
-  │       └─ 2026-05/
-  │           └─ 2026-05-27-insight.md
-  │
   └─ observe/                       # 类别 4：外部观测快照（每次 tick 前重算）
       ├─ sessions-digest.json       # 主 Agent session 列表精简摘要
       ├─ watch-manifest/            # 各 watch 目录上次扫描快照
@@ -546,8 +637,9 @@ KairosRunner 每次 tick 由 `prompt-assembler.ts` 组装上下文。**LLM 看�
 
 - 启动时 controller 顺序读 `config/preferences.json` → `memory/state.json`，按 `preferences.enabled` 决定是否恢复 ticking；其他 config 在首次需要时懒加载，且由 chokidar 监听 mtime 变化触发热重载。
 - `memory/short-term/` 完全复用 heartclaw `ShortMemoryStore` + `ShortTermMemoryContext` 模式，但**每行是 `SessionEvent`**（与主 Agent session.jsonl 完全对齐），不是 heartclaw 的 message dict。**唯一其它调整**：tick 密度高，token 预算"加载上限"从默认 60% 提到 75%，压缩触发阈值仍为 85%。
-- `memory/notes/` 走主 Agent `write_file` / `edit_file` 写入，**不需要 Kairos 专属的 note-store 模块**。文件命名约定（如 `YYYY-MM/<slug>.md`）只在 prompt 中以建议形式告知，违反不阻断。
-- `reset_today` 控制命令对当天 jsonl 走 `rotate_daily` 创建新 segment（不删除旧段，便于后续压缩），同时清空 ring buffer；`notes/` 和 `observe/watch-manifest/` 不动，避免误删用户/Kairos 已沉淀的内容。
+- `workspace/` 是 Kairos 的默认读写根。`kairos-bootstrap.ts` 创建 ToolManager 时把 `workspaceRoot` 指向这里，默认 `config/paths.json` 也只把这里放进 `allowedRoots` 并开启 watch。用户要让 Kairos 接触其它项目目录，必须显式编辑 `paths.json`，并配套确认工具执行层是否支持该路径。
+- `workspace/notes/` 由 bootstrap/controller 预创建，供 Kairos 用共享文件工具写札记；当前 Kairos 文件工具的相对路径默认落到 `workspace/`，因此 prompt/rule 里的笔记路径应写成 `notes/<YYYY-MM>/<title>.md` 这类 workspace 内相对路径。
+- `reset_today` 控制命令对当天 jsonl 走 `rotate_daily` 创建新 segment（不删除旧段，便于后续压缩），同时清空 ring buffer；`workspace/notes/` 和 `observe/watch-manifest/` 不动，避免误删用户/Kairos 已沉淀的内容。
 - 任意时刻"Kairos 在做什么"都可以通过 `short-term/<YYYY-MM>/<today>.jsonl` 还原——这是 v1 的唯一可观测数据源，任何排查都从这里看起。
 
 ## Config 详设
@@ -608,27 +700,12 @@ LLM 看到 `current_phase` 占位符（由 rhythm 推导）后会自然调整 Sl
 
 ```jsonc
 {
-  "tip": "Kairos 可访问的本地路径。watch=true 的路径会自动监听变化。",
+  "tip": "Kairos 可读写的本地路径；默认只授权 Kairos 自己的 workspace，新增路径前请确认不会暴露敏感目录。",
   "paths": [
     {
-      "path": "/Users/.../actspace-agent",
-      "watch": false,
-      "tip": "actspace 项目根目录"
-    },
-    {
-      "path": "/Users/.../actspace-agent/docs",
+      "path": "<userData>/kairos/workspace",
       "watch": true,
-      "tip": "我的设计文档目录，有新增或修改希望你扫一眼"
-    },
-    {
-      "path": "<userData>/sessions/actspace-agent",
-      "watch": false,
-      "tip": "主 Agent 的 session 存储，可以读历史对话总结"
-    },
-    {
-      "path": "/Users/.../downloads/data",
-      "watch": true,
-      "tip": "我的下载数据目录，发现新 csv 帮我读取总结"
+      "tip": "Kairos 的默认工作空间，文件工具的相对路径会落在这里。"
     }
   ]
 }
@@ -647,7 +724,7 @@ LLM 看到 `current_phase` 占位符（由 rhythm 推导）后会自然调整 Sl
 - 默认 exclude（命中即整目录不进、不入 manifest）：`.git`、`node_modules`、`.DS_Store`、`.cache`、`dist`、`build`、`.next`、`__pycache__`、`.venv`、`venv`、`target`、所有 `.` 开头的隐藏文件/目录
 - 单 watch 路径扫描文件上限：5000；扫到 5000 即停，short-term 写一条 warning event 提醒用户精简
 - 单次 tick 单 path 最多展示 50 条变化（超出截断，摘要标"另有 N 条"）
-- Kairos **永远不允许直接修改原文件**——要"整理一份副本"必须用 write_file 到 `<memory_dir>/notes/` 或其它授权写入路径
+- Kairos 默认只读写 `<userData>/kairos/workspace/`。要接触项目源码、下载目录或其它用户目录，必须由用户把绝对路径加入 `paths.json`；v1 的文件工具执行层仍以单个 `workspaceRoot` 作为相对路径根，外部多根写入需要后续单独扩展。
 
 **硬判断接入**（由 `ToolScheduler` + `paths.json` 共同执行，详见 [工具系统扩展](#工具系统扩展callerAgent--extractPaths)）：
 
@@ -697,7 +774,7 @@ LLM 看到 `current_phase` 占位符（由 rhythm 推导）后会自然调整 Sl
   "tip": "含密钥的目录和敏感工具已被屏蔽，命中后工具会直接拒绝，不必绕路。",
 
   "paths": ["**/.env", "**/.env.*", "**/secrets/**", "**/*.pem", "**/*.key"],
-  "toolsDenied": [],                                 // 例：["bash"] 全局禁用 Bash
+  "toolsDenied": ["bash"],                           // bash 默认对 Kairos 关闭；用户可改成 [] 显式开放
   "timeWindows": [                                   // Kairos 完全不唤醒的时段
     { "from": "23:30", "to": "07:00" }
   ],
@@ -762,7 +839,7 @@ nextRun: 2026-05-28T09:00:00+08:00
 # 每日提交回顾
 
 每天早上 9 点，扫描我所有已授权 workspace 的最近 24 小时 git commit，
-按项目分组总结，输出到 `<memory_dir>/notes/daily/YYYY-MM-DD-commits.md`。
+按项目分组总结，输出到 `notes/daily/YYYY-MM-DD-commits.md`。
 
 如果没有 commit，写一条"今日无提交"即可，不要编造。
 ```
@@ -810,11 +887,11 @@ nextRun: 2026-05-28T09:00:00+08:00
 
 ## Notes 说明
 
-`memory/notes/` 是 Kairos 在日常 tick 中写给自己/用户看的 markdown 札记。**v1 走主 Agent 共享工具，零专属 API**：
+`workspace/notes/` 是 Kairos 在日常 tick 中写给自己/用户看的 markdown 札记。**v1 走共享文件工具，零专属 API**：
 
 | 动作 | 工具路径 |
 |---|---|
-| 新建一篇笔记 | `write_file` → `<memory_dir>/notes/<YYYY-MM>/<slug>.md` |
+| 新建一篇笔记 | `write_file` → `notes/<YYYY-MM>/<slug>.md` |
 | 编辑某段 | `edit_file`，标准 `old_string → new_string` 替换 |
 | 在末尾追加 | `read_file` → 找到末尾段 → `edit_file` 把"末尾段"替换为"末尾段 + 新内容"（不需要新工具/新字段） |
 

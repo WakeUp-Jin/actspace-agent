@@ -1,8 +1,13 @@
 {
   "name": "@actspace/desktop",
+  "productName": "actspace",
   "version": "0.1.0",
   "private": true,
   "main": "dist-electron/main/index.js",
+  "files": [
+    "dist",
+    "dist-electron"
+  ],
   "scripts": {
     "dev": "pnpm run build:deps && concurrently -k \"pnpm:dev:shared\" \"pnpm:dev:agent-core\" \"pnpm:dev:renderer\" \"pnpm:dev:electron:build\" \"pnpm:dev:electron:run\"",
     "dev:shared": "pnpm --filter @actspace/shared dev",

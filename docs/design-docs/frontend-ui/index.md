@@ -48,6 +48,7 @@
 - `聊天输入框规范.md`：composer、模式、模型、附件、context 弹窗、发送。
 - `右侧面板与文件渲染规范.md`：文件预览、会话级 diff、右侧定稿图。
 - `prototype/actspace-deepseek-workbench.html`：基于当前规范整理的单文件桌面端高保真原型。
+- `Kairos右侧紧凑视图规范.md`：聊天态右侧面板中的 Kairos compact view，约束同源数据流、三段布局和组件复用边界。
 - `usage-statistics/`：Usage Statistics 统计页面设计专题。
   - `设计规范.md`：统计页面的布局、组件、数据来源和视觉规范，当前以蓝色产品仪表盘为基线。
   - `prototype.html`：统计页面的单文件高保真 HTML 原型，和设计规范保持同步。

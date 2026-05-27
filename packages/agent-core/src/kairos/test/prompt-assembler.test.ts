@@ -131,6 +131,8 @@ describe("assembleSystemPrompt", () => {
     expect(prompt).toContain("You are Kairos");
     expect(prompt).toContain("[活跃 briefs] 2 个");
     expect(prompt).toContain("配置提示");
+    expect(prompt).toContain("# Workspace boundary");
+    expect(prompt).toContain("不要默认读写 actspace app 仓库");
     expect(prompt).toContain("# 用户规则");
     expect(prompt).toContain("请保持简洁。");
     expect(prompt).toContain("# 观测摘要");

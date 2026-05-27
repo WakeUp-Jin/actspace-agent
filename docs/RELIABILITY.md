@@ -31,7 +31,8 @@
 - 如需长期禁用某些工具，可设置 `ACTSPACE_DISABLED_TOOLS=read_file,bash`；工具会在注册阶段直接跳过，不会暴露给模型，也不会出现在运行时工具列表里。
 - `pnpm typecheck`：检查跨包类型契约。
 - `pnpm build`：检查当前桌面端和共享包是否可构建。
-- `pnpm ci`：运行仓库级基础门禁。
+- `pnpm package:desktop`：本地生成当前平台的 desktop archive，便于开源用户从源码自行打包。
+- `pnpm run ci`：运行仓库级基础门禁。
 
 ## 本地开发日志约定
 

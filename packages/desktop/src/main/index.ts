@@ -30,6 +30,7 @@ import { PendingApprovalRegistry } from "./approval-registry";
 import {
   createKairosLlm,
   createKairosToolManagerFactory,
+  getKairosWorkspaceRoot,
   resolveKairosThinkingEnabled,
   ensureKairosScaffolding,
 } from "./kairos-bootstrap";
@@ -241,9 +242,10 @@ async function ensureKairosController(roots: AppDataRoots): Promise<KairosContro
   if (kairosController) return kairosController;
   const kairosRoot = join(roots.dataRoot, "kairos");
   await ensureKairosScaffolding(kairosRoot);
+  const kairosWorkspaceRoot = getKairosWorkspaceRoot(kairosRoot);
   const llm = createKairosLlm();
   const thinkingEnabled = resolveKairosThinkingEnabled();
-  const toolManagerFactory = createKairosToolManagerFactory({ workspaceRoot: roots.workspaceRoot });
+  const toolManagerFactory = createKairosToolManagerFactory({ workspaceRoot: kairosWorkspaceRoot });
   kairosController = await createKairos({
     kairosRoot,
     llm,
@@ -256,7 +258,7 @@ async function ensureKairosController(roots: AppDataRoots): Promise<KairosContro
     kairosRoot,
     getMainWindow,
   });
-  logMain("kairos controller ready", { kairosRoot });
+  logMain("kairos controller ready", { kairosRoot, kairosWorkspaceRoot });
   return kairosController;
 }
 

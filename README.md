@@ -1,66 +1,83 @@
 # actspace
 
-`actspace` 是一个面向 Agent 协作的桌面端工作台。
+`actspace` 是一个面向 Agent 协作开发的本地桌面工作台。
 
-它的目标不是再做一个普通聊天壳，而是围绕“上下文控制”来设计一套真正适合 Agent 工作的桌面应用：让模型拿到更多有组织的上下文，让用户更清楚地看到模型读了什么、想了什么、改了什么、最终产出了什么。
+它不是一个普通聊天壳，而是围绕上下文控制、本地可追溯和工具执行可观察来组织 Agent 工作：用户能看到模型读了什么、想了什么、调用了什么工具、改了什么文件，以及这些过程如何沉淀为可继续协作的仓库知识。
 
-## 项目目标
+## 当前能力
 
-- 做一个适配 DeepSeek 等模型的桌面端工作台。
-- 强化上下文管理、可视化和本地可控性。
-- 让思考、读取、搜索、编辑、diff、最终回复都能被清晰地展示出来。
-- 优先使用本地文件和本地状态，降低系统复杂度和运行成本。
+- **桌面工作台**：Electron + React 桌面端，包含会话栏、消息区、Composer、右侧对象区、Usage 页面和 Kairos 监控页。
+- **Agent Runtime**：`packages/agent-core` 承载模型接入、prompt、context、tools、execution loop、persistence 和 observability。
+- **模型接入**：普通会话默认走真实 DeepSeek provider；Kimi 可作为主模型，也可作为 DeepSeek 的联网搜索和多模态辅助能力。
+- **工具系统**：已包含文件读写编辑、目录读取、Grep / Glob、Bash、工具权限调度、工具预览和运行状态展示。
+- **上下文与统计**：已落地 token usage、context snapshot、每会话 `context-state.json` 和 Usage Statistics 的数据地基。
+- **Kairos 自治模式**：v1 已落地，支持独立 prompt、短期记忆、tick 调度、事件流和桌面端监控页。
+- **Lab 能力实验台**：产品与架构设计已沉淀在 `docs/design-docs/lab/`，尚未进入实现。
 
-## 当前状态
+当前进行中的任务、验收缺口和下一步入口以 `docs/TODOLIST.md` 与 `docs/exec-plans/README.md` 为准。
 
-当前项目已经完成了首版初始化，不再只是设计稿和模板仓库：
+## 快速开始
 
-- `packages/desktop` 已经跑起 Electron + React + TypeScript + Vite 的桌面端骨架。
-- `packages/shared` 已经提供跨进程共享类型、session schema 和 IPC contracts，并可独立构建到 `dist/`。
-- `packages/agent-core` 已经落下首版 Agent 运行层骨架，包含 provider、tools、context 和 persistence，并通过标准包入口供桌面端消费。
-- 桌面端主界面已经实现左侧会话栏、中间消息区、底部 Composer 和右侧预览位。
-- 本地 `jsonl` 会话持久化、`meta.json` 摘要和基础会话恢复链路已经接通，数据目录固定落在系统用户数据目录下的 `actspace/`。
+```sh
+pnpm install
+cp .env.example .env
+pnpm dev:log
+```
 
-当前仍处在 `V1 基础版` 阶段，重点推进项包括：
+默认 DeepSeek 运行路径需要填写 `.env` 中的 `DEEPSEEK_API_KEY`。如果需要 Kimi 主模型，或希望 DeepSeek 通过 Kimi 获得联网搜索、网页读取和多模态辅助能力，再填写 `KIMI_API_KEY`。
 
-- 真实 DeepSeek provider 已接入为默认运行路径；mock provider 只用于测试、浏览器 fixture 和显式 demo，不会静默替代 Electron 真实会话。
-- 把 UI 和真实 turn 数据链路进一步打磨成稳定闭环。
-- 补强 CI、可靠性约束、错误恢复和端到端测试。
+常用命令：
 
-当前设计文档入口见：
+```sh
+pnpm dev        # 启动桌面端开发环境
+pnpm dev:log    # 启动桌面端，并同步写入 logs/latest-dev.log
+pnpm typecheck  # 运行 workspace 类型检查
+pnpm test       # 运行各 package 测试
+pnpm build      # 构建 desktop / shared / agent-core
+pnpm package:desktop # 本地打包 unsigned 桌面应用 archive
+pnpm run ci     # 运行仓库级 CI 检查
+```
 
-- `docs/design-docs/frontend-ui/`
-- `docs/ARCHITECTURE.md`
+本项目当前按开源项目优先支持源码本机构建：用户 clone 仓库后运行 `pnpm install` 和 `pnpm package:desktop`，即可在 `dist/` 下得到当前平台的桌面应用 archive。默认产物不使用付费 Developer ID 证书，也不会强制签名；如果用户需要临时本地签名，可以显式设置 `ACTSPACE_MAC_ADHOC_SIGN=true`。
+
+## 运行边界
+
+- renderer 不能直接访问文件系统，所有本地能力通过 main / preload 暴露的类型化 bridge 进入。
+- API Key 只在 main / agent-core 运行时读取，不进入 renderer、session 事件、前端状态或测试快照。
+- 会话、Kairos 短期记忆、context state 和排障日志都优先落本地文件，便于迁移、审计和调试。
+- `.env` 不提交；`.env.example` 是环境变量模板和说明来源。
+- 本地开发排障优先看 `logs/latest-dev.log` 和 `logs/agent-runs/`。
+
+安全、存储和日志边界详见：
+
+- `docs/SECURITY.md`
+- `docs/design-docs/storage-and-observability.md`
+- `docs/RELIABILITY.md`
+
+## 文档导航
+
+- `AGENTS.md`：Agent 入口和仓库文档路由。
+- `docs/REPO_COLLAB_GUIDE.md`：仓库级协作、文档同步和测试约定。
+- `docs/ARCHITECTURE.md`：顶层架构、包边界和专题阅读路线。
+- `docs/TODOLIST.md`：当前焦点、验收缺口和下一步入口。
+- `docs/exec-plans/README.md`：active / completed execution plans。
+- `docs/design-docs/index.md`：长期设计文档索引。
+- `docs/FRONTEND.md`：前端协作入口和验证规范导航。
+- `docs/QUALITY_SCORE.md`：当前质量水位和主要短板。
+- `docs/SECURITY.md`：密钥、Electron、文件系统和真实模型调用边界。
+- `docs/histories/`：已完成变更的历史记录。
+- `docs/learnings/`：有迁移价值的学习沉淀。
 
 ## 技术栈
 
-当前桌面端应用的首版技术选型如下：
+- `Electron`：桌面应用壳层、窗口和本地能力入口。
+- `React + TypeScript`：renderer UI 和组件开发。
+- `Vite`：前端开发与构建。
+- `Tailwind CSS v4`：正在推进的 renderer 样式架构。
+- `jsonl`：本地 session、事件流和 Kairos 短期记忆的主要存储格式。
+- `Vitest`：agent-core、shared、desktop renderer / main 的单元测试和组件测试。
 
-- `Electron`：桌面应用壳层，用于窗口、菜单、文件系统和本地能力接入。
-- `React + TypeScript`：主界面与组件开发。
-- `Vite`：前端开发与构建工具。
-- `Radix UI`：作为底层无样式交互 primitives，承载 dropdown、popover、dialog、tabs 等基础能力。
-- `jsonl`：本地会话与消息数据存储格式，直接落盘到用户电脑，优先保证可读、可迁移和易调试。
-
-当前不优先引入重量级本地数据库；会话、上下文、工具调用等优先按本地文件组织。
-
-## 当前文档入口
-
-- `docs/ARCHITECTURE.md`：当前架构方向与实现边界。
-- `docs/design-docs/frontend-ui/`：桌面端界面设计文档与定稿图。
-- `docs/REPO_COLLAB_GUIDE.md`：仓库级协作与文档同步约定。
-- `docs/histories/`：每轮设计与代码变更的历史记录。
-
-## 仓库内开发
-
-```sh
-pnpm install            # 安装 workspace 依赖
-pnpm dev                # 启动桌面端开发环境
-pnpm dev:log            # 启动桌面端并写入 logs/latest-dev.log
-pnpm typecheck          # 运行类型检查
-pnpm build              # 构建 desktop/shared/agent-core
-pnpm ci                 # 运行当前仓库级 CI 检查（docs / hygiene / shell 校验）
-```
+当前不优先引入重量级本地数据库；会话、上下文、工具调用和自治事件优先按本地文件组织。
 
 ## 仓库结构
 
@@ -69,34 +86,27 @@ pnpm ci                 # 运行当前仓库级 CI 检查（docs / hygiene / she
 ├── AGENTS.md                  # Agent 入口，文档路由
 ├── CONTRIBUTING.md            # 协作约定
 ├── packages/
-│   ├── agent-core/            # Agent 运行层与上下文/工具骨架
-│   ├── desktop/               # Electron + React 桌面端应用
+│   ├── agent-core/            # Agent 运行层、模型、上下文、工具和 Kairos
+│   ├── desktop/               # Electron main / preload / React renderer
 │   └── shared/                # IPC 契约、session schema、共享类型
 ├── docs/                      # 仓库知识库
 │   ├── ARCHITECTURE.md        # 架构总览
-│   ├── CICD.md                # CI/CD 说明
-│   ├── CODING_BEHAVIOR.md     # 编码行为纪律
-│   ├── FRONTEND.md            # 前端协作入口
-│   ├── RELIABILITY.md         # 稳定性与可运维性
-│   ├── SECURITY.md            # 安全默认约束
-│   ├── TODOLIST.md            # 当前仓库级任务看板
-│   ├── design-docs/           # 设计文档
+│   ├── TODOLIST.md            # 当前焦点和验收缺口
+│   ├── design-docs/           # 长期设计文档
+│   │   └── lab/               # Lab 能力实验台设计
 │   ├── exec-plans/            # 执行计划
 │   ├── histories/             # 变更历史
 │   ├── learnings/             # 学习文档
 │   └── releases/              # 发布记录
-├── scripts/                   # 自动化脚本
-│   ├── ci.sh                  # CI 入口
-│   └── release-package.sh     # Release 打包
+├── scripts/                   # 仓库自动化脚本
 └── .github/                   # GitHub Actions 和模板
-    └── workflows/             # CI、Release、供应链安全
 ```
 
 ## 参考与致谢
 
-- [harness-template](https://github.com/iFurySt/harness-template) / [harness-template-cn](https://github.com/iFurySt/harness-template-cn) — Agent-first 仓库模板的原始实现，本项目早期骨架来源。
-- [上下文工程与运行空间实践指南](https://github.com/WakeUp-Jin/Practical-Guide-to-Context-Engineering) — 从上下文工程到 Harness Engineering 的系统化方法论，本项目的理论参考。
-- OpenAI [harness engineering 文章](https://openai.com/index/harness-engineering/) — 最初启发这一实践方向的思路来源。
+- [harness-template](https://github.com/iFurySt/harness-template) / [harness-template-cn](https://github.com/iFurySt/harness-template-cn)：Agent-first 仓库模板的原始实现，本项目早期骨架来源。
+- [上下文工程与运行空间实践指南](https://github.com/WakeUp-Jin/Practical-Guide-to-Context-Engineering)：从上下文工程到 Harness Engineering 的系统化方法论，本项目的理论参考。
+- OpenAI [harness engineering 文章](https://openai.com/index/harness-engineering/)：最初启发这一实践方向的思路来源。
 
 ## 许可证
 

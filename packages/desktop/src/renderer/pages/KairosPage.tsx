@@ -15,7 +15,7 @@
  *     否则 fixed chrome bar 会覆盖 KairosHeader 上的按钮。
  *   - 配置、Briefs、笔记 UI 暂不恢复；用户仍可通过本地文件编辑 Kairos 配置。
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Bolt,
@@ -28,18 +28,91 @@ import {
   RotateCcw,
   Wrench,
 } from "lucide-react";
-import type { KairosEventRow, KairosRuntimeState, SessionEvent } from "@actspace/shared";
+import type { KairosEventRow, KairosRuntimeState } from "@actspace/shared";
 import { useKairos } from "../state/useKairos";
+import {
+  buildKairosStats,
+  findKairosReplyText,
+  findKairosToolDetail,
+  formatKairosDuration,
+  formatKairosTime,
+  formatKairosTimeShort,
+  getKairosDisplayRows,
+  getKairosStatusLabel,
+  getLatestKairosReply,
+  kairosKindLabel,
+  type KairosToolDetail,
+} from "../state/kairosSelectors";
 
 type DetailTab = "reply" | "tool";
 const EXECUTION_PAGE_SIZE = 10;
+const TRACE_SEGMENT_GAP_PX = 4;
+const TRACE_SEGMENT_BASE_PX = 20;
+const TRACE_SEGMENT_PX_PER_SECOND = 5;
+const TRACE_SEGMENT_MAX_PX = 100;
+const pageRootClass =
+  "relative flex h-full min-h-0 flex-col bg-[#f7f9fc] pt-[var(--window-chrome-strip-height)] text-[#1a1d24]";
+const unavailablePageClass = `${pageRootClass} items-center justify-center`;
+const unavailableCardClass =
+  "max-w-[520px] rounded-act-lg border border-[#e6e8ef] bg-surface px-7 py-6 shadow-[0_4px_18px_rgba(15,23,42,0.04)]";
+const headerClass =
+  "flex items-center justify-between gap-4 border-b border-[#e6e8ef] bg-surface px-7 py-4 max-[760px]:items-start max-[760px]:flex-col max-[760px]:px-4";
+const headerStatusClass =
+  "inline-flex h-7 items-center gap-[7px] rounded-full border border-[#dfe8f3] bg-[#f8fbff] px-[11px] text-[13px] tabular-nums";
+const kairosButtonClass =
+  "inline-flex h-[38px] items-center justify-center gap-[7px] rounded-act-md border border-[#d4d7e0] bg-surface px-[18px] text-sm text-[#2c303a] transition hover:border-[#b5bac6] hover:bg-[#f5f7fb] disabled:cursor-not-allowed disabled:opacity-55";
+const kairosPrimaryButtonClass = "border-brand bg-brand text-white hover:border-brand-strong hover:bg-brand-strong";
+const traceClass =
+  "shrink-0 border-b border-[#e6e8ef] bg-surface px-7 pb-3.5 pt-4 max-[760px]:px-4";
+const traceHeadClass =
+  "mb-3 flex items-center justify-between gap-4 max-[760px]:items-start max-[760px]:flex-col";
+const traceLegendClass = "flex items-center gap-4 text-xs text-[#6c7281]";
+const traceBlockBaseClass =
+  "h-[21px] min-w-5 flex-none rounded border border-transparent transition hover:-translate-y-px";
+const mainGridClass =
+  "grid min-h-0 flex-1 grid-cols-[minmax(620px,7fr)_minmax(340px,3fr)] gap-3 px-4 pb-4 pt-3 max-[1100px]:grid-cols-1";
+const eventsPanelClass =
+  "flex min-h-0 flex-col overflow-hidden rounded-act-md border border-[#e1e6ef] bg-surface";
+const eventsTableClass = "w-full table-fixed border-collapse text-xs";
+const eventsThClass =
+  "sticky top-0 z-[1] border-b border-[#e6e8ef] bg-[#fafbfe] px-4 py-3 text-left text-xs font-medium text-[#6c7281]";
+const eventsTdClass = "border-b border-[#f0f2f7] px-4 py-2.5 tabular-nums text-[#1a1d24]";
+const eventsFooterClass =
+  "mt-auto grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-[#eef1f6] px-4 py-3 text-xs text-[#687083]";
+const pageButtonClass =
+  "inline-flex h-7 w-7 items-center justify-center rounded-[7px] border border-[#d9dfeb] bg-surface text-xs text-[#465063] hover:border-[#b9c6de] hover:bg-[#f7faff] disabled:cursor-not-allowed disabled:opacity-45";
+const sideClass = "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 max-[1100px]:min-h-[520px]";
+const statsClass =
+  "grid grid-cols-4 overflow-hidden rounded-act-md border border-[#e1e6ef] bg-surface max-[760px]:grid-cols-2";
+const detailPanelClass =
+  "min-h-0 overflow-auto rounded-act-md border border-[#e1e6ef] bg-surface px-5 py-[18px]";
+const detailTabsClass =
+  "mb-[26px] inline-flex overflow-hidden rounded-act-md border border-[#dfe5ee] bg-surface";
+const detailTabClass =
+  "h-[38px] min-w-28 border-0 border-r border-[#dfe5ee] bg-transparent px-[18px] text-[13px] text-[#657085] last:border-r-0";
+const detailActiveTabClass = "bg-[#f8fbff] text-[#1e5bd7] shadow-[inset_0_0_0_1px_#2f6fff]";
+const detailToplineClass =
+  "mb-6 flex items-center justify-between gap-4 max-[760px]:items-start max-[760px]:flex-col";
+const detailMetaClass = "inline-flex items-center gap-2.5 text-xs tabular-nums text-[#6c7281]";
+const detailReplyClass = "whitespace-pre-wrap break-words text-[17px] leading-[1.85] text-[#181b22]";
+const detailPlaceholderClass =
+  "flex min-h-40 items-center justify-center text-center text-[13px] text-[#8a90a0]";
+const toolResultClass = "flex flex-col gap-3.5";
+const toolResultSectionTextClass =
+  "m-0 overflow-hidden text-ellipsis rounded-act-md border border-[#e6e8ef] bg-[#f8fafc] px-3 py-2.5 font-mono text-xs leading-[1.5] text-[#2c303a]";
+const pageErrorClass =
+  "absolute bottom-[18px] right-[18px] max-w-[min(520px,calc(100%_-_36px))] rounded-act-md border border-[#f3c4b1] bg-[#fff5f1] px-3 py-2.5 text-xs text-[#b04014] shadow-[0_12px_28px_rgba(166,62,38,0.12)]";
+
+function cn(...classes: Array<string | false | null | undefined>): string {
+  return classes.filter(Boolean).join(" ");
+}
 
 export function KairosPage() {
   const k = useKairos();
   const [detailTab, setDetailTab] = useState<DetailTab>("reply");
   const [page, setPage] = useState(1);
 
-  const displayRows = useMemo(() => k.rows.slice().reverse(), [k.rows]);
+  const displayRows = useMemo(() => getKairosDisplayRows(k.rows), [k.rows]);
   const totalPages = Math.max(1, Math.ceil(displayRows.length / EXECUTION_PAGE_SIZE));
   const pagedRows = useMemo(() => {
     const start = (page - 1) * EXECUTION_PAGE_SIZE;
@@ -49,10 +122,10 @@ export function KairosPage() {
     () => k.rows.find((row) => row.id === k.selectedRowId) ?? null,
     [k.rows, k.selectedRowId],
   );
-  const latestReplyEvents = useMemo(() => findLatestReplyEvents(k.rows, k.events), [k.rows, k.events]);
-  const selectedReplyText = selectedRow?.kind === "reply" ? findReplyText(k.selectedEvents) : "";
-  const latestReplyText = findReplyText(latestReplyEvents);
-  const selectedTool = selectedRow?.kind === "tool" ? findToolDetail(k.selectedEvents) : null;
+  const latestReply = useMemo(() => getLatestKairosReply(k.events, k.rows), [k.events, k.rows]);
+  const selectedReplyText = selectedRow?.kind === "reply" ? findKairosReplyText(k.selectedEvents) : "";
+  const latestReplyText = latestReply.text;
+  const selectedTool = selectedRow?.kind === "tool" ? findKairosToolDetail(k.selectedEvents) : null;
   const detail: DetailModel = {
     replyText: selectedReplyText || latestReplyText,
     tool: selectedTool,
@@ -76,10 +149,10 @@ export function KairosPage() {
 
   if (!k.bridgeAvailable) {
     return (
-      <div className="kairos-page kairos-page--unavailable">
-        <div className="kairos-page__card">
-          <h2 className="kairos-page__heading">Kairos 桥未就绪</h2>
-          <p className="kairos-page__hint">
+      <div className={unavailablePageClass}>
+        <div className={unavailableCardClass}>
+          <h2 className="m-0 mb-2 text-[17px] font-semibold">Kairos 桥未就绪</h2>
+          <p className="m-0 text-[13px] leading-[1.55] text-[#5a6273]">
             当前运行环境未暴露 <code>window.kairos</code>。请在 Electron 环境下打开，或确认 preload 已加载。
           </p>
         </div>
@@ -88,7 +161,7 @@ export function KairosPage() {
   }
 
   return (
-    <div className="kairos-page" role="region" aria-label="Kairos 自治模式">
+    <div className={pageRootClass} role="region" aria-label="Kairos 自治模式">
       <KairosHeader
         state={k.state}
         onStart={() => k.control({ type: "start" }).catch(() => {})}
@@ -103,7 +176,7 @@ export function KairosPage() {
         onSelectRow={selectRow}
       />
 
-      <div className="kairos-page__main">
+      <div className={mainGridClass}>
         <KairosExecutionList
           rows={pagedRows}
           totalRows={displayRows.length}
@@ -113,7 +186,7 @@ export function KairosPage() {
           onPageChange={setPage}
           onSelectRow={selectRow}
         />
-        <div className="kairos-side">
+        <div className={sideClass}>
           <KairosStats state={k.state} rows={k.rows} />
           <KairosDetailPanel
             tab={detailTab}
@@ -125,7 +198,7 @@ export function KairosPage() {
       </div>
 
       {k.error ? (
-        <div className="kairos-page__error" role="alert">
+        <div className={pageErrorClass} role="alert">
           {k.error}
         </div>
       ) : null}
@@ -142,51 +215,75 @@ interface KairosRuntimeTraceProps {
 }
 
 function KairosRuntimeTrace(props: KairosRuntimeTraceProps) {
-  const rows = props.rows.slice(0, 36).reverse();
+  const rows = props.rows.slice().reverse();
   const ticks = buildTraceTicks(rows);
+  const segments = buildTraceSegments(rows);
+  const timelineWidthPx = segments.reduce((sum, segment) => sum + segment.widthPx, 0)
+    + Math.max(0, rows.length - 1) * TRACE_SEGMENT_GAP_PX;
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const latestRowId = rows.at(-1)?.id;
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    viewport.scrollLeft = viewport.scrollWidth;
+  }, [latestRowId, rows.length]);
+
   return (
-    <section className="kairos-trace" aria-label="运行轨迹（近 60 分钟）">
-      <div className="kairos-trace__head">
+    <section className={traceClass} aria-label="运行轨迹（近 60 分钟）">
+      <div className={traceHeadClass}>
         <div>
-          <h2 className="kairos-trace__title">运行轨迹</h2>
-          <span className="kairos-trace__subtle">近 60 分钟</span>
+          <h2 className="m-0 inline text-[15px] font-semibold text-[#171a22]">运行轨迹</h2>
+          <span className="ml-2 text-xs text-[#6c7281]">近 60 分钟</span>
         </div>
-        <div className="kairos-trace__legend" aria-label="运行轨迹图例">
-          <span><i data-tone="reply" />回复</span>
-          <span><i data-tone="sleep" />睡眠</span>
-          <span><i data-tone="error" />异常</span>
-          <span><i data-tone="other" />其他</span>
+        <div className={traceLegendClass} aria-label="运行轨迹图例">
+          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-[#4a8af7]" data-tone="reply" />回复</span>
+          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-[#f0ad3d]" data-tone="sleep" />睡眠</span>
+          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-[#ee5a55]" data-tone="error" />异常</span>
+          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-[#d7dce5]" data-tone="other" />其他</span>
         </div>
       </div>
       {rows.length === 0 ? (
-        <div className="kairos-trace__empty">等待 Kairos 事件</div>
+        <div className="flex h-7 items-center justify-center rounded-[7px] border border-dashed border-[#d8dee9] text-xs text-[#8a90a0]">等待 Kairos 事件</div>
       ) : (
-        <div className="kairos-trace__blocks" role="list">
-          {rows.map((row) => (
-            <button
-              key={row.id}
-              type="button"
-              role="listitem"
-              data-tone={traceTone(row)}
-              className={[
-                "kairos-trace__block",
-                `kairos-trace__block--${traceTone(row)}`,
-                props.selectedRowId === row.id ? "is-selected" : "",
-              ].filter(Boolean).join(" ")}
-              title={`${formatTime(row.startedAt)} · ${kindLabel(row.kind)} · ${row.summary}`}
-              aria-label={`${formatTime(row.startedAt)} ${kindLabel(row.kind)} ${row.summary}`}
-              onClick={() => props.onSelectRow(row.id)}
-            />
-          ))}
+        <div className="overflow-x-auto overflow-y-hidden pb-1" data-testid="kairos-trace-viewport" ref={viewportRef}>
+          <div
+            className="min-w-full"
+            style={{ width: `max(100%, ${timelineWidthPx}px)` }}
+          >
+            <div className="flex min-h-6 flex-nowrap items-center gap-1" role="list">
+              {rows.map((row, index) => (
+                <button
+                  key={row.id}
+                  type="button"
+                  role="listitem"
+                  data-tone={traceTone(row)}
+                  data-duration-ms={row.durationMs ?? 0}
+                  data-testid="kairos-trace-block"
+                  className={cn(
+                    traceBlockBaseClass,
+                    traceToneClass(traceTone(row)),
+                    props.selectedRowId === row.id && "border-brand shadow-[0_0_0_2px_rgba(47,111,255,0.16)]",
+                  )}
+                  style={{
+                    width: `${segments[index].widthPx}px`,
+                  }}
+                  title={`${formatKairosTime(row.startedAt)} · ${kairosKindLabel(row.kind)} · ${row.summary}`}
+                  aria-label={`${formatKairosTime(row.startedAt)} ${kairosKindLabel(row.kind)} ${row.summary}`}
+                  onClick={() => props.onSelectRow(row.id)}
+                />
+              ))}
+            </div>
+            {ticks.length > 0 ? (
+              <div className="mt-[9px] flex justify-between gap-3 text-xs tabular-nums text-[#687083]" aria-hidden="true">
+                {ticks.map((tick) => (
+                  <span key={`${tick.index}-${tick.label}`}>{tick.label}</span>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
-      {ticks.length > 0 ? (
-        <div className="kairos-trace__axis" aria-hidden="true">
-          {ticks.map((tick) => (
-            <span key={`${tick.index}-${tick.label}`}>{tick.label}</span>
-          ))}
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -207,46 +304,39 @@ function KairosHeader(props: KairosHeaderProps) {
   const runState = state?.state ?? "stopped";
   const sleepRemaining = useSleepCountdown(state?.sleepEndsAt);
 
-  let statusText: string;
-  if (!state) {
-    statusText = "Loading";
-  } else if (runState === "sleeping" && sleepRemaining !== null) {
-    statusText = `Sleeping · ${formatDuration(sleepRemaining)}`;
-  } else {
-    statusText = stateLabel(runState);
-  }
+  const statusText = getKairosStatusLabel(state, sleepRemaining);
 
   return (
-    <header className="kairos-header" data-state={runState}>
-      <div className="kairos-header__identity">
-        <span className="kairos-header__brand">Kairos</span>
-        <span className="kairos-header__status">
-          <span className="kairos-header__dot" aria-hidden="true" />
+    <header className={headerClass} data-state={runState}>
+      <div className="flex min-w-0 items-center gap-3.5">
+        <span className="text-2xl font-semibold text-[#12151c]">Kairos</span>
+        <span className={cn(headerStatusClass, stateTextClass(runState))}>
+          <span className={cn("h-2 w-2 rounded-full", stateDotClass(runState))} aria-hidden="true" />
           {statusText}
         </span>
       </div>
-      <div className="kairos-header__actions">
+      <div className="flex flex-wrap items-center gap-2">
         {enabled ? (
-          <button type="button" className="kairos-btn" onClick={props.onStop}>
+          <button type="button" className={kairosButtonClass} onClick={props.onStop}>
             <Pause size={14} aria-hidden="true" />
             暂停
           </button>
         ) : (
-          <button type="button" className="kairos-btn kairos-btn--primary" onClick={props.onStart}>
+          <button type="button" className={cn(kairosButtonClass, kairosPrimaryButtonClass)} onClick={props.onStart}>
             <Bolt size={14} aria-hidden="true" />
             开启
           </button>
         )}
         <button
           type="button"
-          className="kairos-btn"
+          className={kairosButtonClass}
           disabled={!enabled || runState === "ticking"}
           onClick={props.onWakeNow}
         >
           <Bolt size={14} aria-hidden="true" />
           立即唤醒
         </button>
-        <button type="button" className="kairos-btn" onClick={props.onResetToday}>
+        <button type="button" className={kairosButtonClass} onClick={props.onResetToday}>
           <RotateCcw size={14} aria-hidden="true" />
           重置今日
         </button>
@@ -284,8 +374,8 @@ function KairosExecutionList(props: KairosExecutionListProps) {
   const rows = props.rows;
   if (rows.length === 0) {
     return (
-      <section className="kairos-events kairos-events--empty" aria-label="执行列表">
-        <div className="kairos-events__empty">
+      <section className={cn(eventsPanelClass, "items-center justify-center")} aria-label="执行列表">
+        <div className="p-8 text-center text-[13px] text-[#6c7281]">
           暂无 Kairos 事件。开启后会出现巡检、工具执行、最终回复和睡眠条目。
         </div>
       </section>
@@ -293,29 +383,26 @@ function KairosExecutionList(props: KairosExecutionListProps) {
   }
   const pageNumbers = visiblePages(props.page, props.totalPages);
   return (
-    <section className="kairos-events" aria-label="执行列表">
-      <table className="kairos-events__table" role="grid">
+    <section className={eventsPanelClass} aria-label="执行列表">
+      <table className={eventsTableClass} role="grid">
         <thead>
           <tr>
-            <th>时间</th>
-            <th>类型</th>
-            <th>状态</th>
-            <th>摘要</th>
-            <th>耗时</th>
+            <th className={cn(eventsThClass, "w-[92px]")}>时间</th>
+            <th className={cn(eventsThClass, "w-[104px]")}>类型</th>
+            <th className={cn(eventsThClass, "w-[88px]")}>状态</th>
+            <th className={eventsThClass}>摘要</th>
+            <th className={cn(eventsThClass, "w-[72px]")}>耗时</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr
               key={row.id}
-              className={[
-                "kairos-events__row",
-                `kairos-events__row--${row.kind}`,
-                `kairos-events__row--${row.status}`,
-                props.selectedRowId === row.id ? "kairos-events__row--selected" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
+              className={cn(
+                "cursor-pointer transition hover:bg-[#f8faff]",
+                row.status === "failed" && "bg-[#fff8f5]",
+                props.selectedRowId === row.id && "bg-[#eef4ff] shadow-[inset_2px_0_0_#2f6fff]",
+              )}
               onClick={() => props.onSelectRow(row.id)}
               role="row"
               aria-selected={props.selectedRowId === row.id}
@@ -327,30 +414,30 @@ function KairosExecutionList(props: KairosExecutionListProps) {
                 }
               }}
             >
-              <td>{formatTime(row.startedAt)}</td>
-              <td>
-                <span className="kairos-events__kind">
+              <td className={cn(eventsTdClass, "w-[92px]")}>{formatKairosTime(row.startedAt)}</td>
+              <td className={cn(eventsTdClass, "w-[104px]")}>
+                <span className="inline-flex items-center gap-[7px] whitespace-nowrap font-medium text-[#4f5665] [&_svg]:text-[#687083]">
                   <KindIcon kind={row.kind} />
-                  {kindLabel(row.kind)}
+                  {kairosKindLabel(row.kind)}
                 </span>
               </td>
-              <td>
-                <span className={`kairos-status kairos-status--${row.status}`}>
+              <td className={cn(eventsTdClass, "w-[88px]")}>
+                <span className={statusBadgeClass(row.status)}>
                   {row.status}
                 </span>
               </td>
-              <td className="kairos-events__summary">{row.summary || "—"}</td>
-              <td>{row.durationMs ? formatDuration(Math.round(row.durationMs / 1000)) : "—"}</td>
+              <td className={cn(eventsTdClass, "max-w-[320px] overflow-hidden text-ellipsis whitespace-nowrap")}>{row.summary || "—"}</td>
+              <td className={cn(eventsTdClass, "w-[72px]")}>{row.durationMs ? formatKairosDuration(Math.round(row.durationMs / 1000)) : "—"}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <div className="kairos-events__footer" aria-label="执行列表分页">
+      <div className={eventsFooterClass} aria-label="执行列表分页">
         <span>共 {props.totalRows} 条</span>
-        <div className="kairos-events__pager">
+        <div className="inline-flex items-center gap-1.5 justify-self-center">
           <button
             type="button"
-            className="kairos-events__page-btn kairos-events__page-btn--icon"
+            className={pageButtonClass}
             aria-label="上一页"
             disabled={props.page <= 1}
             onClick={() => props.onPageChange(Math.max(1, props.page - 1))}
@@ -361,10 +448,7 @@ function KairosExecutionList(props: KairosExecutionListProps) {
             <button
               key={pageNumber}
               type="button"
-              className={[
-                "kairos-events__page-btn",
-                pageNumber === props.page ? "is-active" : "",
-              ].filter(Boolean).join(" ")}
+              className={cn(pageButtonClass, pageNumber === props.page && "border-brand bg-[#1f66e5] text-white")}
               aria-current={pageNumber === props.page ? "page" : undefined}
               onClick={() => props.onPageChange(pageNumber)}
             >
@@ -373,7 +457,7 @@ function KairosExecutionList(props: KairosExecutionListProps) {
           ))}
           <button
             type="button"
-            className="kairos-events__page-btn kairos-events__page-btn--icon"
+            className={pageButtonClass}
             aria-label="下一页"
             disabled={props.page >= props.totalPages}
             onClick={() => props.onPageChange(Math.min(props.totalPages, props.page + 1))}
@@ -381,7 +465,7 @@ function KairosExecutionList(props: KairosExecutionListProps) {
             <ChevronRight size={15} aria-hidden="true" />
           </button>
         </div>
-        <button type="button" className="kairos-events__page-size" aria-label="每页 10 条">
+        <button type="button" className="inline-flex h-7 items-center justify-self-end gap-[5px] bg-transparent text-xs text-[#687083]" aria-label="每页 10 条">
           10 条/页
           <ChevronDown size={13} aria-hidden="true" />
         </button>
@@ -418,13 +502,20 @@ function KairosStats(props: KairosStatsProps) {
   const sleepRemaining = useSleepCountdown(
     props.state?.state === "sleeping" ? props.state.sleepEndsAt : undefined,
   );
-  const stats = buildStats(props.state, props.rows, sleepRemaining);
+  const stats = buildKairosStats(props.state, props.rows, sleepRemaining);
   return (
-    <section className="kairos-stats" aria-label="统计">
-      {stats.map((item) => (
-        <div key={item.label} className="kairos-stats__item">
-          <span>{item.label}</span>
-          <strong>{item.value}</strong>
+    <section className={statsClass} aria-label="统计">
+      {stats.map((item, index) => (
+        <div
+          key={item.label}
+          className={cn(
+            "border-r border-[#eef1f6] px-4 py-3.5 last:border-r-0",
+            index === 1 && "max-[760px]:border-r-0",
+            index < 2 && "max-[760px]:border-b max-[760px]:border-[#eef1f6]",
+          )}
+        >
+          <span className="mb-2 block text-xs text-[#6c7281]">{item.label}</span>
+          <strong className="block text-xl font-semibold tabular-nums text-[#171a22]">{item.value}</strong>
         </div>
       ))}
     </section>
@@ -443,13 +534,13 @@ interface KairosDetailPanelProps {
 function KairosDetailPanel(props: KairosDetailPanelProps) {
   const { tab, detail, selectedRow } = props;
   return (
-    <aside className="kairos-detail" role="complementary" aria-label="事件详情">
-      <div className="kairos-detail__tabs" role="tablist" aria-label="详情类型">
+    <aside className={detailPanelClass} role="complementary" aria-label="事件详情">
+      <div className={detailTabsClass} role="tablist" aria-label="详情类型">
         <button
           type="button"
           role="tab"
           aria-selected={tab === "reply"}
-          className={tab === "reply" ? "is-active" : ""}
+          className={cn(detailTabClass, tab === "reply" && detailActiveTabClass)}
           onClick={() => props.onTabChange("reply")}
         >
           最终回复
@@ -458,20 +549,20 @@ function KairosDetailPanel(props: KairosDetailPanelProps) {
           type="button"
           role="tab"
           aria-selected={tab === "tool"}
-          className={tab === "tool" ? "is-active" : ""}
+          className={cn(detailTabClass, tab === "tool" && detailActiveTabClass)}
           onClick={() => props.onTabChange("tool")}
         >
           工具结果
         </button>
       </div>
-      <div className="kairos-detail__topline">
-        <h2 className="kairos-detail__title">
+      <div className={detailToplineClass}>
+        <h2 className="m-0 text-base font-semibold text-[#171a22]">
           {tab === "reply" ? "最终回复" : "工具结果"}
         </h2>
-        <div className="kairos-detail__meta">
-          <span>{selectedRow ? formatTime(selectedRow.startedAt) : "最近一次回复"}</span>
+        <div className={detailMetaClass}>
+          <span>{selectedRow ? formatKairosTime(selectedRow.startedAt) : "最近一次回复"}</span>
           {selectedRow ? (
-            <span className={`kairos-status kairos-status--${selectedRow.status}`}>
+            <span className={statusBadgeClass(selectedRow.status)}>
               {selectedRow.status}
             </span>
           ) : null}
@@ -479,8 +570,8 @@ function KairosDetailPanel(props: KairosDetailPanelProps) {
       </div>
 
       {tab === "reply" ? (
-        <div className="kairos-detail__reply">
-          {detail.replyText ? detail.replyText : <span className="kairos-detail__placeholder">暂无最终回复</span>}
+        <div className={detailReplyClass}>
+          {detail.replyText ? detail.replyText : <span className={detailPlaceholderClass}>暂无最终回复</span>}
         </div>
       ) : (
         <ToolResultView tool={detail.tool} />
@@ -489,27 +580,27 @@ function KairosDetailPanel(props: KairosDetailPanelProps) {
   );
 }
 
-function ToolResultView({ tool }: { tool: ToolDetail | null }) {
+function ToolResultView({ tool }: { tool: KairosToolDetail | null }) {
   if (!tool) {
-    return <div className="kairos-detail__placeholder">选择工具执行后查看结果</div>;
+    return <div className={detailPlaceholderClass}>选择工具执行后查看结果</div>;
   }
   return (
-    <div className="kairos-tool-result">
-      <div className="kairos-tool-result__head">
+    <div className={toolResultClass}>
+      <div className="flex items-center justify-between gap-3 border-b border-[#eef1f6] pb-3 font-semibold">
         <span>{tool.name}</span>
-        <span className={`kairos-status kairos-status--${tool.ok ? "success" : "failed"}`}>
+        <span className={statusBadgeClass(tool.ok ? "success" : "failed")}>
           {tool.ok ? "success" : "failed"}
         </span>
       </div>
       {tool.input ? (
-        <div className="kairos-tool-result__section">
-          <span>输入</span>
-          <code>{tool.input}</code>
+        <div className="grid gap-2">
+          <span className="text-xs text-[#6c7281]">输入</span>
+          <code className={toolResultSectionTextClass}>{tool.input}</code>
         </div>
       ) : null}
-      <div className="kairos-tool-result__section">
-        <span>结果</span>
-        <p>{tool.output || "工具执行完成，暂无输出摘要。"}</p>
+      <div className="grid gap-2">
+        <span className="text-xs text-[#6c7281]">结果</span>
+        <p className={toolResultSectionTextClass}>{tool.output || "工具执行完成，暂无输出摘要。"}</p>
       </div>
     </div>
   );
@@ -519,70 +610,8 @@ function ToolResultView({ tool }: { tool: ToolDetail | null }) {
 
 type DetailModel = {
   replyText: string;
-  tool: ToolDetail | null;
+  tool: KairosToolDetail | null;
 };
-
-type ToolDetail = {
-  name: string;
-  input: string;
-  output: string;
-  ok: boolean;
-};
-
-function findLatestReplyEvents(rows: KairosEventRow[], events: SessionEvent[]): SessionEvent[] {
-  const latestReply = rows.filter((row) => row.kind === "reply").at(-1);
-  if (!latestReply) return [];
-  const ids = new Set(latestReply.relatedEventIds);
-  return events.filter((event) => ids.has(event.id));
-}
-
-function findReplyText(events: SessionEvent[]): string {
-  const reply = events
-    .filter((event) => event.type === "assistant_message" || event.type === "assistant_reply")
-    .at(-1);
-  const payload = asRecord(reply?.payload);
-  const content = payload?.content;
-  return typeof content === "string" ? content : "";
-}
-
-function findToolDetail(events: SessionEvent[]): ToolDetail | null {
-  const call = events.find((event) => event.type === "tool_call");
-  const result = events.find((event) => event.type === "tool_result");
-  if (!call && !result) return null;
-  const callPayload = asRecord(call?.payload);
-  const resultPayload = asRecord(result?.payload);
-  const name = stringField(resultPayload, "toolName")
-    || stringField(callPayload, "name")
-    || "tool";
-  const input = stringifyCompact(callPayload?.arguments);
-  const error = asRecord(resultPayload?.error);
-  const output = stringField(resultPayload, "summary")
-    || stringField(error, "message")
-    || stringifyCompact(resultPayload?.output)
-    || stringifyCompact(resultPayload?.result);
-  return {
-    name,
-    input,
-    output,
-    ok: resultPayload?.ok !== false,
-  };
-}
-
-function buildStats(
-  state: KairosRuntimeState | null,
-  rows: KairosEventRow[],
-  sleepRemaining: number | null,
-): Array<{ label: string; value: string }> {
-  const toolCount = rows.filter((row) => row.kind === "tool").length;
-  const tickCount = state?.todayTickCount ?? rows.filter((row) => row.kind === "tick").length;
-  const errorCount = rows.filter((row) => row.kind === "error" || row.status === "failed").length;
-  return [
-    { label: "工具调用", value: String(toolCount) },
-    { label: "巡检", value: String(tickCount) },
-    { label: "异常", value: String(errorCount) },
-    { label: "睡眠剩余", value: sleepRemaining === null ? "--" : formatDuration(sleepRemaining) },
-  ];
-}
 
 function visiblePages(current: number, total: number): number[] {
   if (total <= 5) {
@@ -595,16 +624,34 @@ function visiblePages(current: number, total: number): number[] {
 function buildTraceTicks(rows: KairosEventRow[]): Array<{ index: number; label: string }> {
   if (rows.length === 0) return [];
   if (rows.length === 1) {
-    return [{ index: 0, label: formatTimeShort(rows[0].startedAt) }];
+    return [{ index: 0, label: formatKairosTimeShort(rows[0].startedAt) }];
   }
   const tickCount = Math.min(6, rows.length);
   return Array.from({ length: tickCount }, (_, index) => {
     const rowIndex = Math.round((index * (rows.length - 1)) / (tickCount - 1));
     return {
       index: rowIndex,
-      label: formatTimeShort(rows[rowIndex].startedAt),
+      label: formatKairosTimeShort(rows[rowIndex].startedAt),
     };
   }).filter((tick, index, all) => index === 0 || tick.label !== all[index - 1].label);
+}
+
+function buildTraceSegments(rows: KairosEventRow[]): Array<{ widthPx: number }> {
+  return rows.map((row) => {
+    const durationMs = row.durationMs ?? 0;
+    if (Number.isFinite(durationMs) && durationMs > 0) {
+      const durationSeconds = Math.max(1, Math.round(durationMs / 1000));
+      return {
+        widthPx: Math.min(
+          TRACE_SEGMENT_MAX_PX,
+          TRACE_SEGMENT_BASE_PX + durationSeconds * TRACE_SEGMENT_PX_PER_SECOND,
+        ),
+      };
+    }
+    return {
+      widthPx: TRACE_SEGMENT_BASE_PX,
+    };
+  });
 }
 
 function traceTone(row: KairosEventRow): "reply" | "sleep" | "error" | "other" {
@@ -614,83 +661,46 @@ function traceTone(row: KairosEventRow): "reply" | "sleep" | "error" | "other" {
   return "other";
 }
 
-function kindLabel(kind: KairosEventRow["kind"]): string {
-  switch (kind) {
+function traceToneClass(tone: ReturnType<typeof traceTone>): string {
+  switch (tone) {
     case "reply":
-      return "最终回复";
-    case "tool":
-      return "工具执行";
-    case "tick":
-      return "巡检";
+      return "bg-[#4a8af7]";
     case "sleep":
-      return "睡眠";
-    case "interrupt":
-      return "中断";
+      return "bg-[#f0ad3d]";
     case "error":
-      return "异常";
+      return "bg-[#ee5a55]";
+    case "other":
+      return "bg-[#d7dce5]";
   }
 }
 
-function stateLabel(state: KairosRuntimeState["state"]): string {
-  switch (state) {
-    case "idle":
-      return "Idle";
-    case "ticking":
-      return "Ticking";
-    case "sleeping":
-      return "Sleeping";
+function stateTextClass(state: KairosRuntimeState["state"]): string {
+  if (state === "cooldown" || state === "interrupted") return "text-[#b3433c]";
+  return "text-[#16805b]";
+}
+
+function stateDotClass(state: KairosRuntimeState["state"]): string {
+  if (state === "cooldown" || state === "interrupted") return "bg-[#e0524d] shadow-[0_0_0_3px_rgba(224,82,77,0.12)]";
+  if (state === "stopped") return "bg-[#9aa3b2] shadow-[0_0_0_3px_rgba(154,163,178,0.13)]";
+  return "bg-[#20b779] shadow-[0_0_0_3px_rgba(32,183,121,0.12)]";
+}
+
+function statusBadgeClass(status: KairosEventRow["status"]): string {
+  return cn(
+    "inline-flex h-[22px] items-center rounded-full px-[9px] text-xs font-medium lowercase",
+    statusToneClass(status),
+  );
+}
+
+function statusToneClass(status: KairosEventRow["status"]): string {
+  switch (status) {
+    case "success":
+      return "bg-[#eaf8f1] text-[#17744f]";
+    case "running":
+      return "bg-brand-soft text-[#2f62c7]";
+    case "failed":
+      return "bg-[#fff0ef] text-[#bc3b35]";
     case "interrupted":
-      return "Interrupted";
-    case "cooldown":
-      return "Cooldown";
-    case "stopped":
-      return "Stopped";
+      return "bg-[#fff6e6] text-[#9b6514]";
   }
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" ? value as Record<string, unknown> : null;
-}
-
-function stringField(record: Record<string, unknown> | null, key: string): string {
-  const value = record?.[key];
-  return typeof value === "string" ? value : "";
-}
-
-function stringifyCompact(value: unknown): string {
-  if (value === undefined || value === null) return "";
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
-// ─── utils ──────────────────────────────────────────────────────────
-
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return iso;
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
-}
-
-function formatTimeShort(iso: string): string {
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return iso;
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
-
-function formatDuration(totalSeconds: number): string {
-  const safe = Math.max(0, Math.floor(totalSeconds));
-  const h = Math.floor(safe / 3600);
-  const m = Math.floor((safe % 3600) / 60);
-  const s = safe % 60;
-  if (h > 0) return `${h}h${pad2(m)}m`;
-  if (m > 0) return `${m}m${pad2(s)}s`;
-  return `${s}s`;
-}
-
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
 }

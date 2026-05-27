@@ -116,11 +116,14 @@
 - [x] 迁移 Usage Statistics 页面。
 - [x] 完成浏览器 mock 验收。
 - [x] 完成 Electron 真实窗口验收。
+- [x] 迁移 Kairos 完整监控页和右侧紧凑视图到 Tailwind utility，删除对应 `.kairos-*` 全局 CSS。
+- [x] 确认 Lab V0 renderer mock 已使用 Tailwind utility + 局部 class 常量，无 `.lab-*` 全局 CSS 需要迁移。
 - [ ] 迁移剩余主要前端区域。
 - [ ] 删除旧 CSS 并更新 history / coding standards。
 
 ## 决策记录
 
+- 2026-05-28：Kairos 页面迁移时把运行轨迹测试锚点从旧 CSS class 改为 `data-testid`。原因是 Tailwind 迁移后样式类不再是稳定契约，测试应依赖语义和明确测试锚点，而不是旧 BEM class。
 - 2026-05-27：使用 Tailwind v4 + `@tailwindcss/vite`。原因是项目基于 Vite，官方推荐该插件路径，且 v4 的 CSS-first 配置适合与现有视觉 token 合并。
 - 2026-05-27：启用 Preflight。原因是项目仍处开发阶段，用户明确不需要保留旧样式；全量显式样式比长期兼容旧默认更清晰。
 - 2026-05-27：不保留长期 `legacy.css`。影响是每个迁移切片必须完整落地并验证，不能留下半迁移 class。
