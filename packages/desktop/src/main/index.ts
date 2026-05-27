@@ -22,9 +22,18 @@ import {
   listSessionRecords,
   readSessionRecord,
   setSessionPinned,
+  createKairos,
+  type KairosController,
 } from "@actspace/agent-core";
 import { runAndPersistTurn, abortTurn, type AppDataRoots } from "./agent-turn";
 import { PendingApprovalRegistry } from "./approval-registry";
+import {
+  createKairosLlm,
+  createKairosToolManagerFactory,
+  resolveKairosThinkingEnabled,
+  ensureKairosScaffolding,
+} from "./kairos-bootstrap";
+import { registerKairosIpc, type KairosIpcHandle } from "./kairos-ipc";
 
 const APP_ID = "com.actspace.desktop";
 const APP_NAME = "actspace";
@@ -223,6 +232,34 @@ async function createMainWindow() {
   }
 }
 
+// ─── Kairos 单例（lazy init in app.whenReady） ───
+
+let kairosController: KairosController | undefined;
+let kairosIpcHandle: KairosIpcHandle | undefined;
+
+async function ensureKairosController(roots: AppDataRoots): Promise<KairosController> {
+  if (kairosController) return kairosController;
+  const kairosRoot = join(roots.dataRoot, "kairos");
+  await ensureKairosScaffolding(kairosRoot);
+  const llm = createKairosLlm();
+  const thinkingEnabled = resolveKairosThinkingEnabled();
+  const toolManagerFactory = createKairosToolManagerFactory({ workspaceRoot: roots.workspaceRoot });
+  kairosController = await createKairos({
+    kairosRoot,
+    llm,
+    toolManagerFactory,
+    contextWindow: 32_000,
+    thinkingEnabled,
+  });
+  kairosIpcHandle = registerKairosIpc({
+    controller: kairosController,
+    kairosRoot,
+    getMainWindow,
+  });
+  logMain("kairos controller ready", { kairosRoot });
+  return kairosController;
+}
+
 // ─── 审核注册表（单例） ───
 
 const approvalRegistry = new PendingApprovalRegistry({
@@ -259,6 +296,13 @@ async function registerIpc() {
 
   ipcMain.handle("agent:run-turn", async (_event, input: RunTurnInput) => {
     const roots = await ensureDataDirectories();
+    // Kairos 礼让钩子：让正在 sleep 的 Kairos 让位给 user，turn 结束后 5s 才允许 Kairos 重新投 tick。
+    // controller 尚未初始化时（用户没开启 Kairos）跳过 hook，避免不必要的副作用。
+    try {
+      kairosController?.notifyMainAgentTurnStart();
+    } catch (err) {
+      logMain("kairos notifyMainAgentTurnStart threw", { error: err instanceof Error ? err.message : String(err) });
+    }
     try {
       const result = await runAndPersistTurn(input, roots, getMainWindow, approvalRegistry);
       logMain("run turn completed", {
@@ -274,6 +318,12 @@ async function registerIpc() {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
+    } finally {
+      try {
+        kairosController?.notifyMainAgentTurnEnd();
+      } catch (err) {
+        logMain("kairos notifyMainAgentTurnEnd threw", { error: err instanceof Error ? err.message : String(err) });
+      }
     }
   });
 
@@ -332,9 +382,17 @@ loadEnv();
 
 app.whenReady().then(async () => {
   app.setAppUserModelId(APP_ID);
-  await ensureDataDirectories();
+  const roots = await ensureDataDirectories();
   await registerIpc();
   await createMainWindow();
+  // Kairos 现在仅初始化骨架（preferences.enabled 默认 false → controller 进 stopped 状态）；
+  // renderer 在 KairosPage 显式按"开启"才真正起 tick 循环。
+  try {
+    const controller = await ensureKairosController(roots);
+    await controller.start();
+  } catch (err) {
+    logMain("kairos init failed", { error: err instanceof Error ? err.message : String(err) });
+  }
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -347,4 +405,13 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", async () => {
+  try {
+    await kairosController?.stop();
+  } catch {
+    // 不阻断退出
+  }
+  kairosIpcHandle?.dispose();
 });

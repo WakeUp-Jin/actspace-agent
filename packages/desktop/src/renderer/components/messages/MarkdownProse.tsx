@@ -210,7 +210,9 @@ function isTableRow(line?: string): line is string {
 
 function isTableSeparator(line?: string): boolean {
   if (!line || !line.includes("|")) return false;
-  return splitTableRow(line).every((cell) => /^:?-{3,}:?$/.test(cell));
+  const cells = splitTableRow(line);
+  if (cells.length === 0) return false;
+  return cells.every((cell) => /^:?-+:?$/.test(cell));
 }
 
 function splitTableRow(line: string): string[] {

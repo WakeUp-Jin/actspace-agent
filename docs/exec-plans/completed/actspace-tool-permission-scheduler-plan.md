@@ -127,9 +127,9 @@
 
 ## 与其他计划关系
 
-- 被 `actspace-bash-tool-plan.md` 消费：Bash 使用这里定义的权限结果和调度入口。
-- 被 `actspace-bash-approval-ui-plan.md` 消费：UI 使用这里定义的 approval request 状态。
-- 被 `actspace-tool-pause-session-boundary-plan.md` 消费：暂停恢复、会话切换和进程边界在该计划落细。
+- 被 `docs/exec-plans/completed/actspace-bash-tool-plan.md` 消费：Bash 使用这里定义的权限结果和调度入口。
+- 被 `docs/exec-plans/completed/actspace-bash-approval-ui-plan.md` 消费：UI 使用这里定义的 approval request 状态。
+- 被 `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-tool-pause-session-boundary-plan.md` 消费：暂停恢复、会话切换和进程边界在该计划落细。
 
 ## 进度记录
 

@@ -7,12 +7,16 @@
  * 无 gate 时退回 cancelled（兼容测试和无审核环境）。
  */
 
+import { resolve } from "node:path";
 import type {
   InternalTool,
   PermissionResult,
   ToolResult,
   ToolRiskLevel,
 } from "../internal-tools";
+import { extractPathsFromArgs } from "../kairos/guard/extract-paths";
+import { createBlocklistMatcher } from "../kairos/guard/blocklist-check";
+import { guardWorkspacePath } from "./workspace-guard";
 
 export type ToolCallStatus =
   | "validating"
@@ -100,6 +104,7 @@ export class ToolScheduler {
     toolName: string,
     args: Record<string, unknown>,
     toolCallId?: string,
+    options?: SchedulerExecuteOptions,
   ): Promise<ToolSchedulerExecution> {
     const startedAt = this.now();
     const record: ToolCallRecord = {
@@ -116,6 +121,14 @@ export class ToolScheduler {
         error: `Tool not found: ${toolName}`,
       };
       return this.finish(record, "error", result);
+    }
+
+    // 仅 Kairos 调用路径走"白名单 + blocklist"额外校验；主 Agent 默认零开销。
+    if (options?.callerAgent === "kairos") {
+      const guardResult = checkKairosGuard(tool, args, options.kairosGuard);
+      if (!guardResult.ok) {
+        return this.finish(record, "cancelled", { success: false, error: guardResult.reason });
+      }
     }
 
     try {
@@ -267,4 +280,64 @@ export class ToolScheduler {
 
 function createDefaultId(): string {
   return `tool_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// ─── Kairos guard 集成 ──────────────────────────────────────────────────
+
+export interface SchedulerExecuteOptions {
+  callerAgent?: "main" | "kairos";
+  kairosGuard?: KairosSchedulerGuard;
+}
+
+/** scheduler 视角的 Kairos guard（不耦合 ToolManager 命名空间）。 */
+export interface KairosSchedulerGuard {
+  allowedRoots: string[];
+  blocklistPaths: string[];
+  toolsDenied: string[];
+}
+
+interface KairosGuardCheckResult {
+  ok: boolean;
+  reason?: string;
+}
+
+function checkKairosGuard(
+  tool: InternalTool,
+  args: Record<string, unknown>,
+  guard: KairosSchedulerGuard | undefined,
+): KairosGuardCheckResult {
+  if (!guard) {
+    return { ok: false, reason: "Kairos guard missing; refusing tool call." };
+  }
+
+  if (guard.toolsDenied.includes(tool.name)) {
+    return { ok: false, reason: `Tool ${tool.name} is denied for Kairos by blocklist.` };
+  }
+
+  // 优先用 tool 自带 extractPaths；fallback 到通用提取器。
+  const extracted = tool.extractPaths
+    ? tool.extractPaths(args)
+    : extractPathsFromArgs(args);
+
+  // 无任何已声明路径 → 默认放行（如 web_search / analyze-media 这类无路径工具）。
+  // 注意：如果某个工具实际操作文件却没声明 extractPaths 且 args 也没有可识别字段，
+  // 那就是工具定义不完整的 bug；blocklist + toolsDenied 是双保险。
+  if (extracted.length === 0) return { ok: true };
+
+  const matchBlocklist = createBlocklistMatcher(guard.blocklistPaths);
+
+  for (const raw of extracted) {
+    // 1. 路径必须落在某个 allowedRoot 之下
+    const inAnyRoot = guard.allowedRoots.some((root) => guardWorkspacePath(raw, root).ok);
+    if (!inAnyRoot) {
+      return { ok: false, reason: `Path ${raw} is not within any Kairos allowedRoots.` };
+    }
+    // 2. 命中 blocklist glob 即拒绝
+    const absolute = resolve(raw);
+    if (matchBlocklist(raw) || matchBlocklist(absolute)) {
+      return { ok: false, reason: `Path ${raw} matches Kairos blocklist.` };
+    }
+  }
+
+  return { ok: true };
 }

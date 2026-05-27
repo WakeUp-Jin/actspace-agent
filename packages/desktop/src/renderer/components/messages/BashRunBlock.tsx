@@ -5,15 +5,17 @@ import type { MessageBlock } from "@actspace/shared";
 type BashMessage = Extract<MessageBlock, { kind: "bash" }>;
 type ApprovalDecision = "approve_once" | "deny" | "allow_similar";
 
-async function submitApproval(requestId: string, decision: ApprovalDecision): Promise<void> {
+async function submitApproval(requestId: string, decision: ApprovalDecision): Promise<boolean> {
   if (typeof window === "undefined" || !window.actspace?.submitApproval) {
     console.warn("submitApproval bridge unavailable");
-    return;
+    return false;
   }
   try {
     await window.actspace.submitApproval({ requestId, decision });
+    return true;
   } catch (error) {
     console.error("Failed to submit approval", error);
+    return false;
   }
 }
 
@@ -30,7 +32,7 @@ export function BashRunBlock({ message }: { message: BashMessage }) {
 function BashExecutionBlock({ message }: { message: BashMessage }) {
   const [expanded, setExpanded] = useState(message.status === "failed");
   const chevron = expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />;
-  const statusLabel = getStatusLabel(message);
+  const summary = getExecutionSummary(message);
 
   return (
     <article className={`message-row bash-run is-${message.status}`}>
@@ -40,7 +42,7 @@ function BashExecutionBlock({ message }: { message: BashMessage }) {
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
       >
-        <span>{statusLabel} {message.title}</span>
+        <span>{summary}</span>
         {message.commandPreview ? <span className="bash-command-preview">{message.commandPreview}</span> : null}
         {chevron}
       </button>
@@ -71,6 +73,7 @@ function BashExecutionBlock({ message }: { message: BashMessage }) {
 function BashApprovalBlock({ message }: { message: BashMessage }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [submitting, setSubmitting] = useState<ApprovalDecision | null>(null);
+  const [resolvedDecision, setResolvedDecision] = useState<ApprovalDecision | null>(null);
 
   const requestId = message.approvalRequestId;
   const disabled = !requestId || submitting !== null;
@@ -78,8 +81,25 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
   const decide = async (decision: ApprovalDecision) => {
     if (!requestId || submitting !== null) return;
     setSubmitting(decision);
-    await submitApproval(requestId, decision);
+    const submitted = await submitApproval(requestId, decision);
+    if (submitted) {
+      setResolvedDecision(decision);
+    } else {
+      setSubmitting(null);
+    }
   };
+
+  if (resolvedDecision) {
+    return (
+      <BashExecutionBlock
+        message={{
+          ...message,
+          status: resolvedDecision === "deny" ? "denied" : "running",
+          approvalRequestId: undefined,
+        }}
+      />
+    );
+  }
 
   return (
     <article className="message-row bash-approval">
@@ -157,20 +177,24 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
   );
 }
 
-function getStatusLabel(message: BashMessage): string {
+function getExecutionSummary(message: BashMessage): string {
   switch (message.status) {
     case "running":
-      return "Running";
+      return `Running ${normalizeBashTitle(message.title)}`;
     case "failed":
-      return "Ran";
+      return `Failed ${normalizeBashTitle(message.title)}`;
     case "denied":
-      return "Denied";
+      return `Denied ${normalizeBashTitle(message.title)}`;
     case "expired":
-      return "Expired";
+      return `Expired ${normalizeBashTitle(message.title)}`;
     case "cancelled":
-      return "Cancelled";
+      return `Cancelled ${normalizeBashTitle(message.title)}`;
     case "success":
     default:
-      return "Ran";
+      return `Ran ${normalizeBashTitle(message.title)}`;
   }
+}
+
+function normalizeBashTitle(title: string): string {
+  return title.replace(/\s+failed$/i, "");
 }

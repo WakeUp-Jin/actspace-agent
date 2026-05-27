@@ -14,6 +14,9 @@ export * from "./internal-tools";
 export * from "./adapters";
 export * from "./fixtures";
 
+// Kairos 自治模式入口。Main 进程一处 import 即可装配。
+export * from "./kairos";
+
 import type { BootstrapState } from "@actspace/shared";
 
 export function createBootstrapState(input: BootstrapState): BootstrapState {

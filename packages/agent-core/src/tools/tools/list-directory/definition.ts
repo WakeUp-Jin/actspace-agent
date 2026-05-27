@@ -21,4 +21,6 @@ export const listDirectoryDefinition: ToolDefinitionSpec = {
   isReadOnly: true,
   category: "file",
   previewKind: "directory_list",
+  extractPaths: (args) =>
+    typeof args.path === "string" && args.path.length > 0 ? [args.path] : [],
 };

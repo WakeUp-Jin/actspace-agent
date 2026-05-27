@@ -87,3 +87,98 @@ Agent Turn 的跨层职责边界见 `agent-turn-layers.md`。
 ## 兼容层
 
 原有单文件入口（`agent.ts`、`llm.ts`、`tools.ts`、`context.ts`、`persistence.ts`）保留为兼容层，内部 re-export 新模块的 API，确保 `desktop` 等现有消费方不被破坏。
+
+## `kairos/` - 自治模式
+
+Kairos 是 actspace 内置的"主动 Agent"——常驻进程、tick 驱动、随时被用户消息打断。它复用主 Agent 的 LLMService / ToolManager / SessionEvent / engine.runAgentLoop，自身只新增"调度 + 配置 + 观察 + 短期记忆"四组能力。完整设计见 `kairos-autonomous-mode.md`。
+
+```mermaid
+flowchart TB
+  subgraph kairos[packages/agent-core/src/kairos/]
+    Controller[controller.ts<br/>装配中枢]
+    Scheduler[scheduler.ts<br/>MessageQueue + QueueProcessor]
+    Runner[runner.ts<br/>KairosRunner.processTick]
+    PromptAsm[prompt-assembler.ts<br/>5 段 system prompt 拼装]
+    Aggregator[aggregator.ts<br/>事件聚合 re-export]
+
+    subgraph cfg[config/]
+      Schema[schema.ts<br/>Preferences/Paths/Blocklist]
+      Loader[loader.ts]
+      CfgPrompt[prompt-assembler.ts<br/>config tip 块]
+    end
+
+    subgraph store[storage/]
+      ShortMem[short-memory-store.ts<br/>JSONL append + rotate]
+      Ring[ring-buffer.ts<br/>200 条 SessionEvent]
+    end
+
+    subgraph ctx[context/]
+      ShortTerm[short-term.ts<br/>token budget 加载]
+      WatchScan[watch-scanner.ts<br/>fs.readdir 递归]
+      WatchDiff[watch-diff.ts<br/>sha1 manifest 对比]
+      SessDigest[sessions-digest.ts]
+    end
+
+    subgraph briefs[briefs/]
+      BParser[parser.ts]
+      BIndex[index-manager.ts]
+      BDispatch[dispatcher.ts<br/>pickNext]
+    end
+
+    subgraph guard[guard/]
+      Extract[extract-paths.ts]
+      Block[blocklist-check.ts<br/>globToRegex]
+    end
+
+    subgraph compress[compression/]
+      Compressor[compressor.ts<br/>调 LLMService.complete]
+    end
+
+    subgraph tools[tools/]
+      SleepTool[sleep.ts]
+    end
+  end
+
+  Controller --> Scheduler
+  Controller --> Runner
+  Controller --> ShortMem
+  Controller --> Ring
+  Controller --> BIndex
+  Controller --> WatchDiff
+  Controller --> Compressor
+  Scheduler --> Runner
+  Scheduler --> BDispatch
+  Runner --> PromptAsm
+  Runner --> ShortTerm
+  Runner --> WatchDiff
+  Runner --> SessDigest
+  PromptAsm --> CfgPrompt
+  BIndex --> BParser
+```
+
+模块速读：
+
+- `controller.ts`：单例装配中枢。`createKairos(opts)` 接收 `kairosRoot / llm / toolManagerFactory / contextWindow`，内部串起所有子模块并 emit `event` / `state`。`eventSink` 严格按"写盘 → 推 ring buffer → 回调 listener"顺序，保证消费方任何时刻看到的都是已持久化事实。
+- `scheduler.ts`：`MessageQueue` FIFO + `QueueProcessor` 主循环。`runInterruptibleSleep` 用 `Promise + setTimeout + clearTimeout` 实现可中断 sleep；`mainAgentBusy` 标志让主 Agent runTurn 期间 scheduler 暂停取下一条；连续 `errorThreshold` 次失败进 cooldown。`sleepBiasAt(now, prefs)` 按 `preferences.rhythm` 调节 sleep 系数，`clampSleep` 卡住 LLM 请求范围。
+- `runner.ts`：`KairosRunner.processTick(msg)` 执行单次 tick：刷新观察（watch diff + sessions digest）→ 加载 short-term context（token budget）→ assemble system prompt → emit `kairos_tick_injected` → `runAgentLoop({ toolExecuteOptions: { callerAgent:"kairos", kairosGuard } })` → 解析最后一次 `sleep(seconds)` 工具参数返回给 scheduler。
+- `prompt-assembler.ts`：把 5 段（pacing / observation / config tip / history / rule.md）拼到 `KAIROS_SYSTEM_PROMPT` 占位符；每段独立 token budget。
+- `aggregator.ts`：薄壁 re-export `@actspace/shared` 的 `aggregateKairosEvents`——agent-core 内部统一从这里 import，避免散落引用 shared。
+- `config/`：4 个文件（preferences.json / paths.json / blocklist.json / rule.md）的 schema 解析器（无 Zod，手写校验）+ tip 提取拼装。
+- `storage/`：`ShortMemoryStore` 移植自 heartclaw，按月分目录 + 按日分文件 + 每日分卷（`_001.jsonl` → reset 时滚到 `_002`）。`SessionEventRingBuffer` 是内存圆环，200 条上限，给 UI 首屏用。
+- `context/`：`watch-scanner` 手写递归遍历（不引 chokidar/glob），`watch-diff` 用 sha1 哈希文件列表对比快/慢路径，`sessions-digest` 扫 `paths.json` 列出的会话路径生成 unread turn 元数据，`short-term` 按 token budget 倒序加载历史事件并 sanitize 工具孤儿。
+- `briefs/`：用户写在 `briefs/tasks/<id>.md` 的任务，frontmatter 含 `intervalSec`（v1 替代 cron）；`index-manager` 维护 `briefs/index.json` 的 lastRun/nextRun；`dispatcher.pickNext(now)` 在每次"队列空"时被 scheduler 调用。
+- `guard/`：`extract-paths(args)` 集中处理"哪些字段是路径"，`blocklist-check` 用手写 `globToRegex` 匹配命中。两者被 `tools/scheduler.ts` 的 `checkKairosGuard` 调用，只对 `callerAgent === "kairos"` 路径激活。
+- `compression/compressor.ts`：被动调用——controller 在 tick 完后看 short-term token 超阈值时触发，调 `llm.complete()` 出 markdown summary 写回 `memory/short-term/<YYYY-MM>/week_*.summary.md`。
+- `tools/sleep.ts`：Kairos 专属工具。executor 只是"记账"——返回成功结果给 LLM、把 `seconds` 通过 SessionEvent 传出，真正的 sleep 由 scheduler 在 tick 结束后执行。
+
+与主 Agent 共用的 hooks（已在前置模块文档中说明）：
+
+- `engine/types.ts` 的 `AgentLoopConfig.toolExecuteOptions` 字段：让 runner 把 `callerAgent + kairosGuard` 透到 `ToolManager.execute(name, args, callId, options)`。主 Agent 不传该字段时路径零开销。
+- `tools/scheduler.ts` 的 `checkKairosGuard(toolName, args)`：仅在 `callerAgent === "kairos"` 时跑路径白名单 + blocklist 双校验。
+- 4 个新 `SessionEventType`：`kairos_tick_injected` / `kairos_sleep_start` / `kairos_sleep_end` / `kairos_sleep_interrupted`。`@actspace/shared/kairos-aggregator.ts` 的 `aggregateKairosEvents(events)` 把它们和复用的 `assistant_message` / `tool_call` / `tool_result` 聚合为表格行。
+
+Desktop 集成（`packages/desktop`）：
+
+- `src/main/kairos-bootstrap.ts`：`ensureKairosScaffolding(kairosRoot)` 幂等建目录 + 落 4 份默认 config；`createKairosLlm()` 复用 `buildLLMConfig`；`createKairosToolManagerFactory({ workspaceRoot })` 把 `blocklist.toolsDenied` 合并进 `disabledTools`。
+- `src/main/kairos-ipc.ts`：注册 5 个 invoke handler（`kairos:get-state/get-events-recent/control/read-config/write-config`） + 50ms debounce 推 `kairos:event/state` 到 renderer。
+- `src/renderer/state/useKairos.ts` + `src/renderer/pages/KairosPage.tsx`：UI 入口，事件流上限 500 条，4 个 config tab 共用 raw textarea + 保存按钮。

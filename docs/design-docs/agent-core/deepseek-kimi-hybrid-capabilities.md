@@ -4,7 +4,7 @@
 
 本文档是 `actspace` Agent Core 中 DeepSeek 与 Kimi 混合能力接入的设计事实来源。对应 execution plan 为：
 
-- `docs/exec-plans/active/actspace-deepseek-kimi-hybrid-capabilities.md`
+- `docs/exec-plans/completed/actspace-deepseek-kimi-hybrid-capabilities.md`
 
 当前仓库已经有 DeepSeek provider、mock provider、工具注册与执行框架。下一阶段要引入 Kimi，但目标不是把系统泛化成任意多模型平台，而是用很小的抽象稳定支持两个明确角色：
 

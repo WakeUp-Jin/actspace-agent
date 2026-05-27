@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { relative } from "node:path";
 import * as Diff from "diff";
 import type { ToolResult, ResultRenderer } from "../../../internal-tools";
 import { guardWorkspacePath } from "../../workspace-guard";
@@ -27,6 +28,10 @@ function countPrefixedLines(diff: string, prefix: string): number {
   return diff.split("\n").filter((l) => l.startsWith(prefix) && !l.startsWith(`${prefix}${prefix}`)).length;
 }
 
+function workspaceRelativePath(filePath: string, workspaceRoot: string): string {
+  return relative(workspaceRoot, filePath) || ".";
+}
+
 export const editFileDiffExecutor: ToolExecutorFn = async (
   args,
   workspaceRoot,
@@ -49,12 +54,14 @@ export const editFileDiffExecutor: ToolExecutorFn = async (
   // old_string empty + file does not exist → create new file
   if (!fileExists && oldString === "") {
     await writeTextAtomic(guard.resolvedPath, newString);
-    const diff = Diff.createTwoFilesPatch(pathArg, pathArg, "", newString, "", "", { context: 3 });
+    const relativePath = workspaceRelativePath(guard.resolvedPath, workspaceRoot);
+    const diff = Diff.createTwoFilesPatch(relativePath, relativePath, "", newString, "", "", { context: 3 });
     return {
       success: true,
       data: {
         type: "create",
         filePath: guard.resolvedPath,
+        relativePath,
         diff,
         additions: countPrefixedLines(diff, "+"),
         deletions: 0,
@@ -83,12 +90,14 @@ export const editFileDiffExecutor: ToolExecutorFn = async (
   // old_string empty + file is empty → write new content
   if (oldString === "") {
     await writeTextAtomic(guard.resolvedPath, newString);
-    const diff = Diff.createTwoFilesPatch(pathArg, pathArg, "", newString, "", "", { context: 3 });
+    const relativePath = workspaceRelativePath(guard.resolvedPath, workspaceRoot);
+    const diff = Diff.createTwoFilesPatch(relativePath, relativePath, "", newString, "", "", { context: 3 });
     return {
       success: true,
       data: {
         type: "update",
         filePath: guard.resolvedPath,
+        relativePath,
         diff,
         additions: countPrefixedLines(diff, "+"),
         deletions: 0,
@@ -146,7 +155,8 @@ export const editFileDiffExecutor: ToolExecutorFn = async (
   }
 
   // Generate diff before writing
-  const diff = Diff.createTwoFilesPatch(pathArg, pathArg, content, updated, "", "", { context: 3 });
+  const relativePath = workspaceRelativePath(guard.resolvedPath, workspaceRoot);
+  const diff = Diff.createTwoFilesPatch(relativePath, relativePath, content, updated, "", "", { context: 3 });
 
   await writeTextAtomic(guard.resolvedPath, updated);
 
@@ -155,6 +165,7 @@ export const editFileDiffExecutor: ToolExecutorFn = async (
     data: {
       type: "update",
       filePath: guard.resolvedPath,
+      relativePath,
       diff,
       additions: countPrefixedLines(diff, "+"),
       deletions: countPrefixedLines(diff, "-"),
@@ -170,7 +181,11 @@ export const renderEditResult: ResultRenderer = (result) => {
   const d = result.data as Record<string, unknown> | undefined;
   if (!d) return "Edit completed.";
   const diff = typeof d.diff === "string" ? d.diff : "";
-  const fp = typeof d.filePath === "string" ? d.filePath : "";
+  const fp = typeof d.relativePath === "string"
+    ? d.relativePath
+    : typeof d.filePath === "string"
+      ? d.filePath
+      : "";
   if (d.type === "create") return `${diff}\n\nFile created: ${fp}`;
   return `${diff}\n\nFile updated: ${fp}`;
 };

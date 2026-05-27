@@ -13,3 +13,6 @@
 - `tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约，约束 `previewKind`、`ToolUiPreview` 和用户可见工具日志。
 - `subprocess-runner-guidelines.md`：agent-core 内部受控子进程调用规范，约束 `rg` 等 CLI helper 的 timeout、退出码、输出裁剪和安全边界。
 - `权限设计规则和原则.md`：Agent 工具权限、用户审核、风险分层和权限记录的设计规则。
+- `tool-approval-pause-resume.md`：工具审核暂停恢复设计，约束 PendingApprovalRegistry、幂等 decision、会话切换和过期处理。
+- `bash-policy-allowlist-design.md`：Bash 全局执行策略、会话级 allowlist、Allow 子命令拆分授权和真沙箱路线图。
+- `kairos-autonomous-mode.md`：Kairos 自治模式设计，约束独立 prompt、短期记忆、tick 调度、IPC 契约和事件流页面边界。

@@ -25,4 +25,5 @@ export const globDefinition: ToolDefinitionSpec = {
   isReadOnly: true,
   category: "search",
   previewKind: "glob",
+  extractPaths: (args) => [typeof args.path === "string" && args.path.length > 0 ? args.path : "."],
 };

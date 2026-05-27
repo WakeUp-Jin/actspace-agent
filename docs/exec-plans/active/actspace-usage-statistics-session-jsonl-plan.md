@@ -254,11 +254,11 @@ export type UsageStatisticsSnapshot = {
 1. 增加统计页页面态或路由入口。
 2. 把现有原型布局接成真实数据。
 3. 保留成本弹窗与工具弹窗。
-4. 让缺少 bridge 时可回退到 mock 数据。
+4. 缺少 bridge 或真实 snapshot 时展示空态，不回退到 mock 业务数据。
 
 验证：
 
-- 浏览器 mock 里能看到完整统计页。
+- 浏览器环境里能看到统计页空态；完整统计图表只在有真实 snapshot 或测试 fixture 时渲染。
 - 弹窗与 tab 交互正常。
 
 ### Task 5: 验证、文档、收尾

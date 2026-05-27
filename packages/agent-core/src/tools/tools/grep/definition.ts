@@ -29,4 +29,5 @@ export const grepDefinition: ToolDefinitionSpec = {
   isReadOnly: true,
   category: "search",
   previewKind: "grep",
+  extractPaths: (args) => [typeof args.path === "string" && args.path.length > 0 ? args.path : "."],
 };

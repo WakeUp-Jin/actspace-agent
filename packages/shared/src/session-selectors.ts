@@ -277,6 +277,11 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
       case "tool_call":
       case "llm_usage":
       case "context_snapshot":
+      // Kairos 自治模式专属事件不出现在主 Agent 消息流中；若历史 session 偶然包含也直接跳过。
+      case "kairos_tick_injected":
+      case "kairos_sleep_start":
+      case "kairos_sleep_end":
+      case "kairos_sleep_interrupted":
         return [];
     }
   });

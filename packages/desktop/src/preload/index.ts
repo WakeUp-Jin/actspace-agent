@@ -6,10 +6,21 @@ import type {
   ApprovalDecideResult,
   ApprovalListPendingInput,
   BootstrapState,
+  KairosBridgeApi,
+  KairosControl,
+  KairosControlResponse,
+  KairosGetEventsRecentRequest,
+  KairosGetEventsRecentResponse,
+  KairosReadConfigRequest,
+  KairosReadConfigResponse,
+  KairosRuntimeState,
+  KairosWriteConfigRequest,
+  KairosWriteConfigResponse,
   PendingApprovalInfo,
   RunTurnInput,
   RuntimeStreamEvent,
   SessionCreateInput,
+  SessionEvent,
   SessionGetInput,
   SessionListItem,
   SessionPinInput,
@@ -41,3 +52,34 @@ contextBridge.exposeInMainWorld("actspace", {
     };
   },
 });
+
+// ─── Kairos 桥接 ─────────────────────────────────────────────────────
+// `window.kairos` API surface 与 `KairosBridgeApi` 接口逐字段对齐。
+
+const kairosBridge: KairosBridgeApi = {
+  getState: () => ipcRenderer.invoke("kairos:get-state") as Promise<KairosRuntimeState>,
+  getEventsRecent: (req?: KairosGetEventsRecentRequest) =>
+    ipcRenderer.invoke("kairos:get-events-recent", req ?? {}) as Promise<KairosGetEventsRecentResponse>,
+  control: (ctrl: KairosControl) =>
+    ipcRenderer.invoke("kairos:control", ctrl) as Promise<KairosControlResponse>,
+  readConfig: (req: KairosReadConfigRequest) =>
+    ipcRenderer.invoke("kairos:read-config", req) as Promise<KairosReadConfigResponse>,
+  writeConfig: (req: KairosWriteConfigRequest) =>
+    ipcRenderer.invoke("kairos:write-config", req) as Promise<KairosWriteConfigResponse>,
+  onEvent: (listener: (event: SessionEvent) => void) => {
+    const handler = (_: unknown, event: SessionEvent) => listener(event);
+    ipcRenderer.on("kairos:event", handler);
+    return () => {
+      ipcRenderer.removeListener("kairos:event", handler);
+    };
+  },
+  onState: (listener: (state: KairosRuntimeState) => void) => {
+    const handler = (_: unknown, state: KairosRuntimeState) => listener(state);
+    ipcRenderer.on("kairos:state", handler);
+    return () => {
+      ipcRenderer.removeListener("kairos:state", handler);
+    };
+  },
+};
+
+contextBridge.exposeInMainWorld("kairos", kairosBridge);

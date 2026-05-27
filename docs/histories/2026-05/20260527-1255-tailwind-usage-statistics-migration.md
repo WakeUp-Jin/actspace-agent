@@ -21,6 +21,8 @@
 - **样式入口拆分**：新增 `styles/index.css`、`tokens.css`、`tailwind.css`、`base.css`，建立 `--act-*` token 和 Tailwind `@theme inline` 映射。
 - **Usage 样板迁移**：将 `UsageStatisticsPage` 从 `.usage-*` 全局 CSS 迁移到 Tailwind utility class，并保留金额弹窗、工具详情弹窗、左侧工具调用卡、Token 总数大卡和缓存效率卡。
 - **旧样式清理**：删除 `styles.css` 中已不再引用的 `.usage-*` 样式块，降低旧 CSS 残留。
+- **交互细节补丁**：为 composer textarea 补回局部 `focus-visible` 覆盖，避免全局 focus 样式产生浅蓝边框。
+- **窗口标题栏安全距离**：Usage 页面根节点增加基于 `--window-chrome-strip-height` 的顶部 padding，避免侧边栏展开或收起时页面标题与 Token 卡片顶部重叠。
 - **验证**：通过 desktop typecheck、build、test，并用 Electron 窗口真实点击验证 Usage 页、金额弹窗和工具详情弹窗。
 
 ### 🧠 Design Intent (Why)

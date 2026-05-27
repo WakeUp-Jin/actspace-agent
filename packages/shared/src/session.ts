@@ -49,7 +49,13 @@ export type SessionEventType =
   | "llm_usage"
   | "diff_preview"
   | "context_snapshot"
-  | "error";
+  | "error"
+  // ↓ Kairos 自治模式专属生命周期事件（追加在末尾，不允许调换顺序，详见
+  // docs/exec-plans/active/kairos_shared_contracts.md §1）↓
+  | "kairos_tick_injected"
+  | "kairos_sleep_start"
+  | "kairos_sleep_end"
+  | "kairos_sleep_interrupted";
 
 export type SessionEvent<TPayload = unknown> = {
   id: EventId;
@@ -99,6 +105,34 @@ export type LlmUsagePayload = {
 export type ContextSnapshotPayload = ContextUsageSnapshot;
 
 export type ErrorPayload = SessionError;
+
+/**
+ * Kairos tick 注入事件 payload。
+ * 每次 Kairos 控制器把一个 tick（自动或 brief 触发）作为 user message 投递给 LLM 时落一条。
+ * content 是真正进入 LLM 历史的字符串（与 user_message.content 等价）。
+ */
+export type KairosTickInjectedPayload = {
+  trigger: "auto" | "wake_now" | "brief";
+  briefId?: string;
+  content: string;
+};
+
+/** Kairos 进入 sleep 时的 payload。plannedSeconds 是控制器夹紧后的值。 */
+export type KairosSleepStartPayload = {
+  plannedSeconds: number;
+  reason: "after_tick" | "after_error" | "manual";
+};
+
+/** Kairos sleep 自然结束的 payload；actualSeconds 反映实际等待时长。 */
+export type KairosSleepEndPayload = {
+  actualSeconds: number;
+};
+
+/** Kairos sleep 被打断的 payload；reason 标明打断来源，remainingSeconds 是被打断时还剩多久。 */
+export type KairosSleepInterruptedPayload = {
+  reason: "user_message" | "wake_now";
+  remainingSeconds: number;
+};
 
 export type SessionMeta = {
   id: SessionId;

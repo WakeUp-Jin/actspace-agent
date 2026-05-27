@@ -132,9 +132,9 @@
 
 ## 与其他计划关系
 
-- 依赖 `actspace-tool-permission-scheduler-plan.md` 提供 approval request 字段。
-- 依赖 `actspace-tool-pause-session-boundary-plan.md` 提供 expired/cancelled 状态语义。
-- 消费 `actspace-bash-tool-plan.md` 的 Bash 结果字段。
+- 依赖 `docs/exec-plans/completed/actspace-tool-permission-scheduler-plan.md` 提供 approval request 字段。
+- 依赖 `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-tool-pause-session-boundary-plan.md` 提供 expired/cancelled 状态语义。
+- 消费 `docs/exec-plans/completed/actspace-bash-tool-plan.md` 的 Bash 结果字段。
 
 ## 进度记录
 

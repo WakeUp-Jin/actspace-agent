@@ -33,5 +33,10 @@ declare global {
         input?: import("@actspace/shared").ApprovalListPendingInput
       ) => Promise<import("@actspace/shared").PendingApprovalInfo[]>;
     };
+    /**
+     * Kairos 自治模式 API。preload 在 `kairos` 命名空间下暴露；
+     * 详细契约见 `@actspace/shared` 的 `KairosBridgeApi`。
+     */
+    kairos?: import("@actspace/shared").KairosBridgeApi;
   }
 }

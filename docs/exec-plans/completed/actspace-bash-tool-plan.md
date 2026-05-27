@@ -23,7 +23,7 @@
 ## 设计来源
 
 - `docs/design-docs/agent-core/权限设计规则和原则.md`
-- `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-tool-permission-scheduler-plan.md`
+- `docs/exec-plans/completed/actspace-tool-permission-scheduler-plan.md`
 - `.agents/skills/llm-agent-dev/references/tools/bash-tool.md`
 - `.agents/skills/llm-agent-dev/examples/bash-tool.ts`
 
@@ -156,9 +156,9 @@ Bash 结果至少包含：
 
 ## 与其他计划关系
 
-- 依赖 `actspace-tool-permission-scheduler-plan.md` 的权限结果和调度入口。
-- 被 `actspace-bash-approval-ui-plan.md` 消费结果字段。
-- 受 `actspace-tool-pause-session-boundary-plan.md` 约束：executor 只能在 approve 后启动。
+- 依赖 `docs/exec-plans/completed/actspace-tool-permission-scheduler-plan.md` 的权限结果和调度入口。
+- 被 `docs/exec-plans/completed/actspace-bash-approval-ui-plan.md` 消费结果字段。
+- 受 `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-tool-pause-session-boundary-plan.md` 约束：executor 只能在 approve 后启动。
 
 ## 进度记录
 

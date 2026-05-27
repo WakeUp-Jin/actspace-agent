@@ -21,3 +21,4 @@
 | 可观测性 | C | 已有应用数据 `logs/` 目录初始化、根目录本地开发日志入口 `pnpm dev:log`、即时 console 链路日志，以及每次 Agent turn 一个最近 1 天保留的 JSONL 排障文件。 | 补统一错误面板、renderer 错误按 turn 归因和 provider/tool 故障排查约定。 |
 | 安全 | B- | Electron 边界采用 `contextIsolation` + preload bridge，workspace-guard 路径守卫，env.ts 集中管密钥（.env 不提交、Object.freeze 冻结、验证前置），SECURITY.md 已补充密钥管理和进程隔离约束。 | 真实 provider 接入时补充 API Key 轮换、错误暴露策略和数据脱敏规则。 |
 | 学习沉淀 | B | 体系已经跑起来，且已有学习文档。 | 随着 DeepSeek 接入和前端对接，继续补真正有迁移价值的学习文档。 |
+| Kairos 自治模式 | B+ | v1 闭环已落地，KairosPage 已从原始事件表改成监控台式两列 UI：紧凑 header、运行轨迹、执行列表分页、统计区、最终回复/工具结果共享详情；renderer 单测与真实 Electron 观察均已覆盖本轮关键交互。 | 继续补 notes 编辑、`get-events-recent` 回退 jsonl、external 数据源插件；后续再做更完整的 e2e 场景脚本化验收。 |

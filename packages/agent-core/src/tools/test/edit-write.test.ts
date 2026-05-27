@@ -140,6 +140,7 @@ describe("editFileDiffExecutor", () => {
     expect(await readFile(target, "utf-8")).toBe("new content");
     const data = result.data as Record<string, unknown>;
     expect(data.type).toBe("create");
+    expect(data.relativePath).toBe("brand-new.ts");
   });
 
   it("rejects path outside workspace", async () => {
@@ -189,6 +190,7 @@ describe("writeFileExecutor", () => {
     expect(data.type).toBe("create");
     expect(data.additions).toBeGreaterThan(0);
     expect(data.deletions).toBe(0);
+    expect(data.relativePath).toBe("new-file.ts");
     expect((data.diff as string)).toContain("+line1");
   });
 
@@ -236,10 +238,11 @@ describe("writeFileExecutor", () => {
   it("renderWriteResult returns diff text for model", () => {
     const result = {
       success: true,
-      data: { diff: "+new stuff", filePath: "/tmp/f", type: "create" },
+      data: { diff: "+new stuff", filePath: "/tmp/f", relativePath: "f", type: "create" },
     };
     const rendered = renderWriteResult(result);
     expect(rendered).toContain("+new stuff");
-    expect(rendered).toContain("File created");
+    expect(rendered).toContain("File created: f");
+    expect(rendered).not.toContain("/tmp/f");
   });
 });

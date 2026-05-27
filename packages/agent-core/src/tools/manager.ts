@@ -51,6 +51,7 @@ export class ToolManager {
       category: spec.category,
       previewKind: spec.previewKind,
       renderResult,
+      extractPaths: spec.extractPaths,
     };
     this.tools.set(tool.name, tool);
   }
@@ -78,9 +79,31 @@ export class ToolManager {
   }
 
   /** 执行工具：权限检查 → handler → renderResult（可选）→ truncate */
-  async execute(toolName: string, args: Record<string, unknown>, toolCallId?: string): Promise<ToolResult> {
+  async execute(
+    toolName: string,
+    args: Record<string, unknown>,
+    toolCallId?: string,
+    options?: ToolExecuteOptions,
+  ): Promise<ToolResult> {
     const tool = this.tools.get(toolName);
-    const execution = await this.scheduler.execute(tool, toolName, args, toolCallId);
+    const execution = await this.scheduler.execute(tool, toolName, args, toolCallId, options);
     return execution.result;
   }
+}
+
+/**
+ * Caller-specific options for tool execution.
+ * Main Agent 调用时不传或传 `callerAgent: "main"`，行为与历史一致。
+ * Kairos 调用时必须传 `callerAgent: "kairos"` + `kairosGuard`，scheduler 会做额外路径/blocklist 校验。
+ */
+export interface ToolExecuteOptions {
+  callerAgent?: "main" | "kairos";
+  kairosGuard?: KairosGuardContext;
+}
+
+/** Kairos 工具调用守卫上下文：allowedRoots（白名单）+ blocklist（黑名单）+ toolsDenied（双保险） */
+export interface KairosGuardContext {
+  allowedRoots: string[];
+  blocklistPaths: string[];           // glob，由 kairos/guard/blocklist-check.ts 解析
+  toolsDenied: string[];
 }

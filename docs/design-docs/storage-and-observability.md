@@ -68,3 +68,70 @@ renderer 不能直接访问文件系统，所有文件与 session 读写都必�
 日志目录只保存在本机，不应提交到 Git；仓库根目录 `logs/` 已在 `.gitignore` 中忽略。
 
 开发态 `logRoot` 默认指向仓库根目录 `logs/`，也可以通过 `ACTSPACE_REPO_ROOT` 显式指定仓库根。
+
+## Kairos 存储与可观测性
+
+Kairos（自治模式）在 `<userData>/kairos/` 下独立成树，与主 Agent `sessions/` 完全解耦。`packages/desktop` 在 `app.whenReady()` 时调 `ensureKairosScaffolding(kairosRoot)` 幂等创建并落默认 config。
+
+### 目录树
+
+```
+<userData>/kairos/
+├── config/
+│   ├── preferences.json       # enabled / sleepRange / rhythm / circuitBreaker / tip
+│   ├── paths.json             # workspaces / sessionRoots / watch[] 三大类路径
+│   ├── blocklist.json         # paths[] 黑名单 glob + toolsDenied[] + tip
+│   └── rule.md                # 用户写的自由约束，注入 system prompt [4] 段
+├── memory/
+│   └── short-term/
+│       ├── 2026-05/           # 按月分目录
+│       │   ├── 2026-05-27.jsonl       # 当日事件流（含 _001/_002 分卷）
+│       │   ├── 2026-05-27_001.jsonl   # resetToday 后新卷
+│       │   └── week_2026-W22.summary.md  # 压缩出来的周摘要
+│       └── ...
+├── observe/
+│   └── watch-manifests/       # 每个 watch 路径一份 sha1 fileset 快照
+│       └── <sha1>.json
+├── briefs/
+│   ├── tasks/                 # 用户写的 brief markdown
+│   │   └── <id>.md
+│   └── index.json             # parser 维护的调度索引（lastRun/nextRun/intervalSec）
+└── notes/                     # LLM 自己用 edit_file 写的笔记（v1 只读列出）
+```
+
+### 事件流持久化
+
+Kairos 的运行事实写入 `memory/short-term/<YYYY-MM>/<date>[_NNN].jsonl`，每行是一个 `SessionEvent`。复用主 Agent 同款 schema（`@actspace/shared/session.ts`），并扩展 4 个 Kairos 专属 `SessionEventType`：
+
+| `type` | 触发时机 | 关键 payload |
+|---|---|---|
+| `kairos_tick_injected` | 每次 tick 注入 system message 时 | `{ trigger: "auto" \| "brief" \| "wake_now", briefId?, content }` |
+| `kairos_sleep_start` | LLM 调 `sleep` 工具后 scheduler 真正进入 sleep | `{ seconds, sleepEndsAt, biasApplied }` |
+| `kairos_sleep_end` | 自然 sleep 结束 | `{ actualSeconds }` |
+| `kairos_sleep_interrupted` | 被 `notifyMainAgentTurnStart` / `wakeNow` 打断 | `{ reason: "user_message" \| "wake_now", remainingSeconds }` |
+
+同一文件里同样写 `assistant_message` / `thinking` / `tool_call` / `tool_result`，与主 Agent 共用消费链路（`createMessageBlocks` 等聚合函数无需修改）。前端用 `aggregateKairosEvents(events)` 把这条事件流派生为表格行（`KairosEventRow`）。
+
+`ShortMemoryStore.appendEvent(ev)` 走 append-only；`rotateDaily()` 在 `resetToday` 时把当日分卷号 +1（不删旧文件）；compressor 把"7 天前"的旧事件压成 `week_*.summary.md`，下次 tick 加载顺序中该 week 区间直接走 summary，原 jsonl 不删（人类排障可回看）。
+
+### 内存可观测
+
+- `SessionEventRingBuffer`：controller 持有的内存圆环，capacity=200，给 UI 首屏访问。disk write 成功后才 push（保证消费方看到的都已落盘）。
+- `KairosRuntimeState`（`@actspace/shared`）：`{ enabled, state: "stopped"|"idle"|"ticking"|"sleeping"|"interrupted"|"cooldown", todayTickCount, toolCallCountInCurrentTick, totalSleepSecondsToday, sleepEndsAt?, cooldownEndsAt? }`，每次状态变更通过 `kairos:state` 推到 renderer。
+
+### IPC 通道
+
+| Channel | 方向 | 用途 |
+|---|---|---|
+| `kairos:get-state` | invoke | renderer 拉一次 `KairosRuntimeState` |
+| `kairos:get-events-recent` | invoke | 从 ring buffer 拿最近 N 条事件 |
+| `kairos:control` | invoke | `{ type: "start" \| "stop" \| "wake_now" \| "reset_today" }` |
+| `kairos:read-config` / `kairos:write-config` | invoke | 4 份 config 的读写；写盘前 main 端 schema 校验（rule.md 跳过 JSON parse） |
+| `kairos:event` | main → renderer | 每个 SessionEvent 推一份（50ms debounce 攒批） |
+| `kairos:state` | main → renderer | 每次状态变更推一份（同 50ms 攒批） |
+
+### 排障日志归属
+
+Kairos tick 的内部排障**不走** `logs/agent-runs/`——后者只服务主 Agent 的用户级 turn。Kairos 的等价物就是 `memory/short-term/<date>.jsonl` 本身：因为 SessionEvent 已经包含完整 assistant_message + 工具调用 + 工具结果，无需另起一个 run-log。压缩日志和 controller 出错信息直接落到根目录 `logs/latest-dev.log`（`pnpm dev:log` 输出），便于排障时一处可查。
+
+Workspace Root 边界对 Kairos 仍然有效：`tools/scheduler.ts` 在 `callerAgent === "kairos"` 时按 `paths.json` 跑双校验（workspace 白名单 + blocklist.paths glob），主 Agent 路径完全不受影响。

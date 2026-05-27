@@ -131,6 +131,7 @@ async function runDualLoop(
           toolCalls,
           config.toolExecution ?? "sequential",
           emit,
+          config.toolExecuteOptions,
         );
 
         for (const toolMsg of results) {
@@ -218,6 +219,7 @@ async function executeToolCalls(
   toolCalls: ToolCallContent[],
   mode: ToolExecutionMode,
   emit: AgentEventSink,
+  toolExecuteOptions?: import("../tools/manager").ToolExecuteOptions,
 ): Promise<ToolResultMessage[]> {
   const execOne = async (tc: ToolCallContent): Promise<ToolResultMessage> => {
     await emit({
@@ -227,7 +229,7 @@ async function executeToolCalls(
       args: tc.arguments,
     });
 
-    const result = await toolManager.execute(tc.name, tc.arguments, tc.id);
+    const result = await toolManager.execute(tc.name, tc.arguments, tc.id, toolExecuteOptions);
 
     await emit({
       type: "tool_end",

@@ -60,6 +60,22 @@ export interface AppEnv {
   ACTSPACE_DISABLED_TOOLS: string[];
   /** 调试开关：所有 bash 命令都进入审核（仅绕过 allowlist，硬拒绝仍生效） */
   ACTSPACE_BASH_ALWAYS_ASK: boolean;
+
+  // ─── Kairos 后台 Agent 配置 ───
+  /**
+   * Kairos 使用的 ModelId（同主 Agent 注册表）。
+   * 留空 → 复用主 Agent 默认模型；填非法值 → 视同留空。
+   * 由 `resolveKairosEnv()` 做 ModelRegistry 守卫，再传给 buildLLMConfig。
+   */
+  KAIROS_MODEL_ID: string;
+  /**
+   * Kairos 思考链覆写：
+   *   "auto"（默认）→ 跟随 ModelSpec.thinkingDefault；
+   *   "true"        → 强制启用；
+   *   "false"       → 强制禁用。
+   * 模型不支持 toggle 时（supportsThinkingToggle=false）该字段被忽略。
+   */
+  KAIROS_THINKING: "auto" | "true" | "false";
 }
 
 type EnvField<T> = {
@@ -193,6 +209,25 @@ const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
     required: false,
     default: false,
     parse: bool,
+  },
+
+  // ─── Kairos ───
+  KAIROS_MODEL_ID: {
+    envKey: "KAIROS_MODEL_ID",
+    required: false,
+    default: "",
+    parse: str,
+  },
+  KAIROS_THINKING: {
+    envKey: "KAIROS_THINKING",
+    required: false,
+    default: "auto" as const,
+    parse: (raw): "auto" | "true" | "false" => {
+      const v = raw.trim().toLowerCase();
+      if (v === "true" || v === "1" || v === "yes" || v === "on") return "true";
+      if (v === "false" || v === "0" || v === "no" || v === "off") return "false";
+      return "auto";
+    },
   },
 };
 

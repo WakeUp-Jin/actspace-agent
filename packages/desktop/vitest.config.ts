@@ -11,9 +11,11 @@ export default defineConfig({
     },
   },
   test: {
+    // 统一用 jsdom：renderer 测试需要 DOM；main 进程的 Kairos 内部测试只用 fs/promises 和纯逻辑，
+    // jsdom 不会拦截这些 node builtins，所以单环境足以。
     environment: "jsdom",
     globals: true,
-    include: ["src/**/test/**/*.test.tsx"],
+    include: ["src/**/test/**/*.test.{ts,tsx}"],
     setupFiles: ["./src/renderer/test/setup.ts"],
   },
 });

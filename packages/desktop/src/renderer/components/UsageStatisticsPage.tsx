@@ -6,7 +6,6 @@ import type {
   UsageStatisticsSnapshot,
   UsageStatisticsToolEntry,
 } from "@actspace/shared";
-import { mockUsageStatistics } from "../fixtures/usageStatisticsFixture";
 
 type Props = {
   snapshot: UsageStatisticsSnapshot | null;
@@ -76,9 +75,9 @@ function heatmapCellClass(level: 0 | 1 | 2 | 3): string {
 }
 
 function buildTrendBars(rows: UsageStatisticsDailyRow[]): Array<{ value: number; label: string }> {
-  const source = rows.length > 0 ? rows.slice(0, 31) : [];
-  const normalized = source.length > 0 ? source : mockUsageStatistics.dailyRows;
-  const bars = Array.from({ length: 31 }, (_, index) => normalized[index % normalized.length]);
+  const bars = [...rows]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-31);
   const maxTokens = Math.max(1, ...bars.map((row) => row.totalTokens));
   return bars.map((row) => ({
     value: row.totalTokens / maxTokens,
@@ -89,7 +88,7 @@ function buildTrendBars(rows: UsageStatisticsDailyRow[]): Array<{ value: number;
 function buildHeatmap(rows: UsageStatisticsDailyRow[]) {
   const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
   const map = new Map(sorted.map((row) => [row.date, row.totalTokens] as const));
-  const latest = sorted.at(-1)?.date ?? mockUsageStatistics.dailyRows[0]?.date ?? new Date().toISOString().slice(0, 10);
+  const latest = sorted.at(-1)?.date ?? new Date().toISOString().slice(0, 10);
   const anchor = new Date(`${latest}T00:00:00`);
   const totalCells = 7 * 16;
   const start = new Date(anchor);
@@ -166,10 +165,7 @@ function CostDetailModal({
   onClose: () => void;
 }) {
   const breakdown = [
-    { label: "DeepSeek R1", value: 181.24 },
-    { label: "Kimi K2", value: 72.9 },
-    { label: "Mock / local", value: 0 },
-    { label: "缓存节省估算", value: -25.82 },
+    { label: "估算总成本", value: totalCost },
   ];
 
   return (
@@ -251,14 +247,62 @@ function BreakdownCard({ label, value, detail }: { label: string; value: string;
 }
 
 export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: Props) {
-  const effectiveSnapshot = snapshot ?? mockUsageStatistics;
-  const [range, setRange] = useState<UsageStatisticsSnapshot["range"]>(effectiveSnapshot.range);
+  const [range, setRange] = useState<UsageStatisticsSnapshot["range"]>(snapshot?.range ?? "month");
   const [selectedTool, setSelectedTool] = useState<UsageStatisticsToolEntry | null>(null);
   const [showCostDetail, setShowCostDetail] = useState(false);
 
+  if (!snapshot) {
+    return (
+      <main className="h-full overflow-auto bg-[#f7f8fb] px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main">
+        <div className="grid min-h-[calc(100vh-48px)] place-items-center">
+          <section className={`${panelClass} grid max-w-[560px] gap-4 p-7 text-center`}>
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-brand-soft text-brand">
+              <Info size={22} strokeWidth={2} />
+            </div>
+            <div>
+              <h1 className="m-0 text-2xl font-bold text-text-main">暂无 Usage 数据</h1>
+              <p className="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-text-muted">
+                完成一次真实 Agent 对话后，这里会展示 token、成本、缓存和工具调用统计。
+              </p>
+            </div>
+            {error ? (
+              <div className="rounded-act-lg border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-700">
+                {error}
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {RANGE_TABS.map((tab) => (
+                <button
+                  key={tab}
+                  className={`h-8 min-w-14 rounded-full px-3.5 text-[13px] font-semibold transition ${
+                    tab === range ? "bg-brand-soft text-brand" : "border border-line bg-white text-text-muted hover:text-brand"
+                  }`}
+                  type="button"
+                  onClick={() => {
+                    setRange(tab);
+                    onRefresh?.(tab);
+                  }}
+                >
+                  {getRangeLabel(tab)}
+                </button>
+              ))}
+            </div>
+            <button className={`${actionButtonClass} mx-auto`} type="button" onClick={() => onRefresh?.(range)}>
+              <RefreshCw size={15} strokeWidth={2} />
+              Refresh
+            </button>
+            {isLoading ? <div className="text-xs text-text-faint">Loading usage statistics...</div> : null}
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  const effectiveSnapshot = snapshot;
   const summaryRows = effectiveSnapshot.dailyRows ?? [];
-  const recent7d = sumTokens(summaryRows.slice(0, 7));
-  const recent30d = sumTokens(summaryRows.slice(0, 30));
+  const sortedSummaryRows = [...summaryRows].sort((a, b) => a.date.localeCompare(b.date));
+  const recent7d = sumTokens(sortedSummaryRows.slice(-7));
+  const recent30d = sumTokens(sortedSummaryRows.slice(-30));
   const avg = summaryRows.length > 0 ? Math.round(recent30d / summaryRows.length) : 0;
   const monthValue = effectiveSnapshot.summary.toolCallCount;
   const trendBars = buildTrendBars(summaryRows);
@@ -385,8 +429,8 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: P
               ))}
             </div>
             <div className="mt-3 flex justify-between text-[13px] text-text-subtle">
-              <span>{summaryRows.at(-1)?.date ?? "2026-05-01"}</span>
-              <span>{summaryRows[0]?.date ?? "2026-05-31"}</span>
+              <span>{sortedSummaryRows[0]?.date ?? "-"}</span>
+              <span>{sortedSummaryRows.at(-1)?.date ?? "-"}</span>
             </div>
           </article>
         </section>

@@ -29,4 +29,6 @@ export const readFileDefinition: ToolDefinitionSpec = {
   isReadOnly: true,
   category: "file",
   previewKind: "read",
+  extractPaths: (args) =>
+    typeof args.path === "string" && args.path.length > 0 ? [args.path] : [],
 };

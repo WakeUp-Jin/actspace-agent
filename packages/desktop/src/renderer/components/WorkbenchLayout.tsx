@@ -1,6 +1,6 @@
 import type { ContextUsageSnapshot, MessageBlock, SessionListItem, UsageStatisticsSnapshot } from "@actspace/shared";
 import { useCallback, useEffect, useState } from "react";
-import { FlaskConical, Sparkles } from "lucide-react";
+import { FlaskConical } from "lucide-react";
 import { ConversationView } from "./ConversationView";
 import { PlaceholderView } from "./PlaceholderView";
 import { RightPanel } from "./RightPanel";
@@ -9,7 +9,7 @@ import { SplitView } from "./SplitView";
 import { UsageStatisticsPage } from "./UsageStatisticsPage";
 import { WindowChromeBar } from "./WindowChromeBar";
 import type { ComposerSendOptions } from "./Composer";
-import { mockUsageStatistics } from "../fixtures/usageStatisticsFixture";
+import { KairosPage } from "../pages/KairosPage";
 
 type StoredWorkbenchLayout = {
   leftMode?: SidebarMode | "rail";
@@ -213,7 +213,7 @@ export function WorkbenchLayout({
     }
 
     if (typeof window === "undefined" || !window.actspace?.getUsageStatistics) {
-      setUsageSnapshot(mockUsageStatistics);
+      setUsageSnapshot(null);
       setUsageError(null);
       return;
     }
@@ -222,10 +222,10 @@ export function WorkbenchLayout({
     setUsageError(null);
     try {
       const snapshot = await window.actspace.getUsageStatistics({ sessionId, range });
-      setUsageSnapshot(snapshot ?? mockUsageStatistics);
+      setUsageSnapshot(snapshot);
     } catch (error) {
       console.error("Failed to load usage statistics", error);
-      setUsageSnapshot(mockUsageStatistics);
+      setUsageSnapshot(null);
       setUsageError(error instanceof Error ? error.message : "Failed to load usage statistics.");
     } finally {
       setUsageLoading(false);
@@ -265,19 +265,7 @@ export function WorkbenchLayout({
       />
     );
   } else if (view === "kairos") {
-    mainContent = (
-      <PlaceholderView
-        eyebrow="Kairos"
-        title="Autonomous timing & triggers"
-        description="Kairos 是 actspace 的时机引擎，负责让 Agent 在合适的时刻自主行动——包括定时任务、事件触发与自主 Agent 的运行边界。当前仅做入口预留。"
-        bullets={[
-          "定时唤起 Agent 执行预设 prompt 或工作流",
-          "基于事件（文件变化、外部 webhook）触发 Agent",
-          "自主 Agent 的运行配额、节奏与安全护栏",
-        ]}
-        icon={<Sparkles size={28} strokeWidth={1.6} />}
-      />
-    );
+    mainContent = <KairosPage />;
   } else {
     mainContent = (
       <ConversationView

@@ -82,6 +82,11 @@ export interface InternalTool {
   previewKind: ToolPreviewKind;
   /** 只读标记，影响审批模式和并行调度策略 */
   isReadOnly?: boolean;
+  /**
+   * 工具参数 → 路径数组的提取 hook。仅 Kairos 调用路径会读取它，
+   * 用于 allowedRoots + blocklist 校验。主 Agent 调用时不会调用。
+   */
+  extractPaths?: (args: Record<string, unknown>) => string[];
 }
 
 // ─── InternalTool → Tool 转换 ───

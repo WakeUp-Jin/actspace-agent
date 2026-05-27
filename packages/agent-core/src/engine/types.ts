@@ -18,7 +18,7 @@ import type {
 } from "../messages";
 import type { AssistantMessageEvent } from "../llm/types";
 import type { ToolResult } from "../internal-tools";
-import type { ToolManager } from "../tools/manager";
+import type { ToolExecuteOptions, ToolManager } from "../tools/manager";
 import type { ToolApprovalRequest, ToolApprovalDecision } from "../tools/scheduler";
 
 // ─── 工具执行模式 ───
@@ -65,6 +65,12 @@ export interface AgentLoopConfig {
   thinkingEnabled?: boolean;
   /** 内层循环最大轮次硬限制，防止工具调用无限循环。默认 50。 */
   maxTurns?: number;
+  /**
+   * 工具调用统一附加的 caller-specific options。
+   * Kairos runner 传 `{callerAgent:"kairos", kairosGuard}` 以激活路径/blocklist 双校验。
+   * 主 Agent 不传 → 走零开销原路径。
+   */
+  toolExecuteOptions?: ToolExecuteOptions;
 }
 
 // ─── AgentLoopResult ───

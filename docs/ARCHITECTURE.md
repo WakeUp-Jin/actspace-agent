@@ -49,6 +49,8 @@ desktop -> agent-core -> shared
 - `docs/design-docs/agent-core/tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约。
 - `docs/design-docs/agent-core/deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入边界。
 - `docs/design-docs/frontend-ui/index.md`：前端工作台设计文档入口。
+- `docs/design-docs/agent-core/kairos-autonomous-mode.md`：Kairos 自治模式设计——独立 prompt + 短期记忆、tick 调度、IPC 契约和页面规范。
+- `docs/design-docs/lab/index.md`：Lab 能力实验台设计入口，约束实验矩阵、实验生命周期、产物晋升和分版本构建路线。
 
 ## 当前已确认的实现方向
 

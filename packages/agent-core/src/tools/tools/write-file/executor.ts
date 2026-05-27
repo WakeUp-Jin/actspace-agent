@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { relative } from "node:path";
 import * as Diff from "diff";
 import type { ToolResult, ResultRenderer } from "../../../internal-tools";
 import { guardWorkspacePath } from "../../workspace-guard";
@@ -8,6 +9,10 @@ import type { ToolExecutorFn } from "../../types";
 
 function countPrefixedLines(diff: string, prefix: string): number {
   return diff.split("\n").filter((l) => l.startsWith(prefix) && !l.startsWith(`${prefix}${prefix}`)).length;
+}
+
+function workspaceRelativePath(filePath: string, workspaceRoot: string): string {
+  return relative(workspaceRoot, filePath) || ".";
 }
 
 export const writeFileExecutor: ToolExecutorFn = async (
@@ -38,13 +43,15 @@ export const writeFileExecutor: ToolExecutorFn = async (
 
   await writeTextAtomic(guard.resolvedPath, content);
 
-  const diff = Diff.createTwoFilesPatch(pathArg, pathArg, oldContent, content, "", "", { context: 3 });
+  const relativePath = workspaceRelativePath(guard.resolvedPath, workspaceRoot);
+  const diff = Diff.createTwoFilesPatch(relativePath, relativePath, oldContent, content, "", "", { context: 3 });
 
   return {
     success: true,
     data: {
       type: created ? "create" : "update",
       filePath: guard.resolvedPath,
+      relativePath,
       diff,
       additions: countPrefixedLines(diff, "+"),
       deletions: countPrefixedLines(diff, "-"),
@@ -58,7 +65,11 @@ export const renderWriteResult: ResultRenderer = (result) => {
   const d = result.data as Record<string, unknown> | undefined;
   if (!d) return "Write completed.";
   const diff = typeof d.diff === "string" ? d.diff : "";
-  const fp = typeof d.filePath === "string" ? d.filePath : "";
+  const fp = typeof d.relativePath === "string"
+    ? d.relativePath
+    : typeof d.filePath === "string"
+      ? d.filePath
+      : "";
   if (d.type === "create") return `${diff}\n\nFile created: ${fp}`;
   return `${diff}\n\nFile updated: ${fp}`;
 };
