@@ -639,7 +639,7 @@ KairosRunner 每次 tick 由 `prompt-assembler.ts` 组装上下文。**LLM 看�
 - `memory/short-term/` 完全复用 heartclaw `ShortMemoryStore` + `ShortTermMemoryContext` 模式，但**每行是 `SessionEvent`**（与主 Agent session.jsonl 完全对齐），不是 heartclaw 的 message dict。**唯一其它调整**：tick 密度高，token 预算"加载上限"从默认 60% 提到 75%，压缩触发阈值仍为 85%。
 - `workspace/` 是 Kairos 的默认读写根。`kairos-bootstrap.ts` 创建 ToolManager 时把 `workspaceRoot` 指向这里，默认 `config/paths.json` 也只把这里放进 `allowedRoots` 并开启 watch。用户要让 Kairos 接触其它项目目录，必须显式编辑 `paths.json`，并配套确认工具执行层是否支持该路径。
 - `workspace/notes/` 由 bootstrap/controller 预创建，供 Kairos 用共享文件工具写札记；当前 Kairos 文件工具的相对路径默认落到 `workspace/`，因此 prompt/rule 里的笔记路径应写成 `notes/<YYYY-MM>/<title>.md` 这类 workspace 内相对路径。
-- `reset_today` 控制命令对当天 jsonl 走 `rotate_daily` 创建新 segment（不删除旧段，便于后续压缩），同时清空 ring buffer；`workspace/notes/` 和 `observe/watch-manifest/` 不动，避免误删用户/Kairos 已沉淀的内容。
+- `reset_today` 控制命令对当天 jsonl 走 `rotate_daily` 创建新 segment（不删除旧段，便于后续压缩），同时清空 ring buffer 和当日运行计数；后续 tick 的短期记忆加载只会读“当天最新 segment”，因此从 LLM 视角等价于“今天重新开始”。`workspace/notes/` 和 `observe/watch-manifest/` 不动，避免误删用户/Kairos 已沉淀的内容。
 - 任意时刻"Kairos 在做什么"都可以通过 `short-term/<YYYY-MM>/<today>.jsonl` 还原——这是 v1 的唯一可观测数据源，任何排查都从这里看起。
 
 ## Config 详设

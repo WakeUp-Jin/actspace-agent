@@ -47,5 +47,6 @@
 - `frontend-ui/右侧面板与文件渲染规范.md`
 - `frontend-ui/设置页规范.md`：设置态布局、导航分组和聊天态切换规则。
 - `frontend-ui/Kairos监控页规范.md`：Kairos 监控页信息架构、运行轨迹、执行列表、统计区和详情区规范。
+- `frontend-ui/Kairos上下文Sheet规范.md`：Kairos 监控页"上下文"按钮与右侧滑入 Sheet 的入口、信息架构、Snapshot 契约与 IPC 通道。
 - `frontend-ui/Kairos右侧紧凑视图规范.md`：聊天态右侧面板中的 Kairos compact view，约束同源数据流、三段布局和组件复用边界。
 - `frontend-ui/usage-statistics/设计规范.md`：Usage Statistics 页面布局、组件、数据来源和视觉规范。

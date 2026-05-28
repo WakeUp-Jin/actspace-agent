@@ -325,6 +325,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     async stop() {
       await processor.stop();
       runtimeState.enabled = false;
+      emitter.emit("state", { ...runtimeState });
     },
     async wakeNow() {
       processor.triggerWake("wake_now");

@@ -50,6 +50,12 @@ const TRACE_SEGMENT_GAP_PX = 4;
 const TRACE_SEGMENT_BASE_PX = 20;
 const TRACE_SEGMENT_PX_PER_SECOND = 5;
 const TRACE_SEGMENT_MAX_PX = 100;
+const TRACE_TONE_COLORS: Record<ReturnType<typeof traceTone>, string> = {
+  reply: "#4a8af7",
+  sleep: "#f0ad3d",
+  error: "#ee5a55",
+  other: "#d7dce5",
+};
 const pageRootClass =
   "relative flex h-full min-h-0 flex-col bg-[#f7f9fc] pt-[var(--window-chrome-strip-height)] text-[#1a1d24]";
 const unavailablePageClass = `${pageRootClass} items-center justify-center`;
@@ -262,11 +268,11 @@ function KairosRuntimeTrace(props: KairosRuntimeTraceProps) {
                   data-testid="kairos-trace-block"
                   className={cn(
                     traceBlockBaseClass,
-                    traceToneClass(traceTone(row)),
                     props.selectedRowId === row.id && "border-brand shadow-[0_0_0_2px_rgba(47,111,255,0.16)]",
                   )}
                   style={{
                     width: `${segments[index].widthPx}px`,
+                    backgroundColor: TRACE_TONE_COLORS[traceTone(row)],
                   }}
                   title={`${formatKairosTime(row.startedAt)} · ${kairosKindLabel(row.kind)} · ${row.summary}`}
                   aria-label={`${formatKairosTime(row.startedAt)} ${kairosKindLabel(row.kind)} ${row.summary}`}
@@ -659,19 +665,6 @@ function traceTone(row: KairosEventRow): "reply" | "sleep" | "error" | "other" {
   if (row.kind === "sleep") return "sleep";
   if (row.kind === "error" || row.status === "failed") return "error";
   return "other";
-}
-
-function traceToneClass(tone: ReturnType<typeof traceTone>): string {
-  switch (tone) {
-    case "reply":
-      return "bg-[#4a8af7]";
-    case "sleep":
-      return "bg-[#f0ad3d]";
-    case "error":
-      return "bg-[#ee5a55]";
-    case "other":
-      return "bg-[#d7dce5]";
-  }
 }
 
 function stateTextClass(state: KairosRuntimeState["state"]): string {

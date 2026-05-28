@@ -54,46 +54,46 @@ const STAGE_PROGRESS_META: Record<LabStageId, Pick<LabCardView, "tag" | "tagColo
 };
 
 const pageClass =
-  "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-[18px] overflow-hidden bg-app-bg px-[34px] pb-[34px] pt-[calc(var(--window-chrome-strip-height)+18px)] text-text-main max-[1100px]:px-6 max-[760px]:px-4 max-[760px]:pb-[18px] max-[760px]:pt-[calc(var(--window-chrome-strip-height)+14px)]";
+  "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-5 overflow-hidden bg-app-bg px-7 pb-7 pt-[calc(var(--window-chrome-strip-height)+20px)] text-text-main max-[1100px]:px-5 max-[760px]:px-4 max-[760px]:pb-5 max-[760px]:pt-[calc(var(--window-chrome-strip-height)+14px)]";
 const topbarClass =
-  "flex min-h-[58px] items-center gap-[18px] rounded-[14px] border border-line bg-white/90 px-[26px] max-[760px]:flex-col max-[760px]:items-start max-[760px]:p-4";
-const actionsClass = "ml-auto flex gap-2.5 max-[760px]:ml-0 max-[760px]:w-full";
+  "flex items-end justify-between gap-4 max-[760px]:flex-col max-[760px]:items-stretch";
+const titleWrapClass = "flex items-baseline gap-2.5";
+const titleClass = "m-0 text-[22px] font-semibold leading-none text-text-main";
+const titleHintClass = "text-[12px] font-medium leading-none text-text-faint";
+const actionsClass = "flex items-center gap-2 max-[760px]:w-full";
 const secondaryButtonClass =
-  "inline-flex h-8 min-w-[88px] items-center justify-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-medium text-text-muted transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-main active:translate-y-px max-[760px]:flex-1";
+  "inline-flex h-8 items-center justify-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-medium text-text-muted transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-main active:translate-y-px max-[760px]:flex-1";
 const primaryButtonClass =
-  "inline-flex h-8 min-w-[88px] items-center justify-center rounded-act-md border border-transparent bg-brand px-3 text-[13px] font-medium text-white transition hover:bg-brand-strong active:translate-y-px max-[760px]:flex-1";
+  "inline-flex h-8 items-center justify-center rounded-act-md border border-transparent bg-brand px-3 text-[13px] font-medium text-white shadow-[0_1px_2px_rgba(31,45,61,0.08)] transition hover:bg-brand-strong active:translate-y-px max-[760px]:flex-1";
 const iconButtonClass =
   "grid h-8 w-8 place-items-center rounded-act-md border border-line bg-surface text-text-faint transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-main";
 const addButtonClass =
-  "ml-auto grid h-7 w-7 place-items-center rounded-act-md border bg-white/70 text-text-faint transition hover:border-line-strong hover:bg-white hover:text-brand";
+  "ml-auto grid h-6 w-6 place-items-center rounded-[6px] text-text-faint transition hover:bg-white/70 hover:text-brand";
 const boardClass =
-  "grid min-h-0 grid-cols-[repeat(4,minmax(230px,1fr))] gap-3.5 overflow-hidden max-[1100px]:grid-cols-[repeat(4,minmax(260px,1fr))] max-[1100px]:overflow-x-auto";
+  "grid min-h-0 grid-cols-[repeat(4,minmax(230px,1fr))] gap-4 overflow-hidden max-[1100px]:grid-cols-[repeat(4,minmax(260px,1fr))] max-[1100px]:overflow-x-auto";
 const columnBaseClass =
-  "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 rounded-[14px] border p-3.5";
-const stageColumnClass: Record<LabStageId, string> = {
-  hypothesis: "border-[#dbe6ff] bg-[#f3f7ff]",
-  verification: "border-[#eadfd2] bg-[#fff7ef]",
-  forge: "border-[#d6e8eb] bg-[#eefbfc]",
-  promotion: "border-[#e9e1ce] bg-[#fffaf0]",
+  "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-act-md border border-line bg-surface";
+const stageHeaderBaseClass =
+  "flex min-h-[42px] items-center gap-2 border-b border-line px-3";
+const stageHeaderToneClass: Record<LabStageId, string> = {
+  hypothesis: "bg-[rgba(47,111,255,0.045)]",
+  verification: "bg-[rgba(217,154,32,0.05)]",
+  forge: "bg-[rgba(40,119,131,0.045)]",
+  promotion: "bg-[rgba(148,100,0,0.05)]",
 };
-const stageAddBorderClass: Record<LabStageId, string> = {
-  hypothesis: "border-[#dbe6ff]",
-  verification: "border-[#eadfd2]",
-  forge: "border-[#d6e8eb]",
-  promotion: "border-[#e9e1ce]",
+const stageAccentClass: Record<LabStageId, string> = {
+  hypothesis: "bg-brand",
+  verification: "bg-warm",
+  forge: "bg-[#287783]",
+  promotion: "bg-[#946400]",
 };
-const stageEmptyClass: Record<LabStageId, string> = {
-  hypothesis: "border-[#d5e1f8]",
-  verification: "border-[#e6d9ca]",
-  forge: "border-[#d2e4e7]",
-  promotion: "border-[#e4dbc7]",
-};
+const stageBodyClass = "flex min-h-0 flex-col gap-2 overflow-auto p-2.5";
 const cardClass =
-  "relative grid min-h-[88px] grid-rows-[auto_auto_auto] justify-items-start rounded-act-md border border-line bg-surface p-3 text-left shadow-[0_1px_2px_rgba(31,45,61,0.05)] transition hover:-translate-y-px hover:border-line-strong hover:shadow-[0_8px_24px_rgba(31,45,61,0.08)]";
+  "group relative grid min-h-[76px] grid-rows-[auto_auto_auto] justify-items-start gap-[5px] rounded-act-sm border border-line bg-surface px-3 py-2.5 text-left transition hover:border-line-strong hover:bg-surface-subtle";
 const selectedCardClass =
-  "border-brand before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-brand";
+  "border-brand bg-brand-soft/40 before:absolute before:inset-y-2 before:-left-px before:w-[2px] before:rounded-full before:bg-brand";
 const tagClass =
-  "inline-flex h-[22px] items-center whitespace-nowrap rounded-full px-[9px] text-[11px] font-medium";
+  "inline-flex h-[18px] items-center whitespace-nowrap rounded-full px-[7px] text-[11px] font-medium leading-none";
 const overlayClass = "fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/25 p-8";
 const modalBaseClass =
   "grid max-h-[min(760px,calc(100vh-64px))] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-line-strong bg-surface shadow-act-popover max-[760px]:max-h-[calc(100vh-28px)] max-[760px]:w-[calc(100vw-28px)]";
@@ -338,12 +338,16 @@ export function LabPage() {
   return (
     <main className={pageClass} aria-label="Lab 实验台">
       <header className={topbarClass}>
-        <h1 className="m-0 text-2xl font-bold leading-none text-text-main">Lab</h1>
+        <div className={titleWrapClass}>
+          <h1 className={titleClass}>Lab</h1>
+          <span className={titleHintClass}>实验台 · 当前矩阵</span>
+        </div>
         <div className={actionsClass}>
           <button className={secondaryButtonClass} type="button" onClick={() => setDialog("completed")}>
             已完成实验
           </button>
           <button className={primaryButtonClass} type="button" onClick={() => setDialog("new")}>
+            <Plus size={14} strokeWidth={2.25} className="mr-1 -ml-0.5" />
             新实验
           </button>
         </div>
@@ -352,22 +356,29 @@ export function LabPage() {
       <section className={boardClass} aria-label="Lab experiments">
         {labStages.map((stage) => {
           const stageCards = groupedCards.get(stage.id) ?? [];
-          const emptySlots = Math.max(0, 5 - stageCards.length);
           return (
-            <section key={stage.id} className={`${columnBaseClass} ${stageColumnClass[stage.id]}`} aria-label={stage.title}>
-              <header className="flex min-h-9 items-center gap-2">
-                <h2 className="m-0 text-base font-semibold text-text-main">{stage.title}</h2>
-                <span className="text-[13px] font-medium text-text-faint">{stageCards.length}</span>
+            <section key={stage.id} className={columnBaseClass} aria-label={stage.title}>
+              <header className={`${stageHeaderBaseClass} ${stageHeaderToneClass[stage.id]}`}>
+                <span aria-hidden="true" className={`h-3 w-[3px] rounded-full ${stageAccentClass[stage.id]}`} />
+                <h2 className="m-0 text-[13px] font-semibold leading-none text-text-main">{stage.title}</h2>
+                <span className="text-[11px] font-medium leading-none text-text-faint tabular-nums">
+                  {stageCards.length}
+                </span>
                 <button
-                  className={`${addButtonClass} ${stageAddBorderClass[stage.id]}`}
+                  className={addButtonClass}
                   type="button"
                   aria-label={stage.addLabel}
                   onClick={() => setDialog("new")}
                 >
-                  <Plus size={16} strokeWidth={2} />
+                  <Plus size={14} strokeWidth={2.25} />
                 </button>
               </header>
-              <div className="flex min-h-0 flex-col gap-2.5 overflow-auto pr-0.5">
+              <div className={stageBodyClass}>
+                {stageCards.length === 0 ? (
+                  <p className="m-0 px-1 pt-1 text-[11px] leading-relaxed text-text-subtle">
+                    暂无{stage.title}。
+                  </p>
+                ) : null}
                 {stageCards.map((card) => (
                   <button
                     key={card.id}
@@ -378,20 +389,13 @@ export function LabPage() {
                     <span className={tagClass} style={tagStyle(card.tagColor)}>
                       {card.tag}
                     </span>
-                    <span className="mt-[9px] max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-semibold leading-[1.35] text-text-main">
+                    <span className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium leading-[1.4] text-text-main">
                       {card.title}
                     </span>
-                    <span className="mt-[7px] max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-[1.3] text-text-faint">
+                    <span className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-[1.4] text-text-faint">
                       {card.meta}
                     </span>
                   </button>
-                ))}
-                {Array.from({ length: emptySlots }, (_, index) => (
-                  <div
-                    key={`${stage.id}-empty-${index}`}
-                    className={`min-h-[88px] rounded-act-md border border-dashed bg-white/40 ${stageEmptyClass[stage.id]}`}
-                    aria-hidden="true"
-                  />
                 ))}
               </div>
             </section>

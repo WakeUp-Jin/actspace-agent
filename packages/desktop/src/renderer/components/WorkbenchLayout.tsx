@@ -282,6 +282,7 @@ export function WorkbenchLayout({
         title={chromeTitle}
         onToggleLeft={toggleSidebarMode}
         onToggleRight={toggleRightPanel}
+        showRightToggle={view !== "kairos"}
       />
       <SplitView
         left={

@@ -107,6 +107,38 @@ describe("KairosPage", () => {
     expect(bridge.control).toHaveBeenCalledWith({ type: "start" });
   });
 
+  it("switches the primary action back to 开启 after a stopped disabled state is pushed", async () => {
+    const { bridge, pushState } = installFakeBridge({
+      initialState: {
+        enabled: true,
+        state: "sleeping",
+        sleepEndsAt: new Date(Date.now() + 8_000).toISOString(),
+        todayTickCount: 2,
+        toolCallCountInCurrentTick: 0,
+        totalSleepSecondsToday: 120,
+      },
+    });
+    const user = userEvent.setup();
+    render(<KairosPage />);
+
+    expect(await screen.findByRole("button", { name: "暂停" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "暂停" }));
+    expect(bridge.control).toHaveBeenCalledWith({ type: "stop" });
+
+    act(() => {
+      pushState({
+        enabled: false,
+        state: "stopped",
+        todayTickCount: 2,
+        toolCallCountInCurrentTick: 0,
+        totalSleepSecondsToday: 120,
+      });
+    });
+
+    expect(await screen.findByRole("button", { name: "开启" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "暂停" })).not.toBeInTheDocument();
+  });
+
   it("renders the execution list and shows the final reply by default", async () => {
     const ev1 = makeEvent({
       type: "kairos_tick_injected",
@@ -329,6 +361,103 @@ describe("KairosPage", () => {
     expect(within(detail).getByText("sleep")).toBeInTheDocument();
     expect(within(detail).getByText("ok")).toBeInTheDocument();
     expect(within(detail).queryByText("环境无变化，仍无配置路径、无会话、无 briefs。继续休眠。")).not.toBeInTheDocument();
+  });
+
+  it("preserves tool events pushed synchronously in one IPC flush", async () => {
+    const { pushEvent } = installFakeBridge();
+    const user = userEvent.setup();
+    render(<KairosPage />);
+
+    expect(await screen.findByText(/暂无 Kairos 事件/)).toBeInTheDocument();
+
+    const base = new Date("2026-05-28T07:16:56.000Z").getTime();
+    act(() => {
+      pushEvent(makeEvent({
+        id: "flush-tick",
+        type: "kairos_tick_injected",
+        timestamp: new Date(base).toISOString(),
+        payload: { trigger: "auto", content: "<tick/>" },
+      }));
+      pushEvent(makeEvent({
+        id: "flush-reply",
+        type: "assistant_message",
+        timestamp: new Date(base + 1_000).toISOString(),
+        payload: { content: "探索工作区。", stopReason: "toolUse", model: "m", provider: "p" },
+      }));
+      pushEvent(makeEvent({
+        id: "flush-tool-call",
+        type: "tool_call",
+        timestamp: new Date(base + 2_000).toISOString(),
+        payload: { id: "tc-list", name: "list_directory", arguments: { path: "notes" } },
+      }));
+      pushEvent(makeEvent({
+        id: "flush-tool-result",
+        type: "tool_result",
+        timestamp: new Date(base + 3_000).toISOString(),
+        payload: {
+          toolCallId: "tc-list",
+          toolName: "list_directory",
+          ok: true,
+          summary: "(empty directory)",
+        },
+      }));
+      pushEvent(makeEvent({
+        id: "flush-sleep",
+        type: "kairos_sleep_start",
+        timestamp: new Date(base + 4_000).toISOString(),
+        payload: { plannedSeconds: 120, reason: "after_tick" },
+      }));
+    });
+
+    const list = await screen.findByLabelText("执行列表");
+    expect(within(list).getByText("工具执行")).toBeInTheDocument();
+    expect(within(list).getByText("list_directory: (empty directory)")).toBeInTheDocument();
+
+    const stats = screen.getByLabelText("统计");
+    expect(within(stats).getByText("工具调用")).toBeInTheDocument();
+    expect(within(stats).getByText("1")).toBeInTheDocument();
+
+    await user.click(within(list).getByText("工具执行"));
+    const detail = screen.getByRole("complementary");
+    expect(within(detail).getByRole("tab", { name: "工具结果", selected: true })).toBeInTheDocument();
+    expect(within(detail).getByText("list_directory")).toBeInTheDocument();
+    expect(within(detail).getByText("(empty directory)")).toBeInTheDocument();
+  });
+
+  it("clears the local event view after reset_today", async () => {
+    const { bridge } = installFakeBridge({
+      initialState: {
+        enabled: true,
+        state: "sleeping",
+        sleepEndsAt: new Date(Date.now() + 10_000).toISOString(),
+        todayTickCount: 2,
+        toolCallCountInCurrentTick: 0,
+        totalSleepSecondsToday: 120,
+      },
+      initialEvents: [
+        makeEvent({
+          id: "reset-tick",
+          type: "kairos_tick_injected",
+          payload: { trigger: "auto", content: "<tick/>" },
+        }),
+        makeEvent({
+          id: "reset-reply",
+          type: "assistant_message",
+          payload: { content: "before reset", stopReason: "stop", model: "m", provider: "p" },
+        }),
+      ],
+    });
+    const user = userEvent.setup();
+    render(<KairosPage />);
+
+    const list = await screen.findByLabelText("执行列表");
+    expect(within(list).getByText("before reset")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "重置今日" }));
+
+    expect(bridge.control).toHaveBeenCalledWith({ type: "reset_today" });
+    expect(await screen.findByText(/暂无 Kairos 事件/)).toBeInTheDocument();
+    expect(screen.queryByText("before reset")).not.toBeInTheDocument();
   });
 
   it("does not render the config tab editor (v1.0 removed)", async () => {

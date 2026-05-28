@@ -21,6 +21,11 @@ import {
 
 const EVENT_BUFFER_LIMIT = 500;
 
+function trimEventBuffer(events: SessionEvent[]): SessionEvent[] {
+  if (events.length <= EVENT_BUFFER_LIMIT) return events;
+  return events.slice(events.length - EVENT_BUFFER_LIMIT);
+}
+
 export interface UseKairosResult {
   bridgeAvailable: boolean;
   state: KairosRuntimeState | null;
@@ -82,11 +87,11 @@ export function useKairos(): UseKairosResult {
     if (!bridge) return;
     void refresh();
     const offEvent = bridge.onEvent((ev) => {
-      const next = [...eventsRef.current, ev];
-      if (next.length > EVENT_BUFFER_LIMIT) {
-        next.splice(0, next.length - EVENT_BUFFER_LIMIT);
-      }
-      setEvents(next);
+      setEvents((current) => {
+        const next = trimEventBuffer([...current, ev]);
+        eventsRef.current = next;
+        return next;
+      });
     });
     const offState = bridge.onState((s) => {
       setState(s);
@@ -113,6 +118,11 @@ export function useKairos(): UseKairosResult {
       setError(null);
       try {
         await bridge.control(ctrl);
+        if (ctrl.type === "reset_today") {
+          eventsRef.current = [];
+          setEvents([]);
+          setSelectedRowId(null);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         setError(message);

@@ -25,6 +25,7 @@ export type WindowChromeBarProps = {
   onToggleLeft: () => void;
   onToggleRight: () => void;
   onOpenSearch?: () => void;
+  showRightToggle?: boolean;
 };
 
 export function WindowChromeBar({
@@ -34,6 +35,7 @@ export function WindowChromeBar({
   onToggleLeft,
   onToggleRight,
   onOpenSearch,
+  showRightToggle = true,
 }: WindowChromeBarProps) {
   const isLeftHidden = leftMode === "hidden";
 
@@ -64,16 +66,18 @@ export function WindowChromeBar({
         <h1 className="chrome-title" title={title}>{title}</h1>
       </div>
       <div className="chrome-right">
-        <button
-          className="chrome-button chrome-toggle-right"
-          type="button"
-          aria-label={rightOpen ? "Close panel" : "Open panel"}
-          aria-pressed={rightOpen}
-          title={rightOpen ? "Close right panel" : "Open right panel"}
-          onClick={onToggleRight}
-        >
-          <PanelRight size={15} strokeWidth={1.8} />
-        </button>
+        {showRightToggle ? (
+          <button
+            className="chrome-button chrome-toggle-right"
+            type="button"
+            aria-label={rightOpen ? "Close panel" : "Open panel"}
+            aria-pressed={rightOpen}
+            title={rightOpen ? "Close right panel" : "Open right panel"}
+            onClick={onToggleRight}
+          >
+            <PanelRight size={15} strokeWidth={1.8} />
+          </button>
+        ) : null}
       </div>
     </div>
   );

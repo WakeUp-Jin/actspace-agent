@@ -276,6 +276,14 @@ describe("WindowChromeBar", () => {
     expect(onToggleRight).toHaveBeenCalledTimes(1);
   });
 
+  it("can hide the right toggle button for full-page views like Kairos", () => {
+    renderChromeBar({ showRightToggle: false });
+
+    expect(screen.queryByRole("button", { name: "Open panel" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse session sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Search sessions" })).toBeInTheDocument();
+  });
+
   it("declares the chrome strip as a fixed overlay with pointer-events: none on the wrapper", () => {
     const { container } = renderChromeBar();
     const bar = container.querySelector(".window-chrome-bar") as HTMLElement | null;
