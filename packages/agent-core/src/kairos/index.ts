@@ -18,6 +18,7 @@ export {
   assembleSystemPrompt,
   buildHistorySummary,
   buildObservationSummary,
+  derivePhase,
   type AssembleSystemPromptInput,
   type BuildObservationSummaryInput,
   type BuildHistorySummaryInput,

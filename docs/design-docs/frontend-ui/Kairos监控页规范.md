@@ -13,7 +13,7 @@
 
 ```txt
 +--------------------------------------------------------------------------------+
-| Kairos · Sleeping · 5s                                  [暂停] [立即唤醒] [重置今日] |
+| Kairos · Sleeping · 5s                                  [暂停] [唤醒] [重置] |
 +--------------------------------------------------------------------------------+
 | 运行轨迹（近 60 分钟）                                                           |
 | [灰][灰][蓝][黄][灰][红] ...       legend: 回复 / 睡眠 / 异常 / 其他              |
@@ -32,12 +32,30 @@
 
 ## 顶部控制区
 
-- 左侧只显示 `Kairos` 和状态胶囊，例如 `Sleeping · 5s`、`Ticking`、`Paused`、`Cooldown · 42s`。
+- 左侧依次显示 `Kairos` 标题、状态胶囊（如 `Sleeping · 5s`、`Ticking`、`Paused`、`Cooldown · 42s`），以及用量胶囊（双维度可切换，例如 `[Coins] 12.4K tok · ¥0.0234 [本阶段]`）。
 - 顶部不再显示 `Workspace`、`Session`、`Last wake`、`Sleep today` 等元信息 chip。
-- 右侧按钮组从左到右固定顺序为 `开启 / 暂停`、`立即唤醒`、`上下文`、`重置今日`，遵循"先查看、后破坏"的从左到右心智。未启用时首按钮变为 `开启`。
+- 用量胶囊规范见 [用量胶囊](#用量胶囊)；它和状态胶囊并列在标题右侧，是 header 第一行允许出现的两个数据胶囊。
+- 右侧按钮组从左到右固定顺序为 `开启 / 暂停`、`唤醒`、`上下文`、`重置`，遵循"先查看、后破坏"的从左到右心智。未启用时首按钮变为 `开启`。
+- `暂停` 的显示依据是运行态里的 `enabled === true`，不是单看 `state !== "stopped"`；后端停机后如果回推 `enabled: false`，主按钮要立刻切回 `开启`。
 - `上下文` 按钮打开右侧滑入的 Sheet，展示当前 tick 会看到的系统提示词、会话历史与工具列表；详细规范见 `Kairos上下文Sheet规范.md`。
-- 标题、状态胶囊和按钮垂直居中对齐，减少 header 高度。
-- 点击 `重置今日` 后，页面应立即回到“刚进入 Kairos 且尚无事件”的空态：执行列表、运行轨迹和详情区清空，等待下一次 tick 重新长出内容。
+- 标题、状态胶囊、用量胶囊和按钮垂直居中对齐，减少 header 高度。
+- 点击 `重置` 后，页面立即回到“刚进入 Kairos 且尚无事件”的空态：执行列表、运行轨迹和详情区清空，用量胶囊的 `本阶段` 维度归零（`累计` 维度不动，仍显示全期账）。
+
+### 用量胶囊
+
+- 形态：状态胶囊右侧的弱化胶囊。从左到右依次是：**模式切换图标按钮**、`<总 token>`、分隔点、`<总成本>`、**模式 chip**。例如 `[Coins] 12.4K tok · ¥0.0234 [本阶段]` 或 `[∞] 124K tok · ¥0.2410 [累计]`。
+- 数据来源：**`KairosRuntimeState.usageLifetime` + `KairosRuntimeState.usageSinceReset`**——由 KairosController 的 `KairosUsageAccumulator` 维护**两份**累加器，每条 `llm_usage` 写入短期记忆 jsonl 时**同步**累加到两份维度并 debounce 写入 `<kairosRoot>/memory/usage-accumulator.json`（schemaVersion=2），再通过 IPC `kairos:state` 推送给 renderer。
+- **不再**在 renderer 端从 ring buffer 实时聚合：ring buffer 默认 200 条会滚动，会把"全期累计"切掉；新方案让胶囊数字成为 controller 的"运行账本"，跨进程重启不丢、不受 buffer 容量限制。
+- 双维度语义：
+  - **`累计`（lifetime）**：从 Kairos 第一次有 `llm_usage` 起的全期账。`重置今日` 按钮**不动它**；**只有手动删 `usage-accumulator.json`** 才归零（此时下次启动会扫描全部短期记忆 jsonl 段重建）。语义：持久化历史即真相。
+  - **`本阶段`（sinceReset）**：自上一次 `重置今日` 起累计，与 `todayTickCount` / `totalSleepSecondsToday` 同生命周期——`重置今日` 时清零。accumulator 文件被删时也会一并归零（reset 边界只能由 accumulator 文件维护）。
+- 切换交互：胶囊左侧 logo 是可点击按钮。`sinceReset` 模式用 `Coins` 图标，`lifetime` 模式用 `Infinity` 图标。点击切换两种模式；用户的选择持久化到 `localStorage["kairos.usageBadgeMode"]`，跨开关页保持。默认 `sinceReset`（更贴合日常关注的"本阶段"心智）。
+- 没有 `llm_usage` 事件时只显示 `0 tok`，省略成本部分，避免误展示 `¥0.0000` 让用户疑惑。
+- 货币符号按 `payload.cost.currency` 自适应：USD → `$`、CNY → `¥`、多次调用混合不同币种时退化为 `≈ $X.XX` 并在 tooltip 标注"混合币种"。
+- token 紧凑格式：`< 1000` 显示原始整数；`< 100K/M` 保留 1 位小数（`15.4K`、`1.2M`）；其它整数（`124K`、`15M`）。
+- 成本格式：紧凑模式下 `< 0.01` 用 4 位小数（`$0.0034`），否则 2 位；tooltip 详情统一 4 位小数。
+- hover tooltip：`【<当前模式>】LLM 调用 N 次 · Token 合计 X` / `输入 X（缓存命中 Y） · 输出 Z` / 推理 token / 累计成本（精确小数）。tooltip 底部追加一行"点击图标切换至「<另一模式>」：<对方维度的简要 token + 成本>"，让用户瞥一眼就能对比两个维度。
+- 与运行状态胶囊视觉差异化：用量胶囊不带左侧状态色 dot，背景色更弱；模式切换图标按钮的高亮态保持低饱和，避免抢走主信息（数字 + 成本）的视觉焦点。
 
 ## 运行轨迹
 
@@ -110,10 +128,13 @@
 ## 验收要点
 
 - header 中不出现 `Workspace`、`Session`、`Last wake`、`Sleep today`。
+- header 第一行除标题、状态胶囊、用量胶囊外，不允许再加其它数据胶囊；用量胶囊在 0 调用状态下显示 `0 tok`，有数据时显示 `<token> · <cost>`，货币符号随 `cost.currency` 切换。
 - 运行轨迹颜色只有蓝、黄、红、灰四类语义色。
 - 运行轨迹宽度由 `KairosEventRow.durationMs` 决定，使用 `20px + seconds * 5px` 且最大 100px；事件过多时出现水平滚动且不丢弃历史。
 - 主体不是三栏；页面为“左执行列表 + 右侧统计/详情”的两列结构。
 - 最终回复和工具结果不同时展示；通过同一个详情容器里的胶囊 tab 切换。
 - 最终回复在默认状态完整可见。
 - 执行列表图标无色，状态 badge 有色，`reply` / `tool` 行可点击。
+- 执行列表不新增 token/成本列——单条 LLM 调用的 token 对用户无判断价值，汇总走 header 用量胶囊。
 - Kairos 主页面不显示窗口 chrome 右上角的右侧面板折叠按钮，避免把全局对象预览面板交互带入 Kairos 监控页。
+- `暂停` 后如果后端已进入 `enabled=false, state="stopped"`，主按钮必须显示 `开启`，不能停留在“暂停”文案。

@@ -107,8 +107,8 @@ export function KairosRightPanelView() {
           <button
             type="button"
             className={compactButtonClass}
-            title="立即唤醒 Kairos"
-            aria-label="立即唤醒 Kairos"
+            title="唤醒 Kairos"
+            aria-label="唤醒 Kairos"
             disabled={!enabled || runState === "ticking"}
             onClick={() => k.control({ type: "wake_now" }).catch(() => {})}
           >
@@ -118,8 +118,8 @@ export function KairosRightPanelView() {
           <button
             type="button"
             className={compactButtonClass}
-            title="重置今日 Kairos 统计"
-            aria-label="重置今日 Kairos 统计"
+            title="重置 Kairos 统计"
+            aria-label="重置 Kairos 统计"
             onClick={() => k.control({ type: "reset_today" }).catch(() => {})}
           >
             <RotateCcw size={14} aria-hidden="true" />

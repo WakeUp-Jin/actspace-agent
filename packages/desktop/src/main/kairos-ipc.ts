@@ -15,6 +15,7 @@ import { readFile, rename, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
   KairosBridgeApi,
+  KairosContextSnapshot,
   KairosControl,
   KairosControlResponse,
   KairosGetEventsRecentRequest,
@@ -90,6 +91,12 @@ export function registerKairosIpc(opts: RegisterKairosIpcOptions): KairosIpcHand
       if (code === "ENOENT") return { content: "", fileName, notFound: true };
       throw err;
     }
+  });
+
+  register("kairos:get-context-snapshot", async (): Promise<KairosContextSnapshot> => {
+    // 直接透传 controller 的实现；错误（如 watchDiff IO 失败）让 invoke 路径自然 reject，
+    // 由 renderer Sheet 顶部 banner 提示用户重试。
+    return opts.controller.getContextSnapshot();
   });
 
   register("kairos:write-config", async (...args: unknown[]): Promise<KairosWriteConfigResponse> => {

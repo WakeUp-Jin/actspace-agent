@@ -4,6 +4,7 @@ import type {
   KairosSleepInterruptedPayload,
   KairosSleepStartPayload,
   KairosTickInjectedPayload,
+  LlmUsagePayload,
   SessionEvent,
   SessionError,
   ToolCallPayload,
@@ -145,6 +146,46 @@ export function makeSleepInterrupted(
     {
       reason: payload.reason ?? "user_message",
       remainingSeconds: payload.remainingSeconds ?? 30
+    },
+    overrides
+  );
+}
+
+/**
+ * 模拟 Kairos runner 在每次 LLM message_end 后落的 llm_usage 事件。
+ *
+ * 默认贴近一次 DeepSeek-Flash 普通调用：4K input / 1K output / 5K total / $0.012；
+ * payload.cost.currency 默认 `USD`，与 model-config.ts 中 DeepSeek pricing 保持一致。
+ * 单测里要构造混合币种 / 0 token 等边界，直接覆盖对应字段即可。
+ */
+export function makeLlmUsage(
+  payload: Partial<LlmUsagePayload> = {},
+  overrides?: EventOverrides
+): SessionEvent<LlmUsagePayload> {
+  const promptTokens = payload.promptTokens ?? 4000;
+  const completionTokens = payload.completionTokens ?? 1000;
+  const totalTokens = payload.totalTokens ?? promptTokens + completionTokens;
+  return nextEvent<LlmUsagePayload>(
+    "llm_usage",
+    {
+      callId: payload.callId ?? `call-${counter + 1}`,
+      provider: payload.provider ?? "deepseek",
+      model: payload.model ?? "deepseek-v4-flash",
+      modelId: payload.modelId ?? "deepseek-v4-flash",
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      reasoningTokens: payload.reasoningTokens,
+      cacheHitTokens: payload.cacheHitTokens,
+      cacheMissTokens: payload.cacheMissTokens,
+      cost: payload.cost ?? {
+        input: 0.01,
+        output: 0.002,
+        cacheRead: 0,
+        cacheWrite: 0,
+        total: 0.012,
+        currency: "USD"
+      }
     },
     overrides
   );

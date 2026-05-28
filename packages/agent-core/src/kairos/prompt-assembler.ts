@@ -169,7 +169,11 @@ function truncateByCharBudget(text: string, maxChars: number): string {
   return `${text.slice(0, Math.max(0, maxChars - 24))}\n…[truncated for prompt budget]`;
 }
 
-function derivePhase(now: Date, config: KairosConfig): string {
+/**
+ * 由 prompt-assembler 用来给 system [2] 段填 `{current_phase}`，
+ * controller.getContextSnapshot 也复用本函数派生 KairosContextPhase。
+ */
+export function derivePhase(now: Date, config: KairosConfig): "work" | "quiet" | "weekend" | "off" {
   const day = now.getDay();
   if (day === 0 || day === 6) return "weekend";
   const minutes = now.getHours() * 60 + now.getMinutes();

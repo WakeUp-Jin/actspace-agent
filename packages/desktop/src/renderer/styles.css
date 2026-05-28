@@ -154,7 +154,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-button {
+.window-chrome-bar button,
+.sidebar button,
+.conversation-shell button,
+.right-panel button,
+.context-popover button {
   border: 0;
   background: none;
   color: inherit;
@@ -162,7 +166,11 @@ button {
   font: inherit;
 }
 
-button:focus-visible {
+.window-chrome-bar button:focus-visible,
+.sidebar button:focus-visible,
+.conversation-shell button:focus-visible,
+.right-panel button:focus-visible,
+.context-popover button:focus-visible {
   outline: 3px solid rgba(47, 111, 255, 0.22);
   outline-offset: 2px;
 }

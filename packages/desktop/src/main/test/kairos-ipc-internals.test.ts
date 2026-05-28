@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { KairosRuntimeState, SessionEvent } from "@actspace/shared";
+import { emptyKairosUsageSummary } from "@actspace/shared";
 import {
   CONFIG_FILE_MAP,
   KairosEventBatcher,
@@ -176,6 +177,8 @@ function makeState(over: Partial<KairosRuntimeState> = {}): KairosRuntimeState {
     todayTickCount: 1,
     toolCallCountInCurrentTick: 0,
     totalSleepSecondsToday: 0,
+    usageLifetime: emptyKairosUsageSummary(),
+    usageSinceReset: emptyKairosUsageSummary(),
     ...over,
   };
 }

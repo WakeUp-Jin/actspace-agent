@@ -37,6 +37,7 @@ Kairos 不是另一个 Agent，而是和现有 Agent 共享 LLM / 工具 / 长�
 - 桌面端约束：通过 Electron IPC stream 暴露事件，不走 HTTP / WebSocket。
 - 本地落盘：复用 actspace 现有 `SessionEvent` 格式，**`memory/short-term/<YYYY-MM>/<YYYY-MM-DD>.jsonl` 是 Kairos 唯一持久化层**，覆盖运行记录、行动日志、事件流三种语义。
 - 数据流稳健：运行时"先写盘成功，再 IPC 推送给前端"；刷新页面先从内存 ring buffer（最近 200 条 SessionEvent）回填，不够再读 jsonl。
+- 控制动作需要回传最终权威态：`start / stop / reset_today` 这类命令在内部副作用完成后，controller 还要再 emit 一次完整 `KairosRuntimeState`，保证 renderer 看到的是最终 `enabled / state / counters` 组合，而不是中间态。
 
 ## 非目标（v1 明确不做）
 
@@ -294,6 +295,12 @@ export type KairosControl =
   | { type: "reset_today" };
 ```
 
+补充语义约束：
+
+- `state` 描述调度器当前生命周期，例如 `sleeping`、`ticking`、`stopped`。
+- `enabled` 描述用户意图上的 Kairos 开关，决定 Kairos 页主按钮显示“开启”还是“暂停”。
+- 当 `stop()` 过程中 scheduler 先推送 `state: "stopped"` 时，controller 仍需在 `enabled = false` 落定后再补发一次 state，避免 renderer 停留在 `{ enabled: true, state: "stopped" }` 这样的中间组合。
+
 ### IPC channels
 
 | Channel | 方向 | Payload |
@@ -368,6 +375,18 @@ v1 当前只从 main 进程内存 ring buffer 返回最近事件，`hasMore=fals
 主 Agent 既有的 `runAgentLoop` → `engine/bridge.ts` 把工具事件写入主 Agent session.jsonl 的逻辑**不需要改**。Kairos 走的是同一个 `runAgentLoop`，但事件 adapter 不同：Kairos 在 runner 内把同样的 AgentEvent 转换成 SessionEvent 后写入 Kairos 的 short-term jsonl，而不是主 Agent 的 session.jsonl。
 
 > 当前实现方式：`KairosRunner.processTick` 直接调用 `runAgentLoop(context, llm, loopConfig, onEvent)`。这里的 `onEvent` 是 Kairos 专属 adapter：把 `tool_start` / `tool_end` / `message_end` 这类 `AgentEvent` 转为 Kairos short-term 使用的 `SessionEvent`，再交给 controller 的 `eventSink` 做"写盘 → ring buffer → IPC 推送"。
+>
+> `message_end (assistant)` 除了产出 `assistant_message` 外，还会按需要追加一条 `llm_usage` SessionEvent（payload = `LlmUsagePayload`），用于 KairosHeader 用量胶囊和未来日历视图聚合 token/成本。该事件**只用于持久化与展示**：`toLlmMessages` 不翻译 `llm_usage`，因此不会被回灌到 LLM messages 段、不影响下一轮 prompt。
+>
+> 价格按调用时 `packages/shared/src/model-config.ts` 的 pricing 快照计算并写盘；后续即使价格调整或模型下架，历史成本展示也保持稳定。模型未在注册表中匹配时 `cost.total` 为 0，但仍写一条 usage 事件保留 token 事实。
+>
+> **累加器（KairosUsageAccumulator，双维度）**：controller 维护**两份**内存 `KairosUsageSummary` —— `lifetime`（全期账，对应 `KairosRuntimeState.usageLifetime`）和 `sinceReset`（阶段账，对应 `usageSinceReset`）。每条 `llm_usage` 进 `eventSink` 后两份同步累加，debounce 写到 `<kairosRoot>/memory/usage-accumulator.json`（schemaVersion=2）。
+>
+> 设计原因：用户既要"全期总账"（看长期成本走势），又要"阶段账"（看本轮自治的开销）。两个维度的清零边界完全不同：
+> - `lifetime`：**只有手动删 accumulator 文件**才会归零；`重置今日` 不动它。文件缺失/损坏时启动会扫描**全部短期记忆 jsonl 段**重建——"持久化历史即真相"。
+> - `sinceReset`：`重置今日` 时清零，与 `todayTickCount` / `totalSleepSecondsToday` 同生命周期。文件被删时也会归零（reset 边界只能由 accumulator 文件维护）。
+>
+> v1 旧 schema（单维度 `summary` 字段）会被自动迁移到 v2：旧 summary 同时拷贝到 `lifetime` 和 `sinceReset`，作为升级锚点。
 
 ### 主 Agent vs Kairos 执行链路
 
@@ -640,6 +659,7 @@ KairosRunner 每次 tick 由 `prompt-assembler.ts` 组装上下文。**LLM 看�
 - `workspace/` 是 Kairos 的默认读写根。`kairos-bootstrap.ts` 创建 ToolManager 时把 `workspaceRoot` 指向这里，默认 `config/paths.json` 也只把这里放进 `allowedRoots` 并开启 watch。用户要让 Kairos 接触其它项目目录，必须显式编辑 `paths.json`，并配套确认工具执行层是否支持该路径。
 - `workspace/notes/` 由 bootstrap/controller 预创建，供 Kairos 用共享文件工具写札记；当前 Kairos 文件工具的相对路径默认落到 `workspace/`，因此 prompt/rule 里的笔记路径应写成 `notes/<YYYY-MM>/<title>.md` 这类 workspace 内相对路径。
 - `reset_today` 控制命令对当天 jsonl 走 `rotate_daily` 创建新 segment（不删除旧段，便于后续压缩），同时清空 ring buffer 和当日运行计数；后续 tick 的短期记忆加载只会读“当天最新 segment”，因此从 LLM 视角等价于“今天重新开始”。`workspace/notes/` 和 `observe/watch-manifest/` 不动，避免误删用户/Kairos 已沉淀的内容。
+- renderer 收到 `reset_today` 成功返回后，应立刻把本地执行列表、轨迹和详情区清空，回到“今日初始空态”；下一次 tick 再从新 segment 重新长出内容。
 - 任意时刻"Kairos 在做什么"都可以通过 `short-term/<YYYY-MM>/<today>.jsonl` 还原——这是 v1 的唯一可观测数据源，任何排查都从这里看起。
 
 ## Config 详设
@@ -1089,7 +1109,8 @@ Kairos 页面产品 UI 的详细规范以 `docs/design-docs/frontend-ui/Kairos�
 
 当前页面采用“顶部控制 + 紧凑运行轨迹 + 左执行列表 + 右统计/详情”的两列监控布局：
 
-- 顶部只展示 `Kairos`、当前状态胶囊和 `暂停` / `立即唤醒` / `重置今日` 操作，不展示 Workspace、Session、Last wake、Sleep today 等 metadata chip。
+- 顶部只展示 `Kairos`、当前状态胶囊、用量胶囊（紧凑 `12.4K tok · ¥0.0234`，左侧 logo 可切换 lifetime/sinceReset 维度，右侧 `本阶段` / `累计` mode chip，hover 展开明细）和 `暂停` / `立即唤醒` / `上下文` / `重置今日` 操作，不展示 Workspace、Session、Last wake、Sleep today 等 metadata chip。
+- 用量胶囊直接读取 `state.usageLifetime` + `state.usageSinceReset`（controller 用 `KairosUsageAccumulator` 维护两份维度、IPC 推送过来），**不再**在 renderer 端从 ring buffer 实时聚合；这样跨进程重启、ring buffer 滚动都不影响"账目"的事实。`重置今日` 按钮只清 `sinceReset` 维度，**保留** `lifetime`——产品语义：累计账是持久化历史的真相，按钮不应破坏。用户当前选的 mode 持久化到 `localStorage["kairos.usageBadgeMode"]`，跨开关页保持。
 - 运行轨迹只使用 4 类颜色语义：蓝色=回复，黄色=睡眠，红色=异常，灰色=其他事件。
 - 左侧执行列表渲染 `KairosEventRow[]`，列为时间、类型、状态、摘要、耗时；类型图标无色，状态 badge 可带语义色。
 - 右侧上方是紧凑统计区，只展示名称和值，不放图标。

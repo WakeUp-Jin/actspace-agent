@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { MockLLMService, mockText, mockToolCall } from "../../llm/services/mock";
+import { createEmptyUsage } from "../../messages";
+import type { AssistantMessage } from "../../messages";
+import type { LlmUsagePayload } from "@actspace/shared";
 import { ToolManager, type KairosGuardContext } from "../../tools/manager";
 import { KairosRunner } from "../runner";
 import {
@@ -187,6 +190,87 @@ describe("KairosRunner.processTick", () => {
     });
     const r = await runner.processTick({ type: "tick", payload: tickPayload() });
     expect(r.sleepSecondsRequested).toBeNull();
+  });
+
+  it("emits a persisted llm_usage SessionEvent per assistant message_end with non-zero usage", async () => {
+    // 用一条手写带 usage 的 AssistantMessage（mockText 默认 usage 为 0，不会产 llm_usage）。
+    const replyWithUsage: AssistantMessage = {
+      role: "assistant",
+      content: [{ type: "text", text: "done" }],
+      model: "deepseek-v4-flash",
+      provider: "deepseek",
+      usage: {
+        ...createEmptyUsage(),
+        input: 3_200,
+        output: 800,
+        totalTokens: 4_000,
+        cacheHit: 1_200,
+        cacheMiss: 2_000,
+      },
+      stopReason: "stop",
+      timestamp: Date.now(),
+      source: "llm",
+    };
+
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "deepseek-v4-flash" });
+    llm.setResponses([replyWithUsage]);
+
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp/work" });
+    registerKairosTools(toolManager);
+
+    const events: SessionEvent[] = [];
+    const runner = new KairosRunner({
+      config: baseConfig(),
+      shortTerm: fakeShortTerm(),
+      observeRefresh: async () => ({ watchDiffs: [] as WatchDiffEntry[], sessionsDigest: emptyDigest }),
+      activeBriefsCount: async () => 0,
+      eventSink: async (e) => {
+        events.push(e);
+      },
+      llm,
+      toolManager,
+      kairosGuard: baseGuard,
+    });
+
+    await runner.processTick({ type: "tick", payload: tickPayload() });
+
+    const usageEvents = events.filter((e) => e.type === "llm_usage");
+    expect(usageEvents).toHaveLength(1);
+    const payload = usageEvents[0].payload as LlmUsagePayload;
+    expect(payload.promptTokens).toBe(3_200);
+    expect(payload.completionTokens).toBe(800);
+    expect(payload.totalTokens).toBe(4_000);
+    expect(payload.cacheHitTokens).toBe(1_200);
+    expect(payload.cacheMissTokens).toBe(2_000);
+    expect(payload.modelId).toBe("deepseek-v4-flash");
+    expect(payload.cost.total).toBeGreaterThan(0);
+    // cost.currency 由 model-config pricing 决定；当前 DeepSeek pricing 写的是 USD。
+    expect(["USD", "CNY"]).toContain(payload.cost.currency);
+  });
+
+  it("does not emit llm_usage when AssistantMessage carries zero usage (mock default)", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "mock-model" });
+    llm.setResponses([mockText("hi")]);
+
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp/work" });
+    registerKairosTools(toolManager);
+
+    const events: SessionEvent[] = [];
+    const runner = new KairosRunner({
+      config: baseConfig(),
+      shortTerm: fakeShortTerm(),
+      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
+      activeBriefsCount: async () => 0,
+      eventSink: async (e) => {
+        events.push(e);
+      },
+      llm,
+      toolManager,
+      kairosGuard: baseGuard,
+    });
+
+    await runner.processTick({ type: "tick", payload: tickPayload() });
+    expect(events.some((e) => e.type === "llm_usage")).toBe(false);
   });
 
   it("calls briefsIndex.markRun for brief-triggered ticks", async () => {

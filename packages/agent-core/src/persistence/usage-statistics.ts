@@ -3,6 +3,7 @@ import type {
   SessionEvent,
   ToolCallPayload,
   ToolExecutionResult,
+  UsageStatisticsDailyModelBreakdown,
   UsageStatisticsDailyRow,
   UsageStatisticsModelEntry,
   UsageStatisticsRange,
@@ -27,7 +28,13 @@ type ToolAccumulator = {
   durationCount: number;
 };
 
-type DailyAccumulator = UsageStatisticsDailyRow;
+/**
+ * 内部累加器结构：与 `UsageStatisticsDailyRow` 的差异在于 `modelTokens` 是 Map（按 model name 累加），
+ * 最后阶段才会被 reduce 成有序的 `UsageStatisticsDailyModelBreakdown[]` 写到 snapshot 里。
+ */
+type DailyAccumulator = Omit<UsageStatisticsDailyRow, "modelBreakdown"> & {
+  modelTokens: Map<string, number>;
+};
 
 function emptyDailyRow(date: string): DailyAccumulator {
   return {
@@ -40,7 +47,33 @@ function emptyDailyRow(date: string): DailyAccumulator {
     conversationCount: 0,
     toolCallCount: 0,
     costUsd: 0,
+    modelTokens: new Map<string, number>(),
   };
+}
+
+/**
+ * 把当日按 model 累加的 token Map 折叠成稳定排序的 `modelBreakdown` 列表。
+ *
+ * - 排序：`totalTokens` 降序；并列时按 model name 升序，保证渲染顺序确定（测试稳定）；
+ * - `percent`：在该日 totalTokens 内的占比，保留 1 位小数；
+ * - `dailyTotal === 0` 的"空日"返回 `[]`，让 UI 直接走"无明细"分支。
+ */
+function buildDailyModelBreakdown(
+  modelTokens: Map<string, number>,
+  dailyTotal: number,
+): UsageStatisticsDailyModelBreakdown[] {
+  if (dailyTotal <= 0 || modelTokens.size === 0) return [];
+  const entries = [...modelTokens.entries()]
+    .map(([name, totalTokens]) => ({
+      name,
+      totalTokens,
+      percent: round((totalTokens / dailyTotal) * 100),
+    }))
+    .sort((a, b) => {
+      if (b.totalTokens !== a.totalTokens) return b.totalTokens - a.totalTokens;
+      return a.name.localeCompare(b.name);
+    });
+  return entries;
 }
 
 function getEventDate(event: SessionEvent): string {
@@ -133,14 +166,22 @@ function buildToolEntries(tools: Map<string, ToolAccumulator>, totalToolCalls: n
     }));
 }
 
-export function createUsageStatisticsSnapshot(
-  record: SessionRecord,
-  range: UsageStatisticsRange = "month",
-  now = new Date(),
-): UsageStatisticsSnapshot {
+/**
+ * 内部聚合核心：把任意来源的 SessionEvent 序列汇总成 snapshot 的"summary / 模型分布 / 工具分布 / 日明细"。
+ *
+ * 调用方负责把 meta 字段（sessionId/title/scope 等）补齐。这一层只关心"事件 -> 指标"。
+ *
+ * Kairos 的事件序列也可以通过这里聚合——它们的 `type` 与 `payload` 形态与对话 session 同构
+ * （都是 `@actspace/shared` 的 `SessionEvent`），唯一差别是产生源不同。
+ */
+function aggregateEvents(
+  events: SessionEvent[],
+  range: UsageStatisticsRange,
+  now: Date,
+): Pick<UsageStatisticsSnapshot, "summary" | "modelDistribution" | "toolDistribution" | "dailyRows" | "periodStart" | "periodEnd"> {
   const periodStart = getPeriodStart(range, now);
   const periodEnd = now;
-  const events = record.events.filter((event) => isWithinRange(event, periodStart, periodEnd));
+  const filtered = events.filter((event) => isWithinRange(event, periodStart, periodEnd));
   const models = new Map<string, ModelAccumulator>();
   const tools = new Map<string, ToolAccumulator>();
   const dailyRows = new Map<string, DailyAccumulator>();
@@ -159,7 +200,7 @@ export function createUsageStatisticsSnapshot(
     cacheEfficiencyPercent: 0,
   };
 
-  for (const event of events) {
+  for (const event of filtered) {
     const date = getEventDate(event);
     const daily = getOrCreateDailyRow(dailyRows, date);
 
@@ -186,6 +227,12 @@ export function createUsageStatisticsSnapshot(
       daily.cacheHitTokens += usage.cacheHitTokens ?? 0;
       daily.reasoningTokens += usage.reasoningTokens ?? 0;
       daily.costUsd += costUsd;
+      // 按"展示名"而不是 modelId 累加，让 UI tooltip 上看到的是 `gpt-5.5` 而不是 internal id；
+      // 不同 modelId 但同 model 名的情况会被合并，这与主区 modelDistribution 行为一致。
+      daily.modelTokens.set(
+        usage.model,
+        (daily.modelTokens.get(usage.model) ?? 0) + usage.totalTokens,
+      );
 
       const modelKey = usage.modelId ?? usage.model;
       const model = models.get(modelKey) ?? {
@@ -240,18 +287,74 @@ export function createUsageStatisticsSnapshot(
   summary.costUsd = round(summary.costUsd, 4);
 
   return {
+    summary,
+    modelDistribution: buildModelEntries(models, summary.totalTokens),
+    toolDistribution: buildToolEntries(tools, summary.toolCallCount),
+    dailyRows: [...dailyRows.values()]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((row): UsageStatisticsDailyRow => {
+        const { modelTokens, ...rest } = row;
+        return {
+          ...rest,
+          costUsd: round(rest.costUsd, 4),
+          modelBreakdown: buildDailyModelBreakdown(modelTokens, rest.totalTokens),
+        };
+      }),
+    periodStart: periodStart?.toISOString(),
+    periodEnd: periodEnd.toISOString(),
+  };
+}
+
+/**
+ * 单 session 聚合（向后兼容入口）。等价于 `createGlobalUsageStatisticsSnapshot({ records:[record], ... })`，
+ * 但保留 sessionId/title 字段以便老调用方继续读到原 session 维度的元数据。
+ */
+export function createUsageStatisticsSnapshot(
+  record: SessionRecord,
+  range: UsageStatisticsRange = "month",
+  now = new Date(),
+): UsageStatisticsSnapshot {
+  const aggregated = aggregateEvents(record.events, range, now);
+  return {
+    scope: "session",
     sessionId: record.meta.id,
     title: record.meta.title,
     range,
     generatedAt: now.toISOString(),
-    periodStart: periodStart?.toISOString(),
-    periodEnd: periodEnd.toISOString(),
-    summary,
-    modelDistribution: buildModelEntries(models, summary.totalTokens),
-    toolDistribution: buildToolEntries(tools, summary.toolCallCount),
-    dailyRows: [...dailyRows.values()].sort((a, b) => b.date.localeCompare(a.date)).map((row) => ({
-      ...row,
-      costUsd: round(row.costUsd, 4),
-    })),
+    sourceCount: 1,
+    ...aggregated,
+  };
+}
+
+/**
+ * 全局聚合：跨所有普通对话 session 和（可选的）Kairos 自主模式事件，合并成一份"账单全貌"。
+ *
+ * - 输入侧合并采用"事件级合流"而非"snapshot 合流"，避免百分比和缓存效率等派生指标重复舍入；
+ * - `now` 注入便于测试固定时间窗；
+ * - `title` 默认 "全部数据"，可由调用方覆写（例如想区分"全部对话 + Kairos" vs "仅 Kairos"）。
+ */
+export function createGlobalUsageStatisticsSnapshot(opts: {
+  sessionRecords: SessionRecord[];
+  /** Kairos 短期记忆中的全部事件，已经摊平成 SessionEvent[]。空数组等同于"仅普通对话"。 */
+  kairosEvents?: SessionEvent[];
+  range?: UsageStatisticsRange;
+  now?: Date;
+  title?: string;
+}): UsageStatisticsSnapshot {
+  const range = opts.range ?? "total";
+  const now = opts.now ?? new Date();
+  const sessionEvents = opts.sessionRecords.flatMap((record) => record.events);
+  const kairosEvents = opts.kairosEvents ?? [];
+  const merged = [...sessionEvents, ...kairosEvents];
+  const aggregated = aggregateEvents(merged, range, now);
+  const sourceCount = opts.sessionRecords.length + (kairosEvents.length > 0 ? 1 : 0);
+  return {
+    scope: "global",
+    sessionId: null,
+    title: opts.title ?? "全部数据",
+    range,
+    generatedAt: now.toISOString(),
+    sourceCount,
+    ...aggregated,
   };
 }

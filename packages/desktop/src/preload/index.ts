@@ -7,6 +7,7 @@ import type {
   ApprovalListPendingInput,
   BootstrapState,
   KairosBridgeApi,
+  KairosContextSnapshot,
   KairosControl,
   KairosControlResponse,
   KairosGetEventsRecentRequest,
@@ -66,6 +67,8 @@ const kairosBridge: KairosBridgeApi = {
     ipcRenderer.invoke("kairos:read-config", req) as Promise<KairosReadConfigResponse>,
   writeConfig: (req: KairosWriteConfigRequest) =>
     ipcRenderer.invoke("kairos:write-config", req) as Promise<KairosWriteConfigResponse>,
+  getContextSnapshot: () =>
+    ipcRenderer.invoke("kairos:get-context-snapshot") as Promise<KairosContextSnapshot>,
   onEvent: (listener: (event: SessionEvent) => void) => {
     const handler = (_: unknown, event: SessionEvent) => listener(event);
     ipcRenderer.on("kairos:event", handler);

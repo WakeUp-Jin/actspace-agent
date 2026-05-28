@@ -208,6 +208,7 @@ export const KAIROS_IPC_CHANNELS = {
   control: "kairos:control",
   readConfig: "kairos:read-config",
   writeConfig: "kairos:write-config",
+  getContextSnapshot: "kairos:get-context-snapshot",
   event: "kairos:event",
   state: "kairos:state",
 } as const;

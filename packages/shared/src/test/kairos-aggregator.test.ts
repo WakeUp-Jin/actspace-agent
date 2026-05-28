@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { aggregateKairosEvents } from "../kairos-aggregator";
+import { aggregateKairosEvents, aggregateKairosUsage } from "../kairos-aggregator";
 import type { KairosRowKind } from "../kairos-contracts";
 import {
   makeAssistantReply,
   makeError,
+  makeLlmUsage,
   makeSleepEnd,
   makeSleepInterrupted,
   makeSleepStart,
@@ -149,5 +150,78 @@ describe("aggregateKairosEvents", () => {
     const reply = makeAssistantReply({ content: "out of order" });
     const rows = aggregateKairosEvents([reply, tick]);
     expect(rows[0].kind).toBe("tick");
+  });
+});
+
+describe("aggregateKairosUsage", () => {
+  it("returns empty summary on no llm_usage events", () => {
+    resetFixtureCounter();
+    const summary = aggregateKairosUsage([makeTickInjected(), makeAssistantReply()]);
+    expect(summary.callCount).toBe(0);
+    expect(summary.totalTokens).toBe(0);
+    expect(summary.cost).toBe(0);
+    expect(summary.currency).toBe("USD"); // 默认 currency，不应炸
+  });
+
+  it("sums tokens and cost across multiple llm_usage events", () => {
+    resetFixtureCounter();
+    const events = [
+      makeLlmUsage({
+        promptTokens: 4000,
+        completionTokens: 1000,
+        totalTokens: 5000,
+        cacheHitTokens: 1500,
+        cacheMissTokens: 2500,
+        cost: { input: 0.01, output: 0.002, cacheRead: 0.0001, cacheWrite: 0, total: 0.0121, currency: "USD" }
+      }),
+      makeLlmUsage({
+        promptTokens: 2000,
+        completionTokens: 500,
+        totalTokens: 2500,
+        cacheHitTokens: 0,
+        cacheMissTokens: 2000,
+        cost: { input: 0.005, output: 0.001, cacheRead: 0, cacheWrite: 0, total: 0.006, currency: "USD" }
+      })
+    ];
+    const summary = aggregateKairosUsage(events);
+    expect(summary.callCount).toBe(2);
+    expect(summary.promptTokens).toBe(6000);
+    expect(summary.completionTokens).toBe(1500);
+    expect(summary.totalTokens).toBe(7500);
+    expect(summary.cacheHitTokens).toBe(1500);
+    expect(summary.cacheMissTokens).toBe(4500);
+    expect(summary.cost).toBeCloseTo(0.0181, 4);
+    expect(summary.currency).toBe("USD");
+  });
+
+  it("falls back to prompt+completion when totalTokens is 0", () => {
+    resetFixtureCounter();
+    const events = [
+      makeLlmUsage({ promptTokens: 1000, completionTokens: 200, totalTokens: 0 })
+    ];
+    expect(aggregateKairosUsage(events).totalTokens).toBe(1200);
+  });
+
+  it("flags currency as MIXED when usage events carry different currencies", () => {
+    resetFixtureCounter();
+    const events = [
+      makeLlmUsage({
+        cost: { input: 0.01, output: 0.002, cacheRead: 0, cacheWrite: 0, total: 0.012, currency: "USD" }
+      }),
+      makeLlmUsage({
+        provider: "deepseek",
+        cost: { input: 0.05, output: 0.01, cacheRead: 0, cacheWrite: 0, total: 0.06, currency: "CNY" }
+      })
+    ];
+    const summary = aggregateKairosUsage(events);
+    expect(summary.callCount).toBe(2);
+    expect(summary.currency).toBe("MIXED");
+    expect(summary.cost).toBeCloseTo(0.072, 4);
+  });
+
+  it("ignores non-llm_usage events", () => {
+    resetFixtureCounter();
+    const summary = aggregateKairosUsage(sampleSingleTickWithToolAndReply());
+    expect(summary.callCount).toBe(0);
   });
 });

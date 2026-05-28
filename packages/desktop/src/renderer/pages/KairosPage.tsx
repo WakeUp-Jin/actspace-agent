@@ -15,13 +15,16 @@
  *     否则 fixed chrome bar 会覆盖 KairosHeader 上的按钮。
  *   - 配置、Briefs、笔记 UI 暂不恢复；用户仍可通过本地文件编辑 Kairos 配置。
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Bolt,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Coins,
+  FileText,
+  Infinity as InfinityIcon,
   MessageSquare,
   Moon,
   Pause,
@@ -30,8 +33,10 @@ import {
 } from "lucide-react";
 import type { KairosEventRow, KairosRuntimeState } from "@actspace/shared";
 import { useKairos } from "../state/useKairos";
+import { KairosContextSheet } from "../components/kairos/KairosContextSheet";
 import {
   buildKairosStats,
+  buildKairosUsageBadge,
   findKairosReplyText,
   findKairosToolDetail,
   formatKairosDuration,
@@ -42,7 +47,40 @@ import {
   getLatestKairosReply,
   kairosKindLabel,
   type KairosToolDetail,
+  type KairosUsageBadgeMode,
+  type KairosUsageBadgeModel,
 } from "../state/kairosSelectors";
+
+const USAGE_MODE_STORAGE_KEY = "kairos.usageBadgeMode";
+
+/**
+ * 把"用量胶囊当前显示的是 lifetime 还是 sinceReset"持久化到 localStorage，
+ * 让用户跨开关页保持上次选择。
+ *
+ * - 第一次访问没有存储 → 默认 `sinceReset`（更接近"今日"心智，跟其它 today* 字段一致）。
+ * - localStorage 不可用时退化为只在内存里维护，不抛错。
+ */
+function useKairosUsageMode(): [KairosUsageBadgeMode, (mode: KairosUsageBadgeMode) => void] {
+  const [mode, setModeInternal] = useState<KairosUsageBadgeMode>(() => {
+    if (typeof window === "undefined") return "sinceReset";
+    try {
+      const stored = window.localStorage.getItem(USAGE_MODE_STORAGE_KEY);
+      return stored === "lifetime" ? "lifetime" : "sinceReset";
+    } catch {
+      return "sinceReset";
+    }
+  });
+  const setMode = useCallback((next: KairosUsageBadgeMode) => {
+    setModeInternal(next);
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(USAGE_MODE_STORAGE_KEY, next);
+    } catch {
+      // localStorage 不可用（隐私模式 / quota 满）：仅内存维护，不报错。
+    }
+  }, []);
+  return [mode, setMode];
+}
 
 type DetailTab = "reply" | "tool";
 const EXECUTION_PAGE_SIZE = 10;
@@ -65,9 +103,18 @@ const headerClass =
   "flex items-center justify-between gap-4 border-b border-[#e6e8ef] bg-surface px-7 py-4 max-[760px]:items-start max-[760px]:flex-col max-[760px]:px-4";
 const headerStatusClass =
   "inline-flex h-7 items-center gap-[7px] rounded-full border border-[#dfe8f3] bg-[#f8fbff] px-[11px] text-[13px] tabular-nums";
+const headerUsageBadgeClass =
+  "inline-flex h-7 items-center gap-[7px] rounded-full border border-[#e6e8ef] bg-[#fafbfe] pl-[6px] pr-[11px] text-[13px] tabular-nums text-[#4b5161]";
+const headerUsageBadgeToggleClass =
+  "inline-flex h-[22px] w-[22px] items-center justify-center rounded-full border border-transparent text-[#9aa3b2] transition hover:border-[#d4d7e0] hover:bg-[#eef1f6] hover:text-[#4b5161] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a7b3c4] focus-visible:ring-offset-1 focus-visible:ring-offset-[#fafbfe]";
+const headerUsageBadgeSeparatorClass = "text-[#c5cad6]";
+const headerUsageBadgeCostClass = "text-[#1a1d24] font-medium";
+const headerUsageBadgeModeChipClass =
+  "ml-[2px] inline-flex items-center rounded-full bg-[#eef1f6] px-[6px] py-[1px] text-[10.5px] tracking-wide text-[#6c7281]";
 const kairosButtonClass =
-  "inline-flex h-[38px] items-center justify-center gap-[7px] rounded-act-md border border-[#d4d7e0] bg-surface px-[18px] text-sm text-[#2c303a] transition hover:border-[#b5bac6] hover:bg-[#f5f7fb] disabled:cursor-not-allowed disabled:opacity-55";
-const kairosPrimaryButtonClass = "border-brand bg-brand text-white hover:border-brand-strong hover:bg-brand-strong";
+  "inline-flex h-[38px] items-center justify-center gap-[7px] rounded-act-md border border-[#d4d7e0] bg-surface px-[18px] text-sm font-medium text-[#2c303a] transition hover:border-[#b5bac6] hover:bg-[#f5f7fb] disabled:cursor-not-allowed disabled:opacity-55";
+const kairosPrimaryButtonClass =
+  "border-[#bdd0f8] bg-[#edf4ff] text-[#1a1d24] hover:border-[#a9c0f3] hover:bg-[#e3eeff]";
 const traceClass =
   "shrink-0 border-b border-[#e6e8ef] bg-surface px-7 pb-3.5 pt-4 max-[760px]:px-4";
 const traceHeadClass =
@@ -117,7 +164,22 @@ export function KairosPage() {
   const k = useKairos();
   const [detailTab, setDetailTab] = useState<DetailTab>("reply");
   const [page, setPage] = useState(1);
+  const [contextOpen, setContextOpen] = useState(false);
 
+  // 用量胶囊：lifetime（全期账）+ sinceReset（阶段账）双维度。
+  // 用户的选择持久化到 localStorage；缺省值为 sinceReset（更贴合日常关注的"今日"心智）。
+  const [usageMode, setUsageMode] = useKairosUsageMode();
+  const usageBadge = useMemo(
+    () =>
+      buildKairosUsageBadge(
+        k.state ? { lifetime: k.state.usageLifetime, sinceReset: k.state.usageSinceReset } : null,
+        usageMode,
+      ),
+    [k.state?.usageLifetime, k.state?.usageSinceReset, usageMode],
+  );
+  const toggleUsageMode = useCallback(() => {
+    setUsageMode(usageMode === "lifetime" ? "sinceReset" : "lifetime");
+  }, [usageMode, setUsageMode]);
   const displayRows = useMemo(() => getKairosDisplayRows(k.rows), [k.rows]);
   const totalPages = Math.max(1, Math.ceil(displayRows.length / EXECUTION_PAGE_SIZE));
   const pagedRows = useMemo(() => {
@@ -170,10 +232,15 @@ export function KairosPage() {
     <div className={pageRootClass} role="region" aria-label="Kairos 自治模式">
       <KairosHeader
         state={k.state}
+        usage={usageBadge}
+        onToggleUsageMode={toggleUsageMode}
+        bridgeAvailable={k.bridgeAvailable}
+        contextOpen={contextOpen}
         onStart={() => k.control({ type: "start" }).catch(() => {})}
         onStop={() => k.control({ type: "stop" }).catch(() => {})}
         onWakeNow={() => k.control({ type: "wake_now" }).catch(() => {})}
         onResetToday={() => k.control({ type: "reset_today" }).catch(() => {})}
+        onOpenContext={() => setContextOpen(true)}
       />
 
       <KairosRuntimeTrace
@@ -208,6 +275,12 @@ export function KairosPage() {
           {k.error}
         </div>
       ) : null}
+
+      <KairosContextSheet
+        open={contextOpen}
+        onOpenChange={setContextOpen}
+        load={k.getContextSnapshot}
+      />
     </div>
   );
 }
@@ -298,14 +371,23 @@ function KairosRuntimeTrace(props: KairosRuntimeTraceProps) {
 
 interface KairosHeaderProps {
   state: ReturnType<typeof useKairos>["state"];
+  /** 当前用量胶囊的展示模型（已选定 mode、附带 tooltip 等），由 KairosPage 派生后传入。 */
+  usage: KairosUsageBadgeModel;
+  /** 用户点击胶囊左侧 logo 切换 lifetime ↔ sinceReset。 */
+  onToggleUsageMode(): void;
+  /** 桥未就绪时禁用"上下文"按钮（依赖 IPC）。 */
+  bridgeAvailable: boolean;
+  /** Sheet 当前是否打开；用于 `aria-expanded` 绑定。 */
+  contextOpen: boolean;
   onStart(): void;
   onStop(): void;
   onWakeNow(): void;
   onResetToday(): void;
+  onOpenContext(): void;
 }
 
 function KairosHeader(props: KairosHeaderProps) {
-  const { state } = props;
+  const { state, usage } = props;
   const enabled = state?.enabled === true;
   const runState = state?.state ?? "stopped";
   const sleepRemaining = useSleepCountdown(state?.sleepEndsAt);
@@ -314,12 +396,13 @@ function KairosHeader(props: KairosHeaderProps) {
 
   return (
     <header className={headerClass} data-state={runState}>
-      <div className="flex min-w-0 items-center gap-3.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-2.5">
         <span className="text-2xl font-semibold text-[#12151c]">Kairos</span>
         <span className={cn(headerStatusClass, stateTextClass(runState))}>
           <span className={cn("h-2 w-2 rounded-full", stateDotClass(runState))} aria-hidden="true" />
           {statusText}
         </span>
+        <KairosUsageBadge usage={usage} onToggleMode={props.onToggleUsageMode} />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {enabled ? (
@@ -340,14 +423,83 @@ function KairosHeader(props: KairosHeaderProps) {
           onClick={props.onWakeNow}
         >
           <Bolt size={14} aria-hidden="true" />
-          立即唤醒
+          唤醒
+        </button>
+        <button
+          type="button"
+          className={kairosButtonClass}
+          disabled={!props.bridgeAvailable}
+          aria-haspopup="dialog"
+          aria-expanded={props.contextOpen}
+          title={props.bridgeAvailable ? undefined : "Kairos 桥未就绪"}
+          onClick={props.onOpenContext}
+        >
+          <FileText size={14} aria-hidden="true" />
+          上下文
         </button>
         <button type="button" className={kairosButtonClass} onClick={props.onResetToday}>
           <RotateCcw size={14} aria-hidden="true" />
-          重置今日
+          重置
         </button>
       </div>
     </header>
+  );
+}
+
+/**
+ * Header 内的用量胶囊。
+ *
+ * - 主体 `<token> · <cost>`（无成本时省略后半段）。
+ * - 左侧 logo 是**可点击的模式切换按钮**：
+ *   - `sinceReset` 模式 → `Coins` 图标，胶囊右侧带"本阶段" mode chip；
+ *   - `lifetime` 模式 → `Infinity` 图标，mode chip 为"累计"。
+ *   点击切换并把选择持久化到 localStorage（由父组件管理）。
+ * - hover 整个胶囊弹原生 `title` tooltip，含当前 mode 的明细 + 对面 mode 的简略数字。
+ * - 单测可通过 `data-testid="kairos-usage-badge"` 选中；切换按钮 `data-testid="kairos-usage-toggle"`。
+ */
+function KairosUsageBadge({
+  usage,
+  onToggleMode,
+}: {
+  usage: KairosUsageBadgeModel;
+  onToggleMode(): void;
+}) {
+  const ModeIcon = usage.mode === "lifetime" ? InfinityIcon : Coins;
+  const toggleAria = `切换至「${usage.oppositeModeLabel}」（${usage.oppositeModeHint}）`;
+  return (
+    <span
+      className={headerUsageBadgeClass}
+      data-testid="kairos-usage-badge"
+      data-has-data={usage.hasData ? "true" : "false"}
+      data-mode={usage.mode}
+      title={usage.tooltip}
+      aria-label={`Token 与成本（${usage.modeLabel}）：${usage.tokensLabel}${usage.costLabel ? ` · ${usage.costLabel}` : ""}`}
+    >
+      <button
+        type="button"
+        className={headerUsageBadgeToggleClass}
+        data-testid="kairos-usage-toggle"
+        onClick={onToggleMode}
+        aria-label={toggleAria}
+        title={toggleAria}
+      >
+        <ModeIcon size={13} aria-hidden="true" />
+      </button>
+      <span data-testid="kairos-usage-tokens">{usage.tokensLabel}</span>
+      {usage.costLabel ? (
+        <>
+          <span aria-hidden="true" className={headerUsageBadgeSeparatorClass}>
+            ·
+          </span>
+          <span data-testid="kairos-usage-cost" className={headerUsageBadgeCostClass}>
+            {usage.costLabel}
+          </span>
+        </>
+      ) : null}
+      <span aria-hidden="true" className={headerUsageBadgeModeChipClass} data-testid="kairos-usage-mode-chip">
+        {usage.modeLabel}
+      </span>
+    </span>
   );
 }
 

@@ -56,19 +56,17 @@ const STAGE_PROGRESS_META: Record<LabStageId, Pick<LabCardView, "tag" | "tagColo
 const pageClass =
   "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-5 overflow-hidden bg-app-bg px-7 pb-7 pt-[calc(var(--window-chrome-strip-height)+20px)] text-text-main max-[1100px]:px-5 max-[760px]:px-4 max-[760px]:pb-5 max-[760px]:pt-[calc(var(--window-chrome-strip-height)+14px)]";
 const topbarClass =
-  "flex items-end justify-between gap-4 max-[760px]:flex-col max-[760px]:items-stretch";
-const titleWrapClass = "flex items-baseline gap-2.5";
-const titleClass = "m-0 text-[22px] font-semibold leading-none text-text-main";
-const titleHintClass = "text-[12px] font-medium leading-none text-text-faint";
+  "flex items-center justify-between gap-4 max-[760px]:flex-col max-[760px]:items-stretch";
+const titleClass = "m-0 text-[22px] font-semibold leading-none tracking-[-0.005em] text-text-main";
 const actionsClass = "flex items-center gap-2 max-[760px]:w-full";
 const secondaryButtonClass =
-  "inline-flex h-8 items-center justify-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-medium text-text-muted transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-main active:translate-y-px max-[760px]:flex-1";
+  "inline-flex h-8 items-center justify-center rounded-act-md border border-[#d0d6dd] bg-surface px-3 text-[13px] font-medium text-text-muted shadow-[0_0_0_1px_rgba(15,23,42,0.04),0_1px_2px_rgba(15,23,42,0.06)] transition hover:border-[#a8b3c0] hover:bg-surface-subtle hover:text-text-main hover:shadow-[0_0_0_1px_rgba(15,23,42,0.07),0_2px_6px_rgba(15,23,42,0.08)] active:translate-y-px max-[760px]:flex-1";
 const primaryButtonClass =
-  "inline-flex h-8 items-center justify-center rounded-act-md border border-transparent bg-brand px-3 text-[13px] font-medium text-white shadow-[0_1px_2px_rgba(31,45,61,0.08)] transition hover:bg-brand-strong active:translate-y-px max-[760px]:flex-1";
+  "inline-flex h-8 items-center justify-center gap-1 rounded-act-md border border-[#2157d6] bg-[#2563eb] px-3 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(37,99,235,0.28),0_4px_12px_rgba(37,99,235,0.22)] transition hover:border-[#1f52ca] hover:bg-[#1f5fe8] hover:shadow-[0_2px_6px_rgba(31,95,232,0.3),0_8px_18px_rgba(31,95,232,0.28)] active:translate-y-px max-[760px]:flex-1";
 const iconButtonClass =
   "grid h-8 w-8 place-items-center rounded-act-md border border-line bg-surface text-text-faint transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-main";
 const addButtonClass =
-  "ml-auto grid h-6 w-6 place-items-center rounded-[6px] text-text-faint transition hover:bg-white/70 hover:text-brand";
+  "ml-auto grid h-6 w-6 place-items-center rounded-[6px] text-text-faint transition hover:bg-black/[0.04] hover:text-brand";
 const boardClass =
   "grid min-h-0 grid-cols-[repeat(4,minmax(230px,1fr))] gap-4 overflow-hidden max-[1100px]:grid-cols-[repeat(4,minmax(260px,1fr))] max-[1100px]:overflow-x-auto";
 const columnBaseClass =
@@ -89,9 +87,11 @@ const stageAccentClass: Record<LabStageId, string> = {
 };
 const stageBodyClass = "flex min-h-0 flex-col gap-2 overflow-auto p-2.5";
 const cardClass =
-  "group relative grid min-h-[76px] grid-rows-[auto_auto_auto] justify-items-start gap-[5px] rounded-act-sm border border-line bg-surface px-3 py-2.5 text-left transition hover:border-line-strong hover:bg-surface-subtle";
+  "group relative grid min-h-[76px] grid-rows-[auto_auto_auto] justify-items-start gap-[5px] rounded-act-sm border border-[#bcc6d4] bg-surface px-3 py-2.5 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition";
+const cardHoverClass =
+  "hover:border-[#a7b3c2] hover:shadow-[0_4px_12px_rgba(15,23,42,0.06)]";
 const selectedCardClass =
-  "border-brand bg-brand-soft/40 before:absolute before:inset-y-2 before:-left-px before:w-[2px] before:rounded-full before:bg-brand";
+  "border-[#2f6fff] bg-[#edf4ff] shadow-[0_0_0_1px_rgba(47,111,255,0.22),0_8px_18px_rgba(47,111,255,0.14)] before:absolute before:inset-y-2 before:-left-px before:w-[3px] before:rounded-full before:bg-[#2f6fff]";
 const tagClass =
   "inline-flex h-[18px] items-center whitespace-nowrap rounded-full px-[7px] text-[11px] font-medium leading-none";
 const overlayClass = "fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/25 p-8";
@@ -338,16 +338,13 @@ export function LabPage() {
   return (
     <main className={pageClass} aria-label="Lab 实验台">
       <header className={topbarClass}>
-        <div className={titleWrapClass}>
-          <h1 className={titleClass}>Lab</h1>
-          <span className={titleHintClass}>实验台 · 当前矩阵</span>
-        </div>
+        <h1 className={titleClass}>Lab</h1>
         <div className={actionsClass}>
           <button className={secondaryButtonClass} type="button" onClick={() => setDialog("completed")}>
             已完成实验
           </button>
           <button className={primaryButtonClass} type="button" onClick={() => setDialog("new")}>
-            <Plus size={14} strokeWidth={2.25} className="mr-1 -ml-0.5" />
+            <Plus size={14} strokeWidth={2.5} className="-ml-0.5" />
             新实验
           </button>
         </div>
@@ -383,7 +380,7 @@ export function LabPage() {
                   <button
                     key={card.id}
                     type="button"
-                    className={`${cardClass} ${card.id === selectedCardId ? selectedCardClass : ""}`}
+                    className={`${cardClass} ${card.id === selectedCardId ? selectedCardClass : cardHoverClass}`}
                     onClick={() => openDetail(card)}
                   >
                     <span className={tagClass} style={tagStyle(card.tagColor)}>

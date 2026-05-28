@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { CircleAlert, Info, RefreshCw, Share2, X } from "lucide-react";
 import type {
+  UsageStatisticsDailyModelBreakdown,
   UsageStatisticsDailyRow,
   UsageStatisticsModelEntry,
   UsageStatisticsSnapshot,
@@ -74,20 +75,23 @@ function heatmapCellClass(level: 0 | 1 | 2 | 3): string {
   return `h-3.5 w-3.5 shrink-0 rounded-[4px] ${colors[level]}`;
 }
 
-function buildTrendBars(rows: UsageStatisticsDailyRow[]): Array<{ value: number; label: string }> {
-  const bars = [...rows]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-31);
-  const maxTokens = Math.max(1, ...bars.map((row) => row.totalTokens));
-  return bars.map((row) => ({
-    value: row.totalTokens / maxTokens,
-    label: row.date.slice(5),
-  }));
-}
+/**
+ * 热力图单元格的展示模型。
+ *
+ * 维护 `level` + `dailyRow` 两个字段是为了：
+ * - `level` 决定颜色档（保持现有的 4 档 GitHub 风格视觉）；
+ * - `dailyRow` 直接挂载到格子上，hover 时 tooltip 不需要再二次查找 Map，避免 60fps 移动时的开销。
+ *   没数据的日期 `dailyRow === null`，UI 会渲染成"无数据"占位 + 不显示 tooltip。
+ */
+type HeatmapCell = {
+  iso: string;
+  level: 0 | 1 | 2 | 3;
+  dailyRow: UsageStatisticsDailyRow | null;
+};
 
-function buildHeatmap(rows: UsageStatisticsDailyRow[]) {
+function buildHeatmap(rows: UsageStatisticsDailyRow[]): { columns: HeatmapCell[][]; maxTokens: number } {
   const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
-  const map = new Map(sorted.map((row) => [row.date, row.totalTokens] as const));
+  const map = new Map(sorted.map((row) => [row.date, row] as const));
   const latest = sorted.at(-1)?.date ?? new Date().toISOString().slice(0, 10);
   const anchor = new Date(`${latest}T00:00:00`);
   const totalCells = 7 * 16;
@@ -96,14 +100,15 @@ function buildHeatmap(rows: UsageStatisticsDailyRow[]) {
   const maxTokens = Math.max(1, ...sorted.map((row) => row.totalTokens), 1);
 
   const columns = Array.from({ length: 16 }, (_, columnIndex) =>
-    Array.from({ length: 7 }, (_, weekday) => {
+    Array.from({ length: 7 }, (_, weekday): HeatmapCell => {
       const date = new Date(start);
       date.setDate(start.getDate() + columnIndex * 7 + weekday);
       const iso = date.toISOString().slice(0, 10);
-      const tokens = map.get(iso) ?? 0;
+      const row = map.get(iso) ?? null;
       return {
         iso,
-        level: clampLevel(tokens / maxTokens),
+        level: clampLevel((row?.totalTokens ?? 0) / maxTokens),
+        dailyRow: row,
       };
     }),
   );
@@ -236,13 +241,206 @@ function ModelRow({ model }: { model: UsageStatisticsModelEntry }) {
   );
 }
 
-function BreakdownCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+function BreakdownCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <article className={metricCardClass}>
       <span className="text-xs font-bold text-text-muted">{label}</span>
       <strong className="mt-1.5 block text-lg font-bold tabular-nums text-text-main">{value}</strong>
-      <em className="mt-1 block text-[11px] not-italic text-text-subtle">{detail}</em>
+      {detail ? <em className="mt-1 block text-[11px] not-italic text-text-subtle">{detail}</em> : null}
     </article>
+  );
+}
+
+/** Tooltip 单条 model 颜色条用——和主区 toolDistribution 同一组配色，保证全页视觉一致。 */
+const HEATMAP_MODEL_COLORS = ["#2f6fff", "#28b7d8", "#8b5cf6", "#f4795b", "#22a06b", "#9aa8bb"];
+
+/**
+ * 单格 hover tooltip 锚点信息。
+ *
+ * 这里**不**把 tooltip 渲染成 portal——它跟着 hover 的格子走，相对父容器绝对定位就够用。
+ * 改成 portal 会让 tooltip 跨越外层 `overflow-x-auto` 区域（避免被裁剪），但本场景外层没裁剪需求，
+ * 保留在格子内的 z-index 栈即可，避免 portal 引入的 SSR / 单测复杂度。
+ */
+type HeatmapHover = {
+  cell: HeatmapCell;
+  /** 鼠标所在格的行索引（0=周日, 6=周六），用来决定 tooltip 朝上还是朝下，避免顶部被裁掉。 */
+  weekRowIndex: number;
+  /**
+   * 鼠标进入瞬间拍下的 cell viewport 坐标快照。
+   *
+   * 为什么必须存 rect 而不是 ref 元素：tooltip 用 `position: fixed` 锚到 viewport
+   * 坐标，避免被父级 `overflow-x-auto` 容器 clip（CSS overflow 规范的 "implicit auto"
+   * 副作用——一个轴 hidden/auto 时另一轴的 visible 也会被升级为 auto，
+   * absolute 子元素也会一起被裁）。
+   *
+   * 副作用：用户 hover 同一个 cell 时如果横向滚动，tooltip 不会跟着滚——
+   * 但 hover 离开会触发 leave 清空 hover state，所以下次 enter 自然会拍新照。
+   */
+  anchorRect: DOMRect;
+};
+
+/**
+ * GitHub 风格热力图主体 + hover 详情 tooltip。
+ *
+ * 设计要点：
+ * - hover 状态保留在父组件，单格只负责上报；这样 tooltip 只渲染一份（不是每格一份），
+ *   60fps 拖动也只走一次 setState；
+ * - `tabIndex` 暴露给键盘焦点，焦点也会触发 tooltip——给 a11y 让路；
+ * - `cell.dailyRow === null` 的"未发生过 LLM 调用"日期不显示 tooltip，避免空气 popover。
+ */
+function HeatmapGrid({ columns }: { columns: HeatmapCell[][] }) {
+  const [hover, setHover] = useState<HeatmapHover | null>(null);
+
+  return (
+    <div className="relative flex gap-2.5">
+      <div className="flex flex-col gap-1 pt-px">
+        {WEEKDAY_LABELS.map((label) => (
+          <span key={label} className="h-3.5 text-xs leading-[14px] text-text-faint">
+            {label}
+          </span>
+        ))}
+      </div>
+      <div className="flex min-w-0 gap-1 overflow-x-auto pb-1.5">
+        {columns.map((column, columnIndex) => (
+          <div className="flex flex-col gap-1" key={columnIndex}>
+            {column.map((cell, rowIndex) => (
+              // 用 div + role="button" 而不是真的 <button>：
+              // 1) <button> 默认 padding / border / appearance 会与 tailwind preflight 互相博弈，
+              //    给 14×14 小格子带来不必要的 sizing 风险。
+              // 2) 我们只需要 hover / focus 触发 tooltip，没有 click 语义，
+              //    所以 div + tabIndex 提供"可 focus 元素"已足够；screen reader 仍按 button 读。
+              <div
+                key={`${columnIndex}-${rowIndex}`}
+                role="button"
+                tabIndex={cell.dailyRow ? 0 : -1}
+                className={`${heatmapCellClass(cell.level)} cursor-pointer ring-offset-1 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
+                aria-label={cell.dailyRow
+                  ? `${cell.iso}：${cell.dailyRow.totalTokens.toLocaleString()} tokens`
+                  : `${cell.iso}：无数据`}
+                onMouseEnter={(event) => {
+                  if (!cell.dailyRow) return;
+                  setHover({
+                    cell,
+                    weekRowIndex: rowIndex,
+                    anchorRect: event.currentTarget.getBoundingClientRect(),
+                  });
+                }}
+                onMouseLeave={() => setHover((current) => (current?.cell.iso === cell.iso ? null : current))}
+                onFocus={(event) => {
+                  if (!cell.dailyRow) return;
+                  setHover({
+                    cell,
+                    weekRowIndex: rowIndex,
+                    anchorRect: event.currentTarget.getBoundingClientRect(),
+                  });
+                }}
+                onBlur={() => setHover((current) => (current?.cell.iso === cell.iso ? null : current))}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      {/*
+        tooltip 渲染在 overflow-x-auto 容器外，且使用 position: fixed 锚到 viewport——
+        这是逃出"implicit auto clip"（一个轴 hidden/auto 时另一轴的 visible 也会被升级）的最稳路径。
+        只有当 hover.cell.dailyRow 非空时才渲染（onMouseEnter / onFocus 已做过同样的判断）。
+      */}
+      {hover && hover.cell.dailyRow ? (
+        <HeatmapTooltip
+          row={hover.cell.dailyRow}
+          placement={hover.weekRowIndex <= 2 ? "below" : "above"}
+          anchorRect={hover.anchorRect}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function HeatmapTooltip({
+  row,
+  placement,
+  anchorRect,
+}: {
+  row: UsageStatisticsDailyRow;
+  placement: "above" | "below";
+  anchorRect: DOMRect;
+}) {
+  // 防御：旧 main 进程（未重启）返回的 dailyRow 可能不带 modelBreakdown 字段，
+  // 此时按 `[]` 兜底，hover 仍能看到日期 + tokens，不至于整页崩溃。
+  const breakdown = row.modelBreakdown ?? [];
+  const topModels = breakdown.slice(0, 4);
+
+  // 用 fixed + viewport 坐标定位：tooltip 完全脱离 overflow-x-auto 容器的 clip 范围。
+  // - 水平：锚到 cell 水平中线，再 `translate(-50%)` 让 tooltip 居中；
+  // - 垂直：placement=above 时 bottom 贴 cell 顶边上方 10px；below 时 top 贴 cell 底边下方 10px。
+  const TOOLTIP_GAP = 10;
+  const style: CSSProperties = {
+    position: "fixed",
+    left: `${anchorRect.left + anchorRect.width / 2}px`,
+    top:
+      placement === "above"
+        ? `${anchorRect.top - TOOLTIP_GAP}px`
+        : `${anchorRect.bottom + TOOLTIP_GAP}px`,
+    transform:
+      placement === "above" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+    zIndex: 50,
+  };
+
+  return (
+    <div
+      role="tooltip"
+      data-testid="heatmap-tooltip"
+      style={style}
+      className="pointer-events-none w-[260px] rounded-[14px] border border-[#dce5f3] bg-white px-4 py-3.5 text-left shadow-[0_18px_44px_rgba(17,24,39,0.12)]"
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-[12px] font-semibold tracking-[0.04em] text-text-subtle">{row.date}</span>
+        {breakdown.length === 0 ? (
+          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-faint">no llm</span>
+        ) : null}
+      </div>
+      <div className="mt-1.5 text-[22px] font-bold leading-none tabular-nums text-text-main">
+        {row.totalTokens.toLocaleString()}
+        <span className="ml-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">tokens</span>
+      </div>
+      {topModels.length > 0 ? (
+        <>
+          <div className="mt-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-subtle">model breakdown</div>
+          <div className="mt-2 flex flex-col gap-1.5">
+            {topModels.map((model, index) => (
+              <HeatmapTooltipModelRow
+                key={model.name}
+                model={model}
+                color={HEATMAP_MODEL_COLORS[index % HEATMAP_MODEL_COLORS.length]}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function HeatmapTooltipModelRow({
+  model,
+  color,
+}: {
+  model: UsageStatisticsDailyModelBreakdown;
+  color: string;
+}) {
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_36px] items-center gap-2 text-[12px]">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-text-muted" title={model.name}>
+          {model.name}
+        </span>
+      </div>
+      <span className="font-mono tabular-nums text-text-main">{model.totalTokens.toLocaleString()}</span>
+      <span className="text-right text-[11px] font-semibold tabular-nums text-text-faint">
+        {formatPercent(model.percent)}
+      </span>
+    </div>
   );
 }
 
@@ -262,7 +460,7 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: P
             <div>
               <h1 className="m-0 text-2xl font-bold text-text-main">暂无 Usage 数据</h1>
               <p className="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-text-muted">
-                完成一次真实 Agent 对话后，这里会展示 token、成本、缓存和工具调用统计。
+                这里汇总了你所有对话以及 Kairos 自主模式的 token、成本、缓存和工具调用。完成至少一次真实 Agent 调用后会自动出数据。
               </p>
             </div>
             {error ? (
@@ -305,7 +503,6 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: P
   const recent30d = sumTokens(sortedSummaryRows.slice(-30));
   const avg = summaryRows.length > 0 ? Math.round(recent30d / summaryRows.length) : 0;
   const monthValue = effectiveSnapshot.summary.toolCallCount;
-  const trendBars = buildTrendBars(summaryRows);
   const heatmap = buildHeatmap(summaryRows);
   const cachePercent = effectiveSnapshot.summary.cacheEfficiencyPercent;
 
@@ -335,7 +532,12 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: P
               ))}
             </div>
             <div className="mt-2 flex justify-between gap-3 border-t border-line pt-3 text-xs text-text-faint">
-              <span>排名 {effectiveSnapshot.periodStart?.slice(0, 10) ?? "2025-09-01"}</span>
+              <span>
+                {effectiveSnapshot.scope === "global" ? "全部数据" : effectiveSnapshot.title}
+                {typeof effectiveSnapshot.sourceCount === "number" && effectiveSnapshot.scope === "global"
+                  ? ` · ${effectiveSnapshot.sourceCount} 个来源`
+                  : ""}
+              </span>
               <span>活跃天数 {summaryRows.length} 天</span>
             </div>
           </article>
@@ -356,22 +558,7 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: P
                 <span key={month}>{month}</span>
               ))}
             </div>
-            <div className="flex gap-2.5">
-              <div className="flex flex-col gap-1 pt-px">
-                {WEEKDAY_LABELS.map((label) => (
-                  <span key={label} className="h-3.5 text-xs leading-[14px] text-text-faint">{label}</span>
-                ))}
-              </div>
-              <div className="flex min-w-0 gap-1 overflow-x-auto pb-1.5">
-                {heatmap.columns.map((column, columnIndex) => (
-                  <div className="flex flex-col gap-1" key={columnIndex}>
-                    {column.map((cell, rowIndex) => (
-                      <span key={`${columnIndex}-${rowIndex}`} className={heatmapCellClass(cell.level)} title={cell.iso} />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <HeatmapGrid columns={heatmap.columns} />
             <div className="flex items-center justify-end gap-1.5 text-xs text-text-subtle">
               <span>少</span>
               {[0, 1, 2, 3].map((level) => (
@@ -381,12 +568,18 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: P
             </div>
           </article>
 
-          <article className={`${panelClass} grid gap-4 p-5`}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-subtle">Tool Calls</div>
-                <div className="text-base font-bold text-text-main">工具调用</div>
-              </div>
+          {/*
+            工具调用 panel：article 自己拿 `flex-1` 撑满左栏剩余空间（与右栏每日细目底部对齐），
+            但**内部子项全部维持自然高度**——
+              - 标题行：auto
+              - 子卡片（蓝底分布卡）：auto，不加 flex-1
+              - 4 行 ToolRow：gap-2 紧凑，不加 justify-between
+            flex column 默认 `justify-content: flex-start` 会把多余空间收到底部，
+            形成一整块 panel 内的下方留白；不会分散到 ToolRow 之间拉宽行距（用户认证为"丑"的形态）。
+          */}
+          <article className={`${panelClass} flex flex-1 min-h-0 flex-col gap-4 p-5`}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-base font-bold text-text-main">工具调用</div>
               <button className={actionButtonClass} type="button" onClick={() => setSelectedTool(effectiveSnapshot.toolDistribution[0] ?? null)}>
                 查看详情
               </button>
@@ -415,24 +608,6 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: P
               </div>
             </div>
           </article>
-
-          <article className={`${panelClass} flex flex-1 flex-col p-5`}>
-            <div className="mb-[18px] text-base font-semibold text-text-main">使用趋势</div>
-            <div className="flex h-[98px] items-end gap-1" aria-hidden="true">
-              {trendBars.map((bar, index) => (
-                <div className="flex h-full flex-1 items-end" key={index}>
-                  <span
-                    className="min-h-1 w-full rounded-t-md bg-gradient-to-b from-[#8bb6ff] to-brand opacity-75"
-                    style={{ height: `${Math.max(8, bar.value * 100)}%` }}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 flex justify-between text-[13px] text-text-subtle">
-              <span>{sortedSummaryRows[0]?.date ?? "-"}</span>
-              <span>{sortedSummaryRows.at(-1)?.date ?? "-"}</span>
-            </div>
-          </article>
         </section>
 
         <section className="flex min-w-0 flex-col gap-4 self-stretch">
@@ -444,7 +619,7 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: P
             </section>
           ) : null}
 
-          <section className={`${panelClass} grid justify-items-center gap-4 px-6 pb-5 pt-[18px]`}>
+          <section className={`${panelClass} grid justify-items-center gap-4 px-6 pb-6 pt-6`}>
             <div className="flex w-full items-center justify-between gap-3">
               <div className="inline-flex gap-1.5 rounded-full border border-line bg-white/85 p-1 shadow-[0_8px_24px_rgba(31,45,61,0.04)]" role="tablist" aria-label="Usage range">
                 {RANGE_TABS.map((tab) => (
@@ -506,7 +681,7 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: P
             </section>
           </section>
 
-          <section className={`${panelClass} p-5`}>
+          <section className={`${panelClass} p-6`}>
             <div className="grid grid-cols-[minmax(0,0.76fr)_1.24fr] items-center gap-5">
               <div>
                 <div className="text-base font-semibold text-text-main">缓存效率</div>
@@ -516,15 +691,20 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: P
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <BreakdownCard label="缓存命中" value={formatMillions(effectiveSnapshot.summary.cacheHitTokens)} detail="缓存命中" />
-                <BreakdownCard label="缓存未命中" value={formatMillions(effectiveSnapshot.summary.cacheMissTokens)} detail="缓存未命中" />
-                <BreakdownCard label="推理 Token" value={formatMillions(effectiveSnapshot.summary.reasoningTokens)} detail="推理 Token" />
-                <BreakdownCard label="会话数" value={effectiveSnapshot.summary.conversationCount.toLocaleString()} detail="会话数" />
+                {/*
+                  缓存效率区 4 张卡的 detail 与 label 字面完全相同（"缓存命中"/"缓存未命中"/"推理 Token"/"会话数"），
+                  属于冗余信息，全部省略 detail。主统计区的 detail 是中英对照（"输入"→"direct prompt" 等），
+                  提供补充语义，保留不动。
+                */}
+                <BreakdownCard label="缓存命中" value={formatMillions(effectiveSnapshot.summary.cacheHitTokens)} />
+                <BreakdownCard label="缓存未命中" value={formatMillions(effectiveSnapshot.summary.cacheMissTokens)} />
+                <BreakdownCard label="推理 Token" value={formatMillions(effectiveSnapshot.summary.reasoningTokens)} />
+                <BreakdownCard label="会话数" value={effectiveSnapshot.summary.conversationCount.toLocaleString()} />
               </div>
             </div>
           </section>
 
-          <section className={`${panelClass} flex min-h-[360px] flex-1 flex-col px-5 pb-2.5 pt-[18px]`}>
+          <section className={`${panelClass} flex min-h-[360px] flex-1 flex-col px-6 pb-4 pt-6`}>
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="text-base font-semibold text-text-main">每日细目</div>
               <span className="text-xs text-text-faint">latest rows</span>

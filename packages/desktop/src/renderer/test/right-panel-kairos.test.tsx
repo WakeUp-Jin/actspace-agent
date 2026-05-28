@@ -5,12 +5,14 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   KairosBridgeApi,
+  KairosContextSnapshot,
   KairosControl,
   KairosControlResponse,
   KairosGetEventsRecentResponse,
   KairosRuntimeState,
   SessionEvent,
 } from "@actspace/shared";
+import { emptyKairosUsageSummary } from "@actspace/shared";
 import { RightPanel } from "../components/RightPanel";
 
 type FakeKairosOptions = Partial<{
@@ -28,6 +30,8 @@ function installFakeBridge(opts: FakeKairosOptions = {}): KairosBridgeApi {
     todayTickCount: 0,
     toolCallCountInCurrentTick: 0,
     totalSleepSecondsToday: 0,
+    usageLifetime: emptyKairosUsageSummary(),
+    usageSinceReset: emptyKairosUsageSummary(),
   };
   const bridge: KairosBridgeApi = {
     getState: vi.fn(async () => opts.initialState ?? defaultState),
@@ -38,6 +42,19 @@ function installFakeBridge(opts: FakeKairosOptions = {}): KairosBridgeApi {
     control: vi.fn(opts.controlImpl ?? (async () => ({ ok: true } as const))),
     readConfig: vi.fn(async () => ({ content: "", fileName: "preferences.json", notFound: true })),
     writeConfig: vi.fn(async () => ({ ok: true } as const)),
+    getContextSnapshot: vi.fn(
+      async (): Promise<KairosContextSnapshot> => ({
+        generatedAt: new Date().toISOString(),
+        modelId: null,
+        phase: "work",
+        systemPrompt: "",
+        systemPromptTokens: 0,
+        systemPromptSegments: [],
+        historySummary: [],
+        historyMessages: [],
+        tools: [],
+      }),
+    ),
     onEvent: (listener) => {
       eventListener = listener;
       return () => {
@@ -137,6 +154,8 @@ describe("RightPanel Kairos tab", () => {
         todayTickCount: 1,
         toolCallCountInCurrentTick: 0,
         totalSleepSecondsToday: 0,
+        usageLifetime: emptyKairosUsageSummary(),
+        usageSinceReset: emptyKairosUsageSummary(),
       },
       initialEvents: events,
     });
@@ -162,6 +181,8 @@ describe("RightPanel Kairos tab", () => {
         todayTickCount: 0,
         toolCallCountInCurrentTick: 0,
         totalSleepSecondsToday: 0,
+        usageLifetime: emptyKairosUsageSummary(),
+        usageSinceReset: emptyKairosUsageSummary(),
       },
     });
     const user = userEvent.setup();
@@ -170,8 +191,8 @@ describe("RightPanel Kairos tab", () => {
     await user.click(screen.getByRole("tab", { name: "Kairos" }));
     await screen.findByText("Idle");
     await user.click(screen.getByRole("button", { name: "暂停 Kairos" }));
-    await user.click(screen.getByRole("button", { name: "立即唤醒 Kairos" }));
-    await user.click(screen.getByRole("button", { name: "重置今日 Kairos 统计" }));
+    await user.click(screen.getByRole("button", { name: "唤醒 Kairos" }));
+    await user.click(screen.getByRole("button", { name: "重置 Kairos 统计" }));
 
     expect(bridge.control).toHaveBeenCalledWith({ type: "stop" });
     expect(bridge.control).toHaveBeenCalledWith({ type: "wake_now" });

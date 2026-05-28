@@ -41,4 +41,7 @@ export {
 } from "./recovery";
 
 // Usage statistics
-export { createUsageStatisticsSnapshot } from "./usage-statistics";
+export {
+  createUsageStatisticsSnapshot,
+  createGlobalUsageStatisticsSnapshot,
+} from "./usage-statistics";

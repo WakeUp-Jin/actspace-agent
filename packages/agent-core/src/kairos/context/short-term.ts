@@ -12,8 +12,11 @@ import type { ShortMemoryStore } from "../storage/short-memory-store";
 export interface KairosShortTermLoadResult {
   /** 已 sanitize（去掉 orphan tool_call/tool_result）的消息序列，时间升序。 */
   messages: Message[];
-  /** 历史摘要原文片段，由 prompt-assembler 在 [6] 段拼接展示。 */
-  summarySegments: Array<{ label: string; text: string }>;
+  /**
+   * 历史摘要原文片段，由 prompt-assembler 在 [6] 段拼接展示。
+   * `path` 为该段所属的 `*.summary.md` 绝对路径，便于上下文 Sheet 标注源文件。
+   */
+  summarySegments: Array<{ label: string; text: string; path: string }>;
   /** 加载到的总 token 估算（用于观察是否触发压缩阈值）。 */
   loadedTokenEstimate: number;
 }
@@ -50,7 +53,7 @@ export class KairosShortTermMemoryContext {
 
     const dates = await this.store.listAllDates();
     const dayBatches: Array<{ date: string; events: SessionEvent[] }> = [];
-    const summaries: Array<{ label: string; text: string }> = [];
+    const summaries: Array<{ label: string; text: string; path: string }> = [];
     const loadedSummaryNames = new Set<string>();
 
     for (const date of dates) {
@@ -66,7 +69,7 @@ export class KairosShortTermMemoryContext {
           if (text) {
             const tokens = estimateTokens(text);
             if (used + tokens <= budget) {
-              summaries.push({ label: covering.label, text });
+              summaries.push({ label: covering.label, text, path: covering.path });
               loadedSummaryNames.add(covering.name);
               used += tokens;
             }
@@ -94,7 +97,7 @@ export class KairosShortTermMemoryContext {
       if (!text) continue;
       const tokens = estimateTokens(text);
       if (used + tokens <= budget) {
-        summaries.push({ label: ys.label, text });
+        summaries.push({ label: ys.label, text, path: ys.path });
         used += tokens;
       }
     }

@@ -204,13 +204,6 @@ export function WorkbenchLayout({
   }, []);
 
   const loadUsageStatistics = useCallback(async (range: UsageStatisticsSnapshot["range"] = "month") => {
-    const sessionId = activeSessionId ?? sessions[0]?.id ?? null;
-    if (!sessionId) {
-      setUsageSnapshot(null);
-      setUsageError("No session selected.");
-      return;
-    }
-
     if (typeof window === "undefined" || !window.actspace?.getUsageStatistics) {
       setUsageSnapshot(null);
       setUsageError(null);
@@ -220,7 +213,8 @@ export function WorkbenchLayout({
     setUsageLoading(true);
     setUsageError(null);
     try {
-      const snapshot = await window.actspace.getUsageStatistics({ sessionId, range });
+      // 不传 sessionId 即走 main 的 global 路径：聚合所有 session + Kairos 的全部历史。
+      const snapshot = await window.actspace.getUsageStatistics({ range, scope: "global" });
       setUsageSnapshot(snapshot);
     } catch (error) {
       console.error("Failed to load usage statistics", error);
@@ -229,7 +223,7 @@ export function WorkbenchLayout({
     } finally {
       setUsageLoading(false);
     }
-  }, [activeSessionId, sessions]);
+  }, []);
 
   useEffect(() => {
     if (view !== "usage") return;

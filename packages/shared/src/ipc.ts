@@ -93,9 +93,23 @@ export type SessionPinResult = {
 
 export type UsageStatisticsRange = "day" | "week" | "month" | "total";
 
+/**
+ * Usage 统计的取数范围。
+ *
+ * - `"session"`：单个 session 的 events 聚合（兼容旧用法，必须传 `sessionId`）；
+ * - `"global"`（默认）：跨所有普通对话 session + Kairos 自主模式的全部历史 LLM/工具事件汇总，
+ *   `sessionId` 字段被忽略。
+ *
+ * 出于向后兼容考虑，旧调用 `{ sessionId: "..." }` 在不指定 `scope` 时仍按 `"session"` 模式执行。
+ */
+export type UsageStatisticsScope = "session" | "global";
+
 export type UsageStatisticsGetInput = {
-  sessionId: string;
+  /** 仅当 scope==="session" 时必填；scope==="global" 时忽略。 */
+  sessionId?: string;
   range?: UsageStatisticsRange;
+  /** 默认 "global"（无 sessionId）或 "session"（有 sessionId）。 */
+  scope?: UsageStatisticsScope;
 };
 
 export type UsageStatisticsSummary = {
@@ -128,6 +142,16 @@ export type UsageStatisticsToolEntry = {
   averageDurationMs?: number;
 };
 
+/**
+ * 单日单模型的明细，仅用于 UI 热力图 hover tooltip 的 "MODEL BREAKDOWN" 区。
+ * 不进入主统计区——主区按"整段时间窗"展示模型分布。
+ */
+export type UsageStatisticsDailyModelBreakdown = {
+  name: string;
+  totalTokens: number;
+  percent: number;
+};
+
 export type UsageStatisticsDailyRow = {
   date: string;
   totalTokens: number;
@@ -138,15 +162,27 @@ export type UsageStatisticsDailyRow = {
   conversationCount: number;
   toolCallCount: number;
   costUsd: number;
+  /**
+   * 当日按 model 拆分的 token 明细，按 totalTokens 降序。
+   * - `percent` 是"在该日 totalTokens 内的占比"，不是全段时间窗内的占比；
+   * - 没有 llm_usage 事件的日期会得到空数组。
+   */
+  modelBreakdown: UsageStatisticsDailyModelBreakdown[];
 };
 
 export type UsageStatisticsSnapshot = {
-  sessionId: string;
+  /** "session"=单会话；"global"=跨所有 session + Kairos 全部历史。 */
+  scope: UsageStatisticsScope;
+  /** 仅 scope==="session" 时为对应 session id；global 时为 null。 */
+  sessionId: string | null;
+  /** 仅 scope==="session" 时为对应 session 标题；global 时通常为 "全部数据"。 */
   title: string;
   range: UsageStatisticsRange;
   generatedAt: string;
   periodStart?: string;
   periodEnd?: string;
+  /** 参与聚合的数据源条数（global 时是 session 个数；session 时固定为 1）。 */
+  sourceCount?: number;
   summary: UsageStatisticsSummary;
   modelDistribution: UsageStatisticsModelEntry[];
   toolDistribution: UsageStatisticsToolEntry[];

@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   aggregateKairosEvents,
   type KairosBridgeApi,
+  type KairosContextSnapshot,
   type KairosControl,
   type KairosEventRow,
   type KairosRuntimeState,
@@ -42,6 +43,11 @@ export interface UseKairosResult {
   refresh(): Promise<void>;
   readConfig(name: "preferences" | "paths" | "blocklist" | "rule"): Promise<{ content: string; fileName: string; notFound: boolean }>;
   writeConfig(name: "preferences" | "paths" | "blocklist" | "rule", content: string): Promise<void>;
+  /**
+   * 上下文 Sheet 按需拉取的快照。不缓存到 hook state，由调用方自己持有；
+   * 桥未就绪时 reject，UI 应在按钮上 disable + tooltip。
+   */
+  getContextSnapshot(): Promise<KairosContextSnapshot>;
 }
 
 function getBridge(): KairosBridgeApi | undefined {
@@ -155,6 +161,11 @@ export function useKairos(): UseKairosResult {
     [bridge],
   );
 
+  const getContextSnapshot = useCallback(async () => {
+    if (!bridge) throw new Error("kairos bridge unavailable");
+    return bridge.getContextSnapshot();
+  }, [bridge]);
+
   return {
     bridgeAvailable,
     state,
@@ -169,5 +180,6 @@ export function useKairos(): UseKairosResult {
     refresh,
     readConfig,
     writeConfig,
+    getContextSnapshot,
   };
 }

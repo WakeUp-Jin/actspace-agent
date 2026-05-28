@@ -15,6 +15,7 @@ import { dirname, join } from "node:path";
 import type { AbortTurnInput, RunTurnInput, SessionCreateInput, SessionGetInput, SessionPinInput, ApprovalDecideInput, ApprovalListPendingInput, UsageStatisticsGetInput } from "@actspace/shared";
 import {
   createBootstrapState,
+  createGlobalUsageStatisticsSnapshot,
   createUsageStatisticsSnapshot,
   loadEnv,
   createSessionRecord,
@@ -23,8 +24,10 @@ import {
   readSessionRecord,
   setSessionPinned,
   createKairos,
+  ShortMemoryStore,
   type KairosController,
 } from "@actspace/agent-core";
+import type { SessionEvent, SessionRecord } from "@actspace/shared";
 import { runAndPersistTurn, abortTurn, type AppDataRoots } from "./agent-turn";
 import { PendingApprovalRegistry } from "./approval-registry";
 import {
@@ -99,6 +102,58 @@ async function ensureDataDirectories(): Promise<AppDataRoots> {
   });
 
   return { dataRoot, sessionRoot, logRoot, tmpRoot, workspaceRoot };
+}
+
+/**
+ * 读取 sessionRoot 下**所有** session 的完整 record（含 events）。供 Usage 全局聚合使用。
+ *
+ * 实现细节：
+ * - 先 `listSessionRecords` 只读 meta，再对每条并行 `readSessionRecord`，避免重复 IO；
+ * - 读失败的 session（损坏/缺文件）静默跳过，不让单个坏点炸掉整张账单；
+ * - **不**做时间窗过滤——窗口截断由 `createGlobalUsageStatisticsSnapshot` 内部统一负责，
+ *   这里保持职责单一。
+ */
+async function loadAllSessionRecords(sessionRoot: string): Promise<SessionRecord[]> {
+  const summaries = await listSessionRecords(sessionRoot);
+  const records = await Promise.all(
+    summaries.map(async (item) => {
+      try {
+        return await readSessionRecord(createSessionStorePaths(join(sessionRoot, item.id)));
+      } catch (error) {
+        logMain("usage-statistics: failed to read session record", {
+          sessionId: item.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
+      }
+    }),
+  );
+  return records.filter((record): record is SessionRecord => record !== null);
+}
+
+/**
+ * 读取 Kairos 短期记忆下**全部历史段**的 SessionEvent。
+ *
+ * - 走 `ShortMemoryStore.loadAll()`，已覆盖跨月、跨 `reset_today` 切段的情形；
+ * - 目录不存在/读失败时返回空数组（首启 / 未启用 Kairos 都是正常路径）；
+ * - 返回未过滤的全部事件——`createGlobalUsageStatisticsSnapshot` 只会聚合 `llm_usage`/`tool_call`/
+ *   `tool_result`/`user_message` 等已知类型，其余事件会被忽略。
+ */
+async function loadAllKairosEvents(shortMemoryRoot: string): Promise<SessionEvent[]> {
+  try {
+    await access(shortMemoryRoot);
+  } catch {
+    return [];
+  }
+  try {
+    const store = new ShortMemoryStore(shortMemoryRoot);
+    return await store.loadAll();
+  } catch (error) {
+    logMain("usage-statistics: failed to load kairos events", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return [];
+  }
 }
 
 async function getRepoRoot(): Promise<string> {
@@ -345,9 +400,28 @@ async function registerIpc() {
 
   ipcMain.handle("usage-statistics:get", async (_event, input: UsageStatisticsGetInput) => {
     const roots = await ensureDataDirectories();
-    const record = await readSessionRecord(createSessionStorePaths(join(roots.sessionRoot, input.sessionId)));
-    if (!record) return null;
-    return createUsageStatisticsSnapshot(record, input.range ?? "month");
+    const range = input.range ?? "month";
+    const scope = input.scope ?? (input.sessionId ? "session" : "global");
+
+    if (scope === "session") {
+      if (!input.sessionId) return null;
+      const record = await readSessionRecord(
+        createSessionStorePaths(join(roots.sessionRoot, input.sessionId)),
+      );
+      if (!record) return null;
+      return createUsageStatisticsSnapshot(record, range);
+    }
+
+    // scope === "global" —— 跨所有普通对话 session + Kairos 自主模式的全部历史事件聚合。
+    const [sessionRecords, kairosEvents] = await Promise.all([
+      loadAllSessionRecords(roots.sessionRoot),
+      loadAllKairosEvents(join(roots.dataRoot, "kairos", "memory", "short-term")),
+    ]);
+    return createGlobalUsageStatisticsSnapshot({
+      sessionRecords,
+      kairosEvents,
+      range,
+    });
   });
 
   ipcMain.handle("session:create", async (_event, input: SessionCreateInput = {}) => {

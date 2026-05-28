@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Actspace Lab · Refresh Prototype</title>
+    <style>
+      :root {
+        /* token aligned with packages/desktop/src/renderer/styles/tokens.css */
+        --act-font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC",
+          "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei",
+          "Helvetica Neue", Arial, sans-serif;
+
+        --brand: #2f6fff;
+        --brand-strong: #1f5fe8;
+        --brand-soft: #edf4ff;
+
+        --bg: #fbfcff;
+        --surface: #ffffff;
+        --surface-subtle: #f7f8fa;
+        --sidebar: #f3f5f7;
+        --sidebar-selected: #e6e9ed;
+
+        --line: #dfe4ea;
+        --line-strong: #c8d1dc;
+
+        --text: #202124;
+        --text-muted: rgba(32, 33, 36, 0.72);
+        --text-faint: rgba(32, 33, 36, 0.54);
+        --text-subtle: rgba(32, 33, 36, 0.36);
+
+        --warm: #d99a20;
+        --danger: #d94d5c;
+        --success: #16a36a;
+        --forge: #287783;
+        --promotion: #946400;
+
+        --chrome-strip-height: 30px;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--act-font-ui);
+        font-feature-settings: normal;
+        letter-spacing: 0;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      button {
+        font: inherit;
+        margin: 0;
+        padding: 0;
+        background: none;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      /* ============================ shell ============================ */
+      .shell {
+        height: 100vh;
+        display: grid;
+        grid-template-columns: 56px minmax(0, 1fr);
+        background: var(--bg);
+      }
+
+      .chrome {
+        position: fixed;
+        inset: 0 0 auto 0;
+        height: var(--chrome-strip-height);
+        display: grid;
+        grid-template-columns: 56px 1fr 56px;
+        align-items: center;
+        padding: 0 12px;
+        z-index: 10;
+        pointer-events: none;
+      }
+      .chrome__traffic {
+        display: flex;
+        gap: 8px;
+        padding-left: 2px;
+      }
+      .chrome__traffic span {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        display: block;
+      }
+      .chrome__traffic span:nth-child(1) { background: #ff5f57; }
+      .chrome__traffic span:nth-child(2) { background: #febc2e; }
+      .chrome__traffic span:nth-child(3) { background: #28c840; }
+      .chrome__title {
+        text-align: center;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-faint);
+        letter-spacing: 0;
+      }
+
+      /* ============================ sidebar ============================ */
+      .sidebar {
+        background: var(--sidebar);
+        border-right: 1px solid var(--line);
+        padding-top: calc(var(--chrome-strip-height) + 8px);
+        padding-bottom: 8px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 6px;
+      }
+      .sidebar__nav,
+      .sidebar__footer {
+        display: grid;
+        gap: 2px;
+        padding: 0 8px;
+      }
+      .sidebar__item {
+        display: grid;
+        place-items: center;
+        height: 36px;
+        border-radius: 8px;
+        color: var(--text-faint);
+        transition: background 120ms ease, color 120ms ease;
+      }
+      .sidebar__item:hover {
+        background: rgba(0, 0, 0, 0.04);
+        color: var(--text);
+      }
+      .sidebar__item.is-active {
+        background: var(--sidebar-selected);
+        color: var(--text);
+      }
+      .sidebar__item svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      /* ============================ page ============================ */
+      .page {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 20px;
+        padding: calc(var(--chrome-strip-height) + 20px) 28px 28px;
+        min-height: 0;
+      }
+
+      /* topbar */
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .topbar__title {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.005em;
+        line-height: 1;
+        color: var(--text);
+      }
+      .topbar__actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .btn {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 140ms ease, color 140ms ease,
+          border-color 140ms ease, transform 140ms ease;
+      }
+      .btn:active { transform: translateY(1px); }
+      .btn--secondary {
+        background: var(--surface);
+        color: var(--text-muted);
+        border: 1px solid var(--line);
+      }
+      .btn--secondary:hover {
+        background: var(--surface-subtle);
+        color: var(--text);
+        border-color: var(--line-strong);
+      }
+      .btn--primary {
+        background: var(--brand);
+        color: #ffffff;
+        border: 1px solid transparent;
+        box-shadow: 0 1px 2px rgba(47, 111, 255, 0.28),
+          0 0 0 1px rgba(47, 111, 255, 0.12);
+      }
+      .btn--primary:hover {
+        background: var(--brand-strong);
+        box-shadow: 0 2px 6px rgba(47, 111, 255, 0.32),
+          0 0 0 1px rgba(47, 111, 255, 0.16);
+      }
+
+      /* board */
+      .board {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(230px, 1fr));
+        gap: 16px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      @media (max-width: 1100px) {
+        .board {
+          grid-template-columns: repeat(4, minmax(260px, 1fr));
+          overflow-x: auto;
+        }
+      }
+
+      /* column */
+      .column {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        min-height: 0;
+      }
+      .column__head {
+        min-height: 42px;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      .column--hypothesis .column__head { background: rgba(47, 111, 255, 0.045); }
+      .column--verification .column__head { background: rgba(217, 154, 32, 0.05); }
+      .column--forge .column__head { background: rgba(40, 119, 131, 0.045); }
+      .column--promotion .column__head { background: rgba(148, 100, 0, 0.05); }
+
+      .column__accent {
+        width: 3px;
+        height: 12px;
+        border-radius: 999px;
+        display: block;
+      }
+      .column--hypothesis .column__accent { background: var(--brand); }
+      .column--verification .column__accent { background: var(--warm); }
+      .column--forge .column__accent { background: var(--forge); }
+      .column--promotion .column__accent { background: var(--promotion); }
+
+      .column__title {
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1;
+        color: var(--text);
+      }
+      .column__count {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-faint);
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+      .column__add {
+        margin-left: auto;
+        width: 24px;
+        height: 24px;
+        display: grid;
+        place-items: center;
+        border-radius: 6px;
+        color: var(--text-faint);
+        transition: background 120ms ease, color 120ms ease;
+      }
+      .column__add:hover {
+        background: rgba(0, 0, 0, 0.04);
+        color: var(--brand);
+      }
+      .column__add svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      .column__body {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+        overflow: auto;
+        min-height: 0;
+      }
+      .column__empty {
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--text-subtle);
+        padding: 4px 4px 0;
+        margin: 0;
+      }
+
+      /* card */
+      .card {
+        position: relative;
+        display: grid;
+        grid-template-rows: auto auto auto;
+        justify-items: start;
+        gap: 5px;
+        padding: 10px 12px;
+        min-height: 76px;
+        background: var(--surface);
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        text-align: left;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+        transition: background 140ms ease, border-color 140ms ease,
+          box-shadow 140ms ease;
+      }
+      .card:hover {
+        border-color: #a8b3c0;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+      }
+      .card.is-selected {
+        background: var(--brand-soft);
+        border-color: var(--brand);
+        box-shadow: 0 2px 8px rgba(47, 111, 255, 0.14);
+      }
+      .card.is-selected:hover {
+        box-shadow: 0 2px 8px rgba(47, 111, 255, 0.14);
+      }
+      .card.is-selected::before {
+        content: "";
+        position: absolute;
+        top: 8px;
+        bottom: 8px;
+        left: -1px;
+        width: 3px;
+        border-radius: 999px;
+        background: var(--brand);
+      }
+      .card__tag {
+        display: inline-flex;
+        align-items: center;
+        height: 18px;
+        padding: 0 7px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1;
+        white-space: nowrap;
+      }
+      .card__title {
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 1.4;
+        color: var(--text);
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .card__meta {
+        font-size: 11px;
+        line-height: 1.4;
+        color: var(--text-faint);
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* ============================ modal ============================ */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.25);
+        display: grid;
+        place-items: center;
+        padding: 32px;
+        z-index: 20;
+      }
+      .overlay[hidden] { display: none; }
+      .modal {
+        width: min(860px, calc(100vw - 64px));
+        max-height: min(760px, calc(100vh - 64px));
+        background: var(--surface);
+        border: 1px solid var(--line-strong);
+        border-radius: 16px;
+        box-shadow: 0 24px 64px rgba(31, 45, 61, 0.14);
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        overflow: hidden;
+      }
+      .modal__head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 78px;
+        padding: 0 28px;
+        border-bottom: 1px solid var(--line);
+      }
+      .modal__title {
+        font-size: 22px;
+        font-weight: 600;
+        color: var(--text);
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .modal__icon-btn {
+        width: 32px;
+        height: 32px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--text-faint);
+        transition: background 140ms ease, color 140ms ease,
+          border-color 140ms ease;
+      }
+      .modal__icon-btn:hover {
+        background: var(--surface-subtle);
+        color: var(--text);
+        border-color: var(--line-strong);
+      }
+      .modal__icon-btn svg { width: 16px; height: 16px; }
+
+      .modal__body {
+        padding: 26px 28px;
+        overflow: auto;
+      }
+      .modal__grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 246px;
+        gap: 28px;
+      }
+      @media (max-width: 1100px) {
+        .modal__grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .modal__section + .modal__section { margin-top: 24px; }
+      .modal__section h3 {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 8px;
+      }
+      .modal__section p {
+        font-size: 13px;
+        line-height: 1.65;
+        color: var(--text-muted);
+      }
+      .modal__checks {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .modal__checks li {
+        display: grid;
+        grid-template-columns: 18px 1fr;
+        gap: 8px;
+        align-items: center;
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+      .modal__check-tick {
+        display: grid;
+        place-items: center;
+        width: 16px;
+        height: 16px;
+        border-radius: 5px;
+        background: var(--brand-soft);
+        color: var(--brand-strong);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .modal__aside {
+        padding-left: 24px;
+        border-left: 1px solid var(--line);
+      }
+      .modal__aside-item + .modal__aside-item { margin-top: 18px; }
+      .modal__aside-label {
+        font-size: 11px;
+        color: var(--text-subtle);
+        display: block;
+      }
+      .modal__aside-value {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text);
+        display: block;
+        margin-top: 5px;
+      }
+
+      .modal__foot {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 64px;
+        padding: 0 28px;
+        border-top: 1px solid var(--line);
+      }
+
+      /* notes footer */
+      .notes {
+        position: fixed;
+        right: 16px;
+        bottom: 14px;
+        max-width: 320px;
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 11px;
+        color: var(--text-faint);
+        line-height: 1.5;
+        box-shadow: 0 8px 24px rgba(31, 45, 61, 0.08);
+      }
+      .notes b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .notes kbd {
+        font-family: var(--act-font-ui);
+        font-size: 10px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: var(--surface-subtle);
+        border: 1px solid var(--line);
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- macOS chrome strip with traffic light + center title -->
+    <div class="chrome">
+      <div class="chrome__traffic" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="chrome__title">Lab</div>
+      <div></div>
+    </div>
+
+    <div class="shell">
+      <!-- collapsed sidebar -->
+      <aside class="sidebar" aria-label="Sidebar">
+        <div class="sidebar__nav">
+          <button class="sidebar__item" title="New Agent">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+          </button>
+          <button class="sidebar__item is-active" title="Lab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6"></path><path d="M10 2v6L4 18a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3L14 8V2"></path><path d="M7 14h10"></path></svg>
+          </button>
+          <button class="sidebar__item" title="Usage">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M7 16l4-4 3 3 5-6"></path></svg>
+          </button>
+          <button class="sidebar__item" title="Kairos">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+          </button>
+        </div>
+        <div></div>
+        <div class="sidebar__footer">
+          <button class="sidebar__item" title="Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"></path></svg>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Lab page -->
+      <main class="page" aria-label="Lab 实验台">
+        <header class="topbar">
+          <h1 class="topbar__title">Lab</h1>
+          <div class="topbar__actions">
+            <button class="btn btn--secondary" type="button">已完成实验</button>
+            <button class="btn btn--primary" type="button" onclick="openDetail()">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" style="margin-left:-2px"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              新实验
+            </button>
+          </div>
+        </header>
+
+        <section class="board" aria-label="Lab experiments">
+          <!-- 假说构建 -->
+          <section class="column column--hypothesis" aria-label="假说构建">
+            <header class="column__head">
+              <span class="column__accent" aria-hidden="true"></span>
+              <h2 class="column__title">假说构建</h2>
+              <span class="column__count">5</span>
+              <button class="column__add" type="button" title="添加假说" aria-label="添加假说">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+            </header>
+            <div class="column__body">
+              <button class="card is-selected" type="button" onclick="openDetail()">
+                <span class="card__tag" style="color:#1f5fe8;background:color-mix(in srgb, #1f5fe8 13%, #fff);">主假说</span>
+                <span class="card__title">让 Agent 锻造 Rust CLI</span>
+                <span class="card__meta">CLI · 12m 前</span>
+              </button>
+              <button class="card" type="button">
+                <span class="card__tag" style="color:#6b7280;background:color-mix(in srgb, #6b7280 13%, #fff);">草稿</span>
+                <span class="card__title">失败任务沉淀 skill</span>
+                <span class="card__meta">Kairos · 昨天</span>
+              </button>
+              <button class="card" type="button">
+                <span class="card__tag" style="color:#d94d5c;background:color-mix(in srgb, #d94d5c 13%, #fff);">阻塞</span>
+                <span class="card__title">评估 web_search 证据质量</span>
+                <span class="card__meta">等待引用策略</span>
+              </button>
+              <button class="card" type="button">
+                <span class="card__tag" style="color:#1f5fe8;background:color-mix(in srgb, #1f5fe8 13%, #fff);">候选</span>
+                <span class="card__title">长输出裁剪规则</span>
+                <span class="card__meta">Main Agent · 2h 前</span>
+              </button>
+              <button class="card" type="button">
+                <span class="card__tag" style="color:#6b7280;background:color-mix(in srgb, #6b7280 13%, #fff);">草稿</span>
+                <span class="card__title">沉淀多模型搜索经验</span>
+                <span class="card__meta">User · 今天</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- 实证验证 -->
+          <section class="column column--verification" aria-label="实证验证">
+            <header class="column__head">
+              <span class="column__accent" aria-hidden="true"></span>
+              <h2 class="column__title">实证验证</h2>
+              <span class="column__count">3</span>
+              <button class="column__add" type="button" title="添加验证" aria-label="添加验证">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+            </header>
+            <div class="column__body">
+              <button class="card" type="button">
+                <span class="card__tag" style="color:#d99a20;background:color-mix(in srgb, #d99a20 13%, #fff);">验证中</span>
+                <span class="card__title">3 组样例验证</span>
+                <span class="card__meta">证据 5 · 1 次失败</span>
+              </button>
+              <button class="card" type="button">
+                <span class="card__tag" style="color:#16a36a;background:color-mix(in srgb, #16a36a 13%, #fff);">通过</span>
+                <span class="card__title">复盘验证记录</span>
+                <span class="card__meta">证据 7</span>
+              </button>
+              <button class="card" type="button">
+                <span class="card__tag" style="color:#d99a20;background:color-mix(in srgb, #d99a20 13%, #fff);">验证</span>
+                <span class="card__title">对比 6 类工具输出</span>
+                <span class="card__meta">证据 10 · 失败 0</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- 能力锻造 -->
+          <section class="column column--forge" aria-label="能力锻造">
+            <header class="column__head">
+              <span class="column__accent" aria-hidden="true"></span>
+              <h2 class="column__title">能力锻造</h2>
+              <span class="column__count">2</span>
+              <button class="column__add" type="button" title="添加产物" aria-label="添加产物">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+            </header>
+            <div class="column__body">
+              <button class="card" type="button">
+                <span class="card__tag" style="color:#287783;background:color-mix(in srgb, #287783 13%, #fff);">CLI</span>
+                <span class="card__title">act-log-scan</span>
+                <span class="card__meta">已验证 · 2 子命令</span>
+              </button>
+              <button class="card" type="button">
+                <span class="card__tag" style="color:#287783;background:color-mix(in srgb, #287783 13%, #fff);">skill</span>
+                <span class="card__title">frontend 验证 skill</span>
+                <span class="card__meta">草稿 · 待补充</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- 晋升评审 -->
+          <section class="column column--promotion" aria-label="晋升评审">
+            <header class="column__head">
+              <span class="column__accent" aria-hidden="true"></span>
+              <h2 class="column__title">晋升评审</h2>
+              <span class="column__count">1</span>
+              <button class="column__add" type="button" title="提交评审" aria-label="提交评审">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+            </header>
+            <div class="column__body">
+              <button class="card" type="button">
+                <span class="card__tag" style="color:#946400;background:color-mix(in srgb, #946400 13%, #fff);">待评审</span>
+                <span class="card__title">候选 CLI 晋升</span>
+                <span class="card__meta">高风险 · 4 检查</span>
+              </button>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <!-- 卡片详情弹窗（可选展示 / 通过 + 新实验或卡片触发） -->
+    <div class="overlay" id="detail-overlay" hidden role="presentation" onclick="closeDetail(event)">
+      <section
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="detail-title"
+        onclick="event.stopPropagation()"
+      >
+        <header class="modal__head">
+          <h2 class="modal__title" id="detail-title">让 Agent 锻造 Rust CLI</h2>
+          <span class="card__tag" style="color:#1f5fe8;background:color-mix(in srgb, #1f5fe8 13%, #fff); flex-shrink:0;">主假说</span>
+          <button class="modal__icon-btn" type="button" aria-label="关闭" onclick="closeDetail()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </header>
+        <div class="modal__body">
+          <div class="modal__grid">
+            <section>
+              <section class="modal__section">
+                <h3>问题</h3>
+                <p>Agent 经常需要重复解析日志、文件结构和命令输出，当前只能靠临时 bash 片段和聊天上下文维持。</p>
+              </section>
+              <section class="modal__section">
+                <h3>能力缺口</h3>
+                <p>缺少一个可被 bash 稳定调用、可测试、可复用的 CLI 能力，用来把高频解析动作从临时步骤变成长期工具候选。</p>
+              </section>
+              <section class="modal__section">
+                <h3>假说</h3>
+                <p>如果把高频解析逻辑封装成 Rust CLI，主 Agent 可以通过 bash 工具稳定复用，并且更容易记录证据、测试和错误边界。</p>
+              </section>
+              <section class="modal__section">
+                <h3>检查项</h3>
+                <ul class="modal__checks">
+                  <li><span class="modal__check-tick" aria-hidden="true">✓</span>CLI 能处理 3 组样例输入</li>
+                  <li><span class="modal__check-tick" aria-hidden="true">✓</span>有明确错误输出</li>
+                  <li><span class="modal__check-tick" aria-hidden="true">✓</span>包含最小测试</li>
+                  <li><span class="modal__check-tick" aria-hidden="true">✓</span>不默认启用，必须进入晋升评审</li>
+                </ul>
+              </section>
+            </section>
+            <aside class="modal__aside">
+              <div class="modal__aside-item">
+                <span class="modal__aside-label">所属实验</span>
+                <strong class="modal__aside-value">Agent CLI Forge</strong>
+              </div>
+              <div class="modal__aside-item">
+                <span class="modal__aside-label">阶段</span>
+                <strong class="modal__aside-value">假说构建</strong>
+              </div>
+              <div class="modal__aside-item">
+                <span class="modal__aside-label">创建者</span>
+                <strong class="modal__aside-value">User</strong>
+              </div>
+              <div class="modal__aside-item">
+                <span class="modal__aside-label">更新时间</span>
+                <strong class="modal__aside-value">12m 前</strong>
+              </div>
+              <div class="modal__aside-item">
+                <span class="modal__aside-label">关联证据</span>
+                <strong class="modal__aside-value">0</strong>
+              </div>
+              <div class="modal__aside-item">
+                <span class="modal__aside-label">关联产物</span>
+                <strong class="modal__aside-value">0</strong>
+              </div>
+            </aside>
+          </div>
+        </div>
+        <footer class="modal__foot">
+          <button class="btn btn--secondary" type="button">编辑</button>
+          <button class="btn btn--primary" type="button">进入实证验证</button>
+          <button class="modal__icon-btn" type="button" aria-label="更多操作" style="margin-left:auto;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg>
+          </button>
+        </footer>
+      </section>
+    </div>
+
+    <aside class="notes" aria-label="设计备注">
+      <b>Lab 视觉重构 · 2026-05-28</b><br />
+      白底列体 + 列头 5% 阶段色块 + 左 3px 阶段色线；卡片胶囊 18px / 11px；移除虚线 placeholder。
+      点击任意卡片或<kbd>+ 新实验</kbd>查看详情弹窗。
+    </aside>
+
+    <script>
+      function openDetail() {
+        document.getElementById("detail-overlay").hidden = false;
+      }
+      function closeDetail(event) {
+        if (!event || event.target === event.currentTarget) {
+          document.getElementById("detail-overlay").hidden = true;
+        }
+      }
+      document.querySelectorAll(".card").forEach((card) => {
+        card.addEventListener("click", () => {
+          document.querySelectorAll(".card.is-selected").forEach((el) => el.classList.remove("is-selected"));
+          card.classList.add("is-selected");
+          openDetail();
+        });
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          document.getElementById("detail-overlay").hidden = true;
+        }
+      });
+    </script>
+  </body>
+</html>

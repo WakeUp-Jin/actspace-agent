@@ -23,7 +23,9 @@ import type { LLMService } from "../llm/types";
 import type { ToolManager, KairosGuardContext } from "../tools/manager";
 import { runAgentLoop } from "../engine/loop";
 import type { AgentEvent, AgentLoopConfig } from "../engine/types";
-import type { SessionEvent, SessionEventType } from "@actspace/shared";
+import type { LlmUsagePayload, SessionEvent, SessionEventType } from "@actspace/shared";
+import { resolveModelSpecByApiModel } from "@actspace/shared";
+import { calculateUsageCost } from "../usage";
 import type { KairosShortTermMemoryContext } from "./context/short-term";
 import type { KairosConfig } from "./config/loader";
 import type { WatchDiffEntry } from "./context/watch-diff";
@@ -136,12 +138,14 @@ export class KairosRunner {
 
     // 5) 跑 runAgentLoop；把 AgentEvent 转 SessionEvent → eventSink
     const turnEventBuffer: SessionEvent[] = [];
+    let usageCallIndex = 0;
     const onEvent = async (ev: AgentEvent) => {
       const sessionEvents = agentEventToSessionEvents(ev, {
         sessionId,
         turnId,
         now: this.opts.now ?? (() => new Date()),
         newId: () => makeId("evt", this.opts.newId),
+        nextUsageCallId: () => `llm_call_${turnId}_${++usageCallIndex}`,
       });
       for (const se of sessionEvents) {
         turnEventBuffer.push(se);
@@ -189,13 +193,22 @@ interface AgentEventConvertCtx {
   turnId: string;
   now: () => Date;
   newId: () => string;
+  /**
+   * 为本次 turn 内每次 LLM 回复生成一个稳定 callId（counter 自增）。
+   * 同一 message_end 对应的 `llm_usage` 事件用同一个 id，便于后续按 call 维度聚合统计。
+   */
+  nextUsageCallId: () => string;
 }
 
 /**
  * AgentEvent → SessionEvent[] 翻译。
- * 只产出 Kairos 需要在 short-term 里"重放回 LLM"的事件：
- *   tool_call / tool_result / assistant_message
- * （thinking/usage 不落，以节省 token；plan 6 渲染 UI 时 ring-buffer 已包含全部 lifecycle）。
+ *
+ * 产出策略：
+ * - `tool_call` / `tool_result` / `assistant_message`：短期记忆需要"重放回 LLM"，必落。
+ * - `llm_usage`：每次 assistant message_end 落一条，承载 token/成本事实。
+ *   注：`toLlmMessages` 不翻译 `llm_usage`，所以它不会被回灌进 LLM messages 段，
+ *   但前端聚合（用量胶囊、未来日历视图）和跨重启统计都依赖这条事件。
+ * - thinking 仍不落（不需要回放给 LLM，UI 也暂不展示）。
  */
 function agentEventToSessionEvents(
   ev: AgentEvent,
@@ -242,12 +255,70 @@ function agentEventToSessionEvents(
             provider: ev.message.provider,
           }));
         }
+        // 每次 LLM 回复都落一条 llm_usage（即使是纯工具调用回合，也消耗了 prompt tokens）。
+        const usage = buildKairosLlmUsagePayload(ev.message, ctx.nextUsageCallId());
+        if (usage) {
+          out.push(makeEvent(ctx, ts, "llm_usage", usage));
+        }
       }
       break;
     default:
       break;
   }
   return out;
+}
+
+/**
+ * 把 AssistantMessage.usage 转成可持久化的 `LlmUsagePayload`。
+ *
+ * 价格按调用时 `model-config.ts` 的快照计算并写盘；后续即使价格调整或模型下架，
+ * 历史成本展示也保持稳定。模型未在注册表中匹配时 `cost.total` 为 0，仍写一条事件
+ * 保留 token 事实。
+ *
+ * 若 usage 字段为 0/缺失（mock provider 等情况），返回 null 让调用方跳过。
+ */
+function buildKairosLlmUsagePayload(
+  message: AssistantMessage,
+  callId: string,
+): LlmUsagePayload | null {
+  const usage = message.usage;
+  if (!usage) return null;
+  const inputTokens = usage.input ?? 0;
+  const outputTokens = usage.output ?? 0;
+  const totalTokens = usage.totalTokens ?? inputTokens + outputTokens;
+  if (inputTokens === 0 && outputTokens === 0 && totalTokens === 0) {
+    return null;
+  }
+  const provider = (message.provider as "deepseek" | "kimi" | "mock" | undefined) ?? "kairos";
+  const modelSpec = resolveModelSpecByApiModel(
+    message.model,
+    provider === "deepseek" || provider === "kimi" ? provider : undefined,
+  );
+  const cacheHitTokens = usage.cacheHit || usage.cacheRead || undefined;
+  const cacheMissTokens = usage.cacheMiss || undefined;
+  return {
+    callId,
+    provider,
+    model: message.model,
+    modelId: modelSpec?.id,
+    promptTokens: inputTokens,
+    completionTokens: outputTokens,
+    totalTokens,
+    reasoningTokens: usage.reasoning || undefined,
+    cacheHitTokens,
+    cacheMissTokens,
+    cost: calculateUsageCost(
+      {
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        reasoningTokens: usage.reasoning,
+        cacheHitTokens,
+        cacheMissTokens,
+      },
+      modelSpec?.pricing,
+    ),
+  };
 }
 
 function makeEvent<T>(

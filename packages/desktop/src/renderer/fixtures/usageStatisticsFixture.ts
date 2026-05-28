@@ -1,12 +1,14 @@
 import type { UsageStatisticsSnapshot } from "@actspace/shared";
 
 export const mockUsageStatistics: UsageStatisticsSnapshot = {
-  sessionId: "session-learning-doc-plan",
-  title: "Learning documentation plan",
+  scope: "global",
+  sessionId: null,
+  title: "全部数据",
   range: "month",
   generatedAt: "2026-05-26T08:00:00.000Z",
   periodStart: "2026-04-27T00:00:00.000Z",
   periodEnd: "2026-05-26T08:00:00.000Z",
+  sourceCount: 8,
   summary: {
     totalTokens: 539_108_260,
     promptTokens: 18_300_000,
@@ -50,6 +52,11 @@ export const mockUsageStatistics: UsageStatisticsSnapshot = {
       conversationCount: 142,
       toolCallCount: 118,
       costUsd: 16.42,
+      modelBreakdown: [
+        { name: "gpt-5.5", totalTokens: 16_117_711, percent: 48 },
+        { name: "claude-4.6-opus-high-thinking", totalTokens: 11_726_519, percent: 34.9 },
+        { name: "gpt-5.4", totalTokens: 4_031_628, percent: 12 },
+      ],
     },
     {
       date: "2026-05-25",
@@ -61,6 +68,11 @@ export const mockUsageStatistics: UsageStatisticsSnapshot = {
       conversationCount: 676,
       toolCallCount: 271,
       costUsd: 73.08,
+      modelBreakdown: [
+        { name: "gpt-5.5", totalTokens: 86_432_193, percent: 61 },
+        { name: "claude-4.6-opus-high-thinking", totalTokens: 49_491_902, percent: 34.9 },
+        { name: "gpt-5.4", totalTokens: 5_768_024, percent: 4.1 },
+      ],
     },
     {
       date: "2026-05-24",
@@ -72,6 +84,11 @@ export const mockUsageStatistics: UsageStatisticsSnapshot = {
       conversationCount: 732,
       toolCallCount: 203,
       costUsd: 41.8,
+      modelBreakdown: [
+        { name: "claude-4.6-opus-high-thinking", totalTokens: 43_866_991, percent: 57.7 },
+        { name: "gpt-5.5", totalTokens: 30_433_048, percent: 40 },
+        { name: "gpt-5.4", totalTokens: 1_782_581, percent: 2.3 },
+      ],
     },
     {
       date: "2026-05-23",
@@ -83,6 +100,11 @@ export const mockUsageStatistics: UsageStatisticsSnapshot = {
       conversationCount: 363,
       toolCallCount: 238,
       costUsd: 52.13,
+      modelBreakdown: [
+        { name: "gpt-5.5", totalTokens: 56_167_325, percent: 60 },
+        { name: "claude-4.6-opus-high-thinking", totalTokens: 33_700_395, percent: 36 },
+        { name: "gpt-5.4", totalTokens: 3_744_488, percent: 4 },
+      ],
     },
   ],
 };

@@ -3,13 +3,20 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type {
   KairosBridgeApi,
+  KairosContextSnapshot,
   KairosControl,
   KairosControlResponse,
   KairosGetEventsRecentResponse,
   KairosRuntimeState,
+  KairosUsageSummary,
   SessionEvent,
 } from "@actspace/shared";
+import { emptyKairosUsageSummary } from "@actspace/shared";
 import { KairosPage } from "../pages/KairosPage";
+
+function emptyUsage(): KairosUsageSummary {
+  return emptyKairosUsageSummary();
+}
 
 /*
  * v1.0：原 KairosConfigTab UI 已移除，因此 readConfig / writeConfig 不再有 KairosPage
@@ -35,6 +42,8 @@ function installFakeBridge(opts: FakeKairosOptions = {}): {
     todayTickCount: 0,
     toolCallCountInCurrentTick: 0,
     totalSleepSecondsToday: 0,
+    usageLifetime: emptyUsage(),
+    usageSinceReset: emptyUsage(),
   };
   const bridge: KairosBridgeApi = {
     getState: vi.fn(async () => opts.initialState ?? defaultState),
@@ -47,6 +56,19 @@ function installFakeBridge(opts: FakeKairosOptions = {}): {
       async () => ({ content: "", fileName: "preferences.json", notFound: true }),
     ),
     writeConfig: vi.fn(async () => ({ ok: true } as const)),
+    getContextSnapshot: vi.fn(
+      async (): Promise<KairosContextSnapshot> => ({
+        generatedAt: new Date().toISOString(),
+        modelId: null,
+        phase: "work",
+        systemPrompt: "",
+        systemPromptTokens: 0,
+        systemPromptSegments: [],
+        historySummary: [],
+        historyMessages: [],
+        tools: [],
+      }),
+    ),
     onEvent: (listener) => {
       eventListener = listener;
       return () => {
@@ -116,6 +138,8 @@ describe("KairosPage", () => {
         todayTickCount: 2,
         toolCallCountInCurrentTick: 0,
         totalSleepSecondsToday: 120,
+        usageLifetime: emptyUsage(),
+        usageSinceReset: emptyUsage(),
       },
     });
     const user = userEvent.setup();
@@ -132,6 +156,8 @@ describe("KairosPage", () => {
         todayTickCount: 2,
         toolCallCountInCurrentTick: 0,
         totalSleepSecondsToday: 120,
+        usageLifetime: emptyUsage(),
+        usageSinceReset: emptyUsage(),
       });
     });
 
@@ -171,13 +197,15 @@ describe("KairosPage", () => {
         todayTickCount: 4,
         toolCallCountInCurrentTick: 1,
         totalSleepSecondsToday: 300,
+        usageLifetime: emptyUsage(),
+        usageSinceReset: emptyUsage(),
       },
     });
     render(<KairosPage />);
     expect(await screen.findByText(/Sleeping/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "暂停" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "立即唤醒" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "重置今日" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "唤醒" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重置" })).toBeInTheDocument();
     expect(screen.queryByText(/Workspace/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Session/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Last wake/)).not.toBeInTheDocument();
@@ -433,6 +461,8 @@ describe("KairosPage", () => {
         todayTickCount: 2,
         toolCallCountInCurrentTick: 0,
         totalSleepSecondsToday: 120,
+        usageLifetime: emptyUsage(),
+        usageSinceReset: emptyUsage(),
       },
       initialEvents: [
         makeEvent({
@@ -453,7 +483,7 @@ describe("KairosPage", () => {
     const list = await screen.findByLabelText("执行列表");
     expect(within(list).getByText("before reset")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "重置今日" }));
+    await user.click(screen.getByRole("button", { name: "重置" }));
 
     expect(bridge.control).toHaveBeenCalledWith({ type: "reset_today" });
     expect(await screen.findByText(/暂无 Kairos 事件/)).toBeInTheDocument();
@@ -468,6 +498,159 @@ describe("KairosPage", () => {
     expect(screen.queryByLabelText(/preferences 原始内容/)).not.toBeInTheDocument();
   });
 
+  it("renders the header usage badge with an empty placeholder when no llm_usage events are present", async () => {
+    installFakeBridge();
+    render(<KairosPage />);
+
+    const badge = await screen.findByTestId("kairos-usage-badge");
+    expect(badge.dataset.hasData).toBe("false");
+    expect(within(badge).getByTestId("kairos-usage-tokens")).toHaveTextContent("0 tok");
+    expect(within(badge).queryByTestId("kairos-usage-cost")).not.toBeInTheDocument();
+  });
+
+  it("renders tokens + cost in the header badge from KairosRuntimeState.usageSinceReset (default mode)", async () => {
+    // 默认 mode = sinceReset；fixture 构造"累计 5 次调用、本阶段 2 次"，确认胶囊
+    // 默认显示的是阶段维度。
+    window.localStorage.removeItem("kairos.usageBadgeMode");
+    installFakeBridge({
+      initialState: {
+        enabled: true,
+        state: "ticking",
+        todayTickCount: 3,
+        toolCallCountInCurrentTick: 1,
+        totalSleepSecondsToday: 30,
+        usageLifetime: {
+          callCount: 5,
+          promptTokens: 30_000,
+          completionTokens: 7_000,
+          totalTokens: 37_000,
+          reasoningTokens: 0,
+          cacheHitTokens: 3_000,
+          cacheMissTokens: 6_000,
+          cost: 0.6,
+          currency: "CNY",
+        },
+        usageSinceReset: {
+          callCount: 2,
+          promptTokens: 12_000,
+          completionTokens: 3_400,
+          totalTokens: 15_400,
+          reasoningTokens: 0,
+          cacheHitTokens: 1_500,
+          cacheMissTokens: 2_500,
+          cost: 0.181,
+          currency: "CNY",
+        },
+      },
+    });
+    render(<KairosPage />);
+
+    const badge = await screen.findByTestId("kairos-usage-badge");
+    expect(badge.dataset.hasData).toBe("true");
+    expect(badge.dataset.mode).toBe("sinceReset");
+    expect(within(badge).getByTestId("kairos-usage-tokens")).toHaveTextContent("15.4K tok");
+    expect(within(badge).getByTestId("kairos-usage-cost")).toHaveTextContent("¥0.18");
+    expect(within(badge).getByTestId("kairos-usage-mode-chip")).toHaveTextContent("本阶段");
+    // tooltip 含当前 mode 明细，并提示对面 mode 的总数（让用户瞥一眼就有总览）。
+    const tooltip = badge.getAttribute("title") ?? "";
+    expect(tooltip).toContain("【本阶段】LLM 调用 2 次");
+    expect(tooltip).toContain("缓存命中 1.5K");
+    expect(tooltip).toContain("点击图标切换至「累计」");
+    expect(tooltip).toContain("累计 37.0K tok");
+  });
+
+  it("toggles between lifetime / sinceReset when the badge logo is clicked and persists choice in localStorage", async () => {
+    window.localStorage.removeItem("kairos.usageBadgeMode");
+    installFakeBridge({
+      initialState: {
+        enabled: true,
+        state: "ticking",
+        todayTickCount: 3,
+        toolCallCountInCurrentTick: 1,
+        totalSleepSecondsToday: 30,
+        usageLifetime: {
+          callCount: 5,
+          promptTokens: 30_000,
+          completionTokens: 7_000,
+          totalTokens: 37_000,
+          reasoningTokens: 0,
+          cacheHitTokens: 3_000,
+          cacheMissTokens: 6_000,
+          cost: 0.6,
+          currency: "CNY",
+        },
+        usageSinceReset: {
+          callCount: 2,
+          promptTokens: 12_000,
+          completionTokens: 3_400,
+          totalTokens: 15_400,
+          reasoningTokens: 0,
+          cacheHitTokens: 1_500,
+          cacheMissTokens: 2_500,
+          cost: 0.181,
+          currency: "CNY",
+        },
+      },
+    });
+    const user = userEvent.setup();
+    render(<KairosPage />);
+
+    const badge = await screen.findByTestId("kairos-usage-badge");
+    expect(badge.dataset.mode).toBe("sinceReset");
+    expect(within(badge).getByTestId("kairos-usage-tokens")).toHaveTextContent("15.4K tok");
+
+    // 点击切换按钮 → 切到 lifetime
+    await user.click(within(badge).getByTestId("kairos-usage-toggle"));
+    expect(badge.dataset.mode).toBe("lifetime");
+    expect(within(badge).getByTestId("kairos-usage-tokens")).toHaveTextContent("37.0K tok");
+    expect(within(badge).getByTestId("kairos-usage-mode-chip")).toHaveTextContent("累计");
+    expect(window.localStorage.getItem("kairos.usageBadgeMode")).toBe("lifetime");
+
+    // 再点一次切回
+    await user.click(within(badge).getByTestId("kairos-usage-toggle"));
+    expect(badge.dataset.mode).toBe("sinceReset");
+    expect(window.localStorage.getItem("kairos.usageBadgeMode")).toBe("sinceReset");
+  });
+
+  it("updates header usage badge live when controller pushes new usage state", async () => {
+    window.localStorage.removeItem("kairos.usageBadgeMode");
+    const { pushState } = installFakeBridge();
+    render(<KairosPage />);
+
+    // 启动瞬间 controller 还没产生 llm_usage，胶囊默认空。
+    const badge = await screen.findByTestId("kairos-usage-badge");
+    expect(badge.dataset.hasData).toBe("false");
+
+    // 模拟 controller eventSink 在累加完一条 llm_usage 后推送新 state（两份维度同步增长）。
+    const sampleUsage = {
+      callCount: 1,
+      promptTokens: 800,
+      completionTokens: 200,
+      totalTokens: 1_000,
+      reasoningTokens: 0,
+      cacheHitTokens: 0,
+      cacheMissTokens: 800,
+      cost: 0.005,
+      currency: "USD" as const,
+    };
+    act(() => {
+      pushState({
+        enabled: true,
+        state: "ticking",
+        todayTickCount: 1,
+        toolCallCountInCurrentTick: 0,
+        totalSleepSecondsToday: 0,
+        usageLifetime: sampleUsage,
+        usageSinceReset: sampleUsage,
+      });
+    });
+
+    const refreshed = await screen.findByTestId("kairos-usage-badge");
+    expect(refreshed.dataset.hasData).toBe("true");
+    expect(within(refreshed).getByTestId("kairos-usage-tokens")).toHaveTextContent("1.0K tok");
+    expect(within(refreshed).getByTestId("kairos-usage-cost")).toHaveTextContent("$0.0050");
+  });
+
   it("reflects pushed state updates from stream", async () => {
     const { pushState } = installFakeBridge({
       initialState: {
@@ -476,6 +659,8 @@ describe("KairosPage", () => {
         todayTickCount: 0,
         toolCallCountInCurrentTick: 0,
         totalSleepSecondsToday: 0,
+        usageLifetime: emptyUsage(),
+        usageSinceReset: emptyUsage(),
       },
     });
     render(<KairosPage />);
@@ -487,6 +672,8 @@ describe("KairosPage", () => {
         todayTickCount: 3,
         toolCallCountInCurrentTick: 2,
         totalSleepSecondsToday: 120,
+        usageLifetime: emptyUsage(),
+        usageSinceReset: emptyUsage(),
       });
     });
     expect(await screen.findByText(/Ticking/)).toBeInTheDocument();

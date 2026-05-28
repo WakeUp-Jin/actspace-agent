@@ -105,8 +105,8 @@ describe("buildHistorySummary", () => {
     const r: KairosShortTermLoadResult = {
       messages: [],
       summarySegments: [
-        { label: "week_05-20_to_05-26", text: "week summary body" },
-        { label: "year_2025", text: "year summary body" },
+        { label: "week_05-20_to_05-26", text: "week summary body", path: "/tmp/week.summary.md" },
+        { label: "year_2025", text: "year summary body", path: "/tmp/year.summary.md" },
       ],
       loadedTokenEstimate: 0,
     };

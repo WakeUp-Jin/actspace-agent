@@ -91,6 +91,26 @@ export class ShortMemoryStore {
     return results;
   }
 
+  /**
+   * 加载**所有日期、所有段**的 SessionEvent（含 reset_today 之后切出的 _NNN 段）。
+   *
+   * 用途：跨重启/跨 reset 的全量统计（例如 Usage 页面的"全部数据"模式）。
+   *
+   * 注意：
+   * - 不应用于热路径——这一调用会一次性读全部历史 jsonl 到内存，建议放在 IPC handler 中按需触发；
+   * - 返回顺序为：日期从旧到新（与 `listAllDates` 反序），同日内按 segmentIndex 升序，跟时间线一致；
+   * - 文件损坏行会被静默跳过（沿用 `readJsonl` 的容错策略）。
+   */
+  async loadAll(): Promise<SessionEvent[]> {
+    const datesNewestFirst = await this.listAllDates();
+    const datesOldestFirst = datesNewestFirst.slice().reverse();
+    const results: SessionEvent[] = [];
+    for (const date of datesOldestFirst) {
+      results.push(...(await this.loadDailyAll(date)));
+    }
+    return results;
+  }
+
   async readSummary(path: string): Promise<string> {
     try {
       return await readFile(path, "utf8");

@@ -1,4 +1,9 @@
-import type { KairosEventRow, KairosRowKind, KairosRowStatus } from "./kairos-contracts";
+import type {
+  KairosEventRow,
+  KairosRowKind,
+  KairosRowStatus,
+  KairosUsageSummary,
+} from "./kairos-contracts";
 import type {
   AssistantMessagePayload,
   EventId,
@@ -7,6 +12,8 @@ import type {
   KairosSleepInterruptedPayload,
   KairosSleepStartPayload,
   KairosTickInjectedPayload,
+  LlmUsageCost,
+  LlmUsagePayload,
   SessionEvent,
   ToolCallPayload,
   ToolExecutionResult
@@ -253,6 +260,104 @@ function diffMs(start: string, end: string): number {
   const e = Date.parse(end);
   if (!Number.isFinite(s) || !Number.isFinite(e)) return 0;
   return Math.max(0, e - s);
+}
+
+// ─── llm_usage 聚合 ─────────────────────────────────────────────────────
+
+/**
+ * 出厂默认值；controller 启动时若磁盘没有 accumulator 文件就用这个，
+ * renderer 在 state 未到位时也用这个保证 UI 渲染兜底。
+ */
+export function emptyKairosUsageSummary(): KairosUsageSummary {
+  return {
+    callCount: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    reasoningTokens: 0,
+    cacheHitTokens: 0,
+    cacheMissTokens: 0,
+    cost: 0,
+    currency: "USD",
+  };
+}
+
+/**
+ * 从一段 SessionEvent 流中聚合出 Kairos 的 token / 成本汇总。
+ *
+ * 数据来源：Kairos runner 在每次 LLM 回复后落一条 `llm_usage` SessionEvent（含
+ * `cost` 字段，按调用时 model-config 价格快照算好）。本函数仅做求和和币种一致性
+ * 校验，纯函数、无副作用。
+ *
+ * **使用范围说明**：当前生产链路上 KairosController 维护跨重启的双维度累加器并通过
+ * `KairosRuntimeState.usageLifetime` / `usageSinceReset` 推送给 renderer，因此
+ * KairosPage UI 不再直接调用本函数。它保留主要服务于：
+ * - 单测 / fixture 校验 controller 的累加结果与事件流一致；
+ * - 未来如要做"按时间窗汇总"或"按 brief 维度切片"，可以从事件流派生子集再聚合。
+ */
+export function aggregateKairosUsage(events: SessionEvent[]): KairosUsageSummary {
+  const summary = emptyKairosUsageSummary();
+  let seenCurrency: LlmUsageCost["currency"] | null = null;
+  let currencyMixed = false;
+
+  for (const event of events) {
+    if (event.type !== "llm_usage") continue;
+    const payload = event.payload as LlmUsagePayload | undefined;
+    if (!payload) continue;
+
+    accumulateKairosUsage(summary, payload, {
+      onCurrencyObserved: (currency) => {
+        if (seenCurrency === null) {
+          seenCurrency = currency;
+        } else if (seenCurrency !== currency) {
+          currencyMixed = true;
+        }
+      },
+    });
+  }
+
+  if (currencyMixed) {
+    summary.currency = "MIXED";
+  } else if (seenCurrency) {
+    summary.currency = seenCurrency;
+  }
+  return summary;
+}
+
+/**
+ * 把单条 `LlmUsagePayload` 增量累加到 `summary` 中。
+ *
+ * KairosController 在 eventSink 收到 `llm_usage` 时调用本函数同步增量更新 lifetime
+ * 和 sinceReset 两份累加器；状态通过 `KairosRuntimeState` 推送给 renderer，因此
+ * 累计的边界**不再随 ring buffer 滚动而失真**——只要事件成功写盘，就一定累加过。
+ *
+ * `onCurrencyObserved` 回调把币种一致性校验外推：单条累加时调用方不知道全局
+ * "之前见过 USD 还是 CNY"，由外部状态机维护即可，函数本身保持无副作用。
+ */
+export function accumulateKairosUsage(
+  summary: KairosUsageSummary,
+  payload: LlmUsagePayload,
+  opts: { onCurrencyObserved?: (currency: LlmUsageCost["currency"]) => void } = {},
+): void {
+  summary.callCount += 1;
+  summary.promptTokens += safeNumber(payload.promptTokens);
+  summary.completionTokens += safeNumber(payload.completionTokens);
+  summary.totalTokens +=
+    safeNumber(payload.totalTokens)
+    || safeNumber(payload.promptTokens) + safeNumber(payload.completionTokens);
+  summary.reasoningTokens += safeNumber(payload.reasoningTokens);
+  summary.cacheHitTokens += safeNumber(payload.cacheHitTokens);
+  summary.cacheMissTokens += safeNumber(payload.cacheMissTokens);
+
+  const cost = payload.cost;
+  if (cost && typeof cost.total === "number" && Number.isFinite(cost.total)) {
+    summary.cost += cost.total;
+    opts.onCurrencyObserved?.(cost.currency);
+  }
+}
+
+function safeNumber(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 // 显式 re-export，方便消费方按 `import { type KairosRowKind } from "@actspace/shared"` 拿到全套。

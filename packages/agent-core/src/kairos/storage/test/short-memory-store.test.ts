@@ -91,4 +91,31 @@ describe("ShortMemoryStore", () => {
     const dates = await store.listAllDates();
     expect(dates).toEqual(["2026-05-27", "2026-05-01", "2026-04-30"]);
   });
+
+  it("loadAll flattens every segment across all months in chronological order", async () => {
+    const store = new ShortMemoryStore(rootDir);
+    const april = new Date("2026-04-30T00:00:00Z");
+    const mayDay1 = new Date("2026-05-01T00:00:00Z");
+    const mayDay27 = new Date("2026-05-27T00:00:00Z");
+
+    await store.appendEvent(evt("user_message", { content: "april" }, "ev-april"), april);
+    await store.appendEvent(evt("user_message", { content: "may1" }, "ev-may1"), mayDay1);
+    await store.appendEvent(evt("user_message", { content: "may27a" }, "ev-may27a"), mayDay27);
+    // 模拟 reset_today 之后在同一日的下一段。
+    await store.rotateDaily(mayDay27);
+    await store.appendEvent(evt("user_message", { content: "may27b" }, "ev-may27b"), mayDay27);
+
+    const events = await store.loadAll();
+    expect(events.map((e) => e.id)).toEqual([
+      "ev-april",
+      "ev-may1",
+      "ev-may27a",
+      "ev-may27b",
+    ]);
+  });
+
+  it("loadAll returns empty array when root dir has no segments", async () => {
+    const store = new ShortMemoryStore(rootDir);
+    expect(await store.loadAll()).toEqual([]);
+  });
 });
