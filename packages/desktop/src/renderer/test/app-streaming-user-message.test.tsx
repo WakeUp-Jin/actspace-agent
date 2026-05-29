@@ -28,6 +28,7 @@ const settingsApiStub = {
   setProviderKey: async () => ({ ok: true }),
   clearProviderKey: async () => ({ ok: true }),
   testProviderConnection: async () => ({ ok: true, message: "连接成功" }),
+  setUiZoom: () => {},
 };
 
 function createEmptySessionRecord(sessionId: string): SessionRecord {

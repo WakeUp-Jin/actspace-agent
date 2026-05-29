@@ -17,9 +17,25 @@ import {
   SettingGroup,
   SettingRow,
   SettingsSelect,
+  Stepper,
   Toggle,
   type SelectOption,
 } from "./SettingsPrimitives";
+import { CODE_FONT_PRESETS, UI_FONT_PRESETS } from "../../appearance/fonts";
+import { applyAppearance } from "../../appearance/apply";
+import { loadAppearance, saveAppearance } from "../../appearance/storage";
+import {
+  CODE_FONT_SIZE_MAX,
+  CODE_FONT_SIZE_MIN,
+  CODE_FONT_SIZE_STEP,
+  DEFAULT_APPEARANCE,
+  UI_FONT_SIZE_MAX,
+  UI_FONT_SIZE_MIN,
+  UI_FONT_SIZE_STEP,
+  type AppearancePrefs,
+  type CodeFontId,
+  type UiFontId,
+} from "../../appearance/types";
 
 const BTN_PRIMARY =
   "inline-flex h-8 items-center rounded-act-md bg-brand px-3.5 text-[13px] font-semibold text-white transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60";
@@ -459,9 +475,29 @@ function ToolsSection({ settings, onUpdate }: SectionProps) {
   );
 }
 
+const UI_FONT_OPTIONS: SelectOption[] = UI_FONT_PRESETS.map((preset) => ({
+  value: preset.id,
+  label: preset.label,
+}));
+const CODE_FONT_OPTIONS: SelectOption[] = CODE_FONT_PRESETS.map((preset) => ({
+  value: preset.id,
+  label: preset.label,
+}));
+
 function AppearanceSection() {
+  const [prefs, setPrefs] = useState<AppearancePrefs>(() => loadAppearance());
+
+  const update = (patch: Partial<AppearancePrefs>) => {
+    setPrefs((prev) => {
+      const next = { ...prev, ...patch };
+      saveAppearance(next);
+      applyAppearance(next);
+      return next;
+    });
+  };
+
   return (
-    <SectionShell title="外观" description="主题设置。">
+    <SectionShell title="外观" description="主题、字体与字号。偏好仅保存在本机。">
       <SettingGroup title="主题">
         <SettingRow
           title="浅色"
@@ -480,6 +516,68 @@ function AppearanceSection() {
             <span className="rounded-full bg-surface-subtle px-2.5 py-1 text-[12px] font-semibold text-text-faint">
               即将推出
             </span>
+          }
+        />
+      </SettingGroup>
+
+      <SettingGroup title="字体">
+        <SettingRow
+          title="界面字体"
+          description="应用界面与 AI 回复正文使用的字体。"
+          control={
+            <SettingsSelect
+              value={prefs.uiFontId}
+              options={UI_FONT_OPTIONS}
+              onChange={(value) => update({ uiFontId: value as UiFontId })}
+              ariaLabel="界面字体"
+            />
+          }
+        />
+        <SettingRow
+          title="代码字体"
+          description="代码块、diff 与终端输出使用的等宽字体。"
+          control={
+            <SettingsSelect
+              value={prefs.codeFontId}
+              options={CODE_FONT_OPTIONS}
+              onChange={(value) => update({ codeFontId: value as CodeFontId })}
+              ariaLabel="代码字体"
+            />
+          }
+        />
+      </SettingGroup>
+
+      <SettingGroup title="字号">
+        <SettingRow
+          title="界面字号"
+          description="应用界面与正文的基准字号。"
+          control={
+            <Stepper
+              value={prefs.uiFontSize}
+              onChange={(value) => update({ uiFontSize: value })}
+              min={UI_FONT_SIZE_MIN}
+              max={UI_FONT_SIZE_MAX}
+              step={UI_FONT_SIZE_STEP}
+              format={(value) => `${value}px`}
+              defaultValue={DEFAULT_APPEARANCE.uiFontSize}
+              ariaLabel="界面字号"
+            />
+          }
+        />
+        <SettingRow
+          title="代码字号"
+          description="代码块、diff 与终端文本字号。"
+          control={
+            <Stepper
+              value={prefs.codeFontSize}
+              onChange={(value) => update({ codeFontSize: value })}
+              min={CODE_FONT_SIZE_MIN}
+              max={CODE_FONT_SIZE_MAX}
+              step={CODE_FONT_SIZE_STEP}
+              format={(value) => `${value}px`}
+              defaultValue={DEFAULT_APPEARANCE.codeFontSize}
+              ariaLabel="代码字号"
+            />
           }
         />
       </SettingGroup>

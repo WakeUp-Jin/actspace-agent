@@ -62,7 +62,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--act-font-mono-size, 13px);
   line-height: 1.55;
 }
 

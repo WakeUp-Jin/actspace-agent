@@ -17,6 +17,7 @@
 - `active/20260528-kairos-right-panel-compact-view.md`
 - `active/20260529-deepseek-anthropic-service.md`
 - `active/20260529-settings-page.md`
+- `active/20260529-context-compression.md`
 - `active/actspace-usage-statistics-session-jsonl-plan.md`
 - `active/actspace-token-usage-context-control-foundation.md`
 - `active/frontend-ui-components-foundation.md`

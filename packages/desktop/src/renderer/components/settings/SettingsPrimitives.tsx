@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Minus, Plus, RotateCcw } from "lucide-react";
 
 /**
  * 设置页通用展示原子组件。样式所有权：这些组件只负责"长什么样"，
@@ -222,6 +222,77 @@ export function SettingsSelect({
           )
         : null}
     </>
+  );
+}
+
+/**
+ * 步进器：（↺）− [值] +。纯展示，状态由调用方持有；越界时禁用对应方向按钮。
+ * 传 defaultValue 后，当前值与默认不同时在左侧出现重置按钮（仿 Cursor）。
+ */
+export function Stepper({
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+  format,
+  ariaLabel,
+  defaultValue,
+}: {
+  value: number;
+  onChange: (next: number) => void;
+  min: number;
+  max: number;
+  step?: number;
+  format?: (value: number) => string;
+  ariaLabel: string;
+  defaultValue?: number;
+}) {
+  const decimals = (String(step).split(".")[1] ?? "").length;
+  const roundToStep = (next: number) => Number(Math.min(max, Math.max(min, next)).toFixed(decimals));
+  const atMin = value <= min + 1e-9;
+  const atMax = value >= max - 1e-9;
+  const display = format ? format(value) : String(value);
+  const canReset = defaultValue !== undefined && Math.abs(value - defaultValue) > 1e-9;
+
+  return (
+    <div className="inline-flex items-center gap-2">
+      <button
+        type="button"
+        aria-label={`${ariaLabel}重置`}
+        onClick={() => defaultValue !== undefined && onChange(defaultValue)}
+        className={`grid h-7 w-7 place-items-center rounded-act-sm text-text-faint transition-colors hover:text-text-main ${canReset ? "" : "invisible"}`}
+      >
+        <RotateCcw size={14} strokeWidth={2} aria-hidden="true" />
+      </button>
+      <div
+        role="group"
+        aria-label={ariaLabel}
+        className="inline-flex h-9 items-center rounded-act-md border border-line bg-white"
+      >
+      <button
+        type="button"
+        aria-label={`${ariaLabel}减小`}
+        disabled={atMin}
+        onClick={() => onChange(roundToStep(value - step))}
+        className="grid h-full w-9 place-items-center rounded-l-act-md text-text-faint transition-colors hover:text-text-main disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <Minus size={15} strokeWidth={2.2} aria-hidden="true" />
+      </button>
+      <span className="min-w-[60px] text-center text-[13px] font-semibold tabular-nums text-text-main">
+        {display}
+      </span>
+      <button
+        type="button"
+        aria-label={`${ariaLabel}增大`}
+        disabled={atMax}
+        onClick={() => onChange(roundToStep(value + step))}
+        className="grid h-full w-9 place-items-center rounded-r-act-md text-text-faint transition-colors hover:text-text-main disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <Plus size={15} strokeWidth={2.2} aria-hidden="true" />
+      </button>
+      </div>
+    </div>
   );
 }
 

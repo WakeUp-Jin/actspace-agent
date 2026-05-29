@@ -46,6 +46,8 @@ declare global {
       testProviderConnection: (
         input: import("@actspace/shared").TestConnectionInput
       ) => Promise<import("@actspace/shared").TestConnectionResult>;
+      /** 整窗缩放（Electron webFrame.setZoomFactor）；外观设置的「界面字号」走这里。 */
+      setUiZoom: (factor: number) => void;
     };
     /**
      * Kairos 自治模式 API。preload 在 `kairos` 命名空间下暴露；

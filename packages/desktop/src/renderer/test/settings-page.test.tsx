@@ -23,6 +23,7 @@ describe("SettingsPage", () => {
   const setProviderKey = vi.fn(async () => ({ ok: true }));
   const clearProviderKey = vi.fn(async () => ({ ok: true }));
   const testProviderConnection = vi.fn(async () => ({ ok: true, message: "连接成功" }));
+  const setUiZoom = vi.fn();
 
   beforeEach(() => {
     getSettings.mockClear();
@@ -30,12 +31,15 @@ describe("SettingsPage", () => {
     setProviderKey.mockClear();
     clearProviderKey.mockClear();
     testProviderConnection.mockClear();
+    setUiZoom.mockClear();
+    localStorage.clear();
     window.actspace = {
       getSettings,
       updateSettings,
       setProviderKey,
       clearProviderKey,
       testProviderConnection,
+      setUiZoom,
     } as unknown as ActspaceBridge;
   });
 
@@ -96,5 +100,24 @@ describe("SettingsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "模型" }));
     expect(await screen.findByRole("button", { name: "断开连接" })).toBeInTheDocument();
     expect(screen.getByLabelText("默认模型")).toBeInTheDocument();
+  });
+
+  it("外观分区可改字体与字号并持久化", async () => {
+    render(<SettingsPage onBack={() => {}} />);
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "外观" }));
+
+    await userEvent.click(await screen.findByLabelText("界面字体"));
+    await userEvent.click(await screen.findByRole("option", { name: "阅读衬线" }));
+    expect(document.documentElement.style.getPropertyValue("--act-font-ui")).toContain("Georgia");
+    expect(localStorage.getItem("actspace.appearance.v1")).toContain("serif-reading");
+
+    await userEvent.click(screen.getByRole("button", { name: "代码字号增大" }));
+    expect(document.documentElement.style.getPropertyValue("--act-font-mono-size")).toBe("14px");
+
+    await userEvent.click(screen.getByRole("button", { name: "界面字号增大" }));
+    expect(localStorage.getItem("actspace.appearance.v1")).toContain('"uiFontSize":15');
+    expect(setUiZoom).toHaveBeenCalledWith(15 / 14);
   });
 });

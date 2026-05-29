@@ -15,7 +15,7 @@ const BASH_OUTPUT_SHELL_CLASS =
 const BASH_OUTPUT_MENU_CLASS =
   "bash-output-menu absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-[rgba(47,111,255,0.08)] hover:text-brand focus-visible:bg-[rgba(47,111,255,0.08)] focus-visible:text-brand";
 const BASH_OUTPUT_TEXT_CLASS =
-  "bash-output-text m-0 min-w-0 whitespace-pre-wrap pt-[10px] pr-[38px] pb-3 pl-[var(--conversation-card-padding)] font-mono text-[13px] leading-[1.52] text-text-muted [word-break:break-word]";
+  "bash-output-text m-0 min-w-0 whitespace-pre-wrap pt-[10px] pr-[38px] pb-3 pl-[var(--conversation-card-padding)] font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.52] text-text-muted [word-break:break-word]";
 const BASH_PROMPT_CLASS = "bash-prompt text-text-faint";
 const BASH_APPROVAL_CLASS =
   "message-row bash-approval w-full max-w-[800px] overflow-hidden rounded-act-md border border-[rgba(200,209,220,0.88)] bg-white";
@@ -26,11 +26,11 @@ const BASH_APPROVAL_TITLE_CLASS =
 const BASH_APPROVAL_MENU_CLASS =
   "bash-approval-menu grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-[rgba(47,111,255,0.08)] hover:text-brand focus-visible:bg-[rgba(47,111,255,0.08)] focus-visible:text-brand";
 const BASH_INTENT_COMMENT_CLASS =
-  "bash-intent-comment font-mono text-[13px] italic leading-[1.55] text-text-faint";
+  "bash-intent-comment font-mono text-[length:var(--act-font-mono-size,13px)] italic leading-[1.55] text-text-faint";
 const BASH_INTENT_BLOCK_CLASS =
   "bash-intent-comment--block px-[var(--conversation-card-padding)] pt-[9px] [overflow-wrap:anywhere] break-words";
 const BASH_APPROVAL_COMMAND_CLASS =
-  "bash-approval-command m-0 whitespace-pre-wrap border-b border-[rgba(223,228,234,0.72)] px-[var(--conversation-card-padding)] py-[9px] font-mono text-[13px] leading-[1.55] text-text-muted [overflow-wrap:anywhere]";
+  "bash-approval-command m-0 whitespace-pre-wrap border-b border-[rgba(223,228,234,0.72)] px-[var(--conversation-card-padding)] py-[9px] font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.55] text-text-muted [overflow-wrap:anywhere]";
 const BASH_APPROVAL_REASON_CLASS =
   "bash-approval-reason px-[var(--conversation-card-padding)] pt-2 text-[13px] leading-[1.45] text-text-muted";
 const BASH_APPROVAL_REASON_LABEL_CLASS = "font-semibold text-text-faint";

@@ -14,6 +14,8 @@
     sans-serif;
   --act-font-display: var(--act-font-ui);
   --act-font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+  /* 代码/等宽字号，由外观设置驱动（代码块 / diff / bash 输出消费）。 */
+  --act-font-mono-size: 13px;
 
   --act-color-brand: #2f6fff;
   --act-color-brand-strong: #1f5fe8;
