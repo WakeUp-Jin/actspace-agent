@@ -2,17 +2,17 @@
 
 ## 状态
 
-- 状态：Active / 部分迁移中。
+- 状态：Completed / 持续防回流。
 - 适用范围：`packages/desktop/src/renderer` 的 React / Vite / Electron 前端。
-- 关联计划：`docs/exec-plans/active/actspace-tailwind-style-architecture.md`。
+- 关联计划：`docs/exec-plans/completed/actspace-tailwind-style-architecture.md`。
 
 ## 背景
 
-当前桌面端前端仍以单个 `styles.css` 承载大量全局样式、页面样式和组件样式。Usage Statistics 页面在原型阶段已经形成较清晰的视觉方向，但继续用手写全局 class 扩展，会让布局、间距、响应式和状态样式散落在一个文件里。
+当前桌面端前端已经从单个 `styles.css` 过渡到 `styles/index.css` 统一入口。入口按 cascade layer 导入 token、Tailwind、base、Electron chrome、Markdown 和 diff 内容边界；旧根部 `styles.css` 与 `legacy-*` 分区已经下线，不再承载真实样式。Tailwind 页面切片迁移已完成收口，后续普通 UI 样式应继续落在组件局部 Tailwind utility / class 常量中，而不是恢复 legacy 分区。
 
 项目仍处在开发阶段，不需要保留旧样式兼容层。Tailwind 接入的目标不是在旧 CSS 外再叠一层工具类，而是把样式所有权重新切清楚：
 
-- 全局样式负责设计 token、浏览器基础重置、Electron 窗口基础、滚动条、focus、selection 和少量 keyframes。
+- 全局样式负责设计 token、浏览器基础重置、Electron 窗口基础、滚动条、focus、selection、明确内容边界和少量 keyframes。
 - 组件样式、布局、间距、状态和响应式优先由 Tailwind utility class 表达。
 - 复杂业务界面通过 React 组件拆分保持可读性，而不是通过大量语义 class 复刻一套 CSS 框架。
 
@@ -37,7 +37,7 @@ Tailwind 官方 Vite 安装路径建议安装 `tailwindcss` 和 `@tailwindcss/vi
 - 不在本阶段引入 shadcn/ui 或 Radix 组件体系。
 - 不在本阶段做深色模式、主题编辑器或多主题切换。
 - 不借 Tailwind 接入重做所有产品交互。
-- 不保留长期 `legacy.css` 或兼容旧 class 的过渡层。
+- 不保留长期未分区 `legacy.css` 或宽泛兼容旧 class 的过渡层；迁移期 legacy 文件必须有明确区域边界和删除条件。
 - 不把所有重复样式都塞进 `@apply`，避免重新制造一个手写 CSS 框架。
 
 ## 文件结构
@@ -47,17 +47,35 @@ Tailwind 官方 Vite 安装路径建议安装 `tailwindcss` 和 `@tailwindcss/vi
 ```text
 packages/desktop/src/renderer/styles/
   index.css
-  tailwind.css
   tokens.css
+  tailwind.css
   base.css
+  electron.css
+  markdown.css
+  diff.css
 ```
 
 职责：
 
-- `index.css`：唯一样式入口，按顺序导入 token、Tailwind 和 base。
+- `index.css`：唯一样式入口，声明 `theme, base, chrome, components, utilities` layer 顺序，并按边界导入各样式文件。
 - `tokens.css`：定义 `--act-*` 设计 token，是项目样式语义的来源。
 - `tailwind.css`：导入 Tailwind，并通过 `@theme inline` 把 `--act-*` 映射为 Tailwind token。
-- `base.css`：保留 document、body、root、scrollbar、focus、selection、Electron drag region 和 keyframes 等基础样式。
+- `base.css`：保留 document、body、root、scrollbar、focus、selection 等基础样式，导入时必须使用 `layer(base)`，避免基础 reset 覆盖组件 utility。
+- `electron.css`：保留 Electron chrome 和 native-window hit-test 相关样式。
+- `markdown.css`、`diff.css`：作为模型输出和代码内容的明确渲染边界。
+
+当前入口结构：
+
+```css
+@layer theme, base, chrome, components, utilities;
+
+@import "./tokens.css";
+@import "./tailwind.css";
+@import "./base.css" layer(base);
+@import "./electron.css" layer(chrome);
+@import "./markdown.css" layer(components);
+@import "./diff.css" layer(components);
+```
 
 `packages/desktop/src/renderer/main.tsx` 最终只导入：
 
@@ -65,7 +83,7 @@ packages/desktop/src/renderer/styles/
 import "./styles/index.css";
 ```
 
-旧的 `packages/desktop/src/renderer/styles.css` 在迁移完成后删除，不保留空壳。
+旧的 `packages/desktop/src/renderer/styles.css` 已删除。后续如果需要新增全局 CSS，必须先判断它属于 base、Electron chrome、Markdown、diff 还是第三方内容边界；普通页面和组件样式默认写在对应 React 组件的 Tailwind class 中。
 
 ## Token 命名
 
@@ -236,8 +254,10 @@ Usage Statistics 是第一块完整迁移样板，需满足：
 3. 迁移 Workbench shell 和 Sidebar。
 4. 迁移 Conversation messages、Tool previews 和 Composer。
 5. 迁移 Right Panel、Settings 和剩余页面。
-6. 删除旧 `styles.css` 和未使用 class。
+6. 删除未使用 class，并保持旧 `styles.css` / `legacy-*` 不回流。
 7. 补充 coding standards 中的 Tailwind 书写约定。
+
+当前状态：以上迁移顺序已完成并通过收口验收；后续任务是维持这些边界，而不是继续保留迁移期 legacy 层。
 
 ## 验证要求
 

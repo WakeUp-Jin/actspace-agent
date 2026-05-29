@@ -27,6 +27,8 @@
 
 `llm_usage` 按每次模型回复写入，而不是按 turn 或 session 聚合。成本按当时共享模型配置计算后写入 usage，价格配置本身不写入事件。
 
+DeepSeek Anthropic provider-native server tool 不会产生本地 `tool_call` / `tool_result` 事件；真实触发次数保存在 `llm_usage.payload.serverToolUse` 中，例如 `webSearchRequests` / `webFetchRequests`。
+
 `context-state.json` 是当前可变视图，用于 Context 面板和未来上下文控制能力；完整设计见 `agent-core/token-usage-and-context-state.md`。
 
 ## 应用数据目录
@@ -64,6 +66,7 @@ renderer 不能直接访问文件系统，所有文件与 session 读写都必�
 - 模型流式文本会聚合为单条 `assistant_text` / `assistant_thinking` 事件。
 - 模型完整工具调用指令会记录为单条 `assistant_tool_call`。
 - 工具真实执行只记录开始和完成，便于判断 Agent 执行、后端推送或前端渲染问题。
+- provider-native server tool 只进入 `agent_event.message_end.summary.serverToolUse`，不计入本地 `toolCallCount`。
 
 日志目录只保存在本机，不应提交到 Git；仓库根目录 `logs/` 已在 `.gitignore` 中忽略。
 

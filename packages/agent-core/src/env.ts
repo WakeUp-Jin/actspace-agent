@@ -42,8 +42,12 @@ export interface AppEnv {
 
   /** DeepSeek API Key */
   DEEPSEEK_API_KEY: string;
+  /** DeepSeek API protocol format */
+  DEEPSEEK_API_FORMAT: "openai" | "anthropic";
   /** DeepSeek Base URL（自部署时使用） */
   DEEPSEEK_BASE_URL: string;
+  /** DeepSeek Anthropic-compatible Base URL */
+  DEEPSEEK_ANTHROPIC_BASE_URL: string;
 
   /** Kimi API Key */
   KIMI_API_KEY: string;
@@ -64,15 +68,15 @@ export interface AppEnv {
   // ─── Kairos 后台 Agent 配置 ───
   /**
    * Kairos 使用的 ModelId（同主 Agent 注册表）。
-   * 留空 → 复用主 Agent 默认模型；填非法值 → 视同留空。
+   * 留空或非法值 → 由 resolveKairosEnv() 回落到 Kairos 默认模型。
    * 由 `resolveKairosEnv()` 做 ModelRegistry 守卫，再传给 buildLLMConfig。
    */
   KAIROS_MODEL_ID: string;
   /**
    * Kairos 思考链覆写：
-   *   "auto"（默认）→ 跟随 ModelSpec.thinkingDefault；
-   *   "true"        → 强制启用；
+   *   "true"（默认）→ 强制启用；
    *   "false"       → 强制禁用。
+   *   "auto"        → 跟随 ModelSpec.thinkingDefault；
    * 模型不支持 toggle 时（supportsThinkingToggle=false）该字段被忽略。
    */
   KAIROS_THINKING: "auto" | "true" | "false";
@@ -154,10 +158,25 @@ const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
     default: "",
     parse: str,
   },
+  DEEPSEEK_API_FORMAT: {
+    envKey: "DEEPSEEK_API_FORMAT",
+    required: false,
+    default: "anthropic" as const,
+    parse: (raw): AppEnv["DEEPSEEK_API_FORMAT"] => {
+      const v = raw.trim().toLowerCase();
+      return v === "anthropic" ? "anthropic" : "openai";
+    },
+  },
   DEEPSEEK_BASE_URL: {
     envKey: "DEEPSEEK_BASE_URL",
     required: false,
     default: "https://api.deepseek.com",
+    parse: str,
+  },
+  DEEPSEEK_ANTHROPIC_BASE_URL: {
+    envKey: "DEEPSEEK_ANTHROPIC_BASE_URL",
+    required: false,
+    default: "https://api.deepseek.com/anthropic",
     parse: str,
   },
 
@@ -215,13 +234,13 @@ const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
   KAIROS_MODEL_ID: {
     envKey: "KAIROS_MODEL_ID",
     required: false,
-    default: "",
+    default: "deepseek-v4-flash",
     parse: str,
   },
   KAIROS_THINKING: {
     envKey: "KAIROS_THINKING",
     required: false,
-    default: "auto" as const,
+    default: "true" as const,
     parse: (raw): "auto" | "true" | "false" => {
       const v = raw.trim().toLowerCase();
       if (v === "true" || v === "1" || v === "yes" || v === "on") return "true";
@@ -415,8 +434,11 @@ export function envToLLMConfig() {
 
   return {
     provider: "deepseek",
+    apiFormat: e.DEEPSEEK_API_FORMAT,
     apiKey: e.DEEPSEEK_API_KEY,
-    baseUrl: e.DEEPSEEK_BASE_URL || undefined,
+    baseUrl: e.DEEPSEEK_API_FORMAT === "anthropic"
+      ? e.DEEPSEEK_ANTHROPIC_BASE_URL || undefined
+      : e.DEEPSEEK_BASE_URL || undefined,
     model: e.LLM_MODEL,
     temperature: e.LLM_TEMPERATURE,
     maxTokens: e.LLM_MAX_TOKENS,

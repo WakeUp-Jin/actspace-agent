@@ -6,6 +6,13 @@ export function shouldExposeTool(
 ): boolean {
   if (!spec.exposeOnlyTo) return true;
   if (spec.exposeOnlyTo !== runtime.primaryProvider) return false;
+  if (
+    spec.exposeOnlyTo === "deepseek" &&
+    runtime.apiFormat === "anthropic" &&
+    spec.name === "web_search"
+  ) {
+    return false;
+  }
   if (spec.exposeOnlyTo === "deepseek") return Boolean(runtime.hasKimiKey);
   return true;
 }

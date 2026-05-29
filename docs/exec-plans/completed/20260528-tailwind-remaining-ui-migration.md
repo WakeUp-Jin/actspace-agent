@@ -1,15 +1,17 @@
 # Tailwind 剩余 UI 迁移调整计划
 
+> 状态：已完成。2026-05-29 通过审计确认 Settings / Placeholder / Remaining Pages 无剩余普通 UI legacy selector，并完成全局 CSS 收口验收。
+
 ## 目标
 
-在 Tailwind v4 基础设施、Usage Statistics 样板和 Lab V0 页面已经落地后，继续把 `packages/desktop/src/renderer` 的主要 UI 从旧 `styles.css` 全局 class 迁移到“Tailwind utility + React UI primitive + 少量明确全局边界”的样式架构。
+在 Tailwind v4 基础设施、Usage Statistics 样板和 Lab V0 页面已经落地后，继续把 `packages/desktop/src/renderer` 的主要 UI 从 legacy 分区 CSS 迁移到“Tailwind utility + React UI primitive + 少量明确全局边界”的样式架构。
 
-本计划是 `docs/exec-plans/active/actspace-tailwind-style-architecture.md` 的实施型子计划，重点回答剩余页面按什么顺序迁、每个切片改哪些文件、如何验证、哪些全局样式暂不迁。
+本计划是 `docs/exec-plans/completed/actspace-tailwind-style-architecture.md` 的实施型子计划，重点回答剩余页面按什么顺序迁、每个切片改哪些文件、如何验证、哪些全局样式暂不迁。
 
 ## 范围
 
 - 包含：
-  - 审计 `packages/desktop/src/renderer/styles.css` 中剩余全局样式，按 UI 区域分组。
+  - 审计 `packages/desktop/src/renderer/styles/*.css` 与 renderer 组件中剩余样式所有权，按 UI 区域分组。
   - 迁移 RightPanel 与 Kairos compact 相关 UI 样式。
   - 迁移 Workbench shell 与 Sidebar 相关 UI 样式。
   - 迁移 Conversation messages、Tool previews 与 Composer 相关 UI 样式。
@@ -24,15 +26,15 @@
   - 不改变 Electron main / preload / IPC 契约。
   - 不改变业务数据流、session 存储、Kairos runtime 或 Lab runtime。
   - 不把 Markdown、代码块、diff、第三方 DOM 或 Electron drag primitives 强行 Tailwind 化。
-  - 不一次性删除 `styles.css`；只有在所有迁移切片完成并验证后再移除过渡 import。
+  - 不一次性删除所有 legacy 分区文件；只有在所有迁移切片完成并验证后再移除对应 import。
 
 ## 背景
 
 - Tailwind v4 已接入 `packages/desktop`，入口为 `packages/desktop/src/renderer/styles/index.css`。
-- 当前样式入口仍通过 `@import "../styles.css"` 过渡导入旧全局样式。
+- 当前样式入口已经收口为 `tokens.css`、`tailwind.css`、`base.css`、`electron.css`、`markdown.css` 和 `diff.css`，并通过 `base` / `chrome` / `components` layer 导入。
 - Usage Statistics 已作为第一块完整 Tailwind 样板迁移。
 - Lab V0 renderer mock 已使用 Tailwind utility + `LabPage.tsx` 局部 class 常量落地。
-- `styles.css` 仍承载 Workbench、Sidebar、Conversation、Composer、RightPanel、Kairos、Markdown、Diff 等大量样式，其中一部分属于长期全局边界，另一部分应迁回组件。
+- 旧根部 `styles.css` 与 `legacy-*` 分区已经下线；Conversation / ToolLog / Composer、RightPanel shell/tabs、Workbench shell / Sidebar 已迁回组件，`markdown.css` 和 `diff.css` 作为明确内容边界保留。
 
 ## 必读文档
 
@@ -44,7 +46,7 @@
 - `docs/FRONTEND_VERIFICATION.md`
 - `docs/design-docs/frontend-ui/全局视觉语言规范.md`
 - `docs/design-docs/frontend-ui/tailwind-style-architecture.md`
-- `docs/exec-plans/active/actspace-tailwind-style-architecture.md`
+- `docs/exec-plans/completed/actspace-tailwind-style-architecture.md`
 - `docs/learnings/2026-05/tailwind-page-slice-migration.md`
 
 ## 相关代码路径
@@ -54,7 +56,9 @@
   - `packages/desktop/src/renderer/styles/tokens.css`
   - `packages/desktop/src/renderer/styles/tailwind.css`
   - `packages/desktop/src/renderer/styles/base.css`
-  - `packages/desktop/src/renderer/styles.css`
+  - `packages/desktop/src/renderer/styles/electron.css`
+  - `packages/desktop/src/renderer/styles/markdown.css`
+  - `packages/desktop/src/renderer/styles/diff.css`
 - 已迁移样板：
   - `packages/desktop/src/renderer/components/UsageStatisticsPage.tsx`
   - `packages/desktop/src/renderer/components/LabPage.tsx`
@@ -96,7 +100,7 @@
 - Electron chrome / drag / no-drag 基础边界。
 - Markdown prose、code block、diff、第三方或非 React 控制 DOM。
 - 复杂 keyframes 或必须跨组件共享的动画。
-- 仍未迁移切片的临时 legacy 样式。
+- 明确内容边界中的少量全局规则；普通 UI 不再新增 legacy 分区。
 
 ### 禁止做法
 
@@ -122,7 +126,7 @@
 
 ### 0. 样式审计
 
-- 扫描 `styles.css`，按 selector 前缀输出分组：
+- 扫描 `styles/*.css` 和组件局部 class 常量，按样式所有权输出分组：
   - Workbench / SplitView
   - Sidebar
   - Conversation / Messages
@@ -141,13 +145,13 @@
 
 ### 1. RightPanel / Kairos Compact 切片
 
-优先迁移这块，因为近期改动多、`styles.css` 增长明显，且风险低于 Sidebar。
+优先迁移这块，因为近期改动多、历史 legacy 样式增长明显，且风险低于 Sidebar。
 
 - 修改范围：
   - `packages/desktop/src/renderer/components/RightPanel.tsx`
   - `packages/desktop/src/renderer/components/right-panel/`
   - 与右栏 compact view 直接相关的局部 renderer 组件。
-  - `packages/desktop/src/renderer/styles.css` 中对应 `.right-panel*`、`.kairos-compact*` selector。
+  - legacy right panel / Kairos compact selector。
 - 工作内容：
   - 将 right panel shell、tabs、empty state、compact Kairos rows 改为 Tailwind utility / 局部 class 常量。
   - 删除迁移后不再使用的 `.right-panel*`、`.kairos-compact*` selector。
@@ -164,7 +168,7 @@
   - `SplitView.tsx`
   - `Sidebar.tsx`
   - `WindowChromeBar.tsx`
-  - `styles.css` 中 app shell、split view、sidebar、session row、workspace section 相关 selector。
+  - Workbench / Sidebar 组件局部 class 常量，以及历史 legacy shell selector 的剩余引用。
 - 工作内容：
   - 将 shell grid、split pane、sidebar top actions、session row、workspace foldout 改成 Tailwind utility。
   - 保留或集中 Electron chrome / drag / no-drag 的基础 CSS 边界。
@@ -181,7 +185,7 @@
   - `ConversationView.tsx`
   - `Composer.tsx`
   - `components/messages/`
-  - `styles.css` 中 conversation、message、turn actions、composer、tool log、bash block 等普通组件 selector。
+  - Conversation、message、turn actions、composer、tool log、bash block 等普通组件局部 class 常量和剩余全局边界。
 - 工作内容：
   - 将消息布局、turn actions、工具预览外壳、Composer 输入区和附件区迁到 Tailwind。
   - Markdown prose、code block、diff 内容样式暂时保留全局边界，不在本切片强迁。
@@ -208,7 +212,6 @@
 ### 5. 全局 CSS 收口
 
 - 修改范围：
-  - `styles.css`
   - `styles/base.css`
   - `styles/index.css`
   - `styles/tailwind.css`
@@ -216,8 +219,8 @@
   - `docs/coding-standards/`
 - 工作内容：
   - 把长期保留的 base、Electron、Markdown、Diff、keyframes 等边界移入更明确的 CSS 文件。
-  - 删除 `styles/index.css` 中对 `../styles.css` 的过渡 import。
-  - 删除空的或未使用的 `styles.css`。
+  - 保持 `styles/index.css` 不导入旧根部 `styles.css` 或任何 `legacy-*` 分区。
+  - 保持旧根部 `styles.css` 删除状态，不让普通 UI 样式回流到全局入口。
   - 补充 Tailwind 编码约定：局部 class 常量、primitive 抽取、raw hex 使用边界、测试不绑定 class。
 - 验证：
   - `pnpm typecheck`
@@ -240,17 +243,24 @@
 - [x] Tailwind v4 基础设施已接入。
 - [x] Usage Statistics 样板已迁移。
 - [x] Lab V0 页面已按 Tailwind utility + 局部 class 常量落地。
-- [ ] 完成 `styles.css` 剩余 selector 审计。
-- [ ] 完成 RightPanel / Kairos Compact 切片。
-- [ ] 完成 Workbench Shell / Sidebar 切片。
-- [ ] 完成 Conversation / Tool Preview / Composer 切片。
-- [ ] 完成 Settings / Placeholder / Remaining Pages 切片。
-- [ ] 完成全局 CSS 收口并删除过渡 import。
-- [ ] 补充 coding standards Tailwind 书写约定。
-- [ ] 更新 history，并同步主 Tailwind 架构计划状态。
+- [x] 完成 `styles.css` 剩余 selector 审计：审计结果已在 `20260528-frontend-style-ownership-cleanup.md` M0 记录，旧根部 `styles.css` 已不再承载真实样式。
+- [x] 完成 RightPanel shell / tabs 切片：`RightPanel.tsx` 已改为 Tailwind utility + 局部 class 常量，`legacy-right-panel.css` 已删除，tab no-drag contract 改由组件测试覆盖。
+- [x] 完成 Workbench Shell 第一步：`SplitView.tsx` 和 `PlaceholderView.tsx` 已迁为 Tailwind 局部 class 常量，`legacy-shell.css` 中对应 `.split-view*` / `.placeholder-*` selector 已删除。
+- [x] 完成 Workbench Shell 第二步：`Sidebar.tsx` 的外壳、顶部主入口和底部 Settings 已迁为 Tailwind 局部 class 常量，`legacy-shell.css` 中对应 `.sidebar` / `.sidebar-primary-*` / `.settings-entry` selector 已删除。
+- [x] 完成 Workbench Shell / Sidebar 切片：`Sidebar.tsx` 已接管分组标题、会话行、Pin / Archive hover、See more 和 Workspace 文件夹头；后续全局收口已删除 `legacy-shell.css`。
+- [x] 完成 Conversation / Composer 切片第一步：`ConversationView.tsx`、基础 message row（User / Assistant / Thinking / ToolLogLine）和 `Composer.tsx` 主体外壳已迁为 Tailwind 局部 class 常量；`legacy-conversation.css` 与 `legacy-composer.css` 顶部大段基础布局规则已删除。
+- [x] 完成 Composer 浮层收口：model dropdown、model options、ContextPopup 已迁为组件内 Tailwind 局部 class 常量，`legacy-composer.css` 已删除并从 `styles/index.css` 移除。
+- [x] 完成 Bash approval / execution 切片：`BashRunBlock.tsx` 已接管执行折叠行、输出面板、approval 卡片和操作按钮样式，`legacy-conversation.css` 中 `.bash-*` 视觉规则已删除；浏览器 mock computed style 确认按钮/输出字号、背景和边框符合组件 class。
+- [x] 修正基础层导入：`styles/index.css` 改为 `@import "./base.css" layer(base);`，避免 `button { font: inherit; }` 等 base reset 在导入顺序上压过 Tailwind typography utility。
+- [x] 完成 Conversation / Tool Preview / Composer 切片：`ToolLogLine.tsx` 接管 tooltip open / running / reduced-motion 样式，`FileDiffBlock.tsx` 复用组件侧工具行 running class，`ConversationView.tsx` 接管工具、思考和 diff 相邻消息压缩关系；`legacy-conversation.css` 已删除并从 `styles/index.css` 移除。
+- [x] 完成 Settings / Placeholder / Remaining Pages 切片：审计确认 `PlaceholderView.tsx` 已使用 Tailwind 局部 class 常量，Sidebar Settings 入口已由 `Sidebar.tsx` 接管；当前没有独立 Settings 页面组件，也没有 `.settings-*` / `.placeholder-*` / `legacy-*` 普通 UI selector 残留。
+- [x] 完成全局 CSS 收口并删除过渡 import：旧根部 `styles.css` 与 `legacy-*` 分区已下线，`styles/index.css` 仅导入 token、Tailwind、base、Electron chrome、Markdown 和 diff 边界。
+- [x] 补充 coding standards Tailwind 书写约定。
+- [x] 更新 history，并同步主 Tailwind 架构计划状态。
 
 ## 决策记录
 
 - 2026-05-28：先迁 RightPanel / Kairos Compact，再迁 Sidebar。原因是 RightPanel / Kairos compact 近期新增全局 CSS 较多，收益明显且交互风险低；Sidebar 涉及 Electron hit-test 和 resize，需要单独切片和更强验收。
 - 2026-05-28：Markdown / Diff / code block 暂不强迁 Tailwind。原因是这些区域属于内容渲染边界，受 Preflight 和模型输出影响更大，保留明确全局样式比 utility 化更稳。
 - 2026-05-28：本计划不使用 `@apply` 批量翻译旧 selector。原因是 Tailwind 迁移目标是重切样式所有权，而不是把旧全局 CSS 换成另一种语法。
+- 2026-05-29：Settings / Placeholder / Remaining Pages 作为审计型切片收尾。原因是 Placeholder 和 Settings 入口已经在前置 Workbench / Sidebar 切片中迁回组件，当前没有独立 Settings 页面或剩余普通页面级 selector 需要再迁移。

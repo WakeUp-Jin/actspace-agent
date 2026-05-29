@@ -38,6 +38,7 @@ export type ToolExecutorFn = (
 
 export interface ToolRuntimeConfig {
   primaryProvider?: "deepseek" | "kimi" | "mock";
+  apiFormat?: "openai" | "anthropic";
   hasKimiKey?: boolean;
   disabledTools?: string[];
 }

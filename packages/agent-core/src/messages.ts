@@ -57,6 +57,11 @@ export interface UsageCost {
   total: number;
 }
 
+export interface ServerToolUseUsage {
+  webSearchRequests?: number;
+  webFetchRequests?: number;
+}
+
 export interface Usage {
   input: number;
   output: number;
@@ -67,6 +72,7 @@ export interface Usage {
   cacheMiss: number;
   totalTokens: number;
   cost: UsageCost;
+  serverToolUse?: ServerToolUseUsage;
 }
 
 // ─── Message Priority（压缩优先级） ───
@@ -210,4 +216,14 @@ export function accumulateUsage(total: Usage, delta: Usage): void {
   total.cost.cacheRead += delta.cost.cacheRead;
   total.cost.cacheWrite += delta.cost.cacheWrite;
   total.cost.total += delta.cost.total;
+  if (delta.serverToolUse) {
+    total.serverToolUse = {
+      webSearchRequests:
+        (total.serverToolUse?.webSearchRequests ?? 0) +
+        (delta.serverToolUse.webSearchRequests ?? 0),
+      webFetchRequests:
+        (total.serverToolUse?.webFetchRequests ?? 0) +
+        (delta.serverToolUse.webFetchRequests ?? 0),
+    };
+  }
 }

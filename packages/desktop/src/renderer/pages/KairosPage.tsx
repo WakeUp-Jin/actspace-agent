@@ -11,7 +11,7 @@
  *   └──────────────────────────┴─────────────────────────────────┘
  *
  * 注意：
- *   - 顶部必须 padding-top: var(--window-chrome-strip-height)（见 styles.css），
+ *   - 顶部必须 padding-top: var(--window-chrome-strip-height)（见 styles/tokens.css），
  *     否则 fixed chrome bar 会覆盖 KairosHeader 上的按钮。
  *   - 配置、Briefs、笔记 UI 暂不恢复；用户仍可通过本地文件编辑 Kairos 配置。
  */

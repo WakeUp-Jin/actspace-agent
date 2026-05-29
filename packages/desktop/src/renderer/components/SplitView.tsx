@@ -15,6 +15,16 @@ type DragState = {
   startX: number;
 };
 
+const SPLIT_VIEW_CLASS = "relative grid h-screen overflow-hidden";
+const SPLIT_VIEW_RESIZING_CLASS = "cursor-col-resize select-none";
+const SPLIT_VIEW_PANE_CLASS = "min-h-0 min-w-0 overflow-hidden";
+const SPLIT_SEPARATOR_CLASS =
+  "group absolute bottom-0 top-0 z-[32] grid w-[14px] -translate-x-1/2 cursor-col-resize touch-none place-items-center focus-visible:outline-offset-[-2px]";
+const SPLIT_SEPARATOR_LINE_BASE_CLASS =
+  "h-full w-px bg-transparent transition-[background,box-shadow] duration-[160ms] ease-in-out group-hover:bg-[rgba(47,111,255,0.46)] group-hover:shadow-[0_0_0_3px_rgba(47,111,255,0.08)] group-active:bg-[rgba(47,111,255,0.46)] group-active:shadow-[0_0_0_3px_rgba(47,111,255,0.08)] group-focus-visible:bg-[rgba(47,111,255,0.46)] group-focus-visible:shadow-[0_0_0_3px_rgba(47,111,255,0.08)]";
+const SPLIT_SEPARATOR_LINE_RESIZING_CLASS =
+  "bg-[rgba(47,111,255,0.46)] shadow-[0_0_0_3px_rgba(47,111,255,0.08)]";
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -232,14 +242,21 @@ export function SplitView({
     "--split-right-width": `${rightWidth}px`,
     gridTemplateColumns: columns
   } as CSSProperties;
+  const separatorLineClass = `${SPLIT_SEPARATOR_LINE_BASE_CLASS}${
+    dragState ? ` ${SPLIT_SEPARATOR_LINE_RESIZING_CLASS}` : ""
+  }`;
 
   return (
-    <div className={`split-view${dragState ? " is-resizing" : ""}${leftHidden ? " is-left-hidden" : ""}`} ref={rootRef} style={style}>
+    <div
+      className={`${SPLIT_VIEW_CLASS}${dragState ? ` ${SPLIT_VIEW_RESIZING_CLASS}` : ""}`}
+      ref={rootRef}
+      style={style}
+    >
       {leftHidden ? null : (
         <>
-          <div className="split-view-pane split-view-left">{left}</div>
+          <div className={SPLIT_VIEW_PANE_CLASS}>{left}</div>
           <div
-            className="split-view-separator split-view-left-separator"
+            className={`${SPLIT_SEPARATOR_CLASS} left-[var(--split-left-width)]`}
             role="separator"
             tabIndex={0}
             aria-label={leftSeparatorLabel}
@@ -251,15 +268,15 @@ export function SplitView({
             onKeyDown={(event) => handleSeparatorKeyDown("left", event)}
             onPointerDown={(event) => handlePointerDown("left", event)}
           >
-            <span aria-hidden="true" />
+            <span aria-hidden="true" className={separatorLineClass} />
           </div>
         </>
       )}
-      <div className="split-view-pane split-view-main">{main}</div>
+      <div className={SPLIT_VIEW_PANE_CLASS}>{main}</div>
       {rightOpen ? (
         <>
           <div
-            className="split-view-separator split-view-right-separator"
+            className={`${SPLIT_SEPARATOR_CLASS} left-[calc(100%_-_var(--split-right-width))]`}
             role="separator"
             tabIndex={0}
             aria-label={rightSeparatorLabel}
@@ -271,9 +288,9 @@ export function SplitView({
             onKeyDown={(event) => handleSeparatorKeyDown("right", event)}
             onPointerDown={(event) => handlePointerDown("right", event)}
           >
-            <span aria-hidden="true" />
+            <span aria-hidden="true" className={separatorLineClass} />
           </div>
-          <div className="split-view-pane split-view-right">{right}</div>
+          <div className={SPLIT_VIEW_PANE_CLASS}>{right}</div>
         </>
       ) : null}
     </div>

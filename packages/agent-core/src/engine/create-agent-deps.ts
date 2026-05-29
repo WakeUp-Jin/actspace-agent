@@ -37,7 +37,9 @@ export interface FrontendTurnInput {
 /** 从 env / 配置文件读取的后端环境配置 */
 export interface AgentEnvConfig {
   deepseekApiKey: string;
+  deepseekApiFormat: "openai" | "anthropic";
   deepseekBaseUrl?: string;
+  deepseekAnthropicBaseUrl?: string;
   kimiApiKey: string;
   kimiBaseUrl?: string;
   /** 仅当 .env 显式覆盖默认值时有值 */
@@ -75,7 +77,9 @@ export interface AgentDeps {
 export function resolveAgentEnvConfig(): AgentEnvConfig {
   return {
     deepseekApiKey: env.DEEPSEEK_API_KEY,
+    deepseekApiFormat: env.DEEPSEEK_API_FORMAT,
     deepseekBaseUrl: env.DEEPSEEK_BASE_URL || undefined,
+    deepseekAnthropicBaseUrl: env.DEEPSEEK_ANTHROPIC_BASE_URL || undefined,
     kimiApiKey: env.KIMI_API_KEY,
     kimiBaseUrl: env.KIMI_BASE_URL || undefined,
     temperature: env.LLM_TEMPERATURE !== 0 ? env.LLM_TEMPERATURE : undefined,
@@ -99,12 +103,15 @@ export function buildLLMConfig(spec: ModelSpec, envConfig: AgentEnvConfig): LLMC
     kimi: envConfig.kimiApiKey,
   };
   const baseUrlMap: Record<string, string | undefined> = {
-    deepseek: envConfig.deepseekBaseUrl,
+    deepseek: envConfig.deepseekApiFormat === "anthropic"
+      ? envConfig.deepseekAnthropicBaseUrl
+      : envConfig.deepseekBaseUrl,
     kimi: envConfig.kimiBaseUrl,
   };
 
   return {
     provider: spec.provider,
+    ...(spec.provider === "deepseek" && { apiFormat: envConfig.deepseekApiFormat }),
     apiKey: apiKeyMap[spec.provider] ?? "",
     baseUrl: baseUrlMap[spec.provider] || undefined,
     model: spec.apiModel,
@@ -132,6 +139,7 @@ export function buildAgentConfig(
   const toolManagerConfig: ToolManagerConfig = {
     workspaceRoot,
     primaryProvider: modelSpec.provider,
+    apiFormat: llmConfig.apiFormat,
     hasKimiKey: Boolean(envConfig.kimiApiKey),
     disabledTools: envConfig.disabledTools,
     approvalGate,

@@ -30,6 +30,14 @@ describe("tool exposure", () => {
     expect(shouldExposeTool(deepseekOnlySpec, { primaryProvider: "kimi", hasKimiKey: true })).toBe(false);
   });
 
+  it("hides Kimi-backed web_search when DeepSeek uses Anthropic server search", () => {
+    expect(shouldExposeTool(deepseekOnlySpec, {
+      primaryProvider: "deepseek",
+      apiFormat: "anthropic",
+      hasKimiKey: true,
+    })).toBe(false);
+  });
+
   it("registers Kimi-assisted tools only for DeepSeek with a Kimi key", () => {
     const withoutKimi = createToolManager({
       workspaceRoot: "/tmp",
@@ -46,12 +54,20 @@ describe("tool exposure", () => {
       primaryProvider: "kimi",
       hasKimiKey: true,
     });
+    const deepseekAnthropic = createToolManager({
+      workspaceRoot: "/tmp",
+      primaryProvider: "deepseek",
+      apiFormat: "anthropic",
+      hasKimiKey: true,
+    });
 
     expect(withoutKimi.has("web_search")).toBe(false);
     expect(withKimi.has("web_search")).toBe(true);
     expect(withKimi.has("analyze_media")).toBe(true);
     expect(kimiPrimary.has("web_search")).toBe(false);
     expect(kimiPrimary.has("read_file")).toBe(true);
+    expect(deepseekAnthropic.has("web_search")).toBe(false);
+    expect(deepseekAnthropic.has("analyze_media")).toBe(true);
   });
 
   it("skips tools listed in disabledTools even when they are otherwise exposable", () => {

@@ -1,11 +1,8 @@
+@layer theme, base, chrome, components, utilities;
+
 @import "./tokens.css";
 @import "./tailwind.css";
-@import "./base.css";
-
-/*
- * Transitional import while the renderer is migrated slice by slice.
- * New and migrated surfaces should use Tailwind utilities plus the token/base
- * files above. This file is removed once the remaining shell, conversation,
- * composer, and right-panel styles have moved out of the old global sheet.
- */
-@import "../styles.css";
+@import "./base.css" layer(base);
+@import "./electron.css" layer(chrome);
+@import "./markdown.css" layer(components);
+@import "./diff.css" layer(components);

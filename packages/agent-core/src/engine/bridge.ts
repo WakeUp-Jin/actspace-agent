@@ -365,6 +365,7 @@ function createLlmUsageEvent(
     reasoningTokens: message.usage.reasoning || undefined,
     cacheHitTokens: message.usage.cacheHit || message.usage.cacheRead || undefined,
     cacheMissTokens: message.usage.cacheMiss || undefined,
+    serverToolUse: message.usage.serverToolUse,
     cost: calculateUsageCost(
       {
         inputTokens: message.usage.input,
@@ -1099,6 +1100,7 @@ function summarizeMessage(message: Message): Record<string, unknown> {
       textLength: text.length,
       thinkingLength: thinking.length,
       toolCallCount: toolCalls.length,
+      serverToolUse: message.usage.serverToolUse,
       toolCalls: toolCalls.map((toolCall) => ({
         toolCallId: toolCall.id,
         toolName: toolCall.name,

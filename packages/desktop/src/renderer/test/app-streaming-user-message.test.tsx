@@ -79,6 +79,13 @@ describe("App streaming user message", () => {
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
       listPendingApprovals: async () => [],
       onAgentStream: () => () => {},
       runTurn: () =>
@@ -139,6 +146,13 @@ describe("App streaming user message", () => {
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
       listPendingApprovals: async () => [],
       onAgentStream: (callback) => {
         streamHandler = callback;
@@ -209,6 +223,13 @@ describe("App streaming user message", () => {
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
       listPendingApprovals: async () => [],
       onAgentStream: (callback) => {
         streamHandler = callback;
@@ -286,6 +307,13 @@ describe("App streaming user message", () => {
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
       listPendingApprovals: async () => [],
       onAgentStream: (callback) => {
         streamHandler = callback;
@@ -366,6 +394,13 @@ describe("App streaming user message", () => {
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
       listPendingApprovals: async () => [],
       onAgentStream: (callback) => {
         streamHandler = callback;
@@ -528,6 +563,13 @@ describe("App streaming user message", () => {
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
       listPendingApprovals: async () => [],
       onAgentStream: (callback) => {
         streamHandler = callback;

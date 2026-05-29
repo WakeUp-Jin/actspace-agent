@@ -149,14 +149,16 @@ export function createKairosToolManagerFactory(opts: {
   workspaceRoot: string;
 }) {
   const env = resolveAgentEnvConfig();
-  // 注意：toolManager 的 primaryProvider 必须和实际给 LLM Service 用的 spec 一致，
-  // 否则会出现"Kimi 模型但 toolManager 按 deepseek 暴露工具集"这种错配。
+  // 注意：toolManager 的 provider / apiFormat 必须和实际 LLM Service 一致，
+  // 否则会出现 DeepSeek Anthropic 仍暴露 Kimi-backed web_search 这种错配。
   const { modelSpec } = resolveKairosEnv();
+  const llmConfig = buildLLMConfig(modelSpec, env);
   return (config: KairosConfig): ToolManager => {
     const combinedDisabled = [...env.disabledTools, ...config.blocklist.toolsDenied];
     return createToolManager({
       workspaceRoot: opts.workspaceRoot,
       primaryProvider: modelSpec.provider,
+      apiFormat: llmConfig.apiFormat,
       hasKimiKey: Boolean(env.kimiApiKey),
       disabledTools: combinedDisabled,
       // 不传 approvalGate：Kairos 应避免触发用户审核流；如确需要可由 plan 7 e2e 阶段再补。

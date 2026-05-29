@@ -1,5 +1,7 @@
 # actspace Tailwind 样式架构接入计划
 
+> 状态：已完成。2026-05-29 完成旧 `styles.css` / `legacy-*` 下线、剩余 UI 切片审计、全量命令验证、Browser mock 和 Electron 真窗 smoke。
+
 ## 目标
 
 为桌面端 renderer 接入 Tailwind v4，并把样式架构收敛为“全局 token / base CSS + Tailwind utility + React UI primitive”。第一阶段以 Usage Statistics 页面作为完整样板，后续再分批迁移 Workbench、Sidebar、Conversation、Composer 和 Right Panel。
@@ -39,11 +41,17 @@
   - `packages/desktop/package.json`
   - `packages/desktop/vite.config.mts`
   - `packages/desktop/src/renderer/main.tsx`
-  - `packages/desktop/src/renderer/styles.css`
+  - `packages/desktop/src/renderer/styles/index.css`
+  - `packages/desktop/src/renderer/styles/tokens.css`
+  - `packages/desktop/src/renderer/styles/tailwind.css`
+  - `packages/desktop/src/renderer/styles/base.css`
+  - `packages/desktop/src/renderer/styles/electron.css`
+  - `packages/desktop/src/renderer/styles/markdown.css`
+  - `packages/desktop/src/renderer/styles/diff.css`
   - `packages/desktop/src/renderer/components/UsageStatisticsPage.tsx`
   - `packages/desktop/src/renderer/App.tsx`
 - 已知约束：
-  - 本仓库当前没有 Tailwind 依赖和配置。
+  - Tailwind v4 依赖、Vite plugin、CSS-first token 映射和 `styles/index.css` 统一入口已经接入。
   - 前端是 Vite + React + Electron renderer。
   - 用户已明确项目处于开发阶段，不需要保留旧样式兼容层。
   - Usage Statistics 页面需要贴近 `docs/design-docs/frontend-ui/usage-statistics/prototype.html` 的原型效果。
@@ -69,7 +77,7 @@
    - 在 `packages/desktop/vite.config.mts` 加入 Tailwind Vite plugin。
    - 新建 `packages/desktop/src/renderer/styles/index.css`、`tokens.css`、`tailwind.css`、`base.css`。
    - 更新 `packages/desktop/src/renderer/main.tsx` 的样式入口。
-   - 迁移或删除与基础层重复的旧 `styles.css` 内容。
+   - 下线旧根部 `styles.css`，并将仍需全局管理的基础层、Electron chrome、Markdown、diff 样式收口到明确边界文件。
 2. Usage Statistics 样板迁移。
    - 将 Usage 页面改为 Tailwind utility 和少量 React primitive。
    - Token 总数大卡内部包含 toolbar、数字、金额、分布条、底部输入 / 输出 / 缓存 / 推理卡。
@@ -85,7 +93,7 @@
    - 迁移消息区、工具预览、输入框、附件区和右侧预览面板。
    - 对 Markdown、代码、diff、图片预览保留必要内容样式边界。
 5. 清理与规范固化。
-   - 删除旧 `styles.css` 和未使用 class。
+   - 保持旧 `styles.css` 与 `legacy-*` 分区删除状态，清理未使用 class。
    - 补充 `docs/coding-standards/` 中的 Tailwind 书写约定。
    - 更新 `docs/histories/`。
    - 做完整 typecheck、build、测试和 Electron 真实窗口验收。
@@ -118,8 +126,11 @@
 - [x] 完成 Electron 真实窗口验收。
 - [x] 迁移 Kairos 完整监控页和右侧紧凑视图到 Tailwind utility，删除对应 `.kairos-*` 全局 CSS。
 - [x] 确认 Lab V0 renderer mock 已使用 Tailwind utility + 局部 class 常量，无 `.lab-*` 全局 CSS 需要迁移。
-- [ ] 迁移剩余主要前端区域。
-- [ ] 删除旧 CSS 并更新 history / coding standards。
+- [x] 迁移 Conversation / Tool Preview 剩余 legacy 样式：工具日志 tooltip / running / reduced-motion 归组件，工具、思考和 diff 相邻消息压缩归 `ConversationView`，`legacy-conversation.css` 已删除。
+- [x] 删除旧根部 `styles.css` 与 `legacy-*` 分区，`styles/index.css` 仅导入 token、Tailwind、base、Electron chrome、Markdown 和 diff 边界。
+- [x] 更新 history / coding standards 中的样式作用域约定。
+- [x] 迁移剩余主要前端区域：审计确认 Placeholder、Sidebar Settings 入口和 remaining ordinary pages 已迁回组件局部 Tailwind class；当前没有独立 Settings 页面或剩余普通页面级 legacy selector。
+- [x] 清理剩余未使用 class，并完成全量验证：旧根部 `styles.css` 与 `legacy-*` 文件不存在，高风险 selector 扫描无普通 UI 残留；`pnpm typecheck`、`pnpm --filter @actspace/desktop build`、`pnpm --filter @actspace/desktop test` 均通过，Browser mock 与 Electron 真窗已完成 Chat / Lab / Usage / Kairos smoke。
 
 ## 决策记录
 
@@ -129,3 +140,5 @@
 - 2026-05-27：不保留长期 `legacy.css`。影响是每个迁移切片必须完整落地并验证，不能留下半迁移 class。
 - 2026-05-27：Usage Statistics 作为第一个样板页面。原因是该页面已有 HTML 原型、明确视觉反馈和较完整的卡片 / 表格 / 弹窗 / 响应式需求。
 - 2026-05-27：将 desktop Vite 配置改为 `vite.config.mts`。原因是 `@tailwindcss/vite` 是 ESM-only，`.mts` 能让 Vite 配置以 ESM 方式加载，同时不影响 Electron main 的 CommonJS tsconfig。
+- 2026-05-29：删除旧根部 `styles.css` 和 `legacy-*` 分区，入口 layer 收口为 `theme, base, chrome, components, utilities`。原因是 Workbench、Sidebar、Conversation、Composer、RightPanel 等 legacy 切片已迁回组件，继续保留 legacy 文件会制造第二套样式事实来源。
+- 2026-05-29：剩余主要前端区域以审计收尾。原因是 Placeholder 和 Settings 入口已随 Workbench / Sidebar 切片迁移，继续新增迁移改动会扩大风险，后续重点转为全量验证与 plan 归档。

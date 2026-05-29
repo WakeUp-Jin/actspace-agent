@@ -46,7 +46,9 @@ Radix primitives / 原生 HTML
   - `packages/desktop/src/renderer/components/Sidebar.tsx`
   - `packages/desktop/src/renderer/components/RightPanel.tsx`
   - `packages/desktop/src/renderer/components/SplitView.tsx`
-  - `packages/desktop/src/renderer/styles.css`
+  - `packages/desktop/src/renderer/styles/index.css`
+  - `packages/desktop/src/renderer/styles/tokens.css`
+  - `packages/desktop/src/renderer/styles/base.css`
   - `packages/desktop/src/renderer/test/`
 - 已知约束：
   - 仓库架构文档当前倾向 `Radix UI` primitives，而不是直接依赖重样式组件库。

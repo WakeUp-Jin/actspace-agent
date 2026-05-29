@@ -98,6 +98,10 @@ export type LlmUsagePayload = {
   reasoningTokens?: number;
   cacheHitTokens?: number;
   cacheMissTokens?: number;
+  serverToolUse?: {
+    webSearchRequests?: number;
+    webFetchRequests?: number;
+  };
   cost: LlmUsageCost;
   relatedEventIds?: EventId[];
 };
@@ -322,6 +326,10 @@ export type AssistantReply = {
     reasoningTokens?: number;
     cacheHitTokens?: number;
     cacheMissTokens?: number;
+    serverToolUse?: {
+      webSearchRequests?: number;
+      webFetchRequests?: number;
+    };
     cost?: LlmUsageCost;
   };
 };

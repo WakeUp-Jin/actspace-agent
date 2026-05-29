@@ -40,7 +40,8 @@
 - `packages/desktop/src/renderer/components/Composer.tsx`
 - `packages/desktop/src/renderer/components/ContextPopup.tsx`
 - `packages/desktop/src/renderer/fixtures/workbenchFixture.ts`
-- `packages/desktop/src/renderer/styles.css`
+- `packages/desktop/src/renderer/styles/index.css`
+- `packages/desktop/src/renderer/styles/tokens.css`（仅在需要新增全局 token 时修改）
 
 已知现状：
 

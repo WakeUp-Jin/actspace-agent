@@ -747,6 +747,7 @@ export function App() {
   const activeSessionId =
     sessionRecord?.meta.id ?? turnResult?.sessionId ?? sessions[0]?.id ?? mockSessions[0]?.id ?? null;
   const showDemoAttachments = isDemoSession(activeSessionId);
+  const isSessionReady = Boolean(sessionRecord || turnResult || streamingBlocks.length > 0 || !hasActspaceBridge());
   const title = getSessionTitle(sessionRecord, sessions);
   const busySessionIds = useMemo<Set<string>>(() => {
     const set = new Set<string>();
@@ -793,6 +794,7 @@ export function App() {
       onNewSession={handleCreateSession}
       onSelectSession={handleSelectSession}
       onTogglePin={handleTogglePin}
+      isSessionReady={isSessionReady}
       showDemoAttachments={showDemoAttachments}
     />
   );

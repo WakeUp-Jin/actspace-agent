@@ -1,0 +1,121 @@
+/*
+ * Content rendering boundary for file diff previews and streaming diff output.
+ */
+
+.file-diff-block {
+  max-width: 800px;
+  margin: 2px 0 0;
+  padding: 0 var(--conversation-text-inset);
+}
+
+.file-diff-toggle {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.42;
+  cursor: pointer;
+  text-align: left;
+}
+
+.file-diff-toggle:hover {
+  color: var(--color-text);
+}
+
+.file-diff-toggle svg {
+  flex-shrink: 0;
+  color: var(--color-text-faint);
+}
+
+.file-diff-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-additions {
+  color: var(--success);
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.diff-deletions {
+  color: var(--danger);
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.file-diff-content {
+  margin: 6px 0 0;
+  padding: 6px 0;
+  overflow: hidden;
+  overflow-x: auto;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.diff-line {
+  display: block;
+  padding: 1px 12px;
+  white-space: pre;
+}
+
+.diff-line.is-add {
+  background: rgba(44, 168, 105, 0.12);
+  color: #08784f;
+}
+
+.diff-line.is-remove {
+  background: rgba(225, 70, 86, 0.12);
+  color: #a43342;
+}
+
+.file-diff-block.is-streaming {
+  margin-top: 4px;
+  padding: 0 var(--conversation-text-inset);
+}
+
+.file-diff-streaming-header {
+  margin-bottom: 4px;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.42;
+}
+
+.file-diff-content.is-streaming-content {
+  padding: 8px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #08784f;
+  background: rgba(44, 168, 105, 0.08);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.streaming-cursor {
+  display: inline-block;
+  width: 0.55ch;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  animation: streaming-cursor-blink 1s steps(2, end) infinite;
+}
+
+@keyframes streaming-cursor-blink {
+  50% { opacity: 0; }
+}

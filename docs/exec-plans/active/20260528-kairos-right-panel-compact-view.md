@@ -56,7 +56,10 @@
 - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
 - `packages/desktop/src/renderer/pages/KairosPage.tsx`
 - `packages/desktop/src/renderer/state/useKairos.ts`
-- `packages/desktop/src/renderer/styles.css`
+- `packages/desktop/src/renderer/styles/index.css`
+- `packages/desktop/src/renderer/styles/electron.css`
+- `packages/desktop/src/renderer/styles/markdown.css`
+- `packages/desktop/src/renderer/styles/diff.css`
 - `packages/desktop/src/renderer/test/kairos-page.test.tsx`
 - 计划新增：`packages/desktop/src/renderer/state/kairosSelectors.ts`
 - 计划新增：`packages/desktop/src/renderer/components/right-panel/KairosRightPanelView.tsx`

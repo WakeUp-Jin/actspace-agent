@@ -1,0 +1,162 @@
+/*
+ * Content rendering boundary for model-generated Markdown.
+ * Keep these selectors scoped to markdown containers.
+ */
+
+.markdown-prose {
+  display: grid;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+
+.markdown-prose > :first-child {
+  margin-top: 0;
+}
+
+.markdown-prose > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-prose p,
+.markdown-prose blockquote,
+.markdown-prose ul,
+.markdown-prose ol,
+.markdown-prose pre,
+.markdown-prose table,
+.markdown-prose hr {
+  margin: 0;
+}
+
+.markdown-prose h1,
+.markdown-prose h2,
+.markdown-prose h3,
+.markdown-prose h4 {
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.24;
+  margin: 8px 0 0;
+}
+
+.markdown-prose h1 {
+  font-size: 1.34rem;
+}
+
+.markdown-prose h2 {
+  font-size: 1.18rem;
+}
+
+.markdown-prose h3 {
+  font-size: 1.04rem;
+}
+
+.markdown-prose h4 {
+  font-size: 0.98rem;
+}
+
+.markdown-prose ul,
+.markdown-prose ol {
+  display: grid;
+  gap: 6px;
+  padding-left: 1.35rem;
+}
+
+.markdown-prose li {
+  padding-left: 2px;
+}
+
+.markdown-prose blockquote {
+  border-left: 3px solid rgba(47, 111, 255, 0.28);
+  color: var(--color-text-muted);
+  padding: 2px 0 2px 14px;
+}
+
+.markdown-prose code {
+  border: 1px solid rgba(200, 209, 220, 0.72);
+  border-radius: var(--radius-sm);
+  background: rgba(247, 248, 250, 0.92);
+  color: #173b78;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 0.12em 0.34em;
+}
+
+.markdown-code-block {
+  border: 1px solid rgba(200, 209, 220, 0.82);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgba(248, 251, 255, 0.98), rgba(244, 247, 251, 0.98));
+  color: #193252;
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  line-height: 1.6;
+  max-width: 100%;
+  overflow: auto;
+  padding: 12px 14px;
+}
+
+.markdown-code-block code {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  padding: 0;
+}
+
+.markdown-prose a {
+  color: var(--color-brand-strong);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(47, 111, 255, 0.28);
+}
+
+.markdown-prose a:hover {
+  border-bottom-color: rgba(47, 111, 255, 0.7);
+}
+
+.markdown-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.markdown-prose table {
+  width: 100%;
+  min-width: 420px;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid rgba(200, 209, 220, 0.86);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  font-size: 0.92rem;
+}
+
+.markdown-prose th,
+.markdown-prose td {
+  border-bottom: 1px solid rgba(223, 228, 234, 0.86);
+  border-right: 1px solid rgba(223, 228, 234, 0.72);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-prose th {
+  background: rgba(237, 244, 255, 0.78);
+  color: #173b78;
+  font-weight: 600;
+}
+
+.markdown-prose tr:last-child td {
+  border-bottom: 0;
+}
+
+.markdown-prose th:last-child,
+.markdown-prose td:last-child {
+  border-right: 0;
+}
+
+.markdown-prose hr {
+  border: 0;
+  border-top: 1px solid rgba(223, 228, 234, 0.9);
+  height: 0;
+}

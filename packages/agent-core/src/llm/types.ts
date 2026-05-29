@@ -14,6 +14,7 @@ import type { AssistantMessage, Context, Tool } from "../messages";
 
 export interface LLMConfig {
   provider: string;
+  apiFormat?: "openai" | "anthropic";
   apiKey: string;
   baseUrl?: string;
   model: string;

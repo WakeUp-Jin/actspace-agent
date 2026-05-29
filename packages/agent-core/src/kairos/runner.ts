@@ -307,6 +307,7 @@ function buildKairosLlmUsagePayload(
     reasoningTokens: usage.reasoning || undefined,
     cacheHitTokens,
     cacheMissTokens,
+    serverToolUse: usage.serverToolUse,
     cost: calculateUsageCost(
       {
         inputTokens,

@@ -189,6 +189,19 @@ export type UsageStatisticsSnapshot = {
   dailyRows: UsageStatisticsDailyRow[];
 };
 
+export type DeepSeekBalanceDisplay = {
+  amount: string;
+  currency: string;
+};
+
+export type DeepSeekBalanceSnapshot = {
+  provider: "deepseek";
+  isConfigured: boolean;
+  isAvailable: boolean | null;
+  generatedAt: string;
+  displayBalance: DeepSeekBalanceDisplay | null;
+};
+
 export type AppBootstrapStateInput = {
   appVersion: string;
   dataRoot: string;

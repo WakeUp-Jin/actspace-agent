@@ -87,6 +87,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
   const manager = new ToolManager(config);
   const runtime = {
     primaryProvider: config.primaryProvider,
+    apiFormat: config.apiFormat,
     hasKimiKey: config.hasKimiKey,
   };
   const disabledTools = new Set(config.disabledTools ?? []);

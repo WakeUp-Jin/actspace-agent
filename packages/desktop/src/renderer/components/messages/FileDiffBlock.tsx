@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
+import {
+  TOOL_LOG_LINE_CLASS,
+  TOOL_LOG_LINE_RUNNING_CLASS,
+  TOOL_LOG_LINE_TEXT_CLASS,
+  TOOL_LOG_LINE_TEXT_RUNNING_CLASS,
+} from "./toolLogStyles";
 
 type FileDiffMessage =
   | Extract<MessageBlock, { kind: "edit_diff" }>
   | Extract<MessageBlock, { kind: "write_diff" }>;
 
-export function FileDiffBlock({ message }: { message: FileDiffMessage }) {
+export function FileDiffBlock({ message, className }: { message: FileDiffMessage; className?: string }) {
   const [expanded, setExpanded] = useState(false);
   const actionLabel = message.kind === "write_diff" ? "Write" : "Edit";
   const isRunning = message.status === "running";
@@ -16,9 +22,9 @@ export function FileDiffBlock({ message }: { message: FileDiffMessage }) {
 
   if (isRunning && streamingContent && streamingContent.length > 0) {
     return (
-      <article className="file-diff-block is-streaming">
+      <article className={`file-diff-block is-streaming${className ? ` ${className}` : ""}`}>
         <div className="file-diff-streaming-header">
-          <span className="tool-log-line-text">
+          <span className={TOOL_LOG_LINE_TEXT_CLASS}>
             {actionLabel} {fileLabel}
           </span>
         </div>
@@ -32,8 +38,8 @@ export function FileDiffBlock({ message }: { message: FileDiffMessage }) {
 
   if (isRunning) {
     return (
-      <div className="tool-log-line is-running">
-        <span className="tool-log-line-text">
+      <div className={`${TOOL_LOG_LINE_CLASS} ${TOOL_LOG_LINE_RUNNING_CLASS}${className ? ` ${className}` : ""}`}>
+        <span className={`${TOOL_LOG_LINE_TEXT_CLASS} ${TOOL_LOG_LINE_TEXT_RUNNING_CLASS}`}>
           {actionLabel} {fileLabel}
         </span>
       </div>
@@ -41,7 +47,7 @@ export function FileDiffBlock({ message }: { message: FileDiffMessage }) {
   }
 
   return (
-    <article className="file-diff-block">
+    <article className={`file-diff-block${className ? ` ${className}` : ""}`}>
       <button
         className="file-diff-toggle"
         type="button"

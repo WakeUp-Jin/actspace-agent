@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, readFile, stat, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -122,6 +122,18 @@ describe("ensureKairosScaffolding", () => {
 });
 
 describe("createKairosToolManagerFactory", () => {
+  const ENV_KEYS = [
+    "DEEPSEEK_API_KEY",
+    "DEEPSEEK_API_FORMAT",
+    "KIMI_API_KEY",
+    "KAIROS_MODEL_ID",
+  ];
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) delete process.env[key];
+    vi.resetModules();
+  });
+
   it("returns a function that produces a ToolManager scoped to workspaceRoot", () => {
     const factory = createKairosToolManagerFactory({ workspaceRoot: "/tmp/work" });
     const manager = factory(makeConfig());
@@ -143,5 +155,39 @@ describe("createKairosToolManagerFactory", () => {
     ).getAll().map((t) => t.name);
     expect(restricted).not.toContain("read_file");
     expect(restricted.length).toBeGreaterThan(0);
+  });
+
+  it("uses DeepSeek Anthropic format by default and hides the Kimi-backed web_search", async () => {
+    process.env.DEEPSEEK_API_KEY = "sk-test";
+    process.env.KIMI_API_KEY = "sk-kimi";
+    const { loadEnv } = await import("@actspace/agent-core");
+    const { createKairosToolManagerFactory: createFactory } = await import("../kairos-bootstrap");
+    loadEnv({
+      envPath: "/private/tmp/actspace-agent-kairos-test-does-not-exist",
+      mergeToProcessEnv: false,
+    });
+
+    const factory = createFactory({ workspaceRoot: "/tmp/work" });
+    const manager = factory(makeConfig());
+
+    expect(manager.has("web_search")).toBe(false);
+    expect(manager.has("analyze_media")).toBe(true);
+  });
+
+  it("can expose Kimi-backed web_search when Kairos explicitly falls back to OpenAI-compatible DeepSeek", async () => {
+    process.env.DEEPSEEK_API_KEY = "sk-test";
+    process.env.DEEPSEEK_API_FORMAT = "openai";
+    process.env.KIMI_API_KEY = "sk-kimi";
+    const { loadEnv } = await import("@actspace/agent-core");
+    const { createKairosToolManagerFactory: createFactory } = await import("../kairos-bootstrap");
+    loadEnv({
+      envPath: "/private/tmp/actspace-agent-kairos-test-does-not-exist",
+      mergeToProcessEnv: false,
+    });
+
+    const factory = createFactory({ workspaceRoot: "/tmp/work" });
+    const manager = factory(makeConfig());
+
+    expect(manager.has("web_search")).toBe(true);
   });
 });

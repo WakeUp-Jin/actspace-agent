@@ -12,11 +12,22 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AbortTurnInput, RunTurnInput, SessionCreateInput, SessionGetInput, SessionPinInput, ApprovalDecideInput, ApprovalListPendingInput, UsageStatisticsGetInput } from "@actspace/shared";
+import type {
+  AbortTurnInput,
+  ApprovalDecideInput,
+  ApprovalListPendingInput,
+  DeepSeekBalanceSnapshot,
+  RunTurnInput,
+  SessionCreateInput,
+  SessionGetInput,
+  SessionPinInput,
+  UsageStatisticsGetInput,
+} from "@actspace/shared";
 import {
   createBootstrapState,
   createGlobalUsageStatisticsSnapshot,
   createUsageStatisticsSnapshot,
+  getEnv,
   loadEnv,
   createSessionRecord,
   createSessionStorePaths,
@@ -43,9 +54,20 @@ const APP_ID = "com.actspace.desktop";
 const APP_NAME = "actspace";
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const PREVIEW_LIMIT = 160;
+const DEEPSEEK_BALANCE_TIMEOUT_MS = 8_000;
 
 let repoRootCache: string | undefined;
 let workspaceRootCache: string | undefined;
+
+type DeepSeekBalanceApiInfo = {
+  currency?: unknown;
+  total_balance?: unknown;
+};
+
+type DeepSeekBalanceApiResponse = {
+  is_available?: unknown;
+  balance_infos?: unknown;
+};
 
 // ─── 工具函数 ───
 
@@ -208,6 +230,84 @@ async function getWorkspaceRoot(): Promise<string> {
   return workspaceRootCache;
 }
 
+function resolveDeepSeekBalanceUrl(baseUrl: string): string {
+  const normalized = (baseUrl || "https://api.deepseek.com").replace(/\/+$/, "");
+  const apiRoot = normalized.endsWith("/v1") ? normalized.slice(0, -3) : normalized;
+  return `${apiRoot}/user/balance`;
+}
+
+function normalizeBalanceAmount(value: unknown): string | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) return raw;
+  return numeric.toFixed(2);
+}
+
+function selectDeepSeekDisplayBalance(response: DeepSeekBalanceApiResponse): DeepSeekBalanceSnapshot["displayBalance"] {
+  if (!Array.isArray(response.balance_infos)) return null;
+  const infos = response.balance_infos.filter((item): item is DeepSeekBalanceApiInfo => {
+    return item !== null && typeof item === "object";
+  });
+  const preferred = infos.find((info) => info.currency === "CNY") ?? infos[0];
+  if (!preferred || typeof preferred.currency !== "string") return null;
+
+  const amount = normalizeBalanceAmount(preferred.total_balance);
+  if (!amount) return null;
+  return {
+    amount,
+    currency: preferred.currency.toUpperCase(),
+  };
+}
+
+async function getDeepSeekBalanceSnapshot(): Promise<DeepSeekBalanceSnapshot> {
+  const currentEnv = getEnv();
+  if (!currentEnv.DEEPSEEK_API_KEY) {
+    return {
+      provider: "deepseek",
+      isConfigured: false,
+      isAvailable: null,
+      generatedAt: new Date().toISOString(),
+      displayBalance: null,
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DEEPSEEK_BALANCE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(resolveDeepSeekBalanceUrl(currentEnv.DEEPSEEK_BASE_URL), {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${currentEnv.DEEPSEEK_API_KEY}`,
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`DeepSeek balance request failed with status ${response.status}.`);
+    }
+
+    const payload = (await response.json()) as DeepSeekBalanceApiResponse;
+    return {
+      provider: "deepseek",
+      isConfigured: true,
+      isAvailable: typeof payload.is_available === "boolean" ? payload.is_available : null,
+      generatedAt: new Date().toISOString(),
+      displayBalance: selectDeepSeekDisplayBalance(payload),
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("DeepSeek balance request timed out.");
+    }
+    throw error instanceof Error ? error : new Error("DeepSeek balance request failed.");
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // ─── Electron 配置 ───
 
 function configureAppPaths() {
@@ -247,7 +347,7 @@ async function createMainWindow() {
     titleBarStyle: "hidden",
     // 红绿灯每个圆约 12px，y=16 → 圆心 Y = 22，对齐窗口顶部 chrome bar
     // 的按钮中心（chrome bar height 44 / align-items: center → 中心 Y = 22）。
-    // 调整 y 时也要同步看 styles.css 里 --window-chrome-strip-height。
+    // 调整 y 时也要同步看 renderer styles/tokens.css 里 --window-chrome-strip-height。
     trafficLightPosition: {
       x: 16,
       y: 16
@@ -422,6 +522,17 @@ async function registerIpc() {
       kairosEvents,
       range,
     });
+  });
+
+  ipcMain.handle("deepseek:balance:get", async () => {
+    try {
+      return await getDeepSeekBalanceSnapshot();
+    } catch (error) {
+      logMain("deepseek balance fetch failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   });
 
   ipcMain.handle("session:create", async (_event, input: SessionCreateInput = {}) => {

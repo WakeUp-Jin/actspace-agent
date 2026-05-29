@@ -44,7 +44,7 @@ Kairos 不是另一个 Agent，而是和现有 Agent 共享 LLM / 工具 / 长�
 - 不接入"天工"或外部任务系统巡检。actspace 没有对应概念，先聚焦自治闭环。
 - 不做工具白名单 / 配额护栏。Kairos 默认共享主 Agent 工具集；`blocklist.json` 走调度层硬限制，不是细粒度白名单。
 - 不做 cron 任务管理面板。cron 工具可在后续单独 plan 引入；Kairos 页 v1 不做 cron 视图（briefs 内部走 cron-like 调度，但不暴露给主 Agent）。
-- 不做模型独立选择。Kairos 使用与主 Agent 相同的已选模型。
+- 不做 UI 模型独立选择。Kairos 模型与 thinking 通过 env 配置手动控制：默认 `KAIROS_MODEL_ID=deepseek-v4-flash`、`KAIROS_THINKING=true`；填空或非法模型会回落到 Kairos 默认模型，不跟随主 Agent 默认模型。
 - 不做多设备 / 云端同步。短期记忆仅本地保存。
 - 不做"取消天工任务"或子进程管理类工具。
 - 不做 fs.watch 实时监听巡检目录。v1 巡检走 tick-time poll diff，避免 Electron 多目录监听的稳定性问题（config / briefs 目录是唯一例外——文件数少、稳定）。

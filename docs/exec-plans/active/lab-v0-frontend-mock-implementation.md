@@ -39,7 +39,7 @@
   - `packages/desktop/src/renderer/components/PlaceholderView.tsx`
   - `packages/desktop/src/renderer/components/LabPage.tsx`（新建）
   - `packages/desktop/src/renderer/fixtures/labFixture.ts`（新建）
-  - `packages/desktop/src/renderer/styles.css`（只移除旧 Lab 专属块，不新增 Lab 全局样式）
+  - `packages/desktop/src/renderer/styles/index.css`（只在需要确认全局入口时查看，不新增 Lab 全局样式）
   - `packages/desktop/src/renderer/test/lab-page.test.tsx`（新建）
 - 已知约束：
   - Lab 页面应保持桌面工作台气质，不做营销式说明页。
@@ -114,7 +114,7 @@
 - 在 `LabPage.tsx` 中使用 Tailwind utility / 局部 class 常量表达样式：
   - 页面布局、顶部栏、四列、卡片、列头、空槽。
   - 保持与原型一致的紧凑密度和浅色列底。
-  - 不新增 `styles.css` 的 Lab 专属全局样式。
+  - 不新增 Lab 专属全局样式；Lab 样式保留在 `LabPage.tsx` 的 Tailwind utility / 局部 class 常量中。
 - 验证：
   - 浏览器 mock 下四列全部可见。
   - 卡片高度稳定，长标题不撑开布局。

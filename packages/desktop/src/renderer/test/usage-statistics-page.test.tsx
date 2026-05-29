@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { UsageStatisticsPage } from "../components/UsageStatisticsPage";
 import { mockUsageStatistics } from "../fixtures/usageStatisticsFixture";
 
@@ -11,6 +11,57 @@ import { mockUsageStatistics } from "../fixtures/usageStatisticsFixture";
  * 3. 没数据的格子 hover 不应弹任何 tooltip（避免 empty popover）。
  */
 describe("UsageStatisticsPage heatmap tooltip", () => {
+  it("keeps the DeepSeek balance card visible when usage statistics are empty", () => {
+    render(
+      <UsageStatisticsPage
+        snapshot={null}
+        deepSeekBalance={{
+          provider: "deepseek",
+          isConfigured: true,
+          isAvailable: true,
+          generatedAt: "2026-05-29T03:00:00.000Z",
+          displayBalance: { amount: "19.65", currency: "CNY" },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("DeepSeek 预额")).toBeInTheDocument();
+    expect(screen.getByText("暂无 Usage 数据")).toBeInTheDocument();
+  });
+
+  it("renders the DeepSeek balance card with a compact amount and currency", () => {
+    render(
+      <UsageStatisticsPage
+        snapshot={mockUsageStatistics}
+        deepSeekBalance={{
+          provider: "deepseek",
+          isConfigured: true,
+          isAvailable: true,
+          generatedAt: "2026-05-29T03:00:00.000Z",
+          displayBalance: { amount: "19.65", currency: "CNY" },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("DeepSeek 预额")).toBeInTheDocument();
+    expect(screen.getByText("¥19.65")).toBeInTheDocument();
+    expect(screen.getByText("CNY")).toBeInTheDocument();
+  });
+
+  it("calls the DeepSeek balance refresh handler from the balance card", async () => {
+    const user = userEvent.setup();
+    const onRefreshDeepSeekBalance = vi.fn();
+    render(
+      <UsageStatisticsPage
+        snapshot={mockUsageStatistics}
+        onRefreshDeepSeekBalance={onRefreshDeepSeekBalance}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Refresh DeepSeek balance" }));
+    expect(onRefreshDeepSeekBalance).toHaveBeenCalledTimes(1);
+  });
+
   it("does not render the deprecated 使用趋势 panel", () => {
     render(<UsageStatisticsPage snapshot={mockUsageStatistics} />);
     expect(screen.queryByText("使用趋势")).toBeNull();

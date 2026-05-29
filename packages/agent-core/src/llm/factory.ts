@@ -9,12 +9,16 @@ import type { LLMConfig, LLMService } from "./types";
 import { LLMServiceError } from "./types";
 import { MockLLMService } from "./services/mock";
 import { DeepSeekService } from "./services/deepseek";
+import { DeepSeekAnthropicService } from "./services/deepseek-anthropic";
 import { KimiService } from "./services/kimi";
 import { envToLLMConfig } from "../env";
 
 export function createLLMService(config: LLMConfig): LLMService {
   switch (config.provider.toLowerCase()) {
     case "deepseek":
+      if (config.apiFormat === "anthropic") {
+        return new DeepSeekAnthropicService(config);
+      }
       return new DeepSeekService(config);
 
     case "kimi":

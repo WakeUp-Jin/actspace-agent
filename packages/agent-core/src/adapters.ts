@@ -118,6 +118,10 @@ export function assistantMessageToEvents(
         inputTokens: msg.usage.input,
         outputTokens: msg.usage.output,
         totalTokens: msg.usage.totalTokens,
+        reasoningTokens: msg.usage.reasoning || undefined,
+        cacheHitTokens: msg.usage.cacheHit || msg.usage.cacheRead || undefined,
+        cacheMissTokens: msg.usage.cacheMiss || undefined,
+        serverToolUse: msg.usage.serverToolUse,
       },
     };
     events.push(
@@ -280,6 +284,7 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
               cacheHit: payload.usage?.cacheHitTokens ?? 0,
               cacheMiss: payload.usage?.cacheMissTokens ?? 0,
               totalTokens: payload.usage?.totalTokens ?? 0,
+              serverToolUse: payload.usage?.serverToolUse,
               cost: {
                 input: payload.usage?.cost?.input ?? 0,
                 output: payload.usage?.cost?.output ?? 0,
@@ -364,6 +369,7 @@ export function toAssistantReply(msg: AssistantMessage): AssistantReply {
       reasoningTokens: msg.usage.reasoning,
       cacheHitTokens: msg.usage.cacheHit,
       cacheMissTokens: msg.usage.cacheMiss,
+      serverToolUse: msg.usage.serverToolUse,
     },
   };
 }

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { CircleAlert, Info, RefreshCw, Share2, X } from "lucide-react";
 import type {
+  DeepSeekBalanceSnapshot,
   UsageStatisticsDailyModelBreakdown,
   UsageStatisticsDailyRow,
   UsageStatisticsModelEntry,
@@ -13,6 +14,10 @@ type Props = {
   isLoading?: boolean;
   error?: string | null;
   onRefresh?: (range: UsageStatisticsSnapshot["range"]) => void;
+  deepSeekBalance?: DeepSeekBalanceSnapshot | null;
+  isDeepSeekBalanceLoading?: boolean;
+  deepSeekBalanceError?: string | null;
+  onRefreshDeepSeekBalance?: () => void;
   onBackToChat?: () => void;
 };
 
@@ -251,6 +256,64 @@ function BreakdownCard({ label, value, detail }: { label: string; value: string;
   );
 }
 
+function getBalanceSymbol(currency: string): string {
+  switch (currency.toUpperCase()) {
+    case "CNY":
+      return "¥";
+    case "USD":
+      return "$";
+    default:
+      return "";
+  }
+}
+
+function DeepSeekBalanceCard({
+  balance,
+  isLoading,
+  error,
+  onRefresh,
+}: {
+  balance?: DeepSeekBalanceSnapshot | null;
+  isLoading?: boolean;
+  error?: string | null;
+  onRefresh?: () => void;
+}) {
+  const display = balance?.displayBalance;
+  const amount = display ? `${getBalanceSymbol(display.currency)}${display.amount}` : "--";
+  const currency = display?.currency ?? "CNY";
+  const helperText = isLoading
+    ? "正在刷新余额..."
+    : error
+      ? "刷新失败，保留上次余额"
+      : balance?.isConfigured === false
+        ? "未配置 DeepSeek API Key"
+        : "每 5 分钟自动刷新";
+
+  return (
+    <article className={`${panelClass} grid gap-3 p-5`} aria-label="DeepSeek balance">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-text-faint">DeepSeek 预额</div>
+        <button
+          className={`${iconButtonClass} h-8 w-8`}
+          type="button"
+          aria-label="Refresh DeepSeek balance"
+          disabled={isLoading}
+          onClick={onRefresh}
+        >
+          <RefreshCw size={14} strokeWidth={2} className={isLoading ? "animate-spin" : ""} />
+        </button>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <strong className="text-[34px] font-bold leading-none tracking-[-0.02em] text-text-main tabular-nums">
+          {amount}
+        </strong>
+        <span className="text-[15px] font-semibold text-text-faint">{currency}</span>
+      </div>
+      <div className="text-[11px] text-text-subtle">{helperText}</div>
+    </article>
+  );
+}
+
 /** Tooltip 单条 model 颜色条用——和主区 toolDistribution 同一组配色，保证全页视觉一致。 */
 const HEATMAP_MODEL_COLORS = ["#2f6fff", "#28b7d8", "#8b5cf6", "#f4795b", "#22a06b", "#9aa8bb"];
 
@@ -444,7 +507,16 @@ function HeatmapTooltipModelRow({
   );
 }
 
-export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: Props) {
+export function UsageStatisticsPage({
+  snapshot,
+  isLoading,
+  error,
+  onRefresh,
+  deepSeekBalance,
+  isDeepSeekBalanceLoading,
+  deepSeekBalanceError,
+  onRefreshDeepSeekBalance,
+}: Props) {
   const [range, setRange] = useState<UsageStatisticsSnapshot["range"]>(snapshot?.range ?? "month");
   const [selectedTool, setSelectedTool] = useState<UsageStatisticsToolEntry | null>(null);
   const [showCostDetail, setShowCostDetail] = useState(false);
@@ -452,45 +524,56 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: P
   if (!snapshot) {
     return (
       <main className="h-full overflow-auto bg-[#f7f8fb] px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main">
-        <div className="grid min-h-[calc(100vh-48px)] place-items-center">
-          <section className={`${panelClass} grid max-w-[560px] gap-4 p-7 text-center`}>
-            <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-brand-soft text-brand">
-              <Info size={22} strokeWidth={2} />
-            </div>
-            <div>
-              <h1 className="m-0 text-2xl font-bold text-text-main">暂无 Usage 数据</h1>
-              <p className="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-text-muted">
-                这里汇总了你所有对话以及 Kairos 自主模式的 token、成本、缓存和工具调用。完成至少一次真实 Agent 调用后会自动出数据。
-              </p>
-            </div>
-            {error ? (
-              <div className="rounded-act-lg border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-700">
-                {error}
-              </div>
-            ) : null}
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {RANGE_TABS.map((tab) => (
-                <button
-                  key={tab}
-                  className={`h-8 min-w-14 rounded-full px-3.5 text-[13px] font-semibold transition ${
-                    tab === range ? "bg-brand-soft text-brand" : "border border-line bg-white text-text-muted hover:text-brand"
-                  }`}
-                  type="button"
-                  onClick={() => {
-                    setRange(tab);
-                    onRefresh?.(tab);
-                  }}
-                >
-                  {getRangeLabel(tab)}
-                </button>
-              ))}
-            </div>
-            <button className={`${actionButtonClass} mx-auto`} type="button" onClick={() => onRefresh?.(range)}>
-              <RefreshCw size={15} strokeWidth={2} />
-              Refresh
-            </button>
-            {isLoading ? <div className="text-xs text-text-faint">Loading usage statistics...</div> : null}
+        <div className="grid min-h-[calc(100vh-48px)] min-w-0 grid-cols-[340px_minmax(0,1fr)] items-start gap-4">
+          <section className="flex min-w-0 flex-col gap-4 self-stretch">
+            <DeepSeekBalanceCard
+              balance={deepSeekBalance}
+              isLoading={isDeepSeekBalanceLoading}
+              error={deepSeekBalanceError}
+              onRefresh={onRefreshDeepSeekBalance}
+            />
           </section>
+
+          <div className="grid min-h-[calc(100vh-48px)] place-items-center">
+            <section className={`${panelClass} grid max-w-[560px] gap-4 p-7 text-center`}>
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-brand-soft text-brand">
+                <Info size={22} strokeWidth={2} />
+              </div>
+              <div>
+                <h1 className="m-0 text-2xl font-bold text-text-main">暂无 Usage 数据</h1>
+                <p className="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-text-muted">
+                  这里汇总了你所有对话以及 Kairos 自主模式的 token、成本、缓存和工具调用。完成至少一次真实 Agent 调用后会自动出数据。
+                </p>
+              </div>
+              {error ? (
+                <div className="rounded-act-lg border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-700">
+                  {error}
+                </div>
+              ) : null}
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {RANGE_TABS.map((tab) => (
+                  <button
+                    key={tab}
+                    className={`h-8 min-w-14 rounded-full px-3.5 text-[13px] font-semibold transition ${
+                      tab === range ? "bg-brand-soft text-brand" : "border border-line bg-white text-text-muted hover:text-brand"
+                    }`}
+                    type="button"
+                    onClick={() => {
+                      setRange(tab);
+                      onRefresh?.(tab);
+                    }}
+                  >
+                    {getRangeLabel(tab)}
+                  </button>
+                ))}
+              </div>
+              <button className={`${actionButtonClass} mx-auto`} type="button" onClick={() => onRefresh?.(range)}>
+                <RefreshCw size={15} strokeWidth={2} />
+                Refresh
+              </button>
+              {isLoading ? <div className="text-xs text-text-faint">Loading usage statistics...</div> : null}
+            </section>
+          </div>
         </div>
       </main>
     );
@@ -510,6 +593,13 @@ export function UsageStatisticsPage({ snapshot, isLoading, error, onRefresh }: P
     <main className="h-full overflow-auto bg-[#f7f8fb] px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main">
       <div className="grid min-h-[calc(100vh-48px)] min-w-0 grid-cols-[340px_minmax(0,1fr)] items-start gap-4">
         <section className="flex min-w-0 flex-col gap-4 self-stretch">
+          <DeepSeekBalanceCard
+            balance={deepSeekBalance}
+            isLoading={isDeepSeekBalanceLoading}
+            error={deepSeekBalanceError}
+            onRefresh={onRefreshDeepSeekBalance}
+          />
+
           <article className={`${panelClass} grid gap-3.5 p-4`}>
             <div className="grid grid-cols-4 gap-2">
               {[

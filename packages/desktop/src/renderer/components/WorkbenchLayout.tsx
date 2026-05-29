@@ -1,4 +1,4 @@
-import type { ContextUsageSnapshot, MessageBlock, SessionListItem, UsageStatisticsSnapshot } from "@actspace/shared";
+import type { ContextUsageSnapshot, DeepSeekBalanceSnapshot, MessageBlock, SessionListItem, UsageStatisticsSnapshot } from "@actspace/shared";
 import { useCallback, useEffect, useState } from "react";
 import { ConversationView } from "./ConversationView";
 import { LabPage } from "./LabPage";
@@ -26,6 +26,7 @@ const MAIN_MIN_WIDTH = 560;
 const RIGHT_DEFAULT_WIDTH = 390;
 const RIGHT_MIN_WIDTH = 320;
 const RIGHT_MAX_WIDTH = 640;
+const DEEPSEEK_BALANCE_REFRESH_MS = 5 * 60 * 1000;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -81,6 +82,7 @@ export function WorkbenchLayout({
   onNewSession,
   onSelectSession,
   onTogglePin,
+  isSessionReady = true,
   showDemoAttachments = false,
 }: {
   sessions: SessionListItem[];
@@ -98,6 +100,7 @@ export function WorkbenchLayout({
   onNewSession?: () => void;
   onSelectSession?: (sessionId: string) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
+  isSessionReady?: boolean;
   showDemoAttachments?: boolean;
 }) {
   const [storedLayout] = useState(loadStoredLayout);
@@ -110,6 +113,9 @@ export function WorkbenchLayout({
   const [usageSnapshot, setUsageSnapshot] = useState<UsageStatisticsSnapshot | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState<string | null>(null);
+  const [deepSeekBalance, setDeepSeekBalance] = useState<DeepSeekBalanceSnapshot | null>(null);
+  const [deepSeekBalanceLoading, setDeepSeekBalanceLoading] = useState(false);
+  const [deepSeekBalanceError, setDeepSeekBalanceError] = useState<string | null>(null);
   const isSidebarHidden = leftMode === "hidden";
   const displayedLeftWidth = isSidebarHidden ? 0 : leftWidth;
   const rightMaxWidth = containerWidth > 0 ? Math.max(RIGHT_MIN_WIDTH, Math.min(RIGHT_MAX_WIDTH, containerWidth / 2)) : RIGHT_MAX_WIDTH;
@@ -225,12 +231,49 @@ export function WorkbenchLayout({
     }
   }, []);
 
+  const loadDeepSeekBalance = useCallback(async () => {
+    if (typeof window === "undefined" || !window.actspace?.getDeepSeekBalance) {
+      setDeepSeekBalance(null);
+      setDeepSeekBalanceError(null);
+      return;
+    }
+
+    setDeepSeekBalanceLoading(true);
+    setDeepSeekBalanceError(null);
+    try {
+      const balance = await window.actspace.getDeepSeekBalance();
+      setDeepSeekBalance(balance);
+    } catch (error) {
+      console.error("Failed to load DeepSeek balance", error);
+      setDeepSeekBalanceError(error instanceof Error ? error.message : "Failed to load DeepSeek balance.");
+    } finally {
+      setDeepSeekBalanceLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (view !== "usage") return;
     loadUsageStatistics().catch((error: unknown) => {
       console.error("Failed to bootstrap usage statistics", error);
     });
   }, [view, loadUsageStatistics]);
+
+  useEffect(() => {
+    if (view !== "usage") return;
+    loadDeepSeekBalance().catch((error: unknown) => {
+      console.error("Failed to bootstrap DeepSeek balance", error);
+    });
+
+    const timer = window.setInterval(() => {
+      loadDeepSeekBalance().catch((error: unknown) => {
+        console.error("Failed to refresh DeepSeek balance", error);
+      });
+    }, DEEPSEEK_BALANCE_REFRESH_MS);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [view, loadDeepSeekBalance]);
 
   let mainContent;
   if (view === "lab") {
@@ -242,6 +285,10 @@ export function WorkbenchLayout({
         isLoading={usageLoading}
         error={usageError}
         onRefresh={loadUsageStatistics}
+        deepSeekBalance={deepSeekBalance}
+        isDeepSeekBalanceLoading={deepSeekBalanceLoading}
+        deepSeekBalanceError={deepSeekBalanceError}
+        onRefreshDeepSeekBalance={loadDeepSeekBalance}
         onBackToChat={() => setView("chat")}
       />
     );
@@ -257,6 +304,7 @@ export function WorkbenchLayout({
         sendScrollRequestId={sendScrollRequestId}
         onSend={onSend}
         onAbort={onAbort}
+        isSessionReady={isSessionReady}
         showDemoAttachments={showDemoAttachments}
       />
     );

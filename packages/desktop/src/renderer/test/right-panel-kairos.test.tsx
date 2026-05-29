@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -92,9 +90,12 @@ beforeEach(() => {
 
 describe("RightPanel Kairos tab", () => {
   it("keeps right panel tab buttons out of Electron drag regions", () => {
-    const css = readFileSync(resolve(process.cwd(), "src/renderer/styles.css"), "utf8");
+    render(<RightPanel />);
 
-    expect(css).toMatch(/\.right-tabs button\s*\{[^}]*-webkit-app-region:\s*no-drag;/s);
+    expect(screen.getByRole("tab", { name: "README.md" })).toHaveClass("[-webkit-app-region:no-drag]");
+    expect(screen.getByRole("tab", { name: "Session diff" })).toHaveClass(
+      "[-webkit-app-region:no-drag]",
+    );
   });
 
   it("keeps README and diff tabs switchable", async () => {

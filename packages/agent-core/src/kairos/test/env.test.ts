@@ -4,9 +4,10 @@
  * 这些测试都通过手动改写 process.env 后强制重载 env module 来覆盖各种输入组合，
  * 包括"非法 modelId 静默回落"、"模型不支持 toggle 时强制 ignore"这种边界。
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const ENV_KEYS = ["KAIROS_MODEL_ID", "KAIROS_THINKING"] as const;
+const EMPTY_ENV_PATH = "/tmp/actspace-agent-kairos-env-empty-do-not-create.env";
 
 function withEnv(vars: Partial<Record<(typeof ENV_KEYS)[number], string>>) {
   for (const k of ENV_KEYS) {
@@ -19,11 +20,10 @@ function withEnv(vars: Partial<Record<(typeof ENV_KEYS)[number], string>>) {
 }
 
 async function loadResolver() {
-  // env module 内部有缓存（_env / _loaded），每次测试都重置以读到当前 process.env。
-  // 复用 ESM 的 module cache 比较麻烦，这里用 vitest 的 resetModules 思路：
-  // 直接 import fresh 实例。
+  // env 和 kairos/env 都在模块层读取缓存；每次测试重置模块，保证读到当前 process.env。
+  vi.resetModules();
   const envMod = await import("../../env");
-  envMod.loadEnv({ mergeToProcessEnv: false });
+  envMod.loadEnv({ envPath: EMPTY_ENV_PATH, mergeToProcessEnv: false });
   const { resolveKairosEnv } = await import("../env");
   return resolveKairosEnv;
 }
@@ -46,12 +46,12 @@ describe("resolveKairosEnv", () => {
     }
   });
 
-  it("empty env → falls back to default ModelSpec, thinkingEnabled=undefined", async () => {
+  it("empty env → falls back to Kairos default flash model with thinking enabled", async () => {
     withEnv({});
     const resolve = await loadResolver();
     const r = resolve();
-    expect(r.modelSpec.id).toBe("deepseek-v4-flash"); // DEFAULT_MODEL_ID
-    expect(r.thinkingEnabled).toBeUndefined();
+    expect(r.modelSpec.id).toBe("deepseek-v4-flash");
+    expect(r.thinkingEnabled).toBe(true);
   });
 
   it("valid modelId is honored", async () => {
@@ -97,12 +97,13 @@ describe("resolveKairosEnv", () => {
     expect(r.thinkingEnabled).toBeUndefined();
   });
 
-  it("model without thinking toggle → KAIROS_THINKING is ignored even when=true", async () => {
-    withEnv({ KAIROS_MODEL_ID: "deepseek-v4-flash", KAIROS_THINKING: "true" });
+  it("garbage modelId falls back to Kairos default and still honors KAIROS_THINKING", async () => {
+    withEnv({ KAIROS_MODEL_ID: "not-a-real-model", KAIROS_THINKING: "true" });
     const resolve = await loadResolver();
     const r = resolve();
-    expect(r.modelSpec.supportsThinkingToggle).toBe(false);
-    expect(r.thinkingEnabled).toBeUndefined();
+    expect(r.modelSpec.id).toBe("deepseek-v4-flash");
+    expect(r.modelSpec.supportsThinkingToggle).toBe(true);
+    expect(r.thinkingEnabled).toBe(true);
   });
 
   it("accepts 1 / 0 / on / off as boolean shorthands", async () => {

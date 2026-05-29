@@ -35,7 +35,7 @@
 
 - `packages/desktop/src/renderer/components/Sidebar.tsx`
 - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
-- `packages/desktop/src/renderer/styles.css`
+- `packages/desktop/src/renderer/styles/index.css`
 - `packages/desktop/src/renderer/styles/tokens.css`
 - `packages/desktop/src/renderer/test/**`
 
@@ -43,7 +43,7 @@
 
 - Sidebar 的 Settings 按钮当前没有 onClick 行为。
 - `WorkbenchLayout` 当前 view 只有 `chat | lab | usage | kairos`。
-- 全局字体 token 已存在于 `styles.css` 和 Tailwind token 文件。
+- 全局字体 token 应以 `styles/tokens.css` 为来源，并通过 `styles/tailwind.css` 映射给 Tailwind；普通 Settings 页面样式写在组件局部 Tailwind class 中。
 
 ## 实施任务
 

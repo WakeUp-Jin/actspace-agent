@@ -11,6 +11,19 @@ const colorByBucket: Record<string, string> = {
   conversation: "#f5a313"
 };
 
+const CONTEXT_POPOVER_CLASS =
+  "context-popover absolute bottom-[calc(100%_+_10px)] right-0 z-20 w-[min(820px,100%)] rounded-2xl border border-[#b8c6dd] bg-[#20262d] px-3.5 pb-3.5 pt-[13px] text-[#dce3ec] shadow-act-popover";
+const CONTEXT_ROW_CLASS = "flex items-center justify-between gap-3.5";
+const CONTEXT_CLOSE_CLASS =
+  "grid h-6 w-6 place-items-center rounded-full border-0 bg-[#3b424b] text-[#bfc8d4]";
+const CONTEXT_SUMMARY_CLASS = `${CONTEXT_ROW_CLASS} py-3 pb-2 text-sm text-[#c6ced8]`;
+const CONTEXT_METER_CLASS = "context-meter flex h-[5px] overflow-hidden rounded-full bg-[#555e68]";
+const CONTEXT_BUCKETS_CLASS = "context-buckets grid gap-[9px] py-4 pb-3";
+const CONTEXT_BUCKET_CLASS = "context-bucket grid grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2.5 text-sm text-[#d4dbe4]";
+const BUCKET_SWATCH_CLASS = "bucket-swatch h-[13px] w-[13px] rounded-[3px]";
+const CONTEXT_BUCKET_VALUE_CLASS = "font-semibold text-[#c8d0da]";
+const CONTEXT_FOOTER_CLASS = `${CONTEXT_ROW_CLASS} border-t border-[#3b424b] pt-2.5 text-xs text-[#9ea9b8]`;
+
 export function ContextPopup({
   snapshot,
   onClose
@@ -29,20 +42,20 @@ export function ContextPopup({
     };
 
   return (
-    <div className="context-popover" role="dialog" aria-label="Context usage">
-      <header className="context-popover-header">
+    <div className={CONTEXT_POPOVER_CLASS} role="dialog" aria-label="Context usage">
+      <header className={`context-popover-header ${CONTEXT_ROW_CLASS}`}>
         <strong>Context</strong>
-        <button type="button" onClick={onClose} aria-label="Close context">
+        <button className={CONTEXT_CLOSE_CLASS} type="button" onClick={onClose} aria-label="Close context">
           <X size={15} strokeWidth={2.2} />
         </button>
       </header>
-      <div className="context-summary">
+      <div className={CONTEXT_SUMMARY_CLASS}>
         <span>{safeSnapshot.percentUsed}% Full</span>
         <span>
           ~{safeSnapshot.totalTokens.toLocaleString()} / {safeSnapshot.maxTokens.toLocaleString()} Tokens
         </span>
       </div>
-      <div className="context-meter" aria-hidden="true">
+      <div className={CONTEXT_METER_CLASS} aria-hidden="true">
         {safeSnapshot.buckets.map((bucket) => {
           const key = bucket.key ?? bucket.name ?? "conversation";
           const width = safeSnapshot.totalTokens > 0 ? `${(bucket.tokens / safeSnapshot.totalTokens) * 100}%` : "0%";
@@ -57,19 +70,19 @@ export function ContextPopup({
           );
         })}
       </div>
-      <div className="context-buckets">
+      <div className={CONTEXT_BUCKETS_CLASS}>
         {safeSnapshot.buckets.map((bucket) => {
           const key = bucket.key ?? bucket.name ?? "conversation";
           return (
-            <div className="context-bucket" key={key}>
-              <span className="bucket-swatch" style={{ background: colorByBucket[key] }} />
+            <div className={CONTEXT_BUCKET_CLASS} key={key}>
+              <span className={BUCKET_SWATCH_CLASS} style={{ background: colorByBucket[key] }} />
               <span>{bucket.label ?? key}</span>
-              <strong>{bucket.tokens.toLocaleString()}</strong>
+              <strong className={CONTEXT_BUCKET_VALUE_CLASS}>{bucket.tokens.toLocaleString()}</strong>
             </div>
           );
         })}
       </div>
-      <footer className="context-footer">
+      <footer className={`context-footer ${CONTEXT_FOOTER_CLASS}`}>
         <span>Total used {safeSnapshot.cumulativeTokens?.toLocaleString() ?? "0"}</span>
         <span>Compressed {safeSnapshot.compressionCount ?? 0} times</span>
       </footer>

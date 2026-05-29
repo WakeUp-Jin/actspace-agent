@@ -206,6 +206,7 @@ describe("KairosRunner.processTick", () => {
         totalTokens: 4_000,
         cacheHit: 1_200,
         cacheMiss: 2_000,
+        serverToolUse: { webSearchRequests: 2, webFetchRequests: 1 },
       },
       stopReason: "stop",
       timestamp: Date.now(),
@@ -242,6 +243,7 @@ describe("KairosRunner.processTick", () => {
     expect(payload.totalTokens).toBe(4_000);
     expect(payload.cacheHitTokens).toBe(1_200);
     expect(payload.cacheMissTokens).toBe(2_000);
+    expect(payload.serverToolUse).toEqual({ webSearchRequests: 2, webFetchRequests: 1 });
     expect(payload.modelId).toBe("deepseek-v4-flash");
     expect(payload.cost.total).toBeGreaterThan(0);
     // cost.currency 由 model-config pricing 决定；当前 DeepSeek pricing 写的是 USD。

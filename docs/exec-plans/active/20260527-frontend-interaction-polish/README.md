@@ -8,7 +8,7 @@
 
 本目录是 `20260527-frontend-interaction-polish` 的总索引。原单文件计划已拆成 6 个可独立推进的小计划：
 
-1. [`01-composer-visual-and-model-menu.md`](01-composer-visual-and-model-menu.md)：Composer 视觉基线与模型菜单 hover edit，覆盖 `#5`、`#19`。
+1. [`01-composer-visual-and-model-menu.md`](01-composer-visual-and-model-menu.md)：Follow-up Composer 视觉、`+` command menu、Review 预留层与模型菜单 hover edit，覆盖 `#5`、`#19`。
 2. [`02-attachments-ipc-and-turn-contract.md`](02-attachments-ipc-and-turn-contract.md)：附件选择、展示、删除与 turn 契约，覆盖 `#6`。
 3. [`03-context-readonly-popover.md`](03-context-readonly-popover.md)：Composer Context 只读弹窗，覆盖 `#8`。
 4. [`04-sidebar-workspaces-and-session-status.md`](04-sidebar-workspaces-and-session-status.md)：Workspaces 添加项目与会话状态按钮，覆盖 `#12`、`#18`。
@@ -57,7 +57,7 @@
 - `#12` Workspaces 的增加项目按钮无作用。
 - `#17` 设置页面通用样式设置，尤其字体。
 - `#18` 会话旁边的状态按钮可用化。
-- `#19` 输入框样式调整到补充截图方向。
+- `#19` 输入框从大输入卡片调整到补充截图里的 follow-up bar 方向。
 
 不包含：
 
@@ -69,7 +69,7 @@
 
 ## 并行边界
 
-- 本计划簇 owns Composer、model menu、attachment UI、Context popup、settings general typography、workspace add entry and session status UI。
+- 本计划簇 owns follow-up Composer、model menu、attachment UI、Context popup、settings general typography、workspace add entry and session status UI。
 - 附件只接入选择、展示、删除和 user message 元信息持久化；不要在本计划簇中实现 Agent 对附件内容的深度解析。
 - Context popup 只能消费已有 `contextState` / `contextSnapshot`，不自行解析 `session.jsonl`。
 - Workspaces 添加项目第一版通过“选择目录并创建该 workspace 下的新会话”形成列表，不引入独立 Workspace 数据模型。
@@ -77,7 +77,7 @@
 
 ## 推荐推进顺序
 
-1. 先执行 Composer 视觉与模型菜单，因为附件和 Context 弹窗都依赖 Composer 布局稳定。
+1. 先执行 follow-up Composer 视觉与模型菜单，因为附件和 Context 弹窗都依赖 Composer 布局稳定。
 2. 再执行附件功能，补齐 Electron 文件选择和发送契约。
 3. 再执行 Context 弹窗，复用 Composer 浮层互斥机制。
 4. 再执行 Sidebar / Workspaces / Session Status，集中处理侧栏交互。

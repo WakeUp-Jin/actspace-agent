@@ -153,6 +153,10 @@ export type LlmUsagePayload = {
   reasoningTokens?: number;
   cacheHitTokens?: number;
   cacheMissTokens?: number;
+  serverToolUse?: {
+    webSearchRequests?: number;
+    webFetchRequests?: number;
+  };
 
   cost: {
     input: number;

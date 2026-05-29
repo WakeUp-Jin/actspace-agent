@@ -50,4 +50,71 @@
 
   --act-scrollbar-thumb: rgba(171, 177, 186, 0.46);
   --act-scrollbar-thumb-hover: rgba(146, 153, 164, 0.56);
+
+  /*
+   * Legacy alias layer:
+   * old renderer styles still read unprefixed variables while slices migrate
+   * to Tailwind/theme tokens. Keep these aliases here so legacy CSS no longer
+   * needs to redeclare a second :root block.
+   */
+  --font-ui: var(--act-font-ui);
+  --font-display: var(--act-font-display);
+  --font-mono: var(--act-font-mono);
+
+  --color-brand: var(--act-color-brand);
+  --color-brand-strong: var(--act-color-brand-strong);
+  --color-brand-soft: var(--act-color-brand-soft);
+  --color-bg: var(--act-color-bg);
+  --color-surface: var(--act-color-surface);
+  --color-surface-subtle: var(--act-color-surface-subtle);
+  --color-sidebar: var(--act-color-sidebar);
+  --color-sidebar-selected: var(--act-color-sidebar-selected);
+  --color-border: var(--act-color-border);
+  --color-border-strong: var(--act-color-border-strong);
+  --color-text: var(--act-color-text);
+  --color-text-muted: var(--act-color-text-muted);
+  --color-text-faint: var(--act-color-text-faint);
+  --color-text-subtle: var(--act-color-text-subtle);
+  --color-warm: var(--act-color-warm);
+  --color-danger: var(--act-color-danger);
+  --color-success: var(--act-color-success);
+
+  --surface: var(--color-surface);
+  --surface-soft: var(--color-surface-subtle);
+  --surface-blue: var(--color-brand-soft);
+  --line: var(--color-border);
+  --line-strong: var(--color-border-strong);
+  --text: var(--color-text);
+  --text-soft: var(--color-text-muted);
+  --text-faint: var(--color-text-faint);
+  --accent: var(--color-brand);
+  --accent-muted: var(--color-brand-soft);
+  --success: var(--color-success);
+  --danger: var(--color-danger);
+
+  --radius-xs: var(--act-radius-xs);
+  --radius-sm: var(--act-radius-sm);
+  --radius-md: var(--act-radius-md);
+  --radius-lg: var(--act-radius-lg);
+  --radius-pill: var(--act-radius-pill);
+
+  --shadow-soft: var(--act-shadow-soft);
+  --shadow-popover: var(--act-shadow-popover);
+
+  --motion-fast: 120ms;
+  --motion-base: 160ms;
+  --motion-slow: 220ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --window-chrome-strip-height: 44px;
+  --window-chrome-left-padding: 86px;
+  --window-chrome-control-size: 22px;
+
+  --conversation-inline-padding: 32px;
+  --conversation-content-width: 880px;
+  --conversation-card-padding: 16px;
+  --conversation-text-inset: calc(var(--conversation-card-padding) + 1px);
+
+  --scrollbar-thumb: var(--act-scrollbar-thumb);
+  --scrollbar-thumb-hover: var(--act-scrollbar-thumb-hover);
 }

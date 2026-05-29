@@ -25,8 +25,8 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
     label: "DeepSeek V4 Flash",
     provider: "deepseek",
     apiModel: "deepseek-v4-flash",
-    thinkingDefault: false,
-    supportsThinkingToggle: false,
+    thinkingDefault: true,
+    supportsThinkingToggle: true,
     contextWindow: 1_000_000,
     pricing: {
       currency: "USD",
@@ -63,7 +63,7 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
 
 export const MODEL_LIST: ModelSpec[] = Object.values(MODEL_REGISTRY);
 
-export const DEFAULT_MODEL_ID: ModelId = "deepseek-v4-flash";
+export const DEFAULT_MODEL_ID: ModelId = "deepseek-v4-pro";
 
 export function resolveModelSpec(modelId?: ModelId): ModelSpec {
   if (modelId && modelId in MODEL_REGISTRY) return MODEL_REGISTRY[modelId];

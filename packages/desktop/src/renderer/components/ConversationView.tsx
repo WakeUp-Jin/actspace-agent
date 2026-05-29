@@ -18,6 +18,43 @@ type ConversationTurn = {
   messages: MessageBlock[];
 };
 
+const CONVERSATION_SHELL_CLASS =
+  "conversation-shell grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-white pt-[var(--window-chrome-strip-height)]";
+const MESSAGE_SCROLL_CLASS = "message-scroll min-h-0 overflow-auto bg-white pb-6 [scrollbar-gutter:stable_both-edges]";
+const MESSAGE_SCROLL_INITIAL_CLASS =
+  "message-scroll message-scroll-initial min-h-0 overflow-auto bg-white pb-6 [scrollbar-gutter:stable_both-edges]";
+const MESSAGE_STACK_CLASS =
+  "message-stack mx-auto flex w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] flex-col gap-7 pb-7";
+const INITIAL_COMPOSER_STAGE_CLASS =
+  "initial-composer-stage flex h-full min-h-[420px] items-center justify-center px-[var(--conversation-inline-padding)]";
+const MESSAGE_TURN_CLASS = "message-turn relative flex flex-col gap-0";
+const TURN_PROMPT_CLASS =
+  "turn-prompt sticky top-0 z-12 bg-[linear-gradient(180deg,#fff_0%,rgba(255,255,255,0.96)_78%,rgba(255,255,255,0)_100%)] py-4";
+const TURN_BODY_CLASS = "turn-body flex flex-col gap-[9px]";
+const TURN_ACTIONS_CLASS = "turn-actions mt-[-12px] flex min-h-6 justify-end";
+const TURN_ACTION_ANCHOR_CLASS = "turn-action-anchor relative flex-none";
+const TURN_ACTION_TRIGGER_CLASS =
+  "turn-action-trigger grid h-[30px] w-[30px] place-items-center rounded-act-md border-0 bg-transparent text-text-faint opacity-65 transition-[background,color,opacity] duration-[150ms] ease-in-out hover:bg-brand-soft hover:text-brand-strong hover:opacity-100 aria-expanded:bg-brand-soft aria-expanded:text-brand-strong aria-expanded:opacity-100";
+const TURN_ACTION_MENU_CLASS =
+  "turn-action-menu absolute bottom-[30px] right-0 z-40 w-[178px] rounded-act-md border border-line bg-white/98 p-1.5 shadow-act-popover";
+const TURN_ACTION_MENU_BUTTON_CLASS =
+  "flex min-h-[34px] w-full items-center rounded-act-sm border-0 bg-transparent px-2.5 text-left text-sm font-semibold text-text-main transition-colors duration-[150ms] ease-in-out hover:bg-brand-soft hover:text-brand disabled:cursor-default disabled:text-text-faint";
+const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-[13px] leading-[1.4] text-[#8b95a5]";
+const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-[#b45858]";
+const COMPACT_MESSAGE_RELATION_CLASS = "-mt-1";
+
+const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
+  "read",
+  "search",
+  "grep",
+  "glob",
+  "web_search",
+  "directory_list",
+  "tool",
+  "error",
+]);
+const DIFF_MESSAGE_KINDS = new Set<MessageBlock["kind"]>(["edit_diff", "write_diff"]);
+
 function copyWithSelection(value: string) {
   const textArea = document.createElement("textarea");
   textArea.value = value;
@@ -46,14 +83,45 @@ async function copyToClipboard(value: string) {
   }
 }
 
-function renderMessage(message: MessageBlock) {
+function isToolLogMessage(message: MessageBlock) {
+  return TOOL_LOG_MESSAGE_KINDS.has(message.kind);
+}
+
+function isDiffMessage(message: MessageBlock) {
+  return DIFF_MESSAGE_KINDS.has(message.kind);
+}
+
+function getMessageRelationClass(previousMessage: MessageBlock | undefined, message: MessageBlock) {
+  if (!previousMessage) {
+    return undefined;
+  }
+
+  const previousIsTool = isToolLogMessage(previousMessage);
+  const currentIsTool = isToolLogMessage(message);
+  const previousIsDiff = isDiffMessage(previousMessage);
+  const currentIsDiff = isDiffMessage(message);
+
+  if (
+    (previousMessage.kind === "thinking" && currentIsTool) ||
+    (previousIsTool && (currentIsTool || message.kind === "thinking")) ||
+    (previousMessage.kind === "thinking" && currentIsDiff) ||
+    (previousIsDiff && (currentIsDiff || currentIsTool || message.kind === "thinking")) ||
+    (previousIsTool && currentIsDiff)
+  ) {
+    return COMPACT_MESSAGE_RELATION_CLASS;
+  }
+
+  return undefined;
+}
+
+function renderMessage(message: MessageBlock, className?: string) {
   switch (message.kind) {
     case "user":
       return <UserMessage key={message.id} message={message} />;
     case "assistant":
       return <AssistantReply key={message.id} message={message} />;
     case "thinking":
-      return <ThinkingBlock key={message.id} message={message} />;
+      return <ThinkingBlock key={message.id} message={message} className={className} />;
     case "bash":
       return <BashRunBlock key={message.id} message={message} />;
     case "read":
@@ -64,16 +132,19 @@ function renderMessage(message: MessageBlock) {
     case "directory_list":
     case "tool":
     case "error":
-      return <ToolLogLine key={message.id} message={message} />;
+      return <ToolLogLine key={message.id} message={message} className={className} />;
     case "status":
       return (
-        <div key={message.id} className={`turn-status-line${message.tone === "error" ? " is-error" : ""}`}>
+        <div
+          key={message.id}
+          className={`${TURN_STATUS_LINE_CLASS}${message.tone === "error" ? ` ${TURN_STATUS_LINE_ERROR_CLASS}` : ""}`}
+        >
           {message.content}
         </div>
       );
     case "edit_diff":
     case "write_diff":
-      return <FileDiffBlock key={message.id} message={message} />;
+      return <FileDiffBlock key={message.id} message={message} className={className} />;
   }
 }
 
@@ -152,10 +223,10 @@ function TurnActions({ assistantMessages }: { assistantMessages: AssistantMessag
   }
 
   return (
-    <div className="turn-actions">
-      <div className="turn-action-anchor" ref={menuRef}>
+    <div className={TURN_ACTIONS_CLASS}>
+      <div className={TURN_ACTION_ANCHOR_CLASS} ref={menuRef}>
         <button
-          className="turn-action-trigger"
+          className={TURN_ACTION_TRIGGER_CLASS}
           type="button"
           aria-label="Open message actions"
           aria-expanded={menuOpen}
@@ -165,14 +236,14 @@ function TurnActions({ assistantMessages }: { assistantMessages: AssistantMessag
           <MoreHorizontal size={18} strokeWidth={2.2} />
         </button>
         {menuOpen ? (
-          <div className="turn-action-menu" role="menu">
-            <button type="button" role="menuitem" disabled>
+          <div className={TURN_ACTION_MENU_CLASS} role="menu">
+            <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
               Fork Chat
             </button>
-            <button type="button" role="menuitem" onClick={() => void handleCopy(copyText)}>
+            <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" onClick={() => void handleCopy(copyText)}>
               Copy Message
             </button>
-            <button type="button" role="menuitem" onClick={() => void handleCopy(latestAssistantMessage.id)}>
+            <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" onClick={() => void handleCopy(latestAssistantMessage.id)}>
               Copy Request ID
             </button>
           </div>
@@ -190,6 +261,7 @@ export function ConversationView({
   sendScrollRequestId = 0,
   onSend,
   onAbort,
+  isSessionReady = true,
   showDemoAttachments = false,
 }: {
   messages: MessageBlock[];
@@ -199,9 +271,11 @@ export function ConversationView({
   sendScrollRequestId?: number;
   onSend?: (text: string, options: ComposerSendOptions) => void;
   onAbort?: () => void;
+  isSessionReady?: boolean;
   showDemoAttachments?: boolean;
 }) {
   const turns = groupMessagesIntoTurns(messages);
+  const isInitialComposer = isSessionReady && messages.length === 0 && !isStreaming;
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -213,38 +287,59 @@ export function ConversationView({
   }, [sendScrollRequestId]);
 
   return (
-    <main className="conversation-shell">
-      <section className="message-scroll" aria-label="Conversation messages">
-        <div className="message-stack">
-          {turns.map((turn) => (
-            <section className="message-turn" key={turn.id}>
-              {turn.user ? (
-                <div className="turn-prompt">
-                  <UserMessage message={turn.user} />
+    <main className={CONVERSATION_SHELL_CLASS}>
+      <section className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS} aria-label="Conversation messages">
+        {isInitialComposer ? (
+          <div className={INITIAL_COMPOSER_STAGE_CLASS}>
+            <Composer
+              contextSnapshot={contextSnapshot}
+              isStreaming={isStreaming}
+              isAborting={isAborting}
+              onSend={onSend}
+              onAbort={onAbort}
+              surface="initial"
+              showDemoAttachments={showDemoAttachments}
+            />
+          </div>
+        ) : (
+          <div className={MESSAGE_STACK_CLASS}>
+            {turns.map((turn) => (
+              <section className={MESSAGE_TURN_CLASS} key={turn.id}>
+                {turn.user ? (
+                  <div className={TURN_PROMPT_CLASS}>
+                    <UserMessage message={turn.user} />
+                  </div>
+                ) : null}
+                <div className={TURN_BODY_CLASS}>
+                  {turn.messages.map((message, index) =>
+                    renderMessage(message, getMessageRelationClass(turn.messages[index - 1], message))
+                  )}
                 </div>
-              ) : null}
-              <div className="turn-body">{turn.messages.map(renderMessage)}</div>
-              <TurnActions
-                assistantMessages={
-                  turn.messages.filter((message): message is AssistantMessageBlock => message.kind === "assistant")
-                }
-              />
-            </section>
-          ))}
-          <div ref={bottomAnchorRef} aria-hidden="true" />
-        </div>
+                <TurnActions
+                  assistantMessages={
+                    turn.messages.filter((message): message is AssistantMessageBlock => message.kind === "assistant")
+                  }
+                />
+              </section>
+            ))}
+            <div ref={bottomAnchorRef} aria-hidden="true" />
+          </div>
+        )}
       </section>
 
-      <div className="composer-zone">
-        <Composer
-          contextSnapshot={contextSnapshot}
-          isStreaming={isStreaming}
-          isAborting={isAborting}
-          onSend={onSend}
-          onAbort={onAbort}
-          showDemoAttachments={showDemoAttachments}
-        />
-      </div>
+      {isSessionReady && !isInitialComposer ? (
+        <div className="composer-zone grid w-full overflow-visible pb-5">
+          <Composer
+            contextSnapshot={contextSnapshot}
+            isStreaming={isStreaming}
+            isAborting={isAborting}
+            onSend={onSend}
+            onAbort={onAbort}
+            surface="followup"
+            showDemoAttachments={showDemoAttachments}
+          />
+        </div>
+      ) : null}
     </main>
   );
 }

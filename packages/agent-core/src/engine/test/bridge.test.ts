@@ -310,6 +310,51 @@ describe("runTurnWithAgent bridge", () => {
     expect(assistantMessageEnds.every((event) => !("message" in ((event.payload ?? {}) as object)))).toBe(true);
   });
 
+  it("records provider-native server tool usage in assistant run log summaries", async () => {
+    const deps = createDeps();
+    deps.llm.setResponses([
+      {
+        ...mockText("Fetched with provider-native search."),
+        usage: {
+          ...mockText("unused").usage,
+          input: 100,
+          output: 20,
+          totalTokens: 120,
+          serverToolUse: { webSearchRequests: 1, webFetchRequests: 0 },
+        },
+      },
+    ]);
+    const runLogEvents: AgentRunLogEvent[] = [];
+    const runLogger: AgentRunLogger = {
+      filePath: "/tmp/test-run.jsonl",
+      write: async (event) => {
+        runLogEvents.push(event);
+      },
+    };
+
+    await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Read a web page.",
+      },
+      deps,
+      { runLogger },
+    );
+
+    const assistantMessageEnd = runLogEvents.find((event) => {
+      const payload = event.payload as { type?: string; role?: string } | undefined;
+      return event.type === "agent_event" && payload?.type === "message_end" && payload.role === "assistant";
+    });
+
+    expect(assistantMessageEnd?.payload).toMatchObject({
+      summary: {
+        toolCallCount: 0,
+        serverToolUse: { webSearchRequests: 1, webFetchRequests: 0 },
+      },
+    });
+  });
+
   it("persists list_directory results with a directory_list preview", async () => {
     const deps = createDeps();
     deps.toolManager.register(createListDirectoryTool());

@@ -57,7 +57,6 @@
   - `packages/desktop/src/global.d.ts`
   - `packages/desktop/src/renderer/App.tsx`
   - `packages/desktop/src/renderer/components/messages/BashRunBlock.tsx`
-  - `packages/desktop/src/renderer/styles.css`
   - `packages/desktop/src/renderer/fixtures/workbenchFixture.ts`
 
 ## 已知约束（来自 design.md 的 D1-D5）
@@ -189,9 +188,9 @@
 - `handleStreamEvent` 的 `tool_approval_required` case 写入 `tool.prefixOptions = event.prefixOptions`。
 - `toolEntryToBlock` 的 bash 分支透传 `prefixOptions`。
 
-`packages/desktop/src/renderer/styles.css`：
+`packages/desktop/src/renderer/components/messages/BashRunBlock.tsx`：
 
-- 新增 `.bash-allow-popover` 系列样式：popover 容器、checkbox 行、主按钮 hover/disabled 态。
+- 用组件局部 Tailwind class / class 常量新增 Bash allow popover 样式：popover 容器、checkbox 行、主按钮 hover/disabled 态。
 
 `packages/desktop/src/renderer/fixtures/workbenchFixture.ts`：
 
@@ -236,7 +235,7 @@
    - 验证：`pnpm --filter @actspace/desktop test` 通过；浏览器 mock 看到 dropdown 与菜单。
 
 10. **fixture 与样式**
-    - 文件：`workbenchFixture.ts`、`styles.css`。
+    - 文件：`workbenchFixture.ts`、`BashRunBlock.tsx`。
     - 验证：浏览器 mock 渲染正确。
 
 11. **session.jsonl 事件流 + replay**

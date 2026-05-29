@@ -6,6 +6,7 @@ import type {
   ApprovalDecideResult,
   ApprovalListPendingInput,
   BootstrapState,
+  DeepSeekBalanceSnapshot,
   KairosBridgeApi,
   KairosContextSnapshot,
   KairosControl,
@@ -39,6 +40,8 @@ contextBridge.exposeInMainWorld("actspace", {
   getSession: (input: SessionGetInput) => ipcRenderer.invoke("session:get", input) as Promise<SessionRecord | null>,
   getUsageStatistics: (input: UsageStatisticsGetInput) =>
     ipcRenderer.invoke("usage-statistics:get", input) as Promise<UsageStatisticsSnapshot | null>,
+  getDeepSeekBalance: () =>
+    ipcRenderer.invoke("deepseek:balance:get") as Promise<DeepSeekBalanceSnapshot>,
   createSession: (input?: SessionCreateInput) => ipcRenderer.invoke("session:create", input ?? {}) as Promise<SessionRecord>,
   pinSession: (input: SessionPinInput) => ipcRenderer.invoke("session:pin", input) as Promise<SessionPinResult>,
 

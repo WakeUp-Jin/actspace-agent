@@ -22,3 +22,7 @@
 - 只写 skill 覆盖不到的内容，避免重复。
 - 保持简短，规范越短越容易被遵守。
 - 能变成机械检查的约束（lint 规则、CI 检查），就不要只停留在文档里。
+
+## 当前约定
+
+- [`frontend-style-scope-conventions.md`](frontend-style-scope-conventions.md)：前端样式作用域、Tailwind 迁移期全局 CSS 边界，以及样式覆盖类 bug 的排查方式。

@@ -289,7 +289,7 @@ describe("WindowChromeBar", () => {
     const bar = container.querySelector(".window-chrome-bar") as HTMLElement | null;
     expect(bar).not.toBeNull();
     // 不直接读 computed style（jsdom 不解析 CSS），只断言三段子结构存在，
-    // 真正的 fixed + pointer-events 由 styles.css 提供，CDP / 真机走另一道验收。
+    // 真正的 fixed + pointer-events 由 styles/electron.css 提供，CDP / 真机走另一道验收。
     expect(bar?.querySelector(".chrome-left")).not.toBeNull();
     expect(bar?.querySelector(".chrome-center")).not.toBeNull();
     expect(bar?.querySelector(".chrome-right")).not.toBeNull();

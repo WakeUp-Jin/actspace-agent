@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@actspace/shared": "workspace:*",
+    "@anthropic-ai/sdk": "^0.100.1",
     "@types/diff": "^8.0.0",
     "@vscode/ripgrep": "^1.18.0",
     "diff": "^9.0.0",

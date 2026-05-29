@@ -8,7 +8,9 @@ const ENV_KEYS = [
   "KIMI_BASE_URL",
   "KIMI_MODEL",
   "DEEPSEEK_API_KEY",
+  "DEEPSEEK_API_FORMAT",
   "DEEPSEEK_BASE_URL",
+  "DEEPSEEK_ANTHROPIC_BASE_URL",
   "ACTSPACE_DISABLED_TOOLS",
 ];
 const EMPTY_ENV_PATH = "/private/tmp/actspace-agent-env-test-does-not-exist";
@@ -21,7 +23,7 @@ describe("envToLLMConfig", () => {
     vi.resetModules();
   });
 
-  it("allows DeepSeek without a Kimi key", async () => {
+  it("defaults DeepSeek to Anthropic format without a Kimi key", async () => {
     process.env.LLM_PROVIDER = "deepseek";
     process.env.DEEPSEEK_API_KEY = "deepseek-key";
     const { loadEnv, envToLLMConfig } = await import("../env");
@@ -29,7 +31,42 @@ describe("envToLLMConfig", () => {
     loadEnv({ envPath: EMPTY_ENV_PATH, mergeToProcessEnv: false });
     expect(envToLLMConfig()).toMatchObject({
       provider: "deepseek",
+      apiFormat: "anthropic",
       apiKey: "deepseek-key",
+      baseUrl: "https://api.deepseek.com/anthropic",
+      model: "deepseek-chat",
+    });
+  });
+
+  it("honors custom DeepSeek Anthropic base URL on the default route", async () => {
+    process.env.LLM_PROVIDER = "deepseek";
+    process.env.DEEPSEEK_API_KEY = "deepseek-key";
+    process.env.DEEPSEEK_ANTHROPIC_BASE_URL = "https://example.test/anthropic";
+    const { loadEnv, envToLLMConfig } = await import("../env");
+
+    loadEnv({ envPath: EMPTY_ENV_PATH, mergeToProcessEnv: false });
+    expect(envToLLMConfig()).toMatchObject({
+      provider: "deepseek",
+      apiFormat: "anthropic",
+      apiKey: "deepseek-key",
+      baseUrl: "https://example.test/anthropic",
+      model: "deepseek-chat",
+    });
+  });
+
+  it("can explicitly fall back to DeepSeek OpenAI-compatible format", async () => {
+    process.env.LLM_PROVIDER = "deepseek";
+    process.env.DEEPSEEK_API_KEY = "deepseek-key";
+    process.env.DEEPSEEK_API_FORMAT = "openai";
+    process.env.DEEPSEEK_BASE_URL = "https://example.test/openai";
+    const { loadEnv, envToLLMConfig } = await import("../env");
+
+    loadEnv({ envPath: EMPTY_ENV_PATH, mergeToProcessEnv: false });
+    expect(envToLLMConfig()).toMatchObject({
+      provider: "deepseek",
+      apiFormat: "openai",
+      apiKey: "deepseek-key",
+      baseUrl: "https://example.test/openai",
       model: "deepseek-chat",
     });
   });

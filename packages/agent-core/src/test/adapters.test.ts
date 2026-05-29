@@ -121,4 +121,13 @@ describe("Adapters: toAssistantReply", () => {
     expect(reply.usage).toBeDefined();
     expect(reply.usage!.totalTokens).toBeGreaterThan(0);
   });
+
+  it("preserves provider-native server tool usage on assistant replies", () => {
+    const msg = createMockFinalReply();
+    msg.usage.serverToolUse = { webSearchRequests: 1, webFetchRequests: 0 };
+
+    const reply = toAssistantReply(msg);
+
+    expect(reply.usage?.serverToolUse).toEqual({ webSearchRequests: 1, webFetchRequests: 0 });
+  });
 });
