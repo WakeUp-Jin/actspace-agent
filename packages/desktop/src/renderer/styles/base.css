@@ -64,7 +64,7 @@ a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 3px solid rgba(47, 111, 255, 0.22);
+  outline: 3px solid var(--act-color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -74,7 +74,7 @@ svg {
 }
 
 ::selection {
-  background: rgba(47, 111, 255, 0.18);
+  background: var(--act-color-selection);
 }
 
 @keyframes rise-in {

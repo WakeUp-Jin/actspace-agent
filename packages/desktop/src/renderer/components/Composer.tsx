@@ -40,20 +40,20 @@ const INITIAL_CONTEXT_SELECTOR_CLASS =
   "initial-context-selector inline-flex items-center gap-1 rounded-full border-0 bg-transparent px-1 py-1 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main";
 const COMPOSER_ACTION_STRIP_CLASS = "composer-action-strip flex min-h-[34px] items-center gap-2";
 const REVIEW_PREVIEW_BUTTON_CLASS =
-  "review-preview-button inline-flex h-[30px] items-center gap-1.5 rounded-full border border-line bg-white px-3 text-sm font-medium text-text-muted shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
+  "review-preview-button inline-flex h-[30px] items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-sm font-medium text-text-muted shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
 const REVIEW_ADDITION_CLASS = "font-medium text-success";
 const REVIEW_DELETION_CLASS = "font-medium text-danger";
 const REVIEW_OVERFLOW_BUTTON_CLASS =
-  "review-overflow-button grid h-[30px] w-[30px] place-items-center rounded-full border border-line bg-white text-text-faint shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
+  "review-overflow-button grid h-[30px] w-[30px] place-items-center rounded-full border border-line bg-surface text-text-faint shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
 const COMPOSER_PANEL_CLASS =
-  "composer-panel relative grid overflow-visible rounded-[22px] border border-[rgba(200,209,220,0.9)] bg-white shadow-[0_14px_34px_rgba(31,45,61,0.08)]";
+  "composer-panel relative grid overflow-visible rounded-[22px] border border-line bg-surface shadow-act-soft";
 const COMPOSER_PANEL_INITIAL_CLASS =
-  "composer-panel composer-panel-initial relative grid overflow-visible rounded-[18px] border border-[rgba(200,209,220,0.9)] bg-white shadow-[0_14px_34px_rgba(31,45,61,0.08)]";
+  "composer-panel composer-panel-initial relative grid overflow-visible rounded-[18px] border border-line bg-surface shadow-act-soft";
 const COMPOSER_ATTACHMENTS_CLASS = "composer-attachments flex min-h-14 flex-wrap items-center gap-2.5 px-3 pb-1 pt-3";
 const IMAGE_ATTACHMENT_CLASS =
   "image-attachment group/image-attachment relative h-12 w-12 rounded-lg [background:linear-gradient(135deg,rgba(18,92,210,0.12),rgba(255,255,255,0.36)),linear-gradient(155deg,transparent_0_48%,rgba(25,170,110,0.28)_49%_60%,transparent_61%),repeating-linear-gradient(0deg,#ffffff_0_7px,#dce7f5_7px_8px)] [box-shadow:inset_0_0_0_1px_rgba(81,109,158,0.16),0_8px_18px_rgba(54,83,134,0.08)]";
 const FILE_ATTACHMENT_CLASS =
-  "file-attachment group/file-attachment inline-flex h-9 max-w-[220px] items-center gap-2 rounded-lg border border-line bg-white px-2.5 pr-1.5 text-sm font-medium text-text-main shadow-[0_6px_16px_rgba(31,45,61,0.06)]";
+  "file-attachment group/file-attachment inline-flex h-9 max-w-[220px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-sm font-medium text-text-main shadow-[0_6px_16px_rgba(31,45,61,0.06)]";
 const FILE_ATTACHMENT_NAME_CLASS = "truncate";
 const ATTACHMENT_REMOVE_BASE_CLASS =
   "attachment-remove grid place-items-center rounded-lg opacity-0 pointer-events-none transition-[background,color,opacity] duration-[150ms] ease-in-out";
@@ -73,14 +73,14 @@ const COMPOSER_BAR_STACKED_CLASS =
 const COMPOSER_TOOL_SPACER_CLASS = "composer-tool-spacer flex-1";
 const CONTROL_GROUP_CLASS = "control-group relative";
 const COMMAND_BUTTON_CLASS =
-  "command-button grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-surface-subtle text-text-muted transition-[background,border,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-brand-soft hover:text-brand-strong aria-expanded:border-[rgba(47,111,255,0.22)] aria-expanded:bg-brand-soft aria-expanded:text-brand-strong";
+  "command-button grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-surface-subtle text-text-muted transition-[background,border,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-brand-soft hover:text-brand-strong aria-expanded:border-brand/30 aria-expanded:bg-brand-soft aria-expanded:text-brand-strong";
 const MODEL_BUTTON_CLASS =
   "model-button inline-flex h-8 max-w-[220px] items-center gap-[6px] rounded-full border-0 bg-transparent px-1.5 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main";
 const MODEL_BUTTON_TEXT_CLASS = "model-button-text truncate";
 const SEND_BUTTON_CLASS =
   "send-button grid h-9 w-9 shrink-0 place-items-center rounded-full border-0 bg-brand text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.24),0_8px_18px_rgba(47,111,255,0.18)] transition-[background,box-shadow,opacity] duration-[120ms] ease-in-out hover:bg-brand-strong hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22),0_10px_22px_rgba(47,111,255,0.22)] disabled:cursor-default disabled:opacity-72";
 const DROPDOWN_MENU_CLASS =
-  "dropdown-menu absolute bottom-[calc(100%_+_8px)] left-0 z-30 min-w-[180px] overflow-hidden rounded-xl border border-line bg-white/96 p-1.5 shadow-act-popover";
+  "dropdown-menu absolute bottom-[calc(100%_+_8px)] left-0 z-30 min-w-[180px] overflow-hidden rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
 const COMMAND_MENU_CLASS = `${DROPDOWN_MENU_CLASS} command-menu w-[240px] min-w-[240px] p-2`;
 const COMMAND_MENU_HINT_CLASS = "px-2 pb-2 pt-1 text-sm text-text-subtle";
 const COMMAND_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
@@ -97,7 +97,7 @@ const MODEL_ROW_ACTIONS_CLASS =
   "model-row-actions absolute right-2.5 flex h-full min-w-[42px] items-center justify-end gap-[5px]";
 const MODEL_ROW_ACTIONS_SELECTED_CLASS = "min-w-[62px]";
 const MODEL_EDIT_BUTTON_CLASS =
-  "model-edit-button h-[26px] min-w-[42px] justify-center rounded-[7px] border-0 bg-transparent text-xs font-semibold text-text-muted transition-[opacity,background,color] duration-[120ms] ease-in-out focus-visible:outline-none hover:bg-[rgba(32,33,36,0.08)] hover:text-text-main";
+  "model-edit-button h-[26px] min-w-[42px] justify-center rounded-[7px] border-0 bg-transparent text-xs font-semibold text-text-muted transition-[opacity,background,color] duration-[120ms] ease-in-out focus-visible:outline-none hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 const MODEL_CHECK_ICON_CLASS = "model-check-icon text-text-main";
 const MODEL_OPTIONS_MENU_CLASS = `${DROPDOWN_MENU_CLASS} model-options-menu bottom-0 left-[calc(100%_+_8px)] w-[220px] min-w-[220px]`;
 const DROPDOWN_LABEL_CLASS = "dropdown-label px-2.5 pb-[5px] pt-[7px] text-xs font-semibold text-text-faint";
@@ -106,7 +106,7 @@ const OPTION_TOGGLE_ROW_CLASS =
 const OPTION_TOGGLE_LABEL_CLASS = "flex-1";
 const OPTION_TOGGLE_INPUT_CLASS = "absolute opacity-0 pointer-events-none";
 const TOGGLE_TRACK_CLASS =
-  "toggle-track relative inline-flex h-5 w-8 rounded-full bg-[#d5dbe4] transition-colors duration-[120ms] ease-in-out";
+  "toggle-track relative inline-flex h-5 w-8 rounded-full bg-line-strong transition-colors duration-[120ms] ease-in-out";
 const TOGGLE_TRACK_ON_CLASS = "bg-brand";
 const TOGGLE_THUMB_CLASS =
   "toggle-thumb absolute left-[3px] top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_4px_rgba(31,45,61,0.22)] transition-transform duration-[120ms] ease-in-out";
@@ -119,10 +119,10 @@ const STATUS_ITEM_CLASS = "inline-flex min-w-0 items-center gap-1.5";
 const STATUS_ICON_CLASS = "shrink-0 text-text-subtle";
 const STATUS_USAGE_CLASS = "inline-flex shrink-0 items-center gap-1.5 text-text-muted";
 const STATUS_USAGE_DOT_CLASS =
-  "h-[15px] w-[15px] rounded-full border-[3px] border-[#cfd9e9] border-r-brand-strong border-t-brand-strong";
+  "h-[15px] w-[15px] rounded-full border-[3px] border-line-strong border-r-brand-strong border-t-brand-strong";
 const INITIAL_CHIP_ROW_CLASS = "initial-chip-row flex min-h-8 items-center";
 const INITIAL_CHIP_CLASS =
-  "initial-plan-chip inline-flex h-8 items-center rounded-full border border-line bg-white px-3 text-sm font-medium text-text-muted shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
+  "initial-plan-chip inline-flex h-8 items-center rounded-full border border-line bg-surface px-3 text-sm font-medium text-text-muted shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
 
 type CommandMenuItem = {
   label: string;

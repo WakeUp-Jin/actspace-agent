@@ -9,7 +9,7 @@ if (typeof window !== "undefined" && window.actspace) {
   document.documentElement.classList.add("is-electron");
 }
 
-// 渲染前重放外观偏好，避免字体 / 代码字号先默认再跳变的闪烁。
+// 渲染前重放外观偏好（主题 data-theme + 字体 + 代码字号），避免先默认再跳变的闪烁（FOUC）。
 applyAppearance(loadAppearance());
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { tmpdir } from "node:os";
-import { mkdtemp, realpath } from "node:fs/promises";
+import { mkdtemp, realpath, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { runProcess } from "../subprocess/run-process";
@@ -69,6 +69,68 @@ describe("runProcess", () => {
 
     expect(result.startError).toContain("ENOENT");
     expect(result.exitCode).toBeNull();
+  });
+
+  it("sink mode keeps head buffer in memory and streams overflow to disk", async () => {
+    const cwd = await createWorkspace();
+    const outputFile = join(cwd, "sink", "out.txt");
+    const result = await runProcess({
+      command: process.execPath,
+      args: ["-e", "process.stdout.write('x'.repeat(20));"],
+      cwd,
+      timeoutMs: 5_000,
+      maxOutputChars: 1_000_000,
+      headBufferCap: 4,
+      diskCap: 1_000,
+      outputFile,
+    });
+
+    expect(result.headBuffer).toBe("xxxx");
+    expect(result.totalBytes).toBe(20);
+    expect(result.outputFilePath).toBe(outputFile);
+    expect(result.truncated).toBe(false);
+    const persisted = await readFile(outputFile, "utf8");
+    expect(persisted).toBe("x".repeat(20));
+  });
+
+  it("sink mode does not create a file when output fits in head buffer", async () => {
+    const cwd = await createWorkspace();
+    const outputFile = join(cwd, "sink2", "out.txt");
+    const result = await runProcess({
+      command: process.execPath,
+      args: ["-e", "process.stdout.write('hi');"],
+      cwd,
+      timeoutMs: 5_000,
+      maxOutputChars: 1_000_000,
+      headBufferCap: 4000,
+      diskCap: 1_000,
+      outputFile,
+    });
+
+    expect(result.headBuffer).toBe("hi");
+    expect(result.totalBytes).toBe(2);
+    expect(result.outputFilePath).toBeUndefined();
+  });
+
+  it("sink mode marks truncated when diskCap is hit", async () => {
+    const cwd = await createWorkspace();
+    const outputFile = join(cwd, "sink3", "out.txt");
+    const result = await runProcess({
+      command: process.execPath,
+      args: ["-e", "process.stdout.write('y'.repeat(100));"],
+      cwd,
+      timeoutMs: 5_000,
+      maxOutputChars: 1_000_000,
+      headBufferCap: 4,
+      diskCap: 10,
+      outputFile,
+    });
+
+    expect(result.totalBytes).toBe(100);
+    expect(result.truncated).toBe(true);
+    const persisted = await readFile(outputFile, "utf8");
+    // diskCap=10 → 文件最多 10 字符
+    expect(persisted.length).toBe(10);
   });
 });
 

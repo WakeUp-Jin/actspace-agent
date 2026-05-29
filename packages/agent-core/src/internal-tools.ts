@@ -13,7 +13,7 @@
  */
 
 import type { Tool } from "./messages";
-import type { ToolPreviewKind } from "@actspace/shared";
+import type { ToolPreviewKind, ToolOutputRef } from "@actspace/shared";
 
 // ─── ToolResult（统一返回类型） ───
 
@@ -21,6 +21,13 @@ export interface ToolResult {
   success: boolean;
   data?: unknown;
   error?: string;
+  /**
+   * 工具全量输出的回读引用，由 executor / postProcess 填充、engine/bridge 消费：
+   * - bash 大输出落盘：`{ kind: "file", value: <绝对路径> }`
+   * - 非 bash 工具摘要：`{ kind: "inline", value: <截断/摘要前的全量文本> }`
+   * 不影响传给 LLM 的 `data`（始终是回填文本），仅用于持久化契约与前端「查看完整输出」。
+   */
+  outputRef?: ToolOutputRef;
 }
 
 // ─── Permission（权限验证） ───

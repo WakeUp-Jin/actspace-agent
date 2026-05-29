@@ -14,7 +14,7 @@
  */
 
 import type { ModelId, ModelSpec } from "@actspace/shared";
-import { resolveModelSpec } from "@actspace/shared";
+import { resolveModelSpec, MODEL_REGISTRY } from "@actspace/shared";
 import type { LLMConfig, LLMService } from "../llm/types";
 import { createLLMService } from "../llm/factory";
 import type { ToolManagerConfig } from "../tools/types";
@@ -24,6 +24,7 @@ import { createToolManager } from "../tools/index";
 import { ContextManager } from "../context/manager";
 import { SystemPromptContext } from "../context/modules/system-prompt";
 import { MAIN_AGENT_SYSTEM_PROMPT } from "../prompt/main-agent";
+import { createSummarizer, type Summarizer } from "../context/compression/summarizer";
 import { env } from "../env";
 
 // ─── 类型定义 ───
@@ -64,6 +65,16 @@ export interface AgentDeps {
   contextManager: ContextManager;
   thinkingEnabled: boolean;
   modelSpec: ModelSpec;
+  /** flash 摘要器；无 DeepSeek key 时为 undefined（工具/历史侧走确定性兜底） */
+  summarizer?: Summarizer;
+}
+
+/** buildAgentConfig 的运行环境补充字段（落盘目录与会话 id） */
+export interface AgentRuntimeContext {
+  /** bash 大输出落盘根目录（通常是 <userData>/tmp） */
+  tmpRoot?: string;
+  /** 当前会话 id，用于 bash 落盘文件分目录与历史压缩 ref */
+  sessionId?: string;
 }
 
 // ─── 内部：env 读取 ───
@@ -131,6 +142,7 @@ export function buildAgentConfig(
   frontendInput: FrontendTurnInput,
   workspaceRoot: string,
   approvalGate?: ApprovalGate,
+  runtimeContext?: AgentRuntimeContext,
 ): AgentConfig {
   const envConfig = resolveAgentEnvConfig();
   const modelSpec = resolveModelSpec(frontendInput.model);
@@ -143,8 +155,25 @@ export function buildAgentConfig(
     hasKimiKey: Boolean(envConfig.kimiApiKey),
     disabledTools: envConfig.disabledTools,
     approvalGate,
+    tmpRoot: runtimeContext?.tmpRoot,
+    sessionId: runtimeContext?.sessionId,
   };
   return { llmConfig, toolManagerConfig, thinkingEnabled, modelSpec };
+}
+
+/**
+ * 构造 flash `summarizer`（deepseek-v4-flash）。
+ *
+ * 复用 buildLLMConfig + createLLMService，仅在存在 DeepSeek key 时构造；
+ * 否则返回 undefined，调用方退化为确定性截断/丢弃，见 context-compression.md。
+ */
+export function createSummarizerForAgent(
+  envConfig: AgentEnvConfig = resolveAgentEnvConfig(),
+): Summarizer | undefined {
+  if (!envConfig.deepseekApiKey) return undefined;
+  const flashSpec = MODEL_REGISTRY["deepseek-v4-flash"];
+  const flashLLMConfig = buildLLMConfig(flashSpec, envConfig);
+  return createSummarizer(createLLMService(flashLLMConfig));
 }
 
 /**
@@ -155,15 +184,20 @@ export function buildAgentConfig(
  */
 export function createAgentFromConfig(config: AgentConfig): AgentDeps {
   const llm = createLLMService(config.llmConfig);
-  const toolManager = createToolManager(config.toolManagerConfig);
+  const summarizer = createSummarizerForAgent();
+  const toolManager = createToolManager({ ...config.toolManagerConfig, summarizer });
   const systemPromptModule = new SystemPromptContext(MAIN_AGENT_SYSTEM_PROMPT);
-  const contextManager = new ContextManager({ systemPromptModule });
+  const contextManager = new ContextManager({
+    systemPromptModule,
+    config: { contextWindow: config.modelSpec.contextWindow },
+  });
   return {
     llm,
     toolManager,
     contextManager,
     thinkingEnabled: config.thinkingEnabled,
     modelSpec: config.modelSpec,
+    summarizer,
   };
 }
 
@@ -181,11 +215,13 @@ export async function createAgentForSession(
   options: { sessionPath?: string } = {},
 ): Promise<AgentDeps> {
   const llm = createLLMService(config.llmConfig);
-  const toolManager = createToolManager(config.toolManagerConfig);
+  const summarizer = createSummarizerForAgent();
+  const toolManager = createToolManager({ ...config.toolManagerConfig, summarizer });
   const systemPromptModule = new SystemPromptContext(MAIN_AGENT_SYSTEM_PROMPT);
   const contextManager = await ContextManager.createForSession({
     systemPromptModule,
     sessionPath: options.sessionPath,
+    config: { contextWindow: config.modelSpec.contextWindow },
   });
   return {
     llm,
@@ -193,5 +229,6 @@ export async function createAgentForSession(
     contextManager,
     thinkingEnabled: config.thinkingEnabled,
     modelSpec: config.modelSpec,
+    summarizer,
   };
 }

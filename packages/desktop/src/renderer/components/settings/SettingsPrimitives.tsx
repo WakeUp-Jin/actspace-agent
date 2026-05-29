@@ -31,7 +31,7 @@ export function SettingGroup({ title, children }: { title?: string; children: Re
   return (
     <section className="flex flex-col gap-2.5">
       {title ? <h3 className="px-0.5 text-[12px] font-semibold uppercase tracking-wide text-text-faint">{title}</h3> : null}
-      <div className="divide-y divide-line/80 overflow-hidden rounded-act-lg border border-line bg-white">
+      <div className="divide-y divide-line/80 overflow-hidden rounded-act-lg border border-line bg-surface">
         {children}
       </div>
     </section>
@@ -81,7 +81,7 @@ export function Toggle({
       onClick={() => onChange(!checked)}
       className={[
         "relative inline-flex h-[24px] w-[42px] shrink-0 items-center rounded-full transition-colors duration-150",
-        checked ? "bg-brand" : "bg-[#d3d8e0]",
+        checked ? "bg-brand" : "bg-line-strong",
         disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
       ].join(" ")}
     >
@@ -162,7 +162,7 @@ export function SettingsSelect({
         disabled={disabled}
         onClick={() => (open ? setOpen(false) : openMenu())}
         className={[
-          "flex h-9 min-w-[180px] items-center justify-between gap-2 rounded-act-md border bg-white pl-3 pr-2.5 text-[13px] font-medium text-text-main outline-none transition-colors",
+          "flex h-9 min-w-[180px] items-center justify-between gap-2 rounded-act-md border bg-surface pl-3 pr-2.5 text-[13px] font-medium text-text-main outline-none transition-colors",
           disabled
             ? "cursor-not-allowed border-line opacity-60"
             : open
@@ -185,7 +185,7 @@ export function SettingsSelect({
               role="listbox"
               aria-label={ariaLabel}
               style={{ position: "fixed", top: coords.top, right: coords.right, minWidth: coords.minWidth }}
-              className="z-[200] max-h-[280px] overflow-auto rounded-[10px] border border-line bg-white p-1 shadow-[0_14px_40px_rgba(31,45,61,0.18)]"
+              className="z-[200] max-h-[280px] overflow-auto rounded-[10px] border border-line bg-surface-raised p-1 shadow-act-popover"
             >
               {options.map((option) => {
                 const isSelected = option.value === value;
@@ -203,7 +203,7 @@ export function SettingsSelect({
                         "flex w-full items-center gap-2 rounded-[7px] px-2 py-1.5 text-left text-[13px] transition-colors",
                         isSelected
                           ? "bg-brand font-semibold text-white"
-                          : "font-medium text-text-main hover:bg-[rgba(32,33,36,0.05)]",
+                          : "font-medium text-text-main hover:bg-[var(--act-color-hover-overlay)]",
                       ].join(" ")}
                     >
                       <Check
@@ -268,7 +268,7 @@ export function Stepper({
       <div
         role="group"
         aria-label={ariaLabel}
-        className="inline-flex h-9 items-center rounded-act-md border border-line bg-white"
+        className="inline-flex h-9 items-center rounded-act-md border border-line bg-surface"
       >
       <button
         type="button"
@@ -338,7 +338,7 @@ export function NumberField({
           onCommit(Number.isFinite(parsed) ? parsed : null);
         }}
         className={[
-          "h-9 w-[120px] rounded-act-md border border-line bg-white px-3 text-right text-[13px] font-medium tabular-nums text-text-main outline-none transition-colors",
+          "h-9 w-[120px] rounded-act-md border border-line bg-surface px-3 text-right text-[13px] font-medium tabular-nums text-text-main outline-none transition-colors",
           disabled ? "cursor-not-allowed opacity-60" : "hover:border-brand/40 focus-visible:border-brand",
         ].join(" ")}
       />

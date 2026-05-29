@@ -27,13 +27,13 @@ const MONTH_LABELS = ["1月", "2月", "3月", "4月", "5月"];
 const TOOL_COLORS = ["#2f6fff", "#28b7d8", "#8b5cf6", "#9aa8bb", "#4f7cff", "#93a4b8"];
 
 const panelClass =
-  "w-full rounded-[18px] border border-line/90 bg-white/95 shadow-[0_12px_40px_rgba(31,45,61,0.05)]";
+  "w-full rounded-[18px] border border-line/90 bg-surface/95 shadow-act-soft";
 const metricCardClass =
-  "rounded-act-lg border border-line bg-white px-4 py-3 shadow-none";
+  "rounded-act-lg border border-line bg-surface px-4 py-3 shadow-none";
 const iconButtonClass =
-  "inline-flex h-9 w-9 items-center justify-center rounded-act-md border border-line bg-white text-text-main transition hover:border-brand/30 hover:bg-brand-soft hover:text-brand";
+  "inline-flex h-9 w-9 items-center justify-center rounded-act-md border border-line bg-surface text-text-main transition hover:border-brand/30 hover:bg-brand-soft hover:text-brand";
 const actionButtonClass =
-  "inline-flex h-9 items-center justify-center gap-2 rounded-act-md border border-line bg-white px-3 text-[13px] font-semibold text-text-main transition hover:border-brand/30 hover:bg-brand-soft hover:text-brand";
+  "inline-flex h-9 items-center justify-center gap-2 rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-brand/30 hover:bg-brand-soft hover:text-brand";
 
 function formatMillions(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
@@ -76,7 +76,12 @@ function clampLevel(value: number): 0 | 1 | 2 | 3 {
 }
 
 function heatmapCellClass(level: 0 | 1 | 2 | 3): string {
-  const colors = ["bg-[#e9edf3]", "bg-[#cfe0ff]", "bg-[#78a9ff]", "bg-brand"];
+  const colors = [
+    "bg-[#e9edf3] dark:bg-[#2a2d33]",
+    "bg-[#cfe0ff] dark:bg-[#27406e]",
+    "bg-[#78a9ff] dark:bg-[#3f6fc4]",
+    "bg-brand",
+  ];
   return `h-3.5 w-3.5 shrink-0 rounded-[4px] ${colors[level]}`;
 }
 
@@ -131,7 +136,7 @@ function ToolDetailModal({
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-900/30 p-7 backdrop-blur-md" role="presentation" onClick={onClose}>
       <div
-        className="max-h-[calc(100vh-56px)] w-[640px] max-w-full overflow-auto rounded-2xl border border-[#dce5f3] bg-white shadow-[0_24px_70px_rgba(17,24,39,0.18)]"
+        className="max-h-[calc(100vh-56px)] w-[640px] max-w-full overflow-auto rounded-2xl border border-line bg-surface-raised shadow-act-popover"
         role="dialog"
         aria-modal="true"
         aria-label={`${tool.name} details`}
@@ -153,7 +158,7 @@ function ToolDetailModal({
             ["失败", tool.failedCount.toLocaleString()],
             ["平均耗时", tool.averageDurationMs ? `${Math.round(tool.averageDurationMs / 100) / 10}s` : "-"],
           ].map(([label, value]) => (
-            <div key={label} className="grid gap-1 rounded-act-lg border border-line bg-white p-3">
+            <div key={label} className="grid gap-1 rounded-act-lg border border-line bg-surface p-3">
               <span className="text-xs text-text-muted">{label}</span>
               <strong className="text-lg font-bold text-text-main">{value}</strong>
             </div>
@@ -181,7 +186,7 @@ function CostDetailModal({
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-900/30 p-7 backdrop-blur-md" role="presentation" onClick={onClose}>
       <div
-        className="w-[660px] max-w-[calc(100vw-48px)] rounded-[20px] border border-[#dce5f3] bg-white shadow-[0_28px_84px_rgba(17,24,39,0.2)]"
+        className="w-[660px] max-w-[calc(100vw-48px)] rounded-[20px] border border-line bg-surface-raised shadow-act-popover"
         role="dialog"
         aria-modal="true"
         aria-label="Estimated cost details"
@@ -237,7 +242,7 @@ function ToolRow({
 function ModelRow({ model }: { model: UsageStatisticsModelEntry }) {
   return (
     <article className="flex items-center gap-3 text-[15px]">
-      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#f1f3f5] text-[11px] font-semibold text-[#8f96a3]">
+      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-surface-subtle text-[11px] font-semibold text-text-faint">
         {model.name === "gpt-5.5" ? "1" : model.name.includes("claude") ? "2" : "3"}
       </span>
       <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-text-muted">{model.name}</span>
@@ -315,7 +320,14 @@ function DeepSeekBalanceCard({
 }
 
 /** Tooltip 单条 model 颜色条用——和主区 toolDistribution 同一组配色，保证全页视觉一致。 */
-const HEATMAP_MODEL_COLORS = ["#2f6fff", "#28b7d8", "#8b5cf6", "#f4795b", "#22a06b", "#9aa8bb"];
+const HEATMAP_MODEL_COLORS = [
+  "var(--act-chart-series-1)",
+  "var(--act-chart-series-2)",
+  "var(--act-chart-series-3)",
+  "var(--act-chart-series-4)",
+  "var(--act-chart-series-5)",
+  "var(--act-chart-series-6)",
+];
 
 /**
  * 单格 hover tooltip 锚点信息。
@@ -454,7 +466,7 @@ function HeatmapTooltip({
       role="tooltip"
       data-testid="heatmap-tooltip"
       style={style}
-      className="pointer-events-none w-[260px] rounded-[14px] border border-[#dce5f3] bg-white px-4 py-3.5 text-left shadow-[0_18px_44px_rgba(17,24,39,0.12)]"
+      className="pointer-events-none w-[260px] rounded-[14px] border border-line bg-surface-raised px-4 py-3.5 text-left shadow-act-popover"
     >
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-[12px] font-semibold tracking-[0.04em] text-text-subtle">{row.date}</span>
@@ -523,7 +535,7 @@ export function UsageStatisticsPage({
 
   if (!snapshot) {
     return (
-      <main className="h-full overflow-auto bg-[#f7f8fb] px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main">
+      <main className="h-full overflow-auto bg-app-bg px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main">
         <div className="grid min-h-[calc(100vh-48px)] min-w-0 grid-cols-[340px_minmax(0,1fr)] items-start gap-4">
           <section className="flex min-w-0 flex-col gap-4 self-stretch">
             <DeepSeekBalanceCard
@@ -555,7 +567,7 @@ export function UsageStatisticsPage({
                   <button
                     key={tab}
                     className={`h-8 min-w-14 rounded-full px-3.5 text-[13px] font-semibold transition ${
-                      tab === range ? "bg-brand-soft text-brand" : "border border-line bg-white text-text-muted hover:text-brand"
+                      tab === range ? "bg-brand-soft text-brand" : "border border-line bg-surface text-text-muted hover:text-brand"
                     }`}
                     type="button"
                     onClick={() => {
@@ -590,7 +602,7 @@ export function UsageStatisticsPage({
   const cachePercent = effectiveSnapshot.summary.cacheEfficiencyPercent;
 
   return (
-    <main className="h-full overflow-auto bg-[#f7f8fb] px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main">
+    <main className="h-full overflow-auto bg-app-bg px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main">
       <div className="grid min-h-[calc(100vh-48px)] min-w-0 grid-cols-[340px_minmax(0,1fr)] items-start gap-4">
         <section className="flex min-w-0 flex-col gap-4 self-stretch">
           <DeepSeekBalanceCard
@@ -608,7 +620,7 @@ export function UsageStatisticsPage({
                 [formatMillions(avg), "avg"],
                 [formatMillions(monthValue), "本月"],
               ].map(([value, label]) => (
-                <div key={label} className="grid min-h-[58px] place-items-center rounded-act-lg bg-[#fafbfc] text-center">
+                <div key={label} className="grid min-h-[58px] place-items-center rounded-act-lg bg-surface-subtle text-center">
                   <div>
                     <div className="text-base font-bold tabular-nums text-text-main">{value}</div>
                     <div className="mt-0.5 text-[11px] text-text-subtle">{label}</div>
@@ -636,7 +648,7 @@ export function UsageStatisticsPage({
             <div className="flex items-center justify-between gap-3">
               <div className="text-base font-semibold text-text-main">热力图</div>
               <div className="grid justify-items-end gap-2">
-                <div className="flex rounded-[10px] border border-line bg-white p-0.5">
+                <div className="flex rounded-[10px] border border-line bg-surface p-0.5">
                   <button className="h-[26px] min-w-9 rounded-lg bg-surface-subtle px-2 text-xs font-bold text-text-main" type="button">2D</button>
                   <button className="h-[26px] min-w-9 rounded-lg px-2 text-xs font-bold text-text-faint" type="button">3D</button>
                 </div>
@@ -674,12 +686,12 @@ export function UsageStatisticsPage({
                 查看详情
               </button>
             </div>
-            <div className="rounded-act-lg border border-[#dbe7fa] bg-[#f8fbff] p-4">
+            <div className="rounded-act-lg border border-brand/20 bg-brand-soft p-4">
               <div className="mb-2.5 flex items-center justify-between gap-3 text-xs font-bold text-text-faint">
                 <span>本月工具调用分布</span>
                 <strong className="text-[17px] font-bold tabular-nums text-text-main">{effectiveSnapshot.summary.toolCallCount.toLocaleString()} 次</strong>
               </div>
-              <div className="flex h-[9px] overflow-hidden rounded-full bg-[#e8edf4]" aria-hidden="true">
+              <div className="flex h-[9px] overflow-hidden rounded-full bg-surface-subtle" aria-hidden="true">
                 {effectiveSnapshot.toolDistribution.map((tool, index) => (
                   <span
                     key={tool.name}
@@ -711,7 +723,7 @@ export function UsageStatisticsPage({
 
           <section className={`${panelClass} grid justify-items-center gap-4 px-6 pb-6 pt-6`}>
             <div className="flex w-full items-center justify-between gap-3">
-              <div className="inline-flex gap-1.5 rounded-full border border-line bg-white/85 p-1 shadow-[0_8px_24px_rgba(31,45,61,0.04)]" role="tablist" aria-label="Usage range">
+              <div className="inline-flex gap-1.5 rounded-full border border-line bg-surface/85 p-1 shadow-[0_8px_24px_rgba(31,45,61,0.04)]" role="tablist" aria-label="Usage range">
                 {RANGE_TABS.map((tab) => (
                   <button
                     key={tab}
@@ -744,7 +756,7 @@ export function UsageStatisticsPage({
 
             <div className="grid justify-items-center gap-3 px-0 pb-0 pt-4 text-center">
               <div className="text-xs font-bold uppercase tracking-[0.05em] text-text-faint">TOKEN 总数</div>
-              <div className="text-[clamp(56px,5.1vw,72px)] font-bold leading-[0.9] tracking-[-0.02em] text-black tabular-nums">
+              <div className="text-[clamp(56px,5.1vw,72px)] font-bold leading-[0.9] tracking-[-0.02em] text-text-main tabular-nums">
                 {effectiveSnapshot.summary.totalTokens.toLocaleString()}
               </div>
               <button className="inline-flex items-center gap-1.5 text-xl font-bold text-brand transition hover:text-brand-strong" type="button" onClick={() => setShowCostDetail(true)}>
@@ -753,9 +765,9 @@ export function UsageStatisticsPage({
               </button>
             </div>
 
-            <div className="flex h-2 w-full overflow-hidden rounded-full bg-[#e8edf4]" aria-hidden="true">
+            <div className="flex h-2 w-full overflow-hidden rounded-full bg-surface-subtle" aria-hidden="true">
               <span
-                className="block h-full rounded-full bg-gradient-to-r from-brand via-[#28b7d8] to-[#8b5cf6]"
+                className="block h-full rounded-full bg-gradient-to-r from-brand via-[var(--act-chart-series-2)] to-[var(--act-chart-series-3)]"
                 style={{ width: `${Math.min(100, effectiveSnapshot.summary.cacheEfficiencyPercent)}%` }}
               />
             </div>
@@ -776,7 +788,7 @@ export function UsageStatisticsPage({
               <div>
                 <div className="text-base font-semibold text-text-main">缓存效率</div>
                 <div className="mt-3 text-[42px] font-bold leading-none tracking-[-0.02em] text-brand tabular-nums">{formatPercent(cachePercent)}</div>
-                <div className="mt-[18px] h-[9px] overflow-hidden rounded-full bg-[#e7edf7]" aria-hidden="true">
+                <div className="mt-[18px] h-[9px] overflow-hidden rounded-full bg-surface-subtle" aria-hidden="true">
                   <span className="block h-full rounded-full bg-gradient-to-r from-brand to-[#72a5ff]" style={{ width: `${cachePercent}%` }} />
                 </div>
               </div>
@@ -806,7 +818,7 @@ export function UsageStatisticsPage({
                     {["日期", "总计", "输入", "输出", "缓存", "推理", "对话数"].map((heading, index) => (
                       <th
                         key={heading}
-                        className={`sticky top-0 z-[1] border-b border-line bg-white p-3 text-xs font-semibold text-text-muted ${
+                        className={`sticky top-0 z-[1] border-b border-line bg-surface p-3 text-xs font-semibold text-text-muted ${
                           index === 0 ? "text-left" : "text-right"
                         }`}
                       >
@@ -818,7 +830,7 @@ export function UsageStatisticsPage({
                 <tbody>
                   {effectiveSnapshot.dailyRows.length > 0 ? (
                     effectiveSnapshot.dailyRows.map((row) => (
-                      <tr key={row.date} className="hover:bg-[#fafcff]">
+                      <tr key={row.date} className="hover:bg-surface-subtle">
                         <td className="border-b border-line p-3 text-[13px] tabular-nums text-text-faint">{row.date}</td>
                         <td className="border-b border-line p-3 text-right font-mono text-xs font-bold tabular-nums text-text-main">{row.totalTokens.toLocaleString()}</td>
                         <td className="border-b border-line p-3 text-right font-mono text-xs tabular-nums text-text-muted">{row.promptTokens.toLocaleString()}</td>

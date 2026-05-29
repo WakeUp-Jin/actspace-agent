@@ -31,6 +31,31 @@ export interface LLMUsageCall {
   usage: Usage;
 }
 
+// ─── 历史压缩观测元数据 ───
+
+/** 一次 mid-loop 历史压缩的观测元数据（落 run-log + context_compaction 事件） */
+export interface ContextCompactionInfo {
+  /** 触发压缩时的估算总 token */
+  triggerTokens: number;
+  /** 触发阈值（contextWindow × compressionThreshold） */
+  thresholdTokens: number;
+  /** 压缩前会话消息数 */
+  beforeCount: number;
+  /** 压缩后会话消息数 */
+  afterCount: number;
+  /** 合成摘要正文字符数 */
+  summaryChars: number;
+  /** 完整历史文件路径（session.jsonl 绝对路径） */
+  historyRefPath: string;
+  /** 压缩结果原因（ok / fallback-dropped / nothing-to-compact） */
+  reason: string;
+}
+
+/** maybeCompact 的返回：压缩后的新 messages 数组 + 观测元数据 */
+export interface CompactionOutcome extends ContextCompactionInfo {
+  messages: Message[];
+}
+
 // ─── AgentEvent 四层级事件 ───
 
 export type AgentEvent =
@@ -41,6 +66,7 @@ export type AgentEvent =
   | { type: "message_start"; message: Message }
   | { type: "message_delta"; delta: AssistantMessageEvent }
   | { type: "message_end"; message: Message }
+  | { type: "context_compaction"; info: ContextCompactionInfo }
   | { type: "tool_start"; toolCallId: string; toolName: string; args: Record<string, unknown> }
   | { type: "tool_end"; toolCallId: string; toolName: string; result: ToolResult; isError: boolean }
   | { type: "tool_approval_required"; toolCallId: string; toolName: string; request: ToolApprovalRequest }
@@ -65,6 +91,12 @@ export interface AgentLoopConfig {
   thinkingEnabled?: boolean;
   /** 内层循环最大轮次硬限制，防止工具调用无限循环。默认 50。 */
   maxTurns?: number;
+  /**
+   * mid-loop 历史压缩钩子：每次模型调用前 await。
+   * 发生压缩时返回 CompactionOutcome（含压缩后新 messages 数组 + 观测元数据，
+   * loop 据此刷新 context.messages 引用并 emit context_compaction 事件）；未压缩时返回 null。
+   */
+  maybeCompact?: () => Promise<CompactionOutcome | null>;
   /**
    * 工具调用统一附加的 caller-specific options。
    * Kairos runner 传 `{callerAgent:"kairos", kairosGuard}` 以激活路径/blocklist 双校验。

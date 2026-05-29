@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 import type { ToolResult } from "../../../internal-tools";
-import { guardWorkspacePath } from "../../workspace-guard";
+import { resolveReadablePath } from "../../workspace-guard";
 import type { ToolExecutorFn } from "../../types";
 
 export const listDirectoryExecutor: ToolExecutorFn = async (
@@ -12,7 +12,8 @@ export const listDirectoryExecutor: ToolExecutorFn = async (
     return { success: false, error: "path is required" };
   }
 
-  const guard = guardWorkspacePath(pathArg, workspaceRoot);
+  // 读类工具不受 workspace 边界限制。
+  const guard = resolveReadablePath(pathArg, workspaceRoot);
   if (!guard.ok) {
     return { success: false, error: guard.error };
   }

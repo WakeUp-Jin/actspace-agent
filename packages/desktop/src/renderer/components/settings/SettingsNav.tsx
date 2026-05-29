@@ -16,7 +16,7 @@ export const SETTINGS_SECTIONS: { id: SettingsSectionId; label: string; icon: Ic
 const NAV_ITEM_CLASS =
   "flex h-9 items-center gap-2.5 rounded-act-md px-2.5 text-left text-[13px] font-medium transition-colors duration-[130ms] ease-in-out";
 const NAV_ITEM_ACTIVE_CLASS = "bg-brand-soft text-brand";
-const NAV_ITEM_IDLE_CLASS = "text-text-muted hover:bg-[rgba(32,33,36,0.05)] hover:text-text-main";
+const NAV_ITEM_IDLE_CLASS = "text-text-muted hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 
 export function SettingsNav({
   active,
@@ -29,7 +29,7 @@ export function SettingsNav({
 }) {
   return (
     <nav
-      className="flex h-full w-[232px] shrink-0 flex-col gap-0.5 border-r border-line bg-[#f5f7f9] px-3 pb-3 pt-2"
+      className="flex h-full w-[232px] shrink-0 flex-col gap-0.5 border-r border-line bg-surface-subtle px-3 pb-3 pt-2"
       aria-label="设置导航"
     >
       <button

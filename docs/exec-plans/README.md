@@ -17,7 +17,6 @@
 - `active/20260528-kairos-right-panel-compact-view.md`
 - `active/20260529-deepseek-anthropic-service.md`
 - `active/20260529-settings-page.md`
-- `active/20260529-context-compression.md`
 - `active/actspace-usage-statistics-session-jsonl-plan.md`
 - `active/actspace-token-usage-context-control-foundation.md`
 - `active/frontend-ui-components-foundation.md`
@@ -48,6 +47,8 @@
 - `completed/actspace-tailwind-style-architecture.md`
 - `completed/20260528-tailwind-remaining-ui-migration.md`
 - `completed/20260528-frontend-style-ownership-cleanup.md`
+- `completed/20260529-appearance-dark-theme.md`
+- `completed/20260529-context-compression.md`
 - `completed/actspace-ui-bug-fix-plan.md`
 - `completed/actspace-workbench-split-view-foundation.md`
 - `completed/sidebar-cursor-alignment.md`

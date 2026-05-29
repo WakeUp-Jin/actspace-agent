@@ -26,9 +26,16 @@ export {
   type ToolSchedulerConfig,
   type ToolSchedulerExecution,
 } from "./scheduler";
-export { guardWorkspacePath } from "./workspace-guard";
+export { guardWorkspacePath, resolveReadablePath, displayReadablePath } from "./workspace-guard";
 export type { GuardResult } from "./workspace-guard";
 export { shouldExposeTool } from "./exposure";
+export { cleanupOldToolOutputs } from "./cleanup-tool-outputs";
+export {
+  TOOL_OUTPUT_DIRNAME,
+  toolOutputDir,
+  buildToolOutputPath,
+  createToolOutputId,
+} from "./tool-output-paths";
 
 // 工具定义
 export { readFileDefinition } from "./tools/read-file/definition";
@@ -111,7 +118,14 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
   }
 
   if (!disabledTools.has("bash")) {
-    manager.register(createBashTool(config.workspaceRoot));
+    manager.register(
+      createBashTool(config.workspaceRoot, {
+        tmpRoot: config.tmpRoot,
+        sessionId: config.sessionId,
+        inlineThreshold: config.bashInlineThreshold,
+        diskCap: config.bashDiskCap,
+      }),
+    );
   }
 
   return manager;

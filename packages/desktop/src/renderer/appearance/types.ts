@@ -4,9 +4,12 @@
 
 export type UiFontId = "system" | "sans-modern" | "serif-reading" | "rounded";
 export type CodeFontId = "system-mono" | "jetbrains" | "fira" | "source";
+export type ThemeMode = "light" | "dark" | "system";
 
 export interface AppearancePrefs {
   version: 1;
+  /** 主题三态；驱动 <html data-theme> 与原生 nativeTheme.themeSource。 */
+  theme: ThemeMode;
   /** UI 字体预设；驱动 --act-font-ui（连带 AI 输出正文）。 */
   uiFontId: UiFontId;
   /** 代码字体预设；驱动 --act-font-mono。 */
@@ -31,8 +34,11 @@ export const CODE_FONT_SIZE_MIN = 11;
 export const CODE_FONT_SIZE_MAX = 18;
 export const CODE_FONT_SIZE_STEP = 1;
 
+export const THEME_MODES: ThemeMode[] = ["light", "dark", "system"];
+
 export const DEFAULT_APPEARANCE: AppearancePrefs = {
   version: 1,
+  theme: "system",
   uiFontId: "system",
   codeFontId: "system-mono",
   uiFontSize: 14,

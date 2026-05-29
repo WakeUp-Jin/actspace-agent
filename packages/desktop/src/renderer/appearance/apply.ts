@@ -9,6 +9,14 @@ export function applyAppearance(
   prefs: AppearancePrefs,
   root: HTMLElement | null = typeof document !== "undefined" ? document.documentElement : null,
 ): void {
+  // 主题：写 <html data-theme>，CSS 据此覆盖 --act-color-*；并同步原生 nativeTheme。
+  if (root) {
+    root.setAttribute("data-theme", prefs.theme);
+  }
+  if (typeof window !== "undefined" && typeof window.actspace?.setNativeTheme === "function") {
+    window.actspace.setNativeTheme(prefs.theme);
+  }
+
   // 界面字号 → 整窗缩放比例（仅 Electron 暴露 setUiZoom 时真正生效）。
   const zoom = prefs.uiFontSize / UI_FONT_SIZE_BASE;
   let appliedZoom = 1;

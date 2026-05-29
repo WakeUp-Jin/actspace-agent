@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { ToolResult } from "../../../internal-tools";
-import { guardWorkspacePath } from "../../workspace-guard";
+import { resolveReadablePath } from "../../workspace-guard";
 import type { ToolExecutorFn } from "../../types";
 
 const MAX_LINES_DEFAULT = 500;
@@ -14,7 +14,8 @@ export const readFileExecutor: ToolExecutorFn = async (
     return { success: false, error: "path is required" };
   }
 
-  const guard = guardWorkspacePath(pathArg, workspaceRoot);
+  // 读类工具不受 workspace 边界限制，允许回读 tmp/session 等 workspace 外产物。
+  const guard = resolveReadablePath(pathArg, workspaceRoot);
   if (!guard.ok) {
     return { success: false, error: guard.error };
   }

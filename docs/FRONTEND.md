@@ -8,6 +8,10 @@
 
 - [`docs/coding-standards/team/frontend-style-scope-conventions.md`](coding-standards/team/frontend-style-scope-conventions.md)
 
+改任何带颜色的样式前，必读主题与配色硬约束（颜色必须随主题翻转、禁止 `text-black`/`bg-white`/`#hex` 等非主题感知字面量、浅/深双主题都要验）：
+
+- [`docs/design-docs/frontend-ui/主题与配色规范.md`](design-docs/frontend-ui/主题与配色规范.md)
+
 当前 renderer 的 Tailwind 页面切片迁移已完成收口，`styles/index.css` 是唯一全局样式入口，当前只导入 `tokens.css`、`tailwind.css`、`base.css`、`electron.css`、`markdown.css` 和 `diff.css`。旧根部 `styles.css` 与 `legacy-*` 分区已经下线；新增或排查样式时，必须优先确认样式所有权、cascade layer 和 CSS 加载顺序，避免普通 UI 样式回流到全局 CSS。
 
 当前 `actspace` 桌面端的实际界面设计与组件定稿，请优先查看：

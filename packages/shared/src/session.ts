@@ -49,6 +49,7 @@ export type SessionEventType =
   | "llm_usage"
   | "diff_preview"
   | "context_snapshot"
+  | "context_compaction"
   | "error"
   // ↓ Kairos 自治模式专属生命周期事件（追加在末尾，不允许调换顺序，详见
   // docs/exec-plans/active/kairos_shared_contracts.md §1）↓
@@ -107,6 +108,25 @@ export type LlmUsagePayload = {
 };
 
 export type ContextSnapshotPayload = ContextUsageSnapshot;
+
+/**
+ * 历史压缩事件 payload。每次 HistoryCompactor 把较旧历史替换为合成摘要消息时落一条，
+ * 便于在 session.jsonl 回溯「何时、按什么水位、压了多少」。
+ */
+export type ContextCompactionPayload = {
+  /** 触发压缩时的估算总 token */
+  triggerTokens: number;
+  /** 触发阈值（contextWindow × compressionThreshold） */
+  thresholdTokens: number;
+  /** 压缩前的消息条数 */
+  beforeCount: number;
+  /** 压缩后的消息条数 */
+  afterCount: number;
+  /** 合成摘要正文字符数 */
+  summaryChars: number;
+  /** 完整历史文件路径（session.jsonl 绝对路径） */
+  historyRefPath: string;
+};
 
 export type ErrorPayload = SessionError;
 

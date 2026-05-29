@@ -277,6 +277,8 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
       case "tool_call":
       case "llm_usage":
       case "context_snapshot":
+      // 历史压缩事件是观测元数据，不渲染为消息块。
+      case "context_compaction":
       // Kairos 自治模式专属事件不出现在主 Agent 消息流中；若历史 session 偶然包含也直接跳过。
       case "kairos_tick_injected":
       case "kairos_sleep_start":

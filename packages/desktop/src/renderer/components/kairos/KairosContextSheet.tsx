@@ -98,7 +98,7 @@ export function KairosContextSheet(props: KairosContextSheetProps) {
         <span className="inline-flex items-baseline gap-2.5">
           <span>上下文</span>
           {generatedAt ? (
-            <span className="text-[12px] font-normal tabular-nums text-[#8a90a0]">
+            <span className="text-[12px] font-normal tabular-nums text-text-faint">
               {generatedAt}
             </span>
           ) : null}
@@ -112,7 +112,7 @@ export function KairosContextSheet(props: KairosContextSheetProps) {
           aria-label="刷新上下文"
           onClick={refresh}
           disabled={loading}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-act-md border border-[#dfe4ee] bg-surface text-[#4f5665] transition hover:border-[#b9c6de] hover:bg-[#f5f7fb] disabled:cursor-not-allowed disabled:opacity-55"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-act-md border border-line bg-surface text-text-muted transition hover:border-line-strong hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-55"
         >
           {loading ? (
             <Loader2 size={15} className="animate-spin" aria-hidden="true" />
@@ -137,7 +137,7 @@ interface SheetBodyProps {
 function SheetBody({ snapshot, loading, error, onRetry }: SheetBodyProps) {
   if (error) {
     return (
-      <div className="flex items-start gap-3 rounded-act-md border border-[#f3c4b1] bg-[#fff5f1] px-4 py-3 text-[13px] text-[#b04014]">
+      <div className="flex items-start gap-3 rounded-act-md border border-on-danger/30 bg-danger-soft px-4 py-3 text-[13px] text-on-danger">
         <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <p className="m-0 font-medium">无法加载上下文</p>
@@ -146,7 +146,7 @@ function SheetBody({ snapshot, loading, error, onRetry }: SheetBodyProps) {
         <button
           type="button"
           onClick={onRetry}
-          className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#f3c4b1] bg-surface px-2.5 text-xs text-[#b04014] hover:border-[#e09373] hover:bg-[#fff8f4]"
+          className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-on-danger/30 bg-surface px-2.5 text-xs text-on-danger hover:border-on-danger/50 hover:bg-danger-soft"
         >
           重试
         </button>
@@ -170,9 +170,9 @@ function SheetBody({ snapshot, loading, error, onRetry }: SheetBodyProps) {
 function SkeletonView({ loading }: { loading: boolean }) {
   return (
     <div className="space-y-5" aria-busy={loading} aria-label="正在加载上下文">
-      <div className="h-40 animate-pulse rounded-act-md bg-[#f0f2f7]" />
-      <div className="h-32 animate-pulse rounded-act-md bg-[#f0f2f7]" />
-      <div className="h-24 animate-pulse rounded-act-md bg-[#f0f2f7]" />
+      <div className="h-40 animate-pulse rounded-act-md bg-surface-subtle" />
+      <div className="h-32 animate-pulse rounded-act-md bg-surface-subtle" />
+      <div className="h-24 animate-pulse rounded-act-md bg-surface-subtle" />
     </div>
   );
 }
@@ -203,18 +203,18 @@ function SystemPromptSection({
       <header className="mb-3 flex items-center gap-2">
         <h3
           id="ksheet-prompt"
-          className="text-[13px] font-semibold uppercase tracking-[0.04em] text-[#6c7281]"
+          className="text-[13px] font-semibold uppercase tracking-[0.04em] text-text-faint"
         >
           系统提示词
         </h3>
-        <span className="text-[11px] tabular-nums text-[#8a90a0]">
+        <span className="text-[11px] tabular-nums text-text-faint">
           {segments.length} 段
         </span>
         <div className="ml-auto">
           <button
             type="button"
             onClick={onCopyAll}
-            className="inline-flex items-center gap-1.5 rounded-[7px] border border-[#dfe4ee] bg-surface px-2.5 py-1 text-xs text-[#4f5665] transition hover:border-[#b9c6de] hover:bg-[#f5f7fb]"
+            className="inline-flex items-center gap-1.5 rounded-[7px] border border-line bg-surface px-2.5 py-1 text-xs text-text-muted transition hover:border-line-strong hover:bg-surface-subtle"
           >
             <Copy size={12} aria-hidden="true" />
             {copied ? "已复制全文" : "复制全文"}
@@ -247,29 +247,29 @@ function PromptSegmentItem({
     <article
       className={cn(
         // 章节流：除首段外，每段顶部一根 1px 分隔线作为章节边界
-        isFirst ? "pt-1 pb-5" : "border-t border-[#eef1f6] pt-4 pb-5",
+        isFirst ? "pt-1 pb-5" : "border-t border-line pt-4 pb-5",
       )}
     >
       <header className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
         {/* 短色条：14px 高、3px 宽，垂直锚定段名；替代 v1.2 的"贯穿全段长色条" */}
         <span
           aria-hidden="true"
-          className="inline-block h-[14px] w-[3px] shrink-0 rounded-sm bg-gradient-to-b from-[#c7d1e6] to-[#dbe2f0]"
+          className="inline-block h-[14px] w-[3px] shrink-0 rounded-sm bg-gradient-to-b from-line-strong to-line"
         />
-        <span className="text-[14px] font-semibold leading-[1.4] text-[#12151c]">
+        <span className="text-[14px] font-semibold leading-[1.4] text-text-main">
           {segment.label}
         </span>
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
           {segment.sourceFiles && segment.sourceFiles.length > 0 ? (
             segment.sourceFiles.map((file) => <SourceFileBadge key={file} file={file} />)
           ) : (
-            <span className="inline-flex h-[19px] items-center rounded-full bg-[#fdf6e5] px-2 text-[10.5px] font-medium text-[#9b6514]">
+            <span className="inline-flex h-[19px] items-center rounded-full bg-warm-soft px-2 text-[10.5px] font-medium text-on-warm">
               运行时生成
             </span>
           )}
         </div>
       </header>
-      <div className="whitespace-pre-wrap break-words text-[13px] leading-[1.75] text-[#2c303a]">
+      <div className="whitespace-pre-wrap break-words text-[13px] leading-[1.75] text-text-main">
         {trimmed}
       </div>
     </article>
@@ -296,11 +296,11 @@ function SourceFileBadge({ file }: { file: string }) {
       type="button"
       onClick={onCopy}
       title={`${file}（点击复制完整路径）`}
-      className="inline-flex h-5 items-center gap-1 rounded-full border border-[#e0e5f0] bg-[#fafbfe] px-2 text-[11px] text-[#4f5665] transition hover:border-[#b9c6de] hover:bg-[#f1f5fc]"
+      className="inline-flex h-5 items-center gap-1 rounded-full border border-line bg-surface-subtle px-2 text-[11px] text-text-muted transition hover:border-line-strong hover:bg-brand-soft"
     >
       <FileText size={10} aria-hidden="true" />
       <span className="font-mono">{base}</span>
-      {copied ? <span className="ml-0.5 text-[#1f57b3]">已复制</span> : null}
+      {copied ? <span className="ml-0.5 text-brand-strong">已复制</span> : null}
     </button>
   );
 }
@@ -332,9 +332,9 @@ function HistorySummaryBlock({
       {summary.map((segment) => (
         <details
           key={segment.label}
-          className="rounded-act-md border border-[#e6e8ef] bg-[#fafbfe]"
+          className="rounded-act-md border border-line bg-surface-subtle"
         >
-          <summary className="cursor-pointer list-none px-3 py-2 text-[13px] font-medium text-[#1a1d24] outline-none [&::-webkit-details-marker]:hidden">
+          <summary className="cursor-pointer list-none px-3 py-2 text-[13px] font-medium text-text-main outline-none [&::-webkit-details-marker]:hidden">
             <span className="inline-flex items-center gap-1.5">
               <ChevronRight
                 size={13}
@@ -344,7 +344,7 @@ function HistorySummaryBlock({
               {segment.label}
             </span>
           </summary>
-          <div className="border-t border-[#eef1f6] px-3 py-2.5 text-[12.5px] leading-[1.7] text-[#2c303a]">
+          <div className="border-t border-line px-3 py-2.5 text-[12.5px] leading-[1.7] text-text-main">
             <pre className="m-0 whitespace-pre-wrap break-words font-mono">{segment.text}</pre>
           </div>
         </details>
@@ -376,7 +376,7 @@ function HistoryMessagesBlock({ messages }: { messages: KairosContextMessage[] }
         <button
           type="button"
           onClick={() => setVisibleCount((c) => c + MESSAGES_PAGE_SIZE)}
-          className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#dfe4ee] bg-surface px-2.5 text-xs text-[#4f5665] hover:border-[#b9c6de] hover:bg-[#f5f7fb]"
+          className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-line bg-surface px-2.5 text-xs text-text-muted hover:border-line-strong hover:bg-surface-subtle"
         >
           加载更早 {Math.min(remaining, MESSAGES_PAGE_SIZE)} 条
         </button>
@@ -394,8 +394,8 @@ function HistoryMessageRow({ msg }: { msg: KairosContextMessage }) {
     ? msg.content
     : `${lines.slice(0, MESSAGE_PREVIEW_LINES).join("\n").trimEnd()}\n…`;
   return (
-    <li className="rounded-act-md border border-[#e6e8ef] bg-surface px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-[#6c7281]">
+    <li className="rounded-act-md border border-line bg-surface px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-text-faint">
         <span
           className={cn(
             "inline-flex h-5 items-center rounded-full px-2 text-[11px] font-medium",
@@ -404,15 +404,15 @@ function HistoryMessageRow({ msg }: { msg: KairosContextMessage }) {
         >
           {roleLabel(msg.role)}
         </span>
-        {msg.source ? <span className="text-[#8a90a0]">{msg.source}</span> : null}
+        {msg.source ? <span className="text-text-faint">{msg.source}</span> : null}
         {msg.timestamp ? <span className="ml-auto tabular-nums">{formatTime(msg.timestamp)}</span> : null}
       </div>
-      <pre className="m-0 mt-2 whitespace-pre-wrap break-words font-mono text-[12.5px] leading-[1.7] text-[#1a1d24]">{text}</pre>
+      <pre className="m-0 mt-2 whitespace-pre-wrap break-words font-mono text-[12.5px] leading-[1.7] text-text-main">{text}</pre>
       {truncated ? (
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-2 text-xs text-[#1f57b3] hover:underline"
+          className="mt-2 text-xs text-brand-strong hover:underline"
         >
           {expanded ? "折叠" : "展开本条"}
         </button>
@@ -430,7 +430,7 @@ function ToolsSection({ tools }: { tools: KairosContextTool[] }) {
         <header className="mb-2 flex items-center gap-2">
           <h3
             id="ksheet-tools"
-            className="text-[13px] font-semibold uppercase tracking-[0.04em] text-[#6c7281]"
+            className="text-[13px] font-semibold uppercase tracking-[0.04em] text-text-faint"
           >
             工具列表
           </h3>
@@ -444,11 +444,11 @@ function ToolsSection({ tools }: { tools: KairosContextTool[] }) {
       <header className="mb-3 flex items-center gap-2">
         <h3
           id="ksheet-tools"
-          className="text-[13px] font-semibold uppercase tracking-[0.04em] text-[#6c7281]"
+          className="text-[13px] font-semibold uppercase tracking-[0.04em] text-text-faint"
         >
           工具列表
         </h3>
-        <span className="text-[11px] tabular-nums text-[#8a90a0]">{tools.length} 个</span>
+        <span className="text-[11px] tabular-nums text-text-faint">{tools.length} 个</span>
       </header>
       {/*
         Chip 密排：每个工具是一颗 pill，flex-wrap 自然换行。
@@ -460,7 +460,7 @@ function ToolsSection({ tools }: { tools: KairosContextTool[] }) {
         {tools.map((tool) => (
           <li
             key={tool.name}
-            className="inline-flex items-center rounded-full border border-[#e0e5f0] bg-[#fafbfe] px-2.5 py-0.5 font-mono text-[12px] leading-[1.7] text-[#2c303a]"
+            className="inline-flex items-center rounded-full border border-line bg-surface-subtle px-2.5 py-0.5 font-mono text-[12px] leading-[1.7] text-text-main"
           >
             {tool.name}
           </li>
@@ -492,11 +492,11 @@ function CollapsibleSection(props: {
           <ChevronDown
             size={14}
             aria-hidden="true"
-            className={cn("text-[#6c7281] transition-transform", !open && "-rotate-90")}
+            className={cn("text-text-faint transition-transform", !open && "-rotate-90")}
           />
           <span
             id={props.id}
-            className="text-[13px] font-semibold uppercase tracking-[0.04em] text-[#6c7281]"
+            className="text-[13px] font-semibold uppercase tracking-[0.04em] text-text-faint"
           >
             {props.title}
           </span>
@@ -509,12 +509,12 @@ function CollapsibleSection(props: {
 }
 
 function SubsectionLabel({ children }: { children: React.ReactNode }) {
-  return <div className="text-[12px] font-medium text-[#6c7281]">{children}</div>;
+  return <div className="text-[12px] font-medium text-text-faint">{children}</div>;
 }
 
 function EmptyHint({ text }: { text: string }) {
   return (
-    <div className="rounded-act-md border border-dashed border-[#dfe4ee] bg-[#fafbfe] px-3 py-3 text-[12.5px] text-[#8a90a0]">
+    <div className="rounded-act-md border border-dashed border-line bg-surface-subtle px-3 py-3 text-[12.5px] text-text-faint">
       {text}
     </div>
   );
@@ -549,12 +549,12 @@ function roleLabel(role: KairosContextMessage["role"]): string {
 function roleBadgeClass(role: KairosContextMessage["role"]): string {
   switch (role) {
     case "user":
-      return "bg-[#eaf2ff] text-[#1f57b3]";
+      return "bg-brand-soft text-brand-strong";
     case "assistant":
-      return "bg-[#eaf8f1] text-[#17744f]";
+      return "bg-success-soft text-on-success";
     case "tool":
-      return "bg-[#f1f3f8] text-[#4f5665]";
+      return "bg-surface-subtle text-text-muted";
     case "system":
-      return "bg-[#fff6e6] text-[#9b6514]";
+      return "bg-warm-soft text-on-warm";
   }
 }

@@ -33,6 +33,9 @@ export class ToolManager {
     this.truncateThreshold = config.truncateThreshold ?? DEFAULT_TRUNCATE_THRESHOLD;
     this.scheduler = new ToolScheduler({
       truncateThreshold: this.truncateThreshold,
+      readTruncateThreshold: config.readTruncateThreshold,
+      absoluteMaxChars: config.absoluteMaxChars,
+      summarizer: config.summarizer,
       approvalGate: config.approvalGate,
     });
   }

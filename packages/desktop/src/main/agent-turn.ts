@@ -16,6 +16,7 @@ import {
   createAgentForSession,
   type AgentRunLogger,
   cleanupOldAgentRunLogs,
+  cleanupOldToolOutputs,
   createAgentRunLogger,
   runTurnWithAgent,
   createSessionStorePaths,
@@ -96,6 +97,10 @@ export async function runAndPersistTurn(
   let runLogger: AgentRunLogger | undefined;
   try {
     await cleanupOldAgentRunLogs(roots.logRoot);
+    // best-effort 回收 bash 落盘溢出文件，失败不影响 turn
+    await cleanupOldToolOutputs(roots.tmpRoot).catch((error) => {
+      console.error("[tool-output-cleanup] failed to clean overflow files", error);
+    });
     runLogger = await createAgentRunLogger({
       logRoot: roots.logRoot,
       sessionId: input.sessionId,
@@ -127,6 +132,7 @@ export async function runAndPersistTurn(
     { model: input.model, thinkingEnabled: input.thinkingEnabled },
     roots.workspaceRoot,
     approvalRegistry,
+    { tmpRoot: roots.tmpRoot, sessionId: input.sessionId },
   );
   const sessionDir = join(roots.sessionRoot, input.sessionId);
   const sessionPaths = createSessionStorePaths(sessionDir);

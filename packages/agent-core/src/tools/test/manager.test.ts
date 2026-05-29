@@ -188,7 +188,9 @@ describe("ToolManager", () => {
     expect(result.success).toBe(true);
     const output = String(result.data);
     expect(output.length).toBeLessThan(500);
-    expect(output).toContain("[Output truncated");
+    // 无 summarizer → 确定性头尾截断 + 压缩标记
+    expect(output).toContain("[已压缩摘要");
+    expect(output).toContain("中间省略");
   });
 
   it("should not truncate small output", async () => {

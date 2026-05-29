@@ -10,6 +10,7 @@
 | `02-pi-ai-core-design-extraction.md` | 从 pi-ai 源码中提取的 10 个核心设计思想，及对 skill 改进的具体建议 |
 | `04-skill-rg-tools-fix.md` | Grep/Glob 工具中 ripgrep 共享执行流的 skill 修复建议 |
 | `05-skill-file-tools-fix.md` | Edit/Write 工具、原子写入、diff 生成和权限预留的 skill 修复建议 |
+| `06-skill-bash-tool-fix.md` | Bash 工具大输出的流式落盘、头部截断 + 文件指针、不走 LLM 摘要的 skill 修复建议 |
 
 ## 问题根源
 

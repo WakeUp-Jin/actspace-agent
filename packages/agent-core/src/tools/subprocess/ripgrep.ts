@@ -72,6 +72,8 @@ function createRipgrepMissingResult(options: RunRipgrepOptions): RipgrepResult {
     timedOut: false,
     truncated: false,
     startError: "ENOENT",
+    headBuffer: "",
+    totalBytes: 0,
     notFound: true,
   };
 }

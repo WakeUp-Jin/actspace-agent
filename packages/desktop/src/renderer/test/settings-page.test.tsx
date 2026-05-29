@@ -24,6 +24,7 @@ describe("SettingsPage", () => {
   const clearProviderKey = vi.fn(async () => ({ ok: true }));
   const testProviderConnection = vi.fn(async () => ({ ok: true, message: "连接成功" }));
   const setUiZoom = vi.fn();
+  const setNativeTheme = vi.fn();
 
   beforeEach(() => {
     getSettings.mockClear();
@@ -32,7 +33,9 @@ describe("SettingsPage", () => {
     clearProviderKey.mockClear();
     testProviderConnection.mockClear();
     setUiZoom.mockClear();
+    setNativeTheme.mockClear();
     localStorage.clear();
+    document.documentElement.removeAttribute("data-theme");
     window.actspace = {
       getSettings,
       updateSettings,
@@ -40,6 +43,7 @@ describe("SettingsPage", () => {
       clearProviderKey,
       testProviderConnection,
       setUiZoom,
+      setNativeTheme,
     } as unknown as ActspaceBridge;
   });
 
@@ -119,5 +123,21 @@ describe("SettingsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "界面字号增大" }));
     expect(localStorage.getItem("actspace.appearance.v1")).toContain('"uiFontSize":15');
     expect(setUiZoom).toHaveBeenCalledWith(15 / 14);
+  });
+
+  it("外观分区切换主题写 data-theme、同步原生主题并持久化", async () => {
+    render(<SettingsPage onBack={() => {}} />);
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "外观" }));
+
+    await userEvent.click(await screen.findByRole("radio", { name: "深色" }));
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    expect(setNativeTheme).toHaveBeenCalledWith("dark");
+    expect(localStorage.getItem("actspace.appearance.v1")).toContain('"theme":"dark"');
+
+    await userEvent.click(screen.getByRole("radio", { name: "跟随系统" }));
+    expect(document.documentElement.getAttribute("data-theme")).toBe("system");
+    expect(setNativeTheme).toHaveBeenCalledWith("system");
   });
 });

@@ -60,13 +60,13 @@ const topbarClass =
 const titleClass = "m-0 text-[22px] font-semibold leading-none tracking-[-0.005em] text-text-main";
 const actionsClass = "flex items-center gap-2 max-[760px]:w-full";
 const secondaryButtonClass =
-  "inline-flex h-8 items-center justify-center rounded-act-md border border-[#d0d6dd] bg-surface px-3 text-[13px] font-medium text-text-muted shadow-[0_0_0_1px_rgba(15,23,42,0.04),0_1px_2px_rgba(15,23,42,0.06)] transition hover:border-[#a8b3c0] hover:bg-surface-subtle hover:text-text-main hover:shadow-[0_0_0_1px_rgba(15,23,42,0.07),0_2px_6px_rgba(15,23,42,0.08)] active:translate-y-px max-[760px]:flex-1";
+  "inline-flex h-8 items-center justify-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-medium text-text-muted shadow-[0_0_0_1px_rgba(15,23,42,0.04),0_1px_2px_rgba(15,23,42,0.06)] transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-main hover:shadow-[0_0_0_1px_rgba(15,23,42,0.07),0_2px_6px_rgba(15,23,42,0.08)] active:translate-y-px max-[760px]:flex-1";
 const primaryButtonClass =
-  "inline-flex h-8 items-center justify-center gap-1 rounded-act-md border border-[#2157d6] bg-[#2563eb] px-3 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(37,99,235,0.28),0_4px_12px_rgba(37,99,235,0.22)] transition hover:border-[#1f52ca] hover:bg-[#1f5fe8] hover:shadow-[0_2px_6px_rgba(31,95,232,0.3),0_8px_18px_rgba(31,95,232,0.28)] active:translate-y-px max-[760px]:flex-1";
+  "inline-flex h-8 items-center justify-center gap-1 rounded-act-md border border-brand bg-brand px-3 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(37,99,235,0.28),0_4px_12px_rgba(37,99,235,0.22)] transition hover:border-brand-strong hover:bg-brand-strong hover:shadow-[0_2px_6px_rgba(31,95,232,0.3),0_8px_18px_rgba(31,95,232,0.28)] active:translate-y-px max-[760px]:flex-1";
 const iconButtonClass =
   "grid h-8 w-8 place-items-center rounded-act-md border border-line bg-surface text-text-faint transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-main";
 const addButtonClass =
-  "ml-auto grid h-6 w-6 place-items-center rounded-[6px] text-text-faint transition hover:bg-black/[0.04] hover:text-brand";
+  "ml-auto grid h-6 w-6 place-items-center rounded-[6px] text-text-faint transition hover:bg-[var(--act-color-hover-overlay)] hover:text-brand";
 const boardClass =
   "grid min-h-0 grid-cols-[repeat(4,minmax(230px,1fr))] gap-4 overflow-hidden max-[1100px]:grid-cols-[repeat(4,minmax(260px,1fr))] max-[1100px]:overflow-x-auto";
 const columnBaseClass =
@@ -87,11 +87,11 @@ const stageAccentClass: Record<LabStageId, string> = {
 };
 const stageBodyClass = "flex min-h-0 flex-col gap-2 overflow-auto p-2.5";
 const cardClass =
-  "group relative grid min-h-[76px] grid-rows-[auto_auto_auto] justify-items-start gap-[5px] rounded-act-sm border border-[#bcc6d4] bg-surface px-3 py-2.5 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition";
+  "group relative grid min-h-[76px] grid-rows-[auto_auto_auto] justify-items-start gap-[5px] rounded-act-sm border border-line-strong bg-surface px-3 py-2.5 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition";
 const cardHoverClass =
-  "hover:border-[#a7b3c2] hover:shadow-[0_4px_12px_rgba(15,23,42,0.06)]";
+  "hover:border-line-strong hover:shadow-[0_4px_12px_rgba(15,23,42,0.06)]";
 const selectedCardClass =
-  "border-[#2f6fff] bg-[#edf4ff] shadow-[0_0_0_1px_rgba(47,111,255,0.22),0_8px_18px_rgba(47,111,255,0.14)] before:absolute before:inset-y-2 before:-left-px before:w-[3px] before:rounded-full before:bg-[#2f6fff]";
+  "border-brand bg-brand-soft shadow-[0_0_0_1px_rgba(47,111,255,0.22),0_8px_18px_rgba(47,111,255,0.14)] before:absolute before:inset-y-2 before:-left-px before:w-[3px] before:rounded-full before:bg-brand";
 const tagClass =
   "inline-flex h-[18px] items-center whitespace-nowrap rounded-full px-[7px] text-[11px] font-medium leading-none";
 const overlayClass = "fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/25 p-8";
@@ -107,7 +107,7 @@ const modalBodyClass = "min-h-0 overflow-auto px-7 py-[26px]";
 const modalFootClass = "relative flex min-h-16 items-center gap-2.5 border-t border-line px-7";
 const fieldClass = "grid gap-2";
 const fieldControlClass =
-  "w-full rounded-[10px] border border-line bg-surface px-3 py-2.5 text-[13px] leading-[1.45] text-text-main outline-none transition focus:border-[#bfd4ff] focus:shadow-[0_0_0_3px_rgba(47,111,255,0.12)]";
+  "w-full rounded-[10px] border border-line bg-surface px-3 py-2.5 text-[13px] leading-[1.45] text-text-main outline-none transition focus:border-brand focus:shadow-[0_0_0_3px_var(--act-color-focus-ring)]";
 const detailGridClass =
   "grid grid-cols-[minmax(0,1fr)_246px] gap-7 max-[1100px]:grid-cols-1";
 const sideClass =
@@ -118,7 +118,7 @@ const menuButtonClass =
   "h-8 rounded-[7px] px-2.5 text-left text-[13px] text-text-muted hover:bg-surface-subtle hover:text-text-main";
 const tabClass =
   "h-[30px] rounded-full border border-line bg-surface px-3.5 text-[13px] font-medium text-text-muted";
-const activeTabClass = "border-[#bfd4ff] bg-brand-soft text-brand-strong";
+const activeTabClass = "border-brand/40 bg-brand-soft text-brand-strong";
 const historyGridClass = "grid grid-cols-[minmax(220px,1fr)_96px_120px_112px_64px] items-center gap-4";
 
 function cloneCards(cards: LabCardView[]): LabCardView[] {
@@ -132,7 +132,8 @@ function cloneCards(cards: LabCardView[]): LabCardView[] {
 function tagStyle(color: string): CSSProperties {
   return {
     color,
-    backgroundColor: `color-mix(in srgb, ${color} 13%, #fff)`,
+    // 与 surface 混合而非写死 #fff，深色下 tint 底色随主题翻转。
+    backgroundColor: `color-mix(in srgb, ${color} 13%, var(--act-color-surface))`,
   };
 }
 

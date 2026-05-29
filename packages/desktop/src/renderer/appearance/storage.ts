@@ -7,10 +7,12 @@ import {
   CODE_FONT_SIZE_MAX,
   CODE_FONT_SIZE_MIN,
   DEFAULT_APPEARANCE,
+  THEME_MODES,
   UI_FONT_SIZE_MAX,
   UI_FONT_SIZE_MIN,
   type AppearancePrefs,
   type CodeFontId,
+  type ThemeMode,
   type UiFontId,
 } from "./types";
 
@@ -33,6 +35,12 @@ function asCodeFontId(value: unknown): CodeFontId {
     : DEFAULT_APPEARANCE.codeFontId;
 }
 
+function asTheme(value: unknown): ThemeMode {
+  return THEME_MODES.includes(value as ThemeMode)
+    ? (value as ThemeMode)
+    : DEFAULT_APPEARANCE.theme;
+}
+
 export function loadAppearance(): AppearancePrefs {
   if (typeof localStorage === "undefined") return { ...DEFAULT_APPEARANCE };
   let raw: string | null = null;
@@ -53,6 +61,7 @@ export function loadAppearance(): AppearancePrefs {
 
   return {
     version: 1,
+    theme: asTheme(parsed.theme),
     uiFontId: asUiFontId(parsed.uiFontId),
     codeFontId: asCodeFontId(parsed.codeFontId),
     uiFontSize: Math.round(

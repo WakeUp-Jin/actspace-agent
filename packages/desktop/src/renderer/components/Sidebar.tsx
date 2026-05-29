@@ -101,10 +101,10 @@ const MOCK_SCHEDULED: ScheduledItem[] = [
 ];
 
 const SIDEBAR_CLASS =
-  "sidebar relative flex h-full min-h-0 flex-col gap-3 border-r border-[rgba(223,228,234,0.92)] bg-sidebar pb-2.5 pl-2.5 pr-2 pt-[var(--window-chrome-strip-height)]";
+  "sidebar relative flex h-full min-h-0 flex-col gap-3 border-r border-line bg-sidebar pb-2.5 pl-2.5 pr-2 pt-[var(--window-chrome-strip-height)]";
 const SIDEBAR_PRIMARY_ACTIONS_CLASS = "mt-1.5 flex flex-col gap-px p-0";
 const SIDEBAR_PRIMARY_ACTION_CLASS =
-  "flex min-h-[34px] items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2.5 py-0 text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[rgba(32,33,36,0.05)] hover:text-text-main";
+  "flex min-h-[34px] items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2.5 py-0 text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 const SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS = "text-text-main";
 const SIDEBAR_PRIMARY_ACTION_LABEL_CLASS = "min-w-0 flex-1 text-left";
 const SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS = "text-xs font-medium tracking-[0.02em] text-text-faint";
@@ -117,10 +117,10 @@ const NAV_SECTION_LABEL_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} inline-flex min-w-0 flex-1 items-center gap-1 p-0 text-left text-xs font-medium tracking-[0] text-text-faint transition-colors duration-[130ms] ease-in-out hover:text-text-main`;
 const NAV_SECTION_ACTIONS_CLASS = "inline-flex items-center gap-1 text-text-faint";
 const NAV_SECTION_ACTION_BUTTON_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} grid h-5 w-5 place-items-center rounded-act-sm opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/nav-title:opacity-100 group-focus-within/nav-title:opacity-100 hover:bg-[rgba(32,33,36,0.06)] hover:text-text-muted`;
+  `${SIDEBAR_BUTTON_RESET_CLASS} grid h-5 w-5 place-items-center rounded-act-sm opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/nav-title:opacity-100 group-focus-within/nav-title:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-muted`;
 const SESSION_LIST_CLASS = "flex flex-col gap-px";
 const SESSION_ROW_CLASS =
-  "session-row group/session-row relative grid min-h-9 grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2 rounded-act-md px-2 transition-[background,color] duration-[130ms] ease-in-out hover:bg-[rgba(32,33,36,0.045)]";
+  "session-row group/session-row relative grid min-h-9 grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2 rounded-act-md px-2 transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)]";
 const SESSION_ROW_ACTIVE_CLASS = "is-active bg-sidebar-selected";
 const SESSION_ROW_PINNED_CLASS = "is-pinned";
 const SESSION_ROW_MUTED_CLASS = "is-muted";
@@ -132,9 +132,9 @@ const SESSION_ROW_MAIN_CLASS =
 const SESSION_ROW_MAIN_MUTED_CLASS = "text-text-muted";
 const SESSION_ROW_ACTIONS_CLASS = "inline-flex flex-none items-center gap-0.5";
 const SESSION_ROW_ARCHIVE_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} grid h-[22px] w-[22px] flex-none place-items-center rounded-act-sm text-text-faint opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[rgba(32,33,36,0.08)] hover:text-text-main`;
+  `${SIDEBAR_BUTTON_RESET_CLASS} grid h-[22px] w-[22px] flex-none place-items-center rounded-act-sm text-text-faint opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
 const SESSION_ROW_PIN_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} session-row-pin absolute inset-0 grid h-[14px] w-[14px] place-items-center rounded-act-sm text-text-muted opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[rgba(32,33,36,0.08)] hover:text-text-main`;
+  `${SIDEBAR_BUTTON_RESET_CLASS} session-row-pin absolute inset-0 grid h-[14px] w-[14px] place-items-center rounded-act-sm text-text-muted opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
 const SESSION_ROW_PIN_ACTIVE_CLASS = "is-active opacity-100 text-text-main";
 const SESSION_STATUS_DOT_CLASS =
   "session-status-dot h-1.5 w-1.5 rounded-full bg-brand transition-opacity duration-[130ms] ease-in-out";
@@ -157,9 +157,9 @@ const WORKSPACE_LABEL_CLASS =
 const WORKSPACE_NAME_CLASS = "workspace-folder-name min-w-0 overflow-hidden text-ellipsis whitespace-nowrap";
 const WORKSPACE_ACTIONS_CLASS = NAV_SECTION_ACTIONS_CLASS;
 const WORKSPACE_ADD_BUTTON_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} workspace-add-button grid h-[22px] w-[22px] place-items-center rounded-act-sm text-text-faint opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/workspace-row:opacity-100 focus-visible:opacity-100 hover:bg-[rgba(32,33,36,0.08)] hover:text-text-main`;
+  `${SIDEBAR_BUTTON_RESET_CLASS} workspace-add-button grid h-[22px] w-[22px] place-items-center rounded-act-sm text-text-faint opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/workspace-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
 const SETTINGS_ENTRY_CLASS =
-  "flex min-h-[34px] items-center gap-[9px] rounded-act-md border-0 bg-transparent px-2.5 py-0 text-left text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[rgba(32,33,36,0.06)] hover:text-text-main";
+  "flex min-h-[34px] items-center gap-[9px] rounded-act-md border-0 bg-transparent px-2.5 py-0 text-left text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 
 type NavSectionHeaderProps = {
   label: string;

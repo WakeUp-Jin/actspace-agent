@@ -89,72 +89,72 @@ const TRACE_SEGMENT_BASE_PX = 20;
 const TRACE_SEGMENT_PX_PER_SECOND = 5;
 const TRACE_SEGMENT_MAX_PX = 100;
 const TRACE_TONE_COLORS: Record<ReturnType<typeof traceTone>, string> = {
-  reply: "#4a8af7",
-  sleep: "#f0ad3d",
-  error: "#ee5a55",
-  other: "#d7dce5",
+  reply: "var(--act-color-brand)",
+  sleep: "var(--act-color-warm)",
+  error: "var(--act-color-danger)",
+  other: "var(--act-color-border-strong)",
 };
 const pageRootClass =
-  "relative flex h-full min-h-0 flex-col bg-[#f7f9fc] pt-[var(--window-chrome-strip-height)] text-[#1a1d24]";
+  "relative flex h-full min-h-0 flex-col bg-app-bg pt-[var(--window-chrome-strip-height)] text-text-main";
 const unavailablePageClass = `${pageRootClass} items-center justify-center`;
 const unavailableCardClass =
-  "max-w-[520px] rounded-act-lg border border-[#e6e8ef] bg-surface px-7 py-6 shadow-[0_4px_18px_rgba(15,23,42,0.04)]";
+  "max-w-[520px] rounded-act-lg border border-line bg-surface px-7 py-6 shadow-act-soft";
 const headerClass =
-  "flex items-center justify-between gap-4 border-b border-[#e6e8ef] bg-surface px-7 py-4 max-[760px]:items-start max-[760px]:flex-col max-[760px]:px-4";
+  "flex items-center justify-between gap-4 border-b border-line bg-surface px-7 py-4 max-[760px]:items-start max-[760px]:flex-col max-[760px]:px-4";
 const headerStatusClass =
-  "inline-flex h-7 items-center gap-[7px] rounded-full border border-[#dfe8f3] bg-[#f8fbff] px-[11px] text-[13px] tabular-nums";
+  "inline-flex h-7 items-center gap-[7px] rounded-full border border-line bg-surface-subtle px-[11px] text-[13px] tabular-nums";
 const headerUsageBadgeClass =
-  "inline-flex h-7 items-center gap-[7px] rounded-full border border-[#e6e8ef] bg-[#fafbfe] pl-[6px] pr-[11px] text-[13px] tabular-nums text-[#4b5161]";
+  "inline-flex h-7 items-center gap-[7px] rounded-full border border-line bg-surface-subtle pl-[6px] pr-[11px] text-[13px] tabular-nums text-text-muted";
 const headerUsageBadgeToggleClass =
-  "inline-flex h-[22px] w-[22px] items-center justify-center rounded-full border border-transparent text-[#9aa3b2] transition hover:border-[#d4d7e0] hover:bg-[#eef1f6] hover:text-[#4b5161] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a7b3c4] focus-visible:ring-offset-1 focus-visible:ring-offset-[#fafbfe]";
-const headerUsageBadgeSeparatorClass = "text-[#c5cad6]";
-const headerUsageBadgeCostClass = "text-[#1a1d24] font-medium";
+  "inline-flex h-[22px] w-[22px] items-center justify-center rounded-full border border-transparent text-text-faint transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-line-strong focus-visible:ring-offset-1 focus-visible:ring-offset-surface-subtle";
+const headerUsageBadgeSeparatorClass = "text-text-subtle";
+const headerUsageBadgeCostClass = "text-text-main font-medium";
 const headerUsageBadgeModeChipClass =
-  "ml-[2px] inline-flex items-center rounded-full bg-[#eef1f6] px-[6px] py-[1px] text-[10.5px] tracking-wide text-[#6c7281]";
+  "ml-[2px] inline-flex items-center rounded-full bg-surface-subtle px-[6px] py-[1px] text-[10.5px] tracking-wide text-text-faint";
 const kairosButtonClass =
-  "inline-flex h-[38px] items-center justify-center gap-[7px] rounded-act-md border border-[#d4d7e0] bg-surface px-[18px] text-sm font-medium text-[#2c303a] transition hover:border-[#b5bac6] hover:bg-[#f5f7fb] disabled:cursor-not-allowed disabled:opacity-55";
+  "inline-flex h-[38px] items-center justify-center gap-[7px] rounded-act-md border border-line bg-surface px-[18px] text-sm font-medium text-text-main transition hover:border-line-strong hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-55";
 const kairosPrimaryButtonClass =
-  "border-[#bdd0f8] bg-[#edf4ff] text-[#1a1d24] hover:border-[#a9c0f3] hover:bg-[#e3eeff]";
+  "border-brand/40 bg-brand-soft text-text-main hover:border-brand/60 hover:bg-brand-soft";
 const traceClass =
-  "shrink-0 border-b border-[#e6e8ef] bg-surface px-7 pb-3.5 pt-4 max-[760px]:px-4";
+  "shrink-0 border-b border-line bg-surface px-7 pb-3.5 pt-4 max-[760px]:px-4";
 const traceHeadClass =
   "mb-3 flex items-center justify-between gap-4 max-[760px]:items-start max-[760px]:flex-col";
-const traceLegendClass = "flex items-center gap-4 text-xs text-[#6c7281]";
+const traceLegendClass = "flex items-center gap-4 text-xs text-text-faint";
 const traceBlockBaseClass =
   "h-[21px] min-w-5 flex-none rounded border border-transparent transition hover:-translate-y-px";
 const mainGridClass =
   "grid min-h-0 flex-1 grid-cols-[minmax(620px,7fr)_minmax(340px,3fr)] gap-3 px-4 pb-4 pt-3 max-[1100px]:grid-cols-1";
 const eventsPanelClass =
-  "flex min-h-0 flex-col overflow-hidden rounded-act-md border border-[#e1e6ef] bg-surface";
+  "flex min-h-0 flex-col overflow-hidden rounded-act-md border border-line bg-surface";
 const eventsTableClass = "w-full table-fixed border-collapse text-xs";
 const eventsThClass =
-  "sticky top-0 z-[1] border-b border-[#e6e8ef] bg-[#fafbfe] px-4 py-3 text-left text-xs font-medium text-[#6c7281]";
-const eventsTdClass = "border-b border-[#f0f2f7] px-4 py-2.5 tabular-nums text-[#1a1d24]";
+  "sticky top-0 z-[1] border-b border-line bg-surface-subtle px-4 py-3 text-left text-xs font-medium text-text-faint";
+const eventsTdClass = "border-b border-line px-4 py-2.5 tabular-nums text-text-main";
 const eventsFooterClass =
-  "mt-auto grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-[#eef1f6] px-4 py-3 text-xs text-[#687083]";
+  "mt-auto grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-4 py-3 text-xs text-text-faint";
 const pageButtonClass =
-  "inline-flex h-7 w-7 items-center justify-center rounded-[7px] border border-[#d9dfeb] bg-surface text-xs text-[#465063] hover:border-[#b9c6de] hover:bg-[#f7faff] disabled:cursor-not-allowed disabled:opacity-45";
+  "inline-flex h-7 w-7 items-center justify-center rounded-[7px] border border-line bg-surface text-xs text-text-muted hover:border-line-strong hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-45";
 const sideClass = "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 max-[1100px]:min-h-[520px]";
 const statsClass =
-  "grid grid-cols-4 overflow-hidden rounded-act-md border border-[#e1e6ef] bg-surface max-[760px]:grid-cols-2";
+  "grid grid-cols-4 overflow-hidden rounded-act-md border border-line bg-surface max-[760px]:grid-cols-2";
 const detailPanelClass =
-  "min-h-0 overflow-auto rounded-act-md border border-[#e1e6ef] bg-surface px-5 py-[18px]";
+  "min-h-0 overflow-auto rounded-act-md border border-line bg-surface px-5 py-[18px]";
 const detailTabsClass =
-  "mb-[26px] inline-flex overflow-hidden rounded-act-md border border-[#dfe5ee] bg-surface";
+  "mb-[26px] inline-flex overflow-hidden rounded-act-md border border-line bg-surface";
 const detailTabClass =
-  "h-[38px] min-w-28 border-0 border-r border-[#dfe5ee] bg-transparent px-[18px] text-[13px] text-[#657085] last:border-r-0";
-const detailActiveTabClass = "bg-[#f8fbff] text-[#1e5bd7] shadow-[inset_0_0_0_1px_#2f6fff]";
+  "h-[38px] min-w-28 border-0 border-r border-line bg-transparent px-[18px] text-[13px] text-text-muted last:border-r-0";
+const detailActiveTabClass = "bg-brand-soft text-brand-strong shadow-[inset_0_0_0_1px_var(--act-color-brand)]";
 const detailToplineClass =
   "mb-6 flex items-center justify-between gap-4 max-[760px]:items-start max-[760px]:flex-col";
-const detailMetaClass = "inline-flex items-center gap-2.5 text-xs tabular-nums text-[#6c7281]";
-const detailReplyClass = "whitespace-pre-wrap break-words text-[17px] leading-[1.85] text-[#181b22]";
+const detailMetaClass = "inline-flex items-center gap-2.5 text-xs tabular-nums text-text-faint";
+const detailReplyClass = "whitespace-pre-wrap break-words text-[17px] leading-[1.85] text-text-main";
 const detailPlaceholderClass =
-  "flex min-h-40 items-center justify-center text-center text-[13px] text-[#8a90a0]";
+  "flex min-h-40 items-center justify-center text-center text-[13px] text-text-faint";
 const toolResultClass = "flex flex-col gap-3.5";
 const toolResultSectionTextClass =
-  "m-0 overflow-hidden text-ellipsis rounded-act-md border border-[#e6e8ef] bg-[#f8fafc] px-3 py-2.5 font-mono text-xs leading-[1.5] text-[#2c303a]";
+  "m-0 overflow-hidden text-ellipsis rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 font-mono text-xs leading-[1.5] text-text-main";
 const pageErrorClass =
-  "absolute bottom-[18px] right-[18px] max-w-[min(520px,calc(100%_-_36px))] rounded-act-md border border-[#f3c4b1] bg-[#fff5f1] px-3 py-2.5 text-xs text-[#b04014] shadow-[0_12px_28px_rgba(166,62,38,0.12)]";
+  "absolute bottom-[18px] right-[18px] max-w-[min(520px,calc(100%_-_36px))] rounded-act-md border border-on-danger/30 bg-danger-soft px-3 py-2.5 text-xs text-on-danger shadow-[0_12px_28px_rgba(166,62,38,0.12)]";
 
 function cn(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(" ");
@@ -220,7 +220,7 @@ export function KairosPage() {
       <div className={unavailablePageClass}>
         <div className={unavailableCardClass}>
           <h2 className="m-0 mb-2 text-[17px] font-semibold">Kairos 桥未就绪</h2>
-          <p className="m-0 text-[13px] leading-[1.55] text-[#5a6273]">
+          <p className="m-0 text-[13px] leading-[1.55] text-text-muted">
             当前运行环境未暴露 <code>window.kairos</code>。请在 Electron 环境下打开，或确认 preload 已加载。
           </p>
         </div>
@@ -312,18 +312,18 @@ function KairosRuntimeTrace(props: KairosRuntimeTraceProps) {
     <section className={traceClass} aria-label="运行轨迹（近 60 分钟）">
       <div className={traceHeadClass}>
         <div>
-          <h2 className="m-0 inline text-[15px] font-semibold text-[#171a22]">运行轨迹</h2>
-          <span className="ml-2 text-xs text-[#6c7281]">近 60 分钟</span>
+          <h2 className="m-0 inline text-[15px] font-semibold text-text-main">运行轨迹</h2>
+          <span className="ml-2 text-xs text-text-faint">近 60 分钟</span>
         </div>
         <div className={traceLegendClass} aria-label="运行轨迹图例">
-          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-[#4a8af7]" data-tone="reply" />回复</span>
-          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-[#f0ad3d]" data-tone="sleep" />睡眠</span>
-          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-[#ee5a55]" data-tone="error" />异常</span>
-          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-[#d7dce5]" data-tone="other" />其他</span>
+          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-brand" data-tone="reply" />回复</span>
+          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-warm" data-tone="sleep" />睡眠</span>
+          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-danger" data-tone="error" />异常</span>
+          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-line-strong" data-tone="other" />其他</span>
         </div>
       </div>
       {rows.length === 0 ? (
-        <div className="flex h-7 items-center justify-center rounded-[7px] border border-dashed border-[#d8dee9] text-xs text-[#8a90a0]">等待 Kairos 事件</div>
+        <div className="flex h-7 items-center justify-center rounded-[7px] border border-dashed border-line-strong text-xs text-text-faint">等待 Kairos 事件</div>
       ) : (
         <div className="overflow-x-auto overflow-y-hidden pb-1" data-testid="kairos-trace-viewport" ref={viewportRef}>
           <div
@@ -354,7 +354,7 @@ function KairosRuntimeTrace(props: KairosRuntimeTraceProps) {
               ))}
             </div>
             {ticks.length > 0 ? (
-              <div className="mt-[9px] flex justify-between gap-3 text-xs tabular-nums text-[#687083]" aria-hidden="true">
+              <div className="mt-[9px] flex justify-between gap-3 text-xs tabular-nums text-text-faint" aria-hidden="true">
                 {ticks.map((tick) => (
                   <span key={`${tick.index}-${tick.label}`}>{tick.label}</span>
                 ))}
@@ -397,7 +397,7 @@ function KairosHeader(props: KairosHeaderProps) {
   return (
     <header className={headerClass} data-state={runState}>
       <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-        <span className="text-2xl font-semibold text-[#12151c]">Kairos</span>
+        <span className="text-2xl font-semibold text-text-main">Kairos</span>
         <span className={cn(headerStatusClass, stateTextClass(runState))}>
           <span className={cn("h-2 w-2 rounded-full", stateDotClass(runState))} aria-hidden="true" />
           {statusText}
@@ -533,7 +533,7 @@ function KairosExecutionList(props: KairosExecutionListProps) {
   if (rows.length === 0) {
     return (
       <section className={cn(eventsPanelClass, "items-center justify-center")} aria-label="执行列表">
-        <div className="p-8 text-center text-[13px] text-[#6c7281]">
+        <div className="p-8 text-center text-[13px] text-text-faint">
           暂无 Kairos 事件。开启后会出现巡检、工具执行、最终回复和睡眠条目。
         </div>
       </section>
@@ -557,9 +557,9 @@ function KairosExecutionList(props: KairosExecutionListProps) {
             <tr
               key={row.id}
               className={cn(
-                "cursor-pointer transition hover:bg-[#f8faff]",
-                row.status === "failed" && "bg-[#fff8f5]",
-                props.selectedRowId === row.id && "bg-[#eef4ff] shadow-[inset_2px_0_0_#2f6fff]",
+                "cursor-pointer transition hover:bg-surface-subtle",
+                row.status === "failed" && "bg-danger-soft",
+                props.selectedRowId === row.id && "bg-brand-soft shadow-[inset_2px_0_0_var(--act-color-brand)]",
               )}
               onClick={() => props.onSelectRow(row.id)}
               role="row"
@@ -574,7 +574,7 @@ function KairosExecutionList(props: KairosExecutionListProps) {
             >
               <td className={cn(eventsTdClass, "w-[92px]")}>{formatKairosTime(row.startedAt)}</td>
               <td className={cn(eventsTdClass, "w-[104px]")}>
-                <span className="inline-flex items-center gap-[7px] whitespace-nowrap font-medium text-[#4f5665] [&_svg]:text-[#687083]">
+                <span className="inline-flex items-center gap-[7px] whitespace-nowrap font-medium text-text-muted [&_svg]:text-text-faint">
                   <KindIcon kind={row.kind} />
                   {kairosKindLabel(row.kind)}
                 </span>
@@ -606,7 +606,7 @@ function KairosExecutionList(props: KairosExecutionListProps) {
             <button
               key={pageNumber}
               type="button"
-              className={cn(pageButtonClass, pageNumber === props.page && "border-brand bg-[#1f66e5] text-white")}
+              className={cn(pageButtonClass, pageNumber === props.page && "border-brand bg-brand text-white")}
               aria-current={pageNumber === props.page ? "page" : undefined}
               onClick={() => props.onPageChange(pageNumber)}
             >
@@ -623,7 +623,7 @@ function KairosExecutionList(props: KairosExecutionListProps) {
             <ChevronRight size={15} aria-hidden="true" />
           </button>
         </div>
-        <button type="button" className="inline-flex h-7 items-center justify-self-end gap-[5px] bg-transparent text-xs text-[#687083]" aria-label="每页 10 条">
+        <button type="button" className="inline-flex h-7 items-center justify-self-end gap-[5px] bg-transparent text-xs text-text-faint" aria-label="每页 10 条">
           10 条/页
           <ChevronDown size={13} aria-hidden="true" />
         </button>
@@ -667,13 +667,13 @@ function KairosStats(props: KairosStatsProps) {
         <div
           key={item.label}
           className={cn(
-            "border-r border-[#eef1f6] px-4 py-3.5 last:border-r-0",
+            "border-r border-line px-4 py-3.5 last:border-r-0",
             index === 1 && "max-[760px]:border-r-0",
-            index < 2 && "max-[760px]:border-b max-[760px]:border-[#eef1f6]",
+            index < 2 && "max-[760px]:border-b max-[760px]:border-line",
           )}
         >
-          <span className="mb-2 block text-xs text-[#6c7281]">{item.label}</span>
-          <strong className="block text-xl font-semibold tabular-nums text-[#171a22]">{item.value}</strong>
+          <span className="mb-2 block text-xs text-text-faint">{item.label}</span>
+          <strong className="block text-xl font-semibold tabular-nums text-text-main">{item.value}</strong>
         </div>
       ))}
     </section>
@@ -714,7 +714,7 @@ function KairosDetailPanel(props: KairosDetailPanelProps) {
         </button>
       </div>
       <div className={detailToplineClass}>
-        <h2 className="m-0 text-base font-semibold text-[#171a22]">
+        <h2 className="m-0 text-base font-semibold text-text-main">
           {tab === "reply" ? "最终回复" : "工具结果"}
         </h2>
         <div className={detailMetaClass}>
@@ -744,7 +744,7 @@ function ToolResultView({ tool }: { tool: KairosToolDetail | null }) {
   }
   return (
     <div className={toolResultClass}>
-      <div className="flex items-center justify-between gap-3 border-b border-[#eef1f6] pb-3 font-semibold">
+      <div className="flex items-center justify-between gap-3 border-b border-line pb-3 font-semibold">
         <span>{tool.name}</span>
         <span className={statusBadgeClass(tool.ok ? "success" : "failed")}>
           {tool.ok ? "success" : "failed"}
@@ -752,12 +752,12 @@ function ToolResultView({ tool }: { tool: KairosToolDetail | null }) {
       </div>
       {tool.input ? (
         <div className="grid gap-2">
-          <span className="text-xs text-[#6c7281]">输入</span>
+          <span className="text-xs text-text-faint">输入</span>
           <code className={toolResultSectionTextClass}>{tool.input}</code>
         </div>
       ) : null}
       <div className="grid gap-2">
-        <span className="text-xs text-[#6c7281]">结果</span>
+        <span className="text-xs text-text-faint">结果</span>
         <p className={toolResultSectionTextClass}>{tool.output || "工具执行完成，暂无输出摘要。"}</p>
       </div>
     </div>
@@ -820,14 +820,15 @@ function traceTone(row: KairosEventRow): "reply" | "sleep" | "error" | "other" {
 }
 
 function stateTextClass(state: KairosRuntimeState["state"]): string {
-  if (state === "cooldown" || state === "interrupted") return "text-[#b3433c]";
-  return "text-[#16805b]";
+  if (state === "cooldown" || state === "interrupted") return "text-on-danger";
+  return "text-on-success";
 }
 
 function stateDotClass(state: KairosRuntimeState["state"]): string {
-  if (state === "cooldown" || state === "interrupted") return "bg-[#e0524d] shadow-[0_0_0_3px_rgba(224,82,77,0.12)]";
-  if (state === "stopped") return "bg-[#9aa3b2] shadow-[0_0_0_3px_rgba(154,163,178,0.13)]";
-  return "bg-[#20b779] shadow-[0_0_0_3px_rgba(32,183,121,0.12)]";
+  if (state === "cooldown" || state === "interrupted")
+    return "bg-danger shadow-[0_0_0_3px_var(--act-color-danger-soft)]";
+  if (state === "stopped") return "bg-text-faint shadow-[0_0_0_3px_var(--act-color-hover-overlay)]";
+  return "bg-success shadow-[0_0_0_3px_var(--act-color-success-soft)]";
 }
 
 function statusBadgeClass(status: KairosEventRow["status"]): string {
@@ -840,12 +841,12 @@ function statusBadgeClass(status: KairosEventRow["status"]): string {
 function statusToneClass(status: KairosEventRow["status"]): string {
   switch (status) {
     case "success":
-      return "bg-[#eaf8f1] text-[#17744f]";
+      return "bg-success-soft text-on-success";
     case "running":
-      return "bg-brand-soft text-[#2f62c7]";
+      return "bg-brand-soft text-brand-strong";
     case "failed":
-      return "bg-[#fff0ef] text-[#bc3b35]";
+      return "bg-danger-soft text-on-danger";
     case "interrupted":
-      return "bg-[#fff6e6] text-[#9b6514]";
+      return "bg-warm-soft text-on-warm";
   }
 }

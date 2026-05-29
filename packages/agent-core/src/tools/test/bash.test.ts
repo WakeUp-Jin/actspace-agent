@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, realpath } from "node:fs/promises";
+import { mkdtemp, realpath, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { bashExecutor, bashCheckPermissions, createToolManager, renderBashResult } from "../index";
@@ -105,7 +105,9 @@ describe("Bash executor", () => {
     expect(result.success).toBe(true);
     const data = result.data as BashResult;
     expect(data.cwd).toBe(workspace);
-    expect(data.stdout).toBe("hello");
+    expect(data.output).toBe("hello");
+    expect(data.totalChars).toBe(5);
+    expect(data.outputTruncated).toBe(false);
     expect(data.exitCode).toBe(0);
     expect(data.timedOut).toBe(false);
   });
@@ -137,7 +139,50 @@ describe("Bash executor", () => {
 
     expect(rendered).toContain("$ printf hello");
     expect(rendered).toContain("exitCode: 0");
-    expect(rendered).toContain("stdout:");
+    expect(rendered).toContain("output:");
+  });
+
+  it("streams large output to disk and returns head + truncation marker + path", async () => {
+    const workspace = await createWorkspace();
+    const tmpRoot = await realpath(await mkdtemp(join(tmpdir(), "actspace-bash-tmp-")));
+    // 10000 'a' chars > inlineThreshold(4000) → 落盘 + 头部截断
+    const result = await bashExecutor(
+      { command: "printf 'a%.0s' $(seq 1 10000)", cwd: workspace },
+      workspace,
+      { tmpRoot, sessionId: "sess-1", inlineThreshold: 4000 },
+    );
+
+    expect(result.success).toBe(true);
+    const data = result.data as BashResult;
+    expect(data.outputTruncated).toBe(true);
+    expect(data.output.length).toBe(4000);
+    expect(data.totalChars).toBe(10000);
+    expect(data.stdoutFilePath).toBeTruthy();
+    expect(result.outputRef).toEqual({ kind: "file", value: data.stdoutFilePath });
+
+    // 落盘文件应包含完整 10000 字符
+    const persisted = await readFile(data.stdoutFilePath!, "utf8");
+    expect(persisted.length).toBe(10000);
+
+    const rendered = renderBashResult(result);
+    expect(rendered).toContain("[输出截断：显示前 4000/共 10000 字符");
+    expect(rendered).toContain(data.stdoutFilePath!);
+  });
+
+  it("keeps small output inline without creating a file", async () => {
+    const workspace = await createWorkspace();
+    const tmpRoot = await realpath(await mkdtemp(join(tmpdir(), "actspace-bash-tmp-")));
+    const result = await bashExecutor(
+      { command: "printf hello", cwd: workspace },
+      workspace,
+      { tmpRoot, sessionId: "sess-1", inlineThreshold: 4000 },
+    );
+
+    expect(result.success).toBe(true);
+    const data = result.data as BashResult;
+    expect(data.outputTruncated).toBe(false);
+    expect(data.stdoutFilePath).toBeUndefined();
+    expect(result.outputRef).toBeUndefined();
   });
 });
 

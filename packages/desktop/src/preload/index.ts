@@ -69,6 +69,9 @@ contextBridge.exposeInMainWorld("actspace", {
   // 整窗缩放：preload 直接调 webFrame，无需 IPC 往返。外观设置的「界面字号」用它实现。
   setUiZoom: (factor: number) => webFrame.setZoomFactor(factor),
 
+  // 主题三态同步原生 chrome（main 设 nativeTheme.themeSource）。fire-and-forget。
+  setNativeTheme: (mode: "light" | "dark" | "system") => ipcRenderer.send("appearance:set-theme", mode),
+
   onAgentStream: (callback: (event: RuntimeStreamEvent) => void) => {
     const handler = (_: unknown, event: RuntimeStreamEvent) => callback(event);
     ipcRenderer.on("agent:stream", handler);

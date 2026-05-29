@@ -176,20 +176,20 @@ export function Sheet(props: PropsWithChildren<SheetProps>) {
         style={{ width: widthStyle }}
         className={
           "absolute top-0 right-0 flex h-screen max-w-full flex-col " +
-          "border-l border-[#e6e8ef] bg-surface " +
-          "shadow-[0_8px_30px_rgba(15,23,42,0.08)] " +
+          "border-l border-line bg-surface " +
+          "shadow-act-soft " +
           "transition-transform duration-200 ease-out motion-reduce:transition-none " +
           "data-[state=open]:translate-x-0 data-[state=closed]:translate-x-full"
         }
         data-testid={testId}
       >
-        <header className="flex items-start justify-between gap-3 border-b border-[#eef1f6] px-6 py-4">
+        <header className="flex items-start justify-between gap-3 border-b border-line px-6 py-4">
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="m-0 text-[17px] font-semibold text-[#12151c]">
+            <h2 id={titleId} className="m-0 text-[17px] font-semibold text-text-main">
               {title}
             </h2>
             {description ? (
-              <p className="mt-1 text-[13px] leading-[1.55] text-[#5a6273]">{description}</p>
+              <p className="mt-1 text-[13px] leading-[1.55] text-text-muted">{description}</p>
             ) : null}
           </div>
           <div className="flex items-center gap-2">
@@ -199,7 +199,7 @@ export function Sheet(props: PropsWithChildren<SheetProps>) {
               type="button"
               aria-label="关闭"
               onClick={close}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-act-md border border-[#dfe4ee] bg-surface text-[#4f5665] transition hover:border-[#b9c6de] hover:bg-[#f5f7fb]"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-act-md border border-line bg-surface text-text-muted transition hover:border-line-strong hover:bg-surface-subtle"
             >
               <X size={15} aria-hidden="true" />
             </button>

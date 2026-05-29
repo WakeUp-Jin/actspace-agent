@@ -17,6 +17,8 @@ import type {
 import { extractPathsFromArgs } from "../kairos/guard/extract-paths";
 import { createBlocklistMatcher } from "../kairos/guard/blocklist-check";
 import { guardWorkspacePath } from "./workspace-guard";
+import { processToolOutput } from "./output-truncator";
+import type { Summarizer } from "../context/compression/summarizer";
 
 export type ToolCallStatus =
   | "validating"
@@ -75,7 +77,14 @@ export interface ApprovalGate {
 }
 
 export interface ToolSchedulerConfig {
+  /** 通用工具（web/generic）摘要触发阈值（字符） */
   truncateThreshold: number;
+  /** 读取类工具摘要触发阈值（字符），默认见 DEFAULT_COMPRESSION_CONFIG */
+  readTruncateThreshold?: number;
+  /** 非 bash 工具送 flash 前的头尾截断上限（字符） */
+  absoluteMaxChars?: number;
+  /** flash 摘要器；缺省时非 bash 工具退化为确定性头尾截断 */
+  summarizer?: Summarizer;
   approvalGate?: ApprovalGate;
   now?: () => number;
   createId?: () => string;
@@ -88,12 +97,18 @@ export interface ToolSchedulerExecution {
 
 export class ToolScheduler {
   private truncateThreshold: number;
+  private readTruncateThreshold?: number;
+  private absoluteMaxChars?: number;
+  private summarizer?: Summarizer;
   private approvalGate?: ApprovalGate;
   private now: () => number;
   private createId: () => string;
 
   constructor(config: ToolSchedulerConfig) {
     this.truncateThreshold = config.truncateThreshold;
+    this.readTruncateThreshold = config.readTruncateThreshold;
+    this.absoluteMaxChars = config.absoluteMaxChars;
+    this.summarizer = config.summarizer;
     this.approvalGate = config.approvalGate;
     this.now = config.now ?? Date.now;
     this.createId = config.createId ?? createDefaultId;
@@ -203,7 +218,8 @@ export class ToolScheduler {
     record.status = "scheduled";
     record.status = "executing";
     const result = await tool.handler(executionArgs);
-    return this.finish(record, result.success ? "success" : "error", this.postProcess(tool, result));
+    const processed = await this.postProcess(tool, result);
+    return this.finish(record, result.success ? "success" : "error", processed);
   }
 
   private async checkPermission(
@@ -235,7 +251,7 @@ export class ToolScheduler {
     };
   }
 
-  private postProcess(tool: InternalTool, result: ToolResult): ToolResult {
+  private async postProcess(tool: InternalTool, result: ToolResult): Promise<ToolResult> {
     if (!result.success) return result;
 
     let rendered: string | undefined;
@@ -244,22 +260,29 @@ export class ToolScheduler {
     }
 
     const rawData = rendered ?? (typeof result.data === "string" ? result.data : JSON.stringify(result.data));
-    if (rawData && rawData.length > this.truncateThreshold) {
-      return {
-        success: true,
-        data: rawData.slice(0, this.truncateThreshold) +
-          `\n\n[Output truncated. Showing ${this.truncateThreshold} of ${rawData.length} characters]`,
-      };
+
+    // bash 自处理输出（run-process 流式落盘 + executor 头部截断），不走通用摘要/截断，
+    // 原样回填并保留 executor 设置的 outputRef（落盘文件路径）。
+    if (tool.previewKind === "bash") {
+      return rendered !== undefined ? { ...result, data: rendered } : result;
     }
 
-    if (rendered !== undefined) {
-      return {
-        ...result,
-        data: rendered,
-      };
+    if (!rawData) {
+      return rendered !== undefined ? { ...result, data: rendered } : result;
     }
 
-    return result;
+    const processed = await processToolOutput(tool.previewKind, rawData, {
+      toolTruncateThreshold: this.truncateThreshold,
+      readTruncateThreshold: this.readTruncateThreshold,
+      absoluteMaxChars: this.absoluteMaxChars,
+      summarizer: this.summarizer,
+    });
+
+    return {
+      ...result,
+      data: processed.modelOutput,
+      outputRef: result.outputRef ?? processed.rawOutputRef,
+    };
   }
 
   private finish(

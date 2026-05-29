@@ -64,6 +64,60 @@ export class ConversationContext implements ContextModule {
     this.messages = [];
   }
 
+  /**
+   * 规划一次历史压缩（只读，不改 messages）。
+   *
+   * 切点策略：保留最近 `keepRatio` 比例的消息为「不动区」，其余较旧消息为「可压区」。
+   * 切点落在完整工具配对之后、且让不动区以 assistant turn 开头——既不拆 `tool_call/tool`
+   * 配对，又能与合成的 user 摘要消息天然形成 user→assistant 交替（Anthropic 格式要求
+   * 严格交替，连续两条 user 会被拒）。最近的 user 提问位于尾部、本就在不动区，不受影响。
+   *
+   * @returns `{ split, removed }`：split 为可压区结束/不动区起始下标，removed 为可压区消息；
+   *          无可压区（历史太短或找不到安全切点）时返回 null。
+   */
+  planCompaction(keepRatio: number): { split: number; removed: Message[] } | null {
+    const total = this.messages.length;
+    if (total === 0) return null;
+
+    const clamped = Math.min(Math.max(keepRatio, 0), 1);
+    const target = Math.floor(total * (1 - clamped));
+    if (target <= 0) return null;
+
+    const split = this.findCompactionSplit(target);
+    if (split <= 0 || split >= total) return null;
+
+    return { split, removed: this.messages.slice(0, split) };
+  }
+
+  /**
+   * 提交一次历史压缩：用合成摘要消息替换 `messages[0..split)`。
+   *
+   * 与 planCompaction 配对使用，二者之间不应有并发的 appendMessage（Agent loop 内串行 await）。
+   * split 越界时不动数组、返回 []，避免误伤。
+   */
+  applyCompaction(summary: Message, split: number): Message[] {
+    if (split <= 0 || split > this.messages.length) return [];
+    const removed = this.messages.slice(0, split);
+    this.messages = [summary, ...this.messages.slice(split)];
+    return removed;
+  }
+
+  /**
+   * 从 target 下标向后寻找安全切点：
+   * 1. 优先返回第一条 assistant 消息下标（不动区以 assistant turn 开头，
+   *    与合成 user 摘要消息交替，且不会拆开 tool_call/tool 配对）。
+   * 2. 兜底返回第一条非 toolResult 下标（至少避免不动区以孤儿 toolResult 开头）。
+   */
+  private findCompactionSplit(target: number): number {
+    for (let i = target; i < this.messages.length; i++) {
+      if (this.messages[i].role === "assistant") return i;
+    }
+    for (let i = target; i < this.messages.length; i++) {
+      if (this.messages[i].role !== "toolResult") return i;
+    }
+    return this.messages.length;
+  }
+
   format(): ContextParts {
     return {
       systemParts: [],

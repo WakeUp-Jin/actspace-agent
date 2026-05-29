@@ -1,7 +1,7 @@
-import { relative, resolve } from "node:path";
+import { relative } from "node:path";
 import type { ToolResult } from "../../../internal-tools";
 import { runRipgrep, getRipgrepFailureMessage } from "../../subprocess/ripgrep";
-import { guardWorkspacePath } from "../../workspace-guard";
+import { resolveReadablePath } from "../../workspace-guard";
 import type { ToolExecutorFn } from "../../types";
 
 const MAX_RESULTS = 100;
@@ -18,10 +18,10 @@ export const grepExecutor: ToolExecutorFn = async (
   const searchPathArg = typeof args.path === "string" && args.path
     ? args.path
     : workspaceRoot;
-  const searchPath = resolve(workspaceRoot, searchPathArg);
   const glob = typeof args.glob === "string" ? args.glob : undefined;
 
-  const guard = guardWorkspacePath(searchPath, workspaceRoot);
+  // 读类工具不受 workspace 边界限制；只解析路径。
+  const guard = resolveReadablePath(searchPathArg, workspaceRoot);
   if (!guard.ok) {
     return { success: false, error: guard.error };
   }

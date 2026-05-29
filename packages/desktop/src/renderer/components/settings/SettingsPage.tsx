@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check } from "lucide-react";
+import { Monitor, Moon, Sun } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import {
   DEFAULT_MODEL_ID,
   MODEL_LIST,
@@ -34,15 +35,16 @@ import {
   UI_FONT_SIZE_STEP,
   type AppearancePrefs,
   type CodeFontId,
+  type ThemeMode,
   type UiFontId,
 } from "../../appearance/types";
 
 const BTN_PRIMARY =
   "inline-flex h-8 items-center rounded-act-md bg-brand px-3.5 text-[13px] font-semibold text-white transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60";
 const BTN_SECONDARY =
-  "inline-flex h-8 items-center rounded-act-md border border-line bg-white px-3 text-[13px] font-semibold text-text-main transition hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-60";
 const BTN_DANGER =
-  "inline-flex h-8 items-center rounded-act-md border border-line bg-white px-3 text-[13px] font-semibold text-[#d04444] transition hover:border-[#d04444]/40 hover:bg-[#fdf0f0]";
+  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-on-danger transition hover:border-on-danger/40 hover:bg-danger-soft";
 
 const MOCK_SETTINGS: AppSettings = {
   version: 1,
@@ -172,7 +174,7 @@ export function SettingsPage({
   }, []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white text-text-main">
+    <div className="flex h-full min-h-0 flex-col bg-surface text-text-main">
       <div className="window-chrome-bar" role="presentation">
         <div className="chrome-left" />
         <div className="chrome-center" />
@@ -181,7 +183,7 @@ export function SettingsPage({
 
       <div className="flex min-h-0 flex-1 pt-[var(--window-chrome-strip-height)]">
         <SettingsNav active={section} onSelect={setSection} onBack={onBack} />
-        <div className="min-h-0 flex-1 overflow-y-auto bg-[#fbfcfd]">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-app-bg">
           {settings ? (
             <SettingsContent
               section={section}
@@ -313,8 +315,8 @@ function ProviderRow({
   const badge = !hasApiKey
     ? { text: "未连接", className: "bg-surface-subtle text-text-faint" }
     : testResult && !testResult.ok
-      ? { text: "连接异常", className: "bg-[#fdeaea] text-[#d04444]" }
-      : { text: "已连接", className: "bg-[#e7f6ec] text-[#2f9e5f]" };
+      ? { text: "连接异常", className: "bg-danger-soft text-on-danger" }
+      : { text: "已连接", className: "bg-success-soft text-on-success" };
 
   return (
     <div className="flex flex-col gap-2 px-4 py-3.5">
@@ -348,7 +350,7 @@ function ProviderRow({
         </div>
       </div>
       {testResult ? (
-        <p className={`text-[12px] ${testResult.ok ? "text-[#2f9e5f]" : "text-[#d04444]"}`}>{testResult.text}</p>
+        <p className={`text-[12px] ${testResult.ok ? "text-on-success" : "text-on-danger"}`}>{testResult.text}</p>
       ) : null}
     </div>
   );
@@ -475,6 +477,44 @@ function ToolsSection({ settings, onUpdate }: SectionProps) {
   );
 }
 
+const THEME_OPTIONS: { value: ThemeMode; label: string; icon: LucideIcon }[] = [
+  { value: "light", label: "浅色", icon: Sun },
+  { value: "dark", label: "深色", icon: Moon },
+  { value: "system", label: "跟随系统", icon: Monitor },
+];
+
+function ThemeSegmented({ value, onChange }: { value: ThemeMode; onChange: (value: ThemeMode) => void }) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="主题"
+      className="inline-flex items-center gap-0.5 rounded-act-md border border-line bg-surface-subtle p-0.5"
+    >
+      {THEME_OPTIONS.map(({ value: optionValue, label, icon: Icon }) => {
+        const selected = value === optionValue;
+        return (
+          <button
+            key={optionValue}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={label}
+            onClick={() => onChange(optionValue)}
+            className={`inline-flex h-7 items-center gap-1.5 rounded-act-sm px-2.5 text-[12px] font-semibold transition-colors ${
+              selected
+                ? "bg-surface text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.12)]"
+                : "text-text-faint hover:text-text-main"
+            }`}
+          >
+            <Icon size={13} strokeWidth={2.2} aria-hidden="true" />
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 const UI_FONT_OPTIONS: SelectOption[] = UI_FONT_PRESETS.map((preset) => ({
   value: preset.id,
   label: preset.label,
@@ -500,22 +540,10 @@ function AppearanceSection() {
     <SectionShell title="外观" description="主题、字体与字号。偏好仅保存在本机。">
       <SettingGroup title="主题">
         <SettingRow
-          title="浅色"
-          description="当前默认主题。"
+          title="主题"
+          description="“跟随系统”会随 macOS 外观自动在浅色 / 深色间切换。"
           control={
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-[12px] font-semibold text-brand">
-              <Check size={13} strokeWidth={2.4} />
-              已选用
-            </span>
-          }
-        />
-        <SettingRow
-          title="深色"
-          description="深色主题即将推出。"
-          control={
-            <span className="rounded-full bg-surface-subtle px-2.5 py-1 text-[12px] font-semibold text-text-faint">
-              即将推出
-            </span>
+            <ThemeSegmented value={prefs.theme} onChange={(value) => update({ theme: value })} />
           }
         />
       </SettingGroup>
@@ -627,12 +655,12 @@ function ProviderKeyModal({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(20,24,31,0.32)] px-4"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-overlay px-4"
       role="presentation"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[420px] rounded-[14px] border border-line bg-white p-5 shadow-[0_18px_60px_rgba(31,45,61,0.22)]"
+        className="w-full max-w-[420px] rounded-[14px] border border-line bg-surface-raised p-5 shadow-act-popover"
         role="dialog"
         aria-modal="true"
         aria-label={`连接 ${label}`}
@@ -652,9 +680,9 @@ function ProviderKeyModal({
           onKeyDown={(event) => {
             if (event.key === "Enter") void submit();
           }}
-          className="mt-4 h-10 w-full rounded-act-md border border-line bg-white px-3 text-[13px] text-text-main outline-none transition-colors focus-visible:border-brand"
+          className="mt-4 h-10 w-full rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none transition-colors focus-visible:border-brand"
         />
-        {error ? <p className="mt-2 text-[12px] text-[#d04444]">{error}</p> : null}
+        {error ? <p className="mt-2 text-[12px] text-on-danger">{error}</p> : null}
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" className={BTN_SECONDARY} onClick={onClose} disabled={saving}>
             取消

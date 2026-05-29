@@ -107,6 +107,16 @@ async function runDualLoop(
         pendingMessages = [];
       }
 
+      // 模型调用前：按 token 水位触发历史压缩（mid-loop）。
+      // 压缩会用新数组替换会话历史，必须刷新 context.messages 引用，
+      // 否则后续 push 落到旧数组、与 ConversationContext 失联。
+      const compaction = await config.maybeCompact?.();
+      if (compaction) {
+        const { messages: compactedMessages, ...info } = compaction;
+        context.messages = compactedMessages;
+        await emit({ type: "context_compaction", info });
+      }
+
       // 流式 LLM 调用
       const callId = `llm_call_${Date.now()}_${turnIndex}`;
       const assistantMsg = await streamAssistantResponse(context, llm, signal, emit, config.thinkingEnabled);

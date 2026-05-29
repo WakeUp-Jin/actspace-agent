@@ -150,3 +150,10 @@ window.actspace?.setNativeTheme?.(effective); // main nativeTheme.themeSource �
 - 两套主题在所有页面对比达标、无浅色残留。
 - typecheck / test / lint 全绿；浏览器 mock 与 Electron 双主题验证通过。
 - 记 history 到 `docs/histories/2026-05/`，并在 `设置页规范.md` 标注深色已落地。
+
+## 落地记录（2026-05-29）
+
+- 五个任务全部完成：token 地基 + `dark:` variant、状态色 / 中性面收口、图表 / 渐变 / 阴影收口、三态切换 UI + 持久化 + 开机重放、`nativeTheme` 原生同步。
+- `pnpm --filter @actspace/desktop typecheck` 通过；`test` 全绿（16 文件 / 145 用例）。
+- 浏览器 mock 逐页双主题验证通过（会话 / Usage / Lab / 设置外观，点击「深色」整页即时翻转，`data-theme` + `localStorage` 持久化均确认）；Kairos 完整面板与 Usage 图表 / 热力图、原生 chrome 同步待 Electron 真实环境验证。
+- history：`docs/histories/2026-05/20260529-2340-appearance-dark-theme.md`；规范同步：`docs/design-docs/frontend-ui/设置页规范.md` 外观章节。

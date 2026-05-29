@@ -17,12 +17,20 @@ describe("appearance storage", () => {
     expect(loadAppearance()).toEqual(DEFAULT_APPEARANCE);
   });
 
-  it("clamps out-of-range numbers and rejects unknown font ids", () => {
+  it("clamps out-of-range numbers, rejects unknown font ids, and falls back theme to system", () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ version: 1, uiFontId: "bogus", codeFontId: "bogus", uiFontSize: 99, codeFontSize: 99 }),
+      JSON.stringify({
+        version: 1,
+        theme: "bogus",
+        uiFontId: "bogus",
+        codeFontId: "bogus",
+        uiFontSize: 99,
+        codeFontSize: 99,
+      }),
     );
     const prefs = loadAppearance();
+    expect(prefs.theme).toBe("system");
     expect(prefs.uiFontId).toBe("system");
     expect(prefs.codeFontId).toBe("system-mono");
     expect(prefs.uiFontSize).toBe(20);
@@ -32,6 +40,7 @@ describe("appearance storage", () => {
   it("round-trips saved preferences", () => {
     const prefs: AppearancePrefs = {
       version: 1,
+      theme: "dark",
       uiFontId: "serif-reading",
       codeFontId: "jetbrains",
       uiFontSize: 16,
@@ -47,17 +56,27 @@ describe("applyAppearance", () => {
     delete (window as { actspace?: unknown }).actspace;
   });
 
-  it("writes css vars, maps UI font size to zoom, and compensates code size", () => {
+  it("writes data-theme, css vars, maps UI font size to zoom, and compensates code size", () => {
     const root = document.createElement("div");
     const setUiZoom = vi.fn();
-    (window as { actspace?: unknown }).actspace = { setUiZoom };
+    const setNativeTheme = vi.fn();
+    (window as { actspace?: unknown }).actspace = { setUiZoom, setNativeTheme };
 
     // uiFontSize 21 / base 14 = zoom 1.5；代码 15px 预除以 1.5 = 10px，渲染后恰为 15px。
     applyAppearance(
-      { version: 1, uiFontId: "serif-reading", codeFontId: "jetbrains", uiFontSize: 21, codeFontSize: 15 },
+      {
+        version: 1,
+        theme: "dark",
+        uiFontId: "serif-reading",
+        codeFontId: "jetbrains",
+        uiFontSize: 21,
+        codeFontSize: 15,
+      },
       root,
     );
 
+    expect(root.getAttribute("data-theme")).toBe("dark");
+    expect(setNativeTheme).toHaveBeenCalledWith("dark");
     expect(root.style.getPropertyValue("--act-font-ui")).toContain("Georgia");
     expect(root.style.getPropertyValue("--act-font-mono")).toContain("JetBrains");
     expect(root.style.getPropertyValue("--act-font-mono-size")).toBe("10px");
@@ -67,6 +86,7 @@ describe("applyAppearance", () => {
   it("does not zoom and keeps literal code size when the bridge is absent (browser mock)", () => {
     const root = document.createElement("div");
     expect(() => applyAppearance({ ...DEFAULT_APPEARANCE }, root)).not.toThrow();
+    expect(root.getAttribute("data-theme")).toBe("system");
     expect(root.style.getPropertyValue("--act-font-mono-size")).toBe("13px");
   });
 });

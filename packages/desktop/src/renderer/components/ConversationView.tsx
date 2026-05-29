@@ -19,28 +19,28 @@ type ConversationTurn = {
 };
 
 const CONVERSATION_SHELL_CLASS =
-  "conversation-shell grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-white pt-[var(--window-chrome-strip-height)]";
-const MESSAGE_SCROLL_CLASS = "message-scroll min-h-0 overflow-auto bg-white pb-6 [scrollbar-gutter:stable_both-edges]";
+  "conversation-shell grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-surface pt-[var(--window-chrome-strip-height)]";
+const MESSAGE_SCROLL_CLASS = "message-scroll min-h-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
 const MESSAGE_SCROLL_INITIAL_CLASS =
-  "message-scroll message-scroll-initial min-h-0 overflow-auto bg-white pb-6 [scrollbar-gutter:stable_both-edges]";
+  "message-scroll message-scroll-initial min-h-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
 const MESSAGE_STACK_CLASS =
   "message-stack mx-auto flex w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] flex-col gap-7 pb-7";
 const INITIAL_COMPOSER_STAGE_CLASS =
   "initial-composer-stage flex h-full min-h-[420px] items-center justify-center px-[var(--conversation-inline-padding)]";
 const MESSAGE_TURN_CLASS = "message-turn relative flex flex-col gap-0";
 const TURN_PROMPT_CLASS =
-  "turn-prompt sticky top-0 z-12 bg-[linear-gradient(180deg,#fff_0%,rgba(255,255,255,0.96)_78%,rgba(255,255,255,0)_100%)] py-4";
+  "turn-prompt sticky top-0 z-12 bg-[image:var(--act-gradient-surface-fade)] py-4";
 const TURN_BODY_CLASS = "turn-body flex flex-col gap-[9px]";
 const TURN_ACTIONS_CLASS = "turn-actions mt-[-12px] flex min-h-6 justify-end";
 const TURN_ACTION_ANCHOR_CLASS = "turn-action-anchor relative flex-none";
 const TURN_ACTION_TRIGGER_CLASS =
   "turn-action-trigger grid h-[30px] w-[30px] place-items-center rounded-act-md border-0 bg-transparent text-text-faint opacity-65 transition-[background,color,opacity] duration-[150ms] ease-in-out hover:bg-brand-soft hover:text-brand-strong hover:opacity-100 aria-expanded:bg-brand-soft aria-expanded:text-brand-strong aria-expanded:opacity-100";
 const TURN_ACTION_MENU_CLASS =
-  "turn-action-menu absolute bottom-[30px] right-0 z-40 w-[178px] rounded-act-md border border-line bg-white/98 p-1.5 shadow-act-popover";
+  "turn-action-menu absolute bottom-[30px] right-0 z-40 w-[178px] rounded-act-md border border-line bg-surface-raised/98 p-1.5 shadow-act-popover";
 const TURN_ACTION_MENU_BUTTON_CLASS =
   "flex min-h-[34px] w-full items-center rounded-act-sm border-0 bg-transparent px-2.5 text-left text-sm font-semibold text-text-main transition-colors duration-[150ms] ease-in-out hover:bg-brand-soft hover:text-brand disabled:cursor-default disabled:text-text-faint";
-const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-[13px] leading-[1.4] text-[#8b95a5]";
-const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-[#b45858]";
+const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-[13px] leading-[1.4] text-text-faint";
+const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-on-danger";
 const COMPACT_MESSAGE_RELATION_CLASS = "-mt-1";
 
 const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([

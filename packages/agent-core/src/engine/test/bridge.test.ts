@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeStreamEvent } from "@actspace/shared";
 import { ContextManager } from "../../context/manager";
+import { ConversationContext } from "../../context/modules/conversation";
 import { SystemPromptContext } from "../../context/modules/system-prompt";
+import type { Summarizer } from "../../context/compression/summarizer";
 import type { InternalTool, ToolResult } from "../../internal-tools";
+import { createEmptyUsage } from "../../messages";
+import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "../../messages";
 import { MockLLMService, mockText, mockToolCall } from "../../llm/services/mock";
 import type { AgentRunLogEvent, AgentRunLogger } from "../../observability";
 import { ToolManager } from "../../tools/manager";
@@ -120,6 +124,80 @@ function createDeps() {
   return { llm, toolManager, contextManager };
 }
 
+const compactionSummarizer: Summarizer = {
+  async summarizeToolOutput() {
+    return "tool-summary";
+  },
+  async summarizeHistory() {
+    return "结构化历史摘要";
+  },
+};
+
+function compactionUser(text: string): UserMessage {
+  return { role: "user", content: text, timestamp: Date.now(), source: "user" };
+}
+function compactionAssistantText(text: string): AssistantMessage {
+  return {
+    role: "assistant",
+    content: [{ type: "text", text }],
+    model: "m",
+    provider: "mock",
+    usage: createEmptyUsage(),
+    stopReason: "stop",
+    timestamp: Date.now(),
+  };
+}
+function compactionAssistantToolCall(id: string): AssistantMessage {
+  return {
+    role: "assistant",
+    content: [{ type: "toolCall", id, name: "bash", arguments: {} }],
+    model: "m",
+    provider: "mock",
+    usage: createEmptyUsage(),
+    stopReason: "toolUse",
+    timestamp: Date.now(),
+  };
+}
+function compactionToolResult(id: string, text: string): ToolResultMessage {
+  return {
+    role: "toolResult",
+    toolCallId: id,
+    toolName: "bash",
+    content: [{ type: "text", text }],
+    isError: false,
+    timestamp: Date.now(),
+  };
+}
+
+function createCompactionDeps() {
+  const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
+  llm.setResponses([mockText("final reply after compaction")]);
+  const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
+
+  const messages: Message[] = [];
+  const big = "x".repeat(4000);
+  for (let i = 0; i < 8; i++) {
+    messages.push(compactionUser(`q${i} ${big}`));
+    messages.push(compactionAssistantToolCall(`tc${i}`));
+    messages.push(compactionToolResult(`tc${i}`, big));
+    messages.push(compactionAssistantText(`a${i} ${big}`));
+  }
+
+  const contextManager = new ContextManager({
+    systemPromptModule: new SystemPromptContext("sys"),
+    conversation: new ConversationContext(messages),
+    sessionPath: "/data/sessions/s1/session.jsonl",
+    config: {
+      contextWindow: 2000,
+      compressionThreshold: 0.85,
+      compressKeepRatio: 0.3,
+      compactMinIntervalCalls: 1,
+    },
+  });
+
+  return { llm, toolManager, contextManager, summarizer: compactionSummarizer };
+}
+
 describe("runTurnWithAgent bridge", () => {
   it("persists the user message before assistant and tool events", async () => {
     const result = await runTurnWithAgent(
@@ -151,6 +229,33 @@ describe("runTurnWithAgent bridge", () => {
       "context_snapshot",
     ]);
     expect(result.events.every((event) => event.turnId === "turn-test")).toBe(true);
+  });
+
+  it("persists a context_compaction event and run-log entry when history is compacted", async () => {
+    const runLogEvents: AgentRunLogEvent[] = [];
+    const runLogger: AgentRunLogger = {
+      filePath: "/tmp/test-run.jsonl",
+      write: async (event) => {
+        runLogEvents.push(event);
+      },
+    };
+
+    const result = await runTurnWithAgent(
+      { sessionId: "session-compact", turnId: "turn-compact", userInput: "new question" },
+      createCompactionDeps(),
+      { runLogger },
+    );
+
+    const compactionEvent = result.events.find((event) => event.type === "context_compaction");
+    expect(compactionEvent).toBeDefined();
+    expect(compactionEvent?.payload).toMatchObject({
+      historyRefPath: "/data/sessions/s1/session.jsonl",
+    });
+    expect((compactionEvent?.payload as { beforeCount: number }).beforeCount).toBeGreaterThan(
+      (compactionEvent?.payload as { afterCount: number }).afterCount,
+    );
+
+    expect(runLogEvents.some((event) => event.type === "context_compaction")).toBe(true);
   });
 
   it("persists one llm_usage event for each model response", async () => {

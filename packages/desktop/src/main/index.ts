@@ -9,7 +9,7 @@
  * Agent turn 执行逻辑在 ./agent-turn.ts。
  */
 
-import { app, BrowserWindow, ipcMain, safeStorage } from "electron";
+import { app, BrowserWindow, ipcMain, nativeTheme, safeStorage } from "electron";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
@@ -708,6 +708,14 @@ async function registerIpc() {
     const result = await testProviderConnection(input.provider);
     logMain("settings test connection", { provider: input.provider, ok: result.ok });
     return result;
+  });
+
+  // 主题三态同步原生 chrome（交通灯 / 原生滚动条 / 右键菜单）。
+  // fire-and-forget：renderer 的 applyAppearance 在切换与开机重放时各发一次。
+  ipcMain.on("appearance:set-theme", (_event, mode: unknown) => {
+    if (mode === "light" || mode === "dark" || mode === "system") {
+      nativeTheme.themeSource = mode;
+    }
   });
 }
 

@@ -10,6 +10,7 @@
 import type { ToolParameterSchema, ToolResult } from "../internal-tools";
 import type { ToolPreviewKind } from "@actspace/shared";
 import type { ApprovalGate } from "./scheduler";
+import type { Summarizer } from "../context/compression/summarizer";
 
 /** definition.ts 导出的静态声明——不含任何运行时依赖 */
 export interface ToolDefinitionSpec {
@@ -46,8 +47,22 @@ export interface ToolRuntimeConfig {
 /** ToolManager 配置 */
 export interface ToolManagerConfig extends ToolRuntimeConfig {
   workspaceRoot: string;
-  /** 硬截断阈值（字符数），默认 2000 */
+  /** 硬截断阈值（字符数），默认 2000。通用工具（web/generic）的 flash 摘要触发阈值。 */
   truncateThreshold?: number;
+  /** 读取类工具（read/grep/glob/directory_list）的摘要触发阈值，默认 20000 */
+  readTruncateThreshold?: number;
+  /** 非 bash 工具送 flash 前的头尾截断上限（字符数），默认 100000 */
+  absoluteMaxChars?: number;
+  /** bash 落盘/头部阈值（字符数），默认 4000 */
+  bashInlineThreshold?: number;
+  /** bash 流式写盘硬上限（字节），默认 5MB */
+  bashDiskCap?: number;
   /** 审核网关，提供后 ask 权限会异步等待用户决策 */
   approvalGate?: ApprovalGate;
+  /** bash 大输出落盘根目录（通常是 <userData>/tmp）。缺省时 bash 不落盘、仅头部截断。 */
+  tmpRoot?: string;
+  /** 当前会话 id，用于 bash 落盘文件分目录 */
+  sessionId?: string;
+  /** flash 摘要器；缺省时非 bash 工具退化为确定性头尾截断 */
+  summarizer?: Summarizer;
 }

@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/*
+ * 深色变体绑定到我们的 data-theme 主题机制（而非默认的 .dark class）：
+ *  - data-theme="dark"：始终深色。
+ *  - data-theme="system" + OS 深色：跟随系统。
+ * 语义 token 类（bg-surface / text-text-main…）已随 --act-color-* 自动翻转，
+ * 这个 dark: 变体只用于少数必须保留浅色字面量、又要单独给深色值的装饰色。
+ */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    &:where([data-theme="system"], [data-theme="system"] *) {
+      @slot;
+    }
+  }
+}
+
 @theme inline {
   --font-sans: var(--act-font-ui);
   --font-display: var(--act-font-display);
@@ -22,6 +41,15 @@
   --color-warm: var(--act-color-warm);
   --color-danger: var(--act-color-danger);
   --color-success: var(--act-color-success);
+
+  --color-danger-soft: var(--act-color-danger-soft);
+  --color-on-danger: var(--act-color-on-danger);
+  --color-success-soft: var(--act-color-success-soft);
+  --color-on-success: var(--act-color-on-success);
+  --color-warm-soft: var(--act-color-warm-soft);
+  --color-on-warm: var(--act-color-on-warm);
+  --color-surface-raised: var(--act-color-surface-raised);
+  --color-overlay: var(--act-color-overlay);
 
   --radius-act-xs: var(--act-radius-xs);
   --radius-act-sm: var(--act-radius-sm);

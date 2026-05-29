@@ -73,13 +73,13 @@
 }
 
 .diff-line.is-add {
-  background: rgba(44, 168, 105, 0.12);
-  color: #08784f;
+  background: var(--act-color-diff-add-bg);
+  color: var(--act-color-diff-add-text);
 }
 
 .diff-line.is-remove {
-  background: rgba(225, 70, 86, 0.12);
-  color: #a43342;
+  background: var(--act-color-diff-remove-bg);
+  color: var(--act-color-diff-remove-text);
 }
 
 .file-diff-block.is-streaming {
@@ -100,8 +100,8 @@
   padding: 8px 12px;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #08784f;
-  background: rgba(44, 168, 105, 0.08);
+  color: var(--act-color-diff-add-text);
+  background: var(--act-color-diff-streaming-bg);
   max-height: 320px;
   overflow-y: auto;
 }

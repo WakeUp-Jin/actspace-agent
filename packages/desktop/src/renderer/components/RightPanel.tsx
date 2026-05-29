@@ -10,9 +10,9 @@ const RIGHT_PANEL_TABS: Array<{ id: RightPanelTab; label: string }> = [
 ];
 
 const RIGHT_PANEL_CLASS =
-  "flex min-w-0 flex-col overflow-hidden border-l border-[rgba(223,228,234,0.92)] bg-white";
+  "flex min-w-0 flex-col overflow-hidden border-l border-line bg-surface";
 const RIGHT_TABS_CLASS =
-  "relative z-[61] flex min-h-[var(--window-chrome-strip-height)] items-center gap-1 overflow-x-auto border-b border-[rgba(223,228,234,0.88)] py-0 pl-2.5 pr-[calc(var(--window-chrome-control-size)+24px)] [pointer-events:none]";
+  "relative z-[61] flex min-h-[var(--window-chrome-strip-height)] items-center gap-1 overflow-x-auto border-b border-line py-0 pl-2.5 pr-[calc(var(--window-chrome-control-size)+24px)] [pointer-events:none]";
 const RIGHT_TAB_BUTTON_CLASS =
   "rounded-act-md border-0 px-2.5 py-2 font-[inherit] [cursor:pointer] [pointer-events:auto] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_INACTIVE_CLASS = "bg-transparent text-text-muted";

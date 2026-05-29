@@ -19,6 +19,7 @@ import { MessagePriority, getTextContent } from "../messages";
 import type { LLMService } from "../llm/types";
 import type { ToolManager } from "../tools/manager";
 import type { ContextManager } from "../context/manager";
+import type { Summarizer } from "../context/compression/summarizer";
 import { toToolDefinition } from "../internal-tools";
 import { runAgentLoop } from "./loop";
 import type {
@@ -38,6 +39,11 @@ export interface AgentOptions {
   getSteeringMessages?: AgentLoopConfig["getSteeringMessages"];
   getFollowUpMessages?: AgentLoopConfig["getFollowUpMessages"];
   thinkingEnabled?: boolean;
+  /**
+   * flash 摘要器，用于 mid-loop 历史压缩。缺省时仍会按 token 水位触发压缩，
+   * 但 HistoryCompactor 内部退化为「丢弃最旧 + session.jsonl 指针」兜底。
+   */
+  summarizer?: Summarizer;
 }
 
 export class Agent {
@@ -51,6 +57,7 @@ export class Agent {
   private getSteeringMessages?: AgentLoopConfig["getSteeringMessages"];
   private getFollowUpMessages?: AgentLoopConfig["getFollowUpMessages"];
   private thinkingEnabled?: boolean;
+  private summarizer?: Summarizer;
 
   constructor(options: AgentOptions) {
     this.llm = options.llm;
@@ -62,6 +69,7 @@ export class Agent {
     this.getSteeringMessages = options.getSteeringMessages;
     this.getFollowUpMessages = options.getFollowUpMessages;
     this.thinkingEnabled = options.thinkingEnabled;
+    this.summarizer = options.summarizer;
   }
 
   /** 执行一次完整的 agent 交互 */
@@ -90,6 +98,20 @@ export class Agent {
       getSteeringMessages: this.getSteeringMessages,
       getFollowUpMessages: this.getFollowUpMessages,
       thinkingEnabled: this.thinkingEnabled,
+      maybeCompact: async () => {
+        const report = await this.contextManager.compactIfNeeded(this.summarizer);
+        if (!report?.compacted) return null;
+        return {
+          messages: this.contextManager.getMessages(),
+          triggerTokens: report.triggerTokens,
+          thresholdTokens: report.thresholdTokens,
+          beforeCount: report.beforeCount,
+          afterCount: report.afterCount,
+          summaryChars: report.summaryChars,
+          historyRefPath: report.historyRefPath,
+          reason: report.reason,
+        };
+      },
     };
 
     const emit: AgentEventSink = this.onEvent ?? (() => {});

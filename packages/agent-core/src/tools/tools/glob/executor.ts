@@ -1,8 +1,8 @@
 import { stat } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import type { ToolResult } from "../../../internal-tools";
 import { runRipgrep, getRipgrepFailureMessage } from "../../subprocess/ripgrep";
-import { guardWorkspacePath } from "../../workspace-guard";
+import { resolveReadablePath, displayReadablePath } from "../../workspace-guard";
 import type { ToolExecutorFn } from "../../types";
 
 const MAX_RESULTS = 200;
@@ -24,21 +24,18 @@ export const globExecutor: ToolExecutorFn = async (
   const searchPathArg = typeof args.path === "string" && args.path
     ? args.path
     : workspaceRoot;
-  const searchPath = resolve(workspaceRoot, searchPathArg);
 
-  const guard = guardWorkspacePath(searchPath, workspaceRoot);
+  // 读类工具不受 workspace 边界限制；只解析路径。
+  const guard = resolveReadablePath(searchPathArg, workspaceRoot);
   if (!guard.ok) {
     return { success: false, error: guard.error };
   }
 
   const scope = resolveGlobScope(guard.resolvedPath, pattern);
-  const scopeGuard = guardWorkspacePath(scope.searchRoot, workspaceRoot);
-  if (!scopeGuard.ok) {
-    return { success: false, error: scopeGuard.error };
-  }
+  const searchRoot = resolve(scope.searchRoot);
 
   const result = await runRipgrep({
-    args: ["--files", "--glob", scope.globPattern, "--color", "never", scopeGuard.resolvedPath],
+    args: ["--files", "--glob", scope.globPattern, "--color", "never", searchRoot],
     cwd: workspaceRoot,
   });
 
@@ -50,7 +47,7 @@ export const globExecutor: ToolExecutorFn = async (
     return { success: true, data: `No files found matching "${pattern}"` };
   }
 
-  const entries = await collectFileEntries(result.stdout, scopeGuard.resolvedPath, workspaceRoot);
+  const entries = await collectFileEntries(result.stdout, searchRoot, workspaceRoot);
   if (entries.length === 0) {
     return { success: true, data: `No files found matching "${pattern}"` };
   }
@@ -113,22 +110,14 @@ async function collectFileEntries(stdout: string, searchRoot: string, workspaceR
 
   for (const path of paths) {
     const absolutePath = resolveRipgrepFilePath(path, searchRoot);
-    const guard = guardWorkspacePath(absolutePath, workspaceRoot);
-    if (!guard.ok) {
-      continue;
-    }
+    // workspace 内显示相对路径，workspace 外显示绝对路径（读边界已放开）。
+    const displayPath = displayReadablePath(absolutePath, workspaceRoot);
 
     try {
-      const fileStat = await stat(guard.resolvedPath);
-      entries.push({
-        path: relative(workspaceRoot, guard.resolvedPath),
-        mtime: fileStat.mtimeMs,
-      });
+      const fileStat = await stat(absolutePath);
+      entries.push({ path: displayPath, mtime: fileStat.mtimeMs });
     } catch {
-      entries.push({
-        path: relative(workspaceRoot, guard.resolvedPath),
-        mtime: 0,
-      });
+      entries.push({ path: displayPath, mtime: 0 });
     }
   }
 

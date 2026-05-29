@@ -11,26 +11,26 @@ const BASH_RUN_TOGGLE_CLASS =
 const BASH_COMMAND_PREVIEW_CLASS =
   "bash-command-preview overflow-hidden text-ellipsis whitespace-nowrap font-normal text-text-faint";
 const BASH_OUTPUT_SHELL_CLASS =
-  "bash-output-shell relative mt-[7px] max-h-[236px] overflow-auto rounded-act-md border border-[rgba(200,209,220,0.72)] bg-[#fbfcfe]";
+  "bash-output-shell relative mt-[7px] max-h-[236px] overflow-auto rounded-act-md border border-line bg-surface-subtle";
 const BASH_OUTPUT_MENU_CLASS =
-  "bash-output-menu absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-[rgba(47,111,255,0.08)] hover:text-brand focus-visible:bg-[rgba(47,111,255,0.08)] focus-visible:text-brand";
+  "bash-output-menu absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-brand-soft hover:text-brand focus-visible:bg-brand-soft focus-visible:text-brand";
 const BASH_OUTPUT_TEXT_CLASS =
   "bash-output-text m-0 min-w-0 whitespace-pre-wrap pt-[10px] pr-[38px] pb-3 pl-[var(--conversation-card-padding)] font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.52] text-text-muted [word-break:break-word]";
 const BASH_PROMPT_CLASS = "bash-prompt text-text-faint";
 const BASH_APPROVAL_CLASS =
-  "message-row bash-approval w-full max-w-[800px] overflow-hidden rounded-act-md border border-[rgba(200,209,220,0.88)] bg-white";
+  "message-row bash-approval w-full max-w-[800px] overflow-hidden rounded-act-md border border-line bg-surface";
 const BASH_APPROVAL_HEADER_CLASS =
-  "bash-approval-header flex min-h-8 items-center justify-between border-b border-[rgba(223,228,234,0.8)] py-0 pr-[9px] pl-[var(--conversation-card-padding)]";
+  "bash-approval-header flex min-h-8 items-center justify-between border-b border-line py-0 pr-[9px] pl-[var(--conversation-card-padding)]";
 const BASH_APPROVAL_TITLE_CLASS =
   "bash-approval-title inline-flex min-w-0 items-center gap-[7px] text-sm font-medium text-text-muted";
 const BASH_APPROVAL_MENU_CLASS =
-  "bash-approval-menu grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-[rgba(47,111,255,0.08)] hover:text-brand focus-visible:bg-[rgba(47,111,255,0.08)] focus-visible:text-brand";
+  "bash-approval-menu grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-brand-soft hover:text-brand focus-visible:bg-brand-soft focus-visible:text-brand";
 const BASH_INTENT_COMMENT_CLASS =
   "bash-intent-comment font-mono text-[length:var(--act-font-mono-size,13px)] italic leading-[1.55] text-text-faint";
 const BASH_INTENT_BLOCK_CLASS =
   "bash-intent-comment--block px-[var(--conversation-card-padding)] pt-[9px] [overflow-wrap:anywhere] break-words";
 const BASH_APPROVAL_COMMAND_CLASS =
-  "bash-approval-command m-0 whitespace-pre-wrap border-b border-[rgba(223,228,234,0.72)] px-[var(--conversation-card-padding)] py-[9px] font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.55] text-text-muted [overflow-wrap:anywhere]";
+  "bash-approval-command m-0 whitespace-pre-wrap border-b border-line px-[var(--conversation-card-padding)] py-[9px] font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.55] text-text-muted [overflow-wrap:anywhere]";
 const BASH_APPROVAL_REASON_CLASS =
   "bash-approval-reason px-[var(--conversation-card-padding)] pt-2 text-[13px] leading-[1.45] text-text-muted";
 const BASH_APPROVAL_REASON_LABEL_CLASS = "font-semibold text-text-faint";
@@ -46,9 +46,9 @@ const BASH_ACTION_CLASS =
 const BASH_ACTION_GHOST_CLASS =
   "bash-action-ghost bg-transparent text-text-muted hover:bg-surface-subtle focus-visible:bg-surface-subtle";
 const BASH_ACTION_SOFT_CLASS =
-  "bash-action-soft bg-[#eeeff1] text-text-main hover:bg-[#e4e7eb] focus-visible:bg-[#e4e7eb]";
+  "bash-action-soft bg-[#eeeff1] text-text-main hover:bg-[#e4e7eb] focus-visible:bg-[#e4e7eb] dark:bg-[#2f3237] dark:hover:bg-[#383b41] dark:focus-visible:bg-[#383b41]";
 const BASH_ACTION_PRIMARY_CLASS =
-  "bash-action-primary bg-[#2f83c9] text-white hover:bg-[#2676b8] focus-visible:bg-[#2676b8]";
+  "bash-action-primary bg-[#2f83c9] text-white hover:bg-[#2676b8] focus-visible:bg-[#2676b8] dark:bg-[#3f93d6] dark:hover:bg-[#4f9fda] dark:focus-visible:bg-[#4f9fda]";
 
 async function submitApproval(requestId: string, decision: ApprovalDecision): Promise<boolean> {
   if (typeof window === "undefined" || !window.actspace?.submitApproval) {

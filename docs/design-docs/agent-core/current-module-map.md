@@ -28,11 +28,14 @@
 
 ## `tools/` - 模块化工具系统
 
-- `tools/types.ts`：ToolDefinitionSpec、ToolExecutorFn、ToolManagerConfig；工具定义必须声明 `previewKind` 作为前端展示语义，并可用 `exposeOnlyTo?: "deepseek" | "kimi"` 做轻量暴露筛选，缺省表示两个主模型都可见。
-- `tools/workspace-guard.ts`：路径边界守卫，防止工具访问工作区外文件。
-- `tools/manager.ts`：ToolManager（注册/获取/导出工具定义），执行入口委托给 ToolScheduler。
-- `tools/scheduler.ts`：ToolScheduler（权限三态决策、工具状态记录、执行、结果渲染与裁剪）。当前 `ask` 会返回结构化待审核结果，approve/deny IPC 和恢复流程由后续计划接入。
-- `tools/subprocess/{run-process,ripgrep-path,ripgrep}.ts`：受控子进程执行封装。`run-process` 统一处理进程生命周期、timeout、stdout/stderr 和截断；`ripgrep-path` 按 `ACTSPACE_RG_PATH -> 系统 rg -> bundled @vscode/ripgrep` 解析可执行文件；`ripgrep` 在其上封装 `rg` 命令语义。
+- `tools/types.ts`：ToolDefinitionSpec、ToolExecutorFn、ToolManagerConfig；工具定义必须声明 `previewKind` 作为前端展示语义，并可用 `exposeOnlyTo?: "deepseek" | "kimi"` 做轻量暴露筛选，缺省表示两个主模型都可见。`ToolManagerConfig` 还携带压缩相关字段：`truncateThreshold` / `readTruncateThreshold` / `absoluteMaxChars` / `bashInlineThreshold` / `bashDiskCap` / `tmpRoot` / `sessionId` / `summarizer`。
+- `tools/workspace-guard.ts`：路径解析与边界守卫。写类工具（write/edit/bash）走 `guardWorkspacePath` 拒绝越界；**读类工具（read_file/grep/glob/list_directory）走 `resolveReadablePath` 只解析不越界**（为支持回读 `<userData>/tmp` 落盘文件与 `session.jsonl`），`displayReadablePath` 决定 workspace 外结果展示绝对路径。取舍与后续 blocklist 见 `docs/SECURITY.md`、`权限设计规则和原则.md`。
+- `tools/manager.ts`：ToolManager（注册/获取/导出工具定义），执行入口委托给 ToolScheduler；把 `readTruncateThreshold` / `absoluteMaxChars` / `summarizer` 透传给 scheduler。
+- `tools/scheduler.ts`：ToolScheduler（权限三态决策、工具状态记录、执行、结果渲染与裁剪）。`postProcess` 异步化：bash 由 executor 自处理（流式落盘 + 头部截断 + outputRef），其余工具走 `output-truncator`（flash 摘要 / 头尾确定性截断兜底）。当前 `ask` 会返回结构化待审核结果，approve/deny IPC 和恢复流程由后续计划接入。
+- `tools/output-truncator.ts`：非 bash 工具输出后处理。按工具类型取阈值，超阈值先 `headTailTruncate(absoluteMaxChars)` 再送 `summarizer.summarizeToolOutput`，summarizer 不可用回退头尾确定性截断；回填前拼 `compressedNotice` 压缩标记，返回 `modelOutput` + inline `rawOutputRef`。
+- `tools/tool-output-paths.ts`：bash 大输出落盘路径构造 `<tmpRoot>/tool-output/<sessionId>/<uniqueId>-bash.txt`。
+- `tools/cleanup-tool-outputs.ts`：`cleanupOldToolOutputs(tmpRoot, maxAgeMs=7天)` 按 mtime 删除超期落盘文件并回收空会话目录；desktop 在 turn 起始 best-effort 调用。
+- `tools/subprocess/{run-process,ripgrep-path,ripgrep}.ts`：受控子进程执行封装。`run-process` 统一处理进程生命周期、timeout、stdout/stderr；支持流式落盘 sink（`outputFile` / `headBufferCap` / `diskCap`）：内存只留头部缓冲，超出懒落盘、达 `diskCap` 停写标记 truncated，返回 `headBuffer` / `totalBytes` / `outputFilePath`。`ripgrep-path` 按 `ACTSPACE_RG_PATH -> 系统 rg -> bundled @vscode/ripgrep` 解析可执行文件；`ripgrep` 在其上封装 `rg` 命令语义。
 - `tools/tools/shared/write-atomic.ts`：原子写入 helper（tmpfile → fsync → rename），Edit 和 Write 工具共用。
 - `tools/tools/{read-file,list-directory,edit-file-diff,write-file,bash}/`：每个工具一个目录，含 `definition.ts` + `executor.ts`；其中 `edit-file-diff` 对外工具名为 `edit_file`（snake_case），使用 `diff` 库生成 unified diff 并原子写入；`write-file` 对外工具名为 `write_file`，创建或覆写文件并生成 diff；两者各有 `permissions.ts` 预留 AgentMode 审批扩展；Bash 额外包含 `permissions.ts` 和 `render-result.ts`。目录名沿用 kebab-case，对外 `name` 字段统一 snake_case，详见 `tool-preview-design-guidelines.md` 的工具命名约定章节。
 - `tools/tools/{grep,glob}/`：文件搜索工具。grep 通过 ripgrep 正则搜索文件内容，glob 通过 `rg --files --glob` 按文件名模式查找。
@@ -42,21 +45,22 @@
 
 ## `context/` - 上下文管道
 
-- `context/types.ts`：SystemPart、ContextModule、PromptSegment、CompressionConfig。
-- `context/token-estimator.ts`：token 估算与用量快照生成。
+- `context/types.ts`：SystemPart、ContextModule、PromptSegment、CompressionConfig + `DEFAULT_COMPRESSION_CONFIG`（contextWindow / compressionThreshold / compressKeepRatio / compactMinIntervalCalls / toolTruncateThreshold / readTruncateThreshold / bashInlineThreshold / bashDiskCap / absoluteMaxChars 的单一默认来源）。
+- `context/token-estimator.ts`：token 估算与用量快照生成（`createContextUsageSnapshot` 支持 `compressionCount`）。
 - `context/modules/system-prompt.ts`：分段系统提示词上下文。
-- `context/modules/conversation.ts`：会话历史上下文模块。构造函数接受可选 `initialMessages`；新增 `static async createFromSession(sessionPath)`，内部用 `persistence/parseJsonl + adapters/sessionEventsToMessages` 一次性恢复 `Message[]`。运行期 `format()` / `appendMessage` 仍是纯内存操作，与 `SystemPromptContext` 的"构造时吃数据、运行期只读内存"机制对齐。V1 升级为 ShortTermMemoryContext 时仅引入 turn 标记 / 多日切片 / 压缩接入，构造入口签名不破坏。
-- `context/manager.ts`：ContextManager 编排器（模块协调、appendMessage、getContext、用量统计）。`static async createForSession({ systemPromptModule, sessionPath, ... })` 是会话恢复的语义入口，委托 `ConversationContext.createFromSession`；构造期完成历史加载，`getContext()` 保持同步。普通 `new ContextManager(...)` 也可通过 `options.conversation` 注入已构造好的 ConversationContext，便于测试与 mock 场景。
+- `context/modules/conversation.ts`：会话历史上下文模块。构造函数接受可选 `initialMessages`；`static async createFromSession(sessionPath)` 一次性恢复 `Message[]`。新增历史压缩两阶段能力：`planCompaction(keepRatio)`（只读，按 keepRatio 找安全切点——不动区以 assistant turn 开头，不拆 tool_call/tool 配对、避免连续 user）+ `applyCompaction(summary, split)`（用合成摘要替换可压区并返回被替换消息）。运行期 `format()` / `appendMessage` 仍是纯内存操作。
+- `context/manager.ts`：ContextManager 编排器（模块协调、appendMessage、getContext、用量统计）。`static async createForSession({ systemPromptModule, sessionPath, ... })` 是会话恢复入口，同时把 `sessionPath` 存为压缩摘要的回看 ref。新增 `async compactIfNeeded(summarizer)`：token 水位过 `contextWindow×compressionThreshold` 且距上次压缩满足 `compactMinIntervalCalls` 时调 HistoryCompactor，返回 `ContextCompactionReport`（trigger/threshold token、前后消息数、ref），`compressionCount` 计入用量快照。
+- `context/compression/`：上下文压缩子系统。`summarizer.ts`（flash 摘要封装，`summarizeToolOutput` / `summarizeHistory`，失败抛 `SummarizerUnavailableError`）、`tool-summary-prompts.ts`（按 previewKind 选 prompt + `compressedNotice` 压缩标记）、`history-prompts.ts`（ClaudeCode 8 节摘要 prompt + 开篇语 + session.jsonl 回看 footer）、`history-compactor.ts`（`compactHistory` 序列化可压区 → 摘要 → 合成 `source:"compaction"` UserMessage 替换；摘要不可用兜底为「丢弃最旧 + 指针」）。
 
 ## `engine/` - 执行引擎
 
-- `engine/types.ts`：AgentEvent（discriminated union）、AgentLoopConfig、AgentLoopResult。
-- `engine/loop.ts`：runAgentLoop 纯函数双层循环（内层工具调用+转向、外层跟进）。
-- `engine/agent.ts`：Agent 入口类（run/abort），编排 ContextManager + ToolManager + LLMService。
-- `engine/bridge.ts`：IPC 桥接层，将 AgentEvent 实时映射为 RuntimeStreamEvent，并根据工具 `previewKind` 将执行结果聚合为带 `ToolUiPreview` 的 AgentTurnResult。`tool_call_delta` 阶段维护 `toolCallStreaming` 状态机（按 toolCallId 累积 partial args + 50ms throttle），调用 `streaming-preview-extractors` 把 partial args 解析为 typed `ToolUiPreview`，emit `tool_call_streaming` 让前端在 tool_start 前就能展示 `Write filename` 甚至 streaming content。
+- `engine/types.ts`：AgentEvent（discriminated union，含 `context_compaction`）、AgentLoopConfig（含 `maybeCompact?`）、AgentLoopResult、`ContextCompactionInfo` / `CompactionOutcome`。
+- `engine/loop.ts`：runAgentLoop 纯函数双层循环（内层工具调用+转向、外层跟进）。每次模型调用前 `await config.maybeCompact?.()`，发生压缩时用返回的新数组刷新 `context.messages` 引用并 emit `context_compaction` 事件。
+- `engine/agent.ts`：Agent 入口类（run/abort），编排 ContextManager + ToolManager + LLMService；持有 `summarizer`，把 `contextManager.compactIfNeeded` 包成 `maybeCompact` 传入 loop。
+- `engine/bridge.ts`：IPC 桥接层，将 AgentEvent 实时映射为 RuntimeStreamEvent，并根据工具 `previewKind` 将执行结果聚合为带 `ToolUiPreview` 的 AgentTurnResult。`createToolExecutionResult` 据 `ToolResult.outputRef` 填 `rawOutput` / `rawOutputRef`（bash 为 file ref、其余 inline）；收集 `context_compaction` 事件落 run-log 并生成 `context_compaction` SessionEvent 追加到 session 事件。透传 `summarizer` 给 Agent。`tool_call_delta` 阶段维护 `toolCallStreaming` 状态机（按 toolCallId 累积 partial args + 50ms throttle），调用 `streaming-preview-extractors` 把 partial args 解析为 typed `ToolUiPreview`，emit `tool_call_streaming` 让前端在 tool_start 前就能展示 `Write filename` 甚至 streaming content。
 - `engine/partial-args.ts`：partial JSON 字符串字段提取状态机，正确处理 `\"` `\\` `\n` `\uXXXX` 等 JSON escape，未闭合时返回当前累积部分。仅给 streaming-preview-extractors 使用。
 - `engine/streaming-preview-extractors.ts`：按 `ToolPreviewKind` 注册的 extractor 表，把 LLM 流式 `tool_call_delta` 累积的 partial JSON 解析成 typed `ToolUiPreview`。write_file 同时提取 path 与 content（content 作为 `streamingContent` 让前端 cursor 风格边写边看）；edit_file 只提取 path（diff 需要文件上下文 + 替换执行才能生成）。新工具按 previewKind 注册一行 extractor 即可。
-- `engine/create-agent-deps.ts`：Agent 配置构建与实例创建，两步分离。`buildAgentConfig(frontendInput, workspaceRoot)` 返回纯配置对象 `AgentConfig`（内部读 env + 模型注册表）。运行时实例有两种入口：`createAgentFromConfig(config)`（同步，构造空会话历史，仅供 mock / 单元测试 / 纯内存场景）；`createAgentForSession(config, { sessionPath })`（async，main 进程使用，会话历史在构造阶段通过 `ContextManager.createForSession` 一次性恢复，`contextManager.getContext()` 之后同步可见完整历史）。
+- `engine/create-agent-deps.ts`：Agent 配置构建与实例创建，两步分离。`buildAgentConfig(frontendInput, workspaceRoot, approvalGate?, runtimeContext?)` 返回纯配置对象 `AgentConfig`，`runtimeContext` 透传 `tmpRoot` / `sessionId` 到 `toolManagerConfig`（bash 落盘需要）。运行时实例有两种入口：`createAgentFromConfig(config)`（同步，空会话历史，mock/测试）；`createAgentForSession(config, { sessionPath })`（async，main 进程，构造期一次性恢复历史）。两者都用 `createSummarizerForAgent()`（`deepseek-v4-flash`，无 DeepSeek key 时为 undefined）构造 `summarizer`，注入 ToolManager 与 `AgentDeps`，供工具输出摘要与 mid-loop 历史压缩使用。
 
 Agent Turn 的跨层职责边界见 `agent-turn-layers.md`。
 
@@ -70,7 +74,7 @@ Agent Turn 的跨层职责边界见 `agent-turn-layers.md`。
 
 ## `observability/` - 本地运行排障日志
 
-- `observability/agent-run-log.ts`：每次 Agent turn 一个 JSONL 文件，记录从用户输入、main 边界、AgentEvent、RuntimeStreamEvent 到最终结果的完整链路，并清理超过 24 小时的 run 日志。
+- `observability/agent-run-log.ts`：每次 Agent turn 一个 JSONL 文件，记录从用户输入、main 边界、AgentEvent、RuntimeStreamEvent 到最终结果的完整链路（含 `context_compaction` 历史压缩记录），并清理超过 24 小时的 run 日志。
 
 日志和 session 持久化的边界见 `../storage-and-observability.md`。
 

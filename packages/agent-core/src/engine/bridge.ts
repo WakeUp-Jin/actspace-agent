@@ -14,8 +14,10 @@ import type {
   SessionEvent,
   ContextUsageSnapshot,
   ContextState,
+  ContextCompactionPayload,
   LlmUsagePayload,
   ToolExecutionResult,
+  ToolOutputRef,
   ToolPreviewKind,
   ToolUiPreview,
 } from "@actspace/shared";
@@ -23,10 +25,11 @@ import { resolveModelSpecByApiModel } from "@actspace/shared";
 import type { LLMService } from "../llm/types";
 import type { ToolManager } from "../tools/manager";
 import type { ContextManager } from "../context/manager";
+import type { Summarizer } from "../context/compression/summarizer";
 import type { AgentRunLogger } from "../observability";
 import type { ToolResult } from "../internal-tools";
 import { Agent } from "./agent";
-import type { AgentEvent, AgentLoopResult, ToolExecutionMode } from "./types";
+import type { AgentEvent, AgentLoopResult, ContextCompactionInfo, ToolExecutionMode } from "./types";
 import { extractStreamingPreview } from "./streaming-preview-extractors";
 import {
   createPersistedSessionEvent,
@@ -98,6 +101,8 @@ export interface RunTurnWithAgentDeps {
   contextManager: ContextManager;
   toolExecution?: ToolExecutionMode;
   thinkingEnabled?: boolean;
+  /** flash 摘要器，透传给 Agent 用于 mid-loop 历史压缩 */
+  summarizer?: Summarizer;
   abort?: () => void;
 }
 
@@ -140,6 +145,7 @@ export async function runTurnWithAgent(
   };
   const toolExecutions = new Map<string, ToolExecutionRecord>();
   const toolCallStreaming = new Map<string, ToolCallStreamingEntry>();
+  const compactions: ContextCompactionInfo[] = [];
 
   function nextEventId(): string {
     return `evt_${turnId}_${++eventIdCounter}`;
@@ -158,8 +164,12 @@ export async function runTurnWithAgent(
     toolManager: deps.toolManager,
     toolExecution: deps.toolExecution,
     thinkingEnabled: input.thinkingEnabled ?? deps.thinkingEnabled,
+    summarizer: deps.summarizer,
     onEvent: async (agentEvent) => {
       recordToolExecution(toolExecutions, agentEvent);
+      if (agentEvent.type === "context_compaction") {
+        compactions.push(agentEvent.info);
+      }
       logAgentEvent(agentEvent, sessionId, turnId, streamStats);
       const bufferedStreamDelta = bufferStreamLogDelta(agentEvent, streamLogBuffer);
       if (!bufferedStreamDelta) {
@@ -221,6 +231,9 @@ export async function runTurnWithAgent(
   }
 
   const sessionEvents = buildSessionEvents(loopResult, sessionId, turnId, userInput, deps.toolManager, toolExecutions);
+  for (const info of compactions) {
+    sessionEvents.push(createCompactionEvent(info, sessionId, turnId));
+  }
   const contextSnapshot = deps.contextManager.getUsageSnapshot();
   const contextState = createContextState(contextSnapshot, sessionId, turnId);
   const snapshotEvent = contextSnapshotToEvent(contextSnapshot, sessionId, turnId);
@@ -383,6 +396,22 @@ function createLlmUsageEvent(
   return createPersistedSessionEvent(sessionId, turnId, "llm_usage", payload);
 }
 
+function createCompactionEvent(
+  info: ContextCompactionInfo,
+  sessionId: string,
+  turnId: string,
+): SessionEvent<ContextCompactionPayload> {
+  const payload: ContextCompactionPayload = {
+    triggerTokens: info.triggerTokens,
+    thresholdTokens: info.thresholdTokens,
+    beforeCount: info.beforeCount,
+    afterCount: info.afterCount,
+    summaryChars: info.summaryChars,
+    historyRefPath: info.historyRefPath,
+  };
+  return createPersistedSessionEvent(sessionId, turnId, "context_compaction", payload);
+}
+
 function recordToolExecution(
   records: Map<string, ToolExecutionRecord>,
   event: AgentEvent,
@@ -411,9 +440,27 @@ function createToolExecutionResult(
   record: ToolExecutionRecord | undefined,
 ): ToolExecutionResult {
   const tool = toolManager.get(message.toolName);
-  const rawOutput = getMessageText(message);
+  // message 文本 = 回填给 LLM 的内容（bash 头部 / 非 bash 摘要 / 或原样穿透）
+  const modelOutput = getMessageText(message);
   const ok = !message.isError;
   const summary = getToolSummary(message.toolName, tool?.previewKind ?? "generic", record?.args ?? {}, ok);
+
+  // outputRef 由 executor（bash 落盘）/ OutputTruncator（inline 全量原文）填充
+  const outputRef = record?.result?.outputRef;
+  let rawOutput: string;
+  let rawOutputRef: ToolOutputRef;
+  if (outputRef?.kind === "file") {
+    // 完整原文已落盘，inline 处只放头部，rawOutputRef 指向文件
+    rawOutput = modelOutput;
+    rawOutputRef = outputRef;
+  } else if (outputRef?.kind === "inline") {
+    // 全量原文随 ref 内联返回，modelOutput 为摘要
+    rawOutput = outputRef.value;
+    rawOutputRef = outputRef;
+  } else {
+    rawOutput = modelOutput;
+    rawOutputRef = { kind: "inline", value: modelOutput };
+  }
 
   return {
     toolName: message.toolName,
@@ -421,21 +468,18 @@ function createToolExecutionResult(
     ok,
     summary,
     rawOutput,
-    truncatedOutput: rawOutput,
-    rawOutputRef: {
-      kind: "inline",
-      value: rawOutput,
-    },
-    modelOutput: rawOutput,
-    uiPreview: createToolUiPreview(tool?.previewKind ?? "generic", record?.args ?? {}, rawOutput, summary, ok),
+    truncatedOutput: modelOutput,
+    rawOutputRef,
+    modelOutput,
+    uiPreview: createToolUiPreview(tool?.previewKind ?? "generic", record?.args ?? {}, modelOutput, summary, ok),
     error: ok
       ? undefined
       : {
           code: "TOOL_ERROR",
-          message: record?.result?.error ?? rawOutput,
+          message: record?.result?.error ?? modelOutput,
           recoverable: true,
         },
-    tokenEstimate: Math.ceil(rawOutput.length / 4),
+    tokenEstimate: Math.ceil(modelOutput.length / 4),
   };
 }
 
@@ -759,6 +803,8 @@ function mapAgentEventToStreamEvent(
     case "turn_end":
     case "message_start":
     case "message_end":
+    // 历史压缩仅作观测落 run-log / session.jsonl，本期不向 renderer 推流式事件。
+    case "context_compaction":
       return null;
   }
 }
@@ -913,6 +959,19 @@ function logAgentEvent(
         decision: event.decision.decision,
       });
       return;
+
+    case "context_compaction":
+      logAgentRun("history compacted", {
+        sessionId,
+        turnId,
+        triggerTokens: event.info.triggerTokens,
+        thresholdTokens: event.info.thresholdTokens,
+        beforeCount: event.info.beforeCount,
+        afterCount: event.info.afterCount,
+        summaryChars: event.info.summaryChars,
+        reason: event.info.reason,
+      });
+      return;
   }
 }
 
@@ -1050,6 +1109,12 @@ function serializeAgentEvent(event: AgentEvent): Record<string, unknown> {
         toolName: event.toolName,
         decision: event.decision.decision,
       };
+
+    case "context_compaction":
+      return {
+        type: event.type,
+        ...event.info,
+      };
   }
 }
 
@@ -1123,8 +1188,8 @@ function summarizeMessage(message: Message): Record<string, unknown> {
   };
 }
 
-function getRunLogEventType(event: AgentEvent): "agent_event" | "tool_event" {
-  return event.type === "tool_start" || event.type === "tool_end"
-    ? "tool_event"
-    : "agent_event";
+function getRunLogEventType(event: AgentEvent): "agent_event" | "tool_event" | "context_compaction" {
+  if (event.type === "tool_start" || event.type === "tool_end") return "tool_event";
+  if (event.type === "context_compaction") return "context_compaction";
+  return "agent_event";
 }
