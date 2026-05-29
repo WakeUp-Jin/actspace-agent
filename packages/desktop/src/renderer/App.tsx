@@ -3,10 +3,12 @@ import { createMessageBlocks, getLatestContextSnapshot } from "@actspace/shared"
 import type {
   AbortTurnInput,
   AgentTurnResult,
+  AppSettings,
   BashStatus,
   BootstrapState,
   ContextUsageSnapshot,
   MessageBlock,
+  ModelId,
   RunTurnInput,
   RuntimeStreamEvent,
   SessionListItem,
@@ -363,6 +365,7 @@ export function App() {
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   const [streamingBlocks, setStreamingBlocks] = useState<MessageBlock[]>([]);
   const [sendScrollRequestId, setSendScrollRequestId] = useState(0);
+  const [defaultModelId, setDefaultModelId] = useState<ModelId | undefined>(undefined);
   const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
   const toolFinishTimersRef = useRef<Map<string, number>>(new Map());
@@ -391,6 +394,21 @@ export function App() {
         console.error("Failed to load bootstrap state", error);
         setBootstrapState(mockBootstrapState);
       });
+  }, []);
+
+  useEffect(() => {
+    if (!hasActspaceBridge() || !window.actspace.getSettings) return;
+
+    window.actspace
+      .getSettings()
+      .then((settings) => setDefaultModelId(settings.defaultModelId ?? undefined))
+      .catch((error: unknown) => {
+        console.error("Failed to load settings", error);
+      });
+  }, []);
+
+  const handleSettingsChange = useCallback((settings: AppSettings) => {
+    setDefaultModelId(settings.defaultModelId ?? undefined);
   }, []);
 
   useEffect(() => {
@@ -796,6 +814,8 @@ export function App() {
       onTogglePin={handleTogglePin}
       isSessionReady={isSessionReady}
       showDemoAttachments={showDemoAttachments}
+      defaultModelId={defaultModelId}
+      onSettingsChange={handleSettingsChange}
     />
   );
 }

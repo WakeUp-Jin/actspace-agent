@@ -33,6 +33,19 @@ declare global {
       listPendingApprovals: (
         input?: import("@actspace/shared").ApprovalListPendingInput
       ) => Promise<import("@actspace/shared").PendingApprovalInfo[]>;
+      getSettings: () => Promise<import("@actspace/shared").AppSettings>;
+      updateSettings: (
+        input: import("@actspace/shared").SettingsUpdateInput
+      ) => Promise<import("@actspace/shared").AppSettings>;
+      setProviderKey: (
+        input: import("@actspace/shared").SetProviderKeyInput
+      ) => Promise<import("@actspace/shared").SetProviderKeyResult>;
+      clearProviderKey: (
+        input: import("@actspace/shared").ClearProviderKeyInput
+      ) => Promise<import("@actspace/shared").ClearProviderKeyResult>;
+      testProviderConnection: (
+        input: import("@actspace/shared").TestConnectionInput
+      ) => Promise<import("@actspace/shared").TestConnectionResult>;
     };
     /**
      * Kairos 自治模式 API。preload 在 `kairos` 命名空间下暴露；

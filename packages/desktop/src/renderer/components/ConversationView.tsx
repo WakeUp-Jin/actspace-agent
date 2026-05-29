@@ -1,6 +1,6 @@
 import { MoreHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ContextUsageSnapshot, MessageBlock } from "@actspace/shared";
+import type { ContextUsageSnapshot, MessageBlock, ModelId } from "@actspace/shared";
 import { Composer, type ComposerSendOptions } from "./Composer";
 import { AssistantReply } from "./messages/AssistantReply";
 import { BashRunBlock } from "./messages/BashRunBlock";
@@ -263,6 +263,7 @@ export function ConversationView({
   onAbort,
   isSessionReady = true,
   showDemoAttachments = false,
+  defaultModelId,
 }: {
   messages: MessageBlock[];
   contextSnapshot: ContextUsageSnapshot | null;
@@ -273,6 +274,7 @@ export function ConversationView({
   onAbort?: () => void;
   isSessionReady?: boolean;
   showDemoAttachments?: boolean;
+  defaultModelId?: ModelId;
 }) {
   const turns = groupMessagesIntoTurns(messages);
   const isInitialComposer = isSessionReady && messages.length === 0 && !isStreaming;
@@ -299,6 +301,7 @@ export function ConversationView({
               onAbort={onAbort}
               surface="initial"
               showDemoAttachments={showDemoAttachments}
+              defaultModelId={defaultModelId}
             />
           </div>
         ) : (
@@ -337,6 +340,7 @@ export function ConversationView({
             onAbort={onAbort}
             surface="followup"
             showDemoAttachments={showDemoAttachments}
+            defaultModelId={defaultModelId}
           />
         </div>
       ) : null}

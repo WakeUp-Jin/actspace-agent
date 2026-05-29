@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { BootstrapState, RunTurnInput, RuntimeStreamEvent, SessionListItem, SessionRecord } from "@actspace/shared";
+import type { AppSettings, BootstrapState, RunTurnInput, RuntimeStreamEvent, SessionListItem, SessionRecord } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
 
@@ -11,6 +11,23 @@ const bootstrapState: BootstrapState = {
   logRoot: "/tmp/actspace/logs",
   tmpRoot: "/tmp/actspace/tmp",
   workspaceRoot: "/tmp/workspace",
+};
+
+const defaultSettings: AppSettings = {
+  version: 1,
+  defaultModelId: null,
+  providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: false } },
+  agent: { temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
+  kairos: { modelId: null, thinking: "auto" },
+};
+
+/** window.actspace 的设置相关方法默认 stub，供各用例 spread 进 mock。 */
+const settingsApiStub = {
+  getSettings: async () => defaultSettings,
+  updateSettings: async () => defaultSettings,
+  setProviderKey: async () => ({ ok: true }),
+  clearProviderKey: async () => ({ ok: true }),
+  testProviderConnection: async () => ({ ok: true, message: "连接成功" }),
 };
 
 function createEmptySessionRecord(sessionId: string): SessionRecord {
@@ -87,6 +104,7 @@ describe("App streaming user message", () => {
         displayBalance: null,
       }),
       listPendingApprovals: async () => [],
+      ...settingsApiStub,
       onAgentStream: () => () => {},
       runTurn: () =>
         new Promise((resolve) => {
@@ -154,6 +172,7 @@ describe("App streaming user message", () => {
         displayBalance: null,
       }),
       listPendingApprovals: async () => [],
+      ...settingsApiStub,
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {
@@ -231,6 +250,7 @@ describe("App streaming user message", () => {
         displayBalance: null,
       }),
       listPendingApprovals: async () => [],
+      ...settingsApiStub,
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {
@@ -315,6 +335,7 @@ describe("App streaming user message", () => {
         displayBalance: null,
       }),
       listPendingApprovals: async () => [],
+      ...settingsApiStub,
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {
@@ -402,6 +423,7 @@ describe("App streaming user message", () => {
         displayBalance: null,
       }),
       listPendingApprovals: async () => [],
+      ...settingsApiStub,
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {
@@ -571,6 +593,7 @@ describe("App streaming user message", () => {
         displayBalance: null,
       }),
       listPendingApprovals: async () => [],
+      ...settingsApiStub,
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {

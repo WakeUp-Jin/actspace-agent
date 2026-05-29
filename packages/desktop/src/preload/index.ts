@@ -2,10 +2,13 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   AbortTurnInput,
   AgentTurnResult,
+  AppSettings,
   ApprovalDecideInput,
   ApprovalDecideResult,
   ApprovalListPendingInput,
   BootstrapState,
+  ClearProviderKeyInput,
+  ClearProviderKeyResult,
   DeepSeekBalanceSnapshot,
   KairosBridgeApi,
   KairosContextSnapshot,
@@ -28,6 +31,11 @@ import type {
   SessionPinInput,
   SessionPinResult,
   SessionRecord,
+  SetProviderKeyInput,
+  SetProviderKeyResult,
+  SettingsUpdateInput,
+  TestConnectionInput,
+  TestConnectionResult,
   UsageStatisticsGetInput,
   UsageStatisticsSnapshot
 } from "@actspace/shared";
@@ -47,6 +55,16 @@ contextBridge.exposeInMainWorld("actspace", {
 
   submitApproval: (input: ApprovalDecideInput) => ipcRenderer.invoke("approval:decide", input) as Promise<ApprovalDecideResult>,
   listPendingApprovals: (input?: ApprovalListPendingInput) => ipcRenderer.invoke("approval:list-pending", input ?? {}) as Promise<PendingApprovalInfo[]>,
+
+  getSettings: () => ipcRenderer.invoke("settings:get") as Promise<AppSettings>,
+  updateSettings: (input: SettingsUpdateInput) =>
+    ipcRenderer.invoke("settings:update", input) as Promise<AppSettings>,
+  setProviderKey: (input: SetProviderKeyInput) =>
+    ipcRenderer.invoke("settings:set-provider-key", input) as Promise<SetProviderKeyResult>,
+  clearProviderKey: (input: ClearProviderKeyInput) =>
+    ipcRenderer.invoke("settings:clear-provider-key", input) as Promise<ClearProviderKeyResult>,
+  testProviderConnection: (input: TestConnectionInput) =>
+    ipcRenderer.invoke("settings:test-connection", input) as Promise<TestConnectionResult>,
 
   onAgentStream: (callback: (event: RuntimeStreamEvent) => void) => {
     const handler = (_: unknown, event: RuntimeStreamEvent) => callback(event);

@@ -1,4 +1,4 @@
-import type { ContextUsageSnapshot, DeepSeekBalanceSnapshot, MessageBlock, SessionListItem, UsageStatisticsSnapshot } from "@actspace/shared";
+import type { AppSettings, ContextUsageSnapshot, DeepSeekBalanceSnapshot, MessageBlock, ModelId, SessionListItem, UsageStatisticsSnapshot } from "@actspace/shared";
 import { useCallback, useEffect, useState } from "react";
 import { ConversationView } from "./ConversationView";
 import { LabPage } from "./LabPage";
@@ -9,6 +9,7 @@ import { UsageStatisticsPage } from "./UsageStatisticsPage";
 import { WindowChromeBar } from "./WindowChromeBar";
 import type { ComposerSendOptions } from "./Composer";
 import { KairosPage } from "../pages/KairosPage";
+import { SettingsPage } from "./settings/SettingsPage";
 
 type StoredWorkbenchLayout = {
   leftMode?: SidebarMode | "rail";
@@ -84,6 +85,8 @@ export function WorkbenchLayout({
   onTogglePin,
   isSessionReady = true,
   showDemoAttachments = false,
+  defaultModelId,
+  onSettingsChange,
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
@@ -102,6 +105,8 @@ export function WorkbenchLayout({
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   isSessionReady?: boolean;
   showDemoAttachments?: boolean;
+  defaultModelId?: ModelId;
+  onSettingsChange?: (settings: AppSettings) => void;
 }) {
   const [storedLayout] = useState(loadStoredLayout);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -275,6 +280,11 @@ export function WorkbenchLayout({
     };
   }, [view, loadDeepSeekBalance]);
 
+  // 设置走「整页接管」：不渲染聊天侧栏与右栏，由 SettingsPage 自带导航 + 内容两栏。
+  if (view === "settings") {
+    return <SettingsPage onBack={() => setView("chat")} onSettingsChange={onSettingsChange} />;
+  }
+
   let mainContent;
   if (view === "lab") {
     mainContent = <LabPage />;
@@ -306,6 +316,7 @@ export function WorkbenchLayout({
         onAbort={onAbort}
         isSessionReady={isSessionReady}
         showDemoAttachments={showDemoAttachments}
+        defaultModelId={defaultModelId}
       />
     );
   }

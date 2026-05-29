@@ -19,7 +19,7 @@ import {
 import type { SessionListItem } from "@actspace/shared";
 
 export type SidebarMode = "expanded" | "hidden";
-export type SidebarView = "chat" | "lab" | "usage" | "kairos";
+export type SidebarView = "chat" | "lab" | "usage" | "kairos" | "settings";
 
 const DEFAULT_WORKSPACE_KEY = "__default__";
 const DEFAULT_WORKSPACE_LABEL = "Default workspace";
@@ -525,8 +525,9 @@ export function Sidebar({
       </nav>
 
       <button
-        className={SETTINGS_ENTRY_CLASS}
+        className={`${SETTINGS_ENTRY_CLASS} ${view === "settings" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
         type="button"
+        onClick={() => onSelectView?.("settings")}
       >
         <Settings size={14} strokeWidth={1.9} />
         Settings

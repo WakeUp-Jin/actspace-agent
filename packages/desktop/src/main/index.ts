@@ -9,18 +9,24 @@
  * Agent turn 执行逻辑在 ./agent-turn.ts。
  */
 
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage } from "electron";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
   AbortTurnInput,
   ApprovalDecideInput,
   ApprovalListPendingInput,
+  ClearProviderKeyInput,
   DeepSeekBalanceSnapshot,
+  ProviderId,
   RunTurnInput,
   SessionCreateInput,
   SessionGetInput,
   SessionPinInput,
+  SetProviderKeyInput,
+  SettingsUpdateInput,
+  TestConnectionInput,
+  TestConnectionResult,
   UsageStatisticsGetInput,
 } from "@actspace/shared";
 import {
@@ -49,12 +55,14 @@ import {
   ensureKairosScaffolding,
 } from "./kairos-bootstrap";
 import { registerKairosIpc, type KairosIpcHandle } from "./kairos-ipc";
+import { SettingsService, type SecretCrypto } from "./settings-service";
 
 const APP_ID = "com.actspace.desktop";
 const APP_NAME = "actspace";
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const PREVIEW_LIMIT = 160;
 const DEEPSEEK_BALANCE_TIMEOUT_MS = 8_000;
+const PROVIDER_TEST_TIMEOUT_MS = 8_000;
 
 let repoRootCache: string | undefined;
 let workspaceRootCache: string | undefined;
@@ -308,6 +316,74 @@ async function getDeepSeekBalanceSnapshot(): Promise<DeepSeekBalanceSnapshot> {
   }
 }
 
+// ─── 设置（Settings） ───
+
+/** 生产环境用 Electron safeStorage 为供应商 API Key 加解密。 */
+const electronSecretCrypto: SecretCrypto = {
+  isAvailable: () => safeStorage.isEncryptionAvailable(),
+  encrypt: (plain) => safeStorage.encryptString(plain),
+  decrypt: (cipher) => safeStorage.decryptString(cipher),
+};
+
+let settingsService: SettingsService | undefined;
+
+function getSettingsService(): SettingsService {
+  if (!settingsService) {
+    throw new Error("SettingsService 尚未初始化（应在 app.whenReady 内 load 之后再调用）。");
+  }
+  return settingsService;
+}
+
+function resolveProviderModelsUrl(baseUrl: string): string {
+  const normalized = (baseUrl || "https://api.moonshot.cn/v1").replace(/\/+$/, "");
+  return normalized.endsWith("/v1") ? `${normalized}/models` : `${normalized}/v1/models`;
+}
+
+/**
+ * 轻量探测供应商连通性与 Key 有效性：
+ * - DeepSeek 打余额端点，Kimi 打 `/models`，仅看 HTTP 状态码，不解析正文。
+ * - 返回文案均为脱敏提示，绝不回传明文 Key。
+ */
+async function testProviderConnection(provider: ProviderId): Promise<TestConnectionResult> {
+  const currentEnv = getEnv();
+  const apiKey = provider === "deepseek" ? currentEnv.DEEPSEEK_API_KEY : currentEnv.KIMI_API_KEY;
+  if (!apiKey) {
+    return { ok: false, message: "尚未配置 API Key，请先填写并保存后再测试。" };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), PROVIDER_TEST_TIMEOUT_MS);
+  try {
+    const url =
+      provider === "deepseek"
+        ? resolveDeepSeekBalanceUrl(currentEnv.DEEPSEEK_BASE_URL)
+        : resolveProviderModelsUrl(currentEnv.KIMI_BASE_URL);
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+    });
+    if (response.ok) {
+      return { ok: true, message: "连接成功，API Key 有效。" };
+    }
+    if (response.status === 401 || response.status === 403) {
+      return { ok: false, message: "鉴权失败：API Key 无效或权限不足。" };
+    }
+    return { ok: false, message: `连接失败：服务返回状态码 ${response.status}。` };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return { ok: false, message: "连接超时，请检查网络或稍后重试。" };
+    }
+    return {
+      ok: false,
+      message: "连接失败，请检查网络后重试。",
+      detail: error instanceof Error ? error.message : undefined,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // ─── Electron 配置 ───
 
 function configureAppPaths() {
@@ -415,6 +491,34 @@ async function ensureKairosController(roots: AppDataRoots): Promise<KairosContro
   });
   logMain("kairos controller ready", { kairosRoot, kairosWorkspaceRoot });
   return kairosController;
+}
+
+/**
+ * 在 Kairos 模型 / 思考链设置变更后重建 controller，使其用最新 env 重新创建 LLM。
+ *
+ * - Kairos 的 LLM 在 `createKairos()` 时定型，无法热替换，故采用「停旧 → 释放 IPC → 重建」。
+ * - 仅在 controller 处于非 ticking 态时执行；ticking 中直接跳过，变更会在下次重启或
+ *   下次空闲重建时生效（env 已更新，重启路径天然带上新模型）。
+ * - `start()` 默认尊重 `preferences.enabled`，因此重建后会恢复用户此前的开启/暂停意图。
+ */
+async function rebuildKairosController(roots: AppDataRoots): Promise<void> {
+  if (!kairosController) return;
+  const state = kairosController.getState();
+  if (state.state === "ticking") {
+    logMain("kairos rebuild deferred: controller is ticking");
+    return;
+  }
+  try {
+    await kairosController.stop();
+  } catch (err) {
+    logMain("kairos rebuild: stop threw", { error: err instanceof Error ? err.message : String(err) });
+  }
+  kairosIpcHandle?.dispose();
+  kairosController = undefined;
+  kairosIpcHandle = undefined;
+  const controller = await ensureKairosController(roots);
+  await controller.start();
+  logMain("kairos controller rebuilt with latest settings");
 }
 
 // ─── 审核注册表（单例） ───
@@ -560,6 +664,51 @@ async function registerIpc() {
   ipcMain.handle("approval:list-pending", async (_event, input: ApprovalListPendingInput = {}) => {
     return approvalRegistry.listPending(input.sessionId);
   });
+
+  // ─── 设置 ───
+  ipcMain.handle("settings:get", async () => {
+    return getSettingsService().get();
+  });
+
+  ipcMain.handle("settings:update", async (_event, input: SettingsUpdateInput) => {
+    const service = getSettingsService();
+    const beforeKairos = service.get().kairos;
+    const next = await service.update(input);
+    // Kairos 模型/思考链变更需重建 controller（其 LLM 在创建时定型）；其余 env-backed
+    // 设置（Key/工具/温度/bash 审查）由消费方按 turn 读 env proxy，下一轮自动生效。
+    if (
+      input.kairos &&
+      (beforeKairos.modelId !== next.kairos.modelId || beforeKairos.thinking !== next.kairos.thinking)
+    ) {
+      try {
+        const roots = await ensureDataDirectories();
+        await rebuildKairosController(roots);
+      } catch (err) {
+        logMain("kairos rebuild after settings update failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    return next;
+  });
+
+  ipcMain.handle("settings:set-provider-key", async (_event, input: SetProviderKeyInput) => {
+    const result = await getSettingsService().setProviderKey(input.provider, input.apiKey);
+    logMain("settings set provider key", { provider: input.provider, ok: result.ok });
+    return result;
+  });
+
+  ipcMain.handle("settings:clear-provider-key", async (_event, input: ClearProviderKeyInput) => {
+    const result = await getSettingsService().clearProviderKey(input.provider);
+    logMain("settings clear provider key", { provider: input.provider, ok: result.ok });
+    return result;
+  });
+
+  ipcMain.handle("settings:test-connection", async (_event, input: TestConnectionInput) => {
+    const result = await testProviderConnection(input.provider);
+    logMain("settings test connection", { provider: input.provider, ok: result.ok });
+    return result;
+  });
 }
 
 // ─── 启动 ───
@@ -570,6 +719,15 @@ loadEnv();
 app.whenReady().then(async () => {
   app.setAppUserModelId(APP_ID);
   const roots = await ensureDataDirectories();
+  // 先初始化设置：load() 会把持久化设置覆盖到 process.env 并刷新 env，
+  // 这样后续的 Kairos 初始化与首个 agent turn 都能拿到生效后的配置。
+  settingsService = new SettingsService({ dataRoot: roots.dataRoot, crypto: electronSecretCrypto });
+  try {
+    await settingsService.load();
+    logMain("settings service ready", { dataRoot: roots.dataRoot });
+  } catch (err) {
+    logMain("settings service load failed", { error: err instanceof Error ? err.message : String(err) });
+  }
   await registerIpc();
   await createMainWindow();
   // Kairos 现在仅初始化骨架（preferences.enabled 默认 false → controller 进 stopped 状态）；

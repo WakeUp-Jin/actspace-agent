@@ -106,9 +106,11 @@ const OPTION_TOGGLE_ROW_CLASS =
 const OPTION_TOGGLE_LABEL_CLASS = "flex-1";
 const OPTION_TOGGLE_INPUT_CLASS = "absolute opacity-0 pointer-events-none";
 const TOGGLE_TRACK_CLASS =
-  "toggle-track relative inline-flex h-5 w-8 rounded-full bg-[#d5dbe4] transition-colors duration-[120ms] ease-in-out has-[:checked]:bg-brand";
+  "toggle-track relative inline-flex h-5 w-8 rounded-full bg-[#d5dbe4] transition-colors duration-[120ms] ease-in-out";
+const TOGGLE_TRACK_ON_CLASS = "bg-brand";
 const TOGGLE_THUMB_CLASS =
-  "toggle-thumb absolute left-[3px] top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_4px_rgba(31,45,61,0.22)] transition-transform duration-[120ms] ease-in-out peer-checked:translate-x-3";
+  "toggle-thumb absolute left-[3px] top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_4px_rgba(31,45,61,0.22)] transition-transform duration-[120ms] ease-in-out";
+const TOGGLE_THUMB_ON_CLASS = "translate-x-3";
 const OPTION_EMPTY_CLASS = "px-2.5 py-2 text-sm text-text-faint";
 const STATUS_ROW_CLASS =
   "composer-status-row flex min-h-5 items-center justify-between gap-3 px-3 text-[13px] leading-5 text-text-faint";
@@ -166,6 +168,7 @@ export function Composer({
   surface = "followup",
   inputLayout,
   showDemoAttachments = false,
+  defaultModelId,
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
   isStreaming?: boolean;
@@ -175,16 +178,22 @@ export function Composer({
   surface?: ComposerSurface;
   inputLayout?: ComposerInputLayout;
   showDemoAttachments?: boolean;
+  /** 来自设置页的默认模型；首次到达时同步选中，用户手动选过后不再覆盖。 */
+  defaultModelId?: ModelId;
 }) {
+  const initialModelId = defaultModelId ?? DEFAULT_MODEL_ID;
   const [commandOpen, setCommandOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [modelOptionsOpen, setModelOptionsOpen] = useState(false);
   const [contextSelectorOpen, setContextSelectorOpen] = useState<ContextSelectorKind | null>(null);
-  const [selectedModelId, setSelectedModelId] = useState<ModelId>(DEFAULT_MODEL_ID);
-  const [editingModelId, setEditingModelId] = useState<ModelId>(DEFAULT_MODEL_ID);
+  const [selectedModelId, setSelectedModelId] = useState<ModelId>(initialModelId);
+  const [editingModelId, setEditingModelId] = useState<ModelId>(initialModelId);
   const [hoveredModelId, setHoveredModelId] = useState<ModelId | null>(null);
   const [focusedModelId, setFocusedModelId] = useState<ModelId | null>(null);
-  const [thinkingEnabled, setThinkingEnabled] = useState(DEFAULT_MODEL_SPEC.thinkingDefault);
+  const [thinkingEnabled, setThinkingEnabled] = useState(
+    (MODEL_REGISTRY[initialModelId] ?? DEFAULT_MODEL_SPEC).thinkingDefault,
+  );
+  const userPickedModelRef = useRef(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [imageAttached, setImageAttached] = useState(showDemoAttachments);
   const [fileAttached, setFileAttached] = useState(showDemoAttachments);
@@ -206,6 +215,15 @@ export function Composer({
     setImageAttached(showDemoAttachments);
     setFileAttached(showDemoAttachments);
   }, [showDemoAttachments]);
+
+  // 默认模型可能在 Composer 挂载后才异步到达（settings:get）；只在用户尚未手动
+  // 选择过模型时同步，避免覆盖用户当前会话里的临时选择。
+  useEffect(() => {
+    if (!defaultModelId || userPickedModelRef.current) return;
+    setSelectedModelId(defaultModelId);
+    setEditingModelId(defaultModelId);
+    setThinkingEnabled((MODEL_REGISTRY[defaultModelId] ?? DEFAULT_MODEL_SPEC).thinkingDefault);
+  }, [defaultModelId]);
 
   function closeFloatingPanels() {
     setCommandOpen(false);
@@ -433,6 +451,7 @@ export function Composer({
                       spec.id === selectedModelId ? MODEL_SELECT_BUTTON_SELECTED_CLASS : ""
                     }`}
                     onClick={() => {
+                      userPickedModelRef.current = true;
                       setSelectedModelId(spec.id);
                       setEditingModelId(spec.id);
                       setThinkingEnabled(spec.thinkingDefault);
@@ -483,14 +502,17 @@ export function Composer({
               <label className={OPTION_TOGGLE_ROW_CLASS}>
                 <span className={OPTION_TOGGLE_LABEL_CLASS}>Thinking</span>
                 <input
-                  className={`${OPTION_TOGGLE_INPUT_CLASS} peer`}
+                  className={OPTION_TOGGLE_INPUT_CLASS}
                   type="checkbox"
                   checked={thinkingEnabled}
                   onChange={(event) => setThinkingEnabled(event.target.checked)}
                   aria-label={`${editingModelId} Thinking`}
                 />
-                <span className={TOGGLE_TRACK_CLASS} aria-hidden="true">
-                  <span className={TOGGLE_THUMB_CLASS} />
+                <span
+                  className={`${TOGGLE_TRACK_CLASS}${thinkingEnabled ? ` ${TOGGLE_TRACK_ON_CLASS}` : ""}`}
+                  aria-hidden="true"
+                >
+                  <span className={`${TOGGLE_THUMB_CLASS}${thinkingEnabled ? ` ${TOGGLE_THUMB_ON_CLASS}` : ""}`} />
                 </span>
               </label>
             ) : (
