@@ -19,6 +19,8 @@ for path in "${required_files[@]}"; do
   fi
 done
 
+"${repo_root}/scripts/check-secrets.sh"
+
 if [[ "${failed}" -ne 0 ]]; then
   exit 1
 fi

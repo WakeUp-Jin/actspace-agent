@@ -56,6 +56,8 @@ export interface AgentConfig {
   toolManagerConfig: ToolManagerConfig;
   thinkingEnabled: boolean;
   modelSpec: ModelSpec;
+  /** 主 Agent 当前使用的完整系统提示词。 */
+  systemPrompt: string;
 }
 
 /** 运行时实例集合 */
@@ -75,6 +77,8 @@ export interface AgentRuntimeContext {
   tmpRoot?: string;
   /** 当前会话 id，用于 bash 落盘文件分目录与历史压缩 ref */
   sessionId?: string;
+  /** 主 Agent 当前使用的完整系统提示词；不传则使用代码默认值。 */
+  systemPrompt?: string;
 }
 
 // ─── 内部：env 读取 ───
@@ -158,7 +162,13 @@ export function buildAgentConfig(
     tmpRoot: runtimeContext?.tmpRoot,
     sessionId: runtimeContext?.sessionId,
   };
-  return { llmConfig, toolManagerConfig, thinkingEnabled, modelSpec };
+  return {
+    llmConfig,
+    toolManagerConfig,
+    thinkingEnabled,
+    modelSpec,
+    systemPrompt: runtimeContext?.systemPrompt ?? MAIN_AGENT_SYSTEM_PROMPT,
+  };
 }
 
 /**
@@ -186,7 +196,7 @@ export function createAgentFromConfig(config: AgentConfig): AgentDeps {
   const llm = createLLMService(config.llmConfig);
   const summarizer = createSummarizerForAgent();
   const toolManager = createToolManager({ ...config.toolManagerConfig, summarizer });
-  const systemPromptModule = new SystemPromptContext(MAIN_AGENT_SYSTEM_PROMPT);
+  const systemPromptModule = new SystemPromptContext(config.systemPrompt);
   const contextManager = new ContextManager({
     systemPromptModule,
     config: { contextWindow: config.modelSpec.contextWindow },
@@ -217,7 +227,7 @@ export async function createAgentForSession(
   const llm = createLLMService(config.llmConfig);
   const summarizer = createSummarizerForAgent();
   const toolManager = createToolManager({ ...config.toolManagerConfig, summarizer });
-  const systemPromptModule = new SystemPromptContext(MAIN_AGENT_SYSTEM_PROMPT);
+  const systemPromptModule = new SystemPromptContext(config.systemPrompt);
   const contextManager = await ContextManager.createForSession({
     systemPromptModule,
     sessionPath: options.sessionPath,

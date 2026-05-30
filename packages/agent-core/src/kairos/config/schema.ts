@@ -12,7 +12,6 @@ export type SleepBias = "light" | "normal" | "deep";
 export interface Preferences {
   tip: string;
   enabled: boolean;
-  modelId: string | null;
   sleepRangeSeconds: {
     min: number;
     max: number;
@@ -58,7 +57,6 @@ export interface Blocklist {
 export const DEFAULT_PREFERENCES: Preferences = {
   tip: "Kairos 默认偏好；如需调整 sleep / tickBudget 等请编辑本文件。",
   enabled: false,
-  modelId: null,
   sleepRangeSeconds: { min: 30, max: 900, default: 120 },
   tickBudget: { perDay: 200, perHour: 30 },
   circuitBreaker: { errorThreshold: 5, cooldownSec: 60 },
@@ -138,7 +136,6 @@ export function parsePreferences(raw: unknown): Preferences {
   return {
     tip: pickString(raw.tip, DEFAULT_PREFERENCES.tip),
     enabled: pickBoolean(raw.enabled, DEFAULT_PREFERENCES.enabled),
-    modelId: typeof raw.modelId === "string" ? raw.modelId : DEFAULT_PREFERENCES.modelId,
     sleepRangeSeconds: {
       min: pickInt(sr.min, DEFAULT_PREFERENCES.sleepRangeSeconds.min, 1),
       max: pickInt(sr.max, DEFAULT_PREFERENCES.sleepRangeSeconds.max, 1),

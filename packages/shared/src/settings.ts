@@ -14,8 +14,10 @@ export type ProviderId = "deepseek" | "kimi";
 
 export const SETTINGS_PROVIDER_IDS: readonly ProviderId[] = ["deepseek", "kimi"];
 
-/** Kairos 思考链在设置 UI 里的三态；映射到 env KAIROS_THINKING 的 auto/true/false。 */
 export type KairosThinkingMode = "auto" | "on" | "off";
+
+/** Kairos 设置页只允许默认 Flash 与显式 Pro；null 表示 Kairos 默认 Flash。 */
+export type KairosModelId = Extract<ModelId, "deepseek-v4-pro">;
 
 export interface ProviderSettingsView {
   /** 用户已在页面配置该供应商密钥（safeStorage 中存在）；决定卡片"已连接/可断开"。 */
@@ -23,6 +25,8 @@ export interface ProviderSettingsView {
 }
 
 export interface AgentSettings {
+  /** 主 Agent 当前使用的完整系统提示词。 */
+  systemPrompt: string;
   /** 主 Agent 采样温度；null = 用各 LLM service 默认。范围 0–2。 */
   temperature: number | null;
   /** 主 Agent 最大输出 token；null = 用默认。 */
@@ -34,9 +38,16 @@ export interface AgentSettings {
 }
 
 export interface KairosSettings {
-  /** Kairos 使用的模型；null = 回落 Kairos 默认模型。 */
-  modelId: ModelId | null;
-  /** 思考链覆写。 */
+  /**
+   * Kairos 自主模式模型。
+   *
+   * null = Kairos 默认模型 deepseek-v4-flash；显式值当前只允许 deepseek-v4-pro。
+   * 这是设置页与运行时的唯一真来源，持久化在 settings.json。
+   */
+  modelId: KairosModelId | null;
+  /**
+   * 思考链覆写。
+   */
   thinking: KairosThinkingMode;
 }
 

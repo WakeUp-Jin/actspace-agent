@@ -1,6 +1,8 @@
 # 成本/单位类指标的展示要忠于事实，不跟随 UI 偏好
 
-关联 history：`docs/histories/2026-05/20260528-1702-kairos-usage-badge.md`
+关联 history：`docs/histories/2026-05/20260528-1702-kairos-usage-badge.md`、`docs/histories/2026-05/20260530-2358-deepseek-pricing-cny.md`
+
+> **后续更新（2026-05-30）**：本文预测的「改事实」动作真的发生了——产品确认 DeepSeek 为国产模型、按人民币计价，于是把 `model-config.ts` 里 DeepSeek pricing 的 `currency` 切到 `CNY`，**并把单价从 USD 数额按 ≈7.2 一次性换算成 CNY 单价**（不是只翻 `currency` 标签，否则就是本文第 35–37 行警告的「7 倍欺骗」）。因为当初坚持「UI 跟随 `cost.currency` 而非硬编码 ¥」，这次切换**零 UI 改动**即生效（胶囊、tooltip、Kairos 额度全自动从 `$` 切到 `¥`）——反向验证了本文结论。已写盘的旧 `llm_usage` 事件 cost 字段仍是 USD，按事件内 `currency` 字段照常显示，无需迁移（见「常见陷阱 · 历史数据迁移」）。
 
 ## 是什么
 

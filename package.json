@@ -10,8 +10,10 @@
     "typecheck": "pnpm -r typecheck",
     "ci": "./scripts/ci.sh",
     "check:docs": "./scripts/check-docs.sh",
+    "check:secrets": "./scripts/check-secrets.sh",
     "check:repo": "./scripts/check-repo-hygiene.sh",
     "check:actions": "./scripts/check-action-pinning.sh",
+    "hooks:install": "./scripts/install-git-hooks.sh",
     "package:desktop": "./scripts/release-package.sh",
     "release-package": "./scripts/release-package.sh"
   }

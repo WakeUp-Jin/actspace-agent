@@ -35,6 +35,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
     });
@@ -61,6 +62,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
       firstTickDelayMs: 0,
@@ -97,6 +99,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
       firstTickDelayMs: 0,
@@ -136,6 +139,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
       firstTickDelayMs: 0,
@@ -168,6 +172,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
     });
@@ -194,6 +199,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
     });
@@ -223,6 +229,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
     });
@@ -241,6 +248,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
     });
@@ -259,6 +267,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
     });
@@ -274,6 +283,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
       firstTickDelayMs: 0,
@@ -329,6 +339,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
       firstTickDelayMs: 0,
@@ -356,6 +367,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
       firstTickDelayMs: 0,
@@ -420,6 +432,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
     });
@@ -492,6 +505,7 @@ describe("createKairos", () => {
     const ctrl = await createKairos({
       kairosRoot: root,
       llm,
+      modelId: "deepseek-v4-flash",
       toolManagerFactory: makeToolManagerFactory(),
       contextWindow: 8000,
     });
@@ -505,5 +519,196 @@ describe("createKairos", () => {
     expect(state.usageSinceReset.callCount).toBe(0);
 
     await ctrl.stop();
+  });
+});
+
+// ─── 额度护栏（单一余额） ───
+
+describe("createKairos 额度护栏（单一余额）", () => {
+  async function writeBudgetState(
+    root: string,
+    state: { enabled: boolean; balanceCny: number },
+  ): Promise<void> {
+    await mkdir(join(root, "memory"), { recursive: true });
+    await writeFile(
+      join(root, "memory", "budget-state.json"),
+      JSON.stringify({ schemaVersion: 1, ...state, updatedAt: new Date().toISOString() }),
+      "utf8",
+    );
+  }
+
+  /** 走 deepseek apiModel + provider，让 runner 算出 cost.total > 0（可被余额扣减）。 */
+  function mockDeepseekUsage(
+    text: string,
+    usage: { input: number; output: number; total: number },
+  ): AssistantMessage {
+    return {
+      role: "assistant",
+      content: [{ type: "text", text }],
+      model: "deepseek-v4-flash",
+      provider: "deepseek",
+      usage: { ...createEmptyUsage(), input: usage.input, output: usage.output, totalTokens: usage.total },
+      stopReason: "stop",
+      timestamp: Date.now(),
+      source: "llm",
+    };
+  }
+
+  async function waitFor(pred: () => boolean, timeoutMs: number): Promise<void> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (pred()) return;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    throw new Error("waitFor timed out");
+  }
+
+  it("运行时把余额扣到 ≤0 → budget_exhausted、enabled=false、落 error、写 preferences.enabled=false", async () => {
+    const root = await makeRoot();
+    await writeConfig(root, {
+      "preferences.json": JSON.stringify({
+        enabled: true,
+        sleepRangeSeconds: { min: 1, max: 5, default: 1 },
+        circuitBreaker: { errorThreshold: 5, cooldownSec: 1 },
+      }),
+    });
+    await writeBudgetState(root, { enabled: true, balanceCny: 0.0001 });
+    const llm = new MockLLMService({ provider: "deepseek", apiKey: "k", model: "deepseek-v4-flash" });
+    llm.setResponses([
+      mockDeepseekUsage("reply one", { input: 5_000, output: 2_000, total: 7_000 }),
+      mockDeepseekUsage("reply two", { input: 5_000, output: 2_000, total: 7_000 }),
+    ]);
+    const ctrl = await createKairos({
+      kairosRoot: root,
+      llm,
+      modelId: "deepseek-v4-flash",
+      toolManagerFactory: makeToolManagerFactory(),
+      contextWindow: 8000,
+      firstTickDelayMs: 0,
+    });
+
+    await ctrl.start();
+    await waitFor(() => ctrl.getState().state === "budget_exhausted", 4000);
+
+    const state = ctrl.getState();
+    expect(state.state).toBe("budget_exhausted");
+    expect(state.enabled).toBe(false);
+    expect(state.budget.exhausted).toBe(true);
+    expect(ctrl.getRecentEvents(200).some((e) => e.type === "error")).toBe(true);
+
+    const prefs = JSON.parse(await readFile(join(root, "config", "preferences.json"), "utf8"));
+    expect(prefs.enabled).toBe(false); // 不自动恢复
+    await ctrl.stop();
+  });
+
+  it("余额耗尽时 start({force:true}) 抛错且不投 tick", async () => {
+    const root = await makeRoot();
+    await writeConfig(root, { "preferences.json": JSON.stringify({ enabled: false }) });
+    await writeBudgetState(root, { enabled: true, balanceCny: 0 });
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "m" });
+    llm.setResponses([mockText("hi")]);
+    const ctrl = await createKairos({
+      kairosRoot: root,
+      llm,
+      modelId: "deepseek-v4-flash",
+      toolManagerFactory: makeToolManagerFactory(),
+      contextWindow: 8000,
+      firstTickDelayMs: 0,
+    });
+
+    expect(ctrl.getState().budget).toEqual({ enabled: true, balanceCny: 0, exhausted: true });
+    await expect(ctrl.start({ force: true })).rejects.toThrow(/额度不足/);
+    expect(ctrl.getState().state).toBe("budget_exhausted");
+    expect(ctrl.getState().enabled).toBe(false);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(ctrl.getRecentEvents(50).some((e) => e.type === "kairos_tick_injected")).toBe(false);
+    await ctrl.stop();
+  });
+
+  it("setBudget 充值后清理 budget_exhausted → stopped，可重新开启", async () => {
+    const root = await makeRoot();
+    await writeConfig(root, {
+      "preferences.json": JSON.stringify({ enabled: false, sleepRangeSeconds: { min: 1, max: 5, default: 1 } }),
+    });
+    await writeBudgetState(root, { enabled: true, balanceCny: 0 });
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "m" });
+    llm.setResponses([mockText("ok"), mockText("ok2")]);
+    const ctrl = await createKairos({
+      kairosRoot: root,
+      llm,
+      modelId: "deepseek-v4-flash",
+      toolManagerFactory: makeToolManagerFactory(),
+      contextWindow: 8000,
+      firstTickDelayMs: 0,
+    });
+
+    await expect(ctrl.start({ force: true })).rejects.toThrow();
+    expect(ctrl.getState().state).toBe("budget_exhausted");
+
+    await ctrl.setBudget({ enabled: true, balanceCny: 5 });
+    expect(ctrl.getState().state).toBe("stopped");
+    expect(ctrl.getState().budget).toMatchObject({ enabled: true, balanceCny: 5, exhausted: false });
+
+    await ctrl.start({ force: true });
+    expect(ctrl.getState().enabled).toBe(true);
+    await waitFor(() => ctrl.getRecentEvents(50).some((e) => e.type === "kairos_tick_injected"), 2000);
+    await ctrl.stop();
+
+    const persisted = JSON.parse(await readFile(join(root, "memory", "budget-state.json"), "utf8"));
+    expect(persisted).toMatchObject({ enabled: true, balanceCny: 5 });
+  });
+
+  it("setBudget 关闭开关后不再受额度限制", async () => {
+    const root = await makeRoot();
+    await writeConfig(root, {
+      "preferences.json": JSON.stringify({ enabled: false, sleepRangeSeconds: { min: 1, max: 5, default: 1 } }),
+    });
+    await writeBudgetState(root, { enabled: true, balanceCny: 0 });
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "m" });
+    llm.setResponses([mockText("ok")]);
+    const ctrl = await createKairos({
+      kairosRoot: root,
+      llm,
+      modelId: "deepseek-v4-flash",
+      toolManagerFactory: makeToolManagerFactory(),
+      contextWindow: 8000,
+      firstTickDelayMs: 0,
+    });
+
+    await expect(ctrl.start({ force: true })).rejects.toThrow();
+    await ctrl.setBudget({ enabled: false, balanceCny: 0 });
+    expect(ctrl.getState().state).toBe("stopped");
+    expect(ctrl.getState().budget.exhausted).toBe(false);
+
+    await ctrl.start({ force: true });
+    expect(ctrl.getState().enabled).toBe(true);
+    await waitFor(() => ctrl.getRecentEvents(50).some((e) => e.type === "kairos_tick_injected"), 2000);
+    await ctrl.stop();
+  });
+
+  it("shutdown() abort + flush，正常 resolve 且不丢余额", async () => {
+    const root = await makeRoot();
+    await writeConfig(root, {
+      "preferences.json": JSON.stringify({ enabled: true, sleepRangeSeconds: { min: 1, max: 5, default: 1 } }),
+    });
+    await writeBudgetState(root, { enabled: true, balanceCny: 5 });
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "m" });
+    llm.setResponses([mockToolCall("sleep", { seconds: 1 }, { id: "t1" }), mockText("ok")]);
+    const ctrl = await createKairos({
+      kairosRoot: root,
+      llm,
+      modelId: "deepseek-v4-flash",
+      toolManagerFactory: makeToolManagerFactory(),
+      contextWindow: 8000,
+      firstTickDelayMs: 0,
+    });
+
+    await ctrl.start();
+    await new Promise((r) => setTimeout(r, 300));
+    await expect(ctrl.shutdown()).resolves.toBeUndefined();
+    expect(ctrl.getState().enabled).toBe(false);
+
+    const persisted = JSON.parse(await readFile(join(root, "memory", "budget-state.json"), "utf8"));
+    expect(persisted).toMatchObject({ enabled: true, balanceCny: 5 });
   });
 });

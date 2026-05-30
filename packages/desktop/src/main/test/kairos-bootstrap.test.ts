@@ -135,7 +135,7 @@ describe("createKairosToolManagerFactory", () => {
   });
 
   it("returns a function that produces a ToolManager scoped to workspaceRoot", () => {
-    const factory = createKairosToolManagerFactory({ workspaceRoot: "/tmp/work" });
+    const factory = createKairosToolManagerFactory({ workspaceRoot: "/tmp/work", modelId: null });
     const manager = factory(makeConfig());
     const names = manager.getAll().map((t) => t.name);
     expect(names.length).toBeGreaterThan(0);
@@ -144,7 +144,7 @@ describe("createKairosToolManagerFactory", () => {
   });
 
   it("merges blocklist.toolsDenied into disabledTools, removing those tools from the manager", () => {
-    const factory = createKairosToolManagerFactory({ workspaceRoot: "/tmp/work" });
+    const factory = createKairosToolManagerFactory({ workspaceRoot: "/tmp/work", modelId: null });
     const baseline = factory(makeConfig()).getAll().map((t) => t.name);
     expect(baseline).toContain("read_file");
 
@@ -167,7 +167,7 @@ describe("createKairosToolManagerFactory", () => {
       mergeToProcessEnv: false,
     });
 
-    const factory = createFactory({ workspaceRoot: "/tmp/work" });
+    const factory = createFactory({ workspaceRoot: "/tmp/work", modelId: null });
     const manager = factory(makeConfig());
 
     expect(manager.has("web_search")).toBe(false);
@@ -185,7 +185,7 @@ describe("createKairosToolManagerFactory", () => {
       mergeToProcessEnv: false,
     });
 
-    const factory = createFactory({ workspaceRoot: "/tmp/work" });
+    const factory = createFactory({ workspaceRoot: "/tmp/work", modelId: null });
     const manager = factory(makeConfig());
 
     expect(manager.has("web_search")).toBe(true);

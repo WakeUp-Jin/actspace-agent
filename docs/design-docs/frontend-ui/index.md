@@ -49,6 +49,7 @@
 - `中间消息区规范.md`：消息语法、类型规则、顺序原则。
 - `聊天输入框规范.md`：composer、模式、模型、附件、context 弹窗、发送。
 - `右侧面板与文件渲染规范.md`：文件预览、会话级 diff、右侧定稿图。
+- `工作区文件浏览器规范.md`：右侧面板的文件树 rail（懒加载 + 忽略名单 + 越界拦截）、点文件复用渲染视图开 Tab、`workspace:list-dir` / `workspace:read-file` IPC 契约、V1（只读单 root）/ V2（path 直达 + diff 标记 + 搜索）/ V3（编辑 + Kairos 配置）边界。
 - `HTML渲染与沙箱安全规范.md`：HTML 渲染的威胁模型、sandbox iframe + CSP 双闸、V1（srcDoc 简单安全版）/ V2（独立 origin 完整版）边界。
 - `Markdown渲染规范.md`：右侧面板 Markdown 渲染栈（react-markdown + remark-gfm + rehype-highlight）、主题感知高亮、Preview/源码切换、V1/V2 边界。
 - `Context完整视图规范.md`：右侧面板 Context 完整只读视图的数据契约（`ContextState.entries`）、配色联动、浅底+左色条、会话折叠/上限/导出、V1/V2 边界。

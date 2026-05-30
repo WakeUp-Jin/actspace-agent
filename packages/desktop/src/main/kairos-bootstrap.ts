@@ -3,9 +3,9 @@
  * 1. 在 `<userData>/kairos/` 下创建必备目录、默认 workspace 与缺省 config（preferences.json 等）。
  * 2. 提供 `createKairosToolManagerFactory(...)` 工厂——按 blocklist.toolsDenied 排除主 Agent 工具，
  *    再交给 controller 注册 Sleep。
- * 3. 暴露 `createKairosLlm()` + `resolveKairosThinkingEnabled()`——按 KAIROS_MODEL_ID / KAIROS_THINKING
- *    env 决定 Kairos 自己的模型与思考链；缺省回落到主 Agent 默认。
- *    `preferences.modelId` 字段保留给 v2 由用户在文件里切换。
+ * 3. 暴露 `createKairosLlm(modelId)` + `resolveKairosThinkingEnabled(modelId, thinking)` +
+ *    `resolveKairosModelId(modelId)`——模型 / 思考链来源是 settings.json 的 kairos 分区；
+ *    非法 / 留空回落 Kairos 默认模型。
  */
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -22,6 +22,7 @@ import {
 } from "@actspace/agent-core";
 import type { LLMService } from "@actspace/agent-core";
 import type { ToolManager } from "@actspace/agent-core";
+import type { KairosModelId, KairosThinkingMode } from "@actspace/shared";
 
 const DEFAULT_RULE_MD = `# Kairos 用户规则
 
@@ -112,28 +113,39 @@ function isLegacyEmptyPathsConfig(content: string): boolean {
  * 给 controller 用的 LLM 单例。
  *
  * 行为：
- * - 优先用 `KAIROS_MODEL_ID` env 指定的模型；非法 / 留空 → 回落主 Agent 默认。
+ * - 模型来自传入的 `modelId`（settings.json 的 `kairos.modelId`）；非法 / 留空 → 回落 Kairos 默认模型。
  * - API Key / baseUrl / temperature / maxTokens 仍读主 Agent 的 env（DEEPSEEK_API_KEY 等），
- *   provider 由所选 ModelSpec.provider 自动决定（deepseek / kimi）。
+ *   provider 由所选 ModelSpec.provider 自动决定（当前 Kairos 仅 deepseek）。
  *
  * 注意：`thinkingEnabled` 不在 LLM service 本身决定，由 controller→runner 沿 loopConfig 传给每次调用。
- *      调用 `resolveKairosThinkingEnabled()` 拿到布尔/undefined 再传给 createKairos。
+ *      调用 `resolveKairosThinkingEnabled(modelId, thinking)` 拿到布尔/undefined 再传给 createKairos。
  */
-export function createKairosLlm(): LLMService {
+export function createKairosLlm(modelId: KairosModelId | null): LLMService {
   const env = resolveAgentEnvConfig();
-  const { modelSpec } = resolveKairosEnv();
+  const { modelSpec } = resolveKairosEnv(modelId, "auto");
   const llmConfig = buildLLMConfig(modelSpec, env);
   return createLLMService(llmConfig);
 }
 
 /**
- * 返回 KAIROS_THINKING 解析后的覆写值：
+ * 返回 settings.json 中 kairos.thinking 解析后的覆写值：
  * - `undefined` → 跟随 ModelSpec.thinkingDefault；
  * - `true / false` → 显式覆写。
- * 已在 `resolveKairosEnv()` 内对"模型不支持 toggle"的情况做了兜底（强制 undefined）。
+ * 已在 `resolveKairosEnv(modelId, thinking)` 内对"模型不支持 toggle"的情况做了兜底（强制 undefined）。
  */
-export function resolveKairosThinkingEnabled(): boolean | undefined {
-  return resolveKairosEnv().thinkingEnabled;
+export function resolveKairosThinkingEnabled(
+  modelId: KairosModelId | null,
+  thinking: KairosThinkingMode,
+): boolean | undefined {
+  return resolveKairosEnv(modelId, thinking).thinkingEnabled;
+}
+
+/**
+ * 把 settings.json 的 `kairos.modelId`（可能 null）解析为 Kairos 实际使用的真实模型 id
+ * （已回落默认）。用于：(a) 注入 controller 供上下文快照显示；(b) 判断 modelId 是否变化决定是否重建。
+ */
+export function resolveKairosModelId(modelId: KairosModelId | null): string {
+  return resolveKairosEnv(modelId, "auto").modelSpec.id;
 }
 
 /**
@@ -147,11 +159,13 @@ export function resolveKairosThinkingEnabled(): boolean | undefined {
  */
 export function createKairosToolManagerFactory(opts: {
   workspaceRoot: string;
+  /** 与 createKairosLlm 同源的 modelId（settings.json）；决定工具暴露的 provider / apiFormat。 */
+  modelId: KairosModelId | null;
 }) {
   const env = resolveAgentEnvConfig();
   // 注意：toolManager 的 provider / apiFormat 必须和实际 LLM Service 一致，
   // 否则会出现 DeepSeek Anthropic 仍暴露 Kimi-backed web_search 这种错配。
-  const { modelSpec } = resolveKairosEnv();
+  const { modelSpec } = resolveKairosEnv(opts.modelId, "auto");
   const llmConfig = buildLLMConfig(modelSpec, env);
   return (config: KairosConfig): ToolManager => {
     const combinedDisabled = [...env.disabledTools, ...config.blocklist.toolsDenied];

@@ -24,6 +24,7 @@ import type { AppDataRoots } from "./agent-turn";
 export async function describeSessionContext(
   input: DescribeContextInput,
   roots: AppDataRoots,
+  getSystemPrompt?: () => string,
 ): Promise<ContextState | null> {
   const sessionDir = join(roots.sessionRoot, input.sessionId);
   const sessionPaths = createSessionStorePaths(sessionDir);
@@ -38,6 +39,7 @@ export async function describeSessionContext(
   const config = buildAgentConfig({ model }, workspaceRoot, undefined, {
     tmpRoot: roots.tmpRoot,
     sessionId: input.sessionId,
+    systemPrompt: getSystemPrompt?.(),
   });
   const deps = await createAgentForSession(config, {
     sessionPath: sessionPaths.sessionPath,

@@ -10,6 +10,8 @@ import type { EventId, LlmUsageCost, SessionEvent } from "./session";
  * - `interrupted`：被主 Agent 的 user message 中断，正在等主 Agent runTurn 完成。
  * - `cooldown`：达到熔断阈值，进入冷却期。
  * - `stopped`：用户主动停止 / preferences.enabled=false，整体闲置。
+ * - `budget_exhausted`：额度余额 ≤ 0 被动暂停（区别于用户主动 stopped）。
+ *   需用户在设置页把余额改 > 0 后**手动**重新开启，不自动恢复。
  */
 export type KairosRunState =
   | "idle"
@@ -17,7 +19,8 @@ export type KairosRunState =
   | "sleeping"
   | "interrupted"
   | "stopped"
-  | "cooldown";
+  | "cooldown"
+  | "budget_exhausted";
 
 /**
  * Kairos 的 token / cost 累计（自上一次 reset_today 以来）。
@@ -44,10 +47,29 @@ export interface KairosUsageSummary {
   currency: LlmUsageCost["currency"] | "MIXED";
 }
 
+/**
+ * Kairos 额度护栏运行态（单一余额模型）。
+ *
+ * 真相源是 `<kairosRoot>/memory/budget-state.json`：controller 运行时把每次模型回复的成本
+ * 从 `balanceCny` 里扣减，用户在设置页可随时改这个余额。**不进 preferences.json**——
+ * 它是被高频回写的运行态数据，放配置文件会与热重载打架。
+ *
+ * - `enabled=false` 时 `balanceCny` 无意义，UI 不渲染额度块、Kairos 无限运行。
+ * - `exhausted = enabled && balanceCny <= 0`；为 true 时 Kairos 进入 `budget_exhausted`。
+ */
+export interface KairosBudgetRuntime {
+  enabled: boolean;
+  /** 剩余可花额度（¥）。运行时递减，可被用户改写。tick 边界粒度检查，可能短暂为负。 */
+  balanceCny: number;
+  exhausted: boolean;
+}
+
 /** Kairos 对外暴露的运行时快照。前端 KairosPage 顶部状态条直接渲染本结构。 */
 export type KairosRuntimeState = {
   enabled: boolean;
   state: KairosRunState;
+  /** 额度护栏运行态（始终存在；enabled=false 表示无限运行）。 */
+  budget: KairosBudgetRuntime;
   /** ISO time，仅 state==="sleeping" 时有意义，用于前端倒计时。 */
   sleepEndsAt?: string;
   todayTickCount: number;
@@ -75,12 +97,17 @@ export type KairosRuntimeState = {
   usageSinceReset: KairosUsageSummary;
 };
 
-/** 用户从 KairosPage 发起的控制指令，全部走 `kairos:control` IPC 通道。 */
+/** 用户从 KairosPage / 设置页发起的控制指令，全部走 `kairos:control` IPC 通道。 */
 export type KairosControl =
   | { type: "start" }
   | { type: "stop" }
   | { type: "wake_now" }
-  | { type: "reset_today" };
+  | { type: "reset_today" }
+  /**
+   * 设置页「额度限制」开关 + 「剩余额度」输入 → 写 `budget-state.json`。
+   * `balanceCny` 语义 = "保存后它还能花多少"（即剩余余额，运行时会被扣减）。
+   */
+  | { type: "set_budget"; enabled: boolean; balanceCny: number };
 
 /** KairosEventTable 中一行的语义类型。 */
 export type KairosRowKind =
@@ -234,7 +261,10 @@ export interface KairosContextPromptSegment {
  */
 export interface KairosContextSnapshot {
   generatedAt: string;
-  /** `null` 表示跟随主 Agent 模型选择（preferences.modelId === null）。 */
+  /**
+   * Kairos 实际使用的模型 id：由 `settings.json` 的 `kairos.modelId` 解析、回落 Kairos
+   * 默认模型后的真实 id（恒非空，与 LLM 真正调用的模型一致）。改设置页模型下拉会更新它。
+   */
   modelId: string | null;
   phase: KairosContextPhase;
   systemPrompt: string;

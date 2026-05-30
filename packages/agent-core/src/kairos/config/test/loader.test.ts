@@ -39,7 +39,7 @@ describe("loadKairosConfig", () => {
   it("respects user overrides in valid JSON", async () => {
     await writeFile(
       join(configDir, "preferences.json"),
-      JSON.stringify({ enabled: true, modelId: "kimi-k2" }),
+      JSON.stringify({ enabled: true }),
       "utf8",
     );
     await writeFile(
@@ -49,7 +49,6 @@ describe("loadKairosConfig", () => {
     );
     const cfg = await loadKairosConfig(tmpRoot);
     expect(cfg.preferences.enabled).toBe(true);
-    expect(cfg.preferences.modelId).toBe("kimi-k2");
     expect(cfg.paths.paths[0]).toEqual({ path: "/A", watch: true, tip: "first" });
   });
 

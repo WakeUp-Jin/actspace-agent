@@ -17,7 +17,7 @@ const defaultSettings: AppSettings = {
   version: 1,
   defaultModelId: null,
   providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: false } },
-  agent: { temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
+  agent: { systemPrompt: "", temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
   kairos: { modelId: null, thinking: "auto" },
 };
 
@@ -31,8 +31,11 @@ const settingsApiStub = {
   visualizeReply: async () => ({ html: "<!doctype html><html></html>", sourceHash: "stub", cached: false }),
   listVisualizations: async () => ({ items: [] }),
   describeContext: async () => null,
+  listWorkspaceDir: async () => ({ root: "/tmp/workspace", relativePath: "", entries: [] }),
+  readWorkspaceFile: async () => ({ relativePath: "", renderKind: "text" as const, size: 0, content: "" }),
   setUiZoom: () => {},
   setNativeTheme: () => {},
+  onShuttingDown: () => () => {},
 };
 
 function createEmptySessionRecord(sessionId: string): SessionRecord {

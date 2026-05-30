@@ -246,7 +246,7 @@ describe("KairosRunner.processTick", () => {
     expect(payload.serverToolUse).toEqual({ webSearchRequests: 2, webFetchRequests: 1 });
     expect(payload.modelId).toBe("deepseek-v4-flash");
     expect(payload.cost.total).toBeGreaterThan(0);
-    // cost.currency 由 model-config pricing 决定；当前 DeepSeek pricing 写的是 USD。
+    // cost.currency 由 model-config pricing 决定；当前 DeepSeek pricing 写的是 CNY（国产模型按人民币计费）。
     expect(["USD", "CNY"]).toContain(payload.cost.currency);
   });
 
@@ -301,5 +301,65 @@ describe("KairosRunner.processTick", () => {
       payload: { trigger: "brief", briefId: "morning-recap", content: "复盘昨日" },
     });
     expect(markRun).toHaveBeenCalledWith("morning-recap", "ok", expect.any(Date));
+  });
+
+  it("把 getAbortSignal() 透传进 agent loop（llm.stream 收到同一 signal）", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "mock-model" });
+    const streamSpy = vi.spyOn(llm, "stream");
+    llm.setResponses([mockText("hi")]);
+
+    const controller = new AbortController();
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp/work" });
+    registerKairosTools(toolManager);
+
+    const runner = new KairosRunner({
+      config: baseConfig(),
+      shortTerm: fakeShortTerm(),
+      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
+      activeBriefsCount: async () => 0,
+      eventSink: async () => {},
+      llm,
+      toolManager,
+      kairosGuard: baseGuard,
+      getAbortSignal: () => controller.signal,
+    });
+    await runner.processTick({ type: "tick", payload: tickPayload() });
+
+    const opts = streamSpy.mock.calls.at(-1)?.[1] as { signal?: AbortSignal } | undefined;
+    expect(opts?.signal).toBe(controller.signal);
+  });
+
+  it("已 abort 的 signal 直接短路：不调 llm.stream、无 assistant_message", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "mock-model" });
+    const streamSpy = vi.spyOn(llm, "stream");
+    llm.setResponses([mockText("hi")]);
+
+    const controller = new AbortController();
+    controller.abort();
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp/work" });
+    registerKairosTools(toolManager);
+
+    const events: SessionEvent[] = [];
+    const runner = new KairosRunner({
+      config: baseConfig(),
+      shortTerm: fakeShortTerm(),
+      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
+      activeBriefsCount: async () => 0,
+      eventSink: async (e) => {
+        events.push(e);
+      },
+      llm,
+      toolManager,
+      kairosGuard: baseGuard,
+      getAbortSignal: () => controller.signal,
+    });
+
+    // loop 在第一步就因 aborted 退出、没产出 assistant message → runAgentLoop 抛错。
+    // 关键断言：完全没有真正发起 LLM 请求（shutdown 时正在飞的请求要能立刻被掐断）。
+    await expect(runner.processTick({ type: "tick", payload: tickPayload() })).rejects.toThrow(
+      /without producing an assistant/,
+    );
+    expect(streamSpy).not.toHaveBeenCalled();
+    expect(events.some((e) => e.type === "assistant_message")).toBe(false);
   });
 });

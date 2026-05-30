@@ -34,6 +34,7 @@ function installFakeBridge(opts: FakeKairosOptions = {}): KairosBridgeApi {
   const defaultState: KairosRuntimeState = {
     enabled: false,
     state: "stopped",
+    budget: { enabled: false, balanceCny: 0, exhausted: false },
     todayTickCount: 0,
     toolCallCountInCurrentTick: 0,
     totalSleepSecondsToday: 0,
@@ -155,6 +156,7 @@ describe("RightPanel Kairos tab", () => {
       initialState: {
         enabled: true,
         state: "sleeping",
+        budget: { enabled: false, balanceCny: 0, exhausted: false },
         sleepEndsAt: new Date(Date.now() + 4_000).toISOString(),
         todayTickCount: 1,
         toolCallCountInCurrentTick: 0,
@@ -183,6 +185,7 @@ describe("RightPanel Kairos tab", () => {
       initialState: {
         enabled: true,
         state: "idle",
+        budget: { enabled: false, balanceCny: 0, exhausted: false },
         todayTickCount: 0,
         toolCallCountInCurrentTick: 0,
         totalSleepSecondsToday: 0,

@@ -44,7 +44,7 @@ export function MarkdownRenderView({ source, relativePath }: { source: string; r
       </div>
       {mode === "preview" ? (
         <div className={PREVIEW_SCROLL_CLASS}>
-          <div className="markdown-prose markdown-doc">
+          <div className="markdown-prose markdown-doc act-code-hl">
             <Markdown
               remarkPlugins={REMARK_PLUGINS}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any

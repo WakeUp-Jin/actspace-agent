@@ -1,0 +1,120 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type {
+  AppSettings,
+  KairosBridgeApi,
+  KairosBudgetRuntime,
+  KairosRuntimeState,
+} from "@actspace/shared";
+import { emptyKairosUsageSummary } from "@actspace/shared";
+import { KairosSettings } from "../components/settings/KairosSettings";
+
+function makeSettings(): AppSettings {
+  return {
+    version: 1,
+    defaultModelId: null,
+    providers: { deepseek: { hasApiKey: true }, kimi: { hasApiKey: false } },
+    agent: {
+      systemPrompt: "",
+      temperature: null,
+      maxTokens: null,
+      disabledTools: [],
+      bashAlwaysAsk: false,
+    },
+    kairos: { modelId: null, thinking: "auto" },
+  };
+}
+
+function makeState(budget: KairosBudgetRuntime): KairosRuntimeState {
+  return {
+    enabled: false,
+    state: "stopped",
+    budget,
+    todayTickCount: 0,
+    toolCallCountInCurrentTick: 0,
+    totalSleepSecondsToday: 0,
+    usageLifetime: emptyKairosUsageSummary(),
+    usageSinceReset: emptyKairosUsageSummary(),
+  };
+}
+
+type KairosBridge = NonNullable<typeof window.kairos>;
+
+function installKairosBridge(budget: KairosBudgetRuntime): {
+  control: ReturnType<typeof vi.fn>;
+} {
+  const control = vi.fn(async () => ({ ok: true as const }));
+  const bridge: KairosBridgeApi = {
+    getState: vi.fn(async () => makeState(budget)),
+    getEventsRecent: vi.fn(async () => ({ events: [], hasMore: false })),
+    control,
+    readConfig: vi.fn(async (req) => ({ content: "", fileName: `${req.name}.json`, notFound: true })),
+    writeConfig: vi.fn(async () => ({ ok: true as const })),
+    getContextSnapshot: vi.fn(async () => ({ generatedAt: new Date().toISOString(), sections: [] })),
+    onEvent: vi.fn(() => () => {}),
+    onState: vi.fn(() => () => {}),
+  } as unknown as KairosBridgeApi;
+  window.kairos = bridge as unknown as KairosBridge;
+  return { control };
+}
+
+describe("KairosSettings 额度护栏控件", () => {
+  afterEach(() => {
+    delete (window as { kairos?: KairosBridge }).kairos;
+  });
+
+  it("回填 getState().budget：开关与剩余额度", async () => {
+    installKairosBridge({ enabled: true, balanceCny: 5, exhausted: false });
+    render(<KairosSettings settings={makeSettings()} onUpdate={() => {}} />);
+
+    const toggle = await screen.findByRole("switch", { name: "Kairos 额度限制" });
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
+    const balance = screen.getByLabelText("Kairos 剩余额度") as HTMLInputElement;
+    await waitFor(() => expect(balance.value).toBe("5"));
+    expect(balance).not.toBeDisabled();
+  });
+
+  it("打开额度开关 → control(set_budget, enabled:true)", async () => {
+    const { control } = installKairosBridge({ enabled: false, balanceCny: 0, exhausted: false });
+    render(<KairosSettings settings={makeSettings()} onUpdate={() => {}} />);
+
+    const toggle = await screen.findByRole("switch", { name: "Kairos 额度限制" });
+    await userEvent.click(toggle);
+
+    await waitFor(() =>
+      expect(control).toHaveBeenCalledWith({ type: "set_budget", enabled: true, balanceCny: 0 }),
+    );
+  });
+
+  it("修改剩余额度并失焦 → control(set_budget, balanceCny)", async () => {
+    const { control } = installKairosBridge({ enabled: true, balanceCny: 5, exhausted: false });
+    render(<KairosSettings settings={makeSettings()} onUpdate={() => {}} />);
+
+    const balance = (await screen.findByLabelText("Kairos 剩余额度")) as HTMLInputElement;
+    await waitFor(() => expect(balance.value).toBe("5"));
+
+    await userEvent.clear(balance);
+    await userEvent.type(balance, "12.5");
+    await userEvent.tab();
+
+    await waitFor(() =>
+      expect(control).toHaveBeenCalledWith({ type: "set_budget", enabled: true, balanceCny: 12.5 }),
+    );
+  });
+
+  it("关闭额度限制时剩余额度输入禁用", async () => {
+    installKairosBridge({ enabled: false, balanceCny: 0, exhausted: false });
+    render(<KairosSettings settings={makeSettings()} onUpdate={() => {}} />);
+
+    const balance = (await screen.findByLabelText("Kairos 剩余额度")) as HTMLInputElement;
+    expect(balance).toBeDisabled();
+  });
+
+  it("耗尽时显示「额度不足」提示", async () => {
+    installKairosBridge({ enabled: true, balanceCny: 0, exhausted: true });
+    render(<KairosSettings settings={makeSettings()} onUpdate={() => {}} />);
+
+    expect(await screen.findByText("额度不足")).toBeInTheDocument();
+  });
+});

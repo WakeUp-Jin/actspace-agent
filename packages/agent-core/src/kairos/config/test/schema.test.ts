@@ -18,12 +18,10 @@ describe("parsePreferences", () => {
   it("keeps user overrides and falls back per-field for invalid values", () => {
     const parsed = parsePreferences({
       enabled: true,
-      modelId: "kimi-k2-instruct",
       sleepRangeSeconds: { min: 10, max: 1200, default: "not-a-number" },
       memory: { loadBudgetRatio: 1.5, compressionThreshold: 0.9 },
     });
     expect(parsed.enabled).toBe(true);
-    expect(parsed.modelId).toBe("kimi-k2-instruct");
     expect(parsed.sleepRangeSeconds.min).toBe(10);
     expect(parsed.sleepRangeSeconds.max).toBe(1200);
     expect(parsed.sleepRangeSeconds.default).toBe(DEFAULT_PREFERENCES.sleepRangeSeconds.default);

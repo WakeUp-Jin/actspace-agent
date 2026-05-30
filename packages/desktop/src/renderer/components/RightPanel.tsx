@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, X } from "lucide-react";
+import hljs from "highlight.js";
 import type { ContextState } from "@actspace/shared";
 import { ContextRenderView } from "./right-panel/ContextRenderView";
 import { HtmlRenderView } from "./right-panel/HtmlRenderView";
 import { KairosRightPanelView } from "./right-panel/KairosRightPanelView";
 import { MarkdownRenderView } from "./right-panel/MarkdownRenderView";
 import { ReplyHtmlRenderView } from "./right-panel/ReplyHtmlRenderView";
+import { WorkspaceFileTree } from "./right-panel/WorkspaceFileTree";
 import { useRightPanel, type RightPanelTab } from "./right-panel/RightPanelContext";
 
-const RIGHT_PANEL_CLASS = "flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l border-line bg-surface";
+const RIGHT_PANEL_CLASS = "flex h-full min-h-0 min-w-0 flex-row overflow-hidden border-l border-line bg-surface";
+const RIGHT_PANEL_MAIN_CLASS = "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden";
 // 右侧预留两个 chrome 控件（+ 新建对象 / 折叠面板）的宽度，tab 永远不会滑到按钮下方造成重叠。
 const RIGHT_TABS_CLASS =
   "relative z-[61] flex min-h-[var(--window-chrome-strip-height)] shrink-0 items-center border-b border-line py-0 pl-2.5 pr-[calc(2*var(--window-chrome-control-size)+28px)] [pointer-events:none]";
@@ -38,12 +41,15 @@ const RIGHT_PANEL_HEADING_CLASS = "m-0 mb-2 text-[15px] font-semibold";
 const RIGHT_PANEL_TEXT_CLASS = "m-0 text-[13px] text-text-muted";
 
 export function RightPanel({ contextState, sessionId }: { contextState?: ContextState | null; sessionId?: string | null }) {
-  const { activeTab } = useRightPanel();
+  const { activeTab, isFileTreeOpen } = useRightPanel();
 
   return (
     <aside className={RIGHT_PANEL_CLASS}>
-      <RightPanelTabs />
-      <RightPanelBody tab={activeTab} contextState={contextState} sessionId={sessionId} />
+      {isFileTreeOpen ? <WorkspaceFileTree /> : null}
+      <div className={RIGHT_PANEL_MAIN_CLASS}>
+        <RightPanelTabs />
+        <RightPanelBody tab={activeTab} contextState={contextState} sessionId={sessionId} />
+      </div>
     </aside>
   );
 }
@@ -242,7 +248,7 @@ function RightPanelBody({
   }
 
   if (tab.kind === "text") {
-    return <TextRenderView content={tab.content} relativePath={tab.relativePath} />;
+    return <TextRenderView content={tab.content} relativePath={tab.relativePath} language={tab.language} />;
   }
 
   return <ContextRenderView contextState={contextState} sessionId={sessionId} />;
@@ -268,7 +274,28 @@ function ImageRenderView({ src, relativePath }: { src: string; relativePath?: st
   );
 }
 
-function TextRenderView({ content, relativePath }: { content: string; relativePath?: string }) {
+/**
+ * 文本 / 代码文件视图。带 `language`（ts/js/css/yaml/json…）时用 highlight.js 语法高亮，
+ * 复用 Markdown 的主题感知 hljs 配色（共享 `.act-code-hl` 作用域）；无语言或高亮失败回退纯等宽。
+ */
+function TextRenderView({
+  content,
+  relativePath,
+  language,
+}: {
+  content: string;
+  relativePath?: string;
+  language?: string;
+}) {
+  const highlighted = useMemo(() => {
+    if (!language || !hljs.getLanguage(language)) return null;
+    try {
+      return hljs.highlight(content, { language, ignoreIllegals: true }).value;
+    } catch {
+      return null;
+    }
+  }, [content, language]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className={FILE_TOOLBAR_CLASS}>
@@ -276,9 +303,15 @@ function TextRenderView({ content, relativePath }: { content: string; relativePa
           {relativePath ?? "文本预览"}
         </span>
       </div>
-      <pre className={TEXT_BODY_CLASS}>
-        <code>{content}</code>
-      </pre>
+      {highlighted ? (
+        <pre className={`${TEXT_BODY_CLASS} act-code-hl`}>
+          <code className="hljs" dangerouslySetInnerHTML={{ __html: highlighted }} />
+        </pre>
+      ) : (
+        <pre className={TEXT_BODY_CLASS}>
+          <code>{content}</code>
+        </pre>
+      )}
     </div>
   );
 }

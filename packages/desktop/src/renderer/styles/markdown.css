@@ -192,8 +192,12 @@
   vertical-align: middle;
 }
 
-/* hljs 语法配色：浅色默认，深色随 data-theme 翻转（满足主题硬约束）。 */
-.markdown-doc {
+/*
+ * hljs 语法配色：浅色默认，深色随 data-theme 翻转（满足主题硬约束）。
+ * 作用域提取为共享 class `.act-code-hl`，供 Markdown 文档视图与右侧「代码文件 Tab」复用同一套配色。
+ * Markdown 容器（.markdown-doc）通过同时带上 `act-code-hl` 接入，避免两处各写一套颜色。
+ */
+.act-code-hl {
   --md-hl-comment: #a0a1a7;
   --md-hl-keyword: #a626a4;
   --md-hl-string: #50a14f;
@@ -204,7 +208,7 @@
   --md-hl-literal: #0184bc;
 }
 
-:root[data-theme="dark"] .markdown-doc {
+:root[data-theme="dark"] .act-code-hl {
   --md-hl-comment: #7f848e;
   --md-hl-keyword: #c678dd;
   --md-hl-string: #98c379;
@@ -216,7 +220,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root[data-theme="system"] .markdown-doc {
+  :root[data-theme="system"] .act-code-hl {
     --md-hl-comment: #7f848e;
     --md-hl-keyword: #c678dd;
     --md-hl-string: #98c379;
@@ -228,64 +232,64 @@
   }
 }
 
-.markdown-doc .hljs-comment,
-.markdown-doc .hljs-quote {
+.act-code-hl .hljs-comment,
+.act-code-hl .hljs-quote {
   color: var(--md-hl-comment);
   font-style: italic;
 }
 
-.markdown-doc .hljs-keyword,
-.markdown-doc .hljs-selector-tag,
-.markdown-doc .hljs-built_in,
-.markdown-doc .hljs-name,
-.markdown-doc .hljs-tag {
+.act-code-hl .hljs-keyword,
+.act-code-hl .hljs-selector-tag,
+.act-code-hl .hljs-built_in,
+.act-code-hl .hljs-name,
+.act-code-hl .hljs-tag {
   color: var(--md-hl-keyword);
 }
 
-.markdown-doc .hljs-string,
-.markdown-doc .hljs-meta .hljs-string,
-.markdown-doc .hljs-regexp,
-.markdown-doc .hljs-addition {
+.act-code-hl .hljs-string,
+.act-code-hl .hljs-meta .hljs-string,
+.act-code-hl .hljs-regexp,
+.act-code-hl .hljs-addition {
   color: var(--md-hl-string);
 }
 
-.markdown-doc .hljs-number,
-.markdown-doc .hljs-symbol,
-.markdown-doc .hljs-bullet {
+.act-code-hl .hljs-number,
+.act-code-hl .hljs-symbol,
+.act-code-hl .hljs-bullet {
   color: var(--md-hl-number);
 }
 
-.markdown-doc .hljs-title,
-.markdown-doc .hljs-title.function_,
-.markdown-doc .hljs-section {
+.act-code-hl .hljs-title,
+.act-code-hl .hljs-title.function_,
+.act-code-hl .hljs-section {
   color: var(--md-hl-function);
 }
 
-.markdown-doc .hljs-type,
-.markdown-doc .hljs-class .hljs-title,
-.markdown-doc .hljs-title.class_,
-.markdown-doc .hljs-params {
+.act-code-hl .hljs-type,
+.act-code-hl .hljs-class .hljs-title,
+.act-code-hl .hljs-title.class_,
+.act-code-hl .hljs-params {
   color: var(--md-hl-type);
 }
 
-.markdown-doc .hljs-attr,
-.markdown-doc .hljs-attribute,
-.markdown-doc .hljs-variable,
-.markdown-doc .hljs-template-variable,
-.markdown-doc .hljs-deletion {
+.act-code-hl .hljs-attr,
+.act-code-hl .hljs-attribute,
+.act-code-hl .hljs-variable,
+.act-code-hl .hljs-template-variable,
+.act-code-hl .hljs-deletion {
   color: var(--md-hl-variable);
 }
 
-.markdown-doc .hljs-literal,
-.markdown-doc .hljs-link,
-.markdown-doc .hljs-meta {
+.act-code-hl .hljs-literal,
+.act-code-hl .hljs-link,
+.act-code-hl .hljs-meta {
   color: var(--md-hl-literal);
 }
 
-.markdown-doc .hljs-emphasis {
+.act-code-hl .hljs-emphasis {
   font-style: italic;
 }
 
-.markdown-doc .hljs-strong {
+.act-code-hl .hljs-strong {
   font-weight: 700;
 }

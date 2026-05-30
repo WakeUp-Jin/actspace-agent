@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadEnv } from "@actspace/agent-core";
+import { loadEnv, MAIN_AGENT_SYSTEM_PROMPT } from "@actspace/agent-core";
 import { SettingsService, type SecretCrypto } from "../settings-service";
 
 const MANAGED_ENV_KEYS = [
@@ -71,8 +71,6 @@ describe("SettingsService", () => {
   it("首次运行无 settings.json 时从当前 env 播种默认值", async () => {
     process.env.ACTSPACE_BASH_ALWAYS_ASK = "1";
     process.env.LLM_TEMPERATURE = "0.5";
-    process.env.KAIROS_MODEL_ID = "kimi-k2.6";
-    process.env.KAIROS_THINKING = "false";
     reloadEnv();
 
     const svc = makeService(await makeDataRoot());
@@ -80,9 +78,10 @@ describe("SettingsService", () => {
     const s = svc.get();
 
     expect(s.agent.bashAlwaysAsk).toBe(true);
+    expect(s.agent.systemPrompt).toBe(MAIN_AGENT_SYSTEM_PROMPT);
     expect(s.agent.temperature).toBe(0.5);
-    expect(s.kairos.modelId).toBe("kimi-k2.6");
-    expect(s.kairos.thinking).toBe("off");
+    expect(s.kairos.modelId).toBeNull();
+    expect(s.kairos.thinking).toBe("auto");
     expect(s.defaultModelId).toBeNull();
   });
 
@@ -93,9 +92,16 @@ describe("SettingsService", () => {
 
     const updated = await svc.update({
       defaultModelId: "deepseek-v4-pro",
-      agent: { bashAlwaysAsk: true, temperature: 1.2, maxTokens: 4096, disabledTools: ["bash"] },
+      agent: {
+        systemPrompt: "You are a custom actspace agent.",
+        bashAlwaysAsk: true,
+        temperature: 1.2,
+        maxTokens: 4096,
+        disabledTools: ["bash"],
+      },
     });
 
+    expect(updated.agent.systemPrompt).toBe("You are a custom actspace agent.");
     expect(updated.agent.bashAlwaysAsk).toBe(true);
     expect(process.env.ACTSPACE_BASH_ALWAYS_ASK).toBe("1");
     expect(process.env.LLM_TEMPERATURE).toBe("1.2");
@@ -108,6 +114,7 @@ describe("SettingsService", () => {
 
     const reopened = makeService(dataRoot);
     await reopened.load();
+    expect(reopened.get().agent.systemPrompt).toBe("You are a custom actspace agent.");
     expect(reopened.get().agent.maxTokens).toBe(4096);
     expect(reopened.get().defaultModelId).toBe("deepseek-v4-pro");
   });
@@ -174,28 +181,33 @@ describe("SettingsService", () => {
     expect(process.env.KIMI_API_KEY).toBeUndefined();
   });
 
-  it("applyToEnv 正确映射 Kairos 模型与思考链；null 模型回落删除", async () => {
+  it("Kairos 模型与思考链持久化到 settings.json，不写 KAIROS env", async () => {
     const dataRoot = await makeDataRoot();
     const svc = makeService(dataRoot);
     await svc.load();
 
-    await svc.update({ kairos: { modelId: "kimi-k2.6", thinking: "off" } });
-    expect(process.env.KAIROS_MODEL_ID).toBe("kimi-k2.6");
-    expect(process.env.KAIROS_THINKING).toBe("false");
-
-    await svc.update({ kairos: { modelId: null, thinking: "auto" } });
+    const updated = await svc.update({ kairos: { modelId: "deepseek-v4-pro", thinking: "off" } });
+    expect(updated.kairos.modelId).toBe("deepseek-v4-pro");
+    expect(updated.kairos.thinking).toBe("off");
+    expect(process.env.KAIROS_THINKING).toBeUndefined();
     expect(process.env.KAIROS_MODEL_ID).toBeUndefined();
-    expect(process.env.KAIROS_THINKING).toBe("auto");
+
+    const persisted = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
+    expect(persisted.kairos).toEqual({ modelId: "deepseek-v4-pro", thinking: "off" });
+
+    const reset = await svc.update({ kairos: { modelId: null, thinking: "auto" } });
+    expect(reset.kairos).toEqual({ modelId: null, thinking: "auto" });
+    expect(process.env.KAIROS_THINKING).toBeUndefined();
   });
 
-  it("非法 defaultModelId / kairos.modelId 被收敛为 null", async () => {
+  it("非法 defaultModelId / kairos.modelId 被收敛为 null；kairos.thinking 仍生效", async () => {
     const dataRoot = await makeDataRoot();
     const svc = makeService(dataRoot);
     await svc.load();
 
     const updated = await svc.update({
       defaultModelId: "not-a-model" as never,
-      kairos: { modelId: "also-bad" as never, thinking: "on" },
+      kairos: { modelId: "kimi-k2.6" as never, thinking: "on" },
     });
     expect(updated.defaultModelId).toBeNull();
     expect(updated.kairos.modelId).toBeNull();

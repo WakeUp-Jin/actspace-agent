@@ -26,7 +26,7 @@ import type {
   KairosWriteConfigRequest,
   KairosWriteConfigResponse,
 } from "@actspace/shared";
-import type { KairosController } from "@actspace/agent-core";
+import type { KairosConfig, KairosController } from "@actspace/agent-core";
 import {
   CONFIG_FILE_MAP,
   KAIROS_IPC_CHANNELS,
@@ -40,6 +40,15 @@ export interface RegisterKairosIpcOptions {
   controller: KairosController;
   kairosRoot: string;
   getMainWindow: () => BrowserWindow | undefined;
+  /**
+   * 用户保存 `preferences.json` 成功（已写盘 + reloadConfig）后回调，带上最新 KairosConfig。
+   * 调用方据此做模型重建 / enabled 起停级联。
+   *
+   * 重要：本回调经 `setImmediate` 延后到 write-config handler 返回之后再执行——因为级联可能
+   * `dispose()` 当前 kairos-ipc 句柄（重建路径会 removeHandler），不能在 invoke handler 执行
+   * 过程中拆掉自己的 handler。
+   */
+  onPreferencesWritten?: (config: KairosConfig) => void;
 }
 
 export interface KairosIpcHandle {
@@ -120,7 +129,14 @@ export function registerKairosIpc(opts: RegisterKairosIpcOptions): KairosIpcHand
     await writeFile(tmp, req.content, "utf8");
     await rename(tmp, filePath);
 
-    await opts.controller.reloadConfig();
+    const reloaded = await opts.controller.reloadConfig();
+
+    if (req.name === "preferences" && opts.onPreferencesWritten) {
+      // 延后到本 handler 返回之后：级联可能重建 controller 并 dispose 当前 ipc 句柄，
+      // 不能在 invoke handler 执行中拆掉自己的 handler。
+      const cb = opts.onPreferencesWritten;
+      setImmediate(() => cb(reloaded));
+    }
 
     return { ok: true };
   });

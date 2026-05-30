@@ -38,6 +38,7 @@ function createTestAgentConfig(overrides?: Partial<AgentConfig>): AgentConfig {
     },
     thinkingEnabled: spec.thinkingDefault,
     modelSpec: spec,
+    systemPrompt: "TEST_SYSTEM_PROMPT",
     ...overrides,
   };
 }
@@ -168,8 +169,22 @@ describe("buildAgentConfig (via dynamic import to reset env)", () => {
     expect(config.toolManagerConfig).toBeDefined();
     expect(config.modelSpec).toBeDefined();
     expect(typeof config.thinkingEnabled).toBe("boolean");
+    expect(typeof config.systemPrompt).toBe("string");
     expect(config).not.toHaveProperty("llm");
     expect(config).not.toHaveProperty("toolManager");
+  });
+
+  it("should accept systemPrompt from runtime context", async () => {
+    process.env.DEEPSEEK_API_KEY = "sk-test";
+    const { loadEnv } = await import("../../env");
+    const { buildAgentConfig } = await import("../create-agent-deps");
+    loadEnv({ envPath: EMPTY_ENV_PATH, mergeToProcessEnv: false });
+
+    const config = buildAgentConfig({}, "/tmp/workspace", undefined, {
+      systemPrompt: "CUSTOM_SYSTEM_PROMPT",
+    });
+
+    expect(config.systemPrompt).toBe("CUSTOM_SYSTEM_PROMPT");
   });
 
   it("should resolve default model when none specified", async () => {
@@ -278,6 +293,13 @@ describe("createAgentFromConfig", () => {
     expect(deps.contextManager).toBeDefined();
     expect(deps.thinkingEnabled).toBe(config.thinkingEnabled);
     expect(deps.modelSpec).toBe(config.modelSpec);
+  });
+
+  it("should use config.systemPrompt as the full system prompt", async () => {
+    const { createAgentFromConfig } = await import("../create-agent-deps");
+    const deps = createAgentFromConfig(createTestAgentConfig({ systemPrompt: "FULL_CUSTOM_SYSTEM_PROMPT" }));
+
+    expect(deps.contextManager.getContext().systemPrompt).toContain("FULL_CUSTOM_SYSTEM_PROMPT");
   });
 
   it("should respect disabledTools from config", async () => {
@@ -390,6 +412,13 @@ describe("createAgentForSession", () => {
     const deps = await createAgentForSession(createTestAgentConfig());
 
     expect(deps.contextManager.getMessageCount()).toBe(0);
+  });
+
+  it("uses config.systemPrompt when restoring a session", async () => {
+    const { createAgentForSession } = await import("../create-agent-deps");
+    const deps = await createAgentForSession(createTestAgentConfig({ systemPrompt: "RESTORED_SYSTEM_PROMPT" }));
+
+    expect(deps.contextManager.getContext().systemPrompt).toContain("RESTORED_SYSTEM_PROMPT");
   });
 
   it("creates AgentDeps whose contextManager already contains session history", async () => {

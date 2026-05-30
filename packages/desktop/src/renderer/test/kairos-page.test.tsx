@@ -39,6 +39,7 @@ function installFakeBridge(opts: FakeKairosOptions = {}): {
   const defaultState: KairosRuntimeState = {
     enabled: false,
     state: "stopped",
+    budget: { enabled: false, balanceCny: 0, exhausted: false },
     todayTickCount: 0,
     toolCallCountInCurrentTick: 0,
     totalSleepSecondsToday: 0,
@@ -134,6 +135,7 @@ describe("KairosPage", () => {
       initialState: {
         enabled: true,
         state: "sleeping",
+        budget: { enabled: false, balanceCny: 0, exhausted: false },
         sleepEndsAt: new Date(Date.now() + 8_000).toISOString(),
         todayTickCount: 2,
         toolCallCountInCurrentTick: 0,
@@ -153,6 +155,7 @@ describe("KairosPage", () => {
       pushState({
         enabled: false,
         state: "stopped",
+        budget: { enabled: false, balanceCny: 0, exhausted: false },
         todayTickCount: 2,
         toolCallCountInCurrentTick: 0,
         totalSleepSecondsToday: 120,
@@ -193,6 +196,7 @@ describe("KairosPage", () => {
       initialState: {
         enabled: true,
         state: "sleeping",
+        budget: { enabled: false, balanceCny: 0, exhausted: false },
         sleepEndsAt: new Date(Date.now() + 5_000).toISOString(),
         todayTickCount: 4,
         toolCallCountInCurrentTick: 1,
@@ -457,6 +461,7 @@ describe("KairosPage", () => {
       initialState: {
         enabled: true,
         state: "sleeping",
+        budget: { enabled: false, balanceCny: 0, exhausted: false },
         sleepEndsAt: new Date(Date.now() + 10_000).toISOString(),
         todayTickCount: 2,
         toolCallCountInCurrentTick: 0,
@@ -516,6 +521,7 @@ describe("KairosPage", () => {
       initialState: {
         enabled: true,
         state: "ticking",
+        budget: { enabled: false, balanceCny: 0, exhausted: false },
         todayTickCount: 3,
         toolCallCountInCurrentTick: 1,
         totalSleepSecondsToday: 30,
@@ -565,6 +571,7 @@ describe("KairosPage", () => {
       initialState: {
         enabled: true,
         state: "ticking",
+        budget: { enabled: false, balanceCny: 0, exhausted: false },
         todayTickCount: 3,
         toolCallCountInCurrentTick: 1,
         totalSleepSecondsToday: 30,
@@ -637,6 +644,7 @@ describe("KairosPage", () => {
       pushState({
         enabled: true,
         state: "ticking",
+        budget: { enabled: false, balanceCny: 0, exhausted: false },
         todayTickCount: 1,
         toolCallCountInCurrentTick: 0,
         totalSleepSecondsToday: 0,
@@ -656,6 +664,7 @@ describe("KairosPage", () => {
       initialState: {
         enabled: false,
         state: "stopped",
+        budget: { enabled: false, balanceCny: 0, exhausted: false },
         todayTickCount: 0,
         toolCallCountInCurrentTick: 0,
         totalSleepSecondsToday: 0,
@@ -669,6 +678,7 @@ describe("KairosPage", () => {
       pushState({
         enabled: true,
         state: "ticking",
+        budget: { enabled: false, balanceCny: 0, exhausted: false },
         todayTickCount: 3,
         toolCallCountInCurrentTick: 2,
         totalSleepSecondsToday: 120,
@@ -680,5 +690,67 @@ describe("KairosPage", () => {
     const stats = screen.getByLabelText("统计");
     expect(within(stats).getByText("巡检")).toBeInTheDocument();
     expect(within(stats).getByText("3")).toBeInTheDocument();
+  });
+
+  it("budget_exhausted 状态显示「额度不足」状态条 + danger 额度胶囊", async () => {
+    installFakeBridge({
+      initialState: {
+        enabled: false,
+        state: "budget_exhausted",
+        budget: { enabled: true, balanceCny: 0, exhausted: true },
+        todayTickCount: 5,
+        toolCallCountInCurrentTick: 0,
+        totalSleepSecondsToday: 0,
+        usageLifetime: emptyUsage(),
+        usageSinceReset: emptyUsage(),
+      },
+    });
+    render(<KairosPage />);
+
+    expect(await screen.findByText("额度不足")).toBeInTheDocument();
+    const chip = screen.getByTestId("kairos-budget-chip");
+    expect(chip.dataset.exhausted).toBe("true");
+    expect(within(chip).getByText("不足")).toBeInTheDocument();
+    // 耗尽时主操作仍是「开启」（不自动恢复，需用户充值后手动开）
+    expect(screen.getByRole("button", { name: "开启" })).toBeInTheDocument();
+  });
+
+  it("开启额度限制且运行中：额度胶囊显示剩余余额 ¥x.xx", async () => {
+    installFakeBridge({
+      initialState: {
+        enabled: true,
+        state: "idle",
+        budget: { enabled: true, balanceCny: 3.5, exhausted: false },
+        todayTickCount: 1,
+        toolCallCountInCurrentTick: 0,
+        totalSleepSecondsToday: 0,
+        usageLifetime: emptyUsage(),
+        usageSinceReset: emptyUsage(),
+      },
+    });
+    render(<KairosPage />);
+
+    const chip = await screen.findByTestId("kairos-budget-chip");
+    expect(chip).toHaveTextContent("¥3.50");
+    expect(chip.dataset.exhausted).toBe("false");
+  });
+
+  it("额度限制关闭时不渲染额度胶囊", async () => {
+    installFakeBridge({
+      initialState: {
+        enabled: true,
+        state: "idle",
+        budget: { enabled: false, balanceCny: 0, exhausted: false },
+        todayTickCount: 1,
+        toolCallCountInCurrentTick: 0,
+        totalSleepSecondsToday: 0,
+        usageLifetime: emptyUsage(),
+        usageSinceReset: emptyUsage(),
+      },
+    });
+    render(<KairosPage />);
+
+    await screen.findByText(/Idle/);
+    expect(screen.queryByTestId("kairos-budget-chip")).not.toBeInTheDocument();
   });
 });

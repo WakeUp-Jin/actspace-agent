@@ -133,6 +133,61 @@ export type DescribeContextInput = {
   sessionId: string;
 };
 
+// ─── 工作区文件浏览器（见 `docs/design-docs/frontend-ui/工作区文件浏览器规范.md`）───
+
+/** 懒加载一层工作区目录。renderer 不直接读 FS，全部经此 IPC。 */
+export type WorkspaceListDirInput = {
+  /** 会话根；不传由 main 用 BootstrapState.workspaceRoot 兜底。 */
+  workspaceRoot?: string;
+  /** 相对 workspaceRoot 的目录路径，"" / "." 表示根。 */
+  relativePath?: string;
+};
+
+export type WorkspaceEntryKind = "dir" | "file";
+
+export type WorkspaceDirEntry = {
+  name: string;
+  /** 相对 workspaceRoot 的 POSIX 路径。 */
+  relativePath: string;
+  kind: WorkspaceEntryKind;
+  /** 文件字节数；目录为 undefined。 */
+  size?: number;
+};
+
+export type WorkspaceListDirResult = {
+  /** 实际使用的根（绝对路径）。 */
+  root: string;
+  /** 规范化后的当前目录相对路径。 */
+  relativePath: string;
+  /** 目录在前、文件在后，各自按名字升序。 */
+  entries: WorkspaceDirEntry[];
+  error?: "not_found" | "not_a_directory" | "escapes_root" | "too_many_entries";
+};
+
+/** 读取单个工作区文件，供右侧面板复用现有渲染视图打开。 */
+export type WorkspaceReadFileInput = {
+  workspaceRoot?: string;
+  relativePath: string;
+};
+
+export type WorkspaceFileRenderKind = "markdown" | "html" | "image" | "text";
+
+export type WorkspaceReadFileResult = {
+  relativePath: string;
+  renderKind: WorkspaceFileRenderKind;
+  /** text / markdown / html：UTF-8 文本；image：空。 */
+  content?: string;
+  /** image：data URL（base64）；其余空。 */
+  dataUrl?: string;
+  /** text 类的语法高亮语言（highlight.js 语言 id，按扩展名推断）；无法识别 / 截断 / 二进制时缺省，渲染回退纯等宽。 */
+  language?: string;
+  /** 文件字节数。 */
+  size: number;
+  /** 文本超过大小上限被截断。 */
+  truncated?: boolean;
+  error?: "not_found" | "not_a_file" | "too_large" | "binary" | "escapes_root";
+};
+
 export type SessionCreateInput = {
   title?: string;
   /** 创建时指定 workspace 根目录；不传由主进程从 BootstrapState 自动注入。 */

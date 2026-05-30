@@ -84,6 +84,7 @@ export async function runAndPersistTurn(
   roots: AppDataRoots,
   getMainWindow: () => BrowserWindow | undefined,
   approvalRegistry?: PendingApprovalRegistry,
+  getSystemPrompt?: () => string,
 ): Promise<AgentTurnResult> {
   logAgentTurn("run turn requested", {
     sessionId: input.sessionId,
@@ -132,7 +133,11 @@ export async function runAndPersistTurn(
     { model: input.model, thinkingEnabled: input.thinkingEnabled },
     roots.workspaceRoot,
     approvalRegistry,
-    { tmpRoot: roots.tmpRoot, sessionId: input.sessionId },
+    {
+      tmpRoot: roots.tmpRoot,
+      sessionId: input.sessionId,
+      systemPrompt: getSystemPrompt?.(),
+    },
   );
   const sessionDir = join(roots.sessionRoot, input.sessionId);
   const sessionPaths = createSessionStorePaths(sessionDir);

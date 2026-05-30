@@ -33,6 +33,7 @@ import { loadKairosConfig, type KairosConfig } from "./config/loader";
 import { ShortMemoryStore } from "./storage/short-memory-store";
 import { SessionEventRingBuffer } from "./storage/ring-buffer";
 import { KairosUsageAccumulator } from "./storage/usage-accumulator";
+import { KairosBudgetStore } from "./storage/budget-store";
 import { WatchDiffEngine } from "./context/watch-diff";
 import { SessionsDigestBuilder } from "./context/sessions-digest";
 import { KairosShortTermMemoryContext } from "./context/short-term";
@@ -73,6 +74,12 @@ export interface CreateKairosOptions {
   kairosRoot: string;
   llm: LLMService;
   /**
+   * Kairos 实际使用的模型 id（已由 `resolveKairosModelSpec(settings.kairos.modelId)` 解析、
+   * 回落过默认值的真实 id）。仅用于 `getContextSnapshot().modelId` 展示——让 Sheet 里
+   * 显示的模型 === LLM 真正调用的模型（所见即所得）。LLM 本身在 `opts.llm` 已定型。
+   */
+  modelId: string;
+  /**
    * 工厂：返回一个**Kairos 专属** ToolManager。
    * 调用方应在工厂内：
    *   - 注册主 Agent 同款工具集（已 minus blocklist.toolsDenied）
@@ -81,7 +88,7 @@ export interface CreateKairosOptions {
   toolManagerFactory: (config: KairosConfig) => ToolManager;
   contextWindow: number;
   /**
-   * Kairos LLM 调用是否启用思考链。由 `resolveKairosEnv()` 读 KAIROS_THINKING 决定，
+   * Kairos LLM 调用是否启用思考链。由 `resolveKairosEnv()` 解析 settings.kairos.thinking 后决定，
    * 透传到 runner 的 loopConfig.thinkingEnabled。
    * `undefined` → 让 LLM Service 用 ModelSpec.thinkingDefault；
    * `true / false` → 显式覆盖（仅 supportsThinkingToggle 的模型生效）。
@@ -120,6 +127,17 @@ export interface KairosController {
    * 由 main IPC 透传到 renderer 提示用户先修文件）。
    */
   setEnabledPreference(enabled: boolean): Promise<void>;
+  /**
+   * 设置页「额度限制」开关 + 「剩余额度」输入 → 写 `memory/budget-state.json`，
+   * 刷新运行态 budget，并清理 `budget_exhausted` 态（若充值后余额 > 0 / 关掉开关）。
+   * **不自动起跑**——恢复运行需用户手动点「开启」。
+   */
+  setBudget(input: { enabled: boolean; balanceCny: number }): Promise<void>;
+  /**
+   * 退出统一入口：abort 正在飞的 LLM 请求 → 停循环 → flush usage / budget 写盘。
+   * 内部各步骤独立吞错，保证整体不抛（main 的 before-quit 依赖它一定 resolve）。
+   */
+  shutdown(): Promise<void>;
   getState(): KairosRuntimeState;
   on(event: "state", listener: (s: KairosRuntimeState) => void): void;
   on(event: "event", listener: (e: SessionEvent) => void): void;
@@ -147,6 +165,8 @@ interface ControllerLayout {
   notesDir: string;
   /** `usage-accumulator.json` 落地路径；与 short-term 同根，方便统一备份/清理。 */
   usageAccumulatorFile: string;
+  /** `budget-state.json` 落地路径（额度护栏单一余额运行态）。 */
+  budgetStateFile: string;
 }
 
 function layout(root: string): ControllerLayout {
@@ -158,6 +178,7 @@ function layout(root: string): ControllerLayout {
     briefsDir: join(root, "briefs"),
     notesDir: join(root, "workspace", "notes"),
     usageAccumulatorFile: join(root, "memory", "usage-accumulator.json"),
+    budgetStateFile: join(root, "memory", "budget-state.json"),
   };
 }
 
@@ -192,6 +213,11 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     }
     return all;
   });
+  // 额度护栏单一余额：与 usage-accumulator 独立（后者是只增的统计总账，前者是可扣减的余额）。
+  const budgetStore = new KairosBudgetStore({ filePath: paths.budgetStateFile });
+  await budgetStore.load();
+  // 中断正在飞的 LLM 请求用；每次 start() 重建，shutdown()/耗尽时 abort。
+  let abortController = new AbortController();
   const shortTerm = new KairosShortTermMemoryContext({
     store,
     contextWindow: opts.contextWindow,
@@ -223,6 +249,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
   const runtimeState: KairosRuntimeState = {
     enabled: false,
     state: "stopped",
+    budget: budgetStore.getRuntime(),
     todayTickCount: 0,
     toolCallCountInCurrentTick: 0,
     totalSleepSecondsToday: 0,
@@ -265,7 +292,16 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
         usageAccumulator.accumulate(payload);
         runtimeState.usageLifetime = usageAccumulator.getLifetimeSummary();
         runtimeState.usageSinceReset = usageAccumulator.getSinceResetSummary();
-        // 推一次 state 让 UI 即时刷新用量胶囊；其它字段不变。
+        // 额度护栏：开关开时把本次成本从余额扣减；扣到 ≤0 提前唤醒，让 loop 在
+        // 下个 tick 边界被 canStartTick 拦下（避免长 sleep 期间还显示 sleeping）。
+        if (budgetStore.getEnabled()) {
+          budgetStore.deduct(payload.cost?.total ?? 0);
+          runtimeState.budget = budgetStore.getRuntime();
+          if (runtimeState.budget.exhausted) {
+            processor.triggerWake("wake_now");
+          }
+        }
+        // 推一次 state 让 UI 即时刷新用量胶囊 / 余额；其它字段不变。
         emitter.emit("state", { ...runtimeState });
       }
     }
@@ -298,6 +334,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     kairosGuard,
     briefsIndex,
     thinkingEnabled: opts.thinkingEnabled,
+    getAbortSignal: () => abortController.signal,
   });
 
   const queue = new MessageQueue();
@@ -312,12 +349,84 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     emitter.emit("state", { ...runtimeState });
   };
 
+  /**
+   * merge-write `preferences.json` 的 `enabled` 字段（保留其它字段）+ reload。
+   * 被 controller.setEnabledPreference 和耗尽暂停 haltForBudget 复用。
+   */
+  const persistEnabledPreference = async (enabled: boolean): Promise<void> => {
+    const prefsPath = join(opts.kairosRoot, "config", "preferences.json");
+    let raw: unknown = {};
+    try {
+      const txt = await readFile(prefsPath, "utf8");
+      raw = JSON.parse(txt);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") {
+        raw = {};
+      } else if (err instanceof SyntaxError) {
+        throw new Error(
+          `preferences.json 解析失败，无法持久化 enabled=${enabled}：${err.message}（请先在编辑器里修复 JSON 语法）`,
+        );
+      } else {
+        throw err;
+      }
+    }
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+      throw new Error(`preferences.json 顶层必须是 object，无法持久化 enabled（请检查文件内容）`);
+    }
+    (raw as Record<string, unknown>).enabled = enabled;
+    await mkdir(dirname(prefsPath), { recursive: true });
+    const tmp = `${prefsPath}.tmp`;
+    await writeFile(tmp, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+    await rename(tmp, prefsPath);
+    await reload();
+  };
+
+  /**
+   * 余额耗尽暂停：scheduler 在 tick 边界检测到余额 ≤0 → loop 切 budget_exhausted 并退出，
+   * 这里补做副作用：总开关 enabled=false + 持久化 preferences.enabled=false（避免重启反复
+   * 撞墙）+ 落一条 error 事件让用户在执行列表看到原因。**不自动恢复**——用户充值后手动开启。
+   */
+  const haltForBudget = async (): Promise<void> => {
+    runtimeState.enabled = false;
+    try {
+      await persistEnabledPreference(false);
+    } catch (err) {
+      emitter.emit("error", err);
+    }
+    try {
+      await eventSink({
+        id: makeId("evt"),
+        sessionId: `kairos-${currentSessionDate}`,
+        turnId: `turn-${Date.now()}`,
+        type: "error",
+        timestamp: new Date().toISOString(),
+        schemaVersion: 1,
+        payload: { message: "额度不足，Kairos 已暂停。请在设置页调高剩余额度后重新开启。" },
+      });
+    } catch {
+      // 写盘失败不影响暂停本身
+    }
+    emitter.emit("state", { ...runtimeState });
+  };
+
+  /**
+   * 传给 scheduler 的状态回调：在普通 setState 基础上，捕获"刚进入 budget_exhausted"的
+   * 转换并触发 haltForBudget（仅 scheduler 驱动的被动耗尽走这条；start 的防御性检查不复触发）。
+   */
+  const handleSchedulerState = (s: KairosRunState, meta?: { sleepEndsAt?: string; cooldownEndsAt?: string }) => {
+    const enteringExhausted = s === "budget_exhausted" && runtimeState.state !== "budget_exhausted";
+    setState(s, meta);
+    if (enteringExhausted) void haltForBudget();
+  };
+
   const processor = new QueueProcessor({
     queue,
     runner,
     prefs: config.preferences,
     pickNextTick: (now) => briefsDispatcher.pickNext(now),
-    onStateChange: setState,
+    canStartTick: () => !budgetStore.getRuntime().exhausted,
+    onStateChange: handleSchedulerState,
     onSleepStart: async (plannedSeconds) => {
       await eventSink({
         id: makeId("evt"),
@@ -371,7 +480,9 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
 
   const controller: KairosController = {
     async start(opts) {
-      if (runtimeState.enabled) return;
+      // 幂等：已在跑就返回。但 budget_exhausted 是"被动暂停"（enabled 已被置 false），
+      // 必须允许从这里重新开启，所以显式排除该状态。
+      if (runtimeState.enabled && runtimeState.state !== "budget_exhausted") return;
       const force = opts?.force === true;
       // 非 force 调用沿用旧语义：preferences.enabled=false → 占位 stopped 直接 return。
       // force=true（UI 显式开启）则忽略 preferences，直接进 processor。
@@ -380,7 +491,15 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
         setState("stopped");
         return;
       }
+      // 额度防御：余额耗尽时不起 processor，抛错让 renderer toast 提示先充值。
+      if (budgetStore.getRuntime().exhausted) {
+        runtimeState.enabled = false;
+        setState("budget_exhausted");
+        throw new Error("额度不足，请先在设置页调高剩余额度后再开启。");
+      }
       runtimeState.enabled = true;
+      // 每轮启动重建中断句柄，供 shutdown() abort 正在飞的 LLM 请求。
+      abortController = new AbortController();
       currentSessionDate = todayKey(new Date());
       await processor.start();
       // 首次 tick：firstTickDelay 后投递一个明确的 "first wake-up" tick
@@ -424,35 +543,44 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     },
     reloadConfig: reload,
     async setEnabledPreference(enabled: boolean) {
-      const prefsPath = join(opts.kairosRoot, "config", "preferences.json");
-      let raw: unknown = {};
+      await persistEnabledPreference(enabled);
+    },
+    async setBudget(input) {
+      await budgetStore.setBudget({ enabled: input.enabled, balanceCny: input.balanceCny });
+      runtimeState.budget = budgetStore.getRuntime();
+      // 耗尽态清理：充值后余额 > 0 / 关掉开关 → 从被动暂停回 stopped，UI 不再显示"额度不足"，
+      // 用户点「开启」即可正常进 idle。仍 exhausted（如设了 enabled 但 balance=0）则保持。
+      if (runtimeState.state === "budget_exhausted" && !runtimeState.budget.exhausted) {
+        setState("stopped");
+      } else {
+        emitter.emit("state", { ...runtimeState });
+      }
+    },
+    async shutdown() {
+      // 1) 中断正在飞的 LLM 请求，让当前 tick 尽快返回。
       try {
-        const txt = await readFile(prefsPath, "utf8");
-        raw = JSON.parse(txt);
-      } catch (err) {
-        const code = (err as NodeJS.ErrnoException).code;
-        if (code === "ENOENT") {
-          // 文件缺失：从空对象起步；reload 时 schema 会用默认值兜底其它字段。
-          raw = {};
-        } else if (err instanceof SyntaxError) {
-          throw new Error(
-            `preferences.json 解析失败，无法持久化 enabled=${enabled}：${err.message}（请先在编辑器里修复 JSON 语法）`,
-          );
-        } else {
-          throw err;
-        }
+        abortController.abort();
+      } catch {
+        // ignore
       }
-      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-        throw new Error(
-          `preferences.json 顶层必须是 object，无法持久化 enabled（请检查文件内容）`,
-        );
+      // 2) 停循环（等当前 tick 自然收尾）。
+      try {
+        await processor.stop();
+      } catch {
+        // ignore
       }
-      (raw as Record<string, unknown>).enabled = enabled;
-      await mkdir(dirname(prefsPath), { recursive: true });
-      const tmp = `${prefsPath}.tmp`;
-      await writeFile(tmp, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
-      await rename(tmp, prefsPath);
-      await reload();
+      runtimeState.enabled = false;
+      // 3) flush 两个运行态文件，避免退出丢账 / 丢余额。
+      try {
+        await usageAccumulator.flush();
+      } catch {
+        // ignore
+      }
+      try {
+        await budgetStore.flush();
+      } catch {
+        // ignore
+      }
     },
     getState() {
       return { ...runtimeState };
@@ -515,7 +643,9 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
 
       return {
         generatedAt: now.toISOString(),
-        modelId: config.preferences.modelId ?? null,
+        // 真实解析后的模型 id（来源 settings.kairos.modelId，已回落默认）；不再读裸字段，
+        // 保证显示 === 实际调用的模型。
+        modelId: opts.modelId,
         phase: derivePhase(now, config),
         systemPrompt,
         systemPromptTokens: estimateTokens(systemPrompt),

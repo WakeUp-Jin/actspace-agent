@@ -31,6 +31,8 @@ import type {
   ListVisualizationsInput,
   VisualizeReplyInput,
   DescribeContextInput,
+  WorkspaceListDirInput,
+  WorkspaceReadFileInput,
 } from "@actspace/shared";
 import {
   createBootstrapState,
@@ -45,17 +47,20 @@ import {
   setSessionPinned,
   createKairos,
   ShortMemoryStore,
+  type KairosConfig,
   type KairosController,
 } from "@actspace/agent-core";
 import type { SessionEvent, SessionRecord } from "@actspace/shared";
 import { runAndPersistTurn, abortTurn, type AppDataRoots } from "./agent-turn";
 import { listVisualizations, visualizeReply } from "./visualize-service";
 import { describeSessionContext } from "./context-describe-service";
+import { listWorkspaceDir, readWorkspaceFile } from "./workspace-fs-service";
 import { PendingApprovalRegistry } from "./approval-registry";
 import {
   createKairosLlm,
   createKairosToolManagerFactory,
   getKairosWorkspaceRoot,
+  resolveKairosModelId,
   resolveKairosThinkingEnabled,
   ensureKairosScaffolding,
 } from "./kairos-bootstrap";
@@ -473,18 +478,25 @@ async function createMainWindow() {
 
 let kairosController: KairosController | undefined;
 let kairosIpcHandle: KairosIpcHandle | undefined;
-
 async function ensureKairosController(roots: AppDataRoots): Promise<KairosController> {
   if (kairosController) return kairosController;
   const kairosRoot = join(roots.dataRoot, "kairos");
   await ensureKairosScaffolding(kairosRoot);
   const kairosWorkspaceRoot = getKairosWorkspaceRoot(kairosRoot);
-  const llm = createKairosLlm();
-  const thinkingEnabled = resolveKairosThinkingEnabled();
-  const toolManagerFactory = createKairosToolManagerFactory({ workspaceRoot: kairosWorkspaceRoot });
+  // 模型 / 思考链真来源 = settings.json 的 kairos 分区。
+  const kairosSettings = getSettingsService().get().kairos;
+  const preferredModelId = kairosSettings.modelId;
+  const resolvedModelId = resolveKairosModelId(preferredModelId);
+  const llm = createKairosLlm(preferredModelId);
+  const thinkingEnabled = resolveKairosThinkingEnabled(preferredModelId, kairosSettings.thinking);
+  const toolManagerFactory = createKairosToolManagerFactory({
+    workspaceRoot: kairosWorkspaceRoot,
+    modelId: preferredModelId,
+  });
   kairosController = await createKairos({
     kairosRoot,
     llm,
+    modelId: resolvedModelId,
     toolManagerFactory,
     contextWindow: 32_000,
     thinkingEnabled,
@@ -493,26 +505,48 @@ async function ensureKairosController(roots: AppDataRoots): Promise<KairosContro
     controller: kairosController,
     kairosRoot,
     getMainWindow,
+    onPreferencesWritten: (next) => {
+      void reconcileKairosAfterPreferences(roots, next);
+    },
   });
-  logMain("kairos controller ready", { kairosRoot, kairosWorkspaceRoot });
+  logMain("kairos controller ready", { kairosRoot, kairosWorkspaceRoot, modelId: resolvedModelId });
   return kairosController;
 }
 
 /**
- * 在 Kairos 模型 / 思考链设置变更后重建 controller，使其用最新 env 重新创建 LLM。
+ * 用户保存 `preferences.json` 后的副作用调和（由 kairos:write-config 经 setImmediate 异步触发）：
+ * preferences.json 只保留 enabled / sleep / rhythm 等运行偏好；模型 / 思考链已迁到 settings.json。
+ * 这里仅按 `enabled` 调和运行态：开启且未跑 → start()；关闭且在跑 → stop()。
+ *
+ * 失败只记日志、不抛（写盘已成功，UI 已收到 ok）。
+ */
+async function reconcileKairosAfterPreferences(roots: AppDataRoots, next: KairosConfig): Promise<void> {
+  if (!kairosController) return;
+  try {
+    const state = kairosController.getState();
+    if (next.preferences.enabled && !state.enabled) {
+      await kairosController.start();
+    } else if (!next.preferences.enabled && state.enabled) {
+      await kairosController.stop();
+    }
+  } catch (err) {
+    logMain("kairos reconcile after preferences write failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
+ * 在 Kairos 模型 / 思考链（settings.json）变更后重建 controller，
+ * 使其用最新配置重新创建 LLM。
  *
  * - Kairos 的 LLM 在 `createKairos()` 时定型，无法热替换，故采用「停旧 → 释放 IPC → 重建」。
- * - 仅在 controller 处于非 ticking 态时执行；ticking 中直接跳过，变更会在下次重启或
- *   下次空闲重建时生效（env 已更新，重启路径天然带上新模型）。
+ *   重建里 `ensureKairosController` 会重新读 settings.json 拿到最新 modelId / thinking。
+ * - 即使正在 ticking，也会 stop 旧 controller；保存设置成功后下一次 Kairos 调用必定使用新模型。
  * - `start()` 默认尊重 `preferences.enabled`，因此重建后会恢复用户此前的开启/暂停意图。
  */
 async function rebuildKairosController(roots: AppDataRoots): Promise<void> {
   if (!kairosController) return;
-  const state = kairosController.getState();
-  if (state.state === "ticking") {
-    logMain("kairos rebuild deferred: controller is ticking");
-    return;
-  }
   try {
     await kairosController.stop();
   } catch (err) {
@@ -570,7 +604,13 @@ async function registerIpc() {
       logMain("kairos notifyMainAgentTurnStart threw", { error: err instanceof Error ? err.message : String(err) });
     }
     try {
-      const result = await runAndPersistTurn(input, roots, getMainWindow, approvalRegistry);
+      const result = await runAndPersistTurn(
+        input,
+        roots,
+        getMainWindow,
+        approvalRegistry,
+        () => getSettingsService().get().agent.systemPrompt,
+      );
       logMain("run turn completed", {
         sessionId: input.sessionId,
         turnId: input.turnId,
@@ -622,10 +662,20 @@ async function registerIpc() {
     return listVisualizations(input, roots);
   });
 
+  ipcMain.handle("workspace:list-dir", async (_event, input: WorkspaceListDirInput) => {
+    const roots = await ensureDataDirectories();
+    return listWorkspaceDir(input, roots);
+  });
+
+  ipcMain.handle("workspace:read-file", async (_event, input: WorkspaceReadFileInput) => {
+    const roots = await ensureDataDirectories();
+    return readWorkspaceFile(input, roots);
+  });
+
   ipcMain.handle("context:describe", async (_event, input: DescribeContextInput) => {
     const roots = await ensureDataDirectories();
     try {
-      return await describeSessionContext(input, roots);
+      return await describeSessionContext(input, roots, () => getSettingsService().get().agent.systemPrompt);
     } catch (error) {
       logMain("describe context failed", {
         sessionId: input.sessionId,
@@ -717,8 +767,9 @@ async function registerIpc() {
     const service = getSettingsService();
     const beforeKairos = service.get().kairos;
     const next = await service.update(input);
-    // Kairos 模型/思考链变更需重建 controller（其 LLM 在创建时定型）；其余 env-backed
-    // 设置（Key/工具/温度/bash 审查）由消费方按 turn 读 env proxy，下一轮自动生效。
+    // Kairos 模型 / 思考链来自 settings.json，且 LLM 在 controller 创建时定型；
+    // 保存后立即重建，保证下一次 Kairos 调用使用最新设置。其余 env-backed 设置（Key/工具/
+    // 温度/bash 审查）由消费方按 turn 读 env proxy，下一轮自动生效。
     if (
       input.kairos &&
       (beforeKairos.modelId !== next.kairos.modelId || beforeKairos.thinking !== next.kairos.thinking)
@@ -803,11 +854,40 @@ app.on("window-all-closed", () => {
   }
 });
 
-app.on("before-quit", async () => {
-  try {
-    await kairosController?.stop();
-  } catch {
-    // 不阻断退出
+// 优雅退出：Electron 的 before-quit 不会 await async 回调，要拦截退出必须
+// event.preventDefault()，等 Kairos 收尾（停循环 + abort 正在飞的 LLM 请求 + flush 写盘）
+// 再 app.exit(0)。5s 超时兜底强退，保证用户一定能关掉软件、不残留运行态。
+let shuttingDown = false;
+app.on("before-quit", (event) => {
+  if (shuttingDown) return; // 第二次进入（finish 触发的 exit）直接放行
+  if (!kairosController) {
+    kairosIpcHandle?.dispose();
+    return;
   }
-  kairosIpcHandle?.dispose();
+  shuttingDown = true;
+  event.preventDefault();
+  getMainWindow()?.webContents.send("app:shutting-down");
+
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    app.exit(0); // 强退，绕过 before-quit，避免再次拦截
+  };
+  const timer = setTimeout(() => {
+    logMain("kairos shutdown timed out, forcing exit");
+    finish();
+  }, 5_000);
+
+  void (async () => {
+    try {
+      await kairosController?.shutdown();
+    } catch (err) {
+      logMain("kairos shutdown threw", { error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      clearTimeout(timer);
+      kairosIpcHandle?.dispose();
+      finish();
+    }
+  })();
 });

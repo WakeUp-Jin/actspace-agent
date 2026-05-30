@@ -109,6 +109,12 @@ export interface QueueProcessorOptions {
   prefs: Preferences;
   /** 当队列空闲时获取下一条 tick（通常来自 BriefsDispatcher.pickNext）。 */
   pickNextTick: (now: Date) => Promise<TickPayload>;
+  /**
+   * tick 边界守卫：每轮循环投/取 tick 前调用。返回 false → 不再起新 tick，
+   * loop 切到 `budget_exhausted` 状态并退出（额度耗尽用）。
+   * 不传 / 返回 true → 正常运行。
+   */
+  canStartTick?: () => boolean;
   /** 状态变化回调（含 sleepEndsAt / 中断 reason 等元信息）。 */
   onStateChange: (state: KairosRunState, meta?: SchedulerStateMeta) => void;
   /** 进入 sleep 时回调；返回的 SessionEvent payload 由 controller 写盘。 */
@@ -207,6 +213,13 @@ export class QueueProcessor {
   private async loop(): Promise<void> {
     try {
       while (!this.stopRequested) {
+        // 额度守卫：余额耗尽则不再起新 tick，切到 budget_exhausted 并退出 loop。
+        // 区别于 stopRequested 的 stopped 路径——这是"被动暂停"，需用户充值后手动开启。
+        if (this.opts.canStartTick && !this.opts.canStartTick()) {
+          this.opts.onStateChange("budget_exhausted");
+          break;
+        }
+
         // 等主 Agent 闲下来
         if (this.mainAgentBusy) {
           await this.waitMainAgentDone();
@@ -252,6 +265,12 @@ export class QueueProcessor {
         }
 
         if (this.stopRequested) break;
+
+        // 本次 tick 若把余额扣到耗尽，立即暂停、不再进入 sleep（避免长 sleep 期间还显示运行中）。
+        if (this.opts.canStartTick && !this.opts.canStartTick()) {
+          this.opts.onStateChange("budget_exhausted");
+          break;
+        }
 
         const bias = sleepBiasAt(new Date(this.schedulerImpl.now()), this.opts.prefs);
         const clamped = clampSleep(sleepSeconds, bias, this.opts.prefs);

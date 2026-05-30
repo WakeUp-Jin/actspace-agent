@@ -18,6 +18,7 @@ import type {
 } from "@actspace/shared";
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
+import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import type { ComposerSendOptions } from "./components/Composer";
 import {
   mockBootstrapState,
@@ -824,6 +825,7 @@ export function App() {
         defaultModelId={defaultModelId}
         onSettingsChange={handleSettingsChange}
       />
+      <ShutdownOverlay />
     </RightPanelProvider>
   );
 }

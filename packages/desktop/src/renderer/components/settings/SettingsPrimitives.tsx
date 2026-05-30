@@ -226,6 +226,148 @@ export function SettingsSelect({
 }
 
 /**
+ * 多选下拉。复用 SettingsSelect 的 portal 定位与样式语汇，但菜单项是复选框、
+ * 选择后不收起（便于连续勾选）。触发器展示已选标签拼接，空时显示 placeholder。
+ */
+export function MultiSelect({
+  values,
+  options,
+  onChange,
+  disabled = false,
+  ariaLabel,
+  placeholder = "未选择",
+}: {
+  values: string[];
+  options: SelectOption[];
+  onChange: (values: string[]) => void;
+  disabled?: boolean;
+  ariaLabel: string;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; right: number; minWidth: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
+  const selectedLabels = options.filter((o) => values.includes(o.value)).map((o) => o.label);
+
+  const openMenu = () => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 6, right: window.innerWidth - rect.right, minWidth: rect.width });
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    const onReflow = () => setOpen(false);
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onReflow);
+    window.addEventListener("scroll", onReflow, true);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onReflow);
+      window.removeEventListener("scroll", onReflow, true);
+    };
+  }, [open]);
+
+  const toggle = (value: string) => {
+    onChange(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+  };
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => (open ? setOpen(false) : openMenu())}
+        className={[
+          "flex h-9 min-w-[180px] max-w-[240px] items-center justify-between gap-2 rounded-act-md border bg-surface pl-3 pr-2.5 text-[13px] font-medium outline-none transition-colors",
+          selectedLabels.length === 0 ? "text-text-faint" : "text-text-main",
+          disabled
+            ? "cursor-not-allowed border-line opacity-60"
+            : open
+              ? "cursor-pointer border-brand"
+              : "cursor-pointer border-line hover:border-brand/40",
+        ].join(" ")}
+      >
+        <span className="truncate">
+          {selectedLabels.length === 0 ? placeholder : selectedLabels.join("、")}
+        </span>
+        <ChevronDown
+          size={15}
+          strokeWidth={1.9}
+          className={`shrink-0 text-text-faint transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        />
+      </button>
+      {open && coords
+        ? createPortal(
+            <ul
+              ref={menuRef}
+              role="listbox"
+              aria-label={ariaLabel}
+              aria-multiselectable="true"
+              style={{ position: "fixed", top: coords.top, right: coords.right, minWidth: coords.minWidth }}
+              className="z-[200] max-h-[280px] overflow-auto rounded-[10px] border border-line bg-surface-raised p-1 shadow-act-popover"
+            >
+              {options.map((option) => {
+                const isSelected = values.includes(option.value);
+                return (
+                  <li key={option.value}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      onClick={() => toggle(option.value)}
+                      className={[
+                        "flex w-full items-center gap-2 rounded-[7px] px-2 py-1.5 text-left text-[13px] transition-colors",
+                        isSelected
+                          ? "bg-brand font-semibold text-white"
+                          : "font-medium text-text-main hover:bg-[var(--act-color-hover-overlay)]",
+                      ].join(" ")}
+                    >
+                      <span
+                        className={[
+                          "grid h-[15px] w-[15px] shrink-0 place-items-center rounded-[4px] border",
+                          isSelected ? "border-white/80 bg-white/15" : "border-line-strong",
+                        ].join(" ")}
+                      >
+                        <Check
+                          size={11}
+                          strokeWidth={3}
+                          className={isSelected ? "" : "opacity-0"}
+                          aria-hidden="true"
+                        />
+                      </span>
+                      <span className="truncate">{option.label}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+/**
  * 步进器：（↺）− [值] +。纯展示，状态由调用方持有；越界时禁用对应方向按钮。
  * 传 defaultValue 后，当前值与默认不同时在左侧出现重置按钮（仿 Cursor）。
  */
@@ -344,5 +486,64 @@ export function NumberField({
       />
       {suffix ? <span className="text-[12px] text-text-faint">{suffix}</span> : null}
     </div>
+  );
+}
+
+/**
+ * 受控文本框，commit-on-blur（失焦 / 回车）才回调，未聚焦时随外部 value 同步。
+ * 适合「即时生效」表单里的字符串字段（路径、glob、时区、HH:MM、说明）。
+ */
+export function TextField({
+  value,
+  placeholder,
+  onCommit,
+  disabled = false,
+  ariaLabel,
+  mono = false,
+  className,
+}: {
+  value: string;
+  placeholder?: string;
+  onCommit: (value: string) => void;
+  disabled?: boolean;
+  ariaLabel: string;
+  mono?: boolean;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState(value);
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (!focused.current) setDraft(value);
+  }, [value]);
+
+  const commit = () => {
+    focused.current = false;
+    if (draft !== value) onCommit(draft);
+  };
+
+  return (
+    <input
+      type="text"
+      aria-label={ariaLabel}
+      value={draft}
+      placeholder={placeholder}
+      disabled={disabled}
+      spellCheck={false}
+      onFocus={() => {
+        focused.current = true;
+      }}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") (event.target as HTMLInputElement).blur();
+      }}
+      className={[
+        "h-9 rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none transition-colors",
+        mono ? "font-mono" : "font-medium",
+        disabled ? "cursor-not-allowed opacity-60" : "hover:border-brand/40 focus-visible:border-brand",
+        className ?? "w-full",
+      ].join(" ")}
+    />
   );
 }

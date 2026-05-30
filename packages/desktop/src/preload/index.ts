@@ -43,7 +43,11 @@ import type {
   ListVisualizationsInput,
   ListVisualizationsResult,
   VisualizeReplyInput,
-  VisualizeReplyResult
+  VisualizeReplyResult,
+  WorkspaceListDirInput,
+  WorkspaceListDirResult,
+  WorkspaceReadFileInput,
+  WorkspaceReadFileResult
 } from "@actspace/shared";
 
 contextBridge.exposeInMainWorld("actspace", {
@@ -54,6 +58,10 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("visualize:convert-reply", input) as Promise<VisualizeReplyResult>,
   listVisualizations: (input: ListVisualizationsInput) =>
     ipcRenderer.invoke("visualize:list", input) as Promise<ListVisualizationsResult>,
+  listWorkspaceDir: (input: WorkspaceListDirInput) =>
+    ipcRenderer.invoke("workspace:list-dir", input) as Promise<WorkspaceListDirResult>,
+  readWorkspaceFile: (input: WorkspaceReadFileInput) =>
+    ipcRenderer.invoke("workspace:read-file", input) as Promise<WorkspaceReadFileResult>,
   describeContext: (input: DescribeContextInput) =>
     ipcRenderer.invoke("context:describe", input) as Promise<ContextState | null>,
   listSessions: () => ipcRenderer.invoke("session:list") as Promise<SessionListItem[]>,
@@ -89,6 +97,15 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.on("agent:stream", handler);
     return () => {
       ipcRenderer.removeListener("agent:stream", handler);
+    };
+  },
+
+  // 主进程开始优雅退出时通知 renderer 弹「Kairos 正在关闭」遮罩。无 payload。
+  onShuttingDown: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("app:shutting-down", handler);
+    return () => {
+      ipcRenderer.removeListener("app:shutting-down", handler);
     };
   },
 });

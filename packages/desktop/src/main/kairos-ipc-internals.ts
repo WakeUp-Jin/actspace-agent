@@ -165,6 +165,8 @@ export interface KairosControllerForDispatch {
   wakeNow(): Promise<void>;
   resetToday(): Promise<void>;
   setEnabledPreference(enabled: boolean): Promise<void>;
+  /** 设置页两个控件（额度开关 + 剩余额度）→ 写 budget-state.json。 */
+  setBudget(input: { enabled: boolean; balanceCny: number }): Promise<void>;
 }
 
 export async function dispatchKairosControl(
@@ -192,6 +194,12 @@ export async function dispatchKairosControl(
       return;
     case "reset_today":
       await controller.resetToday();
+      return;
+    case "set_budget":
+      // 额度开关 + 剩余额度 → budget-state.json（不碰 preferences）。
+      // controller.setBudget 内部做耗尽态清理（充值后把 budget_exhausted 拨回 stopped），
+      // 但**不**自动起跑——用户改完额度仍需手动「开启」。
+      await controller.setBudget({ enabled: ctrl.enabled, balanceCny: ctrl.balanceCny });
       return;
     default: {
       const _exhaustive: never = ctrl;

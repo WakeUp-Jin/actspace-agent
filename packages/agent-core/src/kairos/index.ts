@@ -62,4 +62,4 @@ export {
 export { compressKairosSegments } from "./compression/compressor";
 export { sleepDefinition, sleepExecutor, registerKairosTools } from "./tools";
 export { aggregateKairosEvents, type KairosEventRow } from "./aggregator";
-export { resolveKairosEnv, type KairosEnvConfig } from "./env";
+export { resolveKairosEnv, resolveKairosModelSpec, DEFAULT_KAIROS_MODEL_ID, type KairosEnvConfig } from "./env";

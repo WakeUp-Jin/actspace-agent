@@ -27,6 +27,11 @@ type RightPanelContextValue = {
   openPanel: () => void;
   closePanel: () => void;
   togglePanel: () => void;
+  /** 工作区文件树 rail 的显隐，与 tab 列表解耦（见 `工作区文件浏览器规范.md`）。 */
+  isFileTreeOpen: boolean;
+  openFileTree: () => void;
+  closeFileTree: () => void;
+  toggleFileTree: () => void;
 };
 
 const RightPanelStateContext = createContext<RightPanelContextValue | null>(null);
@@ -48,6 +53,7 @@ export function RightPanelProvider({
   const [isOpen, setIsOpen] = useState(initialOpen);
   const [tabs, setTabs] = useState<RightPanelTab[]>(() => initialTabs ?? createDefaultTabs());
   const [activeTabId, setActiveTabId] = useState<string | null>(() => (initialTabs ?? createDefaultTabs())[0]?.id ?? null);
+  const [isFileTreeOpen, setIsFileTreeOpen] = useState(false);
 
   const openTab = useCallback((tab: RightPanelTab) => {
     setTabs((current) => {
@@ -91,6 +97,19 @@ export function RightPanelProvider({
   const closePanel = useCallback(() => setIsOpen(false), []);
   const togglePanel = useCallback(() => setIsOpen((open) => !open), []);
 
+  // 唤出文件树 rail 时同时确保面板打开（rail 是面板内的对象浏览入口）。
+  const openFileTree = useCallback(() => {
+    setIsFileTreeOpen(true);
+    setIsOpen(true);
+  }, []);
+  const closeFileTree = useCallback(() => setIsFileTreeOpen(false), []);
+  const toggleFileTree = useCallback(() => {
+    setIsFileTreeOpen((open) => {
+      if (!open) setIsOpen(true);
+      return !open;
+    });
+  }, []);
+
   const value = useMemo<RightPanelContextValue>(() => {
     const active = tabs.find((tab) => tab.id === activeTabId) ?? null;
     return {
@@ -104,8 +123,26 @@ export function RightPanelProvider({
       openPanel,
       closePanel,
       togglePanel,
+      isFileTreeOpen,
+      openFileTree,
+      closeFileTree,
+      toggleFileTree,
     };
-  }, [isOpen, tabs, activeTabId, openTab, closeTab, setActiveTab, openPanel, closePanel, togglePanel]);
+  }, [
+    isOpen,
+    tabs,
+    activeTabId,
+    openTab,
+    closeTab,
+    setActiveTab,
+    openPanel,
+    closePanel,
+    togglePanel,
+    isFileTreeOpen,
+    openFileTree,
+    closeFileTree,
+    toggleFileTree,
+  ]);
 
   return <RightPanelStateContext.Provider value={value}>{children}</RightPanelStateContext.Provider>;
 }

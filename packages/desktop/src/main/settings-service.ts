@@ -21,11 +21,12 @@
  */
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { getEnv, loadEnv } from "@actspace/agent-core";
+import { getEnv, loadEnv, MAIN_AGENT_SYSTEM_PROMPT } from "@actspace/agent-core";
 import {
   MODEL_REGISTRY,
   SETTINGS_PROVIDER_IDS,
   type AppSettings,
+  type KairosModelId,
   type KairosThinkingMode,
   type ModelId,
   type ProviderId,
@@ -34,6 +35,7 @@ import {
 
 const LLM_TEMPERATURE_DEFAULT = 0;
 const LLM_MAX_TOKENS_DEFAULT = 8192;
+const AGENT_SYSTEM_PROMPT_MAX_CHARS = 20_000;
 
 /** 供应商 API Key 的加解密接口；生产用 Electron safeStorage 实现，测试可注入假实现。 */
 export interface SecretCrypto {
@@ -72,16 +74,8 @@ function isModelId(value: unknown): value is ModelId {
   return typeof value === "string" && value in MODEL_REGISTRY;
 }
 
-function thinkingFromEnv(raw: "auto" | "true" | "false"): KairosThinkingMode {
-  if (raw === "true") return "on";
-  if (raw === "false") return "off";
-  return "auto";
-}
-
-function thinkingToEnv(mode: KairosThinkingMode): "auto" | "true" | "false" {
-  if (mode === "on") return "true";
-  if (mode === "off") return "false";
-  return "auto";
+function isKairosModelId(value: unknown): value is KairosModelId {
+  return value === "deepseek-v4-pro";
 }
 
 export class SettingsService {
@@ -190,7 +184,8 @@ export class SettingsService {
    *   不再把 .env 里的 Key 当作已连接（若 .env 文件仍保留该键，loadEnv 仍可能回填，
    *   要彻底断开请从 .env 中移除）。
    * - 其余 env-backed 项：settings 始终覆盖（首次运行已从 env 播种，故不会误改）。
-   * - 可为空的项（温度/maxTokens/Kairos 模型）为 null 时 delete，回落 .env/默认。
+   * - 可为空的项（温度/maxTokens）为 null 时 delete，回落 .env/默认。
+   * - Kairos 模型 / 思考链不在 env：其唯一来源是 settings.json 的 kairos 分区。
    */
   private applyToEnv(): void {
     this.applyProviderKey("deepseek", "DEEPSEEK_API_KEY");
@@ -207,9 +202,6 @@ export class SettingsService {
       "LLM_MAX_TOKENS",
       this.settings.agent.maxTokens === null ? undefined : String(this.settings.agent.maxTokens),
     );
-
-    setOrDeleteEnv("KAIROS_MODEL_ID", this.settings.kairos.modelId ?? undefined);
-    process.env.KAIROS_THINKING = thinkingToEnv(this.settings.kairos.thinking);
 
     this.reloadEnv();
   }
@@ -254,14 +246,15 @@ function defaultSettingsFromEnv(): PersistedSettings {
     version: 1,
     defaultModelId: null,
     agent: {
+      systemPrompt: MAIN_AGENT_SYSTEM_PROMPT,
       temperature: env.LLM_TEMPERATURE !== LLM_TEMPERATURE_DEFAULT ? env.LLM_TEMPERATURE : null,
       maxTokens: env.LLM_MAX_TOKENS !== LLM_MAX_TOKENS_DEFAULT ? env.LLM_MAX_TOKENS : null,
       disabledTools: [...env.ACTSPACE_DISABLED_TOOLS],
       bashAlwaysAsk: env.ACTSPACE_BASH_ALWAYS_ASK,
     },
     kairos: {
-      modelId: isModelId(env.KAIROS_MODEL_ID) ? env.KAIROS_MODEL_ID : null,
-      thinking: thinkingFromEnv(env.KAIROS_THINKING),
+      modelId: null,
+      thinking: "auto",
     },
   };
 }
@@ -276,13 +269,14 @@ function mergePersistedSettings(raw: unknown): PersistedSettings {
     version: 1,
     defaultModelId: isModelId(obj.defaultModelId) ? obj.defaultModelId : null,
     agent: sanitizeAgent({
+      systemPrompt: agent.systemPrompt as string | undefined,
       temperature: agent.temperature as number | null | undefined,
       maxTokens: agent.maxTokens as number | null | undefined,
       disabledTools: agent.disabledTools as string[] | undefined,
       bashAlwaysAsk: agent.bashAlwaysAsk as boolean | undefined,
     }, seed.agent),
     kairos: sanitizeKairos({
-      modelId: kairos.modelId as ModelId | null | undefined,
+      modelId: kairos.modelId as KairosModelId | null | undefined,
       thinking: kairos.thinking as KairosThinkingMode | undefined,
     }, seed.kairos),
   };
@@ -295,6 +289,10 @@ function sanitizeAgent(
   const temperature = input.temperature;
   const maxTokens = input.maxTokens;
   return {
+    systemPrompt:
+      typeof input.systemPrompt === "string"
+        ? input.systemPrompt.slice(0, AGENT_SYSTEM_PROMPT_MAX_CHARS)
+        : fallback.systemPrompt,
     temperature:
       typeof temperature === "number" && Number.isFinite(temperature) && temperature >= 0 && temperature <= 2
         ? temperature
@@ -320,14 +318,20 @@ function sanitizeKairos(
 ): AppSettings["kairos"] {
   const thinking = input.thinking;
   return {
-    modelId: isModelId(input.modelId) ? input.modelId : input.modelId === null ? null : fallback.modelId,
+    modelId: isKairosModelId(input.modelId) ? input.modelId : input.modelId === null ? null : fallback.modelId,
     thinking:
       thinking === "auto" || thinking === "on" || thinking === "off" ? thinking : fallback.thinking,
   };
 }
 
 function defaultAgent(): AppSettings["agent"] {
-  return { temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false };
+  return {
+    systemPrompt: MAIN_AGENT_SYSTEM_PROMPT,
+    temperature: null,
+    maxTokens: null,
+    disabledTools: [],
+    bashAlwaysAsk: false,
+  };
 }
 
 function defaultKairos(): AppSettings["kairos"] {

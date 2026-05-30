@@ -33,6 +33,9 @@ function makeMockController(): KairosControllerForDispatch & {
     async setEnabledPreference(enabled) {
       calls.push({ method: "setEnabledPreference", args: [enabled] });
     },
+    async setBudget(input) {
+      calls.push({ method: "setBudget", args: [input] });
+    },
   };
 }
 
@@ -174,6 +177,7 @@ function makeState(over: Partial<KairosRuntimeState> = {}): KairosRuntimeState {
   return {
     enabled: true,
     state: "ticking",
+    budget: { enabled: false, balanceCny: 0, exhausted: false },
     todayTickCount: 1,
     toolCallCountInCurrentTick: 0,
     totalSleepSecondsToday: 0,
@@ -303,6 +307,22 @@ describe("dispatchKairosControl", () => {
     const c = makeMockController();
     await dispatchKairosControl(c, { type: "reset_today" });
     expect(c.calls).toEqual([{ method: "resetToday", args: [] }]);
+  });
+
+  it("type=set_budget → 透传 enabled+balanceCny 到 setBudget，不碰 preference", async () => {
+    const c = makeMockController();
+    await dispatchKairosControl(c, { type: "set_budget", enabled: true, balanceCny: 5 });
+    expect(c.calls).toEqual([
+      { method: "setBudget", args: [{ enabled: true, balanceCny: 5 }] },
+    ]);
+  });
+
+  it("type=set_budget → 关闭额度（enabled=false）也透传", async () => {
+    const c = makeMockController();
+    await dispatchKairosControl(c, { type: "set_budget", enabled: false, balanceCny: 0 });
+    expect(c.calls).toEqual([
+      { method: "setBudget", args: [{ enabled: false, balanceCny: 0 }] },
+    ]);
   });
 
   it("throws on missing / malformed payload", async () => {

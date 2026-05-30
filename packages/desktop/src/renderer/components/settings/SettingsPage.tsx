@@ -5,7 +5,6 @@ import {
   DEFAULT_MODEL_ID,
   MODEL_LIST,
   type AppSettings,
-  type KairosThinkingMode,
   type ModelId,
   type ProviderId,
   type SetProviderKeyResult,
@@ -13,6 +12,8 @@ import {
   type TestConnectionResult,
 } from "@actspace/shared";
 import { SettingsNav, type SettingsSectionId } from "./SettingsNav";
+import { KairosSettings } from "./KairosSettings";
+import { TOOL_ITEMS } from "./tool-catalog";
 import {
   SectionShell,
   SettingGroup,
@@ -45,28 +46,17 @@ const BTN_SECONDARY =
   "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-60";
 const BTN_DANGER =
   "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-on-danger transition hover:border-on-danger/40 hover:bg-danger-soft";
+const AGENT_SYSTEM_PROMPT_MAX_CHARS = 20_000;
 
 const MOCK_SETTINGS: AppSettings = {
   version: 1,
   defaultModelId: null,
   providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: false } },
-  agent: { temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
+  agent: { systemPrompt: "", temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
   kairos: { modelId: null, thinking: "auto" },
 };
 
 const MODEL_OPTIONS: SelectOption[] = MODEL_LIST.map((spec) => ({ value: spec.id, label: spec.label }));
-
-const TOOL_ITEMS: { name: string; label: string; description: string; conditional?: boolean }[] = [
-  { name: "read_file", label: "读取文件", description: "读取工作区中的文件内容。" },
-  { name: "grep", label: "Grep 搜索", description: "按正则在文件内容中搜索匹配。" },
-  { name: "glob", label: "Glob 匹配", description: "按通配符查找文件路径。" },
-  { name: "list_directory", label: "列出目录", description: "浏览目录结构与文件清单。" },
-  { name: "edit_file_diff", label: "编辑文件", description: "以 diff 形式修改已有文件。" },
-  { name: "write_file", label: "写入文件", description: "创建新文件或覆盖已有文件。" },
-  { name: "web_search", label: "联网搜索", description: "调用联网搜索获取实时信息。", conditional: true },
-  { name: "analyze_media", label: "媒体分析", description: "解析图片等多模态内容。", conditional: true },
-  { name: "bash", label: "Bash 终端", description: "在工作区执行 shell 命令。" },
-];
 
 function hasSettingsBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace?.getSettings);
@@ -399,40 +389,66 @@ function ModelSection({ settings, onUpdate, onConnectProvider, onClearProvider, 
 }
 
 function AgentSection({ settings, onUpdate }: SectionProps) {
+  const [draftPrompt, setDraftPrompt] = useState(settings.agent.systemPrompt);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setDraftPrompt(settings.agent.systemPrompt);
+  }, [settings.agent.systemPrompt]);
+
+  const dirty = draftPrompt !== settings.agent.systemPrompt;
+  const charCount = draftPrompt.length;
+  const savePrompt = () => {
+    onUpdate({ agent: { systemPrompt: draftPrompt } });
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1800);
+  };
+
   return (
-    <SectionShell title="智能体" description="Kairos 自主智能体的模型与思考链。">
-      <SettingGroup title="Kairos 自主智能体">
-        <SettingRow
-          title="模型"
-          description="Kairos 自主模式使用的模型。修改将在 Kairos 下次空闲时生效。"
-          control={
-            <SettingsSelect
-              value={settings.kairos.modelId ?? "__default__"}
-              options={[{ value: "__default__", label: "跟随默认" }, ...MODEL_OPTIONS]}
-              onChange={(value) =>
-                onUpdate({ kairos: { modelId: value === "__default__" ? null : (value as ModelId) } })
-              }
-              ariaLabel="Kairos 模型"
-            />
-          }
-        />
-        <SettingRow
-          title="思考链"
-          description="是否启用模型的思考过程。"
-          control={
-            <SettingsSelect
-              value={settings.kairos.thinking}
-              options={[
-                { value: "auto", label: "自动" },
-                { value: "on", label: "开启" },
-                { value: "off", label: "关闭" },
-              ]}
-              onChange={(value) => onUpdate({ kairos: { thinking: value as KairosThinkingMode } })}
-              ariaLabel="Kairos 思考链"
-            />
-          }
-        />
+    <SectionShell title="智能体">
+      <SettingGroup title="主 Agent">
+        <div className="flex flex-col gap-3 px-4 py-4">
+          <label htmlFor="agent-system-prompt" className="text-[14px] font-semibold text-text-main">
+            自定义系统提示词
+          </label>
+          <textarea
+            id="agent-system-prompt"
+            value={draftPrompt}
+            maxLength={AGENT_SYSTEM_PROMPT_MAX_CHARS}
+            onChange={(event) => {
+              setDraftPrompt(event.target.value);
+              setSaved(false);
+            }}
+            className="h-[132px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle focus:border-brand"
+            spellCheck={false}
+            aria-label="主 Agent 自定义系统提示词"
+          />
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[12px] text-text-faint">
+              {charCount.toLocaleString()} / {AGENT_SYSTEM_PROMPT_MAX_CHARS.toLocaleString()}
+              {saved && !dirty ? <span className="ml-2 text-on-success">已保存</span> : null}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className={BTN_SECONDARY}
+                onClick={() => {
+                  setDraftPrompt(settings.agent.systemPrompt);
+                  setSaved(false);
+                }}
+                disabled={!dirty}
+              >
+                撤销更改
+              </button>
+              <button type="button" className={BTN_PRIMARY} onClick={savePrompt} disabled={!dirty}>
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
       </SettingGroup>
+
+      <KairosSettings settings={settings} onUpdate={onUpdate} />
     </SectionShell>
   );
 }

@@ -42,9 +42,10 @@ Kairos 不是另一个 Agent，而是和现有 Agent 共享 LLM / 工具 / 长�
 ## 非目标（v1 明确不做）
 
 - 不接入"天工"或外部任务系统巡检。actspace 没有对应概念，先聚焦自治闭环。
-- 不做工具白名单 / 配额护栏。Kairos 默认共享主 Agent 工具集；`blocklist.json` 走调度层硬限制，不是细粒度白名单。
+- 不做工具白名单。Kairos 默认共享主 Agent 工具集；`blocklist.json` 走调度层硬限制，不是细粒度白名单。
+  - 注：**成本配额护栏已落地**（2026-05-30，单一余额模型）。它不是"工具白名单"，而是在 tick 边界对累计花费做约束；详见 [额度护栏（单一余额）](#额度护栏单一余额) 章节。仅约束 Kairos 自治循环，不约束主 Agent。
 - 不做 cron 任务管理面板。cron 工具可在后续单独 plan 引入；Kairos 页 v1 不做 cron 视图（briefs 内部走 cron-like 调度，但不暴露给主 Agent）。
-- 不做 UI 模型独立选择。Kairos 模型与 thinking 通过 env 配置手动控制：默认 `KAIROS_MODEL_ID=deepseek-v4-flash`、`KAIROS_THINKING=true`；填空或非法模型会回落到 Kairos 默认模型，不跟随主 Agent 默认模型。
+- Kairos 模型 / 思考链：**真来源是 `settings.json` 的 `kairos` 分区**，不再使用 `KAIROS_MODEL_ID` / `KAIROS_THINKING` env，也不再从 `preferences.json` 读取模型。设置页「Kairos 自主智能体」分区只提供两个模型选项：`deepseek-v4-flash`（默认，落 `modelId: null`）与 `deepseek-v4-pro`（落 `modelId: "deepseek-v4-pro"`）；其它模型（包括 Kimi）对 Kairos 无效并回落 Flash。保存模型或 thinking 后 main 立即停旧 controller、重建 LLM，再按 `preferences.enabled` 恢复 Kairos 开关状态。
 - 不做多设备 / 云端同步。短期记忆仅本地保存。
 - 不做"取消天工任务"或子进程管理类工具。
 - 不做 fs.watch 实时监听巡检目录。v1 巡检走 tick-time poll diff，避免 Electron 多目录监听的稳定性问题（config / briefs 目录是唯一例外——文件数少、稳定）。
@@ -276,11 +277,20 @@ export type KairosRunState =
   | "sleeping"      // 上一次 tick 完成，进入可中断 sleep
   | "interrupted"   // sleep 期间被 user 消息打断
   | "stopped"       // 用户未启用 Kairos
-  | "cooldown";     // 连续 tick 错误熔断中
+  | "cooldown"      // 连续 tick 错误熔断中
+  | "budget_exhausted";  // 额度余额 ≤ 0 被动暂停（区别于主动 stopped），不自动恢复
+
+/** Kairos 额度护栏运行态（单一余额模型）。真相源 = memory/budget-state.json。 */
+export interface KairosBudgetRuntime {
+  enabled: boolean;          // 额度护栏开关；false = 无限运行，UI 不渲染额度块
+  balanceCny: number;        // 剩余可花额度（¥）；运行时被扣减，用户随时可改；tick 边界检查，可能短暂为负
+  exhausted: boolean;        // = enabled && balanceCny <= 0；为 true 时进入 budget_exhausted
+}
 
 export type KairosRuntimeState = {
   enabled: boolean;
   state: KairosRunState;
+  budget: KairosBudgetRuntime;   // 始终存在（enabled=false 表示无限运行）
   sleepEndsAt?: string;
   todayTickCount: number;
   lastReplyAt?: string;
@@ -292,14 +302,16 @@ export type KairosControl =
   | { type: "start" }
   | { type: "stop" }
   | { type: "wake_now" }
-  | { type: "reset_today" };
+  | { type: "reset_today" }
+  | { type: "set_budget"; enabled: boolean; balanceCny: number };  // 设置页两个控件 → 写 budget-state.json
 ```
 
 补充语义约束：
 
-- `state` 描述调度器当前生命周期，例如 `sleeping`、`ticking`、`stopped`。
+- `state` 描述调度器当前生命周期，例如 `sleeping`、`ticking`、`stopped`、`budget_exhausted`。
 - `enabled` 描述用户意图上的 Kairos 开关，决定 Kairos 页主按钮显示“开启”还是“暂停”。
 - 当 `stop()` 过程中 scheduler 先推送 `state: "stopped"` 时，controller 仍需在 `enabled = false` 落定后再补发一次 state，避免 renderer 停留在 `{ enabled: true, state: "stopped" }` 这样的中间组合。
+- `budget` 是额度护栏运行态。注意区分两个 enabled：`budget.enabled`（额度护栏开关，用户没关）与 `runtimeState.enabled`（Kairos 总开关）。耗尽时 `runtimeState.enabled=false` + `state="budget_exhausted"`，但 `budget.enabled` 保持 true。详见 [额度护栏（单一余额）](#额度护栏单一余额)。
 
 ### IPC channels
 
@@ -307,9 +319,10 @@ export type KairosControl =
 |---|---|---|
 | `kairos:get-state` | renderer ↔ main | `void` → `KairosRuntimeState` |
 | `kairos:get-events-recent` | renderer ↔ main | `{ limit?: number; before?: EventId }` → `SessionEvent[]`（ring buffer 不够时倒读 jsonl 补足） |
-| `kairos:control` | renderer → main | `KairosControl` |
+| `kairos:control` | renderer → main | `KairosControl`（含 `set_budget`：设置页改额度开关 / 剩余额度 → controller.setBudget → 写 budget-state.json） |
 | `kairos:state` | main → renderer | `KairosRuntimeState`（runState 任意变更时推送） |
 | `kairos:event` | main → renderer | `SessionEvent`（每条落盘成功后推送一次） |
+| `app:shutting-down` | main → renderer | `void`（优雅退出开始的单向通知，renderer 据此弹关闭遮罩；裸字符串通道，不引入常量） |
 
 > v1 不需要 `kairos:pin-note`（pinned.md 整套未启用）；后续若加 ⭐ 钉住功能再补该 channel。
 
@@ -635,6 +648,8 @@ KairosRunner 每次 tick 由 `prompt-assembler.ts` 组装上下文。**LLM 看�
   │
   ├─ memory/                        # 类别 3：Kairos 自身记忆（唯一持久化层）
   │   ├─ state.json                 # 启用状态 + active segment + last tick 位置
+  │   ├─ usage-accumulator.json     # token/成本双维度累加器（lifetime + sinceReset，只增不减的统计事实）
+  │   ├─ budget-state.json          # 额度护栏运行态：{ enabled, balanceCny }（可花余额，会被扣减且用户可改）
   │   ├─ short-term/                # 滚动记忆体（heartclaw 模式 + actspace SessionEvent 格式）
   │   │   ├─ 2026-05/
   │   │   │   ├─ 2026-05-27.jsonl            # 每行一条 SessionEvent
@@ -685,8 +700,7 @@ v1 最终落到 **3 份 JSON + 1 份 Markdown**：
 {
   "tip": "我在工作时段更活跃，安静时段请少打扰；睡眠时长由我设置，超出会被夹紧。",
 
-  "enabled": false,                                  // v1 默认关闭
-  "modelId": null,                                    // null = 跟随主 Agent
+  "enabled": false,                                  // v1 默认关闭；改后保存会真的起/停 Kairos
   "sleepRangeSeconds": { "min": 30, "max": 900, "default": 120 },
   "tickBudget": { "perDay": 200, "perHour": 30 },
   "circuitBreaker": { "errorThreshold": 5, "cooldownSec": 60 },
@@ -1101,7 +1115,7 @@ controller.start()
 | 主 Agent runTurn 完成且队列空 | Kairos 等待 5s（防止 user 立即跟进），再注入下一次 tick |
 | 用户切换 session | Kairos 不受影响（事件流是全局的，不绑定 session） |
 | 用户切换 workspace root | Kairos 自动 stop，避免在错误 workspace 上继续巡检；用户重新启用 |
-| 应用退出 | 持久化 `state.enabled` 与运行时计数，下次启动按 `enabled` 恢复 |
+| 应用退出 | 走优雅退出：`before-quit` 拦截 → 弹关闭遮罩 → `controller.shutdown()`（abort 在飞请求 + 停循环 + flush usage/budget）→ 最多 5s 超时强退。持久化 `state.enabled` 与运行时计数 / 余额，下次启动按 `enabled` 恢复。详见 [优雅退出](#优雅退出) |
 
 ## 渲染规范（Kairos 页面）
 
@@ -1131,6 +1145,73 @@ Kairos 页面产品 UI 的详细规范以 `docs/design-docs/frontend-ui/Kairos�
 - 连续 5 次 tick 失败：状态切到 `cooldown(60s)`，期间不注入 tick；冷却结束后回到 `idle` 等待下次注入。
 - Sleep 工具被模型多次调用时只取最后一次合法值，并夹紧到 `[min=30, max=900]`。
 - 主 Agent 抛错不影响 Kairos；Kairos 抛错不影响主 Agent。两者错误日志各自打到 `logs/latest-dev.log` 中带 `[kairos]` 前缀。
+
+## 额度护栏（单一余额）
+
+> 2026-05-30 落地。给一直循环运行的 Kairos 加一层"花钱保险"，避免无人值守时持续烧钱。**只约束 Kairos 自治循环，不约束主 Agent 主动对话。**
+
+### 模型：单一余额
+
+UI 上只有两个控件：一个「额度限制」开关 + 一个「剩余额度（¥）」数字。
+
+- 开关开 → Kairos 每次模型回复（`llm_usage` 事件）都把 `cost.total` 从 `balanceCny` 里**扣减**，余额这个数不断变小。
+- `开关开 且 balanceCny ≤ 0` → 报"额度不足"并停止（进入 `budget_exhausted`）。
+- 用户随时能改这个余额：想充值就填大、想收紧就填小、填 0 即不再让它跑。改完需手动「开启」。
+- 开关关 → 无限运行，无额度概念，UI 不渲染额度块。
+
+与初版"上限 + 已消耗 + 清空已消耗"钱包模型的差异：**只有一个 `balanceCny`，运行时直接做减法**（而非对 spent 做加法），去掉了"清空已消耗"按钮——充值即直接把余额改大。
+
+### 存储：独立运行态文件 `memory/budget-state.json`
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "enabled": false,      // 额度护栏开关；false=无限运行
+  "balanceCny": 0,       // 剩余可花额度（¥）；运行时被扣减，用户可随时改
+  "updatedAt": "2026-05-30T21:00:00+08:00"
+}
+```
+
+- **不进 `preferences.json`**：余额是 Kairos 每跑一次就回写的高频运行态数据，放配置文件会触发配置热重载、与用户手动编辑打架；概念上也要把"配置"和"运行时变化的数"分开。`config/schema.ts` 因此不改。
+- 与 `usage-accumulator.json`（token/成本总账）**独立**——后者是"统计事实"只增不减，前者是"可花余额"会被扣减且用户可改。
+- 由 `agent-core/src/kairos/storage/budget-store.ts` 的 `KairosBudgetStore` 管理：照抄 usage-accumulator 的 debounce + atomic rename + flush 范式；文件缺失/损坏时回退 `enabled=false, balanceCny=0`（无限运行，不误伤）。
+
+### 检查时机与状态机（耗尽不自动恢复）
+
+- **扣减**：`eventSink` 处理 `llm_usage`、累加 usage-accumulator 后，若 `budget.enabled` → `budgetStore.deduct(cost.total)`；若扣到耗尽 → `processor.triggerWake("wake_now")` 提前结束当前 sleep，让 loop 尽快被拦下。
+- **tick 边界拦截**：`QueueProcessor.loop()` 在投/取下一个 tick 前调用注入的 `canStartTick()`（= `!budget.exhausted`）；返回 false → `onStateChange("budget_exhausted")` + break。tick 内允许跑完，**不做 tick 内实时熔断**（余额可能被扣成负数，UI 显示 ¥0）。
+- **耗尽副作用**（controller `haltForBudget`）：`runtimeState.enabled=false` + `state="budget_exhausted"` → 持久化 `preferences.enabled=false`（避免重启反复撞墙）→ emit 一条 `error` SessionEvent（"额度不足，Kairos 已暂停…"）→ emit state。
+- **`start({force:true})` 防御**：若耗尽 → 不起 processor、setState("budget_exhausted")、**throw**（"额度不足，请先在设置页调高剩余额度后再开启。"）让 renderer toast。
+- **设置/恢复**：`set_budget` → `controller.setBudget({enabled, balanceCny})` 写盘 + 重算 `runtimeState.budget` + **耗尽态清理**（若 `state==="budget_exhausted"` 且现在 `!exhausted` → 拨回 `"stopped"`）。**不自动起跑**——用户改完额度仍需手动「开启」。
+
+### 取舍
+
+- 币种固定按 CNY（¥）；非 CNY 成本仍按数值扣减，MIXED 极端情况不特殊处理（Kairos 默认 DeepSeek，`cost.currency==="CNY"`；模型未匹配注册表时 `cost.total===0`，不扣额度但仍记 token 事实）。
+- tick 边界粒度检查：最后一个 tick 可能超额跑完，超额有限，余额允许为负、UI 显示 ¥0。
+- 无周期自动重置（每日/每月）——单一余额无周期。
+
+### 渲染
+
+- 设置页「Kairos 自主智能体」分区：模型 / 思考链下方加「额度限制」开关 + 「剩余额度（¥）」输入两行，读写走 `window.kairos`（`getState().budget` 回填 + `onState` 订阅运行时余额递减 + `control({type:"set_budget"})` 提交）。输入用本地 draft + focus 标志，运行时余额递减不打断用户编辑。
+- Kairos 页状态条：`budget.enabled` 时旁边显示「¥x.xx」额度胶囊，耗尽时转 danger 语义色 + "不足"；`budget_exhausted` 状态文案为"额度不足"。「开启」被 reject 时由 `useKairos` 的 error surface 到页面底部错误条。
+
+## 优雅退出
+
+> 2026-05-30 落地。退出软件时先让 Kairos 安全收尾，再真正关窗，避免后台循环 / 正在飞的 LLM 请求被硬切导致丢账或残留运行态。
+
+### 流程
+
+1. `app.on("before-quit")`：首次进入 `event.preventDefault()` 拦下退出，`shuttingDown` 标志防重入，向 renderer 发 `app:shutting-down`。
+2. renderer 收到后铺 `ShutdownOverlay` 全屏遮罩「Kairos 正在安全关闭…」。
+3. main `await kairosController.shutdown()`：`abortController.abort()`（中断正在飞的 LLM 请求）→ `processor.stop()`（停循环，等当前 tick 自然收尾）→ `usageAccumulator.flush()` + `budgetStore.flush()`（写盘不丢账/余额）。
+4. 收尾完成或 **5 秒超时** → `app.exit(0)` 强退（绕过 before-quit，不再拦截），保证用户一定能关掉软件。
+
+### 关键约束
+
+- Electron `before-quit` 不 await async 回调，所以必须 `preventDefault` + 完成后 `app.exit(0)`。
+- AbortSignal 经 `KairosRunner.getAbortSignal()` 透传到 `runAgentLoop(..., signal)` → `llm.stream({signal})`，每次 `start()` 重建 controller，shutdown / 耗尽时 abort。
+- **Kairos 无独立 OS 进程**——它是 main 进程内的 `QueueProcessor` 循环；"强制杀进程"转化为"停循环 + abort in-flight 请求 + 超时强退"。
+- mock 模式（无 `window.actspace.onShuttingDown`）：renderer 不挂监听，遮罩不出现。
 
 ## 安全与隐私
 

@@ -54,10 +54,16 @@ export interface KairosRunnerOptions {
   kairosGuard: KairosGuardContext;
   briefsIndex?: BriefsIndexManager;        // brief tick 闭合后 markRun
   /**
-   * 传给 runAgentLoop 的 thinkingEnabled —— 来自 KAIROS_THINKING env。
+   * 传给 runAgentLoop 的 thinkingEnabled —— 来自 settings.kairos.thinking。
    * undefined → LLM service 走 ModelSpec.thinkingDefault。
    */
   thinkingEnabled?: boolean;
+  /**
+   * 返回当前 tick 应使用的 AbortSignal —— controller 在 `shutdown()` 时 abort，
+   * 让正在飞的 LLM 请求/工具循环立即中断，加速优雅退出。
+   * 每次 processTick 都重新取（controller 在 start 时重建 AbortController）。
+   */
+  getAbortSignal?: () => AbortSignal | undefined;
   /** 测试可注入伪 id / 时间 */
   newId?: () => string;
   now?: () => Date;
@@ -166,7 +172,7 @@ export class KairosRunner {
 
     let runError: unknown = null;
     try {
-      await runAgentLoop(context, this.opts.llm, loopConfig, onEvent);
+      await runAgentLoop(context, this.opts.llm, loopConfig, onEvent, this.opts.getAbortSignal?.());
     } catch (err) {
       runError = err;
     }

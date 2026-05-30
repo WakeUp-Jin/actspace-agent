@@ -17,7 +17,7 @@
 
 "use strict";
 
-const apiKey = "sk-fbdb84fedc374428b5627ddde28f402a";
+const apiKey = process.env.DEEPSEEK_API_KEY;
 const prompt =
   process.env.DEEPSEEK_WEB_SEARCH_PROMPT ||
   "读取一下这个url里面有内容，总结一下：https://api-docs.deepseek.com/zh-cn/guides/anthropic_api";

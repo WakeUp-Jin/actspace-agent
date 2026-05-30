@@ -5,13 +5,25 @@ import type { AppSettings } from "@actspace/shared";
 import { SettingsPage } from "../components/settings/SettingsPage";
 
 function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
-  return {
+  const base: AppSettings = {
     version: 1,
     defaultModelId: null,
     providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: true } },
-    agent: { temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
+    agent: {
+      systemPrompt: "Default main agent prompt",
+      temperature: null,
+      maxTokens: null,
+      disabledTools: [],
+      bashAlwaysAsk: false,
+    },
     kairos: { modelId: null, thinking: "auto" },
+  };
+  return {
+    ...base,
     ...over,
+    providers: over.providers ? { ...base.providers, ...over.providers } : base.providers,
+    agent: over.agent ? { ...base.agent, ...over.agent } : base.agent,
+    kairos: over.kairos ? { ...base.kairos, ...over.kairos } : base.kairos,
   };
 }
 
@@ -94,6 +106,25 @@ describe("SettingsPage", () => {
     await userEvent.click(readToggle);
     await waitFor(() => {
       expect(updateSettings).toHaveBeenCalledWith({ agent: { disabledTools: ["read_file"] } });
+    });
+  });
+
+  it("editing 主 Agent 系统提示词 saves it through settings", async () => {
+    render(<SettingsPage onBack={() => {}} />);
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "智能体" }));
+    const promptInput = await screen.findByLabelText("主 Agent 自定义系统提示词");
+    expect(promptInput).toHaveValue("Default main agent prompt");
+
+    await userEvent.clear(promptInput);
+    await userEvent.type(promptInput, "Use short Chinese answers.");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(updateSettings).toHaveBeenCalledWith({
+        agent: { systemPrompt: "Use short Chinese answers." },
+      });
     });
   });
 

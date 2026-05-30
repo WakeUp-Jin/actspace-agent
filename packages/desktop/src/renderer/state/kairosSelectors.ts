@@ -274,6 +274,8 @@ export function kairosStateLabel(state: KairosRuntimeState["state"]): string {
       return "Cooldown";
     case "stopped":
       return "Stopped";
+    case "budget_exhausted":
+      return "额度不足";
   }
 }
 

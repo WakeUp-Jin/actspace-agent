@@ -31,7 +31,7 @@ import {
   RotateCcw,
   Wrench,
 } from "lucide-react";
-import type { KairosEventRow, KairosRuntimeState } from "@actspace/shared";
+import type { KairosBudgetRuntime, KairosEventRow, KairosRuntimeState } from "@actspace/shared";
 import { useKairos } from "../state/useKairos";
 import { KairosContextSheet } from "../components/kairos/KairosContextSheet";
 import {
@@ -107,6 +107,10 @@ const headerUsageBadgeClass =
   "inline-flex h-7 items-center gap-[7px] rounded-full border border-line bg-surface-subtle pl-[6px] pr-[11px] text-[13px] tabular-nums text-text-muted";
 const headerUsageBadgeToggleClass =
   "inline-flex h-[22px] w-[22px] items-center justify-center rounded-full border border-transparent text-text-faint transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-line-strong focus-visible:ring-offset-1 focus-visible:ring-offset-surface-subtle";
+const headerBudgetChipClass =
+  "inline-flex h-7 items-center gap-[5px] rounded-full border border-line bg-surface-subtle px-[11px] text-[13px] tabular-nums text-text-muted";
+const headerBudgetChipExhaustedClass =
+  "border-on-danger/30 bg-danger-soft text-on-danger";
 const headerUsageBadgeSeparatorClass = "text-text-subtle";
 const headerUsageBadgeCostClass = "text-text-main font-medium";
 const headerUsageBadgeModeChipClass =
@@ -403,6 +407,7 @@ function KairosHeader(props: KairosHeaderProps) {
           {statusText}
         </span>
         <KairosUsageBadge usage={usage} onToggleMode={props.onToggleUsageMode} />
+        {state?.budget.enabled ? <KairosBudgetChip budget={state.budget} /> : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {enabled ? (
@@ -443,6 +448,34 @@ function KairosHeader(props: KairosHeaderProps) {
         </button>
       </div>
     </header>
+  );
+}
+
+/**
+ * Header 内的额度胶囊：仅在开启额度护栏（budget.enabled）时显示。
+ *
+ * 展示剩余可花额度 `¥x.xx`；耗尽（exhausted）时整枚胶囊转为 danger 语义色并追加「不足」，
+ * 与状态条 `额度不足` 呼应，提示用户去设置页充值。余额运行时递减，靠 onState 推送实时刷新。
+ */
+function KairosBudgetChip({ budget }: { budget: KairosBudgetRuntime }) {
+  const balance = Number.isFinite(budget.balanceCny) ? budget.balanceCny : 0;
+  const display = `¥${Math.max(0, balance).toFixed(2)}`;
+  return (
+    <span
+      className={cn(headerBudgetChipClass, budget.exhausted && headerBudgetChipExhaustedClass)}
+      data-testid="kairos-budget-chip"
+      data-exhausted={budget.exhausted ? "true" : "false"}
+      title={
+        budget.exhausted
+          ? "额度已用完，Kairos 已暂停；请在设置页调高剩余额度后重新开启。"
+          : "Kairos 剩余可花额度（按人民币估算），运行时会不断减少。"
+      }
+      aria-label={`Kairos 剩余额度 ${display}${budget.exhausted ? "，额度不足" : ""}`}
+    >
+      <Coins size={13} aria-hidden="true" />
+      {display}
+      {budget.exhausted ? <span className="font-medium">不足</span> : null}
+    </span>
   );
 }
 
@@ -820,12 +853,12 @@ function traceTone(row: KairosEventRow): "reply" | "sleep" | "error" | "other" {
 }
 
 function stateTextClass(state: KairosRuntimeState["state"]): string {
-  if (state === "cooldown" || state === "interrupted") return "text-on-danger";
+  if (state === "cooldown" || state === "interrupted" || state === "budget_exhausted") return "text-on-danger";
   return "text-on-success";
 }
 
 function stateDotClass(state: KairosRuntimeState["state"]): string {
-  if (state === "cooldown" || state === "interrupted")
+  if (state === "cooldown" || state === "interrupted" || state === "budget_exhausted")
     return "bg-danger shadow-[0_0_0_3px_var(--act-color-danger-soft)]";
   if (state === "stopped") return "bg-text-faint shadow-[0_0_0_3px_var(--act-color-hover-overlay)]";
   return "bg-success shadow-[0_0_0_3px_var(--act-color-success-soft)]";

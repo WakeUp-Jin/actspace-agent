@@ -154,8 +154,8 @@ export function makeSleepInterrupted(
 /**
  * 模拟 Kairos runner 在每次 LLM message_end 后落的 llm_usage 事件。
  *
- * 默认贴近一次 DeepSeek-Flash 普通调用：4K input / 1K output / 5K total / $0.012；
- * payload.cost.currency 默认 `USD`，与 model-config.ts 中 DeepSeek pricing 保持一致。
+ * 默认贴近一次 DeepSeek-Flash 普通调用：4K input / 1K output / 5K total / ¥0.012；
+ * payload.cost.currency 默认 `CNY`，与 model-config.ts 中 DeepSeek pricing 保持一致（国产模型按人民币计费）。
  * 单测里要构造混合币种 / 0 token 等边界，直接覆盖对应字段即可。
  */
 export function makeLlmUsage(
@@ -184,7 +184,7 @@ export function makeLlmUsage(
         cacheRead: 0,
         cacheWrite: 0,
         total: 0.012,
-        currency: "USD"
+        currency: "CNY"
       }
     },
     overrides

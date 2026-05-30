@@ -16,6 +16,12 @@ declare global {
       listVisualizations: (
         input: import("@actspace/shared").ListVisualizationsInput
       ) => Promise<import("@actspace/shared").ListVisualizationsResult>;
+      listWorkspaceDir: (
+        input: import("@actspace/shared").WorkspaceListDirInput
+      ) => Promise<import("@actspace/shared").WorkspaceListDirResult>;
+      readWorkspaceFile: (
+        input: import("@actspace/shared").WorkspaceReadFileInput
+      ) => Promise<import("@actspace/shared").WorkspaceReadFileResult>;
       describeContext: (
         input: import("@actspace/shared").DescribeContextInput
       ) => Promise<import("@actspace/shared").ContextState | null>;
@@ -59,6 +65,8 @@ declare global {
       setUiZoom: (factor: number) => void;
       /** 主题三态同步原生 chrome（main nativeTheme.themeSource）。 */
       setNativeTheme: (mode: "light" | "dark" | "system") => void;
+      /** 主进程优雅退出开始时触发，用于弹「Kairos 正在关闭」遮罩。返回取消订阅函数。 */
+      onShuttingDown: (callback: () => void) => () => void;
     };
     /**
      * Kairos 自治模式 API。preload 在 `kairos` 命名空间下暴露；

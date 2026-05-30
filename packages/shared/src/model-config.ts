@@ -28,11 +28,13 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
     thinkingDefault: true,
     supportsThinkingToggle: true,
     contextWindow: 1_000_000,
+    // DeepSeek 国产模型按人民币计价；单价为 CNY/百万 token（由旧 USD 单价按 ≈7.2 一次性换算而来，
+    // 仅作示意，接真实项目时改成 DeepSeek 官网公布的 CNY 价目即可）。
     pricing: {
-      currency: "USD",
-      inputCacheHitPerMillion: 0.0028,
-      inputCacheMissPerMillion: 0.14,
-      outputPerMillion: 0.28,
+      currency: "CNY",
+      inputCacheHitPerMillion: 0.02016,
+      inputCacheMissPerMillion: 1.008,
+      outputPerMillion: 2.016,
     },
   },
   "deepseek-v4-pro": {
@@ -44,10 +46,10 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
     supportsThinkingToggle: true,
     contextWindow: 1_000_000,
     pricing: {
-      currency: "USD",
-      inputCacheHitPerMillion: 0.003625,
-      inputCacheMissPerMillion: 0.435,
-      outputPerMillion: 0.87,
+      currency: "CNY",
+      inputCacheHitPerMillion: 0.0261,
+      inputCacheMissPerMillion: 3.132,
+      outputPerMillion: 6.264,
     },
   },
   "kimi-k2.6": {

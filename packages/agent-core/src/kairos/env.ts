@@ -1,17 +1,23 @@
 /**
- * Kairos 后台 Agent 的 env 解析。
+ * Kairos 后台 Agent 的模型 / 思考链解析。
  *
- * 把"KAIROS_MODEL_ID（字符串）+ KAIROS_THINKING（auto/true/false）"
- * 这两条 raw env 翻译成"ModelSpec + thinkingEnabled"——
- * 调用方（main/kairos-bootstrap）只关心结构化结果。
+ * 模型与思考链来源是桌面端 `settings.json` 的 `kairos` 分区（由调用方读出后作为入参传入）。
+ * 不再读取 `KAIROS_MODEL_ID` / `KAIROS_THINKING` env。两者一起翻译成
+ * "ModelSpec + thinkingEnabled"，调用方（main/kairos-bootstrap）只关心结构化结果。
  *
  * 设计原则：
  * - 输入永远不抛错：留空 / 非法 modelId 都回落到 Kairos 自己的默认模型。
- * - 模型不支持 thinking toggle 时强制忽略 KAIROS_THINKING，避免把"明确禁用"
+ * - Kairos 当前只允许默认 Flash 与显式 Pro；其它共享注册表模型（如 Kimi）对 Kairos 无效。
+ * - 模型不支持 thinking toggle 时强制忽略 settings.kairos.thinking，避免把"明确禁用"
  *   传给不支持 thinking 参数的模型。
  */
-import { env } from "../env";
-import { MODEL_REGISTRY, resolveModelSpec, type ModelId, type ModelSpec } from "@actspace/shared";
+import {
+  resolveModelSpec,
+  type KairosModelId,
+  type KairosThinkingMode,
+  type ModelId,
+  type ModelSpec,
+} from "@actspace/shared";
 
 export const DEFAULT_KAIROS_MODEL_ID: ModelId = "deepseek-v4-flash";
 
@@ -24,20 +30,35 @@ export interface KairosEnvConfig {
   thinkingEnabled?: boolean;
 }
 
-function asModelId(value: string): ModelId | undefined {
-  if (!value) return undefined;
-  return value in MODEL_REGISTRY ? (value as ModelId) : undefined;
+function asKairosModelId(value: string | null | undefined): KairosModelId | undefined {
+  if (value === "deepseek-v4-pro") return value;
+  return undefined;
 }
 
-export function resolveKairosEnv(): KairosEnvConfig {
-  const modelSpec = resolveModelSpec(asModelId(env.KAIROS_MODEL_ID) ?? DEFAULT_KAIROS_MODEL_ID);
+/**
+ * 把 `settings.kairos.modelId`（可能为 null / 非法字符串）解析为有效 ModelSpec。
+ * 非法 / 留空一律回落 `DEFAULT_KAIROS_MODEL_ID`，永不抛错。
+ */
+export function resolveKairosModelSpec(modelId: string | null): ModelSpec {
+  return resolveModelSpec(asKairosModelId(modelId) ?? DEFAULT_KAIROS_MODEL_ID);
+}
+
+/**
+ * @param modelId 来自 `settings.json` 的 `kairos.modelId`（string | null）。
+ * @param thinking 来自 `settings.json` 的 `kairos.thinking`。
+ */
+export function resolveKairosEnv(
+  modelId: string | null,
+  thinking: KairosThinkingMode = "auto",
+): KairosEnvConfig {
+  const modelSpec = resolveKairosModelSpec(modelId);
 
   let thinkingEnabled: boolean | undefined;
-  switch (env.KAIROS_THINKING) {
-    case "true":
+  switch (thinking) {
+    case "on":
       thinkingEnabled = true;
       break;
-    case "false":
+    case "off":
       thinkingEnabled = false;
       break;
     case "auto":

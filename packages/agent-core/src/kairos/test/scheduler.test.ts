@@ -230,4 +230,59 @@ describe("QueueProcessor", () => {
     expect(states).toContain("cooldown");
     await processor.stop();
   }, 10_000);
+
+  it("canStartTick=false 时直接进入 budget_exhausted，不投 tick", async () => {
+    const sched = new FakeScheduler();
+    const queue = new MessageQueue();
+    const runner = new FakeRunner();
+    const states: string[] = [];
+
+    const processor = new QueueProcessor({
+      queue,
+      runner: runner as unknown as KairosRunner,
+      prefs: { ...DEFAULT_PREFERENCES, sleepRangeSeconds: { min: 10, max: 600, default: 60 } },
+      pickNextTick: async () => makeAutoPayload("x"),
+      canStartTick: () => false,
+      onStateChange: (s) => states.push(s),
+      scheduler: sched,
+    });
+
+    await processor.start();
+    await flush();
+
+    expect(runner.calls).toBe(0);
+    expect(states).toContain("budget_exhausted");
+    await processor.stop();
+  });
+
+  it("tick 后 canStartTick 翻 false → 立刻 budget_exhausted，不进入 sleep", async () => {
+    const sched = new FakeScheduler();
+    const queue = new MessageQueue();
+    const runner = new FakeRunner();
+    const states: string[] = [];
+    let allow = true;
+
+    const processor = new QueueProcessor({
+      queue,
+      runner: runner as unknown as KairosRunner,
+      prefs: { ...DEFAULT_PREFERENCES, sleepRangeSeconds: { min: 10, max: 600, default: 60 } },
+      pickNextTick: async () => makeAutoPayload("x"),
+      canStartTick: () => allow,
+      onStateChange: (s) => {
+        states.push(s);
+        if (s === "ticking") allow = false; // 模拟本 tick 把余额耗尽
+      },
+      scheduler: sched,
+    });
+
+    await processor.start();
+    await flush();
+    sched.advance(0);
+    await flush();
+
+    expect(runner.calls).toBe(1);
+    expect(states).toContain("budget_exhausted");
+    expect(states).not.toContain("sleeping");
+    await processor.stop();
+  });
 });
