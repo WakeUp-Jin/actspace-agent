@@ -14,6 +14,7 @@ import type {
   SessionEvent,
   SessionId
 } from "@actspace/shared";
+import { createEmptyBuckets } from "./context/token-estimator";
 
 // Re-export 新 context 系统的所有导出
 export * from "./context/index";
@@ -41,16 +42,9 @@ export function createEmptyContextState(sessionId: SessionId): ContextState {
   };
 }
 
+// 兼容层 bucket 也走共享注册表（单一事实来源），不再各自硬编码列表。
 function createLegacyBuckets(): ContextUsageBucket[] {
-  return [
-    { key: "systemPrompt", name: "systemPrompt", label: "System prompt", tokens: 0, colorToken: "context.system" },
-    { key: "tools", name: "tools", label: "Tools", tokens: 0, colorToken: "context.tools" },
-    { key: "rules", name: "rules", label: "Rules", tokens: 0, colorToken: "context.rules" },
-    { key: "skills", name: "skills", label: "Skills", tokens: 0, colorToken: "context.skills" },
-    { key: "mcp", name: "mcp", label: "MCP", tokens: 0, colorToken: "context.mcp" },
-    { key: "subagents", name: "subagents", label: "Subagents", tokens: 0, colorToken: "context.subagents" },
-    { key: "conversation", name: "conversation", label: "Conversation", tokens: 0, colorToken: "context.conversation" }
-  ];
+  return createEmptyBuckets();
 }
 
 export function createUsageSnapshot(totalTokens: number, maxTokens = 200_000): ContextUsageSnapshot {

@@ -211,12 +211,19 @@ export class ContextManager {
     const ctx = this.getContext();
     const systemPromptTokens = ctx.systemPrompt ? estimateTokens(ctx.systemPrompt) : 0;
     const toolsTokens = ctx.tools ? estimateTokens(JSON.stringify(ctx.tools)) : 0;
-    const conversationTokens = estimateMessagesTokens(ctx.messages);
+
+    // 历史压缩产出的合成摘要是一条 source:"compaction" 的 UserMessage，单独成桶展示，
+    // 其余消息（普通历史 + 最新用户输入）归入 conversation。
+    const isSummary = (m: (typeof ctx.messages)[number]) =>
+      m.role === "user" && m.source === "compaction";
+    const summarizedConversationTokens = estimateMessagesTokens(ctx.messages.filter(isSummary));
+    const conversationTokens = estimateMessagesTokens(ctx.messages.filter((m) => !isSummary(m)));
 
     return createContextUsageSnapshot({
       systemPromptTokens,
       toolsTokens,
       conversationTokens,
+      summarizedConversationTokens,
       maxTokens: this.config.contextWindow,
       compressionCount: this.compressionCount,
     });
@@ -237,7 +244,12 @@ export class ContextManager {
     return { ...this.config };
   }
 
-  /** 从各模块收集 systemParts，渲染为 XML 并拼接 */
+  /**
+   * 从各模块收集 systemParts，按缓存稳定性降序稳定排序后渲染为 XML 并拼接。
+   *
+   * 稳定性越高（如系统提示词 IMMUTABLE）越靠前，构成 DeepSeek prefix-cache 的不变前缀；
+   * 同稳定性按收集顺序（index）做 tie-break，保持确定性、避免前缀字节漂移。
+   */
   private buildSystemPrompt(): string | undefined {
     const allParts: SystemPart[] = [];
 
@@ -252,7 +264,12 @@ export class ContextManager {
       }
     }
 
-    const filtered = allParts.filter((p) => p.content.trim());
+    const sorted = allParts
+      .map((part, index) => ({ part, index }))
+      .sort((a, b) => b.part.stability - a.part.stability || a.index - b.index)
+      .map((entry) => entry.part);
+
+    const filtered = sorted.filter((p) => p.content.trim());
     return filtered.length > 0
       ? filtered.map((p) => p.render()).join("\n\n")
       : undefined;

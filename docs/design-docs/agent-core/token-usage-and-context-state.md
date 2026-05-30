@@ -200,8 +200,7 @@ export type ContextSnapshotPayload = {
       | "tools"
       | "rules"
       | "skills"
-      | "mcp"
-      | "subagents"
+      | "summarizedConversation"
       | "conversation";
     label?: string;
     tokens: number;
@@ -212,6 +211,13 @@ export type ContextSnapshotPayload = {
   };
 };
 ```
+
+> bucket 的 `key` / `label` / 配色已收口为单一注册表 `packages/shared/src/context-buckets.ts` 的 `CONTEXT_BUCKET_REGISTRY`：
+> `ContextUsageBucketName` 由注册表派生，后端 `createEmptyBuckets()` 遍历注册表生成 bucket，前端 Context 弹窗用 `getContextBucketDisplay(key)` 取 label 与 `--act-context-*` 主题色（浅/深各一套），未知 key 走兜底。
+> 这样「新增一种上下文类型」只需在注册表加一行 + 在 `tokens.css` 加一对主题 token，前后端无需改组件代码（改配置不改代码）。
+>
+> 当前注册表已落地 6 个桶：`systemPrompt / tools / rules / skills / summarizedConversation / conversation`。MCP、Subagents 暂未接入产品，故从注册表移除（需要时再加回）。
+> `summarizedConversation` 由 `ContextManager.getUsageSnapshot()` 从会话消息里拆出：`role:"user" && source:"compaction"` 的合成摘要单独计入该桶，其余消息（普通历史 + 最新输入）计入 `conversation`。`systemPrompt` 为 0 属正常——当前 `MAIN_AGENT_SYSTEM_PROMPT` 是空占位串；`rules / skills` 暂未喂数据也恒为 0。
 
 ### `ContextState`
 
@@ -238,8 +244,7 @@ export type ContextStateEntry = {
     | "toolDefinitions"
     | "rules"
     | "skills"
-    | "mcp"
-    | "subagentDefinitions"
+    | "summarizedConversation"
     | "conversation";
   title: string;
   estimatedTokens: number;
@@ -263,7 +268,7 @@ export type ContextStateEntry = {
 
 ## DeepSeek Cache 设计影响
 
-DeepSeek prompt cache 命中依赖请求前缀复用。上下文系统后续应尽量保持高复用内容的稳定顺序：
+DeepSeek prompt cache 命中依赖请求前缀复用。上下文系统应尽量保持高复用内容的稳定顺序：
 
 1. system prompt
 2. rules
@@ -273,6 +278,28 @@ DeepSeek prompt cache 命中依赖请求前缀复用。上下文系统后续应�
 6. conversation and volatile context
 
 第一阶段只记录 cache hit 和 cache miss。后续 Context 控制面板可以显示 cache-friendly prefix，并提示用户修改前缀上下文会影响缓存命中率。
+
+### 缓存稳定性档位（CACHE_STABILITY）
+
+借鉴 reasonix「字节级前缀稳定」的 cache-first 设计（见
+`/Users/wakeup-jin/Desktop/code-project/back-code/deepseek-reasonix-learing/docs/design-docs/reasonix-cache-first-architecture.md`），
+在 `packages/agent-core/src/context/types.ts` 落地一个显式的缓存稳定性档位：
+
+- `CACHE_STABILITY.IMMUTABLE = 100`：整会话不变，如核心系统提示词、工具协议说明。
+- `CACHE_STABILITY.STABLE = 70`：基本稳定，如规则、长期记忆摘要（`registerSegment` 默认值）。
+- `CACHE_STABILITY.SEMI = 40`：会话级注入但本轮内不变。
+- `CACHE_STABILITY.VOLATILE = 10`：每轮常变的动态注入内容。
+
+`PromptSegment` 与 `SystemPart` 都带 `stability` 字段：
+
+- `SystemPromptContext.getPrompt()` 排序键为「stability 降序 → priority 降序 → id 升序」，确定性拼接，避免前缀字节漂移。
+- `ContextManager.buildSystemPrompt()` 收集各模块的 `SystemPart` 后按 `stability` 降序稳定排序（同稳定性按收集 index tie-break），让最不易变的内容（系统提示词 IMMUTABLE）稳定落在请求前缀。
+
+### 三区域映射（actspace 当前落地）
+
+- 不变前缀：系统提示词（按 stability 降序）+ 工具定义。`getContext()` 在多轮间应产出字节级一致的前缀；工具序列化顺序由测试守护（见 `context/test/manager.test.ts`）。
+- 只追加历史（append-only volatile tail）：会话消息由 `ConversationContext` 只追加管理，**禁止重排**——重排会同时破坏 tool_call/tool_result 配对与缓存前缀。历史压缩走 `compression/` 子系统，以「追加一条合成摘要」的方式释放空间，不重写前缀。
+- 临时不入前缀：模型 thinking / reasoning 在 `convert.ts` 转换时不回放进请求消息，临时内容不污染缓存前缀。
 
 ## 被排除的方案
 

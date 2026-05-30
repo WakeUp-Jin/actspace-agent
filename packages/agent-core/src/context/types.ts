@@ -13,6 +13,27 @@
 
 import type { Message } from "../messages";
 
+// ─── 缓存稳定性档位 ───
+
+/**
+ * 缓存稳定性档位：数字越大越不易变，越应排在请求前缀以提高 DeepSeek prefix-cache 命中率。
+ *
+ * 设计动机见 docs/design-docs/agent-core/token-usage-and-context-state.md「DeepSeek Cache 设计影响」，
+ * 借鉴 reasonix 的「不变前缀 / 只追加历史 / 临时不入前缀」三区域。
+ */
+export const CACHE_STABILITY = {
+  /** 整会话不变：核心系统提示词、工具协议说明。 */
+  IMMUTABLE: 100,
+  /** 基本稳定：规则、长期记忆摘要。 */
+  STABLE: 70,
+  /** 半易变：会话级注入但本轮内不变。 */
+  SEMI: 40,
+  /** 每轮常变：动态注入内容（暂未引入实例，仅保留语义）。 */
+  VOLATILE: 10,
+} as const;
+
+export type CacheStability = (typeof CACHE_STABILITY)[keyof typeof CACHE_STABILITY];
+
 // ─── SystemPart ───
 
 export class SystemPart {
@@ -23,6 +44,8 @@ export class SystemPart {
     public description: string,
     /** 实际内容文本 */
     public content: string,
+    /** 缓存稳定性（越大越靠前），由 ContextManager 组装系统提示词时排序读取 */
+    public stability: number = CACHE_STABILITY.STABLE,
   ) {}
 
   /** 渲染为 <tag description="...">内容</tag> 格式 */
@@ -56,6 +79,8 @@ export interface PromptSegment {
   content: string;
   /** 优先级数值，越高越靠前。核心指令通常为 100 */
   priority: number;
+  /** 缓存稳定性档位（CACHE_STABILITY），同稳定性内再按 priority 排序。核心段为 IMMUTABLE */
+  stability: number;
   enabled: boolean;
 }
 

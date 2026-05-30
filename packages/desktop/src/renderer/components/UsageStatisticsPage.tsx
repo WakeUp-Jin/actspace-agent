@@ -776,10 +776,10 @@ export function UsageStatisticsPage({
               <span>{effectiveSnapshot.summary.toolCallCount.toLocaleString()} tool calls</span>
             </div>
             <section className="grid w-full grid-cols-4 gap-3">
-              <BreakdownCard label="输入" value={formatMillions(effectiveSnapshot.summary.promptTokens)} detail="direct prompt" />
-              <BreakdownCard label="输出" value={formatMillions(effectiveSnapshot.summary.completionTokens)} detail="assistant reply" />
-              <BreakdownCard label="缓存" value={formatMillions(effectiveSnapshot.summary.cacheHitTokens)} detail="cache read" />
-              <BreakdownCard label="推理" value={formatMillions(effectiveSnapshot.summary.reasoningTokens)} detail="reasoning" />
+              <BreakdownCard label="输入" value={formatMillions(effectiveSnapshot.summary.promptTokens)} />
+              <BreakdownCard label="输出" value={formatMillions(effectiveSnapshot.summary.completionTokens)} />
+              <BreakdownCard label="缓存" value={formatMillions(effectiveSnapshot.summary.cacheHitTokens)} />
+              <BreakdownCard label="推理" value={formatMillions(effectiveSnapshot.summary.reasoningTokens)} />
             </section>
           </section>
 

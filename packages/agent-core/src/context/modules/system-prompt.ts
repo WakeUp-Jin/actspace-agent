@@ -12,7 +12,7 @@
  */
 
 import type { ContextModule, ContextParts, PromptSegment } from "../types";
-import { SystemPart } from "../types";
+import { CACHE_STABILITY, SystemPart } from "../types";
 
 const CORE_SEGMENT_ID = "core";
 const CORE_PRIORITY = 100;
@@ -25,13 +25,25 @@ export class SystemPromptContext implements ContextModule {
       id: CORE_SEGMENT_ID,
       content: corePrompt,
       priority: CORE_PRIORITY,
+      stability: CACHE_STABILITY.IMMUTABLE,
       enabled: true,
     });
   }
 
-  registerSegment(segment: Omit<PromptSegment, "enabled"> & { enabled?: boolean }): void {
+  registerSegment(
+    segment: Omit<PromptSegment, "enabled" | "stability"> & {
+      enabled?: boolean;
+      stability?: number;
+    },
+  ): void {
     if (segment.id === CORE_SEGMENT_ID) return;
-    this.segments.set(segment.id, { enabled: true, ...segment });
+    this.segments.set(segment.id, {
+      id: segment.id,
+      content: segment.content,
+      priority: segment.priority,
+      stability: segment.stability ?? CACHE_STABILITY.STABLE,
+      enabled: segment.enabled ?? true,
+    });
   }
 
   updateSegment(id: string, content: string): void {
@@ -62,11 +74,19 @@ export class SystemPromptContext implements ContextModule {
     return Array.from(this.segments.values());
   }
 
-  /** 按优先级降序组装所有启用的 segment */
+  /**
+   * 组装所有启用的 segment。
+   * 排序键：稳定性降序 → priority 降序 → id 升序（确定性，避免前缀字节漂移）。
+   */
   getPrompt(): string {
     return Array.from(this.segments.values())
       .filter((s) => s.enabled)
-      .sort((a, b) => b.priority - a.priority)
+      .sort(
+        (a, b) =>
+          b.stability - a.stability ||
+          b.priority - a.priority ||
+          a.id.localeCompare(b.id),
+      )
       .map((s) => s.content)
       .join("\n\n");
   }
@@ -74,7 +94,13 @@ export class SystemPromptContext implements ContextModule {
   format(): ContextParts {
     return {
       systemParts: [
-        new SystemPart("system_prompt", "核心指令与行为规范", this.getPrompt()),
+        // 系统提示词整体含核心指令，是整会话不变的前缀，标为 IMMUTABLE。
+        new SystemPart(
+          "system_prompt",
+          "核心指令与行为规范",
+          this.getPrompt(),
+          CACHE_STABILITY.IMMUTABLE,
+        ),
       ],
       messages: [],
     };

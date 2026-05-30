@@ -16,15 +16,14 @@ import type {
 } from "../types";
 import { AssistantMessageEventStream, LLMServiceError } from "../types";
 import {
+  buildAnthropicAssistantMessage,
+  buildAnthropicErrorMessage,
   convertContextToAnthropic,
+  createAnthropicAccumulator,
   createAnthropicWebSearchTool,
-  messageToAssistantMessage,
+  processAnthropicStream,
   toAnthropicClientTools,
 } from "../anthropic-convert";
-import {
-  buildErrorMessage,
-  createAccumulator,
-} from "../convert";
 
 const DEFAULT_BASE_URL = "https://api.deepseek.com/anthropic";
 const DEFAULT_WEB_SEARCH_MAX_USES = 3;
@@ -71,8 +70,8 @@ export class DeepSeekAnthropicService implements LLMService {
       if (!self.config.apiKey) {
         yield {
           type: "error" as const,
-          message: buildErrorMessage(
-            createAccumulator(),
+          message: buildAnthropicErrorMessage(
+            createAnthropicAccumulator(),
             self.config,
             "deepseek",
             new LLMServiceError(
@@ -86,12 +85,13 @@ export class DeepSeekAnthropicService implements LLMService {
       }
 
       const requestInput = convertContextToAnthropic(context);
+      const acc = createAnthropicAccumulator();
 
       try {
         const temperature = options?.temperature ?? self.config.temperature;
         const clientTools = (context.tools ?? [])
           .filter((tool) => !PROVIDER_NATIVE_TOOL_NAMES.has(tool.name));
-        const response = await self.client.messages.create(
+        const stream = self.client.messages.stream(
           {
             model: self.config.model,
             max_tokens: options?.maxTokens ?? self.config.maxTokens ?? 8192,
@@ -107,34 +107,15 @@ export class DeepSeekAnthropicService implements LLMService {
           { signal: options?.signal },
         );
 
-        const message = messageToAssistantMessage(response, self.config, "deepseek");
+        // 真流式：逐 SSE 事件转发增量，结束后用累加器组装最终消息。
+        yield* processAnthropicStream(stream, acc);
 
-        let toolCallIndex = 0;
-        for (const block of message.content) {
-          if (block.type === "thinking") {
-            yield { type: "thinking_delta", delta: block.thinking };
-          }
-          if (block.type === "text") {
-            yield { type: "text_delta", delta: block.text };
-          }
-          if (block.type === "toolCall") {
-            yield {
-              type: "tool_call_delta",
-              index: toolCallIndex,
-              toolCallId: block.id,
-              toolName: block.name,
-              delta: JSON.stringify(block.arguments),
-            };
-            toolCallIndex++;
-          }
-        }
-
-        yield { type: "done", message };
+        yield { type: "done", message: buildAnthropicAssistantMessage(acc, self.config, "deepseek") };
       } catch (error) {
         const mapped = mapAnthropicError(error);
         yield {
           type: "error" as const,
-          message: buildErrorMessage(createAccumulator(), self.config, "deepseek", mapped, options?.signal),
+          message: buildAnthropicErrorMessage(acc, self.config, "deepseek", mapped, options?.signal),
         };
       }
     }

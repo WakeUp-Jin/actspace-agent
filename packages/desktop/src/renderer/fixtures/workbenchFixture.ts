@@ -16,13 +16,12 @@ export const mockContextSnapshot: ContextUsageSnapshot = {
   compressionCount: 2,
   cumulativeTokens: 184_200,
   buckets: [
-    { key: "systemPrompt", name: "systemPrompt", label: "System prompt", tokens: 3200, colorToken: "context.system" },
-    { key: "tools", name: "tools", label: "Tools", tokens: 15_000, colorToken: "context.tools" },
-    { key: "rules", name: "rules", label: "Rules", tokens: 681, colorToken: "context.rules" },
-    { key: "skills", name: "skills", label: "Skills", tokens: 1900, colorToken: "context.skills" },
-    { key: "mcp", name: "mcp", label: "MCP", tokens: 3200, colorToken: "context.mcp" },
-    { key: "subagents", name: "subagents", label: "Subagents", tokens: 710, colorToken: "context.subagents" },
-    { key: "conversation", name: "conversation", label: "Conversation", tokens: 46_800, colorToken: "context.conversation" }
+    { key: "systemPrompt", name: "systemPrompt", label: "System prompt", tokens: 3200, colorToken: "--act-context-system" },
+    { key: "tools", name: "tools", label: "Tools", tokens: 15_000, colorToken: "--act-context-tools" },
+    { key: "rules", name: "rules", label: "Rules", tokens: 681, colorToken: "--act-context-rules" },
+    { key: "skills", name: "skills", label: "Skills", tokens: 1900, colorToken: "--act-context-skills" },
+    { key: "summarizedConversation", name: "summarizedConversation", label: "Summarized conversation", tokens: 4200, colorToken: "--act-context-summarized" },
+    { key: "conversation", name: "conversation", label: "Conversation", tokens: 46_800, colorToken: "--act-context-conversation" }
   ]
 };
 

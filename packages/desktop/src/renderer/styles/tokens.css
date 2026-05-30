@@ -84,6 +84,19 @@
   --act-chart-series-5: #22a06b;
   --act-chart-series-6: #9aa8bb;
 
+  /*
+   * Context 弹层 bucket 配色（数据可视化色，浅/深各一组）。
+   * 由 @actspace/shared 的 CONTEXT_BUCKET_REGISTRY.colorVar 引用；新增 bucket = 注册表加一行 + 这里加一对 token。
+   * 浅色取较深饱和值以在白底弹层可见；深色取较亮值以在深底弹层可见。
+   */
+  --act-context-system: #8a96a8;
+  --act-context-tools: #8b5cf6;
+  --act-context-rules: #2f9e5f;
+  --act-context-skills: #d99a20;
+  --act-context-summarized: #db4a86;
+  --act-context-conversation: #ef8636;
+  --act-context-fallback: #9aa8bb;
+
   /* 会话顶部「当前轮提问」的贴顶渐隐遮罩（从 surface 渐隐到透明）。 */
   --act-gradient-surface-fade: linear-gradient(
     180deg,
@@ -247,6 +260,14 @@
   --act-chart-series-5: #43c98c;
   --act-chart-series-6: #8b97a9;
 
+  --act-context-system: #aeb8c6;
+  --act-context-tools: #b68cff;
+  --act-context-rules: #87d58a;
+  --act-context-skills: #ffe978;
+  --act-context-summarized: #ff6fa3;
+  --act-context-conversation: #f5a313;
+  --act-context-fallback: #8b97a9;
+
   --act-gradient-surface-fade: linear-gradient(
     180deg,
     #222428 0%,
@@ -326,6 +347,14 @@
     --act-chart-series-4: #f88a6e;
     --act-chart-series-5: #43c98c;
     --act-chart-series-6: #8b97a9;
+
+    --act-context-system: #aeb8c6;
+    --act-context-tools: #b68cff;
+    --act-context-rules: #87d58a;
+    --act-context-skills: #ffe978;
+    --act-context-summarized: #ff6fa3;
+    --act-context-conversation: #f5a313;
+    --act-context-fallback: #8b97a9;
 
     --act-gradient-surface-fade: linear-gradient(
       180deg,

@@ -231,20 +231,25 @@ describe("anthropic-convert", () => {
       { type: "text", text: "CONNECTED" },
     ]);
     expect(result.stopReason).toBe("toolUse");
+    // Anthropic input_tokens(10) 只是未命中新输入；完整 prompt = 10 + cacheRead(3) + cacheWrite(2) = 15。
     expect(result.usage).toMatchObject({
-      input: 10,
+      input: 15,
       output: 5,
       cacheRead: 3,
       cacheWrite: 2,
       cacheHit: 3,
-      cacheMiss: 7,
+      cacheMiss: 12,
       reasoning: 1,
-      totalTokens: 15,
+      totalTokens: 20,
       serverToolUse: {
         webSearchRequests: 1,
         webFetchRequests: 0,
       },
     });
+    // 不变量：命中 + 未命中 = 输入，总计 = 输入 + 输出，缓存命中 ≤ 总计。
+    expect(result.usage.cacheHit + result.usage.cacheMiss).toBe(result.usage.input);
+    expect(result.usage.totalTokens).toBe(result.usage.input + result.usage.output);
+    expect(result.usage.cacheHit).toBeLessThanOrEqual(result.usage.totalTokens);
   });
 
   it("wraps non-object Anthropic tool input for internal tool calls", () => {
@@ -299,5 +304,27 @@ describe("anthropic-convert", () => {
     expect(usage.totalTokens).toBe(10);
     expect(usage.cacheHit).toBe(0);
     expect(usage.cacheMiss).toBe(4);
+  });
+
+  it("keeps cache <= total for the reported high-cache scenario", () => {
+    // 复刻用户上报：以前 input_tokens 被当成完整输入，导致缓存(7936) > 总计(6877)。
+    const usage = anthropicUsageToUsage({
+      input_tokens: 6729,
+      output_tokens: 148,
+      cache_read_input_tokens: 7936,
+      cache_creation_input_tokens: 0,
+      cache_creation: null,
+      output_tokens_details: null,
+      server_tool_use: null,
+      service_tier: null,
+      inference_geo: null,
+    });
+
+    expect(usage.input).toBe(6729 + 7936);
+    expect(usage.cacheHit).toBe(7936);
+    expect(usage.cacheMiss).toBe(6729);
+    expect(usage.totalTokens).toBe(6729 + 7936 + 148);
+    expect(usage.cacheHit).toBeLessThanOrEqual(usage.totalTokens);
+    expect(usage.cacheHit + usage.cacheMiss).toBe(usage.input);
   });
 });

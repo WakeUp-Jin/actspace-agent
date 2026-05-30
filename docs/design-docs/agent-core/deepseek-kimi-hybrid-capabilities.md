@@ -67,7 +67,7 @@ DeepSeek 不直接处理 Kimi 的内置工具协议，也不直接消费 Kimi Fo
 **Anthropic-compatible 路线**
 
 - 当前 DeepSeek 默认 API 路线，主 Agent 与 Kairos 都会沿用；主 Agent 默认模型为 `deepseek-v4-pro`，Kairos 默认模型为 `deepseek-v4-flash`。
-- 由 `DeepSeekAnthropicService` 使用 Anthropic Messages API 调用 DeepSeek。
+- 由 `DeepSeekAnthropicService` 使用 Anthropic Messages API 真流式（`client.messages.stream`）调用 DeepSeek，逐增量转发 text/thinking/tool_use，结束后由流式累加器组装最终消息。
 - 请求中声明 server tool：`{ type: "web_search_20250305", name: "web_search", max_uses: 3 }`。
 - `web_search` 在 provider 侧执行，不进入本地 ToolManager，不产生本地 tool execution 事件。
 - provider-native 搜索计数会记录到 usage metadata（如 `serverToolUse.webSearchRequests` / `serverToolUse.webFetchRequests`），用于判断是否真实触发搜索；它不是本地 `toolCallCount`。

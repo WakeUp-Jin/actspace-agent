@@ -1,3 +1,5 @@
+import type { ContextUsageBucketName } from "./context-buckets";
+
 export type SessionId = string;
 export type TurnId = string;
 export type EventId = string;
@@ -268,15 +270,6 @@ export type ToolExecutionResult = {
   tokenEstimate?: number;
 };
 
-export type ContextUsageBucketName =
-  | "systemPrompt"
-  | "tools"
-  | "rules"
-  | "skills"
-  | "mcp"
-  | "subagents"
-  | "conversation";
-
 export type ContextUsageBucket = {
   name?: ContextUsageBucketName;
   key?: ContextUsageBucketName;
@@ -305,8 +298,7 @@ export type ContextStateEntry = {
     | "toolDefinitions"
     | "rules"
     | "skills"
-    | "mcp"
-    | "subagentDefinitions"
+    | "summarizedConversation"
     | "conversation";
   title: string;
   estimatedTokens: number;

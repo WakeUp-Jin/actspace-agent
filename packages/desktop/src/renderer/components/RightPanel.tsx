@@ -14,7 +14,7 @@ const RIGHT_PANEL_CLASS =
 const RIGHT_TABS_CLASS =
   "relative z-[61] flex min-h-[var(--window-chrome-strip-height)] items-center gap-1 overflow-x-auto border-b border-line py-0 pl-2.5 pr-[calc(var(--window-chrome-control-size)+24px)] [pointer-events:none]";
 const RIGHT_TAB_BUTTON_CLASS =
-  "rounded-act-md border-0 px-2.5 py-2 font-[inherit] [cursor:pointer] [pointer-events:auto] [-webkit-app-region:no-drag]";
+  "rounded-act-sm border-0 px-2 py-1 text-[12px] leading-none [cursor:pointer] [pointer-events:auto] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_INACTIVE_CLASS = "bg-transparent text-text-muted";
 const RIGHT_TAB_ACTIVE_CLASS = "bg-brand-soft text-brand";
 const RIGHT_PANEL_BODY_CLASS = "min-h-0 flex-1 overflow-auto p-[18px] leading-[1.6] text-text-main";

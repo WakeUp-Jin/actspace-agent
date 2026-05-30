@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SystemPromptContext } from "../modules/system-prompt";
+import { CACHE_STABILITY } from "../types";
 
 describe("SystemPromptContext", () => {
   it("should initialize with core segment", () => {
@@ -41,6 +42,34 @@ describe("SystemPromptContext", () => {
 
     expect(coreIdx).toBeLessThan(highIdx);
     expect(highIdx).toBeLessThan(lowIdx);
+  });
+
+  it("sorts by stability before priority in getPrompt", () => {
+    const spc = new SystemPromptContext("Core (immutable)");
+    // 低 priority 但高 stability，应排在 高 priority 但低 stability 之前。
+    spc.registerSegment({
+      id: "stableLowPrio",
+      content: "STABLE_LOW_PRIO",
+      priority: 10,
+      stability: CACHE_STABILITY.STABLE,
+    });
+    spc.registerSegment({
+      id: "volatileHighPrio",
+      content: "VOLATILE_HIGH_PRIO",
+      priority: 90,
+      stability: CACHE_STABILITY.VOLATILE,
+    });
+
+    const prompt = spc.getPrompt();
+    expect(prompt.indexOf("Core (immutable)")).toBeLessThan(prompt.indexOf("STABLE_LOW_PRIO"));
+    expect(prompt.indexOf("STABLE_LOW_PRIO")).toBeLessThan(prompt.indexOf("VOLATILE_HIGH_PRIO"));
+  });
+
+  it("registered segment defaults to STABLE stability", () => {
+    const spc = new SystemPromptContext("Core");
+    spc.registerSegment({ id: "rules", content: "Follow rules", priority: 50 });
+    expect(spc.getSegment("rules")?.stability).toBe(CACHE_STABILITY.STABLE);
+    expect(spc.getSegment("core")?.stability).toBe(CACHE_STABILITY.IMMUTABLE);
   });
 
   it("should exclude disabled segments", () => {

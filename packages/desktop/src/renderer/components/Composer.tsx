@@ -118,8 +118,10 @@ const STATUS_GROUP_CLASS = "flex min-w-0 items-center gap-3";
 const STATUS_ITEM_CLASS = "inline-flex min-w-0 items-center gap-1.5";
 const STATUS_ICON_CLASS = "shrink-0 text-text-subtle";
 const STATUS_USAGE_CLASS = "inline-flex shrink-0 items-center gap-1.5 text-text-muted";
-const STATUS_USAGE_DOT_CLASS =
-  "h-[15px] w-[15px] rounded-full border-[3px] border-line-strong border-r-brand-strong border-t-brand-strong";
+const STATUS_USAGE_DOT_CLASS = "h-[15px] w-[15px] shrink-0 rounded-full";
+// 3px 环形进度：conic 填充已用占比，radial mask 挖空中心形成圆环。
+const STATUS_USAGE_DOT_MASK =
+  "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px))";
 const INITIAL_CHIP_ROW_CLASS = "initial-chip-row flex min-h-8 items-center";
 const INITIAL_CHIP_CLASS =
   "initial-plan-chip inline-flex h-8 items-center rounded-full border border-line bg-surface px-3 text-sm font-medium text-text-muted shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
@@ -207,6 +209,12 @@ export function Composer({
   const hasAttachments = imageAttached || fileAttached;
   const editingModelSpec = MODEL_LIST.find((spec) => spec.id === editingModelId);
   const contextUsagePercent = contextSnapshot?.percentUsed ?? 77;
+  const contextRingPercent = Math.max(0, Math.min(100, contextUsagePercent));
+  // 有内容但占比不足 1% 时显示「<1」，避免「明明有数据却是 0%」的误解。
+  const contextPercentLabel =
+    contextSnapshot && contextSnapshot.totalTokens > 0 && contextUsagePercent <= 0
+      ? "<1"
+      : `${contextUsagePercent}`;
   const resolvedInputLayout: ComposerInputLayout =
     surface === "initial" || hasAttachments ? "stacked" : inputLayout ?? "inline";
   const placeholder = surface === "initial" ? "Plan, Build, / for commands, @ for context" : "Send follow-up";
@@ -595,7 +603,7 @@ export function Composer({
         <button
           className={STATUS_USAGE_CLASS}
           type="button"
-          aria-label={`Context usage ${contextUsagePercent}%`}
+          aria-label={`Context usage ${contextPercentLabel}%`}
           onClick={() => {
             setContextOpen((value) => !value);
             setCommandOpen(false);
@@ -604,8 +612,16 @@ export function Composer({
             setContextSelectorOpen(null);
           }}
         >
-          <span className={STATUS_USAGE_DOT_CLASS} aria-hidden="true" />
-          <span>{contextUsagePercent}%</span>
+          <span
+            className={STATUS_USAGE_DOT_CLASS}
+            aria-hidden="true"
+            style={{
+              background: `conic-gradient(var(--act-color-brand-strong) ${contextRingPercent}%, var(--act-color-border-strong) ${contextRingPercent}%)`,
+              WebkitMask: STATUS_USAGE_DOT_MASK,
+              mask: STATUS_USAGE_DOT_MASK
+            }}
+          />
+          <span>{contextPercentLabel}%</span>
         </button>
       </div>
     );

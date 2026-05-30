@@ -308,7 +308,7 @@ function createContextState(
       const kind = bucket.key ?? bucket.name ?? "conversation";
       return {
         id: `context_${kind}`,
-        kind: kind === "tools" ? "toolDefinitions" : kind === "subagents" ? "subagentDefinitions" : kind,
+        kind: kind === "tools" ? "toolDefinitions" : kind,
         title: bucket.label ?? kind,
         estimatedTokens: bucket.tokens,
         included: bucket.tokens > 0,

@@ -7,9 +7,9 @@
 
 import type {
   ContextUsageBucket,
-  ContextUsageBucketName,
   ContextUsageSnapshot,
 } from "@actspace/shared";
+import { CONTEXT_BUCKET_REGISTRY } from "@actspace/shared";
 import type { Message } from "../messages";
 import { getMessageText } from "../messages";
 
@@ -29,44 +29,45 @@ export function estimateMessagesTokens(messages: Message[]): number {
 
 // ─── Bucket 生成 ───
 
-function createBucket(
-  name: ContextUsageBucketName,
-  label: string,
-  tokens: number,
-  colorToken: string,
-): ContextUsageBucket {
-  return { key: name, name, label, tokens, colorToken };
-}
-
+/**
+ * 从共享注册表生成空 bucket 列表（单一事实来源）。
+ * 新增上下文类型时只改 `@actspace/shared` 的 CONTEXT_BUCKET_REGISTRY，这里自动跟随。
+ */
 export function createEmptyBuckets(): ContextUsageBucket[] {
-  return [
-    createBucket("systemPrompt", "System prompt", 0, "context.system"),
-    createBucket("tools", "Tools", 0, "context.tools"),
-    createBucket("rules", "Rules", 0, "context.rules"),
-    createBucket("skills", "Skills", 0, "context.skills"),
-    createBucket("mcp", "MCP", 0, "context.mcp"),
-    createBucket("subagents", "Subagents", 0, "context.subagents"),
-    createBucket("conversation", "Conversation", 0, "context.conversation"),
-  ];
+  return CONTEXT_BUCKET_REGISTRY.map((bucket) => ({
+    key: bucket.key,
+    name: bucket.key,
+    label: bucket.label,
+    tokens: 0,
+    colorToken: bucket.colorVar,
+  }));
 }
 
 export interface SnapshotInput {
   systemPromptTokens: number;
   toolsTokens: number;
   conversationTokens: number;
+  /** 压缩摘要消息（source:"compaction"）的估算 token，单独成桶展示 */
+  summarizedConversationTokens?: number;
   maxTokens?: number;
   compressionCount?: number;
 }
 
 export function createContextUsageSnapshot(input: SnapshotInput): ContextUsageSnapshot {
   const maxTokens = input.maxTokens ?? 200_000;
-  const totalTokens = input.systemPromptTokens + input.toolsTokens + input.conversationTokens;
+  const summarizedConversationTokens = input.summarizedConversationTokens ?? 0;
+  const totalTokens =
+    input.systemPromptTokens +
+    input.toolsTokens +
+    input.conversationTokens +
+    summarizedConversationTokens;
   const safeMax = Math.max(maxTokens, 1);
 
   const buckets = createEmptyBuckets();
   const bucketMap = new Map(buckets.map((b) => [b.name, b]));
   bucketMap.get("systemPrompt")!.tokens = input.systemPromptTokens;
   bucketMap.get("tools")!.tokens = input.toolsTokens;
+  bucketMap.get("summarizedConversation")!.tokens = summarizedConversationTokens;
   bucketMap.get("conversation")!.tokens = input.conversationTokens;
 
   return {

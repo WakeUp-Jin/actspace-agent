@@ -13,8 +13,10 @@
 ## `llm/` - LLM 服务层
 
 - `llm/types.ts`：LLMConfig、StreamOptions、LLMService 接口、AssistantMessageEventStream、LLMServiceError。error 事件携带完整 `AssistantMessage`（含部分内容 + `stopReason` + `errorMessage`），而非 `Error` 对象。
-- `llm/convert.ts`：共享的消息转换、工具转换、流式 chunk 处理和 SDK 错误映射逻辑。包含防御性消息处理（跳过 error/aborted 的 assistant messages、为孤儿 tool calls 插入 synthetic toolResult）。
+- `llm/convert.ts`：共享的消息转换、工具转换、流式 chunk 处理和 SDK 错误映射逻辑（OpenAI 协议）。包含防御性消息处理（跳过 error/aborted 的 assistant messages、为孤儿 tool calls 插入 synthetic toolResult）。
+- `llm/anthropic-convert.ts`：Anthropic 协议适配层。Context↔Anthropic system/messages/tools 转换、server/client tool 映射、usage 归一（`anthropicUsageToUsage`），以及真流式处理（`createAnthropicAccumulator` + `processAnthropicStream` 逐增量累积 → `buildAnthropicAssistantMessage` / `buildAnthropicErrorMessage`，设计思路与 `convert.ts` 同构，差异仅在协议）。
 - `llm/services/deepseek.ts`：DeepSeekService，使用 OpenAI SDK 直接流式调用 DeepSeek chat completions，具体实现 stream/complete/streamSimple/completeSimple 四个方法。通过 `convert.ts` 共享转换和流处理逻辑。
+- `llm/services/deepseek-anthropic.ts`：DeepSeekAnthropicService，`apiFormat=anthropic`（默认路线）时由工厂选中，用 `@anthropic-ai/sdk` 的真流式 `messages.stream` 调用 DeepSeek Anthropic Messages API。`stream` 逐 SSE 事件转发增量、结束后用累加器组装最终消息；`complete` 即 `stream().result()`。通过 `anthropic-convert.ts` 共享转换与流处理逻辑。
 - `llm/services/kimi.ts`：KimiService，使用 OpenAI SDK 直接流式调用 Kimi chat completions，支持 `builtin_function.$web_search`，并提供 `streamWithBuiltinWebSearch` / `streamMessages` / `completeMessages` 辅助方法。通过 `convert.ts` 共享转换和流处理逻辑。
 - `llm/services/mock.ts`：MockLLMService，支持 response queue 模式（通过 `setResponses`/`appendResponses` 预设响应序列）和默认行为模式（向后兼容）。提供 `mockText`、`mockToolCall`、`mockError` 辅助工厂函数。
 - `llm/kimi-assistants.ts`：DeepSeek 专用的 Kimi 辅助调用层，包含 `searchWithKimi`（统一处理关键词搜索和 URL 读取，利用 `$web_search` builtin 的 search + crawl 能力）和 `analyzeMediaWithKimi`；系统提示词从 `prompt/kimi-assistants/` 引用。
@@ -45,11 +47,11 @@
 
 ## `context/` - 上下文管道
 
-- `context/types.ts`：SystemPart、ContextModule、PromptSegment、CompressionConfig + `DEFAULT_COMPRESSION_CONFIG`（contextWindow / compressionThreshold / compressKeepRatio / compactMinIntervalCalls / toolTruncateThreshold / readTruncateThreshold / bashInlineThreshold / bashDiskCap / absoluteMaxChars 的单一默认来源）。
-- `context/token-estimator.ts`：token 估算与用量快照生成（`createContextUsageSnapshot` 支持 `compressionCount`）。
-- `context/modules/system-prompt.ts`：分段系统提示词上下文。
+- `context/types.ts`：SystemPart、ContextModule、PromptSegment、CompressionConfig + `DEFAULT_COMPRESSION_CONFIG`（contextWindow / compressionThreshold / compressKeepRatio / compactMinIntervalCalls / toolTruncateThreshold / readTruncateThreshold / bashInlineThreshold / bashDiskCap / absoluteMaxChars 的单一默认来源）。另含 `CACHE_STABILITY`（IMMUTABLE 100 / STABLE 70 / SEMI 40 / VOLATILE 10）缓存稳定性档位；`PromptSegment` 与 `SystemPart` 都带 `stability` 字段，用于把不易变内容稳定排在请求前缀，提高 DeepSeek prefix-cache 命中率（动机见 `token-usage-and-context-state.md`「缓存稳定性档位」）。
+- `context/token-estimator.ts`：token 估算与用量快照生成（`createContextUsageSnapshot` 支持 `compressionCount`）。`createEmptyBuckets()` 遍历共享注册表 `@actspace/shared` 的 `CONTEXT_BUCKET_REGISTRY` 生成 bucket（单一事实来源，新增上下文类型只改注册表 + 主题 token，不改组件）。
+- `context/modules/system-prompt.ts`：分段系统提示词上下文。核心段为 `CACHE_STABILITY.IMMUTABLE`，`registerSegment` 默认 `STABLE`；`getPrompt()` 排序键为「stability 降序 → priority 降序 → id 升序」，确定性拼接避免前缀字节漂移。
 - `context/modules/conversation.ts`：会话历史上下文模块。构造函数接受可选 `initialMessages`；`static async createFromSession(sessionPath)` 一次性恢复 `Message[]`。新增历史压缩两阶段能力：`planCompaction(keepRatio)`（只读，按 keepRatio 找安全切点——不动区以 assistant turn 开头，不拆 tool_call/tool 配对、避免连续 user）+ `applyCompaction(summary, split)`（用合成摘要替换可压区并返回被替换消息）。运行期 `format()` / `appendMessage` 仍是纯内存操作。
-- `context/manager.ts`：ContextManager 编排器（模块协调、appendMessage、getContext、用量统计）。`static async createForSession({ systemPromptModule, sessionPath, ... })` 是会话恢复入口，同时把 `sessionPath` 存为压缩摘要的回看 ref。新增 `async compactIfNeeded(summarizer)`：token 水位过 `contextWindow×compressionThreshold` 且距上次压缩满足 `compactMinIntervalCalls` 时调 HistoryCompactor，返回 `ContextCompactionReport`（trigger/threshold token、前后消息数、ref），`compressionCount` 计入用量快照。
+- `context/manager.ts`：ContextManager 编排器（模块协调、appendMessage、getContext、用量统计）。`buildSystemPrompt()` 收集各模块 `SystemPart` 后按 `stability` 降序稳定排序（同稳定性按收集 index tie-break），让最不易变内容（系统提示词 IMMUTABLE）稳定落在请求前缀。`static async createForSession({ systemPromptModule, sessionPath, ... })` 是会话恢复入口，同时把 `sessionPath` 存为压缩摘要的回看 ref。新增 `async compactIfNeeded(summarizer)`：token 水位过 `contextWindow×compressionThreshold` 且距上次压缩满足 `compactMinIntervalCalls` 时调 HistoryCompactor，返回 `ContextCompactionReport`（trigger/threshold token、前后消息数、ref），`compressionCount` 计入用量快照。
 - `context/compression/`：上下文压缩子系统。`summarizer.ts`（flash 摘要封装，`summarizeToolOutput` / `summarizeHistory`，失败抛 `SummarizerUnavailableError`）、`tool-summary-prompts.ts`（按 previewKind 选 prompt + `compressedNotice` 压缩标记）、`history-prompts.ts`（ClaudeCode 8 节摘要 prompt + 开篇语 + session.jsonl 回看 footer）、`history-compactor.ts`（`compactHistory` 序列化可压区 → 摘要 → 合成 `source:"compaction"` UserMessage 替换；摘要不可用兜底为「丢弃最旧 + 指针」）。
 
 ## `engine/` - 执行引擎

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import type { SessionEvent } from "@actspace/shared";
 import { ContextManager } from "../manager";
 import { SystemPromptContext } from "../modules/system-prompt";
+import { CACHE_STABILITY, SystemPart, type ContextModule } from "../types";
 import { appendEvents } from "../../persistence/jsonl";
 import type { UserMessage, AssistantMessage } from "../../messages";
 import { createEmptyUsage } from "../../messages";
@@ -73,6 +74,36 @@ describe("ContextManager", () => {
     expect(ctx.tools).toBeUndefined();
   });
 
+  it("returns tools in deterministic order across getContext calls", () => {
+    const cm = createTestContextManager();
+    cm.setTools([
+      { name: "read_file", description: "Read file", parameters: { type: "object" } },
+      { name: "bash", description: "Run bash", parameters: { type: "object" } },
+    ]);
+
+    // 守护：工具序列化在多次组装间字节级一致，避免破坏 DeepSeek prefix-cache。
+    expect(JSON.stringify(cm.getContext().tools)).toBe(JSON.stringify(cm.getContext().tools));
+  });
+
+  it("orders higher-stability system parts before lower-stability ones", () => {
+    const longTerm: ContextModule = {
+      format: () => ({
+        systemParts: [
+          new SystemPart("memory", "long term", "LONG_TERM_MARKER", CACHE_STABILITY.SEMI),
+        ],
+        messages: [],
+      }),
+    };
+    const cm = new ContextManager({
+      systemPromptModule: new SystemPromptContext("CORE_MARKER"),
+      longTermModule: longTerm,
+    });
+
+    const systemPrompt = cm.getContext().systemPrompt ?? "";
+    // 系统提示词整体为 IMMUTABLE，应排在 SEMI 的长期记忆之前（构成稳定前缀）。
+    expect(systemPrompt.indexOf("CORE_MARKER")).toBeLessThan(systemPrompt.indexOf("LONG_TERM_MARKER"));
+  });
+
   it("needsCompression should be false with small context", () => {
     const cm = createTestContextManager();
     cm.appendMessage({ role: "user", content: "short message", timestamp: Date.now() });
@@ -89,6 +120,28 @@ describe("ContextManager", () => {
     expect(snapshot.totalTokens).toBeGreaterThan(0);
     expect(snapshot.maxTokens).toBeGreaterThan(0);
     expect(snapshot.percentUsed).toBeGreaterThanOrEqual(0);
+  });
+
+  it("accounts the compaction summary under the summarizedConversation bucket", () => {
+    const cm = createTestContextManager();
+    cm.appendMessage({ role: "user", content: "latest user input", timestamp: Date.now() });
+    cm.appendMessage({
+      role: "user",
+      content: "[摘要] older turns condensed here",
+      timestamp: Date.now(),
+      source: "compaction",
+    });
+
+    const snapshot = cm.getUsageSnapshot();
+    const summarized = snapshot.buckets.find((b) => b.key === "summarizedConversation");
+    const conversation = snapshot.buckets.find((b) => b.key === "conversation");
+
+    // 压缩摘要进 summarizedConversation 桶，普通消息进 conversation 桶，两者都应有 token。
+    expect(summarized?.tokens ?? 0).toBeGreaterThan(0);
+    expect(conversation?.tokens ?? 0).toBeGreaterThan(0);
+    // 不再有 mcp / subagents 桶。
+    expect(snapshot.buckets.some((b) => b.key === "mcp")).toBe(false);
+    expect(snapshot.buckets.some((b) => b.key === "subagents")).toBe(false);
   });
 
   it("should return compression config", () => {

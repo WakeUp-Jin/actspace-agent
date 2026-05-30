@@ -5,28 +5,39 @@ import { ToolManager } from "../../tools/manager";
 import type { Context } from "../../messages";
 import type { InternalTool, ToolResult } from "../../internal-tools";
 
-function createAnthropicMessage(overrides?: Record<string, unknown>) {
+/** 把一组 Anthropic raw stream events 包装成 client.messages.stream 的返回值。 */
+function streamOf(events: unknown[]): AsyncIterable<unknown> {
   return {
-    id: "msg_1",
-    type: "message",
-    role: "assistant",
-    model: "deepseek-v4-pro",
-    stop_reason: "end_turn",
-    stop_sequence: null,
-    content: [{ type: "text", text: "done", citations: null }],
-    usage: {
-      input_tokens: 10,
-      output_tokens: 5,
-      cache_read_input_tokens: 0,
-      cache_creation_input_tokens: 0,
-      cache_creation: null,
-      output_tokens_details: null,
-      server_tool_use: null,
-      service_tier: null,
-      inference_geo: null,
+    async *[Symbol.asyncIterator]() {
+      for (const event of events) {
+        yield event;
+      }
     },
-    ...overrides,
   };
+}
+
+/** 单 text block 的流式事件序列。 */
+function textStream(text: string) {
+  return streamOf([
+    { type: "message_start", message: { usage: { input_tokens: 10, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+    { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
+    { type: "content_block_stop", index: 0 },
+    { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 5 } },
+    { type: "message_stop" },
+  ]);
+}
+
+/** 单 tool_use block 的流式事件序列。 */
+function toolUseStream(id: string, name: string, input: Record<string, unknown>) {
+  return streamOf([
+    { type: "message_start", message: { usage: { input_tokens: 10, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "tool_use", id, name, input: {} } },
+    { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify(input) } },
+    { type: "content_block_stop", index: 0 },
+    { type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 5 } },
+    { type: "message_stop" },
+  ]);
 }
 
 function createReadFileTool(): InternalTool {
@@ -65,19 +76,10 @@ describe("DeepSeek Anthropic local tool loop", () => {
       tools: toolManager.getToolDefinitions(),
     };
 
-    const createSpy = vi
-      .spyOn(llm["client"].messages, "create")
-      .mockResolvedValueOnce(createAnthropicMessage({
-        id: "msg_tool",
-        stop_reason: "tool_use",
-        content: [
-          { type: "tool_use", id: "toolu_1", name: "read_file", input: { path: "README.md" }, caller: { type: "direct" } },
-        ],
-      }) as any)
-      .mockResolvedValueOnce(createAnthropicMessage({
-        id: "msg_final",
-        content: [{ type: "text", text: "I read it.", citations: null }],
-      }) as any);
+    const streamSpy = vi
+      .spyOn(llm["client"].messages, "stream")
+      .mockReturnValueOnce(toolUseStream("toolu_1", "read_file", { path: "README.md" }) as any)
+      .mockReturnValueOnce(textStream("I read it.") as any);
 
     const result = await runAgentLoop(
       context,
@@ -88,9 +90,9 @@ describe("DeepSeek Anthropic local tool loop", () => {
 
     expect(result.message.stopReason).toBe("stop");
     expect(result.message.content).toEqual([{ type: "text", text: "I read it." }]);
-    expect(createSpy).toHaveBeenCalledTimes(2);
+    expect(streamSpy).toHaveBeenCalledTimes(2);
 
-    const secondRequest = createSpy.mock.calls[1][0] as any;
+    const secondRequest = streamSpy.mock.calls[1][0] as any;
     expect(secondRequest.messages).toEqual([
       { role: "user", content: "Read README.md" },
       {
