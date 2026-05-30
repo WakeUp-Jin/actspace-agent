@@ -10,6 +10,15 @@ declare global {
       abortTurn: (
         input: import("@actspace/shared").AbortTurnInput
       ) => Promise<boolean>;
+      visualizeReply: (
+        input: import("@actspace/shared").VisualizeReplyInput
+      ) => Promise<import("@actspace/shared").VisualizeReplyResult>;
+      listVisualizations: (
+        input: import("@actspace/shared").ListVisualizationsInput
+      ) => Promise<import("@actspace/shared").ListVisualizationsResult>;
+      describeContext: (
+        input: import("@actspace/shared").DescribeContextInput
+      ) => Promise<import("@actspace/shared").ContextState | null>;
       listSessions: () => Promise<import("@actspace/shared").SessionListItem[]>;
       getSession: (
         input: import("@actspace/shared").SessionGetInput

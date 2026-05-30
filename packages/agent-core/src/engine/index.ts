@@ -19,7 +19,7 @@ export { Agent } from "./agent";
 export type { AgentOptions } from "./agent";
 
 // IPC 桥接
-export { runTurnWithAgent } from "./bridge";
+export { runTurnWithAgent, createContextState, buildContextEntries } from "./bridge";
 export type {
   RunTurnWithAgentInput,
   RunTurnWithAgentDeps,

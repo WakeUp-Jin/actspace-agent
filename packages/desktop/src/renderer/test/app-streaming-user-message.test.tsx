@@ -28,6 +28,9 @@ const settingsApiStub = {
   setProviderKey: async () => ({ ok: true }),
   clearProviderKey: async () => ({ ok: true }),
   testProviderConnection: async () => ({ ok: true, message: "连接成功" }),
+  visualizeReply: async () => ({ html: "<!doctype html><html></html>", sourceHash: "stub", cached: false }),
+  listVisualizations: async () => ({ items: [] }),
+  describeContext: async () => null,
   setUiZoom: () => {},
   setNativeTheme: () => {},
 };

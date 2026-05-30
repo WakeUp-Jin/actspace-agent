@@ -75,6 +75,64 @@ export type SessionGetInput = {
   sessionId: string;
 };
 
+/** 把一条回复 Markdown 用主模型转成 HTML（见 `消息可视化转换规范.md`）。 */
+export type VisualizeReplyInput = {
+  sessionId: string;
+  /** 被可视化的 assistant 消息事件 id，参与缓存键。 */
+  messageId: string;
+  /** 回复 Markdown 原文，参与缓存键（内容变了 hash 不命中即重算）。 */
+  content: string;
+  /** 强制重新生成，忽略缓存命中。 */
+  regenerate?: boolean;
+  model?: ModelId;
+};
+
+export type VisualizeReplyResult = {
+  html: string;
+  /** content 的内容指纹；renderer 可据此判断是否需重算。 */
+  sourceHash: string;
+  /** true=命中缓存（未触发模型调用）；false=本次新生成。 */
+  cached: boolean;
+  model?: string;
+  provider?: string;
+  usage?: {
+    input: number;
+    output: number;
+    totalTokens: number;
+  };
+};
+
+/** 列出某会话已生成的可视化 HTML（右侧「Reply HTML」文件列表用）。 */
+export type ListVisualizationsInput = {
+  sessionId: string;
+};
+
+export type SessionVisualizationItem = {
+  messageId: string;
+  sourceHash: string;
+  /** 文件列表展示名（从源回复派生）。 */
+  title: string;
+  html: string;
+  model?: string;
+  createdAt: string;
+};
+
+export type ListVisualizationsResult = {
+  /** 按 createdAt 倒序（最新在前）。 */
+  items: SessionVisualizationItem[];
+};
+
+/**
+ * 按需重建某会话的完整 Context（含各 bucket 的内容预览），供右侧 Context 完整视图实时展示。
+ *
+ * 持久化的 context-state.json 只在每轮 turn 结束时写入；老会话或旧版本写入的快照可能缺少
+ * 内容预览。该接口在 main 进程重新装配该会话的 ContextManager（一次性吃完 session.jsonl），
+ * 重新算出 systemPrompt / tools / conversation 等 bucket 的预览，不调用 LLM。
+ */
+export type DescribeContextInput = {
+  sessionId: string;
+};
+
 export type SessionCreateInput = {
   title?: string;
   /** 创建时指定 workspace 根目录；不传由主进程从 BootstrapState 自动注入。 */

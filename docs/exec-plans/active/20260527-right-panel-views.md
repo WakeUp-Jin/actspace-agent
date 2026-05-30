@@ -178,6 +178,30 @@
 - 暂不支持的入口禁用或显示简短说明。
 - 文档记录后续计划，不让用户误以为是坏了。
 
+### Task 7: 消息可视化转换（MD→HTML，依赖 Task 1 + Task 3）✅ 已完成（2026-05-30）
+
+落地实现：
+
+- agent-core `src/visualize/md-to-html.ts`：`convertReplyToHtml()` 复用 `buildAgentConfig` + `createLLMService`，单次 `llm.complete` 转换，`extractHtmlDocument()` 剥围栏/噪声取单文档。
+- main `src/main/visualize-service.ts`：`visualizeReply()` 以 `messageId:sourceHash`（sha256 前 16 位）为键，缓存落 session 目录 `visualizations.json` sidecar；命中（`cached:true`）**零模型调用**；仅 `regenerate` 或 hash 变化才重算。
+- IPC `visualize:convert-reply`（`shared/ipc.ts` 定契约 + preload + `global.d.ts`）。
+- renderer `ConversationView.TurnActions`：⋯ 左侧加可视化按钮，状态机 idle→generating(`Loader2` spin)→ready(`Eye`)/error；ready 且本地有结果直接聚焦 Tab（零 IPC），⋯ 菜单提供"重新生成可视化"。
+- 产物以 `trust:"chat"` 走 Task 3 的沙箱 HTML Tab 渲染。
+- 单测：`agent-core .../visualize/test/md-to-html.test.ts`（extract 5 例）+ `desktop .../main/test/visualize-service.test.ts`（缓存命中零模型调用）。
+
+依据 `消息可视化转换规范.md` 的 V1（**依赖**右侧 Tab 底座 Task 1 与 HTML 渲染 V1 Task 3）：
+
+- `ConversationView` 的 `TurnActions` ⋯ 按钮**左侧**加可视化按钮（`Sparkles`/`Eye`）+ 状态机（idle/generating/ready/error）。
+- 新增 IPC：用主模型把回复 Markdown 转 HTML（renderer 不直接调模型、不读写 FS）。
+- 缓存持久化进 session 记录，键 = `turnId + sourceHash`；命中即读、**不重算**；提供"重新生成"。
+- 产物在右侧 HTML Tab 渲染（沿用 Task 3 的沙箱），usage 计入统计。
+
+验收：
+
+- 首次点击触发一次主模型调用并渲染；usage 有记录。
+- 再次点击同一回复**不触发模型调用**（dev 日志 / usage 可证）；重载后仍读缓存。
+- 内容变化（hash 不命中）才重算；产物渲染走沙箱。
+
 ## V2 实施任务（计划先写，**等用户指令再做**）
 
 > ⚠️ 以下 V2 默认**不执行**。除非用户在后续明确发出"做 V2 / 做某项 V2"的指令，否则保持"只写不做"。各项细节见对应 design-doc 的 V2 小节。
@@ -196,6 +220,10 @@
 
 - 新增 renderer IPC 读取 entry 全文；增删改 / pin / include 切换；按 `sourceEventIds` / `sourceFiles` 跳转；上下文搜索 / 过滤；MCP / Subagents / Recent files 分区接入。
 
+### V2-D: 消息可视化转换 完整版（见 `消息可视化转换规范.md` V2）
+
+- 转换流式渲染；风格预设 / 多版本对比 / 保留历史版本；可视化结果导出（依赖 HTML V2 导出）；消息流内联"可视化"折叠入口；超长回复分段转换拼接。
+
 ## 验证方式
 
 - `pnpm typecheck`
@@ -207,15 +235,18 @@
 ## 进度记录
 
 - [x] 2026-05-30：落三份渲染专题规范（HTML / Markdown / Context）并挂入 `frontend-ui/index.md`。
+- [x] 2026-05-30：补 `消息可视化转换规范.md`（MD→HTML 主模型转换 + 缓存 + 沙箱渲染），挂入 index 与 HTML 规范渲染分层。
 - [x] 2026-05-30：Tab 栏方案 A（压缩按钮高度 + 字号）。
-- [ ] 完成右侧面板 Tab 底座（开关 / 列表 / 当前 / 关闭 / 点击消息打开）。
-- [ ] 完成 Markdown / 文本 / 图片预览（V1）。
-- [ ] 完成 HTML 渲染视图（V1：srcDoc + CSP 双档 + 最小桥）。
-- [ ] 完成 Context 完整只读视图（V1：接 contextState + 配色联动 + 折叠/导出）。
+- [x] 2026-05-30：完成右侧面板 Tab 底座（`RightPanelContext` 驱动开关 / 动态列表 / 当前 / 关闭）。
+- [x] 2026-05-30：完成 Markdown / 文本 / 图片预览（V1：`react-markdown` + `remark-gfm` + `rehype-highlight`，Preview/源码）。
+- [x] 2026-05-30：完成 HTML 渲染视图（V1：srcDoc + CSP 双档 + 最小桥 + 主题注入）。
+- [x] 2026-05-30：完成 Context 完整只读视图（V1：接 contextState + bucket 配色联动 + Conversation 折叠/导出）。
+- [x] 2026-05-30：完成消息可视化转换（V1：⋯左侧 `Sparkles`/`Eye` 按钮 + 状态机 + 主模型 IPC + session sidecar 缓存 + 右侧沙箱渲染）。
 - [ ] 与 `20260528-kairos-right-panel-compact-view.md` 对齐 Kairos tab 接入边界。
-- [ ] 完成暂缓入口收口。
-- [ ] 跑完验证，更新必要文档和 history。
-- [ ] （V2，待用户指令）HTML / Markdown / Context 完整版。
+- [ ] 完成暂缓入口收口（Task 6）。
+- [ ] Task 2 后端：`read-file` IPC（renderer 不直接读 FS）+ 点击消息文件打开 Tab。
+- [x] 2026-05-30：跑完验证（`pnpm typecheck` + `pnpm test` 654 全绿 + `pnpm build`）。
+- [ ] （V2，待用户指令）HTML / Markdown / Context / 可视化转换 完整版。
 
 ## 设计决策（2026-05-30 锁定）
 
@@ -236,7 +267,8 @@
 
 - 入口：Context 弹窗 ✕ 旁加一个**展开/详情图标**（`PanelRight` / `Maximize2`，不用铅笔，避免暗示可编辑），点击打开右侧 Context Tab。
 - 配色联动：每个分区用 bucket 色 `--act-context-*`（单一来源 `@actspace/shared` 的 `CONTEXT_BUCKET_REGISTRY`），让弹窗色与完整视图色一致。
-- 行视觉：**整行浅色底 + 左侧 2px 同色竖条**，不用分割线。浅底由 `color-mix(in srgb, var(--act-context-*) <pct>%, transparent)` 从既有 token 派生，浅/深主题自动翻转（满足主题与配色硬约束，不新增 token）。
+- 行视觉（2026-05-30 修订）：**分区标题左侧一条同色竖线**保留；展开后内容用 **白底（`bg-surface`）卡片**呈现具体上下文内容，不再给整行染色（用户反馈整行底色不够简约）。`bg-surface` 主题感知，浅色=白、深色=深，满足配色硬约束。
+- 内容来源（2026-05-30 修订）：后端 `createContextState` 为每个 bucket 填充 `preview`（systemPrompt 正文 / tools 名单 / 摘要正文 / 最近若干条会话），前端展开即显示真实内容；空 bucket 给兜底文案。
 - Conversation：默认折叠，展开也最多显示 N 条（首版 N=20）；提供**导出**按钮（首版用 renderer Blob 下载 `.md`/`.json`，不引 IPC）。
 - 折叠标题样式同 Kairos sheet 的「会话历史」，但**箭头放到文字右侧**。
 - 数据来源：完整全文类信息（system prompt 正文、tools、rules 等）当前没有面向 renderer 的读取 IPC（`read-file` 仅在 agent-core 工具侧），首版先用 `contextSnapshot` / fixtures 能给的内容渲染，全文类按需补 IPC，分阶段接入。
@@ -247,3 +279,4 @@
 - 2026-05-30：与用户共定右侧视图四项决策（Tab 方案A / 渲染栈 rehype-highlight / Context 行用浅底+左色条 / Context 入口用展开图标），详见「设计决策（2026-05-30 锁定）」。
 - 2026-05-30：采用"先文档后代码"。先落三份渲染专题规范（`HTML渲染与沙箱安全规范.md` / `Markdown渲染规范.md` / `Context完整视图规范.md`），再由规范派生本计划。
 - 2026-05-30：HTML 渲染从"完整 + 安全"角度定 V1/V2 两版——V1 用 sandbox srcDoc iframe 的简单安全版；V2（独立 origin 完整版）计划已写，**默认不动工，等用户显式指令再做**。同口径适用于 Markdown / Context 的 V2。
+- 2026-05-30：新增"消息可视化转换"（回复 MD→HTML）功能。核心约束是**生成一次、持久化缓存、后续读缓存不重算**（成本敏感）；转换走主模型 IPC，产物按半可信走 HTML 沙箱渲染。列为 Task 7，依赖 Tab 底座(Task 1) 与 HTML 渲染 V1(Task 3)。

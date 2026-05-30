@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { PanelLeft, PanelRight, Search } from "lucide-react";
 import type { SidebarMode } from "./Sidebar";
 
@@ -26,6 +27,8 @@ export type WindowChromeBarProps = {
   onToggleRight: () => void;
   onOpenSearch?: () => void;
   showRightToggle?: boolean;
+  /** 渲染在右侧折叠按钮左侧的额外控件（如「+ 新建对象」菜单）。 */
+  rightLeading?: ReactNode;
 };
 
 export function WindowChromeBar({
@@ -36,6 +39,7 @@ export function WindowChromeBar({
   onToggleRight,
   onOpenSearch,
   showRightToggle = true,
+  rightLeading,
 }: WindowChromeBarProps) {
   const isLeftHidden = leftMode === "hidden";
 
@@ -66,6 +70,7 @@ export function WindowChromeBar({
         <h1 className="chrome-title" title={title}>{title}</h1>
       </div>
       <div className="chrome-right">
+        {rightLeading}
         {showRightToggle ? (
           <button
             className="chrome-button chrome-toggle-right"

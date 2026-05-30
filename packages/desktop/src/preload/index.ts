@@ -9,7 +9,9 @@ import type {
   BootstrapState,
   ClearProviderKeyInput,
   ClearProviderKeyResult,
+  ContextState,
   DeepSeekBalanceSnapshot,
+  DescribeContextInput,
   KairosBridgeApi,
   KairosContextSnapshot,
   KairosControl,
@@ -37,13 +39,23 @@ import type {
   TestConnectionInput,
   TestConnectionResult,
   UsageStatisticsGetInput,
-  UsageStatisticsSnapshot
+  UsageStatisticsSnapshot,
+  ListVisualizationsInput,
+  ListVisualizationsResult,
+  VisualizeReplyInput,
+  VisualizeReplyResult
 } from "@actspace/shared";
 
 contextBridge.exposeInMainWorld("actspace", {
   getBootstrapState: () => ipcRenderer.invoke("app:get-bootstrap-state") as Promise<BootstrapState>,
   runTurn: (input: RunTurnInput) => ipcRenderer.invoke("agent:run-turn", input) as Promise<AgentTurnResult>,
   abortTurn: (input: AbortTurnInput) => ipcRenderer.invoke("agent:abort-turn", input) as Promise<boolean>,
+  visualizeReply: (input: VisualizeReplyInput) =>
+    ipcRenderer.invoke("visualize:convert-reply", input) as Promise<VisualizeReplyResult>,
+  listVisualizations: (input: ListVisualizationsInput) =>
+    ipcRenderer.invoke("visualize:list", input) as Promise<ListVisualizationsResult>,
+  describeContext: (input: DescribeContextInput) =>
+    ipcRenderer.invoke("context:describe", input) as Promise<ContextState | null>,
   listSessions: () => ipcRenderer.invoke("session:list") as Promise<SessionListItem[]>,
   getSession: (input: SessionGetInput) => ipcRenderer.invoke("session:get", input) as Promise<SessionRecord | null>,
   getUsageStatistics: (input: UsageStatisticsGetInput) =>

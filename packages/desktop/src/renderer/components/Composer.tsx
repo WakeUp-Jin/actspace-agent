@@ -171,6 +171,7 @@ export function Composer({
   inputLayout,
   showDemoAttachments = false,
   defaultModelId,
+  onExpandContext,
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
   isStreaming?: boolean;
@@ -182,6 +183,8 @@ export function Composer({
   showDemoAttachments?: boolean;
   /** 来自设置页的默认模型；首次到达时同步选中，用户手动选过后不再覆盖。 */
   defaultModelId?: ModelId;
+  /** 提供时 Context 弹窗显示「展开完整视图」按钮，点击在右侧面板打开 Context Tab。 */
+  onExpandContext?: () => void;
 }) {
   const initialModelId = defaultModelId ?? DEFAULT_MODEL_ID;
   const [commandOpen, setCommandOpen] = useState(false);
@@ -686,7 +689,20 @@ export function Composer({
 
   return (
     <footer className={getComposerWrapClass(surface)} ref={composerRef}>
-      {contextOpen ? <ContextPopup snapshot={contextSnapshot} onClose={() => setContextOpen(false)} /> : null}
+      {contextOpen ? (
+        <ContextPopup
+          snapshot={contextSnapshot}
+          onClose={() => setContextOpen(false)}
+          onExpand={
+            onExpandContext
+              ? () => {
+                  onExpandContext();
+                  setContextOpen(false);
+                }
+              : undefined
+          }
+        />
+      ) : null}
       {renderReviewActionsStrip()}
       {renderInitialContextRow()}
       {renderPanel()}

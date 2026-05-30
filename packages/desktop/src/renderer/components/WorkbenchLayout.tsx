@@ -1,8 +1,10 @@
-import type { AppSettings, ContextUsageSnapshot, DeepSeekBalanceSnapshot, MessageBlock, ModelId, SessionListItem, UsageStatisticsSnapshot } from "@actspace/shared";
+import type { AppSettings, ContextState, ContextUsageSnapshot, DeepSeekBalanceSnapshot, MessageBlock, ModelId, SessionListItem, UsageStatisticsSnapshot } from "@actspace/shared";
 import { useCallback, useEffect, useState } from "react";
 import { ConversationView } from "./ConversationView";
 import { LabPage } from "./LabPage";
 import { RightPanel } from "./RightPanel";
+import { useRightPanel } from "./right-panel/RightPanelContext";
+import { RightPanelObjectMenu } from "./right-panel/RightPanelObjectMenu";
 import { Sidebar, type SidebarMode, type SidebarView } from "./Sidebar";
 import { SplitView } from "./SplitView";
 import { UsageStatisticsPage } from "./UsageStatisticsPage";
@@ -73,7 +75,7 @@ export function WorkbenchLayout({
   title,
   messages,
   contextSnapshot,
-  rightPanelOpen = false,
+  contextState,
   isStreaming = false,
   isAborting = false,
   sendScrollRequestId = 0,
@@ -93,7 +95,7 @@ export function WorkbenchLayout({
   title: string;
   messages: MessageBlock[];
   contextSnapshot: ContextUsageSnapshot | null;
-  rightPanelOpen?: boolean;
+  contextState?: ContextState | null;
   isStreaming?: boolean;
   isAborting?: boolean;
   sendScrollRequestId?: number;
@@ -113,7 +115,7 @@ export function WorkbenchLayout({
   const [leftMode, setLeftMode] = useState<SidebarMode>(storedLayout.leftMode);
   const [leftWidth, setLeftWidth] = useState(storedLayout.leftWidth);
   const [rightWidth, setRightWidth] = useState(storedLayout.rightWidth);
-  const [isRightPanelOpen, setIsRightPanelOpen] = useState(rightPanelOpen);
+  const { isOpen: isRightPanelOpen, openPanel: openRightPanel, closePanel: closeRightPanel } = useRightPanel();
   const [view, setView] = useState<SidebarView>("chat");
   const [usageSnapshot, setUsageSnapshot] = useState<UsageStatisticsSnapshot | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
@@ -165,7 +167,7 @@ export function WorkbenchLayout({
         return;
       }
 
-      setIsRightPanelOpen(false);
+      closeRightPanel();
       return;
     }
 
@@ -183,7 +185,7 @@ export function WorkbenchLayout({
 
     setLeftMode("expanded");
     if (isRightPanelOpen && containerWidth - leftWidth - rightWidth < MAIN_MIN_WIDTH) {
-      setIsRightPanelOpen(false);
+      closeRightPanel();
     }
   }
 
@@ -199,7 +201,7 @@ export function WorkbenchLayout({
 
   function toggleRightPanel() {
     if (isRightPanelOpen) {
-      setIsRightPanelOpen(false);
+      closeRightPanel();
       return;
     }
 
@@ -207,7 +209,7 @@ export function WorkbenchLayout({
       setLeftMode("hidden");
     }
 
-    setIsRightPanelOpen(true);
+    openRightPanel();
   }
 
   const handleSelectView = useCallback((next: SidebarView) => {
@@ -309,6 +311,7 @@ export function WorkbenchLayout({
       <ConversationView
         messages={messages}
         contextSnapshot={contextSnapshot}
+        sessionId={activeSessionId}
         isStreaming={isStreaming}
         isAborting={isAborting}
         sendScrollRequestId={sendScrollRequestId}
@@ -336,6 +339,9 @@ export function WorkbenchLayout({
         onToggleLeft={toggleSidebarMode}
         onToggleRight={toggleRightPanel}
         showRightToggle={view !== "kairos"}
+        rightLeading={
+          view === "chat" && isRightPanelOpen ? <RightPanelObjectMenu sessionId={activeSessionId} /> : undefined
+        }
       />
       <SplitView
         left={
@@ -372,7 +378,7 @@ export function WorkbenchLayout({
         onLeftSeparatorDoubleClick={toggleSidebarMode}
         onRightResize={(width) => setRightWidth(clamp(width, RIGHT_MIN_WIDTH, rightMaxWidth))}
         onRightSeparatorDoubleClick={() => setRightWidth(RIGHT_DEFAULT_WIDTH)}
-        right={view === "chat" && isRightPanelOpen ? <RightPanel /> : undefined}
+        right={view === "chat" && isRightPanelOpen ? <RightPanel contextState={contextState} sessionId={activeSessionId} /> : undefined}
         rightBounds={{ minWidth: RIGHT_MIN_WIDTH, maxWidth: rightMaxWidth }}
         rightSeparatorLabel="Resize preview panel"
         rightWidth={rightWidth}

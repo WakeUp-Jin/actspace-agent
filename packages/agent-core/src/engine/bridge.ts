@@ -14,6 +14,7 @@ import type {
   SessionEvent,
   ContextUsageSnapshot,
   ContextState,
+  ContextStateEntry,
   ContextCompactionPayload,
   LlmUsagePayload,
   ToolExecutionResult,
@@ -22,6 +23,7 @@ import type {
   ToolUiPreview,
 } from "@actspace/shared";
 import { resolveModelSpecByApiModel } from "@actspace/shared";
+import { estimateTokens } from "../context/token-estimator";
 import type { LLMService } from "../llm/types";
 import type { ToolManager } from "../tools/manager";
 import type { ContextManager } from "../context/manager";
@@ -39,7 +41,7 @@ import {
   contextSnapshotToEvent,
 } from "../adapters";
 import { getTextContent, getThinkingContent, getToolCalls, getMessageText } from "../messages";
-import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "../messages";
+import type { AssistantMessage, Context, Message, ToolResultMessage, UserMessage } from "../messages";
 import { calculateUsageCost } from "../usage";
 
 const PREVIEW_LIMIT = 160;
@@ -235,6 +237,8 @@ export async function runTurnWithAgent(
     sessionEvents.push(createCompactionEvent(info, sessionId, turnId));
   }
   const contextSnapshot = deps.contextManager.getUsageSnapshot();
+  // 方案 B：持久化只存 token 统计（buckets/总量），不再随每轮写盘塞逐条明细。
+  // 完整逐条内容由 main 进程 `context:describe` 打开视图时现场重算（见 context-describe-service）。
   const contextState = createContextState(contextSnapshot, sessionId, turnId);
   const snapshotEvent = contextSnapshotToEvent(contextSnapshot, sessionId, turnId);
   sessionEvents.push(snapshotEvent);
@@ -290,10 +294,112 @@ export async function runTurnWithAgent(
   return result;
 }
 
-function createContextState(
+/**
+ * 把一条会话消息转成「标题 + 全文正文」。
+ *
+ * 按用户决策「用 title 编码 role、不扩字段」：role 信息全部塞进 title，
+ * entry 结构维持不变（kind 仍是 conversation）。
+ */
+function describeMessageEntry(message: Message): { title: string; preview?: string } {
+  const text = getMessageText(message).trim();
+  if (message.role === "assistant") {
+    if (text) return { title: "Assistant", preview: text };
+    const toolCalls = getToolCalls(message);
+    if (toolCalls.length > 0) {
+      return { title: "Assistant · 工具调用", preview: `调用工具：${toolCalls.map((call) => call.name).join("、")}` };
+    }
+    return { title: "Assistant" };
+  }
+  if (message.role === "toolResult") {
+    return { title: `Tool · ${message.toolName}`, preview: text || undefined };
+  }
+  return { title: "User", preview: text || undefined };
+}
+
+/**
+ * 为 Context 完整视图「逐条」生成 entries（全文，不截断）。
+ *
+ * 仅由 main 进程 `context:describe` 打开视图时现场调用（不调用 LLM），不参与每轮持久化。
+ * - systemPrompt：整段系统提示词作为单条（含 rules/skills 的 XML 子段）。
+ * - tools：每个工具一条，title=工具名，preview=完整描述。
+ * - summarizedConversation：每条历史压缩摘要一条。
+ * - conversation：每条普通消息一条，title 编码 role（User / Assistant / Tool·xxx）。
+ *
+ * rules/skills 当前作为 systemPrompt 的子段，无独立 entry；其 bucket 由前端按注册表
+ * 兜底渲染为「空桶折叠保留」。
+ */
+export function buildContextEntries(ctx: Context): ContextStateEntry[] {
+  const entries: ContextStateEntry[] = [];
+
+  const systemPrompt = ctx.systemPrompt?.trim();
+  if (systemPrompt) {
+    entries.push({
+      id: "ctx_systemPrompt",
+      kind: "systemPrompt",
+      title: "System prompt",
+      estimatedTokens: estimateTokens(systemPrompt),
+      included: true,
+      removable: false,
+      preview: systemPrompt,
+    });
+  }
+
+  ctx.tools?.forEach((tool, index) => {
+    const description = tool.description?.trim();
+    entries.push({
+      id: `ctx_tool_${index}`,
+      kind: "toolDefinitions",
+      title: tool.name,
+      estimatedTokens: estimateTokens(JSON.stringify(tool)),
+      included: true,
+      removable: false,
+      ...(description ? { preview: description } : {}),
+    });
+  });
+
+  const isSummary = (m: Message) => m.role === "user" && m.source === "compaction";
+  let conversationIndex = 0;
+  let summaryIndex = 0;
+  for (const message of ctx.messages) {
+    if (isSummary(message)) {
+      const text = getMessageText(message).trim();
+      entries.push({
+        id: `ctx_summary_${summaryIndex++}`,
+        kind: "summarizedConversation",
+        title: "历史摘要",
+        estimatedTokens: estimateTokens(text),
+        included: true,
+        removable: false,
+        ...(text ? { preview: text } : {}),
+      });
+      continue;
+    }
+    const { title, preview } = describeMessageEntry(message);
+    entries.push({
+      id: `ctx_message_${conversationIndex++}`,
+      kind: "conversation",
+      title,
+      estimatedTokens: estimateTokens(getMessageText(message)),
+      included: true,
+      removable: false,
+      ...(preview ? { preview } : {}),
+    });
+  }
+
+  return entries;
+}
+
+/**
+ * 组装 ContextState。
+ *
+ * `entries` 缺省为空：每轮 turn 的持久化走方案 B（只存 token 统计），
+ * 逐条明细仅在 `context:describe` 现场重算时通过 `buildContextEntries` 传入。
+ */
+export function createContextState(
   snapshot: ContextUsageSnapshot,
   sessionId: string,
   turnId: string,
+  entries: ContextStateEntry[] = [],
 ): ContextState {
   return {
     sessionId,
@@ -304,17 +410,7 @@ function createContextState(
     maxTokens: snapshot.maxTokens,
     percentUsed: snapshot.percentUsed,
     buckets: snapshot.buckets,
-    entries: snapshot.buckets.map((bucket) => {
-      const kind = bucket.key ?? bucket.name ?? "conversation";
-      return {
-        id: `context_${kind}`,
-        kind: kind === "tools" ? "toolDefinitions" : kind,
-        title: bucket.label ?? kind,
-        estimatedTokens: bucket.tokens,
-        included: bucket.tokens > 0,
-        removable: false,
-      };
-    }),
+    entries,
   };
 }
 

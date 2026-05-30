@@ -1,6 +1,7 @@
 import type {
   AgentTurnResult,
   BootstrapState,
+  ContextState,
   ContextUsageSnapshot,
   MessageBlock,
   SessionListItem,
@@ -23,6 +24,71 @@ export const mockContextSnapshot: ContextUsageSnapshot = {
     { key: "summarizedConversation", name: "summarizedConversation", label: "Summarized conversation", tokens: 4200, colorToken: "--act-context-summarized" },
     { key: "conversation", name: "conversation", label: "Conversation", tokens: 46_800, colorToken: "--act-context-conversation" }
   ]
+};
+
+export const mockContextState: ContextState = {
+  sessionId: "session-learning-doc-plan",
+  activeTurnId: "mock-turn-1",
+  updatedAt: now,
+  estimator: { name: "char-heuristic", version: "1" },
+  totalEstimatedTokens: 71_781,
+  maxTokens: 200_000,
+  percentUsed: 36,
+  buckets: mockContextSnapshot.buckets,
+  entries: [
+    {
+      id: "ctx-system-1",
+      kind: "systemPrompt",
+      title: "System prompt",
+      estimatedTokens: 3200,
+      included: true,
+      pinned: true,
+      preview: "You are actspace, an agent-first coding assistant. Follow AGENTS.md navigation and repo collaboration rules…",
+    },
+    {
+      id: "ctx-tools-1",
+      kind: "toolDefinitions",
+      title: "Tool definitions（14 个工具）",
+      estimatedTokens: 15_000,
+      included: true,
+      preview: "Bash, Read, Write, StrReplace, Grep, Glob, WebSearch, WebFetch… 含参数 schema 与使用约束。",
+    },
+    {
+      id: "ctx-rules-1",
+      kind: "rules",
+      title: "AGENTS.md / 协作规则",
+      estimatedTokens: 681,
+      included: true,
+      preview: "每轮先读 REPO_COLLAB_GUIDE / ARCHITECTURE / core-beliefs；改样式前读主题与配色规范。",
+    },
+    {
+      id: "ctx-skills-1",
+      kind: "skills",
+      title: "llm-agent-dev / ui-ux-pro-max",
+      estimatedTokens: 1900,
+      included: true,
+      preview: "Agent 后端开发与 UI/UX 设计两个 Skill 的触发说明与清单。",
+    },
+    {
+      id: "ctx-summary-1",
+      kind: "summarizedConversation",
+      title: "历史摘要（前 3 轮）",
+      estimatedTokens: 4200,
+      included: true,
+      preview: "用户要求设计右侧面板视图：tab 栏瘦身、Markdown/HTML 渲染、Context 完整视图、消息可视化转换…",
+    },
+    ...Array.from({ length: 28 }, (_, index) => ({
+      id: `ctx-conv-${index + 1}`,
+      kind: "conversation" as const,
+      title: index % 2 === 0 ? `User · 第 ${Math.floor(index / 2) + 1} 轮` : `Assistant · 第 ${Math.floor(index / 2) + 1} 轮`,
+      estimatedTokens: 900 + index * 110,
+      included: true,
+      preview:
+        index % 2 === 0
+          ? "帮我把右侧面板的渲染能力补齐，先做简单安全的 V1 版本。"
+          : "已按规范实现 Tab 底座、HTML 沙箱、Markdown 渲染与 Context 完整视图，均通过类型检查与单测。",
+    })),
+  ],
 };
 
 const MOCK_WORKSPACE_PRIMARY = "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent";
@@ -410,7 +476,8 @@ export const mockSessionRecord: SessionRecord = {
   },
   events: [],
   messageBlocks: mockMessages,
-  contextSnapshot: mockContextSnapshot
+  contextSnapshot: mockContextSnapshot,
+  contextState: mockContextState
 };
 
 export const mockTurnResult: AgentTurnResult = {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Eye, X } from "lucide-react";
 import type { ContextUsageSnapshot } from "@actspace/shared";
 import { getContextBucketDisplay } from "@actspace/shared";
 
@@ -19,10 +19,13 @@ const CONTEXT_BUCKET_VALUE_CLASS = "font-semibold text-text-main";
 
 export function ContextPopup({
   snapshot,
-  onClose
+  onClose,
+  onExpand
 }: {
   snapshot: ContextUsageSnapshot | null;
   onClose: () => void;
+  /** 提供时在 ✕ 旁显示「展开完整视图」按钮，点击在右侧面板打开 Context Tab。 */
+  onExpand?: () => void;
 }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
@@ -50,9 +53,22 @@ export function ContextPopup({
     <div className={CONTEXT_POPOVER_CLASS} role="dialog" aria-label="Context usage">
       <header className={`context-popover-header ${CONTEXT_ROW_CLASS}`}>
         <strong>Context</strong>
-        <button className={CONTEXT_CLOSE_CLASS} type="button" onClick={onClose} aria-label="Close context">
-          <X size={15} strokeWidth={2.2} />
-        </button>
+        <div className="flex items-center gap-1.5">
+          {onExpand ? (
+            <button
+              className={CONTEXT_CLOSE_CLASS}
+              type="button"
+              onClick={onExpand}
+              aria-label="查看完整上下文"
+              title="查看完整上下文"
+            >
+              <Eye size={15} strokeWidth={2} />
+            </button>
+          ) : null}
+          <button className={CONTEXT_CLOSE_CLASS} type="button" onClick={onClose} aria-label="Close context">
+            <X size={15} strokeWidth={2.2} />
+          </button>
+        </div>
       </header>
       <div className={CONTEXT_SUMMARY_CLASS}>
         <span>{percentLabel}% Full</span>

@@ -3,6 +3,16 @@
  * Keep this file scoped to chrome-related classes only.
  */
 
+/* 隐藏横向滚动条（右侧面板 tab 条溢出靠下拉而非可见滚动条；触控板/滚轮仍可滚动）。 */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .window-chrome-bar button {
   border: 0;
   background: none;

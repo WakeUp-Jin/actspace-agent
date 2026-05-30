@@ -28,6 +28,9 @@ import type {
   TestConnectionInput,
   TestConnectionResult,
   UsageStatisticsGetInput,
+  ListVisualizationsInput,
+  VisualizeReplyInput,
+  DescribeContextInput,
 } from "@actspace/shared";
 import {
   createBootstrapState,
@@ -46,6 +49,8 @@ import {
 } from "@actspace/agent-core";
 import type { SessionEvent, SessionRecord } from "@actspace/shared";
 import { runAndPersistTurn, abortTurn, type AppDataRoots } from "./agent-turn";
+import { listVisualizations, visualizeReply } from "./visualize-service";
+import { describeSessionContext } from "./context-describe-service";
 import { PendingApprovalRegistry } from "./approval-registry";
 import {
   createKairosLlm,
@@ -590,6 +595,44 @@ async function registerIpc() {
 
   ipcMain.handle("agent:abort-turn", async (_event, input: AbortTurnInput) => {
     return abortTurn(input);
+  });
+
+  ipcMain.handle("visualize:convert-reply", async (_event, input: VisualizeReplyInput) => {
+    const roots = await ensureDataDirectories();
+    try {
+      const result = await visualizeReply(input, roots);
+      logMain("visualize reply", {
+        sessionId: input.sessionId,
+        messageId: input.messageId,
+        cached: result.cached,
+      });
+      return result;
+    } catch (error) {
+      logMain("visualize reply failed", {
+        sessionId: input.sessionId,
+        messageId: input.messageId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  });
+
+  ipcMain.handle("visualize:list", async (_event, input: ListVisualizationsInput) => {
+    const roots = await ensureDataDirectories();
+    return listVisualizations(input, roots);
+  });
+
+  ipcMain.handle("context:describe", async (_event, input: DescribeContextInput) => {
+    const roots = await ensureDataDirectories();
+    try {
+      return await describeSessionContext(input, roots);
+    } catch (error) {
+      logMain("describe context failed", {
+        sessionId: input.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
   });
 
   ipcMain.handle("session:list", async () => {

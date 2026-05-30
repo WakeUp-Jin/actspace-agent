@@ -6,6 +6,7 @@ import type {
   AppSettings,
   BashStatus,
   BootstrapState,
+  ContextState,
   ContextUsageSnapshot,
   MessageBlock,
   ModelId,
@@ -16,6 +17,7 @@ import type {
   ToolUiPreview,
 } from "@actspace/shared";
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
+import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
 import type { ComposerSendOptions } from "./components/Composer";
 import {
   mockBootstrapState,
@@ -762,6 +764,9 @@ export function App() {
     getLatestContextSnapshot(persistedEvents) ??
     mockContextSnapshot;
 
+  const contextState: ContextState | null =
+    sessionRecord?.contextState ?? turnResult?.contextState ?? null;
+
   const activeSessionId =
     sessionRecord?.meta.id ?? turnResult?.sessionId ?? sessions[0]?.id ?? mockSessions[0]?.id ?? null;
   const showDemoAttachments = isDemoSession(activeSessionId);
@@ -797,25 +802,28 @@ export function App() {
   );
 
   return (
-    <WorkbenchLayout
-      sessions={sessions.length > 0 ? sessions : mockSessions}
-      activeSessionId={activeSessionId}
-      title={title}
-      messages={messages}
-      contextSnapshot={contextSnapshot}
-      isStreaming={isStreaming}
-      isAborting={isAborting}
-      sendScrollRequestId={sendScrollRequestId}
-      busySessionIds={busySessionIds}
-      onSend={handleSend}
-      onAbort={handleAbort}
-      onNewSession={handleCreateSession}
-      onSelectSession={handleSelectSession}
-      onTogglePin={handleTogglePin}
-      isSessionReady={isSessionReady}
-      showDemoAttachments={showDemoAttachments}
-      defaultModelId={defaultModelId}
-      onSettingsChange={handleSettingsChange}
-    />
+    <RightPanelProvider>
+      <WorkbenchLayout
+        sessions={sessions.length > 0 ? sessions : mockSessions}
+        activeSessionId={activeSessionId}
+        title={title}
+        messages={messages}
+        contextSnapshot={contextSnapshot}
+        contextState={contextState}
+        isStreaming={isStreaming}
+        isAborting={isAborting}
+        sendScrollRequestId={sendScrollRequestId}
+        busySessionIds={busySessionIds}
+        onSend={handleSend}
+        onAbort={handleAbort}
+        onNewSession={handleCreateSession}
+        onSelectSession={handleSelectSession}
+        onTogglePin={handleTogglePin}
+        isSessionReady={isSessionReady}
+        showDemoAttachments={showDemoAttachments}
+        defaultModelId={defaultModelId}
+        onSettingsChange={handleSettingsChange}
+      />
+    </RightPanelProvider>
   );
 }

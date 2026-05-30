@@ -12,6 +12,15 @@ import type {
 } from "@actspace/shared";
 import { emptyKairosUsageSummary } from "@actspace/shared";
 import { RightPanel } from "../components/RightPanel";
+import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
+
+function renderPanel() {
+  return render(
+    <RightPanelProvider>
+      <RightPanel />
+    </RightPanelProvider>,
+  );
+}
 
 type FakeKairosOptions = Partial<{
   initialState: KairosRuntimeState;
@@ -90,28 +99,23 @@ beforeEach(() => {
 
 describe("RightPanel Kairos tab", () => {
   it("keeps right panel tab buttons out of Electron drag regions", () => {
-    render(<RightPanel />);
+    renderPanel();
 
-    expect(screen.getByRole("tab", { name: "README.md" })).toHaveClass("[-webkit-app-region:no-drag]");
-    expect(screen.getByRole("tab", { name: "Session diff" })).toHaveClass(
-      "[-webkit-app-region:no-drag]",
-    );
+    expect(screen.getByRole("tab", { name: "Kairos" })).toHaveClass("[-webkit-app-region:no-drag]");
   });
 
-  it("keeps README and diff tabs switchable", async () => {
+  it("shows the empty state after closing the only tab", async () => {
     const user = userEvent.setup();
-    render(<RightPanel />);
+    renderPanel();
 
-    expect(screen.getByText("Markdown preview")).toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: "Session diff" }));
-    expect(screen.getByRole("heading", { name: "Session diff" })).toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: "README.md" }));
-    expect(screen.getByText("Markdown preview")).toBeInTheDocument();
+    expect(screen.getByLabelText("Kairos 右侧紧凑视图")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "关闭 Kairos" }));
+    expect(screen.getByRole("heading", { name: "没有打开的对象" })).toBeInTheDocument();
   });
 
   it("shows a compact unavailable state when the Kairos bridge is missing", async () => {
     const user = userEvent.setup();
-    render(<RightPanel />);
+    renderPanel();
 
     await user.click(screen.getByRole("tab", { name: "Kairos" }));
 
@@ -161,7 +165,7 @@ describe("RightPanel Kairos tab", () => {
       initialEvents: events,
     });
     const user = userEvent.setup();
-    render(<RightPanel />);
+    renderPanel();
 
     await user.click(screen.getByRole("tab", { name: "Kairos" }));
 
@@ -187,7 +191,7 @@ describe("RightPanel Kairos tab", () => {
       },
     });
     const user = userEvent.setup();
-    render(<RightPanel />);
+    renderPanel();
 
     await user.click(screen.getByRole("tab", { name: "Kairos" }));
     await screen.findByText("Idle");

@@ -160,3 +160,132 @@
   border-top: 1px solid var(--act-color-border);
   height: 0;
 }
+
+/*
+ * 右侧面板 Markdown 文档视图（react-markdown + rehype-highlight）的增量样式。
+ * 作用域限定在 .markdown-doc，避免影响聊天区手写解析器（.markdown-prose 单用）。
+ */
+.markdown-doc pre {
+  border: 1px solid var(--act-color-code-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--act-color-code-bg-top), var(--act-color-code-bg-bottom));
+  color: var(--act-color-code-text);
+  font-family: var(--font-mono);
+  font-size: var(--act-font-mono-size, 0.86rem);
+  line-height: 1.6;
+  max-width: 100%;
+  overflow: auto;
+  padding: 12px 14px;
+}
+
+.markdown-doc pre code {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  padding: 0;
+}
+
+.markdown-doc input[type="checkbox"] {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* hljs 语法配色：浅色默认，深色随 data-theme 翻转（满足主题硬约束）。 */
+.markdown-doc {
+  --md-hl-comment: #a0a1a7;
+  --md-hl-keyword: #a626a4;
+  --md-hl-string: #50a14f;
+  --md-hl-number: #986801;
+  --md-hl-function: #4078f2;
+  --md-hl-type: #c18401;
+  --md-hl-variable: #e45649;
+  --md-hl-literal: #0184bc;
+}
+
+:root[data-theme="dark"] .markdown-doc {
+  --md-hl-comment: #7f848e;
+  --md-hl-keyword: #c678dd;
+  --md-hl-string: #98c379;
+  --md-hl-number: #d19a66;
+  --md-hl-function: #61afef;
+  --md-hl-type: #e5c07b;
+  --md-hl-variable: #e06c75;
+  --md-hl-literal: #56b6c2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] .markdown-doc {
+    --md-hl-comment: #7f848e;
+    --md-hl-keyword: #c678dd;
+    --md-hl-string: #98c379;
+    --md-hl-number: #d19a66;
+    --md-hl-function: #61afef;
+    --md-hl-type: #e5c07b;
+    --md-hl-variable: #e06c75;
+    --md-hl-literal: #56b6c2;
+  }
+}
+
+.markdown-doc .hljs-comment,
+.markdown-doc .hljs-quote {
+  color: var(--md-hl-comment);
+  font-style: italic;
+}
+
+.markdown-doc .hljs-keyword,
+.markdown-doc .hljs-selector-tag,
+.markdown-doc .hljs-built_in,
+.markdown-doc .hljs-name,
+.markdown-doc .hljs-tag {
+  color: var(--md-hl-keyword);
+}
+
+.markdown-doc .hljs-string,
+.markdown-doc .hljs-meta .hljs-string,
+.markdown-doc .hljs-regexp,
+.markdown-doc .hljs-addition {
+  color: var(--md-hl-string);
+}
+
+.markdown-doc .hljs-number,
+.markdown-doc .hljs-symbol,
+.markdown-doc .hljs-bullet {
+  color: var(--md-hl-number);
+}
+
+.markdown-doc .hljs-title,
+.markdown-doc .hljs-title.function_,
+.markdown-doc .hljs-section {
+  color: var(--md-hl-function);
+}
+
+.markdown-doc .hljs-type,
+.markdown-doc .hljs-class .hljs-title,
+.markdown-doc .hljs-title.class_,
+.markdown-doc .hljs-params {
+  color: var(--md-hl-type);
+}
+
+.markdown-doc .hljs-attr,
+.markdown-doc .hljs-attribute,
+.markdown-doc .hljs-variable,
+.markdown-doc .hljs-template-variable,
+.markdown-doc .hljs-deletion {
+  color: var(--md-hl-variable);
+}
+
+.markdown-doc .hljs-literal,
+.markdown-doc .hljs-link,
+.markdown-doc .hljs-meta {
+  color: var(--md-hl-literal);
+}
+
+.markdown-doc .hljs-emphasis {
+  font-style: italic;
+}
+
+.markdown-doc .hljs-strong {
+  font-weight: 700;
+}

@@ -71,6 +71,17 @@ describe("ContextPopup", () => {
     expect(toolsMeter.style.width).toBe(`${(1_879 / 1_000_000) * 100}%`);
   });
 
+  it("shows an expand button only when onExpand is provided and invokes it", async () => {
+    const user = userEvent.setup();
+    const onExpand = vi.fn();
+    const { rerender } = render(<ContextPopup snapshot={makeSnapshot()} onClose={vi.fn()} />);
+    expect(screen.queryByLabelText("查看完整上下文")).not.toBeInTheDocument();
+
+    rerender(<ContextPopup snapshot={makeSnapshot()} onClose={vi.fn()} onExpand={onExpand} />);
+    await user.click(screen.getByLabelText("查看完整上下文"));
+    expect(onExpand).toHaveBeenCalledTimes(1);
+  });
+
   it("cross-highlights the matching meter segment when a bucket row is toggled", async () => {
     const user = userEvent.setup();
     render(<ContextPopup snapshot={makeSnapshot()} onClose={vi.fn()} />);

@@ -1,7 +1,8 @@
-import { MoreHorizontal } from "lucide-react";
+import { Eye, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContextUsageSnapshot, MessageBlock, ModelId } from "@actspace/shared";
 import { Composer, type ComposerSendOptions } from "./Composer";
+import { useRightPanel } from "./right-panel/RightPanelContext";
 import { AssistantReply } from "./messages/AssistantReply";
 import { BashRunBlock } from "./messages/BashRunBlock";
 import { FileDiffBlock } from "./messages/FileDiffBlock";
@@ -178,9 +179,32 @@ function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTurn[] {
   return turns;
 }
 
-function TurnActions({ assistantMessages }: { assistantMessages: AssistantMessageBlock[] }) {
+type VisualizeState = "idle" | "generating" | "ready" | "error";
+
+/** 从回复正文里抽一个简短标题，给可视化 Tab 用。剥掉常见 Markdown 记号，取首个非空行。 */
+function deriveVisualizeTitle(content: string): string {
+  const firstLine =
+    content
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line.length > 0) ?? "回复";
+  const stripped = firstLine.replace(/^#+\s*/, "").replace(/[*_`>#~]/g, "").trim() || "回复";
+  return `可视化 · ${stripped.length > 16 ? `${stripped.slice(0, 16)}…` : stripped}`;
+}
+
+function TurnActions({
+  assistantMessages,
+  sessionId,
+}: {
+  assistantMessages: AssistantMessageBlock[];
+  sessionId: string | null;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [visualizeState, setVisualizeState] = useState<VisualizeState>("idle");
+  const [visualizeError, setVisualizeError] = useState<string | null>(null);
+  const visualizeHtmlRef = useRef<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { openTab } = useRightPanel();
   const latestAssistantMessage = assistantMessages[assistantMessages.length - 1];
   const copyText = useMemo(
     () => assistantMessages.map((message) => message.content).join("\n\n"),
@@ -222,8 +246,83 @@ function TurnActions({ assistantMessages }: { assistantMessages: AssistantMessag
     setMenuOpen(false);
   }
 
+  const visualizeTabId = `viz:${latestAssistantMessage.id}`;
+
+  function focusVisualizeTab(html: string) {
+    openTab({
+      id: visualizeTabId,
+      kind: "html",
+      title: deriveVisualizeTitle(copyText),
+      html,
+      trust: "chat",
+    });
+  }
+
+  /**
+   * 可视化转换：成本敏感，绝不每次点击都调模型。
+   * - 本地已有结果（ready）且非重生成 → 直接聚焦 Tab，零 IPC。
+   * - 否则走 IPC；main 侧按 messageId+sourceHash 命中缓存即不调模型。
+   */
+  async function handleVisualize(regenerate: boolean) {
+    setMenuOpen(false);
+    if (visualizeState === "generating") {
+      return;
+    }
+    if (!regenerate && visualizeState === "ready" && visualizeHtmlRef.current) {
+      focusVisualizeTab(visualizeHtmlRef.current);
+      return;
+    }
+    if (typeof window === "undefined" || !window.actspace?.visualizeReply || !sessionId) {
+      setVisualizeState("error");
+      setVisualizeError("当前环境不支持可视化转换。");
+      return;
+    }
+
+    setVisualizeState("generating");
+    setVisualizeError(null);
+    try {
+      const result = await window.actspace.visualizeReply({
+        sessionId,
+        messageId: latestAssistantMessage.id,
+        content: copyText,
+        regenerate,
+      });
+      visualizeHtmlRef.current = result.html;
+      setVisualizeState("ready");
+      focusVisualizeTab(result.html);
+    } catch (error) {
+      setVisualizeState("error");
+      setVisualizeError(error instanceof Error ? error.message : "可视化转换失败");
+    }
+  }
+
+  const visualizeLabel =
+    visualizeState === "ready"
+      ? "查看可视化（已生成）"
+      : visualizeState === "generating"
+        ? "正在生成可视化…"
+        : visualizeState === "error"
+          ? (visualizeError ?? "可视化失败，点击重试")
+          : "用主模型把这条回复转成可视化 HTML";
+
   return (
     <div className={TURN_ACTIONS_CLASS}>
+      <button
+        className={TURN_ACTION_TRIGGER_CLASS}
+        type="button"
+        aria-label={visualizeState === "ready" ? "查看可视化" : "可视化这条回复"}
+        title={visualizeLabel}
+        disabled={visualizeState === "generating"}
+        onClick={() => void handleVisualize(false)}
+      >
+        {visualizeState === "generating" ? (
+          <Loader2 size={16} strokeWidth={2.2} className="animate-spin" />
+        ) : visualizeState === "ready" ? (
+          <Eye size={16} strokeWidth={2} />
+        ) : (
+          <Wand2 size={16} strokeWidth={2} />
+        )}
+      </button>
       <div className={TURN_ACTION_ANCHOR_CLASS} ref={menuRef}>
         <button
           className={TURN_ACTION_TRIGGER_CLASS}
@@ -246,6 +345,16 @@ function TurnActions({ assistantMessages }: { assistantMessages: AssistantMessag
             <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" onClick={() => void handleCopy(latestAssistantMessage.id)}>
               Copy Request ID
             </button>
+            {visualizeState === "ready" || visualizeState === "error" ? (
+              <button
+                className={TURN_ACTION_MENU_BUTTON_CLASS}
+                type="button"
+                role="menuitem"
+                onClick={() => void handleVisualize(true)}
+              >
+                重新生成可视化
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -256,6 +365,7 @@ function TurnActions({ assistantMessages }: { assistantMessages: AssistantMessag
 export function ConversationView({
   messages,
   contextSnapshot,
+  sessionId = null,
   isStreaming = false,
   isAborting = false,
   sendScrollRequestId = 0,
@@ -267,6 +377,7 @@ export function ConversationView({
 }: {
   messages: MessageBlock[];
   contextSnapshot: ContextUsageSnapshot | null;
+  sessionId?: string | null;
   isStreaming?: boolean;
   isAborting?: boolean;
   sendScrollRequestId?: number;
@@ -279,6 +390,8 @@ export function ConversationView({
   const turns = groupMessagesIntoTurns(messages);
   const isInitialComposer = isSessionReady && messages.length === 0 && !isStreaming;
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
+  const { openTab } = useRightPanel();
+  const openContextTab = () => openTab({ id: "context", kind: "context", title: "Context" });
 
   useEffect(() => {
     if (sendScrollRequestId === 0) {
@@ -302,6 +415,7 @@ export function ConversationView({
               surface="initial"
               showDemoAttachments={showDemoAttachments}
               defaultModelId={defaultModelId}
+              onExpandContext={openContextTab}
             />
           </div>
         ) : (
@@ -319,6 +433,7 @@ export function ConversationView({
                   )}
                 </div>
                 <TurnActions
+                  sessionId={sessionId}
                   assistantMessages={
                     turn.messages.filter((message): message is AssistantMessageBlock => message.kind === "assistant")
                   }
@@ -341,6 +456,7 @@ export function ConversationView({
             surface="followup"
             showDemoAttachments={showDemoAttachments}
             defaultModelId={defaultModelId}
+            onExpandContext={openContextTab}
           />
         </div>
       ) : null}
