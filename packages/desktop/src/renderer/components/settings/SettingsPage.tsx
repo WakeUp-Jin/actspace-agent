@@ -164,16 +164,19 @@ export function SettingsPage({
   }, []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-surface text-text-main">
+    <div
+      data-testid="settings-page-shell"
+      className="flex h-screen min-h-0 flex-col overflow-hidden bg-surface text-text-main"
+    >
       <div className="window-chrome-bar" role="presentation">
         <div className="chrome-left" />
         <div className="chrome-center" />
         <div className="chrome-right" />
       </div>
 
-      <div className="flex min-h-0 flex-1 pt-[var(--window-chrome-strip-height)]">
+      <div className="flex min-h-0 flex-1 overflow-hidden pt-[var(--window-chrome-strip-height)]">
         <SettingsNav active={section} onSelect={setSection} onBack={onBack} />
-        <div className="min-h-0 flex-1 overflow-y-auto bg-app-bg">
+        <main aria-label="设置内容" className="min-h-0 flex-1 overflow-y-auto bg-app-bg">
           {settings ? (
             <SettingsContent
               section={section}
@@ -186,7 +189,7 @@ export function SettingsPage({
           ) : (
             <div className="flex h-full items-center justify-center text-[13px] text-text-faint">加载设置中…</div>
           )}
-        </div>
+        </main>
       </div>
 
       {keyModalProvider ? (

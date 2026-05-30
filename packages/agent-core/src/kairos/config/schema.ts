@@ -156,13 +156,13 @@ export function parsePreferences(raw: unknown): Preferences {
     rhythm: {
       timezone: pickString(rh.timezone, DEFAULT_PREFERENCES.rhythm.timezone),
       workHours: {
-        start: pickString(wh.start, DEFAULT_PREFERENCES.rhythm.workHours.start),
-        end: pickString(wh.end, DEFAULT_PREFERENCES.rhythm.workHours.end),
+        start: DEFAULT_PREFERENCES.rhythm.workHours.start,
+        end: DEFAULT_PREFERENCES.rhythm.workHours.end,
         sleepBias: pickEnum(wh.sleepBias, biasAllowed, DEFAULT_PREFERENCES.rhythm.workHours.sleepBias),
       },
       quietHours: {
-        start: pickString(qh.start, DEFAULT_PREFERENCES.rhythm.quietHours.start),
-        end: pickString(qh.end, DEFAULT_PREFERENCES.rhythm.quietHours.end),
+        start: DEFAULT_PREFERENCES.rhythm.quietHours.start,
+        end: DEFAULT_PREFERENCES.rhythm.quietHours.end,
         sleepBias: pickEnum(qh.sleepBias, biasAllowed, DEFAULT_PREFERENCES.rhythm.quietHours.sleepBias),
       },
       weekend: {

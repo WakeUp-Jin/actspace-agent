@@ -35,6 +35,22 @@ describe("parsePreferences", () => {
     });
     expect(parsed.rhythm.workHours.sleepBias).toBe(DEFAULT_PREFERENCES.rhythm.workHours.sleepBias);
   });
+
+  it("keeps rhythm time windows fixed while preserving sleepBias", () => {
+    const parsed = parsePreferences({
+      rhythm: {
+        workHours: { start: "10:30", end: "16:30", sleepBias: "light" },
+        quietHours: { start: "01:00", end: "05:00", sleepBias: "normal" },
+      },
+    });
+
+    expect(parsed.rhythm.workHours.start).toBe(DEFAULT_PREFERENCES.rhythm.workHours.start);
+    expect(parsed.rhythm.workHours.end).toBe(DEFAULT_PREFERENCES.rhythm.workHours.end);
+    expect(parsed.rhythm.workHours.sleepBias).toBe("light");
+    expect(parsed.rhythm.quietHours.start).toBe(DEFAULT_PREFERENCES.rhythm.quietHours.start);
+    expect(parsed.rhythm.quietHours.end).toBe(DEFAULT_PREFERENCES.rhythm.quietHours.end);
+    expect(parsed.rhythm.quietHours.sleepBias).toBe("normal");
+  });
 });
 
 describe("parsePathsConfig", () => {

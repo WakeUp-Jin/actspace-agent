@@ -508,7 +508,7 @@ function BudgetBalanceField({
   );
 }
 
-// ─── 运行偏好（精简：作息节律 + 睡眠区间）───
+// ─── 运行偏好（精简：固定时段频率 + 睡眠区间）───
 
 function PreferencesForm({
   prefs,
@@ -541,21 +541,19 @@ function PreferencesForm({
     <SettingGroup title="运行偏好">
       <HoursRow
         title="工作时段"
-        description="该时段 Kairos 更活跃，倾向更短的休眠。"
+        timeLabel={`${RHYTHM_DEFAULT.workHours.start} - ${RHYTHM_DEFAULT.workHours.end}`}
+        description="固定为默认工作时间；只调整这段时间内的运行频率。"
         hours={asObj(rh.workHours)}
-        startFallback={RHYTHM_DEFAULT.workHours.start}
-        endFallback={RHYTHM_DEFAULT.workHours.end}
         biasFallback={RHYTHM_DEFAULT.workHours.sleepBias}
-        onChange={(field, val) => patch((o) => setPath(o, ["rhythm", "workHours", field], val))}
+        onChange={(val) => patch((o) => setPath(o, ["rhythm", "workHours", "sleepBias"], val))}
       />
       <HoursRow
-        title="安静时段"
-        description="该时段尽量少打扰，倾向更长的休眠。"
+        title="晚上时段"
+        timeLabel={`${RHYTHM_DEFAULT.quietHours.start} - ${RHYTHM_DEFAULT.quietHours.end}`}
+        description="固定为默认夜间时间；只调整这段时间内的运行频率。"
         hours={asObj(rh.quietHours)}
-        startFallback={RHYTHM_DEFAULT.quietHours.start}
-        endFallback={RHYTHM_DEFAULT.quietHours.end}
         biasFallback={RHYTHM_DEFAULT.quietHours.sleepBias}
-        onChange={(field, val) => patch((o) => setPath(o, ["rhythm", "quietHours", field], val))}
+        onChange={(val) => patch((o) => setPath(o, ["rhythm", "quietHours", "sleepBias"], val))}
       />
       <SettingRow
         title="睡眠区间"
@@ -590,48 +588,31 @@ function PreferencesForm({
 
 function HoursRow({
   title,
+  timeLabel,
   description,
   hours,
-  startFallback,
-  endFallback,
   biasFallback,
   onChange,
 }: {
   title: string;
+  timeLabel: string;
   description: string;
   hours: Record<string, unknown>;
-  startFallback: string;
-  endFallback: string;
   biasFallback: string;
-  onChange: (field: "start" | "end" | "sleepBias", value: string) => void;
+  onChange: (value: string) => void;
 }) {
   return (
     <SettingRow
       title={title}
-      description={description}
+      description={`${timeLabel}，${description}`}
       align="start"
       control={
         <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
-            <TextField
-              value={asStr(hours.start, startFallback)}
-              ariaLabel={`${title}开始`}
-              className="w-[76px] text-center"
-              onCommit={(v) => onChange("start", v.trim())}
-            />
-            <span className="text-text-faint">–</span>
-            <TextField
-              value={asStr(hours.end, endFallback)}
-              ariaLabel={`${title}结束`}
-              className="w-[76px] text-center"
-              onCommit={(v) => onChange("end", v.trim())}
-            />
-          </div>
           <SettingsSelect
             value={asStr(hours.sleepBias, biasFallback)}
             options={BIAS_OPTIONS}
-            onChange={(v) => onChange("sleepBias", v)}
-            ariaLabel={`${title}睡眠倾向`}
+            onChange={onChange}
+            ariaLabel={`${title}运行频率`}
           />
         </div>
       }

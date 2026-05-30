@@ -206,6 +206,62 @@ describe("KairosSettings — 结构化配置表单", () => {
     });
   });
 
+  it("运行节奏只暴露固定时间说明和频率下拉，不暴露起止时间输入", async () => {
+    installBridge({
+      contents: {
+        preferences:
+          JSON.stringify(
+            {
+              rhythm: {
+                workHours: { start: "10:00", end: "16:00", sleepBias: "normal" },
+                quietHours: { start: "01:00", end: "05:00", sleepBias: "deep" },
+              },
+            },
+            null,
+            2,
+          ) + "\n",
+      },
+    });
+    render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
+
+    expect(await screen.findByText("工作时段")).toBeInTheDocument();
+    expect(screen.getByText("晚上时段")).toBeInTheDocument();
+    expect(screen.getByText(/09:00 - 21:00/)).toBeInTheDocument();
+    expect(screen.getByText(/23:00 - 07:00/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("工作时段开始")).toBeNull();
+    expect(screen.queryByLabelText("晚上时段开始")).toBeNull();
+    expect(screen.getByLabelText("工作时段运行频率")).toBeInTheDocument();
+    expect(screen.getByLabelText("晚上时段运行频率")).toBeInTheDocument();
+  });
+
+  it("修改工作时段运行频率只写回 rhythm.workHours.sleepBias", async () => {
+    const { writeConfig } = installBridge({
+      contents: {
+        preferences:
+          JSON.stringify(
+            {
+              rhythm: {
+                workHours: { start: "09:00", end: "21:00", sleepBias: "normal" },
+                quietHours: { start: "23:00", end: "07:00", sleepBias: "deep" },
+              },
+            },
+            null,
+            2,
+          ) + "\n",
+      },
+    });
+    render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
+
+    await userEvent.click(await screen.findByLabelText("工作时段运行频率"));
+    await userEvent.click(await screen.findByRole("option", { name: "浅睡（更活跃）" }));
+
+    await waitFor(() => {
+      const written = lastWrite(writeConfig, "preferences")!;
+      const rhythm = written.rhythm as { workHours: { start: string; end: string; sleepBias: string } };
+      expect(rhythm.workHours).toEqual({ start: "09:00", end: "21:00", sleepBias: "light" });
+    });
+  });
+
   it("改模型下拉通过统一设置写回 settings.kairos.modelId", async () => {
     const onUpdate = vi.fn();
     const { writeConfig } = installBridge({

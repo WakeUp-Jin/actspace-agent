@@ -70,6 +70,15 @@ describe("SettingsPage", () => {
     expect(screen.getByLabelText("界面语言")).toBeDisabled();
   });
 
+  it("keeps the settings nav fixed while the content pane owns vertical scrolling", async () => {
+    render(<SettingsPage onBack={() => {}} />);
+    expect(await screen.findByRole("switch", { name: "自动审查" })).toBeInTheDocument();
+
+    expect(screen.getByTestId("settings-page-shell")).toHaveClass("h-screen", "overflow-hidden");
+    expect(screen.getByRole("navigation", { name: "设置导航" })).not.toHaveClass("overflow-y-auto");
+    expect(screen.getByRole("main", { name: "设置内容" })).toHaveClass("overflow-y-auto");
+  });
+
   it("toggling 自动审查 calls updateSettings with bashAlwaysAsk", async () => {
     render(<SettingsPage onBack={() => {}} />);
     const toggle = await screen.findByRole("switch", { name: "自动审查" });
