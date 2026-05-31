@@ -61,6 +61,9 @@ declare global {
       testProviderConnection: (
         input: import("@actspace/shared").TestConnectionInput
       ) => Promise<import("@actspace/shared").TestConnectionResult>;
+      getLocalUpdateState?: () => Promise<import("@actspace/shared").LocalUpdateState>;
+      selectLocalUpdateSource?: () => Promise<import("@actspace/shared").LocalUpdateSelectSourceResult>;
+      startLocalUpdate?: () => Promise<import("@actspace/shared").LocalUpdateStartResult>;
       /** 整窗缩放（Electron webFrame.setZoomFactor）；外观设置的「界面字号」走这里。 */
       setUiZoom: (factor: number) => void;
       /** 主题三态同步原生 chrome（main nativeTheme.themeSource）。 */

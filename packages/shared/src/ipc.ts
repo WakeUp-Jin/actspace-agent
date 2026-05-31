@@ -315,6 +315,40 @@ export type DeepSeekBalanceSnapshot = {
   displayBalance: DeepSeekBalanceDisplay | null;
 };
 
+export type LocalUpdateErrorCode =
+  | "invalid_source"
+  | "not_packaged"
+  | "not_macos"
+  | "not_writable"
+  | "missing_source"
+  | "already_running"
+  | "spawn_failed";
+
+export type LocalUpdateState = {
+  sourceRoot: string | null;
+  sourceValid: boolean;
+  sourceError?: LocalUpdateErrorCode;
+  appPath: string | null;
+  installParent: string | null;
+  canUpdate: boolean;
+  reason?: string;
+  logPath: string;
+  running: boolean;
+  lastStartedAt?: string;
+};
+
+export type LocalUpdateSelectSourceResult = {
+  canceled: boolean;
+  state: LocalUpdateState;
+};
+
+export type LocalUpdateStartResult = {
+  ok: boolean;
+  state: LocalUpdateState;
+  error?: LocalUpdateErrorCode;
+  message?: string;
+};
+
 export type AppBootstrapStateInput = {
   appVersion: string;
   dataRoot: string;

@@ -6,6 +6,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 dist_dir="${repo_root}/dist"
 desktop_dir="${repo_root}/packages/desktop"
 desktop_pkg="${desktop_dir}/package.json"
+desktop_resources_dir="${desktop_dir}/resources"
 artifact_root="${dist_dir}/desktop"
 deploy_dir="${dist_dir}/desktop-app"
 electron_runtime_dir="${desktop_dir}/node_modules/electron/dist"
@@ -15,6 +16,7 @@ mac_ad_hoc_sign="${ACTSPACE_MAC_ADHOC_SIGN:-false}"
 signed=false
 notarized=false
 signature="none"
+packaging="portable-electron-archive"
 
 is_truthy() {
   case "$(printf "%s" "${1:-}" | tr '[:upper:]' '[:lower:]')" in
@@ -51,6 +53,10 @@ esac
 
 artifact_name="actspace-desktop-${platform}-${artifact_arch}.tar.gz"
 artifact_path="${dist_dir}/${artifact_name}"
+dmg_name=""
+dmg_path=""
+dmg_manifest_value=null
+dmg_size_bytes=null
 app_name="$(node -e "const pkg=require(process.argv[1]); console.log(pkg.productName || pkg.name || 'actspace-desktop')" "${desktop_pkg}")"
 app_version="$(node -e "const pkg=require(process.argv[1]); console.log(pkg.version || '0.0.0')" "${desktop_pkg}")"
 generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -60,7 +66,11 @@ rm -rf "${dist_dir}"
 mkdir -p "${artifact_root}"
 
 pnpm --filter @actspace/desktop build
-pnpm --filter @actspace/desktop --prod deploy --legacy --offline "${deploy_dir}"
+if ! pnpm --filter @actspace/desktop --prod deploy --legacy --offline "${deploy_dir}"; then
+  echo "Offline deploy failed; retrying with registry access so local packaging can hydrate the pnpm store." >&2
+  rm -rf "${deploy_dir}"
+  pnpm --filter @actspace/desktop --prod deploy --legacy "${deploy_dir}"
+fi
 
 find "${deploy_dir}" -type d -name test -prune -exec rm -rf {} +
 find "${deploy_dir}" \( -name "*.map" -o -name "*.d.ts" -o -name "*.d.mts" \) -type f -delete
@@ -83,12 +93,18 @@ case "${platform}" in
     mkdir -p "${packaged_app}/Contents/Resources"
     rm -rf "${packaged_app}/Contents/Resources/app"
     cp -R "${deploy_dir}" "${packaged_app}/Contents/Resources/app"
+    if [[ -f "${desktop_resources_dir}/icon.icns" ]]; then
+      cp "${desktop_resources_dir}/icon.icns" "${packaged_app}/Contents/Resources/icon.icns"
+    fi
     if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
       /usr/libexec/PlistBuddy -c "Set :CFBundleName ${app_name}" "${packaged_app}/Contents/Info.plist" 2>/dev/null || true
       /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${app_name}" "${packaged_app}/Contents/Info.plist" 2>/dev/null || true
       /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.actspace.desktop" "${packaged_app}/Contents/Info.plist" 2>/dev/null || true
       /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${app_version}" "${packaged_app}/Contents/Info.plist" 2>/dev/null || true
       /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${app_version}" "${packaged_app}/Contents/Info.plist" 2>/dev/null || true
+      /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile icon.icns" "${packaged_app}/Contents/Info.plist" 2>/dev/null \
+        || /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string icon.icns" "${packaged_app}/Contents/Info.plist" 2>/dev/null \
+        || true
     fi
     if [[ -n "${mac_codesign_identity}" ]]; then
       codesign --force --deep --options runtime --timestamp --sign "${mac_codesign_identity}" "${packaged_app}"
@@ -122,6 +138,17 @@ case "${platform}" in
       rm -f "${notary_archive}"
       notarized=true
     fi
+    dmg_name="actspace-desktop-${platform}-${artifact_arch}.dmg"
+    dmg_path="${dist_dir}/${dmg_name}"
+    dmg_root="${dist_dir}/dmg-root"
+    mkdir -p "${dmg_root}"
+    cp -R "${packaged_app}" "${dmg_root}/actspace.app"
+    ln -s /Applications "${dmg_root}/Applications"
+    hdiutil create -volname "${app_name}" -srcfolder "${dmg_root}" -ov -format UDZO "${dmg_path}"
+    rm -rf "${dmg_root}"
+    dmg_manifest_value="\"${dmg_name}\""
+    dmg_size_bytes="$(wc -c < "${dmg_path}" | tr -d '[:space:]')"
+    packaging="portable-electron-archive-and-macos-dmg"
     ;;
   linux)
     cp -R "${electron_runtime_dir}/." "${artifact_root}/"
@@ -149,10 +176,12 @@ cat > "${dist_dir}/release-manifest.json" <<EOF
   "arch": "${artifact_arch}",
   "artifact": "${artifact_name}",
   "artifact_size_bytes": ${artifact_size_bytes},
+  "dmg_artifact": ${dmg_manifest_value},
+  "dmg_artifact_size_bytes": ${dmg_size_bytes},
   "signed": ${signed},
   "notarized": ${notarized},
   "signature": "${signature}",
-  "packaging": "portable-electron-archive"
+  "packaging": "${packaging}"
 }
 EOF
 

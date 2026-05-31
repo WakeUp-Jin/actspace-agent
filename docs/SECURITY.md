@@ -20,6 +20,7 @@
 - 使用 `contextIsolation: true` + `nodeIntegration: false`，renderer 不能直接访问 Node.js API。
 - preload 通过 `contextBridge` 只暴露最小、类型化的 bridge API。
 - 环境变量（含 API Key）只在 main 进程中可见，不会泄露到 renderer。
+- 本地更新只通过 main 进程 IPC 暴露结构化操作：选择源码目录、读取状态、启动更新。renderer 不传 shell 命令；main 会验证所选目录是 `name: "actspace"` 且包含 `package:desktop:dmg` 与 `scripts/release-package.sh` 后，才写入 helper 脚本。helper 位于 `<userData>/tmp/local-update/`，日志写同目录 `update.log`。
 
 ## 文件系统访问控制
 
@@ -29,6 +30,7 @@
   - **Kairos 不受影响**：Kairos 调用路径在 scheduler 层仍按 `allowedRoots + blocklist` 双校验（`checkKairosGuard`），读类工具放开只影响主 Agent。
   - **后续收口方向**（记入 `docs/exec-plans/tech-debt-tracker.md`）：补「敏感路径 blocklist + 按需读审核」，而不是恢复 workspace 硬限制。
 - session 数据存储在 Electron `userData` 目录下，路径固定、可预测。
+- 本地更新源码目录路径存储在 `<userData>/local-update.json`，不存密钥；该路径可暴露用户本机目录结构，日志或截图外发前应按需脱敏。
 - Agent 文件工具的工作区由 `ACTSPACE_WORKSPACE_ROOT` 或当前仓库根目录确定，不使用 `userData` 作为代码文件读取目录，避免把应用数据目录和用户工作区混淆。
 - Bash 工具当前以当前进程的 `process.env` 启动子进程，因此命令执行不会把密钥提交到 Git，但允许被执行命令读取运行时环境变量。后续如要开放更高风险命令，应改为白名单环境变量或显式脱敏环境。
 - Bash 大输出流式落盘到 `<userData>/tmp/tool-output/<sessionId>/`，不写进 workspace；落盘文件由后续定时清理回收（见 context-compression.md「M5 清理」）。

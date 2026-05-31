@@ -9,7 +9,7 @@
  * Agent turn 执行逻辑在 ./agent-turn.ts。
  */
 
-import { app, BrowserWindow, ipcMain, nativeTheme, safeStorage } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, safeStorage } from "electron";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
@@ -55,6 +55,7 @@ import { runAndPersistTurn, abortTurn, type AppDataRoots } from "./agent-turn";
 import { listVisualizations, visualizeReply } from "./visualize-service";
 import { describeSessionContext } from "./context-describe-service";
 import { listWorkspaceDir, readWorkspaceFile } from "./workspace-fs-service";
+import { LocalUpdateService } from "./local-update-service";
 import { PendingApprovalRegistry } from "./approval-registry";
 import {
   createKairosLlm,
@@ -336,12 +337,20 @@ const electronSecretCrypto: SecretCrypto = {
 };
 
 let settingsService: SettingsService | undefined;
+let localUpdateService: LocalUpdateService | undefined;
 
 function getSettingsService(): SettingsService {
   if (!settingsService) {
     throw new Error("SettingsService 尚未初始化（应在 app.whenReady 内 load 之后再调用）。");
   }
   return settingsService;
+}
+
+function getLocalUpdateService(): LocalUpdateService {
+  if (!localUpdateService) {
+    throw new Error("LocalUpdateService is not initialized");
+  }
+  return localUpdateService;
 }
 
 function resolveProviderModelsUrl(baseUrl: string): string {
@@ -804,6 +813,33 @@ async function registerIpc() {
     return result;
   });
 
+  // ─── 本地更新 ───
+  ipcMain.handle("local-update:get-state", async () => {
+    return getLocalUpdateService().getState();
+  });
+
+  ipcMain.handle("local-update:select-source", async () => {
+    const result = await dialog.showOpenDialog({
+      title: "选择 actspace 源码目录",
+      properties: ["openDirectory"],
+    });
+    if (result.canceled || !result.filePaths[0]) {
+      return { canceled: true, state: await getLocalUpdateService().getState() };
+    }
+    const state = await getLocalUpdateService().setSourceRoot(result.filePaths[0]);
+    logMain("local update source selected", { ok: state.sourceValid });
+    return { canceled: false, state };
+  });
+
+  ipcMain.handle("local-update:start", async () => {
+    const result = await getLocalUpdateService().start();
+    logMain("local update start requested", { ok: result.ok, error: result.error });
+    if (result.ok) {
+      setTimeout(() => app.quit(), 300);
+    }
+    return result;
+  });
+
   // 主题三态同步原生 chrome（交通灯 / 原生滚动条 / 右键菜单）。
   // fire-and-forget：renderer 的 applyAppearance 在切换与开机重放时各发一次。
   ipcMain.on("appearance:set-theme", (_event, mode: unknown) => {
@@ -829,6 +865,17 @@ app.whenReady().then(async () => {
     logMain("settings service ready", { dataRoot: roots.dataRoot });
   } catch (err) {
     logMain("settings service load failed", { error: err instanceof Error ? err.message : String(err) });
+  }
+  localUpdateService = new LocalUpdateService({
+    dataRoot: roots.dataRoot,
+    appPath: process.execPath,
+    isPackaged: app.isPackaged,
+  });
+  try {
+    await localUpdateService.load();
+    logMain("local update service ready", { dataRoot: roots.dataRoot, packaged: app.isPackaged });
+  } catch (err) {
+    logMain("local update service load failed", { error: err instanceof Error ? err.message : String(err) });
   }
   await registerIpc();
   await createMainWindow();

@@ -15,6 +15,7 @@
     "check:actions": "./scripts/check-action-pinning.sh",
     "hooks:install": "./scripts/install-git-hooks.sh",
     "package:desktop": "./scripts/release-package.sh",
+    "package:desktop:dmg": "./scripts/release-package.sh",
     "release-package": "./scripts/release-package.sh"
   }
 }

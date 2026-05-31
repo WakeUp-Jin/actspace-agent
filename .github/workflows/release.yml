@@ -57,13 +57,16 @@ jobs:
           name: release-assets
           path: |
             dist/actspace-desktop-*.tar.gz
+            dist/actspace-desktop-*.dmg
             dist/release-manifest.json
             dist/sbom.spdx.json
 
       - name: 生成 build provenance
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
-          subject-path: dist/actspace-desktop-*.tar.gz
+          subject-path: |
+            dist/actspace-desktop-*.tar.gz
+            dist/actspace-desktop-*.dmg
 
       - name: 创建 GitHub Release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
@@ -72,5 +75,6 @@ jobs:
           name: ${{ inputs.title || inputs.tag }}
           files: |
             dist/actspace-desktop-*.tar.gz
+            dist/actspace-desktop-*.dmg
             dist/release-manifest.json
             dist/sbom.spdx.json

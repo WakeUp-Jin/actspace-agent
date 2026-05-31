@@ -5,6 +5,7 @@ import {
   DEFAULT_MODEL_ID,
   MODEL_LIST,
   type AppSettings,
+  type LocalUpdateState,
   type ModelId,
   type ProviderId,
   type SetProviderKeyResult,
@@ -60,6 +61,10 @@ const MODEL_OPTIONS: SelectOption[] = MODEL_LIST.map((spec) => ({ value: spec.id
 
 function hasSettingsBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace?.getSettings);
+}
+
+function hasLocalUpdateBridge(): boolean {
+  return typeof window !== "undefined" && Boolean(window.actspace?.getLocalUpdateState);
 }
 
 function mergeSettings(current: AppSettings, input: SettingsUpdateInput): AppSettings {
@@ -251,6 +256,8 @@ function GeneralSection({ settings, onUpdate }: SectionProps) {
         />
       </SettingGroup>
 
+      <LocalUpdateGroup />
+
       <SettingGroup title="通用设置">
         <SettingRow
           title="语言"
@@ -267,6 +274,98 @@ function GeneralSection({ settings, onUpdate }: SectionProps) {
         />
       </SettingGroup>
     </SectionShell>
+  );
+}
+
+function LocalUpdateGroup() {
+  const [state, setState] = useState<LocalUpdateState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const bridgeReady = hasLocalUpdateBridge();
+
+  useEffect(() => {
+    if (!bridgeReady || !window.actspace.getLocalUpdateState) return;
+    window.actspace
+      .getLocalUpdateState()
+      .then(setState)
+      .catch(() => {
+        setStatus("读取本地更新状态失败。");
+      });
+  }, [bridgeReady]);
+
+  const chooseSource = async () => {
+    if (!window.actspace.selectLocalUpdateSource) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      const result = await window.actspace.selectLocalUpdateSource();
+      setState(result.state);
+      if (!result.canceled && !result.state.sourceValid) {
+        setStatus(result.state.reason ?? "所选目录不可用于本地更新。");
+      }
+    } catch {
+      setStatus("选择源码目录失败。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startUpdate = async () => {
+    if (!window.actspace.startLocalUpdate) return;
+    setBusy(true);
+    setStatus("正在启动本地更新…");
+    try {
+      const result = await window.actspace.startLocalUpdate();
+      setState(result.state);
+      setStatus(result.ok ? "本地更新已启动，应用即将退出并在替换完成后重启。" : result.message ?? "本地更新启动失败。");
+    } catch {
+      setStatus("本地更新启动失败。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sourceText = state?.sourceRoot ?? "尚未选择源码目录";
+  const reason = !bridgeReady
+    ? "仅桌面端安装版可用。"
+    : state?.reason;
+  const canStart = Boolean(bridgeReady && state?.canUpdate && !busy);
+
+  return (
+    <SettingGroup title="本地更新">
+      <SettingRow
+        title="源码目录"
+        description={
+          <span className="break-all">
+            {sourceText}
+            {state?.sourceRoot && !state.sourceValid ? <span className="ml-2 text-on-danger">目录不可用</span> : null}
+          </span>
+        }
+        control={
+          <button type="button" className={BTN_SECONDARY} onClick={() => void chooseSource()} disabled={!bridgeReady || busy}>
+            选择目录
+          </button>
+        }
+        align="start"
+      />
+      <SettingRow
+        title="构建并更新"
+        description={
+          <span className="flex max-w-[430px] flex-col gap-1">
+            <span>从所选源码重新打包，退出当前应用，替换已安装的 actspace.app 后自动重启。</span>
+            {state?.logPath ? <span className="break-all text-text-subtle">日志：{state.logPath}</span> : null}
+            {reason ? <span className="text-on-danger">{reason}</span> : null}
+            {status ? <span className={status.includes("失败") ? "text-on-danger" : "text-text-muted"}>{status}</span> : null}
+          </span>
+        }
+        control={
+          <button type="button" className={BTN_PRIMARY} onClick={() => void startUpdate()} disabled={!canStart}>
+            {busy || state?.running ? "处理中…" : "构建并更新"}
+          </button>
+        }
+        align="start"
+      />
+    </SettingGroup>
   );
 }
 

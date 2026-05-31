@@ -19,6 +19,7 @@
 - `agent-core/backend-agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
 - `agent-core/token-usage-and-context-state.md`：token usage、成本统计、轻量 context snapshot 与每会话 context-state 的数据分层设计。
 - `agent-core/context-compression.md`：上下文压缩设计——工具输出预防层（flash 摘要 + bash 落盘）、历史治疗层（mid-loop 触发、8 节摘要、session.jsonl 回读）与读边界放开取舍。
+- `agent-core/cache-loss-audit.md`：缓存失效排查设计——`llm_usage` 轻量索引、低缓存时 previous/current Context 快照、hash 链断点分析与本地 audit 目录。
 - `agent-core/tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约。
 - `agent-core/subprocess-runner-guidelines.md`：agent-core 内部受控子进程调用规范，约束 `rg` 等 CLI helper 的 timeout、退出码、输出裁剪和安全边界。
 - `agent-core/权限设计规则和原则.md`：Agent 工具权限、用户审核、风险分层和权限记录的设计规则。

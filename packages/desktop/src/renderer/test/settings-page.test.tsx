@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings } from "@actspace/shared";
+import type { AppSettings, LocalUpdateState } from "@actspace/shared";
 import { SettingsPage } from "../components/settings/SettingsPage";
 
 function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
@@ -29,12 +29,31 @@ function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
 
 type ActspaceBridge = NonNullable<typeof window.actspace>;
 
+function makeLocalUpdateState(over: Partial<LocalUpdateState> = {}): LocalUpdateState {
+  return {
+    sourceRoot: "/repo/actspace-agent",
+    sourceValid: true,
+    appPath: "/Applications/actspace.app",
+    installParent: "/Applications",
+    canUpdate: true,
+    logPath: "/Users/test/Library/Application Support/actspace/tmp/local-update/update.log",
+    running: false,
+    ...over,
+  };
+}
+
 describe("SettingsPage", () => {
   const getSettings = vi.fn(async () => makeSettings());
   const updateSettings = vi.fn(async (input) => makeSettings(input as Partial<AppSettings>));
   const setProviderKey = vi.fn(async () => ({ ok: true }));
   const clearProviderKey = vi.fn(async () => ({ ok: true }));
   const testProviderConnection = vi.fn(async () => ({ ok: true, message: "连接成功" }));
+  const getLocalUpdateState = vi.fn(async () => makeLocalUpdateState());
+  const selectLocalUpdateSource = vi.fn(async () => ({ canceled: false, state: makeLocalUpdateState({ sourceRoot: "/repo/new" }) }));
+  const startLocalUpdate = vi.fn(async () => ({
+    ok: true,
+    state: makeLocalUpdateState({ running: true, canUpdate: false }),
+  }));
   const setUiZoom = vi.fn();
   const setNativeTheme = vi.fn();
 
@@ -44,6 +63,9 @@ describe("SettingsPage", () => {
     setProviderKey.mockClear();
     clearProviderKey.mockClear();
     testProviderConnection.mockClear();
+    getLocalUpdateState.mockClear();
+    selectLocalUpdateSource.mockClear();
+    startLocalUpdate.mockClear();
     setUiZoom.mockClear();
     setNativeTheme.mockClear();
     localStorage.clear();
@@ -54,6 +76,9 @@ describe("SettingsPage", () => {
       setProviderKey,
       clearProviderKey,
       testProviderConnection,
+      getLocalUpdateState,
+      selectLocalUpdateSource,
+      startLocalUpdate,
       setUiZoom,
       setNativeTheme,
     } as unknown as ActspaceBridge;
@@ -86,6 +111,23 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(updateSettings).toHaveBeenCalledWith({ agent: { bashAlwaysAsk: true } });
     });
+  });
+
+  it("本地更新分区可选择源码目录并启动更新", async () => {
+    render(<SettingsPage onBack={() => {}} />);
+    expect(await screen.findByText("/repo/actspace-agent")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "选择目录" }));
+    await waitFor(() => {
+      expect(selectLocalUpdateSource).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText("/repo/new")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "构建并更新" }));
+    await waitFor(() => {
+      expect(startLocalUpdate).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText("本地更新已启动，应用即将退出并在替换完成后重启。")).toBeInTheDocument();
   });
 
   it("connecting a provider opens the key modal and saves the key", async () => {

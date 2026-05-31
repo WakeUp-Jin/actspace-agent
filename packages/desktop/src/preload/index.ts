@@ -23,6 +23,9 @@ import type {
   KairosRuntimeState,
   KairosWriteConfigRequest,
   KairosWriteConfigResponse,
+  LocalUpdateSelectSourceResult,
+  LocalUpdateStartResult,
+  LocalUpdateState,
   PendingApprovalInfo,
   RunTurnInput,
   RuntimeStreamEvent,
@@ -85,6 +88,12 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("settings:clear-provider-key", input) as Promise<ClearProviderKeyResult>,
   testProviderConnection: (input: TestConnectionInput) =>
     ipcRenderer.invoke("settings:test-connection", input) as Promise<TestConnectionResult>,
+  getLocalUpdateState: () =>
+    ipcRenderer.invoke("local-update:get-state") as Promise<LocalUpdateState>,
+  selectLocalUpdateSource: () =>
+    ipcRenderer.invoke("local-update:select-source") as Promise<LocalUpdateSelectSourceResult>,
+  startLocalUpdate: () =>
+    ipcRenderer.invoke("local-update:start") as Promise<LocalUpdateStartResult>,
 
   // 整窗缩放：preload 直接调 webFrame，无需 IPC 往返。外观设置的「界面字号」用它实现。
   setUiZoom: (factor: number) => webFrame.setZoomFactor(factor),
