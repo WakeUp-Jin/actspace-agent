@@ -19,9 +19,8 @@ const CSP_RELAXED =
 const MIN_IFRAME_HEIGHT = 160;
 const MAX_IFRAME_HEIGHT = 20000;
 
-const TOOLBAR_CLASS =
-  "flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-1.5";
-const PATH_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-text-faint";
+// 相对路径已统一在工作区操作栏展示，这里只保留 Preview/源码 切换（右对齐）。
+const TOOLBAR_CLASS = "flex shrink-0 items-center justify-end gap-2 border-b border-line px-3 py-1.5";
 const ERROR_BAR_CLASS =
   "flex shrink-0 items-center gap-1.5 border-b border-line bg-danger-soft px-3 py-1.5 text-[11px] text-danger";
 const SOURCE_CLASS =
@@ -152,9 +151,6 @@ export function HtmlRenderView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className={TOOLBAR_CLASS}>
-        <span className={PATH_CLASS} title={relativePath}>
-          {relativePath ?? (trust === "chat" ? "聊天生成的 HTML" : "HTML 预览")}
-        </span>
         <PreviewSourceToggle mode={mode} onChange={setMode} />
       </div>
       {error ? (

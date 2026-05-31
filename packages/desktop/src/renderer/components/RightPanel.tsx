@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import hljs from "highlight.js";
 import type { ContextState } from "@actspace/shared";
 import { ContextRenderView } from "./right-panel/ContextRenderView";
@@ -8,10 +8,19 @@ import { KairosRightPanelView } from "./right-panel/KairosRightPanelView";
 import { MarkdownRenderView } from "./right-panel/MarkdownRenderView";
 import { ReplyHtmlRenderView } from "./right-panel/ReplyHtmlRenderView";
 import { WorkspaceFileTree } from "./right-panel/WorkspaceFileTree";
-import { useRightPanel, type RightPanelTab } from "./right-panel/RightPanelContext";
+import { isWorkspaceFileTab, useRightPanel, type RightPanelTab } from "./right-panel/RightPanelContext";
 
-const RIGHT_PANEL_CLASS = "flex h-full min-h-0 min-w-0 flex-row overflow-hidden border-l border-line bg-surface";
-const RIGHT_PANEL_MAIN_CLASS = "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden";
+const RIGHT_PANEL_CLASS = "flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l border-line bg-surface";
+// 右面板纵向三段（对齐 Cursor 右侧）：① tab 条（全宽）→ ② 工作区操作栏（全宽，仅浏览态出现）→ ③ 两栏 [文件树 | 内容]。
+const RIGHT_PANEL_SPLIT_CLASS = "flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden";
+const RIGHT_PANEL_CONTENT_CLASS = "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden";
+// ② 工作区操作栏：左=树栏折叠/展开按钮，其后=当前文件的相对路径（相对 workspace）。
+const WORKSPACE_BAR_CLASS = "flex shrink-0 items-center gap-2 border-b border-line px-2.5 py-1.5";
+const WORKSPACE_BAR_TOGGLE_CLASS =
+  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main [cursor:pointer]";
+const WORKSPACE_BAR_PATH_CLASS =
+  "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-text-faint";
+const WORKSPACE_BAR_HINT_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-text-faint";
 // 右侧预留两个 chrome 控件（+ 新建对象 / 折叠面板）的宽度，tab 永远不会滑到按钮下方造成重叠。
 const RIGHT_TABS_CLASS =
   "relative z-[61] flex min-h-[var(--window-chrome-strip-height)] shrink-0 items-center border-b border-line py-0 pl-2.5 pr-[calc(2*var(--window-chrome-control-size)+28px)] [pointer-events:none]";
@@ -41,16 +50,85 @@ const RIGHT_PANEL_HEADING_CLASS = "m-0 mb-2 text-[15px] font-semibold";
 const RIGHT_PANEL_TEXT_CLASS = "m-0 text-[13px] text-text-muted";
 
 export function RightPanel({ contextState, sessionId }: { contextState?: ContextState | null; sessionId?: string | null }) {
-  const { activeTab, isFileTreeOpen } = useRightPanel();
+  const { activeTab, isFileTreeOpen, isFileTreeCollapsed } = useRightPanel();
+
+  // 呈现由「当前 Tab」决定：
+  // - 工作区文件 Tab → 进入 shell（树 + 文件预览区），多个文件 Tab 间切换只换 shell 内的内容；
+  // - 浏览态显式打开（isFileTreeOpen，例如刚点 + 菜单还没选文件）→ 也进入 shell，但内容区显示占位；
+  // - 否则（对象 Tab）→ 走整面板，展示它自己的视图。
+  const isFileTab = isWorkspaceFileTab(activeTab);
+  const showShell = isFileTab || isFileTreeOpen;
+  const showTree = showShell && !isFileTreeCollapsed;
 
   return (
     <aside className={RIGHT_PANEL_CLASS}>
-      {isFileTreeOpen ? <WorkspaceFileTree /> : null}
-      <div className={RIGHT_PANEL_MAIN_CLASS}>
-        <RightPanelTabs />
-        <RightPanelBody tab={activeTab} contextState={contextState} sessionId={sessionId} />
+      <RightPanelTabs />
+      {showShell ? <WorkspaceOperationBar activeTab={activeTab} /> : null}
+      <div className={RIGHT_PANEL_SPLIT_CLASS}>
+        {showTree ? <WorkspaceFileTree /> : null}
+        <div className={RIGHT_PANEL_CONTENT_CLASS}>
+          {showShell && !isFileTab ? (
+            <WorkspaceFileEmpty />
+          ) : (
+            <RightPanelBody tab={activeTab} contextState={contextState} sessionId={sessionId} />
+          )}
+        </div>
       </div>
     </aside>
+  );
+}
+
+/** 当前 Tab 的工作区相对路径（仅工作区文件 Tab 有）；其余返回空。 */
+function relativePathOf(tab: RightPanelTab | null): string | undefined {
+  if (tab && "relativePath" in tab && typeof tab.relativePath === "string") {
+    return tab.relativePath;
+  }
+  return undefined;
+}
+
+/** 工作区态下激活的是对象 Tab 时的文件预览区占位。 */
+function WorkspaceFileEmpty() {
+  return (
+    <div className={RIGHT_PANEL_BODY_CLASS}>
+      <h2 className={RIGHT_PANEL_HEADING_CLASS}>选择文件查看</h2>
+      <p className={RIGHT_PANEL_TEXT_CLASS}>
+        在左侧文件树中点击文件，将在这里打开预览。Kairos、Context、Reply HTML 等对象请关闭「工作区文件」后查看完整视图。
+      </p>
+    </div>
+  );
+}
+
+/**
+ * ② 工作区操作栏：全宽、夹在 tab 条与两栏之间。
+ * 折叠按钮只收起/展开左侧树栏（操作栏与内容保持），路径展示当前文件的工作区相对路径。
+ */
+function WorkspaceOperationBar({ activeTab }: { activeTab: RightPanelTab | null }) {
+  const { isFileTreeCollapsed, toggleFileTreeCollapsed } = useRightPanel();
+  const path = relativePathOf(activeTab);
+  return (
+    <div className={WORKSPACE_BAR_CLASS}>
+      <button
+        type="button"
+        className={WORKSPACE_BAR_TOGGLE_CLASS}
+        aria-label={isFileTreeCollapsed ? "展开文件树" : "收起文件树"}
+        aria-expanded={!isFileTreeCollapsed}
+        title={isFileTreeCollapsed ? "展开文件树" : "收起文件树"}
+        onClick={toggleFileTreeCollapsed}
+      >
+        {isFileTreeCollapsed ? (
+          <PanelLeftOpen size={15} strokeWidth={1.8} />
+        ) : (
+          <PanelLeftClose size={15} strokeWidth={1.8} />
+        )}
+      </button>
+      {path ? (
+        <span className={WORKSPACE_BAR_PATH_CLASS} title={path}>
+          {path}
+        </span>
+      ) : (
+        <span className={WORKSPACE_BAR_HINT_CLASS}>工作区文件</span>
+      )}
+    </div>
   );
 }
 
@@ -240,7 +318,7 @@ function RightPanelBody({
   }
 
   if (tab.kind === "markdown") {
-    return <MarkdownRenderView source={tab.source} relativePath={tab.relativePath} />;
+    return <MarkdownRenderView source={tab.source} />;
   }
 
   if (tab.kind === "image") {
@@ -248,28 +326,20 @@ function RightPanelBody({
   }
 
   if (tab.kind === "text") {
-    return <TextRenderView content={tab.content} relativePath={tab.relativePath} language={tab.language} />;
+    return <TextRenderView content={tab.content} language={tab.language} />;
   }
 
   return <ContextRenderView contextState={contextState} sessionId={sessionId} />;
 }
 
-const FILE_TOOLBAR_CLASS = "flex shrink-0 items-center gap-2 border-b border-line px-3 py-1.5";
-const FILE_PATH_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-text-faint";
 const TEXT_BODY_CLASS =
   "m-0 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-[12px] leading-[1.55] text-text-main";
 
+// 路径已统一移到工作区操作栏（②），各文件视图不再自带 path 工具条，避免相邻两行重复同一路径。
 function ImageRenderView({ src, relativePath }: { src: string; relativePath?: string }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className={FILE_TOOLBAR_CLASS}>
-        <span className={FILE_PATH_CLASS} title={relativePath}>
-          {relativePath ?? "图片预览"}
-        </span>
-      </div>
-      <div className="grid min-h-0 flex-1 place-items-center overflow-auto bg-surface-subtle p-4">
-        <img src={src} alt={relativePath ?? "预览图片"} className="max-h-full max-w-full object-contain" />
-      </div>
+    <div className="grid min-h-0 flex-1 place-items-center overflow-auto bg-surface-subtle p-4">
+      <img src={src} alt={relativePath ?? "预览图片"} className="max-h-full max-w-full object-contain" />
     </div>
   );
 }
@@ -278,15 +348,7 @@ function ImageRenderView({ src, relativePath }: { src: string; relativePath?: st
  * 文本 / 代码文件视图。带 `language`（ts/js/css/yaml/json…）时用 highlight.js 语法高亮，
  * 复用 Markdown 的主题感知 hljs 配色（共享 `.act-code-hl` 作用域）；无语言或高亮失败回退纯等宽。
  */
-function TextRenderView({
-  content,
-  relativePath,
-  language,
-}: {
-  content: string;
-  relativePath?: string;
-  language?: string;
-}) {
+function TextRenderView({ content, language }: { content: string; language?: string }) {
   const highlighted = useMemo(() => {
     if (!language || !hljs.getLanguage(language)) return null;
     try {
@@ -296,22 +358,16 @@ function TextRenderView({
     }
   }, [content, language]);
 
+  if (highlighted) {
+    return (
+      <pre className={`${TEXT_BODY_CLASS} act-code-hl`}>
+        <code className="hljs" dangerouslySetInnerHTML={{ __html: highlighted }} />
+      </pre>
+    );
+  }
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className={FILE_TOOLBAR_CLASS}>
-        <span className={FILE_PATH_CLASS} title={relativePath}>
-          {relativePath ?? "文本预览"}
-        </span>
-      </div>
-      {highlighted ? (
-        <pre className={`${TEXT_BODY_CLASS} act-code-hl`}>
-          <code className="hljs" dangerouslySetInnerHTML={{ __html: highlighted }} />
-        </pre>
-      ) : (
-        <pre className={TEXT_BODY_CLASS}>
-          <code>{content}</code>
-        </pre>
-      )}
-    </div>
+    <pre className={TEXT_BODY_CLASS}>
+      <code>{content}</code>
+    </pre>
   );
 }

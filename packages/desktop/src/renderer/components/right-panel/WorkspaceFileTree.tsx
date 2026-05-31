@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { ChevronRight, File, Folder, FolderOpen, Loader2, PanelLeftClose } from "lucide-react";
+import { ChevronRight, File, Folder, FolderOpen, Loader2 } from "lucide-react";
 import type { WorkspaceDirEntry, WorkspaceReadFileResult } from "@actspace/shared";
 import { useRightPanel, type RightPanelTab } from "./RightPanelContext";
 
@@ -11,12 +11,8 @@ import { useRightPanel, type RightPanelTab } from "./RightPanelContext";
  * - 浏览器 mock 无 IPC 时优雅降级为空态，不抛错。
  */
 
-const RAIL_CLASS = "flex h-full w-[220px] shrink-0 flex-col overflow-hidden border-r border-line bg-surface";
-const RAIL_HEADER_CLASS =
-  "flex min-h-[var(--window-chrome-strip-height)] shrink-0 items-center justify-between gap-2 border-b border-line px-2.5 [-webkit-app-region:no-drag]";
-const RAIL_TITLE_CLASS = "text-[11px] font-semibold uppercase tracking-wide text-text-faint";
-const RAIL_COLLAPSE_CLASS =
-  "inline-flex h-6 w-6 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main [cursor:pointer] [-webkit-app-region:no-drag]";
+// rail 是右面板「两栏」的左栏；折叠按钮与路径都在上方的工作区操作栏里，树本身不再自带头部。
+const RAIL_CLASS = "flex h-full w-[200px] shrink-0 flex-col overflow-hidden border-r border-line bg-surface";
 const RAIL_BODY_CLASS = "scrollbar-none min-h-0 flex-1 overflow-auto py-1";
 const ROW_CLASS =
   "flex w-full items-center gap-1.5 border-0 bg-transparent py-1 pr-2 text-left text-[12px] leading-none text-text-muted hover:bg-brand-soft hover:text-text-main [cursor:pointer]";
@@ -184,23 +180,10 @@ function EntryRow({ entry, depth }: { entry: WorkspaceDirEntry; depth: number })
 }
 
 export function WorkspaceFileTree() {
-  const { closeFileTree } = useRightPanel();
   const available = typeof window !== "undefined" && typeof window.actspace?.listWorkspaceDir === "function";
 
   return (
     <div className={RAIL_CLASS}>
-      <div className={RAIL_HEADER_CLASS}>
-        <span className={RAIL_TITLE_CLASS}>工作区文件</span>
-        <button
-          type="button"
-          className={RAIL_COLLAPSE_CLASS}
-          aria-label="收起文件树"
-          title="收起文件树"
-          onClick={closeFileTree}
-        >
-          <PanelLeftClose size={15} strokeWidth={1.8} />
-        </button>
-      </div>
       <div className={RAIL_BODY_CLASS}>
         {available ? (
           <DirView relativePath="" depth={0} />

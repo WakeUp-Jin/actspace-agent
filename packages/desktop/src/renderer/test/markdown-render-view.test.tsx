@@ -24,7 +24,7 @@ const SAMPLE = [
 
 describe("MarkdownRenderView", () => {
   it("renders GFM tables, task lists, highlighted code and safe links", () => {
-    const { container } = render(<MarkdownRenderView source={SAMPLE} relativePath="docs/demo.md" />);
+    const { container } = render(<MarkdownRenderView source={SAMPLE} />);
 
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "1" })).toBeInTheDocument();
@@ -39,14 +39,14 @@ describe("MarkdownRenderView", () => {
   });
 
   it("does not render raw HTML as live elements (no rehype-raw)", () => {
-    const { container } = render(<MarkdownRenderView source={SAMPLE} relativePath="docs/demo.md" />);
+    const { container } = render(<MarkdownRenderView source={SAMPLE} />);
     // 原始 <script> 被转义为文本，不应作为真实 DOM 节点存在。
     expect(container.querySelector("script")).toBeNull();
   });
 
   it("toggles to the source view showing raw markdown", async () => {
     const user = userEvent.setup();
-    render(<MarkdownRenderView source={"# 仅源码"} relativePath="docs/demo.md" />);
+    render(<MarkdownRenderView source={"# 仅源码"} />);
 
     await user.click(screen.getByRole("tab", { name: "源码" }));
     expect(screen.getByText("# 仅源码")).toBeInTheDocument();

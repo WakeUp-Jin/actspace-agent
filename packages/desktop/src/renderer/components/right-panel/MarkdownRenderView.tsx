@@ -12,8 +12,8 @@ import { PreviewSourceToggle, type PreviewMode } from "./PreviewSourceToggle";
  * 配色：包一层 `markdown-doc`，代码块与 hljs token 配色在 `markdown.css` 内随主题翻转。
  */
 
-const TOOLBAR_CLASS = "flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-1.5";
-const PATH_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-text-faint";
+// 相对路径已统一在工作区操作栏展示，这里只保留 Preview/源码 切换（右对齐）。
+const TOOLBAR_CLASS = "flex shrink-0 items-center justify-end gap-2 border-b border-line px-3 py-1.5";
 const PREVIEW_SCROLL_CLASS = "min-h-0 flex-1 overflow-auto p-[18px] text-[13px] leading-[1.7] text-text-main";
 const SOURCE_CLASS =
   "m-0 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-[12px] leading-[1.55] text-text-main";
@@ -31,15 +31,12 @@ function MarkdownLink({ href, children, ...rest }: AnchorHTMLAttributes<HTMLAnch
 
 const MARKDOWN_COMPONENTS = { a: MarkdownLink };
 
-export function MarkdownRenderView({ source, relativePath }: { source: string; relativePath?: string }) {
+export function MarkdownRenderView({ source }: { source: string }) {
   const [mode, setMode] = useState<PreviewMode>("preview");
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className={TOOLBAR_CLASS}>
-        <span className={PATH_CLASS} title={relativePath}>
-          {relativePath ?? "Markdown 预览"}
-        </span>
         <PreviewSourceToggle mode={mode} onChange={setMode} />
       </div>
       {mode === "preview" ? (
