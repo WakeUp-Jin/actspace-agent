@@ -29,11 +29,11 @@
 
 ### Files Modified
 
-- `docs/design-docs/frontend-ui/工作台布局与面板交互规范.md`
-- `docs/design-docs/frontend-ui/前端设计文档.md`
-- `docs/design-docs/frontend-ui/左侧会话栏规范.md`
-- `docs/design-docs/frontend-ui/右侧面板与文件渲染规范.md`
-- `docs/design-docs/frontend-ui/index.md`
+- `docs/design-docs/front-工作台布局与面板交互规范.md`
+- `docs/design-docs/front-前端设计文档.md`
+- `docs/design-docs/front-左侧会话栏规范.md`
+- `docs/design-docs/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/front-index.md`
 - `docs/design-docs/index.md`
 - `docs/exec-plans/active/actspace-workbench-split-view-foundation.md`
 - `docs/exec-plans/README.md`

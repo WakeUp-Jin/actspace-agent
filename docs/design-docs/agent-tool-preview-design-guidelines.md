@@ -43,7 +43,7 @@
 - 如果某个字段可能很长，优先由组件做视觉截断，不改变原始事实字段。
 - 展示文案使用产品动作词：`Read`、`Grep`、`Glob`、`Listed`、`Searched`、`Fetched`、`Edit`、`Write`、`Ran`。
 - 不在前端组件里根据 `toolName` 分支推断展示；新增工具应通过 `previewKind` 和 `ToolUiPreview` 建模。
-- 工具调用进行中阶段（`tool_started` 之后、`tool_finished` 之前）所有工具行使用 text shimmer 视觉，详见 [中间消息区规范 - 工具执行中态规范](../frontend-ui/中间消息区规范.md#工具执行中态规范)。
+- 工具调用进行中阶段（`tool_started` 之后、`tool_finished` 之前）所有工具行使用 text shimmer 视觉，详见 [中间消息区规范 - 工具执行中态规范](../front-中间消息区规范.md#工具执行中态规范)。
 - running 阶段后端 `tool_started.preview` 只推送当前能确定的最小字段（filePath / command / query），不传未生成的数值（diff stats、entryCount 等）；完成态字段在 `tool_finished` / 持久化事件中补齐。
 - **`tool_call_streaming` 事件契约**：bridge 在 LLM 流式输出 `tool_call_delta` 时累积 partial args，按 50ms throttle emit `tool_call_streaming { toolCallId, toolName, isInitial?, preview: ToolUiPreview }`。前端**零解析**直接消费 typed preview，复用与 `tool_started` 相同的渲染分支。`isInitial=true` 是首帧（dispatched 阶段），filePath 此时可能为空字符串，前端用 `Write file…` 等 fallback 文案展示。新工具接入只需在 `engine/streaming-preview-extractors.ts` 注册按 previewKind 的 extractor，前端无需改动。详见 [docs/learnings/2026-05/llm-tool-call-streaming.md](../../learnings/2026-05/llm-tool-call-streaming.md) 的流式协议设计原则。
 

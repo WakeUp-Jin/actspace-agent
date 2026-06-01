@@ -16,7 +16,7 @@
 
 **Key Actions:**
 
-- **[Design]**: 新增 `agent-core/cache-loss-audit.md`，定义 `llm_usage` 轻量索引、旁路 `cache-audit/` 目录、滚动 `last.context.json` 与 hash 链 diff。
+- **[Design]**: 新增 `agent-cache-loss-audit.md`，定义 `llm_usage` 轻量索引、旁路 `cache-audit/` 目录、滚动 `last.context.json` 与 hash 链 diff。
 - **[Plan]**: 新增 active execution plan，拆分共享契约、运行时 `CacheAuditTracker`、session 标记和验证任务。
 - **[Script]**: 新增 `scripts/analyze-cache-audit.mjs`，可扫描未来 audit 目录或直接对比 `previous/current` Context 快照。
 - **[Runtime]**: 扩展 `LlmUsagePayload`，在主 Agent LLM 调用前后接入 `CacheAuditTracker`，低缓存时把 `cacheStatus/cacheAuditId/cacheHitRatio` 写入 `llm_usage.payload`。
@@ -29,10 +29,10 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/agent-core/cache-loss-audit.md`
+- `docs/design-docs/agent-cache-loss-audit.md`
 - `docs/design-docs/index.md`
-- `docs/design-docs/agent-core/current-module-map.md`
-- `docs/design-docs/storage-and-observability.md`
+- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/core-storage-and-observability.md`
 - `docs/exec-plans/active/actspace-cache-loss-audit-plan.md`
 - `scripts/analyze-cache-audit.mjs`
 - `docs/learnings/2026-05/20260531-cache-audit-rolling-snapshot.md`

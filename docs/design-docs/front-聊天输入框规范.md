@@ -120,7 +120,7 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 
 ## Context 定稿图
 
-![Context 定稿图](image/context-popup-final.png)
+![Context 定稿图](public/front/context-popup-final.png)
 
 ## 附件展示
 
@@ -131,6 +131,6 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 
 ## Composer 定稿图
 
-![Composer 定稿图](image/composer-final.png)
+![Composer 定稿图](public/front/composer-final.png)
 
 当前实现计划以 `/Users/wakeup-jin/Desktop/actspace-learing-design/bug/19-2.png` 和 `/Users/wakeup-jin/Desktop/actspace-learing-design/bug/19-3.png` 的 follow-up bar 方向为准；仓库内 `composer-final.png` 后续需要在视觉稿更新时同步替换。

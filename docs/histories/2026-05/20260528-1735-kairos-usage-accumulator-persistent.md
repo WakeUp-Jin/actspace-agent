@@ -44,8 +44,8 @@
   - `desktop/renderer/test/kairos-page.test.tsx` 把原"按 events 聚合"那个用例改为"按 `state.usageToday` 渲染"；并新增"controller 通过 state stream 推用量后胶囊实时更新"用例。
   - 其它 KairosRuntimeState 构造的 fixture（`kairos-page.test.tsx` / `right-panel-kairos.test.tsx` / `kairos-ipc-internals.test.ts`）全部补 `usageToday: emptyKairosUsageSummary()`。
 - **[文档同步]**：
-  - `docs/design-docs/agent-core/kairos-autonomous-mode.md` runner 章节追加 `KairosUsageAccumulator` 段，说明持久化路径、跨重启恢复、resetToday 行为。
-  - `docs/design-docs/frontend-ui/Kairos监控页规范.md` 用量胶囊章节改写数据来源：从 `aggregateKairosUsage(events)` 改成 `KairosRuntimeState.usageToday`，并显式说"不再 renderer 端聚合 ring buffer"以及为什么（ring buffer 200 条会滚动 → 跑久了胶囊会变小）。
+  - `docs/design-docs/agent-kairos-autonomous-mode.md` runner 章节追加 `KairosUsageAccumulator` 段，说明持久化路径、跨重启恢复、resetToday 行为。
+  - `docs/design-docs/front-Kairos监控页规范.md` 用量胶囊章节改写数据来源：从 `aggregateKairosUsage(events)` 改成 `KairosRuntimeState.usageToday`，并显式说"不再 renderer 端聚合 ring buffer"以及为什么（ring buffer 200 条会滚动 → 跑久了胶囊会变小）。
 
 ### 🧠 Design Intent (Why)
 
@@ -88,5 +88,5 @@
 - `packages/desktop/src/renderer/test/kairos-page.test.tsx`
 - `packages/desktop/src/renderer/test/right-panel-kairos.test.tsx`
 - `packages/desktop/src/main/test/kairos-ipc-internals.test.ts`
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`
-- `docs/design-docs/frontend-ui/Kairos监控页规范.md`
+- `docs/design-docs/agent-kairos-autonomous-mode.md`
+- `docs/design-docs/front-Kairos监控页规范.md`

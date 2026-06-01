@@ -29,7 +29,7 @@
 - **修复 button 默认 padding 偷偷推位的细节**：`.nav-section-label` 和 `.workspace-folder-label` 显式 `padding: 0`，否则浏览器默认的 `padding: 1px 6px` 会让 grid 列内的文字往右挤 6px，破坏严格的"文字左对齐线"。
 - **顺手修一个 `UsageStatisticsView.tsx` 的语法错误**：发现一处多余的未闭合 `<button onClick={onRefresh}>`（应该用 `handleRefresh`），导致 typecheck 失败；删掉即可。
 - **测试**：新增 3 个 case 覆盖「Pinned 可折叠」「Scheduled 可折叠」「每条 session row 都有一个 status dot」，sidebar.test.tsx 共 16 个 case；desktop 全套 30 个 case 通过。
-- **设计文档**：`docs/design-docs/frontend-ui/左侧会话栏规范.md` 补充「分组标题统一规范」「会话行 marker 常驻 + 三态」「分组标题字号改回 13.5px」三处。
+- **设计文档**：`docs/design-docs/front-左侧会话栏规范.md` 补充「分组标题统一规范」「会话行 marker 常驻 + 三态」「分组标题字号改回 13.5px」三处。
 
 ### 🧠 Design Intent (Why)
 
@@ -46,4 +46,4 @@
 - `packages/desktop/src/renderer/styles.css`：分组标题字号 / chevron hover 规则、workspace-folder-row grid、workspace-icon-slot / +号叠层、session-row-main padding 8px、session-status-dot 三态、button padding 重置。
 - `packages/desktop/src/renderer/components/UsageStatisticsView.tsx`：删除多余的未闭合 `<button onClick={onRefresh}>`。
 - `packages/desktop/src/renderer/test/sidebar.test.tsx`：新增 3 个 case，sidebar 套件从 13 → 16。
-- `docs/design-docs/frontend-ui/左侧会话栏规范.md`：补「分组标题统一规范」「会话行 marker 三态常驻」「字号基准 13.5px」。
+- `docs/design-docs/front-左侧会话栏规范.md`：补「分组标题统一规范」「会话行 marker 三态常驻」「字号基准 13.5px」。

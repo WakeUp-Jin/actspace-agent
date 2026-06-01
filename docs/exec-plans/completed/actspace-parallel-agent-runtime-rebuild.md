@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-本计划已被 `docs/design-docs/agent-core/backend-agent-design.md` 拆分为更细的后端并行计划，不再作为 active 执行入口保留。
+本计划已被 `docs/design-docs/agent-backend-design.md` 拆分为更细的后端并行计划，不再作为 active 执行入口保留。
 
 新的 active 后端计划包括：
 
@@ -34,7 +34,7 @@
 - `docs/RELIABILITY.md`：错误处理、观测性、稳定性原则。
 - `docs/SECURITY.md`：本地文件、外部模型、工具权限安全边界。
 - `docs/FRONTEND.md`：理解前端需要的事件和 IPC。
-- `docs/design-docs/frontend-ui/中间消息区规范.md`：理解后端事件如何对应消息组件。
+- `docs/design-docs/front-中间消息区规范.md`：理解后端事件如何对应消息组件。
 - `.agents/skills/llm-agent-dev/SKILL.md`：本计划主要执行依据。
 - `.agents/skills/llm-agent-dev/references/architecture.md`：V0/V1 结构选择。
 - `.agents/skills/llm-agent-dev/references/context/overview.md`：上下文管道。

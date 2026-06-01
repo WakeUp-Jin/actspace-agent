@@ -12,7 +12,7 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `packages/desktop`、`docs/design-docs/frontend-ui/usage-statistics`、`docs/learnings`
+**Scope:** `packages/desktop`、`docs/design-docs/front-usage-statistics.md`、`docs/learnings`
 
 **Key Actions:**
 
@@ -31,7 +31,7 @@
 ### 📁 Files Modified
 
 - `packages/desktop/src/renderer/components/UsageStatisticsPage.tsx`
-- `docs/design-docs/frontend-ui/usage-statistics/设计规范.md`
+- `docs/design-docs/front-usage-statistics.md`
 - `docs/learnings/2026-05/overflow-auto-clips-absolute-children.md`（新建）
 
 ---

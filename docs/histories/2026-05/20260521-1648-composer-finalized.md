@@ -12,13 +12,13 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `docs/design-docs`, `docs/histories`, `docs/design-docs/frontend-ui/image`
+**Scope:** `docs/design-docs`, `docs/histories`, `docs/design-docs/public/front`
 
 **Key Actions:**
 
-- **保存定稿图**：将最终版 Composer 图片复制到 `frontend-ui/image/composer-final.png`。
+- **保存定稿图**：将最终版 Composer 图片复制到 `public/front/composer-final.png`。
 - **更新聊天输入框规范**：补充附件显示、Context 圆形入口、无语音按钮、`model` 无边框等定稿规则。
-- **更新目录首页**：在 `frontend-ui/index.md` 中新增 Composer 定稿图引用。
+- **更新目录首页**：在 `front-index.md` 中新增 Composer 定稿图引用。
 
 ### 🧠 Design Intent (Why)
 
@@ -27,7 +27,7 @@
 ### 📁 Files Modified
 
 - `docs/design-docs/index.md`
-- `docs/design-docs/frontend-ui/index.md`
-- `docs/design-docs/frontend-ui/聊天输入框规范.md`
-- `docs/design-docs/frontend-ui/image/composer-final.png`
+- `docs/design-docs/front-index.md`
+- `docs/design-docs/front-聊天输入框规范.md`
+- `docs/design-docs/public/front/composer-final.png`
 - `docs/histories/2026-05/20260521-1648-composer-finalized.md`

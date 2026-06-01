@@ -35,8 +35,8 @@
   - `agent-core/kairos/test/runner.test.ts` 新增 2 个用例：手写带 usage 的 AssistantMessage → 落一条 `llm_usage` 且 token/cost 正确；mock 默认 usage=0 → 不落 `llm_usage`。
   - `desktop/renderer/test/kairos-page.test.tsx` 新增 2 个 UI 用例：无 usage 事件时胶囊显示 `0 tok`、无 cost；有 usage 事件时按 buffer 聚合显示 `15.4K tok · ¥0.18` 且 tooltip 含明细。
 - **[文档同步]**：
-  - `docs/design-docs/agent-core/kairos-autonomous-mode.md` 在 runner 数据流段说明 `llm_usage` 事件的产出规则、写盘策略、不进 LLM messages 段；渲染规范段补"用量胶囊"在 header 第一行。
-  - `docs/design-docs/frontend-ui/Kairos监控页规范.md` 顶部控制区新增"用量胶囊"专节（形态 / 数据来源 / 货币 / token 格式 / tooltip），验收要点同步补两条（header 数据胶囊白名单、执行列表不加 token 列）。
+  - `docs/design-docs/agent-kairos-autonomous-mode.md` 在 runner 数据流段说明 `llm_usage` 事件的产出规则、写盘策略、不进 LLM messages 段；渲染规范段补"用量胶囊"在 header 第一行。
+  - `docs/design-docs/front-Kairos监控页规范.md` 顶部控制区新增"用量胶囊"专节（形态 / 数据来源 / 货币 / token 格式 / tooltip），验收要点同步补两条（header 数据胶囊白名单、执行列表不加 token 列）。
 
 ### 🧠 Design Intent (Why)
 
@@ -64,5 +64,5 @@
 - `packages/desktop/src/renderer/state/kairosSelectors.ts`
 - `packages/desktop/src/renderer/pages/KairosPage.tsx`
 - `packages/desktop/src/renderer/test/kairos-page.test.tsx`
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`
-- `docs/design-docs/frontend-ui/Kairos监控页规范.md`
+- `docs/design-docs/agent-kairos-autonomous-mode.md`
+- `docs/design-docs/front-Kairos监控页规范.md`

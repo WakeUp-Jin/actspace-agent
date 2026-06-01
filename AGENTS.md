@@ -31,10 +31,10 @@
 
 - `docs/FRONTEND.md`：前端协作入口、设计文档和验证规范导航。
 - `docs/FRONTEND_VERIFICATION.md`：桌面端前端修改后的浏览器 mock、Electron 真实验证和 Computer Use 验收方式。
-- `docs/design-docs/frontend-ui/主题与配色规范.md`：**改任何带颜色的样式前必读**。三态主题机制 + 「颜色必须随主题翻转、禁止 `text-black`/`bg-white`/`#hex` 等非主题感知字面量」的硬约束，且要求浅/深双主题都验过。
+- `docs/design-docs/front-主题与配色规范.md`：**改任何带颜色的样式前必读**。三态主题机制 + 「颜色必须随主题翻转、禁止 `text-black`/`bg-white`/`#hex` 等非主题感知字面量」的硬约束，且要求浅/深双主题都验过。
 
-- `docs/design-docs/index.md`：设计文档总索引；按任务需要进入 agent-core、frontend-ui 等专题。
-- `docs/design-docs/agent-core/backend-agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
+- `docs/design-docs/index.md`：设计文档总索引；按 `agent-` / `front-` / `lab-` 等前缀进入对应专题。
+- `docs/design-docs/agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
 
 - `docs/CODING_BEHAVIOR.md`：编码行为纪律——改代码时的操作级约束。
 - `docs/coding-standards/README.md`：编码规范、Skill 推荐清单和团队自定义约定。

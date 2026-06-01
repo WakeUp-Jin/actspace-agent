@@ -440,5 +440,5 @@ V1 基础版暂不做：
 - `.agents/skills/llm-agent-dev/references/tools/overview.md`
 - `.agents/skills/llm-agent-dev/references/llm/llm-service.md`
 - `.agents/skills/llm-agent-dev/references/agent-runtime/agent-patterns.md`
-- `docs/design-docs/frontend-ui/中间消息区规范.md`
+- `docs/design-docs/front-中间消息区规范.md`
 - `docs/ARCHITECTURE.md`

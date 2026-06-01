@@ -12,13 +12,13 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `docs/design-docs`, `docs/histories`, `docs/design-docs/frontend-ui/image`
+**Scope:** `docs/design-docs`, `docs/histories`, `docs/design-docs/public/front`
 
 **Key Actions:**
 
-- **保存定稿图**：将 Read / Search 组件最终图保存为 `frontend-ui/image/read-search-final.png`。
+- **保存定稿图**：将 Read / Search 组件最终图保存为 `public/front/read-search-final.png`。
 - **更新消息区规范**：在 `中间消息区规范.md` 中补充 Read / Search 的结构、交互和视觉原则。
-- **同步目录页和图片说明**：更新 `frontend-ui/index.md` 与 `image/README.md` 中的图引用。
+- **同步目录页和图片说明**：更新 `front-index.md` 与 `public/front/README.md` 中的图引用。
 
 ### 🧠 Design Intent (Why)
 
@@ -26,8 +26,8 @@ Read / Search 必须保持最轻量的文本流感，作为工具调用日志而
 
 ### 📁 Files Modified
 
-- `docs/design-docs/frontend-ui/index.md`
-- `docs/design-docs/frontend-ui/中间消息区规范.md`
-- `docs/design-docs/frontend-ui/image/README.md`
-- `docs/design-docs/frontend-ui/image/read-search-final.png`
+- `docs/design-docs/front-index.md`
+- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/public/front/README.md`
+- `docs/design-docs/public/front/read-search-final.png`
 - `docs/histories/2026-05/20260521-1748-read-search-finalized.md`

@@ -776,7 +776,7 @@ LLM 看到 `current_phase` 占位符（由 rhythm 推导）后会自然调整 Sl
      "entries": [                                  // 相对 root 的文件路径列表（已排序）
        "ARCHITECTURE.md",
        "design-docs/index.md",
-       "design-docs/agent-core/kairos-autonomous-mode.md"
+       "design-docs/agent-kairos-autonomous-mode.md"
      ],
      "lastScanAt": "2026-05-27T19:00:00+08:00"
    }
@@ -1119,7 +1119,7 @@ controller.start()
 
 ## 渲染规范（Kairos 页面）
 
-Kairos 页面产品 UI 的详细规范以 `docs/design-docs/frontend-ui/Kairos监控页规范.md` 为准。本节只保留和自治模式数据流相关的渲染边界，避免前端视觉规则散落在后端设计文档里。
+Kairos 页面产品 UI 的详细规范以 `docs/design-docs/front-Kairos监控页规范.md` 为准。本节只保留和自治模式数据流相关的渲染边界，避免前端视觉规则散落在后端设计文档里。
 
 当前页面采用“顶部控制 + 紧凑运行轨迹 + 左执行列表 + 右统计/详情”的两列监控布局：
 
@@ -1324,14 +1324,14 @@ UI 上只有两个控件：一个「额度限制」开关 + 一个「剩余额�
    - 4 个 tabs（详情 / Briefs / 配置 / 笔记，笔记只读）。
    - 与现有 Sidebar / Workbench 联调。
 10. **端到端验证 + 文档同步**：
-    - `current-module-map.md`、`storage-and-observability.md` 同步补 Kairos 节。
+    - `current-module-map.md`、`core-storage-and-observability.md` 同步补 Kairos 节。
     - skill 内 `cron-job-kaiors.md` 不动；本设计文档作为 actspace 化的事实来源。
 
 ## 维护规则
 
 - Kairos 的"为什么 / 边界 / 不变量"长期事实优先写在本文档。
-- 已落地模块清单合并到 `agent-core/current-module-map.md`，本文档不重复记录实现细节。
-- 存储路径变更必须同步 `storage-and-observability.md`。
+- 已落地模块清单合并到 `agent-current-module-map.md`，本文档不重复记录实现细节。
+- 存储路径变更必须同步 `core-storage-and-observability.md`。
 - skill `cron-job-kaiors.md` 是通用知识来源，本文档只记录 actspace 化决策，不复述通用原理。
 - 新增工具进入 Kairos 默认工具集时，需在本文档"安全与隐私"中显式记录默认信任范围。
 
@@ -1411,4 +1411,4 @@ briefs/
 notes/...
 ```
 
-详细字段语义见 `docs/design-docs/storage-and-observability.md` 的 "Kairos 存储与可观测性" 章节。
+详细字段语义见 `docs/design-docs/core-storage-and-observability.md` 的 "Kairos 存储与可观测性" 章节。

@@ -4,7 +4,7 @@
 
 中间区域是主工作区，承载对话、工具流和最终回复。
 
-工具流的数据契约遵循 [`工具预览设计规范`](../agent-core/tool-preview-design-guidelines.md)。前端组件消费 `ToolUiPreview` 派生出的 `MessageBlock` 字段，不直接展示工具原始参数。
+工具流的数据契约遵循 [`工具预览设计规范`](../agent-tool-preview-design-guidelines.md)。前端组件消费 `ToolUiPreview` 派生出的 `MessageBlock` 字段，不直接展示工具原始参数。
 
 ## 消息语法
 
@@ -64,7 +64,7 @@ Thinking 是消息流中的折叠思考行。
 
 ## Thinking 定稿图
 
-![Thinking 定稿图](image/thinking-final.png)
+![Thinking 定稿图](public/front/thinking-final.png)
 
 ## Read / Grep / Glob / Web Search 组件
 
@@ -91,7 +91,7 @@ Read、Grep、Glob 和 Web Search 是和 Thinking 同级别的工具调用消息
 
 ## Read / Grep / Glob / Web Search 定稿图
 
-![Read / 文本工具行定稿图](image/read-search-final.png)
+![Read / 文本工具行定稿图](public/front/read-search-final.png)
 
 ## Bash 组件
 
@@ -203,7 +203,7 @@ Edit File 和 Write File 是文件修改类工具消息。后端工具名为 `ed
 
 ## Edit File 定稿图
 
-![Edit File 定稿图](image/right-panel-diff-final.png)
+![Edit File 定稿图](public/front/right-panel-diff-final.png)
 
 ## 顺序原则
 

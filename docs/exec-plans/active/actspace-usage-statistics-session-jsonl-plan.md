@@ -19,11 +19,11 @@
 - `docs/SECURITY.md`
 - `docs/FRONTEND_VERIFICATION.md`
 - `docs/QUALITY_SCORE.md`
-- `docs/design-docs/frontend-ui/index.md`
-- `docs/design-docs/frontend-ui/usage-statistics/设计规范.md`
-- `docs/design-docs/agent-core/token-usage-and-context-state.md`
-- `docs/design-docs/storage-and-observability.md`
-- `docs/design-docs/agent-core/backend-agent-testing.md`
+- `docs/design-docs/front-index.md`
+- `docs/design-docs/front-usage-statistics.md`
+- `docs/design-docs/agent-token-usage-and-context-state.md`
+- `docs/design-docs/core-storage-and-observability.md`
+- `docs/design-docs/agent-testing.md`
 
 不要读取 `.env` 文件内容；只允许检查字段名、默认值、示例值和运行时错误信息。
 
@@ -31,8 +31,8 @@
 
 当前仓库已经有：
 
-- `docs/design-docs/frontend-ui/usage-statistics/设计规范.md`：统计页视觉与结构规范。
-- `docs/design-docs/frontend-ui/usage-statistics/prototype.html`：当前高保真单文件原型。
+- `docs/design-docs/front-usage-statistics.md`：统计页视觉与结构规范。
+- `docs/design-docs/public/front/usage-statistics-prototype.html`：当前高保真单文件原型。
 - `session.jsonl` / `meta.json` / `context-state.json` 的会话存储边界。
 - `packages/desktop` 的 Electron 主进程、preload 与 renderer 骨架。
 
@@ -82,12 +82,12 @@
 
 ### 4. 保持原型外观
 
-当前 `prototype.html` 已经被验证为比较合适的视觉基线。实现时应尽量保持它的布局、密度和弹窗交互。
+当前 `public/lab/prototype.html` 已经被验证为比较合适的视觉基线。实现时应尽量保持它的布局、密度和弹窗交互。
 
 ## 相关代码路径
 
-- `docs/design-docs/frontend-ui/usage-statistics/设计规范.md`
-- `docs/design-docs/frontend-ui/usage-statistics/prototype.html`
+- `docs/design-docs/front-usage-statistics.md`
+- `docs/design-docs/public/front/usage-statistics-prototype.html`
 - `packages/shared/src/ipc.ts`
 - `packages/shared/src/session.ts`
 - `packages/shared/src/session-selectors.ts`
@@ -265,8 +265,8 @@ export type UsageStatisticsSnapshot = {
 
 修改目标：
 
-- `docs/design-docs/frontend-ui/usage-statistics/设计规范.md`
-- `docs/design-docs/frontend-ui/index.md`
+- `docs/design-docs/front-usage-statistics.md`
+- `docs/design-docs/front-index.md`
 - `docs/histories/2026-05/*`
 - 必要时补 learning 文档
 
@@ -307,4 +307,4 @@ export type UsageStatisticsSnapshot = {
 ## 决策记录
 
 - 2026-05-26：统计页采用 `session.jsonl` 作为事实源，不直接让 renderer 解析文件；原因是保留桌面端边界、避免 UI 与持久化耦合。
-- 2026-05-26：以当前 `prototype.html` 作为视觉基线，页面优先保持蓝色产品仪表盘密度，而不是回到旧绿色草稿。
+- 2026-05-26：以当前 `public/lab/prototype.html` 作为视觉基线，页面优先保持蓝色产品仪表盘密度，而不是回到旧绿色草稿。

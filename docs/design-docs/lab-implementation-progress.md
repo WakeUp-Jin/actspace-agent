@@ -18,11 +18,11 @@
 - `data-model.md`：定义 Experiment、Stage、Evidence、Artifact、Review 等核心对象。
 - `runtime-architecture.md`：描述 Lab Runtime 与 Main Agent、Kairos、ToolManager、Skill / CLI / Tool Registry 的关系。
 - `promotion-and-safety.md`：定义候选能力晋升、风险分层、沙箱和人工审批原则。
-- `versions/`：拆分 V0-V3 的渐进式路线。
+- `lab-versions-index.md` 与 `lab-v0-*` 到 `lab-v3-*`：拆分 V0-V3 的渐进式路线。
 
 ### 2. 前端原型
 
-- `prototype.html`：已沉淀单文件交互原型，覆盖四栏实验矩阵、卡片详情弹窗、新实验弹窗和已完成实验弹窗。
+- `public/lab/prototype.html`：已沉淀单文件交互原型，覆盖四栏实验矩阵、卡片详情弹窗、新实验弹窗和已完成实验弹窗。
 - `frontend-page-design.md`：已将原型转成前端页面规范，明确 V0 首页、阶段卡片、弹窗和不做项。
 
 ### 3. Renderer V0 Mock

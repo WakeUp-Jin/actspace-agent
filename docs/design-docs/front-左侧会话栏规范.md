@@ -36,7 +36,7 @@
 
 - `New Agent`：替代原 `New chat`，承担"开启一次新的 Agent 任务"语义；展示快捷键 `⌘N`。
 - `Lab`：实验台占位页（Coming soon）。未来用于 prompt 调试、工具沙盒、多模型并排。
-- `Usage`：统计页占位（Coming soon），将承载 token / 成本聚合。具体设计见 `usage-statistics/设计规范.md`。
+- `Usage`：统计页占位（Coming soon），将承载 token / 成本聚合。具体设计见 `front-usage-statistics.md`。
 - `Kairos`：时机引擎占位页（Coming soon）。Kairos 取自希腊语「合适的时刻」，将承载定时任务、事件触发、自主 Agent 的运行边界与节奏。
 - 四个入口共用同一组 hover / active 状态语言；当前 view 视为 active。
 

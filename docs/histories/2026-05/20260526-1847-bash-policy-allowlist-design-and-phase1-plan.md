@@ -18,7 +18,7 @@
 
 ## 主要产出
 
-- 新增设计文档：`docs/design-docs/agent-core/bash-policy-allowlist-design.md`
+- 新增设计文档：`docs/design-docs/agent-bash-policy-allowlist-design.md`
   - 定义 `BashAllowlistEntry` / `BashExecutionPolicy` / `BashAllowlistStore` 共享契约。
   - 阐明 A/B/C/D 四块能力的依赖关系。
   - 给出 D1-D5 五条关键决策（放开 `|`、升级入口形态、用户配置 JSON 结构、preset 与 store 关系、session 事件流）。

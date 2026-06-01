@@ -6,7 +6,7 @@
 
 ## 优化内容总览
 
-基于 `02-pi-ai-core-design-extraction.md` 中提取的 10 个 pi-ai 核心设计理念，选择性引入最有影响力的改进，不做架构大改。
+基于 `fix-llm-agent-02-pi-ai-core-design-extraction.md` 中提取的 10 个 pi-ai 核心设计理念，选择性引入最有影响力的改进，不做架构大改。
 
 ### 已实施的改进
 

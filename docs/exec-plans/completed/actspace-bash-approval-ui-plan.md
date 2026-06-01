@@ -23,8 +23,8 @@
 
 ## 设计来源
 
-- `docs/design-docs/frontend-ui/中间消息区规范.md`
-- `docs/design-docs/agent-core/权限设计规则和原则.md`
+- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/agent-权限设计规则和原则.md`
 - 用户提供的参考图：
   - 正常 Bash 展开态：`/Users/wakeup-jin/Desktop/actspace-learing-design/PixPin_2026-05-24_10-58-40.png`
   - Bash 审核态：`/Users/wakeup-jin/Desktop/actspace-learing-design/PixPin_2026-05-24_13-40-30.png`
@@ -38,7 +38,7 @@
 - `packages/desktop/src/renderer/fixtures/workbenchFixture.ts`
 - `packages/desktop/src/renderer/styles.css`
 - `packages/shared/src/session.ts`
-- `docs/design-docs/frontend-ui/中间消息区规范.md`
+- `docs/design-docs/front-中间消息区规范.md`
 
 ## 正常 Bash 组件规则
 

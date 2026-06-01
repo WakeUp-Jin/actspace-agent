@@ -26,7 +26,7 @@
 
 相关文档：
 
-- `docs/design-docs/frontend-ui/聊天输入框规范.md`
+- `docs/design-docs/front-聊天输入框规范.md`
 - `docs/FRONTEND_VERIFICATION.md`
 - `docs/SECURITY.md`
 

@@ -17,7 +17,7 @@
 **Key Actions:**
 
 - **完善右侧规范**：补上右侧 Markdown / HTML / Image / Diff 定稿图引用。
-- **完善图片说明**：在 `image/README.md` 中列出右侧面板全部定稿图。
+- **完善图片说明**：在 `public/front/README.md` 中列出右侧面板全部定稿图。
 
 ### 🧠 Design Intent (Why)
 
@@ -25,6 +25,6 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/frontend-ui/右侧面板与文件渲染规范.md`
-- `docs/design-docs/frontend-ui/image/README.md`
+- `docs/design-docs/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/public/front/README.md`
 - `docs/histories/2026-05/20260521-1850-right-panel-image-sync.md`

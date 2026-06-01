@@ -44,5 +44,5 @@ Lab 当前需要先验证实验台的前端工作流和信息密度，不宜过�
 - `packages/desktop/src/renderer/fixtures/labFixture.ts`
 - `packages/desktop/src/renderer/test/lab-page.test.tsx`
 - `packages/desktop/src/renderer/styles.css`
-- `docs/design-docs/lab/frontend-page-design.md`
+- `docs/design-docs/lab-frontend-page-design.md`
 - `docs/exec-plans/active/lab-v0-frontend-mock-implementation.md`

@@ -25,6 +25,6 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/frontend-ui/左侧会话栏规范.md`
-- `docs/design-docs/frontend-ui/右侧面板与文件渲染规范.md`
+- `docs/design-docs/front-左侧会话栏规范.md`
+- `docs/design-docs/front-右侧面板与文件渲染规范.md`
 - `docs/histories/2026-05/20260521-1738-sidebar-panel-loadable-docs.md`

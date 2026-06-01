@@ -105,7 +105,7 @@
 - `packages/agent-core/src/engine/types.ts`：`AgentLoopConfig.toolExecuteOptions` 新字段。
 - `packages/agent-core/src/engine/loop.ts`：executeToolCalls 透传 options。
 - `packages/agent-core/src/kairos/config/prompt-assembler.ts`：导出 `CONFIG_TIPS_TOKEN_BUDGET` / `TOKEN_CHARS_PER_UNIT` 给 plan 5 复用。
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`：更新 plan 5 完成状态。
+- `docs/design-docs/agent-kairos-autonomous-mode.md`：更新 plan 5 完成状态。
 
 ### 🚥 Next Steps
 

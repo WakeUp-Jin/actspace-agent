@@ -2,23 +2,21 @@
 
 ## 目标
 
-完成 `#8` Context 按钮接入。点击 Composer 里的 Context 圆形入口后打开只读弹窗，展示总占用、分段占用、System prompt、Tools、Rules、Skills、MCP、Subagents、Conversation，并保证与模型菜单、模式菜单等 Composer 浮层互斥。
+完成 `#8` Context 按钮接入。点击 Composer 里的 Context 圆形入口后打开只读弹窗，展示总占用和分段占用，并保证与模型菜单、模式菜单等 Composer 浮层互斥；逐条 System prompt、Tools、Rules、Skills、MCP、Subagents、Conversation 内容由右侧完整 Context 视图承接。
 
 ## 范围
 
 包含：
 
-- `ContextPopup` 支持 `contextState` entries 展示。
-- 数据优先来自 `SessionRecord.contextState`，没有时 fallback 到 `contextSnapshot`。
-- 弹窗包含总占用、分段条、bucket 列表和 entries 列表。
-- entries 按 System prompt / Tools / Rules / Skills / MCP / Subagents / Conversation 分组展示。
-- 只读展示，不提供增删改按钮。
+- `ContextPopup` 支持 `contextSnapshot` 的总占用、分段条和 bucket 列表展示。
+- 弹窗提供只读用量概览，不提供增删改按钮。
+- 弹窗可在存在右侧面板入口时跳转到完整 Context 视图。
 - Composer 任意时刻只有一个浮层打开。
 
 不包含：
 
 - 不实现 Context 条目的增删改、pin、remove。
-- 不做右侧完整 Context 视图；该能力由 `../20260527-right-panel-views.md` 负责。
+- 不在 Composer 弹窗内渲染逐条 `contextState.entries`；完整 entries 展示由右侧 Context 视图负责。
 - 不自行解析 `session.jsonl`。
 - 不改变后端 context state 生成逻辑，除非发现字段缺失且先更新对应后端计划。
 
@@ -26,8 +24,8 @@
 
 相关文档：
 
-- `docs/design-docs/frontend-ui/聊天输入框规范.md`
-- `docs/design-docs/agent-core/token-usage-and-context-state.md`
+- `docs/design-docs/front-聊天输入框规范.md`
+- `docs/design-docs/agent-token-usage-and-context-state.md`
 - `docs/FRONTEND_VERIFICATION.md`
 
 相关代码路径：
@@ -45,37 +43,36 @@
 
 已知现状：
 
-- `ContextPopup` 当前只接收 `ContextUsageSnapshot | null`。
-- `SessionRecord` 已有 `contextState?: ContextState | null`。
-- `ContextStateEntry` 已包含 kind、title、estimatedTokens、included、preview 等字段。
+- `ContextPopup` 当前接收 `ContextUsageSnapshot | null`，用于 Composer 底部轻量 usage popup。
+- `SessionRecord` 已有 `contextState?: ContextState | null`，由右侧完整 Context 视图消费。
+- `ContextStateEntry` 已包含 kind、title、estimatedTokens、included、preview 等字段，但不在 Composer popup 内重复展示。
 
 ## 实施任务
 
-### Step 1: 数据流补齐
+### Step 1: Usage 数据流补齐
 
-- 将 `contextState` 从 `App` 传到 `WorkbenchLayout`、`ConversationView`、`Composer`。
+- 将 `contextSnapshot` 从 `App` 传到 `WorkbenchLayout`、`ConversationView`、`Composer`。
 - `Composer` 再传给 `ContextPopup`。
-- 保留 `contextSnapshot` fallback。
+- `ContextPopup` 没有 snapshot 时显示安全空态。
 
 验收：
 
-- TypeScript 类型能体现 `contextState` 可空。
-- mock 环境没有 contextState 时仍能显示 snapshot 统计。
+- TypeScript 类型能体现 `contextSnapshot` 可空。
+- mock 环境没有 snapshot 时仍能显示 0% / 0 tokens 统计。
 
 ### Step 2: ContextPopup 展示结构
 
-- 统一输入为 view model：
+- 统一输入为轻量 usage view model：
   - total tokens / max tokens / percent used
   - buckets
-  - entries by bucket
-- 有 entries 时展示各分组标题、token 估算、included 状态和 preview。
-- 无 entries 时展示只读空态，说明当前只有 summary snapshot。
+- 展示总占用、分段条和 bucket 列表。
+- 提供「查看完整上下文」入口时，点击打开右侧完整 Context 视图并关闭 popup。
 - 颜色使用现有 context bucket 色彩，不新增大面积彩色背景。
 
 验收：
 
-- 弹窗能看到 System prompt、Tools、Rules、Skills、MCP、Subagents、Conversation 至少 7 个分组或对应空态。
-- 长 preview 不撑破弹窗。
+- 弹窗能看到 Context 总占用、token 数、分段条和 bucket 列表。
+- 点击完整视图入口时打开右侧 Context 视图，Composer popup 关闭。
 
 ### Step 3: 浮层互斥与可访问性
 
@@ -94,14 +91,15 @@
 
 - renderer 测试覆盖：
   - 点击 Context 打开弹窗。
-  - 有 contextState 时展示 entries。
-  - 无 contextState 时 fallback 到 contextSnapshot。
+  - 有 contextSnapshot 时展示用量和 buckets。
+  - 无 contextSnapshot 时显示安全空态。
+  - 完整视图入口可触发右侧 Context tab。
   - 打开 model menu 后 Context 自动关闭。
 
 ## 风险
 
-- 风险：Context entries 内容过长导致弹窗撑高或遮挡 Composer。
-  - 缓解：限制弹窗最大高度，内部滚动。
+- 风险：把逐条 entries 重复放进 Composer popup 会导致弹窗撑高、遮挡 Composer，并和右侧完整视图重复。
+  - 缓解：Composer popup 只做 usage 概览，逐条内容统一走右侧完整 Context 视图。
 - 风险：Context 数据来源不稳定。
   - 缓解：view model 同时支持 contextState、contextSnapshot 和空态。
 
@@ -109,16 +107,23 @@
 
 - `pnpm --filter @actspace/desktop test -- ContextPopup` 或等价局部测试。
 - `pnpm --filter @actspace/desktop typecheck`。
-- 浏览器 mock 验证弹窗打开/关闭、entries 展示、浮层互斥。
+- 浏览器 mock 验证弹窗打开/关闭、usage 展示、完整视图入口和浮层互斥。
 - 本阶段不强制 Electron 真实验证，因为未新增 preload / IPC。
 
 ## 进度记录
 
-- [ ] 完成 contextState 数据流补齐。
-- [ ] 完成 ContextPopup entries 展示。
-- [ ] 完成浮层互斥与可访问性。
-- [ ] 完成测试和浏览器 mock 验证。
+- [x] 完成 Context usage snapshot 数据流和弹窗展示。
+- [x] 完成 ContextPopup 用量、分段条和 bucket 列表展示。
+- [x] 完成右侧完整 Context 视图入口。
+- [x] 完成浮层互斥与可访问性。
+- [x] 完成测试和浏览器 mock 验证。
+
+## 验证记录
+
+- 2026-05-29：`01-composer-visual-and-model-menu.md` 的浏览器 mock 记录确认 Context usage 入口、model menu / command menu 互斥可用。
+- 2026-06-01：静态核对确认 `ContextPopup` 仍定位为轻量 usage / bucket 概览，逐条 `contextState.entries` 由右侧完整 Context 视图承接；本子计划按调整后的产品边界计为完成。
 
 ## 决策记录
 
 - 2026-05-28：Context popup 只读消费 `contextState` / `contextSnapshot`，不自行解析持久化文件，避免和右侧 Context 视图及后端 context plan 产生职责重叠。
+- 2026-06-01：将 Composer popup 的职责收口为轻量只读用量概览和右侧完整视图入口；`contextState.entries` 不再要求在 Composer popup 内重复展示。理由是右侧 Context 视图已经承接完整逐条内容，Composer 底部弹窗保持短路径、低遮挡和低复杂度。

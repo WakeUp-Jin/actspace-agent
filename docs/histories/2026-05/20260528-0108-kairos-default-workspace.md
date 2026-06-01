@@ -36,4 +36,4 @@ Kairos 是后台自治 Agent，不能默认借用 app 仓库或普通聊天 Agen
 - `packages/agent-core/src/kairos/controller.ts`
 - `packages/agent-core/src/kairos/prompt.ts`
 - `packages/agent-core/src/kairos/test/prompt-assembler.test.ts`
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`
+- `docs/design-docs/agent-kairos-autonomous-mode.md`

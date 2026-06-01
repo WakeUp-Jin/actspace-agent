@@ -47,7 +47,7 @@
 - `packages/desktop/src/main/index.ts`
 - `packages/desktop/src/main/agent-turn.ts`
 - `packages/desktop/src/preload/index.ts`
-- `docs/design-docs/agent-core/tool-approval-pause-resume.md`（新增）
+- `docs/design-docs/agent-tool-approval-pause-resume.md`（新增）
 - `docs/design-docs/index.md`
 - `docs/exec-plans/active/Bash工具和工具权限调度开发计划/README.md`
 - `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-tool-permission-scheduler-plan.md`

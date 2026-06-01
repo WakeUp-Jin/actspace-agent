@@ -35,6 +35,6 @@ Composer now has multiple real product states. Modeling the UI as `surface + inp
 - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/desktop/src/renderer/test/composer.test.tsx`
-- `docs/design-docs/frontend-ui/聊天输入框规范.md`
+- `docs/design-docs/front-聊天输入框规范.md`
 - `docs/exec-plans/active/20260529-composer-layout-variants.md`
 - `docs/learnings/2026-05/component-state-matrix-and-ready-gates.md`

@@ -39,7 +39,7 @@
 - 必读文档（新会话 / 子 Agent 先读）：
   - `AGENTS.md`
   - `docs/FRONTEND.md` 与 `docs/FRONTEND_VERIFICATION.md`
-  - `docs/design-docs/frontend-ui/设置页规范.md`（外观章节为本计划设计依据）
+  - `docs/design-docs/front-设置页规范.md`（外观章节为本计划设计依据）
   - `docs/coding-standards/team/frontend-style-scope-conventions.md`（样式所有权：原子组件只管"长什么样"）
 - 相关代码路径：
   - 外观分区与原子组件：`packages/desktop/src/renderer/components/settings/SettingsPage.tsx`（`AppearanceSection`，462 行起）、`packages/desktop/src/renderer/components/settings/SettingsPrimitives.tsx`
@@ -201,5 +201,5 @@ setUiZoom: (factor: number) => webFrame.setZoomFactor(factor),
 
 - 外观页可改 UI 字体、代码字体、界面字号（整窗缩放）、代码字号，均即时生效并跨刷新/重启保持。
 - typecheck / test / lint 全绿；浏览器 mock 与 Electron 真实验证通过。
-- `docs/design-docs/frontend-ui/设置页规范.md` 外观章节与实现一致（已先行更新）。
+- `docs/design-docs/front-设置页规范.md` 外观章节与实现一致（已先行更新）。
 - 记 history 到 `docs/histories/2026-05/`。

@@ -42,7 +42,7 @@
 
 ### 设计参考
 
-- `docs/design-docs/frontend-ui/主题与配色规范.md`（改任何带颜色样式前必读，硬约束：禁止 `#hex` / `text-black` / `bg-white`，颜色必须随主题翻转、浅深双验）。
+- `docs/design-docs/front-主题与配色规范.md`（改任何带颜色样式前必读，硬约束：禁止 `#hex` / `text-black` / `bg-white`，颜色必须随主题翻转、浅深双验）。
 - 用户提供的 Cursor Context 面板浅/深双截图（参考视觉：System prompt / Tool definitions / Rules / Skills / MCP / Subagent definitions / Summarized conversation / Conversation 多段 + 占用数值）。
 
 ## 配置驱动设计（核心）

@@ -104,6 +104,6 @@
 
 - `HTML渲染与沙箱安全规范.md`：转换产物的渲染与安全闸。
 - `右侧面板与文件渲染规范.md`：右侧 HTML Tab 外壳。
-- `docs/design-docs/agent-core/token-usage-and-context-state.md`：转换调用的 usage 计入口径。
+- `docs/design-docs/agent-token-usage-and-context-state.md`：转换调用的 usage 计入口径。
 - `Markdown渲染规范.md`：源回复的 Markdown 呈现（与"转 HTML"是两种查看方式）。
 - 执行计划：`docs/exec-plans/active/20260527-right-panel-views.md`。

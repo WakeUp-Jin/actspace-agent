@@ -32,4 +32,4 @@ Bash 工具、权限调度、审核 UI 和暂停恢复不是四条孤立工作�
 - `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-bash-approval-ui-plan.md`
 - `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-tool-pause-session-boundary-plan.md`
 - `docs/exec-plans/README.md`
-- `docs/design-docs/agent-core/权限设计规则和原则.md`
+- `docs/design-docs/agent-权限设计规则和原则.md`

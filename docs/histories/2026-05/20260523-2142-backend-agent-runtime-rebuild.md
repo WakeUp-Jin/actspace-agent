@@ -22,7 +22,7 @@
 - **[Plan D] 上下文管道**：创建 `context/` 模块——`types.ts`（SystemPart/ContextModule/PromptSegment）、`token-estimator.ts` token 估算、`modules/system-prompt.ts` 分段系统提示词、`modules/conversation.ts` 会话历史管理、`manager.ts` 上下文编排器；迁移 `context.ts` 为兼容层
 - **[Plan E] 执行引擎**：创建 `engine/` 模块——`types.ts`（AgentEvent discriminated union）、`loop.ts` 纯函数双层循环（内层工具调用+转向、外层跟进）、`agent.ts` Agent 入口类（run/abort）；迁移 `agent.ts` 为兼容层
 - **[Plan F] 持久化与恢复**：创建 `persistence/` 模块——`types.ts` 路径与结果类型、`jsonl.ts` 健壮读写（坏行容错+结构化错误）、`meta.ts` 增量更新、`recovery.ts` 多维恢复（Messages/Blocks/Snapshot/DiffSummary）、`session-store.ts` 会话存储生命周期、`compat.ts` 兼容函数；迁移 `persistence.ts` 为兼容层
-- **[Skill 修复] 同步记录**：创建 `llm-agent-dev-skill-fix.md` 记录 Skill 中缺少 `services/` 子目录设计、工具 `definition + executor` 目录结构矛盾、`context/modules/` 子目录说明缺失、Mock Provider 要求缺失等问题
+- **[Skill 修复] 同步记录**：创建 `fix-llm-agent-dev-skill.md` 记录 Skill 中缺少 `services/` 子目录设计、工具 `definition + executor` 目录结构矛盾、`context/modules/` 子目录说明缺失、Mock Provider 要求缺失等问题
 
 ### 🧠 Design Intent (Why)
 
@@ -71,5 +71,5 @@ agent-core 首版是 6 个平铺的单文件，随着后端设计文档确定了
 - `packages/agent-core/src/persistence/compat.ts`
 - `packages/agent-core/src/persistence/index.ts`
 - `packages/agent-core/src/persistence.ts`（兼容层）
-- `docs/design-docs/llm-agent-dev-skill-fix.md`
+- `docs/design-docs/fix-llm-agent-dev-skill.md`
 - `docs/exec-plans/active/actspace-backend-*.md`（6 个计划文档更新进度）

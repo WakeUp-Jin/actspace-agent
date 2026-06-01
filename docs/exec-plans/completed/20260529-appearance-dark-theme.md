@@ -27,8 +27,8 @@
 - 必读文档（新会话 / 子 Agent 先读）：
   - `AGENTS.md`
   - `docs/FRONTEND.md` 与 `docs/FRONTEND_VERIFICATION.md`
-  - `docs/design-docs/frontend-ui/设置页规范.md`（外观章节）
-  - `docs/design-docs/frontend-ui/全局视觉语言规范.md`
+  - `docs/design-docs/front-设置页规范.md`（外观章节）
+  - `docs/design-docs/front-全局视觉语言规范.md`
   - `docs/coding-standards/team/frontend-style-scope-conventions.md`
 - 前置依赖：
   - **计划 A（`20260529-appearance-fonts-and-zoom.md`）必须先落地**：本计划复用其 `packages/desktop/src/renderer/appearance/{types,storage,apply}.ts` 模块与外观分区骨架。
@@ -156,4 +156,4 @@ window.actspace?.setNativeTheme?.(effective); // main nativeTheme.themeSource �
 - 五个任务全部完成：token 地基 + `dark:` variant、状态色 / 中性面收口、图表 / 渐变 / 阴影收口、三态切换 UI + 持久化 + 开机重放、`nativeTheme` 原生同步。
 - `pnpm --filter @actspace/desktop typecheck` 通过；`test` 全绿（16 文件 / 145 用例）。
 - 浏览器 mock 逐页双主题验证通过（会话 / Usage / Lab / 设置外观，点击「深色」整页即时翻转，`data-theme` + `localStorage` 持久化均确认）；Kairos 完整面板与 Usage 图表 / 热力图、原生 chrome 同步待 Electron 真实环境验证。
-- history：`docs/histories/2026-05/20260529-2340-appearance-dark-theme.md`；规范同步：`docs/design-docs/frontend-ui/设置页规范.md` 外观章节。
+- history：`docs/histories/2026-05/20260529-2340-appearance-dark-theme.md`；规范同步：`docs/design-docs/front-设置页规范.md` 外观章节。

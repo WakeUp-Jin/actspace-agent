@@ -175,7 +175,7 @@ export type WorkspaceReadFileResult = {
 ## V3 边界（远期）
 
 - 文件编辑 + 保存：脏标记 / 撤销；写操作过 `guardWorkspacePath` + 审批。
-- **Kairos 配置编辑器**：不走通用 fs 写。复用已有带 schema 校验的专用通道 `kairos:read-config` / `kairos:write-config`（4 份：`preferences.json` / `paths.json` / `blocklist.json` / `rule.md`，见 `agent-core/kairos-autonomous-mode.md` 与 `storage-and-observability.md`）。文件树只当导航入口，编辑保存仍走 Kairos 校验通道。
+- **Kairos 配置编辑器**：不走通用 fs 写。复用已有带 schema 校验的专用通道 `kairos:read-config` / `kairos:write-config`（4 份：`preferences.json` / `paths.json` / `blocklist.json` / `rule.md`，见 `agent-kairos-autonomous-mode.md` 与 `core-storage-and-observability.md`）。文件树只当导航入口，编辑保存仍走 Kairos 校验通道。
 
 ## 已知陷阱
 

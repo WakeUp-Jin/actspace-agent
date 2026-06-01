@@ -33,10 +33,10 @@
   - `docs/FRONTEND.md`
   - `docs/FRONTEND_VERIFICATION.md`
   - `docs/QUALITY_SCORE.md`
-  - `docs/design-docs/frontend-ui/index.md`
-  - `docs/design-docs/frontend-ui/全局视觉语言规范.md`
-  - `docs/design-docs/frontend-ui/tailwind-style-architecture.md`
-  - `docs/design-docs/frontend-ui/usage-statistics/设计规范.md`
+  - `docs/design-docs/front-index.md`
+  - `docs/design-docs/front-全局视觉语言规范.md`
+  - `docs/design-docs/front-tailwind-style-architecture.md`
+  - `docs/design-docs/front-usage-statistics.md`
 - 相关代码路径：
   - `packages/desktop/package.json`
   - `packages/desktop/vite.config.mts`
@@ -54,7 +54,7 @@
   - Tailwind v4 依赖、Vite plugin、CSS-first token 映射和 `styles/index.css` 统一入口已经接入。
   - 前端是 Vite + React + Electron renderer。
   - 用户已明确项目处于开发阶段，不需要保留旧样式兼容层。
-  - Usage Statistics 页面需要贴近 `docs/design-docs/frontend-ui/usage-statistics/prototype.html` 的原型效果。
+  - Usage Statistics 页面需要贴近 `docs/design-docs/public/front/usage-statistics-prototype.html` 的原型效果。
   - 代码实现前仍需遵守 `AGENTS.md`：先确认方案，再改代码。
 
 ## 风险
@@ -107,7 +107,7 @@
   - `pnpm dev:log`
 - 手工检查：
   - 浏览器 mock 打开 `http://127.0.0.1:5173/`，检查 Usage 页面。
-  - 对照 `http://127.0.0.1:5500/docs/design-docs/frontend-ui/usage-statistics/prototype.html` 的原型布局。
+  - 对照 `http://127.0.0.1:5500/docs/design-docs/public/front/usage-statistics-prototype.html` 的原型布局。
   - 检查金额弹窗、工具详情弹窗、表格滚动、热力图、工具调用卡和缓存效率卡。
   - 调整窗口宽度，确认卡片不溢出、不遮挡、不出现错误横向滚动。
 - 观测检查：

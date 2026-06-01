@@ -40,7 +40,7 @@
 ## 必读
 
 - `AGENTS.md`
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md` 的「Config 详设 / paths.json」「Briefs（用户主动任务）」「主 Agent Sessions 的访问」三章
+- `docs/design-docs/agent-kairos-autonomous-mode.md` 的「Config 详设 / paths.json」「Briefs（用户主动任务）」「主 Agent Sessions 的访问」三章
 - `back-code/heartclaw/apps/ruyi-api/src/core/agent/kairos_agent.py`（brief 触发的概念出处，仅参考）
 - 任意现有 session 目录结构（`<userData>/sessions/<workspaceId>/<sessionId>/session.jsonl`），理解需要解析哪些字段
 

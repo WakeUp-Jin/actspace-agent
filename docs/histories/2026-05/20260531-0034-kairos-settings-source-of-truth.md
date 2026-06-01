@@ -37,7 +37,7 @@ Kairos 原先的模型设置经历过 env、`preferences.json`、设置页状态
 - `packages/desktop/src/main/kairos-bootstrap.ts`
 - `packages/desktop/src/main/index.ts`
 - `packages/desktop/src/renderer/components/settings/KairosSettings.tsx`
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`
+- `docs/design-docs/agent-kairos-autonomous-mode.md`
 - `.env.example`
 
 ### 🧪 Verification

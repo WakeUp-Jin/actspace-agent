@@ -107,5 +107,5 @@
 - `右侧面板与文件渲染规范.md`：右侧面板外壳与 Tab。
 - `Kairos上下文Sheet规范.md` / `Kairos右侧紧凑视图规范.md`：视觉语言同源、数据源不同的对照。
 - `主题与配色规范.md`：`--act-context-*` 数据可视化色与 `bg-surface` 内容卡片必须随主题翻转。
-- `docs/design-docs/agent-core/token-usage-and-context-state.md`：`ContextState` / `contextSnapshot` 的数据分层。
+- `docs/design-docs/agent-token-usage-and-context-state.md`：`ContextState` / `contextSnapshot` 的数据分层。
 - 执行计划：`docs/exec-plans/active/20260527-right-panel-views.md`。

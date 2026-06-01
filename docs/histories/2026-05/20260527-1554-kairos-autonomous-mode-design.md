@@ -19,7 +19,7 @@
 - **Skill 评估**：核对 `.agents/skills/llm-agent-dev/references/agent-runtime/cron-job-kaiors.md` 和 `examples/kairos-runner.ts`，确认 KAIROS 模式核心思想、tick 调度、可中断 sleep、独立 Runner、SleepTool 等概念已覆盖，不需要写 `llm-agent-fix-plan`。
 - **现状盘点**：通读 heartclaw 的 `KairosRunner` 后端与 `KairosPage` 前端（含 store、event、status panel、reply preview、modal），识别可保留的"事件流 + 状态卡"模式，并列出本仓库要修正的点（语义耦合、缺少启停 toggle、缺少自治边界等）。
 - **决策对齐**：通过 5 个问题项让用户拍板布局、默认启停、v1 范围、事件存储、文档落位。
-- **新增设计文档**：`docs/design-docs/agent-core/kairos-autonomous-mode.md`，覆盖动机、目标、非目标、模块分层、shared 契约、tick 调度、上下文构成、prompt 边界、存储布局、与主 Agent 的交互边界、页面规范、错误处理、安全策略、验证策略和推进顺序。
+- **新增设计文档**：`docs/design-docs/agent-kairos-autonomous-mode.md`，覆盖动机、目标、非目标、模块分层、shared 契约、tick 调度、上下文构成、prompt 边界、存储布局、与主 Agent 的交互边界、页面规范、错误处理、安全策略、验证策略和推进顺序。
 - **导航同步**：把新文档收录进 `docs/design-docs/index.md` 与 `docs/ARCHITECTURE.md` 的架构阅读路线。
 
 ### 🧠 Design Intent (Why)
@@ -28,7 +28,7 @@ actspace 主链路是单向被动 turn，Kairos 想给 Agent 一个"用户没说
 
 ### 📁 Files Modified
 
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`
+- `docs/design-docs/agent-kairos-autonomous-mode.md`
 - `docs/design-docs/index.md`
 - `docs/ARCHITECTURE.md`
 
@@ -49,7 +49,7 @@ actspace 主链路是单向被动 turn，Kairos 想给 Agent 一个"用户没说
 - **盘点 heartclaw 短期记忆实现**：通读 `apps/ruyi-api/src/core/context/modules/short_term_memory.py` 和 `storage/short_memory_store.py`，确认"按日 jsonl + 月文件夹 + week/month/year 三层摘要 + 当天 segment + token 预算加载"这一套机制完全适用于 Kairos。
 - **上下文输入分类**：把用户提到的 5 项 + 我补的 5 项归纳为 4 大类（长期偏好 / 主动任务 / 自身记忆 / 外部观测），并定义不同的加载机制和注入路径，强调"第 4 类绝对不能进上下文原文"。
 - **决策对齐**：7 个问题项让用户拍板（短期记忆分段粒度按日；session 默认逐 workspace 授权；briefs 用 frontmatter markdown；watch 走 poll-on-tick；pinned notes 接受 ≤ 1500 token；blocklist 调度层硬限制；briefs 页面表单和直接编辑等价）。
-- **新增/重写章节**（在 `docs/design-docs/agent-core/kairos-autonomous-mode.md`）：
+- **新增/重写章节**（在 `docs/design-docs/agent-kairos-autonomous-mode.md`）：
   - 新增"上下文输入分类"章节，4 大类对比表 + 关键不变量。
   - 重写"上下文构成"为 8 段 system prompt + 4 段 messages + 7 个 Kairos 专属工具。
   - 重写"存储布局"为完整 5 子目录树（config / briefs / memory / observe / events）。
@@ -75,7 +75,7 @@ Kairos 是主动 Agent，没有上下文等于盲眼运行。这一轮在上一�
 
 ### 📁 Files Modified
 
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`（大幅扩展）
+- `docs/design-docs/agent-kairos-autonomous-mode.md`（大幅扩展）
 
 ---
 
@@ -139,7 +139,7 @@ Kairos 是主动 Agent，没有上下文等于盲眼运行。这一轮在上一�
 
 ### 📁 Files Modified
 
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`（大幅重写：契约 / 存储 / Config / 工具 / 安全 / 验证多个章节）
+- `docs/design-docs/agent-kairos-autonomous-mode.md`（大幅重写：契约 / 存储 / Config / 工具 / 安全 / 验证多个章节）
 
 ---
 
@@ -197,4 +197,4 @@ Kairos 是主动 Agent，没有上下文等于盲眼运行。这一轮在上一�
 
 ### 📁 Files Modified
 
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`（pinned 整章删除 + watch 重写 + notes 章节重写 + 多处段编号 / 模块 / 验证 / 推进顺序同步）
+- `docs/design-docs/agent-kairos-autonomous-mode.md`（pinned 整章删除 + watch 重写 + notes 章节重写 + 多处段编号 / 模块 / 验证 / 推进顺序同步）

@@ -2,7 +2,7 @@
 
 ## 背景
 
-在 actspace-agent 设计「上下文压缩」（`docs/design-docs/agent-core/context-compression.md`）时，针对 bash 工具的大输出处理收敛出一套明显更优的设计。回头看 `.agents/skills/llm-agent-dev` 对 bash 的指导，**输出处理这一块太粗糙**，会把使用者带进「内存被大输出吃光」的坑。本文件沉淀该设计，作为后续统一修复 skill 源文件的依据。
+在 actspace-agent 设计「上下文压缩」（`docs/design-docs/agent-context-compression.md`）时，针对 bash 工具的大输出处理收敛出一套明显更优的设计。回头看 `.agents/skills/llm-agent-dev` 对 bash 的指导，**输出处理这一块太粗糙**，会把使用者带进「内存被大输出吃光」的坑。本文件沉淀该设计，作为后续统一修复 skill 源文件的依据。
 
 当前 skill 已经讲清楚的部分（保留）：
 
@@ -22,7 +22,7 @@
 
 ## 参考设计（来自 actspace-agent）
 
-事实来源：`docs/design-docs/agent-core/context-compression.md` 的「预防层 A：bash 流式落盘」。
+事实来源：`docs/design-docs/agent-context-compression.md` 的「预防层 A：bash 流式落盘」。
 
 核心结论：**bash 输出大小不可控，不能在内存变量里累加全量字符串；把内存上限调大只是把问题推后，治标不治本。正确做法是边执行边流式写盘，内存只保留有界头部缓冲。**
 
@@ -39,7 +39,7 @@
 
 ### 2. 流式落盘机制（在通用 runProcess 之上扩展）
 
-复用修复文档 `04-skill-rg-tools-fix.md` 提出的通用 `runProcess`，给它加一个**流式落盘 sink**（bash 使用，rg 不必）：
+复用修复文档 `fix-llm-agent-04-skill-rg-tools-fix.md` 提出的通用 `runProcess`，给它加一个**流式落盘 sink**（bash 使用，rg 不必）：
 
 - 执行期内存只保留一个**有界头部缓冲**（`headBufferCap`，建议 4000 字符）+ 一个总字节计数器。
 - 输出 ≤ `headBufferCap`：头部缓冲即全部内容，**不创建任何文件**。
@@ -103,7 +103,7 @@ Skill 源文件仓库：
 - `references/tools/tool-scheduling.md`：OutputTruncator 节区分「LLM 摘要类工具」与「bash 这类确定性头部 + 文件指针工具」。
 - `references/context/mgmt-compression.md`：工具输出裁剪一节补「流式落盘 vs 内存累加」的反面教材与正解。
 - `examples/bash-tool.ts`：把 `execFileAsync({ maxBuffer })` 改成基于流式 `runProcess` sink 的实现（headBuffer + 懒落盘 + diskCap），`renderBashResult` 改为按阈值输出头部 + 截断标记 + 路径。
-- 复用 `examples/run-process.ts`（`04-skill-rg-tools-fix.md` 已提出新增）：增加可选 `outputFile` / `headBufferCap` / `diskCap` 流式 sink。
+- 复用 `examples/run-process.ts`（`fix-llm-agent-04-skill-rg-tools-fix.md` 已提出新增）：增加可选 `outputFile` / `headBufferCap` / `diskCap` 流式 sink。
 
 ## 验收标准
 
@@ -115,5 +115,5 @@ Skill 源文件仓库：
 
 ## 决策记录
 
-- 2026-05-29：bash skill 修复**只先沉淀本修复文档**，实际 skill 源文件修补不在 actspace-agent 当前 active plan 内执行，沿用本目录既有约定（见 `README.md` / `04-skill-rg-tools-fix.md` 决策记录），后续统一修复 skill 源码时按本文执行。
-- 2026-05-29：bash 输出处理定为「流式落盘 + 头部截断 + 文件指针」，不走 LLM 摘要；摘要只服务 web/generic 等重跑恢复型工具。原因见 `docs/design-docs/agent-core/context-compression.md`。
+- 2026-05-29：bash skill 修复**只先沉淀本修复文档**，实际 skill 源文件修补不在 actspace-agent 当前 active plan 内执行，沿用本目录既有约定（见 `README.md` / `fix-llm-agent-04-skill-rg-tools-fix.md` 决策记录），后续统一修复 skill 源码时按本文执行。
+- 2026-05-29：bash 输出处理定为「流式落盘 + 头部截断 + 文件指针」，不走 LLM 摘要；摘要只服务 web/generic 等重跑恢复型工具。原因见 `docs/design-docs/agent-context-compression.md`。

@@ -133,7 +133,7 @@ export type DescribeContextInput = {
   sessionId: string;
 };
 
-// ─── 工作区文件浏览器（见 `docs/design-docs/frontend-ui/工作区文件浏览器规范.md`）───
+// ─── 工作区文件浏览器（见 `docs/design-docs/front-工作区文件浏览器规范.md`）───
 
 /** 懒加载一层工作区目录。renderer 不直接读 FS，全部经此 IPC。 */
 export type WorkspaceListDirInput = {

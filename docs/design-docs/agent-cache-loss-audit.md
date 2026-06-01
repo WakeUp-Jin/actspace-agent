@@ -206,9 +206,9 @@ const cacheStatus = denominator > 0 && cacheHitRatio < 0.9;
 
 ## 与现有设计的关系
 
-- `docs/design-docs/agent-core/token-usage-and-context-state.md` 定义 token 与 usage 事实来源，本设计只扩展 `llm_usage` 的排障索引字段。
-- `docs/design-docs/agent-core/context-compression.md` 已说明历史压缩会影响 DeepSeek prompt cache，本设计提供压缩前后证据。
-- `docs/design-docs/storage-and-observability.md` 定义本地 session、context-state 和排障日志边界，本设计新增 `cache-audit/` 作为低频、按需写入的排障材料。
+- `docs/design-docs/agent-token-usage-and-context-state.md` 定义 token 与 usage 事实来源，本设计只扩展 `llm_usage` 的排障索引字段。
+- `docs/design-docs/agent-context-compression.md` 已说明历史压缩会影响 DeepSeek prompt cache，本设计提供压缩前后证据。
+- `docs/design-docs/core-storage-and-observability.md` 定义本地 session、context-state 和排障日志边界，本设计新增 `cache-audit/` 作为低频、按需写入的排障材料。
 
 ## 安全与隐私
 

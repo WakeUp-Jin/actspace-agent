@@ -36,5 +36,5 @@
 - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
 - `packages/desktop/src/renderer/components/UsageStatisticsPage.tsx`
 - `packages/desktop/src/renderer/test/usage-statistics-page.test.tsx`
-- `docs/design-docs/frontend-ui/usage-statistics/设计规范.md`
+- `docs/design-docs/front-usage-statistics.md`
 - `docs/SECURITY.md`

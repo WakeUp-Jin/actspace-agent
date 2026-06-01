@@ -51,4 +51,4 @@
 - `packages/desktop/src/renderer/state/kairosSelectors.ts`
 - `packages/desktop/src/renderer/components/ShutdownOverlay.tsx`（新增）
 - `packages/desktop/src/renderer/App.tsx`
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`、`docs/design-docs/frontend-ui/设置页规范.md`、`docs/design-docs/agent-core/current-module-map.md`、`docs/exec-plans/active/20260530-kairos-budget-and-graceful-shutdown.md`
+- `docs/design-docs/agent-kairos-autonomous-mode.md`、`docs/design-docs/front-设置页规范.md`、`docs/design-docs/agent-current-module-map.md`、`docs/exec-plans/active/20260530-kairos-budget-and-graceful-shutdown.md`

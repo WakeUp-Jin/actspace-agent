@@ -40,6 +40,6 @@
 - `packages/agent-core/src/llm/services/deepseek-anthropic.ts`
 - `packages/agent-core/src/llm/test/deepseek-anthropic-service.test.ts`
 - `packages/agent-core/src/engine/test/deepseek-anthropic-tool-loop.test.ts`
-- `docs/design-docs/agent-core/current-module-map.md`
-- `docs/design-docs/agent-core/deepseek-kimi-hybrid-capabilities.md`
+- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`
 - `docs/exec-plans/active/20260530-context-cache-and-usage/01-usage-anthropic-semantics-fix.md`

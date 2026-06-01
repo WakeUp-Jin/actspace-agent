@@ -27,8 +27,8 @@ Context 更符合输入区弹窗而不是常驻面板，放回 Composer 能让�
 ### 📁 Files Modified
 
 - `docs/design-docs/index.md`
-- `docs/design-docs/frontend-ui/index.md`
-- `docs/design-docs/frontend-ui/聊天输入框规范.md`
-- `docs/design-docs/frontend-ui/右侧面板与文件渲染规范.md`
-- `docs/design-docs/frontend-ui/上下文组件规范.md`
+- `docs/design-docs/front-index.md`
+- `docs/design-docs/front-聊天输入框规范.md`
+- `docs/design-docs/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/front-聊天输入框规范.md`
 - `docs/histories/2026-05/20260521-1600-context-moved-to-composer.md`

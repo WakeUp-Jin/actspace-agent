@@ -24,7 +24,7 @@
 
 ## 设计来源
 
-- `docs/design-docs/agent-core/权限设计规则和原则.md`
+- `docs/design-docs/agent-权限设计规则和原则.md`
 - `.agents/skills/llm-agent-dev/references/tools/tool-scheduling.md`
 - `.agents/skills/llm-agent-dev/references/tools/tool-definition.md`
 

@@ -28,16 +28,16 @@
 - `docs/FRONTEND_VERIFICATION.md`
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
-- `docs/design-docs/frontend-ui/index.md`
-- `docs/design-docs/frontend-ui/全局视觉语言规范.md`
+- `docs/design-docs/front-index.md`
+- `docs/design-docs/front-全局视觉语言规范.md`
 - `.agents/skills/frontend-design/SKILL.md`
 
 按子计划需要补读：
 
-- Composer / Context：`docs/design-docs/frontend-ui/聊天输入框规范.md`
-- Sidebar / Workspaces / Session status：`docs/design-docs/frontend-ui/左侧会话栏规范.md`
-- Settings：`docs/design-docs/frontend-ui/设置页规范.md`
-- 页面级布局：`docs/design-docs/frontend-ui/工作台布局与面板交互规范.md`
+- Composer / Context：`docs/design-docs/front-聊天输入框规范.md`
+- Sidebar / Workspaces / Session status：`docs/design-docs/front-左侧会话栏规范.md`
+- Settings：`docs/design-docs/front-设置页规范.md`
+- 页面级布局：`docs/design-docs/front-工作台布局与面板交互规范.md`
 
 补充素材：
 
@@ -92,14 +92,27 @@
 
 ## 总进度记录
 
-- [ ] 完成 `01-composer-visual-and-model-menu.md`。
+- [x] 完成 `01-composer-visual-and-model-menu.md`。
 - [ ] 完成 `02-attachments-ipc-and-turn-contract.md`。
-- [ ] 完成 `03-context-readonly-popover.md`。
+- [x] 完成 `03-context-readonly-popover.md`。
 - [ ] 完成 `04-sidebar-workspaces-and-session-status.md`。
-- [ ] 完成 `05-settings-typography.md`。
+- [x] 完成 `05-settings-typography.md`。
 - [ ] 完成 `06-validation-docs-and-history.md`。
+
+## 当前剩余范围
+
+截至 2026-06-01，本计划簇剩余实现任务只剩：
+
+- `02-attachments-ipc-and-turn-contract.md`：真实附件选择、发送契约、持久化和 Electron 验证。
+- `04-sidebar-workspaces-and-session-status.md`：Workspaces 父级添加目录、workspace 内新建会话、会话状态按钮和详情菜单。
+- `06-validation-docs-and-history.md`：在 `02` / `04` 完成后做最终工程验证、浏览器 mock、Electron 真实验证、文档同步、history 和归档准备。
+
+`01` / `03` / `05` 后续只参与回归验收，不再作为实现阻塞项。
 
 ## 决策记录
 
 - 2026-05-27：本计划负责前端入口和视觉交互；Context 与 Skill 的后端事实来源分别由已有 context/usage 计划和 `20260527-agent-tool-capabilities.md` 提供。
 - 2026-05-28：原单文件计划拆为目录计划簇。`README.md` 只保留索引、总范围和边界，具体实施细节进入 6 个子计划，方便后续分阶段执行和验收。
+- 2026-06-01：`01` 已有局部测试、typecheck 和浏览器 mock 记录，计为完成。
+- 2026-06-01：`03` 按当前产品边界计为完成：Composer popup 保持轻量只读 context usage / bucket 概览，并提供进入右侧完整 Context 视图的入口；逐条 `contextState.entries` 展示由右侧完整 Context 视图承接，不再阻塞本计划簇。
+- 2026-06-01：`05` 代码已落地 Settings 整页接管、Appearance / Typography 本地偏好、字体/字号/主题设置与测试覆盖，计为完成；计划文件同步更新。

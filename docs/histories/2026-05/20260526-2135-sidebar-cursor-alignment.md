@@ -19,7 +19,7 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `packages/shared`、`packages/agent-core`、`packages/desktop`、`docs/design-docs/frontend-ui`、`docs/exec-plans/active`
+**Scope:** `packages/shared`、`packages/agent-core`、`packages/desktop`、`docs/design-docs/front-*`、`docs/exec-plans/active`
 
 **Key Actions:**
 
@@ -32,7 +32,7 @@
 - **样式按现有 token 体系补齐**：`styles.css` 新增 `.sidebar-chrome-row / .sidebar-chrome-button / .sidebar-primary-actions / .sidebar-primary-action`、Workspaces 分组头、行首状态点、Pin 按钮 hover 显隐、See more/less、Placeholder 占位页等样式；`.session-row` min-height 36px 与 `.sidebar-primary-action` 对齐；`.nav-section-label` 字号 13px 与 Cursor 视觉密度一致；`.sidebar-primary-actions` 加 `margin-top: 22px` 避让顶部 absolute 定位的 chrome row。
 - **前端测试**：新增 `renderer/test/sidebar.test.tsx` 覆盖主入口渲染、Workspaces 分组、Pinned 区、See more/less、行首状态点、Pin/Unpin 回调；`app-streaming-user-message.test.tsx` 里所有 `window.actspace` mock 都补上 `pinSession: async () => ({ ok: true })`，避免类型不全。
 - **持久化测试**：`persistence/test/meta.test.ts` 增加「创建时落 `workspaceRoot`」与「`updateMeta` 改 `pinned/workspaceRoot`」两个用例；`persistence/test/session-store.test.ts` 增加「`createSessionRecord` 透传 `workspaceRoot`」与「`setSessionPinned` 双向切换 + `listSessionRecords` 透出」两个用例。
-- **文档同步**：写 `docs/exec-plans/active/sidebar-cursor-alignment.md` 作为 plan + 进度记录；重写 `docs/design-docs/frontend-ui/左侧会话栏规范.md`（信息架构、顶部窗口控件、三主入口、Pinned / Scheduled / Workspaces 三分区、状态点 + Pin 图标交互、Rail 折叠态、后端契约、设计原则）；`docs/design-docs/frontend-ui/index.md` 同步导航条目。
+- **文档同步**：写 `docs/exec-plans/active/sidebar-cursor-alignment.md` 作为 plan + 进度记录；重写 `docs/design-docs/front-左侧会话栏规范.md`（信息架构、顶部窗口控件、三主入口、Pinned / Scheduled / Workspaces 三分区、状态点 + Pin 图标交互、Rail 折叠态、后端契约、设计原则）；`docs/design-docs/front-index.md` 同步导航条目。
 
 ### 🧠 Design Intent (Why)
 
@@ -79,8 +79,8 @@
 
 **文档：**
 - `docs/exec-plans/active/sidebar-cursor-alignment.md`（新增 execution plan + 进度记录）
-- `docs/design-docs/frontend-ui/左侧会话栏规范.md`（整体重写）
-- `docs/design-docs/frontend-ui/index.md`（导航更新）
+- `docs/design-docs/front-左侧会话栏规范.md`（整体重写）
+- `docs/design-docs/front-index.md`（导航更新）
 
 ### ✅ Verification
 

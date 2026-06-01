@@ -12,7 +12,7 @@
 - **工具系统**：已包含文件读写编辑、目录读取、Grep / Glob、Bash、工具权限调度、工具预览和运行状态展示。
 - **上下文与统计**：已落地 token usage、context snapshot、每会话 `context-state.json` 和 Usage Statistics 的数据地基。
 - **Kairos 自治模式**：v1 已落地，支持独立 prompt、短期记忆、tick 调度、事件流和桌面端监控页。
-- **Lab 能力实验台**：产品与架构设计已沉淀在 `docs/design-docs/lab/`，尚未进入实现。
+- **Lab 能力实验台**：产品与架构设计已沉淀在 `docs/design-docs/lab-index.md`，尚未进入实现。
 
 当前进行中的任务、验收缺口和下一步入口以 `docs/TODOLIST.md` 与 `docs/exec-plans/README.md` 为准。
 
@@ -51,7 +51,7 @@ pnpm run ci     # 运行仓库级 CI 检查
 安全、存储和日志边界详见：
 
 - `docs/SECURITY.md`
-- `docs/design-docs/storage-and-observability.md`
+- `docs/design-docs/core-storage-and-observability.md`
 - `docs/RELIABILITY.md`
 
 ## 文档导航
@@ -92,8 +92,8 @@ pnpm run ci     # 运行仓库级 CI 检查
 ├── docs/                      # 仓库知识库
 │   ├── ARCHITECTURE.md        # 架构总览
 │   ├── TODOLIST.md            # 当前焦点和验收缺口
-│   ├── design-docs/           # 长期设计文档
-│   │   └── lab/               # Lab 能力实验台设计
+│   ├── design-docs/           # 长期设计文档，按 core-/agent-/front-/lab- 前缀扁平组织
+│   │   └── public/            # 设计图和 HTML prototype 资产
 │   ├── exec-plans/            # 执行计划
 │   ├── histories/             # 变更历史
 │   ├── learnings/             # 学习文档

@@ -32,4 +32,4 @@
 - `packages/agent-core/src/tools/tools/web-search/`
 - `packages/agent-core/src/tools/tools/web-fetch/`
 - `packages/agent-core/src/tools/tools/analyze-media/`
-- `docs/design-docs/agent-core/deepseek-kimi-hybrid-capabilities.md`
+- `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`

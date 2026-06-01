@@ -29,4 +29,4 @@
 
 - `packages/desktop/src/renderer/components/Sidebar.tsx`
 - `packages/desktop/src/renderer/styles.css`
-- `docs/design-docs/frontend-ui/左侧会话栏规范.md`
+- `docs/design-docs/front-左侧会话栏规范.md`

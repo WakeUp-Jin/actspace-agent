@@ -25,7 +25,7 @@
   - `docs/REPO_COLLAB_GUIDE.md`
   - `docs/ARCHITECTURE.md`
   - `docs/design-docs/core-beliefs.md`
-  - `docs/design-docs/agent-core/deepseek-kimi-hybrid-capabilities.md`
+  - `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`
   - `docs/SECURITY.md`
   - `docs/PLANS_GUIDE.md`
 - 相关代码路径：

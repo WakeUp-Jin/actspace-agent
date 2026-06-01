@@ -321,7 +321,7 @@ V0 页面不做：
 
 ## 视觉约束
 
-- 沿用 `docs/design-docs/frontend-ui/全局视觉语言规范.md`。
+- 沿用 `docs/design-docs/front-全局视觉语言规范.md`。
 - 蓝色只用于主操作、选中和少量运行态。
 - 四列可以有非常浅的纸张色区分，但不能变成彩色看板。
   - 当前实现：四列容器都是白底 `bg-surface`，**只在列头**用 4-5% 阶段色块（hypothesis 蓝、verification 暖黄、forge 青、promotion 金）+ 左侧 3px 阶段色线作身份徽章，列体保持白色。

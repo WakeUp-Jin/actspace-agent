@@ -79,7 +79,7 @@ Agent Turn 的跨层职责边界见 `agent-turn-layers.md`。
 - `observability/agent-run-log.ts`：每次 Agent turn 一个 JSONL 文件，记录从用户输入、main 边界、AgentEvent、RuntimeStreamEvent 到最终结果的完整链路（含 `context_compaction` 历史压缩记录），并清理超过 24 小时的 run 日志。
 - `observability/cache-audit.ts`：缓存失效旁路审计器。模型调用前对真实 Context 生成稳定 hash 指纹并读取滚动 `last.context.json` 做 prefix / append-only 比较；模型返回后按 `cacheHit/cacheRead + cacheMiss` 计算命中率，低于阈值时在 `<userData>/cache-audit/<sessionId>/<cacheAuditId>/` 固化 `summary.json`、`previous.context.json`、`current.context.json`、`diff.txt`，并始终 best-effort 覆盖滚动 `last.context.json`。
 
-日志和 session 持久化的边界见 `../storage-and-observability.md`。
+日志和 session 持久化的边界见 `../core-storage-and-observability.md`。
 
 ## 环境变量管理
 

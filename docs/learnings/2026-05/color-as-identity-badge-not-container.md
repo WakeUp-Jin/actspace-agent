@@ -87,7 +87,7 @@ color: #1f5fe8;
 - **"想让卡片有阶段身份就给整列染色"** —— 反例。让列头承担身份，列体专心承载卡片。
 - **"每张卡片都用高饱和度标签 + 整列染色"** —— 双重彩色，必崩。色彩职责只能由其中一个层级承担。
 - **"为了工业感加虚线 placeholder 撑满列高"** —— 空列自然结束，比虚框更冷静。虚线 placeholder 只在"有明确占位语义"时才用（比如拖拽 hover 区域），看板的空列不应该被虚框填满。
-- **"在冷调背景上用独立中性灰做次级文字"** —— 灰色色相会和冷蓝背景对立，看起来"飘"。应该用 `rgba(主前景, α)` 让弱化文字色"吸收"背景调（这条已在 `docs/design-docs/frontend-ui/全局视觉语言规范.md` 详细论述）。
+- **"在冷调背景上用独立中性灰做次级文字"** —— 灰色色相会和冷蓝背景对立，看起来"飘"。应该用 `rgba(主前景, α)` 让弱化文字色"吸收"背景调（这条已在 `docs/design-docs/front-全局视觉语言规范.md` 详细论述）。
 
 ## 副作用陷阱：列体去饱和后，1px 浅边框会被 Retina 吃掉
 
@@ -139,6 +139,6 @@ const selectedCardClass = "border-brand bg-brand-soft shadow-... before:...";
 ## 相关 history
 
 - 本次重构：`docs/histories/2026-05/20260528-1632-lab-page-visual-refresh.md`
-- 设计文档反例约束：`docs/design-docs/lab/frontend-page-design.md` "视觉约束" 一节
-- 全局视觉语言规范：`docs/design-docs/frontend-ui/全局视觉语言规范.md`
-- 可独立预览的原型：`docs/design-docs/lab/prototype-refresh.html`
+- 设计文档反例约束：`docs/design-docs/lab-frontend-page-design.md` "视觉约束" 一节
+- 全局视觉语言规范：`docs/design-docs/front-全局视觉语言规范.md`
+- 可独立预览的原型：`docs/design-docs/public/lab/prototype-refresh.html`

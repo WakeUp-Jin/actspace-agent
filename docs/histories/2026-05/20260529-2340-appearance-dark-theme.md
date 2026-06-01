@@ -33,8 +33,8 @@
 用户在 Electron 真实环境发现 Usage 页「TOKEN 总数」hero 大数字在深色态仍是黑字（看不见），并要求把「颜色必须随主题翻转」沉淀成约束未来的规范文档。
 
 - **修 bug**：`UsageStatisticsPage.tsx` hero 数字 `text-black` → `text-text-main`（收口时遗漏，因 `text-black` 不在 `text-[#...]` grep 模式内）。顺带排查同类：`LabPage.tsx` 加号按钮 `hover:bg-black/[0.04]`（深色下几乎不可见）→ `hover:bg-[var(--act-color-hover-overlay)]`。其余 `text-white` 均在品牌底/反色元素上，属合法例外。
-- **新增规范**：`docs/design-docs/frontend-ui/主题与配色规范.md`——三态主题机制 + 「禁止 `text-black`/`bg-white`/`#hex` 等非主题感知字面量」硬约束 + 6 类合法例外 + 自检清单（含 `rg` 自查命令）+ 浅/深双主题验收要求。
-- **导航接入**：`AGENTS.md`（前端区，标「改任何带颜色的样式前必读」）、`docs/FRONTEND.md`、`docs/design-docs/frontend-ui/index.md`、`全局视觉语言规范.md`（色彩原则新增「主题与暗色（硬约束）」小节）均加指针。
+- **新增规范**：`docs/design-docs/front-主题与配色规范.md`——三态主题机制 + 「禁止 `text-black`/`bg-white`/`#hex` 等非主题感知字面量」硬约束 + 6 类合法例外 + 自检清单（含 `rg` 自查命令）+ 浅/深双主题验收要求。
+- **导航接入**：`AGENTS.md`（前端区，标「改任何带颜色的样式前必读」）、`docs/FRONTEND.md`、`docs/design-docs/front-index.md`、`全局视觉语言规范.md`（色彩原则新增「主题与暗色（硬约束）」小节）均加指针。
 - typecheck + 145 用例仍全绿。该 hero 数字需真实数据才渲染，浏览器 mock 为空状态无法复现，但属与其它 hero 数字一致的 1:1 token 替换。
 
 ## 最关键受影响文件

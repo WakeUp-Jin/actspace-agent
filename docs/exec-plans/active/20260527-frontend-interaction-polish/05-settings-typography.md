@@ -4,31 +4,33 @@
 
 完成 `#17` 设置页面通用样式设置，尤其字体。点击左侧 Settings 后进入设置态，显示 General / Typography 区域；第一版支持 UI 字号、代码字号、UI 字体和代码字体的本地设置或预览，并至少影响 renderer 可见文本或预览区域。
 
+当前状态：截至 2026-06-01，本计划按已落地代码计为完成。实现范围已经从最初的 General / Typography 扩展为 Settings 整页接管、设置导航、模型 / Agent / Tools / Appearance 等分区，其中 Typography 归入 Appearance 本地偏好。
+
 ## 范围
 
 包含：
 
 - Settings 按钮从 noop 改为页面态入口。
-- 设置态布局符合 `docs/design-docs/frontend-ui/设置页规范.md`：左侧设置导航，右侧设置内容。
-- General / Typography 区域包含 UI Font Size、Code Font Size、UI Font Family、Code Font Family 或等价基础项。
+- 设置态布局符合 `docs/design-docs/front-设置页规范.md`：左侧设置导航，右侧设置内容。
+- Appearance / Typography 区域包含 UI Font Size、Code Font Size、UI Font Family、Code Font Family 或等价基础项。
 - 第一版用 renderer localStorage 或组件状态持久化，不新增 main/preload 设置 IPC。
-- 字体设置改变后影响设置页预览区域，若风险可控再影响全局 renderer CSS variables。
+- 字体设置改变后影响 renderer 可见文本；界面字号通过 Electron zoom / renderer appearance 应用，代码字号通过 CSS variable 应用。
 - 支持返回聊天态。
 
 不包含：
 
 - 不实现账号、登录、云同步或远端设置。
-- 不引入完整跨进程 settings store。
+- Typography / Appearance 偏好不引入完整跨进程 settings store，继续走 renderer localStorage。
 - 不改 Usage / Kairos 页的产品设计。
-- 不做主题色、暗色模式或复杂外观系统。
+- 不做完整主题色定制系统；主题只覆盖浅色 / 深色 / 跟随系统三态。
 
 ## 背景
 
 相关文档：
 
-- `docs/design-docs/frontend-ui/设置页规范.md`
-- `docs/design-docs/frontend-ui/全局视觉语言规范.md`
-- `docs/design-docs/frontend-ui/工作台布局与面板交互规范.md`
+- `docs/design-docs/front-设置页规范.md`
+- `docs/design-docs/front-全局视觉语言规范.md`
+- `docs/design-docs/front-工作台布局与面板交互规范.md`
 - `docs/exec-plans/tech-debt-tracker.md`
 
 相关代码路径：
@@ -41,9 +43,9 @@
 
 已知现状：
 
-- Sidebar 的 Settings 按钮当前没有 onClick 行为。
-- `WorkbenchLayout` 当前 view 只有 `chat | lab | usage | kairos`。
-- 全局字体 token 应以 `styles/tokens.css` 为来源，并通过 `styles/tailwind.css` 映射给 Tailwind；普通 Settings 页面样式写在组件局部 Tailwind class 中。
+- Sidebar 的 Settings 按钮已接入 `settings` view。
+- `WorkbenchLayout` 已在 `view === "settings"` 时整页渲染 `SettingsPage`，不再显示聊天侧栏 / 右栏。
+- Appearance 偏好由 `packages/desktop/src/renderer/appearance/*` 管理并持久化到 localStorage。
 
 ## 实施任务
 
@@ -112,11 +114,18 @@
 
 ## 进度记录
 
-- [ ] 完成 Settings view 接入。
-- [ ] 完成 Settings 页面组件。
-- [ ] 完成 Typography 本地设置模型。
-- [ ] 完成测试和浏览器 mock 验证。
+- [x] 完成 Settings view 接入。
+- [x] 完成 Settings 页面组件。
+- [x] 完成 Typography / Appearance 本地设置模型。
+- [x] 完成测试和浏览器 mock 验证。
+
+## 验证记录
+
+- 2026-05-29：`docs/histories/2026-05/20260529-1950-settings-page.md` 记录 Settings 整页接管、SettingsPage / SettingsNav / SettingsPrimitives、默认模型联动和浏览器 mock 走查。
+- 2026-05-29：`docs/histories/2026-05/20260529-2310-appearance-fonts-and-zoom.md` 记录 Appearance / Typography 本地偏好、字体/字号应用、localStorage 持久化和测试。
+- 2026-06-01：静态核对确认 `WorkbenchLayout` 已接入 `SettingsPage`，`SettingsPage` 已实现字体、字号和主题本地偏好，本子计划计为完成。
 
 ## 决策记录
 
 - 2026-05-28：Typography 第一版优先 renderer localStorage，不新增跨进程 settings store，避免把单个 UI polish 任务扩大成设置系统工程。
+- 2026-06-01：Settings 实际实现已扩展到完整设置页骨架和 Appearance 分区；本计划按“Settings 入口 + Typography 本地偏好可用”验收，不再要求 Typography 必须留在 General 分区内。

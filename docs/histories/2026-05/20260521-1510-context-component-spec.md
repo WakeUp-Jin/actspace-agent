@@ -18,7 +18,7 @@
 
 - **新增上下文组件规范**：创建 `上下文组件规范.md`，定义 Context 的入口、纵向子组件顺序和统计内容。
 - **收敛主设计文档**：在 `前端设计文档.md` 中补充 Context 的组件结构与当前固定信息。
-- **更新目录索引**：将 Context 规范加入 `docs/design-docs/index.md` 与 `frontend-ui/index.md`。
+- **更新目录索引**：将 Context 规范加入 `docs/design-docs/index.md` 与 `front-index.md`。
 
 ### 🧠 Design Intent (Why)
 
@@ -27,7 +27,7 @@
 ### 📁 Files Modified
 
 - `docs/design-docs/index.md`
-- `docs/design-docs/frontend-ui/index.md`
-- `docs/design-docs/frontend-ui/前端设计文档.md`
-- `docs/design-docs/frontend-ui/上下文组件规范.md`
+- `docs/design-docs/front-index.md`
+- `docs/design-docs/front-前端设计文档.md`
+- `docs/design-docs/front-聊天输入框规范.md`
 - `docs/histories/2026-05/20260521-1510-context-component-spec.md`

@@ -14,7 +14,7 @@
 > 2. bash 工具执行结果写入文件，最终输出处判断很大时，把临时文件路径写进压缩结果，模型可按需回读；文件落 userData/tmp，并预留定时清理。后续追加澄清：**bash 无论多少都该流式落盘**，避免大输出把变量/内存吃满；小输出 inline、大输出只 inline 头部 + 文件路径。
 > 3. 短记忆/历史会话大于阈值要压缩，压缩结果拼接完整历史记录文件（session.jsonl）路径再传给模型。
 >
-> 先设计方案与规范、再出执行计划，最后执行。并在计划里追加一项：把这次优秀的 bash 设计总结成 llm-agent-dev skill 的「修复文档」（放 docs/design-docs/llm-agent-fix-plan），先写修复文档不直接改 skill。
+> 先设计方案与规范、再出执行计划，最后执行。并在计划里追加一项：把这次优秀的 bash 设计总结成 llm-agent-dev skill 的「修复文档」（放 docs/design-docs/fix-llm-agent-*），先写修复文档不直接改 skill。
 
 ### 🛠 Changes Overview
 
@@ -54,6 +54,6 @@
 - `packages/agent-core/src/engine/{types,loop,agent,bridge,create-agent-deps}.ts`
 - `packages/desktop/src/main/agent-turn.ts`
 - `packages/shared/src/session.ts`
-- `docs/design-docs/agent-core/{context-compression,current-module-map,权限设计规则和原则}.md`
-- `docs/design-docs/llm-agent-fix-plan/*`
+- `docs/design-docs/agent-context-compression.md、docs/design-docs/agent-current-module-map.md、docs/design-docs/agent-权限设计规则和原则.md`
+- `docs/design-docs/fix-llm-agent-*.md`
 - `docs/SECURITY.md`、`docs/exec-plans/tech-debt-tracker.md`、`docs/exec-plans/active/20260529-context-compression.md`

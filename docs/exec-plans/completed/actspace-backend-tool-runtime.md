@@ -6,7 +6,7 @@
 
 ## 设计来源
 
-- `docs/design-docs/agent-core/backend-agent-design.md`
+- `docs/design-docs/agent-backend-design.md`
 - `.agents/skills/llm-agent-dev/references/tools/overview.md`（模块导航）
 - `.agents/skills/llm-agent-dev/references/tools/tool-definition.md`（核心：InternalTool 类型、description 编写、ToolResult）
 - `.agents/skills/llm-agent-dev/references/tools/tool-scheduling.md`（核心：ToolScheduler 生命周期、权限审批、OutputTruncator）
@@ -14,7 +14,7 @@
 - `.agents/skills/llm-agent-dev/references/tools/file-tools.md`（Read/Write/Edit 设计）
 - `.agents/skills/llm-agent-dev/examples/tool-definition.ts`（InternalTool 参考）
 - `.agents/skills/llm-agent-dev/examples/tool-scheduler.ts`（ToolScheduler 参考）
-- `docs/design-docs/llm-agent-dev-skill-fix.md`（Skill 缺少工具文件夹结构建议的补充）
+- `docs/design-docs/fix-llm-agent-dev-skill.md`（Skill 缺少工具文件夹结构建议的补充）
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
 
@@ -43,7 +43,7 @@ packages/agent-core/src/tools/
 
 每个工具是一个文件夹，内含两个文件：definition（给 LLM 看的声明）和 executor（系统执行的逻辑）。与 Skill `tool-definition.md` 提出的 definition + executor 分离理念一致。
 
-Skill 原始 V0 目录结构将每个工具放在单文件中（`tools/read_file`），本项目将其拆为文件夹（`tools/read-file/definition.ts` + `executor.ts`），已记录到 `docs/design-docs/llm-agent-dev-skill-fix.md`。
+Skill 原始 V0 目录结构将每个工具放在单文件中（`tools/read_file`），本项目将其拆为文件夹（`tools/read-file/definition.ts` + `executor.ts`），已记录到 `docs/design-docs/fix-llm-agent-dev-skill.md`。
 
 ## 相关路径
 
@@ -169,4 +169,4 @@ Skill 原始 V0 目录结构将每个工具放在单文件中（`tools/read_file
 
 - 2026-05-23：V1 工具优先服务文件上下文获取与 diff 预览，默认不做自动写盘。
 - 2026-05-23：按 Skill `tool-definition.md` 采用 InternalTool 统一类型和 ToolResult 统一返回值。V0 先用 ToolManager 做极简调度，V1 引入 ToolScheduler + OutputTruncator。
-- 2026-05-23：每个工具采用文件夹结构（definition.ts + executor.ts），将 Skill 的 definition + executor 分离理念落实到文件组织层面（Skill 原始设计中未覆盖此点，已记录到 `docs/design-docs/llm-agent-dev-skill-fix.md`）。
+- 2026-05-23：每个工具采用文件夹结构（definition.ts + executor.ts），将 Skill 的 definition + executor 分离理念落实到文件组织层面（Skill 原始设计中未覆盖此点，已记录到 `docs/design-docs/fix-llm-agent-dev-skill.md`）。

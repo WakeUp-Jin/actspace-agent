@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | 2026-05-27 使用问题拆分计划 | 进行中 | `docs/exec-plans/active/20260527-bugfix-foundation_代码编完需手动验证.md`、`docs/exec-plans/active/20260527-agent-tool-capabilities.md`、`docs/exec-plans/active/20260527-frontend-interaction-polish/README.md`、`docs/exec-plans/active/20260527-right-panel-views.md`、`docs/exec-plans/active/20260528-kairos-right-panel-compact-view.md` | 按各 plan 的并行边界推进，避免同时改同一块 UI / tool contract。 |
 | Bash 真实审核与暂停恢复验收 | 待验收 | `docs/exec-plans/active/Bash工具和工具权限调度开发计划/README.md`、`docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-tool-pause-session-boundary-plan.md` | 用真实 Bash `ask` 触发审核面板，覆盖 `Run / Allow / Skip`、会话切换、刷新/重启、超时和幂等。 |
-| Bash 会话级动态 allowlist + Allow 子命令拆分授权 | 待执行 | `docs/design-docs/agent-core/bash-policy-allowlist-design.md`、`docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-bash-session-allowlist-plan.md` | 按 Phase 1 plan 从共享契约、split-for-authorization、store、permissions/scheduler、renderer dropdown 和 session replay 推进。 |
+| Bash 会话级动态 allowlist + Allow 子命令拆分授权 | 待执行 | `docs/design-docs/agent-bash-policy-allowlist-design.md`、`docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-bash-session-allowlist-plan.md` | 按 Phase 1 plan 从共享契约、split-for-authorization、store、permissions/scheduler、renderer dropdown 和 session replay 推进。 |
 | Tailwind 样式架构迁移 | 进行中 | `docs/exec-plans/active/actspace-tailwind-style-architecture.md`、`docs/exec-plans/active/20260528-tailwind-remaining-ui-migration.md` | Usage 样板和 Lab V0 已完成；下一步按剩余 UI 迁移计划优先推进 RightPanel / Kairos Compact 切片。 |
 | Usage Statistics 真实数据闭环 | 进行中 | `docs/exec-plans/active/actspace-usage-statistics-session-jsonl-plan.md` | 完成 session 聚合层、真实 UI 接入和浏览器/Electron 验证。 |
 | Token / Context 前端只读展示 | 进行中 | `docs/exec-plans/active/actspace-token-usage-context-control-foundation.md` | 后端数据地基已完成；继续做前端只读展示后的测试、文档和 history。 |
@@ -38,7 +38,7 @@
 
 ## 未来方向
 
-- Bash 全局执行策略选择器和真沙箱以 `docs/design-docs/agent-core/bash-policy-allowlist-design.md` 的 Phase 2 / Phase 3 为准，Phase 1 验收完成后再单独立项。
+- Bash 全局执行策略选择器和真沙箱以 `docs/design-docs/agent-bash-policy-allowlist-design.md` 的 Phase 2 / Phase 3 为准，Phase 1 验收完成后再单独立项。
 - Settings -> General -> Typography 已移入 `docs/exec-plans/tech-debt-tracker.md`，并由 `docs/exec-plans/active/20260527-frontend-interaction-polish/05-settings-typography.md` 承接。
 
 ## 后续维护规则

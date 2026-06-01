@@ -204,7 +204,7 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 - 不放开：`write_file` / `edit_file` / `bash`（写类）继续受 `guardWorkspacePath` 守卫，写操作不得逃逸 workspace。
 - 路径不存在/越权等错误处理保留。
 
-安全权衡（必须在实现时同步更新 `docs/SECURITY.md` 与 `docs/design-docs/agent-core/权限设计规则和原则.md`）：
+安全权衡（必须在实现时同步更新 `docs/SECURITY.md` 与 `docs/design-docs/agent-权限设计规则和原则.md`）：
 
 - 放开读边界后，模型理论上可读任意本机文件（含 `~/.ssh`、密钥文件等）。这是本期明确接受的取舍：用「读不应被 workspace 硬框」换「可回读 Agent 内部产物」。
 - 后续应补「敏感路径 blocklist + 按需读审核」来收口（记入 `docs/exec-plans/tech-debt-tracker.md`），而不是恢复 workspace 硬限制。
@@ -283,7 +283,7 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 ## 关联文档
 
 - `token-usage-and-context-state.md`：token 估算、`context_snapshot`、`context-state.json` 的数据分层。
-- `storage-and-observability.md`：`<userData>/tmp`、`session.jsonl`、run-log 边界。
+- `core-storage-and-observability.md`：`<userData>/tmp`、`session.jsonl`、run-log 边界。
 - `kairos-autonomous-mode.md` + `kairos/compression/`：Kairos 短期记忆压缩，prompt 风格可借鉴但与主 Agent 解耦。
 - `tool-preview-design-guidelines.md`：`previewKind` 与 `ToolUiPreview` 契约（分型依据）。
 - `权限设计规则和原则.md` / `SECURITY.md`：读边界放开需同步更新。

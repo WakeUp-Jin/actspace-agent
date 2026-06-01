@@ -12,7 +12,7 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `@actspace/desktop`（renderer CSS only）+ 三份 `docs/design-docs/frontend-ui/` 规范文档。
+**Scope:** `@actspace/desktop`（renderer CSS only）+ 三份 `docs/design-docs/front-index.md` 规范文档。
 
 **Key Actions:**
 
@@ -20,7 +20,7 @@
 2. **字重严格收敛到 400/500/600/700**：删掉所有非标档（430/440/520/540/620/650/680/720/800），共触达 ~25 处。规则：正文/工具行/file-diff 400、导航/按钮 500、卡片标题/表头 600、Markdown headings/Usage 大数字 700。
 3. **Sidebar 字号下调到"中间档"**：会话标题 13.5→13、section 标题 13.5/440→12/500/faint、主入口 13.5→13、Settings 13.5→13、时间戳 12→11；分组标题改为"靠字号小一档 + 颜色更浅"区分语义，不再依赖 440 这种非标字重做层级。
 4. **去除过度负字距**：Usage 区 `letter-spacing: -0.055em / -0.04em` 全部归到 `-0.02em` 上限；Markdown headings 的 `-0.02em` 直接归 `0`。
-5. **三份设计规范同步更新**：把上面这些代码层决策写进 `全局视觉语言规范.md`、`左侧会话栏规范.md`、`usage-statistics/设计规范.md`，防止规范和代码再次漂移。
+5. **三份设计规范同步更新**：把上面这些代码层决策写进 `全局视觉语言规范.md`、`左侧会话栏规范.md`、`front-usage-statistics.md`，防止规范和代码再次漂移。
 
 ### 🧠 Design Intent (Why)
 
@@ -32,9 +32,9 @@
 ### 📁 Files Modified
 
 - `packages/desktop/src/renderer/styles.css`（核心：~30 处字号/字重/letter-spacing 改动 + 全局 body feature-settings）
-- `docs/design-docs/frontend-ui/全局视觉语言规范.md`（字体栈、字号阶梯、字重段重写，新增「字体特性」段）
-- `docs/design-docs/frontend-ui/左侧会话栏规范.md`（「分组标题统一规范」与「字号基准」段重写）
-- `docs/design-docs/frontend-ui/usage-statistics/设计规范.md`（「字体与数字」段重写）
+- `docs/design-docs/front-全局视觉语言规范.md`（字体栈、字号阶梯、字重段重写，新增「字体特性」段）
+- `docs/design-docs/front-左侧会话栏规范.md`（「分组标题统一规范」与「字号基准」段重写）
+- `docs/design-docs/front-usage-statistics.md`（「字体与数字」段重写）
 
 ### ✅ Verification
 
@@ -66,5 +66,5 @@
   - `--color-text-faint: #8b949e` → `rgba(32, 33, 36, 0.54)`（对齐 Cursor tertiary）
   - 新增 `--color-text-subtle: rgba(32, 33, 36, 0.36)`（对齐 Cursor quaternary，用于占位、kicker、最弱图标）
   - 两处硬编码灰（`bash-output-text #6d727a`、`bash-approval-command #5f6670`）收回 `var(--color-text-muted)`。
-  - `tool-log-line.is-running` 的 shimmer 基色 `#6f7681` 保持纯灰，是 shimmer 动画的有意设计（[中间消息区规范.md](../../design-docs/frontend-ui/中间消息区规范.md) 已说明）。
-- `docs/design-docs/frontend-ui/全局视觉语言规范.md`：「基础色板」段更新 token 定义，新增「关于文字色用 `rgba(主前景, α)` 而不是独立灰 hex 的设计意图」小节；「文本颜色」段补充 `--color-text-subtle`。
+  - `tool-log-line.is-running` 的 shimmer 基色 `#6f7681` 保持纯灰，是 shimmer 动画的有意设计（[中间消息区规范.md](../../design-docs/front-中间消息区规范.md) 已说明）。
+- `docs/design-docs/front-全局视觉语言规范.md`：「基础色板」段更新 token 定义，新增「关于文字色用 `rgba(主前景, α)` 而不是独立灰 hex 的设计意图」小节；「文本颜色」段补充 `--color-text-subtle`。

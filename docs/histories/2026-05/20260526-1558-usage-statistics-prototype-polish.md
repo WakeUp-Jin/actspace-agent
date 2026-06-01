@@ -12,11 +12,11 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `docs/design-docs/frontend-ui/usage-statistics`
+**Scope:** `docs/design-docs/front-usage-statistics.md`
 
 **Key Actions:**
 
-- **[Prototype redesign]**: 重写 `prototype.html` 的统计页布局，保留左右两栏仪表盘结构，将 tabs/actions 放入右侧主统计卡。
+- **[Prototype redesign]**: 重写 `public/lab/prototype.html` 的统计页布局，保留左右两栏仪表盘结构，将 tabs/actions 放入右侧主统计卡。
 - **[Tool stats]**: 删除旧 `Read/Bash/Grep/Others` 工具卡，新增工具统计摘要与工具调用详情弹窗。
 - **[Visual polish]**: 将主色从绿色调整为仓库现有蓝色体系，重做缓存效率、热力图、分布条和趋势图视觉。
 - **[Layout alignment]**: 合并左侧指标与模型排行卡，调整排行序号、间距、圆角和窄桌面适配。
@@ -32,5 +32,5 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/frontend-ui/usage-statistics/prototype.html`
+- `docs/design-docs/public/front/usage-statistics-prototype.html`
 - `docs/histories/2026-05/20260526-1558-usage-statistics-prototype-polish.md`

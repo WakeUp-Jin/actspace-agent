@@ -71,12 +71,12 @@
 - `packages/agent-core/src/llm/test/convert.test.ts`
 
 **文档：**
-- `docs/design-docs/frontend-ui/中间消息区规范.md`（web_search 纳入"不使用图标"、Search → Web Search）
-- `docs/design-docs/agent-core/tool-preview-design-guidelines.md`（新增"工具命名约定"章节）
-- `docs/design-docs/agent-core/current-module-map.md`（edit_file 命名声明）
-- `docs/design-docs/agent-core/backend-agent-design.md`（edit-file → edit_file，3 处）
-- `docs/design-docs/agent-core/deepseek-kimi-hybrid-capabilities.md`（举例换成 grep/glob）
-- `docs/design-docs/storage-and-observability.md`（edit-file → edit_file）
+- `docs/design-docs/front-中间消息区规范.md`（web_search 纳入"不使用图标"、Search → Web Search）
+- `docs/design-docs/agent-tool-preview-design-guidelines.md`（新增"工具命名约定"章节）
+- `docs/design-docs/agent-current-module-map.md`（edit_file 命名声明）
+- `docs/design-docs/agent-backend-design.md`（edit-file → edit_file，3 处）
+- `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`（举例换成 grep/glob）
+- `docs/design-docs/core-storage-and-observability.md`（edit-file → edit_file）
 - `docs/exec-plans/active/actspace-grep-glob-rg-tools-and-ui.md`（补"已下线 search_files"跟进）
 - `.agents/skills/llm-agent-dev/references/tools/tool-definition.md`（name 字段补 snake_case 约定）
 

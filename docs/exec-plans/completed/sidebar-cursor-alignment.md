@@ -19,7 +19,7 @@
 - 底部 `Settings` 保持现状。
 - `Lab` 和 `Usage` 点击切换到中间区的 `Coming soon` 占位页（保留 sidebar）。
 - 后端 `SessionMeta` 增加 `workspaceRoot` 与 `pinned` 字段，创建 session 时写入当前 `workspaceRoot`，IPC 增加 `pinSession`。
-- 设计文档 `docs/design-docs/frontend-ui/左侧会话栏规范.md` 重写。
+- 设计文档 `docs/design-docs/front-左侧会话栏规范.md` 重写。
 
 ### 不包含
 
@@ -34,10 +34,10 @@
 
 ### 相关文档
 
-- `docs/design-docs/frontend-ui/左侧会话栏规范.md`（旧版，本计划完成后重写）
-- `docs/design-docs/frontend-ui/index.md`
-- `docs/design-docs/frontend-ui/工作台布局与面板交互规范.md`
-- `docs/design-docs/storage-and-observability.md`
+- `docs/design-docs/front-左侧会话栏规范.md`（旧版，本计划完成后重写）
+- `docs/design-docs/front-index.md`
+- `docs/design-docs/front-工作台布局与面板交互规范.md`
+- `docs/design-docs/core-storage-and-observability.md`
 
 ### 相关代码路径
 

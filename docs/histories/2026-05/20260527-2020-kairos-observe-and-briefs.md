@@ -43,7 +43,7 @@
 - `packages/agent-core/src/kairos/briefs/dispatcher.ts`（新增）
 - `packages/agent-core/src/kairos/context/test/{watch-scanner,watch-diff,sessions-digest}.test.ts`（新增 14 单测）
 - `packages/agent-core/src/kairos/briefs/test/{parser,index-manager,dispatcher}.test.ts`（新增 13 单测）
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`（plan 完成清单更新）
+- `docs/design-docs/agent-kairos-autonomous-mode.md`（plan 完成清单更新）
 
 ### ✅ 验证结果
 

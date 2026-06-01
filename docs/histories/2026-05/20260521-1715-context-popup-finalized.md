@@ -12,13 +12,13 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `docs/design-docs`, `docs/histories`, `docs/design-docs/frontend-ui/image`
+**Scope:** `docs/design-docs`, `docs/histories`, `docs/design-docs/public/front`
 
 **Key Actions:**
 
-- **落地定稿图**：将 Context 弹窗最终图保存为 `frontend-ui/image/context-popup-final.png`。
+- **落地定稿图**：将 Context 弹窗最终图保存为 `public/front/context-popup-final.png`。
 - **更新输入框规范**：在 `聊天输入框规范.md` 中补充 Context 弹窗定稿图引用。
-- **同步目录页**：在 `frontend-ui/index.md` 中展示 Context 定稿图。
+- **同步目录页**：在 `front-index.md` 中展示 Context 定稿图。
 
 ### 🧠 Design Intent (Why)
 
@@ -26,7 +26,7 @@ Context 弹窗是 Composer 的一部分，先定稿它，后续讨论中间消�
 
 ### 📁 Files Modified
 
-- `docs/design-docs/frontend-ui/index.md`
-- `docs/design-docs/frontend-ui/聊天输入框规范.md`
-- `docs/design-docs/frontend-ui/image/context-popup-final.png`
+- `docs/design-docs/front-index.md`
+- `docs/design-docs/front-聊天输入框规范.md`
+- `docs/design-docs/public/front/context-popup-final.png`
 - `docs/histories/2026-05/20260521-1715-context-popup-finalized.md`

@@ -59,7 +59,7 @@
 - **精简 `desktop/src/main/index.ts`**：移除所有 Agent turn 相关代码，IPC handler 改为调用 agent-turn.ts。main 只负责 Electron 生命周期 + IPC 路由。
 - **更新 `engine/index.ts`**：导出 `buildAgentConfig`、`createAgentFromConfig`、`AgentConfig` 等新 API。
 - **重写测试**：18 个测试覆盖 `buildLLMConfig`、`buildAgentConfig`（通过 `vi.resetModules` 重置 env 缓存）和 `createAgentFromConfig`（直接构造 AgentConfig 绕过 env）。
-- **新建 `docs/design-docs/agent-core/agent-turn-layers.md`**：四层职责规范，定义每层的输入输出、做什么和不做什么、数据流向和新增代码检查清单。
+- **新建 `docs/design-docs/agent-turn-layers.md`**：四层职责规范，定义每层的输入输出、做什么和不做什么、数据流向和新增代码检查清单。
 - **更新文档引用**：在 ARCHITECTURE.md 和 AGENTS.md 中添加四层规范引用。
 
 ### 🧠 Design Intent (Why)
@@ -78,7 +78,7 @@
 - `packages/agent-core/src/env.ts`（JSDoc 更新）
 - `packages/desktop/src/main/agent-turn.ts`（新建）
 - `packages/desktop/src/main/index.ts`（精简）
-- `docs/design-docs/agent-core/agent-turn-layers.md`（新建）
-- `docs/design-docs/agent-core/index.md`
+- `docs/design-docs/agent-turn-layers.md`（新建）
+- `docs/design-docs/agent-index.md`
 - `docs/ARCHITECTURE.md`
 - `AGENTS.md`

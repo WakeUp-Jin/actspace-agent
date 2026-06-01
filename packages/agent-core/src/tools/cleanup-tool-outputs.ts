@@ -5,7 +5,7 @@
  * 仿 observability/agent-run-log.ts#cleanupOldAgentRunLogs，按文件 mtime 删除超期文件，
  * 并回收空的会话子目录。在 turn 开始时调用（best-effort，失败不影响主流程）。
  *
- * 设计事实来源：docs/design-docs/agent-core/context-compression.md「M5 清理」。
+ * 设计事实来源：docs/design-docs/agent-context-compression.md「M5 清理」。
  */
 
 import { readdir, rm, stat } from "node:fs/promises";

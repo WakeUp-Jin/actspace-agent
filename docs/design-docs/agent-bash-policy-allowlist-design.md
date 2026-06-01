@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-状态：草案。本设计是 `docs/design-docs/agent-core/权限设计规则和原则.md` 在 Bash 工具上的具体落地，回答"用户点 Allow 之后究竟发生了什么"以及"如何借鉴 Cursor 的全局策略和子命令拆分授权"。
+状态：草案。本设计是 `docs/design-docs/agent-权限设计规则和原则.md` 在 Bash 工具上的具体落地，回答"用户点 Allow 之后究竟发生了什么"以及"如何借鉴 Cursor 的全局策略和子命令拆分授权"。
 
 相关实施计划：
 

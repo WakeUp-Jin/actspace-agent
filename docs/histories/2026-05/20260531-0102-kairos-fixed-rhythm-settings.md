@@ -31,4 +31,4 @@
 - `packages/desktop/src/renderer/test/kairos-config-files.test.tsx`
 - `packages/agent-core/src/kairos/config/schema.ts`
 - `packages/agent-core/src/kairos/config/test/schema.test.ts`
-- `docs/design-docs/frontend-ui/设置页规范.md`
+- `docs/design-docs/front-设置页规范.md`

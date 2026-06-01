@@ -1,7 +1,7 @@
 /**
  * Sheet —— 自研轻量级右侧滑入抽屉。
  *
- * 设计依据：`docs/design-docs/frontend-ui/Kairos上下文Sheet规范.md` 第 2 节。
+ * 设计依据：`docs/design-docs/front-Kairos上下文Sheet规范.md` 第 2 节。
  * 行为目标对齐 shadcn `Sheet` (`side="right"`)：
  *   - Portal 到 document.body，避开布局副作用；
  *   - Overlay + Panel；

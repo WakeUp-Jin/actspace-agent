@@ -30,8 +30,8 @@
 - `docs/exec-plans/active/20260527-bugfix-foundation_代码编完需手动验证.md`
 - `docs/histories/2026-05/20260528-0032-foundation-bug-usability.md`
 - `docs/histories/2026-05/20260528-0108-kairos-default-workspace.md`
-- `docs/design-docs/agent-core/tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`
+- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/agent-kairos-autonomous-mode.md`
 - `docs/FRONTEND_VERIFICATION.md`
 
 相关代码路径：

@@ -5,7 +5,7 @@
 收尾 Kairos 项目：
 
 - 跑一整套端到端验证场景（实机 Electron + 浏览器 mock），证明前 6 份 plan 装配后行为符合设计文档。
-- 把 Kairos 的最终模块布局、IPC 契约、配置文件、事件流、调度规则、压缩策略 **完整反向同步**到 `docs/design-docs/agent-core/current-module-map.md`、`docs/design-docs/agent-core/storage-and-observability.md`（如有）、`docs/QUALITY_SCORE.md` 与 `docs/exec-plans/README.md`。
+- 把 Kairos 的最终模块布局、IPC 契约、配置文件、事件流、调度规则、压缩策略 **完整反向同步**到 `docs/design-docs/agent-current-module-map.md`、`docs/design-docs/core-storage-and-observability.md`（如有）、`docs/QUALITY_SCORE.md` 与 `docs/exec-plans/README.md`。
 - 把所有 Kairos plan 从 `active/` 移到 `completed/`，写一条覆盖整个项目的总结 history。
 - 评估是否命中 `docs/learnings/WRITING_GUIDE.md` 标准并按需新建 learning。
 
@@ -13,8 +13,8 @@
 
 - 包含：
   - 端到端测试场景的设计与执行记录（写入 history）
-  - `docs/design-docs/agent-core/current-module-map.md` 增补 Kairos 章节
-  - `docs/design-docs/agent-core/storage-and-observability.md` 增补 Kairos 存储 + observe（如该文件不存在，则在 `kairos-autonomous-mode.md` 末尾补一份"实测目录树"）
+  - `docs/design-docs/agent-current-module-map.md` 增补 Kairos 章节
+  - `docs/design-docs/core-storage-and-observability.md` 增补 Kairos 存储 + observe（如该文件不存在，则在 `kairos-autonomous-mode.md` 末尾补一份"实测目录树"）
   - `docs/QUALITY_SCORE.md` 评分更新（如 Kairos 项目质量影响整体评分）
   - `docs/exec-plans/README.md` 更新（把 7 份 Kairos plan 移到 completed 列表，从 active 列表删除）
   - `docs/histories/<month>/<timestamp>-kairos-project-summary.md`
@@ -36,7 +36,7 @@
 ## 必读
 
 - `AGENTS.md`
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md` 全文（最终对照标准）
+- `docs/design-docs/agent-kairos-autonomous-mode.md` 全文（最终对照标准）
 - `docs/FRONTEND_VERIFICATION.md`（实机验收规范）
 - `docs/HISTORY_GUIDE.md`、`docs/learnings/WRITING_GUIDE.md`
 - 前 6 份 Kairos plan 的"决策记录"章节（汇总到 history）
@@ -87,7 +87,7 @@
 ## 文档同步任务
 
 - [ ] **`current-module-map.md`**：增补 "## Kairos" 章节，列出 `packages/agent-core/src/kairos/` 全部子目录与职责，配一张依赖图（mermaid）。
-- [ ] **`storage-and-observability.md`**（若不存在则新建）：增补 Kairos 存储目录树与运行可观测信号清单（IPC 通道、SessionEvent 4 个新 type、关键 log 行）。
+- [ ] **`core-storage-and-observability.md`**（若不存在则新建）：增补 Kairos 存储目录树与运行可观测信号清单（IPC 通道、SessionEvent 4 个新 type、关键 log 行）。
 - [ ] **`kairos-autonomous-mode.md` 顶部状态徽章**：从"设计中"改为"v1 已上线（YYYY-MM-DD）"，并在末尾补"实测目录树"。
 - [ ] **`docs/QUALITY_SCORE.md`**：补一段 Kairos 模块质量评分（按现有评分维度），如必要更新整体分数。
 - [ ] **`docs/exec-plans/README.md`**：
@@ -107,7 +107,7 @@
 - [ ] Step 1：跑端到端场景 1–8，每个场景在临时 issue 文档（暂存 `docs/exec-plans/active/kairos_e2e_and_docs_sync.notes.md`）记录证据；发现 P0 bug 时回切对应 plan 修复后再继续。
 - [ ] Step 2：把临时 notes 合并进最终 history `docs/histories/<month>/<timestamp>-kairos-project-summary.md` 的"端到端验证"章节；删除 notes 临时文件。
 - [ ] Step 3：更新 `current-module-map.md` Kairos 章节（含 mermaid 图）。
-- [ ] Step 4：更新或新建 `storage-and-observability.md` Kairos 章节。
+- [ ] Step 4：更新或新建 `core-storage-and-observability.md` Kairos 章节。
 - [ ] Step 5：更新 `kairos-autonomous-mode.md` 顶部徽章 + 末尾"实测目录树"。
 - [ ] Step 6：更新 `docs/QUALITY_SCORE.md`。
 - [ ] Step 7：更新 `docs/exec-plans/README.md`，把 7 份 plan 移到 completed。
@@ -138,7 +138,7 @@
 - 缓解：用临时 dev script 直接调 `controller.processor.injectTickThatFails()` 工具，避免靠改 LLM 端口手工模拟（如需新增 dev script，记到对应 plan history）。
 
 - 风险：文档同步遗漏，前端/后端开发未来找不到 Kairos 模块边界。
-- 缓解：自审清单——`current-module-map.md` + `storage-and-observability.md` + `kairos-autonomous-mode.md` 三处都更新；history 总结里列出所有相关文档链接。
+- 缓解：自审清单——`current-module-map.md` + `core-storage-and-observability.md` + `kairos-autonomous-mode.md` 三处都更新；history 总结里列出所有相关文档链接。
 
 ## 决策记录
 

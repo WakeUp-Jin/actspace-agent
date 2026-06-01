@@ -1,6 +1,6 @@
 # Kairos 上下文 Sheet 规范
 
-> 本文是 Kairos 监控页"上下文"按钮及其右侧 Sheet 的前端事实来源。Kairos 自治模式、prompt-assembler、短期记忆和工具系统的长期事实来源仍以 `docs/design-docs/agent-core/kairos-autonomous-mode.md` 为准；本文只约束 renderer 的入口按钮、Sheet 行为、信息架构、IPC 契约和验收点。
+> 本文是 Kairos 监控页"上下文"按钮及其右侧 Sheet 的前端事实来源。Kairos 自治模式、prompt-assembler、短期记忆和工具系统的长期事实来源仍以 `docs/design-docs/agent-kairos-autonomous-mode.md` 为准；本文只约束 renderer 的入口按钮、Sheet 行为、信息架构、IPC 契约和验收点。
 
 ## 当前状态
 
@@ -29,8 +29,8 @@
     - `KairosContextTool.description` 字段在契约里**保留**（未来如需在某个 hover/dialog/不同视图重新展示），仅 Sheet 不再渲染。
 - 适用范围：`packages/desktop` 的 renderer + main IPC，`packages/agent-core/src/kairos/controller.ts` 暴露快照方法，`packages/shared/src/kairos-contracts.ts` 扩展契约。
 - 关联文档：
-  - `docs/design-docs/frontend-ui/Kairos监控页规范.md`（监控页母规范；按钮入口位置写在那里）。
-  - `docs/design-docs/agent-core/kairos-autonomous-mode.md`（system prompt 组装、上下文 6 段构成、短期记忆与工具集来源）。
+  - `docs/design-docs/front-Kairos监控页规范.md`（监控页母规范；按钮入口位置写在那里）。
+  - `docs/design-docs/agent-kairos-autonomous-mode.md`（system prompt 组装、上下文 6 段构成、短期记忆与工具集来源）。
 
 ## 设计动机
 

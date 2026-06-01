@@ -1,6 +1,6 @@
 # 存储与可观测性边界
 
-本文档记录 `actspace` 当前本地存储、会话事实、上下文状态、应用数据目录和本地排障日志的边界。Agent 内部模块清单见 `agent-core/current-module-map.md`。
+本文档记录 `actspace` 当前本地存储、会话事实、上下文状态、应用数据目录和本地排障日志的边界。Agent 内部模块清单见 `agent-current-module-map.md`。
 
 ## 本地会话存储模型
 
@@ -30,7 +30,7 @@
 
 DeepSeek Anthropic provider-native server tool 不会产生本地 `tool_call` / `tool_result` 事件；真实触发次数保存在 `llm_usage.payload.serverToolUse` 中，例如 `webSearchRequests` / `webFetchRequests`。
 
-`context-state.json` 是当前可变视图，用于 Context 面板和未来上下文控制能力；完整设计见 `agent-core/token-usage-and-context-state.md`。
+`context-state.json` 是当前可变视图，用于 Context 面板和未来上下文控制能力；完整设计见 `agent-token-usage-and-context-state.md`。
 
 ## 应用数据目录
 

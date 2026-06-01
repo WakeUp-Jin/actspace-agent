@@ -245,7 +245,7 @@ Usage Statistics 是第一块完整迁移样板，需满足：
 5. 金额点击后打开成本估算弹窗。
 6. 工具调用卡保持原型中的紧凑样式，`查看详情` 打开弹窗，而不是在页面中展开。
 7. 缓存效率卡使用蓝色主色，删除解释性长文案。
-8. 页面整体保持 `http://127.0.0.1:5500/docs/design-docs/frontend-ui/usage-statistics/prototype.html` 的视觉基线。
+8. 页面整体保持 `http://127.0.0.1:5500/docs/design-docs/public/front/usage-statistics-prototype.html` 的视觉基线。
 
 ## 迁移顺序
 

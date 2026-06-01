@@ -85,20 +85,20 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 
 ## 定稿图
 
-- [右侧 Markdown 定稿图](image/right-panel-markdown-final.png)
-- [右侧 HTML 定稿图](image/right-panel-html-final.png)
-- [右侧 Image 定稿图](image/right-panel-image-final.png)
-- [右侧 Diff 定稿图](image/right-panel-diff-final.png)
+- [右侧 Markdown 定稿图](public/front/right-panel-markdown-final.png)
+- [右侧 HTML 定稿图](public/front/right-panel-html-final.png)
+- [右侧 Image 定稿图](public/front/right-panel-image-final.png)
+- [右侧 Diff 定稿图](public/front/right-panel-diff-final.png)
 
 ## 定稿图
 
-![Markdown 定稿图](image/right-panel-markdown-final.png)
+![Markdown 定稿图](public/front/right-panel-markdown-final.png)
 
-![HTML 定稿图](image/right-panel-html-final.png)
+![HTML 定稿图](public/front/right-panel-html-final.png)
 
-![Image 定稿图](image/right-panel-image-final.png)
+![Image 定稿图](public/front/right-panel-image-final.png)
 
-![Diff 定稿图](image/right-panel-diff-final.png)
+![Diff 定稿图](public/front/right-panel-diff-final.png)
 
 ## Diff 展示边界
 

@@ -10,7 +10,7 @@
  * 构造（buildLLMConfig + createLLMService）在 engine/create-agent-deps.ts 完成，
  * 本模块只吃一个现成的 LLMService，避免 context → engine 的循环依赖。
  *
- * 设计事实来源：docs/design-docs/agent-core/context-compression.md。
+ * 设计事实来源：docs/design-docs/agent-context-compression.md。
  */
 
 import type { ToolPreviewKind } from "@actspace/shared";

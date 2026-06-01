@@ -18,7 +18,7 @@
 - 对照 `bug/5.png` 修复模型菜单 row hover / focus 状态。
 - 可编辑模型 hover / focus 时显示 edit icon 或轻量操作入口。
 - 当前选中模型继续显示 check，且不和 edit 操作挤压或重叠。
-- 保持 `docs/design-docs/frontend-ui/聊天输入框规范.md` 的边界：不显示语音按钮，发送按钮轻量，模型选择文字化，默认态是 follow-up bar。
+- 保持 `docs/design-docs/front-聊天输入框规范.md` 的边界：不显示语音按钮，发送按钮轻量，模型选择文字化，默认态是 follow-up bar。
 
 不包含：
 
@@ -33,8 +33,8 @@
 
 相关文档：
 
-- `docs/design-docs/frontend-ui/聊天输入框规范.md`
-- `docs/design-docs/frontend-ui/全局视觉语言规范.md`
+- `docs/design-docs/front-聊天输入框规范.md`
+- `docs/design-docs/front-全局视觉语言规范.md`
 - `docs/FRONTEND_VERIFICATION.md`
 
 相关代码路径：

@@ -44,8 +44,8 @@
 - `docs/CODING_BEHAVIOR.md`
 - `docs/FRONTEND.md`
 - `docs/FRONTEND_VERIFICATION.md`
-- `docs/design-docs/frontend-ui/全局视觉语言规范.md`
-- `docs/design-docs/frontend-ui/tailwind-style-architecture.md`
+- `docs/design-docs/front-全局视觉语言规范.md`
+- `docs/design-docs/front-tailwind-style-architecture.md`
 - `docs/exec-plans/completed/actspace-tailwind-style-architecture.md`
 - `docs/learnings/2026-05/tailwind-page-slice-migration.md`
 
@@ -215,7 +215,7 @@
   - `styles/base.css`
   - `styles/index.css`
   - `styles/tailwind.css`
-  - `docs/design-docs/frontend-ui/tailwind-style-architecture.md`
+  - `docs/design-docs/front-tailwind-style-architecture.md`
   - `docs/coding-standards/`
 - 工作内容：
   - 把长期保留的 base、Electron、Markdown、Diff、keyframes 等边界移入更明确的 CSS 文件。

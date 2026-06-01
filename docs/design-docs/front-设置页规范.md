@@ -58,7 +58,7 @@
 - 智能体 Agent
   - 主 Agent：自定义系统提示词（当前完整系统提示词，保存后下轮主 Agent 对话生效）。
   - Kairos 自主智能体：模型下拉（**写 `preferences.json` 的 `modelId`**，非 settings.json）、思考链（自动/开/关，仍走 settings → `KAIROS_THINKING`）、**额度限制（开关 + 剩余额度 ¥，写入 `memory/budget-state.json`，不进 settings/preferences）**。
-    - 额度控件读写走 `window.kairos`（`getState().budget` 回填 + `onState` 订阅运行时余额递减 + `control({type:"set_budget"})` 提交），与下方 config 文件读写独立。开关切换即时提交；剩余额度 commit-on-blur（本地 draft + focus 标志，避免运行时递减打断编辑）；关闭额度时余额输入禁用；耗尽时显示「额度不足」。语义见 `agent-core/kairos-autonomous-mode.md` 的「额度护栏（单一余额）」。桥不可用（mock）时禁用并提示仅桌面端可配置。
+    - 额度控件读写走 `window.kairos`（`getState().budget` 回填 + `onState` 订阅运行时余额递减 + `control({type:"set_budget"})` 提交），与下方 config 文件读写独立。开关切换即时提交；剩余额度 commit-on-blur（本地 draft + focus 标志，避免运行时递减打断编辑）；关闭额度时余额输入禁用；耗尽时显示「额度不足」。语义见 `agent-kairos-autonomous-mode.md` 的「额度护栏（单一余额）」。桥不可用（mock）时禁用并提示仅桌面端可配置。
   - Kairos 配置（结构化表单，**不暴露 raw JSON**）：3 份 JSON 用表单/开关/下拉/多选/列表呈现，`rule.md` 保留文本框。所有控件**即时生效**（开关/下拉/多选改即写，文本/数字 commit-on-blur，列表增删即写）；写回时**保留表单未暴露的字段**（含给 LLM 的 `tip`）。保存走 `window.kairos.writeConfig`（schema 校验 + 原子写 + reloadConfig）。
     - 运行偏好 `preferences.json`（精简）：工作时段（固定 `09:00 - 21:00`）/ 晚上时段（固定 `23:00 - 07:00`）只暴露运行频率下拉，选项用「更活跃 / 正常 / 更安静」表述，**不出现「夹紧」字样**；时间不在 UI 中编辑，运行时也固定使用默认起止。另保留睡眠区间（最短/最长/默认，秒）；`rhythm.timezone` / `rhythm.weekend` / `tickBudget` / `circuitBreaker` / `memory` / `tip` 不暴露、写回原样保留。模型下拉与本表单同源。解析失败时禁用并提供「用默认值覆盖」恢复。
     - 可访问路径 `paths.json`：**「展示 → 点击编辑」列表**（Cursor rule 风格）——路径与说明默认是只读文本、点一下变输入框失焦/回车提交；说明为空时只显示极轻的「+ 添加说明」幽灵按钮，不常驻空输入框；新增行自动进入编辑态；删除按钮 hover 行才浮现。**默认 workspace 行**（路径后缀 `kairos/workspace`）标「默认」徽章、路径只读且禁止删除（防误删工作根目录，说明 / 巡检仍可改）。
@@ -97,4 +97,4 @@
 
 下图为「整页接管（两栏）」定稿基线：左侧设置导航（通用 / 模型 / 智能体 / 工具 / 外观）+ 右侧内容区。
 
-![设置页定稿图](image/settings-page-final.png)
+![设置页定稿图](public/front/settings-page-final.png)

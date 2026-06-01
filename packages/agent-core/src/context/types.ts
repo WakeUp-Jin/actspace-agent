@@ -18,7 +18,7 @@ import type { Message } from "../messages";
 /**
  * 缓存稳定性档位：数字越大越不易变，越应排在请求前缀以提高 DeepSeek prefix-cache 命中率。
  *
- * 设计动机见 docs/design-docs/agent-core/token-usage-and-context-state.md「DeepSeek Cache 设计影响」，
+ * 设计动机见 docs/design-docs/agent-token-usage-and-context-state.md「DeepSeek Cache 设计影响」，
  * 借鉴 reasonix 的「不变前缀 / 只追加历史 / 临时不入前缀」三区域。
  */
 export const CACHE_STABILITY = {
@@ -94,7 +94,7 @@ export interface PromptSegment {
  * （toolTruncateThreshold / readTruncateThreshold / bashInlineThreshold /
  * bashDiskCap / absoluteMaxChars）由 ToolManager / OutputTruncator / bash executor
  * 消费。集中在一处便于统一调参，见
- * docs/design-docs/agent-core/context-compression.md「配置与阈值」。
+ * docs/design-docs/agent-context-compression.md「配置与阈值」。
  */
 export interface CompressionConfig {
   /** 模型上下文窗口大小（Token） */

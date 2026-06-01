@@ -78,7 +78,7 @@ color: inherited dark color
 - `docs/PLANS_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
 - `docs/coding-standards/team/frontend-style-scope-conventions.md`
-- `docs/design-docs/frontend-ui/tailwind-style-architecture.md`
+- `docs/design-docs/front-tailwind-style-architecture.md`
 - `docs/learnings/2026-05/tailwind-page-slice-migration.md`
 - `docs/learnings/2026-05/global-css-reset-vs-tailwind.md`
 - `docs/learnings/2026-05/color-as-identity-badge-not-container.md`

@@ -35,5 +35,5 @@ Bash 的视觉语法需要区分“执行日志”和“需要用户操作的审
 - `packages/desktop/src/renderer/components/messages/BashRunBlock.tsx`
 - `packages/desktop/src/renderer/fixtures/workbenchFixture.ts`
 - `packages/desktop/src/renderer/styles.css`
-- `docs/design-docs/frontend-ui/中间消息区规范.md`
+- `docs/design-docs/front-中间消息区规范.md`
 - `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-bash-approval-ui-plan.md`

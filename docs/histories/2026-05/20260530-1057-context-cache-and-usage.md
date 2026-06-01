@@ -51,8 +51,8 @@
 - `packages/desktop/src/renderer/styles/tokens.css`
 - `packages/desktop/src/renderer/fixtures/workbenchFixture.ts`
 - `packages/desktop/src/renderer/test/context-popup.test.tsx`
-- `docs/design-docs/agent-core/token-usage-and-context-state.md`
-- `docs/design-docs/frontend-ui/主题与配色规范.md`
+- `docs/design-docs/agent-token-usage-and-context-state.md`
+- `docs/design-docs/front-主题与配色规范.md`
 - `docs/exec-plans/active/20260530-context-cache-and-usage/*`
 
 ### 🔁 Follow-up（同日 11:21·桶集合贴合实际 + 摘要单独成桶）
@@ -80,7 +80,7 @@
 - `packages/desktop/src/renderer/styles/tokens.css`
 - `packages/desktop/src/renderer/fixtures/workbenchFixture.ts`
 - `packages/desktop/src/renderer/test/context-popup.test.tsx`
-- `docs/design-docs/agent-core/token-usage-and-context-state.md`
+- `docs/design-docs/agent-token-usage-and-context-state.md`
 
 ### 🔁 Follow-up（同日 11:55·进度可视化口径修正）
 

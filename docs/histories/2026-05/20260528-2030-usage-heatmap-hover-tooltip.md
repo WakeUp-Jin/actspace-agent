@@ -40,7 +40,7 @@
     - 默认渲染不存在"使用趋势"卡——防止后续重新引入；
     - hover 有数据的格子弹 tooltip，含日期 / 总 tokens / `model breakdown` / 头条模型名 / 占比；
     - hover 无数据的格子不弹 tooltip。
-- **[文档]**：`docs/design-docs/frontend-ui/usage-statistics/设计规范.md`
+- **[文档]**：`docs/design-docs/front-usage-statistics.md`
   - 「左栏」第 2 块"热力图"段补全 hover tooltip 设计；
   - 「左栏」第 4 块"使用趋势"标记废弃，给出原因 + 关联 history 链接；
   - 「统计字段」段说明 modelBreakdown 与主区 modelDistribution 的 percent 语义差异。
@@ -87,4 +87,4 @@ Portal 的典型理由是"我需要逃离父容器的 `overflow:hidden` / 高 z-
 - `packages/desktop/src/renderer/components/UsageStatisticsPage.tsx`
 - `packages/desktop/src/renderer/fixtures/usageStatisticsFixture.ts`
 - `packages/desktop/src/renderer/test/usage-statistics-page.test.tsx`（新增）
-- `docs/design-docs/frontend-ui/usage-statistics/设计规范.md`
+- `docs/design-docs/front-usage-statistics.md`

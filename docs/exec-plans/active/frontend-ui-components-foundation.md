@@ -35,8 +35,8 @@ Radix primitives / 原生 HTML
   - `docs/REPO_COLLAB_GUIDE.md`
   - `docs/ARCHITECTURE.md`
   - `docs/design-docs/core-beliefs.md`
-  - `docs/design-docs/frontend-ui/全局视觉语言规范.md`
-  - `docs/design-docs/frontend-ui/基础组件封装规范.md`
+  - `docs/design-docs/front-全局视觉语言规范.md`
+  - `docs/design-docs/front-基础组件封装规范.md`
   - `docs/FRONTEND_VERIFICATION.md`
   - `docs/HISTORY_GUIDE.md`
   - `docs/QUALITY_SCORE.md`
@@ -107,7 +107,7 @@ Radix primitives / 原生 HTML
 ## 进度记录
 
 - [x] 确认基础组件层采用 Radix primitives / 原生 HTML -> 项目 UI wrapper -> 业务组件的分层。
-- [x] 新增 `docs/design-docs/frontend-ui/基础组件封装规范.md`。
+- [x] 新增 `docs/design-docs/front-基础组件封装规范.md`。
 - [ ] 盘点现有重复控件和第一批迁移目标。
 - [ ] 新增 `components/ui/Button.tsx`、`IconButton.tsx`、`Tooltip.tsx`。
 - [ ] 新增 `components/ui/DropdownMenu.tsx`、`Switch.tsx`。

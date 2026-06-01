@@ -21,7 +21,7 @@
 - UI：`SettingsPrimitives.tsx` 新增 `Stepper`（− 值 +，越界禁用）；`SettingsPage.tsx` `AppearanceSection` 重写为「主题（占位）/ 字体（两下拉）/ 字号（两步进器）」，变更即 `save + apply`。
 - 桥接：`preload/index.ts` 暴露 `setUiZoom`（`webFrame.setZoomFactor`）；`global.d.ts` 补类型；`main.tsx` 开机重放。
 - 测试：新增 `renderer/test/appearance.test.ts`（storage clamp/回落 + apply 写变量与调用 setUiZoom）；`settings-page.test.tsx` 增外观分区交互用例并给 stub 补 `setUiZoom` + `localStorage.clear()`；`app-streaming-user-message.test.tsx` 的 `settingsApiStub` 补 `setUiZoom`。
-- 文档：`docs/design-docs/frontend-ui/设置页规范.md` 外观章节定稿；执行计划 `docs/exec-plans/active/20260529-appearance-fonts-and-zoom.md`（A）与 `20260529-appearance-dark-theme.md`（B，深色专项）。
+- 文档：`docs/design-docs/front-设置页规范.md` 外观章节定稿；执行计划 `docs/exec-plans/active/20260529-appearance-fonts-and-zoom.md`（A）与 `20260529-appearance-dark-theme.md`（B，深色专项）。
 
 ## 验证
 

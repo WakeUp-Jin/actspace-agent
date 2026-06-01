@@ -8,7 +8,7 @@
  * 兜底：summarizer 不可用/失败时不抛错——改用「丢弃最旧 + 仅留指向 session.jsonl 的指针消息」，
  * 既降 token 又保留回看入口，不阻塞主循环。
  *
- * 设计事实来源：docs/design-docs/agent-core/context-compression.md「压缩算法」。
+ * 设计事实来源：docs/design-docs/agent-context-compression.md「压缩算法」。
  */
 
 import type { Message, UserMessage } from "../../messages";

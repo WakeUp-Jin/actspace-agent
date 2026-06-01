@@ -12,13 +12,13 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `docs/design-docs`, `docs/histories`, `docs/design-docs/frontend-ui/image`
+**Scope:** `docs/design-docs`, `docs/histories`, `docs/design-docs/public/front`
 
 **Key Actions:**
 
 - **新增组件级规范文档**：补齐左侧会话栏、中间消息区、聊天输入框等大纲文档。
-- **重写目录首页**：`frontend-ui/index.md` 改为大纲入口，并引用当前基线图。
-- **落地设计图资源**：将认可的总览图复制到 `frontend-ui/image/overview-two-column.png`。
+- **重写目录首页**：`front-index.md` 改为大纲入口，并引用当前基线图。
+- **落地设计图资源**：将认可的总览图复制到 `public/front/overview-two-column.png`。
 
 ### 🧠 Design Intent (Why)
 
@@ -27,10 +27,10 @@
 ### 📁 Files Modified
 
 - `docs/design-docs/index.md`
-- `docs/design-docs/frontend-ui/index.md`
-- `docs/design-docs/frontend-ui/前端设计文档.md`
-- `docs/design-docs/frontend-ui/左侧会话栏规范.md`
-- `docs/design-docs/frontend-ui/中间消息区规范.md`
-- `docs/design-docs/frontend-ui/聊天输入框规范.md`
-- `docs/design-docs/frontend-ui/image/overview-two-column.png`
+- `docs/design-docs/front-index.md`
+- `docs/design-docs/front-前端设计文档.md`
+- `docs/design-docs/front-左侧会话栏规范.md`
+- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/front-聊天输入框规范.md`
+- `docs/design-docs/public/front/overview-two-column.png`
 - `docs/histories/2026-05/20260521-1540-frontend-ui-outline-reorg.md`

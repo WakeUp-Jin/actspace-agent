@@ -26,4 +26,4 @@ Attachment previews should stay visually quiet during normal typing. Remove cont
 ### 📁 Files Modified
 
 - `packages/desktop/src/renderer/styles.css`
-- `docs/design-docs/frontend-ui/聊天输入框规范.md`
+- `docs/design-docs/front-聊天输入框规范.md`

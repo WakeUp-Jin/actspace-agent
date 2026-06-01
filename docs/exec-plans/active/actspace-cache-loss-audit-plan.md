@@ -8,7 +8,7 @@
 
 包含：
 
-- 设计规范：`docs/design-docs/agent-core/cache-loss-audit.md`。
+- 设计规范：`docs/design-docs/agent-cache-loss-audit.md`。
 - 共享契约：扩展 `packages/shared/src/session.ts#LlmUsagePayload` 的可选审计字段。
 - agent-core 运行时：在 provider 调用前后接入 `CacheAuditTracker`。
 - session 持久化：低缓存时在 `llm_usage` 事件写入 `cacheStatus/cacheAuditId`。
@@ -27,10 +27,10 @@
 
 相关文档：
 
-- `docs/design-docs/agent-core/cache-loss-audit.md`
-- `docs/design-docs/agent-core/token-usage-and-context-state.md`
-- `docs/design-docs/agent-core/context-compression.md`
-- `docs/design-docs/storage-and-observability.md`
+- `docs/design-docs/agent-cache-loss-audit.md`
+- `docs/design-docs/agent-token-usage-and-context-state.md`
+- `docs/design-docs/agent-context-compression.md`
+- `docs/design-docs/core-storage-and-observability.md`
 - `docs/exec-plans/active/20260530-context-cache-and-usage/README.md`
 
 相关代码路径：
@@ -110,7 +110,7 @@
 
 ## 进度记录
 
-- [x] 完成设计规范 `docs/design-docs/agent-core/cache-loss-audit.md`。
+- [x] 完成设计规范 `docs/design-docs/agent-cache-loss-audit.md`。
 - [x] 完成离线分析脚本 `scripts/analyze-cache-audit.mjs`。
 - [x] 扩展 `LlmUsagePayload` 共享契约。
 - [x] 接入 agent-core `CacheAuditTracker`。

@@ -21,7 +21,7 @@
 - **[Engine]**: 新增 `createAgentForSession(config, { sessionPath })` async 工厂，main 进程使用；`createAgentFromConfig`（同步）保留供 mock / 单元测试 / 纯内存场景。
 - **[Main]**: `runAndPersistTurn` 改为 `await createAgentForSession(config, { sessionPath })` 并复用 `sessionPaths` 给后续 `writeSessionResult`，main 完全不 import `recoverMessages` / 转换函数。
 - **[Tests]**: 新增 `context/test/conversation.test.ts`、`context/test/manager.test.ts` 的 `createForSession` 段、`engine/test/create-agent-deps.test.ts` 的 `createAgentForSession` 段、`engine/test/session-history-replay.test.ts` 端到端两轮 turn 用例（含 session.jsonl 不存在的首轮路径）。
-- **[Docs]**: 同步更新 `current-module-map.md`（ConversationContext / ContextManager / create-agent-deps 三段）、`agent-turn-layers.md`（Main / Bridge / 数据流 / 检查清单）、`actspace-backend-context-pipeline.md` 进度备注、`storage-and-observability.md` 关于 session.jsonl 恢复的描述。
+- **[Docs]**: 同步更新 `current-module-map.md`（ConversationContext / ContextManager / create-agent-deps 三段）、`agent-turn-layers.md`（Main / Bridge / 数据流 / 检查清单）、`actspace-backend-context-pipeline.md` 进度备注、`core-storage-and-observability.md` 关于 session.jsonl 恢复的描述。
 
 ### 🧠 Design Intent (Why)
 
@@ -43,9 +43,9 @@
 - `packages/agent-core/src/engine/test/create-agent-deps.test.ts`
 - `packages/agent-core/src/engine/test/session-history-replay.test.ts`（新增）
 - `packages/desktop/src/main/agent-turn.ts`
-- `docs/design-docs/agent-core/current-module-map.md`
-- `docs/design-docs/agent-core/agent-turn-layers.md`
-- `docs/design-docs/storage-and-observability.md`
+- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/agent-turn-layers.md`
+- `docs/design-docs/core-storage-and-observability.md`
 - `docs/exec-plans/completed/actspace-backend-context-pipeline.md`
 - `docs/histories/2026-05/20260526-1740-conversation-context-session-replay.md`（本文件）
 - `docs/learnings/2026-05/conversation-context-owns-history-recovery.md`（新增 learning，见下方）

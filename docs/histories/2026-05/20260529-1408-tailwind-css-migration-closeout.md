@@ -40,7 +40,7 @@ CSS 主迁移已经完成，但 active plans 仍保留未勾选的 M4 / M5 状�
 
 - `docs/FRONTEND.md`
 - `docs/coding-standards/team/frontend-style-scope-conventions.md`
-- `docs/design-docs/frontend-ui/tailwind-style-architecture.md`
+- `docs/design-docs/front-tailwind-style-architecture.md`
 - `docs/exec-plans/README.md`
 - `docs/exec-plans/completed/actspace-tailwind-style-architecture.md`
 - `docs/exec-plans/completed/20260528-tailwind-remaining-ui-migration.md`

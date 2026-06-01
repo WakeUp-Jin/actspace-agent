@@ -39,8 +39,8 @@
   - `docs/PLANS_GUIDE.md`
   - `docs/HISTORY_GUIDE.md`
   - `docs/QUALITY_SCORE.md`
-  - `docs/design-docs/frontend-ui/index.md`
-  - `docs/design-docs/frontend-ui/聊天输入框规范.md`
+  - `docs/design-docs/front-index.md`
+  - `docs/design-docs/front-聊天输入框规范.md`
   - `docs/coding-standards/team/frontend-style-scope-conventions.md`
 - 相关代码路径：
   - `packages/desktop/src/renderer/components/Composer.tsx`
@@ -225,7 +225,7 @@ pnpm --filter @actspace/desktop test -- packages/desktop/src/renderer/test/app-s
 
 任务：
 
-1. 更新 `docs/design-docs/frontend-ui/聊天输入框规范.md`，写入 `surface + inputLayout` 状态矩阵。
+1. 更新 `docs/design-docs/front-聊天输入框规范.md`，写入 `surface + inputLayout` 状态矩阵。
 2. 按结果更新本计划进度记录。
 3. 新增 history。
 4. 判断是否需要 learning；若实现过程中形成可迁移的“状态矩阵组件设计”经验，则写入 `docs/learnings/YYYY-MM/`。

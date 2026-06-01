@@ -29,13 +29,13 @@
 ## 背景
 
 - 相关设计文档：
-  - `docs/design-docs/agent-core/tool-preview-design-guidelines.md`
-  - `docs/design-docs/agent-core/subprocess-runner-guidelines.md`
-  - `docs/design-docs/agent-core/current-module-map.md`
-  - `docs/design-docs/frontend-ui/中间消息区规范.md`
+  - `docs/design-docs/agent-tool-preview-design-guidelines.md`
+  - `docs/design-docs/agent-subprocess-runner-guidelines.md`
+  - `docs/design-docs/agent-current-module-map.md`
+  - `docs/design-docs/front-中间消息区规范.md`
 - 相关 skill 调研：
   - `.agents/skills/llm-agent-dev/references/tools/search-tools.md`
-  - `docs/design-docs/llm-agent-fix-plan/04-skill-rg-tools-fix.md`
+  - `docs/design-docs/fix-llm-agent-04-skill-rg-tools-fix.md`
 - 参考实现：
   - `heartclaw/apps/ruyi-api/src/core/tool/tools/grep/`
   - `heartclaw/apps/ruyi-api/src/core/tool/tools/glob/`
@@ -172,11 +172,11 @@ type ToolPreviewKind = "grep" | "glob" | ...
 
 更新：
 
-- `docs/design-docs/agent-core/tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-core/current-module-map.md`
-- `docs/design-docs/frontend-ui/中间消息区规范.md`
+- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/front-中间消息区规范.md`
 - `docs/design-docs/index.md`
-- `docs/design-docs/agent-core/index.md`
+- `docs/design-docs/agent-index.md`
 
 完成代码后补：
 

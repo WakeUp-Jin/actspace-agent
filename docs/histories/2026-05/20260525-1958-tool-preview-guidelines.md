@@ -33,8 +33,8 @@
 - `packages/agent-core/src/tools.ts`
 - `packages/agent-core/src/fixtures.ts`
 - `packages/agent-core/src/llm.ts`
-- `docs/design-docs/agent-core/tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-core/index.md`
-- `docs/design-docs/agent-core/backend-agent-design.md`
-- `docs/design-docs/frontend-ui/中间消息区规范.md`
+- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/agent-index.md`
+- `docs/design-docs/agent-backend-design.md`
+- `docs/design-docs/front-中间消息区规范.md`
 - `docs/ARCHITECTURE.md`

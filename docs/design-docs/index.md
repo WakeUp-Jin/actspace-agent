@@ -1,54 +1,76 @@
 # 设计文档索引
 
-用这个目录集中管理架构设计和产品设计文档。
+`docs/design-docs/` 集中管理长期架构设计、产品设计和重要设计决策。这个目录采用扁平结构：正式设计文档只放在当前目录一层，专题归属由文件名前缀表达。
 
-建议约定：
+## 目录规则
 
-- 一个主题一份文档。
-- 每份文档写清当前状态和简短摘要。
-- 关联引入它的 execution plan 或 spec。
+- `core-*`：跨端、跨包的基础原则和运行边界。
+- `agent-*`：Agent Runtime、工具、上下文、权限、Kairos 等后端/运行层设计。
+- `front-*`：桌面端 renderer、交互、视觉、组件和页面设计。
+- `lab-*`：Lab 能力实验台的产品、运行时和版本路线设计。
+- `fix-*`：对 Skill、流程或既有设计债的修复分析。
+- `public/`：图片、HTML prototype 等资产目录；正式 `.md` 设计文档不放进 `public/`。
 
-## 文档列表
+新增设计文档时，优先选一个稳定前缀并保持一题一文。不要再新增 `agent-core/`、`frontend-ui/`、`lab/` 这类专题子目录；需要渐进式披露时，先从本索引或对应 `*-index.md` 进入。
 
-- `core-beliefs.md`
-- `agent-core/backend-agent-design.md`
-- `agent-core/index.md`
-- `agent-core/agent-turn-layers.md`：Agent Turn 四层职责规范（Renderer → Main Process → Bridge → Agent），约束每层的输入输出和边界。
-- `agent-core/current-module-map.md`：当前 `packages/agent-core` 已落地模块地图，记录 LLM、tools、context、engine、persistence、env 等实现清单。
-- `agent-core/deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入设计，约束 provider、工具暴露、联网搜索和多模态能力边界。
-- `agent-core/backend-agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
-- `agent-core/token-usage-and-context-state.md`：token usage、成本统计、轻量 context snapshot 与每会话 context-state 的数据分层设计。
-- `agent-core/context-compression.md`：上下文压缩设计——工具输出预防层（flash 摘要 + bash 落盘）、历史治疗层（mid-loop 触发、8 节摘要、session.jsonl 回读）与读边界放开取舍。
-- `agent-core/cache-loss-audit.md`：缓存失效排查设计——`llm_usage` 轻量索引、低缓存时 previous/current Context 快照、hash 链断点分析与本地 audit 目录。
-- `agent-core/tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约。
-- `agent-core/subprocess-runner-guidelines.md`：agent-core 内部受控子进程调用规范，约束 `rg` 等 CLI helper 的 timeout、退出码、输出裁剪和安全边界。
-- `agent-core/权限设计规则和原则.md`：Agent 工具权限、用户审核、风险分层和权限记录的设计规则。
-- `agent-core/tool-approval-pause-resume.md`：工具审核暂停恢复设计——Promise-based 暂停模型、PendingApprovalRegistry、会话边界规则。
-- `agent-core/bash-policy-allowlist-design.md`：Bash 全局执行策略、会话级 allowlist、Allow 子命令拆分授权和真沙箱路线图。
-- `agent-core/kairos-autonomous-mode.md`：Kairos 自治模式设计——独立 system prompt + 短期记忆、尾递归 tick 调度、与主 Agent 的打断协议、桌面端 IPC 契约和事件流页面规范。
-- `lab/index.md`：Lab 能力实验台设计文档入口，定义实验矩阵、假说/实证/锻造/晋升生命周期和版本路线。
-- `lab/lab-vision.md`：Lab North Star，定义 Agent 以实验方式增长长期能力的产品定位和最终形态。
-- `lab/experiment-lifecycle.md`：一轮实验从创建、假说构建、实证验证、能力锻造到晋升评审的生命周期。
-- `lab/data-model.md`：Experiment、Stage、Evidence、Artifact、Review 等 Lab 核心数据对象。
-- `lab/ui-experience.md`：Lab 实验矩阵页面的信息架构、交互原则和前端设计入口。
-- `lab/frontend-page-design.md`：Lab 首页、阶段卡片、卡片详情弹窗、新实验弹窗和已完成实验弹窗的前端页面规范。
-- `lab/implementation-progress.md`：Lab 当前设计执行进度，记录 V0 renderer mock 已落地以及 Runtime / IPC / 持久化待实现边界。
-- `lab/prototype.html`：Lab V0 页面单文件交互原型，包含四栏实验矩阵、卡片详情弹窗和已完成实验弹窗。
-- `lab/runtime-architecture.md`：Lab Runtime 与 Main Agent、Kairos、ToolManager、能力产物 registry 的关系。
-- `lab/promotion-and-safety.md`：候选能力晋升、风险分层、沙箱、人工审批和失败实验保留原则。
-- `lab/versions/README.md`：Lab V0-V3 渐进式构建路线。
-- `storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
-- `llm-agent-dev-skill-fix.md`：llm-agent-dev Skill 初始版本中发现的缺陷记录，用于后续统一修复。
-- `frontend-ui/index.md`
-- `frontend-ui/tailwind-style-architecture.md`：Tailwind v4 样式架构、全局样式边界、token 映射和迁移策略。
-- `frontend-ui/前端设计文档.md`
-- `frontend-ui/工作台布局与面板交互规范.md`
-- `frontend-ui/左侧会话栏规范.md`
-- `frontend-ui/中间消息区规范.md`
-- `frontend-ui/聊天输入框规范.md`
-- `frontend-ui/右侧面板与文件渲染规范.md`
-- `frontend-ui/设置页规范.md`：设置态布局、导航分组和聊天态切换规则。
-- `frontend-ui/Kairos监控页规范.md`：Kairos 监控页信息架构、运行轨迹、执行列表、统计区和详情区规范。
-- `frontend-ui/Kairos上下文Sheet规范.md`：Kairos 监控页"上下文"按钮与右侧滑入 Sheet 的入口、信息架构、Snapshot 契约与 IPC 通道。
-- `frontend-ui/Kairos右侧紧凑视图规范.md`：聊天态右侧面板中的 Kairos compact view，约束同源数据流、三段布局和组件复用边界。
-- `frontend-ui/usage-statistics/设计规范.md`：Usage Statistics 页面布局、组件、数据来源和视觉规范。
+## 推荐入口
+
+- `core-beliefs.md`：Agent-first 的工作原则和模板设计出发点。
+- `core-storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
+- `agent-index.md`：Agent Runtime 专题入口。
+- `front-index.md`：桌面端前端设计专题入口。
+- `lab-index.md`：Lab 能力实验台专题入口。
+- `fix-llm-agent-plan-index.md`：`llm-agent-dev` Skill 修复计划入口。
+
+## Agent
+
+- `agent-backend-design.md`：后端 Agent Runtime 的总体设计事实来源。
+- `agent-turn-layers.md`：Agent Turn 四层职责规范（Renderer -> Main Process -> Bridge -> Agent）。
+- `agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块地图。
+- `agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
+- `agent-token-usage-and-context-state.md`：token usage、成本统计、context snapshot 与 context state 的数据分层设计。
+- `agent-context-compression.md`：上下文压缩设计。
+- `agent-cache-loss-audit.md`：缓存失效排查设计。
+- `agent-tool-preview-design-guidelines.md`：新增工具必须遵守的前端预览契约。
+- `agent-subprocess-runner-guidelines.md`：agent-core 内部受控子进程调用规范。
+- `agent-权限设计规则和原则.md`：Agent 工具权限、用户审核、风险分层和权限记录的设计规则。
+- `agent-tool-approval-pause-resume.md`：工具审核暂停恢复设计。
+- `agent-bash-policy-allowlist-design.md`：Bash 全局执行策略、会话级 allowlist 和真沙箱路线图。
+- `agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入边界。
+- `agent-kairos-autonomous-mode.md`：Kairos 自治模式设计。
+
+## Front
+
+- `front-前端设计文档.md`：前端总目标、布局原则、消息语法和输入区原则。
+- `front-全局视觉语言规范.md`：全局字体、颜色、间距、圆角、阴影和动效 token。
+- `front-主题与配色规范.md`：三态主题机制与颜色硬约束。
+- `front-tailwind-style-architecture.md`：Tailwind v4 样式架构和迁移策略。
+- `front-基础组件封装规范.md`：基础 UI wrapper 分层和组件抽象边界。
+- `front-工作台布局与面板交互规范.md`：SplitView、面板 resize、collapse 和 restore。
+- `front-左侧会话栏规范.md`：左侧会话栏、Pinned / Scheduled / Workspaces 分区规则。
+- `front-中间消息区规范.md`：消息语法、工具流和消息区可视状态。
+- `front-聊天输入框规范.md`：Composer、模式、模型、附件、Context 弹窗和发送。
+- `front-右侧面板与文件渲染规范.md`：右侧文件预览、diff 和对象区渲染。
+- `front-工作区文件浏览器规范.md`：右侧面板文件树、只读浏览和 IPC 契约。
+- `front-Markdown渲染规范.md`：右侧 Markdown 渲染栈和主题感知高亮。
+- `front-HTML渲染与沙箱安全规范.md`：HTML 渲染的 sandbox iframe + CSP 安全边界。
+- `front-Context完整视图规范.md`：Context 完整只读视图的数据契约和展示规则。
+- `front-消息可视化转换规范.md`：Markdown 回复转 HTML 的缓存、安全和渲染边界。
+- `front-设置页规范.md`：设置态布局、导航分组和聊天态切换规则。
+- `front-Kairos监控页规范.md`：Kairos 监控页信息架构。
+- `front-Kairos上下文Sheet规范.md`：Kairos 上下文 Sheet 的入口、信息架构和 IPC 通道。
+- `front-Kairos右侧紧凑视图规范.md`：聊天态右侧面板中的 Kairos compact view。
+- `front-usage-statistics.md`：Usage Statistics 页面布局、组件、数据来源和视觉规范。
+
+## Lab
+
+- `lab-vision.md`：Lab North Star、产品定位、角色关系和最终形态。
+- `lab-experiment-lifecycle.md`：实验从创建到晋升或废弃的生命周期。
+- `lab-data-model.md`：Experiment、Stage、Evidence、Artifact、Review 等核心对象。
+- `lab-ui-experience.md`：实验矩阵页面的信息架构和交互原则。
+- `lab-frontend-page-design.md`：Lab 首页和弹窗页面规范。
+- `lab-implementation-progress.md`：Lab 当前设计执行进度。
+- `lab-runtime-architecture.md`：Lab Runtime 与 Main Agent、Kairos、ToolManager 和 registry 的关系。
+- `lab-promotion-and-safety.md`：能力晋升、风险分层、沙箱和人工审批原则。
+- `lab-versions-index.md`：Lab V0-V3 渐进式构建路线。
+- `lab-v0-experiment-matrix.md`、`lab-v1-assisted-experiment.md`、`lab-v2-sandbox-forge.md`、`lab-v3-autonomous-capability-rd.md`：分版本范围。

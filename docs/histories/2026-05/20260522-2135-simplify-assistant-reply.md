@@ -28,4 +28,4 @@ The model selection remains available in the composer, while individual assistan
 
 - `packages/desktop/src/renderer/components/messages/AssistantReply.tsx`
 - `packages/desktop/src/renderer/styles.css`
-- `docs/design-docs/frontend-ui/中间消息区规范.md`
+- `docs/design-docs/front-中间消息区规范.md`

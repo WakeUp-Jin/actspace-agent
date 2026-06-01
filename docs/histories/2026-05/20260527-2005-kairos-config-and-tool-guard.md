@@ -48,7 +48,7 @@
 - `packages/agent-core/src/kairos/guard/test/{extract-paths,blocklist-check}.test.ts`（新增 12 单测）
 - `packages/agent-core/src/kairos/tools/test/sleep.test.ts`（新增 4 单测）
 - `packages/agent-core/src/tools/test/scheduler-caller-agent.test.ts`（新增 6 单测）
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`（顶部 plan 完成清单更新）
+- `docs/design-docs/agent-kairos-autonomous-mode.md`（顶部 plan 完成清单更新）
 
 ### ✅ 验证结果
 

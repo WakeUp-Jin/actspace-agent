@@ -4,7 +4,7 @@
 
 让主 Agent 在工具输出和会话历史两条路径上都具备压缩能力：工具输出回填上下文前按工具语义压缩并保留可回读路径（bash 全量落盘）；长会话在 token 水位达阈值时用 flash 模型摘要旧历史、保留最近 N% 并拼接 `session.jsonl` 路径。最终状态：tool-heavy 与长会话场景都不再撑爆窗口，且模型可按需回看被压缩的内容。
 
-设计事实来源：`docs/design-docs/agent-core/context-compression.md`。本计划只回答「谁改哪些文件、按什么顺序、每步如何验证、失败如何回退」。
+设计事实来源：`docs/design-docs/agent-context-compression.md`。本计划只回答「谁改哪些文件、按什么顺序、每步如何验证、失败如何回退」。
 
 ## 范围
 
@@ -26,9 +26,9 @@
 ## 背景
 
 - 相关文档：
-  - `docs/design-docs/agent-core/context-compression.md`（设计事实来源）
-  - `docs/design-docs/agent-core/token-usage-and-context-state.md`
-  - `docs/design-docs/storage-and-observability.md`
+  - `docs/design-docs/agent-context-compression.md`（设计事实来源）
+  - `docs/design-docs/agent-token-usage-and-context-state.md`
+  - `docs/design-docs/core-storage-and-observability.md`
   - `.agents/skills/llm-agent-dev/references/context/mgmt-compression.md`、`mgmt-token-strategies.md`
 - 相关代码路径：
   - 工具侧：`packages/agent-core/src/tools/{scheduler.ts,manager.ts,types.ts,workspace-guard.ts}`、`tools/subprocess/run-process.ts`、`tools/tools/{read-file,grep,glob,list-directory,bash}/executor.ts`、`tools/tools/bash/render-result.ts`
@@ -138,7 +138,7 @@ bash 走流式落盘 + 头部截断（T1.0/T1.1，无 flash）；非 bash 工具
   - 回退：恢复读取类的 `guardWorkspacePath` 调用。
 
 - [x] T2.2 安全文档同步
-  - 文件：`docs/SECURITY.md`（「文件系统访问控制」节注明读类放开 + 取舍 + Kairos 不受影响）、`docs/design-docs/agent-core/权限设计规则和原则.md`（原则 3 补读边界放开、原则 10 补 bash 流式落盘策略）、`docs/exec-plans/tech-debt-tracker.md`（登记「敏感路径 blocklist + 读审核」债务）。
+  - 文件：`docs/SECURITY.md`（「文件系统访问控制」节注明读类放开 + 取舍 + Kairos 不受影响）、`docs/design-docs/agent-权限设计规则和原则.md`（原则 3 补读边界放开、原则 10 补 bash 流式落盘策略）、`docs/exec-plans/tech-debt-tracker.md`（登记「敏感路径 blocklist + 读审核」债务）。
   - 验证：人工通读确认措辞与 `context-compression.md`「读边界放开」一致。
   - 回退：还原文档。
 
@@ -183,10 +183,10 @@ bash 走流式落盘 + 头部截断（T1.0/T1.1，无 flash）；非 bash 工具
 ### M6 文档沉淀（skill 修复留待统一执行）
 
 - [x] T6.1 沉淀 bash 流式落盘设计到 llm-agent-dev 修复文档
-  - 文件：`docs/design-docs/llm-agent-fix-plan/06-skill-bash-tool-fix.md`（已写）、`docs/design-docs/llm-agent-fix-plan/README.md`（已登记）。
-  - 说明：本任务**只产出修复文档**。`.agents/skills/llm-agent-dev` 源文件（`references/tools/bash-tool.md`、`references/tools/tool-scheduling.md`、`references/context/mgmt-compression.md`、`examples/bash-tool.ts`、`examples/run-process.ts`）的实际修补不在本 active plan 内，按 `llm-agent-fix-plan/README.md` 既有约定（见 `04`/`05` 决策记录）留待后续统一修复 skill 源码时按 `06` 执行。
+  - 文件：`docs/design-docs/fix-llm-agent-06-skill-bash-tool-fix.md`（已写）、`docs/design-docs/fix-llm-agent-plan-index.md`（已登记）。
+  - 说明：本任务**只产出修复文档**。`.agents/skills/llm-agent-dev` 源文件（`references/tools/bash-tool.md`、`references/tools/tool-scheduling.md`、`references/context/mgmt-compression.md`、`examples/bash-tool.ts`、`examples/run-process.ts`）的实际修补不在本 active plan 内，按 `fix-llm-agent-plan-index.md` 既有约定（见 `04`/`05` 决策记录）留待后续统一修复 skill 源码时按 `06` 执行。
   - 验证：`pnpm check:docs`。
-  - 回退：删除 `06-skill-bash-tool-fix.md` 并还原 `README.md` 表格。
+  - 回退：删除 `fix-llm-agent-06-skill-bash-tool-fix.md` 并还原 `README.md` 表格。
 
 ## 验证方式
 
@@ -213,7 +213,7 @@ bash 走流式落盘 + 头部截断（T1.0/T1.1，无 flash）；非 bash 工具
 - [x] M3 治疗层完成，历史压缩按 token 水位触发、配对安全（不动区以 assistant turn 开头，避免连续 user）、ref 注入。
 - [x] M4 观测完成（run-log `context_compaction` + session.jsonl `context_compaction` 事件）。
 - [x] （可选）M5 清理完成（cleanupOldToolOutputs + turn 起始 best-effort 调用）。
-- [x] M6 bash skill 修复文档 `06-skill-bash-tool-fix.md` 已沉淀并登记 README（skill 源文件修补留待统一执行）。
+- [x] M6 bash skill 修复文档 `fix-llm-agent-06-skill-bash-tool-fix.md` 已沉淀并登记 README（skill 源文件修补留待统一执行）。
 - [x] 整仓 `pnpm typecheck` + `pnpm test` 通过（agent-core 479、desktop 145、shared 全绿），`current-module-map.md` 同步新增模块，`check:docs` 通过，落 history（`docs/histories/2026-05/20260529-2344-context-compression.md`）。
 
 ## 决策记录
@@ -230,4 +230,4 @@ bash 走流式落盘 + 头部截断（T1.0/T1.1，无 flash）；非 bash 工具
 - 2026-05-29（实现修正）：可压区切点由「user 边界优先」改为「不动区以 assistant turn 开头」。合成摘要是 UserMessage，若不动区也以 user 开头会产生连续两条 user，而 DeepSeek 默认走 Anthropic-compatible route（严格交替、拒连续 user）。assistant 边界同样落在完整 tool 配对之后，且最近 user 提问在尾部不动区不受影响。summarizer 失败兜底为「丢弃最旧 + 仅留 session.jsonl 指针」。
 - 2026-05-29：取消读取类工具的 workspace 硬限制（写类保持守卫），以让「拼路径让模型回读」生效；敏感路径 blocklist + 读审核作为后续债务，不恢复 workspace 硬框。
 - 2026-05-29：通用工具截断阈值默认 2000、读取类独立高阈值（默认 20000），均可配置。
-- 2026-05-29：bash 流式落盘设计沉淀为 skill 修复文档 `docs/design-docs/llm-agent-fix-plan/06-skill-bash-tool-fix.md`；`llm-agent-dev` skill 现有 bash 指导（`maxBuffer` 全量缓冲、无截断/落盘/回读）太粗糙。skill 源文件实际修补不进本 active plan，沿用 `llm-agent-fix-plan` 既有约定留待统一修复。
+- 2026-05-29：bash 流式落盘设计沉淀为 skill 修复文档 `docs/design-docs/fix-llm-agent-06-skill-bash-tool-fix.md`；`llm-agent-dev` skill 现有 bash 指导（`maxBuffer` 全量缓冲、无截断/落盘/回读）太粗糙。skill 源文件实际修补不进本 active plan，沿用 `llm-agent-fix-plan` 既有约定留待统一修复。

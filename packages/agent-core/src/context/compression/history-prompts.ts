@@ -2,7 +2,7 @@
  * 历史会话压缩 prompt（ClaudeCode 风格 8 节结构化摘要）
  *
  * 8 节偏完整性，适合写代码场景：尽量不丢「为什么这样做」与「正在做什么」。
- * 设计事实来源：docs/design-docs/agent-core/context-compression.md「压缩算法」。
+ * 设计事实来源：docs/design-docs/agent-context-compression.md「压缩算法」。
  */
 
 export const HISTORY_COMPACTION_SYSTEM_PROMPT = `你是会话历史压缩器。把下面这段较旧的 Agent 对话历史压缩成结构化摘要，

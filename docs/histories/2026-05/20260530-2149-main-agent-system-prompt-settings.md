@@ -35,6 +35,6 @@
 - `packages/desktop/src/main/agent-turn.ts`
 - `packages/desktop/src/main/context-describe-service.ts`
 - `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`
-- `docs/design-docs/frontend-ui/设置页规范.md`
-- `docs/design-docs/agent-core/current-module-map.md`
-- `docs/design-docs/agent-core/token-usage-and-context-state.md`
+- `docs/design-docs/front-设置页规范.md`
+- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/agent-token-usage-and-context-state.md`

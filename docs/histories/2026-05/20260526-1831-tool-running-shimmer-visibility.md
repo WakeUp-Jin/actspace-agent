@@ -12,7 +12,7 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `packages/desktop` `docs/design-docs/frontend-ui` `docs/design-docs/agent-core`
+**Scope:** `packages/desktop` `docs/design-docs/front-*` `docs/design-docs/agent-*`
 
 **Key Actions:**
 
@@ -30,6 +30,6 @@
 ### 📁 Files Modified
 
 - `packages/desktop/src/renderer/styles.css`
-- `docs/design-docs/frontend-ui/中间消息区规范.md`
-- `docs/design-docs/agent-core/tool-preview-design-guidelines.md`
+- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/agent-tool-preview-design-guidelines.md`
 - `docs/TODOLIST.md`

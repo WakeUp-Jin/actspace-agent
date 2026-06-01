@@ -36,7 +36,7 @@ Kairos 右侧 compact 是完整监控页的伴随式投影，应共享同一条�
 - `packages/desktop/src/renderer/pages/KairosPage.tsx`
 - `packages/desktop/src/renderer/styles.css`
 - `packages/desktop/src/renderer/test/right-panel-kairos.test.tsx`
-- `docs/design-docs/frontend-ui/右侧面板与文件渲染规范.md`
+- `docs/design-docs/front-右侧面板与文件渲染规范.md`
 - `docs/exec-plans/active/20260528-kairos-right-panel-compact-view.md`
 
 ### ✅ Verification

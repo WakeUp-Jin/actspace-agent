@@ -12,7 +12,7 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `docs/design-docs/frontend-ui`, `docs/histories`
+**Scope:** `docs/design-docs/front-*`, `docs/histories`
 
 **Key Actions:**
 
@@ -26,5 +26,5 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/frontend-ui/prototype/actspace-deepseek-workbench.html`
+- `docs/design-docs/public/front/actspace-deepseek-workbench.html`
 - `docs/histories/2026-05/20260521-2023-deepseek-desktop-prototype.md`

@@ -4,7 +4,7 @@
  * bash 大输出落盘到 `<tmpRoot>/tool-output/<sessionId>/<uniqueId>-bash.txt`，
  * 不污染 workspace。仅 bash 等「全量本就该落盘」的工具使用；其余工具不落盘。
  *
- * 设计事实来源：docs/design-docs/agent-core/context-compression.md「bash 流式落盘」。
+ * 设计事实来源：docs/design-docs/agent-context-compression.md「bash 流式落盘」。
  */
 
 import { join } from "node:path";

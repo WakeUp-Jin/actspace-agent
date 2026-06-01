@@ -76,8 +76,8 @@
 
 #### 文档
 
-- `docs/design-docs/agent-core/kairos-autonomous-mode.md`：双维度说明 + v1→v2 迁移路径。
-- `docs/design-docs/frontend-ui/Kairos监控页规范.md`：用量胶囊章节重写，含切换按钮、双语义清零边界、tooltip 双 mode 对比、localStorage 持久化默认值。
+- `docs/design-docs/agent-kairos-autonomous-mode.md`：双维度说明 + v1→v2 迁移路径。
+- `docs/design-docs/front-Kairos监控页规范.md`：用量胶囊章节重写，含切换按钮、双语义清零边界、tooltip 双 mode 对比、localStorage 持久化默认值。
 
 ### 验证
 

@@ -17,8 +17,8 @@
 **Key Actions:**
 
 - **[Architecture routing]**: 将 `docs/ARCHITECTURE.md` 收敛为顶层架构入口，保留仓库结构、依赖边界、阅读路线和维护规则。
-- **[Topic extraction]**: 新增 `docs/design-docs/agent-core/current-module-map.md` 承接 agent-core 当前模块清单。
-- **[Storage boundaries]**: 新增 `docs/design-docs/storage-and-observability.md` 承接本地存储、应用数据目录、workspace root 和排障日志边界。
+- **[Topic extraction]**: 新增 `docs/design-docs/agent-current-module-map.md` 承接 agent-core 当前模块清单。
+- **[Storage boundaries]**: 新增 `docs/design-docs/core-storage-and-observability.md` 承接本地存储、应用数据目录、workspace root 和排障日志边界。
 - **[Navigation cleanup]**: 更新 `AGENTS.md` 和 design-docs 索引，修正不存在的 `docs/backend-agent-testing.md` 路径。
 
 ### 🧠 Design Intent (Why)
@@ -31,6 +31,6 @@
 - `docs/ARCHITECTURE.md`
 - `docs/QUALITY_SCORE.md`
 - `docs/design-docs/index.md`
-- `docs/design-docs/agent-core/index.md`
-- `docs/design-docs/agent-core/current-module-map.md`
-- `docs/design-docs/storage-and-observability.md`
+- `docs/design-docs/agent-index.md`
+- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/core-storage-and-observability.md`

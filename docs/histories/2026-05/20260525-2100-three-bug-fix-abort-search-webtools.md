@@ -58,7 +58,7 @@
 - `packages/agent-core/src/tools/tools/grep/` — 新增
 - `packages/agent-core/src/tools/tools/glob/` — 新增
 - `packages/agent-core/src/tools/index.ts` — 工具注册替换
-- `docs/design-docs/agent-core/current-module-map.md` — 更新工具描述
+- `docs/design-docs/agent-current-module-map.md` — 更新工具描述
 
 ## 设计动机
 

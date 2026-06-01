@@ -33,7 +33,7 @@
 - `docs/CICD.md`
 - `docs/RELIABILITY.md`
 - `docs/SECURITY.md`
-- `docs/design-docs/frontend-ui/设置页规范.md`
+- `docs/design-docs/front-设置页规范.md`
 - `docs/exec-plans/completed/20260531-local-desktop-updater.md`
 - `docs/learnings/2026-05/pnpm-workspace-electron-portable-release.md`
 - `packages/desktop/src/main/local-update-service.ts`

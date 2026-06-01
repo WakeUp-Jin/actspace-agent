@@ -21,7 +21,7 @@
 - `docs/CODING_BEHAVIOR.md`
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
-- `docs/design-docs/agent-core/backend-agent-testing.md`
+- `docs/design-docs/agent-testing.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`
 - `.agents/skills/llm-agent-dev/references/llm/llm-service.md`
 - `.agents/skills/llm-agent-dev/references/tools/overview.md`
@@ -43,7 +43,7 @@
 
 设计事实来源：
 
-- `docs/design-docs/agent-core/deepseek-kimi-hybrid-capabilities.md`
+- `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`
 
 本计划参考的外部文档：
 
@@ -409,7 +409,7 @@ packages/agent-core/src/prompt/kimi-assistants/
 - `docs/ARCHITECTURE.md`
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
-- `docs/design-docs/agent-core/backend-agent-testing.md`
+- `docs/design-docs/agent-testing.md`
 - `.env.example`
 - `README.md`
 - `docs/histories/YYYY-MM/*.md`

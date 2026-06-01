@@ -73,7 +73,7 @@ DeepSeek 的 Anthropic-compatible API 已经能通过 server tool 执行联网�
 - `packages/shared/src/session.ts`
 - `.env.example`
 - `docs/exec-plans/active/20260529-deepseek-anthropic-service.md`
-- `docs/design-docs/agent-core/deepseek-kimi-hybrid-capabilities.md`
+- `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`
 - `docs/SECURITY.md`
 - `docs/learnings/2026-05/provider-native-vs-agent-tools.md`
 - `pnpm-lock.yaml`

@@ -18,7 +18,7 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `packages/desktop`、`docs/design-docs/frontend-ui`
+**Scope:** `packages/desktop`、`docs/design-docs/front-*`
 
 本次任务分两个阶段推进，但代码层最终落到 v1.3：
 
@@ -113,4 +113,4 @@ v1.4 工具列表 chip 化进一步印证了同一个 takeaway——同样是把
 
 - `packages/desktop/src/renderer/components/kairos/KairosContextSheet.tsx`
 - `packages/desktop/src/renderer/test/kairos-context-sheet.test.tsx`
-- `docs/design-docs/frontend-ui/Kairos上下文Sheet规范.md`
+- `docs/design-docs/front-Kairos上下文Sheet规范.md`

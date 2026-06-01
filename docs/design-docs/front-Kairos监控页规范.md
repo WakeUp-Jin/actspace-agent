@@ -1,6 +1,6 @@
 # Kairos 监控页规范
 
-本文档是 Kairos 页面视觉与信息架构的前端事实来源。后端自治模型、存储、IPC 和聚合契约仍以 `docs/design-docs/agent-core/kairos-autonomous-mode.md` 为准；本文只约束 renderer 的页面布局、组件关系和交互状态。
+本文档是 Kairos 页面视觉与信息架构的前端事实来源。后端自治模型、存储、IPC 和聚合契约仍以 `docs/design-docs/agent-kairos-autonomous-mode.md` 为准；本文只约束 renderer 的页面布局、组件关系和交互状态。
 
 ## 设计目标
 

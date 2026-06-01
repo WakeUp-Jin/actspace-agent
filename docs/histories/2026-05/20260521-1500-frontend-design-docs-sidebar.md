@@ -8,7 +8,7 @@
 
 ### 📥 User Query
 
-> 整理桌面端前端设计文档，把已确定的右侧面板与文件渲染规范写入 `docs/design-docs/frontend-ui`，`Context` 组件先保留待细化。
+> 整理桌面端前端设计文档，把已确定的右侧面板与文件渲染规范写入 `docs/design-docs/front-*`，`Context` 组件先保留待细化。
 
 ### 🛠 Changes Overview
 
@@ -16,7 +16,7 @@
 
 **Key Actions:**
 
-- **新增前端设计目录说明**：补充 `frontend-ui/index.md`，说明图片与设计文档的组织方式。
+- **新增前端设计目录说明**：补充 `front-index.md`，说明图片与设计文档的组织方式。
 - **拆分右侧面板规范**：新增 `右侧面板与文件渲染规范.md`，明确横向 Tab、文件渲染、会话级 diff、Task 展示边界。
 - **收敛主设计文档**：将 `前端设计文档.md` 中的右侧面板细节抽离，仅保留总纲与 `Context` 待细化项。
 
@@ -27,7 +27,7 @@
 ### 📁 Files Modified
 
 - `docs/design-docs/index.md`
-- `docs/design-docs/frontend-ui/index.md`
-- `docs/design-docs/frontend-ui/前端设计文档.md`
-- `docs/design-docs/frontend-ui/右侧面板与文件渲染规范.md`
+- `docs/design-docs/front-index.md`
+- `docs/design-docs/front-前端设计文档.md`
+- `docs/design-docs/front-右侧面板与文件渲染规范.md`
 - `docs/histories/2026-05/20260521-1500-frontend-design-docs-sidebar.md`

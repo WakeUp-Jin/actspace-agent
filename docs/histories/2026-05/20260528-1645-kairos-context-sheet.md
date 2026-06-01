@@ -18,7 +18,7 @@
 
 **Key Actions:**
 
-- **[Design]**: 落 `docs/design-docs/frontend-ui/Kairos上下文Sheet规范.md`，覆盖入口按钮位置、Sheet 行为、四段信息架构（概览 / 系统提示词 / 会话历史 / 工具列表）、`KairosContextSnapshot` 契约、新增 IPC、状态边界与测试策略；同步更新母规范与两份索引。
+- **[Design]**: 落 `docs/design-docs/front-Kairos上下文Sheet规范.md`，覆盖入口按钮位置、Sheet 行为、四段信息架构（概览 / 系统提示词 / 会话历史 / 工具列表）、`KairosContextSnapshot` 契约、新增 IPC、状态边界与测试策略；同步更新母规范与两份索引。
 - **[Shared 契约]**: 在 `packages/shared/src/kairos-contracts.ts` 扩 `KairosContextSnapshot`、`KairosContextMessage`、`KairosContextTool`、`KairosContextPhase` 等类型，并在 `KairosBridgeApi` 加 `getContextSnapshot()`。
 - **[Agent-core controller]**: `createKairos` 把 `observeRefresh` / `activeBriefsCount` 闭包外提为顶层 fn，供 runner 与新方法共用；新增 `getContextSnapshot()`：重新跑 observe + shortTerm.load + assembleSystemPrompt，把 `Message` 投影成 `KairosContextMessage`（含 thinking / tool_call 摘要），用 `Set('sleep')` 区分工具来源。顺便把 `derivePhase` 从 prompt-assembler 显式导出。
 - **[Main IPC]**: 在 `kairos-ipc-internals.ts` 的通道常量表加 `getContextSnapshot`，`kairos-ipc.ts` 注册 `kairos:get-context-snapshot` invoke handler，错误由 invoke 路径自然 reject。
@@ -42,9 +42,9 @@ Kairos 原本是黑盒：用户能看到事件流，却看不到 LLM 真正读�
 
 ### 📁 Files Modified
 
-- `docs/design-docs/frontend-ui/Kairos上下文Sheet规范.md`（新增）
-- `docs/design-docs/frontend-ui/Kairos监控页规范.md`
-- `docs/design-docs/frontend-ui/index.md`
+- `docs/design-docs/front-Kairos上下文Sheet规范.md`（新增）
+- `docs/design-docs/front-Kairos监控页规范.md`
+- `docs/design-docs/front-index.md`
 - `docs/design-docs/index.md`
 - `packages/shared/src/kairos-contracts.ts`
 - `packages/agent-core/src/kairos/controller.ts`

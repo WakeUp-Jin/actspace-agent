@@ -1,7 +1,7 @@
 /**
  * 工作区文件浏览器的 main 侧服务。
  *
- * 职责（见 `docs/design-docs/frontend-ui/工作区文件浏览器规范.md`）：
+ * 职责（见 `docs/design-docs/front-工作区文件浏览器规范.md`）：
  * - `listWorkspaceDir`：懒加载一层目录（忽略名单 + 条目上限 + 目录在前排序）。
  * - `readWorkspaceFile`：读单文件（大小上限 + 二进制识别 + 图片 data URL + renderKind 判定 + text 类语言推断）。
  *

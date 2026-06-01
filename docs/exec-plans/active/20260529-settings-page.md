@@ -29,8 +29,8 @@
   - `docs/ARCHITECTURE.md`
   - `docs/SECURITY.md`
   - `docs/FRONTEND.md` 与 `docs/FRONTEND_VERIFICATION.md`
-  - `docs/design-docs/frontend-ui/设置页规范.md`
-  - `docs/design-docs/frontend-ui/全局视觉语言规范.md`
+  - `docs/design-docs/front-设置页规范.md`
+  - `docs/design-docs/front-全局视觉语言规范.md`
   - `docs/coding-standards/team/frontend-style-scope-conventions.md`
 - 相关代码路径：
   - 页面落点：`packages/desktop/src/renderer/components/WorkbenchLayout.tsx`、`packages/desktop/src/renderer/components/Sidebar.tsx`（底部 `SETTINGS_ENTRY_CLASS` 按钮，`view`/`onSelectView`）

@@ -9,7 +9,7 @@
 - 包含：
   - 将 `WorkbenchLayout` 中的 Lab placeholder 替换为真实 `LabPage`。
   - 新增 Lab 前端组件、mock 数据和局部状态管理。
-  - 复刻 `docs/design-docs/lab/prototype.html` 的四栏矩阵、顶部按钮、卡片详情弹窗、新实验弹窗、已完成实验弹窗和 `⋯` 菜单。
+  - 复刻 `docs/design-docs/public/lab/prototype.html` 的四栏矩阵、顶部按钮、卡片详情弹窗、新实验弹窗、已完成实验弹窗和 `⋯` 菜单。
   - 用 mock 数据支持前端交互闭环：创建草稿实验、编辑 / 推进阶段的可见状态变化、暂停 / 取消进入完成类集合、已完成实验弹窗查看。
   - 为关键交互补 renderer 测试。
   - 按前端验证规范完成 typecheck、测试和浏览器 mock 验收记录。
@@ -29,10 +29,10 @@
   - `docs/ARCHITECTURE.md`
   - `docs/design-docs/core-beliefs.md`
   - `docs/FRONTEND_VERIFICATION.md`
-  - `docs/design-docs/lab/index.md`
-  - `docs/design-docs/lab/frontend-page-design.md`
-  - `docs/design-docs/lab/prototype.html`
-  - `docs/design-docs/lab/versions/v0-experiment-matrix.md`
+  - `docs/design-docs/lab-index.md`
+  - `docs/design-docs/lab-frontend-page-design.md`
+  - `docs/design-docs/public/lab/prototype.html`
+  - `docs/design-docs/lab-v0-experiment-matrix.md`
 - 相关代码路径：
   - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
   - `packages/desktop/src/renderer/components/Sidebar.tsx`
@@ -94,7 +94,7 @@
     - `LabCardView`
     - `LabCompletedExperimentView`
   - 导出 `labStages`、`initialLabCards`、`initialCompletedExperiments`。
-  - mock 内容对齐 `docs/design-docs/lab/prototype.html`，覆盖四个阶段和完成实验。
+  - mock 内容对齐 `docs/design-docs/public/lab/prototype.html`，覆盖四个阶段和完成实验。
 - 在 `LabPage.tsx` 中使用 `useState` 持有：
   - `cards`
   - `completedExperiments`
@@ -196,7 +196,7 @@
   - 若当前环境无法稳定运行 Electron，则在收尾说明中记录限制，并至少完成浏览器 mock 交互截图 / 状态检查。
 - 文档收尾：
   - 更新 `docs/histories/YYYY-MM/<timestamp>-lab-v0-frontend-mock.md`。
-  - 如实现与 `docs/design-docs/lab/frontend-page-design.md` 不一致，同步设计文档。
+  - 如实现与 `docs/design-docs/lab-frontend-page-design.md` 不一致，同步设计文档。
   - 完成后将本 plan 进度全部勾选；若仍有后续后端 / IPC 工作，保留本 plan 为完成前端后续任务或新建后端 plan。
 
 ## 验证方式
@@ -219,7 +219,7 @@
 ## 进度记录
 
 - [x] 确认本计划只覆盖 renderer 前端 mock，不做后端 Agent、IPC 或持久化。
-- [x] 对齐 `docs/design-docs/lab/prototype.html` 和 `docs/design-docs/lab/frontend-page-design.md` 的页面范围。
+- [x] 对齐 `docs/design-docs/public/lab/prototype.html` 和 `docs/design-docs/lab-frontend-page-design.md` 的页面范围。
 - [x] 完成 LabPage 外壳接入。
 - [x] 完成 renderer mock view model 和 fixture。
 - [x] 完成四栏矩阵和卡片样式。
