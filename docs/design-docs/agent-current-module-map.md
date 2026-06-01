@@ -56,10 +56,10 @@
 
 ## `engine/` - 执行引擎
 
-- `engine/types.ts`：AgentEvent（discriminated union，含 `context_compaction`）、AgentLoopConfig（含 `maybeCompact?`）、AgentLoopResult、`ContextCompactionInfo` / `CompactionOutcome`。
-- `engine/loop.ts`：runAgentLoop 纯函数双层循环（内层工具调用+转向、外层跟进）。每次模型调用前 `await config.maybeCompact?.()`，发生压缩时用返回的新数组刷新 `context.messages` 引用并 emit `context_compaction` 事件。
-- `engine/agent.ts`：Agent 入口类（run/abort），编排 ContextManager + ToolManager + LLMService；持有 `summarizer`，把 `contextManager.compactIfNeeded` 包成 `maybeCompact` 传入 loop。
-- `engine/bridge.ts`：IPC 桥接层，将 AgentEvent 实时映射为 RuntimeStreamEvent，并根据工具 `previewKind` 将执行结果聚合为带 `ToolUiPreview` 的 AgentTurnResult。`createToolExecutionResult` 据 `ToolResult.outputRef` 填 `rawOutput` / `rawOutputRef`（bash 为 file ref、其余 inline）；收集 `context_compaction` 事件落 run-log 并生成 `context_compaction` SessionEvent 追加到 session 事件。透传 `summarizer` 给 Agent。`tool_call_delta` 阶段维护 `toolCallStreaming` 状态机（按 toolCallId 累积 partial args + 50ms throttle），调用 `streaming-preview-extractors` 把 partial args 解析为 typed `ToolUiPreview`，emit `tool_call_streaming` 让前端在 tool_start 前就能展示 `Write filename` 甚至 streaming content。
+- `engine/types.ts`：AgentEvent（discriminated union，含 `context_compaction`）、AgentLoopConfig（含 `maybeCompact?`、`cacheAudit?`）、AgentLoopResult、`ContextCompactionInfo` / `CompactionOutcome`。`LLMUsageCall` 可携带 `cacheAudit` 元数据，供 bridge 写入 `llm_usage.payload`。
+- `engine/loop.ts`：runAgentLoop 纯函数双层循环（内层工具调用+转向、外层跟进）。每次模型调用前 `await config.maybeCompact?.()`，发生压缩时用返回的新数组刷新 `context.messages` 引用并 emit `context_compaction` 事件；随后在 `llm.stream` 前后调用可选 `cacheAudit.beforeLlmCall/afterLlmCall`，快照真实 provider 输入并根据模型返回 usage 确认低缓存。
+- `engine/agent.ts`：Agent 入口类（run/abort），编排 ContextManager + ToolManager + LLMService；持有 `summarizer` 与可选 `cacheAudit`，把 `contextManager.compactIfNeeded` 包成 `maybeCompact` 传入 loop。
+- `engine/bridge.ts`：IPC 桥接层，将 AgentEvent 实时映射为 RuntimeStreamEvent，并根据工具 `previewKind` 将执行结果聚合为带 `ToolUiPreview` 的 AgentTurnResult。`createToolExecutionResult` 据 `ToolResult.outputRef` 填 `rawOutput` / `rawOutputRef`（bash 为 file ref、其余 inline）；收集 `context_compaction` 事件落 run-log 并生成 `context_compaction` SessionEvent 追加到 session 事件。透传 `summarizer` / `cacheAudit` 给 Agent，并把 `LLMUsageCall.cacheAudit` 的 `cacheStatus/cacheAuditId/cacheHitRatio` 写入 `llm_usage.payload`。`tool_call_delta` 阶段维护 `toolCallStreaming` 状态机（按 toolCallId 累积 partial args + 50ms throttle），调用 `streaming-preview-extractors` 把 partial args 解析为 typed `ToolUiPreview`，emit `tool_call_streaming` 让前端在 tool_start 前就能展示 `Write filename` 甚至 streaming content。
 - `engine/partial-args.ts`：partial JSON 字符串字段提取状态机，正确处理 `\"` `\\` `\n` `\uXXXX` 等 JSON escape，未闭合时返回当前累积部分。仅给 streaming-preview-extractors 使用。
 - `engine/streaming-preview-extractors.ts`：按 `ToolPreviewKind` 注册的 extractor 表，把 LLM 流式 `tool_call_delta` 累积的 partial JSON 解析成 typed `ToolUiPreview`。write_file 同时提取 path 与 content（content 作为 `streamingContent` 让前端 cursor 风格边写边看）；edit_file 只提取 path（diff 需要文件上下文 + 替换执行才能生成）。新工具按 previewKind 注册一行 extractor 即可。
 - `engine/create-agent-deps.ts`：Agent 配置构建与实例创建，两步分离。`buildAgentConfig(frontendInput, workspaceRoot, approvalGate?, runtimeContext?)` 返回纯配置对象 `AgentConfig`，`runtimeContext` 透传 `tmpRoot` / `sessionId` 到 `toolManagerConfig`（bash 落盘需要），并可传入主 Agent 当前完整 `systemPrompt`（桌面端来自 SettingsService；不传则用代码默认 `MAIN_AGENT_SYSTEM_PROMPT`）。运行时实例有两种入口：`createAgentFromConfig(config)`（同步，空会话历史，mock/测试）；`createAgentForSession(config, { sessionPath })`（async，main 进程，构造期一次性恢复历史）。两者都用 `createSummarizerForAgent()`（`deepseek-v4-flash`，无 DeepSeek key 时为 undefined）构造 `summarizer`，注入 ToolManager 与 `AgentDeps`，供工具输出摘要与 mid-loop 历史压缩使用。
@@ -77,6 +77,7 @@ Agent Turn 的跨层职责边界见 `agent-turn-layers.md`。
 ## `observability/` - 本地运行排障日志
 
 - `observability/agent-run-log.ts`：每次 Agent turn 一个 JSONL 文件，记录从用户输入、main 边界、AgentEvent、RuntimeStreamEvent 到最终结果的完整链路（含 `context_compaction` 历史压缩记录），并清理超过 24 小时的 run 日志。
+- `observability/cache-audit.ts`：缓存失效旁路审计器。模型调用前对真实 Context 生成稳定 hash 指纹并读取滚动 `last.context.json` 做 prefix / append-only 比较；模型返回后按 `cacheHit/cacheRead + cacheMiss` 计算命中率，低于阈值时在 `<userData>/cache-audit/<sessionId>/<cacheAuditId>/` 固化 `summary.json`、`previous.context.json`、`current.context.json`、`diff.txt`，并始终 best-effort 覆盖滚动 `last.context.json`。
 
 日志和 session 持久化的边界见 `../storage-and-observability.md`。
 

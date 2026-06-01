@@ -20,6 +20,7 @@ import type { AssistantMessageEvent } from "../llm/types";
 import type { ToolResult } from "../internal-tools";
 import type { ToolExecuteOptions, ToolManager } from "../tools/manager";
 import type { ToolApprovalRequest, ToolApprovalDecision } from "../tools/scheduler";
+import type { CacheAuditTracker, CacheAuditUsageMetadata } from "../observability/cache-audit";
 
 // ─── 工具执行模式 ───
 
@@ -29,6 +30,7 @@ export interface LLMUsageCall {
   callId: string;
   message: AssistantMessage;
   usage: Usage;
+  cacheAudit?: CacheAuditUsageMetadata;
 }
 
 // ─── 历史压缩观测元数据 ───
@@ -103,6 +105,8 @@ export interface AgentLoopConfig {
    * 主 Agent 不传 → 走零开销原路径。
    */
   toolExecuteOptions?: ToolExecuteOptions;
+  /** Optional sidecar observer for cache-loss diagnostics. It never contributes to LLM input. */
+  cacheAudit?: CacheAuditTracker;
 }
 
 // ─── AgentLoopResult ───

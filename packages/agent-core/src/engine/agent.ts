@@ -20,6 +20,7 @@ import type { LLMService } from "../llm/types";
 import type { ToolManager } from "../tools/manager";
 import type { ContextManager } from "../context/manager";
 import type { Summarizer } from "../context/compression/summarizer";
+import type { CacheAuditTracker } from "../observability/cache-audit";
 import { toToolDefinition } from "../internal-tools";
 import { runAgentLoop } from "./loop";
 import type {
@@ -44,6 +45,7 @@ export interface AgentOptions {
    * 但 HistoryCompactor 内部退化为「丢弃最旧 + session.jsonl 指针」兜底。
    */
   summarizer?: Summarizer;
+  cacheAudit?: CacheAuditTracker;
 }
 
 export class Agent {
@@ -58,6 +60,7 @@ export class Agent {
   private getFollowUpMessages?: AgentLoopConfig["getFollowUpMessages"];
   private thinkingEnabled?: boolean;
   private summarizer?: Summarizer;
+  private cacheAudit?: CacheAuditTracker;
 
   constructor(options: AgentOptions) {
     this.llm = options.llm;
@@ -70,6 +73,7 @@ export class Agent {
     this.getFollowUpMessages = options.getFollowUpMessages;
     this.thinkingEnabled = options.thinkingEnabled;
     this.summarizer = options.summarizer;
+    this.cacheAudit = options.cacheAudit;
   }
 
   /** 执行一次完整的 agent 交互 */
@@ -98,6 +102,7 @@ export class Agent {
       getSteeringMessages: this.getSteeringMessages,
       getFollowUpMessages: this.getFollowUpMessages,
       thinkingEnabled: this.thinkingEnabled,
+      cacheAudit: this.cacheAudit,
       maybeCompact: async () => {
         const report = await this.contextManager.compactIfNeeded(this.summarizer);
         if (!report?.compacted) return null;

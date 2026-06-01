@@ -101,6 +101,12 @@ export type LlmUsagePayload = {
   reasoningTokens?: number;
   cacheHitTokens?: number;
   cacheMissTokens?: number;
+  /** True when the model-returned cache hit ratio is below the audit threshold. */
+  cacheStatus?: boolean;
+  /** Sidecar audit id under <userData>/cache-audit/<sessionId>/ when cacheStatus is true. */
+  cacheAuditId?: string;
+  /** cacheHitTokens / (cacheHitTokens + cacheMissTokens), when provider cache usage is available. */
+  cacheHitRatio?: number;
   serverToolUse?: {
     webSearchRequests?: number;
     webFetchRequests?: number;

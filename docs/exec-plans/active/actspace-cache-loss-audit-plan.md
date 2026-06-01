@@ -40,6 +40,8 @@
 - `packages/agent-core/src/context/manager.ts`
 - `packages/agent-core/src/engine/agent.ts`
 - `packages/agent-core/src/engine/bridge.ts`
+- `packages/agent-core/src/engine/loop.ts`
+- `packages/agent-core/src/observability/cache-audit.ts`
 - `packages/agent-core/src/persistence/session-store.ts`
 - `packages/desktop/src/main/agent-turn.ts`
 - `scripts/analyze-cache-audit.mjs`
@@ -90,6 +92,9 @@
 - `node scripts/analyze-cache-audit.mjs <cache-audit-session-dir>`
 - `pnpm --filter @actspace/shared typecheck`
 - `pnpm --filter @actspace/agent-core test`
+- `pnpm --filter @actspace/agent-core typecheck`
+- `pnpm --filter @actspace/agent-core build`
+- `pnpm --filter @actspace/desktop typecheck`
 - `pnpm typecheck`
 
 手工检查：
@@ -107,14 +112,16 @@
 
 - [x] 完成设计规范 `docs/design-docs/agent-core/cache-loss-audit.md`。
 - [x] 完成离线分析脚本 `scripts/analyze-cache-audit.mjs`。
-- [ ] 扩展 `LlmUsagePayload` 共享契约。
-- [ ] 接入 agent-core `CacheAuditTracker`。
-- [ ] 写入 `cacheStatus/cacheAuditId` 与 audit 旁路文件。
-- [ ] 补运行时单测与真实 turn 验证。
+- [x] 扩展 `LlmUsagePayload` 共享契约。
+- [x] 接入 agent-core `CacheAuditTracker`。
+- [x] 写入 `cacheStatus/cacheAuditId/cacheHitRatio` 与 audit 旁路文件。
+- [x] 补运行时单测：`observability/test/cache-audit.test.ts` 与 `engine/test/bridge.test.ts`。
+- [x] 完成 mock 级验证：低缓存 usage 能写 `llm_usage` 索引，并落 `summary/previous/current/diff`。
+- [ ] 真实 DeepSeek turn 手工验证 `session.jsonl` 与 `<userData>/cache-audit`。
 
 ## 决策记录
 
 - 2026-05-31：缓存低的最终事实以模型返回 usage 为准，默认 `cacheHitRatio < 0.9` 标记 `cacheStatus: true`；发送前 hash 链只用于解释原因。
 - 2026-05-31：actspace 的轻量索引写入 `llm_usage.payload`，不写入 assistant message，因为 actspace 的 session 是事件流。
 - 2026-05-31：完整上下文不进 `session.jsonl`，只在低缓存时固化到旁路 audit 目录；上一轮 Context 用 `last.context.json` 滚动保存。
-
+- 2026-06-01：运行时实现挂在 `AgentLoopConfig.cacheAudit` 上，由 desktop main 为主 Agent turn 创建 tracker；Kairos 暂不接入这条审计链路。

@@ -18,6 +18,7 @@ import {
   cleanupOldAgentRunLogs,
   cleanupOldToolOutputs,
   createAgentRunLogger,
+  createCacheAuditTracker,
   runTurnWithAgent,
   createSessionStorePaths,
   writeSessionResult,
@@ -165,6 +166,15 @@ export async function runAndPersistTurn(
   const turnKey = getTurnKey(input);
   const abortableDeps = {
     ...deps,
+    cacheAudit: createCacheAuditTracker({
+      rootDir: join(roots.dataRoot, "cache-audit"),
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      provider: deps.modelSpec.provider,
+      model: deps.modelSpec.apiModel,
+      modelId: deps.modelSpec.id,
+      thinkingEnabled: input.thinkingEnabled ?? deps.thinkingEnabled,
+    }),
     abort: undefined as (() => void) | undefined,
   };
 

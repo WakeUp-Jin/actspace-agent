@@ -29,9 +29,10 @@ import type { ToolManager } from "../tools/manager";
 import type { ContextManager } from "../context/manager";
 import type { Summarizer } from "../context/compression/summarizer";
 import type { AgentRunLogger } from "../observability";
+import type { CacheAuditTracker } from "../observability/cache-audit";
 import type { ToolResult } from "../internal-tools";
 import { Agent } from "./agent";
-import type { AgentEvent, AgentLoopResult, ContextCompactionInfo, ToolExecutionMode } from "./types";
+import type { AgentEvent, AgentLoopResult, ContextCompactionInfo, LLMUsageCall, ToolExecutionMode } from "./types";
 import { extractStreamingPreview } from "./streaming-preview-extractors";
 import {
   createPersistedSessionEvent,
@@ -105,6 +106,8 @@ export interface RunTurnWithAgentDeps {
   thinkingEnabled?: boolean;
   /** flash 摘要器，透传给 Agent 用于 mid-loop 历史压缩 */
   summarizer?: Summarizer;
+  /** 低缓存旁路审计器；只写本地 cache-audit 文件与 llm_usage 索引。 */
+  cacheAudit?: CacheAuditTracker;
   abort?: () => void;
 }
 
@@ -167,6 +170,7 @@ export async function runTurnWithAgent(
     toolExecution: deps.toolExecution,
     thinkingEnabled: input.thinkingEnabled ?? deps.thinkingEnabled,
     summarizer: deps.summarizer,
+    cacheAudit: deps.cacheAudit,
     onEvent: async (agentEvent) => {
       recordToolExecution(toolExecutions, agentEvent);
       if (agentEvent.type === "context_compaction") {
@@ -449,22 +453,30 @@ function buildSessionEvents(
     if (msg.role === "assistant") {
       const usageCall = result.usageCalls[usageCallIndex++];
       const relatedEventIds = messageEvents.map((event) => event.id);
-      events.push(createLlmUsageEvent(usageCall?.callId ?? `llm_call_${turnId}_${usageCallIndex}`, msg, sessionId, turnId, relatedEventIds));
+      events.push(createLlmUsageEvent(
+        usageCall,
+        msg,
+        sessionId,
+        turnId,
+        relatedEventIds,
+        `llm_call_${turnId}_${usageCallIndex}`,
+      ));
     }
   }
   return events;
 }
 
 function createLlmUsageEvent(
-  callId: string,
+  usageCall: LLMUsageCall | undefined,
   message: AssistantMessage,
   sessionId: string,
   turnId: string,
   relatedEventIds: string[],
+  fallbackCallId: string,
 ): SessionEvent<LlmUsagePayload> {
   const modelSpec = resolveModelSpecByApiModel(message.model, message.provider as "deepseek" | "kimi" | undefined);
   const payload: LlmUsagePayload = {
-    callId,
+    callId: usageCall?.callId ?? fallbackCallId,
     provider: message.provider,
     model: message.model,
     modelId: modelSpec?.id,
@@ -488,6 +500,15 @@ function createLlmUsageEvent(
     ),
     relatedEventIds,
   };
+  if (usageCall?.cacheAudit?.cacheStatus !== undefined) {
+    payload.cacheStatus = usageCall.cacheAudit.cacheStatus;
+  }
+  if (usageCall?.cacheAudit?.cacheAuditId) {
+    payload.cacheAuditId = usageCall.cacheAudit.cacheAuditId;
+  }
+  if (usageCall?.cacheAudit?.cacheHitRatio !== undefined) {
+    payload.cacheHitRatio = usageCall.cacheAudit.cacheHitRatio;
+  }
 
   return createPersistedSessionEvent(sessionId, turnId, "llm_usage", payload);
 }

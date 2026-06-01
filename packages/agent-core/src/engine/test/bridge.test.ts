@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { RuntimeStreamEvent } from "@actspace/shared";
 import { ContextManager } from "../../context/manager";
 import { ConversationContext } from "../../context/modules/conversation";
@@ -8,7 +11,7 @@ import type { InternalTool, ToolResult } from "../../internal-tools";
 import { createEmptyUsage } from "../../messages";
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "../../messages";
 import { MockLLMService, mockText, mockToolCall } from "../../llm/services/mock";
-import type { AgentRunLogEvent, AgentRunLogger } from "../../observability";
+import { createCacheAuditTracker, type AgentRunLogEvent, type AgentRunLogger } from "../../observability";
 import { ToolManager } from "../../tools/manager";
 import { runTurnWithAgent } from "../bridge";
 import type { RunTurnWithAgentDeps } from "../bridge";
@@ -282,6 +285,66 @@ describe("runTurnWithAgent bridge", () => {
       },
     });
     expect(usageEvents[0].payload).toHaveProperty("relatedEventIds");
+  });
+
+  it("adds cache audit metadata to llm_usage when low cache is confirmed", async () => {
+    const auditRoot = await mkdtemp(join(tmpdir(), "actspace-bridge-cache-audit-"));
+    try {
+      const deps = createDeps();
+      deps.llm.setResponses([
+        {
+          ...mockText("Low cache response."),
+          usage: {
+            ...createEmptyUsage(),
+            input: 100,
+            output: 20,
+            cacheRead: 20,
+            cacheHit: 20,
+            cacheMiss: 80,
+            totalTokens: 120,
+          },
+        },
+      ]);
+
+      const result = await runTurnWithAgent(
+        {
+          sessionId: "session-cache-audit",
+          turnId: "turn-cache-audit",
+          userInput: "Trigger low cache.",
+        },
+        {
+          ...deps,
+          cacheAudit: createCacheAuditTracker({
+            rootDir: auditRoot,
+            sessionId: "session-cache-audit",
+            turnId: "turn-cache-audit",
+            provider: "mock",
+            model: "deepseek-mock",
+            threshold: 0.9,
+            now: () => new Date("2026-05-31T15:30:12.123Z"),
+          }),
+        },
+      );
+
+      const usageEvent = result.events.find((event) => event.type === "llm_usage");
+      expect(usageEvent?.payload).toMatchObject({
+        cacheStatus: true,
+        cacheHitRatio: 0.2,
+      });
+      const cacheAuditId = (usageEvent?.payload as { cacheAuditId?: string }).cacheAuditId;
+      expect(cacheAuditId).toContain("turn-cache-audit");
+
+      const summaryPath = join(auditRoot, "session-cache-audit", cacheAuditId ?? "", "summary.json");
+      const summary = JSON.parse(await readFile(summaryPath, "utf8"));
+      expect(summary).toMatchObject({
+        cacheStatus: true,
+        cacheHitRatio: 0.2,
+        cacheHitTokens: 20,
+        cacheMissTokens: 80,
+      });
+    } finally {
+      await rm(auditRoot, { recursive: true, force: true });
+    }
   });
 
   it("writes aggregated assistant stream content to the run log", async () => {

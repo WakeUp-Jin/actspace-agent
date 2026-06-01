@@ -40,6 +40,7 @@ import type {
   LLMUsageCall,
   ToolExecutionMode,
 } from "./types";
+import type { CacheAuditPreparedCall, CacheAuditUsageMetadata } from "../observability/cache-audit";
 
 // ─── 核心循环入口 ───
 
@@ -119,10 +120,12 @@ async function runDualLoop(
 
       // 流式 LLM 调用
       const callId = `llm_call_${Date.now()}_${turnIndex}`;
+      const cacheAuditCall = await prepareCacheAuditCall(config, context, callId, turnIndex);
       const assistantMsg = await streamAssistantResponse(context, llm, signal, emit, config.thinkingEnabled);
+      const cacheAudit = await finishCacheAuditCall(config, cacheAuditCall, assistantMsg);
       newMessages.push(assistantMsg);
       accumulateUsage(totalUsage, assistantMsg.usage);
-      usageCalls.push({ callId, message: assistantMsg, usage: assistantMsg.usage });
+      usageCalls.push({ callId, message: assistantMsg, usage: assistantMsg.usage, ...(cacheAudit ? { cacheAudit } : {}) });
 
       // 错误/中止 → 直接退出
       if (assistantMsg.stopReason === "error" || assistantMsg.stopReason === "aborted") {
@@ -285,4 +288,33 @@ function findLastAssistant(messages: Message[]): AssistantMessage | undefined {
     if (msg.role === "assistant") return msg;
   }
   return undefined;
+}
+
+async function prepareCacheAuditCall(
+  config: AgentLoopConfig,
+  context: Context,
+  callId: string,
+  turnIndex: number,
+): Promise<CacheAuditPreparedCall | null> {
+  if (!config.cacheAudit) return null;
+  try {
+    return await config.cacheAudit.beforeLlmCall(context, { callId, turnIndex });
+  } catch (error) {
+    console.error("[cache-audit] beforeLlmCall failed", error);
+    return null;
+  }
+}
+
+async function finishCacheAuditCall(
+  config: AgentLoopConfig,
+  call: CacheAuditPreparedCall | null,
+  message: AssistantMessage,
+): Promise<CacheAuditUsageMetadata | null> {
+  if (!config.cacheAudit) return null;
+  try {
+    return await config.cacheAudit.afterLlmCall(call, message);
+  } catch (error) {
+    console.error("[cache-audit] afterLlmCall failed", error);
+    return null;
+  }
 }

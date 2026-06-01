@@ -16,6 +16,7 @@
 
 - `sessions/`
 - `tmp/`
+- `cache-audit/`：缓存低命中排障旁路目录，仅在低缓存事件附近固化上下文快照。
 
 ## `session.jsonl` 与 `context-state.json`
 
@@ -25,7 +26,7 @@
 
 每轮 turn 开始时，会话历史由 `ContextManager.createForSession({ sessionPath })`（实际由 `ConversationContext.createFromSession` 完成 `parseJsonl + sessionEventsToMessages`）在构造阶段一次性读回 `Message[]`，main 进程仅透传 sessionPath，不直接读 `session.jsonl`，也不接触消息转换函数。
 
-`llm_usage` 按每次模型回复写入，而不是按 turn 或 session 聚合。成本按当时共享模型配置计算后写入 usage，价格配置本身不写入事件。
+`llm_usage` 按每次模型回复写入，而不是按 turn 或 session 聚合。成本按当时共享模型配置计算后写入 usage，价格配置本身不写入事件。低缓存排障只在该 payload 中写轻量索引：`cacheStatus`、`cacheAuditId`、`cacheHitRatio`；完整上下文证据不进入 `session.jsonl`。
 
 DeepSeek Anthropic provider-native server tool 不会产生本地 `tool_call` / `tool_result` 事件；真实触发次数保存在 `llm_usage.payload.serverToolUse` 中，例如 `webSearchRequests` / `webFetchRequests`。
 
@@ -43,6 +44,9 @@ DeepSeek Anthropic provider-native server tool 不会产生本地 `tool_call` / 
 
 - `sessions/`
 - `tmp/`
+- `cache-audit/`
+
+`cache-audit/` 使用 `<userData>/cache-audit/<sessionId>/last.context.json` 保存上一轮真实 provider 输入的滚动快照；当模型返回的 cache hit ratio 低于阈值时，才在 `<cacheAuditId>/` 下固化 `summary.json`、`previous.context.json`、`current.context.json`、`diff.txt`。这些文件可能包含完整用户输入、工具结果和文件片段，只能保存在本地，不应上传或提交。
 
 ## Workspace Root 与 UserData 边界
 
