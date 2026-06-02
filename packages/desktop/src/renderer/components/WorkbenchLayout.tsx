@@ -1,4 +1,4 @@
-import type { AppSettings, ContextState, ContextUsageSnapshot, DeepSeekBalanceSnapshot, MessageBlock, ModelId, SessionListItem, UsageStatisticsSnapshot } from "@actspace/shared";
+import type { AppSettings, ContextState, ContextUsageSnapshot, DeepSeekBalanceSnapshot, MessageBlock, ModelId, SessionListItem, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
 import { useCallback, useEffect, useState } from "react";
 import { ConversationView } from "./ConversationView";
 import { LabPage } from "./LabPage";
@@ -9,7 +9,7 @@ import { Sidebar, type NewSessionInput, type SessionUiStatusKind, type SidebarMo
 import { SplitView } from "./SplitView";
 import { UsageStatisticsPage } from "./UsageStatisticsPage";
 import { WindowChromeBar } from "./WindowChromeBar";
-import type { ComposerSendOptions } from "./Composer";
+import type { ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
 import { KairosPage } from "../pages/KairosPage";
 import { SettingsPage } from "./settings/SettingsPage";
 
@@ -87,12 +87,17 @@ export function WorkbenchLayout({
   onAddWorkspace,
   onSelectSession,
   onTogglePin,
+  onRenameSession,
   onArchiveSession,
   isSessionReady = true,
   showDemoAttachments = false,
   defaultModelId,
   onSettingsChange,
   onArchivedSessionsChange,
+  workspaces,
+  workspaceOptions,
+  selectedWorkspaceRoot,
+  onSelectWorkspace,
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
@@ -111,12 +116,17 @@ export function WorkbenchLayout({
   onAddWorkspace?: () => void;
   onSelectSession?: (sessionId: string) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
+  onRenameSession?: (sessionId: string, title: string) => void;
   onArchiveSession?: (sessionId: string) => void;
   isSessionReady?: boolean;
   showDemoAttachments?: boolean;
   defaultModelId?: ModelId;
   onSettingsChange?: (settings: AppSettings) => void;
   onArchivedSessionsChange?: () => void;
+  workspaces?: WorkspaceEntry[];
+  workspaceOptions?: ComposerWorkspaceOption[];
+  selectedWorkspaceRoot?: string | null;
+  onSelectWorkspace?: (workspaceRoot: string) => void;
 }) {
   const [storedLayout] = useState(loadStoredLayout);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -334,6 +344,9 @@ export function WorkbenchLayout({
         isSessionReady={isSessionReady}
         showDemoAttachments={showDemoAttachments}
         defaultModelId={defaultModelId}
+        workspaceOptions={workspaceOptions}
+        selectedWorkspaceRoot={selectedWorkspaceRoot}
+        onSelectWorkspace={onSelectWorkspace}
       />
     );
   }
@@ -361,6 +374,7 @@ export function WorkbenchLayout({
         left={
           <Sidebar
             sessions={sessions}
+            workspaces={workspaces}
             activeSessionId={activeSessionId}
             mode={leftMode}
             view={view}
@@ -371,6 +385,7 @@ export function WorkbenchLayout({
             onAddWorkspace={onAddWorkspace}
             onSelectSession={onSelectSession}
             onTogglePin={onTogglePin}
+            onRename={onRenameSession}
             onArchive={onArchiveSession}
             onSelectView={handleSelectView}
           />
@@ -395,7 +410,15 @@ export function WorkbenchLayout({
         onLeftSeparatorDoubleClick={toggleSidebarMode}
         onRightResize={(width) => setRightWidth(clamp(width, RIGHT_MIN_WIDTH, rightMaxWidth))}
         onRightSeparatorDoubleClick={() => setRightWidth(RIGHT_DEFAULT_WIDTH)}
-        right={view === "chat" && isRightPanelOpen ? <RightPanel contextState={contextState} sessionId={activeSessionId} /> : undefined}
+        right={
+          view === "chat" && isRightPanelOpen ? (
+            <RightPanel
+              contextState={contextState}
+              sessionId={activeSessionId}
+              workspaceRoot={selectedWorkspaceRoot ?? undefined}
+            />
+          ) : undefined
+        }
         rightBounds={{ minWidth: RIGHT_MIN_WIDTH, maxWidth: rightMaxWidth }}
         rightSeparatorLabel="Resize preview panel"
         rightWidth={rightWidth}

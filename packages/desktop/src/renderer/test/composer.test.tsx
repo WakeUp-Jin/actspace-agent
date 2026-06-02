@@ -269,7 +269,17 @@ describe("Composer follow-up bar", () => {
 
   it("renders initial composer selectors with the input above the toolbar", async () => {
     const user = userEvent.setup();
-    const { onSend } = renderComposer({ surface: "initial" });
+    const onSelectWorkspace = vi.fn();
+    const { onSend } = renderComposer({
+      surface: "initial",
+      selectedWorkspaceRoot: "/work/actspace-agent",
+      workspaceOptions: [
+        { value: "/work/wakeup-Jin-wiki", label: "wakeup-Jin-wiki" },
+        { value: "/work/code-tool-work", label: "code-tool-work" },
+        { value: "/work/actspace-agent", label: "actspace-agent" },
+      ],
+      onSelectWorkspace,
+    });
     const panel = screen.getByLabelText("Message composer panel");
     const toolbar = screen.getByLabelText("Composer toolbar");
     const input = screen.getByLabelText("Message composer");
@@ -286,6 +296,14 @@ describe("Composer follow-up bar", () => {
     expect(toolbarButtons[0]).toHaveAccessibleName("Add agents, context, tools");
     expect(toolbarButtons[1]).toHaveAccessibleName(/deepseek-v4-pro/);
     expect(within(panel).queryByRole("button", { name: "Show context usage" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Select workspace" }));
+    const workspaceMenu = screen.getByRole("menu", { name: "actspace-agent options" });
+    expect(within(workspaceMenu).getByRole("menuitem", { name: "wakeup-Jin-wiki" })).toBeInTheDocument();
+    expect(within(workspaceMenu).getByRole("menuitem", { name: "code-tool-work" })).toBeInTheDocument();
+    await user.click(within(workspaceMenu).getByRole("menuitem", { name: "code-tool-work" }));
+    expect(onSelectWorkspace).toHaveBeenCalledWith("/work/code-tool-work");
+    expect(onSend).not.toHaveBeenCalled();
 
     await user.type(screen.getByLabelText("Message composer"), "start a new idea");
     await user.click(screen.getByRole("button", { name: "Send message" }));

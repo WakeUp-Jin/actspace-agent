@@ -61,6 +61,7 @@
 .chrome-center {
   flex: 1 1 auto;
   justify-content: center;
+  gap: 8px;
   min-width: 0;
   padding: 0 16px;
   -webkit-app-region: drag;

@@ -110,7 +110,7 @@ V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `lo
 
 ## Workspace 文件浏览器
 
-右侧面板提供一个轻量的 Workspace 文件浏览器：树 rail 常驻在浏览态左栏，点文件在右侧以普通 Tab 打开。树根是当前会话的 `workspaceRoot`，与 Agent 文件工具操作的根一致。
+右侧面板提供一个轻量的 Workspace 文件浏览器：树 rail 常驻在浏览态左栏，点文件在右侧以普通 Tab 打开。树根来自顶部 Workspace 选择器的当前选择；发送消息前该选择只停留在 renderer 本地状态，发送时才写入当前 session 的 `workspaceRoot`，随后与 Agent 文件工具操作的根一致。
 
 结构为纵向三段：
 
@@ -168,6 +168,7 @@ type WorkspaceReadFileResult = {
 main 侧服务规则：
 
 - renderer 不直接访问文件系统；树展开和文件读取都走 preload + IPC。
+- 顶部 Workspace 选择器允许用户在发送前多次切换；选择动作不迁移 session，只有发送消息时才把最终选择写入 session meta。
 - UI 浏览强约束在 `workspaceRoot` 内，`..` 逃逸返回 `escapes_root`。
 - 固定忽略 `node_modules`、`.git`、`.pnpm-store`、`dist`、`.next`、`.turbo`、`coverage`、`.DS_Store`。
 - 单目录最多列出 1000 条，目录在前、文件在后，各自按名称升序。

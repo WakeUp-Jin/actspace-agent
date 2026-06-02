@@ -18,8 +18,7 @@ vi.mock("@testing-library/react", async (importOriginal) => {
 
         return React.createElement(
           TooltipProvider,
-          { delayDuration: 0, skipDelayDuration: 0 },
-          wrappedChildren,
+          { delayDuration: 0, skipDelayDuration: 0, children: wrappedChildren },
         );
       }
 

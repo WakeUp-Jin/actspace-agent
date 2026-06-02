@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 import type {
   AbortTurnInput,
+  AgentSystemPromptFile,
   AgentTurnResult,
   AppSettings,
   ApprovalDecideInput,
@@ -40,6 +41,10 @@ import type {
   SessionListItem,
   SessionPinInput,
   SessionPinResult,
+  SessionRenameInput,
+  SessionRenameResult,
+  SessionWorkspaceInput,
+  SessionWorkspaceResult,
   SessionRecord,
   SetProviderKeyInput,
   SetProviderKeyResult,
@@ -54,8 +59,10 @@ import type {
   VisualizeReplyResult,
   WorkspaceListDirInput,
   WorkspaceListDirResult,
+  WorkspaceListResult,
   WorkspaceReadFileInput,
-  WorkspaceReadFileResult
+  WorkspaceReadFileResult,
+  WriteAgentSystemPromptInput
 } from "@actspace/shared";
 
 contextBridge.exposeInMainWorld("actspace", {
@@ -70,6 +77,7 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("visualize:convert-reply", input) as Promise<VisualizeReplyResult>,
   listVisualizations: (input: ListVisualizationsInput) =>
     ipcRenderer.invoke("visualize:list", input) as Promise<ListVisualizationsResult>,
+  listWorkspaces: () => ipcRenderer.invoke("workspace:list") as Promise<WorkspaceListResult>,
   listWorkspaceDir: (input: WorkspaceListDirInput) =>
     ipcRenderer.invoke("workspace:list-dir", input) as Promise<WorkspaceListDirResult>,
   readWorkspaceFile: (input: WorkspaceReadFileInput) =>
@@ -84,6 +92,10 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("deepseek:balance:get") as Promise<DeepSeekBalanceSnapshot>,
   createSession: (input?: SessionCreateInput) => ipcRenderer.invoke("session:create", input ?? {}) as Promise<SessionRecord>,
   pinSession: (input: SessionPinInput) => ipcRenderer.invoke("session:pin", input) as Promise<SessionPinResult>,
+  renameSession: (input: SessionRenameInput) =>
+    ipcRenderer.invoke("session:rename", input) as Promise<SessionRenameResult>,
+  setSessionWorkspace: (input: SessionWorkspaceInput) =>
+    ipcRenderer.invoke("session:set-workspace", input) as Promise<SessionWorkspaceResult>,
   archiveSession: (input: SessionArchiveInput) =>
     ipcRenderer.invoke("session:archive", input) as Promise<SessionArchiveResult>,
 
@@ -91,6 +103,10 @@ contextBridge.exposeInMainWorld("actspace", {
   listPendingApprovals: (input?: ApprovalListPendingInput) => ipcRenderer.invoke("approval:list-pending", input ?? {}) as Promise<PendingApprovalInfo[]>,
 
   getSettings: () => ipcRenderer.invoke("settings:get") as Promise<AppSettings>,
+  readAgentSystemPrompt: () =>
+    ipcRenderer.invoke("settings:read-agent-system-prompt") as Promise<AgentSystemPromptFile>,
+  writeAgentSystemPrompt: (input: WriteAgentSystemPromptInput) =>
+    ipcRenderer.invoke("settings:write-agent-system-prompt", input) as Promise<AgentSystemPromptFile>,
   updateSettings: (input: SettingsUpdateInput) =>
     ipcRenderer.invoke("settings:update", input) as Promise<AppSettings>,
   setProviderKey: (input: SetProviderKeyInput) =>

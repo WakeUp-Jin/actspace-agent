@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   DEFAULT_MODEL_ID,
   MODEL_LIST,
+  type AgentSystemPromptFile,
   type AppSettings,
   type LocalUpdateState,
   type ModelId,
@@ -55,14 +56,29 @@ const MOCK_SETTINGS: AppSettings = {
   version: 1,
   defaultModelId: null,
   providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: false } },
-  agent: { systemPrompt: "", temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
+  agent: {
+    systemPromptPath: "/mock/prompts/main-agent.md",
+    temperature: null,
+    maxTokens: null,
+    disabledTools: [],
+    bashAlwaysAsk: false,
+  },
   kairos: { modelId: null, thinking: "auto" },
+};
+
+const MOCK_PROMPT_FILE: AgentSystemPromptFile = {
+  path: "/mock/prompts/main-agent.md",
+  content: "",
 };
 
 const MODEL_OPTIONS: SelectOption[] = MODEL_LIST.map((spec) => ({ value: spec.id, label: spec.label }));
 
 function hasSettingsBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace?.getSettings);
+}
+
+function hasPromptFileBridge(): boolean {
+  return typeof window !== "undefined" && Boolean(window.actspace?.readAgentSystemPrompt);
 }
 
 function hasLocalUpdateBridge(): boolean {
@@ -522,19 +538,59 @@ function ModelSection({ settings, onUpdate, onConnectProvider, onClearProvider, 
 }
 
 function AgentSection({ settings, onUpdate }: SectionProps) {
-  const [draftPrompt, setDraftPrompt] = useState(settings.agent.systemPrompt);
+  const [promptFile, setPromptFile] = useState<AgentSystemPromptFile>(MOCK_PROMPT_FILE);
+  const [draftPrompt, setDraftPrompt] = useState(MOCK_PROMPT_FILE.content);
   const [saved, setSaved] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
 
   useEffect(() => {
-    setDraftPrompt(settings.agent.systemPrompt);
-  }, [settings.agent.systemPrompt]);
+    let cancelled = false;
 
-  const dirty = draftPrompt !== settings.agent.systemPrompt;
+    async function loadPrompt() {
+      setPromptError(null);
+      try {
+        const next = hasPromptFileBridge()
+          ? await window.actspace.readAgentSystemPrompt()
+          : { path: settings.agent.systemPromptPath, content: "" };
+        if (cancelled) return;
+        setPromptFile(next);
+        setDraftPrompt(next.content);
+        setSaved(false);
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load agent system prompt", error);
+        setPromptFile({ path: settings.agent.systemPromptPath, content: "" });
+        setDraftPrompt("");
+        setPromptError("读取系统提示词文件失败。");
+      }
+    }
+
+    void loadPrompt();
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.agent.systemPromptPath]);
+
+  const dirty = draftPrompt !== promptFile.content;
   const charCount = draftPrompt.length;
-  const savePrompt = () => {
-    onUpdate({ agent: { systemPrompt: draftPrompt } });
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 1800);
+  const savePrompt = async () => {
+    if (!hasPromptFileBridge()) {
+      setPromptFile({ ...promptFile, content: draftPrompt });
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 1800);
+      return;
+    }
+    setPromptError(null);
+    try {
+      const next = await window.actspace.writeAgentSystemPrompt({ content: draftPrompt });
+      setPromptFile(next);
+      setDraftPrompt(next.content);
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 1800);
+    } catch (error) {
+      console.error("Failed to save agent system prompt", error);
+      setPromptError("保存系统提示词文件失败。");
+    }
   };
 
   return (
@@ -544,6 +600,7 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
           <label htmlFor="agent-system-prompt" className="text-[14px] font-semibold text-text-main">
             自定义系统提示词
           </label>
+          <div className="break-all text-[12px] text-text-faint">{promptFile.path}</div>
           <textarea
             id="agent-system-prompt"
             value={draftPrompt}
@@ -560,20 +617,22 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
             <div className="text-[12px] text-text-faint">
               {charCount.toLocaleString()} / {AGENT_SYSTEM_PROMPT_MAX_CHARS.toLocaleString()}
               {saved && !dirty ? <span className="ml-2 text-on-success">已保存</span> : null}
+              {promptError ? <span className="ml-2 text-on-danger">{promptError}</span> : null}
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 className={BTN_SECONDARY}
                 onClick={() => {
-                  setDraftPrompt(settings.agent.systemPrompt);
+                  setDraftPrompt(promptFile.content);
                   setSaved(false);
+                  setPromptError(null);
                 }}
                 disabled={!dirty}
               >
                 撤销更改
               </button>
-              <button type="button" className={BTN_PRIMARY} onClick={savePrompt} disabled={!dirty}>
+              <button type="button" className={BTN_PRIMARY} onClick={() => void savePrompt()} disabled={!dirty}>
                 保存
               </button>
             </div>

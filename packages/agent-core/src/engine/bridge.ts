@@ -329,28 +329,42 @@ function describeMessageEntry(message: Message): { title: string; preview?: stri
  * 为 Context 完整视图「逐条」生成 entries（全文，不截断）。
  *
  * 仅由 main 进程 `context:describe` 打开视图时现场调用（不调用 LLM），不参与每轮持久化。
- * - systemPrompt：整段系统提示词作为单条（含 rules/skills 的 XML 子段）。
+ * - systemPrompt / rules / skills：按 ContextManager 提供的 systemPromptParts 来源分条。
  * - tools：每个工具一条，title=工具名，preview=完整描述。
  * - summarizedConversation：每条历史压缩摘要一条。
  * - conversation：每条普通消息一条，title 编码 role（User / Assistant / Tool·xxx）。
  *
- * rules/skills 当前作为 systemPrompt 的子段，无独立 entry；其 bucket 由前端按注册表
- * 兜底渲染为「空桶折叠保留」。
  */
 export function buildContextEntries(ctx: Context): ContextStateEntry[] {
   const entries: ContextStateEntry[] = [];
 
-  const systemPrompt = ctx.systemPrompt?.trim();
-  if (systemPrompt) {
-    entries.push({
-      id: "ctx_systemPrompt",
-      kind: "systemPrompt",
-      title: "System prompt",
-      estimatedTokens: estimateTokens(systemPrompt),
-      included: true,
-      removable: false,
-      preview: systemPrompt,
+  if (ctx.systemPromptParts && ctx.systemPromptParts.length > 0) {
+    ctx.systemPromptParts.forEach((part, index) => {
+      const content = part.content.trim();
+      if (!content) return;
+      entries.push({
+        id: `ctx_${part.bucket}_${part.id}_${index}`,
+        kind: part.bucket === "rules" || part.bucket === "skills" ? part.bucket : "systemPrompt",
+        title: part.title,
+        estimatedTokens: estimateTokens(content),
+        included: true,
+        removable: false,
+        preview: content,
+      });
     });
+  } else {
+    const systemPrompt = ctx.systemPrompt?.trim();
+    if (systemPrompt) {
+      entries.push({
+        id: "ctx_systemPrompt",
+        kind: "systemPrompt",
+        title: "System prompt",
+        estimatedTokens: estimateTokens(systemPrompt),
+        included: true,
+        removable: false,
+        preview: systemPrompt,
+      });
+    }
   }
 
   ctx.tools?.forEach((tool, index) => {

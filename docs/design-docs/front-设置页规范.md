@@ -33,6 +33,7 @@
   - `智能体 Agent`
   - `工具 Tools`
   - `外观 Appearance`
+  - `归档会话 Archived Chats`
 - 当前选中项使用轻量高亮背景，延续聊天态侧栏的克制视觉，不变成后台控制台。
 
 ### 右侧设置内容区
@@ -77,13 +78,19 @@
     - `代码字号`：CSS 变量 `--act-font-mono-size`，单独调代码/diff/bash 字号（默认 13px）。Electron 下整窗缩放会再乘一次，故写入前按缩放比反向补偿（`codeFontSize / zoom`），保证渲染恰为设定的 px。
   - **主题**：浅色 / 深色 / 跟随系统三态分段控件（`ThemeSegmented`）。由 `<html data-theme>` 驱动：`light`/`dark` 走 `:root[data-theme=...]` 覆盖；`system` 用 `:root[data-theme="system"]` 下的 `@media(prefers-color-scheme: dark)` 随 OS 切换。组件统一用语义类（`bg-surface`/`text-text-main`/`border-line`），主题只覆盖一组 `--act-color-*` 即整体翻转；数据可视化色走 `--act-chart-series-*`（浅深各一组）。原生交通灯 / 滚动条经 `appearance:set-theme` IPC → `nativeTheme.themeSource` 同步。
   - 外观偏好（字体、缩放、代码字号、主题）走 renderer `localStorage`，不进 `settings.json`；开机在 `main.tsx` 渲染前重放，避免闪烁。
+- 归档会话 Archived Chats
+  - 通过 `listSessions({ archived: true })` 读取已归档会话，不混入普通侧边栏列表。
+  - 每条展示标题、更新时间、turn 数和 workspace 摘要。
+  - 「恢复」按钮调用 `archiveSession({ sessionId, archived: false })`，恢复后刷新归档列表，并通知应用刷新普通会话列表。
+  - 恢复不会自动切换到该会话；它只重新出现在普通会话列表中。
+  - 空状态显示「暂无归档会话」。
 
 ## 配置存储与安全
 
 - 非敏感配置落 `<userData>/settings.json`（原子写）。
 - **供应商 API Key 用 Electron `safeStorage` 加密**单独落盘；UI 与 IPC 永不回传明文，仅返回「是否已配置」。
 - 本地更新源码目录落 `<userData>/local-update.json`，只保存路径；更新日志写 `<userData>/tmp/local-update/update.log`。`local-update:start` 只接受已保存且通过校验的源码目录，不接受 renderer 传入的任意命令或脚本内容。
-- 配置生效：main 把 env-backed 设置覆盖到 `process.env` 后 `loadEnv()` 刷新冻结的 `env`，**下一轮对话自动生效，无需重启**；主 Agent 系统提示词直接从 `settings.json` 注入下一轮 Agent runtime；Kairos 思考链变更时在空闲态重建 Kairos LLM。Kairos 模型不再走 settings/env：其唯一来源是 `preferences.json` 的 `modelId`，由 `kairos:write-config` 保存后按 modelId 变化触发空闲态重建。
+- 配置生效：main 把 env-backed 设置覆盖到 `process.env` 后 `loadEnv()` 刷新冻结的 `env`，**下一轮对话自动生效，无需重启**；`settings.json` 只保存主 Agent 系统提示词文件路径，正文由 `settings:read-agent-system-prompt` / `settings:write-agent-system-prompt` 读写 `<userData>/prompts/main-agent.md`，真实 turn 和 `context:describe` 都从同一 prompt 文件注入；Kairos 思考链变更时在空闲态重建 Kairos LLM。Kairos 模型不再走 settings/env：其唯一来源是 `preferences.json` 的 `modelId`，由 `kairos:write-config` 保存后按 modelId 变化触发空闲态重建。
 - UI 偏好（主题、UI/代码字体、界面缩放、代码字号）走 renderer `localStorage`，不进 `settings.json`；开机渲染前重放。
 
 ## 视觉原则

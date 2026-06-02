@@ -57,7 +57,7 @@ function tabFromFile(result: WorkspaceReadFileResult): RightPanelTab {
   }
 }
 
-function DirView({ relativePath, depth }: { relativePath: string; depth: number }) {
+function DirView({ relativePath, depth, workspaceRoot }: { relativePath: string; depth: number; workspaceRoot?: string }) {
   const [entries, setEntries] = useState<WorkspaceDirEntry[] | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
@@ -69,7 +69,7 @@ function DirView({ relativePath, depth }: { relativePath: string; depth: number 
       return;
     }
     setStatus("loading");
-    api({ relativePath })
+    api({ workspaceRoot, relativePath })
       .then((result) => {
         if (cancelled) return;
         // too_many_entries 仍返回前 N 条，按已截断列表渲染；其余错误码当作读失败。
@@ -86,7 +86,7 @@ function DirView({ relativePath, depth }: { relativePath: string; depth: number 
     return () => {
       cancelled = true;
     };
-  }, [relativePath]);
+  }, [relativePath, workspaceRoot]);
 
   if (status === "loading") {
     return (
@@ -112,13 +112,13 @@ function DirView({ relativePath, depth }: { relativePath: string; depth: number 
   return (
     <>
       {entries.map((entry) => (
-        <EntryRow key={entry.relativePath} entry={entry} depth={depth} />
+        <EntryRow key={entry.relativePath} entry={entry} depth={depth} workspaceRoot={workspaceRoot} />
       ))}
     </>
   );
 }
 
-function EntryRow({ entry, depth }: { entry: WorkspaceDirEntry; depth: number }) {
+function EntryRow({ entry, depth, workspaceRoot }: { entry: WorkspaceDirEntry; depth: number; workspaceRoot?: string }) {
   const { openTab } = useRightPanel();
   const [expanded, setExpanded] = useState(false);
   const [opening, setOpening] = useState(false);
@@ -139,7 +139,7 @@ function EntryRow({ entry, depth }: { entry: WorkspaceDirEntry; depth: number })
             {entry.name}
           </span>
         </button>
-        {expanded ? <DirView relativePath={entry.relativePath} depth={depth + 1} /> : null}
+        {expanded ? <DirView relativePath={entry.relativePath} depth={depth + 1} workspaceRoot={workspaceRoot} /> : null}
       </>
     );
   }
@@ -149,7 +149,7 @@ function EntryRow({ entry, depth }: { entry: WorkspaceDirEntry; depth: number })
     if (!api || opening) return;
     setOpening(true);
     try {
-      const result = await api({ relativePath: entry.relativePath });
+      const result = await api({ workspaceRoot, relativePath: entry.relativePath });
       openTab(tabFromFile(result));
     } catch {
       openTab({
@@ -179,14 +179,14 @@ function EntryRow({ entry, depth }: { entry: WorkspaceDirEntry; depth: number })
   );
 }
 
-export function WorkspaceFileTree() {
+export function WorkspaceFileTree({ workspaceRoot }: { workspaceRoot?: string }) {
   const available = typeof window !== "undefined" && typeof window.actspace?.listWorkspaceDir === "function";
 
   return (
     <div className={RAIL_CLASS}>
       <div className={RAIL_BODY_CLASS}>
         {available ? (
-          <DirView relativePath="" depth={0} />
+          <DirView relativePath="" depth={0} workspaceRoot={workspaceRoot} />
         ) : (
           <div className={STATE_CLASS}>当前环境不支持文件浏览。</div>
         )}

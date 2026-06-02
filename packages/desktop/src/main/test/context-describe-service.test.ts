@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createMeta } from "@actspace/agent-core";
+import { createMeta, MAIN_AGENT_SYSTEM_PROMPT } from "@actspace/agent-core";
 import { describeSessionContext } from "../context-describe-service";
 import type { AppDataRoots } from "../agent-turn";
 
@@ -25,6 +25,7 @@ async function makeRoots(): Promise<AppDataRoots> {
     sessionRoot,
     logRoot: join(dataRoot, "logs"),
     tmpRoot: join(dataRoot, "tmp"),
+    defaultWorkspaceRoot: dataRoot,
     workspaceRoot: dataRoot,
   };
 }
@@ -47,10 +48,11 @@ describe("describeSessionContext", () => {
     expect(tools.length).toBeGreaterThan(0);
     expect((tools[0]?.title ?? "").length).toBeGreaterThan(0);
     expect(tools.some((entry) => (entry.preview ?? "").length > 0)).toBe(true);
-    // 本模板 MAIN_AGENT_SYSTEM_PROMPT 为空串：systemPrompt 不产出 entry，且 bucket 合法地 0 token。
-    expect(state?.entries.some((e) => e.kind === "systemPrompt")).toBe(false);
+    const systemPrompt = state?.entries.find((e) => e.kind === "systemPrompt");
+    expect(systemPrompt?.title).toBe("Main agent system prompt");
+    expect(systemPrompt?.preview).toBe(MAIN_AGENT_SYSTEM_PROMPT);
     const systemBucket = state?.buckets.find((b) => (b.key ?? b.name) === "systemPrompt");
-    expect(systemBucket?.tokens ?? 0).toBe(0);
+    expect(systemBucket?.tokens ?? 0).toBeGreaterThan(0);
   });
 
   it("returns null when the session meta does not exist", async () => {

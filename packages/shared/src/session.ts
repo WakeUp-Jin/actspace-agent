@@ -173,6 +173,8 @@ export type SessionMeta = {
   updatedAt: string;
   createdAt: string;
   turnCount: number;
+  /** 工作区注册表里的稳定 id；旧 session 缺这个字段时按 workspaceRoot 或默认 workspace 兼容。 */
+  workspaceId?: string;
   /** 创建会话时的工作区根目录，用于侧边栏按 Workspace 分组；旧 session 缺这个字段时视为 default。 */
   workspaceRoot?: string;
   /** 用户是否把该会话钉到 Pinned 分区；缺省视为 false。 */

@@ -39,12 +39,15 @@ Renderer ──IPC──▶ Main Process ──调用──▶ Bridge ──驱�
 | `model` | `ModelId?` | 用户在下拉菜单选择 | 选定的模型 |
 | `thinkingEnabled` | `boolean?` | 用户切换 toggle | 是否启用思考 |
 
+Workspace 选择器不进入 `RunTurnInput`。用户可在发送前多次切换顶部 Workspace，下拉只更新 renderer 本地状态；真正发送时 renderer 先把最终选择写入当前 session `meta.workspaceRoot`，再发起 `agent:run-turn`。
+
 ## 2. Main Process 层
 
 **做什么：**
 - Electron app 生命周期（`configureAppPaths`、`createMainWindow`）
 - IPC handler 注册和路由
 - 调用 `buildAgentConfig()` 构建配置（前端参数 + 内部读 env）
+- 读取当前 session `meta.workspaceRoot`，缺省时回退应用默认 `workspaceRoot`
 - 调用 `await createAgentForSession(config, { sessionPath })` 创建运行时实例（会话历史在 ContextManager 构造阶段一次性恢复）
 - 调用 `runTurnWithAgent()` 执行 turn
 - 持久化 `AgentTurnResult` 到 session store
@@ -62,8 +65,10 @@ Renderer ──IPC──▶ Main Process ──调用──▶ Bridge ──驱�
 
 **配置两步法：**
 ```typescript
-const config = buildAgentConfig({ model, thinkingEnabled }, workspaceRoot);
 const sessionPaths = createSessionStorePaths(join(roots.sessionRoot, input.sessionId));
+const meta = await readMeta(sessionPaths.metaPath);
+const workspaceRoot = meta?.workspaceRoot ?? roots.workspaceRoot;
+const config = buildAgentConfig({ model, thinkingEnabled }, workspaceRoot);
 const deps = await createAgentForSession(config, { sessionPath: sessionPaths.sessionPath });
 ```
 
@@ -103,6 +108,7 @@ const deps = await createAgentForSession(config, { sessionPath: sessionPaths.ses
 用户输入 → Renderer
          → [IPC: RunTurnInput]
          → Main Process
+           → readMeta(session.metaPath).workspaceRoot ?? defaultRoot
            → buildAgentConfig(frontendInput, workspaceRoot)          → AgentConfig
            → await createAgentForSession(config, { sessionPath })    → AgentDeps（含已恢复历史的 ContextManager）
            → runTurnWithAgent(input, deps, { onStreamEvent })

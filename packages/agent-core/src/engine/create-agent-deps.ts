@@ -23,6 +23,7 @@ import { ToolManager } from "../tools/manager";
 import { createToolManager } from "../tools/index";
 import { ContextManager } from "../context/manager";
 import { SystemPromptContext } from "../context/modules/system-prompt";
+import type { PromptSegment } from "../context/types";
 import { MAIN_AGENT_SYSTEM_PROMPT } from "../prompt/main-agent";
 import { createSummarizer, type Summarizer } from "../context/compression/summarizer";
 import { env } from "../env";
@@ -58,7 +59,14 @@ export interface AgentConfig {
   modelSpec: ModelSpec;
   /** 主 Agent 当前使用的完整系统提示词。 */
   systemPrompt: string;
+  /** 附加规则/技能等系统级上下文段。 */
+  systemPromptSegments?: AgentSystemPromptSegment[];
 }
+
+export type AgentSystemPromptSegment = Omit<PromptSegment, "enabled" | "stability"> & {
+  enabled?: boolean;
+  stability?: number;
+};
 
 /** 运行时实例集合 */
 export interface AgentDeps {
@@ -79,6 +87,8 @@ export interface AgentRuntimeContext {
   sessionId?: string;
   /** 主 Agent 当前使用的完整系统提示词；不传则使用代码默认值。 */
   systemPrompt?: string;
+  /** 附加规则/技能等系统级上下文段，例如 AGENTS.md。 */
+  systemPromptSegments?: AgentSystemPromptSegment[];
 }
 
 // ─── 内部：env 读取 ───
@@ -175,6 +185,7 @@ export function buildAgentConfig(
     thinkingEnabled,
     modelSpec,
     systemPrompt: runtimeContext?.systemPrompt ?? MAIN_AGENT_SYSTEM_PROMPT,
+    systemPromptSegments: runtimeContext?.systemPromptSegments ?? [],
   };
 }
 
@@ -204,6 +215,7 @@ export function createAgentFromConfig(config: AgentConfig): AgentDeps {
   const summarizer = createSummarizerForAgent();
   const toolManager = createToolManager({ ...config.toolManagerConfig, summarizer });
   const systemPromptModule = new SystemPromptContext(config.systemPrompt);
+  registerSystemPromptSegments(systemPromptModule, config.systemPromptSegments);
   const contextManager = new ContextManager({
     systemPromptModule,
     config: { contextWindow: config.modelSpec.contextWindow },
@@ -235,6 +247,7 @@ export async function createAgentForSession(
   const summarizer = createSummarizerForAgent();
   const toolManager = createToolManager({ ...config.toolManagerConfig, summarizer });
   const systemPromptModule = new SystemPromptContext(config.systemPrompt);
+  registerSystemPromptSegments(systemPromptModule, config.systemPromptSegments);
   const contextManager = await ContextManager.createForSession({
     systemPromptModule,
     sessionPath: options.sessionPath,
@@ -248,4 +261,13 @@ export async function createAgentForSession(
     modelSpec: config.modelSpec,
     summarizer,
   };
+}
+
+function registerSystemPromptSegments(
+  systemPromptModule: SystemPromptContext,
+  segments: AgentSystemPromptSegment[] | undefined,
+): void {
+  for (const segment of segments ?? []) {
+    systemPromptModule.registerSegment(segment);
+  }
 }

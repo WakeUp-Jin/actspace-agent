@@ -22,6 +22,7 @@ async function makeRoots(): Promise<AppDataRoots> {
     sessionRoot,
     logRoot: join(dataRoot, "logs"),
     tmpRoot: join(dataRoot, "tmp"),
+    defaultWorkspaceRoot: dataRoot,
     workspaceRoot: dataRoot,
   };
 }

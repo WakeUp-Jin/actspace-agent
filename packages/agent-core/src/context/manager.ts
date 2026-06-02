@@ -13,7 +13,7 @@
  */
 
 import type { ContextUsageSnapshot } from "@actspace/shared";
-import type { Context, Message, Tool } from "../messages";
+import type { Context, ContextSystemPromptPart, Message, Tool } from "../messages";
 import type { ContextModule, CompressionConfig } from "./types";
 import { SystemPart, DEFAULT_COMPRESSION_CONFIG } from "./types";
 import { ConversationContext } from "./modules/conversation";
@@ -126,11 +126,14 @@ export class ContextManager {
    * 从模块收集 systemParts 并刷新 systemPrompt，附加 tools，返回完整输入。
    */
   getContext(): Context {
-    const systemPrompt = this.buildSystemPrompt();
+    const systemParts = this.collectSystemParts();
+    const systemPrompt = this.renderSystemPrompt(systemParts);
+    const systemPromptParts = this.describeSystemParts(systemParts);
     const messages = this.conversation.getMessages();
 
     return {
       systemPrompt,
+      systemPromptParts,
       messages,
       tools: this.tools.length > 0 ? this.tools : undefined,
     };
@@ -209,7 +212,8 @@ export class ContextManager {
   /** 生成 ContextUsageSnapshot（驱动前端 Context popup） */
   getUsageSnapshot(): ContextUsageSnapshot {
     const ctx = this.getContext();
-    const systemPromptTokens = ctx.systemPrompt ? estimateTokens(ctx.systemPrompt) : 0;
+    const systemPromptTokens = estimateSystemPromptPartTokens(ctx.systemPromptParts, "systemPrompt");
+    const rulesTokens = estimateSystemPromptPartTokens(ctx.systemPromptParts, "rules");
     const toolsTokens = ctx.tools ? estimateTokens(JSON.stringify(ctx.tools)) : 0;
 
     // 历史压缩产出的合成摘要是一条 source:"compaction" 的 UserMessage，单独成桶展示，
@@ -221,6 +225,7 @@ export class ContextManager {
 
     return createContextUsageSnapshot({
       systemPromptTokens,
+      rulesTokens,
       toolsTokens,
       conversationTokens,
       summarizedConversationTokens,
@@ -250,7 +255,7 @@ export class ContextManager {
    * 稳定性越高（如系统提示词 IMMUTABLE）越靠前，构成 DeepSeek prefix-cache 的不变前缀；
    * 同稳定性按收集顺序（index）做 tie-break，保持确定性、避免前缀字节漂移。
    */
-  private buildSystemPrompt(): string | undefined {
+  private collectSystemParts(): SystemPart[] {
     const allParts: SystemPart[] = [];
 
     const modules = [
@@ -270,8 +275,28 @@ export class ContextManager {
       .map((entry) => entry.part);
 
     const filtered = sorted.filter((p) => p.content.trim());
-    return filtered.length > 0
-      ? filtered.map((p) => p.render()).join("\n\n")
-      : undefined;
+    return filtered;
   }
+
+  private renderSystemPrompt(parts: SystemPart[]): string | undefined {
+    return parts.length > 0 ? parts.map((p) => p.render()).join("\n\n") : undefined;
+  }
+
+  private describeSystemParts(parts: SystemPart[]): ContextSystemPromptPart[] {
+    return parts.map((part, index) => ({
+      id: part.sourceId ?? `system_part_${index}`,
+      title: part.description || part.tag,
+      bucket: part.bucket,
+      content: part.content,
+    }));
+  }
+}
+
+function estimateSystemPromptPartTokens(
+  parts: ContextSystemPromptPart[] | undefined,
+  bucket: ContextSystemPromptPart["bucket"],
+): number {
+  return (parts ?? [])
+    .filter((part) => part.bucket === bucket)
+    .reduce((sum, part) => sum + estimateTokens(part.content), 0);
 }

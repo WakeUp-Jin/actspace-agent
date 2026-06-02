@@ -25,8 +25,8 @@ export interface ProviderSettingsView {
 }
 
 export interface AgentSettings {
-  /** 主 Agent 当前使用的完整系统提示词。 */
-  systemPrompt: string;
+  /** 主 Agent 系统提示词文件路径；正文由 main 进程单独读写，不长期存入 settings.json。 */
+  systemPromptPath: string;
   /** 主 Agent 采样温度；null = 用各 LLM service 默认。范围 0–2。 */
   temperature: number | null;
   /** 主 Agent 最大输出 token；null = 用默认。 */
@@ -67,6 +67,15 @@ export type SettingsUpdateInput = Partial<{
   agent: Partial<AgentSettings>;
   kairos: Partial<KairosSettings>;
 }>;
+
+export type AgentSystemPromptFile = {
+  path: string;
+  content: string;
+};
+
+export type WriteAgentSystemPromptInput = {
+  content: string;
+};
 
 export type SetProviderKeyInput = {
   provider: ProviderId;

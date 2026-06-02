@@ -47,6 +47,7 @@ export async function createSessionRecord(
   const paths = await ensureSessionStore(join(sessionRoot, sessionId));
   const title = input.title?.trim() || "New chat";
   const result = await createMeta(paths.metaPath, sessionId, title, {
+    workspaceId: input.workspaceId,
     workspaceRoot: input.workspaceRoot,
   });
   if (!result.ok) {
@@ -71,6 +72,21 @@ export async function setSessionPinned(
   return updateMeta(paths.metaPath, { pinned });
 }
 
+/** 更新 session 标题 */
+export async function setSessionTitle(
+  sessionRoot: string,
+  sessionId: string,
+  title: string,
+): Promise<WriteResult> {
+  const trimmed = title.trim();
+  if (!trimmed) {
+    return { ok: false, error: "title is required" };
+  }
+
+  const paths = createSessionStorePaths(join(sessionRoot, sessionId));
+  return updateMeta(paths.metaPath, { title: trimmed });
+}
+
 /** 更新 session 的 archived 状态 */
 export async function setSessionArchived(
   sessionRoot: string,
@@ -86,6 +102,7 @@ export async function setSessionWorkspace(
   sessionRoot: string,
   sessionId: string,
   workspaceRoot: string,
+  workspaceId?: string,
 ): Promise<WriteResult> {
   const trimmed = workspaceRoot.trim();
   if (!trimmed) {
@@ -93,7 +110,7 @@ export async function setSessionWorkspace(
   }
 
   const paths = createSessionStorePaths(join(sessionRoot, sessionId));
-  return updateMeta(paths.metaPath, { workspaceRoot: trimmed });
+  return updateMeta(paths.metaPath, { workspaceId, workspaceRoot: trimmed });
 }
 
 /** 写入一轮完整的 turn 结果（events + meta 更新） */
@@ -191,6 +208,7 @@ export async function listSessionRecords(
           updatedAt: meta.updatedAt,
           turnCount: meta.turnCount,
         };
+        if (meta.workspaceId) item.workspaceId = meta.workspaceId;
         if (meta.workspaceRoot) item.workspaceRoot = meta.workspaceRoot;
         if (meta.pinned) item.pinned = true;
         if (meta.archived) item.archived = true;

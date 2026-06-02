@@ -1,4 +1,4 @@
-import type { ModelApi } from "@actspace/shared";
+import type { ContextUsageBucketName, ModelApi } from "@actspace/shared";
 
 /**
  * Agent-core 内部消息类型体系
@@ -148,10 +148,18 @@ export interface Tool {
   parameters: Record<string, unknown>;
 }
 
+export interface ContextSystemPromptPart {
+  id: string;
+  title: string;
+  bucket: ContextUsageBucketName;
+  content: string;
+}
+
 // ─── Context（顶层容器） ───
 
 export interface Context {
   systemPrompt?: string;
+  systemPromptParts?: ContextSystemPromptPart[];
   messages: Message[];
   tools?: Tool[];
 }

@@ -5,7 +5,7 @@
  */
 
 // 类型
-export { SystemPart } from "./types";
+export { CACHE_STABILITY, SystemPart } from "./types";
 export type {
   ContextParts,
   ContextModule,

@@ -11,7 +11,7 @@ function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
     defaultModelId: null,
     providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: true } },
     agent: {
-      systemPrompt: "Default main agent prompt",
+      systemPromptPath: "/tmp/actspace/prompts/main-agent.md",
       temperature: null,
       maxTokens: null,
       disabledTools: [],
@@ -65,6 +65,14 @@ function renderSettingsPage(props: Parameters<typeof SettingsPage>[0] = { onBack
 describe("SettingsPage", () => {
   const getSettings = vi.fn(async () => makeSettings());
   const updateSettings = vi.fn(async (input) => makeSettings(input as Partial<AppSettings>));
+  const readAgentSystemPrompt = vi.fn(async () => ({
+    path: "/tmp/actspace/prompts/main-agent.md",
+    content: "Default main agent prompt",
+  }));
+  const writeAgentSystemPrompt = vi.fn(async (input: { content: string }) => ({
+    path: "/tmp/actspace/prompts/main-agent.md",
+    content: input.content,
+  }));
   const setProviderKey = vi.fn(async () => ({ ok: true }));
   const clearProviderKey = vi.fn(async () => ({ ok: true }));
   const testProviderConnection = vi.fn(async () => ({ ok: true, message: "连接成功" }));
@@ -82,6 +90,8 @@ describe("SettingsPage", () => {
   beforeEach(() => {
     getSettings.mockClear();
     updateSettings.mockClear();
+    readAgentSystemPrompt.mockClear();
+    writeAgentSystemPrompt.mockClear();
     setProviderKey.mockClear();
     clearProviderKey.mockClear();
     testProviderConnection.mockClear();
@@ -97,6 +107,8 @@ describe("SettingsPage", () => {
     window.actspace = {
       getSettings,
       updateSettings,
+      readAgentSystemPrompt,
+      writeAgentSystemPrompt,
       setProviderKey,
       clearProviderKey,
       testProviderConnection,
@@ -186,7 +198,7 @@ describe("SettingsPage", () => {
     });
   });
 
-  it("editing 主 Agent 系统提示词 saves it through settings", async () => {
+  it("editing 主 Agent 系统提示词 saves it through the prompt file", async () => {
     renderSettingsPage();
     await screen.findByRole("switch", { name: "自动审查" });
 
@@ -199,10 +211,9 @@ describe("SettingsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
-      expect(updateSettings).toHaveBeenCalledWith({
-        agent: { systemPrompt: "Use short Chinese answers." },
-      });
+      expect(writeAgentSystemPrompt).toHaveBeenCalledWith({ content: "Use short Chinese answers." });
     });
+    expect(updateSettings).not.toHaveBeenCalledWith(expect.objectContaining({ agent: expect.anything() }));
   });
 
   it("switching to 模型 shows connected state for kimi", async () => {

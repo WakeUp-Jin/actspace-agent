@@ -1,6 +1,6 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, BootstrapState, RunTurnInput, RuntimeStreamEvent, SessionListItem, SessionRecord } from "@actspace/shared";
+import type { AppSettings, BootstrapState, RunTurnInput, RuntimeStreamEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { TooltipProvider } from "../components/ui/Tooltip";
@@ -18,13 +18,24 @@ const defaultSettings: AppSettings = {
   version: 1,
   defaultModelId: null,
   providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: false } },
-  agent: { systemPrompt: "", temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
+  agent: {
+    systemPromptPath: "/tmp/actspace/prompts/main-agent.md",
+    temperature: null,
+    maxTokens: null,
+    disabledTools: [],
+    bashAlwaysAsk: false,
+  },
   kairos: { modelId: null, thinking: "auto" },
 };
 
 /** window.actspace 的设置相关方法默认 stub，供各用例 spread 进 mock。 */
 const settingsApiStub = {
   getSettings: async () => defaultSettings,
+  readAgentSystemPrompt: async () => ({ path: defaultSettings.agent.systemPromptPath, content: "" }),
+  writeAgentSystemPrompt: async (input: { content: string }) => ({
+    path: defaultSettings.agent.systemPromptPath,
+    content: input.content,
+  }),
   updateSettings: async () => defaultSettings,
   setProviderKey: async () => ({ ok: true }),
   clearProviderKey: async () => ({ ok: true }),
@@ -39,6 +50,42 @@ const settingsApiStub = {
   setNativeTheme: () => {},
   onShuttingDown: () => () => {},
 };
+
+function createWorkspaceRegistryFixture(createdAt: string, updatedAt = createdAt): WorkspaceListResult {
+  return {
+    version: 1,
+    defaultWorkspaceId: "default",
+    items: [
+      {
+        id: "default",
+        kind: "default",
+        label: "Default workspace",
+        path: "/tmp/downloads",
+        order: 0,
+        createdAt,
+        updatedAt,
+      },
+      {
+        id: "ws_source",
+        kind: "folder",
+        label: "workspace",
+        path: "/tmp/workspace",
+        order: 1,
+        createdAt,
+        updatedAt,
+      },
+      {
+        id: "ws_alt",
+        kind: "folder",
+        label: "alt-workspace",
+        path: "/tmp/alt-workspace",
+        order: 2,
+        createdAt,
+        updatedAt,
+      },
+    ],
+  };
+}
 
 function createEmptySessionRecord(sessionId: string): SessionRecord {
   const now = new Date().toISOString();
@@ -109,6 +156,7 @@ describe("App streaming user message", () => {
 
     window.actspace = {
       getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
@@ -177,6 +225,7 @@ describe("App streaming user message", () => {
 
     window.actspace = {
       getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
@@ -255,6 +304,7 @@ describe("App streaming user message", () => {
 
     window.actspace = {
       getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
@@ -387,6 +437,102 @@ describe("App streaming user message", () => {
         workspaceRoot: "/tmp/new-workspace",
       });
     });
+  });
+
+  it("defers moving the current session to the selected workspace until sending", async () => {
+    const sessionId = "session-workspace-switch";
+    const record = createEmptySessionRecord(sessionId);
+    record.meta.workspaceRoot = "/tmp/workspace";
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "Workspace source",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+        workspaceRoot: "/tmp/workspace",
+      },
+      {
+        id: "session-other-workspace",
+        title: "Other workspace",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+        workspaceRoot: "/tmp/alt-workspace",
+      },
+      {
+        id: "session-default-workspace",
+        title: "Default workspace chat",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+    const callOrder: string[] = [];
+    const setSessionWorkspace = vi.fn(async () => {
+      callOrder.push("set-workspace");
+      return { ok: true };
+    });
+    const runTurn = vi.fn(async () => {
+      callOrder.push("run-turn");
+      return {
+        sessionId,
+        turnId: "turn-workspace-switch",
+        status: "completed" as const,
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      };
+    });
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      setSessionWorkspace,
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      onAgentStream: () => () => {},
+      runTurn,
+    };
+
+    renderApp();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Select workspace" }));
+    const workspaceMenu = await screen.findByRole("menu", { name: /options$/ });
+    expect(within(workspaceMenu).getByRole("menuitem", { name: "Default workspace" })).toBeInTheDocument();
+    await userEvent.click(within(workspaceMenu).getByRole("menuitem", { name: "alt-workspace" }));
+
+    expect(setSessionWorkspace).not.toHaveBeenCalled();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "use the alternate workspace");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    await waitFor(() => {
+      expect(setSessionWorkspace).toHaveBeenCalledWith({
+        sessionId,
+        workspaceId: "ws_alt",
+        workspaceRoot: "/tmp/alt-workspace",
+      });
+      expect(runTurn).toHaveBeenCalledTimes(1);
+    });
+    expect(callOrder).toEqual(["set-workspace", "run-turn"]);
   });
 
   it("sends attachments through RunTurnInput and renders media analysis as a runtime tool line", async () => {

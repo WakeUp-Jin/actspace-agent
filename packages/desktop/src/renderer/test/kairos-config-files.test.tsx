@@ -9,7 +9,13 @@ function makeSettings(): AppSettings {
     version: 1,
     defaultModelId: null,
     providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: false } },
-    agent: { systemPrompt: "", temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
+    agent: {
+      systemPromptPath: "/tmp/actspace/prompts/main-agent.md",
+      temperature: null,
+      maxTokens: null,
+      disabledTools: [],
+      bashAlwaysAsk: false,
+    },
     kairos: { modelId: null, thinking: "auto" },
   };
 }

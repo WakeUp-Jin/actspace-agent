@@ -316,11 +316,13 @@ IPC 通道：
 
 - [x] 2026-06-02：完成需求澄清：当前会话不允许归档，当前会话归档按钮禁用。
 - [x] 2026-06-02：完成 active execution plan。
-- [ ] Task 1：shared 契约与 session store。
-- [ ] Task 2：main IPC、preload 与全局类型。
-- [ ] Task 3：侧边栏归档交互。
-- [ ] Task 4：设置页归档会话分区。
-- [ ] Task 5：文档、history 与收尾验证。
+- [x] Task 1：shared 契约与 session store。
+- [x] Task 2：main IPC、preload 与全局类型。
+- [x] Task 3：侧边栏归档交互。
+- [x] Task 4：设置页归档会话分区。
+- [x] Task 5：文档、history 与收尾验证。
+- [x] 2026-06-02：补齐 renderer 测试入口的 `TooltipProvider` 边界，归档相关 `sidebar.test.tsx` / `settings-page.test.tsx` 精确验收通过，完整 desktop 测试通过。
+- [x] 2026-06-02：完成真实 Electron 观察验收：侧边栏当前会话 Archive 禁用、非当前会话 Archive 可见；设置页「归档会话」通过真实 IPC 加载归档列表并显示「恢复」按钮。未点击恢复，避免改动本机真实 session 状态。
 
 ## 决策记录
 

@@ -16,7 +16,7 @@ function makeSettings(): AppSettings {
     defaultModelId: null,
     providers: { deepseek: { hasApiKey: true }, kimi: { hasApiKey: false } },
     agent: {
-      systemPrompt: "",
+      systemPromptPath: "/tmp/actspace/prompts/main-agent.md",
       temperature: null,
       maxTokens: null,
       disabledTools: [],

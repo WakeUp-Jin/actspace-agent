@@ -31,6 +31,12 @@ export type ComposerSendOptions = {
   attachments?: ComposerAttachment[];
 };
 
+export type ComposerWorkspaceOption = {
+  value: string;
+  label: string;
+  workspaceId?: string;
+};
+
 export type ComposerSurface = "followup" | "initial";
 export type ComposerInputLayout = "inline" | "stacked";
 
@@ -250,6 +256,9 @@ export function Composer({
   showDemoAttachments = false,
   defaultModelId,
   onExpandContext,
+  workspaceOptions = [],
+  selectedWorkspaceRoot,
+  onSelectWorkspace,
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
   isStreaming?: boolean;
@@ -263,6 +272,9 @@ export function Composer({
   defaultModelId?: ModelId;
   /** 提供时 Context 弹窗显示「展开完整视图」按钮，点击在右侧面板打开 Context Tab。 */
   onExpandContext?: () => void;
+  workspaceOptions?: ComposerWorkspaceOption[];
+  selectedWorkspaceRoot?: string | null;
+  onSelectWorkspace?: (workspaceRoot: string) => void;
 }) {
   const initialModelId = defaultModelId ?? DEFAULT_MODEL_ID;
   const [commandOpen, setCommandOpen] = useState(false);
@@ -302,6 +314,10 @@ export function Composer({
   const resolvedInputLayout: ComposerInputLayout =
     surface === "initial" || hasAttachments ? "stacked" : inputLayout ?? "inline";
   const placeholder = surface === "initial" ? "Plan, Build, / for commands, @ for context" : "Send follow-up";
+  const selectedWorkspaceLabel =
+    workspaceOptions.find((workspace) => workspace.value === selectedWorkspaceRoot)?.label ??
+    workspaceOptions[0]?.label ??
+    "Workspace";
 
   useEffect(() => {
     setAttachments(showDemoAttachments ? MOCK_ATTACHMENTS : []);
@@ -832,6 +848,12 @@ export function Composer({
   }
 
   function renderContextSelector(kind: ContextSelectorKind, label: string, icon?: "branch" | "runtime") {
+    const isWorkspaceSelector = kind === "workspace";
+    const menuItems =
+      isWorkspaceSelector && workspaceOptions.length > 0
+        ? workspaceOptions
+        : [{ value: label, label }];
+
     return (
       <div className={CONTROL_GROUP_CLASS}>
         <button
@@ -855,9 +877,22 @@ export function Composer({
         </button>
         {contextSelectorOpen === kind ? (
           <div className={DROPDOWN_MENU_CLASS} role="menu" aria-label={`${label} options`}>
-            <button className={COMMAND_MENU_BUTTON_CLASS} type="button" role="menuitem" onClick={() => setContextSelectorOpen(null)}>
-              <span>{label}</span>
-            </button>
+            {menuItems.map((item) => (
+              <button
+                className={COMMAND_MENU_BUTTON_CLASS}
+                type="button"
+                role="menuitem"
+                key={item.value}
+                onClick={() => {
+                  if (isWorkspaceSelector) {
+                    onSelectWorkspace?.(item.value);
+                  }
+                  setContextSelectorOpen(null);
+                }}
+              >
+                <span>{item.label}</span>
+              </button>
+            ))}
           </div>
         ) : null}
       </div>
@@ -869,7 +904,7 @@ export function Composer({
 
     return (
       <div className={INITIAL_CONTEXT_ROW_CLASS} aria-label="Initial composer context selectors">
-        {renderContextSelector("workspace", "actspace-agent")}
+        {renderContextSelector("workspace", selectedWorkspaceLabel)}
         {renderContextSelector("branch", "main", "branch")}
         {renderContextSelector("runtime", "Local", "runtime")}
       </div>

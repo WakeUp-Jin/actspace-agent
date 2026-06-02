@@ -80,6 +80,8 @@ export type SessionListItem = {
   title: string;
   updatedAt: string;
   turnCount: number;
+  /** workspace registry 的稳定 id；旧 session 可能缺失。 */
+  workspaceId?: string;
   /** 创建会话时的工作区根目录；旧 session 缺这个字段时由前端视作 default workspace。 */
   workspaceRoot?: string;
   /** 用户是否把该会话钉到 Pinned 分区。 */
@@ -174,13 +176,13 @@ export type WorkspaceListDirInput = {
   relativePath?: string;
 };
 
-export type WorkspaceEntryKind = "dir" | "file";
+export type WorkspaceDirEntryKind = "dir" | "file";
 
 export type WorkspaceDirEntry = {
   name: string;
   /** 相对 workspaceRoot 的 POSIX 路径。 */
   relativePath: string;
-  kind: WorkspaceEntryKind;
+  kind: WorkspaceDirEntryKind;
   /** 文件字节数；目录为 undefined。 */
   size?: number;
 };
@@ -219,8 +221,30 @@ export type WorkspaceReadFileResult = {
   error?: "not_found" | "not_a_file" | "too_large" | "binary" | "escapes_root";
 };
 
+export type WorkspaceEntryKind = "default" | "folder";
+
+export type WorkspaceEntry = {
+  id: string;
+  kind: WorkspaceEntryKind;
+  label: string;
+  path: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WorkspaceRegistry = {
+  version: 1;
+  defaultWorkspaceId: string;
+  items: WorkspaceEntry[];
+};
+
+export type WorkspaceListResult = WorkspaceRegistry;
+
 export type SessionCreateInput = {
   title?: string;
+  /** workspace registry 的稳定 id；与 workspaceRoot 一起写入 session meta。 */
+  workspaceId?: string;
   /** 创建时指定 workspace 根目录；不传由主进程从 BootstrapState 自动注入。 */
   workspaceRoot?: string;
 };
@@ -235,9 +259,20 @@ export type SessionPinResult = {
   error?: string;
 };
 
+export type SessionRenameInput = {
+  sessionId: string;
+  title: string;
+};
+
+export type SessionRenameResult = {
+  ok: boolean;
+  error?: string;
+};
+
 export type SessionWorkspaceInput = {
   sessionId: string;
-  workspaceRoot: string;
+  workspaceId?: string;
+  workspaceRoot?: string;
 };
 
 export type SessionWorkspaceResult = {

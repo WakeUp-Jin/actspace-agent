@@ -110,9 +110,21 @@
 
 ### 右侧 actions
 
-- 当前只放一个 **Archive** 按钮（`<Archive>` icon），22×22，hover 行时淡入，点击仅 noop（`title="Archive (coming soon)"`）。
-- 完整 Archive 功能（写 SessionMeta.archived、IPC、列表过滤）留作 follow-up。
+- 当前只放一个 **Archive** 按钮（`<Archive>` icon），22×22，hover 行时淡入。
+- 非当前会话点击 Archive 会调用 `archiveSession({ sessionId, archived: true })`，写入 `SessionMeta.archived` 后从普通侧边栏列表隐藏。
+- 当前 active session 不允许归档，Archive 按钮保持占位但禁用，`aria-label` / `title` 为 `Current session cannot be archived`，避免当前工作区被操作清空或自动跳转。
 - 行尾不再出现状态点。
+
+### 右键菜单与重命名
+
+- 会话行支持右键上下文菜单，首版菜单项为 **Pin / Unpin**、**Rename**、**Archive**。
+- 右键菜单是 renderer 内的轻量浮层，不调用 Electron 原生菜单；原因是 Rename 需要直接切换当前 React 行内编辑状态。
+- 菜单浮层使用 `bg-surface-raised` / `border-line` / `shadow-act-popover` / `text-text-main` 等主题 token，随浅色 / 深色主题翻转。
+- 点击 **Rename** 后，当前会话标题位置进入原地输入态：
+  - `Enter` 保存，`Esc` 取消，失焦保存。
+  - 空标题不保存，回退原标题。
+  - 输入框保持 13px / 500，与会话标题同密度，不把行撑成卡片。
+- 菜单里的 **Archive** 遵守行尾 Archive 同一限制：当前 active session 禁用归档。
 
 ## Settings 切换规则
 
@@ -164,10 +176,12 @@
 - `SessionMeta` 增加可选字段：
   - `workspaceRoot?: string`：创建会话时由主进程从 `BootstrapState.workspaceRoot` 注入。
   - `pinned?: boolean`：用户在前端 pin/unpin 时通过 IPC `session:pin` 更新。
-- `SessionListItem` 同步透出这两个字段，让前端按 workspace 分组并标记 pinned。
+- `archived?: boolean`：用户归档会话时通过 IPC `session:archive` 更新。
+- `SessionListItem` 同步透出这些字段，让前端按 workspace 分组并标记 pinned / archived。
 - 后端 `agent-core` 在创建 session 时根据 `SessionCreateInput.workspaceRoot` 写入 meta；列出时直接透出。
 - 切换 pin 走 `pinSession({ sessionId, pinned })`，主进程调用 `setSessionPinned` 重写 meta。
-- Archive 暂未接后端；前端按钮目前只占位，不调用任何 IPC。
+- 重命名走 `renameSession({ sessionId, title })`，主进程调用 `setSessionTitle` 重写既有 `SessionMeta.title`。
+- 切换 archive 走 `archiveSession({ sessionId, archived })`，主进程调用 `setSessionArchived` 重写 meta；普通 `listSessions()` 默认只返回未归档会话，设置页通过 `listSessions({ archived: true })` 读取归档列表。
 
 ## 设计原则
 

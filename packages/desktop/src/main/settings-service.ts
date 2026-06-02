@@ -20,12 +20,13 @@
  * - 任何读盘失败都回落默认/空，不向调用方抛错（与 Kairos 配置加载策略一致）。
  */
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { getEnv, loadEnv, MAIN_AGENT_SYSTEM_PROMPT } from "@actspace/agent-core";
 import {
   MODEL_REGISTRY,
   SETTINGS_PROVIDER_IDS,
   isPublicModelId,
+  type AgentSystemPromptFile,
   type AppSettings,
   type KairosModelId,
   type KairosThinkingMode,
@@ -37,6 +38,8 @@ import {
 const LLM_TEMPERATURE_DEFAULT = 0;
 const LLM_MAX_TOKENS_DEFAULT = 8192;
 const AGENT_SYSTEM_PROMPT_MAX_CHARS = 20_000;
+const PROMPTS_DIR = "prompts";
+const MAIN_AGENT_PROMPT_FILE = "main-agent.md";
 
 /** 供应商 API Key 的加解密接口；生产用 Electron safeStorage 实现，测试可注入假实现。 */
 export interface SecretCrypto {
@@ -59,6 +62,12 @@ interface PersistedSettings {
   defaultModelId: ModelId | null;
   agent: AppSettings["agent"];
   kairos: AppSettings["kairos"];
+}
+
+interface ReadSettingsResult {
+  settings: PersistedSettings;
+  legacySystemPrompt?: string;
+  needsWrite: boolean;
 }
 
 /** secrets.json 落盘形态：每个供应商一段 base64 密文。 */
@@ -93,13 +102,18 @@ export class SettingsService {
     this.dataRoot = options.dataRoot;
     this.crypto = options.crypto;
     this.reloadEnv = options.reloadEnv ?? (() => loadEnv());
-    this.settings = defaultSettingsFromEnv();
+    this.settings = defaultSettingsFromEnv(this.dataRoot);
     this.secrets = { version: 1 };
   }
 
   /** 启动时调用一次：读盘 → 合并默认 → 覆盖 process.env → 刷新 env。 */
   async load(): Promise<void> {
-    this.settings = await this.readSettingsFile();
+    const loadedSettings = await this.readSettingsFile();
+    this.settings = loadedSettings.settings;
+    await this.ensureAgentSystemPromptFile(loadedSettings.legacySystemPrompt);
+    if (loadedSettings.needsWrite) {
+      await this.writeSettingsFile();
+    }
     this.secrets = await this.readSecretsFile();
     this.loaded = true;
     this.applyToEnv();
@@ -127,7 +141,8 @@ export class SettingsService {
       this.settings.defaultModelId = isPublicModelId(input.defaultModelId) ? input.defaultModelId : null;
     }
     if (input.agent) {
-      this.settings.agent = sanitizeAgent({ ...this.settings.agent, ...input.agent });
+      this.settings.agent = sanitizeAgent({ ...this.settings.agent, ...input.agent }, this.settings.agent);
+      await this.ensureAgentSystemPromptFile();
     }
     if (input.kairos) {
       this.settings.kairos = sanitizeKairos({ ...this.settings.kairos, ...input.kairos });
@@ -135,6 +150,21 @@ export class SettingsService {
     await this.writeSettingsFile();
     this.applyToEnv();
     return this.get();
+  }
+
+  async readAgentSystemPrompt(): Promise<AgentSystemPromptFile> {
+    await this.ensureAgentSystemPromptFile();
+    return {
+      path: this.settings.agent.systemPromptPath,
+      content: await readFile(this.settings.agent.systemPromptPath, "utf8"),
+    };
+  }
+
+  async writeAgentSystemPrompt(content: string): Promise<AgentSystemPromptFile> {
+    await this.ensureAgentSystemPromptFile();
+    const nextContent = content.slice(0, AGENT_SYSTEM_PROMPT_MAX_CHARS);
+    await writeTextAtomic(this.settings.agent.systemPromptPath, nextContent);
+    return { path: this.settings.agent.systemPromptPath, content: nextContent };
   }
 
   async setProviderKey(provider: ProviderId, apiKey: string): Promise<{ ok: boolean; error?: string }> {
@@ -207,13 +237,13 @@ export class SettingsService {
     this.reloadEnv();
   }
 
-  private async readSettingsFile(): Promise<PersistedSettings> {
+  private async readSettingsFile(): Promise<ReadSettingsResult> {
     try {
       const raw = await readFile(join(this.dataRoot, SETTINGS_FILE), "utf8");
-      return mergePersistedSettings(JSON.parse(raw) as unknown);
+      return mergePersistedSettings(JSON.parse(raw) as unknown, this.dataRoot);
     } catch {
       // 缺文件 / 坏 JSON：从当前 env 播种默认，保证不覆盖用户 .env。
-      return defaultSettingsFromEnv();
+      return { settings: defaultSettingsFromEnv(this.dataRoot), needsWrite: true };
     }
   }
 
@@ -239,15 +269,31 @@ export class SettingsService {
   private async writeSecretsFile(): Promise<void> {
     await writeJsonAtomic(join(this.dataRoot, SECRETS_FILE), this.secrets);
   }
+
+  private async ensureAgentSystemPromptFile(legacySystemPrompt?: string): Promise<void> {
+    const filePath = this.settings.agent.systemPromptPath;
+    try {
+      await readFile(filePath, "utf8");
+      return;
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+    }
+
+    const initialContent =
+      legacySystemPrompt && legacySystemPrompt.trim().length > 0
+        ? legacySystemPrompt.slice(0, AGENT_SYSTEM_PROMPT_MAX_CHARS)
+        : MAIN_AGENT_SYSTEM_PROMPT;
+    await writeTextAtomic(filePath, initialContent);
+  }
 }
 
-function defaultSettingsFromEnv(): PersistedSettings {
+function defaultSettingsFromEnv(dataRoot: string): PersistedSettings {
   const env = getEnv();
   return {
     version: 1,
     defaultModelId: null,
     agent: {
-      systemPrompt: MAIN_AGENT_SYSTEM_PROMPT,
+      systemPromptPath: defaultSystemPromptPath(dataRoot),
       temperature: env.LLM_TEMPERATURE !== LLM_TEMPERATURE_DEFAULT ? env.LLM_TEMPERATURE : null,
       maxTokens: env.LLM_MAX_TOKENS !== LLM_MAX_TOKENS_DEFAULT ? env.LLM_MAX_TOKENS : null,
       disabledTools: [...env.ACTSPACE_DISABLED_TOOLS],
@@ -260,40 +306,46 @@ function defaultSettingsFromEnv(): PersistedSettings {
   };
 }
 
-function mergePersistedSettings(raw: unknown): PersistedSettings {
-  const seed = defaultSettingsFromEnv();
-  if (typeof raw !== "object" || raw === null) return seed;
+function mergePersistedSettings(raw: unknown, dataRoot: string): ReadSettingsResult {
+  const seed = defaultSettingsFromEnv(dataRoot);
+  if (typeof raw !== "object" || raw === null) return { settings: seed, needsWrite: true };
   const obj = raw as Record<string, unknown>;
   const agent = (obj.agent ?? {}) as Record<string, unknown>;
   const kairos = (obj.kairos ?? {}) as Record<string, unknown>;
+  const legacySystemPrompt = typeof agent.systemPrompt === "string" ? agent.systemPrompt : undefined;
+  const needsWrite =
+    typeof agent.systemPromptPath !== "string" ||
+    typeof agent.systemPrompt === "string" ||
+    obj.version !== 1;
   return {
-    version: 1,
-    defaultModelId: isModelId(obj.defaultModelId) ? obj.defaultModelId : null,
-    agent: sanitizeAgent({
-      systemPrompt: agent.systemPrompt as string | undefined,
-      temperature: agent.temperature as number | null | undefined,
-      maxTokens: agent.maxTokens as number | null | undefined,
-      disabledTools: agent.disabledTools as string[] | undefined,
-      bashAlwaysAsk: agent.bashAlwaysAsk as boolean | undefined,
-    }, seed.agent),
-    kairos: sanitizeKairos({
-      modelId: kairos.modelId as KairosModelId | null | undefined,
-      thinking: kairos.thinking as KairosThinkingMode | undefined,
-    }, seed.kairos),
+    needsWrite,
+    legacySystemPrompt,
+    settings: {
+      version: 1,
+      defaultModelId: isModelId(obj.defaultModelId) ? obj.defaultModelId : null,
+      agent: sanitizeAgent({
+        systemPromptPath: agent.systemPromptPath as string | undefined,
+        temperature: agent.temperature as number | null | undefined,
+        maxTokens: agent.maxTokens as number | null | undefined,
+        disabledTools: agent.disabledTools as string[] | undefined,
+        bashAlwaysAsk: agent.bashAlwaysAsk as boolean | undefined,
+      }, seed.agent),
+      kairos: sanitizeKairos({
+        modelId: kairos.modelId as KairosModelId | null | undefined,
+        thinking: kairos.thinking as KairosThinkingMode | undefined,
+      }, seed.kairos),
+    },
   };
 }
 
 function sanitizeAgent(
   input: Partial<AppSettings["agent"]>,
-  fallback: AppSettings["agent"] = defaultAgent(),
+  fallback: AppSettings["agent"],
 ): AppSettings["agent"] {
   const temperature = input.temperature;
   const maxTokens = input.maxTokens;
   return {
-    systemPrompt:
-      typeof input.systemPrompt === "string"
-        ? input.systemPrompt.slice(0, AGENT_SYSTEM_PROMPT_MAX_CHARS)
-        : fallback.systemPrompt,
+    systemPromptPath: sanitizeSystemPromptPath(input.systemPromptPath, fallback.systemPromptPath),
     temperature:
       typeof temperature === "number" && Number.isFinite(temperature) && temperature >= 0 && temperature <= 2
         ? temperature
@@ -325,16 +377,6 @@ function sanitizeKairos(
   };
 }
 
-function defaultAgent(): AppSettings["agent"] {
-  return {
-    systemPrompt: MAIN_AGENT_SYSTEM_PROMPT,
-    temperature: null,
-    maxTokens: null,
-    disabledTools: [],
-    bashAlwaysAsk: false,
-  };
-}
-
 function defaultKairos(): AppSettings["kairos"] {
   return { modelId: null, thinking: "auto" };
 }
@@ -352,4 +394,31 @@ async function writeJsonAtomic(filePath: string, value: unknown): Promise<void> 
   const tmp = `${filePath}.tmp`;
   await writeFile(tmp, JSON.stringify(value, null, 2) + "\n", "utf8");
   await rename(tmp, filePath);
+}
+
+async function writeTextAtomic(filePath: string, value: string): Promise<void> {
+  await mkdir(dirname(filePath), { recursive: true });
+  const tmp = `${filePath}.tmp`;
+  await writeFile(tmp, value, "utf8");
+  await rename(tmp, filePath);
+}
+
+function defaultSystemPromptPath(dataRoot: string): string {
+  return join(dataRoot, PROMPTS_DIR, MAIN_AGENT_PROMPT_FILE);
+}
+
+function sanitizeSystemPromptPath(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  return isAbsolute(trimmed) ? trimmed : join(dirname(fallback), trimmed);
+}
+
+function isNotFoundError(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: unknown }).code === "ENOENT",
+  );
 }

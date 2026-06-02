@@ -19,6 +19,7 @@ declare global {
       listVisualizations: (
         input: import("@actspace/shared").ListVisualizationsInput
       ) => Promise<import("@actspace/shared").ListVisualizationsResult>;
+      listWorkspaces?: () => Promise<import("@actspace/shared").WorkspaceListResult>;
       listWorkspaceDir: (
         input: import("@actspace/shared").WorkspaceListDirInput
       ) => Promise<import("@actspace/shared").WorkspaceListDirResult>;
@@ -44,6 +45,12 @@ declare global {
       pinSession: (
         input: import("@actspace/shared").SessionPinInput
       ) => Promise<import("@actspace/shared").SessionPinResult>;
+      renameSession?: (
+        input: import("@actspace/shared").SessionRenameInput
+      ) => Promise<import("@actspace/shared").SessionRenameResult>;
+      setSessionWorkspace?: (
+        input: import("@actspace/shared").SessionWorkspaceInput
+      ) => Promise<import("@actspace/shared").SessionWorkspaceResult>;
       archiveSession: (
         input: import("@actspace/shared").SessionArchiveInput
       ) => Promise<import("@actspace/shared").SessionArchiveResult>;
@@ -57,6 +64,10 @@ declare global {
         input?: import("@actspace/shared").ApprovalListPendingInput
       ) => Promise<import("@actspace/shared").PendingApprovalInfo[]>;
       getSettings: () => Promise<import("@actspace/shared").AppSettings>;
+      readAgentSystemPrompt: () => Promise<import("@actspace/shared").AgentSystemPromptFile>;
+      writeAgentSystemPrompt: (
+        input: import("@actspace/shared").WriteAgentSystemPromptInput
+      ) => Promise<import("@actspace/shared").AgentSystemPromptFile>;
       updateSettings: (
         input: import("@actspace/shared").SettingsUpdateInput
       ) => Promise<import("@actspace/shared").AppSettings>;

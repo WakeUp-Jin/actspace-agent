@@ -77,7 +77,7 @@ const MARKDOWN_EXTS = new Set([".md", ".markdown"]);
 const HTML_EXTS = new Set([".html", ".htm"]);
 
 function resolveRoot(input: { workspaceRoot?: string }, roots: AppDataRoots): string {
-  return resolve(input.workspaceRoot ?? roots.workspaceRoot);
+  return resolve(input.workspaceRoot ?? roots.defaultWorkspaceRoot);
 }
 
 /** 规范化相对路径为不含 `./`、`..`、首尾斜杠的 POSIX 形式；空 / "." → 根。 */

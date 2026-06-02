@@ -10,6 +10,8 @@ import {
   createSessionStorePaths,
   setSessionArchived,
   setSessionPinned,
+  setSessionWorkspace,
+  setSessionTitle,
   writeContextState,
 } from "../session-store";
 import { readMeta } from "../meta";
@@ -51,12 +53,15 @@ describe("session store", () => {
   });
 
   it("persists workspaceRoot on session meta when creating", async () => {
+    const workspaceId = "ws_foo_repo";
     const workspaceRoot = "/Users/test/projects/foo-repo";
     const record = await createSessionRecord(sessionRoot, {
       title: "Workspace-aware session",
+      workspaceId,
       workspaceRoot,
     });
 
+    expect(record.meta.workspaceId).toBe(workspaceId);
     expect(record.meta.workspaceRoot).toBe(workspaceRoot);
     expect(record.meta.pinned).toBe(false);
 
@@ -64,7 +69,33 @@ describe("session store", () => {
     expect(listed).toEqual([
       expect.objectContaining({
         id: record.meta.id,
+        workspaceId,
         workspaceRoot,
+      }),
+    ]);
+  });
+
+  it("updates workspaceId and workspaceRoot together", async () => {
+    const record = await createSessionRecord(sessionRoot, {
+      title: "Workspace switch",
+      workspaceId: "default",
+      workspaceRoot: "/Users/test/Downloads",
+    });
+
+    await expect(
+      setSessionWorkspace(sessionRoot, record.meta.id, "/Users/test/projects/next", "ws_next"),
+    ).resolves.toEqual({ ok: true });
+
+    const metaAfterSwitch = await readMeta(join(sessionRoot, record.meta.id, "meta.json"));
+    expect(metaAfterSwitch?.workspaceId).toBe("ws_next");
+    expect(metaAfterSwitch?.workspaceRoot).toBe("/Users/test/projects/next");
+
+    const listed = await listSessionRecords(sessionRoot);
+    expect(listed).toEqual([
+      expect.objectContaining({
+        id: record.meta.id,
+        workspaceId: "ws_next",
+        workspaceRoot: "/Users/test/projects/next",
       }),
     ]);
   });
@@ -85,6 +116,25 @@ describe("session store", () => {
     await expect(setSessionPinned(sessionRoot, record.meta.id, false)).resolves.toEqual({ ok: true });
     const metaAfterUnpin = await readMeta(join(sessionRoot, record.meta.id, "meta.json"));
     expect(metaAfterUnpin?.pinned).toBe(false);
+  });
+
+  it("renames a session via setSessionTitle and surfaces it in list/meta", async () => {
+    const record = await createSessionRecord(sessionRoot, { title: "Old title" });
+
+    await expect(setSessionTitle(sessionRoot, record.meta.id, "  New title  ")).resolves.toEqual({ ok: true });
+
+    const metaAfterRename = await readMeta(join(sessionRoot, record.meta.id, "meta.json"));
+    expect(metaAfterRename?.title).toBe("New title");
+
+    const listed = await listSessionRecords(sessionRoot);
+    expect(listed).toEqual([
+      expect.objectContaining({ id: record.meta.id, title: "New title" }),
+    ]);
+
+    await expect(setSessionTitle(sessionRoot, record.meta.id, "   ")).resolves.toEqual({
+      ok: false,
+      error: "title is required",
+    });
   });
 
   it("filters archived sessions out of the default list and restores them on unarchive", async () => {

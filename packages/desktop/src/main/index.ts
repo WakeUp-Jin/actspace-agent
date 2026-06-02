@@ -29,6 +29,7 @@ import type {
   SessionGetInput,
   SessionListInput,
   SessionPinInput,
+  SessionRenameInput,
   SessionWorkspaceInput,
   SetProviderKeyInput,
   SettingsUpdateInput,
@@ -39,6 +40,7 @@ import type {
   VisualizeReplyInput,
   DescribeContextInput,
   WorkspaceListDirInput,
+  WorkspaceListResult,
   WorkspaceReadFileInput,
 } from "@actspace/shared";
 import {
@@ -53,6 +55,7 @@ import {
   readSessionRecord,
   setSessionArchived,
   setSessionPinned,
+  setSessionTitle,
   setSessionWorkspace,
   createKairos,
   ShortMemoryStore,
@@ -60,10 +63,12 @@ import {
   type KairosController,
 } from "@actspace/agent-core";
 import type { SessionEvent, SessionRecord } from "@actspace/shared";
-import { runAndPersistTurn, abortTurn, type AppDataRoots } from "./agent-turn";
+import { runAndPersistTurn, abortTurn, type AgentRuntimeContextLoader, type AppDataRoots } from "./agent-turn";
 import { listVisualizations, visualizeReply } from "./visualize-service";
 import { describeSessionContext } from "./context-describe-service";
+import { loadMainAgentRuntimeContext } from "./agent-runtime-context";
 import { listWorkspaceDir, readWorkspaceFile } from "./workspace-fs-service";
+import { readWorkspaceRegistry, resolveWorkspaceSelection } from "./workspace-registry-service";
 import { LocalUpdateService } from "./local-update-service";
 import { PendingApprovalRegistry } from "./approval-registry";
 import {
@@ -182,6 +187,7 @@ async function ensureDataDirectories(): Promise<AppDataRoots> {
   const sessionRoot = join(dataRoot, "sessions");
   const logRoot = join(await getRepoRoot(), "logs");
   const tmpRoot = join(dataRoot, "tmp");
+  const defaultWorkspaceRoot = app.getPath("downloads");
   const workspaceRoot = await getWorkspaceRoot();
 
   await mkdir(sessionRoot, { recursive: true });
@@ -193,10 +199,11 @@ async function ensureDataDirectories(): Promise<AppDataRoots> {
     sessionRoot,
     logRoot,
     tmpRoot,
+    defaultWorkspaceRoot,
     workspaceRoot,
   });
 
-  return { dataRoot, sessionRoot, logRoot, tmpRoot, workspaceRoot };
+  return { dataRoot, sessionRoot, logRoot, tmpRoot, defaultWorkspaceRoot, workspaceRoot };
 }
 
 /**
@@ -209,11 +216,7 @@ async function ensureDataDirectories(): Promise<AppDataRoots> {
  *   这里保持职责单一。
  */
 async function loadAllSessionRecords(sessionRoot: string): Promise<SessionRecord[]> {
-  const [activeSummaries, archivedSummaries] = await Promise.all([
-    listSessionRecords(sessionRoot),
-    listSessionRecords(sessionRoot, { archived: true }),
-  ]);
-  const summaries = [...activeSummaries, ...archivedSummaries];
+  const summaries = await listAllSessionSummaries(sessionRoot);
   const records = await Promise.all(
     summaries.map(async (item) => {
       try {
@@ -228,6 +231,37 @@ async function loadAllSessionRecords(sessionRoot: string): Promise<SessionRecord
     }),
   );
   return records.filter((record): record is SessionRecord => record !== null);
+}
+
+async function listAllSessionSummaries(sessionRoot: string) {
+  const [activeSummaries, archivedSummaries] = await Promise.all([
+    listSessionRecords(sessionRoot),
+    listSessionRecords(sessionRoot, { archived: true }),
+  ]);
+  return [...activeSummaries, ...archivedSummaries];
+}
+
+async function readWorkspaceRegistryForRoots(roots: AppDataRoots): Promise<WorkspaceListResult> {
+  const sessions = await listAllSessionSummaries(roots.sessionRoot);
+  return readWorkspaceRegistry({
+    dataRoot: roots.dataRoot,
+    defaultWorkspaceRoot: roots.defaultWorkspaceRoot,
+    fallbackWorkspaceRoot: roots.workspaceRoot,
+    sessions,
+  });
+}
+
+async function resolveWorkspaceForRoots(
+  roots: AppDataRoots,
+  input: { workspaceId?: string; workspaceRoot?: string },
+) {
+  const sessions = await listAllSessionSummaries(roots.sessionRoot);
+  return resolveWorkspaceSelection({
+    dataRoot: roots.dataRoot,
+    defaultWorkspaceRoot: roots.defaultWorkspaceRoot,
+    fallbackWorkspaceRoot: roots.workspaceRoot,
+    sessions,
+  }, input);
 }
 
 /**
@@ -657,7 +691,7 @@ async function registerIpc() {
       sessionRoot: roots.sessionRoot,
       logRoot: roots.logRoot,
       tmpRoot: roots.tmpRoot,
-      workspaceRoot: roots.workspaceRoot
+      workspaceRoot: roots.defaultWorkspaceRoot,
     });
   });
 
@@ -676,7 +710,13 @@ async function registerIpc() {
         roots,
         getMainWindow,
         approvalRegistry,
-        () => getSettingsService().get().agent.systemPrompt,
+        (workspaceRoot) =>
+          loadMainAgentRuntimeContext({
+            dataRoot: roots.dataRoot,
+            workspaceRoot,
+            readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
+            warn: logMain,
+          }),
       );
       logMain("run turn completed", {
         sessionId: input.sessionId,
@@ -763,6 +803,11 @@ async function registerIpc() {
     return listVisualizations(input, roots);
   });
 
+  ipcMain.handle("workspace:list", async (): Promise<WorkspaceListResult> => {
+    const roots = await ensureDataDirectories();
+    return readWorkspaceRegistryForRoots(roots);
+  });
+
   ipcMain.handle("workspace:list-dir", async (_event, input: WorkspaceListDirInput) => {
     const roots = await ensureDataDirectories();
     return listWorkspaceDir(input, roots);
@@ -776,7 +821,14 @@ async function registerIpc() {
   ipcMain.handle("context:describe", async (_event, input: DescribeContextInput) => {
     const roots = await ensureDataDirectories();
     try {
-      return await describeSessionContext(input, roots, () => getSettingsService().get().agent.systemPrompt);
+      return await describeSessionContext(input, roots, (workspaceRoot) =>
+        loadMainAgentRuntimeContext({
+          dataRoot: roots.dataRoot,
+          workspaceRoot,
+          readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
+          warn: logMain,
+        }),
+      );
     } catch (error) {
       logMain("describe context failed", {
         sessionId: input.sessionId,
@@ -835,9 +887,14 @@ async function registerIpc() {
 
   ipcMain.handle("session:create", async (_event, input: SessionCreateInput = {}) => {
     const roots = await ensureDataDirectories();
+    const workspace = await resolveWorkspaceForRoots(roots, input);
+    if (workspace.ok === false) {
+      throw new Error(workspace.error);
+    }
     return createSessionRecord(roots.sessionRoot, {
       ...input,
-      workspaceRoot: input.workspaceRoot ?? roots.workspaceRoot,
+      workspaceId: workspace.workspaceId,
+      workspaceRoot: workspace.workspaceRoot,
     });
   });
 
@@ -846,6 +903,35 @@ async function registerIpc() {
     const result = await setSessionPinned(roots.sessionRoot, input.sessionId, input.pinned);
     if (!result.ok) {
       logMain("session pin failed", { sessionId: input.sessionId, error: result.error });
+    }
+    return result;
+  });
+
+  ipcMain.handle("session:rename", async (_event, input: SessionRenameInput) => {
+    const roots = await ensureDataDirectories();
+    const result = await setSessionTitle(roots.sessionRoot, input.sessionId, input.title);
+    if (!result.ok) {
+      logMain("session rename failed", { sessionId: input.sessionId, error: result.error });
+    }
+    return result;
+  });
+
+  ipcMain.handle("session:set-workspace", async (_event, input: SessionWorkspaceInput) => {
+    const roots = await ensureDataDirectories();
+    const workspace = await resolveWorkspaceForRoots(roots, input);
+    if (workspace.ok === false) {
+      const result = { ok: false, error: workspace.error };
+      logMain("session workspace update failed", { sessionId: input.sessionId, error: result.error });
+      return result;
+    }
+    const result = await setSessionWorkspace(
+      roots.sessionRoot,
+      input.sessionId,
+      workspace.workspaceRoot,
+      workspace.workspaceId,
+    );
+    if (!result.ok) {
+      logMain("session workspace update failed", { sessionId: input.sessionId, error: result.error });
     }
     return result;
   });
@@ -871,6 +957,14 @@ async function registerIpc() {
   // ─── 设置 ───
   ipcMain.handle("settings:get", async () => {
     return getSettingsService().get();
+  });
+
+  ipcMain.handle("settings:read-agent-system-prompt", async () => {
+    return getSettingsService().readAgentSystemPrompt();
+  });
+
+  ipcMain.handle("settings:write-agent-system-prompt", async (_event, input: { content?: unknown }) => {
+    return getSettingsService().writeAgentSystemPrompt(typeof input.content === "string" ? input.content : "");
   });
 
   ipcMain.handle("settings:update", async (_event, input: SettingsUpdateInput) => {

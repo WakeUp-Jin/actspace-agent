@@ -45,6 +45,7 @@ export function createEmptyBuckets(): ContextUsageBucket[] {
 
 export interface SnapshotInput {
   systemPromptTokens: number;
+  rulesTokens?: number;
   toolsTokens: number;
   conversationTokens: number;
   /** 压缩摘要消息（source:"compaction"）的估算 token，单独成桶展示 */
@@ -56,8 +57,10 @@ export interface SnapshotInput {
 export function createContextUsageSnapshot(input: SnapshotInput): ContextUsageSnapshot {
   const maxTokens = input.maxTokens ?? 200_000;
   const summarizedConversationTokens = input.summarizedConversationTokens ?? 0;
+  const rulesTokens = input.rulesTokens ?? 0;
   const totalTokens =
     input.systemPromptTokens +
+    rulesTokens +
     input.toolsTokens +
     input.conversationTokens +
     summarizedConversationTokens;
@@ -66,6 +69,7 @@ export function createContextUsageSnapshot(input: SnapshotInput): ContextUsageSn
   const buckets = createEmptyBuckets();
   const bucketMap = new Map(buckets.map((b) => [b.name, b]));
   bucketMap.get("systemPrompt")!.tokens = input.systemPromptTokens;
+  bucketMap.get("rules")!.tokens = rulesTokens;
   bucketMap.get("tools")!.tokens = input.toolsTokens;
   bucketMap.get("summarizedConversation")!.tokens = summarizedConversationTokens;
   bucketMap.get("conversation")!.tokens = input.conversationTokens;

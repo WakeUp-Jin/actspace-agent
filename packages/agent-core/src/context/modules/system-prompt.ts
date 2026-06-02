@@ -24,6 +24,8 @@ export class SystemPromptContext implements ContextModule {
     this.segments.set(CORE_SEGMENT_ID, {
       id: CORE_SEGMENT_ID,
       content: corePrompt,
+      title: "Main agent system prompt",
+      bucket: "systemPrompt",
       priority: CORE_PRIORITY,
       stability: CACHE_STABILITY.IMMUTABLE,
       enabled: true,
@@ -40,6 +42,8 @@ export class SystemPromptContext implements ContextModule {
     this.segments.set(segment.id, {
       id: segment.id,
       content: segment.content,
+      title: segment.title,
+      bucket: segment.bucket,
       priority: segment.priority,
       stability: segment.stability ?? CACHE_STABILITY.STABLE,
       enabled: segment.enabled ?? true,
@@ -79,6 +83,12 @@ export class SystemPromptContext implements ContextModule {
    * 排序键：稳定性降序 → priority 降序 → id 升序（确定性，避免前缀字节漂移）。
    */
   getPrompt(): string {
+    return this.getEnabledSegments()
+      .map((s) => s.content)
+      .join("\n\n");
+  }
+
+  private getEnabledSegments(): PromptSegment[] {
     return Array.from(this.segments.values())
       .filter((s) => s.enabled)
       .sort(
@@ -86,22 +96,23 @@ export class SystemPromptContext implements ContextModule {
           b.stability - a.stability ||
           b.priority - a.priority ||
           a.id.localeCompare(b.id),
-      )
-      .map((s) => s.content)
-      .join("\n\n");
+      );
   }
 
   format(): ContextParts {
     return {
-      systemParts: [
-        // 系统提示词整体含核心指令，是整会话不变的前缀，标为 IMMUTABLE。
-        new SystemPart(
-          "system_prompt",
-          "核心指令与行为规范",
-          this.getPrompt(),
-          CACHE_STABILITY.IMMUTABLE,
-        ),
-      ],
+      systemParts: this.getEnabledSegments().map((segment) => {
+        const bucket = segment.bucket ?? "systemPrompt";
+        const tag = bucket === "rules" ? "rules" : bucket === "skills" ? "skills" : "system_prompt";
+        return new SystemPart(
+          tag,
+          segment.title ?? segment.id,
+          segment.content,
+          segment.stability,
+          bucket,
+          segment.id,
+        );
+      }),
       messages: [],
     };
   }

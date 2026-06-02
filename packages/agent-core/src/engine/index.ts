@@ -34,4 +34,11 @@ export {
   buildLLMConfig,
   resolveAgentEnvConfig,
 } from "./create-agent-deps";
-export type { FrontendTurnInput, AgentEnvConfig, AgentConfig, AgentDeps } from "./create-agent-deps";
+export type {
+  AgentRuntimeContext,
+  AgentSystemPromptSegment,
+  FrontendTurnInput,
+  AgentEnvConfig,
+  AgentConfig,
+  AgentDeps,
+} from "./create-agent-deps";

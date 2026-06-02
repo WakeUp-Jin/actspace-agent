@@ -19,10 +19,10 @@ function ActiveTabProbe() {
   return <div data-testid="active-tab">{activeTab ? `${activeTab.kind}|${language}|${activeTab.title}` : "none"}</div>;
 }
 
-function renderTree() {
+function renderTree(workspaceRoot?: string) {
   return render(
     <RightPanelProvider>
-      <WorkspaceFileTree />
+      <WorkspaceFileTree workspaceRoot={workspaceRoot} />
       <ActiveTabProbe />
     </RightPanelProvider>,
   );
@@ -60,7 +60,7 @@ describe("WorkspaceFileTree", () => {
     });
     installBridge({ listWorkspaceDir });
 
-    renderTree();
+    renderTree("/ws");
 
     expect(await screen.findByText("src")).toBeInTheDocument();
     expect(screen.getByText("readme.md")).toBeInTheDocument();
@@ -72,7 +72,7 @@ describe("WorkspaceFileTree", () => {
     // 展开目录懒加载其子项。
     expect(await screen.findByText("index.ts")).toBeInTheDocument();
     expect(listWorkspaceDir).toHaveBeenCalledTimes(2);
-    expect(listWorkspaceDir).toHaveBeenLastCalledWith({ relativePath: "src" });
+    expect(listWorkspaceDir).toHaveBeenLastCalledWith({ workspaceRoot: "/ws", relativePath: "src" });
   });
 
   it("opens a code file as a text tab carrying the inferred language", async () => {
@@ -94,14 +94,14 @@ describe("WorkspaceFileTree", () => {
       readWorkspaceFile,
     });
 
-    renderTree();
+    renderTree("/ws-selected");
 
     await userEvent.click(await screen.findByText("main.ts"));
 
     await waitFor(() => {
       expect(screen.getByTestId("active-tab")).toHaveTextContent("text|typescript|main.ts");
     });
-    expect(readWorkspaceFile).toHaveBeenCalledWith({ relativePath: "main.ts" });
+    expect(readWorkspaceFile).toHaveBeenCalledWith({ workspaceRoot: "/ws-selected", relativePath: "main.ts" });
   });
 
   it("degrades gracefully when the file IPC bridge is unavailable", async () => {

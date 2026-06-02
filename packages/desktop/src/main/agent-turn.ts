@@ -14,6 +14,7 @@ import type { AgentTurnResult, RunTurnInput, RuntimeStreamEvent } from "@actspac
 import {
   buildAgentConfig,
   createAgentForSession,
+  type AgentRuntimeContext,
   type AgentRunLogger,
   cleanupOldAgentRunLogs,
   cleanupOldToolOutputs,
@@ -21,6 +22,7 @@ import {
   createCacheAuditTracker,
   runTurnWithAgent,
   createSessionStorePaths,
+  readMeta,
   writeSessionResult,
 } from "@actspace/agent-core";
 import type { PendingApprovalRegistry } from "./approval-registry";
@@ -31,8 +33,13 @@ export type AppDataRoots = {
   sessionRoot: string;
   logRoot: string;
   tmpRoot: string;
+  defaultWorkspaceRoot: string;
   workspaceRoot: string;
 };
+
+export type AgentRuntimeContextLoader = (
+  workspaceRoot: string,
+) => Promise<Pick<AgentRuntimeContext, "systemPrompt" | "systemPromptSegments">>;
 
 const PREVIEW_LIMIT = 160;
 
@@ -86,7 +93,7 @@ export async function runAndPersistTurn(
   roots: AppDataRoots,
   getMainWindow: () => BrowserWindow | undefined,
   approvalRegistry?: PendingApprovalRegistry,
-  getSystemPrompt?: () => string,
+  loadRuntimeContext?: AgentRuntimeContextLoader,
 ): Promise<AgentTurnResult> {
   logAgentTurn("run turn requested", {
     sessionId: input.sessionId,
@@ -131,25 +138,29 @@ export async function runAndPersistTurn(
 
   approvalRegistry?.setCurrentTurn(input.sessionId, input.turnId);
 
+  const sessionDir = join(roots.sessionRoot, input.sessionId);
+  const sessionPaths = createSessionStorePaths(sessionDir);
+  const sessionMeta = await readMeta(sessionPaths.metaPath);
+  const turnWorkspaceRoot = sessionMeta?.workspaceRoot ?? roots.defaultWorkspaceRoot;
+  const runtimeContext = await loadRuntimeContext?.(turnWorkspaceRoot);
+
   const config = buildAgentConfig(
     { model: input.model, thinkingEnabled: input.thinkingEnabled },
-    roots.workspaceRoot,
+    turnWorkspaceRoot,
     approvalRegistry,
     {
       tmpRoot: roots.tmpRoot,
       sessionId: input.sessionId,
-      systemPrompt: getSystemPrompt?.(),
+      ...runtimeContext,
     },
   );
-  const sessionDir = join(roots.sessionRoot, input.sessionId);
-  const sessionPaths = createSessionStorePaths(sessionDir);
   const deps = await createAgentForSession(config, {
     sessionPath: sessionPaths.sessionPath,
   });
 
   const priorMessageCount = deps.contextManager.getMessageCount();
   logAgentTurn("agent dependencies ready", {
-    workspaceRoot: roots.workspaceRoot,
+    workspaceRoot: turnWorkspaceRoot,
     modelId: deps.modelSpec.id,
     provider: deps.modelSpec.provider,
     apiModel: deps.modelSpec.apiModel,
@@ -158,7 +169,7 @@ export async function runAndPersistTurn(
   });
   await writeAgentRunLog(runLogger, "main_event", {
     stage: "agent_dependencies_ready",
-    workspaceRoot: roots.workspaceRoot,
+    workspaceRoot: turnWorkspaceRoot,
     sessionPath: sessionPaths.sessionPath,
     priorMessageCount,
   });

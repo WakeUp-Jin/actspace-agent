@@ -11,6 +11,7 @@
  * 代码参考：.agents/skills/llm-agent-dev/examples/context-manager.ts
  */
 
+import type { ContextUsageBucketName } from "@actspace/shared";
 import type { Message } from "../messages";
 
 // ─── 缓存稳定性档位 ───
@@ -46,6 +47,10 @@ export class SystemPart {
     public content: string,
     /** 缓存稳定性（越大越靠前），由 ContextManager 组装系统提示词时排序读取 */
     public stability: number = CACHE_STABILITY.STABLE,
+    /** 该 system part 在 Context 用量与明细中归属的 bucket。 */
+    public bucket: ContextUsageBucketName = "systemPrompt",
+    /** Context 明细里稳定展示的来源 id；缺省时由 ContextManager 兜底生成。 */
+    public sourceId?: string,
   ) {}
 
   /** 渲染为 <tag description="...">内容</tag> 格式 */
@@ -77,6 +82,10 @@ export interface ContextModule {
 export interface PromptSegment {
   id: string;
   content: string;
+  /** Context 明细标题；缺省使用 id。 */
+  title?: string;
+  /** Context 用量 bucket；默认 systemPrompt，AGENTS.md 等规则用 rules。 */
+  bucket?: ContextUsageBucketName;
   /** 优先级数值，越高越靠前。核心指令通常为 100 */
   priority: number;
   /** 缓存稳定性档位（CACHE_STABILITY），同稳定性内再按 priority 排序。核心段为 IMMUTABLE */

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { SessionListItem } from "@actspace/shared";
@@ -43,6 +43,7 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
   const onSelectSession = vi.fn();
   const onTogglePin = vi.fn();
   const onSelectView = vi.fn();
+  const onRename = vi.fn();
   const onArchive = vi.fn();
 
   const result = render(
@@ -56,13 +57,14 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
         onSelectSession={onSelectSession}
         onTogglePin={onTogglePin}
         onSelectView={onSelectView}
+        onRename={onRename}
         onArchive={onArchive}
         {...overrides}
       />
     </TooltipProvider>,
   );
 
-  return { onNewSession, onSelectSession, onTogglePin, onSelectView, onArchive, ...result };
+  return { onNewSession, onSelectSession, onTogglePin, onSelectView, onRename, onArchive, ...result };
 }
 
 describe("Sidebar (cursor-aligned layout)", () => {
@@ -118,6 +120,22 @@ describe("Sidebar (cursor-aligned layout)", () => {
     await userEvent.click(archiveButtons[0]);
 
     expect(onArchive).toHaveBeenCalled();
+  });
+
+  it("opens the session context menu and commits inline rename with Enter", async () => {
+    const user = userEvent.setup();
+    const { onRename } = renderSidebar();
+
+    const row = screen.getByText("工具定义格式和命名规范").closest(".session-row");
+    expect(row).not.toBeNull();
+    fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
+
+    await user.click(screen.getByRole("menuitem", { name: "Rename" }));
+    const input = screen.getByRole("textbox", { name: "Rename session 工具定义格式和命名规范" });
+    await user.clear(input);
+    await user.type(input, "重命名后的会话{Enter}");
+
+    expect(onRename).toHaveBeenCalledWith("s-actspace-1", "重命名后的会话");
   });
 
   it("disables archive on the active session row", async () => {
@@ -186,6 +204,16 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(within(activeRow as HTMLElement).getByText("Conversation context lookup").closest(".session-row")).toHaveClass(
       "is-busy",
     );
+  });
+
+  it("falls back to idle when a session status is unknown at runtime", () => {
+    renderSidebar({
+      sessions: [SESSIONS[1]],
+      sessionStatuses: { "s-actspace-1": "paused_by_old_hmr" },
+    });
+
+    expect(screen.getByText("工具定义格式和命名规范")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Session status: Idle" })).toBeInTheDocument();
   });
 
   it("collapses Pinned section when its label is clicked", async () => {
@@ -263,6 +291,7 @@ describe("WindowChromeBar", () => {
     expect(screen.getByRole("button", { name: "Search sessions" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open panel" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Workspace > New chat" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Select workspace for next message" })).not.toBeInTheDocument();
   });
 
   it("flips the left toggle aria-label / aria-pressed when sidebar is hidden", () => {

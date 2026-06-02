@@ -50,7 +50,15 @@ const RIGHT_PANEL_BODY_CLASS = "min-h-0 flex-1 overflow-auto p-[18px] leading-[1
 const RIGHT_PANEL_HEADING_CLASS = "m-0 mb-2 text-[15px] font-semibold";
 const RIGHT_PANEL_TEXT_CLASS = "m-0 text-[13px] text-text-muted";
 
-export function RightPanel({ contextState, sessionId }: { contextState?: ContextState | null; sessionId?: string | null }) {
+export function RightPanel({
+  contextState,
+  sessionId,
+  workspaceRoot,
+}: {
+  contextState?: ContextState | null;
+  sessionId?: string | null;
+  workspaceRoot?: string;
+}) {
   const { activeTab, isFileTreeOpen, isFileTreeCollapsed } = useRightPanel();
 
   // 呈现由「当前 Tab」决定：
@@ -66,7 +74,7 @@ export function RightPanel({ contextState, sessionId }: { contextState?: Context
       <RightPanelTabs />
       {showShell ? <WorkspaceOperationBar activeTab={activeTab} /> : null}
       <div className={RIGHT_PANEL_SPLIT_CLASS}>
-        {showTree ? <WorkspaceFileTree /> : null}
+        {showTree ? <WorkspaceFileTree key={workspaceRoot ?? "default-workspace"} workspaceRoot={workspaceRoot} /> : null}
         <div className={RIGHT_PANEL_CONTENT_CLASS}>
           {showShell && !isFileTab ? (
             <WorkspaceFileEmpty />

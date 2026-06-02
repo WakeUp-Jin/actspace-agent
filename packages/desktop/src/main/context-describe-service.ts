@@ -19,12 +19,12 @@ import {
   createSessionStorePaths,
   readMeta,
 } from "@actspace/agent-core";
-import type { AppDataRoots } from "./agent-turn";
+import type { AgentRuntimeContextLoader, AppDataRoots } from "./agent-turn";
 
 export async function describeSessionContext(
   input: DescribeContextInput,
   roots: AppDataRoots,
-  getSystemPrompt?: () => string,
+  loadRuntimeContext?: AgentRuntimeContextLoader,
 ): Promise<ContextState | null> {
   const sessionDir = join(roots.sessionRoot, input.sessionId);
   const sessionPaths = createSessionStorePaths(sessionDir);
@@ -34,12 +34,13 @@ export async function describeSessionContext(
 
   // lastModel 由 meta.json 动态写入，未声明在 SessionMeta 类型上；缺省时由 resolveModelSpec 取默认模型。
   const model = (meta as { lastModel?: ModelId }).lastModel;
-  const workspaceRoot = meta.workspaceRoot ?? roots.workspaceRoot;
+  const workspaceRoot = meta.workspaceRoot ?? roots.defaultWorkspaceRoot;
+  const runtimeContext = await loadRuntimeContext?.(workspaceRoot);
 
   const config = buildAgentConfig({ model }, workspaceRoot, undefined, {
     tmpRoot: roots.tmpRoot,
     sessionId: input.sessionId,
-    systemPrompt: getSystemPrompt?.(),
+    ...runtimeContext,
   });
   const deps = await createAgentForSession(config, {
     sessionPath: sessionPaths.sessionPath,

@@ -15,11 +15,13 @@ import type {
   SessionListItem,
   SessionRecord,
   ToolUiPreview,
+  WorkspaceEntry,
+  WorkspaceListResult,
 } from "@actspace/shared";
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
-import type { ComposerSendOptions } from "./components/Composer";
+import type { ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 import {
   mockBootstrapState,
@@ -32,6 +34,8 @@ import {
 
 const MIN_TOOL_RUNNING_MS = 300;
 const MOCK_ADDED_WORKSPACE_ROOT = "/mock/workspaces/new-project";
+const DEFAULT_WORKSPACE_ID = "default";
+const DEFAULT_WORKSPACE_LABEL = "Default workspace";
 
 function hasActspaceBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace);
@@ -49,6 +53,85 @@ function getSessionTitle(sessionRecord: SessionRecord | null, sessions: SessionL
     .filter(Boolean)
     .map((part, index) => (index === 0 ? `${part.charAt(0).toUpperCase()}${part.slice(1)}` : part))
     .join(" ");
+}
+
+function normalizeWorkspaceRoot(root: string | undefined | null): string | null {
+  const trimmed = root?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function workspaceLabelFromRoot(root: string): string {
+  const normalized = root.replace(/\/+$/, "");
+  const segments = normalized.split("/").filter(Boolean);
+  return segments[segments.length - 1] ?? root;
+}
+
+function createWorkspaceOptionsFromRoots(
+  roots: Array<string | undefined | null>,
+  defaultWorkspaceRoot?: string | null,
+): ComposerWorkspaceOption[] {
+  const options = new Map<string, ComposerWorkspaceOption>();
+  const normalizedDefaultWorkspaceRoot = normalizeWorkspaceRoot(defaultWorkspaceRoot);
+  for (const root of roots) {
+    const normalized = normalizeWorkspaceRoot(root) ?? normalizedDefaultWorkspaceRoot;
+    if (!normalized) continue;
+    const label = normalizeWorkspaceRoot(root) ? workspaceLabelFromRoot(normalized) : DEFAULT_WORKSPACE_LABEL;
+    const existing = options.get(normalized);
+    if (existing) {
+      if (label === DEFAULT_WORKSPACE_LABEL) {
+        existing.label = DEFAULT_WORKSPACE_LABEL;
+      }
+      continue;
+    }
+    options.set(normalized, {
+      value: normalized,
+      label,
+    });
+  }
+  return [...options.values()];
+}
+
+function createWorkspaceOptionsFromRegistry(items: WorkspaceEntry[]): ComposerWorkspaceOption[] {
+  return items.map((workspace) => ({
+    value: workspace.path,
+    label: workspace.label,
+    workspaceId: workspace.id,
+  }));
+}
+
+function createMockWorkspaceRegistry(defaultWorkspaceRoot: string, sessions: SessionListItem[]): WorkspaceListResult {
+  const now = new Date().toISOString();
+  const items: WorkspaceEntry[] = [
+    {
+      id: DEFAULT_WORKSPACE_ID,
+      kind: "default",
+      label: DEFAULT_WORKSPACE_LABEL,
+      path: defaultWorkspaceRoot,
+      order: 0,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
+  const seen = new Set(items.map((item) => item.path));
+  for (const session of sessions) {
+    const root = normalizeWorkspaceRoot(session.workspaceRoot);
+    if (!root || seen.has(root)) continue;
+    items.push({
+      id: session.workspaceId ?? `mock_workspace_${items.length}`,
+      kind: "folder",
+      label: workspaceLabelFromRoot(root),
+      path: root,
+      order: items.length,
+      createdAt: now,
+      updatedAt: now,
+    });
+    seen.add(root);
+  }
+  return {
+    version: 1,
+    defaultWorkspaceId: DEFAULT_WORKSPACE_ID,
+    items,
+  };
 }
 
 type ToolEntry = {
@@ -397,6 +480,14 @@ export function App() {
   const [turnResult, setTurnResult] = useState<AgentTurnResult | null>(
     hasActspaceBridge() ? null : mockTurnResult,
   );
+  const [workspaceRegistry, setWorkspaceRegistry] = useState<WorkspaceListResult | null>(
+    hasActspaceBridge()
+      ? null
+      : createMockWorkspaceRegistry(
+          normalizeWorkspaceRoot(mockBootstrapState.workspaceRoot) ?? "/mock/default-workspace",
+          mockSessions,
+        ),
+  );
   const [isStreaming, setIsStreaming] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
@@ -405,10 +496,26 @@ export function App() {
   const [defaultModelId, setDefaultModelId] = useState<ModelId | undefined>(undefined);
   const [approvalPendingSessionIds, setApprovalPendingSessionIds] = useState<Set<string>>(() => new Set());
   const [failedSessionIds, setFailedSessionIds] = useState<Set<string>>(() => new Set());
+  const [selectedWorkspaceRoot, setSelectedWorkspaceRoot] = useState<string | null>(
+    hasActspaceBridge() ? null : normalizeWorkspaceRoot(mockSessionRecord.meta.workspaceRoot ?? mockBootstrapState.workspaceRoot),
+  );
   const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
   const toolFinishTimersRef = useRef<Map<string, number>>(new Map());
   const activeSessionIdRef = useRef<string>("session-default");
+
+  const refreshWorkspaces = useCallback(async () => {
+    if (!hasActspaceBridge() || !window.actspace.listWorkspaces) return null;
+    const registry = await window.actspace.listWorkspaces();
+    setWorkspaceRegistry(registry);
+    return registry;
+  }, []);
+
+  const findWorkspaceOption = useCallback((workspaceRoot: string | null | undefined) => {
+    const normalized = normalizeWorkspaceRoot(workspaceRoot);
+    if (!normalized) return undefined;
+    return workspaceRegistry?.items.find((workspace) => workspace.path === normalized);
+  }, [workspaceRegistry?.items]);
 
   const refreshStreamingBlocks = useCallback((userBlock?: MessageBlock | null) => {
     const newStreamBlocks = streamingStateToBlocks(streamStateRef.current);
@@ -473,6 +580,18 @@ export function App() {
 
   useEffect(() => {
     if (!hasActspaceBridge()) return;
+    refreshWorkspaces().catch((error: unknown) => {
+      console.error("Failed to load workspaces", error);
+    });
+  }, [refreshWorkspaces]);
+
+  useEffect(() => {
+    if (selectedWorkspaceRoot) return;
+    setSelectedWorkspaceRoot(normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
+  }, [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot]);
+
+  useEffect(() => {
+    if (!hasActspaceBridge()) return;
     refreshPendingApprovalStatuses(sessions.map((session) => session.id)).catch((error: unknown) => {
       console.error("Failed to refresh pending approval statuses", error);
     });
@@ -505,6 +624,9 @@ export function App() {
         activeSessionIdRef.current = existing.id;
         const restored = await window.actspace.getSession({ sessionId: existing.id });
         setSessionRecord(restored);
+        setSelectedWorkspaceRoot(
+          normalizeWorkspaceRoot(restored?.meta.workspaceRoot ?? existing.workspaceRoot ?? bootstrapState?.workspaceRoot),
+        );
         return;
       }
 
@@ -521,6 +643,7 @@ export function App() {
       setSessions(refreshed);
       const restored = await window.actspace.getSession({ sessionId: input.sessionId });
       setSessionRecord(restored);
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(restored?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
     }
 
     bootstrapSession().catch((error: unknown) => {
@@ -653,6 +776,48 @@ export function App() {
 
     const sessionId = activeSessionIdRef.current;
     const turnId = nextTurnId();
+    const nextWorkspaceRoot = selectedWorkspaceRoot;
+    let nextWorkspace = findWorkspaceOption(nextWorkspaceRoot);
+    const currentWorkspaceRoot = normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot);
+
+    if (
+      hasActspaceBridge() &&
+      nextWorkspaceRoot &&
+      nextWorkspaceRoot !== currentWorkspaceRoot &&
+      window.actspace.setSessionWorkspace
+    ) {
+      try {
+        if (!nextWorkspace?.id) {
+          const latestRegistry = await refreshWorkspaces();
+          const normalizedNextRoot = normalizeWorkspaceRoot(nextWorkspaceRoot);
+          nextWorkspace = latestRegistry?.items.find((workspace) => workspace.path === normalizedNextRoot) ?? nextWorkspace;
+        }
+        const result = await window.actspace.setSessionWorkspace({
+          sessionId,
+          ...(nextWorkspace?.id ? { workspaceId: nextWorkspace.id } : {}),
+          workspaceRoot: nextWorkspaceRoot,
+        });
+        if (!result.ok) {
+          console.error("Failed to set session workspace", result.error);
+          setFailedForSession(sessionId, true);
+          return;
+        }
+        setSessionRecord((current) => current
+          ? {
+              ...current,
+              meta: {
+                ...current.meta,
+                ...(nextWorkspace?.id ? { workspaceId: nextWorkspace.id } : {}),
+                workspaceRoot: nextWorkspaceRoot,
+              },
+            }
+          : current);
+      } catch (error) {
+        console.error("Failed to set session workspace", error);
+        setFailedForSession(sessionId, true);
+        return;
+      }
+    }
 
     setIsStreaming(true);
     setIsAborting(false);
@@ -736,6 +901,11 @@ export function App() {
     }
   }, [
     isStreaming,
+    selectedWorkspaceRoot,
+    findWorkspaceOption,
+    refreshWorkspaces,
+    sessionRecord?.meta.workspaceRoot,
+    bootstrapState?.workspaceRoot,
     handleStreamEvent,
     refreshStreamingBlocks,
     clearToolFinishTimers,
@@ -771,6 +941,7 @@ export function App() {
       const created = createMockEmptySession(input);
       activeSessionIdRef.current = created.meta.id;
       setSessionRecord(created);
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
       setMockSessionRecords((current) => ({ ...current, [created.meta.id]: created }));
       setSessions((current) => [
         {
@@ -788,16 +959,19 @@ export function App() {
     try {
       const created = await window.actspace.createSession({
         title: "New chat",
-        workspaceRoot: input.workspaceRoot,
+        ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+        ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
       });
       activeSessionIdRef.current = created.meta.id;
       setSessionRecord(created);
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
       const refreshed = await window.actspace.listSessions();
       setSessions(refreshed);
+      await refreshWorkspaces();
     } catch (error) {
       console.error("Failed to create session", error);
     }
-  }, [clearToolFinishTimers]);
+  }, [bootstrapState?.workspaceRoot, clearToolFinishTimers, refreshWorkspaces]);
 
   const handleAddWorkspace = useCallback(async () => {
     if (!hasActspaceBridge()) {
@@ -838,6 +1012,7 @@ export function App() {
         const selected = mockSessionRecords[sessionId];
         if (selected) {
           setSessionRecord(selected);
+          setSelectedWorkspaceRoot(normalizeWorkspaceRoot(selected.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
           return;
         }
 
@@ -859,17 +1034,19 @@ export function App() {
             pinned: fixture.pinned,
           },
         });
+        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(fixture.workspaceRoot ?? bootstrapState?.workspaceRoot));
         return;
       }
 
       try {
         const restored = await window.actspace.getSession({ sessionId });
         setSessionRecord(restored);
+        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(restored?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
       } catch (error) {
         console.error("Failed to select session", error);
       }
     },
-    [mockSessionRecords, sessions, clearToolFinishTimers, refreshPendingApprovalStatuses],
+    [bootstrapState?.workspaceRoot, mockSessionRecords, sessions, clearToolFinishTimers, refreshPendingApprovalStatuses],
   );
 
   useEffect(() => {
@@ -908,6 +1085,18 @@ export function App() {
   const showDemoAttachments = isDemoSession(activeSessionId);
   const isSessionReady = Boolean(sessionRecord || turnResult || streamingBlocks.length > 0 || !hasActspaceBridge());
   const title = getSessionTitle(sessionRecord, sessions);
+  const workspaceOptions = useMemo(
+    () =>
+      workspaceRegistry
+        ? createWorkspaceOptionsFromRegistry(workspaceRegistry.items)
+        : createWorkspaceOptionsFromRoots([
+            selectedWorkspaceRoot,
+            sessionRecord?.meta.workspaceRoot,
+            bootstrapState?.workspaceRoot,
+            ...sessions.map((session) => session.workspaceRoot),
+          ], bootstrapState?.workspaceRoot),
+    [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot, sessions, workspaceRegistry],
+  );
   const busySessionIds = useMemo<Set<string>>(() => {
     const set = new Set<string>();
     if (isStreaming) {
@@ -945,6 +1134,67 @@ export function App() {
         setSessions(refreshed);
       } catch (error) {
         console.error("Failed to toggle session pin", error);
+      }
+    },
+    [],
+  );
+
+  const handleRenameSession = useCallback(
+    async (sessionId: string, title: string) => {
+      const nextTitle = title.trim();
+      if (!sessionId || !nextTitle) return;
+
+      const updateSessionTitle = () => {
+        setSessions((current) =>
+          current.map((session) => (session.id === sessionId ? { ...session, title: nextTitle } : session)),
+        );
+        setSessionRecord((current) =>
+          current?.meta.id === sessionId
+            ? { ...current, meta: { ...current.meta, title: nextTitle } }
+            : current,
+        );
+      };
+
+      if (!hasActspaceBridge()) {
+        updateSessionTitle();
+        setMockSessionRecords((current) => {
+          const record = current[sessionId];
+          if (!record) return current;
+          return {
+            ...current,
+            [sessionId]: {
+              ...record,
+              meta: {
+                ...record.meta,
+                title: nextTitle,
+              },
+            },
+          };
+        });
+        return;
+      }
+
+      if (!window.actspace.renameSession) {
+        console.error("Session rename is not available");
+        return;
+      }
+
+      try {
+        const result = await window.actspace.renameSession({ sessionId, title: nextTitle });
+        if (!result.ok) {
+          console.error("Failed to rename session", result.error);
+          return;
+        }
+
+        const refreshed = await window.actspace.listSessions();
+        setSessions(refreshed);
+        setSessionRecord((current) =>
+          current?.meta.id === sessionId
+            ? { ...current, meta: { ...current.meta, title: nextTitle } }
+            : current,
+        );
+      } catch (error) {
+        console.error("Failed to rename session", error);
       }
     },
     [],
@@ -1006,12 +1256,17 @@ export function App() {
         onAddWorkspace={handleAddWorkspace}
         onSelectSession={handleSelectSession}
         onTogglePin={handleTogglePin}
+        onRenameSession={handleRenameSession}
         onArchiveSession={handleArchiveSession}
         isSessionReady={isSessionReady}
         showDemoAttachments={showDemoAttachments}
         defaultModelId={defaultModelId}
         onSettingsChange={handleSettingsChange}
         onArchivedSessionsChange={handleArchivedSessionsChange}
+        workspaces={workspaceRegistry?.items}
+        workspaceOptions={workspaceOptions}
+        selectedWorkspaceRoot={selectedWorkspaceRoot}
+        onSelectWorkspace={setSelectedWorkspaceRoot}
       />
       <ShutdownOverlay />
     </RightPanelProvider>

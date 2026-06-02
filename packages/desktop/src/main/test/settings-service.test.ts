@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadEnv, MAIN_AGENT_SYSTEM_PROMPT } from "@actspace/agent-core";
@@ -78,7 +78,8 @@ describe("SettingsService", () => {
     const s = svc.get();
 
     expect(s.agent.bashAlwaysAsk).toBe(true);
-    expect(s.agent.systemPrompt).toBe(MAIN_AGENT_SYSTEM_PROMPT);
+    expect(s.agent.systemPromptPath).toBe(join(s.agent.systemPromptPath.split("/prompts/")[0], "prompts", "main-agent.md"));
+    expect(await readFile(s.agent.systemPromptPath, "utf8")).toBe(MAIN_AGENT_SYSTEM_PROMPT);
     expect(s.agent.temperature).toBe(0.5);
     expect(s.kairos.modelId).toBeNull();
     expect(s.kairos.thinking).toBe("auto");
@@ -93,7 +94,6 @@ describe("SettingsService", () => {
     const updated = await svc.update({
       defaultModelId: "deepseek-v4-pro",
       agent: {
-        systemPrompt: "You are a custom actspace agent.",
         bashAlwaysAsk: true,
         temperature: 1.2,
         maxTokens: 4096,
@@ -101,7 +101,6 @@ describe("SettingsService", () => {
       },
     });
 
-    expect(updated.agent.systemPrompt).toBe("You are a custom actspace agent.");
     expect(updated.agent.bashAlwaysAsk).toBe(true);
     expect(process.env.ACTSPACE_BASH_ALWAYS_ASK).toBe("1");
     expect(process.env.LLM_TEMPERATURE).toBe("1.2");
@@ -114,9 +113,56 @@ describe("SettingsService", () => {
 
     const reopened = makeService(dataRoot);
     await reopened.load();
-    expect(reopened.get().agent.systemPrompt).toBe("You are a custom actspace agent.");
     expect(reopened.get().agent.maxTokens).toBe(4096);
     expect(reopened.get().defaultModelId).toBe("deepseek-v4-pro");
+  });
+
+  it("read/writeAgentSystemPrompt 直接读写主提示词文件", async () => {
+    const dataRoot = await makeDataRoot();
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    const before = await svc.readAgentSystemPrompt();
+    expect(before.path).toBe(join(dataRoot, "prompts", "main-agent.md"));
+    expect(before.content).toBe(MAIN_AGENT_SYSTEM_PROMPT);
+
+    const updated = await svc.writeAgentSystemPrompt("Use short Chinese answers.");
+    expect(updated).toEqual({
+      path: join(dataRoot, "prompts", "main-agent.md"),
+      content: "Use short Chinese answers.",
+    });
+    expect(await readFile(updated.path, "utf8")).toBe("Use short Chinese answers.");
+  });
+
+  it("旧 settings.agent.systemPrompt 非空且新文件不存在时迁移到主提示词文件", async () => {
+    const dataRoot = await makeDataRoot();
+    await writeFile(
+      join(dataRoot, "settings.json"),
+      JSON.stringify({
+        version: 1,
+        defaultModelId: null,
+        agent: {
+          systemPrompt: "Legacy custom prompt.",
+          temperature: null,
+          maxTokens: null,
+          disabledTools: [],
+          bashAlwaysAsk: false,
+        },
+        kairos: { modelId: null, thinking: "auto" },
+      }),
+      "utf8",
+    );
+
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    const promptFile = await svc.readAgentSystemPrompt();
+    expect(promptFile.path).toBe(join(dataRoot, "prompts", "main-agent.md"));
+    expect(promptFile.content).toBe("Legacy custom prompt.");
+
+    const persisted = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
+    expect(persisted.agent.systemPrompt).toBeUndefined();
+    expect(persisted.agent.systemPromptPath).toBe(join(dataRoot, "prompts", "main-agent.md"));
   });
 
   it("setProviderKey 加密落盘、标记 hasApiKey 并覆盖到 process.env", async () => {

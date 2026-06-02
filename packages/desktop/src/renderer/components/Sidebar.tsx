@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import {
   Archive,
   ArrowDownUp,
@@ -10,18 +10,20 @@ import {
   Folder,
   FolderPlus,
   MoreHorizontal,
+  Pencil,
   Pin,
   Plus,
   Settings,
   Sparkles,
   SquarePen,
 } from "lucide-react";
-import type { SessionListItem } from "@actspace/shared";
+import type { SessionListItem, WorkspaceEntry } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 export type SidebarMode = "expanded" | "hidden";
 export type SidebarView = "chat" | "lab" | "usage" | "kairos" | "settings";
 export type NewSessionInput = {
+  workspaceId?: string;
   workspaceRoot?: string;
 };
 export type SessionUiStatusKind = "idle" | "running" | "waiting_approval" | "failed" | "scheduled";
@@ -30,6 +32,9 @@ type SessionStatusMeta = { label: string; detail: string; dotClass: string; rowC
 const DEFAULT_WORKSPACE_KEY = "__default__";
 const DEFAULT_WORKSPACE_LABEL = "Default workspace";
 const SESSION_VISIBLE_LIMIT = 8;
+const SESSION_CONTEXT_MENU_WIDTH = 184;
+const SESSION_CONTEXT_MENU_MAX_HEIGHT = 140;
+const SESSION_CONTEXT_MENU_MARGIN = 8;
 
 function formatRelativeTime(timestamp: string): string {
   const diffMs = Date.now() - new Date(timestamp).getTime();
@@ -64,22 +69,54 @@ function workspaceKey(root: string | undefined | null): string {
   return root && root.length > 0 ? root : DEFAULT_WORKSPACE_KEY;
 }
 
+function clampContextMenuPosition(position: { x: number; y: number }): { x: number; y: number } {
+  if (typeof window === "undefined") return position;
+
+  return {
+    x: Math.max(
+      SESSION_CONTEXT_MENU_MARGIN,
+      Math.min(position.x, window.innerWidth - SESSION_CONTEXT_MENU_WIDTH - SESSION_CONTEXT_MENU_MARGIN),
+    ),
+    y: Math.max(
+      SESSION_CONTEXT_MENU_MARGIN,
+      Math.min(position.y, window.innerHeight - SESSION_CONTEXT_MENU_MAX_HEIGHT - SESSION_CONTEXT_MENU_MARGIN),
+    ),
+  };
+}
+
 type WorkspaceGroup = {
   key: string;
   label: string;
+  workspaceId?: string;
   workspaceRoot?: string;
   sessions: SessionListItem[];
 };
 
-function groupSessionsByWorkspace(sessions: SessionListItem[]): WorkspaceGroup[] {
+function groupSessionsByWorkspace(sessions: SessionListItem[], workspaces: WorkspaceEntry[] = []): WorkspaceGroup[] {
   const groups = new Map<string, WorkspaceGroup>();
+  for (const workspace of workspaces) {
+    groups.set(workspace.id, {
+      key: workspace.id,
+      label: workspace.label,
+      workspaceId: workspace.id,
+      workspaceRoot: workspace.path,
+      sessions: [],
+    });
+  }
+
+  const defaultWorkspace = workspaces.find((workspace) => workspace.kind === "default");
   for (const session of sessions) {
-    const key = workspaceKey(session.workspaceRoot);
+    const matchedWorkspace =
+      workspaces.find((workspace) => workspace.id === session.workspaceId) ??
+      workspaces.find((workspace) => session.workspaceRoot && workspace.path === session.workspaceRoot) ??
+      (session.workspaceRoot ? undefined : defaultWorkspace);
+    const key = matchedWorkspace?.id ?? session.workspaceId ?? workspaceKey(session.workspaceRoot);
     if (!groups.has(key)) {
       groups.set(key, {
         key,
-        label: workspaceLabelFromRoot(session.workspaceRoot),
-        workspaceRoot: session.workspaceRoot,
+        label: matchedWorkspace?.label ?? workspaceLabelFromRoot(session.workspaceRoot),
+        workspaceId: matchedWorkspace?.id ?? session.workspaceId,
+        workspaceRoot: matchedWorkspace?.path ?? session.workspaceRoot,
         sessions: [],
       });
     }
@@ -176,6 +213,8 @@ const SESSION_ROW_TIME_CLASS = "text-[11px] whitespace-nowrap text-text-faint";
 const SESSION_ROW_MAIN_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 p-0 text-left text-text-muted transition-colors duration-[130ms] ease-in-out group-hover/session-row:text-text-main group-[.is-active]/session-row:text-text-main`;
 const SESSION_ROW_MAIN_MUTED_CLASS = "text-text-muted";
+const SESSION_ROW_RENAME_INPUT_CLASS =
+  "min-w-0 rounded-act-sm border border-brand bg-surface-raised px-1.5 py-0.5 text-[13px] font-medium text-text-main outline-none shadow-[0_0_0_2px_var(--act-color-brand-soft)]";
 const SESSION_ROW_ACTIONS_CLASS = "inline-flex flex-none items-center gap-0.5";
 const SESSION_ROW_ARCHIVE_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} grid h-[22px] w-[22px] flex-none place-items-center rounded-act-sm text-text-faint opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
@@ -190,6 +229,12 @@ const SESSION_STATUS_MENU_DETAIL_CLASS = "mt-0.5 leading-snug text-text-faint";
 const SESSION_ROW_PIN_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} session-row-pin absolute inset-0 grid h-[14px] w-[14px] place-items-center rounded-act-sm text-text-muted opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
 const SESSION_ROW_PIN_ACTIVE_CLASS = "is-active opacity-100 text-text-main";
+const SESSION_CONTEXT_MENU_CLASS =
+  "session-context-menu fixed z-[80] rounded-act-md border border-line bg-surface-raised p-1 text-[13px] text-text-main shadow-act-popover";
+const SESSION_CONTEXT_MENU_ITEM_CLASS =
+  `${SIDEBAR_BUTTON_RESET_CLASS} flex h-8 w-full items-center gap-2 rounded-act-sm px-2 text-left text-text-main transition-[background,color] duration-[120ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] disabled:cursor-not-allowed disabled:text-text-faint disabled:hover:bg-transparent`;
+const SESSION_CONTEXT_MENU_ICON_CLASS = "h-4 w-4 text-text-muted";
+const SESSION_CONTEXT_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
 const SESSION_STATUS_DOT_CLASS =
   "session-status-dot h-1.5 w-1.5 rounded-full bg-brand transition-opacity duration-[130ms] ease-in-out";
 const SESSION_STATUS_DOT_MUTED_CLASS = "is-muted bg-text-faint opacity-55";
@@ -258,16 +303,18 @@ function NavSectionHeader({ label, collapsed, onToggle, extraActions }: NavSecti
 type SessionRowProps = {
   session: SessionListItem;
   isActive: boolean;
-  status: SessionUiStatusKind;
+  status: unknown;
   onSelect: () => void;
   onTogglePin?: () => void;
+  onRename?: (title: string) => void;
   onArchive?: () => void;
 };
 
-function SessionStatusButton({ status }: { status: SessionUiStatusKind }) {
+function SessionStatusButton({ status }: { status: unknown }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const meta = SESSION_STATUS_META[status];
+  const resolvedStatus = resolveSessionStatus(status);
+  const meta = SESSION_STATUS_META[resolvedStatus];
 
   useEffect(() => {
     if (!open) return;
@@ -316,11 +363,19 @@ function SessionStatusButton({ status }: { status: SessionUiStatusKind }) {
   );
 }
 
-function SessionRow({ session, isActive, status, onSelect, onTogglePin, onArchive }: SessionRowProps) {
-  const statusMeta = SESSION_STATUS_META[status];
+function SessionRow({ session, isActive, status, onSelect, onTogglePin, onRename, onArchive }: SessionRowProps) {
+  const displayTitle = formatSessionTitle(session.title);
+  const resolvedStatus = resolveSessionStatus(status);
+  const statusMeta = SESSION_STATUS_META[resolvedStatus];
   const archiveDisabled = isActive || !onArchive;
   const archiveLabel = isActive ? "Current session cannot be archived" : "Archive session";
-  const dotClass = isActive && status === "idle"
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(displayTitle);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const skipNextBlurCommitRef = useRef(false);
+  const dotClass = isActive && resolvedStatus === "idle"
     ? `${SESSION_STATUS_DOT_CLASS} ${SESSION_STATUS_DOT_ACTIVE_CLASS}`
     : `${SESSION_STATUS_DOT_CLASS} ${statusMeta.dotClass}`;
   const rowClass = [
@@ -328,11 +383,93 @@ function SessionRow({ session, isActive, status, onSelect, onTogglePin, onArchiv
     isActive ? SESSION_ROW_ACTIVE_CLASS : "",
     statusMeta.rowClass,
     session.pinned ? SESSION_ROW_PINNED_CLASS : "",
+    isRenaming ? "is-renaming" : "",
   ].filter(Boolean).join(" ");
+
+  useEffect(() => {
+    if (!isRenaming) {
+      setDraftTitle(displayTitle);
+    }
+  }, [displayTitle, isRenaming]);
+
+  useEffect(() => {
+    if (!menuPosition) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuPosition(null);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuPosition(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuPosition]);
+
+  useEffect(() => {
+    if (!isRenaming) return;
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [isRenaming]);
+
+  const startRename = () => {
+    if (!onRename) return;
+    skipNextBlurCommitRef.current = false;
+    setDraftTitle(displayTitle);
+    setIsRenaming(true);
+    setMenuPosition(null);
+  };
+
+  const commitRename = () => {
+    if (skipNextBlurCommitRef.current) {
+      skipNextBlurCommitRef.current = false;
+      return;
+    }
+
+    const nextTitle = draftTitle.trim();
+    skipNextBlurCommitRef.current = true;
+    setIsRenaming(false);
+    if (!nextTitle || nextTitle === displayTitle) return;
+    onRename?.(nextTitle);
+  };
+
+  const cancelRename = () => {
+    skipNextBlurCommitRef.current = true;
+    setDraftTitle(displayTitle);
+    setIsRenaming(false);
+  };
+
+  const handleRenameKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitRename();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelRename();
+    }
+  };
+
+  const handleContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setMenuPosition(clampContextMenuPosition({ x: event.clientX, y: event.clientY }));
+  };
 
   return (
     <div
       className={rowClass}
+      data-session-id={session.id}
+      onContextMenu={handleContextMenu}
       role="presentation"
     >
       <span className={`session-row-marker ${SESSION_ROW_MARKER_CLASS}`}>
@@ -356,19 +493,39 @@ function SessionRow({ session, isActive, status, onSelect, onTogglePin, onArchiv
           </button>
         ) : null}
       </span>
-      <button
-        className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && status === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
-        type="button"
-        onClick={onSelect}
-        aria-current={isActive ? "page" : undefined}
-      >
-        <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>{formatSessionTitle(session.title)}</span>
-        <span className={`session-row-time ${SESSION_ROW_TIME_CLASS} ${isActive ? "opacity-0" : ""}`} aria-hidden={isActive}>
-          {formatRelativeTime(session.updatedAt)}
-        </span>
-      </button>
+      {isRenaming ? (
+        <div
+          className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && resolvedStatus === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
+        >
+          <input
+            ref={inputRef}
+            className={`session-row-rename-input ${SESSION_ROW_RENAME_INPUT_CLASS}`}
+            value={draftTitle}
+            aria-label={`Rename session ${displayTitle}`}
+            onChange={(event) => setDraftTitle(event.target.value)}
+            onClick={(event) => event.stopPropagation()}
+            onBlur={commitRename}
+            onKeyDown={handleRenameKeyDown}
+          />
+          <span className={`session-row-time ${SESSION_ROW_TIME_CLASS} opacity-0`} aria-hidden="true">
+            {formatRelativeTime(session.updatedAt)}
+          </span>
+        </div>
+      ) : (
+        <button
+          className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && resolvedStatus === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
+          type="button"
+          onClick={onSelect}
+          aria-current={isActive ? "page" : undefined}
+        >
+          <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>{displayTitle}</span>
+          <span className={`session-row-time ${SESSION_ROW_TIME_CLASS} ${isActive ? "opacity-0" : ""}`} aria-hidden={isActive}>
+            {formatRelativeTime(session.updatedAt)}
+          </span>
+        </button>
+      )}
       <div className={`session-row-actions ${SESSION_ROW_ACTIONS_CLASS}`}>
-        <SessionStatusButton status={status} />
+        <SessionStatusButton status={resolvedStatus} />
         <button
           className={`session-row-archive ${SESSION_ROW_ARCHIVE_CLASS} ${archiveDisabled ? "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-text-faint" : ""}`}
           type="button"
@@ -383,6 +540,64 @@ function SessionRow({ session, isActive, status, onSelect, onTogglePin, onArchiv
           <Archive size={12} strokeWidth={1.9} />
         </button>
       </div>
+      {menuPosition ? (
+        <div
+          ref={menuRef}
+          className={SESSION_CONTEXT_MENU_CLASS}
+          role="menu"
+          aria-label={`Session actions for ${displayTitle}`}
+          style={{
+            left: menuPosition.x,
+            top: menuPosition.y,
+            width: SESSION_CONTEXT_MENU_WIDTH,
+          }}
+        >
+          <button
+            className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+            type="button"
+            role="menuitem"
+            disabled={!onTogglePin}
+            onClick={() => {
+              setMenuPosition(null);
+              onTogglePin?.();
+            }}
+          >
+            <Pin
+              size={16}
+              strokeWidth={1.9}
+              fill={session.pinned ? "currentColor" : "none"}
+              className={SESSION_CONTEXT_MENU_ICON_CLASS}
+              aria-hidden="true"
+            />
+            {session.pinned ? "Unpin" : "Pin"}
+          </button>
+          <button
+            className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+            type="button"
+            role="menuitem"
+            disabled={!onRename}
+            onClick={startRename}
+          >
+            <Pencil size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+            Rename
+          </button>
+          <div className={SESSION_CONTEXT_MENU_SEPARATOR_CLASS} role="separator" />
+          <button
+            className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+            type="button"
+            role="menuitem"
+            disabled={archiveDisabled}
+            title={archiveLabel}
+            onClick={() => {
+              setMenuPosition(null);
+              if (!archiveDisabled) onArchive?.();
+            }}
+          >
+            <Archive size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+            Archive
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -391,9 +606,10 @@ type CollapsibleSessionListProps = {
   sessions: SessionListItem[];
   activeSessionId: string | null;
   busySessionIds: Set<string>;
-  sessionStatuses: Record<string, SessionUiStatusKind>;
+  sessionStatuses?: Record<string, unknown>;
   onSelectSession?: (sessionId: string) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
+  onRename?: (sessionId: string, title: string) => void;
   onArchive?: (sessionId: string) => void;
   groupKey: string;
 };
@@ -405,6 +621,7 @@ function CollapsibleSessionList({
   sessionStatuses,
   onSelectSession,
   onTogglePin,
+  onRename,
   onArchive,
   groupKey,
 }: CollapsibleSessionListProps) {
@@ -419,9 +636,10 @@ function CollapsibleSessionList({
           key={session.id}
           session={session}
           isActive={session.id === activeSessionId}
-          status={sessionStatuses[session.id] ?? (busySessionIds.has(session.id) ? "running" : "idle")}
+          status={sessionStatuses?.[session.id] ?? (busySessionIds.has(session.id) ? "running" : "idle")}
           onSelect={() => onSelectSession?.(session.id)}
           onTogglePin={onTogglePin ? () => onTogglePin(session.id, !session.pinned) : undefined}
+          onRename={onRename ? (title) => onRename(session.id, title) : undefined}
           onArchive={onArchive ? () => onArchive(session.id) : undefined}
         />
       ))}
@@ -440,6 +658,7 @@ function CollapsibleSessionList({
 
 export function Sidebar({
   sessions,
+  workspaces = [],
   activeSessionId,
   mode,
   view,
@@ -450,14 +669,16 @@ export function Sidebar({
   onSelectSession,
   onTogglePin,
   onSelectView,
+  onRename,
   onArchive,
 }: {
   sessions: SessionListItem[];
+  workspaces?: WorkspaceEntry[];
   activeSessionId: string | null;
   mode: SidebarMode;
   view: SidebarView;
   busySessionIds?: Set<string>;
-  sessionStatuses?: Record<string, SessionUiStatusKind>;
+  sessionStatuses?: Record<string, unknown>;
   /** 折叠按钮回调；现由 WorkbenchLayout 通过 WindowChromeBar 调用，Sidebar 内部不直接渲染 chrome row。 */
   onToggleMode?: () => void;
   onNewSession?: (input?: NewSessionInput) => void;
@@ -466,6 +687,7 @@ export function Sidebar({
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   onSelectView?: (next: SidebarView) => void;
   onOpenSearch?: () => void;
+  onRename?: (sessionId: string, title: string) => void;
   /** Archive 占位回调；未传时按钮仅做视觉占位。 */
   onArchive?: (sessionId: string) => void;
 }) {
@@ -484,8 +706,8 @@ export function Sidebar({
     [sessions],
   );
   const workspaceGroups = useMemo(
-    () => groupSessionsByWorkspace(unpinnedSessions),
-    [unpinnedSessions],
+    () => groupSessionsByWorkspace(unpinnedSessions, workspaces),
+    [unpinnedSessions, workspaces],
   );
 
   if (mode === "hidden") {
@@ -556,6 +778,7 @@ export function Sidebar({
                 sessionStatuses={statuses}
                 onSelectSession={handleSelectChatSession}
                 onTogglePin={onTogglePin}
+                onRename={onRename}
                 onArchive={onArchive}
                 groupKey="pinned"
               />
@@ -652,6 +875,7 @@ export function Sidebar({
                   onSelectSession={handleSelectChatSession}
                   onNewSession={handleNewAgent}
                   onTogglePin={onTogglePin}
+                  onRename={onRename}
                   onArchive={onArchive}
                 />
               ))}
@@ -674,10 +898,11 @@ type WorkspaceSectionProps = {
   group: WorkspaceGroup;
   activeSessionId: string | null;
   busySessionIds: Set<string>;
-  sessionStatuses: Record<string, SessionUiStatusKind>;
+  sessionStatuses?: Record<string, unknown>;
   onSelectSession?: (sessionId: string) => void;
   onNewSession?: (input?: NewSessionInput) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
+  onRename?: (sessionId: string, title: string) => void;
   onArchive?: (sessionId: string) => void;
 };
 
@@ -689,6 +914,7 @@ function WorkspaceSection({
   onSelectSession,
   onNewSession,
   onTogglePin,
+  onRename,
   onArchive,
 }: WorkspaceSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -723,7 +949,10 @@ function WorkspaceSection({
             title="New chat in this workspace"
             onClick={(event) => {
               event.stopPropagation();
-              onNewSession?.(group.workspaceRoot ? { workspaceRoot: group.workspaceRoot } : undefined);
+              onNewSession?.({
+                workspaceId: group.workspaceId,
+                workspaceRoot: group.workspaceRoot,
+              });
             }}
           >
             <Plus size={13} strokeWidth={2} />
@@ -738,6 +967,7 @@ function WorkspaceSection({
           sessionStatuses={sessionStatuses}
           onSelectSession={onSelectSession}
           onTogglePin={onTogglePin}
+          onRename={onRename}
           onArchive={onArchive}
           groupKey={group.key}
         />

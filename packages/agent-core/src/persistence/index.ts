@@ -24,6 +24,7 @@ export {
   ensureSessionStore,
   createSessionRecord,
   setSessionPinned,
+  setSessionTitle,
   setSessionArchived,
   setSessionWorkspace,
   writeSessionResult,
