@@ -678,6 +678,16 @@ const approvalRegistry = new PendingApprovalRegistry({
       riskLevel: request.riskLevel,
     });
   },
+  onApprovalResolved: (request, decision) => {
+    const win = getMainWindow();
+    if (!win) return;
+    win.webContents.send("agent:stream", {
+      type: "tool_approval_resolved",
+      toolCallId: request.toolCallId ?? request.id,
+      requestId: decision.requestId,
+      decision: decision.decision,
+    });
+  },
 });
 
 // ─── IPC 注册 ───

@@ -94,6 +94,16 @@ describe("extractStreamingPreview", () => {
     });
   });
 
+  it("delete extractor extracts path", () => {
+    const preview = extractStreamingPreview("delete", '{"path":"/tmp/old.md"}');
+    expect(preview).toEqual({
+      kind: "delete",
+      filePath: "/tmp/old.md",
+      displayText: "",
+      status: "running",
+    });
+  });
+
   it("generic kind returns empty generic preview", () => {
     const preview = extractStreamingPreview("generic", '{"anything":"x"}');
     expect(preview).toEqual({ kind: "generic", title: "", content: "" });

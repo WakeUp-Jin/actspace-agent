@@ -194,10 +194,18 @@ export class ToolScheduler {
       return this.finish(record, "cancelled", result);
     }
 
+    const decisionPromise = this.approvalGate.waitForDecision(approvalRequest);
     this.approvalGate.onApprovalRequired?.(approvalRequest);
 
-    const decision = await this.approvalGate.waitForDecision(approvalRequest);
+    const decision = await decisionPromise;
     record.approvalDecision = decision;
+
+    if (decision.decision === "allow_similar" && permission.allowSimilar === false) {
+      return this.finish(record, "cancelled", {
+        success: false,
+        error: `Tool does not allow similar-operation approval: ${toolName}`,
+      });
+    }
 
     if (decision.decision === "approve_once" || decision.decision === "allow_similar") {
       return this.runHandler(tool, permission.sanitizedArgs ?? args, record);

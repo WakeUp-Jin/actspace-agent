@@ -260,6 +260,23 @@ function getStreamingDirectoryText(
   return `Listed ${preview.path}`;
 }
 
+function displayFileName(path: string): string {
+  const normalized = path.replace(/[\\/]+$/, "");
+  return normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized ?? path;
+}
+
+function getStreamingDeleteText(
+  preview: Extract<ToolUiPreview, { kind: "delete" }>,
+  status: Extract<MessageBlock, { kind: "delete" }>["status"],
+): string {
+  const fileLabel = displayFileName(preview.filePath || "file...");
+  if (status === "completed") return `Deleted ${fileLabel}`;
+  if (status === "failed") return `Delete ${fileLabel} failed`;
+  if (status === "denied") return `Denied delete ${fileLabel}`;
+  if (status === "pending") return "Delete file requires approval";
+  return `Delete ${fileLabel}`;
+}
+
 function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): MessageBlock {
   const blockId = `streaming-tool-${toolCallId}`;
 
@@ -369,6 +386,27 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): Mes
       displayText: getStreamingDirectoryText(tool.preview, tool.finished),
       createdAt: now,
       status: tool.finished ? "completed" : "running",
+    };
+  }
+
+  if (tool.preview?.kind === "delete") {
+    const status = tool.approvalPending
+      ? "pending"
+      : tool.finished
+        ? tool.isError
+          ? tool.preview.status === "denied" ? "denied" : "failed"
+          : "completed"
+        : "running";
+    return {
+      kind: "delete",
+      id: blockId,
+      filePath: displayFileName(tool.preview.filePath || "file..."),
+      displayText: getStreamingDeleteText(tool.preview, status),
+      createdAt: now,
+      status,
+      isError: status === "failed" || status === "denied",
+      approvalRequestId: tool.approvalRequestId,
+      reason: tool.approvalReason,
     };
   }
 
@@ -738,6 +776,14 @@ export function App() {
           if (tool.preview?.kind === "bash" && event.command) {
             tool.preview = { ...tool.preview, command: event.command };
           }
+          if (tool.preview?.kind === "delete") {
+            tool.preview = {
+              ...tool.preview,
+              displayText: "Delete file requires approval",
+              status: "pending",
+              approvalRequestId: event.requestId,
+            };
+          }
         }
         break;
       }
@@ -750,6 +796,15 @@ export function App() {
         const tool = state.activeTools.get(event.toolCallId);
         if (tool) {
           tool.approvalPending = false;
+          if (tool.preview?.kind === "delete" && event.decision === "deny") {
+            tool.finished = true;
+            tool.isError = true;
+            tool.preview = {
+              ...tool.preview,
+              displayText: `Denied delete ${tool.preview.filePath || "file..."}`,
+              status: "denied",
+            };
+          }
         }
         break;
       }

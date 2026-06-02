@@ -9,9 +9,9 @@ import {
 } from "./toolLogStyles";
 
 type ToolLogMessage = Extract<MessageBlock, {
-  kind: "read" | "search" | "grep" | "glob" | "web_search" | "media_analysis" | "directory_list" | "tool" | "error";
+  kind: "read" | "search" | "grep" | "glob" | "web_search" | "media_analysis" | "directory_list" | "delete" | "tool" | "error";
 }>;
-type ToolLogStatus = "running" | "completed" | undefined;
+type ToolLogStatus = "running" | "completed" | "failed" | "denied" | undefined;
 
 const TOOL_LOG_LINE_TOOLTIP_CONTAINER_CLASS = "has-overflow-text max-w-full outline-none";
 const TOOL_LOG_LINE_TOOLTIP_OPEN_CLASS = "is-tooltip-open";
@@ -101,7 +101,12 @@ function OverflowToolLine({
 }
 
 function getToolLogLineClass(status: ToolLogStatus, className?: string) {
-  return `${TOOL_LOG_LINE_CLASS}${status === "running" ? ` ${TOOL_LOG_LINE_RUNNING_CLASS}` : ""}${
+  const stateClass = status === "running"
+    ? ` ${TOOL_LOG_LINE_RUNNING_CLASS}`
+    : status === "failed" || status === "denied"
+      ? ` ${TOOL_LOG_LINE_ERROR_CLASS}`
+      : "";
+  return `${TOOL_LOG_LINE_CLASS}${stateClass}${
     className ? ` ${className}` : ""
   }`;
 }
@@ -182,6 +187,17 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
           Listed {message.path}{message.entryCount !== undefined ? ` (${message.entryCount} entries)` : ""}
         </span>
       </div>
+    );
+  }
+
+  if (message.kind === "delete") {
+    const status = message.status === "pending" ? "running" : message.status;
+    return (
+      <OverflowToolLine
+        className={getToolLogLineClass(status, className)}
+        status={status}
+        text={message.displayText}
+      />
     );
   }
 

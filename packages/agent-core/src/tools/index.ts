@@ -44,6 +44,7 @@ export { globDefinition } from "./tools/glob/definition";
 export { listDirectoryDefinition } from "./tools/list-directory/definition";
 export { editFileDiffDefinition } from "./tools/edit-file-diff/definition";
 export { writeFileDefinition } from "./tools/write-file/definition";
+export { deleteFileDefinition } from "./tools/delete-file/definition";
 export { bashDefinition } from "./tools/bash/definition";
 export { webSearchDefinition } from "./tools/web-search/definition";
 export { analyzeMediaDefinition } from "./tools/analyze-media/definition";
@@ -55,8 +56,13 @@ export { globExecutor } from "./tools/glob/executor";
 export { listDirectoryExecutor } from "./tools/list-directory/executor";
 export { editFileDiffExecutor, renderEditResult } from "./tools/edit-file-diff/executor";
 export { writeFileExecutor, renderWriteResult } from "./tools/write-file/executor";
+export { deleteFileExecutor, renderDeleteResult } from "./tools/delete-file/executor";
 export { bashExecutor } from "./tools/bash/executor";
 export type { BashResult } from "./tools/bash/executor";
+export {
+  createDeleteFilePermissionChecker,
+  createDeleteFileTool,
+} from "./tools/delete-file";
 export {
   bashCheckPermissions,
   createBashPermissionChecker,
@@ -82,6 +88,7 @@ import { editFileDiffDefinition } from "./tools/edit-file-diff/definition";
 import { editFileDiffExecutor, renderEditResult } from "./tools/edit-file-diff/executor";
 import { writeFileDefinition } from "./tools/write-file/definition";
 import { writeFileExecutor, renderWriteResult } from "./tools/write-file/executor";
+import { createDeleteFileTool } from "./tools/delete-file";
 import { createBashTool } from "./tools/bash";
 import { webSearchDefinition } from "./tools/web-search/definition";
 import { webSearchExecutor } from "./tools/web-search/executor";
@@ -115,6 +122,10 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     if (!disabledTools.has(definition.name) && shouldExposeTool(definition, runtime)) {
       manager.registerFromSpec(definition, executor, renderResult);
     }
+  }
+
+  if (!disabledTools.has("delete_file")) {
+    manager.register(createDeleteFileTool(config.workspaceRoot));
   }
 
   if (!disabledTools.has("bash")) {

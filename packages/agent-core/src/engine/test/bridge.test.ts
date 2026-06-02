@@ -116,6 +116,26 @@ function createGlobTool(): InternalTool {
   };
 }
 
+function createDeleteTool(): InternalTool {
+  return {
+    name: "delete_file",
+    description: "Delete a file",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "path" },
+      },
+      required: ["path"],
+    },
+    isReadOnly: false,
+    previewKind: "delete",
+    handler: async (): Promise<ToolResult> => ({
+      success: true,
+      data: "File deleted: notes.md",
+    }),
+  };
+}
+
 function createDeps() {
   const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
   const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
@@ -680,6 +700,37 @@ describe("runTurnWithAgent bridge", () => {
         mode: "url",
         url: "https://example.com/post",
         displayText: "Read Web Page https://example.com/post",
+      },
+    });
+  });
+
+  it("persists delete_file results with a delete preview", async () => {
+    const deps = createDeps();
+    deps.toolManager.register(createDeleteTool());
+    deps.llm.setResponses([
+      mockToolCall("delete_file", { path: "/workspace/notes.md" }),
+      mockText("File removed."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Delete notes.md.",
+      },
+      deps,
+    );
+
+    const toolResult = result.events.find((event) => event.type === "tool_result");
+
+    expect(toolResult?.payload).toMatchObject({
+      toolName: "delete_file",
+      summary: "Deleted notes.md",
+      uiPreview: {
+        kind: "delete",
+        filePath: "notes.md",
+        displayText: "Deleted notes.md",
+        status: "completed",
       },
     });
   });
