@@ -207,6 +207,7 @@ export type ToolPreviewKind =
   | "directory_list"
   | "edit_diff"
   | "write"
+  | "delete"
   | "bash"
   | "generic";
 
@@ -235,6 +236,13 @@ export type ToolUiPreview =
       collapsedLines: number;
       /** running 阶段从 LLM 流式 args.content 提取的部分内容；completed 阶段不使用 */
       streamingContent?: string;
+    }
+  | {
+      kind: "delete";
+      filePath: string;
+      displayText: string;
+      status?: "pending" | "running" | "completed" | "failed" | "denied";
+      approvalRequestId?: string;
     }
   | BashPreview
   | { kind: "generic"; title: string; content: string };
@@ -507,6 +515,17 @@ export type MessageBlock =
       status?: "running" | "completed";
       /** running 阶段从 LLM 流式 args.content 提取的部分内容；completed 不使用 */
       streamingContent?: string;
+    }
+  | {
+      kind: "delete";
+      id: EventId;
+      filePath: string;
+      displayText: string;
+      createdAt: string;
+      status?: "pending" | "running" | "completed" | "failed" | "denied";
+      isError?: boolean;
+      approvalRequestId?: string;
+      reason?: string;
     }
   | ({
       kind: "bash";

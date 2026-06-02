@@ -582,7 +582,7 @@ function createToolExecutionResult(
   // message 文本 = 回填给 LLM 的内容（bash 头部 / 非 bash 摘要 / 或原样穿透）
   const modelOutput = getMessageText(message);
   const ok = !message.isError;
-  const summary = getToolSummary(message.toolName, tool?.previewKind ?? "generic", record?.args ?? {}, ok);
+  const summary = getToolSummary(message.toolName, tool?.previewKind ?? "generic", record?.args ?? {}, ok, modelOutput);
 
   // outputRef 由 executor（bash 落盘）/ OutputTruncator（inline 全量原文）填充
   const outputRef = record?.result?.outputRef;
@@ -746,6 +746,19 @@ function createToolUiPreview(
       };
     }
 
+    case "delete": {
+      const filePath = stringArg(args.path, "Unknown file");
+      const displayPath = displayFileName(filePath);
+      const denied = !ok && isDeleteDeniedOutput(output);
+      const status = output.length === 0 ? "running" : ok ? "completed" : denied ? "denied" : "failed";
+      return {
+        kind: "delete",
+        filePath: displayPath,
+        displayText: getDeletePreviewText(displayPath, status),
+        status,
+      };
+    }
+
     case "bash": {
       const command = stringArg(args.command, "");
       const intent = typeof args.intent === "string" && args.intent.trim().length > 0 ? args.intent.trim() : undefined;
@@ -776,8 +789,9 @@ function getToolSummary(
   previewKind: ToolUiPreview["kind"],
   args: Record<string, unknown>,
   ok: boolean,
+  output = "",
 ): string {
-  if (!ok) return `Error in ${toolName}`;
+  if (!ok && previewKind !== "delete") return `Error in ${toolName}`;
 
   switch (previewKind) {
     case "read":
@@ -809,6 +823,11 @@ function getToolSummary(
       return `Edit ${displayFileName(stringArg(args.path, "file"))}`;
     case "write":
       return `Write ${displayFileName(stringArg(args.path, "file"))}`;
+    case "delete": {
+      const fileName = displayFileName(stringArg(args.path, "file"));
+      if (ok) return output.length > 0 ? `Deleted ${fileName}` : `Delete ${fileName}`;
+      return isDeleteDeniedOutput(output) ? `Denied delete ${fileName}` : `Delete ${fileName} failed`;
+    }
     case "bash":
       return "Bash command";
     case "generic":
@@ -837,6 +856,22 @@ function displayPathTail(path: string): string {
 
 function getReadPreviewText(filePath: string, range?: string): string {
   return `Read ${filePath}${range ? ` ${range}` : ""}`;
+}
+
+function getDeletePreviewText(
+  filePath: string,
+  status: "pending" | "running" | "completed" | "failed" | "denied",
+): string {
+  if (status === "completed") return `Deleted ${filePath}`;
+  if (status === "failed") return `Delete ${filePath} failed`;
+  if (status === "denied") return `Denied delete ${filePath}`;
+  if (status === "pending") return "Delete file requires approval";
+  return `Delete ${filePath}`;
+}
+
+function isDeleteDeniedOutput(output: string): boolean {
+  return /\bUser denied tool:\s*delete_file\b/.test(output) ||
+    /\bApproval timed out for tool:\s*delete_file\b/.test(output);
 }
 
 function getMediaAnalysisPreviewText(mediaName: string, mediaKind: "image" | "video" | "media"): string {

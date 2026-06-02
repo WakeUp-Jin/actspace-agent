@@ -12,6 +12,7 @@ const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 function createTool(name: string, options?: {
   decision?: "allow" | "deny" | "ask";
   reason?: string;
+  allowSimilar?: boolean;
 }): InternalTool {
   const decision = options?.decision ?? "ask";
   return {
@@ -26,6 +27,7 @@ function createTool(name: string, options?: {
       reason: options?.reason ?? `${name} requires approval`,
       summary: `Run ${name}`,
       riskLevel: "medium" as const,
+      allowSimilar: options?.allowSimilar,
       sanitizedArgs: { command: "test-cmd" },
     }),
   };
@@ -137,6 +139,27 @@ describe("ToolScheduler approval flow", () => {
     const execution = await promise;
     expect(execution.result.success).toBe(true);
     expect(execution.record.status).toBe("success");
+  });
+
+  it("ask → allow_similar should cancel when permission disallows similar approvals", async () => {
+    const gate = createMockGate();
+    const scheduler = new ToolScheduler({ truncateThreshold: 2000, approvalGate: gate });
+    const tool = createTool("delete_file", { allowSimilar: false });
+    let handlerCalled = false;
+    tool.handler = async () => { handlerCalled = true; return { success: true, data: "deleted" }; };
+
+    const promise = scheduler.execute(tool, "delete_file", { path: "notes.md" });
+    await tick();
+
+    const requestId = gate.pendingRequests[0].id;
+    const resolver = gate.resolvers.get(requestId)!;
+    resolver({ requestId, decision: "allow_similar", decidedAt: Date.now() });
+
+    const execution = await promise;
+    expect(execution.result.success).toBe(false);
+    expect(execution.result.error).toContain("does not allow similar-operation approval");
+    expect(execution.record.status).toBe("cancelled");
+    expect(handlerCalled).toBe(false);
   });
 
   it("should call onApprovalRequired before waiting", async () => {

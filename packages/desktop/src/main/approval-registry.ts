@@ -30,6 +30,12 @@ interface PendingEntry {
 export interface ApprovalRegistryConfig {
   timeoutMs?: number;
   onApprovalRequired?: (request: ToolApprovalRequest, sessionId: string, turnId: string) => void;
+  onApprovalResolved?: (
+    request: ToolApprovalRequest,
+    decision: ToolApprovalDecision,
+    sessionId: string,
+    turnId: string,
+  ) => void;
 }
 
 export class PendingApprovalRegistry implements ApprovalGate {
@@ -38,10 +44,17 @@ export class PendingApprovalRegistry implements ApprovalGate {
   private sessionId = "";
   private turnId = "";
   private externalOnApprovalRequired?: (request: ToolApprovalRequest, sessionId: string, turnId: string) => void;
+  private externalOnApprovalResolved?: (
+    request: ToolApprovalRequest,
+    decision: ToolApprovalDecision,
+    sessionId: string,
+    turnId: string,
+  ) => void;
 
   constructor(config?: ApprovalRegistryConfig) {
     this.timeoutMs = config?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.externalOnApprovalRequired = config?.onApprovalRequired;
+    this.externalOnApprovalResolved = config?.onApprovalResolved;
   }
 
   setCurrentTurn(sessionId: string, turnId: string): void {
@@ -54,21 +67,25 @@ export class PendingApprovalRegistry implements ApprovalGate {
   waitForDecision(request: ToolApprovalRequest): Promise<ToolApprovalDecision> {
     return new Promise<ToolApprovalDecision>((resolve) => {
       const expiresAt = Date.now() + this.timeoutMs;
+      const sessionId = this.sessionId;
+      const turnId = this.turnId;
 
       const timer = setTimeout(() => {
         this.pending.delete(request.id);
-        resolve({
+        const decision: ToolApprovalDecision = {
           requestId: request.id,
           decision: "timeout",
           decidedAt: Date.now(),
-        });
+        };
+        resolve(decision);
+        this.externalOnApprovalResolved?.(request, decision, sessionId, turnId);
       }, this.timeoutMs);
 
       this.pending.set(request.id, {
         resolve,
         request,
-        sessionId: this.sessionId,
-        turnId: this.turnId,
+        sessionId,
+        turnId,
         expiresAt,
         timer,
       });
@@ -88,14 +105,26 @@ export class PendingApprovalRegistry implements ApprovalGate {
       return { ok: false, reason: "not_found_or_already_resolved" };
     }
 
+    if (entry.request.toolName === "delete_file" && decision === "allow_similar") {
+      return { ok: false, reason: "delete_file_only_allows_approve_once_or_deny" };
+    }
+
     clearTimeout(entry.timer);
     this.pending.delete(requestId);
 
-    entry.resolve({
+    const resolvedDecision: ToolApprovalDecision = {
       requestId,
       decision,
       decidedAt: Date.now(),
-    });
+    };
+
+    entry.resolve(resolvedDecision);
+    this.externalOnApprovalResolved?.(
+      entry.request,
+      resolvedDecision,
+      entry.sessionId,
+      entry.turnId,
+    );
 
     return { ok: true };
   }
@@ -124,11 +153,13 @@ export class PendingApprovalRegistry implements ApprovalGate {
       if (sessionId && entry.sessionId !== sessionId) continue;
       clearTimeout(entry.timer);
       this.pending.delete(id);
-      entry.resolve({
+      const decision: ToolApprovalDecision = {
         requestId: id,
         decision: "timeout",
         decidedAt: Date.now(),
-      });
+      };
+      entry.resolve(decision);
+      this.externalOnApprovalResolved?.(entry.request, decision, entry.sessionId, entry.turnId);
       count++;
     }
     return count;

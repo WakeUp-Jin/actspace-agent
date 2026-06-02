@@ -103,6 +103,13 @@ const EXTRACTORS: Record<ToolPreviewKind, Extractor> = {
     streamingContent: getField(s, "content"),
   }),
 
+  delete: (s) => ({
+    kind: "delete",
+    filePath: getField(s, "path") ?? "",
+    displayText: "",
+    status: "running",
+  }),
+
   bash: (s) => ({
     kind: "bash",
     status: "running",

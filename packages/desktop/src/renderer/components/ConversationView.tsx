@@ -5,6 +5,7 @@ import { Composer, type ComposerSendOptions, type ComposerWorkspaceOption } from
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { AssistantReply } from "./messages/AssistantReply";
 import { BashRunBlock } from "./messages/BashRunBlock";
+import { DeleteFileBlock } from "./messages/DeleteFileBlock";
 import { FileDiffBlock } from "./messages/FileDiffBlock";
 import { ThinkingBlock } from "./messages/ThinkingBlock";
 import { ToolLogLine } from "./messages/ToolLogLine";
@@ -53,6 +54,7 @@ const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
   "web_search",
   "media_analysis",
   "directory_list",
+  "delete",
   "tool",
   "error",
 ]);
@@ -134,8 +136,12 @@ function renderMessage(message: MessageBlock, className?: string) {
     case "web_search":
     case "media_analysis":
     case "directory_list":
+    case "delete":
     case "tool":
     case "error":
+      if (message.kind === "delete" && message.status === "pending") {
+        return <DeleteFileBlock key={message.id} message={message} className={className} />;
+      }
       return <ToolLogLine key={message.id} message={message} className={className} />;
     case "status":
       return (

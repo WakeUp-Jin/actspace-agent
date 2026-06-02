@@ -108,6 +108,17 @@
 - 磁盘写入仍在 tool execute 阶段原子写入（tmpfile → fsync → rename），**不**在 LLM 流式期间写盘，避免半文件出现或 LLM 重试导致脏写。
 - 前端复用 `FileDiffBlock` 折叠式组件（与 `edit_file` 共享），`kind: "write_diff"` 区分标题动作词，无 icon。
 
+### `delete_file`
+
+- `previewKind`: `delete`
+- `ToolUiPreview.filePath`: 文件名，例如 `notes.md`。
+- `ToolUiPreview.status`: `pending` / `running` / `completed` / `failed` / `denied`。
+- 权限语义：第一版默认 `ask`，即使目标在 workspace 内也必须用户确认；只允许一次性 `Delete`，不提供 `allow_similar`。
+- 流式阶段只展示轻量工具行 `Delete notes.md` + shimmer；审批 pending 阶段切换为独立 `DeleteFileBlock`，展示目标文件、reason、`Skip` 和 `Delete`。
+- 审批通过后同一条工具消息回到 running，完成后展示 `Deleted notes.md`；拒绝后展示 `Denied delete notes.md`。
+- session 恢复只恢复最终事实态（completed / failed / denied）；pending 审批依赖运行态 pending approval 事件恢复，不从历史里猜测。
+- 不展示完整路径；完整参数保留在 `tool_call.payload.arguments`、run log 和持久化事件中。
+
 ### `bash`
 
 - `previewKind`: `bash`

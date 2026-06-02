@@ -45,6 +45,8 @@ export interface PermissionResult {
   summary?: string;
   /** 风险分层是决策元数据，不是额外决策状态 */
   riskLevel?: ToolRiskLevel;
+  /** 是否允许把一次审批扩展为类似操作放行；缺省保留旧行为。 */
+  allowSimilar?: boolean;
   /** 验证通过后可修正参数（如路径展开、超时值清洗） */
   sanitizedArgs?: Record<string, unknown>;
 }

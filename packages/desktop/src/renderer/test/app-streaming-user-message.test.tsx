@@ -946,6 +946,146 @@ describe("App streaming user message", () => {
     });
   });
 
+  it("renders delete_file pending approval as a delete confirmation block", async () => {
+    const sessionId = "session-delete-approval";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "Delete approval session",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+
+    let approvalPending = false;
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+      null;
+    const submitApproval = vi.fn(async () => ({ ok: true }));
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval,
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async (input) =>
+        input?.sessionId === sessionId && approvalPending
+          ? [{
+              requestId: "approval-delete-1",
+              toolName: "delete_file",
+              summary: "Delete notes.md",
+              reason: "delete_file is a destructive file operation and requires approval.",
+              createdAt: Date.now(),
+              expiresAt: Date.now() + 60_000,
+            }]
+          : [],
+      ...settingsApiStub,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) {
+            streamHandler = null;
+          }
+        };
+      },
+      runTurn: (input: RunTurnInput) =>
+        new Promise((resolve) => {
+          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          streamHandler?.({
+            type: "tool_call_streaming",
+            toolCallId: "tool-delete-1",
+            toolName: "delete_file",
+            isInitial: true,
+            preview: {
+              kind: "delete",
+              filePath: "/tmp/workspace/notes.md",
+              displayText: "",
+              status: "running",
+            },
+          });
+          approvalPending = true;
+          streamHandler?.({
+            type: "tool_approval_required",
+            toolCallId: "tool-delete-1",
+            toolName: "delete_file",
+            requestId: "approval-delete-1",
+            summary: "Delete notes.md",
+            reason: "delete_file is a destructive file operation and requires approval.",
+            riskLevel: "high",
+          });
+          resolveRunTurn = resolve;
+        }),
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "delete notes.md");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    expect(await screen.findByText("Delete file requires approval")).toBeInTheDocument();
+    expect(screen.getByText("notes.md")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(submitApproval).toHaveBeenCalledWith({
+      requestId: "approval-delete-1",
+      decision: "approve_once",
+    });
+    expect(await screen.findByText("Delete notes.md")).toBeInTheDocument();
+
+    await act(async () => {
+      approvalPending = false;
+      streamHandler?.({
+        type: "tool_approval_resolved",
+        toolCallId: "tool-delete-1",
+        requestId: "approval-delete-1",
+        decision: "approve_once",
+      });
+    });
+
+    await act(async () => {
+      streamHandler?.({
+        type: "tool_finished",
+        toolCallId: "tool-delete-1",
+        toolName: "delete_file",
+        resultEventId: "evt-delete-result",
+        isError: false,
+      });
+    });
+
+    expect(await screen.findByText("Deleted notes.md")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveRunTurn?.({
+        sessionId,
+        turnId: "turn-delete-approval-finished",
+        status: "completed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      });
+    });
+  });
+
   it("marks the active sidebar session as failed when a turn fails", async () => {
     const sessionId = "session-failed";
     const record = createEmptySessionRecord(sessionId);

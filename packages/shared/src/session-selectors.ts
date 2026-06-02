@@ -186,6 +186,19 @@ function messageBlockFromToolPreview(
         collapsedLines: preview.collapsedLines,
         createdAt: getDisplayTime(timestamp)
       };
+    case "delete": {
+      const status = preview.status ?? (isError ? "failed" : "completed");
+      return {
+        kind: "delete",
+        id: eventId,
+        filePath: preview.filePath,
+        displayText: preview.displayText,
+        status,
+        isError,
+        approvalRequestId: preview.approvalRequestId,
+        createdAt: getDisplayTime(timestamp)
+      };
+    }
     case "bash":
       return {
         kind: "bash",
