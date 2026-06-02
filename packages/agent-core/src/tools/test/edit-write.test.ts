@@ -115,6 +115,98 @@ describe("editFileDiffExecutor", () => {
     expect(await readFile(target, "utf-8")).toBe("bar\nbar\nbar\n");
   });
 
+  it("deletes a whole line without leaving an empty line", async () => {
+    const target = join(dir, "delete-line.ts");
+    await writeFile(target, "keep before\nremove me\nkeep after\n");
+
+    const result = await editFileDiffExecutor(
+      { path: target, old_string: "remove me", new_string: "" },
+      dir,
+    );
+
+    expect(result.success).toBe(true);
+    expect(await readFile(target, "utf-8")).toBe("keep before\nkeep after\n");
+
+    const data = result.data as Record<string, unknown>;
+    expect(data.deletions).toBe(1);
+    expect(data.additions).toBe(0);
+    expect(data.diff as string).toContain("-remove me");
+  });
+
+  it("counts deleted content lines that start with diff marker characters", async () => {
+    const target = join(dir, "delete-marker-line.ts");
+    await writeFile(target, "--flag\nkeep\n");
+
+    const result = await editFileDiffExecutor(
+      { path: target, old_string: "--flag", new_string: "" },
+      dir,
+    );
+
+    expect(result.success).toBe(true);
+    expect(await readFile(target, "utf-8")).toBe("keep\n");
+
+    const data = result.data as Record<string, unknown>;
+    expect(data.deletions).toBe(1);
+    expect(data.additions).toBe(0);
+  });
+
+  it("deletes inline text at the end of a line without swallowing the newline", async () => {
+    const target = join(dir, "delete-inline-tail.ts");
+    await writeFile(target, "const label = prefix + suffix\nnext line\n");
+
+    const result = await editFileDiffExecutor(
+      { path: target, old_string: " suffix", new_string: "" },
+      dir,
+    );
+
+    expect(result.success).toBe(true);
+    expect(await readFile(target, "utf-8")).toBe("const label = prefix +\nnext line\n");
+  });
+
+  it("deletes a unique multiline block and preserves surrounding context", async () => {
+    const target = join(dir, "delete-block.ts");
+    await writeFile(target, "before\nremove one\nremove two\nafter\n");
+
+    const result = await editFileDiffExecutor(
+      { path: target, old_string: "remove one\nremove two\n", new_string: "" },
+      dir,
+    );
+
+    expect(result.success).toBe(true);
+    expect(await readFile(target, "utf-8")).toBe("before\nafter\n");
+
+    const data = result.data as Record<string, unknown>;
+    expect(data.deletions).toBe(2);
+    expect(data.additions).toBe(0);
+  });
+
+  it("deletes file tail content without inventing a trailing newline", async () => {
+    const target = join(dir, "delete-tail.ts");
+    await writeFile(target, "keep\nremove tail");
+
+    const result = await editFileDiffExecutor(
+      { path: target, old_string: "remove tail", new_string: "" },
+      dir,
+    );
+
+    expect(result.success).toBe(true);
+    expect(await readFile(target, "utf-8")).toBe("keep\n");
+  });
+
+  it("rejects deleting multiple matches unless replace_all is true", async () => {
+    const target = join(dir, "delete-dup.ts");
+    await writeFile(target, "foo\nfoo\n");
+
+    const result = await editFileDiffExecutor(
+      { path: target, old_string: "foo", new_string: "" },
+      dir,
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("matches 2 locations");
+    expect(await readFile(target, "utf-8")).toBe("foo\nfoo\n");
+  });
+
   it("returns error when old_string not found", async () => {
     const target = join(dir, "miss.ts");
     await writeFile(target, "hello world");

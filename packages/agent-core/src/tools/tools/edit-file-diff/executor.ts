@@ -24,12 +24,53 @@ function normalizeQuotes(s: string): string {
   return result;
 }
 
-function countPrefixedLines(diff: string, prefix: string): number {
-  return diff.split("\n").filter((l) => l.startsWith(prefix) && !l.startsWith(`${prefix}${prefix}`)).length;
+function countChangedLines(diff: string, marker: "+" | "-"): number {
+  let inHunk = false;
+  let count = 0;
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("@@")) {
+      inHunk = true;
+      continue;
+    }
+    if (inHunk && line.startsWith(marker)) {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 function workspaceRelativePath(filePath: string, workspaceRoot: string): string {
   return relative(workspaceRoot, filePath) || ".";
+}
+
+function deleteMatches(content: string, oldString: string, replaceAll: boolean): string {
+  let updated = "";
+  let cursor = 0;
+
+  while (cursor <= content.length) {
+    const matchIndex = content.indexOf(oldString, cursor);
+    if (matchIndex === -1) {
+      updated += content.slice(cursor);
+      break;
+    }
+
+    const matchEnd = matchIndex + oldString.length;
+    const startsAtLineStart = matchIndex === 0 || content[matchIndex - 1] === "\n";
+    const endsBeforeNewline = content[matchEnd] === "\n";
+    const deleteEnd = !oldString.endsWith("\n") && startsAtLineStart && endsBeforeNewline
+      ? matchEnd + 1
+      : matchEnd;
+
+    updated += content.slice(cursor, matchIndex);
+    cursor = deleteEnd;
+
+    if (!replaceAll) {
+      updated += content.slice(cursor);
+      break;
+    }
+  }
+
+  return updated;
 }
 
 export const editFileDiffExecutor: ToolExecutorFn = async (
@@ -63,7 +104,7 @@ export const editFileDiffExecutor: ToolExecutorFn = async (
         filePath: guard.resolvedPath,
         relativePath,
         diff,
-        additions: countPrefixedLines(diff, "+"),
+        additions: countChangedLines(diff, "+"),
         deletions: 0,
         chars: newString.length,
       },
@@ -99,7 +140,7 @@ export const editFileDiffExecutor: ToolExecutorFn = async (
         filePath: guard.resolvedPath,
         relativePath,
         diff,
-        additions: countPrefixedLines(diff, "+"),
+        additions: countChangedLines(diff, "+"),
         deletions: 0,
         chars: newString.length,
       },
@@ -143,13 +184,7 @@ export const editFileDiffExecutor: ToolExecutorFn = async (
   // Perform replacement
   let updated: string;
   if (newString === "") {
-    // Deletion: also remove trailing newline to avoid blank residue
-    const withNewline = oldString.endsWith("\n") ? oldString : oldString + "\n";
-    if (!oldString.endsWith("\n") && content.includes(withNewline)) {
-      updated = replaceAll ? content.replaceAll(withNewline, "") : content.replace(withNewline, "");
-    } else {
-      updated = replaceAll ? content.replaceAll(oldString, "") : content.replace(oldString, "");
-    }
+    updated = deleteMatches(content, oldString, replaceAll);
   } else {
     updated = replaceAll ? content.replaceAll(oldString, newString) : content.replace(oldString, newString);
   }
@@ -167,8 +202,8 @@ export const editFileDiffExecutor: ToolExecutorFn = async (
       filePath: guard.resolvedPath,
       relativePath,
       diff,
-      additions: countPrefixedLines(diff, "+"),
-      deletions: countPrefixedLines(diff, "-"),
+      additions: countChangedLines(diff, "+"),
+      deletions: countChangedLines(diff, "-"),
       chars: updated.length,
       replaceAll,
       matches,

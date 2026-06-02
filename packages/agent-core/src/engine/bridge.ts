@@ -886,9 +886,18 @@ function getDirectoryEntryCount(output: string): number {
 }
 
 function countDiffLines(diff: string, marker: "+" | "-"): number {
-  return diff
-    .split("\n")
-    .filter((line) => line.startsWith(marker) && !line.startsWith(`${marker}${marker}${marker}`)).length;
+  let inHunk = false;
+  let count = 0;
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("@@")) {
+      inHunk = true;
+      continue;
+    }
+    if (inHunk && line.startsWith(marker)) {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 function mapAgentEventToStreamEvent(

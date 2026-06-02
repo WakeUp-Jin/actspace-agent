@@ -925,4 +925,50 @@ describe("runTurnWithAgent bridge", () => {
       },
     });
   });
+
+  it("counts edit preview hunk lines without counting unified diff file headers", async () => {
+    const deps = createDeps();
+    deps.toolManager.register({
+      name: "edit_file",
+      description: "Edit a file",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+        },
+        required: ["path"],
+      },
+      isReadOnly: true,
+      previewKind: "edit_diff",
+      handler: async (): Promise<ToolResult> => ({
+        success: true,
+        data: "--- a/src/index.ts\n+++ b/src/index.ts\n@@ -1 +1 @@\n---flag\n+++flag",
+      }),
+    });
+    deps.llm.setResponses([
+      mockToolCall("edit_file", { path: "/workspace/src/index.ts" }, { id: "tc-edit-header-stats" }),
+      mockText("Done."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Delete a line.",
+      },
+      deps,
+    );
+
+    const toolResult = result.events.find((event) => event.type === "tool_result");
+
+    expect(toolResult?.payload).toMatchObject({
+      toolName: "edit_file",
+      uiPreview: {
+        kind: "edit_diff",
+        filePath: "index.ts",
+        additions: 1,
+        deletions: 1,
+      },
+    });
+  });
 });

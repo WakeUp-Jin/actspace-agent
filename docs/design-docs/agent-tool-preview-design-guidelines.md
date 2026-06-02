@@ -88,6 +88,9 @@
 - 为什么不流式 content：edit 的 diff 需要「文件原内容 + old_string 定位 + new_string 替换」三者全齐才能生成有定位的 unified diff，LLM 流式只能拿到 old/new 两段无上下文文本，强行展示会误导用户。streaming-preview-extractors 的 `edit_diff` extractor 只提取 path。
 - 流式 `tool_finished` 后切换为 `status: completed`，渲染折叠态 `Edit index.ts +3 -1 ›`，点击展开完整 diff。
 - diff 由 `diff` 库 `createTwoFilesPatch` 生成（标准 unified diff 格式），包含上下文行。
+- `new_string: ""` 的长期语义是删除唯一匹配文本内容，不是删除文件；多处匹配仍必须提供更多上下文或显式 `replace_all`。
+- 删除整行时，如果 `old_string` 恰好从行首匹配且匹配后紧跟换行，executor 会连同该换行一起删除，避免留下空白行；行内文本删除不得吞掉后续换行。
+- `ToolUiPreview.additions` / `deletions` 必须只统计 unified diff hunk 内的真实 `+` / `-` 行，不统计 `---` / `+++` 文件头，也不能漏算内容本身以 `---` 或 `+++` 开头的变更行。
 - 前端使用 `FileDiffBlock` 折叠式组件，与 `write_file` 共享同一组件，无 icon，左边缘与 Read / Grep 等工具行对齐。
 
 ### `write_file`
