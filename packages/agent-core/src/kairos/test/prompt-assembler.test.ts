@@ -13,6 +13,7 @@ import type { KairosConfig } from "../config/loader";
 import type { WatchDiffEntry } from "../context/watch-diff";
 import type { SessionsDigestResult } from "../context/sessions-digest";
 import type { KairosShortTermLoadResult } from "../context/short-term";
+import type { KairosInboxSummary } from "../inbox";
 
 function baseConfig(): KairosConfig {
   return {
@@ -36,6 +37,25 @@ function emptyShortTerm(): KairosShortTermLoadResult {
 
 function emptyDigest(): SessionsDigestResult {
   return { workspaces: [], generatedAt: "2026-05-27T19:00:00.000Z" };
+}
+
+function sampleInboxSummary(): KairosInboxSummary {
+  return {
+    text: [
+      "## Agent 收件箱（Main/Lab -> Kairos）",
+      "",
+      "### Main Agent (main-agent.md)",
+      "### 2026-06-02T03:50:00.000Z | priority: normal | topic: 前端验证反复失败",
+      "请 Kairos 后续观察这个重复失败。",
+      "",
+      "### Lab Agent (lab-agent.md)",
+      "### 2026-06-02T04:00:00.000Z | priority: low | topic: blocked 实验",
+      "等待更多证据。",
+    ].join("\n"),
+    files: [],
+    truncated: false,
+    warnings: [],
+  };
 }
 
 describe("buildObservationSummary", () => {
@@ -92,6 +112,20 @@ describe("buildObservationSummary", () => {
     const text = buildObservationSummary({ watchDiffs: [], sessionsDigest: emptyDigest() });
     expect(text).toContain("（无配置 watch 路径或本次扫描无差异）");
     expect(text).toContain("（暂无可读 sessions 工作区）");
+    expect(text).toContain("（暂无 inbox 摘要）");
+  });
+
+  it("includes Agent inbox summary without dropping other observation sections", () => {
+    const text = buildObservationSummary({
+      watchDiffs: [],
+      sessionsDigest: emptyDigest(),
+      inboxSummary: sampleInboxSummary(),
+    });
+    expect(text).toContain("巡检目录变化");
+    expect(text).toContain("主 Agent 最近 sessions");
+    expect(text).toContain("Agent 收件箱");
+    expect(text).toContain("前端验证反复失败");
+    expect(text).toContain("blocked 实验");
   });
 });
 
@@ -127,6 +161,7 @@ describe("assembleSystemPrompt", () => {
       shortTermResult: emptyShortTerm(),
       now: new Date("2026-05-27T13:00:00"),
       activeBriefsCount: 2,
+      inboxSummary: sampleInboxSummary(),
     });
     expect(prompt).toContain("You are Kairos");
     expect(prompt).toContain("[活跃 briefs] 2 个");
@@ -136,6 +171,8 @@ describe("assembleSystemPrompt", () => {
     expect(prompt).toContain("# 用户规则");
     expect(prompt).toContain("请保持简洁。");
     expect(prompt).toContain("# 观测摘要");
+    expect(prompt).toContain("Agent inbox 是后台观察信号");
+    expect(prompt).toContain("前端验证反复失败");
     expect(prompt).toContain("# 历史摘要");
     // 不残留任何未替换占位符
     expect(prompt.match(/\{\w+\}/g)).toBeNull();

@@ -18,6 +18,7 @@ import type { WatchDiffEntry } from "../context/watch-diff";
 import type { SessionsDigestResult } from "../context/sessions-digest";
 import type { TickPayload } from "../briefs/dispatcher";
 import type { BriefsIndexManager } from "../briefs/index-manager";
+import type { KairosInboxSummary } from "../inbox";
 import { tmpdir } from "node:os";
 import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
@@ -58,6 +59,15 @@ const baseGuard: KairosGuardContext = {
 
 function tickPayload(): TickPayload {
   return { trigger: "auto", content: "<tick test/>" };
+}
+
+function sampleInboxSummary(): KairosInboxSummary {
+  return {
+    text: "## Agent 收件箱（Main/Lab -> Kairos）\n\n### Main Agent (main-agent.md)\n请观察重复失败。",
+    files: [],
+    truncated: false,
+    warnings: [],
+  };
 }
 
 describe("KairosRunner.processTick", () => {
@@ -145,6 +155,34 @@ describe("KairosRunner.processTick", () => {
     // llm.stream(context, opts) → opts.thinkingEnabled === false
     const opts = streamSpy.mock.calls.at(-1)?.[1] as { thinkingEnabled?: boolean } | undefined;
     expect(opts?.thinkingEnabled).toBe(false);
+  });
+
+  it("injects Agent inbox summary into the LLM system prompt", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "mock-model" });
+    llm.setResponses([
+      (context) => {
+        expect(context.systemPrompt).toContain("Agent 收件箱");
+        expect(context.systemPrompt).toContain("请观察重复失败");
+        return mockText("seen");
+      },
+    ]);
+
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp/work" });
+    registerKairosTools(toolManager);
+
+    const runner = new KairosRunner({
+      config: baseConfig(),
+      shortTerm: fakeShortTerm(),
+      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
+      activeBriefsCount: async () => 0,
+      loadInboxSummary: async () => sampleInboxSummary(),
+      eventSink: async () => {},
+      llm,
+      toolManager,
+      kairosGuard: baseGuard,
+    });
+
+    await runner.processTick({ type: "tick", payload: tickPayload() });
   });
 
   it("does not pass thinkingEnabled when option is omitted (LLM uses ModelSpec default)", async () => {

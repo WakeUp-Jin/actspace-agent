@@ -8,7 +8,7 @@
  * - 每段独立预算截尾，互不影响：
  *     [3] config_tips_block ≤ 600 token  （在 plan 2 内部完成）
  *     [4] user_rules         ≤ 1500 token （在 loader 中完成 rule.md 截尾）
- *     [5] observation_summary ≤ 800 token
+ *     [5] observation_summary ≤ 1200 token
  *     [6] history_summary     ≤ 3000 token
  * - 字符≈token 估算：1 token ≈ 3 字符（与 agent-core/context/token-estimator 对齐）。
  * - 不抛错——任何子段为空时按 "（暂无数据）" 占位。
@@ -21,15 +21,20 @@ import type { KairosConfig } from "./config/loader";
 import type { WatchDiffEntry } from "./context/watch-diff";
 import type { SessionsDigestResult } from "./context/sessions-digest";
 import type { KairosShortTermLoadResult } from "./context/short-term";
+import type { KairosInboxSummary } from "./inbox";
 import { KAIROS_SYSTEM_PROMPT } from "./prompt";
 
-export const OBSERVATION_TOKEN_BUDGET = 800;
+export const OBSERVATION_TOKEN_BUDGET = 1200;
 export const HISTORY_TOKEN_BUDGET = 3000;
+const OBSERVATION_WATCH_MAX_CHARS = 520;
+const OBSERVATION_SESSIONS_MAX_CHARS = 520;
+const OBSERVATION_INBOX_MAX_CHARS = 2300;
 
 export interface AssembleSystemPromptInput {
   config: KairosConfig;
   watchDiffs: WatchDiffEntry[];
   sessionsDigest: SessionsDigestResult;
+  inboxSummary?: KairosInboxSummary;
   shortTermResult: KairosShortTermLoadResult;
   now: Date;
   activeBriefsCount: number;
@@ -42,6 +47,7 @@ export function assembleSystemPrompt(input: AssembleSystemPromptInput): string {
     buildObservationSummary({
       watchDiffs: input.watchDiffs,
       sessionsDigest: input.sessionsDigest,
+      inboxSummary: input.inboxSummary,
     }),
     OBSERVATION_TOKEN_BUDGET * TOKEN_CHARS_PER_UNIT,
   );
@@ -70,26 +76,54 @@ export function assembleSystemPrompt(input: AssembleSystemPromptInput): string {
 export interface BuildObservationSummaryInput {
   watchDiffs: WatchDiffEntry[];
   sessionsDigest: SessionsDigestResult;
+  inboxSummary?: KairosInboxSummary;
 }
 
 export function buildObservationSummary(input: BuildObservationSummaryInput): string {
   const sections: string[] = [];
-  const generatedAt = input.sessionsDigest.generatedAt
-    ? formatHuman(input.sessionsDigest.generatedAt)
-    : formatHuman(new Date().toISOString());
+  sections.push(
+    truncateByCharBudget(
+      buildWatchDiffSummary(input.watchDiffs, input.sessionsDigest.generatedAt),
+      OBSERVATION_WATCH_MAX_CHARS,
+    ),
+  );
+  sections.push("");
+  sections.push(
+    truncateByCharBudget(
+      buildSessionsDigestSummary(input.sessionsDigest),
+      OBSERVATION_SESSIONS_MAX_CHARS,
+    ),
+  );
+  sections.push("");
+  if (input.inboxSummary) {
+    sections.push(truncateByCharBudget(input.inboxSummary.text, OBSERVATION_INBOX_MAX_CHARS));
+  } else {
+    sections.push("## Agent 收件箱（Main/Lab -> Kairos）");
+    sections.push("（暂无 inbox 摘要）");
+  }
+
+  return sections.join("\n");
+}
+
+function buildWatchDiffSummary(watchDiffs: WatchDiffEntry[], generatedAtIso?: string): string {
+  const sections: string[] = [];
+  const generatedAt = generatedAtIso ? formatHuman(generatedAtIso) : formatHuman(new Date().toISOString());
 
   sections.push(`## 巡检目录变化（截至 ${generatedAt}）`);
-  if (input.watchDiffs.length === 0) {
+  if (watchDiffs.length === 0) {
     sections.push("（无配置 watch 路径或本次扫描无差异）");
   } else {
-    for (const diff of input.watchDiffs) {
+    for (const diff of watchDiffs) {
       sections.push(formatWatchDiffEntry(diff));
     }
   }
+  return sections.join("\n");
+}
 
-  sections.push("");
+function buildSessionsDigestSummary(sessionsDigest: SessionsDigestResult): string {
+  const sections: string[] = [];
   sections.push("## 主 Agent 最近 sessions（按 unreadTurnsForKairos 降序）");
-  const workspaces = input.sessionsDigest.workspaces;
+  const workspaces = sessionsDigest.workspaces;
   if (workspaces.length === 0) {
     sections.push("（暂无可读 sessions 工作区）");
   } else {
@@ -112,7 +146,6 @@ export function buildObservationSummary(input: BuildObservationSummaryInput): st
       }
     }
   }
-
   return sections.join("\n");
 }
 

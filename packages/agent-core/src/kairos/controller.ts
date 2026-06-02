@@ -42,6 +42,7 @@ import { BriefsDispatcher, type TickPayload } from "./briefs/dispatcher";
 import { KairosRunner } from "./runner";
 import { MessageQueue, QueueProcessor, type WakeReason } from "./scheduler";
 import { registerKairosTools } from "./tools";
+import { loadKairosInboxSummary, type KairosInboxSummary } from "./inbox";
 import {
   assembleSystemPrompt,
   buildHistorySummary,
@@ -322,12 +323,14 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     const entries = await briefsIndex.list();
     return entries.filter((e) => e.frontmatter.status === "active").length;
   };
+  const loadInboxSummary = async () => loadKairosInboxSummary({ kairosRoot: opts.kairosRoot });
 
   const runner = new KairosRunner({
     config,
     shortTerm,
     observeRefresh,
     activeBriefsCount,
+    loadInboxSummary,
     eventSink,
     llm: opts.llm,
     toolManager,
@@ -607,11 +610,13 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
       const observe = await observeRefresh();
       const shortTermResult = await shortTerm.load();
       const briefsCount = await activeBriefsCount();
+      const inboxSummary = await loadInboxSummary();
 
       const systemPrompt = assembleSystemPrompt({
         config,
         watchDiffs: observe.watchDiffs,
         sessionsDigest: observe.sessionsDigest,
+        inboxSummary,
         shortTermResult,
         now,
         activeBriefsCount: briefsCount,
@@ -622,6 +627,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
         config,
         configDir: paths.configDir,
         observeResult: observe,
+        inboxSummary,
         shortTermResult,
         briefsCount,
         promptSourceFile: "packages/agent-core/src/kairos/prompt.ts",
@@ -680,6 +686,7 @@ interface BuildPromptSegmentsInput {
     watchDiffs: WatchDiffEntry[];
     sessionsDigest: SessionsDigestResult;
   };
+  inboxSummary?: KairosInboxSummary;
   shortTermResult: KairosShortTermLoadResult;
   briefsCount: number;
   /** 仅用于 segments 的 `sourceFiles` 标注；提交时已经是相对仓库根的路径常量。 */
@@ -736,7 +743,9 @@ function buildPromptSegments(input: BuildPromptSegmentsInput): KairosContextProm
       text: buildObservationSummary({
         watchDiffs: observeResult.watchDiffs,
         sessionsDigest: observeResult.sessionsDigest,
+        inboxSummary: input.inboxSummary,
       }),
+      sourceFiles: input.inboxSummary?.files.map((f) => f.path),
     },
     {
       label: "历史摘要",

@@ -42,6 +42,7 @@ describe("ensureKairosScaffolding", () => {
       "memory/short-term",
       "observe/watch-manifests",
       "briefs/tasks",
+      "inbox",
     ]) {
       const s = await stat(join(root, sub));
       expect(s.isDirectory()).toBe(true);
@@ -71,6 +72,21 @@ describe("ensureKairosScaffolding", () => {
     const rule = await readFile(join(root, "config/rule.md"), "utf8");
     expect(rule.length).toBeGreaterThan(0);
     expect(rule.startsWith("#")).toBe(true);
+  });
+
+  it("writes default Agent inbox files without a Processed section", async () => {
+    const root = await makeRoot();
+    await ensureKairosScaffolding(root);
+
+    const main = await readFile(join(root, "inbox/main-agent.md"), "utf8");
+    const lab = await readFile(join(root, "inbox/lab-agent.md"), "utf8");
+
+    expect(main).toContain("# Main Agent -> Kairos Inbox");
+    expect(main).toContain("## Pending");
+    expect(main).not.toContain("Processed");
+    expect(lab).toContain("# Lab Agent -> Kairos Inbox");
+    expect(lab).toContain("## Pending");
+    expect(lab).not.toContain("Processed");
   });
 
   it("does not overwrite existing config files (idempotent)", async () => {

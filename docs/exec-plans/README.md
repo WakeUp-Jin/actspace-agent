@@ -70,3 +70,4 @@
 - `completed/kairos_main_ipc_and_renderer.md`
 - `completed/kairos_e2e_and_docs_sync.md`
 - `completed/kairos-monitor-page-redesign.md`
+- `completed/20260602-kairos-agent-inbox.md`

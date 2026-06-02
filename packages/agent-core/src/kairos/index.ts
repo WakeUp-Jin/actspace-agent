@@ -63,3 +63,21 @@ export { compressKairosSegments } from "./compression/compressor";
 export { sleepDefinition, sleepExecutor, registerKairosTools } from "./tools";
 export { aggregateKairosEvents, type KairosEventRow } from "./aggregator";
 export { resolveKairosEnv, resolveKairosModelSpec, DEFAULT_KAIROS_MODEL_ID, type KairosEnvConfig } from "./env";
+export {
+  appendKairosInboxMessage,
+  defaultKairosInboxContent,
+  ensureKairosInboxScaffolding,
+  getKairosInboxDir,
+  getKairosInboxFilePath,
+  loadKairosInboxSummary,
+  KAIROS_INBOX_DIR,
+  KAIROS_INBOX_MAX_CHARS_PER_FILE,
+  KAIROS_INBOX_MAX_COMBINED_CHARS,
+  KAIROS_INBOX_MAX_MESSAGES_PER_FILE,
+  type AppendKairosInboxMessageInput,
+  type KairosInboxFileSummary,
+  type KairosInboxPriority,
+  type KairosInboxSource,
+  type KairosInboxSummary,
+  type LoadKairosInboxSummaryInput,
+} from "./inbox";

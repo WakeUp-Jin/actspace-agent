@@ -110,6 +110,7 @@ flowchart TB
     Scheduler[scheduler.ts<br/>MessageQueue + QueueProcessor]
     Runner[runner.ts<br/>KairosRunner.processTick]
     PromptAsm[prompt-assembler.ts<br/>5 段 system prompt 拼装]
+    Inbox[inbox.ts<br/>Agent inbox loader/writer]
     Aggregator[aggregator.ts<br/>事件聚合 re-export]
 
     subgraph cfg[config/]
@@ -163,6 +164,7 @@ flowchart TB
   Runner --> ShortTerm
   Runner --> WatchDiff
   Runner --> SessDigest
+  Runner --> Inbox
   PromptAsm --> CfgPrompt
   BIndex --> BParser
 ```
@@ -171,8 +173,9 @@ flowchart TB
 
 - `controller.ts`：单例装配中枢。`createKairos(opts)` 接收 `kairosRoot / llm / toolManagerFactory / contextWindow`，内部串起所有子模块并 emit `event` / `state`。`eventSink` 严格按"写盘 → 推 ring buffer → 回调 listener"顺序，保证消费方任何时刻看到的都是已持久化事实。**额度护栏**：持有 `KairosBudgetStore`，`eventSink` 处理 `llm_usage` 后按 `budget.enabled` 扣减余额、耗尽则 `triggerWake`；scheduler emit `budget_exhausted` 时走 `haltForBudget`（enabled=false + 持久化 preferences.enabled=false + emit error）；`setBudget()` 写盘 + 重算 + 耗尽态清理；`start({force})` 耗尽时 throw。**优雅退出**：持有每轮重建的 `AbortController`，`shutdown()` = abort 在飞请求 + stop 循环 + flush usage/budget。
 - `scheduler.ts`：`MessageQueue` FIFO + `QueueProcessor` 主循环。`runInterruptibleSleep` 用 `Promise + setTimeout + clearTimeout` 实现可中断 sleep；`mainAgentBusy` 标志让主 Agent runTurn 期间 scheduler 暂停取下一条；连续 `errorThreshold` 次失败进 cooldown。`sleepBiasAt(now, prefs)` 按 `preferences.rhythm` 调节 sleep 系数，`clampSleep` 卡住 LLM 请求范围。注入的 `canStartTick()`（额度耗尽时返回 false）在投/取 tick 前 + tick 后 sleep 前各检查一次，命中即 `onStateChange("budget_exhausted")` + break。
-- `runner.ts`：`KairosRunner.processTick(msg)` 执行单次 tick：刷新观察（watch diff + sessions digest）→ 加载 short-term context（token budget）→ assemble system prompt → emit `kairos_tick_injected` → 从 Kairos 专属 ToolManager 注入工具定义 → 直接调用共享 `runAgentLoop({ toolExecuteOptions: { callerAgent:"kairos", kairosGuard } }, getAbortSignal?.())`（透传退出用 AbortSignal）→ 把 `tool_start/tool_end/message_end` 转成 Kairos `SessionEvent` → 解析最后一次 `sleep(seconds)` 工具参数返回给 scheduler。
-- `prompt-assembler.ts`：把 5 段（pacing / observation / config tip / history / rule.md）拼到 `KAIROS_SYSTEM_PROMPT` 占位符；每段独立 token budget。
+- `runner.ts`：`KairosRunner.processTick(msg)` 执行单次 tick：刷新观察（watch diff + sessions digest + Agent inbox）→ 加载 short-term context（token budget）→ assemble system prompt → emit `kairos_tick_injected` → 从 Kairos 专属 ToolManager 注入工具定义 → 直接调用共享 `runAgentLoop({ toolExecuteOptions: { callerAgent:"kairos", kairosGuard } }, getAbortSignal?.())`（透传退出用 AbortSignal）→ 把 `tool_start/tool_end/message_end` 转成 Kairos `SessionEvent` → 解析最后一次 `sleep(seconds)` 工具参数返回给 scheduler。
+- `prompt-assembler.ts`：把 5 段（pacing / observation / config tip / history / rule.md）拼到 `KAIROS_SYSTEM_PROMPT` 占位符；每段独立 token budget。观测段内部再把 watch diff、sessions digest、Agent inbox 分块截断，避免某一类长内容把其它观测信号完全挤掉。
+- `inbox.ts`：V0 Agent 文件收件箱。幂等创建 `<kairosRoot>/inbox/main-agent.md` / `lab-agent.md`，提供 `appendKairosInboxMessage()` 和 `loadKairosInboxSummary()`；写入只 append 到文件末尾，读取时按最近消息数与字符预算截断。inbox 只作为 Kairos prompt 观测信号，不作为短期记忆事实源。
 - `aggregator.ts`：薄壁 re-export `@actspace/shared` 的 `aggregateKairosEvents`——agent-core 内部统一从这里 import，避免散落引用 shared。
 - `config/`：4 个文件（preferences.json / paths.json / blocklist.json / rule.md）的 schema 解析器（无 Zod，手写校验）+ tip 提取拼装。
 - `storage/`：`ShortMemoryStore` 移植自 heartclaw，按月分目录 + 按日分文件 + 每日分卷（`_001.jsonl` → reset 时滚到 `_002`）。`SessionEventRingBuffer` 是内存圆环，200 条上限，给 UI 首屏用。`usage-accumulator.ts`（`KairosUsageAccumulator`，lifetime + sinceReset 双维度 token/成本总账，只增不减）和 `budget-store.ts`（`KairosBudgetStore`，额度护栏运行态 `{enabled, balanceCny}`，运行时被扣减且用户可改）共用 debounce + atomic rename + flush 范式，分别落 `memory/usage-accumulator.json` 与 `memory/budget-state.json`。

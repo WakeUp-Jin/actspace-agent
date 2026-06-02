@@ -17,6 +17,7 @@ import {
   buildLLMConfig,
   createLLMService,
   createToolManager,
+  ensureKairosInboxScaffolding,
   resolveAgentEnvConfig,
   resolveKairosEnv,
 } from "@actspace/agent-core";
@@ -48,6 +49,7 @@ export async function ensureKairosScaffolding(kairosRoot: string): Promise<void>
     mkdir(join(kairosRoot, "memory", "short-term"), { recursive: true }),
     mkdir(join(kairosRoot, "observe", "watch-manifests"), { recursive: true }),
     mkdir(join(kairosRoot, "briefs", "tasks"), { recursive: true }),
+    ensureKairosInboxScaffolding(kairosRoot),
   ]);
 
   await writeIfMissing(

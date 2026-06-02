@@ -34,6 +34,7 @@ import type { TickPayload } from "./briefs/dispatcher";
 import type { QueueMessage } from "./scheduler";
 import type { BriefsIndexManager } from "./briefs/index-manager";
 import { assembleSystemPrompt } from "./prompt-assembler";
+import type { KairosInboxSummary } from "./inbox";
 
 export interface TickResult {
   sleepSecondsRequested: number | null;
@@ -48,6 +49,7 @@ export interface KairosRunnerOptions {
     sessionsDigest: SessionsDigestResult;
   }>;
   activeBriefsCount: () => Promise<number>;
+  loadInboxSummary?: () => Promise<KairosInboxSummary>;
   eventSink: (event: SessionEvent) => Promise<void>;
   llm: LLMService;
   toolManager: ToolManager;
@@ -98,12 +100,14 @@ export class KairosRunner {
     const observe = await this.opts.observeRefresh();
     const shortTerm = await this.opts.shortTerm.load();
     const activeBriefsCount = await this.opts.activeBriefsCount();
+    const inboxSummary = await this.opts.loadInboxSummary?.();
 
     // 2) assemble system prompt
     const systemPrompt = assembleSystemPrompt({
       config: this.opts.config,
       watchDiffs: observe.watchDiffs,
       sessionsDigest: observe.sessionsDigest,
+      inboxSummary,
       shortTermResult: shortTerm,
       now,
       activeBriefsCount,

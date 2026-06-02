@@ -105,8 +105,13 @@ Kairos（自治模式）在 `<userData>/kairos/` 下独立成树，与主 Agent 
 │   ├── tasks/                 # 用户写的 brief markdown
 │   │   └── <id>.md
 │   └── index.json             # parser 维护的调度索引（lastRun/nextRun/intervalSec）
+├── inbox/
+│   ├── main-agent.md          # Main Agent 追加给 Kairos 的观察信号
+│   └── lab-agent.md           # Lab Agent / Lab Runtime 追加给 Kairos 的观察信号
 └── notes/                     # LLM 自己用 edit_file 写的笔记（v1 只读列出）
 ```
+
+`inbox/` 不是运行事实日志，也不参与 `reset_today` 分卷。它只是 Main Agent / Lab Agent 写给 Kairos 的输入信号目录；Kairos 每次 tick 读取最近消息并拼入 prompt 观测摘要，真正采取过的行动仍以 `memory/short-term/*.jsonl` 的 `SessionEvent` 为事实来源。
 
 ### 事件流持久化
 

@@ -78,6 +78,12 @@ Kairos 不应自动：
 - 修改主 Agent 默认工具集。
 - 写入高风险可执行产物。
 
+### 与 Kairos 的 V0 通信
+
+Lab Runtime 与 Kairos 的 V0 通信只走 Kairos 文件收件箱，不引入消息总线或跨 Agent 实时对话。Lab 需要 Kairos 后台继续观察实验、等待更多证据、提醒用户决策或记录 blocked 原因时，通过 `packages/agent-core/src/kairos/inbox.ts` 的 `appendKairosInboxMessage({ source: "lab-agent", ... })` 追加到 `<userData>/kairos/inbox/lab-agent.md`。
+
+Kairos 每次 tick 主动读取该文件，并把它当作观察信号和 Lab 候选线索；它不能因为 inbox 内容自动晋升能力、修改默认工具集或执行高风险锻造动作。Lab Runtime 尚未落地前，`lab-agent.md` 只是预留入口和手动占位文件。
+
 ## 与 ToolManager 的关系
 
 Lab 不重新实现工具执行。它通过现有 ToolManager 和 Agent Loop 获得执行能力。
@@ -122,4 +128,3 @@ Lab 数据应优先本地落盘，符合 actspace 当前本地优先策略。
 ```
 
 是否落在 Electron `userData` 还是 workspace 内，需要在实现计划中根据可迁移性和项目归属再定。
-
