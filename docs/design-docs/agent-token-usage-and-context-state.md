@@ -1,6 +1,6 @@
 # Token Usage 与 Context State 设计
 
-本文记录 actspace 在 token 统计、成本计算、上下文水位和未来上下文控制面板上的设计决策。它回答“哪些数据是事实、哪些数据是估算、分别存在哪里”，具体实施步骤见 `docs/exec-plans/active/actspace-token-usage-context-control-foundation.md`。
+本文记录 actspace 在 token 统计、成本计算、上下文水位和未来上下文控制面板上的设计决策。它回答“哪些数据是事实、哪些数据是估算、分别存在哪里”，具体实施步骤见 `docs/exec-plans/completed/actspace-token-usage-context-control-foundation.md`。
 
 ## 背景
 

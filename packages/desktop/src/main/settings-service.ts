@@ -25,6 +25,7 @@ import { getEnv, loadEnv, MAIN_AGENT_SYSTEM_PROMPT } from "@actspace/agent-core"
 import {
   MODEL_REGISTRY,
   SETTINGS_PROVIDER_IDS,
+  isPublicModelId,
   type AppSettings,
   type KairosModelId,
   type KairosThinkingMode,
@@ -111,7 +112,7 @@ export class SettingsService {
   get(): AppSettings {
     return {
       version: 1,
-      defaultModelId: this.settings.defaultModelId,
+      defaultModelId: isPublicModelId(this.settings.defaultModelId) ? this.settings.defaultModelId : null,
       providers: {
         deepseek: { hasApiKey: Boolean(this.getDecryptedKey("deepseek")) },
         kimi: { hasApiKey: Boolean(this.getDecryptedKey("kimi")) },
@@ -123,7 +124,7 @@ export class SettingsService {
 
   async update(input: SettingsUpdateInput): Promise<AppSettings> {
     if (input.defaultModelId !== undefined) {
-      this.settings.defaultModelId = isModelId(input.defaultModelId) ? input.defaultModelId : null;
+      this.settings.defaultModelId = isPublicModelId(input.defaultModelId) ? input.defaultModelId : null;
     }
     if (input.agent) {
       this.settings.agent = sanitizeAgent({ ...this.settings.agent, ...input.agent });

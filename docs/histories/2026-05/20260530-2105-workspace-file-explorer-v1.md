@@ -16,7 +16,7 @@
 
 **Key Actions:**
 
-- **设计先行**: 落 `工作区文件浏览器规范.md` + 执行计划 `20260530-workspace-file-explorer.md`，挂入 frontend-ui 索引与右侧面板规范交叉引用。
+- **设计先行**: 落 `front-右侧面板与文件渲染规范.md` + 执行计划 `20260530-workspace-file-explorer.md`，挂入 frontend-ui 索引与右侧面板规范交叉引用。
 - **IPC 契约**: `shared/ipc.ts` 新增 `workspace:list-dir` / `workspace:read-file` 的输入输出类型（含 text 类 `language` 字段）。
 - **main fs 服务**: 新增 `workspace-fs-service.ts`——懒加载目录（忽略名单 + 1000 条上限 + 目录在前排序）、读单文件（文本 2MB / 图片 5MB 上限、NUL 二进制识别、图片 base64 data URL、扩展名→renderKind + highlight.js 语言推断）、越界一律 `escapes_root` 拦截在 root 内。
 - **接线**: `main/index.ts` 注册两个 handler；preload 暴露 `listWorkspaceDir` / `readWorkspaceFile`；补 `global.d.ts` 类型。
@@ -48,7 +48,7 @@
 - `packages/desktop/src/main/test/workspace-fs-service.test.ts`（新增）
 - `packages/desktop/src/renderer/test/workspace-file-tree.test.tsx`（新增）
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
-- `docs/design-docs/front-工作区文件浏览器规范.md`（新增）
+- `docs/design-docs/front-右侧面板与文件渲染规范.md`（新增）
 - `docs/exec-plans/active/20260530-workspace-file-explorer.md`（新增）
 - `docs/design-docs/front-index.md`、`docs/design-docs/front-右侧面板与文件渲染规范.md`
 

@@ -9,6 +9,7 @@ import { FileDiffBlock } from "./messages/FileDiffBlock";
 import { ThinkingBlock } from "./messages/ThinkingBlock";
 import { ToolLogLine } from "./messages/ToolLogLine";
 import { UserMessage } from "./messages/UserMessage";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 type UserMessageBlock = Extract<MessageBlock, { kind: "user" }>;
 type AssistantMessageBlock = Extract<MessageBlock, { kind: "assistant" }>;
@@ -35,7 +36,7 @@ const TURN_BODY_CLASS = "turn-body flex flex-col gap-[9px]";
 const TURN_ACTIONS_CLASS = "turn-actions mt-[-12px] flex min-h-6 justify-end";
 const TURN_ACTION_ANCHOR_CLASS = "turn-action-anchor relative flex-none";
 const TURN_ACTION_TRIGGER_CLASS =
-  "turn-action-trigger grid h-[30px] w-[30px] place-items-center rounded-act-md border-0 bg-transparent text-text-faint opacity-65 transition-[background,color,opacity] duration-[150ms] ease-in-out hover:bg-brand-soft hover:text-brand-strong hover:opacity-100 aria-expanded:bg-brand-soft aria-expanded:text-brand-strong aria-expanded:opacity-100";
+  "turn-action-trigger grid h-[30px] w-[30px] place-items-center rounded-act-md border-0 bg-transparent text-text-faint opacity-65 transition-[background,color,opacity] duration-[150ms] ease-in-out hover:bg-brand-soft hover:text-brand-strong hover:opacity-100 aria-disabled:cursor-default aria-expanded:bg-brand-soft aria-expanded:text-brand-strong aria-expanded:opacity-100";
 const TURN_ACTION_MENU_CLASS =
   "turn-action-menu absolute bottom-[30px] right-0 z-40 w-[178px] rounded-act-md border border-line bg-surface-raised/98 p-1.5 shadow-act-popover";
 const TURN_ACTION_MENU_BUTTON_CLASS =
@@ -50,6 +51,7 @@ const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
   "grep",
   "glob",
   "web_search",
+  "media_analysis",
   "directory_list",
   "tool",
   "error",
@@ -130,6 +132,7 @@ function renderMessage(message: MessageBlock, className?: string) {
     case "grep":
     case "glob":
     case "web_search":
+    case "media_analysis":
     case "directory_list":
     case "tool":
     case "error":
@@ -307,33 +310,42 @@ function TurnActions({
 
   return (
     <div className={TURN_ACTIONS_CLASS}>
-      <button
-        className={TURN_ACTION_TRIGGER_CLASS}
-        type="button"
-        aria-label={visualizeState === "ready" ? "查看可视化" : "可视化这条回复"}
-        title={visualizeLabel}
-        disabled={visualizeState === "generating"}
-        onClick={() => void handleVisualize(false)}
-      >
-        {visualizeState === "generating" ? (
-          <Loader2 size={16} strokeWidth={2.2} className="animate-spin" />
-        ) : visualizeState === "ready" ? (
-          <Eye size={16} strokeWidth={2} />
-        ) : (
-          <Wand2 size={16} strokeWidth={2} />
-        )}
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            className={TURN_ACTION_TRIGGER_CLASS}
+            type="button"
+            aria-label={visualizeState === "ready" ? "查看可视化" : "可视化这条回复"}
+            aria-disabled={visualizeState === "generating"}
+            onClick={() => void handleVisualize(false)}
+          >
+            {visualizeState === "generating" ? (
+              <Loader2 size={16} strokeWidth={2.2} className="animate-spin" />
+            ) : visualizeState === "ready" ? (
+              <Eye size={16} strokeWidth={2} />
+            ) : (
+              <Wand2 size={16} strokeWidth={2} />
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{visualizeLabel}</TooltipContent>
+      </Tooltip>
       <div className={TURN_ACTION_ANCHOR_CLASS} ref={menuRef}>
-        <button
-          className={TURN_ACTION_TRIGGER_CLASS}
-          type="button"
-          aria-label="Open message actions"
-          aria-expanded={menuOpen}
-          aria-haspopup="menu"
-          onClick={() => setMenuOpen((isOpen) => !isOpen)}
-        >
-          <MoreHorizontal size={18} strokeWidth={2.2} />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className={TURN_ACTION_TRIGGER_CLASS}
+              type="button"
+              aria-label="更多消息操作"
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              onClick={() => setMenuOpen((isOpen) => !isOpen)}
+            >
+              <MoreHorizontal size={18} strokeWidth={2.2} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>更多操作</TooltipContent>
+        </Tooltip>
         {menuOpen ? (
           <div className={TURN_ACTION_MENU_CLASS} role="menu">
             <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>

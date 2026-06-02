@@ -21,15 +21,10 @@
 - `docs/design-docs/front-工作台布局与面板交互规范.md`
 - `docs/design-docs/front-主题与配色规范.md`
 - `docs/design-docs/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/front-HTML渲染与沙箱安全规范.md`
-- `docs/design-docs/front-Markdown渲染规范.md`
-- `docs/design-docs/front-Context完整视图规范.md`
-- `docs/design-docs/front-消息可视化转换规范.md`
 - `docs/design-docs/front-Kairos监控页规范.md`
-- `docs/design-docs/front-Kairos右侧紧凑视图规范.md`
 - `docs/design-docs/agent-kairos-autonomous-mode.md`
 
-> 本计划派生自上述四份专题规范（HTML / Markdown / Context / 消息可视化转换）。规范是"为什么 / 做成什么样 / V1-V2 边界 / 安全约束"的事实来源；本计划只负责"谁改哪些文件、按什么顺序、怎么验证"。两者冲突以规范为准。
+> 本计划派生自右侧面板母规范与 Kairos 监控页母规范。规范是"为什么 / 做成什么样 / V1-V2 边界 / 安全约束"的事实来源；本计划只负责"谁改哪些文件、按什么顺序、怎么验证"。两者冲突以规范为准。
 
 补充素材：
 
@@ -40,10 +35,10 @@
 包含：
 
 - `#21` 打开终端：本计划明确暂不做，仅保留入口状态或禁用说明。
-- `#22` 打开浏览器：V1 只做 sandbox iframe 的简单 HTML 渲染（自包含），不做完整外部浏览器；相对资源 / 独立 origin 属 V2（见 `HTML渲染与沙箱安全规范.md`）。
-- `#23` 打开文件并显示预览（Markdown / 文本 / 图片，见 `Markdown渲染规范.md`）。
+- `#22` 打开浏览器：V1 只做 sandbox iframe 的简单 HTML 渲染（自包含），不做完整外部浏览器；相对资源 / 独立 origin 属 V2（见 `front-右侧面板与文件渲染规范.md`）。
+- `#23` 打开文件并显示预览（Markdown / 文本 / 图片，见 `front-右侧面板与文件渲染规范.md`）。
 - `#24` 打开文件改变：明确后置，不在第一版实现。
-- `#25` 打开 Context 完整信息：V1 做只读展示，增删改属 V2（见 `Context完整视图规范.md`）。
+- `#25` 打开 Context 完整信息：V1 做只读展示，增删改属 V2（见 `front-右侧面板与文件渲染规范.md`）。
 - `#26` 打开 Kairos 视图：只做部分组件，让用户边聊天边查看 Kairos 状态。
 
 不包含：
@@ -55,7 +50,7 @@
 - 不重做 Kairos 全页面；只做右侧轻量状态视图。
 - 不处理 Composer、附件或设置页样式。
 
-> Kairos 右侧轻量状态视图已拆出独立计划 `docs/exec-plans/active/20260528-kairos-right-panel-compact-view.md`，该计划负责具体组件拆分、同源数据流和窄宽适配。本计划保留右侧面板总框架与文件/Context/HTML 等对象浏览主线。
+> Kairos 右侧轻量状态视图已拆出独立计划 `docs/exec-plans/completed/20260528-kairos-right-panel-compact-view.md`，该计划负责具体组件拆分、同源数据流和窄宽适配。本计划保留右侧面板总框架与文件/Context/HTML 等对象浏览主线。
 
 ## 相关代码路径
 
@@ -67,14 +62,9 @@
 - `packages/shared/src/ipc.ts`
 - `packages/shared/src/session.ts`
 - `docs/design-docs/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/front-HTML渲染与沙箱安全规范.md`
-- `docs/design-docs/front-Markdown渲染规范.md`
-- `docs/design-docs/front-Context完整视图规范.md`
-- `docs/design-docs/front-消息可视化转换规范.md`
 - `packages/desktop/src/renderer/components/ConversationView.tsx`（`TurnActions` 操作条，可视化按钮入口）
 - `packages/agent-core/src/llm/**`（MD→HTML 转换调用）
 - `docs/design-docs/front-Kairos监控页规范.md`
-- `docs/design-docs/front-Kairos右侧紧凑视图规范.md`
 - `docs/design-docs/agent-kairos-autonomous-mode.md`
 
 ## 并行边界
@@ -86,7 +76,7 @@
 
 ## V1 实施任务（本轮：简单 + 安全）
 
-> 本轮只做 V1。每个 Task 的 V1/V2 精确边界以对应 design-doc 为准（`HTML渲染与沙箱安全规范.md` / `Markdown渲染规范.md` / `Context完整视图规范.md`）。
+> 本轮只做 V1。每个 Task 的 V1/V2 精确边界以 `front-右侧面板与文件渲染规范.md` 和 `front-Kairos监控页规范.md` 为准。
 
 ### Task 1: 右侧面板 Tab 底座
 
@@ -110,7 +100,7 @@
 
 ### Task 2: Markdown / 文本 / 图片预览（V1）
 
-依据 `Markdown渲染规范.md` 的 V1：
+依据 `front-右侧面板与文件渲染规范.md` 的 V1：
 
 - 引入 `react-markdown` + `remark-gfm` + `rehype-highlight` 渲染 `md`；补一套随主题翻转的 hljs 配色（浅/深各一套）。
 - Preview / 源码 切换（与 HTML 共用同一分段控件模式）。
@@ -126,7 +116,7 @@
 
 ### Task 3: HTML 渲染视图（V1）
 
-依据 `HTML渲染与沙箱安全规范.md` 的 V1：
+依据 `front-右侧面板与文件渲染规范.md` 的 V1：
 
 - `<iframe srcDoc={html} sandbox="allow-scripts">`，**绝不加 `allow-same-origin`**。
 - CSP 双档注入 srcDoc：`strict`（本地文件默认，禁外联）/ `relaxed`（聊天 HTML 或用户主动信任，允 https 静态资源但 `connect-src 'none'`）。
@@ -142,7 +132,7 @@
 
 ### Task 4: Context 完整只读视图（V1）
 
-依据 `Context完整视图规范.md` 的 V1：
+依据 `front-右侧面板与文件渲染规范.md` 的 V1：
 
 - 把 `contextState`（含 `entries`）接到右侧面板（App.tsx 当前只透传了 `contextSnapshot`）。
 - 按 `kind` 分区渲染：分区头竖色条（配色联动 `--act-context-*`）+ 整行浅底（`color-mix` 派生）+ 左 2px 同色条，无分割线。
@@ -160,7 +150,7 @@
 
 ### Task 5: Kairos 轻量状态视图
 
-- 由 `docs/exec-plans/active/20260528-kairos-right-panel-compact-view.md` 承接具体实现。
+- 由 `docs/exec-plans/completed/20260528-kairos-right-panel-compact-view.md` 承接具体实现。
 - 本计划只要求右侧面板 tab 底座能够容纳 Kairos tab，不在这里重复定义 compact 布局。
 
 验收：
@@ -189,7 +179,7 @@
 - 产物以 `trust:"chat"` 走 Task 3 的沙箱 HTML Tab 渲染。
 - 单测：`agent-core .../visualize/test/md-to-html.test.ts`（extract 5 例）+ `desktop .../main/test/visualize-service.test.ts`（缓存命中零模型调用）。
 
-依据 `消息可视化转换规范.md` 的 V1（**依赖**右侧 Tab 底座 Task 1 与 HTML 渲染 V1 Task 3）：
+依据 `front-右侧面板与文件渲染规范.md` 的 V1（**依赖**右侧 Tab 底座 Task 1 与 HTML 渲染 V1 Task 3）：
 
 - `ConversationView` 的 `TurnActions` ⋯ 按钮**左侧**加可视化按钮（`Sparkles`/`Eye`）+ 状态机（idle/generating/ready/error）。
 - 新增 IPC：用主模型把回复 Markdown 转 HTML（renderer 不直接调模型、不读写 FS）。
@@ -206,21 +196,21 @@
 
 > ⚠️ 以下 V2 默认**不执行**。除非用户在后续明确发出"做 V2 / 做某项 V2"的指令，否则保持"只写不做"。各项细节见对应 design-doc 的 V2 小节。
 
-### V2-A: HTML 完整版（见 `HTML渲染与沙箱安全规范.md` V2）
+### V2-A: HTML 完整版（见 `front-右侧面板与文件渲染规范.md` V2）
 
 - 独立 origin：Electron main 注册限定 workspace 根的自定义协议（`actfile://`）或本地端口；借鉴 VS Code Webview 的 `localResourceRoots` + `asWebviewUri` + CSP nonce。
 - 独立 origin 下安全开 `allow-scripts allow-same-origin`，支持相对资源 / 多文件 artifact（URL-load）。
 - iframe keep-alive 池、外部浏览器逃生口、双向交互桥（截图 / inspect / 调参）、发布隔离。
 
-### V2-B: Markdown 完整版（见 `Markdown渲染规范.md` V2）
+### V2-B: Markdown 完整版（见 `front-右侧面板与文件渲染规范.md` V2）
 
 - `rehype-raw` + `rehype-sanitize`；`remark-math` + `rehype-katex`；Mermaid（`securityLevel: "sandbox"`）；高亮升级 Shiki；TOC / 锚点；聊天区统一迁移到该渲染栈。
 
-### V2-C: Context 完整版（见 `Context完整视图规范.md` V2）
+### V2-C: Context 完整版（见 `front-右侧面板与文件渲染规范.md` V2）
 
 - 新增 renderer IPC 读取 entry 全文；增删改 / pin / include 切换；按 `sourceEventIds` / `sourceFiles` 跳转；上下文搜索 / 过滤；MCP / Subagents / Recent files 分区接入。
 
-### V2-D: 消息可视化转换 完整版（见 `消息可视化转换规范.md` V2）
+### V2-D: 消息可视化转换 完整版（见 `front-右侧面板与文件渲染规范.md` V2）
 
 - 转换流式渲染；风格预设 / 多版本对比 / 保留历史版本；可视化结果导出（依赖 HTML V2 导出）；消息流内联"可视化"折叠入口；超长回复分段转换拼接。
 
@@ -234,8 +224,8 @@
 
 ## 进度记录
 
-- [x] 2026-05-30：落三份渲染专题规范（HTML / Markdown / Context）并挂入 `front-index.md`。
-- [x] 2026-05-30：补 `消息可视化转换规范.md`（MD→HTML 主模型转换 + 缓存 + 沙箱渲染），挂入 index 与 HTML 规范渲染分层。
+- [x] 2026-05-30：落右侧渲染规范（HTML / Markdown / Context）并挂入 `front-index.md`；后续已合并进 `front-右侧面板与文件渲染规范.md`。
+- [x] 2026-05-30：补 `front-右侧面板与文件渲染规范.md`（MD→HTML 主模型转换 + 缓存 + 沙箱渲染），挂入 index。
 - [x] 2026-05-30：Tab 栏方案 A（压缩按钮高度 + 字号）。
 - [x] 2026-05-30：完成右侧面板 Tab 底座（`RightPanelContext` 驱动开关 / 动态列表 / 当前 / 关闭）。
 - [x] 2026-05-30：完成 Markdown / 文本 / 图片预览（V1：`react-markdown` + `remark-gfm` + `rehype-highlight`，Preview/源码）。
@@ -277,6 +267,6 @@
 
 - 2026-05-27：右侧工作区第一版只做查看，不做编辑；终端和文件改变明确后置，避免把右侧面板变成过大的并行任务。
 - 2026-05-30：与用户共定右侧视图四项决策（Tab 方案A / 渲染栈 rehype-highlight / Context 行用浅底+左色条 / Context 入口用展开图标），详见「设计决策（2026-05-30 锁定）」。
-- 2026-05-30：采用"先文档后代码"。先落三份渲染专题规范（`HTML渲染与沙箱安全规范.md` / `Markdown渲染规范.md` / `Context完整视图规范.md`），再由规范派生本计划。
+- 2026-05-30：采用"先文档后代码"。先落右侧渲染专题规范，再由规范派生本计划；这些专题后续已收敛到 `front-右侧面板与文件渲染规范.md`。
 - 2026-05-30：HTML 渲染从"完整 + 安全"角度定 V1/V2 两版——V1 用 sandbox srcDoc iframe 的简单安全版；V2（独立 origin 完整版）计划已写，**默认不动工，等用户显式指令再做**。同口径适用于 Markdown / Context 的 V2。
 - 2026-05-30：新增"消息可视化转换"（回复 MD→HTML）功能。核心约束是**生成一次、持久化缓存、后续读缓存不重算**（成本敏感）；转换走主模型 IPC，产物按半可信走 HTML 沙箱渲染。列为 Task 7，依赖 Tab 底座(Task 1) 与 HTML 渲染 V1(Task 3)。

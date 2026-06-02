@@ -234,6 +234,73 @@ describe("runTurnWithAgent bridge", () => {
     expect(result.events.every((event) => event.turnId === "turn-test")).toBe(true);
   });
 
+  it("injects attachments into the model input and persists them only on the user message", async () => {
+    const deps = createDeps();
+    let modelUserInput = "";
+    deps.llm.setResponses([
+      (context) => {
+        const userMessage = context.messages.find((message) => message.role === "user");
+        modelUserInput = typeof userMessage?.content === "string" ? userMessage.content : "";
+        return mockText("I can reason over the attachment summary.");
+      },
+    ]);
+
+    const attachments = [
+      {
+        id: "att-image-1",
+        kind: "image" as const,
+        name: "screenshot.png",
+        path: "/Users/test/screenshot.png",
+        mimeType: "image/png",
+      },
+      {
+        id: "att-file-1",
+        kind: "file" as const,
+        name: "notes.md",
+        path: "/Users/test/notes.md",
+        mimeType: "text/markdown",
+      },
+    ];
+    const attachmentAnalyses = [
+      {
+        attachmentId: "att-image-1",
+        toolName: "analyze_media" as const,
+        status: "completed" as const,
+        summary: "The screenshot shows the composer with an attachment chip.",
+        analyzedAt: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-attachments",
+        turnId: "turn-attachments",
+        userInput: "What does this show?",
+        attachments,
+        attachmentAnalyses,
+      },
+      deps,
+    );
+
+    expect(modelUserInput).toContain("What does this show?");
+    expect(modelUserInput).toContain("Attached files:");
+    expect(modelUserInput).toContain("[image] screenshot.png path=/Users/test/screenshot.png mime=image/png");
+    expect(modelUserInput).toContain("[file] notes.md path=/Users/test/notes.md mime=text/markdown");
+    expect(modelUserInput).toContain("Image analysis results:");
+    expect(modelUserInput).toContain("The screenshot shows the composer with an attachment chip.");
+
+    expect(result.events[0]).toMatchObject({
+      type: "user_message",
+      payload: {
+        content: "What does this show?",
+        attachments,
+        attachmentAnalyses,
+      },
+    });
+    expect(result.events.some((event) => event.type === "tool_call")).toBe(false);
+    expect(result.events.some((event) => event.type === "tool_result")).toBe(false);
+  });
+
   it("persists a context_compaction event and run-log entry when history is compacted", async () => {
     const runLogEvents: AgentRunLogEvent[] = [];
     const runLogger: AgentRunLogger = {

@@ -20,7 +20,6 @@
 - `docs/design-docs/front-工作台布局与面板交互规范.md`
 - `docs/design-docs/front-右侧面板与文件渲染规范.md`
 - `docs/design-docs/front-Kairos监控页规范.md`
-- `docs/design-docs/front-Kairos右侧紧凑视图规范.md`
 - `docs/design-docs/agent-kairos-autonomous-mode.md`
 
 ## 范围
@@ -46,8 +45,7 @@
 
 ### 相关设计文档
 
-- `docs/design-docs/front-Kairos右侧紧凑视图规范.md`：本计划的视觉与交互事实来源。
-- `docs/design-docs/front-Kairos监控页规范.md`：完整页面规范，避免 compact 需求反向削弱完整页。
+- `docs/design-docs/front-Kairos监控页规范.md`：本计划的视觉与交互事实来源；同时保留完整页面规范，避免 compact 需求反向削弱完整页。
 - `docs/design-docs/agent-kairos-autonomous-mode.md`：Kairos 事件、工具和 IPC 契约事实来源。
 
 ### 相关代码路径
@@ -189,7 +187,7 @@ window.kairos onEvent/onState
 
 修改目标：
 
-- 根据实际实现更新 `Kairos右侧紧凑视图规范.md`。
+- 根据实际实现更新 `front-Kairos监控页规范.md`。
 - 如右侧通用 tab 行为有变化，同步 `右侧面板与文件渲染规范.md`。
 - 新增 history。
 

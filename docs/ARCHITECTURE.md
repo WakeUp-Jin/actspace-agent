@@ -51,6 +51,7 @@ desktop -> agent-core -> shared
 - `docs/design-docs/front-index.md`：前端工作台设计文档入口。
 - `docs/design-docs/agent-kairos-autonomous-mode.md`：Kairos 自治模式设计——独立 prompt + 短期记忆、tick 调度、IPC 契约和页面规范。
 - `docs/design-docs/lab-index.md`：Lab 能力实验台设计入口，约束实验矩阵、实验生命周期、产物晋升和分版本构建路线。
+- `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档，不作为主线架构事实来源。
 
 ## 当前已确认的实现方向
 

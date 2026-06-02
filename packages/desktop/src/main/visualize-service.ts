@@ -1,7 +1,7 @@
 /**
  * 消息可视化转换的 main 侧服务。
  *
- * 职责（见 `docs/design-docs/front-消息可视化转换规范.md`）：
+ * 职责（见 `docs/design-docs/front-右侧面板与文件渲染规范.md`）：
  * - 缓存「生成一次、持久化、后续读缓存」：键 = `messageId:sourceHash`，落在 session 目录的
  *   `visualizations.json` sidecar；命中即返回、**不触发模型调用**。
  * - 未命中（或 regenerate）才调用 agent-core `convertReplyToHtml`（一次主模型调用）。

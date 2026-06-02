@@ -22,7 +22,7 @@
 - `packages/agent-core/src/tools/tools/edit-file-diff/permissions.ts`：Edit 权限检查（预留 AgentMode）
 - `packages/desktop/src/renderer/components/messages/FileDiffBlock.tsx`：统一 diff 卡片组件
 - `packages/agent-core/src/tools/test/edit-write.test.ts`：16 个单元测试
-- `docs/design-docs/fix-llm-agent-05-skill-file-tools-fix.md`：Skill 修复计划
+- `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-05-skill-file-tools-fix.md`：Skill 修复计划
 
 ### 修改文件
 
@@ -38,7 +38,7 @@
 
 - `docs/design-docs/agent-current-module-map.md`：记录新工具和 shared helper
 - `docs/design-docs/agent-tool-preview-design-guidelines.md`：增加 write_file 展示规范
-- `docs/design-docs/fix-llm-agent-plan-index.md`：索引新增修复文档
+- `docs/references/llm-agent-dev-skill-fixes/README.md`：索引新增修复文档
 
 ## 设计决策
 

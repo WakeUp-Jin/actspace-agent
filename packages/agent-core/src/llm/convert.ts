@@ -31,17 +31,23 @@ import type {
   LLMConfig,
 } from "./types";
 import { LLMServiceError } from "./types";
+import { transformMessages } from "./transform-messages";
 
 // ─── 消息格式转换 ───
 
-export function convertMessages(context: Context): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+export function convertMessages(
+  context: Context,
+  target?: LLMConfig,
+): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
   const result: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
   if (context.systemPrompt) {
     result.push({ role: "system", content: context.systemPrompt });
   }
 
-  const sanitized = sanitizeMessages(context.messages);
+  const sanitized = target
+    ? transformMessages(context.messages, target, { normalizeToolCallId: normalizeOpenAIToolCallId })
+    : sanitizeMessages(context.messages);
 
   for (const msg of sanitized) {
     switch (msg.role) {
@@ -85,6 +91,12 @@ export function convertMessages(context: Context): OpenAI.Chat.Completions.ChatC
   }
 
   return result;
+}
+
+function normalizeOpenAIToolCallId(id: string): string {
+  const callId = id.includes("|") ? id.split("|")[0] : id;
+  const safe = callId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return safe.length > 40 ? safe.slice(0, 40) : safe;
 }
 
 /**
@@ -379,6 +391,7 @@ export function buildAssistantMessage(
   return {
     role: "assistant",
     content,
+    ...(config.api && { api: config.api }),
     model: config.model,
     provider: providerName,
     usage: acc.usage,
@@ -405,6 +418,7 @@ export function buildErrorMessage(
   return {
     role: "assistant",
     content,
+    ...(config.api && { api: config.api }),
     model: config.model,
     provider: providerName,
     usage: acc.usage,

@@ -27,6 +27,6 @@ export const analyzeMediaDefinition: ToolDefinitionSpec = {
   },
   isReadOnly: true,
   category: "media",
-  previewKind: "generic",
+  previewKind: "media_analysis",
   exposeOnlyTo: "deepseek",
 };

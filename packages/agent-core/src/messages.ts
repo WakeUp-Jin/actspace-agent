@@ -1,3 +1,5 @@
+import type { ModelApi } from "@actspace/shared";
+
 /**
  * Agent-core 内部消息类型体系
  *
@@ -20,6 +22,8 @@
 export interface TextContent {
   type: "text";
   text: string;
+  /** Provider-specific opaque text metadata; preserved only for same-api replay. */
+  textSignature?: string;
 }
 
 export interface ThinkingContent {
@@ -43,6 +47,8 @@ export interface ToolCallContent {
   id: string;
   name: string;
   arguments: Record<string, unknown>;
+  /** Provider-specific opaque thinking context, e.g. Gemini thought signatures. */
+  thoughtSignature?: string;
 }
 
 export type Content = TextContent | ThinkingContent | ImageContent | ToolCallContent;
@@ -102,8 +108,16 @@ export interface AssistantMessage {
   role: "assistant";
   /** 结构化内容数组：文本、推理链、工具调用各归其位 */
   content: (TextContent | ThinkingContent | ToolCallContent)[];
+  /** API protocol that produced this message; used for safe cross-provider replay. */
+  api?: ModelApi;
   model: string;
   provider: string;
+  /** Actual provider response model when it differs from requested model. */
+  responseModel?: string;
+  /** Provider response/message id for diagnostics and future replay support. */
+  responseId?: string;
+  /** Sanitized provider/runtime diagnostics. */
+  diagnostics?: Record<string, unknown>[];
   usage: Usage;
   stopReason: StopReason;
   errorMessage?: string;

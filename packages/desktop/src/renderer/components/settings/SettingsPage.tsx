@@ -8,6 +8,7 @@ import {
   type LocalUpdateState,
   type ModelId,
   type ProviderId,
+  type SessionListItem,
   type SetProviderKeyResult,
   type SettingsUpdateInput,
   type TestConnectionResult,
@@ -40,6 +41,7 @@ import {
   type ThemeMode,
   type UiFontId,
 } from "../../appearance/types";
+import { mockArchivedSessions } from "../../fixtures/workbenchFixture";
 
 const BTN_PRIMARY =
   "inline-flex h-8 items-center rounded-act-md bg-brand px-3.5 text-[13px] font-semibold text-white transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60";
@@ -67,6 +69,28 @@ function hasLocalUpdateBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace?.getLocalUpdateState);
 }
 
+function hasArchivedSessionsBridge(): boolean {
+  return typeof window !== "undefined" && Boolean(window.actspace?.listSessions && window.actspace?.archiveSession);
+}
+
+function workspaceLabelFromRoot(root: string | undefined): string {
+  if (!root) return "Default workspace";
+  const normalized = root.replace(/\/+$/, "");
+  const segments = normalized.split("/").filter(Boolean);
+  return segments[segments.length - 1] ?? "Default workspace";
+}
+
+function formatUpdatedAt(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "Unknown time";
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function mergeSettings(current: AppSettings, input: SettingsUpdateInput): AppSettings {
   return {
     ...current,
@@ -79,10 +103,13 @@ function mergeSettings(current: AppSettings, input: SettingsUpdateInput): AppSet
 export function SettingsPage({
   onBack,
   onSettingsChange,
+  onArchivedSessionsChange,
 }: {
   onBack: () => void;
   /** 设置变更后回传最新快照，供上层（如 Composer 默认模型）联动。 */
   onSettingsChange?: (settings: AppSettings) => void;
+  /** 归档会话恢复后通知上层刷新普通会话列表。 */
+  onArchivedSessionsChange?: () => void;
 }) {
   const [section, setSection] = useState<SettingsSectionId>("general");
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -190,6 +217,7 @@ export function SettingsPage({
               onConnectProvider={setKeyModalProvider}
               onClearProvider={handleClearKey}
               onTestProvider={handleTestConnection}
+              onArchivedSessionsChange={onArchivedSessionsChange}
             />
           ) : (
             <div className="flex h-full items-center justify-center text-[13px] text-text-faint">加载设置中…</div>
@@ -214,6 +242,7 @@ type SectionProps = {
   onConnectProvider: (provider: ProviderId) => void;
   onClearProvider: (provider: ProviderId) => Promise<void>;
   onTestProvider: (provider: ProviderId) => Promise<TestConnectionResult>;
+  onArchivedSessionsChange?: () => void;
 };
 
 function SettingsContent({ section, ...rest }: SectionProps & { section: SettingsSectionId }) {
@@ -228,6 +257,8 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
       return <ToolsSection {...rest} />;
     case "appearance":
       return <AppearanceSection />;
+    case "archivedChats":
+      return <ArchivedChatsSection onArchivedSessionsChange={rest.onArchivedSessionsChange} />;
     default:
       return null;
   }
@@ -590,6 +621,102 @@ function ToolsSection({ settings, onUpdate }: SectionProps) {
             }
           />
         ))}
+      </SettingGroup>
+    </SectionShell>
+  );
+}
+
+function ArchivedChatsSection({
+  onArchivedSessionsChange,
+}: {
+  onArchivedSessionsChange?: () => void;
+}) {
+  const [sessions, setSessions] = useState<SessionListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const bridgeReady = hasArchivedSessionsBridge();
+
+  const loadArchived = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    if (!bridgeReady) {
+      setSessions(mockArchivedSessions);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const archived = await window.actspace.listSessions({ archived: true });
+      setSessions(archived);
+    } catch (err) {
+      console.error("Failed to load archived sessions", err);
+      setError("归档会话加载失败。");
+    } finally {
+      setLoading(false);
+    }
+  }, [bridgeReady]);
+
+  useEffect(() => {
+    void loadArchived();
+  }, [loadArchived]);
+
+  const restoreSession = async (sessionId: string) => {
+    setRestoringId(sessionId);
+    setError(null);
+    if (!bridgeReady) {
+      setSessions((current) => current.filter((session) => session.id !== sessionId));
+      setRestoringId(null);
+      return;
+    }
+
+    try {
+      const result = await window.actspace.archiveSession({ sessionId, archived: false });
+      if (!result.ok) {
+        setError(result.error ?? "恢复归档会话失败。");
+        return;
+      }
+      await loadArchived();
+      onArchivedSessionsChange?.();
+    } catch (err) {
+      console.error("Failed to restore archived session", err);
+      setError("恢复归档会话失败。");
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
+  return (
+    <SectionShell title="归档会话" description="已归档的会话不会出现在左侧会话栏，可在这里恢复。">
+      <SettingGroup>
+        {loading ? (
+          <div className="px-4 py-4 text-[13px] text-text-faint">正在加载归档会话…</div>
+        ) : error ? (
+          <div className="px-4 py-4 text-[13px] text-on-danger">{error}</div>
+        ) : sessions.length === 0 ? (
+          <div className="px-4 py-8 text-center text-[13px] text-text-faint">暂无归档会话</div>
+        ) : (
+          sessions.map((session) => (
+            <div key={session.id} className="flex items-center justify-between gap-4 px-4 py-3.5">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[14px] font-semibold text-text-main">{session.title}</div>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-text-faint">
+                  <span>{formatUpdatedAt(session.updatedAt)}</span>
+                  <span>{session.turnCount} turns</span>
+                  <span>{workspaceLabelFromRoot(session.workspaceRoot)}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className={BTN_SECONDARY}
+                disabled={restoringId === session.id}
+                onClick={() => void restoreSession(session.id)}
+              >
+                {restoringId === session.id ? "恢复中…" : "恢复"}
+              </button>
+            </div>
+          ))
+        )}
       </SettingGroup>
     </SectionShell>
   );

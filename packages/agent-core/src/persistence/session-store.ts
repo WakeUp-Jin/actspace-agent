@@ -11,6 +11,7 @@ import type {
   AgentTurnResult,
   ContextState,
   SessionCreateInput,
+  SessionListInput,
   SessionListItem,
   SessionRecord,
 } from "@actspace/shared";
@@ -68,6 +69,31 @@ export async function setSessionPinned(
 ): Promise<WriteResult> {
   const paths = createSessionStorePaths(join(sessionRoot, sessionId));
   return updateMeta(paths.metaPath, { pinned });
+}
+
+/** 更新 session 的 archived 状态 */
+export async function setSessionArchived(
+  sessionRoot: string,
+  sessionId: string,
+  archived: boolean,
+): Promise<WriteResult> {
+  const paths = createSessionStorePaths(join(sessionRoot, sessionId));
+  return updateMeta(paths.metaPath, { archived });
+}
+
+/** 更新 session 归属的 workspace 根目录 */
+export async function setSessionWorkspace(
+  sessionRoot: string,
+  sessionId: string,
+  workspaceRoot: string,
+): Promise<WriteResult> {
+  const trimmed = workspaceRoot.trim();
+  if (!trimmed) {
+    return { ok: false, error: "workspaceRoot is required" };
+  }
+
+  const paths = createSessionStorePaths(join(sessionRoot, sessionId));
+  return updateMeta(paths.metaPath, { workspaceRoot: trimmed });
 }
 
 /** 写入一轮完整的 turn 结果（events + meta 更新） */
@@ -146,16 +172,19 @@ export async function readSessionRecord(
 /** 列出所有 session 摘要 */
 export async function listSessionRecords(
   sessionRoot: string,
+  input: SessionListInput = {},
 ): Promise<SessionListItem[]> {
   try {
     const entries = await readdir(sessionRoot, { withFileTypes: true });
     const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+    const includeArchived = input.archived === true;
 
     const items = await Promise.all(
       dirs.map(async (sessionId) => {
         const paths = createSessionStorePaths(join(sessionRoot, sessionId));
         const meta = await readMeta(paths.metaPath);
         if (!meta) return null;
+        if (Boolean(meta.archived) !== includeArchived) return null;
         const item: SessionListItem = {
           id: meta.id,
           title: meta.title,
@@ -164,6 +193,7 @@ export async function listSessionRecords(
         };
         if (meta.workspaceRoot) item.workspaceRoot = meta.workspaceRoot;
         if (meta.pinned) item.pinned = true;
+        if (meta.archived) item.archived = true;
         return item;
       }),
     );

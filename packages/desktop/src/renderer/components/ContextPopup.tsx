@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Eye, X } from "lucide-react";
 import type { ContextUsageSnapshot } from "@actspace/shared";
 import { getContextBucketDisplay } from "@actspace/shared";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 const CONTEXT_POPOVER_CLASS =
   "context-popover absolute bottom-[calc(100%_+_10px)] right-0 z-20 w-[min(820px,100%)] rounded-2xl border border-line bg-surface-raised px-3.5 pb-3.5 pt-[13px] text-text-main shadow-act-popover";
@@ -55,19 +56,28 @@ export function ContextPopup({
         <strong>Context</strong>
         <div className="flex items-center gap-1.5">
           {onExpand ? (
-            <button
-              className={CONTEXT_CLOSE_CLASS}
-              type="button"
-              onClick={onExpand}
-              aria-label="查看完整上下文"
-              title="查看完整上下文"
-            >
-              <Eye size={15} strokeWidth={2} />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className={CONTEXT_CLOSE_CLASS}
+                  type="button"
+                  onClick={onExpand}
+                  aria-label="查看完整上下文"
+                >
+                  <Eye size={15} strokeWidth={2} aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>查看完整上下文</TooltipContent>
+            </Tooltip>
           ) : null}
-          <button className={CONTEXT_CLOSE_CLASS} type="button" onClick={onClose} aria-label="Close context">
-            <X size={15} strokeWidth={2.2} />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button className={CONTEXT_CLOSE_CLASS} type="button" onClick={onClose} aria-label="Close context">
+                <X size={15} strokeWidth={2.2} aria-hidden="true" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>关闭上下文用量</TooltipContent>
+          </Tooltip>
         </div>
       </header>
       <div className={CONTEXT_SUMMARY_CLASS}>

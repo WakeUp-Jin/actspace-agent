@@ -31,7 +31,7 @@
   - `described ?? contextState` 优先现算结果；新增 `loading` 态，正文区按「加载中 / 有 token 无内容 / 0 token」给不同文案。
   - 每条正文 **4-B**：默认 `line-clamp-3`，超阈值（>160 字符或 >3 行）给「展开全文 / 收起」。
   - 删除 `mergeContextPreviews`（不再需要把预览并回快照）。
-- **导出 / engine 导出 / 文档**：`engine/index.ts` 导出 `buildContextEntries`；更新 `Context完整视图规范.md`（数据来源、4-B、空桶、方案 B、V1/V2 边界）。
+- **导出 / engine 导出 / 文档**：`engine/index.ts` 导出 `buildContextEntries`；更新 `front-右侧面板与文件渲染规范.md`（数据来源、4-B、空桶、方案 B、V1/V2 边界）。
 
 ### 🧠 Design Intent (Why)
 
@@ -48,6 +48,6 @@
 
 ### 🔗 Related
 
-- 规范：`docs/design-docs/front-Context完整视图规范.md`
+- 规范：`docs/design-docs/front-右侧面板与文件渲染规范.md`
 - 上一轮：`docs/histories/2026-05/20260530-1655-right-panel-fixes-and-reply-html.md`
 - 数据分层：`docs/design-docs/agent-token-usage-and-context-state.md`

@@ -20,6 +20,7 @@ import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import type { ComposerSendOptions } from "./components/Composer";
+import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 import {
   mockBootstrapState,
   mockContextSnapshot,
@@ -30,6 +31,7 @@ import {
 } from "./fixtures/workbenchFixture";
 
 const MIN_TOOL_RUNNING_MS = 300;
+const MOCK_ADDED_WORKSPACE_ROOT = "/mock/workspaces/new-project";
 
 function hasActspaceBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace);
@@ -75,6 +77,20 @@ function createEmptyStreamingState(): StreamingState {
   return { segments: [], activeTools: new Map() };
 }
 
+function updateStringSet(current: Set<string>, value: string, included: boolean): Set<string> {
+  if (current.has(value) === included) {
+    return current;
+  }
+
+  const next = new Set(current);
+  if (included) {
+    next.add(value);
+  } else {
+    next.delete(value);
+  }
+  return next;
+}
+
 function appendOrMergeSegment(
   segments: StreamingSegment[],
   segType: "thinking" | "text",
@@ -88,7 +104,7 @@ function appendOrMergeSegment(
   }
 }
 
-function createMockEmptySession(): SessionRecord {
+function createMockEmptySession(input: NewSessionInput = {}): SessionRecord {
   const now = new Date().toISOString();
   const id = `mock-session-${Date.now()}`;
   return {
@@ -98,6 +114,7 @@ function createMockEmptySession(): SessionRecord {
       createdAt: now,
       updatedAt: now,
       turnCount: 0,
+      workspaceRoot: input.workspaceRoot,
     },
     events: [],
     messageBlocks: [],
@@ -142,6 +159,10 @@ function getStreamingGlobText(preview: Extract<ToolUiPreview, { kind: "glob" }>)
 }
 
 function getStreamingWebSearchText(preview: Extract<ToolUiPreview, { kind: "web_search" }>): string {
+  return preview.displayText;
+}
+
+function getStreamingMediaAnalysisText(preview: Extract<ToolUiPreview, { kind: "media_analysis" }>): string {
   return preview.displayText;
 }
 
@@ -240,6 +261,19 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): Mes
       displayText: getStreamingWebSearchText(tool.preview),
       createdAt: now,
       status: tool.finished ? "completed" : "running",
+    };
+  }
+
+  if (tool.preview?.kind === "media_analysis") {
+    return {
+      kind: "media_analysis",
+      id: blockId,
+      mediaName: tool.preview.mediaName,
+      mediaKind: tool.preview.mediaKind,
+      displayText: getStreamingMediaAnalysisText(tool.preview),
+      createdAt: now,
+      status: tool.finished ? "completed" : "running",
+      isError: tool.isError,
     };
   }
 
@@ -369,6 +403,8 @@ export function App() {
   const [streamingBlocks, setStreamingBlocks] = useState<MessageBlock[]>([]);
   const [sendScrollRequestId, setSendScrollRequestId] = useState(0);
   const [defaultModelId, setDefaultModelId] = useState<ModelId | undefined>(undefined);
+  const [approvalPendingSessionIds, setApprovalPendingSessionIds] = useState<Set<string>>(() => new Set());
+  const [failedSessionIds, setFailedSessionIds] = useState<Set<string>>(() => new Set());
   const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
   const toolFinishTimersRef = useRef<Map<string, number>>(new Map());
@@ -387,6 +423,42 @@ export function App() {
     toolFinishTimersRef.current.clear();
   }, []);
 
+  const setApprovalPendingForSession = useCallback((sessionId: string | null | undefined, pending: boolean) => {
+    if (!sessionId) return;
+    setApprovalPendingSessionIds((current) => updateStringSet(current, sessionId, pending));
+  }, []);
+
+  const setFailedForSession = useCallback((sessionId: string | null | undefined, failed: boolean) => {
+    if (!sessionId) return;
+    setFailedSessionIds((current) => updateStringSet(current, sessionId, failed));
+  }, []);
+
+  const refreshPendingApprovalStatuses = useCallback(async (sessionIds: string[]) => {
+    if (!hasActspaceBridge() || !window.actspace.listPendingApprovals) return;
+
+    const uniqueSessionIds = [...new Set(sessionIds.filter(Boolean))];
+    if (uniqueSessionIds.length === 0) return;
+
+    const results = await Promise.all(uniqueSessionIds.map(async (sessionId) => {
+      try {
+        const pending = await window.actspace.listPendingApprovals({ sessionId });
+        return { sessionId, hasPending: pending.length > 0 };
+      } catch (error) {
+        console.error("Failed to load pending approvals", error);
+        return { sessionId, hasPending: null };
+      }
+    }));
+
+    setApprovalPendingSessionIds((current) => {
+      let next = current;
+      for (const result of results) {
+        if (result.hasPending === null) continue;
+        next = updateStringSet(next, result.sessionId, result.hasPending);
+      }
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (!hasActspaceBridge()) return;
 
@@ -398,6 +470,13 @@ export function App() {
         setBootstrapState(mockBootstrapState);
       });
   }, []);
+
+  useEffect(() => {
+    if (!hasActspaceBridge()) return;
+    refreshPendingApprovalStatuses(sessions.map((session) => session.id)).catch((error: unknown) => {
+      console.error("Failed to refresh pending approval statuses", error);
+    });
+  }, [refreshPendingApprovalStatuses, sessions]);
 
   useEffect(() => {
     if (!hasActspaceBridge() || !window.actspace.getSettings) return;
@@ -452,7 +531,7 @@ export function App() {
     });
   }, []);
 
-  const handleStreamEvent = useCallback((event: RuntimeStreamEvent) => {
+  const handleStreamEvent = useCallback((event: RuntimeStreamEvent, streamSessionId = activeSessionIdRef.current) => {
     const state = streamStateRef.current;
 
     switch (event.type) {
@@ -526,6 +605,7 @@ export function App() {
       }
 
       case "tool_approval_required": {
+        setApprovalPendingForSession(streamSessionId, true);
         const tool = state.activeTools.get(event.toolCallId);
         if (tool) {
           tool.approvalPending = true;
@@ -540,6 +620,10 @@ export function App() {
       }
 
       case "tool_approval_resolved": {
+        setApprovalPendingForSession(streamSessionId, false);
+        refreshPendingApprovalStatuses([streamSessionId]).catch((error: unknown) => {
+          console.error("Failed to refresh resolved approval status", error);
+        });
         const tool = state.activeTools.get(event.toolCallId);
         if (tool) {
           tool.approvalPending = false;
@@ -548,18 +632,24 @@ export function App() {
       }
 
       case "turn_finished":
+        setApprovalPendingForSession(event.sessionId, false);
+        setFailedForSession(event.sessionId, false);
+        return;
+
       case "turn_failed":
+        setApprovalPendingForSession(event.sessionId, false);
+        setFailedForSession(event.sessionId, true);
         return;
     }
 
     refreshStreamingBlocks();
-  }, [refreshStreamingBlocks]);
+  }, [refreshPendingApprovalStatuses, refreshStreamingBlocks, setApprovalPendingForSession, setFailedForSession]);
 
   const handleSend = useCallback(async (
     text: string,
     options: ComposerSendOptions,
   ) => {
-    if (isStreaming || !text.trim()) return;
+    if (isStreaming || (!text.trim() && !options.attachments?.length)) return;
 
     const sessionId = activeSessionIdRef.current;
     const turnId = nextTurnId();
@@ -567,6 +657,8 @@ export function App() {
     setIsStreaming(true);
     setIsAborting(false);
     setActiveTurnId(turnId);
+    setApprovalPendingForSession(sessionId, false);
+    setFailedForSession(sessionId, false);
     clearToolFinishTimers();
     streamStateRef.current = createEmptyStreamingState();
 
@@ -575,6 +667,7 @@ export function App() {
       id: `user-${turnId}`,
       content: text,
       createdAt: new Date().toISOString(),
+      attachments: options.attachments,
     };
     streamingUserBlockRef.current = userBlock;
     setStreamingBlocks([userBlock]);
@@ -583,7 +676,7 @@ export function App() {
     let unsubscribe: (() => void) | undefined;
     if (hasActspaceBridge()) {
       unsubscribe = window.actspace.onAgentStream((event) => {
-        handleStreamEvent(event);
+        handleStreamEvent(event, sessionId);
       });
     }
 
@@ -595,6 +688,7 @@ export function App() {
           sessionId,
           turnId,
           userInput: text,
+          attachments: options.attachments,
           model: options.model,
           thinkingEnabled: options.thinkingEnabled,
         };
@@ -602,8 +696,11 @@ export function App() {
 
         if (result.status === "aborted") {
           runWasAborted = true;
+          setApprovalPendingForSession(sessionId, false);
           setStreamingBlocks((current) => [...current, createStoppedBlock(turnId)]);
         } else {
+          setApprovalPendingForSession(sessionId, false);
+          setFailedForSession(sessionId, result.status === "failed");
           const restored = await window.actspace.getSession({ sessionId });
           setSessionRecord(restored ?? {
             meta: {
@@ -623,6 +720,8 @@ export function App() {
       }
     } catch (error) {
       console.error("Failed to run turn", error);
+      setApprovalPendingForSession(sessionId, false);
+      setFailedForSession(sessionId, true);
     } finally {
       unsubscribe?.();
       clearToolFinishTimers();
@@ -635,7 +734,14 @@ export function App() {
       streamStateRef.current = createEmptyStreamingState();
       streamingUserBlockRef.current = null;
     }
-  }, [isStreaming, handleStreamEvent, refreshStreamingBlocks, clearToolFinishTimers]);
+  }, [
+    isStreaming,
+    handleStreamEvent,
+    refreshStreamingBlocks,
+    clearToolFinishTimers,
+    setApprovalPendingForSession,
+    setFailedForSession,
+  ]);
 
   const handleAbort = useCallback(async () => {
     if (!hasActspaceBridge() || !activeTurnId) return;
@@ -654,7 +760,7 @@ export function App() {
     }
   }, [activeTurnId]);
 
-  const handleCreateSession = useCallback(async () => {
+  const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
     setTurnResult(null);
     setStreamingBlocks([]);
     clearToolFinishTimers();
@@ -662,7 +768,7 @@ export function App() {
     streamingUserBlockRef.current = null;
 
     if (!hasActspaceBridge()) {
-      const created = createMockEmptySession();
+      const created = createMockEmptySession(input);
       activeSessionIdRef.current = created.meta.id;
       setSessionRecord(created);
       setMockSessionRecords((current) => ({ ...current, [created.meta.id]: created }));
@@ -672,6 +778,7 @@ export function App() {
           title: created.meta.title,
           updatedAt: created.meta.updatedAt,
           turnCount: created.meta.turnCount,
+          workspaceRoot: created.meta.workspaceRoot,
         },
         ...current,
       ]);
@@ -679,7 +786,10 @@ export function App() {
     }
 
     try {
-      const created = await window.actspace.createSession({ title: "New chat" });
+      const created = await window.actspace.createSession({
+        title: "New chat",
+        workspaceRoot: input.workspaceRoot,
+      });
       activeSessionIdRef.current = created.meta.id;
       setSessionRecord(created);
       const refreshed = await window.actspace.listSessions();
@@ -688,6 +798,26 @@ export function App() {
       console.error("Failed to create session", error);
     }
   }, [clearToolFinishTimers]);
+
+  const handleAddWorkspace = useCallback(async () => {
+    if (!hasActspaceBridge()) {
+      await handleCreateSession({ workspaceRoot: MOCK_ADDED_WORKSPACE_ROOT });
+      return;
+    }
+
+    if (!window.actspace.selectWorkspaceDirectory) {
+      console.error("Workspace directory picker is not available");
+      return;
+    }
+
+    try {
+      const result = await window.actspace.selectWorkspaceDirectory();
+      if (result.canceled || !result.workspaceRoot) return;
+      await handleCreateSession({ workspaceRoot: result.workspaceRoot });
+    } catch (error) {
+      console.error("Failed to add workspace", error);
+    }
+  }, [handleCreateSession]);
 
   const handleSelectSession = useCallback(
     async (sessionId: string) => {
@@ -700,6 +830,9 @@ export function App() {
       streamingUserBlockRef.current = null;
       setTurnResult(null);
       activeSessionIdRef.current = sessionId;
+      refreshPendingApprovalStatuses([sessionId]).catch((error: unknown) => {
+        console.error("Failed to refresh selected session approvals", error);
+      });
 
       if (!hasActspaceBridge()) {
         const selected = mockSessionRecords[sessionId];
@@ -722,6 +855,8 @@ export function App() {
             title: fixture.title,
             updatedAt: fixture.updatedAt,
             turnCount: fixture.turnCount,
+            workspaceRoot: fixture.workspaceRoot,
+            pinned: fixture.pinned,
           },
         });
         return;
@@ -734,7 +869,7 @@ export function App() {
         console.error("Failed to select session", error);
       }
     },
-    [mockSessionRecords, sessions, clearToolFinishTimers],
+    [mockSessionRecords, sessions, clearToolFinishTimers, refreshPendingApprovalStatuses],
   );
 
   useEffect(() => {
@@ -781,6 +916,19 @@ export function App() {
     }
     return set;
   }, [isStreaming]);
+  const sessionStatuses = useMemo<Record<string, SessionUiStatusKind>>(() => {
+    const statuses: Record<string, SessionUiStatusKind> = {};
+    for (const sessionId of failedSessionIds) {
+      statuses[sessionId] = "failed";
+    }
+    for (const sessionId of busySessionIds) {
+      statuses[sessionId] = "running";
+    }
+    for (const sessionId of approvalPendingSessionIds) {
+      statuses[sessionId] = "waiting_approval";
+    }
+    return statuses;
+  }, [approvalPendingSessionIds, busySessionIds, failedSessionIds]);
 
   const handleTogglePin = useCallback(
     async (sessionId: string, nextPinned: boolean) => {
@@ -802,6 +950,42 @@ export function App() {
     [],
   );
 
+  const handleArchiveSession = useCallback(
+    async (sessionId: string) => {
+      if (!sessionId || sessionId === activeSessionId) return;
+
+      if (!hasActspaceBridge()) {
+        setSessions((current) => current.filter((session) => session.id !== sessionId));
+        setMockSessionRecords((current) => {
+          const next = { ...current };
+          delete next[sessionId];
+          return next;
+        });
+        return;
+      }
+
+      try {
+        await window.actspace.archiveSession({ sessionId, archived: true });
+        const refreshed = await window.actspace.listSessions();
+        setSessions(refreshed);
+      } catch (error) {
+        console.error("Failed to archive session", error);
+      }
+    },
+    [activeSessionId],
+  );
+
+  const handleArchivedSessionsChange = useCallback(async () => {
+    if (!hasActspaceBridge()) return;
+
+    try {
+      const refreshed = await window.actspace.listSessions();
+      setSessions(refreshed);
+    } catch (error) {
+      console.error("Failed to refresh sessions after archived chats changed", error);
+    }
+  }, []);
+
   return (
     <RightPanelProvider>
       <WorkbenchLayout
@@ -815,15 +999,19 @@ export function App() {
         isAborting={isAborting}
         sendScrollRequestId={sendScrollRequestId}
         busySessionIds={busySessionIds}
+        sessionStatuses={sessionStatuses}
         onSend={handleSend}
         onAbort={handleAbort}
         onNewSession={handleCreateSession}
+        onAddWorkspace={handleAddWorkspace}
         onSelectSession={handleSelectSession}
         onTogglePin={handleTogglePin}
+        onArchiveSession={handleArchiveSession}
         isSessionReady={isSessionReady}
         showDemoAttachments={showDemoAttachments}
         defaultModelId={defaultModelId}
         onSettingsChange={handleSettingsChange}
+        onArchivedSessionsChange={handleArchivedSessionsChange}
       />
       <ShutdownOverlay />
     </RightPanelProvider>

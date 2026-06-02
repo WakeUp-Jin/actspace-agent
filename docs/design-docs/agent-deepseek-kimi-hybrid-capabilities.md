@@ -6,17 +6,21 @@
 
 - `docs/exec-plans/completed/actspace-deepseek-kimi-hybrid-capabilities.md`
 
-当前仓库已经有 DeepSeek provider、mock provider、工具注册与执行框架。下一阶段要引入 Kimi，但目标不是把系统泛化成任意多模型平台，而是用很小的抽象稳定支持两个明确角色：
+当前仓库已经把公开主模型收口到 DeepSeek `deepseek-v4-flash` / `deepseek-v4-pro`。Kimi 不再作为公开模型选择项，而是保留在模型注册表的 `internal` 层，继续服务 DeepSeek 的搜索、多模态等内部 helper 能力。
 
-- DeepSeek：低成本主力推理模型。
-- Kimi：生态能力更完整的主模型候选，也可作为 DeepSeek 的联网搜索和多模态辅助模型。
+当前 LLM 分层以 `api` 而不是品牌 service 为主线：
+
+- `AnthropicMessagesService`：Anthropic Messages 协议实现层，承接 DeepSeek 默认路线。
+- `OpenAICompletionsService`：OpenAI Chat Completions 协议实现层，承接 OpenAI-compatible fallback 和普通 Kimi 内部调用。
+- `KimiService`：兼容包装层，只保留 Kimi builtin `$web_search` 等内部 helper 入口，不再代表公开主模型职责。
+- `DeepSeekService` / `DeepSeekAnthropicService`：兼容包装层，只兜底 provider 默认值；协议职责归属 `OpenAICompletionsService` / `AnthropicMessagesService`。
 
 2026-05-29 后，DeepSeek 默认走 Anthropic-compatible 路线：主 Agent 默认模型为 `deepseek-v4-pro` 且默认开启 thinking；Kairos 默认模型独立为 `deepseek-v4-flash` 且默认开启 thinking。两条链路都会用 Anthropic Messages API，并由 DeepSeek provider-native server tool `web_search_20250305` 执行联网搜索。原有 OpenAI-compatible 路线和 Kimi 辅助工具路线继续保留，可通过 `DEEPSEEK_API_FORMAT=openai` 显式回退。
 
 ## 设计目标
 
-- 用户可以在 DeepSeek 与 Kimi 之间选择主模型。
-- Kimi 作为主模型时，直接使用 Kimi 原生联网搜索与多模态能力。
+- 公开 UI 只让用户在 DeepSeek `deepseek-v4-flash` / `deepseek-v4-pro` 之间选择。
+- Kimi 继续作为内部 helper 能力，不进入公开主模型选择器。
 - DeepSeek 作为主模型且使用 OpenAI-compatible 路线时，如果配置了 Kimi API Key，则通过应用级工具补齐搜索、网页读取和多模态识别。
 - DeepSeek 作为主模型且使用 Anthropic-compatible 路线时，通过 DeepSeek server `web_search_20250305` 直接联网搜索，避免再暴露同名 Kimi-backed 本地 `web_search`。
 - DeepSeek 没有 Kimi API Key 时仍可正常使用本地文件类工具，只是不暴露联网搜索与多模态工具。
@@ -32,22 +36,28 @@
 - 不把 Kimi 原生能力强行注册成普通 ToolManager 工具。
 - 不把 DeepSeek Anthropic server `web_search_20250305` 注册成普通 ToolManager 工具。
 - 不引入新的 Agent runtime 来承载搜索子代理。
+- 不重新开放 Kimi 作为公开主模型选项。
 
 ## 核心模型
 
-系统中有两类能力：
+系统中有三层边界：
 
-1. **Provider 原生能力**
-   - 由模型供应商在 Chat Completions 请求内支持。
-   - 例如 Kimi `builtin_function.$web_search`、Kimi 图片/视频 content parts、DeepSeek Anthropic `web_search_20250305`。
-   - 这类能力由 provider adapter 负责组装请求和处理协议。
+1. **模型元数据层**
+   - `MODEL_REGISTRY` 区分 `api`、`provider`、`visibility`。
+   - `api` 决定协议服务：`anthropic-messages` 或 `openai-completions`。
+   - `provider` 决定供应商身份、凭据和默认 base URL：`deepseek` 或 `kimi`。
+   - `visibility` 决定是否出现在公开 UI；Kimi 当前为 `internal`。
 
-2. **应用级工具**
-   - 由 `actspace` 的 ToolManager 暴露给主模型。
-   - 例如 `read_file`、`grep`、`glob`、`web_search`、`analyze_media`。
-   - 这类工具必须有稳定名称、清晰 schema 和可裁剪结果。
+2. **协议服务层**
+   - 由 `AnthropicMessagesService` / `OpenAICompletionsService` 实现 provider-neutral `LLMService`。
+   - 消息转换、工具转换、usage 归一、流式事件组装都归协议服务和对应 convert 模块。
+   - 品牌包装层不再承载协议转换职责，只做兼容入口。
 
-这两个层级不能混在一起。Provider 原生能力解决“这个 provider 如何调用自己平台能力”的问题；应用级工具解决“主模型能在 actspace 中做什么”的问题。
+3. **能力包装层**
+   - Provider 原生能力由协议服务或内部 helper 在请求构造层处理，例如 DeepSeek server web search、Kimi `$web_search`。
+   - 应用级工具由 ToolManager 暴露给主模型，例如 `read_file`、`grep`、`glob`、`web_search`、`analyze_media`。
+
+这些层级不能混在一起。`api` 解决“用哪套协议和消息转换”的问题；`provider` 解决“用哪个供应商身份和凭据”的问题；应用级工具解决“主模型能在 actspace 中做什么”的问题。
 
 ## Provider 角色
 
@@ -58,6 +68,7 @@ DeepSeek 是低成本主力模型。它应看到稳定、供应商无关的工�
 **OpenAI-compatible 路线（显式回退）**
 
 - 通过 `DEEPSEEK_API_FORMAT=openai` 启用。
+- 普通对话由 `OpenAICompletionsService` 处理；`DeepSeekService` 只保留为兼容包装入口。
 - 本地文件工具：默认可见。
 - `web_search`：只有配置 Kimi API Key 时可见。支持 `query`（关键词搜索）和 `url`（读取网页）两种模式。
 - `analyze_media`：只有配置 Kimi API Key 时可见。
@@ -67,7 +78,8 @@ DeepSeek 不直接处理 Kimi 的内置工具协议，也不直接消费 Kimi Fo
 **Anthropic-compatible 路线**
 
 - 当前 DeepSeek 默认 API 路线，主 Agent 与 Kairos 都会沿用；主 Agent 默认模型为 `deepseek-v4-pro`，Kairos 默认模型为 `deepseek-v4-flash`。
-- 由 `DeepSeekAnthropicService` 使用 Anthropic Messages API 真流式（`client.messages.stream`）调用 DeepSeek，逐增量转发 text/thinking/tool_use，结束后由流式累加器组装最终消息。
+- 由 `AnthropicMessagesService` 使用 Anthropic Messages API 真流式（`client.messages.stream`）调用 DeepSeek，逐增量转发 text/thinking/tool_use，结束后由流式累加器组装最终消息。
+- `DeepSeekAnthropicService` 只保留为兼容包装层，不再是协议职责事实来源。
 - 请求中声明 server tool：`{ type: "web_search_20250305", name: "web_search", max_uses: 3 }`。
 - `web_search` 在 provider 侧执行，不进入本地 ToolManager，不产生本地 tool execution 事件。
 - provider-native 搜索计数会记录到 usage metadata（如 `serverToolUse.webSearchRequests` / `serverToolUse.webFetchRequests`），用于判断是否真实触发搜索；它不是本地 `toolCallCount`。
@@ -76,12 +88,14 @@ DeepSeek 不直接处理 Kimi 的内置工具协议，也不直接消费 Kimi Fo
 
 ### Kimi
 
-Kimi 可以作为主模型。它拥有两类原生能力：
+Kimi 当前是内部 helper provider，不出现在公开模型菜单。`kimi-k2.6` 仍保留在 `MODEL_REGISTRY` 中，`visibility: "internal"`，以便内部工具、旧配置解析和辅助能力继续复用同一份模型元数据。
+
+Kimi helper 拥有两类原生能力：
 
 - 联网搜索：通过 `builtin_function.$web_search`。
 - 多模态：通过图片/视频 content parts。
 
-Kimi 主模型不需要看到 DeepSeek 专用的 Kimi 辅助工具。Kimi 的联网搜索和多模态由 Kimi provider adapter 在请求构造层处理。
+普通 Kimi OpenAI-compatible 调用复用 `OpenAICompletionsService`。`KimiService` 只保留 `streamWithBuiltinWebSearch` 等内部 helper 入口，用来封装 Kimi builtin `$web_search` 的请求细节。
 
 ## 工具暴露规则
 
@@ -95,7 +109,7 @@ exposeOnlyTo?: "deepseek" | "kimi";
 
 - 缺省：两个主模型都可以看到。
 - `"deepseek"`：只暴露给 DeepSeek，且隐含需要 Kimi API Key。
-- `"kimi"`：只暴露给 Kimi。首版通常不需要。
+- `"kimi"`：只暴露给 Kimi。当前 Kimi 是 internal helper，公开主 Agent 通常不需要注册 Kimi-only 普通工具。
 - `DEEPSEEK_API_FORMAT=anthropic` 时，DeepSeek 不暴露 Kimi-backed 本地 `web_search`，因为联网搜索由 provider-native server tool 承担。
 
 示例：
@@ -135,12 +149,11 @@ function shouldExposeTool(tool, runtime) {
 
 DeepSeek 需要的是干净的应用级工具结果，而不是 Kimi 平台协议细节。
 
-三个辅助工具的 Kimi 系统提示词是 executor 内部资产，统一放在：
+Kimi 系统提示词是 executor 内部资产，统一放在：
 
 ```txt
 packages/agent-core/src/prompt/kimi-assistants/
   web-search.ts
-  web-fetch.ts
   analyze-media.ts
 ```
 
@@ -155,7 +168,7 @@ packages/agent-core/src/prompt/kimi-assistants/
 `web_search` 的实现应是一个很薄的 Kimi 搜索函数：
 
 1. DeepSeek 调用 `web_search({ query })`。
-2. executor 读取 `prompts/web-search.ts` 中的系统提示词。
+2. executor 读取 `prompt/kimi-assistants/web-search.ts` 中的系统提示词。
 3. executor 调用 Kimi Chat Completions。
 4. Kimi 请求声明 `builtin_function.$web_search`。
 5. 使用 `$web_search` 时禁用 thinking。
@@ -186,15 +199,15 @@ Kimi `$web_search` builtin 内置了 search + crawl 双能力。独立的 `web_f
 首版原则：
 
 - DeepSeek 只看到工具名和文本/JSON 结果。
-- Kimi 调用使用 `prompts/analyze-media.ts` 约束输出结构。
+- Kimi 调用使用 `prompt/kimi-assistants/analyze-media.ts` 约束输出结构。
 - 图片可由 Kimi Vision 直接处理。
 - 视频优先按 Kimi 文件上传协议处理，再用 `ms://file_id` 引用。
 - 返回结果必须包含内容摘要、关键细节、限制说明。
 - 不把大体积 base64 原文写入 session 或日志。
 
-## Kimi 主模型原生能力
+## Kimi 内部 helper 原生能力
 
-Kimi 主模型不通过 `web_search` wrapper 联网。它的 provider adapter 在请求参数中声明：
+Kimi 不作为公开主模型暴露给用户。内部 helper 需要联网时，不通过 ToolManager 再包装一层 Kimi-only 普通工具，而是在 Kimi 请求参数中声明：
 
 ```json
 {
@@ -215,7 +228,7 @@ Kimi 主模型不通过 `web_search` wrapper 联网。它的 provider adapter �
 }
 ```
 
-图片/视频输入也不走 `analyze_media`，而是在 Kimi user message 中构造 content part 数组。这样 Kimi 能直接在主模型上下文中理解多模态输入，不需要把视觉结果先降级为工具文本。
+图片/视频输入也不走公开主模型的 `analyze_media` wrapper，而是在 Kimi helper 的 user message 中构造 content part 数组。这样 Kimi 能在内部辅助调用里直接理解多模态输入，再把结果降级成 DeepSeek 可读的工具结果。
 
 ## DeepSeek Anthropic 原生联网搜索
 
@@ -236,7 +249,8 @@ DEEPSEEK_ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
 边界：
 
 - `ContextManager` 继续产出 provider-neutral `Context`，不感知 Anthropic 协议。
-- `DeepSeekAnthropicService` 负责把 `Context` 转成 Anthropic `system/messages/tools`。
+- `AnthropicMessagesService` 负责把 `Context` 转成 Anthropic `system/messages/tools`。
+- `LLMConfig.provider="deepseek"` 只提供供应商身份、密钥和默认 base URL，不决定消息转换算法。
 - Anthropic adapter 转换用户文本、图片、assistant 文本、带签名的 thinking、本地 `toolCall` 和本地 `toolResult`。
 - assistant `ToolCallContent` 回放为 Anthropic `tool_use`；internal `ToolResultMessage` 回放为 user `tool_result`。
 - server `server_tool_use`、`web_search_tool_result` 只作为 provider 响应块处理，不映射成本地 ToolManager 事件。

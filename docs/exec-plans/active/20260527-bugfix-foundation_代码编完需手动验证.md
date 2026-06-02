@@ -19,7 +19,7 @@
 - `docs/design-docs/agent-tool-preview-design-guidelines.md`
 - `docs/design-docs/front-中间消息区规范.md`
 - `docs/design-docs/front-usage-statistics.md`
-- `docs/exec-plans/active/actspace-usage-statistics-session-jsonl-plan.md`
+- `docs/exec-plans/completed/actspace-usage-statistics-session-jsonl-plan.md`
 
 补充素材：
 

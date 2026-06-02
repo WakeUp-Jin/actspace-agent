@@ -58,6 +58,7 @@ export async function updateMeta(
   if (fields.title !== undefined) updated.title = fields.title;
   if (fields.workspaceRoot !== undefined) updated.workspaceRoot = fields.workspaceRoot;
   if (fields.pinned !== undefined) updated.pinned = fields.pinned;
+  if (fields.archived !== undefined) updated.archived = fields.archived;
   if (fields.lastModel !== undefined) (updated as Record<string, unknown>).lastModel = fields.lastModel;
   if (fields.lastError !== undefined) (updated as Record<string, unknown>).lastError = fields.lastError;
   if (fields.lastContextSnapshot !== undefined) {

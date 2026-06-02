@@ -9,7 +9,20 @@ export type BootstrapState = {
   workspaceRoot: string;
 };
 
-export { DEFAULT_MODEL_ID, MODEL_LIST, MODEL_REGISTRY, type ModelId, type ModelSpec, resolveModelSpec } from "./model-config";
+export {
+  ALL_MODEL_LIST,
+  DEFAULT_MODEL_ID,
+  MODEL_LIST,
+  MODEL_REGISTRY,
+  isPublicModelId,
+  type ModelApi,
+  type ModelId,
+  type ModelInputKind,
+  type ModelProvider,
+  type ModelSpec,
+  type ModelVisibility,
+  resolveModelSpec,
+} from "./model-config";
 
 // ─── IPC 输入类型 ───
 
@@ -17,8 +30,19 @@ export type RunTurnInput = {
   sessionId: string;
   turnId: string;
   userInput: string;
+  attachments?: import("./session").ComposerAttachment[];
   model?: ModelId;
   thinkingEnabled?: boolean;
+};
+
+export type SelectFilesResult = {
+  canceled: boolean;
+  attachments: import("./session").ComposerAttachment[];
+};
+
+export type SelectWorkspaceDirectoryResult = {
+  canceled: boolean;
+  workspaceRoot?: string;
 };
 
 export type AbortTurnInput = {
@@ -60,6 +84,13 @@ export type SessionListItem = {
   workspaceRoot?: string;
   /** 用户是否把该会话钉到 Pinned 分区。 */
   pinned?: boolean;
+  /** 用户是否把该会话归档。 */
+  archived?: boolean;
+};
+
+export type SessionListInput = {
+  /** 缺省为 false：普通会话列表只返回未归档会话。 */
+  archived?: boolean;
 };
 
 export type SessionRecord = {
@@ -75,7 +106,7 @@ export type SessionGetInput = {
   sessionId: string;
 };
 
-/** 把一条回复 Markdown 用主模型转成 HTML（见 `消息可视化转换规范.md`）。 */
+/** 把一条回复 Markdown 用主模型转成 HTML（见 `front-右侧面板与文件渲染规范.md`）。 */
 export type VisualizeReplyInput = {
   sessionId: string;
   /** 被可视化的 assistant 消息事件 id，参与缓存键。 */
@@ -133,7 +164,7 @@ export type DescribeContextInput = {
   sessionId: string;
 };
 
-// ─── 工作区文件浏览器（见 `docs/design-docs/front-工作区文件浏览器规范.md`）───
+// ─── 工作区文件浏览器（见 `docs/design-docs/front-右侧面板与文件渲染规范.md`）───
 
 /** 懒加载一层工作区目录。renderer 不直接读 FS，全部经此 IPC。 */
 export type WorkspaceListDirInput = {
@@ -200,6 +231,26 @@ export type SessionPinInput = {
 };
 
 export type SessionPinResult = {
+  ok: boolean;
+  error?: string;
+};
+
+export type SessionWorkspaceInput = {
+  sessionId: string;
+  workspaceRoot: string;
+};
+
+export type SessionWorkspaceResult = {
+  ok: boolean;
+  error?: string;
+};
+
+export type SessionArchiveInput = {
+  sessionId: string;
+  archived: boolean;
+};
+
+export type SessionArchiveResult = {
   ok: boolean;
   error?: string;
 };

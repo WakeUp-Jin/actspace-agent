@@ -184,7 +184,7 @@ export type KairosWriteConfigResponse = { ok: true };
 /** `kairos:control` 响应统一格式。 */
 export type KairosControlResponse = { ok: true };
 
-// ─── 上下文 Sheet 快照（详见 docs/design-docs/front-Kairos上下文Sheet规范.md） ───
+// ─── 上下文 Sheet 快照（详见 docs/design-docs/front-Kairos监控页规范.md） ───
 
 /** prompt-assembler 推导出的当前节奏阶段；UI 概览段直接渲染。 */
 export type KairosContextPhase = "work" | "quiet" | "weekend" | "off";

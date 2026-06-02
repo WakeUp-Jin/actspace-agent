@@ -8,7 +8,6 @@
 - `agent-*`：Agent Runtime、工具、上下文、权限、Kairos 等后端/运行层设计。
 - `front-*`：桌面端 renderer、交互、视觉、组件和页面设计。
 - `lab-*`：Lab 能力实验台的产品、运行时和版本路线设计。
-- `fix-*`：对 Skill、流程或既有设计债的修复分析。
 - `public/`：图片、HTML prototype 等资产目录；正式 `.md` 设计文档不放进 `public/`。
 
 新增设计文档时，优先选一个稳定前缀并保持一题一文。不要再新增 `agent-core/`、`frontend-ui/`、`lab/` 这类专题子目录；需要渐进式披露时，先从本索引或对应 `*-index.md` 进入。
@@ -20,7 +19,7 @@
 - `agent-index.md`：Agent Runtime 专题入口。
 - `front-index.md`：桌面端前端设计专题入口。
 - `lab-index.md`：Lab 能力实验台专题入口。
-- `fix-llm-agent-plan-index.md`：`llm-agent-dev` Skill 修复计划入口。
+- `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档。
 
 ## Agent
 
@@ -50,27 +49,16 @@
 - `front-左侧会话栏规范.md`：左侧会话栏、Pinned / Scheduled / Workspaces 分区规则。
 - `front-中间消息区规范.md`：消息语法、工具流和消息区可视状态。
 - `front-聊天输入框规范.md`：Composer、模式、模型、附件、Context 弹窗和发送。
-- `front-右侧面板与文件渲染规范.md`：右侧文件预览、diff 和对象区渲染。
-- `front-工作区文件浏览器规范.md`：右侧面板文件树、只读浏览和 IPC 契约。
-- `front-Markdown渲染规范.md`：右侧 Markdown 渲染栈和主题感知高亮。
-- `front-HTML渲染与沙箱安全规范.md`：HTML 渲染的 sandbox iframe + CSP 安全边界。
-- `front-Context完整视图规范.md`：Context 完整只读视图的数据契约和展示规则。
-- `front-消息可视化转换规范.md`：Markdown 回复转 HTML 的缓存、安全和渲染边界。
+- `front-右侧面板与文件渲染规范.md`：右侧文件预览、Workspace 文件树、Markdown / HTML / Context / Reply HTML、diff 和对象区渲染。
 - `front-设置页规范.md`：设置态布局、导航分组和聊天态切换规则。
-- `front-Kairos监控页规范.md`：Kairos 监控页信息架构。
-- `front-Kairos上下文Sheet规范.md`：Kairos 上下文 Sheet 的入口、信息架构和 IPC 通道。
-- `front-Kairos右侧紧凑视图规范.md`：聊天态右侧面板中的 Kairos compact view。
+- `front-Kairos监控页规范.md`：Kairos 监控页信息架构、上下文 Sheet 和聊天态右侧 compact view。
 - `front-usage-statistics.md`：Usage Statistics 页面布局、组件、数据来源和视觉规范。
 
 ## Lab
 
-- `lab-vision.md`：Lab North Star、产品定位、角色关系和最终形态。
-- `lab-experiment-lifecycle.md`：实验从创建到晋升或废弃的生命周期。
-- `lab-data-model.md`：Experiment、Stage、Evidence、Artifact、Review 等核心对象。
+- `lab-product-design.md`：Lab North Star、产品定位、实验生命周期、核心数据模型、晋升评审和安全原则。
 - `lab-ui-experience.md`：实验矩阵页面的信息架构和交互原则。
 - `lab-frontend-page-design.md`：Lab 首页和弹窗页面规范。
 - `lab-implementation-progress.md`：Lab 当前设计执行进度。
 - `lab-runtime-architecture.md`：Lab Runtime 与 Main Agent、Kairos、ToolManager 和 registry 的关系。
-- `lab-promotion-and-safety.md`：能力晋升、风险分层、沙箱和人工审批原则。
-- `lab-versions-index.md`：Lab V0-V3 渐进式构建路线。
-- `lab-v0-experiment-matrix.md`、`lab-v1-assisted-experiment.md`、`lab-v2-sandbox-forge.md`、`lab-v3-autonomous-capability-rd.md`：分版本范围。
+- `lab-versions-index.md`：Lab V0-V3 渐进式构建路线和分版本范围。

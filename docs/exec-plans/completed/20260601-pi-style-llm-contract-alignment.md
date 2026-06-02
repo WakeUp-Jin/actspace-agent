@@ -45,6 +45,7 @@
   - `packages/agent-core/src/llm/anthropic-convert.ts`
   - `packages/agent-core/src/llm/factory.ts`
   - `packages/agent-core/src/llm/services/openai-completions.ts`
+  - `packages/agent-core/src/llm/services/anthropic-messages.ts`
   - `packages/agent-core/src/llm/services/deepseek.ts`
   - `packages/agent-core/src/llm/services/deepseek-anthropic.ts`
   - `packages/agent-core/src/llm/services/kimi.ts`
@@ -107,12 +108,18 @@
 - 观测检查：
   - 关键消息转换路径上能看到统一预处理层生效，且没有破坏 tool call / tool result 的配对关系。
 
+## 收尾记录
+
+- 2026-06-02：代码侧已完成 `api/provider/visibility` 模型元数据、`AnthropicMessagesService` / `OpenAICompletionsService` 协议分层、`transformMessages` 通用预处理、公开模型列表过滤和旧配置兼容。
+- 2026-06-02：收尾阶段只做仓库内事实同步，不再修改协议代码；同步 `agent-current-module-map.md` 与 `agent-deepseek-kimi-hybrid-capabilities.md` 的新分层口径。
+- 2026-06-02：补充 history 与 learning 后，本计划从 `active/` 迁入 `completed/`。
+
 ## 进度记录
 
-- [ ] 确认模型契约收口范围。
-- [ ] 完成通用消息预处理层设计与接入。
-- [ ] 完成前端公开模型收口与旧配置兼容。
-- [ ] 完成测试、文档和 history 同步。
+- [x] 确认模型契约收口范围。
+- [x] 完成通用消息预处理层设计与接入。
+- [x] 完成前端公开模型收口与旧配置兼容。
+- [x] 完成测试、文档和 history 同步。
 
 ## 决策记录
 

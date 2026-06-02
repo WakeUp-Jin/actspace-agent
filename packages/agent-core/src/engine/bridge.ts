@@ -10,6 +10,8 @@
 
 import type {
   AgentTurnResult,
+  AttachmentAnalysis,
+  ComposerAttachment,
   RuntimeStreamEvent,
   SessionEvent,
   ContextUsageSnapshot,
@@ -36,6 +38,7 @@ import type { AgentEvent, AgentLoopResult, ContextCompactionInfo, LLMUsageCall, 
 import { extractStreamingPreview } from "./streaming-preview-extractors";
 import {
   createPersistedSessionEvent,
+  formatUserMessageForModel,
   messageToEvents,
   userMessageToEvents,
   toAssistantReply,
@@ -95,6 +98,8 @@ export interface RunTurnWithAgentInput {
   sessionId: string;
   turnId: string;
   userInput: string;
+  attachments?: ComposerAttachment[];
+  attachmentAnalyses?: AttachmentAnalysis[];
   thinkingEnabled?: boolean;
 }
 
@@ -203,7 +208,7 @@ export async function runTurnWithAgent(
       userInputLength: userInput.length,
       userInputPreview: preview(userInput),
     });
-    loopResult = await agent.run(userInput);
+    loopResult = await agent.run(formatUserMessageForModel(userInput, input.attachments, input.attachmentAnalyses));
   } catch (err) {
     await flushStreamLogBuffer(runLogger, streamLogBuffer);
     const errorMsg = err instanceof Error ? err.message : String(err);
@@ -236,7 +241,7 @@ export async function runTurnWithAgent(
     return failedResult;
   }
 
-  const sessionEvents = buildSessionEvents(loopResult, sessionId, turnId, userInput, deps.toolManager, toolExecutions);
+  const sessionEvents = buildSessionEvents(loopResult, sessionId, turnId, input, deps.toolManager, toolExecutions);
   for (const info of compactions) {
     sessionEvents.push(createCompactionEvent(info, sessionId, turnId));
   }
@@ -422,17 +427,20 @@ function buildSessionEvents(
   result: AgentLoopResult,
   sessionId: string,
   turnId: string,
-  userInput: string,
+  input: RunTurnWithAgentInput,
   toolManager: ToolManager,
   toolExecutions: Map<string, ToolExecutionRecord>,
 ): SessionEvent[] {
   const userMessage: UserMessage = {
     role: "user",
-    content: userInput,
+    content: input.userInput,
     timestamp: Date.now(),
     source: "user",
   };
-  const events: SessionEvent[] = userMessageToEvents(userMessage, sessionId, turnId);
+  const events: SessionEvent[] = userMessageToEvents(userMessage, sessionId, turnId, {
+    attachments: input.attachments,
+    attachmentAnalyses: input.attachmentAnalyses,
+  });
   let usageCallIndex = 0;
   for (const msg of result.messages) {
     if (msg.role === "toolResult") {
@@ -672,6 +680,18 @@ function createToolUiPreview(
       };
     }
 
+    case "media_analysis": {
+      const source = stringArg(args.source, "media");
+      const mediaName = displayFileName(source);
+      const mediaKind = getMediaKind(args);
+      return {
+        kind: "media_analysis",
+        mediaName,
+        mediaKind,
+        displayText: getMediaAnalysisPreviewText(mediaName, mediaKind),
+      };
+    }
+
     case "directory_list": {
       const path = stringArg(args.path, "Unknown directory");
       const displayPath = displayPathTail(path);
@@ -765,6 +785,10 @@ function getToolSummary(
       const query = stringArg(args.query, "");
       return url ? `Read Web Page ${url}` : `Web Search ${query || "..."}`;
     }
+    case "media_analysis": {
+      const mediaName = displayFileName(stringArg(args.source, "media"));
+      return getMediaAnalysisPreviewText(mediaName, getMediaKind(args));
+    }
     case "directory_list":
       return `Listed ${displayPathTail(stringArg(args.path, "directory"))}`;
     case "edit_diff":
@@ -799,6 +823,23 @@ function displayPathTail(path: string): string {
 
 function getReadPreviewText(filePath: string, range?: string): string {
   return `Read ${filePath}${range ? ` ${range}` : ""}`;
+}
+
+function getMediaAnalysisPreviewText(mediaName: string, mediaKind: "image" | "video" | "media"): string {
+  const label = mediaKind === "image" ? "image" : mediaKind === "video" ? "video" : "media";
+  return `Analyze ${label} ${mediaName}`;
+}
+
+function getMediaKind(args: Record<string, unknown>): "image" | "video" | "media" {
+  const mimeType = typeof args.mimeType === "string" ? args.mimeType : "";
+  const source = typeof args.source === "string" ? args.source : "";
+  if (mimeType.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg|heic|heif)$/i.test(source)) {
+    return "image";
+  }
+  if (mimeType.startsWith("video/") || /\.(mp4|mov|webm|mkv|avi)$/i.test(source)) {
+    return "video";
+  }
+  return "media";
 }
 
 function getLineRange(args: Record<string, unknown>): string | undefined {

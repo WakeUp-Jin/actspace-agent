@@ -14,7 +14,7 @@
 - `.agents/skills/llm-agent-dev/references/context/mgmt-token-strategies.md`（Token 压缩执行策略，V1）
 - `.agents/skills/llm-agent-dev/examples/context-manager.ts`（核心参考实现）
 - `.agents/skills/llm-agent-dev/examples/system-prompt.ts`（系统提示词参考）
-- `docs/design-docs/fix-llm-agent-dev-skill.md`（Skill 缺少 context modules 目录结构说明的补充）
+- `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-dev-skill.md`（Skill 缺少 context modules 目录结构说明的补充）
 
 ## 目标目录结构
 
@@ -29,7 +29,7 @@ packages/agent-core/src/context/
   index.ts                    # 统一导出
 ```
 
-Skill 的 `architecture.md` V0 目录结构展示了 `context/modules/` 子目录，但 context 参考文档（`mgmt-context-architecture.md`）未提及此结构。已记录到 `docs/design-docs/fix-llm-agent-dev-skill.md`。
+Skill 的 `architecture.md` V0 目录结构展示了 `context/modules/` 子目录，但 context 参考文档（`mgmt-context-architecture.md`）未提及此结构。已记录到 `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-dev-skill.md`。
 
 ## 相关路径
 
@@ -151,4 +151,4 @@ V0 只有 systemPrompt、tools、conversation 有实际 token 值，其余 bucke
 
 - 2026-05-23：上下文管道首版重点是可见、可裁剪、可统计，暂不做高级压缩和长期记忆。
 - 2026-05-23：按 Skill `mgmt-context-architecture.md` 采用 ContextManager + ContextModule.format() 编排架构。
-- 2026-05-23：context 模块采用 modules/ 子目录结构，与 Skill architecture.md V0 目录保持一致。Skill context 参考文档缺少此目录结构说明，已记录到 `docs/design-docs/fix-llm-agent-dev-skill.md`。
+- 2026-05-23：context 模块采用 modules/ 子目录结构，与 Skill architecture.md V0 目录保持一致。Skill context 参考文档缺少此目录结构说明，已记录到 `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-dev-skill.md`。

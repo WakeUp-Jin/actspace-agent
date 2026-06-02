@@ -13,17 +13,14 @@
 
 ### 1. 长期设计文档
 
-- `lab-vision.md`：定义 Lab 的 North Star 和产品定位。
-- `experiment-lifecycle.md`：定义假说构建、实证验证、能力锻造、晋升评审的生命周期。
-- `data-model.md`：定义 Experiment、Stage、Evidence、Artifact、Review 等核心对象。
-- `runtime-architecture.md`：描述 Lab Runtime 与 Main Agent、Kairos、ToolManager、Skill / CLI / Tool Registry 的关系。
-- `promotion-and-safety.md`：定义候选能力晋升、风险分层、沙箱和人工审批原则。
-- `lab-versions-index.md` 与 `lab-v0-*` 到 `lab-v3-*`：拆分 V0-V3 的渐进式路线。
+- `lab-product-design.md`：定义 Lab 的 North Star、产品定位、实验生命周期、核心数据模型、晋升评审和安全原则。
+- `lab-runtime-architecture.md`：描述 Lab Runtime 与 Main Agent、Kairos、ToolManager、Skill / CLI / Tool Registry 的关系。
+- `lab-versions-index.md`：拆分 V0-V3 的渐进式路线。
 
 ### 2. 前端原型
 
 - `public/lab/prototype.html`：已沉淀单文件交互原型，覆盖四栏实验矩阵、卡片详情弹窗、新实验弹窗和已完成实验弹窗。
-- `frontend-page-design.md`：已将原型转成前端页面规范，明确 V0 首页、阶段卡片、弹窗和不做项。
+- `lab-frontend-page-design.md`：已将原型转成前端页面规范，明确 V0 首页、阶段卡片、弹窗和不做项。
 
 ### 3. Renderer V0 Mock
 

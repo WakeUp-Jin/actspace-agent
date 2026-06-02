@@ -31,7 +31,7 @@
 - `docs/design-docs/agent-token-usage-and-context-state.md`
 - `docs/design-docs/agent-context-compression.md`
 - `docs/design-docs/core-storage-and-observability.md`
-- `docs/exec-plans/active/20260530-context-cache-and-usage/README.md`
+- `docs/exec-plans/completed/20260530-context-cache-and-usage/README.md`
 
 相关代码路径：
 

@@ -3,10 +3,10 @@ import type { ToolDefinitionSpec } from "../../types";
 export const readFileDefinition: ToolDefinitionSpec = {
   name: "read_file",
   description:
-    "Read a file from the workspace and return its content with line numbers. " +
+    "Read a file from the workspace or a user-explicitly provided local path, such as an attached file path, and return its content with line numbers. " +
     "Supports optional offset and limit parameters for reading specific line ranges. " +
     "Use offset/limit for large files instead of reading the entire file. " +
-    "Do NOT use this tool for files outside the workspace boundary.",
+    "Only read paths that are relevant to the user's request or provided by the app context.",
   parameters: {
     type: "object",
     properties: {

@@ -20,6 +20,7 @@ import type {
 } from "../messages";
 import { createEmptyUsage } from "../messages";
 import type { AssistantMessageEvent, LLMConfig } from "./types";
+import { transformMessages } from "./transform-messages";
 
 export type AnthropicMessageParam = Anthropic.MessageParam;
 export type AnthropicContentBlockParam = Anthropic.ContentBlockParam;
@@ -32,17 +33,20 @@ export interface AnthropicRequestInput {
   messages: AnthropicMessageParam[];
 }
 
-export function convertContextToAnthropic(context: Context): AnthropicRequestInput {
+export function convertContextToAnthropic(context: Context, target?: LLMConfig): AnthropicRequestInput {
   return {
     system: context.systemPrompt,
-    messages: convertMessagesToAnthropic(context.messages),
+    messages: convertMessagesToAnthropic(context.messages, target),
   };
 }
 
-export function convertMessagesToAnthropic(messages: Message[]): AnthropicMessageParam[] {
+export function convertMessagesToAnthropic(messages: Message[], target?: LLMConfig): AnthropicMessageParam[] {
   const result: AnthropicMessageParam[] = [];
+  const replayMessages = target
+    ? transformMessages(messages, target, { normalizeToolCallId: normalizeAnthropicToolCallId })
+    : sanitizeMessagesForAnthropic(messages);
 
-  for (const message of sanitizeMessagesForAnthropic(messages)) {
+  for (const message of replayMessages) {
     if (message.role === "user") {
       result.push({ role: "user", content: toAnthropicUserContent(message.content) });
       continue;
@@ -62,6 +66,11 @@ export function convertMessagesToAnthropic(messages: Message[]): AnthropicMessag
   }
 
   return result;
+}
+
+function normalizeAnthropicToolCallId(id: string): string {
+  const safe = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return safe.length > 64 ? safe.slice(0, 64) : safe;
 }
 
 function sanitizeMessagesForAnthropic(messages: Message[]): Message[] {
@@ -302,6 +311,7 @@ export function messageToAssistantMessage(
   return {
     role: "assistant",
     content,
+    ...(config.api && { api: config.api }),
     model: config.model,
     provider: providerName,
     usage: anthropicUsageToUsage(message.usage),
@@ -546,6 +556,7 @@ export function buildAnthropicAssistantMessage(
   return {
     role: "assistant",
     content,
+    ...(config.api && { api: config.api }),
     model: config.model,
     provider: providerName,
     usage: acc.usage ? anthropicUsageToUsage(acc.usage) : createEmptyUsage(),
@@ -571,6 +582,7 @@ export function buildAnthropicErrorMessage(
   return {
     role: "assistant",
     content,
+    ...(config.api && { api: config.api }),
     model: config.model,
     provider: providerName,
     usage: acc.usage ? anthropicUsageToUsage(acc.usage) : createEmptyUsage(),

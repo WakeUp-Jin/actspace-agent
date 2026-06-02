@@ -6,14 +6,9 @@
 
 它属于聊天态工作台的可调对象区；右侧开关、宽度边界和中间聊天区保护规则见 `工作台布局与面板交互规范.md`。
 
-## 渲染专题规范
+## 文档范围
 
-具体渲染线各自有专题规范，本文件只保留面板外壳与总规则：
-
-- `HTML渲染与沙箱安全规范.md`：HTML 渲染的威胁模型、sandbox iframe + CSP 双闸、V1 / V2 边界。
-- `Markdown渲染规范.md`：Markdown 渲染栈、主题感知高亮、Preview/源码切换、V1 / V2 边界。
-- `Context完整视图规范.md`：Context 完整只读视图的数据契约、配色联动、折叠/导出、V1 / V2 边界。
-- `工作区文件浏览器规范.md`：右侧面板的文件树 rail（来源于会话 workspaceRoot）、点文件复用本面板渲染视图开 Tab、读盘 IPC 契约与安全边界、V1 / V2 / V3 边界。
+本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、Tab 系统、文件渲染、Workspace 文件浏览、Context 完整只读视图、Reply HTML 和 HTML 沙箱安全。工作台左右面板 resize、collapse 和标题栏让位仍见 `front-工作台布局与面板交互规范.md`；颜色硬约束见 `front-主题与配色规范.md`。
 
 ## 交互模型
 
@@ -45,8 +40,8 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `CSV`：表格预览。
 - `Text`：纯文本或代码文件查看。
 - `Diff`：会话级 review diff。
-- `Kairos`：聊天态右侧紧凑状态视图；具体布局和数据边界见 `Kairos右侧紧凑视图规范.md`。
-- `Context`：完整只读上下文视图；见 `Context完整视图规范.md`。
+- `Kairos`：聊天态右侧紧凑状态视图；具体布局和数据边界见 `front-Kairos监控页规范.md`。
+- `Context`：完整只读上下文视图；见 `front-右侧面板与文件渲染规范.md`。
 - `Reply HTML`：当前会话已生成的可视化 HTML 文件浏览器（见下文）。
 
 ## 「+ 新建对象」菜单（2026-05-30）
@@ -58,7 +53,7 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 
 ## Reply HTML 视图（2026-05-30，下拉选择器版）
 
-把**当前会话**里通过「消息可视化」生成过的 HTML 聚合到一处（数据见 `消息可视化转换规范.md` 的缓存 sidecar）。**渲染区占满**，文件列表收进一个下拉选择器，不再用常驻侧栏挡住渲染图：
+把**当前会话**里通过「消息可视化」生成过的 HTML 聚合到一处（数据见 `front-右侧面板与文件渲染规范.md` 的缓存 sidecar）。**渲染区占满**，文件列表收进一个下拉选择器，不再用常驻侧栏挡住渲染图：
 
 - 顶部操作栏（左起）：**文件选择器**（按钮显示当前文件名 + chevron，点击弹出可滚动浮层，列表项只显示文件名，参考模型选择器）、**刷新**按钮。
 - 主体：复用沙箱 `HtmlRenderView` 渲染选中文件（半可信 → `trust="chat"`，自带预览/源码切换）。
@@ -76,6 +71,172 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `pdf`：渲染为分页阅读视图。
 - `图片`：直接预览。
 - `diff`：展示当前会话累计改动，不放在单条消息里替代消息流中的局部 diff。
+
+## Markdown 渲染
+
+右侧面板是正式 Markdown 渲染栈的入口，聊天消息区是否迁移到同一栈属于 V2。
+
+V1 渲染栈：
+
+- `react-markdown` + `remark-gfm`，支持表格、任务列表、删除线和自动链接。
+- `rehype-highlight` 负责同步代码高亮；Shiki 作为 V2 可选升级。
+- 不引入 `rehype-raw`，Markdown 中的原始 HTML 不直接执行。
+- 链接只放行 `http` / `https` / `mailto`，外链使用 `target="_blank" rel="noreferrer"`。
+- 复用 `.markdown-prose` 和 `styles/markdown.css`，代码块使用 `markdown-code-block`。
+- Preview / 源码 两态切换，切换状态只属于当前 Tab。
+
+代码高亮配色必须随浅 / 深主题翻转。`hljs-*` token 颜色使用主题 token 或专用 CSS 变量，禁止写死 `#hex`、`text-black`、`bg-white` 这类非主题感知字面量。
+
+V1 不做数学公式、Mermaid、TOC、标题锚点、原始 HTML 内联和聊天区解析器迁移。
+
+## HTML 渲染与沙箱安全
+
+HTML 来源包括本地 `.html` 文件、聊天生成 HTML、Markdown 回复转 HTML 的可视化产物。HTML 默认视为不可信或半可信，必须经过 iframe sandbox 与 CSP 双闸。
+
+关键规则：
+
+- 整页 HTML 一律使用 `<iframe srcDoc={html} sandbox="allow-scripts">` 渲染。
+- `srcDoc` 路径绝不同时开启 `allow-scripts` 与 `allow-same-origin`。
+- renderer 不使用 `<webview>`，不向预览 iframe 暴露 preload、`window.actspace`、Node 或文件系统能力。
+- CSP 注入到 `srcDoc` 的 `<meta http-equiv>`。
+- `strict`（本地文件默认）：禁外联，只允许 data/blob 图片、inline style、data 字体和 inline script。
+- `relaxed`（聊天生成 HTML 或用户主动信任外部静态资源）：允许 https 图片 / 样式 / 字体 / 脚本，但 `connect-src 'none'`，阻断数据外传。
+- iframe 只允许单向 `postMessage` 回传运行时错误和内容高度；父窗口校验 `event.source === iframe.contentWindow` 后处理。
+- 注入最小 `color-scheme: light dark;` 基线样式，不强行覆盖产物自带样式。
+
+聊天行内 HTML 小片段先用 DOMPurify 净化；需要脚本或复杂结构时升级为 iframe 路径。V1 不支持相对资源、多文件 artifact、页面内导航、keep-alive 池、双向交互桥或 CDP。
+
+V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `localResourceRoots`、安全打开 `allow-scripts allow-same-origin`、支持相对资源、多文件产物、截图 / inspect / 调参和更细 CSP nonce。
+
+## Workspace 文件浏览器
+
+右侧面板提供一个轻量的 Workspace 文件浏览器：树 rail 常驻在浏览态左栏，点文件在右侧以普通 Tab 打开。树根是当前会话的 `workspaceRoot`，与 Agent 文件工具操作的根一致。
+
+结构为纵向三段：
+
+1. Tab 条横跨整条右面板。
+2. Workspace 操作栏展示树栏折叠按钮和当前文件的 workspace 相对路径。
+3. 两栏 `[文件树 | 文件预览区]`，文件树无独立头部。
+
+呈现由当前 Tab 决定：
+
+- 激活工作区文件 Tab（文件类且有 `relativePath`）时进入 shell。
+- 激活对象 Tab（Kairos / Context / Reply HTML / 聊天生成 HTML 等）时退出 shell，整面板展示对象视图。
+- `isFileTreeOpen` 表示显式进入浏览态；`isFileTreeCollapsed` 只折叠树栏，不关闭内容区。
+
+IPC 契约：
+
+```ts
+type WorkspaceListDirInput = {
+  workspaceRoot?: string;
+  relativePath?: string;
+};
+
+type WorkspaceDirEntry = {
+  name: string;
+  relativePath: string;
+  kind: "dir" | "file";
+  size?: number;
+};
+
+type WorkspaceListDirResult = {
+  root: string;
+  relativePath: string;
+  entries: WorkspaceDirEntry[];
+  error?: "not_found" | "not_a_directory" | "escapes_root" | "too_many_entries";
+};
+
+type WorkspaceReadFileInput = {
+  workspaceRoot?: string;
+  relativePath: string;
+};
+
+type WorkspaceFileRenderKind = "markdown" | "html" | "image" | "text";
+
+type WorkspaceReadFileResult = {
+  relativePath: string;
+  renderKind: WorkspaceFileRenderKind;
+  content?: string;
+  dataUrl?: string;
+  language?: string;
+  size: number;
+  truncated?: boolean;
+  error?: "not_found" | "not_a_file" | "too_large" | "binary" | "escapes_root";
+};
+```
+
+main 侧服务规则：
+
+- renderer 不直接访问文件系统；树展开和文件读取都走 preload + IPC。
+- UI 浏览强约束在 `workspaceRoot` 内，`..` 逃逸返回 `escapes_root`。
+- 固定忽略 `node_modules`、`.git`、`.pnpm-store`、`dist`、`.next`、`.turbo`、`coverage`、`.DS_Store`。
+- 单目录最多列出 1000 条，目录在前、文件在后，各自按名称升序。
+- 文本类上限 2MB，图片类上限 5MB；大文件返回 `too_large` 或截断提示。
+- 图片用 data URL，HTML 文件用 `trust="file"` 的 strict CSP 沙箱。
+- text 类按扩展名确定 highlight.js 语言，不使用 `highlightAuto` 猜测。
+
+V1 不做写 / 删 / 重命名、`.gitignore` 解析、快速打开、多 root、PDF/CSV 预览和 Kairos 配置编辑。V3 若做 Kairos 配置编辑，保存必须走 `kairos:read-config` / `kairos:write-config` 这类带 schema 校验的专用通道。
+
+## Context 完整只读视图
+
+Context Tab 展示主聊天 agent 当前会话喂给模型的完整上下文。它和 Kairos 上下文 Sheet 是不同组件：数据源不同、入口不同，但视觉语言（竖色条段头、可折叠分区、源文件 chip）保持同源。
+
+入口：
+
+- Composer 的 Context 弹窗右上角放展开 / 详情图标按钮。
+- 点击后打开右侧 Context Tab。
+- V1 只读，不使用 Edit / Pencil 图标。
+
+数据来源：
+
+- `@actspace/shared` 的 `ContextState` 与 `ContextStateEntry[]`。
+- 分区顺序和配色来自 `CONTEXT_BUCKET_REGISTRY`。
+- `context-state.json` 持久化只保存 token 统计，逐条正文不落盘。
+- 打开 Context 视图时调用 `context:describe` 现场重算逐条全文，不调用 LLM。
+- describe 结果优先；describe 未返回时退回持久化快照；两者皆无显示空态。
+
+分区顺序：
+
+1. System prompt
+2. Tools
+3. Rules
+4. Skills
+5. Summarized conversation
+6. Conversation
+7. 未来 MCP / Subagents / Recent files
+
+视觉与交互：
+
+- 分区头使用 `--act-context-*` 同色竖线 + 分区名 + 条目数 / token。
+- 展开内容是主题感知 `bg-surface` 白底卡片 + `border-line` 细边，不整行染色。
+- entry 正文默认夹 3 行；超过阈值提供「展开全文 / 收起」。
+- Conversation 默认折叠，V1 最多展示 20 条，导出使用 renderer Blob 下载 `.md` / `.json`。
+- 空 bucket 保留分区头，让用户知道有哪些上下文类型；展开后按状态显示「正在重建」「暂无法生成」「暂未使用」等文案。
+
+V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 token 占比可视化。逐条全文只在内存 / IPC 传输，不持久化。
+
+## 消息可视化转换（Markdown -> HTML）
+
+助手回复上的「可视化」按钮把该条回复的 Markdown 用主模型转换成自包含 HTML，然后在右侧 HTML Tab 渲染。
+
+核心约束：转换是一次真实模型调用，成本高，必须缓存。第一次点击才生成并持久化，之后命中缓存直接渲染。
+
+入口与状态：
+
+- `TurnActions` 的「...」按钮左侧放可视化按钮。
+- `idle` / `error` 用 `Wand2`，`generating` 用旋转 `Loader2`，`ready` 用 `Eye`。
+- 状态机：`idle -> generating -> ready`；失败进入 `error` 可重试。
+- 已生成内容提供显式「重新生成」入口，只有显式触发才重算。
+
+缓存与数据流：
+
+- 缓存键 = `messageId | turnId` + `sourceHash`。
+- sidecar 存 HTML、sourceHash、model、generatedAt、usage 和派生 title。
+- renderer 点击 -> IPC -> main -> agent-core LLM 服务用主模型转换 -> main 写 sidecar -> renderer 打开 / 聚焦 HTML Tab。
+- `visualize:list({ sessionId })` 读取同一 sidecar，供 Reply HTML 聚合视图按 createdAt 倒序浏览本会话全部产物。
+- usage 计入使用统计；缓存命中不新增模型调用。
+
+生成提示词要求输出单个自包含 HTML 文档；如果模型输出 ```html 围栏，解析围栏内内容；解析失败不污染缓存。产物按半可信处理，一律走 HTML sandbox 路径，不因为「是自己模型生成的」就放宽权限。
 
 ## 首版边界
 

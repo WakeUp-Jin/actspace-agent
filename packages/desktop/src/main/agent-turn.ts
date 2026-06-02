@@ -24,6 +24,7 @@ import {
   writeSessionResult,
 } from "@actspace/agent-core";
 import type { PendingApprovalRegistry } from "./approval-registry";
+import { analyzeImageAttachmentsForTurn } from "./media-analysis";
 
 export type AppDataRoots = {
   dataRoot: string;
@@ -180,23 +181,35 @@ export async function runAndPersistTurn(
 
   activeTurnAborts.set(turnKey, () => abortableDeps.abort?.());
 
+  const forwardStreamEvent = (event: RuntimeStreamEvent) => {
+    logAgentTurn("stream event sent to renderer", {
+      sessionId: "sessionId" in event ? event.sessionId : input.sessionId,
+      turnId: "turnId" in event ? event.turnId : input.turnId,
+      type: event.type,
+    });
+    win?.webContents.send("agent:stream", event);
+  };
+
+  const attachmentAnalyses = await analyzeImageAttachmentsForTurn({
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    userInput: input.userInput,
+    attachments: input.attachments,
+    onStreamEvent: forwardStreamEvent,
+  });
+
   const resultPromise = runTurnWithAgent(
     {
       sessionId: input.sessionId,
       turnId: input.turnId,
       userInput: input.userInput,
+      attachments: input.attachments,
+      attachmentAnalyses,
       thinkingEnabled: input.thinkingEnabled,
     },
     abortableDeps,
     {
-      onStreamEvent: (event: RuntimeStreamEvent) => {
-        logAgentTurn("stream event sent to renderer", {
-          sessionId: "sessionId" in event ? event.sessionId : input.sessionId,
-          turnId: "turnId" in event ? event.turnId : input.turnId,
-          type: event.type,
-        });
-        win?.webContents.send("agent:stream", event);
-      },
+      onStreamEvent: forwardStreamEvent,
       runLogger,
     },
   );

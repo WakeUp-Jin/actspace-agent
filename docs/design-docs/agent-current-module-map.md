@@ -1,6 +1,6 @@
 # Agent Core 当前模块地图
 
-本文档记录 `packages/agent-core` 当前已经落地的模块结构。它回答“现在代码分布在哪里、各模块负责什么”，长期设计动机见 `backend-agent-design.md`。
+本文档记录 `packages/agent-core` 当前已经落地的模块结构。它回答“现在代码分布在哪里、各模块负责什么”，长期设计动机见 `agent-backend-design.md`。
 
 ## 顶层类型与契约
 
@@ -12,15 +12,19 @@
 
 ## `llm/` - LLM 服务层
 
-- `llm/types.ts`：LLMConfig、StreamOptions、LLMService 接口、AssistantMessageEventStream、LLMServiceError。error 事件携带完整 `AssistantMessage`（含部分内容 + `stopReason` + `errorMessage`），而非 `Error` 对象。
-- `llm/convert.ts`：共享的消息转换、工具转换、流式 chunk 处理和 SDK 错误映射逻辑（OpenAI 协议）。包含防御性消息处理（跳过 error/aborted 的 assistant messages、为孤儿 tool calls 插入 synthetic toolResult）。
+- `llm/types.ts`：LLMConfig、StreamOptions、LLMService 接口、AssistantMessageEventStream、LLMServiceError。LLMConfig 现在把 `api` / `apiFormat` / `input` 拆开，error 事件仍携带完整 `AssistantMessage`（含部分内容 + `stopReason` + `errorMessage`），而非 `Error` 对象。
+- `llm/convert.ts`：OpenAI 协议的共享消息转换、工具转换、流式 chunk 处理和 SDK 错误映射逻辑。包含防御性消息处理（跳过 error/aborted 的 assistant messages、为孤儿 tool calls 插入 synthetic toolResult）。
 - `llm/anthropic-convert.ts`：Anthropic 协议适配层。Context↔Anthropic system/messages/tools 转换、server/client tool 映射、usage 归一（`anthropicUsageToUsage`），以及真流式处理（`createAnthropicAccumulator` + `processAnthropicStream` 逐增量累积 → `buildAnthropicAssistantMessage` / `buildAnthropicErrorMessage`，设计思路与 `convert.ts` 同构，差异仅在协议）。
-- `llm/services/deepseek.ts`：DeepSeekService，使用 OpenAI SDK 直接流式调用 DeepSeek chat completions，具体实现 stream/complete/streamSimple/completeSimple 四个方法。通过 `convert.ts` 共享转换和流处理逻辑。
-- `llm/services/deepseek-anthropic.ts`：DeepSeekAnthropicService，`apiFormat=anthropic`（默认路线）时由工厂选中，用 `@anthropic-ai/sdk` 的真流式 `messages.stream` 调用 DeepSeek Anthropic Messages API。`stream` 逐 SSE 事件转发增量、结束后用累加器组装最终消息；`complete` 即 `stream().result()`。通过 `anthropic-convert.ts` 共享转换与流处理逻辑。
-- `llm/services/kimi.ts`：KimiService，使用 OpenAI SDK 直接流式调用 Kimi chat completions，支持 `builtin_function.$web_search`，并提供 `streamWithBuiltinWebSearch` / `streamMessages` / `completeMessages` 辅助方法。通过 `convert.ts` 共享转换和流处理逻辑。
+- `llm/transform-messages.ts`：跨 provider 通用预处理层。负责图片降级、thinking 降级、tool call id 规范化、孤儿 tool result 修复，以及 error/aborted assistant 消息过滤；OpenAI / Anthropic 协议服务都先过这一层再做各自协议转换。
+- `llm/services/anthropic-messages.ts`：AnthropicMessagesService，真正的 Anthropic Messages 协议实现层，负责 provider-native tools、usage 归一和真流式事件组装。
+- `llm/services/openai-completions.ts`：OpenAICompletionsService，真正的 OpenAI Chat Completions 协议实现层，负责公共消息转换、tool call 重组和 usage 归一。
+- 协议服务是 LLM 职责事实来源；品牌 service 只保留兼容包装，不再新增消息转换、tool call 重组或 usage 归一逻辑。
+- `llm/services/deepseek.ts`：DeepSeekService 兼容包装层，普通对话实际复用 `OpenAICompletionsService`；只负责 DeepSeek 的 provider 默认值和 api 兜底。
+- `llm/services/deepseek-anthropic.ts`：DeepSeekAnthropicService 兼容包装层，普通对话实际复用 `AnthropicMessagesService`；只负责 DeepSeek 的 provider 默认值和 api 兜底。
+- `llm/services/kimi.ts`：KimiService 兼容包装层，普通 Kimi 对话复用 `OpenAICompletionsService`；仅保留 `streamWithBuiltinWebSearch` 这类 Kimi 内置 `$web_search` 内部 helper 能力。
 - `llm/services/mock.ts`：MockLLMService，支持 response queue 模式（通过 `setResponses`/`appendResponses` 预设响应序列）和默认行为模式（向后兼容）。提供 `mockText`、`mockToolCall`、`mockError` 辅助工厂函数。
 - `llm/kimi-assistants.ts`：DeepSeek 专用的 Kimi 辅助调用层，包含 `searchWithKimi`（统一处理关键词搜索和 URL 读取，利用 `$web_search` builtin 的 search + crawl 能力）和 `analyzeMediaWithKimi`；系统提示词从 `prompt/kimi-assistants/` 引用。
-- `llm/factory.ts`：createLLMService 工厂函数。
+- `llm/factory.ts`：createLLMService 工厂函数。当前按 `LLMConfig.api` 选 `AnthropicMessagesService` / `OpenAICompletionsService`，provider 品牌包装层只保留兼容入口。
 
 ## `prompt/` - 提示词集中管理
 
@@ -31,7 +35,7 @@
 ## `tools/` - 模块化工具系统
 
 - `tools/types.ts`：ToolDefinitionSpec、ToolExecutorFn、ToolManagerConfig；工具定义必须声明 `previewKind` 作为前端展示语义，并可用 `exposeOnlyTo?: "deepseek" | "kimi"` 做轻量暴露筛选，缺省表示两个主模型都可见。`ToolManagerConfig` 还携带压缩相关字段：`truncateThreshold` / `readTruncateThreshold` / `absoluteMaxChars` / `bashInlineThreshold` / `bashDiskCap` / `tmpRoot` / `sessionId` / `summarizer`。
-- `tools/workspace-guard.ts`：路径解析与边界守卫。写类工具（write/edit/bash）走 `guardWorkspacePath` 拒绝越界；**读类工具（read_file/grep/glob/list_directory）走 `resolveReadablePath` 只解析不越界**（为支持回读 `<userData>/tmp` 落盘文件与 `session.jsonl`），`displayReadablePath` 决定 workspace 外结果展示绝对路径。取舍与后续 blocklist 见 `docs/SECURITY.md`、`权限设计规则和原则.md`。
+- `tools/workspace-guard.ts`：路径解析与边界守卫。写类工具（write/edit/bash）走 `guardWorkspacePath` 拒绝越界；**读类工具（read_file/grep/glob/list_directory）走 `resolveReadablePath` 只解析不越界**（为支持回读 `<userData>/tmp` 落盘文件与 `session.jsonl`），`displayReadablePath` 决定 workspace 外结果展示绝对路径。取舍与后续 blocklist 见 `docs/SECURITY.md`、`agent-权限设计规则和原则.md`。
 - `tools/manager.ts`：ToolManager（注册/获取/导出工具定义），执行入口委托给 ToolScheduler；把 `readTruncateThreshold` / `absoluteMaxChars` / `summarizer` 透传给 scheduler。
 - `tools/scheduler.ts`：ToolScheduler（权限三态决策、工具状态记录、执行、结果渲染与裁剪）。`postProcess` 异步化：bash 由 executor 自处理（流式落盘 + 头部截断 + outputRef），其余工具走 `output-truncator`（flash 摘要 / 头尾确定性截断兜底）。当前 `ask` 会返回结构化待审核结果，approve/deny IPC 和恢复流程由后续计划接入。
 - `tools/output-truncator.ts`：非 bash 工具输出后处理。按工具类型取阈值，超阈值先 `headTailTruncate(absoluteMaxChars)` 再送 `summarizer.summarizeToolOutput`，summarizer 不可用回退头尾确定性截断；回填前拼 `compressedNotice` 压缩标记，返回 `modelOutput` + inline `rawOutputRef`。
@@ -39,15 +43,15 @@
 - `tools/cleanup-tool-outputs.ts`：`cleanupOldToolOutputs(tmpRoot, maxAgeMs=7天)` 按 mtime 删除超期落盘文件并回收空会话目录；desktop 在 turn 起始 best-effort 调用。
 - `tools/subprocess/{run-process,ripgrep-path,ripgrep}.ts`：受控子进程执行封装。`run-process` 统一处理进程生命周期、timeout、stdout/stderr；支持流式落盘 sink（`outputFile` / `headBufferCap` / `diskCap`）：内存只留头部缓冲，超出懒落盘、达 `diskCap` 停写标记 truncated，返回 `headBuffer` / `totalBytes` / `outputFilePath`。`ripgrep-path` 按 `ACTSPACE_RG_PATH -> 系统 rg -> bundled @vscode/ripgrep` 解析可执行文件；`ripgrep` 在其上封装 `rg` 命令语义。
 - `tools/tools/shared/write-atomic.ts`：原子写入 helper（tmpfile → fsync → rename），Edit 和 Write 工具共用。
-- `tools/tools/{read-file,list-directory,edit-file-diff,write-file,bash}/`：每个工具一个目录，含 `definition.ts` + `executor.ts`；其中 `edit-file-diff` 对外工具名为 `edit_file`（snake_case），使用 `diff` 库生成 unified diff 并原子写入；`write-file` 对外工具名为 `write_file`，创建或覆写文件并生成 diff；两者各有 `permissions.ts` 预留 AgentMode 审批扩展；Bash 额外包含 `permissions.ts` 和 `render-result.ts`。目录名沿用 kebab-case，对外 `name` 字段统一 snake_case，详见 `tool-preview-design-guidelines.md` 的工具命名约定章节。
+- `tools/tools/{read-file,list-directory,edit-file-diff,write-file,bash}/`：每个工具一个目录，含 `definition.ts` + `executor.ts`；其中 `edit-file-diff` 对外工具名为 `edit_file`（snake_case），使用 `diff` 库生成 unified diff 并原子写入；`write-file` 对外工具名为 `write_file`，创建或覆写文件并生成 diff；两者各有 `permissions.ts` 预留 AgentMode 审批扩展；Bash 额外包含 `permissions.ts` 和 `render-result.ts`。目录名沿用 kebab-case，对外 `name` 字段统一 snake_case，详见 `agent-tool-preview-design-guidelines.md` 的工具命名约定章节。
 - `tools/tools/{grep,glob}/`：文件搜索工具。grep 通过 ripgrep 正则搜索文件内容，glob 通过 `rg --files --glob` 按文件名模式查找。
 - `tools/tools/{web-search,analyze-media}/`：DeepSeek-only Kimi 辅助工具；只有 DeepSeek 为主模型且配置 Kimi key 时注册。`web_search` 统一处理关键词搜索和 URL 读取。
 
-新增工具时，先读 `tool-preview-design-guidelines.md`，确保 `previewKind` 和 `ToolUiPreview` 语义稳定。
+新增工具时，先读 `agent-tool-preview-design-guidelines.md`，确保 `previewKind` 和 `ToolUiPreview` 语义稳定。
 
 ## `context/` - 上下文管道
 
-- `context/types.ts`：SystemPart、ContextModule、PromptSegment、CompressionConfig + `DEFAULT_COMPRESSION_CONFIG`（contextWindow / compressionThreshold / compressKeepRatio / compactMinIntervalCalls / toolTruncateThreshold / readTruncateThreshold / bashInlineThreshold / bashDiskCap / absoluteMaxChars 的单一默认来源）。另含 `CACHE_STABILITY`（IMMUTABLE 100 / STABLE 70 / SEMI 40 / VOLATILE 10）缓存稳定性档位；`PromptSegment` 与 `SystemPart` 都带 `stability` 字段，用于把不易变内容稳定排在请求前缀，提高 DeepSeek prefix-cache 命中率（动机见 `token-usage-and-context-state.md`「缓存稳定性档位」）。
+- `context/types.ts`：SystemPart、ContextModule、PromptSegment、CompressionConfig + `DEFAULT_COMPRESSION_CONFIG`（contextWindow / compressionThreshold / compressKeepRatio / compactMinIntervalCalls / toolTruncateThreshold / readTruncateThreshold / bashInlineThreshold / bashDiskCap / absoluteMaxChars 的单一默认来源）。另含 `CACHE_STABILITY`（IMMUTABLE 100 / STABLE 70 / SEMI 40 / VOLATILE 10）缓存稳定性档位；`PromptSegment` 与 `SystemPart` 都带 `stability` 字段，用于把不易变内容稳定排在请求前缀，提高 DeepSeek prefix-cache 命中率（动机见 `agent-token-usage-and-context-state.md`「缓存稳定性档位」）。
 - `context/token-estimator.ts`：token 估算与用量快照生成（`createContextUsageSnapshot` 支持 `compressionCount`）。`createEmptyBuckets()` 遍历共享注册表 `@actspace/shared` 的 `CONTEXT_BUCKET_REGISTRY` 生成 bucket（单一事实来源，新增上下文类型只改注册表 + 主题 token，不改组件）。
 - `context/modules/system-prompt.ts`：分段系统提示词上下文。核心段为 `CACHE_STABILITY.IMMUTABLE`，`registerSegment` 默认 `STABLE`；`getPrompt()` 排序键为「stability 降序 → priority 降序 → id 升序」，确定性拼接避免前缀字节漂移。
 - `context/modules/conversation.ts`：会话历史上下文模块。构造函数接受可选 `initialMessages`；`static async createFromSession(sessionPath)` 一次性恢复 `Message[]`。新增历史压缩两阶段能力：`planCompaction(keepRatio)`（只读，按 keepRatio 找安全切点——不动区以 assistant turn 开头，不拆 tool_call/tool 配对、避免连续 user）+ `applyCompaction(summary, split)`（用合成摘要替换可压区并返回被替换消息）。运行期 `format()` / `appendMessage` 仍是纯内存操作。
@@ -97,7 +101,7 @@ Agent Turn 的跨层职责边界见 `agent-turn-layers.md`。
 
 ## `kairos/` - 自治模式
 
-Kairos 是 actspace 内置的"主动 Agent"——常驻进程、tick 驱动、随时被用户消息打断。它复用主 Agent 的 LLMService / ToolManager / SessionEvent / engine.runAgentLoop，自身只新增"调度 + 配置 + 观察 + 短期记忆"四组能力。完整设计见 `kairos-autonomous-mode.md`。
+Kairos 是 actspace 内置的"主动 Agent"——常驻进程、tick 驱动、随时被用户消息打断。它复用主 Agent 的 LLMService / ToolManager / SessionEvent / engine.runAgentLoop，自身只新增"调度 + 配置 + 观察 + 短期记忆"四组能力。完整设计见 `agent-kairos-autonomous-mode.md`。
 
 ```mermaid
 flowchart TB

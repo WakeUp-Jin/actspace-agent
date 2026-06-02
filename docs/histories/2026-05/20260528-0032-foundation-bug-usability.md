@@ -39,4 +39,4 @@ Usage 页面展示假数据会误导用户判断真实消耗；运行时应该�
 - `packages/agent-core/src/tools/tools/edit-file-diff/definition.ts`
 - `packages/agent-core/src/tools/test/edit-write.test.ts`
 - `docs/exec-plans/active/20260527-bugfix-foundation_代码编完需手动验证.md`
-- `docs/exec-plans/active/actspace-usage-statistics-session-jsonl-plan.md`
+- `docs/exec-plans/completed/actspace-usage-statistics-session-jsonl-plan.md`

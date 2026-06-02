@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { RightPanel } from "../components/RightPanel";
 import { RightPanelProvider, useRightPanel } from "../components/right-panel/RightPanelContext";
+import { TooltipProvider } from "../components/ui/Tooltip";
 
 const originalActspace = (window as { actspace?: unknown }).actspace;
 
@@ -22,10 +23,12 @@ function WorkspaceToggleProbe() {
 
 function renderPanel() {
   return render(
-    <RightPanelProvider>
-      <WorkspaceToggleProbe />
-      <RightPanel />
-    </RightPanelProvider>,
+    <TooltipProvider delayDuration={0}>
+      <RightPanelProvider>
+        <WorkspaceToggleProbe />
+        <RightPanel />
+      </RightPanelProvider>
+    </TooltipProvider>,
   );
 }
 
@@ -74,5 +77,13 @@ describe("RightPanel 工作区浏览态", () => {
     expect(screen.queryByRole("heading", { name: "选择文件查看" })).toBeNull();
     expect(screen.queryByRole("button", { name: /文件树$/ })).toBeNull();
     expect(screen.getByLabelText("Kairos 右侧紧凑视图")).toBeInTheDocument();
+  });
+
+  it("shows a readable tooltip for the tab close button", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.hover(screen.getByRole("button", { name: "关闭 Kairos" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("关闭 Kairos");
   });
 });

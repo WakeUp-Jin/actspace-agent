@@ -38,7 +38,7 @@ docs/design-docs/
   front-index.md
   front-聊天输入框规范.md
   lab-index.md
-  lab-v0-experiment-matrix.md
+  lab-versions-index.md
   public/
     front/
       composer-final.png

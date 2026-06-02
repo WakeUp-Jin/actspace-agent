@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type { AppSettings, BootstrapState, RunTurnInput, RuntimeStreamEvent, SessionListItem, SessionRecord } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
+import { TooltipProvider } from "../components/ui/Tooltip";
 
 const bootstrapState: BootstrapState = {
   appVersion: "0.1.0",
@@ -33,6 +34,7 @@ const settingsApiStub = {
   describeContext: async () => null,
   listWorkspaceDir: async () => ({ root: "/tmp/workspace", relativePath: "", entries: [] }),
   readWorkspaceFile: async () => ({ relativePath: "", renderKind: "text" as const, size: 0, content: "" }),
+  archiveSession: async () => ({ ok: true }),
   setUiZoom: () => {},
   setNativeTheme: () => {},
   onShuttingDown: () => () => {},
@@ -55,11 +57,21 @@ function createEmptySessionRecord(sessionId: string): SessionRecord {
   };
 }
 
+function renderApp() {
+  return render(
+    <TooltipProvider delayDuration={0}>
+      <App />
+    </TooltipProvider>,
+  );
+}
+
 describe("App streaming user message", () => {
   const originalScrollWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollWidth");
   const originalClientWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
 
   afterEach(() => {
+    delete (window as unknown as { actspace?: unknown }).actspace;
+
     if (originalScrollWidthDescriptor) {
       Object.defineProperty(HTMLElement.prototype, "scrollWidth", originalScrollWidthDescriptor);
     } else {
@@ -120,7 +132,7 @@ describe("App streaming user message", () => {
         }),
     };
 
-    render(<App />);
+    renderApp();
 
     const composer = await screen.findByLabelText("Message composer");
     await userEvent.type(composer, "scroll me");
@@ -196,7 +208,7 @@ describe("App streaming user message", () => {
         }),
     };
 
-    render(<App />);
+    renderApp();
 
     const composer = await screen.findByLabelText("Message composer");
     await userEvent.type(composer, "show me immediately");
@@ -285,7 +297,7 @@ describe("App streaming user message", () => {
         }),
     };
 
-    render(<App />);
+    renderApp();
 
     const composer = await screen.findByLabelText("Message composer");
     await userEvent.type(composer, "read that file");
@@ -297,6 +309,180 @@ describe("App streaming user message", () => {
       resolveRunTurn?.({
         sessionId,
         turnId: "turn-read-finished",
+        status: "completed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      });
+    });
+  });
+
+  it("opens the workspace directory picker when clicking Add workspace", async () => {
+    const sessionId = "session-workspace";
+    const record = createEmptySessionRecord(sessionId);
+    const createdRecord = createEmptySessionRecord("session-created-workspace");
+    createdRecord.meta.workspaceRoot = "/tmp/new-workspace";
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "Workspace source",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+    const selectWorkspaceDirectory = vi.fn(async () => ({
+      canceled: false,
+      workspaceRoot: "/tmp/new-workspace",
+    }));
+    const createSession = vi.fn(async () => createdRecord);
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      selectWorkspaceDirectory,
+      ...settingsApiStub,
+      onAgentStream: () => () => {},
+      runTurn: async () => ({
+        sessionId,
+        turnId: "turn-unused",
+        status: "completed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      }),
+    };
+
+    renderApp();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Add workspace" }));
+
+    await waitFor(() => {
+      expect(selectWorkspaceDirectory).toHaveBeenCalledTimes(1);
+      expect(createSession).toHaveBeenCalledWith({
+        title: "New chat",
+        workspaceRoot: "/tmp/new-workspace",
+      });
+    });
+  });
+
+  it("sends attachments through RunTurnInput and renders media analysis as a runtime tool line", async () => {
+    const sessionId = "session-attachments";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "New chat",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+    const selectedAttachment = {
+      id: "att-screenshot",
+      kind: "image" as const,
+      name: "screenshot.png",
+      path: "/Users/test/screenshot.png",
+      mimeType: "image/png",
+      previewUrl: "file:///Users/test/screenshot.png",
+    };
+
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    let capturedInput: RunTurnInput | null = null;
+    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+      null;
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      selectFiles: async () => ({ canceled: false, attachments: [selectedAttachment] }),
+      ...settingsApiStub,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) {
+            streamHandler = null;
+          }
+        };
+      },
+      runTurn: (input: RunTurnInput) =>
+        new Promise((resolve) => {
+          capturedInput = input;
+          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          streamHandler?.({
+            type: "tool_started",
+            toolCallId: "runtime_analyze_media_att-screenshot",
+            toolName: "analyze_media",
+            argsPreview: "{\"source\":\"/Users/test/screenshot.png\",\"mimeType\":\"image/png\"}",
+            preview: {
+              kind: "media_analysis",
+              mediaName: "screenshot.png",
+              mediaKind: "image",
+              displayText: "Analyze image screenshot.png",
+            },
+          });
+          resolveRunTurn = resolve;
+        }),
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Attach files" }));
+    expect(await screen.findByLabelText("Attached image screenshot.png")).toBeTruthy();
+
+    await userEvent.type(composer, "what is in this screenshot?");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    await waitFor(() => {
+      expect(capturedInput?.attachments).toEqual([selectedAttachment]);
+    });
+    expect(await screen.findByLabelText("Attached image screenshot.png")).toBeTruthy();
+
+    const mediaLine = await screen.findByText("Analyze image screenshot.png");
+    expect(mediaLine.closest(".tool-log-line")?.classList.contains("is-running")).toBe(true);
+
+    await act(async () => {
+      resolveRunTurn?.({
+        sessionId,
+        turnId: "turn-attachments-finished",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -371,7 +557,7 @@ describe("App streaming user message", () => {
         }),
     };
 
-    render(<App />);
+    renderApp();
 
     const composer = await screen.findByLabelText("Message composer");
     await userEvent.type(composer, "search the web");
@@ -471,7 +657,7 @@ describe("App streaming user message", () => {
         }),
     };
 
-    render(<App />);
+    renderApp();
 
     const composer = await screen.findByLabelText("Message composer");
     await userEvent.type(composer, "inspect files");
@@ -496,6 +682,185 @@ describe("App streaming user message", () => {
         contextState: null,
       });
     });
+  });
+
+  it("marks the active sidebar session as waiting for approval while a tool approval is pending", async () => {
+    const sessionId = "session-approval";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "Approval session",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+
+    let approvalPending = false;
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+      null;
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async (input) =>
+        input?.sessionId === sessionId && approvalPending
+          ? [{
+              requestId: "approval-bash-1",
+              toolName: "bash",
+              summary: "Run install",
+              reason: "Bash command requires approval",
+              command: "pnpm install",
+              createdAt: Date.now(),
+              expiresAt: Date.now() + 60_000,
+            }]
+          : [],
+      ...settingsApiStub,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) {
+            streamHandler = null;
+          }
+        };
+      },
+      runTurn: (input: RunTurnInput) =>
+        new Promise((resolve) => {
+          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          streamHandler?.({
+            type: "tool_started",
+            toolCallId: "tool-bash-approval",
+            toolName: "bash",
+            argsPreview: "{\"command\":\"pnpm install\"}",
+            preview: {
+              kind: "bash",
+              status: "running",
+              title: "Run install",
+              command: "pnpm install",
+              commandPreview: "pnpm install",
+            },
+          });
+          approvalPending = true;
+          streamHandler?.({
+            type: "tool_approval_required",
+            toolCallId: "tool-bash-approval",
+            toolName: "bash",
+            requestId: "approval-bash-1",
+            summary: "Run install",
+            reason: "Bash command requires approval",
+            command: "pnpm install",
+          });
+          resolveRunTurn = resolve;
+        }),
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "install deps");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    expect(await screen.findByRole("button", { name: "Session status: Waiting approval" })).toBeTruthy();
+
+    await act(async () => {
+      approvalPending = false;
+      streamHandler?.({
+        type: "tool_approval_resolved",
+        toolCallId: "tool-bash-approval",
+        requestId: "approval-bash-1",
+        decision: "approve_once",
+      });
+      resolveRunTurn?.({
+        sessionId,
+        turnId: "turn-approval-finished",
+        status: "completed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      });
+    });
+  });
+
+  it("marks the active sidebar session as failed when a turn fails", async () => {
+    const sessionId = "session-failed";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "Failure session",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      onAgentStream: (callback) => {
+        return () => {
+          void callback;
+        };
+      },
+      runTurn: async (input: RunTurnInput) => ({
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        status: "failed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+        error: {
+          code: "provider_error",
+          message: "Provider failed",
+        },
+      }),
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "fail this turn");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    expect(await screen.findByRole("button", { name: "Session status: Failed" })).toBeTruthy();
   });
 
   it("only renders grep and glob tooltips when the tool line is truncated", async () => {
@@ -617,7 +982,7 @@ describe("App streaming user message", () => {
         }),
     };
 
-    render(<App />);
+    renderApp();
 
     const composer = await screen.findByLabelText("Message composer");
     await userEvent.type(composer, "stop me");

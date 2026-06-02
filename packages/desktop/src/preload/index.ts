@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, webFrame } from "electron";
+import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 import type {
   AbortTurnInput,
   AgentTurnResult,
@@ -29,9 +29,14 @@ import type {
   PendingApprovalInfo,
   RunTurnInput,
   RuntimeStreamEvent,
+  SelectFilesResult,
+  SelectWorkspaceDirectoryResult,
+  SessionArchiveInput,
+  SessionArchiveResult,
   SessionCreateInput,
   SessionEvent,
   SessionGetInput,
+  SessionListInput,
   SessionListItem,
   SessionPinInput,
   SessionPinResult,
@@ -57,6 +62,10 @@ contextBridge.exposeInMainWorld("actspace", {
   getBootstrapState: () => ipcRenderer.invoke("app:get-bootstrap-state") as Promise<BootstrapState>,
   runTurn: (input: RunTurnInput) => ipcRenderer.invoke("agent:run-turn", input) as Promise<AgentTurnResult>,
   abortTurn: (input: AbortTurnInput) => ipcRenderer.invoke("agent:abort-turn", input) as Promise<boolean>,
+  selectFiles: () => ipcRenderer.invoke("dialog:select-files") as Promise<SelectFilesResult>,
+  selectWorkspaceDirectory: () =>
+    ipcRenderer.invoke("dialog:select-workspace-directory") as Promise<SelectWorkspaceDirectoryResult>,
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
   visualizeReply: (input: VisualizeReplyInput) =>
     ipcRenderer.invoke("visualize:convert-reply", input) as Promise<VisualizeReplyResult>,
   listVisualizations: (input: ListVisualizationsInput) =>
@@ -67,7 +76,7 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("workspace:read-file", input) as Promise<WorkspaceReadFileResult>,
   describeContext: (input: DescribeContextInput) =>
     ipcRenderer.invoke("context:describe", input) as Promise<ContextState | null>,
-  listSessions: () => ipcRenderer.invoke("session:list") as Promise<SessionListItem[]>,
+  listSessions: (input?: SessionListInput) => ipcRenderer.invoke("session:list", input ?? {}) as Promise<SessionListItem[]>,
   getSession: (input: SessionGetInput) => ipcRenderer.invoke("session:get", input) as Promise<SessionRecord | null>,
   getUsageStatistics: (input: UsageStatisticsGetInput) =>
     ipcRenderer.invoke("usage-statistics:get", input) as Promise<UsageStatisticsSnapshot | null>,
@@ -75,6 +84,8 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("deepseek:balance:get") as Promise<DeepSeekBalanceSnapshot>,
   createSession: (input?: SessionCreateInput) => ipcRenderer.invoke("session:create", input ?? {}) as Promise<SessionRecord>,
   pinSession: (input: SessionPinInput) => ipcRenderer.invoke("session:pin", input) as Promise<SessionPinResult>,
+  archiveSession: (input: SessionArchiveInput) =>
+    ipcRenderer.invoke("session:archive", input) as Promise<SessionArchiveResult>,
 
   submitApproval: (input: ApprovalDecideInput) => ipcRenderer.invoke("approval:decide", input) as Promise<ApprovalDecideResult>,
   listPendingApprovals: (input?: ApprovalListPendingInput) => ipcRenderer.invoke("approval:list-pending", input ?? {}) as Promise<PendingApprovalInfo[]>,

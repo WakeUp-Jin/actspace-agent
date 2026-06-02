@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, MoreHorizontal, TerminalSquare } from "lucide-react";
 import { useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 
 type BashMessage = Extract<MessageBlock, { kind: "bash" }>;
 type ApprovalDecision = "approve_once" | "deny" | "allow_similar";
@@ -94,9 +95,14 @@ function BashExecutionBlock({ message }: { message: BashMessage }) {
 
       {expanded ? (
         <div className={BASH_OUTPUT_SHELL_CLASS}>
-          <button className={BASH_OUTPUT_MENU_CLASS} type="button" aria-label="Open Bash output actions">
-            <MoreHorizontal size={16} strokeWidth={2.2} />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button className={BASH_OUTPUT_MENU_CLASS} type="button" aria-label="Open Bash output actions">
+                <MoreHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>更多 Bash 输出操作</TooltipContent>
+          </Tooltip>
           <pre className={BASH_OUTPUT_TEXT_CLASS}>
             {message.intent ? (
               <span className={BASH_INTENT_COMMENT_CLASS}># {message.intent}{"\n"}</span>
@@ -153,9 +159,14 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
           <TerminalSquare className="text-text-faint" size={14} strokeWidth={2} aria-hidden="true" />
           {message.title}
         </span>
-        <button className={BASH_APPROVAL_MENU_CLASS} type="button" aria-label="Open approval actions">
-          <MoreHorizontal size={15} strokeWidth={2.1} />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button className={BASH_APPROVAL_MENU_CLASS} type="button" aria-label="Open approval actions">
+              <MoreHorizontal size={15} strokeWidth={2.1} aria-hidden="true" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>更多审批操作</TooltipContent>
+        </Tooltip>
       </header>
 
       {message.intent ? (

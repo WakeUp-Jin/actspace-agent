@@ -113,6 +113,11 @@ export function resolveAgentEnvConfig(): AgentEnvConfig {
  * - temperature / maxTokens 来自 AgentEnvConfig（仅在显式覆盖时传递）
  */
 export function buildLLMConfig(spec: ModelSpec, envConfig: AgentEnvConfig): LLMConfig {
+  const api = spec.provider === "deepseek"
+    ? envConfig.deepseekApiFormat === "anthropic"
+      ? "anthropic-messages"
+      : "openai-completions"
+    : spec.api;
   const apiKeyMap: Record<string, string> = {
     deepseek: envConfig.deepseekApiKey,
     kimi: envConfig.kimiApiKey,
@@ -125,11 +130,13 @@ export function buildLLMConfig(spec: ModelSpec, envConfig: AgentEnvConfig): LLMC
   };
 
   return {
+    api,
     provider: spec.provider,
     ...(spec.provider === "deepseek" && { apiFormat: envConfig.deepseekApiFormat }),
     apiKey: apiKeyMap[spec.provider] ?? "",
     baseUrl: baseUrlMap[spec.provider] || undefined,
     model: spec.apiModel,
+    input: spec.input,
     ...(envConfig.temperature !== undefined && { temperature: envConfig.temperature }),
     ...(envConfig.maxTokens !== undefined && { maxTokens: envConfig.maxTokens }),
   };

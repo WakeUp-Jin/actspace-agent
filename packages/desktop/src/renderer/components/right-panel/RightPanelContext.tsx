@@ -41,7 +41,7 @@ type RightPanelContextValue = {
   closePanel: () => void;
   togglePanel: () => void;
   /**
-   * 工作区文件浏览器的两个独立开关（见 `工作区文件浏览器规范.md`）：
+   * 工作区文件浏览器的两个独立开关（见 `front-右侧面板与文件渲染规范.md`）：
    * - `isFileTreeOpen`：是否进入工作区浏览态（操作栏 + 两栏）。由 `+` 菜单切换。
    * - `isFileTreeCollapsed`：浏览态内左侧树栏是否收起（操作栏与内容仍在）。由操作栏折叠按钮切换。
    */

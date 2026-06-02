@@ -79,6 +79,7 @@ export {
   createLLMService,
   createLLMServiceFromEnv,
   createMockLLMConfig,
+  analyzeMediaWithKimi,
   AssistantMessageEventStream,
   LLMServiceError,
 } from "./llm/index";
@@ -92,4 +93,6 @@ export type {
   APIToolCall,
   AssistantMessageEvent,
   LLMErrorKind,
+  AnalyzeMediaInput,
+  AnalyzeMediaResult,
 } from "./llm/index";

@@ -390,6 +390,7 @@ export function envToLLMConfig() {
 
   if (e.LLM_PROVIDER === "kimi") {
     return {
+      api: "openai-completions" as const,
       provider: "kimi",
       apiKey: e.KIMI_API_KEY,
       baseUrl: e.KIMI_BASE_URL || undefined,
@@ -400,6 +401,9 @@ export function envToLLMConfig() {
   }
 
   return {
+    api: e.DEEPSEEK_API_FORMAT === "anthropic"
+      ? "anthropic-messages" as const
+      : "openai-completions" as const,
     provider: "deepseek",
     apiFormat: e.DEEPSEEK_API_FORMAT,
     apiKey: e.DEEPSEEK_API_KEY,

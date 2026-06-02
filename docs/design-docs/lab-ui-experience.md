@@ -1,6 +1,6 @@
 # Lab UI 体验
 
-本文档是 Lab 前端体验的总入口。具体首页、卡片、弹窗和 V0 页面删减规则见 `frontend-page-design.md`。
+本文档是 Lab 前端体验的总入口。具体首页、卡片、弹窗和 V0 页面删减规则见 `lab-frontend-page-design.md`。
 
 ## 核心界面：实验矩阵
 

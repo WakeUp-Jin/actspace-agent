@@ -16,7 +16,7 @@
 
 **Key Actions:**
 
-- **[Compact view design]**: 新增 `Kairos右侧紧凑视图规范.md`，明确右侧 compact view 是伴随式状态卡，而不是完整监控页。
+- **[Compact view design]**: 新增 `front-Kairos监控页规范.md`，明确右侧 compact view 是伴随式状态卡，而不是完整监控页。
 - **[Data flow decision]**: 设计中明确使用同一条 `useKairos + aggregateKairosEvents` 数据流服务完整页面和右侧 compact 视图，不新增 compact 专属后端 IPC。
 - **[Component reuse boundary]**: 规划 `kairosSelectors.ts`、`KairosPage`、`KairosRightPanelView` 的拆分边界：共享 selectors 和格式化 helper，不共享完整页面布局。
 - **[Execution plan]**: 新增 active plan `20260528-kairos-right-panel-compact-view.md`，拆出 selectors、RightPanel tab state、compact component、CSS、测试和验证任务。
@@ -28,7 +28,7 @@ Kairos 完整页面适合专门监控，右侧 compact 视图适合聊天时伴�
 
 ### Files Modified
 
-- `docs/design-docs/front-Kairos右侧紧凑视图规范.md`
+- `docs/design-docs/front-Kairos监控页规范.md`
 - `docs/design-docs/front-右侧面板与文件渲染规范.md`
 - `docs/design-docs/front-index.md`
 - `docs/design-docs/index.md`

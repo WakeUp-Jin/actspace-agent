@@ -10,6 +10,9 @@ declare global {
       abortTurn: (
         input: import("@actspace/shared").AbortTurnInput
       ) => Promise<boolean>;
+      selectFiles?: () => Promise<import("@actspace/shared").SelectFilesResult>;
+      selectWorkspaceDirectory?: () => Promise<import("@actspace/shared").SelectWorkspaceDirectoryResult>;
+      getPathForFile?: (file: File) => string;
       visualizeReply: (
         input: import("@actspace/shared").VisualizeReplyInput
       ) => Promise<import("@actspace/shared").VisualizeReplyResult>;
@@ -25,7 +28,9 @@ declare global {
       describeContext: (
         input: import("@actspace/shared").DescribeContextInput
       ) => Promise<import("@actspace/shared").ContextState | null>;
-      listSessions: () => Promise<import("@actspace/shared").SessionListItem[]>;
+      listSessions: (
+        input?: import("@actspace/shared").SessionListInput
+      ) => Promise<import("@actspace/shared").SessionListItem[]>;
       getSession: (
         input: import("@actspace/shared").SessionGetInput
       ) => Promise<import("@actspace/shared").SessionRecord | null>;
@@ -39,6 +44,9 @@ declare global {
       pinSession: (
         input: import("@actspace/shared").SessionPinInput
       ) => Promise<import("@actspace/shared").SessionPinResult>;
+      archiveSession: (
+        input: import("@actspace/shared").SessionArchiveInput
+      ) => Promise<import("@actspace/shared").SessionArchiveResult>;
       onAgentStream: (
         callback: (event: import("@actspace/shared").RuntimeStreamEvent) => void
       ) => () => void;

@@ -13,12 +13,15 @@ import type {
 import { emptyKairosUsageSummary } from "@actspace/shared";
 import { RightPanel } from "../components/RightPanel";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
+import { TooltipProvider } from "../components/ui/Tooltip";
 
 function renderPanel() {
   return render(
-    <RightPanelProvider>
-      <RightPanel />
-    </RightPanelProvider>,
+    <TooltipProvider delayDuration={0}>
+      <RightPanelProvider>
+        <RightPanel />
+      </RightPanelProvider>
+    </TooltipProvider>,
   );
 }
 

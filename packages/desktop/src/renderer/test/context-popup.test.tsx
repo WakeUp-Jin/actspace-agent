@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ContextUsageSnapshot } from "@actspace/shared";
 import { ContextPopup } from "../components/ContextPopup";
+import { TooltipProvider } from "../components/ui/Tooltip";
 
 /**
  * ContextPopup 测试覆盖：
@@ -24,9 +25,17 @@ function makeSnapshot(): ContextUsageSnapshot {
   };
 }
 
+function renderContextPopup(props: Parameters<typeof ContextPopup>[0]) {
+  return render(
+    <TooltipProvider delayDuration={0}>
+      <ContextPopup {...props} />
+    </TooltipProvider>,
+  );
+}
+
 describe("ContextPopup", () => {
   it("renders buckets from the snapshot and omits the footer", () => {
-    render(<ContextPopup snapshot={makeSnapshot()} onClose={vi.fn()} />);
+    renderContextPopup({ snapshot: makeSnapshot(), onClose: vi.fn() });
 
     expect(screen.getByText("System prompt")).toBeInTheDocument();
     expect(screen.getByText("Tools")).toBeInTheDocument();
@@ -46,7 +55,7 @@ describe("ContextPopup", () => {
       colorToken: "--act-context-fallback",
     } as unknown as (typeof snapshot.buckets)[number]);
 
-    render(<ContextPopup snapshot={snapshot} onClose={vi.fn()} />);
+    renderContextPopup({ snapshot, onClose: vi.fn() });
     // 未知 key 经 getContextBucketDisplay 兜底，label 用 key 本身。
     expect(screen.getAllByText("futureThing").length).toBeGreaterThan(0);
   });
@@ -63,7 +72,7 @@ describe("ContextPopup", () => {
         { key: "conversation", name: "conversation", label: "Conversation", tokens: 311, colorToken: "--act-context-conversation" },
       ],
     };
-    render(<ContextPopup snapshot={snapshot} onClose={vi.fn()} />);
+    renderContextPopup({ snapshot, onClose: vi.fn() });
 
     expect(screen.getByText("<1% Full")).toBeInTheDocument();
     // meter 段宽相对 maxTokens：tools 占 ~0.19%，不再撑满整条。
@@ -74,17 +83,29 @@ describe("ContextPopup", () => {
   it("shows an expand button only when onExpand is provided and invokes it", async () => {
     const user = userEvent.setup();
     const onExpand = vi.fn();
-    const { rerender } = render(<ContextPopup snapshot={makeSnapshot()} onClose={vi.fn()} />);
+    const { rerender } = renderContextPopup({ snapshot: makeSnapshot(), onClose: vi.fn() });
     expect(screen.queryByLabelText("查看完整上下文")).not.toBeInTheDocument();
 
-    rerender(<ContextPopup snapshot={makeSnapshot()} onClose={vi.fn()} onExpand={onExpand} />);
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <ContextPopup snapshot={makeSnapshot()} onClose={vi.fn()} onExpand={onExpand} />
+      </TooltipProvider>,
+    );
     await user.click(screen.getByLabelText("查看完整上下文"));
     expect(onExpand).toHaveBeenCalledTimes(1);
   });
 
+  it("shows a readable tooltip for the close button", async () => {
+    const user = userEvent.setup();
+    renderContextPopup({ snapshot: makeSnapshot(), onClose: vi.fn() });
+
+    await user.hover(screen.getByRole("button", { name: "Close context" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("关闭上下文用量");
+  });
+
   it("cross-highlights the matching meter segment when a bucket row is toggled", async () => {
     const user = userEvent.setup();
-    render(<ContextPopup snapshot={makeSnapshot()} onClose={vi.fn()} />);
+    renderContextPopup({ snapshot: makeSnapshot(), onClose: vi.fn() });
 
     const toolsRow = screen.getByRole("button", { name: "Tools 60" });
     const toolsMeter = screen.getByRole("button", { name: "Tools 60 tokens" });

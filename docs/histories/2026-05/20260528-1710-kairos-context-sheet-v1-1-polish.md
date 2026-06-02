@@ -31,7 +31,7 @@
   - `HistoryMessageRow` 截断策略改为按 `\n` 切分的 3 行预览，"展开本条"切换。
   - `ToolsSection` 重写为扁平 `<ul>`：`<name> · <description>`，单行 `truncate`，hover 通过浏览器原生 title 看完整描述。来源角标 / Schema 展开全部去掉。
 - **[Sheet 测试重写]**: `kairos-context-sheet.test.tsx` 7 个用例覆盖：段渲染 + 源文件徽章（basename）+ "运行时生成"占位 + 复制全文 + 段徽章复制路径 + 工具列表 flat + 历史消息 3 行折叠 + 错误重试。`kairos-page.test.tsx` / `right-panel-kairos.test.tsx` 的 fake bridge 同步补 `systemPromptSegments: []`。
-- **[Design-md 同步]**: `Kairos上下文Sheet规范.md` 新增 v1.1 历次变更块、信息架构图改为三段（含标题旁生成时间）、`KairosContextSnapshot` 类型小节追加 `systemPromptSegments` 字段、controller 实现策略写清楚 segments 与 sourceFiles 的来源、测试策略全部对齐 v1.1。
+- **[Design-md 同步]**: `front-Kairos监控页规范.md` 新增 v1.1 历次变更块、信息架构图改为三段（含标题旁生成时间）、`KairosContextSnapshot` 类型小节追加 `systemPromptSegments` 字段、controller 实现策略写清楚 segments 与 sourceFiles 的来源、测试策略全部对齐 v1.1。
 - **[prompt-assembler 测试修复]**: `summarySegments` 加 `path` 字段后，`prompt-assembler.test.ts` fixture 同步补两条 path。
 
 ### 🧠 Design Intent (Why)
@@ -58,4 +58,4 @@
 - `packages/desktop/src/renderer/test/kairos-context-sheet.test.tsx`
 - `packages/desktop/src/renderer/test/kairos-page.test.tsx`
 - `packages/desktop/src/renderer/test/right-panel-kairos.test.tsx`
-- `docs/design-docs/front-Kairos上下文Sheet规范.md`
+- `docs/design-docs/front-Kairos监控页规范.md`

@@ -11,7 +11,7 @@
 - `.agents/skills/llm-agent-dev/references/architecture.md`（V0/V1 LLM 模块定位）
 - `.agents/skills/llm-agent-dev/examples/llm-service.ts`（BaseLLMService 参考实现）
 - `.agents/skills/llm-agent-dev/examples/llm-factory.ts`（工厂函数参考）
-- `docs/design-docs/fix-llm-agent-dev-skill.md`（Skill 缺少 services/ 目录建议的补充）
+- `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-dev-skill.md`（Skill 缺少 services/ 目录建议的补充）
 - `docs/SECURITY.md`
 
 ## 目标目录结构
@@ -193,4 +193,4 @@ MockLLMService（`services/mock.ts`）必须能稳定产出完整 turn 所需的
 - 2026-05-23：LLM 层采用 stream-first 设计，真实 DeepSeek 接入不阻塞 mock provider 与运行时结构稳定。
 - 2026-05-23：按 Skill `llm-service.md` 采用 BaseLLMService 基类模式，子类只实现 `_doStream`。Provider Registry 留给 V1。
 - 2026-05-23：V0 唯一真实 provider 为 DeepSeekService（而非 OpenAIService），突出产品与 DeepSeek 的绑定。底层仍兼容 OpenAI SDK，但类名和配置以 DeepSeek 为主。
-- 2026-05-23：采用 `llm/services/` 子目录分离基类和具体实现（Skill 原始设计中未覆盖此点，已记录到 `docs/design-docs/fix-llm-agent-dev-skill.md`）。
+- 2026-05-23：采用 `llm/services/` 子目录分离基类和具体实现（Skill 原始设计中未覆盖此点，已记录到 `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-dev-skill.md`）。

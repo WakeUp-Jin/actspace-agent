@@ -8,16 +8,21 @@
  * 4. 服务接口 — LLMService（取代旧的 BaseLLMService 抽象类）
  */
 
+import type { ModelApi, ModelInputKind } from "@actspace/shared";
 import type { AssistantMessage, Context, Tool } from "../messages";
 
 // ─── LLM 配置 ───
 
 export interface LLMConfig {
   provider: string;
+  /** API protocol family. Prefer this over apiFormat for new code. */
+  api?: ModelApi;
+  /** Legacy DeepSeek route switch retained while env/settings migrate to ModelApi. */
   apiFormat?: "openai" | "anthropic";
   apiKey: string;
   baseUrl?: string;
   model: string;
+  input?: ModelInputKind[];
   temperature?: number;
   maxTokens?: number;
   maxRetries?: number;

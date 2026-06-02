@@ -8,9 +8,11 @@
 |------|------|
 | `fix-llm-agent-01-skill-llm-module-fix.md` | Skill 现有 LLM 模块指导的 5 个缺陷分析和修复建议 |
 | `fix-llm-agent-02-pi-ai-core-design-extraction.md` | 从 pi-ai 源码中提取的 10 个核心设计思想，及对 skill 改进的具体建议 |
+| `fix-llm-agent-03-robustness-upgrade-result.md` | actspace-agent 侧 LLM 鲁棒性升级结果与采纳边界 |
 | `fix-llm-agent-04-skill-rg-tools-fix.md` | Grep/Glob 工具中 ripgrep 共享执行流的 skill 修复建议 |
 | `fix-llm-agent-05-skill-file-tools-fix.md` | Edit/Write 工具、原子写入、diff 生成和权限预留的 skill 修复建议 |
 | `fix-llm-agent-06-skill-bash-tool-fix.md` | Bash 工具大输出的流式落盘、头部截断 + 文件指针、不走 LLM 摘要的 skill 修复建议 |
+| `fix-llm-agent-dev-skill.md` | 后端 Agent Runtime 重构中发现的 skill 目录结构与示例缺口 |
 
 ## 问题根源
 

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { KairosContextSnapshot } from "@actspace/shared";
 import { KairosContextSheet } from "../components/kairos/KairosContextSheet";
+import { TooltipProvider } from "../components/ui/Tooltip";
 
 const baseSnapshot: KairosContextSnapshot = {
   generatedAt: "2026-05-28T08:00:30Z",
@@ -70,7 +71,11 @@ const baseSnapshot: KairosContextSnapshot = {
 
 function Harness({ load }: { load: () => Promise<KairosContextSnapshot> }) {
   const [open, setOpen] = useState(true);
-  return <KairosContextSheet open={open} onOpenChange={setOpen} load={load} />;
+  return (
+    <TooltipProvider delayDuration={0}>
+      <KairosContextSheet open={open} onOpenChange={setOpen} load={load} />
+    </TooltipProvider>
+  );
 }
 
 describe("KairosContextSheet", () => {
@@ -100,6 +105,16 @@ describe("KairosContextSheet", () => {
     expect(screen.getByText("rule.md")).toBeInTheDocument();
     // 运行时段无来源 → 应有"运行时生成"占位
     expect(screen.getByText("运行时生成")).toBeInTheDocument();
+  });
+
+  it("keeps the refresh tooltip available while loading", async () => {
+    const user = userEvent.setup();
+    render(<Harness load={() => new Promise<KairosContextSnapshot>(() => {})} />);
+
+    const refreshButton = await screen.findByRole("button", { name: "正在刷新上下文" });
+    expect(refreshButton).toHaveAttribute("aria-disabled", "true");
+    await user.hover(refreshButton);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("正在刷新上下文");
   });
 
   it("copies the full prompt when 复制全文 is clicked", async () => {

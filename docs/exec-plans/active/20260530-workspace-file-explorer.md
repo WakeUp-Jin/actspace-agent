@@ -4,7 +4,7 @@
 
 在右侧面板新增一个轻量「工作区文件浏览器」：左侧常驻可折叠文件树（rail），点文件用已有渲染视图开成普通 Tab。第一版只做**只读 + 单 root（当前会话 workspaceRoot）**，让用户能直接翻看 Agent 实际操作的文件，并为后续 path 直达 / diff 标记 / Kairos 配置编辑预留地基。
 
-派生自设计规范 `docs/design-docs/front-工作区文件浏览器规范.md`。规范是「为什么 / 做成什么样 / V1-V3 边界 / 安全约束」的事实来源；本计划只负责「谁改哪些文件、按什么顺序、怎么验证」。两者冲突以规范为准。
+派生自设计规范 `docs/design-docs/front-右侧面板与文件渲染规范.md`。规范是「为什么 / 做成什么样 / V1-V3 边界 / 安全约束」的事实来源；本计划只负责「谁改哪些文件、按什么顺序、怎么验证」。两者冲突以规范为准。
 
 ## Required Reading
 
@@ -21,10 +21,7 @@
 - `docs/QUALITY_SCORE.md`
 - `docs/SECURITY.md`
 - `docs/design-docs/front-index.md`
-- `docs/design-docs/front-工作区文件浏览器规范.md`
 - `docs/design-docs/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/front-Markdown渲染规范.md`
-- `docs/design-docs/front-HTML渲染与沙箱安全规范.md`
 - `docs/design-docs/front-主题与配色规范.md`
 - `docs/design-docs/core-storage-and-observability.md`
 
@@ -181,7 +178,7 @@ V1 全部任务已落地并通过自动化校验。`workspaceRoot` 取数 V1 走
 
 ## 决策记录
 
-- 2026-05-30：与用户共定文件浏览器方向——形态用「树 rail + 文件 Tab」（接近 Cursor 编辑器布局）；V1 范围只做 `+` 菜单唤出的只读浏览器，不做消息内 path 联动；采用「先文档后代码」，先落 `工作区文件浏览器规范.md` 再派生本计划。
+- 2026-05-30：与用户共定文件浏览器方向——形态用「树 rail + 文件 Tab」（接近 Cursor 编辑器布局）；V1 范围只做 `+` 菜单唤出的只读浏览器，不做消息内 path 联动；采用「先文档后代码」，先落 `front-右侧面板与文件渲染规范.md` 再派生本计划。
 - 2026-05-30：UI 浏览强约束在 `workspaceRoot` 内，**故意不复用**读工具放开越界的 `resolveReadablePath`；图片用 data URL 规避 `file://` + CSP；HTML 文件走 `trust="file"` strict CSP。
 - 2026-05-30：Kairos 配置编辑列入 V3，且**必须复用** `kairos:read-config` / `kairos:write-config` 带校验通道，不退化成通用 fs 写。
 - 2026-05-30：ts/js/css/yaml/json 等代码配置文件折进 V1 做**语法高亮**——复用已是直接依赖的 `highlight.js` + Markdown 的主题感知 hljs 配色（提取共享 `.act-code-hl` 作用域）；按扩展名确定性推断语言，不做 `highlightAuto`，表外扩展名回退纯等宽。

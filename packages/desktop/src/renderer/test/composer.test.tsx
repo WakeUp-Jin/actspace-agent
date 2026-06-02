@@ -1,20 +1,34 @@
-import { render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import type { ComposerAttachment } from "@actspace/shared";
 import { mockContextSnapshot } from "../fixtures/workbenchFixture";
 import { Composer } from "../components/Composer";
+import { TooltipProvider } from "../components/ui/Tooltip";
+
+type PartialActspaceBridge = Partial<NonNullable<typeof window.actspace>>;
+
+function setPartialActspaceBridge(bridge: PartialActspaceBridge) {
+  (window as unknown as { actspace?: PartialActspaceBridge }).actspace = bridge;
+}
+
+afterEach(() => {
+  delete (window as unknown as { actspace?: unknown }).actspace;
+});
 
 function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {}) {
   const onSend = vi.fn();
   const onAbort = vi.fn();
 
   const result = render(
-    <Composer
-      contextSnapshot={mockContextSnapshot}
-      onSend={onSend}
-      onAbort={onAbort}
-      {...overrides}
-    />,
+    <TooltipProvider delayDuration={0}>
+      <Composer
+        contextSnapshot={mockContextSnapshot}
+        onSend={onSend}
+        onAbort={onAbort}
+        {...overrides}
+      />
+    </TooltipProvider>,
   );
 
   return { onSend, onAbort, ...result };
@@ -40,7 +54,7 @@ describe("Composer follow-up bar", () => {
     const toolbar = screen.getByLabelText("Composer toolbar");
     const input = screen.getByLabelText("Message composer");
     const toolbarButtons = within(toolbar).getAllByRole("button");
-    expect(within(attachments).getByLabelText("Attached image preview")).toBeInTheDocument();
+    expect(within(attachments).getByLabelText("Attached image mock-screenshot.png")).toBeInTheDocument();
     expect(within(attachments).getByLabelText("Attached file README.md")).toBeInTheDocument();
     expect(within(attachments).getByText("README.md")).toBeInTheDocument();
     expect(panel).toContainElement(attachments);
@@ -72,10 +86,121 @@ describe("Composer follow-up bar", () => {
     expect(within(menu).getByRole("menuitem", { name: "Debug" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Multitask" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Ask" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Attach files" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Image" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Models" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Skills" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "MCP Servers" })).toBeInTheDocument();
+  });
+
+  it("shows a tooltip for the add menu button", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+
+    await user.hover(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("添加上下文、工具或附件");
+  });
+
+  it("keeps the disabled send button explainable without sending", async () => {
+    const user = userEvent.setup();
+    const { onSend } = renderComposer();
+
+    const sendButton = screen.getByRole("button", { name: "Enter a message to send" });
+    expect(sendButton).toHaveAttribute("aria-disabled", "true");
+
+    await user.hover(sendButton);
+    expect((await screen.findAllByText("输入消息后发送")).length).toBeGreaterThan(0);
+    await user.click(sendButton);
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it("adds selected files from the Attach files menu", async () => {
+    const user = userEvent.setup();
+    const attachments: ComposerAttachment[] = [
+      {
+        id: "selected-image",
+        kind: "image",
+        name: "screenshot.png",
+        path: "/Users/test/screenshot.png",
+        mimeType: "image/png",
+        previewUrl: "file:///Users/test/screenshot.png",
+      },
+      {
+        id: "selected-file",
+        kind: "file",
+        name: "notes.md",
+        path: "/Users/test/notes.md",
+        mimeType: "text/markdown",
+      },
+    ];
+    const selectFiles = vi.fn(async () => ({ canceled: false, attachments }));
+    setPartialActspaceBridge({ selectFiles });
+
+    renderComposer();
+
+    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    await user.click(screen.getByRole("menuitem", { name: "Attach files" }));
+
+    expect(selectFiles).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Attached image screenshot.png")).toBeInTheDocument();
+    expect(screen.getByLabelText("Attached file notes.md")).toBeInTheDocument();
+  });
+
+  it("falls back to mock attachments when the Electron file bridge is unavailable", async () => {
+    const user = userEvent.setup();
+
+    renderComposer();
+
+    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    await user.click(screen.getByRole("menuitem", { name: "Attach files" }));
+
+    expect(screen.getByLabelText("Attached image mock-screenshot.png")).toBeInTheDocument();
+    expect(screen.getByLabelText("Attached file README.md")).toBeInTheDocument();
+  });
+
+  it("adds dropped files, removes attachments, and sends only remaining attachments", async () => {
+    const user = userEvent.setup();
+    const getPathForFile = vi.fn((file: File) => file.name === "photo.png" ? "/Users/test/photo.png" : "/Users/test/report.pdf");
+    setPartialActspaceBridge({ getPathForFile });
+    const { onSend } = renderComposer();
+
+    const panel = screen.getByLabelText("Message composer panel");
+    fireEvent.drop(panel, {
+      dataTransfer: {
+        files: [
+          new File(["image"], "photo.png", { type: "image/png" }),
+          new File(["report"], "report.pdf", { type: "application/pdf" }),
+        ],
+        types: ["Files"],
+      },
+    });
+
+    expect(screen.getByLabelText("Attached image photo.png")).toBeInTheDocument();
+    expect(screen.getByLabelText("Attached file report.pdf")).toBeInTheDocument();
+
+    const removeReport = screen.getByRole("button", { name: "Remove report.pdf" });
+    await user.hover(removeReport);
+    expect((await screen.findAllByText("移除 report.pdf")).length).toBeGreaterThan(0);
+
+    fireEvent.pointerDown(removeReport);
+    expect(screen.queryByLabelText("Attached file report.pdf")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Message composer"), "analyze this");
+    await user.click(screen.getByRole("button", { name: "Send message" }));
+
+    expect(onSend).toHaveBeenCalledWith("analyze this", {
+      model: "deepseek-v4-pro",
+      thinkingEnabled: true,
+      attachments: [
+        expect.objectContaining({
+          kind: "image",
+          name: "photo.png",
+          path: "/Users/test/photo.png",
+          mimeType: "image/png",
+        }),
+      ],
+    });
+    expect(screen.queryByLabelText("Attached image photo.png")).not.toBeInTheDocument();
   });
 
   it("keeps command menu, model menu, and context popup mutually exclusive", async () => {

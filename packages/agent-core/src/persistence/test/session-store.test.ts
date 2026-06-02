@@ -8,6 +8,7 @@ import {
   readContextState,
   readSessionRecord,
   createSessionStorePaths,
+  setSessionArchived,
   setSessionPinned,
   writeContextState,
 } from "../session-store";
@@ -84,6 +85,42 @@ describe("session store", () => {
     await expect(setSessionPinned(sessionRoot, record.meta.id, false)).resolves.toEqual({ ok: true });
     const metaAfterUnpin = await readMeta(join(sessionRoot, record.meta.id, "meta.json"));
     expect(metaAfterUnpin?.pinned).toBe(false);
+  });
+
+  it("filters archived sessions out of the default list and restores them on unarchive", async () => {
+    const active = await createSessionRecord(sessionRoot, { title: "Active session" });
+    const archived = await createSessionRecord(sessionRoot, { title: "Archived session" });
+
+    await expect(setSessionArchived(sessionRoot, archived.meta.id, true)).resolves.toEqual({ ok: true });
+
+    const metaAfterArchive = await readMeta(join(sessionRoot, archived.meta.id, "meta.json"));
+    expect(metaAfterArchive?.archived).toBe(true);
+
+    const defaultList = await listSessionRecords(sessionRoot);
+    expect(defaultList.map((item) => item.id)).toEqual([active.meta.id]);
+
+    const archivedList = await listSessionRecords(sessionRoot, { archived: true });
+    expect(archivedList).toEqual([
+      expect.objectContaining({ id: archived.meta.id, archived: true }),
+    ]);
+
+    await expect(setSessionArchived(sessionRoot, archived.meta.id, false)).resolves.toEqual({ ok: true });
+
+    const restoredDefaultList = await listSessionRecords(sessionRoot);
+    expect(restoredDefaultList.map((item) => item.id).sort()).toEqual([active.meta.id, archived.meta.id].sort());
+    await expect(listSessionRecords(sessionRoot, { archived: true })).resolves.toEqual([]);
+  });
+
+  it("keeps pinned archived sessions out of the default list", async () => {
+    const pinned = await createSessionRecord(sessionRoot, { title: "Pinned archived" });
+
+    await expect(setSessionPinned(sessionRoot, pinned.meta.id, true)).resolves.toEqual({ ok: true });
+    await expect(setSessionArchived(sessionRoot, pinned.meta.id, true)).resolves.toEqual({ ok: true });
+
+    await expect(listSessionRecords(sessionRoot)).resolves.toEqual([]);
+    await expect(listSessionRecords(sessionRoot, { archived: true })).resolves.toEqual([
+      expect.objectContaining({ id: pinned.meta.id, pinned: true, archived: true }),
+    ]);
   });
 
   it("writes and restores context-state.json independently from session events", async () => {

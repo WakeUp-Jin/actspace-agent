@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { App } from "./App";
 import { applyAppearance } from "./appearance/apply";
 import { loadAppearance } from "./appearance/storage";
+import { TooltipProvider } from "./components/ui/Tooltip";
 import "./styles/index.css";
 
 if (typeof window !== "undefined" && window.actspace) {
@@ -14,6 +15,8 @@ applyAppearance(loadAppearance());
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <TooltipProvider delayDuration={350} skipDelayDuration={120}>
+      <App />
+    </TooltipProvider>
   </React.StrictMode>
 );

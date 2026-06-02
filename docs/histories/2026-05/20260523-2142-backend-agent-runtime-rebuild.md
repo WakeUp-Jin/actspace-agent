@@ -71,5 +71,5 @@ agent-core 首版是 6 个平铺的单文件，随着后端设计文档确定了
 - `packages/agent-core/src/persistence/compat.ts`
 - `packages/agent-core/src/persistence/index.ts`
 - `packages/agent-core/src/persistence.ts`（兼容层）
-- `docs/design-docs/fix-llm-agent-dev-skill.md`
+- `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-dev-skill.md`
 - `docs/exec-plans/active/actspace-backend-*.md`（6 个计划文档更新进度）

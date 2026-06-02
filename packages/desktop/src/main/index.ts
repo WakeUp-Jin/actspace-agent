@@ -11,18 +11,25 @@
 
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, safeStorage } from "electron";
 import { access, mkdir, readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import type {
   AbortTurnInput,
   ApprovalDecideInput,
   ApprovalListPendingInput,
   ClearProviderKeyInput,
+  ComposerAttachment,
   DeepSeekBalanceSnapshot,
   ProviderId,
   RunTurnInput,
+  SelectFilesResult,
+  SelectWorkspaceDirectoryResult,
+  SessionArchiveInput,
   SessionCreateInput,
   SessionGetInput,
+  SessionListInput,
   SessionPinInput,
+  SessionWorkspaceInput,
   SetProviderKeyInput,
   SettingsUpdateInput,
   TestConnectionInput,
@@ -44,7 +51,9 @@ import {
   createSessionStorePaths,
   listSessionRecords,
   readSessionRecord,
+  setSessionArchived,
   setSessionPinned,
+  setSessionWorkspace,
   createKairos,
   ShortMemoryStore,
   type KairosConfig,
@@ -74,6 +83,30 @@ const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const PREVIEW_LIMIT = 160;
 const DEEPSEEK_BALANCE_TIMEOUT_MS = 8_000;
 const PROVIDER_TEST_TIMEOUT_MS = 8_000;
+
+const MIME_BY_EXT: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+  ".svg": "image/svg+xml",
+  ".heic": "image/heic",
+  ".heif": "image/heif",
+  ".pdf": "application/pdf",
+  ".md": "text/markdown",
+  ".markdown": "text/markdown",
+  ".txt": "text/plain",
+  ".json": "application/json",
+  ".csv": "text/csv",
+  ".ts": "text/typescript",
+  ".tsx": "text/typescript",
+  ".js": "text/javascript",
+  ".jsx": "text/javascript",
+  ".html": "text/html",
+  ".css": "text/css",
+};
 
 let repoRootCache: string | undefined;
 let workspaceRootCache: string | undefined;
@@ -121,6 +154,27 @@ function logRendererConsole(
   console.log(`[renderer-console] ${JSON.stringify(payload)}`);
 }
 
+function attachmentMimeType(filePath: string): string | undefined {
+  return MIME_BY_EXT[extname(filePath).toLowerCase()];
+}
+
+function attachmentKind(filePath: string): ComposerAttachment["kind"] {
+  return attachmentMimeType(filePath)?.startsWith("image/") ? "image" : "file";
+}
+
+function attachmentFromPath(filePath: string, index: number): ComposerAttachment {
+  const mimeType = attachmentMimeType(filePath);
+  const kind = attachmentKind(filePath);
+  return {
+    id: `att_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}`,
+    kind,
+    name: basename(filePath),
+    path: filePath,
+    mimeType,
+    previewUrl: kind === "image" ? pathToFileURL(filePath).toString() : undefined,
+  };
+}
+
 // ─── 数据目录 ───
 
 async function ensureDataDirectories(): Promise<AppDataRoots> {
@@ -155,7 +209,11 @@ async function ensureDataDirectories(): Promise<AppDataRoots> {
  *   这里保持职责单一。
  */
 async function loadAllSessionRecords(sessionRoot: string): Promise<SessionRecord[]> {
-  const summaries = await listSessionRecords(sessionRoot);
+  const [activeSummaries, archivedSummaries] = await Promise.all([
+    listSessionRecords(sessionRoot),
+    listSessionRecords(sessionRoot, { archived: true }),
+  ]);
+  const summaries = [...activeSummaries, ...archivedSummaries];
   const records = await Promise.all(
     summaries.map(async (item) => {
       try {
@@ -646,6 +704,40 @@ async function registerIpc() {
     return abortTurn(input);
   });
 
+  ipcMain.handle("dialog:select-files", async (): Promise<SelectFilesResult> => {
+    const result = await dialog.showOpenDialog({
+      title: "Attach files",
+      properties: ["openFile", "multiSelections"],
+      filters: [
+        { name: "Supported files", extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "heic", "heif", "pdf", "md", "txt", "json", "csv", "ts", "tsx", "js", "jsx", "html", "css"] },
+        { name: "All files", extensions: ["*"] },
+      ],
+    });
+    if (result.canceled) {
+      return { canceled: true, attachments: [] };
+    }
+
+    return {
+      canceled: false,
+      attachments: result.filePaths.map(attachmentFromPath),
+    };
+  });
+
+  ipcMain.handle("dialog:select-workspace-directory", async (): Promise<SelectWorkspaceDirectoryResult> => {
+    const result = await dialog.showOpenDialog({
+      title: "Add workspace",
+      properties: ["openDirectory"],
+    });
+    if (result.canceled || !result.filePaths[0]) {
+      return { canceled: true };
+    }
+
+    return {
+      canceled: false,
+      workspaceRoot: result.filePaths[0],
+    };
+  });
+
   ipcMain.handle("visualize:convert-reply", async (_event, input: VisualizeReplyInput) => {
     const roots = await ensureDataDirectories();
     try {
@@ -694,9 +786,9 @@ async function registerIpc() {
     }
   });
 
-  ipcMain.handle("session:list", async () => {
+  ipcMain.handle("session:list", async (_event, input: SessionListInput = {}) => {
     const roots = await ensureDataDirectories();
-    return listSessionRecords(roots.sessionRoot);
+    return listSessionRecords(roots.sessionRoot, input);
   });
 
   ipcMain.handle("session:get", async (_event, input: SessionGetInput) => {
@@ -754,6 +846,15 @@ async function registerIpc() {
     const result = await setSessionPinned(roots.sessionRoot, input.sessionId, input.pinned);
     if (!result.ok) {
       logMain("session pin failed", { sessionId: input.sessionId, error: result.error });
+    }
+    return result;
+  });
+
+  ipcMain.handle("session:archive", async (_event, input: SessionArchiveInput) => {
+    const roots = await ensureDataDirectories();
+    const result = await setSessionArchived(roots.sessionRoot, input.sessionId, input.archived);
+    if (!result.ok) {
+      logMain("session archive failed", { sessionId: input.sessionId, error: result.error });
     }
     return result;
   });

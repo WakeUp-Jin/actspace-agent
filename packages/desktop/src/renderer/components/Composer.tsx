@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import {
   BookOpen,
   Boxes,
@@ -13,19 +13,22 @@ import {
   Laptop,
   MoreHorizontal,
   Network,
+  Paperclip,
   Plus,
   SendHorizontal,
   Square,
   X,
   type LucideIcon,
 } from "lucide-react";
-import type { ContextUsageSnapshot, ModelId } from "@actspace/shared";
+import type { ComposerAttachment, ContextUsageSnapshot, ModelId } from "@actspace/shared";
 import { MODEL_LIST, MODEL_REGISTRY, DEFAULT_MODEL_ID } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 export type ComposerSendOptions = {
   model: ModelId;
   thinkingEnabled: boolean;
+  attachments?: ComposerAttachment[];
 };
 
 export type ComposerSurface = "followup" | "initial";
@@ -78,7 +81,7 @@ const MODEL_BUTTON_CLASS =
   "model-button inline-flex h-8 max-w-[220px] items-center gap-[6px] rounded-full border-0 bg-transparent px-1.5 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main";
 const MODEL_BUTTON_TEXT_CLASS = "model-button-text truncate";
 const SEND_BUTTON_CLASS =
-  "send-button grid h-9 w-9 shrink-0 place-items-center rounded-full border-0 bg-brand text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.24),0_8px_18px_rgba(47,111,255,0.18)] transition-[background,box-shadow,opacity] duration-[120ms] ease-in-out hover:bg-brand-strong hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22),0_10px_22px_rgba(47,111,255,0.22)] disabled:cursor-default disabled:opacity-72";
+  "send-button grid h-9 w-9 shrink-0 place-items-center rounded-full border-0 bg-brand text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.24),0_8px_18px_rgba(47,111,255,0.18)] transition-[background,box-shadow,opacity] duration-[120ms] ease-in-out hover:bg-brand-strong hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22),0_10px_22px_rgba(47,111,255,0.22)] disabled:cursor-default disabled:opacity-72 aria-disabled:cursor-default aria-disabled:opacity-72";
 const DROPDOWN_MENU_CLASS =
   "dropdown-menu absolute bottom-[calc(100%_+_8px)] left-0 z-30 min-w-[180px] overflow-hidden rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
 const COMMAND_MENU_CLASS = `${DROPDOWN_MENU_CLASS} command-menu w-[240px] min-w-[240px] p-2`;
@@ -125,6 +128,7 @@ const STATUS_USAGE_DOT_MASK =
 const INITIAL_CHIP_ROW_CLASS = "initial-chip-row flex min-h-8 items-center";
 const INITIAL_CHIP_CLASS =
   "initial-plan-chip inline-flex h-8 items-center rounded-full border border-line bg-surface px-3 text-sm font-medium text-text-muted shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
+const COMPOSER_DROP_ACTIVE_CLASS = "border-brand/40 bg-brand-soft";
 
 type CommandMenuItem = {
   label: string;
@@ -140,6 +144,8 @@ const PRIMARY_COMMAND_ITEMS: CommandMenuItem[] = [
   { label: "Ask", icon: CircleHelp },
 ];
 
+const ATTACH_COMMAND_ITEM: CommandMenuItem = { label: "Attach files", icon: Paperclip };
+
 const SECONDARY_COMMAND_ITEMS: CommandMenuItem[] = [
   { label: "Image", icon: Image },
   { label: "Models", icon: Boxes },
@@ -148,6 +154,21 @@ const SECONDARY_COMMAND_ITEMS: CommandMenuItem[] = [
 ];
 
 const DEFAULT_MODEL_SPEC = MODEL_REGISTRY[DEFAULT_MODEL_ID];
+const MOCK_ATTACHMENTS: ComposerAttachment[] = [
+  {
+    id: "mock-image-attachment",
+    kind: "image",
+    name: "mock-screenshot.png",
+    mimeType: "image/png",
+  },
+  {
+    id: "mock-file-attachment",
+    kind: "file",
+    name: "README.md",
+    path: "/mock/README.md",
+    mimeType: "text/markdown",
+  },
+];
 
 function isModelEditable(_modelId: ModelId): boolean {
   return true;
@@ -159,6 +180,63 @@ function getComposerWrapClass(surface: ComposerSurface) {
 
 function getComposerPanelClass(surface: ComposerSurface) {
   return surface === "initial" ? COMPOSER_PANEL_INITIAL_CLASS : COMPOSER_PANEL_CLASS;
+}
+
+function createAttachmentId(): string {
+  return `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function basenameOf(path: string): string {
+  const normalized = path.replace(/[\\/]+$/, "");
+  return normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized;
+}
+
+function inferAttachmentKind(file: File, path?: string): ComposerAttachment["kind"] {
+  if (file.type.startsWith("image/")) return "image";
+  if (path && /\.(png|jpe?g|gif|webp|bmp|svg|heic|heif)$/i.test(path)) return "image";
+  return "file";
+}
+
+function fileUrlFromPath(path?: string): string | undefined {
+  if (!path?.startsWith("/")) return undefined;
+  return `file://${path.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+function attachmentFromDroppedFile(file: File): ComposerAttachment {
+  const path = window.actspace?.getPathForFile?.(file) || undefined;
+  const kind = inferAttachmentKind(file, path);
+  return {
+    id: createAttachmentId(),
+    kind,
+    name: path ? basenameOf(path) : file.name,
+    path,
+    mimeType: file.type || undefined,
+    previewUrl: kind === "image"
+      ? fileUrlFromPath(path) ?? (typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : undefined)
+      : undefined,
+  };
+}
+
+function dedupeAttachments(attachments: ComposerAttachment[]): ComposerAttachment[] {
+  const seen = new Set<string>();
+  const result: ComposerAttachment[] = [];
+  for (const attachment of attachments) {
+    const key = attachment.path || `${attachment.name}:${attachment.mimeType ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(attachment);
+  }
+  return result;
+}
+
+function getAttachmentPreviewStyle(attachment: ComposerAttachment): CSSProperties | undefined {
+  return attachment.previewUrl
+    ? {
+        backgroundImage: `url("${attachment.previewUrl}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : undefined;
 }
 
 export function Composer({
@@ -200,8 +278,10 @@ export function Composer({
   );
   const userPickedModelRef = useRef(false);
   const [contextOpen, setContextOpen] = useState(false);
-  const [imageAttached, setImageAttached] = useState(showDemoAttachments);
-  const [fileAttached, setFileAttached] = useState(showDemoAttachments);
+  const [attachments, setAttachments] = useState<ComposerAttachment[]>(
+    showDemoAttachments ? MOCK_ATTACHMENTS : [],
+  );
+  const [isDragActive, setIsDragActive] = useState(false);
   const [message, setMessage] = useState("");
   const composerRef = useRef<HTMLElement | null>(null);
   const commandButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -209,7 +289,8 @@ export function Composer({
   const modelButtonRef = useRef<HTMLButtonElement | null>(null);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const modelOptionsRef = useRef<HTMLDivElement | null>(null);
-  const hasAttachments = imageAttached || fileAttached;
+  const hasAttachments = attachments.length > 0;
+  const canSendMessage = Boolean(message.trim() || attachments.length > 0);
   const editingModelSpec = MODEL_LIST.find((spec) => spec.id === editingModelId);
   const contextUsagePercent = contextSnapshot?.percentUsed ?? 77;
   const contextRingPercent = Math.max(0, Math.min(100, contextUsagePercent));
@@ -223,8 +304,7 @@ export function Composer({
   const placeholder = surface === "initial" ? "Plan, Build, / for commands, @ for context" : "Send follow-up";
 
   useEffect(() => {
-    setImageAttached(showDemoAttachments);
-    setFileAttached(showDemoAttachments);
+    setAttachments(showDemoAttachments ? MOCK_ATTACHMENTS : []);
   }, [showDemoAttachments]);
 
   // 默认模型可能在 Composer 挂载后才异步到达（settings:get）；只在用户尚未手动
@@ -246,11 +326,53 @@ export function Composer({
     setContextOpen(false);
   }
 
+  function appendAttachments(nextAttachments: ComposerAttachment[]) {
+    if (nextAttachments.length === 0) return;
+    setAttachments((current) => dedupeAttachments([...current, ...nextAttachments]));
+  }
+
+  async function handleAttachFiles() {
+    setCommandOpen(false);
+
+    if (window.actspace?.selectFiles) {
+      try {
+        const result = await window.actspace.selectFiles();
+        if (!result.canceled) {
+          appendAttachments(result.attachments);
+        }
+      } catch (error) {
+        console.error("Failed to select files", error);
+      }
+      return;
+    }
+
+    appendAttachments(MOCK_ATTACHMENTS);
+  }
+
   function sendCurrentMessage() {
-    if (!message.trim() || !onSend || isStreaming) return;
-    onSend(message.trim(), { model: selectedModelId, thinkingEnabled });
+    if (!canSendMessage || !onSend || isStreaming) return;
+    const nextAttachments = attachments;
+    const options: ComposerSendOptions = {
+      model: selectedModelId,
+      thinkingEnabled,
+    };
+    if (nextAttachments.length > 0) {
+      options.attachments = nextAttachments;
+    }
+    onSend(message.trim(), options);
     setMessage("");
+    setAttachments([]);
     closeFloatingPanels();
+  }
+
+  function handleDropFiles(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragActive(false);
+    if (isStreaming) return;
+
+    const files = Array.from(event.dataTransfer.files);
+    appendAttachments(files.map(attachmentFromDroppedFile));
   }
 
   useEffect(() => {
@@ -312,6 +434,22 @@ export function Composer({
     );
   }
 
+  function renderAttachMenuButton() {
+    const Icon = ATTACH_COMMAND_ITEM.icon;
+    return (
+      <button
+        className={COMMAND_MENU_BUTTON_CLASS}
+        type="button"
+        role="menuitem"
+        key={ATTACH_COMMAND_ITEM.label}
+        onClick={() => void handleAttachFiles()}
+      >
+        <Icon className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
+        <span>{ATTACH_COMMAND_ITEM.label}</span>
+      </button>
+    );
+  }
+
   function renderComposerInput() {
     const stackedClass =
       surface === "initial" ? COMPOSER_INITIAL_STACKED_INPUT_CLASS : COMPOSER_STACKED_INPUT_CLASS;
@@ -341,40 +479,61 @@ export function Composer({
 
     return (
       <div className={COMPOSER_ATTACHMENTS_CLASS} aria-label="Attached files">
-        {imageAttached ? (
-          <div className={IMAGE_ATTACHMENT_CLASS} aria-label="Attached image preview">
-            <button
-              className={IMAGE_ATTACHMENT_REMOVE_CLASS}
-              type="button"
-              aria-label="Remove attached image"
-              onPointerDown={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setImageAttached(false);
-              }}
-            >
-              <X size={16} strokeWidth={2.4} />
-            </button>
-          </div>
-        ) : null}
-        {fileAttached ? (
-          <div className={FILE_ATTACHMENT_CLASS} aria-label="Attached file README.md">
-            <FileText size={17} strokeWidth={1.9} aria-hidden="true" />
-            <span className={FILE_ATTACHMENT_NAME_CLASS}>README.md</span>
-            <button
-              className={FILE_ATTACHMENT_REMOVE_CLASS}
-              type="button"
-              aria-label="Remove README.md"
-              onPointerDown={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setFileAttached(false);
-              }}
-            >
-              <X size={13} strokeWidth={2.4} />
-            </button>
-          </div>
-        ) : null}
+        {attachments.map((attachment) => {
+          if (attachment.kind === "image") {
+            return (
+              <div
+                className={IMAGE_ATTACHMENT_CLASS}
+                aria-label={`Attached image ${attachment.name}`}
+                key={attachment.id}
+                style={getAttachmentPreviewStyle(attachment)}
+                title={attachment.name}
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className={IMAGE_ATTACHMENT_REMOVE_CLASS}
+                      type="button"
+                      aria-label={`Remove ${attachment.name}`}
+                      onPointerDown={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+                      }}
+                    >
+                      <X size={16} strokeWidth={2.4} aria-hidden="true" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>移除 {attachment.name}</TooltipContent>
+                </Tooltip>
+              </div>
+            );
+          }
+
+          return (
+            <div className={FILE_ATTACHMENT_CLASS} aria-label={`Attached file ${attachment.name}`} key={attachment.id}>
+              <FileText size={17} strokeWidth={1.9} aria-hidden="true" />
+              <span className={FILE_ATTACHMENT_NAME_CLASS}>{attachment.name}</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className={FILE_ATTACHMENT_REMOVE_CLASS}
+                    type="button"
+                    aria-label={`Remove ${attachment.name}`}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+                    }}
+                  >
+                    <X size={13} strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>移除 {attachment.name}</TooltipContent>
+              </Tooltip>
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -382,28 +541,34 @@ export function Composer({
   function renderAddMenuButton() {
     return (
       <div className={CONTROL_GROUP_CLASS}>
-        <button
-          className={COMMAND_BUTTON_CLASS}
-          type="button"
-          aria-label="Add agents, context, tools"
-          aria-expanded={commandOpen}
-          aria-haspopup="menu"
-          ref={commandButtonRef}
-          onClick={() => {
-            setCommandOpen((value) => !value);
-            setModelOpen(false);
-            setModelOptionsOpen(false);
-            setContextSelectorOpen(null);
-            setContextOpen(false);
-          }}
-        >
-          <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className={COMMAND_BUTTON_CLASS}
+              type="button"
+              aria-label="Add agents, context, tools"
+              aria-expanded={commandOpen}
+              aria-haspopup="menu"
+              ref={commandButtonRef}
+              onClick={() => {
+                setCommandOpen((value) => !value);
+                setModelOpen(false);
+                setModelOptionsOpen(false);
+                setContextSelectorOpen(null);
+                setContextOpen(false);
+              }}
+            >
+              <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>添加上下文、工具或附件</TooltipContent>
+        </Tooltip>
         {commandOpen ? (
           <div className={COMMAND_MENU_CLASS} ref={commandMenuRef} role="menu" aria-label="Add agents, context, tools">
             <div className={COMMAND_MENU_HINT_CLASS}>Add agents, context, tools.</div>
             {PRIMARY_COMMAND_ITEMS.map(renderCommandMenuButton)}
             <div className={COMMAND_MENU_SEPARATOR_CLASS} />
+            {renderAttachMenuButton()}
             {SECONDARY_COMMAND_ITEMS.map(renderCommandMenuButton)}
           </div>
         ) : null}
@@ -536,16 +701,36 @@ export function Composer({
   }
 
   function renderSendButton() {
+    const sendDisabled = isAborting || (!isStreaming && !canSendMessage);
+    const tooltipLabel = isStreaming ? "停止 Agent" : canSendMessage ? "发送消息" : "输入消息后发送";
+    const ariaLabel = isStreaming ? "Stop agent" : canSendMessage ? "Send message" : "Enter a message to send";
+
     return (
-      <button
-        className={`${SEND_BUTTON_CLASS} send-button${isStreaming ? " is-stop" : ""}${isAborting ? " is-aborting" : ""}`}
-        type="button"
-        aria-label={isStreaming ? "Stop agent" : "Send message"}
-        disabled={isAborting || (!isStreaming && !message.trim())}
-        onClick={isStreaming ? onAbort : sendCurrentMessage}
-      >
-        {isStreaming ? <Square size={14} strokeWidth={2.6} fill="currentColor" /> : <SendHorizontal size={18} strokeWidth={2.2} />}
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            className={`${SEND_BUTTON_CLASS} send-button${isStreaming ? " is-stop" : ""}${isAborting ? " is-aborting" : ""}`}
+            type="button"
+            aria-label={ariaLabel}
+            aria-disabled={sendDisabled}
+            onClick={() => {
+              if (sendDisabled) return;
+              if (isStreaming) {
+                onAbort?.();
+                return;
+              }
+              sendCurrentMessage();
+            }}
+          >
+            {isStreaming ? (
+              <Square size={14} strokeWidth={2.6} fill="currentColor" aria-hidden="true" />
+            ) : (
+              <SendHorizontal size={18} strokeWidth={2.2} aria-hidden="true" />
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{tooltipLabel}</TooltipContent>
+      </Tooltip>
     );
   }
 
@@ -563,7 +748,23 @@ export function Composer({
 
   function renderPanel() {
     return (
-      <div className={getComposerPanelClass(surface)} aria-label="Message composer panel">
+      <div
+        className={`${getComposerPanelClass(surface)}${isDragActive ? ` ${COMPOSER_DROP_ACTIVE_CLASS}` : ""}`}
+        aria-label="Message composer panel"
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!isStreaming && event.dataTransfer.types.includes("Files")) {
+            setIsDragActive(true);
+          }
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setIsDragActive(false);
+          }
+        }}
+        onDrop={handleDropFiles}
+      >
         {renderAttachmentStrip()}
         {resolvedInputLayout === "stacked" ? renderComposerInput() : null}
         {renderToolbar()}

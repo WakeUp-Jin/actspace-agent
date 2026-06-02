@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SessionListItem } from "@actspace/shared";
 import { Sidebar } from "../components/Sidebar";
 import { WindowChromeBar } from "../components/WindowChromeBar";
+import { TooltipProvider } from "../components/ui/Tooltip";
 
 function makeSession(partial: Partial<SessionListItem> & Pick<SessionListItem, "id" | "title">): SessionListItem {
   return {
@@ -45,18 +46,20 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
   const onArchive = vi.fn();
 
   const result = render(
-    <Sidebar
-      sessions={SESSIONS}
-      activeSessionId={null}
-      mode="expanded"
-      view="chat"
-      onNewSession={onNewSession}
-      onSelectSession={onSelectSession}
-      onTogglePin={onTogglePin}
-      onSelectView={onSelectView}
-      onArchive={onArchive}
-      {...overrides}
-    />,
+    <TooltipProvider delayDuration={0}>
+      <Sidebar
+        sessions={SESSIONS}
+        activeSessionId={null}
+        mode="expanded"
+        view="chat"
+        onNewSession={onNewSession}
+        onSelectSession={onSelectSession}
+        onTogglePin={onTogglePin}
+        onSelectView={onSelectView}
+        onArchive={onArchive}
+        {...overrides}
+      />
+    </TooltipProvider>,
   );
 
   return { onNewSession, onSelectSession, onTogglePin, onSelectView, onArchive, ...result };
@@ -117,6 +120,16 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(onArchive).toHaveBeenCalled();
   });
 
+  it("disables archive on the active session row", async () => {
+    const { onArchive } = renderSidebar({ activeSessionId: "s-actspace-1" });
+
+    const activeArchive = screen.getByRole("button", { name: "Current session cannot be archived" });
+    expect(activeArchive).toBeDisabled();
+    await userEvent.click(activeArchive);
+
+    expect(onArchive).not.toHaveBeenCalled();
+  });
+
   it("calls onSelectView for Lab / Usage / Kairos entries", async () => {
     const { onSelectView } = renderSidebar();
 
@@ -161,15 +174,10 @@ describe("Sidebar (cursor-aligned layout)", () => {
   });
 
   it("renders a status dot for the active session and a busy dot for busy sessions", () => {
-    const { container } = render(
-      <Sidebar
-        sessions={SESSIONS}
-        activeSessionId="s-actspace-1"
-        mode="expanded"
-        view="chat"
-        busySessionIds={new Set(["s-actspace-2"])}
-      />,
-    );
+    const { container } = renderSidebar({
+      activeSessionId: "s-actspace-1",
+      busySessionIds: new Set(["s-actspace-2"]),
+    });
 
     const activeRow = container.querySelector('[data-group-key="actspace-agent"]') ?? container;
     expect(within(activeRow as HTMLElement).getByText("工具定义格式和命名规范").closest(".session-row")).toHaveClass(
@@ -196,6 +204,22 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(screen.queryByText("Weekly context audit")).not.toBeInTheDocument();
   });
 
+  it("shows a readable tooltip for Scheduled more actions", async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+
+    await user.hover(screen.getByRole("button", { name: "More scheduled actions" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("更多定时任务操作");
+  });
+
+  it("shows a readable tooltip for new Scheduled task", async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+
+    await user.hover(screen.getByRole("button", { name: "New scheduled task" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("新建定时任务");
+  });
+
   it("renders a muted status dot on every session row by default", () => {
     const { container } = renderSidebar();
 
@@ -207,14 +231,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
   });
 
   it("renders nothing when mode is hidden", () => {
-    const { container } = render(
-      <Sidebar
-        sessions={SESSIONS}
-        activeSessionId={null}
-        mode="hidden"
-        view="chat"
-      />,
-    );
+    const { container } = renderSidebar({ mode: "hidden" });
 
     expect(container.querySelector(".sidebar")).toBeNull();
   });

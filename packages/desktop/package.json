@@ -25,6 +25,7 @@
   "dependencies": {
     "@actspace/agent-core": "workspace:*",
     "@actspace/shared": "workspace:*",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "highlight.js": "^11.11.1",
     "lucide-react": "^1.16.0",
     "react": "^18.3.1",

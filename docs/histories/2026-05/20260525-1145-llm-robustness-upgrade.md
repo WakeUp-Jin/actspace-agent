@@ -47,4 +47,4 @@
 - `packages/agent-core/src/llm/test/*.test.ts`
 - `packages/agent-core/src/engine/test/bridge.test.ts`
 - `docs/ARCHITECTURE.md`
-- `docs/design-docs/fix-llm-agent-03-robustness-upgrade-result.md`
+- `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-03-robustness-upgrade-result.md`

@@ -8,7 +8,7 @@ import {
 } from "@actspace/shared";
 
 /**
- * 右侧面板 Context 完整只读视图（见 `Context完整视图规范.md`）。
+ * 右侧面板 Context 完整只读视图（见 `front-右侧面板与文件渲染规范.md`）。
  *
  * 数据来源（方案 B）：持久化快照只存 token 统计；逐条全文明细在打开视图时由 main 进程
  * `context:describe` 现场重算（不调用 LLM）。本组件优先用现算结果渲染逐条 entry，

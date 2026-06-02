@@ -5,7 +5,7 @@ import { PreviewSourceToggle, type PreviewMode } from "./PreviewSourceToggle";
 /**
  * 右侧面板 HTML 渲染视图（V1）。
  *
- * 安全闸（见 `HTML渲染与沙箱安全规范.md`）：
+ * 安全闸（见 `front-右侧面板与文件渲染规范.md`）：
  * - `sandbox="allow-scripts"`，**绝不加 `allow-same-origin`**（srcDoc 默认继承宿主 origin，两者同开可逃逸）。
  * - CSP 双档注入 srcDoc：file→strict 禁外联；chat→relaxed 允 https 静态资源但 `connect-src 'none'` 禁外传。
  * - 单向 postMessage 桥：iframe 只回传内容高度与运行时错误，父窗口不向 iframe 注入可执行内容。

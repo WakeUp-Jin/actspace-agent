@@ -43,4 +43,4 @@ Kairos 后端已经按“写盘成功 -> push ring buffer -> emit IPC”的顺�
 - `packages/desktop/src/renderer/test/right-panel-kairos.test.tsx`
 - `docs/design-docs/agent-kairos-autonomous-mode.md`
 - `docs/design-docs/front-Kairos监控页规范.md`
-- `docs/design-docs/front-Kairos上下文Sheet规范.md`
+- `docs/design-docs/front-Kairos监控页规范.md`

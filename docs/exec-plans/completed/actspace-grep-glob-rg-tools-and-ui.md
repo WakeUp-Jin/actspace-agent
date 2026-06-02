@@ -35,7 +35,7 @@
   - `docs/design-docs/front-中间消息区规范.md`
 - 相关 skill 调研：
   - `.agents/skills/llm-agent-dev/references/tools/search-tools.md`
-  - `docs/design-docs/fix-llm-agent-04-skill-rg-tools-fix.md`
+  - `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-04-skill-rg-tools-fix.md`
 - 参考实现：
   - `heartclaw/apps/ruyi-api/src/core/tool/tools/grep/`
   - `heartclaw/apps/ruyi-api/src/core/tool/tools/glob/`

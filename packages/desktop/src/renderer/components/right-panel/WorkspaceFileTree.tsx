@@ -4,7 +4,7 @@ import type { WorkspaceDirEntry, WorkspaceReadFileResult } from "@actspace/share
 import { useRightPanel, type RightPanelTab } from "./RightPanelContext";
 
 /**
- * 右侧面板的工作区文件树 rail（V1，见 `工作区文件浏览器规范.md`）。
+ * 右侧面板的工作区文件树 rail（V1，见 `front-右侧面板与文件渲染规范.md`）。
  *
  * - 数据来源：当前会话 workspaceRoot（V1 由 main 用 BootstrapState.workspaceRoot 兜底），全部经 IPC，renderer 不碰 FS。
  * - 懒加载逐层展开；点文件读盘后复用现有渲染视图（markdown / html / image / text）开 Tab，`file:<相对路径>` 去重。

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { UsageStatisticsPage } from "../components/UsageStatisticsPage";
 import { mockUsageStatistics } from "../fixtures/usageStatisticsFixture";
+import { TooltipProvider } from "../components/ui/Tooltip";
 
 /**
  * UsageStatisticsPage UI 测试覆盖：
@@ -11,37 +12,41 @@ import { mockUsageStatistics } from "../fixtures/usageStatisticsFixture";
  * 3. 没数据的格子 hover 不应弹任何 tooltip（避免 empty popover）。
  */
 describe("UsageStatisticsPage heatmap tooltip", () => {
-  it("keeps the DeepSeek balance card visible when usage statistics are empty", () => {
-    render(
-      <UsageStatisticsPage
-        snapshot={null}
-        deepSeekBalance={{
-          provider: "deepseek",
-          isConfigured: true,
-          isAvailable: true,
-          generatedAt: "2026-05-29T03:00:00.000Z",
-          displayBalance: { amount: "19.65", currency: "CNY" },
-        }}
-      />,
+  function renderUsageStatisticsPage(props: Parameters<typeof UsageStatisticsPage>[0]) {
+    return render(
+      <TooltipProvider delayDuration={0}>
+        <UsageStatisticsPage {...props} />
+      </TooltipProvider>,
     );
+  }
+
+  it("keeps the DeepSeek balance card visible when usage statistics are empty", () => {
+    renderUsageStatisticsPage({
+      snapshot: null,
+      deepSeekBalance: {
+        provider: "deepseek",
+        isConfigured: true,
+        isAvailable: true,
+        generatedAt: "2026-05-29T03:00:00.000Z",
+        displayBalance: { amount: "19.65", currency: "CNY" },
+      },
+    });
 
     expect(screen.getByText("DeepSeek 预额")).toBeInTheDocument();
     expect(screen.getByText("暂无 Usage 数据")).toBeInTheDocument();
   });
 
   it("renders the DeepSeek balance card with a compact amount and currency", () => {
-    render(
-      <UsageStatisticsPage
-        snapshot={mockUsageStatistics}
-        deepSeekBalance={{
-          provider: "deepseek",
-          isConfigured: true,
-          isAvailable: true,
-          generatedAt: "2026-05-29T03:00:00.000Z",
-          displayBalance: { amount: "19.65", currency: "CNY" },
-        }}
-      />,
-    );
+    renderUsageStatisticsPage({
+      snapshot: mockUsageStatistics,
+      deepSeekBalance: {
+        provider: "deepseek",
+        isConfigured: true,
+        isAvailable: true,
+        generatedAt: "2026-05-29T03:00:00.000Z",
+        displayBalance: { amount: "19.65", currency: "CNY" },
+      },
+    });
 
     expect(screen.getByText("DeepSeek 预额")).toBeInTheDocument();
     expect(screen.getByText("¥19.65")).toBeInTheDocument();
@@ -51,25 +56,33 @@ describe("UsageStatisticsPage heatmap tooltip", () => {
   it("calls the DeepSeek balance refresh handler from the balance card", async () => {
     const user = userEvent.setup();
     const onRefreshDeepSeekBalance = vi.fn();
-    render(
-      <UsageStatisticsPage
-        snapshot={mockUsageStatistics}
-        onRefreshDeepSeekBalance={onRefreshDeepSeekBalance}
-      />,
-    );
+    renderUsageStatisticsPage({
+      snapshot: mockUsageStatistics,
+      onRefreshDeepSeekBalance,
+    });
 
     await user.click(screen.getByRole("button", { name: "Refresh DeepSeek balance" }));
     expect(onRefreshDeepSeekBalance).toHaveBeenCalledTimes(1);
   });
 
   it("does not render the deprecated 使用趋势 panel", () => {
-    render(<UsageStatisticsPage snapshot={mockUsageStatistics} />);
+    renderUsageStatisticsPage({ snapshot: mockUsageStatistics });
     expect(screen.queryByText("使用趋势")).toBeNull();
+  });
+
+  it("shows a readable tooltip for the tool detail close button", async () => {
+    const user = userEvent.setup();
+    renderUsageStatisticsPage({ snapshot: mockUsageStatistics });
+
+    await user.click(screen.getByRole("button", { name: "查看详情" }));
+    const closeButton = await screen.findByRole("button", { name: "Close detail" });
+    await user.hover(closeButton);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("关闭详情");
   });
 
   it("shows a tooltip with date + tokens + model breakdown when hovering a populated cell", async () => {
     const user = userEvent.setup();
-    render(<UsageStatisticsPage snapshot={mockUsageStatistics} />);
+    renderUsageStatisticsPage({ snapshot: mockUsageStatistics });
 
     // 拿 fixture 里实际存在的一个有数据的格子（2026-05-25 一定在热力图 16 周窗内）。
     const targetCell = screen.getByRole("button", {
@@ -89,7 +102,7 @@ describe("UsageStatisticsPage heatmap tooltip", () => {
 
   it("does not render a tooltip when hovering an empty cell", async () => {
     const user = userEvent.setup();
-    render(<UsageStatisticsPage snapshot={mockUsageStatistics} />);
+    renderUsageStatisticsPage({ snapshot: mockUsageStatistics });
 
     // 取所有"无数据"格子里的第一个；它们都是空的，hover 任意一个都不应弹 tooltip。
     const emptyCells = screen.getAllByRole("button", { name: /：无数据$/ });

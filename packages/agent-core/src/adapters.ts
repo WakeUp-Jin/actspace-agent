@@ -12,6 +12,8 @@
 
 import type {
   AssistantReply,
+  AttachmentAnalysis,
+  ComposerAttachment,
   SessionEvent,
   SessionId,
   TurnId,
@@ -60,12 +62,56 @@ export function createPersistedSessionEvent<TPayload>(
   return createSessionEvent(sessionId, turnId, type, payload);
 }
 
+export function formatUserMessageForModel(
+  content: string,
+  attachments?: ComposerAttachment[],
+  attachmentAnalyses?: AttachmentAnalysis[],
+): string {
+  const sections = [content.trim()];
+
+  if (attachments?.length) {
+    sections.push(
+      [
+        "Attached files:",
+        ...attachments.map((attachment, index) => {
+          const path = attachment.path ? ` path=${attachment.path}` : "";
+          const mimeType = attachment.mimeType ? ` mime=${attachment.mimeType}` : "";
+          return `${index + 1}. [${attachment.kind}] ${attachment.name}${path}${mimeType}`;
+        }),
+        "For ordinary file attachments, use read_file with the provided path only if you need the file contents.",
+      ].join("\n"),
+    );
+  }
+
+  if (attachmentAnalyses?.length) {
+    sections.push(
+      [
+        "Image analysis results:",
+        ...attachmentAnalyses.map((analysis, index) => {
+          if (analysis.status === "failed") {
+            return `${index + 1}. attachmentId=${analysis.attachmentId}: analysis failed. ${
+              analysis.errorMessage ?? "The model can only see the attachment metadata."
+            }`;
+          }
+          return `${index + 1}. attachmentId=${analysis.attachmentId}: ${analysis.summary ?? "(empty analysis)"}`;
+        }),
+      ].join("\n"),
+    );
+  }
+
+  return sections.filter((section) => section.trim().length > 0).join("\n\n");
+}
+
 // ─── 方向 1：Message → SessionEvent[] ───
 
 export function userMessageToEvents(
   msg: UserMessage,
   sessionId: SessionId,
   turnId: TurnId,
+  payload?: {
+    attachments?: ComposerAttachment[];
+    attachmentAnalyses?: AttachmentAnalysis[];
+  },
 ): SessionEvent[] {
   const content = typeof msg.content === "string"
     ? msg.content
@@ -75,7 +121,11 @@ export function userMessageToEvents(
         .join("");
 
   return [
-    createSessionEvent(sessionId, turnId, "user_message", { content }),
+    createSessionEvent(sessionId, turnId, "user_message", {
+      content,
+      ...(payload?.attachments?.length ? { attachments: payload.attachments } : {}),
+      ...(payload?.attachmentAnalyses?.length ? { attachmentAnalyses: payload.attachmentAnalyses } : {}),
+    }),
   ];
 }
 
@@ -208,10 +258,14 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
       switch (event.type) {
         case "user_message": {
           flushPendingAssistant();
-          const payload = event.payload as { content: string };
+          const payload = event.payload as {
+            content: string;
+            attachments?: ComposerAttachment[];
+            attachmentAnalyses?: AttachmentAnalysis[];
+          };
           messages.push({
             role: "user",
-            content: payload.content,
+            content: formatUserMessageForModel(payload.content, payload.attachments, payload.attachmentAnalyses),
             timestamp: new Date(event.timestamp).getTime() || now,
           });
           break;

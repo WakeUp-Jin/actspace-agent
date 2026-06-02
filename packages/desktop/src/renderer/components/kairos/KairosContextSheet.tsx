@@ -1,7 +1,7 @@
 /**
  * KairosContextSheet —— Kairos 监控页"上下文"按钮的内容载体。
  *
- * 设计依据：`docs/design-docs/front-Kairos上下文Sheet规范.md`（v1.4 工具 chip 化）。
+ * 设计依据：`docs/design-docs/front-Kairos监控页规范.md`（v1.4 工具 chip 化）。
  *
  * v1.4 改动（仅工具列表）：
  *   - 工具列表从"两列 grid（name + description）"改为"chip 密排（只展示 name）"——
@@ -37,6 +37,7 @@ import type {
   KairosContextTool,
 } from "@actspace/shared";
 import { Sheet } from "../ui/Sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 
 export interface KairosContextSheetProps {
   open: boolean;
@@ -107,19 +108,27 @@ export function KairosContextSheet(props: KairosContextSheetProps) {
       description="Kairos 当前 tick 会看到的系统提示词、会话历史与工具列表。"
       testId="kairos-context-sheet"
       headerActions={
-        <button
-          type="button"
-          aria-label="刷新上下文"
-          onClick={refresh}
-          disabled={loading}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-act-md border border-line bg-surface text-text-muted transition hover:border-line-strong hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-55"
-        >
-          {loading ? (
-            <Loader2 size={15} className="animate-spin" aria-hidden="true" />
-          ) : (
-            <RefreshCw size={15} aria-hidden="true" />
-          )}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label={loading ? "正在刷新上下文" : "刷新上下文"}
+              aria-disabled={loading}
+              onClick={() => {
+                if (loading) return;
+                refresh();
+              }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-act-md border border-line bg-surface text-text-muted transition hover:border-line-strong hover:bg-surface-subtle aria-disabled:cursor-not-allowed aria-disabled:opacity-55"
+            >
+              {loading ? (
+                <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <RefreshCw size={15} aria-hidden="true" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{loading ? "正在刷新上下文" : "刷新上下文"}</TooltipContent>
+        </Tooltip>
       }
     >
       <SheetBody snapshot={snapshot} loading={loading} error={error} onRetry={refresh} />

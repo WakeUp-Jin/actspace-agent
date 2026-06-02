@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { HtmlRenderView } from "../components/right-panel/HtmlRenderView";
 
 /**
- * HTML 沙箱渲染视图的静态安全探针（见 HTML渲染与沙箱安全规范.md 验收）：
+ * HTML 沙箱渲染视图的静态安全探针（见 front-右侧面板与文件渲染规范.md 验收）：
  * - sandbox 只给 allow-scripts，绝不出现 allow-same-origin；
  * - srcDoc 注入 CSP：chat→relaxed（connect-src 'none'）、file→strict（default-src 'none' 且无 https）；
  * - 源码视图展示原始 HTML。

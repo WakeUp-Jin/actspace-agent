@@ -24,6 +24,8 @@ export {
   ensureSessionStore,
   createSessionRecord,
   setSessionPinned,
+  setSessionArchived,
+  setSessionWorkspace,
   writeSessionResult,
   writeContextState,
   readContextState,

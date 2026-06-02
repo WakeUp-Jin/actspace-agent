@@ -212,6 +212,25 @@ export const mockSessions: SessionListItem[] = [
   }
 ];
 
+export const mockArchivedSessions: SessionListItem[] = [
+  {
+    id: "session-archived-release-notes",
+    title: "Release notes cleanup",
+    updatedAt: daysAgo(9),
+    turnCount: 3,
+    workspaceRoot: MOCK_WORKSPACE_PRIMARY,
+    archived: true
+  },
+  {
+    id: "session-archived-old-review",
+    title: "Old project review",
+    updatedAt: daysAgo(18),
+    turnCount: 6,
+    workspaceRoot: MOCK_WORKSPACE_HARNESS,
+    archived: true
+  }
+];
+
 export const mockMessages: MessageBlock[] = [
   {
     kind: "user",

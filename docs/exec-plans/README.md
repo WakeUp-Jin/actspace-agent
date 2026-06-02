@@ -14,13 +14,10 @@
 - `active/20260527-agent-tool-capabilities.md`
 - `active/20260527-frontend-interaction-polish/README.md`
 - `active/20260527-right-panel-views.md`
-- `active/20260528-kairos-right-panel-compact-view.md`
-- `active/20260529-deepseek-anthropic-service.md`
-- `active/20260529-settings-page.md`
-- `active/actspace-usage-statistics-session-jsonl-plan.md`
-- `active/actspace-token-usage-context-control-foundation.md`
+- `active/20260529-appearance-fonts-and-zoom.md`
+- `active/20260530-workspace-file-explorer.md`
+- `active/actspace-cache-loss-audit-plan.md`
 - `active/frontend-ui-components-foundation.md`
-- `active/lab-v0-frontend-mock-implementation.md`
 - `active/Bash工具和工具权限调度开发计划/README.md`
 
 已完成的 `actspace` 计划：
@@ -47,8 +44,18 @@
 - `completed/actspace-tailwind-style-architecture.md`
 - `completed/20260528-tailwind-remaining-ui-migration.md`
 - `completed/20260528-frontend-style-ownership-cleanup.md`
+- `completed/20260528-kairos-right-panel-compact-view.md`
 - `completed/20260529-appearance-dark-theme.md`
+- `completed/20260529-composer-layout-variants.md`
 - `completed/20260529-context-compression.md`
+- `completed/20260529-deepseek-anthropic-service.md`
+- `completed/20260529-settings-page.md`
+- `completed/20260530-context-cache-and-usage/README.md`
+- `completed/20260530-kairos-budget-and-graceful-shutdown.md`
+- `completed/20260530-kairos-config-editor.md`
+- `completed/lab-v0-frontend-mock-implementation.md`
+- `completed/actspace-token-usage-context-control-foundation.md`
+- `completed/actspace-usage-statistics-session-jsonl-plan.md`
 - `completed/actspace-ui-bug-fix-plan.md`
 - `completed/actspace-workbench-split-view-foundation.md`
 - `completed/sidebar-cursor-alignment.md`

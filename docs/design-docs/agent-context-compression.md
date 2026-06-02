@@ -2,7 +2,7 @@
 
 本文是 actspace 主 Agent「上下文压缩」的长期设计事实来源。它回答：为什么压缩、压缩什么、在哪里压缩、压缩后如何恢复，以及哪些方案被排除。具体实施步骤见 `docs/exec-plans/active/20260529-context-compression.md`。
 
-设计原则来源：`.agents/skills/llm-agent-dev/references/context/mgmt-compression.md`、`mgmt-token-strategies.md`、`references/tools/tool-scheduling.md`。
+设计原则来源：`.agents/skills/llm-agent-dev/references/context/mgmt-compression.md`、`.agents/skills/llm-agent-dev/references/context/mgmt-token-strategies.md`、`.agents/skills/llm-agent-dev/references/tools/tool-scheduling.md`。
 
 ## 背景与现状缺口
 
@@ -30,7 +30,7 @@ actspace 的长期产品原则之一是「上下文的绝对控制」。但当�
 非目标（本期不做）：
 
 - 不做 token 移除策略的多策略选择器（中间/最旧/混合自适应）。第一期历史压缩只做「LLM 摘要 + 保留最近 N%」一种策略。
-- 不做用户手动增删改上下文条目（属于 `token-usage-and-context-state.md` 的后续）。
+- 不做用户手动增删改上下文条目（属于 `agent-token-usage-and-context-state.md` 的后续）。
 - 不做溢出文件的强一致清理（定时清理列为最后里程碑、可选）。
 - 不做敏感路径 blocklist 与读审核（仅记录为后续债务，见「读边界放开」）。
 
@@ -282,8 +282,8 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 
 ## 关联文档
 
-- `token-usage-and-context-state.md`：token 估算、`context_snapshot`、`context-state.json` 的数据分层。
+- `agent-token-usage-and-context-state.md`：token 估算、`context_snapshot`、`context-state.json` 的数据分层。
 - `core-storage-and-observability.md`：`<userData>/tmp`、`session.jsonl`、run-log 边界。
-- `kairos-autonomous-mode.md` + `kairos/compression/`：Kairos 短期记忆压缩，prompt 风格可借鉴但与主 Agent 解耦。
-- `tool-preview-design-guidelines.md`：`previewKind` 与 `ToolUiPreview` 契约（分型依据）。
-- `权限设计规则和原则.md` / `SECURITY.md`：读边界放开需同步更新。
+- `agent-kairos-autonomous-mode.md` + `kairos/compression/`：Kairos 短期记忆压缩，prompt 风格可借鉴但与主 Agent 解耦。
+- `agent-tool-preview-design-guidelines.md`：`previewKind` 与 `ToolUiPreview` 契约（分型依据）。
+- `agent-权限设计规则和原则.md` / `docs/SECURITY.md`：读边界放开需同步更新。

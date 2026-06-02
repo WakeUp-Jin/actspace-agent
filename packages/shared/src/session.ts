@@ -73,6 +73,7 @@ export type SessionEvent<TPayload = unknown> = {
 export type UserMessagePayload = {
   content: string;
   attachments?: ComposerAttachment[];
+  attachmentAnalyses?: AttachmentAnalysis[];
 };
 
 export type AssistantMessagePayload = AssistantReply;
@@ -176,6 +177,8 @@ export type SessionMeta = {
   workspaceRoot?: string;
   /** 用户是否把该会话钉到 Pinned 分区；缺省视为 false。 */
   pinned?: boolean;
+  /** 用户是否把该会话归档；缺省视为 false。 */
+  archived?: boolean;
 };
 
 export type ToolArtifact = {
@@ -198,6 +201,7 @@ export type ToolPreviewKind =
   | "grep"
   | "glob"
   | "web_search"
+  | "media_analysis"
   | "directory_list"
   | "edit_diff"
   | "write"
@@ -210,6 +214,7 @@ export type ToolUiPreview =
   | { kind: "grep"; pattern: string; scope?: string; resultCount?: number; displayText: string }
   | { kind: "glob"; pattern: string; scope?: string; resultCount?: number; displayText: string }
   | { kind: "web_search"; mode: "query" | "url"; query?: string; url?: string; displayText: string }
+  | { kind: "media_analysis"; mediaName: string; mediaKind: "image" | "video" | "media"; displayText: string }
   | { kind: "directory_list"; path: string; entryCount?: number; displayText: string }
   | {
       kind: "edit_diff";
@@ -375,6 +380,15 @@ export type ComposerAttachment = {
   previewUrl?: string;
 };
 
+export type AttachmentAnalysis = {
+  attachmentId: string;
+  toolName: "analyze_media";
+  status: "completed" | "failed";
+  summary?: string;
+  errorMessage?: string;
+  analyzedAt?: string;
+};
+
 export type MessageBlock =
   | {
       kind: "user";
@@ -382,6 +396,7 @@ export type MessageBlock =
       content: string;
       createdAt: string;
       attachments?: ComposerAttachment[];
+      attachmentAnalyses?: AttachmentAnalysis[];
     }
   | {
       kind: "assistant";
@@ -447,6 +462,16 @@ export type MessageBlock =
       displayText: string;
       createdAt: string;
       status?: "running" | "completed";
+    }
+  | {
+      kind: "media_analysis";
+      id: EventId;
+      mediaName: string;
+      mediaKind: "image" | "video" | "media";
+      displayText: string;
+      createdAt: string;
+      status?: "running" | "completed";
+      isError?: boolean;
     }
   | {
       kind: "directory_list";

@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
-import { ArrowLeft, Boxes, Settings, Sparkles, Sun, Wrench } from "lucide-react";
+import { Archive, ArrowLeft, Boxes, Settings, Sparkles, Sun, Wrench } from "lucide-react";
 
-export type SettingsSectionId = "general" | "model" | "agent" | "tools" | "appearance";
+export type SettingsSectionId = "general" | "model" | "agent" | "tools" | "appearance" | "archivedChats";
 
 type IconComponent = ComponentType<{ size?: number | string; strokeWidth?: number | string; className?: string }>;
 
@@ -11,6 +11,7 @@ export const SETTINGS_SECTIONS: { id: SettingsSectionId; label: string; icon: Ic
   { id: "agent", label: "智能体", icon: Sparkles },
   { id: "tools", label: "工具", icon: Wrench },
   { id: "appearance", label: "外观", icon: Sun },
+  { id: "archivedChats", label: "归档会话", icon: Archive },
 ];
 
 const NAV_ITEM_CLASS =

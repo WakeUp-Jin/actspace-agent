@@ -42,6 +42,7 @@
 - `CONTRIBUTING.md`：提 PR 前后的默认检查项和协作要求。
 - `docs/releases/README.md`：如何维护面向用户的发布记录。
 - `docs/references/README.md`：沉淀到仓库里的外部参考资料。
+- `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档；需要追溯历史修复方案时再读。
 
 ## 阶段完成后的学习沉淀
 

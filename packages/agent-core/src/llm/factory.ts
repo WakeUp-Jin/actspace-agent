@@ -8,29 +8,30 @@
 import type { LLMConfig, LLMService } from "./types";
 import { LLMServiceError } from "./types";
 import { MockLLMService } from "./services/mock";
-import { DeepSeekService } from "./services/deepseek";
-import { DeepSeekAnthropicService } from "./services/deepseek-anthropic";
-import { KimiService } from "./services/kimi";
+import { AnthropicMessagesService } from "./services/anthropic-messages";
+import { OpenAICompletionsService } from "./services/openai-completions";
 import { envToLLMConfig } from "../env";
 
+function resolveConfigApi(config: LLMConfig): NonNullable<LLMConfig["api"]> | "mock" {
+  if (config.provider.toLowerCase() === "mock" || config.provider.toLowerCase() === "deepseek-mock") {
+    return "mock";
+  }
+  if (config.api) return config.api;
+  if (config.apiFormat === "anthropic") return "anthropic-messages";
+  return "openai-completions";
+}
+
 export function createLLMService(config: LLMConfig): LLMService {
-  switch (config.provider.toLowerCase()) {
-    case "deepseek":
-      if (config.apiFormat === "anthropic") {
-        return new DeepSeekAnthropicService(config);
-      }
-      return new DeepSeekService(config);
-
-    case "kimi":
-      return new KimiService(config);
-
+  switch (resolveConfigApi(config)) {
+    case "anthropic-messages":
+      return new AnthropicMessagesService(config);
+    case "openai-completions":
+      return new OpenAICompletionsService(config);
     case "mock":
-    case "deepseek-mock":
       return new MockLLMService(config);
-
     default:
       throw new LLMServiceError(
-        `Unknown LLM provider: "${config.provider}". Available: deepseek, kimi, mock`,
+        `Unknown LLM api: "${config.api ?? config.apiFormat ?? config.provider}". Available: openai-completions, anthropic-messages, mock`,
         "invalid_request",
         false,
       );

@@ -62,6 +62,22 @@ const EXTRACTORS: Record<ToolPreviewKind, Extractor> = {
     };
   },
 
+  media_analysis: (s) => {
+    const source = getField(s, "source") ?? "";
+    const mimeType = getField(s, "mimeType");
+    const mediaKind = mimeType?.startsWith("image/")
+      ? "image"
+      : mimeType?.startsWith("video/")
+        ? "video"
+        : "media";
+    return {
+      kind: "media_analysis",
+      mediaName: source,
+      mediaKind,
+      displayText: "",
+    };
+  },
+
   directory_list: (s) => ({
     kind: "directory_list",
     path: getField(s, "path") ?? "",

@@ -32,7 +32,7 @@
   - `docs/design-docs/lab-index.md`
   - `docs/design-docs/lab-frontend-page-design.md`
   - `docs/design-docs/public/lab/prototype.html`
-  - `docs/design-docs/lab-v0-experiment-matrix.md`
+  - `docs/design-docs/lab-versions-index.md`
 - 相关代码路径：
   - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
   - `packages/desktop/src/renderer/components/Sidebar.tsx`

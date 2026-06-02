@@ -8,6 +8,7 @@ import type {
   UsageStatisticsSnapshot,
   UsageStatisticsToolEntry,
 } from "@actspace/shared";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 type Props = {
   snapshot: UsageStatisticsSnapshot | null;
@@ -147,9 +148,14 @@ function ToolDetailModal({
             <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Tool detail</div>
             <h3 className="mt-1 text-[22px] font-bold text-text-main">{tool.name}</h3>
           </div>
-          <button className={iconButtonClass} type="button" aria-label="Close detail" onClick={onClose}>
-            <X size={16} strokeWidth={2} />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button className={iconButtonClass} type="button" aria-label="Close detail" onClick={onClose}>
+                <X size={16} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>关闭详情</TooltipContent>
+          </Tooltip>
         </header>
         <div className="grid grid-cols-2 gap-2.5 px-5 py-5">
           {[
@@ -198,9 +204,14 @@ function CostDetailModal({
             <h3 className="mt-1 text-[26px] font-bold leading-none tracking-[-0.02em] text-text-main">{formatMoney(totalCost)}</h3>
             <p className="mt-3 text-[13px] leading-relaxed text-text-muted">基于当前模型单价与 token usage 估算。</p>
           </div>
-          <button className={iconButtonClass} type="button" aria-label="Close cost detail" onClick={onClose}>
-            <X size={16} strokeWidth={2} />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button className={iconButtonClass} type="button" aria-label="Close cost detail" onClick={onClose}>
+                <X size={16} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>关闭详情</TooltipContent>
+          </Tooltip>
         </header>
         <div className="grid px-7 pb-6 pt-2">
           {breakdown.map((item) => (

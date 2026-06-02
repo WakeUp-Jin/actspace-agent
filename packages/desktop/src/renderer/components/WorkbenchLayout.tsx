@@ -5,7 +5,7 @@ import { LabPage } from "./LabPage";
 import { RightPanel } from "./RightPanel";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { RightPanelObjectMenu } from "./right-panel/RightPanelObjectMenu";
-import { Sidebar, type SidebarMode, type SidebarView } from "./Sidebar";
+import { Sidebar, type NewSessionInput, type SessionUiStatusKind, type SidebarMode, type SidebarView } from "./Sidebar";
 import { SplitView } from "./SplitView";
 import { UsageStatisticsPage } from "./UsageStatisticsPage";
 import { WindowChromeBar } from "./WindowChromeBar";
@@ -80,15 +80,19 @@ export function WorkbenchLayout({
   isAborting = false,
   sendScrollRequestId = 0,
   busySessionIds,
+  sessionStatuses,
   onSend,
   onAbort,
   onNewSession,
+  onAddWorkspace,
   onSelectSession,
   onTogglePin,
+  onArchiveSession,
   isSessionReady = true,
   showDemoAttachments = false,
   defaultModelId,
   onSettingsChange,
+  onArchivedSessionsChange,
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
@@ -100,15 +104,19 @@ export function WorkbenchLayout({
   isAborting?: boolean;
   sendScrollRequestId?: number;
   busySessionIds?: Set<string>;
+  sessionStatuses?: Record<string, SessionUiStatusKind>;
   onSend?: (text: string, options: ComposerSendOptions) => void;
   onAbort?: () => void;
-  onNewSession?: () => void;
+  onNewSession?: (input?: NewSessionInput) => void;
+  onAddWorkspace?: () => void;
   onSelectSession?: (sessionId: string) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
+  onArchiveSession?: (sessionId: string) => void;
   isSessionReady?: boolean;
   showDemoAttachments?: boolean;
   defaultModelId?: ModelId;
   onSettingsChange?: (settings: AppSettings) => void;
+  onArchivedSessionsChange?: () => void;
 }) {
   const [storedLayout] = useState(loadStoredLayout);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -284,7 +292,13 @@ export function WorkbenchLayout({
 
   // 设置走「整页接管」：不渲染聊天侧栏与右栏，由 SettingsPage 自带导航 + 内容两栏。
   if (view === "settings") {
-    return <SettingsPage onBack={() => setView("chat")} onSettingsChange={onSettingsChange} />;
+    return (
+      <SettingsPage
+        onBack={() => setView("chat")}
+        onSettingsChange={onSettingsChange}
+        onArchivedSessionsChange={onArchivedSessionsChange}
+      />
+    );
   }
 
   let mainContent;
@@ -351,10 +365,13 @@ export function WorkbenchLayout({
             mode={leftMode}
             view={view}
             busySessionIds={busySessionIds}
+            sessionStatuses={sessionStatuses}
             onToggleMode={toggleSidebarMode}
             onNewSession={onNewSession}
+            onAddWorkspace={onAddWorkspace}
             onSelectSession={onSelectSession}
             onTogglePin={onTogglePin}
+            onArchive={onArchiveSession}
             onSelectView={handleSelectView}
           />
         }

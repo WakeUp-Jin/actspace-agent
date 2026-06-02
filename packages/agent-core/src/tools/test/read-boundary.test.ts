@@ -3,12 +3,19 @@ import { mkdtemp, mkdir, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFileExecutor, listDirectoryExecutor } from "../index";
+import { readFileDefinition } from "../tools/read-file/definition";
 
 /**
  * 读边界放开：read_file / list_directory 等读类工具不再被 workspace 守卫框住，
  * 可读 workspace 之外的路径（bash 落盘文件、session.jsonl 等内部产物的回读前提）。
  */
 describe("read-class tools ignore workspace boundary", () => {
+  it("documents that read_file can read explicit local paths such as attachments", () => {
+    expect(readFileDefinition.description).toContain("user-explicitly provided local path");
+    expect(readFileDefinition.description).toContain("attached file path");
+    expect(readFileDefinition.description).not.toContain("Do NOT use this tool for files outside the workspace boundary");
+  });
+
   it("read_file reads an absolute path outside the workspace", async () => {
     const workspace = await realpath(await mkdtemp(join(tmpdir(), "actspace-rb-ws-")));
     const outsideDir = await realpath(await mkdtemp(join(tmpdir(), "actspace-rb-out-")));

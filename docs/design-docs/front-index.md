@@ -41,20 +41,14 @@
 - `front-主题与配色规范.md`：三态主题（浅/深/跟随系统）机制与「颜色必须随主题翻转」的硬约束；任何写颜色的样式工作先读这里。
 - `front-tailwind-style-architecture.md`：Tailwind v4 样式架构、全局样式边界、token 映射和迁移顺序。
 - `front-基础组件封装规范.md`：基础 UI wrapper 分层、Radix / shadcn 关系、组件抽象边界和迁移顺序。
+- `front-icon-button-tooltip-guidelines.md`：图标按钮 Tooltip、`aria-label`、`title` 迁移、禁用态说明和当前迁移清单。
 - `front-工作台布局与面板交互规范.md`：自研 SplitView、左右面板 resize、左侧 rail 和未来拖动边界。
 - `front-左侧会话栏规范.md`：左侧轻量列表、Pinned / Scheduled / Workspaces 分区规则与状态点约定。
 - `front-中间消息区规范.md`：消息语法、类型规则、顺序原则和工具流可视化。
 - `front-聊天输入框规范.md`：Composer、模式、模型、附件、Context 弹窗和发送。
-- `front-右侧面板与文件渲染规范.md`：文件预览、会话级 diff 和右侧定稿图。
-- `front-工作区文件浏览器规范.md`：右侧面板文件树、只读浏览、IPC 契约和 V1-V3 边界。
-- `front-Markdown渲染规范.md`：右侧面板 Markdown 渲染栈、主题感知高亮和 Preview/源码切换。
-- `front-HTML渲染与沙箱安全规范.md`：HTML 渲染的威胁模型、sandbox iframe + CSP 双闸和 V1/V2 边界。
-- `front-Context完整视图规范.md`：右侧面板 Context 完整只读视图的数据契约、配色联动和导出边界。
-- `front-消息可视化转换规范.md`：Markdown 回复转 HTML 的缓存、安全沙箱和渲染边界。
+- `front-右侧面板与文件渲染规范.md`：右侧文件预览、Workspace 文件树、Markdown / HTML / Context / Reply HTML、会话级 diff、IPC 契约和安全边界。
 - `front-设置页规范.md`：设置态布局、导航与聊天态切换规则。
-- `front-Kairos监控页规范.md`：Kairos 自治模式监控页的信息架构、运行轨迹、执行列表、统计区和详情区规范。
-- `front-Kairos上下文Sheet规范.md`：Kairos 监控页“上下文”按钮与右侧滑入 Sheet 的入口、信息架构、Snapshot 契约与 IPC 通道。
-- `front-Kairos右侧紧凑视图规范.md`：聊天态右侧面板中的 Kairos compact view。
+- `front-Kairos监控页规范.md`：Kairos 自治模式监控页、上下文 Sheet、运行轨迹、执行列表、统计区、详情区和聊天态右侧 compact view。
 - `front-usage-statistics.md`：Usage Statistics 页面布局、组件、数据来源和视觉规范。
 
 ## 资产

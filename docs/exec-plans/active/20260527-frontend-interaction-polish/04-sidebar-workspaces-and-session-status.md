@@ -4,13 +4,17 @@
 
 完成 `#12` 和 `#18`。Workspaces 父级的添加项目按钮不再无响应，第一版通过目录选择并创建该 workspace 下的新会话，让列表出现项目名；会话列表项旁的状态按钮可区分 idle、running、waiting_approval、failed、scheduled，并可点击查看简短详情。
 
+这一轮需要先收清 Workspaces 的产品语义：**添加的是一个项目目录 / workspace root，但列表里展示的仍然是 session 分组**。第一版没有独立 Workspace 实体，因此选择目录后必须创建该目录下的首个 session；如果只保存一个空目录，左侧没有可展示、可选中的对象。
+
 ## 范围
 
 包含：
 
 - Workspaces 父级 `FolderPlus` 按钮接入目录选择。
-- 选择目录后创建新 session，并带 `workspaceRoot`。
+- 选择目录后创建新 session，并带 `workspaceRoot`；该 session 刷新后出现在 Workspaces 下对应项目文件夹里。
 - 取消目录选择时 UI 无副作用。
+- 单个 workspace 文件夹本身点击只负责展开 / 折叠；进入工作内容仍通过其下 session 完成。
+- 单个 workspace 文件夹右侧 `Plus` 在该 workspaceRoot 下创建新 session。
 - 会话行展示状态按钮或状态点，状态至少覆盖 `idle`、`running`、`waiting_approval`、`failed`、`scheduled`。
 - 点击状态按钮展示简短状态菜单或详情。
 - 状态按钮不挤压会话标题和时间，键盘可访问。
@@ -18,6 +22,8 @@
 不包含：
 
 - 不新增独立 Workspace 数据模型。
+- 不支持空 workspace 文件夹；没有 session 的目录不会单独显示在列表中。
+- 不把 workspace 文件夹点击做成 workspace 首页 / 文件视图入口。
 - 不做 workspace 重命名、排序、删除或拖拽。
 - 不实现 Scheduled 真实定时任务；scheduled 只展示已有 mock 或后续契约能提供的状态。
 - 不改 Bash 审核调度核心，只消费已有 pending approval 信息或 renderer 当前状态。
@@ -50,6 +56,7 @@
 - Workspaces 父级 `FolderPlus` 仍是 `coming soon`。
 - `createSession({ workspaceRoot })` 契约已存在，main 会用传入 workspaceRoot 写入 session meta。
 - 当前 `busySessionIds` 只能表达 active session running，不能表达 waiting approval / failed / scheduled。
+- renderer 里的 workspace 分组目前只有 `key` / `label` / `sessions`，其中 default workspace 使用内部 sentinel key；实现单个 workspace `Plus` 时不能把该 sentinel 当真实路径传给 main，需要在 group view model 中保留 `workspaceRoot?: string`。
 
 ## 实施任务
 
@@ -68,17 +75,23 @@
 ### Step 2: Workspaces 添加项目行为
 
 - Sidebar 为 Workspaces 父级 `FolderPlus` 增加 `onAddWorkspace` 回调。
+- Workspaces 父级添加按钮的语义是“选择项目目录并创建首个 session”，不是创建一个可为空的 workspace 实体。
 - WorkbenchLayout / App 实现 `handleAddWorkspace`：
   - Electron 环境选择目录。
   - 成功后调用 `createSession({ title: "New chat", workspaceRoot })`。
   - 刷新 sessions，并选中新 session。
   - mock 环境添加 fallback workspace session。
-- 单个 workspace 文件夹右侧 `Plus` 后续也应创建该 workspace 下的新会话，而不是默认 workspace。
+- Sidebar / WorkbenchLayout / App 将 `onNewSession` 升级为可接收 `{ workspaceRoot?: string }`。
+- 单个 workspace 文件夹右侧 `Plus` 创建该 workspace 下的新会话，而不是默认 workspace。
+- Default workspace 的 `Plus` 不传内部 sentinel；可以不传 `workspaceRoot`，由 main 使用默认 `roots.workspaceRoot` 兜底。
+- 点击 workspace 文件夹 icon 或名称仍只切换展开 / 折叠，不选中 session，也不打开新的 workspace-level 页面。
 
 验收：
 
 - 成功选择目录后左侧 Workspaces 出现项目名。
 - 新建 session 的 `workspaceRoot` 为所选目录。
+- 单个 workspace 文件夹右侧 `Plus` 新建出的 session 仍归在同一 workspace 分组下。
+- 点击 workspace 文件夹名称不会创建 session、不会切换到未知页面，只改变展开 / 折叠状态。
 
 ### Step 3: 会话状态模型
 
@@ -125,6 +138,10 @@
   - 缓解：明确 marker 内状态和 pin 的切换规则，必要时把详情入口放在 title 行内稳定位置。
 - 风险：新增 workspace 数据模型会扩大范围。
   - 缓解：只通过新建 session 形成 workspace 分组，不维护独立 workspace 列表。
+- 风险：把 workspace group 的内部 key 误当真实路径传给 main，导致 default workspace 创建到 `__default__` 之类的伪路径。
+  - 缓解：group view model 显式区分 `key` 和 `workspaceRoot?: string`；Default workspace 新建时不传 root。
+- 风险：用户期待点击 folder 进入 workspace 文件视图。
+  - 缓解：本计划把 folder 点击定义为折叠 / 展开；workspace-level view 需要单独产品语义和计划，不塞进本轮。
 - 风险：pending approval 来源可能异步更新。
   - 缓解：第一版可在打开状态菜单时查询，或沿用 streaming event 状态；不要阻塞基本 UI。
 
@@ -140,6 +157,7 @@
 - [ ] 完成目录选择 IPC。
 - [ ] 完成 Workspaces 父级添加项目行为。
 - [ ] 完成单个 workspace plus 传递 workspaceRoot。
+- [ ] 确认 workspace folder 点击只折叠 / 展开，不承担进入 workspace 的语义。
 - [ ] 完成会话状态 view model。
 - [ ] 完成状态按钮和详情菜单。
 - [ ] 完成测试和 Electron 真实验证。
@@ -147,3 +165,4 @@
 ## 决策记录
 
 - 2026-05-28：Workspaces 第一版不新增独立实体，只通过 `SessionMeta.workspaceRoot` 和 `createSession({ workspaceRoot })` 形成真实列表效果。
+- 2026-06-02：确认 Workspaces 父级添加按钮选择的是项目目录，但落地必须创建该目录下的首个 session；workspace folder 本身点击只折叠 / 展开，不作为 workspace 首页入口。

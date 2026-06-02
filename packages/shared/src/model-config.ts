@@ -1,5 +1,10 @@
 export type ModelId = "deepseek-v4-flash" | "deepseek-v4-pro" | "kimi-k2.6";
 
+export type ModelApi = "openai-completions" | "anthropic-messages";
+export type ModelProvider = "deepseek" | "kimi";
+export type ModelInputKind = "text" | "image";
+export type ModelVisibility = "public" | "internal";
+
 export type ModelPricing = {
   currency: "USD" | "CNY";
   inputCacheHitPerMillion: number;
@@ -11,11 +16,19 @@ export type ModelPricing = {
 export interface ModelSpec {
   id: ModelId;
   label: string;
-  provider: "deepseek" | "kimi";
+  /** API protocol family. It selects the LLM service / message conversion path. */
+  api: ModelApi;
+  /** Provider brand / endpoint owner. It selects credentials and default base URL. */
+  provider: ModelProvider;
   apiModel: string;
+  defaultBaseUrl: string;
   thinkingDefault: boolean;
   supportsThinkingToggle: boolean;
+  reasoning: boolean;
+  input: ModelInputKind[];
   contextWindow: number;
+  maxTokens: number;
+  visibility: ModelVisibility;
   pricing?: ModelPricing;
 }
 
@@ -23,11 +36,17 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
   "deepseek-v4-flash": {
     id: "deepseek-v4-flash",
     label: "DeepSeek V4 Flash",
+    api: "anthropic-messages",
     provider: "deepseek",
     apiModel: "deepseek-v4-flash",
+    defaultBaseUrl: "https://api.deepseek.com/anthropic",
     thinkingDefault: true,
     supportsThinkingToggle: true,
+    reasoning: true,
+    input: ["text", "image"],
     contextWindow: 1_000_000,
+    maxTokens: 8192,
+    visibility: "public",
     // DeepSeek 国产模型按人民币计价；单价为 CNY/百万 token（由旧 USD 单价按 ≈7.2 一次性换算而来，
     // 仅作示意，接真实项目时改成 DeepSeek 官网公布的 CNY 价目即可）。
     pricing: {
@@ -40,11 +59,17 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
   "deepseek-v4-pro": {
     id: "deepseek-v4-pro",
     label: "DeepSeek V4 Pro",
+    api: "anthropic-messages",
     provider: "deepseek",
     apiModel: "deepseek-v4-pro",
+    defaultBaseUrl: "https://api.deepseek.com/anthropic",
     thinkingDefault: true,
     supportsThinkingToggle: true,
+    reasoning: true,
+    input: ["text", "image"],
     contextWindow: 1_000_000,
+    maxTokens: 8192,
+    visibility: "public",
     pricing: {
       currency: "CNY",
       inputCacheHitPerMillion: 0.0261,
@@ -55,15 +80,24 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
   "kimi-k2.6": {
     id: "kimi-k2.6",
     label: "Kimi K2.6",
+    api: "openai-completions",
     provider: "kimi",
     apiModel: "kimi-k2.6",
+    defaultBaseUrl: "https://api.moonshot.ai/v1",
     thinkingDefault: false,
     supportsThinkingToggle: true,
+    reasoning: false,
+    input: ["text", "image"],
     contextWindow: 256_000,
+    maxTokens: 8192,
+    visibility: "internal",
   },
 };
 
-export const MODEL_LIST: ModelSpec[] = Object.values(MODEL_REGISTRY);
+export const ALL_MODEL_LIST: ModelSpec[] = Object.values(MODEL_REGISTRY);
+
+/** Public user-facing models. Internal helper models, such as Kimi, stay in MODEL_REGISTRY. */
+export const MODEL_LIST: ModelSpec[] = ALL_MODEL_LIST.filter((spec) => spec.visibility === "public");
 
 export const DEFAULT_MODEL_ID: ModelId = "deepseek-v4-pro";
 
@@ -72,6 +106,12 @@ export function resolveModelSpec(modelId?: ModelId): ModelSpec {
   return MODEL_REGISTRY[DEFAULT_MODEL_ID];
 }
 
+export function isPublicModelId(value: unknown): value is ModelId {
+  return typeof value === "string" &&
+    value in MODEL_REGISTRY &&
+    MODEL_REGISTRY[value as ModelId].visibility === "public";
+}
+
 export function resolveModelSpecByApiModel(apiModel: string, provider?: ModelSpec["provider"]): ModelSpec | undefined {
-  return MODEL_LIST.find((spec) => spec.apiModel === apiModel && (!provider || spec.provider === provider));
+  return ALL_MODEL_LIST.find((spec) => spec.apiModel === apiModel && (!provider || spec.provider === provider));
 }

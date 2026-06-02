@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   Archive,
@@ -17,9 +17,15 @@ import {
   SquarePen,
 } from "lucide-react";
 import type { SessionListItem } from "@actspace/shared";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 export type SidebarMode = "expanded" | "hidden";
 export type SidebarView = "chat" | "lab" | "usage" | "kairos" | "settings";
+export type NewSessionInput = {
+  workspaceRoot?: string;
+};
+export type SessionUiStatusKind = "idle" | "running" | "waiting_approval" | "failed" | "scheduled";
+type SessionStatusMeta = { label: string; detail: string; dotClass: string; rowClass: string };
 
 const DEFAULT_WORKSPACE_KEY = "__default__";
 const DEFAULT_WORKSPACE_LABEL = "Default workspace";
@@ -61,6 +67,7 @@ function workspaceKey(root: string | undefined | null): string {
 type WorkspaceGroup = {
   key: string;
   label: string;
+  workspaceRoot?: string;
   sessions: SessionListItem[];
 };
 
@@ -72,6 +79,7 @@ function groupSessionsByWorkspace(sessions: SessionListItem[]): WorkspaceGroup[]
       groups.set(key, {
         key,
         label: workspaceLabelFromRoot(session.workspaceRoot),
+        workspaceRoot: session.workspaceRoot,
         sessions: [],
       });
     }
@@ -94,11 +102,49 @@ type ScheduledItem = {
   id: string;
   title: string;
   hint: string;
+  status: SessionUiStatusKind;
 };
 
 const MOCK_SCHEDULED: ScheduledItem[] = [
-  { id: "scheduled-context-audit", title: "Weekly context audit", hint: "Tomorrow" },
+  { id: "scheduled-context-audit", title: "Weekly context audit", hint: "Tomorrow", status: "scheduled" },
 ];
+
+const SESSION_STATUS_META: Record<SessionUiStatusKind, SessionStatusMeta> = {
+  idle: {
+    label: "Idle",
+    detail: "Ready for the next turn.",
+    dotClass: "bg-text-faint opacity-55",
+    rowClass: "",
+  },
+  running: {
+    label: "Running",
+    detail: "Agent turn is currently running.",
+    dotClass: "animate-[session-status-pulse_1500ms_ease-in-out_infinite] bg-brand",
+    rowClass: "is-busy",
+  },
+  waiting_approval: {
+    label: "Waiting approval",
+    detail: "A tool call is paused until approval is resolved.",
+    dotClass: "animate-[session-status-pulse_1500ms_ease-in-out_infinite] bg-warm",
+    rowClass: "is-waiting-approval",
+  },
+  failed: {
+    label: "Failed",
+    detail: "The latest turn failed or needs attention.",
+    dotClass: "bg-danger",
+    rowClass: "is-failed",
+  },
+  scheduled: {
+    label: "Scheduled",
+    detail: "A scheduled run is planned for this session.",
+    dotClass: "bg-warm",
+    rowClass: "is-scheduled",
+  },
+};
+
+function resolveSessionStatus(status: unknown): SessionUiStatusKind {
+  return typeof status === "string" && status in SESSION_STATUS_META ? status as SessionUiStatusKind : "idle";
+}
 
 const SIDEBAR_CLASS =
   "sidebar relative flex h-full min-h-0 flex-col gap-3 border-r border-line bg-sidebar pb-2.5 pl-2.5 pr-2 pt-[var(--window-chrome-strip-height)]";
@@ -133,6 +179,14 @@ const SESSION_ROW_MAIN_MUTED_CLASS = "text-text-muted";
 const SESSION_ROW_ACTIONS_CLASS = "inline-flex flex-none items-center gap-0.5";
 const SESSION_ROW_ARCHIVE_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} grid h-[22px] w-[22px] flex-none place-items-center rounded-act-sm text-text-faint opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
+const SESSION_STATUS_CONTAINER_CLASS = "relative grid h-[22px] w-[22px] flex-none place-items-center";
+const SESSION_STATUS_BUTTON_CLASS =
+  `${SIDEBAR_BUTTON_RESET_CLASS} session-status-button grid h-[22px] w-[22px] place-items-center rounded-act-sm text-text-faint transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main focus-visible:bg-[var(--act-color-hover-overlay)] focus-visible:text-text-main`;
+const SESSION_STATUS_BUTTON_DOT_CLASS = "h-1.5 w-1.5 rounded-full";
+const SESSION_STATUS_MENU_CLASS =
+  "session-status-menu absolute right-0 top-6 z-20 w-44 rounded-act-md border border-line bg-surface-raised px-2 py-1.5 text-left text-[12px] shadow-act-popover";
+const SESSION_STATUS_MENU_LABEL_CLASS = "font-medium text-text-main";
+const SESSION_STATUS_MENU_DETAIL_CLASS = "mt-0.5 leading-snug text-text-faint";
 const SESSION_ROW_PIN_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} session-row-pin absolute inset-0 grid h-[14px] w-[14px] place-items-center rounded-act-sm text-text-muted opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
 const SESSION_ROW_PIN_ACTIVE_CLASS = "is-active opacity-100 text-text-main";
@@ -204,22 +258,75 @@ function NavSectionHeader({ label, collapsed, onToggle, extraActions }: NavSecti
 type SessionRowProps = {
   session: SessionListItem;
   isActive: boolean;
-  isBusy: boolean;
+  status: SessionUiStatusKind;
   onSelect: () => void;
   onTogglePin?: () => void;
   onArchive?: () => void;
 };
 
-function SessionRow({ session, isActive, isBusy, onSelect, onTogglePin, onArchive }: SessionRowProps) {
-  const dotClass = isActive
+function SessionStatusButton({ status }: { status: SessionUiStatusKind }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const meta = SESSION_STATUS_META[status];
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className={SESSION_STATUS_CONTAINER_CLASS} ref={rootRef}>
+      <button
+        className={SESSION_STATUS_BUTTON_CLASS}
+        type="button"
+        aria-label={`Session status: ${meta.label}`}
+        aria-expanded={open}
+        title={meta.label}
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((value) => !value);
+        }}
+      >
+        <span className={`${SESSION_STATUS_BUTTON_DOT_CLASS} ${meta.dotClass}`} aria-hidden="true" />
+      </button>
+      {open ? (
+        <div className={SESSION_STATUS_MENU_CLASS} role="status">
+          <div className={SESSION_STATUS_MENU_LABEL_CLASS}>{meta.label}</div>
+          <div className={SESSION_STATUS_MENU_DETAIL_CLASS}>{meta.detail}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SessionRow({ session, isActive, status, onSelect, onTogglePin, onArchive }: SessionRowProps) {
+  const statusMeta = SESSION_STATUS_META[status];
+  const archiveDisabled = isActive || !onArchive;
+  const archiveLabel = isActive ? "Current session cannot be archived" : "Archive session";
+  const dotClass = isActive && status === "idle"
     ? `${SESSION_STATUS_DOT_CLASS} ${SESSION_STATUS_DOT_ACTIVE_CLASS}`
-    : isBusy
-      ? `${SESSION_STATUS_DOT_CLASS} ${SESSION_STATUS_DOT_BUSY_CLASS}`
-      : `${SESSION_STATUS_DOT_CLASS} ${SESSION_STATUS_DOT_MUTED_CLASS}`;
+    : `${SESSION_STATUS_DOT_CLASS} ${statusMeta.dotClass}`;
   const rowClass = [
     SESSION_ROW_CLASS,
     isActive ? SESSION_ROW_ACTIVE_CLASS : "",
-    isBusy ? "is-busy" : "",
+    statusMeta.rowClass,
     session.pinned ? SESSION_ROW_PINNED_CLASS : "",
   ].filter(Boolean).join(" ");
 
@@ -250,7 +357,7 @@ function SessionRow({ session, isActive, isBusy, onSelect, onTogglePin, onArchiv
         ) : null}
       </span>
       <button
-        className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && !isBusy ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
+        className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && status === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
         type="button"
         onClick={onSelect}
         aria-current={isActive ? "page" : undefined}
@@ -261,14 +368,16 @@ function SessionRow({ session, isActive, isBusy, onSelect, onTogglePin, onArchiv
         </span>
       </button>
       <div className={`session-row-actions ${SESSION_ROW_ACTIONS_CLASS}`}>
+        <SessionStatusButton status={status} />
         <button
-          className={`session-row-archive ${SESSION_ROW_ARCHIVE_CLASS}`}
+          className={`session-row-archive ${SESSION_ROW_ARCHIVE_CLASS} ${archiveDisabled ? "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-text-faint" : ""}`}
           type="button"
-          aria-label="Archive session"
-          title="Archive (coming soon)"
+          disabled={archiveDisabled}
+          aria-label={archiveLabel}
+          title={archiveLabel}
           onClick={(event) => {
             event.stopPropagation();
-            onArchive?.();
+            if (!archiveDisabled) onArchive?.();
           }}
         >
           <Archive size={12} strokeWidth={1.9} />
@@ -282,6 +391,7 @@ type CollapsibleSessionListProps = {
   sessions: SessionListItem[];
   activeSessionId: string | null;
   busySessionIds: Set<string>;
+  sessionStatuses: Record<string, SessionUiStatusKind>;
   onSelectSession?: (sessionId: string) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   onArchive?: (sessionId: string) => void;
@@ -292,6 +402,7 @@ function CollapsibleSessionList({
   sessions,
   activeSessionId,
   busySessionIds,
+  sessionStatuses,
   onSelectSession,
   onTogglePin,
   onArchive,
@@ -308,7 +419,7 @@ function CollapsibleSessionList({
           key={session.id}
           session={session}
           isActive={session.id === activeSessionId}
-          isBusy={busySessionIds.has(session.id)}
+          status={sessionStatuses[session.id] ?? (busySessionIds.has(session.id) ? "running" : "idle")}
           onSelect={() => onSelectSession?.(session.id)}
           onTogglePin={onTogglePin ? () => onTogglePin(session.id, !session.pinned) : undefined}
           onArchive={onArchive ? () => onArchive(session.id) : undefined}
@@ -333,7 +444,9 @@ export function Sidebar({
   mode,
   view,
   busySessionIds,
+  sessionStatuses,
   onNewSession,
+  onAddWorkspace,
   onSelectSession,
   onTogglePin,
   onSelectView,
@@ -344,9 +457,11 @@ export function Sidebar({
   mode: SidebarMode;
   view: SidebarView;
   busySessionIds?: Set<string>;
+  sessionStatuses?: Record<string, SessionUiStatusKind>;
   /** 折叠按钮回调；现由 WorkbenchLayout 通过 WindowChromeBar 调用，Sidebar 内部不直接渲染 chrome row。 */
   onToggleMode?: () => void;
-  onNewSession?: () => void;
+  onNewSession?: (input?: NewSessionInput) => void;
+  onAddWorkspace?: () => void;
   onSelectSession?: (sessionId: string) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   onSelectView?: (next: SidebarView) => void;
@@ -358,6 +473,7 @@ export function Sidebar({
   const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
   const [workspacesCollapsed, setWorkspacesCollapsed] = useState(false);
   const busyIds = busySessionIds ?? new Set<string>();
+  const statuses = sessionStatuses ?? {};
 
   const pinnedSessions = useMemo(
     () => sessions.filter((session) => session.pinned),
@@ -376,9 +492,9 @@ export function Sidebar({
     return null;
   }
 
-  const handleNewAgent = () => {
+  const handleNewAgent = (input?: NewSessionInput) => {
     onSelectView?.("chat");
-    onNewSession?.();
+    onNewSession?.(input);
   };
 
   const handleSelectChatSession = (sessionId: string) => {
@@ -392,7 +508,7 @@ export function Sidebar({
         <button
           className={`${SIDEBAR_PRIMARY_ACTION_CLASS} ${view === "chat" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
           type="button"
-          onClick={handleNewAgent}
+          onClick={() => handleNewAgent()}
         >
           <SquarePen size={14} strokeWidth={1.9} />
           <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>New Agent</span>
@@ -437,6 +553,7 @@ export function Sidebar({
                 sessions={pinnedSessions}
                 activeSessionId={activeSessionId}
                 busySessionIds={busyIds}
+                sessionStatuses={statuses}
                 onSelectSession={handleSelectChatSession}
                 onTogglePin={onTogglePin}
                 onArchive={onArchive}
@@ -453,12 +570,22 @@ export function Sidebar({
             onToggle={() => setScheduledCollapsed((value) => !value)}
             extraActions={
               <>
-                <button className={NAV_SECTION_ACTION_BUTTON_CLASS} type="button" aria-label="More scheduled actions">
-                  <MoreHorizontal size={14} strokeWidth={1.9} />
-                </button>
-                <button className={NAV_SECTION_ACTION_BUTTON_CLASS} type="button" aria-label="New scheduled task">
-                  <SquarePen size={13} strokeWidth={1.9} />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button className={NAV_SECTION_ACTION_BUTTON_CLASS} type="button" aria-label="More scheduled actions">
+                      <MoreHorizontal size={14} strokeWidth={1.9} aria-hidden="true" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>更多定时任务操作</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button className={NAV_SECTION_ACTION_BUTTON_CLASS} type="button" aria-label="New scheduled task">
+                      <SquarePen size={13} strokeWidth={1.9} aria-hidden="true" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>新建定时任务</TooltipContent>
+                </Tooltip>
               </>
             }
           />
@@ -467,13 +594,15 @@ export function Sidebar({
               {MOCK_SCHEDULED.map((item) => (
                 <div className={`${SESSION_ROW_CLASS} ${SESSION_ROW_MUTED_CLASS}`} key={item.id} role="presentation">
                   <span className={`session-row-marker ${SESSION_ROW_MARKER_CLASS}`}>
-                    <span className={`${SESSION_STATUS_DOT_CLASS} ${SESSION_STATUS_DOT_MUTED_CLASS}`} aria-hidden="true" />
+                    <span className={`${SESSION_STATUS_DOT_CLASS} ${SESSION_STATUS_META[item.status].dotClass}`} aria-hidden="true" />
                   </span>
                   <button className={`${SESSION_ROW_MAIN_CLASS} ${SESSION_ROW_MAIN_MUTED_CLASS}`} type="button">
                     <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>{item.title}</span>
                     <span className={`session-row-time ${SESSION_ROW_TIME_CLASS}`}>{item.hint}</span>
                   </button>
-                  <div className={`session-row-actions ${SESSION_ROW_ACTIONS_CLASS}`} />
+                  <div className={`session-row-actions ${SESSION_ROW_ACTIONS_CLASS}`}>
+                    <SessionStatusButton status={item.status} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -498,8 +627,12 @@ export function Sidebar({
                 <button
                   className={NAV_SECTION_ACTION_BUTTON_CLASS}
                   type="button"
-                  aria-label="New workspace folder"
-                  title="New folder (coming soon)"
+                  aria-label="Add workspace"
+                  title="Add workspace"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onAddWorkspace?.();
+                  }}
                 >
                   <FolderPlus size={13} strokeWidth={1.9} />
                 </button>
@@ -515,6 +648,7 @@ export function Sidebar({
                   group={group}
                   activeSessionId={activeSessionId}
                   busySessionIds={busyIds}
+                  sessionStatuses={statuses}
                   onSelectSession={handleSelectChatSession}
                   onNewSession={handleNewAgent}
                   onTogglePin={onTogglePin}
@@ -540,8 +674,9 @@ type WorkspaceSectionProps = {
   group: WorkspaceGroup;
   activeSessionId: string | null;
   busySessionIds: Set<string>;
+  sessionStatuses: Record<string, SessionUiStatusKind>;
   onSelectSession?: (sessionId: string) => void;
-  onNewSession?: () => void;
+  onNewSession?: (input?: NewSessionInput) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   onArchive?: (sessionId: string) => void;
 };
@@ -550,6 +685,7 @@ function WorkspaceSection({
   group,
   activeSessionId,
   busySessionIds,
+  sessionStatuses,
   onSelectSession,
   onNewSession,
   onTogglePin,
@@ -587,7 +723,7 @@ function WorkspaceSection({
             title="New chat in this workspace"
             onClick={(event) => {
               event.stopPropagation();
-              onNewSession?.();
+              onNewSession?.(group.workspaceRoot ? { workspaceRoot: group.workspaceRoot } : undefined);
             }}
           >
             <Plus size={13} strokeWidth={2} />
@@ -599,6 +735,7 @@ function WorkspaceSection({
           sessions={group.sessions}
           activeSessionId={activeSessionId}
           busySessionIds={busySessionIds}
+          sessionStatuses={sessionStatuses}
           onSelectSession={onSelectSession}
           onTogglePin={onTogglePin}
           onArchive={onArchive}

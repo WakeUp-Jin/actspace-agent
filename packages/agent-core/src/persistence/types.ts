@@ -61,4 +61,5 @@ export interface MetaUpdateFields {
   lastContextSnapshot?: ContextUsageSnapshot;
   workspaceRoot?: string;
   pinned?: boolean;
+  archived?: boolean;
 }

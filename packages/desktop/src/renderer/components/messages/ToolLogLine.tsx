@@ -9,7 +9,7 @@ import {
 } from "./toolLogStyles";
 
 type ToolLogMessage = Extract<MessageBlock, {
-  kind: "read" | "search" | "grep" | "glob" | "web_search" | "directory_list" | "tool" | "error";
+  kind: "read" | "search" | "grep" | "glob" | "web_search" | "media_analysis" | "directory_list" | "tool" | "error";
 }>;
 type ToolLogStatus = "running" | "completed" | undefined;
 
@@ -154,6 +154,17 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
   }
 
   if (message.kind === "web_search") {
+    const lineClassName = getToolLogLineClass(message.status, className);
+    return (
+      <div className={lineClassName}>
+        <span className={getToolLogLineTextClass(message.status)}>
+          {message.displayText}
+        </span>
+      </div>
+    );
+  }
+
+  if (message.kind === "media_analysis") {
     const lineClassName = getToolLogLineClass(message.status, className);
     return (
       <div className={lineClassName}>

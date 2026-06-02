@@ -183,8 +183,8 @@ bash 走流式落盘 + 头部截断（T1.0/T1.1，无 flash）；非 bash 工具
 ### M6 文档沉淀（skill 修复留待统一执行）
 
 - [x] T6.1 沉淀 bash 流式落盘设计到 llm-agent-dev 修复文档
-  - 文件：`docs/design-docs/fix-llm-agent-06-skill-bash-tool-fix.md`（已写）、`docs/design-docs/fix-llm-agent-plan-index.md`（已登记）。
-  - 说明：本任务**只产出修复文档**。`.agents/skills/llm-agent-dev` 源文件（`references/tools/bash-tool.md`、`references/tools/tool-scheduling.md`、`references/context/mgmt-compression.md`、`examples/bash-tool.ts`、`examples/run-process.ts`）的实际修补不在本 active plan 内，按 `fix-llm-agent-plan-index.md` 既有约定（见 `04`/`05` 决策记录）留待后续统一修复 skill 源码时按 `06` 执行。
+  - 文件：`docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-06-skill-bash-tool-fix.md`（已写）、`docs/references/llm-agent-dev-skill-fixes/README.md`（已登记）。
+  - 说明：本任务**只产出修复文档**。`.agents/skills/llm-agent-dev` 源文件（`references/tools/bash-tool.md`、`references/tools/tool-scheduling.md`、`references/context/mgmt-compression.md`、`examples/bash-tool.ts`、`examples/run-process.ts`）的实际修补不在本 active plan 内，按 `docs/references/llm-agent-dev-skill-fixes/README.md` 既有约定（见 `04`/`05` 决策记录）留待后续统一修复 skill 源码时按 `06` 执行。
   - 验证：`pnpm check:docs`。
   - 回退：删除 `fix-llm-agent-06-skill-bash-tool-fix.md` 并还原 `README.md` 表格。
 
@@ -230,4 +230,4 @@ bash 走流式落盘 + 头部截断（T1.0/T1.1，无 flash）；非 bash 工具
 - 2026-05-29（实现修正）：可压区切点由「user 边界优先」改为「不动区以 assistant turn 开头」。合成摘要是 UserMessage，若不动区也以 user 开头会产生连续两条 user，而 DeepSeek 默认走 Anthropic-compatible route（严格交替、拒连续 user）。assistant 边界同样落在完整 tool 配对之后，且最近 user 提问在尾部不动区不受影响。summarizer 失败兜底为「丢弃最旧 + 仅留 session.jsonl 指针」。
 - 2026-05-29：取消读取类工具的 workspace 硬限制（写类保持守卫），以让「拼路径让模型回读」生效；敏感路径 blocklist + 读审核作为后续债务，不恢复 workspace 硬框。
 - 2026-05-29：通用工具截断阈值默认 2000、读取类独立高阈值（默认 20000），均可配置。
-- 2026-05-29：bash 流式落盘设计沉淀为 skill 修复文档 `docs/design-docs/fix-llm-agent-06-skill-bash-tool-fix.md`；`llm-agent-dev` skill 现有 bash 指导（`maxBuffer` 全量缓冲、无截断/落盘/回读）太粗糙。skill 源文件实际修补不进本 active plan，沿用 `llm-agent-fix-plan` 既有约定留待统一修复。
+- 2026-05-29：bash 流式落盘设计沉淀为 skill 修复文档 `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-06-skill-bash-tool-fix.md`；`llm-agent-dev` skill 现有 bash 指导（`maxBuffer` 全量缓冲、无截断/落盘/回读）太粗糙。skill 源文件实际修补不进本 active plan，沿用 `llm-agent-fix-plan` 既有约定留待统一修复。

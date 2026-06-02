@@ -5,7 +5,7 @@ import rehypeHighlight from "rehype-highlight";
 import { PreviewSourceToggle, type PreviewMode } from "./PreviewSourceToggle";
 
 /**
- * 右侧面板 Markdown 渲染视图（V1，见 `Markdown渲染规范.md`）。
+ * 右侧面板 Markdown 渲染视图（V1，见 `front-右侧面板与文件渲染规范.md`）。
  *
  * 渲染栈：react-markdown + remark-gfm（表格 / 任务列表）+ rehype-highlight（highlight.js）。
  * 安全：**不引 rehype-raw**，原始 HTML 一律转义不渲染；链接经默认 urlTransform 过滤后再统一加 target/rel。

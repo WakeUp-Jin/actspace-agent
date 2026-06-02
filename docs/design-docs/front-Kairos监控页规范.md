@@ -37,7 +37,7 @@
 - 用量胶囊规范见 [用量胶囊](#用量胶囊)；它和状态胶囊并列在标题右侧，是 header 第一行允许出现的两个数据胶囊。
 - 右侧按钮组从左到右固定顺序为 `开启 / 暂停`、`唤醒`、`上下文`、`重置`，遵循"先查看、后破坏"的从左到右心智。未启用时首按钮变为 `开启`。
 - `暂停` 的显示依据是运行态里的 `enabled === true`，不是单看 `state !== "stopped"`；后端停机后如果回推 `enabled: false`，主按钮要立刻切回 `开启`。
-- `上下文` 按钮打开右侧滑入的 Sheet，展示当前 tick 会看到的系统提示词、会话历史与工具列表；详细规范见 `Kairos上下文Sheet规范.md`。
+- `上下文` 按钮打开右侧滑入的 Sheet，展示当前 tick 会看到的系统提示词、会话历史与工具列表；详细规范见 `front-Kairos监控页规范.md`。
 - 标题、状态胶囊、用量胶囊和按钮垂直居中对齐，减少 header 高度。
 - 点击 `重置` 后，页面立即回到“刚进入 Kairos 且尚无事件”的空态：执行列表、运行轨迹和详情区清空，用量胶囊的 `本阶段` 维度归零（`累计` 维度不动，仍显示全期账）。
 
@@ -124,6 +124,186 @@
 - `assistant_message` / `assistant_reply` 的正文优先作为最终回复内容。
 - `tool_call` + `tool_result` 配对后作为工具结果内容；找不到配对时显示 running 或 missing 状态。
 - `error` 事件和 failed 工具结果共同参与异常计数和红色轨迹块。
+
+## 上下文 Sheet
+
+`上下文` 按钮打开右侧滑入 Sheet，展示 Kairos 当前 tick 会看到的系统提示词、短期记忆和工具列表。Kairos 自治模型、prompt 组装和短期记忆长期事实仍见 `agent-kairos-autonomous-mode.md`；本节只约束 renderer 入口、Sheet 行为、Snapshot 契约和验收点。
+
+### 入口与行为
+
+- 按钮位于 Header 右侧按钮组，顺序固定为 `开启 / 暂停`、`唤醒`、`上下文`、`重置`。
+- `上下文` 是只读查看，放在 `重置` 前，符合先查看、后破坏的心智。
+- icon 使用 `FileText`，样式复用监控页次级按钮。
+- 即使 Kairos stopped 也可查看；只有 `bridgeAvailable === false` 时禁用。
+- 按钮设置 `aria-haspopup="dialog"`、`aria-expanded` 和 `aria-controls`；Sheet 关闭后焦点回到此按钮。
+
+### Sheet 组件
+
+自研轻量 Sheet，不引入 Radix / shadcn runtime 依赖。
+
+- DOM：Overlay + Panel，Panel 使用 `role="dialog"` 和 `aria-modal="true"`。
+- 位置：屏幕右侧滑入，`w-[min(520px,92vw)]`，高度 `100vh`。
+- 关闭：`Esc`、点击 overlay、右上 `X`、程序化 `onOpenChange(false)`。
+- 焦点：打开时 focus 到第一个可聚焦元素；Tab / Shift+Tab 在 Panel 内循环；关闭后归还焦点。
+- 滚动：打开时锁定 body scroll，关闭后恢复。
+- 动效：右滑入 / 右滑出，遵守 `prefers-reduced-motion`。
+
+### 信息架构
+
+Sheet body 是单一纵向滚动容器，分三段：
+
+1. **系统提示词**：首屏主角，按 prompt 段落渲染为一篇连贯文档，而不是多张卡片。章节标题旁显示源文件徽章；纯运行时段显示「运行时生成」。
+2. **会话历史**：展示 `KairosShortTermMemoryContext.load()` 真正会回放给 LLM 的摘要和 messages。历史摘要用折叠段；最近 messages 默认每条显示 3 行，可展开本条。
+3. **工具列表**：chip 密排，只展示工具名。`KairosContextTool.description` 和 `parametersSchema` 保留在契约中，但 Sheet V1 不渲染，避免把能力清单变成 API 文档。
+
+系统提示词段固定对齐 prompt assembler 的 6 段：
+
+- Kairos 角色与节奏。
+- 运行上下文。
+- 配置提示。
+- 用户规则。
+- 观测摘要。
+- 历史摘要。
+
+顶部标题旁显示生成时间 `HH:mm:ss`。模型、阶段和 token 估算字段可以保留在 snapshot 里，但 V1 UI 不展示。
+
+### Snapshot 契约
+
+```ts
+type KairosContextPhase = "work" | "quiet" | "weekend" | "off";
+type KairosContextMessageRole = "user" | "assistant" | "tool" | "system";
+
+type KairosContextHistorySegment = {
+  label: string;
+  text: string;
+};
+
+type KairosContextMessage = {
+  role: KairosContextMessageRole;
+  source?: string;
+  content: string;
+  timestamp?: string;
+};
+
+type KairosContextTool = {
+  name: string;
+  description: string;
+  source: "kairos" | "shared";
+  parametersSchema: unknown;
+};
+
+type KairosContextPromptSegment = {
+  label: string;
+  text: string;
+  sourceFiles?: string[];
+};
+
+type KairosContextSnapshot = {
+  generatedAt: string;
+  modelId: string | null;
+  phase: KairosContextPhase;
+  systemPrompt: string;
+  systemPromptTokens: number;
+  systemPromptSegments: KairosContextPromptSegment[];
+  historySummary: KairosContextHistorySegment[];
+  historyMessages: KairosContextMessage[];
+  tools: KairosContextTool[];
+};
+```
+
+IPC：
+
+| Channel | 方向 | Payload |
+|---|---|---|
+| `kairos:get-context-snapshot` | renderer <-> main | `void` -> `KairosContextSnapshot` |
+
+调用是按需拉取，不新增 state / event 推送通道。Sheet 关闭后不保留 snapshot 到全局 hook state。
+
+Controller 暴露 `getContextSnapshot()`：复用 observe refresh、short-term memory、active briefs、`assembleSystemPrompt(...)` 和工具注册表。该调用纯 IO + 文本拼接，不真正调用 LLM。错误透传给 renderer，Sheet 顶部显示可重试错误。
+
+### Sheet 验收
+
+- Sheet 打开时能看到系统提示词、历史摘要 / messages 和工具 chip。
+- 系统提示词是一篇连续可滚动文档；源文件徽章可复制完整路径。
+- 「复制全文」复制 `snapshot.systemPrompt`。
+- 工具列表只展示 name，不展示 description、schema 或来源角标。
+- 拉取失败显示错误 banner + 重试。
+- `kairos:get-context-snapshot` handler 调 controller 一次并返回；controller throw 时透传错误。
+
+## 聊天态 Kairos 右侧紧凑视图
+
+聊天态右侧面板可以打开 `Kairos` Tab，展示 Kairos 当前状态。它是伴随式状态卡，不是完整监控台。
+
+### 定位与数据原则
+
+- 完整 Kairos 页面适合专门观察自治运行，包含运行轨迹、执行列表、统计、最终回复和工具结果详情。
+- 右侧紧凑视图适合聊天时常驻，只回答 Kairos 是否运行、最近最终回复是什么、最近轨迹如何。
+- 紧凑视图不做工具调试，不展示原始 JSON，不提供执行列表点击详情。
+- 完整页和紧凑视图都消费同一 `useKairos()` 与同一 `aggregateKairosEvents()` 结果。
+- 不新增 Kairos compact 专属 IPC，不让右侧面板自行解析 short-term jsonl。
+
+组件边界：
+
+```txt
+packages/desktop/src/renderer/state/useKairos.ts
+packages/desktop/src/renderer/state/kairosSelectors.ts
+
+packages/desktop/src/renderer/pages/KairosPage.tsx
+packages/desktop/src/renderer/components/right-panel/KairosRightPanelView.tsx
+```
+
+`kairosSelectors.ts` 放共享纯函数，如最新最终回复、展示 rows、状态文案、紧凑指标和时间格式化。不要共享完整页面布局。
+
+### 右侧面板接入
+
+右侧面板 Tab 与文件、Session diff 同级：
+
+```txt
+[ README.md ] [ Session diff ] [ Kairos ]
+```
+
+触发行为是打开右侧面板并设置 `kairos` tab，不切换主工作区到 `view === "kairos"`。
+
+### 紧凑布局
+
+宽度目标 320-640px，默认约 390px，纵向三段：
+
+1. 顶部状态区：`Kairos` + 状态胶囊（`Sleeping · 4m36s`、`Ticking`、`Stopped`、`Cooldown`）+ `暂停/开启`、`立即唤醒`、`重置今日`。
+2. 最终回复区：只展示最近最终回复，空态为 `暂无最终回复`。
+3. 轨迹列表区：展示最近 12-20 条 compact row，不分页、不可点击、不打开详情。
+
+紧凑视图不展示 workspace、session、统计卡片、运行轨迹 legend、工具结果详情或配置 / briefs / notes。
+
+状态边界：
+
+- 未暴露 `window.kairos`：显示 `Kairos 桥未就绪`。
+- 未启用 Kairos：显示 `Stopped`，主按钮为 `开启`。
+- sleeping：倒计时由 renderer 本地 interval 刷新。
+- ticking：`立即唤醒` 禁用。
+- 操作失败：按钮附近显示 `useKairos().error`。
+
+### 完整页与紧凑视图差异
+
+| 能力 | 完整 Kairos 页 | 右侧紧凑视图 |
+|---|---|---|
+| 数据源 | `useKairos()` | `useKairos()` |
+| 派生 rows | `aggregateKairosEvents()` | `aggregateKairosEvents()` |
+| Header 控制 | 有 | 有，紧凑化 |
+| 运行轨迹 timeline | 有 | 无；改为轨迹列表 |
+| 执行列表 | 有，宽表，可点击 | 有，compact row，不可点击 |
+| 最终回复 | 有 | 有，核心区域 |
+| 工具结果详情 | 有 | 无 |
+| 统计区 | 有 | 第一版不做 |
+| 配置 / Briefs / Notes | 不恢复 | 不做 |
+
+### 紧凑视图验收
+
+- 打开聊天右侧面板并切到 Kairos tab，不会切走主聊天区。
+- 代码中没有新增 compact 专属 IPC。
+- 右侧只展示 Header、最终回复、轨迹列表三段。
+- 轨迹列表不可点击，不维护 selected row，不展示工具结果详情。
+- 320px 宽度下文本和按钮不重叠。
+- 完整 Kairos 页仍保留工具结果详情和宽表。
 
 ## 验收要点
 

@@ -145,6 +145,16 @@ function messageBlockFromToolPreview(
         displayText: preview.displayText,
         createdAt: getDisplayTime(timestamp)
       };
+    case "media_analysis":
+      return {
+        kind: "media_analysis",
+        id: eventId,
+        mediaName: preview.mediaName,
+        mediaKind: preview.mediaKind,
+        displayText: preview.displayText,
+        createdAt: getDisplayTime(timestamp),
+        isError
+      };
     case "directory_list":
       return {
         kind: "directory_list",
@@ -216,7 +226,8 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
             id: event.id,
             content: payload.content,
             createdAt: getDisplayTime(event.timestamp),
-            attachments: payload.attachments
+            attachments: payload.attachments,
+            attachmentAnalyses: payload.attachmentAnalyses
           }
         ];
       }

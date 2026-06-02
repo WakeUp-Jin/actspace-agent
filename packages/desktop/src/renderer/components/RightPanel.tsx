@@ -9,6 +9,7 @@ import { MarkdownRenderView } from "./right-panel/MarkdownRenderView";
 import { ReplyHtmlRenderView } from "./right-panel/ReplyHtmlRenderView";
 import { WorkspaceFileTree } from "./right-panel/WorkspaceFileTree";
 import { isWorkspaceFileTab, useRightPanel, type RightPanelTab } from "./right-panel/RightPanelContext";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 const RIGHT_PANEL_CLASS = "flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l border-line bg-surface";
 // 右面板纵向三段（对齐 Cursor 右侧）：① tab 条（全宽）→ ② 工作区操作栏（全宽，仅浏览态出现）→ ③ 两栏 [文件树 | 内容]。
@@ -212,14 +213,19 @@ function RightPanelTabs() {
               >
                 {tab.title}
               </button>
-              <button
-                className={RIGHT_TAB_CLOSE_CLASS}
-                type="button"
-                aria-label={`关闭 ${tab.title}`}
-                onClick={() => closeTab(tab.id)}
-              >
-                <X size={12} strokeWidth={2.2} />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className={RIGHT_TAB_CLOSE_CLASS}
+                    type="button"
+                    aria-label={`关闭 ${tab.title}`}
+                    onClick={() => closeTab(tab.id)}
+                  >
+                    <X size={12} strokeWidth={2.2} aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>关闭 {tab.title}</TooltipContent>
+              </Tooltip>
             </span>
           );
         })}

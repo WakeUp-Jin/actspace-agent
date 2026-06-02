@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, LocalUpdateState } from "@actspace/shared";
+import type { AppSettings, LocalUpdateState, SessionListItem } from "@actspace/shared";
 import { SettingsPage } from "../components/settings/SettingsPage";
+import { TooltipProvider } from "../components/ui/Tooltip";
 
 function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
   const base: AppSettings = {
@@ -42,6 +43,25 @@ function makeLocalUpdateState(over: Partial<LocalUpdateState> = {}): LocalUpdate
   };
 }
 
+const archivedSessions: SessionListItem[] = [
+  {
+    id: "session-archived-1",
+    title: "Archived planning session",
+    updatedAt: "2026-06-01T10:00:00.000Z",
+    turnCount: 4,
+    workspaceRoot: "/repo/actspace-agent",
+    archived: true,
+  },
+];
+
+function renderSettingsPage(props: Parameters<typeof SettingsPage>[0] = { onBack: () => {} }) {
+  return render(
+    <TooltipProvider delayDuration={0}>
+      <SettingsPage {...props} />
+    </TooltipProvider>,
+  );
+}
+
 describe("SettingsPage", () => {
   const getSettings = vi.fn(async () => makeSettings());
   const updateSettings = vi.fn(async (input) => makeSettings(input as Partial<AppSettings>));
@@ -54,6 +74,8 @@ describe("SettingsPage", () => {
     ok: true,
     state: makeLocalUpdateState({ running: true, canUpdate: false }),
   }));
+  const listSessions = vi.fn(async (input?: { archived?: boolean }) => (input?.archived ? archivedSessions : []));
+  const archiveSession = vi.fn(async () => ({ ok: true }));
   const setUiZoom = vi.fn();
   const setNativeTheme = vi.fn();
 
@@ -66,6 +88,8 @@ describe("SettingsPage", () => {
     getLocalUpdateState.mockClear();
     selectLocalUpdateSource.mockClear();
     startLocalUpdate.mockClear();
+    listSessions.mockClear();
+    archiveSession.mockClear();
     setUiZoom.mockClear();
     setNativeTheme.mockClear();
     localStorage.clear();
@@ -79,6 +103,8 @@ describe("SettingsPage", () => {
       getLocalUpdateState,
       selectLocalUpdateSource,
       startLocalUpdate,
+      listSessions,
+      archiveSession,
       setUiZoom,
       setNativeTheme,
     } as unknown as ActspaceBridge;
@@ -89,14 +115,14 @@ describe("SettingsPage", () => {
   });
 
   it("loads settings and renders the general section by default", async () => {
-    render(<SettingsPage onBack={() => {}} />);
+    renderSettingsPage();
     expect(await screen.findByRole("switch", { name: "自动审查" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "通用" })).toBeInTheDocument();
     expect(screen.getByLabelText("界面语言")).toBeDisabled();
   });
 
   it("keeps the settings nav fixed while the content pane owns vertical scrolling", async () => {
-    render(<SettingsPage onBack={() => {}} />);
+    renderSettingsPage();
     expect(await screen.findByRole("switch", { name: "自动审查" })).toBeInTheDocument();
 
     expect(screen.getByTestId("settings-page-shell")).toHaveClass("h-screen", "overflow-hidden");
@@ -105,7 +131,7 @@ describe("SettingsPage", () => {
   });
 
   it("toggling 自动审查 calls updateSettings with bashAlwaysAsk", async () => {
-    render(<SettingsPage onBack={() => {}} />);
+    renderSettingsPage();
     const toggle = await screen.findByRole("switch", { name: "自动审查" });
     await userEvent.click(toggle);
     await waitFor(() => {
@@ -114,7 +140,7 @@ describe("SettingsPage", () => {
   });
 
   it("本地更新分区可选择源码目录并启动更新", async () => {
-    render(<SettingsPage onBack={() => {}} />);
+    renderSettingsPage();
     expect(await screen.findByText("/repo/actspace-agent")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "选择目录" }));
@@ -131,7 +157,7 @@ describe("SettingsPage", () => {
   });
 
   it("connecting a provider opens the key modal and saves the key", async () => {
-    render(<SettingsPage onBack={() => {}} />);
+    renderSettingsPage();
     await screen.findByRole("switch", { name: "自动审查" });
 
     await userEvent.click(screen.getByRole("button", { name: "模型" }));
@@ -147,7 +173,7 @@ describe("SettingsPage", () => {
   });
 
   it("disabling a tool writes it into disabledTools", async () => {
-    render(<SettingsPage onBack={() => {}} />);
+    renderSettingsPage();
     await screen.findByRole("switch", { name: "自动审查" });
 
     await userEvent.click(screen.getByRole("button", { name: "工具" }));
@@ -161,7 +187,7 @@ describe("SettingsPage", () => {
   });
 
   it("editing 主 Agent 系统提示词 saves it through settings", async () => {
-    render(<SettingsPage onBack={() => {}} />);
+    renderSettingsPage();
     await screen.findByRole("switch", { name: "自动审查" });
 
     await userEvent.click(screen.getByRole("button", { name: "智能体" }));
@@ -180,7 +206,7 @@ describe("SettingsPage", () => {
   });
 
   it("switching to 模型 shows connected state for kimi", async () => {
-    render(<SettingsPage onBack={() => {}} />);
+    renderSettingsPage();
     await screen.findByRole("switch", { name: "自动审查" });
 
     await userEvent.click(screen.getByRole("button", { name: "模型" }));
@@ -188,8 +214,36 @@ describe("SettingsPage", () => {
     expect(screen.getByLabelText("默认模型")).toBeInTheDocument();
   });
 
+  it("归档会话分区加载归档列表并支持恢复", async () => {
+    const onArchivedSessionsChange = vi.fn();
+    renderSettingsPage({ onBack: () => {}, onArchivedSessionsChange });
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "归档会话" }));
+
+    expect(await screen.findByText("Archived planning session")).toBeInTheDocument();
+    expect(listSessions).toHaveBeenCalledWith({ archived: true });
+
+    await userEvent.click(screen.getByRole("button", { name: "恢复" }));
+
+    await waitFor(() => {
+      expect(archiveSession).toHaveBeenCalledWith({ sessionId: "session-archived-1", archived: false });
+      expect(onArchivedSessionsChange).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("归档会话分区显示空状态", async () => {
+    listSessions.mockResolvedValueOnce([]);
+    renderSettingsPage();
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "归档会话" }));
+
+    expect(await screen.findByText("暂无归档会话")).toBeInTheDocument();
+  });
+
   it("外观分区可改字体与字号并持久化", async () => {
-    render(<SettingsPage onBack={() => {}} />);
+    renderSettingsPage();
     await screen.findByRole("switch", { name: "自动审查" });
 
     await userEvent.click(screen.getByRole("button", { name: "外观" }));
@@ -207,8 +261,19 @@ describe("SettingsPage", () => {
     expect(setUiZoom).toHaveBeenCalledWith(15 / 14);
   });
 
+  it("外观字号步进器图标按钮有可读 tooltip", async () => {
+    renderSettingsPage();
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "外观" }));
+    const increaseButton = screen.getByRole("button", { name: "代码字号增大" });
+
+    await userEvent.hover(increaseButton);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("增大 代码字号");
+  });
+
   it("外观分区切换主题写 data-theme、同步原生主题并持久化", async () => {
-    render(<SettingsPage onBack={() => {}} />);
+    renderSettingsPage();
     await screen.findByRole("switch", { name: "自动审查" });
 
     await userEvent.click(screen.getByRole("button", { name: "外观" }));

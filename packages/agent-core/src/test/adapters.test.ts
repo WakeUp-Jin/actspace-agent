@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  formatUserMessageForModel,
   messageToEvents,
   sessionEventsToMessages,
   toAssistantReply,
@@ -28,6 +29,42 @@ describe("Adapters: Message -> SessionEvent", () => {
     expect(events.length).toBe(1);
     expect(events[0].type).toBe("user_message");
     expect(events[0].sessionId).toBe(SESSION_ID);
+  });
+
+  it("persists user message attachments and image analyses in the payload", () => {
+    const msg = createMockUserMessage("Please inspect this screenshot.");
+    const attachments = [
+      {
+        id: "att-image-1",
+        kind: "image" as const,
+        name: "screenshot.png",
+        path: "/Users/test/screenshot.png",
+        mimeType: "image/png",
+      },
+    ];
+    const attachmentAnalyses = [
+      {
+        attachmentId: "att-image-1",
+        toolName: "analyze_media" as const,
+        status: "completed" as const,
+        summary: "The screenshot shows a chat input with an attached image.",
+        analyzedAt: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+
+    const events = userMessageToEvents(msg, SESSION_ID, TURN_ID, {
+      attachments,
+      attachmentAnalyses,
+    });
+
+    expect(events[0]).toMatchObject({
+      type: "user_message",
+      payload: {
+        content: "Please inspect this screenshot.",
+        attachments,
+        attachmentAnalyses,
+      },
+    });
   });
 
   it("should convert assistant with tool calls to events", () => {
@@ -80,6 +117,46 @@ describe("Adapters: SessionEvent -> Message (recovery)", () => {
     expect(messages[0].role).toBe("user");
   });
 
+  it("recovers user messages with attachment metadata and analysis text injected for the model", () => {
+    const user = createMockUserMessage("What does this show?");
+    const events = userMessageToEvents(user, SESSION_ID, TURN_ID, {
+      attachments: [
+        {
+          id: "att-image-1",
+          kind: "image",
+          name: "screenshot.png",
+          path: "/Users/test/screenshot.png",
+          mimeType: "image/png",
+        },
+        {
+          id: "att-file-1",
+          kind: "file",
+          name: "notes.md",
+          path: "/Users/test/notes.md",
+          mimeType: "text/markdown",
+        },
+      ],
+      attachmentAnalyses: [
+        {
+          attachmentId: "att-image-1",
+          toolName: "analyze_media",
+          status: "completed",
+          summary: "The screenshot shows the Attach files menu.",
+        },
+      ],
+    });
+
+    const { messages, errors } = sessionEventsToMessages(events);
+
+    expect(errors).toHaveLength(0);
+    expect(messages[0]).toMatchObject({ role: "user" });
+    expect(messages[0].content).toContain("Attached files:");
+    expect(messages[0].content).toContain("[image] screenshot.png path=/Users/test/screenshot.png mime=image/png");
+    expect(messages[0].content).toContain("[file] notes.md path=/Users/test/notes.md mime=text/markdown");
+    expect(messages[0].content).toContain("Image analysis results:");
+    expect(messages[0].content).toContain("The screenshot shows the Attach files menu.");
+  });
+
   it("should recover assistant messages with usage", () => {
     const assistant = createMockFinalReply();
     const events = assistantMessageToEvents(assistant, SESSION_ID, TURN_ID);
@@ -129,5 +206,38 @@ describe("Adapters: toAssistantReply", () => {
     const reply = toAssistantReply(msg);
 
     expect(reply.usage?.serverToolUse).toEqual({ webSearchRequests: 1, webFetchRequests: 0 });
+  });
+});
+
+describe("Adapters: attachment formatting", () => {
+  it("adds file metadata and image analyses to the model input without changing original content", () => {
+    const formatted = formatUserMessageForModel(
+      "Summarize the attachment.",
+      [
+        {
+          id: "att-file-1",
+          kind: "file",
+          name: "notes.md",
+          path: "/Users/test/notes.md",
+          mimeType: "text/markdown",
+        },
+      ],
+      [
+        {
+          attachmentId: "att-image-1",
+          toolName: "analyze_media",
+          status: "failed",
+          errorMessage: "图片分析失败，模型只能看到附件路径和文件名。",
+        },
+      ],
+    );
+
+    expect(formatted).toContain("Summarize the attachment.");
+    expect(formatted).toContain("Attached files:");
+    expect(formatted).toContain("[file] notes.md path=/Users/test/notes.md mime=text/markdown");
+    expect(formatted).toContain("use read_file with the provided path");
+    expect(formatted).toContain("Image analysis results:");
+    expect(formatted).toContain("analysis failed");
+    expect(formatted).toContain("图片分析失败，模型只能看到附件路径和文件名。");
   });
 });

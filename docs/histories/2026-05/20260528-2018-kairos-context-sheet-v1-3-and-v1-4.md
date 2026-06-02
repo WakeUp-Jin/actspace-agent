@@ -46,7 +46,7 @@
 - **[`<ul>` 改 `<div>`]**：`SystemPromptSection` 内容容器从 `<ul>` 列表换成 `<div>` 章节流，对应每段 DOM 从 `<li>` 换 `<article>`——语义上更准确（这不是"列表"，是"章节流"）。
 - **[工具列表保留 v1.2 改动]**：用户明确说"工具列表是可以的"，两列 grid 设计不动。
 - **[会话历史完全不动]**：用户说"会话历史可以的"，保留 v1.1 的 3 行折叠 + `font-mono` 消息正文。
-- **[design doc v1.3 同步]**：`Kairos上下文Sheet规范.md` 顶部状态升 v1.3；"历次调整"补 v1.3 项（标注"信息架构层面的方向修正"）；① 系统提示词段重写 ASCII 示意图 + 视觉描述 + "为什么取消按段预览/折叠"的设计解释；信息架构总图把"段卡片 × N"改成"章节 × N（用 1px 分隔线分界）"；视觉细节小节移除已废弃的卡片样式描述。
+- **[design doc v1.3 同步]**：`front-Kairos监控页规范.md` 顶部状态升 v1.3；"历次调整"补 v1.3 项（标注"信息架构层面的方向修正"）；① 系统提示词段重写 ASCII 示意图 + 视觉描述 + "为什么取消按段预览/折叠"的设计解释；信息架构总图把"段卡片 × N"改成"章节 × N（用 1px 分隔线分界）"；视觉细节小节移除已废弃的卡片样式描述。
 
 **测试影响**：`kairos-context-sheet.test.tsx` 的 7 个用例**完全不需要改**——它们关心的是段标签 / 源文件徽章 / "运行时生成"占位文本 / "复制全文"按钮，这些 v1.3 都保留。
 
@@ -65,7 +65,7 @@
 - **[`Fragment` import 清理]**：v1.2 的两列 grid 用了 `<Fragment>` 串 `<dt><dd>`，v1.4 chip 不需要，import 顺手删掉。
 - **[文件顶部 doc 注释更新]**：把 v1.3 顶部的"工具列表 grid 两列对齐"描述换成 "chip 密排"，并在头部加 v1.4 改动小节。
 - **[测试断言收紧]**：`kairos-context-sheet.test.tsx` 的 "renders tool list..." 用例从"flat without expansion or schema"改为 "renders tools as chips showing only name"，加两条断言：`queryByText(/请求自治调度器睡眠/).not.toBeInTheDocument()` 和 `queryByText(/读取本地文件内容/).not.toBeInTheDocument()`——明确"description 字段不再渲染"是设计契约。
-- **[design doc v1.4 同步]**：`Kairos上下文Sheet规范.md` 顶部状态升 v1.4；"历次调整"补 v1.4 项；③ 工具列表段重写 ASCII 示意图 + 视觉规格 + "为什么不展示描述 / 为什么是 chip"的设计解释 + chip vs source-file badge 视觉差异对照表；信息架构总图把"两列对齐"改成"chip 密排，flex-wrap 换行"；"视觉细节"小节同步；"非目标"小节里加 v1.4 起 description 也不渲染的说明；"测试策略"小节改对应用例描述。
+- **[design doc v1.4 同步]**：`front-Kairos监控页规范.md` 顶部状态升 v1.4；"历次调整"补 v1.4 项；③ 工具列表段重写 ASCII 示意图 + 视觉规格 + "为什么不展示描述 / 为什么是 chip"的设计解释 + chip vs source-file badge 视觉差异对照表；信息架构总图把"两列对齐"改成"chip 密排，flex-wrap 换行"；"视觉细节"小节同步；"非目标"小节里加 v1.4 起 description 也不渲染的说明；"测试策略"小节改对应用例描述。
 
 **v1.4 测试结果**：`pnpm --filter @actspace/desktop test` 全套 110 个测试通过。
 
@@ -113,4 +113,4 @@ v1.4 工具列表 chip 化进一步印证了同一个 takeaway——同样是把
 
 - `packages/desktop/src/renderer/components/kairos/KairosContextSheet.tsx`
 - `packages/desktop/src/renderer/test/kairos-context-sheet.test.tsx`
-- `docs/design-docs/front-Kairos上下文Sheet规范.md`
+- `docs/design-docs/front-Kairos监控页规范.md`
