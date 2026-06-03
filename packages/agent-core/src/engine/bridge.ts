@@ -540,15 +540,25 @@ function createCompactionEvent(
   sessionId: string,
   turnId: string,
 ): SessionEvent<ContextCompactionPayload> {
-  const payload: ContextCompactionPayload = {
+  return createPersistedSessionEvent(sessionId, turnId, "context_compaction", createContextCompactionPayload(info));
+}
+
+function createContextCompactionPayload(info: ContextCompactionInfo): ContextCompactionPayload {
+  const status = info.status ?? "compacted";
+  const removedCount = info.removedCount ?? Math.max(info.beforeCount - info.afterCount, 0);
+  return {
     triggerTokens: info.triggerTokens,
     thresholdTokens: info.thresholdTokens,
     beforeCount: info.beforeCount,
     afterCount: info.afterCount,
     summaryChars: info.summaryChars,
     historyRefPath: info.historyRefPath,
+    trigger: info.trigger ?? "auto",
+    status,
+    removedCount,
+    reductionRatio: info.beforeCount > 0 ? removedCount / info.beforeCount : undefined,
+    reason: info.reason,
   };
-  return createPersistedSessionEvent(sessionId, turnId, "context_compaction", payload);
 }
 
 function recordToolExecution(
@@ -1010,6 +1020,21 @@ function mapAgentEventToStreamEvent(
         decision: event.decision.decision,
       };
 
+    case "context_compaction": {
+      const payload = createContextCompactionPayload(event.info);
+      return {
+        type: "context_compaction_finished",
+        sessionId,
+        turnId,
+        trigger: payload.trigger ?? "auto",
+        stage: "completed",
+        status: payload.status === "skipped" ? "skipped" : "compacted",
+        progress: 1,
+        summary: payload.status === "skipped" ? "Nothing to compact" : "Context compacted",
+        payload,
+      };
+    }
+
     case "agent_end":
       // turn 结束时清空累积状态，防内存泄漏
       toolCallStreaming.clear();
@@ -1019,8 +1044,6 @@ function mapAgentEventToStreamEvent(
     case "turn_end":
     case "message_start":
     case "message_end":
-    // 历史压缩仅作观测落 run-log / session.jsonl，本期不向 renderer 推流式事件。
-    case "context_compaction":
       return null;
   }
 }

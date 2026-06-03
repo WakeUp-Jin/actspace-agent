@@ -108,10 +108,13 @@ export class Agent {
         if (!report?.compacted) return null;
         return {
           messages: this.contextManager.getMessages(),
+          trigger: "auto",
+          status: "compacted",
           triggerTokens: report.triggerTokens,
           thresholdTokens: report.thresholdTokens,
           beforeCount: report.beforeCount,
           afterCount: report.afterCount,
+          removedCount: report.removedCount,
           summaryChars: report.summaryChars,
           historyRefPath: report.historyRefPath,
           reason: report.reason,

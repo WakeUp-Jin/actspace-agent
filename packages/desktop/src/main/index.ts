@@ -19,6 +19,7 @@ import type {
   ApprovalDecideInput,
   ApprovalListPendingInput,
   ClearProviderKeyInput,
+  CompactContextInput,
   ComposerAttachment,
   DeepSeekBalanceSnapshot,
   ProviderId,
@@ -65,6 +66,7 @@ import {
 } from "@actspace/agent-core";
 import type { SessionEvent, SessionRecord } from "@actspace/shared";
 import { runAndPersistTurn, abortTurn, type AgentRuntimeContextLoader, type AppDataRoots } from "./agent-turn";
+import { compactAndPersistContext } from "./context-compact";
 import { listVisualizations, visualizeReply } from "./visualize-service";
 import { describeSessionContext } from "./context-describe-service";
 import { loadMainAgentRuntimeContext } from "./agent-runtime-context";
@@ -779,6 +781,22 @@ async function registerIpc() {
 
   ipcMain.handle("agent:abort-turn", async (_event, input: AbortTurnInput) => {
     return abortTurn(input);
+  });
+
+  ipcMain.handle("context:compact", async (_event, input: CompactContextInput) => {
+    const roots = await ensureDataDirectories();
+    return compactAndPersistContext(
+      input,
+      roots,
+      getMainWindow,
+      (workspaceRoot) =>
+        loadMainAgentRuntimeContext({
+          dataRoot: roots.dataRoot,
+          workspaceRoot,
+          readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
+          warn: logMain,
+        }),
+    );
   });
 
   ipcMain.handle("dialog:select-files", async (): Promise<SelectFilesResult> => {

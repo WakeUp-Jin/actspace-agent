@@ -14,6 +14,18 @@ function toolResultEvent(payload: ToolExecutionResult): SessionEvent<ToolExecuti
   };
 }
 
+function contextCompactionEvent(payload: Record<string, unknown>): SessionEvent<Record<string, unknown>> {
+  return {
+    id: `evt-${String(payload.status ?? "legacy")}`,
+    sessionId: "session-compact",
+    turnId: "turn-compact",
+    type: "context_compaction",
+    timestamp: "2026-06-02T00:00:00.000Z",
+    schemaVersion: 1,
+    payload,
+  };
+}
+
 describe("session selectors", () => {
   it("restores a completed delete_file result as a delete message block", () => {
     const blocks = createMessageBlocks([
@@ -82,5 +94,51 @@ describe("session selectors", () => {
       "Delete missing.md failed",
       "Denied delete notes.md",
     ]);
+  });
+
+  it("maps legacy context_compaction payloads as auto completed blocks", () => {
+    const blocks = createMessageBlocks([
+      contextCompactionEvent({
+        triggerTokens: 1200,
+        thresholdTokens: 1000,
+        beforeCount: 10,
+        afterCount: 4,
+        summaryChars: 240,
+        historyRefPath: "/sessions/s1/session.jsonl",
+      }),
+    ]);
+
+    expect(blocks).toEqual([
+      expect.objectContaining({
+        kind: "context_compaction",
+        status: "completed",
+        trigger: "auto",
+        summaryText: "Context compacted",
+        reductionLabel: "6 messages removed",
+      }),
+    ]);
+  });
+
+  it("maps manual skipped payloads as Nothing to compact", () => {
+    const blocks = createMessageBlocks([
+      contextCompactionEvent({
+        triggerTokens: 120,
+        thresholdTokens: 1000,
+        beforeCount: 1,
+        afterCount: 1,
+        summaryChars: 0,
+        historyRefPath: "/sessions/s1/session.jsonl",
+        trigger: "manual",
+        status: "skipped",
+        removedCount: 0,
+      }),
+    ]);
+
+    expect(blocks[0]).toEqual(expect.objectContaining({
+      kind: "context_compaction",
+      status: "skipped",
+      trigger: "manual",
+      summaryText: "Nothing to compact",
+    }));
   });
 });

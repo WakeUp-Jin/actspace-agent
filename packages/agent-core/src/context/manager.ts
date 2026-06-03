@@ -51,6 +51,7 @@ export interface ContextManagerForSessionOptions
 /** compactIfNeeded 的返回报告：携带是否压缩 + 观测元数据 */
 export interface ContextCompactionReport {
   compacted: boolean;
+  status: "compacted" | "skipped";
   /** 触发压缩时的估算总 token */
   triggerTokens: number;
   /** 触发阈值（contextWindow × compressionThreshold） */
@@ -179,6 +180,42 @@ export class ContextManager {
 
     return {
       compacted: result.compacted,
+      status: result.compacted ? "compacted" : "skipped",
+      triggerTokens,
+      thresholdTokens,
+      beforeCount,
+      afterCount: result.keptCount,
+      removedCount: result.removedCount,
+      summaryChars: result.summaryChars,
+      historyRefPath,
+      reason: result.reason,
+    };
+  }
+
+  /**
+   * 手动压缩入口：跳过 token 阈值和调用间隔检查，但仍复用 HistoryCompactor 的
+   * 安全切点、摘要与 fallback 逻辑。无可压区时返回 skipped 报告，供 UI 明确反馈。
+   */
+  async compactNow(summarizer?: Summarizer): Promise<ContextCompactionReport> {
+    const triggerTokens = this.estimateTotalTokens();
+    const thresholdTokens = this.config.contextWindow * this.config.compressionThreshold;
+    const beforeCount = this.conversation.getMessageCount();
+    const historyRefPath = this.sessionPath ?? "session.jsonl";
+    const result = await compactHistory({
+      conversation: this.conversation,
+      summarizer,
+      sessionJsonlPath: historyRefPath,
+      keepRatio: this.config.compressKeepRatio,
+    });
+
+    if (result.compacted) {
+      this.compressionCount += 1;
+      this.callsSinceCompaction = 0;
+    }
+
+    return {
+      compacted: result.compacted,
+      status: result.compacted ? "compacted" : "skipped",
       triggerTokens,
       thresholdTokens,
       beforeCount,

@@ -330,6 +330,24 @@ export const mockMessages: MessageBlock[] = [
     provider: "deepseek"
   },
   {
+    kind: "context_compaction",
+    id: "mock-compact-completed",
+    status: "completed",
+    trigger: "manual",
+    summaryText: "Context compacted",
+    reductionLabel: "18 messages removed",
+    createdAt: now
+  },
+  {
+    kind: "context_compaction",
+    id: "mock-compact-running",
+    status: "running",
+    trigger: "manual",
+    stage: "summarizing",
+    summaryText: "Compacting context",
+    createdAt: now
+  },
+  {
     kind: "thinking",
     id: "mock-thinking-2",
     title: "Thinking for 6s",

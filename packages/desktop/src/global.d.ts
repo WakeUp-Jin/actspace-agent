@@ -7,6 +7,9 @@ declare global {
       runTurn: (
         input: import("@actspace/shared").RunTurnInput
       ) => Promise<import("@actspace/shared").AgentTurnResult>;
+      compactContext: (
+        input: import("@actspace/shared").CompactContextInput
+      ) => Promise<import("@actspace/shared").CompactContextResult>;
       abortTurn: (
         input: import("@actspace/shared").AbortTurnInput
       ) => Promise<boolean>;

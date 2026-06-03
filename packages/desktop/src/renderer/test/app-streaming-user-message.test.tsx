@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, BootstrapState, RunTurnInput, RuntimeStreamEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
+import type { AppSettings, BootstrapState, CompactContextInput, RunTurnInput, RuntimeStreamEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { TooltipProvider } from "../components/ui/Tooltip";
@@ -43,6 +43,19 @@ const settingsApiStub = {
   visualizeReply: async () => ({ html: "<!doctype html><html></html>", sourceHash: "stub", cached: false }),
   listVisualizations: async () => ({ items: [] }),
   describeContext: async () => null,
+  compactContext: async (input: CompactContextInput) => ({
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    status: "skipped" as const,
+    events: [],
+    contextSnapshot: {
+      totalTokens: 0,
+      maxTokens: 200_000,
+      percentUsed: 0,
+      buckets: [],
+    },
+    contextState: null,
+  }),
   listWorkspaceDir: async () => ({ root: "/tmp/workspace", relativePath: "", entries: [] }),
   readWorkspaceFile: async () => ({ relativePath: "", renderKind: "text" as const, size: 0, content: "" }),
   archiveSession: async () => ({ ok: true }),
@@ -284,6 +297,105 @@ describe("App streaming user message", () => {
         contextState: null,
       });
     });
+  });
+
+  it("routes /compact to compactContext without creating a normal run turn", async () => {
+    const sessionId = "session-compact";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "New chat",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    const runTurn = vi.fn();
+    const compactContext = vi.fn(async (input: CompactContextInput) => {
+      streamHandler?.({
+        type: "context_compaction_started",
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        trigger: "manual",
+        stage: "preparing",
+      });
+      streamHandler?.({
+        type: "context_compaction_finished",
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        trigger: "manual",
+        stage: "completed",
+        status: "skipped",
+        summary: "Nothing to compact",
+        payload: {
+          triggerTokens: 20,
+          thresholdTokens: 1000,
+          beforeCount: 1,
+          afterCount: 1,
+          summaryChars: 0,
+          historyRefPath: "/tmp/session.jsonl",
+          trigger: "manual",
+          status: "skipped",
+          removedCount: 0,
+        },
+      });
+      return {
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        status: "skipped" as const,
+        events: [],
+        contextSnapshot: {
+          totalTokens: 20,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      };
+    });
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      compactContext,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) {
+            streamHandler = null;
+          }
+        };
+      },
+      runTurn,
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "/compact");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    await waitFor(() => {
+      expect(compactContext).toHaveBeenCalledTimes(1);
+    });
+    expect(runTurn).not.toHaveBeenCalled();
   });
 
   it("renders read tool arguments as soon as tool_started arrives", async () => {

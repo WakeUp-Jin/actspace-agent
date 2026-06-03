@@ -122,4 +122,41 @@ describe("ContextManager.compactIfNeeded", () => {
     const third = await manager.compactIfNeeded(okSummarizer);
     expect(third?.compacted).toBe(true);
   });
+
+  it("compactNow forces compaction even when under threshold", async () => {
+    const manager = new ContextManager({
+      systemPromptModule: new SystemPromptContext("sys"),
+      conversation: new ConversationContext(buildHeavyHistory()),
+      sessionPath: "/data/sessions/s1/session.jsonl",
+      config: {
+        contextWindow: 200_000,
+        compressionThreshold: 0.85,
+        compressKeepRatio: 0.3,
+        compactMinIntervalCalls: 99,
+      },
+    });
+
+    expect(manager.needsCompression()).toBe(false);
+    const result = await manager.compactNow(okSummarizer);
+
+    expect(result.status).toBe("compacted");
+    expect(result.compacted).toBe(true);
+    expect(result.removedCount).toBeGreaterThan(0);
+    expect(manager.getCompressionCount()).toBe(1);
+  });
+
+  it("compactNow returns skipped when there is no safe compaction region", async () => {
+    const manager = new ContextManager({
+      systemPromptModule: new SystemPromptContext("sys"),
+      conversation: new ConversationContext([user("hi")]),
+      config: { contextWindow: 200_000, compactMinIntervalCalls: 1 },
+    });
+
+    const result = await manager.compactNow(okSummarizer);
+
+    expect(result.status).toBe("skipped");
+    expect(result.compacted).toBe(false);
+    expect(result.reason).toBe("nothing-to-compact");
+    expect(manager.getCompressionCount()).toBe(0);
+  });
 });
