@@ -36,14 +36,27 @@ function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {})
 
 describe("Composer follow-up bar", () => {
   it("renders the follow-up shell with review preview and status row", () => {
-    renderComposer();
+    renderComposer({
+      reviewSummary: {
+        status: "changes",
+        additions: 4253,
+        deletions: 5,
+      },
+    });
 
-    expect(screen.getByRole("button", { name: "Review pending changes" })).toHaveTextContent("Review+4253-5");
+    expect(screen.getByRole("button", { name: /Review pending changes/ })).toHaveTextContent("Review+4253-5");
     expect(screen.getByRole("button", { name: "More review actions" })).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Send follow-up")).toBeInTheDocument();
     expect(screen.getByText("main")).toBeInTheDocument();
     expect(screen.getByText("Local")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Context usage 36%" })).toBeInTheDocument();
+  });
+
+  it("hides the review action when no review summary is available", () => {
+    renderComposer();
+
+    expect(screen.queryByRole("button", { name: /Review/ })).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Send follow-up")).toBeInTheDocument();
   });
 
   it("keeps image and file attachments in the attachment area above the input bar", () => {
@@ -63,7 +76,7 @@ describe("Composer follow-up bar", () => {
     expect(toolbarButtons[0]).toHaveAccessibleName("Add agents, context, tools");
     expect(toolbarButtons[1]).toHaveAccessibleName(/deepseek-v4-pro/);
     expect(within(panel).queryByRole("button", { name: "Show context usage" })).not.toBeInTheDocument();
-    expect(panel).not.toContainElement(screen.getByRole("button", { name: "Review pending changes" }));
+    expect(panel).not.toContainElement(screen.queryByRole("button", { name: /Review pending changes/ }));
     expect(input).toHaveValue("");
   });
 

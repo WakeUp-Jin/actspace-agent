@@ -189,6 +189,93 @@ export type DescribeContextInput = {
   sessionId: string;
 };
 
+// ─── Review V1：Git-first workspace changes ───
+
+export type ReviewSource = "git" | "session" | "snapshot" | "external";
+
+export type ReviewBaselineKind = "session-preview" | "git-ref" | "snapshot";
+
+export type ReviewScope = "uncommitted";
+
+export type ReviewProviderStatus = "changes" | "empty" | "notAvailable" | "noBaseline" | "partial" | "failed";
+
+export type ReviewFileStatus = "added" | "modified" | "deleted" | "renamed";
+
+export type ReviewWarningKind = "truncated" | "binary_skipped" | "ignored_path" | "provider_failed";
+
+export type ReviewBaseline = {
+  kind: ReviewBaselineKind;
+  label: string;
+};
+
+export type ReviewChunk = {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  unifiedText?: string;
+};
+
+export type ReviewFileChange = {
+  path: string;
+  status: ReviewFileStatus;
+  previousPath?: string;
+  additions: number;
+  deletions: number;
+  chunks: ReviewChunk[];
+};
+
+export type ReviewWarning = {
+  kind: ReviewWarningKind;
+  message: string;
+  filePath?: string;
+};
+
+export type ReviewChangeSet = {
+  id: string;
+  sessionId?: string;
+  workspaceRoot?: string;
+  source: ReviewSource;
+  scope: ReviewScope;
+  baseline?: ReviewBaseline;
+  files: ReviewFileChange[];
+  totalAdditions: number;
+  totalDeletions: number;
+  generatedAt: string;
+  warnings?: ReviewWarning[];
+};
+
+export type ReviewGetWorkspaceChangesInput = {
+  workspaceRoot?: string;
+  scope?: ReviewScope;
+};
+
+export type ReviewProviderReason =
+  | "not_a_repository"
+  | "git_not_found"
+  | "unsupported_scope"
+  | "command_failed";
+
+export type ReviewGetWorkspaceChangesResult = {
+  provider: "git";
+  status: ReviewProviderStatus;
+  changeSet?: ReviewChangeSet;
+  reason?: ReviewProviderReason;
+  message?: string;
+};
+
+export type ReviewInitGitInput = {
+  workspaceRoot?: string;
+};
+
+export type ReviewInitGitResult = {
+  ok: boolean;
+  alreadyRepository?: boolean;
+  workspaceRoot: string;
+  error?: "git_not_found" | "command_failed" | "invalid_workspace";
+  message?: string;
+};
+
 // ─── 工作区文件浏览器（见 `docs/design-docs/front-右侧面板与文件渲染规范.md`）───
 
 /** 懒加载一层工作区目录。renderer 不直接读 FS，全部经此 IPC。 */

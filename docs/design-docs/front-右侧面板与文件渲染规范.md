@@ -2,13 +2,13 @@
 
 ## 定位
 
-右侧面板是当前会话的对象浏览工作区，用于查看文件、预览结果和会话级修改结果。
+右侧面板是当前会话的对象浏览工作区，用于查看文件、预览结果和 Review 变更结果。
 
 它属于聊天态工作台的可调对象区；右侧开关、宽度边界和中间聊天区保护规则见 `工作台布局与面板交互规范.md`。
 
 ## 文档范围
 
-本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、Tab 系统、文件渲染、Workspace 文件浏览、Context 完整只读视图、Reply HTML 和 HTML 沙箱安全。工作台左右面板 resize、collapse 和标题栏让位仍见 `front-工作台布局与面板交互规范.md`；颜色硬约束见 `front-主题与配色规范.md`。
+本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、Tab 系统、文件渲染、Workspace 文件浏览、Context 完整只读视图、Reply HTML 和 HTML 沙箱安全。Review / Diff 的数据来源、baseline 和无 Git 工作区策略见 `core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `front-工作台布局与面板交互规范.md`；颜色硬约束见 `front-主题与配色规范.md`。
 
 ## 交互模型
 
@@ -16,7 +16,7 @@
 - 每个 Tab 对应一个对象实例，不对应固定页面。
 - 点击消息中的文件、链接、图片或 diff 时，在右侧打开对应 Tab。
 - 支持多个 Tab 并列打开与切换。
-- 首版重点只保留文件预览和会话级 diff 两条主线。
+- 首版重点只保留文件预览和 Git-first Review 两条主线。
 - 面板打开后允许调整宽度，关闭后把宽度归还给中间聊天区。
 - 首版关闭右侧面板时不保留右侧 rail。
 - 右侧 Tab 行位于隐藏标题栏 chrome 的同一高度区间，必须保证 tab 按钮能高于 `.chrome-center` 拖拽区接收点击；同时继续给右上角 PanelRight 按钮预留 padding，避免 tab 命中区压住关闭右侧面板入口。
@@ -39,7 +39,7 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `PDF`：PDF 预览。
 - `CSV`：表格预览。
 - `Text`：纯文本或代码文件查看。
-- `Diff`：会话级 review diff。
+- `Review`：Git-first review diff；V1 默认展示当前 Git repository 的 uncommitted changes，Session / Last Turn 视角属于 V2。
 - `Kairos`：聊天态右侧紧凑状态视图；具体布局和数据边界见 `front-Kairos监控页规范.md`。
 - `Context`：完整只读上下文视图；见 `front-右侧面板与文件渲染规范.md`。
 - `Reply HTML`：当前会话已生成的可视化 HTML 文件浏览器（见下文）。
@@ -70,7 +70,7 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `csv`：渲染为表格视图。
 - `pdf`：渲染为分页阅读视图。
 - `图片`：直接预览。
-- `diff`：展示当前会话累计改动，不放在单条消息里替代消息流中的局部 diff。
+- `review` / `diff`：展示 Git Review 聚合改动；V2 可切换到当前会话累计改动，不放在单条消息里替代消息流中的局部 diff。
 
 ## Markdown 渲染
 
@@ -242,7 +242,7 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 ## 首版边界
 
 - 先支持 `md`、`html`、`图片` 三种文件预览优先级。
-- 会话级 diff 作为第二主线。
+- Git-first Review 作为第二主线；无 Git 时提示创建 Git repository，Session Review 只作为 V2 的 Last Turn / Session 视角。
 - 其他类型后续再补，不抢首版设计重点。
 
 ## 定稿图
@@ -250,7 +250,7 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 - [右侧 Markdown 定稿图](public/front/right-panel-markdown-final.png)
 - [右侧 HTML 定稿图](public/front/right-panel-html-final.png)
 - [右侧 Image 定稿图](public/front/right-panel-image-final.png)
-- [右侧 Diff 定稿图](public/front/right-panel-diff-final.png)
+- [右侧 Diff / Review 定稿图](public/front/right-panel-diff-final.png)
 
 ## 定稿图
 
@@ -260,10 +260,15 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 
 ![Image 定稿图](public/front/right-panel-image-final.png)
 
-![Diff 定稿图](public/front/right-panel-diff-final.png)
+![Diff / Review 定稿图](public/front/right-panel-diff-final.png)
 
-## Diff 展示边界
+## Review / Diff 展示边界
 
 - 聊天区保留单次工具调用或编辑动作的局部 diff。
-- 右侧 `Diff` Tab 负责会话级 review diff。
-- 会话级 diff 按文件浏览，适合审核本轮修改结果。
+- 右侧 `Review` Tab 的 V1 来源是 Git provider，默认展示 `Uncommitted` scope。
+- 右侧 `Review` Tab 按文件浏览，适合审核当前 repo 真实修改结果。
+- V1 Review 采用 Codex-style 极简文件级 accordion：顶部是一条单行操作栏，左侧显示 `Uncommitted` scope 和总 `+N -M`，右侧放更多、搜索、diff display、刷新等图标按钮；`N Uncommitted Changes` 保留在 `aria-label`、tooltip 或可访问说明中，不做大 summary card。
+- 文件列表是主体；每个文件一行显示 chevron、状态图标、path 和 `+N -M`，视觉行尾只保留增删统计。`New` / `Deleted` / `Renamed` / `Modified` 通过状态图标、颜色和文件行 `aria-label` / accessible name 表达，不再作为固定可见文字标签列。
+- 点击文件行展开 / 收起该文件的具体 unified diff。
+- 默认只展开第一个有 diff body 的文件，其余折叠，避免大变更一次性铺满右侧面板；文件行必须键盘可达并用 `aria-expanded` 表达展开状态。
+- Session / Last Turn diff 属于 V2 scope，只表示 Agent 会话改动，不能代表完整工作区状态。

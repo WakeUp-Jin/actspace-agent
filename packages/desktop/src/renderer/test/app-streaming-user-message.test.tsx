@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, BootstrapState, CompactContextInput, RunTurnInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
+import type { AppSettings, BootstrapState, CompactContextInput, ReviewGetWorkspaceChangesResult, RunTurnInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { TooltipProvider } from "../components/ui/Tooltip";
@@ -43,6 +43,15 @@ const settingsApiStub = {
   visualizeReply: async () => ({ html: "<!doctype html><html></html>", sourceHash: "stub", cached: false }),
   listVisualizations: async () => ({ items: [] }),
   describeContext: async () => null,
+  getWorkspaceReview: async () => ({
+    provider: "git" as const,
+    status: "empty" as const,
+  }),
+  initGitRepository: async () => ({
+    ok: true,
+    alreadyRepository: true,
+    workspaceRoot: "/tmp/workspace",
+  }),
   compactContext: async (input: CompactContextInput) => ({
     sessionId: input.sessionId,
     turnId: input.turnId,
@@ -117,6 +126,32 @@ function createEmptySessionRecord(sessionId: string): SessionRecord {
   };
 }
 
+function createReviewChanges(additions: number, deletions: number): ReviewGetWorkspaceChangesResult {
+  return {
+    provider: "git",
+    status: "changes",
+    changeSet: {
+      id: `review-${additions}-${deletions}`,
+      source: "git",
+      scope: "uncommitted",
+      workspaceRoot: "/tmp/workspace",
+      baseline: { kind: "git-ref", label: "HEAD" },
+      files: [
+        {
+          path: "src/example.ts",
+          status: "modified",
+          additions,
+          deletions,
+          chunks: [],
+        },
+      ],
+      totalAdditions: additions,
+      totalDeletions: deletions,
+      generatedAt: new Date().toISOString(),
+    },
+  };
+}
+
 function renderApp() {
   return render(
     <TooltipProvider delayDuration={0}>
@@ -143,6 +178,100 @@ describe("App streaming user message", () => {
     } else {
       delete (HTMLElement.prototype as unknown as { clientWidth?: number }).clientWidth;
     }
+  });
+
+  it("refreshes the composer review summary from workspace review state", async () => {
+    const sessionId = "session-review-summary";
+    const record = createEmptySessionRecord(sessionId);
+    record.meta.workspaceRoot = "/tmp/workspace";
+    record.messageBlocks = [
+      {
+        kind: "assistant",
+        id: "assistant-review-summary",
+        content: "Ready to continue.",
+        createdAt: record.meta.createdAt,
+      },
+    ];
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "Review summary",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+        workspaceRoot: "/tmp/workspace",
+      },
+    ];
+    let reviewAdditions = 7;
+    let reviewDeletions = 2;
+    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+      null;
+    const getWorkspaceReview = vi.fn(async () => createReviewChanges(reviewAdditions, reviewDeletions));
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      writable: true,
+      value: vi.fn(),
+    });
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      getWorkspaceReview,
+      onAgentStream: () => () => {},
+      runTurn: () =>
+        new Promise((resolve) => {
+          resolveRunTurn = resolve;
+        }),
+    };
+
+    renderApp();
+
+    expect(await screen.findByRole("button", { name: "Review pending changes +7 -2" })).toHaveTextContent("Review+7-2");
+    await waitFor(() => {
+      expect(getWorkspaceReview).toHaveBeenCalledWith({
+        workspaceRoot: "/tmp/workspace",
+        scope: "uncommitted",
+      });
+    });
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "update files");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    reviewAdditions = 10;
+    reviewDeletions = 1;
+    await act(async () => {
+      resolveRunTurn?.({
+        sessionId,
+        turnId: "turn-review-summary-finished",
+        status: "completed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      });
+    });
+
+    expect(await screen.findByRole("button", { name: "Review pending changes +10 -1" })).toHaveTextContent("Review+10-1");
   });
 
   it("scrolls to the latest message when the user sends a new message", async () => {

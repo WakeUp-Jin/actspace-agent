@@ -7,6 +7,7 @@ import { HtmlRenderView } from "./right-panel/HtmlRenderView";
 import { KairosRightPanelView } from "./right-panel/KairosRightPanelView";
 import { MarkdownRenderView } from "./right-panel/MarkdownRenderView";
 import { ReplyHtmlRenderView } from "./right-panel/ReplyHtmlRenderView";
+import { ReviewRenderView } from "./right-panel/ReviewRenderView";
 import { WorkspaceFileTree } from "./right-panel/WorkspaceFileTree";
 import { isWorkspaceFileTab, useRightPanel, type RightPanelTab } from "./right-panel/RightPanelContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
@@ -54,10 +55,12 @@ export function RightPanel({
   contextState,
   sessionId,
   workspaceRoot,
+  onReviewChanged,
 }: {
   contextState?: ContextState | null;
   sessionId?: string | null;
   workspaceRoot?: string;
+  onReviewChanged?: () => void;
 }) {
   const { activeTab, isFileTreeOpen, isFileTreeCollapsed } = useRightPanel();
 
@@ -79,7 +82,12 @@ export function RightPanel({
           {showShell && !isFileTab ? (
             <WorkspaceFileEmpty />
           ) : (
-            <RightPanelBody tab={activeTab} contextState={contextState} sessionId={sessionId} />
+            <RightPanelBody
+              tab={activeTab}
+              contextState={contextState}
+              sessionId={sessionId}
+              onReviewChanged={onReviewChanged}
+            />
           )}
         </div>
       </div>
@@ -303,10 +311,12 @@ function RightPanelBody({
   tab,
   contextState,
   sessionId,
+  onReviewChanged,
 }: {
   tab: RightPanelTab | null;
   contextState?: ContextState | null;
   sessionId?: string | null;
+  onReviewChanged?: () => void;
 }) {
   if (!tab) {
     return (
@@ -325,6 +335,16 @@ function RightPanelBody({
 
   if (tab.kind === "replyHtml") {
     return <ReplyHtmlRenderView sessionId={tab.sessionId} />;
+  }
+
+  if (tab.kind === "review") {
+    return (
+      <ReviewRenderView
+        workspaceRoot={tab.workspaceRoot}
+        refreshKey={tab.refreshKey}
+        onReviewChanged={onReviewChanged}
+      />
+    );
   }
 
   if (tab.kind === "html") {

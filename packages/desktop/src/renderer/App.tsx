@@ -11,6 +11,7 @@ import type {
   ContextUsageSnapshot,
   MessageBlock,
   ModelId,
+  ReviewGetWorkspaceChangesResult,
   RunTurnInput,
   RuntimeStreamEvent,
   SessionEvent,
@@ -23,7 +24,7 @@ import type {
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
-import type { ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
+import type { ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 import {
   mockBootstrapState,
@@ -133,6 +134,15 @@ function createMockWorkspaceRegistry(defaultWorkspaceRoot: string, sessions: Ses
     version: 1,
     defaultWorkspaceId: DEFAULT_WORKSPACE_ID,
     items,
+  };
+}
+
+function reviewResultToSummary(result: ReviewGetWorkspaceChangesResult): ComposerReviewSummary {
+  return {
+    status: result.status,
+    additions: result.changeSet?.totalAdditions,
+    deletions: result.changeSet?.totalDeletions,
+    reason: result.reason,
   };
 }
 
@@ -593,10 +603,20 @@ export function App() {
   const [selectedWorkspaceRoot, setSelectedWorkspaceRoot] = useState<string | null>(
     hasActspaceBridge() ? null : normalizeWorkspaceRoot(mockSessionRecord.meta.workspaceRoot ?? mockBootstrapState.workspaceRoot),
   );
+  const [reviewSummary, setReviewSummary] = useState<ComposerReviewSummary | null>(
+    hasActspaceBridge()
+      ? null
+      : {
+          status: "changes",
+          additions: 4253,
+          deletions: 5,
+        },
+  );
   const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
   const toolFinishTimersRef = useRef<Map<string, number>>(new Map());
   const activeSessionIdRef = useRef<string>("session-default");
+  const reviewRefreshRequestIdRef = useRef(0);
 
   const refreshWorkspaces = useCallback(async () => {
     if (!hasActspaceBridge() || !window.actspace.listWorkspaces) return null;
@@ -633,6 +653,38 @@ export function App() {
     if (!sessionId) return;
     setFailedSessionIds((current) => updateStringSet(current, sessionId, failed));
   }, []);
+
+  const refreshReviewSummary = useCallback(async (workspaceRoot?: string | null) => {
+    if (!hasActspaceBridge()) return;
+
+    const api = window.actspace?.getWorkspaceReview;
+    if (!api) {
+      setReviewSummary(null);
+      return;
+    }
+
+    const resolvedWorkspaceRoot = normalizeWorkspaceRoot(
+      workspaceRoot ?? selectedWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+    );
+    const requestId = ++reviewRefreshRequestIdRef.current;
+    setReviewSummary({ status: "loading" });
+
+    try {
+      const result = await api({
+        workspaceRoot: resolvedWorkspaceRoot ?? undefined,
+        scope: "uncommitted",
+      });
+      if (requestId !== reviewRefreshRequestIdRef.current) return;
+      setReviewSummary(reviewResultToSummary(result));
+    } catch (error) {
+      console.error("Failed to refresh Review summary", error);
+      if (requestId !== reviewRefreshRequestIdRef.current) return;
+      setReviewSummary({
+        status: "failed",
+        reason: "command_failed",
+      });
+    }
+  }, [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot]);
 
   const refreshPendingApprovalStatuses = useCallback(async (sessionIds: string[]) => {
     if (!hasActspaceBridge() || !window.actspace.listPendingApprovals) return;
@@ -690,6 +742,11 @@ export function App() {
       console.error("Failed to refresh pending approval statuses", error);
     });
   }, [refreshPendingApprovalStatuses, sessions]);
+
+  useEffect(() => {
+    if (!hasActspaceBridge()) return;
+    void refreshReviewSummary();
+  }, [refreshReviewSummary]);
 
   useEffect(() => {
     if (!hasActspaceBridge() || !window.actspace.getSettings) return;
@@ -1117,6 +1174,9 @@ export function App() {
     } finally {
       unsubscribe?.();
       clearToolFinishTimers();
+      if (hasActspaceBridge()) {
+        void refreshReviewSummary(nextWorkspaceRoot);
+      }
       setIsStreaming(false);
       setIsAborting(false);
       setActiveTurnId(null);
@@ -1136,6 +1196,7 @@ export function App() {
     handleStreamEvent,
     refreshStreamingBlocks,
     clearToolFinishTimers,
+    refreshReviewSummary,
     setApprovalPendingForSession,
     setFailedForSession,
   ]);
@@ -1463,6 +1524,10 @@ export function App() {
     }
   }, []);
 
+  const handleReviewChanged = useCallback(() => {
+    void refreshReviewSummary();
+  }, [refreshReviewSummary]);
+
   return (
     <RightPanelProvider>
       <WorkbenchLayout
@@ -1494,6 +1559,8 @@ export function App() {
         workspaceOptions={workspaceOptions}
         selectedWorkspaceRoot={selectedWorkspaceRoot}
         onSelectWorkspace={setSelectedWorkspaceRoot}
+        reviewSummary={reviewSummary}
+        onReviewChanged={handleReviewChanged}
       />
       <ShutdownOverlay />
     </RightPanelProvider>

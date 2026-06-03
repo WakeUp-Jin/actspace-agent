@@ -16,10 +16,17 @@
 
 - `core-beliefs.md`：Agent-first 的工作原则和模板设计出发点。
 - `core-storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
+- `core-review-change-sources.md`：Review 变更来源、Git-first baseline、无 Git 初始化引导和右侧 Review 视图分阶段路线。
 - `agent-index.md`：Agent Runtime 专题入口。
 - `front-index.md`：桌面端前端设计专题入口。
 - `lab-index.md`：Lab 能力实验台专题入口。
 - `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档。
+
+## Core
+
+- `core-beliefs.md`：Agent-first 的工作原则和模板设计出发点。
+- `core-storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
+- `core-review-change-sources.md`：Review 变更来源、Git-first baseline、无 Git 初始化引导和右侧 Review 视图分阶段路线。
 
 ## Agent
 
