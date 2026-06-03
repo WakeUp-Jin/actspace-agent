@@ -46,6 +46,7 @@ desktop -> agent-core -> shared
 - `docs/design-docs/core-storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
 - `docs/design-docs/agent-backend-design.md`：后端 Agent Runtime 的长期设计事实来源，解释为什么采用这些模块边界。
 - `docs/design-docs/agent-token-usage-and-context-state.md`：token usage、成本统计、context snapshot 与 context state 的数据分层设计。
+- `docs/design-docs/agent-skill-loading.md`：Agent Skill 设计与加载规范，约束 `.actspace/skills`、`.agents/skills`、`.claude/skills` 的发现优先级、catalog 注入和 `read_file` 读取边界。
 - `docs/design-docs/agent-tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约。
 - `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入边界。
 - `docs/design-docs/front-index.md`：前端工作台设计文档入口。

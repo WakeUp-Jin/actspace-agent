@@ -1,5 +1,7 @@
 # Skill 后端能力接入计划
 
+> 状态：已被 `docs/exec-plans/completed/20260603-agent-skill-loading.md` 替代。新计划扩大了扫描范围，兼容项目级/用户级 `.actspace/skills`、`.agents/skills` 和 `.claude/skills`；最终实现保留 catalog 注入和绝对路径，Skill 正文读取复用 `read_file`。本文保留作为历史上下文，不再作为当前执行依据。
+
 ## 目标
 
 让主 Agent 能发现仓库内可用 Skill，并把 Skill summary 注入上下文，使模型在前端、文档、表格、Agent 开发等任务中知道应该读取或使用对应 Skill。完成后，前端也能读取 Skill 列表或状态，为后续 Composer / Context UI 接入提供契约。
@@ -177,4 +179,3 @@ shared / IPC 第一版可以只暴露只读列表：
 ## 决策记录
 
 - 2026-06-02：Skill 第一版只接入项目级 `.agents/skills` summary，不扫描全局 Skill、不注入完整正文，用渐进式披露控制上下文体积和信任风险。
-

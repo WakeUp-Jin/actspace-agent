@@ -217,7 +217,7 @@ export type ContextSnapshotPayload = {
 > 这样「新增一种上下文类型」只需在注册表加一行 + 在 `tokens.css` 加一对主题 token，前后端无需改组件代码（改配置不改代码）。
 >
 > 当前注册表已落地 6 个桶：`systemPrompt / tools / rules / skills / summarizedConversation / conversation`。MCP、Subagents 暂未接入产品，故从注册表移除（需要时再加回）。
-> `summarizedConversation` 由 `ContextManager.getUsageSnapshot()` 从会话消息里拆出：`role:"user" && source:"compaction"` 的合成摘要单独计入该桶，其余消息（普通历史 + 最新输入）计入 `conversation`。`systemPrompt` 可能为 0：首次默认值来自代码里的 `MAIN_AGENT_SYSTEM_PROMPT`，当前模板仍可为空；用户在设置页保存主 Agent 系统提示词后，该桶会反映 settings 注入的完整文本。`rules / skills` 暂未喂数据也恒为 0。
+> `summarizedConversation` 由 `ContextManager.getUsageSnapshot()` 从会话消息里拆出：`role:"user" && source:"compaction"` 的合成摘要单独计入该桶，其余消息（普通历史 + 最新输入）计入 `conversation`。`systemPrompt` 可能为 0：首次默认值来自代码里的 `MAIN_AGENT_SYSTEM_PROMPT`，当前模板仍可为空；用户在设置页保存主 Agent 系统提示词后，该桶会反映 settings 注入的完整文本。`rules` 来自 `<userData>/AGENTS.md` 与 `<workspaceRoot>/AGENTS.md` 的 system segment；`skills` 来自 `loadSkillRegistry()` 生成的 `<available_skills>` catalog segment，未发现 Skill 时该桶为 0。
 
 ### `ContextState`
 

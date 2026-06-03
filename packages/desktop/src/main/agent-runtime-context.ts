@@ -1,4 +1,9 @@
-import type { AgentRuntimeContext, AgentSystemPromptSegment } from "@actspace/agent-core";
+import {
+  createSkillCatalogSegment,
+  loadSkillRegistry,
+  type AgentRuntimeContext,
+  type AgentSystemPromptSegment,
+} from "@actspace/agent-core";
 import type { AgentSystemPromptFile } from "@actspace/shared";
 import { join } from "node:path";
 import { loadAgentsMdSegments } from "./agents-md-service";
@@ -8,6 +13,7 @@ type WarningLogger = (message: string, details?: Record<string, unknown>) => voi
 export type MainAgentRuntimeContextInput = {
   dataRoot: string;
   workspaceRoot: string;
+  homeDir?: string;
   readPromptFile: () => Promise<AgentSystemPromptFile>;
   warn?: WarningLogger;
 };
@@ -24,6 +30,16 @@ export async function loadMainAgentRuntimeContext(
     warn: input.warn,
   });
   systemPromptSegments.push(createMainAgentKairosHandoffSegment(mainAgentInboxPath));
+  const skillRegistry = await loadSkillRegistry({
+    dataRoot: input.dataRoot,
+    workspaceRoot: input.workspaceRoot,
+    homeDir: input.homeDir,
+    warn: input.warn,
+  });
+  const skillCatalogSegment = createSkillCatalogSegment(skillRegistry);
+  if (skillCatalogSegment) {
+    systemPromptSegments.push(skillCatalogSegment);
+  }
   return {
     systemPrompt: promptFile.content,
     systemPromptSegments,

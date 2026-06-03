@@ -1,7 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadAgentsMdSegments } from "../agents-md-service";
+import { loadMainAgentRuntimeContext } from "../agent-runtime-context";
 
 function notFoundError(): Error & { code: string } {
   const error = new Error("missing") as Error & { code: string };
@@ -80,5 +83,65 @@ describe("loadAgentsMdSegments", () => {
       path: join(dataRoot, "AGENTS.md"),
       error: "permission denied",
     });
+  });
+});
+
+describe("loadMainAgentRuntimeContext", () => {
+  it("loads AGENTS.md rules and skill catalog from the same runtime context", async () => {
+    const root = await mkdtemp(join(tmpdir(), "actspace-runtime-context-test-"));
+    const dataRoot = join(root, "userData");
+    const workspaceRoot = join(root, "workspace");
+    const homeDir = join(root, "home");
+    const skillDir = join(workspaceRoot, ".agents", "skills", "llm-agent-dev");
+    await mkdir(skillDir, { recursive: true });
+    await mkdir(homeDir, { recursive: true });
+    await writeFile(join(workspaceRoot, "AGENTS.md"), "Workspace rule.", "utf8");
+    await writeFile(
+      join(skillDir, "SKILL.md"),
+      [
+        "---",
+        "name: llm-agent-dev",
+        "description: Use when building LLM agents.",
+        "---",
+        "",
+        "# LLM Agent Dev",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const context = await loadMainAgentRuntimeContext({
+      dataRoot,
+      workspaceRoot,
+      homeDir,
+      readPromptFile: async () => ({ path: join(dataRoot, "prompts", "main-agent.md"), content: "Core prompt" }),
+    });
+
+    expect(context.systemPrompt).toBe("Core prompt");
+    expect(context.additionalWritableRoots).toEqual([join(dataRoot, "kairos", "inbox")]);
+    expect(context.systemPromptSegments).toEqual([
+      {
+        id: "agents_workspace",
+        title: "Workspace AGENTS.md",
+        content: "Workspace rule.",
+        bucket: "rules",
+        priority: 80,
+      },
+      expect.objectContaining({
+        id: "main_agent_kairos_handoff",
+        title: "Kairos handoff inbox",
+        bucket: "systemPrompt",
+        priority: 60,
+      }),
+      expect.objectContaining({
+        id: "skill_catalog",
+        title: "Available Skills",
+        bucket: "skills",
+        priority: 70,
+      }),
+    ]);
+    expect(context.systemPromptSegments?.[1]?.content).toContain(join(dataRoot, "kairos", "inbox", "main-agent.md"));
+    expect(context.systemPromptSegments?.[2]?.content).toContain("<name>llm-agent-dev</name>");
+    expect(context.systemPromptSegments?.[2]?.content).toContain(`<location>${join(skillDir, "SKILL.md")}</location>`);
+    expect(context.systemPromptSegments?.[2]?.content).toContain("use read_file on the skill location");
   });
 });
