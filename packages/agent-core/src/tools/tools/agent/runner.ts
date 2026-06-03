@@ -145,7 +145,7 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
       {
         toolManager: subToolManager,
         toolExecution: "sequential",
-        maxTurns: 12,
+        maxTurns: 100,
       },
       async (event) => {
         trackSubAgentEvent(event, toolCalls, exploredFiles);

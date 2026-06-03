@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bot, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 import { SubAgentTranscriptModal } from "./SubAgentTranscriptModal";
 import { getToolLogRunningTextAttrs, TOOL_LOG_LINE_TEXT_RUNNING_CLASS } from "./toolLogStyles";
@@ -11,31 +11,14 @@ const BLOCK_CLASS =
 const BUTTON_CLASS =
   "w-full rounded-act-md border border-line bg-surface px-3.5 py-3 text-left transition hover:border-line-strong hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--act-color-focus-ring)]";
 const HEADER_CLASS = "flex items-start justify-between gap-3";
-const TITLE_WRAP_CLASS = "flex min-w-0 items-start gap-2.5";
-const ICON_CLASS =
-  "mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-act-sm bg-brand-soft text-brand";
+const TITLE_WRAP_CLASS = "min-w-0";
 const TITLE_CLASS = "min-w-0 text-[14px] font-semibold leading-[1.4] text-text-main";
-const STATUS_CLASS = "mt-0.5 text-[12px] font-medium uppercase tracking-normal text-text-faint";
 const CHEVRON_CLASS = "mt-1 flex-none text-text-faint";
 const SUMMARY_CLASS = "mt-2 line-clamp-4 text-[13px] leading-[1.55] text-text-muted";
 const RECENT_CLASS = "mt-2 flex flex-col gap-1.5";
 const RECENT_LINE_CLASS = "text-[13px] leading-[1.45] text-text-muted";
 const STATS_CLASS = "mt-2 text-[12px] leading-[1.45] text-text-faint";
 const ERROR_CLASS = "mt-2 rounded-act-sm bg-danger-soft px-2.5 py-2 text-[13px] leading-[1.45] text-on-danger";
-
-function statusLabel(status: AgentMessage["status"]): string {
-  switch (status) {
-    case "running":
-      return "Running";
-    case "failed":
-      return "Failed";
-    case "aborted":
-      return "Aborted";
-    case "completed":
-    default:
-      return "Completed";
-  }
-}
 
 function formatStats(message: AgentMessage): string | null {
   const stats = message.stats;
@@ -68,13 +51,7 @@ export function AgentRunBlock({ message, className }: { message: AgentMessage; c
       >
         <div className={HEADER_CLASS}>
           <div className={TITLE_WRAP_CLASS}>
-            <span className={ICON_CLASS}>
-              <Bot size={14} aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <div className={TITLE_CLASS}>{message.description || message.displayText || "Agent"}</div>
-              <div className={STATUS_CLASS}>{statusLabel(message.status)}</div>
-            </div>
+            <div className={TITLE_CLASS}>{message.description || message.displayText || "Agent"}</div>
           </div>
           <ChevronRight className={CHEVRON_CLASS} size={16} aria-hidden="true" />
         </div>

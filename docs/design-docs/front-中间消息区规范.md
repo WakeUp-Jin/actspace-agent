@@ -38,7 +38,7 @@
 - Read、Grep、Glob 和 Web Search 保持文本流感，不做重边框。
 - Bash 正常执行态保持类似 Read 的轻量日志行；只有展开后的命令输出区域使用单层浅色容器。
 - Bash 审核态可以使用轻量边框块，因为它承载用户操作，不属于普通执行日志。
-- Agent 是聚合执行对象：主消息流显示可点击执行块，块内只展示 SubAgent run 的标题、状态、最近事件、摘要和 stats；完整 transcript 通过 modal 展示，不在主消息流展开。
+- Agent 是聚合执行对象：主消息流显示可点击执行块，块内只展示 SubAgent run 的标题、最近事件、摘要和 stats；不展示额外 logo、机器人图标或全大写状态噪音。完整 transcript 通过 modal 展示，不在主消息流展开。
 - Edit / Write File 与 Read 等保持同样的纯文本工具行节奏，仅在用户主动展开时显示 diff 详情容器。
 - Context Compaction 是系统执行事件，不属于工具调用，也不渲染为 Tool Preview；手动 `/compact` 和未来自动压缩共享同一消息块语法。
 - Final reply 作为收束结果，保持最清晰的阅读层级。
@@ -180,7 +180,7 @@ Agent 是主 Agent 调用的聚合工具，用户可见为一个可点击执行�
 
 ### 结构
 
-- 顶部显示 `description`、状态和进入 transcript 的箭头。
+- 顶部显示 `description` 和进入 transcript 的箭头，不额外展示 logo、机器人图标或全大写状态行。
 - running 阶段展示最近 3-5 条 transcript 摘要，使用与工具 running 态一致的 text shimmer。
 - completed 阶段展示最终 summary，控制在 3-4 行内，底部显示 `Explored N files · M tools · Ss` 等 stats。
 - failed / aborted 阶段展示错误摘要，并继续保留 transcript 入口。
@@ -188,7 +188,8 @@ Agent 是主 Agent 调用的聚合工具，用户可见为一个可点击执行�
 ### 交互
 
 - 整块可点击，打开 `SubAgentTranscriptModal`。
-- modal 顶部显示 description 与状态，主体回放 SubAgent transcript events。
+- modal 顶部在 header 下单独展示子智能体收到的任务输入，主体按主消息区语法回放过程事件：`thinking` 复用 Thinking 行，`read_file` / `grep` / `glob` / `list_directory` 复用轻量工具行，usage 只显示轻量 token 行。
+- modal 底部单独展示最终输出；`assistant_message` / `assistant_reply` 不混入中间过程流，避免最终报告被当成普通日志事件。
 - running 时 modal 使用 App streaming state 里已经收到的 events；completed 后可通过 `subagent:get-transcript` IPC 按 `transcriptRef` 补拉落盘 transcript。
 - modal 不提供 follow-up 输入，V0 只负责观察执行流。
 

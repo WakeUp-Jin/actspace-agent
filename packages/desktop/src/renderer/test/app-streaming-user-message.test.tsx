@@ -610,7 +610,7 @@ describe("App streaming user message", () => {
 
     const dialog = await screen.findByRole("dialog", { name: /SubAgent transcript: Explore renderer flow/ });
     expect(dialog).toBeTruthy();
-    expect(within(dialog).getByText(/packages\/desktop\/src\/renderer\/App\.tsx/)).toBeTruthy();
+    expect(within(dialog).getByText("Read App.tsx")).toBeTruthy();
 
     await act(async () => {
       resolveRunTurn?.({

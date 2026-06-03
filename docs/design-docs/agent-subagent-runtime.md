@@ -113,6 +113,8 @@ type AgentToolOutput = {
 - 明确失败或不确定项。
 - transcriptRef，供系统与 UI 回看，但不要求主 Agent 读取。
 
+Agent 工具的 `previewKind === "agent"` 不参与普通工具输出压缩流水线。调度层应像处理 `bash` 一样跳过 `processToolOutput()`，保证返回给主 Agent 的 `modelOutput` 保持 `runExploreSubAgent()` 产出的完整结构化报告，且保留 executor 自己设置的 `outputRef` / `subagent` 元数据。普通工具的 `[已压缩摘要]` 标记不得出现在 Agent 工具结果里。
+
 ## Transcript 契约
 
 SubAgent transcript 是完整可恢复事件流，不是摘要字符串。
@@ -199,6 +201,10 @@ V0 暂不开放：
 - 输出结构化报告，控制长度，明确证据文件。
 - 不要再调用 Agent 工具，避免递归。
 
+运行上限：
+
+- Explore SubAgent V0 使用 `maxTurns: 100`。这个值是防无限循环的硬上限，不应过早截断正常的广泛探索；复杂代码库/设计文档盘点需要允许多轮 read/grep/glob 后再产出最终报告。
+
 ## UI 规范
 
 Agent 工具在主消息流中不是普通单行工具日志，而是一个轻量可点击执行块。
@@ -224,11 +230,12 @@ Agent 工具在主消息流中不是普通单行工具日志，而是一个轻�
 
 点击 Agent 工具块打开居中 modal：
 
-- Header：返回/关闭、description、状态、放大按钮。
-- 顶部固定展示子智能体 prompt。
-- 主体复用正常聊天流渲染 transcript。
+- Header：关闭按钮、description、事件数量。
+- 顶部固定展示子智能体收到的任务输入。
+- 主体复用正常聊天流渲染过程 transcript。
 - 执行中实时追加 transcript events。
-- 完成后显示最终报告，并保留所有工具流。
+- 底部单独显示最终报告，并保留中间过程流里的工具与 thinking 事件。
+- 最终报告来源优先使用主消息流 `MessageBlock.kind === "agent"` 上的 `summary`，也就是 `runExploreSubAgent()` 的最终 `result.message` / `output.summary`；只有旧数据缺少 summary 时，才回退读取 transcript 里的 assistant 输出。
 - modal 不承担 follow-up 输入；V0 只看执行流。
 
 ### 颜色与主题
@@ -251,12 +258,14 @@ Agent 工具在主消息流中不是普通单行工具日志，而是一个轻�
 - Explore 子智能体只暴露只读工具。
 - 子智能体 transcript 包含 user/tool/assistant/usage 事件。
 - 主 Agent tool result 只包含摘要和 ref，不包含完整 transcript。
+- 长 Agent summary 超过普通工具压缩阈值时，主 Agent 收到的 `modelOutput` 仍不包含 `[已压缩摘要]`。
 - abort 可以结束子智能体。
 
 前端：
 
 - running Agent 工具块可点击打开 modal。
 - modal 能显示执行中的 prompt、thinking、工具流和最终回复。
+- modal 的 `Final output` 优先显示 Agent block summary，不把 transcript 中途 `assistant_message` 误判成最终报告。
 - completed Agent 工具块显示 summary 和 stats。
 - 浅色、深色主题都可读。
 

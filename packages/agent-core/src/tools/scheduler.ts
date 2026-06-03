@@ -271,9 +271,9 @@ export class ToolScheduler {
 
     const rawData = rendered ?? (typeof result.data === "string" ? result.data : JSON.stringify(result.data));
 
-    // bash 自处理输出（run-process 流式落盘 + executor 头部截断），不走通用摘要/截断，
-    // 原样回填并保留 executor 设置的 outputRef（落盘文件路径）。
-    if (tool.previewKind === "bash") {
+    // bash 自处理输出（run-process 流式落盘 + executor 头部截断），不走通用摘要/截断。
+    // agent 的输出是 SubAgent 给主 Agent 的结构化报告 + transcriptRef，也不能再被普通工具压缩误伤。
+    if (tool.previewKind === "bash" || tool.previewKind === "agent") {
       return rendered !== undefined ? { ...result, data: rendered } : result;
     }
 

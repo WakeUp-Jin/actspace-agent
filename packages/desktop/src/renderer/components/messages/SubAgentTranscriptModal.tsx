@@ -1,9 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Maximize2, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { MessageBlock, SessionEvent, SubAgentTranscriptRef } from "@actspace/shared";
+import { MarkdownProse } from "./MarkdownProse";
+import { ThinkingBlock } from "./ThinkingBlock";
+import { ToolLogLine } from "./ToolLogLine";
+import { TOOL_LOG_LINE_CLASS, TOOL_LOG_LINE_TEXT_CLASS } from "./toolLogStyles";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
+type AssistantMessage = Extract<MessageBlock, { kind: "assistant" }>;
+type TranscriptMessage =
+  | Extract<MessageBlock, { kind: "thinking" }>
+  | Extract<MessageBlock, { kind: "read" }>
+  | Extract<MessageBlock, { kind: "grep" }>
+  | Extract<MessageBlock, { kind: "glob" }>
+  | Extract<MessageBlock, { kind: "directory_list" }>
+  | Extract<MessageBlock, { kind: "tool" }>
+  | Extract<MessageBlock, { kind: "error" }>;
+type TranscriptItem =
+  | { kind: "message"; message: TranscriptMessage }
+  | { kind: "usage"; id: string; text: string };
+type TranscriptTaskInput = { id: string; content: string; createdAt: string };
+type TranscriptSections = {
+  taskInput: TranscriptTaskInput | null;
+  processItems: TranscriptItem[];
+  fallbackFinalReport: AssistantMessage | null;
+};
 
 const MODAL_ROOT_CLASS = "fixed inset-0 z-[1000] flex items-center justify-center px-5 py-6";
 const MODAL_OVERLAY_CLASS = "absolute inset-0 bg-overlay";
@@ -12,19 +34,17 @@ const MODAL_PANEL_CLASS =
 const MODAL_HEADER_CLASS = "flex items-start justify-between gap-4 border-b border-line px-5 py-4";
 const MODAL_TITLE_CLASS = "m-0 text-[16px] font-semibold leading-[1.35] text-text-main";
 const MODAL_META_CLASS = "mt-1 text-[13px] leading-[1.45] text-text-muted";
-const MODAL_ACTIONS_CLASS = "flex flex-none items-center gap-2";
 const MODAL_ICON_BUTTON_CLASS =
   "grid h-8 w-8 place-items-center rounded-act-md border border-line bg-surface text-text-muted transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-main";
-const MODAL_BODY_CLASS = "min-h-0 flex-1 overflow-y-auto px-5 py-4";
-const PROMPT_CLASS =
-  "mb-4 rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 text-[13px] leading-[1.55] text-text-muted";
-const TIMELINE_CLASS = "flex flex-col gap-2";
-const EVENT_ROW_CLASS = "rounded-act-md border border-line bg-surface px-3 py-2.5";
-const EVENT_HEADER_CLASS = "mb-1 flex items-center justify-between gap-3 text-[12px] leading-[1.35]";
-const EVENT_TITLE_CLASS = "font-semibold text-text-main";
-const EVENT_TIME_CLASS = "flex-none text-text-faint";
-const EVENT_BODY_CLASS = "whitespace-pre-wrap text-[13px] leading-[1.6] text-text-muted [overflow-wrap:anywhere]";
-const EVENT_ERROR_CLASS = "border-danger bg-danger-soft";
+const MODAL_BODY_CLASS = "min-h-0 flex-1 overflow-y-auto px-0 py-4";
+const TRANSCRIPT_FLOW_CLASS = "flex flex-col gap-1.5";
+const EMPTY_CLASS = "px-[var(--conversation-text-inset)] text-sm leading-[1.55] text-text-muted";
+const TASK_INPUT_SECTION_CLASS = "border-b border-line bg-surface-subtle/55 px-5 py-3";
+const FINAL_REPORT_SECTION_CLASS = "max-h-[240px] overflow-y-auto border-t border-line bg-surface px-5 py-4";
+const SECTION_LABEL_CLASS = "mb-2 text-[12px] font-semibold leading-[1.3] text-text-faint";
+const TASK_INPUT_CONTENT_CLASS =
+  "max-h-[150px] overflow-y-auto whitespace-pre-wrap rounded-act-md border border-line bg-surface-raised px-3 py-2.5 text-[13px] leading-[1.55] text-text-main";
+const FINAL_REPORT_CONTENT_CLASS = "text-[14px] leading-[1.65] text-text-main";
 
 function mergeEvents(current: SessionEvent[], next: SessionEvent[] | undefined): SessionEvent[] {
   if (!next?.length) return current;
@@ -38,58 +58,298 @@ function mergeEvents(current: SessionEvent[], next: SessionEvent[] | undefined):
   return merged;
 }
 
-function getTranscriptTitle(event: SessionEvent): string {
-  switch (event.type) {
-    case "user_message":
-      return "Prompt";
-    case "thinking":
-      return "Thinking";
-    case "tool_call": {
-      const payload = event.payload as { name?: string };
-      return payload.name ?? "Tool call";
-    }
-    case "tool_result": {
-      const payload = event.payload as { toolName?: string };
-      return payload.toolName ?? "Tool result";
-    }
-    case "assistant_message":
-    case "assistant_reply":
-      return "Report";
-    case "llm_usage":
-      return "Usage";
-    case "error":
-      return "Error";
-    default:
-      return event.type;
-  }
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
-function getTranscriptBody(event: SessionEvent): string {
-  if (event.type === "tool_call") {
-    const payload = event.payload as { arguments?: Record<string, unknown> };
-    return JSON.stringify(payload.arguments ?? {}, null, 2);
-  }
-  if (event.type === "tool_result") {
-    const payload = event.payload as { summary?: string; modelOutput?: string; rawOutput?: string };
-    return payload.summary ?? payload.modelOutput ?? payload.rawOutput ?? "";
-  }
-  if (event.type === "llm_usage") {
-    const payload = event.payload as { totalTokens?: number; promptTokens?: number; completionTokens?: number };
-    return `Tokens ${payload.totalTokens ?? 0} · input ${payload.promptTokens ?? 0} · output ${payload.completionTokens ?? 0}`;
-  }
-  if (event.type === "error") {
-    const payload = event.payload as { message?: string };
-    return payload.message ?? "";
-  }
-  const payload = event.payload as { content?: string };
-  if (typeof payload.content === "string") return payload.content;
-  return JSON.stringify(event.payload, null, 2);
+function eventPayload(event: SessionEvent): Record<string, unknown> {
+  return isRecord(event.payload) ? event.payload : {};
 }
 
-function firstPrompt(events: SessionEvent[]): string | null {
-  const prompt = events.find((event) => event.type === "user_message");
-  const payload = prompt?.payload as { content?: string } | undefined;
-  return payload?.content ?? null;
+function stringValue(value: unknown, fallback = ""): string {
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+function numberValue(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function displayFileName(path: string): string {
+  const normalized = path.replace(/[\\/]+$/, "");
+  return (normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized) || path;
+}
+
+function displayPathTail(path: string): string {
+  const normalized = path.replace(/[\\/]+$/, "");
+  return (normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized) || path;
+}
+
+function getLineRange(args: Record<string, unknown>): string | undefined {
+  const offset = numberValue(args.offset);
+  if (offset === undefined) return undefined;
+  const limit = numberValue(args.limit);
+  return limit === undefined ? String(offset) : `${offset}-${offset + limit - 1}`;
+}
+
+function getResultText(event: SessionEvent | undefined): string {
+  if (!event) return "";
+  const payload = eventPayload(event);
+  return stringValue(payload.modelOutput) || stringValue(payload.truncatedOutput) || stringValue(payload.rawOutput);
+}
+
+function getResultError(event: SessionEvent | undefined): string {
+  if (!event) return "";
+  const payload = eventPayload(event);
+  const nestedError = isRecord(payload.error) ? stringValue(payload.error.message) : "";
+  return nestedError || stringValue(payload.summary) || getResultText(event);
+}
+
+function resultSucceeded(event: SessionEvent | undefined): boolean {
+  if (!event) return true;
+  return eventPayload(event).ok !== false;
+}
+
+function getGrepScope(args: Record<string, unknown>): string | undefined {
+  return stringValue(args.glob) || stringValue(args.path) || undefined;
+}
+
+function getSearchResultCount(output: string): number | undefined {
+  const match = output.match(/^Found\s+(\d+)\s+match/);
+  return match ? Number(match[1]) : undefined;
+}
+
+function getGlobResultCount(output: string): number | undefined {
+  const match = output.match(/^Found\s+(\d+)\s+file/);
+  return match ? Number(match[1]) : undefined;
+}
+
+function getDirectoryEntryCount(output: string): number | undefined {
+  if (!output) return undefined;
+  if (output.trim() === "(empty directory)") return 0;
+  return output.split("\n").filter((line) => line.trim().length > 0).length;
+}
+
+function createToolErrorMessage(event: SessionEvent, toolName: string, result: SessionEvent | undefined): TranscriptMessage {
+  return {
+    kind: "error",
+    id: result?.id ?? event.id,
+    title: `Error in ${toolName}`,
+    content: getResultError(result) || "Tool failed",
+    recoverable: true,
+    createdAt: result?.timestamp ?? event.timestamp,
+  };
+}
+
+function toolCallMessage(event: SessionEvent, result: SessionEvent | undefined): TranscriptMessage {
+  const payload = eventPayload(event);
+  const toolName = stringValue(payload.name, "tool");
+  const args = isRecord(payload.arguments) ? payload.arguments : {};
+  const output = getResultText(result);
+  const status = result ? "completed" : "running";
+
+  if (!resultSucceeded(result)) {
+    return createToolErrorMessage(event, toolName, result);
+  }
+
+  if (toolName === "read_file") {
+    const filePath = displayFileName(stringValue(args.path, "file"));
+    const range = getLineRange(args);
+    return {
+      kind: "read",
+      id: event.id,
+      filePath,
+      range,
+      displayText: `Read ${filePath}${range ? ` ${range}` : ""}`,
+      status,
+      createdAt: event.timestamp,
+    };
+  }
+
+  if (toolName === "grep") {
+    const pattern = stringValue(args.pattern, "pattern");
+    return {
+      kind: "grep",
+      id: event.id,
+      pattern,
+      scope: getGrepScope(args),
+      resultCount: getSearchResultCount(output),
+      displayText: `Grep ${pattern}`,
+      status,
+      createdAt: event.timestamp,
+    };
+  }
+
+  if (toolName === "glob") {
+    const pattern = stringValue(args.pattern, "pattern");
+    return {
+      kind: "glob",
+      id: event.id,
+      pattern,
+      scope: stringValue(args.path) || undefined,
+      resultCount: getGlobResultCount(output),
+      displayText: `Glob ${pattern}`,
+      status,
+      createdAt: event.timestamp,
+    };
+  }
+
+  if (toolName === "list_directory") {
+    const path = displayPathTail(stringValue(args.path, "directory"));
+    return {
+      kind: "directory_list",
+      id: event.id,
+      path,
+      entryCount: getDirectoryEntryCount(output),
+      displayText: `Listed ${path}`,
+      status,
+      createdAt: event.timestamp,
+    };
+  }
+
+  return {
+    kind: "tool",
+    id: result?.id ?? event.id,
+    title: result ? stringValue(eventPayload(result).summary, `Ran ${toolName}`) : `Running ${toolName}`,
+    content: result ? getResultText(result) : "",
+    createdAt: result?.timestamp ?? event.timestamp,
+  };
+}
+
+function toolResultFallbackMessage(event: SessionEvent): TranscriptMessage {
+  const payload = eventPayload(event);
+  const toolName = stringValue(payload.toolName, "tool");
+  if (payload.ok === false) {
+    return createToolErrorMessage(event, toolName, event);
+  }
+  return {
+    kind: "tool",
+    id: event.id,
+    title: stringValue(payload.summary, `Ran ${toolName}`),
+    content: getResultText(event),
+    createdAt: event.timestamp,
+  };
+}
+
+function usageText(event: SessionEvent): string {
+  const payload = eventPayload(event);
+  const total = numberValue(payload.totalTokens) ?? 0;
+  const input = numberValue(payload.promptTokens) ?? 0;
+  const output = numberValue(payload.completionTokens) ?? 0;
+  return `Usage Tokens ${total} · input ${input} · output ${output}`;
+}
+
+function taskInputFromEvent(event: SessionEvent): TranscriptTaskInput | null {
+  const payload = eventPayload(event);
+  const content = stringValue(payload.content) || stringValue(payload.message);
+  if (!content) return null;
+  return { id: event.id, content, createdAt: event.timestamp };
+}
+
+function assistantMessageFromEvent(event: SessionEvent): AssistantMessage | null {
+  const payload = eventPayload(event);
+  const content = stringValue(payload.content);
+  if (!content) return null;
+  return {
+    kind: "assistant",
+    id: event.id,
+    content,
+    createdAt: event.timestamp,
+    model: stringValue(payload.model) || undefined,
+    provider: stringValue(payload.provider) || undefined,
+  };
+}
+
+function buildTranscriptSections(events: SessionEvent[]): TranscriptSections {
+  const resultsByToolCallId = new Map<string, SessionEvent>();
+  const matchedResultIds = new Set<string>();
+
+  for (const event of events) {
+    if (event.type !== "tool_result") continue;
+    const toolCallId = stringValue(eventPayload(event).toolCallId);
+    if (toolCallId) {
+      resultsByToolCallId.set(toolCallId, event);
+    }
+  }
+
+  const processItems: TranscriptItem[] = [];
+  let taskInput: TranscriptTaskInput | null = null;
+  let fallbackFinalReport: AssistantMessage | null = null;
+
+  for (const event of events) {
+    switch (event.type) {
+      case "user_message":
+        taskInput = taskInput ?? taskInputFromEvent(event);
+        break;
+      case "thinking": {
+        const payload = eventPayload(event);
+        const content = stringValue(payload.content);
+        if (!content) break;
+        processItems.push({
+          kind: "message",
+          message: {
+            kind: "thinking",
+            id: event.id,
+            title: stringValue(payload.title, "Thinking"),
+            content,
+            collapsedByDefault: typeof payload.collapsedByDefault === "boolean" ? payload.collapsedByDefault : true,
+            createdAt: event.timestamp,
+          },
+        });
+        break;
+      }
+      case "tool_call": {
+        const toolCallId = stringValue(eventPayload(event).id);
+        const result = toolCallId ? resultsByToolCallId.get(toolCallId) : undefined;
+        if (result) {
+          matchedResultIds.add(result.id);
+        }
+        processItems.push({ kind: "message", message: toolCallMessage(event, result) });
+        break;
+      }
+      case "tool_result": {
+        if (!matchedResultIds.has(event.id)) {
+          processItems.push({ kind: "message", message: toolResultFallbackMessage(event) });
+        }
+        break;
+      }
+      case "assistant_message":
+      case "assistant_reply": {
+        fallbackFinalReport = assistantMessageFromEvent(event) ?? fallbackFinalReport;
+        break;
+      }
+      case "llm_usage":
+        processItems.push({ kind: "usage", id: event.id, text: usageText(event) });
+        break;
+      case "error": {
+        const payload = eventPayload(event);
+        processItems.push({
+          kind: "message",
+          message: {
+            kind: "error",
+            id: event.id,
+            title: stringValue(payload.code, "Error"),
+            content: stringValue(payload.message, "SubAgent error"),
+            recoverable: payload.recoverable !== false,
+            createdAt: event.timestamp,
+          },
+        });
+        break;
+      }
+    }
+  }
+
+  return { taskInput, processItems, fallbackFinalReport };
+}
+
+function finalReportFromAgentSummary(message: AgentMessage): AssistantMessage | null {
+  const content = typeof message.summary === "string" ? message.summary.trim() : "";
+  if (!content) return null;
+  return {
+    kind: "assistant",
+    id: `${message.id}:summary`,
+    content,
+    createdAt: message.createdAt,
+  };
 }
 
 async function loadTranscript(ref: SubAgentTranscriptRef | undefined): Promise<SessionEvent[]> {
@@ -137,7 +397,8 @@ export function SubAgentTranscriptModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, open]);
 
-  const prompt = useMemo(() => firstPrompt(events), [events]);
+  const transcriptSections = useMemo(() => buildTranscriptSections(events), [events]);
+  const finalReport = finalReportFromAgentSummary(message) ?? transcriptSections.fallbackFinalReport;
 
   if (!open || typeof document === "undefined") {
     return null;
@@ -151,37 +412,59 @@ export function SubAgentTranscriptModal({
           <div className="min-w-0">
             <h2 className={MODAL_TITLE_CLASS}>{message.description}</h2>
             <div className={MODAL_META_CLASS}>
-              {message.status} · {events.length} events
+              {events.length} events
             </div>
           </div>
-          <div className={MODAL_ACTIONS_CLASS}>
-            <button className={MODAL_ICON_BUTTON_CLASS} type="button" aria-label="Expand transcript view" disabled>
-              <Maximize2 size={15} aria-hidden="true" />
-            </button>
-            <button ref={closeButtonRef} className={MODAL_ICON_BUTTON_CLASS} type="button" aria-label="Close transcript" onClick={onClose}>
-              <X size={15} aria-hidden="true" />
-            </button>
-          </div>
+          <button ref={closeButtonRef} className={MODAL_ICON_BUTTON_CLASS} type="button" aria-label="Close transcript" onClick={onClose}>
+            <X size={15} aria-hidden="true" />
+          </button>
         </header>
+        {transcriptSections.taskInput ? (
+          <section className={TASK_INPUT_SECTION_CLASS} aria-label="Task input">
+            <div className={SECTION_LABEL_CLASS}>Task input</div>
+            <div className={TASK_INPUT_CONTENT_CLASS}>{transcriptSections.taskInput.content}</div>
+          </section>
+        ) : null}
         <div className={MODAL_BODY_CLASS}>
-          {prompt ? <div className={PROMPT_CLASS}>{prompt}</div> : null}
-          <div className={TIMELINE_CLASS}>
-            {events.map((event) => {
-              const isError = event.type === "error" || (event.type === "tool_result" && (event.payload as { ok?: boolean }).ok === false);
-              return (
-                <article key={event.id} className={`${EVENT_ROW_CLASS}${isError ? ` ${EVENT_ERROR_CLASS}` : ""}`}>
-                  <div className={EVENT_HEADER_CLASS}>
-                    <span className={EVENT_TITLE_CLASS}>{getTranscriptTitle(event)}</span>
-                    <span className={EVENT_TIME_CLASS}>{event.timestamp}</span>
-                  </div>
-                  <div className={EVENT_BODY_CLASS}>{getTranscriptBody(event)}</div>
-                </article>
-              );
-            })}
+          <div className={TRANSCRIPT_FLOW_CLASS} aria-label="SubAgent process" role="region">
+            {transcriptSections.processItems.length > 0 ? transcriptSections.processItems.map((item) => renderTranscriptItem(item)) : (
+              <div className={EMPTY_CLASS}>Process events will appear here.</div>
+            )}
           </div>
         </div>
+        {finalReport ? (
+          <section className={FINAL_REPORT_SECTION_CLASS} aria-label="Final output">
+            <div className={SECTION_LABEL_CLASS}>Final output</div>
+            <div className={FINAL_REPORT_CONTENT_CLASS}>
+              <MarkdownProse content={finalReport.content} />
+            </div>
+          </section>
+        ) : null}
       </section>
     </div>,
     document.body,
   );
+}
+
+function renderTranscriptItem(item: TranscriptItem) {
+  if (item.kind === "usage") {
+    return (
+      <div key={item.id} className={TOOL_LOG_LINE_CLASS}>
+        <span className={TOOL_LOG_LINE_TEXT_CLASS}>{item.text}</span>
+      </div>
+    );
+  }
+
+  const { message } = item;
+  switch (message.kind) {
+    case "thinking":
+      return <ThinkingBlock key={message.id} message={message} />;
+    case "read":
+    case "grep":
+    case "glob":
+    case "directory_list":
+    case "tool":
+    case "error":
+      return <ToolLogLine key={message.id} message={message} />;
+  }
 }

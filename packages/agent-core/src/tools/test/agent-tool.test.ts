@@ -116,4 +116,38 @@ describe("Agent tool Explore runner", () => {
     expect(toolResult.outputRef?.kind).toBe("inline");
     expect(toolResult.outputRef?.value).not.toContain("SubAgent evidence lives here.");
   });
+
+  it("allows deep Explore runs beyond the previous 12-turn cap before summarizing", async () => {
+    const filePath = join(workspaceRoot, "frontend.md");
+    await writeFile(filePath, "Frontend architecture evidence.");
+
+    const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "mock-model" });
+    llm.setResponses([
+      ...Array.from({ length: 13 }, (_, index) => (
+        mockToolCall("read_file", { path: filePath }, { id: `tc-sub-read-${index + 1}` })
+      )),
+      mockText("Final frontend design panorama after deeper exploration."),
+    ]);
+
+    const output = await runExploreSubAgent({
+      args: {
+        description: "Explore frontend design",
+        prompt: "Explore frontend design docs and code before reporting.",
+        subagent_type: "explore",
+      },
+      runtime: {
+        llm,
+        workspaceRoot,
+        sessionId: "session-agent",
+        turnId: "turn-main",
+      },
+      parentToolCallId: "tc-agent",
+    });
+
+    expect(output.status).toBe("completed");
+    expect(output.summary).toBe("Final frontend design panorama after deeper exploration.");
+    expect(output.summary).not.toBe("Explore SubAgent completed without a text summary.");
+    expect(output.stats.toolCallCount).toBe(13);
+    expect(llm.state.callCount).toBe(14);
+  });
 });
