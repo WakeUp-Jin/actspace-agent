@@ -78,6 +78,23 @@ Kairos 不应自动：
 - 修改主 Agent 默认工具集。
 - 写入高风险可执行产物。
 
+### Lab Agent handoff inbox
+
+Lab Agent 的系统提示词应写入一个很窄的 Kairos handoff 槽：
+
+```txt
+<userData>/kairos/inbox/lab-agent.md
+```
+
+用途是把实验/评测中值得 Kairos 后续观察的发现交接出去，例如：
+
+- 可复现的实验结果。
+- 失败原因和下一步验证线索。
+- 候选产物的证据摘要。
+- 需要后台观察的能力缺口。
+
+不应写普通运行日志、原始命令输出或没有后续观察价值的临时猜测。写入方式保持 append-only，不写 `Processed` 标记。当前 `packages/agent-core/src/prompt/lab-agent.ts` 已版本化 `buildLabAgentSystemPrompt({ labInboxPath })`；但 Lab Runtime、IPC 和持久化尚未实现，因此这个 prompt asset 尚未被真实 Lab 后端消费。
+
 ## 与 ToolManager 的关系
 
 Lab 不重新实现工具执行。它通过现有 ToolManager 和 Agent Loop 获得执行能力。
@@ -122,4 +139,3 @@ Lab 数据应优先本地落盘，符合 actspace 当前本地优先策略。
 ```
 
 是否落在 Electron `userData` 还是 workspace 内，需要在实现计划中根据可迁移性和项目归属再定。
-

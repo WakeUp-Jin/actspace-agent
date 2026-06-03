@@ -9,13 +9,13 @@ export const editFileDiffDefinition: ToolDefinitionSpec = {
     "Use replace_all to replace every occurrence (e.g. renaming a variable). " +
     "Always read the file first before editing to verify current content. " +
     "Prefer this over write_file when you only need to change a few lines. " +
-    "Paths are resolved inside the current workspace root; if the user gives only a filename, edit or create it in the workspace root.",
+    "Paths are resolved inside the current workspace root unless runtime instructions give an explicit writable absolute path; if the user gives only a filename, edit or create it in the workspace root.",
   parameters: {
     type: "object",
     properties: {
       path: {
         type: "string",
-        description: "File path, absolute or relative to workspace root. A bare filename is resolved in the workspace root.",
+        description: "File path, absolute or relative to workspace root. Runtime instructions may provide explicit writable absolute paths. A bare filename is resolved in the workspace root.",
       },
       old_string: {
         type: "string",

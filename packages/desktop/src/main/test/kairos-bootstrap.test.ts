@@ -36,6 +36,7 @@ describe("ensureKairosScaffolding", () => {
     await ensureKairosScaffolding(root);
 
     for (const sub of [
+      "inbox",
       "config",
       "workspace",
       "workspace/notes",

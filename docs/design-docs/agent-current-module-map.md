@@ -29,6 +29,7 @@
 ## `prompt/` - 提示词集中管理
 
 - `prompt/main-agent.ts`：桌面端默认主 Agent 系统提示词，供 `SystemPromptContext` 初始化使用。
+- `prompt/lab-agent.ts`：Lab Agent 默认系统提示词 builder；当前仅作为未来 Lab Runtime 的版本化 prompt 资产，包含写入 `<userData>/kairos/inbox/lab-agent.md` 的 handoff 规则，尚未接入真实 Lab 后端运行时。
 - `prompt/kimi-assistants/`：Kimi 辅助能力使用的系统提示词，包括 `web_search`、`analyze_media`。
 - 提示词文件顶部应写明使用位置、影响范围和维护边界；动态上下文、工具协议、密钥和运行时配置不应硬编码进提示词。
 
@@ -193,7 +194,7 @@ flowchart TB
 
 Desktop 集成（`packages/desktop`）：
 
-- `src/main/agent-runtime-context.ts` + `agents-md-service.ts`：主 Agent runtime context 装配入口。`SettingsService.readAgentSystemPrompt()` 读取 `<userData>/prompts/main-agent.md` 作为主系统提示词；`agents-md-service` 固定加载 `<userData>/AGENTS.md` 与 `<workspaceRoot>/AGENTS.md`，缺失静默跳过、读取失败只 warning，并以 `rules` segment 注入 `SystemPromptContext`。真实 turn 与 `context:describe` 共用该 loader，避免上下文检查视图和 LLM 实际输入漂移。
+- `src/main/agent-runtime-context.ts` + `agents-md-service.ts`：主 Agent runtime context 装配入口。`SettingsService.readAgentSystemPrompt()` 读取 `<userData>/prompts/main-agent.md` 作为主系统提示词；`agents-md-service` 固定加载 `<userData>/AGENTS.md` 与 `<workspaceRoot>/AGENTS.md`，缺失静默跳过、读取失败只 warning，并以 `rules` segment 注入 `SystemPromptContext`。同一 loader 还注入 Main Agent → Kairos handoff 段，给出真实绝对路径 `<userData>/kairos/inbox/main-agent.md`，并把 `<userData>/kairos/inbox/` 作为主 Agent `write_file/edit_file` 的额外可写根。真实 turn 与 `context:describe` 共用该 loader，避免上下文检查视图和 LLM 实际输入漂移。
 - `src/main/context-describe-service.ts`：按需重建某个 session 的 Context 明细，不调用 LLM；现在通过同一 runtime context loader 注入主系统提示词文件和 `AGENTS.md` rules，再用 `buildContextEntries` 生成 systemPrompt / rules / tools / conversation 逐条全文。
 - `src/main/kairos-bootstrap.ts`：`ensureKairosScaffolding(kairosRoot)` 幂等建目录 + 落 4 份默认 config；`createKairosLlm()` 复用 `buildLLMConfig`；`createKairosToolManagerFactory({ workspaceRoot })` 把 `blocklist.toolsDenied` 合并进 `disabledTools`。
 - `src/main/kairos-ipc.ts` + `kairos-ipc-internals.ts`：注册 invoke handler（`kairos:get-state/get-events-recent/control/read-config/write-config/get-context-snapshot`） + 50ms debounce 推 `kairos:event/state` 到 renderer。`dispatchKairosControl` 纯逻辑分派 `KairosControl`，含 `set_budget`（→ `controller.setBudget`，不碰 preferences）。

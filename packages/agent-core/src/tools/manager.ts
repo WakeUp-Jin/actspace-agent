@@ -25,11 +25,13 @@ const DEFAULT_TRUNCATE_THRESHOLD = 2000;
 export class ToolManager {
   private tools = new Map<string, InternalTool>();
   private workspaceRoot: string;
+  private additionalWritableRoots: string[];
   private truncateThreshold: number;
   private scheduler: ToolScheduler;
 
   constructor(config: ToolManagerConfig) {
     this.workspaceRoot = config.workspaceRoot;
+    this.additionalWritableRoots = config.additionalWritableRoots ?? [];
     this.truncateThreshold = config.truncateThreshold ?? DEFAULT_TRUNCATE_THRESHOLD;
     this.scheduler = new ToolScheduler({
       truncateThreshold: this.truncateThreshold,
@@ -49,7 +51,9 @@ export class ToolManager {
       name: spec.name,
       description: spec.description,
       parameters: spec.parameters,
-      handler: (args) => executor(args, this.workspaceRoot),
+      handler: (args) => executor(args, this.workspaceRoot, {
+        additionalWritableRoots: this.additionalWritableRoots,
+      }),
       isReadOnly: spec.isReadOnly,
       category: spec.category,
       previewKind: spec.previewKind,

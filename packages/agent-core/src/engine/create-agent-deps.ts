@@ -85,6 +85,8 @@ export interface AgentRuntimeContext {
   tmpRoot?: string;
   /** 当前会话 id，用于 bash 落盘文件分目录与历史压缩 ref */
   sessionId?: string;
+  /** write_file/edit_file 除 workspaceRoot 外可写入的绝对目录。 */
+  additionalWritableRoots?: string[];
   /** 主 Agent 当前使用的完整系统提示词；不传则使用代码默认值。 */
   systemPrompt?: string;
   /** 附加规则/技能等系统级上下文段，例如 AGENTS.md。 */
@@ -178,6 +180,7 @@ export function buildAgentConfig(
     approvalGate,
     tmpRoot: runtimeContext?.tmpRoot,
     sessionId: runtimeContext?.sessionId,
+    additionalWritableRoots: runtimeContext?.additionalWritableRoots,
   };
   return {
     llmConfig,

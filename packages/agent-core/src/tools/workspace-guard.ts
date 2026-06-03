@@ -46,6 +46,40 @@ export function guardWorkspacePath(
 }
 
 /**
+ * 写类工具的路径解析：默认只允许 workspaceRoot；调用方可显式传入额外
+ * 可写根，例如主 Agent 的 Kairos inbox handoff 目录。
+ */
+export function guardWritablePath(
+  inputPath: string,
+  workspaceRoot: string,
+  additionalWritableRoots: string[] = [],
+): GuardResult {
+  if (!inputPath || inputPath.trim() === "") {
+    return { ok: false, resolvedPath: "", error: "Path is empty" };
+  }
+
+  const workspaceGuard = guardWorkspacePath(inputPath, workspaceRoot);
+  if (workspaceGuard.ok) return workspaceGuard;
+
+  if (isAbsolute(inputPath)) {
+    for (const root of additionalWritableRoots.filter((root) => root.trim() !== "")) {
+      const guard = guardWorkspacePath(inputPath, root);
+      if (guard.ok) return guard;
+    }
+  }
+
+  const absolutePath = isAbsolute(inputPath)
+    ? resolve(inputPath)
+    : resolve(workspaceRoot, inputPath);
+
+  return {
+    ok: false,
+    resolvedPath: absolutePath,
+    error: `Path escapes writable boundary: ${inputPath}`,
+  };
+}
+
+/**
  * 读类工具的路径解析：相对路径基于 workspaceRoot，绝对路径原样保留，
  * **不做越界检查**。仅在路径为空时报错。
  *

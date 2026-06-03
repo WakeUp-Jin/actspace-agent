@@ -69,6 +69,7 @@
 ### Runtime 与 Agent 协作
 
 - 尚未实现 `packages/agent-core` 中的 Lab Runtime。
+- 已版本化 `packages/agent-core/src/prompt/lab-agent.ts` 作为未来 Lab Agent 默认系统提示词资产，其中包含写入 `<userData>/kairos/inbox/lab-agent.md` 的 handoff 规则；由于 Lab Runtime 尚未落地，它目前尚未被真实后端消费。
 - Main Agent 尚不能自动创建、推进或整理 Lab 实验。
 - Kairos 尚不能把巡检发现沉淀为 Lab 实验。
 - ToolManager / Skill / CLI / Tool Registry 尚未接入 Lab 产物晋升链路。

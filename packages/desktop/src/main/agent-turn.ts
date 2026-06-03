@@ -39,7 +39,7 @@ export type AppDataRoots = {
 
 export type AgentRuntimeContextLoader = (
   workspaceRoot: string,
-) => Promise<Pick<AgentRuntimeContext, "systemPrompt" | "systemPromptSegments">>;
+) => Promise<Pick<AgentRuntimeContext, "systemPrompt" | "systemPromptSegments" | "additionalWritableRoots">>;
 
 const PREVIEW_LIMIT = 160;
 

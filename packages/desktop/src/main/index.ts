@@ -187,12 +187,14 @@ async function ensureDataDirectories(): Promise<AppDataRoots> {
   const sessionRoot = join(dataRoot, "sessions");
   const logRoot = join(await getRepoRoot(), "logs");
   const tmpRoot = join(dataRoot, "tmp");
+  const kairosInboxRoot = join(dataRoot, "kairos", "inbox");
   const defaultWorkspaceRoot = app.getPath("downloads");
   const workspaceRoot = await getWorkspaceRoot();
 
   await mkdir(sessionRoot, { recursive: true });
   await mkdir(logRoot, { recursive: true });
   await mkdir(tmpRoot, { recursive: true });
+  await mkdir(kairosInboxRoot, { recursive: true });
 
   logMain("data directories ensured", {
     dataRoot,

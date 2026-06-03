@@ -45,6 +45,7 @@ DeepSeek Anthropic provider-native server tool 不会产生本地 `tool_call` / 
 - `sessions/`
 - `tmp/`
 - `cache-audit/`
+- `kairos/inbox/`
 
 `cache-audit/` 使用 `<userData>/cache-audit/<sessionId>/last.context.json` 保存上一轮真实 provider 输入的滚动快照；当模型返回的 cache hit ratio 低于阈值时，才在 `<cacheAuditId>/` 下固化 `summary.json`、`previous.context.json`、`current.context.json`、`diff.txt`。这些文件可能包含完整用户输入、工具结果和文件片段，只能保存在本地，不应上传或提交。
 
@@ -54,6 +55,7 @@ Agent 文件工具的 `workspaceRoot` 与 Electron `userData` 分离：
 
 - `userData` 只用于 session、附件、tmp 等应用数据。
 - `workspaceRoot` 用于 `read_file`、`grep`、`glob`、`list_directory`、`edit_file` 等文件工具。
+- 主 Agent 的 `write_file` / `edit_file` 额外允许写入 `<userData>/kairos/inbox/`，用于把可交接信息 append 到 `main-agent.md`；这个额外根由 runtime context 显式注入，不代表整个 `userData` 可写。
 - 应用默认根解析顺序为 `ACTSPACE_WORKSPACE_ROOT` -> 当前仓库根目录。
 - 普通聊天 turn 的实际根优先读当前 session `meta.workspaceRoot`；旧 session 或未设置时才回退应用默认根。
 - 顶部 Workspace 选择器的切换只是 renderer 临时状态；用户发送消息时才把最终选择写入当前 session `meta.workspaceRoot`，避免多次选择造成多次迁移。
@@ -86,6 +88,9 @@ Kairos（自治模式）在 `<userData>/kairos/` 下独立成树，与主 Agent 
 
 ```
 <userData>/kairos/
+├── inbox/
+│   ├── main-agent.md          # 主 Agent append-only handoff notes
+│   └── lab-agent.md           # Lab Agent append-only handoff notes（Lab Runtime 接入后写入）
 ├── config/
 │   ├── preferences.json       # enabled / sleepRange / rhythm / circuitBreaker / tip
 │   ├── paths.json             # workspaces / sessionRoots / watch[] 三大类路径

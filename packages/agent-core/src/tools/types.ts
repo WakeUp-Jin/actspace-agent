@@ -35,7 +35,13 @@ export interface ToolDefinitionSpec {
 export type ToolExecutorFn = (
   args: Record<string, unknown>,
   workspaceRoot: string,
+  runtime?: ToolExecutorRuntime,
 ) => Promise<ToolResult>;
+
+export interface ToolExecutorRuntime {
+  /** Extra absolute roots writable by file tools in addition to workspaceRoot. */
+  additionalWritableRoots?: string[];
+}
 
 export interface ToolRuntimeConfig {
   primaryProvider?: "deepseek" | "kimi" | "mock";
@@ -47,6 +53,8 @@ export interface ToolRuntimeConfig {
 /** ToolManager 配置 */
 export interface ToolManagerConfig extends ToolRuntimeConfig {
   workspaceRoot: string;
+  /** Extra absolute roots writable by write_file/edit_file in addition to workspaceRoot. */
+  additionalWritableRoots?: string[];
   /** 硬截断阈值（字符数），默认 2000。通用工具（web/generic）的 flash 摘要触发阈值。 */
   truncateThreshold?: number;
   /** 读取类工具（read/grep/glob/directory_list）的摘要触发阈值，默认 20000 */

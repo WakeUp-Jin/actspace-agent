@@ -26,7 +26,7 @@ export {
   type ToolSchedulerConfig,
   type ToolSchedulerExecution,
 } from "./scheduler";
-export { guardWorkspacePath, resolveReadablePath, displayReadablePath } from "./workspace-guard";
+export { guardWorkspacePath, guardWritablePath, resolveReadablePath, displayReadablePath } from "./workspace-guard";
 export type { GuardResult } from "./workspace-guard";
 export { shouldExposeTool } from "./exposure";
 export { cleanupOldToolOutputs } from "./cleanup-tool-outputs";
