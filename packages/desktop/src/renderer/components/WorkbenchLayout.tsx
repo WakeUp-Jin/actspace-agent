@@ -5,11 +5,12 @@ import { LabPage } from "./LabPage";
 import { RightPanel } from "./RightPanel";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { RightPanelObjectMenu } from "./right-panel/RightPanelObjectMenu";
-import { Sidebar, type NewSessionInput, type SessionPreviewResolver, type SessionUiStatusKind, type SidebarMode, type SidebarView } from "./Sidebar";
+import { Sidebar, type NewSessionInput, type SessionUiStatusKind, type SidebarMode, type SidebarView } from "./Sidebar";
 import { SplitView } from "./SplitView";
 import { UsageStatisticsPage } from "./UsageStatisticsPage";
 import { WindowChromeBar } from "./WindowChromeBar";
 import type { ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
+import type { SessionPreviewResolver } from "./SessionHoverPreview";
 import { KairosPage } from "../pages/KairosPage";
 import { SettingsPage } from "./settings/SettingsPage";
 
@@ -358,6 +359,9 @@ export function WorkbenchLayout({
     : view === "usage" ? "Usage"
     : view === "kairos" ? "Kairos"
     : title;
+  const currentSession = view === "chat"
+    ? sessions.find((session) => session.id === activeSessionId) ?? null
+    : null;
 
   return (
     <>
@@ -368,6 +372,8 @@ export function WorkbenchLayout({
         onToggleLeft={toggleSidebarMode}
         onToggleRight={toggleRightPanel}
         showRightToggle={view !== "kairos"}
+        currentSession={currentSession}
+        getSessionPreview={view === "chat" ? getSessionPreview : undefined}
         rightLeading={
           view === "chat" && isRightPanelOpen ? <RightPanelObjectMenu sessionId={activeSessionId} /> : undefined
         }
@@ -382,7 +388,6 @@ export function WorkbenchLayout({
             view={view}
             busySessionIds={busySessionIds}
             sessionStatuses={sessionStatuses}
-            getSessionPreview={getSessionPreview}
             onToggleMode={toggleSidebarMode}
             onNewSession={onNewSession}
             onAddWorkspace={onAddWorkspace}

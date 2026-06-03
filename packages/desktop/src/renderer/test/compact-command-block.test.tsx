@@ -34,7 +34,7 @@ describe("CompactCommandBlock", () => {
   });
 
   it("renders completed state as an independent divider", () => {
-    render(
+    const { container } = render(
       <CompactCommandBlock
         message={makeBlock({
           status: "completed",
@@ -45,6 +45,8 @@ describe("CompactCommandBlock", () => {
 
     expect(screen.getByRole("separator", { name: "Context compacted · 18 messages" })).toBeInTheDocument();
     expect(screen.getByText("Context compacted · 18 messages")).toBeInTheDocument();
+    expect(container.querySelector(".compact-command-block")).toHaveClass("w-full");
+    expect(container.querySelector(".compact-command-block")).not.toHaveClass("max-w-[720px]");
     expect(screen.queryByText("18 messages removed")).not.toBeInTheDocument();
     expect(document.querySelector("svg")).toBeNull();
   });

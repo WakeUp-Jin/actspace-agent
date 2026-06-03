@@ -265,97 +265,24 @@ describe("Sidebar (cursor-aligned layout)", () => {
     });
   });
 
-  it("shows full workspace path, model label, and context in the session hover card", async () => {
+  it("does not show the session detail hover card from sidebar rows", async () => {
     const user = userEvent.setup();
-    const getSessionPreview = vi.fn(async () => ({
-      sessionId: "s-actspace-1",
-      workspaceRoot: "/Users/me/Desktop/code-project/side-project/actspace-agent",
-      model: "deepseek-v4-pro",
-      modelId: "deepseek-v4-pro" as const,
-      contextSnapshot: HOVER_CONTEXT,
-    }));
-    renderSidebar({ getSessionPreview });
+    renderSidebar();
 
     await user.hover(screen.getByText("工具定义格式和命名规范"));
-    const tooltip = await screen.findByRole("tooltip");
-
-    expect(getSessionPreview).toHaveBeenCalledWith(expect.objectContaining({ id: "s-actspace-1" }));
-    expect(tooltip).toHaveTextContent("/Users/me/Desktop/code-project/side-project/actspace-agent");
-    expect(tooltip).toHaveTextContent("DeepSeek V4 Pro");
-    expect(tooltip).toHaveTextContent("Context 56%");
-    expect(tooltip).toHaveTextContent("56,000 / 100,000");
-    expect(tooltip).not.toHaveTextContent("main");
-  });
-
-  it("keeps the hover card lightweight when preview details are missing", async () => {
-    const user = userEvent.setup();
-    const getSessionPreview = vi.fn(async () => ({
-      sessionId: "s-actspace-1",
-      workspaceRoot: "/Users/me/projects/actspace-agent",
-      contextSnapshot: null,
-    }));
-    renderSidebar({ getSessionPreview });
-
-    await user.hover(screen.getByText("工具定义格式和命名规范"));
-    const tooltip = await screen.findByRole("tooltip");
-
-    expect(tooltip).toHaveTextContent("工具定义格式和命名规范");
-    expect(tooltip).toHaveTextContent("/Users/me/projects/actspace-agent");
-    expect(tooltip).not.toHaveTextContent("Context");
-    expect(tooltip).not.toHaveTextContent("Loading session details");
-  });
-
-  it("shows the session hover card from keyboard focus", async () => {
-    const getSessionPreview = vi.fn(async () => ({
-      sessionId: "s-actspace-1",
-      workspaceRoot: "/Users/me/projects/actspace-agent",
-      model: "deepseek-v4-pro",
-    }));
-    renderSidebar({ getSessionPreview });
-
-    const trigger = screen.getByText("工具定义格式和命名规范").closest("button");
-    expect(trigger).not.toBeNull();
-    fireEvent.focus(trigger as HTMLButtonElement);
-
-    await waitFor(() => expect(getSessionPreview).toHaveBeenCalledTimes(1));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("/Users/me/projects/actspace-agent");
-  });
-
-  it("does not reload the same session preview on repeated hovers", async () => {
-    const user = userEvent.setup();
-    const getSessionPreview = vi.fn(async () => ({
-      sessionId: "s-actspace-1",
-      workspaceRoot: "/Users/me/projects/actspace-agent",
-    }));
-    renderSidebar({ getSessionPreview });
-
-    const title = screen.getByText("工具定义格式和命名规范");
-    await user.hover(title);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("/Users/me/projects/actspace-agent");
-    await user.unhover(title);
-    await user.hover(title);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("/Users/me/projects/actspace-agent");
-
-    expect(getSessionPreview).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("closes the hover card while the context menu or rename input owns the row", async () => {
     const user = userEvent.setup();
-    const getSessionPreview = vi.fn(async () => ({
-      sessionId: "s-actspace-1",
-      workspaceRoot: "/Users/me/projects/actspace-agent",
-    }));
-    renderSidebar({ getSessionPreview });
+    renderSidebar();
 
     const title = screen.getByText("工具定义格式和命名规范");
-    await user.hover(title);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("/Users/me/projects/actspace-agent");
 
     const row = title.closest(".session-row");
     expect(row).not.toBeNull();
     fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
 
-    await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
     expect(screen.getByRole("menu", { name: "Session actions for 工具定义格式和命名规范" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("menuitem", { name: "Rename" }));
@@ -376,15 +303,17 @@ describe("WindowChromeBar", () => {
     const onToggleRight = vi.fn();
     const onOpenSearch = vi.fn();
     const result = render(
-      <WindowChromeBar
-        leftMode="expanded"
-        rightOpen={false}
-        title="New chat"
-        onToggleLeft={onToggleLeft}
-        onToggleRight={onToggleRight}
-        onOpenSearch={onOpenSearch}
-        {...overrides}
-      />,
+      <TooltipProvider delayDuration={0}>
+        <WindowChromeBar
+          leftMode="expanded"
+          rightOpen={false}
+          title="New chat"
+          onToggleLeft={onToggleLeft}
+          onToggleRight={onToggleRight}
+          onOpenSearch={onOpenSearch}
+          {...overrides}
+        />
+      </TooltipProvider>,
     );
     return { onToggleLeft, onToggleRight, onOpenSearch, ...result };
   }
@@ -433,6 +362,71 @@ describe("WindowChromeBar", () => {
     expect(screen.queryByRole("button", { name: "Open panel" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Collapse session sidebar" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Search sessions" })).toBeInTheDocument();
+  });
+
+  it("shows full workspace path, model label, and context from the chrome title hover card", async () => {
+    const user = userEvent.setup();
+    const getSessionPreview = vi.fn(async () => ({
+      sessionId: "s-actspace-1",
+      workspaceRoot: "/Users/me/Desktop/code-project/side-project/actspace-agent",
+      model: "deepseek-v4-pro",
+      modelId: "deepseek-v4-pro" as const,
+      contextSnapshot: HOVER_CONTEXT,
+    }));
+    renderChromeBar({
+      title: "New chat",
+      currentSession: SESSIONS[1],
+      getSessionPreview,
+    });
+
+    await user.hover(screen.getByRole("button", { name: "Show session details for New chat" }));
+    const tooltip = await screen.findByRole("tooltip");
+
+    expect(getSessionPreview).toHaveBeenCalledWith(expect.objectContaining({ id: "s-actspace-1" }));
+    expect(tooltip).toHaveTextContent("New chat");
+    expect(tooltip).toHaveTextContent("/Users/me/Desktop/code-project/side-project/actspace-agent");
+    expect(tooltip).toHaveTextContent("DeepSeek V4 Pro");
+    expect(tooltip).toHaveTextContent("Context 56%");
+    expect(tooltip).toHaveTextContent("56,000 / 100,000");
+    expect(tooltip).not.toHaveTextContent("main");
+  });
+
+  it("shows the chrome title hover card from keyboard focus", async () => {
+    const getSessionPreview = vi.fn(async () => ({
+      sessionId: "s-actspace-1",
+      workspaceRoot: "/Users/me/projects/actspace-agent",
+      model: "deepseek-v4-pro",
+    }));
+    renderChromeBar({
+      currentSession: SESSIONS[1],
+      getSessionPreview,
+    });
+
+    fireEvent.focus(screen.getByRole("button", { name: "Show session details for New chat" }));
+
+    await waitFor(() => expect(getSessionPreview).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("/Users/me/projects/actspace-agent");
+  });
+
+  it("does not reload the same chrome title preview on repeated hovers", async () => {
+    const user = userEvent.setup();
+    const getSessionPreview = vi.fn(async () => ({
+      sessionId: "s-actspace-1",
+      workspaceRoot: "/Users/me/projects/actspace-agent",
+    }));
+    renderChromeBar({
+      currentSession: SESSIONS[1],
+      getSessionPreview,
+    });
+
+    const trigger = screen.getByRole("button", { name: "Show session details for New chat" });
+    await user.hover(trigger);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("/Users/me/projects/actspace-agent");
+    await user.unhover(trigger);
+    await user.hover(trigger);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("/Users/me/projects/actspace-agent");
+
+    expect(getSessionPreview).toHaveBeenCalledTimes(1);
   });
 
   it("declares the chrome strip as a fixed overlay with pointer-events: none on the wrapper", () => {

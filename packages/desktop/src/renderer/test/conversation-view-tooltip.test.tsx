@@ -20,11 +20,23 @@ const messages: MessageBlock[] = [
   },
 ];
 
-function renderConversation() {
+const messagesWithCompaction: MessageBlock[] = [
+  ...messages,
+  {
+    kind: "context_compaction",
+    id: "compact-1",
+    status: "completed",
+    trigger: "manual",
+    summaryText: "Context compacted · 8 messages",
+    createdAt: "2026-06-02T00:00:02.000Z",
+  },
+];
+
+function renderConversation(inputMessages: MessageBlock[] = messages) {
   return render(
     <TooltipProvider delayDuration={0}>
       <RightPanelProvider>
-        <ConversationView messages={messages} contextSnapshot={null} sessionId="session-1" />
+        <ConversationView messages={inputMessages} contextSnapshot={null} sessionId="session-1" />
       </RightPanelProvider>
     </TooltipProvider>,
   );
@@ -45,5 +57,14 @@ describe("ConversationView tooltips", () => {
 
     await user.hover(screen.getByRole("button", { name: "更多消息操作" }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("更多操作");
+  });
+
+  it("keeps assistant turn actions above a following compaction divider", () => {
+    renderConversation(messagesWithCompaction);
+
+    const actionsButton = screen.getByRole("button", { name: "更多消息操作" });
+    const divider = screen.getByRole("separator", { name: "Context compacted · 8 messages" });
+
+    expect(actionsButton.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

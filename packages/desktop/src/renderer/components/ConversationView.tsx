@@ -186,6 +186,16 @@ function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTurn[] {
       continue;
     }
 
+    if (message.kind === "context_compaction") {
+      currentTurn = null;
+      turns.push({
+        id: message.id,
+        user: null,
+        messages: [message],
+      });
+      continue;
+    }
+
     if (!currentTurn) {
       currentTurn = {
         id: `turn-${message.id}`,

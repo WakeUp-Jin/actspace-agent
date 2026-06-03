@@ -25,7 +25,8 @@ import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import type { ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
-import type { NewSessionInput, SessionHoverPreview, SessionUiStatusKind } from "./components/Sidebar";
+import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
+import type { SessionHoverPreview } from "./components/SessionHoverPreview";
 import {
   mockBootstrapState,
   mockContextSnapshot,

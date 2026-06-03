@@ -1,6 +1,13 @@
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { PanelLeft, PanelRight, Search } from "lucide-react";
+import type { SessionListItem } from "@actspace/shared";
 import type { SidebarMode } from "./Sidebar";
+import { SessionHoverPreviewCard } from "./SessionHoverPreview";
+import type { SessionHoverPreview, SessionPreviewResolver } from "./SessionHoverPreview";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
+
+const CHROME_TITLE_HOVER_CONTENT_CLASS = "!max-w-[420px] !p-0 !font-normal !leading-normal";
 
 /**
  * 窗口顶部 chrome 浮层，参考 Cursor Agent Window 的 `.part.titlebar` 实现。
@@ -27,6 +34,8 @@ export type WindowChromeBarProps = {
   onToggleRight: () => void;
   onOpenSearch?: () => void;
   showRightToggle?: boolean;
+  currentSession?: SessionListItem | null;
+  getSessionPreview?: SessionPreviewResolver;
   /** 渲染在右侧折叠按钮左侧的额外控件（如「+ 新建对象」菜单）。 */
   rightLeading?: ReactNode;
 };
@@ -39,6 +48,8 @@ export function WindowChromeBar({
   onToggleRight,
   onOpenSearch,
   showRightToggle = true,
+  currentSession,
+  getSessionPreview,
   rightLeading,
 }: WindowChromeBarProps) {
   const isLeftHidden = leftMode === "hidden";
@@ -67,7 +78,11 @@ export function WindowChromeBar({
         </button>
       </div>
       <div className="chrome-center">
-        <h1 className="chrome-title" title={title}>{title}</h1>
+        <ChromeTitle
+          title={title}
+          currentSession={currentSession ?? null}
+          getSessionPreview={getSessionPreview}
+        />
       </div>
       <div className="chrome-right">
         {rightLeading}
@@ -85,5 +100,85 @@ export function WindowChromeBar({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function ChromeTitle({
+  title,
+  currentSession,
+  getSessionPreview,
+}: {
+  title: string;
+  currentSession: SessionListItem | null;
+  getSessionPreview?: SessionPreviewResolver;
+}) {
+  const [preview, setPreview] = useState<SessionHoverPreview | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const loadedSessionIdRef = useRef<string | null>(null);
+  const loadingSessionIdRef = useRef<string | null>(null);
+  const canShowPreview = Boolean(currentSession && getSessionPreview);
+
+  useEffect(() => {
+    setOpen(false);
+    setPreview(null);
+    setLoading(false);
+    loadedSessionIdRef.current = null;
+    loadingSessionIdRef.current = null;
+  }, [currentSession?.id]);
+
+  const loadPreview = async () => {
+    if (!currentSession || !getSessionPreview) return;
+    if (loadedSessionIdRef.current === currentSession.id || loadingSessionIdRef.current === currentSession.id) return;
+
+    loadingSessionIdRef.current = currentSession.id;
+    setLoading(true);
+    try {
+      setPreview(await getSessionPreview(currentSession));
+      loadedSessionIdRef.current = currentSession.id;
+    } catch (error) {
+      console.error("Failed to load current session preview", error);
+      setPreview(null);
+      loadedSessionIdRef.current = currentSession.id;
+    } finally {
+      loadingSessionIdRef.current = null;
+      setLoading(false);
+    }
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    const resolvedOpen = nextOpen && canShowPreview;
+    setOpen(resolvedOpen);
+    if (resolvedOpen) {
+      void loadPreview();
+    }
+  };
+
+  if (!canShowPreview || !currentSession) {
+    return <h1 className="chrome-title" title={title}>{title}</h1>;
+  }
+
+  return (
+    <Tooltip delayDuration={250} open={open} onOpenChange={handleOpenChange}>
+      <TooltipTrigger asChild>
+        <button className="chrome-title chrome-title-trigger" type="button" aria-label={`Show session details for ${title}`}>
+          {title}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        side="bottom"
+        align="center"
+        sideOffset={10}
+        className={CHROME_TITLE_HOVER_CONTENT_CLASS}
+        onPointerDown={(event) => event.preventDefault()}
+      >
+        <SessionHoverPreviewCard
+          session={currentSession}
+          title={title}
+          preview={preview}
+          loading={loading}
+        />
+      </TooltipContent>
+    </Tooltip>
   );
 }

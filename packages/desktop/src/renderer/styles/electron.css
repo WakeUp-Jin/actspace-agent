@@ -98,6 +98,7 @@
 
 .chrome-title {
   margin: 0;
+  max-width: min(460px, 60vw);
   font-size: 13px;
   font-weight: 500;
   color: var(--text-soft);
@@ -105,4 +106,19 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   pointer-events: none; /* 让 drag region 干净，文本本身不接收 hit-test */
+}
+
+.chrome-title-trigger {
+  border: 0;
+  background: transparent;
+  cursor: default;
+  font: inherit;
+  color: var(--text-soft);
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.chrome-title-trigger:focus-visible {
+  outline: 2px solid var(--act-color-focus-ring);
+  outline-offset: 2px;
 }

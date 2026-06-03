@@ -39,6 +39,25 @@
 - 主题颜色扫描确认 hover card 相关 touched files 没有新增主题相关 hard-coded color。
 - Electron renderer smoke 指向当前工作区 renderer `http://127.0.0.1:5174/`，验证浅/深主题下 hover card 可显示、宽度 420px、路径 `overflow-wrap:anywhere`、进度条百分比正常且未越出 viewport。
 
+### Follow-up Fix: Chrome Title Ownership
+
+用户反馈：会话详情 hover card 不应该挂在左侧会话列表项上，而应该在顶部当前会话标题（例如 `New chat`）hover 时出现。
+
+本次修正：
+
+- **[Ownership]**: 将 hover card 内容抽成 `SessionHoverPreviewCard`，从 `Sidebar` 移到 `WindowChromeBar` 当前会话标题触发。
+- **[Sidebar cleanup]**: 左侧会话行不再触发大详情卡，只保留选择、右键、rename、pin、archive 和状态点行为。
+- **[Chrome integration]**: `WorkbenchLayout` 把当前 active session 和 preview resolver 传给 `WindowChromeBar`；顶部标题支持 mouse hover 和 keyboard focus 打开详情卡，并保留同一会话只加载一次的缓存行为。
+- **[Hit testing]**: `chrome-title-trigger` 使用 `-webkit-app-region: no-drag` 与语义 token 样式，让标题可 hover/focus，同时不破坏顶部栏其他拖拽区域。
+- **[Tests]**: 更新 Sidebar/WindowChromeBar 单测，覆盖左侧不再弹详情、顶部标题 hover/focus 展示详情、重复 hover 不重复加载。
+
+追加验证：
+
+- `pnpm --filter @actspace/desktop typecheck`
+- `pnpm --filter @actspace/desktop test -- src/renderer/test/sidebar.test.tsx`
+- `git diff --check`
+- 主题颜色扫描确认 `WindowChromeBar` / `SessionHoverPreview` / `electron.css` 没有新增主题相关 hard-coded color。
+
 ### Files Modified
 
 - `packages/shared/src/ipc.ts`
@@ -49,7 +68,10 @@
 - `packages/desktop/src/preload/index.ts`
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/desktop/src/renderer/components/Sidebar.tsx`
+- `packages/desktop/src/renderer/components/SessionHoverPreview.tsx`
+- `packages/desktop/src/renderer/components/WindowChromeBar.tsx`
 - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
+- `packages/desktop/src/renderer/styles/electron.css`
 - `packages/desktop/src/renderer/test/sidebar.test.tsx`
 - `docs/design-docs/front-左侧会话栏规范.md`
 - `docs/exec-plans/completed/20260603-session-hover-card.md`

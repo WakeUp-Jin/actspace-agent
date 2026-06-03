@@ -3,7 +3,7 @@ import type { MessageBlock } from "@actspace/shared";
 type CompactMessage = Extract<MessageBlock, { kind: "context_compaction" }>;
 
 const BLOCK_CLASS =
-  "message-row compact-command-block w-full max-w-[720px] px-[var(--conversation-text-inset)] animate-[rise-in_220ms_ease_both]";
+  "message-row compact-command-block w-full px-[var(--conversation-text-inset)] animate-[rise-in_220ms_ease_both]";
 const PENDING_CLASS = "text-sm font-medium text-text-faint";
 const RUNNING_CLASS =
   "compact-command-running w-full py-2";
