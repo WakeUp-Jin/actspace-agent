@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>actspace Compact Command States</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page-bg: #f7f9fd;
+        --surface: #ffffff;
+        --surface-subtle: #f1f4f9;
+        --surface-raised: rgba(255, 255, 255, 0.92);
+        --line: rgba(25, 38, 67, 0.12);
+        --line-strong: rgba(25, 38, 67, 0.18);
+        --text-main: #202124;
+        --text-muted: rgba(32, 33, 36, 0.72);
+        --text-faint: rgba(32, 33, 36, 0.52);
+        --brand: #2f6fff;
+        --brand-soft: rgba(47, 111, 255, 0.1);
+        --success: #168457;
+        --success-soft: rgba(22, 132, 87, 0.1);
+        --exec-bg: #171b24;
+        --exec-bg-2: #202734;
+        --exec-line: rgba(255, 255, 255, 0.12);
+        --exec-text: rgba(255, 255, 255, 0.92);
+        --exec-muted: rgba(255, 255, 255, 0.6);
+        --exec-faint: rgba(255, 255, 255, 0.38);
+        --exec-track: rgba(255, 255, 255, 0.14);
+        --shadow: 0 22px 54px rgba(23, 35, 66, 0.12);
+        --mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+        --ui:
+          -apple-system,
+          BlinkMacSystemFont,
+          "PingFang SC",
+          "Hiragino Sans GB",
+          "Segoe UI",
+          "Microsoft YaHei",
+          "Helvetica Neue",
+          Arial,
+          sans-serif;
+      }
+
+      [data-theme="dark"] {
+        color-scheme: dark;
+        --page-bg: #11141a;
+        --surface: #181c24;
+        --surface-subtle: #141820;
+        --surface-raised: rgba(29, 34, 44, 0.92);
+        --line: rgba(238, 243, 255, 0.1);
+        --line-strong: rgba(238, 243, 255, 0.16);
+        --text-main: rgba(246, 248, 252, 0.94);
+        --text-muted: rgba(246, 248, 252, 0.7);
+        --text-faint: rgba(246, 248, 252, 0.48);
+        --brand: #6b96ff;
+        --brand-soft: rgba(107, 150, 255, 0.14);
+        --success: #68d6a0;
+        --success-soft: rgba(104, 214, 160, 0.12);
+        --exec-bg: #0d1016;
+        --exec-bg-2: #161c26;
+        --exec-line: rgba(255, 255, 255, 0.1);
+        --exec-text: rgba(250, 252, 255, 0.94);
+        --exec-muted: rgba(250, 252, 255, 0.62);
+        --exec-faint: rgba(250, 252, 255, 0.4);
+        --exec-track: rgba(255, 255, 255, 0.12);
+        --shadow: 0 26px 64px rgba(0, 0, 0, 0.36);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--ui);
+        font-feature-settings: normal;
+        background:
+          radial-gradient(circle at 20% 4%, var(--brand-soft), transparent 28%),
+          linear-gradient(180deg, var(--page-bg), var(--surface-subtle));
+        color: var(--text-main);
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .page-shell {
+        width: min(1240px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 32px 0 42px;
+      }
+
+      .header {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 18px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--text-faint);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1.2;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .header p {
+        max-width: 560px;
+        margin: 8px 0 0;
+        color: var(--text-muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .legend {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        height: 28px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface-raised);
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      .theme-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .theme-frame {
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .theme-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-raised);
+      }
+
+      .window-dots {
+        display: inline-flex;
+        gap: 6px;
+      }
+
+      .window-dots i {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--line-strong);
+      }
+
+      .theme-name {
+        color: var(--text-muted);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      .chat-canvas {
+        min-height: 680px;
+        padding: 26px 22px;
+        background:
+          linear-gradient(180deg, transparent, var(--surface-subtle)),
+          var(--page-bg);
+      }
+
+      .message-stream {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        max-width: 640px;
+        margin: 0 auto;
+      }
+
+      .assistant-copy,
+      .user-copy {
+        font-size: 14px;
+        line-height: 1.62;
+      }
+
+      .assistant-copy {
+        color: var(--text-main);
+      }
+
+      .user-copy {
+        align-self: flex-end;
+        max-width: 82%;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface-raised);
+        color: var(--text-main);
+      }
+
+      .compact-event {
+        position: relative;
+        width: min(100%, 560px);
+      }
+
+      .compact-event.pending {
+        padding-left: 15px;
+      }
+
+      .compact-event.pending::before,
+      .compact-event.done::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 9px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--brand);
+        box-shadow: 0 0 0 4px var(--brand-soft);
+      }
+
+      .command-line {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: var(--text-muted);
+        font-size: 13px;
+      }
+
+      .slash-token {
+        display: inline-flex;
+        align-items: center;
+        height: 23px;
+        padding: 0 8px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--surface-raised);
+        color: var(--text-main);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      .running-card {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--exec-line);
+        border-radius: 14px;
+        background:
+          linear-gradient(135deg, rgba(47, 111, 255, 0.2), transparent 32%),
+          linear-gradient(180deg, var(--exec-bg-2), var(--exec-bg));
+        color: var(--exec-text);
+        box-shadow:
+          0 18px 40px rgba(0, 0, 0, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }
+
+      .running-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          repeating-linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.035) 0,
+            rgba(255, 255, 255, 0.035) 1px,
+            transparent 1px,
+            transparent 14px
+          );
+        mask-image: linear-gradient(90deg, transparent, black 18%, black 82%, transparent);
+      }
+
+      .running-head {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 13px 14px 10px;
+      }
+
+      .running-title {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        gap: 10px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .terminal-caret {
+        display: inline-grid;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--brand);
+        font-family: var(--mono);
+        font-size: 14px;
+      }
+
+      .running-title code {
+        color: var(--exec-text);
+        font-family: var(--mono);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .running-meta {
+        flex: 0 0 auto;
+        color: var(--exec-muted);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      .progress-block {
+        position: relative;
+        padding: 0 14px 14px;
+      }
+
+      .progress-track {
+        position: relative;
+        height: 5px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: var(--exec-track);
+      }
+
+      .progress-fill {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 46%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--brand), #9bb7ff);
+        box-shadow: 0 0 18px rgba(47, 111, 255, 0.58);
+      }
+
+      .progress-fill::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+        animation: sweep 1.6s ease-in-out infinite;
+      }
+
+      .running-subrow {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 9px;
+        color: var(--exec-muted);
+        font-size: 12px;
+      }
+
+      .running-subrow span:last-child {
+        flex: 0 0 auto;
+        color: var(--exec-text);
+        font-family: var(--mono);
+      }
+
+      .compact-event.done {
+        padding: 11px 12px 11px 15px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface-raised);
+      }
+
+      .done-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .done-title {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        gap: 9px;
+        color: var(--text-main);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .done-mark {
+        display: inline-grid;
+        place-items: center;
+        flex: 0 0 auto;
+        width: 20px;
+        height: 20px;
+        border-radius: 7px;
+        background: var(--success-soft);
+        color: var(--success);
+        font-size: 13px;
+      }
+
+      .done-meta {
+        flex: 0 0 auto;
+        color: var(--text-faint);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      .compact-event.done::before {
+        top: 18px;
+        background: var(--success);
+        box-shadow: 0 0 0 4px var(--success-soft);
+      }
+
+      .state-label {
+        margin-bottom: 7px;
+        color: var(--text-faint);
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+
+      .conversation-rule {
+        height: 1px;
+        margin: 4px 0;
+        background: var(--line);
+      }
+
+      @keyframes sweep {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(100%);
+        }
+      }
+
+      @media (max-width: 920px) {
+        .theme-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .page-shell {
+          width: min(720px, calc(100vw - 28px));
+          padding-top: 22px;
+        }
+
+        .header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .legend {
+          justify-content: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="header">
+        <div>
+          <p class="eyebrow">/compact command prototype</p>
+          <h1>Message-flow states for conversation compaction</h1>
+          <p>
+            The compact event lives in the chat stream so manual and automatic triggers share the same timeline.
+            The running state uses a high-contrast execution card while still adapting to light and dark themes.
+          </p>
+        </div>
+        <div class="legend" aria-label="state legend">
+          <span>pending</span>
+          <span>running</span>
+          <span>done</span>
+        </div>
+      </header>
+
+      <section class="theme-grid" aria-label="theme comparison">
+        <article class="theme-frame" data-theme="light">
+          <div class="theme-topbar">
+            <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="theme-name">data-theme="light"</span>
+          </div>
+          <div class="chat-canvas">
+            <div class="message-stream">
+              <div class="assistant-copy">
+                I found the context is getting dense, and a compact pass can keep the next turn focused without
+                losing the working trail.
+              </div>
+
+              <div class="user-copy">/compact</div>
+
+              <div class="compact-event pending">
+                <div class="state-label">before execution</div>
+                <div class="command-line">
+                  <span class="slash-token">/compact</span>
+                  <span>Queued conversation compaction</span>
+                </div>
+              </div>
+
+              <div class="conversation-rule"></div>
+
+              <div class="compact-event running">
+                <div class="state-label">executing</div>
+                <div class="running-card">
+                  <div class="running-head">
+                    <div class="running-title">
+                      <span class="terminal-caret" aria-hidden="true">&rsaquo;</span>
+                      <code>/compact</code>
+                      <span>Compacting conversation</span>
+                    </div>
+                    <div class="running-meta">25s</div>
+                  </div>
+                  <div class="progress-block">
+                    <div class="progress-track" aria-hidden="true">
+                      <div class="progress-fill"></div>
+                    </div>
+                    <div class="running-subrow">
+                      <span>Summarizing history and preserving active constraints</span>
+                      <span>46%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="conversation-rule"></div>
+
+              <div class="compact-event done">
+                <div class="done-row">
+                  <div class="done-title">
+                    <span class="done-mark" aria-hidden="true">&#10003;</span>
+                    <span>Context compacted</span>
+                  </div>
+                  <div class="done-meta">18% reduced</div>
+                </div>
+              </div>
+
+              <div class="assistant-copy">
+                Compaction is complete. I will continue from the condensed context and keep the next step aligned with
+                the current task.
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="theme-frame" data-theme="dark">
+          <div class="theme-topbar">
+            <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="theme-name">data-theme="dark"</span>
+          </div>
+          <div class="chat-canvas">
+            <div class="message-stream">
+              <div class="assistant-copy">
+                I found the context is getting dense, and a compact pass can keep the next turn focused without
+                losing the working trail.
+              </div>
+
+              <div class="user-copy">/compact</div>
+
+              <div class="compact-event pending">
+                <div class="state-label">before execution</div>
+                <div class="command-line">
+                  <span class="slash-token">/compact</span>
+                  <span>Queued conversation compaction</span>
+                </div>
+              </div>
+
+              <div class="conversation-rule"></div>
+
+              <div class="compact-event running">
+                <div class="state-label">executing</div>
+                <div class="running-card">
+                  <div class="running-head">
+                    <div class="running-title">
+                      <span class="terminal-caret" aria-hidden="true">&rsaquo;</span>
+                      <code>/compact</code>
+                      <span>Compacting conversation</span>
+                    </div>
+                    <div class="running-meta">25s</div>
+                  </div>
+                  <div class="progress-block">
+                    <div class="progress-track" aria-hidden="true">
+                      <div class="progress-fill"></div>
+                    </div>
+                    <div class="running-subrow">
+                      <span>Summarizing history and preserving active constraints</span>
+                      <span>46%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="conversation-rule"></div>
+
+              <div class="compact-event done">
+                <div class="done-row">
+                  <div class="done-title">
+                    <span class="done-mark" aria-hidden="true">&#10003;</span>
+                    <span>Context compacted</span>
+                  </div>
+                  <div class="done-meta">18% reduced</div>
+                </div>
+              </div>
+
+              <div class="assistant-copy">
+                Compaction is complete. I will continue from the condensed context and keep the next step aligned with
+                the current task.
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

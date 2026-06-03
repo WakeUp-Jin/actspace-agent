@@ -1,5 +1,6 @@
 import type {
   AssistantMessagePayload,
+  ContextCompactionPayload,
   ContextUsageSnapshot,
   ErrorPayload,
   EventId,
@@ -215,6 +216,43 @@ function messageBlockFromToolPreview(
   }
 }
 
+function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
+  const payload = isRecord(event.payload) ? event.payload as ContextCompactionPayload : null;
+  if (
+    !payload ||
+    typeof payload.triggerTokens !== "number" ||
+    typeof payload.thresholdTokens !== "number" ||
+    typeof payload.beforeCount !== "number" ||
+    typeof payload.afterCount !== "number"
+  ) {
+    return [];
+  }
+
+  const trigger = payload.trigger ?? "auto";
+  const status = payload.status ?? "compacted";
+  const removedCount = payload.removedCount ?? Math.max(payload.beforeCount - payload.afterCount, 0);
+  const summaryText = status === "skipped"
+    ? "Nothing to compact"
+    : status === "failed"
+      ? "Context compaction failed"
+      : "Context compacted";
+  const reductionLabel = status === "compacted" && removedCount > 0
+    ? `${removedCount} messages removed`
+    : undefined;
+
+  return [
+    {
+      kind: "context_compaction",
+      id: event.id,
+      status: status === "compacted" ? "completed" : status,
+      trigger,
+      summaryText,
+      reductionLabel,
+      createdAt: getDisplayTime(event.timestamp),
+    }
+  ];
+}
+
 export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
   return events.flatMap((event): MessageBlock[] => {
     switch (event.type) {
@@ -288,8 +326,9 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
       case "tool_call":
       case "llm_usage":
       case "context_snapshot":
-      // 历史压缩事件是观测元数据，不渲染为消息块。
+        return [];
       case "context_compaction":
+        return contextCompactionBlock(event);
       // Kairos 自治模式专属事件不出现在主 Agent 消息流中；若历史 session 偶然包含也直接跳过。
       case "kairos_tick_injected":
       case "kairos_sleep_start":

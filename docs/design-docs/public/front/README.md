@@ -14,6 +14,12 @@
 - `right-panel-diff-final.png`：右侧 Diff 定稿图。
 - `settings-page-final.png`：设置页定稿图。
 
+## HTML 原型
+
+- `actspace-deepseek-workbench.html`：工作台高保真 HTML 原型。
+- `usage-statistics-prototype.html`：Usage Statistics 高保真 HTML 原型。
+- `compact-command-states.html`：`/compact` 命令在消息流中的执行前、执行中、执行完成三态原型，并对照浅色 / 深色主题。
+
 ## 使用方式
 
 - 先在目录页看总览。

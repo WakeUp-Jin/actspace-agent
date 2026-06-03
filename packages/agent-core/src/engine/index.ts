@@ -26,6 +26,9 @@ export type {
   RunTurnWithAgentOptions,
 } from "./bridge";
 
+export { compactContextWithAgent } from "./compact-context";
+export type { CompactContextDeps, CompactContextOptions } from "./compact-context";
+
 // Agent 配置构建与实例创建
 export {
   buildAgentConfig,

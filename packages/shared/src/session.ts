@@ -23,6 +23,42 @@ export type LlmUsageCost = {
 
 export type RuntimeStreamEvent =
   | { type: "turn_started"; sessionId: SessionId; turnId: TurnId }
+  | {
+      type: "context_compaction_started";
+      sessionId: SessionId;
+      turnId: TurnId;
+      trigger: "manual" | "auto";
+      stage: "queued" | "preparing" | "summarizing" | "writing" | "completed";
+      progress?: number;
+    }
+  | {
+      type: "context_compaction_progress";
+      sessionId: SessionId;
+      turnId: TurnId;
+      trigger: "manual" | "auto";
+      stage: "queued" | "preparing" | "summarizing" | "writing" | "completed";
+      progress?: number;
+      summary?: string;
+    }
+  | {
+      type: "context_compaction_finished";
+      sessionId: SessionId;
+      turnId: TurnId;
+      trigger: "manual" | "auto";
+      stage: "completed";
+      status: "compacted" | "skipped";
+      progress?: number;
+      summary?: string;
+      payload: ContextCompactionPayload;
+    }
+  | {
+      type: "context_compaction_failed";
+      sessionId: SessionId;
+      turnId: TurnId;
+      trigger: "manual" | "auto";
+      stage: "failed";
+      error: SessionError;
+    }
   | { type: "assistant_text_delta"; messageId: EventId; delta: string }
   | { type: "assistant_thinking_delta"; messageId: EventId; delta: string }
   | {
@@ -135,6 +171,11 @@ export type ContextCompactionPayload = {
   summaryChars: number;
   /** 完整历史文件路径（session.jsonl 绝对路径） */
   historyRefPath: string;
+  trigger?: "manual" | "auto";
+  status?: "compacted" | "skipped" | "failed";
+  reductionRatio?: number;
+  removedCount?: number;
+  reason?: string;
 };
 
 export type ErrorPayload = SessionError;
@@ -520,6 +561,17 @@ export type MessageBlock =
       content: string;
       createdAt: string;
       isError?: boolean;
+    }
+  | {
+      kind: "context_compaction";
+      id: EventId;
+      status: "pending" | "running" | "completed" | "skipped" | "failed";
+      trigger: "manual" | "auto";
+      stage?: string;
+      summaryText: string;
+      reductionLabel?: string;
+      progress?: number;
+      createdAt: string;
     }
   | {
       kind: "error";

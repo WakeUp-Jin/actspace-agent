@@ -5,6 +5,7 @@ import { Composer, type ComposerSendOptions, type ComposerWorkspaceOption } from
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { AssistantReply } from "./messages/AssistantReply";
 import { BashRunBlock } from "./messages/BashRunBlock";
+import { CompactCommandBlock } from "./messages/CompactCommandBlock";
 import { FileDiffBlock } from "./messages/FileDiffBlock";
 import { ThinkingBlock } from "./messages/ThinkingBlock";
 import { ToolLogLine } from "./messages/ToolLogLine";
@@ -57,6 +58,7 @@ const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
   "error",
 ]);
 const DIFF_MESSAGE_KINDS = new Set<MessageBlock["kind"]>(["edit_diff", "write_diff"]);
+const SYSTEM_MESSAGE_KINDS = new Set<MessageBlock["kind"]>(["context_compaction", "status"]);
 
 function copyWithSelection(value: string) {
   const textArea = document.createElement("textarea");
@@ -94,6 +96,10 @@ function isDiffMessage(message: MessageBlock) {
   return DIFF_MESSAGE_KINDS.has(message.kind);
 }
 
+function isSystemMessage(message: MessageBlock) {
+  return SYSTEM_MESSAGE_KINDS.has(message.kind);
+}
+
 function getMessageRelationClass(previousMessage: MessageBlock | undefined, message: MessageBlock) {
   if (!previousMessage) {
     return undefined;
@@ -109,7 +115,8 @@ function getMessageRelationClass(previousMessage: MessageBlock | undefined, mess
     (previousIsTool && (currentIsTool || message.kind === "thinking")) ||
     (previousMessage.kind === "thinking" && currentIsDiff) ||
     (previousIsDiff && (currentIsDiff || currentIsTool || message.kind === "thinking")) ||
-    (previousIsTool && currentIsDiff)
+    (previousIsTool && currentIsDiff) ||
+    (isSystemMessage(previousMessage) && isSystemMessage(message))
   ) {
     return COMPACT_MESSAGE_RELATION_CLASS;
   }
@@ -127,6 +134,8 @@ function renderMessage(message: MessageBlock, className?: string) {
       return <ThinkingBlock key={message.id} message={message} className={className} />;
     case "bash":
       return <BashRunBlock key={message.id} message={message} />;
+    case "context_compaction":
+      return <CompactCommandBlock key={message.id} message={message} className={className} />;
     case "read":
     case "search":
     case "grep":

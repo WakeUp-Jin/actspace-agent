@@ -99,6 +99,16 @@ svg {
   }
 }
 
+@keyframes compact-progress {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  100% {
+    transform: translateX(220%);
+  }
+}
+
 @keyframes session-status-pulse {
   0%, 100% {
     transform: scale(0.85);

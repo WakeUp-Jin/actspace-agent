@@ -37,6 +37,8 @@ export interface LLMUsageCall {
 
 /** 一次 mid-loop 历史压缩的观测元数据（落 run-log + context_compaction 事件） */
 export interface ContextCompactionInfo {
+  trigger?: "manual" | "auto";
+  status?: "compacted" | "skipped" | "failed";
   /** 触发压缩时的估算总 token */
   triggerTokens: number;
   /** 触发阈值（contextWindow × compressionThreshold） */
@@ -45,6 +47,8 @@ export interface ContextCompactionInfo {
   beforeCount: number;
   /** 压缩后会话消息数 */
   afterCount: number;
+  /** 被替换掉的旧消息数 */
+  removedCount?: number;
   /** 合成摘要正文字符数 */
   summaryChars: number;
   /** 完整历史文件路径（session.jsonl 绝对路径） */

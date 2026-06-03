@@ -26,6 +26,7 @@
 - Bash。
 - Edit File。
 - Write File。
+- Context Compaction。
 - Final reply。
 
 ## 类型规则
@@ -37,6 +38,7 @@
 - Bash 正常执行态保持类似 Read 的轻量日志行；只有展开后的命令输出区域使用单层浅色容器。
 - Bash 审核态可以使用轻量边框块，因为它承载用户操作，不属于普通执行日志。
 - Edit / Write File 与 Read 等保持同样的纯文本工具行节奏，仅在用户主动展开时显示 diff 详情容器。
+- Context Compaction 是系统执行事件，不属于工具调用，也不渲染为 Tool Preview；手动 `/compact` 和未来自动压缩共享同一消息块语法。
 - Final reply 作为收束结果，保持最清晰的阅读层级。
 
 ## Thinking 组件
@@ -204,6 +206,30 @@ Edit File 和 Write File 是文件修改类工具消息。后端工具名为 `ed
 ## Edit File 定稿图
 
 ![Edit File 定稿图](public/front/right-panel-diff-final.png)
+
+## Context Compaction 组件
+
+Context Compaction 展示上下文压缩生命周期。它可能由用户在 Composer 直接输入 `/compact` 手动触发，也可能由后端自动压缩触发；二者都落到消息流中的 `context_compaction` 消息块。
+
+### 结构
+
+- pending：显示轻量 `/compact` 命令行，不生成普通用户消息。
+- running：显示单层执行块，包含 `Compacting context`、当前阶段和阶段式进度条。
+- completed：收束为短结果行 `Context compacted`，可附加 `N messages removed`。
+- skipped：收束为短结果行 `Nothing to compact`。
+- failed：收束为短错误行，展示失败原因。
+
+### 交互
+
+- 本轮不提供展开详情。
+- `/compact` exact command 由 renderer 在发送前分流到 `context:compact` IPC，不进入 `RunTurnInput.userInput`，也不写入 LLM conversation。
+- running 进度条只表达阶段进度；后端没有真实百分比时使用 indeterminate 样式，不伪造精确百分比。
+
+### 视觉原则
+
+- pending / completed / skipped / failed 都保持轻量系统消息，不打断对话阅读节奏。
+- running 使用主题感知单层执行块，颜色只消费语义 token / 语义 Tailwind 类。
+- `prefers-reduced-motion` 下仍能通过文案和状态理解执行过程，不依赖动画。
 
 ## 顺序原则
 

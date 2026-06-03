@@ -41,6 +41,8 @@ Renderer ──IPC──▶ Main Process ──调用──▶ Bridge ──驱�
 
 Workspace 选择器不进入 `RunTurnInput`。用户可在发送前多次切换顶部 Workspace，下拉只更新 renderer 本地状态；真正发送时 renderer 先把最终选择写入当前 session `meta.workspaceRoot`，再发起 `agent:run-turn`。
 
+`/compact` 是例外命令路径：renderer 只在 `text.trim() === "/compact"` 时分流到 `context:compact` IPC，输入为 `{ sessionId, turnId, model? }`。它不创建普通用户消息，不进入 `RunTurnInput.userInput`，也不进入 LLM conversation。
+
 ## 2. Main Process 层
 
 **做什么：**
@@ -51,6 +53,7 @@ Workspace 选择器不进入 `RunTurnInput`。用户可在发送前多次切换�
 - 调用 `await createAgentForSession(config, { sessionPath })` 创建运行时实例（会话历史在 ContextManager 构造阶段一次性恢复）
 - 调用 `runTurnWithAgent()` 执行 turn
 - 持久化 `AgentTurnResult` 到 session store
+- 处理 `context:compact` 手动压缩：为当前 session 装配相同的 Agent deps，调用 `compactContextWithAgent()`，追加 `context_compaction` / `context_snapshot` 并刷新 `context-state.json`
 - 管理 abort 闭包
 
 **不做什么：**
@@ -62,6 +65,7 @@ Workspace 选择器不进入 `RunTurnInput`。用户可在发送前多次切换�
 **关键文件：**
 - `main/index.ts`：Electron 生命周期 + IPC 路由（精简，不含 Agent 逻辑）
 - `main/agent-turn.ts`：Agent turn 编排（`runAndPersistTurn`）
+- `main/context-compact.ts`：手动上下文压缩编排（`compactAndPersistContext`）
 
 **配置两步法：**
 ```typescript
@@ -126,6 +130,22 @@ Agent 结束
   → Renderer: 更新最终状态
 ```
 
+手动 `/compact` 数据流：
+
+```txt
+Renderer: `/compact`
+  → [IPC: CompactContextInput]
+  → Main Process
+    → readMeta(session.metaPath).workspaceRoot ?? defaultRoot
+    → buildAgentConfig({ model }, workspaceRoot)
+    → await createAgentForSession(config, { sessionPath })
+    → compactContextWithAgent(input, deps, { onStreamEvent })
+  ← RuntimeStreamEvent: context_compaction_started/progress/finished/failed
+  → append context_compaction + context_snapshot
+  → write context-state.json
+  ← Renderer: 恢复 SessionRecord，消息流显示 context_compaction block
+```
+
 ## 新增代码时的检查清单
 
 - [ ] 前端传递的字段是否只在 `RunTurnInput` 中定义？
@@ -134,3 +154,4 @@ Agent 结束
 - [ ] Agent 内部新增的事件是否在 Bridge 中有对应的 `RuntimeStreamEvent` 翻译？
 - [ ] Agent 层的代码是否依赖了 Electron API？（不应该）
 - [ ] 持久化是否只在 Main Process 层完成？
+- [ ] Slash command 是否明确分流，不把命令文本写入 LLM conversation？

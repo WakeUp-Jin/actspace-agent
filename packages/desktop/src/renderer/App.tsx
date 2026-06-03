@@ -6,6 +6,7 @@ import type {
   AppSettings,
   BashStatus,
   BootstrapState,
+  CompactContextInput,
   ContextState,
   ContextUsageSnapshot,
   MessageBlock,
@@ -149,15 +150,17 @@ type ToolEntry = {
 type StreamingSegment =
   | { type: "thinking"; text: string }
   | { type: "text"; text: string }
-  | { type: "tool"; toolCallId: string };
+  | { type: "tool"; toolCallId: string }
+  | { type: "compaction"; turnId: string };
 
 type StreamingState = {
   segments: StreamingSegment[];
   activeTools: Map<string, ToolEntry>;
+  activeCompactions: Map<string, Extract<MessageBlock, { kind: "context_compaction" }>>;
 };
 
 function createEmptyStreamingState(): StreamingState {
-  return { segments: [], activeTools: new Map() };
+  return { segments: [], activeTools: new Map(), activeCompactions: new Map() };
 }
 
 function updateStringSet(current: Set<string>, value: string, included: boolean): Set<string> {
@@ -445,10 +448,43 @@ function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
       if (tool) {
         blocks.push(toolEntryToBlock(seg.toolCallId, tool, now));
       }
+    } else if (seg.type === "compaction") {
+      const block = state.activeCompactions.get(seg.turnId);
+      if (block) {
+        blocks.push(block);
+      }
     }
   }
 
   return blocks;
+}
+
+function createCompactionBlock(input: {
+  turnId: string;
+  status: Extract<MessageBlock, { kind: "context_compaction" }>["status"];
+  trigger?: "manual" | "auto";
+  stage?: string;
+  progress?: number;
+  summaryText?: string;
+  reductionLabel?: string;
+}): Extract<MessageBlock, { kind: "context_compaction" }> {
+  return {
+    kind: "context_compaction",
+    id: `streaming-compaction-${input.turnId}`,
+    status: input.status,
+    trigger: input.trigger ?? "manual",
+    stage: input.stage,
+    progress: input.progress,
+    summaryText: input.summaryText ?? (input.status === "pending" ? "/compact" : "Compacting context"),
+    reductionLabel: input.reductionLabel,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function upsertCompactionSegment(state: StreamingState, turnId: string): void {
+  if (!state.segments.some((segment) => segment.type === "compaction" && segment.turnId === turnId)) {
+    state.segments.push({ type: "compaction", turnId });
+  }
 }
 
 let turnCounter = 0;
@@ -661,6 +697,62 @@ export function App() {
       case "turn_started":
         break;
 
+      case "context_compaction_started":
+        upsertCompactionSegment(state, event.turnId);
+        state.activeCompactions.set(event.turnId, createCompactionBlock({
+          turnId: event.turnId,
+          status: "running",
+          trigger: event.trigger,
+          stage: event.stage,
+          progress: event.progress,
+          summaryText: "Compacting context",
+        }));
+        break;
+
+      case "context_compaction_progress": {
+        upsertCompactionSegment(state, event.turnId);
+        const existing = state.activeCompactions.get(event.turnId);
+        state.activeCompactions.set(event.turnId, {
+          ...(existing ?? createCompactionBlock({
+            turnId: event.turnId,
+            status: "running",
+            trigger: event.trigger,
+            summaryText: "Compacting context",
+          })),
+          status: "running",
+          stage: event.stage,
+          progress: event.progress,
+          summaryText: event.summary ?? existing?.summaryText ?? "Compacting context",
+        });
+        break;
+      }
+
+      case "context_compaction_finished": {
+        upsertCompactionSegment(state, event.turnId);
+        const removedCount = event.payload.removedCount ?? Math.max(event.payload.beforeCount - event.payload.afterCount, 0);
+        state.activeCompactions.set(event.turnId, createCompactionBlock({
+          turnId: event.turnId,
+          status: event.status === "compacted" ? "completed" : "skipped",
+          trigger: event.trigger,
+          stage: event.stage,
+          progress: event.progress,
+          summaryText: event.summary ?? (event.status === "skipped" ? "Nothing to compact" : "Context compacted"),
+          reductionLabel: removedCount > 0 ? `${removedCount} messages removed` : undefined,
+        }));
+        break;
+      }
+
+      case "context_compaction_failed":
+        upsertCompactionSegment(state, event.turnId);
+        state.activeCompactions.set(event.turnId, createCompactionBlock({
+          turnId: event.turnId,
+          status: "failed",
+          trigger: event.trigger,
+          stage: event.stage,
+          summaryText: event.error.message,
+        }));
+        break;
+
       case "assistant_thinking_delta":
         appendOrMergeSegment(state.segments, "thinking", event.delta);
         break;
@@ -776,6 +868,7 @@ export function App() {
 
     const sessionId = activeSessionIdRef.current;
     const turnId = nextTurnId();
+    const isCompactCommand = text.trim() === "/compact";
     const nextWorkspaceRoot = selectedWorkspaceRoot;
     let nextWorkspace = findWorkspaceOption(nextWorkspaceRoot);
     const currentWorkspaceRoot = normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot);
@@ -827,15 +920,27 @@ export function App() {
     clearToolFinishTimers();
     streamStateRef.current = createEmptyStreamingState();
 
-    const userBlock: MessageBlock = {
-      kind: "user",
-      id: `user-${turnId}`,
-      content: text,
-      createdAt: new Date().toISOString(),
-      attachments: options.attachments,
-    };
-    streamingUserBlockRef.current = userBlock;
-    setStreamingBlocks([userBlock]);
+    if (isCompactCommand) {
+      const pendingBlock = createCompactionBlock({
+        turnId,
+        status: "pending",
+        summaryText: "/compact",
+      });
+      upsertCompactionSegment(streamStateRef.current, turnId);
+      streamStateRef.current.activeCompactions.set(turnId, pendingBlock);
+      streamingUserBlockRef.current = null;
+      setStreamingBlocks([pendingBlock]);
+    } else {
+      const userBlock: MessageBlock = {
+        kind: "user",
+        id: `user-${turnId}`,
+        content: text,
+        createdAt: new Date().toISOString(),
+        attachments: options.attachments,
+      };
+      streamingUserBlockRef.current = userBlock;
+      setStreamingBlocks([userBlock]);
+    }
     setSendScrollRequestId((value) => value + 1);
 
     let unsubscribe: (() => void) | undefined;
@@ -849,6 +954,33 @@ export function App() {
 
     try {
       if (hasActspaceBridge()) {
+        if (isCompactCommand) {
+          const input: CompactContextInput = {
+            sessionId,
+            turnId,
+            model: options.model,
+          };
+          const result = await window.actspace.compactContext(input);
+          setApprovalPendingForSession(sessionId, false);
+          setFailedForSession(sessionId, result.status === "failed");
+          const restored = await window.actspace.getSession({ sessionId });
+          setSessionRecord(restored ?? {
+            meta: {
+              id: result.sessionId,
+              title: "New chat",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              turnCount: sessionRecord?.meta.turnCount ?? 0,
+            },
+            events: result.events,
+            contextSnapshot: result.contextSnapshot,
+          });
+          setTurnResult(null);
+          const refreshed = await window.actspace.listSessions();
+          setSessions(refreshed);
+          return;
+        }
+
         const input: RunTurnInput = {
           sessionId,
           turnId,

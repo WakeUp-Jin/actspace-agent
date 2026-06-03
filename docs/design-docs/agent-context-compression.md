@@ -166,6 +166,17 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 
 ## 治疗层：历史会话压缩
 
+### 手动压缩入口（`/compact`）
+
+除了自动 token 水位触发外，主聊天流支持手动 `/compact`：
+
+1. Renderer 在 Composer 发送前识别 `text.trim() === "/compact"`，走 `context:compact` IPC，不创建 `user_message`，也不把 `/compact` 送入 LLM conversation。
+2. Main Process 为当前 session 重新装配与普通 turn 相同的 Agent deps（含 `ContextManager`、`ToolManager`、summarizer 和 session path），调用 `compactContextWithAgent`。
+3. `ContextManager.compactNow(summarizer)` 跳过 token 阈值和最小调用间隔检查，但仍复用 `HistoryCompactor` 的安全切点、结构化摘要和 fallback 逻辑。
+4. 无可压区时返回 `skipped`，消息流显示 `Nothing to compact`；有可压区时写入 `context_compaction` 和最新 `context_snapshot`，刷新 `context-state.json`。
+
+手动压缩是系统事件，不递增普通对话 `turnCount`，但会更新 session `updatedAt`，便于侧边栏按最近操作排序。
+
 ### 触发位置与时机
 
 在 `engine/loop.ts` 每次 `streamAssistantResponse` 之前插入一个可选 `maybeCompact` 钩子（保持 loop 仍是纯函数：钩子通过 `AgentLoopConfig` 注入）。这样单轮内大量工具调用也能在窗口溢出前压缩，符合 Skill「按 token 使用率动态触发，而非固定轮次」。
@@ -261,7 +272,8 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 ## 观测与持久化
 
 - 历史压缩发生时写 `logs/agent-runs/*.jsonl`（run-log），记录 trigger token、压缩前后消息数、摘要长度、ref 路径。
-- 可选新增 `context_compaction` `SessionEventType`（`@actspace/shared/session.ts`），payload 含上述字段，写入 `session.jsonl` 便于回溯。`ContextUsageSnapshot.compressionCount` 已存在，沿用。
+- `context_compaction` `SessionEventType`（`@actspace/shared/session.ts`）写入 `session.jsonl`，便于回溯和恢复到主消息流。payload 保留 `triggerTokens`、`thresholdTokens`、`beforeCount`、`afterCount`、`summaryChars`、`historyRefPath`，并补充 `trigger: "manual" | "auto"`、`status: "compacted" | "skipped" | "failed"`、`removedCount`、`reductionRatio?`、`reason?`。旧事件缺新字段时按 `auto/compacted` 兼容。
+- `RuntimeStreamEvent` 暴露 `context_compaction_started/progress/finished/failed` 生命周期，供 renderer 展示 pending、running 和完成/跳过/失败状态。
 - bash 落盘文件路径进入 `ToolExecutionResult.rawOutputRef`，前端「工具结果」可据此提供「查看完整输出」入口（前端改动不在本期范围，仅留契约）。
 
 ## 对 DeepSeek prompt cache 的影响

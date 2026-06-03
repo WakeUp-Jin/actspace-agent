@@ -10,6 +10,8 @@ import type {
   BootstrapState,
   ClearProviderKeyInput,
   ClearProviderKeyResult,
+  CompactContextInput,
+  CompactContextResult,
   ContextState,
   DeepSeekBalanceSnapshot,
   DescribeContextInput,
@@ -68,6 +70,8 @@ import type {
 contextBridge.exposeInMainWorld("actspace", {
   getBootstrapState: () => ipcRenderer.invoke("app:get-bootstrap-state") as Promise<BootstrapState>,
   runTurn: (input: RunTurnInput) => ipcRenderer.invoke("agent:run-turn", input) as Promise<AgentTurnResult>,
+  compactContext: (input: CompactContextInput) =>
+    ipcRenderer.invoke("context:compact", input) as Promise<CompactContextResult>,
   abortTurn: (input: AbortTurnInput) => ipcRenderer.invoke("agent:abort-turn", input) as Promise<boolean>,
   selectFiles: () => ipcRenderer.invoke("dialog:select-files") as Promise<SelectFilesResult>,
   selectWorkspaceDirectory: () =>

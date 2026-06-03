@@ -35,6 +35,25 @@ export type RunTurnInput = {
   thinkingEnabled?: boolean;
 };
 
+export type CompactContextInput = {
+  sessionId: string;
+  turnId: string;
+  model?: ModelId;
+};
+
+export type CompactContextResult = {
+  sessionId: string;
+  turnId: string;
+  status: "compacted" | "skipped" | "failed";
+  events: import("./session").SessionEvent[];
+  contextSnapshot: import("./session").ContextUsageSnapshot;
+  contextState?: import("./session").ContextState | null;
+  error?: {
+    code: string;
+    message: string;
+  };
+};
+
 export type SelectFilesResult = {
   canceled: boolean;
   attachments: import("./session").ComposerAttachment[];
