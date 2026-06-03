@@ -11,6 +11,7 @@ import type { ToolParameterSchema, ToolResult } from "../internal-tools";
 import type { ToolPreviewKind } from "@actspace/shared";
 import type { ApprovalGate } from "./scheduler";
 import type { Summarizer } from "../context/compression/summarizer";
+import type { LLMService } from "../llm/types";
 
 /** definition.ts 导出的静态声明——不含任何运行时依赖 */
 export interface ToolDefinitionSpec {
@@ -71,6 +72,12 @@ export interface ToolManagerConfig extends ToolRuntimeConfig {
   tmpRoot?: string;
   /** 当前会话 id，用于 bash 落盘文件分目录 */
   sessionId?: string;
+  /** 当前主 Agent turn id，用于 SubAgent transcript 关联 */
+  turnId?: string;
+  /** 主 Agent LLM service；存在时注册 Agent 工具供 SubAgent run 复用同一模型配置 */
+  llm?: LLMService;
+  /** 当前模型上下文窗口，供 SubAgent ContextManager 使用 */
+  contextWindow?: number;
   /** flash 摘要器；缺省时非 bash 工具退化为确定性头尾截断 */
   summarizer?: Summarizer;
 }

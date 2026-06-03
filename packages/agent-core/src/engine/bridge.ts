@@ -176,6 +176,20 @@ export async function runTurnWithAgent(
     thinkingEnabled: input.thinkingEnabled ?? deps.thinkingEnabled,
     summarizer: deps.summarizer,
     cacheAudit: deps.cacheAudit,
+    toolExecuteOptions: {
+      subagentEventSink: async (subagentEvent) => {
+        if (!streamCb || !subagentEvent.toolCallId) return;
+        const streamEvent: RuntimeStreamEvent = {
+          type: "subagent_event",
+          toolCallId: subagentEvent.toolCallId,
+          transcriptRef: subagentEvent.transcriptRef,
+          event: subagentEvent.event,
+          preview: subagentEvent.preview,
+        };
+        await writeRunLog(runLogger, "stream_event", streamEvent);
+        streamCb(streamEvent);
+      },
+    },
     onEvent: async (agentEvent) => {
       recordToolExecution(toolExecutions, agentEvent);
       if (agentEvent.type === "context_compaction") {
@@ -242,6 +256,7 @@ export async function runTurnWithAgent(
   }
 
   const sessionEvents = buildSessionEvents(loopResult, sessionId, turnId, input, deps.toolManager, toolExecutions);
+  const subagentTranscripts = collectSubAgentTranscripts(toolExecutions);
   for (const info of compactions) {
     sessionEvents.push(createCompactionEvent(info, sessionId, turnId));
   }
@@ -285,6 +300,7 @@ export async function runTurnWithAgent(
     sessionId,
     turnId,
     events: sessionEvents,
+    subagentTranscripts,
     finalReply,
     contextSnapshot,
     contextState,
@@ -620,7 +636,8 @@ function createToolExecutionResult(
     truncatedOutput: modelOutput,
     rawOutputRef,
     modelOutput,
-    uiPreview: createToolUiPreview(tool?.previewKind ?? "generic", record?.args ?? {}, modelOutput, summary, ok),
+    uiPreview: record?.result?.subagent?.uiPreview
+      ?? createToolUiPreview(tool?.previewKind ?? "generic", record?.args ?? {}, modelOutput, summary, ok),
     error: ok
       ? undefined
       : {
@@ -630,6 +647,21 @@ function createToolExecutionResult(
         },
     tokenEstimate: Math.ceil(modelOutput.length / 4),
   };
+}
+
+function collectSubAgentTranscripts(
+  toolExecutions: Map<string, ToolExecutionRecord>,
+): AgentTurnResult["subagentTranscripts"] {
+  const transcripts: NonNullable<AgentTurnResult["subagentTranscripts"]> = [];
+  for (const record of toolExecutions.values()) {
+    const subagent = record.result?.subagent;
+    if (!subagent) continue;
+    transcripts.push({
+      transcriptRef: subagent.transcriptRef,
+      events: subagent.transcriptEvents,
+    });
+  }
+  return transcripts.length > 0 ? transcripts : undefined;
 }
 
 function createToolUiPreview(
@@ -785,6 +817,20 @@ function createToolUiPreview(
       };
     }
 
+    case "agent": {
+      const description = stringArg(args.description, "Agent");
+      const isRunning = output.length === 0;
+      return {
+        kind: "agent",
+        description,
+        status: isRunning ? "running" : ok ? "completed" : "failed",
+        subagentType: "explore",
+        displayText: description,
+        summary: output || undefined,
+        error: ok ? undefined : output || summary,
+      };
+    }
+
     case "generic":
       return {
         kind: "generic",
@@ -840,6 +886,8 @@ function getToolSummary(
     }
     case "bash":
       return "Bash command";
+    case "agent":
+      return stringArg(args.description, "Agent");
     case "generic":
       if (toolName === "web_search") {
         const url = stringArg(args.url, "");
@@ -998,6 +1046,7 @@ function mapAgentEventToStreamEvent(
         toolName: event.toolName,
         resultEventId: nextId(),
         isError: event.isError,
+        preview: event.result.subagent?.uiPreview,
       };
 
     case "tool_approval_required":

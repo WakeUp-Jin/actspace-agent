@@ -87,6 +87,8 @@ export interface AgentRuntimeContext {
   sessionId?: string;
   /** write_file/edit_file 除 workspaceRoot 外可写入的绝对目录。 */
   additionalWritableRoots?: string[];
+  /** 当前主 Agent turn id，用于 SubAgent transcript 关联 */
+  turnId?: string;
   /** 主 Agent 当前使用的完整系统提示词；不传则使用代码默认值。 */
   systemPrompt?: string;
   /** 附加规则/技能等系统级上下文段，例如 AGENTS.md。 */
@@ -181,6 +183,7 @@ export function buildAgentConfig(
     tmpRoot: runtimeContext?.tmpRoot,
     sessionId: runtimeContext?.sessionId,
     additionalWritableRoots: runtimeContext?.additionalWritableRoots,
+    turnId: runtimeContext?.turnId,
   };
   return {
     llmConfig,
@@ -216,7 +219,12 @@ export function createSummarizerForAgent(
 export function createAgentFromConfig(config: AgentConfig): AgentDeps {
   const llm = createLLMService(config.llmConfig);
   const summarizer = createSummarizerForAgent();
-  const toolManager = createToolManager({ ...config.toolManagerConfig, summarizer });
+  const toolManager = createToolManager({
+    ...config.toolManagerConfig,
+    llm,
+    contextWindow: config.modelSpec.contextWindow,
+    summarizer,
+  });
   const systemPromptModule = new SystemPromptContext(config.systemPrompt);
   registerSystemPromptSegments(systemPromptModule, config.systemPromptSegments);
   const contextManager = new ContextManager({
@@ -248,7 +256,12 @@ export async function createAgentForSession(
 ): Promise<AgentDeps> {
   const llm = createLLMService(config.llmConfig);
   const summarizer = createSummarizerForAgent();
-  const toolManager = createToolManager({ ...config.toolManagerConfig, summarizer });
+  const toolManager = createToolManager({
+    ...config.toolManagerConfig,
+    llm,
+    contextWindow: config.modelSpec.contextWindow,
+    summarizer,
+  });
   const systemPromptModule = new SystemPromptContext(config.systemPrompt);
   registerSystemPromptSegments(systemPromptModule, config.systemPromptSegments);
   const contextManager = await ContextManager.createForSession({

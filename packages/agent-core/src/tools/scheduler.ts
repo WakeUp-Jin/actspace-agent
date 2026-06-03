@@ -159,10 +159,10 @@ export class ToolScheduler {
       }
 
       if (permission.decision === "ask") {
-        return await this.handleAskDecision(tool, toolName, args, permission, record, toolCallId);
+        return await this.handleAskDecision(tool, toolName, args, permission, record, toolCallId, options);
       }
 
-      return await this.runHandler(tool, permission.sanitizedArgs ?? args, record);
+      return await this.runHandler(tool, permission.sanitizedArgs ?? args, record, options);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const result = {
@@ -180,6 +180,7 @@ export class ToolScheduler {
     permission: PermissionResult,
     record: ToolCallRecord,
     toolCallId?: string,
+    options?: SchedulerExecuteOptions,
   ): Promise<ToolSchedulerExecution> {
     const approvalRequest = this.createApprovalRequest(tool, args, permission, toolCallId);
     record.status = "awaiting_approval";
@@ -208,7 +209,7 @@ export class ToolScheduler {
     }
 
     if (decision.decision === "approve_once" || decision.decision === "allow_similar") {
-      return this.runHandler(tool, permission.sanitizedArgs ?? args, record);
+      return this.runHandler(tool, permission.sanitizedArgs ?? args, record, options);
     }
 
     const reason = decision.decision === "timeout"
@@ -221,11 +222,12 @@ export class ToolScheduler {
     tool: InternalTool,
     executionArgs: Record<string, unknown>,
     record: ToolCallRecord,
+    options?: SchedulerExecuteOptions,
   ): Promise<ToolSchedulerExecution> {
     record.args = executionArgs;
     record.status = "scheduled";
     record.status = "executing";
-    const result = await tool.handler(executionArgs);
+    const result = await tool.handler(executionArgs, options);
     const processed = await this.postProcess(tool, result);
     return this.finish(record, result.success ? "success" : "error", processed);
   }
@@ -318,6 +320,9 @@ function createDefaultId(): string {
 export interface SchedulerExecuteOptions {
   callerAgent?: "main" | "kairos";
   kairosGuard?: KairosSchedulerGuard;
+  toolCallId?: string;
+  signal?: AbortSignal;
+  subagentEventSink?: import("./tools/agent/runner").SubAgentEventSink;
 }
 
 /** scheduler 视角的 Kairos guard（不耦合 ToolManager 命名空间）。 */

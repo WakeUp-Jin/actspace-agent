@@ -33,6 +33,7 @@ import type {
   SessionPinInput,
   SessionRenameInput,
   SessionWorkspaceInput,
+  SubAgentTranscriptGetInput,
   SetProviderKeyInput,
   SettingsUpdateInput,
   TestConnectionInput,
@@ -54,6 +55,7 @@ import {
   createSessionRecord,
   createSessionStorePaths,
   listSessionRecords,
+  readSubAgentTranscript,
   readSessionRecord,
   setSessionArchived,
   setSessionPinned,
@@ -904,6 +906,15 @@ async function registerIpc() {
   ipcMain.handle("session:get", async (_event, input: SessionGetInput) => {
     const roots = await ensureDataDirectories();
     return readSessionRecord(createSessionStorePaths(join(roots.sessionRoot, input.sessionId)));
+  });
+
+  ipcMain.handle("subagent:get-transcript", async (_event, input: SubAgentTranscriptGetInput) => {
+    const roots = await ensureDataDirectories();
+    const ref = input.transcriptRef;
+    return readSubAgentTranscript(
+      createSessionStorePaths(join(roots.sessionRoot, ref.sessionId)),
+      ref,
+    );
   });
 
   ipcMain.handle("usage-statistics:get", async (_event, input: UsageStatisticsGetInput) => {

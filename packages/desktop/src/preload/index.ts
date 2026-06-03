@@ -51,6 +51,7 @@ import type {
   SetProviderKeyInput,
   SetProviderKeyResult,
   SettingsUpdateInput,
+  SubAgentTranscriptGetInput,
   TestConnectionInput,
   TestConnectionResult,
   UsageStatisticsGetInput,
@@ -90,6 +91,8 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("context:describe", input) as Promise<ContextState | null>,
   listSessions: (input?: SessionListInput) => ipcRenderer.invoke("session:list", input ?? {}) as Promise<SessionListItem[]>,
   getSession: (input: SessionGetInput) => ipcRenderer.invoke("session:get", input) as Promise<SessionRecord | null>,
+  getSubAgentTranscript: (input: SubAgentTranscriptGetInput) =>
+    ipcRenderer.invoke("subagent:get-transcript", input) as Promise<SessionEvent[]>,
   getUsageStatistics: (input: UsageStatisticsGetInput) =>
     ipcRenderer.invoke("usage-statistics:get", input) as Promise<UsageStatisticsSnapshot | null>,
   getDeepSeekBalance: () =>

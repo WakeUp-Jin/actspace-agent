@@ -1,0 +1,103 @@
+import { useState } from "react";
+import { Bot, ChevronRight } from "lucide-react";
+import type { MessageBlock } from "@actspace/shared";
+import { SubAgentTranscriptModal } from "./SubAgentTranscriptModal";
+
+type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
+
+const BLOCK_CLASS =
+  "message-row agent-run max-w-[800px] px-[var(--conversation-text-inset)]";
+const BUTTON_CLASS =
+  "w-full rounded-act-md border border-line bg-surface px-3.5 py-3 text-left transition hover:border-line-strong hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--act-color-focus-ring)]";
+const HEADER_CLASS = "flex items-start justify-between gap-3";
+const TITLE_WRAP_CLASS = "flex min-w-0 items-start gap-2.5";
+const ICON_CLASS =
+  "mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-act-sm bg-brand-soft text-brand";
+const TITLE_CLASS = "min-w-0 text-[14px] font-semibold leading-[1.4] text-text-main";
+const STATUS_CLASS = "mt-0.5 text-[12px] font-medium uppercase tracking-normal text-text-faint";
+const CHEVRON_CLASS = "mt-1 flex-none text-text-faint";
+const SUMMARY_CLASS = "mt-2 line-clamp-4 text-[13px] leading-[1.55] text-text-muted";
+const RECENT_CLASS = "mt-2 flex flex-col gap-1.5";
+const RECENT_LINE_CLASS = "text-[13px] leading-[1.45] text-text-muted";
+const RECENT_RUNNING_CLASS =
+  "text-transparent [-webkit-text-fill-color:transparent] [background:linear-gradient(90deg,var(--act-color-text-muted)_0%,var(--act-color-text-muted)_35%,var(--act-color-brand)_50%,var(--act-color-text-muted)_65%,var(--act-color-text-muted)_100%)] [background-size:250%_100%] [background-position:100%_0] [background-repeat:no-repeat] [-webkit-background-clip:text] [background-clip:text] animate-[tool-log-text-shimmer_1.1s_ease-in-out_infinite] motion-reduce:text-brand motion-reduce:[-webkit-text-fill-color:currentColor] motion-reduce:[background:none] motion-reduce:animate-none";
+const STATS_CLASS = "mt-2 text-[12px] leading-[1.45] text-text-faint";
+const ERROR_CLASS = "mt-2 rounded-act-sm bg-danger-soft px-2.5 py-2 text-[13px] leading-[1.45] text-on-danger";
+
+function statusLabel(status: AgentMessage["status"]): string {
+  switch (status) {
+    case "running":
+      return "Running";
+    case "failed":
+      return "Failed";
+    case "aborted":
+      return "Aborted";
+    case "completed":
+    default:
+      return "Completed";
+  }
+}
+
+function formatStats(message: AgentMessage): string | null {
+  const stats = message.stats;
+  if (!stats) return null;
+  const parts = [];
+  if (stats.exploredFileCount !== undefined) {
+    parts.push(`Explored ${stats.exploredFileCount} files`);
+  }
+  parts.push(`${stats.toolCallCount} tools`);
+  parts.push(`${Math.max(1, Math.round(stats.durationMs / 1000))}s`);
+  if (stats.totalTokens !== undefined && stats.totalTokens > 0) {
+    parts.push(`${stats.totalTokens} tokens`);
+  }
+  return parts.join(" · ");
+}
+
+export function AgentRunBlock({ message, className }: { message: AgentMessage; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const isRunning = message.status === "running";
+  const stats = formatStats(message);
+  const recentEvents = message.recentEvents?.slice(-5) ?? [];
+
+  return (
+    <article className={`${BLOCK_CLASS}${className ? ` ${className}` : ""}`}>
+      <button
+        className={BUTTON_CLASS}
+        type="button"
+        aria-label={`Open SubAgent transcript for ${message.description}`}
+        onClick={() => setOpen(true)}
+      >
+        <div className={HEADER_CLASS}>
+          <div className={TITLE_WRAP_CLASS}>
+            <span className={ICON_CLASS}>
+              <Bot size={14} aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <div className={TITLE_CLASS}>{message.description || message.displayText || "Agent"}</div>
+              <div className={STATUS_CLASS}>{statusLabel(message.status)}</div>
+            </div>
+          </div>
+          <ChevronRight className={CHEVRON_CLASS} size={16} aria-hidden="true" />
+        </div>
+
+        {isRunning ? (
+          <div className={RECENT_CLASS}>
+            {(recentEvents.length > 0 ? recentEvents : [{ id: "pending", summary: "Starting SubAgent run..." }]).map((event) => (
+              <div key={event.id} className={`${RECENT_LINE_CLASS} ${RECENT_RUNNING_CLASS}`}>
+                {event.summary}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {!isRunning && message.summary ? (
+          <div className={SUMMARY_CLASS}>{message.summary}</div>
+        ) : null}
+
+        {message.error ? <div className={ERROR_CLASS}>{message.error}</div> : null}
+        {stats ? <div className={STATS_CLASS}>{stats}</div> : null}
+      </button>
+      <SubAgentTranscriptModal message={message} open={open} onClose={() => setOpen(false)} />
+    </article>
+  );
+}

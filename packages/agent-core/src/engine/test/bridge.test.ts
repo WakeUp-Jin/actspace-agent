@@ -136,6 +136,29 @@ function createDeleteTool(): InternalTool {
   };
 }
 
+function createFakeAgentTool(): InternalTool {
+  return {
+    name: "agent",
+    description: "Agent: launch a read-only Explore SubAgent run.",
+    parameters: {
+      type: "object",
+      properties: {
+        description: { type: "string", description: "Short title" },
+        prompt: { type: "string", description: "SubAgent prompt" },
+        subagent_type: { type: "string", description: "SubAgent type", enum: ["explore"] },
+      },
+      required: ["description", "prompt"],
+    },
+    isReadOnly: true,
+    category: "agent",
+    previewKind: "agent",
+    handler: async (): Promise<ToolResult> => ({
+      success: true,
+      data: "Found the renderer flow and selector boundary.",
+    }),
+  };
+}
+
 function createDeps() {
   const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
   const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
@@ -892,6 +915,80 @@ describe("runTurnWithAgent bridge", () => {
     const streamingIndex = streamEvents.indexOf(firstStreaming);
     const startedIndex = streamEvents.indexOf(startedEvents[0]);
     expect(streamingIndex).toBeLessThan(startedIndex);
+  });
+
+  it("streams and persists Agent previews without exposing raw args as UI state", async () => {
+    const deps = createDeps();
+    deps.toolManager.register(createFakeAgentTool());
+    deps.llm.setResponses([
+      mockToolCall(
+        "agent",
+        {
+          description: "Explore renderer flow",
+          prompt: "Inspect how Agent blocks are rendered.",
+          subagent_type: "explore",
+        },
+        { id: "tc-agent-preview" },
+      ),
+      mockText("Done."),
+    ]);
+
+    const streamEvents: RuntimeStreamEvent[] = [];
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Launch an Agent run.",
+      },
+      deps,
+      {
+        onStreamEvent: (event) => {
+          streamEvents.push(event);
+        },
+      },
+    );
+
+    expect(streamEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "tool_call_streaming",
+          toolCallId: "tc-agent-preview",
+          toolName: "agent",
+          preview: {
+            kind: "agent",
+            description: "Explore renderer flow",
+            status: "running",
+            subagentType: "explore",
+            displayText: "Explore renderer flow",
+          },
+        }),
+        expect.objectContaining({
+          type: "tool_started",
+          toolCallId: "tc-agent-preview",
+          toolName: "agent",
+          preview: expect.objectContaining({
+            kind: "agent",
+            description: "Explore renderer flow",
+            status: "running",
+            displayText: "Explore renderer flow",
+          }),
+        }),
+      ]),
+    );
+
+    const toolResult = result.events.find((event) => event.type === "tool_result");
+    expect(toolResult?.payload).toMatchObject({
+      toolName: "agent",
+      uiPreview: {
+        kind: "agent",
+        description: "Explore renderer flow",
+        status: "completed",
+        subagentType: "explore",
+        displayText: "Explore renderer flow",
+        summary: "Found the renderer flow and selector boundary.",
+      },
+    });
   });
 
   it("does not emit tool_call_streaming for unregistered tool names", async () => {

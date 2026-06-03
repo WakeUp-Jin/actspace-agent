@@ -127,6 +127,10 @@ export type SessionGetInput = {
   sessionId: string;
 };
 
+export type SubAgentTranscriptGetInput = {
+  transcriptRef: import("./session").SubAgentTranscriptRef;
+};
+
 /** 把一条回复 Markdown 用主模型转成 HTML（见 `front-右侧面板与文件渲染规范.md`）。 */
 export type VisualizeReplyInput = {
   sessionId: string;

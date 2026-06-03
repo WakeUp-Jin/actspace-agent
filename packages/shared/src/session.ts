@@ -71,7 +71,14 @@ export type RuntimeStreamEvent =
       preview: ToolUiPreview;
     }
   | { type: "tool_started"; toolCallId: ToolCallId; toolName: string; argsPreview: string; preview?: ToolUiPreview }
-  | { type: "tool_finished"; toolCallId: ToolCallId; toolName: string; resultEventId: EventId; isError: boolean }
+  | { type: "tool_finished"; toolCallId: ToolCallId; toolName: string; resultEventId: EventId; isError: boolean; preview?: ToolUiPreview }
+  | {
+      type: "subagent_event";
+      toolCallId: ToolCallId;
+      transcriptRef: SubAgentTranscriptRef;
+      event: SessionEvent;
+      preview: AgentToolPreview;
+    }
   | { type: "tool_approval_required"; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string }
   | { type: "tool_approval_resolved"; toolCallId: ToolCallId; requestId: string; decision: string }
   | { type: "turn_finished"; sessionId: SessionId; turnId: TurnId; resultEventIds: EventId[] }
@@ -238,6 +245,45 @@ export type ToolOutputRef = {
   value: string;
 };
 
+export type SubAgentRunStatus = "running" | "completed" | "failed" | "aborted";
+
+export type SubAgentTranscriptRef = {
+  kind: "subagent_transcript";
+  sessionId: SessionId;
+  turnId: TurnId;
+  runId: string;
+  path?: string;
+};
+
+export type AgentToolStats = {
+  durationMs: number;
+  toolCallCount: number;
+  exploredFileCount?: number;
+  totalTokens?: number;
+};
+
+export type AgentToolRecentEvent = {
+  id: EventId;
+  type: SessionEventType;
+  title: string;
+  summary: string;
+  timestamp: string;
+  isError?: boolean;
+};
+
+export type AgentToolPreview = {
+  kind: "agent";
+  description: string;
+  status: SubAgentRunStatus;
+  subagentType: "explore";
+  displayText: string;
+  summary?: string;
+  recentEvents?: AgentToolRecentEvent[];
+  transcriptRef?: SubAgentTranscriptRef;
+  stats?: AgentToolStats;
+  error?: string;
+};
+
 export type ToolPreviewKind =
   | "read"
   | "search"
@@ -250,6 +296,7 @@ export type ToolPreviewKind =
   | "write"
   | "delete"
   | "bash"
+  | "agent"
   | "generic";
 
 export type ToolUiPreview =
@@ -286,6 +333,7 @@ export type ToolUiPreview =
       approvalRequestId?: string;
     }
   | BashPreview
+  | AgentToolPreview
   | { kind: "generic"; title: string; content: string };
 
 export type BashStatus =
@@ -412,6 +460,10 @@ export type AgentTurnResult = {
   sessionId: SessionId;
   turnId: TurnId;
   events: SessionEvent[];
+  subagentTranscripts?: Array<{
+    transcriptRef: SubAgentTranscriptRef;
+    events: SessionEvent[];
+  }>;
   finalReply?: AssistantReply;
   contextSnapshot: ContextUsageSnapshot;
   contextState?: ContextState;
@@ -573,6 +625,12 @@ export type MessageBlock =
       id: EventId;
       createdAt: string;
     } & BashPreview)
+  | ({
+      kind: "agent";
+      id: EventId;
+      createdAt: string;
+      transcriptEvents?: SessionEvent[];
+    } & Omit<AgentToolPreview, "kind">)
   | {
       kind: "tool";
       id: EventId;

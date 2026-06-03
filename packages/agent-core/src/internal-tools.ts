@@ -13,7 +13,13 @@
  */
 
 import type { Tool } from "./messages";
-import type { ToolPreviewKind, ToolOutputRef } from "@actspace/shared";
+import type {
+  AgentToolPreview,
+  SessionEvent,
+  SubAgentTranscriptRef,
+  ToolPreviewKind,
+  ToolOutputRef,
+} from "@actspace/shared";
 
 // ─── ToolResult（统一返回类型） ───
 
@@ -28,6 +34,15 @@ export interface ToolResult {
    * 不影响传给 LLM 的 `data`（始终是回填文本），仅用于持久化契约与前端「查看完整输出」。
    */
   outputRef?: ToolOutputRef;
+  /**
+   * Agent 工具专用的进程内元数据。bridge/main 消费它来推流和单独写 transcript，
+   * 不应展开写入主 session.jsonl。
+   */
+  subagent?: {
+    transcriptRef: SubAgentTranscriptRef;
+    transcriptEvents: SessionEvent[];
+    uiPreview: AgentToolPreview;
+  };
 }
 
 // ─── Permission（权限验证） ───
@@ -53,7 +68,10 @@ export interface PermissionResult {
 
 // ─── 函数类型 ───
 
-export type ToolHandler = (args: Record<string, unknown>) => Promise<ToolResult>;
+export type ToolHandler = (
+  args: Record<string, unknown>,
+  options?: import("./tools/manager").ToolExecuteOptions,
+) => Promise<ToolResult>;
 export type PermissionChecker = (args: Record<string, unknown>) => Promise<PermissionResult>;
 export type ResultRenderer = (result: ToolResult) => string;
 

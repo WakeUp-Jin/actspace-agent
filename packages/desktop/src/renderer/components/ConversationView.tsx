@@ -4,6 +4,7 @@ import type { ContextUsageSnapshot, MessageBlock, ModelId } from "@actspace/shar
 import { Composer, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { AssistantReply } from "./messages/AssistantReply";
+import { AgentRunBlock } from "./messages/AgentRunBlock";
 import { BashRunBlock } from "./messages/BashRunBlock";
 import { CompactCommandBlock } from "./messages/CompactCommandBlock";
 import { DeleteFileBlock } from "./messages/DeleteFileBlock";
@@ -56,6 +57,7 @@ const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
   "media_analysis",
   "directory_list",
   "delete",
+  "agent",
   "tool",
   "error",
 ]);
@@ -134,6 +136,8 @@ function renderMessage(message: MessageBlock, className?: string) {
       return <AssistantReply key={message.id} message={message} />;
     case "thinking":
       return <ThinkingBlock key={message.id} message={message} className={className} />;
+    case "agent":
+      return <AgentRunBlock key={message.id} message={message} className={className} />;
     case "bash":
       return <BashRunBlock key={message.id} message={message} />;
     case "context_compaction":

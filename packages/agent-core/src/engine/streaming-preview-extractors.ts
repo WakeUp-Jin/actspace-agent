@@ -117,6 +117,17 @@ const EXTRACTORS: Record<ToolPreviewKind, Extractor> = {
     command: getField(s, "command") ?? "",
   }),
 
+  agent: (s) => {
+    const description = getField(s, "description") ?? "";
+    return {
+      kind: "agent",
+      description,
+      status: "running",
+      subagentType: "explore",
+      displayText: description,
+    };
+  },
+
   generic: () => ({
     kind: "generic",
     title: "",

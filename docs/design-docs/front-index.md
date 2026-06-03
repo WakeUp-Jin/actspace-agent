@@ -55,6 +55,7 @@
 
 - `public/front/README.md`：前端设计图说明。
 - `public/front/actspace-deepseek-workbench.html`：工作台高保真 HTML 原型。
+- `public/front/agent-subagent-flow-prototype.html`：Agent 工具与 SubAgent 执行流 HTML 原型，包含 running / completed / transcript modal / light-dark 状态。
 - `public/front/usage-statistics-prototype.html`：Usage Statistics 高保真 HTML 原型。
 - `public/front/compact-command-states.html`：`/compact` 命令消息流三态与浅/深主题 HTML 原型。
 - `public/front/*.png`：当前阶段的前端设计图。

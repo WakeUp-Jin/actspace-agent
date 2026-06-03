@@ -104,6 +104,17 @@ describe("extractStreamingPreview", () => {
     });
   });
 
+  it("agent extractor extracts description for a running Agent preview", () => {
+    const preview = extractStreamingPreview("agent", '{"description":"Explore renderer flow","prompt":"Inspect UI"}');
+    expect(preview).toEqual({
+      kind: "agent",
+      description: "Explore renderer flow",
+      status: "running",
+      subagentType: "explore",
+      displayText: "Explore renderer flow",
+    });
+  });
+
   it("generic kind returns empty generic preview", () => {
     const preview = extractStreamingPreview("generic", '{"anything":"x"}');
     expect(preview).toEqual({ kind: "generic", title: "", content: "" });

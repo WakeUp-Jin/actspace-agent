@@ -13,6 +13,7 @@ import type {
   ModelId,
   RunTurnInput,
   RuntimeStreamEvent,
+  SessionEvent,
   SessionListItem,
   SessionRecord,
   ToolUiPreview,
@@ -145,6 +146,7 @@ type ToolEntry = {
   approvalRequestId?: string;
   approvalReason?: string;
   approvalSummary?: string;
+  transcriptEvents?: SessionEvent[];
 };
 
 type StreamingSegment =
@@ -439,6 +441,24 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): Mes
       streamingContent: tool.finished ? undefined : tool.preview.streamingContent,
       createdAt: now,
       status: tool.finished ? "completed" : "running",
+    };
+  }
+
+  if (tool.preview?.kind === "agent") {
+    return {
+      kind: "agent",
+      id: blockId,
+      description: tool.preview.description,
+      status: tool.finished ? tool.preview.status : "running",
+      subagentType: tool.preview.subagentType,
+      displayText: tool.preview.displayText,
+      summary: tool.preview.summary,
+      recentEvents: tool.preview.recentEvents,
+      transcriptRef: tool.preview.transcriptRef,
+      stats: tool.preview.stats,
+      error: tool.preview.error,
+      transcriptEvents: tool.transcriptEvents,
+      createdAt: now,
     };
   }
 
@@ -833,6 +853,9 @@ export function App() {
       case "tool_finished": {
         const tool = state.activeTools.get(event.toolCallId);
         if (tool) {
+          if (event.preview) {
+            tool.preview = event.preview;
+          }
           const finishTool = () => {
             const latest = streamStateRef.current.activeTools.get(event.toolCallId);
             if (!latest) return;
@@ -853,6 +876,23 @@ export function App() {
           } else {
             finishTool();
           }
+        }
+        break;
+      }
+
+      case "subagent_event": {
+        const existing = state.activeTools.get(event.toolCallId);
+        if (existing) {
+          existing.preview = event.preview;
+          existing.transcriptEvents = [...(existing.transcriptEvents ?? []), event.event];
+        } else {
+          state.activeTools.set(event.toolCallId, {
+            toolName: "agent",
+            preview: event.preview,
+            startedAt: Date.now(),
+            transcriptEvents: [event.event],
+          });
+          state.segments.push({ type: "tool", toolCallId: event.toolCallId });
         }
         break;
       }

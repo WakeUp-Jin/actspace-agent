@@ -93,7 +93,10 @@ export class ToolManager {
     options?: ToolExecuteOptions,
   ): Promise<ToolResult> {
     const tool = this.tools.get(toolName);
-    const execution = await this.scheduler.execute(tool, toolName, args, toolCallId, options);
+    const execution = await this.scheduler.execute(tool, toolName, args, toolCallId, {
+      ...options,
+      toolCallId,
+    });
     return execution.result;
   }
 }
@@ -106,6 +109,9 @@ export class ToolManager {
 export interface ToolExecuteOptions {
   callerAgent?: "main" | "kairos";
   kairosGuard?: KairosGuardContext;
+  toolCallId?: string;
+  signal?: AbortSignal;
+  subagentEventSink?: import("./tools/agent/runner").SubAgentEventSink;
 }
 
 /** Kairos 工具调用守卫上下文：allowedRoots（白名单）+ blocklist（黑名单）+ toolsDenied（双保险） */

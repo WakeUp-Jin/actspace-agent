@@ -48,6 +48,7 @@ export { deleteFileDefinition } from "./tools/delete-file/definition";
 export { bashDefinition } from "./tools/bash/definition";
 export { webSearchDefinition } from "./tools/web-search/definition";
 export { analyzeMediaDefinition } from "./tools/analyze-media/definition";
+export { agentDefinition } from "./tools/agent/definition";
 
 // 工具执行器
 export { readFileExecutor } from "./tools/read-file/executor";
@@ -71,6 +72,8 @@ export {
 } from "./tools/bash";
 export { webSearchExecutor } from "./tools/web-search/executor";
 export { analyzeMediaExecutor } from "./tools/analyze-media/executor";
+export { createAgentTool, type CreateAgentToolOptions } from "./tools/agent";
+export type { AgentToolInput, AgentToolOutput, SubAgentEventSink } from "./tools/agent/runner";
 
 // ─── 便捷函数 ───
 
@@ -94,6 +97,7 @@ import { webSearchDefinition } from "./tools/web-search/definition";
 import { webSearchExecutor } from "./tools/web-search/executor";
 import { analyzeMediaDefinition } from "./tools/analyze-media/definition";
 import { analyzeMediaExecutor } from "./tools/analyze-media/executor";
+import { createAgentTool } from "./tools/agent";
 import { shouldExposeTool } from "./exposure";
 
 /** 创建预装基础工具的 ToolManager */
@@ -135,6 +139,18 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
         sessionId: config.sessionId,
         inlineThreshold: config.bashInlineThreshold,
         diskCap: config.bashDiskCap,
+      }),
+    );
+  }
+
+  if (!disabledTools.has("agent") && config.llm) {
+    manager.register(
+      createAgentTool({
+        llm: config.llm,
+        workspaceRoot: config.workspaceRoot,
+        sessionId: config.sessionId,
+        turnId: config.turnId,
+        contextWindow: config.contextWindow,
       }),
     );
   }

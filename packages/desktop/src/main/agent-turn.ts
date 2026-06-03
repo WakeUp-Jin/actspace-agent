@@ -151,6 +151,7 @@ export async function runAndPersistTurn(
     {
       tmpRoot: roots.tmpRoot,
       sessionId: input.sessionId,
+      turnId: input.turnId,
       ...runtimeContext,
     },
   );

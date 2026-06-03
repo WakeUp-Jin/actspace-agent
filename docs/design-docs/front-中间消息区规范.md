@@ -24,6 +24,7 @@
 - Web Search。
 - Directory List。
 - Bash。
+- Agent / SubAgent Run。
 - Edit File。
 - Write File。
 - Context Compaction。
@@ -37,6 +38,7 @@
 - Read、Grep、Glob 和 Web Search 保持文本流感，不做重边框。
 - Bash 正常执行态保持类似 Read 的轻量日志行；只有展开后的命令输出区域使用单层浅色容器。
 - Bash 审核态可以使用轻量边框块，因为它承载用户操作，不属于普通执行日志。
+- Agent 是聚合执行对象：主消息流显示可点击执行块，块内只展示 SubAgent run 的标题、状态、最近事件、摘要和 stats；完整 transcript 通过 modal 展示，不在主消息流展开。
 - Edit / Write File 与 Read 等保持同样的纯文本工具行节奏，仅在用户主动展开时显示 diff 详情容器。
 - Context Compaction 是系统执行事件，不属于工具调用，也不渲染为 Tool Preview；手动 `/compact` 和未来自动压缩共享同一消息块语法。
 - Final reply 作为收束结果，保持最清晰的阅读层级。
@@ -155,6 +157,7 @@ Bash 是命令执行工具，包含正常执行态和审核 pending 态。
 
 - 后端在 `tool_started.preview` 推送当前能确定的最小字段（filePath / command / query），不传未生成的数值（diff stats、entryCount 等）。
 - 完成态字段在 `tool_finished` / 持久化事件中补齐。
+- Agent 工具的内部 SubAgent transcript 不走普通 `tool_call_streaming`；bridge 用 `subagent_event.preview` 推送最新 `AgentToolPreview`，前端覆盖同一个 Agent block 的 running 状态。
 
 ### 4 阶段工具生命周期
 
@@ -169,6 +172,30 @@ LLM 生成工具调用是一段慢操作（write_file 一千多字符的 content
 
 - `tool_call_streaming` 推过来的 preview 直接放进 `state.activeTools.get(toolCallId).preview`，复用与 `tool_started` 相同的 toolEntryToBlock 渲染分支，**不需要单独的 tool_pending segment 类型**。
 - `tool_call_streaming` 首帧（`isInitial=true`）才往 `state.segments` push tool segment；后续 frame 和 `tool_started` 都只是覆盖 preview，segment 位置保持不变，保证工具的位置在消息流中**严格反映 LLM 首次开始生成它的时机**。
+
+## Agent / SubAgent Run 组件
+
+Agent 是主 Agent 调用的聚合工具，用户可见为一个可点击执行块。它承载的是“另一个隔离上下文中的只读探索过程”，因此视觉上允许轻边框和块状入口，但内部仍遵守消息流语法。
+
+### 结构
+
+- 顶部显示 `description`、状态和进入 transcript 的箭头。
+- running 阶段展示最近 3-5 条 transcript 摘要，使用与工具 running 态一致的 text shimmer。
+- completed 阶段展示最终 summary，控制在 3-4 行内，底部显示 `Explored N files · M tools · Ss` 等 stats。
+- failed / aborted 阶段展示错误摘要，并继续保留 transcript 入口。
+
+### 交互
+
+- 整块可点击，打开 `SubAgentTranscriptModal`。
+- modal 顶部显示 description 与状态，主体回放 SubAgent transcript events。
+- running 时 modal 使用 App streaming state 里已经收到的 events；completed 后可通过 `subagent:get-transcript` IPC 按 `transcriptRef` 补拉落盘 transcript。
+- modal 不提供 follow-up 输入，V0 只负责观察执行流。
+
+### 数据边界
+
+- 组件只消费 `MessageBlock.kind === "agent"` 字段，不解析 raw args、raw output 或 transcript 文件路径。
+- 主 session 只恢复 Agent 工具块；SubAgent 内部 user/tool/assistant/usage 事件只存在 sidecar transcript。
+- transcript 读取必须经 preload/main IPC，renderer 不直接访问文件系统。
 
 ## Edit File / Write File 组件
 

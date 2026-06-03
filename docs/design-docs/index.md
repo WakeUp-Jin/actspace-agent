@@ -30,6 +30,7 @@
 - `agent-token-usage-and-context-state.md`：token usage、成本统计、context snapshot 与 context state 的数据分层设计。
 - `agent-context-compression.md`：上下文压缩设计。
 - `agent-cache-loss-audit.md`：缓存失效排查设计。
+- `agent-subagent-runtime.md`：Agent 工具与 SubAgent run 设计，约束子智能体上下文隔离、transcript、只读 Explore 子智能体和前端执行流展示。
 - `agent-tool-preview-design-guidelines.md`：新增工具必须遵守的前端预览契约。
 - `agent-subprocess-runner-guidelines.md`：agent-core 内部受控子进程调用规范。
 - `agent-权限设计规则和原则.md`：Agent 工具权限、用户审核、风险分层和权限记录的设计规则。
