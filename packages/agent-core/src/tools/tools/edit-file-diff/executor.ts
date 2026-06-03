@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { relative } from "node:path";
+import { isAbsolute, relative } from "node:path";
 import * as Diff from "diff";
 import type { ToolResult, ResultRenderer } from "../../../internal-tools";
-import { guardWorkspacePath } from "../../workspace-guard";
+import { guardWritablePath } from "../../workspace-guard";
 import { writeTextAtomic } from "../shared/write-atomic";
 import type { ToolExecutorFn } from "../../types";
 
@@ -40,7 +40,8 @@ function countChangedLines(diff: string, marker: "+" | "-"): number {
 }
 
 function workspaceRelativePath(filePath: string, workspaceRoot: string): string {
-  return relative(workspaceRoot, filePath) || ".";
+  const rel = relative(workspaceRoot, filePath);
+  return rel.startsWith("..") || isAbsolute(rel) ? filePath : rel || ".";
 }
 
 function deleteMatches(content: string, oldString: string, replaceAll: boolean): string {
@@ -76,6 +77,7 @@ function deleteMatches(content: string, oldString: string, replaceAll: boolean):
 export const editFileDiffExecutor: ToolExecutorFn = async (
   args,
   workspaceRoot,
+  runtime,
 ): Promise<ToolResult> => {
   const pathArg = typeof args.path === "string" ? args.path : "";
   let oldString = typeof args.old_string === "string" ? args.old_string : "";
@@ -85,7 +87,7 @@ export const editFileDiffExecutor: ToolExecutorFn = async (
   if (!pathArg) return { success: false, error: "path is required" };
   if (oldString === newString) return { success: false, error: "old_string and new_string must be different" };
 
-  const guard = guardWorkspacePath(pathArg, workspaceRoot);
+  const guard = guardWritablePath(pathArg, workspaceRoot, runtime?.additionalWritableRoots);
   if (!guard.ok) {
     return { success: false, error: guard.error };
   }

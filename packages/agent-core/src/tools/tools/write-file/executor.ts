@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { relative } from "node:path";
+import { isAbsolute, relative } from "node:path";
 import * as Diff from "diff";
 import type { ToolResult, ResultRenderer } from "../../../internal-tools";
-import { guardWorkspacePath } from "../../workspace-guard";
+import { guardWritablePath } from "../../workspace-guard";
 import { writeTextAtomic } from "../shared/write-atomic";
 import type { ToolExecutorFn } from "../../types";
 
@@ -12,19 +12,21 @@ function countPrefixedLines(diff: string, prefix: string): number {
 }
 
 function workspaceRelativePath(filePath: string, workspaceRoot: string): string {
-  return relative(workspaceRoot, filePath) || ".";
+  const rel = relative(workspaceRoot, filePath);
+  return rel.startsWith("..") || isAbsolute(rel) ? filePath : rel || ".";
 }
 
 export const writeFileExecutor: ToolExecutorFn = async (
   args,
   workspaceRoot,
+  runtime,
 ): Promise<ToolResult> => {
   const pathArg = typeof args.path === "string" ? args.path : "";
   const content = typeof args.content === "string" ? args.content : "";
 
   if (!pathArg) return { success: false, error: "path is required" };
 
-  const guard = guardWorkspacePath(pathArg, workspaceRoot);
+  const guard = guardWritablePath(pathArg, workspaceRoot, runtime?.additionalWritableRoots);
   if (!guard.ok) {
     return { success: false, error: guard.error };
   }

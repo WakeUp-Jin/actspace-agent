@@ -57,14 +57,20 @@ describe("writeTextAtomic", () => {
 
 describe("editFileDiffExecutor", () => {
   let dir: string;
+  let extraDir: string;
 
   beforeEach(async () => {
     dir = tempDir();
+    extraDir = tempDir();
     await mkdir(dir, { recursive: true });
+    await mkdir(extraDir, { recursive: true });
   });
 
   afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
+    await Promise.all([
+      rm(dir, { recursive: true, force: true }),
+      rm(extraDir, { recursive: true, force: true }),
+    ]);
   });
 
   it("replaces unique string and writes back to file", async () => {
@@ -244,6 +250,30 @@ describe("editFileDiffExecutor", () => {
     expect(result.error).toContain("escape");
   });
 
+  it("can create a file in an explicit additional writable root", async () => {
+    const target = join(extraDir, "kairos", "inbox", "main-agent.md");
+    const result = await editFileDiffExecutor(
+      { path: target, old_string: "", new_string: "handoff\n" },
+      dir,
+      { additionalWritableRoots: [extraDir] },
+    );
+
+    expect(result.success).toBe(true);
+    expect(await readFile(target, "utf-8")).toBe("handoff\n");
+    expect((result.data as Record<string, unknown>).relativePath).toBe(target);
+  });
+
+  it("does not let relative paths escape through additional writable roots", async () => {
+    const result = await editFileDiffExecutor(
+      { path: "../outside.md", old_string: "", new_string: "x" },
+      dir,
+      { additionalWritableRoots: [extraDir] },
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("writable boundary");
+  });
+
   it("renderEditResult returns diff text for model", () => {
     const result = {
       success: true,
@@ -257,14 +287,20 @@ describe("editFileDiffExecutor", () => {
 
 describe("writeFileExecutor", () => {
   let dir: string;
+  let extraDir: string;
 
   beforeEach(async () => {
     dir = tempDir();
+    extraDir = tempDir();
     await mkdir(dir, { recursive: true });
+    await mkdir(extraDir, { recursive: true });
   });
 
   afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
+    await Promise.all([
+      rm(dir, { recursive: true, force: true }),
+      rm(extraDir, { recursive: true, force: true }),
+    ]);
   });
 
   it("creates a new file with all-green diff", async () => {
@@ -325,6 +361,30 @@ describe("writeFileExecutor", () => {
     );
     expect(result.success).toBe(false);
     expect(result.error).toContain("escape");
+  });
+
+  it("can write an explicit absolute path in an additional writable root", async () => {
+    const target = join(extraDir, "kairos", "inbox", "main-agent.md");
+    const result = await writeFileExecutor(
+      { path: target, content: "handoff\n" },
+      dir,
+      { additionalWritableRoots: [extraDir] },
+    );
+
+    expect(result.success).toBe(true);
+    expect(await readFile(target, "utf-8")).toBe("handoff\n");
+    expect((result.data as Record<string, unknown>).relativePath).toBe(target);
+  });
+
+  it("does not let relative paths escape through additional writable roots", async () => {
+    const result = await writeFileExecutor(
+      { path: "../outside.md", content: "x" },
+      dir,
+      { additionalWritableRoots: [extraDir] },
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("writable boundary");
   });
 
   it("renderWriteResult returns diff text for model", () => {

@@ -233,6 +233,19 @@ describe("buildAgentConfig (via dynamic import to reset env)", () => {
     expect(config.toolManagerConfig.workspaceRoot).toBe("/my/project");
   });
 
+  it("should pass additionalWritableRoots from runtime context into toolManagerConfig", async () => {
+    process.env.DEEPSEEK_API_KEY = "sk-test";
+    const { loadEnv } = await import("../../env");
+    const { buildAgentConfig } = await import("../create-agent-deps");
+    loadEnv({ envPath: EMPTY_ENV_PATH, mergeToProcessEnv: false });
+
+    const config = buildAgentConfig({}, "/my/project", undefined, {
+      additionalWritableRoots: ["/tmp/actspace/kairos/inbox"],
+    });
+
+    expect(config.toolManagerConfig.additionalWritableRoots).toEqual(["/tmp/actspace/kairos/inbox"]);
+  });
+
   it("should read env for llmConfig apiKey", async () => {
     process.env.DEEPSEEK_API_KEY = "sk-env-deepseek";
     const { loadEnv } = await import("../../env");

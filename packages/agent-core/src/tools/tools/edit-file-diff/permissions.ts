@@ -1,5 +1,5 @@
 import type { PermissionChecker } from "../../../internal-tools";
-import { guardWorkspacePath } from "../../workspace-guard";
+import { guardWritablePath } from "../../workspace-guard";
 
 /**
  * Edit-file permission checker.
@@ -9,14 +9,17 @@ import { guardWorkspacePath } from "../../workspace-guard";
  * future AgentMode ("careful") can switch to `decision: "ask"` without
  * changing the scheduler or executor.
  */
-export function createEditPermissionChecker(workspaceRoot: string): PermissionChecker {
+export function createEditPermissionChecker(
+  workspaceRoot: string,
+  additionalWritableRoots: string[] = [],
+): PermissionChecker {
   return async (args) => {
     const pathArg = typeof args.path === "string" ? args.path : "";
     if (!pathArg) {
       return { decision: "deny", reason: "path is required" };
     }
 
-    const guard = guardWorkspacePath(pathArg, workspaceRoot);
+    const guard = guardWritablePath(pathArg, workspaceRoot, additionalWritableRoots);
     if (!guard.ok) {
       return { decision: "deny", reason: guard.error };
     }

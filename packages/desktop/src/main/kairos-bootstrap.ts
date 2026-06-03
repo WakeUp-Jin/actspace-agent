@@ -43,6 +43,7 @@ export async function ensureKairosScaffolding(kairosRoot: string): Promise<void>
   const kairosWorkspaceRoot = getKairosWorkspaceRoot(kairosRoot);
 
   await Promise.all([
+    mkdir(join(kairosRoot, "inbox"), { recursive: true }),
     mkdir(kairosWorkspaceRoot, { recursive: true }),
     mkdir(join(kairosWorkspaceRoot, "notes"), { recursive: true }),
     mkdir(join(kairosRoot, "config"), { recursive: true }),

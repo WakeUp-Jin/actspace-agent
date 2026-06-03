@@ -16,6 +16,7 @@
 - `active/20260527-right-panel-views.md`
 - `active/20260529-appearance-fonts-and-zoom.md`
 - `active/20260530-workspace-file-explorer.md`
+- `active/20260603-session-hover-card.md`
 - `active/actspace-cache-loss-audit-plan.md`
 - `active/frontend-ui-components-foundation.md`
 - `active/Bash工具和工具权限调度开发计划/README.md`

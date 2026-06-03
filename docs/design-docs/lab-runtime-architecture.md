@@ -80,9 +80,22 @@ Kairos 不应自动：
 
 ### 与 Kairos 的 V0 通信
 
-Lab Runtime 与 Kairos 的 V0 通信只走 Kairos 文件收件箱，不引入消息总线或跨 Agent 实时对话。Lab 需要 Kairos 后台继续观察实验、等待更多证据、提醒用户决策或记录 blocked 原因时，通过 `packages/agent-core/src/kairos/inbox.ts` 的 `appendKairosInboxMessage({ source: "lab-agent", ... })` 追加到 `<userData>/kairos/inbox/lab-agent.md`。
+Lab Runtime 与 Kairos 的 V0 通信只走 Kairos 文件收件箱，不引入消息总线或跨 Agent 实时对话。Lab Agent 的系统提示词应写入一个很窄的 Kairos handoff 槽：
 
-Kairos 每次 tick 主动读取该文件，并把它当作观察信号和 Lab 候选线索；它不能因为 inbox 内容自动晋升能力、修改默认工具集或执行高风险锻造动作。Lab Runtime 尚未落地前，`lab-agent.md` 只是预留入口和手动占位文件。
+```txt
+<userData>/kairos/inbox/lab-agent.md
+```
+
+用途是把实验/评测中值得 Kairos 后续观察的发现交接出去，例如：
+
+- 可复现的实验结果。
+- 失败原因和下一步验证线索。
+- 候选产物的证据摘要。
+- 需要后台观察的能力缺口。
+
+不应写普通运行日志、原始命令输出或没有后续观察价值的临时猜测。写入方式保持 append-only，不写 `Processed` 标记。
+
+Kairos 每次 tick 主动读取该文件，并把它当作观察信号和 Lab 候选线索；它不能因为 inbox 内容自动晋升能力、修改默认工具集或执行高风险锻造动作。当前 `packages/agent-core/src/prompt/lab-agent.ts` 已版本化 `buildLabAgentSystemPrompt({ labInboxPath })`；但 Lab Runtime、IPC 和持久化尚未实现，因此这个 prompt asset 尚未被真实 Lab 后端消费。
 
 ## 与 ToolManager 的关系
 

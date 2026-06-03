@@ -250,16 +250,19 @@ async function ensureDataDirectories(): Promise<AppDataRoots> {
     cwd: process.cwd(),
     env: process.env,
   });
+  const kairosInboxRoot = join(roots.dataRoot, "kairos", "inbox");
 
   await mkdir(roots.sessionRoot, { recursive: true });
   await mkdir(roots.logRoot, { recursive: true });
   await mkdir(roots.tmpRoot, { recursive: true });
+  await mkdir(kairosInboxRoot, { recursive: true });
 
   logMain("data directories ensured", {
     dataRoot: roots.dataRoot,
     sessionRoot: roots.sessionRoot,
     logRoot: roots.logRoot,
     tmpRoot: roots.tmpRoot,
+    kairosInboxRoot,
     defaultWorkspaceRoot: roots.defaultWorkspaceRoot,
     workspaceRoot: roots.workspaceRoot,
   });
