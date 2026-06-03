@@ -135,17 +135,6 @@ function groupSessionsByWorkspace(sessions: SessionListItem[], workspaces: Works
   return ordered;
 }
 
-type ScheduledItem = {
-  id: string;
-  title: string;
-  hint: string;
-  status: SessionUiStatusKind;
-};
-
-const MOCK_SCHEDULED: ScheduledItem[] = [
-  { id: "scheduled-context-audit", title: "Weekly context audit", hint: "Tomorrow", status: "scheduled" },
-];
-
 const SESSION_STATUS_META: Record<SessionUiStatusKind, SessionStatusMeta> = {
   idle: {
     label: "Idle",
@@ -814,20 +803,13 @@ export function Sidebar({
           />
           {scheduledCollapsed ? null : (
             <div className={SESSION_LIST_CLASS}>
-              {MOCK_SCHEDULED.map((item) => (
-                <div className={`${SESSION_ROW_CLASS} ${SESSION_ROW_MUTED_CLASS}`} key={item.id} role="presentation">
-                  <span className={`session-row-marker ${SESSION_ROW_MARKER_CLASS}`}>
-                    <span className={`${SESSION_STATUS_DOT_CLASS} ${SESSION_STATUS_META[item.status].dotClass}`} aria-hidden="true" />
-                  </span>
-                  <button className={`${SESSION_ROW_MAIN_CLASS} ${SESSION_ROW_MAIN_MUTED_CLASS}`} type="button">
-                    <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>{item.title}</span>
-                    <span className={`session-row-time ${SESSION_ROW_TIME_CLASS}`}>{item.hint}</span>
-                  </button>
-                  <div className={`session-row-actions ${SESSION_ROW_ACTIONS_CLASS}`}>
-                    <SessionStatusButton status={item.status} />
-                  </div>
+              <div className={`${SESSION_ROW_CLASS} ${SESSION_ROW_MUTED_CLASS}`} role="presentation">
+                <span className={`session-row-marker ${SESSION_ROW_MARKER_CLASS}`} aria-hidden="true" />
+                <div className={`${SESSION_ROW_MAIN_CLASS} ${SESSION_ROW_MAIN_MUTED_CLASS}`}>
+                  <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>No scheduled tasks</span>
+                  <span className={`session-row-time ${SESSION_ROW_TIME_CLASS}`}>Create one when automation is available</span>
                 </div>
-              ))}
+              </div>
             </div>
           )}
         </section>

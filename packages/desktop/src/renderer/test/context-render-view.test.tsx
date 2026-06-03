@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ContextState } from "@actspace/shared";
 import { ContextRenderView } from "../components/right-panel/ContextRenderView";
-import { mockContextState } from "../fixtures/workbenchFixture";
+import { mockContextState } from "./fixtures/workbenchFixture";
 
 describe("ContextRenderView", () => {
   afterEach(() => {

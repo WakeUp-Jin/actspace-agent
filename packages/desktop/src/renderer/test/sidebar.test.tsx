@@ -224,12 +224,12 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(screen.queryByText("Bash 工具开发与权限调度")).not.toBeInTheDocument();
   });
 
-  it("collapses Scheduled section when its label is clicked", async () => {
+  it("collapses the empty Scheduled section when its label is clicked", async () => {
     renderSidebar();
 
-    expect(screen.getByText("Weekly context audit")).toBeInTheDocument();
+    expect(screen.getByText("No scheduled tasks")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /^Scheduled$/ }));
-    expect(screen.queryByText("Weekly context audit")).not.toBeInTheDocument();
+    expect(screen.queryByText("No scheduled tasks")).not.toBeInTheDocument();
   });
 
   it("shows a readable tooltip for Scheduled more actions", async () => {
@@ -251,7 +251,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
   it("renders a muted status dot on every session row by default", () => {
     const { container } = renderSidebar();
 
-    const sessionRows = container.querySelectorAll(".session-row");
+    const sessionRows = container.querySelectorAll(".session-row:not(.is-muted)");
     expect(sessionRows.length).toBeGreaterThan(0);
     sessionRows.forEach((row) => {
       expect(row.querySelector(".session-status-dot")).not.toBeNull();

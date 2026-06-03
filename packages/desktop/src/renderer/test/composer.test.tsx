@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComposerAttachment } from "@actspace/shared";
-import { mockContextSnapshot } from "../fixtures/workbenchFixture";
+import { mockContextSnapshot } from "./fixtures/workbenchFixture";
 import { Composer } from "../components/Composer";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
@@ -46,18 +46,42 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByRole("button", { name: "Context usage 36%" })).toBeInTheDocument();
   });
 
-  it("keeps image and file attachments in the attachment area above the input bar", () => {
-    renderComposer({ showDemoAttachments: true });
+  it("keeps image and file attachments in the attachment area above the input bar", async () => {
+    const user = userEvent.setup();
+    const selectedAttachments: ComposerAttachment[] = [
+      {
+        id: "selected-image",
+        kind: "image",
+        name: "screenshot.png",
+        path: "/Users/test/screenshot.png",
+        mimeType: "image/png",
+        previewUrl: "file:///Users/test/screenshot.png",
+      },
+      {
+        id: "selected-file",
+        kind: "file",
+        name: "README.md",
+        path: "/Users/test/README.md",
+        mimeType: "text/markdown",
+      },
+    ];
+    const selectFiles = vi.fn(async () => ({ canceled: false, attachments: selectedAttachments }));
+    setPartialActspaceBridge({ selectFiles });
+
+    renderComposer();
+
+    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    await user.click(screen.getByRole("menuitem", { name: "Attach files" }));
 
     const panel = screen.getByLabelText("Message composer panel");
-    const attachments = within(panel).getByLabelText("Attached files");
+    const attachmentList = within(panel).getByLabelText("Attached files");
     const toolbar = screen.getByLabelText("Composer toolbar");
     const input = screen.getByLabelText("Message composer");
     const toolbarButtons = within(toolbar).getAllByRole("button");
-    expect(within(attachments).getByLabelText("Attached image mock-screenshot.png")).toBeInTheDocument();
-    expect(within(attachments).getByLabelText("Attached file README.md")).toBeInTheDocument();
-    expect(within(attachments).getByText("README.md")).toBeInTheDocument();
-    expect(panel).toContainElement(attachments);
+    expect(within(attachmentList).getByLabelText("Attached image screenshot.png")).toBeInTheDocument();
+    expect(within(attachmentList).getByLabelText("Attached file README.md")).toBeInTheDocument();
+    expect(within(attachmentList).getByText("README.md")).toBeInTheDocument();
+    expect(panel).toContainElement(attachmentList);
     expect(panel).toContainElement(input);
     expect(toolbar).not.toContainElement(input);
     expect(toolbarButtons[0]).toHaveAccessibleName("Add agents, context, tools");
@@ -146,7 +170,7 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByLabelText("Attached file notes.md")).toBeInTheDocument();
   });
 
-  it("falls back to mock attachments when the Electron file bridge is unavailable", async () => {
+  it("does not add fake attachments when the Electron file bridge is unavailable", async () => {
     const user = userEvent.setup();
 
     renderComposer();
@@ -154,8 +178,7 @@ describe("Composer follow-up bar", () => {
     await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
     await user.click(screen.getByRole("menuitem", { name: "Attach files" }));
 
-    expect(screen.getByLabelText("Attached image mock-screenshot.png")).toBeInTheDocument();
-    expect(screen.getByLabelText("Attached file README.md")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Attached files")).not.toBeInTheDocument();
   });
 
   it("adds dropped files, removes attachments, and sends only remaining attachments", async () => {

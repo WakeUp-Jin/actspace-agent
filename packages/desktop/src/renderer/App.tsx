@@ -25,17 +25,8 @@ import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import type { ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
-import {
-  mockBootstrapState,
-  mockContextSnapshot,
-  mockMessages,
-  mockSessionRecord,
-  mockSessions,
-  mockTurnResult,
-} from "./fixtures/workbenchFixture";
 
 const MIN_TOOL_RUNNING_MS = 300;
-const MOCK_ADDED_WORKSPACE_ROOT = "/mock/workspaces/new-project";
 const DEFAULT_WORKSPACE_ID = "default";
 const DEFAULT_WORKSPACE_LABEL = "Default workspace";
 
@@ -44,7 +35,7 @@ function hasActspaceBridge(): boolean {
 }
 
 function getSessionTitle(sessionRecord: SessionRecord | null, sessions: SessionListItem[]): string {
-  const rawTitle = sessionRecord?.meta.title ?? sessions[0]?.title ?? "Learning documentation plan";
+  const rawTitle = sessionRecord?.meta.title ?? sessions[0]?.title ?? "New chat";
   const normalized = rawTitle.replace(/^Session\s+/i, "").replace(/^session-/i, "");
   if (normalized === rawTitle) {
     return rawTitle;
@@ -99,41 +90,6 @@ function createWorkspaceOptionsFromRegistry(items: WorkspaceEntry[]): ComposerWo
     label: workspace.label,
     workspaceId: workspace.id,
   }));
-}
-
-function createMockWorkspaceRegistry(defaultWorkspaceRoot: string, sessions: SessionListItem[]): WorkspaceListResult {
-  const now = new Date().toISOString();
-  const items: WorkspaceEntry[] = [
-    {
-      id: DEFAULT_WORKSPACE_ID,
-      kind: "default",
-      label: DEFAULT_WORKSPACE_LABEL,
-      path: defaultWorkspaceRoot,
-      order: 0,
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
-  const seen = new Set(items.map((item) => item.path));
-  for (const session of sessions) {
-    const root = normalizeWorkspaceRoot(session.workspaceRoot);
-    if (!root || seen.has(root)) continue;
-    items.push({
-      id: session.workspaceId ?? `mock_workspace_${items.length}`,
-      kind: "folder",
-      label: workspaceLabelFromRoot(root),
-      path: root,
-      order: items.length,
-      createdAt: now,
-      updatedAt: now,
-    });
-    seen.add(root);
-  }
-  return {
-    version: 1,
-    defaultWorkspaceId: DEFAULT_WORKSPACE_ID,
-    items,
-  };
 }
 
 type ToolEntry = {
@@ -192,9 +148,9 @@ function appendOrMergeSegment(
   }
 }
 
-function createMockEmptySession(input: NewSessionInput = {}): SessionRecord {
+function createLocalEmptySession(input: NewSessionInput = {}): SessionRecord {
   const now = new Date().toISOString();
-  const id = `mock-session-${Date.now()}`;
+  const id = `local-session-${Date.now()}`;
   return {
     meta: {
       id,
@@ -208,10 +164,6 @@ function createMockEmptySession(input: NewSessionInput = {}): SessionRecord {
     messageBlocks: [],
     contextSnapshot: null,
   };
-}
-
-function isDemoSession(sessionId: string | null): boolean {
-  return sessionId === "session-learning-doc-plan";
 }
 
 function getStreamingBashStatus(tool: {
@@ -561,27 +513,13 @@ function createStoppedBlock(turnId: string): MessageBlock {
 }
 
 export function App() {
-  const [bootstrapState, setBootstrapState] = useState<BootstrapState | null>(
-    hasActspaceBridge() ? null : mockBootstrapState,
-  );
-  const [sessions, setSessions] = useState<SessionListItem[]>(hasActspaceBridge() ? [] : mockSessions);
-  const [sessionRecord, setSessionRecord] = useState<SessionRecord | null>(
-    hasActspaceBridge() ? null : mockSessionRecord,
-  );
-  const [mockSessionRecords, setMockSessionRecords] = useState<Record<string, SessionRecord>>(
-    hasActspaceBridge() ? {} : { [mockSessionRecord.meta.id]: mockSessionRecord },
-  );
-  const [turnResult, setTurnResult] = useState<AgentTurnResult | null>(
-    hasActspaceBridge() ? null : mockTurnResult,
-  );
-  const [workspaceRegistry, setWorkspaceRegistry] = useState<WorkspaceListResult | null>(
-    hasActspaceBridge()
-      ? null
-      : createMockWorkspaceRegistry(
-          normalizeWorkspaceRoot(mockBootstrapState.workspaceRoot) ?? "/mock/default-workspace",
-          mockSessions,
-        ),
-  );
+  const [bootstrapState, setBootstrapState] = useState<BootstrapState | null>(null);
+  const [sessions, setSessions] = useState<SessionListItem[]>([]);
+  const [sessionRecord, setSessionRecord] = useState<SessionRecord | null>(null);
+  const [localSessionRecords, setLocalSessionRecords] = useState<Record<string, SessionRecord>>({});
+  const [turnResult, setTurnResult] = useState<AgentTurnResult | null>(null);
+  const [workspaceRegistry, setWorkspaceRegistry] = useState<WorkspaceListResult | null>(null);
+  const [sessionBootstrapComplete, setSessionBootstrapComplete] = useState(!hasActspaceBridge());
   const [isStreaming, setIsStreaming] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
@@ -590,13 +528,11 @@ export function App() {
   const [defaultModelId, setDefaultModelId] = useState<ModelId | undefined>(undefined);
   const [approvalPendingSessionIds, setApprovalPendingSessionIds] = useState<Set<string>>(() => new Set());
   const [failedSessionIds, setFailedSessionIds] = useState<Set<string>>(() => new Set());
-  const [selectedWorkspaceRoot, setSelectedWorkspaceRoot] = useState<string | null>(
-    hasActspaceBridge() ? null : normalizeWorkspaceRoot(mockSessionRecord.meta.workspaceRoot ?? mockBootstrapState.workspaceRoot),
-  );
+  const [selectedWorkspaceRoot, setSelectedWorkspaceRoot] = useState<string | null>(null);
   const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
   const toolFinishTimersRef = useRef<Map<string, number>>(new Map());
-  const activeSessionIdRef = useRef<string>("session-default");
+  const activeSessionIdRef = useRef<string | null>(null);
 
   const refreshWorkspaces = useCallback(async () => {
     if (!hasActspaceBridge() || !window.actspace.listWorkspaces) return null;
@@ -668,7 +604,7 @@ export function App() {
       .then(setBootstrapState)
       .catch((error: unknown) => {
         console.error("Failed to load bootstrap state", error);
-        setBootstrapState(mockBootstrapState);
+        setBootstrapState(null);
       });
   }, []);
 
@@ -721,30 +657,24 @@ export function App() {
         setSelectedWorkspaceRoot(
           normalizeWorkspaceRoot(restored?.meta.workspaceRoot ?? existing.workspaceRoot ?? bootstrapState?.workspaceRoot),
         );
+        setSessionBootstrapComplete(true);
         return;
       }
 
-      const input: RunTurnInput = {
-        sessionId: "session-learning-doc-plan",
-        turnId: "turn-0001",
-        userInput: "Review the repository, reason about context, and prepare the first runtime slice.",
-      };
-      activeSessionIdRef.current = input.sessionId;
-
-      const result = await window.actspace.runTurn(input);
-      setTurnResult(result);
-      const refreshed = await window.actspace.listSessions();
-      setSessions(refreshed);
-      const restored = await window.actspace.getSession({ sessionId: input.sessionId });
-      setSessionRecord(restored);
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(restored?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
+      activeSessionIdRef.current = null;
+      setSessionRecord(null);
+      setTurnResult(null);
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(bootstrapState?.workspaceRoot));
+      setSessionBootstrapComplete(true);
     }
 
     bootstrapSession().catch((error: unknown) => {
       console.error("Failed to bootstrap session", error);
-      setSessions(mockSessions);
-      setSessionRecord(mockSessionRecord);
-      setTurnResult(mockTurnResult);
+      activeSessionIdRef.current = null;
+      setSessions([]);
+      setSessionRecord(null);
+      setTurnResult(null);
+      setSessionBootstrapComplete(true);
     });
   }, []);
 
@@ -922,9 +852,11 @@ export function App() {
 
       case "tool_approval_resolved": {
         setApprovalPendingForSession(streamSessionId, false);
-        refreshPendingApprovalStatuses([streamSessionId]).catch((error: unknown) => {
-          console.error("Failed to refresh resolved approval status", error);
-        });
+        if (streamSessionId) {
+          refreshPendingApprovalStatuses([streamSessionId]).catch((error: unknown) => {
+            console.error("Failed to refresh resolved approval status", error);
+          });
+        }
         const tool = state.activeTools.get(event.toolCallId);
         if (tool) {
           tool.approvalPending = false;
@@ -955,18 +887,64 @@ export function App() {
     refreshStreamingBlocks();
   }, [refreshPendingApprovalStatuses, refreshStreamingBlocks, setApprovalPendingForSession, setFailedForSession]);
 
+  const createSessionForInput = useCallback(async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
+    if (!hasActspaceBridge()) {
+      const created = createLocalEmptySession(input);
+      activeSessionIdRef.current = created.meta.id;
+      setSessionRecord(created);
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
+      setLocalSessionRecords((current) => ({ ...current, [created.meta.id]: created }));
+      setSessions((current) => [
+        {
+          id: created.meta.id,
+          title: created.meta.title,
+          updatedAt: created.meta.updatedAt,
+          turnCount: created.meta.turnCount,
+          workspaceRoot: created.meta.workspaceRoot,
+        },
+        ...current,
+      ]);
+      return created;
+    }
+
+    try {
+      const created = await window.actspace.createSession({
+        title: "New chat",
+        ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+        ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
+      });
+      activeSessionIdRef.current = created.meta.id;
+      setSessionRecord(created);
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
+      const refreshed = await window.actspace.listSessions();
+      setSessions(refreshed);
+      await refreshWorkspaces();
+      return created;
+    } catch (error) {
+      console.error("Failed to create session", error);
+      return null;
+    }
+  }, [bootstrapState?.workspaceRoot, refreshWorkspaces]);
+
   const handleSend = useCallback(async (
     text: string,
     options: ComposerSendOptions,
   ) => {
     if (isStreaming || (!text.trim() && !options.attachments?.length)) return;
 
-    const sessionId = activeSessionIdRef.current;
+    const createdSession = activeSessionIdRef.current
+      ? null
+      : await createSessionForInput(selectedWorkspaceRoot ? { workspaceRoot: selectedWorkspaceRoot } : {});
+    const sessionId = activeSessionIdRef.current ?? createdSession?.meta.id;
+    if (!sessionId) return;
+
     const turnId = nextTurnId();
     const isCompactCommand = text.trim() === "/compact";
     const nextWorkspaceRoot = selectedWorkspaceRoot;
     let nextWorkspace = findWorkspaceOption(nextWorkspaceRoot);
-    const currentWorkspaceRoot = normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot);
+    const currentWorkspaceRoot = normalizeWorkspaceRoot(
+      (createdSession ?? sessionRecord)?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+    );
 
     if (
       hasActspaceBridge() &&
@@ -1138,13 +1116,15 @@ export function App() {
     clearToolFinishTimers,
     setApprovalPendingForSession,
     setFailedForSession,
+    createSessionForInput,
   ]);
 
   const handleAbort = useCallback(async () => {
-    if (!hasActspaceBridge() || !activeTurnId) return;
+    const sessionId = activeSessionIdRef.current;
+    if (!hasActspaceBridge() || !activeTurnId || !sessionId) return;
 
     const input: AbortTurnInput = {
-      sessionId: activeSessionIdRef.current,
+      sessionId,
       turnId: activeTurnId,
     };
 
@@ -1164,45 +1144,11 @@ export function App() {
     streamStateRef.current = createEmptyStreamingState();
     streamingUserBlockRef.current = null;
 
-    if (!hasActspaceBridge()) {
-      const created = createMockEmptySession(input);
-      activeSessionIdRef.current = created.meta.id;
-      setSessionRecord(created);
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
-      setMockSessionRecords((current) => ({ ...current, [created.meta.id]: created }));
-      setSessions((current) => [
-        {
-          id: created.meta.id,
-          title: created.meta.title,
-          updatedAt: created.meta.updatedAt,
-          turnCount: created.meta.turnCount,
-          workspaceRoot: created.meta.workspaceRoot,
-        },
-        ...current,
-      ]);
-      return;
-    }
-
-    try {
-      const created = await window.actspace.createSession({
-        title: "New chat",
-        ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
-        ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
-      });
-      activeSessionIdRef.current = created.meta.id;
-      setSessionRecord(created);
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
-      const refreshed = await window.actspace.listSessions();
-      setSessions(refreshed);
-      await refreshWorkspaces();
-    } catch (error) {
-      console.error("Failed to create session", error);
-    }
-  }, [bootstrapState?.workspaceRoot, clearToolFinishTimers, refreshWorkspaces]);
+    await createSessionForInput(input);
+  }, [clearToolFinishTimers, createSessionForInput]);
 
   const handleAddWorkspace = useCallback(async () => {
     if (!hasActspaceBridge()) {
-      await handleCreateSession({ workspaceRoot: MOCK_ADDED_WORKSPACE_ROOT });
       return;
     }
 
@@ -1236,32 +1182,12 @@ export function App() {
       });
 
       if (!hasActspaceBridge()) {
-        const selected = mockSessionRecords[sessionId];
+        const selected = localSessionRecords[sessionId];
         if (selected) {
           setSessionRecord(selected);
           setSelectedWorkspaceRoot(normalizeWorkspaceRoot(selected.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
           return;
         }
-
-        const listed = sessions.find((session) => session.id === sessionId);
-        if (!listed) return;
-
-        const fixture = mockSessions.find((session) => session.id === sessionId);
-        if (!fixture) return;
-
-        setSessionRecord({
-          ...mockSessionRecord,
-          meta: {
-            ...mockSessionRecord.meta,
-            id: fixture.id,
-            title: fixture.title,
-            updatedAt: fixture.updatedAt,
-            turnCount: fixture.turnCount,
-            workspaceRoot: fixture.workspaceRoot,
-            pinned: fixture.pinned,
-          },
-        });
-        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(fixture.workspaceRoot ?? bootstrapState?.workspaceRoot));
         return;
       }
 
@@ -1273,7 +1199,7 @@ export function App() {
         console.error("Failed to select session", error);
       }
     },
-    [bootstrapState?.workspaceRoot, mockSessionRecords, sessions, clearToolFinishTimers, refreshPendingApprovalStatuses],
+    [bootstrapState?.workspaceRoot, localSessionRecords, clearToolFinishTimers, refreshPendingApprovalStatuses],
   );
 
   useEffect(() => {
@@ -1289,8 +1215,7 @@ export function App() {
 
     const fromEvents = createMessageBlocks(persistedEvents);
     if (fromEvents.length > 0) return fromEvents;
-    if (hasActspaceBridge() || sessionRecord) return [];
-    return mockMessages;
+    return [];
   }, [persistedEvents, sessionRecord?.messageBlocks]);
 
   const messages = useMemo<MessageBlock[]>(() => {
@@ -1301,16 +1226,14 @@ export function App() {
   const contextSnapshot: ContextUsageSnapshot | null =
     sessionRecord?.contextSnapshot ??
     turnResult?.contextSnapshot ??
-    getLatestContextSnapshot(persistedEvents) ??
-    mockContextSnapshot;
+    getLatestContextSnapshot(persistedEvents);
 
   const contextState: ContextState | null =
     sessionRecord?.contextState ?? turnResult?.contextState ?? null;
 
   const activeSessionId =
-    sessionRecord?.meta.id ?? turnResult?.sessionId ?? sessions[0]?.id ?? mockSessions[0]?.id ?? null;
-  const showDemoAttachments = isDemoSession(activeSessionId);
-  const isSessionReady = Boolean(sessionRecord || turnResult || streamingBlocks.length > 0 || !hasActspaceBridge());
+    sessionRecord?.meta.id ?? turnResult?.sessionId ?? sessions[0]?.id ?? null;
+  const isSessionReady = Boolean(sessionRecord || turnResult || streamingBlocks.length > 0 || sessionBootstrapComplete);
   const title = getSessionTitle(sessionRecord, sessions);
   const workspaceOptions = useMemo(
     () =>
@@ -1384,7 +1307,7 @@ export function App() {
 
       if (!hasActspaceBridge()) {
         updateSessionTitle();
-        setMockSessionRecords((current) => {
+        setLocalSessionRecords((current) => {
           const record = current[sessionId];
           if (!record) return current;
           return {
@@ -1433,7 +1356,7 @@ export function App() {
 
       if (!hasActspaceBridge()) {
         setSessions((current) => current.filter((session) => session.id !== sessionId));
-        setMockSessionRecords((current) => {
+        setLocalSessionRecords((current) => {
           const next = { ...current };
           delete next[sessionId];
           return next;
@@ -1466,7 +1389,7 @@ export function App() {
   return (
     <RightPanelProvider>
       <WorkbenchLayout
-        sessions={sessions.length > 0 ? sessions : mockSessions}
+        sessions={sessions}
         activeSessionId={activeSessionId}
         title={title}
         messages={messages}
@@ -1486,7 +1409,6 @@ export function App() {
         onRenameSession={handleRenameSession}
         onArchiveSession={handleArchiveSession}
         isSessionReady={isSessionReady}
-        showDemoAttachments={showDemoAttachments}
         defaultModelId={defaultModelId}
         onSettingsChange={handleSettingsChange}
         onArchivedSessionsChange={handleArchivedSessionsChange}

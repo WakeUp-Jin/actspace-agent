@@ -54,6 +54,7 @@
 - `completed/20260530-context-cache-and-usage/README.md`
 - `completed/20260530-kairos-budget-and-graceful-shutdown.md`
 - `completed/20260530-kairos-config-editor.md`
+- `completed/20260604-runtime-mock-data-cleanup.md`
 - `completed/lab-v0-frontend-mock-implementation.md`
 - `completed/actspace-token-usage-context-control-foundation.md`
 - `completed/actspace-usage-statistics-session-jsonl-plan.md`
