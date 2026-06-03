@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 import {
+  getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_CLASS,
   TOOL_LOG_LINE_RUNNING_CLASS,
   TOOL_LOG_LINE_TEXT_CLASS,
@@ -37,10 +38,14 @@ export function FileDiffBlock({ message, className }: { message: FileDiffMessage
   }
 
   if (isRunning) {
+    const text = `${actionLabel} ${fileLabel}`;
     return (
       <div className={`${TOOL_LOG_LINE_CLASS} ${TOOL_LOG_LINE_RUNNING_CLASS}${className ? ` ${className}` : ""}`}>
-        <span className={`${TOOL_LOG_LINE_TEXT_CLASS} ${TOOL_LOG_LINE_TEXT_RUNNING_CLASS}`}>
-          {actionLabel} {fileLabel}
+        <span
+          className={`${TOOL_LOG_LINE_TEXT_CLASS} ${TOOL_LOG_LINE_TEXT_RUNNING_CLASS}`}
+          {...getToolLogRunningTextAttrs(text)}
+        >
+          {text}
         </span>
       </div>
     );

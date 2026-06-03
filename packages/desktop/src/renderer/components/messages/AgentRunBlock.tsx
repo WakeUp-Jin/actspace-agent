@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Bot, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 import { SubAgentTranscriptModal } from "./SubAgentTranscriptModal";
+import { getToolLogRunningTextAttrs, TOOL_LOG_LINE_TEXT_RUNNING_CLASS } from "./toolLogStyles";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 
@@ -19,8 +20,6 @@ const CHEVRON_CLASS = "mt-1 flex-none text-text-faint";
 const SUMMARY_CLASS = "mt-2 line-clamp-4 text-[13px] leading-[1.55] text-text-muted";
 const RECENT_CLASS = "mt-2 flex flex-col gap-1.5";
 const RECENT_LINE_CLASS = "text-[13px] leading-[1.45] text-text-muted";
-const RECENT_RUNNING_CLASS =
-  "text-transparent [-webkit-text-fill-color:transparent] [background:linear-gradient(90deg,var(--act-color-text-muted)_0%,var(--act-color-text-muted)_35%,var(--act-color-brand)_50%,var(--act-color-text-muted)_65%,var(--act-color-text-muted)_100%)] [background-size:250%_100%] [background-position:100%_0] [background-repeat:no-repeat] [-webkit-background-clip:text] [background-clip:text] animate-[tool-log-text-shimmer_1.1s_ease-in-out_infinite] motion-reduce:text-brand motion-reduce:[-webkit-text-fill-color:currentColor] motion-reduce:[background:none] motion-reduce:animate-none";
 const STATS_CLASS = "mt-2 text-[12px] leading-[1.45] text-text-faint";
 const ERROR_CLASS = "mt-2 rounded-act-sm bg-danger-soft px-2.5 py-2 text-[13px] leading-[1.45] text-on-danger";
 
@@ -83,8 +82,10 @@ export function AgentRunBlock({ message, className }: { message: AgentMessage; c
         {isRunning ? (
           <div className={RECENT_CLASS}>
             {(recentEvents.length > 0 ? recentEvents : [{ id: "pending", summary: "Starting SubAgent run..." }]).map((event) => (
-              <div key={event.id} className={`${RECENT_LINE_CLASS} ${RECENT_RUNNING_CLASS}`}>
-                {event.summary}
+              <div key={event.id} className={RECENT_LINE_CLASS}>
+                <span className={TOOL_LOG_LINE_TEXT_RUNNING_CLASS} {...getToolLogRunningTextAttrs(event.summary)}>
+                  {event.summary}
+                </span>
               </div>
             ))}
           </div>

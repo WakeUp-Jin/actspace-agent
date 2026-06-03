@@ -16,6 +16,7 @@ import type {
   SessionEvent,
   SessionListItem,
   SessionRecord,
+  LlmUsagePayload,
   ToolUiPreview,
   WorkspaceEntry,
   WorkspaceListResult,
@@ -24,7 +25,7 @@ import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import type { ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
-import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
+import type { NewSessionInput, SessionHoverPreview, SessionUiStatusKind } from "./components/Sidebar";
 import {
   mockBootstrapState,
   mockContextSnapshot,
@@ -60,6 +61,85 @@ function getSessionTitle(sessionRecord: SessionRecord | null, sessions: SessionL
 function normalizeWorkspaceRoot(root: string | undefined | null): string | null {
   const trimmed = root?.trim();
   return trimmed ? trimmed : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function contextStateToSnapshot(state: ContextState | null | undefined): ContextUsageSnapshot | null {
+  if (!state) return null;
+  return {
+    totalTokens: state.totalEstimatedTokens,
+    maxTokens: state.maxTokens,
+    percentUsed: state.percentUsed,
+    estimator: state.estimator,
+    buckets: state.buckets,
+  };
+}
+
+function latestModelFromEvents(events: SessionEvent[]): Pick<SessionHoverPreview, "model" | "modelId"> {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (!isRecord(event.payload)) continue;
+
+    if (event.type === "llm_usage") {
+      const payload = event.payload as Partial<LlmUsagePayload>;
+      if (typeof payload.model === "string" || typeof payload.modelId === "string") {
+        return {
+          ...(typeof payload.model === "string" ? { model: payload.model } : {}),
+          ...(typeof payload.modelId === "string" ? { modelId: payload.modelId as ModelId } : {}),
+        };
+      }
+    }
+
+    if (event.type === "assistant_message" || event.type === "assistant_reply") {
+      const model = typeof event.payload.model === "string" ? event.payload.model : undefined;
+      const modelId = typeof event.payload.modelId === "string" ? event.payload.modelId as ModelId : undefined;
+      if (model || modelId) {
+        return {
+          ...(model ? { model } : {}),
+          ...(modelId ? { modelId } : {}),
+        };
+      }
+    }
+  }
+
+  return {};
+}
+
+function createSessionHoverPreviewFromRecord(
+  record: SessionRecord,
+  fallbackWorkspaceRoot?: string | null,
+): SessionHoverPreview {
+  return {
+    sessionId: record.meta.id,
+    ...(record.meta.workspaceId ? { workspaceId: record.meta.workspaceId } : {}),
+    workspaceRoot: record.meta.workspaceRoot ?? fallbackWorkspaceRoot ?? undefined,
+    ...latestModelFromEvents(record.events),
+    contextSnapshot:
+      record.contextSnapshot ??
+      getLatestContextSnapshot(record.events) ??
+      contextStateToSnapshot(record.contextState),
+  };
+}
+
+function resolveWorkspaceRootForSession(
+  session: SessionListItem,
+  registry: WorkspaceListResult | null,
+  fallbackWorkspaceRoot?: string | null,
+): string | undefined {
+  const explicitRoot = normalizeWorkspaceRoot(session.workspaceRoot);
+  if (explicitRoot) return explicitRoot;
+  if (session.workspaceId) {
+    const matched = registry?.items.find((workspace) => workspace.id === session.workspaceId);
+    if (matched?.path) return matched.path;
+  }
+  const defaultRoot =
+    registry?.items.find((workspace) => workspace.id === registry.defaultWorkspaceId)?.path ??
+    registry?.items.find((workspace) => workspace.kind === "default")?.path ??
+    fallbackWorkspaceRoot;
+  return normalizeWorkspaceRoot(defaultRoot) ?? undefined;
 }
 
 function workspaceLabelFromRoot(root: string): string {
@@ -524,7 +604,6 @@ function createCompactionBlock(input: {
   stage?: string;
   progress?: number;
   summaryText?: string;
-  reductionLabel?: string;
 }): Extract<MessageBlock, { kind: "context_compaction" }> {
   return {
     kind: "context_compaction",
@@ -534,9 +613,13 @@ function createCompactionBlock(input: {
     stage: input.stage,
     progress: input.progress,
     summaryText: input.summaryText ?? (input.status === "pending" ? "/compact" : "Compacting context"),
-    reductionLabel: input.reductionLabel,
     createdAt: new Date().toISOString(),
   };
+}
+
+function formatContextCompactionSummary(removedCount: number): string {
+  if (removedCount <= 0) return "Context compacted";
+  return `Context compacted · ${removedCount} ${removedCount === 1 ? "message" : "messages"}`;
 }
 
 function upsertCompactionSegment(state: StreamingState, turnId: string): void {
@@ -596,6 +679,8 @@ export function App() {
   const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
   const toolFinishTimersRef = useRef<Map<string, number>>(new Map());
+  const sessionPreviewCacheRef = useRef<Map<string, SessionHoverPreview | null>>(new Map());
+  const sessionPreviewInflightRef = useRef<Map<string, Promise<SessionHoverPreview | null>>>(new Map());
   const activeSessionIdRef = useRef<string>("session-default");
 
   const refreshWorkspaces = useCallback(async () => {
@@ -794,8 +879,9 @@ export function App() {
           trigger: event.trigger,
           stage: event.stage,
           progress: event.progress,
-          summaryText: event.summary ?? (event.status === "skipped" ? "Nothing to compact" : "Context compacted"),
-          reductionLabel: removedCount > 0 ? `${removedCount} messages removed` : undefined,
+          summaryText: event.status === "skipped"
+            ? (event.summary ?? "Nothing to compact")
+            : formatContextCompactionSummary(removedCount),
         }));
         break;
       }
@@ -1309,6 +1395,75 @@ export function App() {
 
   const activeSessionId =
     sessionRecord?.meta.id ?? turnResult?.sessionId ?? sessions[0]?.id ?? mockSessions[0]?.id ?? null;
+  const getSessionHoverPreview = useCallback(async (session: SessionListItem): Promise<SessionHoverPreview | null> => {
+    const workspaceRoot = resolveWorkspaceRootForSession(session, workspaceRegistry, bootstrapState?.workspaceRoot);
+
+    if (sessionRecord?.meta.id === session.id) {
+      const preview = createSessionHoverPreviewFromRecord(sessionRecord, workspaceRoot);
+      sessionPreviewCacheRef.current.set(session.id, preview);
+      return preview;
+    }
+
+    if (turnResult?.sessionId === session.id) {
+      const preview: SessionHoverPreview = {
+        sessionId: session.id,
+        ...(session.workspaceId ? { workspaceId: session.workspaceId } : {}),
+        workspaceRoot,
+        ...latestModelFromEvents(turnResult.events),
+        contextSnapshot: turnResult.contextSnapshot ?? getLatestContextSnapshot(turnResult.events),
+      };
+      sessionPreviewCacheRef.current.set(session.id, preview);
+      return preview;
+    }
+
+    const cached = sessionPreviewCacheRef.current.get(session.id);
+    if (cached !== undefined) return cached;
+
+    if (!hasActspaceBridge()) {
+      const record = mockSessionRecords[session.id];
+      const preview = record
+        ? createSessionHoverPreviewFromRecord(record, workspaceRoot)
+        : {
+            sessionId: session.id,
+            ...(session.workspaceId ? { workspaceId: session.workspaceId } : {}),
+            workspaceRoot,
+            contextSnapshot: null,
+          };
+      sessionPreviewCacheRef.current.set(session.id, preview);
+      return preview;
+    }
+
+    if (!window.actspace.getSessionPreview) {
+      const preview = {
+        sessionId: session.id,
+        ...(session.workspaceId ? { workspaceId: session.workspaceId } : {}),
+        workspaceRoot,
+        contextSnapshot: null,
+      };
+      sessionPreviewCacheRef.current.set(session.id, preview);
+      return preview;
+    }
+
+    const inflight = sessionPreviewInflightRef.current.get(session.id);
+    if (inflight) return inflight;
+
+    const request = window.actspace.getSessionPreview({ sessionId: session.id })
+      .then((preview) => {
+        const resolvedPreview = preview
+          ? {
+              ...preview,
+              workspaceRoot: preview.workspaceRoot ?? workspaceRoot,
+            }
+          : null;
+        sessionPreviewCacheRef.current.set(session.id, resolvedPreview);
+        return resolvedPreview;
+      })
+      .finally(() => {
+        sessionPreviewInflightRef.current.delete(session.id);
+      });
+    sessionPreviewInflightRef.current.set(session.id, request);
+    return request;
+  }, [bootstrapState?.workspaceRoot, mockSessionRecords, sessionRecord, turnResult, workspaceRegistry]);
   const showDemoAttachments = isDemoSession(activeSessionId);
   const isSessionReady = Boolean(sessionRecord || turnResult || streamingBlocks.length > 0 || !hasActspaceBridge());
   const title = getSessionTitle(sessionRecord, sessions);
@@ -1494,6 +1649,7 @@ export function App() {
         workspaceOptions={workspaceOptions}
         selectedWorkspaceRoot={selectedWorkspaceRoot}
         onSelectWorkspace={setSelectedWorkspaceRoot}
+        getSessionPreview={getSessionHoverPreview}
       />
       <ShutdownOverlay />
     </RightPanelProvider>

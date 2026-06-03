@@ -51,7 +51,10 @@ describe("FileDiffBlock running state", () => {
       />,
     );
 
-    expect(screen.getByText("Write 夜雨.md")).toBeInTheDocument();
+    const runningLine = screen.getByText("Write 夜雨.md");
+    expect(runningLine).toBeInTheDocument();
+    expect(runningLine).toHaveClass("tool-log-text-running");
+    expect(runningLine).toHaveAttribute("data-shimmer-text", "Write 夜雨.md");
     expect(screen.queryByText(/\+\d+/)).toBeNull();
   });
 

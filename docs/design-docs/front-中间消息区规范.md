@@ -135,9 +135,10 @@ Bash 是命令执行工具，包含正常执行态和审核 pending 态。
 
 ### 视觉
 
-- 文本始终可读：基础色 `#6f7681` 灰色，任意时刻、任意快慢的工具都能立即看清文字。
-- 蓝色高光（`#6ea7ff`）作为**叠加**效果从右向左扫过文本一次为一轮，不允许出现「文字消失」的瞬间。
-- 实现方式：`background: linear-gradient` 左右两端用足够长的纯灰段，中央 50% 是亮蓝；`background-size: 250%` 加上 `background-position` 在 `100%` 与 `0%` 之间循环，保证起始 / 结束帧文字看到的都是纯灰区间。
+- 文本始终可读：底层使用 `text-text-muted` / `--act-color-text-muted`，任意时刻、任意快慢的工具都能立即看清文字。
+- 品牌高光使用 `--act-color-brand` 作为**叠加**效果从右向左扫过文本一次为一轮，不允许出现「文字消失」的瞬间。
+- 实现方式：running 文本使用 `.tool-log-text-running`。真实文本保留为主题色；`::after` 通过 `content: attr(data-shimmer-text)` 复制同一段文字，再用 `background-clip: text` 裁出扫光层。动画背景必须限制在 inline 文本盒子内，不允许占满整条工具行。
+- 颜色必须走主题 token，禁止在 running shimmer 中写死 `#hex` 作为基础色或高光色。
 - 完成态文字色直接回到默认 muted 灰，无切换动画。
 
 ### 时序
@@ -241,21 +242,26 @@ Context Compaction 展示上下文压缩生命周期。它可能由用户在 Com
 ### 结构
 
 - pending：显示轻量 `/compact` 命令行，不生成普通用户消息。
-- running：显示单层执行块，包含 `Compacting context`、当前阶段和阶段式进度条。
-- completed：收束为短结果行 `Context compacted`，可附加 `N messages removed`。
-- skipped：收束为短结果行 `Nothing to compact`。
-- failed：收束为短错误行，展示失败原因。
+- running：显示为消息流中的独立系统执行段，不使用外围方框、图标或 spinner。上方是一段稳定文字，例如 `Compacting context · Summarizing older messages`；下方是一条细进度条。
+- completed：显示为独立 timeline divider，推荐文案 `Context compacted · 29 messages`。divider 左右细线铺开，居中文案，不使用图标、卡片或 pill。
+- skipped：显示为独立 timeline divider，推荐文案 `Nothing to compact`。
+- failed：显示为独立系统结果行或 divider，展示失败原因；不贴进上一条 assistant 回复。
 
 ### 交互
 
 - 本轮不提供展开详情。
 - `/compact` exact command 由 renderer 在发送前分流到 `context:compact` IPC，不进入 `RunTurnInput.userInput`，也不写入 LLM conversation。
 - running 进度条只表达阶段进度；后端没有真实百分比时使用 indeterminate 样式，不伪造精确百分比。
+- running 文本不做 opacity pulse、扫光或省略号动画；动态只交给进度条，避免在阅读流里产生重复闪动。
 
 ### 视觉原则
 
 - pending / completed / skipped / failed 都保持轻量系统消息，不打断对话阅读节奏。
-- running 使用主题感知单层执行块，颜色只消费语义 token / 语义 Tailwind 类。
+- Context Compaction 是工作流的一部分，但不是工具日志，也不是 assistant 正文；它必须作为独立 timeline item 占据消息流位置，不能贴到上一条模型回复里。
+- running 的进度条宽度与中间内容列 / Composer 输入框宽度对齐，允许铺满；高度保持克制，建议 2-3px。
+- completed divider 使用普通主题色文字 + 细线，视觉重量低于用户消息卡片，高于普通工具日志行，确保用户能感知这里发生了上下文边界事件。
+- 所有状态都不使用图标。当前方向明确去掉 `CheckCircle`、`Loader`、`CircleDashed` 等图标语言，让状态由文案、位置和进度条表达。
+- 颜色只消费语义 token / 语义 Tailwind 类。
 - `prefers-reduced-motion` 下仍能通过文案和状态理解执行过程，不依赖动画。
 
 ## 顺序原则

@@ -312,7 +312,8 @@ describe("App streaming user message", () => {
     ];
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     const runTurn = vi.fn();
-    const compactContext = vi.fn(async (input: CompactContextInput) => {
+    let resolveCompactContext: (() => void) | null = null;
+    const compactContext = vi.fn((input: CompactContextInput) => new Promise<Awaited<ReturnType<NonNullable<typeof window.actspace>["compactContext"]>>>((resolve) => {
       streamHandler?.({
         type: "context_compaction_started",
         sessionId: input.sessionId,
@@ -326,24 +327,23 @@ describe("App streaming user message", () => {
         turnId: input.turnId,
         trigger: "manual",
         stage: "completed",
-        status: "skipped",
-        summary: "Nothing to compact",
+        status: "compacted",
         payload: {
           triggerTokens: 20,
           thresholdTokens: 1000,
-          beforeCount: 1,
+          beforeCount: 6,
           afterCount: 1,
-          summaryChars: 0,
+          summaryChars: 240,
           historyRefPath: "/tmp/session.jsonl",
           trigger: "manual",
-          status: "skipped",
-          removedCount: 0,
+          status: "compacted",
+          removedCount: 5,
         },
       });
-      return {
+      resolveCompactContext = () => resolve({
         sessionId: input.sessionId,
         turnId: input.turnId,
-        status: "skipped" as const,
+        status: "compacted" as const,
         events: [],
         contextSnapshot: {
           totalTokens: 20,
@@ -352,8 +352,8 @@ describe("App streaming user message", () => {
           buckets: [],
         },
         contextState: null,
-      };
-    });
+      });
+    }));
 
     window.actspace = {
       getBootstrapState: async () => bootstrapState,
@@ -395,7 +395,12 @@ describe("App streaming user message", () => {
     await waitFor(() => {
       expect(compactContext).toHaveBeenCalledTimes(1);
     });
+    expect(await screen.findByRole("separator", { name: "Context compacted · 5 messages" })).toBeInTheDocument();
     expect(runTurn).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveCompactContext?.();
+    });
   });
 
   it("renders read tool arguments as soon as tool_started arrives", async () => {
@@ -1427,11 +1432,15 @@ describe("App streaming user message", () => {
           scope: "*.ts",
           displayText: "Grep ToolUiPreview in *.ts",
           createdAt: new Date().toISOString(),
+          status: "running",
         }}
       />,
     );
 
-    expect(screen.getByText("Grep ToolUiPreview in *.ts")).toBeTruthy();
+    const runningGrepLine = screen.getByText("Grep ToolUiPreview in *.ts");
+    expect(runningGrepLine).toBeTruthy();
+    expect(runningGrepLine.classList.contains("tool-log-text-running")).toBe(true);
+    expect(runningGrepLine).toHaveAttribute("data-shimmer-text", "Grep ToolUiPreview in *.ts");
     expect(screen.queryByRole("tooltip")).toBeNull();
 
     Object.defineProperty(HTMLElement.prototype, "scrollWidth", {

@@ -1,5 +1,8 @@
 # Session Hover Card 执行计划
 
+状态：已完成  
+完成时间：2026-06-04 00:33 CST
+
 ## 目标
 
 在左侧会话列表中，为每条会话增加一个 hover/focus 信息卡片，帮助用户快速确认当前会话归属的完整 workspace 路径、最近使用模型和 context 使用情况。第一版只做只读展示，不加入路径操作、模型切换或 workspace 管理功能。
@@ -196,14 +199,34 @@ export type SessionPreview = {
 
 - [x] 2026-06-03：确认用户诉求：会话 hover 卡片显示完整路径、模型、context，不显示截图第一行 repo/branch 信息。
 - [x] 2026-06-03：确认当前问题背景：同名 `actspace-agent` workspace 对应不同绝对路径，UI 需要让用户可辨识。
-- [ ] 完成数据来源确认和 preview 契约。
-- [ ] 完成 hover card 组件。
-- [ ] 完成 Sidebar 接入。
-- [ ] 完成单测、类型检查和真实窗口验收。
-- [ ] 完成文档/history 收尾。
+- [x] 2026-06-04：完成数据来源确认和 `session:get-preview` 契约；非当前会话按需读取 `meta.json`、`context-state.json` 与 `session.jsonl` 摘要，renderer 按 `sessionId` 缓存。
+- [x] 2026-06-04：完成 `SessionHoverCard`，显示标题、完整 workspace path、模型 label、context 百分比与 token 比例，并使用主题 token。
+- [x] 2026-06-04：完成 Sidebar / WorkbenchLayout / App 接入；hover 与 focus 均可打开，右键菜单和 rename 状态会关闭卡片。
+- [x] 2026-06-04：完成单测、类型检查、build、颜色扫描和 Electron renderer smoke 验收。
+- [x] 2026-06-04：完成左侧会话栏设计文档、history、learning 和 plan 归档收尾。
+
+## 完成验证
+
+- `pnpm --filter @actspace/desktop exec vitest run src/renderer/test/sidebar.test.tsx`
+  - 30 tests passed.
+- `pnpm --filter @actspace/desktop exec vitest run src/main/test/session-preview-service.test.ts`
+  - 4 tests passed.
+- `pnpm --filter @actspace/desktop typecheck`
+- `pnpm --filter @actspace/desktop build`
+- `git diff --check`
+- 主题颜色扫描：
+  - `rg -n "text-black|bg-black|bg-white|text-\[#|bg-\[#|border-\[#|rgba\(|#[0-9A-Fa-f]{3,8}" packages/desktop/src/renderer/components/Sidebar.tsx packages/desktop/src/renderer/components/WorkbenchLayout.tsx packages/desktop/src/renderer/App.tsx packages/desktop/src/main/session-preview-service.ts packages/shared/src/ipc.ts docs/design-docs/front-左侧会话栏规范.md`
+  - 无命中。
+- Electron renderer smoke：
+  - 使用当前工作区 renderer `http://127.0.0.1:5174/`。
+  - 验证浅色和深色主题下 `.session-hover-card` 均可显示，宽度为 420px，未越出 1280px viewport，路径 `overflow-wrap:anywhere`，context 进度条宽度与 snapshot 百分比一致。
+  - 这次 smoke 曾抓到隐藏 Electron 窗口里 focus 不打开卡片的问题，最终通过显式受控 `open` 和 trigger `onFocus` 修复。
 
 ## 决策记录
 
 - 2026-06-03：第一版 hover card 只做只读摘要，不放路径操作、模型切换或 workspace 管理。原因是这个入口的主要目标是辨识会话上下文，操作能力会扩大交互复杂度。
 - 2026-06-03：不显示 repo / branch 行。原因是用户明确要求“第一不要”，并且当前待解决问题是 workspace path、模型和 context 信息不足。
 - 2026-06-03：完整路径不做中段省略。原因是同名 workspace 的关键差异通常在父级路径或 worktree 前缀，省略会重新制造歧义。
+- 2026-06-04：非当前会话 preview 使用独立 `session:get-preview` IPC，而不是扩展 `listSessions()`。原因是列表刷新不应读取所有完整 session 事件，hover 后按需拉取再缓存更符合左栏性能边界。
+- 2026-06-04：main 侧 preview service 不复用完整 `readSessionRecord()` 派生消息块，而是只读 `meta/context-state/jsonl` 摘要，并拒绝带路径分隔符的 unsafe `sessionId`。原因是 hover preview 只需要摘要，不应扩大恢复链路负担。
+- 2026-06-04：hover card 使用受控 Radix Tooltip open 状态。原因是异步 preview、focus 可访问性、右键菜单和 rename 互斥都需要业务状态显式参与，而不是只依赖 tooltip 内部 hover 状态。

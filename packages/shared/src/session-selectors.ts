@@ -263,10 +263,9 @@ function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
     ? "Nothing to compact"
     : status === "failed"
       ? "Context compaction failed"
-      : "Context compacted";
-  const reductionLabel = status === "compacted" && removedCount > 0
-    ? `${removedCount} messages removed`
-    : undefined;
+      : removedCount > 0
+        ? `Context compacted · ${removedCount} ${removedCount === 1 ? "message" : "messages"}`
+        : "Context compacted";
 
   return [
     {
@@ -275,7 +274,6 @@ function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
       status: status === "compacted" ? "completed" : status,
       trigger,
       summaryText,
-      reductionLabel,
       createdAt: getDisplayTime(event.timestamp),
     }
   ];

@@ -102,6 +102,9 @@ describe("AgentRunBlock", () => {
     );
 
     expect(screen.getByText("Running")).toBeInTheDocument();
-    expect(screen.getByText("Read ConversationView.tsx")).toBeInTheDocument();
+    const runningSummary = screen.getByText("Read ConversationView.tsx");
+    expect(runningSummary).toBeInTheDocument();
+    expect(runningSummary).toHaveClass("tool-log-text-running");
+    expect(runningSummary).toHaveAttribute("data-shimmer-text", "Read ConversationView.tsx");
   });
 });

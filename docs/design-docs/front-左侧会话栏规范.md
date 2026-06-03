@@ -126,6 +126,25 @@
   - 输入框保持 13px / 500，与会话标题同密度，不把行撑成卡片。
 - 菜单里的 **Archive** 遵守行尾 Archive 同一限制：当前 active session 禁用归档。
 
+### Hover 信息卡
+
+- 鼠标 hover 或键盘 focus 到会话主按钮时，显示轻量信息卡，帮助用户确认这条会话属于哪个工作区以及用了什么上下文。
+- 信息卡只做只读摘要，不放复制路径、打开 Finder、切换 workspace、模型切换等操作。
+- 内容顺序：
+  - 会话标题。
+  - 完整 `workspaceRoot` 绝对路径；不做 `~/...` 或中段省略，长路径在卡片内换行。
+  - 最近模型 label。优先使用 `modelId` 映射 `MODEL_REGISTRY` 的用户可读名；没有 `modelId` 时用 provider 返回的 `model` 字符串。
+  - Context 摘要：`Context <percent>%` 和 `<used tokens> / <max tokens>`，附一条细进度条。
+- 不显示 repo / branch 行。当前问题是区分同名 workspace 与会话上下文，repo/branch 信息会让小卡片变重。
+- 数据来源：
+  - 当前会话优先复用 renderer 已有的 `SessionRecord`、`contextSnapshot`、`contextState`。
+  - 非当前会话通过 `session:get-preview` 按需读取摘要，renderer 按 `sessionId` 缓存，避免 `listSessions()` 读取所有 `session.jsonl`。
+  - 旧会话缺 `workspaceRoot` 时回退 workspace registry default path。
+- 视觉：
+  - 浮层使用 `bg-surface-raised` / `border-line` / `shadow-act-popover` / `text-text-*` 等主题 token。
+  - 路径使用小号等宽文本，`overflow-wrap:anywhere`，不能撑破主布局。
+  - 卡片宽度约 420px，并依赖 Radix collision 逻辑在窗口边界处调整位置。
+
 ## Settings 切换规则
 
 - 底部 `Settings` 是页面级入口，不是弹窗入口。
@@ -182,6 +201,7 @@
 - 切换 pin 走 `pinSession({ sessionId, pinned })`，主进程调用 `setSessionPinned` 重写 meta。
 - 重命名走 `renameSession({ sessionId, title })`，主进程调用 `setSessionTitle` 重写既有 `SessionMeta.title`。
 - 切换 archive 走 `archiveSession({ sessionId, archived })`，主进程调用 `setSessionArchived` 重写 meta；普通 `listSessions()` 默认只返回未归档会话，设置页通过 `listSessions({ archived: true })` 读取归档列表。
+- 会话 hover 信息卡的非当前会话摘要走 `getSessionPreview({ sessionId })` / `session:get-preview`，只返回 `workspaceId`、`workspaceRoot`、最近模型和 context snapshot，不返回完整事件流或消息内容。
 
 ## 设计原则
 

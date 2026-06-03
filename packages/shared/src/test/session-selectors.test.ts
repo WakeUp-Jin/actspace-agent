@@ -132,8 +132,7 @@ describe("session selectors", () => {
         kind: "context_compaction",
         status: "completed",
         trigger: "auto",
-        summaryText: "Context compacted",
-        reductionLabel: "6 messages removed",
+        summaryText: "Context compacted · 6 messages",
       }),
     ]);
   });

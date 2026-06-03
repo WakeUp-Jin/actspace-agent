@@ -5,7 +5,7 @@ import { LabPage } from "./LabPage";
 import { RightPanel } from "./RightPanel";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { RightPanelObjectMenu } from "./right-panel/RightPanelObjectMenu";
-import { Sidebar, type NewSessionInput, type SessionUiStatusKind, type SidebarMode, type SidebarView } from "./Sidebar";
+import { Sidebar, type NewSessionInput, type SessionPreviewResolver, type SessionUiStatusKind, type SidebarMode, type SidebarView } from "./Sidebar";
 import { SplitView } from "./SplitView";
 import { UsageStatisticsPage } from "./UsageStatisticsPage";
 import { WindowChromeBar } from "./WindowChromeBar";
@@ -98,6 +98,7 @@ export function WorkbenchLayout({
   workspaceOptions,
   selectedWorkspaceRoot,
   onSelectWorkspace,
+  getSessionPreview,
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
@@ -127,6 +128,7 @@ export function WorkbenchLayout({
   workspaceOptions?: ComposerWorkspaceOption[];
   selectedWorkspaceRoot?: string | null;
   onSelectWorkspace?: (workspaceRoot: string) => void;
+  getSessionPreview?: SessionPreviewResolver;
 }) {
   const [storedLayout] = useState(loadStoredLayout);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -380,6 +382,7 @@ export function WorkbenchLayout({
             view={view}
             busySessionIds={busySessionIds}
             sessionStatuses={sessionStatuses}
+            getSessionPreview={getSessionPreview}
             onToggleMode={toggleSidebarMode}
             onNewSession={onNewSession}
             onAddWorkspace={onAddWorkspace}

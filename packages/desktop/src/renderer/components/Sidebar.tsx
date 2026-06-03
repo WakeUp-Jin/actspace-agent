@@ -17,7 +17,8 @@ import {
   Sparkles,
   SquarePen,
 } from "lucide-react";
-import type { SessionListItem, WorkspaceEntry } from "@actspace/shared";
+import { MODEL_REGISTRY, resolveModelSpecByApiModel } from "@actspace/shared";
+import type { ContextUsageSnapshot, ModelId, SessionListItem, WorkspaceEntry } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 export type SidebarMode = "expanded" | "hidden";
@@ -27,6 +28,15 @@ export type NewSessionInput = {
   workspaceRoot?: string;
 };
 export type SessionUiStatusKind = "idle" | "running" | "waiting_approval" | "failed" | "scheduled";
+export type SessionHoverPreview = {
+  sessionId: string;
+  workspaceId?: string;
+  workspaceRoot?: string;
+  model?: string;
+  modelId?: ModelId;
+  contextSnapshot?: ContextUsageSnapshot | null;
+};
+export type SessionPreviewResolver = (session: SessionListItem) => Promise<SessionHoverPreview | null> | SessionHoverPreview | null;
 type SessionStatusMeta = { label: string; detail: string; dotClass: string; rowClass: string };
 
 const DEFAULT_WORKSPACE_KEY = "__default__";
@@ -67,6 +77,31 @@ function workspaceLabelFromRoot(root: string | undefined | null): string {
 
 function workspaceKey(root: string | undefined | null): string {
   return root && root.length > 0 ? root : DEFAULT_WORKSPACE_KEY;
+}
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+function formatTokenCount(tokens: number): string {
+  return Number.isFinite(tokens) ? tokens.toLocaleString() : "0";
+}
+
+function formatContextPercent(snapshot: ContextUsageSnapshot): string {
+  if (snapshot.totalTokens > 0 && snapshot.percentUsed <= 0) return "<1";
+  return `${clampPercent(snapshot.percentUsed)}`;
+}
+
+function resolveModelLabel(preview: SessionHoverPreview | null | undefined): string | null {
+  if (!preview) return null;
+  if (preview.modelId && preview.modelId in MODEL_REGISTRY) {
+    return MODEL_REGISTRY[preview.modelId].label;
+  }
+  if (preview.model) {
+    return resolveModelSpecByApiModel(preview.model)?.label ?? preview.model;
+  }
+  return null;
 }
 
 function clampContextMenuPosition(position: { x: number; y: number }): { x: number; y: number } {
@@ -235,6 +270,18 @@ const SESSION_CONTEXT_MENU_ITEM_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} flex h-8 w-full items-center gap-2 rounded-act-sm px-2 text-left text-text-main transition-[background,color] duration-[120ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] disabled:cursor-not-allowed disabled:text-text-faint disabled:hover:bg-transparent`;
 const SESSION_CONTEXT_MENU_ICON_CLASS = "h-4 w-4 text-text-muted";
 const SESSION_CONTEXT_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
+const SESSION_HOVER_CONTENT_CLASS = "!max-w-[420px] !p-0 !font-normal !leading-normal";
+const SESSION_HOVER_CARD_CLASS =
+  "session-hover-card w-[min(420px,calc(100vw-32px))] rounded-act-md border border-line bg-surface-raised px-3 py-2.5 text-left text-text-main shadow-act-popover";
+const SESSION_HOVER_TITLE_CLASS = "line-clamp-2 text-[13px] font-semibold leading-snug text-text-main";
+const SESSION_HOVER_ROWS_CLASS = "mt-2 grid gap-1.5";
+const SESSION_HOVER_ROW_CLASS = "grid grid-cols-[16px_minmax(0,1fr)] gap-2 text-[12px] leading-[1.4] text-text-muted";
+const SESSION_HOVER_ICON_CLASS = "mt-[1px] h-3.5 w-3.5 text-text-faint";
+const SESSION_HOVER_PATH_CLASS = "break-all font-mono text-[11px] leading-[1.45] text-text-muted [overflow-wrap:anywhere]";
+const SESSION_HOVER_CONTEXT_META_CLASS = "flex min-w-0 items-center justify-between gap-3";
+const SESSION_HOVER_CONTEXT_TRACK_CLASS = "mt-1.5 h-1 overflow-hidden rounded-full bg-[var(--act-color-border-strong)]";
+const SESSION_HOVER_CONTEXT_BAR_CLASS = "h-full rounded-full bg-brand";
+const SESSION_HOVER_LOADING_CLASS = "mt-2 text-[11px] text-text-faint";
 const SESSION_STATUS_DOT_CLASS =
   "session-status-dot h-1.5 w-1.5 rounded-full bg-brand transition-opacity duration-[130ms] ease-in-out";
 const SESSION_STATUS_DOT_MUTED_CLASS = "is-muted bg-text-faint opacity-55";
@@ -304,11 +351,71 @@ type SessionRowProps = {
   session: SessionListItem;
   isActive: boolean;
   status: unknown;
+  getSessionPreview?: SessionPreviewResolver;
   onSelect: () => void;
   onTogglePin?: () => void;
   onRename?: (title: string) => void;
   onArchive?: () => void;
 };
+
+function SessionHoverCard({
+  session,
+  title,
+  preview,
+  loading,
+}: {
+  session: SessionListItem;
+  title: string;
+  preview: SessionHoverPreview | null;
+  loading: boolean;
+}) {
+  const workspaceRoot = preview?.workspaceRoot ?? session.workspaceRoot;
+  const modelLabel = resolveModelLabel(preview);
+  const snapshot = preview?.contextSnapshot ?? null;
+  const hasDetails = Boolean(workspaceRoot || modelLabel || snapshot);
+
+  return (
+    <div className={SESSION_HOVER_CARD_CLASS}>
+      <div className={SESSION_HOVER_TITLE_CLASS}>{title}</div>
+      {hasDetails ? (
+        <div className={SESSION_HOVER_ROWS_CLASS}>
+          {workspaceRoot ? (
+            <div className={SESSION_HOVER_ROW_CLASS}>
+              <Folder size={14} strokeWidth={1.8} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
+              <span className={SESSION_HOVER_PATH_CLASS}>{workspaceRoot}</span>
+            </div>
+          ) : null}
+          {modelLabel ? (
+            <div className={SESSION_HOVER_ROW_CLASS}>
+              <Sparkles size={14} strokeWidth={1.8} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
+              <span className="min-w-0 text-text-muted">{modelLabel}</span>
+            </div>
+          ) : null}
+          {snapshot ? (
+            <div className={SESSION_HOVER_ROW_CLASS}>
+              <BarChart3 size={14} strokeWidth={1.8} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
+              <div className="min-w-0">
+                <div className={SESSION_HOVER_CONTEXT_META_CLASS}>
+                  <span>Context {formatContextPercent(snapshot)}%</span>
+                  <span className="whitespace-nowrap font-medium text-text-main">
+                    {formatTokenCount(snapshot.totalTokens)} / {formatTokenCount(snapshot.maxTokens)}
+                  </span>
+                </div>
+                <div className={SESSION_HOVER_CONTEXT_TRACK_CLASS} aria-hidden="true">
+                  <div
+                    className={SESSION_HOVER_CONTEXT_BAR_CLASS}
+                    style={{ width: `${clampPercent(snapshot.percentUsed)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {loading ? <div className={SESSION_HOVER_LOADING_CLASS}>Loading session details...</div> : null}
+    </div>
+  );
+}
 
 function SessionStatusButton({ status }: { status: unknown }) {
   const [open, setOpen] = useState(false);
@@ -363,7 +470,16 @@ function SessionStatusButton({ status }: { status: unknown }) {
   );
 }
 
-function SessionRow({ session, isActive, status, onSelect, onTogglePin, onRename, onArchive }: SessionRowProps) {
+function SessionRow({
+  session,
+  isActive,
+  status,
+  getSessionPreview,
+  onSelect,
+  onTogglePin,
+  onRename,
+  onArchive,
+}: SessionRowProps) {
   const displayTitle = formatSessionTitle(session.title);
   const resolvedStatus = resolveSessionStatus(status);
   const statusMeta = SESSION_STATUS_META[resolvedStatus];
@@ -372,9 +488,14 @@ function SessionRow({ session, isActive, status, onSelect, onTogglePin, onRename
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftTitle, setDraftTitle] = useState(displayTitle);
+  const [hoverPreview, setHoverPreview] = useState<SessionHoverPreview | null>(null);
+  const [hoverPreviewLoading, setHoverPreviewLoading] = useState(false);
+  const [hoverCardOpen, setHoverCardOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const skipNextBlurCommitRef = useRef(false);
+  const hoverPreviewLoadedRef = useRef(false);
+  const hoverPreviewLoadingRef = useRef(false);
   const dotClass = isActive && resolvedStatus === "idle"
     ? `${SESSION_STATUS_DOT_CLASS} ${SESSION_STATUS_DOT_ACTIVE_CLASS}`
     : `${SESSION_STATUS_DOT_CLASS} ${statusMeta.dotClass}`;
@@ -391,6 +512,20 @@ function SessionRow({ session, isActive, status, onSelect, onTogglePin, onRename
       setDraftTitle(displayTitle);
     }
   }, [displayTitle, isRenaming]);
+
+  useEffect(() => {
+    setHoverPreview(null);
+    setHoverPreviewLoading(false);
+    setHoverCardOpen(false);
+    hoverPreviewLoadedRef.current = false;
+    hoverPreviewLoadingRef.current = false;
+  }, [session.id]);
+
+  useEffect(() => {
+    if (isRenaming || menuPosition) {
+      setHoverCardOpen(false);
+    }
+  }, [isRenaming, menuPosition]);
 
   useEffect(() => {
     if (!menuPosition) return;
@@ -424,6 +559,7 @@ function SessionRow({ session, isActive, status, onSelect, onTogglePin, onRename
     if (!onRename) return;
     skipNextBlurCommitRef.current = false;
     setDraftTitle(displayTitle);
+    setHoverCardOpen(false);
     setIsRenaming(true);
     setMenuPosition(null);
   };
@@ -462,7 +598,41 @@ function SessionRow({ session, isActive, status, onSelect, onTogglePin, onRename
   const handleContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    setHoverCardOpen(false);
     setMenuPosition(clampContextMenuPosition({ x: event.clientX, y: event.clientY }));
+  };
+
+  const loadHoverPreview = async () => {
+    if (!getSessionPreview || hoverPreviewLoadedRef.current || hoverPreviewLoadingRef.current) return;
+    hoverPreviewLoadingRef.current = true;
+    setHoverPreviewLoading(true);
+    try {
+      setHoverPreview(await getSessionPreview(session));
+    } catch (error) {
+      console.error("Failed to load session preview", error);
+      setHoverPreview(null);
+    } finally {
+      hoverPreviewLoadedRef.current = true;
+      hoverPreviewLoadingRef.current = false;
+      setHoverPreviewLoading(false);
+    }
+  };
+
+  const handleHoverOpenChange = (open: boolean) => {
+    const nextOpen = open && !isRenaming && !menuPosition;
+    setHoverCardOpen(nextOpen);
+    if (!nextOpen) return;
+    void loadHoverPreview();
+  };
+
+  const handleTriggerFocus = () => {
+    if (isRenaming || menuPosition) return;
+    setHoverCardOpen(true);
+    void loadHoverPreview();
+  };
+
+  const handleTriggerBlur = () => {
+    setHoverCardOpen(false);
   };
 
   return (
@@ -512,17 +682,37 @@ function SessionRow({ session, isActive, status, onSelect, onTogglePin, onRename
           </span>
         </div>
       ) : (
-        <button
-          className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && resolvedStatus === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
-          type="button"
-          onClick={onSelect}
-          aria-current={isActive ? "page" : undefined}
-        >
-          <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>{displayTitle}</span>
-          <span className={`session-row-time ${SESSION_ROW_TIME_CLASS} ${isActive ? "opacity-0" : ""}`} aria-hidden={isActive}>
-            {formatRelativeTime(session.updatedAt)}
-          </span>
-        </button>
+        <Tooltip delayDuration={250} open={hoverCardOpen} onOpenChange={handleHoverOpenChange}>
+          <TooltipTrigger asChild>
+            <button
+              className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && resolvedStatus === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
+              type="button"
+              onClick={onSelect}
+              aria-current={isActive ? "page" : undefined}
+              onFocus={handleTriggerFocus}
+              onBlur={handleTriggerBlur}
+            >
+              <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>{displayTitle}</span>
+              <span className={`session-row-time ${SESSION_ROW_TIME_CLASS} ${isActive ? "opacity-0" : ""}`} aria-hidden={isActive}>
+                {formatRelativeTime(session.updatedAt)}
+              </span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent
+            side="right"
+            align="start"
+            sideOffset={10}
+            className={SESSION_HOVER_CONTENT_CLASS}
+            onPointerDown={(event) => event.preventDefault()}
+          >
+            <SessionHoverCard
+              session={session}
+              title={displayTitle}
+              preview={hoverPreview}
+              loading={hoverPreviewLoading}
+            />
+          </TooltipContent>
+        </Tooltip>
       )}
       <div className={`session-row-actions ${SESSION_ROW_ACTIONS_CLASS}`}>
         <SessionStatusButton status={resolvedStatus} />
@@ -607,6 +797,7 @@ type CollapsibleSessionListProps = {
   activeSessionId: string | null;
   busySessionIds: Set<string>;
   sessionStatuses?: Record<string, unknown>;
+  getSessionPreview?: SessionPreviewResolver;
   onSelectSession?: (sessionId: string) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   onRename?: (sessionId: string, title: string) => void;
@@ -619,6 +810,7 @@ function CollapsibleSessionList({
   activeSessionId,
   busySessionIds,
   sessionStatuses,
+  getSessionPreview,
   onSelectSession,
   onTogglePin,
   onRename,
@@ -637,6 +829,7 @@ function CollapsibleSessionList({
           session={session}
           isActive={session.id === activeSessionId}
           status={sessionStatuses?.[session.id] ?? (busySessionIds.has(session.id) ? "running" : "idle")}
+          getSessionPreview={getSessionPreview}
           onSelect={() => onSelectSession?.(session.id)}
           onTogglePin={onTogglePin ? () => onTogglePin(session.id, !session.pinned) : undefined}
           onRename={onRename ? (title) => onRename(session.id, title) : undefined}
@@ -671,6 +864,7 @@ export function Sidebar({
   onSelectView,
   onRename,
   onArchive,
+  getSessionPreview,
 }: {
   sessions: SessionListItem[];
   workspaces?: WorkspaceEntry[];
@@ -679,6 +873,7 @@ export function Sidebar({
   view: SidebarView;
   busySessionIds?: Set<string>;
   sessionStatuses?: Record<string, unknown>;
+  getSessionPreview?: SessionPreviewResolver;
   /** 折叠按钮回调；现由 WorkbenchLayout 通过 WindowChromeBar 调用，Sidebar 内部不直接渲染 chrome row。 */
   onToggleMode?: () => void;
   onNewSession?: (input?: NewSessionInput) => void;
@@ -776,6 +971,7 @@ export function Sidebar({
                 activeSessionId={activeSessionId}
                 busySessionIds={busyIds}
                 sessionStatuses={statuses}
+                getSessionPreview={getSessionPreview}
                 onSelectSession={handleSelectChatSession}
                 onTogglePin={onTogglePin}
                 onRename={onRename}
@@ -872,6 +1068,7 @@ export function Sidebar({
                   activeSessionId={activeSessionId}
                   busySessionIds={busyIds}
                   sessionStatuses={statuses}
+                  getSessionPreview={getSessionPreview}
                   onSelectSession={handleSelectChatSession}
                   onNewSession={handleNewAgent}
                   onTogglePin={onTogglePin}
@@ -899,6 +1096,7 @@ type WorkspaceSectionProps = {
   activeSessionId: string | null;
   busySessionIds: Set<string>;
   sessionStatuses?: Record<string, unknown>;
+  getSessionPreview?: SessionPreviewResolver;
   onSelectSession?: (sessionId: string) => void;
   onNewSession?: (input?: NewSessionInput) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
@@ -911,6 +1109,7 @@ function WorkspaceSection({
   activeSessionId,
   busySessionIds,
   sessionStatuses,
+  getSessionPreview,
   onSelectSession,
   onNewSession,
   onTogglePin,
@@ -965,6 +1164,7 @@ function WorkspaceSection({
           activeSessionId={activeSessionId}
           busySessionIds={busySessionIds}
           sessionStatuses={sessionStatuses}
+          getSessionPreview={getSessionPreview}
           onSelectSession={onSelectSession}
           onTogglePin={onTogglePin}
           onRename={onRename}

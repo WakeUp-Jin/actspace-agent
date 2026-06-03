@@ -43,6 +43,8 @@ import type {
   SessionListItem,
   SessionPinInput,
   SessionPinResult,
+  SessionPreviewInput,
+  SessionPreviewResult,
   SessionRenameInput,
   SessionRenameResult,
   SessionWorkspaceInput,
@@ -91,6 +93,8 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("context:describe", input) as Promise<ContextState | null>,
   listSessions: (input?: SessionListInput) => ipcRenderer.invoke("session:list", input ?? {}) as Promise<SessionListItem[]>,
   getSession: (input: SessionGetInput) => ipcRenderer.invoke("session:get", input) as Promise<SessionRecord | null>,
+  getSessionPreview: (input: SessionPreviewInput) =>
+    ipcRenderer.invoke("session:get-preview", input) as Promise<SessionPreviewResult | null>,
   getSubAgentTranscript: (input: SubAgentTranscriptGetInput) =>
     ipcRenderer.invoke("subagent:get-transcript", input) as Promise<SessionEvent[]>,
   getUsageStatistics: (input: UsageStatisticsGetInput) =>

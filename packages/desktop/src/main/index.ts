@@ -31,6 +31,7 @@ import type {
   SessionGetInput,
   SessionListInput,
   SessionPinInput,
+  SessionPreviewInput,
   SessionRenameInput,
   SessionWorkspaceInput,
   SubAgentTranscriptGetInput,
@@ -74,6 +75,7 @@ import { describeSessionContext } from "./context-describe-service";
 import { loadMainAgentRuntimeContext } from "./agent-runtime-context";
 import { listWorkspaceDir, readWorkspaceFile } from "./workspace-fs-service";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "./workspace-registry-service";
+import { getSessionPreview } from "./session-preview-service";
 import { LocalUpdateService } from "./local-update-service";
 import { PendingApprovalRegistry } from "./approval-registry";
 import {
@@ -906,6 +908,11 @@ async function registerIpc() {
   ipcMain.handle("session:get", async (_event, input: SessionGetInput) => {
     const roots = await ensureDataDirectories();
     return readSessionRecord(createSessionStorePaths(join(roots.sessionRoot, input.sessionId)));
+  });
+
+  ipcMain.handle("session:get-preview", async (_event, input: SessionPreviewInput) => {
+    const roots = await ensureDataDirectories();
+    return getSessionPreview(input, roots);
   });
 
   ipcMain.handle("subagent:get-transcript", async (_event, input: SubAgentTranscriptGetInput) => {

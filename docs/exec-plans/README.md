@@ -16,7 +16,6 @@
 - `active/20260527-right-panel-views.md`
 - `active/20260529-appearance-fonts-and-zoom.md`
 - `active/20260530-workspace-file-explorer.md`
-- `active/20260603-session-hover-card.md`
 - `active/actspace-cache-loss-audit-plan.md`
 - `active/frontend-ui-components-foundation.md`
 - `active/Bash工具和工具权限调度开发计划/README.md`
@@ -54,6 +53,8 @@
 - `completed/20260530-context-cache-and-usage/README.md`
 - `completed/20260530-kairos-budget-and-graceful-shutdown.md`
 - `completed/20260530-kairos-config-editor.md`
+- `completed/20260604-context-compaction-timeline-bugfix.md`
+- `completed/20260603-session-hover-card.md`
 - `completed/lab-v0-frontend-mock-implementation.md`
 - `completed/actspace-token-usage-context-control-foundation.md`
 - `completed/actspace-usage-statistics-session-jsonl-plan.md`

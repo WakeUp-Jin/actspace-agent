@@ -38,6 +38,9 @@ declare global {
       getSession: (
         input: import("@actspace/shared").SessionGetInput
       ) => Promise<import("@actspace/shared").SessionRecord | null>;
+      getSessionPreview?: (
+        input: import("@actspace/shared").SessionPreviewInput
+      ) => Promise<import("@actspace/shared").SessionPreviewResult | null>;
       getSubAgentTranscript?: (
         input: import("@actspace/shared").SubAgentTranscriptGetInput
       ) => Promise<import("@actspace/shared").SessionEvent[]>;

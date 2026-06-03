@@ -99,6 +99,55 @@ svg {
   }
 }
 
+.tool-log-text-running {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--act-color-text-muted);
+  text-overflow: ellipsis;
+  vertical-align: baseline;
+  -webkit-text-fill-color: currentColor;
+  contain: paint;
+}
+
+.tool-log-text-running::after {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  color: transparent;
+  content: attr(data-shimmer-text);
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 35%,
+      var(--act-color-brand) 50%,
+      transparent 65%,
+      transparent 100%
+    );
+  background-repeat: no-repeat;
+  background-position: 100% 0;
+  background-size: 250% 100%;
+  -webkit-text-fill-color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-overflow: inherit;
+  white-space: inherit;
+  animation: tool-log-text-shimmer 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-log-text-running::after {
+    color: var(--act-color-brand);
+    background: none;
+    animation: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
 @keyframes compact-progress {
   0% {
     transform: translateX(-110%);

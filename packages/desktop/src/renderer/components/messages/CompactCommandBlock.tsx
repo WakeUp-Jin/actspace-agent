@@ -1,24 +1,25 @@
-import { CheckCircle2, CircleDashed, Loader2, XCircle } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 
 type CompactMessage = Extract<MessageBlock, { kind: "context_compaction" }>;
 
 const BLOCK_CLASS =
-  "message-row compact-command-block max-w-[720px] px-[var(--conversation-text-inset)] animate-[rise-in_220ms_ease_both]";
-const PENDING_CLASS = "inline-flex min-w-0 items-center gap-2 text-sm text-text-faint";
+  "message-row compact-command-block w-full max-w-[720px] px-[var(--conversation-text-inset)] animate-[rise-in_220ms_ease_both]";
+const PENDING_CLASS = "text-sm font-medium text-text-faint";
 const RUNNING_CLASS =
-  "rounded-act-md border border-line bg-surface-subtle px-3.5 py-3 shadow-act-soft";
-const RESULT_CLASS =
-  "inline-flex min-w-0 items-center gap-2 rounded-act-sm border border-line bg-surface-subtle px-2.5 py-1.5 text-sm text-text-muted";
-const FAILED_CLASS =
-  "inline-flex min-w-0 items-center gap-2 rounded-act-sm border border-danger-soft bg-danger-soft px-2.5 py-1.5 text-sm text-on-danger";
-const TITLE_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-semibold";
-const META_CLASS = "shrink-0 text-xs text-text-faint";
-const PROGRESS_TRACK_CLASS = "mt-2 h-1 overflow-hidden rounded-act-pill bg-line";
+  "compact-command-running w-full py-2";
+const RUNNING_TEXT_CLASS = "flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 text-sm";
+const TITLE_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-semibold text-text-main";
+const META_CLASS = "text-text-muted";
+const PROGRESS_TRACK_CLASS = "mt-2 h-[3px] w-full overflow-hidden rounded-act-pill bg-line";
 const PROGRESS_BAR_CLASS =
   "h-full rounded-act-pill bg-brand transition-[width] duration-200 ease-out motion-reduce:transition-none";
 const INDETERMINATE_BAR_CLASS =
   "h-full w-1/2 rounded-act-pill bg-brand animate-[compact-progress_1.1s_ease-in-out_infinite] motion-reduce:animate-none";
+const DIVIDER_CLASS = "compact-command-divider flex w-full items-center gap-3 py-3 text-xs font-medium text-text-faint";
+const DIVIDER_FAILED_CLASS = "text-on-danger";
+const DIVIDER_LINE_CLASS = "h-px min-w-6 flex-1 bg-line";
+const DIVIDER_FAILED_LINE_CLASS = "bg-danger-soft";
+const DIVIDER_LABEL_CLASS = "shrink min-w-0 overflow-hidden text-ellipsis whitespace-nowrap";
 
 function getResultTitle(message: CompactMessage): string {
   if (message.status === "skipped") return "Nothing to compact";
@@ -31,14 +32,31 @@ function getResultTitle(message: CompactMessage): string {
 function getStageLabel(stage: string | undefined): string {
   switch (stage) {
     case "preparing":
-      return "Preparing";
+      return "Preparing context";
     case "summarizing":
-      return "Summarizing";
+      return "Summarizing older messages";
     case "writing":
-      return "Writing";
+      return "Writing summary";
     default:
-      return "Running";
+      return "Working";
   }
+}
+
+function renderDivider(text: string, tone: "default" | "failed" = "default") {
+  const failed = tone === "failed";
+  const lineClassName = `${DIVIDER_LINE_CLASS}${failed ? ` ${DIVIDER_FAILED_LINE_CLASS}` : ""}`;
+
+  return (
+    <div
+      className={`${DIVIDER_CLASS}${failed ? ` ${DIVIDER_FAILED_CLASS}` : ""}`}
+      role="separator"
+      aria-label={text}
+    >
+      <span className={lineClassName} aria-hidden="true" />
+      <span className={DIVIDER_LABEL_CLASS}>{text}</span>
+      <span className={lineClassName} aria-hidden="true" />
+    </div>
+  );
 }
 
 export function CompactCommandBlock({ message, className }: { message: CompactMessage; className?: string }) {
@@ -47,10 +65,7 @@ export function CompactCommandBlock({ message, className }: { message: CompactMe
   if (message.status === "pending") {
     return (
       <article className={blockClassName}>
-        <div className={PENDING_CLASS}>
-          <CircleDashed size={15} strokeWidth={2.1} aria-hidden="true" />
-          <span className={TITLE_CLASS}>/compact</span>
-        </div>
+        <div className={PENDING_CLASS}>/compact</div>
       </article>
     );
   }
@@ -63,12 +78,17 @@ export function CompactCommandBlock({ message, className }: { message: CompactMe
     return (
       <article className={blockClassName}>
         <div className={RUNNING_CLASS}>
-          <div className="flex min-w-0 items-center gap-2 text-text-main">
-            <Loader2 size={16} strokeWidth={2.2} className="shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          <div className={RUNNING_TEXT_CLASS} role="status" aria-live="polite">
             <span className={TITLE_CLASS}>{message.summaryText || "Compacting context"}</span>
+            <span className={META_CLASS} aria-hidden="true">·</span>
             <span className={META_CLASS}>{getStageLabel(message.stage)}</span>
           </div>
-          <div className={PROGRESS_TRACK_CLASS} aria-hidden="true">
+          <div
+            className={PROGRESS_TRACK_CLASS}
+            role="progressbar"
+            aria-label="Context compaction progress"
+            {...(progress === null ? {} : { "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(progress * 100) })}
+          >
             {progress === null ? (
               <div className={INDETERMINATE_BAR_CLASS} />
             ) : (
@@ -83,21 +103,14 @@ export function CompactCommandBlock({ message, className }: { message: CompactMe
   if (message.status === "failed") {
     return (
       <article className={blockClassName}>
-        <div className={FAILED_CLASS}>
-          <XCircle size={15} strokeWidth={2.1} aria-hidden="true" />
-          <span className={TITLE_CLASS}>{message.summaryText || getResultTitle(message)}</span>
-        </div>
+        {renderDivider(message.summaryText || getResultTitle(message), "failed")}
       </article>
     );
   }
 
   return (
     <article className={blockClassName}>
-      <div className={RESULT_CLASS}>
-        <CheckCircle2 size={15} strokeWidth={2.1} className="shrink-0 text-success" aria-hidden="true" />
-        <span className={TITLE_CLASS}>{message.summaryText || getResultTitle(message)}</span>
-        {message.reductionLabel ? <span className={META_CLASS}>{message.reductionLabel}</span> : null}
-      </div>
+      {renderDivider(message.summaryText || getResultTitle(message))}
     </article>
   );
 }

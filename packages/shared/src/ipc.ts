@@ -127,6 +127,19 @@ export type SessionGetInput = {
   sessionId: string;
 };
 
+export type SessionPreviewInput = {
+  sessionId: string;
+};
+
+export type SessionPreviewResult = {
+  sessionId: string;
+  workspaceId?: string;
+  workspaceRoot?: string;
+  model?: string;
+  modelId?: ModelId;
+  contextSnapshot?: import("./session").ContextUsageSnapshot | null;
+};
+
 export type SubAgentTranscriptGetInput = {
   transcriptRef: import("./session").SubAgentTranscriptRef;
 };

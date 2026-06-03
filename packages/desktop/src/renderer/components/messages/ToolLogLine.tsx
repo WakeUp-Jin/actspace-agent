@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
 import {
+  getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_CLASS,
   TOOL_LOG_LINE_ERROR_CLASS,
   TOOL_LOG_LINE_RUNNING_CLASS,
@@ -90,7 +91,7 @@ function OverflowToolLine({
       }}
       onMouseLeave={() => setIsTooltipOpen(false)}
     >
-      <span ref={textRef} className={getToolLogLineTextClass(status)}>{text}</span>
+      <span ref={textRef} {...getToolLogLineTextProps(status, text)}>{text}</span>
       {isOverflowing ? (
         <span className={`${TOOL_LOG_TOOLTIP_CLASS} ${isTooltipOpen ? "block" : "hidden"}`} role="tooltip">
           {text}
@@ -115,25 +116,29 @@ function getToolLogLineTextClass(status: ToolLogStatus) {
   return `${TOOL_LOG_LINE_TEXT_CLASS}${status === "running" ? ` ${TOOL_LOG_LINE_TEXT_RUNNING_CLASS}` : ""}`;
 }
 
+function getToolLogLineTextProps(status: ToolLogStatus, text: string) {
+  return status === "running"
+    ? { className: getToolLogLineTextClass(status), ...getToolLogRunningTextAttrs(text) }
+    : { className: getToolLogLineTextClass(status) };
+}
+
 export function ToolLogLine({ message, className }: { message: ToolLogMessage; className?: string }) {
   if (message.kind === "read") {
     const lineClassName = getToolLogLineClass(message.status, className);
+    const text = `Read ${message.filePath}${message.range ? ` ${message.range}` : ""}`;
     return (
       <div className={lineClassName}>
-        <span className={getToolLogLineTextClass(message.status)}>
-          Read {message.filePath} {message.range ?? ""}
-        </span>
+        <span {...getToolLogLineTextProps(message.status, text)}>{text}</span>
       </div>
     );
   }
 
   if (message.kind === "search") {
     const lineClassName = getToolLogLineClass(message.status, className);
+    const text = `Searched files ${message.scope ? `${message.scope} ` : ""}for ${message.query}`;
     return (
       <div className={lineClassName}>
-        <span className={getToolLogLineTextClass(message.status)}>
-          Searched files {message.scope ? `${message.scope} ` : ""}for {message.query}
-        </span>
+        <span {...getToolLogLineTextProps(message.status, text)}>{text}</span>
       </div>
     );
   }
@@ -162,7 +167,7 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
     const lineClassName = getToolLogLineClass(message.status, className);
     return (
       <div className={lineClassName}>
-        <span className={getToolLogLineTextClass(message.status)}>
+        <span {...getToolLogLineTextProps(message.status, message.displayText)}>
           {message.displayText}
         </span>
       </div>
@@ -173,7 +178,7 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
     const lineClassName = getToolLogLineClass(message.status, className);
     return (
       <div className={lineClassName}>
-        <span className={getToolLogLineTextClass(message.status)}>
+        <span {...getToolLogLineTextProps(message.status, message.displayText)}>
           {message.displayText}
         </span>
       </div>
@@ -181,11 +186,10 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
   }
 
   if (message.kind === "directory_list") {
+    const text = `Listed ${message.path}${message.entryCount !== undefined ? ` (${message.entryCount} entries)` : ""}`;
     return (
       <div className={getToolLogLineClass(message.status, className)}>
-        <span className={getToolLogLineTextClass(message.status)}>
-          Listed {message.path}{message.entryCount !== undefined ? ` (${message.entryCount} entries)` : ""}
-        </span>
+        <span {...getToolLogLineTextProps(message.status, text)}>{text}</span>
       </div>
     );
   }

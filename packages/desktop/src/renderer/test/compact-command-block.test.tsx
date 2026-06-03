@@ -21,28 +21,32 @@ describe("CompactCommandBlock", () => {
     render(<CompactCommandBlock message={makeBlock({ status: "pending", summaryText: "/compact" })} />);
 
     expect(screen.getByText("/compact")).toBeInTheDocument();
+    expect(document.querySelector("svg")).toBeNull();
   });
 
-  it("renders running stage without requiring a fake percentage", () => {
+  it("renders running stage as text and a full-width progressbar", () => {
     render(<CompactCommandBlock message={makeBlock({ status: "running", stage: "summarizing" })} />);
 
     expect(screen.getByText("Compacting context")).toBeInTheDocument();
-    expect(screen.getByText("Summarizing")).toBeInTheDocument();
+    expect(screen.getByText("Summarizing older messages")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Context compaction progress" })).toBeInTheDocument();
+    expect(document.querySelector("svg")).toBeNull();
   });
 
-  it("renders completed reduction label", () => {
+  it("renders completed state as an independent divider", () => {
     render(
       <CompactCommandBlock
         message={makeBlock({
           status: "completed",
-          summaryText: "Context compacted",
-          reductionLabel: "18 messages removed",
+          summaryText: "Context compacted · 18 messages",
         })}
       />,
     );
 
-    expect(screen.getByText("Context compacted")).toBeInTheDocument();
-    expect(screen.getByText("18 messages removed")).toBeInTheDocument();
+    expect(screen.getByRole("separator", { name: "Context compacted · 18 messages" })).toBeInTheDocument();
+    expect(screen.getByText("Context compacted · 18 messages")).toBeInTheDocument();
+    expect(screen.queryByText("18 messages removed")).not.toBeInTheDocument();
+    expect(document.querySelector("svg")).toBeNull();
   });
 
   it("renders skipped and failed states", () => {

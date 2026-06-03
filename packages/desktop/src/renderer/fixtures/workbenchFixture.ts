@@ -334,8 +334,7 @@ export const mockMessages: MessageBlock[] = [
     id: "mock-compact-completed",
     status: "completed",
     trigger: "manual",
-    summaryText: "Context compacted",
-    reductionLabel: "18 messages removed",
+    summaryText: "Context compacted · 18 messages",
     createdAt: now
   },
   {
