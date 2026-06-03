@@ -160,21 +160,6 @@ const SECONDARY_COMMAND_ITEMS: CommandMenuItem[] = [
 ];
 
 const DEFAULT_MODEL_SPEC = MODEL_REGISTRY[DEFAULT_MODEL_ID];
-const MOCK_ATTACHMENTS: ComposerAttachment[] = [
-  {
-    id: "mock-image-attachment",
-    kind: "image",
-    name: "mock-screenshot.png",
-    mimeType: "image/png",
-  },
-  {
-    id: "mock-file-attachment",
-    kind: "file",
-    name: "README.md",
-    path: "/mock/README.md",
-    mimeType: "text/markdown",
-  },
-];
 
 function isModelEditable(_modelId: ModelId): boolean {
   return true;
@@ -253,7 +238,6 @@ export function Composer({
   onAbort,
   surface = "followup",
   inputLayout,
-  showDemoAttachments = false,
   defaultModelId,
   onExpandContext,
   workspaceOptions = [],
@@ -267,7 +251,6 @@ export function Composer({
   onAbort?: () => void;
   surface?: ComposerSurface;
   inputLayout?: ComposerInputLayout;
-  showDemoAttachments?: boolean;
   /** 来自设置页的默认模型；首次到达时同步选中，用户手动选过后不再覆盖。 */
   defaultModelId?: ModelId;
   /** 提供时 Context 弹窗显示「展开完整视图」按钮，点击在右侧面板打开 Context Tab。 */
@@ -290,9 +273,7 @@ export function Composer({
   );
   const userPickedModelRef = useRef(false);
   const [contextOpen, setContextOpen] = useState(false);
-  const [attachments, setAttachments] = useState<ComposerAttachment[]>(
-    showDemoAttachments ? MOCK_ATTACHMENTS : [],
-  );
+  const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const [message, setMessage] = useState("");
   const composerRef = useRef<HTMLElement | null>(null);
@@ -304,7 +285,7 @@ export function Composer({
   const hasAttachments = attachments.length > 0;
   const canSendMessage = Boolean(message.trim() || attachments.length > 0);
   const editingModelSpec = MODEL_LIST.find((spec) => spec.id === editingModelId);
-  const contextUsagePercent = contextSnapshot?.percentUsed ?? 77;
+  const contextUsagePercent = contextSnapshot?.percentUsed ?? 0;
   const contextRingPercent = Math.max(0, Math.min(100, contextUsagePercent));
   // 有内容但占比不足 1% 时显示「<1」，避免「明明有数据却是 0%」的误解。
   const contextPercentLabel =
@@ -318,10 +299,6 @@ export function Composer({
     workspaceOptions.find((workspace) => workspace.value === selectedWorkspaceRoot)?.label ??
     workspaceOptions[0]?.label ??
     "Workspace";
-
-  useEffect(() => {
-    setAttachments(showDemoAttachments ? MOCK_ATTACHMENTS : []);
-  }, [showDemoAttachments]);
 
   // 默认模型可能在 Composer 挂载后才异步到达（settings:get）；只在用户尚未手动
   // 选择过模型时同步，避免覆盖用户当前会话里的临时选择。
@@ -362,7 +339,7 @@ export function Composer({
       return;
     }
 
-    appendAttachments(MOCK_ATTACHMENTS);
+    console.warn("File attachment picker is only available in the desktop app.");
   }
 
   function sendCurrentMessage() {

@@ -413,7 +413,6 @@ export function ConversationView({
   onSend,
   onAbort,
   isSessionReady = true,
-  showDemoAttachments = false,
   defaultModelId,
   workspaceOptions,
   selectedWorkspaceRoot,
@@ -428,7 +427,6 @@ export function ConversationView({
   onSend?: (text: string, options: ComposerSendOptions) => void;
   onAbort?: () => void;
   isSessionReady?: boolean;
-  showDemoAttachments?: boolean;
   defaultModelId?: ModelId;
   workspaceOptions?: ComposerWorkspaceOption[];
   selectedWorkspaceRoot?: string | null;
@@ -460,7 +458,6 @@ export function ConversationView({
               onSend={onSend}
               onAbort={onAbort}
               surface="initial"
-              showDemoAttachments={showDemoAttachments}
               defaultModelId={defaultModelId}
               onExpandContext={openContextTab}
               workspaceOptions={workspaceOptions}
@@ -504,7 +501,6 @@ export function ConversationView({
             onSend={onSend}
             onAbort={onAbort}
             surface="followup"
-            showDemoAttachments={showDemoAttachments}
             defaultModelId={defaultModelId}
             onExpandContext={openContextTab}
             workspaceOptions={workspaceOptions}

@@ -42,7 +42,6 @@ import {
   type ThemeMode,
   type UiFontId,
 } from "../../appearance/types";
-import { mockArchivedSessions } from "../../fixtures/workbenchFixture";
 
 const BTN_PRIMARY =
   "inline-flex h-8 items-center rounded-act-md bg-brand px-3.5 text-[13px] font-semibold text-white transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60";
@@ -51,25 +50,6 @@ const BTN_SECONDARY =
 const BTN_DANGER =
   "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-on-danger transition hover:border-on-danger/40 hover:bg-danger-soft";
 const AGENT_SYSTEM_PROMPT_MAX_CHARS = 20_000;
-
-const MOCK_SETTINGS: AppSettings = {
-  version: 1,
-  defaultModelId: null,
-  providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: false } },
-  agent: {
-    systemPromptPath: "/mock/prompts/main-agent.md",
-    temperature: null,
-    maxTokens: null,
-    disabledTools: [],
-    bashAlwaysAsk: false,
-  },
-  kairos: { modelId: null, thinking: "auto" },
-};
-
-const MOCK_PROMPT_FILE: AgentSystemPromptFile = {
-  path: "/mock/prompts/main-agent.md",
-  content: "",
-};
 
 const MODEL_OPTIONS: SelectOption[] = MODEL_LIST.map((spec) => ({ value: spec.id, label: spec.label }));
 
@@ -129,19 +109,23 @@ export function SettingsPage({
 }) {
   const [section, setSection] = useState<SettingsSectionId>("general");
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const [keyModalProvider, setKeyModalProvider] = useState<ProviderId | null>(null);
 
   useEffect(() => {
     if (!hasSettingsBridge()) {
-      setSettings(MOCK_SETTINGS);
+      setSettingsError("设置仅在桌面端可用。");
       return;
     }
     window.actspace
       .getSettings()
-      .then(setSettings)
+      .then((next) => {
+        setSettings(next);
+        setSettingsError(null);
+      })
       .catch((error: unknown) => {
         console.error("Failed to load settings", error);
-        setSettings(MOCK_SETTINGS);
+        setSettingsError("读取设置失败。");
       });
   }, []);
 
@@ -235,6 +219,10 @@ export function SettingsPage({
               onTestProvider={handleTestConnection}
               onArchivedSessionsChange={onArchivedSessionsChange}
             />
+          ) : settingsError ? (
+            <div className="flex h-full items-center justify-center px-6 text-center text-[13px] text-text-faint">
+              {settingsError}
+            </div>
           ) : (
             <div className="flex h-full items-center justify-center text-[13px] text-text-faint">加载设置中…</div>
           )}
@@ -538,20 +526,27 @@ function ModelSection({ settings, onUpdate, onConnectProvider, onClearProvider, 
 }
 
 function AgentSection({ settings, onUpdate }: SectionProps) {
-  const [promptFile, setPromptFile] = useState<AgentSystemPromptFile>(MOCK_PROMPT_FILE);
-  const [draftPrompt, setDraftPrompt] = useState(MOCK_PROMPT_FILE.content);
+  const [promptFile, setPromptFile] = useState<AgentSystemPromptFile | null>(null);
+  const [draftPrompt, setDraftPrompt] = useState("");
   const [saved, setSaved] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
+  const promptBridgeReady = hasPromptFileBridge();
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadPrompt() {
       setPromptError(null);
+      if (!promptBridgeReady) {
+        setPromptFile(null);
+        setDraftPrompt("");
+        setSaved(false);
+        setPromptError("系统提示词文件接口不可用。");
+        return;
+      }
+
       try {
-        const next = hasPromptFileBridge()
-          ? await window.actspace.readAgentSystemPrompt()
-          : { path: settings.agent.systemPromptPath, content: "" };
+        const next = await window.actspace.readAgentSystemPrompt();
         if (cancelled) return;
         setPromptFile(next);
         setDraftPrompt(next.content);
@@ -559,7 +554,7 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
       } catch (error) {
         if (cancelled) return;
         console.error("Failed to load agent system prompt", error);
-        setPromptFile({ path: settings.agent.systemPromptPath, content: "" });
+        setPromptFile(null);
         setDraftPrompt("");
         setPromptError("读取系统提示词文件失败。");
       }
@@ -569,15 +564,13 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
     return () => {
       cancelled = true;
     };
-  }, [settings.agent.systemPromptPath]);
+  }, [promptBridgeReady]);
 
-  const dirty = draftPrompt !== promptFile.content;
+  const dirty = Boolean(promptFile && draftPrompt !== promptFile.content);
   const charCount = draftPrompt.length;
   const savePrompt = async () => {
-    if (!hasPromptFileBridge()) {
-      setPromptFile({ ...promptFile, content: draftPrompt });
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 1800);
+    if (!promptBridgeReady || !promptFile) {
+      setPromptError("系统提示词文件接口不可用。");
       return;
     }
     setPromptError(null);
@@ -600,7 +593,9 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
           <label htmlFor="agent-system-prompt" className="text-[14px] font-semibold text-text-main">
             自定义系统提示词
           </label>
-          <div className="break-all text-[12px] text-text-faint">{promptFile.path}</div>
+          <div className="break-all text-[12px] text-text-faint">
+            {promptFile?.path ?? settings.agent.systemPromptPath}
+          </div>
           <textarea
             id="agent-system-prompt"
             value={draftPrompt}
@@ -612,6 +607,7 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
             className="h-[132px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle focus:border-brand"
             spellCheck={false}
             aria-label="主 Agent 自定义系统提示词"
+            disabled={!promptBridgeReady || !promptFile}
           />
           <div className="flex items-center justify-between gap-3">
             <div className="text-[12px] text-text-faint">
@@ -624,7 +620,7 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
                 type="button"
                 className={BTN_SECONDARY}
                 onClick={() => {
-                  setDraftPrompt(promptFile.content);
+                  setDraftPrompt(promptFile?.content ?? "");
                   setSaved(false);
                   setPromptError(null);
                 }}
@@ -700,7 +696,7 @@ function ArchivedChatsSection({
     setLoading(true);
     setError(null);
     if (!bridgeReady) {
-      setSessions(mockArchivedSessions);
+      setSessions([]);
       setLoading(false);
       return;
     }
@@ -724,7 +720,7 @@ function ArchivedChatsSection({
     setRestoringId(sessionId);
     setError(null);
     if (!bridgeReady) {
-      setSessions((current) => current.filter((session) => session.id !== sessionId));
+      setError("归档会话仅桌面端可恢复。");
       setRestoringId(null);
       return;
     }

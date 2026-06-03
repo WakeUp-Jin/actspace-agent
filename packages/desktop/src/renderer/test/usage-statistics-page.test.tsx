@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { UsageStatisticsPage } from "../components/UsageStatisticsPage";
-import { mockUsageStatistics } from "../fixtures/usageStatisticsFixture";
+import { mockUsageStatistics } from "./fixtures/usageStatisticsFixture";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
 /**

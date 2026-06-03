@@ -55,6 +55,7 @@
 - `completed/20260530-kairos-config-editor.md`
 - `completed/20260604-context-compaction-timeline-bugfix.md`
 - `completed/20260603-session-hover-card.md`
+- `completed/20260604-runtime-mock-data-cleanup.md`
 - `completed/lab-v0-frontend-mock-implementation.md`
 - `completed/actspace-token-usage-context-control-foundation.md`
 - `completed/actspace-usage-statistics-session-jsonl-plan.md`

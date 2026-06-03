@@ -1,14 +1,47 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { MoreHorizontal, Plus, X } from "lucide-react";
-import {
-  initialCompletedExperiments,
-  initialLabCards,
-  labStages,
-  type LabCardView,
-  type LabCompletedExperimentView,
-  type LabCompletedFilter,
-  type LabStageId,
-} from "../fixtures/labFixture";
+
+type LabStageId = "hypothesis" | "verification" | "forge" | "promotion";
+
+type LabStageView = {
+  id: LabStageId;
+  title: string;
+  addLabel: string;
+};
+
+type LabCardSection = {
+  title: string;
+  body: string;
+};
+
+type LabCardView = {
+  id: string;
+  stage: LabStageId;
+  tag: string;
+  tagColor: string;
+  title: string;
+  meta: string;
+  experiment: string;
+  creator: string;
+  updatedAt: string;
+  evidence: string;
+  artifacts: string;
+  sections: LabCardSection[];
+  checks: string[];
+};
+
+type LabCompletedFilter = "promoted" | "rejected" | "abandoned";
+
+type LabCompletedExperimentView = {
+  id: string;
+  title: string;
+  result: string;
+  resultColor: string;
+  filter: LabCompletedFilter;
+  artifact: string;
+  date: string;
+  summary: string;
+};
 
 type LabDialog = "new" | "detail" | "completed" | null;
 type CompletedTab = "all" | LabCompletedFilter;
@@ -26,28 +59,51 @@ const NEXT_STAGE: Partial<Record<LabStageId, LabStageId>> = {
   forge: "promotion",
 };
 
+const labStages: LabStageView[] = [
+  {
+    id: "hypothesis",
+    title: "假说构建",
+    addLabel: "添加假说",
+  },
+  {
+    id: "verification",
+    title: "实证验证",
+    addLabel: "添加验证",
+  },
+  {
+    id: "forge",
+    title: "能力锻造",
+    addLabel: "添加产物",
+  },
+  {
+    id: "promotion",
+    title: "晋升评审",
+    addLabel: "提交评审",
+  },
+];
+
 const STAGE_PROGRESS_META: Record<LabStageId, Pick<LabCardView, "tag" | "tagColor" | "meta" | "checks">> = {
   hypothesis: {
     tag: "草稿",
-    tagColor: "#6b7280",
+    tagColor: "var(--act-color-text-faint)",
     meta: "User · 刚刚",
     checks: ["补能力缺口", "补初始假说", "定义成功标准"],
   },
   verification: {
     tag: "验证中",
-    tagColor: "#d99a20",
+    tagColor: "var(--act-color-warm)",
     meta: "证据 0 · 刚刚",
     checks: ["补验证方案", "记录证据", "写出观察结论"],
   },
   forge: {
     tag: "候选",
-    tagColor: "#287783",
+    tagColor: "var(--act-chart-series-2)",
     meta: "待锻造 · 刚刚",
     checks: ["定义产物类型", "补使用契约", "补验证方式"],
   },
   promotion: {
     tag: "待评审",
-    tagColor: "#946400",
+    tagColor: "var(--act-color-on-warm)",
     meta: "中风险 · 3 检查",
     checks: ["确认证据", "确认风险", "等待人工批准"],
   },
@@ -82,8 +138,8 @@ const stageHeaderToneClass: Record<LabStageId, string> = {
 const stageAccentClass: Record<LabStageId, string> = {
   hypothesis: "bg-brand",
   verification: "bg-warm",
-  forge: "bg-[#287783]",
-  promotion: "bg-[#946400]",
+  forge: "bg-[var(--act-chart-series-2)]",
+  promotion: "bg-[var(--act-color-on-warm)]",
 };
 const stageBodyClass = "flex min-h-0 flex-col gap-2 overflow-auto p-2.5";
 const cardClass =
@@ -121,14 +177,6 @@ const tabClass =
 const activeTabClass = "border-brand/40 bg-brand-soft text-brand-strong";
 const historyGridClass = "grid grid-cols-[minmax(220px,1fr)_96px_120px_112px_64px] items-center gap-4";
 
-function cloneCards(cards: LabCardView[]): LabCardView[] {
-  return cards.map((card) => ({
-    ...card,
-    sections: card.sections.map((section) => ({ ...section })),
-    checks: [...card.checks],
-  }));
-}
-
 function tagStyle(color: string): CSSProperties {
   return {
     color,
@@ -150,7 +198,7 @@ function buildDraftCard(title: string, idea: string): LabCardView {
     id: `hyp-draft-${Date.now()}`,
     stage: "hypothesis",
     tag: "草稿",
-    tagColor: "#6b7280",
+    tagColor: "var(--act-color-text-faint)",
     title,
     meta: "User · 刚刚",
     experiment: title,
@@ -192,11 +240,9 @@ function makeCompletedExperiment(
 }
 
 export function LabPage() {
-  const [cards, setCards] = useState<LabCardView[]>(() => cloneCards(initialLabCards));
-  const [completedExperiments, setCompletedExperiments] = useState<LabCompletedExperimentView[]>(() => [
-    ...initialCompletedExperiments,
-  ]);
-  const [selectedCardId, setSelectedCardId] = useState(initialLabCards[0]?.id ?? null);
+  const [cards, setCards] = useState<LabCardView[]>([]);
+  const [completedExperiments, setCompletedExperiments] = useState<LabCompletedExperimentView[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<LabDialog>(null);
   const [completedTab, setCompletedTab] = useState<CompletedTab>("all");
   const [selectedCompletedId, setSelectedCompletedId] = useState<string | null>(null);
@@ -277,7 +323,13 @@ export function LabPage() {
     if (selectedCard.stage === "promotion") {
       setCards((current) => current.filter((card) => card.id !== selectedCard.id));
       setCompletedExperiments((current) => [
-        makeCompletedExperiment(selectedCard, "已晋升", "#16a36a", "promoted", selectedCard.artifacts === "0" ? "candidate" : "artifact"),
+        makeCompletedExperiment(
+          selectedCard,
+          "已晋升",
+          "var(--act-color-success)",
+          "promoted",
+          selectedCard.artifacts === "0" ? "candidate" : "artifact",
+        ),
         ...current,
       ]);
       closeDialog();
@@ -315,8 +367,8 @@ export function LabPage() {
     if (!selectedCard) return;
     const completed =
       result === "pause"
-        ? makeCompletedExperiment(selectedCard, "已暂停", "#6b7280", "abandoned")
-        : makeCompletedExperiment(selectedCard, "已废弃", "#6b7280", "abandoned");
+        ? makeCompletedExperiment(selectedCard, "已暂停", "var(--act-color-text-faint)", "abandoned")
+        : makeCompletedExperiment(selectedCard, "已废弃", "var(--act-color-text-faint)", "abandoned");
     setCards((current) => current.filter((card) => card.id !== selectedCard.id));
     setCompletedExperiments((current) => [completed, ...current]);
     closeDialog();
@@ -501,8 +553,8 @@ export function LabPage() {
                       </label>
                     </div>
                   ) : (
-                    selectedCard.sections.map((section) => (
-                      <section key={`${selectedCard.id}-${section.title}`} className="mt-[25px] first:mt-0">
+                    selectedCard.sections.map((section, index) => (
+                      <section key={`${selectedCard.id}-${index}-${section.title}`} className="mt-[25px] first:mt-0">
                         <h3 className="mb-[9px] mt-0 text-[13px] font-semibold text-text-main">{section.title}</h3>
                         <p className="m-0 text-[13px] leading-[1.65] text-text-muted">{section.body}</p>
                       </section>

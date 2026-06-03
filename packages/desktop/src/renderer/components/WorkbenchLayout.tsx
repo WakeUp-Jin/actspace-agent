@@ -91,7 +91,6 @@ export function WorkbenchLayout({
   onRenameSession,
   onArchiveSession,
   isSessionReady = true,
-  showDemoAttachments = false,
   defaultModelId,
   onSettingsChange,
   onArchivedSessionsChange,
@@ -121,7 +120,6 @@ export function WorkbenchLayout({
   onRenameSession?: (sessionId: string, title: string) => void;
   onArchiveSession?: (sessionId: string) => void;
   isSessionReady?: boolean;
-  showDemoAttachments?: boolean;
   defaultModelId?: ModelId;
   onSettingsChange?: (settings: AppSettings) => void;
   onArchivedSessionsChange?: () => void;
@@ -345,7 +343,6 @@ export function WorkbenchLayout({
         onSend={onSend}
         onAbort={onAbort}
         isSessionReady={isSessionReady}
-        showDemoAttachments={showDemoAttachments}
         defaultModelId={defaultModelId}
         workspaceOptions={workspaceOptions}
         selectedWorkspaceRoot={selectedWorkspaceRoot}

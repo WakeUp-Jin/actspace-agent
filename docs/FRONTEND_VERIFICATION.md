@@ -8,7 +8,7 @@
 
 - 前端改动必须在计划和收尾中写清验证方式。
 - 工程验证优先使用仓库命令，不要只依赖人工目测。
-- UI 样式与组件打磨优先使用浏览器 mock 验证，因为它更适合快速检查 CSS、布局、HMR 和交互状态。
+- UI 样式与组件打磨优先使用浏览器 renderer 验证，因为它更适合快速检查 CSS、布局、HMR、空态和不依赖 IPC 的局部交互。
 - 真实桌面链路必须使用 Electron 窗口验证，但它是完成流程的最终验收，不是每次样式微调的首选工具。
 - 有 Computer Use 的 Agent，完成重要 UI 修改后应在收尾阶段查看真实 Electron 窗口。
 - 没有 Computer Use 的 Agent，需要说明限制，并让用户提供截图或启动日志辅助确认。
@@ -38,7 +38,7 @@ pnpm build
 - Vite renderer 可以构建。
 - Electron main/preload 可以构建。
 
-### 2. 浏览器 Mock 验证
+### 2. 浏览器 Renderer 验证
 
 适用范围：
 
@@ -55,7 +55,9 @@ pnpm build
 http://127.0.0.1:5173/
 ```
 
-浏览器验证需要 renderer 支持 mock/fallback 模式。没有 Electron preload 时，页面不应该白屏，而应该使用 mock bridge 或显示明确的开发提示。
+浏览器验证只加载 renderer，不代表完整桌面产品。没有 Electron preload 时，页面不应该白屏；它应该显示真实空态、明确的开发提示，或只在测试/显式 demo harness 中使用 mock bridge。
+
+浏览器 renderer 验证不能用运行时假业务数据证明产品状态。稳定样例数据应放在测试、Story 或显式 demo 边界内。
 
 可以验证：
 
@@ -112,8 +114,8 @@ pnpm dev
 
 | 改动类型 | 必须验证 | 推荐补充 |
 | --- | --- | --- |
-| 样式、布局、组件展示 | `pnpm typecheck`、浏览器 mock 截图 | 完成阶段再看 Electron 窗口 |
-| Composer、弹窗、菜单等交互 | `pnpm typecheck`、浏览器 mock 交互 | Electron 窗口交互 |
+| 样式、布局、组件展示 | `pnpm typecheck`、浏览器 renderer 截图 | 完成阶段再看 Electron 窗口 |
+| Composer、弹窗、菜单等交互 | `pnpm typecheck`、浏览器 renderer 交互 | Electron 窗口交互 |
 | IPC、preload、session、本地文件 | `pnpm typecheck`、`pnpm build`、Electron 真实验证 | Computer Use 操作或用户截图 |
 | 构建脚本、workspace、Electron 配置 | `pnpm typecheck`、`pnpm build`、`pnpm dev` | 检查 `dist-electron/main/index.js` 是否生成 |
 | 设计文档或图片更新 | 文档链接检查 | 对照设计图人工确认 |
@@ -123,7 +125,7 @@ pnpm dev
 计划阶段应该写明：
 
 - 这次改动属于哪一类。
-- 使用浏览器 mock 还是 Electron 真实验证。
+- 使用浏览器 renderer 还是 Electron 真实验证。
 - 是否需要用户截图或 Computer Use。
 
 收尾阶段应该写明：
@@ -136,7 +138,7 @@ pnpm dev
 
 ```text
 已运行 pnpm typecheck 和 pnpm build。
-本次只改 Composer 样式，使用浏览器 mock 验证布局；未涉及 preload、IPC 和本地持久化。
+本次只改 Composer 样式，使用浏览器 renderer 验证布局；未涉及 preload、IPC 和本地持久化。
 ```
 
 另一个示例：

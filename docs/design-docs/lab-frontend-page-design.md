@@ -4,17 +4,18 @@
 
 ## 当前状态
 
-- 状态：V0 renderer mock 已落地，后端 Lab Runtime、IPC 和持久化尚未实现。
+- 状态：V0 renderer 页面已落地，运行时预置 mock 初始数据已清理；后端 Lab Runtime、IPC 和持久化尚未实现。
 - 适用范围：Lab 首页、实验矩阵、阶段卡片、卡片详情弹窗、新实验弹窗、已完成实验弹窗。
 - 核心决策：Lab 首页只展示进行中的实验；完成、拒绝、废弃、归档实验进入 `已完成实验` 弹窗。
 
 ## 实现边界
 
 - 当前实现位于 `packages/desktop/src/renderer/components/LabPage.tsx`。
-- 数据来源是 renderer 内存 mock fixture：`packages/desktop/src/renderer/fixtures/labFixture.ts`。
+- 运行时没有预置实验数据；首屏默认展示空矩阵，新实验只从用户输入生成本地临时卡片。
+- 测试样例数据只允许放在 `packages/desktop/src/renderer/test/**` 边界内。
 - 样式采用 Tailwind utility 和 `LabPage.tsx` 内局部 class 常量，不新增 `.lab-*` 全局 CSS。
 - 当前实现不新增 Electron IPC、preload bridge、main process 存储或 `shared` Lab 契约。
-- 刷新页面后创建、编辑、推进、暂停和取消的 mock 状态会重置。
+- 刷新页面后创建、编辑、推进、暂停和取消的本地临时状态会重置。
 
 ## 页面原则
 
@@ -258,7 +259,7 @@ V0 表单保持克制：
 [取消] [创建]
 ```
 
-创建后默认在 `假说构建` 列生成一张假说卡。
+创建后默认在 `假说构建` 列生成一张本地临时假说卡。
 
 V0 不要求用户一次性填能力缺口、初始假说、成功标准、风险、产物类型等复杂字段。这些内容可以在卡片详情弹窗里继续补。
 
