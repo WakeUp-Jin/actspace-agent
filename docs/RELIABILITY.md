@@ -32,6 +32,7 @@
 - `pnpm typecheck`：检查跨包类型契约。
 - `pnpm build`：检查当前桌面端和共享包是否可构建。
 - `pnpm package:desktop`：本地生成当前平台的 desktop archive，便于开源用户从源码自行打包。
+- 安装版 Electron main 进程启动日志位于 `<userData>/logs/main-startup.log`，macOS 默认是 `~/Library/Application Support/actspace/logs/main-startup.log`。排查“Dock 有图标但窗口没出来 / renderer 白屏 / packaged renderer 加载失败”时，优先读取这个文件；每次启动还会生成一份 `main-startup-<timestamp>.log` 归档。
 - 设置页「通用 → 本地更新」：已安装 macOS app 可从已选择的本机源码目录重新打包并替换当前 `.app`。更新 helper 日志位于 Electron `userData/tmp/local-update/update.log`；如果构建或替换失败，优先看该文件。
 - `pnpm run ci`：运行仓库级基础门禁。
 
@@ -41,6 +42,7 @@
 - `pnpm dev:log` 会保留最近约 2 天的 `*.log`，并自动清理更旧文件。
 - 终端日志通过 `pnpm dev 2>&1 | tee -a <log-file>` 写入文件：`2>&1` 合并错误输出，`tee` 同时显示到终端和写入日志。
 - Agent 排查启动、构建、Electron 或 provider 问题时，优先读取 `logs/latest-dev.log`。
+- Agent 排查安装版启动问题时，优先读取 `~/Library/Application Support/actspace/logs/main-startup.log`。该日志由 main 进程直接写入，包含 app path 配置、数据目录初始化、窗口创建、renderer 加载成功/失败、renderer console、renderer 进程退出和 main 进程未捕获异常。
 - 排查本地更新时，优先读取设置页显示的 `<userData>/tmp/local-update/update.log`；该日志由外部 helper 写入，可能发生在主 app 退出之后。
 - Agent turn 运行时会向终端即时输出关键链路日志，`pnpm dev:log` 会同步写入 `logs/latest-dev.log`：
   - `[agent-ipc]`：renderer 调用 main、main 推送 stream event、turn 持久化等 IPC 边界。

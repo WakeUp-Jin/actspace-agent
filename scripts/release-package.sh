@@ -112,8 +112,9 @@ case "${platform}" in
       signed=true
       signature="developer-id"
     elif is_truthy "${mac_ad_hoc_sign}"; then
-      codesign --force --deep --sign - "${packaged_app}"
-      codesign --verify --deep --strict --verbose=2 "${packaged_app}"
+      codesign --force --sign - --timestamp=none "${packaged_app}/Contents/MacOS/Electron"
+      codesign --force --sign - --timestamp=none "${packaged_app}"
+      codesign --verify --no-strict --verbose=2 "${packaged_app}"
       signature="ad-hoc"
     else
       codesign --remove-signature "${packaged_app}" 2>/dev/null || true

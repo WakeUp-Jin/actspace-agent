@@ -10,8 +10,9 @@
  */
 
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, safeStorage } from "electron";
-import { access, mkdir, readFile } from "node:fs/promises";
-import { basename, dirname, extname, join } from "node:path";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { access, mkdir } from "node:fs/promises";
+import { basename, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type {
   AbortTurnInput,
@@ -81,6 +82,7 @@ import {
 } from "./kairos-bootstrap";
 import { registerKairosIpc, type KairosIpcHandle } from "./kairos-ipc";
 import { SettingsService, type SecretCrypto } from "./settings-service";
+import { resolveAppDataRoots } from "./app-paths";
 
 const APP_ID = "com.actspace.desktop";
 const APP_NAME = "actspace";
@@ -113,8 +115,8 @@ const MIME_BY_EXT: Record<string, string> = {
   ".css": "text/css",
 };
 
-let repoRootCache: string | undefined;
-let workspaceRootCache: string | undefined;
+let startupLogPath: string | undefined;
+let startupRunLogPath: string | undefined;
 
 type DeepSeekBalanceApiInfo = {
   currency?: unknown;
@@ -139,11 +141,67 @@ function preview(value: unknown, limit = PREVIEW_LIMIT): string {
   return text.length > limit ? `${text.slice(0, limit)}...` : text;
 }
 
+function safeJson(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return JSON.stringify(String(value));
+  }
+}
+
+function appendStartupLogLine(line: string): void {
+  if (!startupLogPath || !startupRunLogPath) return;
+  try {
+    appendFileSync(startupLogPath, line);
+    appendFileSync(startupRunLogPath, line);
+  } catch {
+    // Startup logging must never block the app from opening.
+  }
+}
+
+function writeStartupLog(
+  source: "main" | "renderer-console",
+  message: string,
+  details?: Record<string, unknown>,
+): void {
+  appendStartupLogLine(
+    `${safeJson({
+      ts: new Date().toISOString(),
+      source,
+      message,
+      details: details ?? {},
+    })}\n`,
+  );
+}
+
+function initializeStartupLogging(): void {
+  const logRoot = join(app.getPath("userData"), "logs");
+  const runStamp = new Date().toISOString().replace(/[:.]/g, "-");
+  startupLogPath = join(logRoot, "main-startup.log");
+  startupRunLogPath = join(logRoot, `main-startup-${runStamp}.log`);
+  try {
+    mkdirSync(logRoot, { recursive: true });
+    writeFileSync(startupRunLogPath, "");
+  } catch {
+    startupLogPath = undefined;
+    startupRunLogPath = undefined;
+    return;
+  }
+  writeStartupLog("main", "startup log initialized", {
+    logPath: startupLogPath,
+    runLogPath: startupRunLogPath,
+    isPackaged: app.isPackaged,
+    version: app.getVersion(),
+    execPath: process.execPath,
+  });
+}
+
 function logMain(message: string, details?: Record<string, unknown>): void {
   console.log(
     `[main] ${message}`,
     details ? JSON.stringify(details) : "",
   );
+  writeStartupLog("main", message, details);
 }
 
 function logRendererConsole(
@@ -157,6 +215,7 @@ function logRendererConsole(
     ...details,
   };
   console.log(`[renderer-console] ${JSON.stringify(payload)}`);
+  writeStartupLog("renderer-console", message, { level, ...details });
 }
 
 function attachmentMimeType(filePath: string): string | undefined {
@@ -183,27 +242,27 @@ function attachmentFromPath(filePath: string, index: number): ComposerAttachment
 // ─── 数据目录 ───
 
 async function ensureDataDirectories(): Promise<AppDataRoots> {
-  const dataRoot = app.getPath("userData");
-  const sessionRoot = join(dataRoot, "sessions");
-  const logRoot = join(await getRepoRoot(), "logs");
-  const tmpRoot = join(dataRoot, "tmp");
-  const defaultWorkspaceRoot = app.getPath("downloads");
-  const workspaceRoot = await getWorkspaceRoot();
-
-  await mkdir(sessionRoot, { recursive: true });
-  await mkdir(logRoot, { recursive: true });
-  await mkdir(tmpRoot, { recursive: true });
-
-  logMain("data directories ensured", {
-    dataRoot,
-    sessionRoot,
-    logRoot,
-    tmpRoot,
-    defaultWorkspaceRoot,
-    workspaceRoot,
+  const roots = await resolveAppDataRoots({
+    dataRoot: app.getPath("userData"),
+    defaultWorkspaceRoot: app.getPath("downloads"),
+    cwd: process.cwd(),
+    env: process.env,
   });
 
-  return { dataRoot, sessionRoot, logRoot, tmpRoot, defaultWorkspaceRoot, workspaceRoot };
+  await mkdir(roots.sessionRoot, { recursive: true });
+  await mkdir(roots.logRoot, { recursive: true });
+  await mkdir(roots.tmpRoot, { recursive: true });
+
+  logMain("data directories ensured", {
+    dataRoot: roots.dataRoot,
+    sessionRoot: roots.sessionRoot,
+    logRoot: roots.logRoot,
+    tmpRoot: roots.tmpRoot,
+    defaultWorkspaceRoot: roots.defaultWorkspaceRoot,
+    workspaceRoot: roots.workspaceRoot,
+  });
+
+  return roots;
 }
 
 /**
@@ -287,58 +346,6 @@ async function loadAllKairosEvents(shortMemoryRoot: string): Promise<SessionEven
     });
     return [];
   }
-}
-
-async function getRepoRoot(): Promise<string> {
-  if (repoRootCache) return repoRootCache;
-
-  const explicit = process.env.ACTSPACE_REPO_ROOT;
-  if (explicit) {
-    await access(join(explicit, "package.json"));
-    repoRootCache = explicit;
-    return repoRootCache;
-  }
-
-  let current = process.cwd();
-  while (true) {
-    if (await isActspaceRepoRoot(current)) {
-      repoRootCache = current;
-      return repoRootCache;
-    }
-
-    const parent = dirname(current);
-    if (parent === current) {
-      repoRootCache = process.cwd();
-      return repoRootCache;
-    }
-    current = parent;
-  }
-}
-
-async function isActspaceRepoRoot(dir: string): Promise<boolean> {
-  try {
-    const raw = await readFile(join(dir, "package.json"), "utf-8");
-    const pkg = JSON.parse(raw) as { name?: string };
-    return pkg.name === "actspace";
-  } catch {
-    return false;
-  }
-}
-
-async function getWorkspaceRoot(): Promise<string> {
-  if (workspaceRootCache) return workspaceRootCache;
-
-  const explicit = process.env.ACTSPACE_WORKSPACE_ROOT;
-  if (explicit) {
-    await access(explicit);
-    workspaceRootCache = explicit;
-    logMain("workspace root resolved from ACTSPACE_WORKSPACE_ROOT", { workspaceRoot: workspaceRootCache });
-    return workspaceRootCache;
-  }
-
-  workspaceRootCache = await getRepoRoot();
-  logMain("workspace root resolved from repo root", { workspaceRoot: workspaceRootCache });
-  return workspaceRootCache;
 }
 
 function resolveDeepSeekBalanceUrl(baseUrl: string): string {
@@ -501,6 +508,7 @@ function configureAppPaths() {
   app.setName(APP_NAME);
   const userDataRoot = join(app.getPath("appData"), APP_NAME);
   app.setPath("userData", userDataRoot);
+  initializeStartupLogging();
   logMain("app paths configured", { userDataRoot });
 }
 
@@ -525,6 +533,7 @@ function getMainWindow(): BrowserWindow | undefined {
 
 async function createMainWindow() {
   const preloadPath = join(__dirname, "..", "preload", "index.js");
+  logMain("create main window start", { preloadPath });
   const win = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -552,6 +561,23 @@ async function createMainWindow() {
     logRendererConsole(levelName, message, { line, sourceId: preview(sourceId, 240) });
   });
 
+  win.webContents.on("did-finish-load", () => {
+    logMain("renderer did finish load", { url: win.webContents.getURL() });
+  });
+
+  win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    logMain("renderer did fail load", {
+      errorCode,
+      errorDescription,
+      validatedURL,
+      isMainFrame,
+    });
+  });
+
+  win.webContents.on("dom-ready", () => {
+    logMain("renderer dom ready", { url: win.webContents.getURL() });
+  });
+
   win.webContents.on("render-process-gone", (_event, details) => {
     logMain("renderer process gone", {
       reason: details.reason,
@@ -573,6 +599,7 @@ async function createMainWindow() {
     logMain("loading packaged renderer", { filePath });
     await win.loadFile(filePath);
   }
+  logMain("create main window loaded", { url: win.webContents.getURL() });
 }
 
 // ─── Kairos 单例（lazy init in app.whenReady） ───
@@ -1058,6 +1085,20 @@ async function registerIpc() {
 
 configureAppPaths();
 loadEnv();
+
+process.on("uncaughtException", (error) => {
+  logMain("process uncaught exception", {
+    error: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+  });
+});
+
+process.on("unhandledRejection", (reason) => {
+  logMain("process unhandled rejection", {
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+});
 
 app.whenReady().then(async () => {
   app.setAppUserModelId(APP_ID);
