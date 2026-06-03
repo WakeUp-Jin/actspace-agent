@@ -49,6 +49,13 @@
 
 新增工具时，先读 `agent-tool-preview-design-guidelines.md`，确保 `previewKind` 和 `ToolUiPreview` 语义稳定。
 
+## `skills/` - Skill 发现与 catalog 注入
+
+- `skills/types.ts`：SkillScope、SkillSource、SkillSummary、SkillRegistry 等基础类型。
+- `skills/frontmatter.ts`：轻量 frontmatter parser。读取 `name` / `description`，支持简单单双引号标量；缺少 frontmatter 或必需字段时用目录名兜底并返回 warning，不阻断普通 turn。
+- `skills/registry.ts`：Skill 扫描与去重。按 `<workspace>/.actspace/skills`、`<workspace>/.agents/skills`、`<workspace>/.claude/skills`、`<userData>/skills`、`<userData>/.actspace/skills`、`<home>/.agents/skills`、`<home>/.claude/skills` 顺序扫描一级子目录中的 `SKILL.md`；同名 first-win，后发现的进入 `shadowed`。
+- `skills/catalog.ts`：把 registry 渲染为 `<available_skills>` XML catalog，并生成 `bucket: "skills"` 的 system prompt segment。catalog 只注入元信息和 `SKILL.md` 绝对路径，提示 Agent 在任务匹配时用已有 `read_file` 读取 `location`。
+
 ## `context/` - 上下文管道
 
 - `context/types.ts`：SystemPart、ContextModule、PromptSegment、CompressionConfig + `DEFAULT_COMPRESSION_CONFIG`（contextWindow / compressionThreshold / compressKeepRatio / compactMinIntervalCalls / toolTruncateThreshold / readTruncateThreshold / bashInlineThreshold / bashDiskCap / absoluteMaxChars 的单一默认来源）。另含 `CACHE_STABILITY`（IMMUTABLE 100 / STABLE 70 / SEMI 40 / VOLATILE 10）缓存稳定性档位；`PromptSegment` 与 `SystemPart` 都带 `stability` 字段，用于把不易变内容稳定排在请求前缀，提高 DeepSeek prefix-cache 命中率（动机见 `agent-token-usage-and-context-state.md`「缓存稳定性档位」）。
@@ -67,7 +74,7 @@
 - `engine/compact-context.ts`：手动 `/compact` 后端入口。接收 `CompactContextInput` + 已装配 `AgentDeps`，发送 `context_compaction_started/progress/finished/failed` stream event，调用 `contextManager.compactNow()`，返回 `CompactContextResult` 并产出 `context_compaction` / `context_snapshot` 事件。
 - `engine/partial-args.ts`：partial JSON 字符串字段提取状态机，正确处理 `\"` `\\` `\n` `\uXXXX` 等 JSON escape，未闭合时返回当前累积部分。仅给 streaming-preview-extractors 使用。
 - `engine/streaming-preview-extractors.ts`：按 `ToolPreviewKind` 注册的 extractor 表，把 LLM 流式 `tool_call_delta` 累积的 partial JSON 解析成 typed `ToolUiPreview`。write_file 同时提取 path 与 content（content 作为 `streamingContent` 让前端 cursor 风格边写边看）；edit_file 和 delete_file 只提取 path（edit 的 diff 需要文件上下文 + 替换执行才能生成，delete 的审批/执行状态由权限事件和工具结果决定）。新工具按 previewKind 注册一行 extractor 即可。
-- `engine/create-agent-deps.ts`：Agent 配置构建与实例创建，两步分离。`buildAgentConfig(frontendInput, workspaceRoot, approvalGate?, runtimeContext?)` 返回纯配置对象 `AgentConfig`，`runtimeContext` 透传 `tmpRoot` / `sessionId` 到 `toolManagerConfig`（bash 落盘需要），并可传入主 Agent 当前完整 `systemPrompt`（桌面端来自 SettingsService；不传则用代码默认 `MAIN_AGENT_SYSTEM_PROMPT`）。运行时实例有两种入口：`createAgentFromConfig(config)`（同步，空会话历史，mock/测试）；`createAgentForSession(config, { sessionPath })`（async，main 进程，构造期一次性恢复历史）。两者都用 `createSummarizerForAgent()`（`deepseek-v4-flash`，无 DeepSeek key 时为 undefined）构造 `summarizer`，注入 ToolManager 与 `AgentDeps`，供工具输出摘要与 mid-loop 历史压缩使用。
+- `engine/create-agent-deps.ts`：Agent 配置构建与实例创建，两步分离。`buildAgentConfig(frontendInput, workspaceRoot, approvalGate?, runtimeContext?)` 返回纯配置对象 `AgentConfig`，`runtimeContext` 透传 `tmpRoot` / `sessionId` 到 `toolManagerConfig`（bash 落盘需要），并可传入主 Agent 当前完整 `systemPrompt`（桌面端来自 SettingsService；不传则用代码默认 `MAIN_AGENT_SYSTEM_PROMPT`）和附加 `systemPromptSegments`。运行时实例有两种入口：`createAgentFromConfig(config)`（同步，空会话历史，mock/测试）；`createAgentForSession(config, { sessionPath })`（async，main 进程，构造期一次性恢复历史）。两者都用 `createSummarizerForAgent()`（`deepseek-v4-flash`，无 DeepSeek key 时为 undefined）构造 `summarizer`，注入 ToolManager 与 `AgentDeps`，供工具输出摘要与 mid-loop 历史压缩使用。
 
 Agent Turn 的跨层职责边界见 `agent-turn-layers.md`。
 
@@ -197,7 +204,7 @@ flowchart TB
 
 Desktop 集成（`packages/desktop`）：
 
-- `src/main/agent-runtime-context.ts` + `agents-md-service.ts`：主 Agent runtime context 装配入口。`SettingsService.readAgentSystemPrompt()` 读取 `<userData>/prompts/main-agent.md` 作为主系统提示词；`agents-md-service` 固定加载 `<userData>/AGENTS.md` 与 `<workspaceRoot>/AGENTS.md`，缺失静默跳过、读取失败只 warning，并以 `rules` segment 注入 `SystemPromptContext`。真实 turn 与 `context:describe` 共用该 loader，避免上下文检查视图和 LLM 实际输入漂移。
+- `src/main/agent-runtime-context.ts` + `agents-md-service.ts`：主 Agent runtime context 装配入口。`SettingsService.readAgentSystemPrompt()` 读取 `<userData>/prompts/main-agent.md` 作为主系统提示词；`agents-md-service` 固定加载 `<userData>/AGENTS.md` 与 `<workspaceRoot>/AGENTS.md`，缺失静默跳过、读取失败只 warning，并以 `rules` segment 注入 `SystemPromptContext`。同一 loader 还调用 `loadSkillRegistry()` 扫描项目级/用户级 Skill，把 `<available_skills>` 注入 `skills` segment；Skill 正文由 Agent 按 catalog 中的绝对 `location` 使用 `read_file` 读取。真实 turn、`context:describe` 和 `/compact` 共用该 loader，避免上下文检查视图和 LLM 实际输入漂移。
 - `src/main/context-describe-service.ts`：按需重建某个 session 的 Context 明细，不调用 LLM；现在通过同一 runtime context loader 注入主系统提示词文件和 `AGENTS.md` rules，再用 `buildContextEntries` 生成 systemPrompt / rules / tools / conversation 逐条全文。
 - `src/main/kairos-bootstrap.ts`：`ensureKairosScaffolding(kairosRoot)` 幂等建目录 + 落 4 份默认 config；`createKairosLlm()` 复用 `buildLLMConfig`；`createKairosToolManagerFactory({ workspaceRoot })` 把 `blocklist.toolsDenied` 合并进 `disabledTools`。
 - `src/main/kairos-ipc.ts` + `kairos-ipc-internals.ts`：注册 invoke handler（`kairos:get-state/get-events-recent/control/read-config/write-config/get-context-snapshot`） + 50ms debounce 推 `kairos:event/state` 到 renderer。`dispatchKairosControl` 纯逻辑分派 `KairosControl`，含 `set_budget`（→ `controller.setBudget`，不碰 preferences）。

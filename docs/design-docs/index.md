@@ -29,6 +29,7 @@
 - `agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
 - `agent-token-usage-and-context-state.md`：token usage、成本统计、context snapshot 与 context state 的数据分层设计。
 - `agent-context-compression.md`：上下文压缩设计。
+- `agent-skill-loading.md`：Agent Skill 设计与加载规范，包括目录生态、渐进式披露、catalog 注入和 `read_file` 正文读取边界。
 - `agent-cache-loss-audit.md`：缓存失效排查设计。
 - `agent-tool-preview-design-guidelines.md`：新增工具必须遵守的前端预览契约。
 - `agent-subprocess-runner-guidelines.md`：agent-core 内部受控子进程调用规范。

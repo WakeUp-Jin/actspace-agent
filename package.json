@@ -3,9 +3,10 @@
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "scripts": {
+    "clean": "pnpm --filter @actspace/shared clean && pnpm --filter @actspace/agent-core clean && pnpm --filter @actspace/desktop clean",
     "dev": "pnpm --filter @actspace/desktop dev",
     "dev:log": "./scripts/dev-with-logs.sh",
-    "build": "pnpm --filter @actspace/desktop build && pnpm --filter @actspace/shared build && pnpm --filter @actspace/agent-core build",
+    "build": "pnpm --filter @actspace/desktop build",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r typecheck",
     "ci": "./scripts/ci.sh",

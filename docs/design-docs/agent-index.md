@@ -16,6 +16,7 @@
 - `agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入设计。
 - `agent-token-usage-and-context-state.md`：token usage、成本统计、context snapshot 与每会话 context state 的数据分层设计。
 - `agent-context-compression.md`：上下文压缩设计，包括工具输出预防层、历史治疗层和读边界取舍。
+- `agent-skill-loading.md`：Agent Skill 设计与加载规范，包括 Skill 目录生态、渐进式披露、catalog 注入、`read_file` 正文读取和安全边界。
 - `agent-cache-loss-audit.md`：缓存失效排查设计，包括 `llm_usage` 索引、Context 快照和 hash 链断点分析。
 
 ## 工具与权限

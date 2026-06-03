@@ -72,3 +72,4 @@
 - `completed/kairos-monitor-page-redesign.md`
 - `completed/20260602-kairos-agent-inbox.md`
 - `completed/20260602-compact-command-ui.md`
+- `completed/20260603-agent-skill-loading.md`

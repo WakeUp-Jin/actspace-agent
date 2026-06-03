@@ -5,6 +5,7 @@ export * from "./llm";
 export * from "./observability";
 export * from "./persistence";
 export * from "./prompt";
+export * from "./skills";
 export * from "./tools";
 export * from "./types";
 export * from "./usage";
