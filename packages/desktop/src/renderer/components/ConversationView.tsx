@@ -1,7 +1,7 @@
 import { Eye, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContextUsageSnapshot, MessageBlock, ModelId } from "@actspace/shared";
-import { Composer, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
+import { Composer, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { AssistantReply } from "./messages/AssistantReply";
 import { AgentRunBlock } from "./messages/AgentRunBlock";
@@ -417,6 +417,8 @@ export function ConversationView({
   workspaceOptions,
   selectedWorkspaceRoot,
   onSelectWorkspace,
+  reviewSummary,
+  onOpenReview,
 }: {
   messages: MessageBlock[];
   contextSnapshot: ContextUsageSnapshot | null;
@@ -431,6 +433,8 @@ export function ConversationView({
   workspaceOptions?: ComposerWorkspaceOption[];
   selectedWorkspaceRoot?: string | null;
   onSelectWorkspace?: (workspaceRoot: string) => void;
+  reviewSummary?: ComposerReviewSummary | null;
+  onOpenReview?: () => void;
 }) {
   const turns = groupMessagesIntoTurns(messages);
   const isInitialComposer = isSessionReady && messages.length === 0 && !isStreaming;
@@ -506,6 +510,8 @@ export function ConversationView({
             workspaceOptions={workspaceOptions}
             selectedWorkspaceRoot={selectedWorkspaceRoot}
             onSelectWorkspace={onSelectWorkspace}
+            reviewSummary={reviewSummary}
+            onOpenReview={onOpenReview}
           />
         </div>
       ) : null}

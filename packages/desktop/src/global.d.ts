@@ -29,6 +29,12 @@ declare global {
       readWorkspaceFile: (
         input: import("@actspace/shared").WorkspaceReadFileInput
       ) => Promise<import("@actspace/shared").WorkspaceReadFileResult>;
+      getWorkspaceReview: (
+        input: import("@actspace/shared").ReviewGetWorkspaceChangesInput
+      ) => Promise<import("@actspace/shared").ReviewGetWorkspaceChangesResult>;
+      initGitRepository: (
+        input: import("@actspace/shared").ReviewInitGitInput
+      ) => Promise<import("@actspace/shared").ReviewInitGitResult>;
       describeContext: (
         input: import("@actspace/shared").DescribeContextInput
       ) => Promise<import("@actspace/shared").ContextState | null>;

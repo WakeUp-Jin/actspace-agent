@@ -11,6 +11,7 @@ export type RightPanelTab = { id: string } & (
   | { kind: "text"; title: string; content: string; language?: string; relativePath?: string }
   | { kind: "context"; title: string }
   | { kind: "kairos"; title: string }
+  | { kind: "review"; title: string; workspaceRoot?: string; scope: "uncommitted"; refreshKey?: number }
   | { kind: "replyHtml"; title: string; sessionId: string | null }
 );
 

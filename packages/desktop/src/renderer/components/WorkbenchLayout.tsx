@@ -1,5 +1,5 @@
 import type { AppSettings, ContextState, ContextUsageSnapshot, DeepSeekBalanceSnapshot, MessageBlock, ModelId, SessionListItem, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ConversationView } from "./ConversationView";
 import { LabPage } from "./LabPage";
 import { RightPanel } from "./RightPanel";
@@ -9,7 +9,7 @@ import { Sidebar, type NewSessionInput, type SessionUiStatusKind, type SidebarMo
 import { SplitView } from "./SplitView";
 import { UsageStatisticsPage } from "./UsageStatisticsPage";
 import { WindowChromeBar } from "./WindowChromeBar";
-import type { ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
+import type { ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
 import type { SessionPreviewResolver } from "./SessionHoverPreview";
 import { KairosPage } from "../pages/KairosPage";
 import { SettingsPage } from "./settings/SettingsPage";
@@ -99,6 +99,8 @@ export function WorkbenchLayout({
   selectedWorkspaceRoot,
   onSelectWorkspace,
   getSessionPreview,
+  reviewSummary,
+  onReviewChanged,
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
@@ -128,13 +130,20 @@ export function WorkbenchLayout({
   selectedWorkspaceRoot?: string | null;
   onSelectWorkspace?: (workspaceRoot: string) => void;
   getSessionPreview?: SessionPreviewResolver;
+  reviewSummary?: ComposerReviewSummary | null;
+  onReviewChanged?: () => void;
 }) {
   const [storedLayout] = useState(loadStoredLayout);
   const [containerWidth, setContainerWidth] = useState(0);
   const [leftMode, setLeftMode] = useState<SidebarMode>(storedLayout.leftMode);
   const [leftWidth, setLeftWidth] = useState(storedLayout.leftWidth);
   const [rightWidth, setRightWidth] = useState(storedLayout.rightWidth);
-  const { isOpen: isRightPanelOpen, openPanel: openRightPanel, closePanel: closeRightPanel } = useRightPanel();
+  const {
+    isOpen: isRightPanelOpen,
+    openPanel: openRightPanel,
+    closePanel: closeRightPanel,
+    openTab,
+  } = useRightPanel();
   const [view, setView] = useState<SidebarView>("chat");
   const [usageSnapshot, setUsageSnapshot] = useState<UsageStatisticsSnapshot | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
@@ -142,6 +151,7 @@ export function WorkbenchLayout({
   const [deepSeekBalance, setDeepSeekBalance] = useState<DeepSeekBalanceSnapshot | null>(null);
   const [deepSeekBalanceLoading, setDeepSeekBalanceLoading] = useState(false);
   const [deepSeekBalanceError, setDeepSeekBalanceError] = useState<string | null>(null);
+  const reviewTabRefreshCounterRef = useRef(0);
   const isSidebarHidden = leftMode === "hidden";
   const displayedLeftWidth = isSidebarHidden ? 0 : leftWidth;
   const rightMaxWidth = containerWidth > 0 ? Math.max(RIGHT_MIN_WIDTH, Math.min(RIGHT_MAX_WIDTH, containerWidth / 2)) : RIGHT_MAX_WIDTH;
@@ -230,6 +240,20 @@ export function WorkbenchLayout({
 
     openRightPanel();
   }
+
+  const openReviewTab = useCallback(() => {
+    const workspaceKey = selectedWorkspaceRoot ?? "default";
+    const refreshKey = ++reviewTabRefreshCounterRef.current;
+    openTab({
+      id: `review:${workspaceKey}:git:uncommitted`,
+      kind: "review",
+      title: "Review",
+      workspaceRoot: selectedWorkspaceRoot ?? undefined,
+      scope: "uncommitted",
+      refreshKey,
+    });
+    onReviewChanged?.();
+  }, [onReviewChanged, openTab, selectedWorkspaceRoot]);
 
   const handleSelectView = useCallback((next: SidebarView) => {
     setView(next);
@@ -347,6 +371,8 @@ export function WorkbenchLayout({
         workspaceOptions={workspaceOptions}
         selectedWorkspaceRoot={selectedWorkspaceRoot}
         onSelectWorkspace={onSelectWorkspace}
+        reviewSummary={reviewSummary}
+        onOpenReview={openReviewTab}
       />
     );
   }
@@ -421,6 +447,7 @@ export function WorkbenchLayout({
               contextState={contextState}
               sessionId={activeSessionId}
               workspaceRoot={selectedWorkspaceRoot ?? undefined}
+              onReviewChanged={onReviewChanged}
             />
           ) : undefined
         }

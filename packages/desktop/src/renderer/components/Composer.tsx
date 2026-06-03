@@ -37,6 +37,13 @@ export type ComposerWorkspaceOption = {
   workspaceId?: string;
 };
 
+export type ComposerReviewSummary = {
+  status: "loading" | "changes" | "empty" | "notAvailable" | "noBaseline" | "partial" | "failed";
+  additions?: number;
+  deletions?: number;
+  reason?: string;
+};
+
 export type ComposerSurface = "followup" | "initial";
 export type ComposerInputLayout = "inline" | "stacked";
 
@@ -243,6 +250,8 @@ export function Composer({
   workspaceOptions = [],
   selectedWorkspaceRoot,
   onSelectWorkspace,
+  reviewSummary,
+  onOpenReview,
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
   isStreaming?: boolean;
@@ -258,6 +267,8 @@ export function Composer({
   workspaceOptions?: ComposerWorkspaceOption[];
   selectedWorkspaceRoot?: string | null;
   onSelectWorkspace?: (workspaceRoot: string) => void;
+  reviewSummary?: ComposerReviewSummary | null;
+  onOpenReview?: () => void;
 }) {
   const initialModelId = defaultModelId ?? DEFAULT_MODEL_ID;
   const [commandOpen, setCommandOpen] = useState(false);
@@ -767,13 +778,33 @@ export function Composer({
 
   function renderReviewActionsStrip() {
     if (surface !== "followup") return null;
+    if (!reviewSummary || reviewSummary.status === "empty") return null;
+
+    const showCounts = reviewSummary.status === "changes" || reviewSummary.status === "partial";
+    const isLoading = reviewSummary.status === "loading";
+    const ariaLabel =
+      showCounts
+        ? `Review pending changes +${reviewSummary.additions ?? 0} -${reviewSummary.deletions ?? 0}`
+        : reviewSummary.reason === "not_a_repository"
+          ? "Review workspace changes; Git repository is not initialized"
+          : "Review workspace changes";
 
     return (
       <div className={COMPOSER_ACTION_STRIP_CLASS} aria-label="Pending review actions">
-        <button className={REVIEW_PREVIEW_BUTTON_CLASS} type="button" aria-label="Review pending changes">
+        <button
+          className={REVIEW_PREVIEW_BUTTON_CLASS}
+          type="button"
+          aria-label={ariaLabel}
+          disabled={isLoading}
+          onClick={onOpenReview}
+        >
           <span>Review</span>
-          <span className={REVIEW_ADDITION_CLASS}>+4253</span>
-          <span className={REVIEW_DELETION_CLASS}>-5</span>
+          {showCounts ? (
+            <>
+              <span className={REVIEW_ADDITION_CLASS}>+{reviewSummary.additions ?? 0}</span>
+              <span className={REVIEW_DELETION_CLASS}>-{reviewSummary.deletions ?? 0}</span>
+            </>
+          ) : null}
         </button>
         <button className={REVIEW_OVERFLOW_BUTTON_CLASS} type="button" aria-label="More review actions">
           <MoreHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />

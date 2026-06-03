@@ -43,6 +43,8 @@ import type {
   ListVisualizationsInput,
   VisualizeReplyInput,
   DescribeContextInput,
+  ReviewGetWorkspaceChangesInput,
+  ReviewInitGitInput,
   WorkspaceListDirInput,
   WorkspaceListResult,
   WorkspaceReadFileInput,
@@ -74,6 +76,7 @@ import { listVisualizations, visualizeReply } from "./visualize-service";
 import { describeSessionContext } from "./context-describe-service";
 import { loadMainAgentRuntimeContext } from "./agent-runtime-context";
 import { listWorkspaceDir, readWorkspaceFile } from "./workspace-fs-service";
+import { getWorkspaceGitChanges, initializeGitRepository } from "./review-git-service";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "./workspace-registry-service";
 import { getSessionPreview } from "./session-preview-service";
 import { LocalUpdateService } from "./local-update-service";
@@ -878,6 +881,16 @@ async function registerIpc() {
   ipcMain.handle("workspace:read-file", async (_event, input: WorkspaceReadFileInput) => {
     const roots = await ensureDataDirectories();
     return readWorkspaceFile(input, roots);
+  });
+
+  ipcMain.handle("review:get-workspace-changes", async (_event, input: ReviewGetWorkspaceChangesInput = {}) => {
+    const roots = await ensureDataDirectories();
+    return getWorkspaceGitChanges(input, roots);
+  });
+
+  ipcMain.handle("review:init-git", async (_event, input: ReviewInitGitInput = {}) => {
+    const roots = await ensureDataDirectories();
+    return initializeGitRepository(input, roots);
   });
 
   ipcMain.handle("context:describe", async (_event, input: DescribeContextInput) => {

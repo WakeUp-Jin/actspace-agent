@@ -20,6 +20,7 @@
 - `actspace-deepseek-workbench.html`：工作台高保真 HTML 原型。
 - `usage-statistics-prototype.html`：Usage Statistics 高保真 HTML 原型。
 - `compact-command-states.html`：`/compact` 命令在消息流中的执行前、执行中、执行完成三态原型，并对照浅色 / 深色主题。
+- `review-v1-git-review-prototype.html`：Review V1 Git-first 右侧面板 HTML 原型，覆盖 `Uncommitted` 汇总、文件级 accordion、默认展开首个 diff、键盘可达与浅深主题切换。
 
 ## 使用方式
 

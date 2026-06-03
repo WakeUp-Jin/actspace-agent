@@ -30,6 +30,10 @@ import type {
   LocalUpdateStartResult,
   LocalUpdateState,
   PendingApprovalInfo,
+  ReviewGetWorkspaceChangesInput,
+  ReviewGetWorkspaceChangesResult,
+  ReviewInitGitInput,
+  ReviewInitGitResult,
   RunTurnInput,
   RuntimeStreamEvent,
   SelectFilesResult,
@@ -89,6 +93,10 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("workspace:list-dir", input) as Promise<WorkspaceListDirResult>,
   readWorkspaceFile: (input: WorkspaceReadFileInput) =>
     ipcRenderer.invoke("workspace:read-file", input) as Promise<WorkspaceReadFileResult>,
+  getWorkspaceReview: (input: ReviewGetWorkspaceChangesInput) =>
+    ipcRenderer.invoke("review:get-workspace-changes", input) as Promise<ReviewGetWorkspaceChangesResult>,
+  initGitRepository: (input: ReviewInitGitInput) =>
+    ipcRenderer.invoke("review:init-git", input) as Promise<ReviewInitGitResult>,
   describeContext: (input: DescribeContextInput) =>
     ipcRenderer.invoke("context:describe", input) as Promise<ContextState | null>,
   listSessions: (input?: SessionListInput) => ipcRenderer.invoke("session:list", input ?? {}) as Promise<SessionListItem[]>,

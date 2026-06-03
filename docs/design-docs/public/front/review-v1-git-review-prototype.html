@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>actspace Review V1 Git Review Prototype</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --act-color-app-bg: #eef2f8;
+        --act-color-surface: #ffffff;
+        --act-color-surface-subtle: #f6f8fb;
+        --act-color-surface-raised: #ffffff;
+        --act-color-line: rgba(28, 36, 52, 0.12);
+        --act-color-line-strong: rgba(28, 36, 52, 0.2);
+        --act-color-text-main: #171b23;
+        --act-color-text-muted: rgba(23, 27, 35, 0.66);
+        --act-color-text-faint: rgba(23, 27, 35, 0.46);
+        --act-color-brand: #2f6fff;
+        --act-color-brand-soft: rgba(47, 111, 255, 0.08);
+        --act-color-success: #078a54;
+        --act-color-success-soft: rgba(7, 138, 84, 0.08);
+        --act-color-danger: #cf323d;
+        --act-color-danger-soft: rgba(207, 50, 61, 0.08);
+        --act-color-hover-overlay: rgba(28, 36, 52, 0.055);
+        --act-color-focus: rgba(47, 111, 255, 0.36);
+        --act-shadow-panel: 0 24px 72px rgba(36, 48, 75, 0.12);
+        --act-font-ui:
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          "SF Pro Text",
+          "Segoe UI",
+          sans-serif;
+        --act-font-mono:
+          "SFMono-Regular",
+          "Cascadia Code",
+          "Liberation Mono",
+          Menlo,
+          monospace;
+      }
+
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --act-color-app-bg: #101419;
+        --act-color-surface: #15191f;
+        --act-color-surface-subtle: #101419;
+        --act-color-surface-raised: #1a1f27;
+        --act-color-line: rgba(235, 241, 252, 0.11);
+        --act-color-line-strong: rgba(235, 241, 252, 0.2);
+        --act-color-text-main: rgba(248, 250, 253, 0.94);
+        --act-color-text-muted: rgba(248, 250, 253, 0.66);
+        --act-color-text-faint: rgba(248, 250, 253, 0.44);
+        --act-color-brand: #83a7ff;
+        --act-color-brand-soft: rgba(131, 167, 255, 0.13);
+        --act-color-success: #63d69a;
+        --act-color-success-soft: rgba(99, 214, 154, 0.12);
+        --act-color-danger: #ff7f87;
+        --act-color-danger-soft: rgba(255, 127, 135, 0.12);
+        --act-color-hover-overlay: rgba(235, 241, 252, 0.065);
+        --act-color-focus: rgba(131, 167, 255, 0.44);
+        --act-shadow-panel: 0 26px 80px rgba(0, 0, 0, 0.34);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: var(--act-color-app-bg);
+        color: var(--act-color-text-main);
+        font-family: var(--act-font-ui);
+        font-feature-settings: "tnum";
+      }
+
+      button {
+        color: inherit;
+        font: inherit;
+      }
+
+      .stage {
+        display: grid;
+        min-height: 100vh;
+        place-items: start center;
+        padding: 18px;
+      }
+
+      .review-shell {
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        width: min(900px, 100%);
+        min-height: calc(100vh - 36px);
+        overflow: hidden;
+        border: 1px solid var(--act-color-line);
+        border-radius: 9px;
+        background: var(--act-color-surface);
+        box-shadow: var(--act-shadow-panel);
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 42px;
+        padding: 6px 8px 6px 14px;
+        border-bottom: 1px solid var(--act-color-line);
+        background: var(--act-color-surface-raised);
+      }
+
+      .tab-cluster,
+      .window-actions,
+      .toolbar-actions {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .window-actions,
+      .toolbar-actions {
+        justify-content: flex-end;
+      }
+
+      .app-title {
+        overflow: hidden;
+        color: var(--act-color-text-muted);
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .app-title svg,
+      .active-tab svg,
+      .scope-button svg,
+      .summary-delta svg {
+        flex: 0 0 auto;
+        width: 14px;
+        height: 14px;
+      }
+
+      .app-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .active-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        height: 28px;
+        max-width: 180px;
+        padding: 0 10px;
+        border: 1px solid var(--act-color-line);
+        border-radius: 7px;
+        background: var(--act-color-surface-subtle);
+        color: var(--act-color-text-main);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .active-tab svg,
+      .summary-delta svg {
+        color: var(--act-color-brand);
+      }
+
+      .top-icon,
+      .toolbar-icon {
+        display: inline-grid;
+        flex: 0 0 auto;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--act-color-text-muted);
+        cursor: pointer;
+      }
+
+      .top-icon:hover,
+      .toolbar-icon:hover {
+        background: var(--act-color-hover-overlay);
+        color: var(--act-color-text-main);
+      }
+
+      .top-icon svg,
+      .toolbar-icon svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        min-height: 44px;
+        padding: 8px 14px;
+        border-bottom: 1px solid var(--act-color-line);
+        background: var(--act-color-surface);
+      }
+
+      .toolbar-left {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .scope-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        min-width: 0;
+        height: 28px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--act-color-text-main);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 560;
+      }
+
+      .scope-button svg {
+        width: 13px;
+        height: 13px;
+        color: var(--act-color-text-faint);
+      }
+
+      .summary-delta,
+      .file-delta {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-family: var(--act-font-mono);
+        font-size: 13px;
+        font-weight: 650;
+        white-space: nowrap;
+      }
+
+      .plus {
+        color: var(--act-color-success);
+      }
+
+      .minus {
+        color: var(--act-color-danger);
+      }
+
+      .files {
+        min-height: 0;
+        overflow: auto;
+        background: var(--act-color-surface);
+      }
+
+      .files::-webkit-scrollbar,
+      .diff-code::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+
+      .files::-webkit-scrollbar-thumb,
+      .diff-code::-webkit-scrollbar-thumb {
+        border: 3px solid transparent;
+        border-radius: 999px;
+        background: var(--act-color-line-strong);
+        background-clip: padding-box;
+      }
+
+      .file-card {
+        border-bottom: 1px solid var(--act-color-line);
+      }
+
+      .file-toggle {
+        display: grid;
+        grid-template-columns: 18px 20px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        width: 100%;
+        min-height: 42px;
+        padding: 7px 14px;
+        border: 0;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .file-toggle:hover {
+        background: var(--act-color-hover-overlay);
+      }
+
+      .file-toggle[aria-expanded="true"] {
+        background: var(--act-color-surface-subtle);
+      }
+
+      .chevron,
+      .status-icon {
+        display: inline-grid;
+        place-items: center;
+      }
+
+      .chevron svg,
+      .status-icon svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .chevron {
+        color: var(--act-color-text-main);
+      }
+
+      .chevron svg {
+        transition: transform 120ms ease;
+      }
+
+      .file-toggle[aria-expanded="true"] .chevron svg {
+        transform: rotate(90deg);
+      }
+
+      .status-icon {
+        color: var(--act-color-text-muted);
+      }
+
+      .status-added .status-icon,
+      .status-renamed .status-icon {
+        color: var(--act-color-success);
+      }
+
+      .status-deleted .status-icon {
+        color: var(--act-color-danger);
+      }
+
+      .file-path {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--act-color-text-main);
+        font-family: var(--act-font-mono);
+        font-size: 13px;
+        font-weight: 650;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .diff-region {
+        display: none;
+        padding: 0 14px 12px 62px;
+        background: var(--act-color-surface-subtle);
+      }
+
+      .file-card[data-open="true"] .diff-region {
+        display: block;
+      }
+
+      .diff-code {
+        overflow: auto;
+        border: 1px solid var(--act-color-line);
+        border-radius: 7px;
+        background: var(--act-color-surface);
+      }
+
+      .diff-line {
+        display: grid;
+        grid-template-columns: 38px 38px 18px minmax(420px, 1fr);
+        min-width: 560px;
+        font-family: var(--act-font-mono);
+        font-size: 12px;
+        line-height: 1.72;
+      }
+
+      .line-no {
+        padding-right: 7px;
+        color: var(--act-color-text-faint);
+        text-align: right;
+        user-select: none;
+      }
+
+      .sign {
+        color: var(--act-color-text-faint);
+        text-align: center;
+        user-select: none;
+      }
+
+      .line-text {
+        overflow: hidden;
+        padding-right: 12px;
+        text-overflow: ellipsis;
+        white-space: pre;
+      }
+
+      .diff-line.hunk {
+        background: var(--act-color-brand-soft);
+        color: var(--act-color-brand);
+        font-weight: 650;
+      }
+
+      .diff-line.add {
+        background: var(--act-color-success-soft);
+      }
+
+      .diff-line.add .sign,
+      .diff-line.add .line-text {
+        color: var(--act-color-success);
+      }
+
+      .diff-line.del {
+        background: var(--act-color-danger-soft);
+      }
+
+      .diff-line.del .sign,
+      .diff-line.del .line-text {
+        color: var(--act-color-danger);
+      }
+
+      .file-toggle:focus-visible,
+      .top-icon:focus-visible,
+      .toolbar-icon:focus-visible,
+      .scope-button:focus-visible {
+        outline: 3px solid var(--act-color-focus);
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 640px) {
+        .stage {
+          padding: 0;
+        }
+
+        .review-shell {
+          width: 100%;
+          min-height: 100vh;
+          border-width: 0;
+          border-radius: 0;
+        }
+
+        .app-title {
+          display: none;
+        }
+
+        .file-toggle {
+          grid-template-columns: 18px 20px minmax(0, 1fr) auto;
+          gap: 8px;
+          padding-inline: 12px;
+        }
+
+        .file-path {
+          font-size: 12px;
+        }
+
+        .diff-region {
+          padding-left: 12px;
+          padding-right: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="stage">
+      <section class="review-shell" aria-label="Review tab prototype">
+        <header class="topbar">
+          <div class="tab-cluster">
+            <span class="app-title">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" />
+                <path d="M3 12h18M12 3c2.3 2.4 3.4 5.4 3.4 9S14.3 18.6 12 21M12 3C9.7 5.4 8.6 8.4 8.6 12S9.7 18.6 12 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+              </svg>
+              actspace Review
+            </span>
+            <span class="active-tab" role="tab" aria-selected="true">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <path d="M18 9a3 3 0 1 0-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <path d="M6 15a3 3 0 1 0 3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <path d="M18 9v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <path d="M6 12h6a6 6 0 0 0 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+              Review
+            </span>
+            <button type="button" class="top-icon" aria-label="Open another review object">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="window-actions" aria-label="Window actions">
+            <button type="button" class="top-icon" aria-label="Focus panel">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+              </svg>
+            </button>
+            <button type="button" class="top-icon" aria-label="Collapse right panel">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.8" />
+                <path d="M15 5v14" stroke="currentColor" stroke-width="1.8" />
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="toolbar" aria-label="Review controls">
+          <div class="toolbar-left">
+            <button type="button" class="scope-button" aria-label="Review scope: Uncommitted">
+              <span>Uncommitted</span>
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <span class="summary-delta" aria-label="4 uncommitted changes, 136 additions and 42 deletions">
+              <span class="plus">+136</span>
+              <span class="minus">-42</span>
+            </span>
+          </div>
+
+          <div class="toolbar-actions" aria-label="Review actions">
+            <button type="button" class="toolbar-icon" aria-label="More actions">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5 12h.01M12 12h.01M19 12h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+              </svg>
+            </button>
+            <button type="button" class="toolbar-icon" aria-label="Search changed files">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="m21 21-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+              </svg>
+            </button>
+            <button type="button" class="toolbar-icon" aria-label="Toggle diff colors">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="4" y="6" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.8" />
+                <path d="M12 6v12" stroke="currentColor" stroke-width="1.8" />
+                <path d="M7 9h3M14 9h3M7 12h3M14 12h3M7 15h3M14 15h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+              </svg>
+            </button>
+            <button type="button" class="toolbar-icon" aria-label="Refresh changes">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <button type="button" class="toolbar-icon" data-theme-toggle aria-label="Preview dark theme">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20.5 14.2A7.7 7.7 0 1 1 9.8 3.5a6.4 6.4 0 1 0 10.7 10.7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="files" aria-label="Changed files">
+          <article class="file-card status-modified" data-open="true">
+            <button
+              type="button"
+              class="file-toggle"
+              aria-label="Modified file packages/desktop/src/renderer/components/right-panel/ReviewRenderView.tsx, 82 additions and 19 deletions"
+              aria-expanded="true"
+              aria-controls="diff-review-render-view"
+            >
+              <span class="chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="status-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                  <path d="M14 2v5h5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="file-path">packages/desktop/src/renderer/components/right-panel/ReviewRenderView.tsx</span>
+              <span class="file-delta">
+                <span class="plus">+82</span>
+                <span class="minus">-19</span>
+              </span>
+            </button>
+            <div class="diff-region" id="diff-review-render-view">
+              <div class="diff-code" role="region" aria-label="Diff for ReviewRenderView.tsx">
+                <div class="diff-line hunk"><span class="line-no"></span><span class="line-no"></span><span class="sign">@@</span><span class="line-text">renderFileRows(changeSet.files)</span></div>
+                <div class="diff-line"><span class="line-no">18</span><span class="line-no">18</span><span class="sign"></span><span class="line-text">const sortedFiles = sortReviewFiles(changeSet.files);</span></div>
+                <div class="diff-line del"><span class="line-no">19</span><span class="line-no"></span><span class="sign">-</span><span class="line-text">return &lt;RawDiffBlock diff={changeSet.unifiedText} /&gt;;</span></div>
+                <div class="diff-line add"><span class="line-no"></span><span class="line-no">19</span><span class="sign">+</span><span class="line-text">const firstExpandableFile = sortedFiles.find((file) =&gt; file.chunks.length &gt; 0);</span></div>
+                <div class="diff-line add"><span class="line-no"></span><span class="line-no">20</span><span class="sign">+</span><span class="line-text">return sortedFiles.map((file) =&gt; (</span></div>
+                <div class="diff-line add"><span class="line-no"></span><span class="line-no">21</span><span class="sign">+</span><span class="line-text">  &lt;ReviewFileAccordion</span></div>
+                <div class="diff-line add"><span class="line-no"></span><span class="line-no">22</span><span class="sign">+</span><span class="line-text">    file={file}</span></div>
+                <div class="diff-line add"><span class="line-no"></span><span class="line-no">23</span><span class="sign">+</span><span class="line-text">    defaultOpen={file.path === firstExpandableFile?.path}</span></div>
+                <div class="diff-line add"><span class="line-no"></span><span class="line-no">24</span><span class="sign">+</span><span class="line-text">  /&gt;</span></div>
+                <div class="diff-line add"><span class="line-no"></span><span class="line-no">25</span><span class="sign">+</span><span class="line-text">));</span></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="file-card status-added" data-open="false">
+            <button
+              type="button"
+              class="file-toggle"
+              aria-label="New file packages/desktop/src/renderer/test/right-panel-review.test.tsx, 44 additions and 0 deletions"
+              aria-expanded="false"
+              aria-controls="diff-review-tests"
+            >
+              <span class="chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="status-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+              </span>
+              <span class="file-path">packages/desktop/src/renderer/test/right-panel-review.test.tsx</span>
+              <span class="file-delta">
+                <span class="plus">+44</span>
+                <span class="minus">-0</span>
+              </span>
+            </button>
+            <div class="diff-region" id="diff-review-tests">
+              <div class="diff-code" role="region" aria-label="Diff for new review test">
+                <div class="diff-line hunk"><span class="line-no"></span><span class="line-no"></span><span class="sign">@@</span><span class="line-text">new renderer coverage</span></div>
+                <div class="diff-line add"><span class="line-no"></span><span class="line-no">1</span><span class="sign">+</span><span class="line-text">it("opens the first diff file by default", () =&gt; {</span></div>
+                <div class="diff-line add"><span class="line-no"></span><span class="line-no">2</span><span class="sign">+</span><span class="line-text">  render(&lt;ReviewRenderView changeSet={fixture} /&gt;);</span></div>
+                <div class="diff-line add"><span class="line-no"></span><span class="line-no">3</span><span class="sign">+</span><span class="line-text">  expect(screen.getByRole("button", { expanded: true })).toBeVisible();</span></div>
+                <div class="diff-line add"><span class="line-no"></span><span class="line-no">4</span><span class="sign">+</span><span class="line-text">});</span></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="file-card status-renamed" data-open="false">
+            <button
+              type="button"
+              class="file-toggle"
+              aria-label="Renamed file docs/design-docs/core-review-change-sources.md, 8 additions and 3 deletions"
+              aria-expanded="false"
+              aria-controls="diff-review-renamed"
+            >
+              <span class="chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="status-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M7 7h11l-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M17 17H6l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="file-path">docs/design-docs/core-review-change-sources.md</span>
+              <span class="file-delta">
+                <span class="plus">+8</span>
+                <span class="minus">-3</span>
+              </span>
+            </button>
+            <div class="diff-region" id="diff-review-renamed">
+              <div class="diff-code" role="region" aria-label="Diff for renamed review source doc">
+                <div class="diff-line hunk"><span class="line-no"></span><span class="line-no"></span><span class="sign">@@</span><span class="line-text">Review source ordering</span></div>
+                <div class="diff-line del"><span class="line-no">37</span><span class="line-no"></span><span class="sign">-</span><span class="line-text">Review may read session changes first.</span></div>
+                <div class="diff-line add"><span class="line-no"></span><span class="line-no">37</span><span class="sign">+</span><span class="line-text">Review defaults to Git repository state first.</span></div>
+                <div class="diff-line"><span class="line-no">38</span><span class="line-no">38</span><span class="sign"></span><span class="line-text">Session review remains a later provider scope.</span></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="file-card status-deleted" data-open="false">
+            <button
+              type="button"
+              class="file-toggle"
+              aria-label="Deleted file packages/desktop/src/renderer/components/right-panel/LegacyRawDiff.tsx, 0 additions and 20 deletions"
+              aria-expanded="false"
+              aria-controls="diff-review-deleted"
+            >
+              <span class="chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="status-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  <path d="M6 6l1 16h10l1-16" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="file-path">packages/desktop/src/renderer/components/right-panel/LegacyRawDiff.tsx</span>
+              <span class="file-delta">
+                <span class="plus">+0</span>
+                <span class="minus">-20</span>
+              </span>
+            </button>
+            <div class="diff-region" id="diff-review-deleted">
+              <div class="diff-code" role="region" aria-label="Diff for deleted raw diff component">
+                <div class="diff-line hunk"><span class="line-no"></span><span class="line-no"></span><span class="sign">@@</span><span class="line-text">removed raw diff renderer</span></div>
+                <div class="diff-line del"><span class="line-no">1</span><span class="line-no"></span><span class="sign">-</span><span class="line-text">export function LegacyRawDiff({ diff }: { diff: string }) {</span></div>
+                <div class="diff-line del"><span class="line-no">2</span><span class="line-no"></span><span class="sign">-</span><span class="line-text">  return &lt;pre&gt;{diff}&lt;/pre&gt;;</span></div>
+                <div class="diff-line del"><span class="line-no">3</span><span class="line-no"></span><span class="sign">-</span><span class="line-text">}</span></div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const toggleFileCard = (button) => {
+        const card = button.closest(".file-card");
+        const isOpen = card.dataset.open === "true";
+
+        card.dataset.open = String(!isOpen);
+        button.setAttribute("aria-expanded", String(!isOpen));
+      };
+
+      document.querySelectorAll(".file-toggle").forEach((button) => {
+        button.addEventListener("click", () => {
+          toggleFileCard(button);
+        });
+
+        button.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") {
+            return;
+          }
+
+          event.preventDefault();
+          toggleFileCard(button);
+        });
+      });
+
+      document.querySelector("[data-theme-toggle]").addEventListener("click", () => {
+        const root = document.documentElement;
+        const nextTheme = root.dataset.theme === "dark" ? "light" : "dark";
+
+        root.dataset.theme = nextTheme;
+        document.querySelector("[data-theme-toggle]").setAttribute(
+          "aria-label",
+          nextTheme === "dark" ? "Preview light theme" : "Preview dark theme",
+        );
+      });
+    </script>
+  </body>
+</html>
