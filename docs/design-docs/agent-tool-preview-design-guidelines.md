@@ -46,6 +46,7 @@
 - 工具调用进行中阶段（`tool_started` 之后、`tool_finished` 之前）所有工具行使用 text shimmer 视觉，详见 [中间消息区规范 - 工具执行中态规范](../front-中间消息区规范.md#工具执行中态规范)。
 - running 阶段后端 `tool_started.preview` 只推送当前能确定的最小字段（filePath / command / query），不传未生成的数值（diff stats、entryCount 等）；完成态字段在 `tool_finished` / 持久化事件中补齐。
 - **`tool_call_streaming` 事件契约**：bridge 在 LLM 流式输出 `tool_call_delta` 时累积 partial args，按 50ms throttle emit `tool_call_streaming { toolCallId, toolName, isInitial?, preview: ToolUiPreview }`。前端**零解析**直接消费 typed preview，复用与 `tool_started` 相同的渲染分支。`isInitial=true` 是首帧（dispatched 阶段），filePath 此时可能为空字符串，前端用 `Write file…` 等 fallback 文案展示。新工具接入只需在 `engine/streaming-preview-extractors.ts` 注册按 previewKind 的 extractor，前端无需改动。详见 [docs/learnings/2026-05/llm-tool-call-streaming.md](../../learnings/2026-05/llm-tool-call-streaming.md) 的流式协议设计原则。
+- **`subagent_event` 事件契约**：Agent 工具执行 SubAgent run 时，bridge emit `subagent_event { toolCallId, transcriptRef, event, preview }`，其中 `preview` 是完整 typed `AgentToolPreview`。renderer 只用它覆盖同一个 Agent block 的 running state，不解析 SubAgent 原始工具参数；最终完成态仍由 `tool_result.uiPreview.kind === "agent"` 持久化恢复。
 
 ## 内置工具规范
 
@@ -127,12 +128,23 @@
 - 优先展示媒体文件名、URL 或输入来源。
 - 展示建议：`Analyzed image screenshot.png` 或 `Analyzed media`。
 
+### `agent`
+
+- `previewKind`: `agent`
+- 对外工具名是 `agent`，用户可见名是 `Agent`。
+- `ToolUiPreview` 必须是 `AgentToolPreview`，包含 `description`、`status`、`subagentType`、`displayText`，执行中可带 `recentEvents` 和 `transcriptRef`，完成态带 `summary`、`stats`、`transcriptRef`。
+- 展示：主消息流渲染为可点击 `AgentRunBlock`，而不是普通单行工具日志；点击打开 SubAgent transcript modal。
+- running 更新来自 `RuntimeStreamEvent.subagent_event.preview`。`recentEvents` 只展示最近 3-5 条 transcript 摘要，完整 transcript 通过 `transcriptRef` 读取。
+- 主 session 只持久化 Agent 工具的 `tool_call` / `tool_result` 和最终 preview，不展开写入 SubAgent transcript 内部事件。
+- `modelOutput` 给主 Agent 使用，必须是短 summary + stats + transcript ref；完整 transcript 只服务 UI 回放和排障。
+
 ## 新增工具检查清单
 
 - 工具 definition 必须声明 `previewKind`。
 - `createToolUiPreview()` 必须为新增展示类型生成稳定字段。
 - 在 `engine/streaming-preview-extractors.ts` 注册同名 previewKind 的 extractor（即便只输出空 preview），让 `tool_call_streaming` 在前端有稳定渲染。
 - 流式 `tool_call_streaming.preview`、`tool_started.preview` 和最终 `tool_result.uiPreview` 必须使用同一套展示语义。
+- 聚合型工具如果有内部事件流（例如 Agent/SubAgent），必须新增 typed stream event 或 typed preview 更新，不能让 renderer 从 raw args / raw output 反推运行状态。
 - `MessageBlock` / `session-selectors` 必须能从 `ToolUiPreview` 恢复前端消息。
 - 前端组件应消费 `MessageBlock` 字段，不直接读取 raw args。
 - 测试至少覆盖一次流式展示和一次持久化恢复展示。

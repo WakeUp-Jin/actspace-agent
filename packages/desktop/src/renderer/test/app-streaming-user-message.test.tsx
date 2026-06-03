@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, BootstrapState, RunTurnInput, RuntimeStreamEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
+import type { AppSettings, BootstrapState, RunTurnInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { TooltipProvider } from "../components/ui/Tooltip";
@@ -359,6 +359,146 @@ describe("App streaming user message", () => {
       resolveRunTurn?.({
         sessionId,
         turnId: "turn-read-finished",
+        status: "completed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      });
+    });
+  });
+
+  it("renders a streaming Agent block from SubAgent events and opens the live transcript", async () => {
+    const sessionId = "session-subagent-stream";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "SubAgent stream",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+    const transcriptEvent: SessionEvent = {
+      id: "evt-subagent-tool",
+      sessionId,
+      turnId: "turn-subagent:subagent:run-1",
+      type: "tool_call",
+      timestamp: "2026-06-03T10:00:00.000Z",
+      payload: {
+        id: "tool-read-app",
+        name: "read_file",
+        arguments: { path: "packages/desktop/src/renderer/App.tsx" },
+      },
+    };
+
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+      null;
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      getSubAgentTranscript: async () => [],
+      ...settingsApiStub,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) {
+            streamHandler = null;
+          }
+        };
+      },
+      runTurn: (input: RunTurnInput) =>
+        new Promise((resolve) => {
+          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          streamHandler?.({
+            type: "tool_call_streaming",
+            toolCallId: "tool-agent-1",
+            toolName: "agent",
+            isInitial: true,
+            preview: {
+              kind: "agent",
+              description: "Explore renderer flow",
+              status: "running",
+              subagentType: "explore",
+              displayText: "Explore renderer flow",
+            },
+          });
+          streamHandler?.({
+            type: "subagent_event",
+            toolCallId: "tool-agent-1",
+            transcriptRef: {
+              kind: "subagent_transcript",
+              sessionId,
+              turnId: input.turnId,
+              runId: "run-1",
+            },
+            event: transcriptEvent,
+            preview: {
+              kind: "agent",
+              description: "Explore renderer flow",
+              status: "running",
+              subagentType: "explore",
+              displayText: "Explore renderer flow",
+              transcriptRef: {
+                kind: "subagent_transcript",
+                sessionId,
+                turnId: input.turnId,
+                runId: "run-1",
+              },
+              recentEvents: [
+                {
+                  id: "evt-subagent-tool",
+                  type: "tool_call",
+                  title: "Read",
+                  summary: "Read packages/desktop/src/renderer/App.tsx",
+                  timestamp: "2026-06-03T10:00:00.000Z",
+                },
+              ],
+            },
+          });
+          resolveRunTurn = resolve;
+        }),
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "delegate exploration");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    expect(await screen.findByText("Explore renderer flow")).toBeTruthy();
+    expect(await screen.findByText("Read packages/desktop/src/renderer/App.tsx")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: /Open SubAgent transcript for Explore renderer flow/ }));
+
+    const dialog = await screen.findByRole("dialog", { name: /SubAgent transcript: Explore renderer flow/ });
+    expect(dialog).toBeTruthy();
+    expect(within(dialog).getByText(/packages\/desktop\/src\/renderer\/App\.tsx/)).toBeTruthy();
+
+    await act(async () => {
+      resolveRunTurn?.({
+        sessionId,
+        turnId: "turn-subagent-finished",
         status: "completed",
         events: [],
         contextSnapshot: {

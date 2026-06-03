@@ -6,6 +6,7 @@ import {
   createSessionRecord,
   listSessionRecords,
   readContextState,
+  readSubAgentTranscript,
   readSessionRecord,
   createSessionStorePaths,
   setSessionArchived,
@@ -13,8 +14,10 @@ import {
   setSessionWorkspace,
   setSessionTitle,
   writeContextState,
+  writeSubAgentTranscripts,
 } from "../session-store";
 import { readMeta } from "../meta";
+import type { SessionEvent, SubAgentTranscriptRef } from "@actspace/shared";
 
 let sessionRoot: string;
 
@@ -26,6 +29,33 @@ beforeEach(async () => {
 afterEach(async () => {
   await rm(sessionRoot, { recursive: true, force: true });
 });
+
+function createTranscriptEvent(sessionId: string, turnId: string): SessionEvent {
+  return {
+    id: "evt-subagent-report",
+    sessionId,
+    turnId,
+    type: "assistant_message",
+    timestamp: "2026-06-02T10:00:00.000Z",
+    schemaVersion: 1,
+    payload: {
+      content: "SubAgent report",
+      stopReason: "stop",
+      model: "mock-model",
+      provider: "mock",
+    },
+  };
+}
+
+function createTranscriptRef(sessionId: string, partial: Partial<SubAgentTranscriptRef> = {}): SubAgentTranscriptRef {
+  return {
+    kind: "subagent_transcript",
+    sessionId,
+    turnId: "turn-1",
+    runId: "run-1",
+    ...partial,
+  };
+}
 
 describe("session store", () => {
   it("creates an empty session record and lists it", async () => {
@@ -203,5 +233,47 @@ describe("session store", () => {
     const restored = await readSessionRecord(paths);
     expect(restored?.events).toEqual([]);
     expect(restored?.contextState).toEqual(state);
+  });
+
+  it("writes and reads SubAgent transcripts outside the main session event stream", async () => {
+    const record = await createSessionRecord(sessionRoot, { title: "SubAgent transcript" });
+    const paths = createSessionStorePaths(join(sessionRoot, record.meta.id));
+    const ref = createTranscriptRef(record.meta.id);
+    const event = createTranscriptEvent(record.meta.id, "turn-1:subagent:run-1");
+
+    await expect(writeSubAgentTranscripts(paths, [{ transcriptRef: ref, events: [event] }])).resolves.toEqual({
+      ok: true,
+    });
+    await expect(readSubAgentTranscript(paths, ref)).resolves.toEqual([event]);
+
+    const restored = await readSessionRecord(paths);
+    expect(restored?.events).toEqual([]);
+  });
+
+  it("rejects SubAgent transcript refs that do not belong to the session root", async () => {
+    const first = await createSessionRecord(sessionRoot, { title: "First" });
+    const second = await createSessionRecord(sessionRoot, { title: "Second" });
+    const firstPaths = createSessionStorePaths(join(sessionRoot, first.meta.id));
+    const secondPaths = createSessionStorePaths(join(sessionRoot, second.meta.id));
+    const ref = createTranscriptRef(first.meta.id);
+    const event = createTranscriptEvent(first.meta.id, "turn-1:subagent:run-1");
+
+    await expect(writeSubAgentTranscripts(firstPaths, [{ transcriptRef: ref, events: [event] }])).resolves.toEqual({
+      ok: true,
+    });
+    await expect(readSubAgentTranscript(secondPaths, ref)).resolves.toEqual([]);
+  });
+
+  it("rejects unsafe SubAgent transcript path segments", async () => {
+    const record = await createSessionRecord(sessionRoot, { title: "Unsafe transcript" });
+    const paths = createSessionStorePaths(join(sessionRoot, record.meta.id));
+    const unsafeRef = createTranscriptRef(record.meta.id, { turnId: "../turn-1", runId: "run-1" });
+    const event = createTranscriptEvent(record.meta.id, "turn-1:subagent:run-1");
+
+    await expect(writeSubAgentTranscripts(paths, [{ transcriptRef: unsafeRef, events: [event] }])).resolves.toEqual({
+      ok: false,
+      error: "Invalid SubAgent transcript reference.",
+    });
+    await expect(readSubAgentTranscript(paths, unsafeRef)).resolves.toEqual([]);
   });
 });

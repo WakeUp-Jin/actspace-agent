@@ -6,7 +6,7 @@
  */
 
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import type {
   AgentTurnResult,
   ContextState,
@@ -14,9 +14,12 @@ import type {
   SessionListInput,
   SessionListItem,
   SessionRecord,
+  SessionEvent,
+  SubAgentTranscriptRef,
 } from "@actspace/shared";
 import type { SessionStorePaths, WriteResult } from "./types";
 import { appendEvents } from "./jsonl";
+import { parseJsonl } from "./jsonl";
 import { createMeta, incrementTurnCount, readMeta, updateMeta } from "./meta";
 import { recoverSession } from "./recovery";
 
@@ -124,6 +127,9 @@ export async function writeSessionResult(
   const writeResult = await appendEvents(paths.sessionPath, result.events);
   if (!writeResult.ok) return writeResult;
 
+  const transcriptResult = await writeSubAgentTranscripts(paths, result.subagentTranscripts ?? []);
+  if (!transcriptResult.ok) return transcriptResult;
+
   // 确保 meta 存在
   const existingMeta = await readMeta(paths.metaPath);
   if (!existingMeta) {
@@ -141,6 +147,71 @@ export async function writeSessionResult(
   }
 
   return metaResult;
+}
+
+export function getSubAgentTranscriptPath(
+  paths: SessionStorePaths,
+  transcriptRef: SubAgentTranscriptRef,
+): string {
+  const safePath = getSafeSubAgentTranscriptPath(paths, transcriptRef);
+  if (!safePath) {
+    throw new Error("Invalid SubAgent transcript reference.");
+  }
+  return safePath;
+}
+
+function getSafeSubAgentTranscriptPath(
+  paths: SessionStorePaths,
+  transcriptRef: SubAgentTranscriptRef,
+): string | null {
+  if (
+    !isSafePathSegment(transcriptRef.sessionId) ||
+    !isSafePathSegment(transcriptRef.turnId) ||
+    !isSafePathSegment(transcriptRef.runId)
+  ) {
+    return null;
+  }
+  if (basename(paths.root) !== transcriptRef.sessionId) {
+    return null;
+  }
+  return join(paths.root, "subagents", transcriptRef.turnId, `${transcriptRef.runId}.jsonl`);
+}
+
+export async function writeSubAgentTranscripts(
+  paths: SessionStorePaths,
+  transcripts: Array<{ transcriptRef: SubAgentTranscriptRef; events: SessionEvent[] }>,
+): Promise<WriteResult> {
+  for (const transcript of transcripts) {
+    const transcriptPath = getSafeSubAgentTranscriptPath(paths, transcript.transcriptRef);
+    if (!transcriptPath) {
+      return { ok: false, error: "Invalid SubAgent transcript reference." };
+    }
+    const writeResult = await appendEvents(transcriptPath, transcript.events);
+    if (!writeResult.ok) return writeResult;
+  }
+  return { ok: true };
+}
+
+export async function readSubAgentTranscript(
+  paths: SessionStorePaths,
+  transcriptRef: SubAgentTranscriptRef,
+): Promise<SessionEvent[]> {
+  const transcriptPath = getSafeSubAgentTranscriptPath(paths, transcriptRef);
+  if (!transcriptPath) {
+    return [];
+  }
+  const parsed = await parseJsonl(transcriptPath);
+  return parsed.events;
+}
+
+function isSafePathSegment(segment: string): boolean {
+  return (
+    segment.length > 0 &&
+    segment !== "." &&
+    segment !== ".." &&
+    !segment.includes("/") &&
+    !segment.includes("\\")
+  );
 }
 
 export async function writeContextState(

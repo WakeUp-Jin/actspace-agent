@@ -13,6 +13,7 @@
 - `right-panel-image-final.png`：右侧 Image 定稿图。
 - `right-panel-diff-final.png`：右侧 Diff 定稿图。
 - `settings-page-final.png`：设置页定稿图。
+- `agent-subagent-flow-prototype.html`：Agent 工具与 SubAgent 执行流 HTML 原型，包含执行中摘要块、完成摘要块、完整 transcript 弹窗和浅深主题切换。
 
 ## 使用方式
 

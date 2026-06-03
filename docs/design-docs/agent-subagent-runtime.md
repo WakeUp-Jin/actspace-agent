@@ -2,7 +2,7 @@
 
 ## 定位
 
-本文定义 actspace 的子智能体能力：主 Agent 通过 **Agent 工具**启动一个独立的 SubAgent run，让它在隔离上下文中完成探索、验证或局部分析任务。这里是长期设计事实来源；具体实施步骤见 `docs/exec-plans/active/20260602-agent-tool-subagent-runtime.md`。
+本文定义 actspace 的子智能体能力：主 Agent 通过 **Agent 工具**启动一个独立的 SubAgent run，让它在隔离上下文中完成探索、验证或局部分析任务。这里是长期设计事实来源；具体实施步骤归档见 `docs/exec-plans/completed/20260602-agent-tool-subagent-runtime.md`。
 
 命名约定：
 
@@ -51,7 +51,8 @@ SubAgent run 采用 AgentTool 模式：
 
 - `packages/shared`
   - 扩展 `ToolPreviewKind` / `ToolUiPreview` / `MessageBlock`，新增 `agent` 展示语义。
-  - 定义 transcript 引用和 summary payload 的共享类型。
+  - 定义 `SubAgentTranscriptRef`、`AgentToolPreview`、`AgentToolStats`、`AgentToolRecentEvent` 等共享类型。
+  - `RuntimeStreamEvent.subagent_event` 承载 SubAgent transcript 增量事件和最新 typed preview。
 - `packages/agent-core`
   - 新增 Agent 工具定义、executor、只读子工具集工厂、SubAgent runner。
   - runner 复用现有 `runAgentLoop`、LLM service、ContextManager、ToolManager。
@@ -59,6 +60,7 @@ SubAgent run 采用 AgentTool 模式：
 - `packages/desktop/main`
   - 给 agent-core 提供 transcript 落盘根目录、sessionId、turnId、stream callback。
   - 主 turn abort 时级联 abort 当前 SubAgent run。
+  - 提供 `subagent:get-transcript` IPC，按 typed `SubAgentTranscriptRef` 读取 sidecar transcript。
 - `packages/desktop/renderer`
   - 渲染主消息流中的 Agent 工具块。
   - 点击 Agent 工具块打开完整 transcript modal。
@@ -102,6 +104,8 @@ type AgentToolOutput = {
 };
 ```
 
+`ToolResult` 里额外带 `subagent` 运行时字段，供 bridge 收集 `transcriptEvents` 和最终 `uiPreview`。这个字段不直接暴露给 renderer；renderer 只收到 `RuntimeStreamEvent.subagent_event` 和最终 `tool_result.uiPreview`。
+
 传给主 Agent 的 `modelOutput` 应短而结构化，包含：
 
 - 子智能体最终结论。
@@ -119,7 +123,20 @@ SubAgent transcript 是完整可恢复事件流，不是摘要字符串。
 <userData>/sessions/<sessionId>/subagents/<turnId>/<runId>.jsonl
 ```
 
-每行是 `SessionEvent`。事件的 `sessionId` 仍使用父 sessionId，`turnId` 可使用 `${parentTurnId}:subagent:${runId}` 或新增 payload 字段关联父 turn。V0 推荐保留父 `sessionId` 并在 payload/ref 中写 `parentTurnId`、`runId`，避免破坏现有 selector。
+当前落地路径为：
+
+```txt
+<sessionDir>/subagents/<parentTurnId>/<runId>.jsonl
+```
+
+每行是 `SessionEvent`。事件的 `sessionId` 仍使用父 sessionId；transcript 内部事件的 `turnId` 使用 `${parentTurnId}:subagent:${runId}`，而 `SubAgentTranscriptRef.turnId` 保留父 turnId，用于从主 session 定位 sidecar 文件。
+
+读取边界：
+
+- `writeSessionResult()` 先追加主 `session.jsonl`，再写 `AgentTurnResult.subagentTranscripts`。
+- `readSubAgentTranscript()` 只接受 `SubAgentTranscriptRef`，并校验 `sessionId`、`turnId`、`runId` 都是安全 path segment。
+- `getSafeSubAgentTranscriptPath()` 要求 `basename(sessionDir) === transcriptRef.sessionId`，拒绝 renderer 传跨 session ref。
+- renderer 通过 preload 调用 `subagent:get-transcript`，不接触文件系统路径。
 
 最小事件集：
 
@@ -131,6 +148,27 @@ SubAgent transcript 是完整可恢复事件流，不是摘要字符串。
 - `error`：失败或 abort。
 
 主会话 `session.jsonl` 只写 Agent 工具的 `tool_call` / `tool_result`，不展开写入 transcript 内部事件，避免主上下文膨胀。
+
+## 流式更新契约
+
+SubAgent run 的内部事件不复用普通工具 `tool_call_streaming`，而是走独立 runtime event：
+
+```ts
+type SubAgentRuntimeEvent = {
+  type: "subagent_event";
+  toolCallId: string;
+  transcriptRef: SubAgentTranscriptRef;
+  event: SessionEvent;
+  preview: AgentToolPreview;
+};
+```
+
+约束：
+
+- `event` 是刚产生的一条 transcript 事件，可用于 live modal 追加。
+- `preview` 是同一 toolCallId 的最新 Agent block view model，renderer 直接覆盖 running block。
+- `preview.recentEvents` 只保留少量摘要，用于主消息流；完整 transcript 以 sidecar JSONL 为事实来源。
+- 完成态仍以 `tool_result.payload.uiPreview.kind === "agent"` 持久化恢复。
 
 ## 子智能体类型
 

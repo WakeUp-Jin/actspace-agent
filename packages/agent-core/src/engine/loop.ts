@@ -144,7 +144,7 @@ async function runDualLoop(
           toolCalls,
           config.toolExecution ?? "sequential",
           emit,
-          config.toolExecuteOptions,
+          { ...config.toolExecuteOptions, signal },
         );
 
         for (const toolMsg of results) {

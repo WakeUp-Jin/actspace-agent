@@ -39,6 +39,7 @@ export interface AgentOptions {
   shouldStopAfterTurn?: AgentLoopConfig["shouldStopAfterTurn"];
   getSteeringMessages?: AgentLoopConfig["getSteeringMessages"];
   getFollowUpMessages?: AgentLoopConfig["getFollowUpMessages"];
+  toolExecuteOptions?: AgentLoopConfig["toolExecuteOptions"];
   thinkingEnabled?: boolean;
   /**
    * flash 摘要器，用于 mid-loop 历史压缩。缺省时仍会按 token 水位触发压缩，
@@ -58,6 +59,7 @@ export class Agent {
   private shouldStopAfterTurn?: AgentLoopConfig["shouldStopAfterTurn"];
   private getSteeringMessages?: AgentLoopConfig["getSteeringMessages"];
   private getFollowUpMessages?: AgentLoopConfig["getFollowUpMessages"];
+  private toolExecuteOptions?: AgentLoopConfig["toolExecuteOptions"];
   private thinkingEnabled?: boolean;
   private summarizer?: Summarizer;
   private cacheAudit?: CacheAuditTracker;
@@ -71,6 +73,7 @@ export class Agent {
     this.shouldStopAfterTurn = options.shouldStopAfterTurn;
     this.getSteeringMessages = options.getSteeringMessages;
     this.getFollowUpMessages = options.getFollowUpMessages;
+    this.toolExecuteOptions = options.toolExecuteOptions;
     this.thinkingEnabled = options.thinkingEnabled;
     this.summarizer = options.summarizer;
     this.cacheAudit = options.cacheAudit;
@@ -101,6 +104,7 @@ export class Agent {
       shouldStopAfterTurn: this.shouldStopAfterTurn,
       getSteeringMessages: this.getSteeringMessages,
       getFollowUpMessages: this.getFollowUpMessages,
+      toolExecuteOptions: this.toolExecuteOptions,
       thinkingEnabled: this.thinkingEnabled,
       cacheAudit: this.cacheAudit,
       maybeCompact: async () => {

@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>actspace Agent SubAgent Flow Prototype</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --surface: #ffffff;
+      --surface-raised: #ffffff;
+      --surface-subtle: #f6f8fb;
+      --app-bg: #eef1f5;
+      --line: #dfe4ea;
+      --line-strong: #cbd3dd;
+      --text-main: #202124;
+      --text-muted: rgba(32, 33, 36, 0.72);
+      --text-faint: rgba(32, 33, 36, 0.54);
+      --text-subtle: rgba(32, 33, 36, 0.38);
+      --brand: #2f6fff;
+      --brand-strong: #1f5fe8;
+      --brand-soft: #edf4ff;
+      --success: #169b65;
+      --success-soft: #e9f8f1;
+      --warm: #c98316;
+      --warm-soft: #fff4dc;
+      --danger: #c94351;
+      --danger-soft: #fdecef;
+      --shadow-popover: 0 22px 70px rgba(19, 28, 43, 0.18);
+      --shadow-soft: 0 10px 32px rgba(26, 36, 55, 0.08);
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+    }
+
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --surface: #17191d;
+      --surface-raised: #202329;
+      --surface-subtle: #242831;
+      --app-bg: #101216;
+      --line: #333843;
+      --line-strong: #474d5a;
+      --text-main: #eef1f5;
+      --text-muted: rgba(238, 241, 245, 0.74);
+      --text-faint: rgba(238, 241, 245, 0.56);
+      --text-subtle: rgba(238, 241, 245, 0.38);
+      --brand: #6ea7ff;
+      --brand-strong: #9bc3ff;
+      --brand-soft: rgba(110, 167, 255, 0.14);
+      --success: #5fd39a;
+      --success-soft: rgba(95, 211, 154, 0.12);
+      --warm: #f1bf60;
+      --warm-soft: rgba(241, 191, 96, 0.13);
+      --danger: #ff7b8a;
+      --danger-soft: rgba(255, 123, 138, 0.14);
+      --shadow-popover: 0 26px 80px rgba(0, 0, 0, 0.48);
+      --shadow-soft: 0 12px 36px rgba(0, 0, 0, 0.26);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--app-bg);
+      color: var(--text-main);
+      font-family: var(--font-ui);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .prototype-shell {
+      display: grid;
+      min-height: 100vh;
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .prototype-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-raised);
+      padding: 10px 18px;
+    }
+
+    .toolbar-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .toolbar-mark {
+      display: grid;
+      width: 22px;
+      height: 22px;
+      place-items: center;
+      border-radius: var(--radius-sm);
+      background: var(--brand-soft);
+      color: var(--brand-strong);
+      font-weight: 700;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .segmented {
+      display: flex;
+      gap: 2px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface-subtle);
+      padding: 2px;
+    }
+
+    .segmented button,
+    .ghost-button,
+    .icon-button {
+      border: 0;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+    }
+
+    .segmented button {
+      min-height: 28px;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .segmented button[aria-pressed="true"] {
+      background: var(--surface-raised);
+      color: var(--text-main);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    .ghost-button {
+      min-height: 30px;
+      border-radius: var(--radius-md);
+      background: transparent;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .ghost-button:hover,
+    .icon-button:hover {
+      background: var(--brand-soft);
+      color: var(--brand-strong);
+    }
+
+    .workbench {
+      min-height: 0;
+      overflow: auto;
+      background:
+        linear-gradient(180deg, var(--surface) 0, var(--surface) 70%, var(--surface-subtle) 100%);
+      padding: 38px 20px 72px;
+    }
+
+    .message-stack {
+      width: min(930px, calc(100vw - 48px));
+      margin: 0 auto;
+    }
+
+    .turn {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .user-message {
+      align-self: flex-end;
+      max-width: min(740px, 92%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface-raised);
+      padding: 12px 14px;
+      box-shadow: var(--shadow-soft);
+      color: var(--text-main);
+    }
+
+    .assistant-text {
+      max-width: 780px;
+      color: var(--text-main);
+      font-size: 14px;
+    }
+
+    .muted-line {
+      color: var(--text-faint);
+      font-size: 13px;
+    }
+
+    .agent-block {
+      width: min(760px, 100%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface-raised);
+      padding: 12px 14px;
+      color: var(--text-main);
+      cursor: pointer;
+      text-align: left;
+      box-shadow: 0 1px 2px rgba(10, 18, 32, 0.04);
+      transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease, background 150ms ease;
+    }
+
+    .agent-block:hover {
+      border-color: var(--line-strong);
+      box-shadow: var(--shadow-soft);
+      transform: translateY(-1px);
+    }
+
+    .agent-block:focus-visible {
+      outline: 2px solid var(--brand);
+      outline-offset: 3px;
+    }
+
+    .agent-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .agent-title-group {
+      min-width: 0;
+    }
+
+    .agent-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-main);
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .agent-title::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      flex: none;
+      border-radius: 999px;
+      background: var(--brand);
+      box-shadow: 0 0 0 4px var(--brand-soft);
+    }
+
+    .agent-kicker {
+      margin-top: 4px;
+      color: var(--text-faint);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .status-pill {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 24px;
+      border-radius: 999px;
+      background: var(--surface-subtle);
+      padding: 0 9px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--brand);
+    }
+
+    .is-completed .status-dot {
+      background: var(--success);
+    }
+
+    .agent-live-feed {
+      display: grid;
+      gap: 7px;
+      margin-top: 13px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .feed-row {
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr);
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .feed-row strong {
+      color: var(--text-faint);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .feed-row span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .agent-summary {
+      margin-top: 10px;
+      color: var(--text-main);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .agent-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+      color: var(--text-faint);
+      font-size: 12px;
+    }
+
+    .stat-chip {
+      border-radius: 999px;
+      background: var(--surface-subtle);
+      padding: 3px 8px;
+    }
+
+    .planning-line {
+      width: fit-content;
+      margin-top: 4px;
+      color: var(--text-faint);
+      font-size: 13px;
+    }
+
+    .shimmer {
+      background:
+        linear-gradient(90deg, var(--text-faint) 0%, var(--text-faint) 34%, var(--brand) 50%, var(--text-faint) 66%, var(--text-faint) 100%);
+      background-size: 250% 100%;
+      background-position: 100% 0;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: text-shimmer 1.1s ease-in-out infinite;
+    }
+
+    @keyframes text-shimmer {
+      from { background-position: 100% 0; }
+      to { background-position: 0 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .shimmer {
+        animation: none;
+        color: var(--brand);
+      }
+
+      .agent-block {
+        transition: none;
+      }
+    }
+
+    .modal-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(8, 12, 18, 0.42);
+      padding: 24px;
+    }
+
+    .modal-layer.is-open {
+      display: flex;
+    }
+
+    .modal {
+      display: grid;
+      width: min(920px, calc(100vw - 44px));
+      height: min(740px, calc(100vh - 44px));
+      min-height: 520px;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface-raised);
+      box-shadow: var(--shadow-popover);
+    }
+
+    .modal-header {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+    }
+
+    .icon-button {
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border-radius: var(--radius-md);
+      background: transparent;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .modal-title-wrap {
+      min-width: 0;
+    }
+
+    .modal-title {
+      overflow: hidden;
+      color: var(--text-main);
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .modal-meta {
+      margin-top: 1px;
+      color: var(--text-faint);
+      font-size: 12px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .modal-body {
+      min-height: 0;
+      overflow: auto;
+      padding: 16px 20px 26px;
+      background: var(--surface);
+    }
+
+    .prompt-panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface-raised);
+      padding: 12px 14px;
+      color: var(--text-main);
+      line-height: 1.6;
+      box-shadow: 0 1px 2px rgba(10, 18, 32, 0.03);
+    }
+
+    .prompt-label {
+      margin-bottom: 5px;
+      color: var(--text-faint);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .transcript {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .event-line {
+      display: grid;
+      grid-template-columns: 108px minmax(0, 1fr);
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .event-line .label {
+      color: var(--text-faint);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .thinking-card {
+      border-left: 2px solid var(--line-strong);
+      padding-left: 12px;
+      color: var(--text-muted);
+    }
+
+    .tool-line {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .tool-line.is-running {
+      color: var(--brand);
+    }
+
+    .assistant-card {
+      max-width: 780px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface-raised);
+      padding: 13px 14px;
+      color: var(--text-main);
+      line-height: 1.68;
+    }
+
+    .assistant-card h3 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      line-height: 1.4;
+    }
+
+    .assistant-card p {
+      margin: 0 0 8px;
+    }
+
+    .assistant-card p:last-child {
+      margin-bottom: 0;
+    }
+
+    .code-pill {
+      border-radius: var(--radius-sm);
+      background: var(--surface-subtle);
+      padding: 1px 5px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 720px) {
+      .prototype-toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .toolbar-actions {
+        justify-content: flex-start;
+      }
+
+      .workbench {
+        padding: 24px 14px 52px;
+      }
+
+      .message-stack {
+        width: 100%;
+      }
+
+      .feed-row,
+      .event-line {
+        grid-template-columns: 1fr;
+        gap: 2px;
+      }
+
+      .modal-layer {
+        padding: 12px;
+      }
+
+      .modal {
+        width: 100%;
+        height: calc(100vh - 24px);
+        min-height: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="prototype-shell">
+    <header class="prototype-toolbar">
+      <div class="toolbar-title">
+        <span class="toolbar-mark">A</span>
+        <span>Agent tool flow prototype</span>
+      </div>
+      <div class="toolbar-actions">
+        <div class="segmented" aria-label="Run state">
+          <button type="button" id="state-running" aria-pressed="true">Running</button>
+          <button type="button" id="state-completed" aria-pressed="false">Completed</button>
+        </div>
+        <div class="segmented" aria-label="Theme">
+          <button type="button" id="theme-light" aria-pressed="true">Light</button>
+          <button type="button" id="theme-dark" aria-pressed="false">Dark</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="workbench">
+      <div class="message-stack">
+        <section class="turn" aria-label="Main conversation">
+          <div class="user-message">
+            我们现在来开发一个子 Agent 的功能吧，参考 Claude Code 的实现。前端工具展示区点击后弹窗出现完整的子 Agent 执行流。
+          </div>
+
+          <div class="assistant-text">先把探索子 Agent 发出去：</div>
+
+          <button type="button" class="agent-block" id="agent-block" aria-haspopup="dialog">
+            <div class="agent-head">
+              <div class="agent-title-group">
+                <div class="agent-title">探索 actspace-agent 项目</div>
+                <div class="agent-kicker" id="agent-kicker">Opus 4.6 High · Explore SubAgent · read-only</div>
+              </div>
+              <span class="status-pill" id="agent-status-pill">
+                <span class="status-dot"></span>
+                <span id="agent-status-label">Running</span>
+              </span>
+            </div>
+
+            <div id="running-feed" class="agent-live-feed">
+              <div class="feed-row">
+                <strong>Explored</strong>
+                <span>8 files</span>
+              </div>
+              <div class="feed-row">
+                <strong>Exploring</strong>
+                <span>Reading core engine files and context compression modules</span>
+              </div>
+              <div class="feed-row">
+                <strong>Tool</strong>
+                <span>Read agent.ts L1-148</span>
+              </div>
+              <div class="feed-row">
+                <strong>Tool</strong>
+                <span>Read loop.ts L1-321</span>
+              </div>
+              <div class="feed-row">
+                <strong>Status</strong>
+                <span class="shimmer">Planning next moves</span>
+              </div>
+            </div>
+
+            <div id="completed-summary" class="hidden">
+              <div class="agent-summary">
+                完成了对 actspace-agent 仓库的全面只读探索，产出了覆盖 10 个维度的结构化导览报告，重点详解了上下文压缩的完整触发条件与代码路径，包括 token 估算、阈值判断、防抖、planCompaction、flash 摘要和 applyCompaction 的全链路。
+              </div>
+              <div class="agent-stats">
+                <span class="stat-chip">10 files explored</span>
+                <span class="stat-chip">14 tool calls</span>
+                <span class="stat-chip">41s</span>
+                <span class="stat-chip">38.2k tokens</span>
+              </div>
+            </div>
+          </button>
+
+          <div class="planning-line" id="main-planning-line">Planning next moves</div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-layer" id="modal-layer" role="presentation">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <header class="modal-header">
+        <button type="button" class="icon-button" id="modal-back" aria-label="Back">‹</button>
+        <div class="modal-title-wrap">
+          <div class="modal-title" id="modal-title">探索 actspace-agent 项目</div>
+          <div class="modal-meta" id="modal-meta">Running · Explore SubAgent · transcript live</div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="ghost-button" id="toggle-complete">Complete run</button>
+          <button type="button" class="icon-button" id="modal-close" aria-label="Close">×</button>
+        </div>
+      </header>
+
+      <div class="modal-body">
+        <div class="prompt-panel">
+          <div class="prompt-label">Prompt</div>
+          请对当前工作区的 actspace-agent 仓库做一次很彻底的只读探索，并产出一份结构化项目导览报告。你看不到此前的对话历史，以下是你需要知道的全部背景与任务。
+        </div>
+
+        <div class="transcript" aria-label="SubAgent transcript">
+          <div class="event-line">
+            <div class="label">Thought briefly</div>
+            <div class="thinking-card">
+              探索子 Agent 已在独立上下文启动。先确认仓库结构，再读 Agent Runtime、工具系统、上下文压缩和前端消息流相关文件。
+            </div>
+          </div>
+
+          <div class="event-line">
+            <div class="label">Tool</div>
+            <div class="tool-line">Listed packages (3 entries)</div>
+          </div>
+
+          <div class="event-line">
+            <div class="label">Tool</div>
+            <div class="tool-line">Glob **/*agent*.ts in packages/agent-core</div>
+          </div>
+
+          <div class="event-line">
+            <div class="label">Tool</div>
+            <div class="tool-line">Read agent.ts L1-148</div>
+          </div>
+
+          <div class="event-line">
+            <div class="label">Tool</div>
+            <div class="tool-line">Read loop.ts L1-321</div>
+          </div>
+
+          <div class="event-line">
+            <div class="label">Tool</div>
+            <div class="tool-line">Read bridge.ts L1-1354</div>
+          </div>
+
+          <div class="event-line">
+            <div class="label">Exploring</div>
+            <div>
+              Now reading context compression files and shared session selectors to map how transcript events can render like normal chat.
+            </div>
+          </div>
+
+          <div class="event-line">
+            <div class="label">Tool</div>
+            <div class="tool-line">Read history-compactor.ts L1-260</div>
+          </div>
+
+          <div class="event-line">
+            <div class="label">Tool</div>
+            <div class="tool-line">Read session-selectors.ts L1-360</div>
+          </div>
+
+          <div class="event-line" id="running-modal-line">
+            <div class="label">Status</div>
+            <div class="tool-line is-running shimmer">Planning next moves</div>
+          </div>
+
+          <div class="event-line hidden" id="final-modal-answer">
+            <div class="label">Answer</div>
+            <div class="assistant-card">
+              <h3>结构化导览报告</h3>
+              <p>仓库采用 <span class="code-pill">desktop -> agent-core -> shared</span> 的依赖方向。主 Agent turn 经 Renderer、Main、Bridge、Agent 四层流动，bridge 是 runtime event 与持久化事件的翻译边界。</p>
+              <p>上下文压缩路径集中在 ContextManager 与 HistoryCompactor：token usage 过阈值后先 planCompaction，再调用 flash 摘要，最后 applyCompaction 用合成摘要替换旧历史。</p>
+              <p>子 Agent 能力适合落在工具系统中，由 Agent 工具创建独立 ContextManager 和只读 ToolManager。主会话只记录摘要和 transcriptRef，完整执行流单独保存并由前端 modal 回放。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const stateRunning = document.getElementById("state-running");
+    const stateCompleted = document.getElementById("state-completed");
+    const themeLight = document.getElementById("theme-light");
+    const themeDark = document.getElementById("theme-dark");
+    const agentBlock = document.getElementById("agent-block");
+    const runningFeed = document.getElementById("running-feed");
+    const completedSummary = document.getElementById("completed-summary");
+    const statusLabel = document.getElementById("agent-status-label");
+    const statusPill = document.getElementById("agent-status-pill");
+    const modalLayer = document.getElementById("modal-layer");
+    const modalClose = document.getElementById("modal-close");
+    const modalBack = document.getElementById("modal-back");
+    const modalMeta = document.getElementById("modal-meta");
+    const toggleComplete = document.getElementById("toggle-complete");
+    const runningModalLine = document.getElementById("running-modal-line");
+    const finalModalAnswer = document.getElementById("final-modal-answer");
+
+    let currentState = "running";
+
+    function setPressed(active, inactive) {
+      active.setAttribute("aria-pressed", "true");
+      inactive.setAttribute("aria-pressed", "false");
+    }
+
+    function applyState(nextState) {
+      currentState = nextState;
+      const completed = nextState === "completed";
+      setPressed(completed ? stateCompleted : stateRunning, completed ? stateRunning : stateCompleted);
+      agentBlock.classList.toggle("is-completed", completed);
+      runningFeed.classList.toggle("hidden", completed);
+      completedSummary.classList.toggle("hidden", !completed);
+      runningModalLine.classList.toggle("hidden", completed);
+      finalModalAnswer.classList.toggle("hidden", !completed);
+      statusLabel.textContent = completed ? "Completed" : "Running";
+      statusPill.setAttribute("aria-label", completed ? "Completed" : "Running");
+      modalMeta.textContent = completed
+        ? "Completed · Explore SubAgent · transcript saved"
+        : "Running · Explore SubAgent · transcript live";
+      toggleComplete.textContent = completed ? "Back to running" : "Complete run";
+    }
+
+    function applyTheme(theme) {
+      root.setAttribute("data-theme", theme);
+      setPressed(theme === "dark" ? themeDark : themeLight, theme === "dark" ? themeLight : themeDark);
+    }
+
+    function openModal() {
+      modalLayer.classList.add("is-open");
+      modalClose.focus();
+    }
+
+    function closeModal() {
+      modalLayer.classList.remove("is-open");
+      agentBlock.focus();
+    }
+
+    stateRunning.addEventListener("click", () => applyState("running"));
+    stateCompleted.addEventListener("click", () => applyState("completed"));
+    themeLight.addEventListener("click", () => applyTheme("light"));
+    themeDark.addEventListener("click", () => applyTheme("dark"));
+    agentBlock.addEventListener("click", openModal);
+    modalClose.addEventListener("click", closeModal);
+    modalBack.addEventListener("click", closeModal);
+    toggleComplete.addEventListener("click", () => applyState(currentState === "completed" ? "running" : "completed"));
+    modalLayer.addEventListener("click", (event) => {
+      if (event.target === modalLayer) closeModal();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && modalLayer.classList.contains("is-open")) {
+        closeModal();
+      }
+    });
+  </script>
+</body>
+</html>

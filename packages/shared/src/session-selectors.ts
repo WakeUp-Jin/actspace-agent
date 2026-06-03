@@ -203,6 +203,21 @@ function messageBlockFromToolPreview(
         policyLabel: preview.policyLabel,
         createdAt: getDisplayTime(timestamp)
       };
+    case "agent":
+      return {
+        kind: "agent",
+        id: eventId,
+        description: preview.description,
+        status: preview.status,
+        subagentType: preview.subagentType,
+        displayText: preview.displayText,
+        summary: preview.summary,
+        recentEvents: preview.recentEvents,
+        transcriptRef: preview.transcriptRef,
+        stats: preview.stats,
+        error: preview.error,
+        createdAt: getDisplayTime(timestamp)
+      };
     case "generic":
       return {
         kind: "tool",

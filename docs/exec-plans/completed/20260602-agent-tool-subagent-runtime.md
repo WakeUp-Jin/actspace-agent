@@ -241,14 +241,23 @@
 
 - [x] 确认命名：工具显示名采用 `Agent`，运行实例称 SubAgent run。
 - [x] 新增设计规范 `agent-subagent-runtime.md`。
-- [ ] 完成 shared 契约。
-- [ ] 完成后端 Agent 工具和 Explore runner。
-- [ ] 完成 main/preload transcript IPC。
-- [ ] 完成 renderer Agent block 和 modal。
-- [ ] 完成测试、文档同步、history 和 learning。
+- [x] 完成 shared 契约。
+- [x] 完成后端 Agent 工具和 Explore runner。
+- [x] 完成 main/preload transcript IPC。
+- [x] 完成 renderer Agent block 和 modal。
+- [x] 完成测试、文档同步、history 和 learning。
 
 ## 决策记录
 
 - 2026-06-02：采用 `Agent` 作为用户可见工具名。原因是 Claude Code 最新主名为 `Agent`，`Task` 只是 legacy alias；影响是 UI/prompt 统一叫 Agent，架构文档用 SubAgent run 避免和主 Agent 混淆。
 - 2026-06-02：V0 只实现同步前台 Explore SubAgent。原因是先验证上下文隔离、transcript 和 UI 可观测闭环；后台通知、并发和写工具会显著扩大风险。
 - 2026-06-02：主 session 不展开写入 SubAgent transcript。原因是保护主上下文和恢复链路；影响是需要单独 transcript store 和读取 IPC。
+- 2026-06-03：运行时流式更新采用独立 `RuntimeStreamEvent.subagent_event`，而不是让 renderer 从 raw args 或普通 tool event 猜状态。原因是 shared 契约已具备 typed `AgentToolPreview`、`SubAgentTranscriptRef` 和 transcript event 载荷；影响是 renderer 只消费 typed preview，主 session 仍只持久化最终摘要和 transcript 引用。
+
+## 推进记录
+
+- 2026-06-03：收口里程碑 1 shared 契约。验证命令：`pnpm --filter @actspace/shared test`、`pnpm --filter @actspace/shared typecheck`，均通过。
+- 2026-06-03：收口里程碑 2 后端 Agent 工具与 Explore runner。确认 `agent` 工具注册、Explore 只读工具集、递归 Agent 禁用、runner 输出 summary/ref/stats、bridge 单独收集 transcript 均已有实现和测试覆盖。验证命令：`pnpm --filter @actspace/agent-core test -- src/tools/test/agent-tool.test.ts`、`pnpm --filter @actspace/agent-core test -- src/engine/test/bridge.test.ts`、`pnpm --filter @actspace/agent-core typecheck`，均通过。
+- 2026-06-03：收口 main/preload transcript IPC。确认 `subagent:get-transcript` 只接收 typed `SubAgentTranscriptRef`，renderer 经 preload 调用，main 以 session root 派生路径并交由 `readSubAgentTranscript()` 做 segment 与跨 session 校验；主 turn abort 通过共享 `AbortSignal` 级联到 SubAgent run。验证命令：`pnpm --filter @actspace/agent-core test -- src/persistence/test/session-store.test.ts`、`pnpm --filter @actspace/desktop typecheck`，均通过。
+- 2026-06-03：收口 renderer Agent block 与 transcript modal。新增 App 级流式测试，覆盖 `subagent_event` 推到 Agent block、点击打开 live transcript modal；`AgentRunBlock` 组件测试覆盖 completed summary、running recent events 和 transcript 拉取。验证命令：`pnpm --dir packages/desktop exec vitest run src/renderer/test/app-streaming-user-message.test.tsx`、`pnpm --dir packages/desktop exec vitest run src/renderer/test/agent-run-block.test.tsx`、`pnpm --filter @actspace/desktop typecheck`，均通过。主题颜色扫描 `rg -n "text-black|bg-black|bg-white|text-\\[#|bg-\\[#|border-\\[#|rgba\\(" ...` 无命中。整包 `pnpm --filter @actspace/desktop test -- ...` 仍会触发现有 `src/renderer/test/sheet.test.tsx` focus trap 失败，和本里程碑无关，后续单独处理。
+- 2026-06-03：完成文档收口、history 和 learning。长期事实来源已同步 `agent-current-module-map.md`、`agent-tool-preview-design-guidelines.md`、`front-中间消息区规范.md`、`agent-subagent-runtime.md`；history 记录见 `docs/histories/2026-06/20260603-0804-agent-subagent-runtime-closeout.md`，学习沉淀见 `docs/learnings/2026-06/sidecar-transcript-for-subagents.md`。本计划已从 active 归档到 completed。
