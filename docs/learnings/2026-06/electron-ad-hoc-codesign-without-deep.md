@@ -14,14 +14,14 @@ bundle format is ambiguous (could be app or framework)
 
 ## 为什么这次不能用 `--deep`
 
-本地源码构建只需要降低自用打开摩擦，不需要 Developer ID 身份背书。用 `codesign --deep --sign - actspace.app` 会强行递归重签 Electron 内置 framework，反而引入失败点。
+本地源码构建只需要降低自用打开摩擦，不需要 Developer ID 身份背书。用 `codesign --deep --sign - Actspace.app` 会强行递归重签 Electron 内置 framework，反而引入失败点。
 
 更稳的本地 ad-hoc 策略是：
 
 ```sh
-codesign --force --sign - --timestamp=none "actspace.app/Contents/MacOS/Electron"
-codesign --force --sign - --timestamp=none "actspace.app"
-codesign --verify --no-strict --verbose=2 "actspace.app"
+codesign --force --sign - --timestamp=none "Actspace.app/Contents/MacOS/Actspace"
+codesign --force --sign - --timestamp=none "Actspace.app"
+codesign --verify --no-strict --verbose=2 "Actspace.app"
 ```
 
 这保留 Electron runtime 内部已有结构，只对我们改过的主可执行文件和外层 app 重新做本地临时签名。

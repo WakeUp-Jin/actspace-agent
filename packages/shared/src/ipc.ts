@@ -537,6 +537,8 @@ export type LocalUpdateState = {
   sourceRoot: string | null;
   sourceValid: boolean;
   sourceError?: LocalUpdateErrorCode;
+  appExecutablePath?: string;
+  appIsPackaged?: boolean;
   appPath: string | null;
   installParent: string | null;
   canUpdate: boolean;

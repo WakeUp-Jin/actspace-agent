@@ -16,6 +16,7 @@
 4. 将 app 目录放进 Electron runtime：
    - macOS: `<App>.app/Contents/Resources/app`
    - Linux: `<runtime>/resources/app`
+   - macOS 手写 runtime 组装时，还要把 `Contents/MacOS/Electron` 改成产品可执行文件名，并同步 `Info.plist` 的 `CFBundleExecutable`；否则外壳虽然叫产品名，Electron 仍可能把自己识别成默认 runtime。
 5. macOS 如果要接自定义图标，把 `.icns` 放入 `<App>.app/Contents/Resources/`，并在 `Info.plist` 写 `CFBundleIconFile`。
 6. macOS 如果要产出 `.dmg`，用同一个最终 `.app` 建一个临时目录，目录内放 `<App>.app` 和指向 `/Applications` 的 symlink，再用 `hdiutil create -srcfolder ... -format UDZO` 生成压缩磁盘映像。
 7. release manifest 明确标注 `signed: false` 和 `notarized: false`，并分别记录 archive / dmg artifact，避免把本地安装介质误认为正式签名分发包。
@@ -32,6 +33,7 @@
 - 图标必须在签名或去签名前写入 `.app`，否则先签名再改资源会让签名失效。
 - `iconutil` 对 `.iconset` 很挑剔；如果本机 PNG 元数据导致转换失败，可以先保留规范尺寸的 iconset，再用 ICNS 容器格式生成最终 `.icns`，但要用 `file` 或真实 app 打包验证。
 - 应用内“点击更新”不是 `.dmg` 自动带来的能力。运行中的 app 不能可靠覆盖自己，本地 updater 需要外部 helper 或脚本执行“退出 app -> 替换 app -> 重启 app”。
+- 手写 Electron portable 包时，`app.isPackaged` 可能因为主可执行文件仍叫 `Electron` 而不可靠。本地 updater 应以真实 `.app` 路径和安全边界为主，例如允许 `Actspace.app` / `actspace.app`，但拒绝 `node_modules/electron/dist/Electron.app`。
 - 本地 updater 需要把“能执行什么”固定在 main 进程：renderer 只触发 `start`，不能传 shell 命令；main 校验 source root 是预期 repo 后再生成 helper 脚本。否则更新按钮会变成任意命令执行入口。
 - 替换 `.app` 前最好先把旧 app 移到同目录 backup，复制新 app 失败时恢复 backup；成功重启后再清理 backup。这样比直接 `rm -rf "$APP_PATH" && cp -R` 更容易从中途失败恢复。
 

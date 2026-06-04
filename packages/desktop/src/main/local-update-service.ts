@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { constants } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type {
   LocalUpdateErrorCode,
   LocalUpdateStartResult,
@@ -75,6 +75,8 @@ export class LocalUpdateService {
       sourceRoot: this.sourceRoot,
       sourceValid: source.ok,
       sourceError: source.ok === false ? source.error : undefined,
+      appExecutablePath: this.appPathInput,
+      appIsPackaged: this.isPackaged,
       appPath: app.ok ? app.appPath : null,
       installParent: app.ok ? app.installParent : null,
       canUpdate,
@@ -163,9 +165,10 @@ export class LocalUpdateService {
 
   private async resolveInstallTarget(): Promise<InstallTargetResult> {
     if (this.platform !== "darwin") return { ok: false, error: "not_macos" };
-    if (!this.isPackaged) return { ok: false, error: "not_packaged" };
     const appPath = deriveMacAppPath(this.appPathInput);
     if (!appPath) return { ok: false, error: "not_packaged" };
+    if (isDevelopmentElectronRuntime(appPath)) return { ok: false, error: "not_packaged" };
+    if (!isActspaceAppBundle(appPath)) return { ok: false, error: "not_packaged" };
     const installParent = dirname(appPath);
     try {
       await access(installParent, constants.W_OK);
@@ -220,6 +223,15 @@ export function deriveMacAppPath(input: string): string | null {
   return input.slice(0, index + marker.length);
 }
 
+export function isDevelopmentElectronRuntime(appPath: string): boolean {
+  const normalized = appPath.replace(/\\/g, "/");
+  return normalized.includes("/node_modules/") && normalized.endsWith("/Electron.app");
+}
+
+export function isActspaceAppBundle(appPath: string): boolean {
+  return basename(appPath).toLowerCase() === "actspace.app";
+}
+
 export function createHelperScript({
   sourceRoot,
   appPath,
@@ -238,8 +250,13 @@ SOURCE_ROOT=${sh(sourceRoot)}
 APP_PATH=${sh(appPath)}
 APP_PID=${pid}
 LOG_PATH=${sh(logPath)}
-NEW_APP="$SOURCE_ROOT/dist/desktop/actspace.app"
-BACKUP_APP="$APP_PATH.previous-local-update"
+NEW_APP="$SOURCE_ROOT/dist/desktop/Actspace.app"
+if [[ ! -d "$NEW_APP" && -d "$SOURCE_ROOT/dist/desktop/actspace.app" ]]; then
+  NEW_APP="$SOURCE_ROOT/dist/desktop/actspace.app"
+fi
+TARGET_APP="$(dirname "$APP_PATH")/$(basename "$NEW_APP")"
+CURRENT_BACKUP="$APP_PATH.previous-local-update"
+TARGET_BACKUP="$TARGET_APP.previous-local-update"
 
 mkdir -p "$(dirname "$LOG_PATH")"
 exec >> "$LOG_PATH" 2>&1
@@ -257,20 +274,26 @@ while kill -0 "$APP_PID" 2>/dev/null; do
   sleep 0.5
 done
 
-rm -rf "$BACKUP_APP"
-if [[ -d "$APP_PATH" ]]; then
-  mv "$APP_PATH" "$BACKUP_APP"
+rm -rf "$CURRENT_BACKUP" "$TARGET_BACKUP"
+if [[ "$APP_PATH" != "$TARGET_APP" && -d "$TARGET_APP" ]]; then
+  mv "$TARGET_APP" "$TARGET_BACKUP"
 fi
-if ! ditto "$NEW_APP" "$APP_PATH"; then
+if [[ -d "$APP_PATH" ]]; then
+  mv "$APP_PATH" "$CURRENT_BACKUP"
+fi
+if ! ditto "$NEW_APP" "$TARGET_APP"; then
   echo "[local-update] failed to copy new app, restoring previous app"
-  rm -rf "$APP_PATH"
-  if [[ -d "$BACKUP_APP" ]]; then
-    mv "$BACKUP_APP" "$APP_PATH"
+  rm -rf "$TARGET_APP"
+  if [[ -d "$CURRENT_BACKUP" ]]; then
+    mv "$CURRENT_BACKUP" "$APP_PATH"
+  fi
+  if [[ -d "$TARGET_BACKUP" ]]; then
+    mv "$TARGET_BACKUP" "$TARGET_APP"
   fi
   exit 1
 fi
-open "$APP_PATH"
-rm -rf "$BACKUP_APP" || true
+open "$TARGET_APP"
+rm -rf "$CURRENT_BACKUP" "$TARGET_BACKUP" || true
 echo "[local-update] finished at $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 `;
 }

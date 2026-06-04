@@ -42,7 +42,7 @@
 ## Failure Handling
 
 - Invalid source path: return `invalid_source`.
-- Running in dev mode or not inside a `.app`: return `not_packaged`.
+- Not inside an Actspace `.app`, or running from `node_modules/electron/dist/Electron.app`: return `not_packaged`. Do not rely only on Electron `app.isPackaged`, because hand-assembled local app bundles can report false before the runtime executable is renamed.
 - Install parent not writable: return `not_writable`.
 - Helper spawn failure: return `spawn_failed`.
 - Build/replace failure happens inside helper and is logged to `<userData>/tmp/local-update/update.log`; the current app may have already exited, so this is documented as a local updater limitation.

@@ -59,6 +59,11 @@ dmg_manifest_value=null
 dmg_size_bytes=null
 app_name="$(node -e "const pkg=require(process.argv[1]); console.log(pkg.productName || pkg.name || 'actspace-desktop')" "${desktop_pkg}")"
 app_version="$(node -e "const pkg=require(process.argv[1]); console.log(pkg.version || '0.0.0')" "${desktop_pkg}")"
+app_bundle_name="${app_name}.app"
+app_executable_name="$(printf "%s" "${app_name}" | tr -cd '[:alnum:]_-')"
+if [[ -z "${app_executable_name}" ]]; then
+  app_executable_name="actspace"
+fi
 generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 git_sha="${GITHUB_SHA:-$(git -C "${repo_root}" rev-parse HEAD 2>/dev/null || echo unknown)}"
 
@@ -84,12 +89,17 @@ fi
 case "${platform}" in
   darwin)
     runtime_app="${electron_runtime_dir}/Electron.app"
-    packaged_app="${artifact_root}/actspace.app"
+    packaged_app="${artifact_root}/${app_bundle_name}"
     if [[ ! -d "${runtime_app}" ]]; then
       echo "Electron.app not found at ${runtime_app}" >&2
       exit 1
     fi
     cp -R "${runtime_app}" "${packaged_app}"
+    runtime_executable="${packaged_app}/Contents/MacOS/Electron"
+    app_executable="${packaged_app}/Contents/MacOS/${app_executable_name}"
+    if [[ "${app_executable_name}" != "Electron" && -f "${runtime_executable}" ]]; then
+      mv "${runtime_executable}" "${app_executable}"
+    fi
     mkdir -p "${packaged_app}/Contents/Resources"
     rm -rf "${packaged_app}/Contents/Resources/app"
     cp -R "${deploy_dir}" "${packaged_app}/Contents/Resources/app"
@@ -100,6 +110,9 @@ case "${platform}" in
       /usr/libexec/PlistBuddy -c "Set :CFBundleName ${app_name}" "${packaged_app}/Contents/Info.plist" 2>/dev/null || true
       /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${app_name}" "${packaged_app}/Contents/Info.plist" 2>/dev/null || true
       /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.actspace.desktop" "${packaged_app}/Contents/Info.plist" 2>/dev/null || true
+      /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable ${app_executable_name}" "${packaged_app}/Contents/Info.plist" 2>/dev/null \
+        || /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string ${app_executable_name}" "${packaged_app}/Contents/Info.plist" 2>/dev/null \
+        || true
       /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${app_version}" "${packaged_app}/Contents/Info.plist" 2>/dev/null || true
       /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${app_version}" "${packaged_app}/Contents/Info.plist" 2>/dev/null || true
       /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile icon.icns" "${packaged_app}/Contents/Info.plist" 2>/dev/null \
@@ -112,7 +125,7 @@ case "${platform}" in
       signed=true
       signature="developer-id"
     elif is_truthy "${mac_ad_hoc_sign}"; then
-      codesign --force --sign - --timestamp=none "${packaged_app}/Contents/MacOS/Electron"
+      codesign --force --sign - --timestamp=none "${app_executable}"
       codesign --force --sign - --timestamp=none "${packaged_app}"
       codesign --verify --no-strict --verbose=2 "${packaged_app}"
       signature="ad-hoc"
@@ -143,7 +156,7 @@ case "${platform}" in
     dmg_path="${dist_dir}/${dmg_name}"
     dmg_root="${dist_dir}/dmg-root"
     mkdir -p "${dmg_root}"
-    cp -R "${packaged_app}" "${dmg_root}/actspace.app"
+    cp -R "${packaged_app}" "${dmg_root}/${app_bundle_name}"
     ln -s /Applications "${dmg_root}/Applications"
     hdiutil create -volname "${app_name}" -srcfolder "${dmg_root}" -ov -format UDZO "${dmg_path}"
     rm -rf "${dmg_root}"

@@ -1,6 +1,6 @@
 {
   "name": "@actspace/desktop",
-  "productName": "actspace",
+  "productName": "Actspace",
   "version": "0.1.0",
   "private": true,
   "main": "dist-electron/main/index.js",

@@ -361,6 +361,7 @@ function LocalUpdateGroup() {
   };
 
   const sourceText = state?.sourceRoot ?? "尚未选择源码目录";
+  const appTargetText = state?.appPath ?? "尚未识别到已安装的 Actspace.app";
   const reason = !bridgeReady
     ? "仅桌面端安装版可用。"
     : state?.reason;
@@ -384,10 +385,25 @@ function LocalUpdateGroup() {
         align="start"
       />
       <SettingRow
+        title="安装目标"
+        description={
+          <span className="flex max-w-[430px] flex-col gap-1">
+            <span className="break-all">{appTargetText}</span>
+            {state?.appExecutablePath ? (
+              <span className="break-all text-text-subtle">当前进程：{state.appExecutablePath}</span>
+            ) : null}
+            {typeof state?.appIsPackaged === "boolean" ? (
+              <span className="text-text-subtle">Electron packaged：{state.appIsPackaged ? "是" : "否"}</span>
+            ) : null}
+          </span>
+        }
+        align="start"
+      />
+      <SettingRow
         title="构建并更新"
         description={
           <span className="flex max-w-[430px] flex-col gap-1">
-            <span>从所选源码重新打包，退出当前应用，替换已安装的 actspace.app 后自动重启。</span>
+            <span>从所选源码重新打包，退出当前应用，替换已安装的 Actspace.app 后自动重启。</span>
             {state?.logPath ? <span className="break-all text-text-subtle">日志：{state.logPath}</span> : null}
             {reason ? <span className="text-on-danger">{reason}</span> : null}
             {status ? <span className={status.includes("失败") ? "text-on-danger" : "text-text-muted"}>{status}</span> : null}

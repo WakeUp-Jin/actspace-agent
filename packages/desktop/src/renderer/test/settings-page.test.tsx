@@ -34,7 +34,9 @@ function makeLocalUpdateState(over: Partial<LocalUpdateState> = {}): LocalUpdate
   return {
     sourceRoot: "/repo/actspace-agent",
     sourceValid: true,
-    appPath: "/Applications/actspace.app",
+    appExecutablePath: "/Applications/Actspace.app/Contents/MacOS/Actspace",
+    appIsPackaged: true,
+    appPath: "/Applications/Actspace.app",
     installParent: "/Applications",
     canUpdate: true,
     logPath: "/Users/test/Library/Application Support/actspace/tmp/local-update/update.log",
@@ -154,6 +156,9 @@ describe("SettingsPage", () => {
   it("本地更新分区可选择源码目录并启动更新", async () => {
     renderSettingsPage();
     expect(await screen.findByText("/repo/actspace-agent")).toBeInTheDocument();
+    expect(screen.getByText("/Applications/Actspace.app")).toBeInTheDocument();
+    expect(screen.getByText("当前进程：/Applications/Actspace.app/Contents/MacOS/Actspace")).toBeInTheDocument();
+    expect(screen.getByText("Electron packaged：是")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "选择目录" }));
     await waitFor(() => {

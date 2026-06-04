@@ -47,7 +47,7 @@ export function SettingRow({
 }: {
   title: ReactNode;
   description?: ReactNode;
-  control: ReactNode;
+  control?: ReactNode;
   align?: "center" | "start";
 }) {
   return (
@@ -56,7 +56,7 @@ export function SettingRow({
         <div className="text-[14px] font-semibold text-text-main">{title}</div>
         {description ? <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">{description}</p> : null}
       </div>
-      <div className="flex shrink-0 items-center">{control}</div>
+      {control ? <div className="flex shrink-0 items-center">{control}</div> : null}
     </div>
   );
 }

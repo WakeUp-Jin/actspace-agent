@@ -44,9 +44,11 @@ pnpm package:desktop
 pnpm package:desktop:dmg
 ```
 
-该命令会在 `dist/` 生成当前平台的 desktop archive；macOS 上还会生成 `actspace-desktop-darwin-<arch>.dmg`。打开 `.dmg` 后把 `actspace.app` 拖到 Applications 即可本地安装。macOS 上没有 Developer ID 证书时，脚本默认不签名，并会移除外层 app 继承自 Electron runtime 的旧签名，避免修改资源后留下失效签名。这适合源码本地构建和开发验证，不等于面向公众分发所需的 Developer ID 签名和 notarization；首次打开时系统可能提示无法验证开发者，需要右键打开或在系统设置里允许。源码本地自用时也可以运行 `ACTSPACE_MAC_ADHOC_SIGN=true pnpm package:desktop:dmg` 生成本地临时签名产物；该模式只用于降低自构建使用摩擦，仍不提供开发者身份背书。`pnpm deploy` 会先尝试 `--offline`，如果本机 pnpm store 缺少 tarball，再自动退回普通 deploy 以补齐缓存。
+该命令会在 `dist/` 生成当前平台的 desktop archive；macOS 上还会生成 `actspace-desktop-darwin-<arch>.dmg`。打开 `.dmg` 后把 `Actspace.app` 拖到 Applications 即可本地安装。macOS 上没有 Developer ID 证书时，脚本默认不签名，并会移除外层 app 继承自 Electron runtime 的旧签名，避免修改资源后留下失效签名。这适合源码本地构建和开发验证，不等于面向公众分发所需的 Developer ID 签名和 notarization；首次打开时系统可能提示无法验证开发者，需要右键打开或在系统设置里允许。源码本地自用时也可以运行 `ACTSPACE_MAC_ADHOC_SIGN=true pnpm package:desktop:dmg` 生成本地临时签名产物；该模式只用于降低自构建使用摩擦，仍不提供开发者身份背书。`pnpm deploy` 会先尝试 `--offline`，如果本机 pnpm store 缺少 tarball，再自动退回普通 deploy 以补齐缓存。
 
-已安装的 macOS app 还提供设置页「通用 → 本地更新」入口，服务本地自用：用户选择本机 actspace 源码目录后，应用会从该目录运行 `pnpm package:desktop:dmg`，等待当前 app 退出，替换当前 `.app`，然后重新打开。该能力不拉取远程代码、不做版本比对，也不等同于正式自动更新；它依赖本机源码目录、pnpm 环境和当前安装位置可写。
+macOS 产物会把复制来的 Electron runtime 改成 Actspace 语义：外层 bundle 为 `Actspace.app`，主可执行文件为 `Contents/MacOS/Actspace`，`Info.plist` 的 `CFBundleExecutable` 也同步指向 `Actspace`。这让本地构建的应用更接近标准 macOS app，并减少 Electron 默认 runtime 名称带来的 `app.isPackaged`、钥匙串和系统识别混乱。
+
+已安装的 macOS app 还提供设置页「通用 → 本地更新」入口，服务本地自用：用户选择本机 actspace 源码目录后，应用会从该目录运行 `pnpm package:desktop:dmg`，等待当前 app 退出，替换当前 `.app`，然后重新打开。该能力不拉取远程代码、不做版本比对，也不等同于正式自动更新；它依赖本机源码目录、pnpm 环境和当前安装位置可写。updater 通过当前进程路径解析真实 `.app` 安装目标，并拒绝 `node_modules/electron/dist/Electron.app` 这类开发 runtime；不要只用 Electron 的 `app.isPackaged` 作为本地安装判定。
 
 所有 GitHub Actions 仍然保持 pin 到 commit SHA。后续升级 action 时，也要继续保持这个约束。
 
