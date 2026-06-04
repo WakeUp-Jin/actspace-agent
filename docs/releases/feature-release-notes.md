@@ -6,6 +6,11 @@
 
 | 日期 | 功能域 | 用户价值 | 变更摘要 |
 | --- | --- | --- | --- |
+| 2026-06-05 | 本地更新 | 本地更新更稳：构建时能看到进度，坏包不会再把可用旧版覆盖掉。 | 本地更新独立到「设置 → 更新」页；构建阶段保持应用打开并写入 `status.json`；helper 默认生成 ad-hoc signed 本地包，替换前验证新 app，启动失败时自动恢复旧版本。 |
+| 2026-06-05 | Usage 统计 | 用量页可以追到每轮请求明细，并用分页查看长列表。 | 底部新增会话明细表，展示 workspace、sessionId、模型、token；Token hover 展示 Cache Read/Input/Output/Total；明细支持每页 10 条分页。 |
+| 2026-06-05 | 模型与连接 | 新会话选中的模型会真正生效，打包版 Kimi 默认连接也更适合国内 endpoint。 | 修复 Composer 模型选择在 initial/follow-up 输入框切换后回到默认模型的问题；Kimi 默认 base URL 统一为 `https://api.moonshot.cn/v1`。 |
+| 2026-06-05 | Agent 文件读取 | Agent 重复读取同一文件范围时更少污染上下文，长任务缓存更稳。 | `read_file` 默认鼓励分段读取，重复读取未变化的同一路径/范围时返回简短提示，并保留 `force=true` 逃生口。 |
+| 2026-06-05 | 界面细节 | 侧栏和设置入口更清爽，窄宽度下不会横向乱滚。 | 修复会话侧栏横向滚动；本地更新从通用设置移到独立「更新」页。 |
 | 2026-06-03 | Agent 协作 | 主 Agent 可以把局部探索任务交给隔离的 SubAgent，主会话保持干净，同时仍可查看完整执行过程。 | 新增 `Agent` 工具、SubAgent sidecar transcript、运行中预览和 transcript 弹窗；主 session 只保留摘要与引用。 |
 | 2026-06-03 | 本地安装与启动 | 源码本地自构建的 macOS 应用更容易打包、启动和排障。 | 修复 ad-hoc DMG 签名策略，新增安装版启动 JSONL 日志，并修复双击启动时从 `/` 推导日志和工作区路径的问题。 |
 | 2026-06-02 | 上下文管理 | 用户可以在聊天中输入 `/compact` 主动压缩上下文，并在消息流里看到执行状态。 | 新增手动 context compaction IPC、started/progress/finished 生命周期、`CompactCommandBlock` 和可恢复的 `context_compaction` 消息块。 |
