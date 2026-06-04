@@ -274,6 +274,76 @@ describe("App streaming user message", () => {
     expect(await screen.findByRole("button", { name: "Review pending changes +10 -1" })).toHaveTextContent("Review+10-1");
   });
 
+  it("wires the current session hover preview through the App bridge", async () => {
+    const user = userEvent.setup();
+    const sessionId = "session-hover-preview-app";
+    const record = createEmptySessionRecord(sessionId);
+    record.meta.title = "Hover preview";
+    record.meta.workspaceRoot = "/tmp/workspace";
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "Hover preview",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+        workspaceRoot: "/tmp/workspace",
+      },
+    ];
+    const getSessionPreview = vi.fn(async () => ({
+      sessionId,
+      workspaceRoot: "/tmp/workspace",
+      modelId: "deepseek-v4-pro" as const,
+      contextSnapshot: {
+        totalTokens: 42_000,
+        maxTokens: 100_000,
+        percentUsed: 42,
+        buckets: [],
+      },
+    }));
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      getSessionPreview,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      onAgentStream: () => () => {},
+      runTurn: async () => ({
+        sessionId,
+        turnId: "turn-unused",
+        status: "completed",
+        events: [],
+        contextSnapshot: null,
+        contextState: null,
+      }),
+    };
+
+    renderApp();
+
+    const titleTrigger = await screen.findByRole("button", { name: "Show session details for Hover preview" });
+    await user.hover(titleTrigger);
+
+    const tooltip = await screen.findByRole("tooltip");
+    expect(getSessionPreview).toHaveBeenCalledWith({ sessionId });
+    expect(tooltip).toHaveTextContent("/tmp/workspace");
+    expect(tooltip).toHaveTextContent("DeepSeek V4 Pro");
+    expect(tooltip).toHaveTextContent("42,000 / 100,000");
+  });
+
   it("scrolls to the latest message when the user sends a new message", async () => {
     const sessionId = "session-scroll";
     const record = createEmptySessionRecord(sessionId);

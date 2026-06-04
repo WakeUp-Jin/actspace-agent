@@ -20,6 +20,22 @@ const promptEvent: SessionEvent = {
   payload: { content: "Inspect the renderer Agent block." },
 };
 
+const longPromptEvent: SessionEvent = {
+  ...promptEvent,
+  id: "evt-long-prompt",
+  payload: {
+    content: [
+      "Inspect the renderer Agent block in detail.",
+      "",
+      "1. Locate the component that opens the SubAgent transcript.",
+      "2. Verify the task input stays pinned at the top of the modal.",
+      "3. Check that the task input defaults to a compact preview.",
+      "4. Confirm the work list and final output scroll below it.",
+      "5. Report any layout edge cases in light and dark themes.",
+    ].join("\n"),
+  },
+};
+
 const reportEvent: SessionEvent = {
   id: "evt-report",
   sessionId: "session-1",
@@ -211,18 +227,23 @@ describe("AgentRunBlock", () => {
 
     await user.click(screen.getByRole("button", { name: /Open SubAgent transcript/ }));
 
-    expect(await screen.findByRole("button", { name: "Thinking" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Worked for 4s/ })).toBeInTheDocument();
     const taskInput = screen.getByLabelText("Task input");
-    const process = screen.getByLabelText("SubAgent process");
     const finalOutput = screen.getByLabelText("Final output");
 
     expect(within(taskInput).getByText("Inspect the renderer Agent block.")).toBeInTheDocument();
+    expect(within(finalOutput).getByText("Found the relevant renderer components.")).toBeInTheDocument();
+    expect(within(finalOutput).queryByText("The block renders summaries and opens a transcript modal.")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("SubAgent process")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Worked for 4s/ }));
+
+    const process = screen.getByLabelText("SubAgent process");
+    expect(await within(process).findByRole("button", { name: "Thinking" })).toBeInTheDocument();
     expect(await within(process).findByText("Read AgentRunBlock.tsx")).toBeInTheDocument();
     expect(within(process).getByText("Glob packages/desktop/src/renderer/components/messages/*.tsx")).toBeInTheDocument();
     expect(within(process).getByText("Usage Tokens 120 · input 100 · output 20")).toBeInTheDocument();
     expect(within(process).queryByText("The block renders summaries and opens a transcript modal.")).not.toBeInTheDocument();
-    expect(within(finalOutput).getByText("Found the relevant renderer components.")).toBeInTheDocument();
-    expect(within(finalOutput).queryByText("The block renders summaries and opens a transcript modal.")).not.toBeInTheDocument();
     expect(screen.queryByText("read_file")).not.toBeInTheDocument();
   });
 
@@ -238,5 +259,56 @@ describe("AgentRunBlock", () => {
 
     const finalOutput = await screen.findByLabelText("Final output");
     expect(within(finalOutput).getByText("The block renders summaries and opens a transcript modal.")).toBeInTheDocument();
+  });
+
+  it("toggles task input expansion without an internal scroll area", async () => {
+    const user = userEvent.setup();
+    (window as unknown as { actspace: Partial<typeof window.actspace> }).actspace = {
+      getSubAgentTranscript: vi.fn(async () => [longPromptEvent, reportEvent]),
+    };
+
+    render(<AgentRunBlock message={makeAgentBlock({ transcriptEvents: [longPromptEvent] })} />);
+
+    await user.click(screen.getByRole("button", { name: /Open SubAgent transcript/ }));
+
+    const expandButton = await screen.findByRole("button", { name: "Expand task input" });
+    expect(expandButton).toHaveAttribute("aria-expanded", "false");
+    expect(expandButton).toHaveClass("max-h-[98px]", "overflow-hidden");
+    expect(expandButton).not.toHaveClass("overflow-y-auto");
+    expect(screen.getByTestId("task-input-fade")).toBeInTheDocument();
+
+    await user.click(expandButton);
+
+    const collapseButton = screen.getByRole("button", { name: "Collapse task input" });
+    expect(collapseButton).toHaveAttribute("aria-expanded", "true");
+    expect(collapseButton).toHaveClass("max-h-none");
+    expect(collapseButton).not.toHaveClass("overflow-y-auto");
+    expect(screen.queryByTestId("task-input-fade")).not.toBeInTheDocument();
+
+    await user.click(collapseButton);
+
+    expect(screen.getByRole("button", { name: "Expand task input" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByTestId("task-input-fade")).toBeInTheDocument();
+  });
+
+  it("keeps the final output hidden while the SubAgent is still running", async () => {
+    const user = userEvent.setup();
+    (window as unknown as { actspace: Partial<typeof window.actspace> }).actspace = {
+      getSubAgentTranscript: vi.fn(async () => [promptEvent, readCallEvent, reportEvent]),
+    };
+
+    render(<AgentRunBlock message={makeAgentBlock({
+      status: "running",
+      summary: undefined,
+      stats: undefined,
+      transcriptEvents: [promptEvent, readCallEvent, reportEvent],
+    })} />);
+
+    await user.click(screen.getByRole("button", { name: /Open SubAgent transcript/ }));
+
+    const process = await screen.findByLabelText("SubAgent process");
+    expect(screen.queryByLabelText("Final output")).not.toBeInTheDocument();
+    expect(within(process).getByText("Read AgentRunBlock.tsx")).toBeInTheDocument();
+    expect(within(process).queryByText("The block renders summaries and opens a transcript modal.")).not.toBeInTheDocument();
   });
 });

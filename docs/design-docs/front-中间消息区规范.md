@@ -188,8 +188,12 @@ Agent 是主 Agent 调用的聚合工具，用户可见为一个可点击执行�
 ### 交互
 
 - 整块可点击，打开 `SubAgentTranscriptModal`。
-- modal 顶部在 header 下单独展示子智能体收到的任务输入，主体按主消息区语法回放过程事件：`thinking` 复用 Thinking 行，`read_file` / `grep` / `glob` / `list_directory` 复用轻量工具行，usage 只显示轻量 token 行。
-- modal 底部单独展示最终输出；`assistant_message` / `assistant_reply` 不混入中间过程流，避免最终报告被当成普通日志事件。
+- modal 顶部在 header 下单独展示子智能体收到的任务输入；输入区使用轻量边框容器，字号和行高接近用户消息，默认只露出数行预览。
+- Task input 自身不出现内部滚动条；点击输入区展开完整任务，再次点击收起。
+- Task input 在 transcript 滚动时保持在顶部，工具流和最终回复在其下方滚动，避免长输入和正文形成割裂的上下两块。
+- running 时 modal 按主消息区语法实时回放过程事件：`thinking` 复用 Thinking 行，`read_file` / `grep` / `glob` / `list_directory` 复用轻量工具行，usage 只显示轻量 token 行。
+- 出现最终回复后，modal 将过程事件默认折叠成 `Worked for ...` 行；点击该行才展开完整工具流。
+- 最终回复作为 `Worked` 行下方的正常 Markdown 正文渲染，不放入固定高度底部抽屉；`assistant_message` / `assistant_reply` 不混入中间过程流，避免最终报告被当成普通日志事件。
 - running 时 modal 使用 App streaming state 里已经收到的 events；completed 后可通过 `subagent:get-transcript` IPC 按 `transcriptRef` 补拉落盘 transcript。
 - modal 不提供 follow-up 输入，V0 只负责观察执行流。
 

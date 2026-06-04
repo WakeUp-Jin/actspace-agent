@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Eye, FileCode2, FolderTree, Plus } from "lucide-react";
+import { Bot, Eye, FileCode2, Folder, FolderTree, Plus } from "lucide-react";
 import { useRightPanel } from "./RightPanelContext";
 
 /**
@@ -7,6 +7,7 @@ import { useRightPanel } from "./RightPanelContext";
  *
  * 放在右侧折叠按钮左侧，点开后可往右侧面板加对象：
  * - 工作区文件：切换工作区浏览态（操作栏 + 文件树两栏，不新增 Tab）。
+ * - Review：打开当前 workspace 的 Git Review。
  * - Reply HTML：当前会话生成过的可视化 HTML 文件浏览器。
  * - Kairos：自治模式紧凑视图。
  * - Context：完整只读上下文视图。
@@ -17,7 +18,13 @@ const MENU_CLASS =
 const MENU_ITEM_CLASS =
   "flex min-h-[34px] w-full items-center gap-2.5 rounded-act-sm border-0 bg-transparent px-2.5 text-left text-[13px] font-medium text-text-main transition-colors hover:bg-brand-soft hover:text-brand [cursor:pointer]";
 
-export function RightPanelObjectMenu({ sessionId }: { sessionId: string | null }) {
+export function RightPanelObjectMenu({
+  sessionId,
+  onOpenReview,
+}: {
+  sessionId: string | null;
+  onOpenReview?: () => void;
+}) {
   const { openTab, toggleFileTree } = useRightPanel();
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -73,6 +80,17 @@ export function RightPanelObjectMenu({ sessionId }: { sessionId: string | null }
             <FolderTree size={15} strokeWidth={2} />
             工作区文件
           </button>
+          {onOpenReview ? (
+            <button
+              type="button"
+              role="menuitem"
+              className={MENU_ITEM_CLASS}
+              onClick={() => pick(onOpenReview)}
+            >
+              <Folder size={15} strokeWidth={2} />
+              Review
+            </button>
+          ) : null}
           <button
             type="button"
             role="menuitem"

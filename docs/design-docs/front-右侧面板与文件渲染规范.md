@@ -44,10 +44,11 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `Context`：完整只读上下文视图；见 `front-右侧面板与文件渲染规范.md`。
 - `Reply HTML`：当前会话已生成的可视化 HTML 文件浏览器（见下文）。
 
-## 「+ 新建对象」菜单（2026-05-30）
+## 「+ 新建对象」菜单（2026-05-30，2026-06-04 补 Review）
 
 - 隐藏标题栏 chrome 右段、右侧折叠（PanelRight）按钮**左侧**放一个 `+` 按钮（参考 Cursor 顶栏的 +）。
-- 点开是一个轻量菜单，可往右侧面板新增三种对象：`Reply HTML` / `Kairos` / `Context`，各自用稳定 Tab id 去重（重复打开只聚焦不堆叠）。
+- 点开是一个轻量菜单，可往右侧面板新增对象：`工作区文件` / `Review` / `Reply HTML` / `Kairos` / `Context`。对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；`工作区文件` 只切换工作区浏览态，不新增 Tab。
+- `Review` 入口复用 Composer 的 Review 打开逻辑，默认打开当前 workspace 的 Git `Uncommitted` scope。
 - 菜单与右侧折叠按钮同属 chrome-right，`-webkit-app-region: no-drag`；Kairos 全屏页下与右侧折叠按钮一起隐藏。
 - **`+` 仅在右侧面板打开时显示**（`view === "chat" && isRightPanelOpen`）：`+` 的语义是「往面板里加对象」，面板关着时无意义；面板关闭时 chrome-right 只保留 PanelRight 折叠按钮。
 
@@ -267,7 +268,8 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 - 聊天区保留单次工具调用或编辑动作的局部 diff。
 - 右侧 `Review` Tab 的 V1 来源是 Git provider，默认展示 `Uncommitted` scope。
 - 右侧 `Review` Tab 按文件浏览，适合审核当前 repo 真实修改结果。
-- V1 Review 采用 Codex-style 极简文件级 accordion：顶部是一条单行操作栏，左侧显示 `Uncommitted` scope 和总 `+N -M`，右侧放更多、搜索、diff display、刷新等图标按钮；`N Uncommitted Changes` 保留在 `aria-label`、tooltip 或可访问说明中，不做大 summary card。
+- V1 Review 采用 Codex-style 极简文件级 accordion：顶部是一条单行操作栏，左侧显示轻量无边框的 `Folder + N Uncommitted Changes + Chevron` scope 触发器和总 `+N -M`（新增用 success 语义色、删除用 danger 语义色），右侧放更多、搜索、diff display、刷新等图标按钮；不做大 summary card。
+- 点击 scope 触发器会打开轻量浮层。V1 真实数据只支持 `Uncommitted`；菜单可以先展示 `Uncommitted` / `Unstaged` / `Staged` / `All Branch Changes`，其中非 `Uncommitted` 项弱化为不可切换的未来 scope。
 - 文件列表是主体；每个文件一行显示 chevron、状态图标、path 和 `+N -M`，视觉行尾只保留增删统计。`New` / `Deleted` / `Renamed` / `Modified` 通过状态图标、颜色和文件行 `aria-label` / accessible name 表达，不再作为固定可见文字标签列。
 - 点击文件行展开 / 收起该文件的具体 unified diff。
 - 默认只展开第一个有 diff body 的文件，其余折叠，避免大变更一次性铺满右侧面板；文件行必须键盘可达并用 `aria-expanded` 表达展开状态。

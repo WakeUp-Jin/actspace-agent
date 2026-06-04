@@ -1442,6 +1442,11 @@ export function App() {
     }
   }, []);
 
+  const getSessionPreview = useCallback(async (session: SessionListItem) => {
+    if (!hasActspaceBridge() || !window.actspace.getSessionPreview) return null;
+    return window.actspace.getSessionPreview({ sessionId: session.id });
+  }, []);
+
   const handleReviewChanged = useCallback(() => {
     void refreshReviewSummary();
   }, [refreshReviewSummary]);
@@ -1476,6 +1481,7 @@ export function App() {
         workspaceOptions={workspaceOptions}
         selectedWorkspaceRoot={selectedWorkspaceRoot}
         onSelectWorkspace={setSelectedWorkspaceRoot}
+        getSessionPreview={getSessionPreview}
         reviewSummary={reviewSummary}
         onReviewChanged={handleReviewChanged}
       />

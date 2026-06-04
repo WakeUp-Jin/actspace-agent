@@ -73,7 +73,7 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 
 从上到下分三层：
 
-1. 操作预留层：位于输入栏上方，默认可以显示 demo 的 `Review +4253 -5` 和 `...`。本层当前只做视觉与 DOM 预留，真实交互后续设计。
+1. Review 操作层：位于输入栏上方，Git workspace 存在未提交改动时显示真实 `Review +N -M` 汇总和 `...`；无改动时不显示 Review 入口；当前 workspace 不是 Git repository 时显示无计数的 `Review` 入口，引导用户到右侧 Review 面板初始化 Git。
 2. 输入栏：左侧 `+`，inline 状态下输入框紧跟其后；stacked 状态下模型选择紧跟 `+` 右侧；右侧为发送 / 停止按钮。
 3. 状态行：左侧显示 branch 与 `Local`，右侧显示 context usage 百分比或等价统计入口，也是打开 Context 弹窗的唯一入口。
 
@@ -87,14 +87,14 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 
 该菜单的语义是“添加能力 / 上下文 / 工具”，不等同于单纯附件按钮。真实附件选择仍由附件计划接入，当前 Composer 计划只保证入口位置、浮层样式和窄窗口布局稳定。
 
-### Review / overflow 预留层
+### Review / overflow 操作层
 
-输入栏上方需要预留一行轻量 action strip：
+输入栏上方的轻量 action strip 用于进入 Review：
 
-- 左侧 demo 按钮：`Review +4253 -5`。
-- 右侧或相邻 demo overflow：`...`。
-- 当前不实现真实 review 流程，也不绑定 diff 数据。
-- 该层必须占用稳定 DOM 和高度，避免未来加入交互时重新挤压消息流和输入栏。
+- 左侧 Review 按钮由 Git Review summary 驱动：有未提交改动时显示 `Review +N -M`。
+- 无 Git repository 时显示无计数的 `Review`，点击打开右侧 Review 空态。
+- 无未提交改动时不显示 Review strip，避免 Composer 常驻无效操作。
+- 右侧或相邻 overflow `...` 保留位置，后续接入更多 Review / Git 操作。
 
 ## Context 弹窗
 

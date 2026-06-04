@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
+  Check,
   ChevronDown,
   ChevronRight,
   FileText,
+  Folder,
   GitBranch,
   Loader2,
   Minus,
@@ -26,11 +28,20 @@ type ReviewViewState =
   | { status: "error"; message: string };
 
 const SHELL_CLASS = "flex min-h-0 flex-1 flex-col overflow-hidden bg-surface";
-const TOOLBAR_CLASS = "flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-2";
-const TOOLBAR_LEFT_CLASS = "flex min-w-0 items-center gap-2";
+const TOOLBAR_CLASS = "flex shrink-0 items-center justify-between gap-2 border-b border-line bg-surface-subtle/70 px-3 py-2";
+const TOOLBAR_LEFT_CLASS = "relative flex min-w-0 items-center gap-2";
 const SCOPE_BUTTON_CLASS =
-  "inline-flex h-7 items-center gap-1.5 rounded-act-sm border border-line bg-surface-subtle px-2 text-[12px] font-medium text-text-main";
-const TOTAL_CLASS = "shrink-0 text-[12px] tabular-nums text-text-faint";
+  "inline-flex h-7 min-w-0 items-center gap-1.5 rounded-act-sm border-0 bg-transparent px-1 text-[13px] font-medium text-text-main hover:bg-surface-subtle [cursor:pointer]";
+const SCOPE_ICON_CLASS = "shrink-0 text-text-muted";
+const SCOPE_LABEL_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap";
+const SCOPE_MENU_CLASS =
+  "absolute left-0 top-[calc(100%+6px)] z-[70] w-[212px] rounded-act-md border border-line bg-surface-raised p-1.5 shadow-act-popover [-webkit-app-region:no-drag]";
+const SCOPE_MENU_ITEM_CLASS =
+  "flex min-h-8 w-full items-center justify-between gap-3 rounded-act-sm border-0 bg-transparent px-2.5 text-left text-[13px] font-medium text-text-main hover:bg-surface-subtle [cursor:pointer]";
+const SCOPE_MENU_DISABLED_CLASS =
+  "flex min-h-8 w-full cursor-default items-center justify-between gap-3 rounded-act-sm border-0 bg-transparent px-2.5 text-left text-[13px] font-medium text-text-faint";
+const SCOPE_MENU_COUNT_CLASS = "shrink-0 font-normal tabular-nums text-text-faint";
+const TOTAL_CLASS = "inline-flex shrink-0 items-center gap-1 text-[13px] tabular-nums";
 const TOOLBAR_RIGHT_CLASS = "flex shrink-0 items-center gap-1";
 const ICON_BUTTON_CLASS =
   "inline-flex h-7 w-7 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main [cursor:pointer]";
@@ -93,6 +104,49 @@ function renderDiffLine(line: string, key: string) {
     <span className={diffLineClass(line)} key={key}>
       {line || " "}
     </span>
+  );
+}
+
+function ReviewTotal({ additions, deletions }: { additions: number; deletions: number }) {
+  return (
+    <span className={TOTAL_CLASS} aria-label={`Review totals +${additions} -${deletions}`}>
+      <span className={ADD_CLASS}>+{additions}</span>
+      <span className={DELETE_CLASS}>-{deletions}</span>
+    </span>
+  );
+}
+
+function ReviewScopeMenu({
+  fileCount,
+  open,
+  onClose,
+}: {
+  fileCount: number;
+  open: boolean;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className={SCOPE_MENU_CLASS} role="menu" aria-label="Review scope options">
+      <button type="button" role="menuitem" className={SCOPE_MENU_ITEM_CLASS} onClick={onClose}>
+        <span className="min-w-0">
+          Uncommitted <span className={SCOPE_MENU_COUNT_CLASS}>{fileCount}</span>
+        </span>
+        <Check size={14} className="shrink-0 text-text-muted" aria-hidden="true" />
+      </button>
+      <button type="button" role="menuitem" className={SCOPE_MENU_DISABLED_CLASS} aria-disabled="true">
+        <span className="min-w-0">
+          Unstaged <span className={SCOPE_MENU_COUNT_CLASS}>{fileCount}</span>
+        </span>
+      </button>
+      <button type="button" role="menuitem" className={SCOPE_MENU_DISABLED_CLASS} aria-disabled="true">
+        Staged
+      </button>
+      <button type="button" role="menuitem" className={SCOPE_MENU_DISABLED_CLASS} aria-disabled="true">
+        All Branch Changes
+      </button>
+    </div>
   );
 }
 
@@ -183,6 +237,8 @@ export function ReviewRenderView({ workspaceRoot, refreshKey, onReviewChanged }:
   const [state, setState] = useState<ReviewViewState>({ status: "loading" });
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set());
   const [initializing, setInitializing] = useState(false);
+  const [scopeMenuOpen, setScopeMenuOpen] = useState(false);
+  const scopeMenuRef = useRef<HTMLDivElement>(null);
 
   const loadReview = useCallback(async () => {
     const api = typeof window !== "undefined" ? window.actspace?.getWorkspaceReview : undefined;
@@ -207,6 +263,31 @@ export function ReviewRenderView({ workspaceRoot, refreshKey, onReviewChanged }:
   useEffect(() => {
     void loadReview();
   }, [loadReview, refreshKey]);
+
+  useEffect(() => {
+    if (!scopeMenuOpen) {
+      return;
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      if (!scopeMenuRef.current?.contains(event.target as Node)) {
+        setScopeMenuOpen(false);
+      }
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setScopeMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [scopeMenuOpen]);
 
   const initializeGit = useCallback(async () => {
     const api = typeof window !== "undefined" ? window.actspace?.initGitRepository : undefined;
@@ -248,11 +329,11 @@ export function ReviewRenderView({ workspaceRoot, refreshKey, onReviewChanged }:
   const result = state.status === "ready" ? state.result : null;
   const changeSet = result?.changeSet;
   const fileCount = changeSet?.files.length ?? 0;
-  const totalLabel = changeSet ? `+${changeSet.totalAdditions} -${changeSet.totalDeletions}` : "";
   const toolbarLabel = useMemo(() => {
     if (!changeSet) return "Review uncommitted changes";
     return `${fileCount} Uncommitted Changes, +${changeSet.totalAdditions} -${changeSet.totalDeletions}`;
   }, [changeSet, fileCount]);
+  const scopeLabel = changeSet ? `${fileCount} Uncommitted Changes` : "Uncommitted Changes";
 
   let body: React.ReactNode;
   if (state.status === "loading") {
@@ -337,12 +418,23 @@ export function ReviewRenderView({ workspaceRoot, refreshKey, onReviewChanged }:
   return (
     <section className={SHELL_CLASS} aria-label="Review">
       <div className={TOOLBAR_CLASS} aria-label={toolbarLabel}>
-        <div className={TOOLBAR_LEFT_CLASS}>
-          <button type="button" className={SCOPE_BUTTON_CLASS} aria-label="Review scope" disabled>
-            <span>Uncommitted</span>
-            <ChevronDown size={13} aria-hidden="true" />
+        <div className={TOOLBAR_LEFT_CLASS} ref={scopeMenuRef}>
+          <button
+            type="button"
+            className={SCOPE_BUTTON_CLASS}
+            aria-label="Review scope"
+            aria-haspopup="menu"
+            aria-expanded={scopeMenuOpen}
+            onClick={() => setScopeMenuOpen((value) => !value)}
+          >
+            <Folder size={13} strokeWidth={1.8} className={SCOPE_ICON_CLASS} aria-hidden="true" />
+            <span className={SCOPE_LABEL_CLASS}>{scopeLabel}</span>
+            <ChevronDown size={12} className="shrink-0 text-text-muted" aria-hidden="true" />
           </button>
-          {totalLabel ? <span className={TOTAL_CLASS}>{totalLabel}</span> : null}
+          <ReviewScopeMenu fileCount={fileCount} open={scopeMenuOpen} onClose={() => setScopeMenuOpen(false)} />
+          {changeSet ? (
+            <ReviewTotal additions={changeSet.totalAdditions} deletions={changeSet.totalDeletions} />
+          ) : null}
         </div>
         <div className={TOOLBAR_RIGHT_CLASS}>
           <button type="button" className={ICON_BUTTON_CLASS} aria-label="Refresh Review" onClick={() => void loadReview()}>

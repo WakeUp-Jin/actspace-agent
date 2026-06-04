@@ -398,7 +398,9 @@ export function WorkbenchLayout({
         currentSession={currentSession}
         getSessionPreview={view === "chat" ? getSessionPreview : undefined}
         rightLeading={
-          view === "chat" && isRightPanelOpen ? <RightPanelObjectMenu sessionId={activeSessionId} /> : undefined
+          view === "chat" && isRightPanelOpen ? (
+            <RightPanelObjectMenu sessionId={activeSessionId} onOpenReview={openReviewTab} />
+          ) : undefined
         }
       />
       <SplitView

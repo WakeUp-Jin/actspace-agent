@@ -231,10 +231,12 @@ Agent 工具在主消息流中不是普通单行工具日志，而是一个轻�
 点击 Agent 工具块打开居中 modal：
 
 - Header：关闭按钮、description、事件数量。
-- 顶部固定展示子智能体收到的任务输入。
+- 顶部固定展示子智能体收到的任务输入；输入区默认折叠为数行预览，点击展开完整任务，再次点击收起。
+- Task input 不设置内部滚动条，长输入由展开态直接撑开顶部区域；工具流和最终回复仍在其下方滚动。
 - 主体复用正常聊天流渲染过程 transcript。
-- 执行中实时追加 transcript events。
-- 底部单独显示最终报告，并保留中间过程流里的工具与 thinking 事件。
+- 执行中实时追加 transcript events，并且不展示最终报告区域。
+- 出现最终报告后，过程 transcript 默认折叠成 `Worked for ...` 行；用户点击该行后再展开完整工具与 thinking 事件。
+- 最终报告显示在 `Worked` 行下方，按正常 Markdown 正文渲染，不使用固定高度底部抽屉。
 - 最终报告来源优先使用主消息流 `MessageBlock.kind === "agent"` 上的 `summary`，也就是 `runExploreSubAgent()` 的最终 `result.message` / `output.summary`；只有旧数据缺少 summary 时，才回退读取 transcript 里的 assistant 输出。
 - modal 不承担 follow-up 输入；V0 只看执行流。
 
@@ -264,8 +266,9 @@ Agent 工具在主消息流中不是普通单行工具日志，而是一个轻�
 前端：
 
 - running Agent 工具块可点击打开 modal。
-- modal 能显示执行中的 prompt、thinking、工具流和最终回复。
-- modal 的 `Final output` 优先显示 Agent block summary，不把 transcript 中途 `assistant_message` 误判成最终报告。
+- modal 能显示执行中的 prompt、thinking 和工具流，运行中不显示 `Final output`。
+- modal 的 `Final output` 只在 Agent block 不再 running 后展示，优先显示 Agent block summary，不把 transcript 中途 `assistant_message` 误判成最终报告。
+- completed modal 默认把工具流折叠成 `Worked for ...` 行，最终回复作为正文直接渲染在下方。
 - completed Agent 工具块显示 summary 和 stats。
 - 浅色、深色主题都可读。
 
