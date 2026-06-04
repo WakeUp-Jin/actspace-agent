@@ -147,7 +147,7 @@
 - `previewKind`: `agent`
 - 对外工具名是 `agent`，用户可见名是 `Agent`。
 - `ToolUiPreview` 必须是 `AgentToolPreview`，包含 `description`、`status`、`subagentType`、`displayText`，执行中可带 `recentEvents` 和 `transcriptRef`，完成态带 `summary`、`stats`、`transcriptRef`。
-- 展示：主消息流渲染为可点击 `AgentRunBlock`，而不是普通单行工具日志；点击打开 SubAgent transcript modal。
+- 展示：主消息流渲染为可点击 `AgentRunBlock`，而不是普通单行工具日志；点击打开 Composer 上方的 SubAgent transcript panel。
 - running 更新来自 `RuntimeStreamEvent.subagent_event.preview`。`recentEvents` 只展示最近 3-5 条 transcript 摘要，完整 transcript 通过 `transcriptRef` 读取。
 - 主 session 只持久化 Agent 工具的 `tool_call` / `tool_result` 和最终 preview，不展开写入 SubAgent transcript 内部事件。
 - `modelOutput` 给主 Agent 使用，必须是短 summary + stats + transcript ref；完整 transcript 只服务 UI 回放和排障。

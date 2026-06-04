@@ -94,6 +94,7 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 - 左侧 Review 按钮由 Git Review summary 驱动：有未提交改动时显示 `Review +N -M`。
 - 无 Git repository 时显示无计数的 `Review`，点击打开右侧 Review 空态。
 - 无未提交改动时不显示 Review strip，避免 Composer 常驻无效操作。
+- SubAgent transcript panel 打开期间不显示 Review strip，优先保证当前 panel 和 follow-up 输入的视觉关系；关闭 panel 后恢复。
 - 右侧或相邻 overflow `...` 保留位置，后续接入更多 Review / Git 操作。
 
 ## Context 弹窗

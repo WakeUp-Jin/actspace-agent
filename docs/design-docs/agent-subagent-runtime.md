@@ -8,7 +8,7 @@
 
 - **Agent 工具**：LLM 可调用的工具，用户可见名称为 `Agent`，对齐 Claude Code 新版命名。
 - **SubAgent run**：一次 Agent 工具调用创建的子智能体运行实例。
-- **Transcript**：SubAgent run 内部的 `SessionEvent[]` 执行流，供前端弹窗完整回放。
+- **Transcript**：SubAgent run 内部的 `SessionEvent[]` 执行流，供前端会话内 panel 完整回放。
 
 Claude Code 当前主工具名是 `Agent`，`Task` 仍作为 legacy alias。actspace 首版采用 `Agent` 作为展示名与工具语义名，内部文档用 SubAgent run 区分运行实例。
 
@@ -63,7 +63,7 @@ SubAgent run 采用 AgentTool 模式：
   - 提供 `subagent:get-transcript` IPC，按 typed `SubAgentTranscriptRef` 读取 sidecar transcript。
 - `packages/desktop/renderer`
   - 渲染主消息流中的 Agent 工具块。
-  - 点击 Agent 工具块打开完整 transcript modal。
+  - 点击 Agent 工具块打开完整 transcript panel。
   - 执行中也可打开，实时显示已产生的 transcript events。
 
 ## V0 工具契约
@@ -167,7 +167,7 @@ type SubAgentRuntimeEvent = {
 
 约束：
 
-- `event` 是刚产生的一条 transcript 事件，可用于 live modal 追加。
+- `event` 是刚产生的一条 transcript 事件，可用于 live panel 追加。
 - `preview` 是同一 toolCallId 的最新 Agent block view model，renderer 直接覆盖 running block。
 - `preview.recentEvents` 只保留少量摘要，用于主消息流；完整 transcript 以 sidecar JSONL 为事实来源。
 - 完成态仍以 `tool_result.payload.uiPreview.kind === "agent"` 持久化恢复。
@@ -226,11 +226,11 @@ Agent 工具在主消息流中不是普通单行工具日志，而是一个轻�
 - 底部可显示 `Explored 10 files · 8 tools · 41s` 这类 stats。
 - 下方继续接主 Agent 的后续状态，如 `Planning next moves`。
 
-### Modal
+### Composer 上方 Transcript Panel
 
-点击 Agent 工具块打开居中 modal：
+点击 Agent 工具块后，在 follow-up Composer 上方打开会话内 transcript panel。它不使用全局遮罩，也不居中覆盖整个工作台。
 
-- Header：关闭按钮、description、事件数量。
+- Header：description 和关闭按钮。
 - 顶部固定展示子智能体收到的任务输入；输入区默认折叠为数行预览，点击展开完整任务，再次点击收起。
 - Task input 不设置内部滚动条，长输入由展开态直接撑开顶部区域；工具流和最终回复仍在其下方滚动。
 - 主体复用正常聊天流渲染过程 transcript。
@@ -238,7 +238,9 @@ Agent 工具在主消息流中不是普通单行工具日志，而是一个轻�
 - 出现最终报告后，过程 transcript 默认折叠成 `Worked for ...` 行；用户点击该行后再展开完整工具与 thinking 事件。
 - 最终报告显示在 `Worked` 行下方，按正常 Markdown 正文渲染，不使用固定高度底部抽屉。
 - 最终报告来源优先使用主消息流 `MessageBlock.kind === "agent"` 上的 `summary`，也就是 `runExploreSubAgent()` 的最终 `result.message` / `output.summary`；只有旧数据缺少 summary 时，才回退读取 transcript 里的 assistant 输出。
-- modal 不承担 follow-up 输入；V0 只看执行流。
+- Panel 和 follow-up Composer 使用同一套 `conversation-content-width` 宽度约束；panel 自身不承担 follow-up 输入，V0 只看执行流。
+- Panel 打开时应控制最大高度，让顶部仍露出一截聊天内容，而不是完全遮住当前阅读上下文。
+- Panel 打开期间，follow-up Composer 上方的 Review / overflow 操作层暂时隐藏；关闭 Panel 后再按 Git Review summary 恢复。
 
 ### 颜色与主题
 
@@ -265,10 +267,11 @@ Agent 工具在主消息流中不是普通单行工具日志，而是一个轻�
 
 前端：
 
-- running Agent 工具块可点击打开 modal。
-- modal 能显示执行中的 prompt、thinking 和工具流，运行中不显示 `Final output`。
-- modal 的 `Final output` 只在 Agent block 不再 running 后展示，优先显示 Agent block summary，不把 transcript 中途 `assistant_message` 误判成最终报告。
-- completed modal 默认把工具流折叠成 `Worked for ...` 行，最终回复作为正文直接渲染在下方。
+- running Agent 工具块可点击打开 Composer 上方 transcript panel。
+- Panel 能显示执行中的 prompt、thinking 和工具流，运行中不显示 `Final output`。
+- Panel 的 `Final output` 只在 Agent block 不再 running 后展示，优先显示 Agent block summary，不把 transcript 中途 `assistant_message` 误判成最终报告。
+- completed panel 默认把工具流折叠成 `Worked for ...` 行，最终回复作为正文直接渲染在下方。
+- transcript panel 打开时顶部仍保留可见聊天内容，并暂时隐藏 Composer 的 Review 操作层。
 - completed Agent 工具块显示 summary 和 stats。
 - 浅色、深色主题都可读。
 

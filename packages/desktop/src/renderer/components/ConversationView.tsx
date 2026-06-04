@@ -9,6 +9,7 @@ import { BashRunBlock } from "./messages/BashRunBlock";
 import { CompactCommandBlock } from "./messages/CompactCommandBlock";
 import { DeleteFileBlock } from "./messages/DeleteFileBlock";
 import { FileDiffBlock } from "./messages/FileDiffBlock";
+import { SubAgentTranscriptPanel } from "./messages/SubAgentTranscriptModal";
 import { ThinkingBlock } from "./messages/ThinkingBlock";
 import { ToolLogLine } from "./messages/ToolLogLine";
 import { UserMessage } from "./messages/UserMessage";
@@ -16,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 type UserMessageBlock = Extract<MessageBlock, { kind: "user" }>;
 type AssistantMessageBlock = Extract<MessageBlock, { kind: "assistant" }>;
+type AgentMessageBlock = Extract<MessageBlock, { kind: "agent" }>;
 
 type ConversationTurn = {
   id: string;
@@ -128,7 +130,11 @@ function getMessageRelationClass(previousMessage: MessageBlock | undefined, mess
   return undefined;
 }
 
-function renderMessage(message: MessageBlock, className?: string) {
+function renderMessage(
+  message: MessageBlock,
+  className?: string,
+  onOpenAgentTranscript?: (message: AgentMessageBlock) => void,
+) {
   switch (message.kind) {
     case "user":
       return <UserMessage key={message.id} message={message} />;
@@ -137,7 +143,7 @@ function renderMessage(message: MessageBlock, className?: string) {
     case "thinking":
       return <ThinkingBlock key={message.id} message={message} className={className} />;
     case "agent":
-      return <AgentRunBlock key={message.id} message={message} className={className} />;
+      return <AgentRunBlock key={message.id} message={message} className={className} onOpenTranscript={onOpenAgentTranscript} />;
     case "bash":
       return <BashRunBlock key={message.id} message={message} />;
     case "context_compaction":
@@ -439,8 +445,13 @@ export function ConversationView({
   const turns = groupMessagesIntoTurns(messages);
   const isInitialComposer = isSessionReady && messages.length === 0 && !isStreaming;
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
+  const [activeTranscriptMessage, setActiveTranscriptMessage] = useState<AgentMessageBlock | null>(null);
   const { openTab } = useRightPanel();
   const openContextTab = () => openTab({ id: "context", kind: "context", title: "Context" });
+
+  const latestActiveTranscriptMessage = activeTranscriptMessage
+    ? messages.find((message): message is AgentMessageBlock => message.kind === "agent" && message.id === activeTranscriptMessage.id) ?? activeTranscriptMessage
+    : null;
 
   useEffect(() => {
     if (sendScrollRequestId === 0) {
@@ -449,6 +460,14 @@ export function ConversationView({
 
     bottomAnchorRef.current?.scrollIntoView({ block: "end" });
   }, [sendScrollRequestId]);
+
+  useEffect(() => {
+    if (!activeTranscriptMessage) return;
+    const stillPresent = messages.some((message) => message.kind === "agent" && message.id === activeTranscriptMessage.id);
+    if (!stillPresent) {
+      setActiveTranscriptMessage(null);
+    }
+  }, [activeTranscriptMessage, messages]);
 
   return (
     <main className={CONVERSATION_SHELL_CLASS}>
@@ -480,7 +499,7 @@ export function ConversationView({
                 ) : null}
                 <div className={TURN_BODY_CLASS}>
                   {turn.messages.map((message, index) =>
-                    renderMessage(message, getMessageRelationClass(turn.messages[index - 1], message))
+                    renderMessage(message, getMessageRelationClass(turn.messages[index - 1], message), setActiveTranscriptMessage)
                   )}
                 </div>
                 <TurnActions
@@ -497,7 +516,14 @@ export function ConversationView({
       </section>
 
       {isSessionReady && !isInitialComposer ? (
-        <div className="composer-zone grid w-full overflow-visible pb-5">
+        <div className="composer-zone grid w-full gap-3 overflow-visible pb-5">
+          {latestActiveTranscriptMessage ? (
+            <SubAgentTranscriptPanel
+              message={latestActiveTranscriptMessage}
+              open={true}
+              onClose={() => setActiveTranscriptMessage(null)}
+            />
+          ) : null}
           <Composer
             contextSnapshot={contextSnapshot}
             isStreaming={isStreaming}
@@ -510,7 +536,7 @@ export function ConversationView({
             workspaceOptions={workspaceOptions}
             selectedWorkspaceRoot={selectedWorkspaceRoot}
             onSelectWorkspace={onSelectWorkspace}
-            reviewSummary={reviewSummary}
+            reviewSummary={latestActiveTranscriptMessage ? null : reviewSummary}
             onOpenReview={onOpenReview}
           />
         </div>

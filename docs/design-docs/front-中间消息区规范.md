@@ -38,7 +38,7 @@
 - Read、Grep、Glob 和 Web Search 保持文本流感，不做重边框。
 - Bash 正常执行态保持类似 Read 的轻量日志行；只有展开后的命令输出区域使用单层浅色容器。
 - Bash 审核态可以使用轻量边框块，因为它承载用户操作，不属于普通执行日志。
-- Agent 是聚合执行对象：主消息流显示可点击执行块，块内只展示 SubAgent run 的标题、最近事件、摘要和 stats；不展示额外 logo、机器人图标或全大写状态噪音。完整 transcript 通过 modal 展示，不在主消息流展开。
+- Agent 是聚合执行对象：主消息流显示可点击执行块，块内只展示 SubAgent run 的标题、最近事件、摘要和 stats；不展示额外 logo、机器人图标或全大写状态噪音。完整 transcript 通过 Composer 上方的会话内 panel 展示，不使用全局遮罩弹窗，也不在主消息流原地展开。
 - Edit / Write File 与 Read 等保持同样的纯文本工具行节奏，仅在用户主动展开时显示 diff 详情容器。
 - Context Compaction 是系统执行事件，不属于工具调用，也不渲染为 Tool Preview；手动 `/compact` 和未来自动压缩共享同一消息块语法。
 - Final reply 作为收束结果，保持最清晰的阅读层级。
@@ -187,15 +187,17 @@ Agent 是主 Agent 调用的聚合工具，用户可见为一个可点击执行�
 
 ### 交互
 
-- 整块可点击，打开 `SubAgentTranscriptModal`。
-- modal 顶部在 header 下单独展示子智能体收到的任务输入；输入区使用轻量边框容器，字号和行高接近用户消息，默认只露出数行预览。
+- 整块可点击，打开 Composer 上方的 `SubAgentTranscriptPanel`。
+- Panel 顶部在 header 下单独展示子智能体收到的任务输入；输入区使用轻量边框容器，字号和行高接近用户消息，默认只露出数行预览。
 - Task input 自身不出现内部滚动条；点击输入区展开完整任务，再次点击收起。
 - Task input 在 transcript 滚动时保持在顶部，工具流和最终回复在其下方滚动，避免长输入和正文形成割裂的上下两块。
-- running 时 modal 按主消息区语法实时回放过程事件：`thinking` 复用 Thinking 行，`read_file` / `grep` / `glob` / `list_directory` 复用轻量工具行，usage 只显示轻量 token 行。
-- 出现最终回复后，modal 将过程事件默认折叠成 `Worked for ...` 行；点击该行才展开完整工具流。
+- running 时 panel 按主消息区语法实时回放过程事件：`thinking` 复用 Thinking 行，`read_file` / `grep` / `glob` / `list_directory` 复用轻量工具行，usage 只显示轻量 token 行。
+- 出现最终回复后，panel 将过程事件默认折叠成 `Worked for ...` 行；点击该行才展开完整工具流。
 - 最终回复作为 `Worked` 行下方的正常 Markdown 正文渲染，不放入固定高度底部抽屉；`assistant_message` / `assistant_reply` 不混入中间过程流，避免最终报告被当成普通日志事件。
-- running 时 modal 使用 App streaming state 里已经收到的 events；completed 后可通过 `subagent:get-transcript` IPC 按 `transcriptRef` 补拉落盘 transcript。
-- modal 不提供 follow-up 输入，V0 只负责观察执行流。
+- running 时 panel 使用 App streaming state 里已经收到的 events；completed 后可通过 `subagent:get-transcript` IPC 按 `transcriptRef` 补拉落盘 transcript。
+- Panel 位于 follow-up Composer 上方，并和输入框使用同一套宽度约束；它不提供 follow-up 输入，V0 只负责观察执行流。
+- Panel 最大高度要克制，打开后顶部仍应露出一截聊天内容，避免完全遮住当前阅读上下文。
+- Panel 打开期间，follow-up Composer 上方的 Review / overflow 操作层暂时隐藏；关闭 Panel 后再按 Git Review summary 恢复。
 
 ### 数据边界
 

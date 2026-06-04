@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import type { MessageBlock, SessionEvent, SubAgentTranscriptRef } from "@actspace/shared";
 import { MarkdownProse } from "./MarkdownProse";
@@ -27,17 +26,14 @@ type TranscriptSections = {
   fallbackFinalReport: AssistantMessage | null;
 };
 
-const MODAL_ROOT_CLASS = "fixed inset-0 z-[1000] flex items-center justify-center px-4 py-5";
-const MODAL_OVERLAY_CLASS = "absolute inset-0 bg-overlay";
-const MODAL_PANEL_CLASS =
-  "relative flex h-[min(860px,calc(100vh_-_40px))] w-[min(1180px,calc(100vw_-_32px))] flex-col overflow-hidden rounded-act-lg border border-line bg-surface-raised shadow-act-popover";
-const MODAL_HEADER_CLASS = "flex items-start justify-between gap-5 border-b border-line px-6 py-5";
-const MODAL_TITLE_CLASS = "m-0 text-[20px] font-semibold leading-[1.3] text-text-main";
-const MODAL_META_CLASS = "mt-1 text-[15px] leading-[1.45] text-text-muted";
-const MODAL_ICON_BUTTON_CLASS =
-  "grid h-9 w-9 place-items-center rounded-act-md border border-line bg-surface text-text-muted transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-main";
-const MODAL_BODY_CLASS = "min-h-0 flex-1 overflow-y-auto";
-const MODAL_CONTENT_CLASS = "min-h-full bg-surface";
+const PANEL_CLASS =
+  "subagent-transcript-panel mx-auto flex max-h-[min(620px,calc(100vh_-_248px))] w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] flex-col overflow-hidden rounded-act-lg border border-line bg-surface-raised shadow-act-popover";
+const PANEL_HEADER_CLASS = "flex items-center justify-between gap-4 border-b border-line px-4 py-3";
+const PANEL_TITLE_CLASS = "m-0 min-w-0 truncate text-[14px] font-medium leading-[1.35] text-text-main";
+const PANEL_ICON_BUTTON_CLASS =
+  "grid h-8 w-8 place-items-center rounded-act-md border-0 bg-transparent text-text-muted transition hover:bg-surface-subtle hover:text-text-main";
+const PANEL_BODY_CLASS = "min-h-0 flex-1 overflow-y-auto";
+const PANEL_CONTENT_CLASS = "min-h-full bg-surface";
 const TRANSCRIPT_FLOW_CLASS = "flex flex-col gap-1.5";
 const EMPTY_CLASS = "px-[var(--conversation-text-inset)] text-sm leading-[1.55] text-text-muted";
 const TASK_INPUT_SECTION_CLASS = "sticky top-0 z-10 bg-surface-raised px-5 py-3";
@@ -408,7 +404,7 @@ async function loadTranscript(ref: SubAgentTranscriptRef | undefined): Promise<S
   return window.actspace.getSubAgentTranscript({ transcriptRef: ref });
 }
 
-export function SubAgentTranscriptModal({
+export function SubAgentTranscriptPanel({
   message,
   open,
   onClose,
@@ -462,83 +458,76 @@ export function SubAgentTranscriptModal({
   const workVisible = !hasFinalReport || workExpanded;
   const workedLabel = formatWorkedDuration(message.stats?.durationMs ?? durationFromEvents(events));
 
-  if (!open || typeof document === "undefined") {
+  if (!open) {
     return null;
   }
 
-  return createPortal(
-    <div className={MODAL_ROOT_CLASS}>
-      <button className={MODAL_OVERLAY_CLASS} type="button" aria-label="Close transcript" onClick={onClose} />
-      <section className={MODAL_PANEL_CLASS} role="dialog" aria-modal="true" aria-label={`SubAgent transcript: ${message.description}`}>
-        <header className={MODAL_HEADER_CLASS}>
-          <div className="min-w-0">
-            <h2 className={MODAL_TITLE_CLASS}>{message.description}</h2>
-            <div className={MODAL_META_CLASS}>
-              {events.length} events
-            </div>
-          </div>
-          <button ref={closeButtonRef} className={MODAL_ICON_BUTTON_CLASS} type="button" aria-label="Close transcript" onClick={onClose}>
-            <X size={15} aria-hidden="true" />
-          </button>
-        </header>
-        <div className={MODAL_BODY_CLASS}>
-          <div className={MODAL_CONTENT_CLASS}>
-            {transcriptSections.taskInput ? (
-              <section className={TASK_INPUT_SECTION_CLASS} aria-label="Task input">
-                <div className="sr-only">Task input</div>
-                <button
-                  className={`${TASK_INPUT_BUTTON_CLASS} ${taskInputExpanded ? TASK_INPUT_EXPANDED_CLASS : TASK_INPUT_COLLAPSED_CLASS}`}
-                  type="button"
-                  aria-expanded={taskInputExpanded}
-                  aria-label={taskInputExpanded ? "Collapse task input" : "Expand task input"}
-                  onClick={() => setTaskInputExpanded((value) => !value)}
-                >
-                  <span className={TASK_INPUT_TEXT_CLASS}>{transcriptSections.taskInput.content}</span>
-                  {!taskInputExpanded ? <span className={TASK_INPUT_FADE_CLASS} aria-hidden="true" data-testid="task-input-fade" /> : null}
-                </button>
-              </section>
-            ) : null}
-            <section className={WORK_SECTION_CLASS}>
-              <div className={WORK_HEADER_CLASS}>
-                {hasFinalReport ? (
-                  <button
-                    className={WORK_TOGGLE_CLASS}
-                    type="button"
-                    aria-expanded={workExpanded}
-                    onClick={() => setWorkExpanded((value) => !value)}
-                  >
-                    <span>{workedLabel}</span>
-                    {workExpanded ? <ChevronDown size={15} strokeWidth={2.2} /> : <ChevronRight size={15} strokeWidth={2.2} />}
-                  </button>
-                ) : (
-                  <div className={WORK_TOGGLE_CLASS}>{workedLabel}</div>
-                )}
-              </div>
-              {workVisible ? (
-                <div className={WORK_FLOW_CLASS}>
-                  <div className={TRANSCRIPT_FLOW_CLASS} aria-label="SubAgent process" role="region">
-                    {transcriptSections.processItems.length > 0 ? transcriptSections.processItems.map((item) => renderTranscriptItem(item)) : (
-                      <div className={EMPTY_CLASS}>Process events will appear here.</div>
-                    )}
-                  </div>
-                </div>
-              ) : null}
+  return (
+    <section className={PANEL_CLASS} role="region" aria-label={`SubAgent transcript: ${message.description}`}>
+      <header className={PANEL_HEADER_CLASS}>
+        <h2 className={PANEL_TITLE_CLASS}>{message.description}</h2>
+        <button ref={closeButtonRef} className={PANEL_ICON_BUTTON_CLASS} type="button" aria-label="Close transcript" onClick={onClose}>
+          <X size={15} aria-hidden="true" />
+        </button>
+      </header>
+      <div className={PANEL_BODY_CLASS}>
+        <div className={PANEL_CONTENT_CLASS}>
+          {transcriptSections.taskInput ? (
+            <section className={TASK_INPUT_SECTION_CLASS} aria-label="Task input">
+              <div className="sr-only">Task input</div>
+              <button
+                className={`${TASK_INPUT_BUTTON_CLASS} ${taskInputExpanded ? TASK_INPUT_EXPANDED_CLASS : TASK_INPUT_COLLAPSED_CLASS}`}
+                type="button"
+                aria-expanded={taskInputExpanded}
+                aria-label={taskInputExpanded ? "Collapse task input" : "Expand task input"}
+                onClick={() => setTaskInputExpanded((value) => !value)}
+              >
+                <span className={TASK_INPUT_TEXT_CLASS}>{transcriptSections.taskInput.content}</span>
+                {!taskInputExpanded ? <span className={TASK_INPUT_FADE_CLASS} aria-hidden="true" data-testid="task-input-fade" /> : null}
+              </button>
             </section>
-            {finalReport ? (
-              <section className={FINAL_REPORT_SECTION_CLASS} aria-label="Final output">
-                <div className="sr-only">Final output</div>
-                <div className={FINAL_REPORT_CONTENT_CLASS}>
-                  <MarkdownProse content={finalReport.content} />
+          ) : null}
+          <section className={WORK_SECTION_CLASS}>
+            <div className={WORK_HEADER_CLASS}>
+              {hasFinalReport ? (
+                <button
+                  className={WORK_TOGGLE_CLASS}
+                  type="button"
+                  aria-expanded={workExpanded}
+                  onClick={() => setWorkExpanded((value) => !value)}
+                >
+                  <span>{workedLabel}</span>
+                  {workExpanded ? <ChevronDown size={15} strokeWidth={2.2} /> : <ChevronRight size={15} strokeWidth={2.2} />}
+                </button>
+              ) : (
+                <div className={WORK_TOGGLE_CLASS}>{workedLabel}</div>
+              )}
+            </div>
+            {workVisible ? (
+              <div className={WORK_FLOW_CLASS}>
+                <div className={TRANSCRIPT_FLOW_CLASS} aria-label="SubAgent process" role="region">
+                  {transcriptSections.processItems.length > 0 ? transcriptSections.processItems.map((item) => renderTranscriptItem(item)) : (
+                    <div className={EMPTY_CLASS}>Process events will appear here.</div>
+                  )}
                 </div>
-              </section>
+              </div>
             ) : null}
-          </div>
+          </section>
+          {finalReport ? (
+            <section className={FINAL_REPORT_SECTION_CLASS} aria-label="Final output">
+              <div className="sr-only">Final output</div>
+              <div className={FINAL_REPORT_CONTENT_CLASS}>
+                <MarkdownProse content={finalReport.content} />
+              </div>
+            </section>
+          ) : null}
         </div>
-      </section>
-    </div>,
-    document.body,
+      </div>
+    </section>
   );
 }
+
+export const SubAgentTranscriptModal = SubAgentTranscriptPanel;
 
 function renderTranscriptItem(item: TranscriptItem) {
   if (item.kind === "usage") {

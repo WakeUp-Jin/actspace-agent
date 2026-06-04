@@ -711,6 +711,7 @@ describe("App streaming user message", () => {
         arguments: { path: "packages/desktop/src/renderer/App.tsx" },
       },
     };
+    const getWorkspaceReview = vi.fn(async () => createReviewChanges(7, 2));
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
@@ -735,6 +736,7 @@ describe("App streaming user message", () => {
       listPendingApprovals: async () => [],
       getSubAgentTranscript: async () => [],
       ...settingsApiStub,
+      getWorkspaceReview,
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {
@@ -804,12 +806,15 @@ describe("App streaming user message", () => {
 
     expect(await screen.findByText("Explore renderer flow")).toBeTruthy();
     expect(await screen.findByText("Read packages/desktop/src/renderer/App.tsx")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Review pending changes +7 -2" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Open SubAgent transcript for Explore renderer flow/ }));
 
-    const dialog = await screen.findByRole("dialog", { name: /SubAgent transcript: Explore renderer flow/ });
-    expect(dialog).toBeTruthy();
-    expect(within(dialog).getByText("Read App.tsx")).toBeTruthy();
+    const panel = await screen.findByRole("region", { name: /SubAgent transcript: Explore renderer flow/ });
+    expect(panel).toBeTruthy();
+    expect(within(panel).getByText("Read App.tsx")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: /SubAgent transcript: Explore renderer flow/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review pending changes +7 -2" })).not.toBeInTheDocument();
 
     await act(async () => {
       resolveRunTurn?.({

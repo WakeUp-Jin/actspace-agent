@@ -1,7 +1,5 @@
-import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
-import { SubAgentTranscriptModal } from "./SubAgentTranscriptModal";
 import { getToolLogRunningTextAttrs, TOOL_LOG_LINE_TEXT_RUNNING_CLASS } from "./toolLogStyles";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
@@ -35,8 +33,15 @@ function formatStats(message: AgentMessage): string | null {
   return parts.join(" · ");
 }
 
-export function AgentRunBlock({ message, className }: { message: AgentMessage; className?: string }) {
-  const [open, setOpen] = useState(false);
+export function AgentRunBlock({
+  message,
+  className,
+  onOpenTranscript,
+}: {
+  message: AgentMessage;
+  className?: string;
+  onOpenTranscript?: (message: AgentMessage) => void;
+}) {
   const isRunning = message.status === "running";
   const stats = formatStats(message);
   const recentEvents = message.recentEvents?.slice(-5) ?? [];
@@ -47,7 +52,7 @@ export function AgentRunBlock({ message, className }: { message: AgentMessage; c
         className={BUTTON_CLASS}
         type="button"
         aria-label={`Open SubAgent transcript for ${message.description}`}
-        onClick={() => setOpen(true)}
+        onClick={() => onOpenTranscript?.(message)}
       >
         <div className={HEADER_CLASS}>
           <div className={TITLE_WRAP_CLASS}>
@@ -75,7 +80,6 @@ export function AgentRunBlock({ message, className }: { message: AgentMessage; c
         {message.error ? <div className={ERROR_CLASS}>{message.error}</div> : null}
         {stats ? <div className={STATS_CLASS}>{stats}</div> : null}
       </button>
-      <SubAgentTranscriptModal message={message} open={open} onClose={() => setOpen(false)} />
     </article>
   );
 }
