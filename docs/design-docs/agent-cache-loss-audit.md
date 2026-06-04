@@ -204,6 +204,16 @@ const cacheStatus = denominator > 0 && cacheHitRatio < 0.9;
 4. `firstChangedMessageIndex` 靠近尾部：可能只是近期工具结果或用户输入变化，影响较小。
 5. 以上都为 false 但 cache 低：可能是首次请求、provider 侧缓存过期、缓存尚未热、或服务端策略波动。
 
+当前 `scripts/analyze-cache-audit.mjs` 会在保留上述 hash diff 的基础上输出诊断分类：
+
+- `cold start`：没有上一轮 Context 快照，首轮低命中通常正常。
+- `prefix changed`：稳定前缀发生变化。
+- `append-only broken`：消息链不是上一轮完整前缀加新增后缀。
+- `large appended suffix`：prefix 与 append-only 都正常，但新增消息/工具结果占本轮请求比例较大。
+- `provider/cache uncertainty`：客户端结构未见明显问题，优先考虑缓存预热、过期或 provider 侧策略。
+
+脚本中的字符数与新增比例只用于本地排障排序，不替代 provider 返回的 token/cache usage 事实。
+
 ## 与现有设计的关系
 
 - `docs/design-docs/agent-token-usage-and-context-state.md` 定义 token 与 usage 事实来源，本设计只扩展 `llm_usage` 的排障索引字段。
@@ -216,4 +226,3 @@ const cacheStatus = denominator > 0 && cacheHitRatio < 0.9;
 - `cache-audit/` 不应上传，不应进入反馈 issue，不应写入 renderer 状态。
 - 后续实现可以增加配置开关，默认只在开发版或显式启用时保存完整上下文。
 - 脚本输出默认只展示摘要与文件路径，不直接打印完整上下文正文。
-

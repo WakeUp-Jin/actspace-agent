@@ -246,6 +246,8 @@ export function Composer({
   surface = "followup",
   inputLayout,
   defaultModelId,
+  selectedModelId: controlledSelectedModelId,
+  onSelectedModelChange,
   onExpandContext,
   workspaceOptions = [],
   selectedWorkspaceRoot,
@@ -262,6 +264,9 @@ export function Composer({
   inputLayout?: ComposerInputLayout;
   /** 来自设置页的默认模型；首次到达时同步选中，用户手动选过后不再覆盖。 */
   defaultModelId?: ModelId;
+  /** 会话级当前模型；提供时由上层持有，避免 initial/followup Composer 切换时丢选择。 */
+  selectedModelId?: ModelId;
+  onSelectedModelChange?: (modelId: ModelId) => void;
   /** 提供时 Context 弹窗显示「展开完整视图」按钮，点击在右侧面板打开 Context Tab。 */
   onExpandContext?: () => void;
   workspaceOptions?: ComposerWorkspaceOption[];
@@ -270,12 +275,13 @@ export function Composer({
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
 }) {
-  const initialModelId = defaultModelId ?? DEFAULT_MODEL_ID;
+  const initialModelId = controlledSelectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID;
   const [commandOpen, setCommandOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [modelOptionsOpen, setModelOptionsOpen] = useState(false);
   const [contextSelectorOpen, setContextSelectorOpen] = useState<ContextSelectorKind | null>(null);
-  const [selectedModelId, setSelectedModelId] = useState<ModelId>(initialModelId);
+  const [localSelectedModelId, setLocalSelectedModelId] = useState<ModelId>(initialModelId);
+  const selectedModelId = controlledSelectedModelId ?? localSelectedModelId;
   const [editingModelId, setEditingModelId] = useState<ModelId>(initialModelId);
   const [hoveredModelId, setHoveredModelId] = useState<ModelId | null>(null);
   const [focusedModelId, setFocusedModelId] = useState<ModelId | null>(null);
@@ -314,11 +320,17 @@ export function Composer({
   // 默认模型可能在 Composer 挂载后才异步到达（settings:get）；只在用户尚未手动
   // 选择过模型时同步，避免覆盖用户当前会话里的临时选择。
   useEffect(() => {
-    if (!defaultModelId || userPickedModelRef.current) return;
-    setSelectedModelId(defaultModelId);
+    if (!defaultModelId || controlledSelectedModelId || userPickedModelRef.current) return;
+    setLocalSelectedModelId(defaultModelId);
     setEditingModelId(defaultModelId);
     setThinkingEnabled((MODEL_REGISTRY[defaultModelId] ?? DEFAULT_MODEL_SPEC).thinkingDefault);
-  }, [defaultModelId]);
+  }, [controlledSelectedModelId, defaultModelId]);
+
+  useEffect(() => {
+    if (!controlledSelectedModelId) return;
+    setEditingModelId(controlledSelectedModelId);
+    setThinkingEnabled((MODEL_REGISTRY[controlledSelectedModelId] ?? DEFAULT_MODEL_SPEC).thinkingDefault);
+  }, [controlledSelectedModelId]);
 
   function closeFloatingPanels() {
     setCommandOpen(false);
@@ -632,7 +644,8 @@ export function Composer({
                     }`}
                     onClick={() => {
                       userPickedModelRef.current = true;
-                      setSelectedModelId(spec.id);
+                      setLocalSelectedModelId(spec.id);
+                      onSelectedModelChange?.(spec.id);
                       setEditingModelId(spec.id);
                       setThinkingEnabled(spec.thinkingDefault);
                       setHoveredModelId(null);

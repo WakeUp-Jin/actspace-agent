@@ -6,6 +6,9 @@ import type {
   UsageStatisticsDailyModelBreakdown,
   UsageStatisticsDailyRow,
   UsageStatisticsModelEntry,
+  UsageStatisticsRequestRowsPage,
+  UsageStatisticsRequestRowsPageInput,
+  UsageStatisticsRequestRow,
   UsageStatisticsRange,
   UsageStatisticsSnapshot,
   UsageStatisticsToolEntry,
@@ -27,6 +30,37 @@ type ToolAccumulator = {
   totalDurationMs: number;
   durationCount: number;
 };
+
+type RequestModelAccumulator = {
+  name: string;
+  modelId?: string;
+  provider?: string;
+  totalTokens: number;
+};
+
+type RequestAccumulator = {
+  timestamp: string;
+  sessionId: string;
+  turnId: string;
+  workspaceId?: string;
+  workspaceRoot?: string;
+  modelCallCount: number;
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  cacheHitTokens: number;
+  cacheMissTokens: number;
+  reasoningTokens: number;
+  costUsd: number;
+  models: Map<string, RequestModelAccumulator>;
+};
+
+type UsageSourceMetadata = {
+  workspaceId?: string;
+  workspaceRoot?: string;
+};
+
+const REQUEST_ROWS_PAGE_SIZE = 10;
 
 /**
  * 内部累加器结构：与 `UsageStatisticsDailyRow` 的差异在于 `modelTokens` 是 Map（按 model name 累加），
@@ -166,6 +200,99 @@ function buildToolEntries(tools: Map<string, ToolAccumulator>, totalToolCalls: n
     }));
 }
 
+function requestKey(event: SessionEvent): string {
+  return `${event.sessionId}:${event.turnId}`;
+}
+
+function getOrCreateRequestRow(
+  rows: Map<string, RequestAccumulator>,
+  event: SessionEvent,
+  sourceMetadata?: UsageSourceMetadata,
+): RequestAccumulator {
+  const key = requestKey(event);
+  const existing = rows.get(key);
+  if (existing) return existing;
+  const row: RequestAccumulator = {
+    timestamp: event.timestamp,
+    sessionId: event.sessionId,
+    turnId: event.turnId,
+    ...(sourceMetadata?.workspaceId ? { workspaceId: sourceMetadata.workspaceId } : {}),
+    ...(sourceMetadata?.workspaceRoot ? { workspaceRoot: sourceMetadata.workspaceRoot } : {}),
+    modelCallCount: 0,
+    totalTokens: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    cacheHitTokens: 0,
+    cacheMissTokens: 0,
+    reasoningTokens: 0,
+    costUsd: 0,
+    models: new Map<string, RequestModelAccumulator>(),
+  };
+  rows.set(key, row);
+  return row;
+}
+
+function buildRequestRows(rows: Map<string, RequestAccumulator>): UsageStatisticsRequestRow[] {
+  return [...rows.values()]
+    .map((row): UsageStatisticsRequestRow => {
+      const primaryModel = [...row.models.values()].sort((a, b) => {
+        if (b.totalTokens !== a.totalTokens) return b.totalTokens - a.totalTokens;
+        return a.name.localeCompare(b.name);
+      })[0];
+
+      return {
+        timestamp: row.timestamp,
+        sessionId: row.sessionId,
+        turnId: row.turnId,
+        ...(row.workspaceId ? { workspaceId: row.workspaceId } : {}),
+        ...(row.workspaceRoot ? { workspaceRoot: row.workspaceRoot } : {}),
+        model: primaryModel?.name ?? "unknown",
+        ...(primaryModel?.modelId ? { modelId: primaryModel.modelId as UsageStatisticsRequestRow["modelId"] } : {}),
+        ...(primaryModel?.provider ? { provider: primaryModel.provider } : {}),
+        modelCallCount: row.modelCallCount,
+        totalTokens: row.totalTokens,
+        promptTokens: row.promptTokens,
+        completionTokens: row.completionTokens,
+        cacheHitTokens: row.cacheHitTokens,
+        cacheMissTokens: row.cacheMissTokens,
+        reasoningTokens: row.reasoningTokens,
+        costUsd: round(row.costUsd, 4),
+      };
+    })
+    .sort((a, b) => {
+      const byTimestamp = b.timestamp.localeCompare(a.timestamp);
+      if (byTimestamp !== 0) return byTimestamp;
+      return a.sessionId.localeCompare(b.sessionId) || a.turnId.localeCompare(b.turnId);
+    });
+}
+
+function normalizeRequestRowsPage(
+  input: UsageStatisticsRequestRowsPageInput | undefined,
+  totalRows: number,
+): UsageStatisticsRequestRowsPage {
+  const totalPages = Math.max(1, Math.ceil(totalRows / REQUEST_ROWS_PAGE_SIZE));
+  const requestedPage = typeof input?.page === "number" ? Math.floor(input.page) : 1;
+  const page = Math.min(Math.max(1, requestedPage), totalPages);
+  return {
+    page,
+    pageSize: REQUEST_ROWS_PAGE_SIZE,
+    totalRows,
+    totalPages,
+  };
+}
+
+function paginateRequestRows(
+  rows: UsageStatisticsRequestRow[],
+  input?: UsageStatisticsRequestRowsPageInput,
+): { requestRows: UsageStatisticsRequestRow[]; requestRowsPage: UsageStatisticsRequestRowsPage } {
+  const requestRowsPage = normalizeRequestRowsPage(input, rows.length);
+  const start = (requestRowsPage.page - 1) * requestRowsPage.pageSize;
+  return {
+    requestRows: rows.slice(start, start + requestRowsPage.pageSize),
+    requestRowsPage,
+  };
+}
+
 /**
  * 内部聚合核心：把任意来源的 SessionEvent 序列汇总成 snapshot 的"summary / 模型分布 / 工具分布 / 日明细"。
  *
@@ -178,13 +305,16 @@ function aggregateEvents(
   events: SessionEvent[],
   range: UsageStatisticsRange,
   now: Date,
-): Pick<UsageStatisticsSnapshot, "summary" | "modelDistribution" | "toolDistribution" | "dailyRows" | "periodStart" | "periodEnd"> {
+  sourceMetadataBySessionId: Map<string, UsageSourceMetadata> = new Map(),
+  requestRowsPageInput?: UsageStatisticsRequestRowsPageInput,
+): Pick<UsageStatisticsSnapshot, "summary" | "modelDistribution" | "toolDistribution" | "dailyRows" | "requestRows" | "requestRowsPage" | "periodStart" | "periodEnd"> {
   const periodStart = getPeriodStart(range, now);
   const periodEnd = now;
   const filtered = events.filter((event) => isWithinRange(event, periodStart, periodEnd));
   const models = new Map<string, ModelAccumulator>();
   const tools = new Map<string, ToolAccumulator>();
   const dailyRows = new Map<string, DailyAccumulator>();
+  const requestRows = new Map<string, RequestAccumulator>();
   const toolCallNames = new Map<string, string>();
 
   const summary = {
@@ -233,6 +363,26 @@ function aggregateEvents(
         usage.model,
         (daily.modelTokens.get(usage.model) ?? 0) + usage.totalTokens,
       );
+
+      const request = getOrCreateRequestRow(requestRows, event, sourceMetadataBySessionId.get(event.sessionId));
+      request.timestamp = event.timestamp > request.timestamp ? event.timestamp : request.timestamp;
+      request.modelCallCount += 1;
+      request.totalTokens += usage.totalTokens;
+      request.promptTokens += usage.promptTokens;
+      request.completionTokens += usage.completionTokens;
+      request.cacheHitTokens += usage.cacheHitTokens ?? 0;
+      request.cacheMissTokens += usage.cacheMissTokens ?? 0;
+      request.reasoningTokens += usage.reasoningTokens ?? 0;
+      request.costUsd += costUsd;
+      const requestModelKey = usage.modelId ?? usage.model;
+      const requestModel = request.models.get(requestModelKey) ?? {
+        name: usage.model,
+        provider: usage.provider,
+        ...(usage.modelId ? { modelId: usage.modelId } : {}),
+        totalTokens: 0,
+      };
+      requestModel.totalTokens += usage.totalTokens;
+      request.models.set(requestModelKey, requestModel);
 
       const modelKey = usage.modelId ?? usage.model;
       const model = models.get(modelKey) ?? {
@@ -285,6 +435,7 @@ function aggregateEvents(
   const cacheDenominator = summary.cacheHitTokens + summary.cacheMissTokens;
   summary.cacheEfficiencyPercent = cacheDenominator > 0 ? round((summary.cacheHitTokens / cacheDenominator) * 100) : 0;
   summary.costUsd = round(summary.costUsd, 4);
+  const pagedRequestRows = paginateRequestRows(buildRequestRows(requestRows), requestRowsPageInput);
 
   return {
     summary,
@@ -300,6 +451,7 @@ function aggregateEvents(
           modelBreakdown: buildDailyModelBreakdown(modelTokens, rest.totalTokens),
         };
       }),
+    ...pagedRequestRows,
     periodStart: periodStart?.toISOString(),
     periodEnd: periodEnd.toISOString(),
   };
@@ -313,8 +465,18 @@ export function createUsageStatisticsSnapshot(
   record: SessionRecord,
   range: UsageStatisticsRange = "month",
   now = new Date(),
+  requestRowsPage?: UsageStatisticsRequestRowsPageInput,
 ): UsageStatisticsSnapshot {
-  const aggregated = aggregateEvents(record.events, range, now);
+  const sourceMetadata = new Map<string, UsageSourceMetadata>([
+    [
+      record.meta.id,
+      {
+        ...(record.meta.workspaceId ? { workspaceId: record.meta.workspaceId } : {}),
+        ...(record.meta.workspaceRoot ? { workspaceRoot: record.meta.workspaceRoot } : {}),
+      },
+    ],
+  ]);
+  const aggregated = aggregateEvents(record.events, range, now, sourceMetadata, requestRowsPage);
   return {
     scope: "session",
     sessionId: record.meta.id,
@@ -340,13 +502,21 @@ export function createGlobalUsageStatisticsSnapshot(opts: {
   range?: UsageStatisticsRange;
   now?: Date;
   title?: string;
+  requestRowsPage?: UsageStatisticsRequestRowsPageInput;
 }): UsageStatisticsSnapshot {
   const range = opts.range ?? "total";
   const now = opts.now ?? new Date();
   const sessionEvents = opts.sessionRecords.flatMap((record) => record.events);
   const kairosEvents = opts.kairosEvents ?? [];
   const merged = [...sessionEvents, ...kairosEvents];
-  const aggregated = aggregateEvents(merged, range, now);
+  const sourceMetadata = new Map<string, UsageSourceMetadata>();
+  for (const record of opts.sessionRecords) {
+    sourceMetadata.set(record.meta.id, {
+      ...(record.meta.workspaceId ? { workspaceId: record.meta.workspaceId } : {}),
+      ...(record.meta.workspaceRoot ? { workspaceRoot: record.meta.workspaceRoot } : {}),
+    });
+  }
+  const aggregated = aggregateEvents(merged, range, now, sourceMetadata, opts.requestRowsPage);
   const sourceCount = opts.sessionRecords.length + (kairosEvents.length > 0 ? 1 : 0);
   return {
     scope: "global",

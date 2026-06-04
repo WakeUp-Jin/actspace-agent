@@ -339,6 +339,7 @@ describe("App streaming user message", () => {
 
     const tooltip = await screen.findByRole("tooltip");
     expect(getSessionPreview).toHaveBeenCalledWith({ sessionId });
+    expect(tooltip).toHaveTextContent(`sessionId: ${sessionId}`);
     expect(tooltip).toHaveTextContent("/tmp/workspace");
     expect(tooltip).toHaveTextContent("DeepSeek V4 Pro");
     expect(tooltip).toHaveTextContent("42,000 / 100,000");
@@ -496,6 +497,72 @@ describe("App streaming user message", () => {
         contextState: null,
       });
     });
+  });
+
+  it("keeps the selected model after creating a new session and switching composer surfaces", async () => {
+    const sessionId = "session-created-model";
+    const record = createEmptySessionRecord(sessionId);
+    const runTurn = vi.fn(async (input: RunTurnInput) => ({
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      status: "completed" as const,
+      events: [],
+      contextSnapshot: {
+        totalTokens: 0,
+        maxTokens: 200_000,
+        percentUsed: 0,
+        buckets: [],
+      },
+      contextState: null,
+    }));
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      listSessions: async () => [],
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      onAgentStream: () => () => {},
+      runTurn,
+    };
+
+    renderApp();
+
+    await userEvent.click(await screen.findByRole("button", { name: /deepseek-v4-pro/ }));
+    await userEvent.click(screen.getByRole("button", { name: "deepseek-v4-flash" }));
+
+    let composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "start with flash");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    await waitFor(() => {
+      expect(runTurn).toHaveBeenCalledTimes(1);
+    });
+
+    composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "continue with flash");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    await waitFor(() => {
+      expect(runTurn).toHaveBeenCalledTimes(2);
+    });
+    expect(runTurn.mock.calls.map(([input]) => input.model)).toEqual([
+      "deepseek-v4-flash",
+      "deepseek-v4-flash",
+    ]);
   });
 
   it("routes /compact to compactContext without creating a normal run turn", async () => {

@@ -34,6 +34,7 @@
   - `工具 Tools`
   - `外观 Appearance`
   - `归档会话 Archived Chats`
+  - `更新 Update`
 - 当前选中项使用轻量高亮背景，延续聊天态侧栏的克制视觉，不变成后台控制台。
 
 ### 右侧设置内容区
@@ -48,7 +49,6 @@
 - 通用 General
   - 权限设置 ·「默认权限」：占位开关（暂不接逻辑）。
   - 权限设置 ·「自动审查」：开 = 每条 bash 命令执行前都要确认（绕过 allowlist，硬拒绝仍生效）。
-  - 本地更新：选择本机 `actspace` 源码目录后，可从设置页触发“构建并更新”。该能力仅面向 macOS 已安装版；开发模式或当前安装目录不可写时按钮禁用并显示原因。更新流程由 main 进程验证源码目录、写入 helper 脚本、退出当前 app 后替换 `.app` 并重启；renderer 只显示状态，不直接执行 shell。
   - 通用 ·「语言」：固定「简体中文」。
   - （已删除「工作模式」「完全访问」两条。）
 - 模型 Model（按供应商而非按模型，参考 OpenCode）
@@ -84,12 +84,18 @@
   - 「恢复」按钮调用 `archiveSession({ sessionId, archived: false })`，恢复后刷新归档列表，并通知应用刷新普通会话列表。
   - 恢复不会自动切换到该会话；它只重新出现在普通会话列表中。
   - 空状态显示「暂无归档会话」。
+- 更新 Update
+  - 作为设置导航里的独立页面，放在「归档会话」下方；不再塞进「通用」分区。
+  - 选择本机 `actspace` 源码目录后，可触发“构建并更新”。
+  - 该能力仅面向 macOS 已安装版；开发模式、非 macOS 或当前安装目录不可写时按钮禁用并显示原因。
+  - 更新流程由 main 进程验证源码目录并写入 helper 脚本；构建阶段当前 app 保持打开，renderer 弹窗轮询 `status.json` 展示阶段进度；helper 默认生成 ad-hoc signed 本地包，并在退出当前 app 前验证新 `.app` 的 bundle 元数据、主可执行文件和 code signature。helper 报告 `ready_to_replace` 后，main 才退出当前 app，由 helper 替换 `.app` 并重启；复制或打开新 app 失败时 helper 会尝试恢复旧版本。
+  - 页面分三段：源码目录、安装目标、构建并更新；安装目标展示当前进程路径与 Electron packaged 状态，方便排查安装版/开发态差异。点击“构建并更新”后弹出进度弹窗，显示启动 / 构建 / 准备替换 / 退出当前应用 / 替换等阶段和日志路径。
 
 ## 配置存储与安全
 
 - 非敏感配置落 `<userData>/settings.json`（原子写）。
 - **供应商 API Key 用 Electron `safeStorage` 加密**单独落盘；UI 与 IPC 永不回传明文，仅返回「是否已配置」。
-- 本地更新源码目录落 `<userData>/local-update.json`，只保存路径；更新日志写 `<userData>/tmp/local-update/update.log`。`local-update:start` 只接受已保存且通过校验的源码目录，不接受 renderer 传入的任意命令或脚本内容。
+- 本地更新源码目录落 `<userData>/local-update.json`，只保存路径；更新日志写 `<userData>/tmp/local-update/update.log`，阶段状态写同目录 `status.json`。`local-update:start` 只接受已保存且通过校验的源码目录，不接受 renderer 传入的任意命令或脚本内容。
 - 配置生效：main 把 env-backed 设置覆盖到 `process.env` 后 `loadEnv()` 刷新冻结的 `env`，**下一轮对话自动生效，无需重启**；`settings.json` 只保存主 Agent 系统提示词文件路径，正文由 `settings:read-agent-system-prompt` / `settings:write-agent-system-prompt` 读写 `<userData>/prompts/main-agent.md`，真实 turn 和 `context:describe` 都从同一 prompt 文件注入；Kairos 思考链变更时在空闲态重建 Kairos LLM。Kairos 模型不再走 settings/env：其唯一来源是 `preferences.json` 的 `modelId`，由 `kairos:write-config` 保存后按 modelId 变化触发空闲态重建。
 - UI 偏好（主题、UI/代码字体、界面缩放、代码字号）走 renderer `localStorage`，不进 `settings.json`；开机渲染前重放。
 
@@ -102,6 +108,6 @@
 
 ## 当前参考图
 
-下图为「整页接管（两栏）」定稿基线：左侧设置导航（通用 / 模型 / 智能体 / 工具 / 外观）+ 右侧内容区。
+下图为「整页接管（两栏）」定稿基线：左侧设置导航（通用 / 模型 / 智能体 / 工具 / 外观 / 归档会话 / 更新）+ 右侧内容区。
 
 ![设置页定稿图](public/front/settings-page-final.png)

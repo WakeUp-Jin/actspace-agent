@@ -449,6 +449,7 @@ const electronSecretCrypto: SecretCrypto = {
 
 let settingsService: SettingsService | undefined;
 let localUpdateService: LocalUpdateService | undefined;
+let localUpdateQuitRequested = false;
 
 function getSettingsService(): SettingsService {
   if (!settingsService) {
@@ -948,7 +949,7 @@ async function registerIpc() {
         createSessionStorePaths(join(roots.sessionRoot, input.sessionId)),
       );
       if (!record) return null;
-      return createUsageStatisticsSnapshot(record, range);
+      return createUsageStatisticsSnapshot(record, range, undefined, input.requestRowsPage);
     }
 
     // scope === "global" —— 跨所有普通对话 session + Kairos 自主模式的全部历史事件聚合。
@@ -960,6 +961,7 @@ async function registerIpc() {
       sessionRecords,
       kairosEvents,
       range,
+      requestRowsPage: input.requestRowsPage,
     });
   });
 
@@ -1118,9 +1120,6 @@ async function registerIpc() {
   ipcMain.handle("local-update:start", async () => {
     const result = await getLocalUpdateService().start();
     logMain("local update start requested", { ok: result.ok, error: result.error });
-    if (result.ok) {
-      setTimeout(() => app.quit(), 300);
-    }
     return result;
   });
 
@@ -1168,6 +1167,11 @@ app.whenReady().then(async () => {
     dataRoot: roots.dataRoot,
     appPath: process.execPath,
     isPackaged: app.isPackaged,
+    onReadyToReplace: () => {
+      localUpdateQuitRequested = true;
+      logMain("local update ready to replace, quitting app");
+      app.quit();
+    },
   });
   try {
     await localUpdateService.load();
@@ -1211,7 +1215,9 @@ app.on("before-quit", (event) => {
   }
   shuttingDown = true;
   event.preventDefault();
-  getMainWindow()?.webContents.send("app:shutting-down");
+  getMainWindow()?.webContents.send("app:shutting-down", {
+    reason: localUpdateQuitRequested ? "local_update" : "normal",
+  });
 
   let finished = false;
   const finish = () => {

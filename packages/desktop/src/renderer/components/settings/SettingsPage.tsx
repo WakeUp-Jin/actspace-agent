@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { CheckCircle2, CircleAlert, Loader2, Monitor, Moon, Sun, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
   DEFAULT_MODEL_ID,
   MODEL_LIST,
   type AgentSystemPromptFile,
   type AppSettings,
+  type LocalUpdateProgressPhase,
   type LocalUpdateState,
   type ModelId,
   type ProviderId,
@@ -50,6 +51,7 @@ const BTN_SECONDARY =
 const BTN_DANGER =
   "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-on-danger transition hover:border-on-danger/40 hover:bg-danger-soft";
 const AGENT_SYSTEM_PROMPT_MAX_CHARS = 20_000;
+const LOCAL_UPDATE_POLL_MS = 700;
 
 const MODEL_OPTIONS: SelectOption[] = MODEL_LIST.map((spec) => ({ value: spec.id, label: spec.label }));
 
@@ -67,6 +69,15 @@ function hasLocalUpdateBridge(): boolean {
 
 function hasArchivedSessionsBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace?.listSessions && window.actspace?.archiveSession);
+}
+
+function isActiveLocalUpdatePhase(phase: LocalUpdateProgressPhase): boolean {
+  return phase === "starting" || phase === "building" || phase === "ready_to_replace" || phase === "waiting_for_exit" || phase === "replacing";
+}
+
+function isLocalUpdateActive(state: LocalUpdateState | null): boolean {
+  if (!state) return false;
+  return state.running || isActiveLocalUpdatePhase(state.progress.phase);
 }
 
 function workspaceLabelFromRoot(root: string | undefined): string {
@@ -263,6 +274,8 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
       return <AppearanceSection />;
     case "archivedChats":
       return <ArchivedChatsSection onArchivedSessionsChange={rest.onArchivedSessionsChange} />;
+    case "update":
+      return <LocalUpdateSection />;
     default:
       return null;
   }
@@ -291,8 +304,6 @@ function GeneralSection({ settings, onUpdate }: SectionProps) {
         />
       </SettingGroup>
 
-      <LocalUpdateGroup />
-
       <SettingGroup title="通用设置">
         <SettingRow
           title="语言"
@@ -312,10 +323,11 @@ function GeneralSection({ settings, onUpdate }: SectionProps) {
   );
 }
 
-function LocalUpdateGroup() {
+function LocalUpdateSection() {
   const [state, setState] = useState<LocalUpdateState | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [progressOpen, setProgressOpen] = useState(false);
   const bridgeReady = hasLocalUpdateBridge();
 
   useEffect(() => {
@@ -327,6 +339,33 @@ function LocalUpdateGroup() {
         setStatus("读取本地更新状态失败。");
       });
   }, [bridgeReady]);
+
+  useEffect(() => {
+    if (!bridgeReady || !window.actspace.getLocalUpdateState) return;
+    if (!progressOpen && !isLocalUpdateActive(state)) return;
+
+    let canceled = false;
+    const refreshState = async () => {
+      try {
+        const next = await window.actspace.getLocalUpdateState?.();
+        if (!canceled && next) {
+          setState(next);
+          if (next.progress.phase === "failed") {
+            setStatus(next.progress.message);
+          }
+        }
+      } catch {
+        if (!canceled) setStatus("读取本地更新进度失败。");
+      }
+    };
+
+    void refreshState();
+    const timer = window.setInterval(() => void refreshState(), LOCAL_UPDATE_POLL_MS);
+    return () => {
+      canceled = true;
+      window.clearInterval(timer);
+    };
+  }, [bridgeReady, progressOpen, state?.running, state?.progress.phase]);
 
   const chooseSource = async () => {
     if (!window.actspace.selectLocalUpdateSource) return;
@@ -349,12 +388,15 @@ function LocalUpdateGroup() {
     if (!window.actspace.startLocalUpdate) return;
     setBusy(true);
     setStatus("正在启动本地更新…");
+    setProgressOpen(true);
     try {
       const result = await window.actspace.startLocalUpdate();
       setState(result.state);
-      setStatus(result.ok ? "本地更新已启动，应用即将退出并在替换完成后重启。" : result.message ?? "本地更新启动失败。");
+      setStatus(result.ok ? "本地更新已启动，正在构建。" : result.message ?? "本地更新启动失败。");
+      if (!result.ok) setProgressOpen(false);
     } catch {
       setStatus("本地更新启动失败。");
+      setProgressOpen(false);
     } finally {
       setBusy(false);
     }
@@ -366,57 +408,220 @@ function LocalUpdateGroup() {
     ? "仅桌面端安装版可用。"
     : state?.reason;
   const canStart = Boolean(bridgeReady && state?.canUpdate && !busy);
+  const active = isLocalUpdateActive(state);
 
   return (
-    <SettingGroup title="本地更新">
-      <SettingRow
-        title="源码目录"
-        description={
-          <span className="break-all">
-            {sourceText}
-            {state?.sourceRoot && !state.sourceValid ? <span className="ml-2 text-on-danger">目录不可用</span> : null}
-          </span>
-        }
-        control={
-          <button type="button" className={BTN_SECONDARY} onClick={() => void chooseSource()} disabled={!bridgeReady || busy}>
-            选择目录
-          </button>
-        }
-        align="start"
-      />
-      <SettingRow
-        title="安装目标"
-        description={
-          <span className="flex max-w-[430px] flex-col gap-1">
-            <span className="break-all">{appTargetText}</span>
-            {state?.appExecutablePath ? (
-              <span className="break-all text-text-subtle">当前进程：{state.appExecutablePath}</span>
-            ) : null}
-            {typeof state?.appIsPackaged === "boolean" ? (
-              <span className="text-text-subtle">Electron packaged：{state.appIsPackaged ? "是" : "否"}</span>
-            ) : null}
-          </span>
-        }
-        align="start"
-      />
-      <SettingRow
-        title="构建并更新"
-        description={
-          <span className="flex max-w-[430px] flex-col gap-1">
-            <span>从所选源码重新打包，退出当前应用，替换已安装的 Actspace.app 后自动重启。</span>
-            {state?.logPath ? <span className="break-all text-text-subtle">日志：{state.logPath}</span> : null}
-            {reason ? <span className="text-on-danger">{reason}</span> : null}
-            {status ? <span className={status.includes("失败") ? "text-on-danger" : "text-text-muted"}>{status}</span> : null}
-          </span>
-        }
-        control={
-          <button type="button" className={BTN_PRIMARY} onClick={() => void startUpdate()} disabled={!canStart}>
-            {busy || state?.running ? "处理中…" : "构建并更新"}
-          </button>
-        }
-        align="start"
-      />
-    </SettingGroup>
+    <>
+      <SectionShell title="本地更新" description="从本机源码重新构建并替换已安装的 Actspace.app。">
+        <SettingGroup>
+          <SettingRow
+            title="源码目录"
+            description={
+              <span className="break-all">
+                {sourceText}
+                {state?.sourceRoot && !state.sourceValid ? <span className="ml-2 text-on-danger">目录不可用</span> : null}
+              </span>
+            }
+            control={
+              <button type="button" className={BTN_SECONDARY} onClick={() => void chooseSource()} disabled={!bridgeReady || busy || active}>
+                选择目录
+              </button>
+            }
+            align="start"
+          />
+          <SettingRow
+            title="安装目标"
+            description={
+              <span className="flex max-w-[430px] flex-col gap-1">
+                <span className="break-all">{appTargetText}</span>
+                {state?.appExecutablePath ? (
+                  <span className="break-all text-text-subtle">当前进程：{state.appExecutablePath}</span>
+                ) : null}
+                {typeof state?.appIsPackaged === "boolean" ? (
+                  <span className="text-text-subtle">Electron packaged：{state.appIsPackaged ? "是" : "否"}</span>
+                ) : null}
+              </span>
+            }
+            align="start"
+          />
+          <SettingRow
+            title="构建并更新"
+            description={
+              <span className="flex max-w-[430px] flex-col gap-1">
+                <span>先在当前应用内完成构建；构建完成后再退出、替换已安装的 Actspace.app 并自动重启。</span>
+                {state?.logPath ? <span className="break-all text-text-subtle">日志：{state.logPath}</span> : null}
+                {reason ? <span className="text-on-danger">{reason}</span> : null}
+                {status ? <span className={status.includes("失败") ? "text-on-danger" : "text-text-muted"}>{status}</span> : null}
+              </span>
+            }
+            control={
+              <button type="button" className={BTN_PRIMARY} onClick={() => void startUpdate()} disabled={!canStart}>
+                {busy || active ? "处理中…" : "构建并更新"}
+              </button>
+            }
+            align="start"
+          />
+        </SettingGroup>
+      </SectionShell>
+      {progressOpen && state ? (
+        <LocalUpdateProgressDialog state={state} onClose={() => setProgressOpen(false)} />
+      ) : null}
+    </>
+  );
+}
+
+const LOCAL_UPDATE_STEPS: { phase: LocalUpdateProgressPhase; label: string }[] = [
+  { phase: "starting", label: "启动" },
+  { phase: "building", label: "构建" },
+  { phase: "ready_to_replace", label: "准备替换" },
+  { phase: "waiting_for_exit", label: "退出当前应用" },
+  { phase: "replacing", label: "替换" },
+];
+
+function localUpdateStepIndex(phase: LocalUpdateProgressPhase): number {
+  if (phase === "succeeded") return LOCAL_UPDATE_STEPS.length;
+  if (phase === "failed") return Math.max(1, LOCAL_UPDATE_STEPS.findIndex((step) => step.phase === "building") + 1);
+  const index = LOCAL_UPDATE_STEPS.findIndex((step) => step.phase === phase);
+  return index >= 0 ? index + 1 : 0;
+}
+
+function formatLocalUpdateTime(timestamp: string | undefined): string | null {
+  if (!timestamp) return null;
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
+}
+
+function LocalUpdateProgressDialog({
+  state,
+  onClose,
+}: {
+  state: LocalUpdateState;
+  onClose: () => void;
+}) {
+  const progress = state.progress;
+  const phase = progress.phase;
+  const isFailed = phase === "failed";
+  const isSucceeded = phase === "succeeded";
+  const isActive = isActiveLocalUpdatePhase(phase);
+  const completedSteps = localUpdateStepIndex(phase);
+  const progressWidth = isFailed
+    ? "100%"
+    : `${Math.min(100, Math.max(8, (completedSteps / LOCAL_UPDATE_STEPS.length) * 100))}%`;
+  const updatedAt = formatLocalUpdateTime(progress.updatedAt);
+
+  return (
+    <div
+      className="fixed inset-0 z-[130] flex items-center justify-center bg-overlay px-4"
+      role="presentation"
+      onClick={isActive ? undefined : onClose}
+    >
+      <div
+        className="w-full max-w-[460px] rounded-[14px] border border-line bg-surface-raised p-5 shadow-act-popover"
+        role="dialog"
+        aria-modal="true"
+        aria-label="本地更新进度"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              className={[
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-act-lg",
+                isFailed ? "bg-danger-soft text-on-danger" : isSucceeded ? "bg-success-soft text-on-success" : "bg-brand-soft text-brand",
+              ].join(" ")}
+              aria-hidden="true"
+            >
+              {isFailed ? (
+                <CircleAlert size={21} strokeWidth={2.2} />
+              ) : isSucceeded ? (
+                <CheckCircle2 size={21} strokeWidth={2.2} />
+              ) : (
+                <Loader2 size={21} strokeWidth={2.2} className="animate-spin" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-[16px] font-bold text-text-main">本地更新</h3>
+              <p className="mt-1 text-[12px] leading-relaxed text-text-faint">{progress.message}</p>
+            </div>
+          </div>
+          {!isActive ? (
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-act-md text-text-faint transition hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main"
+              aria-label="关闭更新进度"
+              onClick={onClose}
+            >
+              <X size={16} strokeWidth={2} />
+            </button>
+          ) : null}
+        </div>
+
+        <div
+          className="mt-5 h-2 overflow-hidden rounded-act-pill bg-line"
+          role="progressbar"
+          aria-label="本地更新进度"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={isFailed ? 100 : Math.round(Math.min(100, Math.max(0, (completedSteps / LOCAL_UPDATE_STEPS.length) * 100)))}
+        >
+          <div
+            className={[
+              "h-full rounded-act-pill transition-all duration-300",
+              isFailed ? "bg-danger" : isSucceeded ? "bg-success" : "bg-brand",
+            ].join(" ")}
+            style={{ width: progressWidth }}
+          />
+        </div>
+
+        <ol className="mt-4 grid grid-cols-5 gap-1.5">
+          {LOCAL_UPDATE_STEPS.map((step, index) => {
+            const done = isSucceeded || index < completedSteps;
+            const current = step.phase === phase;
+            return (
+              <li key={step.phase} className="flex min-w-0 flex-col items-center gap-1 text-center">
+                <span
+                  className={[
+                    "flex h-5 w-5 items-center justify-center rounded-act-pill border text-[10px] font-semibold",
+                    current && isActive
+                      ? "border-brand bg-brand text-white"
+                      : done
+                        ? "border-success bg-success-soft text-on-success"
+                        : "border-line bg-surface text-text-faint",
+                  ].join(" ")}
+                >
+                  {index + 1}
+                </span>
+                <span className="w-full truncate text-[11px] text-text-faint">{step.label}</span>
+              </li>
+            );
+          })}
+        </ol>
+
+        <div className="mt-4 flex flex-col gap-1 rounded-act-md border border-line bg-surface-subtle px-3 py-2">
+          {updatedAt ? <span className="text-[12px] text-text-faint">更新时间：{updatedAt}</span> : null}
+          <span className="break-all text-[12px] text-text-subtle">日志：{state.logPath}</span>
+        </div>
+
+        {isActive ? (
+          <p className="mt-3 text-[12px] leading-relaxed text-text-faint">
+            构建阶段不会退出应用；构建完成后才会关闭窗口并执行替换。
+          </p>
+        ) : null}
+
+        {!isActive ? (
+          <div className="mt-5 flex justify-end">
+            <button type="button" className={BTN_SECONDARY} onClick={onClose}>
+              关闭
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

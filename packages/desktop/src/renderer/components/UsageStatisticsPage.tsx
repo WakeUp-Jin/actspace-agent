@@ -1,25 +1,31 @@
 import { useState, type CSSProperties } from "react";
-import { CircleAlert, Info, RefreshCw, Share2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleAlert, Info, RefreshCw, Share2, X } from "lucide-react";
 import type {
   DeepSeekBalanceSnapshot,
   UsageStatisticsDailyModelBreakdown,
   UsageStatisticsDailyRow,
   UsageStatisticsModelEntry,
+  UsageStatisticsRequestRowsPage,
+  UsageStatisticsRequestRow,
   UsageStatisticsSnapshot,
   UsageStatisticsToolEntry,
+  WorkspaceEntry,
 } from "@actspace/shared";
+import { MODEL_REGISTRY, resolveModelSpecByApiModel } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 type Props = {
   snapshot: UsageStatisticsSnapshot | null;
   isLoading?: boolean;
   error?: string | null;
-  onRefresh?: (range: UsageStatisticsSnapshot["range"]) => void;
+  onRefresh?: (range: UsageStatisticsSnapshot["range"], requestRowsPage?: number) => void;
+  onRequestPageChange?: (page: number, range: UsageStatisticsSnapshot["range"]) => void;
   deepSeekBalance?: DeepSeekBalanceSnapshot | null;
   isDeepSeekBalanceLoading?: boolean;
   deepSeekBalanceError?: string | null;
   onRefreshDeepSeekBalance?: () => void;
   onBackToChat?: () => void;
+  workspaces?: WorkspaceEntry[];
 };
 
 const RANGE_TABS = ["day", "week", "month", "total"] as const;
@@ -36,6 +42,13 @@ const iconButtonClass =
 const actionButtonClass =
   "inline-flex h-9 items-center justify-center gap-2 rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-brand/30 hover:bg-brand-soft hover:text-brand";
 
+const REQUEST_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
 function formatMillions(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
@@ -48,6 +61,48 @@ function formatPercent(value: number): string {
 
 function formatMoney(value: number): string {
   return `$${value.toFixed(2)}`;
+}
+
+function formatRequestTimestamp(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return timestamp;
+  return REQUEST_TIME_FORMATTER.format(date);
+}
+
+function compactSessionId(sessionId: string): string {
+  if (sessionId.length <= 18) return sessionId;
+  return `${sessionId.slice(0, 10)}...${sessionId.slice(-5)}`;
+}
+
+function normalizeWorkspacePath(path: string | undefined | null): string | null {
+  const trimmed = path?.trim();
+  if (!trimmed) return null;
+  return trimmed.replace(/\/+$/, "");
+}
+
+function workspaceLabelFromRoot(root: string | undefined | null): string {
+  const normalized = normalizeWorkspacePath(root);
+  if (!normalized) return "Default workspace";
+  const segments = normalized.split("/").filter(Boolean);
+  return segments[segments.length - 1] ?? normalized;
+}
+
+function resolveWorkspaceLabel(row: UsageStatisticsRequestRow, workspaces: WorkspaceEntry[] = []): string {
+  const byId = row.workspaceId ? workspaces.find((workspace) => workspace.id === row.workspaceId) : undefined;
+  if (byId) return byId.label;
+
+  const rowRoot = normalizeWorkspacePath(row.workspaceRoot);
+  const byRoot = rowRoot
+    ? workspaces.find((workspace) => normalizeWorkspacePath(workspace.path) === rowRoot)
+    : undefined;
+  return byRoot?.label ?? workspaceLabelFromRoot(row.workspaceRoot);
+}
+
+function resolveRequestModelLabel(row: UsageStatisticsRequestRow): string {
+  if (row.modelId && row.modelId in MODEL_REGISTRY) {
+    return MODEL_REGISTRY[row.modelId].label;
+  }
+  return resolveModelSpecByApiModel(row.model)?.label ?? row.model;
 }
 
 function getRangeLabel(range: UsageStatisticsSnapshot["range"]): string {
@@ -530,15 +585,188 @@ function HeatmapTooltipModelRow({
   );
 }
 
+type RequestTokenHover = {
+  row: UsageStatisticsRequestRow;
+  anchorRect: DOMRect;
+};
+
+function RequestUsageTable({
+  rows,
+  page,
+  workspaces,
+  onPageChange,
+}: {
+  rows: UsageStatisticsRequestRow[];
+  page: UsageStatisticsRequestRowsPage;
+  workspaces?: WorkspaceEntry[];
+  onPageChange?: (page: number) => void;
+}) {
+  const [hover, setHover] = useState<RequestTokenHover | null>(null);
+  const hasPreviousPage = page.page > 1;
+  const hasNextPage = page.page < page.totalPages;
+  const firstRowNumber = page.totalRows > 0 ? (page.page - 1) * page.pageSize + 1 : 0;
+  const lastRowNumber = page.totalRows > 0 ? firstRowNumber + rows.length - 1 : 0;
+
+  return (
+    <section className={`${panelClass} col-span-2 flex min-h-[340px] flex-col px-6 pb-5 pt-6`}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-base font-semibold text-text-main">会话明细</div>
+          <div className="mt-1 text-xs text-text-faint">按一轮用户输入聚合，每页 10 条，最近的模型调用在最前</div>
+        </div>
+        <span className="text-xs text-text-faint">
+          {page.totalRows > 0
+            ? `${firstRowNumber.toLocaleString()}-${lastRowNumber.toLocaleString()} / ${page.totalRows.toLocaleString()} rows`
+            : "0 rows"}
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto">
+        <table className="w-full min-w-[980px] border-collapse">
+          <thead>
+            <tr>
+              {["时间", "Workspace", "sessionId", "模型", "Tokens", "模型调用"].map((heading, index) => (
+                <th
+                  key={heading}
+                  className={`sticky top-0 z-[1] border-b border-line bg-surface p-3 text-xs font-semibold text-text-muted ${
+                    index >= 4 ? "text-right" : "text-left"
+                  }`}
+                >
+                  {heading}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length > 0 ? (
+              rows.map((row) => (
+                <tr key={`${row.sessionId}:${row.turnId}`} className="hover:bg-surface-subtle">
+                  <td className="border-b border-line p-3 text-[13px] tabular-nums text-text-faint">
+                    {formatRequestTimestamp(row.timestamp)}
+                  </td>
+                  <td className="max-w-[190px] border-b border-line p-3 text-[13px] text-text-muted">
+                    <span className="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={row.workspaceRoot ?? resolveWorkspaceLabel(row, workspaces)}>
+                      {resolveWorkspaceLabel(row, workspaces)}
+                    </span>
+                  </td>
+                  <td className="border-b border-line p-3">
+                    <span className="font-mono text-xs tabular-nums text-text-muted" title={row.sessionId}>
+                      {compactSessionId(row.sessionId)}
+                    </span>
+                  </td>
+                  <td className="max-w-[320px] border-b border-line p-3 text-[13px] text-text-muted">
+                    <span className="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={row.model}>
+                      {resolveRequestModelLabel(row)}
+                    </span>
+                  </td>
+                  <td className="border-b border-line p-3 text-right">
+                    <button
+                      type="button"
+                      className="rounded-act-sm px-1.5 py-1 text-right font-mono text-xs font-bold tabular-nums text-text-main transition hover:bg-brand-soft hover:text-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      aria-label={`${row.totalTokens.toLocaleString()} tokens, show token breakdown`}
+                      onMouseEnter={(event) => setHover({ row, anchorRect: event.currentTarget.getBoundingClientRect() })}
+                      onMouseLeave={() => setHover((current) => (current?.row === row ? null : current))}
+                      onFocus={(event) => setHover({ row, anchorRect: event.currentTarget.getBoundingClientRect() })}
+                      onBlur={() => setHover((current) => (current?.row === row ? null : current))}
+                    >
+                      {row.totalTokens.toLocaleString()}
+                    </button>
+                  </td>
+                  <td className="border-b border-line p-3 text-right font-mono text-xs tabular-nums text-text-muted">
+                    {row.modelCallCount.toLocaleString()}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="p-8 text-center text-sm text-text-muted">No request rows yet.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
+        <button
+          className={`${iconButtonClass} h-8 w-8`}
+          type="button"
+          aria-label="上一页会话明细"
+          disabled={!hasPreviousPage}
+          onClick={() => onPageChange?.(Math.max(1, page.page - 1))}
+        >
+          <ChevronLeft size={15} strokeWidth={2} aria-hidden="true" />
+        </button>
+        <div className="min-w-[118px] text-center text-xs font-semibold tabular-nums text-text-muted">
+          {page.page.toLocaleString()} / {page.totalPages.toLocaleString()}
+        </div>
+        <button
+          className={`${iconButtonClass} h-8 w-8`}
+          type="button"
+          aria-label="下一页会话明细"
+          disabled={!hasNextPage}
+          onClick={() => onPageChange?.(Math.min(page.totalPages, page.page + 1))}
+        >
+          <ChevronRight size={15} strokeWidth={2} aria-hidden="true" />
+        </button>
+      </div>
+      {hover ? <RequestTokenTooltip row={hover.row} anchorRect={hover.anchorRect} /> : null}
+    </section>
+  );
+}
+
+function RequestTokenTooltip({
+  row,
+  anchorRect,
+}: {
+  row: UsageStatisticsRequestRow;
+  anchorRect: DOMRect;
+}) {
+  const style: CSSProperties = {
+    position: "fixed",
+    left: `${anchorRect.left + anchorRect.width / 2}px`,
+    top: `${anchorRect.bottom + 8}px`,
+    transform: "translate(-50%, 0)",
+    zIndex: 60,
+  };
+  const rows: Array<readonly [string, number]> = [
+    ["Cache Read", row.cacheHitTokens],
+    ["Input", row.promptTokens],
+    ["Output", row.completionTokens],
+    ...(row.reasoningTokens > 0 ? ([["Reasoning", row.reasoningTokens]] as const) : []),
+  ];
+
+  return (
+    <div
+      role="tooltip"
+      data-testid="request-token-tooltip"
+      style={style}
+      className="pointer-events-none w-[220px] rounded-[14px] border border-line bg-surface-raised px-3.5 py-3 text-left shadow-act-popover"
+    >
+      <div className="grid gap-2 text-[12px]">
+        {rows.map(([label, value]) => (
+          <div key={label} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4">
+            <span className="text-text-muted">{label}</span>
+            <span className="font-mono tabular-nums text-text-main">{value.toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2.5 grid grid-cols-[minmax(0,1fr)_auto] gap-4 border-t border-line pt-2.5 text-[12px] font-semibold">
+        <span className="text-text-main">Total</span>
+        <span className="font-mono tabular-nums text-text-main">{row.totalTokens.toLocaleString()}</span>
+      </div>
+    </div>
+  );
+}
+
 export function UsageStatisticsPage({
   snapshot,
   isLoading,
   error,
   onRefresh,
+  onRequestPageChange,
   deepSeekBalance,
   isDeepSeekBalanceLoading,
   deepSeekBalanceError,
   onRefreshDeepSeekBalance,
+  workspaces,
 }: Props) {
   const [range, setRange] = useState<UsageStatisticsSnapshot["range"]>(snapshot?.range ?? "month");
   const [selectedTool, setSelectedTool] = useState<UsageStatisticsToolEntry | null>(null);
@@ -583,14 +811,14 @@ export function UsageStatisticsPage({
                     type="button"
                     onClick={() => {
                       setRange(tab);
-                      onRefresh?.(tab);
+                      onRefresh?.(tab, 1);
                     }}
                   >
                     {getRangeLabel(tab)}
                   </button>
                 ))}
               </div>
-              <button className={`${actionButtonClass} mx-auto`} type="button" onClick={() => onRefresh?.(range)}>
+              <button className={`${actionButtonClass} mx-auto`} type="button" onClick={() => onRefresh?.(range, 1)}>
                 <RefreshCw size={15} strokeWidth={2} />
                 Refresh
               </button>
@@ -746,7 +974,7 @@ export function UsageStatisticsPage({
                     aria-selected={tab === range}
                     onClick={() => {
                       setRange(tab);
-                      onRefresh?.(tab);
+                      onRefresh?.(tab, 1);
                     }}
                   >
                     {getRangeLabel(tab)}
@@ -754,7 +982,11 @@ export function UsageStatisticsPage({
                 ))}
               </div>
               <div className="flex items-center gap-2">
-                <button className={actionButtonClass} type="button" onClick={() => onRefresh?.(range)}>
+                <button
+                  className={actionButtonClass}
+                  type="button"
+                  onClick={() => onRefresh?.(range, effectiveSnapshot.requestRowsPage?.page ?? 1)}
+                >
                   <RefreshCw size={15} strokeWidth={2} />
                   Refresh
                 </button>
@@ -863,6 +1095,13 @@ export function UsageStatisticsPage({
 
           {isLoading ? <div className="px-0.5 pt-1 text-xs text-text-faint">Loading usage statistics...</div> : null}
         </section>
+
+        <RequestUsageTable
+          rows={effectiveSnapshot.requestRows ?? []}
+          page={effectiveSnapshot.requestRowsPage ?? { page: 1, pageSize: 10, totalRows: 0, totalPages: 1 }}
+          workspaces={workspaces}
+          onPageChange={(page) => onRequestPageChange?.(page, effectiveSnapshot.range)}
+        />
       </div>
 
       {selectedTool ? <ToolDetailModal tool={selectedTool} onClose={() => setSelectedTool(null)} /> : null}

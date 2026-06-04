@@ -102,8 +102,10 @@ declare global {
       setUiZoom: (factor: number) => void;
       /** 主题三态同步原生 chrome（main nativeTheme.themeSource）。 */
       setNativeTheme: (mode: "light" | "dark" | "system") => void;
-      /** 主进程优雅退出开始时触发，用于弹「Kairos 正在关闭」遮罩。返回取消订阅函数。 */
-      onShuttingDown: (callback: () => void) => () => void;
+      /** 主进程优雅退出开始时触发，用于弹退出遮罩。返回取消订阅函数。 */
+      onShuttingDown: (
+        callback: (notice: import("@actspace/shared").AppShutdownNotice) => void
+      ) => () => void;
     };
     /**
      * Kairos 自治模式 API。preload 在 `kairos` 命名空间下暴露；

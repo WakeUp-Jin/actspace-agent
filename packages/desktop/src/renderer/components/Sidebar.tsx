@@ -173,16 +173,16 @@ function resolveSessionStatus(status: unknown): SessionUiStatusKind {
 }
 
 const SIDEBAR_CLASS =
-  "sidebar relative flex h-full min-h-0 flex-col gap-3 border-r border-line bg-sidebar pb-2.5 pl-2.5 pr-2 pt-[var(--window-chrome-strip-height)]";
-const SIDEBAR_PRIMARY_ACTIONS_CLASS = "mt-1.5 flex flex-col gap-px p-0";
+  "sidebar relative flex h-full min-h-0 min-w-0 flex-col gap-3 border-r border-line bg-sidebar pb-2.5 pl-2.5 pr-2 pt-[var(--window-chrome-strip-height)]";
+const SIDEBAR_PRIMARY_ACTIONS_CLASS = "mt-1.5 flex min-w-0 flex-col gap-px p-0";
 const SIDEBAR_PRIMARY_ACTION_CLASS =
-  "flex min-h-[34px] items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2.5 py-0 text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
+  "flex min-h-[34px] min-w-0 items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2.5 py-0 text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 const SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS = "text-text-main";
 const SIDEBAR_PRIMARY_ACTION_LABEL_CLASS = "min-w-0 flex-1 text-left";
 const SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS = "text-xs font-medium tracking-[0.02em] text-text-faint";
 const SIDEBAR_BUTTON_RESET_CLASS = "appearance-none border-0 bg-transparent font-[inherit]";
-const SESSION_NAV_CLASS = "flex min-h-0 flex-1 flex-col gap-3.5 overflow-auto pt-2";
-const NAV_SECTION_CLASS = "flex flex-col gap-0.5 pb-0";
+const SESSION_NAV_CLASS = "flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-x-hidden overflow-y-auto pt-2";
+const NAV_SECTION_CLASS = "flex min-w-0 flex-col gap-0.5 pb-0";
 const NAV_SECTION_WORKSPACES_CLASS = `${NAV_SECTION_CLASS} gap-1`;
 const NAV_SECTION_TITLE_CLASS = "group/nav-title flex min-h-6 items-center justify-between gap-2 px-2";
 const NAV_SECTION_LABEL_CLASS =
@@ -190,9 +190,9 @@ const NAV_SECTION_LABEL_CLASS =
 const NAV_SECTION_ACTIONS_CLASS = "inline-flex items-center gap-1 text-text-faint";
 const NAV_SECTION_ACTION_BUTTON_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} grid h-5 w-5 place-items-center rounded-act-sm opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/nav-title:opacity-100 group-focus-within/nav-title:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-muted`;
-const SESSION_LIST_CLASS = "flex flex-col gap-px";
+const SESSION_LIST_CLASS = "flex min-w-0 flex-col gap-px";
 const SESSION_ROW_CLASS =
-  "session-row group/session-row relative grid min-h-9 grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2 rounded-act-md px-2 transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)]";
+  "session-row group/session-row relative grid min-h-9 w-full min-w-0 grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2 rounded-act-md px-2 transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)]";
 const SESSION_ROW_ACTIVE_CLASS = "is-active bg-sidebar-selected";
 const SESSION_ROW_PINNED_CLASS = "is-pinned";
 const SESSION_ROW_MUTED_CLASS = "is-muted";
@@ -247,7 +247,7 @@ const WORKSPACE_ACTIONS_CLASS = NAV_SECTION_ACTIONS_CLASS;
 const WORKSPACE_ADD_BUTTON_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} workspace-add-button grid h-[22px] w-[22px] place-items-center rounded-act-sm text-text-faint opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/workspace-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
 const SETTINGS_ENTRY_CLASS =
-  "flex min-h-[34px] items-center gap-[9px] rounded-act-md border-0 bg-transparent px-2.5 py-0 text-left text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
+  "flex min-h-[34px] min-w-0 items-center gap-[9px] rounded-act-md border-0 bg-transparent px-2.5 py-0 text-left text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 
 type NavSectionHeaderProps = {
   label: string;
@@ -815,7 +815,6 @@ export function Sidebar({
                 <span className={`session-row-marker ${SESSION_ROW_MARKER_CLASS}`} aria-hidden="true" />
                 <div className={`${SESSION_ROW_MAIN_CLASS} ${SESSION_ROW_MAIN_MUTED_CLASS}`}>
                   <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>No scheduled tasks</span>
-                  <span className={`session-row-time ${SESSION_ROW_TIME_CLASS}`}>Create one when automation is available</span>
                 </div>
               </div>
             </div>

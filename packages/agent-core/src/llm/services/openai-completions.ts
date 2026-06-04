@@ -26,7 +26,7 @@ import {
 
 const DEFAULT_BASE_URLS: Record<string, string> = {
   deepseek: "https://api.deepseek.com",
-  kimi: "https://api.moonshot.ai/v1",
+  kimi: "https://api.moonshot.cn/v1",
 };
 
 function providerDisplayName(provider: string): string {

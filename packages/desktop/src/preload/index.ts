@@ -14,6 +14,7 @@ import type {
   CompactContextResult,
   ContextState,
   DeepSeekBalanceSnapshot,
+  AppShutdownNotice,
   DescribeContextInput,
   KairosBridgeApi,
   KairosContextSnapshot,
@@ -156,8 +157,8 @@ contextBridge.exposeInMainWorld("actspace", {
   },
 
   // 主进程开始优雅退出时通知 renderer 弹「Kairos 正在关闭」遮罩。无 payload。
-  onShuttingDown: (callback: () => void) => {
-    const handler = () => callback();
+  onShuttingDown: (callback: (notice: AppShutdownNotice) => void) => {
+    const handler = (_: unknown, notice?: AppShutdownNotice) => callback(notice ?? { reason: "normal" });
     ipcRenderer.on("app:shutting-down", handler);
     return () => {
       ipcRenderer.removeListener("app:shutting-down", handler);

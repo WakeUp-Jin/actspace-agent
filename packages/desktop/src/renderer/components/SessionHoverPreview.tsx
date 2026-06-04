@@ -1,4 +1,4 @@
-import { BarChart3, Folder, Sparkles } from "lucide-react";
+import { BarChart3, Folder, Hash, Sparkles } from "lucide-react";
 import { MODEL_REGISTRY, resolveModelSpecByApiModel } from "@actspace/shared";
 import type { ContextUsageSnapshot, ModelId, SessionListItem } from "@actspace/shared";
 
@@ -64,13 +64,18 @@ export function SessionHoverPreviewCard({
   const workspaceRoot = preview?.workspaceRoot ?? session.workspaceRoot;
   const modelLabel = resolveModelLabel(preview);
   const snapshot = preview?.contextSnapshot ?? null;
-  const hasDetails = Boolean(workspaceRoot || modelLabel || snapshot);
+  const sessionId = preview?.sessionId ?? session.id;
+  const hasDetails = Boolean(sessionId || workspaceRoot || modelLabel || snapshot);
 
   return (
     <div className={SESSION_HOVER_CARD_CLASS}>
       <div className={SESSION_HOVER_TITLE_CLASS}>{title}</div>
       {hasDetails ? (
         <div className={SESSION_HOVER_ROWS_CLASS}>
+          <div className={SESSION_HOVER_ROW_CLASS}>
+            <Hash size={14} strokeWidth={1.8} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
+            <span className={SESSION_HOVER_PATH_CLASS}>sessionId: {sessionId}</span>
+          </div>
           {workspaceRoot ? (
             <div className={SESSION_HOVER_ROW_CLASS}>
               <Folder size={14} strokeWidth={1.8} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />

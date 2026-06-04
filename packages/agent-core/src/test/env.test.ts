@@ -81,6 +81,7 @@ describe("envToLLMConfig", () => {
     expect(envToLLMConfig()).toMatchObject({
       provider: "kimi",
       apiKey: "kimi-key",
+      baseUrl: "https://api.moonshot.cn/v1",
       model: "kimi-k2.6",
     });
   });

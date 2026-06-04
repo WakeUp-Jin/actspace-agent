@@ -38,7 +38,9 @@ function llmUsage(opts: {
   id: string;
   timestamp: string;
   sessionId?: string;
+  turnId?: string;
   model?: string;
+  modelId?: string;
   provider?: string;
   prompt?: number;
   completion?: number;
@@ -52,6 +54,7 @@ function llmUsage(opts: {
     callId: `call-${opts.id}`,
     provider: opts.provider ?? "openai",
     model: opts.model ?? "gpt-5.5",
+    ...(opts.modelId ? { modelId: opts.modelId } : {}),
     promptTokens: opts.prompt ?? 1_000,
     completionTokens: opts.completion ?? 200,
     totalTokens: opts.total ?? 1_200,
@@ -60,7 +63,7 @@ function llmUsage(opts: {
     cacheMissTokens: opts.cacheMiss ?? 0,
     cost: opts.cost ?? { total: 0.02, currency: "USD" },
   };
-  return ev("llm_usage", payload, { id: opts.id, timestamp: opts.timestamp, sessionId: opts.sessionId });
+  return ev("llm_usage", payload, { id: opts.id, timestamp: opts.timestamp, sessionId: opts.sessionId, turnId: opts.turnId });
 }
 
 function toolCall(opts: {
@@ -112,6 +115,7 @@ function fakeRecord(id: string, title: string, events: SessionEvent[]): SessionR
       createdAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),
       turnCount: 1,
+      workspaceId: "ws_tmp",
       workspaceRoot: "/tmp/ws",
     },
     events,
@@ -126,6 +130,7 @@ describe("createUsageStatisticsSnapshot (single session)", () => {
       llmUsage({
         id: "l1",
         timestamp: "2026-05-28T08:01:00.000Z",
+        sessionId: "session-a",
         prompt: 100,
         completion: 50,
         total: 150,
@@ -159,6 +164,18 @@ describe("createUsageStatisticsSnapshot (single session)", () => {
     expect(snapshot.summary.conversationCount).toBe(1);
     expect(snapshot.summary.costUsd).toBeCloseTo(0.01, 5);
     expect(snapshot.toolDistribution[0]).toMatchObject({ name: "Read", callCount: 1, failedCount: 0 });
+    expect(snapshot.requestRows[0]).toMatchObject({
+      sessionId: "session-a",
+      turnId: "turn-1",
+      workspaceId: "ws_tmp",
+      workspaceRoot: "/tmp/ws",
+      modelCallCount: 1,
+      totalTokens: 150,
+      promptTokens: 100,
+      completionTokens: 50,
+      cacheHitTokens: 80,
+      cacheMissTokens: 20,
+    });
   });
 });
 
@@ -300,6 +317,121 @@ describe("createGlobalUsageStatisticsSnapshot", () => {
     ]);
   });
 
+  it("builds request rows by turn and sorts newest first", () => {
+    const record = fakeRecord("session-a", "A", [
+      llmUsage({
+        id: "older",
+        timestamp: "2026-05-27T09:00:00.000Z",
+        sessionId: "session-a",
+        turnId: "turn-older",
+        model: "gpt-5.5",
+        total: 100,
+        prompt: 80,
+        completion: 20,
+        cacheHit: 60,
+        cacheMiss: 40,
+      }),
+      llmUsage({
+        id: "new-a",
+        timestamp: "2026-05-28T08:00:00.000Z",
+        sessionId: "session-a",
+        turnId: "turn-new",
+        model: "gpt-5.5",
+        total: 300,
+        prompt: 200,
+        completion: 100,
+        cacheHit: 250,
+        cacheMiss: 50,
+      }),
+      llmUsage({
+        id: "new-b",
+        timestamp: "2026-05-28T08:02:00.000Z",
+        sessionId: "session-a",
+        turnId: "turn-new",
+        model: "claude-4.6-sonnet",
+        total: 700,
+        prompt: 600,
+        completion: 100,
+        cacheHit: 650,
+        cacheMiss: 50,
+      }),
+    ]);
+
+    const snapshot = createGlobalUsageStatisticsSnapshot({
+      sessionRecords: [record],
+      range: "total",
+      now: NOW,
+    });
+
+    expect(snapshot.requestRows).toHaveLength(2);
+    expect(snapshot.requestRows[0]).toMatchObject({
+      timestamp: "2026-05-28T08:02:00.000Z",
+      sessionId: "session-a",
+      turnId: "turn-new",
+      workspaceId: "ws_tmp",
+      workspaceRoot: "/tmp/ws",
+      model: "claude-4.6-sonnet",
+      modelCallCount: 2,
+      totalTokens: 1000,
+      promptTokens: 800,
+      completionTokens: 200,
+      cacheHitTokens: 900,
+      cacheMissTokens: 100,
+    });
+    expect(snapshot.requestRows[1].turnId).toBe("turn-older");
+    expect(snapshot.requestRowsPage).toEqual({
+      page: 1,
+      pageSize: 10,
+      totalRows: 2,
+      totalPages: 1,
+    });
+  });
+
+  it("paginates request rows without changing aggregate totals", () => {
+    const events = Array.from({ length: 12 }, (_, index) =>
+      llmUsage({
+        id: `page-${index + 1}`,
+        timestamp: `2026-05-28T${String(index).padStart(2, "0")}:00:00.000Z`,
+        sessionId: "session-a",
+        turnId: `turn-${index + 1}`,
+        total: 100 + index,
+        prompt: 80 + index,
+        completion: 20,
+      }),
+    );
+    const record = fakeRecord("session-a", "A", events);
+
+    const firstPage = createGlobalUsageStatisticsSnapshot({
+      sessionRecords: [record],
+      range: "total",
+      now: NOW,
+    });
+    const secondPage = createGlobalUsageStatisticsSnapshot({
+      sessionRecords: [record],
+      range: "total",
+      now: NOW,
+      requestRowsPage: { page: 2 },
+    });
+
+    expect(firstPage.summary.totalTokens).toBe(1266);
+    expect(firstPage.requestRows).toHaveLength(10);
+    expect(firstPage.requestRows[0].turnId).toBe("turn-12");
+    expect(firstPage.requestRowsPage).toEqual({
+      page: 1,
+      pageSize: 10,
+      totalRows: 12,
+      totalPages: 2,
+    });
+    expect(secondPage.summary.totalTokens).toBe(1266);
+    expect(secondPage.requestRows.map((row) => row.turnId)).toEqual(["turn-2", "turn-1"]);
+    expect(secondPage.requestRowsPage).toEqual({
+      page: 2,
+      pageSize: 10,
+      totalRows: 12,
+      totalPages: 2,
+    });
+  });
+
   it("excludes pure user-message days from modelBreakdown (empty array, not undefined)", () => {
     const record = fakeRecord("session-a", "A", [
       userMessage({ id: "u1", timestamp: "2026-05-28T08:00:00.000Z" }),
@@ -326,6 +458,13 @@ describe("createGlobalUsageStatisticsSnapshot", () => {
     expect(snapshot.modelDistribution).toEqual([]);
     expect(snapshot.toolDistribution).toEqual([]);
     expect(snapshot.dailyRows).toEqual([]);
+    expect(snapshot.requestRows).toEqual([]);
+    expect(snapshot.requestRowsPage).toEqual({
+      page: 1,
+      pageSize: 10,
+      totalRows: 0,
+      totalPages: 1,
+    });
     expect(snapshot.sourceCount).toBe(0);
   });
 });

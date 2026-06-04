@@ -41,6 +41,10 @@ function makeLocalUpdateState(over: Partial<LocalUpdateState> = {}): LocalUpdate
     canUpdate: true,
     logPath: "/Users/test/Library/Application Support/actspace/tmp/local-update/update.log",
     running: false,
+    progress: {
+      phase: "idle",
+      message: "尚未开始本地更新。",
+    },
     ...over,
   };
 }
@@ -82,7 +86,16 @@ describe("SettingsPage", () => {
   const selectLocalUpdateSource = vi.fn(async () => ({ canceled: false, state: makeLocalUpdateState({ sourceRoot: "/repo/new" }) }));
   const startLocalUpdate = vi.fn(async () => ({
     ok: true,
-    state: makeLocalUpdateState({ running: true, canUpdate: false }),
+    state: makeLocalUpdateState({
+      running: true,
+      canUpdate: false,
+      progress: {
+        phase: "building",
+        message: "正在从源码构建 Actspace.app…",
+        startedAt: "2026-06-04T15:00:00.000Z",
+        updatedAt: "2026-06-04T15:00:01.000Z",
+      },
+    }),
   }));
   const listSessions = vi.fn(async (input?: { archived?: boolean }) => (input?.archived ? archivedSessions : []));
   const archiveSession = vi.fn(async () => ({ ok: true }));
@@ -97,15 +110,29 @@ describe("SettingsPage", () => {
     setProviderKey.mockClear();
     clearProviderKey.mockClear();
     testProviderConnection.mockClear();
-    getLocalUpdateState.mockClear();
+    getLocalUpdateState.mockReset();
     selectLocalUpdateSource.mockClear();
-    startLocalUpdate.mockClear();
+    startLocalUpdate.mockReset();
     listSessions.mockClear();
     archiveSession.mockClear();
     setUiZoom.mockClear();
     setNativeTheme.mockClear();
     localStorage.clear();
     document.documentElement.removeAttribute("data-theme");
+    getLocalUpdateState.mockImplementation(async () => makeLocalUpdateState());
+    startLocalUpdate.mockImplementation(async () => ({
+      ok: true,
+      state: makeLocalUpdateState({
+        running: true,
+        canUpdate: false,
+        progress: {
+          phase: "building",
+          message: "正在从源码构建 Actspace.app…",
+          startedAt: "2026-06-04T15:00:00.000Z",
+          updatedAt: "2026-06-04T15:00:01.000Z",
+        },
+      }),
+    }));
     window.actspace = {
       getSettings,
       updateSettings,
@@ -132,7 +159,9 @@ describe("SettingsPage", () => {
     renderSettingsPage();
     expect(await screen.findByRole("switch", { name: "自动审查" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "通用" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "更新" })).toBeInTheDocument();
     expect(screen.getByLabelText("界面语言")).toBeDisabled();
+    expect(getLocalUpdateState).not.toHaveBeenCalled();
   });
 
   it("keeps the settings nav fixed while the content pane owns vertical scrolling", async () => {
@@ -154,7 +183,24 @@ describe("SettingsPage", () => {
   });
 
   it("本地更新分区可选择源码目录并启动更新", async () => {
+    getLocalUpdateState
+      .mockResolvedValueOnce(makeLocalUpdateState())
+      .mockResolvedValue(makeLocalUpdateState({
+        running: true,
+        canUpdate: false,
+        progress: {
+          phase: "building",
+          message: "正在从源码构建 Actspace.app…",
+          startedAt: "2026-06-04T15:00:00.000Z",
+          updatedAt: "2026-06-04T15:00:01.000Z",
+        },
+      }));
+
     renderSettingsPage();
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "更新" }));
+
     expect(await screen.findByText("/repo/actspace-agent")).toBeInTheDocument();
     expect(screen.getByText("/Applications/Actspace.app")).toBeInTheDocument();
     expect(screen.getByText("当前进程：/Applications/Actspace.app/Contents/MacOS/Actspace")).toBeInTheDocument();
@@ -170,7 +216,48 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(startLocalUpdate).toHaveBeenCalledTimes(1);
     });
-    expect(await screen.findByText("本地更新已启动，应用即将退出并在替换完成后重启。")).toBeInTheDocument();
+    expect(await screen.findByText("本地更新已启动，正在构建。")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "本地更新进度" })).toBeInTheDocument();
+    expect(screen.getByText("正在从源码构建 Actspace.app…")).toBeInTheDocument();
+    expect(screen.getByText("构建阶段不会退出应用；构建完成后才会关闭窗口并执行替换。")).toBeInTheDocument();
+  });
+
+  it("本地更新弹窗可显示失败状态并关闭", async () => {
+    startLocalUpdate.mockResolvedValueOnce({
+      ok: true,
+      state: makeLocalUpdateState({
+        running: true,
+        canUpdate: false,
+        progress: {
+          phase: "building",
+          message: "正在从源码构建 Actspace.app…",
+          startedAt: "2026-06-04T15:00:00.000Z",
+          updatedAt: "2026-06-04T15:00:01.000Z",
+        },
+      }),
+    });
+    getLocalUpdateState
+      .mockResolvedValueOnce(makeLocalUpdateState())
+      .mockResolvedValueOnce(makeLocalUpdateState({
+        running: false,
+        canUpdate: true,
+        progress: {
+          phase: "failed",
+          message: "未找到 pnpm，请确认 Homebrew 路径已加入环境。",
+          startedAt: "2026-06-04T15:00:00.000Z",
+          updatedAt: "2026-06-04T15:00:02.000Z",
+          finishedAt: "2026-06-04T15:00:02.000Z",
+        },
+      }));
+
+    renderSettingsPage();
+    await screen.findByRole("switch", { name: "自动审查" });
+    await userEvent.click(screen.getByRole("button", { name: "更新" }));
+    await userEvent.click(await screen.findByRole("button", { name: "构建并更新" }));
+
+    expect(await screen.findByText("未找到 pnpm，请确认 Homebrew 路径已加入环境。")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "关闭" }));
+    expect(screen.queryByRole("dialog", { name: "本地更新进度" })).not.toBeInTheDocument();
   });
 
   it("connecting a provider opens the key modal and saves the key", async () => {

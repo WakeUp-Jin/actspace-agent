@@ -74,7 +74,8 @@ bash 与非 bash 工具走两条不同的路径——bash 用流式落盘 + 头�
 要点：
 
 - **bash 不用 flash**：其全量原文已在磁盘且可逐字翻页，头部通常最有用（命令回显/前段输出/报错），逐字头部 + 文件路径比摘要更可信，也省掉每次 bash 都叫一次 flash 的延迟与成本，避免 flash 把日志里的精确数字/路径摘错。flash 摘要只服务「重跑才能恢复、且适合摘要」的 read/grep/glob/web/generic。
-- 读取类工具有自己的分页（`read_file` 默认 500 行 + `offset/limit`），常规读取很少全文，且 DeepSeek 1M / Kimi 256k 窗口能容纳；故其阈值（20000）显著高于通用阈值，让常规读取**逐字穿透、不被摘要**，只有极端大读取才触发 flash 摘要。
+- 读取类工具有自己的分页（`read_file` 默认 200 行 + `offset/limit`），工具描述鼓励模型进行小范围分段读取；故其阈值（20000）显著高于通用阈值，让常规读取**逐字穿透、不被摘要**，只有极端大读取才触发 flash 摘要。
+- `read_file` 对同一 `path + offset + limit` 做 unchanged dedup：文件 size/mtime 未变且未传 `force=true` 时返回短提示，避免重复把同一段源码塞回上下文；压缩后确实需要重读时可用 `force=true`。
 
 ### bash 流式落盘（核心）
 
@@ -231,14 +232,14 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 | `compressKeepRatio` | 0.3 | 历史压缩保留最近比例 |
 | `compactMinIntervalCalls` | 2 | 两次历史压缩之间的最小模型调用间隔 |
 | 通用阈值 `toolTruncateThreshold` | 2000 字符 | web/generic 超此值即 flash 摘要 |
-| 读取类阈值 `readTruncateThreshold` | 20000 字符 | read/grep/glob/list 超此值才摘要，让常规 500 行读取逐字穿透 |
+| 读取类阈值 `readTruncateThreshold` | 20000 字符 | read/grep/glob/list 超此值才摘要，让常规 200 行分段读取逐字穿透 |
 | bash 头部/落盘阈值 `bashInlineThreshold` | 4000 字符 | bash 超此值才落盘并回填头部 4000，低于则原样 inline、不落盘 |
 | bash 磁盘硬上限 `bashDiskCap` | 5MB | `run-process` 流式写盘上限，防跑飞命令撑爆磁盘 |
 | `absoluteMaxChars` | 100000 字符 | 非 bash 工具送入 flash 前的头尾截断上限（对齐 Skill） |
 
 成本/延迟提示：通用 `toolTruncateThreshold=2000` 会让多数 web/generic 输出触发一次 flash 摘要，给工具密集 turn 叠加额外往返；读取类用更高阈值穿透；bash 全程不调 flash。所有阈值可配置，后续按实测调整。
 
-读取类阈值取 20000 的理由：`read_file` 默认 500 行 + `offset/limit` 分页，常规读取很少全文；即便模型一次性大读取，20000 字符（约 5.7k token）相对 DeepSeek 1M / Kimi 256k 窗口仍可接受，故让其逐字穿透、不被摘要。
+读取类阈值取 20000 的理由：`read_file` 默认 200 行 + `offset/limit` 分页，常规读取应以小范围分段为主；即便模型一次性大读取，20000 字符（约 5.7k token）相对 DeepSeek 1M / Kimi 256k 窗口仍可接受，故让其逐字穿透、不被摘要。
 
 摘要模型：统一用 `deepseek-v4-flash`，通过独立的 `summarizer` LLMService（由 `MODEL_REGISTRY["deepseek-v4-flash"]` + env 构造，复用 `buildLLMConfig`）。无 DeepSeek key 时 `summarizer` 为空：工具侧退化为确定性头尾截断；历史侧退化为「廉价前置工具消息裁剪 + 丢弃最旧可压消息」。
 

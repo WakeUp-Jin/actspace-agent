@@ -420,6 +420,8 @@ export function ConversationView({
   onAbort,
   isSessionReady = true,
   defaultModelId,
+  selectedModelId,
+  onSelectedModelChange,
   workspaceOptions,
   selectedWorkspaceRoot,
   onSelectWorkspace,
@@ -436,6 +438,8 @@ export function ConversationView({
   onAbort?: () => void;
   isSessionReady?: boolean;
   defaultModelId?: ModelId;
+  selectedModelId?: ModelId;
+  onSelectedModelChange?: (modelId: ModelId) => void;
   workspaceOptions?: ComposerWorkspaceOption[];
   selectedWorkspaceRoot?: string | null;
   onSelectWorkspace?: (workspaceRoot: string) => void;
@@ -482,6 +486,8 @@ export function ConversationView({
               onAbort={onAbort}
               surface="initial"
               defaultModelId={defaultModelId}
+              selectedModelId={selectedModelId}
+              onSelectedModelChange={onSelectedModelChange}
               onExpandContext={openContextTab}
               workspaceOptions={workspaceOptions}
               selectedWorkspaceRoot={selectedWorkspaceRoot}
@@ -532,6 +538,8 @@ export function ConversationView({
             onAbort={onAbort}
             surface="followup"
             defaultModelId={defaultModelId}
+            selectedModelId={selectedModelId}
+            onSelectedModelChange={onSelectedModelChange}
             onExpandContext={openContextTab}
             workspaceOptions={workspaceOptions}
             selectedWorkspaceRoot={selectedWorkspaceRoot}

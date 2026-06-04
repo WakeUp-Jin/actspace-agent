@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { act, render, screen } from "@testing-library/react";
+import type { AppShutdownNotice } from "@actspace/shared";
 import { ShutdownOverlay } from "../components/ShutdownOverlay";
 
 type ActspaceBridge = NonNullable<typeof window.actspace>;
@@ -10,9 +11,9 @@ describe("ShutdownOverlay", () => {
   });
 
   it("默认不渲染遮罩；收到 onShuttingDown 回调后出现", () => {
-    let fire: (() => void) | null = null;
+    let fire: ((notice: AppShutdownNotice) => void) | null = null;
     window.actspace = {
-      onShuttingDown: (cb: () => void) => {
+      onShuttingDown: (cb: (notice: AppShutdownNotice) => void) => {
         fire = cb;
         return () => {};
       },
@@ -22,11 +23,30 @@ describe("ShutdownOverlay", () => {
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 
     act(() => {
-      fire?.();
+      fire?.({ reason: "normal" });
     });
 
     expect(screen.getByRole("alertdialog", { name: "Kairos 正在关闭" })).toBeInTheDocument();
     expect(screen.getByText("Kairos 正在安全关闭…")).toBeInTheDocument();
+  });
+
+  it("本地更新退出时显示替换应用文案", () => {
+    let fire: ((notice: AppShutdownNotice) => void) | null = null;
+    window.actspace = {
+      onShuttingDown: (cb: (notice: AppShutdownNotice) => void) => {
+        fire = cb;
+        return () => {};
+      },
+    } as unknown as ActspaceBridge;
+
+    render(<ShutdownOverlay />);
+
+    act(() => {
+      fire?.({ reason: "local_update" });
+    });
+
+    expect(screen.getByRole("alertdialog", { name: "Actspace 准备更新" })).toBeInTheDocument();
+    expect(screen.getByText("Actspace 准备替换应用…")).toBeInTheDocument();
   });
 
   it("桥不可用（mock 模式）时不挂监听、不渲染", () => {

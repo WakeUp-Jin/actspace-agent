@@ -83,7 +83,7 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
     api: "openai-completions",
     provider: "kimi",
     apiModel: "kimi-k2.6",
-    defaultBaseUrl: "https://api.moonshot.ai/v1",
+    defaultBaseUrl: "https://api.moonshot.cn/v1",
     thinkingDefault: false,
     supportsThinkingToggle: true,
     reasoning: false,

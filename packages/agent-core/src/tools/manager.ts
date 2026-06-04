@@ -17,7 +17,12 @@ import type {
 } from "../internal-tools";
 import { toToolDefinition } from "../internal-tools";
 import type { Tool } from "../messages";
-import type { ToolDefinitionSpec, ToolExecutorFn, ToolManagerConfig } from "./types";
+import type {
+  ReadFileRangeCacheEntry,
+  ToolDefinitionSpec,
+  ToolExecutorFn,
+  ToolManagerConfig,
+} from "./types";
 import { ToolScheduler, type ApprovalGate } from "./scheduler";
 
 const DEFAULT_TRUNCATE_THRESHOLD = 2000;
@@ -28,6 +33,7 @@ export class ToolManager {
   private additionalWritableRoots: string[];
   private truncateThreshold: number;
   private scheduler: ToolScheduler;
+  private readFileCache = new Map<string, ReadFileRangeCacheEntry>();
 
   constructor(config: ToolManagerConfig) {
     this.workspaceRoot = config.workspaceRoot;
@@ -53,6 +59,7 @@ export class ToolManager {
       parameters: spec.parameters,
       handler: (args) => executor(args, this.workspaceRoot, {
         additionalWritableRoots: this.additionalWritableRoots,
+        readFileCache: this.readFileCache,
       }),
       isReadOnly: spec.isReadOnly,
       category: spec.category,

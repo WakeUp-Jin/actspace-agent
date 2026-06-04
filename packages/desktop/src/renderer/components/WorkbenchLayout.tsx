@@ -92,6 +92,8 @@ export function WorkbenchLayout({
   onArchiveSession,
   isSessionReady = true,
   defaultModelId,
+  selectedModelId,
+  onSelectedModelChange,
   onSettingsChange,
   onArchivedSessionsChange,
   workspaces,
@@ -123,6 +125,8 @@ export function WorkbenchLayout({
   onArchiveSession?: (sessionId: string) => void;
   isSessionReady?: boolean;
   defaultModelId?: ModelId;
+  selectedModelId?: ModelId;
+  onSelectedModelChange?: (modelId: ModelId) => void;
   onSettingsChange?: (settings: AppSettings) => void;
   onArchivedSessionsChange?: () => void;
   workspaces?: WorkspaceEntry[];
@@ -259,7 +263,10 @@ export function WorkbenchLayout({
     setView(next);
   }, []);
 
-  const loadUsageStatistics = useCallback(async (range: UsageStatisticsSnapshot["range"] = "month") => {
+  const loadUsageStatistics = useCallback(async (
+    range: UsageStatisticsSnapshot["range"] = "month",
+    requestRowsPage = 1,
+  ) => {
     if (typeof window === "undefined" || !window.actspace?.getUsageStatistics) {
       setUsageSnapshot(null);
       setUsageError(null);
@@ -270,7 +277,11 @@ export function WorkbenchLayout({
     setUsageError(null);
     try {
       // 不传 sessionId 即走 main 的 global 路径：聚合所有 session + Kairos 的全部历史。
-      const snapshot = await window.actspace.getUsageStatistics({ range, scope: "global" });
+      const snapshot = await window.actspace.getUsageStatistics({
+        range,
+        scope: "global",
+        requestRowsPage: { page: requestRowsPage },
+      });
       setUsageSnapshot(snapshot);
     } catch (error) {
       console.error("Failed to load usage statistics", error);
@@ -346,11 +357,13 @@ export function WorkbenchLayout({
         isLoading={usageLoading}
         error={usageError}
         onRefresh={loadUsageStatistics}
+        onRequestPageChange={(page, nextRange) => loadUsageStatistics(nextRange, page)}
         deepSeekBalance={deepSeekBalance}
         isDeepSeekBalanceLoading={deepSeekBalanceLoading}
         deepSeekBalanceError={deepSeekBalanceError}
         onRefreshDeepSeekBalance={loadDeepSeekBalance}
         onBackToChat={() => setView("chat")}
+        workspaces={workspaces}
       />
     );
   } else if (view === "kairos") {
@@ -368,6 +381,8 @@ export function WorkbenchLayout({
         onAbort={onAbort}
         isSessionReady={isSessionReady}
         defaultModelId={defaultModelId}
+        selectedModelId={selectedModelId}
+        onSelectedModelChange={onSelectedModelChange}
         workspaceOptions={workspaceOptions}
         selectedWorkspaceRoot={selectedWorkspaceRoot}
         onSelectWorkspace={onSelectWorkspace}

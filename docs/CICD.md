@@ -48,7 +48,7 @@ pnpm package:desktop:dmg
 
 macOS 产物会把复制来的 Electron runtime 改成 Actspace 语义：外层 bundle 为 `Actspace.app`，主可执行文件为 `Contents/MacOS/Actspace`，`Info.plist` 的 `CFBundleExecutable` 也同步指向 `Actspace`。这让本地构建的应用更接近标准 macOS app，并减少 Electron 默认 runtime 名称带来的 `app.isPackaged`、钥匙串和系统识别混乱。
 
-已安装的 macOS app 还提供设置页「通用 → 本地更新」入口，服务本地自用：用户选择本机 actspace 源码目录后，应用会从该目录运行 `pnpm package:desktop:dmg`，等待当前 app 退出，替换当前 `.app`，然后重新打开。该能力不拉取远程代码、不做版本比对，也不等同于正式自动更新；它依赖本机源码目录、pnpm 环境和当前安装位置可写。updater 通过当前进程路径解析真实 `.app` 安装目标，并拒绝 `node_modules/electron/dist/Electron.app` 这类开发 runtime；不要只用 Electron 的 `app.isPackaged` 作为本地安装判定。
+已安装的 macOS app 还提供设置页「更新 → 本地更新」入口，服务本地自用：用户选择本机 actspace 源码目录后，应用会从该目录运行 `pnpm package:desktop:dmg`，构建阶段保持当前 app 打开并显示阶段进度。本地 updater 构建默认启用 `ACTSPACE_MAC_ADHOC_SIGN=true`，但不会覆盖用户显式提供的 Developer ID 签名或 ad-hoc 配置；helper 会在退出当前 app 前验证新 `.app` 的 bundle 元数据、主可执行文件和 code signature。验证通过并写出 `ready_to_replace` 后，main 进程才退出当前 app，helper 随后替换 `.app` 并重新打开；如果复制或打开新 app 失败，helper 会尝试恢复旧版本。该能力不拉取远程代码、不做版本比对，也不等同于正式自动更新；它依赖本机源码目录、pnpm 环境和当前安装位置可写。updater 通过当前进程路径解析真实 `.app` 安装目标，并拒绝 `node_modules/electron/dist/Electron.app` 这类开发 runtime；不要只用 Electron 的 `app.isPackaged` 作为本地安装判定。
 
 所有 GitHub Actions 仍然保持 pin 到 commit SHA。后续升级 action 时，也要继续保持这个约束。
 

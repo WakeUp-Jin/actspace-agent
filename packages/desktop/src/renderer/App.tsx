@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createMessageBlocks, getLatestContextSnapshot } from "@actspace/shared";
+import { DEFAULT_MODEL_ID, createMessageBlocks, getLatestContextSnapshot } from "@actspace/shared";
 import type {
   AbortTurnInput,
   AgentTurnResult,
@@ -538,6 +538,7 @@ export function App() {
   const [streamingBlocks, setStreamingBlocks] = useState<MessageBlock[]>([]);
   const [sendScrollRequestId, setSendScrollRequestId] = useState(0);
   const [defaultModelId, setDefaultModelId] = useState<ModelId | undefined>(undefined);
+  const [selectedChatModelId, setSelectedChatModelId] = useState<ModelId>(DEFAULT_MODEL_ID);
   const [approvalPendingSessionIds, setApprovalPendingSessionIds] = useState<Set<string>>(() => new Set());
   const [failedSessionIds, setFailedSessionIds] = useState<Set<string>>(() => new Set());
   const [selectedWorkspaceRoot, setSelectedWorkspaceRoot] = useState<string | null>(null);
@@ -547,6 +548,7 @@ export function App() {
   const toolFinishTimersRef = useRef<Map<string, number>>(new Map());
   const activeSessionIdRef = useRef<string | null>(null);
   const reviewRefreshRequestIdRef = useRef(0);
+  const userPickedChatModelRef = useRef(false);
 
   const refreshWorkspaces = useCallback(async () => {
     if (!hasActspaceBridge() || !window.actspace.listWorkspaces) return null;
@@ -683,7 +685,12 @@ export function App() {
 
     window.actspace
       .getSettings()
-      .then((settings) => setDefaultModelId(settings.defaultModelId ?? undefined))
+      .then((settings) => {
+        setDefaultModelId(settings.defaultModelId ?? undefined);
+        if (!userPickedChatModelRef.current) {
+          setSelectedChatModelId(settings.defaultModelId ?? DEFAULT_MODEL_ID);
+        }
+      })
       .catch((error: unknown) => {
         console.error("Failed to load settings", error);
       });
@@ -691,6 +698,14 @@ export function App() {
 
   const handleSettingsChange = useCallback((settings: AppSettings) => {
     setDefaultModelId(settings.defaultModelId ?? undefined);
+    if (!userPickedChatModelRef.current) {
+      setSelectedChatModelId(settings.defaultModelId ?? DEFAULT_MODEL_ID);
+    }
+  }, []);
+
+  const handleSelectedChatModelChange = useCallback((modelId: ModelId) => {
+    userPickedChatModelRef.current = true;
+    setSelectedChatModelId(modelId);
   }, []);
 
   useEffect(() => {
@@ -1475,6 +1490,8 @@ export function App() {
         onArchiveSession={handleArchiveSession}
         isSessionReady={isSessionReady}
         defaultModelId={defaultModelId}
+        selectedModelId={selectedChatModelId}
+        onSelectedModelChange={handleSelectedChatModelChange}
         onSettingsChange={handleSettingsChange}
         onArchivedSessionsChange={handleArchivedSessionsChange}
         workspaces={workspaceRegistry?.items}

@@ -42,6 +42,13 @@ export type ToolExecutorFn = (
 export interface ToolExecutorRuntime {
   /** Extra absolute roots writable by file tools in addition to workspaceRoot. */
   additionalWritableRoots?: string[];
+  /** Per ToolManager read_file range cache, used to avoid repeating unchanged reads. */
+  readFileCache?: Map<string, ReadFileRangeCacheEntry>;
+}
+
+export interface ReadFileRangeCacheEntry {
+  size: number;
+  mtimeMs: number;
 }
 
 export interface ToolRuntimeConfig {

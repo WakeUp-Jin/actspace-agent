@@ -174,7 +174,7 @@ const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
   KIMI_BASE_URL: {
     envKey: "KIMI_BASE_URL",
     required: false,
-    default: "https://api.moonshot.ai/v1",
+    default: "https://api.moonshot.cn/v1",
     parse: str,
   },
   KIMI_MODEL: {

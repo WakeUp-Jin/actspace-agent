@@ -37,6 +37,7 @@ Usage Statistics 是 actspace 桌面端的第三种页面态，和聊天态、�
 
 - 左栏：数据概览、模型排行、热力图、工具分布、趋势。
 - 右栏：主统计大卡、缓存效率、每日明细表。
+- 底部：会话明细表，单独跨左右两栏占满宽度。
 
 布局原则：
 
@@ -189,6 +190,27 @@ box-shadow: 0 1px 2px rgba(17,24,39,0.03), 0 0 0 1px rgba(17,24,39,0.08);
 - 列：日期、总计、输入、输出、缓存、推理、对话数
 - 右对齐数值，表头固定
 
+### 底部全宽明细
+
+#### 会话明细表
+
+- 位置：左右两栏之后，独立跨两栏，占满 Usage 主内容宽度。
+- 行粒度：按 `sessionId + turnId` 聚合，即一轮用户输入一行；同一轮用户输入里多次 `llm_usage` 会累加到同一行。
+- 排序：按该 turn 内最新 `llm_usage.timestamp` 倒序，最近的模型调用排在最前。
+- 分页：每页固定 10 条，通过 `UsageStatisticsGetInput.requestRowsPage.page` 查询；切换时间范围回到第一页，普通刷新保留当前页。
+- 列：时间、Workspace、sessionId、模型、Tokens、模型调用。
+- Workspace 优先显示 workspace registry 的 label；拿不到时用 `workspaceRoot` 的 basename 兜底。
+- sessionId 在表格中短显，完整值保留在 `title`，顶部会话 hover 卡直接显示完整 `sessionId:`。
+- 模型显示该 turn 里 token 占比最大的模型；`模型调用`显示该 turn 内折叠的 LLM call 次数。
+- Tokens 是该 turn 的 `totalTokens`；hover / focus 后显示 token 小卡片：
+  - Cache Read：`cacheHitTokens`
+  - Input：`promptTokens`
+  - Output：`completionTokens`
+  - Reasoning：仅当 `reasoningTokens > 0` 时显示
+  - Total：`totalTokens`
+- 不展示 Cache Write。当前 `llm_usage` 事件没有可靠的 cache write token 字段，不能用 `cacheMissTokens` 代替。
+- hover 小卡片使用 `position: fixed` + 单元格 `getBoundingClientRect()` 锚到 viewport，避免被表格 `overflow-auto` 裁切。
+
 ## 交互
 
 ### 时间切换
@@ -213,6 +235,18 @@ box-shadow: 0 1px 2px rgba(17,24,39,0.03), 0 0 0 1px rgba(17,24,39,0.08);
 - 序号默认灰色，不做彩色强调。
 - 只保留轻量的视觉层级，不增加过多装饰。
 
+### 会话明细 Token Hover
+
+- 触发：鼠标悬浮 Tokens 数字，或键盘 focus 到 Tokens 按钮。
+- 展示：轻量小卡片，只展示 token 分解，不做点击跳转。
+- 定位：固定到 viewport，跟随进入瞬间的数字单元格坐标；离开 / blur 时关闭。
+
+### 会话明细分页
+
+- 会话明细分页控件位于表格底部右侧。
+- 控件显示当前页 / 总页数，以及当前页行号范围 / 总行数。
+- 上一页 / 下一页按钮只改变 `requestRows` 当前页，不改变主统计、模型分布、每日明细等完整时间窗聚合结果。
+
 ## 数据来源
 
 Usage 页面默认展示**全局账本**，跨所有事实源聚合，不绑定单条会话。
@@ -226,7 +260,7 @@ IPC 协议 `UsageStatisticsGetInput` 显式区分两种取数范围：
   - Kairos 自主模式：`<userData>/kairos/memory/short-term/` 下的全部历史段（`ShortMemoryStore.loadAll()`，含 reset_today 之后切出的 `_NNN` 段）。
 - **`"session"`（兼容入口，UI 暂不暴露）**：等价于旧版"按当前 session 统计"，需要显式传 `sessionId`。保留这条路径只为后续可能的"按会话钻取"视图。
 
-聚合在 main 进程完成：`createGlobalUsageStatisticsSnapshot({ sessionRecords, kairosEvents, range, now })` 走"事件级合流"——把所有来源的 `SessionEvent[]` 摊平再 reduce 一次，避免对 cost / 缓存命中率等派生指标做两次舍入。
+聚合在 main 进程完成：`createGlobalUsageStatisticsSnapshot({ sessionRecords, kairosEvents, range, now, requestRowsPage })` 走"事件级合流"——把所有来源的 `SessionEvent[]` 摊平再 reduce 一次，避免对 cost / 缓存命中率等派生指标做两次舍入。`requestRowsPage` 只影响底部会话明细的返回页，不影响 summary / distribution / daily 聚合。
 
 ### 时间窗（range）
 
@@ -247,6 +281,7 @@ IPC 协议 `UsageStatisticsGetInput` 显式区分两种取数范围：
 - 成本统计：`cost.total`；CNY 按 `7.2 → 1 USD` 折算（与产品当前展示口径对齐）。
 - 模型分布（整段时间窗）：`llm_usage.model`（主聚合 key 优先用 `modelId`，回落 `model`）
 - **单日模型分布**（热力图 tooltip 专用）：在每日的累加器内额外维护 `Map<model.name → totalTokens>`，导出时按 totalTokens 降序 + model name 升序生成 `modelBreakdown`，`percent` 为"在当日 totalTokens 内的占比"。**注意 percent 与主区 modelDistribution 的 percent 不同语义**——前者是日内占比，后者是整段时间窗的全局占比。
+- **会话明细**（底部表格专用）：在聚合器内维护 `Map<sessionId:turnId → requestRow>`，把同一 turn 内的多次 `llm_usage` 累加为一行；`timestamp` 取该 turn 内最新 usage 时间；`model` 取 token 最高的模型；`modelCallCount` 记录折叠的调用次数；`workspaceId/workspaceRoot` 来自普通 session meta，Kairos 事件没有 session meta 时允许为空并由 UI 兜底；排序完成后按每页 10 条切片返回。
 - 工具调用：`tool_call.payload.name`；`tool_result.ok = false` 累加 failedCount。
 - 日期活跃度：按事件 `timestamp.slice(0, 10)` 的日期聚合。
 
@@ -255,6 +290,7 @@ IPC 协议 `UsageStatisticsGetInput` 显式区分两种取数范围：
 - 事实来源为 jsonl：`session.jsonl`（普通对话）+ Kairos 短期记忆段。`context-state.json` 不作为统计页输入。
 - renderer 不直接读文件系统，统计页通过 IPC 拿到聚合后的视图模型。
 - snapshot 携带 `scope` / `sessionId` / `sourceCount` 三个元数据字段：UI 用它们决定标题、来源数提示和兼容旧调用方。`scope === "global"` 时 `sessionId === null`。
+- snapshot 携带 `requestRows` 和 `requestRowsPage`，供底部会话明细表展示当前页与总数；旧数据源没有该字段时 UI 按空数组和第一页兜底。
 - Kairos 的 `usage-accumulator.json` 仅供 Kairos 监控页头部胶囊使用（"自上次 reset_today 起"的累计），**不**进 Usage 页面账本——后者总是按事件级真相重建，独立于 reset_today 的语义。
 - DeepSeek 预额卡不进入 usage 聚合账本。它通过独立 IPC 读取 DeepSeek 账户余额接口，只作为当前账户余额状态展示。
 
@@ -269,6 +305,7 @@ IPC 协议 `UsageStatisticsGetInput` 显式区分两种取数范围：
 - 主统计大卡
 - 缓存效率卡
 - 每日明细表
+- 会话明细表
 
 ## 首版不做
 
@@ -276,6 +313,7 @@ IPC 协议 `UsageStatisticsGetInput` 显式区分两种取数范围：
 - 自定义时间范围选择器
 - 实时刷新
 - 暗色模式
+- Cache Write token 展示（当前没有事实字段）
 
 ## 原型说明
 

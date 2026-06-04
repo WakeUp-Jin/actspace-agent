@@ -27,6 +27,7 @@ describe("model config", () => {
     expect(MODEL_REGISTRY["kimi-k2.6"]).toMatchObject({
       api: "openai-completions",
       provider: "kimi",
+      defaultBaseUrl: "https://api.moonshot.cn/v1",
     });
   });
 

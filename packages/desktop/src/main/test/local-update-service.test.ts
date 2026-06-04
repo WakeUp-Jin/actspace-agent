@@ -54,6 +54,8 @@ function makeService(options: Partial<ConstructorParameters<typeof LocalUpdateSe
     pid: options.pid ?? 1234,
     spawnHelper: options.spawnHelper,
     now: options.now ?? (() => new Date("2026-05-31T16:00:00.000Z")),
+    onReadyToReplace: options.onReadyToReplace,
+    readinessPollMs: options.readinessPollMs,
   });
 }
 
@@ -103,16 +105,27 @@ describe("LocalUpdateService", () => {
     expect(result.ok).toBe(true);
     expect(result.state.running).toBe(true);
     expect(result.state.lastStartedAt).toBe("2026-05-31T16:00:00.000Z");
+    expect(result.state.progress.phase).toBe("starting");
     expect(spawnHelper).toHaveBeenCalledTimes(1);
 
     const scriptPath = spawnHelper.mock.calls[0]?.[0] ?? "";
     const script = await readFile(scriptPath, "utf8");
-    expect(script).toContain("pnpm package:desktop:dmg");
+    expect(script).toContain("export PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH\"");
+    expect(script).toContain("STATUS_PATH=");
+    expect(script).toContain("write_status \"building\"");
+    expect(script).toContain("command -v pnpm");
+    expect(script).toContain("export ACTSPACE_MAC_ADHOC_SIGN=true");
+    expect(script).toContain("\"$PNPM_BIN\" package:desktop:dmg");
+    expect(script).toContain("validate_new_app()");
+    expect(script).toContain("codesign --verify --no-strict --verbose=2 \"$app\"");
+    expect(script).toContain("write_failed \"构建出的 Actspace.app 未通过启动前验证，已保留当前版本。\"");
+    expect(script).toContain("write_status \"ready_to_replace\"");
     expect(script).toContain('NEW_APP="$SOURCE_ROOT/dist/desktop/Actspace.app"');
     expect(script).toContain('NEW_APP="$SOURCE_ROOT/dist/desktop/actspace.app"');
     expect(script).toContain('TARGET_APP="$(dirname "$APP_PATH")/$(basename "$NEW_APP")"');
     expect(script).toContain('ditto "$NEW_APP" "$TARGET_APP"');
-    expect(script).toContain('open "$TARGET_APP"');
+    expect(script).toContain('if ! open "$TARGET_APP"; then');
+    expect(script).toContain("write_failed \"更新后的 Actspace.app 启动失败，已恢复旧版本。\"");
   });
 
   it("allows a copied Actspace app even when Electron reports isPackaged=false", async () => {
@@ -133,6 +146,70 @@ describe("LocalUpdateService", () => {
 
     expect(result.ok).toBe(true);
     expect(spawnHelper).toHaveBeenCalledTimes(1);
+  });
+
+  it("requests app quit only after helper reports it is ready to replace", async () => {
+    const dataRoot = await makeTempRoot("actspace-update-data-");
+    const sourceRoot = await makeSourceRoot();
+    const appExe = await makeInstalledApp();
+    const onReadyToReplace = vi.fn();
+    const spawnHelper = vi.fn((_scriptPath: string) => {
+      void writeFile(
+        join(dataRoot, "tmp", "local-update", "status.json"),
+        JSON.stringify({
+          phase: "ready_to_replace",
+          message: "构建完成，准备退出并替换应用。",
+          startedAt: "2026-05-31T16:00:00.000Z",
+          updatedAt: "2026-05-31T16:00:01.000Z",
+        }),
+        "utf8",
+      );
+      return { unref: vi.fn() } as unknown as ChildProcess;
+    });
+    const svc = makeService({
+      dataRoot,
+      appPath: appExe,
+      spawnHelper,
+      onReadyToReplace,
+      readinessPollMs: 5,
+    });
+    await svc.load();
+    await svc.setSourceRoot(sourceRoot);
+
+    const result = await svc.start();
+
+    expect(result.ok).toBe(true);
+    await vi.waitFor(() => {
+      expect(onReadyToReplace).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("treats failed helper status as retryable instead of stuck running", async () => {
+    const dataRoot = await makeTempRoot("actspace-update-data-");
+    const sourceRoot = await makeSourceRoot();
+    const appExe = await makeInstalledApp();
+    const svc = makeService({ dataRoot, appPath: appExe });
+    await svc.load();
+    await svc.setSourceRoot(sourceRoot);
+    await mkdir(join(dataRoot, "tmp", "local-update"), { recursive: true });
+    await writeFile(
+      join(dataRoot, "tmp", "local-update", "status.json"),
+      JSON.stringify({
+        phase: "failed",
+        message: "未找到 pnpm，请确认 Homebrew 路径已加入环境。",
+        startedAt: "2026-05-31T16:00:00.000Z",
+        updatedAt: "2026-05-31T16:00:01.000Z",
+        finishedAt: "2026-05-31T16:00:01.000Z",
+      }),
+      "utf8",
+    );
+
+    const state = await svc.getState();
+
+    expect(state.running).toBe(false);
+    expect(state.canUpdate).toBe(true);
+    expect(state.progress.phase).toBe("failed");
+    expect(state.progress.message).toContain("未找到 pnpm");
   });
 
   it("rejects development mode because there is no installed app to replace", async () => {
@@ -169,11 +246,30 @@ describe("LocalUpdateService", () => {
       appPath: "/Applications/Actspace.app",
       pid: 42,
       logPath: "/tmp/update log.txt",
+      statusPath: "/tmp/status with 'quote'.json",
     });
 
     expect(script).toContain("SOURCE_ROOT='/tmp/source with '\\''quote'\\'''");
+    expect(script).toContain("STATUS_PATH='/tmp/status with '\\''quote'\\''.json'");
     expect(script).toContain("APP_PID=42");
     expect(script).toContain("CURRENT_BACKUP=\"$APP_PATH.previous-local-update\"");
     expect(script).toContain("TARGET_BACKUP=\"$TARGET_APP.previous-local-update\"");
+  });
+
+  it("restores the previous app when the copied update fails to open", () => {
+    const script = createHelperScript({
+      sourceRoot: "/tmp/source",
+      appPath: "/Applications/Actspace.app",
+      pid: 42,
+      logPath: "/tmp/update.log",
+      statusPath: "/tmp/status.json",
+    });
+
+    expect(script).toContain("restore_previous_app()");
+    expect(script).toContain("rm -rf \"$TARGET_APP\"");
+    expect(script).toContain("mv \"$CURRENT_BACKUP\" \"$APP_PATH\"");
+    expect(script).toContain("if ! open \"$TARGET_APP\"; then");
+    expect(script).toContain("restore_previous_app");
+    expect(script).toContain("write_failed \"更新后的 Actspace.app 启动失败，已恢复旧版本。\"");
   });
 });

@@ -94,6 +94,15 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(screen.getByText("agent-harness-dev")).toBeInTheDocument();
   });
 
+  it("keeps the session list on vertical scrolling only", () => {
+    renderSidebar();
+
+    expect(screen.getByRole("navigation", { name: "Sessions" })).toHaveClass(
+      "overflow-x-hidden",
+      "overflow-y-auto",
+    );
+  });
+
   it("collapses all workspace folders when the Workspaces parent is toggled", async () => {
     renderSidebar();
 
@@ -235,6 +244,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
     renderSidebar();
 
     expect(screen.getByText("No scheduled tasks")).toBeInTheDocument();
+    expect(screen.queryByText("Create one when automation is available")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /^Scheduled$/ }));
     expect(screen.queryByText("No scheduled tasks")).not.toBeInTheDocument();
   });

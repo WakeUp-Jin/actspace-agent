@@ -432,6 +432,8 @@ export type UsageStatisticsGetInput = {
   range?: UsageStatisticsRange;
   /** 默认 "global"（无 sessionId）或 "session"（有 sessionId）。 */
   scope?: UsageStatisticsScope;
+  /** 底部会话明细表分页；默认第一页，每页 10 条。 */
+  requestRowsPage?: UsageStatisticsRequestRowsPageInput;
 };
 
 export type UsageStatisticsSummary = {
@@ -492,6 +494,39 @@ export type UsageStatisticsDailyRow = {
   modelBreakdown: UsageStatisticsDailyModelBreakdown[];
 };
 
+export type UsageStatisticsRequestRow = {
+  /** Latest llm_usage timestamp in this user turn. */
+  timestamp: string;
+  sessionId: string;
+  turnId: string;
+  workspaceId?: string;
+  workspaceRoot?: string;
+  /** Primary model in this turn, chosen by largest token share. */
+  model: string;
+  modelId?: ModelId;
+  provider?: string;
+  /** Number of llm_usage calls folded into this turn row. */
+  modelCallCount: number;
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  cacheHitTokens: number;
+  cacheMissTokens: number;
+  reasoningTokens: number;
+  costUsd: number;
+};
+
+export type UsageStatisticsRequestRowsPageInput = {
+  page?: number;
+};
+
+export type UsageStatisticsRequestRowsPage = {
+  page: number;
+  pageSize: number;
+  totalRows: number;
+  totalPages: number;
+};
+
 export type UsageStatisticsSnapshot = {
   /** "session"=单会话；"global"=跨所有 session + Kairos 全部历史。 */
   scope: UsageStatisticsScope;
@@ -509,6 +544,9 @@ export type UsageStatisticsSnapshot = {
   modelDistribution: UsageStatisticsModelEntry[];
   toolDistribution: UsageStatisticsToolEntry[];
   dailyRows: UsageStatisticsDailyRow[];
+  /** 当前页会话明细。完整账本仍参与 summary / distribution / daily 聚合。 */
+  requestRows: UsageStatisticsRequestRow[];
+  requestRowsPage: UsageStatisticsRequestRowsPage;
 };
 
 export type DeepSeekBalanceDisplay = {
@@ -533,6 +571,24 @@ export type LocalUpdateErrorCode =
   | "already_running"
   | "spawn_failed";
 
+export type LocalUpdateProgressPhase =
+  | "idle"
+  | "starting"
+  | "building"
+  | "ready_to_replace"
+  | "waiting_for_exit"
+  | "replacing"
+  | "succeeded"
+  | "failed";
+
+export type LocalUpdateProgress = {
+  phase: LocalUpdateProgressPhase;
+  message: string;
+  startedAt?: string;
+  updatedAt?: string;
+  finishedAt?: string;
+};
+
 export type LocalUpdateState = {
   sourceRoot: string | null;
   sourceValid: boolean;
@@ -546,6 +602,11 @@ export type LocalUpdateState = {
   logPath: string;
   running: boolean;
   lastStartedAt?: string;
+  progress: LocalUpdateProgress;
+};
+
+export type AppShutdownNotice = {
+  reason: "normal" | "local_update";
 };
 
 export type LocalUpdateSelectSourceResult = {

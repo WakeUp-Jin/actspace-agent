@@ -42,7 +42,7 @@ describe("Kimi assistants", () => {
 
     const result = await searchWithKimi("Moonshot AI", {
       apiKey: "test-key",
-      baseUrl: "https://api.moonshot.ai/v1",
+      baseUrl: "https://api.moonshot.cn/v1",
       model: "kimi-k2.6",
     });
 
@@ -74,7 +74,7 @@ describe("Kimi assistants", () => {
 
     const result = await searchWithKimi("Moonshot AI", {
       apiKey: "test-key",
-      baseUrl: "https://api.moonshot.ai/v1",
+      baseUrl: "https://api.moonshot.cn/v1",
       model: "kimi-k2.6",
     });
 
@@ -103,7 +103,7 @@ describe("Kimi assistants", () => {
 
     const result = await searchWithKimi("test query", {
       apiKey: "test-key",
-      baseUrl: "https://api.moonshot.ai/v1",
+      baseUrl: "https://api.moonshot.cn/v1",
       model: "kimi-k2.6",
     });
 
@@ -121,7 +121,7 @@ describe("Kimi assistants", () => {
 
     const result = await searchWithKimi("nonexistent query xyz", {
       apiKey: "test-key",
-      baseUrl: "https://api.moonshot.ai/v1",
+      baseUrl: "https://api.moonshot.cn/v1",
       model: "kimi-k2.6",
     });
 

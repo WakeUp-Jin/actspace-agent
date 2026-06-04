@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { UsageStatisticsPage } from "../components/UsageStatisticsPage";
@@ -68,6 +68,84 @@ describe("UsageStatisticsPage heatmap tooltip", () => {
   it("does not render the deprecated 使用趋势 panel", () => {
     renderUsageStatisticsPage({ snapshot: mockUsageStatistics });
     expect(screen.queryByText("使用趋势")).toBeNull();
+  });
+
+  it("renders request rows newest first with workspace labels and model call counts", () => {
+    renderUsageStatisticsPage({
+      snapshot: mockUsageStatistics,
+      workspaces: [
+        {
+          id: "ws_actspace_agent",
+          kind: "folder",
+          label: "Actspace Agent",
+          path: "/Users/me/projects/actspace-agent",
+          order: 0,
+          createdAt: "2026-05-01T00:00:00.000Z",
+          updatedAt: "2026-05-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(screen.getByText("会话明细")).toBeInTheDocument();
+    expect(screen.getByText("Actspace Agent")).toBeInTheDocument();
+    expect(screen.getByText("agent-harness-dev")).toBeInTheDocument();
+    expect(screen.getByText("DeepSeek V4 Pro")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1,629,467 tokens, show token breakdown" })).toBeInTheDocument();
+    const latestRow = screen.getByText("session-us...00001").closest("tr");
+    expect(latestRow).not.toBeNull();
+    expect(within(latestRow as HTMLElement).getByText("2")).toBeInTheDocument();
+  });
+
+  it("requests the next request-row page from the pager", async () => {
+    const user = userEvent.setup();
+    const onRequestPageChange = vi.fn();
+    const pagedSnapshot = {
+      ...mockUsageStatistics,
+      requestRows: Array.from({ length: 10 }, (_, index) => ({
+        ...mockUsageStatistics.requestRows[0],
+        timestamp: `2026-05-26T${String(9 - index).padStart(2, "0")}:07:00.000Z`,
+        sessionId: `session-page-${index + 1}`,
+        turnId: `turn-page-${index + 1}`,
+        totalTokens: 1_000 + index,
+      })),
+      requestRowsPage: {
+        page: 1,
+        pageSize: 10,
+        totalRows: 12,
+        totalPages: 2,
+      },
+    };
+
+    renderUsageStatisticsPage({
+      snapshot: pagedSnapshot,
+      onRequestPageChange,
+    });
+
+    expect(screen.getByText("1-10 / 12 rows")).toBeInTheDocument();
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "上一页会话明细" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "下一页会话明细" }));
+
+    expect(onRequestPageChange).toHaveBeenCalledWith(2, "month");
+  });
+
+  it("shows token details on request token hover without Cache Write", async () => {
+    const user = userEvent.setup();
+    renderUsageStatisticsPage({ snapshot: mockUsageStatistics });
+
+    await user.hover(screen.getByRole("button", { name: "1,629,467 tokens, show token breakdown" }));
+
+    const tooltip = await screen.findByTestId("request-token-tooltip");
+    expect(tooltip).toHaveTextContent("Cache Read");
+    expect(tooltip).toHaveTextContent("1,464,212");
+    expect(tooltip).toHaveTextContent("Input");
+    expect(tooltip).toHaveTextContent("20");
+    expect(tooltip).toHaveTextContent("Output");
+    expect(tooltip).toHaveTextContent("10,642");
+    expect(tooltip).toHaveTextContent("Total");
+    expect(tooltip).toHaveTextContent("1,629,467");
+    expect(tooltip).not.toHaveTextContent("Cache Write");
   });
 
   it("shows a readable tooltip for the tool detail close button", async () => {
