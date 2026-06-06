@@ -24,6 +24,7 @@ const defaultSettings: AppSettings = {
     maxTokens: null,
     disabledTools: [],
     bashAlwaysAsk: false,
+    exploreModelId: null,
   },
   kairos: { modelId: null, thinking: "auto" },
 };

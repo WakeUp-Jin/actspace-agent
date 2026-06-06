@@ -34,6 +34,8 @@ import { env } from "../env";
 export interface FrontendTurnInput {
   model?: ModelId;
   thinkingEnabled?: boolean;
+  /** 内置 Explore 聚焦子代理模型；null/缺省 = deepseek-v4-flash。来自 settings.agent.exploreModelId。 */
+  exploreModelId?: ModelId | null;
 }
 
 /** 从 env / 配置文件读取的后端环境配置 */
@@ -61,6 +63,8 @@ export interface AgentConfig {
   systemPrompt: string;
   /** 附加规则/技能等系统级上下文段。 */
   systemPromptSegments?: AgentSystemPromptSegment[];
+  /** 内置 Explore 聚焦子代理模型；null/缺省 = deepseek-v4-flash。 */
+  exploreModelId?: ModelId | null;
 }
 
 export type AgentSystemPromptSegment = Omit<PromptSegment, "enabled" | "stability"> & {
@@ -192,6 +196,7 @@ export function buildAgentConfig(
     modelSpec,
     systemPrompt: runtimeContext?.systemPrompt ?? MAIN_AGENT_SYSTEM_PROMPT,
     systemPromptSegments: runtimeContext?.systemPromptSegments ?? [],
+    exploreModelId: frontendInput.exploreModelId ?? null,
   };
 }
 
@@ -211,6 +216,35 @@ export function createSummarizerForAgent(
 }
 
 /**
+ * 构造内置 Explore 聚焦子代理用的便宜模型 service。
+ *
+ * 默认 `deepseek-v4-flash`，可由 `exploreModelId` 覆盖。复用 buildLLMConfig + createLLMService。
+ * 缺对应供应商 key 时返回 undefined，调用方（createToolManager）回落主模型，保证功能不因缺 key 失效。
+ */
+export function createExploreLLMService(
+  exploreModelId?: ModelId | null,
+  envConfig: AgentEnvConfig = resolveAgentEnvConfig(),
+): LLMService | undefined {
+  const spec = MODEL_REGISTRY[exploreModelId ?? "deepseek-v4-flash"] ?? MODEL_REGISTRY["deepseek-v4-flash"];
+  const hasKey = spec.provider === "kimi" ? Boolean(envConfig.kimiApiKey) : Boolean(envConfig.deepseekApiKey);
+  if (!hasKey) return undefined;
+  return createLLMService(buildLLMConfig(spec, envConfig));
+}
+
+/**
+ * 构造会话标题生成用的便宜模型 service（固定 deepseek-v4-flash）。
+ *
+ * 与 summarizer 同源（buildLLMConfig + createLLMService），仅在存在 DeepSeek key 时构造；
+ * 否则返回 undefined，调用方跳过自动标题、保留 "New chat"。
+ */
+export function createTitlerLLMService(
+  envConfig: AgentEnvConfig = resolveAgentEnvConfig(),
+): LLMService | undefined {
+  if (!envConfig.deepseekApiKey) return undefined;
+  return createLLMService(buildLLMConfig(MODEL_REGISTRY["deepseek-v4-flash"], envConfig));
+}
+
+/**
  * 第二步（同步入口）：根据配置创建运行时实例，会话历史为空。
  *
  * 主要供 mock / 单元测试 / 纯内存场景使用。Main 进程的真实 turn 应走
@@ -219,9 +253,11 @@ export function createSummarizerForAgent(
 export function createAgentFromConfig(config: AgentConfig): AgentDeps {
   const llm = createLLMService(config.llmConfig);
   const summarizer = createSummarizerForAgent();
+  const exploreLlm = createExploreLLMService(config.exploreModelId);
   const toolManager = createToolManager({
     ...config.toolManagerConfig,
     llm,
+    exploreLlm,
     contextWindow: config.modelSpec.contextWindow,
     summarizer,
   });
@@ -256,9 +292,11 @@ export async function createAgentForSession(
 ): Promise<AgentDeps> {
   const llm = createLLMService(config.llmConfig);
   const summarizer = createSummarizerForAgent();
+  const exploreLlm = createExploreLLMService(config.exploreModelId);
   const toolManager = createToolManager({
     ...config.toolManagerConfig,
     llm,
+    exploreLlm,
     contextWindow: config.modelSpec.contextWindow,
     summarizer,
   });

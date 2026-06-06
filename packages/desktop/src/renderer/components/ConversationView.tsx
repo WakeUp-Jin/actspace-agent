@@ -5,12 +5,14 @@ import { Composer, type ComposerReviewSummary, type ComposerSendOptions, type Co
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { AssistantReply } from "./messages/AssistantReply";
 import { AgentRunBlock } from "./messages/AgentRunBlock";
+import { ExploreRunBlock } from "./messages/ExploreRunBlock";
 import { BashRunBlock } from "./messages/BashRunBlock";
 import { CompactCommandBlock } from "./messages/CompactCommandBlock";
 import { DeleteFileBlock } from "./messages/DeleteFileBlock";
 import { FileDiffBlock } from "./messages/FileDiffBlock";
 import { SubAgentTranscriptPanel } from "./messages/SubAgentTranscriptModal";
 import { ThinkingBlock } from "./messages/ThinkingBlock";
+import { ToolActivityGroup } from "./messages/ToolActivityGroup";
 import { ToolLogLine } from "./messages/ToolLogLine";
 import { UserMessage } from "./messages/UserMessage";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
@@ -143,6 +145,9 @@ function renderMessage(
     case "thinking":
       return <ThinkingBlock key={message.id} message={message} className={className} />;
     case "agent":
+      if (message.display === "inline") {
+        return <ExploreRunBlock key={message.id} message={message} className={className} />;
+      }
       return <AgentRunBlock key={message.id} message={message} className={className} onOpenTranscript={onOpenAgentTranscript} />;
     case "bash":
       return <BashRunBlock key={message.id} message={message} />;
@@ -215,6 +220,82 @@ function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTurn[] {
   }
 
   return turns;
+}
+
+// 工具活动组：哪些消息算「过程行」（thinking + 工具 + diff），有它才把过程聚合成 Worked for 折叠组。
+const WORK_TOOL_LIKE_KINDS = new Set<MessageBlock["kind"]>([
+  ...TOOL_LOG_MESSAGE_KINDS,
+  ...DIFF_MESSAGE_KINDS,
+  "bash",
+]);
+
+function hasToolLikeItem(messages: MessageBlock[]): boolean {
+  return messages.some((message) => WORK_TOOL_LIKE_KINDS.has(message.kind));
+}
+
+/**
+ * 把一个 turn 的消息拆成「过程」和「最终回复」两段。
+ *
+ * 最终回复 = turn 末尾、后面不再跟任何工具/thinking 的连续 assistant 块。
+ * 其余（thinking / 工具 / 工具间旁白 content）都归到过程段，进 Worked for 折叠组。
+ */
+function splitTurnMessages(messages: MessageBlock[]): {
+  workItems: MessageBlock[];
+  finalReply: MessageBlock[];
+} {
+  let splitIndex = messages.length;
+  while (splitIndex > 0 && messages[splitIndex - 1].kind === "assistant") {
+    splitIndex -= 1;
+  }
+  return {
+    workItems: messages.slice(0, splitIndex),
+    finalReply: messages.slice(splitIndex),
+  };
+}
+
+function workDurationMs(workItems: MessageBlock[], finalReply: MessageBlock[]): number | undefined {
+  if (workItems.length === 0) return undefined;
+  const start = Date.parse(workItems[0].createdAt);
+  const endSource = finalReply[0]?.createdAt ?? workItems[workItems.length - 1].createdAt;
+  const end = Date.parse(endSource);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return undefined;
+  return end - start;
+}
+
+type AgentTranscriptHandler = (message: AgentMessageBlock) => void;
+
+function renderMessageList(messages: MessageBlock[], onOpenAgentTranscript?: AgentTranscriptHandler) {
+  return messages.map((message, index) =>
+    renderMessage(message, getMessageRelationClass(messages[index - 1], message), onOpenAgentTranscript),
+  );
+}
+
+/**
+ * 渲染一个 turn 的正文：含工具时把过程聚合进 ToolActivityGroup（执行中滚动视口 / 完成后 Worked for 折叠），
+ * 最终回复始终留在折叠组外正常渲染；没有工具时回退到原来的平铺渲染。
+ */
+function renderTurnBody(
+  turn: ConversationTurn,
+  isActive: boolean,
+  onOpenAgentTranscript?: AgentTranscriptHandler,
+) {
+  const { workItems, finalReply } = splitTurnMessages(turn.messages);
+
+  if (!hasToolLikeItem(workItems)) {
+    return renderMessageList(turn.messages, onOpenAgentTranscript);
+  }
+
+  return (
+    <>
+      <ToolActivityGroup
+        running={isActive}
+        durationMs={workDurationMs(workItems, finalReply)}
+      >
+        {renderMessageList(workItems, onOpenAgentTranscript)}
+      </ToolActivityGroup>
+      {finalReply.length > 0 ? renderMessageList(finalReply, onOpenAgentTranscript) : null}
+    </>
+  );
 }
 
 type VisualizeState = "idle" | "generating" | "ready" | "error";
@@ -496,7 +577,7 @@ export function ConversationView({
           </div>
         ) : (
           <div className={MESSAGE_STACK_CLASS}>
-            {turns.map((turn) => (
+            {turns.map((turn, turnIndex) => (
               <section className={MESSAGE_TURN_CLASS} key={turn.id}>
                 {turn.user ? (
                   <div className={TURN_PROMPT_CLASS}>
@@ -504,9 +585,7 @@ export function ConversationView({
                   </div>
                 ) : null}
                 <div className={TURN_BODY_CLASS}>
-                  {turn.messages.map((message, index) =>
-                    renderMessage(message, getMessageRelationClass(turn.messages[index - 1], message), setActiveTranscriptMessage)
-                  )}
+                  {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, setActiveTranscriptMessage)}
                 </div>
                 <TurnActions
                   sessionId={sessionId}

@@ -34,6 +34,7 @@ export {
   buildAgentConfig,
   createAgentFromConfig,
   createAgentForSession,
+  createTitlerLLMService,
   buildLLMConfig,
   resolveAgentEnvConfig,
 } from "./create-agent-deps";

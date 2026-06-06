@@ -123,6 +123,11 @@ function groupSessionsByWorkspace(sessions: SessionListItem[], workspaces: Works
     groups.get(key)!.sessions.push(session);
   }
 
+  // 组内会话按 updatedAt 降序（最近修改/创建在前）；下方组排序依赖 sessions[0] 为最新。
+  for (const group of groups.values()) {
+    group.sessions.sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+  }
+
   const ordered = [...groups.values()];
   ordered.sort((a, b) => {
     if (a.key === DEFAULT_WORKSPACE_KEY) return 1;

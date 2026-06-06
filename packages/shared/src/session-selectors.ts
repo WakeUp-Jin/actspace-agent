@@ -230,6 +230,7 @@ function messageBlockFromToolPreview(
         transcriptRef: preview.transcriptRef,
         stats: preview.stats,
         error: preview.error,
+        display: preview.display,
         createdAt: getDisplayTime(timestamp)
       };
     case "generic":

@@ -41,13 +41,20 @@ function createSessionEvent<TPayload>(
   turnId: TurnId,
   type: SessionEvent["type"],
   payload: TPayload,
+  // 源消息的真实发生时间（epoch ms）。事件是在一轮结束时批量落盘的，如果都用 flush 时刻，
+  // 整轮事件会挤在同一毫秒，导致前端「Worked for」之类基于时间差的展示恒为 ~0。
+  occurredAtMs?: number,
 ): SessionEvent<TPayload> {
+  const timestamp =
+    typeof occurredAtMs === "number" && Number.isFinite(occurredAtMs)
+      ? new Date(occurredAtMs).toISOString()
+      : new Date().toISOString();
   return {
     id: createEventId(),
     sessionId,
     turnId,
     type,
-    timestamp: new Date().toISOString(),
+    timestamp,
     schemaVersion: 1,
     payload,
   };
@@ -125,7 +132,7 @@ export function userMessageToEvents(
       content,
       ...(payload?.attachments?.length ? { attachments: payload.attachments } : {}),
       ...(payload?.attachmentAnalyses?.length ? { attachmentAnalyses: payload.attachmentAnalyses } : {}),
-    }),
+    }, msg.timestamp),
   ];
 }
 
@@ -142,7 +149,7 @@ export function assistantMessageToEvents(
       createSessionEvent(sessionId, turnId, "thinking", {
         content: thinking,
         collapsedByDefault: true,
-      }),
+      }, msg.timestamp),
     );
   }
 
@@ -153,7 +160,7 @@ export function assistantMessageToEvents(
         id: tc.id,
         name: tc.name,
         arguments: tc.arguments,
-      }),
+      }, msg.timestamp),
     );
   }
 
@@ -175,7 +182,7 @@ export function assistantMessageToEvents(
       },
     };
     events.push(
-      createSessionEvent(sessionId, turnId, "assistant_message", reply),
+      createSessionEvent(sessionId, turnId, "assistant_message", reply, msg.timestamp),
     );
   }
 
@@ -209,7 +216,7 @@ export function toolResultMessageToEvents(
   };
 
   return [
-    createSessionEvent(sessionId, turnId, "tool_result", result),
+    createSessionEvent(sessionId, turnId, "tool_result", result, msg.timestamp),
   ];
 }
 

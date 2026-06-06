@@ -20,11 +20,16 @@ import {
   cleanupOldToolOutputs,
   createAgentRunLogger,
   createCacheAuditTracker,
+  createTitlerLLMService,
+  generateSessionTitle,
+  isDefaultSessionTitle,
   runTurnWithAgent,
   createSessionStorePaths,
   readMeta,
+  updateMeta,
   writeSessionResult,
 } from "@actspace/agent-core";
+import type { SessionMeta } from "@actspace/shared";
 import type { PendingApprovalRegistry } from "./approval-registry";
 import { analyzeImageAttachmentsForTurn } from "./media-analysis";
 
@@ -72,6 +77,44 @@ async function writeAgentRunLog(
     await runLogger.write({ type, payload });
   } catch (error) {
     console.error("[agent-run-log] failed to write main run log", error);
+  }
+}
+
+/**
+ * 首轮对话结束后，用 flash 模型把「用户首条输入 + 助手回复」浓缩成会话标题，替换 "New chat"。
+ *
+ * 全程 best-effort：缺 key / 非首轮 / 标题已被用户改过 / 生成失败，都静默跳过，绝不阻塞或污染 turn。
+ * await 完成后再返回，让 renderer 在 turn 结束后的 listSessions 刷新里直接拿到新标题（无需额外 IPC）。
+ */
+async function maybeGenerateSessionTitle(input: {
+  metaPath: string;
+  sessionMeta: SessionMeta | null;
+  priorMessageCount: number;
+  result: AgentTurnResult;
+  userInput: string;
+}): Promise<void> {
+  // 仅首轮（turn 前上下文为空）+ 仍是默认标题 + 本轮正常完成时才生成。
+  if (input.priorMessageCount > 0) return;
+  if (!isDefaultSessionTitle(input.sessionMeta?.title)) return;
+  if (input.result.status !== "completed") return;
+
+  const titler = createTitlerLLMService();
+  if (!titler) return;
+
+  try {
+    const title = await generateSessionTitle(titler, {
+      userInput: input.userInput,
+      replyText: input.result.finalReply?.content ?? "",
+    });
+    if (!title) return;
+    const write = await updateMeta(input.metaPath, { title });
+    if (write.ok) {
+      logAgentTurn("session title generated", { title });
+    } else {
+      console.error("[agent-turn] failed to persist generated title", write.error);
+    }
+  } catch (error) {
+    console.error("[agent-turn] session title generation failed", error);
   }
 }
 
@@ -145,7 +188,7 @@ export async function runAndPersistTurn(
   const runtimeContext = await loadRuntimeContext?.(turnWorkspaceRoot);
 
   const config = buildAgentConfig(
-    { model: input.model, thinkingEnabled: input.thinkingEnabled },
+    { model: input.model, thinkingEnabled: input.thinkingEnabled, exploreModelId: input.exploreModelId },
     turnWorkspaceRoot,
     approvalRegistry,
     {
@@ -250,6 +293,14 @@ export async function runAndPersistTurn(
     sessionId: input.sessionId,
     turnId: input.turnId,
     status: result.status,
+  });
+
+  await maybeGenerateSessionTitle({
+    metaPath: sessionPaths.metaPath,
+    sessionMeta,
+    priorMessageCount,
+    result,
+    userInput: input.userInput,
   });
 
   activeTurnAborts.delete(turnKey);

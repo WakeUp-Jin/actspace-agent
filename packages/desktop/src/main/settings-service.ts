@@ -298,6 +298,7 @@ function defaultSettingsFromEnv(dataRoot: string): PersistedSettings {
       maxTokens: env.LLM_MAX_TOKENS !== LLM_MAX_TOKENS_DEFAULT ? env.LLM_MAX_TOKENS : null,
       disabledTools: [...env.ACTSPACE_DISABLED_TOOLS],
       bashAlwaysAsk: env.ACTSPACE_BASH_ALWAYS_ASK,
+      exploreModelId: null,
     },
     kairos: {
       modelId: null,
@@ -329,6 +330,7 @@ function mergePersistedSettings(raw: unknown, dataRoot: string): ReadSettingsRes
         maxTokens: agent.maxTokens as number | null | undefined,
         disabledTools: agent.disabledTools as string[] | undefined,
         bashAlwaysAsk: agent.bashAlwaysAsk as boolean | undefined,
+        exploreModelId: agent.exploreModelId as ModelId | null | undefined,
       }, seed.agent),
       kairos: sanitizeKairos({
         modelId: kairos.modelId as KairosModelId | null | undefined,
@@ -362,6 +364,12 @@ function sanitizeAgent(
       ? input.disabledTools.filter((item): item is string => typeof item === "string")
       : fallback.disabledTools,
     bashAlwaysAsk: typeof input.bashAlwaysAsk === "boolean" ? input.bashAlwaysAsk : fallback.bashAlwaysAsk,
+    exploreModelId:
+      input.exploreModelId === null
+        ? null
+        : isModelId(input.exploreModelId)
+          ? input.exploreModelId
+          : fallback.exploreModelId,
   };
 }
 

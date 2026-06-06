@@ -33,6 +33,8 @@ export type RunTurnInput = {
   attachments?: import("./session").ComposerAttachment[];
   model?: ModelId;
   thinkingEnabled?: boolean;
+  /** 内置 Explore 聚焦子代理模型；null/缺省 = deepseek-v4-flash。由 main 从 settings 注入。 */
+  exploreModelId?: ModelId | null;
 };
 
 export type CompactContextInput = {

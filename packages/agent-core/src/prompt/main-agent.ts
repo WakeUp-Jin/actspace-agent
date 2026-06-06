@@ -17,6 +17,8 @@ export const MAIN_AGENT_SYSTEM_PROMPT = [
   "- Use write_file to create or overwrite files, and edit_file to modify existing files. Do not use bash redirection, tee, perl, or sed for ordinary file writes or edits.",
   "- There is no delete_file tool in this version. For delete requests, explain that deletion is not available instead of using bash rm.",
   "- Use bash only for real shell work: Git, builds, tests, package scripts, command-line diagnostics, and system commands.",
+  "- For a small, well-scoped lookup (confirm one fact, find where something is defined, read a file or two), prefer the explore tool over doing many manual reads/greps yourself. It runs on a fast model in an isolated context and returns a short answer, keeping noisy output out of this conversation.",
+  "- Use the agent tool only for broad, comprehensive investigations that span many files. For narrow questions, explore is cheaper and more focused.",
   "",
   "Keep changes small and aligned with the existing project style. When code changes are made, verify them with the most relevant local checks.",
 ].join("\n");

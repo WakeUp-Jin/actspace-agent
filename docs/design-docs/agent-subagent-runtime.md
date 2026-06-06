@@ -2,7 +2,9 @@
 
 ## 定位
 
-本文定义 actspace 的子智能体能力：主 Agent 通过 **Agent 工具**启动一个独立的 SubAgent run，让它在隔离上下文中完成探索、验证或局部分析任务。这里是长期设计事实来源；具体实施步骤归档见 `docs/exec-plans/completed/20260602-agent-tool-subagent-runtime.md`。
+本文定义 actspace 的子智能体**运行时**能力：主 Agent 通过 **Agent 工具**启动一个独立的 SubAgent run，让它在隔离上下文中完成探索、验证或局部分析任务。这里是子代理运行时（隔离上下文、transcript、落盘、流式、abort 级联）的长期设计事实来源；具体实施步骤归档见 `docs/exec-plans/completed/20260602-agent-tool-subagent-runtime.md`。
+
+> 工具分工：`agent` 工具定位为**通用、全面**的子代理探索（跑主模型、Panel 展示）。另有内置的**聚焦小范围** `explore` 子代理（跑便宜模型、内联折叠展示），复用本文的运行时机制，仅在模型 / scope / 展示三点上分叉，单独见 [`agent-explore-subagent.md`](agent-explore-subagent.md)。本文历史上把 `agent` 写成「Explore 专用」，现已 reframe 为通用子代理；`subagent_type: "explore"` 字段为兼容保留，新设计以 `explore` 独立工具承载聚焦探索。
 
 命名约定：
 

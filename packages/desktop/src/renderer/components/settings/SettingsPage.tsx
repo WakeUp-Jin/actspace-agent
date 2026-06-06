@@ -55,6 +55,12 @@ const LOCAL_UPDATE_POLL_MS = 700;
 
 const MODEL_OPTIONS: SelectOption[] = MODEL_LIST.map((spec) => ({ value: spec.id, label: spec.label }));
 
+const EXPLORE_DEFAULT_VALUE = "__default__";
+const EXPLORE_MODEL_OPTIONS: SelectOption[] = [
+  { value: EXPLORE_DEFAULT_VALUE, label: "DeepSeek V4 Flash（默认）" },
+  ...MODEL_OPTIONS,
+];
+
 function hasSettingsBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace?.getSettings);
 }
@@ -855,6 +861,25 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
             </div>
           </div>
         </div>
+      </SettingGroup>
+
+      <SettingGroup title="Explore 子代理">
+        <SettingRow
+          title="模型"
+          description="内置 Explore 聚焦子代理使用的模型；默认便宜快速的 Flash。缺对应供应商密钥时运行时自动回落主模型。"
+          control={
+            <SettingsSelect
+              value={settings.agent.exploreModelId ?? EXPLORE_DEFAULT_VALUE}
+              options={EXPLORE_MODEL_OPTIONS}
+              onChange={(value) =>
+                onUpdate({
+                  agent: { exploreModelId: value === EXPLORE_DEFAULT_VALUE ? null : (value as ModelId) },
+                })
+              }
+              ariaLabel="Explore 子代理模型"
+            />
+          }
+        />
       </SettingGroup>
 
       <KairosSettings settings={settings} onUpdate={onUpdate} />

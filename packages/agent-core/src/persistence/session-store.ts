@@ -287,7 +287,10 @@ export async function listSessionRecords(
       }),
     );
 
-    return items.filter((item): item is SessionListItem => item !== null);
+    // 默认按 updatedAt 降序：最近修改/创建的会话排在最前（readdir 顺序无意义）。
+    return items
+      .filter((item): item is SessionListItem => item !== null)
+      .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
   } catch {
     return [];
   }

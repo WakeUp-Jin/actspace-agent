@@ -282,6 +282,15 @@ export type AgentToolPreview = {
   transcriptRef?: SubAgentTranscriptRef;
   stats?: AgentToolStats;
   error?: string;
+  /**
+   * 前端展示形态。
+   *
+   * - `panel`（默认/缺省）：通用 `agent` 子代理，点击打开 Composer 上方 transcript Panel。
+   * - `inline`：内置 Explore 聚焦子代理，主消息流内联 `Worked for Xs` 折叠，展开是嵌套真实工具行。
+   *
+   * 见 docs/design-docs/agent-explore-subagent.md。
+   */
+  display?: "panel" | "inline";
 };
 
 export type ToolPreviewKind =

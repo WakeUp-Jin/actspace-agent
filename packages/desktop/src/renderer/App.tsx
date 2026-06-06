@@ -418,6 +418,9 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): Mes
       transcriptRef: tool.preview.transcriptRef,
       stats: tool.preview.stats,
       error: tool.preview.error,
+      // explore 内置子代理首帧（tool_call_streaming）preview 尚未带 display，
+      // 仅靠 toolName 兜底为 inline，避免执行前一瞬被渲染成 agent 工具的 panel 框。
+      display: tool.preview.display ?? (tool.toolName === "explore" ? "inline" : undefined),
       transcriptEvents: tool.transcriptEvents,
       createdAt: now,
     };

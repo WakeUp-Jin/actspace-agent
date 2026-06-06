@@ -83,6 +83,11 @@ export interface ToolManagerConfig extends ToolRuntimeConfig {
   turnId?: string;
   /** 主 Agent LLM service；存在时注册 Agent 工具供 SubAgent run 复用同一模型配置 */
   llm?: LLMService;
+  /**
+   * 内置 Explore 聚焦子代理用的便宜模型 service（通常是 flash）。
+   * 缺省时 explore 工具回落 `llm`（主模型）。两者都缺时不注册 explore。
+   */
+  exploreLlm?: LLMService;
   /** 当前模型上下文窗口，供 SubAgent ContextManager 使用 */
   contextWindow?: number;
   /** flash 摘要器；缺省时非 bash 工具退化为确定性头尾截断 */

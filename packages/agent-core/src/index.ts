@@ -12,6 +12,7 @@ export * from "./usage";
 export * from "./visualize";
 
 export * from "./messages";
+export * from "./session-title";
 export * from "./internal-tools";
 export * from "./adapters";
 export * from "./fixtures";

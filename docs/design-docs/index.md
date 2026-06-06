@@ -38,7 +38,8 @@
 - `agent-context-compression.md`：上下文压缩设计。
 - `agent-skill-loading.md`：Agent Skill 设计与加载规范，包括目录生态、渐进式披露、catalog 注入和 `read_file` 正文读取边界。
 - `agent-cache-loss-audit.md`：缓存失效排查设计。
-- `agent-subagent-runtime.md`：Agent 工具与 SubAgent run 设计，约束子智能体上下文隔离、transcript、只读 Explore 子智能体和前端执行流展示。
+- `agent-subagent-runtime.md`：Agent 工具与 SubAgent run 设计，约束子智能体上下文隔离、transcript、落盘、流式和前端执行流展示。
+- `agent-explore-subagent.md`：内置 Explore 聚焦子代理设计，约束便宜模型分叉、收窄 scope、自动 delegate 和内联折叠展示，与通用 `agent` 工具分工。
 - `agent-tool-preview-design-guidelines.md`：新增工具必须遵守的前端预览契约。
 - `agent-subprocess-runner-guidelines.md`：agent-core 内部受控子进程调用规范。
 - `agent-权限设计规则和原则.md`：Agent 工具权限、用户审核、风险分层和权限记录的设计规则。

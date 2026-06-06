@@ -755,8 +755,13 @@ async function registerIpc() {
       logMain("kairos notifyMainAgentTurnStart threw", { error: err instanceof Error ? err.message : String(err) });
     }
     try {
+      // exploreModelId 是全局设置，不由 renderer 每轮上送；在 main 从 settings 注入到 turn 输入。
+      const turnInput: RunTurnInput = {
+        ...input,
+        exploreModelId: input.exploreModelId ?? getSettingsService().get().agent.exploreModelId,
+      };
       const result = await runAndPersistTurn(
-        input,
+        turnInput,
         roots,
         getMainWindow,
         approvalRegistry,

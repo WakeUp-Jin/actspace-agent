@@ -35,6 +35,13 @@ export interface AgentSettings {
   disabledTools: string[];
   /** 「自动审查」开关 → ACTSPACE_BASH_ALWAYS_ASK：每条 bash 命令执行前都要确认。 */
   bashAlwaysAsk: boolean;
+  /**
+   * 内置 Explore 聚焦子代理模型。
+   *
+   * null = 默认 `deepseek-v4-flash`（便宜、快）；显式值覆盖为指定模型。
+   * 缺 DeepSeek key 时运行时回落主模型，见 docs/design-docs/agent-explore-subagent.md。
+   */
+  exploreModelId: ModelId | null;
 }
 
 export interface KairosSettings {

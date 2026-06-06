@@ -61,6 +61,12 @@ export type AgentToolRuntime = {
   sessionId?: string;
   turnId?: string;
   contextWindow?: number;
+  /** 子代理系统提示词；缺省用通用 Explore SubAgent prompt。 */
+  systemPrompt?: string;
+  /** 子代理循环硬上限；缺省 100（通用），聚焦 explore 传更小值。 */
+  maxTurns?: number;
+  /** 前端展示形态，透传到 preview。缺省 `panel`（通用 agent），聚焦 explore 传 `inline`。 */
+  display?: "panel" | "inline";
 };
 
 type RunExploreSubAgentInput = {
@@ -104,7 +110,10 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
   const toolCalls = new Map<string, { toolName: string; args: Record<string, unknown> }>();
   const exploredFiles = new Set<string>();
 
-  const systemPromptModule = new SystemPromptContext(EXPLORE_SUBAGENT_SYSTEM_PROMPT);
+  const display = input.runtime.display ?? "panel";
+  const systemPromptModule = new SystemPromptContext(
+    input.runtime.systemPrompt ?? EXPLORE_SUBAGENT_SYSTEM_PROMPT,
+  );
   const contextManager = new ContextManager({
     systemPromptModule,
     config: input.runtime.contextWindow ? { contextWindow: input.runtime.contextWindow } : undefined,
@@ -127,6 +136,7 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
       transcriptRef,
       description: input.args.description,
       status: "running",
+      display,
       sink: input.eventSink,
       parentToolCallId: input.parentToolCallId,
     });
@@ -145,7 +155,7 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
       {
         toolManager: subToolManager,
         toolExecution: "sequential",
-        maxTurns: 100,
+        maxTurns: input.runtime.maxTurns ?? 100,
       },
       async (event) => {
         trackSubAgentEvent(event, toolCalls, exploredFiles);
@@ -156,6 +166,7 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
           transcriptRef,
           transcript,
           description: input.args.description,
+          display,
           usageCallId: `subagent_${runId}_llm_${++usageCallIndex}`,
           sink: input.eventSink,
           parentToolCallId: input.parentToolCallId,
@@ -185,6 +196,7 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
       transcriptRef,
       description: input.args.description,
       status,
+      display,
       sink: input.eventSink,
       parentToolCallId: input.parentToolCallId,
     });
@@ -202,6 +214,7 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
       transcriptRef,
       description: input.args.description,
       status,
+      display,
       sink: input.eventSink,
       parentToolCallId: input.parentToolCallId,
     });
@@ -222,6 +235,7 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
     stats,
     recentEvents: transcript.recentEvents,
     error: status === "failed" ? summary : undefined,
+    display,
   });
   const modelOutput = formatModelOutput({
     status,
@@ -292,6 +306,7 @@ function createAgentPreview(input: {
   stats?: AgentToolStats;
   recentEvents?: AgentToolRecentEvent[];
   error?: string;
+  display?: "panel" | "inline";
 }): AgentToolPreview {
   return {
     kind: "agent",
@@ -304,6 +319,7 @@ function createAgentPreview(input: {
     stats: input.stats,
     recentEvents: input.recentEvents,
     error: input.error,
+    display: input.display ?? "panel",
   };
 }
 
@@ -314,6 +330,7 @@ async function appendEventsFromAgentEvent(input: {
   transcriptRef: SubAgentTranscriptRef;
   transcript: TranscriptState;
   description: string;
+  display: "panel" | "inline";
   usageCallId: string;
   sink?: SubAgentEventSink;
   parentToolCallId?: string;
@@ -328,6 +345,7 @@ async function appendEventsFromAgentEvent(input: {
       transcriptRef: input.transcriptRef,
       description: input.description,
       status: "running",
+      display: input.display,
       sink: input.sink,
       parentToolCallId: input.parentToolCallId,
     });
@@ -346,6 +364,7 @@ async function appendEventsFromAgentEvent(input: {
       transcriptRef: input.transcriptRef,
       description: input.description,
       status: "running",
+      display: input.display,
       sink: input.sink,
       parentToolCallId: input.parentToolCallId,
     });
@@ -398,6 +417,7 @@ async function appendTranscriptEvent(input: {
   transcriptRef: SubAgentTranscriptRef;
   description: string;
   status: SubAgentRunStatus;
+  display: "panel" | "inline";
   sink?: SubAgentEventSink;
   parentToolCallId?: string;
 }): Promise<void> {
@@ -415,6 +435,7 @@ async function appendTranscriptEvent(input: {
       status: input.status,
       transcriptRef: input.transcriptRef,
       recentEvents: input.transcript.recentEvents,
+      display: input.display,
     }),
   });
 }

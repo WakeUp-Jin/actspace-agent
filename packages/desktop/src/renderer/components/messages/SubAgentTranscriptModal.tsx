@@ -5,6 +5,7 @@ import { MarkdownProse } from "./MarkdownProse";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolLogLine } from "./ToolLogLine";
 import { TOOL_LOG_LINE_CLASS, TOOL_LOG_LINE_TEXT_CLASS } from "./toolLogStyles";
+import { formatWorkedDuration } from "./workedDuration";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 type AssistantMessage = Extract<MessageBlock, { kind: "assistant" }>;
@@ -16,7 +17,7 @@ type TranscriptMessage =
   | Extract<MessageBlock, { kind: "directory_list" }>
   | Extract<MessageBlock, { kind: "tool" }>
   | Extract<MessageBlock, { kind: "error" }>;
-type TranscriptItem =
+export type TranscriptItem =
   | { kind: "message"; message: TranscriptMessage }
   | { kind: "usage"; id: string; text: string };
 type TranscriptTaskInput = { id: string; content: string; createdAt: string };
@@ -53,7 +54,7 @@ const WORK_FLOW_CLASS = "mt-4 flex flex-col gap-1.5";
 const FINAL_REPORT_SECTION_CLASS = "bg-surface px-6 py-6";
 const FINAL_REPORT_CONTENT_CLASS = "max-w-[840px] text-[15px] leading-[1.7] text-text-main";
 
-function mergeEvents(current: SessionEvent[], next: SessionEvent[] | undefined): SessionEvent[] {
+export function mergeEvents(current: SessionEvent[], next: SessionEvent[] | undefined): SessionEvent[] {
   if (!next?.length) return current;
   const seen = new Set(current.map((event) => event.id));
   const merged = [...current];
@@ -245,7 +246,7 @@ function usageText(event: SessionEvent): string {
   return `Usage Tokens ${total} · input ${input} · output ${output}`;
 }
 
-function durationFromEvents(events: SessionEvent[]): number | undefined {
+export function durationFromEvents(events: SessionEvent[]): number | undefined {
   let firstTime = Number.POSITIVE_INFINITY;
   let lastTime = Number.NEGATIVE_INFINITY;
 
@@ -261,26 +262,6 @@ function durationFromEvents(events: SessionEvent[]): number | undefined {
   }
 
   return lastTime - firstTime;
-}
-
-function formatWorkedDuration(durationMs: number | undefined): string {
-  if (durationMs === undefined || !Number.isFinite(durationMs) || durationMs <= 0) {
-    return "Worked";
-  }
-
-  const totalSeconds = Math.max(1, Math.round(durationMs / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-
-  if (minutes <= 0) {
-    return `Worked for ${seconds}s`;
-  }
-
-  if (seconds === 0) {
-    return `Worked for ${minutes}m`;
-  }
-
-  return `Worked for ${minutes}m ${seconds}s`;
 }
 
 function taskInputFromEvent(event: SessionEvent): TranscriptTaskInput | null {
@@ -304,7 +285,7 @@ function assistantMessageFromEvent(event: SessionEvent): AssistantMessage | null
   };
 }
 
-function buildTranscriptSections(events: SessionEvent[]): TranscriptSections {
+export function buildTranscriptSections(events: SessionEvent[]): TranscriptSections {
   const resultsByToolCallId = new Map<string, SessionEvent>();
   const matchedResultIds = new Set<string>();
 
@@ -397,7 +378,7 @@ function finalReportFromAgentSummary(message: AgentMessage): AssistantMessage | 
   };
 }
 
-async function loadTranscript(ref: SubAgentTranscriptRef | undefined): Promise<SessionEvent[]> {
+export async function loadTranscript(ref: SubAgentTranscriptRef | undefined): Promise<SessionEvent[]> {
   if (!ref || typeof window === "undefined" || !window.actspace?.getSubAgentTranscript) {
     return [];
   }
@@ -529,7 +510,7 @@ export function SubAgentTranscriptPanel({
 
 export const SubAgentTranscriptModal = SubAgentTranscriptPanel;
 
-function renderTranscriptItem(item: TranscriptItem) {
+export function renderTranscriptItem(item: TranscriptItem) {
   if (item.kind === "usage") {
     return (
       <div key={item.id} className={TOOL_LOG_LINE_CLASS}>
