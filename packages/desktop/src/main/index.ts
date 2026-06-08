@@ -22,6 +22,7 @@ import type {
   CompactContextInput,
   ComposerAttachment,
   DeepSeekBalanceSnapshot,
+  KimiBalanceSnapshot,
   ProviderId,
   RunTurnInput,
   SelectFilesResult,
@@ -433,6 +434,81 @@ async function getDeepSeekBalanceSnapshot(): Promise<DeepSeekBalanceSnapshot> {
       throw new Error("DeepSeek balance request timed out.");
     }
     throw error instanceof Error ? error : new Error("DeepSeek balance request failed.");
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// ─── Kimi（Moonshot）余额 ───
+
+type MoonshotBalanceData = {
+  available_balance?: unknown;
+};
+
+type MoonshotBalanceApiResponse = {
+  code?: unknown;
+  status?: unknown;
+  data?: unknown;
+};
+
+/** Moonshot 余额端点：<root>/v1/users/me/balance（baseUrl 可能已含 /v1）。 */
+function resolveKimiBalanceUrl(baseUrl: string): string {
+  const normalized = (baseUrl || "https://api.moonshot.cn/v1").replace(/\/+$/, "");
+  const root = normalized.endsWith("/v1") ? normalized.slice(0, -3) : normalized;
+  return `${root}/v1/users/me/balance`;
+}
+
+function selectKimiDisplayBalance(payload: MoonshotBalanceApiResponse): KimiBalanceSnapshot["displayBalance"] {
+  const data = payload.data;
+  if (data === null || typeof data !== "object") return null;
+  const amount = normalizeBalanceAmount((data as MoonshotBalanceData).available_balance);
+  if (!amount) return null;
+  // Moonshot 账户按人民币结算。
+  return { amount, currency: "CNY" };
+}
+
+async function getKimiBalanceSnapshot(): Promise<KimiBalanceSnapshot> {
+  const currentEnv = getEnv();
+  if (!currentEnv.KIMI_API_KEY) {
+    return {
+      provider: "kimi",
+      isConfigured: false,
+      isAvailable: null,
+      generatedAt: new Date().toISOString(),
+      displayBalance: null,
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DEEPSEEK_BALANCE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(resolveKimiBalanceUrl(currentEnv.KIMI_BASE_URL), {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${currentEnv.KIMI_API_KEY}`,
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Kimi balance request failed with status ${response.status}.`);
+    }
+
+    const payload = (await response.json()) as MoonshotBalanceApiResponse;
+    return {
+      provider: "kimi",
+      isConfigured: true,
+      isAvailable: typeof payload.status === "boolean" ? payload.status : null,
+      generatedAt: new Date().toISOString(),
+      displayBalance: selectKimiDisplayBalance(payload),
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Kimi balance request timed out.");
+    }
+    throw error instanceof Error ? error : new Error("Kimi balance request failed.");
   } finally {
     clearTimeout(timeout);
   }
@@ -975,6 +1051,17 @@ async function registerIpc() {
       return await getDeepSeekBalanceSnapshot();
     } catch (error) {
       logMain("deepseek balance fetch failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  });
+
+  ipcMain.handle("kimi:balance:get", async () => {
+    try {
+      return await getKimiBalanceSnapshot();
+    } catch (error) {
+      logMain("kimi balance fetch failed", {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;

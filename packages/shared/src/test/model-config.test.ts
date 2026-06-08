@@ -10,13 +10,15 @@ import {
 } from "../model-config";
 
 describe("model config", () => {
-  it("keeps public model list user-facing while retaining internal models", () => {
+  it("exposes Kimi as a public model alongside DeepSeek", () => {
     expect(MODEL_LIST.map((model) => model.id)).toEqual([
       "deepseek-v4-flash",
       "deepseek-v4-pro",
+      "kimi-k2.6",
     ]);
     expect(ALL_MODEL_LIST.map((model) => model.id)).toContain("kimi-k2.6");
-    expect(MODEL_REGISTRY["kimi-k2.6"].visibility).toBe("internal");
+    expect(MODEL_REGISTRY["kimi-k2.6"].visibility).toBe("public");
+    expect(MODEL_REGISTRY["kimi-k2.6"].pricing?.currency).toBe("CNY");
   });
 
   it("declares api separately from provider", () => {
@@ -31,13 +33,13 @@ describe("model config", () => {
     });
   });
 
-  it("resolves internal models without exposing them as public defaults", () => {
+  it("treats Kimi as a public, selectable model", () => {
     expect(resolveModelSpec("kimi-k2.6").id).toBe("kimi-k2.6");
-    expect(isPublicModelId("kimi-k2.6")).toBe(false);
+    expect(isPublicModelId("kimi-k2.6")).toBe(true);
     expect(isPublicModelId(DEFAULT_MODEL_ID)).toBe(true);
   });
 
-  it("finds internal models by provider api model", () => {
+  it("finds models by provider api model", () => {
     expect(resolveModelSpecByApiModel("kimi-k2.6", "kimi")?.id).toBe("kimi-k2.6");
   });
 });

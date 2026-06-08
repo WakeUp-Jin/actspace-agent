@@ -270,6 +270,22 @@ function normalizeToolInputSchema(parameters: Record<string, unknown>): Anthropi
   } as Anthropic.Tool.InputSchema;
 }
 
+/**
+ * 检测 DeepSeek 原生 DSML tool-call 标记是否泄漏成普通正文。
+ *
+ * 背景：DeepSeek 模型内部用全角特殊 token `｜｜DSML｜｜...` 表达工具调用。
+ * 走 Anthropic 兼容网关 + provider-native web_search 时，网关偶发不把这些 token
+ * 转成结构化 `server_tool_use`/`tool_use` block，而是当作 text_delta 吐出，
+ * 导致裸 DSML 被当正文落库展示（见 session-mpvwikcx-eo6dik turn-5）。
+ *
+ * 这里只做严格全角子串匹配，避免误伤正常含英文 "DSML" 词的正文。
+ */
+export function detectLeakedDsmlToolCalls(text: string): boolean {
+  if (!text) return false;
+  if (text.includes("｜｜DSML｜｜tool_calls")) return true;
+  return text.includes("｜｜DSML｜｜invoke") && text.includes("name=");
+}
+
 export function createAnthropicWebSearchTool(maxUses = 3): Anthropic.WebSearchTool20250305 {
   return {
     type: "web_search_20250305",

@@ -7,7 +7,7 @@
  *
  * 设计原则：
  * - 输入永远不抛错：留空 / 非法 modelId 都回落到 Kairos 自己的默认模型。
- * - Kairos 当前只允许默认 Flash 与显式 Pro；其它共享注册表模型（如 Kimi）对 Kairos 无效。
+ * - Kairos 当前允许默认 Flash、显式 Pro 或显式 Kimi K2.6；其它字符串回落默认。
  * - 模型不支持 thinking toggle 时强制忽略 settings.kairos.thinking，避免把"明确禁用"
  *   传给不支持 thinking 参数的模型。
  */
@@ -31,7 +31,7 @@ export interface KairosEnvConfig {
 }
 
 function asKairosModelId(value: string | null | undefined): KairosModelId | undefined {
-  if (value === "deepseek-v4-pro") return value;
+  if (value === "deepseek-v4-pro" || value === "kimi-k2.6") return value;
   return undefined;
 }
 

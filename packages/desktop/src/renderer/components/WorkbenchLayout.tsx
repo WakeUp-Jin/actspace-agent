@@ -1,4 +1,4 @@
-import type { AppSettings, ContextState, ContextUsageSnapshot, DeepSeekBalanceSnapshot, MessageBlock, ModelId, SessionListItem, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
+import type { AppSettings, ContextState, ContextUsageSnapshot, DeepSeekBalanceSnapshot, KimiBalanceSnapshot, MessageBlock, ModelId, SessionListItem, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConversationView } from "./ConversationView";
 import { LabPage } from "./LabPage";
@@ -155,6 +155,9 @@ export function WorkbenchLayout({
   const [deepSeekBalance, setDeepSeekBalance] = useState<DeepSeekBalanceSnapshot | null>(null);
   const [deepSeekBalanceLoading, setDeepSeekBalanceLoading] = useState(false);
   const [deepSeekBalanceError, setDeepSeekBalanceError] = useState<string | null>(null);
+  const [kimiBalance, setKimiBalance] = useState<KimiBalanceSnapshot | null>(null);
+  const [kimiBalanceLoading, setKimiBalanceLoading] = useState(false);
+  const [kimiBalanceError, setKimiBalanceError] = useState<string | null>(null);
   const reviewTabRefreshCounterRef = useRef(0);
   const isSidebarHidden = leftMode === "hidden";
   const displayedLeftWidth = isSidebarHidden ? 0 : leftWidth;
@@ -312,6 +315,26 @@ export function WorkbenchLayout({
     }
   }, []);
 
+  const loadKimiBalance = useCallback(async () => {
+    if (typeof window === "undefined" || !window.actspace?.getKimiBalance) {
+      setKimiBalance(null);
+      setKimiBalanceError(null);
+      return;
+    }
+
+    setKimiBalanceLoading(true);
+    setKimiBalanceError(null);
+    try {
+      const balance = await window.actspace.getKimiBalance();
+      setKimiBalance(balance);
+    } catch (error) {
+      console.error("Failed to load Kimi balance", error);
+      setKimiBalanceError(error instanceof Error ? error.message : "Failed to load Kimi balance.");
+    } finally {
+      setKimiBalanceLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (view !== "usage") return;
     loadUsageStatistics().catch((error: unknown) => {
@@ -321,20 +344,22 @@ export function WorkbenchLayout({
 
   useEffect(() => {
     if (view !== "usage") return;
-    loadDeepSeekBalance().catch((error: unknown) => {
-      console.error("Failed to bootstrap DeepSeek balance", error);
-    });
-
-    const timer = window.setInterval(() => {
+    const refreshAll = () => {
       loadDeepSeekBalance().catch((error: unknown) => {
         console.error("Failed to refresh DeepSeek balance", error);
       });
-    }, DEEPSEEK_BALANCE_REFRESH_MS);
+      loadKimiBalance().catch((error: unknown) => {
+        console.error("Failed to refresh Kimi balance", error);
+      });
+    };
+    refreshAll();
+
+    const timer = window.setInterval(refreshAll, DEEPSEEK_BALANCE_REFRESH_MS);
 
     return () => {
       window.clearInterval(timer);
     };
-  }, [view, loadDeepSeekBalance]);
+  }, [view, loadDeepSeekBalance, loadKimiBalance]);
 
   // 设置走「整页接管」：不渲染聊天侧栏与右栏，由 SettingsPage 自带导航 + 内容两栏。
   if (view === "settings") {
@@ -362,6 +387,10 @@ export function WorkbenchLayout({
         isDeepSeekBalanceLoading={deepSeekBalanceLoading}
         deepSeekBalanceError={deepSeekBalanceError}
         onRefreshDeepSeekBalance={loadDeepSeekBalance}
+        kimiBalance={kimiBalance}
+        isKimiBalanceLoading={kimiBalanceLoading}
+        kimiBalanceError={kimiBalanceError}
+        onRefreshKimiBalance={loadKimiBalance}
         onBackToChat={() => setView("chat")}
         workspaces={workspaces}
       />

@@ -42,6 +42,7 @@ const DEFAULT_MODEL_VALUE = "__default__";
 const MODEL_OPTIONS: SelectOption[] = [
   { value: DEFAULT_MODEL_VALUE, label: "DeepSeek V4 Flash（默认）" },
   { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" },
+  { value: "kimi-k2.6", label: "Kimi K2.6（偏贵）" },
 ];
 
 const THINKING_OPTIONS: SelectOption[] = [
@@ -321,7 +322,7 @@ export function KairosSettings({
           title="模型"
           description={
             bridgeAvailable
-              ? "Kairos 自主模式使用的模型，保存到 settings.json；改后会立即重建 Kairos 并生效。"
+              ? "Kairos 自主模式使用的模型，保存到 settings.json；改后会立即重建 Kairos 并生效。Kimi 单价更高，自主模式量大建议配合下方额度护栏。"
               : "Kairos 模型仅在桌面端可配置（保存在 settings.json）。"
           }
           align="start"

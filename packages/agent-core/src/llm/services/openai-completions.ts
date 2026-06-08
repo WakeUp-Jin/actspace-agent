@@ -5,7 +5,7 @@
  */
 
 import OpenAI from "openai";
-import type { Context, AssistantMessage, Tool } from "../../messages";
+import type { Context, AssistantMessage, Tool, Usage } from "../../messages";
 import type {
   LLMService,
   LLMConfig,
@@ -29,10 +29,31 @@ const DEFAULT_BASE_URLS: Record<string, string> = {
   kimi: "https://api.moonshot.cn/v1",
 };
 
+/** Kimi 内置联网搜索工具名；以 `$` 前缀标识 Kimi builtin_function。 */
+const KIMI_WEB_SEARCH_NAME = "$web_search";
+/** Kimi `$web_search` 内部回填的最大轮数，防止异常时死循环。 */
+const KIMI_WEB_SEARCH_MAX_ROUNDS = 5;
+
 function providerDisplayName(provider: string): string {
   if (provider === "deepseek") return "DeepSeek";
   if (provider === "kimi") return "Kimi";
   return provider;
+}
+
+function isBuiltinToolName(name: string | undefined): boolean {
+  return typeof name === "string" && name.startsWith("$");
+}
+
+/** 把一轮 usage 累加进总账（跨 Kimi `$web_search` 多次内部往返）。 */
+function addUsage(total: Usage, delta: Usage): void {
+  total.input += delta.input;
+  total.output += delta.output;
+  total.totalTokens += delta.totalTokens;
+  total.cacheRead += delta.cacheRead;
+  total.cacheWrite += delta.cacheWrite;
+  total.cacheHit += delta.cacheHit;
+  total.cacheMiss += delta.cacheMiss;
+  total.reasoning += delta.reasoning;
 }
 
 export class OpenAICompletionsService implements LLMService {
@@ -49,7 +70,8 @@ export class OpenAICompletionsService implements LLMService {
   }
 
   stream(context: Context, options?: StreamOptions): AssistantMessageEventStream {
-    return this._stream(convertMessages(context, this.config), context.tools, options);
+    // 主 Agent 入口：Kimi 主模型在此启用 provider-native $web_search（见 _stream）。
+    return this._stream(convertMessages(context, this.config), context.tools, options, true);
   }
 
   async complete(context: Context, options?: StreamOptions): Promise<AssistantMessage> {
@@ -81,8 +103,12 @@ export class OpenAICompletionsService implements LLMService {
     messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
     tools?: Tool[],
     options?: StreamOptions,
+    enableKimiBuiltinWebSearch = false,
   ): AssistantMessageEventStream {
     const self = this;
+    // 仅主 Agent 入口（stream(context)）对 Kimi 启用 builtin $web_search 内部循环；
+    // streamMessages / streamWithBuiltinWebSearch 等 helper 路径保持原有单次行为。
+    const kimiWebSearch = self.config.provider === "kimi" && enableKimiBuiltinWebSearch;
 
     async function* generate() {
       const displayName = providerDisplayName(self.config.provider);
@@ -103,46 +129,114 @@ export class OpenAICompletionsService implements LLMService {
         return;
       }
 
-      const requestTools = options?.tools ?? toRequestTools(tools ?? []);
-      const acc = createAccumulator();
+      const baseRequestTools = options?.tools ?? toRequestTools(tools ?? []);
+      // Kimi 主模型联网搜索是 provider-native 能力：在请求里声明 builtin $web_search，
+      // 由 Kimi 服务端执行，不进入本地 ToolManager（与 DeepSeek Anthropic server web search 对称）。
+      const requestTools = kimiWebSearch
+        ? [...baseRequestTools, { type: "builtin_function", function: { name: KIMI_WEB_SEARCH_NAME } }]
+        : baseRequestTools;
 
-      const requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
-        model: self.config.model,
-        messages,
-        stream: true,
-        stream_options: { include_usage: true },
-        temperature: options?.temperature ?? self.config.temperature ?? undefined,
-        max_tokens: options?.maxTokens ?? self.config.maxTokens ?? undefined,
-      };
+      // 运行消息序列；Kimi $web_search 回填会向其追加 assistant/tool 消息后再次请求。
+      const runningMessages = [...messages];
+      // 跨内部往返累加的 usage 与搜索计数。
+      const totalUsage = createAccumulator().usage;
+      let webSearchRequests = 0;
 
-      if (requestTools.length > 0) {
-        (requestParams as any).tools = requestTools;
-      }
-      if (options?.thinking) {
-        (requestParams as any).thinking = options.thinking;
-      } else if (options?.thinkingEnabled === false) {
-        (requestParams as any).thinking = { type: "disabled" };
-      }
+      for (let round = 0; ; round++) {
+        const acc = createAccumulator();
+        const requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
+          model: self.config.model,
+          messages: runningMessages,
+          stream: true,
+          stream_options: { include_usage: true },
+          temperature: options?.temperature ?? self.config.temperature ?? undefined,
+          max_tokens: options?.maxTokens ?? self.config.maxTokens ?? undefined,
+        };
 
-      try {
-        const stream = await self.client.chat.completions.create(
-          requestParams,
-          { signal: options?.signal },
-        );
+        if (requestTools.length > 0) {
+          (requestParams as any).tools = requestTools;
+        }
+        // 使用 $web_search 时 Kimi 要求禁用 thinking（见 platform.kimi.ai 文档）。
+        if (kimiWebSearch) {
+          (requestParams as any).thinking = { type: "disabled" };
+        } else if (options?.thinking) {
+          (requestParams as any).thinking = options.thinking;
+        } else if (options?.thinkingEnabled === false) {
+          (requestParams as any).thinking = { type: "disabled" };
+        }
 
-        yield* processStreamChunks(stream, acc);
-      } catch (error) {
-        if (error instanceof LLMServiceError) {
-          yield { type: "error" as const, message: buildErrorMessage(acc, self.config, self.config.provider, error, options?.signal) };
+        try {
+          const stream = await self.client.chat.completions.create(
+            requestParams,
+            { signal: options?.signal },
+          );
+
+          for await (const event of processStreamChunks(stream, acc)) {
+            // builtin $web_search 的 tool_call 增量不暴露给上层（它不是本地工具调用）。
+            if (kimiWebSearch && event.type === "tool_call_delta" && isBuiltinToolName(event.toolName)) {
+              continue;
+            }
+            yield event;
+          }
+        } catch (error) {
+          addUsage(totalUsage, acc.usage);
+          acc.usage = totalUsage;
+          if (error instanceof LLMServiceError) {
+            yield { type: "error" as const, message: buildErrorMessage(acc, self.config, self.config.provider, error, options?.signal) };
+            return;
+          }
+          const mapped = mapSdkError(error, displayName);
+          yield { type: "error" as const, message: buildErrorMessage(acc, self.config, self.config.provider, mapped, options?.signal) };
           return;
         }
-        const mapped = mapSdkError(error, displayName);
-        yield { type: "error" as const, message: buildErrorMessage(acc, self.config, self.config.provider, mapped, options?.signal) };
+
+        addUsage(totalUsage, acc.usage);
+
+        const builtinCalls = kimiWebSearch
+          ? [...acc.toolCalls.values()].filter((tc) => isBuiltinToolName(tc.name))
+          : [];
+        const hasLocalCalls = [...acc.toolCalls.values()].some((tc) => !isBuiltinToolName(tc.name));
+
+        // 仅当本轮只触发了 builtin $web_search（没有本地工具调用）时，在 service 内部回填后继续，
+        // 让上层只看到最终一轮 assistant 回复。混入本地工具调用的罕见情况按最终轮处理。
+        if (builtinCalls.length > 0 && !hasLocalCalls && round < KIMI_WEB_SEARCH_MAX_ROUNDS) {
+          webSearchRequests += builtinCalls.length;
+          runningMessages.push({
+            role: "assistant",
+            content: null,
+            tool_calls: builtinCalls.map((tc) => ({
+              id: tc.id,
+              type: "function",
+              function: { name: tc.name, arguments: tc.argumentsText || "{}" },
+            })),
+          });
+          // 文档要求：把 tool_call.function.arguments 原样作为 role:tool 回填，Kimi 服务端据此执行搜索。
+          for (const tc of builtinCalls) {
+            runningMessages.push({
+              role: "tool",
+              tool_call_id: tc.id,
+              content: tc.argumentsText || "{}",
+            });
+          }
+          continue;
+        }
+
+        // 最终轮：用累加 usage 覆盖，并把 builtin 搜索次数记入 serverToolUse（与 DeepSeek 对齐）。
+        acc.usage = totalUsage;
+        if (webSearchRequests > 0) {
+          acc.usage.serverToolUse = {
+            webSearchRequests,
+            webFetchRequests: 0,
+          };
+        }
+        const message = buildAssistantMessage(acc, self.config, self.config.provider);
+        // 防御：剔除最终消息里残留的 builtin 工具调用，避免把 $web_search 当本地工具返回给上层。
+        message.content = message.content.filter(
+          (block) => block.type !== "toolCall" || !isBuiltinToolName(block.name),
+        );
+        yield { type: "done" as const, message };
         return;
       }
-
-      const message = buildAssistantMessage(acc, self.config, self.config.provider);
-      yield { type: "done" as const, message };
     }
 
     return new AssistantMessageEventStream(generate());

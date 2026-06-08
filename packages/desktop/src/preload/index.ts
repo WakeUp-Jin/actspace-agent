@@ -14,6 +14,7 @@ import type {
   CompactContextResult,
   ContextState,
   DeepSeekBalanceSnapshot,
+  KimiBalanceSnapshot,
   AppShutdownNotice,
   DescribeContextInput,
   KairosBridgeApi,
@@ -110,6 +111,8 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("usage-statistics:get", input) as Promise<UsageStatisticsSnapshot | null>,
   getDeepSeekBalance: () =>
     ipcRenderer.invoke("deepseek:balance:get") as Promise<DeepSeekBalanceSnapshot>,
+  getKimiBalance: () =>
+    ipcRenderer.invoke("kimi:balance:get") as Promise<KimiBalanceSnapshot>,
   createSession: (input?: SessionCreateInput) => ipcRenderer.invoke("session:create", input ?? {}) as Promise<SessionRecord>,
   pinSession: (input: SessionPinInput) => ipcRenderer.invoke("session:pin", input) as Promise<SessionPinResult>,
   renameSession: (input: SessionRenameInput) =>

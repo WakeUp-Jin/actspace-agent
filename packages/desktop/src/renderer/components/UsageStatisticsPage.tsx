@@ -2,6 +2,8 @@ import { useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight, CircleAlert, Info, RefreshCw, Share2, X } from "lucide-react";
 import type {
   DeepSeekBalanceSnapshot,
+  KimiBalanceSnapshot,
+  ProviderBalanceSnapshot,
   UsageStatisticsDailyModelBreakdown,
   UsageStatisticsDailyRow,
   UsageStatisticsModelEntry,
@@ -24,6 +26,10 @@ type Props = {
   isDeepSeekBalanceLoading?: boolean;
   deepSeekBalanceError?: string | null;
   onRefreshDeepSeekBalance?: () => void;
+  kimiBalance?: KimiBalanceSnapshot | null;
+  isKimiBalanceLoading?: boolean;
+  kimiBalanceError?: string | null;
+  onRefreshKimiBalance?: () => void;
   onBackToChat?: () => void;
   workspaces?: WorkspaceEntry[];
 };
@@ -338,17 +344,25 @@ function getBalanceSymbol(currency: string): string {
   }
 }
 
-function DeepSeekBalanceCard({
+const PROVIDER_BALANCE_META: Record<ProviderBalanceSnapshot["provider"], { title: string; notConfigured: string }> = {
+  deepseek: { title: "DeepSeek 余额", notConfigured: "未配置 DeepSeek API Key" },
+  kimi: { title: "Kimi 余额", notConfigured: "未配置 Kimi API Key" },
+};
+
+function ProviderBalanceCard({
+  provider,
   balance,
   isLoading,
   error,
   onRefresh,
 }: {
-  balance?: DeepSeekBalanceSnapshot | null;
+  provider: ProviderBalanceSnapshot["provider"];
+  balance?: ProviderBalanceSnapshot | null;
   isLoading?: boolean;
   error?: string | null;
   onRefresh?: () => void;
 }) {
+  const meta = PROVIDER_BALANCE_META[provider];
   const display = balance?.displayBalance;
   const amount = display ? `${getBalanceSymbol(display.currency)}${display.amount}` : "--";
   const currency = display?.currency ?? "CNY";
@@ -357,17 +371,17 @@ function DeepSeekBalanceCard({
     : error
       ? "刷新失败，保留上次余额"
       : balance?.isConfigured === false
-        ? "未配置 DeepSeek API Key"
+        ? meta.notConfigured
         : "每 5 分钟自动刷新";
 
   return (
-    <article className={`${panelClass} grid gap-3 p-5`} aria-label="DeepSeek balance">
+    <article className={`${panelClass} grid gap-3 p-5`} aria-label={`${provider} balance`}>
       <div className="flex items-center justify-between gap-3">
-        <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-text-faint">DeepSeek 预额</div>
+        <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-text-faint">{meta.title}</div>
         <button
           className={`${iconButtonClass} h-8 w-8`}
           type="button"
-          aria-label="Refresh DeepSeek balance"
+          aria-label={`Refresh ${provider} balance`}
           disabled={isLoading}
           onClick={onRefresh}
         >
@@ -766,6 +780,10 @@ export function UsageStatisticsPage({
   isDeepSeekBalanceLoading,
   deepSeekBalanceError,
   onRefreshDeepSeekBalance,
+  kimiBalance,
+  isKimiBalanceLoading,
+  kimiBalanceError,
+  onRefreshKimiBalance,
   workspaces,
 }: Props) {
   const [range, setRange] = useState<UsageStatisticsSnapshot["range"]>(snapshot?.range ?? "month");
@@ -777,11 +795,19 @@ export function UsageStatisticsPage({
       <main className="h-full overflow-auto bg-app-bg px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main">
         <div className="grid min-h-[calc(100vh-48px)] min-w-0 grid-cols-[340px_minmax(0,1fr)] items-start gap-4">
           <section className="flex min-w-0 flex-col gap-4 self-stretch">
-            <DeepSeekBalanceCard
+            <ProviderBalanceCard
+              provider="deepseek"
               balance={deepSeekBalance}
               isLoading={isDeepSeekBalanceLoading}
               error={deepSeekBalanceError}
               onRefresh={onRefreshDeepSeekBalance}
+            />
+            <ProviderBalanceCard
+              provider="kimi"
+              balance={kimiBalance}
+              isLoading={isKimiBalanceLoading}
+              error={kimiBalanceError}
+              onRefresh={onRefreshKimiBalance}
             />
           </section>
 
@@ -844,11 +870,19 @@ export function UsageStatisticsPage({
     <main className="h-full overflow-auto bg-app-bg px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main">
       <div className="grid min-h-[calc(100vh-48px)] min-w-0 grid-cols-[340px_minmax(0,1fr)] items-start gap-4">
         <section className="flex min-w-0 flex-col gap-4 self-stretch">
-          <DeepSeekBalanceCard
+          <ProviderBalanceCard
+            provider="deepseek"
             balance={deepSeekBalance}
             isLoading={isDeepSeekBalanceLoading}
             error={deepSeekBalanceError}
             onRefresh={onRefreshDeepSeekBalance}
+          />
+          <ProviderBalanceCard
+            provider="kimi"
+            balance={kimiBalance}
+            isLoading={isKimiBalanceLoading}
+            error={kimiBalanceError}
+            onRefresh={onRefreshKimiBalance}
           />
 
           <article className={`${panelClass} grid gap-3.5 p-4`}>

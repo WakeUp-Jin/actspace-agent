@@ -20,6 +20,7 @@ import {
   convertContextToAnthropic,
   createAnthropicAccumulator,
   createAnthropicWebSearchTool,
+  detectLeakedDsmlToolCalls,
   processAnthropicStream,
   toAnthropicClientTools,
 } from "../anthropic-convert";
@@ -122,6 +123,31 @@ export class AnthropicMessagesService implements LLMService {
         );
 
         yield* processAnthropicStream(stream, acc);
+
+        // DeepSeek Anthropic 网关偶发把模型原生 DSML tool-call 标记当正文吐出（未转成
+        // 结构化 tool_use），导致裸标记被当回复展示。检测到泄漏时按可重试 server_error 处理，
+        // 而不是把垃圾正文落库。错误文案不含原始 DSML，避免污染日志。
+        if (acc.toolCalls.size === 0 && detectLeakedDsmlToolCalls(acc.textParts.join(""))) {
+          // 丢弃泄漏的 DSML 正文，但保留 usage（含计费），避免错误消息把裸标记带出去。
+          const sanitized = createAnthropicAccumulator();
+          sanitized.usage = acc.usage;
+          sanitized.stopReason = acc.stopReason;
+          yield {
+            type: "error" as const,
+            message: buildAnthropicErrorMessage(
+              sanitized,
+              self.config,
+              self.config.provider,
+              new LLMServiceError(
+                `${displayName} 返回了未解析的工具调用标记（DSML leak），已按可重试错误处理。`,
+                "server_error",
+                true,
+              ),
+              options?.signal,
+            ),
+          };
+          return;
+        }
 
         yield { type: "done", message: buildAnthropicAssistantMessage(acc, self.config, self.config.provider) };
       } catch (error) {

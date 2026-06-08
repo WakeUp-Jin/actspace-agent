@@ -866,7 +866,7 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
       <SettingGroup title="Explore 子代理">
         <SettingRow
           title="模型"
-          description="内置 Explore 聚焦子代理使用的模型；默认便宜快速的 Flash。缺对应供应商密钥时运行时自动回落主模型。"
+          description="内置 Explore 聚焦子代理使用的模型；默认便宜快速的 Flash。缺对应供应商密钥时运行时自动回落主模型。Explore 调用频繁，选 Kimi 等较贵模型会显著增加成本。"
           control={
             <SettingsSelect
               value={settings.agent.exploreModelId ?? EXPLORE_DEFAULT_VALUE}

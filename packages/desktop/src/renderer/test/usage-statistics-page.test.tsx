@@ -32,7 +32,7 @@ describe("UsageStatisticsPage heatmap tooltip", () => {
       },
     });
 
-    expect(screen.getByText("DeepSeek 预额")).toBeInTheDocument();
+    expect(screen.getByText("DeepSeek 余额")).toBeInTheDocument();
     expect(screen.getByText("暂无 Usage 数据")).toBeInTheDocument();
   });
 
@@ -48,9 +48,34 @@ describe("UsageStatisticsPage heatmap tooltip", () => {
       },
     });
 
-    expect(screen.getByText("DeepSeek 预额")).toBeInTheDocument();
-    expect(screen.getByText("¥19.65")).toBeInTheDocument();
-    expect(screen.getByText("CNY")).toBeInTheDocument();
+    const card = screen.getByRole("article", { name: "deepseek balance" });
+    expect(within(card).getByText("DeepSeek 余额")).toBeInTheDocument();
+    expect(within(card).getByText("¥19.65")).toBeInTheDocument();
+    expect(within(card).getByText("CNY")).toBeInTheDocument();
+  });
+
+  it("renders a separate Kimi balance card alongside DeepSeek", () => {
+    renderUsageStatisticsPage({
+      snapshot: mockUsageStatistics,
+      deepSeekBalance: {
+        provider: "deepseek",
+        isConfigured: true,
+        isAvailable: true,
+        generatedAt: "2026-05-29T03:00:00.000Z",
+        displayBalance: { amount: "19.65", currency: "CNY" },
+      },
+      kimiBalance: {
+        provider: "kimi",
+        isConfigured: true,
+        isAvailable: true,
+        generatedAt: "2026-05-29T03:00:00.000Z",
+        displayBalance: { amount: "8.20", currency: "CNY" },
+      },
+    });
+
+    const kimiCard = screen.getByRole("article", { name: "kimi balance" });
+    expect(within(kimiCard).getByText("Kimi 余额")).toBeInTheDocument();
+    expect(within(kimiCard).getByText("¥8.20")).toBeInTheDocument();
   });
 
   it("calls the DeepSeek balance refresh handler from the balance card", async () => {
@@ -61,8 +86,20 @@ describe("UsageStatisticsPage heatmap tooltip", () => {
       onRefreshDeepSeekBalance,
     });
 
-    await user.click(screen.getByRole("button", { name: "Refresh DeepSeek balance" }));
+    await user.click(screen.getByRole("button", { name: "Refresh deepseek balance" }));
     expect(onRefreshDeepSeekBalance).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls the Kimi balance refresh handler from the balance card", async () => {
+    const user = userEvent.setup();
+    const onRefreshKimiBalance = vi.fn();
+    renderUsageStatisticsPage({
+      snapshot: mockUsageStatistics,
+      onRefreshKimiBalance,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Refresh kimi balance" }));
+    expect(onRefreshKimiBalance).toHaveBeenCalledTimes(1);
   });
 
   it("does not render the deprecated 使用趋势 panel", () => {

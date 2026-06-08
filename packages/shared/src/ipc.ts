@@ -551,18 +551,31 @@ export type UsageStatisticsSnapshot = {
   requestRowsPage: UsageStatisticsRequestRowsPage;
 };
 
-export type DeepSeekBalanceDisplay = {
+export type ProviderBalanceDisplay = {
   amount: string;
   currency: string;
 };
 
-export type DeepSeekBalanceSnapshot = {
-  provider: "deepseek";
+/** 余额可读取的供应商；目前 DeepSeek 与 Kimi 各有一张余额卡。 */
+export type BalanceProviderId = "deepseek" | "kimi";
+
+/** 通用供应商余额快照；按 provider 区分来源，UI 每个 provider 渲染一张卡。 */
+export type ProviderBalanceSnapshot = {
+  provider: BalanceProviderId;
   isConfigured: boolean;
   isAvailable: boolean | null;
   generatedAt: string;
-  displayBalance: DeepSeekBalanceDisplay | null;
+  displayBalance: ProviderBalanceDisplay | null;
 };
+
+/** @deprecated 用 ProviderBalanceDisplay；保留别名向后兼容。 */
+export type DeepSeekBalanceDisplay = ProviderBalanceDisplay;
+
+/** DeepSeek 余额快照（ProviderBalanceSnapshot 的 deepseek 特化）。 */
+export type DeepSeekBalanceSnapshot = ProviderBalanceSnapshot & { provider: "deepseek" };
+
+/** Kimi（Moonshot）余额快照（ProviderBalanceSnapshot 的 kimi 特化）。 */
+export type KimiBalanceSnapshot = ProviderBalanceSnapshot & { provider: "kimi" };
 
 export type LocalUpdateErrorCode =
   | "invalid_source"

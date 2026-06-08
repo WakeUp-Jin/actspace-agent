@@ -12,20 +12,24 @@ describe("resolveKairosEnv", () => {
     expect(r.thinkingEnabled).toBeUndefined();
   });
 
-  it("allows only explicit DeepSeek Pro as Kairos model override", () => {
+  it("allows explicit DeepSeek Pro as Kairos model override", () => {
     const r = resolveKairosEnv("deepseek-v4-pro", "auto");
     expect(r.modelSpec.id).toBe("deepseek-v4-pro");
     expect(r.modelSpec.provider).toBe("deepseek");
   });
 
-  it("rejects shared registry models outside the Kairos allowlist", () => {
+  it("allows explicit Kimi K2.6 as Kairos model override", () => {
     const r = resolveKairosEnv("kimi-k2.6", "auto");
-    expect(r.modelSpec.id).toBe("deepseek-v4-flash");
+    expect(r.modelSpec.id).toBe("kimi-k2.6");
+    expect(r.modelSpec.provider).toBe("kimi");
   });
 
-  it("garbage modelId silently falls back to default", () => {
-    const r = resolveKairosEnv("not-a-real-model", "auto");
+  it("rejects shared registry models outside the Kairos allowlist", () => {
+    const r = resolveKairosEnv("deepseek-v4-flash", "auto");
+    // flash 不是「显式覆盖」选项；非 allowlist 字符串一律回落默认 flash。
     expect(r.modelSpec.id).toBe("deepseek-v4-flash");
+    const garbage = resolveKairosEnv("not-a-real-model", "auto");
+    expect(garbage.modelSpec.id).toBe("deepseek-v4-flash");
   });
 
   it("settings thinking=on/off explicitly toggles supported DeepSeek models", () => {
@@ -37,6 +41,7 @@ describe("resolveKairosEnv", () => {
   it("resolveKairosModelSpec follows the same allowlist", () => {
     expect(resolveKairosModelSpec(null).id).toBe("deepseek-v4-flash");
     expect(resolveKairosModelSpec("deepseek-v4-pro").id).toBe("deepseek-v4-pro");
-    expect(resolveKairosModelSpec("kimi-k2.6").id).toBe("deepseek-v4-flash");
+    expect(resolveKairosModelSpec("kimi-k2.6").id).toBe("kimi-k2.6");
+    expect(resolveKairosModelSpec("not-a-real-model").id).toBe("deepseek-v4-flash");
   });
 });
