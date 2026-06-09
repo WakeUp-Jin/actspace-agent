@@ -101,7 +101,12 @@ Kimi 原生能力：
 
 普通 Kimi OpenAI-compatible 调用复用 `OpenAICompletionsService`。`KimiService` 保留 `streamWithBuiltinWebSearch` 等内部 helper 入口（供 DeepSeek 的 `searchWithKimi` 复用），用来封装 Kimi builtin `$web_search` 的请求细节。
 
-**Kimi 作为公开主模型时的联网搜索**：`OpenAICompletionsService` 的主入口 `stream(context)` 检测到 `provider === "kimi"` 时，会在请求里追加 `builtin_function.$web_search` 并强制 `thinking: { type: "disabled" }`，然后在 service 内部完成 `$web_search` 的回填循环：
+**Kimi 主模型的 thinking 与联网搜索互斥**：Kimi K2.6 的 `$web_search` 要求禁用 thinking（`thinking.type: "disabled"`），而 K2.6 的深度思考走 `thinking.type: "enabled"` 且结果在流式 `reasoning_content` 字段。二者不能同时开，因此主入口按用户的 thinking 开关二选一：
+
+- 用户**开启** Thinking（`options.thinkingEnabled === true`）：发 `thinking: { type: "enabled" }`，**不挂** `$web_search`，思考增量经 `reasoning_content` → `thinking_delta` 正常显示。
+- 用户**关闭** Thinking（默认，`thinkingDefault: false`）：挂 `builtin_function.$web_search` 并发 `thinking: { type: "disabled" }`，走下面的回填循环。
+
+**Kimi 作为公开主模型时的联网搜索**：当 Thinking 关闭时，`OpenAICompletionsService` 的主入口 `stream(context)` 检测到 `provider === "kimi"` 会在请求里追加 `builtin_function.$web_search`，然后在 service 内部完成 `$web_search` 的回填循环：
 
 1. 模型本轮只触发 `$web_search`（无本地工具调用）时，把 assistant 的 tool_calls + 原样 arguments 作为 `role:tool` 追加进消息序列，再次请求；
 2. builtin `$web_search` 的 `tool_call_delta` 不向上层（agent loop / UI）暴露，避免被当成本地工具调用；
@@ -333,3 +338,4 @@ Formula 可以作为后续扩展方向，但应单独设计“托管工具平台
 - 2026-06-08：把 `kimi-k2.6` 提升为公开主模型（`visibility: "public"` + CNY 计价），作为 DeepSeek 降智时的备用模型。Explore 子代理与 Kairos 自主模式也放出 Kimi 选项（默认仍是便宜的 DeepSeek Flash，UI 提示 Kimi 偏贵，Kairos 依赖既有额度护栏控成本）。
 - 2026-06-08：Kimi 主模型联网搜索走 provider-native `$web_search`，在 `OpenAICompletionsService` 主入口内部完成回填循环，不经过 ToolManager、不暴露本地 `web_search`，与 DeepSeek server web search 的“原生能力归 service 层”原则一致。
 - 2026-06-08：DeepSeek Anthropic 网关偶发把模型原生 DSML tool-call 标记泄漏成正文（未转成结构化 tool_use），`AnthropicMessagesService` 检测到 `acc.toolCalls 为空但正文含 ｜｜DSML｜｜tool_calls/invoke` 时，按可重试 `server_error` 处理并丢弃裸标记正文（保留 usage），而不是把垃圾正文落库展示。
+- 2026-06-08：Kimi K2.6 的 thinking 与 `$web_search` 互斥（搜索要求禁用 thinking）。主入口按用户 Thinking 开关二选一：开 → `thinking: enabled` 且不挂搜索（思考走 `reasoning_content`）；关 → 挂 `$web_search` 且 `thinking: disabled`。聊天框 Thinking 默认关（`thinkingDefault: false`），即默认带联网搜索，用户可手动切到思考模式。

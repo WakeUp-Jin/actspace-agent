@@ -95,15 +95,18 @@ const MODEL_BUTTON_CLASS =
 const MODEL_BUTTON_TEXT_CLASS = "model-button-text truncate";
 const SEND_BUTTON_CLASS =
   "send-button grid h-9 w-9 shrink-0 place-items-center rounded-full border-0 bg-brand text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.24),0_8px_18px_rgba(47,111,255,0.18)] transition-[background,box-shadow,opacity] duration-[120ms] ease-in-out hover:bg-brand-strong hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22),0_10px_22px_rgba(47,111,255,0.22)] disabled:cursor-default disabled:opacity-72 aria-disabled:cursor-default aria-disabled:opacity-72";
-const DROPDOWN_MENU_CLASS =
-  "dropdown-menu absolute bottom-[calc(100%_+_8px)] left-0 z-30 min-w-[180px] overflow-hidden rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
+// 不含水平锚点（left/right）的基类，方便不同菜单各自选择向左/向右展开，避免 left-0 与 right-0 冲突。
+const DROPDOWN_MENU_BASE_CLASS =
+  "dropdown-menu absolute bottom-[calc(100%_+_8px)] z-30 min-w-[180px] overflow-hidden rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
+const DROPDOWN_MENU_CLASS = `${DROPDOWN_MENU_BASE_CLASS} left-0`;
 const COMMAND_MENU_CLASS = `${DROPDOWN_MENU_CLASS} command-menu w-[240px] min-w-[240px] p-2`;
 const COMMAND_MENU_HINT_CLASS = "px-2 pb-2 pt-1 text-sm text-text-subtle";
 const COMMAND_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
 const COMMAND_MENU_BUTTON_CLASS =
   "command-menu-button flex min-h-[34px] w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 text-left text-sm font-medium text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-brand-soft focus-visible:bg-brand-soft focus-visible:outline-none";
 const COMMAND_MENU_ICON_CLASS = "text-text-muted";
-const MODEL_MENU_CLASS = `${DROPDOWN_MENU_CLASS} model-menu max-h-[222px] min-w-[280px] overflow-y-auto`;
+// 模型选择器贴近输入框右侧，菜单向左展开（right-0），避免 280px 宽列表撞到窗口右边界。
+const MODEL_MENU_CLASS = `${DROPDOWN_MENU_BASE_CLASS} model-menu right-0 max-h-[222px] min-w-[280px] overflow-y-auto`;
 const MODEL_MENU_ROW_CLASS = "model-menu-row relative flex items-center rounded-lg";
 const MODEL_MENU_ROW_SELECTED_CLASS = "is-selected-row bg-brand-soft";
 const MODEL_SELECT_BUTTON_CLASS =
@@ -115,15 +118,20 @@ const MODEL_ROW_ACTIONS_SELECTED_CLASS = "min-w-[62px]";
 const MODEL_EDIT_BUTTON_CLASS =
   "model-edit-button h-[26px] min-w-[42px] justify-center rounded-[7px] border-0 bg-transparent text-xs font-semibold text-text-muted transition-[opacity,background,color] duration-[120ms] ease-in-out focus-visible:outline-none hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 const MODEL_CHECK_ICON_CLASS = "model-check-icon text-text-main";
-const MODEL_OPTIONS_MENU_CLASS = `${DROPDOWN_MENU_CLASS} model-options-menu bottom-0 left-[calc(100%_+_8px)] w-[220px] min-w-[220px]`;
+// 模型菜单向左展开（right-0，宽 280px），Options 子菜单再贴其左侧弹出：右偏移 288px（280 + 8）。
+// z-40 确保盖在模型菜单（z-30）之上。
+const MODEL_OPTIONS_MENU_CLASS = `${DROPDOWN_MENU_BASE_CLASS} model-options-menu bottom-0 right-[288px] z-40 w-[220px] min-w-[220px]`;
 const DROPDOWN_LABEL_CLASS = "dropdown-label px-2.5 pb-[5px] pt-[7px] text-xs font-semibold text-text-faint";
 const OPTION_TOGGLE_ROW_CLASS =
   "option-toggle-row flex min-h-9 cursor-pointer items-center gap-2.5 rounded-lg px-[9px] py-[7px] text-text-main hover:bg-brand-soft";
 const OPTION_TOGGLE_LABEL_CLASS = "flex-1";
 const OPTION_TOGGLE_INPUT_CLASS = "absolute opacity-0 pointer-events-none";
+// 注意：track 的底色不写进基类，由 on/off 分支二选一给出，避免 `bg-line-strong` 与 `bg-brand`
+// 同优先级、按样式表顺序覆盖导致开启时不变主题色。
 const TOGGLE_TRACK_CLASS =
-  "toggle-track relative inline-flex h-5 w-8 rounded-full bg-line-strong transition-colors duration-[120ms] ease-in-out";
+  "toggle-track relative inline-flex h-5 w-8 rounded-full transition-colors duration-[120ms] ease-in-out";
 const TOGGLE_TRACK_ON_CLASS = "bg-brand";
+const TOGGLE_TRACK_OFF_CLASS = "bg-line-strong";
 const TOGGLE_THUMB_CLASS =
   "toggle-thumb absolute left-[3px] top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_4px_rgba(31,45,61,0.22)] transition-transform duration-[120ms] ease-in-out";
 const TOGGLE_THUMB_ON_CLASS = "translate-x-3";
@@ -702,7 +710,7 @@ export function Composer({
                   aria-label={`${editingModelId} Thinking`}
                 />
                 <span
-                  className={`${TOGGLE_TRACK_CLASS}${thinkingEnabled ? ` ${TOGGLE_TRACK_ON_CLASS}` : ""}`}
+                  className={`${TOGGLE_TRACK_CLASS} ${thinkingEnabled ? TOGGLE_TRACK_ON_CLASS : TOGGLE_TRACK_OFF_CLASS}`}
                   aria-hidden="true"
                 >
                   <span className={`${TOGGLE_THUMB_CLASS}${thinkingEnabled ? ` ${TOGGLE_THUMB_ON_CLASS}` : ""}`} />

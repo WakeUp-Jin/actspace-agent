@@ -337,16 +337,26 @@ export async function* processStreamChunks(
       const usageAny = chunk.usage as unknown as {
         prompt_cache_hit_tokens?: number;
         prompt_cache_miss_tokens?: number;
+        cached_tokens?: number;
+        prompt_tokens_details?: { cached_tokens?: number };
         completion_tokens_details?: { reasoning_tokens?: number };
       };
-      if (usageAny.prompt_cache_hit_tokens !== undefined) {
-        acc.usage.cacheRead = usageAny.prompt_cache_hit_tokens;
-        acc.usage.cacheHit = usageAny.prompt_cache_hit_tokens;
+      // 缓存命中 token 的字段名因 provider 而异：
+      // - DeepSeek：prompt_cache_hit_tokens / prompt_cache_miss_tokens；
+      // - Kimi/Moonshot（OpenAI 兼容，自动前缀缓存）：prompt_tokens_details.cached_tokens（主），
+      //   或顶层 cached_tokens（兼容旧 payload）。
+      const cacheHitTokens =
+        usageAny.prompt_cache_hit_tokens ??
+        usageAny.prompt_tokens_details?.cached_tokens ??
+        usageAny.cached_tokens;
+      if (cacheHitTokens !== undefined) {
+        acc.usage.cacheRead = cacheHitTokens;
+        acc.usage.cacheHit = cacheHitTokens;
       }
       if (usageAny.prompt_cache_miss_tokens !== undefined) {
         acc.usage.cacheMiss = usageAny.prompt_cache_miss_tokens;
-      } else if (usageAny.prompt_cache_hit_tokens !== undefined && chunk.usage.prompt_tokens !== undefined) {
-        acc.usage.cacheMiss = Math.max(chunk.usage.prompt_tokens - usageAny.prompt_cache_hit_tokens, 0);
+      } else if (cacheHitTokens !== undefined && chunk.usage.prompt_tokens !== undefined) {
+        acc.usage.cacheMiss = Math.max(chunk.usage.prompt_tokens - cacheHitTokens, 0);
       }
       if (usageAny.completion_tokens_details?.reasoning_tokens !== undefined) {
         acc.usage.reasoning = usageAny.completion_tokens_details.reasoning_tokens;

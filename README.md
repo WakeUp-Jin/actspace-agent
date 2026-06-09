@@ -1,4 +1,6 @@
-# actspace
+<p align="center">
+  <img src="docs/assets/readme/actspace-agent-wordmark.png" alt="Actspace Agent" width="760">
+</p>
 
 `actspace` 是一个面向 Agent 协作开发的本地桌面工作台。
 

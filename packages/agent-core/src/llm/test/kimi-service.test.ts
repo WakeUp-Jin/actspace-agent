@@ -87,6 +87,51 @@ describe("KimiService", () => {
     expect(params.thinking).toEqual({ type: "disabled" });
   });
 
+  it("parses Kimi automatic prefix cache hits from prompt_tokens_details.cached_tokens", async () => {
+    const llm = new KimiService({ provider: "kimi", apiKey: "test-key", model: "kimi-k2.6" });
+    vi.spyOn(llm["client"].chat.completions, "create").mockResolvedValue(
+      createMockStream([
+        { choices: [{ delta: { content: "hi" }, finish_reason: "stop" }] },
+        {
+          choices: [],
+          usage: {
+            prompt_tokens: 3337,
+            completion_tokens: 388,
+            total_tokens: 3725,
+            cached_tokens: 1024,
+            prompt_tokens_details: { cached_tokens: 1024 },
+          },
+        },
+      ]) as any,
+    );
+
+    const result = await llm.complete(context);
+
+    expect(result.usage.cacheRead).toBe(1024);
+    expect(result.usage.cacheHit).toBe(1024);
+    // miss = prompt_tokens - cached = 3337 - 1024
+    expect(result.usage.cacheMiss).toBe(2313);
+  });
+
+  it("enables thinking and drops $web_search when thinking is turned on (mutually exclusive)", async () => {
+    const llm = new KimiService({ provider: "kimi", apiKey: "test-key", model: "kimi-k2.6" });
+    const createSpy = vi.spyOn(llm["client"].chat.completions, "create").mockResolvedValue(
+      createMockStream([
+        { choices: [{ delta: { reasoning_content: "let me think" }, finish_reason: null }] },
+        { choices: [{ delta: { content: "answer" }, finish_reason: "stop" }] },
+      ]) as any,
+    );
+
+    const result = await llm.complete(context, { thinkingEnabled: true });
+
+    const params = createSpy.mock.calls[0][0] as Record<string, unknown>;
+    expect(params.thinking).toEqual({ type: "enabled" });
+    // 开 thinking 时不挂 builtin $web_search。
+    expect(params.tools).toBeUndefined();
+    expect(result.content).toContainEqual({ type: "thinking", thinking: "let me think" });
+    expect(result.content).toContainEqual({ type: "text", text: "answer" });
+  });
+
   it("handles the $web_search echo-back loop internally without leaking it to the agent loop", async () => {
     const llm = new KimiService({ provider: "kimi", apiKey: "test-key", model: "kimi-k2.6" });
     const createSpy = vi.spyOn(llm["client"].chat.completions, "create")

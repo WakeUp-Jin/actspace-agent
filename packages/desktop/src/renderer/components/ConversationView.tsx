@@ -1,5 +1,5 @@
 import { Eye, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ContextUsageSnapshot, MessageBlock, ModelId } from "@actspace/shared";
 import { Composer, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { useRightPanel } from "./right-panel/RightPanelContext";
@@ -530,6 +530,10 @@ export function ConversationView({
   const turns = groupMessagesIntoTurns(messages);
   const isInitialComposer = isSessionReady && messages.length === 0 && !isStreaming;
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
+  // 是否「贴底自动跟随」：流式输出时保持视图贴底；用户向上滚动阅读历史则暂停，
+  // 滚回接近底部时恢复（类似 Cursor 的聊天滚动）。
+  const stickToBottomRef = useRef(true);
   const [activeTranscriptMessage, setActiveTranscriptMessage] = useState<AgentMessageBlock | null>(null);
   const { openTab } = useRightPanel();
   const openContextTab = () => openTab({ id: "context", kind: "context", title: "Context" });
@@ -543,8 +547,30 @@ export function ConversationView({
       return;
     }
 
+    // 发送新消息时强制回到底部并恢复自动跟随。
+    stickToBottomRef.current = true;
     bottomAnchorRef.current?.scrollIntoView({ block: "end" });
   }, [sendScrollRequestId]);
+
+  // 切换会话时重置为贴底状态，避免上一会话的「已上滚」状态影响新会话。
+  useEffect(() => {
+    stickToBottomRef.current = true;
+  }, [sessionId]);
+
+  // 用户滚动时判断是否贴底（距底 < 80px 视为贴底），决定是否继续自动跟随。
+  const handleMessagesScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }, []);
+
+  // 流式输出 / 消息增长时，若仍处于贴底状态则跟随滚动到底部。
+  useEffect(() => {
+    if (!stickToBottomRef.current) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages, isStreaming]);
 
   useEffect(() => {
     if (!activeTranscriptMessage) return;
@@ -556,7 +582,12 @@ export function ConversationView({
 
   return (
     <main className={CONVERSATION_SHELL_CLASS}>
-      <section className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS} aria-label="Conversation messages">
+      <section
+        ref={scrollContainerRef}
+        onScroll={handleMessagesScroll}
+        className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS}
+        aria-label="Conversation messages"
+      >
         {isInitialComposer ? (
           <div className={INITIAL_COMPOSER_STAGE_CLASS}>
             <Composer

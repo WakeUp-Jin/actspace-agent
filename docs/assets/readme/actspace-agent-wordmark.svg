@@ -1,0 +1,12 @@
+<svg width="2048" height="512" viewBox="0 0 2048 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title id="title">Actspace Agent</title>
+  <rect width="2048" height="512" fill="#ffffff"/>
+  <g transform="translate(177 136) scale(0.94)" fill="#000000">
+    <rect x="48" y="0" width="40" height="40"/>
+    <rect x="20" y="80" width="34" height="34"/>
+    <rect x="77" y="145" width="33" height="32"/>
+    <rect x="0" y="208" width="136" height="32"/>
+  </g>
+  <text x="440" y="330" fill="#000000" font-family="Georgia, 'Times New Roman', serif" font-size="190" font-weight="700">Actspace</text>
+  <text x="1410" y="330" fill="#000000" font-family="Georgia, 'Times New Roman', serif" font-size="190" font-weight="700">Agent</text>
+</svg>

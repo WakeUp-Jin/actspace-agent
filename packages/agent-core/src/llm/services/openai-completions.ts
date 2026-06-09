@@ -108,7 +108,11 @@ export class OpenAICompletionsService implements LLMService {
     const self = this;
     // 仅主 Agent 入口（stream(context)）对 Kimi 启用 builtin $web_search 内部循环；
     // streamMessages / streamWithBuiltinWebSearch 等 helper 路径保持原有单次行为。
-    const kimiWebSearch = self.config.provider === "kimi" && enableKimiBuiltinWebSearch;
+    const kimiMain = self.config.provider === "kimi" && enableKimiBuiltinWebSearch;
+    // Kimi `$web_search` 要求禁用 thinking，二者互斥：用户显式开 thinking 时优先 thinking，
+    // 不挂 web search；否则默认用 web search（thinking 关）。
+    const kimiThinking = kimiMain && options?.thinkingEnabled === true;
+    const kimiWebSearch = kimiMain && !kimiThinking;
 
     async function* generate() {
       const displayName = providerDisplayName(self.config.provider);
@@ -156,9 +160,12 @@ export class OpenAICompletionsService implements LLMService {
         if (requestTools.length > 0) {
           (requestParams as any).tools = requestTools;
         }
-        // 使用 $web_search 时 Kimi 要求禁用 thinking（见 platform.kimi.ai 文档）。
+        // 使用 $web_search 时 Kimi 要求禁用 thinking（见 platform.kimi.ai 文档）；
+        // 用户显式开 thinking 时给 Kimi 发 { type: "enabled" }（K2.6 思考走 reasoning_content）。
         if (kimiWebSearch) {
           (requestParams as any).thinking = { type: "disabled" };
+        } else if (kimiThinking) {
+          (requestParams as any).thinking = { type: "enabled" };
         } else if (options?.thinking) {
           (requestParams as any).thinking = options.thinking;
         } else if (options?.thinkingEnabled === false) {
