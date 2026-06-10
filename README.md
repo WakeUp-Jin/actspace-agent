@@ -13,7 +13,6 @@
   <a href="#许可证">MIT</a>
 </p>
 
-<!-- TODO: 主界面截图。建议：浅色主题、统一窗口尺寸、包含一次完整的工具执行流，2x 分辨率 -->
 <p align="center">
   <img src="docs/assets/readme/home.png" alt="Actspace 主界面" width="920">
 </p>
@@ -69,7 +68,6 @@ pnpm package:desktop   # 产物输出到 dist/
 
 ## 架构设计
 
-<!-- TODO: 自己这里使用excalidraw补充一张设计图，一个是从被动自主，工具自建出发，一个是总设计图 ，还有一个完整的执行循环，从用户输入开始，到最终输出-->
 <p align="center">
   <img src="docs/assets/readme/design-home.png" alt="Actspace" width="100%">
 </p>
@@ -97,6 +95,9 @@ pnpm package:desktop   # 产物输出到 dist/
 - [上下文管理](https://github.com/WakeUp-Jin/Practical-Guide-to-Context-Engineering/blob/main/docs/%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AE%A1%E7%90%86/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9%E8%B0%83%E5%BA%A6%EF%BC%9A%E5%B7%A5%E5%85%B7%E8%A3%81%E5%89%AA%E4%B8%8E%E5%8E%86%E5%8F%B2%E8%AE%B0%E5%BD%95%E5%8E%8B%E7%BC%A9.md)——目前的压缩机制主要是两种策略：工具输出的结果裁剪和压缩、会话历史记录的压缩
 
 ## 一些闲谈
+<p align="center">
+  <img src="docs/assets/readme/space-people (1).png" alt="Actspace" width="100%">
+</p>
 
 我很喜欢市面上的很多 Agent 产品，想法和设计都很棒。真心感谢每一个在背后付出的团队和开发者。
 
