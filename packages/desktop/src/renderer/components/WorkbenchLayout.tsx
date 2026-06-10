@@ -1,7 +1,8 @@
 import type { AppSettings, ContextState, ContextUsageSnapshot, DeepSeekBalanceSnapshot, KimiBalanceSnapshot, MessageBlock, ModelId, SessionListItem, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FlaskConical } from "lucide-react";
 import { ConversationView } from "./ConversationView";
-import { LabPage } from "./LabPage";
+import { PlaceholderView } from "./PlaceholderView";
 import { RightPanel } from "./RightPanel";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { RightPanelObjectMenu } from "./right-panel/RightPanelObjectMenu";
@@ -374,7 +375,20 @@ export function WorkbenchLayout({
 
   let mainContent;
   if (view === "lab") {
-    mainContent = <LabPage />;
+    // Lab 仍在产品设计阶段：原型实现保留在 LabPage.tsx，功能定型后换回 <LabPage />。
+    mainContent = (
+      <PlaceholderView
+        eyebrow="Lab"
+        title="Lab 功能正在开发中"
+        description="实验台用于沉淀 Agent 的假说、验证证据与能力产物。当前功能还在设计与开发中，暂未开放使用。"
+        bullets={[
+          "假说构建 → 实证验证 → 能力锻造 → 晋升评审的四阶段实验流",
+          "实验证据与产物的统一归档",
+          "已完成实验的回溯与复盘",
+        ]}
+        icon={<FlaskConical size={22} strokeWidth={1.9} />}
+      />
+    );
   } else if (view === "usage") {
     mainContent = (
       <UsageStatisticsPage
