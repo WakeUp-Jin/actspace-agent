@@ -126,6 +126,11 @@ export type ThinkingPayload = {
   content: string;
   durationMs?: number;
   collapsedByDefault?: boolean;
+  /**
+   * Provider 签名（Anthropic extended thinking）。重放时必须原样带回——
+   * anthropic-convert 只在 signature 存在时才把 thinking 块回发给 API。
+   */
+  signature?: string;
 };
 
 export type ToolCallPayload = {

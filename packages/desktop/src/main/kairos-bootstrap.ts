@@ -152,6 +152,14 @@ export function resolveKairosModelId(modelId: KairosModelId | null): string {
 }
 
 /**
+ * Kairos 上下文窗口真来源 = MODEL_REGISTRY 中所选模型的 contextWindow
+ * （DeepSeek 1M / Kimi K2.6 256K）。短期记忆加载预算 = contextWindow × loadBudgetRatio。
+ */
+export function resolveKairosContextWindow(modelId: KairosModelId | null): number {
+  return resolveKairosEnv(modelId, "auto").modelSpec.contextWindow;
+}
+
+/**
  * 给 controller 用的 ToolManager 工厂：
  * - 复用主 Agent 同款工具集（read_file / list_directory / grep / glob / write_file / edit_file_diff / bash 等）
  * - 把 `config.blocklist.toolsDenied` 加进 `disabledTools` → 不注册到 manager 上

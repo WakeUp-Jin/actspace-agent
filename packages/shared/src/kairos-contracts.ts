@@ -112,6 +112,7 @@ export type KairosControl =
 /** KairosEventTable 中一行的语义类型。 */
 export type KairosRowKind =
   | "tick"
+  | "thinking"
   | "tool"
   | "reply"
   | "sleep"

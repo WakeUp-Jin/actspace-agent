@@ -68,7 +68,8 @@ function stripFrontmatter(raw: string): string {
   return raw;
 }
 
-function autoTick(now: Date): { trigger: "auto"; content: string } {
-  const ts = now.toISOString().replace("T", " ").slice(0, 19);
-  return { trigger: "auto", content: `<tick>${ts}</tick>` };
+function autoTick(_now: Date): { trigger: "auto"; content: string } {
+  // auto tick 没有触发正文：时间戳 / 观测增量由 runner 的 assembleTickMessage
+  // 统一拼进 tick message，这里再带时间只会产生重复噪音。
+  return { trigger: "auto", content: "" };
 }

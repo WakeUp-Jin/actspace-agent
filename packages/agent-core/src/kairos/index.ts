@@ -16,11 +16,13 @@ export {
 export { KAIROS_SYSTEM_PROMPT } from "./prompt";
 export {
   assembleSystemPrompt,
+  assembleTickMessage,
   buildHistorySummary,
-  buildObservationSummary,
+  buildObservationDelta,
   derivePhase,
   type AssembleSystemPromptInput,
-  type BuildObservationSummaryInput,
+  type AssembleTickMessageInput,
+  type BuildObservationDeltaInput,
   type BuildHistorySummaryInput,
 } from "./prompt-assembler";
 export { loadKairosConfig, type KairosConfig } from "./config/loader";
@@ -60,15 +62,22 @@ export {
   type BriefTrigger,
 } from "./briefs/parser";
 export { compressKairosSegments } from "./compression/compressor";
+export {
+  KairosCompressionTrigger,
+  type KairosCompressionOutcome,
+  type KairosCompressionTriggerOptions,
+} from "./compression/trigger";
 export { sleepDefinition, sleepExecutor, registerKairosTools } from "./tools";
 export { aggregateKairosEvents, type KairosEventRow } from "./aggregator";
 export { resolveKairosEnv, resolveKairosModelSpec, DEFAULT_KAIROS_MODEL_ID, type KairosEnvConfig } from "./env";
 export {
   appendKairosInboxMessage,
+  commitKairosInboxReadCursor,
   defaultKairosInboxContent,
   ensureKairosInboxScaffolding,
   getKairosInboxDir,
   getKairosInboxFilePath,
+  loadKairosInboxReadCursor,
   loadKairosInboxSummary,
   KAIROS_INBOX_DIR,
   KAIROS_INBOX_MAX_CHARS_PER_FILE,
@@ -77,6 +86,7 @@ export {
   type AppendKairosInboxMessageInput,
   type KairosInboxFileSummary,
   type KairosInboxPriority,
+  type KairosInboxReadCursor,
   type KairosInboxSource,
   type KairosInboxSummary,
   type LoadKairosInboxSummaryInput,

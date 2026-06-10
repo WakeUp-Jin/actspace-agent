@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Bolt,
+  Brain,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -38,6 +39,7 @@ import {
   buildKairosStats,
   buildKairosUsageBadge,
   findKairosReplyText,
+  findKairosThinkingText,
   findKairosToolDetail,
   formatKairosDuration,
   formatKairosTime,
@@ -82,7 +84,7 @@ function useKairosUsageMode(): [KairosUsageBadgeMode, (mode: KairosUsageBadgeMod
   return [mode, setMode];
 }
 
-type DetailTab = "reply" | "tool";
+type DetailTab = "reply" | "tool" | "thinking";
 const EXECUTION_PAGE_SIZE = 10;
 const TRACE_SEGMENT_GAP_PX = 4;
 const TRACE_SEGMENT_BASE_PX = 20;
@@ -198,14 +200,17 @@ export function KairosPage() {
   const selectedReplyText = selectedRow?.kind === "reply" ? findKairosReplyText(k.selectedEvents) : "";
   const latestReplyText = latestReply.text;
   const selectedTool = selectedRow?.kind === "tool" ? findKairosToolDetail(k.selectedEvents) : null;
+  const selectedThinkingText = selectedRow?.kind === "thinking" ? findKairosThinkingText(k.selectedEvents) : "";
   const detail: DetailModel = {
     replyText: selectedReplyText || latestReplyText,
     tool: selectedTool,
+    thinkingText: selectedThinkingText,
   };
 
   useEffect(() => {
     if (selectedRow?.kind === "tool") setDetailTab("tool");
     if (selectedRow?.kind === "reply") setDetailTab("reply");
+    if (selectedRow?.kind === "thinking") setDetailTab("thinking");
   }, [selectedRow?.id, selectedRow?.kind]);
 
   useEffect(() => {
@@ -670,6 +675,8 @@ function KindIcon({ kind }: { kind: KairosEventRow["kind"] }) {
   switch (kind) {
     case "reply":
       return <MessageSquare size={size} aria-hidden="true" />;
+    case "thinking":
+      return <Brain size={size} aria-hidden="true" />;
     case "tool":
       return <Wrench size={size} aria-hidden="true" />;
     case "sleep":
@@ -745,10 +752,19 @@ function KairosDetailPanel(props: KairosDetailPanelProps) {
         >
           工具结果
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "thinking"}
+          className={cn(detailTabClass, tab === "thinking" && detailActiveTabClass)}
+          onClick={() => props.onTabChange("thinking")}
+        >
+          思考过程
+        </button>
       </div>
       <div className={detailToplineClass}>
         <h2 className="m-0 text-base font-semibold text-text-main">
-          {tab === "reply" ? "最终回复" : "工具结果"}
+          {tab === "reply" ? "最终回复" : tab === "tool" ? "工具结果" : "思考过程"}
         </h2>
         <div className={detailMetaClass}>
           <span>{selectedRow ? formatKairosTime(selectedRow.startedAt) : "最近一次回复"}</span>
@@ -764,8 +780,12 @@ function KairosDetailPanel(props: KairosDetailPanelProps) {
         <div className={detailReplyClass}>
           {detail.replyText ? detail.replyText : <span className={detailPlaceholderClass}>暂无最终回复</span>}
         </div>
-      ) : (
+      ) : tab === "tool" ? (
         <ToolResultView tool={detail.tool} />
+      ) : (
+        <div className={cn(detailReplyClass, "text-text-muted")}>
+          {detail.thinkingText ? detail.thinkingText : <span className={detailPlaceholderClass}>选择思考行后查看完整思考过程</span>}
+        </div>
       )}
     </aside>
   );
@@ -802,6 +822,7 @@ function ToolResultView({ tool }: { tool: KairosToolDetail | null }) {
 type DetailModel = {
   replyText: string;
   tool: KairosToolDetail | null;
+  thinkingText: string;
 };
 
 function visiblePages(current: number, total: number): number[] {

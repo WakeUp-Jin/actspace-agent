@@ -47,6 +47,7 @@
 - `agent-bash-policy-allowlist-design.md`：Bash 全局执行策略、会话级 allowlist 和真沙箱路线图。
 - `agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入边界。
 - `agent-kairos-autonomous-mode.md`：Kairos 自治模式设计。
+- `agent-kairos-prompt-cache-optimization.md`：Kairos prompt 缓存优化设计（静态前缀 + 动态尾部、观测增量化、thinking 落盘回放）。
 
 ## Front
 

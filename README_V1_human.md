@@ -20,9 +20,9 @@
 
 ## 什么是 Actspace
 
-Actspace 是一个为适配 DeepSeek 打造的本地 Agent 桌面应用。它不是聊天壳，而是把「模型读了什么、调用了什么工具、改了什么文件」全部摊开在你面前的工作台——上下文绝对可控，执行过程完全可视，所有数据落在本地。
+Actspace 是一个为适配 DeepSeek 打造的本地 Agent 桌面应用。其构建了一套Agent Harness，目的是让DeepSeek能够获取更多的上下文，做更多的事情
 
-它遵循三条原则：**简约优雅 · 上下文的绝对控制 · 为 DeepSeek 适配**（尤其是缓存利用，让成本低到可以忽略）。
+它遵循三条原则：**简约优雅 · 上下文的绝对控制 · 为 DeepSeek 适配**（尤其是缓存利用，降低成本）。
 
 ## 核心特性
 
@@ -52,22 +52,24 @@ pnpm package:desktop   # 产物输出到 dist/
 
 ## 截图
 
-<!-- TODO: 2x2 截图网格。建议四张：Kairos 监控页 / 工具执行流与权限审批 / Usage Statistics / 右侧 Review 与文件预览 -->
+<table>
+  <tr>
+    <td align="center"><img src="docs/assets/readme/kairos.png" width="100%" alt="Kairos 监控页"><br><sub>Kairos 自治监控</sub></td>
+    <td align="center"><img src="docs/assets/readme/tool-permission2.png" width="100%" alt="工具执行流"><br><sub>工具执行与审批</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/assets/readme/usage2.png" width="100%" alt="Usage 统计"><br><sub>Usage 与缓存统计</sub></td>
+    <td align="center"><img src="docs/assets/readme/file-prevoew2.png" width="100%" alt="文件预览"><br><sub>文件预览</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/assets/readme/context-controle.png" width="100%" alt="上下文控制"><br><sub>上下文控制与可视化</sub></td>
+    <td align="center"><img src="docs/assets/readme/review3.png" width="100%" alt="Review"><br><sub>Review</sub></td>
+  </tr>
+</table>
 
-| ![Kairos 监控页](docs/assets/readme/kairos.png) | ![工具执行流](docs/assets/readme/tool-permission2.png) |
-| :--: | :--: |
-| Kairos 自治监控 | 工具执行与审批 |
-
-| ![Usage 统计](docs/assets/readme/shot-usage.png) | ![文件预览与 Review](docs/assets/readme/file-preview.png) |
-| :--: | :--: |
-| Usage 与缓存统计 | 文件预览与 Review |
-
-| ![上下文控制与可视化](docs/assets/readme/context-controle.png) | ![Review](docs/assets/readme/shot-review.png) |
-| :--: | :--: |
-| 上下文控制与可视化 | Review |
 ## 架构设计
 
-<!-- TODO: 自己这里使用excalidraw补充一张设计图，一个是从被动自主，工具自建出发，一个是总设计图 -->
+<!-- TODO: 自己这里使用excalidraw补充一张设计图，一个是从被动自主，工具自建出发，一个是总设计图 ，还有一个完整的执行循环，从用户输入开始，到最终输出-->
 
 所有架构事实与设计决策都以文档形式版本化在仓库里：
 
@@ -81,13 +83,15 @@ pnpm package:desktop   # 产物输出到 dist/
 
 ## 想说的话
 
-市面上的很多 Agent 产品，想法和设计都很棒。真心感谢每一个在背后默默付出的团队和开发者。
+我很喜欢市面上的很多 Agent 产品，想法和设计都很棒。真心感谢每一个在背后付出的团队和开发者。
 
-大模型应用还在快速发展，我一直希望有一个可以随时构建、完全按照自己想法生长的东西。DeepSeek 的成本足够低、理念足够纯粹，让我可以放心地围绕模型去构建应用，而不必担心模型的成本、真实性和可靠性。作为一个应用工程师，这让我很舒服——不用担心源头，只专注于这种力量的应用与构建。
+大模型应用还在快速发展，我特别希望有一个能够按照我自己想法构建的东西。
 
-这个应用还有很多不足。但我相信随着日常使用，bug 会被修复，新功能会自然长出来。无论它如何变化，我都希望为它守住三件事：
+DeepSeek 的成本很低并且理念很好，让我可以放心地围绕模型去构建应用，而不必担心模型的成本、真实性和可靠性。让我这个工程师很安心，不用担心源头，而专注于这种力量的应用构建。
+   
+这个应用有很多的不足，但是我相信随着日常的使用，许多bug会被修复，许多新功能会产生，会完善，无论应用如何变化，我希望可以为这个应用保持**简约优雅，执行可视化，上下文可控性**
 
-<p align="center"><b>简约优雅 · 执行可视化 · 上下文可控</b></p>
+<hr/>
 
 <p align="center">「不诱于誉，不恐于诽，率道而行，端然正己。」</p>
 

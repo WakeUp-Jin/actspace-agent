@@ -31,3 +31,4 @@
 ## 自治模式
 
 - `agent-kairos-autonomous-mode.md`：Kairos 自治模式设计，约束独立 prompt、短期记忆、tick 调度、IPC 契约和事件流页面边界。
+- `agent-kairos-prompt-cache-optimization.md`：Kairos prompt 缓存优化设计，约束「静态前缀 + 动态尾部」上下文形态、观测增量化、thinking 落盘回放与 contextWindow 来源。

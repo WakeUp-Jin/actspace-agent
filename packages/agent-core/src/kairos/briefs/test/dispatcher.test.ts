@@ -29,10 +29,11 @@ afterEach(async () => {
 });
 
 describe("BriefsDispatcher.pickNext", () => {
-  it("returns auto tick when no briefs are active", async () => {
+  it("returns auto tick with empty content when no briefs are active", async () => {
     const res = await dispatcher.pickNext(new Date("2026-05-27T10:00:00.000Z"));
     expect(res.trigger).toBe("auto");
-    if (res.trigger === "auto") expect(res.content).toMatch(/^<tick>2026-05-27/);
+    // auto tick 无触发正文：时间 / 观测增量由 runner 的 assembleTickMessage 统一拼装
+    if (res.trigger === "auto") expect(res.content).toBe("");
   });
 
   it("returns brief content when one is due", async () => {

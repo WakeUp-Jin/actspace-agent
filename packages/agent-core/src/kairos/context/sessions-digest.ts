@@ -17,6 +17,12 @@ export interface SessionsDigestResult {
     sessions: SessionDigestItem[];
   }>;
   generatedAt: string;
+  /**
+   * 本次计算观察到的最新 turn 游标（sessionId → lastTurnId）。
+   * 由调用方在 tick 正常闭合后传给 `commitCursor` 持久化；
+   * 失败 tick 不提交 → 下个 tick 重新看到同一批未读。
+   */
+  cursor: Record<string, string>;
 }
 
 const PREVIEW_MAX = 80;
@@ -43,14 +49,20 @@ export class SessionsDigestBuilder {
     this.outputFile = opts.outputFile;
   }
 
+  /**
+   * 只读计算 digest：基于已持久化的游标算未读数，**不**推进游标。
+   * 观察到的最新 turn 写进 `result.cursor`，由调用方在 tick 正常闭合后
+   * 调 `commitCursor(result.cursor)` 持久化。
+   */
   async refresh(): Promise<SessionsDigestResult> {
     const state = await this.loadState();
+    const cursor: Record<string, string> = {};
     const workspaces: SessionsDigestResult["workspaces"] = [];
 
     for (const entry of this.paths.paths) {
       // 不挑食策略：每个 paths.path 都尝试当 sessions root；
       // 子目录不含 session.jsonl 则忽略，不报错。
-      const sessions = await this.discoverSessionsUnder(entry.path, state);
+      const sessions = await this.discoverSessionsUnder(entry.path, state, cursor);
       if (sessions.length > 0) {
         workspaces.push({ rootPath: entry.path, sessions });
       }
@@ -59,22 +71,31 @@ export class SessionsDigestBuilder {
     const result: SessionsDigestResult = {
       workspaces,
       generatedAt: new Date().toISOString(),
+      cursor,
     };
 
-    await this.saveState(state);
     await this.writeOutput(result);
 
     return result;
   }
 
+  /** 把一次 refresh 观察到的游标合并进 state 文件（tick 正常闭合后调用）。 */
+  async commitCursor(cursor: Record<string, string>): Promise<void> {
+    if (Object.keys(cursor).length === 0) return;
+    const state = await this.loadState();
+    Object.assign(state.lastSeenTurnId, cursor);
+    await this.saveState(state);
+  }
+
   private async discoverSessionsUnder(
     root: string,
     state: KairosSessionsState,
+    cursor: Record<string, string>,
   ): Promise<SessionDigestItem[]> {
     const subdirs = await this.safeListDirs(root);
     const result: SessionDigestItem[] = [];
     for (const subdir of subdirs) {
-      const item = await this.readSessionDigest(subdir, state);
+      const item = await this.readSessionDigest(subdir, state, cursor);
       if (item) result.push(item);
     }
     return result;
@@ -83,6 +104,7 @@ export class SessionsDigestBuilder {
   private async readSessionDigest(
     sessionRoot: string,
     state: KairosSessionsState,
+    cursor: Record<string, string>,
   ): Promise<SessionDigestItem | null> {
     const jsonlPath = join(sessionRoot, "session.jsonl");
     const metaPath = join(sessionRoot, "meta.json");
@@ -119,7 +141,7 @@ export class SessionsDigestBuilder {
         : observedTurns.length - observedTurns.indexOf(lastSeen) - 1
       : observedTurns.length;
 
-    if (lastTurnId) state.lastSeenTurnId[sessionId] = lastTurnId;
+    if (lastTurnId) cursor[sessionId] = lastTurnId;
 
     return {
       id: sessionId,

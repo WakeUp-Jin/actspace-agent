@@ -86,6 +86,7 @@ import {
   createKairosLlm,
   createKairosToolManagerFactory,
   getKairosWorkspaceRoot,
+  resolveKairosContextWindow,
   resolveKairosModelId,
   resolveKairosThinkingEnabled,
   ensureKairosScaffolding,
@@ -710,12 +711,13 @@ async function ensureKairosController(roots: AppDataRoots): Promise<KairosContro
     workspaceRoot: kairosWorkspaceRoot,
     modelId: preferredModelId,
   });
+  const contextWindow = resolveKairosContextWindow(preferredModelId);
   kairosController = await createKairos({
     kairosRoot,
     llm,
     modelId: resolvedModelId,
     toolManagerFactory,
-    contextWindow: 32_000,
+    contextWindow,
     thinkingEnabled,
   });
   kairosIpcHandle = registerKairosIpc({

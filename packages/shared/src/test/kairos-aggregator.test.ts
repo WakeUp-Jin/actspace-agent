@@ -4,6 +4,7 @@ import type { KairosRowKind } from "../kairos-contracts";
 import {
   makeAssistantReply,
   makeError,
+  makeThinking,
   makeLlmUsage,
   makeSleepEnd,
   makeSleepInterrupted,
@@ -39,6 +40,23 @@ describe("aggregateKairosEvents", () => {
     expect(tool!.relatedEventIds).toHaveLength(2);
     expect(tool!.summary).toContain("read_file");
     expect(tool!.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("renders thinking events as standalone thinking rows attached to the tick", () => {
+    resetFixtureCounter();
+    const events = [
+      makeTickInjected(),
+      makeThinking({ content: "先看看 sessions 有没有新东西。", signature: "sig_x" }),
+      makeAssistantReply({ content: "没有新增任务。" })
+    ];
+    const rows = aggregateKairosEvents(events);
+    expect(kinds(rows)).toContain("thinking");
+    const thinking = rows.find((r) => r.kind === "thinking");
+    expect(thinking?.summary).toContain("先看看 sessions");
+    expect(thinking?.status).toBe("success");
+    // thinking 事件 id 计入所在 tick 行的 relatedEventIds
+    const tick = rows.find((r) => r.kind === "tick");
+    expect(tick?.relatedEventIds).toContain(thinking?.id);
   });
 
   it("marks tool row as running when tool_result is missing", () => {

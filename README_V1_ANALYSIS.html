@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>README V1 分析报告 — Actspace</title>
+<style>
+  :root {
+    --ink: #1a1815;
+    --ink-soft: #5c574e;
+    --ink-faint: #8a8478;
+    --paper: #faf8f4;
+    --card: #ffffff;
+    --line: #e6e1d7;
+    --accent: #2456e6;
+    --accent-soft: #eef2fe;
+    --good: #1a7f4e;
+    --good-soft: #e8f5ee;
+    --warn: #b4690e;
+    --warn-soft: #fdf3e4;
+    --bad: #c0392b;
+    --bad-soft: #fbeae8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
+    line-height: 1.75; font-size: 15px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 64px 32px 96px; }
+
+  .kicker { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 14px; }
+  h1 { font-family: "Songti SC", "Noto Serif CJK SC", Georgia, serif; font-size: 36px; line-height: 1.3; font-weight: 700; }
+  .lede { color: var(--ink-soft); margin-top: 16px; max-width: 680px; font-size: 16px; }
+  .meta { margin-top: 20px; font-size: 12.5px; color: var(--ink-faint); display: flex; gap: 18px; }
+  hr.rule { border: none; border-top: 1px solid var(--line); margin: 48px 0; }
+
+  section { margin-top: 56px; }
+  .sec-num { font-family: Georgia, serif; font-style: italic; color: var(--accent); font-size: 15px; margin-bottom: 4px; }
+  h2 { font-family: "Songti SC", "Noto Serif CJK SC", Georgia, serif; font-size: 25px; font-weight: 700; margin-bottom: 18px; }
+  h3 { font-size: 16px; font-weight: 600; margin: 28px 0 10px; }
+  p { margin-bottom: 12px; color: var(--ink-soft); }
+  p strong, li strong, td strong { color: var(--ink); }
+  code { font-family: "SF Mono", Menlo, monospace; font-size: 12.5px; background: #f1ede4; padding: 2px 6px; border-radius: 4px; color: #6b3f12; }
+  pre {
+    background: #211e19; color: #e8e3d8; border-radius: 10px; padding: 18px 20px;
+    overflow-x: auto; margin: 14px 0; font-size: 12.5px; line-height: 1.65;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+  pre .cm { color: #8a8478; }
+  pre .hl { color: #7ea6ff; }
+
+  /* verdict banner */
+  .verdict {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 24px 0;
+  }
+  .v-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }
+  .v-card .v-label { font-size: 11.5px; letter-spacing: 0.08em; color: var(--ink-faint); font-weight: 600; }
+  .v-card .v-score { font-family: Georgia, serif; font-size: 30px; font-weight: 700; margin-top: 4px; }
+  .v-card .v-note { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; }
+  .s-good { color: var(--good); } .s-warn { color: var(--warn); } .s-bad { color: var(--bad); }
+
+  /* callouts */
+  .callout { border-radius: 10px; padding: 16px 20px; margin: 16px 0; font-size: 13.5px; }
+  .callout .ct { font-weight: 700; font-size: 13px; letter-spacing: 0.04em; margin-bottom: 6px; }
+  .c-bad { background: var(--bad-soft); border: 1px solid #f2d3cf; }
+  .c-bad .ct { color: var(--bad); }
+  .c-warn { background: var(--warn-soft); border: 1px solid #f0dcbd; }
+  .c-warn .ct { color: var(--warn); }
+  .c-good { background: var(--good-soft); border: 1px solid #cde8da; }
+  .c-good .ct { color: var(--good); }
+  .c-idea { background: var(--accent-soft); border: 1px solid #d7e1fb; }
+  .c-idea .ct { color: var(--accent); }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 13.5px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th { text-align: left; padding: 11px 16px; background: #f4f1e9; font-size: 12px; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 600; }
+  td { padding: 11px 16px; border-top: 1px solid #f3f0e8; vertical-align: top; }
+  .pill { display: inline-block; font-size: 11px; padding: 1px 9px; border-radius: 99px; font-weight: 600; white-space: nowrap; }
+  .p-good { background: var(--good-soft); color: var(--good); }
+  .p-warn { background: var(--warn-soft); color: var(--warn); }
+  .p-bad { background: var(--bad-soft); color: var(--bad); }
+
+  /* shot review */
+  .shot { display: grid; grid-template-columns: 300px 1fr; gap: 20px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin: 14px 0; align-items: start; }
+  .shot img { width: 100%; border-radius: 6px; border: 1px solid var(--line); display: block; }
+  .shot .sh-name { font-weight: 700; font-size: 14px; }
+  .shot .sh-name code { font-size: 11.5px; }
+  .shot .sh-body { font-size: 13.5px; color: var(--ink-soft); margin-top: 6px; }
+  .shot .missing {
+    width: 100%; aspect-ratio: 1.713; border: 1.5px dashed var(--bad); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; color: var(--bad);
+    font-size: 13px; background: var(--bad-soft);
+  }
+
+  ul.fix { list-style: none; margin: 14px 0; counter-reset: fx; }
+  ul.fix li { padding: 9px 0 9px 38px; position: relative; font-size: 13.5px; color: var(--ink-soft); border-bottom: 1px dashed var(--line); }
+  ul.fix li:last-child { border-bottom: none; }
+  ul.fix li::before {
+    counter-increment: fx; content: counter(fx);
+    position: absolute; left: 0; top: 9px; width: 24px; height: 24px;
+    background: var(--accent-soft); color: var(--accent); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; font-family: Georgia, serif;
+  }
+
+  footer { margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-faint); }
+  @media (max-width: 720px) {
+    .verdict { grid-template-columns: 1fr; }
+    .shot { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="kicker">Actspace · README V1 (human)</div>
+  <h1>分析报告：内容已经立住了，<br>问题集中在「卫生层」</h1>
+  <p class="lede">针对 <code>README_V1_human.md</code> 的逐项分析：图片为什么不整齐（已定位根因）、六张截图逐张点评、文字细节清单，以及给出可直接粘贴的修复代码。</p>
+  <div class="meta"><span>2026-06-10</span><span>对比基线：README_V0</span></div>
+
+  <div class="verdict">
+    <div class="v-card">
+      <div class="v-label">结构与内容</div>
+      <div class="v-score s-good">A−</div>
+      <div class="v-note">骨架完整，「想说的话」比 V0 更有人味，致谢更真诚</div>
+    </div>
+    <div class="v-card">
+      <div class="v-label">截图质量</div>
+      <div class="v-score s-warn">B</div>
+      <div class="v-note">尺寸全部一致是亮点；1 张缺失、1 张空状态、Usage 未拍</div>
+    </div>
+    <div class="v-card">
+      <div class="v-label">细节卫生</div>
+      <div class="v-score s-bad">C+</div>
+      <div class="v-note">错别字、标点、空格、大小写问题约 10 处，发布前必须清</div>
+    </div>
+  </div>
+
+  <hr class="rule">
+
+  <!-- ================= 1 ================= -->
+  <section>
+    <div class="sec-num">No. 1</div>
+    <h2>图片不整齐：根因诊断</h2>
+    <p>先说结论：<strong>不是图片比例的问题。</strong>我测了所有在用截图的实际尺寸：</p>
+    <table>
+      <tr><th>文件</th><th>尺寸</th><th>宽高比</th><th>状态</th></tr>
+      <tr><td><code>home.png</code></td><td>2940 × 1716</td><td>1.713</td><td><span class="pill p-good">一致</span></td></tr>
+      <tr><td><code>kairos.png</code></td><td>2940 × 1716</td><td>1.713</td><td><span class="pill p-good">一致</span></td></tr>
+      <tr><td><code>tool-permission2.png</code></td><td>2940 × 1716</td><td>1.713</td><td><span class="pill p-good">一致</span></td></tr>
+      <tr><td><code>shot-usage.png</code></td><td>—</td><td>—</td><td><span class="pill p-bad">文件不存在</span></td></tr>
+      <tr><td><code>file-preview.png</code></td><td>2940 × 1716</td><td>1.713</td><td><span class="pill p-good">一致</span></td></tr>
+      <tr><td><code>context-controle.png</code></td><td>2940 × 1716</td><td>1.713</td><td><span class="pill p-good">一致</span></td></tr>
+      <tr><td><code>review3.png</code></td><td>2940 × 1716</td><td>1.713</td><td><span class="pill p-good">一致</span></td></tr>
+    </table>
+    <p>截图工作做得很标准——七张图全部同一窗口尺寸、同一比例。「一大一小」来自下面两个排版层的问题：</p>
+
+    <div class="callout c-bad">
+      <div class="ct">根因 ① — shot-usage.png 是 404</div>
+      README 第 61 行引用了 <code>docs/assets/readme/shot-usage.png</code>（V0 的占位名），但目录里没有这个文件。渲染时左格只剩一个很小的裂图图标，右边的 <code>file-preview.png</code> 正常撑满半格——这一行就成了「一小一大」。<strong>补拍 Usage 页截图，或先把这一行换成已有的图。</strong>
+    </div>
+
+    <div class="callout c-warn">
+      <div class="ct">根因 ② — 三个独立表格，列宽各自为政</div>
+      三行截图写成了三个被空行隔开的表格。GitHub 的表格列宽由内容自适应：每个表格根据自己题注文字的长度分配列宽（「上下文控制与可视化」就比「Kairos 自治监控」宽），于是<strong>不同表格之间图片宽度对不齐</strong>。另外第 67 行表格和 <code>## 架构设计</code> 之间没有空行，标题有解析风险。
+    </div>
+
+    <h3>修复方案 A：合并为一个表格（最简单）</h3>
+    <p>六张图放进同一个表格，列宽全局统一，一处对齐处处对齐：</p>
+<pre><code><span class="cm">&lt;!-- 同一表格内，GitHub 会统一两列宽度 --&gt;</span>
+| ![Kairos 监控页](docs/assets/readme/kairos.png) | ![工具执行流](docs/assets/readme/tool-permission2.png) |
+| :--: | :--: |
+| <span class="hl">Kairos 自治监控</span> | <span class="hl">工具执行与审批</span> |
+| ![Usage 统计](docs/assets/readme/usage.png) | ![文件预览](docs/assets/readme/file-preview.png) |
+| <span class="hl">Usage 与缓存统计</span> | <span class="hl">文件预览</span> |
+| ![上下文控制](docs/assets/readme/context-controle.png) | ![Review](docs/assets/readme/review3.png) |
+| <span class="hl">上下文控制与可视化</span> | <span class="hl">Review</span> |
+</code></pre>
+    <p style="font-size:13px;">注意：markdown 表格里「图行」和「题注行」交替时，第二行之后的图会被当成普通单元格内容——效果仍然正确，但严格说表头分隔线 <code>| :--: |</code> 只能出现一次，所以这种写法把第一行图当表头。介意的话用方案 B。</p>
+
+    <h3>修复方案 B：HTML 表格 + 百分比宽度（最稳，推荐）</h3>
+    <p>GitHub 允许 <code>&lt;img width&gt;</code> 属性，用 <code>width="49%"</code> 强制每张图等宽，彻底摆脱表格列宽的不确定性：</p>
+<pre><code>&lt;table&gt;
+  &lt;tr&gt;
+    &lt;td align="center"&gt;&lt;img src="docs/assets/readme/kairos.png" <span class="hl">width="100%"</span> alt="Kairos 监控页"&gt;&lt;br&gt;&lt;sub&gt;Kairos 自治监控&lt;/sub&gt;&lt;/td&gt;
+    &lt;td align="center"&gt;&lt;img src="docs/assets/readme/tool-permission2.png" <span class="hl">width="100%"</span> alt="工具执行流"&gt;&lt;br&gt;&lt;sub&gt;工具执行与审批&lt;/sub&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td align="center"&gt;&lt;img src="docs/assets/readme/usage.png" width="100%" alt="Usage 统计"&gt;&lt;br&gt;&lt;sub&gt;Usage 与缓存统计&lt;/sub&gt;&lt;/td&gt;
+    &lt;td align="center"&gt;&lt;img src="docs/assets/readme/file-preview.png" width="100%" alt="文件预览"&gt;&lt;br&gt;&lt;sub&gt;文件预览&lt;/sub&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td align="center"&gt;&lt;img src="docs/assets/readme/context-controle.png" width="100%" alt="上下文控制"&gt;&lt;br&gt;&lt;sub&gt;上下文控制与可视化&lt;/sub&gt;&lt;/td&gt;
+    &lt;td align="center"&gt;&lt;img src="docs/assets/readme/review3.png" width="100%" alt="Review"&gt;&lt;br&gt;&lt;sub&gt;Review&lt;/sub&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/table&gt;</code></pre>
+    <p style="font-size:13px;">HTML 表格的两列天然各占 50%，<code>width="100%"</code> 让图撑满单元格；<code>&lt;sub&gt;</code> 题注比表格行更轻盈。题注长短不再影响图片宽度。</p>
+  </section>
+
+  <!-- ================= 2 ================= -->
+  <section>
+    <div class="sec-num">No. 2</div>
+    <h2>截图逐张点评</h2>
+
+    <div class="shot">
+      <img src="docs/assets/readme/home.png" alt="home">
+      <div>
+        <div class="sh-name">home.png — Hero 主图 <span class="pill p-good">很好</span></div>
+        <div class="sh-body">三栏同框：左侧会话栏、中间带 Thinking + 工具读取流的消息、右侧渐进式渲染。一张图同时演示了「执行可视化」和工作台形态，完全符合「代表作场景」的要求。内容也有巧思——让 Agent 介绍项目自己的设计，自指且真实。</div>
+      </div>
+    </div>
+
+    <div class="shot">
+      <img src="docs/assets/readme/kairos.png" alt="kairos">
+      <div>
+        <div class="sh-name">kairos.png — Kairos 监控页 <span class="pill p-good">很好</span></div>
+        <div class="sh-body">运行轨迹色带、事件表、成本（¥0.03）、睡眠状态都在，是六张里信息密度最高的一张，「主动 Agent」的卖点立得住。</div>
+      </div>
+    </div>
+
+    <div class="shot">
+      <img src="docs/assets/readme/tool-permission2.png" alt="tool-permission2">
+      <div>
+        <div class="sh-name">tool-permission2.png — 工具执行与审批 <span class="pill p-good">切题</span></div>
+        <div class="sh-body">Bash 审批面板（Allow / Run / Skip + Allowlist）和右侧 Context 面板同框，一图覆盖「审批」和「上下文可见」两个点。小瑕疵：右侧 Context 面板和 context-controle.png 内容重复，两张图区分度略低。</div>
+      </div>
+    </div>
+
+    <div class="shot">
+      <div class="missing">shot-usage.png — 文件不存在（404）</div>
+      <div>
+        <div class="sh-name">shot-usage.png — Usage 统计 <span class="pill p-bad">缺失</span></div>
+        <div class="sh-body">这是「一大一小」的直接原因。Usage 页是「为 DeepSeek 而生 / 缓存命中」卖点的唯一视觉证据，<strong>建议优先补拍</strong>：拍出缓存命中率和成本数字的页面，文件名建议 <code>usage.png</code>（与其他命名风格一致，去掉 V0 的 shot- 前缀）。</div>
+      </div>
+    </div>
+
+    <div class="shot">
+      <img src="docs/assets/readme/file-preview.png" alt="file-preview">
+      <div>
+        <div class="sh-name">file-preview.png — 文件预览 <span class="pill p-warn">建议重拍</span></div>
+        <div class="sh-body">右侧文件树 + Markdown 渲染本身不错，但中间是 New chat 空状态，画面左 2/3 基本是空白，是六张里唯一「没有故事」的一张。建议在一个有对话内容的会话里重拍，或者直接换成右侧面板的特写。</div>
+      </div>
+    </div>
+
+    <div class="shot">
+      <img src="docs/assets/readme/context-controle.png" alt="context-controle">
+      <div>
+        <div class="sh-name">context-controle.png — 上下文控制 <span class="pill p-good">最有说服力</span></div>
+        <div class="sh-body">Context 弹窗（1% Full、token 分项统计）+ 右侧 Context 面板同框，是「上下文绝对控制」的最佳证据，甚至比 hero 图更能体现产品差异。小问题：文件名拼写 <code>controle</code> → 建议改为 <code>context-control.png</code>。</div>
+      </div>
+    </div>
+
+    <div class="shot">
+      <img src="docs/assets/readme/review3.png" alt="review3">
+      <div>
+        <div class="sh-name">review3.png — Review <span class="pill p-good">切题</span></div>
+        <div class="sh-body">右侧 35 Uncommitted Changes + diff 统计（+1764 −409），「本地可追溯」立住了。注意：<code>review.png</code>（1920×1050，比例 1.829）和 <code>review2.png</code> 没有被引用，属于遗留文件，建议删除，避免仓库里堆积废图。</div>
+      </div>
+    </div>
+
+    <div class="callout c-warn">
+      <div class="ct">⚠ 体积提醒</div>
+      七张图单张 540KB–980KB，总计约 5.2MB。GitHub 会走 CDN 但首屏加载仍然偏重，建议全部过一遍 oxipng / tinypng，目标单张 ≤ 300KB。另外可以考虑给 hero 图加外边框圆角阴影版本，或保持现状——目前的原生窗口阴影已经够干净。
+    </div>
+  </section>
+
+  <!-- ================= 3 ================= -->
+  <section>
+    <div class="sec-num">No. 3</div>
+    <h2>文字细节清单</h2>
+    <p>内容判断都对，以下是发布前要清的「卫生层」问题，按行号列出：</p>
+    <table>
+      <tr><th style="width:64px;">行号</th><th>问题</th><th>建议</th></tr>
+      <tr><td>23</td><td>「其构建了一套Agent Harness，目的是让Deepseek能够获取更多的上下文，做更多的事情」</td><td>① <code>Deepseek</code> → <code>DeepSeek</code>（全文统一）；② 中英文之间加空格「一套 Agent Harness」；③ 句尾补句号；④ 「其构建了」开头较生硬，可改为「它构建了一套 Agent Harness，让 DeepSeek 获得更多上下文、做更多的事情。」</td></tr>
+      <tr><td>63</td><td>题注「文件预览」后少了空格：<code>文件预览|</code></td><td>格式统一为 <code>| 文件预览 |</code></td></tr>
+      <tr><td>67–68</td><td>表格和 <code>## 架构设计</code> 之间没有空行</td><td>补一个空行，避免解析歧义</td></tr>
+      <tr><td>88</td><td>「这让我一个应用工程师很安心」</td><td>「让我这个应用工程师很安心」更顺口</td></tr>
+      <tr><td>89</td><td>行尾有多余的尾随空格</td><td>删除</td></tr>
+      <tr><td>90</td><td>「许多bug会被修复」「上下文可控性**」句尾无标点</td><td>① <code>bug</code> 前后加空格「许多 bug 会被修复」；② 句尾补句号；③ 这一句较长，可拆成两句</td></tr>
+      <tr><td>99–100</td><td>致谢两条用了 <code>--</code> 而第 98 条用 <code>——</code></td><td>统一为 <code>——</code>，破折号前后格式对齐</td></tr>
+      <tr><td>102</td><td>「Linux.Do社区佬友们的公益站……」单独成条但无链接、与上一条部分重复</td><td>可与 101 行合并为一条：「[Linux.Do 社区](https://linux.do/latest)——真诚、友善、团结、专业；佬友们公益站的充足 Token，让本项目得以 Agent 原生开发、快速构建。」</td></tr>
+    </table>
+
+    <div class="callout c-warn">
+      <div class="ct">⚠ 致谢里少了两个不该少的名字</div>
+      ① <strong>DeepSeek</strong>——整个 README 都在讲「为 DeepSeek 打造」，tagline、三原则、特性都围绕它，致谢里却没有它，逻辑上说不过去，建议放回第一条。② <strong>harness-template</strong>——现行 README 写明它是「本项目早期骨架来源」，从致谢中移除对原作者不太厚道（你新加的 code-develop-harness-init 如果是它的继承者，可以在同一条里说明渊源）。
+    </div>
+
+    <div class="callout c-good">
+      <div class="ct">✓ 这版改得好的地方</div>
+      ① 「想说的话」回到了你自己的口吻，「我特别希望有一个能够按照我自己想法构建的东西」比 V0 的修饰版更真；② 引文前加 <code>&lt;hr/&gt;</code> 分隔，仪式感更好；③ 致谢加入 Linux.Do 和自己的方法论项目，个人项目的致谢就该这样具体；④ 架构图改用 excalidraw 手绘的决定正确——手绘图比代码块依赖图更有温度，和「手写 README」的气质一致。
+    </div>
+  </section>
+
+  <!-- ================= 4 ================= -->
+  <section>
+    <div class="sec-num">No. 4</div>
+    <h2>发布前待办（按优先级）</h2>
+    <ul class="fix">
+      <li><strong>补拍 Usage 页截图</strong>，命名 <code>usage.png</code>，更新第 61 行引用——这一步直接解决「一大一小」。</li>
+      <li><strong>截图区改用方案 B 的 HTML 表格</strong>（或方案 A 合并表格），列宽永久统一。</li>
+      <li><strong>重拍 file-preview.png</strong>：换一个有内容的会话，避免空状态画面。</li>
+      <li><strong>清理文字细节</strong>：按第 3 节清单逐行修复（约 10 处）。</li>
+      <li><strong>致谢补回 DeepSeek 和 harness-template</strong>。</li>
+      <li><strong>清理图片资产</strong>：删除未引用的 <code>review.png</code>、<code>review2.png</code>；<code>context-controle.png</code> 改名 <code>context-control.png</code>（同步更新引用）；全部压缩至 ≤ 300KB。</li>
+      <li><strong>画 excalidraw 架构图</strong>：建议就画你说的那张「被动/主动 × 被添加/自构建」四象限图——它是你独有的产品语言，比模块框图更值得放 README。</li>
+      <li>定稿后：<code>README_V1_human.md</code> 合入 <code>README.md</code>，删除 V0/V1 草稿和分析文件，按 HISTORY_GUIDE 补一条变更记录。</li>
+    </ul>
+  </section>
+
+  <footer>
+    README_V1_ANALYSIS.html — 工作草稿，定稿后可删除。图片直接引用 docs/assets/readme/ 相对路径，请将本文件保留在仓库根目录下打开以正常显示截图。
+  </footer>
+
+</div>
+</body>
+</html>

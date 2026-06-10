@@ -12,6 +12,8 @@ export interface CompressKairosSegmentsInput {
   kind: CompressionKind;
   rangeLabel: string;
   llm: LLMService;
+  /** controller shutdown 时中断在飞的压缩 LLM 调用。 */
+  signal?: AbortSignal;
 }
 
 export interface CompressKairosSegmentsOutput {
@@ -45,7 +47,7 @@ export async function compressKairosSegments(
     ],
   };
 
-  const reply = await input.llm.complete(context);
+  const reply = await input.llm.complete(context, { signal: input.signal });
   const text = getTextContent(reply);
   return { markdown: text };
 }

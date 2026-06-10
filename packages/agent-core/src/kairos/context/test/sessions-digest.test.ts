@@ -66,13 +66,19 @@ describe("SessionsDigestBuilder", () => {
     expect(s1.title).toBe("First");
   });
 
-  it("counts all turns as unread on first refresh, zero on second", async () => {
+  it("counts all turns as unread until cursor is committed", async () => {
     await writeSession("s1", [
       { type: "user_message", turnId: "t-1", payload: { content: "one" } },
       { type: "assistant_message", turnId: "t-1", payload: { content: "ok" } },
     ]);
     const first = await builder.refresh();
     expect(first.workspaces[0].sessions[0].unreadTurnsForKairos).toBe(1);
+
+    // 计算/提交分离：未提交游标时再次 refresh，未读不变（失败 tick 不丢增量）
+    const recompute = await builder.refresh();
+    expect(recompute.workspaces[0].sessions[0].unreadTurnsForKairos).toBe(1);
+
+    await builder.commitCursor(first.cursor);
     const second = await builder.refresh();
     expect(second.workspaces[0].sessions[0].unreadTurnsForKairos).toBe(0);
   });
@@ -81,7 +87,8 @@ describe("SessionsDigestBuilder", () => {
     await writeSession("s1", [
       { type: "user_message", turnId: "t-1", payload: { content: "one" } },
     ]);
-    await builder.refresh();                         // Kairos 已读 t-1
+    const first = await builder.refresh();
+    await builder.commitCursor(first.cursor);        // tick 闭合：Kairos 已读 t-1
     // append a new turn
     const jsonlPath = join(sessionsRoot, "s1", "session.jsonl");
     const more = `\n${JSON.stringify({ id: "ev-extra", sessionId: "s1", turnId: "t-2", type: "user_message", payload: { content: "two" }, timestamp: "2026-05-27T12:00:00.000Z" })}\n`;

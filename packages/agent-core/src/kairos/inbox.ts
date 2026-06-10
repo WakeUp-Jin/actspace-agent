@@ -33,11 +33,19 @@ export interface AppendKairosInboxMessageInput {
   now?: Date;
 }
 
+/** 已读水位：来源 → 最后已读消息块的 ISO 时间戳（消息块头 `### <ISO> | …` 即天然游标）。 */
+export type KairosInboxReadCursor = Partial<Record<KairosInboxSource, string>>;
+
 export interface LoadKairosInboxSummaryInput {
   kairosRoot: string;
   maxMessagesPerFile?: number;
   maxCharsPerFile?: number;
   maxCombinedChars?: number;
+  /**
+   * 已读水位。传入时只返回时间戳晚于水位的新消息块（观测增量化）；
+   * 不传时返回全部最近消息（冷启动语义：一切都是新的）。
+   */
+  readCursor?: KairosInboxReadCursor;
 }
 
 export interface KairosInboxFileSummary {
@@ -45,10 +53,21 @@ export interface KairosInboxFileSummary {
   path: string;
   content: string;
   totalMessageCount: number;
+  /** 本次注入的（新）消息块数量；为 0 时观测增量会省略该来源。 */
   includedMessageCount: number;
   truncated: boolean;
   missing: boolean;
   warning?: string;
+  /**
+   * 文件内可解析的最新消息块时间戳（不限于新消息）。
+   * tick 正常闭合后由调用方写回已读水位；失败 tick 不写 → 下个 tick 重见同批增量。
+   */
+  latestMessageTimestamp?: string;
+  /**
+   * 内容来自无消息块的 fallback 文本（手工编辑的 inbox）。无时间戳可推进水位，
+   * 在该来源出现第一条带时间戳的消息前会持续可见——重复展示好过丢手写信号。
+   */
+  usedFallback?: boolean;
 }
 
 export interface KairosInboxSummary {
@@ -129,7 +148,13 @@ export async function loadKairosInboxSummary(input: LoadKairosInboxSummaryInput)
 
   const files = await Promise.all(
     (Object.keys(SOURCE_LABELS) as KairosInboxSource[]).map((source) =>
-      loadInboxFileSummary(input.kairosRoot, source, maxMessagesPerFile, maxCharsPerFile),
+      loadInboxFileSummary(
+        input.kairosRoot,
+        source,
+        maxMessagesPerFile,
+        maxCharsPerFile,
+        input.readCursor?.[source],
+      ),
     ),
   );
   const warnings = files.flatMap((file) => (file.warning ? [file.warning] : []));
@@ -149,24 +174,43 @@ async function loadInboxFileSummary(
   source: KairosInboxSource,
   maxMessages: number,
   maxChars: number,
+  cursorTs?: string,
 ): Promise<KairosInboxFileSummary> {
   const path = getKairosInboxFilePath(kairosRoot, source);
   try {
     const content = await readFile(path, "utf8");
     const blocks = extractMessageBlocks(content);
-    const selected = blocks.length > 0 ? blocks.slice(-maxMessages) : extractFallbackContent(content);
+    const latestMessageTimestamp = latestBlockTimestamp(blocks);
+
+    // 水位过滤：只保留时间戳晚于水位的新消息块。
+    // 无法解析时间戳的块视为"早于水位"（appendKairosInboxMessage 写的头一定可解析；
+    // 手工编辑的异常块只在无水位的冷启动时出现一次，不会每 tick 重复刷屏）。
+    const cursorMs = cursorTs ? Date.parse(cursorTs) : Number.NaN;
+    const newBlocks = Number.isFinite(cursorMs)
+      ? blocks.filter((b) => {
+          const ts = blockTimestampMs(b);
+          return ts !== null && ts > cursorMs;
+        })
+      : blocks;
+
+    const fallback = newBlocks.length === 0 && blocks.length === 0 ? extractFallbackContent(content) : [];
+    const selected = newBlocks.length > 0 ? newBlocks.slice(-maxMessages) : fallback;
+    const usedFallback = newBlocks.length === 0 && fallback.length > 0;
     const joined = selected.join("\n\n").trim();
     const truncatedContent = joined.length > 0
       ? truncateKeepingEnd(joined, maxChars, "…[earlier inbox content truncated]")
-      : "（暂无 pending 信号）";
+      : "（自上个 tick 无新消息）";
+    const includedMessageCount = newBlocks.length > 0 ? Math.min(newBlocks.length, maxMessages) : 0;
     return {
       source,
       path,
       content: truncatedContent,
       totalMessageCount: blocks.length,
-      includedMessageCount: blocks.length > 0 ? Math.min(blocks.length, maxMessages) : 0,
-      truncated: blocks.length > maxMessages || (joined.length > 0 && truncatedContent !== joined),
+      includedMessageCount,
+      truncated: newBlocks.length > maxMessages || (joined.length > 0 && truncatedContent !== joined),
       missing: false,
+      ...(latestMessageTimestamp ? { latestMessageTimestamp } : {}),
+      ...(usedFallback ? { usedFallback: true } : {}),
     };
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
@@ -195,6 +239,30 @@ async function loadInboxFileSummary(
   }
 }
 
+/** 解析消息块头 `### <ISO> | …` 的时间戳；解析失败返回 null。 */
+function blockTimestampMs(block: string): number | null {
+  const m = /^###\s+(\S+)\s*\|/.exec(block);
+  if (!m) return null;
+  const ms = Date.parse(m[1]);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** 全部消息块中可解析的最新时间戳（ISO 原文）；无可解析块时返回 undefined。 */
+function latestBlockTimestamp(blocks: string[]): string | undefined {
+  let bestMs = Number.NEGATIVE_INFINITY;
+  let bestIso: string | undefined;
+  for (const block of blocks) {
+    const m = /^###\s+(\S+)\s*\|/.exec(block);
+    if (!m) continue;
+    const ms = Date.parse(m[1]);
+    if (Number.isFinite(ms) && ms > bestMs) {
+      bestMs = ms;
+      bestIso = m[1];
+    }
+  }
+  return bestIso;
+}
+
 function extractMessageBlocks(content: string): string[] {
   const matches = [...content.matchAll(/^###\s+.*$/gm)];
   return matches
@@ -217,7 +285,14 @@ function extractFallbackContent(content: string): string[] {
 
 function formatInboxSummary(files: KairosInboxFileSummary[]): string {
   const lines = ["## Agent 收件箱（Main/Lab -> Kairos）"];
-  for (const file of files) {
+  // 只渲染有新消息（或手写 fallback 内容）的来源；全部无新消息时输出占位行
+  // （观测增量化：prompt-assembler 在所有来源都无新消息时会整段省略本摘要）。
+  const withNew = files.filter((file) => file.includedMessageCount > 0 || file.usedFallback);
+  if (withNew.length === 0) {
+    lines.push("（自上个 tick 无新消息）");
+    return lines.join("\n").trim();
+  }
+  for (const file of withNew) {
     lines.push("", `### ${SOURCE_LABELS[file.source]} (${file.source}.md)`);
     lines.push(file.content);
     if (file.truncated) {
@@ -241,4 +316,46 @@ function sanitizeSingleLine(value: string, fallback = ""): string {
 function normalizeBody(value: string): string {
   const normalized = value.replace(/\r\n?/g, "\n").trim();
   return normalized.length > 0 ? normalized : "（无正文）";
+}
+
+// ─── 已读水位持久化 ─────────────────────────────────────────────────────
+
+/** 读已读水位文件；不存在 / 损坏时返回空水位（冷启动语义）。 */
+export async function loadKairosInboxReadCursor(stateFile: string): Promise<KairosInboxReadCursor> {
+  try {
+    const raw = await readFile(stateFile, "utf8");
+    const parsed = JSON.parse(raw) as { readCursor?: KairosInboxReadCursor };
+    return parsed.readCursor ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * 合并写回已读水位（tick 正常闭合后调用）。
+ * 从 `KairosInboxSummary.files[].latestMessageTimestamp` 提取每来源最新时间戳。
+ */
+export async function commitKairosInboxReadCursor(
+  stateFile: string,
+  summary: KairosInboxSummary,
+): Promise<void> {
+  const next: KairosInboxReadCursor = {};
+  for (const file of summary.files) {
+    if (file.latestMessageTimestamp) {
+      next[file.source] = file.latestMessageTimestamp;
+    }
+  }
+  if (Object.keys(next).length === 0) return;
+  const current = await loadKairosInboxReadCursor(stateFile);
+  const merged = { ...current, ...next };
+  await mkdir(dirOf(stateFile), { recursive: true });
+  const tmp = `${stateFile}.tmp`;
+  await writeFile(tmp, JSON.stringify({ readCursor: merged }, null, 2), "utf8");
+  const { rename } = await import("node:fs/promises");
+  await rename(tmp, stateFile);
+}
+
+function dirOf(p: string): string {
+  const idx = p.lastIndexOf("/");
+  return idx >= 0 ? p.slice(0, idx) : ".";
 }

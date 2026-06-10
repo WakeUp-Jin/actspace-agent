@@ -40,13 +40,19 @@ import { KairosShortTermMemoryContext } from "./context/short-term";
 import { BriefsIndexManager } from "./briefs/index-manager";
 import { BriefsDispatcher, type TickPayload } from "./briefs/dispatcher";
 import { KairosRunner } from "./runner";
+import { KairosCompressionTrigger } from "./compression/trigger";
 import { MessageQueue, QueueProcessor, type WakeReason } from "./scheduler";
 import { registerKairosTools } from "./tools";
-import { loadKairosInboxSummary, type KairosInboxSummary } from "./inbox";
+import {
+  commitKairosInboxReadCursor,
+  loadKairosInboxReadCursor,
+  loadKairosInboxSummary,
+  type KairosInboxSummary,
+} from "./inbox";
 import {
   assembleSystemPrompt,
+  assembleTickMessage,
   buildHistorySummary,
-  buildObservationSummary,
   derivePhase,
 } from "./prompt-assembler";
 import { buildConfigTipsBlock } from "./config/prompt-assembler";
@@ -311,19 +317,60 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
   // 抽到 controller 顶层：runner 和 getContextSnapshot 共用，避免重复实现。
   // 注意闭包内的 `config` / `kairosGuard` 通过 reload() 整体替换；这里读它们时拿到的
   // 永远是最新一份。
+  //
+  // 计算与提交分离：observeRefresh 只读不写游标；返回的 commit 闭包由 runner 在
+  // tick 正常闭合后调用。getContextSnapshot 只 compute 不 commit——
+  // 用户打开上下文 Sheet 不会"看一眼就吃掉观测增量"。
+  const inboxStateFile = join(paths.observeDir, "inbox-state.json");
   const observeRefresh = async () => {
-    const watchDiffs = [];
+    const watchDiffs: WatchDiffEntry[] = [];
+    const watchCommits: Array<() => Promise<void>> = [];
     for (const p of config.paths.paths.filter((x) => x.watch)) {
-      watchDiffs.push(await watchDiff.diff(p.path));
+      const { entry, scannedEntries } = await watchDiff.computeDiff(p.path);
+      watchDiffs.push(entry);
+      watchCommits.push(() => watchDiff.commitManifest(p.path, scannedEntries));
     }
     const sd = await sessionsDigest.refresh();
-    return { watchDiffs, sessionsDigest: sd };
+    const commit = async () => {
+      for (const commitOne of watchCommits) await commitOne();
+      await sessionsDigest.commitCursor(sd.cursor);
+    };
+    return { watchDiffs, sessionsDigest: sd, commit };
   };
   const activeBriefsCount = async () => {
     const entries = await briefsIndex.list();
     return entries.filter((e) => e.frontmatter.status === "active").length;
   };
-  const loadInboxSummary = async () => loadKairosInboxSummary({ kairosRoot: opts.kairosRoot });
+  const loadInboxSummary = async () => {
+    const readCursor = await loadKairosInboxReadCursor(inboxStateFile);
+    return loadKairosInboxSummary({ kairosRoot: opts.kairosRoot, readCursor });
+  };
+  const commitInboxCursor = (summary: KairosInboxSummary) =>
+    commitKairosInboxReadCursor(inboxStateFile, summary);
+
+  // 短期记忆压缩触发器：tick 闭合（onSleepStart）后异步判定阈值并压缩，
+  // 失败仅 emit warning，不阻塞调度循环。
+  const compressionTrigger = new KairosCompressionTrigger({
+    store,
+    shortTerm,
+    llm: opts.llm,
+    contextWindow: opts.contextWindow,
+    getCompressionThreshold: () => config.preferences.memory.compressionThreshold,
+    emitCompactionEvent: (payload) =>
+      eventSink({
+        id: makeId("evt"),
+        sessionId: `kairos-${currentSessionDate}`,
+        turnId: `turn-${Date.now()}`,
+        type: "context_compaction",
+        timestamp: new Date().toISOString(),
+        schemaVersion: 1,
+        payload,
+      }),
+    onWarning: (message, cause) => {
+      emitter.emit("error", new Error(message, cause ? { cause } : undefined));
+    },
+    getAbortSignal: () => abortController.signal,
+  });
 
   const runner = new KairosRunner({
     config,
@@ -331,6 +378,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     observeRefresh,
     activeBriefsCount,
     loadInboxSummary,
+    commitInboxCursor,
     eventSink,
     llm: opts.llm,
     toolManager,
@@ -440,6 +488,8 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
         schemaVersion: 1,
         payload: { plannedSeconds, reason: "after_tick" },
       });
+      // tick 已闭合、进入睡眠期——后台检查压缩阈值（fire-and-forget）
+      compressionTrigger.maybeCompressInBackground();
     },
     onSleepEnd: async (info) => {
       if (info.interruptedBy) {
@@ -614,12 +664,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
 
       const systemPrompt = assembleSystemPrompt({
         config,
-        watchDiffs: observe.watchDiffs,
-        sessionsDigest: observe.sessionsDigest,
-        inboxSummary,
         shortTermResult,
-        now,
-        activeBriefsCount: briefsCount,
       });
 
       const systemPromptSegments = buildPromptSegments({
@@ -721,10 +766,6 @@ function buildPromptSegments(input: BuildPromptSegmentsInput): KairosContextProm
       sourceFiles: [promptSourceFile],
     },
     {
-      label: "运行上下文",
-      text: `[当前时间] ${now.toISOString()}（${phase}）\n[活跃 briefs] ${Math.max(0, briefsCount)} 个`,
-    },
-    {
       label: "配置提示",
       text: buildConfigTipsBlock(config),
       sourceFiles: [
@@ -739,18 +780,23 @@ function buildPromptSegments(input: BuildPromptSegmentsInput): KairosContextProm
       sourceFiles: [join(configDir, "rule.md")],
     },
     {
-      label: "观测摘要",
-      text: buildObservationSummary({
+      label: "历史摘要",
+      text: buildHistorySummary({ shortTermResult }),
+      sourceFiles: summaryPaths.length > 0 ? summaryPaths : undefined,
+    },
+    // 以下内容不在 system prompt 里——每 tick 拼进 tick user message（动态尾部），
+    // 这里预览"下个 tick 注入时 LLM 会看到什么"。
+    {
+      label: "下个 tick 注入（动态尾部）",
+      text: assembleTickMessage({
+        now,
+        phase,
+        activeBriefsCount: briefsCount,
         watchDiffs: observeResult.watchDiffs,
         sessionsDigest: observeResult.sessionsDigest,
         inboxSummary: input.inboxSummary,
       }),
       sourceFiles: input.inboxSummary?.files.map((f) => f.path),
-    },
-    {
-      label: "历史摘要",
-      text: buildHistorySummary({ shortTermResult }),
-      sourceFiles: summaryPaths.length > 0 ? summaryPaths : undefined,
     },
   ];
 }

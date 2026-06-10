@@ -20,6 +20,13 @@ export interface WatchManifest {
   lastScanAt: string;
 }
 
+/** `computeDiff` 的返回：diff 条目 + 本次扫描全量（提交 manifest 时用）。 */
+export interface WatchDiffComputation {
+  entry: WatchDiffEntry;
+  /** 本次扫描的完整相对路径列表；`commitManifest` 必须用它而不是重扫。 */
+  scannedEntries: string[];
+}
+
 /**
  * watch 路径的"上次扫描快照"管理 + 差集计算。
  *
@@ -27,6 +34,10 @@ export interface WatchManifest {
  * 同一路径每次扫描读取/覆盖同一个 manifest；rename 路径自动失效（hash 变）。
  *
  * 写入采用 tmp + rename 的原子写法，避免半文件损坏。
+ *
+ * 计算与提交分离（观测增量化）：`computeDiff` 只读不写；`commitManifest` 由调用方
+ * 在 tick 正常闭合后调用。失败 tick 不提交 → 下个 tick 重新看到同一批增量。
+ * 上下文快照（getContextSnapshot）只 compute 不 commit，避免"看一眼就吃掉观测"。
  */
 export class WatchDiffEngine {
   private readonly manifestDir: string;
@@ -35,7 +46,8 @@ export class WatchDiffEngine {
     this.manifestDir = manifestDir;
   }
 
-  async diff(rootPath: string): Promise<WatchDiffEntry> {
+  /** 只读计算 diff；不写 manifest。 */
+  async computeDiff(rootPath: string): Promise<WatchDiffComputation> {
     const scan = await scanWatchPath(rootPath);
     const newEntries = scan.entries;
     const oldEntries = await this.loadManifest(rootPath);
@@ -63,16 +75,29 @@ export class WatchDiffEngine {
       visibleRemoved = removedRel.slice(0, removedSlot);
     }
 
-    await this.saveManifest(rootPath, newEntries);
-
     return {
-      rootPath,
-      added: visibleAdded.map((rel) => join(rootPath, rel)),
-      removed: visibleRemoved.map((rel) => join(rootPath, rel)),
-      truncated,
-      totalAdded,
-      totalRemoved,
+      entry: {
+        rootPath,
+        added: visibleAdded.map((rel) => join(rootPath, rel)),
+        removed: visibleRemoved.map((rel) => join(rootPath, rel)),
+        truncated,
+        totalAdded,
+        totalRemoved,
+      },
+      scannedEntries: newEntries,
     };
+  }
+
+  /** 提交本次扫描快照；必须传 `computeDiff` 返回的 `scannedEntries`（不重扫，避免吞掉 tick 期间的变化）。 */
+  async commitManifest(rootPath: string, scannedEntries: string[]): Promise<void> {
+    await this.saveManifest(rootPath, scannedEntries);
+  }
+
+  /** compute + commit 一步到位；仅供不关心提交时序的调用方（如测试）使用。 */
+  async diff(rootPath: string): Promise<WatchDiffEntry> {
+    const { entry, scannedEntries } = await this.computeDiff(rootPath);
+    await this.saveManifest(rootPath, scannedEntries);
+    return entry;
   }
 
   /** 获取一个 rootPath 对应的 manifest 文件路径（外部调试用）。 */

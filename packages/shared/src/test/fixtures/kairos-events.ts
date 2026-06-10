@@ -7,6 +7,7 @@ import type {
   LlmUsagePayload,
   SessionEvent,
   SessionError,
+  ThinkingPayload,
   ToolCallPayload,
   ToolExecutionResult
 } from "../../session";
@@ -91,6 +92,20 @@ export function makeToolResult(
       ok: payload.ok ?? true,
       summary: payload.summary ?? "ok",
       ...payload
+    },
+    overrides
+  );
+}
+
+export function makeThinking(
+  payload: Partial<ThinkingPayload> = {},
+  overrides?: EventOverrides
+): SessionEvent<ThinkingPayload> {
+  return nextEvent<ThinkingPayload>(
+    "thinking",
+    {
+      content: payload.content ?? "Considering what to inspect next…",
+      ...(payload.signature ? { signature: payload.signature } : {})
     },
     overrides
   );

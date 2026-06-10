@@ -64,10 +64,20 @@ function tickPayload(): TickPayload {
 function sampleInboxSummary(): KairosInboxSummary {
   return {
     text: "## Agent 收件箱（Main/Lab -> Kairos）\n\n### Main Agent (main-agent.md)\n请观察重复失败。",
-    files: [],
+    files: [
+      {
+        source: "main-agent",
+        path: "/tmp/kairos/inbox/main-agent.md",
+        content: "请观察重复失败。",
+        totalMessageCount: 1,
+        includedMessageCount: 1,
+        truncated: false,
+        missing: false,
+      },
+    ],
     truncated: false,
     warnings: [],
-  };
+  } as KairosInboxSummary;
 }
 
 describe("KairosRunner.processTick", () => {
@@ -157,12 +167,18 @@ describe("KairosRunner.processTick", () => {
     expect(opts?.thinkingEnabled).toBe(false);
   });
 
-  it("injects Agent inbox summary into the LLM system prompt", async () => {
+  it("injects Agent inbox summary into the tick user message, keeping system prompt static", async () => {
     const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "mock-model" });
     llm.setResponses([
       (context) => {
-        expect(context.systemPrompt).toContain("Agent 收件箱");
-        expect(context.systemPrompt).toContain("请观察重复失败");
+        // 缓存约束：每 tick 必变内容禁止进入 system prompt
+        expect(context.systemPrompt).not.toContain("Agent 收件箱");
+        expect(context.systemPrompt).not.toContain("[当前时间]");
+        const last = context.messages.at(-1);
+        const content = typeof last?.content === "string" ? last.content : "";
+        expect(content).toContain("Agent 收件箱");
+        expect(content).toContain("请观察重复失败");
+        expect(content).toContain("[当前时间]");
         return mockText("seen");
       },
     ]);
@@ -183,6 +199,120 @@ describe("KairosRunner.processTick", () => {
     });
 
     await runner.processTick({ type: "tick", payload: tickPayload() });
+  });
+
+  it("commits observation cursors only after a successful tick", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "mock-model" });
+    llm.setResponses([mockText("ok")]);
+
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp/work" });
+    registerKairosTools(toolManager);
+
+    let observeCommits = 0;
+    let inboxCommits = 0;
+    const runner = new KairosRunner({
+      config: baseConfig(),
+      shortTerm: fakeShortTerm(),
+      observeRefresh: async () => ({
+        watchDiffs: [],
+        sessionsDigest: emptyDigest,
+        commit: async () => {
+          observeCommits += 1;
+        },
+      }),
+      activeBriefsCount: async () => 0,
+      loadInboxSummary: async () => sampleInboxSummary(),
+      commitInboxCursor: async () => {
+        inboxCommits += 1;
+      },
+      eventSink: async () => {},
+      llm,
+      toolManager,
+      kairosGuard: baseGuard,
+    });
+
+    await runner.processTick({ type: "tick", payload: tickPayload() });
+    expect(observeCommits).toBe(1);
+    expect(inboxCommits).toBe(1);
+  });
+
+  it("does NOT commit observation cursors when the tick fails (增量不丢)", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "mock-model" });
+    llm.setResponses([
+      () => {
+        throw new Error("llm exploded");
+      },
+    ]);
+
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp/work" });
+    registerKairosTools(toolManager);
+
+    let observeCommits = 0;
+    let inboxCommits = 0;
+    const runner = new KairosRunner({
+      config: baseConfig(),
+      shortTerm: fakeShortTerm(),
+      observeRefresh: async () => ({
+        watchDiffs: [],
+        sessionsDigest: emptyDigest,
+        commit: async () => {
+          observeCommits += 1;
+        },
+      }),
+      activeBriefsCount: async () => 0,
+      loadInboxSummary: async () => sampleInboxSummary(),
+      commitInboxCursor: async () => {
+        inboxCommits += 1;
+      },
+      eventSink: async () => {},
+      llm,
+      toolManager,
+      kairosGuard: baseGuard,
+    });
+
+    await expect(
+      runner.processTick({ type: "tick", payload: tickPayload() }),
+    ).rejects.toThrow();
+    expect(observeCommits).toBe(0);
+    expect(inboxCommits).toBe(0);
+  });
+
+  it("persists exactly the same tick content as sent to the LLM (发送 = 落盘 = 重放)", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "mock-model" });
+    let sentContent = "";
+    llm.setResponses([
+      (context) => {
+        const last = context.messages.at(-1);
+        sentContent = typeof last?.content === "string" ? last.content : "";
+        return mockText("ok");
+      },
+    ]);
+
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp/work" });
+    registerKairosTools(toolManager);
+
+    const events: SessionEvent[] = [];
+    const runner = new KairosRunner({
+      config: baseConfig(),
+      shortTerm: fakeShortTerm(),
+      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
+      activeBriefsCount: async () => 0,
+      loadInboxSummary: async () => sampleInboxSummary(),
+      eventSink: async (e) => {
+        events.push(e);
+      },
+      llm,
+      toolManager,
+      kairosGuard: baseGuard,
+    });
+
+    await runner.processTick({ type: "tick", payload: tickPayload() });
+
+    const injected = events.find((e) => e.type === "kairos_tick_injected");
+    expect(injected).toBeDefined();
+    const persisted = (injected?.payload as { content?: string }).content ?? "";
+    expect(persisted.length).toBeGreaterThan(0);
+    expect(persisted).toBe(sentContent);
   });
 
   it("does not pass thinkingEnabled when option is omitted (LLM uses ModelSpec default)", async () => {

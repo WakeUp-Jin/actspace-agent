@@ -4,9 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   appendKairosInboxMessage,
+  commitKairosInboxReadCursor,
   defaultKairosInboxContent,
   ensureKairosInboxScaffolding,
   getKairosInboxFilePath,
+  loadKairosInboxReadCursor,
   loadKairosInboxSummary,
 } from "../inbox";
 
@@ -108,6 +110,73 @@ describe("Kairos inbox", () => {
     expect(summary.text).toContain("topic-10");
     expect(summary.text).not.toMatch(/\| topic: topic-1\n/);
     expect(summary.text).toContain("truncated");
+  });
+
+  it("filters already-read messages by readCursor and reports latest timestamp", async () => {
+    const root = await makeRoot();
+    await ensureKairosInboxScaffolding(root);
+    await appendKairosInboxMessage({
+      kairosRoot: root,
+      source: "main-agent",
+      topic: "旧消息",
+      body: "已读过。",
+      now: new Date("2026-06-09T10:00:00.000Z"),
+    });
+    await appendKairosInboxMessage({
+      kairosRoot: root,
+      source: "main-agent",
+      topic: "新消息",
+      body: "这是新的。",
+      now: new Date("2026-06-10T08:00:00.000Z"),
+    });
+
+    // 无水位（冷启动）：全部视为新
+    const cold = await loadKairosInboxSummary({ kairosRoot: root });
+    const coldMain = cold.files.find((f) => f.source === "main-agent")!;
+    expect(coldMain.includedMessageCount).toBe(2);
+    expect(coldMain.latestMessageTimestamp).toBe("2026-06-10T08:00:00.000Z");
+
+    // 水位在两条之间：只看到新的一条
+    const summary = await loadKairosInboxSummary({
+      kairosRoot: root,
+      readCursor: { "main-agent": "2026-06-09T10:00:00.000Z" },
+    });
+    const main = summary.files.find((f) => f.source === "main-agent")!;
+    expect(main.includedMessageCount).toBe(1);
+    expect(summary.text).toContain("新消息");
+    expect(summary.text).not.toContain("旧消息");
+
+    // 水位推到最新：无新消息
+    const upToDate = await loadKairosInboxSummary({
+      kairosRoot: root,
+      readCursor: { "main-agent": "2026-06-10T08:00:00.000Z" },
+    });
+    const mainUpToDate = upToDate.files.find((f) => f.source === "main-agent")!;
+    expect(mainUpToDate.includedMessageCount).toBe(0);
+    expect(upToDate.text).toContain("自上个 tick 无新消息");
+  });
+
+  it("commits read cursor from summary and round-trips through state file", async () => {
+    const root = await makeRoot();
+    await ensureKairosInboxScaffolding(root);
+    await appendKairosInboxMessage({
+      kairosRoot: root,
+      source: "main-agent",
+      topic: "消息",
+      body: "正文。",
+      now: new Date("2026-06-10T08:00:00.000Z"),
+    });
+
+    const stateFile = join(root, "observe", "inbox-state.json");
+    const summary = await loadKairosInboxSummary({ kairosRoot: root });
+    await commitKairosInboxReadCursor(stateFile, summary);
+
+    const cursor = await loadKairosInboxReadCursor(stateFile);
+    expect(cursor["main-agent"]).toBe("2026-06-10T08:00:00.000Z");
+
+    // 用提交后的水位再加载：增量为空
+    const next = await loadKairosInboxSummary({ kairosRoot: root, readCursor: cursor });
+    expect(next.files.find((f) => f.source === "main-agent")?.includedMessageCount).toBe(0);
   });
 
   it("treats malformed markdown as plain pending text", async () => {

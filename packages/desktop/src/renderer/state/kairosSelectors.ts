@@ -50,6 +50,14 @@ export function findKairosReplyText(events: SessionEvent[]): string {
   return typeof content === "string" ? content : "";
 }
 
+/** 从一行 thinking 行的关联事件里取思考全文（payload.content）。 */
+export function findKairosThinkingText(events: SessionEvent[]): string {
+  const thinking = events.filter((event) => event.type === "thinking").at(-1);
+  const payload = asRecord(thinking?.payload);
+  const content = payload?.content;
+  return typeof content === "string" ? content : "";
+}
+
 export function findKairosToolDetail(events: SessionEvent[]): KairosToolDetail | null {
   const call = events.find((event) => event.type === "tool_call");
   const result = events.find((event) => event.type === "tool_result");
@@ -247,6 +255,8 @@ export function kairosKindLabel(kind: KairosEventRow["kind"]): string {
   switch (kind) {
     case "reply":
       return "最终回复";
+    case "thinking":
+      return "思考";
     case "tool":
       return "工具执行";
     case "tick":

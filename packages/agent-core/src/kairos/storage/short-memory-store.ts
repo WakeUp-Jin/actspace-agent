@@ -254,7 +254,8 @@ export class ShortMemoryStore {
 
 // ─── 模块级 helpers ────────────────────────────────────────────────────
 
-function toIsoDate(d: Date): string {
+/** UTC 日期 → `YYYY-MM-DD`。store 的分段命名与压缩触发的日期判定共用同一规则。 */
+export function toIsoDate(d: Date): string {
   const y = d.getUTCFullYear();
   const m = String(d.getUTCMonth() + 1).padStart(2, "0");
   const day = String(d.getUTCDate()).padStart(2, "0");

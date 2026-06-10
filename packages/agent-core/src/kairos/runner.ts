@@ -33,7 +33,7 @@ import type { SessionsDigestResult } from "./context/sessions-digest";
 import type { TickPayload } from "./briefs/dispatcher";
 import type { QueueMessage } from "./scheduler";
 import type { BriefsIndexManager } from "./briefs/index-manager";
-import { assembleSystemPrompt } from "./prompt-assembler";
+import { assembleSystemPrompt, assembleTickMessage, derivePhase } from "./prompt-assembler";
 import type { KairosInboxSummary } from "./inbox";
 
 export interface TickResult {
@@ -47,9 +47,16 @@ export interface KairosRunnerOptions {
   observeRefresh: () => Promise<{
     watchDiffs: WatchDiffEntry[];
     sessionsDigest: SessionsDigestResult;
+    /**
+     * 提交本次观测的游标（watch manifest + sessions lastSeenTurnId）。
+     * runner 仅在 tick 正常闭合后调用；失败 tick 不提交 → 下个 tick 重见同批增量。
+     */
+    commit?: () => Promise<void>;
   }>;
   activeBriefsCount: () => Promise<number>;
   loadInboxSummary?: () => Promise<KairosInboxSummary>;
+  /** 提交 inbox 已读水位；与 observe.commit 同一时机（tick 正常闭合后）。 */
+  commitInboxCursor?: (summary: KairosInboxSummary) => Promise<void>;
   eventSink: (event: SessionEvent) => Promise<void>;
   llm: LLMService;
   toolManager: ToolManager;
@@ -102,18 +109,25 @@ export class KairosRunner {
     const activeBriefsCount = await this.opts.activeBriefsCount();
     const inboxSummary = await this.opts.loadInboxSummary?.();
 
-    // 2) assemble system prompt
+    // 2) 组装上下文：system prompt 只含低频内容（可被前缀缓存复用）；
+    //    时间 / phase / 观测增量全部进 tick message（动态尾部）。
     const systemPrompt = assembleSystemPrompt({
       config: this.opts.config,
+      shortTermResult: shortTerm,
+    });
+    const tickContent = assembleTickMessage({
+      now,
+      phase: derivePhase(now, this.opts.config),
+      activeBriefsCount,
       watchDiffs: observe.watchDiffs,
       sessionsDigest: observe.sessionsDigest,
       inboxSummary,
-      shortTermResult: shortTerm,
-      now,
-      activeBriefsCount,
+      triggerContent: payload.content,
     });
 
-    // 3) 注入 tick → SessionEvent
+    // 3) 注入 tick → SessionEvent。
+    //    content 与下面发送给 LLM 的 user message 是同一字符串：
+    //    发送 = 落盘 = 重放，否则下个 tick 重放时前缀缓存必断。
     await this.opts.eventSink({
       id: makeId("evt", this.opts.newId),
       sessionId,
@@ -124,14 +138,14 @@ export class KairosRunner {
       payload: {
         trigger: payload.trigger,
         ...(payload.trigger === "brief" ? { briefId: payload.briefId } : {}),
-        content: payload.content,
+        content: tickContent,
       },
     });
 
     // 4) 构造 user message 给 LLM
     const tickUserMsg: UserMessage = {
       role: "user",
-      content: payload.content,
+      content: tickContent,
       timestamp: now.getTime(),
       source: "kairos_tick",
       priority: MessagePriority.NORMAL,
@@ -188,7 +202,14 @@ export class KairosRunner {
 
     if (runError) throw runError;
 
-    // 7) 抽取 sleep
+    // 7) tick 正常闭合：提交观测游标（watch manifest / sessions / inbox 水位）。
+    //    失败 tick 已在上面 throw，不会走到这里 → 增量不丢，下个 tick 重见。
+    await observe.commit?.();
+    if (inboxSummary) {
+      await this.opts.commitInboxCursor?.(inboxSummary);
+    }
+
+    // 8) 抽取 sleep
     const sleepSeconds = extractLastSleepSeconds(turnEventBuffer);
     const toolCallCount = turnEventBuffer.filter((e) => e.type === "tool_call").length;
 
@@ -213,12 +234,15 @@ interface AgentEventConvertCtx {
 /**
  * AgentEvent → SessionEvent[] 翻译。
  *
- * 产出策略：
- * - `tool_call` / `tool_result` / `assistant_message`：短期记忆需要"重放回 LLM"，必落。
+ * 产出策略（重放保真：落盘事件序必须能还原现场 assistant 消息的块结构与顺序）：
+ * - `message_end`：按现场块顺序落 `thinking*`（含 signature）→ `assistant_message`(text)
+ *   → `tool_call*`（来自消息内的 toolCall 块，而不是 tool_start——后者在 sequential
+ *   执行下与 tool_result 交错，重放时无法无歧义地还原"同一次 LLM 回复"的归属）。
+ * - `tool_end` → `tool_result`。
  * - `llm_usage`：每次 assistant message_end 落一条，承载 token/成本事实。
  *   注：`toLlmMessages` 不翻译 `llm_usage`，所以它不会被回灌进 LLM messages 段，
  *   但前端聚合（用量胶囊、未来日历视图）和跨重启统计都依赖这条事件。
- * - thinking 仍不落（不需要回放给 LLM，UI 也暂不展示）。
+ * - `tool_start` 不再产出事件（避免与 message_end 的 tool_call 重复）。
  */
 function agentEventToSessionEvents(
   ev: AgentEvent,
@@ -227,36 +251,40 @@ function agentEventToSessionEvents(
   const out: SessionEvent[] = [];
   const ts = ctx.now().toISOString();
   switch (ev.type) {
-    case "tool_start":
-      out.push(makeEvent(ctx, ts, "tool_call", {
-        id: ev.toolCallId,
-        name: ev.toolName,
-        arguments: ev.args,
-      }));
-      break;
-    case "tool_end":
+    case "tool_end": {
+      // modelOutput 必须与 engine/loop 现场构造的 ToolResultMessage 文本逐字一致
+      // （非字符串 data 同样走 JSON.stringify），否则重放时该处前缀缓存断裂。
+      const liveText = ev.result.success
+        ? typeof ev.result.data === "string"
+          ? ev.result.data
+          : JSON.stringify(ev.result.data ?? "")
+        : ev.result.error ?? "Unknown error";
       out.push(makeEvent(ctx, ts, "tool_result", {
         toolCallId: ev.toolCallId,
         toolName: ev.toolName,
         ok: !ev.isError,
-        summary: ev.result.success
-          ? typeof ev.result.data === "string"
-            ? truncate(ev.result.data, 240)
-            : "ok"
-          : ev.result.error ?? "error",
-        modelOutput:
-          ev.result.success && typeof ev.result.data === "string"
-            ? ev.result.data
-            : ev.result.error,
+        summary: truncate(liveText, 240),
+        modelOutput: liveText,
       }));
       break;
+    }
     case "message_end":
       if (ev.message.role === "assistant") {
+        // 1) thinking 块（可多个）；signature 必须保留——anthropic-convert 只在
+        //    signature 存在时才把 thinking 块回发给 API，丢 signature = 重放残缺。
+        for (const block of ev.message.content) {
+          if (block.type === "thinking") {
+            out.push(makeEvent(ctx, ts, "thinking", {
+              content: block.thinking,
+              ...(block.signature ? { signature: block.signature } : {}),
+            }));
+          }
+        }
+        // 2) 文本块；仅在有文本时落 assistant_message（纯 toolUse 回复无此事件）
         const text = ev.message.content
           .filter((c): c is { type: "text"; text: string } => c.type === "text")
           .map((c) => c.text)
           .join("");
-        // 仅在有文本时落一条 assistant_message；纯 toolUse 不重复落（tool_call 已经够了）
         if (text.length > 0) {
           out.push(makeEvent(ctx, ts, "assistant_message", {
             content: text,
@@ -264,6 +292,16 @@ function agentEventToSessionEvents(
             model: ev.message.model,
             provider: ev.message.provider,
           }));
+        }
+        // 3) toolCall 块（保持现场顺序；tool_use 永远是 assistant 消息的末尾块）
+        for (const block of ev.message.content) {
+          if (block.type === "toolCall") {
+            out.push(makeEvent(ctx, ts, "tool_call", {
+              id: block.id,
+              name: block.name,
+              arguments: block.arguments,
+            }));
+          }
         }
         // 每次 LLM 回复都落一条 llm_usage（即使是纯工具调用回合，也消耗了 prompt tokens）。
         const usage = buildKairosLlmUsagePayload(ev.message, ctx.nextUsageCallId());

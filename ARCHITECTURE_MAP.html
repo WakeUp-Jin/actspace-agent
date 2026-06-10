@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACTSPACE 架构蓝图 — 全局模块地图</title>
+<style>
+  /* ───────────────────────── 暖纸编辑风基底 ───────────────────────── */
+  :root {
+    --ink: #1a1815;
+    --ink-soft: #5c574e;
+    --ink-faint: #8a8478;
+    --paper: #faf8f4;
+    --card: #ffffff;
+    --card-tint: #fbfaf6;
+    --line: #e6e1d7;
+    --line-soft: #efebe2;
+    --accent: #2456e6;
+    --accent-soft: #eef2fe;
+    --good: #1a7f4e;  --good-soft: #e8f5ee;  --good-line: #cde8da;
+    --warn: #b4690e;  --warn-soft: #fdf3e4;  --warn-line: #f0dcbd;
+    --bad: #c0392b;   --bad-soft: #fbeae8;   --bad-line: #f2d3cf;
+    --violet: #7048b6; --violet-line: #ddd0f0;
+    /* 旧变量名兼容映射（正文中仍有 var() 内联引用） */
+    --cyan: var(--accent);
+    --cyan-bright: var(--accent);
+    --amber: var(--warn);
+    --green: var(--good);
+    --rose: var(--bad);
+    --text: var(--ink);
+    --text-dim: var(--ink-soft);
+    --text-faint: var(--ink-faint);
+    --mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    --serif: "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.75;
+  }
+  ::selection { background: var(--accent-soft); }
+
+  /* ───────────────────────── 顶部导航 ───────────────────────── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(250, 248, 244, 0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    padding: 0 24px;
+    display: flex; align-items: center; gap: 4px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  nav .brand {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 3px;
+    color: var(--accent); padding-right: 18px; border-right: 1px solid var(--line);
+    margin-right: 10px; flex-shrink: 0; font-weight: 700;
+  }
+  nav a {
+    color: var(--ink-soft); text-decoration: none; font-size: 13px;
+    padding: 13px 11px; border-bottom: 2px solid transparent; transition: all .2s;
+    flex-shrink: 0;
+  }
+  nav a:hover { color: var(--accent); }
+  nav a.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+  /* ───────────────────────── 布局骨架 ───────────────────────── */
+  main { max-width: 1280px; margin: 0 auto; padding: 0 32px 120px; }
+  header.hero { padding: 72px 0 40px; }
+  .hero-kicker {
+    font-size: 12px; letter-spacing: 0.22em;
+    color: var(--accent); text-transform: uppercase; font-weight: 600;
+  }
+  .hero h1 {
+    font-family: var(--serif);
+    font-size: 42px; font-weight: 700; letter-spacing: 1px; margin: 12px 0 14px;
+    color: var(--ink); line-height: 1.3;
+  }
+  .hero h1 .thin { font-weight: 400; color: var(--accent); }
+  .hero p.sub { color: var(--ink-soft); max-width: 760px; font-size: 16px; }
+  .hero-meta {
+    display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px;
+  }
+  .hero-meta .chip {
+    font-family: var(--mono); font-size: 12px; color: var(--ink-soft);
+    border: 1px solid var(--line); padding: 5px 14px; border-radius: 99px;
+    background: var(--card);
+  }
+
+  section { padding-top: 64px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 8px; }
+  .sec-num {
+    font-family: Georgia, serif; font-style: italic; font-size: 15px; color: var(--accent);
+    letter-spacing: 1px; flex-shrink: 0;
+  }
+  .sec-head h2 { font-family: var(--serif); font-size: 26px; font-weight: 700; color: var(--ink); letter-spacing: .5px; }
+  .sec-lead { color: var(--ink-soft); margin-bottom: 28px; max-width: 860px; }
+  .sec-lead code, p code, li code, td code {
+    font-family: var(--mono); font-size: .88em; color: #6b3f12;
+    background: #f1ede4; padding: 1px 6px; border-radius: 4px;
+  }
+
+  /* ───────────────────────── 卡片 / 节点 ───────────────────────── */
+  .panel {
+    border: 1px solid var(--line); background: var(--card);
+    border-radius: 10px; padding: 26px 28px; margin-bottom: 26px;
+    position: relative;
+  }
+  .panel-title {
+    font-size: 12px; letter-spacing: 0.14em;
+    color: var(--ink-faint); text-transform: uppercase; margin-bottom: 18px;
+    font-weight: 700;
+  }
+
+  .node {
+    border: 1px solid var(--line); background: var(--card-tint);
+    border-radius: 8px; padding: 12px 16px; transition: all .2s;
+  }
+  .node:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
+  .node .nm { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+  .node .ds { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; line-height: 1.55; }
+
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600;
+    padding: 1px 9px; border-radius: 99px; white-space: nowrap;
+    margin-left: 8px; vertical-align: 1px;
+  }
+  .tag.amber { color: var(--warn); background: var(--warn-soft); }
+  .tag.green { color: var(--good); background: var(--good-soft); }
+  .tag.rose  { color: var(--bad); background: var(--bad-soft); }
+  .tag.violet{ color: var(--violet); background: #f1ebfa; }
+  .tag.cyan  { color: var(--accent); background: var(--accent-soft); }
+
+  /* ───────────────────────── 表格 ───────────────────────── */
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; margin: 14px 0 6px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th {
+    text-align: left; font-size: 12px; letter-spacing: 0.06em;
+    color: var(--ink-soft); padding: 10px 14px; background: #f4f1e9;
+    font-weight: 600;
+  }
+  td {
+    padding: 10px 14px; border-top: 1px solid #f3f0e8;
+    vertical-align: top; color: var(--ink);
+  }
+  td:first-child { font-family: var(--mono); font-size: 12.5px; color: var(--accent); white-space: nowrap; }
+  tr:hover td { background: #fdfcf9; }
+  td .dim { color: var(--ink-soft); }
+
+  /* ───────────────────────── 图 1：全局分层 ───────────────────────── */
+  .stack { display: flex; flex-direction: column; gap: 0; }
+  .layer-box {
+    border: 1px solid var(--line); border-radius: 10px; padding: 18px 22px;
+    background: var(--card);
+  }
+  .layer-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+  .layer-head .lt { font-family: var(--serif); font-size: 18px; font-weight: 700; color: var(--ink); }
+  .layer-head .lp { font-size: 12px; color: var(--ink-faint); }
+  .grid { display: grid; gap: 10px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .g4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 900px) { .g3, .g4 { grid-template-columns: repeat(2, 1fr); } }
+  .down-arrow {
+    align-self: center; text-align: center; color: var(--accent);
+    font-family: var(--mono); font-size: 12px; padding: 8px 0;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .down-arrow .lbl { color: var(--ink-faint); font-size: 11px; letter-spacing: 1px; }
+  .down-arrow .ar { font-size: 16px; line-height: 1; }
+
+  /* ───────────────────────── 图 2：时序泳道 ───────────────────────── */
+  .seq { display: grid; grid-template-columns: 150px 1fr; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seq-row { display: contents; }
+  .seq-actor {
+    background: #f4f1e9; border-bottom: 1px solid var(--line-soft);
+    padding: 13px 14px; font-family: var(--mono); font-size: 12px; color: var(--ink);
+    display: flex; align-items: center; font-weight: 700;
+  }
+  .seq-steps {
+    border-bottom: 1px solid var(--line-soft); padding: 11px 16px;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    background: var(--card);
+  }
+  .step {
+    font-size: 12.5px; padding: 4px 12px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--card-tint); color: var(--ink-soft);
+  }
+  .step b { color: var(--accent); font-weight: 600; }
+  .step.hl { border-color: var(--warn-line); background: var(--warn-soft); }
+  .flow-sep { color: var(--ink-faint); font-family: var(--mono); font-size: 13px; }
+
+  /* ───────────────────────── 流程链 ───────────────────────── */
+  .chain { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 12px 0; }
+  .chain .cnode {
+    border: 1px solid var(--line); background: var(--card); border-radius: 8px;
+    padding: 8px 14px; font-size: 12.5px; min-width: 90px;
+  }
+  .chain .cnode .t { font-family: var(--mono); color: var(--accent); font-size: 12px; font-weight: 600; }
+  .chain .cnode .d { color: var(--ink-soft); font-size: 11.5px; margin-top: 1px; }
+  .chain .carr { align-self: center; color: var(--ink-faint); font-family: var(--mono); font-size: 14px; }
+
+  /* ───────────────────────── 折叠块 ───────────────────────── */
+  details { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; background: var(--card); }
+  details summary {
+    cursor: pointer; list-style: none; padding: 15px 20px;
+    display: flex; align-items: center; gap: 12px; user-select: none;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::before {
+    content: "+"; font-family: Georgia, serif; color: var(--accent); font-size: 17px;
+    width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%;
+    background: var(--accent-soft); display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+  }
+  details[open] summary::before { content: "−"; }
+  details summary .st { font-family: var(--mono); font-size: 14px; color: var(--ink); font-weight: 700; }
+  details summary .sd { font-size: 13px; color: var(--ink-soft); }
+  details .body { padding: 4px 22px 20px 56px; }
+  details[open] summary { border-bottom: 1px dashed var(--line); }
+  details summary:hover .st { color: var(--accent); }
+
+  /* ───────────────────────── 文件树（保留深色代码块风格） ───────────────────────── */
+  .tree {
+    font-family: var(--mono); font-size: 13px; line-height: 1.9;
+    background: #211e19; color: #e8e3d8; border: 1px solid var(--line);
+    border-radius: 10px; padding: 22px 26px; overflow-x: auto;
+    white-space: pre;
+  }
+  .tree .dir { color: #7ea6ff; font-weight: 600; }
+  .tree .file { color: #e8e3d8; }
+  .tree .cm { color: #8a8478; }
+  .tree .hl { color: #e8b34b; }
+
+  /* ───────────────────────── 原则卡 ───────────────────────── */
+  .principles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .principles { grid-template-columns: 1fr; } }
+  .pcard {
+    border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px;
+    background: var(--card); position: relative;
+  }
+  .pcard .pnum {
+    font-family: Georgia, serif; font-size: 30px; color: #ece6d8;
+    position: absolute; top: 10px; right: 18px; font-weight: 700; font-style: italic;
+  }
+  .pcard h4 { color: var(--ink); font-size: 15.5px; margin-bottom: 8px; letter-spacing: .3px; }
+  .pcard p { font-size: 13.5px; color: var(--ink-soft); }
+  .pcard p b { color: var(--ink); font-weight: 600; }
+
+  /* ───────────────────────── 注释 / 标尺 ───────────────────────── */
+  .annot {
+    border: 1px solid #d7e1fb; padding: 13px 18px; margin: 16px 0;
+    background: var(--accent-soft); font-size: 13.5px; color: var(--ink-soft);
+    border-radius: 10px;
+  }
+  .annot b { color: var(--accent); font-weight: 700; }
+  .footnote {
+    margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line);
+    font-size: 12.5px; color: var(--ink-faint);
+  }
+  .footnote a { color: var(--ink-soft); }
+  ul.tight { padding-left: 22px; }
+  ul.tight li { margin: 5px 0; font-size: 13.5px; }
+  ul.tight li b { color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<nav id="topnav">
+  <span class="brand">ACTSPACE</span>
+  <a href="#s0">鸟瞰</a>
+  <a href="#s1">全局分层</a>
+  <a href="#s2">Turn 数据流</a>
+  <a href="#s3">agent-core</a>
+  <a href="#s4">Kairos</a>
+  <a href="#s5">Desktop</a>
+  <a href="#s6">存储布局</a>
+  <a href="#s7">设计思想</a>
+  <a href="ARCHITECTURE_GRAPH.html" style="margin-left:auto;color:var(--accent);font-weight:600">交互依赖图谱 ↗</a>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════ HERO ═══════════════════════ -->
+<header class="hero">
+  <div class="hero-kicker">Architecture Blueprint · 架构蓝图</div>
+  <h1>ACTSPACE <span class="thin">全局模块地图</span></h1>
+  <p class="sub">
+    一个 Agent-first 的本地桌面工作台：主 Agent 负责对话式协作，Kairos 自治 Agent 在后台常驻巡航。
+    本图纸覆盖三包结构、两条业务主线、八大子系统与全部核心模块，供手绘架构图时逐层参考。
+  </p>
+  <div class="hero-meta">
+    <span class="chip">Electron + React + TS + Vite</span>
+    <span class="chip">3 packages 单仓</span>
+    <span class="chip">DeepSeek 1M / Kimi 256K</span>
+    <span class="chip">JSONL 事件溯源</span>
+    <span class="chip">本地优先 · 密钥不出主进程</span>
+  </div>
+</header>
+
+<!-- ═══════════════════════ 00 鸟瞰 ═══════════════════════ -->
+<section id="s0">
+  <div class="sec-head"><span class="sec-num">00 /</span><h2>鸟瞰：仓库即三层蛋糕</h2></div>
+  <p class="sec-lead">
+    整个仓库只有一个不可违背的依赖方向：<code>desktop → agent-core → shared</code>。
+    上层通过包名（<code>@actspace/agent-core</code>、<code>@actspace/shared</code>）消费下层的 <code>dist/</code> 产物，禁止反向引用、禁止直接相对引用 sibling 的 <code>src/</code>。
+  </p>
+
+  <div class="chain" style="margin-bottom:22px">
+    <div class="cnode"><div class="t">packages/desktop</div><div class="d">Electron 桌面端：main / preload / renderer</div></div>
+    <div class="carr">─▶</div>
+    <div class="cnode"><div class="t">packages/agent-core</div><div class="d">Agent 运行层：引擎 / LLM / 工具 / 上下文 / Kairos</div></div>
+    <div class="carr">─▶</div>
+    <div class="cnode"><div class="t">packages/shared</div><div class="d">纯类型契约：IPC / SessionEvent / 模型注册表</div></div>
+  </div>
+
+  <table>
+    <tr><th style="width:200px">包</th><th>一句话定位</th><th style="width:300px">关键约束</th></tr>
+    <tr><td>packages/desktop</td><td>Electron 应用壳：窗口、IPC 路由、依赖装配、持久化编排、全部 UI</td><td class="dim">renderer 不碰文件系统、不碰密钥、不 import agent-core</td></tr>
+    <tr><td>packages/agent-core</td><td>可独立测试的纯 Node Agent 运行层：执行循环、模型接入、工具系统、上下文管道、Kairos 自治内核</td><td class="dim">完全不知道 Electron 存在；不处理 IPC 协议</td></tr>
+    <tr><td>packages/shared</td><td>跨进程契约唯一来源：事件 schema、IPC 类型、模型注册表、Kairos 契约与聚合纯函数</td><td class="dim">不依赖任何兄弟包；改契约 = 改宪法，须三端同步</td></tr>
+    <tr><td>docs/ · scripts/ · infra/</td><td>仓库知识库（设计文档/执行计划/history/learnings）、自动化脚本、部署定义</td><td class="dim">docs 是本地规则正式来源，代码变更须同轮同步文档</td></tr>
+  </table>
+
+  <div class="annot"><b>画图建议</b>：先画这三层蛋糕和一个磁盘圆柱（userData/），再在旁边标注"依赖方向永远向下"。后面每一节都是对某一层的放大。</div>
+</section>
+
+<!-- ═══════════════════════ 01 全局分层 ═══════════════════════ -->
+<section id="s1">
+  <div class="sec-head"><span class="sec-num">01 /</span><h2>全局分层图：进程边界与子系统</h2></div>
+  <p class="sec-lead">把鸟瞰图放大一档：desktop 拆成三个进程角色，agent-core 拆成八个子系统，底部是统一落盘的本地存储。</p>
+
+  <div class="stack">
+    <!-- desktop -->
+    <div class="layer-box">
+      <div class="layer-head">
+        <span class="lt">packages/desktop</span>
+        <span class="lp">Electron 桌面端 · 三个进程角色</span>
+      </div>
+      <div class="grid g3">
+        <div class="node"><div class="nm">Renderer 渲染进程</div><div class="ds">React + Vite。聊天工作台 / Kairos 监控台 / 设置页 / 右侧预览面板。只认 IPC 协议，是"哑终端"</div></div>
+        <div class="node"><div class="nm">Preload 预加载</div><div class="ds">contextBridge 安全桥：把 <code>window.api</code> / <code>window.kairos</code> 暴露给 renderer，隔离 Node 能力</div></div>
+        <div class="node"><div class="nm">Main 主进程</div><div class="ds">app 生命周期、IPC handler 注册、Agent 依赖装配（读 env/settings）、session 持久化、Kairos bootstrap</div></div>
+      </div>
+    </div>
+    <div class="down-arrow"><span class="lbl">runTurnWithAgent(deps) / createKairos(opts) — 函数调用，非 IPC</span><span class="ar">▼</span></div>
+
+    <!-- agent-core -->
+    <div class="layer-box">
+      <div class="layer-head">
+        <span class="lt">packages/agent-core</span>
+        <span class="lp">Agent 运行层 · 八大子系统（详见 03 节）</span>
+      </div>
+      <div class="grid g4">
+        <div class="node"><div class="nm">engine/</div><div class="ds">执行引擎：双层循环 loop、Agent 入口、Bridge 协议翻译、依赖装配</div></div>
+        <div class="node"><div class="nm">llm/</div><div class="ds">模型服务层：协议服务（OpenAI/Anthropic）+ 品牌薄包装 + 预处理</div></div>
+        <div class="node"><div class="nm">tools/</div><div class="ds">工具系统：12 个工具、权限三态调度、路径守卫、大输出裁剪</div></div>
+        <div class="node"><div class="nm">context/</div><div class="ds">上下文管道：分段 system prompt、会话历史、token 估算、历史压缩</div></div>
+        <div class="node"><div class="nm">persistence/</div><div class="ds">JSONL 读写、meta、多维恢复、session store、子智能体 transcript</div></div>
+        <div class="node"><div class="nm">kairos/</div><div class="ds">自治 Agent：调度 / 观测 / 短期记忆 / 守卫 / 压缩（详见 04 节）</div></div>
+        <div class="node"><div class="nm">skills/ + prompt/</div><div class="ds">Skill 扫描与 catalog 懒注入；版本化提示词资产</div></div>
+        <div class="node"><div class="nm">observability/</div><div class="ds">每 turn run-log + 缓存失效旁路审计（cache-audit）</div></div>
+      </div>
+    </div>
+    <div class="down-arrow"><span class="lbl">import type — 只有类型流动</span><span class="ar">▼</span></div>
+
+    <!-- shared -->
+    <div class="layer-box">
+      <div class="layer-head">
+        <span class="lt">packages/shared</span>
+        <span class="lp">契约层 · 全项目的"宪法"</span>
+      </div>
+      <div class="grid g4">
+        <div class="node"><div class="nm">session.ts</div><div class="ds"><b style="color:var(--amber)">最核心的数据结构</b>：SessionEvent（15 种 type）、各类 Payload、RuntimeStreamEvent</div></div>
+        <div class="node"><div class="nm">ipc.ts</div><div class="ds">Renderer↔Main 全部 IPC 协议：RunTurnInput、AgentTurnResult 等</div></div>
+        <div class="node"><div class="nm">model-config.ts</div><div class="ds">MODEL_REGISTRY：模型 id、contextWindow（DeepSeek 1M / Kimi 256K）、价格、thinking 能力</div></div>
+        <div class="node"><div class="nm">kairos-contracts.ts<br>kairos-aggregator.ts</div><div class="ds">Kairos IPC 契约 + 事件流→UI 表格行的聚合纯函数（前后端共用）</div></div>
+        <div class="node"><div class="nm">settings.ts</div><div class="ds">设置 schema（模型选择 / thinking 三态 / Kairos 偏好）</div></div>
+        <div class="node"><div class="nm">context-buckets.ts</div><div class="ds">CONTEXT_BUCKET_REGISTRY：上下文用量分桶的单一事实来源</div></div>
+        <div class="node"><div class="nm">session-selectors.ts</div><div class="ds">事件流派生只读视图的共享 selector</div></div>
+      </div>
+    </div>
+    <div class="down-arrow"><span class="lbl">读写均经 main 进程 / agent-core，renderer 永不直接落盘</span><span class="ar">▼</span></div>
+
+    <!-- storage -->
+    <div class="layer-box" style="border-color:var(--good-line);background:var(--good-soft)">
+      <div class="layer-head">
+        <span class="lt" style="color:var(--green)">本地磁盘 &lt;userData&gt;/</span>
+        <span class="lp">JSONL 优先 · 详见 06 节</span>
+      </div>
+      <div class="grid g4">
+        <div class="node"><div class="nm">sessions/</div><div class="ds">主 Agent 会话：session.jsonl + meta.json + subagents/</div></div>
+        <div class="node"><div class="nm">kairos/</div><div class="ds">配置 / 短期记忆 / briefs / 观测游标 / inbox / 笔记</div></div>
+        <div class="node"><div class="nm">settings/ prompts/</div><div class="ds">用户设置、主 Agent 系统提示词 markdown</div></div>
+        <div class="node"><div class="nm">cache-audit/ tmp/ logs/</div><div class="ds">缓存审计快照、bash 大输出落盘、开发日志</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annot">
+    <b>三个核心设计决策</b>：
+    ① 依赖方向单向且通过 dist 产物消费，保证 main 进程编译输出稳定；
+    ② agent-core 是纯 Node 库 → 可单测、可被 Kairos 复用、未来可被 CLI 复用；
+    ③ Renderer 是哑终端 → API Key 永远不进渲染进程，<code>.env</code> 由 <code>agent-core/env.ts</code> 统一管理。
+  </div>
+</section>
+
+<!-- ═══════════════════════ 02 Turn 数据流 ═══════════════════════ -->
+<section id="s2">
+  <div class="sec-head"><span class="sec-num">02 /</span><h2>主线一：一次对话 Turn 的四层数据流</h2></div>
+  <p class="sec-lead">
+    项目最重要的动态主线（事实来源：<code>docs/design-docs/agent-turn-layers.md</code>）。
+    四层各司其职，数据格式在层间逐级翻译，<b style="color:var(--amber)">每层只认自己的协议</b>。
+  </p>
+
+  <div class="panel">
+    <div class="panel-title">Sequence · 从输入到落盘</div>
+    <div class="seq">
+      <div class="seq-row">
+        <div class="seq-actor">① Renderer</div>
+        <div class="seq-steps">
+          <span class="step">Composer 收集 <b>{userInput, model, thinkingEnabled}</b></span><span class="flow-sep">→</span>
+          <span class="step">先把 Workspace 选择写入 session meta</span><span class="flow-sep">→</span>
+          <span class="step hl">IPC: <b>agent:run-turn(RunTurnInput)</b></span>
+        </div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-actor">② Main Process</div>
+        <div class="seq-steps">
+          <span class="step">readMeta → workspaceRoot</span><span class="flow-sep">→</span>
+          <span class="step"><b>buildAgentConfig()</b> 前端参数 + env/settings → AgentConfig</span><span class="flow-sep">→</span>
+          <span class="step"><b>createAgentForSession()</b> 构造期一次性恢复会话历史 → AgentDeps</span><span class="flow-sep">→</span>
+          <span class="step hl">runTurnWithAgent(deps)</span>
+        </div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-actor">③ Bridge</div>
+        <div class="seq-steps">
+          <span class="step">new Agent(deps).run(userInput)</span><span class="flow-sep">→</span>
+          <span class="step">AgentEvent → <b>RuntimeStreamEvent</b> 实时翻译</span><span class="flow-sep">→</span>
+          <span class="step">按 previewKind 聚合 <b>ToolUiPreview</b></span><span class="flow-sep">→</span>
+          <span class="step">汇总 <b>AgentTurnResult</b></span>
+        </div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-actor">④ Agent Loop</div>
+        <div class="seq-steps">
+          <span class="step">每次调 LLM 前 <b>maybeCompact()</b>（超阈值压缩历史）</span><span class="flow-sep">→</span>
+          <span class="step">llm.stream(context)</span><span class="flow-sep">→</span>
+          <span class="step">thinking / text / <b>tool_call</b></span><span class="flow-sep">→</span>
+          <span class="step">ToolManager.execute（权限三态）</span><span class="flow-sep">→</span>
+          <span class="step">结果回填 context，循环直到无工具调用</span>
+        </div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-actor">⑤ 回程</div>
+        <div class="seq-steps">
+          <span class="step">Bridge 流式回调 onStreamEvent</span><span class="flow-sep">→</span>
+          <span class="step">Main <b>webContents.send</b> 推给 Renderer 实时渲染</span><span class="flow-sep">→</span>
+          <span class="step hl">Main 持久化 <b>session.jsonl + meta.json</b>（含 subagents transcript）</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">职责矩阵 · 做什么 / 刻意不做什么</div>
+    <table>
+      <tr><th style="width:120px">层</th><th style="width:280px">核心文件</th><th>做什么</th><th>刻意不做什么</th></tr>
+      <tr><td>Renderer</td><td>renderer/components/Composer.tsx<br>ConversationView.tsx</td><td>收集输入、监听 agent:stream 实时渲染、管理 loading/abort UI 态</td><td class="dim">不读 .env、不碰 API Key、不构造 LLMConfig、不 import agent-core</td></tr>
+      <tr><td>Main</td><td>main/index.ts（路由）<br>main/agent-turn.ts（编排）</td><td>生命周期、IPC 路由、两步装配（config → deps）、结果落盘、abort 闭包</td><td class="dim">不读 session.jsonl、不感知恢复细节（透传 sessionPath 即可）、不处理 Agent 内部事件</td></tr>
+      <tr><td>Bridge</td><td>engine/bridge.ts</td><td>事件协议翻译、ToolUiPreview 聚合、流式 tool_call 预览状态机、SubAgent 事件透传</td><td class="dim">不创建实例、不持久化、不感知 IPC 传输</td></tr>
+      <tr><td>Agent</td><td>engine/agent.ts + loop.ts</td><td>LLM 双层循环、上下文管理、工具执行、产出 AgentEvent 流、支持 abort</td><td class="dim">不知道 Electron 存在、不写盘、不关心 RuntimeStreamEvent 格式</td></tr>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">数据格式翻译链 · 每个箭头都是一次显式转换</div>
+    <div class="chain">
+      <div class="cnode"><div class="t">RunTurnInput</div><div class="d">IPC 入参（shared）</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">AgentConfig</div><div class="d">纯配置对象</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">AgentDeps</div><div class="d">已装配实例（含恢复历史）</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">AgentEvent</div><div class="d">引擎内部事件流</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">RuntimeStreamEvent</div><div class="d">IPC 流式协议（shared）</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">AgentTurnResult</div><div class="d">聚合结果</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">SessionEvent[]</div><div class="d">session.jsonl 落盘</div></div>
+    </div>
+    <div class="annot"><b>例外路径</b>：<code>/compact</code> 命令不进入 RunTurnInput——renderer 检测到 <code>text === "/compact"</code> 直接分流到 <code>context:compact</code> IPC，走 <code>engine/compact-context.ts</code> 手动压缩入口，产出 context_compaction 系列事件。</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ 03 agent-core ═══════════════════════ -->
+<section id="s3">
+  <div class="sec-head"><span class="sec-num">03 /</span><h2>agent-core 八大子系统逐个拆解</h2></div>
+  <p class="sec-lead">每个子系统展开到文件级。点击展开/收起。（事实来源：<code>docs/design-docs/agent-current-module-map.md</code>）</p>
+
+  <!-- llm -->
+  <details open>
+    <summary><span class="st">llm/</span><span class="sd">模型服务层 —— 核心设计：协议与品牌分离</span></summary>
+    <div class="body">
+      <div class="chain">
+        <div class="cnode"><div class="t">factory.ts</div><div class="d">createLLMService 按 LLMConfig.api 选协议</div></div>
+        <div class="carr">─▶</div>
+        <div class="cnode" style="border-color:var(--warn-line);background:var(--warn-soft)"><div class="t">transform-messages.ts</div><div class="d">跨协议公共预处理</div></div>
+        <div class="carr">─▶</div>
+        <div class="cnode"><div class="t">协议服务 ×2</div><div class="d">真正干活的层</div></div>
+        <div class="carr">─▶</div>
+        <div class="cnode"><div class="t">品牌包装 ×4</div><div class="d">只填默认值的薄壳</div></div>
+      </div>
+      <table>
+        <tr><th style="width:280px">文件</th><th>职责</th></tr>
+        <tr><td>types.ts</td><td>LLMConfig（api / apiFormat / input 拆分）、StreamOptions、LLMService 接口、事件流类型；error 事件携带完整 AssistantMessage（含部分内容 + stopReason）而非裸 Error</td></tr>
+        <tr><td>transform-messages.ts</td><td><span class="tag amber">预处理层</span>图片降级、thinking 降级、tool call id 规范化、孤儿 tool result 修复、error/aborted 消息过滤——两个协议服务都先过这层</td></tr>
+        <tr><td>services/openai-completions.ts</td><td><span class="tag cyan">协议服务</span>OpenAI Chat Completions 协议实现：消息转换、流式 tool call 重组、usage 归一</td></tr>
+        <tr><td>services/anthropic-messages.ts</td><td><span class="tag cyan">协议服务</span>Anthropic Messages 协议实现：system/messages/tools 转换、thinking 块（含 signature 回传）、真流式累积</td></tr>
+        <tr><td>convert.ts / anthropic-convert.ts</td><td>两套协议各自的转换函数库：Context↔API 消息、工具转换、chunk 处理、SDK 错误映射</td></tr>
+        <tr><td>services/deepseek.ts<br>services/deepseek-anthropic.ts<br>services/kimi.ts</td><td><span class="tag violet">品牌包装</span>只负责 provider 默认值与 api 兜底，内部复用协议服务；Kimi 额外保留 <code>$web_search</code> builtin helper</td></tr>
+        <tr><td>services/mock.ts</td><td>MockLLMService：response queue 模式 + mockText/mockToolCall/mockError 工厂，全部单测的地基</td></tr>
+        <tr><td>kimi-assistants.ts</td><td><span class="tag green">混合能力</span>DeepSeek 当主模型时借 Kimi 做 searchWithKimi（搜索+爬取）与 analyzeMediaWithKimi（多模态分析）</td></tr>
+      </table>
+      <div class="annot"><b>为什么这样分</b>：新接一个 OpenAI 兼容的模型 = 写一个十几行的品牌包装；消息转换 / usage 归一逻辑永远只有两份（每协议一份），不随品牌数量增长。</div>
+    </div>
+  </details>
+
+  <!-- context -->
+  <details>
+    <summary><span class="st">context/</span><span class="sd">上下文管道 —— 核心设计：缓存稳定性分层 + 两阶段压缩</span></summary>
+    <div class="body">
+      <table>
+        <tr><th style="width:280px">文件</th><th>职责</th></tr>
+        <tr><td>types.ts</td><td>ContextModule / PromptSegment / CompressionConfig（contextWindow、compressionThreshold、compressKeepRatio、compactMinIntervalCalls 等全部默认值的单一来源）+ <b>CACHE_STABILITY 档位</b></td></tr>
+        <tr><td>manager.ts</td><td>ContextManager 编排器：buildSystemPrompt 按 stability 降序稳定排序；createForSession 会话恢复入口；compactIfNeeded（自动）/ compactNow（手动 /compact）</td></tr>
+        <tr><td>modules/system-prompt.ts</td><td>分段系统提示词：核心段 IMMUTABLE，registerSegment 默认 STABLE；排序键「stability ↓ → priority ↓ → id ↑」保证逐字节确定性</td></tr>
+        <tr><td>modules/conversation.ts</td><td>会话历史模块：createFromSession 一次性恢复；<b>planCompaction</b>（只读找安全切点：不拆 tool 配对、不动区以 assistant turn 开头）+ <b>applyCompaction</b>（摘要替换可压区）</td></tr>
+        <tr><td>compression/summarizer.ts</td><td>flash 模型摘要封装（summarizeToolOutput / summarizeHistory），不可用时抛 SummarizerUnavailableError</td></tr>
+        <tr><td>compression/history-compactor.ts</td><td>compactHistory：可压区序列化 → 摘要 → 合成 source:"compaction" 的 UserMessage 替换；摘要不可用兜底「丢最旧 + 指针」</td></tr>
+        <tr><td>compression/*-prompts.ts</td><td>历史摘要 8 节 prompt（ClaudeCode 风格）+ 按 previewKind 选工具摘要 prompt + compressedNotice 标记</td></tr>
+        <tr><td>token-estimator.ts</td><td>字符数/3.5 估算；createContextUsageSnapshot 按 CONTEXT_BUCKET_REGISTRY 生成用量分桶</td></tr>
+      </table>
+      <table>
+        <tr><th>CACHE_STABILITY 档位</th><th>值</th><th>典型内容</th></tr>
+        <tr><td>IMMUTABLE</td><td>100</td><td>主系统提示词核心段</td></tr>
+        <tr><td>STABLE</td><td>70</td><td>AGENTS.md rules、skills catalog</td></tr>
+        <tr><td>SEMI</td><td>40</td><td>低频变化的注入段</td></tr>
+        <tr><td>VOLATILE</td><td>10</td><td>易变内容，强制排在最后</td></tr>
+      </table>
+      <div class="annot"><b>设计动机</b>：DeepSeek 按 64-token 块匹配前缀缓存。把"越不变的内容排越前"做成机制（而非约定），缓存命中率才可持续——主 Agent 的 system prompt 排序和 Kairos 的「静态前缀 + 动态尾部」是同一原则的两处落地。</div>
+    </div>
+  </details>
+
+  <!-- tools -->
+  <details>
+    <summary><span class="st">tools/</span><span class="sd">工具系统 —— 核心设计：权限三态 + 路径守卫 + 大输出裁剪</span></summary>
+    <div class="body">
+      <div class="chain">
+        <div class="cnode"><div class="t">manager.ts</div><div class="d">注册 / 导出定义</div></div>
+        <div class="carr">─▶</div>
+        <div class="cnode" style="border-color:var(--warn-line);background:var(--warn-soft)"><div class="t">scheduler.ts</div><div class="d">权限三态 → 执行 → 渲染裁剪</div></div>
+        <div class="carr">─▶</div>
+        <div class="cnode"><div class="t">workspace-guard</div><div class="d">写严读宽</div></div>
+        <div class="carr">─▶</div>
+        <div class="cnode"><div class="t">executor</div><div class="d">每工具一目录</div></div>
+        <div class="carr">─▶</div>
+        <div class="cnode"><div class="t">output-truncator</div><div class="d">摘要 / 截断兜底</div></div>
+      </div>
+
+      <table>
+        <tr><th style="width:160px">工具（对外名）</th><th style="width:110px">previewKind</th><th>要点</th></tr>
+        <tr><td>read_file</td><td>file</td><td>读类走 resolveReadablePath：<b>只解析不越界</b>（为回读 tmp 落盘文件和 session.jsonl）</td></tr>
+        <tr><td>list_directory / grep / glob</td><td>text</td><td>grep/glob 基于 ripgrep（ACTSPACE_RG_PATH → 系统 rg → bundled @vscode/ripgrep 三级解析）</td></tr>
+        <tr><td>edit_file</td><td>diff</td><td>diff 库生成 unified diff + 原子写入（tmpfile→fsync→rename）；new_string:"" 是删内容不是删文件</td></tr>
+        <tr><td>write_file</td><td>diff</td><td>创建/覆写 + 生成 diff；流式时 partial args 可边写边预览（streamingContent）</td></tr>
+        <tr><td>delete_file</td><td>diff</td><td>只删 workspace 内普通文件；<b>默认一次性审批且禁止 allow_similar</b></td></tr>
+        <tr><td>bash</td><td>bash</td><td>受控子进程（run-process）：timeout、流式落盘 sink、内存只留头部、超 diskCap 标记 truncated</td></tr>
+        <tr><td>web_search / analyze_media</td><td>text</td><td><span class="tag green">DeepSeek-only</span>借 Kimi $web_search / 多模态；仅 DeepSeek 主模型 + 有 Kimi key 时注册</td></tr>
+        <tr><td>agent（Explore 子智能体）</td><td>agent</td><td>隔离 runtime：只注册 4 个只读工具、不恢复主历史、禁止递归；transcript 落 sidecar 文件，主 session 只存调用/结果</td></tr>
+      </table>
+
+      <table>
+        <tr><th>机制</th><th>说明</th></tr>
+        <tr><td>权限三态</td><td><b>allow</b> 直接执行；<b>ask</b> 经 ApprovalGate 暂停 → 弹审批卡片（approve_once / deny / 超时）；<b>deny</b> 拒绝。allow_similar 只在工具权限显式允许时生效</td></tr>
+        <tr><td>路径守卫</td><td>写类工具 guardWorkspacePath <b>严格不许越界</b>；读类 resolveReadablePath 放宽，workspace 外结果展示绝对路径</td></tr>
+        <tr><td>大输出两策略</td><td>bash：executor 自处理（流式落盘 + 头部截断 + outputRef 文件引用）；其它工具：output-truncator → 超阈值先 headTail 截断再送 flash 摘要，摘要不可用回退确定性截断，回填时拼 compressedNotice</td></tr>
+        <tr><td>落盘清理</td><td>cleanup-tool-outputs：按 mtime 删 7 天前的 tool-output 文件，desktop 在 turn 起始 best-effort 调用</td></tr>
+        <tr><td>暴露筛选</td><td>exposeOnlyTo: "deepseek" | "kimi" 做轻量按模型暴露；previewKind 是前端渲染语义的强制契约</td></tr>
+      </table>
+    </div>
+  </details>
+
+  <!-- engine -->
+  <details>
+    <summary><span class="st">engine/</span><span class="sd">执行引擎 —— 核心设计：纯函数双层循环 + 厚翻译层 Bridge</span></summary>
+    <div class="body">
+      <table>
+        <tr><th style="width:280px">文件</th><th>职责</th></tr>
+        <tr><td>loop.ts</td><td><b>runAgentLoop 纯函数双层循环</b>：内层「LLM → tool_call → 执行 → 回填 → 再 LLM」直到无工具调用；外层跟进轮次。每次调 LLM 前 await maybeCompact()，压缩后刷新 messages 引用并 emit context_compaction；前后钩 cacheAudit</td></tr>
+        <tr><td>agent.ts</td><td>Agent 入口类（run/abort）：编排 ContextManager + ToolManager + LLMService，把 compactIfNeeded 包成 maybeCompact 传给 loop</td></tr>
+        <tr><td>bridge.ts</td><td><b>最厚的一层</b>：AgentEvent→RuntimeStreamEvent 翻译；tool_call_delta 流式状态机（partial args 累积 + 50ms throttle）；previewKind→ToolUiPreview 聚合；SubAgent 事件透传；llm_usage 写入 cacheAudit 元数据；context_compaction 落 run-log + 生成 SessionEvent</td></tr>
+        <tr><td>create-agent-deps.ts</td><td>两步装配：<b>buildAgentConfig</b>（纯配置，注入 systemPrompt / rules / skills segment、tmpRoot、sessionId）→ <b>createAgentForSession</b>（async，构造期恢复历史）或 createAgentFromConfig（同步，mock/测试）；createSummarizerForAgent 用 deepseek-v4-flash</td></tr>
+        <tr><td>compact-context.ts</td><td>手动 /compact 后端入口：发 started/progress/finished/failed 流事件，调 compactNow，产出 context_compaction + context_snapshot 事件</td></tr>
+        <tr><td>partial-args.ts</td><td>partial JSON 字符串字段提取状态机（正确处理转义），流式预览的地基</td></tr>
+        <tr><td>streaming-preview-extractors.ts</td><td>按 previewKind 注册的 extractor 表：write_file 边流边出 path+content；edit/delete 只出 path。新工具注册一行即可</td></tr>
+        <tr><td>types.ts</td><td>AgentEvent 判别联合、AgentLoopConfig（maybeCompact / cacheAudit / toolExecuteOptions）、AgentLoopResult</td></tr>
+      </table>
+    </div>
+  </details>
+
+  <!-- persistence -->
+  <details>
+    <summary><span class="st">persistence/</span><span class="sd">持久化与恢复 —— JSONL 事件溯源的读写两端</span></summary>
+    <div class="body">
+      <table>
+        <tr><th style="width:280px">文件</th><th>职责</th></tr>
+        <tr><td>jsonl.ts</td><td>健壮 JSONL 读写：坏行容错（跳过不炸）+ 结构化错误传播</td></tr>
+        <tr><td>meta.ts</td><td>meta.json 增量更新：turnCount / updatedAt / lastModel / workspaceRoot</td></tr>
+        <tr><td>recovery.ts</td><td><b>多维恢复</b>：同一事件流分别重建 → LLM Messages（续聊）/ UI Blocks（渲染）/ Snapshot / DiffSummary</td></tr>
+        <tr><td>session-store.ts</td><td>会话生命周期 create/ensure/write/read/list；writeSessionResult 把 SubAgent transcript 写 <code>subagents/&lt;turnId&gt;/&lt;runId&gt;.jsonl</code>；readSubAgentTranscript 带路径穿越校验</td></tr>
+        <tr><td>usage-statistics.ts</td><td>跨 session 用量统计聚合（Usage 页数据源）</td></tr>
+      </table>
+    </div>
+  </details>
+
+  <!-- skills + prompt -->
+  <details>
+    <summary><span class="st">skills/ + prompt/</span><span class="sd">能力资产 —— 懒加载上下文的典型实现</span></summary>
+    <div class="body">
+      <table>
+        <tr><th style="width:280px">文件</th><th>职责</th></tr>
+        <tr><td>skills/registry.ts</td><td>按 7 个根目录顺序扫描 SKILL.md（workspace 的 .actspace/.agents/.claude → userData → home），同名 first-win，后者进 shadowed</td></tr>
+        <tr><td>skills/catalog.ts</td><td>渲染 &lt;available_skills&gt; XML catalog 注入 system prompt——<b>只注入元信息和绝对路径</b>，正文由 Agent 任务匹配时自己 read_file</td></tr>
+        <tr><td>skills/frontmatter.ts</td><td>轻量 frontmatter parser，缺字段用目录名兜底 + warning，不阻断 turn</td></tr>
+        <tr><td>prompt/main-agent.ts</td><td>主 Agent 默认系统提示词（用户可用 <code>&lt;userData&gt;/prompts/main-agent.md</code> 覆盖）</td></tr>
+        <tr><td>prompt/lab-agent.ts</td><td>Lab Agent 提示词资产（含 Kairos inbox handoff 规则），后端运行时未接</td></tr>
+        <tr><td>prompt/kimi-assistants/</td><td>web_search / analyze_media 的系统提示词</td></tr>
+      </table>
+    </div>
+  </details>
+
+  <!-- observability -->
+  <details>
+    <summary><span class="st">observability/ + env.ts</span><span class="sd">排障与环境 —— 旁路审计，不干扰主链路</span></summary>
+    <div class="body">
+      <table>
+        <tr><th style="width:280px">文件</th><th>职责</th></tr>
+        <tr><td>agent-run-log.ts</td><td>每 turn 一个 JSONL run-log：用户输入 → main 边界 → AgentEvent → RuntimeStreamEvent → 最终结果全链路；自动清理 24h 前日志</td></tr>
+        <tr><td>cache-audit.ts</td><td><b>缓存失效旁路审计</b>：调用前对真实 Context 做稳定 hash 指纹 + 与滚动 last.context.json 做 prefix 比较；返回后按 usage 算命中率，低于阈值固化 summary + 前后 context + diff 到 cache-audit/ 目录</td></tr>
+        <tr><td>env.ts</td><td>集中式环境变量：自带 .env parser（零依赖）、Schema 驱动校验、冻结只读 proxy；EnvValidationError 聚合全部问题</td></tr>
+      </table>
+    </div>
+  </details>
+
+  <!-- kairos pointer -->
+  <details>
+    <summary><span class="st">kairos/</span><span class="sd">自治 Agent —— 单独一节深潜（见 04）</span></summary>
+    <div class="body">
+      <p style="font-size:13.5px;color:var(--text-dim)">
+        Kairos 复用上面全部内核（LLMService / ToolManager / runAgentLoop / SessionEvent），自身只新增「调度 + 配置 + 观测 + 短期记忆」四组能力。模块清单与运行机制见下一节。
+      </p>
+    </div>
+  </details>
+</section>
+
+<!-- ═══════════════════════ 04 Kairos ═══════════════════════ -->
+<section id="s4">
+  <div class="sec-head"><span class="sec-num">04 /</span><h2>主线二：Kairos 自治循环深潜</h2></div>
+  <p class="sec-lead">
+    Kairos 是常驻的"主动 Agent"：tick 驱动、可被打断、自带记忆。
+    （事实来源：<code>docs/design-docs/agent-kairos-autonomous-mode.md</code>）
+  </p>
+
+  <div class="panel">
+    <div class="panel-title">单次 Tick 生命周期 · runner.processTick</div>
+    <div class="chain">
+      <div class="cnode"><div class="t">1 取消息</div><div class="d">队列 / briefs.pickNext / wakeNow</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">2 刷观测</div><div class="d">watch-diff + sessions-digest + inbox（只算不提交）</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">3 组上下文</div><div class="d">静态 system prompt + 历史重放 + tick 动态尾部</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode" style="border-color:var(--warn-line);background:var(--warn-soft)"><div class="t">4 跑循环</div><div class="d">复用 runAgentLoop（callerAgent:"kairos" + guard）</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">5 落事件</div><div class="d">thinking→text→tool_call 按现场块序写 jsonl</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">6 提交游标</div><div class="d">tick 成功才 commit 观测水位</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">7 入睡</div><div class="d">解析 sleep(seconds) → 可中断睡眠</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode" style="border-color:var(--good-line);background:var(--good-soft)"><div class="t">8 后台压缩</div><div class="d">onSleepStart 异步检查记忆阈值</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">上下文组装 · 静态前缀 + 动态尾部（缓存优化核心）</div>
+    <table>
+      <tr><th style="width:200px">区段</th><th style="width:120px">变化频率</th><th>内容</th></tr>
+      <tr><td>system prompt</td><td><span class="tag green">静态</span></td><td>固定指令 + config tips + rule.md + 历史摘要（仅压缩产出新摘要时变化）——逐字节稳定，prefix cache 长期复用</td></tr>
+      <tr><td>messages[历史]</td><td><span class="tag cyan">append-only</span></td><td>短期记忆 jsonl 重放：同 turn 的 thinking/assistant/tool_call 合并回单条 AssistantMessage，块序与现场一致（重放保真）</td></tr>
+      <tr><td>messages[尾部]</td><td><span class="tag amber">每 tick 新增</span></td><td><code>&lt;tick&gt;</code> 消息：当前时间（分钟粒度）/ phase / 活跃 briefs 数 + <b>增量</b>观测（watch diffs / sessions digest / inbox 新消息）+ 任务正文。发送 = 落盘 = 重放同一字符串</td></tr>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">模块清单 · kairos/ 全目录</div>
+    <table>
+      <tr><th style="width:250px">模块</th><th>职责</th></tr>
+      <tr><td>controller.ts</td><td><b>装配中枢</b>：createKairos 串起全部子模块；eventSink 严格「写盘 → ring buffer → UI 回调」；额度护栏（llm_usage 扣减余额、耗尽 halt + 持久化 enabled=false）；优雅退出 shutdown（abort 在飞请求 + flush）；reloadConfig 热更新</td></tr>
+      <tr><td>scheduler.ts</td><td>MessageQueue FIFO + QueueProcessor 主循环：可中断 sleep（Promise+setTimeout）、mainAgentBusy 礼让主 Agent、连续失败 errorThreshold 次进 cooldown、rhythm 偏好调节睡眠系数、canStartTick 额度闸门</td></tr>
+      <tr><td>runner.ts</td><td>KairosRunner.processTick：上面 8 步生命周期的 1–6 步；message_end 时按现场块序产出事件（重放保真的写入端）</td></tr>
+      <tr><td>prompt-assembler.ts + prompt.ts</td><td>静态 system prompt 模板与拼装；assembleTickMessage 组动态尾部；buildObservationDelta 渲染增量观测（无新观测则省略）</td></tr>
+      <tr><td>briefs/</td><td>任务卡系统：用户写 <code>briefs/tasks/&lt;id&gt;.md</code>（frontmatter 含 intervalSec）；index-manager 维护 lastRun/nextRun；dispatcher.pickNext 在队列空时选下一个到期任务</td></tr>
+      <tr><td>context/（观测三件套）</td><td><b>watch-scanner + watch-diff</b>：手写递归遍历 + sha1 manifest 对比文件变更；<b>sessions-digest</b>：扫主 Agent 会话目录出 unread turns 鸟瞰；<b>short-term</b>：token budget 倒序加载历史 + sanitize 工具孤儿 + estimateDiskTokens 全量估算</td></tr>
+      <tr><td>inbox.ts</td><td>Agent 间文件信箱 <code>inbox/main-agent.md</code>：主 Agent 写、Kairos 读；带已读水位（ISO 时间戳游标），只注入新消息</td></tr>
+      <tr><td>storage/</td><td><b>short-memory-store</b>：按月目录 + 按日 jsonl + reset 分卷（_001…）；<b>ring-buffer</b>：内存 200 条供 UI 首屏；<b>usage-accumulator / budget-store</b>：用量总账（只增）与额度余额（可扣减），debounce + 原子写</td></tr>
+      <tr><td>compression/</td><td><b>trigger.ts</b>：tick 闭合后异步判定「全量磁盘 token ≥ contextWindow × 0.85」→ 取前天往前未覆盖日期（≤7 天、同自然月）→ <b>compressor.ts</b> 调 LLM 压成 week_*.summary.md；失败仅 warning；写 context_compaction 事件留痕</td></tr>
+      <tr><td>guard/</td><td>extract-paths（集中声明哪些工具参数是路径）+ blocklist-check（手写 globToRegex）；被 ToolScheduler 的 checkKairosGuard 调用，仅 callerAgent==="kairos" 激活：路径白名单 + blocklist 双校验</td></tr>
+      <tr><td>config/</td><td>4 份配置的手写 schema 校验：preferences.json（节律/记忆/熔断）、paths.json（可见路径+watch 标记）、blocklist.json（toolsDenied 默认含 bash）、rule.md（用户规则直入 prompt）</td></tr>
+      <tr><td>tools/sleep.ts</td><td>Kairos 专属工具：executor 只"记账"返回 seconds，真正睡眠由 scheduler 在 tick 后执行</td></tr>
+      <tr><td>aggregator.ts / env.ts</td><td>shared 聚合函数的薄 re-export；resolveKairosEnv 解析模型/思考开关/contextWindow（接 MODEL_REGISTRY）</td></tr>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">记忆分层 · 无限累积，只压缩不清理</div>
+    <div class="chain">
+      <div class="cnode"><div class="t">当日 jsonl</div><div class="d">SessionEvent 原文（今天/昨天保留原文）</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">week_*.summary.md</div><div class="d">超阈值时压前天往前 ≤7 天</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">month_*.summary.md</div><div class="d">月度归档（内部 brief，规划中）</div></div>
+      <div class="carr">─▶</div>
+      <div class="cnode"><div class="t">year_*.summary.md</div><div class="d">年度归档（规划中）</div></div>
+    </div>
+    <div class="annot">
+      <b>两个易踩的坑</b>（已修复并写入 learnings）：
+      ① 阈值判定必须用<b>未截断的全量磁盘估算</b>——load() 受 75% budget 截断，恒小于 85% 阈值，用它判定则压缩永不触发；
+      ② week summary 落首日所在月目录，而覆盖判定只查日期自己的月目录 → <b>压缩批次必须限定同一自然月</b>，否则跨月日期被重复加载。
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">与主 Agent 的内核复用边界</div>
+    <table>
+      <tr><th style="width:240px">共享内核</th><th style="width:340px">主 Agent 外壳</th><th>Kairos 外壳</th></tr>
+      <tr>
+        <td>LLMService<br>ToolManager + ToolScheduler<br>runAgentLoop<br>SessionEvent schema</td>
+        <td class="dim">engine/bridge.ts 推 RuntimeStreamEvent 到聊天区；session-store 写主 session.jsonl；权限审批走 ApprovalGate 弹卡片</td>
+        <td class="dim">runner + controller.eventSink 推 SessionEvent 到 KairosPage；写 memory/short-term jsonl；工具额外过 kairosGuard 白名单；专属 sleep 工具</td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════ 05 Desktop ═══════════════════════ -->
+<section id="s5">
+  <div class="sec-head"><span class="sec-num">05 /</span><h2>Desktop 拆解：Main Services 与 Renderer 组件</h2></div>
+  <p class="sec-lead">main 进程按域拆成一组 service；renderer 按「布局 → 消息块 → 右侧面板 → 设置」分层。</p>
+
+  <details open>
+    <summary><span class="st">src/main/</span><span class="sd">主进程 service 清单（按域拆分，index.ts 只做路由）</span></summary>
+    <div class="body">
+      <table>
+        <tr><th style="width:280px">文件</th><th>职责</th></tr>
+        <tr><td>index.ts</td><td>Electron 生命周期 + IPC handler 注册 + <b>before-quit 优雅退出</b>（preventDefault → 发 app:shutting-down → await kairos.shutdown() → app.exit，5s 超时兜底）</td></tr>
+        <tr><td>agent-turn.ts</td><td>runAndPersistTurn：02 节四层数据流里 Main 层的编排实现</td></tr>
+        <tr><td>agent-runtime-context.ts<br>agents-md-service.ts</td><td>主 Agent runtime context 装配：读 prompts/main-agent.md 主提示词 + 加载 userData 与 workspace 两份 AGENTS.md 作 rules segment + Kairos handoff 段 + Skill catalog 注入。<b>真实 turn、context:describe、/compact 共用同一 loader</b>（防上下文视图与 LLM 实际输入漂移）</td></tr>
+        <tr><td>kairos-bootstrap.ts</td><td>ensureKairosScaffolding 幂等建目录落默认配置；createKairosLlm / createKairosToolManagerFactory（合并 blocklist.toolsDenied）；resolveKairosContextWindow 接 MODEL_REGISTRY</td></tr>
+        <tr><td>kairos-ipc.ts + kairos-ipc-internals.ts</td><td>kairos:* invoke handler + 50ms debounce 推 event/state 到 renderer；dispatchKairosControl 纯逻辑分派（start/stop/wake/reset/set_budget…）</td></tr>
+        <tr><td>settings-service.ts</td><td>设置读写（模型选择 / thinking 三态 / Kairos 偏好 / 主提示词）</td></tr>
+        <tr><td>context-compact.ts<br>context-describe-service.ts</td><td>手动 /compact 编排；按需重建某 session 的 Context 明细（不调 LLM），供"上下文检查"视图</td></tr>
+        <tr><td>approval-registry.ts</td><td>pending 工具审批登记处：ask 态工具在此等待用户 approve/deny</td></tr>
+        <tr><td>review-git-service.ts</td><td>Review 功能：git diff 解析 + 大文件/二进制防御</td></tr>
+        <tr><td>workspace-fs-service.ts<br>workspace-registry-service.ts</td><td>workspace 文件树读取；多 workspace 注册管理</td></tr>
+        <tr><td>session-preview-service.ts</td><td>侧栏 hover 会话预览数据</td></tr>
+        <tr><td>media-analysis.ts / visualize-service.ts</td><td>附件多模态分析（走 Kimi）；md→HTML 可视化渲染服务</td></tr>
+        <tr><td>local-update-service.ts / app-paths.ts</td><td>本地更新检查；userData 路径配置</td></tr>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary><span class="st">src/renderer/</span><span class="sd">渲染进程组件分层</span></summary>
+    <div class="body">
+      <table>
+        <tr><th style="width:280px">层 / 组件</th><th>职责</th></tr>
+        <tr><td>WorkbenchLayout + SplitView<br>Sidebar / WindowChromeBar</td><td>工作台骨架：左侧会话列表 + 中间聊天 + 右侧面板的可拖拽分栏</td></tr>
+        <tr><td>ConversationView + Composer</td><td>聊天主区：流式渲染 + 输入框（model 选择 / thinking 开关 / 附件 / /compact 分流）</td></tr>
+        <tr><td>messages/*（消息块家族）</td><td>每种事件一个块组件：AssistantReply、ThinkingBlock、FileDiffBlock、BashRunBlock、AgentRunBlock（子智能体）、ExploreRunBlock、DeleteFileBlock、CompactCommandBlock、ToolActivityGroup（工具折叠组）、SubAgentTranscriptModal</td></tr>
+        <tr><td>right-panel/*</td><td>右侧多视图：WorkspaceFileTree、Markdown/Html/Reply 渲染视图、ReviewRenderView（代码评审）、ContextRenderView（上下文检查）、KairosRightPanelView；RightPanelContext 管理对象路由</td></tr>
+        <tr><td>KairosPage + kairos/KairosContextSheet</td><td>Kairos 监控台：两列式执行流（tick/thinking/tool/reply/sleep 行）+ 详情 Tab（含思考过程）+ 上下文快照 Sheet</td></tr>
+        <tr><td>settings/*</td><td>SettingsPage + KairosSettings（额度限制/剩余额度）+ tool-catalog（工具权限目录）</td></tr>
+        <tr><td>state/（useKairos / kairosSelectors）</td><td>Kairos 事件流订阅（上限 500 条）+ 行聚合 selector</td></tr>
+        <tr><td>appearance/</td><td>三态主题机制（浅/深/跟随系统）——<b>所有颜色必须随主题翻转，禁止非主题感知字面量</b></td></tr>
+      </table>
+    </div>
+  </details>
+</section>
+
+<!-- ═══════════════════════ 06 存储 ═══════════════════════ -->
+<section id="s6">
+  <div class="sec-head"><span class="sec-num">06 /</span><h2>存储布局：一切真相都在磁盘上</h2></div>
+  <p class="sec-lead">本地优先、JSONL 优先。UI 状态、LLM 上下文、用量统计全部可以从这些文件重建。</p>
+
+  <div class="tree">
+<span class="dir">&lt;userData&gt;/</span>                                    <span class="cm">← Electron app.getPath("userData")</span>
+├─ <span class="dir">sessions/actspace-agent/&lt;sessionId&gt;/</span>
+│  ├─ <span class="hl">session.jsonl</span>                          <span class="cm">← 主 Agent 事件流（每行一条 SessionEvent，事实唯一来源）</span>
+│  ├─ <span class="file">meta.json</span>                              <span class="cm">← turnCount / updatedAt / lastModel / workspaceRoot</span>
+│  ├─ <span class="file">context-state.json</span>                     <span class="cm">← 最近一次上下文用量快照</span>
+│  └─ <span class="dir">subagents/&lt;turnId&gt;/&lt;runId&gt;.jsonl</span>       <span class="cm">← Explore 子智能体 transcript（sidecar，不混入主流）</span>
+├─ <span class="dir">kairos/</span>
+│  ├─ <span class="dir">config/</span>                                <span class="cm">← 4 份用户可编辑配置</span>
+│  │  ├─ <span class="file">preferences.json</span>                    <span class="cm">← enabled / rhythm / memory 阈值 / 熔断</span>
+│  │  ├─ <span class="file">paths.json</span>  <span class="file">blocklist.json</span>  <span class="file">rule.md</span> <span class="cm">← 可见路径 / 工具与路径黑名单 / 用户规则</span>
+│  ├─ <span class="dir">memory/</span>
+│  │  ├─ <span class="dir">short-term/&lt;YYYY-MM&gt;/</span>
+│  │  │  ├─ <span class="hl">&lt;YYYY-MM-DD&gt;.jsonl</span> <span class="file">(_001…)</span>      <span class="cm">← 短期记忆（reset_today 分卷）</span>
+│  │  │  └─ <span class="hl">week_MM-DD_to_MM-DD.summary.md</span>   <span class="cm">← 压缩产物，覆盖对应日期的原文加载</span>
+│  │  ├─ <span class="file">usage-accumulator.json</span>              <span class="cm">← 用量总账（lifetime + sinceReset，只增）</span>
+│  │  └─ <span class="file">budget-state.json</span>                   <span class="cm">← 额度余额（可扣减）</span>
+│  ├─ <span class="dir">briefs/</span> <span class="file">tasks/*.md</span> + <span class="file">index.json</span>        <span class="cm">← 任务卡 + lastRun/nextRun 索引</span>
+│  ├─ <span class="dir">observe/</span>                               <span class="cm">← 观测游标（全部 tick 成功才提交）</span>
+│  │  ├─ <span class="dir">watch-manifests/</span> <span class="file">sessions-state.json</span> <span class="file">inbox-state.json</span> <span class="file">sessions-digest.json</span>
+│  ├─ <span class="dir">inbox/</span> <span class="file">main-agent.md</span> <span class="file">lab-agent.md</span>     <span class="cm">← Agent 间文件信箱（append-only）</span>
+│  └─ <span class="dir">workspace/notes/</span>                       <span class="cm">← Kairos 自己沉淀的笔记</span>
+├─ <span class="dir">prompts/</span> <span class="file">main-agent.md</span>                     <span class="cm">← 主 Agent 系统提示词（用户可改）</span>
+├─ <span class="dir">settings/</span>                                 <span class="cm">← 应用设置</span>
+├─ <span class="dir">skills/</span>                                   <span class="cm">← 用户级 Skill</span>
+├─ <span class="dir">cache-audit/&lt;sessionId&gt;/&lt;auditId&gt;/</span>        <span class="cm">← 低命中率时固化的 context diff 现场</span>
+├─ <span class="dir">tmp/tool-output/&lt;sessionId&gt;/</span>              <span class="cm">← bash 大输出落盘（7 天自动清理）</span>
+└─ <span class="dir">agent-run-logs/</span>                           <span class="cm">← 每 turn 一个排障 jsonl（24h 清理）</span>
+
+<span class="dir">&lt;repo&gt;/logs/</span>                                  <span class="cm">← pnpm dev:log 的开发日志（latest-dev.log）</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════ 07 设计思想 ═══════════════════════ -->
+<section id="s7">
+  <div class="sec-head"><span class="sec-num">07 /</span><h2>七个全局设计思想</h2></div>
+  <p class="sec-lead">画图时建议把这些作为"图例注释"写在边上——它们解释了为什么模块长成这个形状。</p>
+
+  <div class="principles">
+    <div class="pcard"><span class="pnum">01</span>
+      <h4>事件溯源（Event Sourcing）</h4>
+      <p>一切真相都是 <b>SessionEvent 的 append-only JSONL 流</b>。UI 状态、LLM 上下文、用量统计、Kairos 记忆全部从事件流重建；坏行容错跳过，永不让一行垃圾炸掉整个会话。</p>
+    </div>
+    <div class="pcard"><span class="pnum">02</span>
+      <h4>协议翻译链，每层只认自己的协议</h4>
+      <p><b>AgentEvent →（Bridge）→ RuntimeStreamEvent →（IPC）→ React 状态</b>。引擎不知道 IPC，渲染层不知道引擎；改任何一层协议只动翻译器，不渗透。</p>
+    </div>
+    <div class="pcard"><span class="pnum">03</span>
+      <h4>静态前缀 + 动态尾部</h4>
+      <p>上下文中<b>越靠前的内容变化频率必须越低</b>。主 Agent 用 CACHE_STABILITY 档位排序，Kairos 用纯静态 system prompt + tick 尾部消息——同一原则，两处落地，为 DeepSeek 64-token 块前缀缓存服务。</p>
+    </div>
+    <div class="pcard"><span class="pnum">04</span>
+      <h4>内核复用，外壳分叉</h4>
+      <p>主 Agent 与 Kairos 共享 <b>LLMService / ToolManager / runAgentLoop</b> 内核；差异全部留在外壳（bridge 推聊天区 vs eventSink 写短期记忆），新增第三种 Agent 形态时内核零改动。</p>
+    </div>
+    <div class="pcard"><span class="pnum">05</span>
+      <h4>计算 / 提交分离 + 非关键路径异步化</h4>
+      <p>观测游标只在 <b>tick 成功闭合后提交</b>（at-least-once，失败不丢增量）；压缩、摘要、审计全部后台跑、失败可跳过，绝不阻塞主循环。"看一眼"（快照预览）不消耗状态。</p>
+    </div>
+    <div class="pcard"><span class="pnum">06</span>
+      <h4>密钥与权限的硬边界</h4>
+      <p>API Key 只活在 main 进程的 env 层；写类工具严格不越界、读类放宽但显式标注；Kairos 工具调用再加白名单 + blocklist 双校验；删除文件强制一次性审批。<b>权限是分层叠加的，不是单点开关。</b></p>
+    </div>
+    <div class="pcard"><span class="pnum">07</span>
+      <h4>懒加载上下文，只注入"目录卡片"</h4>
+      <p>Skill 只把名字 + 描述 + 绝对路径注入 system prompt，正文由 Agent 匹配任务后自己 read_file；工具大输出落盘留 ref 而非塞回上下文。<b>上下文是稀缺资源，按需取用。</b></p>
+    </div>
+    <div class="pcard"><span class="pnum">08</span>
+      <h4>发送 = 落盘 = 重放</h4>
+      <p>发给 LLM 的字符串与持久化的事件、与重放重建的消息必须<b>逐字节一致</b>（thinking 块连 signature 都要存）——否则跨 tick/turn 缓存在分歧处断裂。用序列化层 deepEqual 测试锁死。</p>
+    </div>
+  </div>
+
+  <div class="footnote">
+    事实来源：docs/ARCHITECTURE.md · docs/design-docs/agent-current-module-map.md · agent-turn-layers.md · agent-kairos-autonomous-mode.md · core-storage-and-observability.md<br>
+    生成时间 2026-06-10 · 与仓库当前实现同步；架构变更后请同步更新本图或对应设计文档。
+  </div>
+</section>
+
+</main>
+
+<script>
+  // 滚动高亮当前导航项
+  const links = Array.from(document.querySelectorAll('nav a')).filter(a => a.getAttribute('href').startsWith('#'));
+  const sections = links.map(a => document.querySelector(a.getAttribute('href')));
+  const onScroll = () => {
+    const y = window.scrollY + 120;
+    let active = 0;
+    sections.forEach((s, i) => { if (s && s.offsetTop <= y) active = i; });
+    links.forEach((a, i) => a.classList.toggle('active', i === active));
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+
+</body>
+</html>

@@ -15,12 +15,14 @@ import type {
   LlmUsageCost,
   LlmUsagePayload,
   SessionEvent,
+  ThinkingPayload,
   ToolCallPayload,
   ToolExecutionResult
 } from "./session";
 
 const TICK_SUMMARY_MAX = 60;
 const REPLY_SUMMARY_MAX = 80;
+const THINKING_SUMMARY_MAX = 80;
 const TOOL_SUMMARY_MAX = 80;
 const ERROR_SUMMARY_MAX = 80;
 const INTERRUPT_SUMMARY_MAX = 80;
@@ -34,6 +36,7 @@ const INTERRUPT_SUMMARY_MAX = 80;
  *   或事件流结束时关闭；区间内所有 event 的 id 都计入 relatedEventIds。
  * - `tool_call` + 同 toolCallId 的 `tool_result` 折叠成单行 `tool`；缺 result 标 running。
  * - `assistant_message` / `assistant_reply` 各自单行 `reply`。
+ * - `thinking` 各自单行 `thinking`（弱化展示；summary 取首行截断）。
  * - `kairos_sleep_start` + 同 turnId 的下一个 sleep_end / sleep_interrupted 折叠成单行 `sleep`；
  *   被打断时**额外**产出一行独立的 `interrupt`。
  * - `error` 各自单行 `error`，并把所在 tick 行的 status 推为 failed。
@@ -125,6 +128,22 @@ export function aggregateKairosEvents(events: SessionEvent[]): KairosEventRow[] 
           durationMs: 0,
           status: "success",
           summary: truncate(payload?.content ?? "", REPLY_SUMMARY_MAX),
+          relatedEventIds: [event.id]
+        });
+        break;
+      }
+
+      case "thinking": {
+        attachToTick(event);
+        const payload = event.payload as ThinkingPayload;
+        rows.push({
+          id: event.id,
+          kind: "thinking",
+          startedAt: event.timestamp,
+          finishedAt: event.timestamp,
+          durationMs: 0,
+          status: "success",
+          summary: truncate(payload?.content ?? "", THINKING_SUMMARY_MAX),
           relatedEventIds: [event.id]
         });
         break;
