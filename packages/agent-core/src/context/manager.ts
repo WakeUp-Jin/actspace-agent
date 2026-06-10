@@ -16,9 +16,8 @@ import type { ContextUsageSnapshot } from "@actspace/shared";
 import type { Context, ContextSystemPromptPart, Message, Tool } from "../messages";
 import type { ContextModule, CompressionConfig } from "./types";
 import { SystemPart, DEFAULT_COMPRESSION_CONFIG } from "./types";
-import { ConversationContext } from "./modules/conversation";
+import { ConversationContext, type ConversationCompressionResult } from "./modules/conversation";
 import type { Summarizer } from "./compression/summarizer";
-import { compactHistory, type HistoryCompactionResult } from "./compression/history-compactor";
 import {
   estimateTokens,
   estimateMessagesTokens,
@@ -66,7 +65,7 @@ export interface ContextCompactionReport {
   summaryChars: number;
   /** 完整历史文件路径（session.jsonl 绝对路径） */
   historyRefPath: string;
-  reason: HistoryCompactionResult["reason"];
+  reason: ConversationCompressionResult["reason"];
 }
 
 const DEFAULT_CONFIG: CompressionConfig = DEFAULT_COMPRESSION_CONFIG;
@@ -148,10 +147,10 @@ export class ContextManager {
 
   /**
    * mid-loop 钩子：每次模型调用前调用。token 水位过阈值且距上次压缩满足最小间隔时，
-   * 用 flash 8 节摘要压缩较旧历史，并把完整历史路径（session.jsonl）拼进合成消息。
+   * 向会话历史模块发压缩指令（怎么压由 conversation.compress 自己编排）。
    *
    * 无 summarizer / 未过阈值 / 防抖未到 → 返回 null（不动历史）；
-   * summarizer 失败由 HistoryCompactor 内部兜底为「丢弃最旧 + 指针」，不抛错到主循环。
+   * summarizer 失败由 conversation.compress 内部兜底为「丢弃最旧 + 指针」，不抛错到主循环。
    *
    * 返回值携带观测元数据（trigger/threshold token、前后消息数、摘要长度、ref 路径），
    * 供 engine/bridge 落 run-log 与 context_compaction 事件。
@@ -164,45 +163,34 @@ export class ContextManager {
     if (triggerTokens < thresholdTokens) return null;
     if (this.callsSinceCompaction < this.config.compactMinIntervalCalls) return null;
 
-    const beforeCount = this.conversation.getMessageCount();
-    const historyRefPath = this.sessionPath ?? "session.jsonl";
-    const result = await compactHistory({
-      conversation: this.conversation,
-      summarizer,
-      sessionJsonlPath: historyRefPath,
-      keepRatio: this.config.compressKeepRatio,
-    });
-
-    if (result.compacted) {
-      this.compressionCount += 1;
-      this.callsSinceCompaction = 0;
-    }
-
-    return {
-      compacted: result.compacted,
-      status: result.compacted ? "compacted" : "skipped",
-      triggerTokens,
-      thresholdTokens,
-      beforeCount,
-      afterCount: result.keptCount,
-      removedCount: result.removedCount,
-      summaryChars: result.summaryChars,
-      historyRefPath,
-      reason: result.reason,
-    };
+    return this.dispatchCompression(summarizer, triggerTokens, thresholdTokens);
   }
 
   /**
-   * 手动压缩入口：跳过 token 阈值和调用间隔检查，但仍复用 HistoryCompactor 的
-   * 安全切点、摘要与 fallback 逻辑。无可压区时返回 skipped 报告，供 UI 明确反馈。
+   * 手动压缩入口：跳过 token 阈值和调用间隔检查，直接发压缩指令。
+   * 无可压区时返回 skipped 报告，供 UI 明确反馈。
    */
   async compactNow(summarizer?: Summarizer): Promise<ContextCompactionReport> {
     const triggerTokens = this.estimateTotalTokens();
     const thresholdTokens = this.config.contextWindow * this.config.compressionThreshold;
+    return this.dispatchCompression(summarizer, triggerTokens, thresholdTokens);
+  }
+
+  /**
+   * 发出会话压缩指令并组装观测报告。
+   *
+   * ContextManager 在这里只是指挥者：压缩的安全切点、摘要、fallback 全部封装在
+   * ConversationContext.compress 内。将来扩展其他压缩目标（如长期记忆）时，
+   * 同样由对应模块提供自己的 compress()，这里增加新的指令分发即可。
+   */
+  private async dispatchCompression(
+    summarizer: Summarizer | undefined,
+    triggerTokens: number,
+    thresholdTokens: number,
+  ): Promise<ContextCompactionReport> {
     const beforeCount = this.conversation.getMessageCount();
     const historyRefPath = this.sessionPath ?? "session.jsonl";
-    const result = await compactHistory({
-      conversation: this.conversation,
+    const result = await this.conversation.compress({
       summarizer,
       sessionJsonlPath: historyRefPath,
       keepRatio: this.config.compressKeepRatio,

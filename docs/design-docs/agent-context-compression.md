@@ -49,7 +49,7 @@ actspace 的长期产品原则之一是「上下文的绝对控制」。但当�
 │  · 按工具类型选 system prompt，保留行号/路径等关键锚点                  │
 │  · 回填前加压缩标记；恢复路径 = offset/limit 翻页 / 重跑               │
 └──────────────────────────────────────────────────────────────────┘
-┌─ 治疗层：每次模型调用前检查 token 水位（HistoryCompactor）────────┐
+┌─ 治疗层：每次模型调用前检查 token 水位（ConversationContext.compress）─┐
 │  总 token ≥ contextWindow × compressionThreshold → 压缩历史：          │
 │  · 保留最近 compressKeepRatio 的消息（且切点落在完整工具配对之后）       │
 │  · 旧消息用 flash 8 节结构化摘要替换                                   │
@@ -173,7 +173,7 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 
 1. Renderer 在 Composer 发送前识别 `text.trim() === "/compact"`，走 `context:compact` IPC，不创建 `user_message`，也不把 `/compact` 送入 LLM conversation。
 2. Main Process 为当前 session 重新装配与普通 turn 相同的 Agent deps（含 `ContextManager`、`ToolManager`、summarizer 和 session path），调用 `compactContextWithAgent`。
-3. `ContextManager.compactNow(summarizer)` 跳过 token 阈值和最小调用间隔检查，但仍复用 `HistoryCompactor` 的安全切点、结构化摘要和 fallback 逻辑。
+3. `ContextManager.compactNow(summarizer)` 跳过 token 阈值和最小调用间隔检查，但仍复用 `ConversationContext.compress` 的安全切点、结构化摘要和 fallback 逻辑。
 4. 无可压区时返回 `skipped`，消息流显示 `Nothing to compact`；有可压区时写入 `context_compaction` 和最新 `context_snapshot`，刷新 `context-state.json`。
 
 手动压缩是系统事件，不递增普通对话 `turnCount`，但会更新 session `updatedAt`，便于侧边栏按最近操作排序。
@@ -184,9 +184,9 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 
 触发条件：`ContextManager.estimateTotalTokens() ≥ contextWindow × compressionThreshold`。`contextWindow` 取真实 `modelSpec.contextWindow`（需在 `createForSession` 透传 config）。同时设最小压缩间隔（默认 2 次模型调用），避免抖动反复触发。
 
-### 压缩算法（HistoryCompactor）
+### 压缩算法（ConversationContext.compress）
 
-新增 `context/compression/history-compactor.ts`，作用于 `ConversationContext` 的 `messages`：
+压缩执行权在会话历史的所有者模块自身（充血模型）：`ContextManager` 只发指令（阈值/防抖判断），`ConversationContext.compress()` 编排 `planCompaction → 序列化 → 摘要 → applyCompaction` 全流程；`context/compression/` 是被它消费的纯函数工具库（`history-serializer.ts` 序列化、`history-prompts.ts` 模板、`summarizer.ts` 服务）。算法步骤：
 
 1. 不动区 = 最近 `compressKeepRatio`（默认 0.3）比例的消息。
 2. 可压区 = 其余较旧消息。**切点必须落在完整的 `assistant(toolCall) + 全部对应 toolResult` 配对之后，且让不动区以 assistant turn 开头**——这样既不拆 `tool_calls`/`tool` 结果，又能与合成的 `UserMessage` 摘要天然形成 `user→assistant` 交替（Anthropic 格式要求严格交替，连续两条 user 会被拒；DeepSeek 默认走 Anthropic-compatible route，故不能让摘要 user 后紧跟另一条 user）。最近的 user 提问位于尾部、本就在不动区，不受影响。实现见 `ConversationContext.planCompaction`（找 target 之后第一条 assistant，兜底第一条非 toolResult）。`llm/convert.ts` 已有孤儿兜底，但压缩仍主动切干净边界。
@@ -250,7 +250,7 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 - `packages/agent-core/src/tools/tool-output-paths.ts`：bash 落盘临时文件的路径构造 + 清理 helper（`<userData>/tmp/tool-output/`）。
 - `packages/agent-core/src/tools/output-truncator.ts`：非 bash 工具的 flash 摘要流水线（异步）。
 - `packages/agent-core/src/context/compression/tool-summary-prompts.ts`：按工具类型的摘要 prompt。
-- `packages/agent-core/src/context/compression/history-compactor.ts`：历史压缩。
+- `packages/agent-core/src/context/compression/history-serializer.ts`：可压区消息序列化（压缩编排在 `modules/conversation.ts` 的 `compress()`）。
 - `packages/agent-core/src/context/compression/history-prompts.ts`：8 节摘要 prompt。
 - `packages/agent-core/src/context/compression/summarizer.ts`：flash `summarizer` 构造与 `summarizeToolOutput` / `complete` 封装。
 

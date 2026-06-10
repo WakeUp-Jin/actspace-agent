@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { ConversationContext } from "../../modules/conversation";
-import { compactHistory, serializeMessagesForSummary } from "../history-compactor";
-import type { Summarizer } from "../summarizer";
-import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "../../../messages";
-import { createEmptyUsage } from "../../../messages";
+import { ConversationContext } from "../modules/conversation";
+import type { Summarizer } from "../compression/summarizer";
+import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "../../messages";
+import { createEmptyUsage } from "../../messages";
 
 const SESSION_PATH = "/data/sessions/s1/session.jsonl";
 
@@ -72,28 +71,12 @@ const failingSummarizer: Summarizer = {
   },
 };
 
-describe("serializeMessagesForSummary", () => {
-  it("renders roles, tool calls and tool results into readable lines", () => {
-    const text = serializeMessagesForSummary([
-      user("hi"),
-      assistantToolCall("tc1", "bash", { command: "ls" }),
-      toolResult("tc1", "bash", "file.txt"),
-      assistantText("done"),
-    ]);
-    expect(text).toContain("【用户】hi");
-    expect(text).toContain("【工具调用】bash");
-    expect(text).toContain("【工具结果】bash: file.txt");
-    expect(text).toContain("【助手】done");
-  });
-});
-
-describe("compactHistory", () => {
+describe("ConversationContext.compress", () => {
   it("replaces the older region with a summary that points to session.jsonl", async () => {
     const conversation = new ConversationContext(buildHistory());
     const before = conversation.getMessageCount();
 
-    const result = await compactHistory({
-      conversation,
+    const result = await conversation.compress({
       summarizer: okSummarizer,
       sessionJsonlPath: SESSION_PATH,
       keepRatio: 0.3,
@@ -116,8 +99,7 @@ describe("compactHistory", () => {
 
   it("falls back to dropping the oldest region when the summarizer fails", async () => {
     const conversation = new ConversationContext(buildHistory());
-    const result = await compactHistory({
-      conversation,
+    const result = await conversation.compress({
       summarizer: failingSummarizer,
       sessionJsonlPath: SESSION_PATH,
       keepRatio: 0.3,
@@ -134,8 +116,7 @@ describe("compactHistory", () => {
 
   it("falls back when no summarizer is provided", async () => {
     const conversation = new ConversationContext(buildHistory());
-    const result = await compactHistory({
-      conversation,
+    const result = await conversation.compress({
       summarizer: undefined,
       sessionJsonlPath: SESSION_PATH,
       keepRatio: 0.3,
@@ -146,8 +127,7 @@ describe("compactHistory", () => {
 
   it("returns nothing-to-compact for short history", async () => {
     const conversation = new ConversationContext([user("a")]);
-    const result = await compactHistory({
-      conversation,
+    const result = await conversation.compress({
       summarizer: okSummarizer,
       sessionJsonlPath: SESSION_PATH,
       keepRatio: 0.3,

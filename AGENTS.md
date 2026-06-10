@@ -29,6 +29,8 @@
 
 - `docs/CICD.md`：仓库的 CI/CD 骨架以及后续如何接入真实项目。
 
+- `docs/ARCHITECTURE_GRAPH_GUIDE.md`：交互式架构依赖图谱的生成规范（含扫描脚本、数据 Schema、配色 token、万能提示词与完整 HTML 模板）；需要为项目生成/更新 `ARCHITECTURE_GRAPH.html`（产物为 HTML）时照此执行。
+
 - `docs/FRONTEND.md`：前端协作入口、设计文档和验证规范导航。
 - `docs/FRONTEND_VERIFICATION.md`：桌面端前端修改后的浏览器 mock、Electron 真实验证和 Computer Use 验收方式。
 - `docs/design-docs/front-主题与配色规范.md`：**改任何带颜色的样式前必读**。三态主题机制 + 「颜色必须随主题翻转、禁止 `text-black`/`bg-white`/`#hex` 等非主题感知字面量」的硬约束，且要求浅/深双主题都验过。

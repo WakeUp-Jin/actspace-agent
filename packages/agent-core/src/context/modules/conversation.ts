@@ -10,15 +10,45 @@
  *
  * 加载只发生在构造阶段；运行期没有"未加载"状态，也没有重复读盘。
  *
- * 后续 V1 升级为 ShortTermMemoryContext 时仅引入 turn 标记 / 多日切片 / 压缩接入，
- * 构造入口签名（initialMessages / createFromSession）不破坏。
+ * 历史压缩同理：会话历史归本模块所有，「怎么压自己」也由本模块执行——
+ * `compress()` 编排 planCompaction → summarizer → applyCompaction 全流程，
+ * `ContextManager` 只负责发指令（阈值/防抖判断），不触碰压缩细节。
+ * compression/ 目录是被本模块消费的纯函数工具库（序列化、prompt、summarizer）。
+ * 将来其他模块（如长期记忆）需要压缩时，同样在该模块自身上提供 compress()。
  */
 
-import type { Message } from "../../messages";
+import type { Message, UserMessage } from "../../messages";
 import { MessagePriority } from "../../messages";
 import { parseJsonl } from "../../persistence/jsonl";
 import { sessionEventsToMessages } from "../../adapters";
 import type { ContextModule, ContextParts } from "../types";
+import type { Summarizer } from "../compression/summarizer";
+import { serializeMessagesForSummary } from "../compression/history-serializer";
+import {
+  buildCompactionMessageBody,
+  historyRecoveryFooter,
+  HISTORY_COMPACTION_PREAMBLE,
+} from "../compression/history-prompts";
+
+export interface ConversationCompressOptions {
+  /** flash 摘要器；缺省时直接走丢弃最旧兜底 */
+  summarizer?: Summarizer;
+  /** 完整历史文件路径（<userData>/sessions/<id>/session.jsonl），拼进摘要供模型回看原文 */
+  sessionJsonlPath: string;
+  /** 保留最近消息比例（取自 CompressionConfig.compressKeepRatio） */
+  keepRatio: number;
+}
+
+export interface ConversationCompressionResult {
+  compacted: boolean;
+  /** 被替换掉的旧消息数量 */
+  removedCount: number;
+  /** 压缩后会话消息总数 */
+  keptCount: number;
+  /** 合成摘要消息正文字符数 */
+  summaryChars: number;
+  reason: "ok" | "fallback-dropped" | "nothing-to-compact";
+}
 
 export class ConversationContext implements ContextModule {
   private messages: Message[] = [];
@@ -65,7 +95,63 @@ export class ConversationContext implements ContextModule {
   }
 
   /**
-   * 规划一次历史压缩（只读，不改 messages）。
+   * 执行一次历史压缩（充血入口）：planCompaction → 摘要 → applyCompaction 一条龙。
+   *
+   * 调用方（ContextManager）只负责决定「要不要压」（token 阈值 + 调用间隔防抖），
+   * 「怎么压」全部在这里：把较旧的可压区序列化后交 flash 做 8 节结构化摘要，
+   * 用一条合成 UserMessage（source:"compaction"）替换可压区，正文 = 开篇语 + 摘要 +
+   * session.jsonl 绝对路径（模型可 read_file 回看被压缩的原始对话）。
+   *
+   * 兜底：summarizer 缺省/失败时不抛错——改用「丢弃最旧 + 仅留指向 session.jsonl
+   * 的指针消息」，既降 token 又保留回看入口，不阻塞主循环。
+   *
+   * 设计事实来源：docs/design-docs/agent-context-compression.md「压缩算法」。
+   */
+  async compress(options: ConversationCompressOptions): Promise<ConversationCompressionResult> {
+    const { summarizer, sessionJsonlPath, keepRatio } = options;
+
+    const plan = this.planCompaction(keepRatio);
+    if (!plan) {
+      return {
+        compacted: false,
+        removedCount: 0,
+        keptCount: this.getMessageCount(),
+        summaryChars: 0,
+        reason: "nothing-to-compact",
+      };
+    }
+
+    let body: string;
+    let reason: ConversationCompressionResult["reason"];
+
+    if (summarizer) {
+      try {
+        const summary = await summarizer.summarizeHistory(serializeMessagesForSummary(plan.removed));
+        body = buildCompactionMessageBody(summary, sessionJsonlPath);
+        reason = "ok";
+      } catch {
+        body = buildFallbackBody(plan.removed.length, sessionJsonlPath);
+        reason = "fallback-dropped";
+      }
+    } else {
+      body = buildFallbackBody(plan.removed.length, sessionJsonlPath);
+      reason = "fallback-dropped";
+    }
+
+    const removed = this.applyCompaction(buildCompactionMessage(body), plan.split);
+
+    return {
+      compacted: removed.length > 0,
+      removedCount: removed.length,
+      keptCount: this.getMessageCount(),
+      summaryChars: body.length,
+      reason,
+    };
+  }
+
+  /**
+   * 规划一次历史压缩（只读，不改 messages）。compress() 的第一步；
+   * 保持 public 是为了让切点策略可以被独立单测。
    *
    * 切点策略：保留最近 `keepRatio` 比例的消息为「不动区」，其余较旧消息为「可压区」。
    * 切点落在完整工具配对之后、且让不动区以 assistant turn 开头——既不拆 `tool_call/tool`
@@ -124,4 +210,20 @@ export class ConversationContext implements ContextModule {
       messages: [...this.messages],
     };
   }
+}
+
+/** 合成替换可压区的摘要消息（source:"compaction" 让 UI/统计单独成桶）。 */
+function buildCompactionMessage(body: string): UserMessage {
+  return {
+    role: "user",
+    content: body,
+    timestamp: Date.now(),
+    source: "compaction",
+    priority: MessagePriority.HIGH,
+  };
+}
+
+/** 摘要不可用时的兜底正文：丢弃最旧内容，仅保留指向 session.jsonl 的回看指针。 */
+function buildFallbackBody(droppedCount: number, sessionJsonlPath: string): string {
+  return `${HISTORY_COMPACTION_PREAMBLE}\n\n[摘要模型不可用，已直接丢弃较旧的 ${droppedCount} 条消息以释放上下文。]${historyRecoveryFooter(sessionJsonlPath)}`;
 }
