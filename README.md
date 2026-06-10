@@ -117,7 +117,7 @@ DeepSeek 的成本很低并且理念很好，让我可以放心地围绕模型�
 - [agent-harness-dev](https://github.com/WakeUp-Jin/agent-harness-dev) -- 一份指导开发者如何无框架从0构建 Agent 后端的架构规范的skill
 - [code-develop-harness-init](https://github.com/WakeUp-Jin/code-develop-harness-init)--面向 Agent-first 开发的基础模板
 - [Linux.Do 社区](https://linux.do/latest) (真诚 、友善 、团结 、专业)
-- Linux.Do社区佬友们的公益站的大力支持和帮助，充足的Token得以让该项目可以实现Agent原生开发，并且快速构建
+- Linux.Do社区佬友们的公益站大力支持和帮助，充足的Token得以让该项目可以实现Agent原生开发，并且快速构建
 
 
 ## 许可证
