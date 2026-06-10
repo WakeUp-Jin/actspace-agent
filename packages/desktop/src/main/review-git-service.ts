@@ -21,6 +21,14 @@ const UNTRACKED_MAX_TEXT_BYTES = 256 * 1024;
 const UNTRACKED_TOTAL_TEXT_BYTES = 1024 * 1024;
 const DIFF_WARNING_THRESHOLD_CHARS = Math.floor(GIT_MAX_OUTPUT_CHARS * 0.96);
 
+/** 仅含二进制图片格式；svg 是文本，按 unified diff 渲染更适合 review。 */
+const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"]);
+
+function isImagePath(path: string): boolean {
+  const dot = path.lastIndexOf(".");
+  return dot >= 0 && IMAGE_EXTS.has(path.slice(dot).toLowerCase());
+}
+
 export type GitCommandRunner = (
   args: string[],
   options: { cwd: string; timeoutMs: number; maxOutputChars: number },
@@ -461,6 +469,20 @@ async function appendUntrackedFiles(
     } catch {
       continue;
     }
+    // 图片不走文本 diff 流程（不读内容、不报 too large / binary 警告），
+    // 标记 renderKind 让前端渲染图片预览。
+    if (isImagePath(path)) {
+      files.set(path, {
+        path,
+        status: "added",
+        additions: 0,
+        deletions: 0,
+        chunks: [],
+        renderKind: "image",
+        sortStatus: "",
+      });
+      continue;
+    }
     if (size > UNTRACKED_MAX_TEXT_BYTES || totalBytes + size > UNTRACKED_TOTAL_TEXT_BYTES) {
       warnings.push({
         kind: "truncated",
@@ -544,7 +566,13 @@ function createChangeSet(
   files: ParsedFile[],
   warnings: ReviewWarning[],
 ): ReviewChangeSet {
-  const cleanedFiles: ReviewFileChange[] = files.map(({ sortStatus: _sortStatus, ...file }) => file);
+  const cleanedFiles: ReviewFileChange[] = files.map(({ sortStatus: _sortStatus, ...file }) => ({
+    ...file,
+    // 被跟踪的图片改动在 git diff 中是 binary、无 hunks，同样按图片预览渲染（已删除的除外）。
+    ...(file.renderKind === undefined && file.status !== "deleted" && isImagePath(file.path)
+      ? { renderKind: "image" as const }
+      : {}),
+  }));
   const totalAdditions = cleanedFiles.reduce((sum, file) => sum + file.additions, 0);
   const totalDeletions = cleanedFiles.reduce((sum, file) => sum + file.deletions, 0);
   return {

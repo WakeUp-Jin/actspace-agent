@@ -14,7 +14,7 @@ import {
   Plus,
   RefreshCw,
 } from "lucide-react";
-import type { ReviewFileChange, ReviewGetWorkspaceChangesResult, ReviewWarning } from "@actspace/shared";
+import type { ReviewFileChange, ReviewGetWorkspaceChangesResult, ReviewWarning, WorkspaceReadFileResult } from "@actspace/shared";
 
 type ReviewRenderViewProps = {
   workspaceRoot?: string;
@@ -65,6 +65,8 @@ const DELETE_CLASS = "font-medium text-danger";
 const DIFF_WRAP_CLASS = "border-b border-line bg-surface px-3 pb-3";
 const DIFF_CONTENT_CLASS = "file-diff-content my-2 max-w-none";
 const DIFF_EMPTY_CLASS = "px-3 py-2 text-[12px] text-text-faint";
+const IMAGE_PREVIEW_WRAP_CLASS = "my-2 grid place-items-center rounded-act-sm border border-line bg-surface-subtle p-3";
+const IMAGE_PREVIEW_IMG_CLASS = "max-h-[320px] max-w-full rounded-act-sm object-contain";
 
 const STATUS_LABEL: Record<ReviewFileChange["status"], string> = {
   added: "New",
@@ -187,12 +189,53 @@ function ReviewWarnings({ warnings }: { warnings?: ReviewWarning[] }) {
   );
 }
 
+function ReviewImagePreview({ workspaceRoot, path }: { workspaceRoot?: string; path: string }) {
+  const [result, setResult] = useState<WorkspaceReadFileResult | null | "failed">(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const api = typeof window !== "undefined" ? window.actspace?.readWorkspaceFile : undefined;
+    if (!api) {
+      setResult("failed");
+      return;
+    }
+    setResult(null);
+    api({ workspaceRoot, relativePath: path })
+      .then((value) => {
+        if (!cancelled) setResult(value);
+      })
+      .catch(() => {
+        if (!cancelled) setResult("failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceRoot, path]);
+
+  if (result === null) {
+    return <div className={DIFF_EMPTY_CLASS}>Loading image preview…</div>;
+  }
+  if (result === "failed" || result.error || !result.dataUrl) {
+    const message = result !== "failed" && result.error === "too_large"
+      ? "Image is too large to preview."
+      : "Image preview is not available.";
+    return <div className={DIFF_EMPTY_CLASS}>{message}</div>;
+  }
+  return (
+    <div className={IMAGE_PREVIEW_WRAP_CLASS}>
+      <img className={IMAGE_PREVIEW_IMG_CLASS} src={result.dataUrl} alt={path} />
+    </div>
+  );
+}
+
 function ReviewFileRow({
   file,
+  workspaceRoot,
   expanded,
   onToggle,
 }: {
   file: ReviewFileChange;
+  workspaceRoot?: string;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -216,7 +259,9 @@ function ReviewFileRow({
       </button>
       {expanded ? (
         <div className={DIFF_WRAP_CLASS}>
-          {hasTextDiff(file) ? (
+          {file.renderKind === "image" ? (
+            <ReviewImagePreview workspaceRoot={workspaceRoot} path={file.path} />
+          ) : hasTextDiff(file) ? (
             <pre className={DIFF_CONTENT_CLASS}>
               {file.chunks.flatMap((chunk, chunkIndex) =>
                 (chunk.unifiedText ?? "").split("\n").map((line, lineIndex) =>
@@ -406,6 +451,7 @@ export function ReviewRenderView({ workspaceRoot, refreshKey, onReviewChanged }:
             <ReviewFileRow
               key={file.path}
               file={file}
+              workspaceRoot={changeSet.workspaceRoot ?? workspaceRoot}
               expanded={expandedPaths.has(file.path)}
               onToggle={() => toggleFile(file.path)}
             />

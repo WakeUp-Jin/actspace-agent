@@ -68,6 +68,9 @@ type ReviewFileChange = {
   additions: number;
   deletions: number;
   chunks: ReviewChunk[];
+  // 缺省按文本 diff 渲染；"image" 表示该文件渲染图片预览（复用 workspace:read-file 的 data URL）。
+  // 图片类 untracked / 修改文件不再走文本上限与二进制检测，也不产生 truncated / binary_skipped 警告。
+  renderKind?: "image";
   sourceEventIds?: string[];
 };
 

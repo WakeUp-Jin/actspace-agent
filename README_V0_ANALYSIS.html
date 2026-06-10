@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>README 分析与建议 — Actspace</title>
+<style>
+  :root {
+    --ink: #1a1815;
+    --ink-soft: #5c574e;
+    --ink-faint: #8a8478;
+    --paper: #faf8f4;
+    --card: #ffffff;
+    --line: #e6e1d7;
+    --accent: #2456e6;
+    --accent-soft: #eef2fe;
+    --good: #1a7f4e;
+    --good-soft: #e8f5ee;
+    --warn: #b4690e;
+    --warn-soft: #fdf3e4;
+    --bad: #c0392b;
+    --bad-soft: #fbeae8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
+    line-height: 1.75;
+    font-size: 15px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 64px 32px 96px; }
+
+  /* ---- header ---- */
+  .kicker {
+    font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600; margin-bottom: 14px;
+  }
+  h1 {
+    font-family: "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+    font-size: 38px; line-height: 1.3; font-weight: 700; letter-spacing: 0.01em;
+  }
+  .lede { color: var(--ink-soft); margin-top: 16px; max-width: 640px; font-size: 16px; }
+  .meta { margin-top: 20px; font-size: 12.5px; color: var(--ink-faint); display: flex; gap: 18px; }
+  hr.rule { border: none; border-top: 1px solid var(--line); margin: 48px 0; }
+
+  /* ---- sections ---- */
+  section { margin-top: 56px; }
+  .sec-num {
+    font-family: Georgia, serif; font-style: italic;
+    color: var(--accent); font-size: 15px; margin-bottom: 4px;
+  }
+  h2 {
+    font-family: "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+    font-size: 26px; font-weight: 700; margin-bottom: 18px;
+  }
+  h3 { font-size: 16px; font-weight: 600; margin: 26px 0 10px; }
+  p { margin-bottom: 12px; color: var(--ink-soft); }
+  p strong, li strong { color: var(--ink); }
+  code {
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px;
+    background: #f1ede4; padding: 2px 6px; border-radius: 4px; color: #6b3f12;
+  }
+
+  /* ---- reference cards ---- */
+  .ref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 20px 0; }
+  .ref-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 20px 22px;
+  }
+  .ref-card .name { font-weight: 700; font-size: 15px; }
+  .ref-card .tag {
+    display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 99px;
+    background: var(--accent-soft); color: var(--accent); margin-left: 8px; vertical-align: 2px;
+  }
+  .ref-card .takeaway { font-size: 13.5px; color: var(--ink-soft); margin-top: 8px; }
+  .ref-card .lesson { font-size: 13px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .ref-card .lesson b { color: var(--good); font-weight: 600; }
+
+  /* ---- principle list ---- */
+  .laws { counter-reset: law; margin: 20px 0; }
+  .law {
+    display: flex; gap: 18px; padding: 16px 0; border-bottom: 1px solid var(--line);
+  }
+  .law:last-child { border-bottom: none; }
+  .law::before {
+    counter-increment: law; content: counter(law, decimal-leading-zero);
+    font-family: Georgia, serif; font-style: italic; color: var(--accent);
+    font-size: 18px; flex-shrink: 0; width: 34px; padding-top: 1px;
+  }
+  .law .t { font-weight: 600; color: var(--ink); }
+  .law .d { font-size: 13.5px; color: var(--ink-soft); margin-top: 3px; }
+
+  /* ---- structure diagram ---- */
+  .structure { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 0; margin: 20px 0; }
+  .row {
+    display: grid; grid-template-columns: 150px 1fr 86px; gap: 14px; align-items: baseline;
+    padding: 10px 22px; border-bottom: 1px solid #f3f0e8; font-size: 13.5px;
+  }
+  .row:last-child { border-bottom: none; }
+  .row .part { font-weight: 600; color: var(--ink); }
+  .row .why { color: var(--ink-soft); }
+  .badge { font-size: 11px; padding: 2px 9px; border-radius: 99px; text-align: center; font-weight: 600; white-space: nowrap; justify-self: end; }
+  .b-must { background: var(--good-soft); color: var(--good); }
+  .b-short { background: var(--accent-soft); color: var(--accent); }
+  .b-care { background: var(--warn-soft); color: var(--warn); }
+
+  /* ---- callouts ---- */
+  .callout { border-radius: 10px; padding: 16px 20px; margin: 16px 0; font-size: 13.5px; }
+  .callout .ct { font-weight: 700; font-size: 13px; letter-spacing: 0.04em; margin-bottom: 6px; }
+  .c-warn { background: var(--warn-soft); border: 1px solid #f0dcbd; }
+  .c-warn .ct { color: var(--warn); }
+  .c-idea { background: var(--accent-soft); border: 1px solid #d7e1fb; }
+  .c-idea .ct { color: var(--accent); }
+
+  /* ---- checklist ---- */
+  ul.check { list-style: none; margin: 14px 0; }
+  ul.check li {
+    padding: 7px 0 7px 30px; position: relative; font-size: 13.5px; color: var(--ink-soft);
+  }
+  ul.check li::before {
+    content: ""; position: absolute; left: 2px; top: 13px;
+    width: 14px; height: 14px; border: 1.5px solid var(--ink-faint); border-radius: 4px;
+  }
+
+  /* ---- decisions table ---- */
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 13.5px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th { text-align: left; padding: 11px 16px; background: #f4f1e9; font-size: 12px; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 600; }
+  td { padding: 11px 16px; border-top: 1px solid #f3f0e8; vertical-align: top; }
+  td:first-child { font-weight: 600; color: var(--ink); white-space: nowrap; }
+
+  footer { margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-faint); }
+  @media (max-width: 680px) {
+    .ref-grid { grid-template-columns: 1fr; }
+    .row { grid-template-columns: 1fr; gap: 4px; }
+    .badge { justify-self: start; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="kicker">Actspace · README 重写</div>
+  <h1>分析、参考与建议</h1>
+  <p class="lede">配合 <code>README_V0.md</code> 初稿阅读。这份文档解释初稿为什么这样排，参考项目里值得借用的规律是什么，以及哪些地方需要你亲自定夺。</p>
+  <div class="meta"><span>2026-06-10</span><span>初稿版本 V0</span></div>
+
+  <hr class="rule">
+
+  <!-- ================= 1 ================= -->
+  <section>
+    <div class="sec-num">No. 1</div>
+    <h2>参考项目在做什么</h2>
+    <p>你给的七个参考，排版策略其实分两个流派。它们的共性比差异更值得注意：<strong>前三屏全部交给「视觉 + 一句话定位 + 一条安装命令」，文字解释永远排在演示之后。</strong></p>
+
+    <div class="ref-grid">
+      <div class="ref-card">
+        <div class="name">Kimi Code<span class="tag">极简流</span></div>
+        <div class="takeaway">一张 GIF → 三行定义 → 一条安装命令。全文没有一个多余的 section，Docs 全部外链，README 只负责「让你跑起来」。</div>
+        <div class="lesson"><b>借用 →</b> 最贴近你「精简干练」的口味，是 V0 的主要骨架来源。</div>
+      </div>
+      <div class="ref-card">
+        <div class="name">Cherry Studio<span class="tag">陈列流</span></div>
+        <div class="takeaway">badge 墙 + 三张大截图 + 五大类特性清单 + Roadmap + 社区。信息量大，适合已经有大量用户的成熟产品。</div>
+        <div class="lesson"><b>借用 →</b> 截图先于特性文字出现；但 badge 墙和 Roadmap 对个人项目是噪音。</div>
+      </div>
+      <div class="ref-card">
+        <div class="name">nanobot<span class="tag">导航流</span></div>
+        <div class="takeaway">封面图 + 一段话定义 + 「Start Here」意图导航表（你想做 X → 去 Y），News 时间线展示项目活跃度。</div>
+        <div class="lesson"><b>借用 →</b> 用一段话（而非列表）定义产品的写法；News 流维护成本太高，不学。</div>
+      </div>
+      <div class="ref-card">
+        <div class="name">AFFiNE / browser-use<span class="tag">品牌流</span></div>
+        <div class="takeaway">强视觉资产（wordmark、配图、统一色调），README 像一张海报。一句 slogan 就完成定位。</div>
+        <div class="lesson"><b>借用 →</b> 你已有 wordmark，hero 区按海报思路拍一张「代表作」截图即可。</div>
+      </div>
+    </div>
+
+    <p>你说「大部分是 AI 火之前手写的，非常漂亮」——我认同，它们漂亮的根源是<strong>每一节都在回答读者的一个真实问题</strong>，而不是在展示作者写了多少东西。AI 生成的 README 常见病是对称工整但每节都半满；手写的好 README 是不对称的：该长的长（截图、特性），该短的极短（License 一行）。</p>
+  </section>
+
+  <!-- ================= 2 ================= -->
+  <section>
+    <div class="sec-num">No. 2</div>
+    <h2>好 README 的五条规律</h2>
+    <div class="laws">
+      <div class="law"><div><div class="t">七秒法则</div><div class="d">访客平均 7 秒决定去留。第一屏 = logo + 一句话 + 一张图，必须独立完成「这是什么、长什么样」的回答。任何需要滚动才能理解定位的 README 都失败了。</div></div></div>
+      <div class="law"><div><div class="t">截图就是论点</div><div class="d">对桌面应用而言，截图不是配图，是核心论据。「执行可视化」「上下文可控」这种卖点，一张带工具流和 context 面板的截图比三段文字更有说服力。</div></div></div>
+      <div class="law"><div><div class="t">安装命令的字数 = 用户的信任度</div><div class="d">Kimi Code 用一条 curl 赢得好感。你是源码构建路线，四行命令已是下限，不要再加注释和分支说明，例外情况放文档链接。</div></div></div>
+      <div class="law"><div><div class="t">特性写差异，不写清单</div><div class="d">「支持 Markdown 渲染」是清单；「Kairos 主动自治运行」是差异。README 只写后者，前者用户打开应用自然会发现。</div></div></div>
+      <div class="law"><div><div class="t">个人项目的杀手锏是「人」</div><div class="d">大厂 README 不敢写「想说的话」，这恰恰是个人项目最稀缺的差异化。你的第 7 节会是整个 README 记忆度最高的部分，值得认真打磨。</div></div></div>
+    </div>
+  </section>
+
+  <!-- ================= 3 ================= -->
+  <section>
+    <div class="sec-num">No. 3</div>
+    <h2>V0 的结构与取舍</h2>
+    <p>初稿按你的九节大纲落地，每节的角色和篇幅控制如下：</p>
+    <div class="structure">
+      <div class="row"><span class="part">Hero 区</span><span class="why">wordmark + tagline + 锚点导航 + 主截图，独立完成定位</span><span class="badge b-must">核心</span></div>
+      <div class="row"><span class="part">什么是 Actspace</span><span class="why">两段、三行以内；第二段直接亮三原则，这是全文的纲</span><span class="badge b-short">克制</span></div>
+      <div class="row"><span class="part">核心特性</span><span class="why">7 条全部围绕差异：双模式、上下文控制、DeepSeek 适配、可视化、工具自构建、Agent 改造自己、本地优先</span><span class="badge b-must">核心</span></div>
+      <div class="row"><span class="part">开始使用</span><span class="why">5 行命令 + 1 行打包，环境说明压缩进行内注释</span><span class="badge b-short">克制</span></div>
+      <div class="row"><span class="part">截图</span><span class="why">2×2 网格，四张图各对应一个特性卖点</span><span class="badge b-must">核心</span></div>
+      <div class="row"><span class="part">架构设计</span><span class="why">一行依赖图 + 设计文档链接清单，本体留在 docs/，README 只做入口</span><span class="badge b-short">克制</span></div>
+      <div class="row"><span class="part">想说的话</span><span class="why">你的原文精修，结尾收在三件事 + 引文，居中排版制造仪式感</span><span class="badge b-care">打磨</span></div>
+      <div class="row"><span class="part">致谢 / 许可</span><span class="why">致谢含 DeepSeek 与启发项目；许可一行</span><span class="badge b-short">克制</span></div>
+    </div>
+
+    <h3>两个表达上的处理</h3>
+    <p><strong>「主动 / 被动」与「自构建 / 被添加」</strong>这两组对照是你独有的产品语言，我把它们直接做成了特性条目的标题句（「被动与主动，两种 Agent」「工具：被添加，也能自构建」），而不是藏在解释里——对照结构本身就有记忆点。</p>
+    <p><strong>三原则</strong>（简约、上下文绝对控制、适配 DeepSeek）出现了两次：定义段一次、「想说的话」结尾一次（变体为 简约优雅 · 执行可视化 · 上下文可控）。两处措辞目前不一致，建议你统一成一套，全文只用一种说法。</p>
+
+    <div class="callout c-warn">
+      <div class="ct">⚠ 需要注意：「写在后面的话」那段引文</div>
+      你贴的「感谢每一位用户的信任与支持……向实现 AGI 的目标不断靠近」是 DeepSeek 官方发布语，带有明显的团队/公司口吻（「我们」「AGI 目标」），照搬进个人项目会失真，也有抄录之嫌。V0 的处理是：<strong>只保留《荀子》引文「不诱于誉，不恐于诽，率道而行，端然正己」</strong>作为收尾——它本身是古文，气质相通且无归属问题；其余情绪由你自己的话承载。如果你想致敬那段话，更好的方式是在致谢里写明它来自 DeepSeek。
+    </div>
+  </section>
+
+  <!-- ================= 4 ================= -->
+  <section>
+    <div class="sec-num">No. 4</div>
+    <h2>截图：最重要的待办</h2>
+    <p>V0 里有 5 个截图占位（1 张 hero + 4 张网格）。这是 README 成败的关键，建议按以下规范拍：</p>
+    <ul class="check">
+      <li><strong>hero 图选「代表作」场景</strong>：一次完整的 Agent 任务——左侧会话、中间带工具执行流的消息、右侧文件 diff 同框，一张图同时证明「执行可视化 + 上下文可控」。</li>
+      <li><strong>统一窗口尺寸和主题</strong>：五张图同一分辨率（建议 1600×1000 左右窗口、2x retina 导出）、同一主题。GitHub 上浅色主题更通透，若想兼容深色页面可用 <code>&lt;picture&gt;</code> + <code>prefers-color-scheme</code> 出双版本。</li>
+      <li><strong>内容预演</strong>：截图里的会话标题、任务内容提前设计好，避免测试数据（「测试123」）和真实路径、API key、个人信息入镜。</li>
+      <li><strong>四张网格图各管一个卖点</strong>：Kairos 监控页（主动）、工具审批流（可视化）、Usage 缓存统计（DeepSeek 适配）、Review/文件预览（本地可追溯）。</li>
+      <li><strong>压缩后入库</strong>：PNG 过 oxipng/tinypng，单图控制在 300KB 内，统一放 <code>docs/assets/readme/</code>。</li>
+    </ul>
+    <div class="callout c-idea">
+      <div class="ct">💡 进阶</div>
+      hero 位如果换成 10–15 秒的 GIF/WebP 动图（发起任务 → 工具执行 → diff 出现），「执行可视化」的说服力会再上一个量级——这是 Kimi Code 和 browser-use 的共同选择。可以作为 V1 的目标，V0 先用静态图。
+    </div>
+  </section>
+
+  <!-- ================= 5 ================= -->
+  <section>
+    <div class="sec-num">No. 5</div>
+    <h2>留给你定夺的问题</h2>
+    <table>
+      <tr><th>问题</th><th>我的建议</th></tr>
+      <tr>
+        <td>中文 or 双语？</td>
+        <td>当前受众和「想说的话」的气质都是中文的，建议 V0 纯中文。等有海外用户再加 <code>README.en.md</code>，不要为不存在的读者写作。</td>
+      </tr>
+      <tr>
+        <td>tagline 定稿</td>
+        <td>V0 用了「为 DeepSeek 打造的本地 Agent 桌面工作台」。备选方向：「上下文绝对可控的本地 Agent 工作台」（卖差异）/「看得见每一步的 Agent 桌面应用」（卖可视化）。建议选一个最想被记住的点，只卖一个。</td>
+      </tr>
+      <tr>
+        <td>要不要 badge？</td>
+        <td>最多三枚（License / Platform / DeepSeek Ready），或者一枚不放。个人项目阶段 badge 墙是负资产。</td>
+      </tr>
+      <tr>
+        <td>「工具自构建」的措辞</td>
+        <td>Lab 实验台目前是设计态、未实现。V0 的措辞（「依托 Lab 实验台」）略微超前，如果你介意，可以改成「正在通过 Lab 实验台落地」，README 不该承诺还不存在的能力。</td>
+      </tr>
+      <tr>
+        <td>三原则的最终措辞</td>
+        <td>「简约优雅 / 上下文的绝对控制 / 适配 DeepSeek」与「简约优雅 / 执行可视化 / 上下文可控」需要二选一并全文统一，我倾向前者（执行可视化可归入特性而非原则）。</td>
+      </tr>
+      <tr>
+        <td>当前 README.md 的去留</td>
+        <td>现 README 偏「仓库协作说明书」（运行边界、文档导航、仓库结构），这些对 Agent 协作有用但对访客是噪音。建议定稿后：面向访客的内容进新 README，协作向内容迁回 <code>AGENTS.md</code> / <code>docs/REPO_COLLAB_GUIDE.md</code>，避免两边重复。</td>
+      </tr>
+    </table>
+  </section>
+
+  <footer>
+    README_V0.md · README_V0_ANALYSIS.html — 两个文件均为工作草稿，定稿合入 README.md 后可删除；届时按 HISTORY_GUIDE 补一条变更记录。
+  </footer>
+
+</div>
+</body>
+</html>

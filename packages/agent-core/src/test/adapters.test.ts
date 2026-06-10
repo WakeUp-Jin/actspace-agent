@@ -169,6 +169,35 @@ describe("Adapters: SessionEvent -> Message (recovery)", () => {
     }
   });
 
+  it("recovers assistant blocks in original order: thinking, text, then toolCalls last", () => {
+    // 回归：tool_use 必须是 assistant 消息末尾块，text 排在 tool_use 后会被
+    // DeepSeek Anthropic 兼容端 400 拒绝（tool_use 后必须紧跟 tool_result）。
+    const assistant: AssistantMessage = {
+      role: "assistant",
+      content: [
+        { type: "thinking", thinking: "Let me run a command." },
+        { type: "text", text: "好的，我来执行命令。" },
+        { type: "toolCall", id: "tc_bash_1", name: "bash", arguments: { command: "echo hi" } },
+      ],
+      model: "deepseek-mock",
+      provider: "deepseek",
+      usage: createEmptyUsage(),
+      stopReason: "toolUse",
+      timestamp: Date.now(),
+      source: "llm",
+    };
+
+    const events = assistantMessageToEvents(assistant, SESSION_ID, TURN_ID);
+    const { messages, errors } = sessionEventsToMessages(events);
+
+    expect(errors).toHaveLength(0);
+    const recovered = messages.find((m) => m.role === "assistant");
+    expect(recovered).toBeDefined();
+    if (recovered?.role === "assistant") {
+      expect(recovered.content.map((block) => block.type)).toEqual(["thinking", "text", "toolCall"]);
+    }
+  });
+
   it("should handle full turn round-trip", () => {
     const allMessages = createMockFullTurnMessages();
     const allEvents = allMessages.flatMap((msg) =>

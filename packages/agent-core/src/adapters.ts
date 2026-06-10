@@ -318,18 +318,20 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
           const payload = event.payload as AssistantReply;
           const content: AssistantMessage["content"] = [];
 
+          // 还原原始消息的块顺序 [thinking, text, ...toolCalls]（与流式组装一致）。
+          // tool_use 必须是 assistant 消息的末尾块：DeepSeek Anthropic 兼容端要求
+          // tool_use 之后紧跟 tool_result，若 text 排在 tool_use 后会被 400 拒绝。
           if (pendingThinking) {
             content.push({ type: "thinking", thinking: pendingThinking });
             pendingThinking = undefined;
+          }
+          if (payload.content) {
+            content.push({ type: "text", text: payload.content });
           }
           for (const tc of pendingToolCalls) {
             content.push({ type: "toolCall", id: tc.id, name: tc.name, arguments: tc.arguments });
           }
           pendingToolCalls = [];
-
-          if (payload.content) {
-            content.push({ type: "text", text: payload.content });
-          }
 
           messages.push({
             role: "assistant",

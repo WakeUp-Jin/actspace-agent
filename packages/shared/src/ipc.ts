@@ -238,6 +238,8 @@ export type ReviewFileChange = {
   additions: number;
   deletions: number;
   chunks: ReviewChunk[];
+  /** 缺省为文本 diff；image 表示该文件应渲染图片预览而不是 unified diff。 */
+  renderKind?: "image";
 };
 
 export type ReviewWarning = {

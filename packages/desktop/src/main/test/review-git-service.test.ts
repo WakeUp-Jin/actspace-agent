@@ -170,6 +170,50 @@ describe("review git service", () => {
     });
   });
 
+  it("marks untracked images for preview instead of warning, even when oversized", async () => {
+    const roots = await makeWorkspace();
+    await initRepo(roots);
+    // 超过 UNTRACKED_MAX_TEXT_BYTES（256KB）的 PNG：不应再报 "too large" 警告
+    const oversized = Buffer.alloc(300 * 1024, 0x42);
+    oversized[0] = 0x89; // PNG 魔数首字节，顺带保证含非文本字节
+    await writeFile(join(roots.workspaceRoot, "home.png"), oversized);
+
+    const result = await getWorkspaceGitChanges({}, roots);
+
+    if (!gitAvailable) {
+      expect(result.reason).toBe("git_not_found");
+      return;
+    }
+    expect(result.status).toBe("changes");
+    expect(result.changeSet?.warnings).toBeUndefined();
+    expect(result.changeSet?.files[0]).toMatchObject({
+      path: "home.png",
+      status: "added",
+      renderKind: "image",
+      chunks: [],
+    });
+  });
+
+  it("marks tracked modified images for preview", async () => {
+    const roots = await makeWorkspace();
+    await initRepo(roots);
+    await writeFile(join(roots.workspaceRoot, "icon.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    await commitAll(roots);
+    await writeFile(join(roots.workspaceRoot, "icon.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d]));
+
+    const result = await getWorkspaceGitChanges({}, roots);
+
+    if (!gitAvailable) {
+      expect(result.reason).toBe("git_not_found");
+      return;
+    }
+    expect(result.changeSet?.files[0]).toMatchObject({
+      path: "icon.png",
+      status: "modified",
+      renderKind: "image",
+    });
+  });
+
   it("maps renamed and deleted files", async () => {
     const roots = await makeWorkspace();
     await initRepo(roots);
