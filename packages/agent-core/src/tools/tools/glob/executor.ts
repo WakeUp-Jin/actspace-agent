@@ -9,7 +9,8 @@ const MAX_RESULTS = 200;
 
 interface FileEntry {
   path: string;
-  mtime: number;
+  sizeBytes?: number;
+  mtimeMs?: number;
 }
 
 export const globExecutor: ToolExecutorFn = async (
@@ -52,10 +53,10 @@ export const globExecutor: ToolExecutorFn = async (
     return { success: true, data: `No files found matching "${pattern}"` };
   }
 
-  entries.sort((a, b) => b.mtime - a.mtime);
+  entries.sort((a, b) => (b.mtimeMs ?? 0) - (a.mtimeMs ?? 0));
   const limited = entries.slice(0, MAX_RESULTS);
 
-  const output = limited.map((e) => e.path).join("\n");
+  const output = limited.map(formatFileEntry).join("\n");
   const header = `Found ${entries.length} file${entries.length > 1 ? "s" : ""}${entries.length > MAX_RESULTS ? ` (showing first ${MAX_RESULTS})` : ""} matching "${pattern}":\n\n`;
   const suffix = result.truncated ? "\n\n[Output truncated by ripgrep runner]" : "";
 
@@ -115,13 +116,46 @@ async function collectFileEntries(stdout: string, searchRoot: string, workspaceR
 
     try {
       const fileStat = await stat(absolutePath);
-      entries.push({ path: displayPath, mtime: fileStat.mtimeMs });
+      entries.push({ path: displayPath, sizeBytes: fileStat.size, mtimeMs: fileStat.mtimeMs });
     } catch {
-      entries.push({ path: displayPath, mtime: 0 });
+      entries.push({ path: displayPath });
     }
   }
 
   return entries;
+}
+
+function formatFileEntry(entry: FileEntry): string {
+  return `${entry.path} | size: ${formatFileSize(entry.sizeBytes)} | modified: ${formatModifiedTime(entry.mtimeMs)}`;
+}
+
+function formatFileSize(sizeBytes: number | undefined): string {
+  if (typeof sizeBytes !== "number" || !Number.isFinite(sizeBytes) || sizeBytes < 0) {
+    return "unknown";
+  }
+
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
+  }
+
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = sizeBytes / 1024;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function formatModifiedTime(mtimeMs: number | undefined): string {
+  if (typeof mtimeMs !== "number" || !Number.isFinite(mtimeMs) || mtimeMs <= 0) {
+    return "unknown";
+  }
+
+  return new Date(mtimeMs).toISOString();
 }
 
 function resolveRipgrepFilePath(path: string, searchRoot: string): string {

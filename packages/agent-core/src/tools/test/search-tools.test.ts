@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, realpath, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -54,10 +54,17 @@ describe("grepExecutor", () => {
 });
 
 describe("globExecutor", () => {
-  it("matches pattern relative to the provided path", async () => {
+  it("returns paths with size and modified time, sorted newest first", async () => {
     if (!hasRipgrep()) return;
 
     const workspace = await createWorkspace();
+    const olderFile = join(workspace, "packages/agent-core/src/tools/alpha.ts");
+    const newerFile = join(workspace, "packages/agent-core/src/tools/beta.test.ts");
+    const older = new Date("2024-01-01T00:00:00.000Z");
+    const newer = new Date("2025-01-01T00:00:00.000Z");
+    await utimes(olderFile, older, older);
+    await utimes(newerFile, newer, newer);
+
     const result = await globExecutor({
       pattern: "src/**/*.ts",
       path: "packages/agent-core",
@@ -67,6 +74,11 @@ describe("globExecutor", () => {
     const output = String(result.data);
     expect(output).toContain("packages/agent-core/src/tools/alpha.ts");
     expect(output).toContain("packages/agent-core/src/tools/beta.test.ts");
+    expect(output).toContain("packages/agent-core/src/tools/alpha.ts | size: 31 B | modified: 2024-01-01T00:00:00.000Z");
+    expect(output).toContain("packages/agent-core/src/tools/beta.test.ts | size: 30 B | modified: 2025-01-01T00:00:00.000Z");
+    expect(output.indexOf("packages/agent-core/src/tools/beta.test.ts")).toBeLessThan(
+      output.indexOf("packages/agent-core/src/tools/alpha.ts"),
+    );
     expect(output).not.toContain("packages/desktop/src/view.tsx");
   });
 
@@ -81,5 +93,6 @@ describe("globExecutor", () => {
 
     expect(result.success).toBe(true);
     expect(String(result.data)).toContain("packages/desktop/src/view.tsx");
+    expect(String(result.data)).toMatch(/packages\/desktop\/src\/view\.tsx \| size: \d+ B \| modified: \d{4}-\d{2}-\d{2}T/);
   });
 });

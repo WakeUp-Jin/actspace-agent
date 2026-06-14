@@ -4,7 +4,7 @@ export const globDefinition: ToolDefinitionSpec = {
   name: "glob",
   description:
     "Find files by name pattern in the workspace. " +
-    "Returns matching file paths sorted by modification time (most recent first). " +
+    "Returns matching file paths with file size and modification timestamp, sorted by modification time (most recent first). " +
     "Use for locating files by extension, name, or directory structure. " +
     "Do NOT use this for searching file contents — use grep instead.",
   parameters: {

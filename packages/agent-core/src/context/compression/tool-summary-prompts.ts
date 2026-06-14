@@ -29,7 +29,7 @@ const GREP_PROMPT =
 
 const GLOB_PROMPT =
   `${SHARED_RULE}\n` +
-  "这是文件名检索类工具（glob）的输出。必须逐字保留文件路径与文件总数，" +
+  "这是文件名检索类工具（glob）的输出。必须逐字保留文件路径、文件大小、修改时间与文件总数，" +
   "可以折叠同目录下的大量同类文件为 `<dir>/ 下 N 个文件`，但保留有代表性的具体路径。";
 
 const DIRECTORY_PROMPT =
