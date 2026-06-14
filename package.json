@@ -1,6 +1,7 @@
 {
   "name": "actspace",
   "private": true,
+  "license": "Apache-2.0",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "clean": "pnpm --filter @actspace/shared clean && pnpm --filter @actspace/agent-core clean && pnpm --filter @actspace/desktop clean",

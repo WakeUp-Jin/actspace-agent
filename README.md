@@ -10,7 +10,7 @@
   <a href="#开始使用">开始使用</a> ·
   <a href="#架构设计">架构设计</a> ·
   <a href="docs/design-docs/index.md">设计文档</a> ·
-  <a href="#许可证">MIT</a>
+  <a href="#许可证">Apache-2.0</a>
 </p>
 
 <p align="center">
@@ -122,4 +122,4 @@ DeepSeek 的成本很低并且理念很好，让我可以放心地围绕模型�
 
 ## 许可证
 
-[MIT](LICENSE)
+Actspace 采用 [Apache License 2.0](LICENSE) 授权。允许商用、修改和分发，但分发时需要保留许可证、版权声明和 [NOTICE](NOTICE) 中的归属声明。
