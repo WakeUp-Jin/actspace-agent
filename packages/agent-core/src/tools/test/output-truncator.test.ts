@@ -31,14 +31,17 @@ describe("processToolOutput", () => {
     expect(out.modelOutput).toBe(text);
   });
 
-  it("summarizes oversized output with a compression notice", async () => {
-    const text = "y".repeat(3000);
+  it("summarizes oversized output with a compression notice and raw prefix", async () => {
+    const text = "prefix-detail-" + "y".repeat(3000);
     const summarizer: Summarizer = {
       summarizeToolOutput: async () => "FLASH-SUMMARY",
       summarizeHistory: async () => "",
     };
     const out = await processToolOutput("generic", text, { toolTruncateThreshold: 2000, summarizer });
     expect(out.modelOutput).toContain("[已压缩摘要");
+    expect(out.modelOutput).toContain("[原始输出前 2000 字符]");
+    expect(out.modelOutput).toContain(text.slice(0, 2000));
+    expect(out.modelOutput).toContain("[flash 摘要]");
     expect(out.modelOutput).toContain("FLASH-SUMMARY");
     expect(out.rawOutputRef).toEqual({ kind: "inline", value: text });
   });

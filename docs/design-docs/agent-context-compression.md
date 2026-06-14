@@ -47,7 +47,8 @@ actspace 的长期产品原则之一是「上下文的绝对控制」。但当�
 ┌─ 预防层 B：非 bash 工具 flash 摘要（OutputTruncator）────────────────┐
 │  渲染文本 > 工具类阈值 → flash 摘要（送入前 absoluteMaxChars 头尾截断） │
 │  · 按工具类型选 system prompt，保留行号/路径等关键锚点                  │
-│  · 回填前加压缩标记；恢复路径 = offset/limit 翻页 / 重跑               │
+│  · 回填压缩标记 + 原始输出前 2000 字符 + flash 摘要，降低细节稀释风险    │
+│  · 恢复路径 = offset/limit 翻页 / 重跑                                  │
 └──────────────────────────────────────────────────────────────────┘
 ┌─ 治疗层：每次模型调用前检查 token 水位（ConversationContext.compress）─┐
 │  总 token ≥ contextWindow × compressionThreshold → 压缩历史：          │
@@ -68,8 +69,8 @@ bash 与非 bash 工具走两条不同的路径——bash 用流式落盘 + 头�
 | 工具类型（`previewKind` / category） | 触发阈值 | 超阈值处理 | 落盘 | 模型的恢复路径 |
 |---|---|---|---|---|
 | `bash` | `bashInlineThreshold`（默认 4000） | **流式落盘** + 回填**逐字头部 4000 字符** + 截断标记 + 文件路径（**不调 flash**） | **是**（> 阈值才保留文件） | `read_file` 读落盘的全量原文（配 offset/limit） |
-| `read` / `grep` / `glob` / `directory_list` | `readTruncateThreshold`（默认 20000） | flash 摘要，prompt 要求**逐字保留行号、文件路径、匹配位置**，仅压缩重复/正文；加压缩标记 | 否 | `offset/limit` 翻页重读原文件 / 重跑搜索 |
-| `web_search` / `generic` / 其他 | `toolTruncateThreshold`（默认 2000） | flash 摘要（通用）；加压缩标记 | 否 | 重新搜索 / 抓取 |
+| `read` / `grep` / `glob` / `directory_list` | `readTruncateThreshold`（默认 20000） | flash 摘要，prompt 要求**逐字保留行号、文件路径、匹配位置**，仅压缩重复/正文；回填压缩标记 + 原始前缀 + 摘要 | 否 | `offset/limit` 翻页重读原文件 / 重跑搜索 |
+| `web_search` / `generic` / 其他 | `toolTruncateThreshold`（默认 2000） | flash 摘要（通用）；回填压缩标记 + 原始前缀 + 摘要 | 否 | 重新搜索 / 抓取 |
 
 要点：
 
@@ -119,7 +120,7 @@ headTailTruncate(text, cap):
 
 两条路径都必须让模型明确知道「内容不完整、原文如何取」，但形式不同：
 
-- **flash 摘要（非 bash）**：正文前拼压缩标记 `[已压缩摘要 ⚠️ 原始 ${N} 字符 → 以下为 flash 摘要，非完整原文。${recoveryHint}]`。`recoveryHint`：read=`可用 offset/limit 翻页或重读原文件`；grep/glob=`可重跑搜索获取完整结果`；web/generic=`可重新搜索/抓取`。
+- **flash 摘要（非 bash）**：正文前拼压缩标记 `[已压缩摘要 ⚠️ 原始 ${N} 字符 → 以下包含原始输出前缀与 flash 摘要，非完整原文。${recoveryHint}]`。flash 摘要成功时，标记后固定拼接原始输出前 2000 字符，再拼 flash 摘要。原始前缀保留输出开头的高保真细节，摘要负责保留整体关键信息。summarizer 不可用或失败时只回填压缩标记 + 确定性头尾截断，避免重复拼接导致兜底输出膨胀。`recoveryHint`：read=`可用 offset/limit 翻页或重读原文件`；grep/glob=`可重跑搜索获取完整结果`；web/generic=`可重新搜索/抓取`。
 - **bash 头部截断**：头部正文后拼截断标记 `[输出截断：显示前 ${N}/共 ${M} 字符，完整原文见 <path>，可 read_file 读取]`。
 
 未触发任何压缩（原样穿透）的输出不加标记，避免误导模型以为内容被改过。
@@ -136,12 +137,23 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 
   # 极限保护：送 flash 前头尾截断到 absoluteMaxChars
   summaryInput = headTailTruncate(renderedText, absoluteMaxChars)
-  summaryBody = summarizer
-      ? await summarizer.summarizeToolOutput(tool.kind, summaryInput)   # flash + 按类型 prompt
-      : headTailTruncate(renderedText, threshold)                       # flash 不可用时确定性兜底
+  usedSummarizer = false
+  if summarizer:
+      try:
+          summaryBody = await summarizer.summarizeToolOutput(tool.kind, summaryInput)
+          usedSummarizer = true
+      catch:
+          summaryBody = headTailTruncate(renderedText, threshold)
+  else:
+      summaryBody = headTailTruncate(renderedText, threshold)
   notice = compressedNotice(len(renderedText), recoveryHintFor(tool.kind))
+  rawPrefix = renderedText.slice(0, 2000)
   return {
-    modelOutput: notice + "\n" + summaryBody,
+    modelOutput: usedSummarizer
+      ? notice + "\n\n"
+          + "[原始输出前 " + len(rawPrefix) + " 字符]\n" + rawPrefix + "\n\n"
+          + "[flash 摘要]\n" + summaryBody
+      : notice + "\n" + summaryBody,
     rawOutputRef: { kind: "inline", value: renderedText },
   }
 ```

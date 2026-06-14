@@ -89,5 +89,5 @@ export function recoveryHintFor(kind: ToolPreviewKind, overflowPath?: string): s
 
 /** 压缩标记前缀，明确告知模型「内容不完整、原文如何取」。 */
 export function compressedNotice(originalChars: number, recoveryHint: string): string {
-  return `[已压缩摘要 ⚠️ 原始 ${originalChars} 字符 → 以下为 flash 摘要，非完整原文。${recoveryHint}]`;
+  return `[已压缩摘要 ⚠️ 原始 ${originalChars} 字符 → 以下包含原始输出前缀与 flash 摘要，非完整原文。${recoveryHint}]`;
 }

@@ -3,8 +3,8 @@
  *
  * 替换 scheduler 旧的「一刀切 slice 到 truncateThreshold」：
  * - 低于阈值原样穿透（不加任何标记）。
- * - 超阈值 → 送 flash 前先头尾截断到 absoluteMaxChars，再按工具类型摘要，
- *   摘要前拼压缩标记；summarizer 不可用/失败时退化为确定性头尾截断。
+ * - 超阈值 → 送 flash 前先头尾截断到 absoluteMaxChars，再按工具类型摘要；
+ *   flash 成功时回填压缩标记 + 原始输出前缀 + 摘要，summarizer 不可用/失败时退化为确定性头尾截断。
  *
  * bash 不进此流水线（bash 在 run-process/executor 自处理：流式落盘 + 头部截断）。
  *
@@ -44,6 +44,8 @@ const READ_KINDS: ReadonlySet<ToolPreviewKind> = new Set([
   "search",
 ]);
 
+const COMPRESSED_RAW_PREFIX_CHARS = 2000;
+
 /**
  * 头尾保留截断：保头 70% + 中间省略标记 + 保尾 30%。
  * 优于纯掐头——报错/结论常在尾部。
@@ -67,6 +69,19 @@ function thresholdFor(kind: ToolPreviewKind, config: ProcessToolOutputConfig): n
   return config.toolTruncateThreshold ?? DEFAULT_COMPRESSION_CONFIG.toolTruncateThreshold;
 }
 
+function buildCompressedOutput(notice: string, rawText: string, summaryBody: string): string {
+  const prefix = rawText.slice(0, COMPRESSED_RAW_PREFIX_CHARS);
+  return [
+    notice,
+    "",
+    `[原始输出前 ${prefix.length} 字符]`,
+    prefix,
+    "",
+    "[flash 摘要]",
+    summaryBody,
+  ].join("\n");
+}
+
 /** 处理单个非 bash 工具的渲染输出。 */
 export async function processToolOutput(
   kind: ToolPreviewKind,
@@ -85,9 +100,11 @@ export async function processToolOutput(
   const summaryInput = headTailTruncate(renderedText, absoluteMax);
 
   let summaryBody: string;
+  let usedSummarizer = false;
   if (config.summarizer) {
     try {
       summaryBody = await config.summarizer.summarizeToolOutput(kind, summaryInput);
+      usedSummarizer = true;
     } catch {
       // flash 失败：确定性兜底，不阻塞主流程
       summaryBody = headTailTruncate(renderedText, threshold);
@@ -98,7 +115,9 @@ export async function processToolOutput(
 
   const notice = compressedNotice(renderedText.length, recoveryHintFor(kind));
   return {
-    modelOutput: `${notice}\n${summaryBody}`,
+    modelOutput: usedSummarizer
+      ? buildCompressedOutput(notice, renderedText, summaryBody)
+      : `${notice}\n${summaryBody}`,
     rawOutputRef: { kind: "inline", value: renderedText },
   };
 }
