@@ -31,6 +31,7 @@
 ## Agent
 
 - `agent-backend-design.md`：后端 Agent Runtime 的总体设计事实来源。
+- `agent-browser-bridge-design.md`：真实 Chrome 浏览器桥接层设计，约束 `actspace-agent` 与 extension、Go host/CLI、协议契约之间的接入边界。
 - `agent-turn-layers.md`：Agent Turn 四层职责规范（Renderer -> Main Process -> Bridge -> Agent）。
 - `agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块地图。
 - `agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。

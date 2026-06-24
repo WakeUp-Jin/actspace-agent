@@ -43,6 +43,7 @@ const MODEL_OPTIONS: SelectOption[] = [
   { value: DEFAULT_MODEL_VALUE, label: "DeepSeek V4 Flash（默认）" },
   { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" },
   { value: "kimi-k2.6", label: "Kimi K2.6（偏贵）" },
+  { value: "kimi-k2.7-code", label: "Kimi K2.7 Code（偏贵）" },
 ];
 
 const THINKING_OPTIONS: SelectOption[] = [

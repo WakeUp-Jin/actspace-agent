@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { runAgentLoop } from "../loop";
-import { MockLLMService } from "../../llm/services/mock";
+import { MockLLMService, mockText } from "../../llm/services/mock";
 import { ToolManager } from "../../tools/manager";
 import type { Context } from "../../messages";
+import { createEmptyUsage } from "../../messages";
 import type { AgentEvent } from "../types";
 import type { InternalTool, ToolResult } from "../../internal-tools";
 
@@ -121,5 +122,55 @@ describe("runAgentLoop", () => {
     );
 
     expect(steeringCalled).toBe(true);
+  });
+
+  it("blocks write tools when provider stopped at length while emitting tool calls", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
+    const writeHandler = vi.fn(async (): Promise<ToolResult> => ({ success: true, data: "wrote" }));
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
+    toolManager.register({
+      name: "write_file",
+      description: "write",
+      parameters: { type: "object" },
+      isReadOnly: false,
+      previewKind: "write",
+      handler: writeHandler,
+    });
+
+    llm.setResponses([
+      {
+        role: "assistant",
+        content: [{
+          type: "toolCall",
+          id: "tc_write",
+          name: "write_file",
+          arguments: { path: "article.md", content: "partial" },
+        }],
+        model: "mock-model",
+        provider: "mock",
+        usage: createEmptyUsage(),
+        stopReason: "toolUse",
+        diagnostics: [{ rawStopReason: "length" }],
+        timestamp: Date.now(),
+        source: "llm",
+      },
+      mockText("Done."),
+    ]);
+
+    const context: Context = {
+      messages: [{ role: "user", content: "write a long article", timestamp: Date.now() }],
+      tools: toolManager.getToolDefinitions(),
+    };
+
+    const result = await runAgentLoop(context, llm, { toolManager }, () => {});
+    const toolResult = result.messages.find((message) => message.role === "toolResult");
+
+    expect(writeHandler).not.toHaveBeenCalled();
+    expect(toolResult?.role).toBe("toolResult");
+    expect(toolResult?.isError).toBe(true);
+    expect(toolResult?.content[0]).toMatchObject({
+      type: "text",
+      text: "工具参数可能因模型输出长度限制被截断，已取消写入。请缩小内容，或先写骨架后用 edit_file 分段补齐。",
+    });
   });
 });

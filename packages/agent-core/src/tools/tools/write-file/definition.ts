@@ -6,6 +6,8 @@ export const writeFileDefinition: ToolDefinitionSpec = {
     "Write content to a file. Creates the file if it does not exist, or overwrites it if it does. " +
     "Parent directories are created automatically. " +
     "Paths are resolved inside the current workspace root unless runtime instructions give an explicit writable absolute path; if the user gives only a filename, create it in the workspace root. " +
+    "Use write_file only for small complete files. For long documents, large generated content, or large files, write a scaffold or first section, then continue with read_file + edit_file section by section. " +
+    "To append content, read the file tail and use edit_file to replace a unique trailing anchor or final block. " +
     "For modifying existing files, prefer edit_file to change specific sections " +
     "rather than overwriting the entire file. " +
     "When overwriting an existing file, you must read it first.",

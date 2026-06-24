@@ -1,4 +1,4 @@
-export type ModelId = "deepseek-v4-flash" | "deepseek-v4-pro" | "kimi-k2.6";
+export type ModelId = "deepseek-v4-flash" | "deepseek-v4-pro" | "kimi-k2.6" | "kimi-k2.7-code";
 
 export type ModelApi = "openai-completions" | "anthropic-messages";
 export type ModelProvider = "deepseek" | "kimi";
@@ -99,6 +99,27 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
       inputCacheHitPerMillion: 0.936,
       inputCacheMissPerMillion: 6.84,
       outputPerMillion: 28.8,
+    },
+  },
+  "kimi-k2.7-code": {
+    id: "kimi-k2.7-code",
+    label: "Kimi K2.7 Code",
+    api: "openai-completions",
+    provider: "kimi",
+    apiModel: "kimi-k2.7-code",
+    defaultBaseUrl: "https://api.moonshot.cn/v1",
+    thinkingDefault: false,
+    supportsThinkingToggle: true,
+    reasoning: false,
+    input: ["text"],
+    contextWindow: 1_000_000,
+    maxTokens: 262_144,
+    visibility: "public",
+    pricing: {
+      currency: "CNY",
+      inputCacheHitPerMillion: 1.3,
+      inputCacheMissPerMillion: 6.5,
+      outputPerMillion: 27,
     },
   },
 };

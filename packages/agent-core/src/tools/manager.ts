@@ -119,6 +119,7 @@ export interface ToolExecuteOptions {
   toolCallId?: string;
   signal?: AbortSignal;
   subagentEventSink?: import("./tools/agent/runner").SubAgentEventSink;
+  blockWriteToolsForTruncatedAssistant?: boolean;
 }
 
 /** Kairos 工具调用守卫上下文：allowedRoots（白名单）+ blocklist（黑名单）+ toolsDenied（双保险） */

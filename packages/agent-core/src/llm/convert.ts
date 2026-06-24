@@ -262,6 +262,7 @@ export interface StreamChunkAccumulator {
   toolCalls: Map<number, { id: string; name: string; argumentsText: string }>;
   usage: Usage;
   stopReason: StopReason;
+  rawStopReason?: string;
 }
 
 export function createAccumulator(): StreamChunkAccumulator {
@@ -271,6 +272,7 @@ export function createAccumulator(): StreamChunkAccumulator {
     toolCalls: new Map(),
     usage: createEmptyUsage(),
     stopReason: "stop",
+    rawStopReason: undefined,
   };
 }
 
@@ -327,6 +329,7 @@ export async function* processStreamChunks(
     }
 
     if (choice?.finish_reason) {
+      acc.rawStopReason = choice.finish_reason;
       acc.stopReason = mapStopReason(choice.finish_reason);
     }
 
@@ -406,6 +409,7 @@ export function buildAssistantMessage(
     provider: providerName,
     usage: acc.usage,
     stopReason,
+    ...(acc.rawStopReason && { diagnostics: [{ rawStopReason: acc.rawStopReason }] }),
     timestamp: Date.now(),
     source: "llm",
   };

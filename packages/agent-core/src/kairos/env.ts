@@ -31,7 +31,7 @@ export interface KairosEnvConfig {
 }
 
 function asKairosModelId(value: string | null | undefined): KairosModelId | undefined {
-  if (value === "deepseek-v4-pro" || value === "kimi-k2.6") return value;
+  if (value === "deepseek-v4-pro" || value === "kimi-k2.6" || value === "kimi-k2.7-code") return value;
   return undefined;
 }
 

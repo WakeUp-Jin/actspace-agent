@@ -85,7 +85,7 @@ function isModelId(value: unknown): value is ModelId {
 }
 
 function isKairosModelId(value: unknown): value is KairosModelId {
-  return value === "deepseek-v4-pro";
+  return value === "deepseek-v4-pro" || value === "kimi-k2.6" || value === "kimi-k2.7-code";
 }
 
 export class SettingsService {

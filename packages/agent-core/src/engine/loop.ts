@@ -42,6 +42,10 @@ import type {
 } from "./types";
 import type { CacheAuditPreparedCall, CacheAuditUsageMetadata } from "../observability/cache-audit";
 
+const TRUNCATED_WRITE_TOOL_ERROR =
+  "工具参数可能因模型输出长度限制被截断，已取消写入。请缩小内容，或先写骨架后用 edit_file 分段补齐。";
+const WRITE_TOOL_NAMES = new Set(["write_file", "edit_file", "delete_file"]);
+
 // ─── 核心循环入口 ───
 
 export async function runAgentLoop(
@@ -144,7 +148,11 @@ async function runDualLoop(
           toolCalls,
           config.toolExecution ?? "sequential",
           emit,
-          { ...config.toolExecuteOptions, signal },
+          {
+            ...config.toolExecuteOptions,
+            signal,
+            blockWriteToolsForTruncatedAssistant: hasRawLengthStopReason(assistantMsg),
+          },
         );
 
         for (const toolMsg of results) {
@@ -242,7 +250,12 @@ async function executeToolCalls(
       args: tc.arguments,
     });
 
-    const result = await toolManager.execute(tc.name, tc.arguments, tc.id, toolExecuteOptions);
+    const shouldBlock =
+      toolExecuteOptions?.blockWriteToolsForTruncatedAssistant === true &&
+      WRITE_TOOL_NAMES.has(tc.name);
+    const result = shouldBlock
+      ? { success: false, error: TRUNCATED_WRITE_TOOL_ERROR }
+      : await toolManager.execute(tc.name, tc.arguments, tc.id, toolExecuteOptions);
 
     await emit({
       type: "tool_end",
@@ -281,6 +294,10 @@ async function executeToolCalls(
 }
 
 // ─── 工具函数 ───
+
+function hasRawLengthStopReason(message: AssistantMessage): boolean {
+  return message.diagnostics?.some((entry) => entry.rawStopReason === "length") ?? false;
+}
 
 function findLastAssistant(messages: Message[]): AssistantMessage | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {

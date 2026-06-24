@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { convertMessages, toRequestTools, parseToolCall, mapStopReason, mapSdkError } from "../convert";
+import {
+  buildAssistantMessage,
+  convertMessages,
+  createAccumulator,
+  mapSdkError,
+  mapStopReason,
+  parseToolCall,
+  toRequestTools,
+} from "../convert";
 import type { Context, AssistantMessage, ToolResultMessage } from "../../messages";
 import { createEmptyUsage } from "../../messages";
 import { LLMServiceError } from "../types";
@@ -176,6 +184,28 @@ describe("mapStopReason", () => {
 
   it("defaults unknown reasons to stop", () => {
     expect(mapStopReason("something_else")).toBe("stop");
+  });
+});
+
+describe("buildAssistantMessage", () => {
+  it("preserves raw length stop reason when tool calls force toolUse", () => {
+    const acc = createAccumulator();
+    acc.rawStopReason = "length";
+    acc.stopReason = "length";
+    acc.toolCalls.set(0, {
+      id: "tc1",
+      name: "write_file",
+      argumentsText: '{"path":"a.md","content":"partial"}',
+    });
+
+    const message = buildAssistantMessage(
+      acc,
+      { provider: "kimi", apiKey: "sk", model: "kimi-k2.6" },
+      "kimi",
+    );
+
+    expect(message.stopReason).toBe("toolUse");
+    expect(message.diagnostics).toEqual([{ rawStopReason: "length" }]);
   });
 });
 

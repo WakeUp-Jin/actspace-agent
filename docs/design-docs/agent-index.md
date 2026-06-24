@@ -7,6 +7,7 @@
 ## 核心入口
 
 - `agent-backend-design.md`：后端 Agent Runtime 的总体设计事实来源，约束 LLM Service、Context Pipeline、Tool Runtime、Execution Engine 和 Session Persistence。
+- `agent-browser-bridge-design.md`：真实 Chrome 浏览器桥接层设计，约束 `actspace-agent` 应通过哪一层接入浏览器能力，以及为什么保留 Go bridge 与协议契约边界。
 - `agent-turn-layers.md`：Agent Turn 四层职责规范（Renderer -> Main Process -> Bridge -> Agent），约束每层输入输出和边界。
 - `agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块地图，记录 LLM、tools、context、engine、persistence、env 等实现清单。
 - `agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
@@ -24,6 +25,7 @@
 
 - `agent-tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约。
 - `agent-subprocess-runner-guidelines.md`：agent-core 内部受控子进程调用规范。
+- `agent-browser-bridge-design.md`：浏览器桥接层的接入边界、Go 选型理由和 `actspace-agent` 作为使用方的集成位置。
 - `agent-权限设计规则和原则.md`：Agent 工具权限、用户审核、风险分层和权限记录的设计规则。
 - `agent-tool-approval-pause-resume.md`：工具审核暂停恢复设计，约束 PendingApprovalRegistry、幂等 decision、会话切换和过期处理。
 - `agent-bash-policy-allowlist-design.md`：Bash 全局执行策略、会话级 allowlist、Allow 子命令拆分授权和真沙箱路线图。

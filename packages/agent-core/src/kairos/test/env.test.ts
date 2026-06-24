@@ -18,10 +18,13 @@ describe("resolveKairosEnv", () => {
     expect(r.modelSpec.provider).toBe("deepseek");
   });
 
-  it("allows explicit Kimi K2.6 as Kairos model override", () => {
+  it("allows explicit Kimi models as Kairos model override", () => {
     const r = resolveKairosEnv("kimi-k2.6", "auto");
     expect(r.modelSpec.id).toBe("kimi-k2.6");
     expect(r.modelSpec.provider).toBe("kimi");
+    const code = resolveKairosEnv("kimi-k2.7-code", "auto");
+    expect(code.modelSpec.id).toBe("kimi-k2.7-code");
+    expect(code.modelSpec.provider).toBe("kimi");
   });
 
   it("rejects shared registry models outside the Kairos allowlist", () => {
@@ -42,6 +45,7 @@ describe("resolveKairosEnv", () => {
     expect(resolveKairosModelSpec(null).id).toBe("deepseek-v4-flash");
     expect(resolveKairosModelSpec("deepseek-v4-pro").id).toBe("deepseek-v4-pro");
     expect(resolveKairosModelSpec("kimi-k2.6").id).toBe("kimi-k2.6");
+    expect(resolveKairosModelSpec("kimi-k2.7-code").id).toBe("kimi-k2.7-code");
     expect(resolveKairosModelSpec("not-a-real-model").id).toBe("deepseek-v4-flash");
   });
 });

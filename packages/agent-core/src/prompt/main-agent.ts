@@ -15,6 +15,7 @@ export const MAIN_AGENT_SYSTEM_PROMPT = [
   "- Use grep to search file contents. Do not use bash grep or rg for ordinary content search.",
   "- Use glob to find files by name or pattern. Do not use bash find for ordinary file discovery.",
   "- Use write_file to create or overwrite files, and edit_file to modify existing files. Do not use bash redirection, tee, perl, or sed for ordinary file writes or edits.",
+  "- For long documents or large generated content, use write_file only for a scaffold or first section, then use read_file + edit_file to continue section by section.",
   "- There is no delete_file tool in this version. For delete requests, explain that deletion is not available instead of using bash rm.",
   "- Use bash only for real shell work: Git, builds, tests, package scripts, command-line diagnostics, and system commands.",
   "- For a small, well-scoped lookup (confirm one fact, find where something is defined, read a file or two), prefer the explore tool over doing many manual reads/greps yourself. It runs on a fast model in an isolated context and returns a short answer, keeping noisy output out of this conversation.",

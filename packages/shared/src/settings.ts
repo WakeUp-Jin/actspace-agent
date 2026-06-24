@@ -18,9 +18,9 @@ export type KairosThinkingMode = "auto" | "on" | "off";
 
 /**
  * Kairos 设置页允许的显式模型；null 表示 Kairos 默认 Flash。
- * 当前允许显式 DeepSeek V4 Pro 或 Kimi K2.6（Kimi 偏贵，建议配合额度护栏）。
+ * 当前允许显式 DeepSeek V4 Pro 或 Kimi（Kimi 偏贵，建议配合额度护栏）。
  */
-export type KairosModelId = Extract<ModelId, "deepseek-v4-pro" | "kimi-k2.6">;
+export type KairosModelId = Extract<ModelId, "deepseek-v4-pro" | "kimi-k2.6" | "kimi-k2.7-code">;
 
 export interface ProviderSettingsView {
   /** 用户已在页面配置该供应商密钥（safeStorage 中存在）；决定卡片"已连接/可断开"。 */
