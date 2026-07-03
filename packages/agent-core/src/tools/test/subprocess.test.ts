@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { mkdtemp, realpath, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { runProcess } from "../subprocess/run-process";
+import { runProcess, startProcessSink } from "../subprocess/run-process";
 import { getRipgrepFailureMessage, runRipgrep } from "../subprocess/ripgrep";
 import { clearRipgrepCommandCache, resolveRipgrepCommand } from "../subprocess/ripgrep-path";
 
@@ -133,6 +133,60 @@ describe("runProcess", () => {
     expect(result.headBuffer).toBe("hi");
     expect(result.totalBytes).toBe(2);
     expect(result.outputFilePath).toBeUndefined();
+  });
+
+  it("sink handle keeps writing all output to the file after ensureOutputFile (backgrounding)", async () => {
+    const cwd = await createWorkspace();
+    const outputFile = join(cwd, "sink-bg", "out.txt");
+    const handle = startProcessSink({
+      command: process.execPath,
+      args: [
+        "-e",
+        // 分批延迟输出，模拟转后台后进程持续产出日志
+        "let i = 0; const t = setInterval(() => { process.stdout.write(`line-${i}\\n`); if (++i >= 5) { clearInterval(t); } }, 40);",
+      ],
+      cwd,
+      outputFile,
+      headBufferCap: 4000,
+      diskCap: 100_000,
+    });
+
+    // 模拟 blockMs 到点转后台：任何输出到来之前强制创建落盘文件
+    expect(handle.ensureOutputFile()).toBe(outputFile);
+
+    const status = await handle.wait;
+    expect(status.exitCode).toBe(0);
+
+    // 回归：文件创建后到达的输出必须全量续写，文件不能停在创建瞬间的快照
+    const persisted = await readFile(outputFile, "utf8");
+    expect(persisted).toBe("line-0\nline-1\nline-2\nline-3\nline-4\n");
+  });
+
+  it("sink handle file has no hole when head buffer fills after backgrounding", async () => {
+    const cwd = await createWorkspace();
+    const outputFile = join(cwd, "sink-hole", "out.txt");
+    const handle = startProcessSink({
+      command: process.execPath,
+      args: [
+        "-e",
+        // 三批各 8 字符，headBufferCap=8：第一批进 headBuffer，之后溢出。
+        // 旧实现会丢掉「文件创建后、headBuffer 满之前」的中间段，留下空洞。
+        "const parts = ['AAAAAAAA', 'BBBBBBBB', 'CCCCCCCC']; let i = 0; const t = setInterval(() => { process.stdout.write(parts[i]); if (++i >= parts.length) { clearInterval(t); } }, 40);",
+      ],
+      cwd,
+      outputFile,
+      headBufferCap: 8,
+      diskCap: 100_000,
+    });
+
+    expect(handle.ensureOutputFile()).toBe(outputFile);
+
+    const status = await handle.wait;
+    expect(status.exitCode).toBe(0);
+    expect(status.headBuffer).toBe("AAAAAAAA");
+
+    const persisted = await readFile(outputFile, "utf8");
+    expect(persisted).toBe("AAAAAAAABBBBBBBBCCCCCCCC");
   });
 
   it("sink mode marks truncated when diskCap is hit", async () => {

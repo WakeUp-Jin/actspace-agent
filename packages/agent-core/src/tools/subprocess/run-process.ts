@@ -323,9 +323,17 @@ export function startProcessSink(options: ProcessSinkOptions): ProcessSinkHandle
       overflowStart = take;
     }
 
-    const overflow = text.slice(overflowStart);
-    if (overflow.length > 0) {
-      writeToFile(overflow);
+    if (fileCreated) {
+      // 文件已存在（ensureOutputFile 转后台 / 此前已溢出）：本 chunk 全量续写。
+      // 创建瞬间只刷入了当时的 headBuffer，之后若仍按「仅溢出写盘」处理，
+      // headBuffer 未满时文件会停止增长，满了之后又会留下中间空洞。
+      writeToFile(text);
+    } else {
+      const overflow = text.slice(overflowStart);
+      if (overflow.length > 0) {
+        // writeToFile 首次调用会创建文件并先刷入 headBuffer（含本 chunk 已吸收部分）
+        writeToFile(overflow);
+      }
     }
     options.onChunk?.(text);
   };

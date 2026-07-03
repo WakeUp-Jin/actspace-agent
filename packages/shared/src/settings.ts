@@ -59,6 +59,30 @@ export interface KairosSettings {
    * 思考链覆写。
    */
   thinking: KairosThinkingMode;
+  /**
+   * Kairos 的 Skill 白名单（按 Skill name）。
+   *
+   * 与主 Agent 的黑名单语义相反：默认空数组 = Kairos 一个 Skill 都不加载，
+   * 只有显式列入的 Skill 才会进 Kairos 的 catalog 段并把 Skill 目录并入 allowedRoots。
+   * 变更后 main 会重建 Kairos controller 使其生效。
+   */
+  enabledSkills: string[];
+}
+
+export interface PluginsSettings {
+  /** fs-watch 文件监听插件（设计文档 agent-plugins-fs-watch.md）。 */
+  fsWatch: {
+    /** 总开关：开 = app 启动时自动拉起插件进程并守护；关 = 停止进程。 */
+    enabled: boolean;
+  };
+}
+
+export interface SkillsSettings {
+  /**
+   * 主 Agent 的 Skill 黑名单（按 Skill name）。
+   * 默认空数组 = 全部已发现 Skill 进主 Agent catalog；列入即从 catalog 剔除。
+   */
+  disabled: string[];
 }
 
 export interface AppSettings {
@@ -68,6 +92,8 @@ export interface AppSettings {
   providers: Record<ProviderId, ProviderSettingsView>;
   agent: AgentSettings;
   kairos: KairosSettings;
+  plugins: PluginsSettings;
+  skills: SkillsSettings;
 }
 
 // ─── IPC 输入 / 输出 ───
@@ -76,6 +102,8 @@ export type SettingsUpdateInput = Partial<{
   defaultModelId: ModelId | null;
   agent: Partial<AgentSettings>;
   kairos: Partial<KairosSettings>;
+  plugins: Partial<PluginsSettings>;
+  skills: Partial<SkillsSettings>;
 }>;
 
 export type AgentSystemPromptFile = {

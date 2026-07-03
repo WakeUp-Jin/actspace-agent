@@ -15,6 +15,8 @@ export type MainAgentRuntimeContextInput = {
   workspaceRoot: string;
   homeDir?: string;
   readPromptFile: () => Promise<AgentSystemPromptFile>;
+  /** 主 Agent Skill 黑名单（settings.skills.disabled）；命中的 Skill 不进 catalog。 */
+  disabledSkills?: string[];
   warn?: WarningLogger;
 };
 
@@ -36,7 +38,11 @@ export async function loadMainAgentRuntimeContext(
     homeDir: input.homeDir,
     warn: input.warn,
   });
-  const skillCatalogSegment = createSkillCatalogSegment(skillRegistry);
+  const disabled = new Set(input.disabledSkills ?? []);
+  const filteredRegistry = disabled.size === 0
+    ? skillRegistry
+    : { ...skillRegistry, skills: skillRegistry.skills.filter((s) => !disabled.has(s.name)) };
+  const skillCatalogSegment = createSkillCatalogSegment(filteredRegistry);
   if (skillCatalogSegment) {
     systemPromptSegments.push(skillCatalogSegment);
   }

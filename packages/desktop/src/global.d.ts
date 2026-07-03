@@ -96,6 +96,22 @@ declare global {
       testProviderConnection: (
         input: import("@actspace/shared").TestConnectionInput
       ) => Promise<import("@actspace/shared").TestConnectionResult>;
+      getFsWatchStatus?: () => Promise<import("@actspace/shared").FsWatchStatus>;
+      installFsWatchPlugin?: () => Promise<import("@actspace/shared").FsWatchInstallResult>;
+      setFsWatchEnabled?: (
+        input: import("@actspace/shared").FsWatchSetEnabledInput
+      ) => Promise<import("@actspace/shared").FsWatchActionResult>;
+      retryFsWatch?: () => Promise<import("@actspace/shared").FsWatchActionResult>;
+      getFsWatchConfig?: () => Promise<import("@actspace/shared").FsWatchConfigView>;
+      updateFsWatchConfig?: (
+        input: import("@actspace/shared").FsWatchConfigUpdateInput
+      ) => Promise<import("@actspace/shared").FsWatchConfigView>;
+      pickFsWatchRoot?: () => Promise<import("@actspace/shared").FsWatchPickRootResult>;
+      listSkills?: () => Promise<import("@actspace/shared").SkillListResult>;
+      installSkill?: () => Promise<import("@actspace/shared").SkillInstallResult>;
+      uninstallSkill?: (
+        input: import("@actspace/shared").SkillUninstallInput
+      ) => Promise<import("@actspace/shared").SkillUninstallResult>;
       getLocalUpdateState?: () => Promise<import("@actspace/shared").LocalUpdateState>;
       selectLocalUpdateSource?: () => Promise<import("@actspace/shared").LocalUpdateSelectSourceResult>;
       startLocalUpdate?: () => Promise<import("@actspace/shared").LocalUpdateStartResult>;

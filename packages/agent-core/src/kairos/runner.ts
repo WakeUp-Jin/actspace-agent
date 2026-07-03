@@ -33,7 +33,12 @@ import type { SessionsDigestResult } from "./context/sessions-digest";
 import type { TickPayload } from "./briefs/dispatcher";
 import type { QueueMessage } from "./scheduler";
 import type { BriefsIndexManager } from "./briefs/index-manager";
-import { assembleSystemPrompt, assembleTickMessage, derivePhase } from "./prompt-assembler";
+import {
+  assembleSystemPrompt,
+  assembleTickMessage,
+  derivePhase,
+  type KairosSkillCatalogEntry,
+} from "./prompt-assembler";
 import type { KairosInboxSummary } from "./inbox";
 
 export interface TickResult {
@@ -44,6 +49,8 @@ export interface TickResult {
 export interface KairosRunnerOptions {
   config: KairosConfig;
   shortTerm: KairosShortTermMemoryContext;
+  /** 白名单过滤后的 Skill catalog；进 system prompt 的「可用 Skills」段。 */
+  skillCatalog?: KairosSkillCatalogEntry[];
   observeRefresh: () => Promise<{
     watchDiffs: WatchDiffEntry[];
     sessionsDigest: SessionsDigestResult;
@@ -114,6 +121,7 @@ export class KairosRunner {
     const systemPrompt = assembleSystemPrompt({
       config: this.opts.config,
       shortTermResult: shortTerm,
+      skillCatalog: this.opts.skillCatalog,
     });
     const tickContent = assembleTickMessage({
       now,

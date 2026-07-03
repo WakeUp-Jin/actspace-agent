@@ -20,10 +20,12 @@ export {
   buildHistorySummary,
   buildObservationDelta,
   derivePhase,
+  renderKairosSkillCatalog,
   type AssembleSystemPromptInput,
   type AssembleTickMessageInput,
   type BuildObservationDeltaInput,
   type BuildHistorySummaryInput,
+  type KairosSkillCatalogEntry,
 } from "./prompt-assembler";
 export { loadKairosConfig, type KairosConfig } from "./config/loader";
 export {

@@ -132,7 +132,7 @@ export function userMessageToEvents(
       content,
       ...(payload?.attachments?.length ? { attachments: payload.attachments } : {}),
       ...(payload?.attachmentAnalyses?.length ? { attachmentAnalyses: payload.attachmentAnalyses } : {}),
-      // 注入消息（如后台任务通知）标记来源，前端按来源换展示样式
+      // 注入消息（如后台任务通知）标记来源；前端 selectors 按来源隐藏，恢复时也不会混入用户消息
       ...(msg.source && msg.source !== "user" ? { source: msg.source } : {}),
     }, msg.timestamp),
   ];

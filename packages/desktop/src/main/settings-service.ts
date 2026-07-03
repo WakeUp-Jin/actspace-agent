@@ -62,6 +62,8 @@ interface PersistedSettings {
   defaultModelId: ModelId | null;
   agent: AppSettings["agent"];
   kairos: AppSettings["kairos"];
+  plugins: AppSettings["plugins"];
+  skills: AppSettings["skills"];
 }
 
 interface ReadSettingsResult {
@@ -132,7 +134,9 @@ export class SettingsService {
         kimi: { hasApiKey: Boolean(this.getDecryptedKey("kimi")) },
       },
       agent: { ...this.settings.agent, disabledTools: [...this.settings.agent.disabledTools] },
-      kairos: { ...this.settings.kairos },
+      kairos: { ...this.settings.kairos, enabledSkills: [...this.settings.kairos.enabledSkills] },
+      plugins: { fsWatch: { ...this.settings.plugins.fsWatch } },
+      skills: { disabled: [...this.settings.skills.disabled] },
     };
   }
 
@@ -146,6 +150,14 @@ export class SettingsService {
     }
     if (input.kairos) {
       this.settings.kairos = sanitizeKairos({ ...this.settings.kairos, ...input.kairos });
+    }
+    if (input.plugins) {
+      this.settings.plugins = sanitizePlugins({
+        fsWatch: { ...this.settings.plugins.fsWatch, ...input.plugins.fsWatch },
+      });
+    }
+    if (input.skills) {
+      this.settings.skills = sanitizeSkills({ ...this.settings.skills, ...input.skills });
     }
     await this.writeSettingsFile();
     this.applyToEnv();
@@ -303,7 +315,10 @@ function defaultSettingsFromEnv(dataRoot: string): PersistedSettings {
     kairos: {
       modelId: null,
       thinking: "auto",
+      enabledSkills: [],
     },
+    plugins: { fsWatch: { enabled: false } },
+    skills: { disabled: [] },
   };
 }
 
@@ -313,10 +328,14 @@ function mergePersistedSettings(raw: unknown, dataRoot: string): ReadSettingsRes
   const obj = raw as Record<string, unknown>;
   const agent = (obj.agent ?? {}) as Record<string, unknown>;
   const kairos = (obj.kairos ?? {}) as Record<string, unknown>;
+  const plugins = (obj.plugins ?? {}) as Record<string, unknown>;
+  const skills = (obj.skills ?? {}) as Record<string, unknown>;
   const legacySystemPrompt = typeof agent.systemPrompt === "string" ? agent.systemPrompt : undefined;
   const needsWrite =
     typeof agent.systemPromptPath !== "string" ||
     typeof agent.systemPrompt === "string" ||
+    obj.plugins === undefined ||
+    obj.skills === undefined ||
     obj.version !== 1;
   return {
     needsWrite,
@@ -335,7 +354,10 @@ function mergePersistedSettings(raw: unknown, dataRoot: string): ReadSettingsRes
       kairos: sanitizeKairos({
         modelId: kairos.modelId as KairosModelId | null | undefined,
         thinking: kairos.thinking as KairosThinkingMode | undefined,
+        enabledSkills: kairos.enabledSkills as string[] | undefined,
       }, seed.kairos),
+      plugins: sanitizePlugins(plugins as Partial<AppSettings["plugins"]>),
+      skills: sanitizeSkills(skills as Partial<AppSettings["skills"]>),
     },
   };
 }
@@ -382,11 +404,32 @@ function sanitizeKairos(
     modelId: isKairosModelId(input.modelId) ? input.modelId : input.modelId === null ? null : fallback.modelId,
     thinking:
       thinking === "auto" || thinking === "on" || thinking === "off" ? thinking : fallback.thinking,
+    enabledSkills: sanitizeSkillNameList(input.enabledSkills, fallback.enabledSkills),
   };
 }
 
 function defaultKairos(): AppSettings["kairos"] {
-  return { modelId: null, thinking: "auto" };
+  return { modelId: null, thinking: "auto", enabledSkills: [] };
+}
+
+function sanitizePlugins(input: Partial<AppSettings["plugins"]>): AppSettings["plugins"] {
+  const fsWatch = (input.fsWatch ?? {}) as Partial<AppSettings["plugins"]["fsWatch"]>;
+  return {
+    fsWatch: { enabled: typeof fsWatch.enabled === "boolean" ? fsWatch.enabled : false },
+  };
+}
+
+function sanitizeSkills(input: Partial<AppSettings["skills"]>): AppSettings["skills"] {
+  return { disabled: sanitizeSkillNameList(input.disabled, []) };
+}
+
+/** 过滤为去重后的非空字符串数组；非法输入回落 fallback。 */
+function sanitizeSkillNameList(value: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(value)) return [...fallback];
+  const names = value.filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+  return [...new Set(names)];
 }
 
 function setOrDeleteEnv(key: string, value: string | undefined): void {

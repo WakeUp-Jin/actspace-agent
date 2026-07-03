@@ -26,7 +26,9 @@ const defaultSettings: AppSettings = {
     bashAlwaysAsk: false,
     exploreModelId: null,
   },
-  kairos: { modelId: null, thinking: "auto" },
+  kairos: { modelId: null, thinking: "auto", enabledSkills: [] },
+  plugins: { fsWatch: { enabled: false } },
+  skills: { disabled: [] },
 };
 
 /** window.actspace 的设置相关方法默认 stub，供各用例 spread 进 mock。 */

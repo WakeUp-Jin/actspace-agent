@@ -679,7 +679,7 @@ function createToolExecutionResult(
     modelOutput,
     uiPreview: record?.result?.subagent?.uiPreview
       ?? applyBashBackgroundPreview(
-        createToolUiPreview(tool?.previewKind ?? "generic", record?.args ?? {}, modelOutput, summary, ok),
+        createToolUiPreview(message.toolName, tool?.previewKind ?? "generic", record?.args ?? {}, modelOutput, summary, ok),
         record,
       ),
     error: ok
@@ -749,7 +749,21 @@ function getToolResultOutputText(result: ToolResult): string {
   return JSON.stringify(result.data ?? "");
 }
 
+/** bash_output / bash_kill 没有 command 参数：合成伪命令行，让 UI 能显示「执行了什么」。 */
+function getBashManagementCommand(toolName: string, args: Record<string, unknown>): string {
+  const taskId = typeof args.taskId === "string" && args.taskId.length > 0 ? args.taskId : "<taskId>";
+  if (toolName === "bash_output") {
+    const tail = typeof args.tailLines === "number" ? ` --tail ${args.tailLines}` : "";
+    return `bash_output ${taskId}${tail}`;
+  }
+  if (toolName === "bash_kill") {
+    return `bash_kill ${taskId}`;
+  }
+  return "";
+}
+
 function createToolUiPreview(
+  toolName: string,
   previewKind: ToolUiPreview["kind"],
   args: Record<string, unknown>,
   output: string,
@@ -887,7 +901,7 @@ function createToolUiPreview(
     }
 
     case "bash": {
-      const command = stringArg(args.command, "");
+      const command = stringArg(args.command, "") || getBashManagementCommand(toolName, args);
       const intent = typeof args.intent === "string" && args.intent.trim().length > 0 ? args.intent.trim() : undefined;
       return {
         kind: "bash",
@@ -1113,7 +1127,7 @@ function mapAgentEventToStreamEvent(
         const tool = toolManager.get(event.toolName);
         const previewKind = tool?.previewKind ?? "generic";
         const summary = getToolSummary(event.toolName, previewKind, event.args, true);
-        const preview = createToolUiPreview(previewKind, event.args, "", summary, true);
+        const preview = createToolUiPreview(event.toolName, previewKind, event.args, "", summary, true);
         const startedEvent: RuntimeStreamEvent = {
           type: "tool_started",
           toolCallId: event.toolCallId,
@@ -1139,7 +1153,7 @@ function mapAgentEventToStreamEvent(
         resultEventId: nextId(),
         isError: event.isError,
         preview: event.result.subagent?.uiPreview
-          ?? createToolUiPreview(previewKind, args, output, summary, ok),
+          ?? createToolUiPreview(event.toolName, previewKind, args, output, summary, ok),
       };
     }
 

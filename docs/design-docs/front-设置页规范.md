@@ -27,11 +27,13 @@
 ### 左侧设置导航
 
 - 保持窄而稳定的宽度，纯列表导航，不做聊天会话展示。
-- 首版分区（定稿）：
+- 当前分区：
   - `通用 General`
   - `模型 Model`
   - `智能体 Agent`
   - `工具 Tools`
+  - `插件 Plugins`
+  - `Skills`
   - `外观 Appearance`
   - `归档会话 Archived Chats`
   - `更新 Update`
@@ -68,6 +70,15 @@
   - 不含 Kairos 开启/暂停按钮、也不放 `enabled` 开关（启停留在 Kairos 页）；但**直接改 `preferences.json` 的 `enabled` 保存后仍会真的起/停 Kairos**（main 端按 enabled 调和运行态）。
 - 工具 Tools
   - 列出全部基础工具开关；当前 provider 下不可用的工具显示禁用态与原因。
+- 插件 Plugins（管理外部**进程**；设计事实来源 `agent-plugins-fs-watch.md`）
+  - 文件监听（fs-watch）卡片：未安装态给「选择二进制安装」；已安装态给总开关 Toggle、运行状态徽标（运行中 / 启动中 / 已停止 / 异常+重试）、版本与最近心跳时间，`overflow` 时提示当日记录不完整。
+  - 配置区（安装后可见）：监听目录列表（系统目录选择器增删）、合并窗口（debounce）与日志保留天数步进器、排除隐藏文件开关；排除名单与事件输出目录只读展示。开关 / 配置变更即时生效（写 config.json，运行中自动重启进程）。
+  - 状态 2s 轮询，仅本分区挂载时进行；浏览器 mock 模式显示「仅桌面端可用」。
+  - 开启 fs-watch 时 main 自动把 `fs-watch` 并入 Kairos 的 Skill 白名单（用户可在 Skills 分区再关掉）。
+- Skills（管理**知识能力**的可见性；与「插件」分区分工——插件管进程，这里管 catalog）
+  - Skill 卡片列表：name / description / scope+来源徽标 / SKILL.md 目录路径 / 异常 warning；同名被遮蔽（shadowed）的条目默认不展示、只在顶部计数提及。
+  - 每卡两个独立开关：「主 Agent」= 黑名单反向（默认全开，关闭写 `settings.skills.disabled`）；「Kairos」= 白名单（默认全关，开启写 `settings.kairos.enabledSkills`，变更触发 Kairos controller 重建）。
+  - 顶部「安装 Skill」：选目录 → 校验 SKILL.md → 复制到 `<userData>/skills/<目录名>/`；仅该目录下（`removable`）的 Skill 显示「卸载」按钮（confirm 后删除目录）。
 - 外观 Appearance（字体 + 缩放 + 三态主题均已落地）
   - **字体**（参考 Cursor，只分两类）：
     - `UI 字体`：驱动 `--act-font-ui`，连带 AI 输出正文（`.markdown-body` 用的 `--act-font-display` 始终 = `--act-font-ui`）。

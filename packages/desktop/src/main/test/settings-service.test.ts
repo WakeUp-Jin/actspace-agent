@@ -239,10 +239,10 @@ describe("SettingsService", () => {
     expect(process.env.KAIROS_MODEL_ID).toBeUndefined();
 
     const persisted = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
-    expect(persisted.kairos).toEqual({ modelId: "deepseek-v4-pro", thinking: "off" });
+    expect(persisted.kairos).toEqual({ modelId: "deepseek-v4-pro", thinking: "off", enabledSkills: [] });
 
     const reset = await svc.update({ kairos: { modelId: null, thinking: "auto" } });
-    expect(reset.kairos).toEqual({ modelId: null, thinking: "auto" });
+    expect(reset.kairos).toEqual({ modelId: null, thinking: "auto", enabledSkills: [] });
     expect(process.env.KAIROS_THINKING).toBeUndefined();
   });
 
@@ -253,10 +253,58 @@ describe("SettingsService", () => {
 
     const updated = await svc.update({
       defaultModelId: "not-a-model" as never,
-      kairos: { modelId: "kimi-k2.6" as never, thinking: "on" },
+      kairos: { modelId: "not-a-kairos-model" as never, thinking: "on" },
     });
     expect(updated.defaultModelId).toBeNull();
     expect(updated.kairos.modelId).toBeNull();
     expect(updated.kairos.thinking).toBe("on");
+  });
+
+  it("plugins / skills / kairos.enabledSkills 默认播种并持久化 round-trip", async () => {
+    const dataRoot = await makeDataRoot();
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    // 默认播种：全部关闭 / 空列表
+    expect(svc.get().plugins).toEqual({ fsWatch: { enabled: false } });
+    expect(svc.get().skills).toEqual({ disabled: [] });
+    expect(svc.get().kairos.enabledSkills).toEqual([]);
+
+    await svc.update({
+      plugins: { fsWatch: { enabled: true } },
+      skills: { disabled: ["foo", "foo", " ", "bar"] },
+      kairos: { enabledSkills: ["fs-watch", "fs-watch"] },
+    });
+
+    // 重新加载实例读回：去重、剔除空白项
+    const reloaded = makeService(dataRoot);
+    await reloaded.load();
+    expect(reloaded.get().plugins.fsWatch.enabled).toBe(true);
+    expect(reloaded.get().skills.disabled).toEqual(["foo", "bar"]);
+    expect(reloaded.get().kairos.enabledSkills).toEqual(["fs-watch"]);
+  });
+
+  it("老 settings.json 缺 plugins/skills 分区时回默认并补写", async () => {
+    const dataRoot = await makeDataRoot();
+    await writeFile(
+      join(dataRoot, "settings.json"),
+      JSON.stringify({
+        version: 1,
+        defaultModelId: null,
+        agent: { systemPromptPath: join(dataRoot, "prompts", "main-agent.md") },
+        kairos: { modelId: null, thinking: "auto" },
+      }),
+      "utf8",
+    );
+
+    const svc = makeService(dataRoot);
+    await svc.load();
+    expect(svc.get().plugins).toEqual({ fsWatch: { enabled: false } });
+    expect(svc.get().skills).toEqual({ disabled: [] });
+    expect(svc.get().kairos.enabledSkills).toEqual([]);
+
+    const persisted = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
+    expect(persisted.plugins).toEqual({ fsWatch: { enabled: false } });
+    expect(persisted.skills).toEqual({ disabled: [] });
   });
 });

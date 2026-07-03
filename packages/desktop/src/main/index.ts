@@ -49,6 +49,12 @@ import type {
   WorkspaceListDirInput,
   WorkspaceListResult,
   WorkspaceReadFileInput,
+  FsWatchConfigUpdateInput,
+  FsWatchInstallResult,
+  FsWatchPickRootResult,
+  FsWatchSetEnabledInput,
+  SkillInstallResult,
+  SkillUninstallInput,
 } from "@actspace/shared";
 import {
   createBootstrapState,
@@ -68,8 +74,10 @@ import {
   createKairos,
   ShortMemoryStore,
   bashTaskRegistry,
+  loadSkillRegistry,
   type KairosConfig,
   type KairosController,
+  type KairosSkillCatalogEntry,
 } from "@actspace/agent-core";
 import type { SessionEvent, SessionRecord } from "@actspace/shared";
 import { runAndPersistTurn, abortTurn, type AgentRuntimeContextLoader, type AppDataRoots } from "./agent-turn";
@@ -95,6 +103,8 @@ import {
 import { registerKairosIpc, type KairosIpcHandle } from "./kairos-ipc";
 import { SettingsService, type SecretCrypto } from "./settings-service";
 import { resolveAppDataRoots } from "./app-paths";
+import { FsWatchService } from "./plugins/fs-watch-service";
+import { installSkillFromDirectory, listSkills, uninstallSkillDirectory } from "./skills-service";
 
 const APP_ID = "com.actspace.desktop";
 const APP_NAME = "actspace";
@@ -528,12 +538,54 @@ const electronSecretCrypto: SecretCrypto = {
 let settingsService: SettingsService | undefined;
 let localUpdateService: LocalUpdateService | undefined;
 let localUpdateQuitRequested = false;
+let fsWatchService: FsWatchService | undefined;
 
 function getSettingsService(): SettingsService {
   if (!settingsService) {
     throw new Error("SettingsService 尚未初始化（应在 app.whenReady 内 load 之后再调用）。");
   }
   return settingsService;
+}
+
+function getFsWatchService(roots: AppDataRoots): FsWatchService {
+  if (!fsWatchService) {
+    fsWatchService = new FsWatchService({
+      dataRoot: roots.dataRoot,
+      // 首次生成 config.json 的默认监听目录：Kairos 自己的 workspace（开箱即用且无隐私风险）
+      defaultWatchRoot: getKairosWorkspaceRoot(join(roots.dataRoot, "kairos")),
+      isEnabled: () => getSettingsService().get().plugins.fsWatch.enabled,
+      log: logMain,
+    });
+  }
+  return fsWatchService;
+}
+
+function sameStringSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const setA = new Set(a);
+  return b.every((item) => setA.has(item));
+}
+
+/**
+ * 读取 Kairos 的 Skill 白名单 catalog：loadSkillRegistry（与主 Agent 同一套发现）
+ * → 按 settings.kairos.enabledSkills 过滤 → 映射为 controller 需要的 catalog 条目。
+ */
+async function loadKairosSkillCatalog(roots: AppDataRoots): Promise<KairosSkillCatalogEntry[]> {
+  const enabled = new Set(getSettingsService().get().kairos.enabledSkills);
+  if (enabled.size === 0) return [];
+  const registry = await loadSkillRegistry({
+    dataRoot: roots.dataRoot,
+    workspaceRoot: roots.workspaceRoot,
+    warn: logMain,
+  });
+  return registry.skills
+    .filter((skill) => enabled.has(skill.name))
+    .map((skill) => ({
+      name: skill.name,
+      description: skill.description,
+      location: skill.location,
+      directory: skill.directory,
+    }));
 }
 
 function getLocalUpdateService(): LocalUpdateService {
@@ -713,6 +765,13 @@ async function ensureKairosController(roots: AppDataRoots): Promise<KairosContro
     modelId: preferredModelId,
   });
   const contextWindow = resolveKairosContextWindow(preferredModelId);
+  // Skill 白名单 catalog：加载失败不阻塞 Kairos 启动（回落为不加载任何 Skill）
+  let skillCatalog: KairosSkillCatalogEntry[] = [];
+  try {
+    skillCatalog = await loadKairosSkillCatalog(roots);
+  } catch (err) {
+    logMain("kairos skill catalog load failed", { error: err instanceof Error ? err.message : String(err) });
+  }
   kairosController = await createKairos({
     kairosRoot,
     llm,
@@ -720,6 +779,7 @@ async function ensureKairosController(roots: AppDataRoots): Promise<KairosContro
     toolManagerFactory,
     contextWindow,
     thinkingEnabled,
+    skillCatalog,
   });
   kairosIpcHandle = registerKairosIpc({
     controller: kairosController,
@@ -849,6 +909,7 @@ async function registerIpc() {
             dataRoot: roots.dataRoot,
             workspaceRoot,
             readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
+            disabledSkills: getSettingsService().get().skills.disabled,
             warn: logMain,
           }),
       );
@@ -889,6 +950,7 @@ async function registerIpc() {
           dataRoot: roots.dataRoot,
           workspaceRoot,
           readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
+          disabledSkills: getSettingsService().get().skills.disabled,
           warn: logMain,
         }),
     );
@@ -986,6 +1048,7 @@ async function registerIpc() {
           dataRoot: roots.dataRoot,
           workspaceRoot,
           readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
+          disabledSkills: getSettingsService().get().skills.disabled,
           warn: logMain,
         }),
       );
@@ -1157,12 +1220,15 @@ async function registerIpc() {
     const service = getSettingsService();
     const beforeKairos = service.get().kairos;
     const next = await service.update(input);
-    // Kairos 模型 / 思考链来自 settings.json，且 LLM 在 controller 创建时定型；
-    // 保存后立即重建，保证下一次 Kairos 调用使用最新设置。其余 env-backed 设置（Key/工具/
-    // 温度/bash 审查）由消费方按 turn 读 env proxy，下一轮自动生效。
+    // Kairos 模型 / 思考链 / Skill 白名单来自 settings.json，且在 controller 创建时定型
+    // （LLM 实例、skillCatalog 注入 guard 与 prompt）；保存后立即重建，保证下一次
+    // Kairos 调用使用最新设置。其余 env-backed 设置（Key/工具/温度/bash 审查）由
+    // 消费方按 turn 读 env proxy，下一轮自动生效。
     if (
       input.kairos &&
-      (beforeKairos.modelId !== next.kairos.modelId || beforeKairos.thinking !== next.kairos.thinking)
+      (beforeKairos.modelId !== next.kairos.modelId ||
+        beforeKairos.thinking !== next.kairos.thinking ||
+        !sameStringSet(beforeKairos.enabledSkills, next.kairos.enabledSkills))
     ) {
       try {
         const roots = await ensureDataDirectories();
@@ -1191,6 +1257,108 @@ async function registerIpc() {
   ipcMain.handle("settings:test-connection", async (_event, input: TestConnectionInput) => {
     const result = await testProviderConnection(input.provider);
     logMain("settings test connection", { provider: input.provider, ok: result.ok });
+    return result;
+  });
+
+  // ─── 插件：fs-watch 文件监听 ───
+  ipcMain.handle("plugins:fs-watch:get-status", async () => {
+    const roots = await ensureDataDirectories();
+    return getFsWatchService(roots).getStatus();
+  });
+
+  ipcMain.handle("plugins:fs-watch:install", async (): Promise<FsWatchInstallResult> => {
+    const roots = await ensureDataDirectories();
+    const picked = await dialog.showOpenDialog({
+      title: "选择 fs-watch 插件二进制",
+      properties: ["openFile"],
+    });
+    if (picked.canceled || !picked.filePaths[0]) {
+      return { ok: false, canceled: true };
+    }
+    const result = await getFsWatchService(roots).installFromFile(picked.filePaths[0]);
+    logMain("fs-watch plugin install", { ok: result.ok, error: result.error });
+    return result;
+  });
+
+  ipcMain.handle("plugins:fs-watch:set-enabled", async (_event, input: FsWatchSetEnabledInput) => {
+    const roots = await ensureDataDirectories();
+    const service = getFsWatchService(roots);
+    const enabled = input.enabled === true;
+    // 先持久化用户意图；开启时顺带把 fs-watch Skill 并入 Kairos 白名单（用户可再手动移除）
+    const settings = getSettingsService();
+    const kairosSkills = settings.get().kairos.enabledSkills;
+    await settings.update({
+      plugins: { fsWatch: { enabled } },
+      ...(enabled && !kairosSkills.includes("fs-watch")
+        ? { kairos: { enabledSkills: [...kairosSkills, "fs-watch"] } }
+        : {}),
+    });
+    if (enabled) {
+      const result = await service.start();
+      logMain("fs-watch plugin enabled", { ok: result.ok, error: result.error });
+      if (!result.ok) return { ok: false, error: result.error };
+    } else {
+      await service.stop();
+      logMain("fs-watch plugin disabled");
+    }
+    return { ok: true };
+  });
+
+  ipcMain.handle("plugins:fs-watch:retry", async () => {
+    const roots = await ensureDataDirectories();
+    return getFsWatchService(roots).retry();
+  });
+
+  ipcMain.handle("plugins:fs-watch:get-config", async () => {
+    const roots = await ensureDataDirectories();
+    return getFsWatchService(roots).getConfig();
+  });
+
+  ipcMain.handle("plugins:fs-watch:update-config", async (_event, input: FsWatchConfigUpdateInput) => {
+    const roots = await ensureDataDirectories();
+    return getFsWatchService(roots).updateConfig(input);
+  });
+
+  ipcMain.handle("plugins:fs-watch:pick-root", async (): Promise<FsWatchPickRootResult> => {
+    const picked = await dialog.showOpenDialog({
+      title: "选择要监听的目录",
+      properties: ["openDirectory"],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return { canceled: true };
+    return { canceled: false, path: picked.filePaths[0] };
+  });
+
+  // ─── Skills 管理 ───
+  ipcMain.handle("skills:list", async () => {
+    const roots = await ensureDataDirectories();
+    const settings = getSettingsService().get();
+    return listSkills({
+      dataRoot: roots.dataRoot,
+      workspaceRoot: roots.workspaceRoot,
+      disabledForAgent: settings.skills.disabled,
+      enabledForKairos: settings.kairos.enabledSkills,
+      warn: logMain,
+    });
+  });
+
+  ipcMain.handle("skills:install", async (): Promise<SkillInstallResult> => {
+    const roots = await ensureDataDirectories();
+    const picked = await dialog.showOpenDialog({
+      title: "选择 Skill 目录（需包含 SKILL.md）",
+      properties: ["openDirectory"],
+    });
+    if (picked.canceled || !picked.filePaths[0]) {
+      return { ok: false, canceled: true };
+    }
+    const result = await installSkillFromDirectory(roots.dataRoot, picked.filePaths[0]);
+    logMain("skill install", { ok: result.ok, name: result.name, error: result.error });
+    return result;
+  });
+
+  ipcMain.handle("skills:uninstall", async (_event, input: SkillUninstallInput) => {
+    const roots = await ensureDataDirectories();
+    const result = await uninstallSkillDirectory(roots.dataRoot, input.directory);
+    logMain("skill uninstall", { ok: result.ok, directory: input.directory, error: result.error });
     return result;
   });
 
@@ -1311,6 +1479,15 @@ app.whenReady().then(async () => {
   } catch (err) {
     logMain("kairos init failed", { error: err instanceof Error ? err.message : String(err) });
   }
+  // fs-watch 插件：按持久化开关自动拉起（未安装/启动失败只记日志，不阻塞启动）
+  if (getSettingsService().get().plugins.fsWatch.enabled) {
+    try {
+      const result = await getFsWatchService(roots).start();
+      logMain("fs-watch plugin autostart", { ok: result.ok, error: result.error });
+    } catch (err) {
+      logMain("fs-watch plugin autostart failed", { error: err instanceof Error ? err.message : String(err) });
+    }
+  }
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -1337,6 +1514,8 @@ app.on("before-quit", (event) => {
   if (harvested > 0) {
     logMain("harvested background bash tasks on quit", { count: harvested });
   }
+  // fs-watch 插件：同步 best-effort SIGTERM；插件自己会 flush 事件并写最后一次心跳
+  fsWatchService?.shutdownSync();
   if (!kairosController) {
     kairosIpcHandle?.dispose();
     return;

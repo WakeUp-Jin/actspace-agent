@@ -17,6 +17,17 @@ import type {
   KimiBalanceSnapshot,
   AppShutdownNotice,
   DescribeContextInput,
+  FsWatchActionResult,
+  FsWatchConfigUpdateInput,
+  FsWatchConfigView,
+  FsWatchInstallResult,
+  FsWatchPickRootResult,
+  FsWatchSetEnabledInput,
+  FsWatchStatus,
+  SkillInstallResult,
+  SkillListResult,
+  SkillUninstallInput,
+  SkillUninstallResult,
   KairosBridgeApi,
   KairosContextSnapshot,
   KairosControl,
@@ -138,6 +149,24 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("settings:clear-provider-key", input) as Promise<ClearProviderKeyResult>,
   testProviderConnection: (input: TestConnectionInput) =>
     ipcRenderer.invoke("settings:test-connection", input) as Promise<TestConnectionResult>,
+  getFsWatchStatus: () =>
+    ipcRenderer.invoke("plugins:fs-watch:get-status") as Promise<FsWatchStatus>,
+  installFsWatchPlugin: () =>
+    ipcRenderer.invoke("plugins:fs-watch:install") as Promise<FsWatchInstallResult>,
+  setFsWatchEnabled: (input: FsWatchSetEnabledInput) =>
+    ipcRenderer.invoke("plugins:fs-watch:set-enabled", input) as Promise<FsWatchActionResult>,
+  retryFsWatch: () =>
+    ipcRenderer.invoke("plugins:fs-watch:retry") as Promise<FsWatchActionResult>,
+  getFsWatchConfig: () =>
+    ipcRenderer.invoke("plugins:fs-watch:get-config") as Promise<FsWatchConfigView>,
+  updateFsWatchConfig: (input: FsWatchConfigUpdateInput) =>
+    ipcRenderer.invoke("plugins:fs-watch:update-config", input) as Promise<FsWatchConfigView>,
+  pickFsWatchRoot: () =>
+    ipcRenderer.invoke("plugins:fs-watch:pick-root") as Promise<FsWatchPickRootResult>,
+  listSkills: () => ipcRenderer.invoke("skills:list") as Promise<SkillListResult>,
+  installSkill: () => ipcRenderer.invoke("skills:install") as Promise<SkillInstallResult>,
+  uninstallSkill: (input: SkillUninstallInput) =>
+    ipcRenderer.invoke("skills:uninstall", input) as Promise<SkillUninstallResult>,
   getLocalUpdateState: () =>
     ipcRenderer.invoke("local-update:get-state") as Promise<LocalUpdateState>,
   selectLocalUpdateSource: () =>

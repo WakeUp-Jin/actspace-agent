@@ -11,6 +11,9 @@ export const bashDefinition: ToolDefinitionSpec = {
     "Do NOT use Bash to edit files; use edit_file or write_file instead. " +
     "Shell state does not persist between calls. Provide cwd when a command must run in a workspace subdirectory. " +
     "Quote paths that contain spaces. " +
+    "The permission layer rejects commands containing pipes, redirection, command substitution, or subshells " +
+    "(| < > ` $() {}). Write plain single commands (chaining with && or ; is fine); " +
+    "to filter or slice output, read the returned output file with read_file or grep instead of piping. " +
     "Large output handling: when a command produces more output than the inline limit, only the head is returned along with the absolute path of a file containing the full output. " +
     "Read that file with read_file (offset/limit) or search it with grep instead of re-running the command with | head or | tail. " +
     "Long-running commands: set blockMs to how long you are willing to wait. When blockMs elapses the command is NOT killed; " +

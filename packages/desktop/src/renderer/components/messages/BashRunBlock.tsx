@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight, MoreHorizontal, TerminalSquare } from "lucid
 import { useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
+import { TOOL_LOG_LINE_TEXT_RUNNING_CLASS, getToolLogRunningTextAttrs } from "./toolLogStyles";
 
 type BashMessage = Extract<MessageBlock, { kind: "bash" }>;
 type ApprovalDecision = "approve_once" | "deny" | "allow_similar";
@@ -90,6 +91,10 @@ function BashExecutionBlock({ message }: { message: BashMessage }) {
   const [expanded, setExpanded] = useState(message.status === "failed");
   const chevron = expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />;
   const summary = getExecutionSummary(message);
+  // 前台执行中 / 后台仍在跑：标题走 shimmer 高光，让用户看出命令正在执行
+  const isActive =
+    message.status === "running" &&
+    (message.backgroundStatus === undefined || message.backgroundStatus === "running");
 
   return (
     <article className={`${BASH_RUN_CLASS} is-${message.status}`}>
@@ -99,7 +104,13 @@ function BashExecutionBlock({ message }: { message: BashMessage }) {
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
       >
-        <span>{summary}</span>
+        {isActive ? (
+          <span className={TOOL_LOG_LINE_TEXT_RUNNING_CLASS} {...getToolLogRunningTextAttrs(summary)}>
+            {summary}
+          </span>
+        ) : (
+          <span>{summary}</span>
+        )}
         {message.commandPreview ? <span className={BASH_COMMAND_PREVIEW_CLASS}>{message.commandPreview}</span> : null}
         {message.backgroundStatus ? (
           <span className={BASH_BACKGROUND_BADGE_CLASS}>{BACKGROUND_BADGE_TEXT[message.backgroundStatus]}</span>

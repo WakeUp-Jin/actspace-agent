@@ -7,7 +7,7 @@
 | 计划 | 消费设计 Phase | 依赖 | 状态 |
 | --- | --- | --- | --- |
 | `01-output-pipeline.md` | E1 输出管道收口 | 无 | 已完成（2026-07-03） |
-| `02-background-tasks.md` | E2 后台运行 MVP + E3 blockMs 语义切换 | 01 | 代码完成，待手工验收（2026-07-03） |
+| `02-background-tasks.md` | E2 后台运行 MVP + E3 blockMs 语义切换 | 01 | 代码完成；首轮手工验收发现「转后台后落盘停写」bug 已修复（见下），待复验（2026-07-03） |
 | `03-output-subscription-watchdog.md` | E4 输出订阅与卡死看门狗 | 02 | 代码完成，待手工验收（2026-07-03） |
 | （未立项）沙盒执行层 | E5 | 与 `agent-bash-policy-allowlist-design.md` Phase 3 合并立项，另行开计划 | — |
 
@@ -37,3 +37,12 @@ E2 与 E3 合并为一份计划：两者触碰同一批文件（executor / run-p
 - `pnpm typecheck`
 - `pnpm test`
 - 手工验收：`pnpm dev:log` 启动后按各子计划的手工检查项走一遍，日志在 `logs/latest-dev.log`。
+
+## 首轮手工验收结果（2026-07-03）
+
+发现并已修复四个问题（详见 `docs/histories/2026-07/20260703-1745-bash-background-verification-fixes.md`）：
+
+1. **转后台后落盘文件停写（真 bug）**：`startProcessSink` 只写「溢出段」，`ensureOutputFile` 创建文件后 headBuffer 吸收的输出永不落盘。已改为文件创建后全量续写；单测此前被命令回显假阳性掩盖，已一并修正（教训见 `docs/learnings/2026-07/testing-assertion-poisoned-by-command-echo.md`）。
+2. bash 块执行中无 shimmer 高光 → `BashRunBlock` 复用 `tool-log-text-running`。
+3. `bash_output`/`bash_kill` 块显示空 `$` → bridge 合成伪命令行。
+4. 模型重跑命令加管道被权限层硬拒（预期行为）→ 工具描述补充管道限制与「读落盘文件」引导。

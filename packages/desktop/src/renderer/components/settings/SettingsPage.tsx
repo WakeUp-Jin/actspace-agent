@@ -17,6 +17,8 @@ import {
 } from "@actspace/shared";
 import { SettingsNav, type SettingsSectionId } from "./SettingsNav";
 import { KairosSettings } from "./KairosSettings";
+import { PluginsSection } from "./PluginsSettings";
+import { SkillsSection } from "./SkillsSettings";
 import { TOOL_ITEMS } from "./tool-catalog";
 import {
   SectionShell,
@@ -110,6 +112,7 @@ function mergeSettings(current: AppSettings, input: SettingsUpdateInput): AppSet
     defaultModelId: input.defaultModelId !== undefined ? input.defaultModelId : current.defaultModelId,
     agent: input.agent ? { ...current.agent, ...input.agent } : current.agent,
     kairos: input.kairos ? { ...current.kairos, ...input.kairos } : current.kairos,
+    skills: input.skills ? { ...current.skills, ...input.skills } : current.skills,
   };
 }
 
@@ -276,6 +279,10 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
       return <AgentSection {...rest} />;
     case "tools":
       return <ToolsSection {...rest} />;
+    case "plugins":
+      return <PluginsSection />;
+    case "skills":
+      return <SkillsSection settings={rest.settings} onUpdate={rest.onUpdate} />;
     case "appearance":
       return <AppearanceSection />;
     case "archivedChats":

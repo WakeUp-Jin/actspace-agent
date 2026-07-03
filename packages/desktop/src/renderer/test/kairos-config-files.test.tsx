@@ -17,7 +17,9 @@ function makeSettings(): AppSettings {
       bashAlwaysAsk: false,
       exploreModelId: null,
     },
-    kairos: { modelId: null, thinking: "auto" },
+    kairos: { modelId: null, thinking: "auto", enabledSkills: [] },
+    plugins: { fsWatch: { enabled: false } },
+    skills: { disabled: [] },
   };
 }
 

@@ -45,7 +45,9 @@ afterEach(() => {
 
 describe("bash task registry lifecycle", () => {
   it("marks completed tasks and queues a task_notification", async () => {
-    const data = await backgroundTask("printf done-marker; exit 0");
+    // 注意：断言的关键词不能是命令文本的子串——通知/输出都会回显命令本身，
+    // 否则断言会被命令回显「假阳性」满足（曾掩盖过转后台后停止写盘的 bug）。
+    const data = await backgroundTask("printf 'done-%s' marker; exit 0");
     const task = await waitForStatus(data.taskId);
 
     expect(task.status).toBe("completed");
@@ -94,29 +96,31 @@ describe("bash task registry lifecycle", () => {
 
 describe("bash_output tool", () => {
   it("returns incremental output and advances the read offset", async () => {
-    const data = await backgroundTask("printf first-chunk; sleep 30");
+    // 'chunk-one' 不是命令文本的子串 → 断言只能被真实落盘输出满足
+    const data = await backgroundTask("printf 'chunk-%s' one; sleep 30");
     // 等首段输出落盘
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     const first = await bashOutputTool.handler({ taskId: data.taskId });
     expect(first.success).toBe(true);
-    expect(String(first.data)).toContain("first-chunk");
+    expect(String(first.data)).toContain("chunk-one");
 
     const second = await bashOutputTool.handler({ taskId: data.taskId });
     expect(String(second.data)).toContain("(no new output)");
   });
 
   it("supports tail mode without advancing the offset", async () => {
-    const data = await backgroundTask("printf 'l1\\nl2\\nl3\\n'; sleep 30");
+    // 输出 line-1/line-2/line-3；命令文本只含 'line-%s'，不会假阳性命中
+    const data = await backgroundTask("printf 'line-%s\\n' 1 2 3; sleep 30");
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     const tail = await bashOutputTool.handler({ taskId: data.taskId, tailLines: 2 });
-    expect(String(tail.data)).toContain("l3");
-    expect(String(tail.data)).not.toContain("l1\nl2\nl3");
+    expect(String(tail.data)).toContain("line-3");
+    expect(String(tail.data)).not.toContain("line-1\nline-2\nline-3");
 
     // tail 模式不吃掉增量
     const delta = await bashOutputTool.handler({ taskId: data.taskId });
-    expect(String(delta.data)).toContain("l1");
+    expect(String(delta.data)).toContain("line-1");
   });
 
   it("rejects unknown task ids", async () => {
@@ -142,7 +146,8 @@ describe("notifyOnOutput subscription (integration)", () => {
     const tmpRoot = await createTmpRoot();
     const result = await bashExecutor(
       {
-        command: "printf 'booting\\nserver ready on :5173\\n'; sleep 30",
+        // 输出 'server ready on :5173'；命令文本只含 ':%s'，通知内容断言不会被命令回显假阳性满足
+        command: "printf 'booting\\nserver ready on :%s\\n' 5173; sleep 30",
         cwd: workspace,
         blockMs: 0,
         notifyOnOutput: { pattern: "ready on", reason: "dev server ready" },
@@ -193,13 +198,14 @@ describe("notifyOnOutput subscription (integration)", () => {
 
 describe("bash_kill tool", () => {
   it("kills a running task and returns the output tail", async () => {
-    const data = await backgroundTask("printf started; sleep 30");
+    // 输出 'boot-ok'；命令文本只含 'boot-%s'，输出尾断言不会被命令回显假阳性满足
+    const data = await backgroundTask("printf 'boot-%s' ok; sleep 30");
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     const result = await bashKillTool.handler({ taskId: data.taskId });
     expect(result.success).toBe(true);
     expect(String(result.data)).toContain("status=killed");
-    expect(String(result.data)).toContain("started");
+    expect(String(result.data)).toContain("boot-ok");
 
     // kill 结果已在工具返回里 → 不再投递终态通知
     expect(bashTaskRegistry.drainPendingNotifications("sess-bg-test")).toHaveLength(0);

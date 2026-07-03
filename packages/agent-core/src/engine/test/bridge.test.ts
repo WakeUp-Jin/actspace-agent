@@ -1194,6 +1194,52 @@ describe("runTurnWithAgent bridge", () => {
     });
   });
 
+  it("synthesizes a pseudo command for bash_output previews so the UI shows what ran", async () => {
+    const deps = createDeps();
+    deps.toolManager.register({
+      name: "bash_output",
+      description: "Read background task output",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string", description: "task id" },
+          tailLines: { type: "number", description: "tail lines" },
+        },
+        required: ["taskId"],
+      },
+      isReadOnly: true,
+      previewKind: "bash",
+      handler: async (): Promise<ToolResult> => ({
+        success: true,
+        data: "Task bash_task123 status=running\nsome output",
+      }),
+    });
+    deps.llm.setResponses([
+      mockToolCall("bash_output", { taskId: "bash_task123", tailLines: 50 }, { id: "tc-bash-output" }),
+      mockText("Done."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Check the background task.",
+      },
+      deps,
+    );
+
+    const toolResult = result.events.find((event) => event.type === "tool_result");
+    expect(toolResult?.payload).toMatchObject({
+      toolName: "bash_output",
+      ok: true,
+      uiPreview: {
+        kind: "bash",
+        command: "bash_output bash_task123 --tail 50",
+        commandPreview: "bash_output bash_task123 --tail",
+      },
+    });
+  });
+
   it("records failed Bash output in run log previews", async () => {
     const deps = createDeps();
     deps.toolManager.register(createFailingBashTool());

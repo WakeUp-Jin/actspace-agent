@@ -47,6 +47,7 @@ desktop -> agent-core -> shared
 - `docs/design-docs/agent-backend-design.md`：后端 Agent Runtime 的长期设计事实来源，解释为什么采用这些模块边界。
 - `docs/design-docs/agent-token-usage-and-context-state.md`：token usage、成本统计、context snapshot 与 context state 的数据分层设计。
 - `docs/design-docs/agent-skill-loading.md`：Agent Skill 设计与加载规范，约束 `.actspace/skills`、`.agents/skills`、`.claude/skills` 的发现优先级、catalog 注入和 `read_file` 读取边界。
+- `docs/design-docs/agent-plugins-fs-watch.md`：插件（Plugins）模式与 fs-watch 文件监听插件——外部 Rust 二进制的文件契约（事件 JSONL / 心跳 / config）、main 进程生命周期管理、设置页「插件」「Skills」分区和 Kairos Skill 白名单。插件源码在独立仓库 `actspace-plugins`。
 - `docs/design-docs/agent-tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约。
 - `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入边界。
 - `docs/design-docs/front-index.md`：前端工作台设计文档入口。

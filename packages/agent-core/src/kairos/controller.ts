@@ -54,6 +54,8 @@ import {
   assembleTickMessage,
   buildHistorySummary,
   derivePhase,
+  renderKairosSkillCatalog,
+  type KairosSkillCatalogEntry,
 } from "./prompt-assembler";
 import { buildConfigTipsBlock } from "./config/prompt-assembler";
 import { KAIROS_SYSTEM_PROMPT } from "./prompt";
@@ -103,6 +105,13 @@ export interface CreateKairosOptions {
   thinkingEnabled?: boolean;
   /** 自动启动后第一次 tick 的注入延迟（ms），默认 5000；测试可设 0。 */
   firstTickDelayMs?: number;
+  /**
+   * Kairos 的 Skill catalog（main 已按 `settings.kairos.enabledSkills` 白名单过滤）。
+   * 作用有二：(a) 注入 system prompt 的「可用 Skills」段；
+   * (b) Skill 目录并入 kairosGuard.allowedRoots，让 read_file 能读 SKILL.md / references。
+   * 白名单变化时由 main 重建 controller，本实例内视为不变。
+   */
+  skillCatalog?: KairosSkillCatalogEntry[];
 }
 
 export interface KairosController {
@@ -244,8 +253,11 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
   const toolManager = opts.toolManagerFactory(config);
   registerKairosTools(toolManager);
 
+  const skillCatalog = opts.skillCatalog ?? [];
   const buildKairosGuard = (cfg: KairosConfig): KairosGuardContext => ({
-    allowedRoots: cfg.paths.paths.map((p) => p.path),
+    // Skill 目录并入可读范围：catalog 段告诉 Kairos 去读 SKILL.md / references，
+    // guard 必须放行，否则 catalog 形同虚设。
+    allowedRoots: [...cfg.paths.paths.map((p) => p.path), ...skillCatalog.map((s) => s.directory)],
     blocklistPaths: cfg.blocklist.paths,
     toolsDenied: cfg.blocklist.toolsDenied,
   });
@@ -375,6 +387,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
   const runner = new KairosRunner({
     config,
     shortTerm,
+    skillCatalog,
     observeRefresh,
     activeBriefsCount,
     loadInboxSummary,
@@ -665,6 +678,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
       const systemPrompt = assembleSystemPrompt({
         config,
         shortTermResult,
+        skillCatalog,
       });
 
       const systemPromptSegments = buildPromptSegments({
@@ -675,6 +689,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
         inboxSummary,
         shortTermResult,
         briefsCount,
+        skillCatalog,
         promptSourceFile: "packages/agent-core/src/kairos/prompt.ts",
       });
 
@@ -734,6 +749,7 @@ interface BuildPromptSegmentsInput {
   inboxSummary?: KairosInboxSummary;
   shortTermResult: KairosShortTermLoadResult;
   briefsCount: number;
+  skillCatalog: KairosSkillCatalogEntry[];
   /** 仅用于 segments 的 `sourceFiles` 标注；提交时已经是相对仓库根的路径常量。 */
   promptSourceFile: string;
 }
@@ -773,6 +789,11 @@ function buildPromptSegments(input: BuildPromptSegmentsInput): KairosContextProm
         join(configDir, "preferences.json"),
         join(configDir, "blocklist.json"),
       ],
+    },
+    {
+      label: "可用 Skills",
+      text: renderKairosSkillCatalog(input.skillCatalog),
+      sourceFiles: input.skillCatalog.length > 0 ? input.skillCatalog.map((s) => s.location) : undefined,
     },
     {
       label: "用户规则",

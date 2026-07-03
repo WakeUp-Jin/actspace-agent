@@ -35,9 +35,25 @@ const OBSERVATION_INBOX_MAX_CHARS = 2300;
 
 // ─── system prompt（仅低频段）────────────────────────────────────────────
 
+/**
+ * Kairos 可用 Skill 的 catalog 条目。
+ * 由 main 按 `settings.kairos.enabledSkills` 白名单过滤后传入（controller 不做筛选）；
+ * 白名单变化时 main 重建 controller，因此对单个 controller 实例这是低频稳定内容。
+ */
+export interface KairosSkillCatalogEntry {
+  name: string;
+  description: string;
+  /** SKILL.md 绝对路径。 */
+  location: string;
+  /** Skill 目录绝对路径（已由 controller 并入 allowedRoots）。 */
+  directory: string;
+}
+
 export interface AssembleSystemPromptInput {
   config: KairosConfig;
   shortTermResult: KairosShortTermLoadResult;
+  /** 白名单过滤后的 Skill catalog；缺省 / 空数组 = 不加载任何 Skill。 */
+  skillCatalog?: KairosSkillCatalogEntry[];
 }
 
 export function assembleSystemPrompt(input: AssembleSystemPromptInput): string {
@@ -49,6 +65,7 @@ export function assembleSystemPrompt(input: AssembleSystemPromptInput): string {
 
   const replacements: Record<string, string> = {
     config_tips_block: configTipsBlock,
+    skill_catalog: renderKairosSkillCatalog(input.skillCatalog ?? []),
     user_rules: input.config.ruleMd.trim().length > 0
       ? input.config.ruleMd.trim()
       : "（暂无 rule.md 内容）",
@@ -56,6 +73,28 @@ export function assembleSystemPrompt(input: AssembleSystemPromptInput): string {
   };
 
   return applyTemplate(KAIROS_SYSTEM_PROMPT, replacements);
+}
+
+/**
+ * 渲染 Kairos 的 Skill catalog 段。
+ *
+ * 与主 Agent 的 `<available_skills>` XML 相比刻意精简（Kairos 上下文预算紧张）：
+ * 每个 Skill 三行（name / description / SKILL.md 路径）+ 一句使用指引。
+ */
+export function renderKairosSkillCatalog(entries: KairosSkillCatalogEntry[]): string {
+  if (entries.length === 0) {
+    return "（无已启用 Skill——用户尚未在设置页为你开启任何 Skill）";
+  }
+  const lines: string[] = [];
+  for (const entry of entries) {
+    lines.push(`- ${entry.name}：${entry.description}`);
+    lines.push(`  SKILL.md：${entry.location}`);
+  }
+  lines.push("");
+  lines.push(
+    "当任务与某个 Skill 的描述匹配时，先用 read_file 读它的 SKILL.md 再按指引行动；上面列出的路径都在你的可读范围内。",
+  );
+  return lines.join("\n");
 }
 
 // ─── tick message（动态尾部）────────────────────────────────────────────

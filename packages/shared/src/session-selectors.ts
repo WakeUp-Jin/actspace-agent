@@ -289,17 +289,10 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
     switch (event.type) {
       case "user_message": {
         const payload = event.payload as UserMessagePayload;
-        // 注入消息（后台任务通知等）不是用户输入，用 tool 样式块展示而非用户气泡
+        // 任务通知注入消息只给模型消费，用户侧不渲染：
+        // 任务状态由 bash 块徽标（bash_task_update）呈现，输出在落盘文件里
         if (payload.source === "task_notification") {
-          return [
-            {
-              kind: "tool",
-              id: event.id,
-              title: "后台任务通知",
-              content: payload.content,
-              createdAt: getDisplayTime(event.timestamp)
-            }
-          ];
+          return [];
         }
         return [
           {

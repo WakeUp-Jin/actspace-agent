@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import {
   BookOpen,
   Boxes,
@@ -302,6 +302,7 @@ export function Composer({
   const [isDragActive, setIsDragActive] = useState(false);
   const [message, setMessage] = useState("");
   const composerRef = useRef<HTMLElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const commandButtonRef = useRef<HTMLButtonElement | null>(null);
   const commandMenuRef = useRef<HTMLDivElement | null>(null);
   const modelButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -339,6 +340,15 @@ export function Composer({
     setEditingModelId(controlledSelectedModelId);
     setThinkingEnabled((MODEL_REGISTRY[controlledSelectedModelId] ?? DEFAULT_MODEL_SPEC).thinkingDefault);
   }, [controlledSelectedModelId]);
+
+  // 原生 textarea 不会随内容自动长高（粘贴大段文本时只会内部滚动）。
+  // 内容变化后把高度重置为 auto 再设为 scrollHeight，超出 max-h 时由 CSS 钳住并显示滚动条。
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.style.height = "auto";
+    input.style.height = `${input.scrollHeight}px`;
+  }, [message, resolvedInputLayout, surface]);
 
   function closeFloatingPanels() {
     setCommandOpen(false);

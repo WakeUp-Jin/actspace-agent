@@ -5,6 +5,8 @@
  * 占位符约定（只允许低频变化内容，详见
  * docs/design-docs/agent-kairos-prompt-cache-optimization.md）：
  *   {config_tips_block}   buildConfigTipsBlock 输出（改 preferences/paths/blocklist 才变）
+ *   {skill_catalog}       renderKairosSkillCatalog 输出（改 settings.kairos.enabledSkills 才变，
+ *                         变更时 main 会重建 controller，缓存前缀随之整体更新）
  *   {user_rules}          rule.md 全文（改 rule.md 才变）
  *   {history_summary}     buildHistorySummary 输出（压缩产出新摘要文件才变）
  *
@@ -70,6 +72,9 @@ notes/<YYYY-MM>/<title>.md 这类 workspace 内路径。
 
 # 上下文段
 {config_tips_block}
+
+# 可用 Skills
+{skill_catalog}
 
 # 用户规则
 {user_rules}

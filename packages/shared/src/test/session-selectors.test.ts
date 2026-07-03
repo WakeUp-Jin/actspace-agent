@@ -262,27 +262,41 @@ describe("session selectors", () => {
     });
   });
 
-  it("maps task_notification user messages to tool-style blocks instead of user bubbles", () => {
+  it("hides task_notification user messages from the conversation entirely", () => {
     const blocks = createMessageBlocks([
       {
         id: "evt-notify",
         sessionId: "session-1",
         turnId: "turn-1",
         type: "user_message",
-        timestamp: "2026-06-02T12:00:00.000Z",
+        timestamp: "2026-07-03T12:00:00.000Z",
         schemaVersion: 1,
         payload: {
-          content: "<task_notification>bash_abc123 completed</task_notification>",
+          content: [
+            "<task_notification>",
+            "<task_id>bash_abc123</task_id>",
+            "<status>completed</status>",
+            "<exit_code>0</exit_code>",
+            '<summary>Background command "bash scripts/slow-log.sh" completed (exit code 0)</summary>',
+            "</task_notification>",
+          ].join("\n"),
           source: "task_notification",
         },
       },
+      {
+        id: "evt-user",
+        sessionId: "session-1",
+        turnId: "turn-1",
+        type: "user_message",
+        timestamp: "2026-07-03T12:00:01.000Z",
+        schemaVersion: 1,
+        payload: { content: "看看进度" },
+      },
     ]);
 
-    expect(blocks[0]).toMatchObject({
-      kind: "tool",
-      title: "后台任务通知",
-      content: expect.stringContaining("bash_abc123"),
-    });
+    // 注入消息不渲染；普通用户消息不受影响
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ kind: "user", content: "看看进度" });
   });
 
   it("restores a running Agent tool block with recent transcript summaries", () => {

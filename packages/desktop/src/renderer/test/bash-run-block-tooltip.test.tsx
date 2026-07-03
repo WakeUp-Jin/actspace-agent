@@ -31,6 +31,37 @@ describe("BashRunBlock tooltips", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("更多 Bash 输出操作");
   });
 
+  it("applies the shimmer running highlight while the command is executing", () => {
+    renderBash({
+      id: "bash-running-1",
+      kind: "bash",
+      createdAt: "2026-07-03T00:00:00.000Z",
+      title: "Bash command",
+      status: "running",
+      command: "pnpm test",
+    });
+
+    const summary = screen.getByText("Running Bash command");
+    expect(summary).toHaveClass("tool-log-text-running");
+    expect(summary).toHaveAttribute("data-shimmer-text", "Running Bash command");
+  });
+
+  it("stops the shimmer once the background task reaches a terminal state", () => {
+    renderBash({
+      id: "bash-running-2",
+      kind: "bash",
+      createdAt: "2026-07-03T00:00:00.000Z",
+      title: "Bash command (background)",
+      status: "running",
+      command: "pnpm build",
+      backgroundTaskId: "bash_ghi789",
+      backgroundStatus: "completed",
+    });
+
+    const summary = screen.getByText("Running Bash command (background)");
+    expect(summary).not.toHaveClass("tool-log-text-running");
+  });
+
   it("shows a background badge for backgrounded commands", () => {
     renderBash({
       id: "bash-bg-1",

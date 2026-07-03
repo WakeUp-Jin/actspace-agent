@@ -4,6 +4,7 @@ import {
   assembleTickMessage,
   buildHistorySummary,
   buildObservationDelta,
+  renderKairosSkillCatalog,
 } from "../prompt-assembler";
 import {
   DEFAULT_BLOCKLIST,
@@ -298,5 +299,40 @@ describe("assembleSystemPrompt", () => {
     expect(a).not.toContain("[当前时间]");
     expect(a).not.toContain("[活跃 briefs]");
     expect(a).not.toContain("# 观测摘要");
+  });
+
+  it("renders the whitelist skill catalog into the system prompt", () => {
+    const prompt = assembleSystemPrompt({
+      config: baseConfig(),
+      shortTermResult: emptyShortTerm(),
+      skillCatalog: [
+        {
+          name: "fs-watch",
+          description: "读取文件监听事件日志",
+          location: "/data/skills/fs-watch/SKILL.md",
+          directory: "/data/skills/fs-watch",
+        },
+      ],
+    });
+    expect(prompt).toContain("- fs-watch：读取文件监听事件日志");
+    expect(prompt).toContain("SKILL.md：/data/skills/fs-watch/SKILL.md");
+    expect(prompt.match(/\{\w+\}/g)).toBeNull();
+  });
+});
+
+describe("renderKairosSkillCatalog", () => {
+  it("renders placeholder when no skill is enabled", () => {
+    expect(renderKairosSkillCatalog([])).toContain("无已启用 Skill");
+  });
+
+  it("renders name/description/location plus usage guidance per entry", () => {
+    const text = renderKairosSkillCatalog([
+      { name: "a", description: "da", location: "/s/a/SKILL.md", directory: "/s/a" },
+      { name: "b", description: "db", location: "/s/b/SKILL.md", directory: "/s/b" },
+    ]);
+    expect(text).toContain("- a：da");
+    expect(text).toContain("  SKILL.md：/s/a/SKILL.md");
+    expect(text).toContain("- b：db");
+    expect(text).toContain("先用 read_file 读它的 SKILL.md");
   });
 });
