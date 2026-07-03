@@ -58,6 +58,8 @@
   padding: 6px 0;
   overflow: hidden;
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 420px;
   background: var(--color-surface-subtle);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);

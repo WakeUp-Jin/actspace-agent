@@ -2,6 +2,8 @@ import { spawn, type SpawnOptions } from "node:child_process";
 import { createWriteStream, mkdirSync, type WriteStream } from "node:fs";
 import { dirname } from "node:path";
 
+const TIMEOUT_KILL_GRACE_MS = 500;
+
 export interface RunProcessOptions {
   command: string;
   args: string[];
@@ -55,6 +57,27 @@ export async function runProcess(options: RunProcessOptions): Promise<RunProcess
   return runProcessInMemory(options);
 }
 
+function createSpawnOptions(options: RunProcessOptions): SpawnOptions {
+  return {
+    cwd: options.cwd,
+    env: options.env ?? process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: process.platform !== "win32",
+  };
+}
+
+function signalChild(child: ReturnType<typeof spawn>, signal: NodeJS.Signals): void {
+  if (process.platform !== "win32" && child.pid) {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+      // Fall back to the direct child when process-group signalling is unavailable.
+    }
+  }
+  child.kill(signal);
+}
+
 /** 旧内存累加模式（ripgrep 等使用）：受 maxOutputChars 约束。 */
 async function runProcessInMemory(options: RunProcessOptions): Promise<RunProcessResult> {
   const startedAt = Date.now();
@@ -70,28 +93,39 @@ async function runProcessInMemory(options: RunProcessOptions): Promise<RunProces
     let settled = false;
     let timedOut = false;
     let truncated = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const spawnOptions: SpawnOptions = {
-      cwd: options.cwd,
-      env: options.env ?? process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    };
-
-    const child = spawn(options.command, options.args, spawnOptions);
+    const child = spawn(options.command, options.args, createSpawnOptions(options));
 
     const finish = (result: Omit<RunProcessResult, "durationMs">) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
       resolve({
         ...result,
         durationMs: Date.now() - startedAt,
       });
     };
 
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGTERM");
+      signalChild(child, "SIGTERM");
+      killTimer = setTimeout(() => {
+        signalChild(child, "SIGKILL");
+        finish({
+          ...resultBase,
+          stdout,
+          stderr,
+          exitCode: null,
+          signal: "SIGKILL",
+          timedOut,
+          truncated,
+          headBuffer: "",
+          totalBytes: 0,
+        });
+      }, TIMEOUT_KILL_GRACE_MS);
     }, options.timeoutMs);
 
     const append = (current: string, next: Buffer): string => {
@@ -173,14 +207,10 @@ async function runProcessStreaming(
     let settled = false;
     let timedOut = false;
     let truncated = false; // diskCap 命中
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const spawnOptions: SpawnOptions = {
-      cwd: options.cwd,
-      env: options.env ?? process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    };
-
-    const child = spawn(options.command, options.args, spawnOptions);
+    const child = spawn(options.command, options.args, createSpawnOptions(options));
 
     const ensureFile = (): WriteStream | undefined => {
       if (fileCreated) return fileStream;
@@ -221,6 +251,7 @@ async function runProcessStreaming(
     };
 
     const handleChunk = (chunk: Buffer): void => {
+      if (settled) return;
       const text = chunk.toString("utf8");
       totalChars += text.length;
 
@@ -240,7 +271,8 @@ async function runProcessStreaming(
     const settle = (exitCode: number | null, signal: NodeJS.Signals | null, startError?: string) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
       const outputFilePath = fileCreated && fileStream ? outputFile : undefined;
       const done = () => {
         resolve({
@@ -266,9 +298,13 @@ async function runProcessStreaming(
       }
     };
 
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGTERM");
+      signalChild(child, "SIGTERM");
+      killTimer = setTimeout(() => {
+        signalChild(child, "SIGKILL");
+        settle(null, "SIGKILL");
+      }, TIMEOUT_KILL_GRACE_MS);
     }, options.timeoutMs);
 
     child.stdout.on("data", handleChunk);

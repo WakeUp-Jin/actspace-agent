@@ -57,6 +57,29 @@ describe("runProcess", () => {
     expect(result.exitCode).toBeNull();
   });
 
+  it("returns after timeout when a spawned shell child keeps running", async () => {
+    const cwd = await createWorkspace();
+    const startedAt = Date.now();
+    const result = await runProcess({
+      command: "bash",
+      args: [
+        "-lc",
+        `${process.execPath} -e "process.stdout.write('ready'); process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"`,
+      ],
+      cwd,
+      timeoutMs: 50,
+      maxOutputChars: 1_000,
+      headBufferCap: 1_000,
+      diskCap: 1_000,
+    });
+
+    expect(Date.now() - startedAt).toBeLessThan(2_000);
+    expect(result.stdout).toBe("ready");
+    expect(result.headBuffer).toBe("ready");
+    expect(result.timedOut).toBe(true);
+    expect(result.exitCode).toBeNull();
+  });
+
   it("captures process start errors", async () => {
     const cwd = await createWorkspace();
     const result = await runProcess({

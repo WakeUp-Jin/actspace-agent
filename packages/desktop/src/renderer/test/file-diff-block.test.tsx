@@ -1,5 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { MessageBlock } from "@actspace/shared";
 import { FileDiffBlock } from "../components/messages/FileDiffBlock";
 
@@ -113,6 +115,15 @@ describe("FileDiffBlock running state", () => {
 });
 
 describe("FileDiffBlock completed state", () => {
+  it("keeps expanded diff content in a bounded scroll area", () => {
+    const css = readFileSync(resolve(__dirname, "../styles/diff.css"), "utf-8");
+    const block = css.match(/\.file-diff-content\s*\{[^}]+\}/)?.[0] ?? "";
+
+    expect(block).toContain("max-height: 420px");
+    expect(block).toContain("overflow-y: auto");
+    expect(block).toContain("overflow-x: auto");
+  });
+
   it("omits +0 when additions are zero", () => {
     render(<FileDiffBlock message={makeWriteBlock({ additions: 0, deletions: 0 })} />);
     expect(screen.queryByText(/\+0/)).toBeNull();
@@ -132,6 +143,8 @@ describe("FileDiffBlock completed state", () => {
     expect(screen.queryByText(/半夜醒来/)).toBeNull();
     const toggle = screen.getByRole("button");
     await user.click(toggle);
-    expect(screen.getByText(/半夜醒来/)).toBeInTheDocument();
+    const diffLine = screen.getByText(/半夜醒来/);
+    expect(diffLine).toBeInTheDocument();
+    expect(diffLine.closest("pre")).toHaveClass("file-diff-content");
   });
 });

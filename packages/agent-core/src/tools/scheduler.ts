@@ -262,11 +262,13 @@ export class ToolScheduler {
   }
 
   private async postProcess(tool: InternalTool, result: ToolResult): Promise<ToolResult> {
-    if (!result.success) return result;
-
     let rendered: string | undefined;
     if (tool.renderResult && result.data !== undefined) {
       rendered = tool.renderResult(result);
+    }
+
+    if (!result.success) {
+      return rendered !== undefined ? { ...result, data: rendered } : result;
     }
 
     const rawData = rendered ?? (typeof result.data === "string" ? result.data : JSON.stringify(result.data));

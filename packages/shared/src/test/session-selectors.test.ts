@@ -115,6 +115,39 @@ describe("session selectors", () => {
     ]);
   });
 
+  it("preserves write_file streaming content when restoring preview blocks", () => {
+    const blocks = createMessageBlocks([
+      toolResultEvent({
+        toolName: "write_file",
+        toolCallId: "tool-write-running",
+        ok: true,
+        summary: "Write notes.md",
+        modelOutput: "",
+        uiPreview: {
+          kind: "write",
+          filePath: "notes.md",
+          additions: 0,
+          deletions: 0,
+          diff: "",
+          collapsedLines: 0,
+          streamingContent: "# Notes\n\nDraft",
+        },
+      }),
+    ]);
+
+    expect(blocks).toEqual([
+      expect.objectContaining({
+        kind: "write_diff",
+        filePath: "notes.md",
+        additions: 0,
+        deletions: 0,
+        diff: "",
+        collapsedLines: 0,
+        streamingContent: "# Notes\n\nDraft",
+      }),
+    ]);
+  });
+
   it("maps legacy context_compaction payloads as auto completed blocks", () => {
     const blocks = createMessageBlocks([
       contextCompactionEvent({

@@ -202,7 +202,7 @@ export async function runTurnWithAgent(
         await writeAgentEventRunLog(runLogger, agentEvent);
       }
       if (!streamCb) return;
-      const mapped = mapAgentEventToStreamEvent(agentEvent, sessionId, turnId, nextEventId, deps.toolManager, toolCallStreaming);
+      const mapped = mapAgentEventToStreamEvent(agentEvent, sessionId, turnId, nextEventId, deps.toolManager, toolCallStreaming, toolExecutions);
       if (mapped) {
         if (!isStreamDeltaEvent(mapped)) {
           await flushStreamLogBuffer(runLogger, streamLogBuffer);
@@ -664,6 +664,12 @@ function collectSubAgentTranscripts(
   return transcripts.length > 0 ? transcripts : undefined;
 }
 
+function getToolResultOutputText(result: ToolResult): string {
+  if (typeof result.data === "string") return result.data;
+  if (!result.success) return result.error ?? "Unknown error";
+  return JSON.stringify(result.data ?? "");
+}
+
 function createToolUiPreview(
   previewKind: ToolUiPreview["kind"],
   args: Record<string, unknown>,
@@ -1000,6 +1006,7 @@ function mapAgentEventToStreamEvent(
   nextId: () => string,
   toolManager: ToolManager,
   toolCallStreaming: Map<string, ToolCallStreamingEntry>,
+  toolExecutions: Map<string, ToolExecutionRecord>,
 ): RuntimeStreamEvent | null {
   switch (event.type) {
     case "agent_start":
@@ -1039,15 +1046,23 @@ function mapAgentEventToStreamEvent(
         return startedEvent;
       }
 
-    case "tool_end":
+    case "tool_end": {
+      const tool = toolManager.get(event.toolName);
+      const previewKind = tool?.previewKind ?? "generic";
+      const ok = !event.isError;
+      const output = getToolResultOutputText(event.result);
+      const args = toolExecutions.get(event.toolCallId)?.args ?? {};
+      const summary = getToolSummary(event.toolName, previewKind, args, ok, output);
       return {
         type: "tool_finished",
         toolCallId: event.toolCallId,
         toolName: event.toolName,
         resultEventId: nextId(),
         isError: event.isError,
-        preview: event.result.subagent?.uiPreview,
+        preview: event.result.subagent?.uiPreview
+          ?? createToolUiPreview(previewKind, args, output, summary, ok),
       };
+    }
 
     case "tool_approval_required":
       return {
@@ -1223,7 +1238,7 @@ function logAgentEvent(
         toolCallId: event.toolCallId,
         toolName: event.toolName,
         isError: event.isError,
-        resultPreview: preview(event.result.success ? event.result.data : event.result.error),
+        resultPreview: preview(getToolResultOutputText(event.result)),
       });
       return;
 

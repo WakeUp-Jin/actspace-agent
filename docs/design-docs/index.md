@@ -46,6 +46,7 @@
 - `agent-权限设计规则和原则.md`：Agent 工具权限、用户审核、风险分层和权限记录的设计规则。
 - `agent-tool-approval-pause-resume.md`：工具审核暂停恢复设计。
 - `agent-bash-policy-allowlist-design.md`：Bash 全局执行策略、会话级 allowlist 和真沙箱路线图。
+- `agent-bash工具设计文档.md`：Bash 工具设计事实来源——工具契约、输出管道、后台运行与 turn 边界通知注入、沙盒优先执行模型和前端展示契约（调研底稿见 `docs/references/bash-tool-reference-analysis.md`）。
 - `agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入边界。
 - `agent-kairos-autonomous-mode.md`：Kairos 自治模式设计。
 - `agent-kairos-prompt-cache-optimization.md`：Kairos prompt 缓存优化设计（静态前缀 + 动态尾部、观测增量化、thinking 落盘回放）。

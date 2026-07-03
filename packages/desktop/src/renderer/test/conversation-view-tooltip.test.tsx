@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
 import { ConversationView } from "../components/ConversationView";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
@@ -43,6 +44,49 @@ function renderConversation(inputMessages: MessageBlock[] = messages) {
 }
 
 describe("ConversationView tooltips", () => {
+  it("keeps the message viewport pinned when streaming content resizes at the bottom", () => {
+    let resizeCallback: ResizeObserverCallback | null = null;
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    const OriginalResizeObserver = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = vi.fn((callback: ResizeObserverCallback) => {
+      resizeCallback = callback;
+      return { observe, unobserve: vi.fn(), disconnect };
+    }) as unknown as typeof ResizeObserver;
+
+    try {
+      renderConversation([
+        ...messages,
+        {
+          kind: "write_diff",
+          id: "write-running",
+          filePath: "notes.md",
+          additions: 0,
+          deletions: 0,
+          diff: "",
+          collapsedLines: 0,
+          streamingContent: "# Notes\n\nDraft",
+          status: "running",
+          createdAt: "2026-06-02T00:00:02.000Z",
+        },
+      ]);
+
+      const viewport = screen.getByLabelText("Conversation messages");
+      Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1200 });
+      Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 400 });
+      Object.defineProperty(viewport, "scrollTop", { configurable: true, writable: true, value: 800 });
+
+      act(() => {
+        resizeCallback?.([], {} as ResizeObserver);
+      });
+
+      expect(viewport.scrollTop).toBe(1200);
+      expect(observe).toHaveBeenCalled();
+    } finally {
+      globalThis.ResizeObserver = OriginalResizeObserver;
+    }
+  });
+
   it("shows a readable label for the visualize action", async () => {
     const user = userEvent.setup();
     renderConversation();

@@ -531,6 +531,7 @@ export function ConversationView({
   const isInitialComposer = isSessionReady && messages.length === 0 && !isStreaming;
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
+  const messageStackRef = useRef<HTMLDivElement | null>(null);
   // 是否「贴底自动跟随」：流式输出时保持视图贴底；用户向上滚动阅读历史则暂停，
   // 滚回接近底部时恢复（类似 Cursor 的聊天滚动）。
   const stickToBottomRef = useRef(true);
@@ -565,12 +566,30 @@ export function ConversationView({
   }, []);
 
   // 流式输出 / 消息增长时，若仍处于贴底状态则跟随滚动到底部。
-  useEffect(() => {
+  const scrollToBottomIfStuck = useCallback(() => {
     if (!stickToBottomRef.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, isStreaming]);
+  }, []);
+
+  useEffect(() => {
+    scrollToBottomIfStuck();
+  }, [messages, isStreaming, scrollToBottomIfStuck]);
+
+  // 同一条 running 消息内部变高时（例如 write_file 持续追加 code preview），
+  // messages 引用可能不变；观察消息栈尺寸，保持贴底状态继续跟随尾部。
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const stack = messageStackRef.current;
+    if (!stack) return;
+
+    const observer = new ResizeObserver(() => {
+      scrollToBottomIfStuck();
+    });
+    observer.observe(stack);
+    return () => observer.disconnect();
+  }, [messages, isStreaming, scrollToBottomIfStuck]);
 
   useEffect(() => {
     if (!activeTranscriptMessage) return;
@@ -607,7 +626,7 @@ export function ConversationView({
             />
           </div>
         ) : (
-          <div className={MESSAGE_STACK_CLASS}>
+          <div ref={messageStackRef} className={MESSAGE_STACK_CLASS}>
             {turns.map((turn, turnIndex) => (
               <section className={MESSAGE_TURN_CLASS} key={turn.id}>
                 {turn.user ? (

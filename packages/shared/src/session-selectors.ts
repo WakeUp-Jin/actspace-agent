@@ -185,6 +185,7 @@ function messageBlockFromToolPreview(
         deletions: preview.deletions,
         diff: preview.diff,
         collapsedLines: preview.collapsedLines,
+        streamingContent: preview.streamingContent,
         createdAt: getDisplayTime(timestamp)
       };
     case "delete": {

@@ -136,6 +136,29 @@ function createDeleteTool(): InternalTool {
   };
 }
 
+function createFailingBashTool(): InternalTool {
+  return {
+    name: "bash",
+    description: "Run Bash",
+    parameters: {
+      type: "object",
+      properties: { command: { type: "string", description: "command" } },
+      required: ["command"],
+    },
+    isReadOnly: true,
+    previewKind: "bash",
+    handler: async (): Promise<ToolResult> => ({
+      success: false,
+      data: { command: "npx tsc", output: "src/index.ts(1,1): error TS1000: boom" },
+      error: "Bash command exited with code 2",
+    }),
+    renderResult: (result) => {
+      const data = result.data as { command: string; output: string };
+      return `$ ${data.command}\n\noutput:\n${data.output}\n\nerror: ${result.error}`;
+    },
+  };
+}
+
 function createFakeAgentTool(): InternalTool {
   return {
     name: "agent",
@@ -866,7 +889,7 @@ describe("runTurnWithAgent bridge", () => {
       previewKind: "write",
       handler: async (): Promise<ToolResult> => ({
         success: true,
-        data: "+++ b/x.md\n+# title\n+body",
+        data: "--- x.md\n+++ x.md\n@@ -0,0 +1,2 @@\n+# title\n+body",
       }),
     });
     deps.llm.setResponses([
@@ -898,6 +921,7 @@ describe("runTurnWithAgent bridge", () => {
       (event) => event.type === "tool_call_streaming",
     );
     const startedEvents = streamEvents.filter((event) => event.type === "tool_started");
+    const finishedEvents = streamEvents.filter((event) => event.type === "tool_finished");
 
     expect(streamingEvents.length).toBeGreaterThan(0);
     const firstStreaming = streamingEvents[0];
@@ -915,6 +939,23 @@ describe("runTurnWithAgent bridge", () => {
     const streamingIndex = streamEvents.indexOf(firstStreaming);
     const startedIndex = streamEvents.indexOf(startedEvents[0]);
     expect(streamingIndex).toBeLessThan(startedIndex);
+
+    expect(finishedEvents[0]).toMatchObject({
+      type: "tool_finished",
+      toolCallId: "tc-write-streaming",
+      toolName: "write_file",
+      isError: false,
+      preview: {
+        kind: "write",
+        filePath: "x.md",
+        additions: 2,
+        deletions: 0,
+        diff: expect.stringContaining("+# title"),
+      },
+    });
+    expect(
+      (finishedEvents[0] as Extract<RuntimeStreamEvent, { type: "tool_finished" }>).preview,
+    ).toHaveProperty("streamingContent", undefined);
   });
 
   it("streams and persists Agent previews without exposing raw args as UI state", async () => {
@@ -1118,5 +1159,76 @@ describe("runTurnWithAgent bridge", () => {
         deletions: 1,
       },
     });
+  });
+
+  it("preserves failed Bash output in tool result and preview", async () => {
+    const deps = createDeps();
+    deps.toolManager.register(createFailingBashTool());
+    deps.llm.setResponses([
+      mockToolCall("bash", { command: "npx tsc" }, { id: "tc-bash-fail" }),
+      mockText("Done."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Run the compiler.",
+      },
+      deps,
+    );
+
+    const toolResult = result.events.find((event) => event.type === "tool_result");
+
+    expect(toolResult?.payload).toMatchObject({
+      toolName: "bash",
+      ok: false,
+      rawOutput: expect.stringContaining("src/index.ts(1,1): error TS1000: boom"),
+      modelOutput: expect.stringContaining("src/index.ts(1,1): error TS1000: boom"),
+      uiPreview: {
+        kind: "bash",
+        status: "failed",
+        stderr: expect.stringContaining("src/index.ts(1,1): error TS1000: boom"),
+      },
+    });
+  });
+
+  it("records failed Bash output in run log previews", async () => {
+    const deps = createDeps();
+    deps.toolManager.register(createFailingBashTool());
+    deps.llm.setResponses([
+      mockToolCall("bash", { command: "npx tsc" }, { id: "tc-bash-fail" }),
+      mockText("Done."),
+    ]);
+    const runLogEvents: AgentRunLogEvent[] = [];
+    const runLogger: AgentRunLogger = {
+      filePath: "/tmp/test-run.jsonl",
+      write: async (event) => {
+        runLogEvents.push(event);
+      },
+    };
+
+    await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Run the compiler.",
+      },
+      deps,
+      { runLogger },
+    );
+
+    const toolEndEvent = runLogEvents.find((event) => {
+      const payload = event.payload as { type?: string; toolName?: string } | undefined;
+      return event.type === "tool_event" && payload?.type === "tool_end" && payload.toolName === "bash";
+    });
+
+    expect(toolEndEvent?.payload).toEqual(
+      expect.objectContaining({
+        result: expect.objectContaining({
+          data: expect.stringContaining("src/index.ts(1,1): error TS1000: boom"),
+        }),
+      }),
+    );
   });
 });

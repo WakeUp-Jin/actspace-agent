@@ -13,3 +13,4 @@
 ## 已归档参考
 
 - `llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析与历史方案归档。
+- `bash-tool-reference-analysis.md`：Cursor / Claude Code / OpenCode 三家 Bash 工具实现的源码级调研对比，`docs/design-docs/agent-bash工具设计文档.md` 的设计输入底稿。

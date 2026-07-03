@@ -266,9 +266,11 @@ async function executeToolCalls(
     });
 
     // ToolResult.data → 文本内容
-    const textContent = result.success
-      ? (typeof result.data === "string" ? result.data : JSON.stringify(result.data ?? ""))
-      : (result.error ?? "Unknown error");
+    const textContent = typeof result.data === "string"
+      ? result.data
+      : result.success
+        ? JSON.stringify(result.data ?? "")
+        : (result.error ?? "Unknown error");
 
     return {
       role: "toolResult",

@@ -258,7 +258,7 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): Mes
       commandPreview: tool.preview.commandPreview || "bash",
       cwd: tool.preview.cwd,
       stdout: tool.finished ? tool.preview.stdout : undefined,
-      stderr: tool.isError ? "Tool execution failed" : undefined,
+      stderr: tool.isError && !tool.preview.stdout ? (tool.preview.stderr ?? "Tool execution failed") : undefined,
       reason: tool.approvalReason ?? tool.preview.reason,
       approvalRequestId: tool.approvalRequestId,
       intent: tool.preview.intent,

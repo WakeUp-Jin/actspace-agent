@@ -33,6 +33,25 @@ function createTestSetup() {
   return { llm, toolManager, context };
 }
 
+function createFailingRenderedTool(): InternalTool {
+  return {
+    name: "bash",
+    description: "Run Bash",
+    parameters: { type: "object", properties: { command: { type: "string", description: "command" } }, required: ["command"] },
+    isReadOnly: true,
+    previewKind: "bash",
+    handler: async (): Promise<ToolResult> => ({
+      success: false,
+      data: { command: "npx tsc", output: "src/index.ts(1,1): error TS1000: boom" },
+      error: "Bash command exited with code 2",
+    }),
+    renderResult: (result) => {
+      const data = result.data as { command: string; output: string };
+      return `$ ${data.command}\n\noutput:\n${data.output}\n\nerror: ${result.error}`;
+    },
+  };
+}
+
 describe("runAgentLoop", () => {
   it("should complete a normal turn cycle: toolUse → stop", async () => {
     const { llm, toolManager, context } = createTestSetup();
@@ -171,6 +190,39 @@ describe("runAgentLoop", () => {
     expect(toolResult?.content[0]).toMatchObject({
       type: "text",
       text: "工具参数可能因模型输出长度限制被截断，已取消写入。请缩小内容，或先写骨架后用 edit_file 分段补齐。",
+    });
+  });
+
+  it("uses rendered data for failed tool results when available", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
+    toolManager.register(createFailingRenderedTool());
+    llm.setResponses([
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "tc-bash-fail", name: "bash", arguments: { command: "npx tsc" } }],
+        model: "mock",
+        provider: "mock",
+        usage: createEmptyUsage(),
+        stopReason: "toolUse",
+        timestamp: Date.now(),
+        source: "llm",
+      },
+      mockText("Done."),
+    ]);
+
+    const context: Context = {
+      messages: [{ role: "user", content: "run tests", timestamp: Date.now() }],
+      tools: toolManager.getToolDefinitions(),
+    };
+
+    const result = await runAgentLoop(context, llm, { toolManager }, () => {});
+    const toolResult = result.messages.find((message) => message.role === "toolResult");
+
+    expect(toolResult?.isError).toBe(true);
+    expect(toolResult?.content[0]).toMatchObject({
+      type: "text",
+      text: expect.stringContaining("src/index.ts(1,1): error TS1000: boom"),
     });
   });
 });
