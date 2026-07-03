@@ -69,7 +69,12 @@ export {
   createBashPermissionChecker,
   createBashTool,
   renderBashResult,
+  bashOutputTool,
+  bashKillTool,
+  bashTaskRegistry,
+  formatTaskNotification,
 } from "./tools/bash";
+export type { BashTask, BashTaskNotification, BashTaskStatus, BashBackgroundedResult } from "./tools/bash";
 export { webSearchExecutor } from "./tools/web-search/executor";
 export { analyzeMediaExecutor } from "./tools/analyze-media/executor";
 export {
@@ -97,7 +102,7 @@ import { editFileDiffExecutor, renderEditResult } from "./tools/edit-file-diff/e
 import { writeFileDefinition } from "./tools/write-file/definition";
 import { writeFileExecutor, renderWriteResult } from "./tools/write-file/executor";
 import { createDeleteFileTool } from "./tools/delete-file";
-import { createBashTool } from "./tools/bash";
+import { createBashTool, bashOutputTool, bashKillTool } from "./tools/bash";
 import { webSearchDefinition } from "./tools/web-search/definition";
 import { webSearchExecutor } from "./tools/web-search/executor";
 import { analyzeMediaDefinition } from "./tools/analyze-media/definition";
@@ -146,6 +151,9 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
         diskCap: config.bashDiskCap,
       }),
     );
+    // 后台任务配套工具与 bash 同进退
+    manager.register(bashOutputTool);
+    manager.register(bashKillTool);
   }
 
   if (!disabledTools.has("agent") && config.llm) {

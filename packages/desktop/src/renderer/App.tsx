@@ -4,6 +4,7 @@ import type {
   AbortTurnInput,
   AgentTurnResult,
   AppSettings,
+  BashBackgroundStatus,
   BashStatus,
   BootstrapState,
   CompactContextInput,
@@ -262,6 +263,9 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): Mes
       reason: tool.approvalReason ?? tool.preview.reason,
       approvalRequestId: tool.approvalRequestId,
       intent: tool.preview.intent,
+      backgroundTaskId: tool.preview.backgroundTaskId,
+      backgroundStatus: tool.preview.backgroundStatus,
+      outputFilePath: tool.preview.outputFilePath,
       createdAt: now,
     };
   }
@@ -539,6 +543,8 @@ export function App() {
   const [isAborting, setIsAborting] = useState(false);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   const [streamingBlocks, setStreamingBlocks] = useState<MessageBlock[]>([]);
+  // 后台 bash 任务状态（taskId → 最新状态）；bash_task_update 事件驱动，覆写块显示
+  const [bashTaskUpdates, setBashTaskUpdates] = useState<Record<string, { status: BashBackgroundStatus; exitCode?: number | null }>>({});
   const [sendScrollRequestId, setSendScrollRequestId] = useState(0);
   const [defaultModelId, setDefaultModelId] = useState<ModelId | undefined>(undefined);
   const [selectedChatModelId, setSelectedChatModelId] = useState<ModelId>(DEFAULT_MODEL_ID);
@@ -877,6 +883,14 @@ export function App() {
             finishTool();
           }
         }
+        break;
+      }
+
+      case "bash_task_update": {
+        setBashTaskUpdates((current) => ({
+          ...current,
+          [event.taskId]: { status: event.status, exitCode: event.exitCode },
+        }));
         break;
       }
 
@@ -1293,9 +1307,17 @@ export function App() {
   }, [persistedEvents, sessionRecord?.messageBlocks]);
 
   const messages = useMemo<MessageBlock[]>(() => {
-    if (streamingBlocks.length === 0) return persistedMessages;
-    return [...persistedMessages, ...streamingBlocks];
-  }, [persistedMessages, streamingBlocks]);
+    const merged = streamingBlocks.length === 0 ? persistedMessages : [...persistedMessages, ...streamingBlocks];
+    // 后台 bash 任务状态覆写：bash_task_update 事件在 turn 结束后仍会到达，
+    // 持久化块里的 backgrounded 状态以内存最新事件为准
+    if (Object.keys(bashTaskUpdates).length === 0) return merged;
+    return merged.map((block) => {
+      if (block.kind !== "bash" || !block.backgroundTaskId) return block;
+      const update = bashTaskUpdates[block.backgroundTaskId];
+      if (!update) return block;
+      return { ...block, backgroundStatus: update.status, exitCode: update.exitCode ?? block.exitCode };
+    });
+  }, [persistedMessages, streamingBlocks, bashTaskUpdates]);
 
   const contextSnapshot: ContextUsageSnapshot | null =
     sessionRecord?.contextSnapshot ??

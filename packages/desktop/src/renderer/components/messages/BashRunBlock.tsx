@@ -75,6 +75,17 @@ export function BashRunBlock({ message }: { message: BashMessage }) {
   return <BashExecutionBlock message={message} />;
 }
 
+const BASH_BACKGROUND_BADGE_CLASS =
+  "bash-background-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-xs font-medium text-text-faint";
+
+const BACKGROUND_BADGE_TEXT: Record<NonNullable<BashMessage["backgroundStatus"]>, string> = {
+  running: "后台运行中",
+  completed: "后台完成",
+  failed: "后台失败",
+  killed: "已终止",
+  stalled: "疑似等待输入",
+};
+
 function BashExecutionBlock({ message }: { message: BashMessage }) {
   const [expanded, setExpanded] = useState(message.status === "failed");
   const chevron = expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />;
@@ -90,6 +101,9 @@ function BashExecutionBlock({ message }: { message: BashMessage }) {
       >
         <span>{summary}</span>
         {message.commandPreview ? <span className={BASH_COMMAND_PREVIEW_CLASS}>{message.commandPreview}</span> : null}
+        {message.backgroundStatus ? (
+          <span className={BASH_BACKGROUND_BADGE_CLASS}>{BACKGROUND_BADGE_TEXT[message.backgroundStatus]}</span>
+        ) : null}
         {chevron}
       </button>
 
@@ -109,6 +123,8 @@ function BashExecutionBlock({ message }: { message: BashMessage }) {
             ) : null}
             <span className={BASH_PROMPT_CLASS}>$ </span>{message.command}
             {message.cwd ? `\n# cwd: ${message.cwd}` : ""}
+            {message.backgroundTaskId ? `\n# task: ${message.backgroundTaskId}` : ""}
+            {message.outputFilePath ? `\n# output: ${message.outputFilePath}` : ""}
             {message.exitCode !== undefined ? `\n# exit: ${message.exitCode}` : ""}
             {message.durationMs !== undefined ? ` (${message.durationMs}ms)` : ""}
             {message.stdout ? `\n\n${message.stdout.trimEnd()}` : ""}

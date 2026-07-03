@@ -73,6 +73,14 @@ export type RuntimeStreamEvent =
   | { type: "tool_started"; toolCallId: ToolCallId; toolName: string; argsPreview: string; preview?: ToolUiPreview }
   | { type: "tool_finished"; toolCallId: ToolCallId; toolName: string; resultEventId: EventId; isError: boolean; preview?: ToolUiPreview }
   | {
+      /** 后台 bash 任务状态更新：turn 内外统一走 agent:stream 推送，前端按 taskId 更新对应块 */
+      type: "bash_task_update";
+      sessionId: SessionId;
+      taskId: string;
+      status: BashBackgroundStatus;
+      exitCode?: number | null;
+    }
+  | {
       type: "subagent_event";
       toolCallId: ToolCallId;
       transcriptRef: SubAgentTranscriptRef;
@@ -117,6 +125,8 @@ export type UserMessagePayload = {
   content: string;
   attachments?: ComposerAttachment[];
   attachmentAnalyses?: AttachmentAnalysis[];
+  /** 非用户手动输入的注入消息来源（如 "task_notification"），前端据此换展示样式。 */
+  source?: string;
 };
 
 export type AssistantMessagePayload = AssistantReply;
@@ -359,6 +369,13 @@ export type BashStatus =
   | "expired"
   | "cancelled";
 
+/**
+ * 后台 bash 任务的 UI 状态（shared 为契约权威）。
+ * 前四态与 agent-core BashTaskStatus 对齐；"stalled" 是 UI 附加态：
+ * 进程仍在运行但疑似阻塞在交互式提问（看门狗事件），输出恢复后回到 running。
+ */
+export type BashBackgroundStatus = "running" | "completed" | "failed" | "killed" | "stalled";
+
 export type BashPreview = {
   kind: "bash";
   status: BashStatus;
@@ -374,6 +391,12 @@ export type BashPreview = {
   policyLabel?: string;
   approvalRequestId?: string;
   intent?: string;
+  /** 命令已转后台运行时的任务 id（bash_task_update 事件按它定位块）。 */
+  backgroundTaskId?: string;
+  /** 后台任务当前状态；存在即表示该命令走了后台路径。 */
+  backgroundStatus?: BashBackgroundStatus;
+  /** 后台任务落盘输出路径。 */
+  outputFilePath?: string;
 };
 
 export type ToolExecutionResult = {

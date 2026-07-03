@@ -233,6 +233,58 @@ describe("session selectors", () => {
     ]);
   });
 
+  it("restores backgrounded bash results with task fields", () => {
+    const blocks = createMessageBlocks([
+      toolResultEvent({
+        toolName: "bash",
+        toolCallId: "tool-bash-bg",
+        ok: true,
+        summary: "Bash command",
+        modelOutput: "status: backgrounded",
+        uiPreview: {
+          kind: "bash",
+          status: "running",
+          title: "Bash command (background)",
+          command: "pnpm dev",
+          backgroundTaskId: "bash_abc123",
+          backgroundStatus: "running",
+          outputFilePath: "/tmp/tool-output/s1/x-bash.txt",
+        },
+      }),
+    ]);
+
+    expect(blocks[0]).toMatchObject({
+      kind: "bash",
+      status: "running",
+      backgroundTaskId: "bash_abc123",
+      backgroundStatus: "running",
+      outputFilePath: "/tmp/tool-output/s1/x-bash.txt",
+    });
+  });
+
+  it("maps task_notification user messages to tool-style blocks instead of user bubbles", () => {
+    const blocks = createMessageBlocks([
+      {
+        id: "evt-notify",
+        sessionId: "session-1",
+        turnId: "turn-1",
+        type: "user_message",
+        timestamp: "2026-06-02T12:00:00.000Z",
+        schemaVersion: 1,
+        payload: {
+          content: "<task_notification>bash_abc123 completed</task_notification>",
+          source: "task_notification",
+        },
+      },
+    ]);
+
+    expect(blocks[0]).toMatchObject({
+      kind: "tool",
+      title: "后台任务通知",
+      content: expect.stringContaining("bash_abc123"),
+    });
+  });
+
   it("restores a running Agent tool block with recent transcript summaries", () => {
     const preview: AgentToolPreview = {
       kind: "agent",

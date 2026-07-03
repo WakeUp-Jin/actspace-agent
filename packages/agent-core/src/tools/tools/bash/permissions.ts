@@ -2,14 +2,15 @@ import type { PermissionResult } from "../../../internal-tools";
 import { guardWorkspacePath } from "../../workspace-guard";
 import { env } from "../../../env";
 
-export const DEFAULT_BASH_TIMEOUT_MS = 30_000;
-export const MIN_BASH_TIMEOUT_MS = 1_000;
-export const MAX_BASH_TIMEOUT_MS = 120_000;
+/** blockMs：前台最长等待（到点转后台，不杀进程）。0 = 立即后台。 */
+export const DEFAULT_BASH_BLOCK_MS = 30_000;
+export const MIN_BASH_BLOCK_MS = 1_000;
+export const MAX_BASH_BLOCK_MS = 600_000;
 
 interface NormalizedBashArgs {
   command: string;
   cwd: string;
-  timeoutMs: number;
+  blockMs: number;
 }
 
 const CONTROL_CHARS_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
@@ -67,7 +68,13 @@ export async function bashCheckPermissions(
     reason: policy.reason,
     summary: summarizeCommand(normalized.command),
     riskLevel: policy.riskLevel,
-    sanitizedArgs: { ...normalized },
+    // intent / notifyOnOutput 是透传字段，不参与归一化：intent 供展示，
+    // notifyOnOutput 的结构校验在 executor 层做
+    sanitizedArgs: {
+      ...normalized,
+      ...(typeof args.intent === "string" && args.intent.trim() ? { intent: args.intent.trim() } : {}),
+      ...(args.notifyOnOutput !== undefined ? { notifyOnOutput: args.notifyOnOutput } : {}),
+    },
   };
 }
 
@@ -98,16 +105,18 @@ function normalizeArgs(
   return {
     command,
     cwd: cwdGuard.resolvedPath,
-    timeoutMs: sanitizeTimeout(args.timeoutMs),
+    blockMs: sanitizeBlockMs(args.blockMs),
   };
 }
 
-function sanitizeTimeout(value: unknown): number {
+function sanitizeBlockMs(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    return DEFAULT_BASH_TIMEOUT_MS;
+    return DEFAULT_BASH_BLOCK_MS;
   }
+  // 0 = 显式立即后台（dev server / watcher 等常驻进程）
+  if (value === 0) return 0;
 
-  return Math.min(MAX_BASH_TIMEOUT_MS, Math.max(MIN_BASH_TIMEOUT_MS, Math.trunc(value)));
+  return Math.min(MAX_BASH_BLOCK_MS, Math.max(MIN_BASH_BLOCK_MS, Math.trunc(value)));
 }
 
 function getHardRejectReason(command: string): string | undefined {

@@ -6,9 +6,26 @@ import { renderBashResult } from "./render-result";
 
 export { bashDefinition } from "./definition";
 export { bashExecutor } from "./executor";
-export type { BashResult, BashExecutorConfig } from "./executor";
+export type { BashResult, BashBackgroundedResult, BashExecutorConfig } from "./executor";
 export { bashCheckPermissions, createBashPermissionChecker } from "./permissions";
 export { renderBashResult } from "./render-result";
+export { bashOutputTool, bashKillTool } from "./background-tools";
+export {
+  bashTaskRegistry,
+  BashTaskRegistry,
+  formatTaskNotification,
+  formatTaskEventNotification,
+  type BashTask,
+  type BashTaskNotification,
+  type BashTaskEventStatus,
+  type BashTaskStatus,
+  type BashTaskListener,
+} from "./task-registry";
+export {
+  TaskOutputMonitor,
+  MIN_SUBSCRIPTION_DEBOUNCE_MS,
+  type OutputSubscriptionSpec,
+} from "./output-monitor";
 
 export function createBashTool(workspaceRoot: string, config: BashExecutorConfig = {}): InternalTool {
   return {

@@ -132,6 +132,8 @@ export function userMessageToEvents(
       content,
       ...(payload?.attachments?.length ? { attachments: payload.attachments } : {}),
       ...(payload?.attachmentAnalyses?.length ? { attachmentAnalyses: payload.attachmentAnalyses } : {}),
+      // 注入消息（如后台任务通知）标记来源，前端按来源换展示样式
+      ...(msg.source && msg.source !== "user" ? { source: msg.source } : {}),
     }, msg.timestamp),
   ];
 }
@@ -269,11 +271,13 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
             content: string;
             attachments?: ComposerAttachment[];
             attachmentAnalyses?: AttachmentAnalysis[];
+            source?: string;
           };
           messages.push({
             role: "user",
             content: formatUserMessageForModel(payload.content, payload.attachments, payload.attachmentAnalyses),
             timestamp: new Date(event.timestamp).getTime() || now,
+            ...(payload.source ? { source: payload.source } : {}),
           });
           break;
         }

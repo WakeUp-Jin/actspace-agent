@@ -31,6 +31,38 @@ describe("BashRunBlock tooltips", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("更多 Bash 输出操作");
   });
 
+  it("shows a background badge for backgrounded commands", () => {
+    renderBash({
+      id: "bash-bg-1",
+      kind: "bash",
+      createdAt: "2026-07-03T00:00:00.000Z",
+      title: "Bash command (background)",
+      status: "running",
+      command: "pnpm dev",
+      backgroundTaskId: "bash_abc123",
+      backgroundStatus: "running",
+      outputFilePath: "/tmp/tool-output/s1/x-bash.txt",
+    });
+
+    expect(screen.getByText("后台运行中")).toBeInTheDocument();
+  });
+
+  it("shows the terminal background state after a task update", () => {
+    renderBash({
+      id: "bash-bg-2",
+      kind: "bash",
+      createdAt: "2026-07-03T00:00:00.000Z",
+      title: "Bash command (background)",
+      status: "running",
+      command: "pnpm build",
+      backgroundTaskId: "bash_def456",
+      backgroundStatus: "completed",
+      exitCode: 0,
+    });
+
+    expect(screen.getByText("后台完成")).toBeInTheDocument();
+  });
+
   it("shows a readable tooltip for approval actions", async () => {
     const user = userEvent.setup();
     renderBash({

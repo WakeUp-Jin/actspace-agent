@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,6 +14,7 @@ import { MockLLMService, mockText, mockToolCall } from "../../llm/services/mock"
 import { createCacheAuditTracker, type AgentRunLogEvent, type AgentRunLogger } from "../../observability";
 import { ToolManager } from "../../tools/manager";
 import { runTurnWithAgent } from "../bridge";
+import { bashTaskRegistry } from "../../tools/tools/bash/task-registry";
 import type { RunTurnWithAgentDeps } from "../bridge";
 
 function createTestTool(name: string): InternalTool {
@@ -1230,5 +1231,75 @@ describe("runTurnWithAgent bridge", () => {
         }),
       }),
     );
+  });
+});
+
+describe("background bash task notifications", () => {
+  afterEach(() => {
+    bashTaskRegistry.clear();
+  });
+
+  it("injects pending task notifications as steering messages at turn boundaries", async () => {
+    const deps = createDeps();
+    bashTaskRegistry.pushNotification({
+      taskId: "bash_test123",
+      sessionId: "session-notify",
+      status: "completed",
+      text: "<task_notification>\n<task_id>bash_test123</task_id>\n<status>completed</status>\n</task_notification>",
+    });
+
+    let modelSawNotification = false;
+    deps.llm.setResponses([
+      (context) => {
+        modelSawNotification = context.messages.some(
+          (message) =>
+            message.role === "user" &&
+            typeof message.content === "string" &&
+            message.content.includes("<task_notification>"),
+        );
+        return mockText("Noted the background task result.");
+      },
+    ]);
+
+    const result = await runTurnWithAgent(
+      { sessionId: "session-notify", turnId: "turn-notify", userInput: "继续" },
+      deps,
+    );
+
+    expect(modelSawNotification).toBe(true);
+    const notificationEvent = result.events.find(
+      (event) =>
+        event.type === "user_message" &&
+        (event.payload as { source?: string }).source === "task_notification",
+    );
+    expect(notificationEvent).toBeTruthy();
+    expect((notificationEvent?.payload as { content: string }).content).toContain("bash_test123");
+
+    // 通知已被 drain，不会重复注入
+    expect(bashTaskRegistry.drainPendingNotifications("session-notify")).toHaveLength(0);
+  });
+
+  it("does not inject anything for sessions without pending notifications", async () => {
+    const deps = createDeps();
+    bashTaskRegistry.pushNotification({
+      taskId: "bash_other",
+      sessionId: "session-other",
+      status: "completed",
+      text: "<task_notification>other</task_notification>",
+    });
+
+    const result = await runTurnWithAgent(
+      { sessionId: "session-no-notify", turnId: "turn-x", userInput: "hello" },
+      deps,
+    );
+
+    const injected = result.events.filter(
+      (event) =>
+        event.type === "user_message" &&
+        (event.payload as { source?: string }).source === "task_notification",
+    );
+    expect(injected).toHaveLength(0);
+    // 其他会话的通知仍在队列里
+    expect(bashTaskRegistry.drainPendingNotifications("session-other")).toHaveLength(1);
   });
 });

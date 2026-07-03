@@ -216,6 +216,9 @@ function messageBlockFromToolPreview(
         durationMs: preview.durationMs,
         reason: preview.reason,
         policyLabel: preview.policyLabel,
+        backgroundTaskId: preview.backgroundTaskId,
+        backgroundStatus: preview.backgroundStatus,
+        outputFilePath: preview.outputFilePath,
         createdAt: getDisplayTime(timestamp)
       };
     case "agent":
@@ -286,6 +289,18 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
     switch (event.type) {
       case "user_message": {
         const payload = event.payload as UserMessagePayload;
+        // 注入消息（后台任务通知等）不是用户输入，用 tool 样式块展示而非用户气泡
+        if (payload.source === "task_notification") {
+          return [
+            {
+              kind: "tool",
+              id: event.id,
+              title: "后台任务通知",
+              content: payload.content,
+              createdAt: getDisplayTime(event.timestamp)
+            }
+          ];
+        }
         return [
           {
             kind: "user",

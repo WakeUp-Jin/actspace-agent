@@ -44,9 +44,10 @@ import {
   toAssistantReply,
   contextSnapshotToEvent,
 } from "../adapters";
-import { getTextContent, getThinkingContent, getToolCalls, getMessageText } from "../messages";
+import { getTextContent, getThinkingContent, getToolCalls, getMessageText, MessagePriority } from "../messages";
 import type { AssistantMessage, Context, Message, ToolResultMessage, UserMessage } from "../messages";
 import { calculateUsageCost } from "../usage";
+import { bashTaskRegistry } from "../tools/tools/bash/task-registry";
 
 const PREVIEW_LIMIT = 160;
 
@@ -176,6 +177,8 @@ export async function runTurnWithAgent(
     thinkingEnabled: input.thinkingEnabled ?? deps.thinkingEnabled,
     summarizer: deps.summarizer,
     cacheAudit: deps.cacheAudit,
+    // 后台 bash 任务事件在 turn 边界（每次 LLM 调用前）注入模型上下文
+    getSteeringMessages: async () => buildBashTaskSteeringMessages(sessionId),
     toolExecuteOptions: {
       subagentEventSink: async (subagentEvent) => {
         if (!streamCb || !subagentEvent.toolCallId) return;
@@ -317,6 +320,44 @@ export async function runTurnWithAgent(
     result,
   );
   return result;
+}
+
+/**
+ * 后台 bash 任务通知 → steering 消息（turn 边界注入）。
+ *
+ * 两部分内容合并为一条 UserMessage：
+ * 1. 待投递的 <task_notification>（终态 / output_match / stalled）
+ * 2. 运行中任务清单一行附件（防模型遗忘 / 重复启动；设计文档投递规则 5）
+ *
+ * 无通知且无运行中任务时返回空数组（loop 不注入任何消息）。
+ */
+function buildBashTaskSteeringMessages(sessionId: string): UserMessage[] {
+  const notifications = bashTaskRegistry.drainPendingNotifications(sessionId);
+  const running = bashTaskRegistry.listRunning(sessionId);
+
+  const parts: string[] = notifications.map((n) => n.text);
+  if (running.length > 0) {
+    const list = running
+      .map((task) => {
+        const runtime = Math.round((Date.now() - task.startedAt) / 1000);
+        return `- ${task.taskId}: "${task.command}" (running ${runtime}s)`;
+      })
+      .join("\n");
+    parts.push(`<background_tasks>\n当前有 ${running.length} 个后台任务运行中：\n${list}\n</background_tasks>`);
+  }
+
+  // 仅在有终态通知时注入；只有 running 清单而无新事件时不打扰（避免每个 turn 边界都插消息）
+  if (notifications.length === 0) return [];
+
+  return [
+    {
+      role: "user",
+      content: parts.join("\n\n"),
+      timestamp: Date.now(),
+      source: "task_notification",
+      priority: MessagePriority.HIGH,
+    },
+  ];
 }
 
 /**
@@ -637,7 +678,10 @@ function createToolExecutionResult(
     rawOutputRef,
     modelOutput,
     uiPreview: record?.result?.subagent?.uiPreview
-      ?? createToolUiPreview(tool?.previewKind ?? "generic", record?.args ?? {}, modelOutput, summary, ok),
+      ?? applyBashBackgroundPreview(
+        createToolUiPreview(tool?.previewKind ?? "generic", record?.args ?? {}, modelOutput, summary, ok),
+        record,
+      ),
     error: ok
       ? undefined
       : {
@@ -662,6 +706,41 @@ function collectSubAgentTranscripts(
     });
   }
   return transcripts.length > 0 ? transcripts : undefined;
+}
+
+/** bash 转后台的结构化数据（executor BashBackgroundedResult 的 preview 消费面）。 */
+function getBackgroundedBashData(record: ToolExecutionRecord | undefined):
+  | { taskId: string; outputFilePath?: string }
+  | undefined {
+  const data = record?.result?.data;
+  if (
+    data !== null &&
+    typeof data === "object" &&
+    (data as { status?: unknown }).status === "backgrounded" &&
+    typeof (data as { taskId?: unknown }).taskId === "string"
+  ) {
+    const typed = data as { taskId: string; outputFilePath?: string };
+    return { taskId: typed.taskId, outputFilePath: typed.outputFilePath };
+  }
+  return undefined;
+}
+
+/** bash 命令转后台时覆写 preview：工具调用本身以 backgrounded 收尾，任务状态由 bash_task_update 独立更新。 */
+function applyBashBackgroundPreview(
+  preview: ToolUiPreview,
+  record: ToolExecutionRecord | undefined,
+): ToolUiPreview {
+  if (preview.kind !== "bash") return preview;
+  const backgrounded = getBackgroundedBashData(record);
+  if (!backgrounded) return preview;
+  return {
+    ...preview,
+    status: "running",
+    title: "Bash command (background)",
+    backgroundTaskId: backgrounded.taskId,
+    backgroundStatus: "running",
+    outputFilePath: backgrounded.outputFilePath,
+  };
 }
 
 function getToolResultOutputText(result: ToolResult): string {

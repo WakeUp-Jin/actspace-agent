@@ -1,10 +1,26 @@
 import type { ToolResult } from "../../../internal-tools";
-import type { BashResult } from "./executor";
+import type { BashBackgroundedResult, BashResult } from "./executor";
+
+function isBackgrounded(data: BashResult | BashBackgroundedResult): data is BashBackgroundedResult {
+  return "status" in data && data.status === "backgrounded";
+}
 
 export function renderBashResult(result: ToolResult): string {
-  const data = result.data as BashResult | undefined;
+  const data = result.data as BashResult | BashBackgroundedResult | undefined;
   if (!data) {
     return result.error ?? "Bash command failed without structured output.";
+  }
+
+  if (isBackgrounded(data)) {
+    return [
+      `$ ${data.command}`,
+      `cwd: ${data.cwd}`,
+      `status: backgrounded (${data.reason})`,
+      `taskId: ${data.taskId}`,
+      ...(data.outputFilePath ? [`outputFile: ${data.outputFilePath}`] : []),
+      "",
+      data.hint,
+    ].join("\n");
   }
 
   const lines = [
@@ -14,10 +30,6 @@ export function renderBashResult(result: ToolResult): string {
     `durationMs: ${data.durationMs}`,
   ];
 
-  if (data.timedOut) {
-    lines.push("timedOut: true");
-  }
-
   const output = data.output.trimEnd();
   if (output) {
     lines.push("", "output:", output);
@@ -26,7 +38,7 @@ export function renderBashResult(result: ToolResult): string {
   // 输出超过头部阈值：逐字头部 + 截断标记 + 文件路径（不调 flash 摘要）。
   if (data.outputTruncated) {
     const recovery = data.stdoutFilePath
-      ? `完整原文见 ${data.stdoutFilePath}，可用 read_file 读取`
+      ? `完整原文见 ${data.stdoutFilePath}。检索方式：用 read_file 带 offset/limit 分段读该文件，或用 grep 带 path 在该文件中搜索关键行。不要重跑命令加 | head / | tail 截断`
       : "完整原文未落盘（超出内存头部即被丢弃，可缩小输出后重跑）";
     lines.push(
       "",

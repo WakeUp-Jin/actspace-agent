@@ -2,7 +2,9 @@
 
 ## 当前状态
 
-状态：设计定稿（设计先行，尚未实现）。
+状态：E1–E4 已实现（2026-07-03，见 `docs/exec-plans/active/20260703-bash-execution-model/`）；E5 沙盒未实现，待与 allowlist 设计 Phase 3 合并立项。
+
+实现与本文的已知偏差：前端首期复用 bash 块扩展后台徽标（未做独立任务卡片与输出流式滚动）；后台任务终态不回写持久化事件（重启后历史块停在 backgrounded）。均记录于 `docs/exec-plans/tech-debt-tracker.md`。
 
 本文是 Actspace Bash 工具的**设计事实来源**，覆盖工具契约、输出管道、后台运行与通知机制、沙盒执行模型和前端展示契约。
 

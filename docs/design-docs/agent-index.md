@@ -34,3 +34,4 @@
 
 - `agent-kairos-autonomous-mode.md`：Kairos 自治模式设计，约束独立 prompt、短期记忆、tick 调度、IPC 契约和事件流页面边界。
 - `agent-kairos-prompt-cache-optimization.md`：Kairos prompt 缓存优化设计，约束「静态前缀 + 动态尾部」上下文形态、观测增量化、thinking 落盘回放与 contextWindow 来源。
+- `agent-plugins-fs-watch.md`：Plugins 插件模式与 fs-watch 文件监听设计，约束独立仓库 Rust 二进制的文件契约、Skill 载体形态、设置页「插件」「Skills」分区和 Kairos Skill 白名单集成。

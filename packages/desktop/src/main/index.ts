@@ -67,6 +67,7 @@ import {
   setSessionWorkspace,
   createKairos,
   ShortMemoryStore,
+  bashTaskRegistry,
   type KairosConfig,
   type KairosController,
 } from "@actspace/agent-core";
@@ -1275,6 +1276,33 @@ app.whenReady().then(async () => {
   }
   await registerIpc();
   await createMainWindow();
+  // 后台 bash 任务终态 → 推给 renderer 更新对应块（turn 内外统一走 agent:stream）
+  bashTaskRegistry.subscribe((task) => {
+    if (task.status === "running") return;
+    logMain("background bash task finished", {
+      taskId: task.taskId,
+      sessionId: task.sessionId,
+      status: task.status,
+      exitCode: task.exitCode,
+    });
+    getMainWindow()?.webContents.send("agent:stream", {
+      type: "bash_task_update",
+      sessionId: task.sessionId,
+      taskId: task.taskId,
+      status: task.status,
+      exitCode: task.exitCode,
+    });
+  });
+  // 看门狗事件：stalled（疑似等待交互输入）/ stall_recovered（输出恢复）→ 前端徽标切换
+  bashTaskRegistry.subscribeNotifications((notification) => {
+    if (notification.status !== "stalled" && notification.status !== "stall_recovered") return;
+    getMainWindow()?.webContents.send("agent:stream", {
+      type: "bash_task_update",
+      sessionId: notification.sessionId,
+      taskId: notification.taskId,
+      status: notification.status === "stalled" ? "stalled" : "running",
+    });
+  });
   // Kairos 现在仅初始化骨架（preferences.enabled 默认 false → controller 进 stopped 状态）；
   // renderer 在 KairosPage 显式按"开启"才真正起 tick 循环。
   try {
@@ -1303,6 +1331,12 @@ app.on("window-all-closed", () => {
 let shuttingDown = false;
 app.on("before-quit", (event) => {
   if (shuttingDown) return; // 第二次进入（finish 触发的 exit）直接放行
+  // 后台 bash 任务收割：子进程是 detached 的，app 退出不会连带杀掉，
+  // 必须显式对进程组发信号，绝不留孤儿 dev server。同步发 SIGTERM，best-effort。
+  const harvested = bashTaskRegistry.harvestAll();
+  if (harvested > 0) {
+    logMain("harvested background bash tasks on quit", { count: harvested });
+  }
   if (!kairosController) {
     kairosIpcHandle?.dispose();
     return;

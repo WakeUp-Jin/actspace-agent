@@ -50,6 +50,7 @@
 - `agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入边界。
 - `agent-kairos-autonomous-mode.md`：Kairos 自治模式设计。
 - `agent-kairos-prompt-cache-optimization.md`：Kairos prompt 缓存优化设计（静态前缀 + 动态尾部、观测增量化、thinking 落盘回放）。
+- `agent-plugins-fs-watch.md`：Plugins 插件模式与 fs-watch 文件监听设计——独立仓库 Rust 二进制的文件契约、Skill 载体、设置页「插件」「Skills」分区和 Kairos Skill 白名单。
 
 ## Front
 
