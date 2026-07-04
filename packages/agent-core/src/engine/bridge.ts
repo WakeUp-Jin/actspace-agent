@@ -708,19 +708,40 @@ function collectSubAgentTranscripts(
   return transcripts.length > 0 ? transcripts : undefined;
 }
 
+/**
+ * bash 结果的结构化数据：renderResult 后 data 已是回填文本，
+ * 原始对象在 structured（scheduler postProcess 保留）；无 renderResult 的
+ * 测试桩工具则 data 本身就是结构化对象，做兜底。
+ */
+function getStructuredBashData(record: ToolExecutionRecord | undefined): Record<string, unknown> | undefined {
+  const result = record?.result;
+  if (!result) return undefined;
+  const candidate = result.structured ?? result.data;
+  if (candidate !== null && typeof candidate === "object") {
+    return candidate as Record<string, unknown>;
+  }
+  return undefined;
+}
+
 /** bash 转后台的结构化数据（executor BashBackgroundedResult 的 preview 消费面）。 */
 function getBackgroundedBashData(record: ToolExecutionRecord | undefined):
   | { taskId: string; outputFilePath?: string }
   | undefined {
-  const data = record?.result?.data;
-  if (
-    data !== null &&
-    typeof data === "object" &&
-    (data as { status?: unknown }).status === "backgrounded" &&
-    typeof (data as { taskId?: unknown }).taskId === "string"
-  ) {
-    const typed = data as { taskId: string; outputFilePath?: string };
-    return { taskId: typed.taskId, outputFilePath: typed.outputFilePath };
+  const data = getStructuredBashData(record);
+  if (data && data.status === "backgrounded" && typeof data.taskId === "string") {
+    return {
+      taskId: data.taskId,
+      outputFilePath: typeof data.outputFilePath === "string" ? data.outputFilePath : undefined,
+    };
+  }
+  return undefined;
+}
+
+/** 从 bash 结果里取执行环境标记（前台 / 后台两种 result 形状都带 sandboxed）。 */
+function getBashSandboxedFlag(record: ToolExecutionRecord | undefined): boolean | undefined {
+  const data = getStructuredBashData(record);
+  if (data && typeof data.sandboxed === "boolean") {
+    return data.sandboxed;
   }
   return undefined;
 }
@@ -731,10 +752,12 @@ function applyBashBackgroundPreview(
   record: ToolExecutionRecord | undefined,
 ): ToolUiPreview {
   if (preview.kind !== "bash") return preview;
+  const sandboxed = getBashSandboxedFlag(record);
+  const withSandbox = sandboxed === undefined ? preview : { ...preview, sandboxed };
   const backgrounded = getBackgroundedBashData(record);
-  if (!backgrounded) return preview;
+  if (!backgrounded) return withSandbox;
   return {
-    ...preview,
+    ...withSandbox,
     status: "running",
     title: "Bash command (background)",
     backgroundTaskId: backgrounded.taskId,
@@ -1146,6 +1169,8 @@ function mapAgentEventToStreamEvent(
       const output = getToolResultOutputText(event.result);
       const args = toolExecutions.get(event.toolCallId)?.args ?? {};
       const summary = getToolSummary(event.toolName, previewKind, args, ok, output);
+      // 内联临时 record：不依赖 trackToolExecution 与本函数的调用顺序
+      const liveRecord: ToolExecutionRecord = { toolName: event.toolName, args, result: event.result };
       return {
         type: "tool_finished",
         toolCallId: event.toolCallId,
@@ -1153,7 +1178,10 @@ function mapAgentEventToStreamEvent(
         resultEventId: nextId(),
         isError: event.isError,
         preview: event.result.subagent?.uiPreview
-          ?? createToolUiPreview(event.toolName, previewKind, args, output, summary, ok),
+          ?? applyBashBackgroundPreview(
+            createToolUiPreview(event.toolName, previewKind, args, output, summary, ok),
+            liveRecord,
+          ),
       };
     }
 

@@ -26,11 +26,23 @@ export {
   MIN_SUBSCRIPTION_DEBOUNCE_MS,
   type OutputSubscriptionSpec,
 } from "./output-monitor";
+export {
+  probeSandbox,
+  resetSandboxProbeCache,
+  buildSandboxSpawn,
+  buildSandboxProfile,
+  findSandboxViolationEvidence,
+  formatSandboxViolationHint,
+} from "./sandbox";
+export type { SandboxProfileInput, SandboxProfileSpec, SandboxSpawnInput, SandboxSpawnSpec } from "./sandbox";
 
 export function createBashTool(workspaceRoot: string, config: BashExecutorConfig = {}): InternalTool {
+  // 生产链路默认沙盒优先（executor 内还有运行时探测兜底）；
+  // 直接调 bashExecutor 的测试不经过这里，默认无沙盒。
+  const effectiveConfig: BashExecutorConfig = { sandbox: true, ...config };
   return {
     ...bashDefinition,
-    handler: (args) => bashExecutor(args, workspaceRoot, config),
+    handler: (args) => bashExecutor(args, workspaceRoot, effectiveConfig),
     checkPermissions: createBashPermissionChecker(workspaceRoot),
     renderResult: renderBashResult,
     previewKind: "bash",

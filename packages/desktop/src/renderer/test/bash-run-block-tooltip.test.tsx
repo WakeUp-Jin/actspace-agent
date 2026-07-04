@@ -94,6 +94,54 @@ describe("BashRunBlock tooltips", () => {
     expect(screen.getByText("后台完成")).toBeInTheDocument();
   });
 
+  it("shows a subdued sandbox badge for sandboxed commands", () => {
+    renderBash({
+      id: "bash-sbx-1",
+      kind: "bash",
+      createdAt: "2026-07-04T00:00:00.000Z",
+      title: "Bash command",
+      status: "success",
+      command: "pnpm test",
+      exitCode: 0,
+      sandboxed: true,
+    });
+
+    expect(screen.getByText("沙盒")).toBeInTheDocument();
+    expect(screen.queryByText("真实环境")).not.toBeInTheDocument();
+  });
+
+  it("shows a prominent real-environment badge for unsandboxed commands", () => {
+    renderBash({
+      id: "bash-sbx-2",
+      kind: "bash",
+      createdAt: "2026-07-04T00:00:00.000Z",
+      title: "Bash command",
+      status: "success",
+      command: "npm i -g foo",
+      exitCode: 0,
+      sandboxed: false,
+    });
+
+    const badge = screen.getByText("真实环境");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveClass("bash-real-env-badge");
+  });
+
+  it("shows no environment badge when sandboxed is unknown (historical data)", () => {
+    renderBash({
+      id: "bash-sbx-3",
+      kind: "bash",
+      createdAt: "2026-07-04T00:00:00.000Z",
+      title: "Bash command",
+      status: "success",
+      command: "pwd",
+      exitCode: 0,
+    });
+
+    expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
+    expect(screen.queryByText("真实环境")).not.toBeInTheDocument();
+  });
+
   it("shows a readable tooltip for approval actions", async () => {
     const user = userEvent.setup();
     renderBash({

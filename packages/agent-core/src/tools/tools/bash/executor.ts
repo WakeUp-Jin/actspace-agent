@@ -10,6 +10,12 @@ import {
   MAX_SUBSCRIPTION_PATTERN_LENGTH,
   type OutputSubscriptionSpec,
 } from "./output-monitor";
+import {
+  buildSandboxSpawn,
+  findSandboxViolationEvidence,
+  formatSandboxViolationHint,
+  probeSandbox,
+} from "./sandbox";
 
 export interface BashResult {
   command: string;
@@ -28,6 +34,10 @@ export interface BashResult {
   outputTruncated: boolean;
   /** 大输出落盘文件的绝对路径（仅 outputTruncated 且 tmpRoot 可用时）。 */
   stdoutFilePath?: string;
+  /** 本次是否在沙盒内执行（前端标签 + 模型归因用）。 */
+  sandboxed: boolean;
+  /** 沙盒内失败且输出命中拦截特征时的归因标注 + 升级引导。 */
+  sandboxViolationHint?: string;
 }
 
 /** blockMs 到点（或 blockMs=0）转后台时的返回结构。进程继续运行，不存在超时失败。 */
@@ -39,6 +49,8 @@ export interface BashBackgroundedResult {
   /** 立即可读的落盘输出路径（无 tmpRoot 时缺省）。 */
   outputFilePath?: string;
   reason: "explicit" | "block_timeout";
+  /** 本次是否在沙盒内执行。 */
+  sandboxed: boolean;
   hint: string;
 }
 
@@ -52,6 +64,13 @@ export interface BashExecutorConfig {
   inlineThreshold?: number;
   /** 流式写盘硬上限（字符），默认 5MB。 */
   diskCap?: number;
+  /**
+   * 沙盒优先执行开关（生产链路 createBashTool 传 true，直接调 executor 的
+   * 测试默认 false）。true 时仍需运行时探测通过才真正沙盒。
+   */
+  sandbox?: boolean;
+  /** 敏感禁读清单覆盖（沙盒集成测试注入临时替身用）。 */
+  sandboxSensitivePaths?: string[];
 }
 
 function sanitizeBlockMs(value: unknown): number {
@@ -90,6 +109,7 @@ function buildForegroundResult(
   command: string,
   cwd: string,
   status: ProcessSinkStatus,
+  sandboxed: boolean,
 ): ToolResult {
   const outputTruncated = status.totalChars > status.headBuffer.length;
   const result: BashResult = {
@@ -103,6 +123,7 @@ function buildForegroundResult(
     truncated: status.truncated,
     outputTruncated,
     stdoutFilePath: status.outputFilePath,
+    sandboxed,
   };
 
   // 大输出落盘时给出 file ref，供 bridge 填 rawOutputRef、前端「查看完整输出」。
@@ -111,6 +132,13 @@ function buildForegroundResult(
     : undefined;
 
   if (status.exitCode !== 0) {
+    // 沙盒内失败：扫描输出中的拦截特征做归因标注，防止模型在错误方向重试
+    if (sandboxed) {
+      const evidence = findSandboxViolationEvidence(status.headBuffer);
+      if (evidence) {
+        result.sandboxViolationHint = formatSandboxViolationHint(evidence);
+      }
+    }
     return { success: false, data: result, error: `Bash command exited with code ${status.exitCode}`, outputRef };
   }
 
@@ -146,12 +174,41 @@ export const bashExecutor = async (
       })
     : undefined;
 
+  // 沙盒优先：生产链路（config.sandbox=true）+ 运行时探测通过 + 未获批真实环境。
+  // requiredPermissions 到达 executor 说明升级审批已在权限层通过（scheduler
+  // 只有 ask 批准后才透传 sanitizedArgs），直接走真实环境。
+  const requiredPermissions = Array.isArray(args.requiredPermissions)
+    ? args.requiredPermissions.filter((item): item is string => typeof item === "string")
+    : [];
+  const wantsRealEnv = requiredPermissions.includes("no_sandbox");
+  let spawnSpec: { command: string; args: string[]; env?: NodeJS.ProcessEnv } = {
+    command: "bash",
+    args: ["-lc", command],
+  };
+  let sandboxed = false;
+  if (config.sandbox === true && !wantsRealEnv && (await probeSandbox())) {
+    try {
+      const sandboxSpawn = await buildSandboxSpawn({
+        command,
+        workspaceRoot,
+        tmpRoot: config.tmpRoot,
+        sessionId: config.sessionId,
+        sensitiveReadDenyPaths: config.sandboxSensitivePaths,
+      });
+      spawnSpec = sandboxSpawn;
+      sandboxed = true;
+    } catch {
+      // profile 写盘失败等基础设施故障：降级真实环境，sandboxed 如实为 false
+    }
+  }
+
   // 输出监控（订阅匹配 + 卡死看门狗）从进程启动就挂 onChunk，转后台时才 attach 投递
   const monitor = new TaskOutputMonitor({ subscription: subscription ?? undefined });
 
   const handle = startProcessSink({
-    command: "bash",
-    args: ["-lc", command],
+    command: spawnSpec.command,
+    args: spawnSpec.args,
+    env: spawnSpec.env,
     cwd,
     outputFile,
     headBufferCap: inlineThreshold,
@@ -188,7 +245,7 @@ export const bashExecutor = async (
           `Check that the cwd exists and the command is available.`,
       };
     }
-    return buildForegroundResult(command, cwd, status);
+    return buildForegroundResult(command, cwd, status, sandboxed);
   }
 
   // 转后台：强制创建落盘文件（含已有 headBuffer），保证 outputFilePath 立即可读
@@ -202,6 +259,7 @@ export const bashExecutor = async (
     outputFilePath,
     monitor,
     subscriptionReason: subscription?.reason,
+    sandboxed,
   });
 
   const data: BashBackgroundedResult = {
@@ -211,6 +269,7 @@ export const bashExecutor = async (
     taskId: task.taskId,
     outputFilePath,
     reason: blockMs === 0 ? "explicit" : "block_timeout",
+    sandboxed,
     hint:
       "The command is still running in the background. You will receive a <task_notification> when it finishes. " +
       "To check progress, call bash_output with this taskId (or read the output file). " +

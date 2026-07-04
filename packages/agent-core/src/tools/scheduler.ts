@@ -267,8 +267,10 @@ export class ToolScheduler {
       rendered = tool.renderResult(result);
     }
 
+    // renderResult 会用回填文本覆盖 data；原始结构化结果保留在 structured，
+    // 供 bridge 提取 preview 元数据（bash 的 backgrounded taskId / sandboxed 等）
     if (!result.success) {
-      return rendered !== undefined ? { ...result, data: rendered } : result;
+      return rendered !== undefined ? { ...result, data: rendered, structured: result.data } : result;
     }
 
     const rawData = rendered ?? (typeof result.data === "string" ? result.data : JSON.stringify(result.data));
@@ -276,7 +278,7 @@ export class ToolScheduler {
     // bash 自处理输出（run-process 流式落盘 + executor 头部截断），不走通用摘要/截断。
     // agent 的输出是 SubAgent 给主 Agent 的结构化报告 + transcriptRef，也不能再被普通工具压缩误伤。
     if (tool.previewKind === "bash" || tool.previewKind === "agent") {
-      return rendered !== undefined ? { ...result, data: rendered } : result;
+      return rendered !== undefined ? { ...result, data: rendered, structured: result.data } : result;
     }
 
     if (!rawData) {

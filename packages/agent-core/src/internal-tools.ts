@@ -35,6 +35,12 @@ export interface ToolResult {
    */
   outputRef?: ToolOutputRef;
   /**
+   * renderResult 把 data 替换为回填文本之前的原始结构化结果。
+   * scheduler postProcess 填充、engine/bridge 消费：bash 的 backgrounded
+   * taskId / sandboxed 等 preview 元数据从这里读，不再依赖 data 的形状。
+   */
+  structured?: unknown;
+  /**
    * Agent 工具专用的进程内元数据。bridge/main 消费它来推流和单独写 transcript，
    * 不应展开写入主 session.jsonl。
    */
@@ -81,7 +87,7 @@ export interface ToolParameterProperty {
   type: string;
   description: string;
   enum?: string[];
-  items?: { type: string };
+  items?: { type: string; enum?: string[] };
 }
 
 export interface ToolParameterSchema {

@@ -21,7 +21,20 @@ export const bashDefinition: ToolDefinitionSpec = {
     "so do NOT poll with sleep loops or repeated bash_output calls. " +
     "For dev servers and watchers that never exit, set blockMs to 0 to background immediately and use notifyOnOutput to subscribe to key log events " +
     "(e.g. pattern 'ready|error' for a dev server); you will be notified when a line matches, so never poll with sleep loops. " +
-    "Never append '&' to commands.",
+    "Never append '&' to commands. " +
+    "Sandbox: by default commands run inside a sandbox that restricts writes to the workspace and temp directories " +
+    "and denies reads of sensitive paths (~/.ssh, ~/.aws, etc.); network is currently unrestricted. " +
+    "Use $TMPDIR for temp files instead of hardcoding /tmp. " +
+    "Irreversible operations always require user approval even in the sandbox: rm/rmdir, find -delete, dd/shred/truncate, " +
+    "git reset --hard, git clean, git restore, git checkout with pathspec, git stash drop/clear, git push --force. " +
+    "When running one of these, explain why in `intent`. Prefer non-destructive alternatives when possible " +
+    "(e.g. move files aside instead of rm, git stash instead of git reset --hard). " +
+    "If a command fails ONLY because of sandbox restrictions — evidence in the output such as 'Operation not permitted', EPERM, " +
+    "'Read-only file system', or an explicit [sandbox] annotation — you may retry once with requiredPermissions: [\"no_sandbox\"], " +
+    "which asks the user for approval to run in the real environment. " +
+    "Most failures (wrong path, missing dependency, compile error) are NOT sandbox-related: never escalate without evidence, " +
+    "and evaluate each command independently instead of carrying requiredPermissions over by habit. " +
+    "Beware that a failed sandboxed run may have already applied partial side effects inside the workspace before hitting the restriction.",
   parameters: {
     type: "object",
     properties: {
@@ -53,6 +66,15 @@ export const bashDefinition: ToolDefinitionSpec = {
           "`reason` is a short phrase (5 words or less) shown to the user describing what you are waiting for. " +
           "`debounceMs` throttles notifications (minimum and default 5000). " +
           "Ignored if the command finishes in the foreground.",
+      },
+      requiredPermissions: {
+        type: "array",
+        items: { type: "string", enum: ["no_sandbox"] },
+        description:
+          "Escalation request: run in the real environment instead of the sandbox. " +
+          "Always triggers user approval. Only use after a sandboxed run failed with clear sandbox evidence " +
+          "(EPERM / 'Operation not permitted' / [sandbox] annotation), and put the evidence in `intent` " +
+          "so the user can see why escalation is needed.",
       },
     },
     required: ["command"],

@@ -1,11 +1,46 @@
+/**
+ * bash 权限层编排
+ *
+ * 规则内容（哪些命令拒/问/放）集中在 ./command-rules.ts；本文件只做决策编排。
+ *
+ * 决策顺序（docs/design-docs/agent-bash工具设计文档.md「权限层与沙盒的关系」）：
+ *
+ * ```txt
+ * 归一化（command / cwd 边界 / blockMs）
+ *   → ① hard reject（deny：任何环境、任何审批都不跑）
+ *   → ② requiredPermissions 升级请求（强制 ask，无视一切放宽）
+ *   → ③ 不可逆操作（ask：沙盒放宽不豁免，逐条评估）
+ *   → ④ ALWAYS_ASK 调试开关（ask）
+ *   → ⑤ allowlist 命中（allow）
+ *   → ⑥ 沙盒可用放宽（allow：沙盒兜底爆炸半径）
+ *   → ⑦ 兜底 ask
+ * ```
+ */
+
 import type { PermissionResult } from "../../../internal-tools";
 import { guardWorkspacePath } from "../../workspace-guard";
 import { env } from "../../../env";
+import { probeSandbox } from "./sandbox";
+import {
+  getCommandHardRejectReason,
+  getSegmentHardRejectReason,
+  getIrreversibleAskReason,
+  isAllowedDevelopmentCommand,
+  getFirstToken,
+} from "./command-rules";
 
 /** blockMs：前台最长等待（到点转后台，不杀进程）。0 = 立即后台。 */
 export const DEFAULT_BASH_BLOCK_MS = 30_000;
 export const MIN_BASH_BLOCK_MS = 1_000;
 export const MAX_BASH_BLOCK_MS = 600_000;
+
+/** requiredPermissions 目前只支持真实环境升级；full_network 随网络代理阶段引入。 */
+export const SUPPORTED_REQUIRED_PERMISSIONS = ["no_sandbox"] as const;
+
+export interface BashPermissionOptions {
+  /** 沙盒可用时权限层放宽：非 allowlist 命令直接沙盒内自动运行。 */
+  sandboxAvailable?: boolean;
+}
 
 interface NormalizedBashArgs {
   command: string;
@@ -13,36 +48,43 @@ interface NormalizedBashArgs {
   blockMs: number;
 }
 
-const CONTROL_CHARS_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
-const UNICODE_WHITESPACE_RE = /[\u00A0\u1680\u180E\u2000-\u200B\u2028\u2029\u202F\u205F\u3000\uFEFF]/;
 const SIMPLE_SEGMENT_SPLIT_RE = /\s*(?:&&|;)\s*/;
-const UNSUPPORTED_SHELL_SYNTAX_RE = /[|<>`$(){}]/;
-const EVAL_LIKE_COMMANDS = new Set(["eval", "source", ".", "exec", "builtin", "fc", "trap"]);
-const DELETE_COMMANDS = new Set(["rm", "rmdir"]);
 
 export function createBashPermissionChecker(workspaceRoot: string) {
   return async (args: Record<string, unknown>): Promise<PermissionResult> => {
-    return bashCheckPermissions(args, workspaceRoot);
+    return bashCheckPermissions(args, workspaceRoot, { sandboxAvailable: await probeSandbox() });
   };
+}
+
+/** 解析 requiredPermissions；非法时返回错误消息字符串。 */
+function parseRequiredPermissions(value: unknown): string[] | string {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+    return "requiredPermissions must be an array of strings";
+  }
+  const unknown = value.filter(
+    (item) => !(SUPPORTED_REQUIRED_PERMISSIONS as readonly string[]).includes(item),
+  );
+  if (unknown.length > 0) {
+    return `Unknown requiredPermissions: ${unknown.join(", ")} (supported: ${SUPPORTED_REQUIRED_PERMISSIONS.join(", ")})`;
+  }
+  return value;
 }
 
 export async function bashCheckPermissions(
   args: Record<string, unknown>,
   workspaceRoot: string,
+  options: BashPermissionOptions = {},
 ): Promise<PermissionResult> {
   const normalized = normalizeArgs(args, workspaceRoot);
   if (isPermissionResult(normalized)) {
     return normalized;
   }
 
-  const hardReject = getHardRejectReason(normalized.command);
+  // ① hard reject：整条命令级 + 段级
+  const hardReject = getCommandHardRejectReason(normalized.command);
   if (hardReject) {
-    return {
-      decision: "deny",
-      reason: hardReject,
-      summary: summarizeCommand(normalized.command),
-      riskLevel: "high",
-    };
+    return deny(hardReject, normalized.command);
   }
 
   const segments = splitCommandSegments(normalized.command);
@@ -51,30 +93,98 @@ export async function bashCheckPermissions(
   }
 
   for (const segment of segments) {
-    const segmentReject = getSegmentRejectReason(segment);
+    const segmentReject = getSegmentHardRejectReason(segment);
     if (segmentReject) {
+      return deny(segmentReject, normalized.command);
+    }
+  }
+
+  const requiredPermissions = parseRequiredPermissions(args.requiredPermissions);
+  if (typeof requiredPermissions === "string") {
+    return deny(requiredPermissions, normalized.command);
+  }
+
+  // intent / notifyOnOutput / requiredPermissions 是透传字段，不参与归一化：
+  // intent 供展示，notifyOnOutput 结构校验在 executor 层做，
+  // requiredPermissions 让 executor 知道「已获批真实环境」
+  const sanitizedArgs = {
+    ...normalized,
+    ...(typeof args.intent === "string" && args.intent.trim() ? { intent: args.intent.trim() } : {}),
+    ...(args.notifyOnOutput !== undefined ? { notifyOnOutput: args.notifyOnOutput } : {}),
+    ...(requiredPermissions.length > 0 ? { requiredPermissions } : {}),
+  };
+
+  // ② 沙盒升级请求：无条件 ask（无视 allowlist 与沙盒放宽）。
+  // 逐条评估（allowSimilar: false）：不因上一条豁免过就默认下一条也豁免。
+  if (requiredPermissions.includes("no_sandbox")) {
+    return {
+      decision: "ask",
+      reason:
+        "Command requests escalation to the real environment (no sandbox). " +
+        "The user's previous approvals were given with the sandbox as a backstop; " +
+        "running unsandboxed requires fresh approval.",
+      summary: summarizeCommand(normalized.command),
+      riskLevel: "high",
+      allowSimilar: false,
+      sanitizedArgs,
+    };
+  }
+
+  // ③ 不可逆操作：沙盒管不住 workspace 内部（本来就是可写区），删除 /
+  // 丢弃改动没有回滚路径，所以沙盒放宽不豁免这一级，永远问人
+  for (const segment of segments) {
+    const irreversible = getIrreversibleAskReason(segment);
+    if (irreversible) {
       return {
-        decision: "deny",
-        reason: segmentReject,
+        decision: "ask",
+        reason: `Irreversible operation (not exempted by the sandbox): ${irreversible}`,
         summary: summarizeCommand(normalized.command),
         riskLevel: "high",
+        allowSimilar: false,
+        sanitizedArgs,
       };
     }
   }
 
-  const policy = classifyCommand(segments);
+  // ④ 调试开关：全部进审
+  if (env.ACTSPACE_BASH_ALWAYS_ASK) {
+    return {
+      decision: "ask",
+      reason: `Bash always-ask mode is enabled (ACTSPACE_BASH_ALWAYS_ASK=1)`,
+      summary: summarizeCommand(normalized.command),
+      riskLevel: "low",
+      sanitizedArgs,
+    };
+  }
+
+  // ⑤ allowlist 命中：任何环境免审
+  if (segments.every(isAllowedDevelopmentCommand)) {
+    return {
+      decision: "allow",
+      summary: summarizeCommand(normalized.command),
+      riskLevel: "low",
+      sanitizedArgs,
+    };
+  }
+
+  // ⑥ 沙盒优先：沙盒可用时非 allowlist 命令不再打扰用户，沙盒兜底爆炸半径
+  if (options.sandboxAvailable === true) {
+    return {
+      decision: "allow",
+      reason: "Running inside the sandbox (writes restricted to workspace and temp directories)",
+      summary: summarizeCommand(normalized.command),
+      riskLevel: "low",
+      sanitizedArgs,
+    };
+  }
+
+  // ⑦ 兜底：无沙盒环境的非 allowlist 命令进审
   return {
-    decision: policy.decision,
-    reason: policy.reason,
+    decision: "ask",
+    reason: `Command is not in the Bash allowlist: ${segments.join(" && ")}`,
     summary: summarizeCommand(normalized.command),
-    riskLevel: policy.riskLevel,
-    // intent / notifyOnOutput 是透传字段，不参与归一化：intent 供展示，
-    // notifyOnOutput 的结构校验在 executor 层做
-    sanitizedArgs: {
-      ...normalized,
-      ...(typeof args.intent === "string" && args.intent.trim() ? { intent: args.intent.trim() } : {}),
-      ...(args.notifyOnOutput !== undefined ? { notifyOnOutput: args.notifyOnOutput } : {}),
-    },
+    riskLevel: "medium",
+    sanitizedArgs,
   };
 }
 
@@ -94,12 +204,7 @@ function normalizeArgs(
   const cwdArg = typeof args.cwd === "string" && args.cwd.trim() ? args.cwd : workspaceRoot;
   const cwdGuard = guardWorkspacePath(cwdArg, workspaceRoot);
   if (!cwdGuard.ok) {
-    return {
-      decision: "deny",
-      reason: cwdGuard.error ?? "cwd escapes workspace boundary",
-      summary: summarizeCommand(command),
-      riskLevel: "high",
-    };
+    return deny(cwdGuard.error ?? "cwd escapes workspace boundary", command);
   }
 
   return {
@@ -119,113 +224,11 @@ function sanitizeBlockMs(value: unknown): number {
   return Math.min(MAX_BASH_BLOCK_MS, Math.max(MIN_BASH_BLOCK_MS, Math.trunc(value)));
 }
 
-function getHardRejectReason(command: string): string | undefined {
-  if (CONTROL_CHARS_RE.test(command)) {
-    return "Command contains control characters";
-  }
-
-  if (UNICODE_WHITESPACE_RE.test(command)) {
-    return "Command contains unsupported Unicode whitespace";
-  }
-
-  if (UNSUPPORTED_SHELL_SYNTAX_RE.test(command)) {
-    return "Command uses unsupported shell syntax and cannot be safely classified";
-  }
-
-  return undefined;
-}
-
 function splitCommandSegments(command: string): string[] {
   return command
     .split(SIMPLE_SEGMENT_SPLIT_RE)
     .map((part) => part.trim())
     .filter(Boolean);
-}
-
-function getSegmentRejectReason(segment: string): string | undefined {
-  const first = getFirstToken(segment);
-  if (!first) {
-    return "Command segment is empty";
-  }
-
-  if (EVAL_LIKE_COMMANDS.has(first)) {
-    return `Command uses blocked shell builtin: ${first}`;
-  }
-
-  if (DELETE_COMMANDS.has(first) && isDangerousDelete(segment)) {
-    return "Command contains dangerous delete operation";
-  }
-
-  return undefined;
-}
-
-function getFirstToken(segment: string): string {
-  return segment.trim().split(/\s+/)[0] ?? "";
-}
-
-function isDangerousDelete(segment: string): boolean {
-  const tokens = segment.split(/\s+/).slice(1);
-  if (!tokens.length) return true;
-
-  return tokens.some((token) => {
-    if (token.startsWith("-")) return token.includes("r") || token.includes("f");
-    if (token.includes("*")) return true;
-    return isCriticalPath(token);
-  });
-}
-
-function isCriticalPath(token: string): boolean {
-  const cleaned = token.replace(/^['"]|['"]$/g, "");
-  return cleaned === "/" ||
-    cleaned === "~" ||
-    cleaned === "$HOME" ||
-    cleaned === "/tmp" ||
-    cleaned === "/var" ||
-    cleaned === "/usr" ||
-    cleaned === "/bin" ||
-    cleaned === "/sbin" ||
-    cleaned === "/etc" ||
-    cleaned === "/Applications" ||
-    /^\/Users\/[^/]+$/.test(cleaned);
-}
-
-function classifyCommand(segments: string[]): {
-  decision: PermissionResult["decision"];
-  reason?: string;
-  riskLevel?: PermissionResult["riskLevel"];
-} {
-  if (env.ACTSPACE_BASH_ALWAYS_ASK) {
-    return {
-      decision: "ask",
-      reason: `Bash always-ask mode is enabled (ACTSPACE_BASH_ALWAYS_ASK=1)`,
-      riskLevel: "low",
-    };
-  }
-
-  const allAllowed = segments.every(isAllowedDevelopmentCommand);
-  if (allAllowed) {
-    return { decision: "allow", riskLevel: "low" };
-  }
-
-  return {
-    decision: "ask",
-    reason: `Command is not in the Bash allowlist: ${segments.join(" && ")}`,
-    riskLevel: "medium",
-  };
-}
-
-function isAllowedDevelopmentCommand(segment: string): boolean {
-  const normalized = segment.trim().replace(/\s+/g, " ");
-  if (normalized === "pwd") return true;
-  if (normalized === "ls" || normalized.startsWith("ls ")) return true;
-  if (normalized === "git status" || normalized.startsWith("git status ")) return true;
-  if (normalized === "git diff" || normalized.startsWith("git diff ")) return true;
-  if (normalized === "node --version" || normalized === "node -v") return true;
-  if (normalized === "pnpm --version" || normalized === "pnpm -v") return true;
-  if (normalized === "pnpm typecheck" || normalized.startsWith("pnpm typecheck ")) return true;
-  if (normalized === "pnpm test" || normalized.startsWith("pnpm test ")) return true;
-  if (normalized === "pnpm build" || normalized.startsWith("pnpm build ")) return true;
-  return false;
 }
 
 function deny(reason: string, command: string): PermissionResult {

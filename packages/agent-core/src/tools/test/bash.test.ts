@@ -67,6 +67,124 @@ describe("Bash tool permissions", () => {
     expect(result.sanitizedArgs).toMatchObject({ command: "pnpm install" });
   });
 
+  it("relaxes non-allowlist commands to allow when the sandbox is available", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashCheckPermissions({ command: "pnpm install" }, workspace, {
+      sandboxAvailable: true,
+    });
+
+    expect(result.decision).toBe("allow");
+    expect(result.reason).toContain("sandbox");
+  });
+
+  it("still hard-rejects dangerous commands even when the sandbox is available", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashCheckPermissions({ command: "rm -rf /" }, workspace, {
+      sandboxAvailable: true,
+    });
+
+    expect(result.decision).toBe("deny");
+  });
+
+  describe("irreversible operations ask even when sandboxed", () => {
+    const irreversibleCommands = [
+      "rm notes.txt",
+      "rmdir build",
+      "find . -name '*.log' -delete",
+      "dd if=/dev/zero of=disk.img",
+      "git reset --hard HEAD~1",
+      "git clean -fd",
+      "git restore src/index.ts",
+      "git checkout -- src",
+      "git checkout .",
+      "git checkout HEAD~1 src/index.ts",
+      "git stash drop",
+      "git push --force origin main",
+      "git push -f",
+      "git push --force-with-lease=main origin main",
+    ];
+
+    for (const command of irreversibleCommands) {
+      it(`asks for: ${command}`, async () => {
+        const workspace = await createWorkspace();
+        const result = await bashCheckPermissions({ command }, workspace, {
+          sandboxAvailable: true,
+        });
+
+        expect(result.decision).toBe("ask");
+        expect(result.riskLevel).toBe("high");
+        expect(result.allowSimilar).toBe(false);
+        expect(result.reason).toContain("Irreversible");
+      });
+    }
+
+    const safeSiblings = [
+      "git checkout main",
+      "git checkout -b feature/new-thing",
+      "git reset HEAD~1",
+      "git clean -n",
+      "git stash",
+      "git push origin main",
+      "truncate-logs",
+    ];
+
+    for (const command of safeSiblings) {
+      it(`does not treat as irreversible: ${command}`, async () => {
+        const workspace = await createWorkspace();
+        const result = await bashCheckPermissions({ command }, workspace, {
+          sandboxAvailable: true,
+        });
+
+        expect(result.decision).toBe("allow");
+      });
+    }
+
+    it("asks when an irreversible segment hides inside a chained command", async () => {
+      const workspace = await createWorkspace();
+      const result = await bashCheckPermissions({ command: "ls && rm notes.txt" }, workspace, {
+        sandboxAvailable: true,
+      });
+
+      expect(result.decision).toBe("ask");
+      expect(result.reason).toContain("Irreversible");
+    });
+  });
+
+  it("hard-rejects deleting or moving the .git directory itself", async () => {
+    const workspace = await createWorkspace();
+    for (const command of ["rmdir .git", "mv .git /tmp/backup", "mv packages/.git elsewhere"]) {
+      const result = await bashCheckPermissions({ command }, workspace, { sandboxAvailable: true });
+      expect(result.decision, command).toBe("deny");
+      expect(result.reason, command).toContain(".git");
+    }
+  });
+
+  it("forces ask when requiredPermissions requests no_sandbox, regardless of sandbox relaxation", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashCheckPermissions(
+      { command: "pwd", requiredPermissions: ["no_sandbox"] },
+      workspace,
+      { sandboxAvailable: true },
+    );
+
+    expect(result.decision).toBe("ask");
+    expect(result.riskLevel).toBe("high");
+    expect(result.allowSimilar).toBe(false);
+    expect(result.reason).toContain("real environment");
+    expect(result.sanitizedArgs).toMatchObject({ requiredPermissions: ["no_sandbox"] });
+  });
+
+  it("denies unknown requiredPermissions values", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashCheckPermissions(
+      { command: "pwd", requiredPermissions: ["root_access"] },
+      workspace,
+    );
+
+    expect(result.decision).toBe("deny");
+    expect(result.reason).toContain("root_access");
+  });
+
   it("ACTSPACE_BASH_ALWAYS_ASK forces ask even for allowlisted commands", async () => {
     const workspace = await createWorkspace();
     const original = process.env.ACTSPACE_BASH_ALWAYS_ASK;

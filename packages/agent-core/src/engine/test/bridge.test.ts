@@ -1194,6 +1194,49 @@ describe("runTurnWithAgent bridge", () => {
     });
   });
 
+  it("propagates the sandboxed flag from bash results into the UI preview", async () => {
+    const deps = createDeps();
+    deps.toolManager.register({
+      name: "bash",
+      description: "Run Bash",
+      parameters: {
+        type: "object",
+        properties: { command: { type: "string", description: "command" } },
+        required: ["command"],
+      },
+      isReadOnly: true,
+      previewKind: "bash",
+      handler: async (): Promise<ToolResult> => ({
+        success: true,
+        data: { command: "echo hi", output: "hi", exitCode: 0, sandboxed: true },
+      }),
+      renderResult: () => "$ echo hi\nenv: sandboxed\n\noutput:\nhi",
+    });
+    deps.llm.setResponses([
+      mockToolCall("bash", { command: "echo hi" }, { id: "tc-bash-sandboxed" }),
+      mockText("Done."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Say hi.",
+      },
+      deps,
+    );
+
+    const toolResult = result.events.find((event) => event.type === "tool_result");
+
+    expect(toolResult?.payload).toMatchObject({
+      toolName: "bash",
+      uiPreview: {
+        kind: "bash",
+        sandboxed: true,
+      },
+    });
+  });
+
   it("synthesizes a pseudo command for bash_output previews so the UI shows what ran", async () => {
     const deps = createDeps();
     deps.toolManager.register({

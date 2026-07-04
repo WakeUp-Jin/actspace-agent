@@ -64,6 +64,8 @@ export interface AppEnv {
   ACTSPACE_DISABLED_TOOLS: string[];
   /** 调试开关：所有 bash 命令都进入审核（仅绕过 allowlist，硬拒绝仍生效） */
   ACTSPACE_BASH_ALWAYS_ASK: boolean;
+  /** 逃生门：禁用 bash 沙盒执行（所有命令直接真实环境，权限层不放宽） */
+  ACTSPACE_BASH_NO_SANDBOX: boolean;
 
 }
 
@@ -210,6 +212,12 @@ const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
   },
   ACTSPACE_BASH_ALWAYS_ASK: {
     envKey: "ACTSPACE_BASH_ALWAYS_ASK",
+    required: false,
+    default: false,
+    parse: bool,
+  },
+  ACTSPACE_BASH_NO_SANDBOX: {
+    envKey: "ACTSPACE_BASH_NO_SANDBOX",
     required: false,
     default: false,
     parse: bool,

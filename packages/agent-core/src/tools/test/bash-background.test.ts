@@ -201,6 +201,8 @@ describe("bash_kill tool", () => {
     // 输出 'boot-ok'；命令文本只含 'boot-%s'，输出尾断言不会被命令回显假阳性满足
     const data = await backgroundTask("printf 'boot-%s' ok; sleep 30");
     await new Promise((resolve) => setTimeout(resolve, 300));
+    // 清掉前序用例被 afterEach harvest 杀掉后异步落队的遗留通知（跨用例隔离）
+    bashTaskRegistry.drainPendingNotifications("sess-bg-test");
 
     const result = await bashKillTool.handler({ taskId: data.taskId });
     expect(result.success).toBe(true);

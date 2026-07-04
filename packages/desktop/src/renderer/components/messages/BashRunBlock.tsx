@@ -87,6 +87,20 @@ const BACKGROUND_BADGE_TEXT: Record<NonNullable<BashMessage["backgroundStatus"]>
   stalled: "疑似等待输入",
 };
 
+// 沙盒标签：沙盒是默认态弱化显示；真实环境是例外态，醒目提示用户命令未受沙盒约束
+const BASH_SANDBOX_BADGE_CLASS =
+  "bash-sandbox-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-xs font-medium text-text-faint";
+const BASH_REAL_ENV_BADGE_CLASS =
+  "bash-real-env-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-warm-soft px-1.5 py-px text-xs font-medium text-on-warm";
+
+function SandboxBadge({ sandboxed }: { sandboxed: boolean | undefined }) {
+  if (sandboxed === undefined) return null;
+  if (sandboxed) {
+    return <span className={BASH_SANDBOX_BADGE_CLASS}>沙盒</span>;
+  }
+  return <span className={BASH_REAL_ENV_BADGE_CLASS}>真实环境</span>;
+}
+
 function BashExecutionBlock({ message }: { message: BashMessage }) {
   const [expanded, setExpanded] = useState(message.status === "failed");
   const chevron = expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />;
@@ -112,6 +126,7 @@ function BashExecutionBlock({ message }: { message: BashMessage }) {
           <span>{summary}</span>
         )}
         {message.commandPreview ? <span className={BASH_COMMAND_PREVIEW_CLASS}>{message.commandPreview}</span> : null}
+        <SandboxBadge sandboxed={message.sandboxed} />
         {message.backgroundStatus ? (
           <span className={BASH_BACKGROUND_BADGE_CLASS}>{BACKGROUND_BADGE_TEXT[message.backgroundStatus]}</span>
         ) : null}

@@ -15,6 +15,7 @@ export function renderBashResult(result: ToolResult): string {
     return [
       `$ ${data.command}`,
       `cwd: ${data.cwd}`,
+      `env: ${data.sandboxed ? "sandboxed" : "real"}`,
       `status: backgrounded (${data.reason})`,
       `taskId: ${data.taskId}`,
       ...(data.outputFilePath ? [`outputFile: ${data.outputFilePath}`] : []),
@@ -26,6 +27,7 @@ export function renderBashResult(result: ToolResult): string {
   const lines = [
     `$ ${data.command}`,
     `cwd: ${data.cwd}`,
+    `env: ${data.sandboxed ? "sandboxed" : "real"}`,
     `exitCode: ${data.exitCode}`,
     `durationMs: ${data.durationMs}`,
   ];
@@ -53,6 +55,11 @@ export function renderBashResult(result: ToolResult): string {
 
   if (!result.success && result.error) {
     lines.push("", `error: ${result.error}`);
+  }
+
+  // 沙盒违规归因：让模型分清「命令本身错了」和「被沙盒拦了」
+  if (data.sandboxViolationHint) {
+    lines.push("", data.sandboxViolationHint);
   }
 
   return lines.join("\n");

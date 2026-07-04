@@ -397,6 +397,8 @@ export type BashPreview = {
   backgroundStatus?: BashBackgroundStatus;
   /** 后台任务落盘输出路径。 */
   outputFilePath?: string;
+  /** 本次命令是否在沙盒内执行（true 沙盒 / false 真实环境 / 缺省未知——历史数据）。 */
+  sandboxed?: boolean;
 };
 
 export type ToolExecutionResult = {

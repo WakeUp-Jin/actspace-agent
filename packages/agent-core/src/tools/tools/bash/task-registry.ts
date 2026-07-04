@@ -32,6 +32,8 @@ export interface BashTask {
   notified: boolean;
   /** bash_output 增量读取记账（字符 offset）。 */
   lastReadOffset: number;
+  /** 本任务是否在沙盒内执行。 */
+  sandboxed?: boolean;
 }
 
 export type BashTaskEventStatus = BashTaskStatus | "output_match" | "stalled" | "stall_recovered";
@@ -137,6 +139,7 @@ export class BashTaskRegistry {
     outputFilePath?: string;
     monitor?: TaskOutputMonitor;
     subscriptionReason?: string;
+    sandboxed?: boolean;
   }): BashTask {
     const task: BashTask = {
       taskId: createTaskId(),
@@ -150,6 +153,7 @@ export class BashTaskRegistry {
       startedAt: Date.now(),
       notified: false,
       lastReadOffset: 0,
+      sandboxed: input.sandboxed,
     };
     this.tasks.set(task.taskId, { task, handle: input.handle, monitor: input.monitor });
 

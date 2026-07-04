@@ -2,9 +2,16 @@
 
 ## 当前状态
 
-状态：E1–E4 已实现（2026-07-03，见 `docs/exec-plans/active/20260703-bash-execution-model/`）；E5 沙盒未实现，待与 allowlist 设计 Phase 3 合并立项。
+状态：E1–E4 已实现（2026-07-03，见 `docs/exec-plans/active/20260703-bash-execution-model/`）；E5 沙盒第一期已实现（2026-07-04，见 `docs/exec-plans/active/20260704-bash-sandbox/`），随后落地了文本层规则分级（hard reject / 不可逆 ask / allowlist，见「文本层规则分级表」）与 `.git` 延迟执行点定向禁写。
 
-实现与本文的已知偏差：前端首期复用 bash 块扩展后台徽标（未做独立任务卡片与输出流式滚动）；后台任务终态不回写持久化事件（重启后历史块停在 backgrounded）。均记录于 `docs/exec-plans/tech-debt-tracker.md`。
+E5 第一期与本文的裁剪偏差（后续阶段收敛）：
+
+- **网络域名过滤代理未做**：profile 内 `(allow network*)` 放行网络，沙盒本期只收文件系统（写只放行 workspace / 会话 tmp / 系统临时区，敏感路径禁读）。代理是自研路线最大增量，单独立项。
+- **`requiredPermissions` 只支持 `"no_sandbox"`**：`"full_network"` 在网络放行的第一期没有语义，随代理阶段引入。
+- **违规标注只做输出模式匹配**（`Operation not permitted` / EPERM 等）；`log stream` 精确归因监听记 tech debt。
+- Linux bwrap 未做：非 darwin 探测不通过即真实环境执行 + 权限层不放宽。
+
+E1–E4 的已知偏差：前端首期复用 bash 块扩展后台徽标（未做独立任务卡片与输出流式滚动）；后台任务终态不回写持久化事件（重启后历史块停在 backgrounded）。均记录于 `docs/exec-plans/tech-debt-tracker.md`。
 
 本文是 Actspace Bash 工具的**设计事实来源**，覆盖工具契约、输出管道、后台运行与通知机制、沙盒执行模型和前端展示契约。
 
@@ -19,7 +26,9 @@
 ```txt
 命令进入
   │
-  ├─ ① hard reject（控制字符 / 危险删除 / eval 类 → 直接拒绝，任何环境都不跑）
+  ├─ ① hard reject（控制字符 / 危险删除 / eval 类 / 动 .git 本体 → 直接拒绝，任何环境都不跑）
+  │
+  ├─ ①' 不可逆 ask（rm / git reset --hard 等 → 沙盒放宽不豁免，永远问人）
   │
   ├─ ② 沙盒执行（默认路径：跳过 ask 审批，自动运行）
   │      │
@@ -219,9 +228,13 @@ interface BashTask {
 沙盒不是审批的附属品，而是**默认执行路径**：
 
 ```txt
-① hard reject：控制字符、危险删除（rm -rf 关键路径）、eval 类 → 直接拒绝。
+① hard reject：控制字符、危险删除（rm -rf 关键路径）、eval 类、
+   删除/移动 .git 本体 → 直接拒绝。
    保留原因：沙盒管不住 workspace 内部（workspace 本来就是可写区，
    rm -rf ./src 在沙盒里畅通无阻），文本层的极端危险拦截不可少。
+   ↓ 通过
+②' 不可逆操作：rm、git reset --hard 等 → 强制 ask（沙盒放宽不豁免）。
+   见下方「文本层规则分级表」。
    ↓ 通过
 ② 沙盒执行：跳过 ask 审批，自动运行。
    沙盒的收益一半是安全，另一半是体验——大部分命令不再打扰用户。
@@ -244,7 +257,27 @@ interface BashTask {
 
 沙盒落地后权限层可以放宽（沙盒内基本自动跑），最终形态是三层叠加：hard reject（文本层拦极端危险）→ allowlist / 审批（决定要不要问人，主要作用于升级请求和无沙盒平台）→ 沙盒（运行时兜底爆炸半径）。
 
-沙盒管不了的，要靠其它层兜住：workspace 内的破坏（hard reject + git 可回滚）、白名单域名内的滥用（域名白名单尽量窄）、Windows（暂只靠权限层）。
+沙盒管不了的，要靠其它层兜住：workspace 内的破坏（hard reject + 不可逆 ask + git 可回滚）、白名单域名内的滥用（域名白名单尽量窄）、Windows（暂只靠权限层）。
+
+### 文本层规则分级表
+
+规则内容集中在 `command-rules.ts`（单一事实源），`permissions.ts` 只做决策编排。分级的判据是两个问题：**有没有正当场景**、**出错有没有回滚路径**。
+
+| 级别 | 语义 | 判据 | 清单 |
+| --- | --- | --- | --- |
+| hard reject | deny，任何环境、任何审批都不跑 | 不存在正当场景 | 控制字符 / Unicode 空白、不支持的 shell 语法（`\| < > $() {}` 等）、eval 类 builtin、危险删除（`rm -rf` 关键路径 / 通配 / 递归强制）、删除或移动 `.git` 本体 |
+| 不可逆 ask | ask，**沙盒放宽不豁免**，逐条评估（`allowSimilar: false`） | 有正当场景（用户可能真的要丢弃改动），但出错无法回滚 | `rm` / `rmdir`、`find -delete`、`dd` / `shred` / `truncate`、`git reset --hard/--merge`、`git clean`（非 dry-run）、`git restore`、`git checkout` 丢弃形态（`--` / `.` / 多参数 pathspec）、`git stash drop/clear`、`git push --force[-with-lease]` |
+| allowlist | allow，任何环境免审 | 只读或幂等的高频开发命令 | `pwd`、`ls`、`git status/diff`、`node -v`、`pnpm typecheck/test/build` 等 |
+| 其余 | 沙盒可用 → allow；否则 ask | 沙盒兜底爆炸半径 | — |
+
+分级的关键取舍：
+
+- **不可逆类放 ask 而不是 deny**：`git reset --hard`、`git push --force` 有正当场景（用户明确要丢弃/强推），deny 会把这些任务堵死；它们与 rm 同属"有正当场景但不可逆"。deny 的准入标准是"永远不该发生"。
+- **写/编辑文件不进 ask**：git 提供了回滚路径（diff / revert），这也是 `write_file` 工具本身 allow 的原因；而 rm 与 `delete_file` 工具的永远 ask 对齐，否则 bash 成为绕过 `delete_file` 审批的后门。
+- **git 分支/commit 级操作（`branch -D`、rebase 等）不列**：reflog 可恢复，保持清单短。
+- **可信度前提**：不支持的 shell 语法在 hard reject 一级整体拒绝，变量展开 / 子 shell 不存在，因此 token 级文本匹配所见即所得，不会被 `rm $DIR` 绕过。
+
+**机制层补充（profile 定向禁写）**：workspace 根仓库的 `.git/hooks/**` 与 `.git/config` 是"延迟执行点"——沙盒内写进去的内容会在沙盒外以用户全权限执行（commit 触发 hook；`core.fsmonitor` 等配置项等价于 hook），是 workspace 可写区里的沙盒逃逸通道，由 profile 在写放行之后定向 deny（last-match-wins）。只保护根仓库：嵌套子仓库不拦，否则 `git clone` / 子目录 `git init`（都会写 hooks 模板）在沙盒内全部失败；根仓库自身的 `git init` / `git remote add` / `git push -u`（写 config）被拦时走违规标注 + 升级审批路径。
 
 ## 模型引导（工具描述要点）
 
@@ -252,7 +285,8 @@ interface BashTask {
 2. 禁止 sleep 轮询：后台事件会主动通知，不要 `sleep N && check` 或反复 `bash_output`；确需节流保持 sleep < 2s。
 3. 大输出：不要用 `| head` / `| tail` 截断重跑（全量已落盘），用 `read_file` offset/limit 或 `grep` 检索落盘文件。
 4. 沙盒：默认沙盒执行；只有看到沙盒拦截证据才申请 `requiredPermissions`，逐条评估；临时文件用 `$TMPDIR` 不要硬编码 `/tmp`。
-5. 沿用现状：读/搜/改文件用专用工具；引号包裹含空格路径；`cwd` 参数替代 `cd`。
+5. 不可逆操作（rm、git reset --hard 等）沙盒内也会进审批：在 `intent` 里说明原因，优先用非破坏性替代（挪走文件而不是 rm、git stash 而不是 reset --hard）。
+6. 沿用现状：读/搜/改文件用专用工具；引号包裹含空格路径；`cwd` 参数替代 `cd`。
 
 ## 前端展示契约
 
