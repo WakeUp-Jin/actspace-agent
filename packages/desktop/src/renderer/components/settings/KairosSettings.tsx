@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import {
+  KAIROS_SOUL_PRESETS,
   type AppSettings,
+  type KairosBriefSummary,
+  type KairosBriefTrigger,
+  type KairosBriefPriority,
   type KairosBudgetRuntime,
   type KairosConfigName,
   type KairosModelId,
@@ -97,9 +101,6 @@ function asStr(v: unknown, fb: string): string {
 function asNum(v: unknown, fb: number): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fb;
 }
-function asBool(v: unknown, fb: boolean): boolean {
-  return typeof v === "boolean" ? v : fb;
-}
 function asArr(v: unknown): unknown[] {
   return Array.isArray(v) ? v : [];
 }
@@ -148,6 +149,7 @@ export function KairosSettings({
   const [pathsObj, setPathsObj] = useState<Parsed | null>(null);
   const [blocklistObj, setBlocklistObj] = useState<Parsed | null>(null);
   const [ruleText, setRuleText] = useState("");
+  const [soulText, setSoulText] = useState("");
   const [loading, setLoading] = useState(bridgeAvailable);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -167,17 +169,19 @@ export function KairosSettings({
     let cancelled = false;
     void (async () => {
       try {
-        const [p, pa, bl, ru] = await Promise.all([
+        const [p, pa, bl, ru, so] = await Promise.all([
           bridge.readConfig({ name: "preferences" }),
           bridge.readConfig({ name: "paths" }),
           bridge.readConfig({ name: "blocklist" }),
           bridge.readConfig({ name: "rule" }),
+          bridge.readConfig({ name: "soul" }),
         ]);
         if (cancelled) return;
         setPrefs(parseObj(p.content));
         setPathsObj(parseObj(pa.content));
         setBlocklistObj(parseObj(bl.content));
         setRuleText(ru.content);
+        setSoulText(so.content);
       } catch (err) {
         if (!cancelled) setLoadError(err instanceof Error ? err.message : "读取 Kairos 配置失败。");
       } finally {
@@ -306,6 +310,22 @@ export function KairosSettings({
     }
   }, []);
 
+  const writeSoul = useCallback(async (text: string) => {
+    const bridge = getKairosBridge();
+    if (!bridge) return;
+    setSoulText(text);
+    try {
+      await bridge.writeConfig({ name: "soul", content: text });
+    } catch {
+      try {
+        const res = await bridge.readConfig({ name: "soul" });
+        setSoulText(res.content);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
   const resetPreferences = useCallback(() => {
     const def = clone(PREFERENCES_DEFAULT);
     setPrefs({ obj: def, parseError: false });
@@ -388,12 +408,14 @@ export function KairosSettings({
         </SettingGroup>
       ) : null}
 
+      {formsReady ? <SoulForm value={soulText} onSave={(text) => void writeSoul(text)} /> : null}
+      {formsReady ? <RuleForm value={ruleText} onSave={(text) => void writeRule(text)} /> : null}
+      {formsReady ? <BriefsForm /> : null}
       {formsReady && prefs ? (
         <PreferencesForm prefs={prefs} patch={patchPrefs} onReset={resetPreferences} />
       ) : null}
       {formsReady && pathsObj ? <PathsForm paths={pathsObj} patch={patchPaths} /> : null}
       {formsReady && blocklistObj ? <BlocklistForm blocklist={blocklistObj} patch={patchBlocklist} /> : null}
-      {formsReady ? <RuleForm value={ruleText} onSave={(text) => void writeRule(text)} /> : null}
     </>
   );
 }
@@ -744,16 +766,16 @@ function PathsForm({ paths, patch }: { paths: Parsed; patch: PatchFn }) {
     setAutoEditIndex(list.length);
     patch((o) => {
       const a = asArr(o.paths);
-      a.push({ path: "", watch: false });
+      a.push({ path: "" });
       o.paths = a;
     });
   };
 
   return (
-    <SettingGroup title="可访问路径">
+    <SettingGroup title="可读写路径">
       <div className="flex flex-col gap-2 px-4 py-3.5">
         <p className="text-[12px] leading-relaxed text-text-faint">
-          Kairos 仅能读写这里声明的路径；「巡检」开启后每次唤醒前对该路径做变化检测。新增前请确认不会暴露敏感目录。
+          Kairos 可读写这里声明的路径（默认只有自己的 workspace）。文件监听（fs-watch）的目录会自动并入只读范围，无需在此重复添加。新增前请确认不会暴露敏感目录。
         </p>
         {list.length === 0 ? (
           <p className="py-1 text-[12px] text-text-subtle">暂未配置；Kairos 仅能访问内置默认 workspace。</p>
@@ -801,22 +823,6 @@ function PathsForm({ paths, patch }: { paths: Parsed; patch: PatchFn }) {
                         }
                       />
                     )}
-                    <span className="flex shrink-0 items-center gap-1.5 text-[12px] text-text-faint">
-                      巡检
-                      <Toggle
-                        checked={asBool(item.watch, false)}
-                        ariaLabel={`路径 ${i + 1} 巡检`}
-                        onChange={(next) =>
-                          patch((o) => {
-                            const a = asArr(o.paths);
-                            const it = asObj(a[i]);
-                            it.watch = next;
-                            a[i] = it;
-                            o.paths = a;
-                          })
-                        }
-                      />
-                    </span>
                     {isDefault ? (
                       <span className="w-8 shrink-0" aria-hidden="true" />
                     ) : (
@@ -958,6 +964,406 @@ function BlocklistForm({ blocklist, patch }: { blocklist: Parsed; patch: PatchFn
         }
       />
     </SettingGroup>
+  );
+}
+
+// ─── 人格（soul.md：预设下拉 + 文本框）───
+
+const SOUL_MAX_CHARS = 3_000;
+const SOUL_CUSTOM_VALUE = "__custom__";
+
+const SOUL_PRESET_OPTIONS: SelectOption[] = [
+  ...KAIROS_SOUL_PRESETS.map((p) => ({ value: p.id, label: p.label })),
+  { value: SOUL_CUSTOM_VALUE, label: "自定义" },
+];
+
+/**
+ * 通过「当前 soul 内容与哪个 preset 逐字节相等（trim 后）」反推下拉选中态。
+ * 空内容视为「默认」——loader 会 fallback 到 KAIROS_DEFAULT_SOUL（= default preset）。
+ */
+function matchSoulPreset(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return KAIROS_SOUL_PRESETS[0].id;
+  const hit = KAIROS_SOUL_PRESETS.find((p) => p.content.trim() === trimmed);
+  return hit ? hit.id : SOUL_CUSTOM_VALUE;
+}
+
+function SoulForm({ value, onSave }: { value: string; onSave: (text: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  const focused = useRef(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  useEffect(() => {
+    if (!focused.current) setDraft(value);
+  }, [value]);
+
+  const flash = () => {
+    setSavedFlash(true);
+    window.setTimeout(() => setSavedFlash(false), 1800);
+  };
+
+  const commit = () => {
+    focused.current = false;
+    if (draft !== value) {
+      onSave(draft);
+      flash();
+    }
+  };
+
+  const selectedPreset = matchSoulPreset(draft);
+
+  const applyPreset = (presetId: string) => {
+    if (presetId === SOUL_CUSTOM_VALUE) return;         // 「自定义」只是展示态，不可主动选中生效
+    const preset = KAIROS_SOUL_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    // 覆盖用户自定义内容前确认；当前内容为空或等于某个预设时直接切换。
+    if (matchSoulPreset(draft) === SOUL_CUSTOM_VALUE) {
+      const ok = window.confirm("当前人格是自定义内容，切换预设会覆盖它。确定继续吗？");
+      if (!ok) return;
+    }
+    setDraft(preset.content);
+    onSave(preset.content);
+    flash();
+  };
+
+  return (
+    <SettingGroup title="人格">
+      <div className="flex flex-col gap-2 px-4 py-3.5">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-[12px] leading-relaxed text-text-faint">
+            Kairos 的身份与语气（soul.md，约 500 token 上限），作为人格插槽注入系统提示词开头；
+            例程、场景应对等机制规则由内置模板兜底，人格随便改都不影响行为骨架。留空 = 使用默认人格。
+          </p>
+          {savedFlash ? <span className="shrink-0 text-[12px] text-on-success">已保存</span> : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] text-text-faint">预设</span>
+          <SettingsSelect
+            value={selectedPreset}
+            options={SOUL_PRESET_OPTIONS}
+            onChange={applyPreset}
+            ariaLabel="Kairos 人格预设"
+          />
+        </div>
+        <textarea
+          value={draft}
+          maxLength={SOUL_MAX_CHARS}
+          aria-label="soul.md 内容"
+          placeholder={KAIROS_SOUL_PRESETS[0].content}
+          spellCheck={false}
+          onFocus={() => {
+            focused.current = true;
+          }}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          className="min-h-[140px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle focus:border-brand"
+        />
+      </div>
+    </SettingGroup>
+  );
+}
+
+// ─── 任务表（briefs/tasks/*.md 列表编辑）───
+
+const TRIGGER_OPTIONS: SelectOption[] = [
+  { value: "interval", label: "定时（间隔）" },
+  { value: "manual", label: "手动" },
+  { value: "event", label: "事件" },
+];
+
+const PRIORITY_OPTIONS: SelectOption[] = [
+  { value: "high", label: "高" },
+  { value: "normal", label: "普通" },
+  { value: "low", label: "低" },
+];
+
+interface BriefDraft {
+  id: string;
+  active: boolean;
+  trigger: KairosBriefTrigger;
+  intervalSec: number | null;
+  priority: KairosBriefPriority;
+  body: string;
+}
+
+function BriefsForm() {
+  const [briefs, setBriefs] = useState<KairosBriefSummary[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  /** 当前展开编辑的 brief id；`__new__` 表示新建表单。 */
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<BriefDraft | null>(null);
+
+  const refresh = useCallback(async () => {
+    const bridge = getKairosBridge();
+    if (!bridge) return;
+    try {
+      const res = await bridge.briefsList();
+      setBriefs(res.briefs);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "读取任务表失败。");
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const openEditor = async (summary: KairosBriefSummary) => {
+    const bridge = getKairosBridge();
+    if (!bridge) return;
+    try {
+      const res = await bridge.briefsRead({ id: summary.id });
+      setDraft({
+        id: summary.id,
+        active: res.summary.status === "active",
+        trigger: res.summary.trigger,
+        intervalSec: res.summary.intervalSec,
+        priority: res.summary.priority,
+        body: res.body,
+      });
+      setExpandedId(summary.id);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "读取任务失败。");
+    }
+  };
+
+  const openNew = () => {
+    setDraft({ id: "", active: true, trigger: "interval", intervalSec: 3600, priority: "normal", body: "" });
+    setExpandedId("__new__");
+  };
+
+  const closeEditor = () => {
+    setExpandedId(null);
+    setDraft(null);
+  };
+
+  const saveDraft = async () => {
+    const bridge = getKairosBridge();
+    if (!bridge || !draft) return;
+    try {
+      await bridge.briefsWrite({
+        id: draft.id.trim(),
+        status: draft.active ? "active" : "paused",
+        trigger: draft.trigger,
+        intervalSec: draft.trigger === "interval" ? draft.intervalSec : null,
+        priority: draft.priority,
+        body: draft.body,
+      });
+      closeEditor();
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "保存任务失败。");
+    }
+  };
+
+  const removeBrief = async (id: string) => {
+    const bridge = getKairosBridge();
+    if (!bridge) return;
+    const ok = window.confirm(`确定删除任务「${id}」吗？该操作会移除对应的 brief 文件。`);
+    if (!ok) return;
+    try {
+      await bridge.briefsDelete({ id });
+      if (expandedId === id) closeEditor();
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "删除任务失败。");
+    }
+  };
+
+  return (
+    <SettingGroup title="任务表">
+      <div className="flex flex-col gap-2 px-4 py-3.5">
+        <p className="text-[12px] leading-relaxed text-text-faint">
+          交给 Kairos 的例行任务（briefs/tasks/*.md）。定时任务到点会把正文投递进 Kairos 的下一次唤醒；
+          最近运行 / 下次运行时间由系统维护。
+        </p>
+        {error ? <p className="text-[12px] text-on-danger">{error}</p> : null}
+        {briefs.length === 0 && expandedId !== "__new__" ? (
+          <p className="py-1 text-[12px] text-text-subtle">暂无任务。</p>
+        ) : (
+          <div className="flex flex-col">
+            {briefs.map((b) => (
+              <div key={b.id} className="flex flex-col border-b border-line/60 py-1.5 last:border-b-0">
+                <div className="group flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label={`编辑任务 ${b.id}`}
+                    onClick={() => (expandedId === b.id ? closeEditor() : void openEditor(b))}
+                    className="flex min-w-0 flex-1 items-center gap-1.5 rounded-act-sm px-1.5 py-1 text-left transition-colors hover:bg-[var(--act-color-hover-overlay)]"
+                  >
+                    {expandedId === b.id ? (
+                      <ChevronDown size={14} strokeWidth={2} className="shrink-0 text-text-faint" aria-hidden="true" />
+                    ) : (
+                      <ChevronRight size={14} strokeWidth={2} className="shrink-0 text-text-faint" aria-hidden="true" />
+                    )}
+                    <span className="truncate font-mono text-[12px] text-text-main">{b.id}</span>
+                    <BriefStatusBadge status={b.status} />
+                    <span className="ml-auto shrink-0 text-[11px] tabular-nums text-text-faint">
+                      {b.trigger === "interval" && b.intervalSec ? `每 ${formatInterval(b.intervalSec)}` : triggerLabel(b.trigger)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`删除任务 ${b.id}`}
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-act-sm text-text-faint opacity-0 transition-opacity hover:text-on-danger focus-visible:opacity-100 group-hover:opacity-100"
+                    onClick={() => void removeBrief(b.id)}
+                  >
+                    <Trash2 size={15} strokeWidth={2} aria-hidden="true" />
+                  </button>
+                </div>
+                {expandedId === b.id && draft ? (
+                  <BriefEditor draft={draft} isNew={false} onChange={setDraft} onSave={() => void saveDraft()} onCancel={closeEditor} />
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+        {expandedId === "__new__" && draft ? (
+          <BriefEditor draft={draft} isNew onChange={setDraft} onSave={() => void saveDraft()} onCancel={closeEditor} />
+        ) : (
+          <button type="button" className={`${BTN_SECONDARY} self-start`} onClick={openNew}>
+            <Plus size={15} strokeWidth={2.2} className="mr-1" aria-hidden="true" />
+            新建任务
+          </button>
+        )}
+      </div>
+    </SettingGroup>
+  );
+}
+
+function triggerLabel(trigger: KairosBriefTrigger): string {
+  return TRIGGER_OPTIONS.find((o) => o.value === trigger)?.label ?? trigger;
+}
+
+function formatInterval(sec: number): string {
+  if (sec % 86_400 === 0) return `${sec / 86_400} 天`;
+  if (sec % 3_600 === 0) return `${sec / 3_600} 小时`;
+  if (sec % 60 === 0) return `${sec / 60} 分钟`;
+  return `${sec} 秒`;
+}
+
+function BriefStatusBadge({ status }: { status: KairosBriefSummary["status"] }) {
+  const map: Record<KairosBriefSummary["status"], { label: string; cls: string }> = {
+    active: { label: "启用", cls: "bg-brand-soft text-brand" },
+    paused: { label: "暂停", cls: "bg-surface-subtle text-text-faint" },
+    done: { label: "已完成", cls: "bg-surface-subtle text-text-faint" },
+    failed: { label: "失败", cls: "bg-surface-subtle text-on-danger" },
+  };
+  const it = map[status];
+  return (
+    <span className={`shrink-0 rounded-act-sm px-1.5 py-0.5 text-[11px] font-medium ${it.cls}`}>{it.label}</span>
+  );
+}
+
+function BriefEditor({
+  draft,
+  isNew,
+  onChange,
+  onSave,
+  onCancel,
+}: {
+  draft: BriefDraft;
+  isNew: boolean;
+  onChange: (next: BriefDraft) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  const idValid = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(draft.id.trim());
+  const intervalValid = draft.trigger !== "interval" || (draft.intervalSec != null && draft.intervalSec > 0);
+  const canSave = idValid && intervalValid;
+
+  return (
+    <div className="mt-1 flex flex-col gap-2.5 rounded-act-md border border-line bg-surface-subtle p-3">
+      {isNew ? (
+        <label className="flex items-center gap-2 text-[12px] text-text-faint">
+          <span className="w-14 shrink-0">任务 ID</span>
+          <input
+            value={draft.id}
+            aria-label="任务 ID"
+            placeholder="daily-report（字母/数字/-/_）"
+            spellCheck={false}
+            onChange={(e) => onChange({ ...draft, id: e.target.value })}
+            className="h-8 min-w-0 flex-1 rounded-act-md border border-line bg-surface px-2.5 font-mono text-[12px] text-text-main outline-none transition-colors focus:border-brand"
+          />
+        </label>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="flex items-center gap-2 text-[12px] text-text-faint">
+          <span>启用</span>
+          <Toggle
+            checked={draft.active}
+            ariaLabel="任务启用"
+            onChange={(next) => onChange({ ...draft, active: next })}
+          />
+        </label>
+        <label className="flex items-center gap-2 text-[12px] text-text-faint">
+          <span>触发</span>
+          <SettingsSelect
+            value={draft.trigger}
+            options={TRIGGER_OPTIONS}
+            ariaLabel="任务触发方式"
+            onChange={(v) => onChange({ ...draft, trigger: v as KairosBriefTrigger })}
+          />
+        </label>
+        {draft.trigger === "interval" ? (
+          <label className="flex items-center gap-2 text-[12px] text-text-faint">
+            <span>间隔</span>
+            <NumberField
+              value={draft.intervalSec ?? 3600}
+              placeholder="3600"
+              min={60}
+              step={60}
+              suffix="秒"
+              ariaLabel="任务间隔秒数"
+              onCommit={(n) =>
+                onChange({ ...draft, intervalSec: typeof n === "number" && n >= 1 ? Math.floor(n) : 3600 })
+              }
+            />
+          </label>
+        ) : null}
+        <label className="flex items-center gap-2 text-[12px] text-text-faint">
+          <span>优先级</span>
+          <SettingsSelect
+            value={draft.priority}
+            options={PRIORITY_OPTIONS}
+            ariaLabel="任务优先级"
+            onChange={(v) => onChange({ ...draft, priority: v as KairosBriefPriority })}
+          />
+        </label>
+      </div>
+      <textarea
+        value={draft.body}
+        aria-label="任务正文"
+        placeholder={"# 任务说明\n写清楚要 Kairos 做什么、产出放哪里。"}
+        spellCheck={false}
+        onChange={(e) => onChange({ ...draft, body: e.target.value })}
+        className="min-h-[120px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle focus:border-brand"
+      />
+      <div className="flex items-center justify-between gap-3">
+        {!idValid && draft.id.trim().length > 0 ? (
+          <span className="text-[11px] text-on-danger">ID 仅限字母/数字/-/_，最长 64。</span>
+        ) : !intervalValid ? (
+          <span className="text-[11px] text-on-danger">定时任务需要正数间隔秒数。</span>
+        ) : (
+          <span />
+        )}
+        <div className="flex items-center gap-2">
+          <button type="button" className={BTN_SECONDARY} onClick={onCancel}>
+            取消
+          </button>
+          <button
+            type="button"
+            className={BTN_SECONDARY}
+            disabled={!canSave}
+            onClick={onSave}
+          >
+            保存
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

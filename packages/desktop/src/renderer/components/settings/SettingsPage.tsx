@@ -17,6 +17,7 @@ import {
 } from "@actspace/shared";
 import { SettingsNav, type SettingsSectionId } from "./SettingsNav";
 import { KairosSettings } from "./KairosSettings";
+import { FileWatchSection } from "./FileWatchSettings";
 import { PluginsSection } from "./PluginsSettings";
 import { SkillsSection } from "./SkillsSettings";
 import { TOOL_ITEMS } from "./tool-catalog";
@@ -112,6 +113,15 @@ function mergeSettings(current: AppSettings, input: SettingsUpdateInput): AppSet
     defaultModelId: input.defaultModelId !== undefined ? input.defaultModelId : current.defaultModelId,
     agent: input.agent ? { ...current.agent, ...input.agent } : current.agent,
     kairos: input.kairos ? { ...current.kairos, ...input.kairos } : current.kairos,
+    plugins: input.plugins
+      ? {
+          ...current.plugins,
+          ...input.plugins,
+          fsWatch: input.plugins.fsWatch
+            ? { ...current.plugins.fsWatch, ...input.plugins.fsWatch }
+            : current.plugins.fsWatch,
+        }
+      : current.plugins,
     skills: input.skills ? { ...current.skills, ...input.skills } : current.skills,
   };
 }
@@ -277,10 +287,14 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
       return <ModelSection {...rest} />;
     case "agent":
       return <AgentSection {...rest} />;
+    case "kairos":
+      return <KairosSection {...rest} />;
     case "tools":
       return <ToolsSection {...rest} />;
     case "plugins":
-      return <PluginsSection />;
+      return <PluginsSection settings={rest.settings} onUpdate={rest.onUpdate} />;
+    case "fileWatch":
+      return <FileWatchSection />;
     case "skills":
       return <SkillsSection settings={rest.settings} onUpdate={rest.onUpdate} />;
     case "appearance":
@@ -888,7 +902,16 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
           }
         />
       </SettingGroup>
+    </SectionShell>
+  );
+}
 
+function KairosSection({ settings, onUpdate }: SectionProps) {
+  return (
+    <SectionShell
+      title="Kairos"
+      description="自主智能体的模型、人格、规则、任务表与运行边界（2026-07-04 由「智能体」分区拆出）。"
+    >
       <KairosSettings settings={settings} onUpdate={onUpdate} />
     </SectionShell>
   );

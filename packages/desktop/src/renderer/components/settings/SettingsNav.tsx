@@ -1,12 +1,14 @@
 import type { ComponentType } from "react";
-import { Archive, ArrowLeft, Boxes, Library, Plug, RefreshCw, Settings, Sparkles, Sun, Wrench } from "lucide-react";
+import { Archive, ArrowLeft, Boxes, FolderSearch, Hourglass, Library, Plug, RefreshCw, Settings, Sparkles, Sun, Wrench } from "lucide-react";
 
 export type SettingsSectionId =
   | "general"
   | "model"
   | "agent"
+  | "kairos"
   | "tools"
   | "plugins"
+  | "fileWatch"
   | "skills"
   | "appearance"
   | "archivedChats"
@@ -18,8 +20,10 @@ export const SETTINGS_SECTIONS: { id: SettingsSectionId; label: string; icon: Ic
   { id: "general", label: "通用", icon: Settings },
   { id: "model", label: "模型", icon: Boxes },
   { id: "agent", label: "智能体", icon: Sparkles },
+  { id: "kairos", label: "Kairos", icon: Hourglass },
   { id: "tools", label: "工具", icon: Wrench },
   { id: "plugins", label: "插件", icon: Plug },
+  { id: "fileWatch", label: "文件监听", icon: FolderSearch },
   { id: "skills", label: "Skills", icon: Library },
   { id: "appearance", label: "外观", icon: Sun },
   { id: "archivedChats", label: "归档会话", icon: Archive },

@@ -28,12 +28,25 @@ import type {
   SkillListResult,
   SkillUninstallInput,
   SkillUninstallResult,
+  KairosBriefDeleteRequest,
+  KairosBriefDeleteResponse,
+  KairosBriefReadRequest,
+  KairosBriefReadResponse,
+  KairosBriefWriteRequest,
+  KairosBriefWriteResponse,
+  KairosBriefsListResponse,
   KairosBridgeApi,
   KairosContextSnapshot,
   KairosControl,
   KairosControlResponse,
   KairosGetEventsRecentRequest,
   KairosGetEventsRecentResponse,
+  KairosNotification,
+  KairosNotificationsListResponse,
+  KairosNotificationsMarkReadRequest,
+  KairosNotificationsMarkReadResponse,
+  KairosNotificationsRemoveRequest,
+  KairosNotificationsRemoveResponse,
   KairosReadConfigRequest,
   KairosReadConfigResponse,
   KairosRuntimeState,
@@ -153,6 +166,10 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("plugins:fs-watch:get-status") as Promise<FsWatchStatus>,
   installFsWatchPlugin: () =>
     ipcRenderer.invoke("plugins:fs-watch:install") as Promise<FsWatchInstallResult>,
+  installFsWatchFromRepo: () =>
+    ipcRenderer.invoke("plugins:fs-watch:install-from-repo") as Promise<FsWatchInstallResult>,
+  pickPluginsRepoRoot: () =>
+    ipcRenderer.invoke("plugins:pick-repo-root") as Promise<FsWatchPickRootResult>,
   setFsWatchEnabled: (input: FsWatchSetEnabledInput) =>
     ipcRenderer.invoke("plugins:fs-watch:set-enabled", input) as Promise<FsWatchActionResult>,
   retryFsWatch: () =>
@@ -213,6 +230,20 @@ const kairosBridge: KairosBridgeApi = {
     ipcRenderer.invoke("kairos:write-config", req) as Promise<KairosWriteConfigResponse>,
   getContextSnapshot: () =>
     ipcRenderer.invoke("kairos:get-context-snapshot") as Promise<KairosContextSnapshot>,
+  briefsList: () =>
+    ipcRenderer.invoke("kairos:briefs-list") as Promise<KairosBriefsListResponse>,
+  briefsRead: (req: KairosBriefReadRequest) =>
+    ipcRenderer.invoke("kairos:briefs-read", req) as Promise<KairosBriefReadResponse>,
+  briefsWrite: (req: KairosBriefWriteRequest) =>
+    ipcRenderer.invoke("kairos:briefs-write", req) as Promise<KairosBriefWriteResponse>,
+  briefsDelete: (req: KairosBriefDeleteRequest) =>
+    ipcRenderer.invoke("kairos:briefs-delete", req) as Promise<KairosBriefDeleteResponse>,
+  notificationsList: () =>
+    ipcRenderer.invoke("kairos:notifications-list") as Promise<KairosNotificationsListResponse>,
+  notificationsMarkRead: (req: KairosNotificationsMarkReadRequest) =>
+    ipcRenderer.invoke("kairos:notifications-mark-read", req) as Promise<KairosNotificationsMarkReadResponse>,
+  notificationsRemove: (req: KairosNotificationsRemoveRequest) =>
+    ipcRenderer.invoke("kairos:notifications-remove", req) as Promise<KairosNotificationsRemoveResponse>,
   onEvent: (listener: (event: SessionEvent) => void) => {
     const handler = (_: unknown, event: SessionEvent) => listener(event);
     ipcRenderer.on("kairos:event", handler);
@@ -225,6 +256,13 @@ const kairosBridge: KairosBridgeApi = {
     ipcRenderer.on("kairos:state", handler);
     return () => {
       ipcRenderer.removeListener("kairos:state", handler);
+    };
+  },
+  onNotification: (listener: (notification: KairosNotification) => void) => {
+    const handler = (_: unknown, notification: KairosNotification) => listener(notification);
+    ipcRenderer.on("kairos:notification", handler);
+    return () => {
+      ipcRenderer.removeListener("kairos:notification", handler);
     };
   },
 };

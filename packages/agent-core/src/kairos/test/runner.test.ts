@@ -14,7 +14,6 @@ import { registerKairosTools } from "../tools";
 import type { KairosConfig } from "../config/loader";
 import type { SessionEvent } from "@actspace/shared";
 import type { KairosShortTermMemoryContext, KairosShortTermLoadResult } from "../context/short-term";
-import type { WatchDiffEntry } from "../context/watch-diff";
 import type { SessionsDigestResult } from "../context/sessions-digest";
 import type { TickPayload } from "../briefs/dispatcher";
 import type { BriefsIndexManager } from "../briefs/index-manager";
@@ -33,6 +32,7 @@ function baseConfig(): KairosConfig {
     paths: { ...DEFAULT_PATHS_CONFIG, paths: [] },
     blocklist: { ...DEFAULT_BLOCKLIST, toolsDenied: [] },
     ruleMd: "be concise",
+    soulMd: "",
     warnings: [],
   };
 }
@@ -95,8 +95,8 @@ describe("KairosRunner.processTick", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [] as WatchDiffEntry[], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       eventSink: async (e) => {
         events.push(e);
       },
@@ -129,8 +129,8 @@ describe("KairosRunner.processTick", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       eventSink: async () => {},
       llm,
       toolManager,
@@ -151,8 +151,8 @@ describe("KairosRunner.processTick", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       eventSink: async () => {},
       llm,
       toolManager,
@@ -189,8 +189,8 @@ describe("KairosRunner.processTick", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       loadInboxSummary: async () => sampleInboxSummary(),
       eventSink: async () => {},
       llm,
@@ -214,13 +214,12 @@ describe("KairosRunner.processTick", () => {
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
       observeRefresh: async () => ({
-        watchDiffs: [],
         sessionsDigest: emptyDigest,
         commit: async () => {
           observeCommits += 1;
         },
       }),
-      activeBriefsCount: async () => 0,
+      activeBriefs: async () => [],
       loadInboxSummary: async () => sampleInboxSummary(),
       commitInboxCursor: async () => {
         inboxCommits += 1;
@@ -253,13 +252,12 @@ describe("KairosRunner.processTick", () => {
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
       observeRefresh: async () => ({
-        watchDiffs: [],
         sessionsDigest: emptyDigest,
         commit: async () => {
           observeCommits += 1;
         },
       }),
-      activeBriefsCount: async () => 0,
+      activeBriefs: async () => [],
       loadInboxSummary: async () => sampleInboxSummary(),
       commitInboxCursor: async () => {
         inboxCommits += 1;
@@ -295,8 +293,8 @@ describe("KairosRunner.processTick", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       loadInboxSummary: async () => sampleInboxSummary(),
       eventSink: async (e) => {
         events.push(e);
@@ -326,8 +324,8 @@ describe("KairosRunner.processTick", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       eventSink: async () => {},
       llm,
       toolManager,
@@ -349,8 +347,8 @@ describe("KairosRunner.processTick", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       eventSink: async () => {},
       llm,
       toolManager,
@@ -391,8 +389,8 @@ describe("KairosRunner.processTick", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [] as WatchDiffEntry[], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       eventSink: async (e) => {
         events.push(e);
       },
@@ -429,8 +427,8 @@ describe("KairosRunner.processTick", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       eventSink: async (e) => {
         events.push(e);
       },
@@ -456,8 +454,8 @@ describe("KairosRunner.processTick", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       eventSink: async () => {},
       llm,
       toolManager,
@@ -483,8 +481,8 @@ describe("KairosRunner.processTick", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       eventSink: async () => {},
       llm,
       toolManager,
@@ -511,8 +509,8 @@ describe("KairosRunner.processTick", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       eventSink: async (e) => {
         events.push(e);
       },

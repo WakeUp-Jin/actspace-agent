@@ -28,7 +28,6 @@ import { resolveModelSpecByApiModel } from "@actspace/shared";
 import { calculateUsageCost } from "../usage";
 import type { KairosShortTermMemoryContext } from "./context/short-term";
 import type { KairosConfig } from "./config/loader";
-import type { WatchDiffEntry } from "./context/watch-diff";
 import type { SessionsDigestResult } from "./context/sessions-digest";
 import type { TickPayload } from "./briefs/dispatcher";
 import type { QueueMessage } from "./scheduler";
@@ -37,6 +36,7 @@ import {
   assembleSystemPrompt,
   assembleTickMessage,
   derivePhase,
+  type KairosActiveBriefInfo,
   type KairosSkillCatalogEntry,
 } from "./prompt-assembler";
 import type { KairosInboxSummary } from "./inbox";
@@ -52,15 +52,15 @@ export interface KairosRunnerOptions {
   /** 白名单过滤后的 Skill catalog；进 system prompt 的「可用 Skills」段。 */
   skillCatalog?: KairosSkillCatalogEntry[];
   observeRefresh: () => Promise<{
-    watchDiffs: WatchDiffEntry[];
     sessionsDigest: SessionsDigestResult;
     /**
-     * 提交本次观测的游标（watch manifest + sessions lastSeenTurnId）。
+     * 提交本次观测的游标（sessions lastSeenTurnId）。
      * runner 仅在 tick 正常闭合后调用；失败 tick 不提交 → 下个 tick 重见同批增量。
      */
     commit?: () => Promise<void>;
   }>;
-  activeBriefsCount: () => Promise<number>;
+  /** 当前 active briefs（id + nextRun）；进 tick 消息的「任务表」行。 */
+  activeBriefs: () => Promise<KairosActiveBriefInfo[]>;
   loadInboxSummary?: () => Promise<KairosInboxSummary>;
   /** 提交 inbox 已读水位；与 observe.commit 同一时机（tick 正常闭合后）。 */
   commitInboxCursor?: (summary: KairosInboxSummary) => Promise<void>;
@@ -113,7 +113,7 @@ export class KairosRunner {
     // 1) observation + memory
     const observe = await this.opts.observeRefresh();
     const shortTerm = await this.opts.shortTerm.load();
-    const activeBriefsCount = await this.opts.activeBriefsCount();
+    const activeBriefs = await this.opts.activeBriefs();
     const inboxSummary = await this.opts.loadInboxSummary?.();
 
     // 2) 组装上下文：system prompt 只含低频内容（可被前缀缓存复用）；
@@ -126,8 +126,7 @@ export class KairosRunner {
     const tickContent = assembleTickMessage({
       now,
       phase: derivePhase(now, this.opts.config),
-      activeBriefsCount,
-      watchDiffs: observe.watchDiffs,
+      activeBriefs,
       sessionsDigest: observe.sessionsDigest,
       inboxSummary,
       triggerContent: payload.content,
@@ -210,7 +209,7 @@ export class KairosRunner {
 
     if (runError) throw runError;
 
-    // 7) tick 正常闭合：提交观测游标（watch manifest / sessions / inbox 水位）。
+    // 7) tick 正常闭合：提交观测游标（sessions / inbox 水位）。
     //    失败 tick 已在上面 throw，不会走到这里 → 增量不丢，下个 tick 重见。
     await observe.commit?.();
     if (inboxSummary) {

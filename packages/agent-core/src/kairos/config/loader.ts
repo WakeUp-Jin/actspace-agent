@@ -13,6 +13,7 @@ import {
 } from "./schema";
 
 const RULE_MD_TOKEN_BUDGET = 1500;
+const SOUL_MD_TOKEN_BUDGET = 500;
 const TOKEN_CHARS_PER_UNIT = 3;          // 与主 Agent 估算保持一致
 
 export interface KairosConfig {
@@ -20,6 +21,11 @@ export interface KairosConfig {
   paths: PathsConfig;
   blocklist: Blocklist;
   ruleMd: string;
+  /**
+   * soul.md 原文（人格插槽，设计见 agent-kairos-prompt-design.md §3）。
+   * 缺失 = 空串；空白时 prompt-assembler fallback 到 KAIROS_DEFAULT_SOUL。
+   */
+  soulMd: string;
   warnings: string[];                    // loader 路径上的非致命问题
 }
 
@@ -67,9 +73,18 @@ export async function loadKairosConfig(
     warn,
   );
 
-  const ruleMd = await readRuleMd(join(dir, "rule.md"), warn);
+  const ruleMd = await readMarkdownWithBudget(
+    join(dir, "rule.md"),
+    RULE_MD_TOKEN_BUDGET,
+    warn,
+  );
+  const soulMd = await readMarkdownWithBudget(
+    join(dir, "soul.md"),
+    SOUL_MD_TOKEN_BUDGET,
+    warn,
+  );
 
-  return { preferences, paths, blocklist, ruleMd, warnings };
+  return { preferences, paths, blocklist, ruleMd, soulMd, warnings };
 }
 
 async function readJson<T>(
@@ -94,7 +109,11 @@ async function readJson<T>(
   }
 }
 
-async function readRuleMd(filePath: string, warn: (msg: string) => void): Promise<string> {
+async function readMarkdownWithBudget(
+  filePath: string,
+  tokenBudget: number,
+  warn: (msg: string) => void,
+): Promise<string> {
   let text: string;
   try {
     text = await readFile(filePath, "utf8");
@@ -104,10 +123,11 @@ async function readRuleMd(filePath: string, warn: (msg: string) => void): Promis
     return "";
   }
   const tokenEstimate = Math.ceil(text.length / TOKEN_CHARS_PER_UNIT);
-  if (tokenEstimate <= RULE_MD_TOKEN_BUDGET) return text;
-  const maxChars = RULE_MD_TOKEN_BUDGET * TOKEN_CHARS_PER_UNIT;
-  warn(`rule.md exceeds ${RULE_MD_TOKEN_BUDGET}-token budget; truncating to ${maxChars} chars.`);
-  return `${text.slice(0, maxChars)}\n\n[Truncated: rule.md too long]`;
+  if (tokenEstimate <= tokenBudget) return text;
+  const maxChars = tokenBudget * TOKEN_CHARS_PER_UNIT;
+  const name = filePath.split("/").pop() ?? filePath;
+  warn(`${name} exceeds ${tokenBudget}-token budget; truncating to ${maxChars} chars.`);
+  return `${text.slice(0, maxChars)}\n\n[Truncated: ${name} too long]`;
 }
 
 function cloneDefault<T>(value: T): T {

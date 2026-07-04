@@ -111,6 +111,25 @@ describe("Composer follow-up bar", () => {
     expect(toolbar).toContainElement(screen.getByLabelText("Message composer"));
   });
 
+  it("grows the input height to fit pasted multi-line content", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+
+    const input = screen.getByLabelText("Message composer") as HTMLTextAreaElement;
+    // jsdom 不做真实布局，scrollHeight 恒为 0；用 getter 模拟粘贴大段文本后内容撑高。
+    let mockScrollHeight = 20;
+    Object.defineProperty(input, "scrollHeight", {
+      configurable: true,
+      get: () => mockScrollHeight,
+    });
+
+    mockScrollHeight = 96;
+    await user.click(input);
+    await user.paste("line1\nline2\nline3\nline4");
+
+    expect(input.style.height).toBe("96px");
+  });
+
   it("opens the plus command menu with demo agent and capability entries", async () => {
     const user = userEvent.setup();
     renderComposer();

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Kairos 通知删除 · 交互方案对比</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-subtle: #f2f4f7;
+    --line: #e4e7ec;
+    --line-strong: #cdd3dc;
+    --text: #1c2430;
+    --text-muted: #5b6472;
+    --text-faint: #98a1b0;
+    --brand: #2f6fff;
+    --brand-soft: #e8efff;
+    --brand-strong: #1f56d6;
+    --danger: #e5484d;
+    --danger-soft: #fdebec;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }
+  body { background: var(--bg); color: var(--text); padding: 28px; }
+  h1 { font-size: 20px; margin-bottom: 6px; }
+  .lede { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; }
+  .variants { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; align-items: start; }
+  .variant { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .variant h2 { font-size: 15px; margin-bottom: 2px; }
+  .variant .tag { display:inline-block; font-size: 11px; color: var(--brand-strong); background: var(--brand-soft); border-radius: 99px; padding: 2px 8px; margin-bottom: 8px; }
+  .variant .tag.rec { color: #1c7a41; background: #e4f5eb; }
+  .variant .desc { font-size: 12px; line-height: 1.7; color: var(--text-muted); margin-bottom: 14px; }
+  .stage { background: var(--bg); border: 1px dashed var(--line-strong); border-radius: 12px; padding: 14px; min-height: 380px; }
+
+  /* 通知面板骨架（模拟详情面板的通知 tab） */
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .panel-head { display:flex; justify-content:space-between; align-items:center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .panel-head b { font-size: 13px; }
+  .head-actions { display:flex; align-items:center; gap:10px; }
+  .link-btn { font-size: 11.5px; color: var(--text-faint); background:none; border:none; cursor:pointer; padding:0; }
+  .link-btn:hover { color: var(--text); }
+  .item { position: relative; display:grid; gap:4px; padding: 10px 34px 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .item:last-child { border-bottom: none; }
+  .item:hover { background: var(--surface-subtle); }
+  .item.unread { background: #f4f8ff; }
+  .meta { display:flex; align-items:center; gap:6px; font-size: 11px; color: var(--text-faint); }
+  .dot { width:6px; height:6px; border-radius:99px; background: var(--brand); }
+  .dot.imp { background: var(--danger); }
+  .unread-chip { color: var(--brand-strong); }
+  .title { font-size: 12.5px; line-height: 1.5; }
+  .unread .title { font-weight: 600; }
+  .body { font-size: 12px; line-height: 1.7; color: var(--text-muted); white-space: pre-wrap; }
+
+  /* 方案 A：hover 行尾垃圾桶 */
+  .trash {
+    position: absolute; right: 8px; top: 8px;
+    width: 22px; height: 22px; border-radius: 6px;
+    display: none; align-items: center; justify-content: center;
+    border: none; background: transparent; cursor: pointer;
+    color: var(--text-faint); font-size: 13px; line-height: 1;
+  }
+  .item:hover .trash { display: inline-flex; }
+  .trash:hover { background: var(--danger-soft); color: var(--danger); }
+  .item.show-hover { background: var(--surface-subtle); }
+  .item.show-hover .trash { display: inline-flex; }
+  .item.show-hover .trash.hovered { background: var(--danger-soft); color: var(--danger); }
+
+  /* 方案 B：展开后操作区 */
+  .expand-actions { display:flex; gap:8px; margin-top: 8px; }
+  .mini-btn { display:inline-flex; align-items:center; gap:4px; height: 24px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); font-size: 11.5px; color: var(--text-muted); cursor: pointer; }
+  .mini-btn:hover { border-color: var(--line-strong); color: var(--text); }
+  .mini-btn.danger { color: var(--danger); }
+  .mini-btn.danger:hover { border-color: var(--danger); background: var(--danger-soft); }
+  .item.expanded { background: var(--surface-subtle); }
+
+  /* 方案 C：批量清理菜单 */
+  .menu-anchor { position: relative; }
+  .menu {
+    position: absolute; right: 0; top: 24px; z-index: 5;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 9px;
+    box-shadow: 0 10px 28px rgba(16,24,40,.16); padding: 4px; min-width: 130px;
+  }
+  .menu button { display:flex; width:100%; align-items:center; gap:6px; height: 30px; padding: 0 9px; border:none; border-radius: 6px; background: none; font-size: 12px; color: var(--text); cursor: pointer; text-align: left; }
+  .menu button:hover { background: var(--surface-subtle); }
+  .menu button.danger { color: var(--danger); }
+
+  /* 撤销 toast */
+  .undo-toast {
+    margin: 10px 12px 12px; display: flex; justify-content: space-between; align-items: center;
+    background: var(--text); color: #fff; font-size: 12px;
+    border-radius: 8px; padding: 8px 12px;
+  }
+  .undo-toast button { background: none; border: none; color: #9db9ff; font-size: 12px; cursor: pointer; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>Kairos 通知删除 · 交互方案对比</h1>
+<p class="lede">三个方案不互斥：A 是单条删除的主交互，B 是它在展开态的补充位，C 解决批量清理。推荐 A + C 组合。</p>
+
+<div class="variants">
+  <!-- 方案 A -->
+  <div class="variant">
+    <span class="tag rec">方案 A · 推荐（单条删除）</span>
+    <h2>hover 行尾垃圾桶</h2>
+    <p class="desc">鼠标悬停条目时右上角浮现垃圾桶图标，点击即删（无确认弹窗），列表底部出现 5 秒「已删除 · 撤销」提示。桌面端最常见的低摩擦删除模式（Gmail / macOS 通知中心同款）。图标点击不冒泡，不会误触展开。</p>
+    <div class="stage">
+      <div class="panel">
+        <div class="panel-head"><b>通知</b><div class="head-actions"><button class="link-btn">全部已读</button></div></div>
+        <div class="item unread show-hover">
+          <button class="trash hovered" title="删除">🗑</button>
+          <span class="meta"><i class="dot"></i>11:57:34 <span class="unread-chip">未读</span></span>
+          <span class="title">消费记录 CSV 已分析：6/15-7/3 共 ¥4,652.70</span>
+        </div>
+        <div class="item">
+          <button class="trash" title="删除">🗑</button>
+          <span class="meta"><i class="dot"></i>11:21:26</span>
+          <span class="title">消费记录分析 — 6/15~7/3 支出概要</span>
+        </div>
+        <div class="item">
+          <button class="trash" title="删除">🗑</button>
+          <span class="meta"><i class="dot imp"></i>09:02:11</span>
+          <span class="title">检测到 3 个失败的定时任务</span>
+        </div>
+        <div class="undo-toast"><span>已删除「旧的巡检提醒」</span><button>撤销</button></div>
+      </div>
+      <p class="desc" style="margin-top:10px">↑ 第一条模拟 hover 态（垃圾桶悬停高亮），底部为删除后的撤销提示。</p>
+    </div>
+  </div>
+
+  <!-- 方案 B -->
+  <div class="variant">
+    <span class="tag">方案 B · 展开态补充</span>
+    <h2>展开后显示操作区</h2>
+    <p class="desc">点击条目展开正文后，底部出现「删除」小按钮。适合"读完再决定删不删"的流程，但删除必须先展开、多一步；单独使用时效率低，只作为 A 的补充位（触屏 / 无 hover 环境也可达）。</p>
+    <div class="stage">
+      <div class="panel">
+        <div class="panel-head"><b>通知</b><div class="head-actions"><button class="link-btn">全部已读</button></div></div>
+        <div class="item expanded">
+          <span class="meta"><i class="dot"></i>11:57:34</span>
+          <span class="title">消费记录 CSV 已分析：6/15-7/3 共 ¥4,652.70</span>
+          <div class="body">总览 | 12 笔交易，18 天跨度
+- 必要支出：¥878.70（19%）
+- 非必要支出：¥3,774.00（81%）</div>
+          <div class="expand-actions">
+            <button class="mini-btn danger">🗑 删除</button>
+          </div>
+        </div>
+        <div class="item">
+          <span class="meta"><i class="dot"></i>11:21:26</span>
+          <span class="title">消费记录分析 — 6/15~7/3 支出概要</span>
+        </div>
+      </div>
+      <p class="desc" style="margin-top:10px">↑ 展开正文后底部出现删除按钮。</p>
+    </div>
+  </div>
+
+  <!-- 方案 C -->
+  <div class="variant">
+    <span class="tag rec">方案 C · 推荐（批量清理）</span>
+    <h2>头部「清理」下拉</h2>
+    <p class="desc">头部「全部已读」旁增加「清理 ▾」下拉：清除已读 / 清空全部。清空全部因不可逆且影响面大，点击后按钮原地变为「确认清空？」二次确认（不弹对话框）。解决通知攒多之后一条条删的痛点。</p>
+    <div class="stage">
+      <div class="panel" style="overflow:visible">
+        <div class="panel-head">
+          <b>通知</b>
+          <div class="head-actions">
+            <button class="link-btn">全部已读</button>
+            <div class="menu-anchor">
+              <button class="link-btn">清理 ▾</button>
+              <div class="menu">
+                <button>清除已读</button>
+                <button class="danger">清空全部…</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="item unread">
+          <span class="meta"><i class="dot"></i>11:57:34 <span class="unread-chip">未读</span></span>
+          <span class="title">消费记录 CSV 已分析：6/15-7/3 共 ¥4,652.70</span>
+        </div>
+        <div class="item">
+          <span class="meta"><i class="dot"></i>11:21:26</span>
+          <span class="title">消费记录分析 — 6/15~7/3 支出概要</span>
+        </div>
+        <div class="item" style="border-bottom:none">
+          <span class="meta"><i class="dot imp"></i>09:02:11</span>
+          <span class="title">检测到 3 个失败的定时任务</span>
+        </div>
+      </div>
+      <p class="desc" style="margin-top:88px">↑ 「清理 ▾」展开后的菜单：清除已读 / 清空全部（红色，需二次确认）。</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

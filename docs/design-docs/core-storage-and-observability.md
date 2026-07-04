@@ -95,10 +95,12 @@ Kairos（自治模式）在 `<userData>/kairos/` 下独立成树，与主 Agent 
 │   └── lab-agent.md           # Lab Agent append-only handoff notes（Lab Runtime 接入后写入）
 ├── config/
 │   ├── preferences.json       # enabled / sleepRange / rhythm / circuitBreaker / tip
-│   ├── paths.json             # workspaces / sessionRoots / watch[] 三大类路径
+│   ├── paths.json             # 可读写路径列表（2026-07-03 起 watch 字段随巡检管道退役）
 │   ├── blocklist.json         # paths[] 黑名单 glob + toolsDenied[] + tip
-│   └── rule.md                # 用户写的自由约束，注入 system prompt [4] 段
+│   ├── rule.md                # 用户写的自由约束，注入 system prompt [4] 段
+│   └── soul.md                # 人格插槽（2026-07-04），注入 [1] 段 {soul}；空白 fallback 内置默认人格
 ├── memory/
+│   ├── notifications.json     # 通知中心（2026-07-04，notify_user 产出 + 可变已读状态，滚动 200 条）
 │   └── short-term/
 │       ├── 2026-05/           # 按月分目录
 │       │   ├── 2026-05-27.jsonl       # 当日事件流（含 _001/_002 分卷）
@@ -106,8 +108,9 @@ Kairos（自治模式）在 `<userData>/kairos/` 下独立成树，与主 Agent 
 │       │   └── week_2026-W22.summary.md  # 压缩出来的周摘要
 │       └── ...
 ├── observe/
-│   └── watch-manifests/       # 每个 watch 路径一份 sha1 fileset 快照
-│       └── <sha1>.json
+│   ├── sessions-state.json    # sessions-digest 已读游标
+│   └── inbox-state.json       # inbox 已读水位
+│                              # （watch-manifests/ 已于 2026-07-03 随巡检管道退役；旧目录无害可删）
 ├── briefs/
 │   ├── tasks/                 # 用户写的 brief markdown
 │   │   └── <id>.md
@@ -147,9 +150,12 @@ Kairos 的运行事实写入 `memory/short-term/<YYYY-MM>/<date>[_NNN].jsonl`，
 | `kairos:get-state` | invoke | renderer 拉一次 `KairosRuntimeState` |
 | `kairos:get-events-recent` | invoke | 从 ring buffer 拿最近 N 条事件 |
 | `kairos:control` | invoke | `{ type: "start" \| "stop" \| "wake_now" \| "reset_today" }` |
-| `kairos:read-config` / `kairos:write-config` | invoke | 4 份 config 的读写；写盘前 main 端 schema 校验（rule.md 跳过 JSON parse） |
+| `kairos:read-config` / `kairos:write-config` | invoke | 5 份 config 的读写；写盘前 main 端 schema 校验（rule.md / soul.md 跳过 JSON parse） |
+| `kairos:briefs-list` / `briefs-read` / `briefs-write` / `briefs-delete` | invoke | `briefs/tasks/*.md` 的列表与编辑（2026-07-04）；系统字段（created/lastRun/nextRun）由 main 保护，写/删后 `reloadBriefs()` |
+| `kairos:notifications-list` / `notifications-mark-read` / `notifications-remove` | invoke | 通知中心列表 + 已读 + 删除（单条/清除已读/清空全部；2026-07-04，见 agent-kairos-notifications.md） |
 | `kairos:event` | main → renderer | 每个 SessionEvent 推一份（50ms debounce 攒批） |
 | `kairos:state` | main → renderer | 每次状态变更推一份（同 50ms 攒批） |
+| `kairos:notification` | main → renderer | 新通知直发（不攒批）；important 级同时弹 macOS 系统通知 |
 
 ### 排障日志归属
 

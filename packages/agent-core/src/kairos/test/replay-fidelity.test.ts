@@ -29,6 +29,7 @@ function baseConfig(): KairosConfig {
     paths: { ...DEFAULT_PATHS_CONFIG, paths: [] },
     blocklist: { ...DEFAULT_BLOCKLIST, toolsDenied: [] },
     ruleMd: "be concise",
+    soulMd: "",
     warnings: [],
   };
 }
@@ -106,8 +107,8 @@ describe("Kairos replay fidelity (现场 === 重放)", () => {
     const runner = new KairosRunner({
       config: baseConfig(),
       shortTerm: fakeShortTerm(),
-      observeRefresh: async () => ({ watchDiffs: [], sessionsDigest: emptyDigest }),
-      activeBriefsCount: async () => 0,
+      observeRefresh: async () => ({ sessionsDigest: emptyDigest }),
+      activeBriefs: async () => [],
       eventSink: async (e) => {
         events.push(e);
       },

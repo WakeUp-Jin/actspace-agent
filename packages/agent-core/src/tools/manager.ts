@@ -122,9 +122,15 @@ export interface ToolExecuteOptions {
   blockWriteToolsForTruncatedAssistant?: boolean;
 }
 
-/** Kairos 工具调用守卫上下文：allowedRoots（白名单）+ blocklist（黑名单）+ toolsDenied（双保险） */
+/** Kairos 工具调用守卫上下文：allowedRoots（读写白名单）+ readOnlyRoots（只读白名单）+ blocklist（黑名单）+ toolsDenied（双保险） */
 export interface KairosGuardContext {
+  /** 可读**可写**的根路径（paths.json 声明，默认只有 Kairos workspace）。 */
   allowedRoots: string[];
+  /**
+   * 只读授权的根路径：只读工具（isReadOnly=true）额外放行；
+   * 写类工具命中这里仍拒绝。来源：Skill 目录 + fs-watch 监听目录。
+   */
+  readOnlyRoots?: string[];
   blocklistPaths: string[];           // glob，由 kairos/guard/blocklist-check.ts 解析
   toolsDenied: string[];
 }

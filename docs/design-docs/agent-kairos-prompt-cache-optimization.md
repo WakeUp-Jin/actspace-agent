@@ -39,7 +39,7 @@ call 10 | hit= 640 miss=4069  命中率=14%
 
 ```
 ┌─ system prompt（仅低频段，按变化频率降序排列）─────────────┐
-│ [1] 静态指令头                  ← 永不变                  │
+│ [1] 静态指令头（含 {soul} 插槽）← 改 soul.md 才变（2026-07-04）│
 │ [2] config_tips_block          ← 改 preferences 才变      │
 │ [3] user_rules                 ← 改 rule.md 才变          │
 │ [4] history_summary            ← 压缩产出新摘要文件才变    │
@@ -74,13 +74,13 @@ system prompt 模板删除 `[当前时间]` 行和 `{observation_summary}` 段�
 
 | 观测源 | 现状 | 增量化方案 |
 | --- | --- | --- |
-| watch diff | 本身就是快照对比差异（`watch-diff.ts`），无新增/删除时输出"无变化" | 保持；无变化时输出固定短语或省略该节 |
+| watch diff | ~~本身就是快照对比差异（`watch-diff.ts`）~~ 2026-07-03 已随巡检管道退役，目录变化改由 fs-watch Skill 主动读取，不再进观测增量 | （已退役，无需增量化） |
 | sessions digest | 已有 `lastSeenTurnId` 游标（`memory/state.json`），但每 tick 输出全量列表 | 只输出 `unreadTurnsForKairos > 0` 的 session；全部已读时省略该节 |
 | inbox | 每 tick 输出每个来源最近 N 条消息全文，无已读水位 | 新增已读水位（按消息块的时间戳行），只注入水位之后的新消息块；tick 闭合后推进水位 |
 
 inbox 已读水位持久化到 `observe/inbox-state.json`（独立文件；sessions 游标实际位于 `observe/sessions-state.json`，分文件归属清晰、避免两个模块对同一文件读改写竞争），格式 `{ readCursor: Record<KairosInboxSource, string /* 最后已读消息的 ISO 时间戳 */> }`。inbox 文件是 append-only 的 markdown，消息块头部 `### <ISO> | priority | topic` 即天然游标。
 
-**增量丢失兜底**：tick 失败（LLM 报错/中断）时不推进任何游标，下个 tick 重新看到同一批增量。游标推进时机统一为"tick 正常闭合后"（实现：`observeRefresh` 返回 commit 闭包 + `commitInboxCursor` 回调，由 `runner.processTick` 成功路径末尾调用）。watch manifest 的提交必须用计算时捕获的扫描快照，不能提交时重扫——否则 tick 执行期间的新变化会被"标记已读但从未展示"。`getContextSnapshot` 只计算不提交，预览不消费观测。
+**增量丢失兜底**：tick 失败（LLM 报错/中断）时不推进任何游标，下个 tick 重新看到同一批增量。游标推进时机统一为"tick 正常闭合后"（实现：`observeRefresh` 返回 commit 闭包 + `commitInboxCursor` 回调，由 `runner.processTick` 成功路径末尾调用）。`getContextSnapshot` 只计算不提交，预览不消费观测。（watch manifest 相关的提交约定已随巡检管道退役删除。）
 
 ## 5. Thinking 全链路
 

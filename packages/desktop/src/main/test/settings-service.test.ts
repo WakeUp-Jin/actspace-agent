@@ -266,22 +266,29 @@ describe("SettingsService", () => {
     await svc.load();
 
     // 默认播种：全部关闭 / 空列表
-    expect(svc.get().plugins).toEqual({ fsWatch: { enabled: false } });
+    expect(svc.get().plugins).toEqual({ repoRoot: null, fsWatch: { enabled: false } });
     expect(svc.get().skills).toEqual({ disabled: [] });
     expect(svc.get().kairos.enabledSkills).toEqual([]);
 
     await svc.update({
-      plugins: { fsWatch: { enabled: true } },
+      plugins: { repoRoot: "  /Users/me/actspace-plugins  ", fsWatch: { enabled: true } },
       skills: { disabled: ["foo", "foo", " ", "bar"] },
       kairos: { enabledSkills: ["fs-watch", "fs-watch"] },
     });
 
-    // 重新加载实例读回：去重、剔除空白项
+    // 重新加载实例读回：去重、剔除空白项、路径 trim
     const reloaded = makeService(dataRoot);
     await reloaded.load();
     expect(reloaded.get().plugins.fsWatch.enabled).toBe(true);
+    expect(reloaded.get().plugins.repoRoot).toBe("/Users/me/actspace-plugins");
     expect(reloaded.get().skills.disabled).toEqual(["foo", "bar"]);
     expect(reloaded.get().kairos.enabledSkills).toEqual(["fs-watch"]);
+
+    // 只更新 fsWatch 不应清掉 repoRoot；显式传空串则重置为 null
+    await reloaded.update({ plugins: { fsWatch: { enabled: false } } });
+    expect(reloaded.get().plugins.repoRoot).toBe("/Users/me/actspace-plugins");
+    await reloaded.update({ plugins: { repoRoot: "" } });
+    expect(reloaded.get().plugins.repoRoot).toBeNull();
   });
 
   it("老 settings.json 缺 plugins/skills 分区时回默认并补写", async () => {
@@ -299,12 +306,12 @@ describe("SettingsService", () => {
 
     const svc = makeService(dataRoot);
     await svc.load();
-    expect(svc.get().plugins).toEqual({ fsWatch: { enabled: false } });
+    expect(svc.get().plugins).toEqual({ repoRoot: null, fsWatch: { enabled: false } });
     expect(svc.get().skills).toEqual({ disabled: [] });
     expect(svc.get().kairos.enabledSkills).toEqual([]);
 
     const persisted = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
-    expect(persisted.plugins).toEqual({ fsWatch: { enabled: false } });
+    expect(persisted.plugins).toEqual({ repoRoot: null, fsWatch: { enabled: false } });
     expect(persisted.skills).toEqual({ disabled: [] });
   });
 });

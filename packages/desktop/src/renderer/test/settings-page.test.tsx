@@ -19,7 +19,7 @@ function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
       exploreModelId: null,
     },
     kairos: { modelId: null, thinking: "auto", enabledSkills: [] },
-    plugins: { fsWatch: { enabled: false } },
+    plugins: { repoRoot: null, fsWatch: { enabled: false } },
     skills: { disabled: [] },
   };
   return {

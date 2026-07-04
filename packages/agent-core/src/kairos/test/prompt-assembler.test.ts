@@ -12,7 +12,6 @@ import {
   DEFAULT_PREFERENCES,
 } from "../config/schema";
 import type { KairosConfig } from "../config/loader";
-import type { WatchDiffEntry } from "../context/watch-diff";
 import type { SessionsDigestResult } from "../context/sessions-digest";
 import type { KairosShortTermLoadResult } from "../context/short-term";
 import type { KairosInboxSummary } from "../inbox";
@@ -23,12 +22,13 @@ function baseConfig(): KairosConfig {
     paths: {
       ...DEFAULT_PATHS_CONFIG,
       paths: [
-        { path: "/tmp/work/docs", watch: true, tip: "design docs" },
-        { path: "/tmp/work/data", watch: false, tip: "data inbox" },
+        { path: "/tmp/work/docs", tip: "design docs" },
+        { path: "/tmp/work/data", tip: "data inbox" },
       ],
     },
     blocklist: { ...DEFAULT_BLOCKLIST },
     ruleMd: "请保持简洁。",
+    soulMd: "",
     warnings: [],
   };
 }
@@ -39,19 +39,6 @@ function emptyShortTerm(): KairosShortTermLoadResult {
 
 function emptyDigest(): SessionsDigestResult {
   return { workspaces: [], generatedAt: "2026-05-27T19:00:00.000Z" };
-}
-
-function sampleWatchDiffs(): WatchDiffEntry[] {
-  return [
-    {
-      rootPath: "/tmp/work/docs",
-      added: ["/tmp/work/docs/a.md", "/tmp/work/docs/b.md"],
-      removed: [],
-      truncated: false,
-      totalAdded: 2,
-      totalRemoved: 0,
-    },
-  ];
 }
 
 function sampleDigest(): SessionsDigestResult {
@@ -136,15 +123,10 @@ function emptyInboxSummary(): KairosInboxSummary {
 }
 
 describe("buildObservationDelta", () => {
-  it("renders watch diff and unread sessions, skipping all-read sessions", () => {
+  it("renders unread sessions in descending order, skipping all-read sessions", () => {
     const text = buildObservationDelta({
-      watchDiffs: sampleWatchDiffs(),
       sessionsDigest: sampleDigest(),
     });
-    expect(text).toContain("巡检目录变化");
-    expect(text).toContain("/tmp/work/docs");
-    expect(text).toContain("新增 2");
-    expect(text).toContain("a.md");
     // 排序按 unread 降序：s1 在前；s3 已读不出现
     const s1Idx = text.indexOf("session-s1");
     const s2Idx = text.indexOf("session-s2");
@@ -155,16 +137,6 @@ describe("buildObservationDelta", () => {
 
   it("returns empty string when nothing changed (no placeholder noise)", () => {
     const text = buildObservationDelta({
-      watchDiffs: [
-        {
-          rootPath: "/tmp/work/docs",
-          added: [],
-          removed: [],
-          truncated: false,
-          totalAdded: 0,
-          totalRemoved: 0,
-        },
-      ],
       sessionsDigest: emptyDigest(),
       inboxSummary: emptyInboxSummary(),
     });
@@ -173,7 +145,6 @@ describe("buildObservationDelta", () => {
 
   it("includes inbox section only when it has new messages", () => {
     const withNew = buildObservationDelta({
-      watchDiffs: [],
       sessionsDigest: emptyDigest(),
       inboxSummary: sampleInboxSummary(),
     });
@@ -181,7 +152,6 @@ describe("buildObservationDelta", () => {
     expect(withNew).toContain("前端验证反复失败");
 
     const withoutNew = buildObservationDelta({
-      watchDiffs: [],
       sessionsDigest: emptyDigest(),
       inboxSummary: emptyInboxSummary(),
     });
@@ -190,12 +160,14 @@ describe("buildObservationDelta", () => {
 });
 
 describe("assembleTickMessage", () => {
-  it("renders minute-granularity time, phase, briefs count and observation delta", () => {
+  it("renders minute-granularity time, phase, briefs schedule and observation delta", () => {
     const msg = assembleTickMessage({
       now: new Date("2026-05-27T13:00:42"),
       phase: "work",
-      activeBriefsCount: 2,
-      watchDiffs: sampleWatchDiffs(),
+      activeBriefs: [
+        { id: "weekly-report", nextRun: "2026-05-27T15:30:00" },
+        { id: "inbox-triage", nextRun: null },
+      ],
       sessionsDigest: sampleDigest(),
       inboxSummary: sampleInboxSummary(),
     });
@@ -204,31 +176,78 @@ describe("assembleTickMessage", () => {
     // 分钟粒度：不含秒
     expect(msg).toContain("[当前时间] 2026-05-27 13:00（work）");
     expect(msg).not.toContain("13:00:42");
-    expect(msg).toContain("[活跃 briefs] 2 个");
+    // 任务表行：数量 + 逐项 id 与下次时间；未排期显示「待排期」
+    expect(msg).toContain("[任务表] 2 项：weekly-report（下次 05-27 15:30）、inbox-triage（下次 待排期）");
     expect(msg).toContain("## 观测增量");
-    expect(msg).toContain("巡检目录变化");
     expect(msg).toContain("session-s1");
     expect(msg).toContain("前端验证反复失败");
+  });
+
+  it("renders 空 when no active briefs", () => {
+    const msg = assembleTickMessage({
+      now: new Date("2026-05-27T13:00:00"),
+      phase: "work",
+      activeBriefs: [],
+      sessionsDigest: emptyDigest(),
+      inboxSummary: emptyInboxSummary(),
+    });
+    expect(msg).toContain("[任务表] 空");
+  });
+
+  it("truncates the briefs line beyond 8 items", () => {
+    const briefs = Array.from({ length: 10 }, (_, i) => ({
+      id: `task-${i}`,
+      nextRun: null,
+    }));
+    const msg = assembleTickMessage({
+      now: new Date("2026-05-27T13:00:00"),
+      phase: "work",
+      activeBriefs: briefs,
+      sessionsDigest: emptyDigest(),
+    });
+    expect(msg).toContain("10 项：");
+    expect(msg).toContain("task-7");
+    expect(msg).not.toContain("task-8（");
+    expect(msg).toContain("…另有 2 项");
   });
 
   it("renders fallback line when there is no new observation", () => {
     const msg = assembleTickMessage({
       now: new Date("2026-05-27T13:00:00"),
       phase: "work",
-      activeBriefsCount: 0,
-      watchDiffs: [],
+      activeBriefs: [],
       sessionsDigest: emptyDigest(),
       inboxSummary: emptyInboxSummary(),
     });
     expect(msg).toContain("（自上个 tick 无新观测）");
   });
 
+  it("appends the fixed reminder suffix on every tick message", () => {
+    const withDelta = assembleTickMessage({
+      now: new Date("2026-05-27T13:00:42"),
+      phase: "work",
+      activeBriefs: [],
+      sessionsDigest: sampleDigest(),
+    });
+    const withoutDelta = assembleTickMessage({
+      now: new Date("2026-05-27T13:05:00"),
+      phase: "quiet",
+      activeBriefs: [],
+      sessionsDigest: emptyDigest(),
+    });
+    for (const msg of [withDelta, withoutDelta]) {
+      expect(msg).toContain("提醒：观测增量不含持续数据源型 Skill");
+      expect(msg).toContain("全部安静才允许直接 sleep");
+      // 后缀在 </tick> 之前
+      expect(msg.indexOf("提醒：")).toBeLessThan(msg.indexOf("</tick>"));
+    }
+  });
+
   it("embeds brief trigger content as 任务正文 section", () => {
     const msg = assembleTickMessage({
       now: new Date("2026-05-27T13:00:00"),
       phase: "work",
-      activeBriefsCount: 1,
-      watchDiffs: [],
+      activeBriefs: [{ id: "weekly-report", nextRun: null }],
       sessionsDigest: emptyDigest(),
       triggerContent: "# 周报整理\n请汇总本周 sessions。",
     });
@@ -240,8 +259,7 @@ describe("assembleTickMessage", () => {
     const msg = assembleTickMessage({
       now: new Date("2026-05-27T13:00:00"),
       phase: "work",
-      activeBriefsCount: 0,
-      watchDiffs: [],
+      activeBriefs: [],
       sessionsDigest: emptyDigest(),
       triggerContent: "",
     });
@@ -280,8 +298,10 @@ describe("assembleSystemPrompt", () => {
     });
     expect(prompt).toContain("You are Kairos");
     expect(prompt).toContain("配置提示");
+    expect(prompt).toContain("# 每次唤醒的例程");
+    expect(prompt).toContain("# 闲时工作");
     expect(prompt).toContain("# Workspace boundary");
-    expect(prompt).toContain("不要默认读写 actspace app 仓库");
+    expect(prompt).toContain("读和写的授权范围不同");
     expect(prompt).toContain("# 用户规则");
     expect(prompt).toContain("请保持简洁。");
     expect(prompt).toContain("# 历史摘要");
@@ -297,8 +317,32 @@ describe("assembleSystemPrompt", () => {
     expect(a).toBe(b);
     // 每 tick 必变的内容禁止进入 system prompt
     expect(a).not.toContain("[当前时间]");
-    expect(a).not.toContain("[活跃 briefs]");
+    expect(a).not.toContain("[任务表]");
     expect(a).not.toContain("# 观测摘要");
+  });
+
+  it("falls back to the default soul when soul.md is blank", () => {
+    const prompt = assembleSystemPrompt({
+      config: baseConfig(),                       // soulMd: ""
+      shortTermResult: emptyShortTerm(),
+    });
+    expect(prompt).toContain("时机之神");
+    expect(prompt).toContain("恰当的时机");
+    // 塞巴斯设定已废弃，不允许回归
+    expect(prompt).not.toContain("塞巴斯");
+    expect(prompt).not.toContain("执事");
+  });
+
+  it("injects a custom soul.md into the {soul} slot, keeping mechanism sections intact", () => {
+    const config = { ...baseConfig(), soulMd: "# 你是 Kairos —— 海盗腔的后台助手\n说话带点海风味。" };
+    const prompt = assembleSystemPrompt({ config, shortTermResult: emptyShortTerm() });
+    expect(prompt).toContain("海盗腔的后台助手");
+    expect(prompt).not.toContain("时机之神");
+    // 人格可换，机制段不可丢
+    expect(prompt).toContain("# 产出契约");
+    expect(prompt).toContain("# 每次唤醒的例程");
+    expect(prompt).toContain("授权覆盖原则");
+    expect(prompt.match(/\{\w+\}/g)).toBeNull();
   });
 
   it("renders the whitelist skill catalog into the system prompt", () => {
@@ -334,5 +378,6 @@ describe("renderKairosSkillCatalog", () => {
     expect(text).toContain("  SKILL.md：/s/a/SKILL.md");
     expect(text).toContain("- b：db");
     expect(text).toContain("先用 read_file 读它的 SKILL.md");
+    expect(text).toContain("持续更新的数据源");
   });
 });

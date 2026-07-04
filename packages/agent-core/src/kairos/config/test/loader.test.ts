@@ -25,6 +25,7 @@ describe("loadKairosConfig", () => {
     expect(cfg.paths.paths).toEqual([]);
     expect(cfg.blocklist.toolsDenied).toEqual(["bash"]);
     expect(cfg.ruleMd).toBe("");
+    expect(cfg.soulMd).toBe("");
     expect(cfg.warnings).toEqual([]);                  // ENOENT 不产生 warning
   });
 
@@ -49,7 +50,8 @@ describe("loadKairosConfig", () => {
     );
     const cfg = await loadKairosConfig(tmpRoot);
     expect(cfg.preferences.enabled).toBe(true);
-    expect(cfg.paths.paths[0]).toEqual({ path: "/A", watch: true, tip: "first" });
+    // 旧文件里的 watch 字段被静默忽略（巡检管道已退役）
+    expect(cfg.paths.paths[0]).toEqual({ path: "/A", tip: "first" });
   });
 
   it("truncates rule.md and emits a warning when over budget", async () => {
@@ -60,6 +62,24 @@ describe("loadKairosConfig", () => {
     expect(cfg.ruleMd.length).toBeLessThan(longBody.length);
     expect(cfg.ruleMd.endsWith("[Truncated: rule.md too long]")).toBe(true);
     expect(cfg.warnings.some((w) => w.includes("rule.md exceeds"))).toBe(true);
+  });
+
+  it("reads soul.md verbatim when within budget", async () => {
+    const soul = "# 你是 Kairos —— 自定义人格\n简洁、温和。";
+    await writeFile(join(configDir, "soul.md"), soul, "utf8");
+    const cfg = await loadKairosConfig(tmpRoot);
+    expect(cfg.soulMd).toBe(soul);
+    expect(cfg.warnings).toEqual([]);
+  });
+
+  it("truncates soul.md and emits a warning when over 500-token budget", async () => {
+    // ~4000 chars → ~1334 tokens, over budget 500
+    const longSoul = "人格设定 ".repeat(800);
+    await writeFile(join(configDir, "soul.md"), longSoul, "utf8");
+    const cfg = await loadKairosConfig(tmpRoot);
+    expect(cfg.soulMd.length).toBeLessThan(longSoul.length);
+    expect(cfg.soulMd.endsWith("[Truncated: soul.md too long]")).toBe(true);
+    expect(cfg.warnings.some((w) => w.includes("soul.md exceeds 500-token budget"))).toBe(true);
   });
 
   it("invokes onWarning hook for non-fatal issues", async () => {

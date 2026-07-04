@@ -66,6 +66,16 @@ function installFakeBridge(opts: FakeKairosOptions = {}): KairosBridgeApi {
         tools: [],
       }),
     ),
+    briefsList: vi.fn(async () => ({ briefs: [] })),
+    briefsRead: vi.fn(async () => {
+      throw new Error("not found");
+    }),
+    briefsWrite: vi.fn(async () => ({ ok: true } as const)),
+    briefsDelete: vi.fn(async () => ({ ok: true } as const)),
+    notificationsList: vi.fn(async () => ({ notifications: [], unreadCount: 0 })),
+    notificationsMarkRead: vi.fn(async () => ({ ok: true as const, unreadCount: 0 })),
+    notificationsRemove: vi.fn(async () => ({ ok: true as const, removedCount: 0, unreadCount: 0 })),
+    onNotification: vi.fn(() => () => {}),
     onEvent: (listener) => {
       eventListener = listener;
       return () => {
@@ -175,7 +185,7 @@ describe("RightPanel Kairos tab", () => {
     await user.click(screen.getByRole("tab", { name: "Kairos" }));
 
     expect(await screen.findByText(/Sleeping/)).toBeInTheDocument();
-    const reply = screen.getByLabelText("最终回复");
+    const reply = screen.getByLabelText("最终回复与通知");
     expect(within(reply).getByText("环境无变化。继续待命。")).toBeInTheDocument();
     const trail = screen.getByLabelText("轨迹列表");
     expect(within(trail).getByText("最终回复")).toBeInTheDocument();

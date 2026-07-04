@@ -9,6 +9,7 @@ function makeConfig(overrides: Partial<KairosConfig> = {}): KairosConfig {
     paths: { ...DEFAULT_PATHS_CONFIG, paths: [] },
     blocklist: { ...DEFAULT_BLOCKLIST },
     ruleMd: "",
+    soulMd: "",
     warnings: [],
     ...overrides,
   };
@@ -23,26 +24,25 @@ describe("buildConfigTipsBlock", () => {
     expect(text).toContain("[blocklist]");
   });
 
-  it("renders watch tag and explicit tip for each path", () => {
+  it("renders explicit tip (or derived tip) for each path", () => {
     const text = buildConfigTipsBlock(
       makeConfig({
         paths: {
-          tip: "watch list",
+          tip: "path list",
           paths: [
-            { path: "/Users/me/docs", watch: true, tip: "design docs" },
-            { path: "/Users/me/inbox", watch: false },
+            { path: "/Users/me/docs", tip: "design docs" },
+            { path: "/Users/me/inbox" },
           ],
         },
       }),
     );
-    expect(text).toMatch(/\/Users\/me\/docs \(watch\)\s+→ design docs/);
+    expect(text).toMatch(/\/Users\/me\/docs\s+→ design docs/);
     expect(text).toMatch(/\/Users\/me\/inbox\s+→ inbox/);    // 末段名作 tip
   });
 
   it("truncates path list and shows remaining count when over budget", () => {
     const manyPaths = Array.from({ length: 200 }, (_, i) => ({
       path: `/Users/me/big-${"x".repeat(40)}-${i}`,
-      watch: i % 2 === 0,
       tip: "very long descriptive tip ".repeat(10),
     }));
     const text = buildConfigTipsBlock(

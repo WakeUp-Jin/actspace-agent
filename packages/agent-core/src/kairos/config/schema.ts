@@ -41,7 +41,6 @@ export interface PathsConfig {
   tip: string;
   paths: Array<{
     path: string;
-    watch: boolean;
     tip?: string;
   }>;
 }
@@ -70,7 +69,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 };
 
 export const DEFAULT_PATHS_CONFIG: PathsConfig = {
-  tip: "在此声明 Kairos 可读的本地路径；watch=true 表示同时纳入巡检差异检测。",
+  tip: "在此声明 Kairos 可读写的本地路径（默认只有自己的 workspace）；目录变化感知请使用文件监听（fs-watch）。",
   paths: [],
 };
 
@@ -175,13 +174,13 @@ export function parsePreferences(raw: unknown): Preferences {
 export function parsePathsConfig(raw: unknown): PathsConfig {
   if (!isObject(raw)) return { ...DEFAULT_PATHS_CONFIG, paths: [] };
   const items = Array.isArray(raw.paths) ? raw.paths : [];
+  // 旧版 entry 里的 watch 字段（巡检开关）已随巡检管道退役，读到时静默忽略。
   const paths = items.flatMap((item): PathsConfig["paths"] => {
     if (!isObject(item)) return [];
     const p = typeof item.path === "string" ? item.path.trim() : "";
     if (!p) return [];
     const entry: PathsConfig["paths"][number] = {
       path: p,
-      watch: pickBoolean(item.watch, false),
     };
     if (typeof item.tip === "string" && item.tip.trim().length > 0) {
       entry.tip = item.tip.trim();

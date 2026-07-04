@@ -15,7 +15,8 @@
  * 不 import "electron"，所有环境依赖注入，保证可单测。
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { chmod, copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type {
   FsWatchActionResult,
@@ -36,6 +37,10 @@ export const RESTART_WINDOW_MS = 10 * 60 * 1000;
 /** 停止时 SIGTERM → SIGKILL 的等待时间。 */
 const STOP_GRACE_MS = 2_000;
 const VERSION_PROBE_TIMEOUT_MS = 3_000;
+/** cargo build --release 的超时：首次全量编译含依赖下载，给足余量。 */
+const CARGO_BUILD_TIMEOUT_MS = 10 * 60 * 1000;
+/** 编译失败时回传给 UI 的 cargo 输出尾部长度。 */
+const CARGO_ERROR_TAIL_CHARS = 1_600;
 
 /** 与插件契约一致的默认排除名单（同 Kairos DEFAULT_WATCH_EXCLUDE）。 */
 export const FS_WATCH_DEFAULT_EXCLUDES = [
@@ -60,12 +65,18 @@ export const FS_WATCH_SKILL_NAME = "fs-watch";
  */
 const FS_WATCH_SKILL_MD = `---
 name: fs-watch
-description: 本机文件监听插件的输出读取指南。当你需要知道被监听目录里哪些文件被创建、修改、删除或重命名（含具体时间与次数）时使用；也用于回答「某目录最近发生了什么变化」。读取前必须先检查 references/watch-log/state.json 心跳确认插件存活。
+description: 本机文件监听插件的持续输出——被监听目录的文件创建 / 修改 / 删除 / 重命名事件按天写入 JSONL 日志。这是一个持续更新的数据源：每次唤醒 / 开始工作时都应先扫一眼当天日志的新增事件，再决定要不要深入；也用于回答「某目录最近发生了什么变化」、统计某文件的修改时间与次数。读取前必须先检查 references/watch-log/state.json 心跳确认插件存活。
 ---
 
 # fs-watch 文件监听
 
 一个独立运行的二进制插件在持续监听若干本机目录，把文件变化事件写到本 Skill 的 \`references/watch-log/\` 下。你不需要（也不应该）自己启动或停止它——只负责读取输出。
+
+## 使用时机（重要）
+
+- **每次唤醒先扫一眼**：读当天事件日志，与你上次看到的最后一条 \`ts\` 对比，只关注新增部分。有值得注意的变化（新文件、密集修改、删除/重命名）就纳入本轮判断，必要时读对应文件内容或记进笔记。
+- 没有新增事件、或心跳已过期时，扫一眼即可结束，不要反复精读整份历史日志。
+- 用户问「最近哪些文件变了 / 某目录发生了什么」时，这里是唯一权威来源，不要用目录扫描去猜。
 
 ## 使用步骤（每次都要做）
 
@@ -108,6 +119,16 @@ export function restartDelayMs(restartIndex: number): number | undefined {
 /** 滑动窗口内的重启时间戳过滤；返回仍在窗口内的时间戳。 */
 export function pruneRestartWindow(timestamps: number[], now: number): number[] {
   return timestamps.filter((t) => now - t < RESTART_WINDOW_MS);
+}
+
+/**
+ * cargo 可执行文件的候选路径（按优先级）。
+ *
+ * macOS 下 Finder 启动的 GUI app 的 PATH 通常不含 `~/.cargo/bin`，
+ * 所以除了裸 "cargo"（交给 PATH 解析）还要显式回落 rustup 默认安装位置。
+ */
+export function cargoCandidates(home: string): string[] {
+  return ["cargo", join(home, ".cargo", "bin", "cargo")];
 }
 
 export interface FsWatchPluginConfig {
@@ -171,6 +192,7 @@ export function normalizeFsWatchConfig(
 interface StateFileShape {
   lastHeartbeatAt?: string;
   overflow?: boolean;
+  pid?: number;
 }
 
 export interface FsWatchServiceOptions {
@@ -249,6 +271,43 @@ export class FsWatchService {
     };
   }
 
+  /**
+   * 从本机 actspace-plugins 仓库一键构建并安装。
+   *
+   * 仓库布局：一个插件一个自包含文件夹 `plugins/fs-watch/`（自带 Cargo.toml / lockfile，
+   * 无根级 workspace）。在插件目录内 `cargo build --release`，产物在其 target/release/ 下。
+   * 编译输出走 log；失败时把 cargo 输出尾部拼进 error 供 UI 展示。
+   */
+  async buildAndInstall(repoRoot: string): Promise<FsWatchInstallResult> {
+    const pluginDir = join(repoRoot, "plugins", "fs-watch");
+    try {
+      await stat(join(pluginDir, "Cargo.toml"));
+    } catch {
+      return {
+        ok: false,
+        error: `该目录不是 actspace-plugins 仓库（缺少 plugins/fs-watch/Cargo.toml）：${repoRoot}`,
+      };
+    }
+
+    const cargo = await findCargo();
+    if (!cargo) {
+      return {
+        ok: false,
+        error: "未找到 cargo（Rust 工具链）。请先安装 Rust（https://rustup.rs），或改用「选择二进制安装」。",
+      };
+    }
+
+    this.log("fs-watch cargo build started", { pluginDir, cargo });
+    const build = await runCargoBuild(cargo, pluginDir, (line) => {
+      this.log("[plugin:fs-watch] cargo", { line });
+    });
+    if (!build.ok) {
+      return { ok: false, error: `编译失败：${build.error ?? "未知错误"}` };
+    }
+
+    return this.installFromFile(join(pluginDir, "target", "release", "fs-watch"));
+  }
+
   async installFromFile(sourcePath: string): Promise<FsWatchInstallResult> {
     try {
       await mkdir(dirname(this.binPath), { recursive: true });
@@ -325,6 +384,7 @@ export class FsWatchService {
     try {
       await this.materializeSkill();
       await this.readOrCreateConfig();
+      await this.takeOverOrphan();
       this.spawnChild();
       return { ok: true };
     } catch (error) {
@@ -485,6 +545,38 @@ export class FsWatchService {
     await rename(tmp, this.configPath);
   }
 
+  /**
+   * 接管孤儿实例。
+   *
+   * outDir 由 actspace 独占管理，所以任何往这里写心跳的进程都是 actspace 之前
+   * spawn 的（典型场景：dev 热重启把主进程直接杀掉，来不及给子进程发 SIGTERM）。
+   * 启动前若发现心跳新鲜且该 pid 仍存活，先 SIGTERM（等 2s）再 SIGKILL 清掉，
+   * 避免新实例撞上插件的单实例锁（exit 2）。
+   */
+  private async takeOverOrphan(): Promise<void> {
+    const state = await this.readStateFile();
+    if (!state || !isHeartbeatFresh(state.lastHeartbeatAt, new Date())) return;
+    const pid = state.pid;
+    if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) return;
+    if (!pidAlive(pid)) return;
+    this.log("fs-watch orphan instance detected, taking over", { pid });
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      return;
+    }
+    const deadline = Date.now() + STOP_GRACE_MS;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (!pidAlive(pid)) return;
+    }
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // 已退出
+    }
+  }
+
   private async readStateFile(): Promise<StateFileShape | undefined> {
     try {
       const raw = await readFile(join(this.outDir, "state.json"), "utf8");
@@ -494,6 +586,94 @@ export class FsWatchService {
       return undefined;
     }
   }
+}
+
+/** kill(pid, 0) 探活：抛 ESRCH 表示进程已退出。 */
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/** 在候选路径里找可用的 cargo（跑 `cargo --version` 验证）；找不到返回 undefined。 */
+async function findCargo(): Promise<string | undefined> {
+  for (const candidate of cargoCandidates(homedir())) {
+    const ok = await new Promise<boolean>((resolve) => {
+      let child: ChildProcess;
+      try {
+        child = spawn(candidate, ["--version"], { stdio: "ignore" });
+      } catch {
+        resolve(false);
+        return;
+      }
+      child.once("error", () => resolve(false));
+      child.once("exit", (code) => resolve(code === 0));
+    });
+    if (ok) return candidate;
+  }
+  return undefined;
+}
+
+/**
+ * 在插件目录内运行 `cargo build --release --locked`（每个插件自带 Cargo.lock）。
+ * 显式移除 CARGO_TARGET_DIR，保证产物落在插件目录自己的 target/release/ 下。
+ */
+async function runCargoBuild(
+  cargo: string,
+  pluginDir: string,
+  onLine: (line: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const env = { ...process.env };
+    delete env.CARGO_TARGET_DIR;
+    let child: ChildProcess;
+    try {
+      child = spawn(cargo, ["build", "--release", "--locked"], {
+        cwd: pluginDir,
+        env,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (error) {
+      resolve({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+
+    let output = "";
+    const collect = (chunk: Buffer) => {
+      const text = chunk.toString("utf8");
+      output += text;
+      for (const line of text.split("\n")) {
+        if (line.trim().length > 0) onLine(line.trimEnd());
+      }
+    };
+    child.stdout?.on("data", collect);
+    child.stderr?.on("data", collect);
+
+    const timer = setTimeout(() => {
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        // 进程可能已退出
+      }
+      resolve({ ok: false, error: `编译超时（超过 ${CARGO_BUILD_TIMEOUT_MS / 60_000} 分钟）` });
+    }, CARGO_BUILD_TIMEOUT_MS);
+
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      resolve({ ok: false, error: error.message });
+    });
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve({ ok: true });
+      } else {
+        resolve({ ok: false, error: output.slice(-CARGO_ERROR_TAIL_CHARS) || `cargo 退出码 ${code}` });
+      }
+    });
+  });
 }
 
 /** 跑 `<bin> --version` 验证二进制；成功返回版本串，失败返回 undefined。 */

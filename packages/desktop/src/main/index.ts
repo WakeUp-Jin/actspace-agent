@@ -772,6 +772,14 @@ async function ensureKairosController(roots: AppDataRoots): Promise<KairosContro
   } catch (err) {
     logMain("kairos skill catalog load failed", { error: err instanceof Error ? err.message : String(err) });
   }
+  // fs-watch 监听目录并入 Kairos 只读授权：用户把目录加进文件监听即代表允许 Kairos
+  // 阅读其中内容（写仍限 paths.json）。读取失败回落空数组，不阻塞启动。
+  let fsWatchReadOnlyRoots: string[] = [];
+  try {
+    fsWatchReadOnlyRoots = (await getFsWatchService(roots).getConfig()).roots;
+  } catch (err) {
+    logMain("kairos fs-watch roots load failed", { error: err instanceof Error ? err.message : String(err) });
+  }
   kairosController = await createKairos({
     kairosRoot,
     llm,
@@ -780,6 +788,7 @@ async function ensureKairosController(roots: AppDataRoots): Promise<KairosContro
     contextWindow,
     thinkingEnabled,
     skillCatalog,
+    readOnlyRoots: fsWatchReadOnlyRoots,
   });
   kairosIpcHandle = registerKairosIpc({
     controller: kairosController,
@@ -1280,6 +1289,27 @@ async function registerIpc() {
     return result;
   });
 
+  // 一键路径：校验仓库 → cargo build --release → 安装产物（编译可能耗时数分钟，renderer 侧给忙态）
+  ipcMain.handle("plugins:fs-watch:install-from-repo", async (): Promise<FsWatchInstallResult> => {
+    const roots = await ensureDataDirectories();
+    const repoRoot = getSettingsService().get().plugins.repoRoot;
+    if (!repoRoot) {
+      return { ok: false, error: "尚未设置插件仓库路径，请先在上方选择 actspace-plugins 仓库目录。" };
+    }
+    const result = await getFsWatchService(roots).buildAndInstall(repoRoot);
+    logMain("fs-watch plugin build-install", { ok: result.ok, error: result.error });
+    return result;
+  });
+
+  ipcMain.handle("plugins:pick-repo-root", async (): Promise<FsWatchPickRootResult> => {
+    const picked = await dialog.showOpenDialog({
+      title: "选择本机 actspace-plugins 仓库目录",
+      properties: ["openDirectory"],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return { canceled: true };
+    return { canceled: false, path: picked.filePaths[0] };
+  });
+
   ipcMain.handle("plugins:fs-watch:set-enabled", async (_event, input: FsWatchSetEnabledInput) => {
     const roots = await ensureDataDirectories();
     const service = getFsWatchService(roots);
@@ -1287,9 +1317,10 @@ async function registerIpc() {
     // 先持久化用户意图；开启时顺带把 fs-watch Skill 并入 Kairos 白名单（用户可再手动移除）
     const settings = getSettingsService();
     const kairosSkills = settings.get().kairos.enabledSkills;
+    const skillNewlyEnabled = enabled && !kairosSkills.includes("fs-watch");
     await settings.update({
       plugins: { fsWatch: { enabled } },
-      ...(enabled && !kairosSkills.includes("fs-watch")
+      ...(skillNewlyEnabled
         ? { kairos: { enabledSkills: [...kairosSkills, "fs-watch"] } }
         : {}),
     });
@@ -1300,6 +1331,17 @@ async function registerIpc() {
     } else {
       await service.stop();
       logMain("fs-watch plugin disabled");
+    }
+    // Skill 白名单刚变化 → 重建 Kairos controller，让 catalog 段 + 只读授权立即生效
+    // （这里绕过了 settings:update IPC，重建要自己触发）。失败只记日志。
+    if (skillNewlyEnabled) {
+      try {
+        await rebuildKairosController(roots);
+      } catch (err) {
+        logMain("kairos rebuild after fs-watch enable failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
     return { ok: true };
   });
@@ -1316,7 +1358,21 @@ async function registerIpc() {
 
   ipcMain.handle("plugins:fs-watch:update-config", async (_event, input: FsWatchConfigUpdateInput) => {
     const roots = await ensureDataDirectories();
-    return getFsWatchService(roots).updateConfig(input);
+    const service = getFsWatchService(roots);
+    const before = (await service.getConfig()).roots;
+    const next = await service.updateConfig(input);
+    // 监听目录变化 → 重建 Kairos controller，让 guard 的只读授权（readOnlyRoots）跟上。
+    // 与模型 / Skill 白名单变更同一套「停旧重建」机制；失败只记日志，不影响配置保存。
+    if (!sameStringSet(before, next.roots)) {
+      try {
+        await rebuildKairosController(roots);
+      } catch (err) {
+        logMain("kairos rebuild after fs-watch roots update failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    return next;
   });
 
   ipcMain.handle("plugins:fs-watch:pick-root", async (): Promise<FsWatchPickRootResult> => {

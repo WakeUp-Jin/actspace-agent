@@ -493,6 +493,7 @@ export function Composer({
         aria-label="Message composer"
         placeholder={placeholder}
         rows={1}
+        ref={inputRef}
         value={message}
         disabled={isStreaming}
         onChange={(event) => setMessage(event.target.value)}

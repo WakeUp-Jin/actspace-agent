@@ -24,7 +24,7 @@ function makeSettings(): AppSettings {
       exploreModelId: null,
     },
     kairos: { modelId: null, thinking: "auto", enabledSkills: [] },
-    plugins: { fsWatch: { enabled: false } },
+    plugins: { repoRoot: null, fsWatch: { enabled: false } },
     skills: { disabled: [] },
   };
 }
@@ -55,8 +55,12 @@ function installKairosBridge(budget: KairosBudgetRuntime): {
     readConfig: vi.fn(async (req) => ({ content: "", fileName: `${req.name}.json`, notFound: true })),
     writeConfig: vi.fn(async () => ({ ok: true as const })),
     getContextSnapshot: vi.fn(async () => ({ generatedAt: new Date().toISOString(), sections: [] })),
+    notificationsList: vi.fn(async () => ({ notifications: [], unreadCount: 0 })),
+    notificationsMarkRead: vi.fn(async () => ({ ok: true as const, unreadCount: 0 })),
+    notificationsRemove: vi.fn(async () => ({ ok: true as const, removedCount: 0, unreadCount: 0 })),
     onEvent: vi.fn(() => () => {}),
     onState: vi.fn(() => () => {}),
+    onNotification: vi.fn(() => () => {}),
   } as unknown as KairosBridgeApi;
   window.kairos = bridge as unknown as KairosBridge;
   return { control };

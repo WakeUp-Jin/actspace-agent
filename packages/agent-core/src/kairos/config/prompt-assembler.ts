@@ -37,9 +37,8 @@ function buildPathsBlock(config: KairosConfig): string[] {
   }
   block.push(`[paths] ${config.paths.tip}：`);
   for (const item of config.paths.paths) {
-    const watchTag = item.watch ? " (watch)" : "";
     const tip = item.tip ?? deriveTipFromPath(item.path);
-    block.push(`  - ${item.path}${watchTag}  → ${tip}`);
+    block.push(`  - ${item.path}  → ${tip}`);
   }
   return block;
 }
@@ -59,9 +58,8 @@ function rebuildWithTruncation(config: KairosConfig, maxChars: number): string {
     const block: string[] = [];
     block.push(`[paths] ${config.paths.tip}：`);
     for (const item of visible) {
-      const watchTag = item.watch ? " (watch)" : "";
       const tip = item.tip ?? deriveTipFromPath(item.path);
-      block.push(`  - ${item.path}${watchTag}  → ${tip}`);
+      block.push(`  - ${item.path}  → ${tip}`);
     }
     if (rest > 0) {
       block.push(`  - …另有 ${rest} 条已省略`);

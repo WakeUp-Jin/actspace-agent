@@ -160,8 +160,8 @@ export type KairosGetEventsRecentResponse = {
  */
 export type KairosPinNoteRequest = never;
 
-/** 4 份配置文件的逻辑名（IPC 用），main 端映射成实际文件名。 */
-export type KairosConfigName = "preferences" | "paths" | "blocklist" | "rule";
+/** 5 份配置文件的逻辑名（IPC 用），main 端映射成实际文件名。 */
+export type KairosConfigName = "preferences" | "paths" | "blocklist" | "rule" | "soul";
 
 /** `kairos:read-config` 请求/响应。`content` 是原始文本（JSON 或 markdown），由 renderer 直接显示/编辑。 */
 export type KairosReadConfigRequest = { name: KairosConfigName };
@@ -184,6 +184,95 @@ export type KairosWriteConfigResponse = { ok: true };
 
 /** `kairos:control` 响应统一格式。 */
 export type KairosControlResponse = { ok: true };
+
+// ─── briefs（任务表）编辑 IPC（详见 docs/design-docs/agent-kairos-prompt-design.md §7） ───
+
+/** brief 生命周期状态；UI 只在 active/paused 间切换，done/failed 由系统写入。 */
+export type KairosBriefStatus = "active" | "paused" | "done" | "failed";
+export type KairosBriefTrigger = "interval" | "manual" | "event";
+export type KairosBriefPriority = "high" | "normal" | "low";
+
+/**
+ * `kairos:briefs-list` 响应的单条摘要（frontmatter 投影，不含正文）。
+ * `created` / `lastRun` / `nextRun` 由系统维护，UI 只读展示。
+ */
+export interface KairosBriefSummary {
+  id: string;
+  status: KairosBriefStatus;
+  trigger: KairosBriefTrigger;
+  intervalSec: number | null;
+  priority: KairosBriefPriority;
+  created: string;
+  lastRun: string | null;
+  nextRun: string | null;
+}
+
+export type KairosBriefsListResponse = { briefs: KairosBriefSummary[] };
+
+export type KairosBriefReadRequest = { id: string };
+export type KairosBriefReadResponse = { summary: KairosBriefSummary; body: string };
+
+/**
+ * `kairos:briefs-write` 请求：新建或编辑同走一条通道（按 id 是否已存在区分）。
+ * 只允许提交用户可编辑字段；`created`（新建时置当前时间）与 `lastRun` / `nextRun`
+ * （编辑时保留原值）由 main 端维护，防止 UI 破坏调度状态。
+ */
+export type KairosBriefWriteRequest = {
+  id: string;
+  status: Extract<KairosBriefStatus, "active" | "paused">;
+  trigger: KairosBriefTrigger;
+  intervalSec: number | null;
+  priority: KairosBriefPriority;
+  body: string;
+};
+export type KairosBriefWriteResponse = { ok: true };
+
+export type KairosBriefDeleteRequest = { id: string };
+export type KairosBriefDeleteResponse = { ok: true };
+
+// ─── 通知中心（详见 docs/design-docs/agent-kairos-notifications.md） ───
+
+/** 通知级别；`important` 会额外触发 macOS 系统通知。 */
+export type KairosNotificationLevel = "info" | "important";
+
+/**
+ * 单条通知。由 Kairos 调用 `notify_user` 工具产生，落盘 `<kairosRoot>/memory/notifications.json`。
+ * `read` 是可变状态（用户点击已读），因此不进 append-only 的事件流。
+ */
+export interface KairosNotification {
+  id: string;
+  /** ISO time，创建时间。 */
+  timestamp: string;
+  /** 一句话结论，通知列表主行。 */
+  title: string;
+  /** markdown 详情，可为 null（只有一句话时）。 */
+  body: string | null;
+  level: KairosNotificationLevel;
+  read: boolean;
+}
+
+/** `kairos:notifications-list` 响应；notifications 按新→旧排序。 */
+export type KairosNotificationsListResponse = {
+  notifications: KairosNotification[];
+  unreadCount: number;
+};
+
+/** `kairos:notifications-mark-read` 请求；省略 `id` = 全部标记已读。 */
+export type KairosNotificationsMarkReadRequest = { id?: string };
+export type KairosNotificationsMarkReadResponse = { ok: true; unreadCount: number };
+
+/**
+ * `kairos:notifications-remove` 请求（纯用户侧操作，Kairos 工具不感知删除）：
+ * - `{ id }`：删除单条；
+ * - `{ scope: "read" }`：清除所有已读；
+ * - `{ scope: "all" }`：清空全部。
+ */
+export type KairosNotificationsRemoveRequest = { id: string } | { scope: "read" | "all" };
+export type KairosNotificationsRemoveResponse = {
+  ok: true;
+  removedCount: number;
+  unreadCount: number;
+};
 
 // ─── 上下文 Sheet 快照（详见 docs/design-docs/front-Kairos监控页规范.md） ───
 
@@ -218,7 +307,7 @@ export interface KairosContextMessage {
 
 /**
  * 工具列表单条。
- * - `source: "kairos"` 表示该工具仅在 Kairos 实例注册（v1 只有 `sleep`）；
+ * - `source: "kairos"` 表示该工具仅在 Kairos 实例注册（`sleep` / `notify_user`）；
  * - `source: "shared"` 表示来自主 Agent 共享工具集；
  * - `parametersSchema` 保留 JSON Schema 子树以备将来扩展；v1 渲染器只显示
  *   `name + description`，不再让用户点开 schema（细节不直观）。
@@ -290,6 +379,18 @@ export interface KairosBridgeApi {
   writeConfig(req: KairosWriteConfigRequest): Promise<KairosWriteConfigResponse>;
   /** Sheet 按钮按需拉取的上下文快照；renderer 不缓存，关闭即释放。 */
   getContextSnapshot(): Promise<KairosContextSnapshot>;
+  briefsList(): Promise<KairosBriefsListResponse>;
+  briefsRead(req: KairosBriefReadRequest): Promise<KairosBriefReadResponse>;
+  briefsWrite(req: KairosBriefWriteRequest): Promise<KairosBriefWriteResponse>;
+  briefsDelete(req: KairosBriefDeleteRequest): Promise<KairosBriefDeleteResponse>;
+  notificationsList(): Promise<KairosNotificationsListResponse>;
+  notificationsMarkRead(
+    req: KairosNotificationsMarkReadRequest,
+  ): Promise<KairosNotificationsMarkReadResponse>;
+  notificationsRemove(
+    req: KairosNotificationsRemoveRequest,
+  ): Promise<KairosNotificationsRemoveResponse>;
   onEvent(listener: (event: SessionEvent) => void): () => void;
   onState(listener: (state: KairosRuntimeState) => void): () => void;
+  onNotification(listener: (notification: KairosNotification) => void): () => void;
 }

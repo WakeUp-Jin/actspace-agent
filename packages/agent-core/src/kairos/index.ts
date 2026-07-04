@@ -21,10 +21,12 @@ export {
   buildObservationDelta,
   derivePhase,
   renderKairosSkillCatalog,
+  TICK_MESSAGE_REMINDER,
   type AssembleSystemPromptInput,
   type AssembleTickMessageInput,
   type BuildObservationDeltaInput,
   type BuildHistorySummaryInput,
+  type KairosActiveBriefInfo,
   type KairosSkillCatalogEntry,
 } from "./prompt-assembler";
 export { loadKairosConfig, type KairosConfig } from "./config/loader";
@@ -49,9 +51,7 @@ export {
   toLlmMessages,
   type KairosShortTermLoadResult,
 } from "./context/short-term";
-export { WatchDiffEngine, type WatchDiffEntry } from "./context/watch-diff";
 export { SessionsDigestBuilder, type SessionsDigestResult, type SessionDigestItem } from "./context/sessions-digest";
-export { scanWatchPath } from "./context/watch-scanner";
 export { BriefsIndexManager, type BriefsIndex, type BriefIndexEntry } from "./briefs/index-manager";
 export { BriefsDispatcher, type TickPayload } from "./briefs/dispatcher";
 export {

@@ -3,6 +3,12 @@ import { Bolt, Pause, RotateCcw } from "lucide-react";
 import type { KairosEventRow, KairosRuntimeState } from "@actspace/shared";
 import { useKairos } from "../../state/useKairos";
 import {
+  KairosNotificationActions,
+  KairosNotificationList,
+  KairosNotificationTabBadge,
+  useKairosNotifications,
+} from "../kairos/KairosNotifications";
+import {
   formatKairosDuration,
   formatKairosTime,
   getKairosDisplayRows,
@@ -22,11 +28,17 @@ const compactStatusClass =
 const compactActionsClass = "grid grid-cols-3 gap-1.5";
 const compactButtonClass =
   "inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-[7px] border border-line bg-surface px-2 text-xs text-text-main transition hover:border-line-strong hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50 max-[980px]:[&>span]:hidden";
-const compactPrimaryButtonClass = "border-brand bg-brand text-white hover:border-brand-strong hover:bg-brand-strong";
+// 主按钮是独立完整类，不叠加在 compactButtonClass 上——bg-surface/bg-brand、
+// text-text-main/text-white 同属性类的胜负取决于生成 CSS 的顺序，叠加曾导致
+// 「开启」按钮白底白字不可见（与分页激活按钮同一个坑）。
+const compactPrimaryButtonClass =
+  "inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-[7px] border border-brand bg-brand px-2 text-xs font-medium text-white transition hover:border-brand-strong hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50 max-[980px]:[&>span]:hidden";
 const compactErrorClass =
   "rounded-[7px] border border-on-danger/30 bg-danger-soft px-[9px] py-[7px] text-xs leading-[1.45] text-on-danger";
 const compactPanelClass = "grid min-w-0 min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-surface";
 const compactReplyClass = `${compactPanelClass} max-h-[220px] border-b border-line`;
+// 通知 tab 下放宽上限：展开的 Markdown 正文需要更多可视空间，轨迹列表往下挤。
+const compactNotificationClass = `${compactPanelClass} max-h-[min(480px,60vh)] border-b border-line`;
 const compactSectionHeadClass = "flex min-w-0 items-center justify-between gap-2.5 px-3.5 pb-2 pt-3";
 const compactSectionMetaClass =
   "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs tabular-nums text-text-faint";
@@ -42,6 +54,11 @@ const compactRowMetaClass =
 const compactRowMetaItemClass = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap";
 const compactRowSummaryClass =
   "m-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-[1.45] text-text-main";
+// 与 KairosPage 详情面板同款 Cursor 风格 segmented control（浅灰槽 + 激活项白底微浮起）。
+const compactReplyTabClass =
+  "inline-flex h-6 items-center gap-1 rounded-[5px] border-0 bg-transparent px-2 text-xs text-text-muted transition hover:text-text-main";
+const compactReplyTabActiveClass =
+  "bg-surface font-medium text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.07),inset_0_0_0_1px_var(--act-color-border)]";
 
 function cn(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(" ");
@@ -49,6 +66,8 @@ function cn(...classes: Array<string | false | null | undefined>): string {
 
 export function KairosRightPanelView() {
   const k = useKairos();
+  const notifications = useKairosNotifications();
+  const [replyTab, setReplyTab] = useState<"reply" | "notification">("reply");
   const sleepRemaining = useSleepCountdown(k.state?.sleepEndsAt);
   const latestReply = useMemo(() => getLatestKairosReply(k.events, k.rows), [k.events, k.rows]);
   const rows = useMemo(
@@ -95,7 +114,7 @@ export function KairosRightPanelView() {
           ) : (
             <button
               type="button"
-              className={cn(compactButtonClass, compactPrimaryButtonClass)}
+              className={compactPrimaryButtonClass}
               title="开启 Kairos"
               aria-label="开启 Kairos"
               onClick={() => k.control({ type: "start" }).catch(() => {})}
@@ -133,14 +152,52 @@ export function KairosRightPanelView() {
         ) : null}
       </header>
 
-      <section className={compactReplyClass} aria-label="最终回复">
+      <section
+        className={replyTab === "notification" ? compactNotificationClass : compactReplyClass}
+        aria-label="最终回复与通知"
+      >
         <div className={compactSectionHeadClass}>
-          <h2 className="m-0 text-[13px] font-semibold text-text-main">最终回复</h2>
-          <span className={compactSectionMetaClass}>{latestReply.timestamp ? formatKairosTime(latestReply.timestamp) : "最近一次回复"}</span>
+          <div
+            className="flex items-center gap-0.5 rounded-[7px] bg-surface-subtle p-0.5"
+            role="tablist"
+            aria-label="回复与通知切换"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={replyTab === "reply"}
+              className={cn(compactReplyTabClass, replyTab === "reply" && compactReplyTabActiveClass)}
+              onClick={() => setReplyTab("reply")}
+            >
+              最终回复
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={replyTab === "notification"}
+              className={cn(compactReplyTabClass, replyTab === "notification" && compactReplyTabActiveClass)}
+              data-testid="kairos-notification-tab"
+              onClick={() => setReplyTab("notification")}
+            >
+              通知
+              <KairosNotificationTabBadge count={notifications.unreadCount} />
+            </button>
+          </div>
+          {replyTab === "reply" ? (
+            <span className={compactSectionMetaClass}>{latestReply.timestamp ? formatKairosTime(latestReply.timestamp) : "最近一次回复"}</span>
+          ) : (
+            <KairosNotificationActions store={notifications} />
+          )}
         </div>
-        <div className={compactReplyBodyClass}>
-          {latestReply.text ? latestReply.text : <span className="text-text-faint">暂无最终回复</span>}
-        </div>
+        {replyTab === "reply" ? (
+          <div className={compactReplyBodyClass}>
+            {latestReply.text ? latestReply.text : <span className="text-text-faint">暂无最终回复</span>}
+          </div>
+        ) : (
+          <div className="min-h-[72px] overflow-auto px-3.5 pb-3.5">
+            <KairosNotificationList store={notifications} size="compact" />
+          </div>
+        )}
       </section>
 
       <section className={compactPanelClass} aria-label="轨迹列表">

@@ -1,15 +1,15 @@
 # Agent Plugins 插件模式与 fs-watch 文件监听设计
 
-> 长期设计事实来源（design fact source）。本文档定义 actspace 的 Plugin 插件模式（外部二进制辅助工具）、第一个插件 `fs-watch`（Rust 文件监听程序）的文件契约，以及 actspace 侧的集成边界：设置页「插件」分区、Skills 管理分区和 Kairos Skill 白名单。后续 execution plan 从本文档派生。
+> 长期设计事实来源（design fact source）。本文档定义 actspace 的 Plugin 插件模式（外部二进制辅助工具）、第一个插件 `fs-watch`（Rust 文件监听程序）的文件契约，以及 actspace 侧的集成边界：设置页「插件」「文件监听」两个分区、Skills 管理分区和 Kairos Skill 白名单。后续 execution plan 从本文档派生。
 
 ## 当前状态
 
-- 状态：设计阶段 v2（2026-07-03），未实施。v1 曾命名为 Sidecar 并计划源码进仓，v2 定名 **Plugins** 且插件源码外置到独立仓库 `actspace-plugins`。
+- 状态：已上线（2026-07-03）。插件仓库侧：`actspace-plugins` 内 fs-watch v0 已实现（`plugins/fs-watch/`，一插件一自包含文件夹布局，含 PID 探活的单实例锁）。actspace 集成侧已实施：main 进程 `FsWatchService`（spawn / 守护 / 孤儿接管 / 优雅退出）、设置页「插件」（安装与编译）+「文件监听」（开关与监听目录）两个分区、Kairos Skill catalog 接入。同日两项联动变更：Kairos 旧 poll-on-tick 巡检管道退役（目录变化感知归口本插件）；fs-watch 监听目录自动并入 Kairos 的只读授权 `readOnlyRoots`（详见 `agent-kairos-autonomous-mode.md`）。v1 曾命名为 Sidecar 并计划源码进仓，v2 定名 **Plugins** 且插件源码外置到独立仓库 `actspace-plugins`。
 - 适用范围：
   - `actspace-plugins` 独立仓库（side-project 下新建）：Rust 插件源码、Skill 模板、构建发布。
   - actspace 仓库：`packages/shared`（settings 契约）、`packages/desktop`（main 进程管理 + 设置页）、`packages/agent-core`（Kairos Skill catalog）。
 - 关联文档：
-  - `agent-kairos-autonomous-mode.md`：现有 poll-on-tick 巡检（watch-scanner + watch-diff）的事实来源；本设计**不改动**该管道。
+  - `agent-kairos-autonomous-mode.md`：Kairos 自治模式的事实来源。其 v1 poll-on-tick 巡检（watch-scanner + watch-diff）已于 2026-07-03 退役，目录变化感知统一由本插件承担。
   - `agent-skill-loading.md`：Skill 目录结构、发现路径和渐进式披露规范，fs-watch 的 Skill 形态完全遵守它。
   - `agent-browser-bridge-design.md`：另一个外部辅助程序先例（Go CLI），语言选型讨论以它为参照。
 
@@ -17,7 +17,7 @@
 
 ### Kairos 现有文件监听的局限
 
-Kairos v1 的巡检刻意不用 `fs.watch`，走「轮询快照 + 集合差集」（`kairos/context/watch-scanner.ts` + `watch-diff.ts`）。算法简单可靠，但有三个天然局限：
+Kairos v1 的巡检刻意不用 `fs.watch`，走「轮询快照 + 集合差集」（`kairos/context/watch-scanner.ts` + `watch-diff.ts`，2026-07-03 已随管道退役删除）。算法简单可靠，但有三个天然局限：
 
 1. **感知不到 modified**：文件内容变了、文件名没变，diff 完全看不见。
 2. **粒度粗**：变化只能在下一次 tick 才被发现，两次 tick 之间的中间状态丢失。
@@ -58,7 +58,7 @@ fs-watch 选 Rust，核心理由是技术性的，不只是偏好：
 
 | 仓库 | 内容 | 不放什么 |
 | --- | --- | --- |
-| `actspace-plugins`（独立新仓库） | Cargo workspace，未来所有插件各占一个 crate；`fs-watch` 源码 + `Cargo.lock`；各插件的 Skill 模板（SKILL.md）；构建脚本与发布说明 | 不放 actspace 的 TS 代码，不反向依赖 actspace |
+| `actspace-plugins`（独立新仓库） | 一个插件一个自包含文件夹 `plugins/<name>/`（语言无关，Rust / Go 均可，不用根级 Cargo workspace）；每个插件带自己的构建定义与 lockfile、`build.sh`（编译并把二进制放进 `skill/scripts/`）和 Skill 载体 `skill/`（SKILL.md + 构建产物，可整体分发） | 不放 actspace 的 TS 代码，不反向依赖 actspace |
 | `actspace-agent`（本仓库） | 集成层：settings 契约、main 进程插件管理、设置页 UI、Kairos Skill catalog | 不放插件源码，不解析插件内部实现 |
 
 两仓之间的唯一耦合是下文的**文件契约**（事件 JSONL + state.json），契约以本文档为唯一事实来源，用 `v` 字段做版本兼容。
@@ -76,7 +76,7 @@ fs-watch 选 Rust，核心理由是技术性的，不只是偏好：
 - 不做插件与宿主的双向通信（socket / stdin 命令通道）。配置变更走「重写 config + 重启进程」。
 - 不监听文件**内容**、不计算 diff patch。fs-watch 只产出「哪个路径发生了什么类型的变化」。
 - 不做网络能力。fs-watch 不发任何网络请求。
-- 不改动 Kairos 现有 poll-on-tick 巡检管道（watch-scanner / watch-diff 原样保留，职责不变）。**不做 controller 直读插件日志进 tick 观测增量的路径**——Kairos 消费只走 Skill catalog（理由与取舍见下文）；若实际运行发现 Kairos 经常漏看，再回头补该路径。
+- **不做 controller 直读插件日志进 tick 观测增量的路径**——Kairos 消费只走 Skill catalog（理由与取舍见下文）；若实际运行发现 Kairos 经常漏看，再回头补该路径。（原「不改动 Kairos 巡检管道」一条已过时：2026-07-03 旧巡检管道整体退役，本插件成为唯一的目录变化感知来源。）
 - 不随 actspace 打包插件二进制（v0 走约定路径 + 手动安装，见下文；打包留给后续）。
 
 ## 总体架构
@@ -84,8 +84,9 @@ fs-watch 选 Rust，核心理由是技术性的，不只是偏好：
 ```text
 ┌─────────────────────────────────────────────────────────────┐
 │ actspace-plugins 仓库（独立）                                 │
-│   crates/fs-watch/            Rust 源码                      │
-│   crates/fs-watch/skill/      Skill 模板（SKILL.md）          │
+│   plugins/fs-watch/           Rust 源码 + build.sh           │
+│   plugins/fs-watch/skill/     Skill 载体（SKILL.md +          │
+│                               scripts/ 内的构建产物二进制）    │
 └─────────────────────────────────────────────────────────────┘
                     │ 构建二进制，用户安装（设置页选文件 / 手动放置）
                     ▼
@@ -160,8 +161,8 @@ fs-watch 选 Rust，核心理由是技术性的，不只是偏好：
   "binaryVersion": "0.1.0" }
 ```
 
-- 消费方判定插件存活的唯一标准：`lastHeartbeatAt` 距今 < 90s（3 个心跳周期）。**不要用 pid 探活**——pid 复用会误判。
-- 单实例锁：启动时若 state.json 心跳新鲜则直接退出（exit code 非 0 + stderr 说明），避免双写。
+- **消费方**（Agent / 只读方）判定插件存活的唯一标准：`lastHeartbeatAt` 距今 < 90s（3 个心跳周期）。消费方**不要用 pid 探活**——pid 复用会误判。
+- 单实例锁（插件自身）：启动时若 state.json 心跳新鲜**且其中 pid 仍存活**（`kill(pid, 0)`）则以 exit code 2 退出 + stderr 说明，避免双写。只看心跳会误伤优雅重启：进程退出时会写最后一次遗言心跳（向消费方标记数据截止时间），90s 内的「停止 → 再启动」（改配置自动重启、快速关开开关）就会被自己的遗言心跳挡住。插件自己 kill(pid, 0) 探活可接受——误判窗口只有 90s，远短于 pid 复用周期。
 - 优雅退出：收到 SIGTERM / SIGINT 后 flush 缓冲、写最后一次心跳、退出。
 
 ### 插件 config.json
@@ -183,7 +184,7 @@ fs-watch 选 Rust，核心理由是技术性的，不只是偏好：
 }
 ```
 
-- `excludeNames` 默认值与 Kairos `watch-scanner.ts` 的 `DEFAULT_WATCH_EXCLUDE` 保持一致，命中即跳过整个子树。
+- `excludeNames` 默认值沿用 Kairos 旧 `watch-scanner.ts` 的 `DEFAULT_WATCH_EXCLUDE` 清单（该文件已删除，清单事实来源改为本文档与插件源码），命中即跳过整个子树。
 - 监听目录由设置页直接维护，**不再从 Kairos `paths.json` 生成**——插件配置与 Kairos 配置解耦，各管各的。
 
 ### CLI 形态（self-describing）
@@ -201,63 +202,77 @@ fs-watch --version
 
 ### 物化位置
 
-Skill 模板放在插件仓库 `crates/fs-watch/skill/`，由 actspace 在启用插件时**物化**到用户级 Skill 目录 `<userData>/skills/fs-watch/`。选这里而不是项目 `.agents/skills/` 的原因：
+Skill 模板放在插件仓库 `plugins/fs-watch/skill/`（构建后 `scripts/` 内含二进制，整个文件夹是完整分发单元），由 actspace 在启用插件时**物化**到用户级 Skill 目录 `<userData>/skills/fs-watch/`。选这里而不是项目 `.agents/skills/` 的原因：
 
 - `references/` 是运行时持续写入的数据，放进任何 git 仓库都会污染状态。
 - `<userData>/skills/` 已经在 `agent-skill-loading.md` 的扫描路径里（user scope 优先级 4），主 Agent 零改动即可发现。
 
-给 actspace 之外的 Agent 使用时，把 Skill 目录复制到 `~/.agents/skills/fs-watch/`，二进制由用户按各自环境启动。
+给 actspace 之外的 Agent 使用时，把构建后的 Skill 目录整体复制到 `~/.agents/skills/fs-watch/`（二进制已在 `scripts/fs-watch`），按 SKILL.md 指引启动。
 
 ### SKILL.md 要点
 
-frontmatter 遵守 `agent-skill-loading.md` 规范。因为 Kairos 消费只走 Skill 读取（没有 controller 强制注入增量），description 要写得 **pushy**，正文必须覆盖：
+frontmatter 遵守 `agent-skill-loading.md` 规范。因为 Kairos 消费只走 Skill 读取（没有 controller 强制注入增量），description 要写得 **pushy**——明确自述"这是持续更新的数据源，每次唤醒 / 开始工作都应先扫一眼当天日志新增事件"，而不是被动等任务匹配。正文必须覆盖：
 
 1. **是什么**：fs-watch 插件的输出目录，记录被监听目录的文件变化事件。
-2. **先查存活**：读 `references/watch-log/state.json`，`lastHeartbeatAt` 距今 < 90s 才代表数据实时；过期则明确告知用户"监听未在运行"，不要拿旧数据当实时状态。
-3. **怎么读**：当日文件是 `references/watch-log/<YYYY-MM>/<YYYY-MM-DD>.jsonl`，每行一条事件；关心近期变化从文件尾部读，回溯按天往前翻。
-4. **事件语义**：`kind` 四种取值、`path` 相对 `root`、rename 可能退化为 removed+created。
-5. **边界**：事件只反映"路径发生了变化"，不含文件内容；需要内容自己 `read_file`。
+2. **使用时机**：每次唤醒先扫当天日志，对比上次读到的最后一条 `ts` 只看新增；无新增或心跳过期就收手，不反复精读历史。
+3. **先查存活**：读 `references/watch-log/state.json`，`lastHeartbeatAt` 距今 < 90s 才代表数据实时；过期则明确告知用户"监听未在运行"，不要拿旧数据当实时状态。
+4. **怎么读**：当日文件是 `references/watch-log/<YYYY-MM>/<YYYY-MM-DD>.jsonl`，每行一条事件；关心近期变化从文件尾部读，回溯按天往前翻。
+5. **事件语义**：`kind` 四种取值、`path` 相对 `root`、rename 可能退化为 removed+created。
+6. **边界**：事件只反映"路径发生了变化"，不含文件内容；需要内容自己 `read_file`。
 
 ## actspace 集成
 
 ### 安装与二进制发现
 
 - 约定安装位置：`<userData>/plugins/fs-watch/bin/fs-watch`。
-- 设置页检测该路径：
-  - 不存在 → 显示「未安装」+ 安装指引 + 「选择二进制安装」按钮（文件选择器选中本地构建产物，复制到约定位置并 `chmod +x`）。
-  - 存在 → 显示版本（`fs-watch --version`）与开关。
+- **主路径（一键编译安装）**：设置页「插件」分区的「插件仓库」卡片配置仓库路径（`settings.plugins.repoRoot`），指向用户 clone 的 `actspace-plugins` 仓库绝对路径。设置后未安装时显示「编译并安装」按钮，已安装时显示「重新编译」按钮（升级用：先停旧进程 → 重编 → 重装 → 重启），一键完成：
+  1. 校验仓库结构（`plugins/fs-watch/Cargo.toml` 存在——每个插件是自包含文件夹，自带构建定义与 lockfile，无根级 workspace）；
+  2. 发现 cargo（先 PATH，再回落 `~/.cargo/bin/cargo`——macOS GUI 启动的 app PATH 通常不含后者）；找不到给出安装 Rust 的指引；
+  3. `cargo build --release --locked`（cwd = `plugins/fs-watch/`，显式移除 `CARGO_TARGET_DIR`，10 分钟超时，输出进主进程日志）；
+  4. 安装 `plugins/fs-watch/target/release/fs-watch` 到约定位置（复制 + chmod + `--version` 校验）；
+  5. renderer 侧随即自动打开总开关 → 物化 Skill + 启动进程 + 并入 Kairos 白名单。复杂度全部藏在代码后面，用户视角就是一次点击。
+- **兜底路径**：「选择二进制安装」文件选择器仍保留（未设仓库路径、或没装 Rust 工具链时使用）。
+- 设置页检测约定位置：存在 → 显示版本（`fs-watch --version`）与开关；不存在 → 上述安装入口。
 - 后续插件稳定后再评估随 actspace 打包（extraResources）或下载安装，v0 不做。
 
-### 设置页「插件」分区
+### 设置页「插件」与「文件监听」两个分区
 
-新增设置分组「插件」，V1 只有「文件监听」一张卡片：
+fs-watch 在设置页拆成两个导航分区，按用户心智分工（用户反馈：安装/编译这类"插件"操作和"文件监听"这个功能混在一个页面不好懂）：
 
-1. **安装状态**：已安装（版本号）/ 未安装（安装按钮 + 指引）。
-2. **总开关**：开启 = spawn 进程 + 守护 + 挂优雅退出；关闭 = SIGTERM 停进程。状态持久化，应用重启后按状态自动拉起。
-3. **运行状态**：运行中 / 已停止 / 异常，依据心跳新鲜度（<90s）展示，附最近心跳时间。
-4. **配置**：监听目录列表（增删，目录选择器）、排除规则、日志保留天数。写 `config.json`，变更后自动重启进程生效。
+**「插件」分区**——管插件二进制的安装与版本（未来新插件都加在这里）：
+
+1. 「插件仓库」卡片：`settings.plugins.repoRoot` 配置（见上节「安装与二进制发现」）。
+2. 「已接入的插件」列表：每个插件一张卡片，显示安装状态 / 版本号 / 运行状态徽标 / 最近心跳，提供「编译并安装」「选二进制」「重新编译」按钮；卡片文案指引用户到对应功能分区做开关与配置。
+
+**「文件监听」分区**——面向用户管功能本身：
+
+1. **总开关**：开启 = spawn 进程 + 守护 + 挂优雅退出；关闭 = SIGTERM 停进程。状态持久化，应用重启后按状态自动拉起。
+2. **运行状态**：运行中 / 已停止 / 异常（附内联重试），依据心跳新鲜度（<90s）展示，附最近心跳时间。
+3. **配置**：监听目录列表（增删，目录选择器）、排除规则、日志保留天数。写 `config.json`，变更后自动重启进程生效。
+4. 未安装时整版引导到「插件」分区先安装。
 
 关闭开关**不删除** Skill 目录和历史日志——再次开启无缝续写；用户想清理可手动删。
 
 ### 进程生命周期（main 进程职责）
 
 - spawn：以 `--config <userData>/plugins/fs-watch/config.json` 启动，stdout/stderr 落应用日志（`[plugin:fs-watch]` 前缀）。
-- 守护：异常退出后指数退避重启，10 分钟内最多 5 次，超过置「异常」状态并停止重试（设置页可手动重试）。
+- 守护：异常退出后指数退避重启，10 分钟内最多 5 次，超过置「异常」状态并停止重试（设置页可手动重试）；exit code 2（单实例锁冲突）不自动重启，直接置异常。
+- 孤儿接管：start 前若发现 state.json 心跳新鲜且 pid 存活，先 SIGTERM（2s 后 SIGKILL）清掉再 spawn——outDir 由 actspace 独占管理，往这里写心跳的进程必然是 actspace 之前 spawn 的（典型：dev 热重启杀主进程来不及给子进程发 SIGTERM 留下的孤儿）。
 - 优雅退出：应用 `before-quit` 时发 SIGTERM，2s 超时后 SIGKILL（与 Kairos `shutdown()` 同阶段处理）。
 
 ### Kairos 集成：Skill catalog（唯一路径）
 
-Kairos 现有观测管道零改动。插件价值通过 Skill 进入：
+插件价值通过 Skill 进入（不直连 tick 观测增量）：
 
 - Kairos 新增最小 Skill catalog 能力：白名单 `kairos.enabledSkills`（默认 `[]`）命中的 Skill，以现有 catalog 格式（name / description / location）注入 Kairos system prompt 配置提示段（低频内容，不破坏缓存前缀）；正文仍走 `read_file` 渐进式披露。
-- `location` 指向的 Skill 根目录自动加入 Kairos 的 `allowedRoots`（等价于 paths.json 授权），否则 guard 会拒绝它读 SKILL.md 和 references。
+- 授权走**只读**通道：Skill 根目录与 fs-watch 正在监听的目录一起进入 Kairos guard 的 `readOnlyRoots`（读工具放行、写工具拒绝）；可写授权仍只来自 paths.json 的 `allowedRoots`。用户把目录加入文件监听即视为允许 Kairos 阅读其中内容。fs-watch 监听目录或开关变化时 main 进程重建 KairosController，保证授权实时同步。
 - 联动：设置页开启「文件监听」时，默认把 `fs-watch` 加入 `kairos.enabledSkills`（用户可手动移除）。
 
-**已知取舍**：只靠 catalog，Kairos 不保证每次 tick 都读监听日志——它是"知道有这个能力、需要时来读"。缓解手段：SKILL.md description 写得 pushy；用户可在 Kairos `rule.md` 写"每次唤醒先看一眼文件变化"。若实际运行发现 Kairos 经常漏看，再补 controller 直读观测增量的路径（该方案的水位 / 回退设计已在本文档 v1 版本中论证过，可从 git 历史找回）。
+**已知取舍**：只靠 catalog，Kairos 不保证每次 tick 都读监听日志——它是"知道有这个能力、需要时来读"。缓解手段（前两条已实施）：① catalog 渲染的通用指引里加一句"持续更新的数据源类 Skill 每次唤醒应主动查看最新输出"（保持 skill-agnostic，不在 Kairos 代码里硬编码 fs-watch）；② fs-watch 的 description 写得 pushy（自述为持续数据源 + 每次唤醒先扫）；③ 用户可在 Kairos `rule.md` 写"每次唤醒先看一眼文件变化"进一步强化。若实际运行仍发现 Kairos 经常漏看，再补 controller 直读观测增量的路径（该方案的水位 / 回退设计已在本文档 v1 版本中论证过，可从 git 历史找回）。
 
-## Skills 管理分区（与「插件」分开成组）
+## Skills 管理分区（与「插件」「文件监听」分开成组）
 
-新增独立设置分组「Skills」，把散落在文件系统里的 Skill 生态可视化。与「插件」分开的理由：Skill 是**能力知识**的管理，插件是**外部进程**的管理，混在一起概念会糊。
+新增独立设置分组「Skills」，把散落在文件系统里的 Skill 生态可视化。与前两个分区分开的理由：Skill 是**能力知识**的管理，插件是**外部进程**的管理，混在一起概念会糊。
 
 - **列表**：展示所有扫描到的 Skill（项目级 + 用户级，即 `agent-skill-loading.md` 的 7 个扫描根），每张卡片显示 name、description、scope / source、路径、是否被同名覆盖（shadowed）、warning 状态。
 - **两个维度的开关**（故意不对称）：
@@ -302,7 +317,7 @@ export interface SkillsSettings {
 ### V0（最小闭环）
 
 - `actspace-plugins` 仓库：fs-watch 实现（config 加载、notify 递归监听、去抖合并、JSONL 按天输出、state.json 心跳、单实例锁、SIGTERM 优雅退出、保留清理）+ Skill 模板 + 构建脚本。
-- actspace：settings 契约扩展；main 进程安装检测 / spawn / 守护 / 退出挂钩；设置页「插件-文件监听」卡片（安装、开关、状态、配置）。
+- actspace：settings 契约扩展；main 进程安装检测 / spawn / 守护 / 退出挂钩；设置页「插件」（安装、编译、版本）与「文件监听」（开关、状态、配置）两个分区。
 - 单测：Rust 侧事件合并 / 轮转 / 心跳（插件仓库）；TS 侧进程管理状态机、心跳判定。
 
 ### V1（补齐）
@@ -320,9 +335,9 @@ export interface SkillsSettings {
 
 ## 与现有文档的关系
 
-- `agent-kairos-autonomous-mode.md` 中 watch 的 v2–v5 演进猜想（mtime 跟踪、事件 tick 等）由本设计接管；实施后应在该文档的 watch 小节加一句指向本文档。
+- `agent-kairos-autonomous-mode.md` 中 watch 的 v2–v5 演进猜想（mtime 跟踪、事件 tick 等）由本设计接管；该文档的 watch 小节已标注退役并指向本文档（2026-07-03）。
 - 实施时 `<userData>/plugins/`、`<userData>/skills/fs-watch/` 的落盘布局需同步进 `core-storage-and-observability.md`。
-- 设置页新增「插件」「Skills」分组时同步 `front-设置页规范.md`。
+- 设置页新增「插件」「文件监听」「Skills」分组时同步 `front-设置页规范.md`。
 - `agent-current-module-map.md` 在实现完成后记录插件管理与 Kairos catalog 模块。
 
 ## 维护规则

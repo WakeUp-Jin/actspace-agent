@@ -16,12 +16,12 @@
  * - 字符≈token 估算：1 token ≈ 3 字符（与 agent-core/context/token-estimator 对齐）。
  * - 不抛错——任何子段为空时按占位/省略处理。
  */
+import { KAIROS_DEFAULT_SOUL } from "@actspace/shared";
 import {
   buildConfigTipsBlock,
   TOKEN_CHARS_PER_UNIT,
 } from "./config/prompt-assembler";
 import type { KairosConfig } from "./config/loader";
-import type { WatchDiffEntry } from "./context/watch-diff";
 import type { SessionsDigestResult } from "./context/sessions-digest";
 import type { KairosShortTermLoadResult } from "./context/short-term";
 import type { KairosInboxSummary } from "./inbox";
@@ -29,7 +29,6 @@ import { KAIROS_SYSTEM_PROMPT } from "./prompt";
 
 export const OBSERVATION_TOKEN_BUDGET = 1200;
 export const HISTORY_TOKEN_BUDGET = 3000;
-const OBSERVATION_WATCH_MAX_CHARS = 520;
 const OBSERVATION_SESSIONS_MAX_CHARS = 520;
 const OBSERVATION_INBOX_MAX_CHARS = 2300;
 
@@ -64,6 +63,9 @@ export function assembleSystemPrompt(input: AssembleSystemPromptInput): string {
   );
 
   const replacements: Record<string, string> = {
+    soul: input.config.soulMd.trim().length > 0
+      ? input.config.soulMd.trim()
+      : KAIROS_DEFAULT_SOUL,
     config_tips_block: configTipsBlock,
     skill_catalog: renderKairosSkillCatalog(input.skillCatalog ?? []),
     user_rules: input.config.ruleMd.trim().length > 0
@@ -94,16 +96,39 @@ export function renderKairosSkillCatalog(entries: KairosSkillCatalogEntry[]): st
   lines.push(
     "当任务与某个 Skill 的描述匹配时，先用 read_file 读它的 SKILL.md 再按指引行动；上面列出的路径都在你的可读范围内。",
   );
+  lines.push(
+    "特别地：若某个 Skill 的描述表明它是**持续更新的数据源**（如监听日志、采集结果），不要等任务匹配——每次唤醒都应主动查看它的最新输出，把值得注意的变化纳入本 tick 的判断。",
+  );
   return lines.join("\n");
 }
 
 // ─── tick message（动态尾部）────────────────────────────────────────────
 
+/** tick 消息「任务表」行需要的最小 brief 信息（来自 briefs index 的 active 条目）。 */
+export interface KairosActiveBriefInfo {
+  id: string;
+  /** ISO 时间；null = 尚未排期（首次 interval 任务会立即投递）。 */
+  nextRun: string | null;
+}
+
+/**
+ * tick message 固定后缀。
+ *
+ * 每条 tick 消息末尾原样携带：系统提示词在长上下文里离决策点太远（会被历史稀释），
+ * 这几行贴着模型每 tick 必读的位置，把例程的关键约束钉在决策点旁边。
+ * 必须保持简短（历史里每条 tick 消息都会重复携带它）且逐 tick 完全一致。
+ */
+export const TICK_MESSAGE_REMINDER = [
+  "---",
+  "提醒：观测增量不含持续数据源型 Skill（如 fs-watch）的输出，需按例程自行读取；",
+  "发现变化对照「场景应对」行动并留下笔记或汇报；全部安静才允许直接 sleep。",
+].join("\n");
+
 export interface AssembleTickMessageInput {
   now: Date;
   phase: "work" | "quiet" | "weekend" | "off";
-  activeBriefsCount: number;
-  watchDiffs: WatchDiffEntry[];
+  /** 当前 active 状态的 briefs；渲染成「任务表」行让 Kairos 看到自己的排班。 */
+  activeBriefs: KairosActiveBriefInfo[];
   sessionsDigest: SessionsDigestResult;
   inboxSummary?: KairosInboxSummary;
   /**
@@ -112,6 +137,9 @@ export interface AssembleTickMessageInput {
    */
   triggerContent?: string;
 }
+
+/** 「任务表」行渲染上限：防止大量 brief 把 tick message 撑爆。 */
+const TICK_BRIEFS_MAX_ITEMS = 8;
 
 /**
  * 组装 tick 注入的 user message 全文。
@@ -124,12 +152,11 @@ export function assembleTickMessage(input: AssembleTickMessageInput): string {
   const lines: string[] = [
     "<tick>",
     `[当前时间] ${ts}（${input.phase}）`,
-    `[活跃 briefs] ${Math.max(0, input.activeBriefsCount)} 个`,
+    `[任务表] ${renderActiveBriefsLine(input.activeBriefs)}`,
   ];
 
   const observation = truncateByCharBudget(
     buildObservationDelta({
-      watchDiffs: input.watchDiffs,
       sessionsDigest: input.sessionsDigest,
       inboxSummary: input.inboxSummary,
     }),
@@ -143,14 +170,34 @@ export function assembleTickMessage(input: AssembleTickMessageInput): string {
     lines.push("", "## 任务正文", trigger);
   }
 
+  lines.push("", TICK_MESSAGE_REMINDER);
   lines.push("</tick>");
   return lines.join("\n");
+}
+
+/** 渲染「任务表」行：`id（下次 MM-DD HH:mm）` 逗号连接；空表输出「空」。 */
+function renderActiveBriefsLine(briefs: KairosActiveBriefInfo[]): string {
+  if (briefs.length === 0) return "空";
+  const items = briefs.slice(0, TICK_BRIEFS_MAX_ITEMS).map((b) => {
+    const next = b.nextRun ? formatBriefNextRun(b.nextRun) : "待排期";
+    return `${b.id}（下次 ${next}）`;
+  });
+  const more = briefs.length > TICK_BRIEFS_MAX_ITEMS
+    ? `，…另有 ${briefs.length - TICK_BRIEFS_MAX_ITEMS} 项`
+    : "";
+  return `${briefs.length} 项：${items.join("、")}${more}`;
+}
+
+function formatBriefNextRun(iso: string): string {
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return "待排期";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(t.getMonth() + 1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
 }
 
 // ─── 观测增量渲染 ───────────────────────────────────────────────────────
 
 export interface BuildObservationDeltaInput {
-  watchDiffs: WatchDiffEntry[];
   sessionsDigest: SessionsDigestResult;
   inboxSummary?: KairosInboxSummary;
 }
@@ -158,19 +205,16 @@ export interface BuildObservationDeltaInput {
 /**
  * 渲染「自上个 tick 以来的观测增量」。
  *
+ * 来源只有两个：sessions digest（主 Agent 新活动）+ Agent inbox。
+ * 目录变化感知已归口到 fs-watch 插件（Skill 形态，由 Kairos 例程主动读取），
+ * 不再有巡检（watch-scanner/watch-diff）管道。
+ *
  * 与旧版全量快照的区别：空节直接省略而不是输出占位符；全部为空时返回空字符串，
  * 由 `assembleTickMessage` 统一输出「无新观测」。这保证历史里每个 tick 消息
  * 记录的都是当时的新信息，重放时无冗余快照。
  */
 export function buildObservationDelta(input: BuildObservationDeltaInput): string {
   const sections: string[] = [];
-
-  const changedDiffs = input.watchDiffs.filter((d) => d.totalAdded > 0 || d.totalRemoved > 0);
-  if (changedDiffs.length > 0) {
-    sections.push(
-      truncateByCharBudget(buildWatchDiffSummary(changedDiffs), OBSERVATION_WATCH_MAX_CHARS),
-    );
-  }
 
   const sessionsSection = buildSessionsDigestSummary(input.sessionsDigest);
   if (sessionsSection.length > 0) {
@@ -188,14 +232,6 @@ export function buildObservationDelta(input: BuildObservationDeltaInput): string
 
 function inboxHasNewMessages(summary: KairosInboxSummary): boolean {
   return summary.files.some((file) => file.includedMessageCount > 0 || file.usedFallback);
-}
-
-function buildWatchDiffSummary(watchDiffs: WatchDiffEntry[]): string {
-  const sections: string[] = ["## 巡检目录变化"];
-  for (const diff of watchDiffs) {
-    sections.push(formatWatchDiffEntry(diff));
-  }
-  return sections.join("\n");
 }
 
 /** 只渲染有未读 turn 的 session；全部已读时返回空字符串（节被省略）。 */
@@ -220,28 +256,6 @@ function buildSessionsDigestSummary(sessionsDigest: SessionsDigestResult): strin
     sections.push(`- …另有 ${unread.length - 12} 个 session 已省略`);
   }
   return sections.join("\n");
-}
-
-function formatWatchDiffEntry(diff: WatchDiffEntry): string {
-  const lines: string[] = [];
-  lines.push("");
-  lines.push(`### ${diff.rootPath}`);
-  if (diff.added.length > 0) {
-    lines.push(`- 新增 ${diff.totalAdded}：`);
-    for (const p of diff.added) lines.push(`  - ${p}`);
-  } else {
-    lines.push(`- 新增 ${diff.totalAdded}`);
-  }
-  if (diff.removed.length > 0) {
-    lines.push(`- 删除 ${diff.totalRemoved}：`);
-    for (const p of diff.removed) lines.push(`  - ${p}`);
-  } else {
-    lines.push(`- 删除 ${diff.totalRemoved}`);
-  }
-  if (diff.truncated) {
-    lines.push("- 注：差异条目已截断；如需完整列表请用 list_directory 工具直接核对");
-  }
-  return lines.join("\n");
 }
 
 // ─── 历史摘要 ───────────────────────────────────────────────────────────

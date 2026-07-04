@@ -25,6 +25,7 @@ function makeConfig(over: Partial<KairosConfig> = {}): KairosConfig {
     paths: { ...DEFAULT_PATHS_CONFIG },
     blocklist: { ...DEFAULT_BLOCKLIST },
     ruleMd: "",
+    soulMd: "",
     warnings: [],
     ...over,
   };
@@ -41,7 +42,7 @@ describe("ensureKairosScaffolding", () => {
       "workspace",
       "workspace/notes",
       "memory/short-term",
-      "observe/watch-manifests",
+      "observe",
       "briefs/tasks",
       "inbox",
     ]) {
@@ -61,7 +62,6 @@ describe("ensureKairosScaffolding", () => {
     expect(paths.paths).toEqual([
       {
         path: getKairosWorkspaceRoot(root),
-        watch: true,
         tip: "Kairos 的默认工作空间，文件工具的相对路径会落在这里。",
       },
     ]);
@@ -124,7 +124,29 @@ describe("ensureKairosScaffolding", () => {
     expect(paths.paths).toEqual([
       expect.objectContaining({
         path: getKairosWorkspaceRoot(root),
-        watch: true,
+      }),
+    ]);
+  });
+
+  it("also migrates the pre-retirement legacy empty paths config (old watch tip)", async () => {
+    const root = await makeRoot();
+    await mkdir(join(root, "config"), { recursive: true });
+    await writeFile(
+      join(root, "config/paths.json"),
+      JSON.stringify(
+        { tip: "在此声明 Kairos 可读的本地路径；watch=true 表示同时纳入巡检差异检测。", paths: [] },
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+
+    await ensureKairosScaffolding(root);
+
+    const paths = JSON.parse(await readFile(join(root, "config/paths.json"), "utf8"));
+    expect(paths.paths).toEqual([
+      expect.objectContaining({
+        path: getKairosWorkspaceRoot(root),
       }),
     ]);
   });

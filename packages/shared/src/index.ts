@@ -6,6 +6,7 @@ export * from "./context-buckets";
 export * from "./session";
 export * from "./session-selectors";
 export * from "./kairos-contracts";
+export * from "./kairos-soul-presets";
 export {
   aggregateKairosEvents,
   aggregateKairosUsage,

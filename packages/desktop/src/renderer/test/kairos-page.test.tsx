@@ -70,6 +70,16 @@ function installFakeBridge(opts: FakeKairosOptions = {}): {
         tools: [],
       }),
     ),
+    briefsList: vi.fn(async () => ({ briefs: [] })),
+    briefsRead: vi.fn(async () => {
+      throw new Error("not found");
+    }),
+    briefsWrite: vi.fn(async () => ({ ok: true } as const)),
+    briefsDelete: vi.fn(async () => ({ ok: true } as const)),
+    notificationsList: vi.fn(async () => ({ notifications: [], unreadCount: 0 })),
+    notificationsMarkRead: vi.fn(async () => ({ ok: true as const, unreadCount: 0 })),
+    notificationsRemove: vi.fn(async () => ({ ok: true as const, removedCount: 0, unreadCount: 0 })),
+    onNotification: vi.fn(() => () => {}),
     onEvent: (listener) => {
       eventListener = listener;
       return () => {
@@ -209,7 +219,10 @@ describe("KairosPage", () => {
     expect(await screen.findByText(/Sleeping/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "暂停" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "唤醒" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "重置" })).toBeInTheDocument();
+    // 重置收进「更多」下拉，需展开后可见
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("kairos-header-more"));
+    expect(screen.getByRole("menuitem", { name: "重置" })).toBeInTheDocument();
     expect(screen.queryByText(/Workspace/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Session/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Last wake/)).not.toBeInTheDocument();
@@ -395,6 +408,27 @@ describe("KairosPage", () => {
     expect(within(detail).queryByText("环境无变化，仍无配置路径、无会话、无 briefs。继续休眠。")).not.toBeInTheDocument();
   });
 
+  it("hides tool/thinking tabs behind the more dropdown by default", async () => {
+    installFakeBridge();
+    const user = userEvent.setup();
+    render(<KairosPage />);
+
+    const detail = screen.getByRole("complementary");
+    expect(within(detail).getByRole("tab", { name: "最终回复" })).toBeInTheDocument();
+    expect(within(detail).getByRole("tab", { name: /通知/ })).toBeInTheDocument();
+    // 工具结果 / 思考过程 默认不直接出现在 tab 栏
+    expect(within(detail).queryByRole("tab", { name: "工具结果" })).not.toBeInTheDocument();
+    expect(within(detail).queryByRole("tab", { name: "思考过程" })).not.toBeInTheDocument();
+
+    const moreTab = within(detail).getByTestId("kairos-detail-more-tab");
+    expect(moreTab).toHaveTextContent("更多");
+    await user.click(moreTab);
+    await user.click(within(detail).getByRole("menuitem", { name: "思考过程" }));
+
+    expect(within(detail).getByRole("tab", { name: "思考过程", selected: true })).toBeInTheDocument();
+    expect(within(detail).getByText("选择思考行后查看完整思考过程")).toBeInTheDocument();
+  });
+
   it("preserves tool events pushed synchronously in one IPC flush", async () => {
     const { pushEvent } = installFakeBridge();
     const user = userEvent.setup();
@@ -488,7 +522,8 @@ describe("KairosPage", () => {
     const list = await screen.findByLabelText("执行列表");
     expect(within(list).getByText("before reset")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "重置" }));
+    await user.click(screen.getByTestId("kairos-header-more"));
+    await user.click(screen.getByRole("menuitem", { name: "重置" }));
 
     expect(bridge.control).toHaveBeenCalledWith({ type: "reset_today" });
     expect(await screen.findByText(/暂无 Kairos 事件/)).toBeInTheDocument();

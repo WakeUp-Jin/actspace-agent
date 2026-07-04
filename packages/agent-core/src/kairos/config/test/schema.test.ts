@@ -58,21 +58,21 @@ describe("parsePathsConfig", () => {
     expect(parsePathsConfig("oops").paths).toEqual([]);
   });
 
-  it("drops entries without a path and respects watch=true", () => {
+  it("drops entries without a path and silently ignores legacy watch field", () => {
     const parsed = parsePathsConfig({
       tip: "custom tip",
       paths: [
-        { path: "/A", watch: true, tip: "first" },
+        { path: "/A", watch: true, tip: "first" },   // legacy watch → 忽略
         { path: " ", watch: true },                  // empty after trim → drop
         { watch: false },                            // no path → drop
-        { path: "/B" },                              // default watch=false
+        { path: "/B" },
         "not-an-object",                             // not object → drop
       ],
     });
     expect(parsed.tip).toBe("custom tip");
     expect(parsed.paths).toEqual([
-      { path: "/A", watch: true, tip: "first" },
-      { path: "/B", watch: false },
+      { path: "/A", tip: "first" },
+      { path: "/B" },
     ]);
   });
 });

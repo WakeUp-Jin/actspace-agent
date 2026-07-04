@@ -1,12 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
-import type { KairosRuntimeState, SessionEvent } from "@actspace/shared";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { KairosBriefWriteRequest, KairosRuntimeState, SessionEvent } from "@actspace/shared";
 import { emptyKairosUsageSummary } from "@actspace/shared";
 import {
   CONFIG_FILE_MAP,
   KairosEventBatcher,
   clampLimit,
+  deleteBrief,
   dispatchKairosControl,
+  listBriefs,
+  readBrief,
   validateByName,
+  writeBrief,
   type BatcherSink,
   type BatcherTimer,
   type KairosControllerForDispatch,
@@ -84,14 +91,16 @@ describe("validateByName", () => {
     expect(() => validateByName("blocklist", { paths: [123] })).not.toThrow();
   });
 
-  it("skips validation for rule.md (no parse needed)", () => {
+  it("skips validation for markdown configs (rule.md / soul.md)", () => {
     expect(() => validateByName("rule", "# 任意 markdown 文本\n- bullet")).not.toThrow();
+    expect(() => validateByName("soul", "# 你是 Kairos —— 自定义人格")).not.toThrow();
   });
 
-  it("dispatches to the right parser for all 4 logical names", () => {
-    // 4 个 name 都能 round-trip 不抛；任何漏分支会被 default 兜底/exhaustive 暴露
-    for (const name of ["preferences", "paths", "blocklist", "rule"] as const) {
-      expect(() => validateByName(name, name === "rule" ? "" : {})).not.toThrow();
+  it("dispatches to the right parser for all 5 logical names", () => {
+    // 5 个 name 都能 round-trip 不抛；任何漏分支会被 default 兜底/exhaustive 暴露
+    const markdownNames = new Set(["rule", "soul"]);
+    for (const name of ["preferences", "paths", "blocklist", "rule", "soul"] as const) {
+      expect(() => validateByName(name, markdownNames.has(name) ? "" : {})).not.toThrow();
     }
   });
 });
@@ -99,12 +108,13 @@ describe("validateByName", () => {
 // ─── CONFIG_FILE_MAP ──────────────────────────────────────────
 
 describe("CONFIG_FILE_MAP", () => {
-  it("maps all 4 logical names to expected filenames", () => {
+  it("maps all 5 logical names to expected filenames", () => {
     expect(CONFIG_FILE_MAP).toEqual({
       preferences: "preferences.json",
       paths: "paths.json",
       blocklist: "blocklist.json",
       rule: "rule.md",
+      soul: "soul.md",
     });
   });
 });
@@ -344,5 +354,109 @@ describe("dispatchKairosControl", () => {
     await expect(dispatchKairosControl(c, { type: "start" })).rejects.toThrow(/解析失败/);
     // start 已经成功，但 setEnabledPreference 抛错被上抛
     expect(c.calls.find((e) => e.method === "start")).toBeTruthy();
+  });
+});
+
+// ─── briefs 文件存取 ──────────────────────────────────────────
+
+describe("briefs store (list/read/write/delete)", () => {
+  let briefsDir: string;
+
+  beforeEach(async () => {
+    briefsDir = await mkdtemp(join(tmpdir(), "kairos-briefs-"));
+  });
+
+  afterEach(async () => {
+    await rm(briefsDir, { recursive: true, force: true });
+  });
+
+  const writeReq = (over: Partial<KairosBriefWriteRequest> = {}): KairosBriefWriteRequest => ({
+    id: "daily-report",
+    status: "active",
+    trigger: "interval",
+    intervalSec: 3600,
+    priority: "normal",
+    body: "# 日报\n汇总今日文件变动。",
+    ...over,
+  });
+
+  it("returns empty list when tasks dir does not exist", async () => {
+    expect(await listBriefs(briefsDir)).toEqual({ briefs: [] });
+  });
+
+  it("creates a new brief with system-managed fields initialized", async () => {
+    const now = new Date("2026-07-04T10:00:00.000Z");
+    await writeBrief(briefsDir, writeReq(), now);
+
+    const { briefs } = await listBriefs(briefsDir);
+    expect(briefs).toHaveLength(1);
+    expect(briefs[0]).toMatchObject({
+      id: "daily-report",
+      status: "active",
+      trigger: "interval",
+      intervalSec: 3600,
+      priority: "normal",
+      created: now.toISOString(),
+      lastRun: null,
+      nextRun: null,
+    });
+
+    const read = await readBrief(briefsDir, "daily-report");
+    expect(read.body).toContain("# 日报");
+  });
+
+  it("preserves created/lastRun/nextRun when editing an existing brief", async () => {
+    const created = new Date("2026-07-01T08:00:00.000Z");
+    await writeBrief(briefsDir, writeReq(), created);
+    // 模拟系统跑过一次：直接改盘上的 frontmatter
+    const filePath = join(briefsDir, "tasks", "daily-report.md");
+    const raw = await readFile(filePath, "utf8");
+    await writeFile(
+      filePath,
+      raw
+        .replace("lastRun: null", "lastRun: 2026-07-03T18:00:00.000Z")
+        .replace("nextRun: null", "nextRun: 2026-07-04T18:00:00.000Z"),
+      "utf8",
+    );
+
+    await writeBrief(briefsDir, writeReq({ priority: "high", body: "更新后的正文" }));
+
+    const read = await readBrief(briefsDir, "daily-report");
+    expect(read.summary.priority).toBe("high");
+    expect(read.body).toContain("更新后的正文");
+    // 系统字段不被 UI 提交破坏
+    expect(read.summary.created).toBe(created.toISOString());
+    expect(read.summary.lastRun).toBe("2026-07-03T18:00:00.000Z");
+    expect(read.summary.nextRun).toBe("2026-07-04T18:00:00.000Z");
+  });
+
+  it("clears intervalSec for non-interval triggers", async () => {
+    await writeBrief(briefsDir, writeReq({ id: "manual-task", trigger: "manual", intervalSec: 999 }));
+    const read = await readBrief(briefsDir, "manual-task");
+    expect(read.summary.intervalSec).toBeNull();
+  });
+
+  it("rejects interval briefs without a positive intervalSec", async () => {
+    await expect(
+      writeBrief(briefsDir, writeReq({ intervalSec: null })),
+    ).rejects.toThrow(/intervalSec/);
+    await expect(
+      writeBrief(briefsDir, writeReq({ intervalSec: -5 })),
+    ).rejects.toThrow(/intervalSec/);
+  });
+
+  it("rejects ids with path traversal or illegal characters", async () => {
+    for (const bad of ["../escape", "a/b", "", "含中文", ".hidden"]) {
+      await expect(writeBrief(briefsDir, writeReq({ id: bad }))).rejects.toThrow(/Invalid brief id/);
+    }
+    await expect(readBrief(briefsDir, "../../etc/passwd")).rejects.toThrow(/Invalid brief id/);
+    await expect(deleteBrief(briefsDir, "../x")).rejects.toThrow(/Invalid brief id/);
+  });
+
+  it("deletes a brief and tolerates deleting a missing one", async () => {
+    await writeBrief(briefsDir, writeReq());
+    await deleteBrief(briefsDir, "daily-report");
+    expect(await listBriefs(briefsDir)).toEqual({ briefs: [] });
+    await expect(deleteBrief(briefsDir, "daily-report")).resolves.toBeUndefined();
   });
 });

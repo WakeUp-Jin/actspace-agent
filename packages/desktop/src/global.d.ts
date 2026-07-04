@@ -98,6 +98,8 @@ declare global {
       ) => Promise<import("@actspace/shared").TestConnectionResult>;
       getFsWatchStatus?: () => Promise<import("@actspace/shared").FsWatchStatus>;
       installFsWatchPlugin?: () => Promise<import("@actspace/shared").FsWatchInstallResult>;
+      installFsWatchFromRepo?: () => Promise<import("@actspace/shared").FsWatchInstallResult>;
+      pickPluginsRepoRoot?: () => Promise<import("@actspace/shared").FsWatchPickRootResult>;
       setFsWatchEnabled?: (
         input: import("@actspace/shared").FsWatchSetEnabledInput
       ) => Promise<import("@actspace/shared").FsWatchActionResult>;

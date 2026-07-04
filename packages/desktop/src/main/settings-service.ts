@@ -135,7 +135,7 @@ export class SettingsService {
       },
       agent: { ...this.settings.agent, disabledTools: [...this.settings.agent.disabledTools] },
       kairos: { ...this.settings.kairos, enabledSkills: [...this.settings.kairos.enabledSkills] },
-      plugins: { fsWatch: { ...this.settings.plugins.fsWatch } },
+      plugins: { repoRoot: this.settings.plugins.repoRoot, fsWatch: { ...this.settings.plugins.fsWatch } },
       skills: { disabled: [...this.settings.skills.disabled] },
     };
   }
@@ -153,6 +153,7 @@ export class SettingsService {
     }
     if (input.plugins) {
       this.settings.plugins = sanitizePlugins({
+        repoRoot: input.plugins.repoRoot !== undefined ? input.plugins.repoRoot : this.settings.plugins.repoRoot,
         fsWatch: { ...this.settings.plugins.fsWatch, ...input.plugins.fsWatch },
       });
     }
@@ -317,7 +318,7 @@ function defaultSettingsFromEnv(dataRoot: string): PersistedSettings {
       thinking: "auto",
       enabledSkills: [],
     },
-    plugins: { fsWatch: { enabled: false } },
+    plugins: { repoRoot: null, fsWatch: { enabled: false } },
     skills: { disabled: [] },
   };
 }
@@ -414,7 +415,11 @@ function defaultKairos(): AppSettings["kairos"] {
 
 function sanitizePlugins(input: Partial<AppSettings["plugins"]>): AppSettings["plugins"] {
   const fsWatch = (input.fsWatch ?? {}) as Partial<AppSettings["plugins"]["fsWatch"]>;
+  const repoRoot = typeof input.repoRoot === "string" && input.repoRoot.trim().length > 0
+    ? input.repoRoot.trim()
+    : null;
   return {
+    repoRoot,
     fsWatch: { enabled: typeof fsWatch.enabled === "boolean" ? fsWatch.enabled : false },
   };
 }

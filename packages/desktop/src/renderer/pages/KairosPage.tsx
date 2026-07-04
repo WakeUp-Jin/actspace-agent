@@ -28,6 +28,7 @@ import {
   Infinity as InfinityIcon,
   MessageSquare,
   Moon,
+  MoreHorizontal,
   Pause,
   RotateCcw,
   Wrench,
@@ -35,6 +36,13 @@ import {
 import type { KairosBudgetRuntime, KairosEventRow, KairosRuntimeState } from "@actspace/shared";
 import { useKairos } from "../state/useKairos";
 import { KairosContextSheet } from "../components/kairos/KairosContextSheet";
+import {
+  KairosNotificationActions,
+  KairosNotificationList,
+  KairosNotificationTabBadge,
+  useKairosNotifications,
+  type KairosNotificationsStore,
+} from "../components/kairos/KairosNotifications";
 import {
   buildKairosStats,
   buildKairosUsageBadge,
@@ -84,7 +92,7 @@ function useKairosUsageMode(): [KairosUsageBadgeMode, (mode: KairosUsageBadgeMod
   return [mode, setMode];
 }
 
-type DetailTab = "reply" | "tool" | "thinking";
+type DetailTab = "reply" | "tool" | "thinking" | "notification";
 const EXECUTION_PAGE_SIZE = 10;
 const TRACE_SEGMENT_GAP_PX = 4;
 const TRACE_SEGMENT_BASE_PX = 20;
@@ -102,7 +110,7 @@ const unavailablePageClass = `${pageRootClass} items-center justify-center`;
 const unavailableCardClass =
   "max-w-[520px] rounded-act-lg border border-line bg-surface px-7 py-6 shadow-act-soft";
 const headerClass =
-  "flex items-center justify-between gap-4 border-b border-line bg-surface px-7 py-4 max-[760px]:items-start max-[760px]:flex-col max-[760px]:px-4";
+  "flex items-center justify-between gap-4 border-b border-line bg-surface px-7 py-3 max-[760px]:items-start max-[760px]:flex-col max-[760px]:px-4";
 const headerStatusClass =
   "inline-flex h-7 items-center gap-[7px] rounded-full border border-line bg-surface-subtle px-[11px] text-[13px] tabular-nums";
 const headerUsageBadgeClass =
@@ -118,9 +126,11 @@ const headerUsageBadgeCostClass = "text-text-main font-medium";
 const headerUsageBadgeModeChipClass =
   "ml-[2px] inline-flex items-center rounded-full bg-surface-subtle px-[6px] py-[1px] text-[10.5px] tracking-wide text-text-faint";
 const kairosButtonClass =
-  "inline-flex h-[38px] items-center justify-center gap-[7px] rounded-act-md border border-line bg-surface px-[18px] text-sm font-medium text-text-main transition hover:border-line-strong hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-55";
+  "inline-flex h-8 items-center justify-center gap-1.5 rounded-[7px] border border-line bg-surface px-3 text-[13px] font-medium text-text-main transition hover:border-line-strong hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-55";
+// 独立完整类，不叠加在 kairosButtonClass 上（bg-surface/bg-brand-soft 同属性类
+// 的胜负取决于生成 CSS 的顺序，叠加时品牌色底可能不生效——与分页按钮同一个坑）。
 const kairosPrimaryButtonClass =
-  "border-brand/40 bg-brand-soft text-text-main hover:border-brand/60 hover:bg-brand-soft";
+  "inline-flex h-8 items-center justify-center gap-1.5 rounded-[7px] border border-brand/40 bg-brand-soft px-3 text-[13px] font-medium text-text-main transition hover:border-brand/60 hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-55";
 const traceClass =
   "shrink-0 border-b border-line bg-surface px-7 pb-3.5 pt-4 max-[760px]:px-4";
 const traceHeadClass =
@@ -140,18 +150,25 @@ const eventsFooterClass =
   "mt-auto grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-4 py-3 text-xs text-text-faint";
 const pageButtonClass =
   "inline-flex h-7 w-7 items-center justify-center rounded-[7px] border border-line bg-surface text-xs text-text-muted hover:border-line-strong hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-45";
+// 激活页按钮是独立完整类，不在 pageButtonClass 上叠加覆盖——bg-surface / bg-brand
+// 同属性类的胜负取决于生成 CSS 的顺序而非 class 顺序，叠加曾导致白底白字（数字不可见）。
+const pageButtonActiveClass =
+  "inline-flex h-7 w-7 items-center justify-center rounded-[7px] border border-brand bg-brand text-xs font-medium text-white";
 const sideClass = "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 max-[1100px]:min-h-[520px]";
 const statsClass =
   "grid grid-cols-4 overflow-hidden rounded-act-md border border-line bg-surface max-[760px]:grid-cols-2";
+// grid 三行：tab 栏 / 标题行固定，只有第三行内容区滚动（滚动时 tab 不能被卷走）。
 const detailPanelClass =
-  "min-h-0 overflow-auto rounded-act-md border border-line bg-surface px-5 py-[18px]";
-const detailTabsClass =
-  "mb-[26px] inline-flex overflow-hidden rounded-act-md border border-line bg-surface";
+  "grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] rounded-act-md border border-line bg-surface px-5 py-[18px]";
+const detailBodyClass = "min-h-0 overflow-y-auto overflow-x-hidden";
+// Cursor 风格 segmented control：浅灰槽 + 激活项白底微浮起，替代早期的边框分格样式。
+const detailTabsClass = "flex items-center gap-0.5 rounded-[8px] bg-surface-subtle p-0.5";
 const detailTabClass =
-  "h-[38px] min-w-28 border-0 border-r border-line bg-transparent px-[18px] text-[13px] text-text-muted last:border-r-0";
-const detailActiveTabClass = "bg-brand-soft text-brand-strong shadow-[inset_0_0_0_1px_var(--act-color-brand)]";
+  "inline-flex h-7 min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-[6px] border-0 bg-transparent px-2 text-xs text-text-muted transition hover:text-text-main";
+const detailActiveTabClass =
+  "bg-surface font-medium text-text-main shadow-[0_1px_2px_rgba(0,0,0,0.07),inset_0_0_0_1px_var(--act-color-border)]";
 const detailToplineClass =
-  "mb-6 flex items-center justify-between gap-4 max-[760px]:items-start max-[760px]:flex-col";
+  "mb-4 flex items-center justify-between gap-4 max-[760px]:items-start max-[760px]:flex-col";
 const detailMetaClass = "inline-flex items-center gap-2.5 text-xs tabular-nums text-text-faint";
 const detailReplyClass = "whitespace-pre-wrap break-words text-[17px] leading-[1.85] text-text-main";
 const detailPlaceholderClass =
@@ -159,6 +176,10 @@ const detailPlaceholderClass =
 const toolResultClass = "flex flex-col gap-3.5";
 const toolResultSectionTextClass =
   "m-0 overflow-hidden text-ellipsis rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 font-mono text-xs leading-[1.5] text-text-main";
+const headerMoreMenuClass =
+  "absolute right-0 top-[calc(100%+6px)] z-50 grid min-w-[150px] gap-0.5 overflow-hidden rounded-[10px] border border-line bg-surface p-1 shadow-[0_10px_32px_rgba(0,0,0,0.16)]";
+const headerMoreItemClass =
+  "inline-flex h-8 w-full items-center gap-2 rounded-[7px] border-0 bg-transparent px-2.5 text-[13px] text-text-main transition hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50";
 const pageErrorClass =
   "absolute bottom-[18px] right-[18px] max-w-[min(520px,calc(100%_-_36px))] rounded-act-md border border-on-danger/30 bg-danger-soft px-3 py-2.5 text-xs text-on-danger shadow-[0_12px_28px_rgba(166,62,38,0.12)]";
 
@@ -168,6 +189,7 @@ function cn(...classes: Array<string | false | null | undefined>): string {
 
 export function KairosPage() {
   const k = useKairos();
+  const notifications = useKairosNotifications();
   const [detailTab, setDetailTab] = useState<DetailTab>("reply");
   const [page, setPage] = useState(1);
   const [contextOpen, setContextOpen] = useState(false);
@@ -275,6 +297,7 @@ export function KairosPage() {
             onTabChange={setDetailTab}
             detail={detail}
             selectedRow={selectedRow}
+            notifications={notifications}
           />
         </div>
       </div>
@@ -421,7 +444,7 @@ function KairosHeader(props: KairosHeaderProps) {
             暂停
           </button>
         ) : (
-          <button type="button" className={cn(kairosButtonClass, kairosPrimaryButtonClass)} onClick={props.onStart}>
+          <button type="button" className={kairosPrimaryButtonClass} onClick={props.onStart}>
             <Bolt size={14} aria-hidden="true" />
             开启
           </button>
@@ -435,24 +458,93 @@ function KairosHeader(props: KairosHeaderProps) {
           <Bolt size={14} aria-hidden="true" />
           唤醒
         </button>
-        <button
-          type="button"
-          className={kairosButtonClass}
-          disabled={!props.bridgeAvailable}
-          aria-haspopup="dialog"
-          aria-expanded={props.contextOpen}
-          title={props.bridgeAvailable ? undefined : "Kairos 桥未就绪"}
-          onClick={props.onOpenContext}
-        >
-          <FileText size={14} aria-hidden="true" />
-          上下文
-        </button>
-        <button type="button" className={kairosButtonClass} onClick={props.onResetToday}>
-          <RotateCcw size={14} aria-hidden="true" />
-          重置
-        </button>
+        <HeaderMoreMenu
+          bridgeAvailable={props.bridgeAvailable}
+          contextOpen={props.contextOpen}
+          onOpenContext={props.onOpenContext}
+          onResetToday={props.onResetToday}
+        />
       </div>
     </header>
+  );
+}
+
+/**
+ * Header 的「更多」下拉：收纳低频操作（上下文 / 重置），
+ * 让按钮组保持最多 3 个直出按钮（开启/暂停、唤醒、通知）。
+ */
+function HeaderMoreMenu(props: {
+  bridgeAvailable: boolean;
+  contextOpen: boolean;
+  onOpenContext(): void;
+  onResetToday(): void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        className={cn(kairosButtonClass, "w-8 px-0")}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="更多操作"
+        title="更多操作"
+        data-testid="kairos-header-more"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <MoreHorizontal size={15} aria-hidden="true" />
+      </button>
+      {open ? (
+        <div className={headerMoreMenuClass} role="menu" aria-label="更多操作">
+          <button
+            type="button"
+            role="menuitem"
+            className={headerMoreItemClass}
+            disabled={!props.bridgeAvailable}
+            aria-haspopup="dialog"
+            aria-expanded={props.contextOpen}
+            title={props.bridgeAvailable ? undefined : "Kairos 桥未就绪"}
+            onClick={() => {
+              setOpen(false);
+              props.onOpenContext();
+            }}
+          >
+            <FileText size={14} aria-hidden="true" />
+            上下文
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={headerMoreItemClass}
+            onClick={() => {
+              setOpen(false);
+              props.onResetToday();
+            }}
+          >
+            <RotateCcw size={14} aria-hidden="true" />
+            重置
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -644,7 +736,7 @@ function KairosExecutionList(props: KairosExecutionListProps) {
             <button
               key={pageNumber}
               type="button"
-              className={cn(pageButtonClass, pageNumber === props.page && "border-brand bg-brand text-white")}
+              className={pageNumber === props.page ? pageButtonActiveClass : pageButtonClass}
               aria-current={pageNumber === props.page ? "page" : undefined}
               onClick={() => props.onPageChange(pageNumber)}
             >
@@ -727,66 +819,129 @@ interface KairosDetailPanelProps {
   onTabChange(tab: DetailTab): void;
   detail: DetailModel;
   selectedRow: KairosEventRow | null;
+  notifications: KairosNotificationsStore;
 }
 
+const DETAIL_TAB_LABELS: Record<DetailTab, string> = {
+  reply: "最终回复",
+  tool: "工具结果",
+  thinking: "思考过程",
+  notification: "通知",
+};
+
+/** 收进「更多」下拉的次要详情 tab（工具结果 / 思考过程）。 */
+const DETAIL_MORE_TABS = ["tool", "thinking"] as const;
+
 function KairosDetailPanel(props: KairosDetailPanelProps) {
-  const { tab, detail, selectedRow } = props;
+  const { tab, detail, selectedRow, notifications } = props;
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement | null>(null);
+  const moreActive = (DETAIL_MORE_TABS as readonly string[]).includes(tab);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMoreOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [moreOpen]);
+
   return (
     <aside className={detailPanelClass} role="complementary" aria-label="事件详情">
-      <div className={detailTabsClass} role="tablist" aria-label="详情类型">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "reply"}
-          className={cn(detailTabClass, tab === "reply" && detailActiveTabClass)}
-          onClick={() => props.onTabChange("reply")}
-        >
-          最终回复
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "tool"}
-          className={cn(detailTabClass, tab === "tool" && detailActiveTabClass)}
-          onClick={() => props.onTabChange("tool")}
-        >
-          工具结果
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "thinking"}
-          className={cn(detailTabClass, tab === "thinking" && detailActiveTabClass)}
-          onClick={() => props.onTabChange("thinking")}
-        >
-          思考过程
-        </button>
+      {/* 外层 relative 承接下拉菜单的绝对定位 */}
+      <div className="relative mb-4" ref={moreRef}>
+        <div className={detailTabsClass} role="tablist" aria-label="详情类型">
+          {(["reply", "notification"] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              className={cn(detailTabClass, tab === id && detailActiveTabClass)}
+              data-testid={id === "notification" ? "kairos-notification-tab" : undefined}
+              onClick={() => {
+                setMoreOpen(false);
+                props.onTabChange(id);
+              }}
+            >
+              {DETAIL_TAB_LABELS[id]}
+              {id === "notification" ? (
+                <KairosNotificationTabBadge count={notifications.unreadCount} />
+              ) : null}
+            </button>
+          ))}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={moreActive}
+            aria-haspopup="menu"
+            aria-expanded={moreOpen}
+            className={cn(detailTabClass, "gap-1", moreActive && detailActiveTabClass)}
+            data-testid="kairos-detail-more-tab"
+            onClick={() => setMoreOpen((v) => !v)}
+          >
+            {moreActive ? DETAIL_TAB_LABELS[tab] : "更多"}
+            <ChevronDown size={13} aria-hidden="true" />
+          </button>
+        </div>
+        {moreOpen ? (
+          <div className={headerMoreMenuClass} role="menu" aria-label="更多详情类型">
+            {DETAIL_MORE_TABS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="menuitem"
+                className={cn(headerMoreItemClass, tab === id && "bg-brand-soft text-brand-strong")}
+                onClick={() => {
+                  setMoreOpen(false);
+                  props.onTabChange(id);
+                }}
+              >
+                {DETAIL_TAB_LABELS[id]}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div className={detailToplineClass}>
-        <h2 className="m-0 text-base font-semibold text-text-main">
-          {tab === "reply" ? "最终回复" : tab === "tool" ? "工具结果" : "思考过程"}
-        </h2>
-        <div className={detailMetaClass}>
-          <span>{selectedRow ? formatKairosTime(selectedRow.startedAt) : "最近一次回复"}</span>
-          {selectedRow ? (
-            <span className={statusBadgeClass(selectedRow.status)}>
-              {selectedRow.status}
-            </span>
-          ) : null}
-        </div>
+        <h2 className="m-0 text-base font-semibold text-text-main">{DETAIL_TAB_LABELS[tab]}</h2>
+        {tab === "notification" ? (
+          <KairosNotificationActions store={notifications} />
+        ) : (
+          <div className={detailMetaClass}>
+            <span>{selectedRow ? formatKairosTime(selectedRow.startedAt) : "最近一次回复"}</span>
+            {selectedRow ? (
+              <span className={statusBadgeClass(selectedRow.status)}>
+                {selectedRow.status}
+              </span>
+            ) : null}
+          </div>
+        )}
       </div>
 
-      {tab === "reply" ? (
-        <div className={detailReplyClass}>
-          {detail.replyText ? detail.replyText : <span className={detailPlaceholderClass}>暂无最终回复</span>}
-        </div>
-      ) : tab === "tool" ? (
-        <ToolResultView tool={detail.tool} />
-      ) : (
-        <div className={cn(detailReplyClass, "text-text-muted")}>
-          {detail.thinkingText ? detail.thinkingText : <span className={detailPlaceholderClass}>选择思考行后查看完整思考过程</span>}
-        </div>
-      )}
+      <div className={detailBodyClass}>
+        {tab === "reply" ? (
+          <div className={detailReplyClass}>
+            {detail.replyText ? detail.replyText : <span className={detailPlaceholderClass}>暂无最终回复</span>}
+          </div>
+        ) : tab === "tool" ? (
+          <ToolResultView tool={detail.tool} />
+        ) : tab === "thinking" ? (
+          <div className={cn(detailReplyClass, "text-text-muted")}>
+            {detail.thinkingText ? detail.thinkingText : <span className={detailPlaceholderClass}>选择思考行后查看完整思考过程</span>}
+          </div>
+        ) : (
+          <KairosNotificationList store={notifications} />
+        )}
+      </div>
     </aside>
   );
 }

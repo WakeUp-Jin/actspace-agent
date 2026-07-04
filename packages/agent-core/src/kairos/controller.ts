@@ -2,7 +2,7 @@
  * KairosController — Kairos 域的"装配中枢"。
  *
  * 职责（plan 5 §6）：
- * 1. 拉起 ShortMemoryStore / RingBuffer / WatchDiff / SessionsDigest / BriefsIndex /
+ * 1. 拉起 ShortMemoryStore / RingBuffer / SessionsDigest / BriefsIndex /
  *    BriefsDispatcher / KairosRunner / QueueProcessor。
  * 2. 暴露 start / stop / wakeNow / resetToday 控制；emit `state` / `event`。
  * 3. 主 Agent 在 runTurn 边界调 notifyMainAgentTurn{Start,End}，让 scheduler 礼让用户。
@@ -22,11 +22,17 @@ import type {
   KairosContextPromptSegment,
   KairosContextSnapshot,
   KairosContextTool,
+  KairosNotification,
+  KairosNotificationsListResponse,
+  KairosNotificationsMarkReadResponse,
+  KairosNotificationsRemoveRequest,
+  KairosNotificationsRemoveResponse,
   KairosRunState,
   KairosRuntimeState,
   LlmUsagePayload,
   SessionEvent,
 } from "@actspace/shared";
+import { KAIROS_DEFAULT_SOUL } from "@actspace/shared";
 import type { LLMService } from "../llm/types";
 import type { ToolManager, KairosGuardContext } from "../tools/manager";
 import { loadKairosConfig, type KairosConfig } from "./config/loader";
@@ -34,7 +40,7 @@ import { ShortMemoryStore } from "./storage/short-memory-store";
 import { SessionEventRingBuffer } from "./storage/ring-buffer";
 import { KairosUsageAccumulator } from "./storage/usage-accumulator";
 import { KairosBudgetStore } from "./storage/budget-store";
-import { WatchDiffEngine } from "./context/watch-diff";
+import { KairosNotificationStore } from "./storage/notification-store";
 import { SessionsDigestBuilder } from "./context/sessions-digest";
 import { KairosShortTermMemoryContext } from "./context/short-term";
 import { BriefsIndexManager } from "./briefs/index-manager";
@@ -55,12 +61,12 @@ import {
   buildHistorySummary,
   derivePhase,
   renderKairosSkillCatalog,
+  type KairosActiveBriefInfo,
   type KairosSkillCatalogEntry,
 } from "./prompt-assembler";
 import { buildConfigTipsBlock } from "./config/prompt-assembler";
 import { KAIROS_SYSTEM_PROMPT } from "./prompt";
 import { estimateTokens } from "../context/token-estimator";
-import type { WatchDiffEntry } from "./context/watch-diff";
 import type { SessionsDigestResult } from "./context/sessions-digest";
 import type { KairosShortTermLoadResult } from "./context/short-term";
 import type {
@@ -76,7 +82,7 @@ import {
 } from "../messages";
 
 /** Kairos 实例专属工具（不在主 Agent 出现）；用于 Snapshot 区分工具来源标签。 */
-const KAIROS_OWN_TOOL_NAMES: ReadonlySet<string> = new Set(["sleep"]);
+const KAIROS_OWN_TOOL_NAMES: ReadonlySet<string> = new Set(["sleep", "notify_user"]);
 
 export interface CreateKairosOptions {
   /** `<userData>/kairos` 的绝对路径；所有子目录都基于它派生。 */
@@ -112,6 +118,13 @@ export interface CreateKairosOptions {
    * 白名单变化时由 main 重建 controller，本实例内视为不变。
    */
   skillCatalog?: KairosSkillCatalogEntry[];
+  /**
+   * 额外的**只读**授权根（绝对路径）——当前来源是 fs-watch 插件正在监听的目录：
+   * 用户把目录加入文件监听，即代表"允许 Kairos 阅读该目录"，Kairos 才能对
+   * fs-watch 报告的变化用 read_file 看细节。
+   * 只并入 guard.readOnlyRoots（写工具不放行）；监听目录变化时由 main 重建 controller。
+   */
+  readOnlyRoots?: string[];
 }
 
 export interface KairosController {
@@ -131,6 +144,11 @@ export interface KairosController {
   resetToday(): Promise<void>;
   /** 让 main IPC 在用户保存 config 后调用，触发 in-place reload。 */
   reloadConfig(): Promise<KairosConfig>;
+  /**
+   * 让 main IPC 在用户通过设置页新建/编辑/删除 brief 后调用：
+   * 全量重扫 `briefs/tasks/*.md` 重建 index，dispatcher 下一 tick 即可看到变化。
+   */
+  reloadBriefs(): Promise<void>;
   /**
    * 持久化 `preferences.enabled` 字段到 `<kairosRoot>/config/preferences.json`，
    * 并触发 `reloadConfig()` 让内存中 `config.preferences.enabled` 同步。
@@ -155,9 +173,18 @@ export interface KairosController {
    */
   shutdown(): Promise<void>;
   getState(): KairosRuntimeState;
+  /** 通知中心：全量列表（新→旧）+ 未读数。 */
+  notificationsList(): KairosNotificationsListResponse;
+  /** 标记已读；`id` 省略 = 全部已读。返回最新未读数。 */
+  notificationsMarkRead(id?: string): Promise<KairosNotificationsMarkReadResponse>;
+  /** 删除通知（单条 / 清除已读 / 清空全部）；纯用户侧操作。 */
+  notificationsRemove(
+    req: KairosNotificationsRemoveRequest,
+  ): Promise<KairosNotificationsRemoveResponse>;
   on(event: "state", listener: (s: KairosRuntimeState) => void): void;
   on(event: "event", listener: (e: SessionEvent) => void): void;
-  off(event: "state" | "event", listener: (...args: unknown[]) => void): void;
+  on(event: "notification", listener: (n: KairosNotification) => void): void;
+  off(event: "state" | "event" | "notification", listener: (...args: unknown[]) => void): void;
   notifyMainAgentTurnStart(): void;
   notifyMainAgentTurnEnd(): void;
   /** 测试/调试用：返回当前 ring buffer 内事件。 */
@@ -165,7 +192,7 @@ export interface KairosController {
   /**
    * 按需组装上下文快照——renderer 的"上下文" Sheet 按钮触发。
    *
-   * 复用 runner 的依赖（observe / shortTerm / activeBriefsCount + assembleSystemPrompt），
+   * 复用 runner 的依赖（observe / shortTerm / activeBriefs + assembleSystemPrompt），
    * 但不真正调 LLM。即使 controller 处于 stopped 也能返回——展示的是"如果现在 tick
    * 将会看到的上下文"，不依赖 enabled 状态。
    */
@@ -175,7 +202,6 @@ export interface KairosController {
 interface ControllerLayout {
   configDir: string;
   shortMemoryDir: string;
-  manifestDir: string;
   observeDir: string;
   briefsDir: string;
   notesDir: string;
@@ -183,18 +209,20 @@ interface ControllerLayout {
   usageAccumulatorFile: string;
   /** `budget-state.json` 落地路径（额度护栏单一余额运行态）。 */
   budgetStateFile: string;
+  /** `notifications.json` 落地路径（通知中心，含可变已读状态）。 */
+  notificationsFile: string;
 }
 
 function layout(root: string): ControllerLayout {
   return {
     configDir: join(root, "config"),
     shortMemoryDir: join(root, "memory", "short-term"),
-    manifestDir: join(root, "observe", "watch-manifests"),
     observeDir: join(root, "observe"),
     briefsDir: join(root, "briefs"),
     notesDir: join(root, "workspace", "notes"),
     usageAccumulatorFile: join(root, "memory", "usage-accumulator.json"),
     budgetStateFile: join(root, "memory", "budget-state.json"),
+    notificationsFile: join(root, "memory", "notifications.json"),
   };
 }
 
@@ -205,7 +233,6 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
   await Promise.all([
     mkdir(paths.configDir, { recursive: true }),
     mkdir(paths.shortMemoryDir, { recursive: true }),
-    mkdir(paths.manifestDir, { recursive: true }),
     mkdir(paths.observeDir, { recursive: true }),
     mkdir(paths.briefsDir, { recursive: true }),
     mkdir(paths.notesDir, { recursive: true }),
@@ -239,7 +266,6 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     contextWindow: opts.contextWindow,
     loadBudgetRatio: config.preferences.memory.loadBudgetRatio,
   });
-  const watchDiff = new WatchDiffEngine(paths.manifestDir);
   const sessionsDigest = new SessionsDigestBuilder({
     paths: config.paths,
     stateFile: join(paths.observeDir, "sessions-state.json"),
@@ -249,15 +275,35 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
   await briefsIndex.rebuildFromDisk();
   const briefsDispatcher = new BriefsDispatcher(briefsIndex);
 
+  // 通知中心：notify_user 工具写入，UI 铃铛读取；防刷计数每 tick 清零（见 eventSink）。
+  const notificationStore = new KairosNotificationStore(paths.notificationsFile);
+  await notificationStore.load();
+  let tickNotifyCount = 0;
+
   // Kairos 专属 ToolManager
   const toolManager = opts.toolManagerFactory(config);
-  registerKairosTools(toolManager);
+  registerKairosTools(toolManager, {
+    notify: {
+      store: notificationStore,
+      getTickNotifyCount: () => tickNotifyCount,
+      incTickNotifyCount: () => {
+        tickNotifyCount += 1;
+      },
+    },
+  });
 
   const skillCatalog = opts.skillCatalog ?? [];
   const buildKairosGuard = (cfg: KairosConfig): KairosGuardContext => ({
-    // Skill 目录并入可读范围：catalog 段告诉 Kairos 去读 SKILL.md / references，
-    // guard 必须放行，否则 catalog 形同虚设。
-    allowedRoots: [...cfg.paths.paths.map((p) => p.path), ...skillCatalog.map((s) => s.directory)],
+    // 可读可写：paths.json 声明的路径（默认只有 Kairos 自己的 workspace）。
+    allowedRoots: cfg.paths.paths.map((p) => p.path),
+    // 只读授权：Skill 目录（catalog 段告诉 Kairos 去读 SKILL.md / references，
+    // guard 必须放行）+ fs-watch 监听目录（用户加入监听即授权阅读）
+    // + briefs 目录（Kairos 可以翻自己的任务表原文，但任务是用户定的，不给写）。
+    readOnlyRoots: [
+      ...skillCatalog.map((s) => s.directory),
+      paths.briefsDir,
+      ...(opts.readOnlyRoots ?? []),
+    ],
     blocklistPaths: cfg.blocklist.paths,
     toolsDenied: cfg.blocklist.toolsDenied,
   });
@@ -265,6 +311,10 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
   let kairosGuard = buildKairosGuard(config);
 
   const emitter = new EventEmitter();
+  // 新通知 → 对外 emit，kairos-ipc 转发 renderer（徽标 +1）+ important 级弹系统通知。
+  notificationStore.onCreated((n) => {
+    emitter.emit("notification", n);
+  });
   const runtimeState: KairosRuntimeState = {
     enabled: false,
     state: "stopped",
@@ -294,6 +344,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     if (event.type === "kairos_tick_injected") {
       runtimeState.todayTickCount += 1;
       runtimeState.toolCallCountInCurrentTick = 0;
+      tickNotifyCount = 0;
     } else if (event.type === "tool_call") {
       runtimeState.toolCallCountInCurrentTick += 1;
     } else if (event.type === "assistant_message") {
@@ -335,23 +386,17 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
   // 用户打开上下文 Sheet 不会"看一眼就吃掉观测增量"。
   const inboxStateFile = join(paths.observeDir, "inbox-state.json");
   const observeRefresh = async () => {
-    const watchDiffs: WatchDiffEntry[] = [];
-    const watchCommits: Array<() => Promise<void>> = [];
-    for (const p of config.paths.paths.filter((x) => x.watch)) {
-      const { entry, scannedEntries } = await watchDiff.computeDiff(p.path);
-      watchDiffs.push(entry);
-      watchCommits.push(() => watchDiff.commitManifest(p.path, scannedEntries));
-    }
     const sd = await sessionsDigest.refresh();
     const commit = async () => {
-      for (const commitOne of watchCommits) await commitOne();
       await sessionsDigest.commitCursor(sd.cursor);
     };
-    return { watchDiffs, sessionsDigest: sd, commit };
+    return { sessionsDigest: sd, commit };
   };
-  const activeBriefsCount = async () => {
+  const activeBriefs = async () => {
     const entries = await briefsIndex.list();
-    return entries.filter((e) => e.frontmatter.status === "active").length;
+    return entries
+      .filter((e) => e.frontmatter.status === "active")
+      .map((e) => ({ id: e.id, nextRun: e.frontmatter.nextRun }));
   };
   const loadInboxSummary = async () => {
     const readCursor = await loadKairosInboxReadCursor(inboxStateFile);
@@ -389,7 +434,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     shortTerm,
     skillCatalog,
     observeRefresh,
-    activeBriefsCount,
+    activeBriefs,
     loadInboxSummary,
     commitInboxCursor,
     eventSink,
@@ -416,8 +461,21 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
   /**
    * merge-write `preferences.json` 的 `enabled` 字段（保留其它字段）+ reload。
    * 被 controller.setEnabledPreference 和耗尽暂停 haltForBudget 复用。
+   *
+   * 写入串行化 + tmp 名唯一：曾因固定 `.tmp` 路径在快速连点开启/暂停时并发写，
+   * 先完成的 rename 把共享 tmp 挪走，后一个 rename 直接 ENOENT（UI 表现为暂停失效）。
    */
-  const persistEnabledPreference = async (enabled: boolean): Promise<void> => {
+  let prefsWriteChain: Promise<void> = Promise.resolve();
+  const persistEnabledPreference = (enabled: boolean): Promise<void> => {
+    const next = prefsWriteChain.then(
+      () => persistEnabledPreferenceUnsafe(enabled),
+      () => persistEnabledPreferenceUnsafe(enabled),
+    );
+    // 队列本身吞掉错误避免链条中断；调用方仍通过返回的 next 感知失败。
+    prefsWriteChain = next.catch(() => {});
+    return next;
+  };
+  const persistEnabledPreferenceUnsafe = async (enabled: boolean): Promise<void> => {
     const prefsPath = join(opts.kairosRoot, "config", "preferences.json");
     let raw: unknown = {};
     try {
@@ -440,7 +498,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     }
     (raw as Record<string, unknown>).enabled = enabled;
     await mkdir(dirname(prefsPath), { recursive: true });
-    const tmp = `${prefsPath}.tmp`;
+    const tmp = `${prefsPath}.${process.pid}.${Date.now()}.tmp`;
     await writeFile(tmp, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
     await rename(tmp, prefsPath);
     await reload();
@@ -566,20 +624,26 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
       runtimeState.enabled = true;
       // 每轮启动重建中断句柄，供 shutdown() abort 正在飞的 LLM 请求。
       abortController = new AbortController();
-      currentSessionDate = todayKey(new Date());
+      const startNow = new Date();
+      currentSessionDate = todayKey(startNow);
       await processor.start();
-      // 首次 tick：firstTickDelay 后投递一个明确的 "first wake-up" tick
+      // 首个 tick：firstTickDelay 后投递。"first wake-up" 标记只在今天（当前分卷）
+      // 还没有任何短期记忆时携带——settings 变更引发的 controller rebuild 会反复走
+      // start()，若无条件带标记，Kairos 会在一天内收到多个"首次唤醒"（模型会困惑并
+      // 重复勘察）。已有今日记忆时说明环境是熟悉的，投普通 tick 即可。
+      const isFirstWakeUpToday = (await store.loadDaily(currentSessionDate)).length === 0;
+      const firstTickContent = isFirstWakeUpToday ? "<tick first wake-up/>" : "";
       if (firstTickDelay > 0) {
         setTimeout(() => {
           queue.enqueue({
             type: "tick",
-            payload: { trigger: "auto", content: "<tick first wake-up/>" },
+            payload: { trigger: "auto", content: firstTickContent },
           });
         }, firstTickDelay);
       } else {
         queue.enqueue({
           type: "tick",
-          payload: { trigger: "auto", content: "<tick first wake-up/>" },
+          payload: { trigger: "auto", content: firstTickContent },
         });
       }
     },
@@ -608,6 +672,9 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
       emitter.emit("state", { ...runtimeState });
     },
     reloadConfig: reload,
+    async reloadBriefs() {
+      await briefsIndex.rebuildFromDisk();
+    },
     async setEnabledPreference(enabled: boolean) {
       await persistEnabledPreference(enabled);
     },
@@ -651,6 +718,20 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     getState() {
       return { ...runtimeState };
     },
+    notificationsList() {
+      return {
+        notifications: notificationStore.list(),
+        unreadCount: notificationStore.unreadCount(),
+      };
+    },
+    async notificationsMarkRead(id?: string) {
+      const unreadCount = await notificationStore.markRead(id);
+      return { ok: true as const, unreadCount };
+    },
+    async notificationsRemove(req) {
+      const removedCount = await notificationStore.remove(req);
+      return { ok: true as const, removedCount, unreadCount: notificationStore.unreadCount() };
+    },
     on(event, listener) {
       emitter.on(event, listener as (...args: unknown[]) => void);
     },
@@ -672,7 +753,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
       // 复用 runner 同款的输入：保证"用户在 Sheet 里看到的" === "下次 tick LLM 看到的"。
       const observe = await observeRefresh();
       const shortTermResult = await shortTerm.load();
-      const briefsCount = await activeBriefsCount();
+      const briefs = await activeBriefs();
       const inboxSummary = await loadInboxSummary();
 
       const systemPrompt = assembleSystemPrompt({
@@ -688,7 +769,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
         observeResult: observe,
         inboxSummary,
         shortTermResult,
-        briefsCount,
+        briefs,
         skillCatalog,
         promptSourceFile: "packages/agent-core/src/kairos/prompt.ts",
       });
@@ -743,12 +824,11 @@ interface BuildPromptSegmentsInput {
   config: KairosConfig;
   configDir: string;
   observeResult: {
-    watchDiffs: WatchDiffEntry[];
     sessionsDigest: SessionsDigestResult;
   };
   inboxSummary?: KairosInboxSummary;
   shortTermResult: KairosShortTermLoadResult;
-  briefsCount: number;
+  briefs: KairosActiveBriefInfo[];
   skillCatalog: KairosSkillCatalogEntry[];
   /** 仅用于 segments 的 `sourceFiles` 标注；提交时已经是相对仓库根的路径常量。 */
   promptSourceFile: string;
@@ -762,12 +842,15 @@ interface BuildPromptSegmentsInput {
  * - 因此 Sheet 里复制某一段可能少模板分隔符；想拿原文用 `systemPrompt` 字段。
  */
 function buildPromptSegments(input: BuildPromptSegmentsInput): KairosContextPromptSegment[] {
-  const { now, config, configDir, observeResult, shortTermResult, briefsCount, promptSourceFile } = input;
+  const { now, config, configDir, observeResult, shortTermResult, briefs, promptSourceFile } = input;
 
-  // 模板里 `# 上下文段` 之前都是硬编码段（人设 / 节奏 / Workspace boundary），
-  // 用 split() 安全切出。`prompt.ts` 改了顺序也会被对应反映。
+  // 模板里 `# 上下文段` 之前是身份段（{soul} 插槽）+ 机制段（例程 / 场景应对 /
+  // Workspace boundary），用 split() 安全切出。`prompt.ts` 改了顺序也会被对应反映。
+  // {soul} 按 assembleSystemPrompt 同款规则替换，保证 Sheet 预览 === LLM 实际所见。
   const splitMarker = "# 上下文段";
-  const [hardcodedHeader] = KAIROS_SYSTEM_PROMPT.split(splitMarker);
+  const [rawHeader] = KAIROS_SYSTEM_PROMPT.split(splitMarker);
+  const effectiveSoul = config.soulMd.trim().length > 0 ? config.soulMd.trim() : KAIROS_DEFAULT_SOUL;
+  const hardcodedHeader = rawHeader.replace("{soul}", effectiveSoul);
   const phase = derivePhase(now, config);
   const userRules = config.ruleMd.trim().length > 0 ? config.ruleMd.trim() : "（暂无 rule.md 内容）";
 
@@ -779,7 +862,8 @@ function buildPromptSegments(input: BuildPromptSegmentsInput): KairosContextProm
     {
       label: "Kairos 角色与节奏",
       text: hardcodedHeader.trim(),
-      sourceFiles: [promptSourceFile],
+      // soul.md 是用户可改的人格插槽；prompt.ts 是机制段来源。
+      sourceFiles: [join(configDir, "soul.md"), promptSourceFile],
     },
     {
       label: "配置提示",
@@ -812,8 +896,7 @@ function buildPromptSegments(input: BuildPromptSegmentsInput): KairosContextProm
       text: assembleTickMessage({
         now,
         phase,
-        activeBriefsCount: briefsCount,
-        watchDiffs: observeResult.watchDiffs,
+        activeBriefs: briefs,
         sessionsDigest: observeResult.sessionsDigest,
         inboxSummary: input.inboxSummary,
       }),

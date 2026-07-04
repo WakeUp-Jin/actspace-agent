@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Kairos 通知中心 · 交互方案对比</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-subtle: #f2f4f7;
+    --line: #e4e7ec;
+    --line-strong: #cdd3dc;
+    --text: #1c2430;
+    --text-muted: #5b6472;
+    --text-faint: #98a1b0;
+    --brand: #2f6fff;
+    --brand-soft: #e8efff;
+    --brand-strong: #1f56d6;
+    --danger: #e5484d;
+    --danger-soft: #fdebec;
+    --success: #2e9e5b;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }
+  body { background: var(--bg); color: var(--text); padding: 28px; }
+  h1 { font-size: 20px; margin-bottom: 6px; }
+  .lede { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; }
+  .variants { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; align-items: start; }
+  .variant { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .variant h2 { font-size: 15px; margin-bottom: 2px; }
+  .variant .tag { display:inline-block; font-size: 11px; color: var(--brand-strong); background: var(--brand-soft); border-radius: 99px; padding: 2px 8px; margin-bottom: 8px; }
+  .variant .desc { font-size: 12px; line-height: 1.6; color: var(--text-muted); margin-bottom: 14px; }
+  .stage { position: relative; background: var(--bg); border: 1px dashed var(--line-strong); border-radius: 12px; min-height: 480px; padding: 14px; overflow: hidden; }
+
+  /* 模拟 header bar */
+  .fakebar { display:flex; justify-content: flex-end; gap: 8px; background: var(--surface); border:1px solid var(--line); border-radius: 9px; padding: 8px 10px; margin-bottom: 10px; }
+  .btn { display:inline-flex; align-items:center; gap:6px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); font-size: 12.5px; color: var(--text); cursor: pointer; position: relative; }
+  .btn:hover { background: var(--surface-subtle); }
+  .badge { position:absolute; top:-6px; right:-6px; background: var(--danger); color:#fff; font-size:10px; font-weight:600; min-width:16px; height:16px; border-radius:99px; display:inline-flex; align-items:center; justify-content:center; padding:0 4px; }
+  .bell::before { content:"🔔"; font-size: 13px; }
+
+  /* 通用列表条目 */
+  .pop { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(16,24,40,.14); overflow: hidden; }
+  .pop-head { display:flex; justify-content:space-between; align-items:center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .pop-head b { font-size: 13px; }
+  .mark-all { font-size: 11.5px; color: var(--text-faint); background:none; border:none; cursor:pointer; }
+  .mark-all:hover { color: var(--text); }
+  .item { display:grid; gap:4px; padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .item:last-child { border-bottom: none; }
+  .item:hover { background: var(--surface-subtle); }
+  .item.unread { background: #f4f8ff; }
+  .meta { display:flex; align-items:center; gap:6px; font-size: 11px; color: var(--text-faint); }
+  .dot { width:6px; height:6px; border-radius:99px; background: var(--brand); }
+  .dot.imp { background: var(--danger); }
+  .lvl-imp { color: var(--danger); }
+  .unread-chip { color: var(--brand-strong); }
+  .title { font-size: 12.5px; line-height: 1.5; }
+  .unread .title { font-weight: 600; }
+  .body { font-size: 12px; line-height: 1.6; color: var(--text-muted); white-space: pre-wrap; }
+
+  /* 方案 A：行内展开 */
+  #a-pop { position: absolute; right: 14px; top: 60px; width: 300px; }
+  .a-body { display: none; }
+  .item.expanded { background: var(--surface-subtle); }
+  .item.expanded .a-body { display: block; }
+
+  /* 方案 B：双层切换 */
+  #b-pop { position: absolute; right: 14px; top: 60px; width: 300px; height: 360px; display: grid; grid-template-rows: auto 1fr; }
+  .b-view { overflow: auto; }
+  .b-detail { display: none; padding: 14px; overflow: auto; }
+  .b-detail .b-title { font-size: 14px; font-weight: 600; line-height: 1.5; margin: 8px 0 6px; }
+  .b-detail .meta { margin-bottom: 10px; }
+  .back { display:inline-flex; align-items:center; gap:4px; font-size: 12px; color: var(--text-muted); background:none; border:none; cursor:pointer; padding:0; }
+  .back:hover { color: var(--text); }
+  .b-actions { margin-top: 14px; display:flex; gap:8px; }
+  .b-actions .btn { height: 28px; font-size: 12px; }
+  #b-pop.detail-mode .b-view { display:none; }
+  #b-pop.detail-mode .b-detail { display:block; }
+  #b-pop.detail-mode .pop-head { display:none; }
+
+  /* 方案 C：右侧抽屉 */
+  .c-sheet { position: absolute; top: 0; right: 0; bottom: 0; width: 78%; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -16px 0 40px rgba(16,24,40,.12); display: grid; grid-template-rows: auto auto 1fr; }
+  .c-head { display:flex; justify-content: space-between; align-items:center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .c-head b { font-size: 14px; }
+  .c-close { border:none; background:none; font-size: 15px; cursor:pointer; color: var(--text-faint); }
+  .c-filters { display:flex; gap:6px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .chip { font-size: 11.5px; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; color: var(--text-muted); }
+  .chip.on { background: var(--brand-soft); color: var(--brand-strong); border-color: transparent; }
+  .c-list { overflow:auto; }
+  .c-detail-inline { display:none; padding: 10px 14px 12px 26px; background: var(--surface-subtle); border-bottom: 1px solid var(--line); }
+  .c-item.expanded + .c-detail-inline { display: block; }
+  .footnote { margin-top: 26px; font-size: 12px; color: var(--text-faint); line-height: 1.7; }
+</style>
+</head>
+<body>
+<h1>Kairos 通知中心 · 交互方案对比</h1>
+<p class="lede">三个方案都满足：点铃铛 → 通知列表 → 点条目查看详情并标记已读。差别在「详情呈现的容器」。全部可点击交互。</p>
+
+<div class="variants">
+
+  <!-- ═══ 方案 A ═══ -->
+  <section class="variant">
+    <h2>方案 A · 锚定浮层 + 行内展开</h2>
+    <span class="tag">现行方案的打磨版 · 最轻</span>
+    <p class="desc">点条目在列表内原地展开详情（手风琴），同时标记已读。不离开当前页面、无层级切换。适合详情较短（1–3 段）的通知。</p>
+    <div class="stage">
+      <div class="fakebar">
+        <button class="btn">⏸ 暂停</button>
+        <button class="btn">⚡ 唤醒</button>
+        <button class="btn bell">通知<span class="badge">2</span></button>
+      </div>
+      <div class="pop" id="a-pop">
+        <div class="pop-head"><b>通知（2 未读）</b><button class="mark-all">✓ 全部已读</button></div>
+        <div class="item unread" onclick="this.classList.toggle('expanded'); this.classList.remove('unread')">
+          <span class="meta"><i class="dot imp"></i>11:02:31 <span class="lvl-imp">重要</span> <span class="unread-chip">未读</span></span>
+          <span class="title">sales-2026Q2.csv 分析完成：Q2 环比 +18%</span>
+          <span class="body a-body">共 2,340 行。核心发现：
+· 华东区贡献 62% 增长
+· 6 月客单价下滑 7%，需关注
+· 已写入 notes/observations/2026-07-04.md</span>
+        </div>
+        <div class="item unread" onclick="this.classList.toggle('expanded'); this.classList.remove('unread')">
+          <span class="meta"><i class="dot"></i>10:47:12 <span class="unread-chip">未读</span></span>
+          <span class="title">监听目录新增 3 个文档，已整理摘要</span>
+          <span class="body a-body">draft-v2.md / meeting-notes.md / todo.txt，主题均与「发布计划」相关，摘要已并入主题笔记。</span>
+        </div>
+        <div class="item" onclick="this.classList.toggle('expanded')">
+          <span class="meta"><i class="dot"></i>09:30:05</span>
+          <span class="title">每日站会材料已准备好</span>
+          <span class="body a-body">昨日 3 个 session 复盘完成，待办清单更新至 notes/standup.md。</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 方案 B ═══ -->
+  <section class="variant">
+    <h2>方案 B · 浮层双层（列表 ⇄ 详情页）</h2>
+    <span class="tag">主从式 · 详情空间完整</span>
+    <p class="desc">浮层固定尺寸。点条目整体切换到详情视图（← 返回），详情有独立标题区、正文区和操作区。适合详情较长、需要完整排版（如分析报告要点）的通知。</p>
+    <div class="stage">
+      <div class="fakebar">
+        <button class="btn">⏸ 暂停</button>
+        <button class="btn">⚡ 唤醒</button>
+        <button class="btn bell">通知<span class="badge">2</span></button>
+      </div>
+      <div class="pop" id="b-pop">
+        <div class="pop-head"><b>通知（2 未读）</b><button class="mark-all">✓ 全部已读</button></div>
+        <div class="b-view">
+          <div class="item unread" onclick="document.getElementById('b-pop').classList.add('detail-mode')">
+            <span class="meta"><i class="dot imp"></i>11:02:31 <span class="lvl-imp">重要</span> <span class="unread-chip">未读</span></span>
+            <span class="title">sales-2026Q2.csv 分析完成：Q2 环比 +18% ›</span>
+          </div>
+          <div class="item unread" onclick="document.getElementById('b-pop').classList.add('detail-mode')">
+            <span class="meta"><i class="dot"></i>10:47:12 <span class="unread-chip">未读</span></span>
+            <span class="title">监听目录新增 3 个文档，已整理摘要 ›</span>
+          </div>
+          <div class="item" onclick="document.getElementById('b-pop').classList.add('detail-mode')">
+            <span class="meta"><i class="dot"></i>09:30:05</span>
+            <span class="title">每日站会材料已准备好 ›</span>
+          </div>
+        </div>
+        <div class="b-detail">
+          <button class="back" onclick="document.getElementById('b-pop').classList.remove('detail-mode')">← 返回列表</button>
+          <div class="b-title">sales-2026Q2.csv 分析完成：Q2 环比 +18%</div>
+          <span class="meta"><i class="dot imp"></i>11:02:31 · <span class="lvl-imp">重要</span> · 已读</span>
+          <div class="body">共 2,340 行数据。核心发现：
+
+· 华东区贡献 62% 的增长，连续两个季度领跑
+· 6 月客单价环比下滑 7%，建议关注促销策略
+· 新客占比 31%，高于 Q1 的 24%
+
+完整分析已写入 notes/observations/2026-07-04.md。</div>
+          <div class="b-actions">
+            <button class="btn">📄 打开关联笔记</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 方案 C ═══ -->
+  <section class="variant">
+    <h2>方案 C · 右侧抽屉通知中心</h2>
+    <span class="tag">与上下文 Sheet 同模式 · 空间最大</span>
+    <p class="desc">点铃铛从右侧滑出抽屉（复用现有 Sheet 组件的交互模式）。带「全部 / 未读」筛选，点条目行内展开完整详情。空间最大，能容纳 markdown 报告和后续扩展（按天分组、跳转笔记）。</p>
+    <div class="stage">
+      <div class="fakebar">
+        <button class="btn">⏸ 暂停</button>
+        <button class="btn">⚡ 唤醒</button>
+        <button class="btn bell">通知<span class="badge">2</span></button>
+      </div>
+      <div class="c-sheet">
+        <div class="c-head"><b>通知中心</b><div><button class="mark-all">✓ 全部已读</button> <button class="c-close">✕</button></div></div>
+        <div class="c-filters">
+          <button class="chip on">全部 3</button>
+          <button class="chip">未读 2</button>
+          <button class="chip">重要 1</button>
+        </div>
+        <div class="c-list">
+          <div class="item unread c-item" onclick="this.classList.toggle('expanded'); this.classList.remove('unread')">
+            <span class="meta"><i class="dot imp"></i>11:02:31 <span class="lvl-imp">重要</span> <span class="unread-chip">未读</span></span>
+            <span class="title">sales-2026Q2.csv 分析完成：Q2 环比 +18%</span>
+          </div>
+          <div class="c-detail-inline">
+            <div class="body">共 2,340 行数据。核心发现：
+· 华东区贡献 62% 的增长，连续两个季度领跑
+· 6 月客单价环比下滑 7%，建议关注促销策略
+· 新客占比 31%，高于 Q1 的 24%
+
+完整分析已写入 notes/observations/2026-07-04.md。</div>
+          </div>
+          <div class="item unread c-item" onclick="this.classList.toggle('expanded'); this.classList.remove('unread')">
+            <span class="meta"><i class="dot"></i>10:47:12 <span class="unread-chip">未读</span></span>
+            <span class="title">监听目录新增 3 个文档，已整理摘要</span>
+          </div>
+          <div class="c-detail-inline">
+            <div class="body">draft-v2.md / meeting-notes.md / todo.txt，主题均与「发布计划」相关，摘要已并入主题笔记。</div>
+          </div>
+          <div class="item c-item" onclick="this.classList.toggle('expanded')">
+            <span class="meta"><i class="dot"></i>09:30:05</span>
+            <span class="title">每日站会材料已准备好</span>
+          </div>
+          <div class="c-detail-inline">
+            <div class="body">昨日 3 个 session 复盘完成，待办清单更新至 notes/standup.md。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<p class="footnote">
+共同点：未读浅蓝底 + 加粗标题；info 蓝点 / important 红点 + 「重要」标签；点击详情即标记已读；头部「全部已读」。<br>
+差异总结：A 最轻但长详情局促；B 详情排版最完整、多一步返回；C 空间最大、可扩展筛选与分组，但交互最重（遮挡页面内容）。
+</p>
+</body>
+</html>

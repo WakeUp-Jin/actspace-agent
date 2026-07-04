@@ -5,21 +5,39 @@
  * 单元测试可以零成本覆盖（无需 mock ipcMain / BrowserWindow），
  * `kairos-ipc.ts` 只负责把这些纯函数串到真实的 ipcMain.handle / webContents.send 上。
  */
+import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type {
+  KairosBriefReadResponse,
+  KairosBriefSummary,
+  KairosBriefWriteRequest,
+  KairosBriefsListResponse,
   KairosConfigName,
   KairosControl,
   KairosRuntimeState,
   SessionEvent,
 } from "@actspace/shared";
-import { parseBlocklist, parsePathsConfig, parsePreferences } from "@actspace/agent-core";
+import {
+  fullBriefMarkdown,
+  parseBriefFile,
+  parseBlocklist,
+  parsePathsConfig,
+  parsePreferences,
+  type BriefDoc,
+  type BriefFrontmatter,
+} from "@actspace/agent-core";
 
-/** 4 个配置文件的逻辑名 → 磁盘文件名映射。`kairos:read-config` / `write-config` 用。 */
+/** 5 个配置文件的逻辑名 → 磁盘文件名映射。`kairos:read-config` / `write-config` 用。 */
 export const CONFIG_FILE_MAP: Record<KairosConfigName, string> = {
   preferences: "preferences.json",
   paths: "paths.json",
   blocklist: "blocklist.json",
   rule: "rule.md",
+  soul: "soul.md",
 };
+
+/** markdown 配置（不做 JSON schema 校验，main 直接写盘）。 */
+export const MARKDOWN_CONFIG_NAMES: ReadonlySet<KairosConfigName> = new Set(["rule", "soul"]);
 
 /**
  * `kairos:get-events-recent` 的 limit 边界处理：
@@ -34,7 +52,7 @@ export function clampLimit(value: number): number {
 
 /**
  * `kairos:write-config` 的 schema 校验调度。
- * - rule.md 跳过（markdown 不校验，main 直接写盘）
+ * - rule.md / soul.md 跳过（markdown 不校验，main 直接写盘）
  * - 其余 3 份 JSON 用 agent-core 暴露的 parser；解析失败 throw 让 invoke 端 surface 给 renderer。
  */
 export function validateByName(name: KairosConfigName, parsed: unknown): void {
@@ -49,8 +67,121 @@ export function validateByName(name: KairosConfigName, parsed: unknown): void {
       parseBlocklist(parsed);
       return;
     case "rule":
+    case "soul":
       return;
   }
+}
+
+// ─── briefs（任务表）文件存取 ────────────────────────────────────────────
+//
+// `kairos:briefs-*` 4 条通道的纯逻辑：直接读写 `<kairosRoot>/briefs/tasks/<id>.md`，
+// frontmatter 解析/序列化复用 agent-core 的 parseBriefFile / fullBriefMarkdown。
+// 写路径的系统字段保护（created / lastRun / nextRun 由系统维护）在这里强制执行，
+// UI 无法通过 IPC 破坏调度状态。调用方（kairos-ipc.ts）在写/删成功后负责
+// `controller.reloadBriefs()` 让 dispatcher 下一 tick 看到变化。
+
+/** brief id 即文件名（不含 .md）；白名单字符防路径穿越。 */
+const BRIEF_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+export function assertBriefId(id: string): void {
+  if (!BRIEF_ID_RE.test(id)) {
+    throw new Error(`Invalid brief id: ${JSON.stringify(id)}（仅限字母/数字/-/_，最长 64）`);
+  }
+}
+
+function briefFilePath(briefsDir: string, id: string): string {
+  assertBriefId(id);
+  return join(briefsDir, "tasks", `${id}.md`);
+}
+
+function summaryFromFrontmatter(fm: BriefFrontmatter): KairosBriefSummary {
+  return {
+    id: fm.id,
+    status: fm.status,
+    trigger: fm.trigger,
+    intervalSec: fm.intervalSec,
+    priority: fm.priority,
+    created: fm.created,
+    lastRun: fm.lastRun,
+    nextRun: fm.nextRun,
+  };
+}
+
+export async function listBriefs(briefsDir: string): Promise<KairosBriefsListResponse> {
+  const tasksDir = join(briefsDir, "tasks");
+  let files: string[];
+  try {
+    files = await readdir(tasksDir);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return { briefs: [] };
+    throw err;
+  }
+  const briefs: KairosBriefSummary[] = [];
+  for (const name of files) {
+    if (!name.endsWith(".md")) continue;
+    try {
+      const doc = await parseBriefFile(join(tasksDir, name));
+      briefs.push(summaryFromFrontmatter(doc.frontmatter));
+    } catch {
+      // 解析失败的文件跳过展示（index-manager 会把它标 failed；编辑入口以能解析的为准）
+    }
+  }
+  briefs.sort((a, b) => a.id.localeCompare(b.id));
+  return { briefs };
+}
+
+export async function readBrief(briefsDir: string, id: string): Promise<KairosBriefReadResponse> {
+  const doc = await parseBriefFile(briefFilePath(briefsDir, id));
+  return { summary: summaryFromFrontmatter(doc.frontmatter), body: doc.body };
+}
+
+/**
+ * 新建或编辑（按 id 是否已存在区分）：
+ * - 新建：created = now，lastRun / nextRun = null（首次 interval 任务由 dispatcher 立即投递）。
+ * - 编辑：created / lastRun / nextRun 保留磁盘原值，只更新用户可编辑字段。
+ * 原子写（tmp + rename），防止半截 frontmatter 被 index rebuild 读到。
+ */
+export async function writeBrief(
+  briefsDir: string,
+  req: KairosBriefWriteRequest,
+  now: Date = new Date(),
+): Promise<void> {
+  const filePath = briefFilePath(briefsDir, req.id);
+  if (req.trigger === "interval" && (!Number.isFinite(req.intervalSec) || (req.intervalSec ?? 0) <= 0)) {
+    throw new Error("interval 触发的 brief 必须提供正数 intervalSec");
+  }
+  let existing: BriefDoc | null = null;
+  try {
+    existing = await parseBriefFile(filePath);
+  } catch {
+    existing = null;                       // 不存在或损坏 → 按新建处理
+  }
+
+  const frontmatter: BriefFrontmatter = {
+    id: req.id,
+    status: req.status,
+    trigger: req.trigger,
+    intervalSec: req.trigger === "interval" ? req.intervalSec : null,
+    priority: req.priority,
+    created: existing?.frontmatter.created ?? now.toISOString(),
+    lastRun: existing?.frontmatter.lastRun ?? null,
+    nextRun: existing?.frontmatter.nextRun ?? null,
+  };
+
+  await mkdir(join(briefsDir, "tasks"), { recursive: true });
+  const markdown = fullBriefMarkdown({
+    frontmatter,
+    body: req.body,
+    filePath,
+    fileMtime: 0,
+  });
+  const tmp = `${filePath}.tmp`;
+  await writeFile(tmp, markdown, "utf8");
+  await rename(tmp, filePath);
+}
+
+export async function deleteBrief(briefsDir: string, id: string): Promise<void> {
+  await rm(briefFilePath(briefsDir, id), { force: true });
 }
 
 /** KairosEventBatcher 内部用，把 setTimeout / clearTimeout 抽出来便于测试驱动假时钟。 */
@@ -217,6 +348,15 @@ export const KAIROS_IPC_CHANNELS = {
   readConfig: "kairos:read-config",
   writeConfig: "kairos:write-config",
   getContextSnapshot: "kairos:get-context-snapshot",
+  briefsList: "kairos:briefs-list",
+  briefsRead: "kairos:briefs-read",
+  briefsWrite: "kairos:briefs-write",
+  briefsDelete: "kairos:briefs-delete",
+  notificationsList: "kairos:notifications-list",
+  notificationsMarkRead: "kairos:notifications-mark-read",
+  notificationsRemove: "kairos:notifications-remove",
   event: "kairos:event",
   state: "kairos:state",
+  /** 推送通道：新通知实时下发（renderer 徽标 +1、列表头插）。 */
+  notification: "kairos:notification",
 } as const;

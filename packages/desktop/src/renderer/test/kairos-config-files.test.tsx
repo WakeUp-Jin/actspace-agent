@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, KairosBridgeApi, KairosConfigName } from "@actspace/shared";
+import { KAIROS_SOUL_PRESETS, type AppSettings, type KairosBridgeApi, type KairosConfigName } from "@actspace/shared";
 import { KairosSettings } from "../components/settings/KairosSettings";
 
 function makeSettings(): AppSettings {
@@ -18,7 +18,7 @@ function makeSettings(): AppSettings {
       exploreModelId: null,
     },
     kairos: { modelId: null, thinking: "auto", enabledSkills: [] },
-    plugins: { fsWatch: { enabled: false } },
+    plugins: { repoRoot: null, fsWatch: { enabled: false } },
     skills: { disabled: [] },
   };
 }
@@ -28,6 +28,7 @@ const FILE_NAME: Record<KairosConfigName, string> = {
   paths: "paths.json",
   blocklist: "blocklist.json",
   rule: "rule.md",
+  soul: "soul.md",
 };
 
 type WriteArg = { name: KairosConfigName; content: string };
@@ -42,6 +43,7 @@ function installBridge(over: BridgeOverrides = {}) {
     paths: over.contents?.paths ?? JSON.stringify({ tip: "t", paths: [] }, null, 2) + "\n",
     blocklist: over.contents?.blocklist ?? JSON.stringify({ paths: [], toolsDenied: [] }, null, 2) + "\n",
     rule: over.contents?.rule ?? "# rule\n",
+    soul: over.contents?.soul ?? "",
   };
   const readConfig = vi.fn(async ({ name }: { name: KairosConfigName }) => ({
     content: contents[name],
@@ -55,6 +57,9 @@ function installBridge(over: BridgeOverrides = {}) {
         return { ok: true } as const;
       }),
   );
+  const briefsList = vi.fn(async () => ({ briefs: [] }));
+  const briefsWrite = vi.fn(async () => ({ ok: true }) as const);
+  const briefsDelete = vi.fn(async () => ({ ok: true }) as const);
   const bridge = {
     getState: vi.fn(),
     getEventsRecent: vi.fn(),
@@ -62,11 +67,19 @@ function installBridge(over: BridgeOverrides = {}) {
     readConfig,
     writeConfig,
     getContextSnapshot: vi.fn(),
+    briefsList,
+    briefsRead: vi.fn(),
+    briefsWrite,
+    briefsDelete,
+    notificationsList: vi.fn(async () => ({ notifications: [], unreadCount: 0 })),
+    notificationsMarkRead: vi.fn(async () => ({ ok: true as const, unreadCount: 0 })),
+    notificationsRemove: vi.fn(async () => ({ ok: true as const, removedCount: 0, unreadCount: 0 })),
     onEvent: () => () => {},
     onState: () => () => {},
+    onNotification: () => () => {},
   } as unknown as KairosBridgeApi;
   (window as unknown as { kairos: KairosBridgeApi }).kairos = bridge;
-  return { bridge, readConfig, writeConfig, contents };
+  return { bridge, readConfig, writeConfig, contents, briefsList, briefsWrite, briefsDelete };
 }
 
 /** 取某文件最后一次写入的解析对象。 */
@@ -90,7 +103,7 @@ describe("KairosSettings — 结构化配置表单", () => {
     render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
 
     expect(await screen.findByText("运行偏好")).toBeInTheDocument();
-    expect(screen.getByText("可访问路径")).toBeInTheDocument();
+    expect(screen.getByText("可读写路径")).toBeInTheDocument();
     expect(screen.getByText("屏蔽规则")).toBeInTheDocument();
     expect(screen.getByText("用户规则")).toBeInTheDocument();
     expect(screen.getByLabelText("Kairos 模型")).toBeInTheDocument();
@@ -108,7 +121,7 @@ describe("KairosSettings — 结构化配置表单", () => {
     const { writeConfig } = installBridge();
     render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
 
-    await screen.findByText("可访问路径");
+    await screen.findByText("可读写路径");
     await userEvent.click(screen.getByRole("button", { name: "添加路径" }));
     const input = screen.getByLabelText("路径 1");
     await userEvent.type(input, "/Users/me/docs");
@@ -123,21 +136,6 @@ describe("KairosSettings — 结构化配置表单", () => {
     });
   });
 
-  it("切换路径 watch 巡检开关写回 watch=true", async () => {
-    const { writeConfig } = installBridge({
-      contents: { paths: JSON.stringify({ paths: [{ path: "/a", watch: false }] }, null, 2) + "\n" },
-    });
-    render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
-
-    const toggle = await screen.findByLabelText("路径 1 巡检");
-    await userEvent.click(toggle);
-
-    await waitFor(() => {
-      const paths = lastWrite(writeConfig, "paths")!.paths as Array<{ watch: boolean }>;
-      expect(paths[0].watch).toBe(true);
-    });
-  });
-
   it("默认 workspace 行标「默认」且不可删除，普通行可删除", async () => {
     installBridge({
       contents: {
@@ -145,8 +143,8 @@ describe("KairosSettings — 结构化配置表单", () => {
           JSON.stringify(
             {
               paths: [
-                { path: "/Users/me/Library/Application Support/actspace/kairos/workspace", watch: true, tip: "默认空间" },
-                { path: "/Users/me/docs", watch: false },
+                { path: "/Users/me/Library/Application Support/actspace/kairos/workspace", tip: "默认空间" },
+                { path: "/Users/me/docs" },
               ],
             },
             null,
@@ -157,7 +155,7 @@ describe("KairosSettings — 结构化配置表单", () => {
     render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
 
     await screen.findByRole("button", { name: "添加路径" });
-    const section = screen.getByText("可访问路径").closest("section") as HTMLElement;
+    const section = screen.getByText("可读写路径").closest("section") as HTMLElement;
     // 默认行有「默认」徽章；该行没有删除按钮，普通行（路径 2）有。
     expect(within(section).getByText("默认")).toBeInTheDocument();
     expect(within(section).queryByRole("button", { name: "删除路径 1" })).toBeNull();
@@ -166,7 +164,7 @@ describe("KairosSettings — 结构化配置表单", () => {
 
   it("点击「+ 添加说明」可编辑并写回路径 tip", async () => {
     const { writeConfig } = installBridge({
-      contents: { paths: JSON.stringify({ paths: [{ path: "/Users/me/docs", watch: false }] }, null, 2) + "\n" },
+      contents: { paths: JSON.stringify({ paths: [{ path: "/Users/me/docs" }] }, null, 2) + "\n" },
     });
     render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
 
@@ -303,6 +301,114 @@ describe("KairosSettings — 结构化配置表单", () => {
     await waitFor(() => {
       expect(writeConfig).toHaveBeenCalledWith({ name: "rule", content: "# new rule" });
     });
+  });
+
+  it("渲染人格与任务表分组", async () => {
+    installBridge();
+    render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
+
+    expect(await screen.findByText("人格")).toBeInTheDocument();
+    expect(screen.getByText("任务表")).toBeInTheDocument();
+    expect(screen.getByLabelText("soul.md 内容")).toBeInTheDocument();
+    expect(screen.getByLabelText("Kairos 人格预设")).toBeInTheDocument();
+  });
+
+  it("soul.md 为空时预设下拉显示「时机之神（默认）」", async () => {
+    installBridge();
+    render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
+
+    const trigger = await screen.findByLabelText("Kairos 人格预设");
+    expect(trigger).toHaveTextContent("时机之神（默认）");
+  });
+
+  it("选择「极简」预设把预设全文写入 soul.md", async () => {
+    const { writeConfig } = installBridge();
+    render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
+
+    await userEvent.click(await screen.findByLabelText("Kairos 人格预设"));
+    await userEvent.click(await screen.findByRole("option", { name: "极简" }));
+
+    const concise = KAIROS_SOUL_PRESETS.find((p) => p.id === "concise")!;
+    await waitFor(() => {
+      expect(writeConfig).toHaveBeenCalledWith({ name: "soul", content: concise.content });
+    });
+  });
+
+  it("soul.md 文本框自定义内容失焦写回，预设下拉显示「自定义」", async () => {
+    const { writeConfig } = installBridge();
+    render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
+
+    const textarea = await screen.findByLabelText("soul.md 内容");
+    await userEvent.type(textarea, "# 你是 Kairos —— 我的自定义人格");
+    await userEvent.tab();
+
+    await waitFor(() => {
+      expect(writeConfig).toHaveBeenCalledWith({
+        name: "soul",
+        content: "# 你是 Kairos —— 我的自定义人格",
+      });
+    });
+    expect(screen.getByLabelText("Kairos 人格预设")).toHaveTextContent("自定义");
+  });
+
+  it("任务表为空时显示占位文案，可通过新建表单保存任务", async () => {
+    const { briefsWrite, briefsList } = installBridge();
+    render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
+
+    expect(await screen.findByText("暂无任务。")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "新建任务" }));
+
+    await userEvent.type(screen.getByLabelText("任务 ID"), "daily-report");
+    await userEvent.type(screen.getByLabelText("任务正文"), "# 日报");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(briefsWrite).toHaveBeenCalledWith({
+        id: "daily-report",
+        status: "active",
+        trigger: "interval",
+        intervalSec: 3600,
+        priority: "normal",
+        body: "# 日报",
+      });
+    });
+    // 保存成功后刷新列表
+    expect(briefsList.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("任务列表渲染 id、状态徽章与调度描述", async () => {
+    installBridge();
+    const bridge = (window as unknown as { kairos: KairosBridgeApi }).kairos;
+    (bridge.briefsList as ReturnType<typeof vi.fn>).mockResolvedValue({
+      briefs: [
+        {
+          id: "weekly-report",
+          status: "active",
+          trigger: "interval",
+          intervalSec: 86_400,
+          priority: "normal",
+          created: "2026-07-01T00:00:00.000Z",
+          lastRun: null,
+          nextRun: null,
+        },
+        {
+          id: "inbox-triage",
+          status: "paused",
+          trigger: "manual",
+          intervalSec: null,
+          priority: "low",
+          created: "2026-07-01T00:00:00.000Z",
+          lastRun: null,
+          nextRun: null,
+        },
+      ],
+    });
+    render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
+
+    expect(await screen.findByText("weekly-report")).toBeInTheDocument();
+    expect(screen.getByText("每 1 天")).toBeInTheDocument();
+    expect(screen.getByText("inbox-triage")).toBeInTheDocument();
+    expect(screen.getByText("暂停")).toBeInTheDocument();
   });
 
   it("preferences.json 解析失败时模型下拉仍可用，并可用默认值覆盖恢复运行偏好", async () => {

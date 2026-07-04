@@ -329,7 +329,10 @@ export interface SchedulerExecuteOptions {
 
 /** scheduler 视角的 Kairos guard（不耦合 ToolManager 命名空间）。 */
 export interface KairosSchedulerGuard {
+  /** 可读**可写**的根路径。 */
   allowedRoots: string[];
+  /** 只读授权的根路径；仅 isReadOnly=true 的工具放行。 */
+  readOnlyRoots?: string[];
   blocklistPaths: string[];
   toolsDenied: string[];
 }
@@ -364,11 +367,19 @@ function checkKairosGuard(
 
   const matchBlocklist = createBlocklistMatcher(guard.blocklistPaths);
 
+  // 读写授权分离：只读工具（isReadOnly=true）可访问 allowedRoots ∪ readOnlyRoots；
+  // 写类工具只放行 allowedRoots——readOnlyRoots（Skill 目录 / fs-watch 监听目录）
+  // 对写操作是硬拒绝，"写入范围 = paths.json"由此成为代码强制而非软约定。
+  const readable = tool.isReadOnly === true
+    ? [...guard.allowedRoots, ...(guard.readOnlyRoots ?? [])]
+    : guard.allowedRoots;
+
   for (const raw of extracted) {
-    // 1. 路径必须落在某个 allowedRoot 之下
-    const inAnyRoot = guard.allowedRoots.some((root) => guardWorkspacePath(raw, root).ok);
+    // 1. 路径必须落在某个授权根之下
+    const inAnyRoot = readable.some((root) => guardWorkspacePath(raw, root).ok);
     if (!inAnyRoot) {
-      return { ok: false, reason: `Path ${raw} is not within any Kairos allowedRoots.` };
+      const scope = tool.isReadOnly === true ? "readable roots" : "writable roots (allowedRoots)";
+      return { ok: false, reason: `Path ${raw} is not within any Kairos ${scope}.` };
     }
     // 2. 命中 blocklist glob 即拒绝
     const absolute = resolve(raw);

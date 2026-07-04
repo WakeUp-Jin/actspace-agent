@@ -70,6 +70,12 @@ export interface KairosSettings {
 }
 
 export interface PluginsSettings {
+  /**
+   * 本机 actspace-plugins 仓库的绝对路径（用户 clone 下来的插件源码仓库）。
+   * 设置后插件可以「编译并安装」一键完成 cargo build → 安装 → 启动；null = 未设置，
+   * 仍可退回手动选择二进制安装。
+   */
+  repoRoot: string | null;
   /** fs-watch 文件监听插件（设计文档 agent-plugins-fs-watch.md）。 */
   fsWatch: {
     /** 总开关：开 = app 启动时自动拉起插件进程并守护；关 = 停止进程。 */

@@ -31,8 +31,10 @@
   - `通用 General`
   - `模型 Model`
   - `智能体 Agent`
+  - `Kairos`
   - `工具 Tools`
   - `插件 Plugins`
+  - `文件监听 File Watch`
   - `Skills`
   - `外观 Appearance`
   - `归档会话 Archived Chats`
@@ -58,24 +60,32 @@
   - 未连接「连接」→ API Key 输入弹窗；已连接「断开连接」。
   - 「测试连接」按钮校验 Key 是否有效。
   - 「默认模型」下拉，决定 Composer 初始选中模型。
-- 智能体 Agent
+- 智能体 Agent（2026-07-04 起只含主 Agent 内容；Kairos 全部迁到独立「Kairos」分区）
   - 主 Agent：自定义系统提示词（当前完整系统提示词，保存后下轮主 Agent 对话生效）。
-  - Kairos 自主智能体：模型下拉（**写 `preferences.json` 的 `modelId`**，非 settings.json）、思考链（自动/开/关，仍走 settings → `KAIROS_THINKING`）、**额度限制（开关 + 剩余额度 ¥，写入 `memory/budget-state.json`，不进 settings/preferences）**。
+  - Explore 子代理：模型下拉。
+- Kairos（2026-07-04 新增独立分区，聚拢 Kairos 全部配置；提示词分层设计见 `agent-kairos-prompt-design.md`）
+  - Kairos 自主智能体：模型下拉、思考链（自动/开/关，仍走 settings → `KAIROS_THINKING`）、**额度限制（开关 + 剩余额度 ¥，写入 `memory/budget-state.json`，不进 settings/preferences）**。
     - 额度控件读写走 `window.kairos`（`getState().budget` 回填 + `onState` 订阅运行时余额递减 + `control({type:"set_budget"})` 提交），与下方 config 文件读写独立。开关切换即时提交；剩余额度 commit-on-blur（本地 draft + focus 标志，避免运行时递减打断编辑）；关闭额度时余额输入禁用；耗尽时显示「额度不足」。语义见 `agent-kairos-autonomous-mode.md` 的「额度护栏（单一余额）」。桥不可用（mock）时禁用并提示仅桌面端可配置。
-  - Kairos 配置（结构化表单，**不暴露 raw JSON**）：3 份 JSON 用表单/开关/下拉/多选/列表呈现，`rule.md` 保留文本框。所有控件**即时生效**（开关/下拉/多选改即写，文本/数字 commit-on-blur，列表增删即写）；写回时**保留表单未暴露的字段**（含给 LLM 的 `tip`）。保存走 `window.kairos.writeConfig`（schema 校验 + 原子写 + reloadConfig）。
+  - 人格 `soul.md`（2026-07-04 新增）：预设下拉（时机之神（默认）/ 极简 / 技术流 / 温暖陪伴 / 自定义）+ markdown 文本框（失焦保存，约 500 token 上限）。预设选中态通过「当前内容与哪个 preset 逐字节相等」反推，都不等显示「自定义」；选预设 = 把预设全文写入 soul.md（覆盖自定义内容前 confirm）。预设字典在 `@actspace/shared` 的 `kairos-soul-presets.ts`。留空 = 使用默认人格（loader fallback）。
+  - 用户规则 `rule.md`：markdown 文本框，失焦自动保存。
+  - 任务表 briefs（2026-07-04 新增）：`briefs/tasks/*.md` 列表编辑。每行显示 id / 状态徽章（启用/暂停/已完成/失败）/ 调度描述（每 N 天/小时/分钟 或 手动/事件）；点击展开编辑器（启用开关、触发方式、间隔秒、优先级、正文 textarea，显式「保存」）；「新建任务」内联表单（含 id 输入，校验 `[A-Za-z0-9][A-Za-z0-9_-]{0,63}`）；删除需 confirm。读写走 `window.kairos.briefsList/briefsRead/briefsWrite/briefsDelete`，main 端保护系统字段（created/lastRun/nextRun），写/删成功后 `reloadBriefs()` 让 dispatcher 下一 tick 生效。
+  - Kairos 配置（结构化表单，**不暴露 raw JSON**）：3 份 JSON 用表单/开关/下拉/多选/列表呈现。所有控件**即时生效**（开关/下拉/多选改即写，文本/数字 commit-on-blur，列表增删即写）；写回时**保留表单未暴露的字段**（含给 LLM 的 `tip`）。保存走 `window.kairos.writeConfig`（schema 校验 + 原子写 + reloadConfig）。
     - 运行偏好 `preferences.json`（精简）：工作时段（固定 `09:00 - 21:00`）/ 晚上时段（固定 `23:00 - 07:00`）只暴露运行频率下拉，选项用「更活跃 / 正常 / 更安静」表述，**不出现「夹紧」字样**；时间不在 UI 中编辑，运行时也固定使用默认起止。另保留睡眠区间（最短/最长/默认，秒）；`rhythm.timezone` / `rhythm.weekend` / `tickBudget` / `circuitBreaker` / `memory` / `tip` 不暴露、写回原样保留。模型下拉与本表单同源。解析失败时禁用并提供「用默认值覆盖」恢复。
-    - 可访问路径 `paths.json`：**「展示 → 点击编辑」列表**（Cursor rule 风格）——路径与说明默认是只读文本、点一下变输入框失焦/回车提交；说明为空时只显示极轻的「+ 添加说明」幽灵按钮，不常驻空输入框；新增行自动进入编辑态；删除按钮 hover 行才浮现。**默认 workspace 行**（路径后缀 `kairos/workspace`）标「默认」徽章、路径只读且禁止删除（防误删工作根目录，说明 / 巡检仍可改）。
+    - 可读写路径 `paths.json`（2026-07-03 由「可访问路径」更名，随巡检开关一起移除了每行的 watch Toggle；只读授权由文件监听目录自动获得，说明文案在卡片头部提示）：**「展示 → 点击编辑」列表**（Cursor rule 风格）——路径与说明默认是只读文本、点一下变输入框失焦/回车提交；说明为空时只显示极轻的「+ 添加说明」幽灵按钮，不常驻空输入框；新增行自动进入编辑态；删除按钮 hover 行才浮现。**默认 workspace 行**（路径后缀 `kairos/workspace`）标「默认」徽章、路径只读且禁止删除（防误删工作根目录，说明仍可改）。
     - 屏蔽规则 `blocklist.json`（精简）：屏蔽路径 glob 列表 + **禁用工具多选下拉**（复用「工具」分区清单，选中=对 Kairos 禁用）。`timeWindows`（免打扰时段）/ `maxToolCallsPerTick`（单次唤醒上限）不暴露、写回原样保留。
-    - 用户规则 `rule.md`：markdown 文本框，失焦自动保存。
   - 不含 Kairos 开启/暂停按钮、也不放 `enabled` 开关（启停留在 Kairos 页）；但**直接改 `preferences.json` 的 `enabled` 保存后仍会真的起/停 Kairos**（main 端按 enabled 调和运行态）。
 - 工具 Tools
   - 列出全部基础工具开关；当前 provider 下不可用的工具显示禁用态与原因。
-- 插件 Plugins（管理外部**进程**；设计事实来源 `agent-plugins-fs-watch.md`）
-  - 文件监听（fs-watch）卡片：未安装态给「选择二进制安装」；已安装态给总开关 Toggle、运行状态徽标（运行中 / 启动中 / 已停止 / 异常+重试）、版本与最近心跳时间，`overflow` 时提示当日记录不完整。
-  - 配置区（安装后可见）：监听目录列表（系统目录选择器增删）、合并窗口（debounce）与日志保留天数步进器、排除隐藏文件开关；排除名单与事件输出目录只读展示。开关 / 配置变更即时生效（写 config.json，运行中自动重启进程）。
-  - 状态 2s 轮询，仅本分区挂载时进行；浏览器 mock 模式显示「仅桌面端可用」。
-  - 开启 fs-watch 时 main 自动把 `fs-watch` 并入 Kairos 的 Skill 白名单（用户可在 Skills 分区再关掉）。
-- Skills（管理**知识能力**的可见性；与「插件」分区分工——插件管进程，这里管 catalog）
+- 插件 Plugins（管理外部插件二进制的**安装 / 编译 / 版本**；功能开关与配置在各功能自己的分区；设计事实来源 `agent-plugins-fs-watch.md`）
+  - 「插件仓库」卡片：配置本机 `actspace-plugins` 仓库绝对路径（目录选择器 + 手输 commit-on-blur，持久化 `settings.plugins.repoRoot`）。
+  - 「已接入的插件」列表，当前只有 fs-watch 卡片：未安装态——已设仓库路径时主按钮「编译并安装」（cargo build → 安装 → 自动开启，按钮带「编译中…」busy 态与耗时提示），副按钮「选二进制」兜底；未设仓库路径时只有「选择二进制安装」+ 引导提示。已安装态显示版本、运行状态徽标（运行中 / 启动中 / 已停止 / 异常+重试）、最近心跳与「重新编译」按钮（已设仓库路径时；升级用：停旧进程 → 重编 → 重装 → 重启）；卡片文案指引用户到「文件监听」分区做开关与配置。
+- 文件监听 File Watch（面向用户管 fs-watch **功能**：开关 + 监听配置；插件安装在「插件」分区）
+  - 未安装态：整版引导提示「请先到插件分区完成安装」。
+  - 「开关与状态」卡片：总开关 Toggle、运行状态徽标、最近心跳、异常时内联「重试」，`overflow` 时提示当日记录不完整；关闭不删除历史日志。
+  - 配置区：监听目录列表（系统目录选择器增删）、合并窗口(debounce)与日志保留天数步进器、排除隐藏文件开关；排除名单与事件输出目录只读展示。开关 / 配置变更即时生效（写 config.json，运行中自动重启进程）。
+  - 两个分区共用 `fs-watch-shared.ts`（状态轮询 hook、徽标 / 心跳格式化），各自挂载时独立 2s 轮询；浏览器 mock 模式均显示「仅桌面端可用」。
+  - 开启文件监听时 main 自动把 `fs-watch` 并入 Kairos 的 Skill 白名单（用户可在 Skills 分区再关掉）。
+- Skills（管理**知识能力**的可见性；插件分区管进程安装、文件监听分区管功能，这里管 catalog）
   - Skill 卡片列表：name / description / scope+来源徽标 / SKILL.md 目录路径 / 异常 warning；同名被遮蔽（shadowed）的条目默认不展示、只在顶部计数提及。
   - 每卡两个独立开关：「主 Agent」= 黑名单反向（默认全开，关闭写 `settings.skills.disabled`）；「Kairos」= 白名单（默认全关，开启写 `settings.kairos.enabledSkills`，变更触发 Kairos controller 重建）。
   - 顶部「安装 Skill」：选目录 → 校验 SKILL.md → 复制到 `<userData>/skills/<目录名>/`；仅该目录下（`removable`）的 Skill 显示「卸载」按钮（confirm 后删除目录）。

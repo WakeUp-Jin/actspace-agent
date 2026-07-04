@@ -258,6 +258,28 @@ describe("createKairos", () => {
     await ctrl.stop();
   });
 
+  it("setEnabledPreference tolerates concurrent calls (no shared-tmp rename race)", async () => {
+    const root = await makeRoot();
+    await mkdir(join(root, "config"), { recursive: true });
+    const llm = new MockLLMService({ provider: "mock", apiKey: "k", model: "m" });
+    const ctrl = await createKairos({
+      kairosRoot: root,
+      llm,
+      modelId: "deepseek-v4-flash",
+      toolManagerFactory: makeToolManagerFactory(),
+      contextWindow: 8000,
+    });
+    // 曾因固定 `.tmp` 路径并发写：先完成的 rename 挪走共享 tmp，后一个 rename ENOENT。
+    await Promise.all([
+      ctrl.setEnabledPreference(true),
+      ctrl.setEnabledPreference(false),
+      ctrl.setEnabledPreference(true),
+    ]);
+    const parsed = JSON.parse(await readFile(join(root, "config", "preferences.json"), "utf8"));
+    expect(typeof parsed.enabled).toBe("boolean");
+    await ctrl.stop();
+  });
+
   it("setEnabledPreference throws when preferences.json is invalid JSON", async () => {
     const root = await makeRoot();
     await writeConfig(root, {

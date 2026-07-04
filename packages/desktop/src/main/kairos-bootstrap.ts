@@ -48,7 +48,7 @@ export async function ensureKairosScaffolding(kairosRoot: string): Promise<void>
     mkdir(join(kairosWorkspaceRoot, "notes"), { recursive: true }),
     mkdir(join(kairosRoot, "config"), { recursive: true }),
     mkdir(join(kairosRoot, "memory", "short-term"), { recursive: true }),
-    mkdir(join(kairosRoot, "observe", "watch-manifests"), { recursive: true }),
+    mkdir(join(kairosRoot, "observe"), { recursive: true }),
     mkdir(join(kairosRoot, "briefs", "tasks"), { recursive: true }),
     ensureKairosInboxScaffolding(kairosRoot),
   ]);
@@ -82,7 +82,6 @@ function defaultPathsConfigForKairosWorkspace(kairosRoot: string) {
     paths: [
       {
         path: getKairosWorkspaceRoot(kairosRoot),
-        watch: true,
         tip: "Kairos 的默认工作空间，文件工具的相对路径会落在这里。",
       },
     ],
@@ -103,10 +102,14 @@ async function writePathsConfigIfMissingOrLegacyDefault(kairosRoot: string): Pro
   }
 }
 
+/** 巡检管道退役前的默认 tip；老安装的空 paths.json 仍带这句，需要一并识别成 legacy。 */
+const LEGACY_PATHS_CONFIG_TIP = "在此声明 Kairos 可读的本地路径；watch=true 表示同时纳入巡检差异检测。";
+
 function isLegacyEmptyPathsConfig(content: string): boolean {
   try {
     const parsed = JSON.parse(content) as { tip?: unknown; paths?: unknown };
-    return parsed.tip === DEFAULT_PATHS_CONFIG.tip && Array.isArray(parsed.paths) && parsed.paths.length === 0;
+    const isKnownDefaultTip = parsed.tip === DEFAULT_PATHS_CONFIG.tip || parsed.tip === LEGACY_PATHS_CONFIG_TIP;
+    return isKnownDefaultTip && Array.isArray(parsed.paths) && parsed.paths.length === 0;
   } catch {
     return false;
   }
