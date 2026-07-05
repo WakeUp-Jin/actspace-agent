@@ -2,10 +2,30 @@
 
 这份记录按用户可感知的新功能、体验优化和重要修复回填，不等同于正式版本号、Git tag 或远程发布通道。
 
+## 2026-07
+
+| 日期 | 功能域 | 用户价值 | 变更摘要 |
+| --- | --- | --- | --- |
+| 2026-07-04 | Bash 安全执行 | Bash 命令默认在 macOS 沙盒里运行，常规命令少打扰、危险命令永远问人，安全和流畅同时提升。 | 新增 Seatbelt 沙盒执行层（deny-default profile、敏感路径定向拒绝、运行时探测自动降级）；命令规则收敛为三级分级表：hard reject（`rm -rf` 关键路径、删 `.git` 本体等）、不可逆 ask（`rm`、`git reset --hard`、`git push --force` 等永远询问且不豁免）、allowlist/沙盒放宽自动放行；沙盒外升级走 `no_sandbox` 审批。 |
+| 2026-07-04 | Kairos 通知中心 | Kairos 的重要发现不再淹没在滚动轨迹里，用户在铃铛通知中心就能看到并标记已读。 | 新增仅供 Kairos 使用的 `notify_user(title, body, level)` 工具（每 tick 限 3 条）；`memory/notifications.json` 持久化（滚动上限 200）；Kairos 完整页与右侧紧凑视图各挂一个铃铛入口。 |
+| 2026-07-04 | Kairos 人格定制 | 用户可以自定义 Kairos 的人格，并直接在设置页编辑规则和任务表。 | 系统提示词开出 `{soul}` 人格插槽（`soul.md` + 4 个内置预设，空白回落默认人格）；rule.md、briefs 暴露给用户编辑；设置页新增独立「Kairos」分区。 |
+| 2026-07-03 | Kairos 主动性 | Kairos 醒来会主动读取数据源、按场景表行动并留下笔记，不再"看一眼就睡"。 | 系统提示词重写为「唤醒例程 + 闲时工作」骨架，新增信息渠道说明、场景应对表和固定笔记落点；每条 tick 消息尾部追加固定提醒对抗提示词稀释；tick 头部渲染任务表清单；旧轮询巡检管道退役；工具守卫读写授权分离（监听目录、briefs 只读可访问）。 |
+| 2026-07-03 | 文件监听插件与 Skills | 文件变化由常驻 Rust 插件持续监听，Kairos 和其他 Agent 都能通过 Skill 消费监听日志；插件和 Skills 可在设置页管理。 | 新建独立仓库 `actspace-plugins` 的 fs-watch 插件（notify 监听、去抖合并、按天 JSONL、心跳与单实例锁）；main 侧插件守护进程与 Skills 安装/启停服务；Kairos Skill 白名单注入 system prompt。 |
+| 2026-07-03 | Bash 后台执行 | 长命令不再把 Agent 卡死：超时自动转后台继续跑，Agent 可查增量输出、终止任务，任务完成时会收到通知。 | `timeoutMs` 语义改为 `blockMs`（到点转后台而非杀进程）；新增跨 turn 任务注册表、`bash_output`（增量/tail 读取）与 `bash_kill` 工具；终态经 `task_notification` 注入下一次 LLM 调用；修复转后台后落盘文件停写、执行中缺 shimmer 等验收问题。 |
+| 2026-07-03 | 工具与输入细节 | 写文件完成后能看到 +N/-N 的 diff 折叠态；输入框粘贴大段文本会自动长高；Bash 超时可靠返回已捕获输出。 | `tool_finished` 为普通工具补最终 preview（`write_file` 带 additions/deletions/diff）；Composer textarea auto-grow；`runProcess` 超时 SIGTERM→SIGKILL 进程组终止并保证返回。 |
+
 ## 2026-06
 
 | 日期 | 功能域 | 用户价值 | 变更摘要 |
 | --- | --- | --- | --- |
+| 2026-06-18 | 写入安全阀 | 模型输出触顶时不会再把截断的半截内容写进文件。 | provider 原始 stop reason 为 `length` 且本轮含 tool call 时阻断 `write_file`/`edit_file`/`delete_file` 并返回明确错误；工具描述引导长文档先写骨架再分段补齐；新增 `kimi-k2.7-code` 模型配置（1M context）。 |
+| 2026-06-14 | 工具输出压缩 | 长工具输出压缩后关键细节更少被摘要稀释，模型判断更准。 | 压缩回填从「标记 + flash 摘要」改为「标记 + 原始输出前 2000 字符 + 摘要」；`glob` 输出每行附 `size` 和 `modified` 元数据。 |
+| 2026-06-14 | 开源与品牌 | 项目以 Apache-2.0 协议开源，README、logo 和应用视觉整体成型。 | 开源协议切换为 Apache-2.0；完成项目 README 与 wordmark；logo 重设计；Lab 页改为「开发中」占位。 |
+| 2026-06-10 | 会话稳定性 | 修复「只有第一条消息有响应」的严重 bug，多轮对话恢复正常；Review 支持图片预览。 | 历史重建 assistant 消息块顺序恢复为 `[thinking, text, toolCall]`，消除 DeepSeek 400 拒绝；Review 对二进制图片标记 `renderKind: "image"` 并复用 workspace 读取链路渲染。 |
+| 2026-06-10 | Kairos 缓存与思考 | Kairos 的 prompt 缓存命中大幅提升，运行成本下降；支持思考模式展示，短期记忆压缩真正生效。 | system prompt 静态化 + 时间等易变内容移入 tick 消息；观测增量改为游标制（失败 tick 不丢增量）；thinking 全链路落盘/重放/前端展示；`compressKairosSegments` 接入后台压缩触发器；contextWindow 从模型配置动态读取。 |
+| 2026-06-08 | 模型备份 | DeepSeek 降智时聊天可切换 Kimi 备用主模型，带联网搜索和余额卡。 | `kimi-k2.6` 转 public 并补 CNY 计价；Kimi 主模型内置 `$web_search` 回填循环；Usage 页余额卡泛化为 DeepSeek/Kimi 双卡；新增 DeepSeek 裸 DSML 泄漏检测兜底（按可重试错误处理）。 |
+| 2026-06-06 | Explore 子代理 | 小范围代码探索可交给更便宜的聚焦子代理，主上下文更干净、成本更低。 | 新增内置 `explore` 工具（默认 `deepseek-v4-flash`、由主模型自动委派、内联折叠展示），与通用 `agent` 工具共用运行时；设置页可配置 Explore 模型。 |
+| 2026-06-06 | 消息流与会话体验 | 完成的工具过程折叠成一行 `Worked for Xs`，长任务不再铺满屏幕；会话按最近排序，首轮后自动生成标题。 | 新增 `ToolActivityGroup` 折叠组件并修复时长恒为 1s 的落盘时间戳 bug；会话列表按 `updatedAt` 降序；首轮完成后用 flash 模型生成简短会话标题。 |
 | 2026-06-05 | 本地更新 | 本地更新更稳：构建时能看到进度，坏包不会再把可用旧版覆盖掉。 | 本地更新独立到「设置 → 更新」页；构建阶段保持应用打开并写入 `status.json`；helper 默认生成 ad-hoc signed 本地包，替换前验证新 app，启动失败时自动恢复旧版本。 |
 | 2026-06-05 | Usage 统计 | 用量页可以追到每轮请求明细，并用分页查看长列表。 | 底部新增会话明细表，展示 workspace、sessionId、模型、token；Token hover 展示 Cache Read/Input/Output/Total；明细支持每页 10 条分页。 |
 | 2026-06-05 | 模型与连接 | 新会话选中的模型会真正生效，打包版 Kimi 默认连接也更适合国内 endpoint。 | 修复 Composer 模型选择在 initial/follow-up 输入框切换后回到默认模型的问题；Kimi 默认 base URL 统一为 `https://api.moonshot.cn/v1`。 |
