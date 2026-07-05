@@ -338,6 +338,10 @@ export type ToolUiPreview =
       deletions: number;
       diff: string;
       collapsedLines: number;
+      status?: "pending" | "running" | "completed" | "failed" | "denied";
+      approvalRequestId?: string;
+      /** 失败/拒绝时的错误说明；不复用 diff 字段承载错误文本 */
+      errorMessage?: string;
     }
   | {
       kind: "write";
@@ -346,6 +350,10 @@ export type ToolUiPreview =
       deletions: number;
       diff: string;
       collapsedLines: number;
+      status?: "pending" | "running" | "completed" | "failed" | "denied";
+      approvalRequestId?: string;
+      /** 失败/拒绝时的错误说明；不复用 diff 字段承载错误文本 */
+      errorMessage?: string;
       /** running 阶段从 LLM 流式 args.content 提取的部分内容；completed 阶段不使用 */
       streamingContent?: string;
     }
@@ -633,7 +641,12 @@ export type MessageBlock =
       diff: string;
       collapsedLines: number;
       createdAt: string;
-      status?: "running" | "completed";
+      status?: "pending" | "running" | "completed" | "failed" | "denied";
+      approvalRequestId?: string;
+      /** pending 审批时的原因说明 */
+      reason?: string;
+      /** 失败/拒绝时的错误说明 */
+      errorMessage?: string;
     }
   | {
       kind: "write_diff";
@@ -644,7 +657,12 @@ export type MessageBlock =
       diff: string;
       collapsedLines: number;
       createdAt: string;
-      status?: "running" | "completed";
+      status?: "pending" | "running" | "completed" | "failed" | "denied";
+      approvalRequestId?: string;
+      /** pending 审批时的原因说明 */
+      reason?: string;
+      /** 失败/拒绝时的错误说明 */
+      errorMessage?: string;
       /** running 阶段从 LLM 流式 args.content 提取的部分内容；completed 不使用 */
       streamingContent?: string;
     }

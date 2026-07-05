@@ -20,6 +20,13 @@ export interface GuardResult {
   error?: string;
 }
 
+/**
+ * sanitizedArgs 内部标记：写类工具的权限检查器发现目标越界时返回 `ask`，
+ * 用户审批通过后 scheduler 用 sanitizedArgs 执行，executor 见此标记放行越界路径。
+ * 该标记只会由权限检查器写入（检查器总会覆盖它），模型自行传入无效。
+ */
+export const APPROVED_OUTSIDE_BOUNDARY_ARG = "approved_outside_boundary";
+
 export function guardWorkspacePath(
   inputPath: string,
   workspaceRoot: string,

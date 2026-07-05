@@ -12,6 +12,7 @@
 
 import type {
   InternalTool,
+  PermissionChecker,
   ToolResult,
   ResultRenderer,
 } from "../internal-tools";
@@ -52,7 +53,12 @@ export class ToolManager {
    * 从 definition + executor 注册一个工具
    * 将两者合并为完整的 InternalTool
    */
-  registerFromSpec(spec: ToolDefinitionSpec, executor: ToolExecutorFn, renderResult?: ResultRenderer): void {
+  registerFromSpec(
+    spec: ToolDefinitionSpec,
+    executor: ToolExecutorFn,
+    renderResult?: ResultRenderer,
+    checkPermissions?: PermissionChecker,
+  ): void {
     const tool: InternalTool = {
       name: spec.name,
       description: spec.description,
@@ -65,6 +71,7 @@ export class ToolManager {
       category: spec.category,
       previewKind: spec.previewKind,
       renderResult,
+      checkPermissions,
       extractPaths: spec.extractPaths,
     };
     this.tools.set(tool.name, tool);

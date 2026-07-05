@@ -268,7 +268,8 @@ export class ToolScheduler {
     }
 
     // renderResult 会用回填文本覆盖 data；原始结构化结果保留在 structured，
-    // 供 bridge 提取 preview 元数据（bash 的 backgrounded taskId / sandboxed 等）
+    // 供 bridge 提取 preview 元数据（bash 的 backgrounded taskId、edit/write 的
+    // diff/additions/deletions 等），不受后续摘要/截断影响。
     if (!result.success) {
       return rendered !== undefined ? { ...result, data: rendered, structured: result.data } : result;
     }
@@ -282,7 +283,7 @@ export class ToolScheduler {
     }
 
     if (!rawData) {
-      return rendered !== undefined ? { ...result, data: rendered } : result;
+      return rendered !== undefined ? { ...result, data: rendered, structured: result.data } : result;
     }
 
     const processed = await processToolOutput(tool.previewKind, rawData, {
@@ -295,6 +296,7 @@ export class ToolScheduler {
     return {
       ...result,
       data: processed.modelOutput,
+      ...(rendered !== undefined ? { structured: result.data } : {}),
       outputRef: result.outputRef ?? processed.rawOutputRef,
     };
   }

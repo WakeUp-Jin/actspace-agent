@@ -174,6 +174,9 @@ function messageBlockFromToolPreview(
         deletions: preview.deletions,
         diff: preview.diff,
         collapsedLines: preview.collapsedLines,
+        status: preview.status ?? (isError ? "failed" : undefined),
+        approvalRequestId: preview.approvalRequestId,
+        errorMessage: preview.errorMessage,
         createdAt: getDisplayTime(timestamp)
       };
     case "write":
@@ -185,6 +188,9 @@ function messageBlockFromToolPreview(
         deletions: preview.deletions,
         diff: preview.diff,
         collapsedLines: preview.collapsedLines,
+        status: preview.status ?? (isError ? "failed" : undefined),
+        approvalRequestId: preview.approvalRequestId,
+        errorMessage: preview.errorMessage,
         streamingContent: preview.streamingContent,
         createdAt: getDisplayTime(timestamp)
       };
@@ -401,6 +407,11 @@ export function createSessionDiffSummary(sessionId: SessionId, events: SessionEv
         : event.payload;
 
     if (!isToolUiPreview(preview) || (preview.kind !== "edit_diff" && preview.kind !== "write")) {
+      continue;
+    }
+
+    // 失败/被拒/未完成的写入没有真实落盘变更，不进 Review 汇总（旧事件无 status，保持原行为）。
+    if (preview.status !== undefined && preview.status !== "completed") {
       continue;
     }
 

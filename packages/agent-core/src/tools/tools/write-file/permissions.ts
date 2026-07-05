@@ -1,31 +1,15 @@
 import type { PermissionChecker } from "../../../internal-tools";
-import { guardWritablePath } from "../../workspace-guard";
+import { createWriteBoundaryChecker } from "../edit-file-diff/permissions";
 
 /**
  * Write-file permission checker.
  *
- * Current policy: allow by default. The hook is preserved so a future
- * AgentMode ("careful") can switch to `decision: "ask"` without touching
- * the scheduler or executor.
+ * 与 edit_file 共用越界审批逻辑：workspace 内直接放行，
+ * 越界改为 `ask` 请求用户审批（不再硬拒绝），见 createWriteBoundaryChecker。
  */
 export function createWritePermissionChecker(
   workspaceRoot: string,
   additionalWritableRoots: string[] = [],
 ): PermissionChecker {
-  return async (args) => {
-    const pathArg = typeof args.path === "string" ? args.path : "";
-    if (!pathArg) {
-      return { decision: "deny", reason: "path is required" };
-    }
-
-    const guard = guardWritablePath(pathArg, workspaceRoot, additionalWritableRoots);
-    if (!guard.ok) {
-      return { decision: "deny", reason: guard.error };
-    }
-
-    return {
-      decision: "allow",
-      sanitizedArgs: { ...args, path: guard.resolvedPath },
-    };
-  };
+  return createWriteBoundaryChecker("Write", workspaceRoot, additionalWritableRoots);
 }

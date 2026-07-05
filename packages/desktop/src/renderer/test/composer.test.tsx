@@ -104,11 +104,67 @@ describe("Composer follow-up bar", () => {
     expect(input).toHaveValue("");
   });
 
-  it("keeps the follow-up input inline when there are no attachments", () => {
+  // 输入布局对齐 Cursor：单行内容 inline（同一行），内容折行自动切 stacked（控件行贴底），
+  // 删回单行再切回 inline；切换只改 grid-template-areas，textarea 不 remount。
+  it("switches between inline and stacked layout as content wraps", async () => {
+    const user = userEvent.setup();
     renderComposer();
 
-    const toolbar = screen.getByLabelText("Composer toolbar");
-    expect(toolbar).toContainElement(screen.getByLabelText("Message composer"));
+    const panel = screen.getByLabelText("Message composer panel");
+    const body = panel.querySelector(".composer-body") as HTMLElement;
+    const input = screen.getByLabelText("Message composer") as HTMLTextAreaElement;
+
+    // jsdom 不做真实布局，scrollHeight 恒为 0；用 getter 模拟内容高度。
+    let mockScrollHeight = 34;
+    Object.defineProperty(input, "scrollHeight", {
+      configurable: true,
+      get: () => mockScrollHeight,
+    });
+
+    expect(body.dataset.layout).toBe("inline");
+
+    mockScrollHeight = 74;
+    await user.click(input);
+    await user.paste("line1\nline2\nline3");
+    expect(body.dataset.layout).toBe("stacked");
+
+    mockScrollHeight = 34;
+    await user.clear(input);
+    await user.type(input, "short");
+    expect(body.dataset.layout).toBe("inline");
+
+    // 切换过程 textarea 是同一个 DOM 节点（不 remount）
+    expect(screen.getByLabelText("Message composer")).toBe(input);
+  });
+
+  it("forces stacked layout when attachments exist", async () => {
+    const user = userEvent.setup();
+    const selectFiles = vi.fn(async () => ({
+      canceled: false,
+      attachments: [
+        { id: "att-1", kind: "file" as const, name: "notes.md", path: "/Users/test/notes.md" },
+      ],
+    }));
+    setPartialActspaceBridge({ selectFiles });
+    renderComposer();
+
+    const panel = screen.getByLabelText("Message composer panel");
+    const body = panel.querySelector(".composer-body") as HTMLElement;
+    expect(body.dataset.layout).toBe("inline");
+
+    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    await user.click(screen.getByRole("menuitem", { name: "Attach files" }));
+
+    expect(body.dataset.layout).toBe("stacked");
+  });
+
+  it("renders the send button as an inverse round arrow button", () => {
+    renderComposer();
+
+    const sendButton = screen.getByRole("button", { name: "Enter a message to send" });
+    expect(sendButton.className).toContain("bg-text-main");
+    expect(sendButton.className).toContain("text-surface");
+    expect(sendButton.className).not.toContain("bg-brand");
   });
 
   it("grows the input height to fit pasted multi-line content", async () => {

@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { MessageBlock } from "@actspace/shared";
@@ -146,5 +147,92 @@ describe("FileDiffBlock completed state", () => {
     const diffLine = screen.getByText(/半夜醒来/);
     expect(diffLine).toBeInTheDocument();
     expect(diffLine.closest("pre")).toHaveClass("file-diff-content");
+  });
+});
+
+describe("FileDiffBlock failed / denied states", () => {
+  it("renders failed edit with an error detail instead of a fake diff", () => {
+    render(
+      <FileDiffBlock
+        message={makeEditBlock({
+          status: "failed",
+          additions: 0,
+          deletions: 0,
+          diff: "",
+          errorMessage: "old_string not found in file.",
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Edit index.ts failed")).toBeInTheDocument();
+    expect(screen.getByText("old_string not found in file.")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("renders denied write as an error log line", () => {
+    render(
+      <FileDiffBlock
+        message={makeWriteBlock({
+          status: "denied",
+          additions: 0,
+          deletions: 0,
+          diff: "",
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Denied write 夜雨.md")).toBeInTheDocument();
+  });
+});
+
+describe("FileDiffBlock approval state", () => {
+  afterEach(() => {
+    delete (window as unknown as { actspace?: unknown }).actspace;
+  });
+
+  function makePendingEditBlock() {
+    return makeEditBlock({
+      status: "pending",
+      additions: 0,
+      deletions: 0,
+      diff: "",
+      filePath: "vocab.md",
+      approvalRequestId: "approval-edit-1",
+      reason: "Target path is outside the workspace: /Users/me/.agents/vocab.md",
+    });
+  }
+
+  it("submits approve_once when allowing an out-of-workspace edit", async () => {
+    const submitApproval = vi.fn(async () => ({ ok: true }));
+    window.actspace = { submitApproval } as unknown as Window["actspace"];
+
+    render(<FileDiffBlock message={makePendingEditBlock()} />);
+
+    expect(screen.getByText("Edit file requires approval")).toBeInTheDocument();
+    expect(screen.getByText("vocab.md")).toBeInTheDocument();
+    expect(screen.getByText(/outside the workspace/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Allow" }));
+
+    expect(submitApproval).toHaveBeenCalledWith({
+      requestId: "approval-edit-1",
+      decision: "approve_once",
+    });
+    expect(await screen.findByText("Edit vocab.md")).toBeInTheDocument();
+  });
+
+  it("submits deny when skipping", async () => {
+    const submitApproval = vi.fn(async () => ({ ok: true }));
+    window.actspace = { submitApproval } as unknown as Window["actspace"];
+
+    render(<FileDiffBlock message={makePendingEditBlock()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+
+    expect(submitApproval).toHaveBeenCalledWith({
+      requestId: "approval-edit-1",
+      decision: "deny",
+    });
+    expect(await screen.findByText("Denied edit vocab.md")).toBeInTheDocument();
   });
 });

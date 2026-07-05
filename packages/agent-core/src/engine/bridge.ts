@@ -679,7 +679,15 @@ function createToolExecutionResult(
     modelOutput,
     uiPreview: record?.result?.subagent?.uiPreview
       ?? applyBashBackgroundPreview(
-        createToolUiPreview(message.toolName, tool?.previewKind ?? "generic", record?.args ?? {}, modelOutput, summary, ok),
+        createToolUiPreview(
+          message.toolName,
+          tool?.previewKind ?? "generic",
+          record?.args ?? {},
+          modelOutput,
+          summary,
+          ok,
+          record?.result?.structured,
+        ),
         record,
       ),
     error: ok
@@ -785,6 +793,26 @@ function getBashManagementCommand(toolName: string, args: Record<string, unknown
   return "";
 }
 
+/** edit/write executor 的结构化结果（scheduler postProcess 保留在 result.structured）。 */
+function getFileChangeStructured(structured: unknown): {
+  diff?: string;
+  additions?: number;
+  deletions?: number;
+} | undefined {
+  if (structured === null || typeof structured !== "object") return undefined;
+  const record = structured as Record<string, unknown>;
+  return {
+    diff: typeof record.diff === "string" ? record.diff : undefined,
+    additions: typeof record.additions === "number" ? record.additions : undefined,
+    deletions: typeof record.deletions === "number" ? record.deletions : undefined,
+  };
+}
+
+function isFileWriteDeniedOutput(output: string): boolean {
+  return /\bUser denied tool:\s*(edit_file|write_file)\b/.test(output) ||
+    /\bApproval timed out for tool:\s*(edit_file|write_file)\b/.test(output);
+}
+
 function createToolUiPreview(
   toolName: string,
   previewKind: ToolUiPreview["kind"],
@@ -792,6 +820,7 @@ function createToolUiPreview(
   output: string,
   summary: string,
   ok: boolean,
+  structured?: unknown,
 ): ToolUiPreview {
   switch (previewKind) {
     case "read": {
@@ -883,26 +912,42 @@ function createToolUiPreview(
 
     case "edit_diff": {
       const filePath = stringArg(args.path, "Unknown file");
+      // diff/统计优先取 executor 的结构化结果：modelOutput 可能被 flash 摘要
+      // 压缩（>阈值时），从压缩文本反解 diff 会得到错误统计和乱码 diff。
+      const fileChange = getFileChangeStructured(structured);
+      const diff = ok ? fileChange?.diff ?? output : "";
+      const status = output.length === 0
+        ? "running"
+        : ok ? "completed" : isFileWriteDeniedOutput(output) ? "denied" : "failed";
       return {
         kind: "edit_diff",
         filePath: displayFileName(filePath),
-        additions: countDiffLines(output, "+"),
-        deletions: countDiffLines(output, "-"),
-        diff: output,
+        additions: ok ? fileChange?.additions ?? countDiffLines(diff, "+") : 0,
+        deletions: ok ? fileChange?.deletions ?? countDiffLines(diff, "-") : 0,
+        diff,
         collapsedLines: 5,
+        status,
+        errorMessage: ok ? undefined : output,
       };
     }
 
     case "write": {
       const filePath = stringArg(args.path, "Unknown file");
       const hasOutput = output.length > 0;
+      const fileChange = getFileChangeStructured(structured);
+      const diff = ok && hasOutput ? fileChange?.diff ?? output : "";
+      const status = !hasOutput
+        ? "running"
+        : ok ? "completed" : isFileWriteDeniedOutput(output) ? "denied" : "failed";
       return {
         kind: "write",
         filePath: displayFileName(filePath),
-        additions: hasOutput ? countDiffLines(output, "+") : 0,
-        deletions: hasOutput ? countDiffLines(output, "-") : 0,
-        diff: hasOutput ? output : "",
+        additions: ok && hasOutput ? fileChange?.additions ?? countDiffLines(diff, "+") : 0,
+        deletions: ok && hasOutput ? fileChange?.deletions ?? countDiffLines(diff, "-") : 0,
+        diff,
         collapsedLines: 5,
+        status,
+        errorMessage: ok || !hasOutput ? undefined : output,
         // tool_started 阶段（output=""）保留完整 content 作为 streamingContent，
         // 让 step 2 → step 3 过渡时前端 code preview 不闪烁消失；
         // tool_finished 阶段（output 含 diff）不设 streamingContent，diff 视图接管
@@ -1179,7 +1224,7 @@ function mapAgentEventToStreamEvent(
         isError: event.isError,
         preview: event.result.subagent?.uiPreview
           ?? applyBashBackgroundPreview(
-            createToolUiPreview(event.toolName, previewKind, args, output, summary, ok),
+            createToolUiPreview(event.toolName, previewKind, args, output, summary, ok, event.result.structured),
             liveRecord,
           ),
       };

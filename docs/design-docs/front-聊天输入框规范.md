@@ -6,7 +6,7 @@
 
 当前 Composer 是一套可复用输入系统，而不是单一输入条。它既支持已有会话底部的轻量 `follow-up bar`，也支持创建新会话时的居中 `initial composer`。
 
-- 默认态是一条单行输入栏，优先服务“继续追问 / 继续指挥当前会话”。
+- 默认态是低高度的贴底输入面板，优先服务“继续追问 / 继续指挥当前会话”。
 - 复杂能力通过左侧 `+` 菜单展开，不在默认态把所有入口铺开。
 - 输入栏下方展示会话状态行，让 branch、local runtime 和 context usage 成为稳定状态信息。
 - 输入栏上方预留 `Review / overflow` 操作层，未来承载 diff review、批量操作和更多会话动作。
@@ -14,7 +14,7 @@
 
 ## 内容
 
-- 默认单行 follow-up 输入区域，内容较长时再向多行扩展。
+- follow-up 输入区域默认一行高，内容较长时向多行扩展（上限内滚动）。
 - 左侧 `+` command menu，用于添加 agents、context、tools、附件和其他能力入口。
 - `Review / overflow` 操作层。
 - 模型按钮下拉。
@@ -31,33 +31,33 @@
 - 默认态保持轻量、贴底、低高度；不要把输入区域做成大面积白色卡片。
 - 保留继续输入的舒适空间，但默认视觉重心应让位给上方消息流。
 - 不显示语音按钮。
-- 发送按钮保持单一、轻量、克制。
+- 发送按钮保持单一、轻量、克制。样式对齐 Cursor（2026-07-05）：反色圆形按钮 + 上箭头，用 `bg-text-main` / `text-surface` 语义类随主题翻转（浅色 = 近黑底白箭头，深色 = 近白底深箭头），禁用态退为灰底；不使用品牌蓝。
 - `model` 选择保持文字化，不加边框。
 - Context usage 只在 follow-up 底部状态行右侧显示和打开，不再放在输入 panel 内。
-- 品牌蓝仍可用于发送按钮、focus ring、Context usage 等关键状态；不要为了参考图把主行动色改成灰黑。
+- 品牌蓝仍可用于 focus ring、Context usage、Thinking toggle 等关键状态。
 - workspace、branch、runtime 都应表现为下拉入口，即使第一版只有静态选项。
 
-## Composer 多形态矩阵
+## Composer 形态
 
-Composer 由两个维度组合：
+Composer 有 `surface`（`followup` / `initial`）一个外部维度，内部布局按内容高度**动态切换**（2026-07-05 定稿，对齐 Cursor）：
 
-- `surface`：`followup` 或 `initial`。
-- `inputLayout`：`inline` 或 `stacked`。
+- **inline（单行）**：follow-up 默认态。`+` 左侧、输入框居中占满、右侧模型选择 + 发送按钮，全部同一行，低高度。
+- **stacked（两行）**：输入框全宽在上，控件行贴底（左 `+` 和模型选择，右发送 / 停止）。
 
-当前支持四种组合：
+切换规则：
 
-| 组合 | 使用场景 | 结构 |
+- 判定依据是**渲染高度**（`scrollHeight` 超过单行阈值），不是有没有 `\n`——长文本自动折行也会触发；删回一行自动切回 inline。
+- 附件存在、`initial` surface 强制 stacked。
+- **实现约束：切换不允许 remount textarea**。inline / stacked 是同一个 grid 容器切换 `grid-template-areas`，textarea / `+` / 模型 / 发送四个元素 DOM 结构不变，正在打字时切换不丢焦点和光标。toolbar 分组用 `display: contents` 保留 aria 语义。
+- 模型菜单展开方向随布局态切换：inline 时按钮在右、菜单向左展开；stacked 时按钮在左、菜单向右展开（菜单宽 280px，避免撞窗口边界）。
+
+| surface | 布局 | 结构 |
 | --- | --- | --- |
-| `followup + inline` | 已有会话、无附件 | Review strip → panel 内 `+ / input / model / send` → status row |
-| `followup + stacked` | 已有会话、有附件 | Review strip → panel 内 `attachments / input / + / model / send` → status row |
-| `initial + stacked` | 新会话输入，无论是否有附件 | selector row → panel 内 `attachments? / input / + / Auto / send` → Plan New Idea |
+| `followup` 单行 | inline | Review strip → panel 内 `+ / input / model / send` 同行 → status row |
+| `followup` 多行或有附件 | stacked | Review strip → panel 内 `attachments? / input` 全宽 / `+ model … send` 贴底 → status row |
+| `initial` | stacked | selector row → panel 内 `attachments? / input` 全宽 / `+ model … send` 贴底 → Plan New Idea |
 
-自动规则：
-
-- follow-up 无附件默认使用 `inline`。
-- follow-up 有附件强制使用 `stacked`，避免附件、输入框和工具按钮挤在同一行。
-- initial 始终使用 `stacked`。新会话输入框必须位于面板上半部，不和 `+`、`Auto`、发送按钮挤在同一行。
-- 首条消息发送后，ConversationView 进入消息流状态，并显示底部 `followup + inline` composer。
+首条消息发送后，ConversationView 进入消息流状态，并显示底部 followup composer。
 
 ## Initial composer 结构
 
@@ -74,7 +74,7 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 从上到下分三层：
 
 1. Review 操作层：位于输入栏上方，Git workspace 存在未提交改动时显示真实 `Review +N -M` 汇总和 `...`；无改动时不显示 Review 入口；当前 workspace 不是 Git repository 时显示无计数的 `Review` 入口，引导用户到右侧 Review 面板初始化 Git。
-2. 输入栏：左侧 `+`，inline 状态下输入框紧跟其后；stacked 状态下模型选择紧跟 `+` 右侧；右侧为发送 / 停止按钮。
+2. 输入面板：输入框全宽在上；底部控件行左侧为 `+` 与模型选择，右侧为发送 / 停止按钮。
 3. 状态行：左侧显示 branch 与 `Local`，右侧显示 context usage 百分比或等价统计入口，也是打开 Context 弹窗的唯一入口。
 
 ### `+` command menu

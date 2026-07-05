@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import {
+  ArrowUp,
   BookOpen,
   Boxes,
   Bug,
@@ -15,7 +16,6 @@ import {
   Network,
   Paperclip,
   Plus,
-  SendHorizontal,
   Square,
   X,
   type LucideIcon,
@@ -45,7 +45,6 @@ export type ComposerReviewSummary = {
 };
 
 export type ComposerSurface = "followup" | "initial";
-export type ComposerInputLayout = "inline" | "stacked";
 
 const COMPOSER_WRAP_CLASS =
   "composer-wrap relative mx-auto grid w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] gap-2";
@@ -77,24 +76,31 @@ const IMAGE_ATTACHMENT_REMOVE_CLASS =
   `${ATTACHMENT_REMOVE_BASE_CLASS} image-attachment-remove absolute right-[-5px] top-[-5px] h-6 w-6 bg-[rgba(45,51,58,0.86)] text-white shadow-[0_6px_14px_rgba(25,35,52,0.2)] group-hover/image-attachment:pointer-events-auto group-hover/image-attachment:opacity-100 group-focus-within/image-attachment:pointer-events-auto group-focus-within/image-attachment:opacity-100 hover:bg-[rgba(31,36,42,0.94)]`;
 const FILE_ATTACHMENT_REMOVE_CLASS =
   `${ATTACHMENT_REMOVE_BASE_CLASS} file-attachment-remove h-[22px] w-[22px] text-text-faint group-hover/file-attachment:pointer-events-auto group-hover/file-attachment:opacity-100 group-focus-within/file-attachment:pointer-events-auto group-focus-within/file-attachment:opacity-100 hover:bg-brand-soft hover:text-brand-strong`;
+// Composer 输入布局对齐 Cursor：单行内容 inline（+ / 输入 / 模型 / 发送同一行），
+// 内容折行到两行及以上自动切 stacked（输入全宽在上、控件行贴底）。
+// 用同一个 grid 容器切换 grid-template-areas，DOM 结构不变——textarea 是同一节点，
+// 切换布局不 remount、不丢焦点光标；附件存在或 initial surface 强制 stacked。
+const COMPOSER_BODY_BASE_CLASS = "composer-body grid min-h-[48px] items-center gap-x-1.5 px-2 py-1.5";
+const COMPOSER_BODY_INLINE_CLASS =
+  `${COMPOSER_BODY_BASE_CLASS} grid-cols-[auto_minmax(0,1fr)_auto_auto] [grid-template-areas:'plus_input_model_send']`;
+const COMPOSER_BODY_STACKED_CLASS =
+  `${COMPOSER_BODY_BASE_CLASS} gap-y-1 grid-cols-[auto_auto_minmax(0,1fr)_auto] [grid-template-areas:'input_input_input_input'_'plus_model_._send']`;
 const COMPOSER_INPUT_CLASS =
-  "composer-input block min-h-[34px] max-h-[116px] flex-1 resize-none overflow-y-auto border-0 bg-transparent px-1 py-[7px] text-[15px] leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
-const COMPOSER_STACKED_INPUT_CLASS =
-  "composer-input composer-input-stacked block min-h-[42px] max-h-[142px] w-full resize-none overflow-y-auto border-0 bg-transparent px-3 py-2 text-[15px] leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
-const COMPOSER_INITIAL_STACKED_INPUT_CLASS =
-  "composer-input composer-input-stacked block min-h-[76px] max-h-[172px] w-full resize-none overflow-y-auto border-0 bg-transparent px-3 py-2 text-[15px] leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
-const COMPOSER_BAR_CLASS = "composer-bar relative flex min-h-[48px] items-center gap-2 px-2 py-1.5";
-const COMPOSER_BAR_STACKED_CLASS =
-  "composer-bar relative flex min-h-[48px] items-center gap-2 px-2 py-1.5";
-const COMPOSER_TOOL_SPACER_CLASS = "composer-tool-spacer flex-1";
+  "composer-input block w-full min-h-[34px] max-h-[142px] [grid-area:input] resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-[7px] text-[15px] leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
+const COMPOSER_INITIAL_INPUT_CLASS =
+  "composer-input block w-full min-h-[76px] max-h-[172px] [grid-area:input] resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-[7px] text-[15px] leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
+// 单行高度 = 20px line-height + 7px*2 padding = 34px；超过它说明内容折行（显式换行或自动 wrap）。
+const COMPOSER_SINGLE_LINE_MAX_PX = 40;
 const CONTROL_GROUP_CLASS = "control-group relative";
 const COMMAND_BUTTON_CLASS =
   "command-button grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-surface-subtle text-text-muted transition-[background,border,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-brand-soft hover:text-brand-strong aria-expanded:border-brand/30 aria-expanded:bg-brand-soft aria-expanded:text-brand-strong";
 const MODEL_BUTTON_CLASS =
   "model-button inline-flex h-8 max-w-[220px] items-center gap-[6px] rounded-full border-0 bg-transparent px-1.5 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main";
 const MODEL_BUTTON_TEXT_CLASS = "model-button-text truncate";
+// 发送按钮对齐 Cursor：反色圆形按钮 + 上箭头。bg-text-main / text-surface 随主题翻转
+// （浅色 = 近黑底白箭头，深色 = 近白底深箭头），禁用态退为灰底。
 const SEND_BUTTON_CLASS =
-  "send-button grid h-9 w-9 shrink-0 place-items-center rounded-full border-0 bg-brand text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.24),0_8px_18px_rgba(47,111,255,0.18)] transition-[background,box-shadow,opacity] duration-[120ms] ease-in-out hover:bg-brand-strong hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22),0_10px_22px_rgba(47,111,255,0.22)] disabled:cursor-default disabled:opacity-72 aria-disabled:cursor-default aria-disabled:opacity-72";
+  "send-button grid h-8 w-8 shrink-0 place-items-center rounded-full border-0 bg-text-main text-surface transition-[background,opacity] duration-[120ms] ease-in-out hover:opacity-85 disabled:cursor-default aria-disabled:cursor-default aria-disabled:bg-text-subtle aria-disabled:hover:opacity-100";
 // 不含水平锚点（left/right）的基类，方便不同菜单各自选择向左/向右展开，避免 left-0 与 right-0 冲突。
 const DROPDOWN_MENU_BASE_CLASS =
   "dropdown-menu absolute bottom-[calc(100%_+_8px)] z-30 min-w-[180px] overflow-hidden rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
@@ -105,8 +111,9 @@ const COMMAND_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
 const COMMAND_MENU_BUTTON_CLASS =
   "command-menu-button flex min-h-[34px] w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 text-left text-sm font-medium text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-brand-soft focus-visible:bg-brand-soft focus-visible:outline-none";
 const COMMAND_MENU_ICON_CLASS = "text-text-muted";
-// 模型选择器贴近输入框右侧，菜单向左展开（right-0），避免 280px 宽列表撞到窗口右边界。
-const MODEL_MENU_CLASS = `${DROPDOWN_MENU_BASE_CLASS} model-menu right-0 max-h-[222px] min-w-[280px] overflow-y-auto`;
+// 模型菜单展开方向随布局态切换：inline 时模型按钮在右侧，菜单向左展开（right-0）
+// 避免 280px 宽列表撞右边界；stacked 时按钮在控件行左侧，菜单向右展开（left-0）。
+const MODEL_MENU_BASE_CLASS = `${DROPDOWN_MENU_BASE_CLASS} model-menu max-h-[222px] min-w-[280px] overflow-y-auto`;
 const MODEL_MENU_ROW_CLASS = "model-menu-row relative flex items-center rounded-lg";
 const MODEL_MENU_ROW_SELECTED_CLASS = "is-selected-row bg-brand-soft";
 const MODEL_SELECT_BUTTON_CLASS =
@@ -118,9 +125,10 @@ const MODEL_ROW_ACTIONS_SELECTED_CLASS = "min-w-[62px]";
 const MODEL_EDIT_BUTTON_CLASS =
   "model-edit-button h-[26px] min-w-[42px] justify-center rounded-[7px] border-0 bg-transparent text-xs font-semibold text-text-muted transition-[opacity,background,color] duration-[120ms] ease-in-out focus-visible:outline-none hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 const MODEL_CHECK_ICON_CLASS = "model-check-icon text-text-main";
-// 模型菜单向左展开（right-0，宽 280px），Options 子菜单再贴其左侧弹出：右偏移 288px（280 + 8）。
+// Options 子菜单贴模型菜单（宽 280px）另一侧弹出，偏移 288px（280 + 8）；
+// 方向跟随模型菜单：菜单向右展开时子菜单贴右（left-[288px]），反之贴左。
 // z-40 确保盖在模型菜单（z-30）之上。
-const MODEL_OPTIONS_MENU_CLASS = `${DROPDOWN_MENU_BASE_CLASS} model-options-menu bottom-0 right-[288px] z-40 w-[220px] min-w-[220px]`;
+const MODEL_OPTIONS_MENU_BASE_CLASS = `${DROPDOWN_MENU_BASE_CLASS} model-options-menu bottom-0 z-40 w-[220px] min-w-[220px]`;
 const DROPDOWN_LABEL_CLASS = "dropdown-label px-2.5 pb-[5px] pt-[7px] text-xs font-semibold text-text-faint";
 const OPTION_TOGGLE_ROW_CLASS =
   "option-toggle-row flex min-h-9 cursor-pointer items-center gap-2.5 rounded-lg px-[9px] py-[7px] text-text-main hover:bg-brand-soft";
@@ -252,7 +260,6 @@ export function Composer({
   onSend,
   onAbort,
   surface = "followup",
-  inputLayout,
   defaultModelId,
   selectedModelId: controlledSelectedModelId,
   onSelectedModelChange,
@@ -269,7 +276,6 @@ export function Composer({
   onSend?: (text: string, options: ComposerSendOptions) => void;
   onAbort?: () => void;
   surface?: ComposerSurface;
-  inputLayout?: ComposerInputLayout;
   /** 来自设置页的默认模型；首次到达时同步选中，用户手动选过后不再覆盖。 */
   defaultModelId?: ModelId;
   /** 会话级当前模型；提供时由上层持有，避免 initial/followup Composer 切换时丢选择。 */
@@ -301,6 +307,7 @@ export function Composer({
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const [message, setMessage] = useState("");
+  const [isInputMultiline, setIsInputMultiline] = useState(false);
   const composerRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const commandButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -318,8 +325,9 @@ export function Composer({
     contextSnapshot && contextSnapshot.totalTokens > 0 && contextUsagePercent <= 0
       ? "<1"
       : `${contextUsagePercent}`;
-  const resolvedInputLayout: ComposerInputLayout =
-    surface === "initial" || hasAttachments ? "stacked" : inputLayout ?? "inline";
+  // 单行内容用 inline 紧凑布局；内容折行、有附件或 initial surface 切 stacked（参考 Cursor）。
+  const resolvedLayout: "inline" | "stacked" =
+    surface === "initial" || hasAttachments || isInputMultiline ? "stacked" : "inline";
   const placeholder = surface === "initial" ? "Plan, Build, / for commands, @ for context" : "Send follow-up";
   const selectedWorkspaceLabel =
     workspaceOptions.find((workspace) => workspace.value === selectedWorkspaceRoot)?.label ??
@@ -343,12 +351,14 @@ export function Composer({
 
   // 原生 textarea 不会随内容自动长高（粘贴大段文本时只会内部滚动）。
   // 内容变化后把高度重置为 auto 再设为 scrollHeight，超出 max-h 时由 CSS 钳住并显示滚动条。
+  // 同时用 scrollHeight 判断内容是否折行（含显式换行与自动 wrap），驱动 inline↔stacked 切换。
   useLayoutEffect(() => {
     const input = inputRef.current;
     if (!input) return;
     input.style.height = "auto";
     input.style.height = `${input.scrollHeight}px`;
-  }, [message, resolvedInputLayout, surface]);
+    setIsInputMultiline(input.scrollHeight > COMPOSER_SINGLE_LINE_MAX_PX);
+  }, [message, surface]);
 
   function closeFloatingPanels() {
     setCommandOpen(false);
@@ -485,11 +495,9 @@ export function Composer({
   }
 
   function renderComposerInput() {
-    const stackedClass =
-      surface === "initial" ? COMPOSER_INITIAL_STACKED_INPUT_CLASS : COMPOSER_STACKED_INPUT_CLASS;
     return (
       <textarea
-        className={resolvedInputLayout === "stacked" ? stackedClass : COMPOSER_INPUT_CLASS}
+        className={surface === "initial" ? COMPOSER_INITIAL_INPUT_CLASS : COMPOSER_INPUT_CLASS}
         aria-label="Message composer"
         placeholder={placeholder}
         rows={1}
@@ -575,7 +583,7 @@ export function Composer({
 
   function renderAddMenuButton() {
     return (
-      <div className={CONTROL_GROUP_CLASS}>
+      <div className={`${CONTROL_GROUP_CLASS} [grid-area:plus]`}>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -612,8 +620,12 @@ export function Composer({
   }
 
   function renderModelSelector() {
+    // inline 时模型按钮靠右，菜单向左展开；stacked 时按钮在左，菜单向右展开。
+    const modelMenuClass = `${MODEL_MENU_BASE_CLASS} ${resolvedLayout === "inline" ? "right-0" : "left-0"}`;
+    const modelOptionsMenuClass =
+      `${MODEL_OPTIONS_MENU_BASE_CLASS} ${resolvedLayout === "inline" ? "right-[288px]" : "left-[288px]"}`;
     return (
-      <div className={CONTROL_GROUP_CLASS}>
+      <div className={`${CONTROL_GROUP_CLASS} [grid-area:model]`}>
         <button
           className={MODEL_BUTTON_CLASS}
           type="button"
@@ -631,7 +643,7 @@ export function Composer({
           <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
         </button>
         {modelOpen ? (
-          <div className={MODEL_MENU_CLASS} ref={modelMenuRef}>
+          <div className={modelMenuClass} ref={modelMenuRef}>
             {MODEL_LIST.map((spec) => {
               const showEdit = spec.id === selectedModelId || hoveredModelId === spec.id || focusedModelId === spec.id;
               return (
@@ -708,7 +720,7 @@ export function Composer({
           </div>
         ) : null}
         {modelOpen && modelOptionsOpen ? (
-          <div className={MODEL_OPTIONS_MENU_CLASS} ref={modelOptionsRef}>
+          <div className={modelOptionsMenuClass} ref={modelOptionsRef}>
             <div className={DROPDOWN_LABEL_CLASS}>Options</div>
             {editingModelSpec?.supportsThinkingToggle ? (
               <label className={OPTION_TOGGLE_ROW_CLASS}>
@@ -742,6 +754,7 @@ export function Composer({
     const ariaLabel = isStreaming ? "Stop agent" : canSendMessage ? "Send message" : "Enter a message to send";
 
     return (
+      <div className="[grid-area:send] grid">
       <Tooltip>
         <TooltipTrigger asChild>
           <button
@@ -759,24 +772,25 @@ export function Composer({
             }}
           >
             {isStreaming ? (
-              <Square size={14} strokeWidth={2.6} fill="currentColor" aria-hidden="true" />
+              <Square size={12} strokeWidth={2.6} fill="currentColor" aria-hidden="true" />
             ) : (
-              <SendHorizontal size={18} strokeWidth={2.2} aria-hidden="true" />
+              <ArrowUp size={16} strokeWidth={2.4} aria-hidden="true" />
             )}
           </button>
         </TooltipTrigger>
         <TooltipContent>{tooltipLabel}</TooltipContent>
       </Tooltip>
+      </div>
     );
   }
 
+  // display:contents 让 toolbar 保留分组语义（aria/测试定位），
+  // 同时让 +/模型/发送直接参与外层 grid 的 grid-template-areas 排布。
   function renderToolbar() {
     return (
-      <div className={resolvedInputLayout === "stacked" ? COMPOSER_BAR_STACKED_CLASS : COMPOSER_BAR_CLASS} aria-label="Composer toolbar">
+      <div className="composer-bar contents" aria-label="Composer toolbar">
         {renderAddMenuButton()}
-        {resolvedInputLayout === "inline" ? renderComposerInput() : null}
         {renderModelSelector()}
-        {resolvedInputLayout === "stacked" ? <div className={COMPOSER_TOOL_SPACER_CLASS} /> : null}
         {renderSendButton()}
       </div>
     );
@@ -802,8 +816,13 @@ export function Composer({
         onDrop={handleDropFiles}
       >
         {renderAttachmentStrip()}
-        {resolvedInputLayout === "stacked" ? renderComposerInput() : null}
-        {renderToolbar()}
+        <div
+          className={resolvedLayout === "inline" ? COMPOSER_BODY_INLINE_CLASS : COMPOSER_BODY_STACKED_CLASS}
+          data-layout={resolvedLayout}
+        >
+          {renderComposerInput()}
+          {renderToolbar()}
+        </div>
       </div>
     );
   }

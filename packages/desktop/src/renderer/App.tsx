@@ -381,6 +381,11 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): Mes
   }
 
   if (tool.preview?.kind === "edit_diff") {
+    const status = tool.approvalPending
+      ? "pending"
+      : tool.finished
+        ? tool.preview.status ?? (tool.isError ? "failed" : "completed")
+        : "running";
     return {
       kind: "edit_diff",
       id: blockId,
@@ -390,11 +395,19 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): Mes
       diff: tool.preview.diff,
       collapsedLines: tool.preview.collapsedLines,
       createdAt: now,
-      status: tool.finished ? "completed" : "running",
+      status,
+      approvalRequestId: tool.approvalRequestId,
+      reason: tool.approvalReason,
+      errorMessage: tool.preview.errorMessage,
     };
   }
 
   if (tool.preview?.kind === "write") {
+    const status = tool.approvalPending
+      ? "pending"
+      : tool.finished
+        ? tool.preview.status ?? (tool.isError ? "failed" : "completed")
+        : "running";
     return {
       kind: "write_diff",
       id: blockId,
@@ -405,7 +418,10 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): Mes
       collapsedLines: tool.preview.collapsedLines,
       streamingContent: tool.finished ? undefined : tool.preview.streamingContent,
       createdAt: now,
-      status: tool.finished ? "completed" : "running",
+      status,
+      approvalRequestId: tool.approvalRequestId,
+      reason: tool.approvalReason,
+      errorMessage: tool.preview.errorMessage,
     };
   }
 

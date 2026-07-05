@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { isAbsolute, relative } from "node:path";
 import * as Diff from "diff";
 import type { ToolResult, ResultRenderer } from "../../../internal-tools";
-import { guardWritablePath } from "../../workspace-guard";
+import { APPROVED_OUTSIDE_BOUNDARY_ARG, guardWritablePath, resolveReadablePath } from "../../workspace-guard";
 import { writeTextAtomic } from "../shared/write-atomic";
 import type { ToolExecutorFn } from "../../types";
 
@@ -87,7 +87,10 @@ export const editFileDiffExecutor: ToolExecutorFn = async (
   if (!pathArg) return { success: false, error: "path is required" };
   if (oldString === newString) return { success: false, error: "old_string and new_string must be different" };
 
-  const guard = guardWritablePath(pathArg, workspaceRoot, runtime?.additionalWritableRoots);
+  // 权限检查器让用户审批通过越界写入后（sanitizedArgs 带标记），只解析路径不再做边界检查。
+  const guard = args[APPROVED_OUTSIDE_BOUNDARY_ARG] === true
+    ? resolveReadablePath(pathArg, workspaceRoot)
+    : guardWritablePath(pathArg, workspaceRoot, runtime?.additionalWritableRoots);
   if (!guard.ok) {
     return { success: false, error: guard.error };
   }

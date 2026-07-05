@@ -1116,6 +1116,108 @@ describe("runTurnWithAgent bridge", () => {
     });
   });
 
+  it("keeps full diff and structured stats in edit preview when model output is compressed", async () => {
+    // 构造超过 truncateThreshold（默认 2000 字符）的 diff：modelOutput 会被压缩，
+    // 但 uiPreview 应从 result.structured 恢复完整 diff 与统计。
+    const bigDiff = [
+      "Index: src/big.ts",
+      "===================================================================",
+      "--- src/big.ts",
+      "+++ src/big.ts",
+      "@@ -1,3 +1,3 @@",
+      "-old line",
+      `+${"x".repeat(2500)}`,
+      "+new line",
+    ].join("\n");
+    const deps = createDeps();
+    deps.toolManager.register({
+      name: "edit_file",
+      description: "Edit a file",
+      parameters: {
+        type: "object",
+        properties: { path: { type: "string" } },
+        required: ["path"],
+      },
+      isReadOnly: false,
+      previewKind: "edit_diff",
+      handler: async (): Promise<ToolResult> => ({
+        success: true,
+        data: { diff: bigDiff, additions: 40, deletions: 2, filePath: "/workspace/src/big.ts" },
+      }),
+      renderResult: (result) => {
+        const data = result.data as { diff: string };
+        return `${data.diff}\n\nFile updated: src/big.ts`;
+      },
+    });
+    deps.llm.setResponses([
+      mockToolCall("edit_file", { path: "/workspace/src/big.ts" }, { id: "tc-edit-compressed" }),
+      mockText("Done."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      { sessionId: "session-test", turnId: "turn-test", userInput: "Edit the big file." },
+      deps,
+    );
+
+    const toolResult = result.events.find((event) => event.type === "tool_result");
+    const payload = toolResult?.payload as {
+      modelOutput?: string;
+      uiPreview?: { diff?: string; additions?: number; deletions?: number; status?: string };
+    };
+
+    // 回填给模型的输出确实被压缩了
+    expect(payload.modelOutput).toContain("已压缩摘要");
+    // 但 UI preview 保留完整 diff 与结构化统计
+    expect(payload.uiPreview?.diff).toBe(bigDiff);
+    expect(payload.uiPreview?.additions).toBe(40);
+    expect(payload.uiPreview?.deletions).toBe(2);
+    expect(payload.uiPreview?.status).toBe("completed");
+  });
+
+  it("marks failed edit previews as failed with an errorMessage instead of a fake diff", async () => {
+    const deps = createDeps();
+    deps.toolManager.register({
+      name: "edit_file",
+      description: "Edit a file",
+      parameters: {
+        type: "object",
+        properties: { path: { type: "string" } },
+        required: ["path"],
+      },
+      isReadOnly: false,
+      previewKind: "edit_diff",
+      handler: async (): Promise<ToolResult> => ({
+        success: false,
+        error: "old_string not found in file. Read the file first to verify the current content.",
+      }),
+    });
+    deps.llm.setResponses([
+      mockToolCall("edit_file", { path: "/workspace/src/index.ts" }, { id: "tc-edit-failed" }),
+      mockText("Done."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      { sessionId: "session-test", turnId: "turn-test", userInput: "Edit the file." },
+      deps,
+    );
+
+    const toolResult = result.events.find((event) => event.type === "tool_result");
+
+    expect(toolResult?.payload).toMatchObject({
+      toolName: "edit_file",
+      ok: false,
+      uiPreview: {
+        kind: "edit_diff",
+        filePath: "index.ts",
+        additions: 0,
+        deletions: 0,
+        diff: "",
+        status: "failed",
+        errorMessage: expect.stringContaining("old_string not found"),
+      },
+    });
+  });
+
   it("counts edit preview hunk lines without counting unified diff file headers", async () => {
     const deps = createDeps();
     deps.toolManager.register({

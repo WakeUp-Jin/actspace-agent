@@ -99,8 +99,10 @@ import { listDirectoryDefinition } from "./tools/list-directory/definition";
 import { listDirectoryExecutor } from "./tools/list-directory/executor";
 import { editFileDiffDefinition } from "./tools/edit-file-diff/definition";
 import { editFileDiffExecutor, renderEditResult } from "./tools/edit-file-diff/executor";
+import { createEditPermissionChecker } from "./tools/edit-file-diff/permissions";
 import { writeFileDefinition } from "./tools/write-file/definition";
 import { writeFileExecutor, renderWriteResult } from "./tools/write-file/executor";
+import { createWritePermissionChecker } from "./tools/write-file/permissions";
 import { createDeleteFileTool } from "./tools/delete-file";
 import { createBashTool, bashOutputTool, bashKillTool } from "./tools/bash";
 import { webSearchDefinition } from "./tools/web-search/definition";
@@ -120,21 +122,37 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
   };
   const disabledTools = new Set(config.disabledTools ?? []);
   const entries: ReadonlyArray<
-    readonly [import("./types").ToolDefinitionSpec, import("./types").ToolExecutorFn, import("../internal-tools").ResultRenderer?]
+    readonly [
+      import("./types").ToolDefinitionSpec,
+      import("./types").ToolExecutorFn,
+      import("../internal-tools").ResultRenderer?,
+      import("../internal-tools").PermissionChecker?,
+    ]
   > = [
     [readFileDefinition, readFileExecutor],
     [grepDefinition, grepExecutor],
     [globDefinition, globExecutor],
     [listDirectoryDefinition, listDirectoryExecutor],
-    [editFileDiffDefinition, editFileDiffExecutor, renderEditResult],
-    [writeFileDefinition, writeFileExecutor, renderWriteResult],
+    // edit/write：workspace 内直接放行，越界走 ask 审批（见 permissions.ts）
+    [
+      editFileDiffDefinition,
+      editFileDiffExecutor,
+      renderEditResult,
+      createEditPermissionChecker(config.workspaceRoot, config.additionalWritableRoots),
+    ],
+    [
+      writeFileDefinition,
+      writeFileExecutor,
+      renderWriteResult,
+      createWritePermissionChecker(config.workspaceRoot, config.additionalWritableRoots),
+    ],
     [webSearchDefinition, webSearchExecutor],
     [analyzeMediaDefinition, analyzeMediaExecutor],
   ];
 
-  for (const [definition, executor, renderResult] of entries) {
+  for (const [definition, executor, renderResult, checkPermissions] of entries) {
     if (!disabledTools.has(definition.name) && shouldExposeTool(definition, runtime)) {
-      manager.registerFromSpec(definition, executor, renderResult);
+      manager.registerFromSpec(definition, executor, renderResult, checkPermissions);
     }
   }
 

@@ -51,7 +51,9 @@ validating -> awaiting_approval -> scheduled -> executing -> success/error/cance
 
 - 只读工具默认不需要审核，可以并行执行。
 - 非只读工具默认进入审核策略判断。
-- 写类工具（`write_file` / `edit_file` / `bash`）的路径必须经 `guardWorkspacePath` 守卫，越过工作区边界即拒绝。
+- 写类工具（`write_file` / `edit_file` / `bash`）的路径必须经 `guardWritablePath` 守卫。
+
+**写越界改为可审核（2026-07-05）**：`write_file` / `edit_file` 目标越过工作区边界时，不再由 executor 硬拒绝，而是权限检查器返回 `ask`（medium 风险、只允许一次性批准，不提供 allow_similar）。用户批准后 scheduler 以 `sanitizedArgs` 恢复执行，executor 依据其中的 `APPROVED_OUTSIDE_BOUNDARY_ARG` 内部标记放行该次越界路径。防绕过约束：该标记只能由权限检查器写入——检查器对工作区内路径会显式剥除模型自行传入的标记，因此模型无法伪造审批。bash 工具的写路径仍走硬守卫，不参与此流程。这符合原则 4：「路径在工作区外」是意图清楚、范围可见、用户能有效判断的可审核风险，而不是硬拒绝。
 
 只读不是“绝对安全”的代名词，它只是调度策略的一个输入。
 

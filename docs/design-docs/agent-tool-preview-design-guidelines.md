@@ -92,6 +92,9 @@
 - `new_string: ""` 的长期语义是删除唯一匹配文本内容，不是删除文件；多处匹配仍必须提供更多上下文或显式 `replace_all`。
 - 删除整行时，如果 `old_string` 恰好从行首匹配且匹配后紧跟换行，executor 会连同该换行一起删除，避免留下空白行；行内文本删除不得吞掉后续换行。
 - `ToolUiPreview.additions` / `deletions` 必须只统计 unified diff hunk 内的真实 `+` / `-` 行，不统计 `---` / `+++` 文件头，也不能漏算内容本身以 `---` 或 `+++` 开头的变更行。
+- **diff/统计来源必须是 `ToolResult.structured`**（scheduler `postProcess` 保留的原始结构化结果），不能从回填给模型的 `modelOutput` 反解析——大 diff 会被上下文压缩改写，反解析会导致统计归零、展开内容是摘要文本。
+- `ToolUiPreview.status`: `pending` / `running` / `completed` / `failed` / `denied`（与 `delete` 一致）。失败/拒绝时错误说明放 `errorMessage` 字段，**不**复用 `diff` 字段承载错误文本。
+- 越界写入审批：目标路径在 workspace 外时权限检查器返回 `ask`，前端复用 `FileDiffBlock` 渲染审批卡片（`status: pending` + `approvalRequestId` + `reason`），用户 `Allow` / `Skip`；拒绝后展示 `Denied edit xxx.md`。
 - 前端使用 `FileDiffBlock` 折叠式组件，与 `write_file` 共享同一组件，无 icon，左边缘与 Read / Grep 等工具行对齐。
 
 ### `write_file`
@@ -107,6 +110,7 @@
   4. finished（`tool_finished`）：streamingContent 清空，切换为折叠态 `Write config.ts +15 ›`（deletions=0 不展示），点击展开看完整 diff。
 - diff 由 `diff` 库 `createTwoFilesPatch` 生成，新建时旧内容为空字符串。
 - 磁盘写入仍在 tool execute 阶段原子写入（tmpfile → fsync → rename），**不**在 LLM 流式期间写盘，避免半文件出现或 LLM 重试导致脏写。
+- diff/统计来源、`status` / `errorMessage` 语义、越界写入审批流程与 `edit_file` 一致（见上）。
 - 前端复用 `FileDiffBlock` 折叠式组件（与 `edit_file` 共享），`kind: "write_diff"` 区分标题动作词，无 icon。
 
 ### `delete_file`
