@@ -47,6 +47,7 @@ export { writeFileDefinition } from "./tools/write-file/definition";
 export { deleteFileDefinition } from "./tools/delete-file/definition";
 export { bashDefinition } from "./tools/bash/definition";
 export { webSearchDefinition } from "./tools/web-search/definition";
+export { webFetchDefinition } from "./tools/web-fetch/definition";
 export { analyzeMediaDefinition } from "./tools/analyze-media/definition";
 export { agentDefinition, exploreDefinition } from "./tools/agent/definition";
 
@@ -76,6 +77,7 @@ export {
 } from "./tools/bash";
 export type { BashTask, BashTaskNotification, BashTaskStatus, BashBackgroundedResult } from "./tools/bash";
 export { webSearchExecutor } from "./tools/web-search/executor";
+export { webFetchExecutor } from "./tools/web-fetch/executor";
 export { analyzeMediaExecutor } from "./tools/analyze-media/executor";
 export {
   createAgentTool,
@@ -107,6 +109,8 @@ import { createDeleteFileTool } from "./tools/delete-file";
 import { createBashTool, bashOutputTool, bashKillTool } from "./tools/bash";
 import { webSearchDefinition } from "./tools/web-search/definition";
 import { webSearchExecutor } from "./tools/web-search/executor";
+import { webFetchDefinition } from "./tools/web-fetch/definition";
+import { webFetchExecutor } from "./tools/web-fetch/executor";
 import { analyzeMediaDefinition } from "./tools/analyze-media/definition";
 import { analyzeMediaExecutor } from "./tools/analyze-media/executor";
 import { createAgentTool, createExploreTool } from "./tools/agent";
@@ -119,6 +123,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     primaryProvider: config.primaryProvider,
     apiFormat: config.apiFormat,
     hasKimiKey: config.hasKimiKey,
+    hasWebSearchKey: config.hasWebSearchKey,
   };
   const disabledTools = new Set(config.disabledTools ?? []);
   const entries: ReadonlyArray<
@@ -147,6 +152,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
       createWritePermissionChecker(config.workspaceRoot, config.additionalWritableRoots),
     ],
     [webSearchDefinition, webSearchExecutor],
+    [webFetchDefinition, webFetchExecutor],
     [analyzeMediaDefinition, analyzeMediaExecutor],
   ];
 

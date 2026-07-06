@@ -1269,6 +1269,12 @@ async function registerIpc() {
     return result;
   });
 
+  ipcMain.handle("settings:search-usage", async () => {
+    const result = await getSettingsService().getSearchUsage();
+    logMain("settings search usage", { ok: result.ok });
+    return result;
+  });
+
   // ─── 插件：fs-watch 文件监听 ───
   ipcMain.handle("plugins:fs-watch:get-status", async () => {
     const roots = await ensureDataDirectories();

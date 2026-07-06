@@ -96,6 +96,7 @@ declare global {
       testProviderConnection: (
         input: import("@actspace/shared").TestConnectionInput
       ) => Promise<import("@actspace/shared").TestConnectionResult>;
+      getSearchUsage?: () => Promise<import("@actspace/shared").SearchUsageResult>;
       getFsWatchStatus?: () => Promise<import("@actspace/shared").FsWatchStatus>;
       installFsWatchPlugin?: () => Promise<import("@actspace/shared").FsWatchInstallResult>;
       installFsWatchFromRepo?: () => Promise<import("@actspace/shared").FsWatchInstallResult>;

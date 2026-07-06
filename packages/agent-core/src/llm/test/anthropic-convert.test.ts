@@ -3,7 +3,6 @@ import {
   anthropicUsageToUsage,
   convertContextToAnthropic,
   convertMessagesToAnthropic,
-  createAnthropicWebSearchTool,
   messageToAssistantMessage,
   toAnthropicClientTools,
 } from "../anthropic-convert";
@@ -182,14 +181,6 @@ describe("anthropic-convert", () => {
         input_schema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
       },
     ]);
-  });
-
-  it("creates Anthropic web search server tool", () => {
-    expect(createAnthropicWebSearchTool(2)).toEqual({
-      type: "web_search_20250305",
-      name: "web_search",
-      max_uses: 2,
-    });
   });
 
   it("maps Anthropic message content and usage to AssistantMessage", () => {

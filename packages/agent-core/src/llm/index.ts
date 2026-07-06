@@ -14,5 +14,4 @@ export {
   convertContextToAnthropic,
   convertMessagesToAnthropic,
   toAnthropicClientTools,
-  createAnthropicWebSearchTool,
 } from "./anthropic-convert";

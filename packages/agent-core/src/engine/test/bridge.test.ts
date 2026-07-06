@@ -10,7 +10,7 @@ import type { Summarizer } from "../../context/compression/summarizer";
 import type { InternalTool, ToolResult } from "../../internal-tools";
 import { createEmptyUsage } from "../../messages";
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "../../messages";
-import { MockLLMService, mockText, mockToolCall } from "../../llm/services/mock";
+import { MockLLMService, mockError, mockText, mockToolCall } from "../../llm/services/mock";
 import { createCacheAuditTracker, type AgentRunLogEvent, type AgentRunLogger } from "../../observability";
 import { ToolManager } from "../../tools/manager";
 import { runTurnWithAgent } from "../bridge";
@@ -366,6 +366,67 @@ describe("runTurnWithAgent bridge", () => {
     });
     expect(result.events.some((event) => event.type === "tool_call")).toBe(false);
     expect(result.events.some((event) => event.type === "tool_result")).toBe(false);
+  });
+
+  it("persists an error event instead of an empty assistant_message when the turn fails", async () => {
+    const deps = { ...createDeps(), llmRetry: { maxRetries: 0 } };
+    deps.llm.setResponses([
+      mockError("upstream gateway exploded", "error", { errorKind: "server_error", errorRetryable: true }),
+    ]);
+
+    const result = await runTurnWithAgent(
+      { sessionId: "session-fail", turnId: "turn-fail", userInput: "hello" },
+      deps,
+    );
+
+    expect(result.status).toBe("failed");
+    expect(result.error).toMatchObject({
+      code: "LLM_SERVER_ERROR",
+      message: "upstream gateway exploded",
+    });
+    const errorEvent = result.events.find((event) => event.type === "error");
+    expect(errorEvent?.payload).toMatchObject({
+      code: "LLM_SERVER_ERROR",
+      message: "upstream gateway exploded",
+      recoverable: true,
+    });
+    // 不再落 content 为空的 assistant_message（空白气泡的来源）
+    const emptyAssistant = result.events.filter(
+      (event) => event.type === "assistant_message" &&
+        (event.payload as { content?: string }).content === "",
+    );
+    expect(emptyAssistant).toHaveLength(0);
+  });
+
+  it("retries retryable errors, streams llm_retry, and keeps usage for failed attempts", async () => {
+    const deps = { ...createDeps(), llmRetry: { maxRetries: 1, backoffMs: [1] } };
+    deps.llm.setResponses([
+      mockError("gateway hiccup", "error", { errorKind: "server_error", errorRetryable: true }),
+      mockText("recovered final reply"),
+    ]);
+    const streamEvents: RuntimeStreamEvent[] = [];
+
+    const result = await runTurnWithAgent(
+      { sessionId: "session-retry", turnId: "turn-retry", userInput: "hello" },
+      deps,
+      { onStreamEvent: (event) => streamEvents.push(event) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(streamEvents).toContainEqual({
+      type: "llm_retry",
+      sessionId: "session-retry",
+      turnId: "turn-retry",
+      attempt: 1,
+      maxAttempts: 1,
+      reason: "gateway hiccup",
+    });
+    // 重试成功后不落 error 事件；失败尝试不留 content 事件，但 llm_usage 全量保留
+    expect(result.events.some((event) => event.type === "error")).toBe(false);
+    expect(result.events.filter((event) => event.type === "llm_usage")).toHaveLength(2);
+    const assistantEvents = result.events.filter((event) => event.type === "assistant_message");
+    expect(assistantEvents).toHaveLength(1);
+    expect(assistantEvents[0].payload).toMatchObject({ content: "recovered final reply" });
   });
 
   it("persists a context_compaction event and run-log entry when history is compacted", async () => {
@@ -746,7 +807,7 @@ describe("runTurnWithAgent bridge", () => {
         kind: "web_search",
         mode: "url",
         url: "https://example.com/post",
-        displayText: "Read Web Page https://example.com/post",
+        displayText: "Web Search https://example.com/post",
       },
     });
   });

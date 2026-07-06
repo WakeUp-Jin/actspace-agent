@@ -46,6 +46,8 @@ export interface AgentEnvConfig {
   deepseekAnthropicBaseUrl?: string;
   kimiApiKey: string;
   kimiBaseUrl?: string;
+  /** 是否配置了任一 web_search provider key（智谱 / Tavily / TinyFish / Exa） */
+  hasWebSearchKey: boolean;
   /** 仅当 .env 显式覆盖默认值时有值 */
   temperature?: number;
   /** 仅当 .env 显式覆盖默认值时有值 */
@@ -115,6 +117,9 @@ export function resolveAgentEnvConfig(): AgentEnvConfig {
     deepseekAnthropicBaseUrl: env.DEEPSEEK_ANTHROPIC_BASE_URL || undefined,
     kimiApiKey: env.KIMI_API_KEY,
     kimiBaseUrl: env.KIMI_BASE_URL || undefined,
+    hasWebSearchKey: Boolean(
+      env.ZHIPU_API_KEY || env.TAVILY_API_KEY || env.TINYFISH_API_KEY || env.EXA_API_KEY,
+    ),
     temperature: env.LLM_TEMPERATURE !== 0 ? env.LLM_TEMPERATURE : undefined,
     maxTokens: env.LLM_MAX_TOKENS !== 8192 ? env.LLM_MAX_TOKENS : undefined,
     disabledTools: env.ACTSPACE_DISABLED_TOOLS,
@@ -182,6 +187,7 @@ export function buildAgentConfig(
     primaryProvider: modelSpec.provider,
     apiFormat: llmConfig.apiFormat,
     hasKimiKey: Boolean(envConfig.kimiApiKey),
+    hasWebSearchKey: envConfig.hasWebSearchKey,
     disabledTools: envConfig.disabledTools,
     approvalGate,
     tmpRoot: runtimeContext?.tmpRoot,

@@ -166,8 +166,11 @@ export function assistantMessageToEvents(
     );
   }
 
+  // 失败回复通常正文为空（或被 guard 清空），不落空 assistant_message 事件，
+  // 避免渲染成空白气泡；错误信息由 turn 级 error 事件承载（见 engine/bridge buildSessionEvents）。
   const text = getTextContent(msg);
-  if (text || toolCalls.length === 0) {
+  const isErrorMessage = msg.stopReason === "error";
+  if (text || (toolCalls.length === 0 && !isErrorMessage)) {
     const reply: AssistantReply = {
       content: text,
       stopReason: msg.stopReason,

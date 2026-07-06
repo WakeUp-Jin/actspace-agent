@@ -9,7 +9,7 @@ const context: Context = {
   tools: [
     {
       name: "web_search",
-      description: "Kimi-backed local web search should not be sent as a client tool in Anthropic format",
+      description: "Kimi-backed local web search exposed as a normal client tool",
       parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
     },
     {
@@ -67,7 +67,7 @@ describe("DeepSeekAnthropicService", () => {
     vi.restoreAllMocks();
   });
 
-  it("declares Anthropic server web search plus local client tools and maps the streamed response", async () => {
+  it("declares only local client tools (no server web search) and maps the streamed response", async () => {
     const llm = new DeepSeekAnthropicService({
       provider: "deepseek",
       apiFormat: "anthropic",
@@ -116,7 +116,11 @@ describe("DeepSeekAnthropicService", () => {
       system: "You are helpful.",
       messages: [{ role: "user", content: "Read https://example.com" }],
       tools: [
-        { type: "web_search_20250305", name: "web_search", max_uses: 3 },
+        {
+          name: "web_search",
+          description: "Kimi-backed local web search exposed as a normal client tool",
+          input_schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+        },
         {
           name: "read_file",
           description: "Read a file",
@@ -124,6 +128,8 @@ describe("DeepSeekAnthropicService", () => {
         },
       ],
     });
+    // 不再声明 server tool：所有工具都是普通 client tool，web_search 只出现一次
+    expect((params.tools as { type?: string }[]).some((tool) => tool.type === "web_search_20250305")).toBe(false);
     expect((params.tools as { name: string }[]).filter((tool) => tool.name === "web_search")).toHaveLength(1);
     expect(params.thinking).toBeUndefined();
   });

@@ -27,7 +27,7 @@
 - `pnpm dev`：本地开发启动桌面端。
 - `pnpm dev:log`：本地开发启动桌面端，并把终端 stdout/stderr 同步写入根目录 `logs/dev-*.log`，同时更新 `logs/latest-dev.log` 供 Agent 排障读取。
 - 文件工具默认使用 workspace root，而不是 Electron `userData`。如需指定工作区，设置 `ACTSPACE_WORKSPACE_ROOT`。
-- DeepSeek 主模型的联网搜索、网页读取和多模态工具需要 `KIMI_API_KEY`。未配置时这些工具不会注册，避免运行中暴露一个必然失败的能力。
+- `analyze_media`（多模态）需要 `KIMI_API_KEY`；`web_search` 需要任一搜索 provider key（`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY`）；`web_fetch` 无 key 要求。未配置时对应工具不会注册，避免运行中暴露一个必然失败的能力；executor 内另有缺 key 兜底错误作防御（见 `agent-web-tools.md`）。
 - 如需长期禁用某些工具，可设置 `ACTSPACE_DISABLED_TOOLS=read_file,bash`；工具会在注册阶段直接跳过，不会暴露给模型，也不会出现在运行时工具列表里。
 - `pnpm typecheck`：检查跨包类型契约。
 - `pnpm build`：检查当前桌面端和共享包是否可构建。
@@ -79,7 +79,7 @@
 
 - 启动、健康检查和基本可用性要求。
 - 日志、指标、链路的采集和访问约定。
-- timeout、retry、backoff 的默认策略。
+- timeout、retry、backoff 的默认策略。LLM 可重试错误的自动重试已落地：默认最多 2 次重试、退避 1s → 3s，可通过 `AgentLoopConfig.llmRetry` 配置，详见 `docs/design-docs/agent-backend-design.md` 的「LLM 错误分类与自动重试」。
 - 本地和 CI 的关键路径验证方式。
 - 常见故障、排查路径和恢复步骤。
 

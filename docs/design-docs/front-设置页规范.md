@@ -59,6 +59,7 @@
   - DeepSeek / Kimi 供应商卡，徽标显示是否已连接。
   - 未连接「连接」→ API Key 输入弹窗；已连接「断开连接」。
   - 「测试连接」按钮校验 Key 是否有效。
+  - 「网络搜索」组：智谱 Web Search / Tavily / TinyFish / Exa 四个搜索供应商行（`web_search` 工具的通道 key，见 `agent-web-tools.md`），仅连接/断开，无测试连接；Tavily 已连接时显示本周期 credits 用量（main 进程代理 `GET /usage`）。
   - 「默认模型」下拉，决定 Composer 初始选中模型。
 - 智能体 Agent（2026-07-04 起只含主 Agent 内容；Kairos 全部迁到独立「Kairos」分区）
   - 主 Agent：自定义系统提示词（当前完整系统提示词，保存后下轮主 Agent 对话生效）。

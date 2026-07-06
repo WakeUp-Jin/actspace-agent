@@ -56,6 +56,15 @@ export interface AppEnv {
   /** Kimi 默认模型 */
   KIMI_MODEL: string;
 
+  /** 智谱 API Key（web_search 工具，国内通道） */
+  ZHIPU_API_KEY: string;
+  /** Tavily 搜索 API Key（web_search 工具，国际通道优先级 1） */
+  TAVILY_API_KEY: string;
+  /** TinyFish 搜索 API Key（web_search 工具，国际通道优先级 2） */
+  TINYFISH_API_KEY: string;
+  /** Exa 搜索 API Key（web_search 工具，国际通道优先级 3） */
+  EXA_API_KEY: string;
+
   /** 日志级别 */
   LOG_LEVEL: "debug" | "info" | "warn" | "error";
   /** 是否在 mock 模式下运行（快捷开关） */
@@ -183,6 +192,31 @@ const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
     envKey: "KIMI_MODEL",
     required: false,
     default: "kimi-k2.6",
+    parse: str,
+  },
+
+  ZHIPU_API_KEY: {
+    envKey: "ZHIPU_API_KEY",
+    required: false,
+    default: "",
+    parse: str,
+  },
+  TAVILY_API_KEY: {
+    envKey: "TAVILY_API_KEY",
+    required: false,
+    default: "",
+    parse: str,
+  },
+  TINYFISH_API_KEY: {
+    envKey: "TINYFISH_API_KEY",
+    required: false,
+    default: "",
+    parse: str,
+  },
+  EXA_API_KEY: {
+    envKey: "EXA_API_KEY",
+    required: false,
+    default: "",
     parse: str,
   },
 

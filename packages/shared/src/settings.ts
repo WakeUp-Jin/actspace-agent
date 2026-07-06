@@ -14,6 +14,19 @@ export type ProviderId = "deepseek" | "kimi";
 
 export const SETTINGS_PROVIDER_IDS: readonly ProviderId[] = ["deepseek", "kimi"];
 
+/** 网络搜索供应商（web_search 工具）。zhipu = 国内通道；其余为国际通道候选。 */
+export type SearchProviderId = "zhipu" | "tavily" | "tinyfish" | "exa";
+
+export const SEARCH_PROVIDER_IDS: readonly SearchProviderId[] = [
+  "zhipu",
+  "tavily",
+  "tinyfish",
+  "exa",
+];
+
+/** 可在设置页保存加密密钥的全部供应商（LLM + 搜索）。 */
+export type SecretProviderId = ProviderId | SearchProviderId;
+
 export type KairosThinkingMode = "auto" | "on" | "off";
 
 /**
@@ -96,6 +109,8 @@ export interface AppSettings {
   /** 默认模型；null = 用内置 DEFAULT_MODEL_ID。决定 Composer 初始选中。 */
   defaultModelId: ModelId | null;
   providers: Record<ProviderId, ProviderSettingsView>;
+  /** 网络搜索供应商的密钥状态（web_search 工具）。 */
+  searchProviders: Record<SearchProviderId, ProviderSettingsView>;
   agent: AgentSettings;
   kairos: KairosSettings;
   plugins: PluginsSettings;
@@ -122,7 +137,7 @@ export type WriteAgentSystemPromptInput = {
 };
 
 export type SetProviderKeyInput = {
-  provider: ProviderId;
+  provider: SecretProviderId;
   apiKey: string;
 };
 
@@ -133,7 +148,7 @@ export type SetProviderKeyResult = {
 };
 
 export type ClearProviderKeyInput = {
-  provider: ProviderId;
+  provider: SecretProviderId;
 };
 
 export type ClearProviderKeyResult = {
@@ -149,4 +164,21 @@ export type TestConnectionResult = {
   /** 面向用户的脱敏提示文案，绝不包含明文密钥。 */
   message: string;
   detail?: string;
+};
+
+/**
+ * 搜索供应商用量查询结果。
+ * 目前只有 Tavily 提供公开的用量接口（GET /usage）；TinyFish 搜索免费（限速），
+ * 智谱 / Exa 无公开用量 API，UI 侧展示静态计费说明。
+ */
+export type SearchUsageResult = {
+  ok: boolean;
+  tavily?: {
+    /** 当前计费周期已用 credits（账户级） */
+    planUsage: number;
+    /** 当前套餐 credits 上限；null = 无限制 */
+    planLimit: number | null;
+  };
+  /** 查询失败时的脱敏提示。 */
+  error?: string;
 };

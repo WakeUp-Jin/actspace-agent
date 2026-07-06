@@ -428,6 +428,7 @@ export function buildErrorMessage(
   const content = buildContentFromAccumulator(acc);
   const isAborted = signal?.aborted ||
     (error instanceof Error && error.name === "AbortError");
+  const serviceError = error instanceof LLMServiceError ? error : undefined;
 
   return {
     role: "assistant",
@@ -438,6 +439,9 @@ export function buildErrorMessage(
     usage: acc.usage,
     stopReason: isAborted ? "aborted" : "error",
     errorMessage: error instanceof Error ? error.message : String(error),
+    ...(serviceError && !isAborted
+      ? { errorKind: serviceError.kind, errorRetryable: serviceError.retryable }
+      : {}),
     timestamp: Date.now(),
     source: "llm",
   };

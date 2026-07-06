@@ -6,6 +6,7 @@
 
 | 日期 | 功能域 | 用户价值 | 变更摘要 |
 | --- | --- | --- | --- |
+| 2026-07-06 | 联网工具重构 | 网页读取结果真实可靠（不再有 LLM 幻觉页面），搜索同时覆盖中英文来源，且供应商额度用尽会自动切换。 | 拆除 Kimi-backed `web_search`，新增 `web_fetch`（本地抓取 HTML 转 Markdown，含 charset 探测与 Cloudflare 兜底）+ 重写 `web_search`（智谱 + Tavily/TinyFish/Exa 双通道并行，配额/认证失败自动降级）；设置页新增「网络搜索」供应商区块（4 个 key + Tavily 额度显示）。 |
 | 2026-07-04 | Bash 安全执行 | Bash 命令默认在 macOS 沙盒里运行，常规命令少打扰、危险命令永远问人，安全和流畅同时提升。 | 新增 Seatbelt 沙盒执行层（deny-default profile、敏感路径定向拒绝、运行时探测自动降级）；命令规则收敛为三级分级表：hard reject（`rm -rf` 关键路径、删 `.git` 本体等）、不可逆 ask（`rm`、`git reset --hard`、`git push --force` 等永远询问且不豁免）、allowlist/沙盒放宽自动放行；沙盒外升级走 `no_sandbox` 审批。 |
 | 2026-07-04 | Kairos 通知中心 | Kairos 的重要发现不再淹没在滚动轨迹里，用户在铃铛通知中心就能看到并标记已读。 | 新增仅供 Kairos 使用的 `notify_user(title, body, level)` 工具（每 tick 限 3 条）；`memory/notifications.json` 持久化（滚动上限 200）；Kairos 完整页与右侧紧凑视图各挂一个铃铛入口。 |
 | 2026-07-04 | Kairos 人格定制 | 用户可以自定义 Kairos 的人格，并直接在设置页编辑规则和任务表。 | 系统提示词开出 `{soul}` 人格插槽（`soul.md` + 4 个内置预设，空白回落默认人格）；rule.md、briefs 暴露给用户编辑；设置页新增独立「Kairos」分区。 |

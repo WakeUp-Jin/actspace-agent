@@ -8,7 +8,8 @@
 - **模板文件**：`.env.example` 列出全部可配置项和说明，新开发者克隆仓库后复制为 `.env` 即可。
 - **集中管理**：所有环境变量通过 `packages/agent-core/src/env.ts` 统一读取和验证，禁止在业务代码中散落 `process.env.XXX` 直接读取。
 - **DeepSeek API 格式边界**：`DEEPSEEK_API_FORMAT=openai|anthropic` 只影响 agent-core 里的 DeepSeek service 选择。当前默认是 `anthropic`，使用 `DEEPSEEK_ANTHROPIC_BASE_URL`；`openai` 是临时回退路线，使用 `DEEPSEEK_BASE_URL`。两个 base URL 都不应传入 renderer。
-- **Kimi key 边界**：`KIMI_API_KEY` 可作为 Kimi 主模型密钥，也可作为 DeepSeek 主模型的联网搜索、网页读取和多模态辅助密钥。该 key 只在 main/agent-core 运行时读取，不进入 renderer、session 事件、前端状态或测试快照。
+- **Kimi key 边界**：`KIMI_API_KEY` 可作为 Kimi 主模型密钥，也可作为 DeepSeek 主模型的多模态辅助（`analyze_media`）密钥。该 key 只在 main/agent-core 运行时读取，不进入 renderer、session 事件、前端状态或测试快照。
+- **搜索 provider key 边界**：`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY` 是 `web_search` 工具的外部搜索 API 密钥，边界与 LLM key 相同——只在 main/agent-core 运行时读取，经设置页加密落盘，不进入 renderer 明文状态。
 - **工具暴露最小化**：可通过 `ACTSPACE_DISABLED_TOOLS` 明确关闭不希望暴露给模型的工具，关闭发生在注册阶段，而不是只在执行时拒绝。
 - **优先级**：`process.env` 已有值 > `.env` 文件值 > schema 默认值。这保证 CI/Docker 场景可通过系统变量覆盖。
 - **验证前置**：`loadEnv()` 在应用启动时尽早调用，缺失 required 字段或值不合法时立即抛 `EnvValidationError`，不让无效配置流入运行时。
@@ -41,9 +42,9 @@
 - 真实 DeepSeek 与 Kimi 请求仅从 main 进程内的 Agent runtime 发起，renderer 只接收结构化事件与最终结果。
 - 普通会话默认使用真实 DeepSeek provider，且 DeepSeek 默认走 Anthropic-compatible route；`LLM_PROVIDER=kimi` 可切换 Kimi 主模型。Electron 真实 turn 不允许被 mock 配置静默替代，mock 仅用于测试、浏览器 fixture 或显式 demo。
 - Usage 页 DeepSeek 余额查询通过 main 进程调用 `GET /user/balance`，renderer 只接收已裁剪的余额展示模型，不接触 `DEEPSEEK_API_KEY`、鉴权头或 DeepSeek 原始响应。
-- DeepSeek OpenAI-compatible 路线下，主模型的 `web_search`、`analyze_media` 工具由 Kimi 辅助调用实现；只有配置 Kimi key 时才注册，工具结果会被裁剪后回填给主模型。`web_search` 统一处理关键词搜索和 URL 读取。
-- DeepSeek Anthropic-compatible 路线下，联网搜索由 DeepSeek provider-native server tool `web_search_20250305` 执行，不需要 `KIMI_API_KEY`；同名 Kimi-backed 本地 `web_search` 默认不暴露，避免模型看到两套搜索入口。
-- Anthropic server `server_tool_use`、`web_search_tool_result` 属于 provider 响应协议，不应当作为本地 ToolManager 执行日志写入；session / run log 只保留 `serverToolUse` 请求计数，不应将未裁剪网页全文或 provider tool result 原文写入 session。
+- `analyze_media` 工具由 Kimi 辅助调用实现；只有 DeepSeek 主模型且配置 Kimi key 时才注册，工具结果会被裁剪后回填给主模型。`web_search`（外部搜索 API 双通道）任一搜索 provider key 存在时注册，`web_fetch`（本地抓取）始终注册（见 `agent-web-tools.md`）。缺 key 时 executor 的兜底错误只提示需要配置的 key 名，不泄露其它运行时信息。
+- 2026-07-06 起 DeepSeek Anthropic-compatible 路线不再声明 provider-native server tool `web_search_20250305`（server 搜索与本地工具混用会触发网关 DSML 泄漏，见 `agent-deepseek-kimi-hybrid-capabilities.md` 决策记录）。
+- 历史 session 中的 Anthropic server `server_tool_use`、`web_search_tool_result` 属于 provider 响应协议，不应当作为本地 ToolManager 执行日志写入；session / run log 只保留 `serverToolUse` 请求计数，不应将未裁剪网页全文或 provider tool result 原文写入 session。
 - 验收真实 provider 时应先发送不含仓库内容和隐私的固定探针，确认连接后再决定是否允许工具结果进入外部模型上下文。
 - API 错误仅暴露必要的结构化诊断信息，不把鉴权请求头或密钥写入日志、session 或界面。
 

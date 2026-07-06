@@ -10,6 +10,12 @@ function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
     version: 1,
     defaultModelId: null,
     providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: true } },
+    searchProviders: {
+      zhipu: { hasApiKey: false },
+      tavily: { hasApiKey: false },
+      tinyfish: { hasApiKey: false },
+      exa: { hasApiKey: false },
+    },
     agent: {
       systemPromptPath: "/tmp/actspace/prompts/main-agent.md",
       temperature: null,
@@ -268,7 +274,9 @@ describe("SettingsPage", () => {
     await screen.findByRole("switch", { name: "自动审查" });
 
     await userEvent.click(screen.getByRole("button", { name: "模型" }));
-    await userEvent.click(await screen.findByRole("button", { name: "连接" }));
+    // 「模型」页现在同时包含 LLM 供应商与网络搜索供应商的连接按钮，取第一个（DeepSeek）。
+    const connectButtons = await screen.findAllByRole("button", { name: "连接" });
+    await userEvent.click(connectButtons[0]);
 
     const input = await screen.findByLabelText("DeepSeek API Key");
     await userEvent.type(input, "sk-test-123");

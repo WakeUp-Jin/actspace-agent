@@ -21,8 +21,14 @@ export interface ToolDefinitionSpec {
   isReadOnly: boolean;
   category: string;
   previewKind: ToolPreviewKind;
-  /** Missing means visible to both real providers. DeepSeek-only tools require a Kimi key. */
+  /** Missing means visible to both real providers. */
   exposeOnlyTo?: "deepseek" | "kimi";
+  /**
+   * 工具依赖的外部 key；缺失时不注册该工具（见 exposure.ts）。
+   * - "kimi"：Kimi-backed 能力（analyze_media）
+   * - "webSearch"：任一搜索 provider key（ZHIPU / TAVILY / TINYFISH / EXA_API_KEY）
+   */
+  requiresKey?: "kimi" | "webSearch";
   /**
    * 工具参数 → 路径数组的提取 hook，给 Kairos 路径访问控制用。
    * 主 Agent 调用路径不会读取这个字段；Kairos 调用时 scheduler 会优先使用本 hook，
@@ -55,6 +61,8 @@ export interface ToolRuntimeConfig {
   primaryProvider?: "deepseek" | "kimi" | "mock";
   apiFormat?: "openai" | "anthropic";
   hasKimiKey?: boolean;
+  /** 是否配置了任一 web_search provider key（智谱 / Tavily / TinyFish / Exa） */
+  hasWebSearchKey?: boolean;
   disabledTools?: string[];
 }
 

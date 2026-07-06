@@ -72,7 +72,11 @@ export function mockToolCall(
   };
 }
 
-export function mockError(errorMessage: string, stopReason: "error" | "aborted" = "error"): AssistantMessage {
+export function mockError(
+  errorMessage: string,
+  stopReason: "error" | "aborted" = "error",
+  options?: { errorKind?: string; errorRetryable?: boolean },
+): AssistantMessage {
   return {
     role: "assistant",
     content: [],
@@ -81,6 +85,8 @@ export function mockError(errorMessage: string, stopReason: "error" | "aborted" 
     usage: createEmptyUsage(),
     stopReason,
     errorMessage,
+    ...(options?.errorKind !== undefined ? { errorKind: options.errorKind } : {}),
+    ...(options?.errorRetryable !== undefined ? { errorRetryable: options.errorRetryable } : {}),
     timestamp: Date.now(),
     source: "llm",
   };

@@ -46,6 +46,10 @@ const TRUNCATED_WRITE_TOOL_ERROR =
   "工具参数可能因模型输出长度限制被截断，已取消写入。请缩小内容，或先写骨架后用 edit_file 分段补齐。";
 const WRITE_TOOL_NAMES = new Set(["write_file", "edit_file", "delete_file"]);
 
+/** LLM 可重试错误的默认策略：最多 2 次重试（共 3 次尝试），退避 1s → 3s */
+const DEFAULT_LLM_RETRY_MAX = 2;
+const DEFAULT_LLM_RETRY_BACKOFF_MS = [1000, 3000];
+
 // ─── 核心循环入口 ───
 
 export async function runAgentLoop(
@@ -122,14 +126,45 @@ async function runDualLoop(
         await emit({ type: "context_compaction", info });
       }
 
-      // 流式 LLM 调用
-      const callId = `llm_call_${Date.now()}_${turnIndex}`;
-      const cacheAuditCall = await prepareCacheAuditCall(config, context, callId, turnIndex);
-      const assistantMsg = await streamAssistantResponse(context, llm, signal, emit, config.thinkingEnabled);
-      const cacheAudit = await finishCacheAuditCall(config, cacheAuditCall, assistantMsg);
-      newMessages.push(assistantMsg);
-      accumulateUsage(totalUsage, assistantMsg.usage);
-      usageCalls.push({ callId, message: assistantMsg, usage: assistantMsg.usage, ...(cacheAudit ? { cacheAudit } : {}) });
+      // 流式 LLM 调用（可重试错误自动重试，见 AgentLoopConfig.llmRetry）
+      const maxRetries = config.llmRetry?.maxRetries ?? DEFAULT_LLM_RETRY_MAX;
+      const backoffMs = config.llmRetry?.backoffMs ?? DEFAULT_LLM_RETRY_BACKOFF_MS;
+      let retryCount = 0;
+      let assistantMsg: AssistantMessage;
+
+      while (true) {
+        const callId = `llm_call_${Date.now()}_${turnIndex}`;
+        const cacheAuditCall = await prepareCacheAuditCall(config, context, callId, turnIndex);
+        assistantMsg = await streamAssistantResponse(context, llm, signal, emit, config.thinkingEnabled);
+        const cacheAudit = await finishCacheAuditCall(config, cacheAuditCall, assistantMsg);
+        // 失败尝试的 usage 也照常累进：钱已经花了，计费审计不能丢
+        newMessages.push(assistantMsg);
+        accumulateUsage(totalUsage, assistantMsg.usage);
+        usageCalls.push({ callId, message: assistantMsg, usage: assistantMsg.usage, ...(cacheAudit ? { cacheAudit } : {}) });
+
+        const shouldRetry =
+          assistantMsg.stopReason === "error" &&
+          assistantMsg.errorRetryable === true &&
+          retryCount < maxRetries &&
+          !signal?.aborted;
+        if (!shouldRetry) break;
+
+        retryCount++;
+        // 必须弹出 streamAssistantResponse push 进 context 的 error message：
+        // 脏消息会污染下一次请求，还会破坏 prompt cache 前缀。
+        if (context.messages[context.messages.length - 1] === assistantMsg) {
+          context.messages.pop();
+        }
+        await emit({
+          type: "llm_retry",
+          attempt: retryCount,
+          maxAttempts: maxRetries,
+          reason: assistantMsg.errorMessage ?? "LLM error",
+        });
+        const delay = backoffMs[Math.min(retryCount - 1, backoffMs.length - 1)] ?? 0;
+        const abortedDuringBackoff = await sleepWithAbort(delay, signal);
+        if (abortedDuringBackoff) break;
+      }
 
       // 错误/中止 → 直接退出
       if (assistantMsg.stopReason === "error" || assistantMsg.stopReason === "aborted") {
@@ -296,6 +331,23 @@ async function executeToolCalls(
 }
 
 // ─── 工具函数 ───
+
+/** 可中断的退避 sleep；返回 true 表示等待期间被 abort。 */
+function sleepWithAbort(ms: number, signal?: AbortSignal): Promise<boolean> {
+  if (signal?.aborted) return Promise.resolve(true);
+  if (ms <= 0) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve(false);
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 function hasRawLengthStopReason(message: AssistantMessage): boolean {
   return message.diagnostics?.some((entry) => entry.rawStopReason === "length") ?? false;

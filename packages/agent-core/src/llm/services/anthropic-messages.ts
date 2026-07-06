@@ -19,7 +19,6 @@ import {
   buildAnthropicErrorMessage,
   convertContextToAnthropic,
   createAnthropicAccumulator,
-  createAnthropicWebSearchTool,
   detectLeakedDsmlToolCalls,
   processAnthropicStream,
   toAnthropicClientTools,
@@ -28,8 +27,6 @@ import {
 const DEFAULT_BASE_URLS: Record<string, string> = {
   deepseek: "https://api.deepseek.com/anthropic",
 };
-const DEFAULT_WEB_SEARCH_MAX_USES = 3;
-const PROVIDER_NATIVE_TOOL_NAMES = new Set(["web_search"]);
 
 function providerDisplayName(provider: string): string {
   if (provider === "deepseek") return "DeepSeek";
@@ -70,13 +67,6 @@ export class AnthropicMessagesService implements LLMService {
     return { signal: options.signal };
   }
 
-  protected providerNativeTools(): Anthropic.ToolUnion[] {
-    if (this.config.provider === "deepseek") {
-      return [createAnthropicWebSearchTool(DEFAULT_WEB_SEARCH_MAX_USES)];
-    }
-    return [];
-  }
-
   protected _stream(context: Context, options?: StreamOptions): AssistantMessageEventStream {
     const self = this;
 
@@ -104,8 +94,9 @@ export class AnthropicMessagesService implements LLMService {
 
       try {
         const temperature = options?.temperature ?? self.config.temperature;
-        const clientTools = (context.tools ?? [])
-          .filter((tool) => !PROVIDER_NATIVE_TOOL_NAMES.has(tool.name));
+        // 不再声明 DeepSeek server tool `web_search_20250305`：server 搜索与本地工具
+        // 混用的轮次会稳定触发网关 DSML 泄漏（工具调用被当正文吐出）。联网搜索改由
+        // Kimi-backed 本地 web_search 工具承担，所有工具调用统一走标准 tool_use 链路。
         const stream = self.client.messages.stream(
           {
             model: self.config.model,
@@ -114,10 +105,7 @@ export class AnthropicMessagesService implements LLMService {
             ...(requestInput.system && { system: requestInput.system }),
             ...(temperature !== undefined && { temperature }),
             ...(options?.thinkingEnabled === false && { thinking: { type: "disabled" as const } }),
-            tools: [
-              ...self.providerNativeTools(),
-              ...toAnthropicClientTools(clientTools),
-            ],
+            tools: toAnthropicClientTools(context.tools ?? []),
           },
           { signal: options?.signal },
         );

@@ -165,6 +165,7 @@ describe("createKairosToolManagerFactory", () => {
     "DEEPSEEK_API_KEY",
     "DEEPSEEK_API_FORMAT",
     "KIMI_API_KEY",
+    "TAVILY_API_KEY",
     "KAIROS_MODEL_ID",
   ];
 
@@ -196,9 +197,10 @@ describe("createKairosToolManagerFactory", () => {
     expect(restricted.length).toBeGreaterThan(0);
   });
 
-  it("uses DeepSeek Anthropic format by default and hides the Kimi-backed web_search", async () => {
+  it("uses DeepSeek Anthropic format by default and exposes web_search when a search key exists", async () => {
     process.env.DEEPSEEK_API_KEY = "sk-test";
     process.env.KIMI_API_KEY = "sk-kimi";
+    process.env.TAVILY_API_KEY = "tvly-test";
     const { loadEnv } = await import("@actspace/agent-core");
     const { createKairosToolManagerFactory: createFactory } = await import("../kairos-bootstrap");
     loadEnv({
@@ -209,14 +211,15 @@ describe("createKairosToolManagerFactory", () => {
     const factory = createFactory({ workspaceRoot: "/tmp/work", modelId: null });
     const manager = factory(makeConfig());
 
-    expect(manager.has("web_search")).toBe(false);
+    expect(manager.has("web_search")).toBe(true);
     expect(manager.has("analyze_media")).toBe(true);
   });
 
-  it("can expose Kimi-backed web_search when Kairos explicitly falls back to OpenAI-compatible DeepSeek", async () => {
+  it("keeps exposing web_search when Kairos explicitly falls back to OpenAI-compatible DeepSeek", async () => {
     process.env.DEEPSEEK_API_KEY = "sk-test";
     process.env.DEEPSEEK_API_FORMAT = "openai";
     process.env.KIMI_API_KEY = "sk-kimi";
+    process.env.TAVILY_API_KEY = "tvly-test";
     const { loadEnv } = await import("@actspace/agent-core");
     const { createKairosToolManagerFactory: createFactory } = await import("../kairos-bootstrap");
     loadEnv({

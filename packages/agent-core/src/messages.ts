@@ -121,6 +121,10 @@ export interface AssistantMessage {
   usage: Usage;
   stopReason: StopReason;
   errorMessage?: string;
+  /** Provider 错误分类（LLMErrorKind 的值；stopReason === "error" 时由 LLM service 填充） */
+  errorKind?: string;
+  /** 错误是否可安全重试；agent loop 据此决定自动重试（见 AgentLoopConfig.llmRetry） */
+  errorRetryable?: boolean;
   timestamp: number;
   source?: string;
   priority?: MessagePriority;

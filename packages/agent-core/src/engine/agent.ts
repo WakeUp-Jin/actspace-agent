@@ -47,6 +47,8 @@ export interface AgentOptions {
    */
   summarizer?: Summarizer;
   cacheAudit?: CacheAuditTracker;
+  /** LLM 可重试错误的自动重试策略；缺省用 loop 默认值（2 次重试，1s → 3s 退避）。 */
+  llmRetry?: AgentLoopConfig["llmRetry"];
 }
 
 export class Agent {
@@ -63,6 +65,7 @@ export class Agent {
   private thinkingEnabled?: boolean;
   private summarizer?: Summarizer;
   private cacheAudit?: CacheAuditTracker;
+  private llmRetry?: AgentLoopConfig["llmRetry"];
 
   constructor(options: AgentOptions) {
     this.llm = options.llm;
@@ -77,6 +80,7 @@ export class Agent {
     this.thinkingEnabled = options.thinkingEnabled;
     this.summarizer = options.summarizer;
     this.cacheAudit = options.cacheAudit;
+    this.llmRetry = options.llmRetry;
   }
 
   /** 执行一次完整的 agent 交互 */
@@ -107,6 +111,7 @@ export class Agent {
       toolExecuteOptions: this.toolExecuteOptions,
       thinkingEnabled: this.thinkingEnabled,
       cacheAudit: this.cacheAudit,
+      llmRetry: this.llmRetry,
       maybeCompact: async () => {
         const report = await this.contextManager.compactIfNeeded(this.summarizer);
         if (!report?.compacted) return null;

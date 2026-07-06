@@ -51,13 +51,13 @@ packages/agent-core/
 
 - `llm/test/mock-service.test.ts`：流式事件产出、stream→result 聚合
 - `llm/test/base-convert.test.ts`：convertMessages 转换
-- `llm/test/kimi-service.test.ts`：Kimi OpenAI-compatible 流式调用、`$web_search` 请求参数和 auth 错误分类
-- `llm/test/kimi-assistants.test.ts`：Kimi 辅助搜索函数按内置 `$web_search` tool call 协议回填 tool message
+- `llm/test/kimi-service.test.ts`：Kimi OpenAI-compatible 流式调用、auth 错误分类（Kimi 主模型 `$web_search` 覆盖见 openai-completions 相关测试）
 
 ### 工具系统
 
 - `tools/test/manager.test.ts`：注册/查询/执行/裁剪/未知工具错误
-- `tools/test/exposure.test.ts`：`exposeOnlyTo` 工具暴露规则；DeepSeek + Kimi key 才注册 `web_search`、`analyze_media`
+- `tools/test/exposure.test.ts`：`exposeOnlyTo` / `requiresKey` 工具暴露规则；搜索 key 门控 `web_search`，DeepSeek + Kimi key 门控 `analyze_media`
+- `tools/test/web-search-executor.test.ts` / `web-search-providers.test.ts` / `web-fetch-executor.test.ts`：web 工具双通道编排、provider 适配与本地抓取（见 `agent-web-tools.md`）
 
 ### 上下文管道
 

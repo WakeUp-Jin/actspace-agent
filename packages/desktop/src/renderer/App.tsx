@@ -125,6 +125,8 @@ type StreamingState = {
   segments: StreamingSegment[];
   activeTools: Map<string, ToolEntry>;
   activeCompactions: Map<string, Extract<MessageBlock, { kind: "context_compaction" }>>;
+  /** LLM 可重试错误退避中：显示重试提示；新 delta 到达（重试成功）时清除 */
+  retryNotice?: { attempt: number; maxAttempts: number };
 };
 
 function createEmptyStreamingState(): StreamingState {
@@ -155,6 +157,18 @@ function appendOrMergeSegment(
     last.text += delta;
   } else {
     segments.push({ type: segType, text: delta });
+  }
+}
+
+/** LLM 重试前清掉失败尝试留下的半截 thinking/text 段（已完成的工具块保留） */
+function dropTrailingStreamSegments(segments: StreamingSegment[]): void {
+  while (segments.length > 0) {
+    const last = segments[segments.length - 1];
+    if (last.type === "thinking" || last.type === "text") {
+      segments.pop();
+    } else {
+      break;
+    }
   }
 }
 
@@ -498,6 +512,16 @@ function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
     }
   }
 
+  if (state.retryNotice) {
+    blocks.push({
+      kind: "status",
+      id: `llm-retry-${state.retryNotice.attempt}`,
+      content: `网关异常，正在重试 (${state.retryNotice.attempt}/${state.retryNotice.maxAttempts})`,
+      createdAt: now,
+      tone: "muted",
+    });
+  }
+
   return blocks;
 }
 
@@ -834,11 +858,18 @@ export function App() {
         break;
 
       case "assistant_thinking_delta":
+        state.retryNotice = undefined;
         appendOrMergeSegment(state.segments, "thinking", event.delta);
         break;
 
       case "assistant_text_delta":
+        state.retryNotice = undefined;
         appendOrMergeSegment(state.segments, "text", event.delta);
+        break;
+
+      case "llm_retry":
+        dropTrailingStreamSegments(state.segments);
+        state.retryNotice = { attempt: event.attempt, maxAttempts: event.maxAttempts };
         break;
 
       case "tool_call_streaming": {

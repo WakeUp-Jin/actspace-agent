@@ -73,6 +73,8 @@ export type AgentEvent =
   | { type: "message_delta"; delta: AssistantMessageEvent }
   | { type: "message_end"; message: Message }
   | { type: "context_compaction"; info: ContextCompactionInfo }
+  /** LLM 调用命中可重试错误、即将退避重试。attempt 从 1 开始计数（第 1 次重试 = 1）。 */
+  | { type: "llm_retry"; attempt: number; maxAttempts: number; reason: string }
   | { type: "tool_start"; toolCallId: string; toolName: string; args: Record<string, unknown> }
   | { type: "tool_end"; toolCallId: string; toolName: string; result: ToolResult; isError: boolean }
   | { type: "tool_approval_required"; toolCallId: string; toolName: string; request: ToolApprovalRequest }
@@ -80,6 +82,16 @@ export type AgentEvent =
 
 /** 事件回调签名 */
 export type AgentEventSink = (event: AgentEvent) => Promise<void> | void;
+
+// ─── LLM 重试策略 ───
+
+/** loop 层 LLM 可重试错误的自动重试策略（errorRetryable === true 时生效）。 */
+export interface LLMRetryConfig {
+  /** 最大重试次数（不含首次尝试）。默认 2，即最多 3 次尝试。 */
+  maxRetries?: number;
+  /** 每次重试前的退避毫秒数，按次序取值，超出时取最后一项。默认 [1000, 3000]。 */
+  backoffMs?: number[];
+}
 
 // ─── AgentLoopConfig ───
 
@@ -111,6 +123,8 @@ export interface AgentLoopConfig {
   toolExecuteOptions?: ToolExecuteOptions;
   /** Optional sidecar observer for cache-loss diagnostics. It never contributes to LLM input. */
   cacheAudit?: CacheAuditTracker;
+  /** LLM 可重试错误的自动重试策略；缺省用默认值（2 次重试，1s → 3s 退避）。 */
+  llmRetry?: LLMRetryConfig;
 }
 
 // ─── AgentLoopResult ───

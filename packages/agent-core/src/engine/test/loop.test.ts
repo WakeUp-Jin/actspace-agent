@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { runAgentLoop } from "../loop";
-import { MockLLMService, mockText } from "../../llm/services/mock";
+import { MockLLMService, mockText, mockError } from "../../llm/services/mock";
 import { ToolManager } from "../../tools/manager";
 import type { Context } from "../../messages";
 import { createEmptyUsage } from "../../messages";
@@ -191,6 +191,96 @@ describe("runAgentLoop", () => {
       type: "text",
       text: "工具参数可能因模型输出长度限制被截断，已取消写入。请缩小内容，或先写骨架后用 edit_file 分段补齐。",
     });
+  });
+
+  it("retries retryable LLM errors and pops the dirty error message from context", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
+    llm.setResponses([
+      mockError("gateway hiccup", "error", { errorKind: "server_error", errorRetryable: true }),
+      mockText("recovered reply"),
+    ]);
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
+    const context: Context = {
+      messages: [{ role: "user", content: "hello", timestamp: Date.now() }],
+      tools: [],
+    };
+    const events: AgentEvent[] = [];
+
+    const result = await runAgentLoop(
+      context,
+      llm,
+      { toolManager, llmRetry: { maxRetries: 2, backoffMs: [1] } },
+      (e) => { events.push(e); },
+    );
+
+    expect(result.message.stopReason).toBe("stop");
+    // 失败尝试的 usage call 照常记录（计费审计）
+    expect(result.usageCalls).toHaveLength(2);
+    expect(result.usageCalls[0].message.stopReason).toBe("error");
+    // llm_retry 事件带 attempt/maxAttempts/reason
+    const retryEvents = events.filter((e) => e.type === "llm_retry");
+    expect(retryEvents).toEqual([
+      { type: "llm_retry", attempt: 1, maxAttempts: 2, reason: "gateway hiccup" },
+    ]);
+    // 脏 error message 必须从 context 弹出，不污染重试请求
+    const errorInContext = context.messages.filter(
+      (m) => m.role === "assistant" && m.stopReason === "error",
+    );
+    expect(errorInContext).toHaveLength(0);
+  });
+
+  it("gives up after exhausting retries and returns the final error message", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
+    llm.setResponses([
+      mockError("boom 1", "error", { errorKind: "server_error", errorRetryable: true }),
+      mockError("boom 2", "error", { errorKind: "server_error", errorRetryable: true }),
+      mockError("boom 3", "error", { errorKind: "server_error", errorRetryable: true }),
+    ]);
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
+    const context: Context = {
+      messages: [{ role: "user", content: "hello", timestamp: Date.now() }],
+      tools: [],
+    };
+    const events: AgentEvent[] = [];
+
+    const result = await runAgentLoop(
+      context,
+      llm,
+      { toolManager, llmRetry: { maxRetries: 2, backoffMs: [1] } },
+      (e) => { events.push(e); },
+    );
+
+    expect(result.message.stopReason).toBe("error");
+    expect(result.message.errorMessage).toBe("boom 3");
+    expect(result.usageCalls).toHaveLength(3);
+    expect(events.filter((e) => e.type === "llm_retry")).toHaveLength(2);
+  });
+
+  it("does not retry non-retryable LLM errors", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
+    llm.setResponses([
+      mockError("invalid api key", "error", { errorKind: "auth", errorRetryable: false }),
+      mockText("should never be reached"),
+    ]);
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
+    const context: Context = {
+      messages: [{ role: "user", content: "hello", timestamp: Date.now() }],
+      tools: [],
+    };
+    const events: AgentEvent[] = [];
+
+    const result = await runAgentLoop(
+      context,
+      llm,
+      { toolManager, llmRetry: { maxRetries: 2, backoffMs: [1] } },
+      (e) => { events.push(e); },
+    );
+
+    expect(result.message.stopReason).toBe("error");
+    expect(result.message.errorMessage).toBe("invalid api key");
+    expect(result.usageCalls).toHaveLength(1);
+    expect(events.filter((e) => e.type === "llm_retry")).toHaveLength(0);
+    expect(llm.getPendingCount()).toBe(1);
   });
 
   it("uses rendered data for failed tool results when available", async () => {

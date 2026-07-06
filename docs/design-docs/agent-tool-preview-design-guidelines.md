@@ -137,7 +137,7 @@
 - 支持两种模式：`query`（关键词搜索）和 `url`（读取网页）。
 - `ToolUiPreview.mode`: `query` 或 `url`。
 - query 模式展示：`Web Search 最新新闻 今天`。
-- url 模式展示：`Read Web Page https://example.com/path`。
+- url 模式展示：`Web Search https://example.com/path`（2026-07-06 起两种模式统一 `Web Search` 前缀，`mode` 字段仍保留区分）。
 - 不在工具日志行里展示搜索结果正文、来源摘要或页面摘要；这些内容只保留在 `tool_result.rawOutput` / `modelOutput` 中，供模型继续推理和排障使用。
 
 ### `analyze_media`

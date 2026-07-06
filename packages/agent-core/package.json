@@ -29,10 +29,12 @@
     "@types/diff": "^8.0.0",
     "@vscode/ripgrep": "^1.18.0",
     "diff": "^9.0.0",
-    "openai": "^6.39.0"
+    "openai": "^6.39.0",
+    "turndown": "^7.2.4"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",
+    "@types/turndown": "^5.0.6",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   }

@@ -131,6 +131,14 @@ V1 采用 `llm-agent-dev` skill 中推荐的纯函数执行循环。
 - 工具失败转为 recoverable tool result，不让整个进程崩溃。
 - 流式事件与最终持久化事件分离。
 
+### LLM 错误分类与自动重试
+
+provider 错误按三层处理，任何新接入的 provider 自动继承整条链路：
+
+1. **错误元数据**：各 service 的 `mapSdkError` / `mapAnthropicError` 把 SDK 异常映射为 `LLMServiceError`（kind + retryable），`buildErrorMessage` / `buildAnthropicErrorMessage` 再把 kind/retryable 写入 `AssistantMessage.errorKind` / `errorRetryable`（`llm/convert.ts`、`llm/anthropic-convert.ts`）。
+2. **loop 层自动重试**：`engine/loop.ts` 在 `stopReason === "error"` 且 `errorRetryable === true` 时自动重试。重试放在 loop 层而不是 service 层，因为 service 内部重试无法收拾已经 emit 给 UI 的半截流式内容，且每个 service 要各写一遍。重试前必须把 error message 从 `context.messages` pop 掉（防污染请求、防打断 prompt cache 前缀），但失败尝试的 usage 照常累进（计费审计）。策略挂在 `AgentLoopConfig.llmRetry`，默认最多 2 次重试、退避 1s → 3s，退避 sleep 响应 `AbortSignal`。每次重试 emit `llm_retry` agent event，bridge 转成同名 stream event，renderer 清掉半截 streaming 内容并显示重试提示。
+3. **重试耗尽后的 error 事件**：`engine/bridge.ts` 的 `buildSessionEvents` 发现最终消息 `stopReason === "error"` 时落一条 `error` SessionEvent（code 由 errorKind 派生如 `LLM_SERVER_ERROR`，recoverable: true），selector 渲染为错误块；失败回复不再落 `content: ""` 的空 `assistant_message`，被重试掉的中间失败尝试只留 `llm_usage` 不留内容事件。
+
 ## 事件模型
 
 后端至少维护两层事件：
@@ -147,7 +155,7 @@ V1 采用 `llm-agent-dev` skill 中推荐的纯函数执行循环。
 - `diff_preview`
 - `assistant_message`
 - `context_snapshot`
-- `error`
+- `error`（由失败轮次的最终 assistant message 派生，见「LLM 错误分类与自动重试」）
 
 事件设计要求：
 

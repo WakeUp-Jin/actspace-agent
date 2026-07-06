@@ -331,64 +331,58 @@ describe("createAgentFromConfig", () => {
     expect(deps.toolManager.has("bash")).toBe(false);
   });
 
-  it("should register kimi-assistant tools when DeepSeek uses OpenAI-compatible format", async () => {
+  it("should register web_search only when a search provider key is configured", async () => {
+    const { createAgentFromConfig } = await import("../create-agent-deps");
+    const withKey = createAgentFromConfig(createTestAgentConfig({
+      toolManagerConfig: {
+        workspaceRoot: "/tmp/workspace",
+        primaryProvider: "deepseek",
+        apiFormat: "openai",
+        hasKimiKey: false,
+        hasWebSearchKey: true,
+        disabledTools: [],
+      },
+    }));
+    const withoutKey = createAgentFromConfig(createTestAgentConfig({
+      toolManagerConfig: {
+        workspaceRoot: "/tmp/workspace",
+        primaryProvider: "deepseek",
+        apiFormat: "openai",
+        hasKimiKey: false,
+        hasWebSearchKey: false,
+        disabledTools: [],
+      },
+    }));
+
+    expect(withKey.toolManager.has("web_search")).toBe(true);
+    expect(withoutKey.toolManager.has("web_search")).toBe(false);
+    // web_fetch 无 key 依赖，两种情况下都注册
+    expect(withKey.toolManager.has("web_fetch")).toBe(true);
+    expect(withoutKey.toolManager.has("web_fetch")).toBe(true);
+  });
+
+  it("should register web tools and analyze_media for DeepSeek Anthropic format", async () => {
     const { createAgentFromConfig } = await import("../create-agent-deps");
     const config = createTestAgentConfig({
       llmConfig: {
         provider: "deepseek",
-        apiFormat: "openai",
+        apiFormat: "anthropic",
         apiKey: "sk-test-deepseek",
         model: "deepseek-v4-flash",
       },
       toolManagerConfig: {
         workspaceRoot: "/tmp/workspace",
         primaryProvider: "deepseek",
-        apiFormat: "openai",
+        apiFormat: "anthropic",
         hasKimiKey: true,
+        hasWebSearchKey: true,
         disabledTools: [],
       },
     });
     const deps = createAgentFromConfig(config);
 
     expect(deps.toolManager.has("web_search")).toBe(true);
-  });
-
-  it("should not register kimi-assistant tools when hasKimiKey is false", async () => {
-    const { createAgentFromConfig } = await import("../create-agent-deps");
-    const config = createTestAgentConfig({
-      toolManagerConfig: {
-        workspaceRoot: "/tmp/workspace",
-        primaryProvider: "deepseek",
-        apiFormat: "openai",
-        hasKimiKey: false,
-        disabledTools: [],
-      },
-    });
-    const deps = createAgentFromConfig(config);
-
-    expect(deps.toolManager.has("web_search")).toBe(false);
-  });
-
-  it("should not register Kimi-backed web_search for DeepSeek Anthropic format", async () => {
-    const { createAgentFromConfig } = await import("../create-agent-deps");
-    const config = createTestAgentConfig({
-      llmConfig: {
-        provider: "deepseek",
-        apiFormat: "anthropic",
-        apiKey: "sk-test-deepseek",
-        model: "deepseek-v4-flash",
-      },
-      toolManagerConfig: {
-        workspaceRoot: "/tmp/workspace",
-        primaryProvider: "deepseek",
-        apiFormat: "anthropic",
-        hasKimiKey: true,
-        disabledTools: [],
-      },
-    });
-    const deps = createAgentFromConfig(config);
-
-    expect(deps.toolManager.has("web_search")).toBe(false);
+    expect(deps.toolManager.has("web_fetch")).toBe(true);
     expect(deps.toolManager.has("analyze_media")).toBe(true);
   });
 });

@@ -80,6 +80,7 @@ import type {
   SessionWorkspaceInput,
   SessionWorkspaceResult,
   SessionRecord,
+  SearchUsageResult,
   SetProviderKeyInput,
   SetProviderKeyResult,
   SettingsUpdateInput,
@@ -162,6 +163,8 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("settings:clear-provider-key", input) as Promise<ClearProviderKeyResult>,
   testProviderConnection: (input: TestConnectionInput) =>
     ipcRenderer.invoke("settings:test-connection", input) as Promise<TestConnectionResult>,
+  getSearchUsage: () =>
+    ipcRenderer.invoke("settings:search-usage") as Promise<SearchUsageResult>,
   getFsWatchStatus: () =>
     ipcRenderer.invoke("plugins:fs-watch:get-status") as Promise<FsWatchStatus>,
   installFsWatchPlugin: () =>

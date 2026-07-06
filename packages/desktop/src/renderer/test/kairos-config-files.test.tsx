@@ -9,6 +9,12 @@ function makeSettings(): AppSettings {
     version: 1,
     defaultModelId: null,
     providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: false } },
+    searchProviders: {
+      zhipu: { hasApiKey: false },
+      tavily: { hasApiKey: false },
+      tinyfish: { hasApiKey: false },
+      exa: { hasApiKey: false },
+    },
     agent: {
       systemPromptPath: "/tmp/actspace/prompts/main-agent.md",
       temperature: null,

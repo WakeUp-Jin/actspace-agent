@@ -107,7 +107,7 @@ export class OpenAICompletionsService implements LLMService {
   ): AssistantMessageEventStream {
     const self = this;
     // 仅主 Agent 入口（stream(context)）对 Kimi 启用 builtin $web_search 内部循环；
-    // streamMessages / streamWithBuiltinWebSearch 等 helper 路径保持原有单次行为。
+    // streamMessages 等 helper 路径保持原有单次行为。
     const kimiMain = self.config.provider === "kimi" && enableKimiBuiltinWebSearch;
     // Kimi `$web_search` 要求禁用 thinking，二者互斥：用户显式开 thinking 时优先 thinking，
     // 不挂 web search；否则默认用 web search（thinking 关）。

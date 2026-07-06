@@ -34,7 +34,7 @@ import type { AgentRunLogger } from "../observability";
 import type { CacheAuditTracker } from "../observability/cache-audit";
 import type { ToolResult } from "../internal-tools";
 import { Agent } from "./agent";
-import type { AgentEvent, AgentLoopResult, ContextCompactionInfo, LLMUsageCall, ToolExecutionMode } from "./types";
+import type { AgentEvent, AgentLoopResult, ContextCompactionInfo, LLMRetryConfig, LLMUsageCall, ToolExecutionMode } from "./types";
 import { extractStreamingPreview } from "./streaming-preview-extractors";
 import {
   createPersistedSessionEvent,
@@ -114,6 +114,8 @@ export interface RunTurnWithAgentDeps {
   summarizer?: Summarizer;
   /** 低缓存旁路审计器；只写本地 cache-audit 文件与 llm_usage 索引。 */
   cacheAudit?: CacheAuditTracker;
+  /** LLM 可重试错误的自动重试策略；缺省用 loop 默认值（2 次重试，1s → 3s 退避）。 */
+  llmRetry?: LLMRetryConfig;
   abort?: () => void;
 }
 
@@ -177,6 +179,7 @@ export async function runTurnWithAgent(
     thinkingEnabled: input.thinkingEnabled ?? deps.thinkingEnabled,
     summarizer: deps.summarizer,
     cacheAudit: deps.cacheAudit,
+    llmRetry: deps.llmRetry,
     // 后台 bash 任务事件在 turn 边界（每次 LLM 调用前）注入模型上下文
     getSteeringMessages: async () => buildBashTaskSteeringMessages(sessionId),
     toolExecuteOptions: {
@@ -311,7 +314,12 @@ export async function runTurnWithAgent(
       ? "aborted"
       : loopResult.message.stopReason === "error" ? "failed" : "completed",
     error: loopResult.message.errorMessage
-      ? { code: "LLM_ERROR", message: loopResult.message.errorMessage }
+      ? {
+          code: loopResult.message.errorKind
+            ? `LLM_${loopResult.message.errorKind.toUpperCase()}`
+            : "LLM_ERROR",
+          message: loopResult.message.errorMessage,
+        }
       : undefined,
   };
   await writeRunLog(
@@ -526,7 +534,11 @@ function buildSessionEvents(
       continue;
     }
 
-    const messageEvents = messageToEvents(msg, sessionId, turnId);
+    // 被 loop 重试掉的中间失败尝试：半截 thinking/text 不落内容事件（实时流里已被
+    // llm_retry 清掉，重开会话不应再出现），但 llm_usage 照常落——钱已经花了。
+    const isRetriedErrorAttempt =
+      msg.role === "assistant" && msg.stopReason === "error" && msg !== result.message;
+    const messageEvents = isRetriedErrorAttempt ? [] : messageToEvents(msg, sessionId, turnId);
     events.push(...messageEvents);
 
     if (msg.role === "assistant") {
@@ -541,6 +553,17 @@ function buildSessionEvents(
         `llm_call_${turnId}_${usageCallIndex}`,
       ));
     }
+  }
+
+  // 失败轮次落一条 error 事件：selector 会渲染成错误块（实时流与重开会话一致），
+  // 替代原本"空 assistant_message → 空白气泡"的表现。
+  const finalMessage = result.message;
+  if (finalMessage.stopReason === "error") {
+    events.push(createPersistedSessionEvent(sessionId, turnId, "error", {
+      code: finalMessage.errorKind ? `LLM_${finalMessage.errorKind.toUpperCase()}` : "LLM_ERROR",
+      message: finalMessage.errorMessage ?? "LLM call failed",
+      recoverable: true,
+    }));
   }
   return events;
 }
@@ -868,13 +891,14 @@ function createToolUiPreview(
     }
 
     case "web_search": {
+      // web_fetch 复用 web_search 预览通道（mode: "url"），只是动词不同
       const url = stringArg(args.url, "");
       if (url) {
         return {
           kind: "web_search",
           mode: "url",
           url,
-          displayText: `Read Web Page ${url}`,
+          displayText: `${toolName === "web_fetch" ? "Web Fetch" : "Web Search"} ${url}`,
         };
       }
 
@@ -1034,7 +1058,8 @@ function getToolSummary(
     case "web_search": {
       const url = stringArg(args.url, "");
       const query = stringArg(args.query, "");
-      return url ? `Read Web Page ${url}` : `Web Search ${query || "..."}`;
+      if (toolName === "web_fetch") return `Web Fetch ${url || "..."}`;
+      return `Web Search ${query || url || "..."}`;
     }
     case "media_analysis": {
       const mediaName = displayFileName(stringArg(args.source, "media"));
@@ -1057,9 +1082,10 @@ function getToolSummary(
       return stringArg(args.description, "Agent");
     case "generic":
       if (toolName === "web_search") {
-        const url = stringArg(args.url, "");
-        const query = stringArg(args.query, "");
-        return url ? `Fetching: ${url}` : `Searching: ${query || "..."}`;
+        return `Searching: ${stringArg(args.query, "...")}`;
+      }
+      if (toolName === "web_fetch") {
+        return `Fetching: ${stringArg(args.url, "...")}`;
       }
       return `Ran ${toolName}`;
   }
@@ -1265,6 +1291,16 @@ function mapAgentEventToStreamEvent(
       };
     }
 
+    case "llm_retry":
+      return {
+        type: "llm_retry",
+        sessionId,
+        turnId,
+        attempt: event.attempt,
+        maxAttempts: event.maxAttempts,
+        reason: event.reason,
+      };
+
     case "agent_end":
       // turn 结束时清空累积状态，防内存泄漏
       toolCallStreaming.clear();
@@ -1441,6 +1477,16 @@ function logAgentEvent(
         reason: event.info.reason,
       });
       return;
+
+    case "llm_retry":
+      logAgentRun("llm retrying after error", {
+        sessionId,
+        turnId,
+        attempt: event.attempt,
+        maxAttempts: event.maxAttempts,
+        reason: preview(event.reason),
+      });
+      return;
   }
 }
 
@@ -1584,6 +1630,9 @@ function serializeAgentEvent(event: AgentEvent): Record<string, unknown> {
         type: event.type,
         ...event.info,
       };
+
+    case "llm_retry":
+      return event;
   }
 }
 

@@ -20,6 +20,7 @@ import type {
 } from "../messages";
 import { createEmptyUsage } from "../messages";
 import type { AssistantMessageEvent, LLMConfig } from "./types";
+import { LLMServiceError } from "./types";
 import { transformMessages } from "./transform-messages";
 
 export type AnthropicMessageParam = Anthropic.MessageParam;
@@ -284,14 +285,6 @@ export function detectLeakedDsmlToolCalls(text: string): boolean {
   if (!text) return false;
   if (text.includes("｜｜DSML｜｜tool_calls")) return true;
   return text.includes("｜｜DSML｜｜invoke") && text.includes("name=");
-}
-
-export function createAnthropicWebSearchTool(maxUses = 3): Anthropic.WebSearchTool20250305 {
-  return {
-    type: "web_search_20250305",
-    name: "web_search",
-    max_uses: maxUses,
-  };
 }
 
 export function messageToAssistantMessage(
@@ -594,6 +587,7 @@ export function buildAnthropicErrorMessage(
 ): AssistantMessage {
   const content = buildAnthropicStreamContent(acc);
   const isAborted = signal?.aborted || (error instanceof Error && error.name === "AbortError");
+  const serviceError = error instanceof LLMServiceError ? error : undefined;
 
   return {
     role: "assistant",
@@ -604,6 +598,9 @@ export function buildAnthropicErrorMessage(
     usage: acc.usage ? anthropicUsageToUsage(acc.usage) : createEmptyUsage(),
     stopReason: isAborted ? "aborted" : "error",
     errorMessage: error instanceof Error ? error.message : String(error),
+    ...(serviceError && !isAborted
+      ? { errorKind: serviceError.kind, errorRetryable: serviceError.retryable }
+      : {}),
     timestamp: Date.now(),
     source: "llm",
   };

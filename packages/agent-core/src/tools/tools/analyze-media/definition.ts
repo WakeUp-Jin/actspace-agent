@@ -29,4 +29,5 @@ export const analyzeMediaDefinition: ToolDefinitionSpec = {
   category: "media",
   previewKind: "media_analysis",
   exposeOnlyTo: "deepseek",
+  requiresKey: "kimi",
 };

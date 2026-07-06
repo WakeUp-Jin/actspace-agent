@@ -455,7 +455,8 @@ const tools = this.opts.toolManager.getAll().map(toToolDefinition);
 | `write_file` | 主 Agent 共享 | 可见 | `tools/tools/write-file/definition.ts` | 同上；默认相对路径写到 Kairos workspace |
 | `edit_file` | 主 Agent 共享 | 可见 | `tools/tools/edit-file-diff/definition.ts` | 同上；追加内容仍走 read → edit 的普通替换路径 |
 | `bash` | 主 Agent 共享 | 取决于 env/config | `tools/tools/bash/definition.ts` | 建议默认放入 `toolsDenied`；命令字符串难精确提取路径，主要靠整工具禁用管控 |
-| `web_search` | 主 Agent 共享 | DeepSeek 主模型且配置 Kimi key 时可见 | `tools/tools/web-search/definition.ts` | 无路径参数，不走 allowedRoots；仍可被 `toolsDenied` 禁用 |
+| `web_search` | 主 Agent 共享 | 任一搜索 provider key 存在时可见 | `tools/tools/web-search/definition.ts` | 无路径参数，不走 allowedRoots；仍可被 `toolsDenied` 禁用 |
+| `web_fetch` | 主 Agent 共享 | 始终可见 | `tools/tools/web-fetch/definition.ts` | 无路径参数，不走 allowedRoots；仍可被 `toolsDenied` 禁用 |
 | `analyze_media` | 主 Agent 共享 | DeepSeek 主模型且配置 Kimi key 时可见 | `tools/tools/analyze-media/definition.ts` | 无路径参数，不走 allowedRoots；仍可被 `toolsDenied` 禁用 |
 
 新增工具时必须同时回答三个问题：
@@ -620,7 +621,7 @@ KairosRunner 每次 tick 由 `prompt-assembler.ts` 组装上下文。**LLM 看�
 | `read_file` / `list_directory` / `grep` / `glob` | 主 Agent 共享 | 经 ToolScheduler `callerAgent=kairos` 走 blocklist 校验 |
 | `edit_file` / `write_file` | 主 Agent 共享 | 同上 |
 | `bash` | 主 Agent 共享 | 默认禁用；用户从 `blocklist.toolsDenied` 移除 `"bash"` 后才会暴露给 Kairos |
-| `web_search` / `analyze_media` | 主 Agent 共享 | DeepSeek 主模型且配置 Kimi key 时可见；仍可被 `toolsDenied` 禁用 |
+| `web_search` / `web_fetch` / `analyze_media` | 主 Agent 共享 | `web_search` 看搜索 key、`web_fetch` 始终可见、`analyze_media` 看 DeepSeek + Kimi key；均可被 `toolsDenied` 禁用 |
 
 工具集**不再有 `kairos_*` 业务工具**。访问控制走 ToolScheduler 的 hook，完整矩阵见上文 [Kairos 工具能力矩阵](#kairos-工具能力矩阵)，实现细节见后文 [工具系统扩展](#工具系统扩展callerAgent--extractPaths)。
 
@@ -1155,7 +1156,7 @@ export type ToolDefinitionSpec = {
 | `grep` | `(args) => [args.path ?? args.dir ?? "."]` |
 | `glob` | `(args) => [args.cwd ?? "."]` |
 | `bash` | `(args) => []`（路径在命令里难精确提取，整个工具靠 `toolsDenied` 整体管控） |
-| `web_search` / `analyze_media` | 不实现（不涉及本地路径） |
+| `web_search` / `web_fetch` / `analyze_media` | 不实现（不涉及本地路径） |
 
 > 设计原则：`extractPaths` 由工具自己最清楚怎么提取（同一工具未来加新参数也只改一处），ToolScheduler 只做"调用 hook + 匹配规则"，不维护任何工具特定逻辑。
 

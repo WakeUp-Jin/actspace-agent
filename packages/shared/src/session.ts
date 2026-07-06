@@ -89,6 +89,17 @@ export type RuntimeStreamEvent =
     }
   | { type: "tool_approval_required"; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string }
   | { type: "tool_approval_resolved"; toolCallId: ToolCallId; requestId: string; decision: string }
+  | {
+      /** LLM 调用命中可重试错误、agent loop 正在退避重试；renderer 据此清掉半截 streaming 内容并显示重试提示 */
+      type: "llm_retry";
+      sessionId: SessionId;
+      turnId: TurnId;
+      /** 第几次重试（从 1 开始） */
+      attempt: number;
+      /** 最大重试次数 */
+      maxAttempts: number;
+      reason: string;
+    }
   | { type: "turn_finished"; sessionId: SessionId; turnId: TurnId; resultEventIds: EventId[] }
   | { type: "turn_failed"; sessionId: SessionId; turnId: TurnId; error: SessionError };
 

@@ -24,6 +24,7 @@ import { dirname, isAbsolute, join } from "node:path";
 import { getEnv, loadEnv, MAIN_AGENT_SYSTEM_PROMPT } from "@actspace/agent-core";
 import {
   MODEL_REGISTRY,
+  SEARCH_PROVIDER_IDS,
   SETTINGS_PROVIDER_IDS,
   isPublicModelId,
   type AgentSystemPromptFile,
@@ -31,7 +32,8 @@ import {
   type KairosModelId,
   type KairosThinkingMode,
   type ModelId,
-  type ProviderId,
+  type SearchUsageResult,
+  type SecretProviderId,
   type SettingsUpdateInput,
 } from "@actspace/shared";
 
@@ -72,12 +74,22 @@ interface ReadSettingsResult {
   needsWrite: boolean;
 }
 
-/** secrets.json 落盘形态：每个供应商一段 base64 密文。 */
-interface PersistedSecrets {
-  version: 1;
-  deepseek?: string;
-  kimi?: string;
-}
+/** secrets.json 落盘形态：每个供应商（LLM + 搜索）一段 base64 密文。 */
+type PersistedSecrets = { version: 1 } & Partial<Record<SecretProviderId, string>>;
+
+/** 所有可保存密钥的供应商 id（LLM + 搜索），读写 secrets.json 时用。 */
+const ALL_SECRET_PROVIDER_IDS: readonly SecretProviderId[] = [
+  ...SETTINGS_PROVIDER_IDS,
+  ...SEARCH_PROVIDER_IDS,
+];
+
+/** 搜索供应商 → 生效的 env 变量名。 */
+const SEARCH_PROVIDER_ENV_KEYS = {
+  zhipu: "ZHIPU_API_KEY",
+  tavily: "TAVILY_API_KEY",
+  tinyfish: "TINYFISH_API_KEY",
+  exa: "EXA_API_KEY",
+} as const;
 
 const SETTINGS_FILE = "settings.json";
 const SECRETS_FILE = "secrets.json";
@@ -133,6 +145,12 @@ export class SettingsService {
         deepseek: { hasApiKey: Boolean(this.getDecryptedKey("deepseek")) },
         kimi: { hasApiKey: Boolean(this.getDecryptedKey("kimi")) },
       },
+      searchProviders: {
+        zhipu: { hasApiKey: Boolean(this.getDecryptedKey("zhipu")) },
+        tavily: { hasApiKey: Boolean(this.getDecryptedKey("tavily")) },
+        tinyfish: { hasApiKey: Boolean(this.getDecryptedKey("tinyfish")) },
+        exa: { hasApiKey: Boolean(this.getDecryptedKey("exa")) },
+      },
       agent: { ...this.settings.agent, disabledTools: [...this.settings.agent.disabledTools] },
       kairos: { ...this.settings.kairos, enabledSkills: [...this.settings.kairos.enabledSkills] },
       plugins: { repoRoot: this.settings.plugins.repoRoot, fsWatch: { ...this.settings.plugins.fsWatch } },
@@ -180,7 +198,7 @@ export class SettingsService {
     return { path: this.settings.agent.systemPromptPath, content: nextContent };
   }
 
-  async setProviderKey(provider: ProviderId, apiKey: string): Promise<{ ok: boolean; error?: string }> {
+  async setProviderKey(provider: SecretProviderId, apiKey: string): Promise<{ ok: boolean; error?: string }> {
     const trimmed = apiKey.trim();
     if (!trimmed) {
       return { ok: false, error: "API Key 不能为空。" };
@@ -195,15 +213,47 @@ export class SettingsService {
     return { ok: true };
   }
 
-  async clearProviderKey(provider: ProviderId): Promise<{ ok: boolean }> {
+  async clearProviderKey(provider: SecretProviderId): Promise<{ ok: boolean }> {
     delete this.secrets[provider];
     await this.writeSecretsFile();
     this.applyToEnv();
     return { ok: true };
   }
 
+  /**
+   * 查询搜索供应商用量。目前只有 Tavily 有公开用量接口（GET /usage，账户级 credits）。
+   * 明文 key 只在 main 进程内使用，不进返回值。
+   */
+  async getSearchUsage(): Promise<SearchUsageResult> {
+    const key = this.getDecryptedKey("tavily");
+    if (!key) {
+      return { ok: false, error: "未配置 Tavily API Key。" };
+    }
+    try {
+      const response = await fetch("https://api.tavily.com/usage", {
+        headers: { Authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) {
+        return { ok: false, error: `Tavily 用量查询失败（HTTP ${response.status}）。` };
+      }
+      const data = (await response.json()) as {
+        account?: { plan_usage?: number; plan_limit?: number | null };
+      };
+      return {
+        ok: true,
+        tavily: {
+          planUsage: data.account?.plan_usage ?? 0,
+          planLimit: data.account?.plan_limit ?? null,
+        },
+      };
+    } catch {
+      return { ok: false, error: "Tavily 用量查询失败（网络错误或超时）。" };
+    }
+  }
+
   /** 解密某供应商的明文 Key（仅 main 内部使用，例如测试连接）。无密钥或解密失败返回 undefined。 */
-  getDecryptedKey(provider: ProviderId): string | undefined {
+  getDecryptedKey(provider: SecretProviderId): string | undefined {
     const base64 = this.secrets[provider];
     if (!base64) return undefined;
     try {
@@ -216,7 +266,7 @@ export class SettingsService {
   // ─── 内部 ───
 
   /** 有 UI 密钥则覆盖 process.env；否则删除该键（不再回落 .env / 外部 env）。 */
-  private applyProviderKey(provider: ProviderId, envKey: string): void {
+  private applyProviderKey(provider: SecretProviderId, envKey: string): void {
     setOrDeleteEnv(envKey, this.getDecryptedKey(provider));
   }
 
@@ -234,6 +284,9 @@ export class SettingsService {
   private applyToEnv(): void {
     this.applyProviderKey("deepseek", "DEEPSEEK_API_KEY");
     this.applyProviderKey("kimi", "KIMI_API_KEY");
+    for (const id of SEARCH_PROVIDER_IDS) {
+      this.applyProviderKey(id, SEARCH_PROVIDER_ENV_KEYS[id]);
+    }
 
     process.env.ACTSPACE_DISABLED_TOOLS = this.settings.agent.disabledTools.join(",");
     process.env.ACTSPACE_BASH_ALWAYS_ASK = this.settings.agent.bashAlwaysAsk ? "1" : "0";
@@ -265,7 +318,7 @@ export class SettingsService {
       const raw = await readFile(join(this.dataRoot, SECRETS_FILE), "utf8");
       const parsed = JSON.parse(raw) as Partial<PersistedSecrets>;
       const out: PersistedSecrets = { version: 1 };
-      for (const id of SETTINGS_PROVIDER_IDS) {
+      for (const id of ALL_SECRET_PROVIDER_IDS) {
         const value = parsed[id];
         if (typeof value === "string" && value.length > 0) out[id] = value;
       }

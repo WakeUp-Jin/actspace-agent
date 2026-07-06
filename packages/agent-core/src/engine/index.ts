@@ -9,6 +9,7 @@ export type {
   AgentEventSink,
   AgentLoopConfig,
   AgentLoopResult,
+  LLMRetryConfig,
 } from "./types";
 
 // 核心循环

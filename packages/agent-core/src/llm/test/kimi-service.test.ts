@@ -35,23 +35,6 @@ describe("KimiService", () => {
     expect(result.provider).toBe("kimi");
   });
 
-  it("declares builtin web search and disables thinking for search subcalls", async () => {
-    const llm = new KimiService({ provider: "kimi", apiKey: "test-key", model: "kimi-k2.6" });
-    const mockStream = createMockStream([
-      { choices: [{ delta: { content: "searched" }, finish_reason: "stop" }] },
-    ]);
-
-    const createSpy = vi.spyOn(llm["client"].chat.completions, "create").mockResolvedValue(mockStream as any);
-
-    await llm.streamWithBuiltinWebSearch([{ role: "user", content: "latest news" }]).result();
-
-    const params = createSpy.mock.calls[0][0] as Record<string, unknown>;
-    expect(params.tools).toEqual([
-      { type: "builtin_function", function: { name: "$web_search" } },
-    ]);
-    expect(params.thinking).toEqual({ type: "disabled" });
-  });
-
   it("can disable thinking for ordinary Kimi requests", async () => {
     const llm = new KimiService({ provider: "kimi", apiKey: "test-key", model: "kimi-k2.6" });
     const mockStream = createMockStream([

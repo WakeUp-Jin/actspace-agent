@@ -10,6 +10,9 @@ import {
   type LocalUpdateState,
   type ModelId,
   type ProviderId,
+  type SearchProviderId,
+  type SearchUsageResult,
+  type SecretProviderId,
   type SessionListItem,
   type SetProviderKeyResult,
   type SettingsUpdateInput,
@@ -107,6 +110,18 @@ function formatUpdatedAt(timestamp: string): string {
   }).format(date);
 }
 
+/** 浏览器预览模式（无 IPC 桥）下模拟密钥保存/断开的本地状态更新。 */
+function previewSetKeyState(
+  current: AppSettings,
+  provider: SecretProviderId,
+  hasApiKey: boolean,
+): AppSettings {
+  if (provider === "deepseek" || provider === "kimi") {
+    return { ...current, providers: { ...current.providers, [provider]: { hasApiKey } } };
+  }
+  return { ...current, searchProviders: { ...current.searchProviders, [provider]: { hasApiKey } } };
+}
+
 function mergeSettings(current: AppSettings, input: SettingsUpdateInput): AppSettings {
   return {
     ...current,
@@ -140,7 +155,7 @@ export function SettingsPage({
   const [section, setSection] = useState<SettingsSectionId>("general");
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
-  const [keyModalProvider, setKeyModalProvider] = useState<ProviderId | null>(null);
+  const [keyModalProvider, setKeyModalProvider] = useState<SecretProviderId | null>(null);
 
   useEffect(() => {
     if (!hasSettingsBridge()) {
@@ -186,13 +201,9 @@ export function SettingsPage({
   );
 
   const handleSaveKey = useCallback(
-    async (provider: ProviderId, apiKey: string): Promise<SetProviderKeyResult> => {
+    async (provider: SecretProviderId, apiKey: string): Promise<SetProviderKeyResult> => {
       if (!hasSettingsBridge()) {
-        setSettings((current) =>
-          current
-            ? { ...current, providers: { ...current.providers, [provider]: { hasApiKey: true } } }
-            : current,
-        );
+        setSettings((current) => (current ? previewSetKeyState(current, provider, true) : current));
         return { ok: true };
       }
       const result = await window.actspace.setProviderKey({ provider, apiKey });
@@ -203,13 +214,9 @@ export function SettingsPage({
   );
 
   const handleClearKey = useCallback(
-    async (provider: ProviderId) => {
+    async (provider: SecretProviderId) => {
       if (!hasSettingsBridge()) {
-        setSettings((current) =>
-          current
-            ? { ...current, providers: { ...current.providers, [provider]: { hasApiKey: false } } }
-            : current,
-        );
+        setSettings((current) => (current ? previewSetKeyState(current, provider, false) : current));
         return;
       }
       await window.actspace.clearProviderKey({ provider });
@@ -273,8 +280,8 @@ export function SettingsPage({
 type SectionProps = {
   settings: AppSettings;
   onUpdate: (input: SettingsUpdateInput) => void;
-  onConnectProvider: (provider: ProviderId) => void;
-  onClearProvider: (provider: ProviderId) => Promise<void>;
+  onConnectProvider: (provider: SecretProviderId) => void;
+  onClearProvider: (provider: SecretProviderId) => Promise<void>;
   onTestProvider: (provider: ProviderId) => Promise<TestConnectionResult>;
   onArchivedSessionsChange?: () => void;
 };
@@ -731,6 +738,131 @@ function ProviderRow({
   );
 }
 
+const SEARCH_PROVIDER_ROWS: Array<{
+  provider: SearchProviderId;
+  label: string;
+  description: string;
+}> = [
+  {
+    provider: "zhipu",
+    label: "智谱 Web Search",
+    description: "国内搜索通道；按次计费（search_pro ¥0.03/次），中文内容覆盖好。",
+  },
+  {
+    provider: "tavily",
+    label: "Tavily",
+    description: "国际搜索通道优先级 1；每月 1000 credits 免费，超出按量计费。",
+  },
+  {
+    provider: "tinyfish",
+    label: "TinyFish",
+    description: "国际搜索通道优先级 2；搜索接口目前免费（按套餐限速）。",
+  },
+  {
+    provider: "exa",
+    label: "Exa",
+    description: "国际搜索通道优先级 3；语义搜索，按量计费。",
+  },
+];
+
+function SearchProviderRow({
+  provider,
+  label,
+  description,
+  hasApiKey,
+  onConnect,
+  onClear,
+}: {
+  provider: SearchProviderId;
+  label: string;
+  description: string;
+  hasApiKey: boolean;
+  onConnect: (provider: SecretProviderId) => void;
+  onClear: (provider: SecretProviderId) => Promise<void>;
+}) {
+  const badge = hasApiKey
+    ? { text: "已连接", className: "bg-success-soft text-on-success" }
+    : { text: "未连接", className: "bg-surface-subtle text-text-faint" };
+
+  return (
+    <div className="flex flex-col gap-2 px-4 py-3.5">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[14px] font-semibold text-text-main">{label}</span>
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}
+            >
+              {badge.text}
+            </span>
+          </div>
+          <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">{description}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {hasApiKey ? (
+            <button type="button" className={BTN_DANGER} onClick={() => void onClear(provider)}>
+              断开连接
+            </button>
+          ) : (
+            <button type="button" className={BTN_PRIMARY} onClick={() => onConnect(provider)}>
+              连接
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Tavily 额度显示：账户级 plan credits 用量（GET /usage）。其余 provider 无公开用量接口。 */
+function TavilyUsageRow({ hasApiKey }: { hasApiKey: boolean }) {
+  const [usage, setUsage] = useState<SearchUsageResult | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!hasApiKey || typeof window === "undefined" || !window.actspace?.getSearchUsage) {
+      setUsage(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    window.actspace
+      .getSearchUsage()
+      .then((result) => {
+        if (!cancelled) setUsage(result);
+      })
+      .catch(() => {
+        if (!cancelled) setUsage({ ok: false, error: "Tavily 用量查询失败。" });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasApiKey]);
+
+  if (!hasApiKey) return null;
+
+  return (
+    <div className="px-4 py-3">
+      <p className="text-[12px] text-text-faint">
+        {loading
+          ? "查询 Tavily 剩余额度中…"
+          : usage?.ok && usage.tavily
+            ? `Tavily 本周期已用 ${usage.tavily.planUsage}${
+                usage.tavily.planLimit !== null ? ` / ${usage.tavily.planLimit}` : ""
+              } credits${
+                usage.tavily.planLimit !== null
+                  ? `，剩余 ${Math.max(usage.tavily.planLimit - usage.tavily.planUsage, 0)}`
+                  : ""
+              }。`
+            : usage?.error ?? "Tavily 用量暂不可用。"}
+      </p>
+    </div>
+  );
+}
+
 function ModelSection({ settings, onUpdate, onConnectProvider, onClearProvider, onTestProvider }: SectionProps) {
   return (
     <SectionShell title="模型" description="管理模型供应商连接与默认模型。">
@@ -747,12 +879,27 @@ function ModelSection({ settings, onUpdate, onConnectProvider, onClearProvider, 
         <ProviderRow
           provider="kimi"
           label="Kimi"
-          description="Kimi K2.6 与联网搜索能力供应商。"
+          description="Kimi K2.6 与多模态分析（analyze_media）供应商。"
           hasApiKey={settings.providers.kimi.hasApiKey}
           onConnect={onConnectProvider}
           onClear={onClearProvider}
           onTest={onTestProvider}
         />
+      </SettingGroup>
+
+      <SettingGroup title="网络搜索">
+        {SEARCH_PROVIDER_ROWS.map(({ provider, label, description }) => (
+          <SearchProviderRow
+            key={provider}
+            provider={provider}
+            label={label}
+            description={description}
+            hasApiKey={settings.searchProviders[provider].hasApiKey}
+            onConnect={onConnectProvider}
+            onClear={onClearProvider}
+          />
+        ))}
+        <TavilyUsageRow hasApiKey={settings.searchProviders.tavily.hasApiKey} />
       </SettingGroup>
 
       <SettingGroup title="默认模型">
@@ -1189,9 +1336,13 @@ function AppearanceSection() {
   );
 }
 
-const PROVIDER_LABELS: Record<ProviderId, string> = {
+const PROVIDER_LABELS: Record<SecretProviderId, string> = {
   deepseek: "DeepSeek",
   kimi: "Kimi",
+  zhipu: "智谱 Web Search",
+  tavily: "Tavily",
+  tinyfish: "TinyFish",
+  exa: "Exa",
 };
 
 function ProviderKeyModal({
@@ -1199,7 +1350,7 @@ function ProviderKeyModal({
   onClose,
   onSave,
 }: {
-  provider: ProviderId;
+  provider: SecretProviderId;
   onClose: () => void;
   onSave: (apiKey: string) => Promise<SetProviderKeyResult>;
 }) {
