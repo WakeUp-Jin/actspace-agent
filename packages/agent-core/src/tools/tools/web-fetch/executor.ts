@@ -248,5 +248,6 @@ export const webFetchExecutor: ToolExecutorFn = async (args): Promise<ToolResult
 
   const data = [...header, "", content].join("\n") + truncationNote;
   cacheSet(rawUrl, data);
-  return { success: true, data, structured: { resultUrls: [rawUrl] } };
+  const contentPreview = content.slice(0, 2000);
+  return { success: true, data, structured: { contentPreview } };
 };

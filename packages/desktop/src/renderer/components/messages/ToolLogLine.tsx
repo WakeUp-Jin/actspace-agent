@@ -127,17 +127,19 @@ function WebToolBlock({
   displayText,
   status,
   resultUrls,
+  contentPreview,
   className,
 }: {
   displayText: string;
   status: ToolLogStatus;
   resultUrls?: string[];
+  contentPreview?: string;
   className?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const hasUrls = resultUrls && resultUrls.length > 0;
+  const hasContent = (resultUrls && resultUrls.length > 0) || !!contentPreview;
 
-  if (status === "running" || !hasUrls) {
+  if (status === "running" || !hasContent) {
     return (
       <div className={getToolLogLineClass(status, className)}>
         <span {...getToolLogLineTextProps(status, displayText)}>{displayText}</span>
@@ -159,13 +161,17 @@ function WebToolBlock({
           : <ChevronRight size={14} strokeWidth={2.2} />}
       </button>
       {expanded ? (
-        <ul className="web-tool-url-list">
-          {resultUrls.map((url, i) => (
-            <li key={`${url}-${i}`} className="web-tool-url-item">
-              <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>
-            </li>
-          ))}
-        </ul>
+        contentPreview ? (
+          <pre className="web-tool-content">{contentPreview}</pre>
+        ) : (
+          <ul className="web-tool-url-list">
+            {resultUrls!.map((url, i) => (
+              <li key={`${url}-${i}`} className="web-tool-url-item">
+                <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>
+              </li>
+            ))}
+          </ul>
+        )
       ) : null}
     </article>
   );
@@ -218,6 +224,7 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
         displayText={message.displayText}
         status={message.status}
         resultUrls={message.resultUrls}
+        contentPreview={message.contentPreview}
         className={className}
       />
     );

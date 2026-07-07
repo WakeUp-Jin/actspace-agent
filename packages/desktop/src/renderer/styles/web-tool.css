@@ -66,3 +66,19 @@
   color: var(--color-text);
   text-decoration: underline;
 }
+
+.web-tool-content {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  overflow-y: auto;
+  max-height: 280px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: var(--act-font-mono-size, 13px);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text-muted);
+}

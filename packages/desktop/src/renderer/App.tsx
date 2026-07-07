@@ -345,6 +345,8 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): Mes
       displayText: getStreamingWebSearchText(tool.preview),
       createdAt: now,
       status: tool.finished ? "completed" : "running",
+      resultUrls: tool.finished ? tool.preview.resultUrls : undefined,
+      contentPreview: tool.finished ? tool.preview.contentPreview : undefined,
     };
   }
 

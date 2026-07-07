@@ -146,6 +146,7 @@ function messageBlockFromToolPreview(
         displayText: preview.displayText,
         createdAt: getDisplayTime(timestamp),
         resultUrls: preview.resultUrls,
+        contentPreview: preview.contentPreview,
       };
     case "media_analysis":
       return {
