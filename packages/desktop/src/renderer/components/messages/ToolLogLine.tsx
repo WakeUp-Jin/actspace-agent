@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 import {
   getToolLogRunningTextAttrs,
@@ -122,6 +123,54 @@ function getToolLogLineTextProps(status: ToolLogStatus, text: string) {
     : { className: getToolLogLineTextClass(status) };
 }
 
+function WebToolBlock({
+  displayText,
+  status,
+  resultUrls,
+  className,
+}: {
+  displayText: string;
+  status: ToolLogStatus;
+  resultUrls?: string[];
+  className?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const hasUrls = resultUrls && resultUrls.length > 0;
+
+  if (status === "running" || !hasUrls) {
+    return (
+      <div className={getToolLogLineClass(status, className)}>
+        <span {...getToolLogLineTextProps(status, displayText)}>{displayText}</span>
+      </div>
+    );
+  }
+
+  return (
+    <article className={`web-tool-block${className ? ` ${className}` : ""}`}>
+      <button
+        className="web-tool-toggle"
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <span className="web-tool-summary">{displayText}</span>
+        {expanded
+          ? <ChevronDown size={14} strokeWidth={2.2} />
+          : <ChevronRight size={14} strokeWidth={2.2} />}
+      </button>
+      {expanded ? (
+        <ul className="web-tool-url-list">
+          {resultUrls.map((url, i) => (
+            <li key={`${url}-${i}`} className="web-tool-url-item">
+              <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </article>
+  );
+}
+
 export function ToolLogLine({ message, className }: { message: ToolLogMessage; className?: string }) {
   if (message.kind === "read") {
     const lineClassName = getToolLogLineClass(message.status, className);
@@ -164,13 +213,13 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
   }
 
   if (message.kind === "web_search") {
-    const lineClassName = getToolLogLineClass(message.status, className);
     return (
-      <div className={lineClassName}>
-        <span {...getToolLogLineTextProps(message.status, message.displayText)}>
-          {message.displayText}
-        </span>
-      </div>
+      <WebToolBlock
+        displayText={message.displayText}
+        status={message.status}
+        resultUrls={message.resultUrls}
+        className={className}
+      />
     );
   }
 

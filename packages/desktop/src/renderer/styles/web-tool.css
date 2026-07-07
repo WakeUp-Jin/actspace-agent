@@ -1,0 +1,68 @@
+.web-tool-block {
+  max-width: 800px;
+  margin: 2px 0 0;
+  padding: 0 var(--conversation-text-inset);
+}
+
+.web-tool-toggle {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.42;
+  cursor: pointer;
+  text-align: left;
+}
+
+.web-tool-toggle:hover {
+  color: var(--color-text);
+}
+
+.web-tool-toggle svg {
+  flex-shrink: 0;
+  color: var(--color-text-faint);
+}
+
+.web-tool-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.web-tool-url-list {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  overflow-y: auto;
+  max-height: 280px;
+  list-style: none;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font-size: var(--act-font-mono-size, 13px);
+  line-height: 1.65;
+}
+
+.web-tool-url-item {
+  padding: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.web-tool-url-item a {
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.web-tool-url-item a:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}

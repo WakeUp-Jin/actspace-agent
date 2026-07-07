@@ -891,6 +891,7 @@ function createToolUiPreview(
     }
 
     case "web_search": {
+      const resultUrls = extractResultUrls(structured);
       // web_fetch 复用 web_search 预览通道（mode: "url"），只是动词不同
       const url = stringArg(args.url, "");
       if (url) {
@@ -899,6 +900,7 @@ function createToolUiPreview(
           mode: "url",
           url,
           displayText: `${toolName === "web_fetch" ? "Web Fetch" : "Web Search"} ${url}`,
+          resultUrls,
         };
       }
 
@@ -908,6 +910,7 @@ function createToolUiPreview(
         mode: "query",
         query,
         displayText: `Web Search ${query || "..."}`,
+        resultUrls,
       };
     }
 
@@ -1093,6 +1096,18 @@ function getToolSummary(
 
 function stringArg(value: unknown, fallback: string): string {
   return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+function extractResultUrls(structured: unknown): string[] | undefined {
+  if (
+    structured != null &&
+    typeof structured === "object" &&
+    "resultUrls" in structured &&
+    Array.isArray((structured as { resultUrls: unknown }).resultUrls)
+  ) {
+    return (structured as { resultUrls: string[] }).resultUrls;
+  }
+  return undefined;
 }
 
 function displayFileName(path: string): string {

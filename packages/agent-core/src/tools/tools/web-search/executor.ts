@@ -201,5 +201,13 @@ export const webSearchExecutor: ToolExecutorFn = async (args): Promise<ToolResul
     };
   }
 
-  return { success: true, data: formatMergedResults(query, lanes) };
+  const allUrls = lanes.flatMap(({ outcome }) =>
+    outcome.results.map((item) => item.url),
+  );
+
+  return {
+    success: true,
+    data: formatMergedResults(query, lanes),
+    structured: { resultUrls: allUrls },
+  };
 };

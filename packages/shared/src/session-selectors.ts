@@ -144,7 +144,8 @@ function messageBlockFromToolPreview(
         query: preview.query,
         url: preview.url,
         displayText: preview.displayText,
-        createdAt: getDisplayTime(timestamp)
+        createdAt: getDisplayTime(timestamp),
+        resultUrls: preview.resultUrls,
       };
     case "media_analysis":
       return {

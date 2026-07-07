@@ -339,7 +339,7 @@ export type ToolUiPreview =
   | { kind: "search"; query: string; scope?: string; resultCount?: number; displayText: string }
   | { kind: "grep"; pattern: string; scope?: string; resultCount?: number; displayText: string }
   | { kind: "glob"; pattern: string; scope?: string; resultCount?: number; displayText: string }
-  | { kind: "web_search"; mode: "query" | "url"; query?: string; url?: string; displayText: string }
+  | { kind: "web_search"; mode: "query" | "url"; query?: string; url?: string; displayText: string; resultUrls?: string[] }
   | { kind: "media_analysis"; mediaName: string; mediaKind: "image" | "video" | "media"; displayText: string }
   | { kind: "directory_list"; path: string; entryCount?: number; displayText: string }
   | {
@@ -623,6 +623,7 @@ export type MessageBlock =
       displayText: string;
       createdAt: string;
       status?: "running" | "completed";
+      resultUrls?: string[];
     }
   | {
       kind: "media_analysis";

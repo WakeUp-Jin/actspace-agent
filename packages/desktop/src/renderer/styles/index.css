@@ -6,3 +6,4 @@
 @import "./electron.css" layer(chrome);
 @import "./markdown.css" layer(components);
 @import "./diff.css" layer(components);
+@import "./web-tool.css" layer(components);
