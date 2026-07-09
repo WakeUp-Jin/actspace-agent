@@ -14,3 +14,4 @@
 
 - `llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析与历史方案归档。
 - `bash-tool-reference-analysis.md`：Cursor / Claude Code / OpenCode 三家 Bash 工具实现的源码级调研对比，`docs/design-docs/agent-bash工具设计文档.md` 的设计输入底稿。
+- `minecontext-architecture-analysis.md`：MineContext（字节跳动开源）上下文分类体系与主动推送机制的源码级分析。六种认知对齐的上下文类型、四大定时推送任务的级联信息流设计、双通道检索机制。

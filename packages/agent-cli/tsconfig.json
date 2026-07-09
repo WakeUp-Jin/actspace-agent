@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "strict": true,
+    "lib": [
+      "ES2022"
+    ],
+    "baseUrl": ".",
+    "rootDir": "src",
+    "types": [
+      "node"
+    ],
+    "outDir": "dist"
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/**/test"
+  ]
+}

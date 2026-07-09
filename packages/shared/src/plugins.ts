@@ -64,6 +64,50 @@ export type FsWatchActionResult = {
   error?: string;
 };
 
+// ─── browser-bridge 插件 ───
+
+export type BrowserBridgeRunState =
+  | "not_installed"
+  | "host_not_installed"
+  | "extension_offline"
+  | "ready"
+  | "error";
+
+export interface BrowserBridgeDoctorCheck {
+  name: string;
+  status: string;
+  backend?: string;
+  detail: string;
+}
+
+export interface BrowserBridgeStatus {
+  /** `abb` 是否已安装到 <dataRoot>/plugins/browser-bridge/bin/abb。 */
+  installed: boolean;
+  /** 本机安装后的 `abb` 路径；未安装时仍返回约定路径，便于 UI 提示。 */
+  abbPath: string;
+  /** actspace-plugins 中 Chrome extension 源目录；需要用户在 chrome://extensions 手动 Load unpacked。 */
+  extensionDir?: string;
+  /** `abb doctor --json` 的综合状态。 */
+  runState: BrowserBridgeRunState;
+  doctorSummary?: string;
+  doctorChecks: BrowserBridgeDoctorCheck[];
+  /** `abb capabilities --json` 的原始 JSON；UI 仅作为调试/展开信息展示。 */
+  capabilitiesJson?: string;
+  lastError?: string;
+}
+
+export type BrowserBridgeInstallResult = {
+  ok: boolean;
+  abbPath?: string;
+  extensionDir?: string;
+  error?: string;
+};
+
+export type BrowserBridgeActionResult = {
+  ok: boolean;
+  error?: string;
+};
+
 // ─── Skill 管理 ───
 
 export type SkillCatalogScope = "project" | "user";

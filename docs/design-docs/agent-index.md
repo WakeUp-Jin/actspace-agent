@@ -8,6 +8,7 @@
 
 - `agent-backend-design.md`：后端 Agent Runtime 的总体设计事实来源，约束 LLM Service、Context Pipeline、Tool Runtime、Execution Engine 和 Session Persistence。
 - `agent-browser-bridge-design.md`：真实 Chrome 浏览器桥接层设计，约束 `actspace-agent` 应通过哪一层接入浏览器能力，以及为什么保留 Go bridge 与协议契约边界。
+- `agent-evaluation.md`：Agent 评估模块设计，约束 `actspace-agent` CLI、独立评估仓库、Docker 优先运行、`yolo` 权限模式、评估产物输出和四类核心评分器。
 - `agent-turn-layers.md`：Agent Turn 四层职责规范（Renderer -> Main Process -> Bridge -> Agent），约束每层输入输出和边界。
 - `agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块地图，记录 LLM、tools、context、engine、persistence、env 等实现清单。
 - `agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。

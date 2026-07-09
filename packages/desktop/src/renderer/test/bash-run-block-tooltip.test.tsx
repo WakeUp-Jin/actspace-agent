@@ -46,6 +46,31 @@ describe("BashRunBlock tooltips", () => {
     expect(summary).toHaveAttribute("data-shimmer-text", "Running Bash command");
   });
 
+  it("keeps the summary stable while long command previews truncate", () => {
+    renderBash({
+      id: "bash-long-preview-1",
+      kind: "bash",
+      createdAt: "2026-07-09T00:00:00.000Z",
+      title: "Bash command",
+      status: "success",
+      command: "\"/Users/wakeup-jin/Library/Application Support/actspace/plugins/browser-bridge/bin/abb\" doctor --json",
+      commandPreview:
+        "\"/Users/wakeup-jin/Library/Application Support/actspace/plugins/browser-bridge/bin/abb\" doctor",
+      exitCode: 0,
+      sandboxed: true,
+    });
+
+    const summary = screen.getByText("Ran Bash command");
+    const preview = screen.getByText(
+      "\"/Users/wakeup-jin/Library/Application Support/actspace/plugins/browser-bridge/bin/abb\" doctor",
+    );
+    const toggle = summary.closest("button");
+
+    expect(toggle).toHaveClass("flex", "w-full", "overflow-hidden");
+    expect(summary).toHaveClass("bash-run-summary", "flex-none", "whitespace-nowrap");
+    expect(preview).toHaveClass("bash-command-preview", "min-w-0", "flex-1", "overflow-hidden", "text-ellipsis");
+  });
+
   it("stops the shimmer once the background task reaches a terminal state", () => {
     renderBash({
       id: "bash-running-2",

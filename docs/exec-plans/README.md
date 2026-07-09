@@ -1,4 +1,4 @@
-# Execution Plans
+# 执行计划
 
 这个目录用于存放长期任务的执行计划。
 
@@ -17,6 +17,7 @@
 - `active/20260529-appearance-fonts-and-zoom.md`
 - `active/20260530-workspace-file-explorer.md`
 - `active/actspace-cache-loss-audit-plan.md`
+- `active/20260708-agent-evaluation/README.md`
 - `active/frontend-ui-components-foundation.md`
 - `active/Bash工具和工具权限调度开发计划/README.md`
 

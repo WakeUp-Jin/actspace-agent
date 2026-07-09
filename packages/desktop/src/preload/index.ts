@@ -7,6 +7,9 @@ import type {
   ApprovalDecideInput,
   ApprovalDecideResult,
   ApprovalListPendingInput,
+  BrowserBridgeActionResult,
+  BrowserBridgeInstallResult,
+  BrowserBridgeStatus,
   BootstrapState,
   ClearProviderKeyInput,
   ClearProviderKeyResult,
@@ -98,7 +101,7 @@ import type {
   WorkspaceListResult,
   WorkspaceReadFileInput,
   WorkspaceReadFileResult,
-  WriteAgentSystemPromptInput
+  WriteAgentSystemPromptInput,
 } from "@actspace/shared";
 
 contextBridge.exposeInMainWorld("actspace", {
@@ -183,6 +186,12 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("plugins:fs-watch:update-config", input) as Promise<FsWatchConfigView>,
   pickFsWatchRoot: () =>
     ipcRenderer.invoke("plugins:fs-watch:pick-root") as Promise<FsWatchPickRootResult>,
+  getBrowserBridgeStatus: () =>
+    ipcRenderer.invoke("plugins:browser-bridge:get-status") as Promise<BrowserBridgeStatus>,
+  installBrowserBridgeFromRepo: () =>
+    ipcRenderer.invoke("plugins:browser-bridge:install-from-repo") as Promise<BrowserBridgeInstallResult>,
+  installBrowserBridgeNativeHost: () =>
+    ipcRenderer.invoke("plugins:browser-bridge:install-native-host") as Promise<BrowserBridgeActionResult>,
   listSkills: () => ipcRenderer.invoke("skills:list") as Promise<SkillListResult>,
   installSkill: () => ipcRenderer.invoke("skills:install") as Promise<SkillInstallResult>,
   uninstallSkill: (input: SkillUninstallInput) =>

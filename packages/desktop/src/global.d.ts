@@ -110,6 +110,9 @@ declare global {
         input: import("@actspace/shared").FsWatchConfigUpdateInput
       ) => Promise<import("@actspace/shared").FsWatchConfigView>;
       pickFsWatchRoot?: () => Promise<import("@actspace/shared").FsWatchPickRootResult>;
+      getBrowserBridgeStatus?: () => Promise<import("@actspace/shared").BrowserBridgeStatus>;
+      installBrowserBridgeFromRepo?: () => Promise<import("@actspace/shared").BrowserBridgeInstallResult>;
+      installBrowserBridgeNativeHost?: () => Promise<import("@actspace/shared").BrowserBridgeActionResult>;
       listSkills?: () => Promise<import("@actspace/shared").SkillListResult>;
       installSkill?: () => Promise<import("@actspace/shared").SkillInstallResult>;
       uninstallSkill?: (

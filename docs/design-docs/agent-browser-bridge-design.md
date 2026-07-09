@@ -4,13 +4,18 @@
 
 本文档定义 `actspace-agent` 接入真实 Chrome 浏览器自动化能力的推荐架构。目标不是把浏览器实现细节散落进 `agent-core`，而是先确定稳定边界：浏览器插件负责执行，Go 本地桥接负责连接，`actspace-agent` 只依赖稳定的上层入口。
 
+代码主位置：Browser Use / Browser Bridge 主线实现已迁入平级插件仓库
+`/Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/plugins/browser-bridge/`。
+原独立仓库 `/Users/wakeup-jin/Desktop/code-project/side-project/agent-browser-bridge/`
+保留为迁移来源与历史上下文。
+
 当前结论：
 
 - 浏览器桥接层采用三层设计：browser backend -> Go host/CLI -> `actspace-agent` 集成入口。
 - 本地桥接优先使用 Go 实现，而不是 Rust。
 - 协议层必须存在，但保持为仓库内共享契约层，不单独包装成新的产品面。
 - `actspace-agent` 默认不直接操作 Chrome extension，也不直接耦合 Native Messaging framing。
-- 首阶段不以 MCP 或独立 Skill 为主线，而是以 self-describing CLI 为主入口。
+- 首阶段不以 MCP 或手写独立 Skill 为主线，而是以 self-describing CLI 为主入口。
 - browser backend 首阶段分成两类：`extension backend` 与 `cdp backend`。
 
 ## 设计目标
@@ -21,6 +26,7 @@
 - 保持跨平台发布、安装、调试和本地排障成本可控。
 - 让浏览器工具在 Agent 体系内仍然表现为普通工具能力，而不是特殊旁路。
 - 让浏览器能力的发现与帮助信息直接来自 CLI 自身，避免 Skill / 文档 / 命令面三处漂移。
+- ActSpace 只生成薄的托管 Skill / runtime hint，把 Agent 引导到已安装的 `abb` CLI。
 
 ## 非目标
 
@@ -29,7 +35,7 @@
 - 首阶段不把浏览器桥接做成常驻 daemon 平台。
 - 首阶段不引入独立对外发布的协议 SDK 生态。
 - 首阶段不把 MCP 作为主接入面。
-- 首阶段不维护独立的浏览器 Skill 文档体系。
+- 首阶段不维护手写的独立浏览器 Skill 文档体系；只允许从安装状态生成薄 Skill 入口。
 - 首阶段不覆盖除 Chrome route 之外的多浏览器抽象。
 
 ## 为什么选择 Go
@@ -184,10 +190,46 @@ browser backend 不是单一实现，而是统一接口下的两类后端：
 - `actspace-agent` 内先通过 bash 调用 CLI，并通过系统提示词要求模型先运行帮助命令。
 - 浏览器能力在 Agent 体系内仍表现为标准工具或标准 bash 工作流，并遵守现有 preview、approval、日志和权限约束。
 
-### 为什么不以 MCP 或独立 Skill 为主线
+### ActSpace 初始化流程（v0）
+
+Browser Bridge 是 **host-bridge plugin**，初始化不能完全复用 `fs-watch` 的
+spawn / heartbeat 模型：
+
+- `fs-watch`：ActSpace build -> install binary -> 写 config -> main process spawn ->
+  心跳判定运行状态。
+- `browser-bridge`：ActSpace build -> install `abb` -> 注册 Chrome Native Messaging
+  host -> 用户加载 Chrome extension -> Chrome 拉起 host -> `abb doctor --json` 判定
+  socket / extension 状态。
+
+v0 集成职责：
+
+1. 设置页「插件」分区复用 `settings.plugins.repoRoot`，从
+   `actspace-plugins/plugins/browser-bridge/` 构建 `abb`。
+2. 安装位置约定为 `<userData>/plugins/browser-bridge/bin/abb`。
+3. 成功安装 `abb` 后，ActSpace 在 `<userData>/skills/browser-bridge/SKILL.md`
+   生成薄托管 Skill，内容只包含使用场景、`abb` 绝对路径和优先查看
+   `help` / `doctor --json` / `capabilities --json` 的约束。
+4. 点击「安装 Native Host」时运行
+   `abb install-native-host --binary <userData>/plugins/browser-bridge/bin/abb --json`。
+5. Chrome extension 仍由用户在 `chrome://extensions` 手动 Load unpacked，目录为
+   `actspace-plugins/plugins/browser-bridge/apps/chrome-extension/`。
+6. 设置页通过 `abb doctor --json` / `abb capabilities --json` 展示 ready 状态。
+7. Agent 使用阶段仍通过 bash 调 `abb`。当 `<userData>/plugins/browser-bridge/bin/abb`
+   存在时，ActSpace 注入 runtime prompt segment，要求先看 `abb help`、
+   `abb doctor --json`、`abb capabilities --json`，并优先使用 Browser Bridge
+   而不是 AppleScript 等通用 OS 自动化。
+
+v0 不做：
+
+- 不由 ActSpace 常驻 spawn `abb host`；host 生命周期交给 Chrome Native Messaging。
+- 不直接操作 Chrome extension 私有 API。
+- 不新增 `browser_*` 内建工具；等 CLI 路线真实稳定后再评估包装。
+
+### 为什么不以 MCP 或手写独立 Skill 为主线
 
 - `actspace-agent` 当前没有成熟 MCP 接入面，强行引入会放大系统复杂度。
-- 独立 Skill 会和 CLI 命令面形成双重知识源，容易漂移。
+- 手写独立 Skill 会和 CLI 命令面形成双重知识源，容易漂移。
+- 托管 Skill 只负责让模型知道“这里有 `abb`”，不复制完整命令手册。
 - 把渐进式帮助能力内建进 CLI，可以让“人类用户帮助”和“模型帮助”共用同一事实来源。
 
 ## CLI 自描述设计
@@ -196,18 +238,18 @@ CLI 不应只提供传统的一大段 `--help` 文本，而应提供渐进式、
 
 推荐至少提供：
 
-- `obu help`：列出一级命令大纲与一句话摘要。
-- `obu help <command>`：展示单个命令的用途、参数、backend 支持、前置条件和示例。
-- `obu help <command> --json`：输出机器可读的命令 schema。
-- `obu capabilities --json`：列出当前 bridge 支持的 backend、能力、限制和推荐 fallback。
-- `obu doctor`：检查插件、native host、socket、CDP endpoint 等运行条件。
+- `abb help`：列出一级命令大纲与一句话摘要。
+- `abb help <command>`：展示单个命令的用途、参数、backend 支持、前置条件和示例。
+- `abb help <command> --json`：输出机器可读的命令 schema。
+- `abb capabilities --json`：列出当前 bridge 支持的 backend、能力、限制和推荐 fallback。
+- `abb doctor`：检查插件、native host、socket、CDP endpoint 等运行条件。
 
 系统提示词的推荐策略：
 
-- 首次使用浏览器能力前先运行 `obu help`。
-- 调用某个命令前先运行 `obu help <command>`。
-- 需要稳定参数格式时优先使用 `obu help <command> --json`。
-- 需要确认当前环境可用能力时先运行 `obu doctor` 或 `obu capabilities --json`。
+- 首次使用浏览器能力前先运行 `abb help`。
+- 调用某个命令前先运行 `abb help <command>`。
+- 需要稳定参数格式时优先使用 `abb help <command> --json`。
+- 需要确认当前环境可用能力时先运行 `abb doctor` 或 `abb capabilities --json`。
 
 ## actspace-agent 内的职责落点
 

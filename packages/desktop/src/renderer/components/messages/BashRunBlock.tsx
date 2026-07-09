@@ -9,9 +9,11 @@ type ApprovalDecision = "approve_once" | "deny" | "allow_similar";
 
 const BASH_RUN_CLASS = "message-row bash-run max-w-[800px] px-[var(--conversation-text-inset)]";
 const BASH_RUN_TOGGLE_CLASS =
-  "bash-run-toggle inline-flex max-w-full items-center gap-[7px] border-0 bg-transparent p-0 text-left text-sm font-medium leading-[1.42] text-text-muted";
+  "bash-run-toggle flex w-full max-w-full items-center gap-[7px] overflow-hidden border-0 bg-transparent p-0 text-left text-sm font-medium leading-[1.42] text-text-muted";
+const BASH_RUN_SUMMARY_CLASS = "bash-run-summary flex-none whitespace-nowrap";
 const BASH_COMMAND_PREVIEW_CLASS =
-  "bash-command-preview overflow-hidden text-ellipsis whitespace-nowrap font-normal text-text-faint";
+  "bash-command-preview min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-normal text-text-faint";
+const BASH_RUN_TRAILING_CLASS = "bash-run-trailing inline-flex flex-none items-center gap-[7px]";
 const BASH_OUTPUT_SHELL_CLASS =
   "bash-output-shell relative mt-[7px] max-h-[236px] overflow-auto rounded-act-md border border-line bg-surface-subtle";
 const BASH_OUTPUT_MENU_CLASS =
@@ -119,18 +121,23 @@ function BashExecutionBlock({ message }: { message: BashMessage }) {
         onClick={() => setExpanded((value) => !value)}
       >
         {isActive ? (
-          <span className={TOOL_LOG_LINE_TEXT_RUNNING_CLASS} {...getToolLogRunningTextAttrs(summary)}>
+          <span
+            className={`${BASH_RUN_SUMMARY_CLASS} ${TOOL_LOG_LINE_TEXT_RUNNING_CLASS}`}
+            {...getToolLogRunningTextAttrs(summary)}
+          >
             {summary}
           </span>
         ) : (
-          <span>{summary}</span>
+          <span className={BASH_RUN_SUMMARY_CLASS}>{summary}</span>
         )}
         {message.commandPreview ? <span className={BASH_COMMAND_PREVIEW_CLASS}>{message.commandPreview}</span> : null}
-        <SandboxBadge sandboxed={message.sandboxed} />
-        {message.backgroundStatus ? (
-          <span className={BASH_BACKGROUND_BADGE_CLASS}>{BACKGROUND_BADGE_TEXT[message.backgroundStatus]}</span>
-        ) : null}
-        {chevron}
+        <span className={BASH_RUN_TRAILING_CLASS}>
+          <SandboxBadge sandboxed={message.sandboxed} />
+          {message.backgroundStatus ? (
+            <span className={BASH_BACKGROUND_BADGE_CLASS}>{BACKGROUND_BADGE_TEXT[message.backgroundStatus]}</span>
+          ) : null}
+          {chevron}
+        </span>
       </button>
 
       {expanded ? (

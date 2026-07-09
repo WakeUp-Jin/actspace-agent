@@ -6,7 +6,7 @@
  * 两个分区同一时刻只挂载一个，各自独立轮询状态即可，不需要全局 store。
  */
 import { useCallback, useEffect, useState } from "react";
-import type { FsWatchStatus } from "@actspace/shared";
+import type { BrowserBridgeStatus, FsWatchStatus } from "@actspace/shared";
 
 export const FS_WATCH_BTN_PRIMARY =
   "inline-flex h-8 items-center rounded-act-md bg-brand px-3.5 text-[13px] font-semibold text-white transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60";
@@ -58,6 +58,34 @@ export function useFsWatchStatus(bridgeReady: boolean): {
       setStatus(await window.actspace.getFsWatchStatus());
     } catch (error) {
       console.error("Failed to load fs-watch status", error);
+    }
+  }, [bridgeReady]);
+
+  useEffect(() => {
+    void refreshStatus();
+    const timer = window.setInterval(() => void refreshStatus(), STATUS_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [refreshStatus]);
+
+  return { status, refreshStatus };
+}
+
+/** 挂载期间每 2s 轮询一次 Browser Bridge doctor 状态。 */
+export function useBrowserBridgeStatus(bridgeReady: boolean): {
+  status: BrowserBridgeStatus | null;
+  refreshStatus: () => Promise<BrowserBridgeStatus | null>;
+} {
+  const [status, setStatus] = useState<BrowserBridgeStatus | null>(null);
+
+  const refreshStatus = useCallback(async () => {
+    if (!bridgeReady || !window.actspace.getBrowserBridgeStatus) return null;
+    try {
+      const next = await window.actspace.getBrowserBridgeStatus();
+      setStatus(next);
+      return next;
+    } catch (error) {
+      console.error("Failed to load browser-bridge status", error);
+      return null;
     }
   }, [bridgeReady]);
 

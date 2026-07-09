@@ -49,6 +49,8 @@ import type {
   WorkspaceListDirInput,
   WorkspaceListResult,
   WorkspaceReadFileInput,
+  BrowserBridgeActionResult,
+  BrowserBridgeInstallResult,
   FsWatchConfigUpdateInput,
   FsWatchInstallResult,
   FsWatchPickRootResult,
@@ -103,6 +105,7 @@ import {
 import { registerKairosIpc, type KairosIpcHandle } from "./kairos-ipc";
 import { SettingsService, type SecretCrypto } from "./settings-service";
 import { resolveAppDataRoots } from "./app-paths";
+import { BrowserBridgeService } from "./plugins/browser-bridge-service";
 import { FsWatchService } from "./plugins/fs-watch-service";
 import { installSkillFromDirectory, listSkills, uninstallSkillDirectory } from "./skills-service";
 
@@ -538,6 +541,7 @@ const electronSecretCrypto: SecretCrypto = {
 let settingsService: SettingsService | undefined;
 let localUpdateService: LocalUpdateService | undefined;
 let localUpdateQuitRequested = false;
+let browserBridgeService: BrowserBridgeService | undefined;
 let fsWatchService: FsWatchService | undefined;
 
 function getSettingsService(): SettingsService {
@@ -558,6 +562,16 @@ function getFsWatchService(roots: AppDataRoots): FsWatchService {
     });
   }
   return fsWatchService;
+}
+
+function getBrowserBridgeService(roots: AppDataRoots): BrowserBridgeService {
+  if (!browserBridgeService) {
+    browserBridgeService = new BrowserBridgeService({
+      dataRoot: roots.dataRoot,
+      log: logMain,
+    });
+  }
+  return browserBridgeService;
 }
 
 function sameStringSet(a: string[], b: string[]): boolean {
@@ -919,6 +933,7 @@ async function registerIpc() {
             workspaceRoot,
             readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
             disabledSkills: getSettingsService().get().skills.disabled,
+            browserBridgeAbbPath: getBrowserBridgeService(roots).binPath,
             warn: logMain,
           }),
       );
@@ -960,6 +975,7 @@ async function registerIpc() {
           workspaceRoot,
           readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
           disabledSkills: getSettingsService().get().skills.disabled,
+          browserBridgeAbbPath: getBrowserBridgeService(roots).binPath,
           warn: logMain,
         }),
     );
@@ -1058,6 +1074,7 @@ async function registerIpc() {
           workspaceRoot,
           readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
           disabledSkills: getSettingsService().get().skills.disabled,
+          browserBridgeAbbPath: getBrowserBridgeService(roots).binPath,
           warn: logMain,
         }),
       );
@@ -1314,6 +1331,42 @@ async function registerIpc() {
     });
     if (picked.canceled || !picked.filePaths[0]) return { canceled: true };
     return { canceled: false, path: picked.filePaths[0] };
+  });
+
+  // ─── 插件：browser-bridge / Browser Use 初始化 ───
+  ipcMain.handle("plugins:browser-bridge:get-status", async () => {
+    const roots = await ensureDataDirectories();
+    const repoRoot = getSettingsService().get().plugins.repoRoot;
+    return getBrowserBridgeService(roots).getStatus(repoRoot);
+  });
+
+  ipcMain.handle("plugins:browser-bridge:install-from-repo", async (): Promise<BrowserBridgeInstallResult> => {
+    const roots = await ensureDataDirectories();
+    const repoRoot = getSettingsService().get().plugins.repoRoot;
+    if (!repoRoot) {
+      return { ok: false, error: "尚未设置插件仓库路径，请先在上方选择 actspace-plugins 仓库目录。" };
+    }
+    const service = getBrowserBridgeService(roots);
+    const result = await service.buildAndInstall(repoRoot);
+    if (result.ok) {
+      const host = await service.installNativeHost();
+      if (!host.ok) {
+        return {
+          ...result,
+          ok: false,
+          error: `abb 已安装，但本机桥接注册失败：${host.error ?? "未知错误"}`,
+        };
+      }
+    }
+    logMain("browser-bridge build-install", { ok: result.ok, error: result.error });
+    return result;
+  });
+
+  ipcMain.handle("plugins:browser-bridge:install-native-host", async (): Promise<BrowserBridgeActionResult> => {
+    const roots = await ensureDataDirectories();
+    const result = await getBrowserBridgeService(roots).installNativeHost();
+    logMain("browser-bridge native host install", { ok: result.ok, error: result.error });
+    return result;
   });
 
   ipcMain.handle("plugins:fs-watch:set-enabled", async (_event, input: FsWatchSetEnabledInput) => {

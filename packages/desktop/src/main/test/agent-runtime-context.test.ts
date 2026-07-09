@@ -76,3 +76,50 @@ describe("loadMainAgentRuntimeContext skill blacklist", () => {
     expect(catalog?.content).toContain("<name>beta</name>");
   });
 });
+
+describe("loadMainAgentRuntimeContext browser bridge", () => {
+  const tempDirs: string[] = [];
+
+  afterEach(async () => {
+    await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  });
+
+  it("injects Browser Bridge CLI guidance when abb exists", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "actspace-browser-bridge-workspace-"));
+    const dataRoot = await mkdtemp(join(tmpdir(), "actspace-browser-bridge-data-"));
+    tempDirs.push(workspaceRoot, dataRoot);
+    const abbPath = join(dataRoot, "plugins", "browser-bridge", "bin", "abb");
+    await mkdir(join(dataRoot, "plugins", "browser-bridge", "bin"), { recursive: true });
+    await writeFile(abbPath, "#!/bin/sh\n", "utf8");
+
+    const context = await loadMainAgentRuntimeContext({
+      dataRoot,
+      workspaceRoot,
+      homeDir: join(workspaceRoot, "no-home"),
+      readPromptFile: async () => ({ path: "/tmp/p.md", content: "PROMPT" }),
+      browserBridgeAbbPath: abbPath,
+    });
+
+    const browserBridge = context.systemPromptSegments?.find((segment) => segment.id === "browser_bridge_cli");
+    expect(browserBridge?.bucket).toBe("skills");
+    expect(browserBridge?.content).toContain(abbPath);
+    expect(browserBridge?.content).toContain("doctor --json");
+    expect(browserBridge?.content).toContain("prefer this CLI over AppleScript");
+  });
+
+  it("does not inject Browser Bridge CLI guidance when abb is absent", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "actspace-browser-bridge-workspace-"));
+    const dataRoot = await mkdtemp(join(tmpdir(), "actspace-browser-bridge-data-"));
+    tempDirs.push(workspaceRoot, dataRoot);
+
+    const context = await loadMainAgentRuntimeContext({
+      dataRoot,
+      workspaceRoot,
+      homeDir: join(workspaceRoot, "no-home"),
+      readPromptFile: async () => ({ path: "/tmp/p.md", content: "PROMPT" }),
+      browserBridgeAbbPath: join(dataRoot, "plugins", "browser-bridge", "bin", "abb"),
+    });
+
+    expect(context.systemPromptSegments?.some((segment) => segment.id === "browser_bridge_cli")).toBe(false);
+  });
+});
