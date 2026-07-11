@@ -196,10 +196,10 @@ export function PluginsSection({
         <div className="flex flex-col gap-2 px-4 py-3.5">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <div className="text-[14px] font-semibold text-text-main">actspace-plugins 仓库路径</div>
+              <div className="text-[14px] font-semibold text-text-main">插件仓库路径</div>
               <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">
-                插件源码所在的本机仓库（git clone 下来的目录）。设置后各插件可一键「编译并安装」，
-                编译需要本机已安装 Rust 工具链（rustup.rs）。
+                包含 plugins/ 目录的本机仓库路径（actspace-agent 根目录）。设置后各插件可一键「编译并安装」，
+                编译需要本机已安装 Go 和 Rust 工具链。
               </p>
             </div>
             <button
@@ -214,10 +214,10 @@ export function PluginsSection({
           </div>
           <TextField
             value={repoRoot ?? ""}
-            placeholder="/path/to/actspace-plugins"
+            placeholder="/path/to/actspace-agent"
             onCommit={(value) => onUpdate({ plugins: { repoRoot: value.trim() || null } })}
             disabled={busy}
-            ariaLabel="actspace-plugins 仓库路径"
+            ariaLabel="插件仓库路径"
             mono
           />
         </div>
@@ -297,7 +297,7 @@ export function PluginsSection({
           ) : null}
           {!status?.installed && !repoRoot ? (
             <p className="text-[12px] text-text-faint">
-              提示：在上方设置 actspace-plugins 仓库路径后，可一键「编译并安装」，无需手动构建。
+              提示：在上方设置插件仓库路径后，可一键「编译并安装」，无需手动构建。
             </p>
           ) : null}
           {status?.installed ? (
@@ -426,7 +426,7 @@ function BrowserBridgeCard({
       ) : null}
       {!status?.installed && !repoRoot ? (
         <p className="text-[12px] text-text-faint">
-          提示：在上方设置 actspace-plugins 仓库路径后，可一键编译 Browser Bridge。
+          提示：在上方设置插件仓库路径后，可一键编译 Browser Bridge。
         </p>
       ) : null}
       {status?.installed ? (

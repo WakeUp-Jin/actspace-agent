@@ -2,21 +2,21 @@
 
 ## 当前状态
 
-本文档定义 `actspace-agent` 接入真实 Chrome 浏览器自动化能力的推荐架构。目标不是把浏览器实现细节散落进 `agent-core`，而是先确定稳定边界：浏览器插件负责执行，Go 本地桥接负责连接，`actspace-agent` 只依赖稳定的上层入口。
+本文档定义真实 Chrome Browser Bridge 的宿主、安装、传输和 backend 边界。Browser Use 当前完整架构入口见 `agent-browser-use-index.md`；本文后半部分保留的 CLI-first v0 方案是历史阶段，不再代表 Agent 正常调用路径。
 
-代码主位置：Browser Use / Browser Bridge 主线实现已迁入平级插件仓库
-`/Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/plugins/browser-bridge/`。
+代码主位置：Browser Use / Browser Bridge 主线实现已经合并到当前仓库
+`plugins/browser-bridge/`。
 原独立仓库 `/Users/wakeup-jin/Desktop/code-project/side-project/agent-browser-bridge/`
 保留为迁移来源与历史上下文。
 
 当前结论：
 
-- 浏览器桥接层采用三层设计：browser backend -> Go host/CLI -> `actspace-agent` 集成入口。
+- 浏览器主调用链采用 `Agent 分类工具 -> Unix socket -> Go Command Engine -> Extension primitive backend`。
 - 本地桥接优先使用 Go 实现，而不是 Rust。
 - 协议层必须存在，但保持为仓库内共享契约层，不单独包装成新的产品面。
 - `actspace-agent` 默认不直接操作 Chrome extension，也不直接耦合 Native Messaging framing。
-- 首阶段不以 MCP 或手写独立 Skill 为主线，而是以 self-describing CLI 为主入口。
-- browser backend 首阶段分成两类：`extension backend` 与 `cdp backend`。
+- Agent 正常浏览器任务使用 9 个分类工具加 `browser_help`、`browser_run`；CLI 用于安装、诊断、人工调用和机器可读帮助。
+- 当前实现以 `extension backend` 接入用户真实 Chrome；独立 `cdp backend` 保留接口边界，但不属于 Plan 5 的实现范围。
 
 ## 设计目标
 
@@ -25,8 +25,8 @@
 - 为后续 CLI、多轮 session、浏览器事件订阅和潜在 IAB backend 保留统一入口。
 - 保持跨平台发布、安装、调试和本地排障成本可控。
 - 让浏览器工具在 Agent 体系内仍然表现为普通工具能力，而不是特殊旁路。
-- 让浏览器能力的发现与帮助信息直接来自 CLI 自身，避免 Skill / 文档 / 命令面三处漂移。
-- ActSpace 只生成薄的托管 Skill / runtime hint，把 Agent 引导到已安装的 `abb` CLI。
+- 让 CLI help、Agent action 列表、协议能力与文档状态从同一份 Go registry 派生，避免多处漂移。
+- Agent Core 只保留稳定分类工具、审批、预览和 Socket client，不复制浏览器执行逻辑。
 
 ## 非目标
 
@@ -56,19 +56,18 @@ Rust 的资源控制和类型建模优势依然成立，但在现阶段，这些
 
 ```text
 actspace-agent
-  -> browser tool adapter / bash wrapper
-  -> Go browser bridge
-     -> backend selection
-     -> extension backend or cdp backend
+  -> 9 category tools + browser_help + browser_run
+  -> Unix socket
+  -> Go browser command engine
+     -> canonical registry / validation / session / orchestration
+     -> extension backend
 
 extension backend
-  -> local socket / stdio RPC
-  -> Chrome Native Messaging host
-  -> Chrome extension
+  -> primitive RPC over Chrome Native Messaging
   -> chrome.tabs / chrome.debugger / chrome.history / chrome.tabGroups
   -> user's real Chrome profile
 
-cdp backend
+future cdp backend (not in Plan 5 scope)
   -> local DevTools endpoint or app-owned target
   -> Chrome DevTools Protocol
   -> controlled browser instance or future IAB page target
@@ -77,9 +76,9 @@ cdp backend
 这个架构要点如下：
 
 - `actspace-agent` 只消费稳定入口，不感知 extension 内部实现。
-- Go bridge 既是 CLI，也是 Native Messaging host，并负责 backend 选择与能力发现。
+- Go bridge 既是 command engine、CLI，也是 Native Messaging host，并负责能力发现和 backend adapter。
 - Chrome extension 只负责浏览器权限内的执行，不承担上层业务编排。
-- `cdp backend` 不依赖插件，适合作为无插件 fallback，以及未来 IAB backend 的执行基础。
+- 独立 `cdp backend` 不依赖插件，未来可作为无插件 fallback 或 IAB 执行基础，但当前不实现。
 - “协议”同时包含传输 framing 和应用 RPC schema，两者都保留，但不一定分别对外发布。
 - CLI 必须是 self-describing 的：帮助、能力、参数和 backend 约束优先由 CLI 自身输出，而不是外置 Skill 文本。
 
@@ -98,7 +97,7 @@ browser backend 不是单一实现，而是统一接口下的两类后端：
 
 - 连接本地 Native Messaging host。
 - 调用 Chrome 原生 API，如 `tabs`、`debugger`、`history`、`downloads`、`tabGroups`。
-- 维护浏览器会话态，如当前 session tab group、逻辑 active tab、deliverable tabs。
+- 执行 Go 传入的 tab group、active tab 和 deliverable 原语；高层 session 语义由 Go 管理。
 - 向 host 回传结构化结果与事件通知，例如 CDP event、下载变化、file chooser、clipboard 结果。
 - 提供真实用户浏览器表面，例如 user tabs、history、claim tab、finalize session tabs。
 
@@ -130,14 +129,14 @@ browser backend 不是单一实现，而是统一接口下的两类后端：
 - 对外暴露本地 socket 与 CLI 子命令。
 - 维护 request/response 路由、多 client 连接和通知分发。
 - 负责 backend 检测、浏览器安装引导、host manifest 注册和本地排障入口。
-- 提供高层命令，如 `ping`、`tabs`、`open-tab`、`navigate`、`history`、`cdp`、`screenshot`、`run`、`doctor`、`backends`、`capabilities`。
+- 通过 canonical registry 提供 62 条高层 Browser Use 命令，并保留 `ping`、`doctor`、`capabilities`、raw `cdp` 等诊断入口。
 - 通过 `help` / `schema` / `--json` 形态输出渐进式帮助信息，让 CLI 自身承担 Skill 式知识发现能力。
 
 约束：
 
 - 桥接层不直接承载 `actspace-agent` 的通用工具调度、上下文压缩和会话持久化。
 - 不把 Agent Runtime 的产品规则混入桥接层。
-- 只实现浏览器能力暴露和必要的会话中继，不抢占上层工具系统的职责。
+- 只实现浏览器领域的 command 编排和会话状态，不抢占 Agent Runtime 的通用工具权限、上下文或产品调度职责。
 
 ### 3. actspace-agent 集成层
 
@@ -146,8 +145,8 @@ browser backend 不是单一实现，而是统一接口下的两类后端：
 - 在 `packages/agent-core` 中把浏览器能力包装成稳定工具。
 - 管理用户审批、工具预览、错误呈现、日志和模型可见摘要。
 - 将 `actspace-agent` 的 `sessionId` / `turnId` 映射到浏览器桥接层的会话字段。
-- 决定何时调用 CLI，何时保留或清理标签页，何时在 extension / cdp backend 之间切换。
-- 在首阶段通过系统提示词约束模型先查看 CLI 帮助，再调用实际命令。
+- 通过 BridgeClient 调用 Go command protocol，并决定何时向用户发起审批、如何展示 preview 和裁剪结果。
+- 通过 `browser_help` 渐进加载 action schema，不要求模型通过 Bash 解析 CLI 帮助。
 
 约束：
 
@@ -174,7 +173,9 @@ browser backend 不是单一实现，而是统一接口下的两类后端：
 - 这个契约层可以是 Go 内部 package，也可以附带 TypeScript 类型定义或文档 schema，但不要求首阶段单独对外发布。
 - `actspace-agent` 不直接依赖 framing 细节，只依赖更高层入口。
 
-## 推荐的集成入口
+## 历史集成入口（CLI-first v0，已被替代）
+
+> 这一节记录 Browser Bridge 独立仓库阶段的启动策略。首版验证 CLI 后，Agent 已经改为标准 `browser_*` 工具通过 Unix socket 调用 Go bridge。Plan 5 会进一步收敛为 9 个分类工具加 `browser_help`、`browser_run`。以下内容不得再作为新实现依据。
 
 `actspace-agent` 作为使用方，默认不应站在 extension 边界，而应站在 CLI 边界。
 
@@ -190,7 +191,7 @@ browser backend 不是单一实现，而是统一接口下的两类后端：
 - `actspace-agent` 内先通过 bash 调用 CLI，并通过系统提示词要求模型先运行帮助命令。
 - 浏览器能力在 Agent 体系内仍表现为标准工具或标准 bash 工作流，并遵守现有 preview、approval、日志和权限约束。
 
-### ActSpace 初始化流程（v0）
+### ActSpace 初始化流程（历史 v0）
 
 Browser Bridge 是 **host-bridge plugin**，初始化不能完全复用 `fs-watch` 的
 spawn / heartbeat 模型：
@@ -203,8 +204,7 @@ spawn / heartbeat 模型：
 
 v0 集成职责：
 
-1. 设置页「插件」分区复用 `settings.plugins.repoRoot`，从
-   `actspace-plugins/plugins/browser-bridge/` 构建 `abb`。
+1. 设置页「插件」分区从当前仓库 `plugins/browser-bridge/` 构建 `abb`。
 2. 安装位置约定为 `<userData>/plugins/browser-bridge/bin/abb`。
 3. 成功安装 `abb` 后，ActSpace 在 `<userData>/skills/browser-bridge/SKILL.md`
    生成薄托管 Skill，内容只包含使用场景、`abb` 绝对路径和优先查看
@@ -212,7 +212,7 @@ v0 集成职责：
 4. 点击「安装 Native Host」时运行
    `abb install-native-host --binary <userData>/plugins/browser-bridge/bin/abb --json`。
 5. Chrome extension 仍由用户在 `chrome://extensions` 手动 Load unpacked，目录为
-   `actspace-plugins/plugins/browser-bridge/apps/chrome-extension/`。
+   `plugins/browser-bridge/apps/chrome-extension/`。
 6. 设置页通过 `abb doctor --json` / `abb capabilities --json` 展示 ready 状态。
 7. Agent 使用阶段仍通过 bash 调 `abb`。当 `<userData>/plugins/browser-bridge/bin/abb`
    存在时，ActSpace 注入 runtime prompt segment，要求先看 `abb help`、

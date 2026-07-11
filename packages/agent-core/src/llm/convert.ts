@@ -40,6 +40,15 @@ export function convertMessages(
   target?: LLMConfig,
 ): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
   const result: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+  const pendingImageObservations: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
+
+  const flushImageObservations = () => {
+    if (pendingImageObservations.length === 0) return;
+    result.push({
+      role: "user",
+      content: pendingImageObservations.splice(0),
+    });
+  };
 
   if (context.systemPrompt) {
     result.push({ role: "system", content: context.systemPrompt });
@@ -52,10 +61,12 @@ export function convertMessages(
   for (const msg of sanitized) {
     switch (msg.role) {
       case "user":
+        flushImageObservations();
         result.push({ role: "user", content: toUserContent(msg.content) });
         break;
 
       case "assistant": {
+        flushImageObservations();
         const textParts = msg.content.filter((c): c is TextContent => c.type === "text");
         const toolCallParts = msg.content.filter((c): c is ToolCallContent => c.type === "toolCall");
         const textStr = textParts.map((t) => t.text).join("");
@@ -80,15 +91,26 @@ export function convertMessages(
       }
 
       case "toolResult": {
-        const text = msg.content
-          .filter((c): c is TextContent => c.type === "text")
-          .map((c) => c.text)
-          .join("");
+        const textParts = msg.content.filter((c): c is TextContent => c.type === "text");
+        const imageParts = msg.content.filter((c): c is ImageContent => c.type === "image");
+        const text = textParts.map((c) => c.text).join("");
         result.push({ role: "tool", tool_call_id: msg.toolCallId, content: text });
+        if (imageParts.length > 0) {
+          pendingImageObservations.push({
+            type: "text",
+            text: `Tool ${msg.toolName} returned ${imageParts.length} image${imageParts.length === 1 ? "" : "s"} for visual analysis.`,
+          });
+          pendingImageObservations.push(...imageParts.map((part) => ({
+            type: "image_url" as const,
+            image_url: { url: toImageUrl(part) },
+          })));
+        }
         break;
       }
     }
   }
+
+  flushImageObservations();
 
   return result;
 }
@@ -172,11 +194,14 @@ export function toUserContent(
     }
     return {
       type: "image_url",
-      image_url: {
-        url: part.data.startsWith("data:") ? part.data : `data:${part.mimeType};base64,${part.data}`,
-      },
+      image_url: { url: toImageUrl(part) },
     };
   });
+}
+
+function toImageUrl(part: ImageContent): string {
+  if (/^(data:|https?:|file:)/i.test(part.data)) return part.data;
+  return `data:${part.mimeType};base64,${part.data}`;
 }
 
 // ─── 工具定义转换 ───

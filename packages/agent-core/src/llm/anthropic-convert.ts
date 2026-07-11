@@ -147,7 +147,7 @@ function toAnthropicUserContent(
       return { type: "text", text: part.text };
     }
 
-    if (/^https?:\/\//i.test(part.data)) {
+    if (/^(https?:|file:)/i.test(part.data)) {
       return { type: "image", source: { type: "url", url: part.data } };
     }
 
@@ -229,7 +229,7 @@ function toAnthropicToolResultContent(
       return { type: "text", text: part.text };
     }
 
-    if (/^https?:\/\//i.test(part.data)) {
+    if (/^(https?:|file:)/i.test(part.data)) {
       return { type: "image", source: { type: "url", url: part.data } };
     }
 

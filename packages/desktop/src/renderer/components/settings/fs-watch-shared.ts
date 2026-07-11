@@ -14,6 +14,7 @@ export const FS_WATCH_BTN_SECONDARY =
   "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-60";
 
 const STATUS_POLL_MS = 2000;
+const STATUS_ERROR_POLL_MS = 5000;
 
 export function hasFsWatchBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace?.getFsWatchStatus);
@@ -70,7 +71,7 @@ export function useFsWatchStatus(bridgeReady: boolean): {
   return { status, refreshStatus };
 }
 
-/** 挂载期间每 2s 轮询一次 Browser Bridge doctor 状态。 */
+/** 挂载期间串行轮询 Browser Bridge doctor 状态，异常时降低频率。 */
 export function useBrowserBridgeStatus(bridgeReady: boolean): {
   status: BrowserBridgeStatus | null;
   refreshStatus: () => Promise<BrowserBridgeStatus | null>;
@@ -90,9 +91,18 @@ export function useBrowserBridgeStatus(bridgeReady: boolean): {
   }, [bridgeReady]);
 
   useEffect(() => {
-    void refreshStatus();
-    const timer = window.setInterval(() => void refreshStatus(), STATUS_POLL_MS);
-    return () => window.clearInterval(timer);
+    let canceled = false;
+    let timer: number | undefined;
+    const poll = async () => {
+      const next = await refreshStatus();
+      if (canceled) return;
+      timer = window.setTimeout(poll, next?.runState === "error" ? STATUS_ERROR_POLL_MS : STATUS_POLL_MS);
+    };
+    void poll();
+    return () => {
+      canceled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   }, [refreshStatus]);
 
   return { status, refreshStatus };

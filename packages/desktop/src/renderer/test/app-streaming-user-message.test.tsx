@@ -1142,7 +1142,7 @@ describe("App streaming user message", () => {
     expect(callOrder).toEqual(["set-workspace", "run-turn"]);
   });
 
-  it("sends attachments through RunTurnInput and renders media analysis as a runtime tool line", async () => {
+  it("sends attachments through RunTurnInput and keeps the attachment chip while running", async () => {
     const sessionId = "session-attachments";
     const record = createEmptySessionRecord(sessionId);
     const sessions: SessionListItem[] = [
@@ -1205,18 +1205,6 @@ describe("App streaming user message", () => {
         new Promise((resolve) => {
           capturedInput = input;
           streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
-          streamHandler?.({
-            type: "tool_started",
-            toolCallId: "runtime_analyze_media_att-screenshot",
-            toolName: "analyze_media",
-            argsPreview: "{\"source\":\"/Users/test/screenshot.png\",\"mimeType\":\"image/png\"}",
-            preview: {
-              kind: "media_analysis",
-              mediaName: "screenshot.png",
-              mediaKind: "image",
-              displayText: "Analyze image screenshot.png",
-            },
-          });
           resolveRunTurn = resolve;
         }),
     };
@@ -1235,9 +1223,6 @@ describe("App streaming user message", () => {
       expect(capturedInput?.attachments).toEqual([selectedAttachment]);
     });
     expect(await screen.findByLabelText("Attached image screenshot.png")).toBeTruthy();
-
-    const mediaLine = await screen.findByText("Analyze image screenshot.png");
-    expect(mediaLine.closest(".tool-log-line")?.classList.contains("is-running")).toBe(true);
 
     await act(async () => {
       resolveRunTurn?.({

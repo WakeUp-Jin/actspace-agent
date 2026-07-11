@@ -135,7 +135,6 @@ export type SessionEvent<TPayload = unknown> = {
 export type UserMessagePayload = {
   content: string;
   attachments?: ComposerAttachment[];
-  attachmentAnalyses?: AttachmentAnalysis[];
   /** 非用户手动输入的注入消息来源（如 "task_notification"），前端据此换展示样式。 */
   source?: string;
 };
@@ -332,6 +331,32 @@ export type ToolPreviewKind =
   | "delete"
   | "bash"
   | "agent"
+  | "browser_cua"
+  | "browser_dom"
+  | "browser_locator"
+  | "browser_navigation"
+  | "browser_tabs"
+  | "browser_user"
+  | "browser_wait"
+  | "browser_io"
+  | "browser_debug"
+  | "browser_help"
+  | "browser_run"
+  | "browser_screenshot"
+  | "browser_dom_snapshot"
+  | "browser_navigate"
+  | "browser_open_tab"
+  | "browser_list_tabs"
+  | "browser_click"
+  | "browser_fill"
+  | "browser_press_key"
+  | "browser_select"
+  | "browser_scroll"
+  | "browser_back"
+  | "browser_close_tab"
+  | "browser_user_tabs"
+  | "browser_claim_tab"
+  | "browser_finalize"
   | "generic";
 
 export type ToolUiPreview =
@@ -541,15 +566,6 @@ export type ComposerAttachment = {
   previewUrl?: string;
 };
 
-export type AttachmentAnalysis = {
-  attachmentId: string;
-  toolName: "analyze_media";
-  status: "completed" | "failed";
-  summary?: string;
-  errorMessage?: string;
-  analyzedAt?: string;
-};
-
 export type MessageBlock =
   | {
       kind: "user";
@@ -557,7 +573,6 @@ export type MessageBlock =
       content: string;
       createdAt: string;
       attachments?: ComposerAttachment[];
-      attachmentAnalyses?: AttachmentAnalysis[];
     }
   | {
       kind: "assistant";

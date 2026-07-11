@@ -10,8 +10,8 @@
 
 import type {
   AgentTurnResult,
-  AttachmentAnalysis,
   ComposerAttachment,
+  ModelSpec,
   RuntimeStreamEvent,
   SessionEvent,
   ContextUsageSnapshot,
@@ -24,7 +24,7 @@ import type {
   ToolPreviewKind,
   ToolUiPreview,
 } from "@actspace/shared";
-import { resolveModelSpecByApiModel } from "@actspace/shared";
+import { resolveModelSpec, resolveModelSpecByApiModel } from "@actspace/shared";
 import { estimateTokens } from "../context/token-estimator";
 import type { LLMService } from "../llm/types";
 import type { ToolManager } from "../tools/manager";
@@ -48,6 +48,13 @@ import { getTextContent, getThinkingContent, getToolCalls, getMessageText, Messa
 import type { AssistantMessage, Context, Message, ToolResultMessage, UserMessage } from "../messages";
 import { calculateUsageCost } from "../usage";
 import { bashTaskRegistry } from "../tools/tools/bash/task-registry";
+import { summarizeBrowserToolCall } from "../tools/tools/browser/preview";
+import {
+  browserPersistenceOutput,
+  sanitizeBrowserToolArgs,
+  sanitizeBrowserToolResult,
+  shouldRedactToolResult,
+} from "../tools/tools/browser/redaction";
 
 const PREVIEW_LIMIT = 160;
 
@@ -100,7 +107,7 @@ export interface RunTurnWithAgentInput {
   turnId: string;
   userInput: string;
   attachments?: ComposerAttachment[];
-  attachmentAnalyses?: AttachmentAnalysis[];
+  modelAttachments?: ComposerAttachment[];
   thinkingEnabled?: boolean;
 }
 
@@ -108,6 +115,7 @@ export interface RunTurnWithAgentDeps {
   llm: LLMService;
   toolManager: ToolManager;
   contextManager: ContextManager;
+  modelSpec?: ModelSpec;
   toolExecution?: ToolExecutionMode;
   thinkingEnabled?: boolean;
   /** flash 摘要器，透传给 Agent 用于 mid-loop 历史压缩 */
@@ -222,13 +230,17 @@ export async function runTurnWithAgent(
 
   let loopResult: AgentLoopResult;
   try {
+    const modelSpec = deps.modelSpec ?? resolveModelSpec();
     logAgentRun("turn execution started", {
       sessionId,
       turnId,
       userInputLength: userInput.length,
       userInputPreview: preview(userInput),
     });
-    loopResult = await agent.run(formatUserMessageForModel(userInput, input.attachments, input.attachmentAnalyses));
+    loopResult = await agent.run(formatUserMessageForModel(userInput, input.modelAttachments ?? input.attachments, {
+      modelId: modelSpec.id,
+      input: modelSpec.input,
+    }));
   } catch (err) {
     await flushStreamLogBuffer(runLogger, streamLogBuffer);
     const errorMsg = err instanceof Error ? err.message : String(err);
@@ -518,7 +530,6 @@ function buildSessionEvents(
   };
   const events: SessionEvent[] = userMessageToEvents(userMessage, sessionId, turnId, {
     attachments: input.attachments,
-    attachmentAnalyses: input.attachmentAnalyses,
   });
   let usageCallIndex = 0;
   for (const msg of result.messages) {
@@ -670,8 +681,10 @@ function createToolExecutionResult(
 ): ToolExecutionResult {
   const tool = toolManager.get(message.toolName);
   // message 文本 = 回填给 LLM 的内容（bash 头部 / 非 bash 摘要 / 或原样穿透）
-  const modelOutput = getMessageText(message);
+  const liveModelOutput = getMessageText(message);
   const ok = !message.isError;
+  const redactInPersistence = shouldRedactToolResult(message.toolName, record?.result);
+  const modelOutput = redactInPersistence ? browserPersistenceOutput(ok) : liveModelOutput;
   const summary = getToolSummary(message.toolName, tool?.previewKind ?? "generic", record?.args ?? {}, ok, modelOutput);
 
   // outputRef 由 executor（bash 落盘）/ OutputTruncator（inline 全量原文）填充
@@ -687,6 +700,10 @@ function createToolExecutionResult(
     rawOutput = outputRef.value;
     rawOutputRef = outputRef;
   } else {
+    rawOutput = modelOutput;
+    rawOutputRef = { kind: "inline", value: modelOutput };
+  }
+  if (redactInPersistence) {
     rawOutput = modelOutput;
     rawOutputRef = { kind: "inline", value: modelOutput };
   }
@@ -717,7 +734,9 @@ function createToolExecutionResult(
       ? undefined
       : {
           code: "TOOL_ERROR",
-          message: record?.result?.error ?? modelOutput,
+          message: redactInPersistence
+            ? "Browser command failed; details omitted from persistence."
+            : record?.result?.error ?? modelOutput,
           recoverable: true,
         },
     tokenEstimate: Math.ceil(modelOutput.length / 4),
@@ -838,7 +857,7 @@ function isFileWriteDeniedOutput(output: string): boolean {
 
 function createToolUiPreview(
   toolName: string,
-  previewKind: ToolUiPreview["kind"],
+  previewKind: string,
   args: Record<string, unknown>,
   output: string,
   summary: string,
@@ -1026,18 +1045,33 @@ function createToolUiPreview(
       };
     }
 
+    case "browser_cua":
+    case "browser_dom":
+    case "browser_locator":
+    case "browser_navigation":
+    case "browser_tabs":
+    case "browser_user":
+    case "browser_wait":
+    case "browser_io":
+    case "browser_debug":
+    case "browser_help":
+    case "browser_run":
     case "generic":
       return {
         kind: "generic",
-        title: summary,
-        content: output,
+        title: previewKind.startsWith("browser_")
+          ? summarizeBrowserToolCall(toolName, args)
+          : summary,
+        content: previewKind.startsWith("browser_")
+          ? ok ? "Completed" : "Failed"
+          : output,
       };
   }
 }
 
 function getToolSummary(
   toolName: string,
-  previewKind: ToolUiPreview["kind"],
+  previewKind: string,
   args: Record<string, unknown>,
   ok: boolean,
   output = "",
@@ -1084,6 +1118,18 @@ function getToolSummary(
       return "Bash command";
     case "agent":
       return stringArg(args.description, "Agent");
+    case "browser_cua":
+    case "browser_dom":
+    case "browser_locator":
+    case "browser_navigation":
+    case "browser_tabs":
+    case "browser_user":
+    case "browser_wait":
+    case "browser_io":
+    case "browser_debug":
+    case "browser_help":
+    case "browser_run":
+      return summarizeBrowserToolCall(toolName, args);
     case "generic":
       if (toolName === "web_search") {
         return `Searching: ${stringArg(args.query, "...")}`;
@@ -1254,7 +1300,7 @@ function mapAgentEventToStreamEvent(
           type: "tool_started",
           toolCallId: event.toolCallId,
           toolName: event.toolName,
-          argsPreview: JSON.stringify(event.args).slice(0, 200),
+          argsPreview: JSON.stringify(sanitizeBrowserToolArgs(event.toolName, event.args)).slice(0, 200),
           preview,
         };
 
@@ -1457,7 +1503,7 @@ function logAgentEvent(
         turnId,
         toolCallId: event.toolCallId,
         toolName: event.toolName,
-        argsPreview: preview(event.args),
+        argsPreview: preview(sanitizeBrowserToolArgs(event.toolName, event.args)),
       });
       return;
 
@@ -1468,7 +1514,11 @@ function logAgentEvent(
         toolCallId: event.toolCallId,
         toolName: event.toolName,
         isError: event.isError,
-        resultPreview: preview(getToolResultOutputText(event.result)),
+        resultPreview: preview(
+          shouldRedactToolResult(event.toolName, event.result)
+            ? browserPersistenceOutput(!event.isError)
+            : getToolResultOutputText(event.result),
+        ),
       });
       return;
 
@@ -1621,7 +1671,16 @@ function serializeAgentEvent(event: AgentEvent): Record<string, unknown> {
       return event;
 
     case "turn_end":
-      return event;
+      return {
+        type: event.type,
+        turnIndex: event.turnIndex,
+        stopReason: event.message.stopReason,
+        toolResults: event.toolResults.map((result) => ({
+          toolCallId: result.toolCallId,
+          toolName: result.toolName,
+          isError: result.isError,
+        })),
+      };
 
     case "message_delta":
       return {
@@ -1630,10 +1689,16 @@ function serializeAgentEvent(event: AgentEvent): Record<string, unknown> {
       };
 
     case "tool_start":
-      return event;
+      return {
+        ...event,
+        args: sanitizeBrowserToolArgs(event.toolName, event.args),
+      };
 
     case "tool_end":
-      return event;
+      return {
+        ...event,
+        result: sanitizeBrowserToolResult(event.toolName, event.result),
+      };
 
     case "tool_approval_required":
       return {
@@ -1691,7 +1756,7 @@ async function writeAssistantMessageRunLog(
     await writeRunLog(runLogger, "assistant_tool_call", {
       toolCallId: toolCall.id,
       toolName: toolCall.name,
-      arguments: toolCall.arguments,
+      arguments: sanitizeBrowserToolArgs(toolCall.name, toolCall.arguments),
       model: message.model,
       provider: message.provider,
       stopReason: message.stopReason,
@@ -1715,7 +1780,7 @@ function summarizeMessage(message: Message): Record<string, unknown> {
       toolCalls: toolCalls.map((toolCall) => ({
         toolCallId: toolCall.id,
         toolName: toolCall.name,
-        arguments: toolCall.arguments,
+        arguments: sanitizeBrowserToolArgs(toolCall.name, toolCall.arguments),
       })),
     };
   }

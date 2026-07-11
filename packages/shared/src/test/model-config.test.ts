@@ -22,6 +22,7 @@ describe("model config", () => {
     expect(MODEL_REGISTRY["kimi-k2.6"].pricing?.currency).toBe("CNY");
     expect(MODEL_REGISTRY["kimi-k2.7-code"]).toMatchObject({
       visibility: "public",
+      input: ["text", "image"],
       contextWindow: 1_000_000,
       maxTokens: 262_144,
       pricing: {

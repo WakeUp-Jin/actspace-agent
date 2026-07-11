@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Room - UI Preview</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  background: #ffffff;
+  color: #1a1a1a;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Room Header */
+.room-header {
+  background: #fafafa;
+  border-bottom: 1px solid #e5e5e5;
+  padding: 12px 20px;
+  flex-shrink: 0;
+}
+
+.room-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.room-agents {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.room-agent {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #666;
+  padding: 3px 10px;
+  background: #f3f4f6;
+  border-radius: 12px;
+}
+
+.room-agent .agent-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+}
+.agent-dot.active { background: #22c55e; }
+.agent-dot.thinking { background: #f59e0b; animation: pulse 1.5s infinite; }
+.agent-dot.idle { background: #d1d5db; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.room-agent .agent-tier {
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.t-think { background: #eef2ff; color: #4f46e5; }
+.t-steady { background: #ecfeff; color: #0891b2; }
+.t-flash { background: #fffbeb; color: #d97706; }
+
+/* Message Area */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+
+.message {
+  margin-bottom: 18px;
+}
+
+.msg-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.msg-role {
+  font-size: 13px;
+  font-weight: 600;
+}
+.msg-role.user-role { color: #6b7280; }
+.msg-role.searcher-role { color: #d97706; }
+.msg-role.analyst-role { color: #4f46e5; }
+.msg-role.challenger-role { color: #dc2626; }
+.msg-role.ideator-role { color: #059669; }
+.msg-role.synthesizer-role { color: #7c3aed; }
+
+.msg-tier {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.msg-time {
+  font-size: 11px;
+  color: #bbb;
+}
+
+.msg-body {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: #333;
+}
+
+.msg-body p { margin-bottom: 6px; }
+.msg-body p:last-child { margin-bottom: 0; }
+
+.msg-body code {
+  background: #f3f4f6; padding: 1px 5px; border-radius: 3px;
+  font-size: 12px; font-family: 'SF Mono', monospace;
+}
+
+.msg-body ul { padding-left: 18px; margin: 4px 0; }
+.msg-body li { margin-bottom: 4px; }
+.msg-body strong { color: #111; }
+
+/* Search results */
+.search-results {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 8px 0;
+}
+.search-results .sr-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 5px 0;
+  font-size: 12.5px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.search-results .sr-item:last-child { border-bottom: none; }
+.search-results .sr-num { color: #6366f1; font-weight: 600; flex-shrink: 0; }
+.search-results .sr-title { color: #333; font-weight: 500; }
+.search-results .sr-desc { color: #888; font-size: 11.5px; margin-top: 1px; }
+
+/* @mention */
+.mention { color: #6366f1; font-weight: 500; }
+
+/* Divider */
+.msg-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: #ccc;
+  font-size: 11px;
+}
+.msg-divider::before, .msg-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid #eee;
+}
+
+/* Input */
+.input-bar {
+  background: #fafafa;
+  border-top: 1px solid #e5e5e5;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.input-bar input {
+  flex: 1;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #333;
+  font-size: 13px;
+  outline: none;
+}
+.input-bar input:focus { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.1); }
+.input-bar .send-btn {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: #6366f1; border: none; color: white;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px;
+}
+.input-bar .at-btn {
+  width: 32px; height: 32px; border-radius: 6px;
+  background: #fff; border: 1px solid #ddd; color: #888;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 14px;
+}
+.input-bar .at-btn:hover { border-color: #6366f1; color: #6366f1; }
+</style>
+</head>
+<body>
+
+<!-- Room Header -->
+<div class="room-header">
+  <div class="room-title">Room — 多智能体编排方案的实际效果讨论</div>
+  <div class="room-agents">
+    <div class="room-agent">
+      <span class="agent-dot idle"></span>
+      🔍 搜索者
+      <span class="agent-tier t-flash">极速</span>
+    </div>
+    <div class="room-agent">
+      <span class="agent-dot active"></span>
+      📊 分析师
+      <span class="agent-tier t-think">深思</span>
+    </div>
+    <div class="room-agent">
+      <span class="agent-dot idle"></span>
+      ❓ 质疑者
+      <span class="agent-tier t-think">深思</span>
+    </div>
+    <div class="room-agent">
+      <span class="agent-dot thinking"></span>
+      💡 创想者
+      <span class="agent-tier t-steady">稳态</span>
+    </div>
+    <div class="room-agent">
+      <span class="agent-dot idle"></span>
+      📝 总结者
+      <span class="agent-tier t-steady">稳态</span>
+    </div>
+  </div>
+</div>
+
+<!-- Messages -->
+<div class="messages">
+
+  <div class="message">
+    <div class="msg-header">
+      <span class="msg-role user-role">你</span>
+      <span class="msg-time">22:15</span>
+    </div>
+    <div class="msg-body">
+      <p>多智能体在编程开发场景下，真的比单智能体效果更好吗？有什么实际的证据或者论文吗？我想从成本和质量两个角度来分析。</p>
+    </div>
+  </div>
+
+  <div class="message">
+    <div class="msg-header">
+      <span class="msg-role searcher-role">🔍 搜索者</span>
+      <span class="msg-tier t-flash">极速</span>
+      <span class="msg-time">22:15</span>
+    </div>
+    <div class="msg-body">
+      <p>找到以下相关资料：</p>
+      <div class="search-results">
+        <div class="sr-item">
+          <span class="sr-num">1.</span>
+          <div>
+            <div class="sr-title">SWE-bench Multi-Agent Leaderboard (2026-06)</div>
+            <div class="sr-desc">多智能体在 resolved rate 上比单智能体高 12-18%，但 token 消耗高 3-5x</div>
+          </div>
+        </div>
+        <div class="sr-item">
+          <span class="sr-num">2.</span>
+          <div>
+            <div class="sr-title">《Cost-Aware Multi-Agent Orchestration》ICML 2026</div>
+            <div class="sr-desc">tier-routing 策略在质量持平条件下降低 40-55% 成本</div>
+          </div>
+        </div>
+        <div class="sr-item">
+          <span class="sr-num">3.</span>
+          <div>
+            <div class="sr-title">Anthropic Research: When Agents Should Delegate</div>
+            <div class="sr-desc">子代理在"搜索+摘要"和"代码审查"任务上 ROI 最高</div>
+          </div>
+        </div>
+        <div class="sr-item">
+          <span class="sr-num">4.</span>
+          <div>
+            <div class="sr-title">OpenAI Codex Team: Parallel Agent Scaling Laws</div>
+            <div class="sr-desc">并行子代理在 >3 文件修改时效率超过串行，&lt;3 文件时反而更慢</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="message">
+    <div class="msg-header">
+      <span class="msg-role analyst-role">📊 分析师</span>
+      <span class="msg-tier t-think">深思</span>
+      <span class="msg-time">22:16</span>
+    </div>
+    <div class="msg-body">
+      <p>基于搜索者的资料，从两个维度分析：</p>
+      <p><strong>质量维度：</strong></p>
+      <ul>
+        <li>SWE-bench 数据显示多智能体有 +12-18% 优势，但前提是任务足够复杂</li>
+        <li>代码审查是多智能体 ROI 最高的场景——独立 Reviewer 比自我审查效果显著更好</li>
+        <li>关键门槛：涉及 3+ 文件修改的任务才适合并行分工</li>
+      </ul>
+      <p><strong>成本维度：</strong></p>
+      <ul>
+        <li>朴素的多智能体（全用旗舰）贵 3-5x</li>
+        <li>tier-routing（不同角色用不同等级模型）可在质量持平下降低 40-55%</li>
+        <li>核心洞察：搜索和摘要不需要旗舰，只有规划和审查需要</li>
+      </ul>
+      <p><strong>结论</strong>：多智能体 + tier-routing 是当前性价比最优解，但只适用于中等以上复杂度任务。</p>
+    </div>
+  </div>
+
+  <div class="message">
+    <div class="msg-header">
+      <span class="msg-role challenger-role">❓ 质疑者</span>
+      <span class="msg-tier t-think">深思</span>
+      <span class="msg-time">22:17</span>
+    </div>
+    <div class="msg-body">
+      <p>分析师的框架清晰，但有两点质疑：</p>
+      <p><strong>1. 上下文割裂被低估了。</strong> SWE-bench 是独立 issue，但真实编程中子代理 A 改 auth.ts 可能影响子代理 B 在改的 session.ts。论文没覆盖这种任务间实时冲突。</p>
+      <p><strong>2. "质量持平"有水分。</strong> tier-routing 论文的"持平"是 pass@1 衡量的。但编程还有可读性、架构一致性、命名风格等维度，benchmark 不测这些。</p>
+      <p>建议：上线前在内部 repo 跑 A/B，人工打分代码质量（不只是 pass/fail）。</p>
+    </div>
+  </div>
+
+  <div class="message">
+    <div class="msg-header">
+      <span class="msg-role analyst-role">📊 分析师</span>
+      <span class="msg-tier t-think">深思</span>
+      <span class="msg-time">22:17</span>
+    </div>
+    <div class="msg-body">
+      <p>质疑者的两点都很好，修正一下：</p>
+      <p>关于冲突——实际方案中 Leader 必须做冲突检测（或顺序依赖声明），Reviewer 的价值不只是代码审查还是一致性守门人。</p>
+      <p>关于风格统一——同意。首版可以用"同 provider 内切模型"（deepseek-pro ↔ deepseek-flash）来回避。</p>
+    </div>
+  </div>
+
+  <div class="message">
+    <div class="msg-header">
+      <span class="msg-role ideator-role">💡 创想者</span>
+      <span class="msg-tier t-steady">稳态</span>
+      <span class="msg-time">22:18</span>
+    </div>
+    <div class="msg-body">
+      <p>换个角度想：与其纠结"多 vs 单"的二选一，不如想<strong>什么时候切换</strong>。</p>
+      <p>类比 Linux 内核——不是"多进程 vs 单进程"二选一，而是按需 fork。Agent 可以学同样的模式：默认单智能体运行，检测到复杂度超阈值时自动 fork 子代理，完成后 join 回来。</p>
+      <p>首版手动选形态合理，但远期方向是系统自动决策。</p>
+    </div>
+  </div>
+
+  <div class="msg-divider">新话题</div>
+
+  <div class="message">
+    <div class="msg-header">
+      <span class="msg-role user-role">你</span>
+      <span class="msg-time">22:19</span>
+    </div>
+    <div class="msg-body">
+      <p><span class="mention">@总结者</span> 帮我总结一下刚才讨论的要点。</p>
+    </div>
+  </div>
+
+  <div class="message">
+    <div class="msg-header">
+      <span class="msg-role synthesizer-role">📝 总结者</span>
+      <span class="msg-tier t-steady">稳态</span>
+      <span class="msg-time">22:19</span>
+    </div>
+    <div class="msg-body">
+      <p><strong>讨论总结</strong></p>
+      <p>✅ 共识：</p>
+      <ul>
+        <li>多智能体 + tier-routing 在中等以上复杂任务有明确优势</li>
+        <li>代码审查（独立 Reviewer）是 ROI 最高的场景</li>
+        <li>同 provider 内切模型可避免风格不统一</li>
+      </ul>
+      <p>⚠️ 注意事项：</p>
+      <ul>
+        <li>简单任务不适用（通信开销 > 收益）</li>
+        <li>任务间依赖冲突是盲区，需要 Leader 冲突检测</li>
+        <li>上线前需人工 A/B 评审，不能只看 pass/fail</li>
+      </ul>
+      <p>💡 远期：从手动选形态演进到自动 fork/join。</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Input Bar -->
+<div class="input-bar">
+  <button class="at-btn" title="@提及某个 Agent">@</button>
+  <input type="text" placeholder="在 Room 中发言..." />
+  <button class="send-btn">↑</button>
+</div>
+
+</body>
+</html>

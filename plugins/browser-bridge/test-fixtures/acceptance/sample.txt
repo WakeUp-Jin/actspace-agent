@@ -1,0 +1,2 @@
+Agent Browser Bridge acceptance download fixture.
+Expected filename: browser-bridge-sample.txt

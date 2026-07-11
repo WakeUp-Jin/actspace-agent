@@ -272,7 +272,7 @@ export class FsWatchService {
   }
 
   /**
-   * 从本机 actspace-plugins 仓库一键构建并安装。
+   * 从本机插件仓库一键构建并安装。
    *
    * 仓库布局：一个插件一个自包含文件夹 `plugins/fs-watch/`（自带 Cargo.toml / lockfile，
    * 无根级 workspace）。在插件目录内 `cargo build --release`，产物在其 target/release/ 下。
@@ -285,7 +285,7 @@ export class FsWatchService {
     } catch {
       return {
         ok: false,
-        error: `该目录不是 actspace-plugins 仓库（缺少 plugins/fs-watch/Cargo.toml）：${repoRoot}`,
+        error: `在该路径下找不到 fs-watch 插件（缺少 plugins/fs-watch/Cargo.toml）：${repoRoot}`,
       };
     }
 

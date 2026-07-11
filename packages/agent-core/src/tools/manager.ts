@@ -30,6 +30,8 @@ const DEFAULT_TRUNCATE_THRESHOLD = 2000;
 
 export class ToolManager {
   private tools = new Map<string, InternalTool>();
+  private disposers: Array<() => Promise<void> | void> = [];
+  private disposed = false;
   private workspaceRoot: string;
   private additionalWritableRoots: string[];
   private truncateThreshold: number;
@@ -82,6 +84,11 @@ export class ToolManager {
     this.tools.set(tool.name, tool);
   }
 
+  /** 注册与当前 ToolManager 同生命周期的资源清理函数。 */
+  registerDisposer(disposer: () => Promise<void> | void): void {
+    this.disposers.push(disposer);
+  }
+
   get(name: string): InternalTool | undefined {
     return this.tools.get(name);
   }
@@ -112,6 +119,15 @@ export class ToolManager {
       toolCallId,
     });
     return execution.result;
+  }
+
+  async dispose(): Promise<void> {
+    if (this.disposed) return;
+    this.disposed = true;
+    const disposers = this.disposers.splice(0).reverse();
+    const results = await Promise.allSettled(disposers.map((dispose) => dispose()));
+    const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (failure) throw failure.reason;
   }
 }
 

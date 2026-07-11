@@ -24,7 +24,7 @@
 
 两者配合的模式写进了工具描述与输出里：`web_search` 找到候选 URL → `web_fetch` 精读页面全文。
 
-> Kimi 作为**公开主模型**时的 provider-native `$web_search`（service 层回填循环）不受本次改动影响，见 `agent-deepseek-kimi-hybrid-capabilities.md`。本次移除的是 DeepSeek 借道 Kimi 的 `searchWithKimi` 辅助层。
+> Kimi 作为**公开主模型**时也不再挂 provider-native `$web_search`。所有模型的联网搜索统一走本地 `web_search` / `web_fetch` 工具链。
 
 ## web_fetch：本地确定性网页抓取
 
@@ -98,6 +98,7 @@ web_search(query)
 
 - 2026-07-06：拆除 Kimi-backed `web_search`（删除 `searchWithKimi`、`KimiService.streamWithBuiltinWebSearch`、`prompt/kimi-assistants/web-search.ts`），改为 `web_fetch`（本地确定性抓取）+ `web_search`（外部搜索 API）两个独立工具，均不经过 LLM 中间层。
 - 2026-07-06：`web_search` 采用双通道并行：国内智谱 + 国际 Tavily → TinyFish → Exa 优先级降级；quota/auth/rate_limit 触发同调用内 failover；结果按来源分组、跨通道 URL 去重（国内优先）。
-- 2026-07-06：搜索 key 与 LLM key 统一进 `SecretProviderId` 密钥管理；`web_search` 暴露门控从 `hasKimiKey` 改为 `hasWebSearchKey`；`analyze_media` 保持 `hasKimiKey`（显式 `requiresKey: "kimi"`）。
+- 2026-07-06：搜索 key 与 LLM key 统一进 `SecretProviderId` 密钥管理；`web_search` 暴露门控从 `hasKimiKey` 改为 `hasWebSearchKey`。
+- 2026-07-09：图片理解不再通过独立 Kimi helper 工具兜底；模型是否接收图片由 `MODEL_REGISTRY.input` 统一声明，具体见 `agent-deepseek-kimi-hybrid-capabilities.md`。
 - 2026-07-06：不引入 firecrawl（付费、非按量）与火山引擎搜索（与方舟模型 API 耦合的 server tool，非独立 REST）。
 - 2026-07-07：`web_search` 输出以国际线为主参考——国际组排前、去重优先保留国际条目，分组标题附渠道特性说明与 primary/supplementary 标注（双通道有结果时）。放弃「按供应商给结果打静态数字比重」方案：数字权重会让模型直接忽略低分结果，而结果质量实际随 query 语言变化，且国际线内部是 failover（Tavily/TinyFish/Exa 不共存），静态权重只能区分两组，收益薄。描述性说明把判断权留给模型。

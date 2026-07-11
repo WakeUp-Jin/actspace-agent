@@ -361,7 +361,7 @@ describe("createAgentFromConfig", () => {
     expect(withoutKey.toolManager.has("web_fetch")).toBe(true);
   });
 
-  it("should register web tools and analyze_media for DeepSeek Anthropic format", async () => {
+  it("should register web tools for DeepSeek Anthropic format", async () => {
     const { createAgentFromConfig } = await import("../create-agent-deps");
     const config = createTestAgentConfig({
       llmConfig: {
@@ -383,7 +383,6 @@ describe("createAgentFromConfig", () => {
 
     expect(deps.toolManager.has("web_search")).toBe(true);
     expect(deps.toolManager.has("web_fetch")).toBe(true);
-    expect(deps.toolManager.has("analyze_media")).toBe(true);
   });
 });
 

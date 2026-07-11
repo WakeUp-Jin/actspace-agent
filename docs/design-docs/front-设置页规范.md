@@ -30,6 +30,7 @@
 - 当前分区：
   - `通用 General`
   - `模型 Model`
+  - `成员 Members`
   - `智能体 Agent`
   - `Kairos`
   - `工具 Tools`
@@ -61,6 +62,16 @@
   - 「测试连接」按钮校验 Key 是否有效。
   - 「网络搜索」组：智谱 Web Search / Tavily / TinyFish / Exa 四个搜索供应商行（`web_search` 工具的通道 key，见 `agent-web-tools.md`），仅连接/断开，无测试连接；Tavily 已连接时显示本周期 credits 用量（main 进程代理 `GET /usage`）。
   - 「默认模型」下拉，决定 Composer 初始选中模型。
+- 成员 Members（事实来源 `agent-members.md`）
+  - Member 是跨多个 Room 持久存在的 Agent 身份，不是某个 Room 内临时复制的角色。V0 只管理 Agent，不展示 Humans、邀请或 Owner/Admin 权限。
+  - 首屏显示成员列表，顶部主操作为「创建 Agent」；每项展示图标、名称、描述、状态文字、模型和已加入 Room 数量。
+  - 点击成员后，右侧内容区切换为成员详情；成员列表不继续常驻成第三列。详情提供「返回成员列表」，返回时恢复列表滚动位置。
+  - 成员详情顶部固定身份区（图标 / 名称 / 描述 / idle-working-error-offline 状态）和四个局部 Tab：Profile / Activity / Reminders / Workspace。
+  - Profile：基本资料（名称、图标、描述、Persona）、运行配置（模型、推理等级）、能力（Web Research、项目只读、Skills）、使用情况（当前加入 Room，可跳转）。
+  - Activity：跨 Room 的结构化脱敏活动日志，展示时间、事件类型、摘要和 Room 跳转；不展示 Chain of Thought、完整 Prompt、秘密或未经裁剪的工具输出。
+  - Reminders：V0 只展示「后续支持」空状态，不提供无法工作的创建按钮。
+  - Workspace：V0 只展示只读文件树 + 文件预览布局占位和空状态；不创建默认文件，不提供新建、编辑、保存、删除或 Agent 写入。
+  - Member Profile 修改影响未来 AgentRun，并递增 `configVersion`；Room 只通过稳定 `memberId` 引用成员。
 - 智能体 Agent（2026-07-04 起只含主 Agent 内容；Kairos 全部迁到独立「Kairos」分区）
   - 主 Agent：自定义系统提示词（当前完整系统提示词，保存后下轮主 Agent 对话生效）。
   - Explore 子代理：模型下拉。
@@ -130,6 +141,6 @@
 
 ## 当前参考图
 
-下图为「整页接管（两栏）」定稿基线：左侧设置导航（通用 / 模型 / 智能体 / 工具 / 外观 / 归档会话 / 更新）+ 右侧内容区。
+下图仍作为「整页接管（两栏）」视觉基线；实际导航已包含 Members、Kairos、Plugins、File Watch、Skills 等后续分区。Members 详情在右侧内容区内部使用 Profile / Activity / Reminders / Workspace 局部 Tab，不增加第三个常驻侧栏。
 
 ![设置页定稿图](public/front/settings-page-final.png)

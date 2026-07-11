@@ -25,7 +25,7 @@ export interface ToolDefinitionSpec {
   exposeOnlyTo?: "deepseek" | "kimi";
   /**
    * 工具依赖的外部 key；缺失时不注册该工具（见 exposure.ts）。
-   * - "kimi"：Kimi-backed 能力（analyze_media）
+   * - "kimi"：Kimi provider-native or Kimi-backed capability
    * - "webSearch"：任一搜索 provider key（ZHIPU / TAVILY / TINYFISH / EXA_API_KEY）
    */
   requiresKey?: "kimi" | "webSearch";
@@ -69,6 +69,8 @@ export interface ToolRuntimeConfig {
 /** ToolManager 配置 */
 export interface ToolManagerConfig extends ToolRuntimeConfig {
   workspaceRoot: string;
+  /** Browser Bridge Native Host 暴露的稳定 Unix socket；缺省时不注册 browser_* 工具。 */
+  browserBridgeSocketPath?: string;
   /** Extra absolute roots writable by write_file/edit_file in addition to workspaceRoot. */
   additionalWritableRoots?: string[];
   /** 硬截断阈值（字符数），默认 2000。通用工具（web/generic）的 flash 摘要触发阈值。 */

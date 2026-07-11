@@ -35,3 +35,7 @@
 - `packages/desktop/src/main/test/browser-bridge-service.test.ts`
 - `docs/design-docs/agent-browser-bridge-design.md`
 - `docs/histories/2026-07/20260709-1739-browser-bridge-agent-context.md`
+
+### Superseded on 2026-07-10
+
+该方案记录的是当时的 CLI-first 过渡接入。actspace-agent 现已改为直接向模型注册标准 `browser_*` 工具，并通过稳定 Native Host socket 长连接执行；`abb` runtime hint 和托管 Skill 仅保留诊断/安装用途。详见 `20260710-0130-browser-use-full-implementation.md` 的“接入闭环修正”。

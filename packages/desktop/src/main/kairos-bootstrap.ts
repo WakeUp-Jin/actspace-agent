@@ -178,7 +178,7 @@ export function createKairosToolManagerFactory(opts: {
 }) {
   const env = resolveAgentEnvConfig();
   // 注意：toolManager 的 provider / apiFormat 必须和实际 LLM Service 一致，
-  // 否则工具暴露判断（如 Kimi-backed web_search / analyze_media 的 key 门控）会错配。
+  // 否则工具暴露判断（如 web_search 的 key 门控）会错配。
   const { modelSpec } = resolveKairosEnv(opts.modelId, "auto");
   const llmConfig = buildLLMConfig(modelSpec, env);
   return (config: KairosConfig): ToolManager => {

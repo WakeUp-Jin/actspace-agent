@@ -1,6 +1,5 @@
-import type { AgentEvent, AgentLoopResult, Message } from "@actspace/agent-core";
-
-export type PermissionMode = "default" | "trusted" | "yolo";
+import type { AgentEvent, AgentLoopResult, Message, PermissionMode } from "@actspace/agent-core";
+export type { PermissionMode } from "@actspace/agent-core";
 
 export interface RunCommandOptions {
   input?: string;

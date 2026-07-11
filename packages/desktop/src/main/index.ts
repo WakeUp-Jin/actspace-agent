@@ -927,15 +927,18 @@ async function registerIpc() {
         roots,
         getMainWindow,
         approvalRegistry,
-        (workspaceRoot) =>
-          loadMainAgentRuntimeContext({
+        (workspaceRoot) => {
+          const browserBridge = getBrowserBridgeService(roots);
+          return loadMainAgentRuntimeContext({
             dataRoot: roots.dataRoot,
             workspaceRoot,
             readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
             disabledSkills: getSettingsService().get().skills.disabled,
-            browserBridgeAbbPath: getBrowserBridgeService(roots).binPath,
+            browserBridgeAbbPath: browserBridge.binPath,
+            browserBridgeSocketPath: browserBridge.socketPath,
             warn: logMain,
-          }),
+          });
+        },
       );
       logMain("run turn completed", {
         sessionId: input.sessionId,
@@ -969,15 +972,18 @@ async function registerIpc() {
       input,
       roots,
       getMainWindow,
-      (workspaceRoot) =>
-        loadMainAgentRuntimeContext({
+      (workspaceRoot) => {
+        const browserBridge = getBrowserBridgeService(roots);
+        return loadMainAgentRuntimeContext({
           dataRoot: roots.dataRoot,
           workspaceRoot,
           readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
           disabledSkills: getSettingsService().get().skills.disabled,
-          browserBridgeAbbPath: getBrowserBridgeService(roots).binPath,
+          browserBridgeAbbPath: browserBridge.binPath,
+          browserBridgeSocketPath: browserBridge.socketPath,
           warn: logMain,
-        }),
+        });
+      },
     );
   });
 
@@ -1068,16 +1074,18 @@ async function registerIpc() {
   ipcMain.handle("context:describe", async (_event, input: DescribeContextInput) => {
     const roots = await ensureDataDirectories();
     try {
-      return await describeSessionContext(input, roots, (workspaceRoot) =>
-        loadMainAgentRuntimeContext({
+      return await describeSessionContext(input, roots, (workspaceRoot) => {
+        const browserBridge = getBrowserBridgeService(roots);
+        return loadMainAgentRuntimeContext({
           dataRoot: roots.dataRoot,
           workspaceRoot,
           readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
           disabledSkills: getSettingsService().get().skills.disabled,
-          browserBridgeAbbPath: getBrowserBridgeService(roots).binPath,
+          browserBridgeAbbPath: browserBridge.binPath,
+          browserBridgeSocketPath: browserBridge.socketPath,
           warn: logMain,
-        }),
-      );
+        });
+      });
     } catch (error) {
       logMain("describe context failed", {
         sessionId: input.sessionId,
@@ -1317,7 +1325,7 @@ async function registerIpc() {
     const roots = await ensureDataDirectories();
     const repoRoot = getSettingsService().get().plugins.repoRoot;
     if (!repoRoot) {
-      return { ok: false, error: "尚未设置插件仓库路径，请先在上方选择 actspace-plugins 仓库目录。" };
+      return { ok: false, error: "尚未设置插件仓库路径，请先在上方选择包含 plugins/ 的仓库根目录。" };
     }
     const result = await getFsWatchService(roots).buildAndInstall(repoRoot);
     logMain("fs-watch plugin build-install", { ok: result.ok, error: result.error });
@@ -1326,7 +1334,7 @@ async function registerIpc() {
 
   ipcMain.handle("plugins:pick-repo-root", async (): Promise<FsWatchPickRootResult> => {
     const picked = await dialog.showOpenDialog({
-      title: "选择本机 actspace-plugins 仓库目录",
+      title: "选择插件仓库目录（actspace-agent 根目录）",
       properties: ["openDirectory"],
     });
     if (picked.canceled || !picked.filePaths[0]) return { canceled: true };
@@ -1344,7 +1352,7 @@ async function registerIpc() {
     const roots = await ensureDataDirectories();
     const repoRoot = getSettingsService().get().plugins.repoRoot;
     if (!repoRoot) {
-      return { ok: false, error: "尚未设置插件仓库路径，请先在上方选择 actspace-plugins 仓库目录。" };
+      return { ok: false, error: "尚未设置插件仓库路径，请先在上方选择包含 plugins/ 的仓库根目录。" };
     }
     const service = getBrowserBridgeService(roots);
     const result = await service.buildAndInstall(repoRoot);

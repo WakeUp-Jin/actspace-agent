@@ -243,6 +243,18 @@ describe("Bash executor", () => {
     expect(data.exitCode).toBe(0);
   });
 
+  it("returns image content when stdout is a complete image data URL", async () => {
+    const workspace = await createWorkspace();
+    const image = "data:image/png;base64,aGVsbG8=";
+    const result = await bashExecutor({ command: `printf '${image}'`, cwd: workspace }, workspace);
+
+    expect(result.success).toBe(true);
+    expect(result.content).toEqual([
+      { type: "text", text: "Bash produced an image data URL (image/png)." },
+      { type: "image", data: "aGVsbG8=", mimeType: "image/png" },
+    ]);
+  });
+
   it("returns structured output for non-zero exit code", async () => {
     const workspace = await createWorkspace();
     const result = await bashExecutor({ command: "exit 2", cwd: workspace }, workspace);

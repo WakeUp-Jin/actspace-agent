@@ -12,7 +12,6 @@
 
 import type {
   AssistantReply,
-  AttachmentAnalysis,
   ComposerAttachment,
   SessionEvent,
   SessionId,
@@ -22,11 +21,14 @@ import type {
 } from "@actspace/shared";
 import type {
   AssistantMessage,
+  ImageContent,
   Message,
+  TextContent,
   ToolResultMessage,
   UserMessage,
 } from "./messages";
 import { getTextContent, getThinkingContent, getToolCalls } from "./messages";
+import { sanitizeBrowserToolArgs } from "./tools/tools/browser/redaction";
 
 // ─── 事件 ID 生成 ───
 
@@ -72,8 +74,20 @@ export function createPersistedSessionEvent<TPayload>(
 export function formatUserMessageForModel(
   content: string,
   attachments?: ComposerAttachment[],
-  attachmentAnalyses?: AttachmentAnalysis[],
-): string {
+  options?: {
+    modelId?: string;
+    input?: string[];
+  },
+): string | (TextContent | ImageContent)[] {
+  const input = options?.input ?? ["text"];
+  const supportsImages = input.includes("image");
+  const runtimeModel = [
+    "<runtime_model>",
+    options?.modelId ? `model_id: ${options.modelId}` : undefined,
+    `input: ${input.join(",")}`,
+    "</runtime_model>",
+  ].filter(Boolean).join("\n");
+
   const sections = [content.trim()];
 
   if (attachments?.length) {
@@ -85,28 +99,31 @@ export function formatUserMessageForModel(
           const mimeType = attachment.mimeType ? ` mime=${attachment.mimeType}` : "";
           return `${index + 1}. [${attachment.kind}] ${attachment.name}${path}${mimeType}`;
         }),
+        supportsImages
+          ? "Image attachments are also provided as image input when a local path is available."
+          : "The current model does not support image input. Do not make visual claims from image attachments; ask the user to switch to an image-capable model if visual inspection is required.",
         "For ordinary file attachments, use read_file with the provided path only if you need the file contents.",
       ].join("\n"),
     );
   }
 
-  if (attachmentAnalyses?.length) {
-    sections.push(
-      [
-        "Image analysis results:",
-        ...attachmentAnalyses.map((analysis, index) => {
-          if (analysis.status === "failed") {
-            return `${index + 1}. attachmentId=${analysis.attachmentId}: analysis failed. ${
-              analysis.errorMessage ?? "The model can only see the attachment metadata."
-            }`;
-          }
-          return `${index + 1}. attachmentId=${analysis.attachmentId}: ${analysis.summary ?? "(empty analysis)"}`;
-        }),
-      ].join("\n"),
-    );
+  sections.push(runtimeModel);
+
+  const text = sections.filter((section) => section.trim().length > 0).join("\n\n");
+  if (!supportsImages || !attachments?.some((attachment) => attachment.kind === "image" && attachment.path)) {
+    return text;
   }
 
-  return sections.filter((section) => section.trim().length > 0).join("\n\n");
+  const parts: (TextContent | ImageContent)[] = [{ type: "text", text }];
+  for (const attachment of attachments) {
+    if (attachment.kind !== "image" || !attachment.path) continue;
+    parts.push({
+      type: "image",
+      data: attachment.path,
+      mimeType: attachment.mimeType ?? "image/png",
+    });
+  }
+  return parts;
 }
 
 // ─── 方向 1：Message → SessionEvent[] ───
@@ -117,7 +134,6 @@ export function userMessageToEvents(
   turnId: TurnId,
   payload?: {
     attachments?: ComposerAttachment[];
-    attachmentAnalyses?: AttachmentAnalysis[];
   },
 ): SessionEvent[] {
   const content = typeof msg.content === "string"
@@ -131,7 +147,6 @@ export function userMessageToEvents(
     createSessionEvent(sessionId, turnId, "user_message", {
       content,
       ...(payload?.attachments?.length ? { attachments: payload.attachments } : {}),
-      ...(payload?.attachmentAnalyses?.length ? { attachmentAnalyses: payload.attachmentAnalyses } : {}),
       // 注入消息（如后台任务通知）标记来源；前端 selectors 按来源隐藏，恢复时也不会混入用户消息
       ...(msg.source && msg.source !== "user" ? { source: msg.source } : {}),
     }, msg.timestamp),
@@ -161,7 +176,7 @@ export function assistantMessageToEvents(
       createSessionEvent(sessionId, turnId, "tool_call", {
         id: tc.id,
         name: tc.name,
-        arguments: tc.arguments,
+        arguments: sanitizeBrowserToolArgs(tc.name, tc.arguments),
       }, msg.timestamp),
     );
   }
@@ -273,12 +288,11 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
           const payload = event.payload as {
             content: string;
             attachments?: ComposerAttachment[];
-            attachmentAnalyses?: AttachmentAnalysis[];
             source?: string;
           };
           messages.push({
             role: "user",
-            content: formatUserMessageForModel(payload.content, payload.attachments, payload.attachmentAnalyses),
+            content: formatUserMessageForModel(payload.content, payload.attachments, { input: ["text"] }),
             timestamp: new Date(event.timestamp).getTime() || now,
             ...(payload.source ? { source: payload.source } : {}),
           });

@@ -300,18 +300,22 @@ async function executeToolCalls(
       isError: !result.success,
     });
 
-    // ToolResult.data → 文本内容
+    // ToolResult.content preserves rich model inputs such as images; otherwise
+    // ToolResult.data is rendered as ordinary text.
     const textContent = typeof result.data === "string"
       ? result.data
       : result.success
         ? JSON.stringify(result.data ?? "")
         : (result.error ?? "Unknown error");
+    const content = result.content?.length
+      ? result.content
+      : [{ type: "text" as const, text: textContent }];
 
     return {
       role: "toolResult",
       toolCallId: tc.id,
       toolName: tc.name,
-      content: [{ type: "text", text: textContent }],
+      content,
       isError: !result.success,
       timestamp: Date.now(),
       source: `tool:${tc.name}`,

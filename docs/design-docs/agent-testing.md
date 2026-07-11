@@ -25,6 +25,8 @@ packages/agent-core/
     tools/test/           # 工具系统测试
     context/test/         # 上下文管道测试
     engine/test/          # 执行引擎测试
+    members/test/         # 持久 Member、配置版本与 Activity 投影测试
+    room/test/            # Agent Room 调度、Draft、预算和恢复协议测试
     persistence/test/     # 持久化层测试
     test/                 # 跨模块类型测试 + 端到端 smoke
 ```
@@ -51,12 +53,12 @@ packages/agent-core/
 
 - `llm/test/mock-service.test.ts`：流式事件产出、stream→result 聚合
 - `llm/test/base-convert.test.ts`：convertMessages 转换
-- `llm/test/kimi-service.test.ts`：Kimi OpenAI-compatible 流式调用、auth 错误分类（Kimi 主模型 `$web_search` 覆盖见 openai-completions 相关测试）
+- `llm/test/kimi-service.test.ts`：Kimi OpenAI-compatible 流式调用、auth 错误分类、thinking 参数策略，以及不再声明 provider-native `$web_search` 的回归。
 
 ### 工具系统
 
 - `tools/test/manager.test.ts`：注册/查询/执行/裁剪/未知工具错误
-- `tools/test/exposure.test.ts`：`exposeOnlyTo` / `requiresKey` 工具暴露规则；搜索 key 门控 `web_search`，DeepSeek + Kimi key 门控 `analyze_media`
+- `tools/test/exposure.test.ts`：`exposeOnlyTo` / `requiresKey` 工具暴露规则；搜索 key 门控 `web_search`
 - `tools/test/web-search-executor.test.ts` / `web-search-providers.test.ts` / `web-fetch-executor.test.ts`：web 工具双通道编排、provider 适配与本地抓取（见 `agent-web-tools.md`）
 
 ### 上下文管道
@@ -69,6 +71,22 @@ packages/agent-core/
 - `persistence/test/jsonl.test.ts`：appendEvent + parseJsonl 往返、坏行容错
 - `persistence/test/meta.test.ts`：createMeta/readMeta/updateMeta/incrementTurnCount
 - `persistence/test/recovery.test.ts`：recoverSession 多维恢复
+
+### Agent Room
+
+- `room/test/coordinator.test.ts`：用户广播/@定向、Agent @接力、cycle 替换、讨论上限、调用预算、失败隔离与级联 abort。
+- `room/test/draft-manager.test.ts`：并发 Draft 原子提交、Held 新鲜度检查、revise/send/silence/force-send 和迟到 Draft 拒绝。
+- `room/test/room-runtime.test.ts`：Room Input、结构化终止工具、只读工具权限、`read_room_log` 快照边界、三类事件出口与配置/私有历史恢复。
+
+Room 自动化测试使用脚本化 Mock 控制完成顺序与结构化决策，不访问真实 provider。完整场景、UI 验收和真实模型体验指标以 `agent-form-room.md` 的“测试与验收策略”为准。
+
+### Agent Members
+
+- `members/test/registry.test.ts`：稳定 Member ID、Profile 原子写入、`configVersion` 递增和列表恢复。
+- `members/test/activity.test.ts`：跨 Room Activity 关联、事件摘要裁剪、秘密脱敏和追加写恢复。
+- `room/test/room-runtime.test.ts` 追加：Room 只保存 `memberId`，AgentRun 捕获 `memberConfigVersion`，不同 Room 的 Member 私有历史相互隔离。
+
+Members 页面、四个详情 Tab 和 Workspace/Reminders 占位验收以 `agent-members.md` 为准。
 
 ### 类型与适配器
 

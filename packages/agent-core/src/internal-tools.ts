@@ -12,7 +12,7 @@
  * 代码参考：.agents/skills/llm-agent-dev/examples/tool-definition.ts
  */
 
-import type { Tool } from "./messages";
+import type { ImageContent, TextContent, Tool } from "./messages";
 import type {
   AgentToolPreview,
   SessionEvent,
@@ -28,6 +28,12 @@ export interface ToolResult {
   data?: unknown;
   error?: string;
   /**
+   * Optional rich content returned to the next LLM call. Use this when a tool
+   * produces native model input such as an image; `data` remains the textual
+   * summary used for UI previews and persisted output.
+   */
+  content?: (TextContent | ImageContent)[];
+  /**
    * 工具全量输出的回读引用，由 executor / postProcess 填充、engine/bridge 消费：
    * - bash 大输出落盘：`{ kind: "file", value: <绝对路径> }`
    * - 非 bash 工具摘要：`{ kind: "inline", value: <截断/摘要前的全量文本> }`
@@ -40,6 +46,12 @@ export interface ToolResult {
    * taskId / sandboxed 等 preview 元数据从这里读，不再依赖 data 的形状。
    */
   structured?: unknown;
+  /**
+   * Keep the real result available to the current model call, but replace it
+   * in session events, UI previews and run logs. Browser page/clipboard output
+   * uses this boundary because it may contain credentials or private content.
+   */
+  redactInPersistence?: boolean;
   /**
    * Agent 工具专用的进程内元数据。bridge/main 消费它来推流和单独写 transcript，
    * 不应展开写入主 session.jsonl。

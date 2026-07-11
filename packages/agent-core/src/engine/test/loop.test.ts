@@ -193,6 +193,53 @@ describe("runAgentLoop", () => {
     });
   });
 
+  it("preserves rich tool result content for the next model call", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
+    toolManager.register({
+      name: "read_file",
+      description: "read",
+      parameters: { type: "object" },
+      isReadOnly: true,
+      previewKind: "read",
+      handler: async (): Promise<ToolResult> => ({
+        success: true,
+        data: "Read image file: image.png",
+        content: [
+          { type: "text", text: "Read image file: image.png" },
+          { type: "image", data: "abc", mimeType: "image/png" },
+        ],
+      }),
+    });
+    llm.setResponses([
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "tc-image", name: "read_file", arguments: { path: "image.png" } }],
+        model: "mock",
+        provider: "mock",
+        usage: createEmptyUsage(),
+        stopReason: "toolUse",
+        timestamp: Date.now(),
+        source: "llm",
+      },
+      mockText("Saw it."),
+    ]);
+
+    const context: Context = {
+      messages: [{ role: "user", content: "look", timestamp: Date.now() }],
+      tools: toolManager.getToolDefinitions(),
+    };
+
+    const result = await runAgentLoop(context, llm, { toolManager }, () => {});
+    const toolResult = result.messages.find((message) => message.role === "toolResult");
+
+    expect(toolResult?.content).toEqual([
+      { type: "text", text: "Read image file: image.png" },
+      { type: "image", data: "abc", mimeType: "image/png" },
+    ]);
+    expect(context.messages).toContain(toolResult);
+  });
+
   it("retries retryable LLM errors and pops the dirty error message from context", async () => {
     const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
     llm.setResponses([

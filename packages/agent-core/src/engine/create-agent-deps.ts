@@ -95,6 +95,8 @@ export interface AgentRuntimeContext {
   additionalWritableRoots?: string[];
   /** 当前主 Agent turn id，用于 SubAgent transcript 关联 */
   turnId?: string;
+  /** Browser Bridge Native Host 的稳定 Unix socket。 */
+  browserBridgeSocketPath?: string;
   /** 主 Agent 当前使用的完整系统提示词；不传则使用代码默认值。 */
   systemPrompt?: string;
   /** 附加规则/技能等系统级上下文段，例如 AGENTS.md。 */
@@ -194,6 +196,7 @@ export function buildAgentConfig(
     sessionId: runtimeContext?.sessionId,
     additionalWritableRoots: runtimeContext?.additionalWritableRoots,
     turnId: runtimeContext?.turnId,
+    browserBridgeSocketPath: runtimeContext?.browserBridgeSocketPath,
   };
   return {
     llmConfig,

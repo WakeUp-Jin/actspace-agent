@@ -309,8 +309,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
             id: event.id,
             content: payload.content,
             createdAt: getDisplayTime(event.timestamp),
-            attachments: payload.attachments,
-            attachmentAnalyses: payload.attachmentAnalyses
+            attachments: payload.attachments
           }
         ];
       }

@@ -46,10 +46,11 @@
 - `docs/references/README.md`：沉淀到仓库里的外部参考资料。
 - `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档；需要追溯历史修复方案时再读。
 
-## 相关平级项目
+## 插件代码（plugins/）
 
-- `/Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/`：外部能力插件集合仓库；`fs-watch` 位于 `plugins/fs-watch/`，Browser Use / Browser Bridge 主线代码位于 `plugins/browser-bridge/`。
-- `/Users/wakeup-jin/Desktop/code-project/side-project/agent-browser-bridge/`：Browser Bridge 迁移来源仓库；保留作历史上下文，新的主位置以 `actspace-plugins/plugins/browser-bridge/` 为准。
+- `plugins/browser-bridge/`：Browser Use / Browser Bridge 代码（Go CLI + Chrome Extension + 协议层）。原位于独立仓库 `actspace-plugins`，已于 2026-07-10 合并入主仓库。
+- `plugins/fs-watch/`：文件监听 Rust 插件。同上，已合并入主仓库。
+- `/Users/wakeup-jin/Desktop/code-project/side-project/agent-browser-bridge/`：Browser Bridge 最早期来源仓库；仅作历史上下文。
 
 ## 阶段完成后的学习沉淀
 

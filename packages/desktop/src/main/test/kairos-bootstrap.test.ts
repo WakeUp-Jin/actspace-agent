@@ -212,7 +212,6 @@ describe("createKairosToolManagerFactory", () => {
     const manager = factory(makeConfig());
 
     expect(manager.has("web_search")).toBe(true);
-    expect(manager.has("analyze_media")).toBe(true);
   });
 
   it("keeps exposing web_search when Kairos explicitly falls back to OpenAI-compatible DeepSeek", async () => {

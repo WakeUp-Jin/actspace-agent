@@ -26,7 +26,7 @@
 
 ## 工具命名约定
 
-- **工具对外 `name`** 一律 **snake_case**，例如 `read_file`, `write_file`, `edit_file`, `list_directory`, `web_search`, `analyze_media`。单词工具（`bash`, `grep`, `glob`）保持单词无分隔符。
+- **工具对外 `name`** 一律 **snake_case**，例如 `read_file`, `write_file`, `edit_file`, `list_directory`, `web_search`, `web_fetch`。单词工具（`bash`, `grep`, `glob`）保持单词无分隔符。
   - LLM 工具协议（OpenAI / DeepSeek / Kimi / Anthropic）事实约定都是 snake_case，统一使用 `_` 而不是 `-` 兼容性最好。
   - 历史上 `edit-file` 是 kebab-case 异类，已在 2026-05 统一为 `edit_file`。
 - **目录名**（`packages/agent-core/src/tools/tools/<dir>/`）一律 **kebab-case**，例如 `edit-file-diff/`, `read-file/`, `web-search/`。这是仓库整体的目录命名风格，与工具 `name` 独立。
@@ -139,12 +139,6 @@
 - query 模式展示：`Web Search 最新新闻 今天`。
 - url 模式展示：`Web Search https://example.com/path`（2026-07-06 起两种模式统一 `Web Search` 前缀，`mode` 字段仍保留区分）。
 - 不在工具日志行里展示搜索结果正文、来源摘要或页面摘要；这些内容只保留在 `tool_result.rawOutput` / `modelOutput` 中，供模型继续推理和排障使用。
-
-### `analyze_media`
-
-- 当前使用 `generic`。
-- 优先展示媒体文件名、URL 或输入来源。
-- 展示建议：`Analyzed image screenshot.png` 或 `Analyzed media`。
 
 ### `agent`
 

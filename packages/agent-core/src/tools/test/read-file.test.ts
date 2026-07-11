@@ -44,6 +44,20 @@ describe("read_file", () => {
     expect(output).toContain("[Showing lines 1-200 of 250. Use offset/limit to read more.]");
   });
 
+  it("returns image files as native image content for multimodal models", async () => {
+    const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    await writeFile(join(workspace, "pixel.png"), Buffer.from(pngBase64, "base64"));
+
+    const result = await readFileExecutor({ path: "pixel.png" }, workspace);
+
+    expect(result.success).toBe(true);
+    expect(String(result.data)).toContain("Read image file:");
+    expect(result.content).toEqual([
+      expect.objectContaining({ type: "text" }),
+      { type: "image", data: pngBase64, mimeType: "image/png" },
+    ]);
+  });
+
   it("returns an unchanged stub for repeated reads of the same unchanged range", async () => {
     await writeFile(join(workspace, "memo.txt"), "alpha\nbeta\n", "utf8");
 

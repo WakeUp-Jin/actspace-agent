@@ -14,7 +14,7 @@
  * 设计参考：.agents/skills/llm-agent-dev/examples/agent-loop.ts
  */
 
-import type { UserMessage } from "../messages";
+import type { ImageContent, TextContent, UserMessage } from "../messages";
 import { MessagePriority, getTextContent } from "../messages";
 import type { LLMService } from "../llm/types";
 import type { ToolManager } from "../tools/manager";
@@ -84,10 +84,10 @@ export class Agent {
   }
 
   /** 执行一次完整的 agent 交互 */
-  async run(userText: string): Promise<AgentLoopResult> {
+  async run(userInput: string | (TextContent | ImageContent)[]): Promise<AgentLoopResult> {
     const userMsg: UserMessage = {
       role: "user",
-      content: userText,
+      content: userInput,
       timestamp: Date.now(),
       source: "user",
       priority: MessagePriority.HIGH,

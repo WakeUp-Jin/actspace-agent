@@ -16,28 +16,41 @@ Browser Bridge 已经能安装 `abb`、注册 Native Messaging host，并通过�
 
 ## 怎么做
 
-插件能力至少要补两层可见性：
+插件能力至少要补四层闭环：
 
-1. **动态 runtime hint**
+1. **工具注册**
+   - definition 和 executor 只是源码素材，必须进入 ToolManager 才会出现在模型的 tool definitions 中。
+   - 外部能力未安装时不注册，避免暴露必然失败的工具。
+
+2. **运行时连接契约**
+   - Agent 与插件必须共享同一 socket 路径、协议版本和 session 生命周期。
+   - 长连接要求服务端能在同一连接内持续读帧，不能处理一条请求就关闭。
+
+3. **动态 runtime hint**
    - 当能力确实存在时才注入。
-   - 内容只放入口路径、适用场景和第一步诊断命令。
+   - 内容描述标准工具选择和失败后的诊断路径。
    - 不把本机路径硬编码进基础 system prompt。
 
-2. **托管 Skill**
+4. **托管 Skill**
    - 安装成功后生成到 Agent 已扫描的 Skill 目录。
-   - 只负责让模型知道“这里有这个能力”。
-   - 不复制完整命令手册，命令细节继续从 CLI 的 `help`、`doctor`、`capabilities` 获取。
+   - 对 actspace-agent 来说只承担诊断/修复说明，不能与标准工具争夺正常任务入口。
+   - 对其他 Agent 仍可保留 CLI onboarding，但必须明确消费方边界。
 
 ## 核心要点
 
 - 设置页状态是给人看的，不会自动进入模型上下文。
 - Skill 放在插件源码目录里不等于 Agent 能扫描到；必须落到 `.actspace/skills`、`.agents/skills`、userData skills 等已知扫描根。
-- CLI-first 不排斥 Skill；关键是 Skill 只能做薄入口，避免和 CLI 命令面形成双重事实来源。
+- Bridge 产品可以保持 CLI-first；特定宿主消费它时可以用标准工具作为模型入口。两者解决的是不同层级的问题。
 - 动态能力不要写进全局基础 prompt，否则未安装插件的用户会收到不存在的工具指令。
+- “export 了工具”不等于“模型拥有工具”；验收必须查看真实会话 tool definitions 或 tool_call 日志。
+- 长连接能力必须用至少三帧回归测试锁定：session.start、业务请求、session.end。
 
 ## 常见陷阱
 
 - 只做 IPC / UI / doctor 检查，忘记主 Agent prompt。
+- 只导出 definition/executor，忘记加入 ToolManager 注册表。
+- TS 客户端与 Native Host 各自发明默认 socket 路径。
+- 客户端设计为长连接，服务端却每个连接只读取一条请求。
 - 只写设计文档，没把可执行路径注入当前 turn。
 - 把插件源码里的 Skill 当作已安装 Skill。
 - 在 Skill 里写满命令细节，后续 CLI 改了但 Skill 没同步。

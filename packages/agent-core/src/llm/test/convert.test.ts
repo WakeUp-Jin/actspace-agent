@@ -83,6 +83,91 @@ describe("convertMessages", () => {
     expect(result[1]).toEqual({ role: "tool", tool_call_id: "tc1", content: "content" });
   });
 
+  it("converts tool image content into a follow-up user image observation", () => {
+    const ctx: Context = {
+      messages: [{
+        role: "assistant",
+        content: [
+          { type: "toolCall", id: "tc1", name: "read_file", arguments: { path: "image.png" } },
+        ],
+        model: "m", provider: "p",
+        usage: createEmptyUsage(), stopReason: "toolUse", timestamp: Date.now(),
+      } as AssistantMessage,
+      {
+        role: "toolResult",
+        toolCallId: "tc1",
+        toolName: "read_file",
+        content: [
+          { type: "text", text: "Read image file: image.png" },
+          { type: "image", data: "abc", mimeType: "image/png" },
+        ],
+        isError: false,
+        timestamp: Date.now(),
+      } as ToolResultMessage],
+    };
+
+    const result = convertMessages(ctx);
+
+    expect(result[1]).toEqual({
+      role: "tool",
+      tool_call_id: "tc1",
+      content: "Read image file: image.png",
+    });
+    expect(result[2]).toEqual({
+      role: "user",
+      content: [
+        { type: "text", text: "Tool read_file returned 1 image for visual analysis." },
+        { type: "image_url", image_url: { url: "data:image/png;base64,abc" } },
+      ],
+    });
+  });
+
+  it("delays tool image observations until all consecutive tool results are emitted", () => {
+    const ctx: Context = {
+      messages: [{
+        role: "assistant",
+        content: [
+          { type: "toolCall", id: "tc_image", name: "read_file", arguments: { path: "image.png" } },
+          { type: "toolCall", id: "tc_text", name: "bash", arguments: { command: "echo ok" } },
+        ],
+        model: "m", provider: "p",
+        usage: createEmptyUsage(), stopReason: "toolUse", timestamp: Date.now(),
+      } as AssistantMessage,
+      {
+        role: "toolResult",
+        toolCallId: "tc_image",
+        toolName: "read_file",
+        content: [
+          { type: "text", text: "Read image file: image.png" },
+          { type: "image", data: "abc", mimeType: "image/png" },
+        ],
+        isError: false,
+        timestamp: Date.now(),
+      } as ToolResultMessage,
+      {
+        role: "toolResult",
+        toolCallId: "tc_text",
+        toolName: "bash",
+        content: [{ type: "text", text: "ok" }],
+        isError: false,
+        timestamp: Date.now(),
+      } as ToolResultMessage],
+    };
+
+    const result = convertMessages(ctx);
+
+    expect(result.map((message) => message.role)).toEqual(["assistant", "tool", "tool", "user"]);
+    expect(result[1]).toEqual({ role: "tool", tool_call_id: "tc_image", content: "Read image file: image.png" });
+    expect(result[2]).toEqual({ role: "tool", tool_call_id: "tc_text", content: "ok" });
+    expect(result[3]).toEqual({
+      role: "user",
+      content: [
+        { type: "text", text: "Tool read_file returned 1 image for visual analysis." },
+        { type: "image_url", image_url: { url: "data:image/png;base64,abc" } },
+      ],
+    });
+  });
+
   it("skips assistant messages with stopReason error", () => {
     const ctx: Context = {
       messages: [

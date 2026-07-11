@@ -105,6 +105,18 @@ function parseNotifyOnOutput(value: unknown): OutputSubscriptionSpec | string | 
   return { pattern: spec.pattern, reason: spec.reason.trim(), debounceMs };
 }
 
+function imageContentFromDataUrl(output: string): { type: "image"; data: string; mimeType: string } | undefined {
+  const trimmed = output.trim();
+  const match = trimmed.match(/^data:(image\/(?:png|jpeg|jpg|gif|webp|bmp));base64,([A-Za-z0-9+/=\r\n]+)$/i);
+  if (!match?.[1] || !match[2]) return undefined;
+  const mimeType = match[1].toLowerCase() === "image/jpg" ? "image/jpeg" : match[1].toLowerCase();
+  return {
+    type: "image",
+    data: match[2].replace(/\s/g, ""),
+    mimeType,
+  };
+}
+
 function buildForegroundResult(
   command: string,
   cwd: string,
@@ -112,6 +124,9 @@ function buildForegroundResult(
   sandboxed: boolean,
 ): ToolResult {
   const outputTruncated = status.totalChars > status.headBuffer.length;
+  const imageContent = !outputTruncated && status.exitCode === 0
+    ? imageContentFromDataUrl(status.headBuffer)
+    : undefined;
   const result: BashResult = {
     command,
     cwd,
@@ -142,7 +157,19 @@ function buildForegroundResult(
     return { success: false, data: result, error: `Bash command exited with code ${status.exitCode}`, outputRef };
   }
 
-  return { success: true, data: result, outputRef };
+  if (!imageContent) {
+    return { success: true, data: result, outputRef };
+  }
+
+  return {
+    success: true,
+    data: result,
+    content: [
+      { type: "text", text: `Bash produced an image data URL (${imageContent.mimeType}).` },
+      imageContent,
+    ],
+    outputRef,
+  };
 }
 
 export const bashExecutor = async (

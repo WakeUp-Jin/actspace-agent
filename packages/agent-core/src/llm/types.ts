@@ -35,7 +35,6 @@ export interface StreamOptions {
   maxTokens?: number;
   signal?: AbortSignal;
   tools?: APIRequestTool[];
-  thinking?: { type: "disabled" };
   thinkingEnabled?: boolean;
 }
 

@@ -26,6 +26,10 @@ export {
   type ToolSchedulerConfig,
   type ToolSchedulerExecution,
 } from "./scheduler";
+export {
+  createApprovalGateForPermissionMode,
+  type PermissionMode,
+} from "./permission-mode";
 export { guardWorkspacePath, guardWritablePath, resolveReadablePath, displayReadablePath } from "./workspace-guard";
 export type { GuardResult } from "./workspace-guard";
 export { shouldExposeTool } from "./exposure";
@@ -48,8 +52,21 @@ export { deleteFileDefinition } from "./tools/delete-file/definition";
 export { bashDefinition } from "./tools/bash/definition";
 export { webSearchDefinition } from "./tools/web-search/definition";
 export { webFetchDefinition } from "./tools/web-fetch/definition";
-export { analyzeMediaDefinition } from "./tools/analyze-media/definition";
 export { agentDefinition, exploreDefinition } from "./tools/agent/definition";
+export {
+  browserDefinitions,
+  browserCuaDefinition,
+  browserDomDefinition,
+  browserLocatorDefinition,
+  browserNavigationDefinition,
+  browserTabsDefinition,
+  browserUserDefinition,
+  browserWaitDefinition,
+  browserIoDefinition,
+  browserDebugDefinition,
+  browserHelpDefinition,
+  browserRunDefinition,
+} from "./tools/browser/definition";
 
 // 工具执行器
 export { readFileExecutor } from "./tools/read-file/executor";
@@ -61,6 +78,10 @@ export { writeFileExecutor, renderWriteResult } from "./tools/write-file/executo
 export { deleteFileExecutor, renderDeleteResult } from "./tools/delete-file/executor";
 export { bashExecutor } from "./tools/bash/executor";
 export type { BashResult } from "./tools/bash/executor";
+export {
+  createBrowserToolExecutors,
+  type BrowserToolExecutors,
+} from "./tools/browser/executor";
 export {
   createDeleteFilePermissionChecker,
   createDeleteFileTool,
@@ -78,7 +99,6 @@ export {
 export type { BashTask, BashTaskNotification, BashTaskStatus, BashBackgroundedResult } from "./tools/bash";
 export { webSearchExecutor } from "./tools/web-search/executor";
 export { webFetchExecutor } from "./tools/web-fetch/executor";
-export { analyzeMediaExecutor } from "./tools/analyze-media/executor";
 export {
   createAgentTool,
   createExploreTool,
@@ -111,9 +131,16 @@ import { webSearchDefinition } from "./tools/web-search/definition";
 import { webSearchExecutor } from "./tools/web-search/executor";
 import { webFetchDefinition } from "./tools/web-fetch/definition";
 import { webFetchExecutor } from "./tools/web-fetch/executor";
-import { analyzeMediaDefinition } from "./tools/analyze-media/definition";
-import { analyzeMediaExecutor } from "./tools/analyze-media/executor";
 import { createAgentTool, createExploreTool } from "./tools/agent";
+import {
+  browserDefinitions,
+} from "./tools/browser/definition";
+import { createBrowserToolExecutors } from "./tools/browser/executor";
+import {
+  createBrowserActionPermissionChecker,
+  createBrowserRunPermissionChecker,
+} from "./tools/browser/permissions";
+import { browserLegacyAliases } from "./tools/browser/generated-actions";
 import { shouldExposeTool } from "./exposure";
 
 /** 创建预装基础工具的 ToolManager */
@@ -153,13 +180,33 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     ],
     [webSearchDefinition, webSearchExecutor],
     [webFetchDefinition, webFetchExecutor],
-    [analyzeMediaDefinition, analyzeMediaExecutor],
   ];
 
   for (const [definition, executor, renderResult, checkPermissions] of entries) {
     if (!disabledTools.has(definition.name) && shouldExposeTool(definition, runtime)) {
       manager.registerFromSpec(definition, executor, renderResult, checkPermissions);
     }
+  }
+
+  if (config.browserBridgeSocketPath) {
+    const browserExecutors = createBrowserToolExecutors({
+      socketPath: config.browserBridgeSocketPath,
+      sessionId: config.sessionId ?? `session-${process.pid}`,
+      turnId: config.turnId ?? `turn-${Date.now()}`,
+    });
+    for (const definition of browserDefinitions) {
+      if (isBrowserToolDisabled(definition.name, disabledTools)) continue;
+      const executor = browserExecutors.executors[definition.name];
+      if (!executor) continue;
+      const category = definition.name.replace(/^browser_/, "");
+      const checkPermissions = definition.name === "browser_help"
+        ? undefined
+        : definition.name === "browser_run"
+          ? createBrowserRunPermissionChecker(browserExecutors.preflight, disabledTools)
+          : createBrowserActionPermissionChecker(category, disabledTools);
+      manager.registerFromSpec(definition, executor, undefined, checkPermissions);
+    }
+    manager.registerDisposer(browserExecutors.dispose);
   }
 
   if (!disabledTools.has("delete_file")) {
@@ -206,4 +253,12 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
   }
 
   return manager;
+}
+
+function isBrowserToolDisabled(name: string, disabledTools: ReadonlySet<string>): boolean {
+  if (disabledTools.has(name)) return true;
+  const category = name.replace(/^browser_/, "");
+  return Object.entries(browserLegacyAliases).some(([alias, target]) => (
+    disabledTools.has(alias) && target.category === category
+  ));
 }

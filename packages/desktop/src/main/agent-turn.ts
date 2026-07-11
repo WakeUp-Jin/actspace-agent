@@ -9,8 +9,9 @@
  */
 
 import type { BrowserWindow } from "electron";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AgentTurnResult, RunTurnInput, RuntimeStreamEvent } from "@actspace/shared";
+import type { AgentTurnResult, ComposerAttachment, RunTurnInput, RuntimeStreamEvent } from "@actspace/shared";
 import {
   buildAgentConfig,
   createAgentForSession,
@@ -31,7 +32,6 @@ import {
 } from "@actspace/agent-core";
 import type { SessionMeta } from "@actspace/shared";
 import type { PendingApprovalRegistry } from "./approval-registry";
-import { analyzeImageAttachmentsForTurn } from "./media-analysis";
 
 export type AppDataRoots = {
   dataRoot: string;
@@ -42,9 +42,55 @@ export type AppDataRoots = {
   workspaceRoot: string;
 };
 
+const IMAGE_MIME_BY_EXT: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+  ".svg": "image/svg+xml",
+  ".heic": "image/heic",
+  ".heif": "image/heif",
+};
+
+function extname(value: string): string {
+  const match = value.match(/\.[^.\\/]+$/);
+  return match?.[0]?.toLowerCase() ?? "";
+}
+
+function inferAttachmentMimeType(attachment: ComposerAttachment): string {
+  return attachment.mimeType || IMAGE_MIME_BY_EXT[extname(attachment.name)] || "image/png";
+}
+
+async function prepareAttachmentsForModel(
+  attachments: ComposerAttachment[] | undefined,
+  supportsImages: boolean,
+): Promise<ComposerAttachment[] | undefined> {
+  if (!supportsImages || !attachments?.some((attachment) => attachment.kind === "image" && attachment.path)) {
+    return attachments;
+  }
+
+  const prepared: ComposerAttachment[] = [];
+  for (const attachment of attachments) {
+    if (attachment.kind !== "image" || !attachment.path) {
+      prepared.push(attachment);
+      continue;
+    }
+    const mimeType = inferAttachmentMimeType(attachment);
+    const bytes = await readFile(attachment.path);
+    prepared.push({
+      ...attachment,
+      mimeType,
+      path: `data:${mimeType};base64,${bytes.toString("base64")}`,
+    });
+  }
+  return prepared;
+}
+
 export type AgentRuntimeContextLoader = (
   workspaceRoot: string,
-) => Promise<Pick<AgentRuntimeContext, "systemPrompt" | "systemPromptSegments" | "additionalWritableRoots">>;
+) => Promise<Pick<AgentRuntimeContext, "systemPrompt" | "systemPromptSegments" | "additionalWritableRoots" | "browserBridgeSocketPath">>;
 
 const PREVIEW_LIMIT = 160;
 
@@ -245,64 +291,67 @@ export async function runAndPersistTurn(
     win?.webContents.send("agent:stream", event);
   };
 
-  const attachmentAnalyses = await analyzeImageAttachmentsForTurn({
-    sessionId: input.sessionId,
-    turnId: input.turnId,
-    userInput: input.userInput,
-    attachments: input.attachments,
-    onStreamEvent: forwardStreamEvent,
-  });
+  try {
+    const modelAttachments = await prepareAttachmentsForModel(
+      input.attachments,
+      deps.modelSpec.input.includes("image"),
+    );
 
-  const resultPromise = runTurnWithAgent(
-    {
+    const resultPromise = runTurnWithAgent(
+      {
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        userInput: input.userInput,
+        attachments: input.attachments,
+        modelAttachments,
+        thinkingEnabled: input.thinkingEnabled,
+      },
+      abortableDeps,
+      {
+        onStreamEvent: forwardStreamEvent,
+        runLogger,
+      },
+    );
+
+    const result = await resultPromise;
+
+    await writeAgentRunLog(runLogger, "main_event", {
+      stage: "persisting_turn_result",
+      sessionDir,
+      status: result.status,
+      eventCount: result.events.length,
+    });
+    logAgentTurn("persisting turn result", {
       sessionId: input.sessionId,
       turnId: input.turnId,
+      sessionDir,
+      status: result.status,
+      eventCount: result.events.length,
+    });
+    await writeSessionResult(sessionPaths, result);
+    await writeAgentRunLog(runLogger, "main_event", {
+      stage: "turn_result_persisted",
+      status: result.status,
+    });
+    logAgentTurn("turn result persisted", {
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      status: result.status,
+    });
+
+    await maybeGenerateSessionTitle({
+      metaPath: sessionPaths.metaPath,
+      sessionMeta,
+      priorMessageCount,
+      result,
       userInput: input.userInput,
-      attachments: input.attachments,
-      attachmentAnalyses,
-      thinkingEnabled: input.thinkingEnabled,
-    },
-    abortableDeps,
-    {
-      onStreamEvent: forwardStreamEvent,
-      runLogger,
-    },
-  );
+    });
 
-  const result = await resultPromise;
-
-  await writeAgentRunLog(runLogger, "main_event", {
-    stage: "persisting_turn_result",
-    sessionDir,
-    status: result.status,
-    eventCount: result.events.length,
-  });
-  logAgentTurn("persisting turn result", {
-    sessionId: input.sessionId,
-    turnId: input.turnId,
-    sessionDir,
-    status: result.status,
-    eventCount: result.events.length,
-  });
-  await writeSessionResult(sessionPaths, result);
-  await writeAgentRunLog(runLogger, "main_event", {
-    stage: "turn_result_persisted",
-    status: result.status,
-  });
-  logAgentTurn("turn result persisted", {
-    sessionId: input.sessionId,
-    turnId: input.turnId,
-    status: result.status,
-  });
-
-  await maybeGenerateSessionTitle({
-    metaPath: sessionPaths.metaPath,
-    sessionMeta,
-    priorMessageCount,
-    result,
-    userInput: input.userInput,
-  });
-
-  activeTurnAborts.delete(turnKey);
-  return result;
+    return result;
+  } finally {
+    activeTurnAborts.delete(turnKey);
+    await deps.toolManager.dispose().catch((error) => {
+      console.error("[agent-turn] failed to dispose tool manager", error);
+    });
+  }
 }

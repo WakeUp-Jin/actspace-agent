@@ -64,11 +64,15 @@ describe("BashRunBlock tooltips", () => {
     const preview = screen.getByText(
       "\"/Users/wakeup-jin/Library/Application Support/actspace/plugins/browser-bridge/bin/abb\" doctor",
     );
+    const sandboxBadge = screen.getByText("沙盒");
+    const trailing = sandboxBadge.closest(".bash-run-trailing");
     const toggle = summary.closest("button");
 
     expect(toggle).toHaveClass("flex", "w-full", "overflow-hidden");
     expect(summary).toHaveClass("bash-run-summary", "flex-none", "whitespace-nowrap");
     expect(preview).toHaveClass("bash-command-preview", "min-w-0", "flex-1", "overflow-hidden", "text-ellipsis");
+    expect(trailing).toHaveClass("bash-run-trailing", "flex-none");
+    expect(trailing).toContainElement(sandboxBadge);
   });
 
   it("stops the shimmer once the background task reaches a terminal state", () => {

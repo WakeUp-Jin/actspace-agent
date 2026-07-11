@@ -18,6 +18,7 @@
 - `core-storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
 - `core-review-change-sources.md`：Review 变更来源、Git-first baseline、无 Git 初始化引导和右侧 Review 视图分阶段路线。
 - `agent-index.md`：Agent Runtime 专题入口。
+- `agent-browser-use-index.md`：Browser Use 专题入口，统一当前架构、11 个模型工具、62 条 canonical command 和 Go/Extension/Injected JS 职责边界。
 - `front-index.md`：桌面端前端设计专题入口。
 - `lab-index.md`：Lab 能力实验台专题入口。
 - `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档。
@@ -32,6 +33,10 @@
 
 - `agent-backend-design.md`：后端 Agent Runtime 的总体设计事实来源。
 - `agent-browser-bridge-design.md`：真实 Chrome 浏览器桥接层设计，约束 `actspace-agent` 与 extension、Go host/CLI、协议契约之间的接入边界。
+- `agent-browser-use-index.md`：Browser Use 专题入口；阅读其他 Browser Use 文档前先从这里确认当前架构和状态。
+- `agent-browser-use-command-surface.md`：Browser Use 62 条命令面分类详解（CUA / DOM CUA / Playwright / 导航 / Tab / 用户浏览器 / 等待 / 文件 / 调试），含参数 schema、内部实现和安全门控。
+- `agent-browser-use-integration-design.md`：Browser Use 集成方案设计——薄集成 + 长连接 Socket + Go Bridge 承担高层逻辑的工具暴露、连接生命周期、事件处理、光标可视化、Tab Group 管理和渐进路线。
+- `agent-browser-use-command-implementation.md`：Browser Use 62 条命令的核心实现设计——从 CDP 原语出发，按 7 种人类基本操作分组，定义每条命令的 CDP 调用链、Extension 伪代码、职责分层、实现状态和优先级排序。
 - `agent-turn-layers.md`：Agent Turn 四层职责规范（Renderer -> Main Process -> Bridge -> Agent）。
 - `agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块地图。
 - `agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
@@ -52,6 +57,9 @@
 - `agent-kairos-autonomous-mode.md`：Kairos 自治模式设计。
 - `agent-kairos-prompt-cache-optimization.md`：Kairos prompt 缓存优化设计（静态前缀 + 动态尾部、观测增量化、thinking 落盘回放）。
 - `agent-plugins-fs-watch.md`：Plugins 插件模式与 fs-watch 文件监听设计——独立仓库 Rust 二进制的文件契约、Skill 载体、设置页「插件」「Skills」分区和 Kairos Skill 白名单。
+- `agent-members.md`：跨 Room 持久 Agent Member 设计——稳定身份、配置版本、Members 设置页、Profile / Activity / Reminders / Workspace，以及 Member 全局状态与 Room 私有上下文边界。
+- `agent-form-team.md`：Agent 形态 — Agent Team 设计规范。约束会话级不可切换的 Team 形态、成员预设与团队成员、Task 单一事实源、成员 writeScope、文件 Mailbox、故障恢复、用户直聊成员和标签页 UI。
+- `agent-form-room.md`：Agent 形态 — Agent Room 设计规范。Room 引用持久 Member，使用 Room Log 范围读取、Shelved Draft 输出前检查、显式 @接力、cycle 运行预算和消息流 UI。
 
 ## Front
 

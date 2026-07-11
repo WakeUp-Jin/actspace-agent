@@ -21,16 +21,14 @@
 - 协议服务是 LLM 职责事实来源；品牌 service 只保留兼容包装，不再新增消息转换、tool call 重组或 usage 归一逻辑。
 - `llm/services/deepseek.ts`：DeepSeekService 兼容包装层，普通对话实际复用 `OpenAICompletionsService`；只负责 DeepSeek 的 provider 默认值和 api 兜底。
 - `llm/services/deepseek-anthropic.ts`：DeepSeekAnthropicService 兼容包装层，普通对话实际复用 `AnthropicMessagesService`；只负责 DeepSeek 的 provider 默认值和 api 兜底。
-- `llm/services/kimi.ts`：KimiService 兼容包装层，普通 Kimi 对话复用 `OpenAICompletionsService`；只兜底 provider 默认值（Kimi 主模型的 `$web_search` 回填循环在协议服务主入口内实现）。
+- `llm/services/kimi.ts`：KimiService 兼容包装层，普通 Kimi 对话复用 `OpenAICompletionsService`；只兜底 provider 默认值。
 - `llm/services/mock.ts`：MockLLMService，支持 response queue 模式（通过 `setResponses`/`appendResponses` 预设响应序列）和默认行为模式（向后兼容）。提供 `mockText`、`mockToolCall`、`mockError` 辅助工厂函数。
-- `llm/kimi-assistants.ts`：DeepSeek 专用的 Kimi 辅助调用层，当前仅含 `analyzeMediaWithKimi`（多模态识别）；系统提示词从 `prompt/kimi-assistants/` 引用。联网搜索已迁出 Kimi（见 `agent-web-tools.md`）。
 - `llm/factory.ts`：createLLMService 工厂函数。当前按 `LLMConfig.api` 选 `AnthropicMessagesService` / `OpenAICompletionsService`，provider 品牌包装层只保留兼容入口。
 
 ## `prompt/` - 提示词集中管理
 
 - `prompt/main-agent.ts`：桌面端默认主 Agent 系统提示词，供 `SystemPromptContext` 初始化使用。
 - `prompt/lab-agent.ts`：Lab Agent 默认系统提示词 builder；当前仅作为未来 Lab Runtime 的版本化 prompt 资产，包含写入 `<userData>/kairos/inbox/lab-agent.md` 的 handoff 规则，尚未接入真实 Lab 后端运行时。
-- `prompt/kimi-assistants/`：Kimi 辅助能力使用的系统提示词，当前仅 `analyze_media`。
 - 提示词文件顶部应写明使用位置、影响范围和维护边界；动态上下文、工具协议、密钥和运行时配置不应硬编码进提示词。
 
 ## `tools/` - 模块化工具系统
@@ -47,6 +45,7 @@
 - `tools/tools/{read-file,list-directory,edit-file-diff,write-file,delete-file,bash}/`：每个工具一个目录，含 `definition.ts` + `executor.ts`；其中 `edit-file-diff` 对外工具名为 `edit_file`（snake_case），使用 `diff` 库生成 unified diff 并原子写入；`new_string: ""` 表示删除匹配文本内容，不是删除文件，整行删除会连同该行换行删除，行内删除不得吞掉后续换行；`write-file` 对外工具名为 `write_file`，创建或覆写文件并生成 diff；`delete-file` 对外工具名为 `delete_file`，只删除 workspace 内普通文件，默认走一次性用户审批且不允许 `allow_similar`；这些写类/删类工具各有 `permissions.ts` 预留 AgentMode 审批扩展；Bash 额外包含 `permissions.ts` 和 `render-result.ts`。目录名沿用 kebab-case，对外 `name` 字段统一 snake_case，详见 `agent-tool-preview-design-guidelines.md` 的工具命名约定章节。
 - `tools/tools/{grep,glob}/`：文件搜索工具。grep 通过 ripgrep 正则搜索文件内容，glob 通过 `rg --files --glob` 按文件名模式查找。
 - `tools/tools/{web-search,web-fetch}/`：联网工具（设计见 `agent-web-tools.md`）。`web_search` 走外部搜索 API 双通道（智谱 + Tavily/TinyFish/Exa failover），任一搜索 key 存在时注册；`web_fetch` 本地确定性抓取 URL 转 Markdown，始终注册。
+- `tools/tools/browser/`：Browser Use 的薄 Agent adapter。`definition.ts` 只暴露 9 个分类工具、`browser_help`、`browser_run`；`generated-actions.ts` 从 Go 62 条 registry 生成 action/risk/status/legacy alias；`permissions.ts` 对单 action 做 metadata 审批、对 batch 调 Go preflight 并携带绑定 session/turn/action hash 的短期 token；`executor.ts` 通过单一长连接调用 `command.execute/describe/run`，不实现 CDP、Locator 或 Chrome API 逻辑。旧 15 个工具名只保留禁用配置 alias 与历史 preview 读取兼容。
 - `tools/tools/analyze-media/`：DeepSeek-only Kimi 辅助工具（多模态识别）；只有 DeepSeek 为主模型且配置 Kimi key 时注册。
 - `tools/tools/agent/`：Agent 工具（用户可见名 `Agent`，内部工具名 `agent`）。`definition.ts` 声明 `description` / `prompt` / `subagent_type:"explore"` 输入和 `previewKind:"agent"`；`runner.ts` 创建隔离 Explore SubAgent runtime，复用父 turn 的 LLMService，但只注册 `read_file`、`grep`、`glob`、`list_directory` 四个只读工具，不恢复主 session 历史，也不允许递归 Agent。runner 把 SubAgent 内部事件转成 sidecar transcript、`AgentToolPreview.recentEvents`、最终 summary/stats/transcriptRef，并通过 `ToolResult.subagent` 返回给 bridge。
 

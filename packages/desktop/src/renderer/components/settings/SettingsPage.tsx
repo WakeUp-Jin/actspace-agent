@@ -879,7 +879,7 @@ function ModelSection({ settings, onUpdate, onConnectProvider, onClearProvider, 
         <ProviderRow
           provider="kimi"
           label="Kimi"
-          description="Kimi K2.6 与多模态分析（analyze_media）供应商。"
+          description="Kimi K 系列模型供应商。"
           hasApiKey={settings.providers.kimi.hasApiKey}
           onConnect={onConnectProvider}
           onClear={onClearProvider}

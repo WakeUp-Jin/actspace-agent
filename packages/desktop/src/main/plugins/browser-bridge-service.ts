@@ -4,9 +4,11 @@
  * 与 fs-watch 不同：browser-bridge 的运行时 host 由 Chrome Native Messaging 拉起，
  * actspace 只负责安装 `abb`、注册 native host、暴露 doctor/capabilities 状态。
  */
-import { chmod, copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { homedir } from "node:os";
 import type {
   BrowserBridgeActionResult,
   BrowserBridgeDoctorCheck,
@@ -18,11 +20,14 @@ import type {
 const BROWSER_BRIDGE_BUILD_TIMEOUT_MS = 10 * 60 * 1000;
 const BROWSER_BRIDGE_ERROR_TAIL_CHARS = 1_600;
 const ABB_COMMAND_TIMEOUT_MS = 15_000;
+const ABB_STATUS_ERROR_RETRY_MS = 5_000;
 const BROWSER_BRIDGE_SKILL_NAME = "browser-bridge";
 
 interface BrowserBridgeServiceOptions {
   dataRoot: string;
   log?: (message: string, details?: Record<string, unknown>) => void;
+  commandTimeoutMs?: number;
+  statusErrorRetryMs?: number;
 }
 
 interface AbbCommandResult {
@@ -40,11 +45,22 @@ interface DoctorJson {
 export class BrowserBridgeService {
   private readonly dataRoot: string;
   private readonly log: (message: string, details?: Record<string, unknown>) => void;
+  private readonly commandTimeoutMs: number;
+  private readonly statusErrorRetryMs: number;
   private lastError: string | undefined;
+  private statusGeneration = 0;
+  private statusInFlight:
+    | { key: string; promise: Promise<BrowserBridgeStatus> }
+    | undefined;
+  private statusErrorCache:
+    | { key: string; expiresAt: number; status: BrowserBridgeStatus }
+    | undefined;
 
   constructor(options: BrowserBridgeServiceOptions) {
     this.dataRoot = options.dataRoot;
     this.log = options.log ?? (() => {});
+    this.commandTimeoutMs = options.commandTimeoutMs ?? ABB_COMMAND_TIMEOUT_MS;
+    this.statusErrorRetryMs = options.statusErrorRetryMs ?? ABB_STATUS_ERROR_RETRY_MS;
   }
 
   get pluginRoot(): string {
@@ -63,9 +79,47 @@ export class BrowserBridgeService {
     return join(this.skillDir, "SKILL.md");
   }
 
-  async getStatus(repoRoot?: string | null): Promise<BrowserBridgeStatus> {
+  get socketPath(): string {
+    if (process.env.ABB_SOCKET) return process.env.ABB_SOCKET;
+    const supportDir = process.env.ABB_SUPPORT_DIR
+      ?? join(homedir(), "Library", "Application Support", "AgentBrowserBridge");
+    return join(supportDir, "agent-browser-bridge.sock");
+  }
+
+  getStatus(repoRoot?: string | null): Promise<BrowserBridgeStatus> {
+    const key = repoRoot ?? "";
+    const cached = this.statusErrorCache;
+    if (cached && cached.key === key && cached.expiresAt > Date.now()) {
+      return Promise.resolve(cached.status);
+    }
+    if (this.statusInFlight?.key === key) return this.statusInFlight.promise;
+
+    const generation = this.statusGeneration;
+    const promise = this.loadStatus(repoRoot)
+      .then((status) => {
+        if (generation === this.statusGeneration) {
+          if (status.runState === "error") {
+            this.statusErrorCache = {
+              key,
+              expiresAt: Date.now() + this.statusErrorRetryMs,
+              status,
+            };
+          } else if (this.statusErrorCache?.key === key) {
+            this.statusErrorCache = undefined;
+          }
+        }
+        return status;
+      })
+      .finally(() => {
+        if (this.statusInFlight?.promise === promise) this.statusInFlight = undefined;
+      });
+    this.statusInFlight = { key, promise };
+    return promise;
+  }
+
+  private async loadStatus(repoRoot?: string | null): Promise<BrowserBridgeStatus> {
     const installed = await this.isInstalled();
-    const extensionDir = repoRoot ? join(repoRoot, "plugins", "browser-bridge", "apps", "chrome-extension") : undefined;
+    const extensionDir = repoRoot ? join(resolvePluginDir(repoRoot), "apps", "chrome-extension") : undefined;
     if (!installed) {
       return {
         installed,
@@ -104,7 +158,7 @@ export class BrowserBridgeService {
   }
 
   async buildAndInstall(repoRoot: string): Promise<BrowserBridgeInstallResult> {
-    const pluginDir = join(repoRoot, "plugins", "browser-bridge");
+    const pluginDir = resolvePluginDir(repoRoot);
     const buildScript = join(pluginDir, "build.sh");
     const sourceBinary = join(pluginDir, "skill", "scripts", "abb");
     const extensionDir = join(pluginDir, "apps", "chrome-extension");
@@ -114,7 +168,7 @@ export class BrowserBridgeService {
     } catch {
       return {
         ok: false,
-        error: `该目录不是含 browser-bridge 的 actspace-plugins 仓库（缺少 plugins/browser-bridge/build.sh 或 Chrome extension）：${repoRoot}`,
+        error: `在该路径下找不到 browser-bridge 插件（缺少 plugins/browser-bridge/build.sh 或 Chrome extension）：${repoRoot}`,
       };
     }
 
@@ -132,22 +186,34 @@ export class BrowserBridgeService {
   }
 
   async installFromFile(sourcePath: string): Promise<BrowserBridgeInstallResult> {
+    const tmpPath = `${this.binPath}.tmp-${process.pid}-${randomUUID()}`;
     try {
       await mkdir(dirname(this.binPath), { recursive: true });
-      await copyFile(sourcePath, this.binPath);
-      await chmod(this.binPath, 0o755);
-      const help = await this.runAbb(["help"]);
-      if (!help.ok || !help.stdout.includes("Agent Browser Bridge")) {
-        return { ok: false, error: "该文件不是有效的 abb 二进制（help 探测失败）。" };
+      await copyFile(sourcePath, tmpPath);
+      await chmod(tmpPath, 0o755);
+      const help = await this.runAbbAt(tmpPath, ["help"]);
+      if (!help.ok) {
+        const error = `abb help 探测失败：${commandFailureDetail(help)}`;
+        this.lastError = error;
+        return { ok: false, error };
       }
+      if (!help.stdout.includes("Agent Browser Bridge")) {
+        const error = "abb help 探测失败：输出不包含 Agent Browser Bridge 标识。";
+        this.lastError = error;
+        return { ok: false, error };
+      }
+      await rename(tmpPath, this.binPath);
       await this.writeManagedSkill();
       this.lastError = undefined;
+      this.invalidateStatusState();
       this.log("browser-bridge abb installed", { abbPath: this.binPath, skillPath: this.skillPath });
       return { ok: true, abbPath: this.binPath };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.lastError = message;
       return { ok: false, error: `安装失败：${message}` };
+    } finally {
+      await rm(tmpPath, { force: true }).catch(() => {});
     }
   }
 
@@ -162,6 +228,7 @@ export class BrowserBridgeService {
       return { ok: false, error };
     }
     this.lastError = undefined;
+    this.invalidateStatusState();
     return { ok: true };
   }
 
@@ -175,7 +242,17 @@ export class BrowserBridgeService {
   }
 
   private runAbb(args: string[]): Promise<AbbCommandResult> {
-    return runCommand(this.binPath, args, undefined, ABB_COMMAND_TIMEOUT_MS);
+    return this.runAbbAt(this.binPath, args);
+  }
+
+  private runAbbAt(command: string, args: string[]): Promise<AbbCommandResult> {
+    return runCommand(command, args, undefined, this.commandTimeoutMs);
+  }
+
+  private invalidateStatusState(): void {
+    this.statusGeneration += 1;
+    this.statusInFlight = undefined;
+    this.statusErrorCache = undefined;
   }
 
   private async writeManagedSkill(): Promise<void> {
@@ -184,22 +261,32 @@ export class BrowserBridgeService {
   }
 }
 
+/**
+ * 兼容两种仓库结构：
+ * - 旧结构（actspace-plugins）：repoRoot/plugins/browser-bridge/
+ * - 新结构（actspace-agent 合并后）：repoRoot/plugins/browser-bridge/
+ * 两者路径一致，但如果传入的是 actspace-agent 根目录或旧 actspace-plugins 根目录都能正确解析。
+ */
+function resolvePluginDir(repoRoot: string): string {
+  return join(repoRoot, "plugins", "browser-bridge");
+}
+
 function renderManagedSkill(abbPath: string): string {
   return [
     "---",
     "name: browser-bridge",
-    "description: Use when the user asks to inspect, navigate, automate, or take screenshots of the real Chrome browser via Browser Use. Prefer the abb CLI through bash for tabs, pages, history, navigation, screenshots, and CDP-backed browser actions.",
+    "description: Use only to diagnose or repair Browser Bridge when the standard browser_* tools report that the native host, socket, or Chrome extension is unavailable.",
     "---",
     "",
     "# Browser Bridge",
     "",
-    "Use this skill when a task needs the user's real Chrome browser state, including open tabs, current pages, navigation, history, screenshots, or Chrome Debugger/CDP-backed actions.",
+    "Normal browser tasks must use the standard `browser_*` tools exposed by actspace-agent. Do not invoke `abb` through Bash for tabs, page reads, navigation, screenshots, or browser interaction.",
     "",
-    "## Command",
+    "## Diagnostic Command",
     "",
     `- CLI: \`${abbPath}\``,
     "- Always quote the absolute path in bash commands because it may contain spaces.",
-    "- Start with `help`, `doctor --json`, or `capabilities --json` before using unfamiliar subcommands.",
+    "- Use only `help`, `doctor --json`, `capabilities --json`, or installation/registration commands needed to repair the bridge.",
     "- Prefer JSON output when available.",
     "- If `doctor --json` reports that the native host, local socket, or extension is unavailable, tell the user which part needs to be loaded or reloaded.",
     "",
@@ -241,6 +328,10 @@ function resolveRunState(checks: BrowserBridgeDoctorCheck[]): BrowserBridgeRunSt
   return "ready";
 }
 
+function commandFailureDetail(result: AbbCommandResult): string {
+  return result.error ?? (result.stderr || "未知错误");
+}
+
 function runCommand(
   command: string,
   args: string[],
@@ -260,6 +351,15 @@ function runCommand(
       return;
     }
 
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
+    const finish = (result: AbbCommandResult) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(result);
+    };
+
     let stdout = "";
     let stderr = "";
     const collect = (kind: "stdout" | "stderr", chunk: Buffer) => {
@@ -276,25 +376,30 @@ function runCommand(
     child.stdout?.on("data", (chunk: Buffer) => collect("stdout", chunk));
     child.stderr?.on("data", (chunk: Buffer) => collect("stderr", chunk));
 
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       try {
         child.kill("SIGKILL");
       } catch {
         // 进程可能已退出
       }
-      resolve({ ok: false, stdout, stderr, error: `命令超时（超过 ${Math.round(timeoutMs / 1000)} 秒）` });
+      const pid = child.pid ? `，PID ${child.pid}` : "";
+      finish({
+        ok: false,
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+        error: `命令超时（超过 ${Math.round(timeoutMs / 1000)} 秒${pid}，已请求 SIGKILL）`,
+      });
     }, timeoutMs);
 
     child.once("error", (error) => {
-      clearTimeout(timer);
-      resolve({ ok: false, stdout, stderr, error: error.message });
+      finish({ ok: false, stdout: stdout.trim(), stderr: stderr.trim(), error: error.message });
     });
-    child.once("exit", (code) => {
-      clearTimeout(timer);
-      if (code === 0) resolve({ ok: true, stdout: stdout.trim(), stderr: stderr.trim() });
+    child.once("close", (code, signal) => {
+      if (code === 0) finish({ ok: true, stdout: stdout.trim(), stderr: stderr.trim() });
       else {
         const tail = `${stdout}\n${stderr}`.slice(-BROWSER_BRIDGE_ERROR_TAIL_CHARS).trim();
-        resolve({ ok: false, stdout: stdout.trim(), stderr: stderr.trim(), error: tail || `命令退出码 ${code}` });
+        const fallback = signal ? `命令被信号 ${signal} 终止` : `命令退出码 ${code ?? "未知"}`;
+        finish({ ok: false, stdout: stdout.trim(), stderr: stderr.trim(), error: tail || fallback });
       }
     });
   });

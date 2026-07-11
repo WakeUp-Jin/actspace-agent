@@ -21,13 +21,15 @@
   - 本地落盘
 - 每轮真实 turn 的 `session.jsonl` 必须能恢复用户输入、中间执行和最终回复，至少包含 `user_message`、每次模型回复对应的 `llm_usage` 和轻量 `context_snapshot`。
 - 每个会话可以维护独立的 `context-state.json`，用于恢复当前 Context 面板展示；该文件是可覆盖视图，不替代 `session.jsonl` 的事实日志。
+- 本机二进制插件升级必须先在唯一临时路径完成探测，再通过原子 `rename` 替换正式路径；禁止原地覆盖可能正在运行的 Native Messaging host。Chrome unpacked extension 必须用 manifest 公开 key 固定 ID，并通过测试校验 Native Host allowlist 默认值与该 ID 一致。插件健康检查必须 single-flight，renderer 只能在上一轮完成后安排下一轮，失败状态需要退避，避免超时探测演变为进程风暴。
 
 ## 当前本地排障入口
 
 - `pnpm dev`：本地开发启动桌面端。
 - `pnpm dev:log`：本地开发启动桌面端，并把终端 stdout/stderr 同步写入根目录 `logs/dev-*.log`，同时更新 `logs/latest-dev.log` 供 Agent 排障读取。
 - 文件工具默认使用 workspace root，而不是 Electron `userData`。如需指定工作区，设置 `ACTSPACE_WORKSPACE_ROOT`。
-- `analyze_media`（多模态）需要 `KIMI_API_KEY`；`web_search` 需要任一搜索 provider key（`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY`）；`web_fetch` 无 key 要求。未配置时对应工具不会注册，避免运行中暴露一个必然失败的能力；executor 内另有缺 key 兜底错误作防御（见 `agent-web-tools.md`）。
+- `web_search` 需要任一搜索 provider key（`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY`）；`web_fetch` 无 key 要求。未配置搜索 key 时 `web_search` 不会注册，避免运行中暴露一个必然失败的能力；executor 内另有缺 key 兜底错误作防御（见 `agent-web-tools.md`）。
+- 多模态输入由模型注册表的 `input` 能力决定。当前模型不支持 `image` 时，图片附件不会被隐式分析，Agent 只看到附件元信息和 runtime model 能力提示。
 - 如需长期禁用某些工具，可设置 `ACTSPACE_DISABLED_TOOLS=read_file,bash`；工具会在注册阶段直接跳过，不会暴露给模型，也不会出现在运行时工具列表里。
 - `pnpm typecheck`：检查跨包类型契约。
 - `pnpm build`：检查当前桌面端和共享包是否可构建。
@@ -44,6 +46,7 @@
 - Agent 排查启动、构建、Electron 或 provider 问题时，优先读取 `logs/latest-dev.log`。
 - Agent 排查安装版启动问题时，优先读取 `~/Library/Application Support/actspace/logs/main-startup.log`。该日志由 main 进程直接写入，包含 app path 配置、数据目录初始化、窗口创建、renderer 加载成功/失败、renderer console、renderer 进程退出和 main 进程未捕获异常。
 - 排查本地更新时，优先读取设置页显示的 `<userData>/tmp/local-update/status.json` 和 `update.log`；这些文件由外部 helper 写入，替换阶段可能发生在主 app 退出之后。
+- 排查 Browser Bridge 编译安装失败时，先确认构建日志是否已经输出 `Built browser-bridge`，再区分临时二进制 `help` 探测失败、正式路径状态探测超时和 Chrome extension 未重载。若系统进程状态显示为不可中断等待，应先退出插件设置页和应用，停止继续轮询；代码侧不得通过提高 timeout 或重复重试掩盖问题。
 - Agent turn 运行时会向终端即时输出关键链路日志，`pnpm dev:log` 会同步写入 `logs/latest-dev.log`：
   - `[agent-ipc]`：renderer 调用 main、main 推送 stream event、turn 持久化等 IPC 边界。
   - `[agent-run]`：Agent loop 生命周期、流式 delta 计数、工具开始/结束、turn 完成状态。

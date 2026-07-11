@@ -128,12 +128,46 @@ const EXTRACTORS: Record<ToolPreviewKind, Extractor> = {
     };
   },
 
+  browser_cua: (s) => browserCategoryPreview("Browser CUA", s),
+  browser_dom: (s) => browserCategoryPreview("Browser DOM", s),
+  browser_locator: (s) => browserCategoryPreview("Browser Locator", s),
+  browser_navigation: (s) => browserCategoryPreview("Browser Navigation", s),
+  browser_tabs: (s) => browserCategoryPreview("Browser Tabs", s),
+  browser_user: (s) => browserCategoryPreview("Browser User", s),
+  browser_wait: (s) => browserCategoryPreview("Browser Wait", s),
+  browser_io: (s) => browserCategoryPreview("Browser I/O", s),
+  browser_debug: (s) => browserCategoryPreview("Browser Debug", s),
+  browser_help: (s) => browserCategoryPreview("Browser Help", s),
+  browser_run: () => ({ kind: "generic", title: "Browser Run", content: "batch" }),
+
+  browser_screenshot: () => ({ kind: "generic", title: "Browser Screenshot", content: "" }),
+  browser_dom_snapshot: () => ({ kind: "generic", title: "DOM Snapshot", content: "" }),
+  browser_navigate: (s) => ({ kind: "generic", title: "Navigate", content: getField(s, "url") ?? "" }),
+  browser_open_tab: (s) => ({ kind: "generic", title: "Open Tab", content: getField(s, "url") ?? "" }),
+  browser_list_tabs: () => ({ kind: "generic", title: "List Tabs", content: "" }),
+  browser_click: (s) => ({ kind: "generic", title: "Click", content: getField(s, "selector") ?? "" }),
+  browser_fill: (s) => ({ kind: "generic", title: "Fill", content: getField(s, "selector") ?? "" }),
+  browser_press_key: (s) => ({ kind: "generic", title: "Press Key", content: getField(s, "keys") ?? "" }),
+  browser_select: (s) => ({ kind: "generic", title: "Select", content: getField(s, "selector") ?? "" }),
+  browser_scroll: (s) => ({ kind: "generic", title: "Scroll", content: getField(s, "direction") ?? "" }),
+  browser_back: () => ({ kind: "generic", title: "Back", content: "" }),
+  browser_close_tab: () => ({ kind: "generic", title: "Close Tab", content: "" }),
+  browser_user_tabs: () => ({ kind: "generic", title: "User Tabs", content: "" }),
+  browser_claim_tab: () => ({ kind: "generic", title: "Claim Tab", content: "" }),
+  browser_finalize: () => ({ kind: "generic", title: "Finalize", content: "" }),
+
   generic: () => ({
     kind: "generic",
     title: "",
     content: "",
   }),
 };
+
+function browserCategoryPreview(title: string, partialArgsText: string): ToolUiPreview {
+  const action = getField(partialArgsText, "action") ?? "";
+  const target = getField(partialArgsText, "url") ?? getField(partialArgsText, "selector") ?? "";
+  return { kind: "generic", title, content: [action, target].filter(Boolean).join(" · ") };
+}
 
 export function extractStreamingPreview(
   previewKind: ToolPreviewKind,

@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Browser Bridge Acceptance Fixture</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f5f7;
+      color: #15171a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { width: min(960px, calc(100% - 40px)); margin: 40px auto 120px; }
+    header, section {
+      background: #fff;
+      border: 1px solid #d9dde3;
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 18px;
+      box-shadow: 0 6px 20px rgba(18, 23, 31, 0.05);
+    }
+    h1, h2 { margin-top: 0; }
+    .status { display: inline-flex; padding: 5px 10px; border-radius: 999px; background: #e7f7ec; color: #176b35; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    label { display: grid; gap: 7px; font-weight: 650; }
+    input, textarea, select, button, a.action {
+      font: inherit;
+      border-radius: 9px;
+    }
+    input, textarea, select { width: 100%; border: 1px solid #aeb6c2; padding: 10px 12px; background: #fff; }
+    textarea { min-height: 92px; resize: vertical; }
+    .checkbox { display: flex; align-items: center; gap: 9px; }
+    .checkbox input { width: 18px; height: 18px; }
+    button, a.action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 9px 16px;
+      border: 1px solid #20242a;
+      background: #20242a;
+      color: #fff;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    button.secondary, a.secondary { background: #fff; color: #20242a; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    pre { min-height: 70px; margin-bottom: 0; padding: 14px; overflow: auto; border-radius: 10px; background: #101317; color: #d7f9df; }
+    .drag-row { display: grid; grid-template-columns: 180px 1fr; gap: 18px; align-items: stretch; }
+    #drag-source, #drop-target {
+      display: grid;
+      place-items: center;
+      min-height: 110px;
+      border-radius: 12px;
+      user-select: none;
+    }
+    #drag-source { background: #f4c95d; cursor: grab; }
+    #drop-target { border: 2px dashed #788393; background: #f7f8fa; }
+    #drop-target[data-dropped="true"] { border-color: #198754; background: #e7f7ec; }
+    #scroll-stage { height: 720px; position: relative; background: linear-gradient(#f7f8fa, #e9edf2); border-radius: 12px; }
+    #scroll-target { position: absolute; left: 24px; right: 24px; bottom: 24px; padding: 18px; border-radius: 10px; background: #dbe8ff; }
+    @media (max-width: 680px) { .grid, .drag-row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="status" id="fixture-status">ready</p>
+      <h1 id="fixture-title">Browser Bridge Acceptance Fixture</h1>
+      <p>Deterministic local controls for Locator, DOM CUA, CUA, file, download, clipboard and debug acceptance.</p>
+    </header>
+
+    <section aria-labelledby="form-heading">
+      <h2 id="form-heading">Form controls</h2>
+      <form id="acceptance-form">
+        <div class="grid">
+          <label for="name-input">Name
+            <input id="name-input" name="name" type="text" autocomplete="off" placeholder="Type a name" />
+          </label>
+          <label for="color-select">Color
+            <select id="color-select" name="color">
+              <option value="red">Red</option>
+              <option value="green">Green</option>
+              <option value="blue">Blue</option>
+            </select>
+          </label>
+        </div>
+        <label for="notes-input" style="margin-top: 16px;">Notes
+          <textarea id="notes-input" name="notes" placeholder="Type notes"></textarea>
+        </label>
+        <label class="checkbox" for="agree-checkbox" style="margin-top: 16px;">
+          <input id="agree-checkbox" name="agree" type="checkbox" />
+          Accept fixture terms
+        </label>
+        <div class="actions">
+          <button id="apply-button" type="button">Apply form state</button>
+          <button id="click-counter" class="secondary" type="button">Click count: 0</button>
+        </div>
+      </form>
+      <pre id="result-output" aria-live="polite">{"state":"empty"}</pre>
+    </section>
+
+    <section aria-labelledby="file-heading">
+      <h2 id="file-heading">File and download</h2>
+      <label for="file-input">Choose a local file
+        <input id="file-input" type="file" />
+      </label>
+      <p id="file-output">No file selected</p>
+      <div class="actions">
+        <a id="download-link" class="action" href="./sample.txt" download="browser-bridge-sample.txt">Download sample</a>
+      </div>
+    </section>
+
+    <section aria-labelledby="debug-heading">
+      <h2 id="debug-heading">Debug and navigation</h2>
+      <div class="actions">
+        <button id="console-button" type="button">Emit console probe</button>
+        <a id="page-two-link" class="action secondary" href="./page-two.html">Open page two</a>
+      </div>
+      <p id="console-output">Console probe not emitted</p>
+    </section>
+
+    <section aria-labelledby="drag-heading">
+      <h2 id="drag-heading">Drag target</h2>
+      <div class="drag-row">
+        <div id="drag-source" draggable="true">Drag me</div>
+        <div id="drop-target" role="button" aria-label="Drop target" data-dropped="false">Drop here</div>
+      </div>
+    </section>
+
+    <section aria-labelledby="scroll-heading">
+      <h2 id="scroll-heading">Scroll target</h2>
+      <div id="scroll-stage">
+        <p id="scroll-target" role="status">Scroll target reached</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      applied: 0,
+      clickCount: 0,
+      consoleCount: 0,
+      dropped: false,
+      selectedFile: ""
+    };
+
+    const resultOutput = document.querySelector("#result-output");
+    const fixtureStatus = document.querySelector("#fixture-status");
+
+    function renderState() {
+      resultOutput.textContent = JSON.stringify({
+        name: document.querySelector("#name-input").value,
+        color: document.querySelector("#color-select").value,
+        notes: document.querySelector("#notes-input").value,
+        agreed: document.querySelector("#agree-checkbox").checked,
+        applied: state.applied,
+        clickCount: state.clickCount,
+        consoleCount: state.consoleCount,
+        dropped: state.dropped,
+        selectedFile: state.selectedFile
+      }, null, 2);
+    }
+
+    document.querySelector("#apply-button").addEventListener("click", () => {
+      state.applied += 1;
+      fixtureStatus.textContent = "form-applied";
+      renderState();
+    });
+
+    document.querySelector("#click-counter").addEventListener("click", (event) => {
+      state.clickCount += 1;
+      event.currentTarget.textContent = `Click count: ${state.clickCount}`;
+      renderState();
+    });
+
+    document.querySelector("#file-input").addEventListener("change", (event) => {
+      state.selectedFile = event.target.files?.[0]?.name ?? "";
+      document.querySelector("#file-output").textContent = state.selectedFile || "No file selected";
+      renderState();
+    });
+
+    document.querySelector("#console-button").addEventListener("click", () => {
+      state.consoleCount += 1;
+      const message = `[browser-bridge-fixture] console probe ${state.consoleCount}`;
+      console.log(message);
+      document.querySelector("#console-output").textContent = message;
+      renderState();
+    });
+
+    const dragSource = document.querySelector("#drag-source");
+    const dropTarget = document.querySelector("#drop-target");
+    dragSource.addEventListener("dragstart", (event) => {
+      event.dataTransfer.setData("text/plain", "browser-bridge-fixture");
+    });
+    dropTarget.addEventListener("dragover", (event) => event.preventDefault());
+    dropTarget.addEventListener("drop", (event) => {
+      event.preventDefault();
+      state.dropped = event.dataTransfer.getData("text/plain") === "browser-bridge-fixture";
+      dropTarget.dataset.dropped = String(state.dropped);
+      dropTarget.textContent = state.dropped ? "Dropped" : "Drop failed";
+      renderState();
+    });
+
+    window.__browserBridgeFixture = { state, renderState };
+  </script>
+</body>
+</html>

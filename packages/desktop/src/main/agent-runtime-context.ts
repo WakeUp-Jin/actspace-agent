@@ -19,14 +19,16 @@ export type MainAgentRuntimeContextInput = {
   readPromptFile: () => Promise<AgentSystemPromptFile>;
   /** 主 Agent Skill 黑名单（settings.skills.disabled）；命中的 Skill 不进 catalog。 */
   disabledSkills?: string[];
-  /** Browser Bridge CLI path. When present on disk, inject bash-based browser-use guidance. */
+  /** Browser Bridge CLI path, retained only for diagnostics when standard tools fail. */
   browserBridgeAbbPath?: string;
+  /** Browser Bridge Native Host exposed stable Unix socket. */
+  browserBridgeSocketPath?: string;
   warn?: WarningLogger;
 };
 
 export async function loadMainAgentRuntimeContext(
   input: MainAgentRuntimeContextInput,
-): Promise<Pick<AgentRuntimeContext, "systemPrompt" | "systemPromptSegments" | "additionalWritableRoots">> {
+): Promise<Pick<AgentRuntimeContext, "systemPrompt" | "systemPromptSegments" | "additionalWritableRoots" | "browserBridgeSocketPath">> {
   const promptFile = await input.readPromptFile();
   const kairosInboxRoot = join(input.dataRoot, "kairos", "inbox");
   const mainAgentInboxPath = join(kairosInboxRoot, "main-agent.md");
@@ -36,9 +38,12 @@ export async function loadMainAgentRuntimeContext(
     warn: input.warn,
   });
   systemPromptSegments.push(createMainAgentKairosHandoffSegment(mainAgentInboxPath));
-  const browserBridgeSegment = await createBrowserBridgeCliSegment(input.browserBridgeAbbPath);
-  if (browserBridgeSegment) {
-    systemPromptSegments.push(browserBridgeSegment);
+  const browserBridgeRuntime = await resolveBrowserBridgeRuntime(
+    input.browserBridgeAbbPath,
+    input.browserBridgeSocketPath,
+  );
+  if (browserBridgeRuntime) {
+    systemPromptSegments.push(browserBridgeRuntime.segment);
   }
   const skillRegistry = await loadSkillRegistry({
     dataRoot: input.dataRoot,
@@ -47,6 +52,7 @@ export async function loadMainAgentRuntimeContext(
     warn: input.warn,
   });
   const disabled = new Set(input.disabledSkills ?? []);
+  if (browserBridgeRuntime) disabled.add("browser-bridge");
   const filteredRegistry = disabled.size === 0
     ? skillRegistry
     : { ...skillRegistry, skills: skillRegistry.skills.filter((s) => !disabled.has(s.name)) };
@@ -58,11 +64,15 @@ export async function loadMainAgentRuntimeContext(
     systemPrompt: promptFile.content,
     systemPromptSegments,
     additionalWritableRoots: [kairosInboxRoot],
+    browserBridgeSocketPath: browserBridgeRuntime?.socketPath,
   };
 }
 
-async function createBrowserBridgeCliSegment(abbPath?: string): Promise<AgentSystemPromptSegment | undefined> {
-  if (!abbPath) return undefined;
+async function resolveBrowserBridgeRuntime(
+  abbPath?: string,
+  socketPath?: string,
+): Promise<{ socketPath: string; segment: AgentSystemPromptSegment } | undefined> {
+  if (!abbPath || !socketPath) return undefined;
   try {
     await access(abbPath);
   } catch {
@@ -70,19 +80,22 @@ async function createBrowserBridgeCliSegment(abbPath?: string): Promise<AgentSys
   }
 
   return {
-    id: "browser_bridge_cli",
-    title: "Browser Bridge CLI",
-    content: [
-      "Browser Bridge is available through the `abb` CLI and bash.",
-      `- abb path: ${abbPath}`,
-      "- For browser/tab/page tasks, prefer this CLI over AppleScript or generic OS automation.",
-      "- First inspect the interface with the absolute-path command plus `help`, `doctor --json`, or `capabilities --json`.",
-      "- Use JSON output when available, and quote the absolute path because it may contain spaces.",
-      "- If the Chrome extension or native host is not connected, report the doctor result and the required user action instead of guessing.",
-    ].join("\n"),
-    bucket: "skills",
-    priority: 72,
-    stability: CACHE_STABILITY.STABLE,
+    socketPath,
+    segment: {
+      id: "browser_bridge_tools",
+      title: "Browser tools",
+      content: [
+        "The user's real Chrome browser is available through 11 categorized `browser_*` tools backed by 62 canonical actions.",
+        "- Start with `browser_help` when an action schema is unclear. Use `browser_user` or `browser_tabs` to inspect tabs, then choose CUA, DOM, Locator, navigation, wait, I/O, or debug by intent.",
+        "- Use `browser_run` only for a known structured sequence; the Go bridge preflights and binds approval to the exact batch.",
+        "- Do not invoke `abb` through Bash for normal browser tasks.",
+        "- Check `<runtime_model>.input` before relying on screenshots: if it is text-only, prefer DOM, URL, visible text, and structured browser state.",
+        `- If a standard browser tool reports that the native host, socket, or extension is unavailable, diagnose with the quoted CLI path \`${abbPath}\` using only \`doctor --json\` or \`capabilities --json\`.`,
+      ].join("\n"),
+      bucket: "skills",
+      priority: 72,
+      stability: CACHE_STABILITY.STABLE,
+    },
   };
 }
 

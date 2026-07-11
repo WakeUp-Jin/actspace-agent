@@ -115,6 +115,18 @@ describe("extractStreamingPreview", () => {
     });
   });
 
+  it("browser category extractor exposes action and target", () => {
+    const preview = extractStreamingPreview(
+      "browser_locator",
+      '{"action":"click","selector":"#submit"}',
+    );
+    expect(preview).toEqual({
+      kind: "generic",
+      title: "Browser Locator",
+      content: "click · #submit",
+    });
+  });
+
   it("generic kind returns empty generic preview", () => {
     const preview = extractStreamingPreview("generic", '{"anything":"x"}');
     expect(preview).toEqual({ kind: "generic", title: "", content: "" });

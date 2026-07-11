@@ -70,17 +70,13 @@ describe("tool exposure", () => {
     // web_fetch 无 key 依赖，永远注册
     expect(noKeys.has("web_fetch")).toBe(true);
     expect(noKeys.has("web_search")).toBe(false);
-    expect(noKeys.has("analyze_media")).toBe(false);
 
     expect(allKeys.has("web_fetch")).toBe(true);
     expect(allKeys.has("web_search")).toBe(true);
-    expect(allKeys.has("analyze_media")).toBe(true);
 
     // web_search / web_fetch 不再绑定 DeepSeek：Kimi 主模型同样可用
     expect(kimiPrimary.has("web_search")).toBe(true);
     expect(kimiPrimary.has("web_fetch")).toBe(true);
-    // analyze_media 仍是 DeepSeek 专属（Kimi 主模型自身就是多模态）
-    expect(kimiPrimary.has("analyze_media")).toBe(false);
   });
 
   it("skips tools listed in disabledTools even when they are otherwise exposable", () => {

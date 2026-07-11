@@ -183,6 +183,31 @@ function createFakeAgentTool(): InternalTool {
   };
 }
 
+function createSensitiveBrowserTool(): InternalTool {
+  return {
+    name: "browser_io",
+    description: "Test browser persistence boundary",
+    parameters: {
+      type: "object",
+      properties: {
+        action: { type: "string", description: "Browser action" },
+        tab_id: { type: "number", description: "Tab ID" },
+        text: { type: "string", description: "Clipboard input" },
+      },
+      required: ["action", "tab_id"],
+    },
+    isReadOnly: false,
+    category: "browser",
+    previewKind: "browser_io",
+    handler: async (): Promise<ToolResult> => ({
+      success: true,
+      data: "private-browser-result",
+      structured: { clipboard: "private-browser-result" },
+      redactInPersistence: true,
+    }),
+  };
+}
+
 function createDeps() {
   const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
   const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
@@ -308,7 +333,7 @@ describe("runTurnWithAgent bridge", () => {
       (context) => {
         const userMessage = context.messages.find((message) => message.role === "user");
         modelUserInput = typeof userMessage?.content === "string" ? userMessage.content : "";
-        return mockText("I can reason over the attachment summary.");
+        return mockText("I can reason over the attachment metadata.");
       },
     ]);
 
@@ -328,23 +353,12 @@ describe("runTurnWithAgent bridge", () => {
         mimeType: "text/markdown",
       },
     ];
-    const attachmentAnalyses = [
-      {
-        attachmentId: "att-image-1",
-        toolName: "analyze_media" as const,
-        status: "completed" as const,
-        summary: "The screenshot shows the composer with an attachment chip.",
-        analyzedAt: "2026-06-02T00:00:00.000Z",
-      },
-    ];
-
     const result = await runTurnWithAgent(
       {
         sessionId: "session-attachments",
         turnId: "turn-attachments",
         userInput: "What does this show?",
         attachments,
-        attachmentAnalyses,
       },
       deps,
     );
@@ -353,15 +367,14 @@ describe("runTurnWithAgent bridge", () => {
     expect(modelUserInput).toContain("Attached files:");
     expect(modelUserInput).toContain("[image] screenshot.png path=/Users/test/screenshot.png mime=image/png");
     expect(modelUserInput).toContain("[file] notes.md path=/Users/test/notes.md mime=text/markdown");
-    expect(modelUserInput).toContain("Image analysis results:");
-    expect(modelUserInput).toContain("The screenshot shows the composer with an attachment chip.");
+    expect(modelUserInput).toContain("model_id: deepseek-v4-pro");
+    expect(modelUserInput).toContain("input: text");
 
     expect(result.events[0]).toMatchObject({
       type: "user_message",
       payload: {
         content: "What does this show?",
         attachments,
-        attachmentAnalyses,
       },
     });
     expect(result.events.some((event) => event.type === "tool_call")).toBe(false);
@@ -656,7 +669,7 @@ describe("runTurnWithAgent bridge", () => {
         expect.objectContaining({
           payload: expect.objectContaining({
             toolName: "grep",
-            arguments: { pattern: "Please inspect the README." },
+            arguments: { pattern: expect.stringContaining("Please inspect the README.") },
           }),
         }),
       ]),
@@ -671,6 +684,61 @@ describe("runTurnWithAgent bridge", () => {
     ]);
     expect(assistantMessageEnds.length).toBeGreaterThan(0);
     expect(assistantMessageEnds.every((event) => !("message" in ((event.payload ?? {}) as object)))).toBe(true);
+  });
+
+  it("keeps browser payloads in the live model loop but out of streams, sessions and run logs", async () => {
+    const deps = createDeps();
+    deps.toolManager.register(createSensitiveBrowserTool());
+    let liveModelSawResult = false;
+    deps.llm.setResponses([
+      mockToolCall("browser_io", {
+        action: "clipboard_write_text",
+        tab_id: 42,
+        text: "private-browser-input",
+      }, { id: "tc-browser-sensitive" }),
+      (context) => {
+        liveModelSawResult = context.messages.some((message) => (
+          message.role === "toolResult" &&
+          message.content.some((part) => part.type === "text" && part.text.includes("private-browser-result"))
+        ));
+        return mockText("Browser action completed.");
+      },
+    ]);
+    const streamEvents: RuntimeStreamEvent[] = [];
+    const runLogEvents: AgentRunLogEvent[] = [];
+    const runLogger: AgentRunLogger = {
+      filePath: "/tmp/test-browser-redaction-run.jsonl",
+      write: async (event) => {
+        runLogEvents.push(event);
+      },
+    };
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Write the clipboard.",
+      },
+      deps,
+      {
+        runLogger,
+        onStreamEvent: (event) => {
+          streamEvents.push(event);
+        },
+      },
+    );
+
+    expect(liveModelSawResult).toBe(true);
+    const persisted = JSON.stringify(result.events);
+    const streamed = JSON.stringify(streamEvents);
+    const logged = JSON.stringify(runLogEvents);
+    for (const output of [persisted, streamed, logged]) {
+      expect(output).not.toContain("private-browser-input");
+      expect(output).not.toContain("private-browser-result");
+    }
+    expect(persisted).toContain("[redacted]");
+    expect(persisted).toContain("[browser output omitted from persistence]");
+    expect(streamed).toContain("Completed");
   });
 
   it("records provider-native server tool usage in assistant run log summaries", async () => {

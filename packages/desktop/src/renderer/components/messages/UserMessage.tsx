@@ -20,10 +20,6 @@ const USER_IMAGE_ATTACHMENT_CLASS =
 const USER_FILE_ATTACHMENT_CLASS =
   "inline-flex h-9 max-w-[240px] items-center gap-2 rounded-act-md border border-line bg-surface-subtle px-2.5 text-sm font-medium text-text-main";
 const USER_FILE_NAME_CLASS = "truncate";
-const ANALYSIS_WRAP_CLASS = "mt-3 rounded-act-md border border-line bg-surface-subtle px-3 py-2 text-sm text-text-muted";
-const ANALYSIS_SUMMARY_CLASS = "cursor-pointer text-sm font-semibold text-text-main";
-const ANALYSIS_BODY_CLASS = "mt-2 whitespace-pre-wrap text-sm leading-[1.55] text-text-muted";
-const ANALYSIS_ERROR_CLASS = "text-on-danger";
 
 function getAttachmentPreviewStyle(attachment: ComposerAttachment): CSSProperties | undefined {
   return attachment.previewUrl
@@ -92,7 +88,6 @@ function UserMessageContent({ content }: { content: string }) {
 
 export function UserMessage({ message }: { message: Extract<MessageBlock, { kind: "user" }> }) {
   const attachments = message.attachments ?? [];
-  const analyses = message.attachmentAnalyses ?? [];
 
   return (
     <article className={USER_MESSAGE_CLASS}>
@@ -120,20 +115,6 @@ export function UserMessage({ message }: { message: Extract<MessageBlock, { kind
                 </div>
               );
             })}
-          </div>
-        ) : null}
-        {analyses.length > 0 ? (
-          <div className={ANALYSIS_WRAP_CLASS} aria-label="Image analysis results">
-            {analyses.map((analysis) => (
-              <details key={analysis.attachmentId} open={analyses.length === 1}>
-                <summary className={ANALYSIS_SUMMARY_CLASS}>图片分析结果</summary>
-                <div className={`${ANALYSIS_BODY_CLASS}${analysis.status === "failed" ? ` ${ANALYSIS_ERROR_CLASS}` : ""}`}>
-                  {analysis.status === "failed"
-                    ? analysis.errorMessage ?? "图片分析失败，模型只能看到附件路径和文件名。"
-                    : analysis.summary ?? "图片分析结果为空。"}
-                </div>
-              </details>
-            ))}
           </div>
         ) : null}
       </div>

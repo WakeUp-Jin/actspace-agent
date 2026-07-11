@@ -9,6 +9,8 @@
 - `packages/desktop`：Electron main、preload、renderer 所在的桌面端应用。
 - `packages/agent-core`：Agent 运行层、模型接入、上下文、工具与执行循环。
 - `packages/shared`：IPC contracts、session schema、跨进程共享类型。
+- `plugins/browser-bridge`：Browser Use Go bridge CLI、Chrome Extension 和协议层。
+- `plugins/fs-watch`：文件监听 Rust 插件。
 - `infra/`：部署、基础设施和环境定义。
 - `scripts/`：仓库级自动化脚本，供人和 Agent 直接调用。
 - `docs/`：仓库知识库，也是本地规则和上下文的正式来源。
@@ -26,10 +28,20 @@
   - 只放跨进程共享契约和类型
   - 不依赖 `desktop` 或 `agent-core`
 
+- `plugins/browser-bridge`
+  - 独立 Go 模块，不参与 pnpm workspace
+  - 通过 Unix socket 与 `agent-core` 通信
+  - 不依赖 TS 编译产物
+- `plugins/fs-watch`
+  - 独立 Rust crate，不参与 pnpm workspace
+  - 通过文件契约与 `desktop` main 进程通信
+
 默认依赖方向应保持为：
 
 ```txt
 desktop -> agent-core -> shared
+agent-core --(socket)--> plugins/browser-bridge
+desktop --(file contract)--> plugins/fs-watch
 ```
 
 为保证 Electron 主进程编译输出稳定，`desktop` 不应直接相对引用 sibling package 的 `src/`，而应通过包名消费：
@@ -45,9 +57,14 @@ desktop -> agent-core -> shared
 - `docs/design-docs/agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块清单，包括 LLM、prompt、tools、context、engine、persistence、observability、env 和兼容层。
 - `docs/design-docs/core-storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
 - `docs/design-docs/agent-backend-design.md`：后端 Agent Runtime 的长期设计事实来源，解释为什么采用这些模块边界。
+- `docs/design-docs/agent-members.md`：跨 Room 持久 Agent Member 的身份、配置版本、Activity、设置页与 Room 私有上下文边界。
 - `docs/design-docs/agent-token-usage-and-context-state.md`：token usage、成本统计、context snapshot 与 context state 的数据分层设计。
 - `docs/design-docs/agent-skill-loading.md`：Agent Skill 设计与加载规范，约束 `.actspace/skills`、`.agents/skills`、`.claude/skills` 的发现优先级、catalog 注入和 `read_file` 读取边界。
-- `docs/design-docs/agent-plugins-fs-watch.md`：插件（Plugins）模式与 fs-watch 文件监听插件——外部 Rust 二进制的文件契约（事件 JSONL / 心跳 / config）、main 进程生命周期管理、设置页「插件」「Skills」分区和 Kairos Skill 白名单。插件源码在独立仓库 `actspace-plugins`。
+- `docs/design-docs/agent-plugins-fs-watch.md`：插件（Plugins）模式与 fs-watch 文件监听插件——外部 Rust 二进制的文件契约（事件 JSONL / 心跳 / config）、main 进程生命周期管理、设置页「插件」「Skills」分区和 Kairos Skill 白名单。插件源码在 `plugins/fs-watch/`。
+- `docs/design-docs/agent-browser-use-index.md`：Browser Use 专题入口，统一 Agent Core、Go Command Engine、Injected Locator runtime 与 Chrome Extension 的职责边界。
+- `docs/design-docs/agent-browser-use-command-surface.md`：Browser Use 62 条命令面分类详解。
+- `docs/design-docs/agent-browser-use-integration-design.md`：Browser Use 集成方案设计。
+- `docs/design-docs/agent-browser-use-command-implementation.md`：Browser Use 62 条命令的核心实现设计——CDP 调用链、Go/Extension/Injected runtime 职责，以及 Plan 5 前历史基线与当前 62/62 实现矩阵。
 - `docs/design-docs/agent-tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约。
 - `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入边界。
 - `docs/design-docs/front-index.md`：前端工作台设计文档入口。

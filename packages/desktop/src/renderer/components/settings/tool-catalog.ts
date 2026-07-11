@@ -2,13 +2,14 @@
  * 工具清单单一来源。
  *
  * 同时被「工具」分区（主 Agent 的全局开关）与 Kairos「禁用工具」多选复用，
- * 避免两处各维护一份工具名而漂移。`name` 必须与后端 ToolManager 注册名一致。
+ * 避免两处各维护一份工具名而漂移。普通项的 `name` 与 ToolManager 注册名一致；
+ * `browser_capability_*` 是 Browser permission checker 消费的细粒度 capability 开关，不注册为模型工具。
  */
 export interface ToolCatalogItem {
   name: string;
   label: string;
   description: string;
-  /** true 表示是否可用取决于供应商配置（如联网搜索 / 媒体分析）。 */
+  /** true 表示是否可用取决于供应商或插件配置。 */
   conditional?: boolean;
 }
 
@@ -20,6 +21,19 @@ export const TOOL_ITEMS: ToolCatalogItem[] = [
   { name: "edit_file_diff", label: "编辑文件", description: "以 diff 形式修改已有文件。" },
   { name: "write_file", label: "写入文件", description: "创建新文件或覆盖已有文件。" },
   { name: "web_search", label: "联网搜索", description: "调用联网搜索获取实时信息。", conditional: true },
-  { name: "analyze_media", label: "媒体分析", description: "解析图片等多模态内容。", conditional: true },
   { name: "bash", label: "Bash 终端", description: "在工作区执行 shell 命令。" },
+  { name: "browser_cua", label: "浏览器 CUA", description: "截图与坐标级鼠标、键盘操作。", conditional: true },
+  { name: "browser_dom", label: "浏览器 DOM CUA", description: "基于 snapshot node_id 的稳定页面操作。", conditional: true },
+  { name: "browser_locator", label: "浏览器 Locator", description: "CSS selector 点击、填写、读取与等待。", conditional: true },
+  { name: "browser_navigation", label: "浏览器导航", description: "打开网址、前进、后退与刷新。", conditional: true },
+  { name: "browser_tabs", label: "浏览器会话标签页", description: "管理 Agent 会话标签页及最终交付。", conditional: true },
+  { name: "browser_user", label: "用户浏览器", description: "读取或接管用户现有标签页与历史。", conditional: true },
+  { name: "browser_wait", label: "浏览器等待", description: "等待加载、URL、元素、文件或下载事件。", conditional: true },
+  { name: "browser_io", label: "浏览器 I/O", description: "处理上传、下载路径和剪贴板。", conditional: true },
+  { name: "browser_debug", label: "浏览器调试", description: "读取 console 与 runtime 日志。", conditional: true },
+  { name: "browser_help", label: "浏览器帮助", description: "渐进查看 62 个 action 的参数和状态。", conditional: true },
+  { name: "browser_run", label: "浏览器批处理", description: "预检、审批并顺序执行多个结构化 action。", conditional: true },
+  { name: "browser_capability_download", label: "浏览器触发下载", description: "允许 CUA、DOM 或 Locator 触发媒体下载；每次仍需高风险审批。", conditional: true },
+  { name: "browser_capability_file_upload", label: "浏览器文件上传", description: "允许把本地文件设置到网页文件选择器；每次仍需高风险审批。", conditional: true },
+  { name: "browser_capability_clipboard_write", label: "浏览器写剪贴板", description: "允许网页上下文写入文本或富媒体剪贴板；每次仍需高风险审批。", conditional: true },
 ];

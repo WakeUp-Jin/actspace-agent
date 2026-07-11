@@ -193,7 +193,6 @@ V0 暂不开放：
 - `write_file`
 - `bash`
 - `web_search`
-- `analyze_media`
 - `agent`
 
 系统提示词重点：

@@ -42,8 +42,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Set up Go for Browser Bridge
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: plugins/browser-bridge/apps/cli/go.mod
+          cache-dependency-path: |
+            plugins/browser-bridge/apps/cli/go.mod
+            plugins/browser-bridge/packages/protocol/go.mod
+
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Browser Bridge contract checks
+        run: pnpm check:browser
+
+      - name: Browser Bridge Go tests
+        working-directory: plugins/browser-bridge
+        run: go test ./packages/protocol/... ./apps/cli/...
 
       - name: Test
         run: pnpm test

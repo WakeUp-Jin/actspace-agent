@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Agent Browser Bridge",
+  "version": "0.2.1",
+  "description": "Chrome extension backend for the Agent Browser Bridge — enables Agent to interact with and control browser tabs.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoIfIBPRbrs+lNpJq/oqgvyJ+dWASlMEKr98piHd1B7TX1ZdWlc/gQXEvQ546UV+2xwRB4Xj3oMM+Nk1BNsYGneUs07GQD2+Akivgydq7HAtovRK2v/O+TPDvTSd3dBEitcvwt6Nk+Oeln17+sewmPA5JTGI4INFgBXY88kajcdidbARp7qzMolNjIEQKo0Vp7o6dxlzozLIsIOnl0Njpfg7w9XcTi/qNuHu7eHeclIKyzK2oAPKG1y80vbyGgJcw13ybzdXye9BDRUb1bh7zgjfa57pFig6/QMV3BlOEmoH9zxoLpMZ++cCapJXqr9RUPJ3P1yif8cPuMHQ3cmu+/wIDAQAB",
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "debugger",
+    "downloads",
+    "history",
+    "nativeMessaging",
+    "tabs",
+    "tabGroups"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/cursor-overlay.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "minimum_chrome_version": "116"
+}

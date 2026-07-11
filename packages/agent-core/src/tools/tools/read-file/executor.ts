@@ -1,9 +1,23 @@
+import { extname } from "node:path";
 import { readFile, stat } from "node:fs/promises";
 import type { ToolResult } from "../../../internal-tools";
 import { resolveReadablePath } from "../../workspace-guard";
 import type { ToolExecutorFn } from "../../types";
 
 export const READ_FILE_DEFAULT_LIMIT = 200;
+
+const IMAGE_MIME_BY_EXT: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+};
+
+function imageMimeType(path: string): string | undefined {
+  return IMAGE_MIME_BY_EXT[extname(path).toLowerCase()];
+}
 
 const UNCHANGED_RANGE_NOTICE =
   "File unchanged since previous read for this exact path/offset/limit range. " +
@@ -32,6 +46,20 @@ export const readFileExecutor: ToolExecutorFn = async (
       : READ_FILE_DEFAULT_LIMIT;
     const force = args.force === true;
     const fileStat = await stat(guard.resolvedPath);
+    const mimeType = imageMimeType(guard.resolvedPath);
+    if (mimeType) {
+      const bytes = await readFile(guard.resolvedPath);
+      const data = `Read image file: ${guard.resolvedPath}\nsizeBytes: ${fileStat.size}\nmimeType: ${mimeType}`;
+      return {
+        success: true,
+        data,
+        content: [
+          { type: "text", text: data },
+          { type: "image", data: bytes.toString("base64"), mimeType },
+        ],
+      };
+    }
+
     const cacheKey = `${guard.resolvedPath}\0${offset}\0${limit}`;
     const cached = runtime?.readFileCache?.get(cacheKey);
     if (!force && cached && cached.size === fileStat.size && cached.mtimeMs === fileStat.mtimeMs) {

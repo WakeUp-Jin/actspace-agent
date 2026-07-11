@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { MODEL_REGISTRY } from "@actspace/shared";
 import {
   formatUserMessageForModel,
   messageToEvents,
@@ -31,7 +32,7 @@ describe("Adapters: Message -> SessionEvent", () => {
     expect(events[0].sessionId).toBe(SESSION_ID);
   });
 
-  it("persists user message attachments and image analyses in the payload", () => {
+  it("persists user message attachments in the payload", () => {
     const msg = createMockUserMessage("Please inspect this screenshot.");
     const attachments = [
       {
@@ -42,19 +43,9 @@ describe("Adapters: Message -> SessionEvent", () => {
         mimeType: "image/png",
       },
     ];
-    const attachmentAnalyses = [
-      {
-        attachmentId: "att-image-1",
-        toolName: "analyze_media" as const,
-        status: "completed" as const,
-        summary: "The screenshot shows a chat input with an attached image.",
-        analyzedAt: "2026-06-02T00:00:00.000Z",
-      },
-    ];
 
     const events = userMessageToEvents(msg, SESSION_ID, TURN_ID, {
       attachments,
-      attachmentAnalyses,
     });
 
     expect(events[0]).toMatchObject({
@@ -62,7 +53,6 @@ describe("Adapters: Message -> SessionEvent", () => {
       payload: {
         content: "Please inspect this screenshot.",
         attachments,
-        attachmentAnalyses,
       },
     });
   });
@@ -117,7 +107,7 @@ describe("Adapters: SessionEvent -> Message (recovery)", () => {
     expect(messages[0].role).toBe("user");
   });
 
-  it("recovers user messages with attachment metadata and analysis text injected for the model", () => {
+  it("recovers user messages with attachment metadata injected for the model", () => {
     const user = createMockUserMessage("What does this show?");
     const events = userMessageToEvents(user, SESSION_ID, TURN_ID, {
       attachments: [
@@ -136,14 +126,6 @@ describe("Adapters: SessionEvent -> Message (recovery)", () => {
           mimeType: "text/markdown",
         },
       ],
-      attachmentAnalyses: [
-        {
-          attachmentId: "att-image-1",
-          toolName: "analyze_media",
-          status: "completed",
-          summary: "The screenshot shows the Attach files menu.",
-        },
-      ],
     });
 
     const { messages, errors } = sessionEventsToMessages(events);
@@ -153,8 +135,8 @@ describe("Adapters: SessionEvent -> Message (recovery)", () => {
     expect(messages[0].content).toContain("Attached files:");
     expect(messages[0].content).toContain("[image] screenshot.png path=/Users/test/screenshot.png mime=image/png");
     expect(messages[0].content).toContain("[file] notes.md path=/Users/test/notes.md mime=text/markdown");
-    expect(messages[0].content).toContain("Image analysis results:");
-    expect(messages[0].content).toContain("The screenshot shows the Attach files menu.");
+    expect(messages[0].content).toContain("<runtime_model>");
+    expect(messages[0].content).toContain("input: text");
   });
 
   it("should recover assistant messages with usage", () => {
@@ -239,7 +221,7 @@ describe("Adapters: toAssistantReply", () => {
 });
 
 describe("Adapters: attachment formatting", () => {
-  it("adds file metadata and image analyses to the model input without changing original content", () => {
+  it("adds file metadata and text-only visual limitation to the model input", () => {
     const formatted = formatUserMessageForModel(
       "Summarize the attachment.",
       [
@@ -251,22 +233,60 @@ describe("Adapters: attachment formatting", () => {
           mimeType: "text/markdown",
         },
       ],
-      [
-        {
-          attachmentId: "att-image-1",
-          toolName: "analyze_media",
-          status: "failed",
-          errorMessage: "图片分析失败，模型只能看到附件路径和文件名。",
-        },
-      ],
+      { modelId: "deepseek-v4-pro", input: ["text"] },
     );
 
     expect(formatted).toContain("Summarize the attachment.");
     expect(formatted).toContain("Attached files:");
     expect(formatted).toContain("[file] notes.md path=/Users/test/notes.md mime=text/markdown");
     expect(formatted).toContain("use read_file with the provided path");
-    expect(formatted).toContain("Image analysis results:");
-    expect(formatted).toContain("analysis failed");
-    expect(formatted).toContain("图片分析失败，模型只能看到附件路径和文件名。");
+    expect(formatted).toContain("model_id: deepseek-v4-pro");
+    expect(formatted).toContain("input: text");
+  });
+
+  it("returns image content parts for image-capable models", () => {
+    const formatted = formatUserMessageForModel(
+      "What is on screen?",
+      [
+        {
+          id: "att-image-1",
+          kind: "image",
+          name: "screenshot.png",
+          path: "data:image/png;base64,abc",
+          mimeType: "image/png",
+        },
+      ],
+      { modelId: "kimi-k2.6", input: ["text", "image"] },
+    );
+
+    expect(Array.isArray(formatted)).toBe(true);
+    expect(formatted).toEqual([
+      expect.objectContaining({ type: "text", text: expect.stringContaining("model_id: kimi-k2.6") }),
+      { type: "image", data: "data:image/png;base64,abc", mimeType: "image/png" },
+    ]);
+  });
+
+  it("routes Kimi K2.7 Code image attachments as native image input", () => {
+    const spec = MODEL_REGISTRY["kimi-k2.7-code"];
+    const formatted = formatUserMessageForModel(
+      "Look at this.",
+      [
+        {
+          id: "att-image-1",
+          kind: "image",
+          name: "screen.png",
+          path: "data:image/png;base64,k27",
+          mimeType: "image/png",
+        },
+      ],
+      { modelId: spec.id, input: spec.input },
+    );
+
+    expect(spec.input).toContain("image");
+    expect(Array.isArray(formatted)).toBe(true);
+    expect(formatted).toEqual([
+      expect.objectContaining({ type: "text", text: expect.stringContaining("model_id: kimi-k2.7-code") }),
+      { type: "image", data: "data:image/png;base64,k27", mimeType: "image/png" },
+    ]);
   });
 });
