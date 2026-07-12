@@ -309,6 +309,7 @@ export function Composer({
   const [message, setMessage] = useState("");
   const [isInputMultiline, setIsInputMultiline] = useState(false);
   const composerRef = useRef<HTMLElement | null>(null);
+  const composerBodyRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const commandButtonRef = useRef<HTMLButtonElement | null>(null);
   const commandMenuRef = useRef<HTMLDivElement | null>(null);
@@ -350,15 +351,51 @@ export function Composer({
   }, [controlledSelectedModelId]);
 
   // 原生 textarea 不会随内容自动长高（粘贴大段文本时只会内部滚动）。
-  // 内容变化后把高度重置为 auto 再设为 scrollHeight，超出 max-h 时由 CSS 钳住并显示滚动条。
-  // 同时用 scrollHeight 判断内容是否折行（含显式换行与自动 wrap），驱动 inline↔stacked 切换。
+  // 多行判定必须始终按 inline 布局的可用宽度测量：如果在 stacked 的全宽输入框中测量，
+  // 长文本可能被误判为单行，切回更窄的 inline 后又发生折行，但 effect 不再触发，最终裁切内容。
+  // 判定完成后再按当前布局宽度设置实际高度；布局切换和容器宽度变化都会安全重测。
   useLayoutEffect(() => {
     const input = inputRef.current;
-    if (!input) return;
-    input.style.height = "auto";
-    input.style.height = `${input.scrollHeight}px`;
-    setIsInputMultiline(input.scrollHeight > COMPOSER_SINGLE_LINE_MAX_PX);
-  }, [message, surface]);
+    const body = composerBodyRef.current;
+    if (!input || !body) return;
+
+    function measureInput() {
+      const bodyStyle = window.getComputedStyle(body);
+      const paddingLeft = Number.parseFloat(bodyStyle.paddingLeft) || 0;
+      const paddingRight = Number.parseFloat(bodyStyle.paddingRight) || 0;
+      const paddingWidth = paddingLeft + paddingRight;
+      const columnGap = Number.parseFloat(bodyStyle.columnGap) || 0;
+      const commandWidth = commandButtonRef.current?.offsetWidth ?? 0;
+      const modelWidth = modelButtonRef.current?.offsetWidth ?? 0;
+      const sendWidth = body.querySelector<HTMLElement>(".send-button")?.offsetWidth ?? 0;
+      const inlineInputWidth = Math.max(
+        1,
+        body.clientWidth - paddingWidth - commandWidth - modelWidth - sendWidth - columnGap * 3,
+      );
+      const previousWidth = input.style.width;
+
+      input.style.width = `${inlineInputWidth}px`;
+      input.style.height = "auto";
+      const inlineContentHeight = input.scrollHeight;
+
+      input.style.width = previousWidth;
+      input.style.height = "auto";
+      input.style.height = `${input.scrollHeight}px`;
+      setIsInputMultiline(inlineContentHeight > COMPOSER_SINGLE_LINE_MAX_PX);
+    }
+
+    measureInput();
+
+    if (typeof ResizeObserver === "undefined") return;
+    let observedWidth = body.clientWidth;
+    const resizeObserver = new ResizeObserver(() => {
+      if (body.clientWidth === observedWidth) return;
+      observedWidth = body.clientWidth;
+      measureInput();
+    });
+    resizeObserver.observe(body);
+    return () => resizeObserver.disconnect();
+  }, [message, resolvedLayout, selectedModelId, surface]);
 
   function closeFloatingPanels() {
     setCommandOpen(false);
@@ -817,6 +854,7 @@ export function Composer({
       >
         {renderAttachmentStrip()}
         <div
+          ref={composerBodyRef}
           className={resolvedLayout === "inline" ? COMPOSER_BODY_INLINE_CLASS : COMPOSER_BODY_STACKED_CLASS}
           data-layout={resolvedLayout}
         >

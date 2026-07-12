@@ -87,8 +87,8 @@ export type RuntimeStreamEvent =
       event: SessionEvent;
       preview: AgentToolPreview;
     }
-  | { type: "tool_approval_required"; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string }
-  | { type: "tool_approval_resolved"; toolCallId: ToolCallId; requestId: string; decision: string }
+  | { type: "tool_approval_required"; sessionId?: SessionId; turnId?: TurnId; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string; approvalScope?: "browser_session" }
+  | { type: "tool_approval_resolved"; sessionId?: SessionId; turnId?: TurnId; toolCallId: ToolCallId; requestId: string; decision: string; approvalScope?: "browser_session" }
   | {
       /** LLM 调用命中可重试错误、agent loop 正在退避重试；renderer 据此清掉半截 streaming 内容并显示重试提示 */
       type: "llm_retry";
@@ -719,10 +719,15 @@ export type MessageBlock =
   | {
       kind: "tool";
       id: EventId;
+      toolName?: string;
       title: string;
       content: string;
       createdAt: string;
       isError?: boolean;
+      status?: "pending" | "running" | "completed" | "failed" | "denied";
+      approvalRequestId?: string;
+      approvalReason?: string;
+      approvalScope?: "browser_session";
     }
   | {
       kind: "context_compaction";

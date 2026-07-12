@@ -40,6 +40,8 @@ export interface ApprovalRegistryConfig {
 
 export class PendingApprovalRegistry implements ApprovalGate {
   private pending = new Map<string, PendingEntry>();
+  private browserAuthorizedSessions = new Set<string>();
+  private browserDeniedTurns = new Set<string>();
   private timeoutMs: number;
   private sessionId = "";
   private turnId = "";
@@ -65,10 +67,27 @@ export class PendingApprovalRegistry implements ApprovalGate {
   // ─── ApprovalGate 接口实现 ───
 
   waitForDecision(request: ToolApprovalRequest): Promise<ToolApprovalDecision> {
+    const sessionId = request.sessionId ?? this.sessionId;
+    const turnId = request.turnId ?? this.turnId;
+    if (request.approvalScope === "browser_session") {
+      if (this.browserAuthorizedSessions.has(sessionId)) {
+        return Promise.resolve({
+          requestId: request.id,
+          decision: "approve_once",
+          decidedAt: Date.now(),
+        });
+      }
+      if (this.browserDeniedTurns.has(browserTurnKey(sessionId, turnId))) {
+        return Promise.resolve({
+          requestId: request.id,
+          decision: "deny",
+          decidedAt: Date.now(),
+        });
+      }
+    }
+
     return new Promise<ToolApprovalDecision>((resolve) => {
       const expiresAt = Date.now() + this.timeoutMs;
-      const sessionId = this.sessionId;
-      const turnId = this.turnId;
 
       const timer = setTimeout(() => {
         this.pending.delete(request.id);
@@ -77,6 +96,7 @@ export class PendingApprovalRegistry implements ApprovalGate {
           decision: "timeout",
           decidedAt: Date.now(),
         };
+        this.rememberBrowserDecision(request, decision, sessionId, turnId);
         resolve(decision);
         this.externalOnApprovalResolved?.(request, decision, sessionId, turnId);
       }, this.timeoutMs);
@@ -93,7 +113,9 @@ export class PendingApprovalRegistry implements ApprovalGate {
   }
 
   onApprovalRequired(request: ToolApprovalRequest): void {
-    this.externalOnApprovalRequired?.(request, this.sessionId, this.turnId);
+    const entry = this.pending.get(request.id);
+    if (!entry) return;
+    this.externalOnApprovalRequired?.(request, entry.sessionId, entry.turnId);
   }
 
   // ─── IPC 消费的公共方法 ───
@@ -118,6 +140,7 @@ export class PendingApprovalRegistry implements ApprovalGate {
       decidedAt: Date.now(),
     };
 
+    this.rememberBrowserDecision(entry.request, resolvedDecision, entry.sessionId, entry.turnId);
     entry.resolve(resolvedDecision);
     this.externalOnApprovalResolved?.(
       entry.request,
@@ -158,6 +181,7 @@ export class PendingApprovalRegistry implements ApprovalGate {
         decision: "timeout",
         decidedAt: Date.now(),
       };
+      this.rememberBrowserDecision(entry.request, decision, entry.sessionId, entry.turnId);
       entry.resolve(decision);
       this.externalOnApprovalResolved?.(entry.request, decision, entry.sessionId, entry.turnId);
       count++;
@@ -168,4 +192,31 @@ export class PendingApprovalRegistry implements ApprovalGate {
   get size(): number {
     return this.pending.size;
   }
+
+  isBrowserAuthorized(sessionId: string): boolean {
+    return this.browserAuthorizedSessions.has(sessionId);
+  }
+
+  isBrowserDeniedForTurn(sessionId: string, turnId: string): boolean {
+    return this.browserDeniedTurns.has(browserTurnKey(sessionId, turnId));
+  }
+
+  private rememberBrowserDecision(
+    request: ToolApprovalRequest,
+    decision: ToolApprovalDecision,
+    sessionId: string,
+    turnId: string,
+  ): void {
+    if (request.approvalScope !== "browser_session") return;
+    if (decision.decision === "approve_once" || decision.decision === "allow_similar") {
+      this.browserAuthorizedSessions.add(sessionId);
+      this.browserDeniedTurns.delete(browserTurnKey(sessionId, turnId));
+      return;
+    }
+    this.browserDeniedTurns.add(browserTurnKey(sessionId, turnId));
+  }
+}
+
+function browserTurnKey(sessionId: string, turnId: string): string {
+  return `${sessionId}\u0000${turnId}`;
 }

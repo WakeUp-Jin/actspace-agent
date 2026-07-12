@@ -95,3 +95,35 @@ func TestValidateInputRejectsUnknownMissingAndWrongTypes(t *testing.T) {
 		}
 	}
 }
+
+func TestDOMSnapshotAndLocatorListSchemasExposeFidelityControls(t *testing.T) {
+	snapshot, ok := Find("dom", "snapshot")
+	if !ok {
+		t.Fatal("dom snapshot missing")
+	}
+	if snapshot.InputSchema.Properties["limit"].Type != "integer" {
+		t.Fatal("dom snapshot must expose an integer limit")
+	}
+	for _, field := range []string{"total", "returned", "truncated", "nodes"} {
+		if _, exists := snapshot.OutputSchema.Properties[field]; !exists {
+			t.Fatalf("dom snapshot output missing %s", field)
+		}
+	}
+
+	for _, action := range []string{"all_text_contents", "read_all"} {
+		command, ok := Find("locator", action)
+		if !ok {
+			t.Fatalf("locator %s missing", action)
+		}
+		for _, field := range []string{"offset", "limit"} {
+			if command.InputSchema.Properties[field].Type != "integer" {
+				t.Fatalf("locator %s input missing integer %s", action, field)
+			}
+		}
+		for _, field := range []string{"values", "total", "offset", "returned", "has_more"} {
+			if _, exists := command.OutputSchema.Properties[field]; !exists {
+				t.Fatalf("locator %s output missing %s", action, field)
+			}
+		}
+	}
+}

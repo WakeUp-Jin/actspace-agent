@@ -112,6 +112,7 @@ type ToolEntry = {
   approvalRequestId?: string;
   approvalReason?: string;
   approvalSummary?: string;
+  approvalScope?: "browser_session";
   transcriptEvents?: SessionEvent[];
 };
 
@@ -465,16 +466,27 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): Mes
   return {
     kind: "tool",
     id: blockId,
+    toolName: tool.toolName,
     title: tool.preview?.kind === "generic"
       ? tool.preview.title
       : tool.finished ? `${tool.toolName}` : `Running ${tool.toolName}...`,
-    content: tool.preview?.kind === "generic"
-      ? tool.preview.content
+    content: tool.approvalPending && tool.approvalScope === "browser_session"
+      ? "等待浏览器授权"
+      : tool.preview?.kind === "generic"
+        ? tool.preview.content
       : tool.finished
         ? tool.isError ? "Tool execution failed" : "Completed"
         : "Executing...",
     createdAt: now,
     isError: tool.isError,
+    status: tool.approvalPending
+      ? "pending"
+      : tool.finished
+        ? tool.isError ? "failed" : "completed"
+        : "running",
+    approvalRequestId: tool.approvalRequestId,
+    approvalReason: tool.approvalReason,
+    approvalScope: tool.approvalScope,
   };
 }
 
@@ -961,13 +973,15 @@ export function App() {
       }
 
       case "tool_approval_required": {
-        setApprovalPendingForSession(streamSessionId, true);
+        const approvalSessionId = event.sessionId ?? streamSessionId;
+        setApprovalPendingForSession(approvalSessionId, true);
         const tool = state.activeTools.get(event.toolCallId);
         if (tool) {
           tool.approvalPending = true;
           tool.approvalRequestId = event.requestId;
           tool.approvalReason = event.reason;
           tool.approvalSummary = event.summary;
+          tool.approvalScope = event.approvalScope;
           if (tool.preview?.kind === "bash" && event.command) {
             tool.preview = { ...tool.preview, command: event.command };
           }
@@ -984,9 +998,10 @@ export function App() {
       }
 
       case "tool_approval_resolved": {
-        setApprovalPendingForSession(streamSessionId, false);
-        if (streamSessionId) {
-          refreshPendingApprovalStatuses([streamSessionId]).catch((error: unknown) => {
+        const approvalSessionId = event.sessionId ?? streamSessionId;
+        setApprovalPendingForSession(approvalSessionId, false);
+        if (approvalSessionId) {
+          refreshPendingApprovalStatuses([approvalSessionId]).catch((error: unknown) => {
             console.error("Failed to refresh resolved approval status", error);
           });
         }

@@ -72,6 +72,8 @@ bash 与非 bash 工具走两条不同的路径——bash 用流式落盘 + 头�
 | `read` / `grep` / `glob` / `directory_list` | `readTruncateThreshold`（默认 20000） | flash 摘要，prompt 要求**逐字保留行号、文件路径、匹配位置**，仅压缩重复/正文；回填压缩标记 + 原始前缀 + 摘要 | 否 | `offset/limit` 翻页重读原文件 / 重跑搜索 |
 | `web_search` / `generic` / 其他 | `toolTruncateThreshold`（默认 2000） | flash 摘要（通用）；回填压缩标记 + 原始前缀 + 摘要 | 否 | 重新搜索 / 抓取 |
 
+Browser Use 中不能安全摘要的结构事实不走上述通用分流：`browser_dom.snapshot` 由 executor 以 50,000 字符、完整节点边界裁剪；精确 `browser_help(category, action)` 以 20,000 字符保留 action schema；已分页的 `all_text_contents` / `read_all` 以完整 item 边界格式化；`browser_run` 复用各 action 的同一策略。这些结果通过 `ToolResult.preserveModelOutput` 跳过通用 flash 摘要，不改变全局工具阈值。
+
 要点：
 
 - **bash 不用 flash**：其全量原文已在磁盘且可逐字翻页，头部通常最有用（命令回显/前段输出/报错），逐字头部 + 文件路径比摘要更可信，也省掉每次 bash 都叫一次 flash 的延迟与成本，避免 flash 把日志里的精确数字/路径摘错。flash 摘要只服务「重跑才能恢复、且适合摘要」的 read/grep/glob/web/generic。

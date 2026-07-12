@@ -61,7 +61,7 @@ window.HTMLElement.prototype.getBoundingClientRect = function getBoundingClientR
 window.eval(runtime);
 
 const locator = window.__actspaceLocator;
-assert.equal(locator.version, "3");
+assert.equal(locator.version, "4");
 
 const point = await locator.invoke("point", { selector: ".multi" });
 assert.deepEqual({ x: point.x, y: point.y }, { x: 60, y: 35 });
@@ -87,8 +87,10 @@ const checked = await locator.invoke("set_checked", { selector: "#check", checke
 assert.equal(checked.value, false);
 assert.equal(checked.point.x, 60);
 
-const snapshot = await locator.invoke("visible_dom", { limit: 250 });
+const snapshot = await locator.invoke("visible_dom", { limit: 500 });
 assert.ok(snapshot.nodes.length >= 4);
+assert.equal(snapshot.total, snapshot.returned);
+assert.equal(snapshot.truncated, false);
 assert.ok(snapshot.nodes.some((node) => node.text === "Drag me"));
 assert.ok(!snapshot.nodes.some((node) => node.text === "Offscreen"));
 const staleID = snapshot.nodes.find((node) => node.tagName === "button").nodeId;
@@ -96,6 +98,18 @@ window.document.querySelector("#only").remove();
 await assert.rejects(() => locator.invoke("node_point", { nodeId: staleID }), /node_snapshot_stale/);
 
 assert.equal((await locator.invoke("count", { selector: "button" })).count, 3);
+const firstTextPage = await locator.invoke("all_text_contents", { selector: "button", offset: 0, limit: 2 });
+assert.deepEqual(Array.from(firstTextPage.values), ["Visible", "Hidden"]);
+assert.deepEqual(
+  { total: firstTextPage.total, offset: firstTextPage.offset, returned: firstTextPage.returned, has_more: firstTextPage.has_more },
+  { total: 3, offset: 0, returned: 2, has_more: true },
+);
+const secondReadPage = await locator.invoke("read_all", { selector: "button", offset: 2, limit: 2 });
+assert.equal(secondReadPage.values[0].text_content, "Offscreen");
+assert.deepEqual(
+  { total: secondReadPage.total, offset: secondReadPage.offset, returned: secondReadPage.returned, has_more: secondReadPage.has_more },
+  { total: 3, offset: 2, returned: 1, has_more: false },
+);
 assert.equal((await locator.invoke("is_enabled", { selector: "#name" })).value, true);
 await locator.invoke("wait_for", { selector: "#name", state: "visible", timeoutMs: 100 });
 assert.equal((await locator.invoke("download_media_selector", { selector: "#media" })).url, "https://example.test/image.png");

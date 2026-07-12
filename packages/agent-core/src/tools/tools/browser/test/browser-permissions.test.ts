@@ -6,7 +6,7 @@ import {
 } from "../permissions";
 
 describe("browser capability permissions", () => {
-  it("denies only the disabled high-risk effect while keeping other actions available", async () => {
+  it("hard-denies disabled effects while asking for session authorization on other actions", async () => {
     const checker = createBrowserActionPermissionChecker(
       "io",
       new Set(["browser_capability_file_upload"]),
@@ -21,7 +21,8 @@ describe("browser capability permissions", () => {
 
     expect(upload.decision).toBe("deny");
     expect(upload.reason).toContain("file_upload capability 已在设置中禁用");
-    expect(read.decision).toBe("allow");
+    expect(read.decision).toBe("ask");
+    expect(read.approvalScope).toBe("browser_session");
   });
 
   it("hard-denies the whole batch when one effect capability is disabled", async () => {
@@ -58,7 +59,7 @@ describe("browser capability permissions", () => {
     expect(result.reason).toContain("整批未执行");
   });
 
-  it("includes the target origin in browser_run approval summaries", async () => {
+  it("uses the browser session authorization contract without exposing action inputs", async () => {
     const checker = createBrowserRunPermissionChecker(async () => ({
       actionHash: "hash",
       highestRisk: "medium",
@@ -88,8 +89,10 @@ describe("browser capability permissions", () => {
     });
 
     expect(result.decision).toBe("ask");
-    expect(result.summary).toContain("locator.fill (#name-input)");
-    expect(result.summary).toContain("@ http://127.0.0.1:4173");
+    expect(result.approvalScope).toBe("browser_session");
+    expect(result.summary).toBe("允许 ActSpace 在当前会话中使用浏览器？");
+    expect(result.summary).not.toContain("#name-input");
+    expect(result.summary).not.toContain("http://127.0.0.1:4173");
     expect(result.summary).not.toContain("secret");
   });
 });

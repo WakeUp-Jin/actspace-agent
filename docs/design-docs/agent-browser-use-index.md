@@ -97,9 +97,10 @@ Model
 
 - Go registry：62/62 `implemented`，且全部使用 `go.*` handler。
 - Agent Core：11 个模型工具；旧 15 工具仅保留 alias 与 preview 读取兼容。
+- Browser 读取输出：`browser_dom.snapshot` 使用 50K DOM 专属保真通道；精确 `browser_help(category, action)` 使用 20K schema 保真通道；Locator 批量读取支持 offset/limit 分页；`browser_run` 向模型返回逐 action 真实结果。
 - Extension：旧 `playwright-injected.js` 和 click/fill/select/scroll 等高层 handler 已删除，只保留 primitive backend、Chrome APIs、事件转发与 cursor。
 - 测试：Go、registry parity、Locator fixture、Agent Core Socket integration、desktop typecheck 已通过。
-- 真实环境：Extension 0.2.1、runtime v3 与原子部署 Native Host 已完成多轮 reload/重连验收；确定性 fixture、I/O、claim/handoff、deliverable、Agent approval/denial 和 A/B session isolation smoke 均通过。
+- 真实环境：Extension 0.2.1、Locator runtime v3 与原子部署 Native Host 已完成多轮 reload/重连验收；确定性 fixture、I/O、claim/handoff、deliverable、Agent approval/denial 和 A/B session isolation smoke 均通过。Locator runtime v4 的 DOM 保真与分页源码测试已通过；品牌与 cursor runtime v2 随 Extension 0.2.2 源码完成，两者都需 reload 后进入真实 Chrome。
 
 ## 已确认设计闸门
 
@@ -110,7 +111,8 @@ Model
 - Go 负责 CUA、DOM CUA、Locator、导航等待和事件编排；Extension 只执行 Chrome/CDP 原语；injected JS 只负责页面内 DOM 语义。
 - 当前核心范围为既有 62 条命令，`tab_content_export*` 留作未来 capability extension。
 - raw CDP 只保留 CLI 诊断入口，不默认暴露给 Agent。
-- `browser_run` 整批 preflight、整批展示并一次明确审批；拒绝后整批不执行。
+- Browser Use 使用一次性 Session 授权租约：除 `browser_help` 外，当前应用运行期间某 Session 第一次调用 Browser 工具时只展示“允许 / 拒绝”。允许后该 Session 后续 Browser 工具不再重复审批；拒绝或超时只阻止当前 Turn，下一次用户输入可重新申请。
+- `browser_run` 仍执行整批 preflight 和 capability hard deny，但用户交互复用上述 Session 授权，不再单独按 action 重复弹窗。
 - 旧 15 个工具保留一个迁移阶段的 alias 与旧会话兼容。
 
 ## 维护规则

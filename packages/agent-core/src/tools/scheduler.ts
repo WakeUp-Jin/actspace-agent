@@ -37,6 +37,9 @@ export interface ToolApprovalRequest {
   summary: string;
   reason: string;
   riskLevel?: ToolRiskLevel;
+  approvalScope?: "browser_session";
+  sessionId?: string;
+  turnId?: string;
   createdAt: number;
 }
 
@@ -86,6 +89,7 @@ export interface ToolSchedulerConfig {
   /** flash 摘要器；缺省时非 bash 工具退化为确定性头尾截断 */
   summarizer?: Summarizer;
   approvalGate?: ApprovalGate;
+  approvalContext?: { sessionId?: string; turnId?: string };
   now?: () => number;
   createId?: () => string;
 }
@@ -101,6 +105,7 @@ export class ToolScheduler {
   private absoluteMaxChars?: number;
   private summarizer?: Summarizer;
   private approvalGate?: ApprovalGate;
+  private approvalContext?: { sessionId?: string; turnId?: string };
   private now: () => number;
   private createId: () => string;
 
@@ -110,6 +115,7 @@ export class ToolScheduler {
     this.absoluteMaxChars = config.absoluteMaxChars;
     this.summarizer = config.summarizer;
     this.approvalGate = config.approvalGate;
+    this.approvalContext = config.approvalContext;
     this.now = config.now ?? Date.now;
     this.createId = config.createId ?? createDefaultId;
   }
@@ -213,8 +219,8 @@ export class ToolScheduler {
     }
 
     const reason = decision.decision === "timeout"
-      ? `Approval timed out for tool: ${toolName}`
-      : `User denied tool: ${toolName}`;
+      ? requestDenialMessage(approvalRequest, "timeout")
+      : requestDenialMessage(approvalRequest, "deny");
     return this.finish(record, "cancelled", { success: false, error: reason });
   }
 
@@ -257,6 +263,9 @@ export class ToolScheduler {
       summary: permission.summary ?? `Run ${tool.name}`,
       reason: permission.reason ?? `Tool requires approval: ${tool.name}`,
       riskLevel: permission.riskLevel,
+      approvalScope: permission.approvalScope,
+      sessionId: this.approvalContext?.sessionId,
+      turnId: this.approvalContext?.turnId,
       createdAt: this.now(),
     };
   }
@@ -280,6 +289,14 @@ export class ToolScheduler {
     // agent 的输出是 SubAgent 给主 Agent 的结构化报告 + transcriptRef，也不能再被普通工具压缩误伤。
     if (tool.previewKind === "bash" || tool.previewKind === "agent") {
       return rendered !== undefined ? { ...result, data: rendered, structured: result.data } : result;
+    }
+
+    if (result.preserveModelOutput) {
+      return {
+        ...result,
+        ...(rendered !== undefined ? { data: rendered, structured: result.data } : {}),
+        outputRef: result.outputRef ?? { kind: "inline", value: rawData },
+      };
     }
 
     if (!rawData) {
@@ -315,6 +332,19 @@ export class ToolScheduler {
 
     return { record, result };
   }
+}
+
+function requestDenialMessage(
+  request: ToolApprovalRequest,
+  decision: "deny" | "timeout",
+): string {
+  if (request.approvalScope === "browser_session") {
+    const cause = decision === "timeout" ? "浏览器授权请求已超时" : "用户拒绝了本轮浏览器授权";
+    return `${cause}。当前 Turn 不得再次调用任何 browser_* 工具；下一次用户输入可以重新申请授权。`;
+  }
+  return decision === "timeout"
+    ? `Approval timed out for tool: ${request.toolName}`
+    : `User denied tool: ${request.toolName}`;
 }
 
 function createDefaultId(): string {

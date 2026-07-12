@@ -569,11 +569,12 @@ func executeGoHandler(handler string, params map[string]any, forward requestForw
 	case "go.dom.snapshot":
 		var input struct {
 			TabID int `json:"tab_id"`
+			Limit int `json:"limit"`
 		}
 		if err := decodeCommandParams(params, &input); err != nil {
 			return nil, protocol.ErrorInvalidParams, err
 		}
-		result, err := domEngine.Snapshot(ctx, input.TabID)
+		result, err := domEngine.Snapshot(ctx, input.TabID, input.Limit)
 		return result, protocol.ErrorCDPFailed, err
 	case "go.dom.click", "go.dom.double_click":
 		var input struct {

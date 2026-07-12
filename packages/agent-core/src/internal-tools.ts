@@ -41,6 +41,12 @@ export interface ToolResult {
    */
   outputRef?: ToolOutputRef;
   /**
+   * Executor 已按工具语义完成模型输出裁剪时，跳过通用 OutputTruncator。
+   * 仅用于不能安全交给 flash 摘要的结构化读取结果，例如 DOM snapshot、
+   * 精确工具 schema 和已分页的 Browser 列表。
+   */
+  preserveModelOutput?: boolean;
+  /**
    * renderResult 把 data 替换为回填文本之前的原始结构化结果。
    * scheduler postProcess 填充、engine/bridge 消费：bash 的 backgrounded
    * taskId / sandboxed 等 preview 元数据从这里读，不再依赖 data 的形状。
@@ -80,6 +86,8 @@ export interface PermissionResult {
   riskLevel?: ToolRiskLevel;
   /** 是否允许把一次审批扩展为类似操作放行；缺省保留旧行为。 */
   allowSimilar?: boolean;
+  /** 审批作用域；Browser Use 用 session 级租约替代逐命令审批。 */
+  approvalScope?: "browser_session";
   /** 验证通过后可修正参数（如路径展开、超时值清洗） */
   sanitizedArgs?: Record<string, unknown>;
 }

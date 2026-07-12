@@ -58,7 +58,7 @@ Browser Use 提供三种页面交互粒度。模型根据场景选择最合适�
 返回：{}
 
 内部实现：
-  1. ui.moveMouse(tabId, x, y) → 显示光标动画
+  1. await ui.moveMouse(tabId, x, y) → 从上次位置连续移动并等待到达
   2. 开始监听 Page 导航事件
   3. Input.dispatchMouseEvent(mousePressed)
   4. Input.dispatchMouseEvent(mouseReleased)
@@ -85,7 +85,7 @@ Browser Use 提供三种页面交互粒度。模型根据场景选择最合适�
 返回：{}
 
 内部：
-  1. ui.moveMouse → 光标动画
+  1. await ui.moveMouse → 光标动画完成
   2. Input.dispatchMouseEvent(mouseMoved)
 ```
 
@@ -169,14 +169,21 @@ Browser Use 提供三种页面交互粒度。模型根据场景选择最合适�
 获取当前页面可见的交互元素快照。
 
 ```
-参数：{ tab_id: int }
+参数：{ tab_id: int, limit?: int }  // 默认 500，硬上限 1000
 返回：{
+  generation: int,
+  total: int,
+  returned: int,
+  truncated: bool,
   nodes: [{
     node_id: string,
     tagName: string,
     role?: string,
     text: string,       // innerText/value/alt/title/aria-label，截断500字
+    textTruncated?: bool,
+    originalTextChars?: int,
     ariaName?: string,
+    href?: string,
     type?: string,      // input type
     boundingBox: { x, y, width, height }
   }]
@@ -185,7 +192,9 @@ Browser Use 提供三种页面交互粒度。模型根据场景选择最合适�
 选择范围：a, button, input, textarea, select, summary, details, label,
          img, video, audio, [role], [onclick], [contenteditable=true], [tabindex]
 过滤：可见（rect > 0, visibility !== hidden, display !== none）
-上限：最多 250 个节点
+节点上限：默认 500，调用方可调，硬上限 1000。
+模型输出：使用紧凑逐节点行格式，50,000 字符内逐字保留且不进入通用 flash 摘要；
+超过后只在完整节点边界停止，并返回 DOM_SNAPSHOT_TRUNCATED 与节点计数。
 ```
 
 ### dom_cua_click
@@ -375,20 +384,34 @@ replace=false：
 
 ### playwright_locator_all_text_contents
 
-读取所有匹配元素的 textContent。
+分页读取匹配元素的 textContent。
 
 ```
-参数：{ tab_id: int, selector: string, timeout_ms?: int }
-返回：{ values: string[] }
+参数：{ tab_id: int, selector: string, offset?: int, limit?: int, timeout_ms?: int }
+返回：{
+  values: string[],
+  total: int,
+  offset: int,
+  returned: int,
+  has_more: bool
+}
 ```
+
+`offset` 默认 0；`limit` 默认 200、硬上限 1000。模型输出按完整 item 保留，避免大列表被通用摘要静默删除中间结果。
 
 ### playwright_locator_read_all
 
-读取所有匹配元素的属性和文本。
+分页读取匹配元素的属性和文本。
 
 ```
-参数：{ tab_id: int, selector: string, relative_selector?: string, timeout_ms?: int }
-返回：{ values: [{ attributes: {}, inner_text: string, text_content: string }] }
+参数：{ tab_id: int, selector: string, relative_selector?: string, offset?: int, limit?: int, timeout_ms?: int }
+返回：{
+  values: [{ attributes: {}, inner_text: string, text_content: string }],
+  total: int,
+  offset: int,
+  returned: int,
+  has_more: bool
+}
 ```
 
 ### playwright_locator_get_attribute
@@ -814,13 +837,9 @@ files 为本地绝对路径数组
 - `feature_status.agent === true` → 站点被阻止
 - localhost / 127.0.0.1 / ::1 免检
 
-### 3. User Origin Permission
+### 3. User Browser Session Permission
 
-对非 localhost 站点弹出权限确认：
-
-- 首次访问某个 origin 时询问用户
-- 用户授权后记住
-- 部分命令无需 origin 检查：list_tabs、create_tab、name_session 等
+产品权限边界采用 Session 授权租约，不按 origin 重复询问：除 `browser_help` 外，第一次 Browser 工具调用请求一次允许/拒绝；允许覆盖当前应用运行期间的同一 Session，拒绝或超时只覆盖当前 Turn。站点 blocklist 与 capability hard deny 是独立的更低层安全边界，不能被 Session 授权绕过。
 
 ## 事件通知
 

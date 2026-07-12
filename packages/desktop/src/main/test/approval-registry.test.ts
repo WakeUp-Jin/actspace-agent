@@ -66,4 +66,76 @@ describe("PendingApprovalRegistry", () => {
       decision: "deny",
     });
   });
+
+  it("authorizes Browser Use once for the current session", async () => {
+    const onApprovalRequired = vi.fn();
+    const registry = new PendingApprovalRegistry({ onApprovalRequired });
+    const first = makeRequest({
+      id: "browser-approval-1",
+      toolName: "browser_tabs",
+      approvalScope: "browser_session",
+      sessionId: "session-browser",
+      turnId: "turn-1",
+    });
+
+    const firstDecision = registry.waitForDecision(first);
+    registry.onApprovalRequired(first);
+    expect(onApprovalRequired).toHaveBeenCalledTimes(1);
+    expect(registry.decide(first.id, "approve_once")).toEqual({ ok: true });
+    await expect(firstDecision).resolves.toMatchObject({ decision: "approve_once" });
+    expect(registry.isBrowserAuthorized("session-browser")).toBe(true);
+
+    const second = makeRequest({
+      id: "browser-approval-2",
+      toolName: "browser_cua",
+      approvalScope: "browser_session",
+      sessionId: "session-browser",
+      turnId: "turn-2",
+    });
+    await expect(registry.waitForDecision(second)).resolves.toMatchObject({ decision: "approve_once" });
+    registry.onApprovalRequired(second);
+    expect(onApprovalRequired).toHaveBeenCalledTimes(1);
+  });
+
+  it("denies Browser Use only for the current turn and asks again next turn", async () => {
+    const onApprovalRequired = vi.fn();
+    const registry = new PendingApprovalRegistry({ onApprovalRequired });
+    const first = makeRequest({
+      id: "browser-deny-1",
+      toolName: "browser_tabs",
+      approvalScope: "browser_session",
+      sessionId: "session-browser",
+      turnId: "turn-1",
+    });
+
+    const firstDecision = registry.waitForDecision(first);
+    registry.onApprovalRequired(first);
+    registry.decide(first.id, "deny");
+    await expect(firstDecision).resolves.toMatchObject({ decision: "deny" });
+    expect(registry.isBrowserDeniedForTurn("session-browser", "turn-1")).toBe(true);
+
+    const sameTurn = makeRequest({
+      id: "browser-deny-2",
+      toolName: "browser_navigation",
+      approvalScope: "browser_session",
+      sessionId: "session-browser",
+      turnId: "turn-1",
+    });
+    await expect(registry.waitForDecision(sameTurn)).resolves.toMatchObject({ decision: "deny" });
+    registry.onApprovalRequired(sameTurn);
+    expect(onApprovalRequired).toHaveBeenCalledTimes(1);
+
+    const nextTurn = makeRequest({
+      id: "browser-deny-3",
+      toolName: "browser_tabs",
+      approvalScope: "browser_session",
+      sessionId: "session-browser",
+      turnId: "turn-2",
+    });
+    const nextDecision = registry.waitForDecision(nextTurn);
+    registry.onApprovalRequired(nextTurn);
+    expect(onApprovalRequired).toHaveBeenCalledTimes(2);
+    registry.decide(nextTurn.id, "deny");
+    await nextDecision;
+  });
 });

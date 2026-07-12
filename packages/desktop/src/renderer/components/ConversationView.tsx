@@ -7,6 +7,7 @@ import { AssistantReply } from "./messages/AssistantReply";
 import { AgentRunBlock } from "./messages/AgentRunBlock";
 import { ExploreRunBlock } from "./messages/ExploreRunBlock";
 import { BashRunBlock } from "./messages/BashRunBlock";
+import { BrowserApprovalBlock } from "./messages/BrowserApprovalBlock";
 import { CompactCommandBlock } from "./messages/CompactCommandBlock";
 import { DeleteFileBlock } from "./messages/DeleteFileBlock";
 import { FileDiffBlock } from "./messages/FileDiffBlock";
@@ -165,6 +166,9 @@ function renderMessage(
     case "error":
       if (message.kind === "delete" && message.status === "pending") {
         return <DeleteFileBlock key={message.id} message={message} className={className} />;
+      }
+      if (message.kind === "tool" && message.approvalScope === "browser_session" && message.status === "pending") {
+        return <BrowserApprovalBlock key={message.id} message={message} className={className} />;
       }
       return <ToolLogLine key={message.id} message={message} className={className} />;
     case "status":

@@ -693,6 +693,8 @@ Plan 5 前盘点：⚠️ 协议已定义，playwright-injected.js 有实现，E
 实现量：Extension 只需加一个 case 即可接通
 ```
 
+当前实现（2026-07-12）：命令已收敛到 Go + injected Locator runtime。`visibleDom` 默认最多返回 500 个节点、硬上限 1000，并返回 `generation / total / returned / truncated`；节点补充 href 与单节点文本截断元数据。Agent Core 使用紧凑逐节点格式，在 50,000 字符内跳过通用 flash 摘要，超限只在完整节点边界停止。
+
 ---
 
 ## 九、Locator subset 独有能力
@@ -830,6 +832,8 @@ Extension 实现：
 返回：{ values: [{ attributes, inner_text, text_content }] }
 Plan 5 前盘点：❌ 未实现
 ```
+
+当前实现（2026-07-12）：`all_text_contents` 与 `read_all` 均已支持 `offset` / `limit` 分页，默认 `offset=0`、`limit=200`、硬上限 1000；返回 `values / total / offset / returned / has_more`，Agent Core 按完整 item 格式化并跳过通用 flash 摘要。
 
 ### 31. playwright_locator_get_attribute — 读取属性
 

@@ -23,7 +23,7 @@ const SUPPORTED_CDP_METHODS = new Set([
 ]);
 
 const state = {
-  version: chrome.runtime.getManifest?.().version ?? "0.2.1",
+  version: chrome.runtime.getManifest?.().version ?? "0.2.2",
   nativePort: null,
   nativeConnected: false,
   nativeLastError: null,
@@ -172,7 +172,7 @@ function connectNativeHost() {
   try {
     const port = chrome.runtime.connectNative(HOST_NAME);
     state.nativePort = port;
-    state.nativeConnected = true;
+    state.nativeConnected = false;
     state.nativeLastError = null;
 
     port.onDisconnect.addListener(() => {
@@ -183,6 +183,10 @@ function connectNativeHost() {
     });
 
     port.onMessage.addListener((message) => {
+      if (!state.nativeConnected) {
+        state.nativeConnected = true;
+        console.info("[agent-browser-bridge] native host connected", { hostName: HOST_NAME });
+      }
       handleNativeRequest(message).then((response) => {
         try {
           port.postMessage(response);
@@ -192,7 +196,7 @@ function connectNativeHost() {
       });
     });
 
-    console.info("[agent-browser-bridge] native host connected", { hostName: HOST_NAME });
+    console.info("[agent-browser-bridge] native host connecting", { hostName: HOST_NAME });
     return port;
   } catch (error) {
     state.nativePort = null;
@@ -524,7 +528,10 @@ async function detachDebugger(target) {
   }
   state.debuggerRefs.delete(target.tabId);
   return new Promise((resolve) => {
-    chrome.debugger.detach(target, () => resolve());
+    chrome.debugger.detach(target, () => {
+      void chrome.runtime.lastError;
+      resolve();
+    });
   });
 }
 
@@ -597,7 +604,7 @@ async function addTabToGroup(session, tabId, windowId) {
     }
     const groupId = await chrome.tabs.group({ tabIds: tabId, createProperties: { windowId } });
     session.tabGroupId = groupId;
-    const title = session.sessionName || "Agent";
+    const title = session.sessionName || "ActSpace";
     await chrome.tabGroups.update(groupId, { title, color: "blue", collapsed: false });
   } catch (err) {
     console.warn("[agent-browser-bridge] failed to group tab", tabId, err);
@@ -625,7 +632,7 @@ async function moveTabsToDeliverableGroup(tabIds) {
 
 async function nameSession(params) {
   const session = getSessionState(params);
-  session.sessionName = params.name ?? "Agent";
+  session.sessionName = params.name ?? "ActSpace";
   if (session.tabGroupId && chrome.tabGroups) {
     try {
       await chrome.tabGroups.update(session.tabGroupId, { title: session.sessionName });
@@ -640,7 +647,7 @@ async function injectCursorOverlay(tabId) {
     await attachDebugger(target);
     const check = await promisifyChrome((done) =>
       chrome.debugger.sendCommand(target, "Runtime.evaluate", {
-        expression: "typeof window.__actspaceCursor !== 'undefined'",
+        expression: "window.__actspaceCursor?.version === 2",
         returnByValue: true
       }, done)
     );
@@ -661,11 +668,12 @@ async function injectCursorOverlay(tabId) {
 
 async function showCursorAt(target, x, y, isClick = false) {
   try {
-    const method = isClick ? "click" : "show";
+    const method = isClick ? "click" : "moveTo";
     await promisifyChrome((done) =>
       chrome.debugger.sendCommand(target, "Runtime.evaluate", {
-        expression: `(function(){ if(window.__actspaceCursor){window.__actspaceCursor.${method}(${x},${y})} })()`,
-        returnByValue: true
+        expression: `(async function(){ if(window.__actspaceCursor){await window.__actspaceCursor.${method}(${x},${y})} })()`,
+        returnByValue: true,
+        awaitPromise: true
       }, done)
     );
   } catch { /* cursor overlay not injected yet, non-fatal */ }
@@ -702,6 +710,7 @@ chrome.debugger.onDetach.addListener((source, reason) => {
 });
 
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+  state.debuggerRefs.delete(tabId);
   for (const session of state.sessions.values()) {
     session.ownedTabIds.delete(tabId);
     session.claimedTabIds.delete(tabId);

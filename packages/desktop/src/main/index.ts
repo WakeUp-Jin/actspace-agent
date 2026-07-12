@@ -878,9 +878,12 @@ const approvalRegistry = new PendingApprovalRegistry({
       reason: request.reason,
       command: typeof request.args.command === "string" ? request.args.command : undefined,
       riskLevel: request.riskLevel,
+      approvalScope: request.approvalScope,
+      sessionId,
+      turnId,
     });
   },
-  onApprovalResolved: (request, decision) => {
+  onApprovalResolved: (request, decision, sessionId, turnId) => {
     const win = getMainWindow();
     if (!win) return;
     win.webContents.send("agent:stream", {
@@ -888,6 +891,9 @@ const approvalRegistry = new PendingApprovalRegistry({
       toolCallId: request.toolCallId ?? request.id,
       requestId: decision.requestId,
       decision: decision.decision,
+      approvalScope: request.approvalScope,
+      sessionId,
+      turnId,
     });
   },
 });

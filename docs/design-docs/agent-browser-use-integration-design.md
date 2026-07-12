@@ -195,6 +195,8 @@ plugins/browser-bridge/apps/chrome-extension/
 | `browser_help` | list/search/describe action schema、risk、backend、status |
 | `browser_run` | 结构化 actions 批处理，逐 action 校验并整批 preflight |
 
+`browser_run` 的模型结果必须包含每个已执行 action 的真实返回值，而不只列 action 名称。DOM snapshot、Locator 分页列表、tabs 列表与短状态结果分别复用单 action 的格式化和输出上限；截图只返回完成摘要，不在批处理文本中展开 base64。
+
 62 条叶子能力以 `category + action` 进入 Go registry，不平铺成 62 个模型工具。
 
 ### 首版兼容工具（15 个，迁移期）
@@ -331,13 +333,16 @@ Chrome Native Messaging host 可能长期运行在已注册的 `abb` 路径上�
 Chrome Extension 的 content script 在被控制的页面上渲染虚拟光标：
 
 - 每次 click/move 操作前，Go bridge 发 `moveMouse` 给 extension
-- Extension 向目标 tab 发 `AGENT_CURSOR_STATE` 消息
-- Content script 移动光标 overlay
+- Extension 注入 versioned `cursor-overlay.js`，并通过 `Runtime.evaluate(awaitPromise=true)` 等待 `moveTo()` 完成
+- 首次出现从 viewport 中心开始，后续操作沿用当前页面内的上次位置
+- overlay 使用紧凑短尾的黑色实心箭头、半透明细白描边和柔和蓝色光晕，箭头尖端就是真实 CDP 坐标；轨迹使用距离相关时长与轻微二次贝塞尔弯曲
+- 可视光标到达目标后，Go 才继续发送 `mouseMoved` / `mousePressed` / `mouseReleased`
+- click 在箭头尖端显示短促反馈环；drag 的可视光标与 CDP path 点同步推进
 
 显示规则：
-- 用户正在观看该 tab（active tab）→ 显示光标
-- 用户切走了 → 隐藏光标
-- Session 结束 → 清理光标
+- 第一次 CUA 操作时淡入，页面内后续操作保持连续位置
+- 页面刷新或旧 runtime 存在时，Extension 通过 runtime version 检查重新注入
+- `prefers-reduced-motion` 开启时取消轨迹动画，但仍保持坐标与点击顺序正确
 
 ### Tab Group 管理
 
@@ -358,7 +363,7 @@ Chrome 标签栏：
 
 规则：
 - 每个 session 创建一个 tab group，颜色随机
-- `name_session` 设置 group 标题
+- 未显式命名时 group 标题为 `ActSpace`；`name_session` 可设置更具体的会话标题
 - Agent 创建/claim 的 tab 自动加入 group
 - `finalize_tabs` 时：
   - `deliverable` tab → 移入 "✅ actspace" 固定分组
@@ -378,9 +383,19 @@ Chrome 标签栏：
 
 ### 权限分层
 
-- `low`：只读操作（截图、DOM 读取、列 tab）→ 自动批准
-- `medium`：改变页面状态的操作（点击、输入、导航、claim）→ 需要用户确认或配置白名单
-- `high`：敏感操作（文件上传、剪贴板写入）→ 每次确认
+Browser 工具不再按 62 条 action 逐次弹窗，而是使用 Agent Core 内存中的 Session 授权租约：
+
+- `browser_help` 只读取命令说明，不触发浏览器授权。
+- 其余 10 个 Browser 工具第一次调用时统一请求一次“允许 ActSpace 在当前会话中使用浏览器？”。
+- 用户允许后，以 `sessionId` 为键记录内存授权；当前应用运行期间该 Session 的后续 Turn 和 Browser action 自动放行。
+- 用户拒绝或审批超时后，以 `sessionId + turnId` 为键拒绝当前 Turn；本轮后续 Browser 调用直接失败且不重复弹窗，下一次用户输入可以重新申请。
+- 授权不写入 `session.jsonl`，应用重启后自动失效，也不会跨 Session 共享。
+
+Go registry 的 `low / medium / high` risk 继续用于能力说明、批处理 preflight 和诊断，不再直接决定 UI 弹窗次数。
+
+高风险 capability 仍由 Settings hard deny 控制：文件上传、下载、剪贴板写入等能力被禁用时，即使 Session 已授权也不能执行；启用后则纳入同一次 Session 授权，不逐 action 打断 Agent。
+
+审批卡片只提供“拒绝 / 允许”两个动作。状态必须依次展示为“等待浏览器授权 → 执行中 → 完成/失败”，不得在工具开始时提前显示 `Completed`。
 
 ### 站点策略
 

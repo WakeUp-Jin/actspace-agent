@@ -13,8 +13,8 @@ type Engine struct {
 	Backend backend.BrowserBackend
 }
 
-func (engine Engine) Snapshot(ctx context.Context, tabID int) (any, error) {
-	return locator.Engine{Backend: engine.Backend}.Invoke(ctx, tabID, "visible_dom", map[string]any{"limit": 250})
+func (engine Engine) Snapshot(ctx context.Context, tabID int, limit int) (any, error) {
+	return locator.Engine{Backend: engine.Backend}.Invoke(ctx, tabID, "visible_dom", map[string]any{"limit": limit})
 }
 
 func (engine Engine) Click(ctx context.Context, tabID int, nodeID string, clickCount int) error {

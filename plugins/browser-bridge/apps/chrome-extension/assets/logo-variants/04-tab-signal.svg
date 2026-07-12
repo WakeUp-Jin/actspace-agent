@@ -1,0 +1,7 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ActSpace Browser tab signal logo">
+  <rect x="13" y="19" width="74" height="63" rx="16" fill="none" stroke="currentColor" stroke-width="6"/>
+  <path d="M16 37h68" stroke="currentColor" stroke-width="6"/>
+  <path d="M33 65c10-15 24-15 34 0" fill="none" stroke="#2563EB" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="50" cy="64" r="7" fill="currentColor"/>
+  <circle cx="50" cy="64" r="3" fill="#fff"/>
+</svg>

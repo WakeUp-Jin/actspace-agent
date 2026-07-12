@@ -137,6 +137,34 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByLabelText("Message composer")).toBe(input);
   });
 
+  it("keeps wrapped content stacked when the wider stacked layout would fit on one line", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+
+    const panel = screen.getByLabelText("Message composer panel");
+    const body = panel.querySelector(".composer-body") as HTMLElement;
+    const input = screen.getByLabelText("Message composer") as HTMLTextAreaElement;
+
+    Object.defineProperty(input, "scrollHeight", {
+      configurable: true,
+      get: () => {
+        // 测量判定时组件会临时写入 inline 宽度；真实 stacked 展示宽度没有 inline style。
+        if (input.style.width) return 74;
+        return body.dataset.layout === "stacked" ? 34 : 74;
+      },
+    });
+
+    await user.click(input);
+    await user.paste("这段文字在宽的 stacked 输入框里只有一行，但在带模型和发送按钮的 inline 输入框里会折行");
+
+    expect(body.dataset.layout).toBe("stacked");
+    expect(input.style.height).toBe("34px");
+
+    // 模拟中文输入法按 Enter 确认候选后 message 再次变化：仍应按 inline 宽度判定，不能缩回 inline。
+    await user.type(input, "啦");
+    expect(body.dataset.layout).toBe("stacked");
+  });
+
   it("forces stacked layout when attachments exist", async () => {
     const user = userEvent.setup();
     const selectFiles = vi.fn(async () => ({

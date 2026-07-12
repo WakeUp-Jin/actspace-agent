@@ -265,5 +265,12 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
     return <div className={`${TOOL_LOG_LINE_CLASS} ${TOOL_LOG_LINE_ERROR_CLASS}${className ? ` ${className}` : ""}`}>{message.title}: {message.content}</div>;
   }
 
-  return <div className={`${TOOL_LOG_LINE_CLASS}${className ? ` ${className}` : ""}`}>{message.title}: {message.content}</div>;
+  const status = message.status === "pending" ? "running" : message.status;
+  return (
+    <OverflowToolLine
+      className={getToolLogLineClass(status, className)}
+      status={status}
+      text={`${message.title}: ${message.content}`}
+    />
+  );
 }

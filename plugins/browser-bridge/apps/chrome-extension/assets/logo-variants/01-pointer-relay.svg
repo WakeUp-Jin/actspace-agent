@@ -1,0 +1,6 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ActSpace Browser pointer relay logo">
+  <rect x="8" y="8" width="84" height="84" rx="24" fill="#2563EB"/>
+  <path d="M31 23.5 31 67l10.7-9.3 8.2 18.8 10.2-4.5-8.2-18.3 14.5-.4L31 23.5Z" fill="#fff" stroke="#102A63" stroke-width="3.2" stroke-linejoin="round"/>
+  <circle cx="67" cy="29" r="5" fill="#BFDBFE"/>
+  <circle cx="76" cy="39" r="3.6" fill="#DBEAFE"/>
+</svg>

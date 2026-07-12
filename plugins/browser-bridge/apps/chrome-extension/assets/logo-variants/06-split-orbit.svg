@@ -1,0 +1,6 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ActSpace Browser split orbit logo">
+  <path d="M50 13a37 37 0 1 0 37 37" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+  <path d="M50 29a21 21 0 1 0 21 21" fill="none" stroke="#2563EB" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="78" cy="22" r="9" fill="currentColor"/>
+  <circle cx="50" cy="50" r="6" fill="currentColor"/>
+</svg>

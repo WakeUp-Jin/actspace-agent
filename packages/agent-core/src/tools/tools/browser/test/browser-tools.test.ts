@@ -7,6 +7,13 @@ import { createToolManager } from "../../../index";
 import type { ApprovalGate } from "../../../scheduler";
 
 const PROTOCOL_VERSION = "0.2.0";
+const allowBrowser: ApprovalGate = {
+  waitForDecision: async (request) => ({
+    requestId: request.id,
+    decision: "approve_once",
+    decidedAt: Date.now(),
+  }),
+};
 
 describe("browser tool runtime", () => {
   const tempDirs: string[] = [];
@@ -24,6 +31,7 @@ describe("browser tool runtime", () => {
       browserBridgeSocketPath: "/tmp/browser-bridge-test.sock",
       sessionId: "session-test",
       turnId: "turn-test",
+      approvalGate: allowBrowser,
     });
 
     expect(withoutBridge.has("browser_tabs")).toBe(false);
@@ -64,6 +72,7 @@ describe("browser tool runtime", () => {
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
       turnId: "turn-test",
+      approvalGate: allowBrowser,
     });
 
     const result = await manager.execute("browser_tabs", { action: "list" });
@@ -105,6 +114,7 @@ describe("browser tool runtime", () => {
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
       turnId: "turn-test",
+      approvalGate: allowBrowser,
     });
 
     const result = await manager.execute("browser_cua", { action: "screenshot", tab_id: 42 });
@@ -138,6 +148,7 @@ describe("browser tool runtime", () => {
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
       turnId: "turn-test",
+      approvalGate: allowBrowser,
     });
 
     const result = await manager.execute("browser_io", { action: "clipboard_read_text", tab_id: 42 });
@@ -148,7 +159,7 @@ describe("browser tool runtime", () => {
     await manager.dispose();
   });
 
-  it("requires approval before mutating the real browser", async () => {
+  it("requires session approval before any real browser action", async () => {
     const manager = createToolManager({
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: "/tmp/browser-bridge-test.sock",
@@ -156,11 +167,7 @@ describe("browser tool runtime", () => {
       turnId: "turn-test",
     });
 
-    const result = await manager.execute("browser_navigation", {
-      action: "goto",
-      tab_id: 42,
-      url: "https://example.com",
-    });
+    const result = await manager.execute("browser_tabs", { action: "list" });
 
     expect(result.success).toBe(false);
     expect(result.data).toMatchObject({ status: "awaiting_approval" });
@@ -322,9 +329,242 @@ describe("browser tool runtime", () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("User denied tool: browser_run");
+    expect(result.error).toContain("用户拒绝了本轮浏览器授权");
+    expect(result.error).toContain("当前 Turn 不得再次调用任何 browser_* 工具");
     expect(methods).toContain("agent_browser_bridge.command.preflight");
     expect(methods).not.toContain("agent_browser_bridge.command.run");
+    await manager.dispose();
+  });
+
+  it("preserves a large DOM snapshot with compact node lines instead of flash summarizing it", async () => {
+    const dir = await mkdtemp(join("/private/tmp", "actspace-browser-dom-fidelity-"));
+    tempDirs.push(dir);
+    const socketPath = join(dir, "bridge.sock");
+    const nodes = Array.from({ length: 400 }, (_, index) => ({
+      nodeId: `4:${index + 1}`,
+      tagName: "a",
+      text: index === 319 ? "动画" : `频道-${index + 1}-${"x".repeat(60)}`,
+      href: index === 319 ? "//www.bilibili.com/c/douga/" : `/channel/${index + 1}`,
+      visible: true,
+      enabled: true,
+      boundingBox: { x: index, y: 203, width: 90, height: 32 },
+    }));
+    const server = createServer((socket) => {
+      handleFrames(socket, (request) => request.method === "agent_browser_bridge.command.execute"
+        ? {
+            commandId: "dom_cua_get_visible_dom",
+            category: "dom",
+            action: "snapshot",
+            result: { generation: 4, total: 400, returned: 400, truncated: false, nodes },
+          }
+        : { status: "ok" });
+    });
+    servers.push(server);
+    await listen(server, socketPath);
+    const manager = createToolManager({
+      workspaceRoot: "/tmp",
+      browserBridgeSocketPath: socketPath,
+      sessionId: "session-test",
+      turnId: "turn-test",
+      approvalGate: allowBrowser,
+    });
+
+    const result = await manager.execute("browser_dom", { action: "snapshot", tab_id: 42 });
+    const output = String(result.data);
+
+    expect(output.length).toBeGreaterThan(20_000);
+    expect(output.length).toBeLessThanOrEqual(50_000);
+    expect(output).toContain('[4:320] <a> text="动画"');
+    expect(output).toContain('href="//www.bilibili.com/c/douga/"');
+    expect(output).not.toContain("[已压缩摘要");
+    expect(output).not.toContain("...[truncated]");
+    await manager.dispose();
+  });
+
+  it("truncates DOM snapshots only at node boundaries with an explicit marker", async () => {
+    const dir = await mkdtemp(join("/private/tmp", "actspace-browser-dom-cap-"));
+    tempDirs.push(dir);
+    const socketPath = join(dir, "bridge.sock");
+    const nodes = Array.from({ length: 500 }, (_, index) => ({
+      nodeId: `4:${index + 1}`,
+      tagName: "button",
+      text: `button-${index + 1}-${"y".repeat(180)}`,
+      visible: true,
+      boundingBox: { x: 0, y: index, width: 100, height: 20 },
+    }));
+    const server = createServer((socket) => {
+      handleFrames(socket, (request) => request.method === "agent_browser_bridge.command.execute"
+        ? {
+            commandId: "dom_cua_get_visible_dom",
+            category: "dom",
+            action: "snapshot",
+            result: { generation: 4, total: 500, returned: 500, truncated: false, nodes },
+          }
+        : { status: "ok" });
+    });
+    servers.push(server);
+    await listen(server, socketPath);
+    const manager = createToolManager({
+      workspaceRoot: "/tmp",
+      browserBridgeSocketPath: socketPath,
+      sessionId: "session-test",
+      turnId: "turn-test",
+      approvalGate: allowBrowser,
+    });
+
+    const result = await manager.execute("browser_dom", { action: "snapshot", tab_id: 42 });
+    const output = String(result.data);
+
+    expect(output.length).toBeLessThanOrEqual(50_000);
+    expect(output).toContain("[DOM_SNAPSHOT_TRUNCATED]");
+    expect(output.split("\n").at(-1)).toMatch(/^\[DOM_SNAPSHOT_TRUNCATED\]/);
+    expect(output).not.toContain("[已压缩摘要");
+    await manager.dispose();
+  });
+
+  it("keeps exact browser_help action schemas up to 20K without generic summarization", async () => {
+    const dir = await mkdtemp(join("/private/tmp", "actspace-browser-help-fidelity-"));
+    tempDirs.push(dir);
+    const socketPath = join(dir, "bridge.sock");
+    const description = `schema-${"z".repeat(9_000)}`;
+    const server = createServer((socket) => {
+      handleFrames(socket, (request) => request.method === "agent_browser_bridge.command.describe"
+        ? { category: "locator", action: "read_all", description }
+        : { status: "ok" });
+    });
+    servers.push(server);
+    await listen(server, socketPath);
+    const manager = createToolManager({
+      workspaceRoot: "/tmp",
+      browserBridgeSocketPath: socketPath,
+      sessionId: "session-test",
+      turnId: "turn-test",
+    });
+
+    const result = await manager.execute("browser_help", { category: "locator", action: "read_all" });
+    const output = String(result.data);
+
+    expect(output.length).toBeGreaterThan(9_000);
+    expect(output).toContain(description);
+    expect(output).not.toContain("[已压缩摘要");
+    await manager.dispose();
+  });
+
+  it("forwards locator pagination and returns page metadata without flash summarization", async () => {
+    const dir = await mkdtemp(join("/private/tmp", "actspace-browser-pagination-"));
+    tempDirs.push(dir);
+    const socketPath = join(dir, "bridge.sock");
+    let executeParams: Record<string, unknown> | undefined;
+    const server = createServer((socket) => {
+      handleFrames(socket, (request) => {
+        if (request.method === "agent_browser_bridge.command.execute") {
+          executeParams = request.params as Record<string, unknown>;
+          return {
+            commandId: "playwright_locator_read_all",
+            category: "locator",
+            action: "read_all",
+            result: {
+              values: [{ attributes: { href: "/target" }, inner_text: "target", text_content: "target" }],
+              total: 1537,
+              offset: 200,
+              returned: 1,
+              has_more: true,
+            },
+          };
+        }
+        return { status: "ok" };
+      });
+    });
+    servers.push(server);
+    await listen(server, socketPath);
+    const manager = createToolManager({
+      workspaceRoot: "/tmp",
+      browserBridgeSocketPath: socketPath,
+      sessionId: "session-test",
+      turnId: "turn-test",
+      approvalGate: allowBrowser,
+    });
+
+    const result = await manager.execute("browser_locator", {
+      action: "read_all",
+      tab_id: 42,
+      selector: "a",
+      offset: 200,
+      limit: 1,
+    });
+    const output = String(result.data);
+
+    expect(executeParams).toMatchObject({
+      category: "locator",
+      action: "read_all",
+      params: { tab_id: 42, selector: "a", offset: 200, limit: 1 },
+    });
+    expect(output).toContain("read_all total=1537 offset=200 returned=1 has_more=true");
+    expect(output).toContain('[200] {"attributes":{"href":"/target"}');
+    expect(output).not.toContain("[已压缩摘要");
+    await manager.dispose();
+  });
+
+  it("returns real per-action results from browser_run", async () => {
+    const dir = await mkdtemp(join("/private/tmp", "actspace-browser-run-results-"));
+    tempDirs.push(dir);
+    const socketPath = join(dir, "bridge.sock");
+    const server = createServer((socket) => {
+      handleFrames(socket, (request) => {
+        if (request.method === "agent_browser_bridge.command.preflight") {
+          return {
+            actionHash: "hash-results",
+            highestRisk: "low",
+            readOnly: true,
+            approval: "signed-token",
+            expiresAt: Date.now() + 60_000,
+            actions: [],
+          };
+        }
+        if (request.method === "agent_browser_bridge.command.run") {
+          return {
+            actionHash: "hash-results",
+            results: [
+              {
+                commandId: "list_tabs",
+                category: "tabs",
+                action: "list",
+                result: [{ id: 42, title: "Bilibili", url: "https://www.bilibili.com/", active: true }],
+              },
+              {
+                commandId: "playwright_locator_all_text_contents",
+                category: "locator",
+                action: "all_text_contents",
+                result: { values: ["番剧", "动画"], total: 2, offset: 0, returned: 2, has_more: false },
+              },
+              { commandId: "cua_move", category: "cua", action: "move", result: {} },
+            ],
+          };
+        }
+        return { status: "ok" };
+      });
+    });
+    servers.push(server);
+    await listen(server, socketPath);
+    const manager = createToolManager({
+      workspaceRoot: "/tmp",
+      browserBridgeSocketPath: socketPath,
+      sessionId: "session-test",
+      turnId: "turn-test",
+      approvalGate: allowBrowser,
+    });
+
+    const result = await manager.execute("browser_run", {
+      actions: [{ category: "tabs", action: "list" }],
+    });
+    const output = String(result.data);
+
+    expect(output).toContain("## 1. tabs.list (list_tabs)");
+    expect(output).toContain("[42] * Bilibili — https://www.bilibili.com/");
+    expect(output).toContain("## 2. locator.all_text_contents");
+    expect(output).toContain('[1] "动画"');
+    expect(output).toContain("## 3. cua.move (cua_move)");
+    expect(output).not.toContain("[已压缩摘要");
     await manager.dispose();
   });
 });

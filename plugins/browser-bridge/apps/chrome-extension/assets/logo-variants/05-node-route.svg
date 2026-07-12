@@ -1,0 +1,7 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ActSpace Browser node route logo">
+  <path d="M25 74C25 50 48 51 48 31c0-9 7-15 18-15" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="25" cy="74" r="11" fill="#2563EB"/>
+  <circle cx="48" cy="48" r="8" fill="currentColor"/>
+  <circle cx="68" cy="16" r="11" fill="currentColor"/>
+  <path d="M58 82h26" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+</svg>

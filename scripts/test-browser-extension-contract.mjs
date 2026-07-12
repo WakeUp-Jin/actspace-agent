@@ -10,15 +10,35 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const extensionRoot = path.join(repoRoot, "plugins/browser-bridge/apps/chrome-extension");
 const source = readFileSync(path.join(extensionRoot, "src/background.js"), "utf8");
 const manifest = JSON.parse(readFileSync(path.join(extensionRoot, "manifest.json"), "utf8"));
+const cursorSource = readFileSync(path.join(extensionRoot, "src/cursor-overlay.js"), "utf8");
+
+assert.equal(manifest.name, "ActSpace Browser");
+assert.equal(manifest.action.default_title, "ActSpace Browser");
+assert.deepEqual(manifest.icons, {
+  16: "assets/icons/icon16.png",
+  32: "assets/icons/icon32.png",
+  48: "assets/icons/icon48.png",
+  128: "assets/icons/icon128.png",
+});
 
 const userTabs = [
   { id: 7, windowId: 1, title: "Seven", url: "https://example.test/", active: true, status: "complete" },
   { id: 8, windowId: 1, title: "Eight", url: "https://other.test/", active: false, status: "complete" },
 ];
 let nextTabId = 9;
-const calls = { attach: 0, detach: 0, cdp: 0, close: 0, groups: [], groupUpdates: [] };
-const event = () => ({ addListener() {} });
-const nativePort = { onDisconnect: event(), onMessage: event(), postMessage() {} };
+const calls = { attach: 0, detach: 0, cdp: 0, close: 0, groups: [], groupUpdates: [], nativeMessages: [] };
+const event = () => {
+  const listeners = [];
+  return {
+    addListener(listener) { listeners.push(listener); },
+    emit(...args) { for (const listener of listeners) listener(...args); },
+  };
+};
+const nativePort = {
+  onDisconnect: event(),
+  onMessage: event(),
+  postMessage(message) { calls.nativeMessages.push(message); },
+};
 const chrome = {
   runtime: {
     lastError: null,
@@ -87,6 +107,17 @@ const request = (method, params = {}) => context.handleNativeRequest({
 const info = await request("agent_browser_bridge.info");
 assert.equal(info.result.version, manifest.version);
 assert.equal(info.result.protocolVersion, "0.2.0");
+assert.equal(info.result.nativeMessaging.connected, false);
+nativePort.onMessage.emit({
+  protocolVersion: "0.2.0",
+  id: "native-ping",
+  method: "agent_browser_bridge.ping",
+  params: {},
+});
+await new Promise((resolve) => setTimeout(resolve, 0));
+const connectedInfo = await request("agent_browser_bridge.info");
+assert.equal(connectedInfo.result.nativeMessaging.connected, true);
+assert.equal(calls.nativeMessages.at(-1).id, "native-ping");
 
 const beforeClaim = await request("agent_browser_bridge.backend.tabs.list");
 assert.equal(beforeClaim.ok, true, JSON.stringify(beforeClaim));
@@ -102,6 +133,7 @@ assert.equal(claimed.ok, true);
 assert.equal(claimed.result.claimed, true);
 assert.equal(calls.groups.length, 1);
 assert.equal(calls.groups[0].tabIds, 7);
+assert.equal(calls.groupUpdates.at(-1).properties.title, "ActSpace");
 const sessionTabs = await request("agent_browser_bridge.backend.tabs.list");
 assert.deepEqual(Array.from(sessionTabs.result, (tab) => tab.id), [7]);
 
@@ -155,6 +187,15 @@ const resources = manifest.web_accessible_resources.flatMap((entry) => entry.res
 assert.deepEqual(resources, ["src/cursor-overlay.js"]);
 assert.equal(source.includes("__actspacePlaywright"), false);
 assert.equal(source.includes("clickElement("), false);
+assert.equal(source.includes("void chrome.runtime.lastError"), true);
+assert.equal(source.includes("window.__actspaceCursor?.version === 2"), true);
+assert.equal(source.includes("awaitPromise: true"), true);
+assert.equal(cursorSource.includes("async moveTo(x, y)"), true);
+assert.equal(cursorSource.includes("requestAnimationFrame(frame)"), true);
+assert.equal(cursorSource.includes("viewBox=\"0 0 20 24\""), true);
+assert.equal(cursorSource.includes('fill="#05070a" stroke="#f8fafc"'), true);
+assert.equal(cursorSource.includes('stroke-opacity=".78" stroke-width="1.15"'), true);
+assert.equal(cursorSource.includes('M2.2 2.1c-.3-.2-.6.1-.5.5'), true);
 
 const sessionACreated = await request("agent_browser_bridge.backend.tabs.create", {
   sessionId: "session-a",

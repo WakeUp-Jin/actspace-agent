@@ -8,7 +8,7 @@ import (
 
 func TestEmbeddedRuntimeHasStableVersionAndNoModelEvaluateEntry(t *testing.T) {
 	source := RuntimeSource()
-	for _, want := range []string{"window.__actspaceLocator", `const VERSION = "3"`, "locateStrict", "setNativeValue", "visibleDom", "waitFor"} {
+	for _, want := range []string{"window.__actspaceLocator", `const VERSION = "4"`, "locateStrict", "setNativeValue", "visibleDom", "paginate", "waitFor"} {
 		if !strings.Contains(source, want) {
 			t.Fatalf("runtime missing %q", want)
 		}
@@ -30,7 +30,7 @@ func TestEmbeddedRuntimeVersionMatchesGoRuntimeVersion(t *testing.T) {
 
 func TestVisibleDOMUsesViewportFilteringAndIncludesDraggableElements(t *testing.T) {
 	source := RuntimeSource()
-	for _, want := range []string{"function isInViewport", "rect.bottom > 0", "rect.top < window.innerHeight", "[draggable=true]", "if (!isInViewport(element)) continue"} {
+	for _, want := range []string{"function isInViewport", "rect.bottom > 0", "rect.top < window.innerHeight", "[draggable=true]", "filter(isInViewport)", "href: element instanceof HTMLAnchorElement"} {
 		if !strings.Contains(source, want) {
 			t.Fatalf("visible DOM runtime missing %q", want)
 		}

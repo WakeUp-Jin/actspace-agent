@@ -1713,6 +1713,109 @@ describe("App streaming user message", () => {
     });
   });
 
+  it("renders browser session approval from the runtime stream and submits allow", async () => {
+    const sessionId = "session-browser-approval";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "Browser approval session",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+      null;
+    const submitApproval = vi.fn(async () => ({ ok: true }));
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval,
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      getKimiBalance: async () => ({
+        provider: "kimi",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) streamHandler = null;
+        };
+      },
+      runTurn: (input: RunTurnInput) =>
+        new Promise((resolve) => {
+          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          streamHandler?.({
+            type: "tool_started",
+            toolCallId: "tool-browser-1",
+            toolName: "browser_tabs",
+            argsPreview: '{"action":"list"}',
+          });
+          streamHandler?.({
+            type: "tool_approval_required",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
+            toolCallId: "tool-browser-1",
+            toolName: "browser_tabs",
+            requestId: "approval-browser-1",
+            summary: "允许当前会话使用浏览器",
+            reason: "Browser tools require session authorization.",
+            approvalScope: "browser_session",
+          });
+          resolveRunTurn = resolve;
+        }),
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "看看浏览器标签页");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    expect(await screen.findByText("允许 ActSpace 在当前会话中使用浏览器？")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "允许" }));
+
+    expect(submitApproval).toHaveBeenCalledWith({
+      requestId: "approval-browser-1",
+      decision: "approve_once",
+    });
+
+    await act(async () => {
+      resolveRunTurn?.({
+        sessionId,
+        turnId: "turn-browser-approval-finished",
+        status: "completed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      });
+    });
+  });
+
   it("marks the active sidebar session as failed when a turn fails", async () => {
     const sessionId = "session-failed";
     const record = createEmptySessionRecord(sessionId);

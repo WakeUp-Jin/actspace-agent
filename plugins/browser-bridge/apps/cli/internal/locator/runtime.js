@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = "3";
+  const VERSION = "4";
   if (window.__actspaceLocator?.version === VERSION) return;
 
   let snapshotGeneration = 0;
@@ -65,11 +65,15 @@
 
   function describe(element) {
     const rect = element.getBoundingClientRect();
+    const rawText = (element.innerText || element.textContent || "").trim().replace(/\s+/g, " ");
     return {
       tagName: element.tagName.toLowerCase(),
       role: element.getAttribute("role") || undefined,
-      text: (element.innerText || element.textContent || "").trim().slice(0, 500),
+      text: rawText.slice(0, 500),
+      textTruncated: rawText.length > 500 || undefined,
+      originalTextChars: rawText.length > 500 ? rawText.length : undefined,
       ariaName: element.getAttribute("aria-label") || undefined,
+      href: element instanceof HTMLAnchorElement ? element.getAttribute("href") || undefined : undefined,
       type: element.getAttribute("type") || undefined,
       visible: isVisible(element),
       enabled: isEnabled(element),
@@ -79,19 +83,39 @@
     };
   }
 
-  function visibleDom(limit = 250) {
+  function visibleDom(limit = 500) {
     snapshotGeneration += 1;
     snapshotNodes = new Map();
     const selector = "a,button,input,textarea,select,summary,details,label,img,video,audio,[role],[onclick],[contenteditable=true],[tabindex],[draggable=true]";
+    const normalizedLimit = Math.min(1000, Math.max(1, Math.trunc(Number(limit) || 500)));
+    const visibleElements = locateAll(selector).filter(isInViewport);
     const nodes = [];
-    for (const element of locateAll(selector)) {
-      if (!isInViewport(element)) continue;
+    for (const element of visibleElements.slice(0, normalizedLimit)) {
       const nodeId = `${snapshotGeneration}:${nodes.length + 1}`;
       snapshotNodes.set(nodeId, element);
       nodes.push({ nodeId, ...describe(element) });
-      if (nodes.length >= limit) break;
     }
-    return { generation: snapshotGeneration, nodes };
+    return {
+      generation: snapshotGeneration,
+      total: visibleElements.length,
+      returned: nodes.length,
+      truncated: nodes.length < visibleElements.length,
+      nodes,
+    };
+  }
+
+  function paginate(values, params) {
+    const total = values.length;
+    const offset = Math.min(total, Math.max(0, Math.trunc(Number(params.offset) || 0)));
+    const limit = Math.min(1000, Math.max(1, Math.trunc(Number(params.limit) || 200)));
+    const page = values.slice(offset, offset + limit);
+    return {
+      values: page,
+      total,
+      offset,
+      returned: page.length,
+      has_more: offset + page.length < total,
+    };
   }
 
   function snapshotNode(nodeId) {
@@ -212,8 +236,8 @@
       }
       case "inner_text": return { value: locateStrict(params.selector).innerText };
       case "text_content": return { value: locateStrict(params.selector).textContent };
-      case "all_text_contents": return { values: locateAll(params.selector).map((element) => element.textContent || "") };
-      case "read_all": return { values: locateAll(params.selector).map((element) => ({ attributes: Object.fromEntries(Array.from(element.attributes).map((attribute) => [attribute.name, attribute.value])), inner_text: element.innerText || "", text_content: element.textContent || "" })) };
+      case "all_text_contents": return paginate(locateAll(params.selector).map((element) => element.textContent || ""), params);
+      case "read_all": return paginate(locateAll(params.selector).map((element) => ({ attributes: Object.fromEntries(Array.from(element.attributes).map((attribute) => [attribute.name, attribute.value])), inner_text: element.innerText || "", text_content: element.textContent || "" })), params);
       case "get_attribute": return { value: locateStrict(params.selector).getAttribute(params.name) };
       case "is_visible": return { value: locateAll(params.selector).some(isVisible) };
       case "is_enabled": return { value: isEnabled(locateStrict(params.selector)) };
@@ -221,7 +245,7 @@
       case "wait_for": return waitFor(params.selector, params.state, params.timeoutMs || 10000);
       case "dom_snapshot": return { dom_snapshot: document.body?.innerText || "" };
       case "element_info": return { elements: document.elementsFromPoint(params.x, params.y).slice(0, 10).filter((element) => params.includeNonInteractable || isVisible(element)).map(describe) };
-      case "visible_dom": return visibleDom(params.limit || 250);
+      case "visible_dom": return visibleDom(params.limit || 500);
       case "node_point": return point(snapshotNode(params.nodeId));
       case "node_scroll": snapshotNode(params.nodeId).scrollBy(params.scrollX || 0, params.scrollY || 0); return {};
       case "download_media_at_point": return triggerDownload(document.elementFromPoint(params.x, params.y));

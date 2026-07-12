@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ActSpace Browser — Logo Exploration</title>
+  <style>
+    :root { --ink:#101828; --muted:#667085; --line:#d9dfeb; --blue:#2563eb; --paper:#f3f5f9; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--paper); font-family:"Avenir Next","Helvetica Neue",sans-serif; }
+    body::before { content:""; position:fixed; inset:0; pointer-events:none; opacity:.32; background-image:radial-gradient(#99a4b7 0.55px,transparent .55px); background-size:10px 10px; mask-image:linear-gradient(to bottom,#000,transparent 72%); }
+    main { position:relative; width:min(1320px,calc(100% - 48px)); margin:auto; padding:72px 0 96px; }
+    header { display:grid; grid-template-columns:1.25fr .75fr; gap:64px; align-items:end; padding-bottom:42px; border-bottom:1px solid var(--line); }
+    .eyebrow { font:600 11px/1.2 ui-monospace,SFMono-Regular,monospace; letter-spacing:.18em; text-transform:uppercase; color:var(--blue); }
+    h1 { max-width:760px; margin:14px 0 0; font-size:clamp(50px,7vw,104px); line-height:.88; letter-spacing:-.065em; font-weight:650; }
+    header p { margin:0; color:var(--muted); font-size:15px; line-height:1.75; }
+    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; margin-top:42px; background:var(--line); border:1px solid var(--line); }
+    article { min-height:440px; padding:28px; background:rgba(255,255,255,.88); display:flex; flex-direction:column; transition:background .2s,transform .2s; }
+    article:hover { position:relative; z-index:2; transform:translateY(-4px); box-shadow:0 22px 60px rgba(16,24,40,.12); }
+    article.selected { background:#e9f0ff; }
+    .meta { display:flex; justify-content:space-between; align-items:center; font:600 11px/1 ui-monospace,SFMono-Regular,monospace; letter-spacing:.1em; text-transform:uppercase; }
+    .badge { padding:6px 8px; border-radius:999px; color:#fff; background:var(--blue); }
+    .stage { flex:1; display:grid; place-items:center; min-height:245px; }
+    .stage img { width:138px; height:138px; transition:transform .35s cubic-bezier(.2,.8,.2,1); }
+    article:hover .stage img { transform:scale(1.06) rotate(-2deg); }
+    h2 { margin:0 0 8px; font-size:22px; letter-spacing:-.025em; }
+    article p { margin:0; min-height:52px; color:var(--muted); font-size:13px; line-height:1.55; }
+    .sizes { display:flex; align-items:end; gap:16px; margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
+    .sizes span { display:grid; place-items:center; border-radius:8px; background:#fff; box-shadow:inset 0 0 0 1px rgba(16,24,40,.08); }
+    .sizes img { width:var(--s); height:var(--s); }
+    .dark { background:#111827!important; }
+    .dark img:not([src*="01-"]) { filter:invert(1); }
+    .toolbar { margin-top:48px; padding:22px 24px; border-radius:16px; color:#dbe4f3; background:#1f2937; box-shadow:0 18px 50px rgba(16,24,40,.18); }
+    .toolbar-title { margin-bottom:16px; font:600 11px/1 ui-monospace,SFMono-Regular,monospace; letter-spacing:.15em; text-transform:uppercase; color:#93a4bd; }
+    .toolbar-row { display:flex; gap:14px; align-items:center; }
+    .browser-bar { height:40px; flex:1; display:flex; align-items:center; gap:8px; padding:0 13px; border-radius:10px; background:#111827; }
+    .browser-bar img { width:16px; height:16px; }
+    .browser-bar img:not([src*="01-"]) { filter:invert(1); }
+    .browser-bar strong { margin-left:4px; font-size:12px; font-weight:600; }
+    footer { display:flex; justify-content:space-between; margin-top:34px; color:var(--muted); font:500 11px/1.6 ui-monospace,SFMono-Regular,monospace; }
+    @media (max-width:900px) { header { grid-template-columns:1fr; } .grid { grid-template-columns:1fr 1fr; } }
+    @media (max-width:620px) { main { width:min(100% - 24px,1320px); padding-top:40px; } .grid { grid-template-columns:1fr; } footer { display:block; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><div class="eyebrow">Identity study · 01—06</div><h1>ActSpace<br>Browser</h1></div>
+    <p>目标不是做一个独立的新品牌，而是把 ActSpace 的“节点、空间与执行”语言压缩成 Chrome 工具栏里仍然清晰的符号。01 号方案被选为首版默认：它把真实浏览器控制、光标与连接轨迹合成一个最小图形。</p>
+  </header>
+  <section class="grid" id="logo-grid"></section>
+  <section class="toolbar">
+    <div class="toolbar-title">16px Chrome toolbar reality check</div>
+    <div class="toolbar-row" id="toolbar-row"></div>
+  </section>
+  <footer><span>ACTSPACE / BROWSER BRIDGE / BRAND EXPLORATION</span><span>SVG SOURCE · 100×100 VIEWBOX · 2026</span></footer>
+</main>
+<script>
+  const logos = [
+    ["01-pointer-relay.svg","Pointer Relay","推荐","光标、连接节点与 ActSpace 蓝色合成一个高识别度符号，最适合 16px 工具栏。"],
+    ["02-space-window.svg","Space Window","品牌继承","把桌面端节点结构放进浏览器窗口，品牌关系最直接。"],
+    ["03-bridge-portal.svg","Bridge Portal","基础设施","双层拱门表达本机桥接与浏览器边界，稳定但更偏工程品牌。"],
+    ["04-tab-signal.svg","Tab Signal","连接状态","标签页框架与信号节点组合，适合作为连接状态或 popup 图形。"],
+    ["05-node-route.svg","Node Route","执行路径","沿路径汇聚的节点延续主图标语言，强调 Agent 的操作轨迹。"],
+    ["06-split-orbit.svg","Split Orbit","空间系统","断开的轨道表达跨运行时边界，图形感强但浏览器语义较弱。"]
+  ];
+  const root = "logo-variants/";
+  document.querySelector("#logo-grid").innerHTML = logos.map((item,index) => `
+    <article class="${index===0?"selected":""}">
+      <div class="meta"><span>0${index+1}</span>${index===0?'<span class="badge">Selected</span>':`<span>${item[2]}</span>`}</div>
+      <div class="stage"><img src="${root+item[0]}" alt="${item[1]}"></div>
+      <h2>${item[1]}</h2><p>${item[3]}</p>
+      <div class="sizes"><span style="width:52px;height:52px"><img style="--s:32px" src="${root+item[0]}"></span><span style="width:38px;height:38px"><img style="--s:24px" src="${root+item[0]}"></span><span class="dark" style="width:30px;height:30px"><img style="--s:16px" src="${root+item[0]}"></span></div>
+    </article>`).join("");
+  document.querySelector("#toolbar-row").innerHTML = logos.map(item => `<div class="browser-bar"><img src="${root+item[0]}"><strong>${item[1]}</strong></div>`).join("");
+</script>
+</body>
+</html>

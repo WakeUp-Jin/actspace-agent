@@ -32,6 +32,19 @@ func arrayProperty(description string, item Schema) Schema {
 	return Schema{Type: "array", Description: description, Items: &item}
 }
 
+func paginatedValuesResult(values Schema) Schema {
+	return object(
+		[]string{"values", "total", "offset", "returned", "has_more"},
+		map[string]Schema{
+			"values":   values,
+			"total":    integerProperty("Total matching result count."),
+			"offset":   integerProperty("Zero-based offset of this page."),
+			"returned": integerProperty("Number of results in this page."),
+			"has_more": booleanProperty("Whether more results remain."),
+		},
+	)
+}
+
 var (
 	tabID              = integerProperty("Target Chrome tab id.")
 	timeoutMS          = integerProperty("Timeout in milliseconds.")

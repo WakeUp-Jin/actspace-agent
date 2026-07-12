@@ -1,6 +1,16 @@
-# Chrome Extension Backend
+# ActSpace Browser Chrome Extension
 
-This directory contains the Manifest V3 Chrome extension backend for Agent Browser Bridge. The extension connects to the Go Native Messaging host and executes browser-host operations against the user's real Chrome profile.
+This directory contains the Manifest V3 Chrome extension backend for ActSpace Browser. The extension connects to the Go Native Messaging host and executes browser-host operations against the user's real Chrome profile.
+
+## Brand assets
+
+- Chrome display name: `ActSpace Browser`
+- Default automation tab group: `ActSpace`
+- Selected toolbar icon: `assets/logo-variants/01-pointer-relay.svg`
+- Chrome PNG icons: `assets/icons/`
+- Six-direction offline review page: `assets/logo-showcase.html`
+
+The visible CUA cursor is a versioned injected runtime. It starts at the viewport center on first use, remembers its last page position, animates to the next target, and resolves before the Go CUA engine dispatches the corresponding CDP input event.
 
 ## Local Load
 

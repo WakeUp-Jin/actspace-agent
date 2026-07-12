@@ -1063,7 +1063,7 @@ function createToolUiPreview(
           ? summarizeBrowserToolCall(toolName, args)
           : summary,
         content: previewKind.startsWith("browser_")
-          ? ok ? "Completed" : "Failed"
+          ? output.length === 0 ? "Executing..." : ok ? "Completed" : "Failed"
           : output,
       };
   }
@@ -1340,6 +1340,9 @@ function mapAgentEventToStreamEvent(
         reason: event.request.reason,
         command: typeof event.request.args.command === "string" ? event.request.args.command : undefined,
         riskLevel: event.request.riskLevel,
+        approvalScope: event.request.approvalScope,
+        sessionId,
+        turnId,
       };
 
     case "tool_approval_resolved":
@@ -1348,6 +1351,8 @@ function mapAgentEventToStreamEvent(
         toolCallId: event.toolCallId,
         requestId: event.decision.requestId,
         decision: event.decision.decision,
+        sessionId,
+        turnId,
       };
 
     case "context_compaction": {

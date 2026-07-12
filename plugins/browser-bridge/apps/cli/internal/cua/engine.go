@@ -213,6 +213,7 @@ func (engine Engine) Drag(ctx context.Context, tabID int, path []Point, modifier
 			return nil, err
 		}
 		for _, point := range path[1:] {
+			_ = engine.Backend.MoveCursor(ctx, tabID, point.X, point.Y, false)
 			if _, err := session.Execute(ctx, "Input.dispatchMouseEvent", map[string]any{"type": "mouseMoved", "x": point.X, "y": point.Y, "button": "left", "buttons": 1, "modifiers": mask}); err != nil {
 				return nil, err
 			}

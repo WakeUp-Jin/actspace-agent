@@ -1,6 +1,5 @@
 import type { PermissionChecker, PermissionResult } from "../../../internal-tools";
 import { browserCommandMetadata } from "./generated-actions";
-import { summarizeBrowserToolCall } from "./preview";
 import type { BrowserCommandAction, BrowserPreflightResult } from "./types";
 
 const INTERNAL_APPROVAL_ARG = "__browser_approval";
@@ -26,15 +25,13 @@ export function createBrowserActionPermissionChecker(
       return deny(`${metadata.effect} capability 已在设置中禁用。`);
     }
     const sanitizedArgs = stripInternalArgs(args);
-    if (metadata.readOnly) {
-      return { decision: "allow", riskLevel: metadata.riskLevel, sanitizedArgs };
-    }
     return {
       decision: "ask",
-      reason: `${metadata.id} 会产生 ${metadata.effect} 外部影响。`,
-      summary: summarizeAction(category, action, sanitizedArgs),
+      reason: "Agent 请求在当前会话中使用你的 Chrome。允许后，本次应用运行期间该会话后续 Browser 工具不再重复询问。",
+      summary: "允许 ActSpace 在当前会话中使用浏览器？",
       riskLevel: metadata.riskLevel,
-      allowSimilar: metadata.riskLevel !== "high",
+      allowSimilar: false,
+      approvalScope: "browser_session",
       sanitizedArgs,
     };
   };
@@ -69,17 +66,13 @@ export function createBrowserRunPermissionChecker(
       [INTERNAL_APPROVAL_ARG]: result.approval,
       [INTERNAL_ACTION_HASH_ARG]: result.actionHash,
     };
-    if (result.readOnly) {
-      return { decision: "allow", riskLevel: result.highestRisk, sanitizedArgs };
-    }
     return {
       decision: "ask",
-      reason: `批处理中最高风险为 ${result.highestRisk}，包含会改变真实 Chrome 状态的动作。`,
-      summary: result.actions.map((action) => (
-        `${action.category}.${action.action}${action.target ? ` (${action.target})` : ""}${action.origin ? ` @ ${action.origin}` : ""}`
-      )).join(" → "),
+      reason: "Agent 请求在当前会话中使用你的 Chrome。允许后，本次应用运行期间该会话后续 Browser 工具不再重复询问。",
+      summary: "允许 ActSpace 在当前会话中使用浏览器？",
       riskLevel: result.highestRisk,
       allowSimilar: false,
+      approvalScope: "browser_session",
       sanitizedArgs,
     };
   };
@@ -115,10 +108,6 @@ function normalizeActions(value: unknown): BrowserCommandAction[] | null {
     });
   }
   return actions;
-}
-
-function summarizeAction(category: string, action: string, args: Record<string, unknown>): string {
-  return summarizeBrowserToolCall(`browser_${category}`, { action, ...args });
 }
 
 function deny(reason: string): PermissionResult {

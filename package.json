@@ -15,7 +15,7 @@
     "check:secrets": "./scripts/check-secrets.sh",
     "check:repo": "./scripts/check-repo-hygiene.sh",
     "check:actions": "./scripts/check-action-pinning.sh",
-    "check:browser": "node --check plugins/browser-bridge/apps/chrome-extension/src/background.js && node scripts/check-browser-command-registry.mjs && node scripts/test-browser-locator-runtime.mjs && node scripts/test-browser-extension-contract.mjs",
+    "check:browser": "node --check plugins/browser-bridge/apps/chrome-extension/src/background.js && node --check plugins/browser-bridge/apps/chrome-extension/src/cursor-overlay.js && node scripts/check-browser-command-registry.mjs && node scripts/test-browser-locator-runtime.mjs && node scripts/test-browser-cursor-runtime.mjs && node scripts/test-browser-extension-contract.mjs",
     "hooks:install": "./scripts/install-git-hooks.sh",
     "package:desktop": "./scripts/release-package.sh",
     "package:desktop:dmg": "./scripts/release-package.sh",
