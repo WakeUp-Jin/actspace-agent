@@ -30,6 +30,9 @@ describe("writeArtifacts", () => {
         id: "001-final",
         kind: "final",
         messageCount: 1,
+        tokenEstimate: 2,
+        compacted: false,
+        toolCallIds: [],
         messages: [{ role: "user", content: "Say hi", timestamp: 1 }],
       }],
     });

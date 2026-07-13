@@ -17,6 +17,7 @@ import { AgentEventCollector } from "./event-collector";
 import { createApprovalGate } from "./permission";
 import { writeArtifacts } from "./artifacts";
 import type { CliArtifactResult, RunCommandOptions } from "./types";
+import { ContextSnapshotCollector } from "./context-snapshot-collector";
 
 export async function runCommand(options: RunCommandOptions): Promise<CliArtifactResult> {
   const workspace = resolveRequiredWorkspace(options.workspace);
@@ -24,6 +25,7 @@ export async function runCommand(options: RunCommandOptions): Promise<CliArtifac
   const startedAt = new Date().toISOString();
   const collector = new AgentEventCollector();
   const deps = createDeps(options, workspace);
+  const contextSnapshots = options.out ? new ContextSnapshotCollector() : undefined;
 
   const agent = new Agent({
     llm: deps.llm,
@@ -31,7 +33,13 @@ export async function runCommand(options: RunCommandOptions): Promise<CliArtifac
     toolManager: deps.toolManager,
     thinkingEnabled: deps.thinkingEnabled,
     summarizer: deps.summarizer,
-    onEvent: collector.sink,
+    onEvent: (event) => {
+      collector.sink(event);
+      if (event.type === "context_compaction") {
+        contextSnapshots?.capturePostCompaction(deps.contextManager.getMessages());
+      }
+    },
+    cacheAudit: contextSnapshots,
   });
 
   const loopResult = await agent.run(input);
@@ -55,17 +63,13 @@ export async function runCommand(options: RunCommandOptions): Promise<CliArtifac
   };
 
   if (options.out) {
+    contextSnapshots?.captureFinal(loopResult.messages);
     await writeArtifacts({
       outDir: options.out,
       result,
       events,
       finalText,
-      contextSnapshots: [{
-        id: "001-final",
-        kind: "final",
-        messageCount: loopResult.messages.length,
-        messages: loopResult.messages,
-      }],
+      contextSnapshots: contextSnapshots?.getSnapshots(),
     });
   }
 

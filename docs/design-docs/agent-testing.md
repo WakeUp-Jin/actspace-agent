@@ -43,6 +43,8 @@ packages/agent-core/
 ### 端到端 smoke
 
 - `src/test/smoke.test.ts`：MockLLMService + ToolManager + ContextManager + Agent → 完整 turn → 事件序列 + 最终回复 + usage
+- `packages/agent-cli/src/test/run.test.ts`：无 `--out` 时 artifact-free；显式 `--out` 时写 result/trace/final response，以及 pre-LLM/final context snapshots。
+- `packages/agent-cli/src/test/artifacts.test.ts`：context snapshot 文件名、字段和输出目录逃逸保护。
 
 ### 执行引擎
 

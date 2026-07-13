@@ -37,7 +37,11 @@ describe("runCommand", () => {
     await expect(readFile(join(out, "result.json"), "utf8")).resolves.toContain('"permissionMode": "yolo"');
     await expect(readFile(join(out, "trace.jsonl"), "utf8")).resolves.toContain('"agent_start"');
     await expect(readFile(join(out, "final-response.md"), "utf8")).resolves.toBe("Mock ActSpace Agent response.");
-    await expect(readFile(join(out, "context-snapshots", "001-final.json"), "utf8"))
-      .resolves.toContain('"kind": "final"');
+    const snapshotNames = await readdir(join(out, "context-snapshots"));
+    expect(snapshotNames.some((name) => name.includes("pre-llm"))).toBe(true);
+    expect(snapshotNames.some((name) => name.includes("final"))).toBe(true);
+    const preLlm = snapshotNames.find((name) => name.includes("pre-llm"));
+    await expect(readFile(join(out, "context-snapshots", preLlm ?? ""), "utf8"))
+      .resolves.toContain('"kind": "pre-llm"');
   });
 });

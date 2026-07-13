@@ -34,7 +34,12 @@ export interface SerializableAgentEvent {
 
 export interface ContextSnapshotArtifact {
   id: string;
-  kind: "final";
+  kind: "pre-llm" | "post-compaction" | "final";
+  turnIndex?: number;
+  callId?: string;
   messageCount: number;
+  tokenEstimate: number;
+  compacted: boolean;
+  toolCallIds: string[];
   messages: Message[];
 }

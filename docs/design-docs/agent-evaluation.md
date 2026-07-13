@@ -355,9 +355,6 @@ result.json
 trace.jsonl
 final-response.md
 context-snapshots/
-git-diff.patch
-command-results.json
-grader-results.json
 ```
 
 文件含义：
@@ -365,10 +362,21 @@ grader-results.json
 - `result.json`：Agent 运行的顶层结果。
 - `trace.jsonl`：Agent 事件、工具调用、审批、错误和轮次生命周期。
 - `final-response.md`：最终用户可见回复。
-- `context-snapshots/`：ActSpace CLI 写出的上下文快照，用于上下文质量评分器。
-- `git-diff.patch`：评估运行器后处理生成的运行后工作区改动。
-- `command-results.json`：评估运行器后处理执行验证命令后的输出和退出码。
-- `grader-results.json`：各评分器的评分细节。
+- `context-snapshots/`：ActSpace CLI 写出的 eval-only 上下文快照，用于上下文质量评分器；包含 `pre-llm`、`post-compaction` 和 `final`。
+
+每个 context snapshot 至少包含：
+
+- `kind`
+- `turnIndex` / `callId`（适用时）
+- 实际进入模型调用的 `messages`
+- `messageCount`
+- `tokenEstimate`
+- `compacted`
+- `toolCallIds`
+
+CLI 使用不参与 LLM 输入的 sidecar observer 在真实调用前复制 context；普通 CLI 和桌面端没有 `--out` 时不创建 collector，也不写 snapshot。
+
+`git-diff.patch`、`command-results.json`、runtime policy、grader result 和 report 由外部评估仓库在 Agent 执行后生成，不属于 ActSpace CLI 自身写出的 artifact contract。
 
 没有 `--out` 就没有评估产物。
 
