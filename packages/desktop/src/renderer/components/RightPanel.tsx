@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Bot, ChevronDown, Eye, FolderTree, GitBranch, MessageSquare, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import hljs from "highlight.js";
 import type { ContextState } from "@actspace/shared";
 import { ContextRenderView } from "./right-panel/ContextRenderView";
@@ -50,16 +50,27 @@ const RIGHT_TAB_MENU_CLOSE_CLASS =
 const RIGHT_PANEL_BODY_CLASS = "min-h-0 flex-1 overflow-auto p-[18px] leading-[1.6] text-text-main";
 const RIGHT_PANEL_HEADING_CLASS = "m-0 mb-2 text-[15px] font-semibold";
 const RIGHT_PANEL_TEXT_CLASS = "m-0 text-[13px] text-text-muted";
+const RIGHT_PANEL_LAUNCHER_CLASS =
+  "grid min-h-0 flex-1 place-items-center overflow-auto bg-app-bg px-5 py-8";
+const RIGHT_PANEL_LAUNCHER_GRID_CLASS = "grid w-full max-w-[300px] grid-cols-2 gap-3";
+const RIGHT_PANEL_LAUNCHER_BUTTON_CLASS =
+  "group flex h-[108px] min-w-0 flex-col items-center justify-center gap-3 rounded-act-lg border border-line bg-surface px-3 text-[13px] font-medium text-text-muted transition-[background-color,border-color,color,transform] duration-150 hover:border-line-strong hover:bg-surface-subtle hover:text-text-main active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-app-bg disabled:opacity-45 disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-text-muted [cursor:pointer] disabled:[cursor:not-allowed]";
+const RIGHT_PANEL_LAUNCHER_LAST_BUTTON_CLASS =
+  "col-span-2 w-[calc(50%_-_6px)] justify-self-center";
+const RIGHT_PANEL_LAUNCHER_ICON_CLASS =
+  "text-text-faint transition-colors duration-150 group-hover:text-text-muted group-focus-visible:text-brand";
 
 export function RightPanel({
   contextState,
   sessionId,
   workspaceRoot,
+  onOpenReview,
   onReviewChanged,
 }: {
   contextState?: ContextState | null;
   sessionId?: string | null;
   workspaceRoot?: string;
+  onOpenReview?: () => void;
   onReviewChanged?: () => void;
 }) {
   const { activeTab, isFileTreeOpen, isFileTreeCollapsed } = useRightPanel();
@@ -86,6 +97,7 @@ export function RightPanel({
               tab={activeTab}
               contextState={contextState}
               sessionId={sessionId}
+              onOpenReview={onOpenReview}
               onReviewChanged={onReviewChanged}
             />
           )}
@@ -109,7 +121,7 @@ function WorkspaceFileEmpty() {
     <div className={RIGHT_PANEL_BODY_CLASS}>
       <h2 className={RIGHT_PANEL_HEADING_CLASS}>选择文件查看</h2>
       <p className={RIGHT_PANEL_TEXT_CLASS}>
-        在左侧文件树中点击文件，将在这里打开预览。Kairos、Context、Reply HTML 等对象请关闭「工作区文件」后查看完整视图。
+        在左侧文件树中点击文件，将在这里打开预览。Kairos、Context、Reply 等对象请关闭「工作区文件」后查看完整视图。
       </p>
     </div>
   );
@@ -311,22 +323,17 @@ function RightPanelBody({
   tab,
   contextState,
   sessionId,
+  onOpenReview,
   onReviewChanged,
 }: {
   tab: RightPanelTab | null;
   contextState?: ContextState | null;
   sessionId?: string | null;
+  onOpenReview?: () => void;
   onReviewChanged?: () => void;
 }) {
   if (!tab) {
-    return (
-      <div className={RIGHT_PANEL_BODY_CLASS}>
-        <h2 className={RIGHT_PANEL_HEADING_CLASS}>没有打开的对象</h2>
-        <p className={RIGHT_PANEL_TEXT_CLASS}>
-          在会话中点击文件、可视化按钮或上下文展开按钮，会在这里打开对应视图。
-        </p>
-      </div>
-    );
+    return <RightPanelLauncher sessionId={sessionId ?? null} onOpenReview={onOpenReview} />;
   }
 
   if (tab.kind === "kairos") {
@@ -364,6 +371,74 @@ function RightPanelBody({
   }
 
   return <ContextRenderView contextState={contextState} sessionId={sessionId} />;
+}
+
+function RightPanelLauncher({
+  sessionId,
+  onOpenReview,
+}: {
+  sessionId: string | null;
+  onOpenReview?: () => void;
+}) {
+  const { openFileTree, openTab } = useRightPanel();
+
+  return (
+    <nav className={RIGHT_PANEL_LAUNCHER_CLASS} aria-label="右侧面板对象">
+      <div className={RIGHT_PANEL_LAUNCHER_GRID_CLASS}>
+        <LauncherButton label="Files" icon={<FolderTree size={19} strokeWidth={1.7} />} onClick={openFileTree} />
+        <LauncherButton
+          label="Review"
+          icon={<GitBranch size={19} strokeWidth={1.7} />}
+          onClick={onOpenReview}
+          disabled={!onOpenReview}
+        />
+        <LauncherButton
+          label="Context"
+          icon={<Eye size={19} strokeWidth={1.7} />}
+          onClick={() => openTab({ id: "context", kind: "context", title: "Context" })}
+        />
+        <LauncherButton
+          label="Kairos"
+          icon={<Bot size={19} strokeWidth={1.7} />}
+          onClick={() => openTab({ id: "kairos", kind: "kairos", title: "Kairos" })}
+        />
+        <LauncherButton
+          label="Reply"
+          icon={<MessageSquare size={19} strokeWidth={1.7} />}
+          onClick={() => openTab({ id: "reply", kind: "replyHtml", title: "Reply", sessionId })}
+          centered
+        />
+      </div>
+    </nav>
+  );
+}
+
+function LauncherButton({
+  label,
+  icon,
+  onClick,
+  centered = false,
+  disabled = false,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick?: () => void;
+  centered?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={`${RIGHT_PANEL_LAUNCHER_BUTTON_CLASS} ${centered ? RIGHT_PANEL_LAUNCHER_LAST_BUTTON_CLASS : ""}`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className={RIGHT_PANEL_LAUNCHER_ICON_CLASS} aria-hidden="true">
+        {icon}
+      </span>
+      <span>{label}</span>
+    </button>
+  );
 }
 
 const TEXT_BODY_CLASS =

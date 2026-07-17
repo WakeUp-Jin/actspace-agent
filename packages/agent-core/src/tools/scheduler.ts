@@ -43,7 +43,7 @@ export interface ToolApprovalRequest {
   createdAt: number;
 }
 
-export type ToolApprovalDecisionKind = "approve_once" | "deny" | "allow_similar" | "timeout";
+export type ToolApprovalDecisionKind = "approve_once" | "deny" | "allow_similar" | "timeout" | "abort";
 
 export interface ToolApprovalDecision {
   requestId: string;
@@ -144,6 +144,13 @@ export class ToolScheduler {
       return this.finish(record, "error", result);
     }
 
+    if (options?.signal?.aborted) {
+      return this.finish(record, "cancelled", {
+        success: false,
+        error: `Turn stopped before tool execution: ${toolName}`,
+      });
+    }
+
     // 仅 Kairos 调用路径走"白名单 + blocklist"额外校验；主 Agent 默认零开销。
     if (options?.callerAgent === "kairos") {
       const guardResult = checkKairosGuard(tool, args, options.kairosGuard);
@@ -155,6 +162,13 @@ export class ToolScheduler {
     try {
       const permission = await this.checkPermission(tool, args);
       record.permission = permission;
+
+      if (options?.signal?.aborted) {
+        return this.finish(record, "cancelled", {
+          success: false,
+          error: `Turn stopped before tool execution: ${toolName}`,
+        });
+      }
 
       if (permission.decision === "deny") {
         const result = {
@@ -207,6 +221,13 @@ export class ToolScheduler {
     const decision = await decisionPromise;
     record.approvalDecision = decision;
 
+    if (decision.decision === "abort" || options?.signal?.aborted) {
+      return this.finish(record, "cancelled", {
+        success: false,
+        error: requestDenialMessage(approvalRequest, "abort"),
+      });
+    }
+
     if (decision.decision === "allow_similar" && permission.allowSimilar === false) {
       return this.finish(record, "cancelled", {
         success: false,
@@ -230,6 +251,12 @@ export class ToolScheduler {
     record: ToolCallRecord,
     options?: SchedulerExecuteOptions,
   ): Promise<ToolSchedulerExecution> {
+    if (options?.signal?.aborted) {
+      return this.finish(record, "cancelled", {
+        success: false,
+        error: `Turn stopped before tool execution: ${tool.name}`,
+      });
+    }
     record.args = executionArgs;
     record.status = "scheduled";
     record.status = "executing";
@@ -336,11 +363,16 @@ export class ToolScheduler {
 
 function requestDenialMessage(
   request: ToolApprovalRequest,
-  decision: "deny" | "timeout",
+  decision: "deny" | "timeout" | "abort",
 ): string {
   if (request.approvalScope === "browser_session") {
-    const cause = decision === "timeout" ? "浏览器授权请求已超时" : "用户拒绝了本轮浏览器授权";
+    const cause = decision === "abort"
+      ? "当前 Turn 已停止，浏览器授权已取消"
+      : decision === "timeout" ? "浏览器授权请求已超时" : "用户拒绝了本轮浏览器授权";
     return `${cause}。当前 Turn 不得再次调用任何 browser_* 工具；下一次用户输入可以重新申请授权。`;
+  }
+  if (decision === "abort") {
+    return `Turn stopped while waiting for approval: ${request.toolName}`;
   }
   return decision === "timeout"
     ? `Approval timed out for tool: ${request.toolName}`

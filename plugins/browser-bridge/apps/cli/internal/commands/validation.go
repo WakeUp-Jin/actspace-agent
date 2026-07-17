@@ -23,6 +23,57 @@ func ValidateInput(command Command, params map[string]any) error {
 			return err
 		}
 	}
+	if command.Category == "locator" && locatorActionRequiresTarget(command.Action) {
+		selector, _ := params["selector"].(string)
+		target, hasTarget := params["target"].(map[string]any)
+		if selector == "" && (!hasTarget || target == nil) {
+			return fmt.Errorf("locator target required: provide non-empty selector or target")
+		}
+		if hasTarget {
+			if err := validateLocatorTarget("target", target); err != nil {
+				return err
+			}
+		}
+	}
+	if target, ok := params["target"].(map[string]any); ok && !locatorActionRequiresTarget(command.Action) {
+		if err := validateLocatorTarget("target", target); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func locatorActionRequiresTarget(action string) bool {
+	switch action {
+	case "click", "double_click", "fill", "press", "select_option", "set_checked", "inner_text", "text_content", "all_text_contents", "read_all", "get_attribute", "is_visible", "is_enabled", "count", "wait_for", "download_media":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateLocatorTarget(path string, target map[string]any) error {
+	kind, _ := target["kind"].(string)
+	requireValue := kind == "css" || kind == "text" || kind == "label" || kind == "placeholder" || kind == "test_id"
+	value, _ := target["value"].(string)
+	role, _ := target["role"].(string)
+	if requireValue && value == "" {
+		return fmt.Errorf("parameter %q requires non-empty value", path)
+	}
+	if kind == "role" && role == "" && value == "" {
+		return fmt.Errorf("parameter %q requires non-empty role", path)
+	}
+	if frames, ok := target["frame_path"].([]any); ok {
+		for index, frame := range frames {
+			frameTarget, ok := frame.(map[string]any)
+			if !ok {
+				return fmt.Errorf("parameter %q must be an object", fmt.Sprintf("%s.frame_path[%d]", path, index))
+			}
+			if err := validateLocatorTarget(fmt.Sprintf("%s.frame_path[%d]", path, index), frameTarget); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 

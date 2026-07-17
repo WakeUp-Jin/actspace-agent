@@ -14,6 +14,9 @@ import type { TaskOutputMonitor } from "./output-monitor";
 
 export type BashTaskStatus = "running" | "completed" | "failed" | "killed";
 
+export const DEFAULT_BASH_MAX_RUNTIME_MS = 30 * 60 * 1_000;
+export const DEFAULT_MAX_BACKGROUND_TASKS_PER_SESSION = 8;
+
 export interface BashTask {
   taskId: string;
   sessionId: string;
@@ -26,8 +29,12 @@ export interface BashTask {
   exitCode?: number | null;
   startedAt: number;
   endedAt?: number;
+  /** 从进程启动计时的最大总运行时间。 */
+  maxRuntimeMs: number;
   /** diskCap 命中被磁盘看门狗终止。 */
   diskCapHit?: boolean;
+  /** 达到后台任务最大运行时间后被看门狗终止。 */
+  maxRuntimeHit?: boolean;
   /** 终态通知已投递（或无需投递），防止重复通知。 */
   notified: boolean;
   /** bash_output 增量读取记账（字符 offset）。 */
@@ -53,6 +60,16 @@ const OUTPUT_TAIL_CHARS = 2_000;
 
 function createTaskId(): string {
   return `bash_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function formatRuntimeLimit(maxRuntimeMs: number): string {
+  if (maxRuntimeMs >= 60_000 && maxRuntimeMs % 60_000 === 0) {
+    return `${maxRuntimeMs / 60_000} minutes`;
+  }
+  if (maxRuntimeMs >= 1_000 && maxRuntimeMs % 1_000 === 0) {
+    return `${maxRuntimeMs / 1_000} seconds`;
+  }
+  return `${maxRuntimeMs}ms`;
 }
 
 /** 读落盘文件末尾 ≤ 2KB，供通知内嵌，多数场景免去一次 bash_output。 */
@@ -99,7 +116,9 @@ export function formatTaskNotification(task: BashTask, outputTail: string): stri
     failed: `Background command "${task.command}" failed (exit code ${task.exitCode})`,
     killed: task.diskCapHit
       ? `Background command "${task.command}" was killed: output reached the disk cap`
-      : `Background command "${task.command}" was killed`,
+      : task.maxRuntimeHit
+        ? `Background command "${task.command}" was killed: maximum runtime reached (${formatRuntimeLimit(task.maxRuntimeMs)} limit)`
+        : `Background command "${task.command}" was killed`,
   };
   const lines = [
     "<task_notification>",
@@ -118,6 +137,7 @@ interface RegisteredTask {
   task: BashTask;
   handle: ProcessSinkHandle;
   monitor?: TaskOutputMonitor;
+  maxRuntimeTimer?: ReturnType<typeof setTimeout>;
 }
 
 export class BashTaskRegistry {
@@ -140,7 +160,10 @@ export class BashTaskRegistry {
     monitor?: TaskOutputMonitor;
     subscriptionReason?: string;
     sandboxed?: boolean;
+    startedAt?: number;
+    maxRuntimeMs?: number;
   }): BashTask {
+    const maxRuntimeMs = input.maxRuntimeMs ?? DEFAULT_BASH_MAX_RUNTIME_MS;
     const task: BashTask = {
       taskId: createTaskId(),
       sessionId: input.sessionId,
@@ -150,12 +173,24 @@ export class BashTaskRegistry {
       pid: input.handle.pid,
       outputFilePath: input.outputFilePath,
       status: "running",
-      startedAt: Date.now(),
+      startedAt: input.startedAt ?? Date.now(),
+      maxRuntimeMs,
       notified: false,
       lastReadOffset: 0,
       sandboxed: input.sandboxed,
     };
-    this.tasks.set(task.taskId, { task, handle: input.handle, monitor: input.monitor });
+    const entry: RegisteredTask = { task, handle: input.handle, monitor: input.monitor };
+    this.tasks.set(task.taskId, entry);
+
+    const remainingRuntimeMs = Math.max(0, task.startedAt + maxRuntimeMs - Date.now());
+    entry.maxRuntimeTimer = setTimeout(() => {
+      entry.maxRuntimeTimer = undefined;
+      if (task.status !== "running") return;
+      task.maxRuntimeHit = true;
+      task.status = "killed";
+      entry.handle.kill();
+    }, remainingRuntimeMs);
+    entry.maxRuntimeTimer.unref?.();
 
     // 输出订阅 + 卡死看门狗：转后台后才挂接（前台完成的命令输出已全量回填）
     input.monitor?.attach({
@@ -187,6 +222,10 @@ export class BashTaskRegistry {
     });
 
     void input.handle.wait.then(async (status) => {
+      if (entry.maxRuntimeTimer) {
+        clearTimeout(entry.maxRuntimeTimer);
+        entry.maxRuntimeTimer = undefined;
+      }
       input.monitor?.dispose();
       task.endedAt = Date.now();
       task.exitCode = status.exitCode;
@@ -230,6 +269,10 @@ export class BashTaskRegistry {
     return [...this.tasks.values()]
       .map((entry) => entry.task)
       .filter((task) => task.status === "running" && (!sessionId || task.sessionId === sessionId));
+  }
+
+  findRunning(sessionId: string, cwd: string, command: string): BashTask | undefined {
+    return this.listRunning(sessionId).find((task) => task.cwd === cwd && task.command === command);
   }
 
   /** 模型已通过 bash_kill / bash_output 拿到终态结果时抑制冗余通知。 */
@@ -277,6 +320,10 @@ export class BashTaskRegistry {
   kill(taskId: string): boolean {
     const entry = this.tasks.get(taskId);
     if (!entry || entry.task.status !== "running") return false;
+    if (entry.maxRuntimeTimer) {
+      clearTimeout(entry.maxRuntimeTimer);
+      entry.maxRuntimeTimer = undefined;
+    }
     entry.task.status = "killed";
     entry.handle.kill();
     return true;
@@ -287,6 +334,10 @@ export class BashTaskRegistry {
     let count = 0;
     for (const entry of this.tasks.values()) {
       if (entry.task.sessionId === sessionId && entry.task.status === "running") {
+        if (entry.maxRuntimeTimer) {
+          clearTimeout(entry.maxRuntimeTimer);
+          entry.maxRuntimeTimer = undefined;
+        }
         entry.task.status = "killed";
         entry.handle.kill();
         count++;
@@ -300,6 +351,10 @@ export class BashTaskRegistry {
     let count = 0;
     for (const entry of this.tasks.values()) {
       if (entry.task.status === "running") {
+        if (entry.maxRuntimeTimer) {
+          clearTimeout(entry.maxRuntimeTimer);
+          entry.maxRuntimeTimer = undefined;
+        }
         entry.task.status = "killed";
         entry.handle.kill();
         count++;
@@ -311,6 +366,7 @@ export class BashTaskRegistry {
   /** 测试用：清空注册表状态（不杀进程，先 harvestAll）。 */
   clear(): void {
     for (const entry of this.tasks.values()) {
+      if (entry.maxRuntimeTimer) clearTimeout(entry.maxRuntimeTimer);
       entry.monitor?.dispose();
     }
     this.tasks.clear();

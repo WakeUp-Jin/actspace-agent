@@ -59,10 +59,12 @@ export type RuntimeStreamEvent =
       stage: "failed";
       error: SessionError;
     }
-  | { type: "assistant_text_delta"; messageId: EventId; delta: string }
-  | { type: "assistant_thinking_delta"; messageId: EventId; delta: string }
+  | { type: "assistant_text_delta"; sessionId: SessionId; turnId: TurnId; messageId: EventId; delta: string }
+  | { type: "assistant_thinking_delta"; sessionId: SessionId; turnId: TurnId; messageId: EventId; delta: string }
   | {
       type: "tool_call_streaming";
+      sessionId: SessionId;
+      turnId: TurnId;
       toolCallId: ToolCallId;
       toolName: string;
       /** 首帧（dispatched 阶段）为 true，后续帧 false/undefined */
@@ -70,8 +72,8 @@ export type RuntimeStreamEvent =
       /** 后端按 previewKind 解析 partial args 得到的 typed preview，前端直接渲染 */
       preview: ToolUiPreview;
     }
-  | { type: "tool_started"; toolCallId: ToolCallId; toolName: string; argsPreview: string; preview?: ToolUiPreview }
-  | { type: "tool_finished"; toolCallId: ToolCallId; toolName: string; resultEventId: EventId; isError: boolean; preview?: ToolUiPreview }
+  | { type: "tool_started"; sessionId: SessionId; turnId: TurnId; toolCallId: ToolCallId; toolName: string; argsPreview: string; preview?: ToolUiPreview }
+  | { type: "tool_finished"; sessionId: SessionId; turnId: TurnId; toolCallId: ToolCallId; toolName: string; resultEventId: EventId; isError: boolean; preview?: ToolUiPreview }
   | {
       /** 后台 bash 任务状态更新：turn 内外统一走 agent:stream 推送，前端按 taskId 更新对应块 */
       type: "bash_task_update";
@@ -82,13 +84,15 @@ export type RuntimeStreamEvent =
     }
   | {
       type: "subagent_event";
+      sessionId: SessionId;
+      turnId: TurnId;
       toolCallId: ToolCallId;
       transcriptRef: SubAgentTranscriptRef;
       event: SessionEvent;
       preview: AgentToolPreview;
     }
-  | { type: "tool_approval_required"; sessionId?: SessionId; turnId?: TurnId; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string; approvalScope?: "browser_session" }
-  | { type: "tool_approval_resolved"; sessionId?: SessionId; turnId?: TurnId; toolCallId: ToolCallId; requestId: string; decision: string; approvalScope?: "browser_session" }
+  | { type: "tool_approval_required"; sessionId: SessionId; turnId: TurnId; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string; approvalScope?: "browser_session" }
+  | { type: "tool_approval_resolved"; sessionId: SessionId; turnId: TurnId; toolCallId: ToolCallId; requestId: string; decision: string; approvalScope?: "browser_session" }
   | {
       /** LLM 调用命中可重试错误、agent loop 正在退避重试；renderer 据此清掉半截 streaming 内容并显示重试提示 */
       type: "llm_retry";
@@ -100,6 +104,7 @@ export type RuntimeStreamEvent =
       maxAttempts: number;
       reason: string;
     }
+  | { type: "turn_aborted"; sessionId: SessionId; turnId: TurnId }
   | { type: "turn_finished"; sessionId: SessionId; turnId: TurnId; resultEventIds: EventId[] }
   | { type: "turn_failed"; sessionId: SessionId; turnId: TurnId; error: SessionError };
 
@@ -115,6 +120,7 @@ export type SessionEventType =
   | "context_snapshot"
   | "context_compaction"
   | "error"
+  | "turn_aborted"
   // ↓ Kairos 自治模式专属生命周期事件（追加在末尾，不允许调换顺序，详见
   // docs/exec-plans/active/kairos_shared_contracts.md §1）↓
   | "kairos_tick_injected"
@@ -211,6 +217,10 @@ export type ContextCompactionPayload = {
 };
 
 export type ErrorPayload = SessionError;
+
+export type TurnAbortedPayload = {
+  reason: "user";
+};
 
 /**
  * Kairos tick 注入事件 payload。
@@ -566,7 +576,13 @@ export type ComposerAttachment = {
   previewUrl?: string;
 };
 
-export type MessageBlock =
+export type MessageBlock = {
+  /**
+   * React 展示身份。持久化 event id 保留给数据引用和消息操作，流式状态与持久化状态
+   * 则通过同一个 renderKey 复用 DOM，避免 turn 完成时重新播放入场动画。
+   */
+  renderKey?: string;
+} & (
   | {
       kind: "user";
       id: EventId;
@@ -754,7 +770,8 @@ export type MessageBlock =
       content: string;
       createdAt: string;
       tone?: "muted" | "error";
-    };
+    }
+);
 
 export type SessionDiffSummary = {
   sessionId: SessionId;

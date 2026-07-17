@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>流式 UI 交接需要单一数据源</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #eef1eb;
+      --paper: #fbfcf8;
+      --ink: #17201b;
+      --muted: #637068;
+      --line: #c7d0c9;
+      --stream: #236f62;
+      --persist: #7857a7;
+      --danger: #b14f32;
+      --code: #13201b;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1512;
+        --paper: #171e1a;
+        --ink: #edf4ef;
+        --muted: #a5b2aa;
+        --line: #354239;
+        --stream: #72d2be;
+        --persist: #c0a0ec;
+        --danger: #f0a083;
+        --code: #09100d;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.7 ui-sans-serif, system-ui, -apple-system, "PingFang SC", sans-serif; }
+    main { width: min(1040px, calc(100% - 32px)); margin: 44px auto 72px; }
+    header, section { background: var(--paper); border: 1px solid var(--line); }
+    header { padding: 42px; border-top: 8px solid var(--stream); }
+    section { margin-top: 20px; padding: 28px 32px; }
+    h1 { margin: 0 0 14px; max-width: 820px; font: 750 clamp(34px, 6vw, 68px)/1.04 ui-serif, Georgia, "Songti SC", serif; letter-spacing: -.045em; }
+    h2 { margin: 0 0 16px; font-size: 25px; }
+    h3 { margin: 0 0 10px; }
+    p { margin: 10px 0; }
+    .lead { max-width: 780px; color: var(--muted); font-size: 19px; }
+    .timeline { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px; align-items: center; }
+    .node { min-height: 112px; padding: 18px; border: 1px solid var(--line); }
+    .node strong { display: block; margin-bottom: 8px; }
+    .stream strong { color: var(--stream); }
+    .persist strong { color: var(--persist); }
+    .bad { border-color: var(--danger); }
+    .bad strong { color: var(--danger); }
+    .arrow { color: var(--muted); font-size: 24px; text-align: center; }
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .card { padding: 20px; border: 1px solid var(--line); }
+    .card.bad-card { border-top: 5px solid var(--danger); }
+    .card.good-card { border-top: 5px solid var(--stream); }
+    pre { overflow: auto; margin: 12px 0 0; padding: 18px; background: var(--code); color: #dff8ed; border-left: 4px solid var(--stream); }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .identity { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .identity div { padding: 18px; border: 1px solid var(--line); }
+    .identity b { display: block; margin-bottom: 6px; }
+    li { margin: 8px 0; }
+    footer { margin-top: 22px; color: var(--muted); font-size: 14px; }
+    @media (max-width: 760px) {
+      header, section { padding: 24px 20px; }
+      .timeline, .compare, .identity { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>流式 UI 交接需要单一数据源</h1>
+    <p class="lead">模型完成时的“闪一下”经常不是浏览器刷新，而是同一条消息先被渲染两次，再以另一组 React key 重新挂载。解决它需要同时控制数据源和展示身份。</p>
+  </header>
+
+  <section>
+    <h2>典型故障时间线</h2>
+    <div class="timeline">
+      <div class="node stream"><strong>Streaming</strong>用户消息、Thinking、工具和回复都在内存中持续更新。</div>
+      <div class="arrow">→</div>
+      <div class="node bad"><strong>重叠帧</strong>SessionRecord 已包含当前 turn，但 streaming blocks 尚未清空。</div>
+      <div class="arrow">→</div>
+      <div class="node persist"><strong>Persisted</strong>流式块被移除，持久化块以随机 event id 重新挂载。</div>
+    </div>
+    <p>重叠帧让页面高度突然增加；随后旧节点卸载、新节点播放入场动画，视觉上就像整个消息区闪动。</p>
+  </section>
+
+  <section>
+    <h2>两个必须同时成立的不变量</h2>
+    <ol>
+      <li><strong>数据源互斥：</strong>同一个 <code>turnId</code> 在任何渲染帧中只能来自 streaming 或 persisted。</li>
+      <li><strong>展示身份稳定：</strong>同一个逻辑消息在两个阶段必须拥有相同 React key。</li>
+    </ol>
+    <div class="identity">
+      <div><b>持久化身份：event id</b>用于日志、消息操作、缓存和数据引用。它可以随机生成，但不能承担 UI 交接身份。</div>
+      <div><b>展示身份：render key</b>由 <code>turnId + 语义槽位</code>派生，例如 <code>turn:T1:assistant:0</code>。</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Before / After</h2>
+    <div class="compare">
+      <div class="card bad-card">
+        <h3>状态直接相加</h3>
+        <pre><code>messages = [
+  ...persistedMessages,
+  ...streamingBlocks,
+]
+
+setSessionRecord(restored)
+await refreshSidebar()
+setStreamingBlocks([])</code></pre>
+        <p>当前 turn 会在等待辅助刷新期间出现两份。</p>
+      </div>
+      <div class="card good-card">
+        <h3>按 turn 互斥并同步交接</h3>
+        <pre><code>persistedVisible = persisted.filter(
+  event =&gt; event.turnId !== streamingTurnId
+)
+
+setSessionRecord(restored)
+finishStreamingTurn()
+await refreshSidebar()</code></pre>
+        <p>辅助请求不会再把消息交接拆成两个可见阶段。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>回归测试如何抓住竞态</h2>
+    <p>普通 happy path 很难观察短暂重叠。测试应故意让最终的会话列表刷新保持 pending，然后在这个窗口断言：</p>
+    <ul>
+      <li>用户消息和最终回复各只有一个。</li>
+      <li>流式阶段与持久化阶段的 turn DOM 是同一个节点。</li>
+      <li>Assistant、Thinking 和工具块没有因 event id 改变而 remount。</li>
+      <li>完成、失败、Abort 和 Session 切换使用相同交接规则。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>常见陷阱</h2>
+    <ul>
+      <li>只把多个 <code>setState</code> 放在一起，却没有定义“当前 turn 只能有一个来源”的渲染不变量。</li>
+      <li>直接把持久化 event id 改成展示 key，破坏消息缓存、可视化和日志引用。</li>
+      <li>只移除动画类，隐藏了 remount 症状，却仍然丢失组件内部展开状态。</li>
+      <li>把 Session 列表、Review、统计刷新夹在消息区交接中间，重新制造异步渲染窗口。</li>
+    </ul>
+  </section>
+
+  <footer>来源变更：20260717-1954-fix-stream-persistence-handoff.md</footer>
+</main>
+</body>
+</html>

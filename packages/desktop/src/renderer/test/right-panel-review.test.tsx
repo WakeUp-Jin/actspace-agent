@@ -154,4 +154,42 @@ describe("ReviewRenderView", () => {
       scope: "uncommitted",
     });
   });
+
+  it("opens Review from the right panel launcher", async () => {
+    const user = userEvent.setup();
+    const getWorkspaceReview = vi.fn(async () => emptyReview());
+    (window as unknown as { actspace: Partial<NonNullable<typeof window.actspace>> }).actspace = {
+      getWorkspaceReview,
+    };
+
+    render(
+      <RightPanelProvider initialOpen>
+        <WorkbenchLayout
+          sessions={[
+            {
+              id: "session-review-launcher",
+              title: "Review launcher",
+              updatedAt: new Date().toISOString(),
+              turnCount: 0,
+              workspaceRoot: "/tmp/workspace",
+            },
+          ]}
+          activeSessionId="session-review-launcher"
+          title="Review launcher"
+          messages={[]}
+          contextSnapshot={null}
+          selectedWorkspaceRoot="/tmp/workspace"
+        />
+      </RightPanelProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Review" }));
+
+    expect(await screen.findByRole("tab", { name: "Review" })).toBeInTheDocument();
+    expect(await screen.findByText("No Changes")).toBeInTheDocument();
+    expect(getWorkspaceReview).toHaveBeenCalledWith({
+      workspaceRoot: "/tmp/workspace",
+      scope: "uncommitted",
+    });
+  });
 });

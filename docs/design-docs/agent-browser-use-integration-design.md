@@ -11,9 +11,9 @@
 ```
 packages/agent-core             Go command engine          Injected JS          Chrome Extension
 ───────────────────             ─────────────────          ───────────          ────────────────
-11 个稳定工具                    62 条 canonical registry   Locator subset       Native Messaging
+11 个稳定工具                    62 条 canonical registry   Locator Runtime      Native Messaging
 approval + preview              CUA / DOM CUA / Locator    DOM 状态与读写        chrome.debugger
-BridgeClient                    waits / events / sessions  固定静态 asset        Chrome APIs / cursor
+BridgeClient                    waits / events / sessions  TS 构建 + go:embed    Chrome APIs / cursor
 ```
 
 ### 否决方案及理由
@@ -29,7 +29,7 @@ BridgeClient                    waits / events / sessions  固定静态 asset   
 
 1. **agent-core 保持薄**：只维护工具定义、executor 入口和 socket 客户端。
 2. **Go bridge 承担重逻辑**：62 条 registry、CUA、DOM CUA、Locator 注入管理、CDP 会话、导航等待和事件协调。
-3. **Injected JS 只提供 DOM 语义**：它是轻量 Locator subset，不是完整 Playwright client。
+3. **Injected JS 只提供页面语义**：它是 ActSpace 自研 Locator Runtime，不复制 Codex、不依赖 Playwright 运行时，也不承载 session/权限或 Chrome API。
 4. **Chrome Extension 做原语执行**：只直接调用 `chrome.debugger` 和 Chrome APIs，维护宿主权限与光标。
 5. **工具即能力边界**：不提供给模型的工具 = Agent 无法使用的能力。通过 tool registry 控制暴露面。
 6. **长连接解决 CLI 缺陷**：一次连接整个 turn，支持事件通知和状态持续。
@@ -92,12 +92,16 @@ plugins/browser-bridge/apps/cli/
 ### 层 3：Injected Locator runtime
 
 职责：
-- 由 Go 使用 `go:embed` 打入二进制，并通过 `Runtime.evaluate` 注入页面。
-- 提供 CSS selector subset、strict match、可见/启用/可编辑状态、文本/属性读取、fill/select/check 等页面内 DOM 语义。
+- 源码位于 `plugins/browser-bridge/apps/cli/internal/locator/runtime-src/`，TypeScript 构建产物位于相邻 `generated/runtime.js`。
+- 由 Go 使用 `go:embed` 打入二进制，并通过 `Runtime.evaluate` 注入页面；用户运行时不需要 Node。
+- 提供结构化 css/role/text/label/placeholder/test-id Locator、accessible name、隐式 role、open Shadow DOM、单 Frame context 内的定位和 strict match。
+- 提供可见、启用、可编辑、稳定、viewport、hit-test/receives-events 检查及页面内 deadline 自动等待。
+- 提供文本/属性读取、fill/select/check、DOM snapshot、clipboard 等既有页面内 DOM 语义。
 - 参数必须通过 JSON 编码传入，不执行模型提供的任意 JavaScript。
 
 不做：
-- 完整 Playwright selector grammar、browser/context/page 生命周期、frame/Shadow DOM 或完整 actionability。
+- Playwright 私有 selector 字符串逐字节兼容，或 browser/context/page 生命周期。
+- Frame tree、跨域/OOPIF 的 frameId/sessionId 映射与 CDP execution-context 路由；该部分由 Go/Extension primitive 边界实现，不进入页面 Runtime。
 - Chrome API、session、权限或 Agent 产品编排。
 
 ### 层 4：Chrome Extension primitive 执行层

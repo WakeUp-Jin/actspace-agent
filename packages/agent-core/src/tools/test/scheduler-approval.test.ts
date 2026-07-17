@@ -124,6 +124,26 @@ describe("ToolScheduler approval flow", () => {
     expect(execution.record.status).toBe("cancelled");
   });
 
+  it("ask → abort → should cancel immediately without executing handler", async () => {
+    const gate = createMockGate();
+    const scheduler = new ToolScheduler({ truncateThreshold: 2000, approvalGate: gate });
+    const tool = createTool("bash");
+    let handlerCalled = false;
+    tool.handler = async () => { handlerCalled = true; return { success: true, data: "done" }; };
+
+    const promise = scheduler.execute(tool, "bash", { command: "pnpm install" });
+    await tick();
+
+    const requestId = gate.pendingRequests[0].id;
+    gate.resolvers.get(requestId)!({ requestId, decision: "abort", decidedAt: Date.now() });
+
+    const execution = await promise;
+    expect(execution.result.success).toBe(false);
+    expect(execution.result.error).toContain("Turn stopped");
+    expect(execution.record.status).toBe("cancelled");
+    expect(handlerCalled).toBe(false);
+  });
+
   it("ask → allow_similar → should execute handler", async () => {
     const gate = createMockGate();
     const scheduler = new ToolScheduler({ truncateThreshold: 2000, approvalGate: gate });

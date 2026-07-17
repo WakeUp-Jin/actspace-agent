@@ -1,9 +1,15 @@
+import { resolve } from "node:path";
 import { startProcessSink, type ProcessSinkStatus } from "../../subprocess/run-process";
 import type { ToolResult } from "../../../internal-tools";
 import { DEFAULT_COMPRESSION_CONFIG } from "../../../context/types";
 import { buildToolOutputPath, createToolOutputId } from "../../tool-output-paths";
 import { DEFAULT_BASH_BLOCK_MS, MAX_BASH_BLOCK_MS, MIN_BASH_BLOCK_MS } from "./permissions";
-import { bashTaskRegistry } from "./task-registry";
+import {
+  bashTaskRegistry,
+  DEFAULT_BASH_MAX_RUNTIME_MS,
+  DEFAULT_MAX_BACKGROUND_TASKS_PER_SESSION,
+  type BashTask,
+} from "./task-registry";
 import {
   TaskOutputMonitor,
   MIN_SUBSCRIPTION_DEBOUNCE_MS,
@@ -48,7 +54,7 @@ export interface BashBackgroundedResult {
   taskId: string;
   /** 立即可读的落盘输出路径（无 tmpRoot 时缺省）。 */
   outputFilePath?: string;
-  reason: "explicit" | "block_timeout";
+  reason: "explicit" | "block_timeout" | "already_running";
   /** 本次是否在沙盒内执行。 */
   sandboxed: boolean;
   hint: string;
@@ -64,6 +70,10 @@ export interface BashExecutorConfig {
   inlineThreshold?: number;
   /** 流式写盘硬上限（字符），默认 5MB。 */
   diskCap?: number;
+  /** 后台任务最大总运行时间（从进程启动计时），默认 30 分钟。 */
+  maxRuntimeMs?: number;
+  /** 单会话同时运行的后台任务上限，默认 8。 */
+  maxBackgroundTasksPerSession?: number;
   /**
    * 沙盒优先执行开关（生产链路 createBashTool 传 true，直接调 executor 的
    * 测试默认 false）。true 时仍需运行时探测通过才真正沙盒。
@@ -77,6 +87,48 @@ function sanitizeBlockMs(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_BASH_BLOCK_MS;
   if (value === 0) return 0;
   return Math.min(MAX_BASH_BLOCK_MS, Math.max(MIN_BASH_BLOCK_MS, Math.trunc(value)));
+}
+
+function positiveInteger(value: number | undefined, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.max(1, Math.trunc(value))
+    : fallback;
+}
+
+function backgroundedResult(
+  task: BashTask,
+  reason: BashBackgroundedResult["reason"],
+): ToolResult {
+  const reused = reason === "already_running";
+  const data: BashBackgroundedResult = {
+    command: task.command,
+    cwd: task.cwd,
+    status: "backgrounded",
+    taskId: task.taskId,
+    outputFilePath: task.outputFilePath,
+    reason,
+    sandboxed: task.sandboxed ?? false,
+    hint: reused
+      ? "An identical command is already running in this session. No new process was started. " +
+        "Reuse this taskId and output file; call bash_output only when you need progress, or bash_kill when it is no longer needed."
+      : "The command is still running in the background. You will receive a <task_notification> when it finishes. " +
+        `It will be stopped automatically after at most ${Math.round(task.maxRuntimeMs / 60_000)} minutes total runtime. ` +
+        "To check progress, call bash_output with this taskId (or read the output file). " +
+        "To stop it, call bash_kill. Do NOT poll with sleep loops.",
+  };
+  return { success: true, data };
+}
+
+function backgroundTaskLimitError(sessionId: string, limit: number): ToolResult {
+  const running = bashTaskRegistry.listRunning(sessionId);
+  const list = running.map((task) => `- ${task.taskId}: ${task.cwd} :: ${task.command}`).join("\n");
+  return {
+    success: false,
+    error:
+      `Background task limit reached for this session (${running.length}/${limit}). ` +
+      "Reuse an existing task or stop one with bash_kill before starting another." +
+      (list ? `\nRunning background tasks:\n${list}` : ""),
+  };
 }
 
 /** 解析并校验 notifyOnOutput 参数；非法时返回错误消息字符串。 */
@@ -176,19 +228,37 @@ export const bashExecutor = async (
   args: Record<string, unknown>,
   workspaceRoot: string,
   config: BashExecutorConfig = {},
+  signal?: AbortSignal,
 ): Promise<ToolResult> => {
   const command = typeof args.command === "string" ? args.command : "";
-  const cwd = typeof args.cwd === "string" ? args.cwd : workspaceRoot;
+  const cwd = resolve(typeof args.cwd === "string" ? args.cwd : workspaceRoot);
   const blockMs = sanitizeBlockMs(args.blockMs);
   const intent = typeof args.intent === "string" && args.intent.trim() ? args.intent.trim() : undefined;
+  const sessionId = config.sessionId ?? "default";
+  const maxRuntimeMs = positiveInteger(config.maxRuntimeMs, DEFAULT_BASH_MAX_RUNTIME_MS);
+  const maxBackgroundTasksPerSession = positiveInteger(
+    config.maxBackgroundTasksPerSession,
+    DEFAULT_MAX_BACKGROUND_TASKS_PER_SESSION,
+  );
 
   if (!command) {
     return { success: false, error: "command is required" };
+  }
+  if (signal?.aborted) {
+    return { success: false, error: "Bash command cancelled because the turn was stopped." };
   }
 
   const subscription = parseNotifyOnOutput(args.notifyOnOutput);
   if (typeof subscription === "string") {
     return { success: false, error: subscription };
+  }
+
+  const existingTask = bashTaskRegistry.findRunning(sessionId, cwd, command);
+  if (existingTask) {
+    return backgroundedResult(existingTask, "already_running");
+  }
+  if (blockMs === 0 && bashTaskRegistry.listRunning(sessionId).length >= maxBackgroundTasksPerSession) {
+    return backgroundTaskLimitError(sessionId, maxBackgroundTasksPerSession);
   }
 
   const inlineThreshold = config.inlineThreshold ?? DEFAULT_COMPRESSION_CONFIG.bashInlineThreshold;
@@ -232,6 +302,7 @@ export const bashExecutor = async (
   // 输出监控（订阅匹配 + 卡死看门狗）从进程启动就挂 onChunk，转后台时才 attach 投递
   const monitor = new TaskOutputMonitor({ subscription: subscription ?? undefined });
 
+  const processStartedAt = Date.now();
   const handle = startProcessSink({
     command: spawnSpec.command,
     args: spawnSpec.args,
@@ -245,63 +316,71 @@ export const bashExecutor = async (
     onChunk: monitor.handleChunk,
   });
 
-  // 前台等待：blockMs 内退出按前台返回；到点（或 blockMs=0）转后台。
-  const settledInTime = await Promise.race([
-    handle.wait.then(() => true),
-    new Promise<false>((resolve) => {
-      if (blockMs === 0) {
-        // 立即后台：让出一个宏任务，给「瞬间失败」（如 start error）一次直接返回的机会
-        setImmediate(() => resolve(false));
-        return;
+  const abortProcess = () => handle.kill();
+  signal?.addEventListener("abort", abortProcess, { once: true });
+
+  try {
+    // 前台等待：blockMs 内退出按前台返回；到点（或 blockMs=0）转后台。
+    const settledInTime = await Promise.race([
+      handle.wait.then(() => true),
+      new Promise<false>((resolve) => {
+        if (blockMs === 0) {
+          // 立即后台：让出一个宏任务，给「瞬间失败」（如 start error）一次直接返回的机会
+          setImmediate(() => resolve(false));
+          return;
+        }
+        const timer = setTimeout(() => resolve(false), blockMs);
+        // 进程先退出时释放定时器
+        void handle.wait.then(() => clearTimeout(timer));
+      }),
+    ]);
+
+    // 竞态处理：转后台瞬间进程恰好退出 → 按前台结果返回，不产生 taskId 和通知
+    if (settledInTime || handle.settled) {
+      monitor.dispose();
+      const status = await handle.wait;
+      if (status.startError) {
+        return {
+          success: false,
+          error:
+            `Failed to start Bash command (command: ${command}, cwd: ${cwd}): ${status.startError}. ` +
+            `Check that the cwd exists and the command is available.`,
+        };
       }
-      const timer = setTimeout(() => resolve(false), blockMs);
-      // 进程先退出时释放定时器
-      void handle.wait.then(() => clearTimeout(timer));
-    }),
-  ]);
-
-  // 竞态处理：转后台瞬间进程恰好退出 → 按前台结果返回，不产生 taskId 和通知
-  if (settledInTime || handle.settled) {
-    monitor.dispose();
-    const status = await handle.wait;
-    if (status.startError) {
-      return {
-        success: false,
-        error:
-          `Failed to start Bash command (command: ${command}, cwd: ${cwd}): ${status.startError}. ` +
-          `Check that the cwd exists and the command is available.`,
-      };
+      return buildForegroundResult(command, cwd, status, sandboxed);
     }
-    return buildForegroundResult(command, cwd, status, sandboxed);
+
+    const concurrentDuplicate = bashTaskRegistry.findRunning(sessionId, cwd, command);
+    if (concurrentDuplicate) {
+      monitor.dispose();
+      handle.kill();
+      await handle.wait;
+      return backgroundedResult(concurrentDuplicate, "already_running");
+    }
+    if (bashTaskRegistry.listRunning(sessionId).length >= maxBackgroundTasksPerSession) {
+      monitor.dispose();
+      handle.kill();
+      await handle.wait;
+      return backgroundTaskLimitError(sessionId, maxBackgroundTasksPerSession);
+    }
+
+    // 转后台：强制创建落盘文件（含已有 headBuffer），保证 outputFilePath 立即可读
+    const outputFilePath = handle.ensureOutputFile();
+    const task = bashTaskRegistry.register({
+      sessionId,
+      command,
+      intent,
+      cwd,
+      handle,
+      outputFilePath,
+      monitor,
+      subscriptionReason: subscription?.reason,
+      sandboxed,
+      startedAt: processStartedAt,
+      maxRuntimeMs,
+    });
+    return backgroundedResult(task, blockMs === 0 ? "explicit" : "block_timeout");
+  } finally {
+    signal?.removeEventListener("abort", abortProcess);
   }
-
-  // 转后台：强制创建落盘文件（含已有 headBuffer），保证 outputFilePath 立即可读
-  const outputFilePath = handle.ensureOutputFile();
-  const task = bashTaskRegistry.register({
-    sessionId: config.sessionId ?? "default",
-    command,
-    intent,
-    cwd,
-    handle,
-    outputFilePath,
-    monitor,
-    subscriptionReason: subscription?.reason,
-    sandboxed,
-  });
-
-  const data: BashBackgroundedResult = {
-    command,
-    cwd,
-    status: "backgrounded",
-    taskId: task.taskId,
-    outputFilePath,
-    reason: blockMs === 0 ? "explicit" : "block_timeout",
-    sandboxed,
-    hint:
-      "The command is still running in the background. You will receive a <task_notification> when it finishes. " +
-      "To check progress, call bash_output with this taskId (or read the output file). " +
-      "To stop it, call bash_kill. Do NOT poll with sleep loops.",
-  };
-
-  return { success: true, data };
 };

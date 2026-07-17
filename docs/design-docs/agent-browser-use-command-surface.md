@@ -6,7 +6,24 @@
 
 这 62 条已经全部进入 Go registry 并标记为 `implemented`，但不等于向模型平铺 62 个 tools。模型通过 9 个分类工具、`browser_help` 和 `browser_run` 使用它们。当前架构入口见 `agent-browser-use-index.md`；真实 Chrome 验收状态见 Plan 5。
 
-命令 ID 中的 `playwright_*` 是兼容命名；本项目只承诺 Playwright-compatible Locator subset，不引入完整 Playwright。模型可见分类名统一使用 `browser_locator`。
+命令 ID 中的 `playwright_*` 是兼容命名；本项目不引入 Playwright 运行时，而是在 Browser Bridge 内维护 ActSpace 自研 Locator Runtime。模型可见分类名统一使用 `browser_locator`。
+
+2026-07-17 起，所有需要元素目标的 Locator command 接受二选一输入：
+
+```text
+selector: string  // 旧 CSS 兼容入口
+
+target: {
+  kind: css | role | text | label | placeholder | test_id,
+  value?: string,
+  role?: string,
+  name?: string,
+  exact?: boolean,
+  frame_path?: target[]
+}
+```
+
+`target` 是当前事实契约；逐条命令下方仍出现的 `selector` 示例属于兼容示例，不代表只支持 CSS。
 
 ## 三层操作模式
 
@@ -14,9 +31,9 @@ Browser Use 提供三种页面交互粒度。模型根据场景选择最合适�
 
 ```
 层级 3：Locator 选择器（canonical ID 保留 playwright_*）
-  输入：首版以 CSS selector 为主
-  特点：不需要截图；系统完成等待、定位、验证、滚动和坐标计算
-  适合：结构明确的页面，模型已知元素选择器
+  输入：优先结构化 role/name、label、placeholder、text、test-id；兼容 CSS
+  特点：不需要截图；系统完成语义定位、等待、actionability、滚动和坐标计算
+  适合：结构明确的页面，尤其是文本模型可从 DOM/ARIA 语义识别的控件
 
 层级 2：DOM CUA (node_id)
   输入：由 dom_cua_get_visible_dom 返回的 node_id

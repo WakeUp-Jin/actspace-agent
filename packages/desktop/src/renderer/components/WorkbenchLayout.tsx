@@ -507,6 +507,7 @@ export function WorkbenchLayout({
               contextState={contextState}
               sessionId={activeSessionId}
               workspaceRoot={selectedWorkspaceRoot ?? undefined}
+              onOpenReview={openReviewTab}
               onReviewChanged={onReviewChanged}
             />
           ) : undefined

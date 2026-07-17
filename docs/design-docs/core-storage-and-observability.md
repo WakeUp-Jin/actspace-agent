@@ -22,7 +22,9 @@
 
 `session.jsonl` 是会话恢复事实来源，保存稳定的 SessionEvent。
 
-每轮真实 turn 的 `SessionEvent` 顺序以 `user_message -> thinking/tool_call -> llm_usage -> tool_result -> assistant_message -> llm_usage -> context_snapshot` 为基线。即使后端内部 AgentLoopResult 不包含 user message，IPC bridge 也必须显式写入本轮用户输入事件。
+每轮真实 turn 采用两阶段 append：Main Process 在 Agent 真正开始执行前先写 `user_message`，Agent 收敛后再追加 thinking/tool/assistant/usage、终态与 `context_snapshot`。正常完成的顺序以 `user_message -> thinking/tool_call -> llm_usage -> tool_result -> assistant_message -> llm_usage -> context_snapshot` 为基线；中止轮次至少以 `user_message -> ...已完成事件... -> turn_aborted -> context_snapshot` 收敛。bridge 的通用调用默认仍可聚合 user event，但桌面端真实路径会关闭该选项，避免重复写入。
+
+`turn_aborted` 是可恢复的 SessionEvent，不是 renderer 内存标记。消息 selector 将它派生为 `Stopped` 状态块；应用切换会话或重启后会得到同样的展示。恢复模型上下文时，adapter 会丢弃中止前未闭合的 thinking/tool call，避免把没有对应 tool result 的半截调用重新发给模型。
 
 每轮 turn 开始时，会话历史由 `ContextManager.createForSession({ sessionPath })`（实际由 `ConversationContext.createFromSession` 完成 `parseJsonl + sessionEventsToMessages`）在构造阶段一次性读回 `Message[]`，main 进程仅透传 sessionPath，不直接读 `session.jsonl`，也不接触消息转换函数。
 

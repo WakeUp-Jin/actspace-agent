@@ -18,7 +18,8 @@ export const bashDefinition: ToolDefinitionSpec = {
     "Read that file with read_file (offset/limit) or search it with grep instead of re-running the command with | head or | tail. " +
     "Long-running commands: set blockMs to how long you are willing to wait. When blockMs elapses the command is NOT killed; " +
     "it keeps running in the background and you get a taskId plus an output file path. You will receive a task_notification when it finishes, " +
-    "so do NOT poll with sleep loops or repeated bash_output calls. " +
+    "so do NOT poll with sleep loops or repeated bash_output calls. Background tasks are limited to 30 minutes total runtime and 8 running tasks per session. " +
+    "Starting the same normalized cwd + command while it is already running reuses the existing taskId instead of spawning another process. " +
     "For dev servers and watchers that never exit, set blockMs to 0 to background immediately and use notifyOnOutput to subscribe to key log events " +
     "(e.g. pattern 'ready|error' for a dev server); you will be notified when a line matches, so never poll with sleep loops. " +
     "Never append '&' to commands. " +
@@ -51,7 +52,7 @@ export const bashDefinition: ToolDefinitionSpec = {
         description:
           "How long to wait in the foreground (milliseconds) before the command is moved to the background. " +
           "Default 30000, clamped to [1000, 600000]. Set 0 to background immediately (dev servers, watchers). " +
-          "The process is never killed on timeout.",
+          "The process is not killed when blockMs elapses; once backgrounded, the global 30-minute maximum runtime applies.",
       },
       intent: {
         type: "string",

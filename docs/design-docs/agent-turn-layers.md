@@ -21,7 +21,8 @@ Renderer ──IPC──▶ Main Process ──调用──▶ Bridge ──驱�
 **做什么：**
 - 通过 `Composer.tsx` 收集 `{ model, thinkingEnabled, userInput }` 三个字段
 - 调用 `window.api.runTurn(input)` 发起 IPC 请求
-- 监听 `agent:stream` 事件，驱动 `ConversationView` 实时渲染
+- 在 `App` 生命周期内只注册一次 `agent:stream` 监听，驱动 `ConversationView` 实时渲染
+- 按 `{ sessionId, turnId }` 路由 turn 级事件，只有当前可见 turn 可以修改共享 streaming state
 - 管理 UI 状态（loading、abort 按钮等）
 
 **不做什么：**
@@ -41,6 +42,16 @@ Renderer ──IPC──▶ Main Process ──调用──▶ Bridge ──驱�
 
 Workspace 选择器不进入 `RunTurnInput`。用户可在发送前多次切换顶部 Workspace，下拉只更新 renderer 本地状态；真正发送时 renderer 先把最终选择写入当前 session `meta.workspaceRoot`，再发起 `agent:run-turn`。
 
+`RuntimeStreamEvent` 中所有 turn 级事件都必须携带 `sessionId` 与 `turnId`，包括 assistant delta、工具 streaming/start/finish、审批和 SubAgent 事件。`bash_task_update` 是例外：后台任务可能在原 turn 结束后继续变化，因此它保持 session 级作用域，只按 `sessionId` 路由。
+
+切换会话只会把旧 turn 从当前可见 streaming state 脱离，不会隐式中止 main 进程中的执行。旧 turn 后续返回的 delta、结果和 finally 收尾都不能覆盖新会话或新 turn 的 UI。
+
+流式 turn 完成并恢复 `SessionRecord` 时，Renderer 必须遵守以下交接不变量：
+
+- 同一个 `turnId` 在一个渲染帧内只能来自 streaming blocks 或 persisted blocks，不能同时来自两份状态源。
+- 恢复后的 `SessionRecord`、streaming blocks 清理和运行状态收尾必须在同一个同步交接阶段完成；会话列表、Review 等辅助刷新不能插在消息交接中间。
+- `MessageBlock.id` 保留持久化事件身份，用于消息操作和数据引用；`MessageBlock.renderKey` 是 turn 级展示身份，流式块与持久化块通过相同 render key 复用 React DOM，避免完成时重新播放入场动画。
+
 `/compact` 是例外命令路径：renderer 只在 `text.trim() === "/compact"` 时分流到 `context:compact` IPC，输入为 `{ sessionId, turnId, model? }`。它不创建普通用户消息，不进入 `RunTurnInput.userInput`，也不进入 LLM conversation。
 
 ## 2. Main Process 层
@@ -51,8 +62,9 @@ Workspace 选择器不进入 `RunTurnInput`。用户可在发送前多次切换�
 - 调用 `buildAgentConfig()` 构建配置（前端参数 + 内部读 env）
 - 读取当前 session `meta.workspaceRoot`，缺省时回退应用默认 `workspaceRoot`
 - 调用 `await createAgentForSession(config, { sessionPath })` 创建运行时实例（会话历史在 ContextManager 构造阶段一次性恢复）
+- Agent 依赖和上下文恢复完成后、真正执行 turn 前，先 append 本轮 `user_message`；这样审批等待或工具执行期间被中止时，用户输入也已经成为会话事实
 - 调用 `runTurnWithAgent()` 执行 turn
-- 持久化 `AgentTurnResult` 到 session store
+- 持久化 `AgentTurnResult` 中剩余事件到 session store；bridge 在这条真实桌面端路径关闭重复的 user event 聚合
 - 处理 `context:compact` 手动压缩：为当前 session 装配相同的 Agent deps，调用 `compactContextWithAgent()`，追加 `context_compaction` / `context_snapshot` 并刷新 `context-state.json`
 - 管理 abort 闭包
 
@@ -85,6 +97,8 @@ const deps = await createAgentForSession(config, { sessionPath: sessionPaths.ses
 - 将 `AgentEvent` 流（来自 Agent 内部）翻译成 `RuntimeStreamEvent`（前端约定的协议）
 - 根据工具的 `previewKind` 聚合执行结果为 `ToolUiPreview`
 - 汇总所有事件为最终的 `AgentTurnResult`
+- 使用 `AgentLoopResult.status` 判断 turn 终态；abort 不从最后一条 assistant message 的 `stopReason` 反推
+- abort 时产出带 `{ sessionId, turnId }` 的 `turn_aborted` stream event，并聚合可持久化的同名 SessionEvent
 
 **不做什么：**
 - 不创建 LLM/Tool 实例（接收已创建好的）
@@ -100,6 +114,7 @@ const deps = await createAgentForSession(config, { sessionPath: sessionPaths.ses
 - 工具执行（通过 `ToolManager`）
 - 产出 `AgentEvent` 流（thinking、text、toolCall、toolResult 等）
 - 支持 abort
+- abort 是独立的 turn 终态；即使中止发生在 tool call、审批等待或尚未收到首条 assistant message 时，也返回 `status: "aborted"`
 
 **不做什么：**
 - 不知道 Electron 的存在
@@ -115,20 +130,44 @@ const deps = await createAgentForSession(config, { sessionPath: sessionPaths.ses
            → readMeta(session.metaPath).workspaceRoot ?? defaultRoot
            → buildAgentConfig(frontendInput, workspaceRoot)          → AgentConfig
            → await createAgentForSession(config, { sessionPath })    → AgentDeps（含已恢复历史的 ContextManager）
-           → runTurnWithAgent(input, deps, { onStreamEvent })
+           → append user_message                                    → session.jsonl
+           → runTurnWithAgent(input, deps, { onStreamEvent, includeUserEvent: false })
          → Bridge
            → new Agent(deps).run(userInput)
          → Agent
            ← AgentEvent stream
          ← Bridge: 翻译为 RuntimeStreamEvent，回调 onStreamEvent
          ← Main Process: 通过 webContents.send 推送给 Renderer
-         ← Renderer: 实时渲染
+         ← Renderer: 单一监听按 sessionId + turnId 路由后实时渲染
 
 Agent 结束
   → Bridge: 聚合为 AgentTurnResult
-  → Main Process: 持久化到 session store，返回给 IPC caller
-  → Renderer: 更新最终状态
+  → Main Process: 追加剩余事件到 session store，返回给 IPC caller
+  → Renderer: 重新读取 SessionRecord
+    → 同步完成 streaming → persisted 单一数据源交接
+    → 使用稳定 renderKey 保留当前 turn DOM
+    → 再刷新会话列表和 Review 等辅助状态
 ```
+
+### Stop / Abort 收敛链路
+
+```txt
+Renderer: 点击 Stop
+  → [IPC: agent:abort-turn]
+  → Main Process: 命中 active turn abort closure
+    → Agent.abort() 触发当前 turn AbortSignal
+    → PendingApprovalRegistry.abortTurn(sessionId, turnId)
+      → 若正在等待审批，立即 resolve 为 abort，executor 不启动
+    → 若前台 Bash 已启动，signal listener 终止对应进程
+  → Agent loop 返回显式 status: "aborted"
+  → Bridge: 追加 turn_aborted SessionEvent，并推送 turn_aborted RuntimeStreamEvent
+  → Main Process: append 剩余事件并更新 meta.turnCount
+  → Renderer: getSession(sessionId)，清空临时 streamingBlocks，Composer 恢复输入
+```
+
+`Stopped` 不是 renderer 临时拼出的占位块，而是 `turn_aborted` SessionEvent 派生出的持久化状态块。因此切换 Session、发送下一轮消息或重启应用后，中止记录仍然存在。
+
+abort 与 Allow/Run 可能同时发生。PendingApprovalRegistry 对 pending entry 采用先到先得的删除语义，scheduler 在 approval 返回后还会再次检查 `AbortSignal`；一旦 abort 获胜，工具 executor 不能启动。
 
 手动 `/compact` 数据流：
 
@@ -152,6 +191,10 @@ Renderer: `/compact`
 - [ ] 配置构建是否通过 `buildAgentConfig` 完成？（不要在 main 直接拼 LLMConfig）
 - [ ] Main 进程是否仅透传 `sessionPath` 给 `createAgentForSession`，没有自行读 `session.jsonl` 或调 `sessionEventsToMessages`？
 - [ ] Agent 内部新增的事件是否在 Bridge 中有对应的 `RuntimeStreamEvent` 翻译？
+- [ ] 新增的 turn 级 `RuntimeStreamEvent` 是否包含 `sessionId` 与 `turnId`？
+- [ ] Renderer 是否继续保持单一 `agent:stream` 订阅，且旧 turn 收尾不会修改新 turn 状态？
+- [ ] abort 是否同时覆盖 Agent signal、pending approval 和仍在前台等待的 Bash，且不会误杀已经 backgrounded 的 task？
+- [ ] aborted turn 是否从持久化 `turn_aborted` 恢复，而不是依赖 renderer 临时状态？
 - [ ] Agent 层的代码是否依赖了 Electron API？（不应该）
 - [ ] 持久化是否只在 Main Process 层完成？
 - [ ] Slash command 是否明确分流，不把命令文本写入 LLM conversation？

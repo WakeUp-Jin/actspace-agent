@@ -107,7 +107,7 @@ export interface AgentLoopConfig {
   getFollowUpMessages?: () => Promise<Message[]>;
   /** 本轮是否允许 provider 输出 thinking/reasoning。 */
   thinkingEnabled?: boolean;
-  /** 内层循环最大轮次硬限制，防止工具调用无限循环。默认 50。 */
+  /** 内层循环最大轮次硬限制，防止工具调用无限循环。默认 200。 */
   maxTurns?: number;
   /**
    * mid-loop 历史压缩钩子：每次模型调用前 await。
@@ -130,6 +130,7 @@ export interface AgentLoopConfig {
 // ─── AgentLoopResult ───
 
 export interface AgentLoopResult {
+  status: "completed" | "failed" | "aborted";
   message: AssistantMessage;
   totalUsage: Usage;
   usageCalls: LLMUsageCall[];

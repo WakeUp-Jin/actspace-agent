@@ -46,6 +46,71 @@ function agentToolResultEvent(uiPreview: AgentToolPreview): SessionEvent<ToolExe
 }
 
 describe("session selectors", () => {
+  it("derives turn-scoped render keys independently from persisted event ids", () => {
+    const timestamp = "2026-07-17T07:00:00.000Z";
+    const blocks = createMessageBlocks([
+      {
+        id: "evt-random-user",
+        sessionId: "session-render-key",
+        turnId: "turn-render-key",
+        type: "user_message",
+        timestamp,
+        schemaVersion: 1,
+        payload: { content: "Prompt" },
+      },
+      {
+        id: "evt-random-thinking",
+        sessionId: "session-render-key",
+        turnId: "turn-render-key",
+        type: "thinking",
+        timestamp,
+        schemaVersion: 1,
+        payload: { content: "Reasoning" },
+      },
+      {
+        id: "evt-random-assistant",
+        sessionId: "session-render-key",
+        turnId: "turn-render-key",
+        type: "assistant_message",
+        timestamp,
+        schemaVersion: 1,
+        payload: {
+          content: "Reply",
+          stopReason: "stop",
+          model: "test-model",
+          provider: "test-provider",
+        },
+      },
+    ]);
+
+    expect(blocks.map((block) => block.renderKey)).toEqual([
+      "turn:turn-render-key:user:0",
+      "turn:turn-render-key:thinking:0",
+      "turn:turn-render-key:assistant:0",
+    ]);
+  });
+
+  it("restores an aborted turn as a persisted Stopped status", () => {
+    const blocks = createMessageBlocks([{
+      id: "evt-aborted",
+      sessionId: "session-aborted",
+      turnId: "turn-aborted",
+      type: "turn_aborted",
+      timestamp: "2026-07-17T07:00:00.000Z",
+      schemaVersion: 1,
+      payload: { reason: "user" },
+    }]);
+
+    expect(blocks).toEqual([{
+      kind: "status",
+      id: "evt-aborted",
+      renderKey: "turn:turn-aborted:status:0",
+      content: "Stopped",
+      createdAt: "2026-07-17T07:00:00.000Z",
+      tone: "muted",
+    }]);
+  });
+
   it("restores a completed delete_file result as a delete message block", () => {
     const blocks = createMessageBlocks([
       toolResultEvent({
@@ -67,6 +132,7 @@ describe("session selectors", () => {
       {
         kind: "delete",
         id: "evt-delete",
+        renderKey: "turn:turn-delete:tool:tool-delete-1",
         filePath: "notes.md",
         displayText: "Deleted notes.md",
         status: "completed",
@@ -219,6 +285,7 @@ describe("session selectors", () => {
       {
         kind: "agent",
         id: "evt_agent_result",
+        renderKey: "turn:turn-1:tool:toolu-agent-1",
         description: "Explore tool rendering",
         status: "completed",
         subagentType: "explore",
@@ -228,6 +295,7 @@ describe("session selectors", () => {
         stats: preview.stats,
         recentEvents: undefined,
         error: undefined,
+        display: undefined,
         createdAt: "2026-06-02T10:00:00.000Z",
       },
     ]);

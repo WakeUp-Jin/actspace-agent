@@ -14,8 +14,10 @@ import {
   setSessionWorkspace,
   setSessionTitle,
   writeContextState,
+  writeSessionResult,
   writeSubAgentTranscripts,
 } from "../session-store";
+import { appendEvents } from "../jsonl";
 import { readMeta } from "../meta";
 import type { SessionEvent, SubAgentTranscriptRef } from "@actspace/shared";
 
@@ -80,6 +82,49 @@ describe("session store", () => {
 
     const sessionFile = await readFile(join(sessionRoot, record.meta.id, "session.jsonl"), "utf-8");
     expect(sessionFile).toBe("");
+  });
+
+  it("keeps one prewritten user message and the aborted terminal event", async () => {
+    const record = await createSessionRecord(sessionRoot, { title: "Abort recovery" });
+    const paths = createSessionStorePaths(join(sessionRoot, record.meta.id));
+    const turnId = "turn-aborted";
+    const timestamp = new Date().toISOString();
+    const userEvent: SessionEvent = {
+      id: "evt-user-aborted",
+      sessionId: record.meta.id,
+      turnId,
+      type: "user_message",
+      timestamp,
+      schemaVersion: 1,
+      payload: { content: "stop this turn" },
+    };
+    const abortedEvent: SessionEvent = {
+      id: "evt-turn-aborted",
+      sessionId: record.meta.id,
+      turnId,
+      type: "turn_aborted",
+      timestamp,
+      schemaVersion: 1,
+      payload: { reason: "user" },
+    };
+
+    await expect(appendEvents(paths.sessionPath, [userEvent])).resolves.toEqual({ ok: true });
+    await expect(writeSessionResult(paths, {
+      sessionId: record.meta.id,
+      turnId,
+      events: [abortedEvent],
+      status: "aborted",
+      contextSnapshot: {
+        totalTokens: 0,
+        maxTokens: 200_000,
+        percentUsed: 0,
+        buckets: [],
+      },
+    })).resolves.toEqual({ ok: true });
+
+    const restored = await readSessionRecord(paths);
+    expect(restored?.events.map((event) => event.type)).toEqual(["user_message", "turn_aborted"]);
+    expect(restored?.meta.turnCount).toBe(1);
   });
 
   it("persists workspaceRoot on session meta when creating", async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MODEL_REGISTRY } from "@actspace/shared";
+import { MODEL_REGISTRY, type SessionEvent } from "@actspace/shared";
 import {
   formatUserMessageForModel,
   messageToEvents,
@@ -194,6 +194,35 @@ describe("Adapters: SessionEvent -> Message (recovery)", () => {
     expect(roles).toContain("user");
     expect(roles).toContain("assistant");
     expect(roles).toContain("toolResult");
+  });
+
+  it("does not replay incomplete thinking after an aborted turn", () => {
+    const events: SessionEvent[] = [
+      ...userMessageToEvents(createMockUserMessage("stop this"), SESSION_ID, TURN_ID),
+      {
+        id: "evt-thinking-aborted",
+        sessionId: SESSION_ID,
+        turnId: TURN_ID,
+        type: "thinking",
+        timestamp: new Date().toISOString(),
+        schemaVersion: 1,
+        payload: { content: "partial private reasoning" },
+      },
+      {
+        id: "evt-turn-aborted",
+        sessionId: SESSION_ID,
+        turnId: TURN_ID,
+        type: "turn_aborted",
+        timestamp: new Date().toISOString(),
+        schemaVersion: 1,
+        payload: { reason: "user" },
+      },
+    ];
+
+    const { messages, errors } = sessionEventsToMessages(events);
+
+    expect(errors).toEqual([]);
+    expect(messages.map((message) => message.role)).toEqual(["user"]);
   });
 });
 

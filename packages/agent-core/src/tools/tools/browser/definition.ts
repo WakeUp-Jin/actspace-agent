@@ -2,8 +2,31 @@ import type { ToolDefinitionSpec } from "../../types";
 import { browserActionsByCategory } from "./generated-actions";
 
 const tabId = { type: "number", description: "目标 Chrome 标签页 ID。" };
-const selector = { type: "string", description: "CSS selector；精确参数请先调用 browser_help。" };
+const selector = { type: "string", description: "兼容用 CSS selector；语义定位优先使用 target。" };
 const timeout = { type: "number", description: "可选超时毫秒数。" };
+const frameTarget = {
+  type: "object",
+  description: "iframe 定位步骤。",
+  properties: {
+    kind: { type: "string", enum: ["css", "role", "text", "label", "placeholder", "test_id"] },
+    value: { type: "string", description: "css/text/label/placeholder/test_id 的匹配值。" },
+    role: { type: "string", description: "role 定位的 ARIA/隐式角色。" },
+    name: { type: "string", description: "role 定位的 accessible name。" },
+    exact: { type: "boolean", description: "是否精确匹配规范化文本。" },
+  },
+  required: ["kind"],
+  additionalProperties: false,
+};
+const locatorTarget = {
+  type: "object",
+  description: "结构化 Locator。支持语义 role/name、文本、label、placeholder、test id、CSS、open Shadow DOM 和 iframe path。",
+  properties: {
+    ...frameTarget.properties,
+    frame_path: { type: "array", items: frameTarget, description: "从外到内的 iframe Locator 路径。" },
+  },
+  required: ["kind"],
+  additionalProperties: false,
+};
 
 export const browserCuaDefinition: ToolDefinitionSpec = {
   name: "browser_cua",
@@ -55,13 +78,14 @@ export const browserDomDefinition: ToolDefinitionSpec = {
 
 export const browserLocatorDefinition: ToolDefinitionSpec = {
   name: "browser_locator",
-  description: "CSS Locator subset。用于 selector 点击、填写、读取、状态判断、等待和元素截图；不承诺完整 Playwright selector grammar。",
+  description: "语义 Locator。优先用 target 按 role + accessible name、label、placeholder、text 或 test_id 定位；兼容 CSS selector。页面内自动等待元素满足可见、启用、稳定和可接收事件条件，真实交互仍通过 CDP 输入完成。",
   parameters: {
     type: "object",
     properties: {
       action: { type: "string", enum: [...browserActionsByCategory.locator], description: "Locator action。" },
       tab_id: tabId,
       selector,
+      target: locatorTarget,
       value: { type: "string", description: "fill 值。" },
       replace: { type: "boolean", description: "是否替换已有输入，默认 true。" },
       keys: { type: "array", items: { type: "string" }, description: "按键或组合键。" },

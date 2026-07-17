@@ -138,22 +138,24 @@ function renderMessage(
   className?: string,
   onOpenAgentTranscript?: (message: AgentMessageBlock) => void,
 ) {
+  const renderKey = message.renderKey ?? message.id;
+
   switch (message.kind) {
     case "user":
-      return <UserMessage key={message.id} message={message} />;
+      return <UserMessage key={renderKey} message={message} />;
     case "assistant":
-      return <AssistantReply key={message.id} message={message} />;
+      return <AssistantReply key={renderKey} message={message} />;
     case "thinking":
-      return <ThinkingBlock key={message.id} message={message} className={className} />;
+      return <ThinkingBlock key={renderKey} message={message} className={className} />;
     case "agent":
       if (message.display === "inline") {
-        return <ExploreRunBlock key={message.id} message={message} className={className} />;
+        return <ExploreRunBlock key={renderKey} message={message} className={className} />;
       }
-      return <AgentRunBlock key={message.id} message={message} className={className} onOpenTranscript={onOpenAgentTranscript} />;
+      return <AgentRunBlock key={renderKey} message={message} className={className} onOpenTranscript={onOpenAgentTranscript} />;
     case "bash":
-      return <BashRunBlock key={message.id} message={message} />;
+      return <BashRunBlock key={renderKey} message={message} />;
     case "context_compaction":
-      return <CompactCommandBlock key={message.id} message={message} className={className} />;
+      return <CompactCommandBlock key={renderKey} message={message} className={className} />;
     case "read":
     case "search":
     case "grep":
@@ -165,16 +167,16 @@ function renderMessage(
     case "tool":
     case "error":
       if (message.kind === "delete" && message.status === "pending") {
-        return <DeleteFileBlock key={message.id} message={message} className={className} />;
+        return <DeleteFileBlock key={renderKey} message={message} className={className} />;
       }
       if (message.kind === "tool" && message.approvalScope === "browser_session" && message.status === "pending") {
-        return <BrowserApprovalBlock key={message.id} message={message} className={className} />;
+        return <BrowserApprovalBlock key={renderKey} message={message} className={className} />;
       }
-      return <ToolLogLine key={message.id} message={message} className={className} />;
+      return <ToolLogLine key={renderKey} message={message} className={className} />;
     case "status":
       return (
         <div
-          key={message.id}
+          key={renderKey}
           className={`${TURN_STATUS_LINE_CLASS}${message.tone === "error" ? ` ${TURN_STATUS_LINE_ERROR_CLASS}` : ""}`}
         >
           {message.content}
@@ -182,7 +184,7 @@ function renderMessage(
       );
     case "edit_diff":
     case "write_diff":
-      return <FileDiffBlock key={message.id} message={message} className={className} />;
+      return <FileDiffBlock key={renderKey} message={message} className={className} />;
   }
 }
 
@@ -193,7 +195,7 @@ function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTurn[] {
   for (const message of messages) {
     if (message.kind === "user") {
       currentTurn = {
-        id: message.id,
+        id: message.renderKey ?? message.id,
         user: message,
         messages: []
       };
@@ -204,7 +206,7 @@ function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTurn[] {
     if (message.kind === "context_compaction") {
       currentTurn = null;
       turns.push({
-        id: message.id,
+        id: message.renderKey ?? message.id,
         user: null,
         messages: [message],
       });
@@ -213,7 +215,7 @@ function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTurn[] {
 
     if (!currentTurn) {
       currentTurn = {
-        id: `turn-${message.id}`,
+        id: `turn-${message.renderKey ?? message.id}`,
         user: null,
         messages: []
       };

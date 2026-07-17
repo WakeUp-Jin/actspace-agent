@@ -49,7 +49,7 @@ describe("RightPanel 工作区浏览态", () => {
     expect(collapseBtn).toBeInTheDocument();
     expect(screen.getByText("当前环境不支持文件浏览。")).toBeInTheDocument();
 
-    // 内容区是「文件预览区」：默认激活的 Kairos 对象 Tab 不在此渲染，只显示占位。
+    // 内容区是「文件预览区」：尚未选中文件时只显示占位。
     expect(screen.getByRole("heading", { name: "选择文件查看" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Kairos 右侧紧凑视图")).toBeNull();
 
@@ -68,7 +68,8 @@ describe("RightPanel 工作区浏览态", () => {
     (window as { actspace?: unknown }).actspace = undefined;
     renderPanel();
 
-    // 进入工作区浏览态：默认激活的 Kairos 对象 Tab 退居占位。
+    // 先从启动页打开 Kairos，再进入工作区浏览态：对象 Tab 退居占位。
+    await user.click(screen.getByRole("button", { name: "Kairos" }));
     await user.click(screen.getByRole("button", { name: "probe-toggle" }));
     expect(screen.getByRole("heading", { name: "选择文件查看" })).toBeInTheDocument();
 
@@ -83,6 +84,7 @@ describe("RightPanel 工作区浏览态", () => {
     const user = userEvent.setup();
     renderPanel();
 
+    await user.click(screen.getByRole("button", { name: "Kairos" }));
     await user.hover(screen.getByRole("button", { name: "关闭 Kairos" }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("关闭 Kairos");
   });

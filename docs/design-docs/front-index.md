@@ -46,7 +46,7 @@
 - `front-左侧会话栏规范.md`：左侧轻量列表、Pinned / Scheduled / Workspaces 分区规则与状态点约定。
 - `front-中间消息区规范.md`：消息语法、类型规则、顺序原则和工具流可视化。
 - `front-聊天输入框规范.md`：Composer、模式、模型、附件、Context 弹窗和发送。
-- `front-右侧面板与文件渲染规范.md`：右侧文件预览、Workspace 文件树、Markdown / HTML / Context / Reply HTML、会话级 diff、IPC 契约和安全边界。
+- `front-右侧面板与文件渲染规范.md`：右侧对象启动页、文件预览、Workspace 文件树、Markdown / HTML / Context / Reply、会话级 diff、IPC 契约和安全边界。
 - `front-设置页规范.md`：设置态布局、导航与聊天态切换规则。
 - `front-Kairos监控页规范.md`：Kairos 自治模式监控页、上下文 Sheet、运行轨迹、执行列表、统计区、详情区和聊天态右侧 compact view。
 - `front-usage-statistics.md`：Usage Statistics 页面布局、组件、数据来源和视觉规范。

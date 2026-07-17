@@ -4,7 +4,7 @@ import type { SessionVisualizationItem } from "@actspace/shared";
 import { HtmlRenderView } from "./HtmlRenderView";
 
 /**
- * 右侧面板「Reply HTML」视图。
+ * 右侧面板「Reply」视图。
  *
  * 聚合**当前会话**里已转换生成的可视化 HTML：渲染区占满，文件列表收进一个下拉选择器
  * （像模型选择器），不再用常驻侧栏挡住渲染图。
@@ -165,7 +165,7 @@ export function ReplyHtmlRenderView({ sessionId }: { sessionId: string | null })
           <div className={EMPTY_CLASS}>
             {status === "loading"
               ? "加载中…"
-              : "当前会话还没有生成可视化 HTML。\n在某条回复下点「可视化」按钮即可生成。"}
+              : "当前会话还没有生成可视化回复。\n在某条回复下点「可视化」按钮即可生成。"}
           </div>
         )}
       </div>

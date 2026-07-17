@@ -41,6 +41,21 @@ describe("browser tool runtime", () => {
     expect(withBridge.has("browser_run")).toBe(true);
     expect(withBridge.has("browser_click")).toBe(false);
     expect(withBridge.getAll().filter((tool) => tool.category === "browser")).toHaveLength(11);
+    const locator = withBridge.get("browser_locator");
+    expect(locator?.description).toContain("accessible name");
+    expect(locator?.parameters).toMatchObject({
+      properties: {
+        selector: { type: "string" },
+        target: {
+          type: "object",
+          required: ["kind"],
+          properties: {
+            kind: { enum: ["css", "role", "text", "label", "placeholder", "test_id"] },
+            frame_path: { type: "array" },
+          },
+        },
+      },
+    });
   });
 
   it("uses one persistent connection for session lifecycle and browser requests", async () => {

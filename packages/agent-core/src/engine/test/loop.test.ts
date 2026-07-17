@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { runAgentLoop } from "../loop";
-import { MockLLMService, mockText, mockError } from "../../llm/services/mock";
+import { MockLLMService, mockText, mockError, mockToolCall } from "../../llm/services/mock";
 import { ToolManager } from "../../tools/manager";
 import type { Context } from "../../messages";
 import { createEmptyUsage } from "../../messages";
@@ -65,6 +65,7 @@ describe("runAgentLoop", () => {
     );
 
     expect(result.message.stopReason).toBe("stop");
+    expect(result.status).toBe("completed");
     expect(result.totalUsage.totalTokens).toBeGreaterThan(0);
     expect(result.usageCalls).toHaveLength(2);
 
@@ -94,6 +95,38 @@ describe("runAgentLoop", () => {
     expect(turnStarts.length).toBe(1);
   });
 
+  it("continues beyond the former 50-turn default limit", async () => {
+    const { llm, toolManager, context } = createTestSetup();
+    llm.setResponses([
+      ...Array.from({ length: 51 }, (_, index) => mockToolCall("read_file", { path: `file-${index}.txt` }, { id: `tc-${index}` })),
+      mockText("finished after fifty-one tool turns"),
+    ]);
+
+    const result = await runAgentLoop(context, llm, { toolManager }, () => {});
+
+    expect(result.status).toBe("completed");
+    expect(result.message.stopReason).toBe("stop");
+    expect(result.usageCalls).toHaveLength(52);
+  });
+
+  it("returns a failed exhaustion result when maxTurns is reached during tool use", async () => {
+    const { llm, toolManager, context } = createTestSetup();
+    llm.setResponses([
+      mockToolCall("read_file", { path: "one.txt" }, { id: "tc-one" }),
+      mockToolCall("read_file", { path: "two.txt" }, { id: "tc-two" }),
+      mockText("must not be reached"),
+    ]);
+
+    const result = await runAgentLoop(context, llm, { toolManager, maxTurns: 2 }, () => {});
+
+    expect(result.status).toBe("failed");
+    expect(result.message.stopReason).toBe("error");
+    expect(result.message.errorKind).toBe("max_turns");
+    expect(result.message.errorMessage).toBe("Agent reached maxTurns (2) before producing a final response");
+    expect(result.usageCalls).toHaveLength(2);
+    expect(llm.getPendingCount()).toBe(1);
+  });
+
   it("should handle abort signal", async () => {
     const { llm, toolManager, context } = createTestSetup();
     const events: AgentEvent[] = [];
@@ -116,8 +149,27 @@ describe("runAgentLoop", () => {
       controller.signal,
     );
 
-    // 第一轮正常跑完（toolUse），第二轮检测到 abort
-    expect(["aborted", "toolUse", "stop"]).toContain(result.message.stopReason);
+    // 第一轮正常跑完（toolUse），第二轮检测到 abort；终态不能再由最后一条消息猜测。
+    expect(result.message.stopReason).toBe("toolUse");
+    expect(result.status).toBe("aborted");
+  });
+
+  it("returns an aborted result even when stopped before the first model response", async () => {
+    const { llm, toolManager, context } = createTestSetup();
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await runAgentLoop(
+      context,
+      llm,
+      { toolManager },
+      () => {},
+      controller.signal,
+    );
+
+    expect(result.status).toBe("aborted");
+    expect(result.message.stopReason).toBe("aborted");
+    expect(result.messages).toEqual([]);
   });
 
   it("should inject steering messages", async () => {

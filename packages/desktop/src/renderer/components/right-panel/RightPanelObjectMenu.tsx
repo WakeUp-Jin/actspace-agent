@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Eye, FileCode2, Folder, FolderTree, Plus } from "lucide-react";
+import { Bot, Eye, FolderTree, GitBranch, MessageSquare, Plus } from "lucide-react";
 import { useRightPanel } from "./RightPanelContext";
 
 /**
@@ -8,7 +8,7 @@ import { useRightPanel } from "./RightPanelContext";
  * 放在右侧折叠按钮左侧，点开后可往右侧面板加对象：
  * - 工作区文件：切换工作区浏览态（操作栏 + 文件树两栏，不新增 Tab）。
  * - Review：打开当前 workspace 的 Git Review。
- * - Reply HTML：当前会话生成过的可视化 HTML 文件浏览器。
+ * - Reply：当前会话生成过的可视化回复浏览器。
  * - Kairos：自治模式紧凑视图。
  * - Context：完整只读上下文视图。
  */
@@ -25,7 +25,7 @@ export function RightPanelObjectMenu({
   sessionId: string | null;
   onOpenReview?: () => void;
 }) {
-  const { openTab, toggleFileTree } = useRightPanel();
+  const { openFileTree, openTab } = useRightPanel();
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
 
@@ -75,7 +75,7 @@ export function RightPanelObjectMenu({
             type="button"
             role="menuitem"
             className={MENU_ITEM_CLASS}
-            onClick={() => pick(() => toggleFileTree())}
+            onClick={() => pick(openFileTree)}
           >
             <FolderTree size={15} strokeWidth={2} />
             工作区文件
@@ -87,7 +87,7 @@ export function RightPanelObjectMenu({
               className={MENU_ITEM_CLASS}
               onClick={() => pick(onOpenReview)}
             >
-              <Folder size={15} strokeWidth={2} />
+              <GitBranch size={15} strokeWidth={2} />
               Review
             </button>
           ) : null}
@@ -95,10 +95,10 @@ export function RightPanelObjectMenu({
             type="button"
             role="menuitem"
             className={MENU_ITEM_CLASS}
-            onClick={() => pick(() => openTab({ id: "reply-html", kind: "replyHtml", title: "Reply HTML", sessionId }))}
+            onClick={() => pick(() => openTab({ id: "reply", kind: "replyHtml", title: "Reply", sessionId }))}
           >
-            <FileCode2 size={15} strokeWidth={2} />
-            Reply HTML
+            <MessageSquare size={15} strokeWidth={2} />
+            Reply
           </button>
           <button
             type="button"

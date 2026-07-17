@@ -56,9 +56,9 @@ type RightPanelContextValue = {
 
 const RightPanelStateContext = createContext<RightPanelContextValue | null>(null);
 
-/** 默认常驻 Kairos tab：保证面板有内容，且 Kairos 视图始终可从右侧面板进入。 */
+/** 默认不打开对象：右侧面板先展示对象启动页，由用户选择要查看的内容。 */
 function createDefaultTabs(): RightPanelTab[] {
-  return [{ id: "kairos", kind: "kairos", title: "Kairos" }];
+  return [];
 }
 
 export function RightPanelProvider({
@@ -88,7 +88,7 @@ export function RightPanelProvider({
     });
     setActiveTabId(tab.id);
     setIsOpen(true);
-    // 打开对象 / 非工作区文件 Tab（Kairos/Context/Reply HTML 等）时退出工作区浏览态，展示它自己的整面板视图；
+    // 打开对象 / 非工作区文件 Tab（Kairos/Context/Reply 等）时退出工作区浏览态，展示它自己的整面板视图；
     // 打开工作区文件则保持浏览态（shell 由 showShell 派生显示）。
     if (!isWorkspaceFileTab(tab)) {
       setIsFileTreeOpen(false);

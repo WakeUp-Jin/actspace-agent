@@ -81,6 +81,14 @@
 - 超时后状态变为 `expired`。
 - 超时后的 approve/deny decision 返回幂等失败，不执行工具。
 
+### Agent abort
+
+- `agent:abort-turn` 同时触发当前 Agent 的 `AbortSignal` 与 PendingApprovalRegistry 的 turn 级取消。
+- 如果 scheduler 正在等待 approval，registry 立即返回 `abort` decision，不等待 `expiresAt`，executor 不启动。
+- approval 与 abort 竞争时，以 pending entry 的第一次有效 resolve 为准；scheduler 在 approval 返回后再次检查 signal，防止 Allow 刚返回时 abort 已经发生。
+- 已启动且仍在前台等待的 Bash 消费相同 signal 并终止进程；已经切到 background task 的 Bash 脱离当前 turn，由 `bash_kill` 单独管理。
+- turn 最终追加 `turn_aborted` SessionEvent，renderer 从 Session 恢复 `Stopped`，而不是保留临时内存状态。
+
 ### 幂等
 
 每个 approval request 必须有稳定 ID。
@@ -137,8 +145,10 @@
 - [x] 设计 pending registry。
 - [x] 设计 session 恢复时 pending 处理。
 - [x] 实现幂等 decision。
-- [ ] 完成 Electron 验收记录。
+- [x] 实现 Agent abort 对 pending approval、前台 Bash 和持久化终态的统一收敛。
+- [x] 完成 Electron 验收记录：审批等待中点击 Stop 后约 2.3 秒回到 Idle，executor 未启动，Composer 恢复。
 
 ## 决策记录
 
 - 2026-05-24：首版暂停的是工具调度，不暂停已经启动的进程。原因是 Bash executor 只有在权限满足后才启动，能避免真实 shell 进程挂起和恢复的复杂度。
+- 2026-07-17：Agent abort 改为 turn 级取消协议。等待审批时立即 resolve 为 abort；前台 Bash 响应同一个 signal；已经 backgrounded 的任务保持独立生命周期。

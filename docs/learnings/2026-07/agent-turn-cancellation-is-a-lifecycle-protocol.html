@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Turn 取消是一份生命周期协议</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f5f1e8; --paper:#fffdf7; --ink:#18201d; --muted:#66716c; --line:#c9d0ca; --accent:#0b6e4f; --warn:#b35328; --code:#13231e; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#101513; --paper:#171d1a; --ink:#ecf3ef; --muted:#a7b3ad; --line:#34413b; --accent:#6bd3ad; --warn:#f0a276; --code:#0b100e; } }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.7 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif; }
+    main { width:min(980px,calc(100% - 32px)); margin:48px auto 80px; }
+    header { border-top:8px solid var(--accent); padding:34px 36px; background:var(--paper); box-shadow:0 18px 60px color-mix(in srgb,var(--ink) 10%,transparent); }
+    h1 { margin:0 0 12px; font:700 clamp(34px,6vw,66px)/1.05 ui-serif,Georgia,"Songti SC",serif; letter-spacing:-.04em; }
+    h2 { margin:0 0 18px; font-size:25px; }
+    p { margin:10px 0; }
+    .lead { max-width:760px; color:var(--muted); font-size:19px; }
+    section { margin-top:22px; padding:28px 32px; background:var(--paper); border:1px solid var(--line); }
+    .flow { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; align-items:stretch; }
+    .node { padding:14px 10px; border:1px solid var(--line); text-align:center; font-size:14px; }
+    .node b { display:block; color:var(--accent); }
+    pre { overflow:auto; padding:18px; background:var(--code); color:#dff7ec; border-left:4px solid var(--accent); }
+    code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .compare { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .bad,.good { padding:18px; border:1px solid var(--line); }
+    .bad h3 { color:var(--warn); } .good h3 { color:var(--accent); }
+    li { margin:8px 0; }
+    footer { color:var(--muted); margin-top:24px; font-size:14px; }
+    @media (max-width:760px) { .flow,.compare { grid-template-columns:1fr; } header,section { padding:24px 20px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Agent Turn 取消是一份生命周期协议</h1>
+    <p class="lead">一次 Stop 会跨过 UI、IPC、审批等待、工具进程、Agent loop 和持久化。只在某一层设置一个 boolean，通常只能“看起来停止”，不能真正收敛。</p>
+  </header>
+  <section>
+    <h2>问题的本质</h2>
+    <div class="flow">
+      <div class="node"><b>Renderer</b>恢复输入框</div>
+      <div class="node"><b>Main</b>找到当前 turn</div>
+      <div class="node"><b>Approval</b>结束等待</div>
+      <div class="node"><b>Executor</b>停止前台进程</div>
+      <div class="node"><b>Storage</b>记录终态</div>
+    </div>
+    <p>任何一环没有观察取消，用户都会感知为“卡住”；任何终态没有落盘，用户都会在重进会话时感知为“历史丢失”。</p>
+  </section>
+  <section>
+    <h2>三个关键不变量</h2>
+    <ol>
+      <li><strong>取消作用域一致：</strong>同一个 turn 的 Agent、pending approval 和前台 executor 必须观察同一个取消事实。</li>
+      <li><strong>终态独立建模：</strong><code>aborted</code> 是 turn 的状态，不是最后一条 assistant message 的属性。</li>
+      <li><strong>UI 从事实恢复：</strong>streaming state 只用于运行中展示；完成、失败和中止都应回到持久化 SessionRecord。</li>
+    </ol>
+  </section>
+  <section>
+    <h2>Before / After</h2>
+    <div class="compare">
+      <div class="bad">
+        <h3>脆弱做法</h3>
+        <pre><code>abortButton.onclick = () =&gt; agent.abort()
+
+status = lastAssistant.stopReason
+ui.push({ text: "Stopped" })</code></pre>
+        <p>审批 Promise 仍可能等待到超时；最后一条消息可能还是 <code>toolUse</code>；Stopped 只在当前 renderer 内存里。</p>
+      </div>
+      <div class="good">
+        <h3>可恢复做法</h3>
+        <pre><code>abortTurn(turnKey) {
+  agent.abort()
+  approvals.abortTurn(turnKey)
+}
+
+result.status = "aborted"
+append({ type: "turn_aborted" })
+ui.reloadSession()</code></pre>
+        <p>等待立即结束，executor 有明确门禁，终态成为 append-only 会话事实。</p>
+      </div>
+    </div>
+  </section>
+  <section>
+    <h2>最容易忽略的竞态</h2>
+    <p>用户点击 Allow 的同时也可能点击 Stop。registry 需要让 pending entry 只被第一次有效 decision 消费；scheduler 即使拿到了 Allow，也要在启动 executor 前再检查一次 signal。这个“入口检查 + 等待后复检”模式适用于锁、队列、网络授权和任何异步门禁。</p>
+    <p>另一个陷阱是后台任务：一旦 Bash 已经转为 background task，它的生命周期就不应继续绑定原 turn，否则用户停止下一轮 Agent 时可能误杀长期任务。</p>
+  </section>
+  <section>
+    <h2>自检问题</h2>
+    <ul>
+      <li>如果 abort 发生在第一条模型回复之前，系统能否返回合法终态而不是抛“没有 assistant message”？</li>
+      <li>如果 approval 刚返回 Allow，abort 是否仍能阻止 executor 启动？</li>
+      <li>应用重启后，Stopped 是从事件事实恢复，还是靠上一次页面内存？</li>
+    </ul>
+  </section>
+  <footer>来源：2026-07-17 Agent turn 中断恢复修复。对应 history：20260717-1601-fix-turn-abort-recovery.md</footer>
+</main>
+</body>
+</html>

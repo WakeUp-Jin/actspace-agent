@@ -60,23 +60,37 @@ async function main() {
     assert(Number.isInteger(tabId), "created fixture tab", created);
 
     await execute("wait", "load_state", { tab_id: tabId, state: "load", timeout_ms: 15_000 });
-    const title = await execute("locator", "inner_text", { tab_id: tabId, selector: "#fixture-title" });
+    const title = await execute("locator", "inner_text", {
+      tab_id: tabId,
+      target: { kind: "role", role: "heading", name: "Browser Bridge Acceptance Fixture", exact: true },
+    });
     assert(title.value === "Browser Bridge Acceptance Fixture", "read fixture title", title);
 
-    await execute("locator", "fill", { tab_id: tabId, selector: "#name-input", value: "ActSpace" });
-    await execute("locator", "fill", { tab_id: tabId, selector: "#notes-input", value: "Plan 5" });
+    await execute("locator", "fill", {
+      tab_id: tabId,
+      target: { kind: "label", value: "Name", exact: true },
+      value: "ActSpace",
+    });
+    await execute("locator", "fill", {
+      tab_id: tabId,
+      target: { kind: "placeholder", value: "Type notes", exact: true },
+      value: "Plan 5",
+    });
     await execute("locator", "select_option", {
       tab_id: tabId,
-      selector: "#color-select",
+      target: { kind: "label", value: "Color", exact: true },
       selections: [{ value: "green" }],
     });
     const checked = await execute("locator", "set_checked", {
       tab_id: tabId,
-      selector: "#agree-checkbox",
+      target: { kind: "label", value: "Accept fixture terms", exact: true },
       checked: true,
     });
     assert(checked.value === true, "checked fixture checkbox", checked);
-    await execute("locator", "click", { tab_id: tabId, selector: "#apply-button" });
+    await execute("locator", "click", {
+      tab_id: tabId,
+      target: { kind: "role", role: "button", name: "Apply form state", exact: true },
+    });
 
     const form = await execute("locator", "inner_text", { tab_id: tabId, selector: "#result-output" });
     const formState = JSON.parse(form.value);
@@ -89,6 +103,24 @@ async function main() {
       "applied locator form state",
       formState,
     );
+
+    await execute("locator", "click", {
+      tab_id: tabId,
+      target: { kind: "role", role: "button", name: "Shadow action", exact: true },
+    });
+    const shadowOutput = await execute("locator", "inner_text", { tab_id: tabId, selector: "#shadow-output" });
+    assert(shadowOutput.value === "shadow-clicked", "clicked semantic target through open Shadow DOM", shadowOutput);
+
+    const framePath = [{ kind: "css", value: "#cross-origin-frame" }];
+    await execute("locator", "click", {
+      tab_id: tabId,
+      target: { kind: "role", role: "button", name: "Frame action", exact: true, frame_path: framePath },
+    });
+    const frameOutput = await execute("locator", "inner_text", {
+      tab_id: tabId,
+      target: { kind: "css", value: "#frame-status", frame_path: framePath },
+    });
+    assert(frameOutput.value === "frame-clicked", "clicked semantic target through cross-origin frame", frameOutput);
 
     const snapshot = await execute("dom", "snapshot", { tab_id: tabId });
     assert(Array.isArray(snapshot.nodes) && snapshot.nodes.length > 0, "captured visible DOM snapshot");

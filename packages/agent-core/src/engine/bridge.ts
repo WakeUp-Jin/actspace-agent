@@ -130,6 +130,8 @@ export interface RunTurnWithAgentDeps {
 export interface RunTurnWithAgentOptions {
   onStreamEvent?: (event: RuntimeStreamEvent) => void;
   runLogger?: AgentRunLogger;
+  /** Main 已预写 user_message 时关闭，避免同一 turn 重复持久化用户输入。 */
+  includeUserEvent?: boolean;
 }
 
 /**
@@ -172,12 +174,7 @@ export async function runTurnWithAgent(
     return `evt_${turnId}_${++eventIdCounter}`;
   }
 
-  await writeRunLog(runLogger, "run_started", {
-    sessionId,
-    turnId,
-    userInput,
-    logFilePath: runLogger?.filePath,
-  });
+  const getBashTaskSteeringMessages = createBashTaskSteeringProvider(sessionId);
 
   const agent = new Agent({
     llm: deps.llm,
@@ -188,13 +185,15 @@ export async function runTurnWithAgent(
     summarizer: deps.summarizer,
     cacheAudit: deps.cacheAudit,
     llmRetry: deps.llmRetry,
-    // 后台 bash 任务事件在 turn 边界（每次 LLM 调用前）注入模型上下文
-    getSteeringMessages: async () => buildBashTaskSteeringMessages(sessionId),
+    // 新用户 turn 首次调用模型前注入运行清单；后续边界只注入新事件，避免清单重复。
+    getSteeringMessages: getBashTaskSteeringMessages,
     toolExecuteOptions: {
       subagentEventSink: async (subagentEvent) => {
         if (!streamCb || !subagentEvent.toolCallId) return;
         const streamEvent: RuntimeStreamEvent = {
           type: "subagent_event",
+          sessionId,
+          turnId,
           toolCallId: subagentEvent.toolCallId,
           transcriptRef: subagentEvent.transcriptRef,
           event: subagentEvent.event,
@@ -227,6 +226,13 @@ export async function runTurnWithAgent(
     },
   });
   deps.abort = () => agent.abort();
+
+  await writeRunLog(runLogger, "run_started", {
+    sessionId,
+    turnId,
+    userInput,
+    logFilePath: runLogger?.filePath,
+  });
 
   let loopResult: AgentLoopResult;
   try {
@@ -273,7 +279,15 @@ export async function runTurnWithAgent(
     return failedResult;
   }
 
-  const sessionEvents = buildSessionEvents(loopResult, sessionId, turnId, input, deps.toolManager, toolExecutions);
+  const sessionEvents = buildSessionEvents(
+    loopResult,
+    sessionId,
+    turnId,
+    input,
+    deps.toolManager,
+    toolExecutions,
+    options?.includeUserEvent ?? true,
+  );
   const subagentTranscripts = collectSubAgentTranscripts(toolExecutions);
   for (const info of compactions) {
     sessionEvents.push(createCompactionEvent(info, sessionId, turnId));
@@ -285,26 +299,26 @@ export async function runTurnWithAgent(
   const snapshotEvent = contextSnapshotToEvent(contextSnapshot, sessionId, turnId);
   sessionEvents.push(snapshotEvent);
 
-  const finalReply = toAssistantReply(loopResult.message);
+  const finalReply = loopResult.status === "aborted" ? undefined : toAssistantReply(loopResult.message);
   await flushStreamLogBuffer(runLogger, streamLogBuffer);
 
   if (streamCb) {
-    const finishedEvent: RuntimeStreamEvent = {
-      type: "turn_finished",
-      sessionId,
-      turnId,
-      resultEventIds: sessionEvents.map((e) => e.id),
-    };
-    await writeRunLog(runLogger, "stream_event", finishedEvent);
-    streamCb(finishedEvent);
+    const terminalEvent: RuntimeStreamEvent = loopResult.status === "aborted"
+      ? { type: "turn_aborted", sessionId, turnId }
+      : {
+          type: "turn_finished",
+          sessionId,
+          turnId,
+          resultEventIds: sessionEvents.map((e) => e.id),
+        };
+    await writeRunLog(runLogger, "stream_event", terminalEvent);
+    streamCb(terminalEvent);
   }
 
   logAgentRun("turn execution completed", {
     sessionId,
     turnId,
-    status: loopResult.message.stopReason === "aborted"
-      ? "aborted"
-      : loopResult.message.stopReason === "error" ? "failed" : "completed",
+    status: loopResult.status,
     stopReason: loopResult.message.stopReason,
     sessionEventCount: sessionEvents.length,
     textDeltaCount: streamStats.textDeltaCount,
@@ -322,13 +336,13 @@ export async function runTurnWithAgent(
     finalReply,
     contextSnapshot,
     contextState,
-    status: loopResult.message.stopReason === "aborted"
-      ? "aborted"
-      : loopResult.message.stopReason === "error" ? "failed" : "completed",
-    error: loopResult.message.errorMessage
+    status: loopResult.status,
+    error: loopResult.status === "failed" && loopResult.message.errorMessage
       ? {
-          code: loopResult.message.errorKind
-            ? `LLM_${loopResult.message.errorKind.toUpperCase()}`
+          code: loopResult.message.errorKind === "max_turns"
+            ? "AGENT_MAX_TURNS"
+            : loopResult.message.errorKind
+              ? `LLM_${loopResult.message.errorKind.toUpperCase()}`
             : "LLM_ERROR",
           message: loopResult.message.errorMessage,
         }
@@ -346,28 +360,41 @@ export async function runTurnWithAgent(
  * 后台 bash 任务通知 → steering 消息（turn 边界注入）。
  *
  * 两部分内容合并为一条 UserMessage：
- * 1. 待投递的 <task_notification>（终态 / output_match / stalled）
- * 2. 运行中任务清单一行附件（防模型遗忘 / 重复启动；设计文档投递规则 5）
+ * 1. 待投递的 <task_notification>（终态 / output_match / stalled），每个调用边界均可注入新事件；
+ * 2. 运行中任务清单附件，仅在本次用户 turn 的第一次调用前注入。
  *
  * 无通知且无运行中任务时返回空数组（loop 不注入任何消息）。
  */
-function buildBashTaskSteeringMessages(sessionId: string): UserMessage[] {
+function createBashTaskSteeringProvider(sessionId: string): () => Promise<UserMessage[]> {
+  let runningSnapshotInjected = false;
+  return async () => {
+    const includeRunningSnapshot = !runningSnapshotInjected;
+    runningSnapshotInjected = true;
+    return buildBashTaskSteeringMessages(sessionId, includeRunningSnapshot);
+  };
+}
+
+function buildBashTaskSteeringMessages(
+  sessionId: string,
+  includeRunningSnapshot: boolean,
+): UserMessage[] {
   const notifications = bashTaskRegistry.drainPendingNotifications(sessionId);
-  const running = bashTaskRegistry.listRunning(sessionId);
 
   const parts: string[] = notifications.map((n) => n.text);
-  if (running.length > 0) {
+  if (includeRunningSnapshot) {
+    const running = bashTaskRegistry.listRunning(sessionId);
     const list = running
       .map((task) => {
         const runtime = Math.round((Date.now() - task.startedAt) / 1000);
         return `- ${task.taskId}: "${task.command}" (running ${runtime}s)`;
       })
       .join("\n");
-    parts.push(`<background_tasks>\n当前有 ${running.length} 个后台任务运行中：\n${list}\n</background_tasks>`);
+    if (running.length > 0) {
+      parts.push(`<background_tasks>\n当前有 ${running.length} 个后台任务运行中：\n${list}\n</background_tasks>`);
+    }
   }
 
-  // 仅在有终态通知时注入；只有 running 清单而无新事件时不打扰（避免每个 turn 边界都插消息）
-  if (notifications.length === 0) return [];
+  if (parts.length === 0) return [];
 
   return [
     {
@@ -521,6 +548,7 @@ function buildSessionEvents(
   input: RunTurnWithAgentInput,
   toolManager: ToolManager,
   toolExecutions: Map<string, ToolExecutionRecord>,
+  includeUserEvent: boolean,
 ): SessionEvent[] {
   const userMessage: UserMessage = {
     role: "user",
@@ -528,9 +556,9 @@ function buildSessionEvents(
     timestamp: Date.now(),
     source: "user",
   };
-  const events: SessionEvent[] = userMessageToEvents(userMessage, sessionId, turnId, {
-    attachments: input.attachments,
-  });
+  const events: SessionEvent[] = includeUserEvent
+    ? userMessageToEvents(userMessage, sessionId, turnId, { attachments: input.attachments })
+    : [];
   let usageCallIndex = 0;
   for (const msg of result.messages) {
     if (msg.role === "toolResult") {
@@ -574,6 +602,11 @@ function buildSessionEvents(
       code: finalMessage.errorKind ? `LLM_${finalMessage.errorKind.toUpperCase()}` : "LLM_ERROR",
       message: finalMessage.errorMessage ?? "LLM call failed",
       recoverable: true,
+    }));
+  }
+  if (result.status === "aborted") {
+    events.push(createPersistedSessionEvent(sessionId, turnId, "turn_aborted", {
+      reason: "user",
     }));
   }
   return events;
@@ -1276,13 +1309,13 @@ function mapAgentEventToStreamEvent(
     case "message_delta": {
       const delta = event.delta;
       if (delta.type === "text_delta") {
-        return { type: "assistant_text_delta", messageId: nextId(), delta: delta.delta };
+        return { type: "assistant_text_delta", sessionId, turnId, messageId: nextId(), delta: delta.delta };
       }
       if (delta.type === "thinking_delta") {
-        return { type: "assistant_thinking_delta", messageId: nextId(), delta: delta.delta };
+        return { type: "assistant_thinking_delta", sessionId, turnId, messageId: nextId(), delta: delta.delta };
       }
       if (delta.type === "tool_call_delta") {
-        return handleToolCallDelta(delta, toolManager, toolCallStreaming);
+        return handleToolCallDelta(delta, sessionId, turnId, toolManager, toolCallStreaming);
       }
       return null;
     }
@@ -1298,6 +1331,8 @@ function mapAgentEventToStreamEvent(
         const preview = createToolUiPreview(event.toolName, previewKind, event.args, "", summary, true);
         const startedEvent: RuntimeStreamEvent = {
           type: "tool_started",
+          sessionId,
+          turnId,
           toolCallId: event.toolCallId,
           toolName: event.toolName,
           argsPreview: JSON.stringify(sanitizeBrowserToolArgs(event.toolName, event.args)).slice(0, 200),
@@ -1318,6 +1353,8 @@ function mapAgentEventToStreamEvent(
       const liveRecord: ToolExecutionRecord = { toolName: event.toolName, args, result: event.result };
       return {
         type: "tool_finished",
+        sessionId,
+        turnId,
         toolCallId: event.toolCallId,
         toolName: event.toolName,
         resultEventId: nextId(),
@@ -1395,6 +1432,8 @@ function mapAgentEventToStreamEvent(
 
 function handleToolCallDelta(
   delta: { toolCallId?: string; toolName?: string; delta: string },
+  sessionId: string,
+  turnId: string,
   toolManager: ToolManager,
   toolCallStreaming: Map<string, ToolCallStreamingEntry>,
 ): RuntimeStreamEvent | null {
@@ -1427,6 +1466,8 @@ function handleToolCallDelta(
 
   return {
     type: "tool_call_streaming",
+    sessionId,
+    turnId,
     toolCallId: delta.toolCallId,
     toolName: delta.toolName,
     isInitial,

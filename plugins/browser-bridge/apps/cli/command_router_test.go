@@ -104,6 +104,28 @@ func TestCommandPreflightIncludesTargetAndOrigin(t *testing.T) {
 	}
 }
 
+func TestCommandPreflightSummarizesStructuredLocator(t *testing.T) {
+	response := dispatchBridgeRequest(protocol.RequestEnvelope{
+		ID:     "1",
+		Method: protocol.MethodCommandPreflight,
+		Params: protocol.CommandPreflightParams{Actions: []protocol.CommandAction{{
+			Category: "locator", Action: "click", Params: map[string]any{
+				"tab_id": 7,
+				"target": map[string]any{"kind": "role", "role": "button", "name": "创建"},
+			},
+		}}},
+	}, func(request protocol.RequestEnvelope) protocol.ResponseEnvelope {
+		return okResponse(request.ID, []protocol.TabInfo{{ID: 7, URL: "https://example.test/form"}})
+	})
+	if !response.OK {
+		t.Fatalf("preflight failed: %+v", response)
+	}
+	action := response.Result.(preflightResult).Actions[0]
+	if action.Target != `role=button name="创建"` || action.Origin != "https://example.test" {
+		t.Fatalf("unexpected structured target: %+v", action)
+	}
+}
+
 func TestCommandExecuteMapsToPrimitiveBackend(t *testing.T) {
 	var forwarded protocol.RequestEnvelope
 	response := dispatchBridgeRequest(protocol.RequestEnvelope{
@@ -279,6 +301,47 @@ func TestGoLocatorClickResolvesPointThenUsesCuaPrimitives(t *testing.T) {
 	for index := range want {
 		if methods[index] != want[index] {
 			t.Fatalf("primitive %d = %q, want %q", index, methods[index], want[index])
+		}
+	}
+}
+
+func TestGoLocatorClickForwardsStructuredTargetToInjectedRuntime(t *testing.T) {
+	var pointExpression string
+	response := dispatchBridgeRequest(protocol.RequestEnvelope{
+		ID:     "1",
+		Method: protocol.MethodCommandExecute,
+		Params: protocol.CommandExecuteParams{Category: "locator", Action: "click", Params: map[string]any{
+			"tab_id": 7,
+			"target": map[string]any{
+				"kind":  "role",
+				"role":  "button",
+				"name":  "创建",
+				"exact": true,
+			},
+		}},
+	}, func(request protocol.RequestEnvelope) protocol.ResponseEnvelope {
+		if request.Method == protocol.MethodBackendExecuteCDP {
+			var params protocol.CDPParams
+			if err := protocol.DecodeParams(request.Params, &params); err != nil {
+				t.Fatal(err)
+			}
+			expression, _ := params.CommandParams["expression"].(string)
+			switch {
+			case strings.Contains(expression, "?.version"):
+				return okResponse(request.ID, map[string]any{"result": map[string]any{"value": true}})
+			case strings.Contains(expression, `invoke("point"`):
+				pointExpression = expression
+				return okResponse(request.ID, map[string]any{"result": map[string]any{"value": map[string]any{"x": 50, "y": 60}}})
+			}
+		}
+		return okResponse(request.ID, map[string]any{})
+	})
+	if !response.OK {
+		t.Fatalf("execute failed: %+v", response)
+	}
+	for _, want := range []string{`"kind":"role"`, `"name":"创建"`} {
+		if !strings.Contains(pointExpression, want) {
+			t.Fatalf("runtime expression missing %s: %s", want, pointExpression)
 		}
 	}
 }

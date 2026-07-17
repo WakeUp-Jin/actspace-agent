@@ -246,6 +246,8 @@ type FinalizeTabsResult struct {
 
 type CDPParams struct {
 	TabID         int            `json:"tabId"`
+	FrameID       string         `json:"frameId,omitempty"`
+	SessionID     string         `json:"sessionId,omitempty"`
 	Method        string         `json:"method"`
 	CommandParams map[string]any `json:"commandParams,omitempty"`
 }

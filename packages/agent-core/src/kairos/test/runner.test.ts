@@ -520,10 +520,10 @@ describe("KairosRunner.processTick", () => {
       getAbortSignal: () => controller.signal,
     });
 
-    // loop 在第一步就因 aborted 退出、没产出 assistant message → runAgentLoop 抛错。
+    // loop 在第一步就因 aborted 退出，Kairos runner 保持失败 tick 语义。
     // 关键断言：完全没有真正发起 LLM 请求（shutdown 时正在飞的请求要能立刻被掐断）。
     await expect(runner.processTick({ type: "tick", payload: tickPayload() })).rejects.toThrow(
-      /without producing an assistant/,
+      /Kairos tick aborted/,
     );
     expect(streamSpy).not.toHaveBeenCalled();
     expect(events.some((e) => e.type === "assistant_message")).toBe(false);

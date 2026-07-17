@@ -96,6 +96,37 @@ func TestValidateInputRejectsUnknownMissingAndWrongTypes(t *testing.T) {
 	}
 }
 
+func TestValidateInputAcceptsStructuredSemanticLocatorAndRequiresTarget(t *testing.T) {
+	command, ok := Find("locator", "click")
+	if !ok {
+		t.Fatal("locator click missing")
+	}
+	valid := map[string]any{
+		"tab_id": float64(7),
+		"target": map[string]any{
+			"kind":  "role",
+			"role":  "button",
+			"name":  "创建",
+			"exact": true,
+			"frame_path": []any{
+				map[string]any{"kind": "css", "value": "#dialog-frame"},
+			},
+		},
+	}
+	if err := ValidateInput(command, valid); err != nil {
+		t.Fatalf("structured locator rejected: %v", err)
+	}
+	for name, params := range map[string]map[string]any{
+		"missing target": {"tab_id": float64(7)},
+		"missing role":   {"tab_id": float64(7), "target": map[string]any{"kind": "role"}},
+		"missing value":  {"tab_id": float64(7), "target": map[string]any{"kind": "label"}},
+	} {
+		if err := ValidateInput(command, params); err == nil {
+			t.Fatalf("%s unexpectedly passed", name)
+		}
+	}
+}
+
 func TestDOMSnapshotAndLocatorListSchemasExposeFidelityControls(t *testing.T) {
 	snapshot, ok := Find("dom", "snapshot")
 	if !ok {

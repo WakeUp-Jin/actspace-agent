@@ -59,6 +59,10 @@ node plugins/browser-bridge/test-fixtures/acceptance/session-isolation-smoke.cjs
 - `#console-button`, `#console-output`, `#page-two-link`
 - `#drag-source`, `#drop-target`
 - `#scroll-stage`, `#scroll-target`
+- `#shadow-host`, `#shadow-output`
+- `#cross-origin-frame` → `frame.html#frame-action`, `frame.html#frame-status`
+
+The main fixture is normally opened from `127.0.0.1`, while the iframe uses `localhost`; this intentionally exercises cross-origin/OOPIF Frame routing through Chrome Debugger flat sessions.
 
 ## Expected form state
 

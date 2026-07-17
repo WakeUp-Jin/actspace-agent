@@ -31,3 +31,7 @@ type BrowserBackend interface {
 	MoveCursor(ctx context.Context, tabID int, x float64, y float64, isClick bool) error
 	SubscribeEvents(session SessionRef) (<-chan BrowserEvent, func(), error)
 }
+
+type FrameCDPExecutor interface {
+	ExecuteCDPInFrame(ctx context.Context, tabID int, frameID string, method string, params map[string]any) (map[string]any, error)
+}

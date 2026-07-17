@@ -9,13 +9,15 @@ import (
 
 func TestExtensionBackendUsesPrimitiveMethods(t *testing.T) {
 	var methods []string
+	var cdpInputs []protocol.CDPParams
 	backend := &ExtensionBackend{
-		Request: func(_ context.Context, method string, _ any) (any, error) {
+		Request: func(_ context.Context, method string, params any) (any, error) {
 			methods = append(methods, method)
 			switch method {
 			case protocol.MethodBackendTabsList:
 				return []protocol.TabInfo{{ID: 7}}, nil
 			case protocol.MethodBackendExecuteCDP:
+				cdpInputs = append(cdpInputs, params.(protocol.CDPParams))
 				return map[string]any{"ok": true}, nil
 			default:
 				return map[string]any{}, nil
@@ -33,10 +35,16 @@ func TestExtensionBackendUsesPrimitiveMethods(t *testing.T) {
 	if _, err := backend.ExecuteCDP(context.Background(), 7, "Runtime.evaluate", map[string]any{}); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{protocol.MethodBackendAttach, protocol.MethodBackendTabsList, protocol.MethodBackendExecuteCDP}
+	if _, err := backend.ExecuteCDPInFrame(context.Background(), 7, "child-frame", "Page.createIsolatedWorld", map[string]any{"frameId": "child-frame"}); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{protocol.MethodBackendAttach, protocol.MethodBackendTabsList, protocol.MethodBackendExecuteCDP, protocol.MethodBackendExecuteCDP}
 	for index := range want {
 		if methods[index] != want[index] {
 			t.Fatalf("method %d = %q, want %q", index, methods[index], want[index])
 		}
+	}
+	if cdpInputs[0].FrameID != "" || cdpInputs[1].FrameID != "child-frame" {
+		t.Fatalf("unexpected frame-scoped CDP inputs: %+v", cdpInputs)
 	}
 }

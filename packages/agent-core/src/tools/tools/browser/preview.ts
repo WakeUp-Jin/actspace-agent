@@ -24,6 +24,8 @@ function summarizeTarget(args: Record<string, unknown>): string {
   if (url) return url;
   const selector = stringValue(args.selector);
   if (selector) return selector;
+  const locatorTarget = recordValue(args.target);
+  if (locatorTarget) return summarizeLocatorTarget(locatorTarget);
   if (typeof args.x === "number" && typeof args.y === "number") return `(${args.x}, ${args.y})`;
   const files = Array.isArray(args.files) ? args.files.filter((item): item is string => typeof item === "string") : [];
   if (files.length > 0) return `${files.length} file${files.length === 1 ? "" : "s"}: ${files.map(fileName).join(", ")}`;
@@ -37,8 +39,25 @@ function summarizeTarget(args: Record<string, unknown>): string {
   return "";
 }
 
+function summarizeLocatorTarget(target: Record<string, unknown>): string {
+  const kind = stringValue(target.kind);
+  const role = stringValue(target.role);
+  const name = stringValue(target.name);
+  const value = stringValue(target.value);
+  const framePath = Array.isArray(target.frame_path) ? target.frame_path.length : 0;
+  const prefix = framePath > 0 ? `${framePath} frame${framePath === 1 ? "" : "s"} → ` : "";
+  if (kind === "role") return `${prefix}role=${role || value}${name ? ` name=${name}` : ""}`;
+  return `${prefix}${kind || "target"}${value ? `=${value}` : ""}`;
+}
+
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function recordValue(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
 }
 
 function fileName(path: string): string {

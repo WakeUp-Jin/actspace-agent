@@ -6,7 +6,7 @@
 
 `abb tabs`、`abb user-tabs`、`abb open-tab` 等既有公共 CLI 仍保持稳定，但它们只是 Go 层 compatibility adapter：CLI 参数转换成 canonical category/action 后进入同一 command engine，再调用 Extension primitive。`ABB_LEGACY_BROWSER_FORWARDING` 只服务显式迁移诊断，不是这些 CLI 命令的运行前提，也不得用于恢复 Extension 高层业务逻辑。
 
-重要：本文大量“Extension 实现”代码块和逐条「Plan 5 前盘点」来自首版逆向与原型阶段，仅保留为 CDP/Chrome API 调用链参考，不表示当前高层逻辑归 Extension，也不再是实现状态事实来源。当前状态以 Go registry 为准：Go command handler 编排后调用 Extension primitive RPC；页面 DOM 语义由 Go 管理的轻量 injected Locator runtime 提供。
+重要：本文大量“Extension 实现”代码块和逐条「Plan 5 前盘点」来自首版逆向与原型阶段，仅保留为 CDP/Chrome API 调用链参考，不表示当前高层逻辑归 Extension，也不再是实现状态事实来源。当前状态以 Go registry 为准：Go command handler 编排后调用 Extension primitive RPC；页面 DOM 语义由 Go 管理的 ActSpace 自研 TypeScript Locator Runtime 提供。
 
 与其他浏览器文档的关系：
 
@@ -697,9 +697,9 @@ Plan 5 前盘点：⚠️ 协议已定义，playwright-injected.js 有实现，E
 
 ---
 
-## 九、Locator subset 独有能力
+## 九、Locator Runtime 独有能力
 
-以下命令需要 injected Locator runtime 提供页面内 DOM 语义，但不依赖完整 Playwright 包。
+以下命令需要 injected Locator runtime 提供页面内 DOM/ARIA 语义，但不依赖 Playwright 包。Runtime v5 支持结构化 css/role/text/label/placeholder/test-id、accessible name、open Shadow DOM、同源 Frame path 和页面内自动等待/actionability；旧 selector 仍作为 CSS 兼容输入。
 
 ### A. 语义表单操作
 
@@ -1549,7 +1549,7 @@ Plan 5 前盘点：❌ 未实现
 | --- | ---: | --- | --- |
 | CUA | 9 | 9/9 implemented | Go CUA + CDP primitive |
 | DOM CUA | 7 | 7/7 implemented | Go DOM CUA + Locator runtime |
-| Locator | 21 | 21/21 implemented | Go Locator subset |
+| Locator | 21 | 21/21 implemented | Go Locator engine + self-authored injected Runtime v5 |
 | Navigation | 4 | 4/4 implemented | Go navigation/wait |
 | Tabs | 6 | 6/6 implemented | Go orchestration + Extension Tabs primitive |
 | User | 3 | 3/3 implemented | Go orchestration + Extension Tabs/History primitive |
@@ -1557,7 +1557,7 @@ Plan 5 前盘点：❌ 未实现
 | I/O | 6 | 6/6 implemented | Go validation/event coordination + CDP/Downloads primitive |
 | Debug | 1 | 1/1 implemented | Go 500-entry ring buffer + CDP event forwarding |
 
-自动化验证已经覆盖 registry parity、Go dispatch/CDP 序列、injected runtime、batch approval token、11 工具注册和旧 preview 兼容。真实 Chrome profile smoke 的结果单独记录在 Plan 5 acceptance 文件中。
+自动化验证已经覆盖 registry parity、Go dispatch/CDP 序列、injected runtime、结构化 target、frame-scoped isolated world、OOPIF child-session primitive、batch approval token、11 工具注册和旧 preview 兼容。Runtime v5 的真实 Chrome profile smoke 记录在 `20260717-browser-locator-runtime-rewrite.md`，并要求 reload 当前 unpacked extension 后执行。
 
 ## 维护规则
 

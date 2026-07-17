@@ -2,8 +2,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bashExecutor, bashTaskRegistry, bashOutputTool, bashKillTool } from "../index";
-import type { BashBackgroundedResult, BashTask } from "../index";
+import {
+  bashExecutor,
+  bashTaskRegistry,
+  bashOutputTool,
+  bashKillTool,
+  DEFAULT_MAX_BACKGROUND_TASKS_PER_SESSION,
+} from "../index";
+import type { BashBackgroundedResult, BashExecutorConfig, BashTask } from "../index";
 
 async function createWorkspace(): Promise<string> {
   return realpath(await mkdtemp(join(tmpdir(), "actspace-bash-bg-test-")));
@@ -13,13 +19,17 @@ async function createTmpRoot(): Promise<string> {
   return realpath(await mkdtemp(join(tmpdir(), "actspace-bash-bg-tmp-")));
 }
 
-async function backgroundTask(command: string, blockMs = 0): Promise<BashBackgroundedResult> {
+async function backgroundTask(
+  command: string,
+  blockMs = 0,
+  config: BashExecutorConfig = {},
+): Promise<BashBackgroundedResult> {
   const workspace = await createWorkspace();
   const tmpRoot = await createTmpRoot();
   const result = await bashExecutor(
     { command, cwd: workspace, blockMs },
     workspace,
-    { tmpRoot, sessionId: "sess-bg-test" },
+    { tmpRoot, sessionId: "sess-bg-test", ...config },
   );
   expect(result.success).toBe(true);
   return result.data as BashBackgroundedResult;
@@ -38,12 +48,34 @@ function waitForStatus(taskId: string, timeoutMs = 5_000): Promise<BashTask> {
   });
 }
 
-afterEach(() => {
+async function waitForNotification(taskId: string, timeoutMs = 2_000): Promise<string> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt <= timeoutMs) {
+    const notification = bashTaskRegistry
+      .drainPendingNotifications("sess-bg-test")
+      .find((item) => item.taskId === taskId);
+    if (notification) return notification.text;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`notification not received for ${taskId}`);
+}
+
+afterEach(async () => {
+  const waits = bashTaskRegistry.listRunning().flatMap((task) => {
+    const handle = bashTaskRegistry.getHandle(task.taskId);
+    return handle ? [handle.wait] : [];
+  });
   bashTaskRegistry.harvestAll();
+  await Promise.all(waits);
+  await new Promise((resolve) => setTimeout(resolve, 10));
   bashTaskRegistry.clear();
 });
 
 describe("bash task registry lifecycle", () => {
+  it("uses a default per-session background task limit of 8", () => {
+    expect(DEFAULT_MAX_BACKGROUND_TASKS_PER_SESSION).toBe(8);
+  });
+
   it("marks completed tasks and queues a task_notification", async () => {
     // 注意：断言的关键词不能是命令文本的子串——通知/输出都会回显命令本身，
     // 否则断言会被命令回显「假阳性」满足（曾掩盖过转后台后停止写盘的 bug）。
@@ -85,12 +117,62 @@ describe("bash task registry lifecycle", () => {
   it("harvestSession kills running tasks of that session", async () => {
     const data = await backgroundTask("sleep 30");
     expect(bashTaskRegistry.listRunning("sess-bg-test")).toHaveLength(1);
+    const handle = bashTaskRegistry.getHandle(data.taskId);
 
     const killed = bashTaskRegistry.harvestSession("sess-bg-test");
     expect(killed).toBe(1);
 
-    const task = await waitForStatus(data.taskId);
-    expect(task.status).toBe("killed");
+    await handle?.wait;
+    expect(bashTaskRegistry.get(data.taskId)?.status).toBe("killed");
+  });
+
+  it("kills a background task when its maximum runtime is reached", async () => {
+    const data = await backgroundTask("sleep 30", 0, { maxRuntimeMs: 50 });
+    const handle = bashTaskRegistry.getHandle(data.taskId);
+    expect(handle).toBeDefined();
+    await handle?.wait;
+    const task = bashTaskRegistry.get(data.taskId);
+
+    expect(task?.status).toBe("killed");
+    expect(task?.maxRuntimeHit).toBe(true);
+    expect(await waitForNotification(data.taskId)).toContain("maximum runtime reached");
+  });
+
+  it("reuses an identical running cwd + command instead of spawning again", async () => {
+    const workspace = await createWorkspace();
+    const tmpRoot = await createTmpRoot();
+    const config = { tmpRoot, sessionId: "sess-bg-test", maxRuntimeMs: 30_000 };
+    const args = { command: "sleep 30", cwd: workspace, blockMs: 0 };
+
+    const first = await bashExecutor(args, workspace, config);
+    const second = await bashExecutor({ ...args, cwd: join(workspace, ".") }, workspace, config);
+    const firstData = first.data as BashBackgroundedResult;
+    const secondData = second.data as BashBackgroundedResult;
+
+    expect(first.success).toBe(true);
+    expect(second.success).toBe(true);
+    expect(secondData.reason).toBe("already_running");
+    expect(secondData.taskId).toBe(firstData.taskId);
+    expect(bashTaskRegistry.listRunning("sess-bg-test")).toHaveLength(1);
+  });
+
+  it("rejects a new background task when the per-session limit is reached", async () => {
+    const workspace = await createWorkspace();
+    const tmpRoot = await createTmpRoot();
+    const config = {
+      tmpRoot,
+      sessionId: "sess-bg-test",
+      maxRuntimeMs: 30_000,
+      maxBackgroundTasksPerSession: 1,
+    };
+
+    const first = await bashExecutor({ command: "sleep 30", cwd: workspace, blockMs: 0 }, workspace, config);
+    const second = await bashExecutor({ command: "sleep 31", cwd: workspace, blockMs: 0 }, workspace, config);
+
+    expect(first.success).toBe(true);
+    expect(second.success).toBe(false);
+    expect(second.error).toContain("Background task limit reached for this session (1/1)");
+    expect(bashTaskRegistry.listRunning("sess-bg-test")).toHaveLength(1);
   });
 });
 

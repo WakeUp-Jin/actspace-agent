@@ -184,8 +184,8 @@ export function assistantMessageToEvents(
   // 失败回复通常正文为空（或被 guard 清空），不落空 assistant_message 事件，
   // 避免渲染成空白气泡；错误信息由 turn 级 error 事件承载（见 engine/bridge buildSessionEvents）。
   const text = getTextContent(msg);
-  const isErrorMessage = msg.stopReason === "error";
-  if (text || (toolCalls.length === 0 && !isErrorMessage)) {
+  const isIncompleteMessage = msg.stopReason === "error" || msg.stopReason === "aborted";
+  if (text || (toolCalls.length === 0 && !isIncompleteMessage)) {
     const reply: AssistantReply = {
       content: text,
       stopReason: msg.stopReason,
@@ -387,6 +387,11 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
         case "llm_usage":
         case "context_snapshot":
         case "diff_preview":
+          break;
+
+        case "turn_aborted":
+          pendingThinking = undefined;
+          pendingToolCalls = [];
           break;
       }
     } catch (err) {

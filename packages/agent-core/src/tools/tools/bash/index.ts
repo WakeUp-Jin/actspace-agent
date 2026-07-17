@@ -13,6 +13,8 @@ export { bashOutputTool, bashKillTool } from "./background-tools";
 export {
   bashTaskRegistry,
   BashTaskRegistry,
+  DEFAULT_BASH_MAX_RUNTIME_MS,
+  DEFAULT_MAX_BACKGROUND_TASKS_PER_SESSION,
   formatTaskNotification,
   formatTaskEventNotification,
   type BashTask,
@@ -42,7 +44,7 @@ export function createBashTool(workspaceRoot: string, config: BashExecutorConfig
   const effectiveConfig: BashExecutorConfig = { sandbox: true, ...config };
   return {
     ...bashDefinition,
-    handler: (args) => bashExecutor(args, workspaceRoot, effectiveConfig),
+    handler: (args, options) => bashExecutor(args, workspaceRoot, effectiveConfig, options?.signal),
     checkPermissions: createBashPermissionChecker(workspaceRoot),
     renderResult: renderBashResult,
     previewKind: "bash",

@@ -15,11 +15,17 @@ import { RightPanel } from "../components/RightPanel";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
-function renderPanel() {
+function renderPanel({
+  sessionId = null,
+  onOpenReview,
+}: {
+  sessionId?: string | null;
+  onOpenReview?: () => void;
+} = {}) {
   return render(
     <TooltipProvider delayDuration={0}>
       <RightPanelProvider>
-        <RightPanel />
+        <RightPanel sessionId={sessionId} onOpenReview={onOpenReview} />
       </RightPanelProvider>
     </TooltipProvider>,
   );
@@ -112,29 +118,57 @@ beforeEach(() => {
 });
 
 describe("RightPanel Kairos tab", () => {
-  it("keeps right panel tab buttons out of Electron drag regions", () => {
-    renderPanel();
-
-    expect(screen.getByRole("tab", { name: "Kairos" })).toHaveClass("[-webkit-app-region:no-drag]");
-  });
-
-  it("shows the empty state after closing the only tab", async () => {
+  it("keeps right panel tab buttons out of Electron drag regions", async () => {
     const user = userEvent.setup();
     renderPanel();
 
+    await user.click(screen.getByRole("button", { name: "Kairos" }));
+    expect(screen.getByRole("tab", { name: "Kairos" })).toHaveClass("[-webkit-app-region:no-drag]");
+  });
+
+  it("shows five launcher objects and returns to the launcher after closing the only tab", async () => {
+    const user = userEvent.setup();
+    const onOpenReview = vi.fn();
+    renderPanel({ sessionId: "session-launcher", onOpenReview });
+
+    const launcher = screen.getByRole("navigation", { name: "右侧面板对象" });
+    expect(within(launcher).getAllByRole("button")).toHaveLength(5);
+    expect(within(launcher).getByRole("button", { name: "Files" })).toBeInTheDocument();
+    expect(within(launcher).getByRole("button", { name: "Review" })).toBeInTheDocument();
+    expect(within(launcher).getByRole("button", { name: "Context" })).toBeInTheDocument();
+    expect(within(launcher).getByRole("button", { name: "Kairos" })).toBeInTheDocument();
+    expect(within(launcher).getByRole("button", { name: "Reply" })).toBeInTheDocument();
+
+    await user.click(within(launcher).getByRole("button", { name: "Review" }));
+    expect(onOpenReview).toHaveBeenCalledTimes(1);
+
+    await user.click(within(launcher).getByRole("button", { name: "Kairos" }));
     expect(screen.getByLabelText("Kairos 右侧紧凑视图")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "关闭 Kairos" }));
-    expect(screen.getByRole("heading", { name: "没有打开的对象" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "右侧面板对象" })).toBeInTheDocument();
   });
 
   it("shows a compact unavailable state when the Kairos bridge is missing", async () => {
     const user = userEvent.setup();
     renderPanel();
 
-    await user.click(screen.getByRole("tab", { name: "Kairos" }));
+    await user.click(screen.getByRole("button", { name: "Kairos" }));
 
     expect(screen.getByLabelText("Kairos 右侧紧凑视图")).toBeInTheDocument();
     expect(screen.getByText("Kairos 桥未就绪")).toBeInTheDocument();
+  });
+
+  it("opens Context and Reply from the launcher with user-facing tab names", async () => {
+    const user = userEvent.setup();
+    renderPanel({ sessionId: "session-launcher-objects" });
+
+    await user.click(screen.getByRole("button", { name: "Context" }));
+    expect(screen.getByRole("tab", { name: "Context" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "关闭 Context" }));
+
+    await user.click(screen.getByRole("button", { name: "Reply" }));
+    expect(screen.getByRole("tab", { name: "Reply" })).toBeInTheDocument();
+    expect(screen.getByText("当前会话还没有生成可视化回复。", { exact: false })).toBeInTheDocument();
   });
 
   it("renders the latest reply and read-only compact trail rows", async () => {
@@ -182,7 +216,7 @@ describe("RightPanel Kairos tab", () => {
     const user = userEvent.setup();
     renderPanel();
 
-    await user.click(screen.getByRole("tab", { name: "Kairos" }));
+    await user.click(screen.getByRole("button", { name: "Kairos" }));
 
     expect(await screen.findByText(/Sleeping/)).toBeInTheDocument();
     const reply = screen.getByLabelText("最终回复与通知");
@@ -209,7 +243,7 @@ describe("RightPanel Kairos tab", () => {
     const user = userEvent.setup();
     renderPanel();
 
-    await user.click(screen.getByRole("tab", { name: "Kairos" }));
+    await user.click(screen.getByRole("button", { name: "Kairos" }));
     await screen.findByText("Idle");
     await user.click(screen.getByRole("button", { name: "暂停 Kairos" }));
     await user.click(screen.getByRole("button", { name: "唤醒 Kairos" }));

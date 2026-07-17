@@ -24,10 +24,12 @@ import {
   createTitlerLLMService,
   generateSessionTitle,
   isDefaultSessionTitle,
+  appendEvents,
   runTurnWithAgent,
   createSessionStorePaths,
   readMeta,
   updateMeta,
+  userMessageToEvents,
   writeSessionResult,
 } from "@actspace/agent-core";
 import type { SessionMeta } from "@actspace/shared";
@@ -280,7 +282,12 @@ export async function runAndPersistTurn(
     abort: undefined as (() => void) | undefined,
   };
 
-  activeTurnAborts.set(turnKey, () => abortableDeps.abort?.());
+  let abortRequested = false;
+  activeTurnAborts.set(turnKey, () => {
+    abortRequested = true;
+    abortableDeps.abort?.();
+    approvalRegistry?.abortTurn(input.sessionId, input.turnId);
+  });
 
   const forwardStreamEvent = (event: RuntimeStreamEvent) => {
     logAgentTurn("stream event sent to renderer", {
@@ -292,6 +299,17 @@ export async function runAndPersistTurn(
   };
 
   try {
+    const userEvents = userMessageToEvents({
+      role: "user",
+      content: input.userInput,
+      timestamp: Date.now(),
+      source: "user",
+    }, input.sessionId, input.turnId, { attachments: input.attachments });
+    const startWrite = await appendEvents(sessionPaths.sessionPath, userEvents);
+    if (!startWrite.ok) {
+      throw new Error(startWrite.error);
+    }
+
     const modelAttachments = await prepareAttachmentsForModel(
       input.attachments,
       deps.modelSpec.input.includes("image"),
@@ -310,8 +328,12 @@ export async function runAndPersistTurn(
       {
         onStreamEvent: forwardStreamEvent,
         runLogger,
+        includeUserEvent: false,
       },
     );
+    if (abortRequested) {
+      abortableDeps.abort?.();
+    }
 
     const result = await resultPromise;
 
@@ -347,9 +369,13 @@ export async function runAndPersistTurn(
       userInput: input.userInput,
     });
 
-    return result;
+    return {
+      ...result,
+      events: [...userEvents, ...result.events],
+    };
   } finally {
     activeTurnAborts.delete(turnKey);
+    approvalRegistry?.abortTurn(input.sessionId, input.turnId);
     await deps.toolManager.dispose().catch((error) => {
       console.error("[agent-turn] failed to dispose tool manager", error);
     });

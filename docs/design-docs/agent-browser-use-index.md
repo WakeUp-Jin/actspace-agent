@@ -8,7 +8,7 @@ Browser Use Plan 5 已完成：62/62 canonical commands 全部由 Go handler 实
 
 - Agent Core 保持薄，只负责工具定义、审批、预览、Socket client 和 turn 生命周期。
 - Go Browser Bridge 是 62 条命令的 canonical registry 和高层 command engine，负责参数验证、session、CUA、DOM CUA、Locator、等待、重试、事件和批处理编排。
-- 页面内 DOM 语义由 Go 使用 `go:embed` 管理的一份轻量 injected JavaScript Locator runtime 提供。
+- 页面内 DOM 语义由插件内自研 TypeScript Locator Runtime 提供：开发期构建为单一 JavaScript 产物，Go 使用 `go:embed` 打入二进制，再通过 CDP `Runtime.evaluate` 注入页面。产品运行时不依赖 Node、Playwright 或 Codex bundle。
 - Chrome Extension 只保留 Chrome 权限域内的原语：Native Messaging、`chrome.debugger`、Tabs、History、Tab Groups、Downloads、事件转发和 cursor content script。
 - 模型默认看到 9 个分类工具，加 `browser_help`、`browser_run`；62 条叶子命令不会平铺成 62 个模型工具。
 - CLI 保留安装、诊断、人工调用和机器可读帮助能力，但不再是 Agent 正常执行 Browser Use 的主接入面。
@@ -41,7 +41,7 @@ Model
 | --- | --- | --- |
 | Agent Core | 11 个模型工具、schema 暴露、用户审批、preview、输出裁剪、Socket 生命周期 | CDP 序列、selector 实现、导航等待、Chrome API |
 | Go Command Engine | 62 条 registry、严格参数验证、高层 handler、session/tab 状态、CUA/DOM CUA/Locator、等待/重试/事件、批处理 preflight | 用户审批最终决定、直接调用浏览器扩展 API |
-| Injected Locator runtime | CSS selector subset、可见性与状态判断、文本/属性读取、fill/select 等页面内 DOM 语义 | 完整 Playwright、任意模型 JS、Chrome API、产品权限 |
+| Injected Locator runtime | 结构化 css/role/text/label/placeholder/test-id Locator、accessible name、open Shadow DOM、单 Frame context 内的 strict match、页面内自动等待/actionability、文本/属性与表单 DOM 语义 | 任意模型 JS、Chrome API、session/权限、跨域/OOPIF 的宿主路由 |
 | Chrome Extension | Native Messaging、`chrome.debugger`、Chrome Tabs/History/TabGroups/Downloads、事件与 cursor 原语 | 高层 command registry、selector 编排、Agent 工具与权限 |
 
 ## Agent 工具面
@@ -64,12 +64,13 @@ Model
 
 ## Playwright 命名边界
 
-本项目不引入完整 `playwright` 或 `playwright-core` 依赖，也不复制 Codex 的大型 Node browser client。
+本项目不引入 `playwright` 或 `playwright-core` 运行时依赖，也不复制 Codex 的大型 Node browser client；Locator 行为由 ActSpace 按 DOM、HTML 与 WAI-ARIA 语义自研。
 
 - 模型可见名称使用 `browser_locator`。
 - 既有 62 条 canonical command ID 暂时保留 `playwright_*` 前缀，作为命令兼容 ID。
-- 这些命令只承诺 Playwright-compatible Locator subset：首版以 CSS selector、strict match、可见/启用/可编辑状态、文本/属性读取、fill/select/check/wait 为主。
-- 完整 selector grammar、role engine、frame、Shadow DOM 和完整 actionability 不属于当前承诺。
+- 模型优先传结构化 `target`，支持 `css / role / text / label / placeholder / test_id`；旧 `selector` 继续作为 CSS 兼容入口。
+- Runtime v5 已实现 accessible name、隐式 role、显式/隐式 label、open Shadow DOM、strict match、稳定/可见/启用/可编辑/receives-events 检查和页面内自动等待。
+- `frame_path` 由 Go 逐层解析 frame element；同源 Frame 可直接进入子 context，跨域/OOPIF 则通过 `DOM.describeNode -> frameId -> flat CDP session -> Page.createIsolatedWorld` 路由到子 Frame。Extension 只维护 frameId/sessionId 映射和 primitive CDP 转发。
 
 ## 阅读顺序
 
@@ -101,6 +102,15 @@ Model
 - Extension：旧 `playwright-injected.js` 和 click/fill/select/scroll 等高层 handler 已删除，只保留 primitive backend、Chrome APIs、事件转发与 cursor。
 - 测试：Go、registry parity、Locator fixture、Agent Core Socket integration、desktop typecheck 已通过。
 - 真实环境：Extension 0.2.1、Locator runtime v3 与原子部署 Native Host 已完成多轮 reload/重连验收；确定性 fixture、I/O、claim/handoff、deliverable、Agent approval/denial 和 A/B session isolation smoke 均通过。Locator runtime v4 的 DOM 保真与分页源码测试已通过；品牌与 cursor runtime v2 随 Extension 0.2.2 源码完成，两者都需 reload 后进入真实 Chrome。
+
+## 2026-07-17 Locator Runtime v5 进展
+
+- 插件新增 `internal/locator/runtime-src/*.ts`，通过确定性 esbuild 脚本生成 `generated/runtime.js`，并由现有 Go `go:embed` 链路进入单一二进制。
+- 结构化 Locator 已进入 Go command schema、command router、Agent Core `browser_locator` schema 和 preview；旧 CSS `selector` 保持兼容。
+- jsdom fixture 已覆盖 role + accessible name、`aria-labelledby`、显式/隐式 label、placeholder、open Shadow DOM、同源 iframe、延迟元素自动等待和既有 DOM/clipboard/pagination 行为。
+- Go Locator engine 已实现 frame element 解析、frameId 获取、isolated world 创建、frame-scoped runtime 注入和坐标回算；Extension 已按 Chrome flat session 语义递归跟踪 OOPIF child session。
+- `pnpm check:browser` 增加 Runtime TypeScript 类型检查和生成产物漂移检查。
+- 源码与 mock acceptance 已覆盖跨域/OOPIF 路由；真实 Chrome v5 acceptance 仍需在本地 unpacked extension reload 后关闭，当前验收状态以 active execution plan 为准。
 
 ## 已确认设计闸门
 

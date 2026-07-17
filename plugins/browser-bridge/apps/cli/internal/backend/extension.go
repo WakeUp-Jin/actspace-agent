@@ -27,11 +27,15 @@ func (backend *ExtensionBackend) Detach(ctx context.Context, tabID int) error {
 }
 
 func (backend *ExtensionBackend) ExecuteCDP(ctx context.Context, tabID int, method string, params map[string]any) (map[string]any, error) {
-	result, err := backend.request(ctx, protocol.MethodBackendExecuteCDP, protocol.CDPParams{
-		TabID:         tabID,
-		Method:        method,
-		CommandParams: params,
-	})
+	return backend.executeCDP(ctx, protocol.CDPParams{TabID: tabID, Method: method, CommandParams: params})
+}
+
+func (backend *ExtensionBackend) ExecuteCDPInFrame(ctx context.Context, tabID int, frameID string, method string, params map[string]any) (map[string]any, error) {
+	return backend.executeCDP(ctx, protocol.CDPParams{TabID: tabID, FrameID: frameID, Method: method, CommandParams: params})
+}
+
+func (backend *ExtensionBackend) executeCDP(ctx context.Context, input protocol.CDPParams) (map[string]any, error) {
+	result, err := backend.request(ctx, protocol.MethodBackendExecuteCDP, input)
 	if err != nil {
 		return nil, err
 	}

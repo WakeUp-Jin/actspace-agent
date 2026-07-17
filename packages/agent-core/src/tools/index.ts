@@ -94,9 +94,17 @@ export {
   bashOutputTool,
   bashKillTool,
   bashTaskRegistry,
+  DEFAULT_BASH_MAX_RUNTIME_MS,
+  DEFAULT_MAX_BACKGROUND_TASKS_PER_SESSION,
   formatTaskNotification,
 } from "./tools/bash";
-export type { BashTask, BashTaskNotification, BashTaskStatus, BashBackgroundedResult } from "./tools/bash";
+export type {
+  BashTask,
+  BashTaskNotification,
+  BashTaskStatus,
+  BashBackgroundedResult,
+  BashExecutorConfig,
+} from "./tools/bash";
 export { webSearchExecutor } from "./tools/web-search/executor";
 export { webFetchExecutor } from "./tools/web-fetch/executor";
 export {

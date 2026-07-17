@@ -3,6 +3,7 @@ const HOST_NAME = "com.agent_browser_bridge.host";
 const SUPPORTED_CDP_METHODS = new Set([
   "Runtime.evaluate",
   "Runtime.callFunctionOn",
+  "Runtime.releaseObject",
   "Runtime.enable",
   "Log.enable",
   "Page.navigate",
@@ -12,6 +13,8 @@ const SUPPORTED_CDP_METHODS = new Set([
   "Page.getLayoutMetrics",
   "Page.getNavigationHistory",
   "Page.navigateToHistoryEntry",
+  "Page.getFrameTree",
+  "Page.createIsolatedWorld",
   "Page.setInterceptFileChooserDialog",
   "Input.dispatchMouseEvent",
   "Input.dispatchKeyEvent",
@@ -19,7 +22,9 @@ const SUPPORTED_CDP_METHODS = new Set([
   "Input.synthesizeScrollGesture",
   "DOM.getDocument",
   "DOM.querySelector",
+  "DOM.describeNode",
   "DOM.setFileInputFiles",
+  "Target.setAutoAttach",
 ]);
 
 const state = {
@@ -30,6 +35,7 @@ const state = {
   sessions: new Map(),
   deliverableGroupId: null,
   debuggerRefs: new Map(),
+  childSessions: new Map(),
 };
 
 function getSessionState(params = {}) {
@@ -483,9 +489,15 @@ async function executeCdpPrimitive(params) {
     error.code = "unsupported_method";
     throw error;
   }
-  return promisifyChrome((done) =>
-    chrome.debugger.sendCommand({ tabId }, params.method, params.commandParams ?? {}, done)
-  );
+  const target = resolveDebuggerSession(tabId, params.frameId, params.sessionId);
+  try {
+    return await sendDebuggerCommand(target, params.method, params.commandParams ?? {});
+  } catch (error) {
+    if (!params.frameId || target.sessionId) throw error;
+    const childSessionId = await waitForChildSession(tabId, params.frameId, 500);
+    if (!childSessionId) throw error;
+    return sendDebuggerCommand({ tabId, sessionId: childSessionId }, params.method, params.commandParams ?? {});
+  }
 }
 
 async function moveCursorPrimitive(params) {
@@ -518,6 +530,7 @@ async function attachDebugger(target) {
   }
   await promisifyChrome((done) => chrome.debugger.attach(target, "1.3", done));
   state.debuggerRefs.set(target.tabId, 1);
+  await configureAutoAttach(target);
 }
 
 async function detachDebugger(target) {
@@ -527,12 +540,81 @@ async function detachDebugger(target) {
     return;
   }
   state.debuggerRefs.delete(target.tabId);
+  state.childSessions.delete(target.tabId);
   return new Promise((resolve) => {
     chrome.debugger.detach(target, () => {
       void chrome.runtime.lastError;
       resolve();
     });
   });
+}
+
+async function configureAutoAttach(target) {
+  try {
+    await promisifyChrome((done) => chrome.debugger.sendCommand(target, "Target.setAutoAttach", {
+      autoAttach: true,
+      waitForDebuggerOnStart: false,
+      flatten: true,
+      filter: [{ type: "iframe", exclude: false }]
+    }, done));
+  } catch (error) {
+    console.warn("[agent-browser-bridge] OOPIF auto-attach unavailable", error);
+  }
+}
+
+function resolveDebuggerSession(tabId, frameId, sessionId) {
+  if (sessionId) return { tabId, sessionId };
+  if (frameId) {
+    const childSessionId = state.childSessions.get(tabId)?.get(frameId);
+    if (childSessionId) return { tabId, sessionId: childSessionId };
+  }
+  return { tabId };
+}
+
+function sendDebuggerCommand(target, method, commandParams = {}) {
+  return promisifyChrome((done) => chrome.debugger.sendCommand(target, method, commandParams, done));
+}
+
+async function waitForChildSession(tabId, frameId, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() <= deadline) {
+    const sessionId = state.childSessions.get(tabId)?.get(frameId);
+    if (sessionId) return sessionId;
+    await sleep(25);
+  }
+  return null;
+}
+
+async function rememberChildSession(source, params) {
+  if (!source.tabId || !params?.sessionId) return;
+  const childTarget = { tabId: source.tabId, sessionId: params.sessionId };
+  await configureAutoAttach(childTarget);
+  let frameId = params.targetInfo?.targetId;
+  try {
+    const tree = await promisifyChrome((done) => chrome.debugger.sendCommand(childTarget, "Page.getFrameTree", {}, done));
+    frameId = tree?.frameTree?.frame?.id ?? frameId;
+  } catch (error) {
+    console.warn("[agent-browser-bridge] failed to resolve OOPIF frame id", error);
+  }
+  if (!frameId) return;
+  let sessions = state.childSessions.get(source.tabId);
+  if (!sessions) {
+    sessions = new Map();
+    state.childSessions.set(source.tabId, sessions);
+  }
+  sessions.set(frameId, params.sessionId);
+  const targetId = params.targetInfo?.targetId;
+  if (targetId) sessions.set(targetId, params.sessionId);
+}
+
+function forgetChildSession(source, params) {
+  if (!source.tabId || !params?.sessionId) return;
+  const sessions = state.childSessions.get(source.tabId);
+  if (!sessions) return;
+  for (const [frameId, sessionId] of sessions) {
+    if (sessionId === params.sessionId) sessions.delete(frameId);
+  }
+  if (sessions.size === 0) state.childSessions.delete(source.tabId);
 }
 
 function assertSessionTab(session, tabId) {
@@ -693,8 +775,11 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.debugger.onEvent.addListener((source, method, params) => {
   if (!source.tabId) return;
+  if (method === "Target.attachedToTarget") void rememberChildSession(source, params);
+  if (method === "Target.detachedFromTarget") forgetChildSession(source, params);
   postNativeEvent("agent_browser_bridge.event.cdp", {
     tabId: source.tabId,
+    sessionId: source.sessionId,
     method,
     params: params ?? {}
   });
@@ -703,6 +788,7 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
 chrome.debugger.onDetach.addListener((source, reason) => {
   if (!source.tabId) return;
   state.debuggerRefs.delete(source.tabId);
+  state.childSessions.delete(source.tabId);
   postNativeEvent("agent_browser_bridge.event.debugger_detach", {
     tabId: source.tabId,
     reason
@@ -711,6 +797,7 @@ chrome.debugger.onDetach.addListener((source, reason) => {
 
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
   state.debuggerRefs.delete(tabId);
+  state.childSessions.delete(tabId);
   for (const session of state.sessions.values()) {
     session.ownedTabIds.delete(tabId);
     session.claimedTabIds.delete(tabId);

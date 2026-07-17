@@ -377,6 +377,8 @@ func enrichPreflight(result *preflightResult, actions []protocol.CommandAction, 
 		}
 		if selector, _ := params["selector"].(string); selector != "" {
 			result.Actions[index].Target = selector
+		} else if target, ok := params["target"].(map[string]any); ok {
+			result.Actions[index].Target = locatorTargetSummary(target)
 		}
 		if files, ok := params["files"].([]any); ok && len(files) > 0 {
 			names := make([]string, 0, len(files))
@@ -635,14 +637,14 @@ func executeGoHandler(handler string, params map[string]any, forward requestForw
 	case "go.locator.click", "go.locator.double_click":
 		var input struct {
 			TabID     int      `json:"tab_id"`
-			Selector  string   `json:"selector"`
 			Button    string   `json:"button"`
 			Modifiers []string `json:"modifiers"`
 		}
 		if err := decodeCommandParams(params, &input); err != nil {
 			return nil, protocol.ErrorInvalidParams, err
 		}
-		value, err := locatorEngine.Invoke(ctx, input.TabID, "point", map[string]any{"selector": input.Selector})
+		runtimeParams := locatorRuntimeParams(params)
+		value, err := locatorEngine.Invoke(ctx, input.TabID, "point", runtimeParams)
 		if err != nil {
 			return nil, protocol.ErrorCDPFailed, err
 		}
@@ -658,47 +660,45 @@ func executeGoHandler(handler string, params map[string]any, forward requestForw
 		return map[string]any{}, protocol.ErrorCDPFailed, err
 	case "go.locator.fill":
 		var input struct {
-			TabID    int    `json:"tab_id"`
-			Selector string `json:"selector"`
-			Value    string `json:"value"`
-			Replace  *bool  `json:"replace"`
+			TabID   int    `json:"tab_id"`
+			Value   string `json:"value"`
+			Replace *bool  `json:"replace"`
 		}
 		if err := decodeCommandParams(params, &input); err != nil {
 			return nil, protocol.ErrorInvalidParams, err
 		}
 		if input.Replace != nil && !*input.Replace {
-			if _, err := locatorEngine.Invoke(ctx, input.TabID, "focus", map[string]any{"selector": input.Selector}); err != nil {
+			if _, err := locatorEngine.Invoke(ctx, input.TabID, "focus", locatorRuntimeParams(params)); err != nil {
 				return nil, protocol.ErrorCDPFailed, err
 			}
 			err := engine.Type(ctx, input.TabID, input.Value)
 			return map[string]any{}, protocol.ErrorCDPFailed, err
 		}
-		result, err := locatorEngine.Invoke(ctx, input.TabID, "fill", map[string]any{"selector": input.Selector, "value": input.Value})
+		result, err := locatorEngine.Invoke(ctx, input.TabID, "fill", locatorRuntimeParams(params))
 		return result, protocol.ErrorCDPFailed, err
 	case "go.locator.press":
 		var input struct {
-			TabID    int      `json:"tab_id"`
-			Selector string   `json:"selector"`
-			Keys     []string `json:"keys"`
+			TabID int      `json:"tab_id"`
+			Keys  []string `json:"keys"`
 		}
 		if err := decodeCommandParams(params, &input); err != nil {
 			return nil, protocol.ErrorInvalidParams, err
 		}
-		if _, err := locatorEngine.Invoke(ctx, input.TabID, "focus", map[string]any{"selector": input.Selector}); err != nil {
+		if _, err := locatorEngine.Invoke(ctx, input.TabID, "focus", locatorRuntimeParams(params)); err != nil {
 			return nil, protocol.ErrorCDPFailed, err
 		}
 		err := engine.Keypress(ctx, input.TabID, input.Keys)
 		return map[string]any{}, protocol.ErrorCDPFailed, err
 	case "go.locator.set_checked":
 		var input struct {
-			TabID    int    `json:"tab_id"`
-			Selector string `json:"selector"`
-			Checked  bool   `json:"checked"`
+			TabID   int  `json:"tab_id"`
+			Checked bool `json:"checked"`
 		}
 		if err := decodeCommandParams(params, &input); err != nil {
 			return nil, protocol.ErrorInvalidParams, err
 		}
-		state, err := locatorEngine.Invoke(ctx, input.TabID, "set_checked", map[string]any{"selector": input.Selector, "checked": input.Checked})
+		runtimeParams := locatorRuntimeParams(params)
+		state, err := locatorEngine.Invoke(ctx, input.TabID, "set_checked", runtimeParams)
 		if err != nil {
 			return nil, protocol.ErrorCDPFailed, err
 		}
@@ -714,7 +714,7 @@ func executeGoHandler(handler string, params map[string]any, forward requestForw
 				return nil, protocol.ErrorCDPFailed, err
 			}
 		}
-		verified, err := locatorEngine.Invoke(ctx, input.TabID, "checked_state", map[string]any{"selector": input.Selector})
+		verified, err := locatorEngine.Invoke(ctx, input.TabID, "checked_state", runtimeParams)
 		if err != nil {
 			return nil, protocol.ErrorCDPFailed, err
 		}
@@ -731,7 +731,6 @@ func executeGoHandler(handler string, params map[string]any, forward requestForw
 	case "go.locator.scroll":
 		var input struct {
 			TabID     int     `json:"tab_id"`
-			Selector  string  `json:"selector"`
 			Direction string  `json:"direction"`
 			Amount    float64 `json:"amount"`
 		}
@@ -745,8 +744,8 @@ func executeGoHandler(handler string, params map[string]any, forward requestForw
 		if err != nil {
 			return nil, protocol.ErrorCDPFailed, err
 		}
-		if input.Selector != "" {
-			value, err := locatorEngine.Invoke(ctx, input.TabID, "point", map[string]any{"selector": input.Selector})
+		if hasLocatorTarget(params) {
+			value, err := locatorEngine.Invoke(ctx, input.TabID, "point", locatorRuntimeParams(params))
 			if err != nil {
 				return nil, protocol.ErrorCDPFailed, err
 			}
@@ -822,13 +821,12 @@ func executeGoHandler(handler string, params map[string]any, forward requestForw
 		return result, protocol.ErrorCDPFailed, err
 	case "go.locator.download_media":
 		var input struct {
-			TabID    int    `json:"tab_id"`
-			Selector string `json:"selector"`
+			TabID int `json:"tab_id"`
 		}
 		if err := decodeCommandParams(params, &input); err != nil {
 			return nil, protocol.ErrorInvalidParams, err
 		}
-		result, err := locatorEngine.Invoke(ctx, input.TabID, "download_media_selector", map[string]any{"selector": input.Selector})
+		result, err := locatorEngine.Invoke(ctx, input.TabID, "download_media_selector", locatorRuntimeParams(params))
 		return result, protocol.ErrorCDPFailed, err
 	case "go.locator.select_option", "go.locator.inner_text", "go.locator.text_content", "go.locator.all_text_contents", "go.locator.read_all", "go.locator.get_attribute", "go.locator.is_visible", "go.locator.is_enabled", "go.locator.count", "go.locator.wait_for", "go.locator.dom_snapshot", "go.locator.element_info":
 		var input struct {
@@ -1323,6 +1321,44 @@ func camelizeMap(input map[string]any) map[string]any {
 		result[snakeToCamel(key)] = camelizeValue(value)
 	}
 	return result
+}
+
+func locatorRuntimeParams(params map[string]any) map[string]any {
+	mapped := camelizeMap(params)
+	delete(mapped, "tabId")
+	delete(mapped, "button")
+	delete(mapped, "modifiers")
+	delete(mapped, "keys")
+	delete(mapped, "replace")
+	delete(mapped, "direction")
+	delete(mapped, "amount")
+	return mapped
+}
+
+func hasLocatorTarget(params map[string]any) bool {
+	selector, _ := params["selector"].(string)
+	if selector != "" {
+		return true
+	}
+	_, ok := params["target"].(map[string]any)
+	return ok
+}
+
+func locatorTargetSummary(target map[string]any) string {
+	kind, _ := target["kind"].(string)
+	role, _ := target["role"].(string)
+	name, _ := target["name"].(string)
+	value, _ := target["value"].(string)
+	if kind == "role" {
+		if name != "" {
+			return fmt.Sprintf("role=%s name=%q", role, name)
+		}
+		return "role=" + role
+	}
+	if value != "" {
+		return fmt.Sprintf("%s=%q", kind, value)
+	}
+	return kind
 }
 
 func camelizeValue(value any) any {

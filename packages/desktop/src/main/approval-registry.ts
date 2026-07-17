@@ -131,25 +131,19 @@ export class PendingApprovalRegistry implements ApprovalGate {
       return { ok: false, reason: "delete_file_only_allows_approve_once_or_deny" };
     }
 
-    clearTimeout(entry.timer);
-    this.pending.delete(requestId);
-
-    const resolvedDecision: ToolApprovalDecision = {
-      requestId,
-      decision,
-      decidedAt: Date.now(),
-    };
-
-    this.rememberBrowserDecision(entry.request, resolvedDecision, entry.sessionId, entry.turnId);
-    entry.resolve(resolvedDecision);
-    this.externalOnApprovalResolved?.(
-      entry.request,
-      resolvedDecision,
-      entry.sessionId,
-      entry.turnId,
-    );
+    this.resolveEntry(requestId, entry, decision);
 
     return { ok: true };
+  }
+
+  abortTurn(sessionId: string, turnId: string): number {
+    let count = 0;
+    for (const [id, entry] of this.pending) {
+      if (entry.sessionId !== sessionId || entry.turnId !== turnId) continue;
+      this.resolveEntry(id, entry, "abort");
+      count++;
+    }
+    return count;
   }
 
   listPending(sessionId?: string): PendingApprovalInfo[] {
@@ -174,16 +168,7 @@ export class PendingApprovalRegistry implements ApprovalGate {
     let count = 0;
     for (const [id, entry] of this.pending) {
       if (sessionId && entry.sessionId !== sessionId) continue;
-      clearTimeout(entry.timer);
-      this.pending.delete(id);
-      const decision: ToolApprovalDecision = {
-        requestId: id,
-        decision: "timeout",
-        decidedAt: Date.now(),
-      };
-      this.rememberBrowserDecision(entry.request, decision, entry.sessionId, entry.turnId);
-      entry.resolve(decision);
-      this.externalOnApprovalResolved?.(entry.request, decision, entry.sessionId, entry.turnId);
+      this.resolveEntry(id, entry, "timeout");
       count++;
     }
     return count;
@@ -208,12 +193,35 @@ export class PendingApprovalRegistry implements ApprovalGate {
     turnId: string,
   ): void {
     if (request.approvalScope !== "browser_session") return;
+    if (decision.decision === "abort") return;
     if (decision.decision === "approve_once" || decision.decision === "allow_similar") {
       this.browserAuthorizedSessions.add(sessionId);
       this.browserDeniedTurns.delete(browserTurnKey(sessionId, turnId));
       return;
     }
     this.browserDeniedTurns.add(browserTurnKey(sessionId, turnId));
+  }
+
+  private resolveEntry(
+    requestId: string,
+    entry: PendingEntry,
+    decision: ToolApprovalDecisionKind,
+  ): void {
+    clearTimeout(entry.timer);
+    this.pending.delete(requestId);
+    const resolvedDecision: ToolApprovalDecision = {
+      requestId,
+      decision,
+      decidedAt: Date.now(),
+    };
+    this.rememberBrowserDecision(entry.request, resolvedDecision, entry.sessionId, entry.turnId);
+    entry.resolve(resolvedDecision);
+    this.externalOnApprovalResolved?.(
+      entry.request,
+      resolvedDecision,
+      entry.sessionId,
+      entry.turnId,
+    );
   }
 }
 

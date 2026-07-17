@@ -197,7 +197,10 @@ export class KairosRunner {
 
     let runError: unknown = null;
     try {
-      await runAgentLoop(context, this.opts.llm, loopConfig, onEvent, this.opts.getAbortSignal?.());
+      const result = await runAgentLoop(context, this.opts.llm, loopConfig, onEvent, this.opts.getAbortSignal?.());
+      if (result.status === "aborted") {
+        throw new Error("Kairos tick aborted");
+      }
     } catch (err) {
       runError = err;
     }

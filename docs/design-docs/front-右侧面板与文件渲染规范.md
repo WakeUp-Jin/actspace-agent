@@ -8,7 +8,7 @@
 
 ## 文档范围
 
-本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、Tab 系统、文件渲染、Workspace 文件浏览、Context 完整只读视图、Reply HTML 和 HTML 沙箱安全。Review / Diff 的数据来源、baseline 和无 Git 工作区策略见 `core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `front-工作台布局与面板交互规范.md`；颜色硬约束见 `front-主题与配色规范.md`。
+本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件渲染、Workspace 文件浏览、Context 完整只读视图、Reply 和 HTML 沙箱安全。Review / Diff 的数据来源、baseline 和无 Git 工作区策略见 `core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `front-工作台布局与面板交互规范.md`；颜色硬约束见 `front-主题与配色规范.md`。
 
 ## 交互模型
 
@@ -20,6 +20,26 @@
 - 面板打开后允许调整宽度，关闭后把宽度归还给中间聊天区。
 - 首版关闭右侧面板时不保留右侧 rail。
 - 右侧 Tab 行位于隐藏标题栏 chrome 的同一高度区间，必须保证 tab 按钮能高于 `.chrome-center` 拖拽区接收点击；同时继续给右上角 PanelRight 按钮预留 padding，避免 tab 命中区压住关闭右侧面板入口。
+
+## 对象启动页（2026-07-17）
+
+右侧面板没有打开对象时，不默认塞入 Kairos 或其它业务 Tab，而是展示一个参考 Cursor 空面板入口密度的对象启动页。启动页只借用“方块入口 + 大留白”的形式，入口名称与数量由 Actspace 当前真实对象决定。
+
+当前固定展示五个入口：
+
+- `Files`：进入 Workspace 文件浏览态，不新增对象 Tab。
+- `Review`：打开当前 workspace 的 Git `Uncommitted` Review Tab。
+- `Context`：打开主 Agent 当前会话的完整只读上下文 Tab。
+- `Kairos`：打开聊天态 Kairos 紧凑状态 Tab。
+- `Reply`：打开当前会话生成过的可视化回复聚合视图；HTML 是当前内部渲染格式，不进入入口名称。
+
+布局与状态规则：
+
+- 默认宽度下使用两列：前四项组成 `2 × 2`，第五项 `Reply` 保持同尺寸并在第三行居中。
+- 卡片使用中性 surface、语义边框和统一 Lucide 线性图标；品牌蓝只用于 focus / 当前状态，不把五个入口做成五种彩色功能卡。
+- 关闭最后一个对象 Tab 后回到启动页；折叠面板时若仍有已打开对象，重新展开继续恢复原 Tab。
+- 启动页和右上角 `+` 菜单打开的是同一组对象语义，不能出现名称或行为漂移。
+- 启动页入口必须是键盘可达的原生按钮，具备明确 hover、pressed、focus-visible 和 disabled 状态。
 
 ## Tab 溢出处理（2026-05-30，参考 Cursor 编辑器标签）
 
@@ -42,17 +62,17 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `Review`：Git-first review diff；V1 默认展示当前 Git repository 的 uncommitted changes，Session / Last Turn 视角属于 V2。
 - `Kairos`：聊天态右侧紧凑状态视图；具体布局和数据边界见 `front-Kairos监控页规范.md`。
 - `Context`：完整只读上下文视图；见 `front-右侧面板与文件渲染规范.md`。
-- `Reply HTML`：当前会话已生成的可视化 HTML 文件浏览器（见下文）。
+- `Reply`：当前会话已生成的可视化回复浏览器（见下文）；内部当前由 HTML 产物承载。
 
 ## 「+ 新建对象」菜单（2026-05-30，2026-06-04 补 Review）
 
 - 隐藏标题栏 chrome 右段、右侧折叠（PanelRight）按钮**左侧**放一个 `+` 按钮（参考 Cursor 顶栏的 +）。
-- 点开是一个轻量菜单，可往右侧面板新增对象：`工作区文件` / `Review` / `Reply HTML` / `Kairos` / `Context`。对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；`工作区文件` 只切换工作区浏览态，不新增 Tab。
+- 点开是一个轻量菜单，可往右侧面板新增对象：`工作区文件` / `Review` / `Reply` / `Kairos` / `Context`。对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；`工作区文件` 只切换工作区浏览态，不新增 Tab。
 - `Review` 入口复用 Composer 的 Review 打开逻辑，默认打开当前 workspace 的 Git `Uncommitted` scope。
 - 菜单与右侧折叠按钮同属 chrome-right，`-webkit-app-region: no-drag`；Kairos 全屏页下与右侧折叠按钮一起隐藏。
 - **`+` 仅在右侧面板打开时显示**（`view === "chat" && isRightPanelOpen`）：`+` 的语义是「往面板里加对象」，面板关着时无意义；面板关闭时 chrome-right 只保留 PanelRight 折叠按钮。
 
-## Reply HTML 视图（2026-05-30，下拉选择器版）
+## Reply 视图（2026-05-30，下拉选择器版；2026-07-17 收口名称）
 
 把**当前会话**里通过「消息可视化」生成过的 HTML 聚合到一处（数据见 `front-右侧面板与文件渲染规范.md` 的缓存 sidecar）。**渲染区占满**，文件列表收进一个下拉选择器，不再用常驻侧栏挡住渲染图：
 
@@ -122,7 +142,7 @@ V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `lo
 呈现由当前 Tab 决定：
 
 - 激活工作区文件 Tab（文件类且有 `relativePath`）时进入 shell。
-- 激活对象 Tab（Kairos / Context / Reply HTML / 聊天生成 HTML 等）时退出 shell，整面板展示对象视图。
+- 激活对象 Tab（Kairos / Context / Reply / 聊天生成 HTML 等）时退出 shell，整面板展示对象视图。
 - `isFileTreeOpen` 表示显式进入浏览态；`isFileTreeCollapsed` 只折叠树栏，不关闭内容区。
 
 IPC 契约：
@@ -235,7 +255,7 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 - 缓存键 = `messageId | turnId` + `sourceHash`。
 - sidecar 存 HTML、sourceHash、model、generatedAt、usage 和派生 title。
 - renderer 点击 -> IPC -> main -> agent-core LLM 服务用主模型转换 -> main 写 sidecar -> renderer 打开 / 聚焦 HTML Tab。
-- `visualize:list({ sessionId })` 读取同一 sidecar，供 Reply HTML 聚合视图按 createdAt 倒序浏览本会话全部产物。
+- `visualize:list({ sessionId })` 读取同一 sidecar，供 Reply 聚合视图按 createdAt 倒序浏览本会话全部产物。
 - usage 计入使用统计；缓存命中不新增模型调用。
 
 生成提示词要求输出单个自包含 HTML 文档；如果模型输出 ```html 围栏，解析围栏内内容；解析失败不污染缓存。产物按半可信处理，一律走 HTML sandbox 路径，不因为「是自己模型生成的」就放宽权限。

@@ -67,6 +67,28 @@ describe("PendingApprovalRegistry", () => {
     });
   });
 
+  it("aborts all pending approvals for the stopped turn", async () => {
+    const onApprovalResolved = vi.fn();
+    const registry = new PendingApprovalRegistry({ onApprovalResolved });
+    registry.setCurrentTurn("session-abort", "turn-abort");
+    const request = makeRequest({ id: "approval-abort" });
+
+    const decisionPromise = registry.waitForDecision(request);
+    expect(registry.abortTurn("session-abort", "turn-abort")).toBe(1);
+
+    await expect(decisionPromise).resolves.toMatchObject({
+      requestId: request.id,
+      decision: "abort",
+    });
+    expect(registry.size).toBe(0);
+    expect(onApprovalResolved).toHaveBeenCalledWith(
+      request,
+      expect.objectContaining({ decision: "abort" }),
+      "session-abort",
+      "turn-abort",
+    );
+  });
+
   it("authorizes Browser Use once for the current session", async () => {
     const onApprovalRequired = vi.fn();
     const registry = new PendingApprovalRegistry({ onApprovalRequired });

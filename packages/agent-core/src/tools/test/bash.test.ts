@@ -415,6 +415,24 @@ describe("Bash executor", () => {
     expect(data.stdoutFilePath).toBeUndefined();
     expect(result.outputRef).toBeUndefined();
   });
+
+  it("kills a foreground command when the turn is aborted", async () => {
+    const workspace = await createWorkspace();
+    const controller = new AbortController();
+    const startedAt = Date.now();
+    const resultPromise = bashExecutor(
+      { command: "sleep 10", cwd: workspace, blockMs: 10_000 },
+      workspace,
+      {},
+      controller.signal,
+    );
+
+    setTimeout(() => controller.abort(), 20);
+    const result = await resultPromise;
+
+    expect(Date.now() - startedAt).toBeLessThan(2_000);
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("Bash tool registration", () => {

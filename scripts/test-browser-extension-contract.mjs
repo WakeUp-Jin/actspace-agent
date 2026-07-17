@@ -12,6 +12,10 @@ const source = readFileSync(path.join(extensionRoot, "src/background.js"), "utf8
 const manifest = JSON.parse(readFileSync(path.join(extensionRoot, "manifest.json"), "utf8"));
 const cursorSource = readFileSync(path.join(extensionRoot, "src/cursor-overlay.js"), "utf8");
 
+for (const method of ["Page.createIsolatedWorld", "DOM.describeNode", "Runtime.releaseObject"]) {
+  assert.ok(source.includes(`"${method}"`), `extension CDP primitive allowlist missing ${method}`);
+}
+
 assert.equal(manifest.name, "ActSpace Browser");
 assert.equal(manifest.action.default_title, "ActSpace Browser");
 assert.deepEqual(manifest.icons, {
@@ -26,7 +30,7 @@ const userTabs = [
   { id: 8, windowId: 1, title: "Eight", url: "https://other.test/", active: false, status: "complete" },
 ];
 let nextTabId = 9;
-const calls = { attach: 0, detach: 0, cdp: 0, close: 0, groups: [], groupUpdates: [], nativeMessages: [] };
+const calls = { attach: 0, detach: 0, cdp: 0, cdpCalls: [], close: 0, groups: [], groupUpdates: [], nativeMessages: [] };
 const event = () => {
   const listeners = [];
   return {
@@ -80,7 +84,15 @@ const chrome = {
   debugger: {
     attach: (_target, _version, done) => { calls.attach += 1; done(); },
     detach: (_target, done) => { calls.detach += 1; done(); },
-    sendCommand: (_target, _method, _params, done) => { calls.cdp += 1; done({ result: { value: true } }); },
+    sendCommand: (target, method, params, done) => {
+      calls.cdp += 1;
+      calls.cdpCalls.push({ target, method, params });
+      if (method === "Page.getFrameTree") {
+        done({ frameTree: { frame: { id: "child-frame" } } });
+        return;
+      }
+      done({ result: { value: true } });
+    },
     onEvent: event(),
     onDetach: event(),
   },
@@ -165,6 +177,7 @@ assert.deepEqual(Array.from(afterFinalize.result, (tab) => tab.id), [7]);
 const attached = await request("agent_browser_bridge.backend.attach", { tabId: 7 });
 assert.equal(attached.ok, true);
 assert.equal(calls.attach, 1);
+assert.equal(calls.cdpCalls.at(-1).method, "Target.setAutoAttach");
 
 const cdp = await request("agent_browser_bridge.backend.execute_cdp", {
   tabId: 7,
@@ -172,7 +185,22 @@ const cdp = await request("agent_browser_bridge.backend.execute_cdp", {
   commandParams: { expression: "1" },
 });
 assert.equal(cdp.ok, true);
-assert.equal(calls.cdp, 1);
+assert.equal(calls.cdpCalls.at(-1).method, "Runtime.evaluate");
+
+chrome.debugger.onEvent.emit(
+  { tabId: 7 },
+  "Target.attachedToTarget",
+  { sessionId: "child-session", targetInfo: { targetId: "child-target", type: "iframe" } },
+);
+await new Promise((resolve) => setTimeout(resolve, 0));
+const childCdp = await request("agent_browser_bridge.backend.execute_cdp", {
+  tabId: 7,
+  frameId: "child-frame",
+  method: "Runtime.evaluate",
+  commandParams: { expression: "document.title" },
+});
+assert.equal(childCdp.ok, true);
+assert.equal(calls.cdpCalls.at(-1).target.sessionId, "child-session");
 
 const deniedClose = await request("agent_browser_bridge.backend.tabs.close", { tabId: 8 });
 assert.equal(deniedClose.ok, false);

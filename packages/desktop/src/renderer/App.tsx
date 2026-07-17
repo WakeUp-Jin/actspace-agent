@@ -259,8 +259,8 @@ function getStreamingDeleteText(
   return `Delete ${fileLabel}`;
 }
 
-function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): MessageBlock {
-  const blockId = `streaming-tool-${toolCallId}`;
+function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, turnId?: string): MessageBlock {
+  const blockId = turnId ? `turn:${turnId}:tool:${toolCallId}` : `streaming-tool-${toolCallId}`;
 
   if (tool.preview?.kind === "bash") {
     return {
@@ -490,7 +490,7 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string): Mes
   };
 }
 
-function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
+function streamingStateToBlocks(state: StreamingState, turnId?: string): MessageBlock[] {
   const now = new Date().toISOString();
   const blocks: MessageBlock[] = [];
   let thinkingIdx = 0;
@@ -498,25 +498,27 @@ function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
 
   for (const seg of state.segments) {
     if (seg.type === "thinking") {
+      const index = thinkingIdx++;
       blocks.push({
         kind: "thinking",
-        id: `streaming-thinking-${thinkingIdx++}`,
+        id: turnId ? `turn:${turnId}:thinking:${index}` : `streaming-thinking-${index}`,
         title: "Thinking...",
         content: seg.text,
         createdAt: now,
         collapsedByDefault: false,
       });
     } else if (seg.type === "text") {
+      const index = textIdx++;
       blocks.push({
         kind: "assistant",
-        id: `streaming-assistant-${textIdx++}`,
+        id: turnId ? `turn:${turnId}:assistant:${index}` : `streaming-assistant-${index}`,
         content: seg.text,
         createdAt: now,
       });
     } else if (seg.type === "tool") {
       const tool = state.activeTools.get(seg.toolCallId);
       if (tool) {
-        blocks.push(toolEntryToBlock(seg.toolCallId, tool, now));
+        blocks.push(toolEntryToBlock(seg.toolCallId, tool, now, turnId));
       }
     } else if (seg.type === "compaction") {
       const block = state.activeCompactions.get(seg.turnId);
@@ -529,7 +531,9 @@ function streamingStateToBlocks(state: StreamingState): MessageBlock[] {
   if (state.retryNotice) {
     blocks.push({
       kind: "status",
-      id: `llm-retry-${state.retryNotice.attempt}`,
+      id: turnId
+        ? `turn:${turnId}:retry:${state.retryNotice.attempt}`
+        : `llm-retry-${state.retryNotice.attempt}`,
       content: `网关异常，正在重试 (${state.retryNotice.attempt}/${state.retryNotice.maxAttempts})`,
       createdAt: now,
       tone: "muted",
@@ -549,7 +553,7 @@ function createCompactionBlock(input: {
 }): Extract<MessageBlock, { kind: "context_compaction" }> {
   return {
     kind: "context_compaction",
-    id: `streaming-compaction-${input.turnId}`,
+    id: `turn:${input.turnId}:context-compaction:0`,
     status: input.status,
     trigger: input.trigger ?? "manual",
     stage: input.stage,
@@ -573,16 +577,6 @@ function upsertCompactionSegment(state: StreamingState, turnId: string): void {
 let turnCounter = 0;
 function nextTurnId(): string {
   return `turn-${Date.now()}-${++turnCounter}`;
-}
-
-function createStoppedBlock(turnId: string): MessageBlock {
-  return {
-    kind: "status",
-    id: `stopped-${turnId}`,
-    content: "Stopped",
-    createdAt: new Date().toISOString(),
-    tone: "muted",
-  };
 }
 
 export function App() {
@@ -610,6 +604,7 @@ export function App() {
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
   const toolFinishTimersRef = useRef<Map<string, number>>(new Map());
   const activeSessionIdRef = useRef<string | null>(null);
+  const activeStreamTurnRef = useRef<{ sessionId: string; turnId: string } | null>(null);
   const reviewRefreshRequestIdRef = useRef(0);
   const userPickedChatModelRef = useRef(false);
 
@@ -627,7 +622,10 @@ export function App() {
   }, [workspaceRegistry?.items]);
 
   const refreshStreamingBlocks = useCallback((userBlock?: MessageBlock | null) => {
-    const newStreamBlocks = streamingStateToBlocks(streamStateRef.current);
+    const newStreamBlocks = streamingStateToBlocks(
+      streamStateRef.current,
+      activeStreamTurnRef.current?.turnId,
+    );
     const currentUserBlock = userBlock ?? streamingUserBlockRef.current;
     setStreamingBlocks(currentUserBlock ? [currentUserBlock, ...newStreamBlocks] : newStreamBlocks);
   }, []);
@@ -807,7 +805,7 @@ export function App() {
     });
   }, []);
 
-  const handleStreamEvent = useCallback((event: RuntimeStreamEvent, streamSessionId = activeSessionIdRef.current) => {
+  const handleStreamEvent = useCallback((event: RuntimeStreamEvent) => {
     const state = streamStateRef.current;
 
     switch (event.type) {
@@ -973,8 +971,6 @@ export function App() {
       }
 
       case "tool_approval_required": {
-        const approvalSessionId = event.sessionId ?? streamSessionId;
-        setApprovalPendingForSession(approvalSessionId, true);
         const tool = state.activeTools.get(event.toolCallId);
         if (tool) {
           tool.approvalPending = true;
@@ -998,13 +994,6 @@ export function App() {
       }
 
       case "tool_approval_resolved": {
-        const approvalSessionId = event.sessionId ?? streamSessionId;
-        setApprovalPendingForSession(approvalSessionId, false);
-        if (approvalSessionId) {
-          refreshPendingApprovalStatuses([approvalSessionId]).catch((error: unknown) => {
-            console.error("Failed to refresh resolved approval status", error);
-          });
-        }
         const tool = state.activeTools.get(event.toolCallId);
         if (tool) {
           tool.approvalPending = false;
@@ -1022,18 +1011,61 @@ export function App() {
       }
 
       case "turn_finished":
-        setApprovalPendingForSession(event.sessionId, false);
-        setFailedForSession(event.sessionId, false);
+        return;
+
+      case "turn_aborted":
         return;
 
       case "turn_failed":
-        setApprovalPendingForSession(event.sessionId, false);
-        setFailedForSession(event.sessionId, true);
         return;
     }
 
     refreshStreamingBlocks();
-  }, [refreshPendingApprovalStatuses, refreshStreamingBlocks, setApprovalPendingForSession, setFailedForSession]);
+  }, [refreshStreamingBlocks]);
+
+  useEffect(() => {
+    if (!hasActspaceBridge()) return;
+
+    return window.actspace.onAgentStream((event) => {
+      if (event.type === "tool_approval_required") {
+        setApprovalPendingForSession(event.sessionId, true);
+      } else if (
+        event.type === "tool_approval_resolved" ||
+        event.type === "turn_aborted" ||
+        event.type === "turn_finished" ||
+        event.type === "turn_failed"
+      ) {
+        refreshPendingApprovalStatuses([event.sessionId]).catch((error: unknown) => {
+          console.error("Failed to refresh stream approval status", error);
+        });
+      }
+
+      if (event.type === "turn_finished" || event.type === "turn_aborted") {
+        setFailedForSession(event.sessionId, false);
+      } else if (event.type === "turn_failed") {
+        setFailedForSession(event.sessionId, true);
+      }
+
+      if (event.type === "bash_task_update") {
+        if (event.sessionId === activeSessionIdRef.current) {
+          handleStreamEvent(event);
+        }
+        return;
+      }
+
+      const activeTurn = activeStreamTurnRef.current;
+      if (
+        !activeTurn ||
+        event.sessionId !== activeTurn.sessionId ||
+        event.turnId !== activeTurn.turnId ||
+        event.sessionId !== activeSessionIdRef.current
+      ) {
+        return;
+      }
+
+      handleStreamEvent(event);
+    });
+  }, [handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession]);
 
   const createSessionForInput = useCallback(async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
     if (!hasActspaceBridge()) {
@@ -1136,6 +1168,7 @@ export function App() {
     setIsStreaming(true);
     setIsAborting(false);
     setActiveTurnId(turnId);
+    activeStreamTurnRef.current = { sessionId, turnId };
     setApprovalPendingForSession(sessionId, false);
     setFailedForSession(sessionId, false);
     clearToolFinishTimers();
@@ -1154,7 +1187,7 @@ export function App() {
     } else {
       const userBlock: MessageBlock = {
         kind: "user",
-        id: `user-${turnId}`,
+        id: `turn:${turnId}:user:0`,
         content: text,
         createdAt: new Date().toISOString(),
         attachments: options.attachments,
@@ -1164,14 +1197,29 @@ export function App() {
     }
     setSendScrollRequestId((value) => value + 1);
 
-    let unsubscribe: (() => void) | undefined;
-    if (hasActspaceBridge()) {
-      unsubscribe = window.actspace.onAgentStream((event) => {
-        handleStreamEvent(event, sessionId);
-      });
-    }
+    const isCurrentVisibleTurn = () => {
+      const activeTurn = activeStreamTurnRef.current;
+      return activeTurn?.sessionId === sessionId &&
+        activeTurn.turnId === turnId &&
+        activeSessionIdRef.current === sessionId;
+    };
 
-    let runWasAborted = false;
+    const finishCurrentVisibleTurn = () => {
+      if (!isCurrentVisibleTurn()) return false;
+
+      clearToolFinishTimers();
+      if (hasActspaceBridge()) {
+        void refreshReviewSummary(nextWorkspaceRoot);
+      }
+      activeStreamTurnRef.current = null;
+      setIsStreaming(false);
+      setIsAborting(false);
+      setActiveTurnId(null);
+      setStreamingBlocks([]);
+      streamStateRef.current = createEmptyStreamingState();
+      streamingUserBlockRef.current = null;
+      return true;
+    };
 
     try {
       if (hasActspaceBridge()) {
@@ -1182,21 +1230,26 @@ export function App() {
             model: options.model,
           };
           const result = await window.actspace.compactContext(input);
-          setApprovalPendingForSession(sessionId, false);
-          setFailedForSession(sessionId, result.status === "failed");
-          const restored = await window.actspace.getSession({ sessionId });
-          setSessionRecord(restored ?? {
-            meta: {
-              id: result.sessionId,
-              title: "New chat",
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              turnCount: sessionRecord?.meta.turnCount ?? 0,
-            },
-            events: result.events,
-            contextSnapshot: result.contextSnapshot,
-          });
-          setTurnResult(null);
+          if (isCurrentVisibleTurn()) {
+            setApprovalPendingForSession(sessionId, false);
+            setFailedForSession(sessionId, result.status === "failed");
+            const restored = await window.actspace.getSession({ sessionId });
+            if (isCurrentVisibleTurn()) {
+              setSessionRecord(restored ?? {
+                meta: {
+                  id: result.sessionId,
+                  title: "New chat",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  turnCount: sessionRecord?.meta.turnCount ?? 0,
+                },
+                events: result.events,
+                contextSnapshot: result.contextSnapshot,
+              });
+              setTurnResult(null);
+              finishCurrentVisibleTurn();
+            }
+          }
           const refreshed = await window.actspace.listSessions();
           setSessions(refreshed);
           return;
@@ -1212,48 +1265,45 @@ export function App() {
         };
         const result = await window.actspace.runTurn(input);
 
-        if (result.status === "aborted") {
-          runWasAborted = true;
-          setApprovalPendingForSession(sessionId, false);
-          setStreamingBlocks((current) => [...current, createStoppedBlock(turnId)]);
-        } else {
+        if (isCurrentVisibleTurn()) {
           setApprovalPendingForSession(sessionId, false);
           setFailedForSession(sessionId, result.status === "failed");
           const restored = await window.actspace.getSession({ sessionId });
-          setSessionRecord(restored ?? {
-            meta: {
-              id: result.sessionId,
-              title: "New chat",
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              turnCount: 1,
-            },
-            events: result.events,
-            contextSnapshot: result.contextSnapshot,
-          });
+          if (isCurrentVisibleTurn()) {
+            setSessionRecord(restored ?? {
+              meta: {
+                id: result.sessionId,
+                title: "New chat",
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                turnCount: 1,
+              },
+              events: result.events,
+              contextSnapshot: result.contextSnapshot,
+            });
+            setTurnResult(null);
+            finishCurrentVisibleTurn();
+          }
         }
-        setTurnResult(null);
         const refreshed = await window.actspace.listSessions();
         setSessions(refreshed);
       }
     } catch (error) {
       console.error("Failed to run turn", error);
-      setApprovalPendingForSession(sessionId, false);
-      setFailedForSession(sessionId, true);
+      if (isCurrentVisibleTurn()) {
+        setApprovalPendingForSession(sessionId, false);
+        setFailedForSession(sessionId, true);
+      } else {
+        const activeTurn = activeStreamTurnRef.current;
+        if (!activeTurn || activeTurn.sessionId !== sessionId) {
+          setFailedForSession(sessionId, true);
+        }
+        refreshPendingApprovalStatuses([sessionId]).catch((refreshError: unknown) => {
+          console.error("Failed to refresh approval status after background turn error", refreshError);
+        });
+      }
     } finally {
-      unsubscribe?.();
-      clearToolFinishTimers();
-      if (hasActspaceBridge()) {
-        void refreshReviewSummary(nextWorkspaceRoot);
-      }
-      setIsStreaming(false);
-      setIsAborting(false);
-      setActiveTurnId(null);
-      if (!runWasAborted) {
-        setStreamingBlocks([]);
-      }
-      streamStateRef.current = createEmptyStreamingState();
-      streamingUserBlockRef.current = null;
+      finishCurrentVisibleTurn();
     }
   }, [
     isStreaming,
@@ -1262,10 +1312,9 @@ export function App() {
     refreshWorkspaces,
     sessionRecord?.meta.workspaceRoot,
     bootstrapState?.workspaceRoot,
-    handleStreamEvent,
-    refreshStreamingBlocks,
     clearToolFinishTimers,
     refreshReviewSummary,
+    refreshPendingApprovalStatuses,
     setApprovalPendingForSession,
     setFailedForSession,
     createSessionForInput,
@@ -1282,7 +1331,10 @@ export function App() {
 
     try {
       setIsAborting(true);
-      await window.actspace.abortTurn(input);
+      const aborted = await window.actspace.abortTurn(input);
+      if (!aborted) {
+        setIsAborting(false);
+      }
     } catch (error) {
       console.error("Failed to abort turn", error);
       setIsAborting(false);
@@ -1290,6 +1342,10 @@ export function App() {
   }, [activeTurnId]);
 
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
+    activeStreamTurnRef.current = null;
+    setIsStreaming(false);
+    setIsAborting(false);
+    setActiveTurnId(null);
     setTurnResult(null);
     setStreamingBlocks([]);
     clearToolFinishTimers();
@@ -1322,7 +1378,10 @@ export function App() {
     async (sessionId: string) => {
       if (!sessionId || sessionId === activeSessionIdRef.current) return;
 
+      activeStreamTurnRef.current = null;
       setIsStreaming(false);
+      setIsAborting(false);
+      setActiveTurnId(null);
       setStreamingBlocks([]);
       clearToolFinishTimers();
       streamStateRef.current = createEmptyStreamingState();
@@ -1362,13 +1421,28 @@ export function App() {
 
   const persistedEvents = sessionRecord?.events ?? turnResult?.events ?? [];
   const persistedMessages = useMemo<MessageBlock[]>(() => {
+    const streamingTurnId = streamingBlocks.length > 0 ? activeTurnId : null;
+    const streamingTurnEventIds = streamingTurnId
+      ? new Set(
+          persistedEvents
+            .filter((event) => event.turnId === streamingTurnId)
+            .map((event) => event.id),
+        )
+      : null;
     const fromRecord = sessionRecord?.messageBlocks;
-    if (fromRecord && fromRecord.length > 0) return fromRecord;
+    if (fromRecord && fromRecord.length > 0) {
+      return streamingTurnEventIds
+        ? fromRecord.filter((block) => !streamingTurnEventIds.has(block.id))
+        : fromRecord;
+    }
 
-    const fromEvents = createMessageBlocks(persistedEvents);
+    const visibleEvents = streamingTurnId
+      ? persistedEvents.filter((event) => event.turnId !== streamingTurnId)
+      : persistedEvents;
+    const fromEvents = createMessageBlocks(visibleEvents);
     if (fromEvents.length > 0) return fromEvents;
     return [];
-  }, [persistedEvents, sessionRecord?.messageBlocks]);
+  }, [activeTurnId, persistedEvents, sessionRecord?.messageBlocks, streamingBlocks.length]);
 
   const messages = useMemo<MessageBlock[]>(() => {
     const merged = streamingBlocks.length === 0 ? persistedMessages : [...persistedMessages, ...streamingBlocks];

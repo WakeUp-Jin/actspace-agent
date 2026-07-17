@@ -48,7 +48,8 @@ func paginatedValuesResult(values Schema) Schema {
 var (
 	tabID              = integerProperty("Target Chrome tab id.")
 	timeoutMS          = integerProperty("Timeout in milliseconds.")
-	selector           = stringProperty("CSS selector interpreted by the Locator subset.")
+	selector           = stringProperty("Legacy CSS selector. Prefer the structured target object for semantic locators.")
+	locatorTarget      = locatorTargetSchema(true)
 	nodeID             = stringProperty("Node id returned by browser_dom snapshot.")
 	keys               = arrayProperty("Key chord or key sequence.", stringProperty("Key name."))
 	modifiers          = arrayProperty("Optional keyboard modifiers.", stringProperty("Modifier name."))
@@ -66,13 +67,28 @@ func tabTimeoutSchema() Schema {
 }
 
 func selectorSchema(extra map[string]Schema, required ...string) Schema {
-	properties := map[string]Schema{"tab_id": tabID, "selector": selector, "timeout_ms": timeoutMS}
+	properties := map[string]Schema{"tab_id": tabID, "selector": selector, "target": locatorTarget, "timeout_ms": timeoutMS}
 	for key, value := range extra {
 		properties[key] = value
 	}
-	baseRequired := []string{"tab_id", "selector"}
+	baseRequired := []string{"tab_id"}
 	baseRequired = append(baseRequired, required...)
 	return object(baseRequired, properties)
+}
+
+func locatorTargetSchema(includeFramePath bool) Schema {
+	properties := map[string]Schema{
+		"kind":  enumProperty("Locator strategy.", "css", "role", "text", "label", "placeholder", "test_id"),
+		"value": stringProperty("Strategy value for css, text, label, placeholder, or test_id."),
+		"role":  stringProperty("ARIA or implicit role for a role locator."),
+		"name":  stringProperty("Accessible name matcher for a role locator."),
+		"exact": booleanProperty("Use exact normalized text matching."),
+	}
+	if includeFramePath {
+		frameTarget := locatorTargetSchema(false)
+		properties["frame_path"] = arrayProperty("Ordered iframe locator path before resolving the leaf target.", frameTarget)
+	}
+	return object([]string{"kind"}, properties)
 }
 
 func pointSchema(extra map[string]Schema, required ...string) Schema {

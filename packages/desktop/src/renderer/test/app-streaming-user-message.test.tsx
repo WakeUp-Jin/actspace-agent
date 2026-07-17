@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AppSettings, BootstrapState, CompactContextInput, ReviewGetWorkspaceChangesResult, RunTurnInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
+import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { TooltipProvider } from "../components/ui/Tooltip";
@@ -536,6 +537,295 @@ describe("App streaming user message", () => {
     });
   });
 
+  it("routes overlapping turns through one stream listener without duplicating or clearing the visible turn", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      writable: true,
+      value: vi.fn(),
+    });
+    const alphaSessionId = "session-overlap-alpha";
+    const betaSessionId = "session-overlap-beta";
+    const alphaRecord = createEmptySessionRecord(alphaSessionId);
+    alphaRecord.meta.title = "Alpha chat";
+    const betaRecord = createEmptySessionRecord(betaSessionId);
+    betaRecord.meta.title = "Beta chat";
+    const records: Record<string, SessionRecord> = {
+      [alphaSessionId]: alphaRecord,
+      [betaSessionId]: betaRecord,
+    };
+    const sessions: SessionListItem[] = [
+      {
+        id: alphaSessionId,
+        title: alphaRecord.meta.title,
+        updatedAt: "2026-07-17T07:10:00.000Z",
+        turnCount: 0,
+      },
+      {
+        id: betaSessionId,
+        title: betaRecord.meta.title,
+        updatedAt: "2026-07-17T07:09:00.000Z",
+        turnCount: 0,
+      },
+    ];
+    const streamListeners = new Set<(event: RuntimeStreamEvent) => void>();
+    const turnIds = new Map<string, string>();
+    const resolveTurns = new Map<string, () => void>();
+    const emit = (event: RuntimeStreamEvent) => {
+      for (const listener of streamListeners) listener(event);
+    };
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listSessions: async () => sessions,
+      getSession: async ({ sessionId }) => records[sessionId] ?? null,
+      createSession: async () => alphaRecord,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      getKimiBalance: async () => ({
+        provider: "kimi",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      onAgentStream: (callback) => {
+        streamListeners.add(callback);
+        return () => {
+          streamListeners.delete(callback);
+        };
+      },
+      runTurn: (input: RunTurnInput) => new Promise((resolve) => {
+        turnIds.set(input.sessionId, input.turnId);
+        emit({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+        if (input.sessionId === betaSessionId) {
+          emit({
+            type: "assistant_text_delta",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
+            messageId: "evt-beta-text",
+            delta: "beta streamed once",
+          });
+        }
+        resolveTurns.set(input.sessionId, () => resolve({
+          sessionId: input.sessionId,
+          turnId: input.turnId,
+          status: "completed" as const,
+          events: [],
+          contextSnapshot: {
+            totalTokens: 0,
+            maxTokens: 200_000,
+            percentUsed: 0,
+            buckets: [],
+          },
+          contextState: null,
+        }));
+      }),
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "alpha prompt");
+    await userEvent.click(screen.getByLabelText("Send message"));
+    await waitFor(() => {
+      expect(turnIds.has(alphaSessionId)).toBe(true);
+      expect(streamListeners.size).toBe(1);
+    });
+
+    const betaTitle = await screen.findByText("Beta chat");
+    await userEvent.click(betaTitle.closest("button") as HTMLButtonElement);
+
+    const betaComposer = await screen.findByLabelText("Message composer");
+    await userEvent.type(betaComposer, "beta prompt");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    expect(await screen.findByText("beta streamed once")).toBeInTheDocument();
+    expect(screen.queryByText("beta streamed oncebeta streamed once")).toBeNull();
+    expect(streamListeners.size).toBe(1);
+
+    const alphaTurnId = turnIds.get(alphaSessionId)!;
+    await act(async () => {
+      emit({
+        type: "assistant_text_delta",
+        sessionId: alphaSessionId,
+        turnId: alphaTurnId,
+        messageId: "evt-stale-alpha",
+        delta: "stale alpha text",
+      });
+    });
+    expect(screen.queryByText("stale alpha text")).toBeNull();
+
+    await act(async () => {
+      resolveTurns.get(alphaSessionId)?.();
+    });
+    expect(await screen.findByText("beta streamed once")).toBeInTheDocument();
+    expect(screen.getByLabelText("Stop agent")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveTurns.get(betaSessionId)?.();
+    });
+  });
+
+  it("hands the visible turn from streaming to persistence without duplicating or remounting it", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      writable: true,
+      value: vi.fn(),
+    });
+    const sessionId = "session-stream-handoff";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "New chat",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+    let currentRecord = record;
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+      null;
+    let resolveFinalSessionList: ((value: SessionListItem[]) => void) | null = null;
+    let listSessionsCallCount = 0;
+    const getSession = vi.fn(async () => currentRecord);
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listSessions: () => {
+        listSessionsCallCount += 1;
+        if (listSessionsCallCount === 1) return Promise.resolve(sessions);
+        return new Promise((resolve) => {
+          resolveFinalSessionList = resolve;
+        });
+      },
+      getSession,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      getKimiBalance: async () => ({
+        provider: "kimi",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) streamHandler = null;
+        };
+      },
+      runTurn: (input: RunTurnInput) =>
+        new Promise((resolve) => {
+          streamHandler?.({ type: "turn_started", sessionId, turnId: input.turnId });
+          streamHandler?.({
+            type: "assistant_text_delta",
+            sessionId,
+            turnId: input.turnId,
+            messageId: "evt-stream-delta",
+            delta: "handoff reply",
+          });
+          const timestamp = new Date().toISOString();
+          const events: SessionEvent[] = [
+            {
+              id: "evt-handoff-user",
+              sessionId,
+              turnId: input.turnId,
+              type: "user_message",
+              timestamp,
+              schemaVersion: 1,
+              payload: { content: "handoff prompt" },
+            },
+            {
+              id: "evt-handoff-assistant",
+              sessionId,
+              turnId: input.turnId,
+              type: "assistant_message",
+              timestamp,
+              schemaVersion: 1,
+              payload: {
+                content: "handoff reply",
+                stopReason: "stop",
+                model: "test-model",
+                provider: "test-provider",
+              },
+            },
+          ];
+          currentRecord = {
+            ...record,
+            meta: { ...record.meta, updatedAt: timestamp, turnCount: 1 },
+            events,
+            messageBlocks: createMessageBlocks(events),
+          };
+          resolveRunTurn = resolve;
+        }),
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "handoff prompt");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    const streamingUserNode = (await screen.findByText("handoff prompt")).closest(".message-turn");
+    const streamingAssistantNode = (await screen.findByText("handoff reply")).closest(".assistant-reply");
+    expect(streamingUserNode).not.toBeNull();
+    expect(streamingAssistantNode).not.toBeNull();
+
+    await act(async () => {
+      resolveRunTurn?.({
+        sessionId,
+        turnId: currentRecord.events[0].turnId,
+        status: "completed",
+        events: currentRecord.events,
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      });
+    });
+
+    await waitFor(() => {
+      expect(getSession).toHaveBeenCalledTimes(2);
+      expect(listSessionsCallCount).toBe(2);
+    });
+
+    expect(screen.getAllByText("handoff prompt")).toHaveLength(1);
+    expect(screen.getAllByText("handoff reply")).toHaveLength(1);
+    expect(screen.getByText("handoff prompt").closest(".message-turn")).toBe(streamingUserNode);
+    expect(screen.getByText("handoff reply").closest(".assistant-reply")).toBe(streamingAssistantNode);
+
+    await act(async () => {
+      resolveFinalSessionList?.(sessions);
+    });
+  });
+
   it("keeps the selected model after creating a new session and switching composer surfaces", async () => {
     const sessionId = "session-created-model";
     const record = createEmptySessionRecord(sessionId);
@@ -775,6 +1065,8 @@ describe("App streaming user message", () => {
           streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
           streamHandler?.({
             type: "tool_started",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
             toolCallId: "tool-read-1",
             toolName: "read_file",
             argsPreview: "{\"path\":\"src/main.ts\"}",
@@ -882,6 +1174,8 @@ describe("App streaming user message", () => {
           streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
           streamHandler?.({
             type: "tool_call_streaming",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
             toolCallId: "tool-agent-1",
             toolName: "agent",
             isInitial: true,
@@ -895,6 +1189,8 @@ describe("App streaming user message", () => {
           });
           streamHandler?.({
             type: "subagent_event",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
             toolCallId: "tool-agent-1",
             transcriptRef: {
               kind: "subagent_transcript",
@@ -1295,6 +1591,8 @@ describe("App streaming user message", () => {
           streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
           streamHandler?.({
             type: "tool_started",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
             toolCallId: "tool-web-search-1",
             toolName: "web_search",
             argsPreview: "{\"query\":\"最新新闻 今天\"}",
@@ -1390,6 +1688,8 @@ describe("App streaming user message", () => {
           streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
           streamHandler?.({
             type: "tool_started",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
             toolCallId: "tool-grep-1",
             toolName: "grep",
             argsPreview: "{\"pattern\":\"ToolUiPreview\",\"glob\":\"*.ts\"}",
@@ -1402,6 +1702,8 @@ describe("App streaming user message", () => {
           });
           streamHandler?.({
             type: "tool_started",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
             toolCallId: "tool-glob-1",
             toolName: "glob",
             argsPreview: "{\"pattern\":\"src/**/*.ts\",\"path\":\"packages/agent-core\"}",
@@ -1456,6 +1758,7 @@ describe("App streaming user message", () => {
     ];
 
     let approvalPending = false;
+    let activeTurnId = "";
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
       null;
@@ -1506,9 +1809,12 @@ describe("App streaming user message", () => {
       },
       runTurn: (input: RunTurnInput) =>
         new Promise((resolve) => {
+          activeTurnId = input.turnId;
           streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
           streamHandler?.({
             type: "tool_started",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
             toolCallId: "tool-bash-approval",
             toolName: "bash",
             argsPreview: "{\"command\":\"pnpm install\"}",
@@ -1523,6 +1829,8 @@ describe("App streaming user message", () => {
           approvalPending = true;
           streamHandler?.({
             type: "tool_approval_required",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
             toolCallId: "tool-bash-approval",
             toolName: "bash",
             requestId: "approval-bash-1",
@@ -1546,6 +1854,8 @@ describe("App streaming user message", () => {
       approvalPending = false;
       streamHandler?.({
         type: "tool_approval_resolved",
+        sessionId,
+        turnId: activeTurnId,
         toolCallId: "tool-bash-approval",
         requestId: "approval-bash-1",
         decision: "approve_once",
@@ -1579,6 +1889,7 @@ describe("App streaming user message", () => {
     ];
 
     let approvalPending = false;
+    let activeTurnId = "";
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
       null;
@@ -1629,9 +1940,12 @@ describe("App streaming user message", () => {
       },
       runTurn: (input: RunTurnInput) =>
         new Promise((resolve) => {
+          activeTurnId = input.turnId;
           streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
           streamHandler?.({
             type: "tool_call_streaming",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
             toolCallId: "tool-delete-1",
             toolName: "delete_file",
             isInitial: true,
@@ -1645,6 +1959,8 @@ describe("App streaming user message", () => {
           approvalPending = true;
           streamHandler?.({
             type: "tool_approval_required",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
             toolCallId: "tool-delete-1",
             toolName: "delete_file",
             requestId: "approval-delete-1",
@@ -1678,6 +1994,8 @@ describe("App streaming user message", () => {
       approvalPending = false;
       streamHandler?.({
         type: "tool_approval_resolved",
+        sessionId,
+        turnId: activeTurnId,
         toolCallId: "tool-delete-1",
         requestId: "approval-delete-1",
         decision: "approve_once",
@@ -1687,6 +2005,8 @@ describe("App streaming user message", () => {
     await act(async () => {
       streamHandler?.({
         type: "tool_finished",
+        sessionId,
+        turnId: activeTurnId,
         toolCallId: "tool-delete-1",
         toolName: "delete_file",
         resultEventId: "evt-delete-result",
@@ -1766,6 +2086,8 @@ describe("App streaming user message", () => {
           streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
           streamHandler?.({
             type: "tool_started",
+            sessionId: input.sessionId,
+            turnId: input.turnId,
             toolCallId: "tool-browser-1",
             toolName: "browser_tabs",
             argsPreview: '{"action":"list"}',
@@ -1962,6 +2284,8 @@ describe("App streaming user message", () => {
   it("switches the send button into a stop button and calls abortTurn while streaming", async () => {
     const sessionId = "session-abort";
     const record = createEmptySessionRecord(sessionId);
+    let currentRecord = record;
+    const getSessionMock = vi.fn(async () => currentRecord);
     const sessions: SessionListItem[] = [
       {
         id: sessionId,
@@ -1979,7 +2303,7 @@ describe("App streaming user message", () => {
     window.actspace = {
       getBootstrapState: async () => bootstrapState,
       listSessions: async () => sessions,
-      getSession: async () => record,
+      getSession: getSessionMock,
       createSession: async () => record,
       abortTurn: abortTurnMock,
       submitApproval: async () => ({ ok: true }),
@@ -2030,11 +2354,38 @@ describe("App streaming user message", () => {
     });
 
     await act(async () => {
+      const timestamp = new Date().toISOString();
+      const events: SessionEvent[] = [
+        {
+          id: "evt-user-abort",
+          sessionId,
+          turnId: "turn-abort-finished",
+          type: "user_message",
+          timestamp,
+          schemaVersion: 1,
+          payload: { content: "stop me" },
+        },
+        {
+          id: "evt-turn-aborted",
+          sessionId,
+          turnId: "turn-abort-finished",
+          type: "turn_aborted",
+          timestamp,
+          schemaVersion: 1,
+          payload: { reason: "user" },
+        },
+      ];
+      currentRecord = {
+        ...record,
+        meta: { ...record.meta, updatedAt: timestamp, turnCount: 1 },
+        events,
+      };
+      streamHandler?.({ type: "turn_aborted", sessionId, turnId: "turn-abort-finished" });
       resolveRunTurn?.({
         sessionId,
         turnId: "turn-abort-finished",
         status: "aborted",
-        events: [],
+        events,
         contextSnapshot: {
           totalTokens: 0,
           maxTokens: 200_000,
@@ -2047,5 +2398,7 @@ describe("App streaming user message", () => {
 
     expect(await screen.findByText("stop me")).toBeTruthy();
     expect(await screen.findByText("Stopped")).toBeTruthy();
+    expect((screen.getByLabelText("Message composer") as HTMLTextAreaElement).disabled).toBe(false);
+    expect(getSessionMock).toHaveBeenCalledTimes(2);
   });
 });

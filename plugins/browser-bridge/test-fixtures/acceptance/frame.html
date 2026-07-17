@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Browser Bridge Cross-Origin Frame</title>
+  <style>
+    body { margin: 0; padding: 24px; font-family: system-ui, sans-serif; background: #f8fafc; }
+    button { padding: 10px 16px; border: 0; border-radius: 8px; background: #2563eb; color: white; cursor: pointer; }
+    p { margin: 14px 0 0; }
+  </style>
+</head>
+<body>
+  <button id="frame-action" type="button" aria-label="Frame action">Run frame action</button>
+  <p id="frame-status">frame-idle</p>
+  <script>
+    document.querySelector("#frame-action").addEventListener("click", () => {
+      document.querySelector("#frame-status").textContent = "frame-clicked";
+    });
+  </script>
+</body>
+</html>

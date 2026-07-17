@@ -70,6 +70,10 @@ function getOptionalString(record: Record<string, unknown>, key: string): string
   return typeof value === "string" ? value : undefined;
 }
 
+function withRenderKey(block: MessageBlock, renderKey: string): MessageBlock {
+  return { ...block, renderKey };
+}
+
 function legacyToolResultBlock(event: SessionEvent, payload: Record<string, unknown>): MessageBlock {
   const toolName = getOptionalString(payload, "toolName") ?? "Tool";
   const summary = getOptionalString(payload, "summary");
@@ -294,6 +298,18 @@ function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
 }
 
 export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
+  const renderKeyCounters = new Map<string, number>();
+  const nextRenderKey = (event: SessionEvent, slot: string, stableIdentity?: string): string => {
+    if (stableIdentity) {
+      return `turn:${event.turnId}:${slot}:${stableIdentity}`;
+    }
+
+    const counterKey = `${event.turnId}:${slot}`;
+    const index = renderKeyCounters.get(counterKey) ?? 0;
+    renderKeyCounters.set(counterKey, index + 1);
+    return `turn:${event.turnId}:${slot}:${index}`;
+  };
+
   return events.flatMap((event): MessageBlock[] => {
     switch (event.type) {
       case "user_message": {
@@ -307,6 +323,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
           {
             kind: "user",
             id: event.id,
+            renderKey: nextRenderKey(event, "user"),
             content: payload.content,
             createdAt: getDisplayTime(event.timestamp),
             attachments: payload.attachments
@@ -320,6 +337,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
           {
             kind: "assistant",
             id: event.id,
+            renderKey: nextRenderKey(event, "assistant"),
             content: payload.content,
             createdAt: getDisplayTime(event.timestamp),
             model: payload.model,
@@ -333,6 +351,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
           {
             kind: "thinking",
             id: event.id,
+            renderKey: nextRenderKey(event, "thinking"),
             title: payload.title ?? "Thinking",
             content: payload.content,
             createdAt: getDisplayTime(event.timestamp),
@@ -343,16 +362,23 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
       case "tool_result": {
         const payload: Record<string, unknown> = isRecord(event.payload) ? event.payload : {};
         const preview = payload.uiPreview;
+        const renderKey = nextRenderKey(event, "tool", getOptionalString(payload, "toolCallId"));
         if (!isToolUiPreview(preview)) {
-          return [legacyToolResultBlock(event, payload)];
+          return [withRenderKey(legacyToolResultBlock(event, payload), renderKey)];
         }
 
-        return [messageBlockFromToolPreview(event.id, event.timestamp, preview, payload.ok === false)];
+        return [withRenderKey(
+          messageBlockFromToolPreview(event.id, event.timestamp, preview, payload.ok === false),
+          renderKey,
+        )];
       }
       case "diff_preview": {
         const preview = event.payload;
         if (!isToolUiPreview(preview)) return [];
-        return [messageBlockFromToolPreview(event.id, event.timestamp, preview)];
+        return [withRenderKey(
+          messageBlockFromToolPreview(event.id, event.timestamp, preview),
+          nextRenderKey(event, "tool-preview"),
+        )];
       }
       case "error": {
         const payload = event.payload as ErrorPayload;
@@ -360,6 +386,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
           {
             kind: "error",
             id: event.id,
+            renderKey: nextRenderKey(event, "error"),
             title: payload.code,
             content: payload.message,
             createdAt: getDisplayTime(event.timestamp),
@@ -367,12 +394,25 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
           }
         ];
       }
+      case "turn_aborted":
+        return [
+          {
+            kind: "status",
+            id: event.id,
+            renderKey: nextRenderKey(event, "status"),
+            content: "Stopped",
+            createdAt: getDisplayTime(event.timestamp),
+            tone: "muted",
+          },
+        ];
       case "tool_call":
       case "llm_usage":
       case "context_snapshot":
         return [];
       case "context_compaction":
-        return contextCompactionBlock(event);
+        return contextCompactionBlock(event).map((block) =>
+          withRenderKey(block, nextRenderKey(event, "context-compaction")),
+        );
       // Kairos 自治模式专属事件不出现在主 Agent 消息流中；若历史 session 偶然包含也直接跳过。
       case "kairos_tick_injected":
       case "kairos_sleep_start":

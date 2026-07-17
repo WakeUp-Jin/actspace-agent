@@ -49,6 +49,7 @@ const WRITE_TOOL_NAMES = new Set(["write_file", "edit_file", "delete_file"]);
 /** LLM 可重试错误的默认策略：最多 2 次重试（共 3 次尝试），退避 1s → 3s */
 const DEFAULT_LLM_RETRY_MAX = 2;
 const DEFAULT_LLM_RETRY_BACKOFF_MS = [1000, 3000];
+const DEFAULT_MAX_TURNS = 200;
 
 // ─── 核心循环入口 ───
 
@@ -65,16 +66,27 @@ export async function runAgentLoop(
 
   await emit({ type: "agent_start" });
 
-  await runDualLoop(context, newMessages, totalUsage, usageCalls, llm, config, emit, signal);
+  const outcome = await runDualLoop(context, newMessages, totalUsage, usageCalls, llm, config, emit, signal);
 
   await emit({ type: "agent_end", messages: newMessages });
 
-  const lastAssistant = findLastAssistant(newMessages);
+  const latestAssistant = findLastAssistant(newMessages);
+  const lastAssistant = outcome === "exhausted" && latestAssistant
+    ? createMaxTurnsMessage(latestAssistant, config.maxTurns ?? DEFAULT_MAX_TURNS)
+    : latestAssistant ?? (outcome === "aborted" ? createAbortedMessage() : undefined);
   if (!lastAssistant) {
     throw new Error("Agent loop ended without producing an assistant message");
   }
 
-  return { message: lastAssistant, totalUsage, usageCalls, messages: newMessages };
+  return {
+    status: outcome === "aborted"
+      ? "aborted"
+      : outcome === "exhausted" || lastAssistant.stopReason === "error" ? "failed" : "completed",
+    message: lastAssistant,
+    totalUsage,
+    usageCalls,
+    messages: newMessages,
+  };
 }
 
 // ─── 双层循环 ───
@@ -88,19 +100,21 @@ async function runDualLoop(
   config: AgentLoopConfig,
   emit: AgentEventSink,
   signal?: AbortSignal,
-): Promise<void> {
+): Promise<"completed" | "aborted" | "exhausted"> {
   let turnIndex = 0;
+  const maxTurns = config.maxTurns ?? DEFAULT_MAX_TURNS;
   let pendingMessages: Message[] = (await config.getSteeringMessages?.()) ?? [];
 
   // 外层：follow-up 消息处理
   while (true) {
-    if (signal?.aborted) break;
+    if (signal?.aborted) return "aborted";
 
     let hasMoreToolCalls = true;
 
     // 内层：tool calls + steering 消息处理
     while (hasMoreToolCalls || pendingMessages.length > 0) {
-      if (signal?.aborted) break;
+      if (signal?.aborted) return "aborted";
+      if (turnIndex >= maxTurns) return "exhausted";
 
       turnIndex++;
       await emit({ type: "turn_start", turnIndex });
@@ -169,7 +183,7 @@ async function runDualLoop(
       // 错误/中止 → 直接退出
       if (assistantMsg.stopReason === "error" || assistantMsg.stopReason === "aborted") {
         await emit({ type: "turn_end", turnIndex, message: assistantMsg, toolResults: [] });
-        return;
+        return assistantMsg.stopReason === "aborted" ? "aborted" : "completed";
       }
 
       // 处理 tool calls
@@ -202,14 +216,18 @@ async function runDualLoop(
 
       await emit({ type: "turn_end", turnIndex, message: assistantMsg, toolResults });
 
+      if (signal?.aborted) {
+        return "aborted";
+      }
+
       // 安全阀检查
       if (config.shouldStopAfterTurn?.({ message: assistantMsg, turnIndex })) {
-        return;
+        return "completed";
       }
 
       // maxTurns 硬限制，防止无限循环
-      if (turnIndex >= (config.maxTurns ?? 50)) {
-        return;
+      if (hasMoreToolCalls && turnIndex >= maxTurns) {
+        return "exhausted";
       }
 
       // 获取 steering 消息
@@ -223,7 +241,7 @@ async function runDualLoop(
       continue;
     }
 
-    break;
+    return signal?.aborted ? "aborted" : "completed";
   }
 }
 
@@ -363,6 +381,32 @@ function findLastAssistant(messages: Message[]): AssistantMessage | undefined {
     if (msg.role === "assistant") return msg;
   }
   return undefined;
+}
+
+function createAbortedMessage(): AssistantMessage {
+  return {
+    role: "assistant",
+    content: [],
+    model: "unknown",
+    provider: "unknown",
+    usage: createEmptyUsage(),
+    stopReason: "aborted",
+    errorMessage: "User stopped the turn",
+    timestamp: Date.now(),
+  };
+}
+
+function createMaxTurnsMessage(lastAssistant: AssistantMessage, maxTurns: number): AssistantMessage {
+  const errorMessage = `Agent reached maxTurns (${maxTurns}) before producing a final response`;
+  return {
+    ...lastAssistant,
+    content: [{ type: "text", text: errorMessage }],
+    stopReason: "error",
+    errorMessage,
+    errorKind: "max_turns",
+    errorRetryable: false,
+    timestamp: Date.now(),
+  };
 }
 
 async function prepareCacheAuditCall(

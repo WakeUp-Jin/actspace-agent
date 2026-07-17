@@ -176,11 +176,7 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
     );
     usageCalls = result.usageCalls;
     finalMessages = result.messages;
-    if (result.message.stopReason === "aborted") {
-      status = "aborted";
-    } else if (result.message.stopReason === "error") {
-      status = "failed";
-    }
+    status = result.status;
     summary = getTextContent(result.message).trim() || "Explore SubAgent completed without a text summary.";
   } catch (error) {
     status = input.parentSignal?.aborted ? "aborted" : "failed";

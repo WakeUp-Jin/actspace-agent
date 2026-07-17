@@ -14,7 +14,7 @@ import { MockLLMService, mockError, mockText, mockToolCall } from "../../llm/ser
 import { createCacheAuditTracker, type AgentRunLogEvent, type AgentRunLogger } from "../../observability";
 import { ToolManager } from "../../tools/manager";
 import { runTurnWithAgent } from "../bridge";
-import { bashTaskRegistry } from "../../tools/tools/bash/task-registry";
+import { bashExecutor, bashTaskRegistry } from "../../tools/tools/bash";
 import type { RunTurnWithAgentDeps } from "../bridge";
 
 function createTestTool(name: string): InternalTool {
@@ -295,6 +295,7 @@ function createCompactionDeps() {
 
 describe("runTurnWithAgent bridge", () => {
   it("persists the user message before assistant and tool events", async () => {
+    const streamEvents: RuntimeStreamEvent[] = [];
     const result = await runTurnWithAgent(
       {
         sessionId: "session-test",
@@ -302,6 +303,7 @@ describe("runTurnWithAgent bridge", () => {
         userInput: "Please inspect the README.",
       },
       createDeps(),
+      { onStreamEvent: (event) => streamEvents.push(event) },
     );
 
     expect(result.events[0]).toMatchObject({
@@ -324,6 +326,38 @@ describe("runTurnWithAgent bridge", () => {
       "context_snapshot",
     ]);
     expect(result.events.every((event) => event.turnId === "turn-test")).toBe(true);
+    expect(
+      streamEvents.every((event) =>
+        event.sessionId === "session-test" &&
+        (event.type === "bash_task_update" || event.turnId === "turn-test"),
+      ),
+    ).toBe(true);
+    expect(streamEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "assistant_thinking_delta",
+        sessionId: "session-test",
+        turnId: "turn-test",
+      }),
+      expect.objectContaining({
+        type: "assistant_text_delta",
+        sessionId: "session-test",
+        turnId: "turn-test",
+      }),
+    ]));
+  });
+
+  it("can omit the user event when main already persisted the turn input", async () => {
+    const deps = createDeps();
+    deps.llm.setResponses([mockText("done")]);
+
+    const result = await runTurnWithAgent(
+      { sessionId: "session-prewritten", turnId: "turn-prewritten", userInput: "already stored" },
+      deps,
+      { includeUserEvent: false },
+    );
+
+    expect(result.events.some((event) => event.type === "user_message")).toBe(false);
+    expect(result.events.some((event) => event.type === "assistant_message")).toBe(true);
   });
 
   it("injects attachments into the model input and persists them only on the user message", async () => {
@@ -964,6 +998,7 @@ describe("runTurnWithAgent bridge", () => {
 
   it("assigns abort closure that can cancel the running agent", async () => {
     const deps = createDeps() as ReturnType<typeof createDeps> & { abort?: () => void };
+    const streamEvents: RuntimeStreamEvent[] = [];
     // Register a slow tool that allows us to abort mid-execution
     deps.toolManager.register({
       name: "slow_tool",
@@ -987,6 +1022,7 @@ describe("runTurnWithAgent bridge", () => {
     const resultPromise = runTurnWithAgent(
       { sessionId: "s-abort", turnId: "t-abort", userInput: "Do something slow." },
       deps,
+      { onStreamEvent: (event) => streamEvents.push(event) },
     );
 
     // Wait a tick for agent to start and deps.abort to be assigned
@@ -997,9 +1033,10 @@ describe("runTurnWithAgent bridge", () => {
     deps.abort!();
 
     const result = await resultPromise;
-    // After abort, the result should exist (possibly with error status)
-    expect(result).toBeDefined();
-    expect(result.status).toMatch(/completed|error/);
+    expect(result.status).toBe("aborted");
+    expect(result.events.some((event) => event.type === "user_message")).toBe(true);
+    expect(result.events.some((event) => event.type === "turn_aborted")).toBe(true);
+    expect(streamEvents.some((event) => event.type === "turn_aborted")).toBe(true);
   });
 
   it("emits tool_call_streaming with typed preview before tool_started", async () => {
@@ -1057,6 +1094,8 @@ describe("runTurnWithAgent bridge", () => {
     const firstStreaming = streamingEvents[0];
     expect(firstStreaming).toMatchObject({
       type: "tool_call_streaming",
+      sessionId: "session-test",
+      turnId: "turn-test",
       toolCallId: "tc-write-streaming",
       toolName: "write_file",
       isInitial: true,
@@ -1072,6 +1111,8 @@ describe("runTurnWithAgent bridge", () => {
 
     expect(finishedEvents[0]).toMatchObject({
       type: "tool_finished",
+      sessionId: "session-test",
+      turnId: "turn-test",
       toolCallId: "tc-write-streaming",
       toolName: "write_file",
       isError: false,
@@ -1124,6 +1165,8 @@ describe("runTurnWithAgent bridge", () => {
       expect.arrayContaining([
         expect.objectContaining({
           type: "tool_call_streaming",
+          sessionId: "session-test",
+          turnId: "turn-test",
           toolCallId: "tc-agent-preview",
           toolName: "agent",
           preview: {
@@ -1136,6 +1179,8 @@ describe("runTurnWithAgent bridge", () => {
         }),
         expect.objectContaining({
           type: "tool_started",
+          sessionId: "session-test",
+          turnId: "turn-test",
           toolCallId: "tc-agent-preview",
           toolName: "agent",
           preview: expect.objectContaining({
@@ -1555,7 +1600,13 @@ describe("runTurnWithAgent bridge", () => {
 });
 
 describe("background bash task notifications", () => {
-  afterEach(() => {
+  afterEach(async () => {
+    const waits = bashTaskRegistry.listRunning().flatMap((task) => {
+      const handle = bashTaskRegistry.getHandle(task.taskId);
+      return handle ? [handle.wait] : [];
+    });
+    bashTaskRegistry.harvestAll();
+    await Promise.all(waits);
     bashTaskRegistry.clear();
   });
 
@@ -1621,5 +1672,54 @@ describe("background bash task notifications", () => {
     expect(injected).toHaveLength(0);
     // 其他会话的通知仍在队列里
     expect(bashTaskRegistry.drainPendingNotifications("session-other")).toHaveLength(1);
+  });
+
+  it("injects the running task list once before the first model call of a user turn", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "actspace-bridge-background-list-"));
+    const sessionId = "session-running-list";
+    const background = await bashExecutor(
+      { command: "sleep 30", cwd: workspace, blockMs: 0 },
+      workspace,
+      { sessionId, maxRuntimeMs: 30_000 },
+    );
+    expect(background.success).toBe(true);
+
+    const backgroundMessageCounts: number[] = [];
+    const deps = createDeps();
+    deps.llm.setResponses([
+      (context) => {
+        backgroundMessageCounts.push(context.messages.filter(
+          (message) =>
+            message.role === "user" &&
+            typeof message.content === "string" &&
+            message.content.includes("<background_tasks>"),
+        ).length);
+        return mockToolCall("read_file", { path: "README.md" });
+      },
+      (context) => {
+        backgroundMessageCounts.push(context.messages.filter(
+          (message) =>
+            message.role === "user" &&
+            typeof message.content === "string" &&
+            message.content.includes("<background_tasks>"),
+        ).length);
+        return mockText("Background task noted once.");
+      },
+    ]);
+
+    const result = await runTurnWithAgent(
+      { sessionId, turnId: "turn-running-list", userInput: "继续" },
+      deps,
+    );
+
+    expect(backgroundMessageCounts).toEqual([1, 1]);
+    const runningListEvents = result.events.filter(
+      (event) =>
+        event.type === "user_message" &&
+        typeof (event.payload as { content?: unknown }).content === "string" &&
+        ((event.payload as { content: string }).content.includes("<background_tasks>")),
+    );
+    expect(runningListEvents).toHaveLength(1);
+    await rm(workspace, { recursive: true, force: true });
   });
 });
