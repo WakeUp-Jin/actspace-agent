@@ -1,16 +1,27 @@
+<p align="center">
+  <img src="docs/assets/readme/actspace-agent-wordmark.png" alt="Actspace" width="640">
+</p>
 
+<p align="center">
+  模型的运行空间——从 Coding Agent 开始
+</p>
 
-模型的运行空间——从 Coding Agent 开始
+<p align="center">
+  <a href="#开始使用">开始使用</a> ·
+  <a href="#架构设计">架构设计</a> ·
+  <a href="docs/design-docs/index.md">设计文档</a> ·
+  <a href="#许可证">Apache-2.0</a>
+</p>
 
-[开始使用](#开始使用) · [架构设计](#架构设计) · 设计文档 · [Apache-2.0](#许可证)
-
-
+<p align="center">
+  <img src="docs/assets/readme/home.png" alt="Actspace 主界面" width="920">
+</p>
 
 ## 什么是 Actspace
 
-**Act + Space = 运行空间。**
+**Act + Space = 行动空间。**
 
-Actspace 是一个本地 Agent 桌面应用，也是模型的Harness——从底层构建上下文管线、工具系统和执行循环，让模型能够获取充分的上下文，真正地行动起来。
+Actspace 是一个本地 Agent 桌面应用，也是模型的 Harness——从底层构建上下文管线、工具系统和执行循环，让模型能够获取充分的上下文，真正地行动起来。
 
 当前主模型选择 DeepSeek，成本低且缓存机制友好。从 Coding Agent 开始，逐步走向通用 Agent。
 
@@ -48,23 +59,37 @@ pnpm package:desktop   # 产物输出到 dist/
 
 ## 截图
 
-
-|             |         |
-| ----------- | ------- |
-| Kairos 自治监控 | 工具执行与审批 |
-| Usage 与缓存统计 | 文件预览    |
-| 上下文控制与可视化   | Review  |
-
+<table>
+  <tr>
+    <td align="center"><img src="docs/assets/readme/kairos.png" width="100%" alt="Kairos 监控页"><br><sub>Kairos 自治监控</sub></td>
+    <td align="center"><img src="docs/assets/readme/tool-permission2.png" width="100%" alt="工具执行流"><br><sub>工具执行与审批</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/assets/readme/usage2.png" width="100%" alt="Usage 统计"><br><sub>Usage 与缓存统计</sub></td>
+    <td align="center"><img src="docs/assets/readme/file-prevoew2.png" width="100%" alt="文件预览"><br><sub>文件预览</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/assets/readme/context-controle.png" width="100%" alt="上下文控制"><br><sub>上下文控制与可视化</sub></td>
+    <td align="center"><img src="docs/assets/readme/review3.png" width="100%" alt="Review"><br><sub>Review</sub></td>
+  </tr>
+</table>
 
 ## 架构设计
 
+<p align="center">
+  <img src="docs/assets/readme/design-home.png" alt="Actspace" width="100%">
+</p>
 
-
-
-|     |     |
-| --- | --- |
-|     |     |
-|     |     |
+<table>
+  <tr>
+    <td align="center"><img src="docs/assets/readme/design-context.png" width="100%" alt="上下文管理"></td>
+    <td align="center"><img src="docs/assets/readme/design-tool.png" width="100%" alt="工具模块"></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/assets/readme/design-karios.png" width="100%" alt="Karios设计"></td>
+    <td align="center"><img src="docs/assets/readme/design-agent-core.png" width="100%" alt="核心执行引擎设计"></td>
+  </tr>
+</table>
 
 
 所有架构事实与设计决策都以文档形式版本化在仓库里：
@@ -78,8 +103,9 @@ pnpm package:desktop   # 产物输出到 dist/
 - [上下文管理](https://github.com/WakeUp-Jin/Practical-Guide-to-Context-Engineering/blob/main/docs/%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AE%A1%E7%90%86/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9%E8%B0%83%E5%BA%A6%EF%BC%9A%E5%B7%A5%E5%85%B7%E8%A3%81%E5%89%AA%E4%B8%8E%E5%8E%86%E5%8F%B2%E8%AE%B0%E5%BD%95%E5%8E%8B%E7%BC%A9.md)——目前的压缩机制主要是两种策略：工具输出的结果裁剪和压缩、会话历史记录的压缩
 
 ## 一些闲谈
-
-
+<p align="center">
+  <img src="docs/assets/readme/space-people (1).png" alt="Actspace" width="100%">
+</p>
 
 我很喜欢市面上的很多 Agent 产品，想法和设计都很棒。真心感谢每一个在背后付出的团队和开发者。
 
@@ -89,9 +115,9 @@ DeepSeek 的低成本和开放理念，让我可以专注于 Harness 工程本�
 
 这个应用有很多的不足，但我相信随着日常使用，它会持续完善。无论应用如何变化，我希望始终保持**简约干净、上下文可控、成本可控**。
 
----
+<hr/>
 
-「不诱于誉，不恐于诽，率道而行，端然正己。」
+<p align="center">「不诱于誉，不恐于诽，率道而行，端然正己。」</p>
 
 ## 致谢
 
@@ -100,6 +126,7 @@ DeepSeek 的低成本和开放理念，让我可以专注于 Harness 工程本�
 - [code-develop-harness-init](https://github.com/WakeUp-Jin/code-develop-harness-init)--面向 Agent-first 开发的基础模板
 - [Linux.Do 社区](https://linux.do/latest) (真诚 、友善 、团结 、专业)
 - Linux.Do社区佬友们的公益站大力支持和帮助，充足的Token得以让该项目可以实现Agent-first(人定方向，Agent 执行)
+
 
 ## 许可证
 
