@@ -36,6 +36,7 @@
 - Context usage 只在 follow-up 底部状态行右侧显示和打开，不再放在输入 panel 内。
 - 品牌蓝仍可用于 focus ring、Context usage、Thinking toggle 等关键状态。
 - workspace、branch、runtime 都应表现为下拉入口，即使第一版只有静态选项。
+- Slash Command 在发送前由 renderer 分流：`/compact` 触发上下文压缩，`/eval [失败说明]` 触发最近失败 Turn 的回归 Candidate 生成；命令文本不作为普通用户消息显示。
 
 ## Composer 形态
 

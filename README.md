@@ -1,37 +1,34 @@
-<p align="center">
-  <img src="docs/assets/readme/actspace-agent-wordmark.png" alt="Actspace" width="640">
-</p>
 
-<p align="center">
-  为 DeepSeek 打造的本地 Agent 桌面工作台
-</p>
 
-<p align="center">
-  <a href="#开始使用">开始使用</a> ·
-  <a href="#架构设计">架构设计</a> ·
-  <a href="docs/design-docs/index.md">设计文档</a> ·
-  <a href="#许可证">Apache-2.0</a>
-</p>
+模型的运行空间——从 Coding Agent 开始
 
-<p align="center">
-  <img src="docs/assets/readme/home.png" alt="Actspace 主界面" width="920">
-</p>
+[开始使用](#开始使用) · [架构设计](#架构设计) · 设计文档 · [Apache-2.0](#许可证)
+
+
 
 ## 什么是 Actspace
 
-Actspace 是一个为适配 DeepSeek 打造的本地 Agent 桌面应用。其构建了一套Agent Harness，目的是让DeepSeek能够获取更多的上下文，做更多的事情
+**Act + Space = 运行空间。**
 
-它遵循三条原则：**简约优雅 · 上下文的绝对控制 · 为 DeepSeek 适配**（尤其是缓存利用，降低成本）。
+Actspace 是一个本地 Agent 桌面应用，也是模型的Harness——从底层构建上下文管线、工具系统和执行循环，让模型能够获取充分的上下文，真正地行动起来。
+
+当前主模型选择 DeepSeek，成本低且缓存机制友好。从 Coding Agent 开始，逐步走向通用 Agent。
+
+## 设计原则
+
+- **简约干净**——采用简单有效的方案，不堆没必要的复杂度。能用一个清晰的抽象解决的问题，不拆成三层。
+- **上下文的绝对控制与可视化**——你随时知道模型的上下文里有什么、花了多少 token、缓存命中了多少。上下文不是黑箱，而是你可以审视和干预的对象。
+- **成本可控**——选择高性价比模型，围绕缓存机制优化上下文管线，最大化命中率；通过多 Agent 编排让每个 Agent 只承载必要的上下文，而不是把所有东西塞进同一个窗口。
 
 ## 核心特性
 
-- **被动与主动，两种 Agent**——New Agent 被动响应你的指令；Kairos 主动自治运行，拥有独立 prompt、短期记忆、tick 调度和专属监控页。
-- **上下文绝对控制**——token usage、context snapshot、每会话 `context-state.json`，你随时知道模型的上下文里有什么、花了多少、缓存命中了多少。
-- **为 DeepSeek 而生**——上下文管线围绕 DeepSeek 的缓存机制设计，最大化缓存命中、最小化成本；Kimi 可作为联网搜索与多模态的辅助能力。
+- **上下文绝对控制**——token usage、context snapshot、每会话 `context-state.json`，模型看到了什么、花了多少，一目了然。
+- **多种 Agent 形态**——Solo 单任务执行；Team 由 Leader 编排多成员协作；Room 多 Agent 在共享消息流中讨论和辩论。形态由用户选择，架构可扩展。
+- **被动与主动**——常规 Agent 被动响应你的指令；Kairos 主动自治运行，拥有独立 prompt、短期记忆、tick 调度和专属监控页。
 - **执行可视化**——每个工具调用都有独立预览：文件 diff、Bash 输出、权限审批、运行状态，不靠日志猜。
-- **工具：被添加，也能自构建**——内置文件读写、Grep / Glob、Bash 等开发者添加的工具；Agent 也能依托 Lab 实验台，根据实际任务自己构建工具。
-- **用 Agent 改造它自己**——借助 harness 工程，项目的全部上下文（功能设计规范、开发历史、执行计划、设计原则）都以文档沉淀在 `docs/`。你可以直接用 Codex / Claude Code 按自己的想法改造源码，自定义性和开放性都很强。
+- **工具系统**——内置文件读写、Grep / Glob、Bash、Browser Use 等工具；Agent 也能依托 Lab 实验台，根据实际任务自己构建工具。
 - **本地优先**——会话、记忆、事件流全部以 jsonl 落盘，可迁移、可审计、可追溯。
+- **开放可改造**——项目的全部上下文（设计规范、开发历史、执行计划、设计原则）都以文档沉淀在 `docs/`，你可以用任何 Coding Agent 按自己的想法改造源码。
 
 ## 开始使用
 
@@ -51,37 +48,23 @@ pnpm package:desktop   # 产物输出到 dist/
 
 ## 截图
 
-<table>
-  <tr>
-    <td align="center"><img src="docs/assets/readme/kairos.png" width="100%" alt="Kairos 监控页"><br><sub>Kairos 自治监控</sub></td>
-    <td align="center"><img src="docs/assets/readme/tool-permission2.png" width="100%" alt="工具执行流"><br><sub>工具执行与审批</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/assets/readme/usage2.png" width="100%" alt="Usage 统计"><br><sub>Usage 与缓存统计</sub></td>
-    <td align="center"><img src="docs/assets/readme/file-prevoew2.png" width="100%" alt="文件预览"><br><sub>文件预览</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/assets/readme/context-controle.png" width="100%" alt="上下文控制"><br><sub>上下文控制与可视化</sub></td>
-    <td align="center"><img src="docs/assets/readme/review3.png" width="100%" alt="Review"><br><sub>Review</sub></td>
-  </tr>
-</table>
+
+|             |         |
+| ----------- | ------- |
+| Kairos 自治监控 | 工具执行与审批 |
+| Usage 与缓存统计 | 文件预览    |
+| 上下文控制与可视化   | Review  |
+
 
 ## 架构设计
 
-<p align="center">
-  <img src="docs/assets/readme/design-home.png" alt="Actspace" width="100%">
-</p>
 
-<table>
-  <tr>
-    <td align="center"><img src="docs/assets/readme/design-context.png" width="100%" alt="上下文管理"></td>
-    <td align="center"><img src="docs/assets/readme/design-tool.png" width="100%" alt="工具模块"></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/assets/readme/design-karios.png" width="100%" alt="Karios设计"></td>
-    <td align="center"><img src="docs/assets/readme/design-agent-core.png" width="100%" alt="核心执行引擎设计"></td>
-  </tr>
-</table>
+
+
+|     |     |
+| --- | --- |
+|     |     |
+|     |     |
 
 
 所有架构事实与设计决策都以文档形式版本化在仓库里：
@@ -95,21 +78,20 @@ pnpm package:desktop   # 产物输出到 dist/
 - [上下文管理](https://github.com/WakeUp-Jin/Practical-Guide-to-Context-Engineering/blob/main/docs/%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AE%A1%E7%90%86/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9%E8%B0%83%E5%BA%A6%EF%BC%9A%E5%B7%A5%E5%85%B7%E8%A3%81%E5%89%AA%E4%B8%8E%E5%8E%86%E5%8F%B2%E8%AE%B0%E5%BD%95%E5%8E%8B%E7%BC%A9.md)——目前的压缩机制主要是两种策略：工具输出的结果裁剪和压缩、会话历史记录的压缩
 
 ## 一些闲谈
-<p align="center">
-  <img src="docs/assets/readme/space-people (1).png" alt="Actspace" width="100%">
-</p>
+
+
 
 我很喜欢市面上的很多 Agent 产品，想法和设计都很棒。真心感谢每一个在背后付出的团队和开发者。
 
-大模型应用还在快速发展，我特别希望有一个能够按照我自己想法构建的东西。
+大模型应用还在快速发展，我特别希望有一个能够按照我自己想法构建的运行空间——给模型一个可控的环境，让它能够真正地行动起来。
 
-DeepSeek 的成本很低并且理念很好，让我可以放心地围绕模型去构建应用，而不必担心模型的成本、真实性和可靠性。让我这个工程师很安心，不用担心源头，而专注于这种力量的应用构建。
-   
-这个应用有很多的不足，但是我相信随着日常的使用，许多bug会被修复，许多新功能会产生，会完善，无论应用如何变化，我希望可以为这个应用保持**简约优雅，执行可视化，上下文可控性**
+DeepSeek 的低成本和开放理念，让我可以专注于 Harness 工程本身，而不必担心模型端的成本和可靠性。
 
-<hr/>
+这个应用有很多的不足，但我相信随着日常使用，它会持续完善。无论应用如何变化，我希望始终保持**简约干净、上下文可控、成本可控**。
 
-<p align="center">「不诱于誉，不恐于诽，率道而行，端然正己。」</p>
+---
+
+「不诱于誉，不恐于诽，率道而行，端然正己。」
 
 ## 致谢
 
@@ -118,7 +100,6 @@ DeepSeek 的成本很低并且理念很好，让我可以放心地围绕模型�
 - [code-develop-harness-init](https://github.com/WakeUp-Jin/code-develop-harness-init)--面向 Agent-first 开发的基础模板
 - [Linux.Do 社区](https://linux.do/latest) (真诚 、友善 、团结 、专业)
 - Linux.Do社区佬友们的公益站大力支持和帮助，充足的Token得以让该项目可以实现Agent-first(人定方向，Agent 执行)
-
 
 ## 许可证
 

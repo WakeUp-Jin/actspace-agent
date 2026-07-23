@@ -8,6 +8,7 @@ import type {
   BashStatus,
   BootstrapState,
   CompactContextInput,
+  GenerateEvalCandidateInput,
   ContextState,
   ContextUsageSnapshot,
   MessageBlock,
@@ -1119,7 +1120,11 @@ export function App() {
     if (!sessionId) return;
 
     const turnId = nextTurnId();
-    const isCompactCommand = text.trim() === "/compact";
+    const trimmedText = text.trim();
+    const isCompactCommand = trimmedText === "/compact";
+    const evalCommandMatch = /^\/eval(?:\s+([\s\S]+))?$/.exec(trimmedText);
+    const isEvalCommand = evalCommandMatch !== null;
+    const evalFailureReason = evalCommandMatch?.[1]?.trim();
     const nextWorkspaceRoot = selectedWorkspaceRoot;
     let nextWorkspace = findWorkspaceOption(nextWorkspaceRoot);
     const currentWorkspaceRoot = normalizeWorkspaceRoot(
@@ -1184,6 +1189,15 @@ export function App() {
       streamStateRef.current.activeCompactions.set(turnId, pendingBlock);
       streamingUserBlockRef.current = null;
       setStreamingBlocks([pendingBlock]);
+    } else if (isEvalCommand) {
+      streamingUserBlockRef.current = null;
+      setStreamingBlocks([{
+        kind: "status",
+        id: `turn:${turnId}:eval-candidate:0`,
+        content: "Generating eval candidate...",
+        createdAt: new Date().toISOString(),
+        tone: "muted",
+      }]);
     } else {
       const userBlock: MessageBlock = {
         kind: "user",
@@ -1245,6 +1259,42 @@ export function App() {
                 },
                 events: result.events,
                 contextSnapshot: result.contextSnapshot,
+              });
+              setTurnResult(null);
+              finishCurrentVisibleTurn();
+            }
+          }
+          const refreshed = await window.actspace.listSessions();
+          setSessions(refreshed);
+          return;
+        }
+
+        if (isEvalCommand) {
+          if (!window.actspace.generateEvalCandidate) {
+            throw new Error("Eval candidate generation is not available");
+          }
+          const input: GenerateEvalCandidateInput = {
+            sessionId,
+            turnId,
+            reason: evalFailureReason,
+            model: options.model,
+            thinkingEnabled: options.thinkingEnabled,
+          };
+          const result = await window.actspace.generateEvalCandidate(input);
+          if (isCurrentVisibleTurn()) {
+            setApprovalPendingForSession(sessionId, false);
+            setFailedForSession(sessionId, result.status === "failed");
+            const restored = await window.actspace.getSession({ sessionId });
+            if (isCurrentVisibleTurn()) {
+              setSessionRecord(restored ?? {
+                meta: {
+                  id: result.sessionId,
+                  title: "New chat",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  turnCount: sessionRecord?.meta.turnCount ?? 0,
+                },
+                events: result.events,
               });
               setTurnResult(null);
               finishCurrentVisibleTurn();

@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, BootstrapState, CompactContextInput, ReviewGetWorkspaceChangesResult, RunTurnInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
+import type { AppSettings, BootstrapState, CompactContextInput, GenerateEvalCandidateInput, ReviewGetWorkspaceChangesResult, RunTurnInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
@@ -1008,6 +1008,100 @@ describe("App streaming user message", () => {
     await act(async () => {
       resolveCompactContext?.();
     });
+  });
+
+  it("routes /eval to candidate generation without creating a normal run turn", async () => {
+    const sessionId = "session-eval";
+    const record = createEmptySessionRecord(sessionId);
+    record.events.push({
+      id: "evt-user",
+      sessionId,
+      turnId: "turn-user",
+      type: "user_message",
+      timestamp: record.meta.createdAt,
+      schemaVersion: 1,
+      payload: { content: "Fix login and add tests" },
+    });
+    const sessions: SessionListItem[] = [{
+      id: sessionId,
+      title: "Eval session",
+      updatedAt: record.meta.updatedAt,
+      turnCount: 1,
+    }];
+    const runTurn = vi.fn();
+    const generateEvalCandidate = vi.fn(async (input: GenerateEvalCandidateInput) => {
+      const event: SessionEvent = {
+        id: "evt-eval",
+        sessionId,
+        turnId: input.turnId,
+        type: "eval_candidate",
+        timestamp: new Date().toISOString(),
+        schemaVersion: 1,
+        payload: {
+          candidateId: "failure-1",
+          relativePath: "eval-candidates/failure-1",
+          status: "generated",
+          summary: "Eval candidate generated · /tmp/actspace/eval-candidates/failure-1",
+        },
+      };
+      record.events.push(event);
+      return {
+        sessionId,
+        turnId: input.turnId,
+        targetTurnId: "turn-user",
+        status: "generated" as const,
+        candidateId: "failure-1",
+        candidatePath: "/tmp/actspace/eval-candidates/failure-1",
+        events: [event],
+      };
+    });
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      getKimiBalance: async () => ({
+        provider: "kimi",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      generateEvalCandidate,
+      onAgentStream: () => () => {},
+      runTurn,
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "/eval Agent did not add tests");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    await waitFor(() => {
+      expect(generateEvalCandidate).toHaveBeenCalledTimes(1);
+    });
+    expect(generateEvalCandidate.mock.calls[0][0]).toMatchObject({
+      sessionId,
+      reason: "Agent did not add tests",
+    });
+    expect(await screen.findByText("Eval candidate generated · /tmp/actspace/eval-candidates/failure-1")).toBeInTheDocument();
+    expect(runTurn).not.toHaveBeenCalled();
   });
 
   it("renders read tool arguments as soon as tool_started arrives", async () => {

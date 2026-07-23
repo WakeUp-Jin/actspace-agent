@@ -27,6 +27,8 @@ import type {
   FsWatchPickRootResult,
   FsWatchSetEnabledInput,
   FsWatchStatus,
+  GenerateEvalCandidateInput,
+  GenerateEvalCandidateResult,
   SkillInstallResult,
   SkillListResult,
   SkillUninstallInput,
@@ -109,6 +111,8 @@ contextBridge.exposeInMainWorld("actspace", {
   runTurn: (input: RunTurnInput) => ipcRenderer.invoke("agent:run-turn", input) as Promise<AgentTurnResult>,
   compactContext: (input: CompactContextInput) =>
     ipcRenderer.invoke("context:compact", input) as Promise<CompactContextResult>,
+  generateEvalCandidate: (input: GenerateEvalCandidateInput) =>
+    ipcRenderer.invoke("eval:generate-candidate", input) as Promise<GenerateEvalCandidateResult>,
   abortTurn: (input: AbortTurnInput) => ipcRenderer.invoke("agent:abort-turn", input) as Promise<boolean>,
   selectFiles: () => ipcRenderer.invoke("dialog:select-files") as Promise<SelectFilesResult>,
   selectWorkspaceDirectory: () =>

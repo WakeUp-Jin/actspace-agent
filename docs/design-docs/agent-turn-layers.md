@@ -52,7 +52,7 @@ Workspace 选择器不进入 `RunTurnInput`。用户可在发送前多次切换�
 - 恢复后的 `SessionRecord`、streaming blocks 清理和运行状态收尾必须在同一个同步交接阶段完成；会话列表、Review 等辅助刷新不能插在消息交接中间。
 - `MessageBlock.id` 保留持久化事件身份，用于消息操作和数据引用；`MessageBlock.renderKey` 是 turn 级展示身份，流式块与持久化块通过相同 render key 复用 React DOM，避免完成时重新播放入场动画。
 
-`/compact` 是例外命令路径：renderer 只在 `text.trim() === "/compact"` 时分流到 `context:compact` IPC，输入为 `{ sessionId, turnId, model? }`。它不创建普通用户消息，不进入 `RunTurnInput.userInput`，也不进入 LLM conversation。
+`/compact` 与 `/eval [失败说明]` 是例外命令路径：renderer 在普通 turn 前分流到独立 IPC。两者都不创建普通用户消息，不进入 `RunTurnInput.userInput`，也不进入主 Agent conversation。`/eval` 使用独立系统提示词和独立 ContextManager，在 `<userData>/eval-candidates/<candidateId>/` 生成回归 Candidate。
 
 ## 2. Main Process 层
 
@@ -66,6 +66,7 @@ Workspace 选择器不进入 `RunTurnInput`。用户可在发送前多次切换�
 - 调用 `runTurnWithAgent()` 执行 turn
 - 持久化 `AgentTurnResult` 中剩余事件到 session store；bridge 在这条真实桌面端路径关闭重复的 user event 聚合
 - 处理 `context:compact` 手动压缩：为当前 session 装配相同的 Agent deps，调用 `compactContextWithAgent()`，追加 `context_compaction` / `context_snapshot` 并刷新 `context-state.json`
+- 处理 `eval:generate-candidate`：定位最近一个普通用户 Turn，以 Candidate 目录作为独立生成 Agent 的 workspace，完成后追加 `eval_candidate` 系统事件
 - 管理 abort 闭包
 
 **不做什么：**
@@ -185,6 +186,22 @@ Renderer: `/compact`
   ← Renderer: 恢复 SessionRecord，消息流显示 context_compaction block
 ```
 
+手动 `/eval` 数据流：
+
+```txt
+Renderer: `/eval [失败说明]`
+  → [IPC: GenerateEvalCandidateInput]
+  → Main Process
+    → 定位最近一个普通 user_message Turn
+    → 创建 <userData>/eval-candidates/<candidateId>/
+    → buildAgentConfig(candidateRoot + 独立 system prompt)
+    → 独立 Agent 用绝对路径只读 session.jsonl / 原工作区
+    → write_file / edit_file 写 case.json + fixture/
+    → 校验必要产物
+    → append eval_candidate SessionEvent
+  ← Renderer: 恢复 SessionRecord，显示 Candidate 成功/失败状态
+```
+
 ## 新增代码时的检查清单
 
 - [ ] 前端传递的字段是否只在 `RunTurnInput` 中定义？
@@ -197,4 +214,4 @@ Renderer: `/compact`
 - [ ] aborted turn 是否从持久化 `turn_aborted` 恢复，而不是依赖 renderer 临时状态？
 - [ ] Agent 层的代码是否依赖了 Electron API？（不应该）
 - [ ] 持久化是否只在 Main Process 层完成？
-- [ ] Slash command 是否明确分流，不把命令文本写入 LLM conversation？
+- [ ] Slash command 是否明确分流，不把命令文本写入主 Agent conversation？

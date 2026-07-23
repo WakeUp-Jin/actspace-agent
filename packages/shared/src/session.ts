@@ -119,6 +119,7 @@ export type SessionEventType =
   | "diff_preview"
   | "context_snapshot"
   | "context_compaction"
+  | "eval_candidate"
   | "error"
   | "turn_aborted"
   // ↓ Kairos 自治模式专属生命周期事件（追加在末尾，不允许调换顺序，详见
@@ -214,6 +215,14 @@ export type ContextCompactionPayload = {
   reductionRatio?: number;
   removedCount?: number;
   reason?: string;
+};
+
+export type EvalCandidatePayload = {
+  candidateId?: string;
+  relativePath?: string;
+  status: "generated" | "failed";
+  summary: string;
+  error?: string;
 };
 
 export type ErrorPayload = SessionError;

@@ -1,6 +1,7 @@
 import type {
   AssistantMessagePayload,
   ContextCompactionPayload,
+  EvalCandidatePayload,
   ContextUsageSnapshot,
   ErrorPayload,
   EventId,
@@ -413,6 +414,19 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
         return contextCompactionBlock(event).map((block) =>
           withRenderKey(block, nextRenderKey(event, "context-compaction")),
         );
+      case "eval_candidate": {
+        const payload = event.payload as EvalCandidatePayload;
+        return [
+          {
+            kind: "status",
+            id: event.id,
+            renderKey: nextRenderKey(event, "eval-candidate"),
+            content: payload.summary,
+            createdAt: getDisplayTime(event.timestamp),
+            tone: payload.status === "failed" ? "error" : "muted",
+          },
+        ];
+      }
       // Kairos 自治模式专属事件不出现在主 Agent 消息流中；若历史 session 偶然包含也直接跳过。
       case "kairos_tick_injected":
       case "kairos_sleep_start":

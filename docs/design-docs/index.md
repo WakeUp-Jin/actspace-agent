@@ -46,6 +46,7 @@
 - `agent-cache-loss-audit.md`：缓存失效排查设计。
 - `agent-subagent-runtime.md`：Agent 工具与 SubAgent run 设计，约束子智能体上下文隔离、transcript、落盘、流式和前端执行流展示。
 - `agent-explore-subagent.md`：内置 Explore 聚焦子代理设计，约束便宜模型分叉、收窄 scope、自动 delegate 和内联折叠展示，与通用 `agent` 工具分工。
+- `agent-eval-failure-candidate.md`：`/eval` 失败回归 Candidate 生成设计，约束独立生成 Agent、现有文件工具复用、userData 落盘与 Eval 仓库导入边界。
 - `agent-tool-preview-design-guidelines.md`：新增工具必须遵守的前端预览契约。
 - `agent-subprocess-runner-guidelines.md`：agent-core 内部受控子进程调用规范。
 - `agent-权限设计规则和原则.md`：Agent 工具权限、用户审核、风险分层和权限记录的设计规则。

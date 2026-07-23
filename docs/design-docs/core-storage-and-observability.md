@@ -17,6 +17,7 @@
 - `sessions/`
 - `tmp/`
 - `cache-audit/`：缓存低命中排障旁路目录，仅在低缓存事件附近固化上下文快照。
+- `eval-candidates/`：只在用户显式执行 `/eval` 后生成的失败回归 Candidate，包含 `candidate.json`、`case.json` 和 `fixture/`。
 
 ## `session.jsonl` 与 `context-state.json`
 
@@ -47,6 +48,7 @@ DeepSeek Anthropic provider-native server tool 不会产生本地 `tool_call` / 
 - `sessions/`
 - `tmp/`
 - `cache-audit/`
+- `eval-candidates/<candidateId>/`：等待 `actspace-agent-eval ingest-candidate` 导入的本地回归 Candidate。
 - `kairos/inbox/`
 - `plugins/<name>/`：外部插件的二进制与配置（如 `plugins/fs-watch/{bin/fs-watch, config.json}`），见 `agent-plugins-fs-watch.md`。
 - `skills/<name>/`：设置页安装 / actspace 物化的用户级 Skill 目录（`SKILL.md` + `references/`）；fs-watch 插件的事件日志落在 `skills/fs-watch/references/watch-log/`。
@@ -60,6 +62,7 @@ Agent 文件工具的 `workspaceRoot` 与 Electron `userData` 分离：
 - `userData` 只用于 session、附件、tmp 等应用数据。
 - `workspaceRoot` 用于 `read_file`、`grep`、`glob`、`list_directory`、`edit_file` 等文件工具。
 - 主 Agent 的 `write_file` / `edit_file` 额外允许写入 `<userData>/kairos/inbox/`，用于把可交接信息 append 到 `main-agent.md`；这个额外根由 runtime context 显式注入，不代表整个 `userData` 可写。
+- `/eval` 的独立生成 Agent 直接把 Candidate 目录设为自己的 `workspaceRoot`；它可通过绝对路径读取原工作区与会话文件，但相对写入只落在 Candidate 内。
 - 应用默认根解析顺序为 `ACTSPACE_WORKSPACE_ROOT` -> 当前仓库根目录。
 - 普通聊天 turn 的实际根优先读当前 session `meta.workspaceRoot`；旧 session 或未设置时才回退应用默认根。
 - 顶部 Workspace 选择器的切换只是 renderer 临时状态；用户发送消息时才把最终选择写入当前 session `meta.workspaceRoot`，避免多次选择造成多次迁移。

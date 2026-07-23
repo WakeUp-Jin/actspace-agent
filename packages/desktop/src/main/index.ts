@@ -20,6 +20,7 @@ import type {
   ApprovalListPendingInput,
   ClearProviderKeyInput,
   CompactContextInput,
+  GenerateEvalCandidateInput,
   ComposerAttachment,
   DeepSeekBalanceSnapshot,
   KimiBalanceSnapshot,
@@ -84,6 +85,7 @@ import {
 import type { SessionEvent, SessionRecord } from "@actspace/shared";
 import { runAndPersistTurn, abortTurn, type AgentRuntimeContextLoader, type AppDataRoots } from "./agent-turn";
 import { compactAndPersistContext } from "./context-compact";
+import { generateEvalCandidate } from "./eval-candidate-service";
 import { listVisualizations, visualizeReply } from "./visualize-service";
 import { describeSessionContext } from "./context-describe-service";
 import { loadMainAgentRuntimeContext } from "./agent-runtime-context";
@@ -991,6 +993,11 @@ async function registerIpc() {
         });
       },
     );
+  });
+
+  ipcMain.handle("eval:generate-candidate", async (_event, input: GenerateEvalCandidateInput) => {
+    const roots = await ensureDataDirectories();
+    return generateEvalCandidate(input, roots);
   });
 
   ipcMain.handle("dialog:select-files", async (): Promise<SelectFilesResult> => {

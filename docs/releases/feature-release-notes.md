@@ -6,6 +6,7 @@
 
 | 日期 | 功能域 | 用户价值 | 变更摘要 |
 | --- | --- | --- | --- |
+| 2026-07-19 | 失败回归沉淀 | Agent 执行失败或效果不佳时，可以直接在当前会话生成可导入评估仓库的回归 Candidate。 | 新增 `/eval [失败说明]` 系统命令；独立生成 Agent 复用现有文件工具，在 `<userData>/eval-candidates/` 写入 `candidate.json + case.json + fixture/`，并通过 `eval_candidate` 事件恢复生成结果；独立 Eval 仓库提供 `ingest-candidate` 加入 regression 数据集。 |
 | 2026-07-17 | Agent Turn 稳定性 | 流式回复不再重复，点击停止后能快速继续输入；中断轮次重新进入任务仍可恢复，完整回复结束时消息区也不会闪动或短暂重复。 | 为 assistant、工具、审批和 SubAgent 流事件补齐 `sessionId + turnId` 作用域，Renderer 收敛为应用级单一监听；Agent loop 显式区分 `completed / failed / aborted`，中断同步取消审批与前台 Bash，并以两阶段 append 持久化用户消息和 `turn_aborted`；流式块与持久化消息采用互斥数据源和稳定 `renderKey` 完成无 remount 交接。 |
 | 2026-07-17 | Browser Locator Runtime | Browser Use 可以用 role、accessible name、label、placeholder 等接近真实用户语义的方式稳定定位页面元素，并覆盖 Frame、开放 Shadow DOM、自动等待和可操作性检查。 | 自研模块化 TypeScript Locator Runtime，确定性构建后由 Go `embed` 注入页面；新增结构化 `css / role / text / label / placeholder / test_id` target、strict match、actionability、deadline 重试，以及 Go 侧 Frame/OOPIF context 路由和坐标回算；Agent 默认最大轮次从 50 提升到 200，耗尽时返回明确终态。 |
 | 2026-07-17 | Bash 后台任务治理 | dev server、watcher 等后台命令可以跨 Turn 延续，但不会无限运行、重复启动或悄悄堆积。 | 后台 Bash 默认最长运行 30 分钟，单会话最多同时运行 8 个任务；相同 `cwd + command` 自动复用已有 `taskId`，每个新用户 Turn 首次模型调用前注入一次运行任务清单，超时和达到上限均返回可读终态。 |

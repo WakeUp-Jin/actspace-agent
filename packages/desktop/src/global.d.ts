@@ -10,6 +10,9 @@ declare global {
       compactContext: (
         input: import("@actspace/shared").CompactContextInput
       ) => Promise<import("@actspace/shared").CompactContextResult>;
+      generateEvalCandidate?: (
+        input: import("@actspace/shared").GenerateEvalCandidateInput
+      ) => Promise<import("@actspace/shared").GenerateEvalCandidateResult>;
       abortTurn: (
         input: import("@actspace/shared").AbortTurnInput
       ) => Promise<boolean>;

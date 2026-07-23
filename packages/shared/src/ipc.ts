@@ -56,6 +56,30 @@ export type CompactContextResult = {
   };
 };
 
+export type GenerateEvalCandidateInput = {
+  sessionId: string;
+  /** `/eval` 命令自身的系统 turn id；不写成普通 user_message。 */
+  turnId: string;
+  /** `/eval` 后的可选失败说明。 */
+  reason?: string;
+  model?: ModelId;
+  thinkingEnabled?: boolean;
+};
+
+export type GenerateEvalCandidateResult = {
+  sessionId: string;
+  turnId: string;
+  targetTurnId?: string;
+  status: "generated" | "failed";
+  candidateId?: string;
+  candidatePath?: string;
+  events: import("./session").SessionEvent[];
+  error?: {
+    code: string;
+    message: string;
+  };
+};
+
 export type SelectFilesResult = {
   canceled: boolean;
   attachments: import("./session").ComposerAttachment[];
