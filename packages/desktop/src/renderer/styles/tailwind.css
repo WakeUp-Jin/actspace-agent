@@ -24,32 +24,54 @@
   --font-display: var(--act-font-display);
   --font-mono: var(--act-font-mono);
 
-  --color-brand: var(--act-color-brand);
-  --color-brand-strong: var(--act-color-brand-strong);
-  --color-brand-soft: var(--act-color-brand-soft);
   --color-app-bg: var(--act-color-bg);
   --color-surface: var(--act-color-surface);
   --color-surface-subtle: var(--act-color-surface-subtle);
   --color-sidebar: var(--act-color-sidebar);
+  --color-selected: var(--act-color-selected);
   --color-sidebar-selected: var(--act-color-sidebar-selected);
+  --color-hover-overlay: var(--act-color-hover-overlay);
   --color-line: var(--act-color-border);
   --color-line-strong: var(--act-color-border-strong);
   --color-text-main: var(--act-color-text);
   --color-text-muted: var(--act-color-text-muted);
   --color-text-faint: var(--act-color-text-faint);
   --color-text-subtle: var(--act-color-text-subtle);
-  --color-warm: var(--act-color-warm);
+
+  --color-action: var(--act-color-action);
+  --color-action-hover: var(--act-color-action-hover);
+  --color-on-action: var(--act-color-on-action);
+  --color-operational: var(--act-color-operational);
+  --color-operational-hover: var(--act-color-operational-hover);
+  --color-operational-soft: var(--act-color-operational-soft);
+  --color-on-operational: var(--act-color-on-operational);
+  --color-info: var(--act-color-info);
+  --color-info-hover: var(--act-color-info-hover);
+  --color-info-soft: var(--act-color-info-soft);
+  --color-on-info: var(--act-color-on-info);
+  --color-warning: var(--act-color-warning);
+  --color-warning-soft: var(--act-color-warning-soft);
+  --color-on-warning: var(--act-color-on-warning);
   --color-danger: var(--act-color-danger);
+  --color-danger-hover: var(--act-color-danger-hover);
   --color-success: var(--act-color-success);
 
   --color-danger-soft: var(--act-color-danger-soft);
   --color-on-danger: var(--act-color-on-danger);
+  --color-on-danger-solid: var(--act-color-on-danger-solid);
   --color-success-soft: var(--act-color-success-soft);
   --color-on-success: var(--act-color-on-success);
-  --color-warm-soft: var(--act-color-warm-soft);
-  --color-on-warm: var(--act-color-on-warm);
   --color-surface-raised: var(--act-color-surface-raised);
   --color-overlay: var(--act-color-overlay);
+  --color-focus-ring: var(--act-color-focus-ring);
+  --color-operational-focus-ring: var(--act-color-operational-focus-ring);
+
+  --color-chart-series-1: var(--act-chart-series-1);
+  --color-chart-series-2: var(--act-chart-series-2);
+  --color-chart-series-3: var(--act-chart-series-3);
+  --color-chart-series-4: var(--act-chart-series-4);
+  --color-chart-series-5: var(--act-chart-series-5);
+  --color-chart-series-6: var(--act-chart-series-6);
 
   --radius-act-xs: var(--act-radius-xs);
   --radius-act-sm: var(--act-radius-sm);

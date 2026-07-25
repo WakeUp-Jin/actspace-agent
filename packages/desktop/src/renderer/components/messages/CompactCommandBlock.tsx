@@ -12,9 +12,9 @@ const TITLE_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap fon
 const META_CLASS = "text-text-muted";
 const PROGRESS_TRACK_CLASS = "mt-2 h-[3px] w-full overflow-hidden rounded-act-pill bg-line";
 const PROGRESS_BAR_CLASS =
-  "h-full rounded-act-pill bg-brand transition-[width] duration-200 ease-out motion-reduce:transition-none";
+  "h-full rounded-act-pill bg-operational transition-[width] duration-200 ease-out motion-reduce:transition-none";
 const INDETERMINATE_BAR_CLASS =
-  "h-full w-1/2 rounded-act-pill bg-brand animate-[compact-progress_1.1s_ease-in-out_infinite] motion-reduce:animate-none";
+  "h-full w-1/2 rounded-act-pill bg-operational animate-[compact-progress_1.1s_ease-in-out_infinite] motion-reduce:animate-none";
 const DIVIDER_CLASS = "compact-command-divider flex w-full items-center gap-3 py-3 text-xs font-medium text-text-faint";
 const DIVIDER_FAILED_CLASS = "text-on-danger";
 const DIVIDER_LINE_CLASS = "h-px min-w-6 flex-1 bg-line";

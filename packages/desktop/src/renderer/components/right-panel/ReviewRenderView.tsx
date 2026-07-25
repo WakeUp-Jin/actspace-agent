@@ -51,7 +51,7 @@ const STATE_INNER_CLASS = "grid max-w-[280px] gap-2";
 const STATE_TITLE_CLASS = "text-[13px] font-semibold text-text-main";
 const STATE_TEXT_CLASS = "text-[12px] leading-[1.6] text-text-muted";
 const PRIMARY_BUTTON_CLASS =
-  "mx-auto mt-1 inline-flex h-8 items-center gap-1.5 rounded-act-sm border border-brand/30 bg-brand-soft px-3 text-[12px] font-semibold text-brand-strong hover:border-brand hover:bg-brand-soft [cursor:pointer]";
+  "mx-auto mt-1 inline-flex h-8 items-center gap-1.5 rounded-act-sm bg-action px-3 text-[12px] font-semibold text-on-action hover:bg-action-hover [cursor:pointer]";
 const WARNING_LIST_CLASS = "grid gap-1 border-b border-line bg-surface-subtle px-3 py-2";
 const WARNING_ROW_CLASS = "flex min-w-0 items-start gap-2 text-[12px] leading-[1.45] text-text-muted";
 const FILE_LIST_CLASS = "grid";
@@ -90,14 +90,14 @@ function getFirstExpandedPath(files: ReviewFileChange[]): string | null {
 function FileStatusIcon({ status }: { status: ReviewFileChange["status"] }) {
   if (status === "added") return <Plus className={`${FILE_ICON_CLASS} text-success`} size={15} strokeWidth={2.2} />;
   if (status === "deleted") return <Minus className={`${FILE_ICON_CLASS} text-danger`} size={15} strokeWidth={2.2} />;
-  if (status === "renamed") return <GitBranch className={`${FILE_ICON_CLASS} text-brand`} size={15} strokeWidth={2.1} />;
+  if (status === "renamed") return <GitBranch className={`${FILE_ICON_CLASS} text-info`} size={15} strokeWidth={2.1} />;
   return <FileText className={`${FILE_ICON_CLASS} text-text-faint`} size={15} strokeWidth={2} />;
 }
 
 function diffLineClass(line: string): string {
   if (line.startsWith("+") && !line.startsWith("+++")) return "diff-line is-add";
   if (line.startsWith("-") && !line.startsWith("---")) return "diff-line is-remove";
-  if (line.startsWith("@@")) return "diff-line text-brand";
+  if (line.startsWith("@@")) return "diff-line text-info";
   return "diff-line";
 }
 
@@ -181,7 +181,7 @@ function ReviewWarnings({ warnings }: { warnings?: ReviewWarning[] }) {
     <div className={WARNING_LIST_CLASS} aria-label="Review warnings">
       {warnings.map((warning, index) => (
         <div className={WARNING_ROW_CLASS} key={`${warning.kind}-${warning.filePath ?? index}`}>
-          <AlertTriangle size={14} className="mt-[2px] shrink-0 text-on-warm" aria-hidden="true" />
+          <AlertTriangle size={14} className="mt-[2px] shrink-0 text-on-warning" aria-hidden="true" />
           <span className="min-w-0">{warningText(warning)}</span>
         </div>
       ))}

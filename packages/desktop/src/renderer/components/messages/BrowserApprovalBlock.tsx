@@ -17,7 +17,7 @@ const FOOTER_CLASS =
   "flex min-h-[46px] items-center justify-end gap-1.5 border-t border-line px-[var(--conversation-card-padding)] py-2";
 const BUTTON_CLASS = "h-7 rounded-act-sm border-0 px-3 text-[13px] font-medium transition-colors disabled:opacity-50";
 const DENY_CLASS = "bg-transparent text-text-muted hover:bg-surface-subtle focus-visible:bg-surface-subtle";
-const ALLOW_CLASS = "bg-brand text-white hover:bg-brand-strong focus-visible:bg-brand-strong";
+const ALLOW_CLASS = "bg-action text-on-action hover:bg-action-hover focus-visible:bg-action-hover";
 
 async function submitBrowserApproval(requestId: string, decision: BrowserDecision): Promise<boolean> {
   if (typeof window === "undefined" || !window.actspace?.submitApproval) return false;
@@ -70,7 +70,7 @@ export function BrowserApprovalBlock({
   return (
     <article className={`${CARD_CLASS}${className ? ` ${className}` : ""}`}>
       <header className={HEADER_CLASS}>
-        <Globe2 className="text-brand" size={15} strokeWidth={2} aria-hidden="true" />
+        <Globe2 className="text-info" size={15} strokeWidth={2} aria-hidden="true" />
         允许 ActSpace 在当前会话中使用浏览器？
       </header>
       <div className={BODY_CLASS}>

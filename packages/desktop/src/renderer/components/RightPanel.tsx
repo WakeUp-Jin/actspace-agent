@@ -32,7 +32,7 @@ const RIGHT_TAB_SCROLL_CLASS =
 const RIGHT_TAB_GROUP_BASE =
   "group inline-flex shrink-0 items-center gap-1 rounded-act-sm pl-2 pr-1 text-[12px] leading-none [pointer-events:auto] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_INACTIVE_CLASS = "bg-transparent text-text-muted";
-const RIGHT_TAB_ACTIVE_CLASS = "bg-brand-soft text-brand";
+const RIGHT_TAB_ACTIVE_CLASS = "bg-selected font-semibold text-text-main";
 const RIGHT_TAB_LABEL_CLASS =
   "max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent py-1 text-[inherit] text-[color:inherit] [cursor:pointer] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_CLOSE_CLASS =
@@ -42,8 +42,8 @@ const RIGHT_TAB_OVERFLOW_CLASS =
 const RIGHT_TAB_MENU_CLASS =
   "absolute right-0 top-[calc(100%+4px)] z-[70] max-h-[60vh] w-[220px] overflow-auto rounded-act-md border border-line bg-surface-raised/98 p-1 shadow-act-popover [pointer-events:auto] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_MENU_ITEM_CLASS =
-  "flex w-full items-center gap-2 rounded-act-sm px-2 py-1.5 text-left text-[12px] text-text-main [cursor:pointer] hover:bg-brand-soft";
-const RIGHT_TAB_MENU_ITEM_ACTIVE_CLASS = "bg-brand-soft text-brand";
+  "flex w-full items-center gap-2 rounded-act-sm px-2 py-1.5 text-left text-[12px] text-text-main [cursor:pointer] hover:bg-hover-overlay";
+const RIGHT_TAB_MENU_ITEM_ACTIVE_CLASS = "bg-selected font-semibold text-text-main";
 const RIGHT_TAB_MENU_LABEL_CLASS = "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap";
 const RIGHT_TAB_MENU_CLOSE_CLASS =
   "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main [cursor:pointer]";
@@ -54,11 +54,11 @@ const RIGHT_PANEL_LAUNCHER_CLASS =
   "grid min-h-0 flex-1 place-items-center overflow-auto bg-app-bg px-5 py-8";
 const RIGHT_PANEL_LAUNCHER_GRID_CLASS = "grid w-full max-w-[300px] grid-cols-2 gap-3";
 const RIGHT_PANEL_LAUNCHER_BUTTON_CLASS =
-  "group flex h-[108px] min-w-0 flex-col items-center justify-center gap-3 rounded-act-lg border border-line bg-surface px-3 text-[13px] font-medium text-text-muted transition-[background-color,border-color,color,transform] duration-150 hover:border-line-strong hover:bg-surface-subtle hover:text-text-main active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-app-bg disabled:opacity-45 disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-text-muted [cursor:pointer] disabled:[cursor:not-allowed]";
+  "group flex h-[108px] min-w-0 flex-col items-center justify-center gap-3 rounded-act-lg border border-line bg-surface px-3 text-[13px] font-medium text-text-muted transition-[background-color,border-color,color,transform] duration-150 hover:border-line-strong hover:bg-surface-subtle hover:text-text-main active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-app-bg disabled:opacity-45 disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-text-muted [cursor:pointer] disabled:[cursor:not-allowed]";
 const RIGHT_PANEL_LAUNCHER_LAST_BUTTON_CLASS =
   "col-span-2 w-[calc(50%_-_6px)] justify-self-center";
 const RIGHT_PANEL_LAUNCHER_ICON_CLASS =
-  "text-text-faint transition-colors duration-150 group-hover:text-text-muted group-focus-visible:text-brand";
+  "text-text-faint transition-colors duration-150 group-hover:text-text-muted group-focus-visible:text-text-main";
 
 export function RightPanel({
   contextState,

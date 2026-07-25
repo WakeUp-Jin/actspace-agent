@@ -124,7 +124,7 @@ svg {
       90deg,
       transparent 0%,
       transparent 35%,
-      var(--act-color-brand) 50%,
+      var(--act-color-operational) 50%,
       transparent 65%,
       transparent 100%
     );
@@ -141,7 +141,7 @@ svg {
 
 @media (prefers-reduced-motion: reduce) {
   .tool-log-text-running::after {
-    color: var(--act-color-brand);
+    color: var(--act-color-operational);
     background: none;
     animation: none;
     -webkit-text-fill-color: currentColor;

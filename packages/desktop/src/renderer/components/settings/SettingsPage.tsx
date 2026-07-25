@@ -51,9 +51,9 @@ import {
 } from "../../appearance/types";
 
 const BTN_PRIMARY =
-  "inline-flex h-8 items-center rounded-act-md bg-brand px-3.5 text-[13px] font-semibold text-white transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-8 items-center rounded-act-md bg-action px-3.5 text-[13px] font-semibold text-on-action transition hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-60";
 const BTN_SECONDARY =
-  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-line-strong hover:bg-hover-overlay disabled:cursor-not-allowed disabled:opacity-60";
 const BTN_DANGER =
   "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-on-danger transition hover:border-on-danger/40 hover:bg-danger-soft";
 const AGENT_SYSTEM_PROMPT_MAX_CHARS = 20_000;
@@ -566,7 +566,7 @@ function LocalUpdateProgressDialog({
             <div
               className={[
                 "flex h-10 w-10 shrink-0 items-center justify-center rounded-act-lg",
-                isFailed ? "bg-danger-soft text-on-danger" : isSucceeded ? "bg-success-soft text-on-success" : "bg-brand-soft text-brand",
+                isFailed ? "bg-danger-soft text-on-danger" : isSucceeded ? "bg-success-soft text-on-success" : "bg-operational-soft text-operational",
               ].join(" ")}
               aria-hidden="true"
             >
@@ -606,7 +606,7 @@ function LocalUpdateProgressDialog({
           <div
             className={[
               "h-full rounded-act-pill transition-all duration-300",
-              isFailed ? "bg-danger" : isSucceeded ? "bg-success" : "bg-brand",
+              isFailed ? "bg-danger" : isSucceeded ? "bg-success" : "bg-operational",
             ].join(" ")}
             style={{ width: progressWidth }}
           />
@@ -622,7 +622,7 @@ function LocalUpdateProgressDialog({
                   className={[
                     "flex h-5 w-5 items-center justify-center rounded-act-pill border text-[10px] font-semibold",
                     current && isActive
-                      ? "border-brand bg-brand text-white"
+                      ? "border-operational bg-operational text-on-operational"
                       : done
                         ? "border-success bg-success-soft text-on-success"
                         : "border-line bg-surface text-text-faint",
@@ -999,7 +999,7 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
               setDraftPrompt(event.target.value);
               setSaved(false);
             }}
-            className="h-[132px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle focus:border-brand"
+            className="h-[132px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20"
             spellCheck={false}
             aria-label="主 Agent 自定义系统提示词"
             disabled={!promptBridgeReady || !promptFile}
@@ -1407,7 +1407,7 @@ function ProviderKeyModal({
           onKeyDown={(event) => {
             if (event.key === "Enter") void submit();
           }}
-          className="mt-4 h-10 w-full rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none transition-colors focus-visible:border-brand"
+          className="mt-4 h-10 w-full rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none transition-colors focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
         />
         {error ? <p className="mt-2 text-[12px] text-on-danger">{error}</p> : null}
         <div className="mt-5 flex justify-end gap-2">

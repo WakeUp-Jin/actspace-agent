@@ -265,14 +265,34 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("新建定时任务");
   });
 
-  it("renders a muted status dot on every session row by default", () => {
+  it("keeps one status dot on the left and places pin actions on the right", () => {
     const { container } = renderSidebar();
 
     const sessionRows = container.querySelectorAll(".session-row:not(.is-muted)");
     expect(sessionRows.length).toBeGreaterThan(0);
     sessionRows.forEach((row) => {
-      expect(row.querySelector(".session-status-dot")).not.toBeNull();
+      expect(row.querySelectorAll(".session-status-dot")).toHaveLength(1);
+      expect(row.querySelector(".session-row-marker .session-row-pin")).toBeNull();
+      expect(row.querySelector(".session-row-actions .session-row-pin")).not.toBeNull();
     });
+  });
+
+  it("keeps time last and always visible while trailing actions stay hover-only", () => {
+    const { container } = renderSidebar({ activeSessionId: "s-pinned-1" });
+    const row = screen.getByText("Bash 工具开发与权限调度").closest(".session-row");
+    expect(row).not.toBeNull();
+
+    const children = Array.from((row as HTMLElement).children);
+    const actions = row?.querySelector(".session-row-actions");
+    const time = row?.querySelector(".session-row-time");
+    expect(actions).not.toBeNull();
+    expect(time).not.toBeNull();
+
+    const pin = within(actions as HTMLElement).getByRole("button", { name: "Unpin session" });
+    expect(children.indexOf(actions as Element)).toBeLessThan(children.indexOf(time as Element));
+    expect(time).not.toHaveClass("opacity-0");
+    expect(pin).not.toHaveClass("opacity-100");
+    expect(container.querySelector(".session-row-actions + .session-row-time")).not.toBeNull();
   });
 
   it("does not show the session detail hover card from sidebar rows", async () => {

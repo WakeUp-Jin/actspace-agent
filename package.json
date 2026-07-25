@@ -14,6 +14,7 @@
     "check:docs": "./scripts/check-docs.sh",
     "check:secrets": "./scripts/check-secrets.sh",
     "check:repo": "./scripts/check-repo-hygiene.sh",
+    "check:frontend-theme": "node scripts/check-frontend-theme-colors.mjs",
     "check:actions": "./scripts/check-action-pinning.sh",
     "build:browser-locator": "node scripts/build-browser-locator-runtime.mjs",
     "check:browser": "node --check plugins/browser-bridge/apps/chrome-extension/src/background.js && node --check plugins/browser-bridge/apps/chrome-extension/src/cursor-overlay.js && pnpm --dir packages/desktop exec tsc -p ../../plugins/browser-bridge/apps/cli/internal/locator/runtime-src/tsconfig.json && node scripts/build-browser-locator-runtime.mjs --check && node scripts/check-browser-command-registry.mjs && node scripts/test-browser-locator-runtime.mjs && node scripts/test-browser-cursor-runtime.mjs && node scripts/test-browser-extension-contract.mjs",

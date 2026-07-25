@@ -55,8 +55,10 @@ button {
 
 ```tsx
 const primaryButtonClass =
-  "inline-flex h-8 items-center rounded-act-md border border-[#2157d6] bg-[#2563eb] text-white";
+  "inline-flex h-8 items-center rounded-act-md bg-action px-3 text-on-action transition hover:bg-action-hover";
 ```
+
+颜色职责应使用 `action`、`operational`、`warning`、`danger` 等主题感知语义 token；不要在组件示例中重新引入固定色值或笼统的品牌色。
 
 ## 排查流程
 

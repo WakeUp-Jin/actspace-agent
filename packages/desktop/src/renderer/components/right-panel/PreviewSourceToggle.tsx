@@ -3,7 +3,7 @@ export type PreviewMode = "preview" | "source";
 const GROUP_CLASS = "inline-flex items-center gap-0.5 rounded-act-sm border border-line bg-surface-subtle p-0.5";
 const BUTTON_BASE =
   "rounded-[5px] border-0 px-2 py-0.5 text-[11px] leading-none [cursor:pointer] [-webkit-app-region:no-drag]";
-const BUTTON_ACTIVE = "bg-brand-soft text-brand";
+const BUTTON_ACTIVE = "bg-selected font-semibold text-text-main";
 const BUTTON_INACTIVE = "bg-transparent text-text-muted hover:text-text-main";
 
 /** Preview / 源码 分段控件，Markdown 与 HTML 渲染视图共用。 */

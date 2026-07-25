@@ -6,7 +6,7 @@
 
 - 入口聚合：聊天态新建（New Agent）以及 Lab / Usage / Kairos 三个占位入口，外加顶栏窗口控件。
 - 会话导航：让用户在大量历史会话之间快速切换。
-- 状态指示：把"当前选中""有运行中 turn / 待审批工具"这类二态合并显示为行首蓝点。
+- 状态指示：把当前选中、运行中 turn、待审批和失败等状态集中显示在行首状态点。
 - 全局设置入口：底部 Settings。
 
 它属于聊天态工作台的可调面板区域，宽度和折叠规则见 `工作台布局与面板交互规范.md`。
@@ -61,7 +61,7 @@
 - 跨 Workspace 的顶层固定分区。
 - 用户可手动 pin/unpin 任意会话。
 - 至少有一个会话被 pin 时出现，没有则该 section 隐藏。
-- Pinned 区会话的图钉始终为深色填充（`<Pin fill="currentColor" />` + `color: var(--color-text)`），区别于未 pin 状态下 hover 才出现的描边图钉。
+- Pinned 区会话 hover 时显示深色填充图钉（`<Pin fill="currentColor" />`），区别于未 pin 状态下的描边图钉；非 hover 时仍隐藏操作，让时间列成为唯一常显的行尾信息。
 
 ### Scheduled
 
@@ -92,28 +92,25 @@
 ## 会话行
 
 - 高度紧凑（约 36px），保持高密度文本导航的气质，不做卡片。
-- 整行用 grid 三列布局：`marker 14px | main 1fr | actions auto`，padding 0 8px、gap 8px。这套 grid 与 workspace folder 头**完全一致**，因此每条 session 的左侧锚点和右侧操作位都跟其所属 workspace folder 的对应位置严格对齐。
-- 字号：`title` 13px / 500；`time` 11px / `--color-text-faint`，紧凑相对时间（`1h` / `3d` 缩写），选中态时淡出让位给 active 体验。
+- 整行用 grid 四段布局：`marker 14px | title 1fr | actions 46px | time auto`，padding 0 8px、gap 8px。左侧状态与标题继续和 workspace folder 对齐，右侧时间形成稳定扫描列。
+- 字号：`title` 13px / 500；`time` 11px / `--color-text-faint`，紧凑相对时间（`1h` / `3d` 缩写）。时间位于最右侧，在普通、选中和 hover 状态下始终显示。
 - Hover 时背景轻灰；当前选中态使用更深一点的浅灰底。
 
-### 左侧 marker（状态点 + Pin 按钮叠层）
+### 左侧 marker（唯一状态点）
 
-- marker 列宽 14px，内含两层（同位绝对叠加，靠 opacity 互斥切换，避免 layout 抖动）：
-  - **`<span class="session-status-dot">`** — 状态点：
-    - `is-muted`（默认）：`--color-text-faint` + opacity 0.55 灰点；提供视觉锚点和"这一行可点击"的暗示。
-    - `is-active`：选中行使用 `--color-brand` 实心蓝点。
-    - `is-busy`：该会话有运行中 turn / 待审批工具时，蓝色 + 呼吸动画。
-  - **`<button class="session-row-pin">`** — Pin / Unpin 按钮：
-    - 默认 `opacity: 0`，行 hover 或会话已 pin 时淡入；同时让 dot 淡出，避免重叠。
-    - 已 pin 的会话即便 hover 退出也保持显示，图标用 `<Pin fill="currentColor" />` + `var(--color-text)` 深色填充，与未 pin 的描边图钉做权重对比。
-- **Pin 按钮位置选择**：actspace 跟随 Cursor，把 pin 操作放在行首 marker 列而不是行尾 actions 列。这样选中"这条会话已经被钉起来"的视觉信号和"我要钉/取消钉"的操作命中区都集中在视线最左端，跟 archive（行尾）形成"左 = 关于这条会话的状态/权重，右 = 对这条会话的破坏性操作"的方向感分工。
+- marker 列宽 14px，只渲染一个可点击的 `session-status-dot`，不再在行尾重复显示同一状态。
+- 默认 idle 使用中性灰点；active / busy 使用 operational green，waiting approval 使用 warning，failed / interrupted 使用 danger。
+- 点击状态点仍可查看状态名称和说明，移除重复点不牺牲原有状态详情功能。
+- Pin 不再覆盖状态点，因此置顶、选中、运行等状态可以同时表达，标题起点也不会因置顶状态变化。
 
 ### 右侧 actions
 
-- 当前只放一个 **Archive** 按钮（`<Archive>` icon），22×22，hover 行时淡入。
+- 固定顺序为 **Pin / Unpin → Archive → 时间戳**；两个按钮均为 22×22，时间戳始终在最右侧。
+- Pin 与 Archive 只在行 hover 或各自获得 keyboard focus 时淡入；已置顶通过填充 Pin 表达，但不在非 hover 状态常显。
+- actions 固定预留 46px，避免 hover 时标题截断位置或时间戳横向跳动。
 - 非当前会话点击 Archive 会调用 `archiveSession({ sessionId, archived: true })`，写入 `SessionMeta.archived` 后从普通侧边栏列表隐藏。
 - 当前 active session 不允许归档，Archive 按钮保持占位但禁用，`aria-label` / `title` 为 `Current session cannot be archived`，避免当前工作区被操作清空或自动跳转。
-- 行尾不再出现状态点。
+- 行尾不显示状态点，避免左右两边出现语义相同的圆点。
 
 ### 右键菜单与重命名
 

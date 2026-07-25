@@ -21,9 +21,9 @@ const SPLIT_VIEW_PANE_CLASS = "min-h-0 min-w-0 overflow-hidden";
 const SPLIT_SEPARATOR_CLASS =
   "group absolute bottom-0 top-0 z-[32] grid w-[14px] -translate-x-1/2 cursor-col-resize touch-none place-items-center focus-visible:outline-offset-[-2px]";
 const SPLIT_SEPARATOR_LINE_BASE_CLASS =
-  "h-full w-px bg-transparent transition-[background,box-shadow] duration-[160ms] ease-in-out group-hover:bg-[rgba(47,111,255,0.46)] group-hover:shadow-[0_0_0_3px_rgba(47,111,255,0.08)] group-active:bg-[rgba(47,111,255,0.46)] group-active:shadow-[0_0_0_3px_rgba(47,111,255,0.08)] group-focus-visible:bg-[rgba(47,111,255,0.46)] group-focus-visible:shadow-[0_0_0_3px_rgba(47,111,255,0.08)]";
+  "h-full w-px bg-transparent transition-[background,box-shadow] duration-[160ms] ease-in-out group-hover:bg-line-strong group-hover:shadow-[0_0_0_3px_var(--act-color-selection)] group-active:bg-focus-ring group-active:shadow-[0_0_0_3px_var(--act-color-selection)] group-focus-visible:bg-focus-ring group-focus-visible:shadow-[0_0_0_3px_var(--act-color-selection)]";
 const SPLIT_SEPARATOR_LINE_RESIZING_CLASS =
-  "bg-[rgba(47,111,255,0.46)] shadow-[0_0_0_3px_rgba(47,111,255,0.08)]";
+  "bg-focus-ring shadow-[0_0_0_3px_var(--act-color-selection)]";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);

@@ -2,103 +2,239 @@
 
 ## 定位
 
-这份文档定义 `actspace` 桌面端的**主题机制**与**颜色落地的硬约束**。它是所有前端样式工作的前置规则：**任何写颜色的地方，先读这里**。
+这份文档定义 ActSpace 桌面端的三态主题机制、目标颜色职责和实现硬约束。任何修改颜色的工作都必须先读本文件。
 
-核心结论一句话：**颜色必须随主题翻转。组件里只允许使用语义 token / 语义 Tailwind 类，不允许写「不随主题变化的颜色字面量」承载主题相关的文字、背景、边框。**
+核心原则：
 
-`actspace` 支持 **浅色 / 深色 / 跟随系统** 三态主题。任何新写的、或被改动的样式，都必须在两套主题下都成立——这不是「深色专项」一次性的事，而是从此以后的默认要求。
+> 组件只消费语义 token；颜色随主题翻转；action、operational、semantic 和 data visualization 必须分离。
 
-## 主题机制（先理解，再写样式）
+`Ink & Emerald` 已在 renderer 落地。旧蓝色 `brand` 与旧 `warm` 消费已清零，后续新增颜色必须通过 `pnpm check:frontend-theme` 的 token 完整性与防回流检查。
 
-1. **单一事实源是 CSS 变量**：所有颜色集中定义为语义 token `--act-color-*`（见 `styles/tokens.css`）。`styles/tailwind.css` 的 `@theme inline` 把 Tailwind 的 `--color-surface` 等映射到 `var(--act-color-surface)`。
-2. **组件只消费语义类**：`bg-surface` / `text-text-main` / `border-line` / `bg-brand-soft` / `text-on-danger` …。这些类的颜色由变量层决定。
-3. **主题切换 = 换 `<html data-theme>`**：
-   - `data-theme="light"` → 用 `:root` 默认浅色值。
-   - `data-theme="dark"` → `:root[data-theme="dark"]` 覆盖整组 `--act-color-*`。
-   - `data-theme="system"` → `:root[data-theme="system"]` 下用 `@media (prefers-color-scheme: dark)` 自动跟随 OS，**无需 JS 监听**。
-4. **少数「深色补一笔」用自定义 `dark:` variant**：`tailwind.css` 里 `@custom-variant dark` 已对齐 `data-theme="dark"` 与 system 下的 `prefers-color-scheme`。需要深色额外样式时写 `dark:shadow-[...]`，口径和变量层一致。
-5. **Electron 原生 chrome 单独同步**：`applyAppearance` 在写 `data-theme` 的同时调 `window.actspace.setNativeTheme(mode)` → 主进程 `nativeTheme.themeSource`，让交通灯 / 系统滚动条 / 右键菜单跟随主题。CSS 管不到这些。
+## 三态主题机制
 
-> 收口的本质：只要组件用语义类，深色覆盖一组 `--act-color-*` 就整体翻转。**问题 100% 出在硬编码的颜色字面量上。**
+ActSpace 支持：
 
-## 硬约束：禁止非主题感知的颜色字面量
+- `light`：显式浅色。
+- `dark`：显式深色。
+- `system`：跟随操作系统。
 
-下列写法用于承载「主题相关的文字 / 背景 / 边框」时**一律禁止**，因为它们在主题切换时不会翻转，必然在某一套主题下出错（最典型：深色背景上的 `text-black` 黑字看不见）：
+当前实现机制保持：
+
+1. CSS 变量是颜色单一事实源，集中定义在 `styles/tokens.css`。
+2. `styles/tailwind.css` 将语义 Tailwind 类映射到 `--act-color-*`。
+3. `<html data-theme="light|dark|system">` 控制主题。
+4. `system` 通过 `prefers-color-scheme` 翻转，不需要组件监听系统主题。
+5. Electron `nativeTheme.themeSource` 同步交通灯、滚动条和系统菜单。
+
+## 新的颜色职责
+
+### Neutral
+
+负责 App、Sidebar、Surface、Selected、Hover、Border 和文本层级。导航选中和普通 hover 不再消费彩色品牌 token。
+
+### Action
+
+负责发送、确认提交等最高优先级动作。目标形态是主题反色：浅色近黑底，深色近白底。
+
+### Operational
+
+负责 running、connected、enabled、healthy 和显式 success。目标 accent 为翡翠绿；diff additions 仍使用独立 diff token。
+
+### Semantic
+
+- Info：信息提示和有限蓝色编码。
+- Warning：风险、等待审批和阈值预警。
+- Danger：错误、删除、失败和 diff removals。
+- Success：完成确认；通常与 operational 共享绿色家族，但语义名称仍应明确。
+
+### Visualization
+
+Chart、Context bucket、热力图等使用独立数据色，不映射到 action 或 operational。
+
+## 已落地 token 拆分
+
+当前实现按以下职责落地，禁止重新合并成单一强调色：
+
+```css
+/* neutral */
+--act-color-bg;
+--act-color-sidebar;
+--act-color-surface;
+--act-color-surface-subtle;
+--act-color-selected;
+--act-color-hover-overlay;
+--act-color-border;
+--act-color-border-strong;
+--act-color-text;
+--act-color-text-muted;
+--act-color-text-faint;
+
+/* main action */
+--act-color-action;
+--act-color-action-hover;
+--act-color-on-action;
+
+/* operational */
+--act-color-operational;
+--act-color-operational-hover;
+--act-color-operational-soft;
+--act-color-on-operational;
+
+/* semantic */
+--act-color-info;
+--act-color-info-soft;
+--act-color-warning;
+--act-color-warning-soft;
+--act-color-danger;
+--act-color-danger-soft;
+--act-color-on-danger;
+--act-color-on-danger-solid;
+--act-color-success;
+--act-color-success-soft;
+--act-color-on-success;
+
+/* specialized */
+--act-chart-series-1;
+--act-chart-series-2;
+--act-context-system;
+--act-context-tools;
+--act-color-diff-add-bg;
+--act-color-diff-add-text;
+--act-color-diff-remove-bg;
+--act-color-diff-remove-text;
+--act-color-focus-ring;
+--act-color-operational-focus-ring;
+```
+
+具体命名在代码迁移计划中可以结合现有 token 收敛，但职责不能重新合并。
+
+## 目标浅深色基线
+
+详细色板见根 `DESIGN.md` 和 `front-全局视觉语言规范.md`。关键方向：
+
+- Light：暖中性灰背景、白色 surface、近黑文字、深翡翠绿 operational。
+- Dark：暖黑灰背景、非纯黑 surface、柔和浅文字、明亮但不霓虹的翡翠绿 operational。
+- Blue：仅保留 info / chart / Context 数据编码。
+- Amber：只用于 warning。
+- Red：只用于 danger / diff removal。
+
+## 硬约束：禁止非主题感知字面量
+
+主题相关的文字、背景、边框和状态色禁止直接写：
 
 ```tsx
-// ❌ 禁止：这些颜色不随主题变化
-text-black        text-white(用于正文/标题/数字时)
-bg-white          bg-black
-text-[#12151c]    text-[#ffffff]
-bg-[#ffffff]      bg-[#fafbfe]
-border-[#e6e8ef]
-text-[rgba(32,33,36,0.72)]
-hover:bg-black/[0.04]   // 深色态下几乎不可见
+text-black
+text-white        // 作为普通正文时
+bg-white
+bg-black
+text-[#20201e]
+bg-[#f7f7f5]
+border-[#deded9]
+text-[rgba(...)]
 ```
 
-对应的正确写法（语义类，随主题翻转）：
+必须使用语义类或 CSS 变量：
 
-| 用途 | ❌ 字面量 | ✅ 语义类 / token |
-| --- | --- | --- |
-| 主文字 / 标题 / 大数字 | `text-black` `text-[#12151c]` | `text-text-main` |
-| 次级 / 弱化文字 | `text-[#6c7281]` | `text-text-muted` / `text-text-faint` / `text-text-subtle` |
-| 卡片 / 面板背景 | `bg-white` | `bg-surface` |
-| 浮层 / 模态 / popover 背景 | `bg-white` | `bg-surface-raised` |
-| 页面 / 次级背景 | `bg-[#f7f9fc]` | `bg-app-bg` / `bg-surface-subtle` |
-| 边框 | `border-[#e6e8ef]` | `border-line` / `border-line-strong` |
-| hover 叠加 | `hover:bg-black/[0.04]` | `hover:bg-[var(--act-color-hover-overlay)]` |
-| 状态底色 | `bg-[#fdeaea]` | `bg-danger-soft` / `bg-success-soft` / `bg-warm-soft` |
-| 状态前景 | `text-[#d04444]` | `text-on-danger` / `text-on-success` / `text-on-warm` |
+| 用途 | 正确方向 |
+|---|---|
+| 主文字 | `text-text-main` |
+| 次级文字 | `text-text-muted` / `text-text-faint` |
+| App / Surface | `bg-app-bg` / `bg-surface` / `bg-surface-subtle` |
+| 选中 / Hover | `bg-selected` / hover overlay token |
+| 边框 | `border-line` / `border-line-strong` |
+| 主操作 | action token / 对应语义类 |
+| 运行与开启 | operational token / 对应语义类 |
+| 错误与风险 | danger / warning token |
 
-需要新颜色时，**先扩展 `tokens.css` 的语义 token（浅 + 深两套）并在 `tailwind.css` 映射**，再在组件里用语义类——不要在组件里随手写新 hex。
+需要新颜色时，先扩展浅色和深色两套 token，再映射 Tailwind 类。禁止先在组件中写 hex，之后再“考虑抽 token”。
 
-## 合法例外（必须刻意判断，不是默认）
+## 合法例外
 
-以下情况允许保留颜色字面量，但**每一处都要明确「它在两套主题下都成立」**：
+颜色字面量只在明确证明浅深主题都成立时允许：
 
-1. **品牌底 + 白字**：`bg-brand text-white` / `bg-brand-soft`。品牌蓝在深色态也保持饱和蓝，白字对比足够。✅
-2. **恒定反色元素**：深色 tooltip（如 `ToolLogLine` 的悬浮提示）。它在浅色态本就是暗底白字，深色态也保持——**不要把它收进语义 token**，否则深色下会变浅、对比丢失。✅
-   - 注意：`ContextPopup`（上下文用量弹层）**不属于**本例外。它是主题感知的浮层，浅色主题用浅色弹层、深色主题用深色弹层，外壳走 `bg-surface-raised` / `text-text-*` / `border-line` 等语义 token；其中 bucket 配色属于「数据可视化色」，见下节用 `--act-context-*`（浅/深各一套）。
-3. **白色控件旋钮**：开关 thumb 的 `bg-white` 是 iOS 式惯例，两套主题都白。✅
-4. **半透明叠加色**：低 alpha 的 `rgba()`（如阶段色 tint `bg-[rgba(47,111,255,0.05)]`、`bg-black/35` 模态遮罩）。半透明色叠加在任意深浅背景上都成立。✅
-5. **装饰性阴影 / 光晕**：`shadow-[0_8px_18px_rgba(47,111,255,0.18)]` 这类品牌/危险态光晕。必要时补 `dark:shadow-[...]` 减弱。✅
-6. **数据可视化色**：见下节。
+1. 恒定反色 tooltip 或遮罩。
+2. Toggle 白色 thumb 等跨主题恒定部件。
+3. 低 alpha overlay、阴影和非语义装饰。
+4. 外部品牌 logo 的官方颜色。
+5. 数据可视化局部色，但优先仍应抽成 chart / context token。
+6. 不随主题变化的媒体内容本身。
 
-判断口诀：**这处颜色，在「白底」和「黑底」上都看得清、不出戏吗？** 不确定就用语义 token。
+“品牌底 + 白字”不再是通用豁免。ActSpace 主操作需要随主题反色，operational green 也必须有浅深两套值。
 
-## 数据可视化色
+## Focus
 
-图表色板、看板阶段色、状态点、热力图——这些是「信息编码」，**不能一律映射成中性 token**（翻成 `border-line` 就丢了语义）。做法：
+- 键盘 focus 必须清晰可见，不能只依赖背景轻微变化。
+- 普通控件优先使用高对比中性 focus ring。
+- operational 控件可以使用 operational ring，但不能把所有 focus 都染绿。
+- focus、selected、running 是三个不同状态，不共享同一个彩色 token。
 
-- 抽成 `--act-chart-series-1..6`（`tokens.css` 浅深各定一组），组件从 CSS 变量读色：`from-brand via-[var(--act-chart-series-2)] to-[var(--act-chart-series-3)]`。
-- 对比敏感的（如热力图格子）补显式 `dark:` 变体：`bg-[#cfe0ff] dark:bg-[#27406e]`。
-- 状态语义色用 `bg-danger` / `bg-success` / `bg-warm` + soft/on 变体，已随主题定义。
-- `ContextPopup` 的 bucket 配色用 `--act-context-system/tools/rules/skills/mcp/subagents/conversation/fallback`（`tokens.css` 浅深各一组），由 `@actspace/shared` 的 `CONTEXT_BUCKET_REGISTRY.colorVar` 引用；新增 bucket = 注册表加一行 + 这里加一对 token，组件不动。
+## 数据可视化
 
-## 新增 / 修改样式自检清单
+- 图表系列色保持低饱和，并在深色主题重新校准亮度。
+- Context bucket 使用 `--act-context-*` 独立 token。
+- Heatmap 必须验证空值、低值、高值和 hover/focus 对比度。
+- 图表蓝色是合法数据色，但不能回流成按钮、导航或 focus 默认色。
+- diff additions / removals 使用独立 diff token，不复用 Toggle 或 danger button 背景。
 
-写完任何带颜色的样式，过一遍：
+## 组件颜色规则
 
-1. 这处颜色用的是语义类（`text-text-main` / `bg-surface` / `border-line` …）还是字面量？
-2. 如果是字面量，它属于上面 6 类「合法例外」中的哪一类？说不出来 → 改成语义 token。
-3. 新加的颜色在 `tokens.css` 里有浅 + 深两套定义吗？
-4. 提交前自查遗漏（黑/白/hex/rgba 字面量）：
+### Sidebar
+
+- selected = 中性灰。
+- busy / running dot = operational green。
+- 普通 icon = currentColor 中性灰黑。
+
+### Composer
+
+- send = action token。
+- running = operational 小型反馈。
+- Context usage = 默认中性，阈值切 warning / danger。
+
+### Message tools
+
+- 默认和 completed = neutral。
+- running shimmer overlay = operational。
+- approval = warning，failed = danger。
+
+### Settings
+
+- nav selected = neutral。
+- Toggle on = operational。
+- 连接成功 = operational，连接错误 = danger。
+
+### Kairos
+
+- running / healthy = operational。
+- sleep / waiting = neutral。
+- warning = warning，failed = danger。
+- selected row = neutral，不使用绿色或蓝色大面积底色。
+
+## 维护纪律
+
+- renderer 中不再允许旧强调色 alias 或 utility 回流。
+- 新增语义 token 必须同时定义 light、dark、system-dark 三个分支。
+- Tailwind 颜色映射只能引用 `tokens.css` 已定义的 token。
+- 组件颜色字面量只允许精确用途 allowlist，不允许目录级豁免。
+- 运行 `pnpm check:frontend-theme` 验证上述契约。
+
+## 自检
 
 ```sh
-rg -n "text-black|bg-black|bg-white|text-\[#|bg-\[#|border-\[#|rgba\(" packages/desktop/src/renderer/<改动文件>
+pnpm check:frontend-theme
 ```
 
-逐条确认命中项都是「合法例外」，否则收口成语义 token。
+逐项检查：
+
+1. 它属于 neutral、action、operational、semantic 还是 visualization？
+2. 浅色和深色是否都有定义？
+3. 是否错误地用绿色表达 selected 或普通按钮？
+4. 状态是否还有文字、形状或图标冗余表达？
+5. keyboard focus 是否清晰？
 
 ## 验收要求
 
-- **新写或改动的页面 / 组件，必须在浅色与深色两套主题下都验过**（浏览器 mock 切 `data-theme`，或 Electron 切主题）。「只在浅色下看着对」不算通过。
-- 重点抽查：大数字 / 标题（最常漏 `text-black`）、卡片背景、边框、hover 态、状态徽标。
-- 浅色态相对改动前应**零视觉回归**（token 收口是等价替换，浅色值不变）。
-
-## 关联
-
-- 机制与色板基线：`全局视觉语言规范.md`（色彩原则 / 基础色板）。
-- 样式作用域（全局 CSS vs 组件 utility）：`docs/coding-standards/team/frontend-style-scope-conventions.md`。
-- 三态主题落地记录：`docs/histories/2026-05/20260529-2340-appearance-dark-theme.md`。
-- 可迁移模式提炼：`docs/learnings/2026-05/tailwind-v4-three-state-theme.md`。
+- 浅色、深色、跟随系统三态都必须验证。
+- 验证 Sidebar、Composer、Settings 三个代表样板后，才允许大范围迁移页面。
+- 检查 hover、selected、pressed、disabled、focus、running、success、warning、danger。
+- 目标色板迁移是有意视觉变化，不要求相对旧蓝色界面零视觉回归；要求相对确认后的新样板保持一致。
+- Electron 原生 chrome 和滚动条必须与主题同步。

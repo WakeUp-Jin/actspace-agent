@@ -36,7 +36,7 @@ import { TOOL_ITEMS } from "./tool-catalog";
  */
 
 const BTN_SECONDARY =
-  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-line-strong hover:bg-hover-overlay disabled:cursor-not-allowed disabled:opacity-60";
 const ICON_BTN =
   "grid h-9 w-9 shrink-0 place-items-center rounded-act-md border border-line bg-surface text-text-faint transition-colors hover:border-on-danger/40 hover:text-on-danger";
 
@@ -525,7 +525,7 @@ function BudgetBalanceField({
         }}
         className={[
           "h-9 w-[120px] rounded-act-md border border-line bg-surface px-3 text-right text-[13px] font-medium tabular-nums text-text-main outline-none transition-colors",
-          disabled ? "cursor-not-allowed opacity-60" : "hover:border-brand/40 focus-visible:border-brand",
+          disabled ? "cursor-not-allowed opacity-60" : "hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20",
         ].join(" ")}
       />
     </div>
@@ -730,7 +730,7 @@ function InlineEdit({
           }
         }}
         className={[
-          "h-8 rounded-act-md border border-brand bg-surface px-2.5 text-text-main outline-none",
+          "h-8 rounded-act-md border border-focus-ring bg-surface px-2.5 text-text-main outline-none ring-2 ring-focus-ring/20",
           mono ? "font-mono text-[12px]" : "text-[13px]",
           className ?? "w-full",
         ].join(" ")}
@@ -1056,7 +1056,7 @@ function SoulForm({ value, onSave }: { value: string; onSave: (text: string) => 
           }}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commit}
-          className="min-h-[140px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle focus:border-brand"
+          className="min-h-[140px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20"
         />
       </div>
     </SettingGroup>
@@ -1246,7 +1246,7 @@ function formatInterval(sec: number): string {
 
 function BriefStatusBadge({ status }: { status: KairosBriefSummary["status"] }) {
   const map: Record<KairosBriefSummary["status"], { label: string; cls: string }> = {
-    active: { label: "启用", cls: "bg-brand-soft text-brand" },
+    active: { label: "启用", cls: "bg-operational-soft text-operational" },
     paused: { label: "暂停", cls: "bg-surface-subtle text-text-faint" },
     done: { label: "已完成", cls: "bg-surface-subtle text-text-faint" },
     failed: { label: "失败", cls: "bg-surface-subtle text-on-danger" },
@@ -1285,7 +1285,7 @@ function BriefEditor({
             placeholder="daily-report（字母/数字/-/_）"
             spellCheck={false}
             onChange={(e) => onChange({ ...draft, id: e.target.value })}
-            className="h-8 min-w-0 flex-1 rounded-act-md border border-line bg-surface px-2.5 font-mono text-[12px] text-text-main outline-none transition-colors focus:border-brand"
+            className="h-8 min-w-0 flex-1 rounded-act-md border border-line bg-surface px-2.5 font-mono text-[12px] text-text-main outline-none transition-colors focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20"
           />
         </label>
       ) : null}
@@ -1339,7 +1339,7 @@ function BriefEditor({
         placeholder={"# 任务说明\n写清楚要 Kairos 做什么、产出放哪里。"}
         spellCheck={false}
         onChange={(e) => onChange({ ...draft, body: e.target.value })}
-        className="min-h-[120px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle focus:border-brand"
+        className="min-h-[120px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors placeholder:text-text-subtle focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20"
       />
       <div className="flex items-center justify-between gap-3">
         {!idValid && draft.id.trim().length > 0 ? (
@@ -1406,7 +1406,7 @@ function RuleForm({ value, onSave }: { value: string; onSave: (text: string) => 
           }}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commit}
-          className="min-h-[160px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors focus:border-brand"
+          className="min-h-[160px] w-full resize-y overflow-auto rounded-act-md border border-line bg-surface-subtle px-3 py-2.5 font-mono text-[12px] leading-relaxed text-text-main outline-none transition-colors focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20"
         />
       </div>
     </SettingGroup>

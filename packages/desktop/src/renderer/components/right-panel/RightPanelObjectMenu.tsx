@@ -16,7 +16,7 @@ import { useRightPanel } from "./RightPanelContext";
 const MENU_CLASS =
   "absolute right-0 top-[calc(100%+4px)] z-[70] w-[188px] rounded-act-md border border-line bg-surface-raised/98 p-1.5 shadow-act-popover [-webkit-app-region:no-drag]";
 const MENU_ITEM_CLASS =
-  "flex min-h-[34px] w-full items-center gap-2.5 rounded-act-sm border-0 bg-transparent px-2.5 text-left text-[13px] font-medium text-text-main transition-colors hover:bg-brand-soft hover:text-brand [cursor:pointer]";
+  "flex min-h-[34px] w-full items-center gap-2.5 rounded-act-sm border-0 bg-transparent px-2.5 text-left text-[13px] font-medium text-text-main transition-colors hover:bg-hover-overlay [cursor:pointer]";
 
 export function RightPanelObjectMenu({
   sessionId,

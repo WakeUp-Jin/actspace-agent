@@ -2,115 +2,99 @@
 
 ## 定位
 
-这份文档定义 `actspace` 桌面端的全局视觉语言。它优先约束字体、颜色、间距、圆角、阴影和动效 token，避免不同组件各自发明局部样式。
+这份文档把根目录 `DESIGN.md` 的 `Ink & Emerald / 墨色与翡翠绿` 方向转换成桌面端可执行的视觉规则。它约束字体、颜色职责、密度、间距、圆角、边框、阴影、图标和动效，避免组件各自发明局部风格。
 
-后续修改前端 UI 时，应先确认这里的全局规则，再进入具体组件规范。
+本规范描述目标设计。当前代码 token 尚未完成迁移，不能因为文档已经更新就宣称界面已经完成换肤。
 
 ## 设计方向
 
-`actspace` 的视觉气质是：轻量桌面工作台、克制、清晰、长期使用不疲劳。
+ActSpace 的视觉气质是：安静、精确、克制、高密度、适合长期停留的 Agent 编辑工作台。
 
-当前方向可以概括为：
+一句话概括：
 
-- 黑色负责阅读。
-- 灰白负责承载。
-- 蓝色负责行动和品牌记忆。
+> 灰阶负责层级，墨色负责操作，翡翠绿负责运行语义。
 
-整体可以保留 DeepSeek 相关的蓝色联想，但不把主界面染成大面积蓝色。蓝色是关键动作和状态信号，不是默认背景。
+这不是“黑绿主题”。界面大约 95% 由暖中性灰阶构成，绿色通常只占 2%–5%。如果移除绿色后页面层级就无法理解，说明灰阶设计没有完成。
 
-## 色彩原则
+## 颜色职责
 
-### 主色使用边界
+### 中性灰阶
 
-蓝色只用于：
+中性灰阶负责：
 
-- 发送按钮等主操作。
-- 当前选中状态中的小面积标识。
-- focus ring。
-- 链接、上下文入口、运行中或可执行状态。
-- 需要用户注意的少量信息提示。
+- App、Sidebar、Surface、Surface Subtle、Selected 的空间层级。
+- 标题、正文、说明、时间戳和 placeholder 的文本层级。
+- hover、pressed、disabled、divider 和普通边框。
+- 普通工具日志、已完成事件和非关键元信息。
 
-蓝色不用于：
+浅色使用接近白色的暖灰；深色使用暖黑灰，不使用纯黑。
 
-- 大面积页面背景。
-- 所有正文文本。
-- 所有边框。
-- 所有 hover 状态。
-- 普通容器阴影或装饰。
+### 主操作色
 
-如果一个区域需要长期阅读或停留，优先使用白色、冷灰和中性浅灰。
+主操作不是某个彩色品牌色，而是主题反色的 ink action：
 
-### 基础色板
+- 浅色主题：近黑底、浅色文字或图标。
+- 深色主题：近白底、深色文字或图标。
 
-建议首版 token：
+用于发送、确认提交等最高优先级动作。普通按钮和导航项继续使用中性 surface。
 
-```css
---color-brand: #2f6fff;
---color-brand-strong: #1f5fe8;
---color-brand-soft: #edf4ff;
+### Operational accent
 
---color-bg: #fbfcff;
---color-surface: #ffffff;
---color-surface-subtle: #f7f8fa;
---color-sidebar: #f3f5f7;
---color-sidebar-selected: #e6e9ed;
+翡翠绿只用于：
 
---color-border: #dfe4ea;
---color-border-strong: #c8d1dc;
+- Agent 正在运行。
+- 已连接、在线、健康。
+- Toggle 开启。
+- 成功、确认和 diff additions。
+- 必要的 operational focus / progress 反馈。
 
-/* 文字层级走"主前景 + alpha 梯度"，参照 Cursor `.monaco-workbench` 的 cursor-text-* */
---color-text: #202124;
---color-text-muted:  rgba(32, 33, 36, 0.72); /* ≈ Cursor secondary 74% */
---color-text-faint:  rgba(32, 33, 36, 0.54); /* ≈ Cursor tertiary 54% */
---color-text-subtle: rgba(32, 33, 36, 0.36); /* ≈ Cursor quaternary 36% */
+禁止用于：
 
---color-warm: #d99a20;
---color-danger: #d94d5c;
---color-success: #16a36a;
-```
+- 所有链接、所有选中导航。
+- 普通按钮和普通 focus。
+- 大面积卡片或页面背景。
+- 每条 completed 工具日志。
+- 所有 Context bucket 和图表系列。
 
-这些值是设计基线，不要求每次组件调整都机械照抄；但新增样式应优先引用语义 token，而不是在组件里随手写新的十六进制颜色。
+### 其他语义色
 
-**关于文字色用 `rgba(主前景, α)` 而不是独立灰 hex 的设计意图**：
+- Danger red：错误、删除、失败、diff removals。
+- Warning amber：风险、等待审批、额度或 Context 接近阈值。
+- Info blue：信息提示、有限图表系列和 Context 数据色之一。
+- Chart palette：只编码数据，不接管 CTA、选中和导航。
 
-`actspace` 的背景是冷调（`--color-bg: #fbfcff`、`--color-sidebar: #f3f5f7`）。如果文字 muted / faint 使用独立的"纯中性灰"hex（如 `#5f6670`、`#8b949e`），灰色色相会与冷蓝背景对立，肉眼立刻感觉"灰得太纯，飘在背景上"。
+蓝色退出全局主色，但不被禁止。琥珀色保留 warning 语义，但不是橙色品牌视觉。
 
-参照 Cursor 的做法，把弱化的文字层级定义成"主前景色的 alpha 梯度"：
+## 目标基础色板
 
-- α=1.00 → primary（主阅读文本）
-- α≈0.72 → secondary / muted（次级信息）
-- α≈0.54 → tertiary / faint（弱提示、分组标题、时间戳）
-- α≈0.36 → quaternary / subtle（占位、最弱元信息）
+以下值是设计样板起点，代码实施前必须结合真实页面验证对比度。
 
-这样文字色会"吸收"背景色调——白卡片上仍是纯灰、浅蓝 sidebar 上会带一丝冷调——视觉上始终"长在背景里"，跨容器一致性也更好。这是冷调背景下"灰色看起来奇怪"问题的根治方案。
+| Role | Light target | Dark target |
+|---|---:|---:|
+| App Background | `#F7F7F5` | `#181916` |
+| Sidebar | `#EFEFED` | `#1E1F1C` |
+| Surface | `#FFFFFF` | `#242522` |
+| Surface Subtle | `#F1F1EF` | `#292A26` |
+| Selected | `#E4E4E1` | `#30312D` |
+| Hover | `#EAEAE7` | `#2A2B27` |
+| Border | `#DEDED9` | `#353630` |
+| Border Strong | `#C9C9C3` | `#484943` |
+| Text Main | `#20201E` | `#F1F1ED` |
+| Text Muted | `#676762` | `#B5B5AE` |
+| Text Faint | `#92928C` | `#85857E` |
+| Operational | `#087A4B` | `#36C783` |
+| Operational Soft | `#E5F2EA` | `#193A2B` |
+| Info | `#3978B8` | `#6CA6DA` |
+| Warning | `#A87218` | `#D2A14D` |
+| Danger | `#C74747` | `#E06B6B` |
 
-### 主题与暗色（硬约束）
-
-上面的基础色板是**浅色基线**。`actspace` 支持 **浅色 / 深色 / 跟随系统** 三态主题，因此有一条贯穿所有样式工作的硬约束：
-
-> **颜色必须随主题翻转。组件里只允许用语义 token / 语义 Tailwind 类（`text-text-main` / `bg-surface` / `border-line` …），不允许用「不随主题变化的颜色字面量」（`text-black` / `bg-white` / `text-[#hex]` / `bg-[#hex]`）承载主题相关的文字、背景、边框。**
-
-最典型的坑：深色背景上写了 `text-black`，黑字直接看不见。这不是「深色专项」一次性的事，而是从此以后写任何颜色的默认要求。机制细节、禁止写法清单、合法例外、自检清单与验收要求见 **`主题与配色规范.md`**——写颜色前先读它。
+色值不能直接写入业务组件，落地规则见 `docs/design-docs/frontend/front-主题与配色规范.md`。
 
 ## 文本系统
 
-### 文本颜色
-
-默认正文、消息回复、按钮文字和导航文字使用中性黑或炭黑，而不是深蓝。
-
-推荐语义：
-
-- `--color-text`：主要阅读文本、标题、普通按钮文字（α=1）。
-- `--color-text-muted`：次级信息、辅助描述、非当前状态（α≈0.72）。
-- `--color-text-faint`：弱提示、占位内容、低优先级元信息、分组标题、时间戳（α≈0.54）。
-- `--color-text-subtle`：最弱的占位 / kicker / hover 触发前的图标（α≈0.36）。
-- `--color-brand`：只用于可点击重点、当前状态、小面积强调。
-
-不要把全局文本色设成品牌蓝。品牌色应该让用户知道“这里可操作”或“这里重要”，而不是承担所有阅读。
-
 ### 字体栈
 
-桌面端优先使用系统字体，保持 macOS 原生感和中文可读性。字体栈与 Cursor `.monaco-workbench.mac:lang(zh-Hans)` 同源：
+桌面端使用系统 UI 字体，不引入 CursorGothic 或营销展示字体：
 
 ```css
 --font-ui:
@@ -121,49 +105,22 @@
   "Segoe UI",
   "Microsoft YaHei",
   "Helvetica Neue",
-  Arial,
-  sans-serif;
-
---font-display:
-  -apple-system,
-  BlinkMacSystemFont,
-  "PingFang SC",
-  "Hiragino Sans GB",
-  "Segoe UI",
-  "Microsoft YaHei",
-  "Helvetica Neue",
-  Arial,
   sans-serif;
 
 --font-mono:
   "SFMono-Regular",
-  "Cascadia Code",
   "JetBrains Mono",
+  "Cascadia Code",
+  Menlo,
+  Consolas,
   monospace;
 ```
 
-要点：
+AI 输出正文继续跟随 UI 字体，代码、diff、Bash 和行内 code 使用 mono 字体。
 
-- **不要把 `"SF Pro Text"` / `"SF Pro Display"` 放在最前面**。这两个是 SF Pro 系列的子家族，会让英文走 SF Pro Text、中文 fallback 到 PingFang SC，基线和字号比例不齐。让 macOS 通过 `-apple-system` 自动选 San Francisco 才能与 Cursor / Finder / Safari 等系统 UI 一致。
-- `actspace` 是高频桌面工具，不优先引入装饰性字体。品牌感主要来自密度、层级、色彩克制和交互细节。
+### 字号
 
-### 字体特性（font-feature-settings）
-
-```css
-body {
-  font-feature-settings: normal;
-}
-```
-
-**全局保持 `normal`，不要打开 `cv11`、`ss01` 等拉丁 stylistic set / character variant**。理由：
-
-- Cursor `.monaco-workbench` 全局也是 `normal`，只在数字字段局部启用 `"tnum"`、个别 hotkey 元素启用 `"cv05" on`。
-- 一旦全局开启 `cv11/ss01`，英文字符会被替换成 SF Pro 的另一种字形（例如双层 `g` 变单层、`l` 末端加钩），整个 UI 的拉丁字符就和 macOS 系统 UI 不一致，肉眼一看就"不像原生应用"。
-- 需要数字表格化的场景，**在该元素上局部使用 `font-variant-numeric: tabular-nums`**（必要时叠加 `font-feature-settings: "tnum"`），不要靠 body 全局开关。
-
-### 字号阶梯
-
-桌面端字号阶梯比移动端更紧凑，整体对齐 Cursor 的 `11 / 12 / 13 / 16 / 20 / 24` 节奏：
+桌面端使用稳定的 `11 / 12 / 13 / 14 / 16 / 20 / 24` 节奏：
 
 ```css
 --text-xxs: 11px;
@@ -175,17 +132,15 @@ body {
 --text-title: 24px;
 ```
 
-使用建议（桌面端密度，已对齐 Cursor IDE）：
+- 时间戳、徽标、kicker：11px。
+- Sidebar 分区标题：12px。
+- Sidebar 主入口、会话标题、Settings、文件名：13px。
+- 消息正文、Thinking、工具行：14px。
+- Composer 输入：16px。
+- 页面和主要面板标题：20–24px。
+- 代码、diff、Bash：13px。
 
-- Sidebar 主入口、会话标题、Workspace 文件夹、Settings：`13px`。
-- Sidebar 分区标题（Pinned / Scheduled / Workspaces）：`12px` + `--color-text-faint`，靠"小一档字号 + 弱颜色"区分语义，不靠非标字重。
-- 会话时间戳、徽标、kicker 等元信息：`11px`。
-- 消息正文、Thinking、工具行：`14px`，行高保留 `1.42`–`1.65`，保证长时间阅读舒适。
-- Composer 输入：`16px`。
-- Markdown headings：`h1 ~1.34rem / h2 ~1.18rem / h3 ~1.04rem / h4 ~0.98rem`，全部 `font-weight: 700`，**不加负 `letter-spacing`**。
-- 代码、diff、Bash 输出：`13px` 等宽字体。
-- 表格表头 / 卡片标题：`12px`–`16px`，配 `font-weight: 600`。
-- Usage 大数字（hero / cache 百分比）：`clamp(56px, 5.1vw, 72px)` / `42px`，`font-weight: 700`，最多保留 `letter-spacing: -0.02em`。
+Usage 等数据页允许出现 42–72px 的数据数字，但它们不是营销标题。
 
 ### 字重与行高
 
@@ -200,23 +155,11 @@ body {
 --leading-body: 1.6;
 ```
 
-**字重只允许使用 `400 / 500 / 600 / 700` 这四档。** 禁止使用 `430 / 440 / 520 / 540 / 620 / 650 / 680 / 720 / 800` 等中间或超粗档。理由：
-
-- 中间档（430/440/520 等）在 macOS 系统字体（San Francisco）渲染时权重落点不稳定，肉眼经常感觉像"半 medium"或"半 regular"，并与 macOS 系统 UI 不一致。
-- 早期版本曾用「主入口 520 / 分组标题 440」做"重一档 vs. 轻一档"区分，已统一改为「都用 500，靠字号 + 颜色 token 区分语义」。
-- Black 档（800）在桌面工作台场景下会让数字过度抢镜；Usage 等数据大数字统一使用 `700`，留出与品牌色搭配的呼吸感。
-
-规则：
-
-- 普通正文、消息文本、Thinking、工具行：`400`。
-- 导航项、按钮、文件名、tab、表格表头：`500` 或 `600`。
-- 页面 / 卡片 / Markdown 标题、Usage 大数字：`600` 或 `700`。
-- **优先用字号和颜色（`--color-text` / `--color-text-muted` / `--color-text-faint`）区分层级，不要用非标字重区分**。
-- 字间距默认保持 `0`；只允许在 50px 以上的 hero 数字处使用 `letter-spacing: -0.02em` 内的轻微紧凑。
+字重只允许 `400 / 500 / 600 / 700`。优先用字号、颜色和空间区分层级，不使用 440、520、650、800 等不稳定档位，也不在普通 UI 中使用营销式负字间距。
 
 ## 间距与密度
 
-整体采用 4px/8px 节奏：
+采用 4px 网格：
 
 ```css
 --space-1: 4px;
@@ -228,16 +171,13 @@ body {
 --space-8: 32px;
 ```
 
-桌面端需要比移动端更高密度，但不能像后台表格一样拥挤：
-
-- Sidebar 列表项高度建议在 `36px` 到 `44px`。
-- 图标按钮视觉尺寸可小，但点击区域应尽量接近 `32px` 到 `40px`。
-- 消息区内容宽度和行长优先保护可读性，不为了铺满窗口而拉长文本。
-- Composer 是核心输入控件，可以比普通卡片更有空间感。
+- Sidebar 列表项通常为 32–40px。
+- 图标按钮视觉尺寸可以较小，但点击区应接近 32–40px。
+- 设置内容列保持适中阅读宽度，不在大窗口横向铺满。
+- 中间消息区保护行长和 Composer 宽度。
+- 高密度不等于拥挤：分组靠间距和 surface 层级，不靠大量卡片。
 
 ## 圆角
-
-建议 token：
 
 ```css
 --radius-xs: 4px;
@@ -247,34 +187,38 @@ body {
 --radius-pill: 999px;
 ```
 
-使用建议：
+- 行内标签、小控件：4px。
+- Sidebar selected、紧凑行：6px。
+- 按钮、输入框、segmented item：8px。
+- Composer、popover、dialog、Sheet：12px。
+- 状态点和必要胶囊：999px。
 
-- Sidebar 选中项、普通按钮：`6px` 到 `8px`。
-- Composer、弹窗、文件预览：`12px`。
-- 状态点、胶囊按钮：`999px`。
-- 不要把所有容器都做成大圆角卡片。工作台区域应保持桌面应用的克制边界。
+不要把所有容器都做成大圆角卡片。
 
-## 阴影与边框
+## 边框、阴影与层级
 
-边框优先于阴影。阴影只用于明确浮层或核心输入区域。
+- 分栏、输入框和列表分组优先使用 1px hairline。
+- 主工作台通常不使用阴影。
+- Popover、dialog、Sheet 可以使用低透明度柔和阴影。
+- Composer 可以依赖 surface + border 获得层级，不默认使用蓝色光晕。
+- 设置分组不使用“白卡 + 边框 + 大圆角 + 阴影”四件套。
 
-建议 token：
+建议目标阴影：
 
 ```css
---shadow-soft: 0 18px 48px rgba(31, 45, 61, 0.08);
---shadow-popover: 0 24px 64px rgba(31, 45, 61, 0.14);
+--shadow-popover: 0 16px 40px rgba(20, 21, 18, 0.12);
+--shadow-dialog: 0 24px 64px rgba(20, 21, 18, 0.18);
 ```
 
-使用建议：
+## 图标语言
 
-- 主布局分栏主要用边框分隔。
-- Composer 可以使用轻阴影，因为它是主要输入焦点。
-- 弹窗和菜单可使用更明显阴影。
-- 消息、diff、工具日志不应全部浮起，否则工作台会显得碎。
+- 统一使用线性图标，默认 `currentColor`。
+- 普通功能图标保持中性，不按功能类型随意染色。
+- 运行、warning、danger 等真实状态才使用语义色。
+- 状态同时用文字、图标/形状和颜色表达。
+- 图标按钮必须有 `aria-label`；隐藏含义必须通过 tooltip 补足。
 
 ## 状态与动效
-
-建议 token：
 
 ```css
 --motion-fast: 120ms;
@@ -283,28 +227,66 @@ body {
 --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 ```
 
-规则：
+- hover、active、focus 不改变布局尺寸。
+- running 可使用小型绿色状态点、细环或克制 shimmer。
+- completed 回到中性样式，不逐条染绿。
+- error、warning、approval 使用对应语义色。
+- resize、collapse、popover 不超过 300ms。
+- 所有动画尊重 `prefers-reduced-motion`。
 
-- hover、active、focus 使用颜色、边框和透明度变化，不改变布局尺寸。
-- resize、collapse、popup 等状态变化应保持轻快，避免超过 `300ms`。
-- 所有动画应尊重 `prefers-reduced-motion`。
-- 不为了装饰加入无意义动效。
+## 组件视觉基线
 
-## 组件落地规则
+### Sidebar
 
-新增或修改组件时：
+- 中性灰 sidebar；选中态为更深灰底和主文字。
+- 当前选中不使用蓝点、蓝色图标或绿色底。
+- busy / running 可以使用小型 operational 绿点。
+- hover、selected、pressed 用灰阶区分。
 
-1. 先选语义 token，再写具体 CSS。
-2. 如果需要新增颜色或字号，先判断是否应扩展这份规范。
-3. 主操作优先使用品牌蓝，次级操作使用中性文字和浅灰背景。
-4. 文本默认使用中性黑，不使用品牌蓝。
-5. 一屏内蓝色面积要小，出现位置要有明确意义。
-6. 组件局部样式不能覆盖全局阅读体验，例如把消息正文改成过小或过淡。
+### Composer
 
-## 当前不做
+- 使用主题 surface + 中性 hairline。
+- 发送按钮使用反色 ink action。
+- Context usage 默认中性，只在阈值风险时使用 warning / danger。
+- 运行反馈可以使用绿色细环或小点，不把发送按钮改成绿色 CTA。
 
-- 不引入完整第三方设计系统。
-- 不做大面积渐变背景。
-- 不把 DeepSeek 官网视觉直接搬进桌面端。
-- 不用品牌蓝替代所有层级表达。
-- 不为了品牌感牺牲长时间阅读和输入舒适度。
+### Message flow
+
+- 普通回复和工具行使用黑灰文字。
+- running shimmer 的基础文字保持中性，叠加层可以使用 operational token。
+- completed 回到 muted，不显示整行绿色。
+- diff additions / removals 使用低饱和绿红。
+
+### Settings
+
+- 导航选中态为灰底黑字。
+- 内容分组使用 surface-subtle，不堆卡片和阴影。
+- Toggle 开启使用 operational green。
+- 内容列保持稳定阅读宽度。
+
+### Context / Usage / Kairos
+
+- 允许有限的低饱和数据色，保留 ActSpace 自有特征。
+- 图表色只编码数据，不承担主操作。
+- Kairos running 为绿，sleep / waiting 为灰，warning 为琥珀，failed 为红。
+
+## 旧资产的地位
+
+`frontend/` 内现有 PNG 和 HTML 记录旧实现阶段，其中部分仍包含蓝色主强调、旧圆角或旧布局。它们可以用于理解组件结构和历史决策，但不能覆盖本规范的目标颜色职责。
+
+在新的 Sidebar、Composer、Settings 浅深主题样板确认前：
+
+- 旧图标记为历史视觉基线。
+- 新实现不得仅以旧截图做颜色验收。
+- 结构交互仍可参考对应组件规范。
+
+## 落地检查
+
+新增或修改 UI 时：
+
+1. 先判断它属于 neutral、action、operational、semantic 还是 chart。
+2. 如果去掉颜色后层级消失，先修灰阶和排版。
+3. 不在组件里写主题相关 hex。
+4. 不把所有旧 `brand` 使用点替换成 operational green。
+5. 同时验证浅色、深色和键盘 focus。
+6. 状态不能只依赖颜色。

@@ -4,9 +4,17 @@
 
 ## 当前阶段
 
-- 先做设计大纲。
-- 再按组件逐个细化。
-- 先让结构稳定，再继续补交互细节和图片。
+- 目标设计系统为根目录 `DESIGN.md` 定义的 `Ink & Emerald / 墨色与翡翠绿`。
+- `Ink & Emerald` renderer token 与组件迁移已完成，旧强调色消费者已清零。
+- 工程验证已完成；真实 Electron / Retina 与完整页面状态由用户进行最终人工验收。
+
+## Ink & Emerald 配色样板
+
+- [打开 Sidebar / Composer / Settings 浅深主题样板](public/front/ink-emerald-color-preview.html)
+- 状态：**样板已确认，生产迁移已落地**。
+- 支持：Light、Dark、System-Light、System-Dark。
+- 样板内置关键前景 / 背景对比度矩阵，并明确标记 selected 需要非颜色冗余表达。
+- 样板提出的 text-faint、warning 与 line-strong 可访问性校准已同步到生产 token。
 
 ## 当前基线图
 
@@ -78,10 +86,6 @@
 
 ## 下一步
 
-1. 聊天输入框。
-2. 中间消息区。
-3. 左侧会话栏。
-4. 右侧文件预览。
-5. 设置页。
-6. 统计页（Usage Statistics）。
-7. Kairos 监控页。
+1. 手动检查 Light、Dark、System-Light、System-Dark 四个实际渲染分支。
+2. 在真实 Electron / Retina 环境复验 Sidebar、Composer、Settings、消息流、右侧面板、Usage、Lab 与 Kairos。
+3. 人工验收通过后归档 `20260725-frontend-color-system-migration.md`。

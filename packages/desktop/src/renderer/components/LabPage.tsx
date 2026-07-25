@@ -91,7 +91,7 @@ const STAGE_PROGRESS_META: Record<LabStageId, Pick<LabCardView, "tag" | "tagColo
   },
   verification: {
     tag: "验证中",
-    tagColor: "var(--act-color-warm)",
+    tagColor: "var(--act-color-warning)",
     meta: "证据 0 · 刚刚",
     checks: ["补验证方案", "记录证据", "写出观察结论"],
   },
@@ -103,7 +103,7 @@ const STAGE_PROGRESS_META: Record<LabStageId, Pick<LabCardView, "tag" | "tagColo
   },
   promotion: {
     tag: "待评审",
-    tagColor: "var(--act-color-on-warm)",
+    tagColor: "var(--act-color-on-warning)",
     meta: "中风险 · 3 检查",
     checks: ["确认证据", "确认风险", "等待人工批准"],
   },
@@ -118,11 +118,11 @@ const actionsClass = "flex items-center gap-2 max-[760px]:w-full";
 const secondaryButtonClass =
   "inline-flex h-8 items-center justify-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-medium text-text-muted shadow-[0_0_0_1px_rgba(15,23,42,0.04),0_1px_2px_rgba(15,23,42,0.06)] transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-main hover:shadow-[0_0_0_1px_rgba(15,23,42,0.07),0_2px_6px_rgba(15,23,42,0.08)] active:translate-y-px max-[760px]:flex-1";
 const primaryButtonClass =
-  "inline-flex h-8 items-center justify-center gap-1 rounded-act-md border border-brand bg-brand px-3 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(37,99,235,0.28),0_4px_12px_rgba(37,99,235,0.22)] transition hover:border-brand-strong hover:bg-brand-strong hover:shadow-[0_2px_6px_rgba(31,95,232,0.3),0_8px_18px_rgba(31,95,232,0.28)] active:translate-y-px max-[760px]:flex-1";
+  "inline-flex h-8 items-center justify-center gap-1 rounded-act-md bg-action px-3 text-[13px] font-semibold text-on-action shadow-act-soft transition hover:bg-action-hover active:translate-y-px max-[760px]:flex-1";
 const iconButtonClass =
   "grid h-8 w-8 place-items-center rounded-act-md border border-line bg-surface text-text-faint transition hover:border-line-strong hover:bg-surface-subtle hover:text-text-main";
 const addButtonClass =
-  "ml-auto grid h-6 w-6 place-items-center rounded-[6px] text-text-faint transition hover:bg-[var(--act-color-hover-overlay)] hover:text-brand";
+  "ml-auto grid h-6 w-6 place-items-center rounded-[6px] text-text-faint transition hover:bg-hover-overlay hover:text-text-main";
 const boardClass =
   "grid min-h-0 grid-cols-[repeat(4,minmax(230px,1fr))] gap-4 overflow-hidden max-[1100px]:grid-cols-[repeat(4,minmax(260px,1fr))] max-[1100px]:overflow-x-auto";
 const columnBaseClass =
@@ -130,16 +130,16 @@ const columnBaseClass =
 const stageHeaderBaseClass =
   "flex min-h-[42px] items-center gap-2 border-b border-line px-3";
 const stageHeaderToneClass: Record<LabStageId, string> = {
-  hypothesis: "bg-[rgba(47,111,255,0.045)]",
-  verification: "bg-[rgba(217,154,32,0.05)]",
-  forge: "bg-[rgba(40,119,131,0.045)]",
-  promotion: "bg-[rgba(148,100,0,0.05)]",
+  hypothesis: "bg-chart-series-1/5",
+  verification: "bg-warning/5",
+  forge: "bg-chart-series-2/5",
+  promotion: "bg-chart-series-4/5",
 };
 const stageAccentClass: Record<LabStageId, string> = {
-  hypothesis: "bg-brand",
-  verification: "bg-warm",
+  hypothesis: "bg-chart-series-1",
+  verification: "bg-warning",
   forge: "bg-[var(--act-chart-series-2)]",
-  promotion: "bg-[var(--act-color-on-warm)]",
+  promotion: "bg-chart-series-4",
 };
 const stageBodyClass = "flex min-h-0 flex-col gap-2 overflow-auto p-2.5";
 const cardClass =
@@ -147,10 +147,10 @@ const cardClass =
 const cardHoverClass =
   "hover:border-line-strong hover:shadow-[0_4px_12px_rgba(15,23,42,0.06)]";
 const selectedCardClass =
-  "border-brand bg-brand-soft shadow-[0_0_0_1px_rgba(47,111,255,0.22),0_8px_18px_rgba(47,111,255,0.14)] before:absolute before:inset-y-2 before:-left-px before:w-[3px] before:rounded-full before:bg-brand";
+  "border-line-strong bg-selected shadow-act-soft before:absolute before:inset-y-2 before:-left-px before:w-[3px] before:rounded-full before:bg-line-strong";
 const tagClass =
   "inline-flex h-[18px] items-center whitespace-nowrap rounded-full px-[7px] text-[11px] font-medium leading-none";
-const overlayClass = "fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/25 p-8";
+const overlayClass = "fixed inset-0 z-[100] flex items-center justify-center bg-overlay p-8";
 const modalBaseClass =
   "grid max-h-[min(760px,calc(100vh-64px))] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-line-strong bg-surface shadow-act-popover max-[760px]:max-h-[calc(100vh-28px)] max-[760px]:w-[calc(100vw-28px)]";
 const modalWidthClass: Record<Exclude<LabDialog, null>, string> = {
@@ -163,7 +163,7 @@ const modalBodyClass = "min-h-0 overflow-auto px-7 py-[26px]";
 const modalFootClass = "relative flex min-h-16 items-center gap-2.5 border-t border-line px-7";
 const fieldClass = "grid gap-2";
 const fieldControlClass =
-  "w-full rounded-[10px] border border-line bg-surface px-3 py-2.5 text-[13px] leading-[1.45] text-text-main outline-none transition focus:border-brand focus:shadow-[0_0_0_3px_var(--act-color-focus-ring)]";
+  "w-full rounded-[10px] border border-line bg-surface px-3 py-2.5 text-[13px] leading-[1.45] text-text-main outline-none transition focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20";
 const detailGridClass =
   "grid grid-cols-[minmax(0,1fr)_246px] gap-7 max-[1100px]:grid-cols-1";
 const sideClass =
@@ -174,7 +174,7 @@ const menuButtonClass =
   "h-8 rounded-[7px] px-2.5 text-left text-[13px] text-text-muted hover:bg-surface-subtle hover:text-text-main";
 const tabClass =
   "h-[30px] rounded-full border border-line bg-surface px-3.5 text-[13px] font-medium text-text-muted";
-const activeTabClass = "border-brand/40 bg-brand-soft text-brand-strong";
+const activeTabClass = "border-line-strong bg-selected font-semibold text-text-main";
 const historyGridClass = "grid grid-cols-[minmax(220px,1fr)_96px_120px_112px_64px] items-center gap-4";
 
 function tagStyle(color: string): CSSProperties {
@@ -565,7 +565,7 @@ export function LabPage() {
                     <ul className="m-0 grid list-none gap-2.5 p-0">
                       {selectedCard.checks.map((check) => (
                         <li key={check} className="grid grid-cols-[18px_minmax(0,1fr)] gap-2 text-[13px] leading-[1.45] text-text-muted">
-                          <span aria-hidden="true" className="grid h-4 w-4 place-items-center rounded-[5px] bg-brand-soft text-[11px] font-bold text-brand-strong">
+                          <span aria-hidden="true" className="grid h-4 w-4 place-items-center rounded-[5px] bg-success-soft text-[11px] font-bold text-on-success">
                             ✓
                           </span>
                           {check}
@@ -704,7 +704,7 @@ export function LabPage() {
                     <span>{item.artifact}</span>
                     <span>{item.date}</span>
                     <button
-                      className="text-left text-[13px] font-medium text-brand"
+                      className="text-left text-[13px] font-medium text-info hover:text-info-hover"
                       type="button"
                       aria-label={`查看 ${item.title}`}
                       onClick={() => setSelectedCompletedId(item.id)}
