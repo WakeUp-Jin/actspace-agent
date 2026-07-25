@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
   CircleAlert,
   Loader2,
   MoonStar,
   Plus,
+  RefreshCw,
   Route,
   Waves,
   X,
@@ -13,6 +14,7 @@ import {
 import {
   PROVIDER_REGISTRY,
   type LlmProviderId,
+  type ProviderBalanceSnapshot,
   type ProviderSettingsView,
 } from "@actspace/shared";
 import { SectionShell } from "./SettingsPrimitives";
@@ -61,6 +63,8 @@ const GROUPS: Array<{ id: ProviderGroup; label: string }> = [
   { id: "compatible", label: "第三方 / 中转兼容" },
 ];
 
+const PROVIDER_BALANCE_REFRESH_MS = 5 * 60 * 1000;
+
 export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promise<void> }) {
   const [providers, setProviders] = useState<Partial<Record<LlmProviderId, ProviderSettingsView>>>({});
   const [loaded, setLoaded] = useState(false);
@@ -68,19 +72,44 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
   const [editing, setEditing] = useState<{ provider: LlmProviderId; restoreToAddButton: boolean } | null>(null);
   const [busy, setBusy] = useState<LlmProviderId | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [balances, setBalances] = useState<Partial<Record<LlmProviderId, ProviderBalanceSnapshot>>>({});
+  const [balanceLoading, setBalanceLoading] = useState<Partial<Record<LlmProviderId, boolean>>>({});
+  const [balanceErrors, setBalanceErrors] = useState<Partial<Record<LlmProviderId, string>>>({});
   const addButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const load = async () => {
+  const loadBalance = useCallback(async (provider: LlmProviderId) => {
+    if (!window.actspace?.getProviderBalance) return;
+    setBalanceLoading((current) => ({ ...current, [provider]: true }));
+    setBalanceErrors((current) => ({ ...current, [provider]: undefined }));
+    try {
+      const balance = await window.actspace.getProviderBalance({ provider });
+      setBalances((current) => ({ ...current, [provider]: balance }));
+    } catch (error) {
+      setBalanceErrors((current) => ({
+        ...current,
+        [provider]: error instanceof Error ? error.message : "余额刷新失败。",
+      }));
+    } finally {
+      setBalanceLoading((current) => ({ ...current, [provider]: false }));
+    }
+  }, []);
+
+  const load = useCallback(async () => {
     if (!window.actspace?.listProviders) return;
     try {
       const result = await window.actspace.listProviders();
       setProviders(result.providers);
+      await Promise.all(
+        PROVIDERS
+          .filter((provider) => result.providers[provider.id]?.hasApiKey)
+          .map((provider) => loadBalance(provider.id)),
+      );
     } finally {
       setLoaded(true);
     }
-  };
+  }, [loadBalance]);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const test = async (provider: LlmProviderId) => {
     if (!window.actspace.testProvider) return;
@@ -107,6 +136,20 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
       setBusy(null);
     }
   };
+
+  const connectedBalanceKey = PROVIDERS
+    .filter((provider) => providers[provider.id]?.hasApiKey)
+    .map((provider) => provider.id)
+    .join(",");
+
+  useEffect(() => {
+    if (!loaded || !connectedBalanceKey) return;
+    const connectedIds = connectedBalanceKey.split(",") as LlmProviderId[];
+    const timer = window.setInterval(() => {
+      void Promise.all(connectedIds.map((provider) => loadBalance(provider)));
+    }, PROVIDER_BALANCE_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [connectedBalanceKey, loadBalance, loaded]);
 
   if (!window.actspace?.listProviders) {
     return <SectionShell title="服务商" description="仅桌面端可配置服务商连接。"><div /></SectionShell>;
@@ -156,7 +199,11 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
                       key={provider.id}
                       provider={provider}
                       state={providers[provider.id]}
+                      balance={balances[provider.id]}
+                      balanceLoading={balanceLoading[provider.id] === true}
+                      balanceError={balanceErrors[provider.id]}
                       busy={busy === provider.id}
+                      onRefreshBalance={() => void loadBalance(provider.id)}
                       onTest={() => void test(provider.id)}
                       onEdit={() => setEditing({ provider: provider.id, restoreToAddButton: false })}
                       onDisconnect={() => void disconnect(provider.id)}
@@ -202,14 +249,22 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
 function ProviderCard({
   provider,
   state,
+  balance,
+  balanceLoading,
+  balanceError,
   busy,
+  onRefreshBalance,
   onTest,
   onEdit,
   onDisconnect,
 }: {
   provider: ProviderMeta;
   state?: ProviderSettingsView;
+  balance?: ProviderBalanceSnapshot;
+  balanceLoading: boolean;
+  balanceError?: string;
   busy: boolean;
+  onRefreshBalance: () => void;
   onTest: () => void;
   onEdit: () => void;
   onDisconnect: () => void;
@@ -248,6 +303,14 @@ function ProviderCard({
         </div>
       </div>
 
+      <ProviderBalanceStrip
+        provider={provider}
+        balance={balance}
+        loading={balanceLoading}
+        error={balanceError}
+        onRefresh={onRefreshBalance}
+      />
+
       <dl className="mt-3 divide-y divide-line/70 overflow-hidden rounded-act-lg bg-surface-subtle px-2.5 text-[11px]">
         <ProviderFact label="可用模型" value={`${state?.enabledModelCount ?? 0} / ${state?.installedModelCount ?? 0} 启用`} />
         <ProviderFact label="接入方式" value="API Key" />
@@ -256,6 +319,63 @@ function ProviderCard({
       </dl>
     </article>
   );
+}
+
+function ProviderBalanceStrip({
+  provider,
+  balance,
+  loading,
+  error,
+  onRefresh,
+}: {
+  provider: ProviderMeta;
+  balance?: ProviderBalanceSnapshot;
+  loading: boolean;
+  error?: string;
+  onRefresh: () => void;
+}) {
+  const label = "账户余额";
+  const display = balance?.displayBalance;
+  const value = display
+    ? `${getBalanceSymbol(display.currency)}${display.amount} ${display.currency}`
+    : "--";
+  const helper = loading
+    ? "正在刷新…"
+    : error
+      ? "刷新失败，已保留上次结果"
+      : provider.id === "openrouter" && balance?.isConfigured === false
+        ? "需配置 Management Key"
+        : "每 5 分钟刷新";
+
+  return (
+    <div className="mt-3 flex min-h-12 items-center justify-between gap-3 rounded-act-lg border border-line/70 bg-surface-subtle px-3 py-2">
+      <div className="min-w-0">
+        <div className="text-[10px] font-medium text-text-faint">{label}</div>
+        <div className="mt-0.5 truncate text-[15px] font-semibold tabular-nums text-text-main" aria-label={`${provider.label} ${label}`}>
+          {value}
+        </div>
+        <div className={`mt-0.5 text-[10px] ${error ? "text-on-danger" : "text-text-faint"}`} role={error ? "status" : undefined} title={error}>
+          {helper}
+        </div>
+      </div>
+      <button
+        type="button"
+        aria-label={`刷新 ${provider.label} ${label}`}
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-act-md text-text-muted transition hover:bg-hover-overlay hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--act-color-focus-ring)] disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={loading}
+        onClick={onRefresh}
+      >
+        <RefreshCw size={14} strokeWidth={2} className={loading ? "animate-spin motion-reduce:animate-none" : ""} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+function getBalanceSymbol(currency: string): string {
+  if (currency === "CNY") return "¥";
+  if (currency === "USD") return "$";
+  if (currency === "EUR") return "€";
+  return "";
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -282,7 +402,7 @@ function ProviderCardsSkeleton() {
   return (
     <div className="grid gap-3 md:grid-cols-2" aria-label="正在加载服务商">
       {[0, 1].map((item) => (
-        <div key={item} className="h-[190px] animate-pulse rounded-act-xl border border-line bg-surface-subtle motion-reduce:animate-none" />
+        <div key={item} className="h-[250px] animate-pulse rounded-act-xl border border-line bg-surface-subtle motion-reduce:animate-none" />
       ))}
     </div>
   );
@@ -358,6 +478,7 @@ function ProviderDialog({
 }) {
   const meta = PROVIDERS.find((item) => item.id === provider)!;
   const [apiKey, setApiKey] = useState("");
+  const [managementKey, setManagementKey] = useState("");
   const [baseUrl, setBaseUrl] = useState(current?.baseUrl ?? "");
   const [proxyEnabled, setProxyEnabled] = useState(Boolean(current?.proxy?.enabled));
   const [proxyUrl, setProxyUrl] = useState("");
@@ -370,8 +491,19 @@ function ProviderDialog({
     setSaving(true); setError(null);
     try {
       const result = connected
-        ? await window.actspace.updateProvider?.({ provider, baseUrl: baseUrl || null, proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl : null } })
-        : await window.actspace.connectProvider?.({ provider, apiKey, baseUrl: baseUrl || null, proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl : null } });
+        ? await window.actspace.updateProvider?.({
+            provider,
+            ...(provider === "openrouter" && managementKey.trim() && { managementKey: managementKey.trim() }),
+            baseUrl: baseUrl || null,
+            proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl : null },
+          })
+        : await window.actspace.connectProvider?.({
+            provider,
+            apiKey,
+            ...(provider === "openrouter" && { managementKey: managementKey.trim() || null }),
+            baseUrl: baseUrl || null,
+            proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl : null },
+          });
       if (!result || !result.ok) { setError(result && "error" in result ? result.error.message : "保存失败。"); return; }
       await onSaved();
     } finally { setSaving(false); }
@@ -380,9 +512,22 @@ function ProviderDialog({
   return (
     <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[150] grid place-items-center bg-scrim px-5" role="dialog" aria-modal="true" aria-labelledby="provider-dialog-title" onKeyDown={(event) => { if (event.key === "Escape") onClose(); else trapTabKey(event); }}>
       <div className="w-full max-w-[520px] rounded-act-xl border border-line bg-surface p-5 shadow-act-float">
-        <div className="flex items-start justify-between gap-4"><div><h2 id="provider-dialog-title" className="text-[18px] font-semibold text-text-main">{connected ? "编辑" : "添加"} {meta.label}</h2><p className="mt-1 text-[12px] text-text-faint">API Key 不会回显，也不会发送给 renderer 之外的模块。</p></div><button type="button" aria-label="关闭" className="grid h-10 w-10 place-items-center rounded-act-md text-text-faint hover:bg-surface-subtle" onClick={onClose}><X size={18} /></button></div>
+        <div className="flex items-start justify-between gap-4"><div><h2 id="provider-dialog-title" className="text-[18px] font-semibold text-text-main">{connected ? "编辑" : "添加"} {meta.label}</h2><p className="mt-1 text-[12px] text-text-faint">密钥不会回显，只在 main 进程解密使用。</p></div><button type="button" aria-label="关闭" className="grid h-10 w-10 place-items-center rounded-act-md text-text-faint hover:bg-surface-subtle" onClick={onClose}><X size={18} /></button></div>
         <div className="mt-5 grid gap-4">
           {!connected ? <Field label="API Key"><input aria-label={`${meta.label} API Key`} autoFocus type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field> : null}
+          {provider === "openrouter" ? (
+            <Field label="Management Key（可选，用于账户余额）">
+              <input
+                aria-label="OpenRouter Management Key"
+                type="password"
+                value={managementKey}
+                onChange={(event) => setManagementKey(event.target.value)}
+                placeholder={current?.hasManagementKey ? "已配置；留空保持不变" : "sk-or-v1-..."}
+                className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]"
+              />
+              <span className="text-[11px] leading-relaxed text-text-faint">只用于 OpenRouter /credits 查询；断开服务时会一并清除。</span>
+            </Field>
+          ) : null}
           <Field label="Base URL（可选）"><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="使用服务商默认地址" className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field>
           <label className="flex min-h-11 items-center justify-between rounded-act-md border border-line px-3"><span className="text-[13px] font-medium text-text-main">仅为此服务商启用代理</span><input type="checkbox" checked={proxyEnabled} onChange={(event) => setProxyEnabled(event.target.checked)} /></label>
           {proxyEnabled ? <Field label="HTTP(S) 代理地址"><input value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder="http://127.0.0.1:7890" className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field> : null}

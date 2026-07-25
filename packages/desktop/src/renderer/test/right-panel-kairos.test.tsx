@@ -12,19 +12,21 @@ import type {
 } from "@actspace/shared";
 import { emptyKairosUsageSummary } from "@actspace/shared";
 import { RightPanel } from "../components/RightPanel";
-import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
+import { RightPanelProvider, type RightPanelTab } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
 function renderPanel({
   sessionId = null,
   onOpenReview,
+  initialTabs,
 }: {
   sessionId?: string | null;
   onOpenReview?: () => void;
+  initialTabs?: RightPanelTab[];
 } = {}) {
   return render(
     <TooltipProvider delayDuration={0}>
-      <RightPanelProvider>
+      <RightPanelProvider initialTabs={initialTabs}>
         <RightPanel sessionId={sessionId} onOpenReview={onOpenReview} />
       </RightPanelProvider>
     </TooltipProvider>,
@@ -124,6 +126,20 @@ describe("RightPanel Kairos tab", () => {
 
     await user.click(screen.getByRole("button", { name: "Kairos" }));
     expect(screen.getByRole("tab", { name: "Kairos" })).toHaveClass("[-webkit-app-region:no-drag]");
+  });
+
+  it("gives inactive right panel tabs a neutral hover state", () => {
+    renderPanel({
+      initialTabs: [
+        { id: "kairos", kind: "kairos", title: "Kairos" },
+        { id: "review", kind: "review", title: "Review", scope: "uncommitted" },
+      ],
+    });
+
+    const activeTab = screen.getByRole("tab", { name: "Kairos" }).closest("span");
+    const inactiveTab = screen.getByRole("tab", { name: "Review" }).closest("span");
+    expect(activeTab).toHaveClass("bg-selected");
+    expect(inactiveTab).toHaveClass("hover:bg-hover-overlay", "hover:text-text-main");
   });
 
   it("shows five launcher objects and returns to the launcher after closing the only tab", async () => {

@@ -30,6 +30,26 @@
   background: transparent;
 }
 
+.sidebar-scrollbar {
+  scrollbar-color: var(--act-scrollbar-thumb-subtle) transparent;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  min-height: 56px;
+  border: 2px solid transparent;
+  background: var(--act-scrollbar-thumb-subtle);
+  background-clip: content-box;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--act-scrollbar-thumb-subtle-hover);
+  background-clip: content-box;
+}
+
 html,
 body,
 #root {

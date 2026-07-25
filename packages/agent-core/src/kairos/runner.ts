@@ -18,7 +18,6 @@ import {
   type ToolResultMessage,
   type UserMessage,
 } from "../messages";
-import { toToolDefinition } from "../internal-tools";
 import type { LLMService } from "../llm/types";
 import type { ToolManager, KairosGuardContext } from "../tools/manager";
 import { runAgentLoop } from "../engine/loop";
@@ -160,7 +159,8 @@ export class KairosRunner {
 
     const historicalMessages: Message[] = shortTerm.messages;
 
-    const tools = this.opts.toolManager.getAll().map(toToolDefinition);
+    this.opts.toolManager.resetProgressiveDisclosure();
+    const tools = this.opts.toolManager.getToolDefinitions();
     const context: Context = {
       systemPrompt,
       messages: [...historicalMessages, tickUserMsg],

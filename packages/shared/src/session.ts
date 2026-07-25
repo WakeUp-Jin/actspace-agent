@@ -606,6 +606,11 @@ export type MessageBlock = {
       createdAt: string;
       model?: string;
       provider?: string;
+      /** 本轮所有 LLM call 的真实 token 与统一 USD 预估费用，只挂在最终可见回复上。 */
+      usage?: {
+        totalTokens: number;
+        costUsd: number;
+      };
     }
   | {
       kind: "thinking";

@@ -4,8 +4,8 @@
 
 ## 当前状态
 
-- 状态：V0 renderer 页面已落地，运行时预置 mock 初始数据已清理；后端 Lab Runtime、IPC、preload bridge 和持久化尚未实现。
-- 可体验范围：桌面端 renderer 中的空实验矩阵、新实验、卡片详情、阶段推进、暂停 / 取消、已完成实验弹窗。
+- 状态：Lab 产品方向暂停，桌面端公开侧栏入口已于 2026-07-25 移除。V0 renderer 页面、测试和设计资产保留，便于未来重新评估；后端 Lab Runtime、IPC、preload bridge 和持久化仍未实现。
+- 可体验范围：当前产品导航不暴露 Lab。空实验矩阵、新实验、卡片详情和阶段推进等 V0 交互仅作为直接组件测试与历史原型保留。
 - 数据来源：运行时没有真实 Lab 数据源；页面只保留用户本轮手动创建后的本地临时状态，刷新页面后创建、编辑和推进状态会重置。
 - 产品边界：当前用于验证 Lab 工作流、信息密度和页面交互，不代表真实实验数据已经落盘；稳定样例数据只保留在测试边界内。
 
@@ -26,11 +26,11 @@
 
 - `packages/desktop/src/renderer/components/LabPage.tsx`：真实 React renderer 页面已落地。
 - 运行时不再依赖 `packages/desktop/src/renderer/fixtures/labFixture.ts` 预置假实验；Lab 首屏默认展示空矩阵。
-- `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`：Lab 已从占位页接入真实页面。
+- `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`：保留 Lab view 的暂停占位内容，但 Sidebar 不再提供进入按钮。
 - `packages/desktop/src/renderer/test/lab-page.test.tsx`：renderer 测试已覆盖空矩阵和用户创建后的核心交互。
 - 样式采用 Tailwind utility 和 `LabPage.tsx` 局部 class 常量，没有新增 `.lab-*` 全局 CSS。
 
-已覆盖的 renderer 交互：
+直接组件测试已覆盖的 renderer 交互：
 
 - 打开 Lab 页面并查看四栏空实验矩阵。
 - 创建新实验，在假说构建列生成本地临时草稿卡。

@@ -11,7 +11,7 @@ const CONTEXT_CLOSE_CLASS =
   "grid h-6 w-6 place-items-center rounded-full border-0 bg-surface-subtle text-text-muted transition-colors hover:bg-[var(--act-color-hover-overlay)]";
 const CONTEXT_SUMMARY_CLASS = `${CONTEXT_ROW_CLASS} py-3 pb-2 text-sm text-text-muted`;
 const CONTEXT_METER_CLASS =
-  "context-meter flex h-1.5 overflow-hidden rounded-full bg-[var(--act-color-border-strong)]";
+  "context-meter flex h-1.5 overflow-hidden rounded-full bg-[var(--act-color-meter-track)]";
 const CONTEXT_BUCKETS_CLASS = "context-buckets grid gap-1 py-3 pb-1";
 const CONTEXT_BUCKET_CLASS =
   "context-bucket grid grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md px-1.5 py-1 text-left text-sm text-text-main transition-colors";

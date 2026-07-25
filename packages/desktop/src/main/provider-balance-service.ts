@@ -4,7 +4,13 @@ import {
   type ProviderFetch,
   type ProviderRuntimeConfig,
 } from "@actspace/agent-core";
-import type { DeepSeekBalanceSnapshot, KimiBalanceSnapshot } from "@actspace/shared";
+import type {
+  BalanceProviderId,
+  DeepSeekBalanceSnapshot,
+  KimiBalanceSnapshot,
+  OpenRouterBalanceSnapshot,
+  ProviderBalanceSnapshot,
+} from "@actspace/shared";
 
 const DEFAULT_TIMEOUT_MS = 8_000;
 
@@ -31,6 +37,15 @@ type MoonshotBalanceData = {
 
 type MoonshotBalanceApiResponse = {
   status?: unknown;
+  data?: unknown;
+};
+
+type OpenRouterCreditsData = {
+  total_credits?: unknown;
+  total_usage?: unknown;
+};
+
+type OpenRouterCreditsApiResponse = {
   data?: unknown;
 };
 
@@ -72,9 +87,24 @@ function selectKimiDisplayBalance(payload: MoonshotBalanceApiResponse): KimiBala
   return amount ? { amount, currency: "CNY" } : null;
 }
 
+function resolveOpenRouterCreditsUrl(baseUrl: string): string {
+  return `${baseUrl.replace(/\/+$/, "")}/credits`;
+}
+
+function selectOpenRouterDisplayBalance(payload: OpenRouterCreditsApiResponse): OpenRouterBalanceSnapshot["displayBalance"] {
+  if (payload.data === null || typeof payload.data !== "object") return null;
+  const data = payload.data as OpenRouterCreditsData;
+  const totalCredits = Number(data.total_credits);
+  const totalUsage = Number(data.total_usage);
+  if (!Number.isFinite(totalCredits) || !Number.isFinite(totalUsage)) return null;
+  const amount = normalizeBalanceAmount(Math.max(0, totalCredits - totalUsage));
+  return amount ? { amount, currency: "USD" } : null;
+}
+
 function unconfiguredSnapshot(provider: "deepseek", generatedAt: string): DeepSeekBalanceSnapshot;
 function unconfiguredSnapshot(provider: "kimi", generatedAt: string): KimiBalanceSnapshot;
-function unconfiguredSnapshot(provider: "deepseek" | "kimi", generatedAt: string): DeepSeekBalanceSnapshot | KimiBalanceSnapshot {
+function unconfiguredSnapshot(provider: "openrouter", generatedAt: string): OpenRouterBalanceSnapshot;
+function unconfiguredSnapshot(provider: BalanceProviderId, generatedAt: string): ProviderBalanceSnapshot {
   return { provider, isConfigured: false, isAvailable: null, generatedAt, displayBalance: null };
 }
 
@@ -142,4 +172,41 @@ export async function getKimiBalanceSnapshot(
     generatedAt,
     displayBalance: selectKimiDisplayBalance(payload),
   };
+}
+
+export async function getOpenRouterBalanceSnapshot(
+  runtime: ProviderRuntimeConfig | undefined,
+  options: ProviderBalanceServiceOptions = {},
+): Promise<OpenRouterBalanceSnapshot> {
+  const generatedAt = (options.now ?? (() => new Date()))().toISOString();
+  if (!runtime) return unconfiguredSnapshot("openrouter", generatedAt);
+  if (runtime.provider !== "openrouter") throw new Error("OpenRouter balance requires an OpenRouter runtime.");
+  const response = await requestBalance(runtime, resolveOpenRouterCreditsUrl(runtime.baseUrl), options);
+  const payload = await response.json() as OpenRouterCreditsApiResponse;
+  return {
+    provider: "openrouter",
+    isConfigured: true,
+    isAvailable: true,
+    generatedAt,
+    displayBalance: selectOpenRouterDisplayBalance(payload),
+  };
+}
+
+export async function getProviderBalanceSnapshot(
+  provider: BalanceProviderId,
+  runtime: ProviderRuntimeConfig | undefined,
+  options: ProviderBalanceServiceOptions = {},
+): Promise<ProviderBalanceSnapshot> {
+  switch (provider) {
+    case "deepseek":
+      return getDeepSeekBalanceSnapshot(runtime, options);
+    case "kimi":
+      return getKimiBalanceSnapshot(runtime, options);
+    case "openrouter":
+      return getOpenRouterBalanceSnapshot(runtime, options);
+    default: {
+      const exhaustiveProvider: never = provider;
+      throw new Error(`Unsupported balance provider: ${exhaustiveProvider}`);
+    }
+  }
 }

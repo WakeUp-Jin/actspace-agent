@@ -165,6 +165,7 @@ describe("provider and model settings", () => {
       expect(connectProvider).toHaveBeenCalledWith({
         provider: "openrouter",
         apiKey: "test-openrouter-key",
+        managementKey: null,
         baseUrl: null,
         proxy: { enabled: true, url: "http://127.0.0.1:7890" },
       });
@@ -283,7 +284,34 @@ describe("provider and model settings", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("notifies the app model list immediately after adding a catalog model", async () => {
+    const onChanged = vi.fn();
+    const addModel = vi.fn(async () => ({ ok: true as const, model: catalogInstalledModel }));
+    window.actspace = {
+      listInstalledModels: async () => ({ models: [installedModel] }),
+      listUsableModels: async () => ({ models: [usableModel] }),
+      listModelCatalog: async () => ({
+        provider: "openrouter" as const,
+        state: "fresh" as const,
+        stale: false,
+        models: [openRouterModel],
+        skippedCount: 0,
+      }),
+      addModel,
+    } as unknown as ActspaceBridge;
+
+    render(<ModelSettings settings={settings} onChanged={onChanged} />);
+    await userEvent.click(await screen.findByRole("button", { name: "从 OpenRouter 添加" }));
+    await userEvent.click(await screen.findByRole("button", { name: "添加" }));
+
+    await waitFor(() => {
+      expect(addModel).toHaveBeenCalledWith({ provider: "openrouter", apiModel: openRouterModel.apiModel });
+      expect(onChanged).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("keeps a stale catalog visible and offers an explicit reload recovery action", async () => {
+    const onReloaded = vi.fn();
     const listModelCatalog = vi.fn(async () => ({
       provider: "openrouter" as const,
       state: "stale" as const,
@@ -303,12 +331,12 @@ describe("provider and model settings", () => {
     }));
     window.actspace = { listModelCatalog, reloadModelCatalog } as unknown as ActspaceBridge;
 
-    render(<OpenRouterModelCatalogDialog onClose={() => {}} onAdded={() => {}} />);
+    render(<OpenRouterModelCatalogDialog onClose={() => {}} onAdded={() => {}} onReloaded={onReloaded} />);
     expect(await screen.findByText(openRouterModel.name)).toBeInTheDocument();
     expect(screen.getByText("模型目录加载失败，已保留上次缓存。")).toBeInTheDocument();
     expect(screen.getByText(/缓存已过期/)).toBeInTheDocument();
-
     await userEvent.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(onReloaded).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(reloadModelCatalog).toHaveBeenCalledWith({ provider: "openrouter", query: "" }));
     await waitFor(() => expect(screen.queryByText("模型目录加载失败，已保留上次缓存。")).not.toBeInTheDocument());
   });

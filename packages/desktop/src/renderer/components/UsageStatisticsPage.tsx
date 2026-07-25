@@ -1,9 +1,6 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight, CircleAlert, Info, RefreshCw, Share2, X } from "lucide-react";
 import type {
-  DeepSeekBalanceSnapshot,
-  KimiBalanceSnapshot,
-  ProviderBalanceSnapshot,
   UsageStatisticsDailyModelBreakdown,
   UsageStatisticsDailyRow,
   UsageStatisticsModelEntry,
@@ -14,6 +11,7 @@ import type {
   WorkspaceEntry,
 } from "@actspace/shared";
 import { MODEL_REGISTRY, resolveModelSpecByApiModel } from "@actspace/shared";
+import { formatUsdCost } from "../usage-format";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 type Props = {
@@ -22,19 +20,12 @@ type Props = {
   error?: string | null;
   onRefresh?: (range: UsageStatisticsSnapshot["range"], requestRowsPage?: number) => void;
   onRequestPageChange?: (page: number, range: UsageStatisticsSnapshot["range"]) => void;
-  deepSeekBalance?: DeepSeekBalanceSnapshot | null;
-  isDeepSeekBalanceLoading?: boolean;
-  deepSeekBalanceError?: string | null;
-  onRefreshDeepSeekBalance?: () => void;
-  kimiBalance?: KimiBalanceSnapshot | null;
-  isKimiBalanceLoading?: boolean;
-  kimiBalanceError?: string | null;
-  onRefreshKimiBalance?: () => void;
   onBackToChat?: () => void;
   workspaces?: WorkspaceEntry[];
 };
 
 const RANGE_TABS = ["day", "week", "month", "total"] as const;
+const DAILY_ROWS_PAGE_SIZE = 5;
 const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 const MONTH_LABELS = ["1月", "2月", "3月", "4月", "5月"];
 const TOOL_COLORS = [
@@ -70,10 +61,6 @@ function formatMillions(value: number): string {
 
 function formatPercent(value: number): string {
   return `${value.toFixed(value >= 10 || Number.isInteger(value) ? 0 : 1)}%`;
-}
-
-function formatMoney(value: number): string {
-  return `$${value.toFixed(2)}`;
 }
 
 function formatRequestTimestamp(timestamp: string): string {
@@ -269,7 +256,7 @@ function CostDetailModal({
         <header className="flex items-start justify-between gap-5 border-b border-line px-7 py-6">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Estimated Cost</div>
-            <h3 className="mt-1 text-[26px] font-bold leading-none tracking-[-0.02em] text-text-main">{formatMoney(totalCost)}</h3>
+            <h3 className="mt-1 text-[26px] font-bold leading-none tracking-[-0.02em] text-text-main">{formatUsdCost(totalCost)}</h3>
             <p className="mt-3 text-[13px] leading-relaxed text-text-muted">基于当前模型单价与 token usage 估算。</p>
           </div>
           <Tooltip>
@@ -286,7 +273,7 @@ function CostDetailModal({
             <div key={item.label} className="flex items-center justify-between gap-4 border-b border-line py-4 text-lg last:border-b-0">
               <span className="text-text-main">{item.label}</span>
               <strong className="font-bold tabular-nums text-text-main">
-                {item.value < 0 ? `-${formatMoney(Math.abs(item.value))}` : formatMoney(item.value)}
+                {item.value < 0 ? `-${formatUsdCost(Math.abs(item.value))}` : formatUsdCost(item.value)}
               </strong>
             </div>
           ))}
@@ -336,72 +323,6 @@ function BreakdownCard({ label, value, detail }: { label: string; value: string;
       <span className="text-xs font-bold text-text-muted">{label}</span>
       <strong className="mt-1.5 block text-lg font-bold tabular-nums text-text-main">{value}</strong>
       {detail ? <em className="mt-1 block text-[11px] not-italic text-text-subtle">{detail}</em> : null}
-    </article>
-  );
-}
-
-function getBalanceSymbol(currency: string): string {
-  switch (currency.toUpperCase()) {
-    case "CNY":
-      return "¥";
-    case "USD":
-      return "$";
-    default:
-      return "";
-  }
-}
-
-const PROVIDER_BALANCE_META: Record<ProviderBalanceSnapshot["provider"], { title: string; notConfigured: string }> = {
-  deepseek: { title: "DeepSeek 余额", notConfigured: "未配置 DeepSeek API Key" },
-  kimi: { title: "Kimi 余额", notConfigured: "未配置 Kimi API Key" },
-};
-
-function ProviderBalanceCard({
-  provider,
-  balance,
-  isLoading,
-  error,
-  onRefresh,
-}: {
-  provider: ProviderBalanceSnapshot["provider"];
-  balance?: ProviderBalanceSnapshot | null;
-  isLoading?: boolean;
-  error?: string | null;
-  onRefresh?: () => void;
-}) {
-  const meta = PROVIDER_BALANCE_META[provider];
-  const display = balance?.displayBalance;
-  const amount = display ? `${getBalanceSymbol(display.currency)}${display.amount}` : "--";
-  const currency = display?.currency ?? "CNY";
-  const helperText = isLoading
-    ? "正在刷新余额..."
-    : error
-      ? "刷新失败，保留上次余额"
-      : balance?.isConfigured === false
-        ? meta.notConfigured
-        : "每 5 分钟自动刷新";
-
-  return (
-    <article className={`${panelClass} grid gap-3 p-5`} aria-label={`${provider} balance`}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-text-faint">{meta.title}</div>
-        <button
-          className={`${iconButtonClass} h-8 w-8`}
-          type="button"
-          aria-label={`Refresh ${provider} balance`}
-          disabled={isLoading}
-          onClick={onRefresh}
-        >
-          <RefreshCw size={14} strokeWidth={2} className={isLoading ? "animate-spin" : ""} />
-        </button>
-      </div>
-      <div className="flex items-baseline gap-2">
-        <strong className="text-[34px] font-bold leading-none tracking-[-0.02em] text-text-main tabular-nums">
-          {amount}
-        </strong>
-        <span className="text-[15px] font-semibold text-text-faint">{currency}</span>
-      </div>
-      <div className="text-[11px] text-text-subtle">{helperText}</div>
     </article>
   );
 }
@@ -642,10 +563,10 @@ function RequestUsageTable({
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[980px] border-collapse">
+        <table className="w-full min-w-[1080px] border-collapse">
           <thead>
             <tr>
-              {["时间", "Workspace", "sessionId", "模型", "Tokens", "模型调用"].map((heading, index) => (
+              {["时间", "Workspace", "sessionId", "模型", "Tokens", "模型调用", "费用 (USD)"].map((heading, index) => (
                 <th
                   key={heading}
                   className={`sticky top-0 z-[1] border-b border-line bg-surface p-3 text-xs font-semibold text-text-muted ${
@@ -695,11 +616,17 @@ function RequestUsageTable({
                   <td className="border-b border-line p-3 text-right font-mono text-xs tabular-nums text-text-muted">
                     {row.modelCallCount.toLocaleString()}
                   </td>
+                  <td
+                    className="border-b border-line p-3 text-right font-mono text-xs font-bold tabular-nums text-text-main"
+                    title="预估费用，统一折算为 USD"
+                  >
+                    {formatUsdCost(row.costUsd)}
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-sm text-text-muted">No request rows yet.</td>
+                <td colSpan={7} className="p-8 text-center text-sm text-text-muted">No request rows yet.</td>
               </tr>
             )}
           </tbody>
@@ -783,81 +710,62 @@ export function UsageStatisticsPage({
   error,
   onRefresh,
   onRequestPageChange,
-  deepSeekBalance,
-  isDeepSeekBalanceLoading,
-  deepSeekBalanceError,
-  onRefreshDeepSeekBalance,
-  kimiBalance,
-  isKimiBalanceLoading,
-  kimiBalanceError,
-  onRefreshKimiBalance,
   workspaces,
 }: Props) {
   const [range, setRange] = useState<UsageStatisticsSnapshot["range"]>(snapshot?.range ?? "month");
+  const [dailyRowsPage, setDailyRowsPage] = useState(1);
   const [selectedTool, setSelectedTool] = useState<UsageStatisticsToolEntry | null>(null);
   const [showCostDetail, setShowCostDetail] = useState(false);
+  const dailyRowsTotal = snapshot?.dailyRows.length ?? 0;
+  const dailyRowsTotalPages = Math.max(1, Math.ceil(dailyRowsTotal / DAILY_ROWS_PAGE_SIZE));
+
+  useEffect(() => {
+    setDailyRowsPage((current) => Math.min(current, dailyRowsTotalPages));
+  }, [dailyRowsTotalPages]);
 
   if (!snapshot) {
     return (
       <main className="h-full overflow-auto bg-app-bg px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main">
-        <div className="grid min-h-[calc(100vh-48px)] min-w-0 grid-cols-[340px_minmax(0,1fr)] items-start gap-4">
-          <section className="flex min-w-0 flex-col gap-4 self-stretch">
-            <ProviderBalanceCard
-              provider="deepseek"
-              balance={deepSeekBalance}
-              isLoading={isDeepSeekBalanceLoading}
-              error={deepSeekBalanceError}
-              onRefresh={onRefreshDeepSeekBalance}
-            />
-            <ProviderBalanceCard
-              provider="kimi"
-              balance={kimiBalance}
-              isLoading={isKimiBalanceLoading}
-              error={kimiBalanceError}
-              onRefresh={onRefreshKimiBalance}
-            />
+        <div className="grid min-h-[calc(100vh-48px)] place-items-center">
+          <section className={`${panelClass} grid max-w-[560px] gap-4 p-7 text-center`}>
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-info-soft text-info">
+              <Info size={22} strokeWidth={2} />
+            </div>
+            <div>
+              <h1 className="m-0 text-2xl font-bold text-text-main">暂无 Usage 数据</h1>
+              <p className="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-text-muted">
+                这里汇总了你所有对话以及 Kairos 自主模式的 token、成本、缓存和工具调用。完成至少一次真实 Agent 调用后会自动出数据。
+              </p>
+            </div>
+            {error ? (
+              <div className="rounded-act-lg border border-danger/30 bg-danger-soft px-4 py-3 text-left text-sm text-on-danger">
+                {error}
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {RANGE_TABS.map((tab) => (
+                <button
+                  key={tab}
+                  className={`h-8 min-w-14 rounded-full px-3.5 text-[13px] font-semibold transition ${
+                    tab === range ? "bg-selected font-semibold text-text-main" : "border border-line bg-surface text-text-muted hover:bg-hover-overlay hover:text-text-main"
+                  }`}
+                  type="button"
+                  onClick={() => {
+                    setRange(tab);
+                    setDailyRowsPage(1);
+                    onRefresh?.(tab, 1);
+                  }}
+                >
+                  {getRangeLabel(tab)}
+                </button>
+              ))}
+            </div>
+            <button className={`${actionButtonClass} mx-auto`} type="button" onClick={() => onRefresh?.(range, 1)}>
+              <RefreshCw size={15} strokeWidth={2} />
+              Refresh
+            </button>
+            {isLoading ? <div className="text-xs text-text-faint">Loading usage statistics...</div> : null}
           </section>
-
-          <div className="grid min-h-[calc(100vh-48px)] place-items-center">
-            <section className={`${panelClass} grid max-w-[560px] gap-4 p-7 text-center`}>
-              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-info-soft text-info">
-                <Info size={22} strokeWidth={2} />
-              </div>
-              <div>
-                <h1 className="m-0 text-2xl font-bold text-text-main">暂无 Usage 数据</h1>
-                <p className="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-text-muted">
-                  这里汇总了你所有对话以及 Kairos 自主模式的 token、成本、缓存和工具调用。完成至少一次真实 Agent 调用后会自动出数据。
-                </p>
-              </div>
-              {error ? (
-                <div className="rounded-act-lg border border-danger/30 bg-danger-soft px-4 py-3 text-left text-sm text-on-danger">
-                  {error}
-                </div>
-              ) : null}
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                {RANGE_TABS.map((tab) => (
-                  <button
-                    key={tab}
-                    className={`h-8 min-w-14 rounded-full px-3.5 text-[13px] font-semibold transition ${
-                      tab === range ? "bg-selected font-semibold text-text-main" : "border border-line bg-surface text-text-muted hover:bg-hover-overlay hover:text-text-main"
-                    }`}
-                    type="button"
-                    onClick={() => {
-                      setRange(tab);
-                      onRefresh?.(tab, 1);
-                    }}
-                  >
-                    {getRangeLabel(tab)}
-                  </button>
-                ))}
-              </div>
-              <button className={`${actionButtonClass} mx-auto`} type="button" onClick={() => onRefresh?.(range, 1)}>
-                <RefreshCw size={15} strokeWidth={2} />
-                Refresh
-              </button>
-              {isLoading ? <div className="text-xs text-text-faint">Loading usage statistics...</div> : null}
-            </section>
-          </div>
         </div>
       </main>
     );
@@ -872,26 +780,19 @@ export function UsageStatisticsPage({
   const monthValue = effectiveSnapshot.summary.toolCallCount;
   const heatmap = buildHeatmap(summaryRows);
   const cachePercent = effectiveSnapshot.summary.cacheEfficiencyPercent;
+  const effectiveDailyRowsPage = Math.min(dailyRowsPage, dailyRowsTotalPages);
+  const dailyRowsStartIndex = (effectiveDailyRowsPage - 1) * DAILY_ROWS_PAGE_SIZE;
+  const visibleDailyRows = effectiveSnapshot.dailyRows.slice(
+    dailyRowsStartIndex,
+    dailyRowsStartIndex + DAILY_ROWS_PAGE_SIZE,
+  );
+  const firstDailyRowNumber = dailyRowsTotal > 0 ? dailyRowsStartIndex + 1 : 0;
+  const lastDailyRowNumber = dailyRowsTotal > 0 ? dailyRowsStartIndex + visibleDailyRows.length : 0;
 
   return (
     <main className="h-full overflow-auto bg-app-bg px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main">
       <div className="grid min-h-[calc(100vh-48px)] min-w-0 grid-cols-[340px_minmax(0,1fr)] items-start gap-4">
         <section className="flex min-w-0 flex-col gap-4 self-stretch">
-          <ProviderBalanceCard
-            provider="deepseek"
-            balance={deepSeekBalance}
-            isLoading={isDeepSeekBalanceLoading}
-            error={deepSeekBalanceError}
-            onRefresh={onRefreshDeepSeekBalance}
-          />
-          <ProviderBalanceCard
-            provider="kimi"
-            balance={kimiBalance}
-            isLoading={isKimiBalanceLoading}
-            error={kimiBalanceError}
-            onRefresh={onRefreshKimiBalance}
-          />
-
           <article className={`${panelClass} grid gap-3.5 p-4`}>
             <div className="grid grid-cols-4 gap-2">
               {[
@@ -1015,6 +916,7 @@ export function UsageStatisticsPage({
                     aria-selected={tab === range}
                     onClick={() => {
                       setRange(tab);
+                      setDailyRowsPage(1);
                       onRefresh?.(tab, 1);
                     }}
                   >
@@ -1044,7 +946,7 @@ export function UsageStatisticsPage({
                 {effectiveSnapshot.summary.totalTokens.toLocaleString()}
               </div>
               <button className="inline-flex items-center gap-1.5 text-xl font-bold text-info transition hover:text-info-hover" type="button" onClick={() => setShowCostDetail(true)}>
-                {formatMoney(effectiveSnapshot.summary.costUsd)}
+                {formatUsdCost(effectiveSnapshot.summary.costUsd)}
                 <Info size={16} strokeWidth={2} />
               </button>
             </div>
@@ -1090,19 +992,19 @@ export function UsageStatisticsPage({
             </div>
           </section>
 
-          <section className={`${panelClass} flex min-h-[360px] flex-1 flex-col px-6 pb-4 pt-6`}>
+          <section className={`${panelClass} flex min-h-[380px] flex-1 flex-col px-6 pb-4 pt-6`}>
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="text-base font-semibold text-text-main">每日细目</div>
-              <span className="text-xs text-text-faint">latest rows</span>
+              <span className="text-xs text-text-faint">每页 {DAILY_ROWS_PAGE_SIZE} 天</span>
             </div>
-            <div className="min-h-0 flex-1 overflow-auto">
-              <table className="w-full min-w-[760px] border-collapse">
+            <div className="min-h-0 flex-1 overflow-x-auto">
+              <table className="w-full min-w-[660px] border-collapse">
                 <thead>
                   <tr>
-                    {["日期", "总计", "输入", "输出", "缓存", "推理", "对话数"].map((heading, index) => (
+                    {["日期", "总计", "输入", "输出", "缓存", "推理", "对话数", "费用 (USD)"].map((heading, index) => (
                       <th
                         key={heading}
-                        className={`sticky top-0 z-[1] border-b border-line bg-surface p-3 text-xs font-semibold text-text-muted ${
+                        className={`border-b border-line bg-surface px-2 py-3 text-xs font-semibold text-text-muted ${
                           index === 0 ? "text-left" : "text-right"
                         }`}
                       >
@@ -1112,25 +1014,61 @@ export function UsageStatisticsPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {effectiveSnapshot.dailyRows.length > 0 ? (
-                    effectiveSnapshot.dailyRows.map((row) => (
+                  {visibleDailyRows.length > 0 ? (
+                    visibleDailyRows.map((row) => (
                       <tr key={row.date} className="hover:bg-surface-subtle">
-                        <td className="border-b border-line p-3 text-[13px] tabular-nums text-text-faint">{row.date}</td>
-                        <td className="border-b border-line p-3 text-right font-mono text-xs font-bold tabular-nums text-text-main">{row.totalTokens.toLocaleString()}</td>
-                        <td className="border-b border-line p-3 text-right font-mono text-xs tabular-nums text-text-muted">{row.promptTokens.toLocaleString()}</td>
-                        <td className="border-b border-line p-3 text-right font-mono text-xs tabular-nums text-text-muted">{row.completionTokens.toLocaleString()}</td>
-                        <td className="border-b border-line p-3 text-right font-mono text-xs tabular-nums text-text-muted">{row.cacheHitTokens.toLocaleString()}</td>
-                        <td className="border-b border-line p-3 text-right font-mono text-xs tabular-nums text-text-muted">{row.reasoningTokens.toLocaleString()}</td>
-                        <td className="border-b border-line p-3 text-right font-mono text-xs font-bold tabular-nums text-text-main">{row.conversationCount.toLocaleString()}</td>
+                        <td className="whitespace-nowrap border-b border-line px-2 py-3 text-[13px] tabular-nums text-text-faint">{row.date}</td>
+                        <td className="border-b border-line px-2 py-3 text-right font-mono text-xs font-bold tabular-nums text-text-main">{row.totalTokens.toLocaleString()}</td>
+                        <td className="border-b border-line px-2 py-3 text-right font-mono text-xs tabular-nums text-text-muted">{row.promptTokens.toLocaleString()}</td>
+                        <td className="border-b border-line px-2 py-3 text-right font-mono text-xs tabular-nums text-text-muted">{row.completionTokens.toLocaleString()}</td>
+                        <td className="border-b border-line px-2 py-3 text-right font-mono text-xs tabular-nums text-text-muted">{row.cacheHitTokens.toLocaleString()}</td>
+                        <td className="border-b border-line px-2 py-3 text-right font-mono text-xs tabular-nums text-text-muted">{row.reasoningTokens.toLocaleString()}</td>
+                        <td className="border-b border-line px-2 py-3 text-right font-mono text-xs font-bold tabular-nums text-text-main">{row.conversationCount.toLocaleString()}</td>
+                        <td
+                          className="whitespace-nowrap border-b border-line px-2 py-3 text-right font-mono text-xs font-bold tabular-nums text-text-main"
+                          title="预估费用，统一折算为 USD"
+                        >
+                          {formatUsdCost(row.costUsd)}
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="p-8 text-center text-sm text-text-muted">No usage data yet.</td>
+                      <td colSpan={8} className="p-8 text-center text-sm text-text-muted">No usage data yet.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
+              <span className="text-xs tabular-nums text-text-faint">
+                {dailyRowsTotal > 0
+                  ? `${firstDailyRowNumber.toLocaleString()}-${lastDailyRowNumber.toLocaleString()} / ${dailyRowsTotal.toLocaleString()} 天`
+                  : "0 天"}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  className={`${iconButtonClass} h-8 w-8`}
+                  type="button"
+                  aria-label="上一页每日明细"
+                  disabled={effectiveDailyRowsPage <= 1}
+                  onClick={() => setDailyRowsPage((current) => Math.max(1, current - 1))}
+                >
+                  <ChevronLeft size={15} strokeWidth={2} aria-hidden="true" />
+                </button>
+                <div className="min-w-[72px] text-center text-xs font-semibold tabular-nums text-text-muted">
+                  {effectiveDailyRowsPage.toLocaleString()} / {dailyRowsTotalPages.toLocaleString()}
+                </div>
+                <button
+                  className={`${iconButtonClass} h-8 w-8`}
+                  type="button"
+                  aria-label="下一页每日明细"
+                  disabled={effectiveDailyRowsPage >= dailyRowsTotalPages}
+                  onClick={() => setDailyRowsPage((current) => Math.min(dailyRowsTotalPages, current + 1))}
+                >
+                  <ChevronRight size={15} strokeWidth={2} aria-hidden="true" />
+                </button>
+              </div>
             </div>
           </section>
 

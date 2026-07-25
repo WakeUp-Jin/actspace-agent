@@ -6,7 +6,6 @@ import type {
   SessionEvent,
 } from "@actspace/shared";
 import { createPersistedSessionEvent, contextSnapshotToEvent } from "../adapters";
-import { toToolDefinition } from "../internal-tools";
 import type { ContextManager } from "../context/manager";
 import type { Summarizer } from "../context/compression/summarizer";
 import type { ToolManager } from "../tools/manager";
@@ -39,7 +38,7 @@ export async function compactContextWithAgent(
       stage: "preparing",
     });
 
-    deps.contextManager.setTools(deps.toolManager.getAll().map((tool) => toToolDefinition(tool)));
+    deps.contextManager.setTools(deps.toolManager.getToolDefinitions());
 
     emit?.({
       type: "context_compaction_progress",

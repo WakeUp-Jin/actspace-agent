@@ -1,4 +1,4 @@
-import { Eye, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
+import { Copy, Eye, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
 import { Composer, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
@@ -17,6 +17,7 @@ import { ToolActivityGroup } from "./messages/ToolActivityGroup";
 import { ToolLogLine } from "./messages/ToolLogLine";
 import { UserMessage } from "./messages/UserMessage";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
+import { formatUsdCost } from "../usage-format";
 
 type UserMessageBlock = Extract<MessageBlock, { kind: "user" }>;
 type AssistantMessageBlock = Extract<MessageBlock, { kind: "assistant" }>;
@@ -41,7 +42,11 @@ const MESSAGE_TURN_CLASS = "message-turn relative flex flex-col gap-0";
 const TURN_PROMPT_CLASS =
   "turn-prompt sticky top-0 z-12 bg-[image:var(--act-gradient-surface-fade)] py-4";
 const TURN_BODY_CLASS = "turn-body flex flex-col gap-[9px]";
-const TURN_ACTIONS_CLASS = "turn-actions mt-[-12px] flex min-h-6 justify-end";
+const ASSISTANT_TURN_GROUP_CLASS = "group/assistant-turn";
+const TURN_ACTIONS_CLASS =
+  "turn-actions mt-1 flex min-h-7 items-center justify-between gap-3 px-[var(--conversation-text-inset)] text-[12px] text-text-faint opacity-0 pointer-events-none transition-opacity duration-[150ms] ease-in-out group-hover/assistant-turn:pointer-events-auto group-hover/assistant-turn:opacity-100 group-focus-within/assistant-turn:pointer-events-auto group-focus-within/assistant-turn:opacity-100";
+const TURN_ACTIONS_RIGHT_CLASS = "flex items-center justify-end gap-0.5";
+const TURN_USAGE_META_CLASS = "flex min-w-0 items-center gap-1.5 tabular-nums";
 const TURN_ACTION_ANCHOR_CLASS = "turn-action-anchor relative flex-none";
 const TURN_ACTION_TRIGGER_CLASS =
   "turn-action-trigger grid h-[30px] w-[30px] place-items-center rounded-act-md border-0 bg-transparent text-text-faint opacity-65 transition-[background,color,opacity] duration-[150ms] ease-in-out hover:bg-hover-overlay hover:text-text-main hover:opacity-100 aria-disabled:cursor-default aria-expanded:bg-selected aria-expanded:text-text-main aria-expanded:opacity-100";
@@ -52,6 +57,17 @@ const TURN_ACTION_MENU_BUTTON_CLASS =
 const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-[13px] leading-[1.4] text-text-faint";
 const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-on-danger";
 const COMPACT_MESSAGE_RELATION_CLASS = "-mt-1";
+
+const MESSAGE_TIME_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+function formatMessageTime(timestamp: string): string {
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? timestamp : MESSAGE_TIME_FORMATTER.format(date);
+}
 
 const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
   "read",
@@ -366,6 +382,10 @@ function TurnActions({
     return null;
   }
 
+  const usageLabel = latestAssistantMessage.usage
+    ? `${latestAssistantMessage.usage.totalTokens.toLocaleString()} tokens · ${formatUsdCost(latestAssistantMessage.usage.costUsd)}`
+    : null;
+
   async function handleCopy(value: string) {
     await copyToClipboard(value);
     setMenuOpen(false);
@@ -432,65 +452,88 @@ function TurnActions({
 
   return (
     <div className={TURN_ACTIONS_CLASS}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            className={TURN_ACTION_TRIGGER_CLASS}
-            type="button"
-            aria-label={visualizeState === "ready" ? "查看可视化" : "可视化这条回复"}
-            aria-disabled={visualizeState === "generating"}
-            onClick={() => void handleVisualize(false)}
-          >
-            {visualizeState === "generating" ? (
-              <Loader2 size={16} strokeWidth={2.2} className="animate-spin" />
-            ) : visualizeState === "ready" ? (
-              <Eye size={16} strokeWidth={2} />
-            ) : (
-              <Wand2 size={16} strokeWidth={2} />
-            )}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{visualizeLabel}</TooltipContent>
-      </Tooltip>
-      <div className={TURN_ACTION_ANCHOR_CLASS} ref={menuRef}>
+      <div
+        className={TURN_USAGE_META_CLASS}
+        aria-label={usageLabel ? `本轮消耗：${usageLabel}` : `回复时间：${formatMessageTime(latestAssistantMessage.createdAt)}`}
+      >
+        <span>{formatMessageTime(latestAssistantMessage.createdAt)}</span>
+        {usageLabel ? <span aria-hidden="true">·</span> : null}
+        {usageLabel ? <span>{usageLabel}</span> : null}
+      </div>
+      <div className={TURN_ACTIONS_RIGHT_CLASS}>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               className={TURN_ACTION_TRIGGER_CLASS}
               type="button"
-              aria-label="更多消息操作"
-              aria-expanded={menuOpen}
-              aria-haspopup="menu"
-              onClick={() => setMenuOpen((isOpen) => !isOpen)}
+              aria-label="复制回复"
+              onClick={() => void handleCopy(copyText)}
             >
-              <MoreHorizontal size={18} strokeWidth={2.2} />
+              <Copy size={15} strokeWidth={2} />
             </button>
           </TooltipTrigger>
-          <TooltipContent>更多操作</TooltipContent>
+          <TooltipContent>复制回复</TooltipContent>
         </Tooltip>
-        {menuOpen ? (
-          <div className={TURN_ACTION_MENU_CLASS} role="menu">
-            <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
-              Fork Chat
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className={TURN_ACTION_TRIGGER_CLASS}
+              type="button"
+              aria-label={visualizeState === "ready" ? "查看可视化" : "可视化这条回复"}
+              aria-disabled={visualizeState === "generating"}
+              onClick={() => void handleVisualize(false)}
+            >
+              {visualizeState === "generating" ? (
+                <Loader2 size={16} strokeWidth={2.2} className="animate-spin" />
+              ) : visualizeState === "ready" ? (
+                <Eye size={16} strokeWidth={2} />
+              ) : (
+                <Wand2 size={16} strokeWidth={2} />
+              )}
             </button>
-            <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" onClick={() => void handleCopy(copyText)}>
-              Copy Message
-            </button>
-            <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" onClick={() => void handleCopy(latestAssistantMessage.id)}>
-              Copy Request ID
-            </button>
-            {visualizeState === "ready" || visualizeState === "error" ? (
+          </TooltipTrigger>
+          <TooltipContent>{visualizeLabel}</TooltipContent>
+        </Tooltip>
+        <div className={TURN_ACTION_ANCHOR_CLASS} ref={menuRef}>
+          <Tooltip>
+            <TooltipTrigger asChild>
               <button
-                className={TURN_ACTION_MENU_BUTTON_CLASS}
+                className={TURN_ACTION_TRIGGER_CLASS}
                 type="button"
-                role="menuitem"
-                onClick={() => void handleVisualize(true)}
+                aria-label="更多消息操作"
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                onClick={() => setMenuOpen((isOpen) => !isOpen)}
               >
-                重新生成可视化
+                <MoreHorizontal size={18} strokeWidth={2.2} />
               </button>
-            ) : null}
-          </div>
-        ) : null}
+            </TooltipTrigger>
+            <TooltipContent>更多操作</TooltipContent>
+          </Tooltip>
+          {menuOpen ? (
+            <div className={TURN_ACTION_MENU_CLASS} role="menu">
+              <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
+                Fork Chat
+              </button>
+              <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" onClick={() => void handleCopy(copyText)}>
+                Copy Message
+              </button>
+              <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" onClick={() => void handleCopy(latestAssistantMessage.id)}>
+                Copy Request ID
+              </button>
+              {visualizeState === "ready" || visualizeState === "error" ? (
+                <button
+                  className={TURN_ACTION_MENU_BUTTON_CLASS}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => void handleVisualize(true)}
+                >
+                  重新生成可视化
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -643,15 +686,17 @@ export function ConversationView({
                     <UserMessage message={turn.user} />
                   </div>
                 ) : null}
-                <div className={TURN_BODY_CLASS}>
-                  {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, setActiveTranscriptMessage)}
+                <div className={ASSISTANT_TURN_GROUP_CLASS}>
+                  <div className={TURN_BODY_CLASS}>
+                    {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, setActiveTranscriptMessage)}
+                  </div>
+                  <TurnActions
+                    sessionId={sessionId}
+                    assistantMessages={
+                      turn.messages.filter((message): message is AssistantMessageBlock => message.kind === "assistant")
+                    }
+                  />
                 </div>
-                <TurnActions
-                  sessionId={sessionId}
-                  assistantMessages={
-                    turn.messages.filter((message): message is AssistantMessageBlock => message.kind === "assistant")
-                  }
-                />
               </section>
             ))}
             <div ref={bottomAnchorRef} aria-hidden="true" />

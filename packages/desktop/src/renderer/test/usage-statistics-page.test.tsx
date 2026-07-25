@@ -20,86 +20,11 @@ describe("UsageStatisticsPage heatmap tooltip", () => {
     );
   }
 
-  it("keeps the DeepSeek balance card visible when usage statistics are empty", () => {
-    renderUsageStatisticsPage({
-      snapshot: null,
-      deepSeekBalance: {
-        provider: "deepseek",
-        isConfigured: true,
-        isAvailable: true,
-        generatedAt: "2026-05-29T03:00:00.000Z",
-        displayBalance: { amount: "19.65", currency: "CNY" },
-      },
-    });
+  it("renders a full-width empty state without provider balance cards", () => {
+    renderUsageStatisticsPage({ snapshot: null });
 
-    expect(screen.getByText("DeepSeek 余额")).toBeInTheDocument();
     expect(screen.getByText("暂无 Usage 数据")).toBeInTheDocument();
-  });
-
-  it("renders the DeepSeek balance card with a compact amount and currency", () => {
-    renderUsageStatisticsPage({
-      snapshot: mockUsageStatistics,
-      deepSeekBalance: {
-        provider: "deepseek",
-        isConfigured: true,
-        isAvailable: true,
-        generatedAt: "2026-05-29T03:00:00.000Z",
-        displayBalance: { amount: "19.65", currency: "CNY" },
-      },
-    });
-
-    const card = screen.getByRole("article", { name: "deepseek balance" });
-    expect(within(card).getByText("DeepSeek 余额")).toBeInTheDocument();
-    expect(within(card).getByText("¥19.65")).toBeInTheDocument();
-    expect(within(card).getByText("CNY")).toBeInTheDocument();
-  });
-
-  it("renders a separate Kimi balance card alongside DeepSeek", () => {
-    renderUsageStatisticsPage({
-      snapshot: mockUsageStatistics,
-      deepSeekBalance: {
-        provider: "deepseek",
-        isConfigured: true,
-        isAvailable: true,
-        generatedAt: "2026-05-29T03:00:00.000Z",
-        displayBalance: { amount: "19.65", currency: "CNY" },
-      },
-      kimiBalance: {
-        provider: "kimi",
-        isConfigured: true,
-        isAvailable: true,
-        generatedAt: "2026-05-29T03:00:00.000Z",
-        displayBalance: { amount: "8.20", currency: "CNY" },
-      },
-    });
-
-    const kimiCard = screen.getByRole("article", { name: "kimi balance" });
-    expect(within(kimiCard).getByText("Kimi 余额")).toBeInTheDocument();
-    expect(within(kimiCard).getByText("¥8.20")).toBeInTheDocument();
-  });
-
-  it("calls the DeepSeek balance refresh handler from the balance card", async () => {
-    const user = userEvent.setup();
-    const onRefreshDeepSeekBalance = vi.fn();
-    renderUsageStatisticsPage({
-      snapshot: mockUsageStatistics,
-      onRefreshDeepSeekBalance,
-    });
-
-    await user.click(screen.getByRole("button", { name: "Refresh deepseek balance" }));
-    expect(onRefreshDeepSeekBalance).toHaveBeenCalledTimes(1);
-  });
-
-  it("calls the Kimi balance refresh handler from the balance card", async () => {
-    const user = userEvent.setup();
-    const onRefreshKimiBalance = vi.fn();
-    renderUsageStatisticsPage({
-      snapshot: mockUsageStatistics,
-      onRefreshKimiBalance,
-    });
-
-    await user.click(screen.getByRole("button", { name: "Refresh kimi balance" }));
-    expect(onRefreshKimiBalance).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/DeepSeek 余额|Kimi 余额/)).toBeNull();
   });
 
   it("does not render the deprecated 使用趋势 panel", () => {
@@ -131,6 +56,57 @@ describe("UsageStatisticsPage heatmap tooltip", () => {
     const latestRow = screen.getByText("session-us...00001").closest("tr");
     expect(latestRow).not.toBeNull();
     expect(within(latestRow as HTMLElement).getByText("2")).toBeInTheDocument();
+    expect(within(latestRow as HTMLElement).getByText("$0.84")).toBeInTheDocument();
+  });
+
+  it("shows USD cost in daily rows without rounding tiny usage down to zero", () => {
+    const snapshot = {
+      ...mockUsageStatistics,
+      dailyRows: [
+        {
+          ...mockUsageStatistics.dailyRows[0],
+          costUsd: 0.000123,
+        },
+      ],
+    };
+    renderUsageStatisticsPage({ snapshot });
+
+    const dailyRow = screen.getByText("2026-05-26").closest("tr");
+    expect(dailyRow).not.toBeNull();
+    expect(within(dailyRow as HTMLElement).getByText("$0.000123")).toBeInTheDocument();
+    expect(screen.getAllByText("费用 (USD)")).toHaveLength(2);
+  });
+
+  it("shows five daily rows per page and resets daily pagination when the range changes", async () => {
+    const user = userEvent.setup();
+    const onRefresh = vi.fn();
+    const dailyRows = Array.from({ length: 12 }, (_, index) => ({
+      ...mockUsageStatistics.dailyRows[0],
+      date: `2026-05-${String(26 - index).padStart(2, "0")}`,
+      totalTokens: 12_000 - index,
+    }));
+
+    renderUsageStatisticsPage({
+      snapshot: { ...mockUsageStatistics, dailyRows },
+      onRefresh,
+    });
+
+    expect(screen.getByText("1-5 / 12 天")).toBeInTheDocument();
+    expect(screen.getByText("2026-05-26")).toBeInTheDocument();
+    expect(screen.queryByText("2026-05-21")).toBeNull();
+    expect(screen.getByRole("button", { name: "上一页每日明细" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "下一页每日明细" }));
+
+    expect(screen.getByText("6-10 / 12 天")).toBeInTheDocument();
+    expect(screen.getByText("2026-05-21")).toBeInTheDocument();
+    expect(screen.queryByText("2026-05-26")).toBeNull();
+
+    await user.click(screen.getByRole("tab", { name: "周" }));
+
+    expect(screen.getByText("1-5 / 12 天")).toBeInTheDocument();
+    expect(screen.getByText("2026-05-26")).toBeInTheDocument();
+    expect(onRefresh).toHaveBeenCalledWith("week", 1);
   });
 
   it("requests the next request-row page from the pager", async () => {

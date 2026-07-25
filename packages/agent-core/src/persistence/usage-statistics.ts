@@ -13,7 +13,7 @@ import type {
   UsageStatisticsSnapshot,
   UsageStatisticsToolEntry,
 } from "@actspace/shared";
-import type { SessionRecord } from "@actspace/shared";
+import { convertUsageCostToUsd, type SessionRecord } from "@actspace/shared";
 
 type ModelAccumulator = {
   name: string;
@@ -140,12 +140,6 @@ function isWithinRange(event: SessionEvent, start: Date | undefined, end: Date):
 function round(value: number, digits = 1): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
-}
-
-function toUsd(cost: LlmUsagePayload["cost"]): number {
-  if (!cost) return 0;
-  if (cost.currency === "USD") return cost.total;
-  return cost.total / 7.2;
 }
 
 function isLlmUsagePayload(payload: unknown): payload is LlmUsagePayload {
@@ -342,7 +336,7 @@ function aggregateEvents(
 
     if (event.type === "llm_usage" && isLlmUsagePayload(event.payload)) {
       const usage = event.payload;
-      const costUsd = toUsd(usage.cost);
+      const costUsd = convertUsageCostToUsd(usage.cost);
       summary.totalTokens += usage.totalTokens;
       summary.promptTokens += usage.promptTokens;
       summary.completionTokens += usage.completionTokens;

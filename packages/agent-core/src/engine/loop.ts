@@ -24,6 +24,7 @@ import type {
   ToolResultMessage,
   ToolCallContent,
 } from "../messages";
+import type { ModelReasoningEffort } from "@actspace/shared";
 import {
   MessagePriority,
   getToolCalls,
@@ -147,9 +148,18 @@ async function runDualLoop(
       let assistantMsg: AssistantMessage;
 
       while (true) {
+        config.toolManager.commitProgressiveDisclosure();
+        context.tools = config.refreshToolDefinitions?.() ?? config.toolManager.getToolDefinitions();
         const callId = `llm_call_${Date.now()}_${turnIndex}`;
         const cacheAuditCall = await prepareCacheAuditCall(config, context, callId, turnIndex);
-        assistantMsg = await streamAssistantResponse(context, llm, signal, emit, config.thinkingEnabled);
+        assistantMsg = await streamAssistantResponse(
+          context,
+          llm,
+          signal,
+          emit,
+          config.thinkingEnabled,
+          config.reasoningEffort,
+        );
         const cacheAudit = await finishCacheAuditCall(config, cacheAuditCall, assistantMsg);
         // 失败尝试的 usage 也照常累进：钱已经花了，计费审计不能丢
         newMessages.push(assistantMsg);
@@ -253,8 +263,9 @@ async function streamAssistantResponse(
   signal: AbortSignal | undefined,
   emit: AgentEventSink,
   thinkingEnabled: boolean | undefined,
+  reasoningEffort: ModelReasoningEffort | undefined,
 ): Promise<AssistantMessage> {
-  const stream = llm.stream(context, { signal, thinkingEnabled });
+  const stream = llm.stream(context, { signal, thinkingEnabled, reasoningEffort });
 
   for await (const event of stream) {
     switch (event.type) {

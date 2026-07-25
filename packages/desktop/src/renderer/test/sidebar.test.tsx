@@ -75,11 +75,11 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
 }
 
 describe("Sidebar (cursor-aligned layout)", () => {
-  it("renders the four top primary actions (New Agent / Lab / Usage / Kairos)", () => {
+  it("renders the three top primary actions (New Agent / Usage / Kairos)", () => {
     renderSidebar();
 
     expect(screen.getByText("New Agent")).toBeInTheDocument();
-    expect(screen.getByText("Lab")).toBeInTheDocument();
+    expect(screen.queryByText("Lab")).not.toBeInTheDocument();
     expect(screen.getByText("Usage")).toBeInTheDocument();
     expect(screen.getByText("Kairos")).toBeInTheDocument();
     expect(screen.getByText("⌘N")).toBeInTheDocument();
@@ -95,12 +95,14 @@ describe("Sidebar (cursor-aligned layout)", () => {
   });
 
   it("keeps the session list on vertical scrolling only", () => {
-    renderSidebar();
+    const { container } = renderSidebar();
 
     expect(screen.getByRole("navigation", { name: "Sessions" })).toHaveClass(
+      "sidebar-scrollbar",
       "overflow-x-hidden",
       "overflow-y-auto",
     );
+    expect(container.querySelector("aside.sidebar")).not.toHaveClass("border-r");
   });
 
   it("collapses all workspace folders when the Workspaces parent is toggled", async () => {
@@ -164,14 +166,12 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(onArchive).not.toHaveBeenCalled();
   });
 
-  it("calls onSelectView for Lab / Usage / Kairos entries", async () => {
+  it("calls onSelectView for Usage / Kairos entries", async () => {
     const { onSelectView } = renderSidebar();
 
-    await userEvent.click(screen.getByRole("button", { name: "Lab" }));
     await userEvent.click(screen.getByRole("button", { name: "Usage" }));
     await userEvent.click(screen.getByRole("button", { name: "Kairos" }));
 
-    expect(onSelectView).toHaveBeenCalledWith("lab");
     expect(onSelectView).toHaveBeenCalledWith("usage");
     expect(onSelectView).toHaveBeenCalledWith("kairos");
   });

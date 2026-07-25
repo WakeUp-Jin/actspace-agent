@@ -75,6 +75,7 @@ export interface SettingsServiceOptions {
 export interface ProviderConnectionMutationInput {
   provider: LlmProviderId;
   apiKey?: string | null;
+  managementKey?: string | null;
   enabled?: boolean;
   baseUrl?: string | null;
   proxy?: ProviderProxySettings;
@@ -118,7 +119,8 @@ export interface PersistedSettingsV2 {
   skills: SkillsSettings;
 }
 
-type PersistedSecretProviderId = LlmProviderId | SearchProviderId;
+type OpenRouterManagementSecretId = "openrouter-management";
+type PersistedSecretProviderId = LlmProviderId | SearchProviderId | OpenRouterManagementSecretId;
 type PersistedSecrets = { version: 1 } & Partial<Record<PersistedSecretProviderId, string>>;
 
 interface ReadSettingsResult {
@@ -132,6 +134,7 @@ interface ReadSettingsResult {
 const ALL_SECRET_PROVIDER_IDS: readonly PersistedSecretProviderId[] = [
   ...PROVIDER_IDS,
   ...SEARCH_PROVIDER_IDS,
+  "openrouter-management",
 ];
 
 const SEARCH_PROVIDER_ENV_KEYS = {
@@ -227,6 +230,7 @@ export class SettingsService {
       const settings = this.settings.providers[provider];
       return [provider, {
         hasApiKey: Boolean(this.getDecryptedKey(provider)),
+        ...(provider === "openrouter" && { hasManagementKey: Boolean(this.getDecryptedKey("openrouter-management")) }),
         enabled: settings.enabled,
         baseUrl: settings.baseUrl,
         proxy: {
@@ -419,8 +423,21 @@ export class SettingsService {
           }
         }
 
+        if (input.provider === "openrouter" && input.managementKey !== undefined) {
+          if (input.managementKey === null) {
+            delete this.secrets["openrouter-management"];
+          } else {
+            const trimmed = input.managementKey.trim();
+            if (!trimmed) throw new ProviderSettingsError("Management Key 不能为空。", "invalid_api_key");
+            if (!this.crypto.isAvailable()) {
+              throw new ProviderSettingsError("系统密钥串不可用，无法安全保存 Management Key。", "secret_storage_unavailable");
+            }
+            this.secrets["openrouter-management"] = this.crypto.encrypt(trimmed).toString("base64");
+          }
+        }
+
         this.settings.providers[input.provider] = next;
-        if (input.apiKey !== undefined) {
+        if (input.apiKey !== undefined || (input.provider === "openrouter" && input.managementKey !== undefined)) {
           await this.writeSecretsFile();
           secretsWritten = true;
         }
@@ -472,6 +489,16 @@ export class SettingsService {
       baseUrl,
       ...(proxyUrl && { transport: { proxyUrl } }),
     };
+  }
+
+  getOpenRouterManagementRuntimeConfig(): ProviderRuntimeConfig | ProviderRuntimeError {
+    const runtime = this.getProviderRuntimeConfig("openrouter");
+    if ("code" in runtime) return runtime;
+    const managementKey = this.getDecryptedKey("openrouter-management");
+    if (!managementKey) {
+      return { ok: false, code: "api_key_missing", message: "尚未配置 OpenRouter Management Key。" };
+    }
+    return { ...runtime, apiKey: managementKey };
   }
 
   async markProviderConnectionResult(

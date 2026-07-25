@@ -152,6 +152,9 @@ interface ModelCapabilities {
   toolUse: "verified" | "declared" | "unsupported" | "unknown";
   reasoning: boolean;
   thinkingToggle: boolean;
+  reasoningEfforts?: Array<"minimal" | "low" | "medium" | "high" | "xhigh" | "max"> | null;
+  reasoningDefaultEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  reasoningMandatory?: boolean;
 }
 
 interface ModelDefinition {
@@ -353,6 +356,8 @@ OpenRouter 连接成功后自动安装少量精选模型，覆盖：
 - 成功结果归一化后缓存到 `<userData>/providers/openrouter/models-cache.json`。
 - 缓存记录 `fetchedAt` 和来源 URL；默认 24 小时后视为 stale，但仍可离线浏览。
 - 用户可显式“重新加载”；失败时保留旧缓存并显示错误与重试入口。
+- 重新加载成功后，main 进程同步重建所有已安装 `provider-catalog` 模型的能力快照，确保 reasoning、effort、价格和上下文等易变元数据不要求用户删除再添加。
+- 添加模型或目录能力刷新完成后，Settings 必须通知 App 根层重新计算 usable models，使 Composer 和任务模型候选立即更新，不依赖重启或切换其他设置。
 
 目录项至少展示：
 
@@ -396,7 +401,7 @@ Kairos
    - 已连接的 DeepSeek / Kimi / OpenRouter 卡片。
    - 主操作“添加服务”。
    - 编辑、测试连接、断开。
-   - 展示状态、已启用模型数、接入方式、Base URL、代理状态。
+   - 展示账户余额、状态、已启用模型数、接入方式、Base URL、代理状态。余额查询通过通用 provider IPC 分发到各服务商适配器，不与 Usage 统计页耦合。
 2. 联网搜索服务
    - 迁移当前智谱 / Tavily / TinyFish / Exa 配置。
    - 保持它们属于 ToolManager 搜索通道，不与 LLM Model Registry 混合。
@@ -408,6 +413,7 @@ Kairos
 ```text
 选择服务商
 → 填 API Key
+→ OpenRouter 可选填 Management Key（账户余额专用）
 → 展开高级配置（Base URL / 代理）
 → 保存并测试
 → available 后安装默认模型
@@ -529,6 +535,18 @@ Provider request adapter 只处理请求差异，不拥有消息历史：
 
 消息转换、tool call 对账、usage 归一仍归协议服务。
 
+### 推理强度能力与请求链路
+
+推理强度不是全局静态菜单，而是模型能力的一部分：
+
+- OpenRouter catalog 将 `supported_efforts`、`default_effort`、`default_enabled` 和 `mandatory` 归一化到 `ModelCapabilities`；`null` 表示目录声明支持全部标准化强度，缺失则表示不展示强度选择器。
+- Composer 只展示当前模型支持的强度，并按模型分别保存临时选择，避免切换模型时相互污染。
+- `Auto` 不向 provider 发送显式 effort，让模型或供应商使用默认策略；用户显式选择后，`reasoningEffort` 经 renderer IPC、Agent runtime 和每次 loop 请求传到 provider adapter。
+- runtime 会再次校验强度是否属于模型能力范围；不支持的值被丢弃，不能仅依赖 UI 防御。`reasoningMandatory` 会强制开启推理且隐藏关闭入口。
+- OpenRouter adapter 将关闭态映射为 `reasoning.enabled = false`，显式强度映射为 `reasoning.effort`，仅开启但没有强度覆盖时映射为 `reasoning.enabled = true`。
+
+上下文长度不在 Composer 中作为请求级控制项。模型使用注册表中的原生 `contextWindow` 上限，避免把上下文窗口与输出 `maxTokens` 混为一谈。
+
 ## Usage 与价格
 
 - 内置 / 精选模型价格来自受版本控制的模型定义。
@@ -565,13 +583,14 @@ Provider request adapter 只处理请求差异，不拥有消息历史：
 ## 安全约束
 
 - API Key 使用 Electron `safeStorage` 加密，renderer 永不获得明文。
+- OpenRouter 模型调用 Key 与 Management Key 分开加密存储：前者用于模型、目录和连接测试，后者只用于需要 Management Key 的 `/credits` 账户余额请求。
 - Base URL 和代理 URL 只允许 `http:` / `https:`；连接测试前解析并规范化。
 - 首版代理 URL 禁止 username/password。
 - catalog item 的 label、ID 等远端字符串只作为文本展示，不拼接 HTML。
 - 自定义模型 ID 设长度上限并拒绝控制字符。
 - 连接测试使用固定、无隐私探针，不发送 workspace、session 或工具内容。
 - 测试成功不代表永久可用；真实请求仍必须正常处理 auth / network 等错误。
-- 断开服务商只删除对应密钥，不应误删历史 usage、session 或用户模型定义。
+- 断开服务商只删除对应密钥，不应误删历史 usage、session 或用户模型定义。断开 OpenRouter 时同时删除其调用 Key 与 Management Key。
 
 ## 迁移
 
@@ -595,12 +614,14 @@ Provider request adapter 只处理请求差异，不拥有消息历史：
 - settings v1 → v2 幂等迁移。
 - purpose capability filter。
 - provider 断开、模型停用、当前选择失效的解析结果。
+- OpenRouter reasoning catalog 元数据归一化，包括强度全集、默认值和 mandatory。
 
 ### Agent Core
 
 - OpenRouter 使用 OpenAI-compatible service 和正确 base URL / headers。
 - 代理 dispatcher 只注入目标 provider。
 - Kimi thinking 行为不泄漏到 OpenRouter。
+- reasoning effort 从 runtime 贯通到每次模型请求；不支持的强度被过滤，mandatory 模型始终开启推理。
 - utility 模型可用、不可用、主模型 fallback、确定性 fallback。
 - 动态模型 toolUse unknown 不进入 chat / explore / kairos。
 
@@ -609,6 +630,7 @@ Provider request adapter 只处理请求差异，不拥有消息历史：
 - Key 加密、连接、断开与 renderer 脱敏视图。
 - 连接测试与 catalog reload 使用同一代理配置。
 - cache 成功、stale、离线回退与坏 JSON 恢复。
+- catalog reload 成功后刷新已安装目录模型的能力快照，同时保留 enabled、addedAt 和任务引用。
 - 删除被任务模型引用的模型需要确认或拒绝。
 
 ### Renderer
@@ -617,6 +639,8 @@ Provider request adapter 只处理请求差异，不拥有消息历史：
 - 模型状态：已添加、已启用、不可用、能力不匹配。
 - 任务模型选择器只显示 purpose 对应候选项。
 - OpenRouter catalog 搜索、防抖、虚拟列表、加载、错误、缓存状态。
+- Composer 模型搜索只过滤当前 usable models；推理开关与强度选项完全由当前模型能力决定。
+- 添加模型和目录能力刷新后，Composer 与任务选择器在同一操作完成后重新拉取候选，不要求页面重挂载。
 - 键盘、焦点、Esc、aria-label、浅色/深色主题。
 - Composer 与设置修改实时同步，不需要重启应用。
 

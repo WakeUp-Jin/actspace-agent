@@ -21,7 +21,7 @@ const SESSION_HOVER_ROW_CLASS = "grid grid-cols-[16px_minmax(0,1fr)] gap-2 text-
 const SESSION_HOVER_ICON_CLASS = "mt-[1px] h-3.5 w-3.5 text-text-faint";
 const SESSION_HOVER_PATH_CLASS = "break-all font-mono text-[11px] leading-[1.45] text-text-muted [overflow-wrap:anywhere]";
 const SESSION_HOVER_CONTEXT_META_CLASS = "flex min-w-0 items-center justify-between gap-3";
-const SESSION_HOVER_CONTEXT_TRACK_CLASS = "mt-1.5 h-1 overflow-hidden rounded-full bg-[var(--act-color-border-strong)]";
+const SESSION_HOVER_CONTEXT_TRACK_CLASS = "mt-1.5 h-1 overflow-hidden rounded-full bg-[var(--act-color-meter-track)]";
 const SESSION_HOVER_CONTEXT_BAR_CLASS = "h-full rounded-full bg-chart-series-1";
 const SESSION_HOVER_LOADING_CLASS = "mt-2 text-[11px] text-text-faint";
 

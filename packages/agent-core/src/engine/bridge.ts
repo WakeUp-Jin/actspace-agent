@@ -13,6 +13,7 @@ import type {
   ComposerAttachment,
   ModelDefinition,
   ModelKey,
+  ModelReasoningEffort,
   ModelSpec,
   RuntimeStreamEvent,
   SessionEvent,
@@ -111,6 +112,7 @@ export interface RunTurnWithAgentInput {
   attachments?: ComposerAttachment[];
   modelAttachments?: ComposerAttachment[];
   thinkingEnabled?: boolean;
+  reasoningEffort?: ModelReasoningEffort;
 }
 
 export interface RunTurnWithAgentDeps {
@@ -123,6 +125,7 @@ export interface RunTurnWithAgentDeps {
   modelKey?: ModelKey;
   toolExecution?: ToolExecutionMode;
   thinkingEnabled?: boolean;
+  reasoningEffort?: ModelReasoningEffort;
   /** flash 摘要器，透传给 Agent 用于 mid-loop 历史压缩 */
   summarizer?: Summarizer;
   /** 低缓存旁路审计器；只写本地 cache-audit 文件与 llm_usage 索引。 */
@@ -187,6 +190,7 @@ export async function runTurnWithAgent(
     toolManager: deps.toolManager,
     toolExecution: deps.toolExecution,
     thinkingEnabled: input.thinkingEnabled ?? deps.thinkingEnabled,
+    reasoningEffort: input.reasoningEffort ?? deps.reasoningEffort,
     summarizer: deps.summarizer,
     cacheAudit: deps.cacheAudit,
     llmRetry: deps.llmRetry,

@@ -43,6 +43,7 @@ export {
   type ModelInputKind,
   type ModelKey,
   type ModelProvider,
+  type ModelReasoningEffort,
   type ModelSelectionId,
   type ModelSpec,
   type ModelVisibility,
@@ -60,6 +61,7 @@ export type RunTurnInput = {
   model?: ModelId;
   modelKey?: ModelKey;
   thinkingEnabled?: boolean;
+  reasoningEffort?: import("./model-config").ModelReasoningEffort;
   /** 内置 Explore 聚焦子代理模型；null/缺省 = deepseek-v4-flash。由 main 从 settings 注入。 */
   exploreModelId?: ModelId | null;
   exploreModelKey?: ModelKey | null;
@@ -94,6 +96,7 @@ export type GenerateEvalCandidateInput = {
   model?: ModelId;
   modelKey?: ModelKey;
   thinkingEnabled?: boolean;
+  reasoningEffort?: import("./model-config").ModelReasoningEffort;
 };
 
 export type GenerateEvalCandidateResult = {
@@ -134,12 +137,14 @@ export type ProvidersListResult = {
 export type ProviderConnectInput = {
   provider: ProviderId;
   apiKey: string;
+  managementKey?: string | null;
   baseUrl?: string | null;
   proxy?: ProviderProxySettings;
 };
 
 export type ProviderUpdateInput = {
   provider: ProviderId;
+  managementKey?: string | null;
   baseUrl?: string | null;
   proxy?: ProviderProxySettings;
   enabled?: boolean;
@@ -744,8 +749,12 @@ export type ProviderBalanceDisplay = {
   currency: string;
 };
 
-/** 余额可读取的供应商；目前 DeepSeek 与 Kimi 各有一张余额卡。 */
-export type BalanceProviderId = "deepseek" | "kimi";
+/** 余额 / 额度可读取的供应商。 */
+export type BalanceProviderId = ProviderId;
+
+export type ProviderBalanceGetInput = {
+  provider: BalanceProviderId;
+};
 
 /** 通用供应商余额快照；按 provider 区分来源，UI 每个 provider 渲染一张卡。 */
 export type ProviderBalanceSnapshot = {
@@ -764,6 +773,9 @@ export type DeepSeekBalanceSnapshot = ProviderBalanceSnapshot & { provider: "dee
 
 /** Kimi（Moonshot）余额快照（ProviderBalanceSnapshot 的 kimi 特化）。 */
 export type KimiBalanceSnapshot = ProviderBalanceSnapshot & { provider: "kimi" };
+
+/** OpenRouter 账户 credits 余额快照（使用独立 Management Key 查询）。 */
+export type OpenRouterBalanceSnapshot = ProviderBalanceSnapshot & { provider: "openrouter" };
 
 export type LocalUpdateErrorCode =
   | "invalid_source"

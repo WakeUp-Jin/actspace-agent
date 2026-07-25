@@ -6,6 +6,7 @@ import type { Context } from "../../messages";
 import { createEmptyUsage } from "../../messages";
 import type { AgentEvent } from "../types";
 import type { InternalTool, ToolResult } from "../../internal-tools";
+import type { ToolDefinitionSpec } from "../../tools/types";
 
 function createTestTool(name: string): InternalTool {
   return {
@@ -53,6 +54,75 @@ function createFailingRenderedTool(): InternalTool {
 }
 
 describe("runAgentLoop", () => {
+  it("reveals deferred tool definitions on the model call after a gateway succeeds", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
+    const gateway: ToolDefinitionSpec = {
+      name: "browser_help",
+      description: "Browser gateway",
+      parameters: { type: "object", properties: {}, required: [] },
+      isReadOnly: true,
+      category: "browser",
+      previewKind: "browser_help",
+      progressiveDisclosure: { group: "browser", role: "gateway" },
+    };
+    const deferred: ToolDefinitionSpec = {
+      name: "browser_tabs",
+      description: "Browser tabs",
+      parameters: { type: "object", properties: {}, required: [] },
+      isReadOnly: true,
+      category: "browser",
+      previewKind: "browser_tabs",
+      progressiveDisclosure: { group: "browser", role: "deferred" },
+    };
+    toolManager.registerFromSpec(gateway, async () => ({ success: true, data: "ready" }));
+    toolManager.registerFromSpec(deferred, async () => ({ success: true, data: "tabs" }));
+
+    const visibleTools: string[][] = [];
+    llm.setResponses([
+      (context) => {
+        visibleTools.push(context.tools?.map((tool) => tool.name) ?? []);
+        return mockToolCall("browser_help", {}, { id: "browser-gateway" });
+      },
+      (context) => {
+        visibleTools.push(context.tools?.map((tool) => tool.name) ?? []);
+        return mockText("browser ready");
+      },
+    ]);
+    const context: Context = {
+      messages: [{ role: "user", content: "open the browser", timestamp: Date.now() }],
+      tools: toolManager.getToolDefinitions(),
+    };
+
+    const result = await runAgentLoop(context, llm, { toolManager }, () => {});
+
+    expect(result.status).toBe("completed");
+    expect(visibleTools).toEqual([
+      ["browser_help"],
+      ["browser_help", "browser_tabs"],
+    ]);
+  });
+
+  it("passes thinking and reasoning effort to every LLM stream call", async () => {
+    const { llm, toolManager, context } = createTestSetup();
+    let receivedOptions: Parameters<typeof llm.stream>[1];
+    llm.setResponses([(_context, options) => {
+      receivedOptions = options;
+      return mockText("done");
+    }]);
+
+    await runAgentLoop(context, llm, {
+      toolManager,
+      thinkingEnabled: true,
+      reasoningEffort: "high",
+    }, () => {});
+
+    expect(receivedOptions).toMatchObject({
+      thinkingEnabled: true,
+      reasoningEffort: "high",
+    });
+  });
+
   it("should complete a normal turn cycle: toolUse → stop", async () => {
     const { llm, toolManager, context } = createTestSetup();
     const events: AgentEvent[] = [];

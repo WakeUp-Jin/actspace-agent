@@ -15,6 +15,12 @@ const allowBrowser: ApprovalGate = {
   }),
 };
 
+function createExpandedBrowserToolManager(config: Parameters<typeof createToolManager>[0]) {
+  const manager = createToolManager(config);
+  manager.activateProgressiveDisclosure("browser");
+  return manager;
+}
+
 describe("browser tool runtime", () => {
   const tempDirs: string[] = [];
   const servers: Server[] = [];
@@ -41,6 +47,9 @@ describe("browser tool runtime", () => {
     expect(withBridge.has("browser_run")).toBe(true);
     expect(withBridge.has("browser_click")).toBe(false);
     expect(withBridge.getAll().filter((tool) => tool.category === "browser")).toHaveLength(11);
+    expect(withBridge.getToolDefinitions().filter((tool) => tool.name.startsWith("browser_"))).toEqual([
+      expect.objectContaining({ name: "browser_help" }),
+    ]);
     const locator = withBridge.get("browser_locator");
     expect(locator?.description).toContain("accessible name");
     expect(locator?.parameters).toMatchObject({
@@ -56,6 +65,14 @@ describe("browser tool runtime", () => {
         },
       },
     });
+
+    const disabled = createToolManager({
+      workspaceRoot: "/tmp",
+      browserBridgeSocketPath: "/tmp/browser-bridge-test.sock",
+      disabledTools: ["browser"],
+    });
+    expect(disabled.has("browser_help")).toBe(false);
+    expect(disabled.getToolDefinitions().some((tool) => tool.name.startsWith("browser_"))).toBe(false);
   });
 
   it("uses one persistent connection for session lifecycle and browser requests", async () => {
@@ -82,7 +99,7 @@ describe("browser tool runtime", () => {
     servers.push(server);
     await listen(server, socketPath);
 
-    const manager = createToolManager({
+    const manager = createExpandedBrowserToolManager({
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
@@ -124,7 +141,7 @@ describe("browser tool runtime", () => {
     });
     servers.push(server);
     await listen(server, socketPath);
-    const manager = createToolManager({
+    const manager = createExpandedBrowserToolManager({
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
@@ -158,7 +175,7 @@ describe("browser tool runtime", () => {
     });
     servers.push(server);
     await listen(server, socketPath);
-    const manager = createToolManager({
+    const manager = createExpandedBrowserToolManager({
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
@@ -175,7 +192,7 @@ describe("browser tool runtime", () => {
   });
 
   it("requires session approval before any real browser action", async () => {
-    const manager = createToolManager({
+    const manager = createExpandedBrowserToolManager({
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: "/tmp/browser-bridge-test.sock",
       sessionId: "session-test",
@@ -190,7 +207,7 @@ describe("browser tool runtime", () => {
   });
 
   it("keeps the category tool visible while denying a disabled high-risk capability", async () => {
-    const manager = createToolManager({
+    const manager = createExpandedBrowserToolManager({
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: "/tmp/browser-bridge-test.sock",
       sessionId: "session-test",
@@ -256,7 +273,7 @@ describe("browser tool runtime", () => {
         decidedAt: Date.now(),
       }),
     };
-    const manager = createToolManager({
+    const manager = createExpandedBrowserToolManager({
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
@@ -327,7 +344,7 @@ describe("browser tool runtime", () => {
         decidedAt: Date.now(),
       }),
     };
-    const manager = createToolManager({
+    const manager = createExpandedBrowserToolManager({
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
@@ -376,7 +393,7 @@ describe("browser tool runtime", () => {
     });
     servers.push(server);
     await listen(server, socketPath);
-    const manager = createToolManager({
+    const manager = createExpandedBrowserToolManager({
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
@@ -419,7 +436,7 @@ describe("browser tool runtime", () => {
     });
     servers.push(server);
     await listen(server, socketPath);
-    const manager = createToolManager({
+    const manager = createExpandedBrowserToolManager({
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
@@ -456,12 +473,18 @@ describe("browser tool runtime", () => {
       turnId: "turn-test",
     });
 
+    expect(manager.getToolDefinitions().map((tool) => tool.name)).toContain("browser_help");
+    expect(manager.getToolDefinitions().map((tool) => tool.name)).not.toContain("browser_locator");
+
     const result = await manager.execute("browser_help", { category: "locator", action: "read_all" });
     const output = String(result.data);
 
     expect(output.length).toBeGreaterThan(9_000);
     expect(output).toContain(description);
     expect(output).not.toContain("[已压缩摘要");
+    expect(manager.getToolDefinitions().map((tool) => tool.name)).not.toContain("browser_locator");
+    manager.commitProgressiveDisclosure();
+    expect(manager.getToolDefinitions().map((tool) => tool.name)).toContain("browser_locator");
     await manager.dispose();
   });
 
@@ -492,7 +515,7 @@ describe("browser tool runtime", () => {
     });
     servers.push(server);
     await listen(server, socketPath);
-    const manager = createToolManager({
+    const manager = createExpandedBrowserToolManager({
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
@@ -561,7 +584,7 @@ describe("browser tool runtime", () => {
     });
     servers.push(server);
     await listen(server, socketPath);
-    const manager = createToolManager({
+    const manager = createExpandedBrowserToolManager({
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",

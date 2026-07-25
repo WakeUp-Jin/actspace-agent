@@ -51,6 +51,7 @@ export const browserCuaDefinition: ToolDefinitionSpec = {
   isReadOnly: false,
   category: "browser",
   previewKind: "browser_cua",
+  progressiveDisclosure: { group: "browser", role: "deferred" },
 };
 
 export const browserDomDefinition: ToolDefinitionSpec = {
@@ -74,6 +75,7 @@ export const browserDomDefinition: ToolDefinitionSpec = {
   isReadOnly: false,
   category: "browser",
   previewKind: "browser_dom",
+  progressiveDisclosure: { group: "browser", role: "deferred" },
 };
 
 export const browserLocatorDefinition: ToolDefinitionSpec = {
@@ -115,6 +117,7 @@ export const browserLocatorDefinition: ToolDefinitionSpec = {
   isReadOnly: false,
   category: "browser",
   previewKind: "browser_locator",
+  progressiveDisclosure: { group: "browser", role: "deferred" },
 };
 
 export const browserNavigationDefinition = categoryDefinition(
@@ -204,7 +207,7 @@ export const browserDebugDefinition = categoryDefinition(
 
 export const browserHelpDefinition: ToolDefinitionSpec = {
   name: "browser_help",
-  description: "渐进查看 Browser Use 分类、action、精确 schema、风险、backend 和实现状态。调用分类工具前参数不确定时使用。",
+  description: "真实 Chrome 浏览器的渐进式入口。任何需要浏览器的任务先调用本工具，以查看分类、action、精确 schema、风险和实现状态；成功后下一次模型调用会披露完整浏览器工具包。",
   parameters: {
     type: "object",
     properties: {
@@ -218,6 +221,7 @@ export const browserHelpDefinition: ToolDefinitionSpec = {
   isReadOnly: true,
   category: "browser",
   previewKind: "browser_help",
+  progressiveDisclosure: { group: "browser", role: "gateway" },
 };
 
 export const browserRunDefinition: ToolDefinitionSpec = {
@@ -235,6 +239,7 @@ export const browserRunDefinition: ToolDefinitionSpec = {
   isReadOnly: false,
   category: "browser",
   previewKind: "browser_run",
+  progressiveDisclosure: { group: "browser", role: "deferred" },
 };
 
 export const browserDefinitions = [
@@ -274,5 +279,6 @@ function categoryDefinition(
     isReadOnly: false,
     category: "browser",
     previewKind,
+    progressiveDisclosure: { group: "browser", role: "deferred" },
   };
 }

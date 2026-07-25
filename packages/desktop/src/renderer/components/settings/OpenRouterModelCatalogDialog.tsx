@@ -7,7 +7,15 @@ const ROW_HEIGHT = 92;
 const VIEWPORT_HEIGHT = 460;
 const OVERSCAN = 4;
 
-export function OpenRouterModelCatalogDialog({ onClose, onAdded }: { onClose: () => void; onAdded: () => void | Promise<void> }) {
+export function OpenRouterModelCatalogDialog({
+  onClose,
+  onAdded,
+  onReloaded,
+}: {
+  onClose: () => void;
+  onAdded: () => void | Promise<void>;
+  onReloaded?: () => void | Promise<void>;
+}) {
   const [result, setResult] = useState<ModelsCatalogListResult | null>(null);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -27,7 +35,11 @@ export function OpenRouterModelCatalogDialog({ onClose, onAdded }: { onClose: ()
   const reload = async () => {
     if (!window.actspace.reloadModelCatalog) return;
     setLoading(true);
-    try { setResult(await window.actspace.reloadModelCatalog({ provider: "openrouter", query: debouncedQuery })); }
+    try {
+      const next = await window.actspace.reloadModelCatalog({ provider: "openrouter", query: debouncedQuery });
+      setResult(next);
+      if (!next.error && next.state === "fresh") await onReloaded?.();
+    }
     finally { setLoading(false); }
   };
 

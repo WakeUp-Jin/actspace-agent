@@ -13,6 +13,7 @@
 import type {
   AssistantMessage,
   Message,
+  Tool,
   ToolResultMessage,
   Usage,
 } from "../messages";
@@ -21,6 +22,7 @@ import type { ToolResult } from "../internal-tools";
 import type { ToolExecuteOptions, ToolManager } from "../tools/manager";
 import type { ToolApprovalRequest, ToolApprovalDecision } from "../tools/scheduler";
 import type { CacheAuditTracker, CacheAuditUsageMetadata } from "../observability/cache-audit";
+import type { ModelReasoningEffort } from "@actspace/shared";
 
 // ─── 工具执行模式 ───
 
@@ -98,6 +100,8 @@ export interface LLMRetryConfig {
 export interface AgentLoopConfig {
   /** V0 用 ToolManager，V1 升级为 ToolScheduler */
   toolManager: ToolManager;
+  /** 每次 LLM 调用前刷新当前可见工具，并同步外部 ContextManager 的工具统计。 */
+  refreshToolDefinitions?: () => Tool[];
   toolExecution?: ToolExecutionMode;
   /** 每轮结束后检查是否应该停止（turnIndex 从 1 开始累加） */
   shouldStopAfterTurn?: (ctx: { message: AssistantMessage; turnIndex: number }) => boolean;
@@ -107,6 +111,8 @@ export interface AgentLoopConfig {
   getFollowUpMessages?: () => Promise<Message[]>;
   /** 本轮是否允许 provider 输出 thinking/reasoning。 */
   thinkingEnabled?: boolean;
+  /** Provider-neutral reasoning strength, already filtered by model capability metadata. */
+  reasoningEffort?: ModelReasoningEffort;
   /** 内层循环最大轮次硬限制，防止工具调用无限循环。默认 200。 */
   maxTurns?: number;
   /**

@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { Agent } from "../agent";
-import { MockLLMService } from "../../llm/services/mock";
+import { MockLLMService, mockText, mockToolCall } from "../../llm/services/mock";
 import { ToolManager } from "../../tools/manager";
 import { ContextManager } from "../../context/manager";
 import { SystemPromptContext } from "../../context/modules/system-prompt";
 import type { InternalTool, ToolResult } from "../../internal-tools";
+import type { ToolDefinitionSpec } from "../../tools/types";
 
 function createTestTool(name: string): InternalTool {
   return {
@@ -30,6 +31,59 @@ function createTestAgent() {
 }
 
 describe("Agent", () => {
+  it("resets progressive tool disclosure for the next user run", async () => {
+    const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "deepseek-mock" });
+    const toolManager = new ToolManager({ workspaceRoot: "/tmp" });
+    const gateway: ToolDefinitionSpec = {
+      name: "browser_help",
+      description: "Browser gateway",
+      parameters: { type: "object", properties: {}, required: [] },
+      isReadOnly: true,
+      category: "browser",
+      previewKind: "browser_help",
+      progressiveDisclosure: { group: "browser", role: "gateway" },
+    };
+    const deferred: ToolDefinitionSpec = {
+      name: "browser_tabs",
+      description: "Browser tabs",
+      parameters: { type: "object", properties: {}, required: [] },
+      isReadOnly: true,
+      category: "browser",
+      previewKind: "browser_tabs",
+      progressiveDisclosure: { group: "browser", role: "deferred" },
+    };
+    toolManager.registerFromSpec(gateway, async () => ({ success: true, data: "ready" }));
+    toolManager.registerFromSpec(deferred, async () => ({ success: true, data: "tabs" }));
+    const contextManager = new ContextManager({
+      systemPromptModule: new SystemPromptContext("Test"),
+    });
+    const visibleTools: string[][] = [];
+    llm.setResponses([
+      (context) => {
+        visibleTools.push(context.tools?.map((tool) => tool.name) ?? []);
+        return mockToolCall("browser_help", {}, { id: "gateway" });
+      },
+      (context) => {
+        visibleTools.push(context.tools?.map((tool) => tool.name) ?? []);
+        return mockText("first run done");
+      },
+      (context) => {
+        visibleTools.push(context.tools?.map((tool) => tool.name) ?? []);
+        return mockText("second run done");
+      },
+    ]);
+    const agent = new Agent({ llm, contextManager, toolManager });
+
+    await agent.run("use browser");
+    await agent.run("ordinary follow-up");
+
+    expect(visibleTools).toEqual([
+      ["browser_help"],
+      ["browser_help", "browser_tabs"],
+      ["browser_help"],
+    ]);
+  });
+
   it("Agent.run should return AgentLoopResult", async () => {
     const agent = createTestAgent();
     const result = await agent.run("Hello");

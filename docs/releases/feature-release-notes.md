@@ -6,6 +6,12 @@
 
 | 日期 | 功能域 | 用户价值 | 变更摘要 |
 | --- | --- | --- | --- |
+| 2026-07-25 | Browser 工具按需加载 | Agent 默认只加载浏览器入口，需要操作网页时再展开完整工具组，减少上下文占用和误调用；Browser 设置也更简洁。 | Browser 工具改为 progressive disclosure：每个 Turn 默认只暴露 `browser_help`，调用 gateway 后从下一次模型请求开始披露完整工具组，并在新 Turn 或 Kairos tick 重置；Context 与压缩链路统一读取当前可见工具，设置页收口为 Browser 总开关和折叠的能力选项。 |
+| 2026-07-25 | Ink & Emerald 视觉系统 | 浅色、深色与跟随系统主题的界面层级更统一，主操作、运行状态、语义提示和数据配色更容易区分，悬浮与选中反馈也更明确。 | 建立 neutral、action、operational、semantic、chart、context 与 diff 语义 token，迁移 Sidebar、Composer、Settings、消息流、右侧面板、Kairos、Usage 和 Context；清除旧 `brand` alias，增加颜色防回流检查，并补齐模型、Review 与右侧 Tab 的交互状态。 |
+| 2026-07-25 | 服务商余额管理 | DeepSeek、Kimi、OpenRouter 的余额回到各自服务商卡片中查看，模型用量与账户余额不再混在 Usage 页面。 | 新增统一 provider balance IPC；OpenRouter 模型 Key 与 Management Key 分开加密保存；服务商卡支持进入刷新、手动刷新和定时刷新，失败时保留上次结果；Usage 移除余额卡。 |
+| 2026-07-25 | Kairos 配置稳定性 | 未选择模型时仍能编辑 Kairos 配置；选择可用模型后当前进程立即启用，无需重启，尚未开放的 Lab 入口也不再干扰主流程。 | 拆分 Kairos 配置 IPC 与 Controller 生命周期，配置通道保持可用；模型可用后即时创建 Controller 和 runtime IPC；Sidebar 暂时隐藏 Lab，保留现有实现资产。 |
+| 2026-07-25 | 用量与费用透明度 | 每轮回复、每日统计和会话明细都能直接看到真实 Token 消耗与统一美元预估费用，Agent 的工具调用和失败重试成本不再隐藏。 | Assistant 回复悬浮尾栏新增时间、本轮 Token、USD 费用和快捷复制；按 turn 聚合全部 `llm_usage`，CNY/USD 共享固定折算口径；Usage 每日细目按 5 天分页并在范围切换时复位，会话明细新增费用列，同时保留低成本调用的小数精度。 |
+| 2026-07-25 | 模型选择体验 | 模型增多后仍能快速搜索；支持的 OpenRouter 模型可以按需选择推理强度，新增模型也会立即出现在 Composer。 | Composer 增加本地模型搜索和轻量弹出过渡；OpenRouter catalog 的 reasoning effort、默认值与强制推理能力贯通 shared、IPC、Agent loop 和 provider adapter；目录重载会更新已安装模型的能力快照，添加与刷新完成后立即重拉 Composer 候选。 |
 | 2026-07-25 | 多供应商模型 | 可以同时配置 DeepSeek、Kimi、OpenRouter，按服务商启用代理和模型，并为主会话、轻量任务、Explore、Kairos 选择真正可用的模型。 | 新增 settings v2 与一次性迁移备份、provider-qualified ModelKey、OpenRouter 精选/远端目录、供应商级代理 transport、统一 purpose resolver、任务模型 runtime，以及独立服务商/模型设置页；Key 配好后无需先测试即可选择，明确测试失败时才禁用。 |
 | 2026-07-19 | 失败回归沉淀 | Agent 执行失败或效果不佳时，可以直接在当前会话生成可导入评估仓库的回归 Candidate。 | 新增 `/eval [失败说明]` 系统命令；独立生成 Agent 复用现有文件工具，在 `<userData>/eval-candidates/` 写入 `candidate.json + case.json + fixture/`，并通过 `eval_candidate` 事件恢复生成结果；独立 Eval 仓库提供 `ingest-candidate` 加入 regression 数据集。 |
 | 2026-07-17 | Agent Turn 稳定性 | 流式回复不再重复，点击停止后能快速继续输入；中断轮次重新进入任务仍可恢复，完整回复结束时消息区也不会闪动或短暂重复。 | 为 assistant、工具、审批和 SubAgent 流事件补齐 `sessionId + turnId` 作用域，Renderer 收敛为应用级单一监听；Agent loop 显式区分 `completed / failed / aborted`，中断同步取消审批与前台 Bash，并以两阶段 append 持久化用户消息和 `turn_aborted`；流式块与持久化消息采用互斥数据源和稳定 `renderKey` 完成无 remount 交接。 |

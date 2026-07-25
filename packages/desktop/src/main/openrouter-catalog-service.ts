@@ -10,6 +10,7 @@ import {
 import type {
   CatalogCacheState,
   CatalogModelView,
+  ModelReasoningEffort,
   OpenRouterCatalogCache,
 } from "@actspace/shared";
 
@@ -166,7 +167,12 @@ export class OpenRouterCatalogService {
       state: forceState ?? (stale ? "stale" : "fresh"),
       fetchedAt: this.cache.fetchedAt,
       stale,
-      models: this.cache.models.map((model) => ({ ...model, input: [...model.input], added: this.isAdded(model.apiModel) })),
+      models: this.cache.models.map((model) => ({
+        ...model,
+        input: [...model.input],
+        ...(Array.isArray(model.reasoningEfforts) && { reasoningEfforts: [...model.reasoningEfforts] }),
+        added: this.isAdded(model.apiModel),
+      })),
       skippedCount: this.cache.skippedCount,
     };
   }
@@ -221,6 +227,7 @@ function normalizeCatalogModel(value: unknown): CatalogModelView | undefined {
   if (modalities.includes("image")) input.push("image");
   if (input.length === 0) input.push("text");
   const supported = Array.isArray(value.supported_parameters) ? value.supported_parameters : [];
+  const reasoning = normalizeReasoningCapabilities(value.reasoning);
   const pricing = normalizePricing(value.pricing);
   const prompt = readFiniteNumber(isRecord(value.pricing) ? value.pricing.prompt : undefined);
   const completion = readFiniteNumber(isRecord(value.pricing) ? value.pricing.completion : undefined);
@@ -233,10 +240,47 @@ function normalizeCatalogModel(value: unknown): CatalogModelView | undefined {
     maxTokens: readPositiveInteger(topProvider.max_completion_tokens),
     input,
     toolUse: supported.includes("tools") || supported.includes("tool_choice") ? "declared" : "unknown",
-    reasoning: supported.includes("reasoning") || supported.includes("include_reasoning"),
+    reasoning: Boolean(reasoning) || supported.includes("reasoning") || supported.includes("include_reasoning"),
+    ...(reasoning?.supportedEfforts !== undefined && { reasoningEfforts: reasoning.supportedEfforts }),
+    ...(reasoning?.defaultEffort && { reasoningDefaultEffort: reasoning.defaultEffort }),
+    ...(reasoning?.defaultEnabled !== undefined && { reasoningDefaultEnabled: reasoning.defaultEnabled }),
+    ...(reasoning?.mandatory !== undefined && { reasoningMandatory: reasoning.mandatory }),
     isFree: prompt === 0 && completion === 0,
     ...(pricing && { pricing }),
     added: false,
+  };
+}
+
+const REASONING_EFFORTS = new Set<ModelReasoningEffort>(["minimal", "low", "medium", "high", "xhigh", "max"]);
+
+function isReasoningEffort(value: unknown): value is ModelReasoningEffort {
+  return typeof value === "string" && REASONING_EFFORTS.has(value as ModelReasoningEffort);
+}
+
+function normalizeReasoningCapabilities(value: unknown): {
+  supportedEfforts?: ModelReasoningEffort[] | null;
+  defaultEffort?: ModelReasoningEffort;
+  defaultEnabled?: boolean;
+  mandatory?: boolean;
+} | undefined {
+  if (!isRecord(value)) return undefined;
+  const supportedEfforts = value.supported_efforts === null
+    ? null
+    : Array.isArray(value.supported_efforts)
+      ? value.supported_efforts.filter(isReasoningEffort)
+      : undefined;
+  const rawDefaultEffort = value.default_effort;
+  const defaultEffort = isReasoningEffort(rawDefaultEffort) ? rawDefaultEffort : undefined;
+  const defaultEnabled = typeof value.default_enabled === "boolean"
+    ? value.default_enabled
+    : rawDefaultEffort === "none"
+      ? false
+      : undefined;
+  return {
+    ...(supportedEfforts !== undefined && { supportedEfforts }),
+    ...(defaultEffort && { defaultEffort }),
+    ...(defaultEnabled !== undefined && { defaultEnabled }),
+    ...(typeof value.mandatory === "boolean" && { mandatory: value.mandatory }),
   };
 }
 

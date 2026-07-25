@@ -13,6 +13,7 @@ import type {
   ToolUiPreview,
   UserMessagePayload
 } from "./session";
+import { convertUsageCostToUsd } from "./usage-cost";
 
 type LegacyTurnResultRecord = {
   type: "turn_result";
@@ -299,6 +300,29 @@ function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
 }
 
 export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
+  const lastAssistantEventIdByTurn = new Map<string, EventId>();
+  const usageByTurn = new Map<string, { totalTokens: number; costUsd: number }>();
+
+  for (const event of events) {
+    if (event.type === "assistant_message" || event.type === "assistant_reply") {
+      lastAssistantEventIdByTurn.set(event.turnId, event.id);
+      continue;
+    }
+
+    if (event.type !== "llm_usage" || !isRecord(event.payload)) continue;
+    const totalTokens = event.payload.totalTokens;
+    const cost = event.payload.cost;
+    if (typeof totalTokens !== "number" || !isRecord(cost)) continue;
+    const currency = cost.currency;
+    const total = cost.total;
+    if ((currency !== "USD" && currency !== "CNY") || typeof total !== "number") continue;
+
+    const current = usageByTurn.get(event.turnId) ?? { totalTokens: 0, costUsd: 0 };
+    current.totalTokens += totalTokens;
+    current.costUsd += convertUsageCostToUsd({ total, currency });
+    usageByTurn.set(event.turnId, current);
+  }
+
   const renderKeyCounters = new Map<string, number>();
   const nextRenderKey = (event: SessionEvent, slot: string, stableIdentity?: string): string => {
     if (stableIdentity) {
@@ -334,6 +358,9 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
       case "assistant_message":
       case "assistant_reply": {
         const payload = event.payload as AssistantMessagePayload;
+        const usage = lastAssistantEventIdByTurn.get(event.turnId) === event.id
+          ? usageByTurn.get(event.turnId)
+          : undefined;
         return [
           {
             kind: "assistant",
@@ -342,7 +369,8 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
             content: payload.content,
             createdAt: getDisplayTime(event.timestamp),
             model: payload.model,
-            provider: payload.provider
+            provider: payload.provider,
+            ...(usage ? { usage } : {}),
           }
         ];
       }

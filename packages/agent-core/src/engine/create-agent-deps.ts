@@ -13,7 +13,7 @@
  * 打开本文件就能看到：前端传了什么，env 补了什么，最终 LLM 收到什么。
  */
 
-import type { ModelDefinition, ModelId, ModelKey, ModelSpec } from "@actspace/shared";
+import type { ModelDefinition, ModelId, ModelKey, ModelReasoningEffort, ModelSpec } from "@actspace/shared";
 import { normalizeModelKey, resolveModelDefinition, resolveModelSpec, MODEL_REGISTRY, PROVIDER_REGISTRY } from "@actspace/shared";
 import type {
   LLMConfig,
@@ -42,6 +42,7 @@ export interface FrontendTurnInput {
   model?: ModelId;
   modelKey?: ModelKey;
   thinkingEnabled?: boolean;
+  reasoningEffort?: ModelReasoningEffort;
   /** 内置 Explore 聚焦子代理模型；null/缺省 = deepseek-v4-flash。来自 settings.agent.exploreModelId。 */
   exploreModelId?: ModelId | null;
 }
@@ -75,6 +76,7 @@ export interface AgentConfig {
   exploreModelKey?: ModelKey;
   toolManagerConfig: ToolManagerConfig;
   thinkingEnabled: boolean;
+  reasoningEffort?: ModelReasoningEffort;
   modelSpec: ModelSpec;
   /** 主 Agent 当前使用的完整系统提示词。 */
   systemPrompt: string;
@@ -96,6 +98,7 @@ export interface AgentDeps {
   toolManager: ToolManager;
   contextManager: ContextManager;
   thinkingEnabled: boolean;
+  reasoningEffort?: ModelReasoningEffort;
   modelSpec: ModelSpec;
   modelDefinition: ModelDefinition;
   modelKey: ModelKey;
@@ -128,6 +131,7 @@ export interface ExplicitAgentRuntimeInput {
   utility?: { definition: ModelDefinition; runtime: ProviderRuntimeConfig };
   explore?: { definition: ModelDefinition; runtime: ProviderRuntimeConfig };
   thinkingEnabled?: boolean;
+  reasoningEffort?: ModelReasoningEffort;
   inferenceSettings?: RuntimeInferenceSettings;
   toolEnvironment?: {
     hasWebSearchKey: boolean;
@@ -340,6 +344,12 @@ export function buildAgentConfigFromRuntime(
     ? buildLLMConfigFromRuntime(input.explore.definition, input.explore.runtime, input.inferenceSettings)
     : undefined;
   const modelSpec = modelDefinitionToCompatSpec(input.main.definition);
+  const thinkingEnabled = input.main.definition.capabilities.reasoningMandatory
+    ? true
+    : input.thinkingEnabled ?? input.main.definition.thinkingDefault;
+  const reasoningEffort = thinkingEnabled
+    ? resolveReasoningEffort(input.main.definition, input.reasoningEffort)
+    : undefined;
   return {
     llmConfig: mainConfig,
     modelDefinition: input.main.definition,
@@ -360,7 +370,8 @@ export function buildAgentConfigFromRuntime(
       turnId: runtimeContext?.turnId,
       browserBridgeSocketPath: runtimeContext?.browserBridgeSocketPath,
     },
-    thinkingEnabled: input.thinkingEnabled ?? input.main.definition.thinkingDefault,
+    thinkingEnabled,
+    ...(reasoningEffort && { reasoningEffort }),
     modelSpec,
     systemPrompt: runtimeContext?.systemPrompt ?? MAIN_AGENT_SYSTEM_PROMPT,
     systemPromptSegments: runtimeContext?.systemPromptSegments ?? [],
@@ -442,6 +453,7 @@ export function createAgentFromConfig(config: AgentConfig): AgentDeps {
     toolManager,
     contextManager,
     thinkingEnabled: config.thinkingEnabled,
+    reasoningEffort: config.reasoningEffort,
     modelSpec: config.modelSpec,
     modelDefinition,
     modelKey,
@@ -489,6 +501,7 @@ export async function createAgentForSession(
     toolManager,
     contextManager,
     thinkingEnabled: config.thinkingEnabled,
+    reasoningEffort: config.reasoningEffort,
     modelSpec: config.modelSpec,
     modelDefinition,
     modelKey,
@@ -496,6 +509,16 @@ export async function createAgentForSession(
     exploreModelKey: config.exploreModelKey,
     summarizer,
   };
+}
+
+function resolveReasoningEffort(
+  definition: ModelDefinition,
+  requested?: ModelReasoningEffort,
+): ModelReasoningEffort | undefined {
+  if (!requested || !definition.capabilities.reasoning) return undefined;
+  const supported = definition.capabilities.reasoningEfforts;
+  if (supported === null || supported?.includes(requested)) return requested;
+  return undefined;
 }
 
 function resolveConfigModelIdentity(config: AgentConfig): {

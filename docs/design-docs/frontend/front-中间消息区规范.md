@@ -46,6 +46,26 @@
 - Context Compaction 是系统执行事件，不属于工具调用，也不渲染为 Tool Preview；手动 `/compact` 和未来自动压缩共享同一消息块语法。
 - Final reply 作为收束结果，保持最清晰的阅读层级。
 
+## Assistant 回复尾栏
+
+每个用户 turn 的最终可见 Assistant 回复下方提供一条轻量尾栏，用于把时间、真实消耗与消息操作放在同一位置。
+
+### 展示与交互
+
+- 默认透明且不响应鼠标；悬浮 Assistant 回复区域时淡入。
+- 键盘 focus 进入尾栏按钮时也必须显示，不能只依赖 hover。
+- 左侧依次展示回复时间、本轮 token 总计和统一折算后的 USD 预估费用，例如 `21:16 · 33,361 tokens · $0.2321`。
+- 右侧保留快捷复制、回复可视化和更多操作。
+- 用户消息、Thinking、工具日志和 Context Compaction 不单独展示费用尾栏。
+
+### Usage 语义
+
+- 尾栏按 `turnId` 聚合该轮全部 `llm_usage`，包括工具调用前后的多次模型请求和失败重试产生的真实消耗。
+- 聚合结果只挂到该 turn 最后一条可见 Assistant 回复；不能只读取最终正文对应的单次调用，否则会漏掉 Agent 中间调用费用。
+- USD 与 CNY 的折算复用 shared 层统一函数，当前固定口径为 `7.2 CNY = 1 USD`，与 Usage Statistics 页面一致。
+- 费用允许显示最多 6 位小数，避免低成本调用被四舍五入成 `$0.00`。
+- 旧 session 没有 `llm_usage` 时只展示时间和操作，不伪造 token 或费用。
+
 ## Thinking 组件
 
 Thinking 是消息流中的折叠思考行。

@@ -28,6 +28,7 @@
 
   --act-color-border: #deded9;
   --act-color-border-strong: #8c8c85;
+  --act-color-meter-track: #e9e9e5;
 
   --act-color-text: #20201e;
   --act-color-text-muted: #676762;
@@ -130,6 +131,8 @@
 
   --act-scrollbar-thumb: rgba(171, 177, 186, 0.46);
   --act-scrollbar-thumb-hover: rgba(146, 153, 164, 0.56);
+  --act-scrollbar-thumb-subtle: rgba(146, 153, 164, 0.3);
+  --act-scrollbar-thumb-subtle-hover: rgba(126, 133, 144, 0.46);
 
   /*
    * Legacy alias layer:
@@ -217,6 +220,7 @@
 
   --act-color-border: #353630;
   --act-color-border-strong: #787870;
+  --act-color-meter-track: #3a3b35;
 
   --act-color-text: #f1f1ed;
   --act-color-text-muted: #b5b5ae;
@@ -301,6 +305,8 @@
 
   --act-scrollbar-thumb: rgba(255, 255, 255, 0.16);
   --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
+  --act-scrollbar-thumb-subtle: rgba(255, 255, 255, 0.11);
+  --act-scrollbar-thumb-subtle-hover: rgba(255, 255, 255, 0.2);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -319,6 +325,7 @@
 
     --act-color-border: #353630;
     --act-color-border-strong: #787870;
+    --act-color-meter-track: #3a3b35;
 
     --act-color-text: #f1f1ed;
     --act-color-text-muted: #b5b5ae;
@@ -403,5 +410,7 @@
 
     --act-scrollbar-thumb: rgba(255, 255, 255, 0.16);
     --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
+    --act-scrollbar-thumb-subtle: rgba(255, 255, 255, 0.11);
+    --act-scrollbar-thumb-subtle-hover: rgba(255, 255, 255, 0.2);
   }
 }

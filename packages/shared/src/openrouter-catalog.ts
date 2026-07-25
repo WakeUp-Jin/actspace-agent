@@ -1,4 +1,4 @@
-import type { ModelDefinition } from "./model-config";
+import type { ModelDefinition, ModelReasoningEffort } from "./model-config";
 
 export type CatalogCacheState = "missing" | "fresh" | "stale" | "offline";
 
@@ -11,6 +11,10 @@ export type CatalogModelView = {
   input: Array<"text" | "image">;
   toolUse: "declared" | "unknown";
   reasoning: boolean;
+  reasoningEfforts?: ModelReasoningEffort[] | null;
+  reasoningDefaultEffort?: ModelReasoningEffort;
+  reasoningDefaultEnabled?: boolean;
+  reasoningMandatory?: boolean;
   isFree: boolean;
   pricing?: ModelDefinition["pricing"];
   added: boolean;

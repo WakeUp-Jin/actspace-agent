@@ -65,6 +65,7 @@ Chart、Context bucket、热力图等使用独立数据色，不映射到 action
 --act-color-hover-overlay;
 --act-color-border;
 --act-color-border-strong;
+--act-color-meter-track;
 --act-color-text;
 --act-color-text-muted;
 --act-color-text-faint;
@@ -189,6 +190,7 @@ text-[rgba(...)]
 - send = action token。
 - running = operational 小型反馈。
 - Context usage = 默认中性，阈值切 warning / danger。
+- Context 容量条的未使用轨道必须消费低对比 `meter-track`，不能使用 `border-strong` 造成“灰色区域也像已使用”的误读。
 
 ### Message tools
 

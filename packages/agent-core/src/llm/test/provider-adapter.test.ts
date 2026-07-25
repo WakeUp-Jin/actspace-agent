@@ -21,7 +21,28 @@ describe("provider adapter", () => {
       thinking: { type: "enabled" },
     });
     expect(applyOpenAIProviderRequestParams("kimi", base, { thinkingEnabled: false })).toEqual(base);
-    expect(applyOpenAIProviderRequestParams("openrouter", base, { thinkingEnabled: true })).toEqual(base);
+    expect(applyOpenAIProviderRequestParams("openrouter", base, { thinkingEnabled: true })).toEqual({
+      ...base,
+      reasoning: { enabled: true },
+    });
+  });
+
+  it("maps OpenRouter reasoning controls to the unified reasoning object", () => {
+    const base = { model: "openai/gpt-5", messages: [] };
+    expect(applyOpenAIProviderRequestParams("openrouter", base, {
+      thinkingEnabled: true,
+      reasoningEffort: "high",
+    })).toEqual({
+      ...base,
+      reasoning: { effort: "high" },
+    });
+    expect(applyOpenAIProviderRequestParams("openrouter", base, {
+      thinkingEnabled: false,
+      reasoningEffort: "high",
+    })).toEqual({
+      ...base,
+      reasoning: { enabled: false },
+    });
   });
 
   it("returns stable provider display names", () => {

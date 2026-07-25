@@ -23,6 +23,8 @@ export type MainAgentRuntimeContextInput = {
   browserBridgeAbbPath?: string;
   /** Browser Bridge Native Host exposed stable Unix socket. */
   browserBridgeSocketPath?: string;
+  /** 主 Agent 工具黑名单；`browser` 或历史 `browser_help` 会关闭整个 Browser 工具组。 */
+  disabledTools?: string[];
   warn?: WarningLogger;
 };
 
@@ -38,10 +40,13 @@ export async function loadMainAgentRuntimeContext(
     warn: input.warn,
   });
   systemPromptSegments.push(createMainAgentKairosHandoffSegment(mainAgentInboxPath));
-  const browserBridgeRuntime = await resolveBrowserBridgeRuntime(
-    input.browserBridgeAbbPath,
-    input.browserBridgeSocketPath,
-  );
+  const disabledTools = new Set(input.disabledTools ?? []);
+  const browserBridgeRuntime = disabledTools.has("browser") || disabledTools.has("browser_help")
+    ? undefined
+    : await resolveBrowserBridgeRuntime(
+        input.browserBridgeAbbPath,
+        input.browserBridgeSocketPath,
+      );
   if (browserBridgeRuntime) {
     systemPromptSegments.push(browserBridgeRuntime.segment);
   }
@@ -85,8 +90,8 @@ async function resolveBrowserBridgeRuntime(
       id: "browser_bridge_tools",
       title: "Browser tools",
       content: [
-        "The user's real Chrome browser is available through 11 categorized `browser_*` tools backed by 62 canonical actions.",
-        "- Start with `browser_help` when an action schema is unclear. Use `browser_user` or `browser_tabs` to inspect tabs, then choose CUA, DOM, Locator, navigation, wait, I/O, or debug by intent.",
+        "The user's real Chrome browser is available through the progressive `browser_help` gateway backed by 62 canonical actions.",
+        "- For any task that needs the browser, call `browser_help` first. After it succeeds, the next model call receives the categorized Browser tools for CUA, DOM, Locator, navigation, tabs, user-browser state, waits, I/O, debug, and batching.",
         "- Use `browser_run` only for a known structured sequence; the Go bridge preflights and binds approval to the exact batch.",
         "- Do not invoke `abb` through Bash for normal browser tasks.",
         "- Check `<runtime_model>.input` before relying on screenshots: if it is text-only, prefer DOM, URL, visible text, and structured browser state.",

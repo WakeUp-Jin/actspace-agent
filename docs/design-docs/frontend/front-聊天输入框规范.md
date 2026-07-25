@@ -58,7 +58,14 @@ Composer 有 `surface`（`followup` / `initial`）一个外部维度，内部布
 - 判定依据是**inline 可用宽度下的渲染高度**（`scrollHeight` 超过单行阈值），不是有没有 `\n`——长文本自动折行也会触发；删回一行自动切回 inline。不允许用 stacked 全宽输入框的高度反向决定是否切回 inline，否则宽度变化会造成误判和内容裁切。
 - 附件存在、`initial` surface 强制 stacked。
 - **实现约束：切换不允许 remount textarea**。inline / stacked 是同一个 grid 容器切换 `grid-template-areas`，textarea / `+` / 模型 / 发送四个元素 DOM 结构不变，正在打字时切换不丢焦点和光标。toolbar 分组用 `display: contents` 保留 aria 语义。
-- 模型菜单展开方向随布局态切换：inline 时按钮在右、菜单向左展开；stacked 时按钮在左、菜单向右展开（菜单宽 280px，避免撞窗口边界）。
+- 模型菜单展开方向随布局态切换：inline 时按钮在右、菜单向左展开；stacked 时按钮在左、菜单向右展开。
+- 模型主菜单保持约 `244px` 的紧凑单列，行高约 `34px`；选中项只使用轻量中性底色与勾选，不额外加粗整行。
+- 菜单顶部固定模型搜索框，打开时自动聚焦；搜索只在当前可用模型中按名称、供应商、API model ID 和内部 ID 做本地过滤，不触发远端目录请求。
+- `Edit` 仅在对应模型行 hover / keyboard focus 或 Options 已打开时出现；Options 约 `210px`，贴着触发模型行在主菜单外侧展开，不固定沉到菜单底部。
+- Options 必须由模型能力驱动：支持开关时显示 Thinking；提供推理强度时显示 `Auto / Minimal / Low / Medium / High / Extra High / Max` 中该模型真实支持的项；`Auto` 表示不覆盖供应商默认值。强制推理模型不能被关闭。
+- Composer 不提供上下文长度选择器。模型使用注册表声明的原生最大上下文，Context 入口只负责展示当前占用。
+- 主菜单和 Options 打开时使用约 `140ms` 的 opacity + transform 轻量过渡；系统启用 reduced motion 时取消过渡。
+- 模型列表保留滚动能力，但不通过扩大菜单宽度或行高承载更多信息。
 
 | surface | 布局 | 结构 |
 | --- | --- | --- |
@@ -123,6 +130,8 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 - Conversation。
 
 ### 原则
+
+- 分段彩色部分表示已使用容量，未使用部分使用低对比 `--act-color-meter-track`；不能用深灰轨道与已用数据竞争视觉注意力。
 
 - 保持统计感。
 - 以占用和构成为主，不做复杂编辑。

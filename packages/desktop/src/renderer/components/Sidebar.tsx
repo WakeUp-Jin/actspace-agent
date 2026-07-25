@@ -6,7 +6,6 @@ import {
   BarChart3,
   ChevronDown,
   ChevronRight,
-  FlaskConical,
   Folder,
   FolderPlus,
   MoreHorizontal,
@@ -178,7 +177,7 @@ function resolveSessionStatus(status: unknown): SessionUiStatusKind {
 }
 
 const SIDEBAR_CLASS =
-  "sidebar relative flex h-full min-h-0 min-w-0 flex-col gap-3 border-r border-line bg-sidebar pb-2.5 pl-2.5 pr-2 pt-[var(--window-chrome-strip-height)]";
+  "sidebar relative flex h-full min-h-0 min-w-0 flex-col gap-3 bg-sidebar pb-2.5 pl-2.5 pr-2 pt-[var(--window-chrome-strip-height)]";
 const SIDEBAR_PRIMARY_ACTIONS_CLASS = "mt-1.5 flex min-w-0 flex-col gap-px p-0";
 const SIDEBAR_PRIMARY_ACTION_CLASS =
   "flex min-h-[34px] min-w-0 items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2.5 py-0 text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
@@ -186,7 +185,7 @@ const SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS = "bg-selected font-semibold text-text
 const SIDEBAR_PRIMARY_ACTION_LABEL_CLASS = "min-w-0 flex-1 text-left";
 const SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS = "text-xs font-medium tracking-[0.02em] text-text-faint";
 const SIDEBAR_BUTTON_RESET_CLASS = "appearance-none border-0 bg-transparent font-[inherit]";
-const SESSION_NAV_CLASS = "flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-x-hidden overflow-y-auto pt-2";
+const SESSION_NAV_CLASS = "sidebar-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-x-hidden overflow-y-auto pt-2";
 const NAV_SECTION_CLASS = "flex min-w-0 flex-col gap-0.5 pb-0";
 const NAV_SECTION_WORKSPACES_CLASS = `${NAV_SECTION_CLASS} gap-1`;
 const NAV_SECTION_TITLE_CLASS = "group/nav-title flex min-h-6 items-center justify-between gap-2 px-2";
@@ -732,14 +731,6 @@ export function Sidebar({
           <SquarePen size={14} strokeWidth={1.9} />
           <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>New Agent</span>
           <span className={SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS} aria-hidden="true">⌘N</span>
-        </button>
-        <button
-          className={`${SIDEBAR_PRIMARY_ACTION_CLASS} ${view === "lab" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
-          type="button"
-          onClick={() => onSelectView?.("lab")}
-        >
-          <FlaskConical size={14} strokeWidth={1.9} />
-          <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>Lab</span>
         </button>
         <button
           className={`${SIDEBAR_PRIMARY_ACTION_CLASS} ${view === "usage" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}

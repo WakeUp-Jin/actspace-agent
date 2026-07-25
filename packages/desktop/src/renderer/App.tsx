@@ -1315,6 +1315,7 @@ export function App() {
             reason: evalFailureReason,
             ...modelSelectionPayload(options.model),
             thinkingEnabled: options.thinkingEnabled,
+            ...(options.reasoningEffort && { reasoningEffort: options.reasoningEffort }),
           };
           const result = await window.actspace.generateEvalCandidate(input);
           if (isCurrentVisibleTurn()) {
@@ -1348,6 +1349,7 @@ export function App() {
           attachments: options.attachments,
           ...modelSelectionPayload(options.model),
           thinkingEnabled: options.thinkingEnabled,
+          ...(options.reasoningEffort && { reasoningEffort: options.reasoningEffort }),
         };
         const result = await window.actspace.runTurn(input);
 

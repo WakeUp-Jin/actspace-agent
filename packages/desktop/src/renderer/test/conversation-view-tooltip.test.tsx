@@ -18,6 +18,10 @@ const messages: MessageBlock[] = [
     id: "assistant-1",
     content: "这是一条可以被转换成可视化 HTML 的回复。",
     createdAt: "2026-06-02T00:00:01.000Z",
+    usage: {
+      totalTokens: 33_361,
+      costUsd: 0.2321,
+    },
   },
 ];
 
@@ -101,6 +105,16 @@ describe("ConversationView tooltips", () => {
 
     await user.hover(screen.getByRole("button", { name: "更多消息操作" }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("更多操作");
+  });
+
+  it("renders a hover-revealed turn footer with tokens, USD cost, and copy action", () => {
+    renderConversation();
+
+    const usageMeta = screen.getByLabelText("本轮消耗：33,361 tokens · $0.2321");
+    expect(usageMeta).toHaveTextContent("33,361 tokens · $0.2321");
+    expect(usageMeta.parentElement).toHaveClass("opacity-0");
+    expect(usageMeta.parentElement).toHaveClass("group-hover/assistant-turn:opacity-100");
+    expect(screen.getByRole("button", { name: "复制回复" })).toBeInTheDocument();
   });
 
   it("keeps assistant turn actions above a following compaction divider", () => {

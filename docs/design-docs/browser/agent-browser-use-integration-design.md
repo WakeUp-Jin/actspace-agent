@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-本文档定义 actspace-agent 接入 Browser Use 能力的集成方案。Plan 5 已完整收敛：62 条 canonical command 全部由 Go handler 实现，Agent 默认暴露 11 个分类/辅助工具，Extension 只保留 session-scoped primitive backend，真实 Chrome profile 与 approval/isolation 验收均已完成。统一入口见 `docs/design-docs/browser/agent-browser-use-index.md`。
+本文档定义 actspace-agent 接入 Browser Use 能力的集成方案。Plan 5 已完整收敛：62 条 canonical command 全部由 Go handler 实现，Agent Core 稳定注册 11 个分类/辅助工具，但模型默认只看到 `browser_help`，成功调用后下一次 LLM 请求才披露完整工具包。Extension 只保留 session-scoped primitive backend，真实 Chrome profile 与 approval/isolation 验收均已完成。统一入口见 `docs/design-docs/browser/agent-browser-use-index.md`。
 
 ## 设计决策
 
@@ -11,7 +11,7 @@
 ```
 packages/agent-core             Go command engine          Injected JS          Chrome Extension
 ───────────────────             ─────────────────          ───────────          ────────────────
-11 个稳定工具                    62 条 canonical registry   Locator Runtime      Native Messaging
+11 个稳定注册工具（1→11 披露）    62 条 canonical registry   Locator Runtime      Native Messaging
 approval + preview              CUA / DOM CUA / Locator    DOM 状态与读写        chrome.debugger
 BridgeClient                    waits / events / sessions  TS 构建 + go:embed    Chrome APIs / cursor
 ```
@@ -31,7 +31,7 @@ BridgeClient                    waits / events / sessions  TS 构建 + go:embed 
 2. **Go bridge 承担重逻辑**：62 条 registry、CUA、DOM CUA、Locator 注入管理、CDP 会话、导航等待和事件协调。
 3. **Injected JS 只提供页面语义**：它是 ActSpace 自研 Locator Runtime，不复制 Codex、不依赖 Playwright 运行时，也不承载 session/权限或 Chrome API。
 4. **Chrome Extension 做原语执行**：只直接调用 `chrome.debugger` 和 Chrome APIs，维护宿主权限与光标。
-5. **工具即能力边界**：不提供给模型的工具 = Agent 无法使用的能力。通过 tool registry 控制暴露面。
+5. **注册态与暴露态分离**：ToolManager 可以稳定持有 executor，但只有当前 definitions 中的工具才允许模型调用；隐藏工具在披露前按不存在拒绝执行。
 6. **长连接解决 CLI 缺陷**：一次连接整个 turn，支持事件通知和状态持续。
 
 ## 架构分层
@@ -183,7 +183,7 @@ plugins/browser-bridge/apps/chrome-extension/
 
 ## 工具暴露设计
 
-### 当前目标工具清单（11 个模型工具）
+### 当前目标工具清单（11 个稳定注册工具）
 
 | 工具名 | actions 范围 |
 |--------|-------------|
@@ -202,6 +202,22 @@ plugins/browser-bridge/apps/chrome-extension/
 `browser_run` 的模型结果必须包含每个已执行 action 的真实返回值，而不只列 action 名称。DOM snapshot、Locator 分页列表、tabs 列表与短状态结果分别复用单 action 的格式化和输出上限；截图只返回完成摘要，不在批处理文本中展开 base64。
 
 62 条叶子能力以 `category + action` 进入 Go registry，不平铺成 62 个模型工具。
+
+### Turn 级渐进披露
+
+初始 LLM 请求只携带 `browser_help`。模型成功调用该 gateway 后，ToolManager 先记录 pending disclosure；Agent Loop 在下一次 LLM 调用前提交 `browser` group，并刷新 Context 中的 tool definitions：
+
+```text
+Agent.run start
+  -> reset disclosure
+  -> LLM call #1: browser_help only
+  -> browser_help success: browser group pending
+  -> before LLM call #2: commit pending group
+  -> LLM call #2+: full 11 Browser tools
+  -> next Agent.run: reset to browser_help only
+```
+
+ToolManager 不动态注册或注销 executor，避免重复绑定 permission checker、disposer 和 Socket 生命周期。gateway 披露也不等于用户授权；第一次真实 Browser action 仍走 Session 授权租约。
 
 ### 首版兼容工具（15 个，迁移期）
 
@@ -413,23 +429,25 @@ const BLOCKED_ORIGINS = [
 
 ### 工具暴露控制
 
-用户可在设置页控制哪些浏览器工具暴露给模型：
+用户可在设置页控制整个浏览器工具组和披露后的细粒度能力：
 
 ```
 设置 → 工具 → 浏览器
-  ☑ browser_cua / browser_dom / browser_locator
-  ☑ browser_navigation / browser_tabs / browser_user
-  ☑ browser_wait / browser_io / browser_debug / help / run
+  ☑ 浏览器（总开关；默认只暴露 browser_help）
+  ▸ 高级设置（默认折叠）
+      ☑ browser_cua / browser_dom / browser_locator
+      ☑ browser_navigation / browser_tabs / browser_user
+      ☑ browser_wait / browser_io / browser_debug / browser_run
 
-高风险 capability（不注册为额外模型工具）：
-  ☐ 触发下载
-  ☐ 文件上传
-  ☐ 写剪贴板
+      高风险 capability（不注册为额外模型工具）：
+        ☐ 触发下载
+        ☐ 文件上传
+        ☐ 写剪贴板
 ```
 
 `browser_capability_download`、`browser_capability_file_upload`、`browser_capability_clipboard_write` 进入现有 disabled-tools 配置；permission checker 按 registry `effect` 做 hard deny。分类工具仍可见，未被禁用的低风险 action 不受影响；batch 命中禁用 capability 时整批拒绝且不发送 `command.run`。
 
-未勾选的工具不会出现在模型的 tool definitions 中。
+未勾选的细粒度工具不会在 Browser group 展开后出现在模型 definitions 中。关闭总开关时，Browser prompt segment、Socket runtime 注入和全部 Browser 工具注册都会关闭，但子项禁用偏好保留，重新开启后恢复。
 
 ### 临时结果与持久化边界
 

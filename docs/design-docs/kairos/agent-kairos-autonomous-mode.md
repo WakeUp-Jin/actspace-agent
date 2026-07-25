@@ -163,6 +163,9 @@ Kairos 不新增 `Agent` 工厂入口，也不复用主 Agent 的 `ContextManage
 
 新增文件，集中处理 Kairos IPC：
 
+- `kairos:read-config` / `kairos:write-config` 是常驻配置通道，在 Kairos 模型未配置、Controller 尚未创建时也必须注册，保证设置页可以读写本地配置。
+- 其余运行态通道跟随 Controller 注册；用户在当前进程选好可用模型后，main 应立即创建 Controller，不要求重启应用。
+
 - `kairos:get-state` 返回当前 `KairosRuntimeState`（运行状态、计数器）。
 - `kairos:get-events-recent` 从 ring buffer 返回最近 200 条 SessionEvent，不足时从 short-term jsonl 倒序补足。
 - `kairos:control` 接收 `KairosControl`（start / stop / wake_now / reset_today）。

@@ -4,7 +4,7 @@
 
 左侧会话栏是 actspace 桌面端工作台的左侧栏，负责：
 
-- 入口聚合：聊天态新建（New Agent）以及 Lab / Usage / Kairos 三个占位入口，外加顶栏窗口控件。
+- 入口聚合：聊天态新建（New Agent）以及 Usage / Kairos 两个产品入口，外加顶栏窗口控件。Lab 方向暂停，不在公开导航中展示。
 - 会话导航：让用户在大量历史会话之间快速切换。
 - 状态指示：把当前选中、运行中 turn、待审批和失败等状态集中显示在行首状态点。
 - 全局设置入口：底部 Settings。
@@ -16,7 +16,7 @@
 自上而下分四块：
 
 1. **顶部窗口区**（红绿灯 + 折叠按钮 + 搜索按钮）。
-2. **顶部主入口**：`New Agent` / `Lab` / `Usage` / `Kairos`。
+2. **顶部主入口**：`New Agent` / `Usage` / `Kairos`。
 3. **分区列表**：`Pinned` → `Scheduled` → `Workspaces`（父分类 + 多个 Workspace 文件夹）。
 4. **底部** `Settings`。
 
@@ -35,10 +35,10 @@
 ## 顶部主入口
 
 - `New Agent`：替代原 `New chat`，承担"开启一次新的 Agent 任务"语义；展示快捷键 `⌘N`。
-- `Lab`：实验台占位页（Coming soon）。未来用于 prompt 调试、工具沙盒、多模型并排。
 - `Usage`：统计页占位（Coming soon），将承载 token / 成本聚合。具体设计见 `front-usage-statistics.md`。
 - `Kairos`：时机引擎占位页（Coming soon）。Kairos 取自希腊语「合适的时刻」，将承载定时任务、事件触发、自主 Agent 的运行边界与节奏。
-- 四个入口共用同一组 hover / active 状态语言；当前 view 视为 active。
+- 三个入口共用同一组 hover / active 状态语言；当前 view 视为 active。
+- Lab 的原型和 renderer 代码作为历史设计资产保留，但暂不提供侧栏入口。
 
 ## 分区列表
 
@@ -141,6 +141,7 @@
   - 浮层使用 `bg-surface-raised` / `border-line` / `shadow-act-popover` / `text-text-*` 等主题 token。
   - 路径使用小号等宽文本，`overflow-wrap:anywhere`，不能撑破主布局。
   - 卡片宽度约 420px，并依赖 Radix collision 逻辑在窗口边界处调整位置。
+  - Context 细进度条的剩余容量使用低对比 `meter-track`，彩色部分才表示实际已用容量。
 
 ## Settings 切换规则
 
@@ -156,6 +157,7 @@
 - 宽度 200–360px，由用户在工作台 SplitView 中调整。
 - 不展示 logo 或品牌 wordmark。
 - 宽度变化不应让会话标题变成多行卡片，超长标题仍按紧凑导航处理。
+- 会话列表保留可见的细滚动条，默认使用低对比 thumb、hover 时再增强；滚动条和右侧 1px SplitView 分隔线必须保持不同视觉层级。
 
 ### 隐藏态（hidden）
 
@@ -180,7 +182,7 @@
 - 不把 `"SF Pro Text"` 写在最前面，让 macOS 通过 `-apple-system` 自动选 San Francisco，与 Cursor `.monaco-workbench.mac:lang(zh-Hans)` 完全一致。
 - **全局 `font-feature-settings: normal`**，**不再开 `cv11/ss01`**——之前开启这两个拉丁 stylistic set 会让英文字形偏离 macOS 系统 UI；body 仅保留 `-webkit-font-smoothing: antialiased`。
 - 字号字重基准（以 sidebar 为例，对齐 Cursor IDE 的"中间档"密度）：
-  - 主入口（New Agent / Lab / Usage / Kairos）：`13px / 500 / --color-text-muted`。
+  - 主入口（New Agent / Usage / Kairos）：`13px / 500 / --color-text-muted`。
   - 会话标题：`13px / 500`。
   - 会话时间戳：`11px / --color-text-faint`。
   - 分组标题（Pinned / Scheduled / Workspaces 等）：`12px / 500 / --color-text-faint`。靠字号小一档 + 颜色更浅区分语义，而不是用 440 这种非标字重。
@@ -205,5 +207,5 @@
 - 轻量优先：信息密度高、视觉装饰少，不做重卡片。
 - 自动归类：Workspace 概念暂不暴露管理面，对用户来说"打开 actspace 在哪个目录"就决定了 Workspace 归属。
 - 状态合并：行首点首版只区分 active 和 busy，不细分未读/错误/审批，等业务上有真实区分需求再扩展。
-- 操作克制：顶部主入口要么是真正在演进的产品方向（Lab / Usage / Kairos），要么是核心操作（New Agent），不放 Marketplace / Refer friends 这种与 actspace 没关系的浮卡。
+- 操作克制：顶部主入口要么是当前真正在演进的产品方向（Usage / Kairos），要么是核心操作（New Agent）；暂停的方向不占用公开入口。
 - 折叠彻底：`hidden` 而非 `rail`，让 main content 真正占满，符合用户对"折叠"的直觉与 Cursor 行为一致；窗口顶部浮动的 chrome row 保证可逆。

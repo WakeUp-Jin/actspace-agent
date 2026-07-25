@@ -775,7 +775,7 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
       });
 
       const tools: KairosContextTool[] = toolManager
-        .getAll()
+        .getToolDefinitions()
         .map<KairosContextTool>((tool) => ({
           name: tool.name,
           description: tool.description,

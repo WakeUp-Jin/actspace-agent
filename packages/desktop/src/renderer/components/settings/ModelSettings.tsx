@@ -52,6 +52,11 @@ export function ModelSettings({ settings, onChanged }: { settings: AppSettings; 
     await load(); await onChanged?.();
   };
 
+  const handleModelAdded = async () => {
+    await load();
+    await onChanged?.();
+  };
+
   if (!window.actspace?.listInstalledModels) return <SectionShell title="模型" description="仅桌面端可管理模型。"><div /></SectionShell>;
 
   return (
@@ -73,7 +78,13 @@ export function ModelSettings({ settings, onChanged }: { settings: AppSettings; 
           })}
         </div>
       </SectionShell>
-      {catalogOpen ? <OpenRouterModelCatalogDialog onClose={() => setCatalogOpen(false)} onAdded={load} /> : null}
+      {catalogOpen ? (
+        <OpenRouterModelCatalogDialog
+          onClose={() => setCatalogOpen(false)}
+          onAdded={handleModelAdded}
+          onReloaded={handleModelAdded}
+        />
+      ) : null}
     </>
   );
 }

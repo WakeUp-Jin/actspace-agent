@@ -35,10 +35,11 @@ function renderContextPopup(props: Parameters<typeof ContextPopup>[0]) {
 
 describe("ContextPopup", () => {
   it("renders buckets from the snapshot and omits the footer", () => {
-    renderContextPopup({ snapshot: makeSnapshot(), onClose: vi.fn() });
+    const { container } = renderContextPopup({ snapshot: makeSnapshot(), onClose: vi.fn() });
 
     expect(screen.getByText("System prompt")).toBeInTheDocument();
     expect(screen.getByText("Tools")).toBeInTheDocument();
+    expect(container.querySelector(".context-meter")).toHaveClass("bg-[var(--act-color-meter-track)]");
     // 已移除的 footer 文案不应再出现。
     expect(screen.queryByText(/Total used/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Compressed/i)).not.toBeInTheDocument();

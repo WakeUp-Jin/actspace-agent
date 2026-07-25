@@ -11,8 +11,10 @@ import {
   deleteBrief,
   dispatchKairosControl,
   listBriefs,
+  readKairosConfigFile,
   readBrief,
   validateByName,
+  writeKairosConfigFile,
   writeBrief,
   type BatcherSink,
   type BatcherTimer,
@@ -116,6 +118,54 @@ describe("CONFIG_FILE_MAP", () => {
       rule: "rule.md",
       soul: "soul.md",
     });
+  });
+});
+
+describe("Kairos config files", () => {
+  let kairosRoot: string;
+
+  beforeEach(async () => {
+    kairosRoot = await mkdtemp(join(tmpdir(), "kairos-config-"));
+  });
+
+  afterEach(async () => {
+    await rm(kairosRoot, { recursive: true, force: true });
+  });
+
+  it("returns a typed not-found response before the runtime controller exists", async () => {
+    await expect(readKairosConfigFile(kairosRoot, { name: "preferences" })).resolves.toEqual({
+      content: "",
+      fileName: "preferences.json",
+      notFound: true,
+    });
+  });
+
+  it("writes and reads JSON config without requiring a runtime controller", async () => {
+    const content = JSON.stringify({ enabled: false }, null, 2);
+    await writeKairosConfigFile(kairosRoot, { name: "preferences", content });
+
+    await expect(readKairosConfigFile(kairosRoot, { name: "preferences" })).resolves.toEqual({
+      content,
+      fileName: "preferences.json",
+      notFound: false,
+    });
+  });
+
+  it("writes markdown config verbatim", async () => {
+    const content = "# Kairos rule\n保持克制。\n";
+    await writeKairosConfigFile(kairosRoot, { name: "rule", content });
+
+    await expect(readKairosConfigFile(kairosRoot, { name: "rule" })).resolves.toMatchObject({
+      content,
+      fileName: "rule.md",
+      notFound: false,
+    });
+  });
+
+  it("rejects invalid JSON before replacing the config file", async () => {
+    await expect(
+      writeKairosConfigFile(kairosRoot, { name: "preferences", content: "{ broken" }),
+    ).rejects.toThrow(/Invalid JSON/);
   });
 });
 

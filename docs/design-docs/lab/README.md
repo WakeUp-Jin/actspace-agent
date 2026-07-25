@@ -4,7 +4,7 @@ Lab 是 ActSpace 的能力实验台，用于让 Agent 以可追溯的实验方�
 
 ## 当前状态
 
-- V0 renderer mock 已落地；后端 Lab Runtime、IPC 和持久化尚未实现。
+- Lab 方向当前暂停，桌面端公开入口已移除；V0 renderer mock 和设计资产保留，后端 Lab Runtime、IPC 和持久化尚未实现。
 - 核心界面是实验矩阵，一列代表一个生命周期阶段。
 - 核心流程是：假说构建 → 实证验证 → 能力锻造 → 晋升评审。
 - 当前实现进度以 `docs/design-docs/lab/lab-implementation-progress.md` 为准。

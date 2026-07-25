@@ -24,5 +24,16 @@ export function applyOpenAIProviderRequestParams<T extends Record<string, unknow
   if (provider === "kimi" && options?.thinkingEnabled === true) {
     return { ...requestParams, thinking: { type: "enabled" } };
   }
+  if (provider === "openrouter") {
+    if (options?.thinkingEnabled === false) {
+      return { ...requestParams, reasoning: { enabled: false } };
+    }
+    if (options?.reasoningEffort) {
+      return { ...requestParams, reasoning: { effort: options.reasoningEffort } };
+    }
+    if (options?.thinkingEnabled === true) {
+      return { ...requestParams, reasoning: { enabled: true } };
+    }
+  }
   return requestParams;
 }

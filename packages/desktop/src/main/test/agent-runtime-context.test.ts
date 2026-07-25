@@ -138,4 +138,25 @@ describe("loadMainAgentRuntimeContext browser bridge", () => {
     expect(context.systemPromptSegments?.some((segment) => segment.id === "browser_bridge_tools")).toBe(false);
     expect(context.browserBridgeSocketPath).toBeUndefined();
   });
+
+  it("does not expose browser guidance or socket when the browser group is disabled", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "actspace-browser-disabled-workspace-"));
+    const dataRoot = await mkdtemp(join(tmpdir(), "actspace-browser-disabled-data-"));
+    tempDirs.push(workspaceRoot, dataRoot);
+    const abbPath = join(dataRoot, "plugins", "browser-bridge", "bin", "abb");
+    await mkdir(join(dataRoot, "plugins", "browser-bridge", "bin"), { recursive: true });
+    await writeFile(abbPath, "#!/bin/sh\n", "utf8");
+
+    const context = await loadMainAgentRuntimeContext({
+      dataRoot,
+      workspaceRoot,
+      readPromptFile: async () => ({ path: "/tmp/p.md", content: "PROMPT" }),
+      browserBridgeAbbPath: abbPath,
+      browserBridgeSocketPath: join(dataRoot, "browser-bridge.sock"),
+      disabledTools: ["browser"],
+    });
+
+    expect(context.systemPromptSegments?.some((segment) => segment.id === "browser_bridge_tools")).toBe(false);
+    expect(context.browserBridgeSocketPath).toBeUndefined();
+  });
 });

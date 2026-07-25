@@ -99,7 +99,17 @@ describe("SettingsPage", () => {
     },
   }));
   const connectProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.deepseek }));
+  const updateProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.openrouter }));
   const disconnectProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.kimi }));
+  const getProviderBalance = vi.fn(async ({ provider }: { provider: "deepseek" | "kimi" | "openrouter" }) => ({
+    provider,
+    isConfigured: true,
+    isAvailable: true,
+    generatedAt: "2026-07-25T08:00:00.000Z",
+    displayBalance: provider === "openrouter"
+      ? { amount: "74.75", currency: "USD" }
+      : { amount: "31.11", currency: "CNY" },
+  }));
   const listInstalledModels = vi.fn(async () => ({ models: [] }));
   const listUsableModels = vi.fn(async () => ({ models: [] }));
   const getLocalUpdateState = vi.fn(async () => makeLocalUpdateState());
@@ -132,7 +142,9 @@ describe("SettingsPage", () => {
     testProviderConnection.mockClear();
     listProviders.mockClear();
     connectProvider.mockClear();
+    updateProvider.mockClear();
     disconnectProvider.mockClear();
+    getProviderBalance.mockClear();
     listInstalledModels.mockClear();
     listUsableModels.mockClear();
     getLocalUpdateState.mockReset();
@@ -168,7 +180,9 @@ describe("SettingsPage", () => {
       testProviderConnection,
       listProviders,
       connectProvider,
+      updateProvider,
       disconnectProvider,
+      getProviderBalance,
       listInstalledModels,
       listUsableModels,
       getLocalUpdateState,
@@ -312,6 +326,42 @@ describe("SettingsPage", () => {
     });
   });
 
+  it("服务商卡片显示账户余额并支持手动刷新", async () => {
+    renderSettingsPage();
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
+    const balance = await screen.findByLabelText("Kimi 账户余额");
+    expect(balance).toHaveTextContent("¥31.11 CNY");
+
+    await userEvent.click(screen.getByRole("button", { name: "刷新 Kimi 账户余额" }));
+    await waitFor(() => expect(getProviderBalance).toHaveBeenCalledTimes(2));
+  });
+
+  it("OpenRouter 编辑弹窗可保存独立 Management Key", async () => {
+    listProviders.mockResolvedValueOnce({
+      providers: {
+        deepseek: { provider: "deepseek" as const, hasApiKey: false, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 2, enabledModelCount: 2 },
+        kimi: { provider: "kimi" as const, hasApiKey: false, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 2, enabledModelCount: 2 },
+        openrouter: { provider: "openrouter" as const, hasApiKey: true, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 1, enabledModelCount: 1 },
+      },
+    });
+    renderSettingsPage();
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
+    await userEvent.click(await screen.findByRole("button", { name: "编辑" }));
+    await userEvent.type(screen.getByLabelText("OpenRouter Management Key"), "sk-or-management");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(updateProvider).toHaveBeenCalledWith(expect.objectContaining({
+        provider: "openrouter",
+        managementKey: "sk-or-management",
+      }));
+    });
+  });
+
   it("disabling a tool writes it into disabledTools", async () => {
     renderSettingsPage();
     await screen.findByRole("switch", { name: "自动审查" });
@@ -324,6 +374,25 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(updateSettings).toHaveBeenCalledWith({ agent: { disabledTools: ["read_file"] } });
     });
+  });
+
+  it("groups browser tools behind one master switch and collapsed advanced settings", async () => {
+    renderSettingsPage();
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "工具" }));
+    expect(screen.getByRole("switch", { name: "浏览器" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByRole("switch", { name: "浏览器 CUA" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "浏览器高级设置" }));
+    expect(screen.getByRole("switch", { name: "浏览器 CUA" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "浏览器文件上传" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("switch", { name: "浏览器" }));
+    await waitFor(() => {
+      expect(updateSettings).toHaveBeenCalledWith({ agent: { disabledTools: ["browser"] } });
+    });
+    expect(screen.getByRole("switch", { name: "浏览器 CUA" })).toBeDisabled();
   });
 
   it("editing 主 Agent 系统提示词 saves it through the prompt file", async () => {

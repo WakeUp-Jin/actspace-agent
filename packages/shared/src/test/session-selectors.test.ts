@@ -90,6 +90,68 @@ describe("session selectors", () => {
     ]);
   });
 
+  it("attaches the full turn usage to the final visible assistant reply", () => {
+    const base = {
+      sessionId: "session-usage",
+      turnId: "turn-usage",
+      timestamp: "2026-07-25T12:00:00.000Z",
+      schemaVersion: 1 as const,
+    };
+    const blocks = createMessageBlocks([
+      {
+        ...base,
+        id: "assistant-intermediate",
+        type: "assistant_message",
+        payload: { content: "I will inspect the files.", stopReason: "toolUse", model: "model-a", provider: "provider-a" },
+      },
+      {
+        ...base,
+        id: "usage-usd",
+        type: "llm_usage",
+        payload: {
+          callId: "call-1",
+          provider: "provider-a",
+          model: "model-a",
+          promptTokens: 100,
+          completionTokens: 20,
+          totalTokens: 120,
+          cost: { input: 0.05, output: 0.05, cacheRead: 0, cacheWrite: 0, total: 0.1, currency: "USD" },
+        },
+      },
+      {
+        ...base,
+        id: "assistant-final",
+        type: "assistant_message",
+        payload: { content: "Done.", stopReason: "stop", model: "model-a", provider: "provider-a" },
+      },
+      {
+        ...base,
+        id: "usage-cny",
+        type: "llm_usage",
+        payload: {
+          callId: "call-2",
+          provider: "provider-a",
+          model: "model-a",
+          promptTokens: 150,
+          completionTokens: 30,
+          totalTokens: 180,
+          cost: { input: 3.6, output: 3.6, cacheRead: 0, cacheWrite: 0, total: 7.2, currency: "CNY" },
+        },
+      },
+    ]);
+
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]).not.toHaveProperty("usage");
+    expect(blocks[1]).toMatchObject({
+      kind: "assistant",
+      id: "assistant-final",
+      usage: {
+        totalTokens: 300,
+        costUsd: 1.1,
+      },
+    });
+  });
+
   it("restores an aborted turn as a persisted Stopped status", () => {
     const blocks = createMessageBlocks([{
       id: "evt-aborted",

@@ -30,6 +30,14 @@ export interface ToolDefinitionSpec {
    */
   requiresKey?: "kimi" | "webSearch";
   /**
+   * 渐进式工具披露。executor 仍正常注册，但 deferred 工具只有在同组 gateway
+   * 成功执行并进入下一次 LLM 调用后，才会出现在模型 definitions 中。
+   */
+  progressiveDisclosure?: {
+    group: string;
+    role: "gateway" | "deferred";
+  };
+  /**
    * 工具参数 → 路径数组的提取 hook，给 Kairos 路径访问控制用。
    * 主 Agent 调用路径不会读取这个字段；Kairos 调用时 scheduler 会优先使用本 hook，
    * 缺省时退回到 kairos/guard/extract-paths.ts 的中心化兜底。

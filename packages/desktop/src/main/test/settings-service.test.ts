@@ -192,6 +192,32 @@ describe("SettingsService", () => {
     expect(Buffer.from(secrets.deepseek, "base64").toString("utf8")).toBe("enc:sk-abc123");
   });
 
+  it("OpenRouter 调用 Key 与 Management Key 分开加密存储", async () => {
+    const dataRoot = await makeDataRoot();
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    await svc.updateProviderConnection({
+      provider: "openrouter",
+      apiKey: "sk-or-call",
+      managementKey: "sk-or-management",
+    });
+
+    expect(svc.getV2().providers.openrouter).toMatchObject({
+      hasApiKey: true,
+      hasManagementKey: true,
+    });
+    expect(svc.getProviderRuntimeConfig("openrouter")).toMatchObject({ apiKey: "sk-or-call" });
+    expect(svc.getOpenRouterManagementRuntimeConfig()).toMatchObject({ apiKey: "sk-or-management" });
+
+    const secrets = JSON.parse(await readFile(join(dataRoot, "secrets.json"), "utf8"));
+    expect(Buffer.from(secrets.openrouter, "base64").toString("utf8")).toBe("enc:sk-or-call");
+    expect(Buffer.from(secrets["openrouter-management"], "base64").toString("utf8")).toBe("enc:sk-or-management");
+
+    await svc.updateProviderConnection({ provider: "openrouter", apiKey: null, managementKey: null });
+    expect(svc.getV2().providers.openrouter).toMatchObject({ hasApiKey: false, hasManagementKey: false });
+  });
+
   it("clearProviderKey 彻底删除密钥，不再回落 .env", async () => {
     process.env.DEEPSEEK_API_KEY = "sk-from-dotenv";
     reloadEnv();

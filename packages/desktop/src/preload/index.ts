@@ -18,6 +18,8 @@ import type {
   ContextState,
   DeepSeekBalanceSnapshot,
   KimiBalanceSnapshot,
+  ProviderBalanceGetInput,
+  ProviderBalanceSnapshot,
   AppShutdownNotice,
   DescribeContextInput,
   FsWatchActionResult,
@@ -164,6 +166,8 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("deepseek:balance:get") as Promise<DeepSeekBalanceSnapshot>,
   getKimiBalance: () =>
     ipcRenderer.invoke("kimi:balance:get") as Promise<KimiBalanceSnapshot>,
+  getProviderBalance: (input: ProviderBalanceGetInput) =>
+    ipcRenderer.invoke("provider:balance:get", input) as Promise<ProviderBalanceSnapshot>,
   createSession: (input?: SessionCreateInput) => ipcRenderer.invoke("session:create", input ?? {}) as Promise<SessionRecord>,
   pinSession: (input: SessionPinInput) => ipcRenderer.invoke("session:pin", input) as Promise<SessionPinResult>,
   renameSession: (input: SessionRenameInput) =>

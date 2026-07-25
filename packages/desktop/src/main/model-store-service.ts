@@ -121,6 +121,22 @@ export class ModelStoreService {
     return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === key) };
   }
 
+  async refreshInstalledCatalogModels(): Promise<number> {
+    const stored = this.settings.getModelStorageState();
+    const updates: Partial<Record<ModelKey, ModelDefinition>> = {};
+    for (const [rawKey, current] of Object.entries(stored.customModels)) {
+      const key = rawKey as ModelKey;
+      if (!current || current.provider !== "openrouter" || current.source !== "provider-catalog") continue;
+      if (!stored.installedModels[key]) continue;
+      const catalog = this.findCatalogModel(current.apiModel);
+      if (!catalog) continue;
+      updates[key] = catalogToDefinition(catalog, this.now().toISOString());
+    }
+    const count = Object.keys(updates).length;
+    if (count > 0) await this.settings.updateModelStorage({ customModels: updates });
+    return count;
+  }
+
   async setModelEnabled(modelKey: ModelKey, enabled: boolean): Promise<ModelStoreResult> {
     const stored = this.settings.getModelStorageState();
     const current = stored.installedModels[modelKey];
@@ -162,6 +178,8 @@ export class ModelStoreService {
 }
 
 function catalogToDefinition(model: CatalogModelView, catalogUpdatedAt: string): ModelDefinition {
+  const thinkingDefault = model.reasoningMandatory || model.reasoningDefaultEnabled === true ||
+    (model.reasoningDefaultEnabled === undefined && model.reasoning);
   return {
     key: `openrouter:${model.apiModel}`,
     provider: "openrouter",
@@ -171,12 +189,17 @@ function catalogToDefinition(model: CatalogModelView, catalogUpdatedAt: string):
     source: "provider-catalog",
     contextWindow: model.contextWindow,
     maxTokens: model.maxTokens,
-    thinkingDefault: model.reasoning,
+    thinkingDefault,
     capabilities: {
       input: [...model.input],
       toolUse: model.toolUse,
       reasoning: model.reasoning,
-      thinkingToggle: model.reasoning,
+      thinkingToggle: model.reasoning && !model.reasoningMandatory,
+      ...(model.reasoningEfforts !== undefined && {
+        reasoningEfforts: model.reasoningEfforts === null ? null : [...model.reasoningEfforts],
+      }),
+      ...(model.reasoningDefaultEffort && { reasoningDefaultEffort: model.reasoningDefaultEffort }),
+      ...(model.reasoningMandatory !== undefined && { reasoningMandatory: model.reasoningMandatory }),
     },
     ...(model.pricing && { pricing: clone(model.pricing) }),
     catalogUpdatedAt,

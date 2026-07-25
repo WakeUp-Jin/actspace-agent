@@ -44,6 +44,8 @@ LLM call 2 -> assistant_message
 
 `llm_usage` 应写入按当时模型配置计算出的 `cost`，这样后续会话统计、每日统计和历史查看不需要重新计算，也不会因为未来价格配置变化而改变旧统计结果。
 
+跨供应商统计与消息尾栏统一展示 USD：原始 `llm_usage.cost` 继续保留调用时币种，视图层通过 shared 的 `convertUsageCostToUsd()` 折算；当前固定口径为 `7.2 CNY = 1 USD`。折算函数必须由 Usage 页面、会话明细和消息尾栏共同复用，避免不同界面出现口径漂移。
+
 但 `pricingSnapshot` 不进入 `session.jsonl`。模型价格、上下文窗口和 provider 映射应集中维护在共享模型配置中，例如：
 
 ```text

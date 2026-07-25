@@ -8,7 +8,7 @@
  * 4. 服务接口 — LLMService（取代旧的 BaseLLMService 抽象类）
  */
 
-import type { LlmProviderId as ProviderId, ModelApi, ModelInputKind } from "@actspace/shared";
+import type { LlmProviderId as ProviderId, ModelApi, ModelInputKind, ModelReasoningEffort } from "@actspace/shared";
 import type { AssistantMessage, Context, Tool } from "../messages";
 
 // ─── LLM 配置 ───
@@ -61,6 +61,7 @@ export interface StreamOptions {
   signal?: AbortSignal;
   tools?: APIRequestTool[];
   thinkingEnabled?: boolean;
+  reasoningEffort?: ModelReasoningEffort;
 }
 
 export interface SimpleStreamOptions {

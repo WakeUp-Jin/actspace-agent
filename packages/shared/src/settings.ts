@@ -42,6 +42,8 @@ export type KairosModelId = Extract<ModelId, "deepseek-v4-pro" | "kimi-k2.6" | "
 export interface ProviderSettingsView {
   /** 用户已在页面配置该供应商密钥（safeStorage 中存在）；决定卡片"已连接/可断开"。 */
   hasApiKey: boolean;
+  /** OpenRouter 可选 Management Key，仅用于账户 credits 余额查询。 */
+  hasManagementKey?: boolean;
   /** Settings v2：供应商是否允许参与新请求。v1 读取时缺省为 true。 */
   enabled?: boolean;
   /** Settings v2：用户覆盖的 Base URL；null 表示 Provider Registry 默认值。 */

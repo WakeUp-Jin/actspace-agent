@@ -4,20 +4,21 @@
 
 ## 当前结论
 
-Browser Use Plan 5 已完成：62/62 canonical commands 全部由 Go handler 实现，Agent 默认只暴露 9 个分类工具、`browser_help` 和 `browser_run`，真实 Chrome profile、Agent approval/denial 和跨 session isolation 均已验收。完整证据见 `docs/exec-plans/completed/20260710-browser-use/plan-5-go-command-engine-convergence.md`。
+Browser Use Plan 5 已完成：62/62 canonical commands 全部由 Go handler 实现，Agent Core 稳定注册 9 个分类工具、`browser_help` 和 `browser_run`，真实 Chrome profile、Agent approval/denial 和跨 session isolation 均已验收。模型默认只看到 `browser_help`；入口成功后，从下一次 LLM 调用开始在当前 `Agent.run()` 内披露完整 11 工具。完整 Plan 5 证据见 `docs/exec-plans/completed/20260710-browser-use/plan-5-go-command-engine-convergence.md`。
 
 - Agent Core 保持薄，只负责工具定义、审批、预览、Socket client 和 turn 生命周期。
 - Go Browser Bridge 是 62 条命令的 canonical registry 和高层 command engine，负责参数验证、session、CUA、DOM CUA、Locator、等待、重试、事件和批处理编排。
 - 页面内 DOM 语义由插件内自研 TypeScript Locator Runtime 提供：开发期构建为单一 JavaScript 产物，Go 使用 `go:embed` 打入二进制，再通过 CDP `Runtime.evaluate` 注入页面。产品运行时不依赖 Node、Playwright 或 Codex bundle。
 - Chrome Extension 只保留 Chrome 权限域内的原语：Native Messaging、`chrome.debugger`、Tabs、History、Tab Groups、Downloads、事件转发和 cursor content script。
-- 模型默认看到 9 个分类工具，加 `browser_help`、`browser_run`；62 条叶子命令不会平铺成 62 个模型工具。
+- 模型默认只看到 `browser_help`；成功调用后下一次 LLM 请求看到完整 11 工具，下一条用户消息重新恢复为单入口。62 条叶子命令不会平铺成 62 个模型工具。
 - CLI 保留安装、诊断、人工调用和机器可读帮助能力，但不再是 Agent 正常执行 Browser Use 的主接入面。
 
 ## 目标架构
 
 ```text
 Model
-  -> 9 category tools + browser_help + browser_run
+  -> browser_help gateway
+  -> next LLM call: 9 category tools + browser_help + browser_run
   -> packages/agent-core browser adapter
        - definitions / approval / preview
        - BridgeClient / turn lifecycle
@@ -39,14 +40,18 @@ Model
 
 | 层 | 负责 | 不负责 |
 | --- | --- | --- |
-| Agent Core | 11 个模型工具、schema 暴露、用户审批、preview、输出裁剪、Socket 生命周期 | CDP 序列、selector 实现、导航等待、Chrome API |
+| Agent Core | 11 个稳定注册工具、1→11 渐进 schema 披露、用户审批、preview、输出裁剪、Socket 生命周期 | CDP 序列、selector 实现、导航等待、Chrome API |
 | Go Command Engine | 62 条 registry、严格参数验证、高层 handler、session/tab 状态、CUA/DOM CUA/Locator、等待/重试/事件、批处理 preflight | 用户审批最终决定、直接调用浏览器扩展 API |
 | Injected Locator runtime | 结构化 css/role/text/label/placeholder/test-id Locator、accessible name、open Shadow DOM、单 Frame context 内的 strict match、页面内自动等待/actionability、文本/属性与表单 DOM 语义 | 任意模型 JS、Chrome API、session/权限、跨域/OOPIF 的宿主路由 |
 | Chrome Extension | Native Messaging、`chrome.debugger`、Chrome Tabs/History/TabGroups/Downloads、事件与 cursor 原语 | 高层 command registry、selector 编排、Agent 工具与权限 |
 
 ## Agent 工具面
 
-默认模型可见工具：
+初始模型可见工具：
+
+1. `browser_help`
+
+`browser_help` 成功执行后，从下一次 LLM 调用开始在当前 `Agent.run()` 内披露：
 
 1. `browser_cua`
 2. `browser_dom`
@@ -59,6 +64,8 @@ Model
 9. `browser_debug`
 10. `browser_help`
 11. `browser_run`
+
+ToolManager 始终注册上述 11 个 executor；渐进披露只改变模型 definitions，不改变执行器、Socket client 或审批器的注册生命周期。隐藏工具在披露前即使被模型生成，也按不存在拒绝执行。
 
 既有 15 个 `browser_*` 首版工具只保留迁移期 alias 和旧 session preview 兼容，不再作为新模型默认工具面。
 
@@ -97,7 +104,7 @@ Model
 ## 2026-07-10 实现状态
 
 - Go registry：62/62 `implemented`，且全部使用 `go.*` handler。
-- Agent Core：11 个模型工具；旧 15 工具仅保留 alias 与 preview 读取兼容。
+- Agent Core：稳定注册 11 个模型工具，普通模型调用默认只暴露 `browser_help`；入口成功后，下一次模型调用才披露其余工具。旧 15 工具仅保留 alias 与 preview 读取兼容。
 - Browser 读取输出：`browser_dom.snapshot` 使用 50K DOM 专属保真通道；精确 `browser_help(category, action)` 使用 20K schema 保真通道；Locator 批量读取支持 offset/limit 分页；`browser_run` 向模型返回逐 action 真实结果。
 - Extension：旧 `playwright-injected.js` 和 click/fill/select/scroll 等高层 handler 已删除，只保留 primitive backend、Chrome APIs、事件转发与 cursor。
 - 测试：Go、registry parity、Locator fixture、Agent Core Socket integration、desktop typecheck 已通过。
@@ -112,6 +119,14 @@ Model
 - `pnpm check:browser` 增加 Runtime TypeScript 类型检查和生成产物漂移检查。
 - 源码与 mock acceptance 已覆盖跨域/OOPIF 路由；真实 Chrome v5 acceptance 仍需在本地 unpacked extension reload 后关闭，当前验收状态以 active execution plan 为准。
 
+## 2026-07-25 渐进式工具披露
+
+- ToolManager 将“executor 已注册”和“definition 对模型可见”分离；非 Browser 工具继续始终可见。
+- `browser_help` 是 Browser progressive disclosure gateway，成功结果只写入 pending group；Agent Loop 到下一次 LLM 调用前才提交，避免同一批 tool calls 顺序执行时意外放行隐藏工具。
+- 披露范围是单次 `Agent.run()`；下一条用户消息和下一次 Kairos tick 都重置为仅 gateway 可见。
+- Context usage、Context 完整视图和手动 compact 统一消费 `getToolDefinitions()`，不再从全部注册工具重新组装。
+- 设置页首屏只显示“浏览器”总开关；分类工具、批处理和高风险 capability 位于默认折叠的高级设置中。关闭总开关保留子项偏好，并同时移除 Browser prompt segment 与 Socket runtime 注入。
+
 ## 已确认设计闸门
 
 2026-07-10 用户确认：
@@ -124,6 +139,12 @@ Model
 - Browser Use 使用一次性 Session 授权租约：除 `browser_help` 外，当前应用运行期间某 Session 第一次调用 Browser 工具时只展示“允许 / 拒绝”。允许后该 Session 后续 Browser 工具不再重复审批；拒绝或超时只阻止当前 Turn，下一次用户输入可重新申请。
 - `browser_run` 仍执行整批 preflight 和 capability hard deny，但用户交互复用上述 Session 授权，不再单独按 action 重复弹窗。
 - 旧 15 个工具保留一个迁移阶段的 alias 与旧会话兼容。
+
+2026-07-25 用户确认：
+
+- Browser executor 保持稳定注册，模型 definitions 使用 Turn 级渐进披露。
+- 初始只暴露 `browser_help`；成功后下一次 LLM 调用披露完整工具包，下一条用户消息重置。
+- 设置页使用一个浏览器总入口和默认折叠的高级设置，不把 11 个工具继续平铺在首屏。
 
 ## 维护规则
 

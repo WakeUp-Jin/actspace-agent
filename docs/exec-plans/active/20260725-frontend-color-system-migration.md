@@ -545,6 +545,7 @@ git diff --check
 - [x] 完成 Usage、Context 和 Lab。
 - [x] 删除旧 brand / warm alias，建立防回流检查。
 - [x] 合并到 `main`，并迁移多供应商 Settings 新增消费者中的旧 `brand` 用法。
+- [x] 根据人工验收反馈降低 Context 剩余轨道对比度，收口 Sidebar 边界 / 滚动条，并压缩 Composer 模型菜单密度。
 - [ ] 完成用户人工 UI 验收（Light / Dark / System、Electron Retina、完整页面状态）。
 - [x] 同步 history / learning / 设计文档；人工验收通过后将 plan 归档。
 
@@ -561,3 +562,4 @@ git diff --check
 - 2026-07-25：实际交付以 worktree 的 36 文件 / 147 行快照为准；不把主仓库未提交的多供应商功能跨边界复制进配色分支。
 - 2026-07-25：用户选择自行完成最终 UI 人工验收；Agent 完成工程验证并保留本地 renderer 服务供检查。
 - 2026-07-25：配色分支合并到含多供应商功能的 `main`；保留主线业务逻辑与规范化文档目录，并由主题防回流检查驱动迁移 5 处新出现的旧 `brand` 消费者。
+- 2026-07-25：人工验收确认 Context 深灰剩余轨道、Sidebar 粗分隔反馈和 Composer 宽菜单需要二次收口；采用独立 meter track、单一 1px SplitView 边界、低对比可见滚动条和紧凑贴行 Options。

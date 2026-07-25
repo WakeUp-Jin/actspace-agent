@@ -21,7 +21,7 @@ import type { ToolManager } from "../tools/manager";
 import type { ContextManager } from "../context/manager";
 import type { Summarizer } from "../context/compression/summarizer";
 import type { CacheAuditTracker } from "../observability/cache-audit";
-import { toToolDefinition } from "../internal-tools";
+import type { ModelReasoningEffort } from "@actspace/shared";
 import { runAgentLoop } from "./loop";
 import type {
   AgentEventSink,
@@ -41,6 +41,7 @@ export interface AgentOptions {
   getFollowUpMessages?: AgentLoopConfig["getFollowUpMessages"];
   toolExecuteOptions?: AgentLoopConfig["toolExecuteOptions"];
   thinkingEnabled?: boolean;
+  reasoningEffort?: ModelReasoningEffort;
   /**
    * flash 摘要器，用于 mid-loop 历史压缩。缺省时仍会按 token 水位触发压缩，
    * 但 HistoryCompactor 内部退化为「丢弃最旧 + session.jsonl 指针」兜底。
@@ -63,6 +64,7 @@ export class Agent {
   private getFollowUpMessages?: AgentLoopConfig["getFollowUpMessages"];
   private toolExecuteOptions?: AgentLoopConfig["toolExecuteOptions"];
   private thinkingEnabled?: boolean;
+  private reasoningEffort?: ModelReasoningEffort;
   private summarizer?: Summarizer;
   private cacheAudit?: CacheAuditTracker;
   private llmRetry?: AgentLoopConfig["llmRetry"];
@@ -78,6 +80,7 @@ export class Agent {
     this.getFollowUpMessages = options.getFollowUpMessages;
     this.toolExecuteOptions = options.toolExecuteOptions;
     this.thinkingEnabled = options.thinkingEnabled;
+    this.reasoningEffort = options.reasoningEffort;
     this.summarizer = options.summarizer;
     this.cacheAudit = options.cacheAudit;
     this.llmRetry = options.llmRetry;
@@ -85,6 +88,7 @@ export class Agent {
 
   /** 执行一次完整的 agent 交互 */
   async run(userInput: string | (TextContent | ImageContent)[]): Promise<AgentLoopResult> {
+    this.toolManager.resetProgressiveDisclosure();
     const userMsg: UserMessage = {
       role: "user",
       content: userInput,
@@ -95,7 +99,7 @@ export class Agent {
     this.contextManager.appendMessage(userMsg);
 
     // 将 ToolManager 中的工具定义注入 Context
-    const toolDefs = this.toolManager.getAll().map((t) => toToolDefinition(t));
+    const toolDefs = this.toolManager.getToolDefinitions();
     this.contextManager.setTools(toolDefs);
 
     const context = this.contextManager.getContext();
@@ -104,12 +108,18 @@ export class Agent {
 
     const config: AgentLoopConfig = {
       toolManager: this.toolManager,
+      refreshToolDefinitions: () => {
+        const definitions = this.toolManager.getToolDefinitions();
+        this.contextManager.setTools(definitions);
+        return definitions;
+      },
       toolExecution: this.toolExecution,
       shouldStopAfterTurn: this.shouldStopAfterTurn,
       getSteeringMessages: this.getSteeringMessages,
       getFollowUpMessages: this.getFollowUpMessages,
       toolExecuteOptions: this.toolExecuteOptions,
       thinkingEnabled: this.thinkingEnabled,
+      reasoningEffort: this.reasoningEffort,
       cacheAudit: this.cacheAudit,
       llmRetry: this.llmRetry,
       maybeCompact: async () => {

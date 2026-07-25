@@ -58,6 +58,7 @@ import type {
   ProviderConnectInput,
   ProviderUpdateInput,
   ProviderIdInput,
+  ProviderBalanceGetInput,
   ProviderOperationResult,
   ProviderTestResult,
   ProvidersListResult,
@@ -119,13 +120,17 @@ import {
   resolveDynamicKairosThinking,
   ensureKairosScaffolding,
 } from "./kairos-bootstrap";
-import { registerKairosIpc, type KairosIpcHandle } from "./kairos-ipc";
+import { registerKairosConfigIpc, registerKairosIpc, type KairosIpcHandle } from "./kairos-ipc";
 import { SettingsService, type SecretCrypto } from "./settings-service";
 import { ModelStoreService, type ModelStoreResult } from "./model-store-service";
 import { OpenRouterCatalogService } from "./openrouter-catalog-service";
 import { ModelRuntimeService } from "./model-runtime-service";
 import { testProviderConnection } from "./provider-connection-service";
-import { getDeepSeekBalanceSnapshot, getKimiBalanceSnapshot } from "./provider-balance-service";
+import {
+  getDeepSeekBalanceSnapshot,
+  getKimiBalanceSnapshot,
+  getProviderBalanceSnapshot,
+} from "./provider-balance-service";
 import { resolveAppDataRoots } from "./app-paths";
 import { BrowserBridgeService } from "./plugins/browser-bridge-service";
 import { FsWatchService } from "./plugins/fs-watch-service";
@@ -619,6 +624,21 @@ async function createMainWindow() {
 
 let kairosController: KairosController | undefined;
 let kairosIpcHandle: KairosIpcHandle | undefined;
+let kairosConfigIpcHandle: KairosIpcHandle | undefined;
+
+async function ensureKairosConfigIpc(roots: AppDataRoots): Promise<void> {
+  if (kairosConfigIpcHandle) return;
+  const kairosRoot = join(roots.dataRoot, "kairos");
+  await ensureKairosScaffolding(kairosRoot);
+  kairosConfigIpcHandle = registerKairosConfigIpc({
+    kairosRoot,
+    getController: () => kairosController,
+    onPreferencesWritten: (next) => {
+      void reconcileKairosAfterPreferences(roots, next);
+    },
+  });
+}
+
 async function ensureKairosController(roots: AppDataRoots): Promise<KairosController> {
   if (kairosController) return kairosController;
   const kairosRoot = join(roots.dataRoot, "kairos");
@@ -672,9 +692,6 @@ async function ensureKairosController(roots: AppDataRoots): Promise<KairosContro
     controller: kairosController,
     kairosRoot,
     getMainWindow,
-    onPreferencesWritten: (next) => {
-      void reconcileKairosAfterPreferences(roots, next);
-    },
   });
   logMain("kairos controller ready", { kairosRoot, kairosWorkspaceRoot, modelId: resolvedModelId });
   return kairosController;
@@ -713,11 +730,12 @@ async function reconcileKairosAfterPreferences(roots: AppDataRoots, next: Kairos
  * - `start()` 默认尊重 `preferences.enabled`，因此重建后会恢复用户此前的开启/暂停意图。
  */
 async function rebuildKairosController(roots: AppDataRoots): Promise<void> {
-  if (!kairosController) return;
-  try {
-    await kairosController.stop();
-  } catch (err) {
-    logMain("kairos rebuild: stop threw", { error: err instanceof Error ? err.message : String(err) });
+  if (kairosController) {
+    try {
+      await kairosController.stop();
+    } catch (err) {
+      logMain("kairos rebuild: stop threw", { error: err instanceof Error ? err.message : String(err) });
+    }
   }
   kairosIpcHandle?.dispose();
   kairosController = undefined;
@@ -728,15 +746,16 @@ async function rebuildKairosController(roots: AppDataRoots): Promise<void> {
 }
 
 async function reconcileKairosModelChange(roots: AppDataRoots): Promise<void> {
-  if (!kairosController) return;
   const resolution = getModelRuntimeService().resolveKairosModel();
   if (!("model" in resolution)) {
-    try {
-      await kairosController.stop();
-    } finally {
-      kairosIpcHandle?.dispose();
-      kairosController = undefined;
-      kairosIpcHandle = undefined;
+    if (kairosController) {
+      try {
+        await kairosController.stop();
+      } finally {
+        kairosIpcHandle?.dispose();
+        kairosController = undefined;
+        kairosIpcHandle = undefined;
+      }
     }
     logMain("kairos paused because configured model is unavailable", {
       modelKey: resolution.modelKey,
@@ -824,6 +843,7 @@ async function registerIpc() {
             workspaceRoot,
             readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
             disabledSkills: getSettingsService().get().skills.disabled,
+            disabledTools: getSettingsService().get().agent.disabledTools,
             browserBridgeAbbPath: browserBridge.binPath,
             browserBridgeSocketPath: browserBridge.socketPath,
             warn: logMain,
@@ -870,6 +890,7 @@ async function registerIpc() {
           workspaceRoot,
           readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
           disabledSkills: getSettingsService().get().skills.disabled,
+          disabledTools: getSettingsService().get().agent.disabledTools,
           browserBridgeAbbPath: browserBridge.binPath,
           browserBridgeSocketPath: browserBridge.socketPath,
           warn: logMain,
@@ -978,6 +999,7 @@ async function registerIpc() {
           workspaceRoot,
           readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
           disabledSkills: getSettingsService().get().skills.disabled,
+          disabledTools: getSettingsService().get().agent.disabledTools,
           browserBridgeAbbPath: browserBridge.binPath,
           browserBridgeSocketPath: browserBridge.socketPath,
           warn: logMain,
@@ -1061,6 +1083,26 @@ async function registerIpc() {
       return await getKimiBalanceSnapshot("code" in runtime ? undefined : runtime);
     } catch (error) {
       logMain("kimi balance fetch failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  });
+
+  ipcMain.handle("provider:balance:get", async (_event, input: ProviderBalanceGetInput) => {
+    if (!isProviderId(input?.provider)) throw new Error("未知服务商。");
+    try {
+      const runtime = input.provider === "openrouter"
+        ? getSettingsService().getOpenRouterManagementRuntimeConfig()
+        : getSettingsService().getProviderRuntimeConfig(input.provider);
+      if ("code" in runtime) {
+        if (runtime.code === "api_key_missing") return getProviderBalanceSnapshot(input.provider, undefined);
+        throw new Error(runtime.message);
+      }
+      return await getProviderBalanceSnapshot(input.provider, runtime);
+    } catch (error) {
+      logMain("provider balance fetch failed", {
+        provider: input.provider,
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -1151,6 +1193,7 @@ async function registerIpc() {
       await getSettingsService().updateProviderConnection({
         provider: input.provider,
         apiKey: input.apiKey,
+        managementKey: input.managementKey,
         baseUrl: input.baseUrl,
         proxy: input.proxy,
         enabled: true,
@@ -1192,7 +1235,11 @@ async function registerIpc() {
   ipcMain.handle("providers:disconnect", async (_event, input: ProviderIdInput): Promise<ProviderOperationResult> => {
     if (!isProviderId(input?.provider)) return providerOperationFailure("invalid_provider", "未知服务商。");
     try {
-      await getSettingsService().updateProviderConnection({ provider: input.provider, apiKey: null });
+      await getSettingsService().updateProviderConnection({
+        provider: input.provider,
+        apiKey: null,
+        ...(input.provider === "openrouter" && { managementKey: null }),
+      });
       await reconcileKairosModelChange(await ensureDataDirectories());
       return { ok: true, provider: getSettingsService().getV2().providers[input.provider] };
     } catch (error) {
@@ -1212,7 +1259,11 @@ async function registerIpc() {
   ipcMain.handle("models:catalog:reload", async (): Promise<ModelsCatalogListResult> => {
     const runtime = getSettingsService().getProviderRuntimeConfig("openrouter");
     if ("code" in runtime) return { provider: "openrouter", ...getOpenRouterCatalogService().list(), error: { code: runtime.code, message: runtime.message } };
-    return { provider: "openrouter", ...await getOpenRouterCatalogService().reload(runtime) };
+    const result = await getOpenRouterCatalogService().reload(runtime);
+    if (!result.error && result.state === "fresh") {
+      await getModelStoreService().refreshInstalledCatalogModels();
+    }
+    return { provider: "openrouter", ...result };
   });
   ipcMain.handle("models:add", async (_event, input: ModelsAddInput): Promise<ModelMutationResult> => {
     if (input?.provider !== "openrouter" || typeof input.apiModel !== "string") {
@@ -1594,6 +1645,7 @@ app.whenReady().then(async () => {
     logMain("local update service load failed", { error: err instanceof Error ? err.message : String(err) });
   }
   await registerIpc();
+  await ensureKairosConfigIpc(roots);
   await createMainWindow();
   // 后台 bash 任务终态 → 推给 renderer 更新对应块（turn 内外统一走 agent:stream）
   bashTaskRegistry.subscribe((task) => {
@@ -1669,6 +1721,7 @@ app.on("before-quit", (event) => {
   fsWatchService?.shutdownSync();
   if (!kairosController) {
     kairosIpcHandle?.dispose();
+    kairosConfigIpcHandle?.dispose();
     void closeProviderTransports();
     return;
   }
@@ -1697,6 +1750,7 @@ app.on("before-quit", (event) => {
     } finally {
       clearTimeout(timer);
       kairosIpcHandle?.dispose();
+      kairosConfigIpcHandle?.dispose();
       await closeProviderTransports();
       finish();
     }

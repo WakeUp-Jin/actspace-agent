@@ -30,6 +30,9 @@ const DEFAULT_TRUNCATE_THRESHOLD = 2000;
 
 export class ToolManager {
   private tools = new Map<string, InternalTool>();
+  private progressiveDisclosure = new Map<string, NonNullable<ToolDefinitionSpec["progressiveDisclosure"]>>();
+  private activeDisclosureGroups = new Set<string>();
+  private pendingDisclosureGroups = new Set<string>();
   private disposers: Array<() => Promise<void> | void> = [];
   private disposed = false;
   private workspaceRoot: string;
@@ -78,11 +81,17 @@ export class ToolManager {
       extractPaths: spec.extractPaths,
     };
     this.tools.set(tool.name, tool);
+    if (spec.progressiveDisclosure) {
+      this.progressiveDisclosure.set(tool.name, spec.progressiveDisclosure);
+    } else {
+      this.progressiveDisclosure.delete(tool.name);
+    }
   }
 
   /** 直接注册一个完整的 InternalTool */
   register(tool: InternalTool): void {
     this.tools.set(tool.name, tool);
+    this.progressiveDisclosure.delete(tool.name);
   }
 
   /** 注册与当前 ToolManager 同生命周期的资源清理函数。 */
@@ -104,7 +113,32 @@ export class ToolManager {
 
   /** 导出 LLM 消费的 Tool[] */
   getToolDefinitions(): Tool[] {
-    return this.getAll().map(toToolDefinition);
+    return this.getAll()
+      .filter((tool) => this.isToolVisible(tool.name))
+      .map(toToolDefinition);
+  }
+
+  /** 新用户 Turn 开始时恢复为仅 gateway 可见。 */
+  resetProgressiveDisclosure(): void {
+    this.activeDisclosureGroups.clear();
+    this.pendingDisclosureGroups.clear();
+  }
+
+  /**
+   * gateway 成功后只记录 pending；由 Agent Loop 在下一次 LLM 调用前提交，
+   * 防止同一批 tool calls 中的隐藏工具被顺序执行意外放行。
+   */
+  commitProgressiveDisclosure(): void {
+    for (const group of this.pendingDisclosureGroups) {
+      this.activeDisclosureGroups.add(group);
+    }
+    this.pendingDisclosureGroups.clear();
+  }
+
+  /** 显式激活入口，供确定性运行路径和测试构造已展开状态。 */
+  activateProgressiveDisclosure(group: string): void {
+    this.activeDisclosureGroups.add(group);
+    this.pendingDisclosureGroups.delete(group);
   }
 
   /** 执行工具：权限检查 → handler → renderResult（可选）→ truncate */
@@ -115,11 +149,22 @@ export class ToolManager {
     options?: ToolExecuteOptions,
   ): Promise<ToolResult> {
     const tool = this.tools.get(toolName);
-    const execution = await this.scheduler.execute(tool, toolName, args, toolCallId, {
+    const visibleTool = tool && this.isToolVisible(toolName) ? tool : undefined;
+    const execution = await this.scheduler.execute(visibleTool, toolName, args, toolCallId, {
       ...options,
       toolCallId,
     });
+    const disclosure = this.progressiveDisclosure.get(toolName);
+    if (execution.result.success && disclosure?.role === "gateway") {
+      this.pendingDisclosureGroups.add(disclosure.group);
+    }
     return execution.result;
+  }
+
+  private isToolVisible(name: string): boolean {
+    const disclosure = this.progressiveDisclosure.get(name);
+    if (!disclosure || disclosure.role === "gateway") return true;
+    return this.activeDisclosureGroups.has(disclosure.group);
   }
 
   async dispose(): Promise<void> {

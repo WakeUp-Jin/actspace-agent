@@ -28,6 +28,12 @@ describe("OpenRouterCatalogService", () => {
         top_provider: { max_completion_tokens: 16000 },
         pricing: { prompt: "0.000001", completion: "0.000002", input_cache_read: "0.0000001" },
         supported_parameters: ["tools", "reasoning"],
+        reasoning: {
+          supported_efforts: ["high", "medium", "low", "none", "unsupported"],
+          default_effort: "medium",
+          default_enabled: true,
+          mandatory: false,
+        },
       },
       { id: "vendor/model-b", name: "No price", architecture: { input_modalities: ["text"] } },
       { name: "missing id" },
@@ -45,6 +51,10 @@ describe("OpenRouterCatalogService", () => {
       input: ["text", "image"],
       toolUse: "declared",
       reasoning: true,
+      reasoningEfforts: ["high", "medium", "low"],
+      reasoningDefaultEffort: "medium",
+      reasoningDefaultEnabled: true,
+      reasoningMandatory: false,
       isFree: false,
       pricing: { inputCacheHitPerMillion: 0.1, inputCacheMissPerMillion: 1, outputPerMillion: 2 },
     });
@@ -54,6 +64,25 @@ describe("OpenRouterCatalogService", () => {
     const cache = JSON.parse(await readFile(join(dataRoot, "providers/openrouter/models-cache.json"), "utf8"));
     expect(cache.version).toBe(1);
     expect(cache.sourceUrl).toBe("https://openrouter.ai/api/v1/models");
+  });
+
+  it("preserves null supported_efforts as OpenRouter accepting all normalized effort values", async () => {
+    const service = new OpenRouterCatalogService({
+      dataRoot: await root(),
+      directFetch: async () => new Response(JSON.stringify({ data: [{
+        id: "vendor/all-efforts",
+        supported_parameters: ["reasoning"],
+        reasoning: { supported_efforts: null, mandatory: true },
+      }] }), { status: 200 }),
+      now: () => NOW,
+    });
+
+    const result = await service.reload(RUNTIME);
+    expect(result.models[0]).toMatchObject({
+      reasoning: true,
+      reasoningEfforts: null,
+      reasoningMandatory: true,
+    });
   });
 
   it.each([[401, "auth"], [402, "insufficient_balance"], [404, "invalid_request"], [429, "rate_limit"], [500, "server"]] as const)("maps HTTP %s to %s", async (status, code) => {

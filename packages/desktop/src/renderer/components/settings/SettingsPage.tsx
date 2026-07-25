@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, CircleAlert, Loader2, Monitor, Moon, Sun, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Loader2, Monitor, Moon, Sun, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
   type AgentSystemPromptFile,
@@ -18,7 +18,11 @@ import { KairosSettings } from "./KairosSettings";
 import { FileWatchSection } from "./FileWatchSettings";
 import { PluginsSection } from "./PluginsSettings";
 import { SkillsSection } from "./SkillsSettings";
-import { TOOL_ITEMS } from "./tool-catalog";
+import {
+  BROWSER_TOOL_GROUP,
+  BROWSER_TOOL_ITEMS,
+  PRIMARY_TOOL_ITEMS,
+} from "./tool-catalog";
 import { ProviderSettings } from "./ProviderSettings";
 import { ModelSettings } from "./ModelSettings";
 import {
@@ -914,6 +918,10 @@ function KairosSection({ settings, onUpdate, onRefresh }: SectionProps) {
 
 function ToolsSection({ settings, onUpdate }: SectionProps) {
   const disabled = settings.agent.disabledTools;
+  const [browserDetailsOpen, setBrowserDetailsOpen] = useState(false);
+  const browserDisabled = disabled.includes(BROWSER_TOOL_GROUP) || disabled.includes("browser_help");
+  const browserExecutionTools = BROWSER_TOOL_ITEMS.filter((tool) => tool.kind !== "capability");
+  const browserCapabilities = BROWSER_TOOL_ITEMS.filter((tool) => tool.kind === "capability");
 
   const toggleTool = (name: string, enabled: boolean) => {
     const set = new Set(disabled);
@@ -925,19 +933,50 @@ function ToolsSection({ settings, onUpdate }: SectionProps) {
     onUpdate({ agent: { disabledTools: [...set] } });
   };
 
+  const toggleBrowserGroup = (enabled: boolean) => {
+    const set = new Set(disabled);
+    if (enabled) {
+      set.delete(BROWSER_TOOL_GROUP);
+      set.delete("browser_help");
+    } else {
+      set.add(BROWSER_TOOL_GROUP);
+    }
+    onUpdate({ agent: { disabledTools: [...set] } });
+  };
+
+  const toolDescription = (tool: (typeof PRIMARY_TOOL_ITEMS)[number]) => {
+    if (!tool.conditional) return tool.description;
+    return `${tool.description}（是否可用取决于当前供应商配置）`;
+  };
+
+  const renderBrowserItem = (tool: (typeof BROWSER_TOOL_ITEMS)[number]) => (
+    <div key={tool.name} className="pl-6">
+      <SettingRow
+        title={tool.label}
+        description={`${tool.description}（是否可用取决于 Browser Bridge 与 Chrome 插件配置）`}
+        control={
+          <Toggle
+            checked={!disabled.includes(tool.name)}
+            disabled={browserDisabled}
+            onChange={(next) => toggleTool(tool.name, next)}
+            ariaLabel={tool.label}
+          />
+        }
+      />
+    </div>
+  );
+
   return (
     <SectionShell
       title="工具"
       description="控制助手在对话中可调用的工具。关闭后该工具在后续对话中不再出现。"
     >
       <SettingGroup>
-        {TOOL_ITEMS.map((tool) => (
+        {PRIMARY_TOOL_ITEMS.map((tool) => (
           <SettingRow
             key={tool.name}
             title={tool.label}
-            description={
-              tool.conditional ? `${tool.description}（是否可用取决于当前供应商配置）` : tool.description
-            }
+            description={toolDescription(tool)}
             control={
               <Toggle
                 checked={!disabled.includes(tool.name)}
@@ -947,6 +986,46 @@ function ToolsSection({ settings, onUpdate }: SectionProps) {
             }
           />
         ))}
+        <SettingRow
+          title={
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 text-left"
+              aria-label="浏览器高级设置"
+              aria-expanded={browserDetailsOpen}
+              aria-controls="browser-tool-details"
+              onClick={() => setBrowserDetailsOpen((open) => !open)}
+            >
+              {browserDetailsOpen
+                ? <ChevronDown size={15} strokeWidth={2} className="text-text-faint" aria-hidden="true" />
+                : <ChevronRight size={15} strokeWidth={2} className="text-text-faint" aria-hidden="true" />}
+              <span>浏览器</span>
+              <span className="rounded-act-sm bg-selected px-1.5 py-0.5 text-[10px] font-semibold text-text-muted">
+                按需加载
+              </span>
+            </button>
+          }
+          description="默认只向模型提供一个浏览器入口；需要真实 Chrome 时，再从下一次模型调用开始披露完整工具包。"
+          control={
+            <Toggle
+              checked={!browserDisabled}
+              onChange={toggleBrowserGroup}
+              ariaLabel="浏览器"
+            />
+          }
+        />
+        {browserDetailsOpen ? (
+          <div id="browser-tool-details" className="divide-y divide-line/80 bg-surface-subtle">
+            <div className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-text-faint">
+              执行工具
+            </div>
+            {browserExecutionTools.map(renderBrowserItem)}
+            <div className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-text-faint">
+              敏感能力
+            </div>
+            {browserCapabilities.map(renderBrowserItem)}
+          </div>
+        ) : null}
       </SettingGroup>
     </SectionShell>
   );

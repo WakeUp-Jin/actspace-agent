@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ComposerAttachment } from "@actspace/shared";
+import type { ComposerAttachment, UsableModelView } from "@actspace/shared";
 import { mockContextSnapshot } from "./fixtures/workbenchFixture";
 import { Composer } from "../components/Composer";
 import { TooltipProvider } from "../components/ui/Tooltip";
@@ -34,6 +34,39 @@ function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {})
   return { onSend, onAbort, ...result };
 }
 
+const reasoningModels: UsableModelView[] = [
+  {
+    key: "deepseek:deepseek-v4-pro",
+    label: "DeepSeek V4 Pro",
+    provider: "deepseek",
+    apiModel: "deepseek-v4-pro",
+    contextWindow: 1_000_000,
+    thinkingDefault: true,
+    capabilities: {
+      input: ["text"],
+      toolUse: "verified",
+      reasoning: true,
+      thinkingToggle: true,
+    },
+  },
+  {
+    key: "openrouter:openai/gpt-5",
+    label: "GPT-5 High",
+    provider: "openrouter",
+    apiModel: "openai/gpt-5",
+    contextWindow: 400_000,
+    thinkingDefault: true,
+    capabilities: {
+      input: ["text"],
+      toolUse: "declared",
+      reasoning: true,
+      thinkingToggle: true,
+      reasoningEfforts: ["low", "medium", "high", "max"],
+      reasoningDefaultEffort: "medium",
+    },
+  },
+];
+
 describe("Composer follow-up bar", () => {
   it("renders the follow-up shell with review preview and status row", () => {
     renderComposer({
@@ -44,8 +77,11 @@ describe("Composer follow-up bar", () => {
       },
     });
 
-    expect(screen.getByRole("button", { name: /Review pending changes/ })).toHaveTextContent("Review+4253-5");
-    expect(screen.getByRole("button", { name: "More review actions" })).toBeInTheDocument();
+    const reviewButton = screen.getByRole("button", { name: /Review pending changes/ });
+    const reviewOverflowButton = screen.getByRole("button", { name: "More review actions" });
+    expect(reviewButton).toHaveTextContent("Review+4253-5");
+    expect(reviewButton).toHaveClass("hover:bg-surface-subtle", "hover:border-line-strong", "hover:text-text-main");
+    expect(reviewOverflowButton).toHaveClass("hover:bg-surface-subtle", "hover:border-line-strong", "hover:text-text-main");
     expect(screen.getByPlaceholderText("Send follow-up")).toBeInTheDocument();
     expect(screen.getByText("main")).toBeInTheDocument();
     expect(screen.getByText("Local")).toBeInTheDocument();
@@ -369,6 +405,71 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByLabelText("deepseek-v4-flash Thinking")).toBeInTheDocument();
     const toolbar = screen.getByLabelText("Composer toolbar");
     expect(toolbar.querySelector(".model-button")).toHaveTextContent("DeepSeek V4 Pro");
+  });
+
+  it("keeps model rows compact and reveals Edit only on row interaction", async () => {
+    const user = userEvent.setup();
+    const { container } = renderComposer();
+
+    await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
+
+    const menu = container.querySelector(".model-menu");
+    const selectedEdit = screen.getByRole("button", { name: "Edit deepseek-v4-pro options" });
+    const selectedRow = selectedEdit.closest(".model-menu-row");
+
+    expect(menu).toHaveClass("w-[244px]");
+    expect(selectedRow).toHaveClass("hover:bg-hover-overlay", "focus-within:bg-selected", "is-selected-row");
+    expect(selectedRow).not.toHaveClass("bg-hover-overlay");
+    expect(selectedEdit).toHaveStyle({ opacity: "0" });
+
+    if (!selectedRow) throw new Error("selected model row was not rendered");
+    await user.hover(selectedRow);
+    expect(selectedEdit).toHaveStyle({ opacity: "1" });
+  });
+
+  it("filters usable models from the search field", async () => {
+    const user = userEvent.setup();
+    renderComposer({
+      models: reasoningModels,
+      defaultModelId: "deepseek:deepseek-v4-pro",
+    });
+
+    await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
+    const menu = screen.getByRole("menu", { name: "Models" });
+    const search = within(menu).getByRole("searchbox", { name: "Search models" });
+    await user.type(search, "openai/gpt");
+
+    expect(within(menu).getByText("GPT-5 High")).toBeInTheDocument();
+    expect(within(menu).queryByText("DeepSeek V4 Pro")).not.toBeInTheDocument();
+    expect(search).toHaveFocus();
+  });
+
+  it("sends a supported OpenRouter reasoning effort and animates both popovers", async () => {
+    const user = userEvent.setup();
+    const { onSend, container } = renderComposer({
+      models: reasoningModels,
+      defaultModelId: "openrouter:openai/gpt-5",
+    });
+
+    await user.click(screen.getByRole("button", { name: /GPT-5 High/i }));
+    const menu = container.querySelector(".model-menu");
+    expect(menu).toHaveClass("duration-[140ms]");
+
+    const modelMenu = screen.getByRole("menu", { name: "Models" });
+    await user.hover(within(modelMenu).getByText("GPT-5 High"));
+    await user.click(screen.getByRole("button", { name: "Edit openrouter:openai/gpt-5 options" }));
+    const options = container.querySelector(".model-options-menu");
+    expect(options).toHaveClass("duration-[140ms]");
+    await user.click(screen.getByRole("button", { name: "High" }));
+
+    await user.type(screen.getByLabelText("Message composer"), "reason carefully");
+    await user.click(screen.getByRole("button", { name: "Send message" }));
+
+    expect(onSend).toHaveBeenCalledWith("reason carefully", {
+      model: "openrouter:openai/gpt-5",
+      thinkingEnabled: true,
+      reasoningEffort: "high",
+    });
   });
 
   it("toggles the Thinking option and reflects it in the track visual", async () => {

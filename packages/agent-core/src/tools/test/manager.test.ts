@@ -212,4 +212,44 @@ describe("ToolManager", () => {
     expect(defs[0]).toHaveProperty("description");
     expect(defs[0]).toHaveProperty("parameters");
   });
+
+  it("progressively exposes deferred tools only after the gateway result is committed", async () => {
+    const manager = new ToolManager({ workspaceRoot: "/tmp" });
+    const gateway: ToolDefinitionSpec = {
+      name: "browser_help",
+      description: "Browser gateway",
+      parameters: { type: "object", properties: {}, required: [] },
+      isReadOnly: true,
+      category: "browser",
+      previewKind: "browser_help",
+      progressiveDisclosure: { group: "browser", role: "gateway" },
+    };
+    const deferred: ToolDefinitionSpec = {
+      name: "browser_tabs",
+      description: "Browser tabs",
+      parameters: { type: "object", properties: {}, required: [] },
+      isReadOnly: true,
+      category: "browser",
+      previewKind: "browser_tabs",
+      progressiveDisclosure: { group: "browser", role: "deferred" },
+    };
+    manager.registerFromSpec(gateway, async () => ({ success: true, data: "ready" }));
+    manager.registerFromSpec(deferred, async () => ({ success: true, data: "tabs" }));
+
+    expect(manager.getAll()).toHaveLength(2);
+    expect(manager.getToolDefinitions().map((tool) => tool.name)).toEqual(["browser_help"]);
+    expect(await manager.execute("browser_tabs", {})).toMatchObject({
+      success: false,
+      error: "Tool not found: browser_tabs",
+    });
+
+    expect(await manager.execute("browser_help", {})).toMatchObject({ success: true });
+    expect(manager.getToolDefinitions().map((tool) => tool.name)).toEqual(["browser_help"]);
+
+    manager.commitProgressiveDisclosure();
+    expect(manager.getToolDefinitions().map((tool) => tool.name)).toEqual(["browser_help", "browser_tabs"]);
+
+    manager.resetProgressiveDisclosure();
+    expect(manager.getToolDefinitions().map((tool) => tool.name)).toEqual(["browser_help"]);
+  });
 });

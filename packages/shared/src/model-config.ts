@@ -17,6 +17,8 @@ export type ModelInputKind = "text" | "image";
 export type ModelVisibility = "public" | "internal";
 export type ModelSource = "builtin" | "curated" | "provider-catalog" | "custom";
 export type ModelToolUseCapability = "verified" | "declared" | "unsupported" | "unknown";
+export const MODEL_REASONING_EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export type ModelReasoningEffort = (typeof MODEL_REASONING_EFFORTS)[number];
 
 export type ModelPricing = {
   currency: "USD" | "CNY";
@@ -50,6 +52,10 @@ export interface ModelCapabilities {
   toolUse: ModelToolUseCapability;
   reasoning: boolean;
   thinkingToggle: boolean;
+  /** undefined = provider catalog does not expose effort control; null = all normalized efforts are accepted. */
+  reasoningEfforts?: ModelReasoningEffort[] | null;
+  reasoningDefaultEffort?: ModelReasoningEffort;
+  reasoningMandatory?: boolean;
 }
 
 export interface ModelDefinition {
@@ -219,7 +225,14 @@ export const CURATED_OPENROUTER_MODEL_LIST: ModelDefinition[] = [
     contextWindow: 1_048_576,
     maxTokens: 65_536,
     thinkingDefault: true,
-    capabilities: { input: ["text", "image"], toolUse: "declared", reasoning: true, thinkingToggle: true },
+    capabilities: {
+      input: ["text", "image"],
+      toolUse: "declared",
+      reasoning: true,
+      thinkingToggle: true,
+      reasoningEfforts: ["minimal", "low", "medium", "high"],
+      reasoningDefaultEffort: "medium",
+    },
     pricing: {
       currency: "USD",
       inputCacheHitPerMillion: 0.03,
@@ -257,7 +270,14 @@ export const CURATED_OPENROUTER_MODEL_LIST: ModelDefinition[] = [
     contextWindow: 1_048_576,
     maxTokens: 65_536,
     thinkingDefault: true,
-    capabilities: { input: ["text", "image"], toolUse: "declared", reasoning: true, thinkingToggle: true },
+    capabilities: {
+      input: ["text", "image"],
+      toolUse: "declared",
+      reasoning: true,
+      thinkingToggle: true,
+      reasoningEfforts: ["minimal", "low", "medium", "high"],
+      reasoningDefaultEffort: "medium",
+    },
     pricing: {
       currency: "USD",
       inputCacheHitPerMillion: 0.15,

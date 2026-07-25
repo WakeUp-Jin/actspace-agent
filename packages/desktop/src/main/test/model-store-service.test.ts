@@ -22,6 +22,10 @@ const CATALOG: CatalogModelView = {
   input: ["text"],
   toolUse: "declared",
   reasoning: true,
+  reasoningEfforts: ["low", "medium", "high"],
+  reasoningDefaultEffort: "medium",
+  reasoningDefaultEnabled: true,
+  reasoningMandatory: false,
   isFree: false,
   pricing: { currency: "USD", inputCacheHitPerMillion: 0.1, inputCacheMissPerMillion: 1, outputPerMillion: 2 },
   added: false,
@@ -33,6 +37,15 @@ async function setup() {
   await settings.load();
   const store = new ModelStoreService({ settings, findCatalogModel: (id) => id === CATALOG.apiModel ? CATALOG : undefined, now: () => NOW });
   return { settings, store };
+}
+
+async function setupWithMutableCatalog(initial: CatalogModelView) {
+  const dataRoot = await mkdtemp(join(tmpdir(), "actspace-model-store-test-"));
+  const settings = new SettingsService({ dataRoot, crypto: CRYPTO, reloadEnv: () => loadEnv({ envPath: "/private/tmp/no-env", mergeToProcessEnv: false }) });
+  await settings.load();
+  let catalog = initial;
+  const store = new ModelStoreService({ settings, findCatalogModel: (id) => id === catalog.apiModel ? catalog : undefined, now: () => NOW });
+  return { settings, store, setCatalog: (next: CatalogModelView) => { catalog = next; } };
 }
 
 describe("ModelStoreService", () => {
@@ -60,6 +73,40 @@ describe("ModelStoreService", () => {
     expect(settings.getModelStorageState().installedModels[key]?.addedAt).toBe(firstAddedAt);
     expect((await store.setModelEnabled(key, false)).ok).toBe(true);
     expect(settings.getModelStorageState().installedModels[key]?.enabled).toBe(false);
+    expect(settings.getModelStorageState().customModels[key]).toMatchObject({
+      thinkingDefault: true,
+      capabilities: {
+        reasoningEfforts: ["low", "medium", "high"],
+        reasoningDefaultEffort: "medium",
+        reasoningMandatory: false,
+      },
+    });
+  });
+
+  it("refreshes installed provider-catalog capabilities after a catalog reload", async () => {
+    const staleCatalog: CatalogModelView = {
+      ...CATALOG,
+      reasoningEfforts: undefined,
+      reasoningDefaultEffort: undefined,
+      reasoningMandatory: undefined,
+    };
+    const { settings, store, setCatalog } = await setupWithMutableCatalog(staleCatalog);
+    await store.addCatalogModel("openrouter", staleCatalog.apiModel);
+    const key = "openrouter:vendor/custom-agent" as const;
+    const addedAt = settings.getModelStorageState().installedModels[key]?.addedAt;
+    expect(settings.getModelStorageState().customModels[key]?.capabilities.reasoningEfforts).toBeUndefined();
+
+    setCatalog(CATALOG);
+    await expect(store.refreshInstalledCatalogModels()).resolves.toBe(1);
+
+    expect(settings.getModelStorageState().installedModels[key]?.addedAt).toBe(addedAt);
+    expect(settings.getModelStorageState().customModels[key]).toMatchObject({
+      capabilities: {
+        reasoningEfforts: ["low", "medium", "high"],
+        reasoningDefaultEffort: "medium",
+        reasoningMandatory: false,
+      },
+    });
   });
 
   it("rejects builtin deletion and reports references for an in-use catalog model", async () => {

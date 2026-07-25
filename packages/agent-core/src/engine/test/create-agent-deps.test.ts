@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ModelDefinition, ModelSpec, SessionEvent } from "@actspace/shared";
 import { BUILTIN_MODEL_REGISTRY, MODEL_REGISTRY } from "@actspace/shared";
-import { buildLLMConfig, buildLLMConfigFromRuntime } from "../create-agent-deps";
+import { buildAgentConfigFromRuntime, buildLLMConfig, buildLLMConfigFromRuntime } from "../create-agent-deps";
 import type { AgentEnvConfig, AgentConfig } from "../create-agent-deps";
 import { appendEvents } from "../../persistence/jsonl";
 
@@ -204,6 +204,65 @@ describe("buildLLMConfigFromRuntime", () => {
       apiKey: "sk-test",
       baseUrl: "file:///tmp/not-http",
     })).toThrow("HTTP or HTTPS");
+  });
+});
+
+describe("buildAgentConfigFromRuntime reasoning controls", () => {
+  const runtime = {
+    provider: "openrouter" as const,
+    apiKey: "sk-or-test",
+    baseUrl: "https://openrouter.ai/api/v1",
+  };
+  const model: ModelDefinition = {
+    key: "openrouter:vendor/reasoning-model",
+    provider: "openrouter",
+    api: "openai-completions",
+    apiModel: "vendor/reasoning-model",
+    label: "Reasoning Model",
+    source: "custom",
+    contextWindow: 200_000,
+    maxTokens: 16_000,
+    thinkingDefault: true,
+    capabilities: {
+      input: ["text"],
+      toolUse: "declared",
+      reasoning: true,
+      thinkingToggle: true,
+      reasoningEfforts: ["low", "medium", "high"],
+    },
+  };
+
+  it("keeps a supported effort and drops an unsupported effort", () => {
+    const supported = buildAgentConfigFromRuntime({
+      main: { definition: model, runtime },
+      thinkingEnabled: true,
+      reasoningEffort: "high",
+    }, "/tmp/workspace");
+    const unsupported = buildAgentConfigFromRuntime({
+      main: { definition: model, runtime },
+      thinkingEnabled: true,
+      reasoningEffort: "max",
+    }, "/tmp/workspace");
+
+    expect(supported.reasoningEffort).toBe("high");
+    expect(unsupported.reasoningEffort).toBeUndefined();
+  });
+
+  it("forces thinking on for mandatory reasoning models", () => {
+    const config = buildAgentConfigFromRuntime({
+      main: {
+        definition: {
+          ...model,
+          capabilities: { ...model.capabilities, thinkingToggle: false, reasoningMandatory: true },
+        },
+        runtime,
+      },
+      thinkingEnabled: false,
+      reasoningEffort: "medium",
+    }, "/tmp/workspace");
+
+    expect(config.thinkingEnabled).toBe(true);
+    expect(config.reasoningEffort).toBe("medium");
   });
 });
 

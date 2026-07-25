@@ -115,16 +115,7 @@ box-shadow: none;
 
 ### 左栏
 
-#### 1. DeepSeek 预额卡
-
-- 位于左栏最顶部，作为账户状态入口。
-- 即使 Usage 统计账本为空、右侧显示空态，左栏也应保留该卡片。
-- UI 只展示一个大数字余额与币种，例如 `¥19.65 CNY`。
-- 卡片右上角提供刷新按钮；进入 Usage 页面自动拉取一次，页面停留时每 5 分钟自动刷新一次。
-- 不展示赠金 / 充值余额拆分，不展示状态胶囊；未配置或刷新失败只用一行轻提示兜底。
-- renderer 通过 preload IPC 获取聚合后的 `DeepSeekBalanceSnapshot`，真实 `GET /user/balance` 请求在 main 进程完成，避免 DeepSeek API Key 暴露到 renderer。
-
-#### 2. 数据概览卡
+#### 1. 数据概览卡
 
 顶部横排 4 个小指标：
 
@@ -188,8 +179,12 @@ box-shadow: none;
 #### 3. 每日明细表
 
 - Tab：每日细目 / 项目用量
-- 列：日期、总计、输入、输出、缓存、推理、对话数
-- 右对齐数值，表头固定
+- 列：日期、总计、输入、输出、缓存、推理、对话数、费用 (USD)
+- 数值右对齐，表格使用紧凑列距；由于不设置内部纵向滚动，表头随卡片自然滚动，不额外 sticky。
+- 费用为当日所有 `llm_usage` 的 USD 预估费用之和；低于 1 美元时最多显示 6 位小数。
+- 每页固定展示 5 天，通过 renderer 对完整 `dailyRows` 本地分页，不新增 IPC 查询状态，也不影响主统计和热力图的完整时间窗聚合。
+- 分页控件位于表格底部，显示当前行号范围、总天数、当前页 / 总页数以及上一页 / 下一页；切换日 / 周 / 月 / 总计时回到第一页。
+- 表格不设置内部纵向滚动；常规桌面宽度优先用紧凑列距完整展示，只有窄窗口才允许横向滚动。固定 5 行用于控制右栏高度，并减少左侧工具调用卡为追平右栏产生的无意义留白。
 
 ### 底部全宽明细
 
@@ -199,7 +194,7 @@ box-shadow: none;
 - 行粒度：按 `sessionId + turnId` 聚合，即一轮用户输入一行；同一轮用户输入里多次 `llm_usage` 会累加到同一行。
 - 排序：按该 turn 内最新 `llm_usage.timestamp` 倒序，最近的模型调用排在最前。
 - 分页：每页固定 10 条，通过 `UsageStatisticsGetInput.requestRowsPage.page` 查询；切换时间范围回到第一页，普通刷新保留当前页。
-- 列：时间、Workspace、sessionId、模型、Tokens、模型调用。
+- 列：时间、Workspace、sessionId、模型、Tokens、模型调用、费用 (USD)。
 - Workspace 优先显示 workspace registry 的 label；拿不到时用 `workspaceRoot` 的 basename 兜底。
 - sessionId 在表格中短显，完整值保留在 `title`，顶部会话 hover 卡直接显示完整 `sessionId:`。
 - 模型显示该 turn 里 token 占比最大的模型；`模型调用`显示该 turn 内折叠的 LLM call 次数。
@@ -210,6 +205,7 @@ box-shadow: none;
   - Reasoning：仅当 `reasoningTokens > 0` 时显示
   - Total：`totalTokens`
 - 不展示 Cache Write。当前 `llm_usage` 事件没有可靠的 cache write token 字段，不能用 `cacheMissTokens` 代替。
+- 费用是同一 turn 内全部 `llm_usage.cost` 的 USD 聚合值，包含工具调用和失败重试产生的成本。
 - hover 小卡片使用 `position: fixed` + 单元格 `getBoundingClientRect()` 锚到 viewport，避免被表格 `overflow-auto` 裁切。
 
 ## 交互
@@ -279,7 +275,7 @@ IPC 协议 `UsageStatisticsGetInput` 显式区分两种取数范围：
 - Token 统计：`llm_usage.promptTokens`、`completionTokens`、`totalTokens`
 - Cache 统计：`cacheHitTokens`、`cacheMissTokens`
 - 推理统计：`reasoningTokens`
-- 成本统计：`cost.total`；CNY 按 `7.2 → 1 USD` 折算（与产品当前展示口径对齐）。
+- 成本统计：`cost.total`；通过 shared 的 `convertUsageCostToUsd()` 统一折算，当前固定口径为 `7.2 CNY = 1 USD`。
 - 模型分布（整段时间窗）：`llm_usage.model`（主聚合 key 优先用 `modelId`，回落 `model`）
 - **单日模型分布**（热力图 tooltip 专用）：在每日的累加器内额外维护 `Map<model.name → totalTokens>`，导出时按 totalTokens 降序 + model name 升序生成 `modelBreakdown`，`percent` 为"在当日 totalTokens 内的占比"。**注意 percent 与主区 modelDistribution 的 percent 不同语义**——前者是日内占比，后者是整段时间窗的全局占比。
 - **会话明细**（底部表格专用）：在聚合器内维护 `Map<sessionId:turnId → requestRow>`，把同一 turn 内的多次 `llm_usage` 累加为一行；`timestamp` 取该 turn 内最新 usage 时间；`model` 取 token 最高的模型；`modelCallCount` 记录折叠的调用次数；`workspaceId/workspaceRoot` 来自普通 session meta，Kairos 事件没有 session meta 时允许为空并由 UI 兜底；排序完成后按每页 10 条切片返回。
@@ -293,13 +289,12 @@ IPC 协议 `UsageStatisticsGetInput` 显式区分两种取数范围：
 - snapshot 携带 `scope` / `sessionId` / `sourceCount` 三个元数据字段：UI 用它们决定标题、来源数提示和兼容旧调用方。`scope === "global"` 时 `sessionId === null`。
 - snapshot 携带 `requestRows` 和 `requestRowsPage`，供底部会话明细表展示当前页与总数；旧数据源没有该字段时 UI 按空数组和第一页兜底。
 - Kairos 的 `usage-accumulator.json` 仅供 Kairos 监控页头部胶囊使用（"自上次 reset_today 起"的累计），**不**进 Usage 页面账本——后者总是按事件级真相重建，独立于 reset_today 的语义。
-- DeepSeek 预额卡不进入 usage 聚合账本。它通过独立 IPC 读取 DeepSeek 账户余额接口，只作为当前账户余额状态展示。
+- 供应商账户余额不属于 usage 聚合账本，统一在设置的“服务商”卡片中查询和展示。Usage 页只负责 token、成本、缓存和工具调用统计。
 
 ## 首版范围
 
 - 统计页导航入口
 - 左右两栏布局
-- DeepSeek 预额卡
 - 模型排行
 - 热力图
 - 工具调用卡 + 工具详情弹窗

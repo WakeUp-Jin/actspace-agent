@@ -62,6 +62,7 @@ type EvalCandidateAgentRunInput = {
   model?: GenerateEvalCandidateInput["model"];
   modelKey?: GenerateEvalCandidateInput["modelKey"];
   thinkingEnabled?: boolean;
+  reasoningEffort?: GenerateEvalCandidateInput["reasoningEffort"];
 };
 
 type EvalCandidateAgentRunResult = {
@@ -143,6 +144,7 @@ export async function generateEvalCandidate(
       model: input.model,
       modelKey: input.modelKey,
       thinkingEnabled: input.thinkingEnabled,
+      reasoningEffort: input.reasoningEffort,
     });
     await validateGeneratedCandidate(candidateRoot);
     await writeCandidateMetadata(candidateRoot, {
@@ -182,7 +184,7 @@ async function runEvalCandidateAgent(
   input: EvalCandidateAgentRunInput,
 ): Promise<EvalCandidateAgentRunResult> {
   const config = buildAgentConfig(
-    { model: input.model, thinkingEnabled: input.thinkingEnabled },
+    { model: input.model, thinkingEnabled: input.thinkingEnabled, reasoningEffort: input.reasoningEffort },
     input.candidateRoot,
     undefined,
     {
@@ -225,6 +227,7 @@ async function runEvalCandidateAgentWithRuntime(
     ...(utility.ok && { utility: { definition: utility.model.definition, runtime: utility.model.providerRuntime } }),
     ...(explore.ok && { explore: { definition: explore.model.definition, runtime: explore.model.providerRuntime } }),
     thinkingEnabled: input.thinkingEnabled,
+    reasoningEffort: input.reasoningEffort,
     toolEnvironment: runtime.getToolEnvironment(),
   }, input.candidateRoot, undefined, {
     systemPrompt: EVAL_CANDIDATE_SYSTEM_PROMPT,

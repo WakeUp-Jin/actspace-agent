@@ -193,6 +193,7 @@ export async function runAndPersistTurn(
     userInputPreview: preview(input.userInput),
     model: input.modelKey ?? input.model,
     thinkingEnabled: Boolean(input.thinkingEnabled),
+    reasoningEffort: input.reasoningEffort,
   });
 
   let runLogger: AgentRunLogger | undefined;
@@ -217,6 +218,7 @@ export async function runAndPersistTurn(
     userInput: input.userInput,
     model: input.model,
     thinkingEnabled: Boolean(input.thinkingEnabled),
+    reasoningEffort: input.reasoningEffort,
     runLogFilePath: runLogger?.filePath,
   });
   if (runLogger) {
@@ -253,11 +255,17 @@ export async function runAndPersistTurn(
           utility: { definition: utility.model.definition, runtime: utility.model.providerRuntime },
           explore: { definition: explore.model.definition, runtime: explore.model.providerRuntime },
           thinkingEnabled: input.thinkingEnabled,
+          reasoningEffort: input.reasoningEffort,
           toolEnvironment: modelRuntime.getToolEnvironment(),
         }, turnWorkspaceRoot, approvalRegistry, runtimeOptions);
       })()
     : buildAgentConfig(
-        { model: input.model, thinkingEnabled: input.thinkingEnabled, exploreModelId: input.exploreModelId },
+        {
+          model: input.model,
+          thinkingEnabled: input.thinkingEnabled,
+          reasoningEffort: input.reasoningEffort,
+          exploreModelId: input.exploreModelId,
+        },
         turnWorkspaceRoot,
         approvalRegistry,
         runtimeOptions,
@@ -275,6 +283,7 @@ export async function runAndPersistTurn(
     utilityModelKey: deps.utilityModelKey,
     exploreModelKey: deps.exploreModelKey,
     thinkingEnabled: deps.thinkingEnabled,
+    reasoningEffort: deps.reasoningEffort,
     priorMessageCount,
   });
   await writeAgentRunLog(runLogger, "main_event", {
@@ -341,6 +350,7 @@ export async function runAndPersistTurn(
         attachments: input.attachments,
         modelAttachments,
         thinkingEnabled: input.thinkingEnabled,
+        reasoningEffort: input.reasoningEffort,
       },
       abortableDeps,
       {

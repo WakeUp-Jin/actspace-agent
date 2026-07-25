@@ -196,7 +196,8 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     }
   }
 
-  if (config.browserBridgeSocketPath) {
+  const browserGroupDisabled = disabledTools.has("browser") || disabledTools.has("browser_help");
+  if (config.browserBridgeSocketPath && !browserGroupDisabled) {
     const browserExecutors = createBrowserToolExecutors({
       socketPath: config.browserBridgeSocketPath,
       sessionId: config.sessionId ?? `session-${process.pid}`,

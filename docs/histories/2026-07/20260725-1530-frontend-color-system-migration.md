@@ -77,3 +77,13 @@
 - 对合并后新增的 Settings 消费者执行主题契约检查，迁移 `ModelPurposeSelect`、`ModelSettings`、`OpenRouterModelCatalogDialog` 中残留的 5 处旧 `brand` 用法；focus 使用 `focus-ring`，中性按钮边界使用 `line-strong`，Kairos 辅助入口使用 `text-muted`。
 - 合并后全量验证通过：`pnpm typecheck`、`pnpm build`、`pnpm check:docs`、`pnpm check:repo`、`git diff --cached --check`，以及 169 个测试文件、1351 个测试。
 - 最终 UI 人工验收仍由用户在 Light、Dark、System 和 Electron Retina 环境完成，执行计划继续保留在 `active/`。
+
+### Follow-up [17:26] | 收口 Context 轨道、Sidebar 边界与模型菜单
+
+- 根据人工截图反馈新增 `--act-color-meter-track`，让 Context 弹窗和会话预览中的剩余容量退为低对比浅轨道，彩色分段只表达已使用容量。
+- Sidebar 移除自身重复右边框，SplitView 统一绘制单一 1px 分隔线；保留 14px 隐形拖拽热区，但删除 hover / dragging 的宽光晕。
+- Sidebar 继续显示滚动条，但使用更细、更淡的专用 thumb token，避免与面板分隔线形成两条同权重竖线。
+- Composer 模型菜单由 280px 收紧为 244px、Options 由 220px 收紧为 196px；行高约 34px，选中项不再整行加粗，Edit 改为交互时出现，Options 贴触发行展开。
+- 未新增 Cursor 的 Search / Auto / Add Models 等功能，本轮只调整现有模型选择和 Thinking Options 的视觉与布局。
+- `pnpm typecheck`、`pnpm build`、`pnpm check:docs`、`pnpm check:repo`、`git diff --check`，以及 60 个 Desktop 测试文件 / 465 个测试通过；构建仅保留既有的大 chunk 提示。
+- 本地浏览器目标受当前浏览器权限限制，未进行自动截图验收；最终 Electron / Retina 视觉继续由用户手动验收。

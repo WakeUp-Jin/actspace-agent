@@ -16,18 +16,26 @@ import {
   Network,
   Paperclip,
   Plus,
+  Search,
   Square,
   X,
   type LucideIcon,
 } from "lucide-react";
-import type { ComposerAttachment, ContextUsageSnapshot, ModelSelectionId, UsableModelView } from "@actspace/shared";
-import { MODEL_LIST, MODEL_REGISTRY, DEFAULT_MODEL_ID } from "@actspace/shared";
+import type {
+  ComposerAttachment,
+  ContextUsageSnapshot,
+  ModelReasoningEffort,
+  ModelSelectionId,
+  UsableModelView,
+} from "@actspace/shared";
+import { DEFAULT_MODEL_ID, MODEL_LIST, MODEL_REASONING_EFFORTS } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 export type ComposerSendOptions = {
   model: ModelSelectionId;
   thinkingEnabled: boolean;
+  reasoningEffort?: ModelReasoningEffort;
   attachments?: ComposerAttachment[];
 };
 
@@ -55,11 +63,11 @@ const INITIAL_CONTEXT_SELECTOR_CLASS =
   "initial-context-selector inline-flex items-center gap-1 rounded-full border-0 bg-transparent px-1 py-1 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main";
 const COMPOSER_ACTION_STRIP_CLASS = "composer-action-strip flex min-h-[34px] items-center gap-2";
 const REVIEW_PREVIEW_BUTTON_CLASS =
-  "review-preview-button inline-flex h-[30px] items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-sm font-medium text-text-muted shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
+  "review-preview-button inline-flex h-[30px] items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-sm font-medium text-text-muted shadow-[0_1px_2px_rgba(31,45,61,0.04)] transition-[background-color,border-color,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-surface-subtle hover:text-text-main disabled:cursor-default disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-text-muted";
 const REVIEW_ADDITION_CLASS = "font-medium text-success";
 const REVIEW_DELETION_CLASS = "font-medium text-danger";
 const REVIEW_OVERFLOW_BUTTON_CLASS =
-  "review-overflow-button grid h-[30px] w-[30px] place-items-center rounded-full border border-line bg-surface text-text-faint shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
+  "review-overflow-button grid h-[30px] w-[30px] place-items-center rounded-full border border-line bg-surface text-text-faint shadow-[0_1px_2px_rgba(31,45,61,0.04)] transition-[background-color,border-color,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-surface-subtle hover:text-text-main";
 const COMPOSER_PANEL_CLASS =
   "composer-panel relative grid overflow-visible rounded-[22px] border border-line bg-surface shadow-act-soft";
 const COMPOSER_PANEL_INITIAL_CLASS =
@@ -111,27 +119,35 @@ const COMMAND_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
 const COMMAND_MENU_BUTTON_CLASS =
   "command-menu-button flex min-h-[34px] w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 text-left text-sm font-medium text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none";
 const COMMAND_MENU_ICON_CLASS = "text-text-muted";
-// 模型菜单展开方向随布局态切换：inline 时模型按钮在右侧，菜单向左展开（right-0）
-// 避免 280px 宽列表撞右边界；stacked 时按钮在控件行左侧，菜单向右展开（left-0）。
-const MODEL_MENU_BASE_CLASS = `${DROPDOWN_MENU_BASE_CLASS} model-menu max-h-[222px] min-w-[280px] overflow-y-auto`;
-const MODEL_MENU_ROW_CLASS = "model-menu-row relative flex items-center rounded-lg";
-const MODEL_MENU_ROW_SELECTED_CLASS = "is-selected-row bg-selected font-semibold";
+// 模型菜单维持 Cursor 式紧凑单列：主菜单只负责选择，Options 作为贴行的轻量二级浮层。
+const MODEL_MENU_CLUSTER_CLASS =
+  "absolute bottom-[calc(100%_+_8px)] z-30 w-[244px]";
+const MODEL_MENU_BASE_CLASS =
+  "model-menu max-h-[292px] w-[244px] overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1 shadow-act-popover transition-[opacity,transform] duration-[140ms] ease-out motion-reduce:transition-none";
+const MODEL_SEARCH_WRAP_CLASS =
+  "sticky top-0 z-10 flex h-9 items-center gap-2 rounded-act-md bg-surface-raised px-2 text-text-faint";
+const MODEL_SEARCH_INPUT_CLASS =
+  "min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] leading-5 text-text-main outline-none placeholder:text-text-subtle";
+const MODEL_SEARCH_EMPTY_CLASS = "px-2.5 py-6 text-center text-[13px] text-text-faint";
+const MODEL_MENU_ROW_CLASS =
+  "model-menu-row relative flex min-h-[34px] items-center rounded-act-md transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-within:bg-selected";
+const MODEL_MENU_ROW_SELECTED_CLASS = "is-selected-row";
 const MODEL_SELECT_BUTTON_CLASS =
-  "model-select-button flex min-w-0 flex-1 justify-start rounded-lg border-0 bg-transparent px-[9px] py-2 pr-[54px] text-left text-text-main";
-const MODEL_SELECT_BUTTON_SELECTED_CLASS = "pr-[72px]";
+  "model-select-button flex min-h-[34px] min-w-0 flex-1 items-center justify-start rounded-act-md border-0 bg-transparent px-2 py-1.5 pr-[46px] text-left text-[14px] font-normal leading-5 text-text-main";
+const MODEL_SELECT_BUTTON_SELECTED_CLASS = "pr-[58px]";
 const MODEL_ROW_ACTIONS_CLASS =
-  "model-row-actions absolute right-2.5 flex h-full min-w-[42px] items-center justify-end gap-[5px]";
-const MODEL_ROW_ACTIONS_SELECTED_CLASS = "min-w-[62px]";
+  "model-row-actions absolute right-2 flex h-full min-w-[34px] items-center justify-end gap-1";
+const MODEL_ROW_ACTIONS_SELECTED_CLASS = "min-w-[50px]";
 const MODEL_EDIT_BUTTON_CLASS =
-  "model-edit-button h-[26px] min-w-[42px] justify-center rounded-[7px] border-0 bg-transparent text-xs font-semibold text-text-muted transition-[opacity,background,color] duration-[120ms] ease-in-out focus-visible:outline-none hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
+  "model-edit-button h-6 min-w-[34px] justify-center rounded-act-sm border-0 bg-transparent px-1.5 text-[11px] font-medium text-text-muted transition-[opacity,background,color] duration-[120ms] ease-in-out focus-visible:bg-selected focus-visible:outline-none hover:bg-selected hover:text-text-main";
 const MODEL_CHECK_ICON_CLASS = "model-check-icon text-text-main";
-// Options 子菜单贴模型菜单（宽 280px）另一侧弹出，偏移 288px（280 + 8）；
-// 方向跟随模型菜单：菜单向右展开时子菜单贴右（left-[288px]），反之贴左。
-// z-40 确保盖在模型菜单（z-30）之上。
-const MODEL_OPTIONS_MENU_BASE_CLASS = `${DROPDOWN_MENU_BASE_CLASS} model-options-menu bottom-0 z-40 w-[220px] min-w-[220px]`;
-const DROPDOWN_LABEL_CLASS = "dropdown-label px-2.5 pb-[5px] pt-[7px] text-xs font-semibold text-text-faint";
+const MODEL_OPTIONS_MENU_BASE_CLASS =
+  "model-options-menu absolute z-40 w-[210px] rounded-xl border border-line bg-surface-raised/96 p-1 shadow-act-popover transition-[opacity,transform] duration-[140ms] ease-out motion-reduce:transition-none";
+const MODEL_OPTIONS_ESTIMATED_HEIGHT_PX = 292;
+const DROPDOWN_LABEL_CLASS = "dropdown-label px-2 pb-1 pt-1.5 text-[11px] font-medium text-text-faint";
+const OPTION_SEPARATOR_CLASS = "mx-1 my-1 h-px bg-line";
 const OPTION_TOGGLE_ROW_CLASS =
-  "option-toggle-row flex min-h-9 cursor-pointer items-center gap-2.5 rounded-lg px-[9px] py-[7px] text-text-main hover:bg-hover-overlay";
+  "option-toggle-row flex min-h-[34px] cursor-pointer items-center gap-2 rounded-act-md px-2 py-1.5 text-[14px] text-text-main hover:bg-hover-overlay";
 const OPTION_TOGGLE_LABEL_CLASS = "flex-1";
 const OPTION_TOGGLE_INPUT_CLASS = "absolute opacity-0 pointer-events-none";
 // 注意：track 的底色不写进基类，由 on/off 分支二选一给出，避免同属性 utility 互相覆盖。
@@ -139,11 +155,14 @@ const OPTION_TOGGLE_INPUT_CLASS = "absolute opacity-0 pointer-events-none";
 const TOGGLE_TRACK_CLASS =
   "toggle-track relative inline-flex h-5 w-8 rounded-full transition-colors duration-[120ms] ease-in-out";
 const TOGGLE_TRACK_ON_CLASS = "bg-operational";
-const TOGGLE_TRACK_OFF_CLASS = "bg-line-strong";
+const TOGGLE_TRACK_OFF_CLASS = "bg-line";
 const TOGGLE_THUMB_CLASS =
   "toggle-thumb absolute left-[3px] top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_4px_rgba(31,45,61,0.22)] transition-transform duration-[120ms] ease-in-out";
 const TOGGLE_THUMB_ON_CLASS = "translate-x-3";
 const OPTION_EMPTY_CLASS = "px-2.5 py-2 text-sm text-text-faint";
+const OPTION_CHOICE_CLASS =
+  "flex min-h-[32px] w-full items-center rounded-act-md border-0 bg-transparent px-2 text-left text-[13px] text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none disabled:cursor-default disabled:text-text-faint disabled:hover:bg-transparent";
+const OPTION_CHOICE_LABEL_CLASS = "flex-1 capitalize";
 const STATUS_ROW_CLASS =
   "composer-status-row flex min-h-5 items-center justify-between gap-3 px-3 text-[13px] leading-5 text-text-faint";
 const STATUS_GROUP_CLASS = "flex min-w-0 items-center gap-3";
@@ -182,24 +201,54 @@ const SECONDARY_COMMAND_ITEMS: CommandMenuItem[] = [
   { label: "MCP Servers", icon: Network },
 ];
 
-const DEFAULT_MODEL_SPEC = MODEL_REGISTRY[DEFAULT_MODEL_ID];
-
 type ComposerModelOption = {
   id: ModelSelectionId;
   label: string;
+  provider: string;
+  apiModel: string;
   thinkingDefault: boolean;
   supportsThinkingToggle: boolean;
+  reasoningEfforts?: ModelReasoningEffort[] | null;
+  reasoningMandatory: boolean;
+};
+
+type ComposerModelRuntimeOptions = {
+  thinkingEnabled: boolean;
+  reasoningEffort?: ModelReasoningEffort;
+};
+
+const REASONING_EFFORT_LABELS: Record<ModelReasoningEffort, string> = {
+  minimal: "Minimal",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Extra High",
+  max: "Max",
 };
 
 const LEGACY_MODEL_OPTIONS: ComposerModelOption[] = MODEL_LIST.map((spec) => ({
   id: spec.id,
   label: spec.label,
+  provider: spec.provider,
+  apiModel: spec.apiModel,
   thinkingDefault: spec.thinkingDefault,
   supportsThinkingToggle: spec.supportsThinkingToggle,
+  reasoningMandatory: false,
 }));
 
-function isModelEditable(_modelId: ModelSelectionId): boolean {
-  return true;
+function isModelEditable(model: ComposerModelOption): boolean {
+  return model.supportsThinkingToggle || model.reasoningEfforts !== undefined;
+}
+
+function modelDefaultRuntimeOptions(model: ComposerModelOption | undefined): ComposerModelRuntimeOptions {
+  return {
+    thinkingEnabled: model?.reasoningMandatory || model?.thinkingDefault || false,
+  };
+}
+
+function modelReasoningEfforts(model: ComposerModelOption | undefined): ModelReasoningEffort[] {
+  if (model?.reasoningEfforts === null) return [...MODEL_REASONING_EFFORTS];
+  return model?.reasoningEfforts ?? [];
 }
 
 function getComposerWrapClass(surface: ComposerSurface) {
@@ -307,7 +356,16 @@ export function Composer({
 }) {
   const modelList: ComposerModelOption[] = models === undefined
     ? LEGACY_MODEL_OPTIONS
-    : models.map((model) => ({ id: model.key, label: model.label, thinkingDefault: model.thinkingDefault, supportsThinkingToggle: model.capabilities.thinkingToggle }));
+    : models.map((model) => ({
+        id: model.key,
+        label: model.label,
+        provider: model.provider,
+        apiModel: model.apiModel,
+        thinkingDefault: model.thinkingDefault,
+        supportsThinkingToggle: model.capabilities.thinkingToggle,
+        reasoningEfforts: model.capabilities.reasoningEfforts,
+        reasoningMandatory: model.capabilities.reasoningMandatory === true,
+      }));
   const initialModelId = controlledSelectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID;
   const [commandOpen, setCommandOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
@@ -318,9 +376,11 @@ export function Composer({
   const [editingModelId, setEditingModelId] = useState<ModelSelectionId>(initialModelId);
   const [hoveredModelId, setHoveredModelId] = useState<ModelSelectionId | null>(null);
   const [focusedModelId, setFocusedModelId] = useState<ModelSelectionId | null>(null);
-  const [thinkingEnabled, setThinkingEnabled] = useState(
-    modelList.find((model) => model.id === initialModelId)?.thinkingDefault ?? DEFAULT_MODEL_SPEC.thinkingDefault,
-  );
+  const [modelOptionsOffset, setModelOptionsOffset] = useState(0);
+  const [modelSearchQuery, setModelSearchQuery] = useState("");
+  const [modelMenuEntered, setModelMenuEntered] = useState(false);
+  const [modelOptionsEntered, setModelOptionsEntered] = useState(false);
+  const [modelRuntimeOptions, setModelRuntimeOptions] = useState<Partial<Record<ModelSelectionId, ComposerModelRuntimeOptions>>>({});
   const userPickedModelRef = useRef(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
@@ -333,12 +393,25 @@ export function Composer({
   const commandButtonRef = useRef<HTMLButtonElement | null>(null);
   const commandMenuRef = useRef<HTMLDivElement | null>(null);
   const modelButtonRef = useRef<HTMLButtonElement | null>(null);
+  const modelSearchInputRef = useRef<HTMLInputElement | null>(null);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const modelOptionsRef = useRef<HTMLDivElement | null>(null);
   const hasAttachments = attachments.length > 0;
   const selectedModelAvailable = modelList.some((model) => model.id === selectedModelId);
   const canSendMessage = Boolean((message.trim() || attachments.length > 0) && selectedModelAvailable);
   const editingModelSpec = modelList.find((spec) => spec.id === editingModelId);
+  const editingModelOptions = modelRuntimeOptions[editingModelId] ?? modelDefaultRuntimeOptions(editingModelSpec);
+  const selectedModelSpec = modelList.find((spec) => spec.id === selectedModelId);
+  const selectedModelOptions = modelRuntimeOptions[selectedModelId] ?? modelDefaultRuntimeOptions(selectedModelSpec);
+  const editingReasoningEfforts = modelReasoningEfforts(editingModelSpec);
+  const normalizedModelSearchQuery = modelSearchQuery.trim().toLocaleLowerCase();
+  const filteredModelList = normalizedModelSearchQuery
+    ? modelList.filter((model) =>
+        model.label.toLocaleLowerCase().includes(normalizedModelSearchQuery) ||
+        model.provider.toLocaleLowerCase().includes(normalizedModelSearchQuery) ||
+        model.apiModel.toLocaleLowerCase().includes(normalizedModelSearchQuery) ||
+        model.id.toLocaleLowerCase().includes(normalizedModelSearchQuery))
+    : modelList;
   const contextUsagePercent = contextSnapshot?.percentUsed ?? 0;
   const contextRingPercent = Math.max(0, Math.min(100, contextUsagePercent));
   const contextRingColor =
@@ -367,14 +440,36 @@ export function Composer({
     if (!defaultModelId || controlledSelectedModelId || userPickedModelRef.current) return;
     setLocalSelectedModelId(defaultModelId);
     setEditingModelId(defaultModelId);
-    setThinkingEnabled(modelList.find((model) => model.id === defaultModelId)?.thinkingDefault ?? DEFAULT_MODEL_SPEC.thinkingDefault);
   }, [controlledSelectedModelId, defaultModelId, models]);
 
   useEffect(() => {
     if (!controlledSelectedModelId) return;
     setEditingModelId(controlledSelectedModelId);
-    setThinkingEnabled(modelList.find((model) => model.id === controlledSelectedModelId)?.thinkingDefault ?? DEFAULT_MODEL_SPEC.thinkingDefault);
   }, [controlledSelectedModelId, models]);
+
+  useLayoutEffect(() => {
+    if (!modelOpen) {
+      setModelMenuEntered(false);
+      setModelSearchQuery("");
+      return;
+    }
+    setModelMenuEntered(false);
+    const handle = window.requestAnimationFrame(() => {
+      setModelMenuEntered(true);
+      modelSearchInputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(handle);
+  }, [modelOpen]);
+
+  useLayoutEffect(() => {
+    if (!modelOptionsOpen) {
+      setModelOptionsEntered(false);
+      return;
+    }
+    setModelOptionsEntered(false);
+    const handle = window.requestAnimationFrame(() => setModelOptionsEntered(true));
+    return () => window.cancelAnimationFrame(handle);
+  }, [modelOptionsOpen, editingModelId]);
 
   // 原生 textarea 不会随内容自动长高（粘贴大段文本时只会内部滚动）。
   // 多行判定必须始终按 inline 布局的可用宽度测量：如果在 stacked 的全宽输入框中测量，
@@ -433,6 +528,17 @@ export function Composer({
     setContextOpen(false);
   }
 
+  function updateModelRuntimeOptions(
+    modelId: ModelSelectionId,
+    update: (current: ComposerModelRuntimeOptions) => ComposerModelRuntimeOptions,
+  ) {
+    const model = modelList.find((candidate) => candidate.id === modelId);
+    setModelRuntimeOptions((current) => ({
+      ...current,
+      [modelId]: update(current[modelId] ?? modelDefaultRuntimeOptions(model)),
+    }));
+  }
+
   function appendAttachments(nextAttachments: ComposerAttachment[]) {
     if (nextAttachments.length === 0) return;
     setAttachments((current) => dedupeAttachments([...current, ...nextAttachments]));
@@ -461,8 +567,11 @@ export function Composer({
     const nextAttachments = attachments;
     const options: ComposerSendOptions = {
       model: selectedModelId,
-      thinkingEnabled,
+      thinkingEnabled: selectedModelOptions.thinkingEnabled,
     };
+    if (selectedModelOptions.thinkingEnabled && selectedModelOptions.reasoningEffort) {
+      options.reasoningEffort = selectedModelOptions.reasoningEffort;
+    }
     if (nextAttachments.length > 0) {
       options.attachments = nextAttachments;
     }
@@ -683,10 +792,19 @@ export function Composer({
   }
 
   function renderModelSelector() {
-    // inline 时模型按钮靠右，菜单向左展开；stacked 时按钮在左，菜单向右展开。
-    const modelMenuClass = `${MODEL_MENU_BASE_CLASS} ${resolvedLayout === "inline" ? "right-0" : "left-0"}`;
-    const modelOptionsMenuClass =
-      `${MODEL_OPTIONS_MENU_BASE_CLASS} ${resolvedLayout === "inline" ? "right-[288px]" : "left-[288px]"}`;
+    // inline 时模型按钮靠右，菜单向左锚定；stacked 时从左侧向右展开。
+    const modelMenuClusterClass = `${MODEL_MENU_CLUSTER_CLASS} ${resolvedLayout === "inline" ? "right-0" : "left-0"}`;
+    const modelMenuMotionClass = modelMenuEntered
+      ? "translate-y-0 scale-100 opacity-100"
+      : "pointer-events-none translate-y-1 scale-[0.985] opacity-0";
+    const modelOptionsMotionClass = modelOptionsEntered
+      ? "translate-x-0 opacity-100"
+      : resolvedLayout === "inline"
+        ? "pointer-events-none translate-x-1 opacity-0"
+        : "pointer-events-none -translate-x-1 opacity-0";
+    const modelOptionsMenuClass = `${MODEL_OPTIONS_MENU_BASE_CLASS} ${modelOptionsMotionClass} ${
+      resolvedLayout === "inline" ? "right-[calc(100%_+_8px)]" : "left-[calc(100%_+_8px)]"
+    }`;
     return (
       <div className={`${CONTROL_GROUP_CLASS} [grid-area:model]`}>
         <button
@@ -706,105 +824,192 @@ export function Composer({
           <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
         </button>
         {modelOpen ? (
-          <div className={modelMenuClass} ref={modelMenuRef}>
-            {modelList.map((spec) => {
-              const showEdit = spec.id === selectedModelId || hoveredModelId === spec.id || focusedModelId === spec.id;
-              return (
-                <div
-                  className={`${MODEL_MENU_ROW_CLASS} ${spec.id === selectedModelId ? MODEL_MENU_ROW_SELECTED_CLASS : ""}`}
-                  key={spec.id}
-                  onPointerEnter={() => setHoveredModelId(spec.id)}
-                  onPointerOver={() => setHoveredModelId(spec.id)}
-                  onPointerLeave={() => {
-                    setHoveredModelId((currentId) => (currentId === spec.id ? null : currentId));
+          <div className={modelMenuClusterClass}>
+            <div
+              className={`${MODEL_MENU_BASE_CLASS} ${modelMenuMotionClass} ${
+                resolvedLayout === "inline" ? "origin-bottom-right" : "origin-bottom-left"
+              }`}
+              ref={modelMenuRef}
+              role="menu"
+              aria-label="Models"
+              onScroll={() => setModelOptionsOpen(false)}
+            >
+              <label className={MODEL_SEARCH_WRAP_CLASS}>
+                <Search size={14} strokeWidth={2} aria-hidden="true" />
+                <input
+                  ref={modelSearchInputRef}
+                  className={MODEL_SEARCH_INPUT_CLASS}
+                  type="search"
+                  value={modelSearchQuery}
+                  placeholder="Search models"
+                  aria-label="Search models"
+                  onChange={(event) => {
+                    setModelSearchQuery(event.target.value);
+                    setModelOptionsOpen(false);
                   }}
-                  onMouseEnter={() => setHoveredModelId(spec.id)}
-                  onMouseOver={() => setHoveredModelId(spec.id)}
-                  onMouseLeave={() => {
-                    setHoveredModelId((currentId) => (currentId === spec.id ? null : currentId));
-                  }}
-                  onFocusCapture={() => setFocusedModelId(spec.id)}
-                  onBlurCapture={(event) => {
-                    const nextTarget = event.relatedTarget;
-                    if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
-                      setFocusedModelId((currentId) => (currentId === spec.id ? null : currentId));
-                    }
-                  }}
-                >
-                  <button
-                    type="button"
-                    className={`${MODEL_SELECT_BUTTON_CLASS} ${
-                      spec.id === selectedModelId ? MODEL_SELECT_BUTTON_SELECTED_CLASS : ""
-                    }`}
-                    onClick={() => {
-                      userPickedModelRef.current = true;
-                      setLocalSelectedModelId(spec.id);
-                      onSelectedModelChange?.(spec.id);
-                      setEditingModelId(spec.id);
-                      setThinkingEnabled(spec.thinkingDefault);
-                      setHoveredModelId(null);
-                      setFocusedModelId(null);
-                      setModelOptionsOpen(false);
-                      setModelOpen(false);
+                />
+              </label>
+              {filteredModelList.map((spec) => {
+                const showEdit =
+                  hoveredModelId === spec.id ||
+                  focusedModelId === spec.id ||
+                  (modelOptionsOpen && editingModelId === spec.id);
+                return (
+                  <div
+                    className={`${MODEL_MENU_ROW_CLASS} ${spec.id === selectedModelId ? MODEL_MENU_ROW_SELECTED_CLASS : ""}`}
+                    key={spec.id}
+                    onPointerEnter={() => setHoveredModelId(spec.id)}
+                    onPointerOver={() => setHoveredModelId(spec.id)}
+                    onPointerLeave={() => {
+                      setHoveredModelId((currentId) => (currentId === spec.id ? null : currentId));
+                    }}
+                    onMouseEnter={() => setHoveredModelId(spec.id)}
+                    onMouseOver={() => setHoveredModelId(spec.id)}
+                    onMouseLeave={() => {
+                      setHoveredModelId((currentId) => (currentId === spec.id ? null : currentId));
+                    }}
+                    onFocusCapture={() => setFocusedModelId(spec.id)}
+                    onBlurCapture={(event) => {
+                      const nextTarget = event.relatedTarget;
+                      if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+                        setFocusedModelId((currentId) => (currentId === spec.id ? null : currentId));
+                      }
                     }}
                   >
-                    <span>{spec.label}</span>
-                  </button>
-                  <div className={`${MODEL_ROW_ACTIONS_CLASS} ${
-                    spec.id === selectedModelId ? MODEL_ROW_ACTIONS_SELECTED_CLASS : ""
-                  }`}>
-                    {isModelEditable(spec.id) ? (
+                    <button
+                      type="button"
+                      className={`${MODEL_SELECT_BUTTON_CLASS} ${
+                        spec.id === selectedModelId ? MODEL_SELECT_BUTTON_SELECTED_CLASS : ""
+                      }`}
+                      onClick={() => {
+                        userPickedModelRef.current = true;
+                        setLocalSelectedModelId(spec.id);
+                        onSelectedModelChange?.(spec.id);
+                        setEditingModelId(spec.id);
+                        setHoveredModelId(null);
+                        setFocusedModelId(null);
+                        setModelOptionsOpen(false);
+                        setModelOpen(false);
+                      }}
+                    >
+                      <span>{spec.label}</span>
+                    </button>
+                    <div className={`${MODEL_ROW_ACTIONS_CLASS} ${
+                      spec.id === selectedModelId ? MODEL_ROW_ACTIONS_SELECTED_CLASS : ""
+                    }`}>
+                      {isModelEditable(spec) ? (
+                        <button
+                          type="button"
+                          className={MODEL_EDIT_BUTTON_CLASS}
+                          aria-label={`Edit ${spec.id} options`}
+                          style={{
+                            opacity: showEdit ? 1 : 0,
+                          }}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            const row = event.currentTarget.closest<HTMLElement>(".model-menu-row");
+                            const menu = modelMenuRef.current;
+                            if (row && menu) {
+                              const rowOffset = Math.max(0, row.offsetTop - menu.scrollTop);
+                              const maxOffset = Math.max(0, menu.clientHeight - MODEL_OPTIONS_ESTIMATED_HEIGHT_PX);
+                              setModelOptionsOffset(Math.min(rowOffset, maxOffset));
+                            }
+                            setEditingModelId(spec.id);
+                            setCommandOpen(false);
+                            setContextSelectorOpen(null);
+                            setContextOpen(false);
+                            setModelOptionsOpen(true);
+                          }}
+                        >
+                          Edit
+                        </button>
+                      ) : null}
+                      {spec.id === selectedModelId ? (
+                        <Check className={MODEL_CHECK_ICON_CLASS} size={14} strokeWidth={2.2} />
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredModelList.length === 0 ? (
+                <div className={MODEL_SEARCH_EMPTY_CLASS}>No matching models.</div>
+              ) : null}
+            </div>
+            {modelOptionsOpen ? (
+              <div
+                className={modelOptionsMenuClass}
+                ref={modelOptionsRef}
+                style={{ top: `${modelOptionsOffset}px` }}
+              >
+                <div className={DROPDOWN_LABEL_CLASS}>Options</div>
+                {editingModelSpec?.supportsThinkingToggle ? (
+                  <label className={OPTION_TOGGLE_ROW_CLASS}>
+                    <span className={OPTION_TOGGLE_LABEL_CLASS}>Thinking</span>
+                    <input
+                      className={OPTION_TOGGLE_INPUT_CLASS}
+                      type="checkbox"
+                      checked={editingModelOptions.thinkingEnabled}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        updateModelRuntimeOptions(editingModelId, (current) => ({
+                          ...current,
+                          thinkingEnabled: checked,
+                        }));
+                      }}
+                      aria-label={`${editingModelId} Thinking`}
+                    />
+                    <span
+                      className={`${TOGGLE_TRACK_CLASS} ${editingModelOptions.thinkingEnabled ? TOGGLE_TRACK_ON_CLASS : TOGGLE_TRACK_OFF_CLASS}`}
+                      aria-hidden="true"
+                    >
+                      <span className={`${TOGGLE_THUMB_CLASS}${editingModelOptions.thinkingEnabled ? ` ${TOGGLE_THUMB_ON_CLASS}` : ""}`} />
+                    </span>
+                  </label>
+                ) : editingModelSpec?.reasoningMandatory ? (
+                  <div className="px-2 py-1.5 text-[13px] text-text-muted">Thinking is always enabled.</div>
+                ) : null}
+                {editingReasoningEfforts.length > 0 ? (
+                  <>
+                    {(editingModelSpec?.supportsThinkingToggle || editingModelSpec?.reasoningMandatory) ? (
+                      <div className={OPTION_SEPARATOR_CLASS} />
+                    ) : null}
+                    <div className={DROPDOWN_LABEL_CLASS}>Effort</div>
+                    <button
+                      type="button"
+                      className={OPTION_CHOICE_CLASS}
+                      disabled={!editingModelOptions.thinkingEnabled}
+                      onClick={() => updateModelRuntimeOptions(editingModelId, (current) => ({
+                        thinkingEnabled: current.thinkingEnabled,
+                      }))}
+                    >
+                      <span className={OPTION_CHOICE_LABEL_CLASS}>Auto</span>
+                      {!editingModelOptions.reasoningEffort ? (
+                        <Check size={14} strokeWidth={2.2} aria-hidden="true" />
+                      ) : null}
+                    </button>
+                    {editingReasoningEfforts.map((effort) => (
                       <button
                         type="button"
-                        className={MODEL_EDIT_BUTTON_CLASS}
-                        aria-label={`Edit ${spec.id} options`}
-                        style={{
-                          opacity: showEdit ? 1 : 0,
-                        }}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setEditingModelId(spec.id);
-                          setCommandOpen(false);
-                          setContextSelectorOpen(null);
-                          setContextOpen(false);
-                          setModelOptionsOpen(true);
-                        }}
+                        className={OPTION_CHOICE_CLASS}
+                        disabled={!editingModelOptions.thinkingEnabled}
+                        key={effort}
+                        onClick={() => updateModelRuntimeOptions(editingModelId, (current) => ({
+                          ...current,
+                          reasoningEffort: effort,
+                        }))}
                       >
-                        Edit
+                        <span className={OPTION_CHOICE_LABEL_CLASS}>{REASONING_EFFORT_LABELS[effort]}</span>
+                        {editingModelOptions.reasoningEffort === effort ? (
+                          <Check size={14} strokeWidth={2.2} aria-hidden="true" />
+                        ) : null}
                       </button>
-                    ) : null}
-                    {spec.id === selectedModelId ? (
-                      <Check className={MODEL_CHECK_ICON_CLASS} size={14} strokeWidth={2.2} />
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-        {modelOpen && modelOptionsOpen ? (
-          <div className={modelOptionsMenuClass} ref={modelOptionsRef}>
-            <div className={DROPDOWN_LABEL_CLASS}>Options</div>
-            {editingModelSpec?.supportsThinkingToggle ? (
-              <label className={OPTION_TOGGLE_ROW_CLASS}>
-                <span className={OPTION_TOGGLE_LABEL_CLASS}>Thinking</span>
-                <input
-                  className={OPTION_TOGGLE_INPUT_CLASS}
-                  type="checkbox"
-                  checked={thinkingEnabled}
-                  onChange={(event) => setThinkingEnabled(event.target.checked)}
-                  aria-label={`${editingModelId} Thinking`}
-                />
-                <span
-                  className={`${TOGGLE_TRACK_CLASS} ${thinkingEnabled ? TOGGLE_TRACK_ON_CLASS : TOGGLE_TRACK_OFF_CLASS}`}
-                  aria-hidden="true"
-                >
-                  <span className={`${TOGGLE_THUMB_CLASS}${thinkingEnabled ? ` ${TOGGLE_THUMB_ON_CLASS}` : ""}`} />
-                </span>
-              </label>
-            ) : (
-              <div className={OPTION_EMPTY_CLASS}>No extra options yet.</div>
-            )}
+                    ))}
+                  </>
+                ) : !editingModelSpec?.supportsThinkingToggle && !editingModelSpec?.reasoningMandatory ? (
+                  <div className={OPTION_EMPTY_CLASS}>No extra options yet.</div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

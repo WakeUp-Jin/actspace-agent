@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>渐进式工具披露：注册、可见与授权必须分层</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f1e9;
+      --surface: #fffdf7;
+      --ink: #1d2420;
+      --muted: #68716b;
+      --line: #d8d5cb;
+      --accent: #087a55;
+      --accent-soft: #dcefe7;
+      --warning: #9a5b08;
+      --warning-soft: #f7e8c9;
+      --code: #202923;
+      --code-ink: #e7f3ec;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111512;
+        --surface: #191e1a;
+        --ink: #e8eee9;
+        --muted: #9da8a0;
+        --line: #343c36;
+        --accent: #72d3aa;
+        --accent-soft: #183c2e;
+        --warning: #efbd6b;
+        --warning-soft: #3d2c13;
+        --code: #0b0f0c;
+        --code-ink: #dcebe1;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-serif, Georgia, "Noto Serif SC", serif;
+      line-height: 1.72;
+    }
+    main { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 64px 0 96px; }
+    header { max-width: 820px; margin-bottom: 44px; }
+    .eyebrow { color: var(--accent); font: 700 12px/1.2 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { margin: 12px 0 16px; font-size: clamp(36px, 6vw, 72px); line-height: 1.02; letter-spacing: -.045em; }
+    .lead { margin: 0; color: var(--muted); font-size: 19px; max-width: 760px; }
+    h2 { margin: 0 0 16px; font-size: 25px; letter-spacing: -.02em; }
+    h3 { margin: 0 0 8px; font-size: 17px; }
+    p { margin: 8px 0 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 26px 0 42px; }
+    .card, section {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: 18px;
+      box-shadow: 0 18px 44px rgba(12, 23, 16, .06);
+    }
+    .card { padding: 22px; }
+    .card strong { display: block; color: var(--accent); font: 800 13px/1.2 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; }
+    section { padding: 28px; margin-top: 18px; }
+    .flow { display: grid; grid-template-columns: 1fr 54px 1fr 54px 1fr; align-items: stretch; gap: 8px; margin-top: 22px; }
+    .node { border: 1px solid var(--line); border-radius: 14px; padding: 17px; background: var(--bg); }
+    .arrow { display: grid; place-items: center; color: var(--accent); font: 800 24px/1 ui-monospace, monospace; }
+    pre { overflow: auto; margin: 18px 0 0; padding: 20px; border-radius: 14px; background: var(--code); color: var(--code-ink); font: 13px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .warning { border-left: 4px solid var(--warning); background: var(--warning-soft); padding: 14px 16px; border-radius: 0 12px 12px 0; margin-top: 18px; }
+    ul { margin: 12px 0 0; padding-left: 22px; }
+    .checks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 18px; }
+    .check { border: 1px solid var(--line); border-radius: 12px; padding: 13px 15px; background: var(--bg); }
+    footer { margin-top: 28px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 760px) {
+      main { padding-top: 38px; }
+      .grid, .checks { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .arrow { min-height: 32px; transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Agent Harness Pattern · 2026-07-25</div>
+      <h1>渐进式工具披露，不是动态装卸执行器</h1>
+      <p class="lead">当一个能力域拥有大量工具时，最稳定的做法是让执行器保持注册，只动态改变本次模型请求能看到的 definitions，并把授权继续留在独立的安全层。</p>
+    </header>
+
+    <div class="grid">
+      <article class="card">
+        <strong>Registered</strong>
+        <h3>系统能不能执行</h3>
+        <p>executor、permission checker、Socket client 和 disposer 是否已经装配。</p>
+      </article>
+      <article class="card">
+        <strong>Visible</strong>
+        <h3>模型这次看见什么</h3>
+        <p>当前 LLM 请求携带哪些工具 schema。渐进披露只改变这一层。</p>
+      </article>
+      <article class="card">
+        <strong>Authorized</strong>
+        <h3>用户是否允许执行</h3>
+        <p>审批租约、能力 hard deny 和风险策略；不能被“已披露”替代。</p>
+      </article>
+    </div>
+
+    <section>
+      <h2>为什么不动态 register / unregister？</h2>
+      <p>注册通常带着资源和生命周期：连接池、Socket、清理函数、权限检查器、输出渲染器。为了省模型 token 而反复重建这些对象，会把上下文优化变成运行时稳定性问题。</p>
+      <pre>ToolManager
+  ├─ registered tools: gateway + deferred executors
+  ├─ visible definitions: filtered per LLM call
+  ├─ active disclosure groups
+  └─ pending disclosure groups</pre>
+    </section>
+
+    <section>
+      <h2>正确时序：pending 到下一次调用才 commit</h2>
+      <div class="flow">
+        <div class="node"><h3>LLM call #1</h3><p>只看到 gateway。</p></div>
+        <div class="arrow">→</div>
+        <div class="node"><h3>Gateway success</h3><p>记录 pending group，不立即放行。</p></div>
+        <div class="arrow">→</div>
+        <div class="node"><h3>LLM call #2</h3><p>commit 后看到完整工具包。</p></div>
+      </div>
+      <div class="warning"><strong>关键陷阱：</strong>如果 gateway 成功后立刻激活，模型在同一条 assistant message 中幻觉生成的隐藏工具，可能因顺序执行而被意外放行。披露必须绑定到下一次模型请求边界。</div>
+    </section>
+
+    <section>
+      <h2>实现骨架</h2>
+      <pre>// 工具注册时记录披露元数据
+gateway.progressiveDisclosure = { group: "browser", role: "gateway" }
+deferred.progressiveDisclosure = { group: "browser", role: "deferred" }
+
+// gateway 成功：只写 pending
+pendingDisclosureGroups.add("browser")
+
+// 下一次 LLM 调用前
+commitProgressiveDisclosure()
+context.tools = toolManager.getToolDefinitions()</pre>
+      <p>隐藏工具不仅不能出现在 definitions 中，执行入口也必须检查可见性。否则模型或不可信历史仍可能绕过“UI 隐藏”。</p>
+    </section>
+
+    <section>
+      <h2>不要漏掉这些消费者</h2>
+      <div class="checks">
+        <div class="check">主 Agent 初始 Context</div>
+        <div class="check">每次 LLM 调用前的刷新</div>
+        <div class="check">Context token bucket / 完整视图</div>
+        <div class="check">手动与自动上下文压缩</div>
+        <div class="check">自治 Agent 的下一次 tick</div>
+        <div class="check">设置总开关与 system prompt</div>
+      </div>
+      <p>只改一个 producer 很容易产生“双口径”：模型看见一组工具，Context 面板却统计另一组；或者用户关闭总开关后，system prompt 仍宣称能力可用。</p>
+    </section>
+
+    <section>
+      <h2>自检问题</h2>
+      <ul>
+        <li>同一批 tool calls 中，gateway 后面的隐藏工具会不会被顺序放行？</li>
+        <li>下一条用户消息是否恢复为 gateway-only，而不是永久膨胀？</li>
+        <li>关闭工具组后，definitions、prompt、运行时依赖和 Context 统计是否同时消失？</li>
+        <li>工具披露是否被错误地当成用户授权？</li>
+      </ul>
+    </section>
+
+    <footer>来源：Browser 工具渐进式披露变更。对应 history：docs/histories/2026-07/20260725-2233-browser-tool-progressive-disclosure.md</footer>
+  </main>
+</body>
+</html>

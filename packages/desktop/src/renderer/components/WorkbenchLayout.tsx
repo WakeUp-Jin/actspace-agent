@@ -1,4 +1,4 @@
-import type { AppSettings, ContextState, ContextUsageSnapshot, DeepSeekBalanceSnapshot, KimiBalanceSnapshot, MessageBlock, ModelSelectionId, SessionListItem, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
+import type { AppSettings, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, SessionListItem, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlaskConical } from "lucide-react";
 import { ConversationView } from "./ConversationView";
@@ -31,7 +31,6 @@ const MAIN_MIN_WIDTH = 560;
 const RIGHT_DEFAULT_WIDTH = 390;
 const RIGHT_MIN_WIDTH = 320;
 const RIGHT_MAX_WIDTH = 640;
-const DEEPSEEK_BALANCE_REFRESH_MS = 5 * 60 * 1000;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -155,12 +154,6 @@ export function WorkbenchLayout({
   const [usageSnapshot, setUsageSnapshot] = useState<UsageStatisticsSnapshot | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState<string | null>(null);
-  const [deepSeekBalance, setDeepSeekBalance] = useState<DeepSeekBalanceSnapshot | null>(null);
-  const [deepSeekBalanceLoading, setDeepSeekBalanceLoading] = useState(false);
-  const [deepSeekBalanceError, setDeepSeekBalanceError] = useState<string | null>(null);
-  const [kimiBalance, setKimiBalance] = useState<KimiBalanceSnapshot | null>(null);
-  const [kimiBalanceLoading, setKimiBalanceLoading] = useState(false);
-  const [kimiBalanceError, setKimiBalanceError] = useState<string | null>(null);
   const reviewTabRefreshCounterRef = useRef(0);
   const isSidebarHidden = leftMode === "hidden";
   const displayedLeftWidth = isSidebarHidden ? 0 : leftWidth;
@@ -298,71 +291,12 @@ export function WorkbenchLayout({
     }
   }, []);
 
-  const loadDeepSeekBalance = useCallback(async () => {
-    if (typeof window === "undefined" || !window.actspace?.getDeepSeekBalance) {
-      setDeepSeekBalance(null);
-      setDeepSeekBalanceError(null);
-      return;
-    }
-
-    setDeepSeekBalanceLoading(true);
-    setDeepSeekBalanceError(null);
-    try {
-      const balance = await window.actspace.getDeepSeekBalance();
-      setDeepSeekBalance(balance);
-    } catch (error) {
-      console.error("Failed to load DeepSeek balance", error);
-      setDeepSeekBalanceError(error instanceof Error ? error.message : "Failed to load DeepSeek balance.");
-    } finally {
-      setDeepSeekBalanceLoading(false);
-    }
-  }, []);
-
-  const loadKimiBalance = useCallback(async () => {
-    if (typeof window === "undefined" || !window.actspace?.getKimiBalance) {
-      setKimiBalance(null);
-      setKimiBalanceError(null);
-      return;
-    }
-
-    setKimiBalanceLoading(true);
-    setKimiBalanceError(null);
-    try {
-      const balance = await window.actspace.getKimiBalance();
-      setKimiBalance(balance);
-    } catch (error) {
-      console.error("Failed to load Kimi balance", error);
-      setKimiBalanceError(error instanceof Error ? error.message : "Failed to load Kimi balance.");
-    } finally {
-      setKimiBalanceLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (view !== "usage") return;
     loadUsageStatistics().catch((error: unknown) => {
       console.error("Failed to bootstrap usage statistics", error);
     });
   }, [view, loadUsageStatistics]);
-
-  useEffect(() => {
-    if (view !== "usage") return;
-    const refreshAll = () => {
-      loadDeepSeekBalance().catch((error: unknown) => {
-        console.error("Failed to refresh DeepSeek balance", error);
-      });
-      loadKimiBalance().catch((error: unknown) => {
-        console.error("Failed to refresh Kimi balance", error);
-      });
-    };
-    refreshAll();
-
-    const timer = window.setInterval(refreshAll, DEEPSEEK_BALANCE_REFRESH_MS);
-
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [view, loadDeepSeekBalance, loadKimiBalance]);
 
   // 设置走「整页接管」：不渲染聊天侧栏与右栏，由 SettingsPage 自带导航 + 内容两栏。
   if (view === "settings") {
@@ -399,14 +333,6 @@ export function WorkbenchLayout({
         error={usageError}
         onRefresh={loadUsageStatistics}
         onRequestPageChange={(page, nextRange) => loadUsageStatistics(nextRange, page)}
-        deepSeekBalance={deepSeekBalance}
-        isDeepSeekBalanceLoading={deepSeekBalanceLoading}
-        deepSeekBalanceError={deepSeekBalanceError}
-        onRefreshDeepSeekBalance={loadDeepSeekBalance}
-        kimiBalance={kimiBalance}
-        isKimiBalanceLoading={kimiBalanceLoading}
-        kimiBalanceError={kimiBalanceError}
-        onRefreshKimiBalance={loadKimiBalance}
         onBackToChat={() => setView("chat")}
         workspaces={workspaces}
       />

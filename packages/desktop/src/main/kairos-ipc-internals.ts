@@ -5,7 +5,7 @@
  * 单元测试可以零成本覆盖（无需 mock ipcMain / BrowserWindow），
  * `kairos-ipc.ts` 只负责把这些纯函数串到真实的 ipcMain.handle / webContents.send 上。
  */
-import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   KairosBriefReadResponse,
@@ -14,7 +14,10 @@ import type {
   KairosBriefsListResponse,
   KairosConfigName,
   KairosControl,
+  KairosReadConfigRequest,
+  KairosReadConfigResponse,
   KairosRuntimeState,
+  KairosWriteConfigRequest,
   SessionEvent,
 } from "@actspace/shared";
 import {
@@ -70,6 +73,47 @@ export function validateByName(name: KairosConfigName, parsed: unknown): void {
     case "soul":
       return;
   }
+}
+
+export async function readKairosConfigFile(
+  kairosRoot: string,
+  req: KairosReadConfigRequest,
+): Promise<KairosReadConfigResponse> {
+  const fileName = CONFIG_FILE_MAP[req.name];
+  if (!fileName) throw new Error(`kairos:read-config unknown name ${req.name}`);
+  const filePath = join(kairosRoot, "config", fileName);
+  try {
+    const content = await readFile(filePath, "utf8");
+    return { content, fileName, notFound: false };
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return { content: "", fileName, notFound: true };
+    throw err;
+  }
+}
+
+export async function writeKairosConfigFile(
+  kairosRoot: string,
+  req: KairosWriteConfigRequest,
+): Promise<void> {
+  const fileName = CONFIG_FILE_MAP[req.name];
+  if (!fileName) throw new Error(`kairos:write-config unknown name ${req.name}`);
+
+  if (!MARKDOWN_CONFIG_NAMES.has(req.name)) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(req.content);
+    } catch (err) {
+      throw new Error(`Invalid JSON: ${(err as Error).message}`);
+    }
+    validateByName(req.name, parsed);
+  }
+
+  const filePath = join(kairosRoot, "config", fileName);
+  await mkdir(join(kairosRoot, "config"), { recursive: true });
+  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tmp, req.content, "utf8");
+  await rename(tmp, filePath);
 }
 
 // ─── briefs（任务表）文件存取 ────────────────────────────────────────────
