@@ -8,7 +8,7 @@
 
 ## 设计来源
 
-- `docs/design-docs/agent-backend-design.md`
+- `docs/design-docs/agent-runtime/agent-backend-design.md`
 - `.agents/skills/llm-agent-dev/references/context/type-session-history.md`（会话历史存储设计）
 - `.agents/skills/llm-agent-dev/examples/session-storage.ts`（存储参考）
 - `docs/ARCHITECTURE.md`

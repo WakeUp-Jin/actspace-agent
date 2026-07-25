@@ -25,7 +25,7 @@
 
 ### 🧠 Design Intent (Why)
 
-- **设计原则先于实现细节**：上一轮我直接照搬 Thinking 视觉但跳过了"统一左边缘""保持文本流感""不靠装饰"等核心约束，导致 `width:100%` + flex-end 把箭头推到最右、缺少 `conversation-text-inset` 让 Write 行视觉突出。这次先读 `docs/design-docs/front-中间消息区规范.md` 再写代码，把这些 token 一次性对齐。
+- **设计原则先于实现细节**：上一轮我直接照搬 Thinking 视觉但跳过了"统一左边缘""保持文本流感""不靠装饰"等核心约束，导致 `width:100%` + flex-end 把箭头推到最右、缺少 `conversation-text-inset` 让 Write 行视觉突出。这次先读 `docs/design-docs/frontend/front-中间消息区规范.md` 再写代码，把这些 token 一次性对齐。
 - **工具进行中态的语法位**：消息流"严格按执行顺序展示"+"保持文本流感"意味着 `tool_started` 阶段就需要一个可见但克制的占位，不能是 additions=0 的空统计卡片；用 `tool-log-line is-running` 直接复用已有的 shimmer 系统，做到 read / grep / write 在 running 态视觉一致。
 - **status 字段而不是新 MessageBlock kind**：在 `edit_diff` / `write_diff` 上挂可选 `status`，可以让同一个 MessageBlock 类型在流式和持久化两条路径上复用；持久化默认 completed 视为正常折叠卡片，不影响历史会话回放。
 - **后端摘要时态统一**：UI 折叠态显示 `Edit filename +3 -1`，但后端持久化的 `summary` 还是 `Edited filename`，会让 history/recovery 时摘要与活态消息脱节。统一为现在时让"摘要 = 用户可见动作"形成单一事实。
@@ -39,5 +39,5 @@
 - `packages/agent-core/src/engine/bridge.ts`
 - `packages/agent-core/src/tools.ts`
 - `packages/agent-core/src/fixtures.ts`
-- `docs/design-docs/front-中间消息区规范.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`

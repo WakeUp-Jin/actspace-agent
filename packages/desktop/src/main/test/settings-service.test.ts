@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { loadEnv, MAIN_AGENT_SYSTEM_PROMPT } from "@actspace/agent-core";
 import { SettingsService, type SecretCrypto } from "../settings-service";
 
@@ -59,6 +59,13 @@ function makeService(dataRoot: string, crypto: SecretCrypto = makeCrypto()): Set
   return new SettingsService({ dataRoot, crypto, reloadEnv });
 }
 
+async function atomicJsonWriter(filePath: string, value: unknown): Promise<void> {
+  await mkdir(dirname(filePath), { recursive: true });
+  const tmp = `${filePath}.test-tmp`;
+  await writeFile(tmp, JSON.stringify(value, null, 2) + "\n", "utf8");
+  await rename(tmp, filePath);
+}
+
 describe("SettingsService", () => {
   beforeEach(() => {
     resetManagedEnv();
@@ -109,7 +116,9 @@ describe("SettingsService", () => {
 
     const persisted = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
     expect(persisted.agent.bashAlwaysAsk).toBe(true);
-    expect(persisted.defaultModelId).toBe("deepseek-v4-pro");
+    expect(persisted.version).toBe(2);
+    expect(persisted.defaultModelId).toBeUndefined();
+    expect(persisted.taskModels.defaultChatModel).toBe("deepseek:deepseek-v4-pro");
 
     const reopened = makeService(dataRoot);
     await reopened.load();
@@ -165,7 +174,7 @@ describe("SettingsService", () => {
     expect(persisted.agent.systemPromptPath).toBe(join(dataRoot, "prompts", "main-agent.md"));
   });
 
-  it("setProviderKey 加密落盘、标记 hasApiKey 并覆盖到 process.env", async () => {
+  it("setProviderKey 加密落盘、标记 hasApiKey 且不回写 LLM process.env", async () => {
     const dataRoot = await makeDataRoot();
     const svc = makeService(dataRoot);
     await svc.load();
@@ -175,7 +184,7 @@ describe("SettingsService", () => {
 
     expect(svc.get().providers.deepseek.hasApiKey).toBe(true);
     expect(svc.get().providers.kimi.hasApiKey).toBe(false);
-    expect(process.env.DEEPSEEK_API_KEY).toBe("sk-abc123");
+    expect(process.env.DEEPSEEK_API_KEY).toBeUndefined();
     expect(svc.getDecryptedKey("deepseek")).toBe("sk-abc123");
 
     const secrets = JSON.parse(await readFile(join(dataRoot, "secrets.json"), "utf8"));
@@ -192,7 +201,7 @@ describe("SettingsService", () => {
     await svc.load();
 
     await svc.setProviderKey("deepseek", "sk-ui");
-    expect(process.env.DEEPSEEK_API_KEY).toBe("sk-ui");
+    expect(process.env.DEEPSEEK_API_KEY).toBeUndefined();
 
     await svc.clearProviderKey("deepseek");
     expect(svc.getDecryptedKey("deepseek")).toBeUndefined();
@@ -239,7 +248,7 @@ describe("SettingsService", () => {
     expect(process.env.KAIROS_MODEL_ID).toBeUndefined();
 
     const persisted = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
-    expect(persisted.kairos).toEqual({ modelId: "deepseek-v4-pro", thinking: "off", enabledSkills: [] });
+    expect(persisted.kairos).toEqual({ modelId: "deepseek:deepseek-v4-pro", thinking: "off", enabledSkills: [] });
 
     const reset = await svc.update({ kairos: { modelId: null, thinking: "auto" } });
     expect(reset.kairos).toEqual({ modelId: null, thinking: "auto", enabledSkills: [] });
@@ -313,5 +322,189 @@ describe("SettingsService", () => {
     const persisted = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
     expect(persisted.plugins).toEqual({ repoRoot: null, fsWatch: { enabled: false } });
     expect(persisted.skills).toEqual({ disabled: [] });
+  });
+
+  it("干净安装直接生成完整 settings v2 与三家 provider", async () => {
+    const dataRoot = await makeDataRoot();
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    const view = svc.getV2();
+    expect(view.version).toBe(2);
+    expect(Object.keys(view.providers)).toEqual(["deepseek", "kimi", "openrouter"]);
+    expect(view.providers.openrouter).toMatchObject({
+      hasApiKey: false,
+      enabled: true,
+      baseUrl: null,
+      proxy: { enabled: false, url: null },
+      lastConnection: { status: "untested" },
+    });
+    expect(Object.keys(view.installedModels)).toHaveLength(4);
+
+    const persisted = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
+    expect(persisted.version).toBe(2);
+    expect(persisted.defaultModelId).toBeUndefined();
+    expect(persisted.agent.exploreModelId).toBeUndefined();
+  });
+
+  it("v1 迁移无损、生成一次性备份且重复加载 addedAt 稳定", async () => {
+    const dataRoot = await makeDataRoot();
+    const v1 = {
+      version: 1,
+      defaultModelId: "deepseek-v4-pro",
+      agent: {
+        systemPromptPath: join(dataRoot, "prompts", "main-agent.md"),
+        temperature: 0.6,
+        maxTokens: 4096,
+        disabledTools: ["bash"],
+        bashAlwaysAsk: true,
+        exploreModelId: "kimi-k2.6",
+      },
+      kairos: { modelId: "kimi-k2.7-code", thinking: "on", enabledSkills: ["fs-watch"] },
+      plugins: { repoRoot: "/tmp/plugins", fsWatch: { enabled: true } },
+      skills: { disabled: ["demo"] },
+    };
+    const rawV1 = JSON.stringify(v1, null, 2);
+    await writeFile(join(dataRoot, "settings.json"), rawV1, "utf8");
+    await writeFile(join(dataRoot, "secrets.json"), JSON.stringify({
+      version: 1,
+      deepseek: Buffer.from("enc:sk-ds", "utf8").toString("base64"),
+    }), "utf8");
+
+    const first = makeService(dataRoot);
+    await first.load();
+    const migrated = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
+    const firstAddedAt = migrated.installedModels["deepseek:deepseek-v4-pro"].addedAt;
+
+    expect(migrated.version).toBe(2);
+    expect(migrated.taskModels).toEqual({
+      defaultChatModel: "deepseek:deepseek-v4-pro",
+      utilityModel: "deepseek:deepseek-v4-flash",
+      exploreModel: "kimi:kimi-k2.6",
+    });
+    expect(migrated.kairos.modelId).toBe("kimi:kimi-k2.7-code");
+    expect(migrated.agent.exploreModelId).toBeUndefined();
+    expect(migrated.plugins).toEqual(v1.plugins);
+    expect(migrated.skills).toEqual(v1.skills);
+    expect(await readFile(join(dataRoot, "settings.v1.backup.json"), "utf8")).toBe(rawV1);
+
+    const second = makeService(dataRoot);
+    await second.load();
+    const reloaded = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
+    expect(reloaded.installedModels["deepseek:deepseek-v4-pro"].addedAt).toBe(firstAddedAt);
+    expect(await readFile(join(dataRoot, "settings.v1.backup.json"), "utf8")).toBe(rawV1);
+  });
+
+  it.each([
+    ["坏 JSON", "{broken"],
+    ["未知版本", JSON.stringify({ version: 99, marker: "keep" })],
+    ["不完整 v2", JSON.stringify({ version: 2, agent: { bashAlwaysAsk: true } })],
+  ])("%s 使用安全默认内存配置且不覆盖原文件", async (_label, raw) => {
+    const dataRoot = await makeDataRoot();
+    await writeFile(join(dataRoot, "settings.json"), raw, "utf8");
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    expect(svc.get().version).toBe(2);
+    expect(svc.getLastLoadError()).toBeTruthy();
+    expect(await readFile(join(dataRoot, "settings.json"), "utf8")).toBe(raw);
+  });
+
+  it("忽略原子写遗留的半截临时文件并继续读取完整 settings.json", async () => {
+    const dataRoot = await makeDataRoot();
+    const first = makeService(dataRoot);
+    await first.load();
+    await first.updateV2({ taskModels: { utilityModel: "deepseek:deepseek-v4-flash" } });
+    const stableRaw = await readFile(join(dataRoot, "settings.json"), "utf8");
+    await writeFile(join(dataRoot, "settings.json.tmp"), "{\"version\":2,\"providers\":", "utf8");
+
+    const second = makeService(dataRoot);
+    await second.load();
+
+    expect(second.getLastLoadError()).toBeUndefined();
+    expect(second.getV2().taskModels.utilityModel).toBe("deepseek:deepseek-v4-flash");
+    expect(await readFile(join(dataRoot, "settings.json"), "utf8")).toBe(stableRaw);
+  });
+
+  it("OpenRouter key 只加密落 secrets，runtime 可解密且 renderer view 不含明文", async () => {
+    const dataRoot = await makeDataRoot();
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    await svc.updateProviderConnection({
+      provider: "openrouter",
+      apiKey: "test-openrouter-key",
+      baseUrl: "https://openrouter.ai/api/v1/",
+      proxy: { enabled: true, url: "http://127.0.0.1:7890" },
+    });
+
+    const view = svc.getV2();
+    expect(view.providers.openrouter.hasApiKey).toBe(true);
+    expect(view.providers.openrouter.proxy?.url).toBe("http://127.0.0.1:••••");
+    expect(JSON.stringify(view)).not.toContain("test-openrouter-key");
+    const runtime = svc.getProviderRuntimeConfig("openrouter");
+    expect("code" in runtime).toBe(false);
+    if (!("code" in runtime)) {
+      expect(runtime.apiKey).toBe("test-openrouter-key");
+      expect(runtime.transport?.proxyUrl).toBe("http://127.0.0.1:7890/");
+    }
+
+    const settingsRaw = await readFile(join(dataRoot, "settings.json"), "utf8");
+    const secretsRaw = await readFile(join(dataRoot, "secrets.json"), "utf8");
+    expect(settingsRaw).not.toContain("test-openrouter-key");
+    expect(secretsRaw).not.toContain("test-openrouter-key");
+    expect(Buffer.from(JSON.parse(secretsRaw).openrouter, "base64").toString("utf8")).toBe("enc:test-openrouter-key");
+  });
+
+  it("修改连接参数会重置状态，断开 key 不删除模型", async () => {
+    const dataRoot = await makeDataRoot();
+    const svc = makeService(dataRoot);
+    await svc.load();
+    await svc.updateProviderConnection({ provider: "openrouter", apiKey: "sk-or" });
+    await svc.markProviderConnectionResult("openrouter", {
+      ok: true,
+      message: "连接成功。",
+      checkedAt: "2026-07-24T10:00:00.000Z",
+    });
+    expect(svc.getV2().providers.openrouter.lastConnection?.status).toBe("available");
+
+    const beforeModels = svc.getV2().installedModels;
+    await svc.updateProviderConnection({ provider: "openrouter", baseUrl: "https://example.com/v1" });
+    expect(svc.getV2().providers.openrouter.lastConnection?.status).toBe("untested");
+    await svc.updateProviderConnection({ provider: "openrouter", apiKey: null });
+    expect(svc.getV2().providers.openrouter.hasApiKey).toBe(false);
+    expect(svc.getV2().installedModels).toEqual(beforeModels);
+  });
+
+  it("provider 更新串行化，最终状态按调用顺序确定", async () => {
+    const svc = makeService(await makeDataRoot());
+    await svc.load();
+    const first = svc.updateProviderConnection({ provider: "openrouter", baseUrl: "https://first.example/v1" });
+    const second = svc.updateProviderConnection({ provider: "openrouter", baseUrl: "https://second.example/v1" });
+    await Promise.all([first, second]);
+    expect(svc.getV2().providers.openrouter.baseUrl).toBe("https://second.example/v1");
+  });
+
+  it("写入失败时回滚内存且不返回成功状态", async () => {
+    const dataRoot = await makeDataRoot();
+    let failWrites = false;
+    const svc = new SettingsService({
+      dataRoot,
+      crypto: makeCrypto(),
+      reloadEnv,
+      writeJson: async (filePath, value) => {
+        if (failWrites) throw new Error("disk full");
+        await atomicJsonWriter(filePath, value);
+      },
+    });
+    await svc.load();
+    const before = svc.getV2().providers.openrouter;
+    failWrites = true;
+
+    await expect(svc.updateProviderConnection({
+      provider: "openrouter",
+      baseUrl: "https://should-not-stick.example/v1",
+    })).rejects.toThrow("写入失败");
+    expect(svc.getV2().providers.openrouter).toEqual(before);
   });
 });

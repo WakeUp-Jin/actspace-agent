@@ -3,7 +3,7 @@
  *
  * 通知由 `notify_user` 工具产生（见 kairos/tools/notify.ts），是「强调版的最终回复」：
  * 带未读状态，用户点击已读后从 UI 消失。设计详见
- * docs/design-docs/agent-kairos-notifications.md。
+ * docs/design-docs/kairos/agent-kairos-notifications.md。
  *
  * 为什么独立成 `memory/notifications.json` 而不进事件流：
  * `read` 是会被用户修改的可变状态，与 append-only 的 short-term / ring buffer 语义冲突；

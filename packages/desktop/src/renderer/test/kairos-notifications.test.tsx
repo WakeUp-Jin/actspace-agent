@@ -1,7 +1,7 @@
 /**
  * Kairos 通知列表（KairosNotificationList + tab 徽标）行为测试：
  * 列表渲染 / 点击已读 + 行内展开 / 全部已读 / push 徽标更新。
- * 设计见 docs/design-docs/agent-kairos-notifications.md。
+ * 设计见 docs/design-docs/kairos/agent-kairos-notifications.md。
  */
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

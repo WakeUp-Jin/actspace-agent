@@ -21,8 +21,8 @@
 ## 背景
 
 - 必读文档：
-  - `docs/design-docs/agent-kairos-prompt-cache-optimization.md`（本计划的设计事实来源）
-  - `docs/design-docs/agent-kairos-autonomous-mode.md`
+  - `docs/design-docs/kairos/agent-kairos-prompt-cache-optimization.md`（本计划的设计事实来源）
+  - `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
   - `docs/learnings/2026-06/event-replay-must-preserve-block-order.md`（重放保真原则）
 - 相关代码路径：
   - `packages/agent-core/src/kairos/prompt.ts`、`prompt-assembler.ts`、`runner.ts`、`controller.ts`
@@ -92,7 +92,7 @@
 
 12. `packages/shared/src/kairos-aggregator.ts`：`aggregateKairosEvents` 把 `thinking` 事件折叠为 `kind: "thinking"` 行，summary 取内容首行截断 80 字符。
 13. `packages/desktop/src/renderer/state/kairosSelectors.ts`：`kairosKindLabel` 增加 thinking 文案（「思考」）。
-14. `packages/desktop/src/renderer/components/right-panel/KairosRightPanelView.tsx` 与 Kairos 事件表：thinking 行弱化展示（沿用 `text-text-faint` 等主题 token，禁止字面量颜色，遵守 `docs/design-docs/front-主题与配色规范.md`）；点击行右侧详情可见全文。
+14. `packages/desktop/src/renderer/components/right-panel/KairosRightPanelView.tsx` 与 Kairos 事件表：thinking 行弱化展示（沿用 `text-text-faint` 等主题 token，禁止字面量颜色，遵守 `docs/design-docs/frontend/front-主题与配色规范.md`）；点击行右侧详情可见全文。
     - 验证：`pnpm --filter @actspace/desktop test` 通过；按 `docs/FRONTEND_VERIFICATION.md` 浅/深双主题各截图一次。
 
 ### M6 端到端验证与收尾
@@ -101,7 +101,7 @@
     - 脚本聚合 `<kairosRoot>/memory/short-term/*.jsonl` 的 `llm_usage`，确认跨 tick 第 1 次调用不再出现 `hit=640` 模式，命中率 ≥85%；
     - 前端 Kairos 面板可见 thinking 行；
     - 切换 Kimi 模型确认 contextWindow 日志为 256K。
-16. 文档同步：更新 `docs/design-docs/agent-kairos-autonomous-mode.md` 的 prompt 结构描述；按 `docs/HISTORY_GUIDE.md` 写 history；本 plan 移入 `docs/exec-plans/completed/`。
+16. 文档同步：更新 `docs/design-docs/kairos/agent-kairos-autonomous-mode.md` 的 prompt 结构描述；按 `docs/HISTORY_GUIDE.md` 写 history；本 plan 移入 `docs/exec-plans/completed/`。
 
 ## 验证方式
 

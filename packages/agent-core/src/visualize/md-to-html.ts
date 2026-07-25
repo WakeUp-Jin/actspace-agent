@@ -1,7 +1,7 @@
 /**
  * 消息可视化转换：把一段回复 Markdown 用主模型转成一份自包含 HTML 文档。
  *
- * 见 `docs/design-docs/front-右侧面板与文件渲染规范.md`。约束：
+ * 见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`。约束：
  * - 复用 `buildAgentConfig` 解析主模型与 apiKey（与正常 turn 同一套 env 来源）。
  * - 单次 `llm.complete`，不进入 agent loop、不带工具。
  * - 产物是「半可信」HTML，由 renderer 侧 sandbox iframe 渲染（不在这里做安全清洗）。

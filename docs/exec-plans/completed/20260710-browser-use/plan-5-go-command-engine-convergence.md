@@ -69,13 +69,13 @@
 
 ### 相关设计文档
 
-- `docs/design-docs/agent-browser-bridge-design.md`
-- `docs/design-docs/agent-browser-use-integration-design.md`
-- `docs/design-docs/agent-browser-use-command-surface.md`
-- `docs/design-docs/agent-browser-use-command-implementation.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-权限设计规则和原则.md`
-- `docs/design-docs/agent-testing.md`
+- `docs/design-docs/browser/agent-browser-bridge-design.md`
+- `docs/design-docs/browser/agent-browser-use-integration-design.md`
+- `docs/design-docs/browser/agent-browser-use-command-surface.md`
+- `docs/design-docs/browser/agent-browser-use-command-implementation.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
 
@@ -503,7 +503,7 @@ extension_unavailable
 
 允许修改：
 
-- `docs/design-docs/agent-browser-use-index.md`（新增）
+- `docs/design-docs/browser/agent-browser-use-index.md`（新增）
 - `docs/design-docs/index.md`
 - `docs/ARCHITECTURE.md`
 - 四份 Browser Use 设计文档

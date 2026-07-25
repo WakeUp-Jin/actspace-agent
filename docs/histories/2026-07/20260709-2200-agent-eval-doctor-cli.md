@@ -18,7 +18,7 @@
   - 输出结构化 doctor report。
   - doctor 检查失败时 CLI 以非零退出码结束，但仍打印结构化结果。
 - ActSpace 文档：
-  - 更新 `docs/design-docs/agent-evaluation.md`，将 doctor 作为真实 Docker/live Agent 前的环境预检。
+  - 更新 `docs/design-docs/evaluation/agent-evaluation.md`，将 doctor 作为真实 Docker/live Agent 前的环境预检。
   - 更新执行计划，记录当前本机 `doctor` 结果：dataset、ActSpace CLI dist、Docker CLI 通过，Docker daemon 未连接。
 - 外部 eval 文档：
   - 更新 README 和架构文档，说明 doctor 命令和检查项。

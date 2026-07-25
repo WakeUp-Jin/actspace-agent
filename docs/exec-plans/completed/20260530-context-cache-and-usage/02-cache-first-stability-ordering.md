@@ -11,7 +11,7 @@
 - `packages/agent-core/src/context/types.ts`：给 `PromptSegment` 加 `stability`，给 `SystemPart` 加可选 `stability`，新增稳定性档位常量。
 - `packages/agent-core/src/context/modules/system-prompt.ts`：segment 排序键改为「stability desc → priority desc → id asc」。
 - `packages/agent-core/src/context/manager.ts`：`buildSystemPrompt` 收集各模块 SystemPart 后按 `stability` 降序排列再渲染。
-- 文档：在 `docs/design-docs/agent-token-usage-and-context-state.md` 的「DeepSeek Cache 设计影响」小节补充 stability 分层与三区域（不变前缀 / 只追加历史 / 临时不入前缀）落地说明。
+- 文档：在 `docs/design-docs/model-context/agent-token-usage-and-context-state.md` 的「DeepSeek Cache 设计影响」小节补充 stability 分层与三区域（不变前缀 / 只追加历史 / 临时不入前缀）落地说明。
 
 不包含：
 
@@ -109,7 +109,7 @@ export type CacheStability = (typeof CACHE_STABILITY)[keyof typeof CACHE_STABILI
 
 ### Step 5: 文档同步
 
-- 在 `docs/design-docs/agent-token-usage-and-context-state.md`「DeepSeek Cache 设计影响」小节补：
+- 在 `docs/design-docs/model-context/agent-token-usage-and-context-state.md`「DeepSeek Cache 设计影响」小节补：
   - `CACHE_STABILITY` 档位含义与默认取值。
   - 三区域映射：系统提示词（按 stability 降序的不变前缀）/ 会话历史（append-only volatile tail）/ thinking 临时内容不回放进请求前缀。
   - 明确「会话历史不可重排」的硬约束与原因。

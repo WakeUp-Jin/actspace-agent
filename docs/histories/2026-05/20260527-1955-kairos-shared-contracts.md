@@ -22,7 +22,7 @@
 - **session-selectors 跳过新事件**：`createMessageBlocks` 的 switch 新增 4 个 Kairos type 的"跳过"分支，避免穷尽性错误，同时锁定"Kairos 事件不进主 Agent 消息流"语义。
 - **shared 包补 vitest 测试基础设施**：新增 `vitest.config.ts`、`package.json` 加 `vitest ^3.2.4` 与 test 脚本、tsconfig 加 `exclude: ["src/**/test"]`。
 - **新增 fixtures + 单测**：`src/test/fixtures/kairos-events.ts` 提供 8 个事件工厂 + 3 个场景；`src/test/kairos-aggregator.test.ts` 覆盖 11 条用例（空输入、tool 配对、sleep 中断、tick 父行、error 推 failed、多 tick 隔离、乱序自排序等）。
-- **更新设计文档状态**：`docs/design-docs/agent-kairos-autonomous-mode.md` 顶部状态从 Draft 改为"实施中"，增加 plan 完成清单。
+- **更新设计文档状态**：`docs/design-docs/kairos/agent-kairos-autonomous-mode.md` 顶部状态从 Draft 改为"实施中"，增加 plan 完成清单。
 
 ### 🧠 Design Intent (Why)
 
@@ -46,7 +46,7 @@ aggregator 放在 shared 而不是 renderer 是因为 main 端未来也会拿它
 - `packages/shared/package.json`（加 vitest + test 脚本）
 - `packages/shared/tsconfig.json`（加 exclude test）
 - `packages/shared/vitest.config.ts`（新增）
-- `docs/design-docs/agent-kairos-autonomous-mode.md`（状态徽章 + plan 完成清单）
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`（状态徽章 + plan 完成清单）
 
 ### ✅ 验证结果
 

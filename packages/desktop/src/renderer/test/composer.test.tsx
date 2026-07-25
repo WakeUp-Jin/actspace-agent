@@ -98,7 +98,7 @@ describe("Composer follow-up bar", () => {
     expect(panel).toContainElement(input);
     expect(toolbar).not.toContainElement(input);
     expect(toolbarButtons[0]).toHaveAccessibleName("Add agents, context, tools");
-    expect(toolbarButtons[1]).toHaveAccessibleName(/deepseek-v4-pro/);
+    expect(toolbarButtons[1]).toHaveAccessibleName(/DeepSeek V4 Pro/i);
     expect(within(panel).queryByRole("button", { name: "Show context usage" })).not.toBeInTheDocument();
     expect(panel).not.toContainElement(screen.queryByRole("button", { name: /Review pending changes/ }));
     expect(input).toHaveValue("");
@@ -349,12 +349,12 @@ describe("Composer follow-up bar", () => {
     await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
     expect(screen.getByRole("menu", { name: "Add agents, context, tools" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /deepseek-v4-pro/ }));
+    await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
     expect(screen.queryByRole("menu", { name: "Add agents, context, tools" })).not.toBeInTheDocument();
-    expect(screen.getByText("deepseek-v4-flash")).toBeInTheDocument();
+    expect(screen.getByText("DeepSeek V4 Flash")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Context usage 36%" }));
-    expect(screen.queryByText("deepseek-v4-flash")).not.toBeInTheDocument();
+    expect(screen.queryByText("DeepSeek V4 Flash")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Context usage" })).toBeInTheDocument();
   });
 
@@ -362,21 +362,21 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     renderComposer();
 
-    await user.click(screen.getByRole("button", { name: /deepseek-v4-pro/ }));
-    await user.hover(screen.getByText("deepseek-v4-flash"));
+    await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
+    await user.hover(screen.getByText("DeepSeek V4 Flash"));
     await user.click(screen.getByRole("button", { name: "Edit deepseek-v4-flash options" }));
 
     expect(screen.getByLabelText("deepseek-v4-flash Thinking")).toBeInTheDocument();
     const toolbar = screen.getByLabelText("Composer toolbar");
-    expect(toolbar.querySelector(".model-button")).toHaveTextContent("deepseek-v4-pro");
+    expect(toolbar.querySelector(".model-button")).toHaveTextContent("DeepSeek V4 Pro");
   });
 
   it("toggles the Thinking option and reflects it in the track visual", async () => {
     const user = userEvent.setup();
     renderComposer();
 
-    await user.click(screen.getByRole("button", { name: /deepseek-v4-pro/ }));
-    await user.hover(screen.getByText("deepseek-v4-flash"));
+    await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
+    await user.hover(screen.getByText("DeepSeek V4 Flash"));
     await user.click(screen.getByRole("button", { name: "Edit deepseek-v4-flash options" }));
 
     const toggle = screen.getByLabelText("deepseek-v4-flash Thinking") as HTMLInputElement;
@@ -433,7 +433,7 @@ describe("Composer follow-up bar", () => {
     expect(panel).toContainElement(input);
     expect(toolbar).not.toContainElement(input);
     expect(toolbarButtons[0]).toHaveAccessibleName("Add agents, context, tools");
-    expect(toolbarButtons[1]).toHaveAccessibleName(/deepseek-v4-pro/);
+    expect(toolbarButtons[1]).toHaveAccessibleName(/DeepSeek V4 Pro/i);
     expect(within(panel).queryByRole("button", { name: "Show context usage" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Select workspace" }));

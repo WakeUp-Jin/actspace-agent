@@ -11,7 +11,7 @@ bash 输出管道的回填文本达到设计文档「输出永远有界 + 全量
 
 ## 背景
 
-- 相关文档：`docs/design-docs/agent-bash工具设计文档.md`「工具契约」「模型引导」节。
+- 相关文档：`docs/design-docs/execution-safety/agent-bash工具设计文档.md`「工具契约」「模型引导」节。
 - 相关代码路径：
   - `packages/agent-core/src/tools/tools/bash/executor.ts`（错误分支在 73–105 行）
   - `packages/agent-core/src/tools/tools/bash/render-result.ts`

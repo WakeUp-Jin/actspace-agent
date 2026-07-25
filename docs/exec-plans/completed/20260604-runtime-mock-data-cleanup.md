@@ -27,9 +27,9 @@
   - `docs/design-docs/core-beliefs.md`
   - `docs/PLANS_GUIDE.md`
   - `docs/FRONTEND_VERIFICATION.md`
-  - `docs/design-docs/lab-implementation-progress.md`
-  - `docs/design-docs/lab-frontend-page-design.md`
-  - `docs/design-docs/agent-testing.md`
+  - `docs/design-docs/lab/lab-implementation-progress.md`
+  - `docs/design-docs/lab/lab-frontend-page-design.md`
+  - `docs/design-docs/agent-runtime/agent-testing.md`
 - 相关代码路径：
   - `packages/desktop/src/renderer/App.tsx`
   - `packages/desktop/src/renderer/components/Composer.tsx`
@@ -85,7 +85,7 @@
    - agent-core 的 `MockLLMService` 和 fixtures 保持不变，必要时只补注释说明测试边界。
 5. 文档同步与验证收尾。
    - 更新 `docs/FRONTEND_VERIFICATION.md` 中“浏览器 mock 验证”的措辞和边界。
-   - 更新 `docs/design-docs/lab-implementation-progress.md` 和 `docs/design-docs/lab-frontend-page-design.md`，说明 renderer mock 初始数据已移除、Lab 后端仍未实现。
+   - 更新 `docs/design-docs/lab/lab-implementation-progress.md` 和 `docs/design-docs/lab/lab-frontend-page-design.md`，说明 renderer mock 初始数据已移除、Lab 后端仍未实现。
    - 更新 `docs/QUALITY_SCORE.md` 中 mock provider 相关描述，避免把测试能力写成产品运行能力。
    - 按 `docs/HISTORY_GUIDE.md` 写入 `docs/histories/2026-06/`。
 
@@ -176,7 +176,7 @@
 - 修改目标：
   - `packages/agent-core/src/llm/services/mock.ts`
   - `packages/agent-core/src/fixtures.ts`
-  - `docs/design-docs/agent-testing.md`
+  - `docs/design-docs/agent-runtime/agent-testing.md`
 - 具体动作：
   - 保留 `MockLLMService` 和 agent-core fixtures。
   - 如有必要，补一行注释或文档说明：这些 mock 是测试设施，不是普通产品运行时假数据。
@@ -188,8 +188,8 @@
 
 - 修改目标：
   - `docs/FRONTEND_VERIFICATION.md`
-  - `docs/design-docs/lab-implementation-progress.md`
-  - `docs/design-docs/lab-frontend-page-design.md`
+  - `docs/design-docs/lab/lab-implementation-progress.md`
+  - `docs/design-docs/lab/lab-frontend-page-design.md`
   - `docs/QUALITY_SCORE.md`
   - `docs/histories/2026-06/<timestamp>-runtime-mock-data-cleanup.md`
 - 具体动作：

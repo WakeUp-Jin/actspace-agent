@@ -53,9 +53,9 @@ SubAgent run 会产生大量只对局部探索有价值的 user/tool/assistant/u
 - `packages/desktop/src/preload/index.ts`
 - `packages/desktop/src/renderer/components/messages/AgentRunBlock.tsx`
 - `packages/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx`
-- `docs/design-docs/agent-subagent-runtime.md`
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/collaboration/agent-subagent-runtime.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/exec-plans/completed/20260602-agent-tool-subagent-runtime.md`
 - `docs/learnings/2026-06/sidecar-transcript-for-subagents.md`

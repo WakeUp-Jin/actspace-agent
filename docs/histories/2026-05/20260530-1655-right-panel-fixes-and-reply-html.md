@@ -48,7 +48,7 @@
 - `packages/desktop/src/renderer/components/RightPanel.tsx`、`WindowChromeBar.tsx`、`WorkbenchLayout.tsx`、`ContextPopup.tsx`、`ConversationView.tsx`
 - `packages/desktop/src/renderer/components/right-panel/ReplyHtmlRenderView.tsx`（新）、`RightPanelObjectMenu.tsx`（新）、`RightPanelContext.tsx`、`ContextRenderView.tsx`
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`、`test/context-popup.test.tsx`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`、`front-右侧面板与文件渲染规范.md`、`front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`、`front-右侧面板与文件渲染规范.md`、`front-右侧面板与文件渲染规范.md`
 - `docs/exec-plans/active/20260527-right-panel-views.md`
 
 ---

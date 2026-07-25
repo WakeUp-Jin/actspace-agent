@@ -4,14 +4,14 @@
 
 ## 当前状态
 
-- 状态：已上线（2026-07-03）。插件仓库侧：`actspace-plugins` 内 fs-watch v0 已实现（`plugins/fs-watch/`，一插件一自包含文件夹布局，含 PID 探活的单实例锁）。actspace 集成侧已实施：main 进程 `FsWatchService`（spawn / 守护 / 孤儿接管 / 优雅退出）、设置页「插件」（安装与编译）+「文件监听」（开关与监听目录）两个分区、Kairos Skill catalog 接入。同日两项联动变更：Kairos 旧 poll-on-tick 巡检管道退役（目录变化感知归口本插件）；fs-watch 监听目录自动并入 Kairos 的只读授权 `readOnlyRoots`（详见 `agent-kairos-autonomous-mode.md`）。v1 曾命名为 Sidecar 并计划源码进仓，v2 定名 **Plugins** 且插件源码外置到独立仓库 `actspace-plugins`。
+- 状态：已上线（2026-07-03）。插件仓库侧：`actspace-plugins` 内 fs-watch v0 已实现（`plugins/fs-watch/`，一插件一自包含文件夹布局，含 PID 探活的单实例锁）。actspace 集成侧已实施：main 进程 `FsWatchService`（spawn / 守护 / 孤儿接管 / 优雅退出）、设置页「插件」（安装与编译）+「文件监听」（开关与监听目录）两个分区、Kairos Skill catalog 接入。同日两项联动变更：Kairos 旧 poll-on-tick 巡检管道退役（目录变化感知归口本插件）；fs-watch 监听目录自动并入 Kairos 的只读授权 `readOnlyRoots`（详见 `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`）。v1 曾命名为 Sidecar 并计划源码进仓，v2 定名 **Plugins** 且插件源码外置到独立仓库 `actspace-plugins`。
 - 适用范围：
   - `actspace-plugins` 独立仓库（side-project 下新建）：Rust 插件源码、Skill 模板、构建发布。
   - actspace 仓库：`packages/shared`（settings 契约）、`packages/desktop`（main 进程管理 + 设置页）、`packages/agent-core`（Kairos Skill catalog）。
 - 关联文档：
-  - `agent-kairos-autonomous-mode.md`：Kairos 自治模式的事实来源。其 v1 poll-on-tick 巡检（watch-scanner + watch-diff）已于 2026-07-03 退役，目录变化感知统一由本插件承担。
-  - `agent-skill-loading.md`：Skill 目录结构、发现路径和渐进式披露规范，fs-watch 的 Skill 形态完全遵守它。
-  - `agent-browser-bridge-design.md`：另一个外部辅助程序先例（Go CLI），语言选型讨论以它为参照。
+  - `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`：Kairos 自治模式的事实来源。其 v1 poll-on-tick 巡检（watch-scanner + watch-diff）已于 2026-07-03 退役，目录变化感知统一由本插件承担。
+  - `docs/design-docs/tool-system/agent-skill-loading.md`：Skill 目录结构、发现路径和渐进式披露规范，fs-watch 的 Skill 形态完全遵守它。
+  - `docs/design-docs/browser/agent-browser-bridge-design.md`：另一个外部辅助程序先例（Go CLI），语言选型讨论以它为参照。
 
 ## 背景与动机
 
@@ -37,7 +37,7 @@ Kairos v1 的巡检刻意不用 `fs.watch`，走「轮询快照 + 集合差集�
 - 术语纪律：仓库文档中**浏览器侧统一称「浏览器扩展（extension）」**，「插件」专指本文档定义的外部二进制辅助工具，避免撞名。
 - 曾评估并排除的候选：
   - Sidecar（伴生工具）：语义最准确，但对普通用户过于工程化，v2 弃用。
-  - 桥梁（Bridge）：已被 `agent-browser-bridge-design.md` 的 Go browser bridge 占用，且 bridge 语义是"连接两端的通道"，插件是"持续生产数据的独立进程"。
+  - 桥梁（Bridge）：已被 `docs/design-docs/browser/agent-browser-bridge-design.md` 的 Go browser bridge 占用，且 bridge 语义是"连接两端的通道"，插件是"持续生产数据的独立进程"。
 
 术语约定：
 
@@ -205,13 +205,13 @@ fs-watch --version
 Skill 模板放在插件仓库 `plugins/fs-watch/skill/`（构建后 `scripts/` 内含二进制，整个文件夹是完整分发单元），由 actspace 在启用插件时**物化**到用户级 Skill 目录 `<userData>/skills/fs-watch/`。选这里而不是项目 `.agents/skills/` 的原因：
 
 - `references/` 是运行时持续写入的数据，放进任何 git 仓库都会污染状态。
-- `<userData>/skills/` 已经在 `agent-skill-loading.md` 的扫描路径里（user scope 优先级 4），主 Agent 零改动即可发现。
+- `<userData>/skills/` 已经在 `docs/design-docs/tool-system/agent-skill-loading.md` 的扫描路径里（user scope 优先级 4），主 Agent 零改动即可发现。
 
 给 actspace 之外的 Agent 使用时，把构建后的 Skill 目录整体复制到 `~/.agents/skills/fs-watch/`（二进制已在 `scripts/fs-watch`），按 SKILL.md 指引启动。
 
 ### SKILL.md 要点
 
-frontmatter 遵守 `agent-skill-loading.md` 规范。因为 Kairos 消费只走 Skill 读取（没有 controller 强制注入增量），description 要写得 **pushy**——明确自述"这是持续更新的数据源，每次唤醒 / 开始工作都应先扫一眼当天日志新增事件"，而不是被动等任务匹配。正文必须覆盖：
+frontmatter 遵守 `docs/design-docs/tool-system/agent-skill-loading.md` 规范。因为 Kairos 消费只走 Skill 读取（没有 controller 强制注入增量），description 要写得 **pushy**——明确自述"这是持续更新的数据源，每次唤醒 / 开始工作都应先扫一眼当天日志新增事件"，而不是被动等任务匹配。正文必须覆盖：
 
 1. **是什么**：fs-watch 插件的输出目录，记录被监听目录的文件变化事件。
 2. **使用时机**：每次唤醒先扫当天日志，对比上次读到的最后一条 `ts` 只看新增；无新增或心跳过期就收手，不反复精读历史。
@@ -274,7 +274,7 @@ fs-watch 在设置页拆成两个导航分区，按用户心智分工（用户�
 
 新增独立设置分组「Skills」，把散落在文件系统里的 Skill 生态可视化。与前两个分区分开的理由：Skill 是**能力知识**的管理，插件是**外部进程**的管理，混在一起概念会糊。
 
-- **列表**：展示所有扫描到的 Skill（项目级 + 用户级，即 `agent-skill-loading.md` 的 7 个扫描根），每张卡片显示 name、description、scope / source、路径、是否被同名覆盖（shadowed）、warning 状态。
+- **列表**：展示所有扫描到的 Skill（项目级 + 用户级，即 `docs/design-docs/tool-system/agent-skill-loading.md` 的 7 个扫描根），每张卡片显示 name、description、scope / source、路径、是否被同名覆盖（shadowed）、warning 状态。
 - **两个维度的开关**（故意不对称）：
   - **主 Agent**：黑名单 `skills.disabled: string[]`，默认全开。理由：主 Agent 交互式，catalog 只注入元信息成本低，默认全开符合现状。
   - **Kairos**：白名单 `kairos.enabledSkills: string[]`，默认全关。理由：后台自治 Agent 上下文预算紧、行为要可预期，不应默认继承整个 Skill 生态。
@@ -308,7 +308,7 @@ export interface SkillsSettings {
 
 - fs-watch 只读文件系统**元数据**（路径、类型、事件），不读文件内容，不联网，输出目录固定为 config 指定的 `outDir`。
 - 事件 JSONL 里的路径可能包含敏感文件名；references/ 位于 `<userData>`，不进仓库、不上传。Kairos blocklist（如 `**/.env`）在 guard 层照常生效：插件会记录 `.env` 变化的事件行，但 Kairos 想读该文件内容仍会被拒绝。
-- Skill 目录内容不会被 Agent 自动执行（遵守 `agent-skill-loading.md`：不自动执行 scripts）；插件进程只由 main 进程按设置开关 spawn。
+- Skill 目录内容不会被 Agent 自动执行（遵守 `docs/design-docs/tool-system/agent-skill-loading.md`：不自动执行 scripts）；插件进程只由 main 进程按设置开关 spawn。
 - 「选择二进制安装」是用户显式动作，等价于用户自己运行该程序；actspace 不校验二进制签名（v0 取舍，用户对自己选择的二进制负责）。
 - 供应链：插件仓库提交 `Cargo.lock`，构建走该仓库自己的 CI；actspace 侧遵循 `docs/SUPPLY_CHAIN_SECURITY.md` 的既有约定，不因插件降低标准。
 
@@ -335,10 +335,10 @@ export interface SkillsSettings {
 
 ## 与现有文档的关系
 
-- `agent-kairos-autonomous-mode.md` 中 watch 的 v2–v5 演进猜想（mtime 跟踪、事件 tick 等）由本设计接管；该文档的 watch 小节已标注退役并指向本文档（2026-07-03）。
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md` 中 watch 的 v2–v5 演进猜想（mtime 跟踪、事件 tick 等）由本设计接管；该文档的 watch 小节已标注退役并指向本文档（2026-07-03）。
 - 实施时 `<userData>/plugins/`、`<userData>/skills/fs-watch/` 的落盘布局需同步进 `core-storage-and-observability.md`。
-- 设置页新增「插件」「文件监听」「Skills」分组时同步 `front-设置页规范.md`。
-- `agent-current-module-map.md` 在实现完成后记录插件管理与 Kairos catalog 模块。
+- 设置页新增「插件」「文件监听」「Skills」分组时同步 `docs/design-docs/frontend/front-设置页规范.md`。
+- `docs/design-docs/agent-runtime/agent-current-module-map.md` 在实现完成后记录插件管理与 Kairos catalog 模块。
 
 ## 维护规则
 

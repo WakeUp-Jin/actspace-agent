@@ -38,5 +38,5 @@ Chrome 对 Native Messaging 使用扩展 ID 做 allowlist。未固定 key 的 un
 - `plugins/browser-bridge/apps/chrome-extension/manifest.json`
 - `plugins/browser-bridge/apps/cli/main.go`
 - `plugins/browser-bridge/apps/cli/main_test.go`
-- `docs/design-docs/agent-browser-use-integration-design.md`
+- `docs/design-docs/browser/agent-browser-use-integration-design.md`
 - `docs/RELIABILITY.md`

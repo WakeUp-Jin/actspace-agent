@@ -24,8 +24,8 @@
 
 相关文档：
 
-- `docs/design-docs/front-聊天输入框规范.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 - `docs/FRONTEND_VERIFICATION.md`
 
 相关代码路径：

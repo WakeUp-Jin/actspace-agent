@@ -2,7 +2,7 @@
 
 ## 背景
 
-在 actspace-agent 设计「上下文压缩」（`docs/design-docs/agent-context-compression.md`）时，针对 bash 工具的大输出处理收敛出一套明显更优的设计。回头看 `.agents/skills/llm-agent-dev` 对 bash 的指导，**输出处理这一块太粗糙**，会把使用者带进「内存被大输出吃光」的坑。本文件沉淀该设计，作为后续统一修复 skill 源文件的依据。
+在 actspace-agent 设计「上下文压缩」（`docs/design-docs/model-context/agent-context-compression.md`）时，针对 bash 工具的大输出处理收敛出一套明显更优的设计。回头看 `.agents/skills/llm-agent-dev` 对 bash 的指导，**输出处理这一块太粗糙**，会把使用者带进「内存被大输出吃光」的坑。本文件沉淀该设计，作为后续统一修复 skill 源文件的依据。
 
 当前 skill 已经讲清楚的部分（保留）：
 
@@ -22,7 +22,7 @@
 
 ## 参考设计（来自 actspace-agent）
 
-事实来源：`docs/design-docs/agent-context-compression.md` 的「预防层 A：bash 流式落盘」。
+事实来源：`docs/design-docs/model-context/agent-context-compression.md` 的「预防层 A：bash 流式落盘」。
 
 核心结论：**bash 输出大小不可控，不能在内存变量里累加全量字符串；把内存上限调大只是把问题推后，治标不治本。正确做法是边执行边流式写盘，内存只保留有界头部缓冲。**
 
@@ -116,4 +116,4 @@ Skill 源文件仓库：
 ## 决策记录
 
 - 2026-05-29：bash skill 修复**只先沉淀本修复文档**，实际 skill 源文件修补不在 actspace-agent 当前 active plan 内执行，沿用本目录既有约定（见 `README.md` / `fix-llm-agent-04-skill-rg-tools-fix.md` 决策记录），后续统一修复 skill 源码时按本文执行。
-- 2026-05-29：bash 输出处理定为「流式落盘 + 头部截断 + 文件指针」，不走 LLM 摘要；摘要只服务 web/generic 等重跑恢复型工具。原因见 `docs/design-docs/agent-context-compression.md`。
+- 2026-05-29：bash 输出处理定为「流式落盘 + 头部截断 + 文件指针」，不走 LLM 摘要；摘要只服务 web/generic 等重跑恢复型工具。原因见 `docs/design-docs/model-context/agent-context-compression.md`。

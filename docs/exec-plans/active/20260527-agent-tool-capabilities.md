@@ -17,11 +17,11 @@
 - `docs/SECURITY.md`
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-backend-design.md`
-- `docs/design-docs/agent-testing.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/agent-runtime/agent-backend-design.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`
 - `.agents/skills/llm-agent-dev/references/tools/overview.md`
 - `.agents/skills/llm-agent-dev/references/context/overview.md`
@@ -63,8 +63,8 @@
 - `packages/desktop/src/preload/index.ts`
 - `skills-lock.json`
 - `.agents/skills/**`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 
 ## 并行边界
 

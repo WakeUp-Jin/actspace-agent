@@ -37,6 +37,6 @@ Agent 工具的输出不是普通工具原文，而是 SubAgent runner 产出的
 - `packages/agent-core/src/tools/test/scheduler-output.test.ts`
 - `packages/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx`
 - `packages/desktop/src/renderer/test/agent-run-block.test.tsx`
-- `docs/design-docs/agent-subagent-runtime.md`
+- `docs/design-docs/collaboration/agent-subagent-runtime.md`
 - `docs/histories/2026-06/20260604-0234-agent-tool-contract-output.md`
 - `docs/learnings/2026-06/tool-output-contract-boundaries.md`

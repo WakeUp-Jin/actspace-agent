@@ -18,7 +18,7 @@
 
 - **新增并完成执行计划**：创建后归档 `docs/exec-plans/completed/20260602-kairos-agent-inbox.md`，定义两份 Markdown inbox、消息格式、读取规则、风险、实施结果和验证命令。
 - **登记 completed plan**：更新 `docs/exec-plans/README.md`，把新计划从 active 列表移到已完成 Kairos 计划列表。
-- **补充 Kairos 设计事实**：更新 `docs/design-docs/agent-kairos-autonomous-mode.md`，把 Agent 文件收件箱纳入 Kairos 输入分类、prompt 观测摘要、存储布局和边界约束。
+- **补充 Kairos 设计事实**：更新 `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`，把 Agent 文件收件箱纳入 Kairos 输入分类、prompt 观测摘要、存储布局和边界约束。
 - **收紧执行细节**：补充 V0 append-only 写入策略、默认不创建 `## Processed`、inbox prompt 预算、唯一写入入口和 Lab Runtime 通信边界，并同步 `core-storage-and-observability.md` / `lab-runtime-architecture.md`。
 - **实现 inbox V0**：新增 `packages/agent-core/src/kairos/inbox.ts`，提供默认文件创建、append-only 写入、最近消息截取和 prompt 摘要 loader；`kairos-bootstrap.ts` 启动时创建两份 inbox。
 - **接入 Kairos prompt**：`KairosRunner.processTick()` 与 `KairosController.getContextSnapshot()` 每次组装 prompt 时读取同一份 inbox summary；`prompt-assembler.ts` 将观测摘要分为 watch diff / sessions digest / inbox 三块独立预算，避免互相挤掉。
@@ -43,10 +43,10 @@ Kairos 是后台主动运行的 Agent，因此不需要让其它 Agent 与它实
 - `packages/desktop/src/main/test/kairos-bootstrap.test.ts`
 - `docs/exec-plans/completed/20260602-kairos-agent-inbox.md`
 - `docs/exec-plans/README.md`
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-kairos-autonomous-mode.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
 - `docs/design-docs/core-storage-and-observability.md`
-- `docs/design-docs/lab-runtime-architecture.md`
+- `docs/design-docs/lab/lab-runtime-architecture.md`
 - `docs/histories/2026-06/20260602-1151-kairos-agent-inbox-plan.md`
 
 ### Validation

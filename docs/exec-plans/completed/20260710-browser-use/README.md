@@ -3,9 +3,9 @@
 状态：Plan 0-pre 至 Plan 5、M0-M6 全部完成，已进入 completed 归档
 
 设计来源：
-- `docs/design-docs/agent-browser-use-integration-design.md`
-- `docs/design-docs/agent-browser-use-command-surface.md`
-- `docs/design-docs/agent-browser-bridge-design.md`
+- `docs/design-docs/browser/agent-browser-use-integration-design.md`
+- `docs/design-docs/browser/agent-browser-use-command-surface.md`
+- `docs/design-docs/browser/agent-browser-bridge-design.md`
 
 ## 目标
 
@@ -83,12 +83,12 @@ Plan 5 的 7 个设计闸门已于 2026-07-10 全部确认；M0-M6 已完成，6
 - `docs/REPO_COLLAB_GUIDE.md`
 - `docs/ARCHITECTURE.md`
 - `docs/design-docs/core-beliefs.md`
-- `docs/design-docs/agent-browser-use-integration-design.md`
-- `docs/design-docs/agent-browser-use-command-surface.md`
-- `docs/design-docs/agent-browser-bridge-design.md`
-- `docs/design-docs/agent-testing.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-权限设计规则和原则.md`
+- `docs/design-docs/browser/agent-browser-use-integration-design.md`
+- `docs/design-docs/browser/agent-browser-use-command-surface.md`
+- `docs/design-docs/browser/agent-browser-bridge-design.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
 - `docs/HISTORY_GUIDE.md`
 
 ## 共享契约

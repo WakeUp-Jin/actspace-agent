@@ -1,6 +1,6 @@
 # Bash 执行模型开发计划（总览）
 
-从 `docs/design-docs/agent-bash工具设计文档.md` 派生的实施计划组。目标：把 bash 工具从「同步执行 + 超时杀进程」升级为「输出有界 + 超时转后台 + 事件通知」的执行模型。
+从 `docs/design-docs/execution-safety/agent-bash工具设计文档.md` 派生的实施计划组。目标：把 bash 工具从「同步执行 + 超时杀进程」升级为「输出有界 + 超时转后台 + 事件通知」的执行模型。
 
 ## 计划拆分与依赖
 
@@ -16,7 +16,7 @@ E2 与 E3 合并为一份计划：两者触碰同一批文件（executor / run-p
 ## 必读文档（新会话 / 子 Agent 先读）
 
 1. `AGENTS.md`
-2. `docs/design-docs/agent-bash工具设计文档.md`（设计事实来源，所有语义问题以它为准）
+2. `docs/design-docs/execution-safety/agent-bash工具设计文档.md`（设计事实来源，所有语义问题以它为准）
 3. 本 README + 对应子计划
 
 ## 共享契约的唯一权威

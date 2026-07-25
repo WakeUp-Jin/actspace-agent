@@ -3,7 +3,7 @@
  *
  * 规则内容（哪些命令拒/问/放）集中在 ./command-rules.ts；本文件只做决策编排。
  *
- * 决策顺序（docs/design-docs/agent-bash工具设计文档.md「权限层与沙盒的关系」）：
+ * 决策顺序（docs/design-docs/execution-safety/agent-bash工具设计文档.md「权限层与沙盒的关系」）：
  *
  * ```txt
  * 归一化（command / cwd 边界 / blockMs）
@@ -46,6 +46,7 @@ interface NormalizedBashArgs {
   command: string;
   cwd: string;
   blockMs: number;
+  intent: string;
 }
 
 const SIMPLE_SEGMENT_SPLIT_RE = /\s*(?:&&|;)\s*/;
@@ -104,12 +105,12 @@ export async function bashCheckPermissions(
     return deny(requiredPermissions, normalized.command);
   }
 
-  // intent / notifyOnOutput / requiredPermissions 是透传字段，不参与归一化：
-  // intent 供展示，notifyOnOutput 结构校验在 executor 层做，
+  // notifyOnOutput / requiredPermissions 是透传字段，不参与归一化：
+  // intent 已在 normalizeArgs 中校验为必填非空字符串，
+  // notifyOnOutput 结构校验在 executor 层做，
   // requiredPermissions 让 executor 知道「已获批真实环境」
   const sanitizedArgs = {
     ...normalized,
-    ...(typeof args.intent === "string" && args.intent.trim() ? { intent: args.intent.trim() } : {}),
     ...(args.notifyOnOutput !== undefined ? { notifyOnOutput: args.notifyOnOutput } : {}),
     ...(requiredPermissions.length > 0 ? { requiredPermissions } : {}),
   };
@@ -201,6 +202,11 @@ function normalizeArgs(
     return deny("command is required", command);
   }
 
+  const intent = typeof args.intent === "string" ? args.intent.trim() : "";
+  if (!intent) {
+    return deny("intent is required and must explain the Bash command", command);
+  }
+
   const cwdArg = typeof args.cwd === "string" && args.cwd.trim() ? args.cwd : workspaceRoot;
   const cwdGuard = guardWorkspacePath(cwdArg, workspaceRoot);
   if (!cwdGuard.ok) {
@@ -211,6 +217,7 @@ function normalizeArgs(
     command,
     cwd: cwdGuard.resolvedPath,
     blockMs: sanitizeBlockMs(args.blockMs),
+    intent,
   };
 }
 

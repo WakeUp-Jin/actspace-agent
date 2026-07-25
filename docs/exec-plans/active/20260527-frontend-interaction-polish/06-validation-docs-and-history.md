@@ -111,9 +111,9 @@
 
 按实际行为更新：
 
-- `docs/design-docs/front-聊天输入框规范.md`
-- `docs/design-docs/front-左侧会话栏规范.md`
-- `docs/design-docs/front-设置页规范.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`
+- `docs/design-docs/frontend/front-设置页规范.md`
 - `docs/FRONTEND_VERIFICATION.md`（仅当验证方式发生变化）
 - `docs/TODOLIST.md`
 - `docs/exec-plans/README.md`

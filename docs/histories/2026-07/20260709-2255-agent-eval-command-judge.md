@@ -26,6 +26,6 @@
 
 ### Files Modified
 
-- `docs/design-docs/agent-evaluation.md`
+- `docs/design-docs/evaluation/agent-evaluation.md`
 - `docs/exec-plans/active/20260708-agent-evaluation/README.md`
 - `docs/histories/2026-07/20260709-2255-agent-eval-command-judge.md`

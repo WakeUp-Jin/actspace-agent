@@ -33,10 +33,12 @@ export type { CompactContextDeps, CompactContextOptions } from "./compact-contex
 // Agent 配置构建与实例创建
 export {
   buildAgentConfig,
+  buildAgentConfigFromRuntime,
   createAgentFromConfig,
   createAgentForSession,
   createTitlerLLMService,
   buildLLMConfig,
+  buildLLMConfigFromRuntime,
   resolveAgentEnvConfig,
 } from "./create-agent-deps";
 export type {

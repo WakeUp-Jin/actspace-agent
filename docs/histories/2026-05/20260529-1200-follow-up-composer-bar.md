@@ -33,8 +33,8 @@
 
 - `packages/desktop/src/renderer/components/Composer.tsx`
 - `packages/desktop/src/renderer/test/composer.test.tsx`
-- `docs/design-docs/front-聊天输入框规范.md`
-- `docs/design-docs/front-前端设计文档.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`
+- `docs/design-docs/frontend/README.md`
 - `docs/exec-plans/active/20260527-frontend-interaction-polish/01-composer-visual-and-model-menu.md`
 - `docs/exec-plans/active/20260527-frontend-interaction-polish/README.md`
 - `docs/learnings/2026-05/hover-actions-need-stable-hit-targets.md`

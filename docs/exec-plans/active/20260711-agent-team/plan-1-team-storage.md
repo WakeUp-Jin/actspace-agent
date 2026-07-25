@@ -12,7 +12,7 @@
 
 ## 附加必读
 
-- `docs/design-docs/agent-form-team.md`
+- `docs/design-docs/collaboration/agent-form-team.md`
 - `docs/design-docs/core-storage-and-observability.md`
 - `packages/agent-core/src/persistence/jsonl.ts`
 - `packages/agent-core/src/persistence/session-store.ts`

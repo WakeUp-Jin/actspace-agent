@@ -5,7 +5,7 @@
  * 订阅匹配从进程启动就开始记录，但通知只在任务转后台（attach）之后投递；
  * 前台完成的命令输出已全量回填，订阅无意义，pending 匹配直接丢弃。
  *
- * 设计事实来源：docs/design-docs/agent-bash工具设计文档.md「三个事件源」。
+ * 设计事实来源：docs/design-docs/execution-safety/agent-bash工具设计文档.md「三个事件源」。
  */
 
 export interface OutputSubscriptionSpec {

@@ -26,5 +26,5 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/public/front/actspace-deepseek-workbench.html`
+- `docs/design-docs/frontend/actspace-deepseek-workbench.html`
 - `docs/histories/2026-05/20260521-2023-deepseek-desktop-prototype.md`

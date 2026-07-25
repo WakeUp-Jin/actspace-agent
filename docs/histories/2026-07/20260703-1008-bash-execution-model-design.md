@@ -6,7 +6,7 @@
 
 ## 主要改动
 
-- 新增 `docs/design-docs/agent-bash工具设计文档.md`：Bash 工具设计事实来源——工具契约（blockMs / notifyOnOutput / requiredPermissions）、输出管道（头部内联 + 条件落盘）、后台任务生命周期与 turn 边界通知注入、沙盒优先执行模型（含"为什么有些命令沙盒里跑不了"的机理说明）、前端沙盒标签三态、E1–E5 分阶段路线。
+- 新增 `docs/design-docs/execution-safety/agent-bash工具设计文档.md`：Bash 工具设计事实来源——工具契约（blockMs / notifyOnOutput / requiredPermissions）、输出管道（头部内联 + 条件落盘）、后台任务生命周期与 turn 边界通知注入、沙盒优先执行模型（含"为什么有些命令沙盒里跑不了"的机理说明）、前端沙盒标签三态、E1–E5 分阶段路线。
 - 调研底稿移至 `docs/references/bash-tool-reference-analysis.md`（原 `docs/design-docs/agent-bash-execution-model-design.md`），标注正式设计以设计文档为准。
 - 更新 `docs/design-docs/index.md` 与 `docs/references/README.md` 索引。
 - 设计文档追加附录：Seatbelt profile 模板与生成契约（生成器而非静态文件、`-D` 参数传路径、域名过滤须靠本地代理、sandbox-exec 探测降级）。
@@ -30,7 +30,7 @@
 
 ## 受影响文件
 
-- `docs/design-docs/agent-bash工具设计文档.md`（新增，设计事实来源）
+- `docs/design-docs/execution-safety/agent-bash工具设计文档.md`（新增，设计事实来源）
 - `docs/references/bash-tool-reference-analysis.md`（由 design-docs 移入并改标题）
 - `docs/design-docs/index.md`
 - `docs/references/README.md`

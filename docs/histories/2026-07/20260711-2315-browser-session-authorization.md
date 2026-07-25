@@ -38,4 +38,4 @@ Browser Use 不是单个低风险函数，而是对用户真实 Chrome 会话的
 - `packages/agent-core/src/tools/scheduler.ts`
 - `packages/agent-core/src/tools/tools/browser/permissions.ts`
 - `plugins/browser-bridge/apps/chrome-extension/src/background.js`
-- `docs/design-docs/agent-browser-use-integration-design.md`
+- `docs/design-docs/browser/agent-browser-use-integration-design.md`

@@ -17,7 +17,7 @@
   - 读取两个 dataset report，输出 fixed cases、regressed cases、unchanged failures 和 score deltas。
   - 不传 `--out` 时输出到 stdout，传入 `--out` 时同时写 comparison report 文件。
 - ActSpace 文档：
-  - 更新 `docs/design-docs/agent-evaluation.md`，明确 baseline comparison 应读取 report 文件并写出 comparison report。
+  - 更新 `docs/design-docs/evaluation/agent-evaluation.md`，明确 baseline comparison 应读取 report 文件并写出 comparison report。
   - 更新执行计划，将 compare CLI 和 comparison report 文件输出记录为已完成能力。
 - 外部 eval 文档：
   - 更新 README 和架构文档，说明 `compare` 命令和 comparison report。

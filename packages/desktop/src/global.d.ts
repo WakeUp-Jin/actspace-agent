@@ -100,6 +100,20 @@ declare global {
         input: import("@actspace/shared").TestConnectionInput
       ) => Promise<import("@actspace/shared").TestConnectionResult>;
       getSearchUsage?: () => Promise<import("@actspace/shared").SearchUsageResult>;
+      listProviders?: () => Promise<import("@actspace/shared").ProvidersListResult>;
+      connectProvider?: (input: import("@actspace/shared").ProviderConnectInput) => Promise<import("@actspace/shared").ProviderOperationResult>;
+      updateProvider?: (input: import("@actspace/shared").ProviderUpdateInput) => Promise<import("@actspace/shared").ProviderOperationResult>;
+      testProvider?: (input: import("@actspace/shared").ProviderIdInput) => Promise<import("@actspace/shared").ProviderTestResult>;
+      disconnectProvider?: (input: import("@actspace/shared").ProviderIdInput) => Promise<import("@actspace/shared").ProviderOperationResult>;
+      listInstalledModels?: () => Promise<import("@actspace/shared").ModelsListInstalledResult>;
+      listUsableModels?: (input: import("@actspace/shared").ModelsListUsableInput) => Promise<import("@actspace/shared").ModelsListUsableResult>;
+      listModelCatalog?: (input: import("@actspace/shared").ModelsCatalogListInput) => Promise<import("@actspace/shared").ModelsCatalogListResult>;
+      reloadModelCatalog?: (input: import("@actspace/shared").ModelsCatalogListInput) => Promise<import("@actspace/shared").ModelsCatalogListResult>;
+      addModel?: (input: import("@actspace/shared").ModelsAddInput) => Promise<import("@actspace/shared").ModelMutationResult>;
+      updateModel?: (input: import("@actspace/shared").ModelsUpdateInput) => Promise<import("@actspace/shared").ModelMutationResult>;
+      removeModel?: (input: import("@actspace/shared").ModelsRemoveInput) => Promise<import("@actspace/shared").ModelMutationResult>;
+      updateTaskModels?: (input: import("@actspace/shared").TaskModelsUpdateInput) => Promise<import("@actspace/shared").TaskModelsUpdateResult>;
+      updateKairosModel?: (input: import("@actspace/shared").KairosModelUpdateInput) => Promise<import("@actspace/shared").KairosModelUpdateResult>;
       getFsWatchStatus?: () => Promise<import("@actspace/shared").FsWatchStatus>;
       installFsWatchPlugin?: () => Promise<import("@actspace/shared").FsWatchInstallResult>;
       installFsWatchFromRepo?: () => Promise<import("@actspace/shared").FsWatchInstallResult>;

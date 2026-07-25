@@ -2,7 +2,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtemp, realpath, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bashExecutor, bashCheckPermissions, createToolManager, renderBashResult, bashTaskRegistry } from "../index";
+import {
+  bashDefinition,
+  bashExecutor,
+  bashCheckPermissions,
+  createToolManager,
+  renderBashResult,
+  bashTaskRegistry,
+} from "../index";
 import type { BashResult, BashBackgroundedResult } from "../index";
 import { loadEnv } from "../../env";
 
@@ -10,10 +17,22 @@ async function createWorkspace(): Promise<string> {
   return realpath(await mkdtemp(join(tmpdir(), "actspace-bash-test-")));
 }
 
+function checkBashPermissions(
+  args: Record<string, unknown>,
+  workspace: string,
+  options?: Parameters<typeof bashCheckPermissions>[2],
+) {
+  return bashCheckPermissions({ intent: "验证 Bash 命令", ...args }, workspace, options);
+}
+
 describe("Bash tool permissions", () => {
+  it("requires intent in the model-facing schema", () => {
+    expect(bashDefinition.parameters.required).toEqual(expect.arrayContaining(["command", "intent"]));
+  });
+
   it("allows simple development commands and sanitizes args", async () => {
     const workspace = await createWorkspace();
-    const result = await bashCheckPermissions({
+    const result = await checkBashPermissions({
       command: "pwd",
       blockMs: 999_999,
     }, workspace);
@@ -23,20 +42,39 @@ describe("Bash tool permissions", () => {
       command: "pwd",
       cwd: workspace,
       blockMs: 600_000,
+      intent: "验证 Bash 命令",
     });
   });
 
   it("keeps blockMs 0 as explicit immediate-background", async () => {
     const workspace = await createWorkspace();
-    const result = await bashCheckPermissions({ command: "pwd", blockMs: 0 }, workspace);
+    const result = await checkBashPermissions({ command: "pwd", blockMs: 0 }, workspace);
 
     expect(result.decision).toBe("allow");
     expect(result.sanitizedArgs).toMatchObject({ blockMs: 0 });
   });
 
+  it("denies missing or blank intent", async () => {
+    const workspace = await createWorkspace();
+
+    for (const args of [{ command: "pwd" }, { command: "pwd", intent: "   " }]) {
+      const result = await bashCheckPermissions(args, workspace);
+      expect(result.decision).toBe("deny");
+      expect(result.reason).toContain("intent is required");
+    }
+  });
+
+  it("trims required intent before execution", async () => {
+    const workspace = await createWorkspace();
+    const result = await bashCheckPermissions({ command: "pwd", intent: "  查看当前目录  " }, workspace);
+
+    expect(result.decision).toBe("allow");
+    expect(result.sanitizedArgs).toMatchObject({ intent: "查看当前目录" });
+  });
+
   it("denies empty commands", async () => {
     const workspace = await createWorkspace();
-    const result = await bashCheckPermissions({ command: "   " }, workspace);
+    const result = await checkBashPermissions({ command: "   " }, workspace);
 
     expect(result.decision).toBe("deny");
     expect(result.reason).toContain("command is required");
@@ -44,7 +82,7 @@ describe("Bash tool permissions", () => {
 
   it("denies dangerous delete commands", async () => {
     const workspace = await createWorkspace();
-    const result = await bashCheckPermissions({ command: "rm -rf /" }, workspace);
+    const result = await checkBashPermissions({ command: "rm -rf /" }, workspace);
 
     expect(result.decision).toBe("deny");
     expect(result.reason).toContain("dangerous delete");
@@ -52,7 +90,7 @@ describe("Bash tool permissions", () => {
 
   it("denies cwd outside workspace", async () => {
     const workspace = await createWorkspace();
-    const result = await bashCheckPermissions({ command: "pwd", cwd: "/" }, workspace);
+    const result = await checkBashPermissions({ command: "pwd", cwd: "/" }, workspace);
 
     expect(result.decision).toBe("deny");
     expect(result.reason).toContain("workspace boundary");
@@ -60,7 +98,7 @@ describe("Bash tool permissions", () => {
 
   it("asks for commands outside the allowlist", async () => {
     const workspace = await createWorkspace();
-    const result = await bashCheckPermissions({ command: "pnpm install" }, workspace);
+    const result = await checkBashPermissions({ command: "pnpm install" }, workspace);
 
     expect(result.decision).toBe("ask");
     expect(result.reason).toContain("not in the Bash allowlist");
@@ -69,7 +107,7 @@ describe("Bash tool permissions", () => {
 
   it("relaxes non-allowlist commands to allow when the sandbox is available", async () => {
     const workspace = await createWorkspace();
-    const result = await bashCheckPermissions({ command: "pnpm install" }, workspace, {
+    const result = await checkBashPermissions({ command: "pnpm install" }, workspace, {
       sandboxAvailable: true,
     });
 
@@ -79,7 +117,7 @@ describe("Bash tool permissions", () => {
 
   it("still hard-rejects dangerous commands even when the sandbox is available", async () => {
     const workspace = await createWorkspace();
-    const result = await bashCheckPermissions({ command: "rm -rf /" }, workspace, {
+    const result = await checkBashPermissions({ command: "rm -rf /" }, workspace, {
       sandboxAvailable: true,
     });
 
@@ -107,7 +145,7 @@ describe("Bash tool permissions", () => {
     for (const command of irreversibleCommands) {
       it(`asks for: ${command}`, async () => {
         const workspace = await createWorkspace();
-        const result = await bashCheckPermissions({ command }, workspace, {
+        const result = await checkBashPermissions({ command }, workspace, {
           sandboxAvailable: true,
         });
 
@@ -131,7 +169,7 @@ describe("Bash tool permissions", () => {
     for (const command of safeSiblings) {
       it(`does not treat as irreversible: ${command}`, async () => {
         const workspace = await createWorkspace();
-        const result = await bashCheckPermissions({ command }, workspace, {
+        const result = await checkBashPermissions({ command }, workspace, {
           sandboxAvailable: true,
         });
 
@@ -141,7 +179,7 @@ describe("Bash tool permissions", () => {
 
     it("asks when an irreversible segment hides inside a chained command", async () => {
       const workspace = await createWorkspace();
-      const result = await bashCheckPermissions({ command: "ls && rm notes.txt" }, workspace, {
+      const result = await checkBashPermissions({ command: "ls && rm notes.txt" }, workspace, {
         sandboxAvailable: true,
       });
 
@@ -153,7 +191,7 @@ describe("Bash tool permissions", () => {
   it("hard-rejects deleting or moving the .git directory itself", async () => {
     const workspace = await createWorkspace();
     for (const command of ["rmdir .git", "mv .git /tmp/backup", "mv packages/.git elsewhere"]) {
-      const result = await bashCheckPermissions({ command }, workspace, { sandboxAvailable: true });
+      const result = await checkBashPermissions({ command }, workspace, { sandboxAvailable: true });
       expect(result.decision, command).toBe("deny");
       expect(result.reason, command).toContain(".git");
     }
@@ -161,7 +199,7 @@ describe("Bash tool permissions", () => {
 
   it("forces ask when requiredPermissions requests no_sandbox, regardless of sandbox relaxation", async () => {
     const workspace = await createWorkspace();
-    const result = await bashCheckPermissions(
+    const result = await checkBashPermissions(
       { command: "pwd", requiredPermissions: ["no_sandbox"] },
       workspace,
       { sandboxAvailable: true },
@@ -176,7 +214,7 @@ describe("Bash tool permissions", () => {
 
   it("denies unknown requiredPermissions values", async () => {
     const workspace = await createWorkspace();
-    const result = await bashCheckPermissions(
+    const result = await checkBashPermissions(
       { command: "pwd", requiredPermissions: ["root_access"] },
       workspace,
     );
@@ -191,7 +229,7 @@ describe("Bash tool permissions", () => {
     process.env.ACTSPACE_BASH_ALWAYS_ASK = "1";
     try {
       loadEnv();
-      const result = await bashCheckPermissions({ command: "pwd" }, workspace);
+      const result = await checkBashPermissions({ command: "pwd" }, workspace);
       expect(result.decision).toBe("ask");
       expect(result.reason).toContain("always-ask");
     } finally {
@@ -210,7 +248,7 @@ describe("Bash tool permissions", () => {
     process.env.ACTSPACE_BASH_ALWAYS_ASK = "1";
     try {
       loadEnv();
-      const result = await bashCheckPermissions({ command: "rm -rf /" }, workspace);
+      const result = await checkBashPermissions({ command: "rm -rf /" }, workspace);
       expect(result.decision).toBe("deny");
     } finally {
       if (original === undefined) {

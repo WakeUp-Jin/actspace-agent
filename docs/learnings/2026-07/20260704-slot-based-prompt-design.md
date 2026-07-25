@@ -1,7 +1,7 @@
 # 插槽式系统提示词设计：让用户改人格而不弄坏 Agent
 
 > 提炼自：`docs/histories/2026-07/20260704-1020-kairos-soul-slot-and-settings-section.md`
-> 相关设计：`docs/design-docs/agent-kairos-prompt-design.md`
+> 相关设计：`docs/design-docs/kairos/agent-kairos-prompt-design.md`
 
 ## 是什么
 

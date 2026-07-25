@@ -12,7 +12,7 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `@actspace/desktop`（renderer CSS only）+ 三份 `docs/design-docs/front-index.md` 规范文档。
+**Scope:** `@actspace/desktop`（renderer CSS only）+ 三份 `docs/design-docs/frontend/README.md` 规范文档。
 
 **Key Actions:**
 
@@ -32,9 +32,9 @@
 ### 📁 Files Modified
 
 - `packages/desktop/src/renderer/styles.css`（核心：~30 处字号/字重/letter-spacing 改动 + 全局 body feature-settings）
-- `docs/design-docs/front-全局视觉语言规范.md`（字体栈、字号阶梯、字重段重写，新增「字体特性」段）
-- `docs/design-docs/front-左侧会话栏规范.md`（「分组标题统一规范」与「字号基准」段重写）
-- `docs/design-docs/front-usage-statistics.md`（「字体与数字」段重写）
+- `docs/design-docs/frontend/front-全局视觉语言规范.md`（字体栈、字号阶梯、字重段重写，新增「字体特性」段）
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`（「分组标题统一规范」与「字号基准」段重写）
+- `docs/design-docs/frontend/front-usage-statistics.md`（「字体与数字」段重写）
 
 ### ✅ Verification
 
@@ -66,5 +66,5 @@
   - `--color-text-faint: #8b949e` → `rgba(32, 33, 36, 0.54)`（对齐 Cursor tertiary）
   - 新增 `--color-text-subtle: rgba(32, 33, 36, 0.36)`（对齐 Cursor quaternary，用于占位、kicker、最弱图标）
   - 两处硬编码灰（`bash-output-text #6d727a`、`bash-approval-command #5f6670`）收回 `var(--color-text-muted)`。
-  - `tool-log-line.is-running` 的 shimmer 基色 `#6f7681` 保持纯灰，是 shimmer 动画的有意设计（[中间消息区规范.md](../../design-docs/front-中间消息区规范.md) 已说明）。
-- `docs/design-docs/front-全局视觉语言规范.md`：「基础色板」段更新 token 定义，新增「关于文字色用 `rgba(主前景, α)` 而不是独立灰 hex 的设计意图」小节；「文本颜色」段补充 `--color-text-subtle`。
+  - `tool-log-line.is-running` 的 shimmer 基色 `#6f7681` 保持纯灰，是 shimmer 动画的有意设计（[中间消息区规范.md](../../design-docs/frontend/front-中间消息区规范.md) 已说明）。
+- `docs/design-docs/frontend/front-全局视觉语言规范.md`：「基础色板」段更新 token 定义，新增「关于文字色用 `rgba(主前景, α)` 而不是独立灰 hex 的设计意图」小节；「文本颜色」段补充 `--color-text-subtle`。

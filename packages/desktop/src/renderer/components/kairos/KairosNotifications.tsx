@@ -1,5 +1,5 @@
 /**
- * Kairos 通知中心的两视图共用模块（设计见 docs/design-docs/agent-kairos-notifications.md §5）。
+ * Kairos 通知中心的两视图共用模块（设计见 docs/design-docs/kairos/agent-kairos-notifications.md §5）。
  *
  * 形态（2026-07-04 与用户确认）：通知不走浮层，作为内容 tab 挂进两个视图——
  * - KairosPage：详情面板第 4 个 tab「通知」（最终回复 / 工具结果 / 思考过程 / 通知）；

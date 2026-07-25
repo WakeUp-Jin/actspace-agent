@@ -10,9 +10,10 @@
  */
 
 import { join } from "node:path";
-import type { ContextState, DescribeContextInput, ModelId } from "@actspace/shared";
+import type { ContextState, DescribeContextInput, ModelId, ModelSelectionId } from "@actspace/shared";
 import {
   buildAgentConfig,
+  buildAgentConfigFromRuntime,
   buildContextEntries,
   createAgentForSession,
   createContextState,
@@ -20,11 +21,13 @@ import {
   readMeta,
 } from "@actspace/agent-core";
 import type { AgentRuntimeContextLoader, AppDataRoots } from "./agent-turn";
+import type { ModelRuntimeService } from "./model-runtime-service";
 
 export async function describeSessionContext(
   input: DescribeContextInput,
   roots: AppDataRoots,
   loadRuntimeContext?: AgentRuntimeContextLoader,
+  modelRuntime?: ModelRuntimeService,
 ): Promise<ContextState | null> {
   const sessionDir = join(roots.sessionRoot, input.sessionId);
   const sessionPaths = createSessionStorePaths(sessionDir);
@@ -33,15 +36,20 @@ export async function describeSessionContext(
   if (!meta) return null;
 
   // lastModel 由 meta.json 动态写入，未声明在 SessionMeta 类型上；缺省时由 resolveModelSpec 取默认模型。
-  const model = (meta as { lastModel?: ModelId }).lastModel;
+  const model = (meta as { lastModel?: ModelSelectionId }).lastModel;
   const workspaceRoot = meta.workspaceRoot ?? roots.defaultWorkspaceRoot;
   const runtimeContext = await loadRuntimeContext?.(workspaceRoot);
 
-  const config = buildAgentConfig({ model }, workspaceRoot, undefined, {
+  const agentRuntimeContext = {
     tmpRoot: roots.tmpRoot,
     sessionId: input.sessionId,
     ...runtimeContext,
-  });
+  };
+  const legacyModel = model && !model.includes(":") ? model as ModelId : undefined;
+  const config = modelRuntime
+    ? buildDynamicContextConfig(modelRuntime, model, workspaceRoot, agentRuntimeContext)
+    : buildAgentConfig({ model: legacyModel }, workspaceRoot, undefined, agentRuntimeContext);
+  if (!config) return null;
   const deps = await createAgentForSession(config, {
     sessionPath: sessionPaths.sessionPath,
   });
@@ -53,4 +61,22 @@ export async function describeSessionContext(
   const entries = buildContextEntries(deps.contextManager.getContext());
   // 这是「实时重建」而非某轮 turn 的快照，activeTurnId 用 "live" 标识来源。
   return createContextState(snapshot, input.sessionId, "live", entries);
+}
+
+function buildDynamicContextConfig(
+  runtime: ModelRuntimeService,
+  model: ModelSelectionId | undefined,
+  workspaceRoot: string,
+  runtimeContext: Parameters<typeof buildAgentConfigFromRuntime>[3],
+) {
+  const main = runtime.resolveMainModel(model);
+  if (!main.ok) return null;
+  const utility = runtime.resolveUtilityModel(main.model);
+  const explore = runtime.resolveExploreModel(main.model);
+  return buildAgentConfigFromRuntime({
+    main: { definition: main.model.definition, runtime: main.model.providerRuntime },
+    ...(utility.ok && { utility: { definition: utility.model.definition, runtime: utility.model.providerRuntime } }),
+    ...(explore.ok && { explore: { definition: explore.model.definition, runtime: explore.model.providerRuntime } }),
+    toolEnvironment: runtime.getToolEnvironment(),
+  }, workspaceRoot, undefined, runtimeContext);
 }

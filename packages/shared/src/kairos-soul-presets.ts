@@ -1,7 +1,7 @@
 /**
  * Kairos soul（人格插槽）内置预设。
  *
- * 设计规范：docs/design-docs/agent-kairos-prompt-design.md §4。
+ * 设计规范：docs/design-docs/kairos/agent-kairos-prompt-design.md §4。
  * - 预设是静态产品文案（不是用户数据），随版本硬编码升级；用户数据只有 soul.md 一份。
  * - 设置页下拉选中预设 = 把 `content` 写入 soul.md；UI 通过「当前 soul 内容与哪个
  *   preset 逐字节相等」反推选中态，都不等则显示「自定义」。

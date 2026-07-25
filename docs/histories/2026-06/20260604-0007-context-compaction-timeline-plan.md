@@ -31,7 +31,7 @@ Context Compaction 是工作流里的上下文边界事件，不是工具调用�
 
 ### Files Modified
 
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/exec-plans/active/20260604-context-compaction-timeline-bugfix.md`
 - `docs/exec-plans/README.md`
 - `docs/histories/2026-06/20260604-0007-context-compaction-timeline-plan.md`

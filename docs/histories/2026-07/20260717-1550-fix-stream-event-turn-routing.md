@@ -32,6 +32,6 @@
 - `packages/agent-core/src/engine/test/bridge.test.ts`
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
-- `docs/design-docs/agent-turn-layers.md`
+- `docs/design-docs/agent-runtime/agent-turn-layers.md`
 - `docs/exec-plans/completed/20260717-stream-event-turn-routing.md`
 - `docs/learnings/2026-07/stream-events-need-explicit-turn-scope.md`

@@ -11,6 +11,8 @@
 import type {
   AgentTurnResult,
   ComposerAttachment,
+  ModelDefinition,
+  ModelKey,
   ModelSpec,
   RuntimeStreamEvent,
   SessionEvent,
@@ -116,6 +118,9 @@ export interface RunTurnWithAgentDeps {
   toolManager: ToolManager;
   contextManager: ContextManager;
   modelSpec?: ModelSpec;
+  /** Provider-qualified runtime identity used by desktop dynamic models. */
+  modelDefinition?: ModelDefinition;
+  modelKey?: ModelKey;
   toolExecution?: ToolExecutionMode;
   thinkingEnabled?: boolean;
   /** flash 摘要器，透传给 Agent 用于 mid-loop 历史压缩 */
@@ -244,8 +249,8 @@ export async function runTurnWithAgent(
       userInputPreview: preview(userInput),
     });
     loopResult = await agent.run(formatUserMessageForModel(userInput, input.modelAttachments ?? input.attachments, {
-      modelId: modelSpec.id,
-      input: modelSpec.input,
+      modelId: deps.modelKey ?? modelSpec.id,
+      input: deps.modelDefinition?.capabilities.input ?? modelSpec.input,
     }));
   } catch (err) {
     await flushStreamLogBuffer(runLogger, streamLogBuffer);
@@ -287,6 +292,8 @@ export async function runTurnWithAgent(
     deps.toolManager,
     toolExecutions,
     options?.includeUserEvent ?? true,
+    deps.modelDefinition,
+    deps.modelKey,
   );
   const subagentTranscripts = collectSubAgentTranscripts(toolExecutions);
   for (const info of compactions) {
@@ -549,6 +556,8 @@ function buildSessionEvents(
   toolManager: ToolManager,
   toolExecutions: Map<string, ToolExecutionRecord>,
   includeUserEvent: boolean,
+  runtimeModelDefinition?: ModelDefinition,
+  runtimeModelKey?: ModelKey,
 ): SessionEvent[] {
   const userMessage: UserMessage = {
     role: "user",
@@ -590,6 +599,8 @@ function buildSessionEvents(
         turnId,
         relatedEventIds,
         `llm_call_${turnId}_${usageCallIndex}`,
+        runtimeModelDefinition,
+        runtimeModelKey,
       ));
     }
   }
@@ -619,13 +630,19 @@ function createLlmUsageEvent(
   turnId: string,
   relatedEventIds: string[],
   fallbackCallId: string,
+  runtimeModelDefinition?: ModelDefinition,
+  runtimeModelKey?: ModelKey,
 ): SessionEvent<LlmUsagePayload> {
-  const modelSpec = resolveModelSpecByApiModel(message.model, message.provider as "deepseek" | "kimi" | undefined);
+  const matchesRuntimeModel = runtimeModelDefinition?.apiModel === message.model
+    && runtimeModelDefinition.provider === message.provider;
+  const modelSpec = matchesRuntimeModel
+    ? undefined
+    : resolveModelSpecByApiModel(message.model, message.provider as "deepseek" | "kimi" | undefined);
   const payload: LlmUsagePayload = {
     callId: usageCall?.callId ?? fallbackCallId,
     provider: message.provider,
     model: message.model,
-    modelId: modelSpec?.id,
+    modelId: matchesRuntimeModel ? runtimeModelKey : modelSpec?.id,
     promptTokens: message.usage.input,
     completionTokens: message.usage.output,
     totalTokens: message.usage.totalTokens,
@@ -642,7 +659,7 @@ function createLlmUsageEvent(
         cacheHitTokens: message.usage.cacheHit || message.usage.cacheRead,
         cacheMissTokens: message.usage.cacheMiss,
       },
-      modelSpec?.pricing,
+      matchesRuntimeModel ? runtimeModelDefinition?.pricing : modelSpec?.pricing,
     ),
     relatedEventIds,
   };

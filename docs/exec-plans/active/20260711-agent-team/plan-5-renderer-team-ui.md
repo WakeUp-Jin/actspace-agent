@@ -14,11 +14,11 @@
 
 - `docs/FRONTEND.md`
 - `docs/FRONTEND_VERIFICATION.md`
-- `docs/design-docs/front-主题与配色规范.md`
-- `docs/design-docs/front-工作台布局与面板交互规范.md`
-- `docs/design-docs/front-中间消息区规范.md`
-- `docs/design-docs/front-聊天输入框规范.md`
-- `docs/design-docs/front-设置页规范.md`
+- `docs/design-docs/frontend/front-主题与配色规范.md`
+- `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`
+- `docs/design-docs/frontend/front-设置页规范.md`
 - `docs/coding-standards/team/frontend-style-scope-conventions.md`
 
 ## 允许修改的文件

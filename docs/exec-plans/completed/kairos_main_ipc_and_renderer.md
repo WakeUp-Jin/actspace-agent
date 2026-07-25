@@ -42,7 +42,7 @@
 ## 必读
 
 - `AGENTS.md`
-- `docs/design-docs/agent-kairos-autonomous-mode.md` 的「IPC 契约」「Renderer 渲染规范」「与主 Agent 的交互边界」三章
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md` 的「IPC 契约」「Renderer 渲染规范」「与主 Agent 的交互边界」三章
 - `docs/FRONTEND.md` + `docs/FRONTEND_VERIFICATION.md`（前端验证规范）
 - `packages/desktop/electron/main.ts`（理解现有 main 启动序列）
 - `packages/desktop/electron/preload.ts`（理解现有 API 暴露风格）

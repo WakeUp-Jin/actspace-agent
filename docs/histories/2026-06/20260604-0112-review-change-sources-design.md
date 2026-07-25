@@ -33,6 +33,6 @@ Review 主入口应该回答「当前 repo 真实改了什么」，而不是只�
 
 - `docs/design-docs/core-review-change-sources.md`
 - `docs/design-docs/index.md`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
 - `docs/exec-plans/active/20260604-review-v1-git-review.md`
 - `docs/histories/2026-06/20260604-0112-review-change-sources-design.md`

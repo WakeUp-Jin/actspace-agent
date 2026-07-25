@@ -57,7 +57,7 @@
 - `packages/desktop/src/renderer/components/messages/UserMessage.tsx`
 - `packages/desktop/src/renderer/components/Composer.tsx`
 - `packages/desktop/src/renderer/test/composer.test.tsx`
-- `docs/design-docs/front-聊天输入框规范.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`
 - `packages/desktop/src/renderer/components/messages/FileDiffBlock.tsx`
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/shared/src/session.ts`
@@ -76,6 +76,6 @@
 - `packages/desktop/src/renderer/test/file-diff-block.test.tsx`
 - `packages/desktop/src/renderer/test/user-message.test.tsx`
 - `docs/SECURITY.md`
-- `docs/design-docs/agent-权限设计规则和原则.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`

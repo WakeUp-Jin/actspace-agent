@@ -33,9 +33,9 @@
 - `docs/exec-plans/active/Bash工具和工具权限调度开发计划/README.md`
 - `docs/design-docs/index.md`
 - `docs/design-docs/agent-index.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/agent-权限设计规则和原则.md`
-- `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
+- `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`
 - `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-bash-session-allowlist-plan.md`
 - `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-tool-pause-session-boundary-plan.md`
 - `docs/exec-plans/completed/actspace-bash-tool-plan.md`

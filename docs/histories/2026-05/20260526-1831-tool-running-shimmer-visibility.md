@@ -30,6 +30,6 @@
 ### 📁 Files Modified
 
 - `packages/desktop/src/renderer/styles.css`
-- `docs/design-docs/front-中间消息区规范.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/TODOLIST.md`

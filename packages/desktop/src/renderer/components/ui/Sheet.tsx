@@ -1,7 +1,7 @@
 /**
  * Sheet —— 自研轻量级右侧滑入抽屉。
  *
- * 设计依据：`docs/design-docs/front-Kairos监控页规范.md` 第 2 节。
+ * 设计依据：`docs/design-docs/kairos/front-Kairos监控页规范.md` 第 2 节。
  * 行为目标对齐 shadcn `Sheet` (`side="right"`)：
  *   - Portal 到 document.body，避开布局副作用；
  *   - Overlay + Panel；
@@ -133,8 +133,11 @@ export function Sheet(props: PropsWithChildren<SheetProps>) {
   useLayoutEffect(() => {
     if (!open) return;
     // 用一个微任务把焦点交给关闭按钮；某些浏览器在 transition 开始时会吞掉同步 focus。
+    // 若用户或调用方已先把焦点放进面板，不再抢回关闭按钮，避免首个 Tab 被意外跳过。
     const handle = window.requestAnimationFrame(() => {
-      closeButtonRef.current?.focus();
+      const panel = panelRef.current;
+      const active = document.activeElement;
+      if (!panel || !panel.contains(active)) closeButtonRef.current?.focus();
     });
     return () => window.cancelAnimationFrame(handle);
   }, [open]);

@@ -14,9 +14,9 @@
 actspace-agent 仓库：
 - `plugins/` 目录（新建，整体迁入）
 - `docs/ARCHITECTURE.md`（更新结构说明）
-- `docs/design-docs/agent-browser-bridge-design.md`（更新路径引用）
+- `docs/design-docs/browser/agent-browser-bridge-design.md`（更新路径引用）
 - `docs/design-docs/agent-plugins-fs-watch.md`（更新路径引用）
-- `docs/design-docs/agent-browser-use-integration-design.md`（更新路径引用）
+- `docs/design-docs/browser/agent-browser-use-integration-design.md`（更新路径引用）
 - `.gitignore`（添加 Go/Rust 构建产物排除）
 - `AGENTS.md`（更新"相关平级项目"段落）
 
@@ -126,8 +126,8 @@ plugins/browser-bridge/apps/cli/abb
 
 在以下文档中，将 `actspace-plugins/plugins/browser-bridge/` 路径替换为 `plugins/browser-bridge/`：
 
-- `docs/design-docs/agent-browser-bridge-design.md`
-- `docs/design-docs/agent-browser-use-integration-design.md`
+- `docs/design-docs/browser/agent-browser-bridge-design.md`
+- `docs/design-docs/browser/agent-browser-use-integration-design.md`
 - `docs/design-docs/agent-plugins-fs-watch.md`
 
 将 `actspace-plugins` 的"独立仓库"表述改为"plugins/ 目录"。

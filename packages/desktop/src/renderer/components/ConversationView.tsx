@@ -1,6 +1,6 @@
 import { Eye, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ContextUsageSnapshot, MessageBlock, ModelId } from "@actspace/shared";
+import type { ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
 import { Composer, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { AssistantReply } from "./messages/AssistantReply";
@@ -514,6 +514,7 @@ export function ConversationView({
   onSelectWorkspace,
   reviewSummary,
   onOpenReview,
+  models,
 }: {
   messages: MessageBlock[];
   contextSnapshot: ContextUsageSnapshot | null;
@@ -524,9 +525,10 @@ export function ConversationView({
   onSend?: (text: string, options: ComposerSendOptions) => void;
   onAbort?: () => void;
   isSessionReady?: boolean;
-  defaultModelId?: ModelId;
-  selectedModelId?: ModelId;
-  onSelectedModelChange?: (modelId: ModelId) => void;
+  defaultModelId?: ModelSelectionId;
+  selectedModelId?: ModelSelectionId;
+  onSelectedModelChange?: (modelId: ModelSelectionId) => void;
+  models?: UsableModelView[];
   workspaceOptions?: ComposerWorkspaceOption[];
   selectedWorkspaceRoot?: string | null;
   onSelectWorkspace?: (workspaceRoot: string) => void;
@@ -629,6 +631,7 @@ export function ConversationView({
               workspaceOptions={workspaceOptions}
               selectedWorkspaceRoot={selectedWorkspaceRoot}
               onSelectWorkspace={onSelectWorkspace}
+              models={models}
             />
           </div>
         ) : (
@@ -681,6 +684,7 @@ export function ConversationView({
             onSelectWorkspace={onSelectWorkspace}
             reviewSummary={latestActiveTranscriptMessage ? null : reviewSummary}
             onOpenReview={onOpenReview}
+            models={models}
           />
         </div>
       ) : null}

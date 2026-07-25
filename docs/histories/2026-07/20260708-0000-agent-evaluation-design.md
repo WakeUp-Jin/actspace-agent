@@ -6,7 +6,7 @@
 
 ## 变更
 
-- 新增 `docs/design-docs/agent-evaluation.md`，作为 Agent 评估的长期设计事实来源。
+- 新增 `docs/design-docs/evaluation/agent-evaluation.md`，作为 Agent 评估的长期设计事实来源。
 - 在 `docs/design-docs/agent-index.md` 中增加评估设计入口。
 - 新增 `docs/exec-plans/active/20260708-agent-evaluation/README.md`，作为从设计文档拆出的分阶段实施计划。
 - 在 `docs/exec-plans/README.md` 中增加 active execution plan 入口。
@@ -25,7 +25,7 @@
 
 ## 影响文件
 
-- `docs/design-docs/agent-evaluation.md`
+- `docs/design-docs/evaluation/agent-evaluation.md`
 - `docs/design-docs/agent-index.md`
 - `docs/exec-plans/active/20260708-agent-evaluation/README.md`
 - `docs/exec-plans/README.md`

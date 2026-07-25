@@ -21,8 +21,8 @@
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
 - `docs/design-docs/core-beliefs.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-主题与配色规范.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-主题与配色规范.md`
 - `docs/design-docs/core-storage-and-observability.md`
 
 ## 范围
@@ -215,7 +215,7 @@ export type SessionPreview = {
 - `pnpm --filter @actspace/desktop build`
 - `git diff --check`
 - 主题颜色扫描：
-  - `rg -n "text-black|bg-black|bg-white|text-\[#|bg-\[#|border-\[#|rgba\(|#[0-9A-Fa-f]{3,8}" packages/desktop/src/renderer/components/Sidebar.tsx packages/desktop/src/renderer/components/WorkbenchLayout.tsx packages/desktop/src/renderer/App.tsx packages/desktop/src/main/session-preview-service.ts packages/shared/src/ipc.ts docs/design-docs/front-左侧会话栏规范.md`
+  - `rg -n "text-black|bg-black|bg-white|text-\[#|bg-\[#|border-\[#|rgba\(|#[0-9A-Fa-f]{3,8}" packages/desktop/src/renderer/components/Sidebar.tsx packages/desktop/src/renderer/components/WorkbenchLayout.tsx packages/desktop/src/renderer/App.tsx packages/desktop/src/main/session-preview-service.ts packages/shared/src/ipc.ts docs/design-docs/frontend/front-左侧会话栏规范.md`
   - 无命中。
 - Electron renderer smoke：
   - 使用当前工作区 renderer `http://127.0.0.1:5174/`。

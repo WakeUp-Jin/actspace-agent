@@ -28,6 +28,6 @@ Docker 评估不能只停留在 dry-run。容器级 mock Agent 证明运行器�
 
 ### Files Modified
 
-- `docs/design-docs/agent-evaluation.md`
+- `docs/design-docs/evaluation/agent-evaluation.md`
 - `docs/exec-plans/active/20260708-agent-evaluation/README.md`
 - `docs/histories/2026-07/20260710-0005-agent-eval-docker-runner-verification.md`

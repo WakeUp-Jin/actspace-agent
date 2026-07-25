@@ -5,7 +5,7 @@
  * （read / grep / glob / directory_list / web_search / generic）。
  * bash 不在此注册表——其全量已落盘、走逐字头部 + 文件指针，不调 flash。
  *
- * 设计事实来源：docs/design-docs/agent-context-compression.md
+ * 设计事实来源：docs/design-docs/model-context/agent-context-compression.md
  * 「按工具类型的摘要 prompt」「压缩标记」。
  */
 

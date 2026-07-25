@@ -35,7 +35,7 @@
 ## 必读
 
 - `AGENTS.md`
-- `docs/design-docs/agent-kairos-autonomous-mode.md` 的「事件存储与前端聚合」「Working Memory 加载与压缩」「存储布局」三章
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md` 的「事件存储与前端聚合」「Working Memory 加载与压缩」「存储布局」三章
 - `back-code/heartclaw/apps/ruyi-api/src/storage/short_memory_store.py`（移植算法的源头）
 - `back-code/heartclaw/apps/ruyi-api/src/core/context/modules/short_term_memory.py`（加载策略的源头）
 - `packages/shared/src/session.ts`（行格式定义）

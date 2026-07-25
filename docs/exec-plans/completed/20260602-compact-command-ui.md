@@ -12,7 +12,7 @@
   - Agent Core 暴露一次性手动压缩入口，复用现有 `ContextManager.compactIfNeeded` / `compactHistory` / summarizer 地基。
   - 流式事件增加 compaction 生命周期，用于执行前、执行中、完成态实时展示。
   - `context_compaction` 持久化事件映射为消息流里的完成态 `MessageBlock`。
-  - 新增 `CompactCommandBlock` 前端组件，视觉对齐 `docs/design-docs/public/front/compact-command-states.html`。
+  - 新增 `CompactCommandBlock` 前端组件，视觉对齐 `docs/design-docs/frontend/compact-command-states.html`。
   - 单测、类型检查、浅/深主题视觉验收与 Electron 手工验收。
 - 不包含：
   - 自动压缩策略调整、阈值调整或摘要 prompt 重写。
@@ -24,10 +24,10 @@
 ## 背景
 
 - 相关文档：
-  - `docs/design-docs/public/front/compact-command-states.html`
-  - `docs/design-docs/front-中间消息区规范.md`
-  - `docs/design-docs/front-主题与配色规范.md`
-  - `docs/design-docs/agent-context-compression.md`
+  - `docs/design-docs/frontend/compact-command-states.html`
+  - `docs/design-docs/frontend/front-中间消息区规范.md`
+  - `docs/design-docs/frontend/front-主题与配色规范.md`
+  - `docs/design-docs/model-context/agent-context-compression.md`
   - `docs/exec-plans/completed/20260529-context-compression.md`
 - 相关代码路径：
   - Shared 契约：`packages/shared/src/session.ts`、`packages/shared/src/ipc.ts`、`packages/shared/src/session-selectors.ts`
@@ -127,7 +127,7 @@
 ### M4 文档、验证与收尾
 
 - [x] T4.1 更新设计规范
-  - 文件：`docs/design-docs/front-中间消息区规范.md`、`docs/design-docs/agent-context-compression.md`、`docs/design-docs/agent-turn-layers.md`。
+  - 文件：`docs/design-docs/frontend/front-中间消息区规范.md`、`docs/design-docs/model-context/agent-context-compression.md`、`docs/design-docs/agent-runtime/agent-turn-layers.md`。
   - 改动：补 `/compact` 命令消息流规则、手动压缩 IPC、自动/手动共用 `context_compaction` 完成态。
   - 验证：人工通读，确保与 HTML 原型和实现一致。
 
@@ -142,7 +142,7 @@
 
 - [x] T4.3 前端视觉验收
   - 文件 / 入口：
-    - `docs/design-docs/public/front/compact-command-states.html`
+    - `docs/design-docs/frontend/compact-command-states.html`
     - 实际 Electron renderer 主聊天页。
   - 检查：
     - 浅色、深色主题下 running 卡片文字、进度条、边框、完成态均可读。
@@ -174,7 +174,7 @@
 ## 进度记录
 
 - [x] 已确认 UI 方向：消息流内三态，执行中使用主题感知高对比执行卡，完成态不展开。
-- [x] 已落 HTML 原型：`docs/design-docs/public/front/compact-command-states.html`。
+- [x] 已落 HTML 原型：`docs/design-docs/frontend/compact-command-states.html`。
 - [x] M1 契约与后端入口。
 - [x] M2 消息块与 Renderer 状态。
 - [x] M3 UI 组件与主题。

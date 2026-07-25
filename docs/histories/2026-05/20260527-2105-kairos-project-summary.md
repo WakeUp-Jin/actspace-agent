@@ -102,9 +102,9 @@ Plan 6 实施时把 `kairos-bootstrap.ts` / `kairos-ipc.ts` 标记为"留 e2e �
 
 ## 相关文档同步清单（本 plan Step 3-7）
 
-- `docs/design-docs/agent-current-module-map.md` —— 新增 "## `kairos/` - 自治模式" 章节，含 mermaid 模块依赖图 + 各子模块速读 + desktop 集成位点。
+- `docs/design-docs/agent-runtime/agent-current-module-map.md` —— 新增 "## `kairos/` - 自治模式" 章节，含 mermaid 模块依赖图 + 各子模块速读 + desktop 集成位点。
 - `docs/design-docs/core-storage-and-observability.md` —— 新增 "## Kairos 存储与可观测性"，含目录树、4 个 SessionEvent 新类型、IPC 通道表、排障日志归属。
-- `docs/design-docs/agent-kairos-autonomous-mode.md` —— 顶部状态徽章改为 "v1 代码已上线"；末尾追加 "## 附录：v1 实测目录树"。
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md` —— 顶部状态徽章改为 "v1 代码已上线"；末尾追加 "## 附录：v1 实测目录树"。
 - `docs/QUALITY_SCORE.md` —— 新增"Kairos 自治模式 B"评分行。
 - `docs/exec-plans/README.md` —— 删除 active 列表的 7 份 kairos plan；在 completed 列表追加 7 份 + 注明 "2026-05-27 全部落地"。
 - `docs/exec-plans/active/kairos_*.md` —— 物理移动到 `docs/exec-plans/completed/kairos_*.md`（普通 `mv`，因为 plan 文件本身未 `git add` 过；未来如要 git mv 已能成功）。

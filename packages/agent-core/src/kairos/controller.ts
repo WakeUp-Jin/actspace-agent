@@ -89,9 +89,9 @@ export interface CreateKairosOptions {
   kairosRoot: string;
   llm: LLMService;
   /**
-   * Kairos 实际使用的模型 id（已由 `resolveKairosModelSpec(settings.kairos.modelId)` 解析、
-   * 回落过默认值的真实 id）。仅用于 `getContextSnapshot().modelId` 展示——让 Sheet 里
-   * 显示的模型 === LLM 真正调用的模型（所见即所得）。LLM 本身在 `opts.llm` 已定型。
+   * Kairos 实际使用的 provider-qualified ModelKey。仅用于
+   * `getContextSnapshot().modelId` 展示——让 Sheet 里显示的模型 === LLM 真正调用的模型
+   * （所见即所得）。模型可用性与默认回退已由桌面端 ModelRuntimeService 处理。
    */
   modelId: string;
   /**
@@ -103,8 +103,8 @@ export interface CreateKairosOptions {
   toolManagerFactory: (config: KairosConfig) => ToolManager;
   contextWindow: number;
   /**
-   * Kairos LLM 调用是否启用思考链。由 `resolveKairosEnv()` 解析 settings.kairos.thinking 后决定，
-   * 透传到 runner 的 loopConfig.thinkingEnabled。
+   * Kairos LLM 调用是否启用思考链。桌面端依据当前 ModelDefinition 的能力与
+   * settings.kairos.thinking 解析后，透传到 runner 的 loopConfig.thinkingEnabled。
    * `undefined` → 让 LLM Service 用 ModelSpec.thinkingDefault；
    * `true / false` → 显式覆盖（仅 supportsThinkingToggle 的模型生效）。
    */

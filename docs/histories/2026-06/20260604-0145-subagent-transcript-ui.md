@@ -43,6 +43,6 @@ SubAgent transcript 是 sidecar 可观测事件流，但用户看到的详情仍
 - `packages/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx`
 - `packages/desktop/src/renderer/test/agent-run-block.test.tsx`
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/histories/2026-06/20260604-0145-subagent-transcript-ui.md`
 - `docs/learnings/2026-06/sidecar-transcript-ui-adapter.md`

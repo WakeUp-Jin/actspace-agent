@@ -73,7 +73,7 @@
 - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
 - `packages/desktop/src/renderer/styles/electron.css`
 - `packages/desktop/src/renderer/test/sidebar.test.tsx`
-- `docs/design-docs/front-左侧会话栏规范.md`
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`
 - `docs/exec-plans/completed/20260603-session-hover-card.md`
 - `docs/exec-plans/README.md`
 - `docs/learnings/2026-06/controlled-tooltip-async-preview.md`

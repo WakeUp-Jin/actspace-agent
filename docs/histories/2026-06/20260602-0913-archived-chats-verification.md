@@ -32,7 +32,7 @@ Learning note: this reinforces the existing tooltip primitive lesson in `docs/le
 ### 📁 Files Modified
 
 - `packages/desktop/src/renderer/test/setup.ts`
-- `docs/design-docs/front-左侧会话栏规范.md`
-- `docs/design-docs/front-设置页规范.md`
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`
+- `docs/design-docs/frontend/front-设置页规范.md`
 - `docs/exec-plans/active/20260602-archived-chats.md`
 - `docs/histories/2026-06/20260602-0913-archived-chats-verification.md`

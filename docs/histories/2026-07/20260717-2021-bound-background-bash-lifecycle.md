@@ -36,7 +36,7 @@
 - `packages/agent-core/src/engine/bridge.ts`
 - `packages/agent-core/src/tools/test/bash-background.test.ts`
 - `packages/agent-core/src/engine/test/bridge.test.ts`
-- `docs/design-docs/agent-bash工具设计文档.md`
+- `docs/design-docs/execution-safety/agent-bash工具设计文档.md`
 
 ### ✅ Verification
 

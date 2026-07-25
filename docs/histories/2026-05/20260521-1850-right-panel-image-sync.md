@@ -25,6 +25,6 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/public/front/README.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/README.md`
 - `docs/histories/2026-05/20260521-1850-right-panel-image-sync.md`

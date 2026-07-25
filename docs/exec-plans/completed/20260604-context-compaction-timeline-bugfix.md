@@ -23,11 +23,11 @@
 ## 背景
 
 - 相关文档：
-  - `docs/design-docs/front-中间消息区规范.md`
-  - `docs/design-docs/front-主题与配色规范.md`
+  - `docs/design-docs/frontend/front-中间消息区规范.md`
+  - `docs/design-docs/frontend/front-主题与配色规范.md`
   - `docs/FRONTEND_VERIFICATION.md`
   - `docs/exec-plans/completed/20260602-compact-command-ui.md`
-  - `docs/design-docs/agent-turn-layers.md`
+  - `docs/design-docs/agent-runtime/agent-turn-layers.md`
 - 相关代码路径：
   - `packages/desktop/src/renderer/components/messages/CompactCommandBlock.tsx`
   - `packages/desktop/src/renderer/components/ConversationView.tsx`
@@ -148,7 +148,7 @@
 ## 进度记录
 
 - [x] 2026-06-04：确认视觉方向：Context Compaction 是独立 timeline item；running 为稳定文字 + 进度条；completed 为 `Context compacted · N messages` divider；不使用图标、卡片、pill 或文字动效。
-- [x] 2026-06-04：已更新 `docs/design-docs/front-中间消息区规范.md`，把该 UI 决策写入设计事实。
+- [x] 2026-06-04：已更新 `docs/design-docs/frontend/front-中间消息区规范.md`，把该 UI 决策写入设计事实。
 - [x] M1 组件视觉重构：`CompactCommandBlock` 已移除图标/卡片/pill，running 改为稳定文字 + 3px 进度条，completed/skipped/failed 改为独立 divider。
 - [x] M2 文案与数据映射：恢复态和流式态均使用 `Context compacted · N messages`；`removedCount` 仍保留为事实字段，不改 IPC / session 契约。
 - [x] M3 测试与 fixture：更新组件测试、streaming 测试、shared selector 测试和 mock fixture。

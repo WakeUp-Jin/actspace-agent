@@ -2,7 +2,7 @@
 
 ## 目标
 
-对当前仓库里已经落地的 Browser Bridge 主线实现做一次“设计规范对齐”审计，判断哪些部分已经与 `docs/design-docs/agent-browser-bridge-design.md` 对齐，哪些仍需要后续真实浏览器验收或能力扩展。
+对当前仓库里已经落地的 Browser Bridge 主线实现做一次“设计规范对齐”审计，判断哪些部分已经与 `docs/design-docs/browser/agent-browser-bridge-design.md` 对齐，哪些仍需要后续真实浏览器验收或能力扩展。
 
 ## 对齐项
 

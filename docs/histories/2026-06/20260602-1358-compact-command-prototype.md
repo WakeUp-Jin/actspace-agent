@@ -16,8 +16,8 @@
 
 **Key Actions:**
 
-- **新增原型**：添加 `docs/design-docs/public/front/compact-command-states.html`，同屏展示 `/compact` 消息流事件在浅色 / 深色主题下的三态。
-- **补设计索引**：更新 `docs/design-docs/front-index.md` 与 `docs/design-docs/public/front/README.md`，让该原型可从前端设计文档入口追踪。
+- **新增原型**：添加 `docs/design-docs/frontend/compact-command-states.html`，同屏展示 `/compact` 消息流事件在浅色 / 深色主题下的三态。
+- **补设计索引**：更新 `docs/design-docs/frontend/README.md` 与 `docs/design-docs/frontend/README.md`，让该原型可从前端设计文档入口追踪。
 - **新增执行计划**：添加 `docs/exec-plans/active/20260602-compact-command-ui.md`，拆分 `/compact` 命令入口、手动压缩 IPC、消息块映射、三态 UI 组件和验证路径。
 - **登记 active plan**：更新 `docs/exec-plans/README.md`，把 `/compact` 命令前端接入加入当前进行中的计划列表。
 
@@ -27,9 +27,9 @@
 
 ### Files Modified
 
-- `docs/design-docs/public/front/compact-command-states.html`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/public/front/README.md`
+- `docs/design-docs/frontend/compact-command-states.html`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/README.md`
 - `docs/exec-plans/active/20260602-compact-command-ui.md`
 - `docs/exec-plans/README.md`
 - `docs/histories/2026-06/20260602-1358-compact-command-prototype.md`
@@ -83,7 +83,7 @@
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/desktop/src/renderer/components/ConversationView.tsx`
 - `packages/desktop/src/renderer/components/messages/CompactCommandBlock.tsx`
-- `docs/design-docs/agent-context-compression.md`
-- `docs/design-docs/agent-turn-layers.md`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/model-context/agent-context-compression.md`
+- `docs/design-docs/agent-runtime/agent-turn-layers.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/exec-plans/completed/20260602-compact-command-ui.md`

@@ -91,6 +91,17 @@ describe("SettingsPage", () => {
   const setProviderKey = vi.fn(async () => ({ ok: true }));
   const clearProviderKey = vi.fn(async () => ({ ok: true }));
   const testProviderConnection = vi.fn(async () => ({ ok: true, message: "连接成功" }));
+  const listProviders = vi.fn(async () => ({
+    providers: {
+      deepseek: { provider: "deepseek" as const, hasApiKey: false, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 2, enabledModelCount: 2 },
+      kimi: { provider: "kimi" as const, hasApiKey: true, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 2, enabledModelCount: 2 },
+      openrouter: { provider: "openrouter" as const, hasApiKey: false, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 0, enabledModelCount: 0 },
+    },
+  }));
+  const connectProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.deepseek }));
+  const disconnectProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.kimi }));
+  const listInstalledModels = vi.fn(async () => ({ models: [] }));
+  const listUsableModels = vi.fn(async () => ({ models: [] }));
   const getLocalUpdateState = vi.fn(async () => makeLocalUpdateState());
   const selectLocalUpdateSource = vi.fn(async () => ({ canceled: false, state: makeLocalUpdateState({ sourceRoot: "/repo/new" }) }));
   const startLocalUpdate = vi.fn(async () => ({
@@ -119,6 +130,11 @@ describe("SettingsPage", () => {
     setProviderKey.mockClear();
     clearProviderKey.mockClear();
     testProviderConnection.mockClear();
+    listProviders.mockClear();
+    connectProvider.mockClear();
+    disconnectProvider.mockClear();
+    listInstalledModels.mockClear();
+    listUsableModels.mockClear();
     getLocalUpdateState.mockReset();
     selectLocalUpdateSource.mockClear();
     startLocalUpdate.mockReset();
@@ -150,6 +166,11 @@ describe("SettingsPage", () => {
       setProviderKey,
       clearProviderKey,
       testProviderConnection,
+      listProviders,
+      connectProvider,
+      disconnectProvider,
+      listInstalledModels,
+      listUsableModels,
       getLocalUpdateState,
       selectLocalUpdateSource,
       startLocalUpdate,
@@ -273,17 +294,21 @@ describe("SettingsPage", () => {
     renderSettingsPage();
     await screen.findByRole("switch", { name: "自动审查" });
 
-    await userEvent.click(screen.getByRole("button", { name: "模型" }));
-    // 「模型」页现在同时包含 LLM 供应商与网络搜索供应商的连接按钮，取第一个（DeepSeek）。
-    const connectButtons = await screen.findAllByRole("button", { name: "连接" });
-    await userEvent.click(connectButtons[0]);
+    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
+    await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
+    await userEvent.click(screen.getByRole("button", { name: "选择 DeepSeek" }));
 
     const input = await screen.findByLabelText("DeepSeek API Key");
     await userEvent.type(input, "sk-test-123");
     await userEvent.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
-      expect(setProviderKey).toHaveBeenCalledWith({ provider: "deepseek", apiKey: "sk-test-123" });
+      expect(connectProvider).toHaveBeenCalledWith({
+        provider: "deepseek",
+        apiKey: "sk-test-123",
+        baseUrl: null,
+        proxy: { enabled: false, url: null },
+      });
     });
   });
 
@@ -319,13 +344,16 @@ describe("SettingsPage", () => {
     expect(updateSettings).not.toHaveBeenCalledWith(expect.objectContaining({ agent: expect.anything() }));
   });
 
-  it("switching to 模型 shows connected state for kimi", async () => {
+  it("separates provider connection state from model task selection", async () => {
     renderSettingsPage();
     await screen.findByRole("switch", { name: "自动审查" });
 
+    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
+    expect(await screen.findByRole("button", { name: "断开" })).toBeInTheDocument();
+
     await userEvent.click(screen.getByRole("button", { name: "模型" }));
-    expect(await screen.findByRole("button", { name: "断开连接" })).toBeInTheDocument();
-    expect(screen.getByLabelText("默认模型")).toBeInTheDocument();
+    expect(await screen.findByLabelText("默认会话模型")).toBeInTheDocument();
+    expect(screen.getByLabelText("轻量任务模型")).toBeInTheDocument();
   });
 
   it("归档会话分区加载归档列表并支持恢复", async () => {

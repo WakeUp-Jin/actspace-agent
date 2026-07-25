@@ -23,7 +23,7 @@
 
 ## 设计来源
 
-- `docs/design-docs/agent-权限设计规则和原则.md`
+- `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
 - `docs/exec-plans/completed/actspace-tool-permission-scheduler-plan.md`
 - `.agents/skills/llm-agent-dev/references/tools/tool-scheduling.md`
 

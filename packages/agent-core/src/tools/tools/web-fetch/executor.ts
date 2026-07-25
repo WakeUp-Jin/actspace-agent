@@ -5,7 +5,7 @@
  * 实现参考 claudecode（getURLMarkdownContent）、opencode（webfetch）与
  * firecrawl 的 fetch 引擎（charset 探测 / 非正文清洗）。
  *
- * 设计事实来源：docs/design-docs/agent-web-tools.md
+ * 设计事实来源：docs/design-docs/tool-system/agent-web-tools.md
  */
 
 import type { ToolResult } from "../../../internal-tools";

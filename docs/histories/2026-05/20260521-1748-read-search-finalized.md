@@ -26,8 +26,8 @@ Read / Search 必须保持最轻量的文本流感，作为工具调用日志而
 
 ### 📁 Files Modified
 
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-中间消息区规范.md`
-- `docs/design-docs/public/front/README.md`
-- `docs/design-docs/public/front/read-search-final.png`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/read-search-final.png`
 - `docs/histories/2026-05/20260521-1748-read-search-finalized.md`

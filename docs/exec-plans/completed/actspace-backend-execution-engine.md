@@ -6,7 +6,7 @@
 
 ## 设计来源
 
-- `docs/design-docs/agent-backend-design.md`
+- `docs/design-docs/agent-runtime/agent-backend-design.md`
 - `.agents/skills/llm-agent-dev/references/agent-runtime/agent-patterns.md`（核心：执行循环设计、双层 while、AgentEvent、Agent 入口类）
 - `.agents/skills/llm-agent-dev/references/architecture.md`（V0/V1 执行循环定位）
 - `.agents/skills/llm-agent-dev/examples/agent-loop.ts`（核心参考实现：runAgentLoop + Agent 类 + SubAgentTool）

@@ -28,5 +28,5 @@ Kairos 不是第二套 Agent 内核，而是共享主 Agent 的工具执行内�
 
 ### Files Modified
 
-- `docs/design-docs/agent-kairos-autonomous-mode.md`
-- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`

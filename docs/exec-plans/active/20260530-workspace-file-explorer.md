@@ -4,7 +4,7 @@
 
 在右侧面板新增一个轻量「工作区文件浏览器」：左侧常驻可折叠文件树（rail），点文件用已有渲染视图开成普通 Tab。第一版只做**只读 + 单 root（当前会话 workspaceRoot）**，让用户能直接翻看 Agent 实际操作的文件，并为后续 path 直达 / diff 标记 / Kairos 配置编辑预留地基。
 
-派生自设计规范 `docs/design-docs/front-右侧面板与文件渲染规范.md`。规范是「为什么 / 做成什么样 / V1-V3 边界 / 安全约束」的事实来源；本计划只负责「谁改哪些文件、按什么顺序、怎么验证」。两者冲突以规范为准。
+派生自设计规范 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`。规范是「为什么 / 做成什么样 / V1-V3 边界 / 安全约束」的事实来源；本计划只负责「谁改哪些文件、按什么顺序、怎么验证」。两者冲突以规范为准。
 
 ## Required Reading
 
@@ -20,9 +20,9 @@
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
 - `docs/SECURITY.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/front-主题与配色规范.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/front-主题与配色规范.md`
 - `docs/design-docs/core-storage-and-observability.md`
 
 ## 范围

@@ -6,7 +6,7 @@
 
 ## 设计来源
 
-- `docs/design-docs/agent-backend-design.md`
+- `docs/design-docs/agent-runtime/agent-backend-design.md`
 - `.agents/skills/llm-agent-dev/references/tools/overview.md`（模块导航）
 - `.agents/skills/llm-agent-dev/references/tools/tool-definition.md`（核心：InternalTool 类型、description 编写、ToolResult）
 - `.agents/skills/llm-agent-dev/references/tools/tool-scheduling.md`（核心：ToolScheduler 生命周期、权限审批、OutputTruncator）

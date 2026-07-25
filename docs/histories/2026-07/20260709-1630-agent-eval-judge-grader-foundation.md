@@ -15,7 +15,7 @@
 - 将单 case report 构建器改为异步，支持确定性 graders 和 judge graders 混合运行。
 - 未配置 judge client 时，judge grader 会生成结构化 failed grader result。
 - 更新外部 `README.md` 和 `docs/ARCHITECTURE.md`，说明 judge grader 是可选接口，默认 CI 只跑 static judge。
-- 更新 `docs/design-docs/agent-evaluation.md` 和执行计划，记录当前实现边界和剩余真实模型工作。
+- 更新 `docs/design-docs/evaluation/agent-evaluation.md` 和执行计划，记录当前实现边界和剩余真实模型工作。
 
 ### Verification
 

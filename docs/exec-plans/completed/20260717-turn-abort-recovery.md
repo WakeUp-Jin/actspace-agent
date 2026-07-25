@@ -22,9 +22,9 @@
 ## 背景
 
 - 相关文档：
-  - `docs/design-docs/agent-turn-layers.md`
+  - `docs/design-docs/agent-runtime/agent-turn-layers.md`
   - `docs/design-docs/core-storage-and-observability.md`
-  - `docs/design-docs/agent-testing.md`
+  - `docs/design-docs/agent-runtime/agent-testing.md`
   - `docs/FRONTEND_VERIFICATION.md`
   - `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-tool-pause-session-boundary-plan.md`
 - 相关代码路径：

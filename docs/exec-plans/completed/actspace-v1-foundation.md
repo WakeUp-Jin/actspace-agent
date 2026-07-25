@@ -24,7 +24,7 @@
 - 相关文档：
   - `README.md`
   - `docs/ARCHITECTURE.md`
-  - `docs/design-docs/front-index.md`
+  - `docs/design-docs/frontend/README.md`
   - `docs/exec-plans/active/actspace-v1-agent-runtime.md`
   - `docs/exec-plans/active/actspace-v1-workbench-ui.md`
   - `docs/exec-plans/active/actspace-v1-integration-and-acceptance.md`
@@ -32,7 +32,7 @@
   - 桌面端首版采用 `Electron + React + TypeScript + Vite`
   - 交互基础组件优先采用 `Radix UI` primitives
   - 本地数据优先使用 `jsonl` 文件存储
-  - 当前前端视觉以 `docs/design-docs/front-index.md` 为单一事实来源
+  - 当前前端视觉以 `docs/design-docs/frontend/README.md` 为单一事实来源
 
 ## 工程结构
 

@@ -40,6 +40,6 @@ Workspace 选择属于用户发送前的准备态，可能被多次调整；把�
 - `packages/desktop/src/renderer/styles/electron.css`
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
 - `packages/desktop/src/renderer/test/workspace-file-tree.test.tsx`
-- `docs/design-docs/agent-turn-layers.md`
+- `docs/design-docs/agent-runtime/agent-turn-layers.md`
 - `docs/design-docs/core-storage-and-observability.md`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`

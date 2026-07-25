@@ -24,6 +24,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+import type { LLMConfig } from "./llm/types";
 
 // ─── 类型定义 ───
 
@@ -418,7 +419,7 @@ export const env: AppEnv = new Proxy({} as AppEnv, {
  * 仅用于测试和 mock fallback 场景。
  * Electron 真实 turn 使用 engine/create-agent-deps.ts 中的 buildAgentConfig() + createAgentFromConfig()。
  */
-export function envToLLMConfig() {
+export function envToLLMConfig(): LLMConfig {
   const e = getEnv();
   if (e.MOCK_MODE || e.LLM_PROVIDER === "mock" || e.LLM_PROVIDER === "deepseek-mock") {
     return {

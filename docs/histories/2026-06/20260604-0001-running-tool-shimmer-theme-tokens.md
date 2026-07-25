@@ -42,5 +42,5 @@
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
 - `packages/desktop/src/renderer/test/file-diff-block.test.tsx`
 - `packages/desktop/src/renderer/test/agent-run-block.test.tsx`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/learnings/2026-06/css-text-shimmer-overlay.md`

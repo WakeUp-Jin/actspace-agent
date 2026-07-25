@@ -2,7 +2,7 @@
 
 - 日期：2026-07-04
 - 类型：新功能
-- 设计：`docs/design-docs/agent-kairos-notifications.md`
+- 设计：`docs/design-docs/kairos/agent-kairos-notifications.md`
 - 计划：`docs/exec-plans/completed/20260704-kairos-notifications.md`
 
 ## 背景
@@ -38,7 +38,7 @@
 ### renderer
 
 - 首版为「头部铃铛 + 锚定浮层」；用户评审三个交互方案（行内展开浮层 / 双层浮层 / 抽屉，
-  mockup 见 `docs/design-docs/mockups/kairos-notification-ui-variants.html`）后提出第 4 种
+  mockup 见 `docs/design-docs/kairos/kairos-notification-ui-variants.html`）后提出第 4 种
   形态并定稿：**通知作为内容 tab**。
 - 新增 `components/kairos/KairosNotifications.tsx`：`useKairosNotifications` hook +
   `KairosNotificationList`（列表 + 行内展开已读）+ `KairosNotificationTabBadge`。

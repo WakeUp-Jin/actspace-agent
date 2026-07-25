@@ -22,9 +22,6 @@ import type {
   CompactContextInput,
   GenerateEvalCandidateInput,
   ComposerAttachment,
-  DeepSeekBalanceSnapshot,
-  KimiBalanceSnapshot,
-  ProviderId,
   RunTurnInput,
   SelectFilesResult,
   SelectWorkspaceDirectoryResult,
@@ -58,12 +55,31 @@ import type {
   FsWatchSetEnabledInput,
   SkillInstallResult,
   SkillUninstallInput,
+  ProviderConnectInput,
+  ProviderUpdateInput,
+  ProviderIdInput,
+  ProviderOperationResult,
+  ProviderTestResult,
+  ProvidersListResult,
+  ModelsListInstalledResult,
+  ModelsListUsableInput,
+  ModelsListUsableResult,
+  ModelsCatalogListInput,
+  ModelsCatalogListResult,
+  ModelsAddInput,
+  ModelsUpdateInput,
+  ModelsRemoveInput,
+  ModelMutationResult,
+  TaskModelsUpdateInput,
+  TaskModelsUpdateResult,
+  KairosModelUpdateInput,
+  KairosModelUpdateResult,
 } from "@actspace/shared";
+import { isProviderId, normalizeModelKey, resolveConfiguredModel } from "@actspace/shared";
 import {
   createBootstrapState,
   createGlobalUsageStatisticsSnapshot,
   createUsageStatisticsSnapshot,
-  getEnv,
   loadEnv,
   createSessionRecord,
   createSessionStorePaths,
@@ -75,8 +91,10 @@ import {
   setSessionTitle,
   setSessionWorkspace,
   createKairos,
+  createLLMService,
   ShortMemoryStore,
   bashTaskRegistry,
+  closeProviderTransports,
   loadSkillRegistry,
   type KairosConfig,
   type KairosController,
@@ -96,16 +114,18 @@ import { getSessionPreview } from "./session-preview-service";
 import { LocalUpdateService } from "./local-update-service";
 import { PendingApprovalRegistry } from "./approval-registry";
 import {
-  createKairosLlm,
-  createKairosToolManagerFactory,
+  createDynamicKairosToolManagerFactory,
   getKairosWorkspaceRoot,
-  resolveKairosContextWindow,
-  resolveKairosModelId,
-  resolveKairosThinkingEnabled,
+  resolveDynamicKairosThinking,
   ensureKairosScaffolding,
 } from "./kairos-bootstrap";
 import { registerKairosIpc, type KairosIpcHandle } from "./kairos-ipc";
 import { SettingsService, type SecretCrypto } from "./settings-service";
+import { ModelStoreService, type ModelStoreResult } from "./model-store-service";
+import { OpenRouterCatalogService } from "./openrouter-catalog-service";
+import { ModelRuntimeService } from "./model-runtime-service";
+import { testProviderConnection } from "./provider-connection-service";
+import { getDeepSeekBalanceSnapshot, getKimiBalanceSnapshot } from "./provider-balance-service";
 import { resolveAppDataRoots } from "./app-paths";
 import { BrowserBridgeService } from "./plugins/browser-bridge-service";
 import { FsWatchService } from "./plugins/fs-watch-service";
@@ -115,8 +135,6 @@ const APP_ID = "com.actspace.desktop";
 const APP_NAME = "actspace";
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const PREVIEW_LIMIT = 160;
-const DEEPSEEK_BALANCE_TIMEOUT_MS = 8_000;
-const PROVIDER_TEST_TIMEOUT_MS = 8_000;
 
 const MIME_BY_EXT: Record<string, string> = {
   ".png": "image/png",
@@ -144,16 +162,6 @@ const MIME_BY_EXT: Record<string, string> = {
 
 let startupLogPath: string | undefined;
 let startupRunLogPath: string | undefined;
-
-type DeepSeekBalanceApiInfo = {
-  currency?: unknown;
-  total_balance?: unknown;
-};
-
-type DeepSeekBalanceApiResponse = {
-  is_available?: unknown;
-  balance_infos?: unknown;
-};
 
 // ─── 工具函数 ───
 
@@ -378,159 +386,6 @@ async function loadAllKairosEvents(shortMemoryRoot: string): Promise<SessionEven
   }
 }
 
-function resolveDeepSeekBalanceUrl(baseUrl: string): string {
-  const normalized = (baseUrl || "https://api.deepseek.com").replace(/\/+$/, "");
-  const apiRoot = normalized.endsWith("/v1") ? normalized.slice(0, -3) : normalized;
-  return `${apiRoot}/user/balance`;
-}
-
-function normalizeBalanceAmount(value: unknown): string | null {
-  if (typeof value !== "string" && typeof value !== "number") return null;
-  const raw = String(value).trim();
-  if (!raw) return null;
-  const numeric = Number(raw);
-  if (!Number.isFinite(numeric)) return raw;
-  return numeric.toFixed(2);
-}
-
-function selectDeepSeekDisplayBalance(response: DeepSeekBalanceApiResponse): DeepSeekBalanceSnapshot["displayBalance"] {
-  if (!Array.isArray(response.balance_infos)) return null;
-  const infos = response.balance_infos.filter((item): item is DeepSeekBalanceApiInfo => {
-    return item !== null && typeof item === "object";
-  });
-  const preferred = infos.find((info) => info.currency === "CNY") ?? infos[0];
-  if (!preferred || typeof preferred.currency !== "string") return null;
-
-  const amount = normalizeBalanceAmount(preferred.total_balance);
-  if (!amount) return null;
-  return {
-    amount,
-    currency: preferred.currency.toUpperCase(),
-  };
-}
-
-async function getDeepSeekBalanceSnapshot(): Promise<DeepSeekBalanceSnapshot> {
-  const currentEnv = getEnv();
-  if (!currentEnv.DEEPSEEK_API_KEY) {
-    return {
-      provider: "deepseek",
-      isConfigured: false,
-      isAvailable: null,
-      generatedAt: new Date().toISOString(),
-      displayBalance: null,
-    };
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEEPSEEK_BALANCE_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(resolveDeepSeekBalanceUrl(currentEnv.DEEPSEEK_BASE_URL), {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${currentEnv.DEEPSEEK_API_KEY}`,
-      },
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`DeepSeek balance request failed with status ${response.status}.`);
-    }
-
-    const payload = (await response.json()) as DeepSeekBalanceApiResponse;
-    return {
-      provider: "deepseek",
-      isConfigured: true,
-      isAvailable: typeof payload.is_available === "boolean" ? payload.is_available : null,
-      generatedAt: new Date().toISOString(),
-      displayBalance: selectDeepSeekDisplayBalance(payload),
-    };
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("DeepSeek balance request timed out.");
-    }
-    throw error instanceof Error ? error : new Error("DeepSeek balance request failed.");
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-// ─── Kimi（Moonshot）余额 ───
-
-type MoonshotBalanceData = {
-  available_balance?: unknown;
-};
-
-type MoonshotBalanceApiResponse = {
-  code?: unknown;
-  status?: unknown;
-  data?: unknown;
-};
-
-/** Moonshot 余额端点：<root>/v1/users/me/balance（baseUrl 可能已含 /v1）。 */
-function resolveKimiBalanceUrl(baseUrl: string): string {
-  const normalized = (baseUrl || "https://api.moonshot.cn/v1").replace(/\/+$/, "");
-  const root = normalized.endsWith("/v1") ? normalized.slice(0, -3) : normalized;
-  return `${root}/v1/users/me/balance`;
-}
-
-function selectKimiDisplayBalance(payload: MoonshotBalanceApiResponse): KimiBalanceSnapshot["displayBalance"] {
-  const data = payload.data;
-  if (data === null || typeof data !== "object") return null;
-  const amount = normalizeBalanceAmount((data as MoonshotBalanceData).available_balance);
-  if (!amount) return null;
-  // Moonshot 账户按人民币结算。
-  return { amount, currency: "CNY" };
-}
-
-async function getKimiBalanceSnapshot(): Promise<KimiBalanceSnapshot> {
-  const currentEnv = getEnv();
-  if (!currentEnv.KIMI_API_KEY) {
-    return {
-      provider: "kimi",
-      isConfigured: false,
-      isAvailable: null,
-      generatedAt: new Date().toISOString(),
-      displayBalance: null,
-    };
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEEPSEEK_BALANCE_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(resolveKimiBalanceUrl(currentEnv.KIMI_BASE_URL), {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${currentEnv.KIMI_API_KEY}`,
-      },
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Kimi balance request failed with status ${response.status}.`);
-    }
-
-    const payload = (await response.json()) as MoonshotBalanceApiResponse;
-    return {
-      provider: "kimi",
-      isConfigured: true,
-      isAvailable: typeof payload.status === "boolean" ? payload.status : null,
-      generatedAt: new Date().toISOString(),
-      displayBalance: selectKimiDisplayBalance(payload),
-    };
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Kimi balance request timed out.");
-    }
-    throw error instanceof Error ? error : new Error("Kimi balance request failed.");
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 // ─── 设置（Settings） ───
 
 /** 生产环境用 Electron safeStorage 为供应商 API Key 加解密。 */
@@ -541,6 +396,9 @@ const electronSecretCrypto: SecretCrypto = {
 };
 
 let settingsService: SettingsService | undefined;
+let modelStoreService: ModelStoreService | undefined;
+let openRouterCatalogService: OpenRouterCatalogService | undefined;
+let modelRuntimeService: ModelRuntimeService | undefined;
 let localUpdateService: LocalUpdateService | undefined;
 let localUpdateQuitRequested = false;
 let browserBridgeService: BrowserBridgeService | undefined;
@@ -551,6 +409,52 @@ function getSettingsService(): SettingsService {
     throw new Error("SettingsService 尚未初始化（应在 app.whenReady 内 load 之后再调用）。");
   }
   return settingsService;
+}
+
+function getModelStoreService(): ModelStoreService {
+  if (!modelStoreService) throw new Error("ModelStoreService 尚未初始化。");
+  return modelStoreService;
+}
+
+function getOpenRouterCatalogService(): OpenRouterCatalogService {
+  if (!openRouterCatalogService) throw new Error("OpenRouterCatalogService 尚未初始化。");
+  return openRouterCatalogService;
+}
+
+function getModelRuntimeService(): ModelRuntimeService {
+  if (!modelRuntimeService) throw new Error("ModelRuntimeService 尚未初始化。");
+  return modelRuntimeService;
+}
+
+function safeErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message.slice(0, 300) : "操作失败，请重试。";
+}
+
+function providerErrorCode(error: unknown): "invalid_api_key" | "invalid_base_url" | "invalid_proxy_url" | "secret_storage_unavailable" | "write_failed" {
+  const code = (error as { code?: string } | null)?.code;
+  return code === "invalid_api_key" || code === "invalid_base_url" || code === "invalid_proxy_url" || code === "secret_storage_unavailable"
+    ? code
+    : "write_failed";
+}
+
+function providerOperationFailure(code: "invalid_provider" | "invalid_api_key" | "invalid_base_url" | "invalid_proxy_url" | "secret_storage_unavailable" | "write_failed", message: string): ProviderOperationResult {
+  return { ok: false, error: { code, message } };
+}
+
+function emptyProviderView() {
+  return { hasApiKey: false, enabled: false, baseUrl: null, proxy: { enabled: false, url: null }, lastConnection: { status: "untested" as const }, installedModelCount: 0, enabledModelCount: 0 };
+}
+
+function toModelMutationResult(result: ModelStoreResult): ModelMutationResult {
+  if (!("code" in result)) return { ok: true, ...(result.model && { model: result.model }) };
+  const code = result.code === "model_in_use"
+    ? "model_in_use"
+    : result.code === "model_not_removable"
+      ? "model_not_removable"
+      : result.code === "model_not_found" || result.code === "model_not_installed"
+        ? "model_missing"
+        : "invalid_model";
+  return { ok: false, error: { code, message: result.message, ...(result.references && { references: result.references as any }) } };
 }
 
 function getFsWatchService(roots: AppDataRoots): FsWatchService {
@@ -609,56 +513,6 @@ function getLocalUpdateService(): LocalUpdateService {
     throw new Error("LocalUpdateService is not initialized");
   }
   return localUpdateService;
-}
-
-function resolveProviderModelsUrl(baseUrl: string): string {
-  const normalized = (baseUrl || "https://api.moonshot.cn/v1").replace(/\/+$/, "");
-  return normalized.endsWith("/v1") ? `${normalized}/models` : `${normalized}/v1/models`;
-}
-
-/**
- * 轻量探测供应商连通性与 Key 有效性：
- * - DeepSeek 打余额端点，Kimi 打 `/models`，仅看 HTTP 状态码，不解析正文。
- * - 返回文案均为脱敏提示，绝不回传明文 Key。
- */
-async function testProviderConnection(provider: ProviderId): Promise<TestConnectionResult> {
-  const currentEnv = getEnv();
-  const apiKey = provider === "deepseek" ? currentEnv.DEEPSEEK_API_KEY : currentEnv.KIMI_API_KEY;
-  if (!apiKey) {
-    return { ok: false, message: "尚未配置 API Key，请先填写并保存后再测试。" };
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), PROVIDER_TEST_TIMEOUT_MS);
-  try {
-    const url =
-      provider === "deepseek"
-        ? resolveDeepSeekBalanceUrl(currentEnv.DEEPSEEK_BASE_URL)
-        : resolveProviderModelsUrl(currentEnv.KIMI_BASE_URL);
-    const response = await fetch(url, {
-      method: "GET",
-      headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}` },
-      signal: controller.signal,
-    });
-    if (response.ok) {
-      return { ok: true, message: "连接成功，API Key 有效。" };
-    }
-    if (response.status === 401 || response.status === 403) {
-      return { ok: false, message: "鉴权失败：API Key 无效或权限不足。" };
-    }
-    return { ok: false, message: `连接失败：服务返回状态码 ${response.status}。` };
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      return { ok: false, message: "连接超时，请检查网络或稍后重试。" };
-    }
-    return {
-      ok: false,
-      message: "连接失败，请检查网络后重试。",
-      detail: error instanceof Error ? error.message : undefined,
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 // ─── Electron 配置 ───
@@ -771,16 +625,24 @@ async function ensureKairosController(roots: AppDataRoots): Promise<KairosContro
   await ensureKairosScaffolding(kairosRoot);
   const kairosWorkspaceRoot = getKairosWorkspaceRoot(kairosRoot);
   // 模型 / 思考链真来源 = settings.json 的 kairos 分区。
-  const kairosSettings = getSettingsService().get().kairos;
-  const preferredModelId = kairosSettings.modelId;
-  const resolvedModelId = resolveKairosModelId(preferredModelId);
-  const llm = createKairosLlm(preferredModelId);
-  const thinkingEnabled = resolveKairosThinkingEnabled(preferredModelId, kairosSettings.thinking);
-  const toolManagerFactory = createKairosToolManagerFactory({
+  const kairosSettings = getSettingsService().getV2().kairos;
+  const resolved = getModelRuntimeService().resolveKairosModel();
+  if (!("model" in resolved)) {
+    const error = new Error(resolved.message) as Error & { code?: string; modelKey?: string };
+    error.code = "model_unavailable";
+    error.modelKey = resolved.modelKey;
+    throw error;
+  }
+  const llm = createLLMService(resolved.model.llmConfig);
+  const resolvedModelId = resolved.model.key;
+  const thinkingEnabled = resolveDynamicKairosThinking(resolved.model.definition, kairosSettings.thinking);
+  const toolManagerFactory = createDynamicKairosToolManagerFactory({
     workspaceRoot: kairosWorkspaceRoot,
-    modelId: preferredModelId,
+    definition: resolved.model.definition,
+    llmConfig: resolved.model.llmConfig,
+    toolEnvironment: getModelRuntimeService().getToolEnvironment(),
   });
-  const contextWindow = resolveKairosContextWindow(preferredModelId);
+  const contextWindow = resolved.model.definition.contextWindow ?? 128_000;
   // Skill 白名单 catalog：加载失败不阻塞 Kairos 启动（回落为不加载任何 Skill）
   let skillCatalog: KairosSkillCatalogEntry[] = [];
   try {
@@ -865,6 +727,26 @@ async function rebuildKairosController(roots: AppDataRoots): Promise<void> {
   logMain("kairos controller rebuilt with latest settings");
 }
 
+async function reconcileKairosModelChange(roots: AppDataRoots): Promise<void> {
+  if (!kairosController) return;
+  const resolution = getModelRuntimeService().resolveKairosModel();
+  if (!("model" in resolution)) {
+    try {
+      await kairosController.stop();
+    } finally {
+      kairosIpcHandle?.dispose();
+      kairosController = undefined;
+      kairosIpcHandle = undefined;
+    }
+    logMain("kairos paused because configured model is unavailable", {
+      modelKey: resolution.modelKey,
+      reason: resolution.reason ?? resolution.code,
+    });
+    return;
+  }
+  await rebuildKairosController(roots);
+}
+
 // ─── 审核注册表（单例） ───
 
 const approvalRegistry = new PendingApprovalRegistry({
@@ -947,6 +829,7 @@ async function registerIpc() {
             warn: logMain,
           });
         },
+        getModelRuntimeService(),
       );
       logMain("run turn completed", {
         sessionId: input.sessionId,
@@ -992,12 +875,13 @@ async function registerIpc() {
           warn: logMain,
         });
       },
+      getModelRuntimeService(),
     );
   });
 
   ipcMain.handle("eval:generate-candidate", async (_event, input: GenerateEvalCandidateInput) => {
     const roots = await ensureDataDirectories();
-    return generateEvalCandidate(input, roots);
+    return generateEvalCandidate(input, roots, undefined, getModelRuntimeService());
   });
 
   ipcMain.handle("dialog:select-files", async (): Promise<SelectFilesResult> => {
@@ -1098,7 +982,7 @@ async function registerIpc() {
           browserBridgeSocketPath: browserBridge.socketPath,
           warn: logMain,
         });
-      });
+      }, getModelRuntimeService());
     } catch (error) {
       logMain("describe context failed", {
         sessionId: input.sessionId,
@@ -1161,7 +1045,8 @@ async function registerIpc() {
 
   ipcMain.handle("deepseek:balance:get", async () => {
     try {
-      return await getDeepSeekBalanceSnapshot();
+      const runtime = getSettingsService().getProviderRuntimeConfig("deepseek");
+      return await getDeepSeekBalanceSnapshot("code" in runtime ? undefined : runtime);
     } catch (error) {
       logMain("deepseek balance fetch failed", {
         error: error instanceof Error ? error.message : String(error),
@@ -1172,7 +1057,8 @@ async function registerIpc() {
 
   ipcMain.handle("kimi:balance:get", async () => {
     try {
-      return await getKimiBalanceSnapshot();
+      const runtime = getSettingsService().getProviderRuntimeConfig("kimi");
+      return await getKimiBalanceSnapshot("code" in runtime ? undefined : runtime);
     } catch (error) {
       logMain("kimi balance fetch failed", {
         error: error instanceof Error ? error.message : String(error),
@@ -1255,6 +1141,119 @@ async function registerIpc() {
     return getSettingsService().get();
   });
 
+  ipcMain.handle("providers:list", async (): Promise<ProvidersListResult> => ({
+    providers: getSettingsService().getV2().providers,
+  }));
+
+  ipcMain.handle("providers:connect", async (_event, input: ProviderConnectInput): Promise<ProviderOperationResult> => {
+    if (!isProviderId(input?.provider)) return providerOperationFailure("invalid_provider", "未知服务商。");
+    try {
+      await getSettingsService().updateProviderConnection({
+        provider: input.provider,
+        apiKey: input.apiKey,
+        baseUrl: input.baseUrl,
+        proxy: input.proxy,
+        enabled: true,
+      });
+      return { ok: true, provider: getSettingsService().getV2().providers[input.provider] };
+    } catch (error) {
+      return providerOperationFailure(providerErrorCode(error), safeErrorMessage(error));
+    }
+  });
+
+  ipcMain.handle("providers:update", async (_event, input: ProviderUpdateInput): Promise<ProviderOperationResult> => {
+    if (!isProviderId(input?.provider)) return providerOperationFailure("invalid_provider", "未知服务商。");
+    try {
+      await getSettingsService().updateProviderConnection(input);
+      await reconcileKairosModelChange(await ensureDataDirectories());
+      return { ok: true, provider: getSettingsService().getV2().providers[input.provider] };
+    } catch (error) {
+      return providerOperationFailure(providerErrorCode(error), safeErrorMessage(error));
+    }
+  });
+
+  ipcMain.handle("providers:test", async (_event, input: ProviderIdInput): Promise<ProviderTestResult> => {
+    if (!isProviderId(input?.provider)) {
+      return { ok: false, provider: emptyProviderView(), message: "未知服务商。", checkedAt: new Date().toISOString(), errorKind: "invalid_request" };
+    }
+    const runtime = getSettingsService().getProviderRuntimeConfig(input.provider);
+    if ("code" in runtime) {
+      return { ok: false, provider: getSettingsService().getV2().providers[input.provider], message: runtime.message, checkedAt: new Date().toISOString(), errorKind: "invalid_request" };
+    }
+    const result = await testProviderConnection(runtime);
+    await getSettingsService().markProviderConnectionResult(input.provider, result);
+    if (result.ok && input.provider === "openrouter") await getModelStoreService().ensureCuratedModelsInstalled();
+    const provider = getSettingsService().getV2().providers[input.provider];
+    return result.ok
+      ? { ok: true, provider, message: result.message, checkedAt: result.checkedAt }
+      : { ok: false, provider, message: result.message, checkedAt: result.checkedAt, errorKind: result.errorKind ?? "network", ...(result.statusCode && { statusCode: result.statusCode }) };
+  });
+
+  ipcMain.handle("providers:disconnect", async (_event, input: ProviderIdInput): Promise<ProviderOperationResult> => {
+    if (!isProviderId(input?.provider)) return providerOperationFailure("invalid_provider", "未知服务商。");
+    try {
+      await getSettingsService().updateProviderConnection({ provider: input.provider, apiKey: null });
+      await reconcileKairosModelChange(await ensureDataDirectories());
+      return { ok: true, provider: getSettingsService().getV2().providers[input.provider] };
+    } catch (error) {
+      return providerOperationFailure(providerErrorCode(error), safeErrorMessage(error));
+    }
+  });
+
+  ipcMain.handle("models:list-installed", async (): Promise<ModelsListInstalledResult> => ({ models: getModelStoreService().listInstalledModels() }));
+  ipcMain.handle("models:list-usable", async (_event, input: ModelsListUsableInput): Promise<ModelsListUsableResult> => {
+    const purpose = ["chat", "utility", "explore", "kairos", "vision"].includes(input?.purpose) ? input.purpose : "chat";
+    return { models: getModelRuntimeService().listUsableModels(purpose) };
+  });
+  ipcMain.handle("models:catalog:list", async (_event, input: ModelsCatalogListInput): Promise<ModelsCatalogListResult> => ({
+    provider: "openrouter",
+    ...getOpenRouterCatalogService().list(input?.query),
+  }));
+  ipcMain.handle("models:catalog:reload", async (): Promise<ModelsCatalogListResult> => {
+    const runtime = getSettingsService().getProviderRuntimeConfig("openrouter");
+    if ("code" in runtime) return { provider: "openrouter", ...getOpenRouterCatalogService().list(), error: { code: runtime.code, message: runtime.message } };
+    return { provider: "openrouter", ...await getOpenRouterCatalogService().reload(runtime) };
+  });
+  ipcMain.handle("models:add", async (_event, input: ModelsAddInput): Promise<ModelMutationResult> => {
+    if (input?.provider !== "openrouter" || typeof input.apiModel !== "string") {
+      return { ok: false, error: { code: "invalid_model", message: "模型添加参数无效。" } };
+    }
+    return toModelMutationResult(await getModelStoreService().addCatalogModel(input.provider, input.apiModel));
+  });
+  ipcMain.handle("models:update", async (_event, input: ModelsUpdateInput): Promise<ModelMutationResult> => {
+    const key = normalizeModelKey(input?.modelKey);
+    if (!key || typeof input.enabled !== "boolean") return { ok: false, error: { code: "invalid_model", message: "模型更新参数无效。" } };
+    const result = await getModelStoreService().setModelEnabled(key, input.enabled);
+    await reconcileKairosModelChange(await ensureDataDirectories());
+    return toModelMutationResult(result);
+  });
+  ipcMain.handle("models:remove", async (_event, input: ModelsRemoveInput): Promise<ModelMutationResult> => {
+    const key = normalizeModelKey(input?.modelKey);
+    if (!key) return { ok: false, error: { code: "invalid_model", message: "模型标识无效。" } };
+    return toModelMutationResult(await getModelStoreService().removeModel(key));
+  });
+  ipcMain.handle("task-models:update", async (_event, input: TaskModelsUpdateInput): Promise<TaskModelsUpdateResult> => {
+    const purposeByField = { defaultChatModel: "chat", utilityModel: "utility", exploreModel: "explore" } as const;
+    for (const [field, purpose] of Object.entries(purposeByField) as Array<[keyof typeof purposeByField, typeof purposeByField[keyof typeof purposeByField]]>) {
+      const value = input?.[field];
+      if (value === undefined || value === null) continue;
+      const key = normalizeModelKey(value);
+      if (!key || !("model" in resolveConfiguredModel(getModelStoreService().getModelSnapshot(), key, purpose))) throw new Error(`${field} 选择的模型不可用。`);
+    }
+    const next = await getSettingsService().updateV2({ taskModels: input });
+    return { taskModels: next.taskModels };
+  });
+  ipcMain.handle("kairos-model:update", async (_event, input: KairosModelUpdateInput): Promise<KairosModelUpdateResult> => {
+    const value = input?.modelKey;
+    const key = value === null ? null : normalizeModelKey(value);
+    if (value !== null && (!key || !("model" in resolveConfiguredModel(getModelStoreService().getModelSnapshot(), key, "kairos")))) {
+      throw new Error("Kairos 选择的模型不可用。");
+    }
+    const next = await getSettingsService().updateV2({ kairos: { modelId: key } });
+    await reconcileKairosModelChange(await ensureDataDirectories());
+    return { modelKey: next.kairos.modelId };
+  });
+
   ipcMain.handle("settings:read-agent-system-prompt", async () => {
     return getSettingsService().readAgentSystemPrompt();
   });
@@ -1302,9 +1301,15 @@ async function registerIpc() {
   });
 
   ipcMain.handle("settings:test-connection", async (_event, input: TestConnectionInput) => {
-    const result = await testProviderConnection(input.provider);
+    const service = getSettingsService();
+    const runtime = service.getProviderRuntimeConfig(input.provider);
+    if ("code" in runtime) {
+      return { ok: false, message: runtime.message } satisfies TestConnectionResult;
+    }
+    const result = await testProviderConnection(runtime);
+    await service.markProviderConnectionResult(input.provider, result);
     logMain("settings test connection", { provider: input.provider, ok: result.ok });
-    return result;
+    return { ok: result.ok, message: result.message } satisfies TestConnectionResult;
   });
 
   ipcMain.handle("settings:search-usage", async () => {
@@ -1562,6 +1567,16 @@ app.whenReady().then(async () => {
   } catch (err) {
     logMain("settings service load failed", { error: err instanceof Error ? err.message : String(err) });
   }
+  modelStoreService = new ModelStoreService({
+    settings: settingsService,
+    findCatalogModel: (apiModel) => openRouterCatalogService?.findModel(apiModel),
+  });
+  openRouterCatalogService = new OpenRouterCatalogService({
+    dataRoot: roots.dataRoot,
+    isAdded: (apiModel) => modelStoreService?.isCatalogModelAdded(apiModel) ?? false,
+  });
+  await openRouterCatalogService.load();
+  modelRuntimeService = new ModelRuntimeService(settingsService, modelStoreService);
   localUpdateService = new LocalUpdateService({
     dataRoot: roots.dataRoot,
     appPath: process.execPath,
@@ -1654,6 +1669,7 @@ app.on("before-quit", (event) => {
   fsWatchService?.shutdownSync();
   if (!kairosController) {
     kairosIpcHandle?.dispose();
+    void closeProviderTransports();
     return;
   }
   shuttingDown = true;
@@ -1681,6 +1697,7 @@ app.on("before-quit", (event) => {
     } finally {
       clearTimeout(timer);
       kairosIpcHandle?.dispose();
+      await closeProviderTransports();
       finish();
     }
   })();

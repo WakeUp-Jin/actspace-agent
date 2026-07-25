@@ -3,7 +3,7 @@
  * 仅维护字符串；占位符替换交给 `prompt-assembler.ts` 的 `assembleSystemPrompt`。
  *
  * 占位符约定（只允许低频变化内容，详见
- * docs/design-docs/agent-kairos-prompt-cache-optimization.md）：
+ * docs/design-docs/kairos/agent-kairos-prompt-cache-optimization.md）：
  *   {soul}                人格插槽：soul.md 原文，空白时 fallback 到 KAIROS_DEFAULT_SOUL
  *                         （改 soul.md 才变；分层设计见 agent-kairos-prompt-design.md）
  *   {config_tips_block}   buildConfigTipsBlock 输出（改 preferences/paths/blocklist 才变）

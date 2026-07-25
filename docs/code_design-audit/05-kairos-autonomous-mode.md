@@ -9,11 +9,11 @@
 - `AGENTS.md`
 - `docs/REPO_COLLAB_GUIDE.md`
 - `docs/CODING_BEHAVIOR.md`
-- `docs/design-docs/agent-kairos-autonomous-mode.md`
-- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
 - `docs/design-docs/core-storage-and-observability.md`
-- `docs/design-docs/front-Kairos监控页规范.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/kairos/front-Kairos监控页规范.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 
 ## 重点代码与文件范围
 
@@ -75,9 +75,9 @@
 
 ### 发现 1：`blocklist.timeWindows` / `tickBudget` 仍停留在 schema 和提示层，调度层没有硬执行（待确认）
 
-- 偏移点：长期设计文档后半段把 `blocklist.timeWindows` 描述为 scheduler 硬拦截、把 `tickBudget.perHour` 描述为超限后自动 stop 并 emit error（`docs/design-docs/agent-kairos-autonomous-mode.md:897`, `docs/design-docs/agent-kairos-autonomous-mode.md:1322`, `docs/design-docs/agent-kairos-autonomous-mode.md:1323`），但 `QueueProcessor` 文件头仍明确写着“不实现 blocklist.timeWindows 推迟 / tickBudget 限额”（`packages/agent-core/src/kairos/scheduler.ts:10`, `packages/agent-core/src/kairos/scheduler.ts:11`, `packages/agent-core/src/kairos/scheduler.ts:12`）。
+- 偏移点：长期设计文档后半段把 `blocklist.timeWindows` 描述为 scheduler 硬拦截、把 `tickBudget.perHour` 描述为超限后自动 stop 并 emit error（`docs/design-docs/kairos/agent-kairos-autonomous-mode.md:897`, `docs/design-docs/kairos/agent-kairos-autonomous-mode.md:1322`, `docs/design-docs/kairos/agent-kairos-autonomous-mode.md:1323`），但 `QueueProcessor` 文件头仍明确写着“不实现 blocklist.timeWindows 推迟 / tickBudget 限额”（`packages/agent-core/src/kairos/scheduler.ts:10`, `packages/agent-core/src/kairos/scheduler.ts:11`, `packages/agent-core/src/kairos/scheduler.ts:12`）。
 - 不合理设计：`Preferences.tickBudget` 和 `Blocklist.timeWindows` 已经进入配置契约（`packages/agent-core/src/kairos/config/schema.ts:20`, `packages/agent-core/src/kairos/config/schema.ts:53`），用户会以为它们是硬约束；实际 scheduler 只执行 sleep bias、cooldown 和 budget balance（`packages/agent-core/src/kairos/scheduler.ts:213` 到 `packages/agent-core/src/kairos/scheduler.ts:292`），没有读取这两个字段。
-- 可读性问题：设计文档同一文件前段也保留了“v1 不硬执行”的历史说明（`docs/design-docs/agent-kairos-autonomous-mode.md:16`），后段又把它写成验收项，读者很难判断当前真相源。
+- 可读性问题：设计文档同一文件前段也保留了“v1 不硬执行”的历史说明（`docs/design-docs/kairos/agent-kairos-autonomous-mode.md:16`），后段又把它写成验收项，读者很难判断当前真相源。
 - 耦合问题：配置 schema、prompt tip 和 scheduler 行为不一致，会让前端 raw config 编辑能力暴露出“不生效字段”，增加用户调试成本。
 - 死代码/兼容残留：若当前产品仍不计划硬执行，则 `tickBudget` / `timeWindows` 是兼容残留字段；若计划硬执行，则 scheduler 是未完成实现。待产品确认。
 - 建议动作：收敛。二选一：要么补 scheduler 层 time window / tick budget 硬约束和对应测试；要么从当前设计事实与默认配置说明里降级这些字段，明确“仅提示 / 预留”。
@@ -88,21 +88,21 @@
 - 不合理设计：controller 的公开能力也只有 ring buffer tail（`packages/agent-core/src/kairos/controller.ts:603` 到 `packages/agent-core/src/kairos/controller.ts:605`），而 `ShortMemoryStore` 已有 `loadAll()` / `loadDailyAll()` 等读取历史能力（`packages/agent-core/src/kairos/storage/short-memory-store.ts:86` 到 `packages/agent-core/src/kairos/storage/short-memory-store.ts:112`）却没有接到 IPC。
 - 可读性问题：`KairosGetEventsRecentRequest.before` 看起来像已支持分页，但没有任何 handler 使用；这会误导后续前端或 e2e 测试编写。
 - 耦合问题：监控页刷新完全依赖 main 进程内存 ring buffer；进程重启后 UI 首屏无法恢复已落盘事件，削弱“短期记忆 jsonl 是唯一事实源”的可观测性。
-- 死代码/兼容残留：`before` 字段目前是未接线的契约残留；文档中也同时存在“应该回填”和“v1 不回填”的冲突说明（`docs/design-docs/agent-kairos-autonomous-mode.md:40`, `docs/design-docs/agent-kairos-autonomous-mode.md:380`）。
+- 死代码/兼容残留：`before` 字段目前是未接线的契约残留；文档中也同时存在“应该回填”和“v1 不回填”的冲突说明（`docs/design-docs/kairos/agent-kairos-autonomous-mode.md:40`, `docs/design-docs/kairos/agent-kairos-autonomous-mode.md:380`）。
 - 建议动作：补实现或补文档。若要符合本轮审查计划，建议让 controller 暴露按 `before/limit` 从 short-term jsonl 倒读的接口，并补 `kairos-ipc-internals.test.ts`；若保留 v1 取舍，删除/标注 `before` 和“buffer 不足回填”的描述。
 
 ### 发现 3：Kairos 的 thinking 事件没有落盘，前端也无法展示 thinking 详情
 
-- 偏移点：存储与监控设计写明 Kairos short-term 同一文件中包含 `thinking` 事件，聚合 tick 行也包括 thinking（`docs/design-docs/core-storage-and-observability.md:132`, `docs/design-docs/agent-kairos-autonomous-mode.md:267`）；但 `agentEventToSessionEvents()` 注释明确“thinking 仍不落”，并且 switch 没有处理 thinking 类 AgentEvent（`packages/agent-core/src/kairos/runner.ts:213` 到 `packages/agent-core/src/kairos/runner.ts:222`, `packages/agent-core/src/kairos/runner.ts:229` 到 `packages/agent-core/src/kairos/runner.ts:277`）。
+- 偏移点：存储与监控设计写明 Kairos short-term 同一文件中包含 `thinking` 事件，聚合 tick 行也包括 thinking（`docs/design-docs/core-storage-and-observability.md:132`, `docs/design-docs/kairos/agent-kairos-autonomous-mode.md:267`）；但 `agentEventToSessionEvents()` 注释明确“thinking 仍不落”，并且 switch 没有处理 thinking 类 AgentEvent（`packages/agent-core/src/kairos/runner.ts:213` 到 `packages/agent-core/src/kairos/runner.ts:222`, `packages/agent-core/src/kairos/runner.ts:229` 到 `packages/agent-core/src/kairos/runner.ts:277`）。
 - 不合理设计：Kairos 支持从 settings 传入 `thinkingEnabled`（`packages/agent-core/src/kairos/runner.ts:166` 到 `packages/agent-core/src/kairos/runner.ts:175`），但启用后思考链既不进入 short-term 事实流，也不进入 Kairos 详情面板；这让“自治过程可解释”少了一块证据。
 - 可读性问题：`controller.getContextSnapshot()` 的历史投影会拼 assistant thinking（`packages/agent-core/src/kairos/controller.ts:790` 到 `packages/agent-core/src/kairos/controller.ts:807`），但 short-term 转换层默认跳过 thinking（`packages/agent-core/src/kairos/context/short-term.ts:132` 到 `packages/agent-core/src/kairos/context/short-term.ts:139`）。这形成了“看似支持、事实无源”的阅读落差。
 - 耦合问题：主 Agent 的 thinking 展示/持久化语义与 Kairos runner adapter 分叉；后续若要统一可解释性，需要同时改 shared session、Kairos runner、aggregator 和监控页。
-- 死代码/兼容残留：`docs/design-docs/agent-kairos-autonomous-mode.md:178` 仍列出 `KairosEventDetail` 可展示 thinking，但当前默认页面只有最终回复/工具结果两个 tab（`packages/desktop/src/renderer/pages/KairosPage.tsx:725` 到 `packages/desktop/src/renderer/pages/KairosPage.tsx:769`）。
+- 死代码/兼容残留：`docs/design-docs/kairos/agent-kairos-autonomous-mode.md:178` 仍列出 `KairosEventDetail` 可展示 thinking，但当前默认页面只有最终回复/工具结果两个 tab（`packages/desktop/src/renderer/pages/KairosPage.tsx:725` 到 `packages/desktop/src/renderer/pages/KairosPage.tsx:769`）。
 - 建议动作：补测试后决定语义。若 thinking 属于可观察事实，补 runner adapter 的 `thinking` SessionEvent、aggregator tick 关联和详情展示；若不希望落 thinking，则同步删掉设计文档里的 thinking 承诺。
 
 ### 发现 4：短期记忆压缩模块存在，但 controller 没有触发压缩链路（待确认）
 
-- 偏移点：设计文档说 controller 在 tick 后按 short-term token 阈值触发压缩，`compression/compressor.ts` 也实现了 LLM 摘要函数（`docs/design-docs/agent-current-module-map.md:195`；`packages/agent-core/src/kairos/compression/compressor.ts:21` 到 `packages/agent-core/src/kairos/compression/compressor.ts:50`）；但全仓检索显示 `compressKairosSegments` 只在自身、导出和测试中出现，controller 没有调用。
+- 偏移点：设计文档说 controller 在 tick 后按 short-term token 阈值触发压缩，`compression/compressor.ts` 也实现了 LLM 摘要函数（`docs/design-docs/agent-runtime/agent-current-module-map.md:195`；`packages/agent-core/src/kairos/compression/compressor.ts:21` 到 `packages/agent-core/src/kairos/compression/compressor.ts:50`）；但全仓检索显示 `compressKairosSegments` 只在自身、导出和测试中出现，controller 没有调用。
 - 不合理设计：`config.preferences.memory.compressionThreshold` 被解析并进入默认配置（`packages/agent-core/src/kairos/config/schema.ts:28` 到 `packages/agent-core/src/kairos/config/schema.ts:31`, `packages/agent-core/src/kairos/config/schema.ts:63`, `packages/agent-core/src/kairos/config/schema.ts:152` 到 `packages/agent-core/src/kairos/config/schema.ts:155`），但运行时没有对应消费点，短期记忆会只加载预算内原始事件/已有 summary，而不会自动生成新 summary。
 - 可读性问题：`ShortMemoryStore.saveSummary()` 和 `loadDailyAll()` 注释都暗示 compression 用途（`packages/agent-core/src/kairos/storage/short-memory-store.ts:71`, `packages/agent-core/src/kairos/storage/short-memory-store.ts:86`），但实际调度入口缺失，读代码时需要靠 `rg` 才能确认链路断点。
 - 耦合问题：压缩策略分散在 config、store、compressor、short-term loader 四处，缺少 controller 或 scheduler 中的单一编排点。

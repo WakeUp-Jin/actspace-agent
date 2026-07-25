@@ -26,4 +26,4 @@ Thinking is a disclosure row. The right chevron communicates a collapsed hidden 
 ### 📁 Files Modified
 
 - `packages/desktop/src/renderer/components/messages/ThinkingBlock.tsx`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`

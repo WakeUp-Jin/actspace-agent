@@ -1,4 +1,4 @@
-import type { AppSettings, ContextState, ContextUsageSnapshot, DeepSeekBalanceSnapshot, KimiBalanceSnapshot, MessageBlock, ModelId, SessionListItem, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
+import type { AppSettings, ContextState, ContextUsageSnapshot, DeepSeekBalanceSnapshot, KimiBalanceSnapshot, MessageBlock, ModelSelectionId, SessionListItem, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlaskConical } from "lucide-react";
 import { ConversationView } from "./ConversationView";
@@ -104,6 +104,7 @@ export function WorkbenchLayout({
   getSessionPreview,
   reviewSummary,
   onReviewChanged,
+  models,
 }: {
   sessions: SessionListItem[];
   activeSessionId: string | null;
@@ -125,9 +126,10 @@ export function WorkbenchLayout({
   onRenameSession?: (sessionId: string, title: string) => void;
   onArchiveSession?: (sessionId: string) => void;
   isSessionReady?: boolean;
-  defaultModelId?: ModelId;
-  selectedModelId?: ModelId;
-  onSelectedModelChange?: (modelId: ModelId) => void;
+  defaultModelId?: ModelSelectionId;
+  selectedModelId?: ModelSelectionId;
+  onSelectedModelChange?: (modelId: ModelSelectionId) => void;
+  models?: UsableModelView[];
   onSettingsChange?: (settings: AppSettings) => void;
   onArchivedSessionsChange?: () => void;
   workspaces?: WorkspaceEntry[];
@@ -431,6 +433,7 @@ export function WorkbenchLayout({
         onSelectWorkspace={onSelectWorkspace}
         reviewSummary={reviewSummary}
         onOpenReview={openReviewTab}
+        models={models}
       />
     );
   }

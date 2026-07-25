@@ -5,7 +5,7 @@
  * （两个视图的铃铛），important 级额外弹 macOS 系统通知。
  * 描述做双向强调（必须用于重要发现 / 不要用于日常安静），防滥用也防不用；
  * 每 tick 限额是代码层兜底，不依赖提示词。
- * 设计详见 docs/design-docs/agent-kairos-notifications.md。
+ * 设计详见 docs/design-docs/kairos/agent-kairos-notifications.md。
  */
 import type { KairosNotificationLevel } from "@actspace/shared";
 import type { ToolDefinitionSpec, ToolExecutorFn } from "../../tools/types";

@@ -18,7 +18,7 @@
 - `docs/REPO_COLLAB_GUIDE.md`：协作、提交、测试约定。
 - `docs/ARCHITECTURE.md`：当前 monorepo、Electron、包边界。
 - `docs/FRONTEND_VERIFICATION.md`：前端 mock 与 Electron 验证边界。
-- `docs/design-docs/front-index.md`：前端定稿图入口，理解 UI 消费哪些数据。
+- `docs/design-docs/frontend/README.md`：前端定稿图入口，理解 UI 消费哪些数据。
 - `.agents/skills/llm-agent-dev/SKILL.md`：Agent 后端契约、上下文、工具和执行循环的设计原则。
 
 ## 相关代码路径

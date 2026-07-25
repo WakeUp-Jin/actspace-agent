@@ -79,7 +79,7 @@
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`（6 处 mock window.actspace 补 getUsageStatistics stub）
 
 **文档：**
-- `docs/design-docs/front-左侧会话栏规范.md`（整体重写：hidden 折叠 + 浮动 chrome row + Workspaces 父级 + Workspace folder hover + Archive 占位 + Kairos 入口 + 字体策略 + 字号基准）
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`（整体重写：hidden 折叠 + 浮动 chrome row + Workspaces 父级 + Workspace folder hover + Archive 占位 + Kairos 入口 + 字体策略 + 字号基准）
 
 ### ✅ Verification
 

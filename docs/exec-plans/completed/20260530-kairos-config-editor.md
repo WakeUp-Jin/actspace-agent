@@ -35,9 +35,9 @@
 
 - 必读文档（新会话 / 子 Agent 先读）：
   - `AGENTS.md`、`docs/REPO_COLLAB_GUIDE.md`、`docs/ARCHITECTURE.md`
-  - `docs/design-docs/agent-kairos-autonomous-mode.md`（Kairos 配置体系、存储布局、配置变更响应、模型 env 约定——本计划会更新其中模型口径）
-  - `docs/design-docs/front-设置页规范.md`（智能体分区信息架构）
-  - `docs/FRONTEND_VERIFICATION.md`、`docs/coding-standards/team/frontend-style-scope-conventions.md`、`docs/design-docs/front-主题与配色规范.md`
+  - `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`（Kairos 配置体系、存储布局、配置变更响应、模型 env 约定——本计划会更新其中模型口径）
+  - `docs/design-docs/frontend/front-设置页规范.md`（智能体分区信息架构）
+  - `docs/FRONTEND_VERIFICATION.md`、`docs/coding-standards/team/frontend-style-scope-conventions.md`、`docs/design-docs/frontend/front-主题与配色规范.md`
 - 关键现状（已核对）：
   - 模型真来源 = `KAIROS_MODEL_ID` env：设置页下拉 → `settings.json` `kairos.modelId` → `SettingsService.applyToEnv` 写 `KAIROS_MODEL_ID` → `resolveKairosEnv()`（`packages/agent-core/src/kairos/env.ts`）→ `createKairosLlm()`（`packages/desktop/src/main/kairos-bootstrap.ts`）。改下拉后 `index.ts` 的 `settings:update` handler 比较前后值并调 `rebuildKairosController()`。
   - `preferences.json.modelId` 当前是**死字段**：仅 `controller.ts:518` 用 `config.preferences.modelId ?? null` 填 `KairosContextSnapshot.modelId`（默认 null → 恒显示「跟随主 Agent」）。

@@ -71,7 +71,6 @@ export {
 } from "./compression/trigger";
 export { sleepDefinition, sleepExecutor, registerKairosTools } from "./tools";
 export { aggregateKairosEvents, type KairosEventRow } from "./aggregator";
-export { resolveKairosEnv, resolveKairosModelSpec, DEFAULT_KAIROS_MODEL_ID, type KairosEnvConfig } from "./env";
 export {
   appendKairosInboxMessage,
   commitKairosInboxReadCursor,

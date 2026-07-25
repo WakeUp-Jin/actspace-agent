@@ -38,5 +38,5 @@ raw JSON 对用户不友好且容易改坏（少逗号就整文件回落默认�
 - `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`（TOOL_ITEMS 改 import）
 - `packages/desktop/src/renderer/components/settings/KairosSettings.tsx`（重写）
 - `packages/desktop/src/renderer/test/kairos-config-files.test.tsx`（重写，9 例）
-- `docs/design-docs/front-设置页规范.md`
+- `docs/design-docs/frontend/front-设置页规范.md`
 - `docs/exec-plans/active/20260530-kairos-config-editor.md`

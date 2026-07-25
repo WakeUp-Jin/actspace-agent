@@ -1,7 +1,7 @@
 /**
  * KairosContextSheet —— Kairos 监控页"上下文"按钮的内容载体。
  *
- * 设计依据：`docs/design-docs/front-Kairos监控页规范.md`（v1.4 工具 chip 化）。
+ * 设计依据：`docs/design-docs/kairos/front-Kairos监控页规范.md`（v1.4 工具 chip 化）。
  *
  * v1.4 改动（仅工具列表）：
  *   - 工具列表从"两列 grid（name + description）"改为"chip 密排（只展示 name）"——

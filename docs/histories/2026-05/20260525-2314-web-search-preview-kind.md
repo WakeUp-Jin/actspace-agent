@@ -37,4 +37,4 @@
 - `packages/desktop/src/renderer/components/messages/ToolLogLine.tsx`
 - `packages/desktop/src/renderer/styles.css`
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`

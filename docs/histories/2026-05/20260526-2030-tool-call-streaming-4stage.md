@@ -58,7 +58,7 @@ write_file 的 streamingContent 是这个协议的最佳实例 —— 后端 50m
 - `packages/desktop/src/renderer/components/messages/FileDiffBlock.tsx`
 - `packages/desktop/src/renderer/styles.css`
 - `packages/desktop/src/renderer/test/file-diff-block.test.tsx`（新增）
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/learnings/2026-05/llm-tool-call-streaming.md`（新增）

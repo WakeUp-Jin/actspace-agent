@@ -29,5 +29,5 @@ inline 和 stacked 会改变 textarea 可用宽度，而宽度又会改变自动
 
 - `packages/desktop/src/renderer/components/Composer.tsx`
 - `packages/desktop/src/renderer/test/composer.test.tsx`
-- `docs/design-docs/front-聊天输入框规范.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`
 - `docs/learnings/2026-07/layout-state-needs-a-stable-measurement-baseline.md`

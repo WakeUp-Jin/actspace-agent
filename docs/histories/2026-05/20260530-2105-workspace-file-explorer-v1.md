@@ -48,9 +48,9 @@
 - `packages/desktop/src/main/test/workspace-fs-service.test.ts`（新增）
 - `packages/desktop/src/renderer/test/workspace-file-tree.test.tsx`（新增）
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`（新增）
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`（新增）
 - `docs/exec-plans/active/20260530-workspace-file-explorer.md`（新增）
-- `docs/design-docs/front-index.md`、`docs/design-docs/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/README.md`、`docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
 
 ### ✅ Verification
 

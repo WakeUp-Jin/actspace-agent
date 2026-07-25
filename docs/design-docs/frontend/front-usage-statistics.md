@@ -1,0 +1,321 @@
+# Usage Statistics 页面设计规范
+
+## 定位
+
+Usage Statistics 是 actspace 桌面端的第三种页面态，和聊天态、设置态同级，用于展示会话维度的 token 消耗、成本、缓存命中、工具调用和活跃度统计。
+
+它不是聊天页右侧附属面板，也不依赖当前对话上下文独立存在。
+
+## 设计目标
+
+- 让用户快速看见“这段时间模型和工具到底消耗了什么”。
+- 让页面既能作为概览仪表盘，也能作为事实查询页。
+- 让统计数据看起来像产品内建能力，而不是单独拼出来的报表页。
+
+## 页面语气
+
+- 克制、清晰、偏工具感。
+- 信息密度高，但不拥挤。
+- 大数字是主角，细节信息退后。
+- 视觉上保持冷静，交互上只保留必要动作。
+
+## 导航入口
+
+侧边栏是轻量导航，宽度约 `210px`，顶部有 `actspace` 标识。
+
+入口项：
+
+- `用量`：当前页，高亮。
+- `会话`：回到聊天态。
+- `限额`
+- `Skills`
+- `设置`
+
+## 整体布局
+
+采用左窄右宽的两栏结构：
+
+- 左栏：数据概览、模型排行、热力图、工具分布、趋势。
+- 右栏：主统计大卡、缓存效率、每日明细表。
+- 底部：会话明细表，单独跨左右两栏占满宽度。
+
+布局原则：
+
+- 左栏更像导航式摘要。
+- 右栏承担主视图和详情查询。
+- 统计信息按“总览 -> 解释 -> 明细”顺序展开。
+
+## 视觉基线
+
+当前目标页面以 **暖中性灰背景 + 克制 surface + 低饱和数据色** 为基调。Usage 不设置单一品牌主强调色；页面层级由灰阶、排版和数据大小完成。
+
+### 推荐 token
+
+```css
+--bg: #f7f7f5;
+--card: #ffffff;
+--surface: #f1f1ef;
+--border: #deded9;
+--border-soft: #ecece8;
+
+--t1: #20201e;
+--t2: #676762;
+--t3: #92928c;
+--t4: #adada6;
+
+--operational: #087a4b;
+--operational-soft: #e5f2ea;
+--series-blue: #5f88ad;
+--series-cyan: #5d999e;
+--series-violet: #8177a1;
+--series-amber: #a88a51;
+```
+
+说明：
+
+- operational green 只用于在线、健康、缓存有效或成功等真实状态，不作为图表统一主色。
+- 蓝、青、紫、琥珀可以作为低饱和 chart series，用于区分数据。
+- 大数字、tab、按钮和选中态优先使用中性灰阶，不依赖彩色强调。
+
+## 字体与数字
+
+- 字体：复用全局 `--font-ui`（macOS 系统字体优先），**不在 Usage 单独引入 Plus Jakarta Sans 等装饰字体**，以免和聊天态、设置态字形不一致。详细字体栈见 [全局视觉语言规范](front-全局视觉语言规范.md) 的「字体栈」段。
+- 数字字段统一使用 `font-variant-numeric: tabular-nums`；必要时**在该元素上局部**叠加 `font-feature-settings: "tnum"`。**禁止在 body 全局开 `font-feature-settings`**（参见全局规范的「字体特性」段）。
+- 字重严格在 `400 / 500 / 600 / 700` 四档内取值：
+  - 大数字（hero / cache 百分比 / cost / breakdown）：`700`。
+  - 卡片标题、tab、按钮、表头、kicker：`600`。
+  - 表格正文、辅助说明：`400`。
+  - **不允许使用 `800` 这种 Black 档**——历史版本的 prototype HTML 大量使用 800，与 actspace 全局视觉语言不一致；当前实现应在组件局部 Tailwind class / token 映射中统一收敛到 700/600。
+
+建议字号：
+
+- 页面主大数字：`56-72px`（`clamp(56px, 5.1vw, 72px)`），`font-weight: 700`，最多保留 `letter-spacing: -0.02em` 内的轻微紧凑。
+- 卡片标题：`16-22px`，`font-weight: 600`。
+- 标签 / 徽标 / kicker：`11-12px`，`font-weight: 500-600`。
+- 表格正文：`12-13px`，正文 `font-weight: 400`，数字列叠加 `tabular-nums`。
+
+## 卡片系统
+
+统一卡片特征：
+
+```css
+background: var(--act-color-surface);
+border: 1px solid var(--act-color-line);
+border-radius: 10px;
+box-shadow: none;
+```
+
+建议间距：
+
+- 卡片之间：`16px`
+- 页面外距：`24px`
+- 卡片内 padding：`18-24px`
+
+## 页面结构
+
+### 左栏
+
+#### 1. DeepSeek 预额卡
+
+- 位于左栏最顶部，作为账户状态入口。
+- 即使 Usage 统计账本为空、右侧显示空态，左栏也应保留该卡片。
+- UI 只展示一个大数字余额与币种，例如 `¥19.65 CNY`。
+- 卡片右上角提供刷新按钮；进入 Usage 页面自动拉取一次，页面停留时每 5 分钟自动刷新一次。
+- 不展示赠金 / 充值余额拆分，不展示状态胶囊；未配置或刷新失败只用一行轻提示兜底。
+- renderer 通过 preload IPC 获取聚合后的 `DeepSeekBalanceSnapshot`，真实 `GET /user/balance` 请求在 main 进程完成，避免 DeepSeek API Key 暴露到 renderer。
+
+#### 2. 数据概览卡
+
+顶部横排 4 个小指标：
+
+- 7d
+- 30d
+- avg
+- 本月
+
+下面是模型排行：
+
+- 排名序号
+- 模型名
+- 占比
+- 底部开始日期与活跃天数
+
+#### 2. 热力图
+
+- 近 16 周（112 天）的 GitHub 风格热力图
+- 上方显示月份
+- 左侧显示周几
+- 下方显示少/多图例
+- **hover 单格出现详情 tooltip**：
+  - 日期（如 `2026-05-27`）
+  - 当日总 tokens（千位分隔大数字 + `TOKENS` 单位 kicker）
+  - `MODEL BREAKDOWN` 区：当日按 model 拆分，每行为 `· 模型名 — 绝对数 — 当日占比%`，至多展示 4 行（按 tokens 降序，并列按 model name 升序）
+  - 当日无 llm_usage 事件的格子（仅有对话/工具调用但无 token）：不显示 model breakdown 段，仅显示日期 + tokens
+  - 完全无任何数据的格子：不弹 tooltip
+- tooltip 位置规则：hover 格在热力图上半部（rowIndex ≤ 2）时朝下展开，下半部时朝上展开，避免顶部裁切
+- **tooltip 定位实现**：用 `position: fixed` + cell `getBoundingClientRect` 锚到 viewport 坐标，**不**用 `absolute`。原因：热力图列容器是 `overflow-x-auto`（16 列宽度会溢出 panel），而 CSS 规范规定一个轴非 visible 时另一轴的 visible 会被升级为 auto——absolute 子元素会一起被裁。`fixed` 锚到 viewport 后完全逃出 clip 范围，前提是父链没有 `transform`/`filter`/`perspective`（已审，无）。代价：用户横向滚动 cell 容器时，已弹出的 tooltip 不会跟随；但鼠标必然离开 cell，下次 enter 会重新拍 anchor 快照，体感不影响。
+- a11y：每个格子是 `div[role="button"][aria-label="<date>：<tokens> tokens"]` 或 `"<date>：无数据"`；键盘焦点（Tab）也会触发 tooltip。**不使用真 `<button>`**——14×14 小格子 + tailwind preflight 下浏览器默认按钮样式会带来 sizing 风险，且我们没有 click 语义，纯 hover/focus 触发足够
+
+#### 3. 工具调用卡
+
+- 标题：工具调用
+- 摘要：本月工具调用分布 + 总次数
+- 下方显示前 4 个工具占比
+- 点击「查看详情」打开弹窗
+
+> 📝 **首版废弃**：旧规范第 4 块"使用趋势 30 天柱图"已下线，能力被"热力图 + hover tooltip"覆盖。下线原因见同目录 prototype 与 [`docs/histories/2026-05/20260528-2030-usage-heatmap-hover-tooltip.md`](../../histories/2026-05/20260528-2030-usage-heatmap-hover-tooltip.md)。
+
+### 右栏
+
+#### 1. 主统计大卡
+
+包含：
+
+- 时间维度 tabs：日 / 周 / 月 / 总计 / 自定义
+- 分享、刷新按钮
+- `TOKEN 总数`
+- 大号总 token 数值
+- 成本金额按钮
+- 分布进度条
+- 4 个摘要块：输入 / 输出 / 缓存 / 推理
+
+#### 2. 缓存效率卡
+
+- 左侧：标题 + 大百分比 + 进度条
+- 右侧：2x2 指标格
+- 不放额外解释文案
+
+#### 3. 每日明细表
+
+- Tab：每日细目 / 项目用量
+- 列：日期、总计、输入、输出、缓存、推理、对话数
+- 右对齐数值，表头固定
+
+### 底部全宽明细
+
+#### 会话明细表
+
+- 位置：左右两栏之后，独立跨两栏，占满 Usage 主内容宽度。
+- 行粒度：按 `sessionId + turnId` 聚合，即一轮用户输入一行；同一轮用户输入里多次 `llm_usage` 会累加到同一行。
+- 排序：按该 turn 内最新 `llm_usage.timestamp` 倒序，最近的模型调用排在最前。
+- 分页：每页固定 10 条，通过 `UsageStatisticsGetInput.requestRowsPage.page` 查询；切换时间范围回到第一页，普通刷新保留当前页。
+- 列：时间、Workspace、sessionId、模型、Tokens、模型调用。
+- Workspace 优先显示 workspace registry 的 label；拿不到时用 `workspaceRoot` 的 basename 兜底。
+- sessionId 在表格中短显，完整值保留在 `title`，顶部会话 hover 卡直接显示完整 `sessionId:`。
+- 模型显示该 turn 里 token 占比最大的模型；`模型调用`显示该 turn 内折叠的 LLM call 次数。
+- Tokens 是该 turn 的 `totalTokens`；hover / focus 后显示 token 小卡片：
+  - Cache Read：`cacheHitTokens`
+  - Input：`promptTokens`
+  - Output：`completionTokens`
+  - Reasoning：仅当 `reasoningTokens > 0` 时显示
+  - Total：`totalTokens`
+- 不展示 Cache Write。当前 `llm_usage` 事件没有可靠的 cache write token 字段，不能用 `cacheMissTokens` 代替。
+- hover 小卡片使用 `position: fixed` + 单元格 `getBoundingClientRect()` 锚到 viewport，避免被表格 `overflow-auto` 裁切。
+
+## 交互
+
+### 时间切换
+
+- 日 / 周 / 月 / 总计 为页面内状态切换。
+- `自定义` 先保留入口，但第一版不提供选择器。
+
+### 成本详情
+
+- 点击成本金额，打开居中弹窗。
+- 弹窗展示按模型分组的成本明细。
+- 点击遮罩或关闭按钮关闭。
+
+### 工具详情
+
+- 点击「查看详情」打开居中弹窗。
+- 弹窗展示工具调用明细。
+- 每条工具明细可展开说明。
+
+### 模型排行
+
+- 序号默认灰色，不做彩色强调。
+- 只保留轻量的视觉层级，不增加过多装饰。
+
+### 会话明细 Token Hover
+
+- 触发：鼠标悬浮 Tokens 数字，或键盘 focus 到 Tokens 按钮。
+- 展示：轻量小卡片，只展示 token 分解，不做点击跳转。
+- 定位：固定到 viewport，跟随进入瞬间的数字单元格坐标；离开 / blur 时关闭。
+
+### 会话明细分页
+
+- 会话明细分页控件位于表格底部右侧。
+- 控件显示当前页 / 总页数，以及当前页行号范围 / 总行数。
+- 上一页 / 下一页按钮只改变 `requestRows` 当前页，不改变主统计、模型分布、每日明细等完整时间窗聚合结果。
+
+## 数据来源
+
+Usage 页面默认展示**全局账本**，跨所有事实源聚合，不绑定单条会话。
+
+### 取数范围（scope）
+
+IPC 协议 `UsageStatisticsGetInput` 显式区分两种取数范围：
+
+- **`"global"`（默认）**：扫描所有事实源后合并聚合，得到"账单全貌"。这是页面当前唯一对用户开放的范围。
+  - 普通对话：`<userData>/sessions/<id>/session.jsonl` 的全部 `SessionRecord.events`。
+  - Kairos 自主模式：`<userData>/kairos/memory/short-term/` 下的全部历史段（`ShortMemoryStore.loadAll()`，含 reset_today 之后切出的 `_NNN` 段）。
+- **`"session"`（兼容入口，UI 暂不暴露）**：等价于旧版"按当前 session 统计"，需要显式传 `sessionId`。保留这条路径只为后续可能的"按会话钻取"视图。
+
+聚合在 main 进程完成：`createGlobalUsageStatisticsSnapshot({ sessionRecords, kairosEvents, range, now, requestRowsPage })` 走"事件级合流"——把所有来源的 `SessionEvent[]` 摊平再 reduce 一次，避免对 cost / 缓存命中率等派生指标做两次舍入。`requestRowsPage` 只影响底部会话明细的返回页，不影响 summary / distribution / daily 聚合。
+
+### 时间窗（range）
+
+`day / week / month / total` 表示**纯时间窗切片**，作用于"全部数据"上：
+
+- `day`：今天 0:00 起。
+- `week`：近 7 天。
+- `month`：近 30 天。
+- `total`：有史以来。
+
+时间过滤在聚合函数内部完成；调用方不需要预先按窗口截断输入事件。
+
+### 统计字段
+
+- Token 统计：`llm_usage.promptTokens`、`completionTokens`、`totalTokens`
+- Cache 统计：`cacheHitTokens`、`cacheMissTokens`
+- 推理统计：`reasoningTokens`
+- 成本统计：`cost.total`；CNY 按 `7.2 → 1 USD` 折算（与产品当前展示口径对齐）。
+- 模型分布（整段时间窗）：`llm_usage.model`（主聚合 key 优先用 `modelId`，回落 `model`）
+- **单日模型分布**（热力图 tooltip 专用）：在每日的累加器内额外维护 `Map<model.name → totalTokens>`，导出时按 totalTokens 降序 + model name 升序生成 `modelBreakdown`，`percent` 为"在当日 totalTokens 内的占比"。**注意 percent 与主区 modelDistribution 的 percent 不同语义**——前者是日内占比，后者是整段时间窗的全局占比。
+- **会话明细**（底部表格专用）：在聚合器内维护 `Map<sessionId:turnId → requestRow>`，把同一 turn 内的多次 `llm_usage` 累加为一行；`timestamp` 取该 turn 内最新 usage 时间；`model` 取 token 最高的模型；`modelCallCount` 记录折叠的调用次数；`workspaceId/workspaceRoot` 来自普通 session meta，Kairos 事件没有 session meta 时允许为空并由 UI 兜底；排序完成后按每页 10 条切片返回。
+- 工具调用：`tool_call.payload.name`；`tool_result.ok = false` 累加 failedCount。
+- 日期活跃度：按事件 `timestamp.slice(0, 10)` 的日期聚合。
+
+### 数据边界
+
+- 事实来源为 jsonl：`session.jsonl`（普通对话）+ Kairos 短期记忆段。`context-state.json` 不作为统计页输入。
+- renderer 不直接读文件系统，统计页通过 IPC 拿到聚合后的视图模型。
+- snapshot 携带 `scope` / `sessionId` / `sourceCount` 三个元数据字段：UI 用它们决定标题、来源数提示和兼容旧调用方。`scope === "global"` 时 `sessionId === null`。
+- snapshot 携带 `requestRows` 和 `requestRowsPage`，供底部会话明细表展示当前页与总数；旧数据源没有该字段时 UI 按空数组和第一页兜底。
+- Kairos 的 `usage-accumulator.json` 仅供 Kairos 监控页头部胶囊使用（"自上次 reset_today 起"的累计），**不**进 Usage 页面账本——后者总是按事件级真相重建，独立于 reset_today 的语义。
+- DeepSeek 预额卡不进入 usage 聚合账本。它通过独立 IPC 读取 DeepSeek 账户余额接口，只作为当前账户余额状态展示。
+
+## 首版范围
+
+- 统计页导航入口
+- 左右两栏布局
+- DeepSeek 预额卡
+- 模型排行
+- 热力图
+- 工具调用卡 + 工具详情弹窗
+- 主统计大卡
+- 缓存效率卡
+- 每日明细表
+- 会话明细表
+
+## 首版不做
+
+- 导出 CSV / PDF
+- 自定义时间范围选择器
+- 实时刷新
+- 暗色模式
+- Cache Write token 展示（当前没有事实字段）
+
+## 原型说明
+
+`usage-statistics-prototype.html` 是当前单文件高保真原型，用于验证页面布局、密度、弹窗交互和视觉节奏。后续实现应尽量保持和它一致。

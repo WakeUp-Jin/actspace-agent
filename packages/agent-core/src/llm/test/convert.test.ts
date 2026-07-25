@@ -307,6 +307,20 @@ describe("mapSdkError", () => {
     expect(err.retryable).toBe(false);
   });
 
+  it("maps 402 to insufficient balance", () => {
+    const apiError = new OpenAI.APIError(402, { message: "Payment Required" }, "Payment Required", fakeHeaders());
+    const err = mapSdkError(apiError, "TestProvider");
+    expect(err.kind).toBe("insufficient_balance");
+    expect(err.retryable).toBe(false);
+  });
+
+  it("maps 404 model errors to invalid_request", () => {
+    const apiError = new OpenAI.APIError(404, { message: "Model not found" }, "Model not found", fakeHeaders());
+    const err = mapSdkError(apiError, "TestProvider");
+    expect(err.kind).toBe("invalid_request");
+    expect(err.retryable).toBe(false);
+  });
+
   it("maps 429 to rate_limit error", () => {
     const apiError = new OpenAI.APIError(429, { message: "Too Many Requests" }, "Rate limited", fakeHeaders());
     const err = mapSdkError(apiError, "TestProvider");

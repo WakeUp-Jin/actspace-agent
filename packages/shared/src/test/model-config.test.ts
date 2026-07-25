@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
   ALL_MODEL_LIST,
+  BUILTIN_MODEL_LIST,
+  BUILTIN_MODEL_REGISTRY,
   DEFAULT_MODEL_ID,
+  DEFAULT_MODEL_KEY,
+  LEGACY_MODEL_KEY_MAP,
   MODEL_LIST,
   MODEL_REGISTRY,
   isPublicModelId,
+  legacyModelIdFromKey,
+  normalizeModelKey,
+  resolveModelDefinition,
+  resolveModelDefinitionByApiModel,
   resolveModelSpec,
   resolveModelSpecByApiModel,
 } from "../model-config";
+import { PROVIDER_IDS, PROVIDER_REGISTRY, isProviderId } from "../provider-config";
 
 describe("model config", () => {
   it("exposes Kimi as a public model alongside DeepSeek", () => {
@@ -61,5 +70,59 @@ describe("model config", () => {
   it("finds models by provider api model", () => {
     expect(resolveModelSpecByApiModel("kimi-k2.6", "kimi")?.id).toBe("kimi-k2.6");
     expect(resolveModelSpecByApiModel("kimi-k2.7-code", "kimi")?.id).toBe("kimi-k2.7-code");
+  });
+
+  it("registers the three supported providers without storing user credentials", () => {
+    expect(PROVIDER_IDS).toEqual(["deepseek", "kimi", "openrouter"]);
+    expect(PROVIDER_REGISTRY.openrouter).toMatchObject({
+      defaultBaseUrl: "https://openrouter.ai/api/v1",
+      supportedApis: ["openai-completions"],
+      supportsRemoteModelCatalog: true,
+      supportsProxy: true,
+    });
+    expect(JSON.stringify(PROVIDER_REGISTRY)).not.toMatch(/apiKey|authorization/i);
+    expect(isProviderId("openrouter")).toBe(true);
+    expect(isProviderId("other")).toBe(false);
+  });
+
+  it("maps every legacy model to a provider-qualified builtin definition", () => {
+    expect(LEGACY_MODEL_KEY_MAP).toEqual({
+      "deepseek-v4-flash": "deepseek:deepseek-v4-flash",
+      "deepseek-v4-pro": "deepseek:deepseek-v4-pro",
+      "kimi-k2.6": "kimi:kimi-k2.6",
+      "kimi-k2.7-code": "kimi:kimi-k2.7-code",
+    });
+    expect(DEFAULT_MODEL_KEY).toBe("deepseek:deepseek-v4-pro");
+    expect(BUILTIN_MODEL_LIST).toHaveLength(4);
+    expect(BUILTIN_MODEL_REGISTRY["kimi:kimi-k2.7-code"]).toMatchObject({
+      provider: "kimi",
+      apiModel: "kimi-k2.7-code",
+      source: "builtin",
+      capabilities: {
+        input: ["text", "image"],
+        toolUse: "verified",
+        reasoning: false,
+        thinkingToggle: true,
+      },
+    });
+  });
+
+  it("normalizes known legacy ids without defaulting unknown values", () => {
+    expect(normalizeModelKey("deepseek-v4-pro")).toBe("deepseek:deepseek-v4-pro");
+    expect(normalizeModelKey("openrouter:anthropic/claude-example")).toBe(
+      "openrouter:anthropic/claude-example",
+    );
+    expect(normalizeModelKey("unknown-model")).toBeUndefined();
+    expect(normalizeModelKey("other:model")).toBeUndefined();
+    expect(legacyModelIdFromKey("kimi:kimi-k2.6")).toBe("kimi-k2.6");
+    expect(legacyModelIdFromKey("openrouter:moonshotai/kimi")).toBeUndefined();
+  });
+
+  it("resolves new definitions by selection or provider api model", () => {
+    expect(resolveModelDefinition("deepseek-v4-flash")?.key).toBe("deepseek:deepseek-v4-flash");
+    expect(resolveModelDefinition("kimi:kimi-k2.6")?.label).toBe("Kimi K2.6");
+    expect(resolveModelDefinition("openrouter:anthropic/claude-example")).toBeUndefined();
+    expect(resolveModelDefinitionByApiModel("kimi-k2.6", "kimi")?.key).toBe("kimi:kimi-k2.6");
+    expect(resolveModelDefinitionByApiModel("kimi-k2.6", "openrouter")).toBeUndefined();
   });
 });

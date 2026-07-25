@@ -16,9 +16,9 @@
 - `docs/FRONTEND_VERIFICATION.md`
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/front-中间消息区规范.md`
-- `docs/design-docs/front-usage-statistics.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-usage-statistics.md`
 - `docs/exec-plans/completed/actspace-usage-statistics-session-jsonl-plan.md`
 
 补充素材：
@@ -62,8 +62,8 @@
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/desktop/src/renderer/components/**`
 - `packages/desktop/src/renderer/fixtures/**`
-- `docs/design-docs/front-usage-statistics.md`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-usage-statistics.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
 
 ## 并行边界
 
@@ -119,7 +119,7 @@
 
 修改目标：
 
-- 对齐 `docs/design-docs/agent-tool-preview-design-guidelines.md` 的失败态语义。
+- 对齐 `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md` 的失败态语义。
 - 长命令摘要截断，展开后显示 command、cwd、exit code、stdout、stderr 和安全分类错误。
 - 避免失败块内出现多层卡片和滚动条混乱。
 

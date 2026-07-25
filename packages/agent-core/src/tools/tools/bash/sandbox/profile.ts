@@ -1,7 +1,7 @@
 /**
  * macOS Seatbelt profile 生成器（bash 沙盒 E5 第一期）
  *
- * 设计事实来源：docs/design-docs/agent-bash工具设计文档.md「附录：Seatbelt profile 模板与生成契约」。
+ * 设计事实来源：docs/design-docs/execution-safety/agent-bash工具设计文档.md「附录：Seatbelt profile 模板与生成契约」。
  *
  * 基线采用 `(deny default)` 全拒 + essential allows。essential allows 清单
  * derived from anthropic-experimental/sandbox-runtime（Apache License 2.0，

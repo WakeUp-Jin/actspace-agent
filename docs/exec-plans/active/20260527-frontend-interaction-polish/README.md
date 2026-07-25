@@ -28,16 +28,16 @@
 - `docs/FRONTEND_VERIFICATION.md`
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-全局视觉语言规范.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-全局视觉语言规范.md`
 - `.agents/skills/frontend-design/SKILL.md`
 
 按子计划需要补读：
 
-- Composer / Context：`docs/design-docs/front-聊天输入框规范.md`
-- Sidebar / Workspaces / Session status：`docs/design-docs/front-左侧会话栏规范.md`
-- Settings：`docs/design-docs/front-设置页规范.md`
-- 页面级布局：`docs/design-docs/front-工作台布局与面板交互规范.md`
+- Composer / Context：`docs/design-docs/frontend/front-聊天输入框规范.md`
+- Sidebar / Workspaces / Session status：`docs/design-docs/frontend/front-左侧会话栏规范.md`
+- Settings：`docs/design-docs/frontend/front-设置页规范.md`
+- 页面级布局：`docs/design-docs/frontend/front-工作台布局与面板交互规范.md`
 
 补充素材：
 

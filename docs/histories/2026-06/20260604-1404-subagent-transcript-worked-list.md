@@ -56,6 +56,6 @@ SubAgent 工具流对排障有价值，但在最终回复出现后，它不应�
 
 - `packages/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx`
 - `packages/desktop/src/renderer/test/agent-run-block.test.tsx`
-- `docs/design-docs/front-中间消息区规范.md`
-- `docs/design-docs/agent-subagent-runtime.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
+- `docs/design-docs/collaboration/agent-subagent-runtime.md`
 - `docs/histories/2026-06/20260604-1404-subagent-transcript-worked-list.md`

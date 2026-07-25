@@ -24,7 +24,7 @@
   - `docs/exec-plans/active/actspace-v1-foundation.md`
   - `docs/exec-plans/active/actspace-v1-agent-runtime.md`
   - `docs/exec-plans/active/actspace-v1-workbench-ui.md`
-  - `docs/design-docs/front-index.md`
+  - `docs/design-docs/frontend/README.md`
 
 ## 本地数据目录
 

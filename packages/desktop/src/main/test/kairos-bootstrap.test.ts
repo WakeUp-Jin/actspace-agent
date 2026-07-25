@@ -1,13 +1,14 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { mkdtemp, readFile, stat, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  createKairosToolManagerFactory,
+  createDynamicKairosToolManagerFactory,
   ensureKairosScaffolding,
   getKairosWorkspaceRoot,
 } from "../kairos-bootstrap";
 import type { KairosConfig } from "@actspace/agent-core";
+import { resolveModelDefinition } from "@actspace/shared";
 
 async function makeRoot(): Promise<string> {
   return mkdtemp(join(tmpdir(), "kairos-bootstrap-test-"));
@@ -160,22 +161,27 @@ describe("ensureKairosScaffolding", () => {
   });
 });
 
-describe("createKairosToolManagerFactory", () => {
-  const ENV_KEYS = [
-    "DEEPSEEK_API_KEY",
-    "DEEPSEEK_API_FORMAT",
-    "KIMI_API_KEY",
-    "TAVILY_API_KEY",
-    "KAIROS_MODEL_ID",
-  ];
-
-  afterEach(() => {
-    for (const key of ENV_KEYS) delete process.env[key];
-    vi.resetModules();
+describe("createDynamicKairosToolManagerFactory", () => {
+  const definition = resolveModelDefinition("deepseek:deepseek-v4-flash");
+  if (!definition) throw new Error("missing DeepSeek fixture model");
+  const makeFactory = (disabledTools: string[] = []) => createDynamicKairosToolManagerFactory({
+    workspaceRoot: "/tmp/work",
+    definition,
+    llmConfig: {
+      provider: "deepseek",
+      api: definition.api,
+      apiKey: "test-key",
+      model: definition.apiModel,
+    },
+    toolEnvironment: {
+      hasKimiKey: true,
+      hasWebSearchKey: true,
+      disabledTools,
+    },
   });
 
   it("returns a function that produces a ToolManager scoped to workspaceRoot", () => {
-    const factory = createKairosToolManagerFactory({ workspaceRoot: "/tmp/work", modelId: null });
+    const factory = makeFactory();
     const manager = factory(makeConfig());
     const names = manager.getAll().map((t) => t.name);
     expect(names.length).toBeGreaterThan(0);
@@ -184,7 +190,7 @@ describe("createKairosToolManagerFactory", () => {
   });
 
   it("merges blocklist.toolsDenied into disabledTools, removing those tools from the manager", () => {
-    const factory = createKairosToolManagerFactory({ workspaceRoot: "/tmp/work", modelId: null });
+    const factory = makeFactory();
     const baseline = factory(makeConfig()).getAll().map((t) => t.name);
     expect(baseline).toContain("read_file");
 
@@ -197,38 +203,17 @@ describe("createKairosToolManagerFactory", () => {
     expect(restricted.length).toBeGreaterThan(0);
   });
 
-  it("uses DeepSeek Anthropic format by default and exposes web_search when a search key exists", async () => {
-    process.env.DEEPSEEK_API_KEY = "sk-test";
-    process.env.KIMI_API_KEY = "sk-kimi";
-    process.env.TAVILY_API_KEY = "tvly-test";
-    const { loadEnv } = await import("@actspace/agent-core");
-    const { createKairosToolManagerFactory: createFactory } = await import("../kairos-bootstrap");
-    loadEnv({
-      envPath: "/private/tmp/actspace-agent-kairos-test-does-not-exist",
-      mergeToProcessEnv: false,
-    });
-
-    const factory = createFactory({ workspaceRoot: "/tmp/work", modelId: null });
+  it("exposes web_search from the explicit tool environment", () => {
+    const factory = makeFactory();
     const manager = factory(makeConfig());
 
     expect(manager.has("web_search")).toBe(true);
   });
 
-  it("keeps exposing web_search when Kairos explicitly falls back to OpenAI-compatible DeepSeek", async () => {
-    process.env.DEEPSEEK_API_KEY = "sk-test";
-    process.env.DEEPSEEK_API_FORMAT = "openai";
-    process.env.KIMI_API_KEY = "sk-kimi";
-    process.env.TAVILY_API_KEY = "tvly-test";
-    const { loadEnv } = await import("@actspace/agent-core");
-    const { createKairosToolManagerFactory: createFactory } = await import("../kairos-bootstrap");
-    loadEnv({
-      envPath: "/private/tmp/actspace-agent-kairos-test-does-not-exist",
-      mergeToProcessEnv: false,
-    });
-
-    const factory = createFactory({ workspaceRoot: "/tmp/work", modelId: null });
+  it("combines runtime-level disabled tools with the Kairos blocklist", () => {
+    const factory = makeFactory(["read_file"]);
     const manager = factory(makeConfig());
 
-    expect(manager.has("web_search")).toBe(true);
+    expect(manager.has("read_file")).toBe(false);
   });
 });

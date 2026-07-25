@@ -13,10 +13,17 @@
  * 打开本文件就能看到：前端传了什么，env 补了什么，最终 LLM 收到什么。
  */
 
-import type { ModelId, ModelSpec } from "@actspace/shared";
-import { resolveModelSpec, MODEL_REGISTRY } from "@actspace/shared";
-import type { LLMConfig, LLMService } from "../llm/types";
+import type { ModelDefinition, ModelId, ModelKey, ModelSpec } from "@actspace/shared";
+import { normalizeModelKey, resolveModelDefinition, resolveModelSpec, MODEL_REGISTRY, PROVIDER_REGISTRY } from "@actspace/shared";
+import type {
+  LLMConfig,
+  LLMService,
+  ProviderRuntimeConfig,
+  RuntimeInferenceSettings,
+} from "../llm/types";
+import { LLMServiceError } from "../llm/types";
 import { createLLMService } from "../llm/factory";
+import { providerDefaultHeaders } from "../llm/provider-adapter";
 import type { ToolManagerConfig } from "../tools/types";
 import type { ApprovalGate } from "../tools/scheduler";
 import { ToolManager } from "../tools/manager";
@@ -33,6 +40,7 @@ import { env } from "../env";
 /** 前端收集并传递过来的字段 —— 只有这些是前端负责的 */
 export interface FrontendTurnInput {
   model?: ModelId;
+  modelKey?: ModelKey;
   thinkingEnabled?: boolean;
   /** 内置 Explore 聚焦子代理模型；null/缺省 = deepseek-v4-flash。来自 settings.agent.exploreModelId。 */
   exploreModelId?: ModelId | null;
@@ -58,6 +66,13 @@ export interface AgentEnvConfig {
 /** 纯配置对象 — 不含任何运行时实例 */
 export interface AgentConfig {
   llmConfig: LLMConfig;
+  /** Desktop runtime always supplies these fields; optional keeps legacy in-memory callers compatible. */
+  modelDefinition?: ModelDefinition;
+  modelKey?: ModelKey;
+  utilityLlmConfig?: LLMConfig;
+  utilityModelKey?: ModelKey;
+  exploreLlmConfig?: LLMConfig;
+  exploreModelKey?: ModelKey;
   toolManagerConfig: ToolManagerConfig;
   thinkingEnabled: boolean;
   modelSpec: ModelSpec;
@@ -77,10 +92,15 @@ export type AgentSystemPromptSegment = Omit<PromptSegment, "enabled" | "stabilit
 /** 运行时实例集合 */
 export interface AgentDeps {
   llm: LLMService;
+  utilityLlm?: LLMService;
   toolManager: ToolManager;
   contextManager: ContextManager;
   thinkingEnabled: boolean;
   modelSpec: ModelSpec;
+  modelDefinition: ModelDefinition;
+  modelKey: ModelKey;
+  utilityModelKey?: ModelKey;
+  exploreModelKey?: ModelKey;
   /** flash 摘要器；无 DeepSeek key 时为 undefined（工具/历史侧走确定性兜底） */
   summarizer?: Summarizer;
 }
@@ -101,6 +121,19 @@ export interface AgentRuntimeContext {
   systemPrompt?: string;
   /** 附加规则/技能等系统级上下文段，例如 AGENTS.md。 */
   systemPromptSegments?: AgentSystemPromptSegment[];
+}
+
+export interface ExplicitAgentRuntimeInput {
+  main: { definition: ModelDefinition; runtime: ProviderRuntimeConfig };
+  utility?: { definition: ModelDefinition; runtime: ProviderRuntimeConfig };
+  explore?: { definition: ModelDefinition; runtime: ProviderRuntimeConfig };
+  thinkingEnabled?: boolean;
+  inferenceSettings?: RuntimeInferenceSettings;
+  toolEnvironment?: {
+    hasWebSearchKey: boolean;
+    disabledTools: string[];
+    hasKimiKey: boolean;
+  };
 }
 
 // ─── 内部：env 读取 ───
@@ -130,6 +163,76 @@ export function resolveAgentEnvConfig(): AgentEnvConfig {
 
 // ─── 内部：LLMConfig 构造 ───
 
+function normalizeRuntimeBaseUrl(baseUrl: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new LLMServiceError("Provider base URL is invalid.", "invalid_request", false);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new LLMServiceError("Provider base URL must use HTTP or HTTPS.", "invalid_request", false);
+  }
+  if (parsed.username || parsed.password) {
+    throw new LLMServiceError("Provider base URL must not contain credentials.", "invalid_request", false);
+  }
+  return parsed.toString().replace(/\/$/, "");
+}
+
+function buildLLMConfigFromRuntimeInternal(
+  model: ModelDefinition,
+  providerRuntime: ProviderRuntimeConfig,
+  inferenceSettings: RuntimeInferenceSettings = {},
+  options: { allowMissingApiKey: boolean; useModelMaxTokens: boolean },
+): LLMConfig {
+  if (!(providerRuntime.provider in PROVIDER_REGISTRY)) {
+    throw new LLMServiceError("Provider is not registered.", "invalid_request", false);
+  }
+  if (model.provider !== providerRuntime.provider) {
+    throw new LLMServiceError("Model and provider runtime do not match.", "invalid_request", false);
+  }
+  const providerSpec = PROVIDER_REGISTRY[providerRuntime.provider];
+  if (!providerSpec.supportedApis.includes(model.api)) {
+    throw new LLMServiceError("Provider does not support the model API protocol.", "invalid_request", false);
+  }
+  if (!options.allowMissingApiKey && !providerRuntime.apiKey.trim()) {
+    throw new LLMServiceError("Provider API key is not configured.", "auth", false);
+  }
+
+  const baseUrl = normalizeRuntimeBaseUrl(providerRuntime.baseUrl);
+  return {
+    provider: providerRuntime.provider,
+    api: model.api,
+    ...(providerRuntime.provider === "deepseek" && {
+      apiFormat: model.api === "anthropic-messages" ? "anthropic" as const : "openai" as const,
+    }),
+    apiKey: providerRuntime.apiKey,
+    baseUrl,
+    model: model.apiModel,
+    input: [...model.capabilities.input],
+    ...(inferenceSettings.temperature !== undefined && { temperature: inferenceSettings.temperature }),
+    ...(inferenceSettings.maxTokens !== undefined
+      ? { maxTokens: inferenceSettings.maxTokens }
+      : options.useModelMaxTokens && model.maxTokens !== null
+        ? { maxTokens: model.maxTokens }
+        : {}),
+    ...(providerRuntime.transport && { transport: { ...providerRuntime.transport } }),
+    defaultHeaders: providerDefaultHeaders(providerRuntime.provider),
+  };
+}
+
+/** Build a service config from an explicit provider runtime. New desktop paths use this API. */
+export function buildLLMConfigFromRuntime(
+  model: ModelDefinition,
+  providerRuntime: ProviderRuntimeConfig,
+  inferenceSettings: RuntimeInferenceSettings = {},
+): LLMConfig {
+  return buildLLMConfigFromRuntimeInternal(model, providerRuntime, inferenceSettings, {
+    allowMissingApiKey: false,
+    useModelMaxTokens: true,
+  });
+}
+
 /**
  * 纯函数：从 ModelSpec + AgentEnvConfig 构造 LLMConfig。
  *
@@ -143,28 +246,31 @@ export function buildLLMConfig(spec: ModelSpec, envConfig: AgentEnvConfig): LLMC
       ? "anthropic-messages"
       : "openai-completions"
     : spec.api;
-  const apiKeyMap: Record<string, string> = {
+  const apiKeyMap = {
     deepseek: envConfig.deepseekApiKey,
     kimi: envConfig.kimiApiKey,
   };
-  const baseUrlMap: Record<string, string | undefined> = {
+  const baseUrlMap = {
     deepseek: envConfig.deepseekApiFormat === "anthropic"
-      ? envConfig.deepseekAnthropicBaseUrl
-      : envConfig.deepseekBaseUrl,
-    kimi: envConfig.kimiBaseUrl,
+      ? envConfig.deepseekAnthropicBaseUrl ?? "https://api.deepseek.com/anthropic"
+      : envConfig.deepseekBaseUrl ?? "https://api.deepseek.com",
+    kimi: envConfig.kimiBaseUrl ?? "https://api.moonshot.cn/v1",
   };
-
-  return {
-    api,
-    provider: spec.provider,
-    ...(spec.provider === "deepseek" && { apiFormat: envConfig.deepseekApiFormat }),
-    apiKey: apiKeyMap[spec.provider] ?? "",
-    baseUrl: baseUrlMap[spec.provider] || undefined,
-    model: spec.apiModel,
-    input: spec.input,
-    ...(envConfig.temperature !== undefined && { temperature: envConfig.temperature }),
-    ...(envConfig.maxTokens !== undefined && { maxTokens: envConfig.maxTokens }),
-  };
+  const builtinDefinition = resolveModelDefinition(spec.id);
+  if (!builtinDefinition) {
+    throw new LLMServiceError("Legacy model is not registered.", "invalid_request", false);
+  }
+  const model: ModelDefinition = { ...builtinDefinition, api };
+  return buildLLMConfigFromRuntimeInternal(
+    model,
+    {
+      provider: spec.provider,
+      apiKey: apiKeyMap[spec.provider],
+      baseUrl: baseUrlMap[spec.provider],
+    },
+    { temperature: envConfig.temperature, maxTokens: envConfig.maxTokens },
+    { allowMissingApiKey: true, useModelMaxTokens: false },
+  );
 }
 
 // ─── 公开 API ───
@@ -182,6 +288,8 @@ export function buildAgentConfig(
 ): AgentConfig {
   const envConfig = resolveAgentEnvConfig();
   const modelSpec = resolveModelSpec(frontendInput.model);
+  const modelDefinition = resolveModelDefinition(modelSpec.id)!;
+  const modelKey = normalizeModelKey(modelSpec.id)!;
   const thinkingEnabled = frontendInput.thinkingEnabled ?? modelSpec.thinkingDefault;
   const llmConfig = buildLLMConfig(modelSpec, envConfig);
   const toolManagerConfig: ToolManagerConfig = {
@@ -200,12 +308,62 @@ export function buildAgentConfig(
   };
   return {
     llmConfig,
+    modelDefinition,
+    modelKey,
     toolManagerConfig,
     thinkingEnabled,
     modelSpec,
     systemPrompt: runtimeContext?.systemPrompt ?? MAIN_AGENT_SYSTEM_PROMPT,
     systemPromptSegments: runtimeContext?.systemPromptSegments ?? [],
     exploreModelId: frontendInput.exploreModelId ?? null,
+  };
+}
+
+/** Desktop/main entrypoint: all LLM credentials and model choices are explicit. */
+export function buildAgentConfigFromRuntime(
+  input: ExplicitAgentRuntimeInput,
+  workspaceRoot: string,
+  approvalGate?: ApprovalGate,
+  runtimeContext?: AgentRuntimeContext,
+): AgentConfig {
+  const envConfig = resolveAgentEnvConfig();
+  const toolEnvironment = input.toolEnvironment ?? {
+    hasWebSearchKey: envConfig.hasWebSearchKey,
+    disabledTools: envConfig.disabledTools,
+    hasKimiKey: Boolean(envConfig.kimiApiKey),
+  };
+  const mainConfig = buildLLMConfigFromRuntime(input.main.definition, input.main.runtime, input.inferenceSettings);
+  const utilityConfig = input.utility
+    ? buildLLMConfigFromRuntime(input.utility.definition, input.utility.runtime, input.inferenceSettings)
+    : undefined;
+  const exploreConfig = input.explore
+    ? buildLLMConfigFromRuntime(input.explore.definition, input.explore.runtime, input.inferenceSettings)
+    : undefined;
+  const modelSpec = modelDefinitionToCompatSpec(input.main.definition);
+  return {
+    llmConfig: mainConfig,
+    modelDefinition: input.main.definition,
+    modelKey: input.main.definition.key,
+    ...(utilityConfig && { utilityLlmConfig: utilityConfig, utilityModelKey: input.utility!.definition.key }),
+    ...(exploreConfig && { exploreLlmConfig: exploreConfig, exploreModelKey: input.explore!.definition.key }),
+    toolManagerConfig: {
+      workspaceRoot,
+      primaryProvider: input.main.definition.provider,
+      apiFormat: mainConfig.apiFormat,
+      hasKimiKey: toolEnvironment.hasKimiKey,
+      hasWebSearchKey: toolEnvironment.hasWebSearchKey,
+      disabledTools: toolEnvironment.disabledTools,
+      approvalGate,
+      tmpRoot: runtimeContext?.tmpRoot,
+      sessionId: runtimeContext?.sessionId,
+      additionalWritableRoots: runtimeContext?.additionalWritableRoots,
+      turnId: runtimeContext?.turnId,
+      browserBridgeSocketPath: runtimeContext?.browserBridgeSocketPath,
+    },
+    thinkingEnabled: input.thinkingEnabled ?? input.main.definition.thinkingDefault,
+    modelSpec,
+    systemPrompt: runtimeContext?.systemPrompt ?? MAIN_AGENT_SYSTEM_PROMPT,
+    systemPromptSegments: runtimeContext?.systemPromptSegments ?? [],
   };
 }
 
@@ -260,28 +418,35 @@ export function createTitlerLLMService(
  * `createAgentForSession`，让 ConversationContext 在构造阶段一次性吃完 session 历史。
  */
 export function createAgentFromConfig(config: AgentConfig): AgentDeps {
+  const { modelDefinition, modelKey } = resolveConfigModelIdentity(config);
   const llm = createLLMService(config.llmConfig);
-  const summarizer = createSummarizerForAgent();
-  const exploreLlm = createExploreLLMService(config.exploreModelId);
+  const utilityLlm = config.utilityLlmConfig ? createLLMService(config.utilityLlmConfig) : undefined;
+  const summarizer = utilityLlm ? createSummarizer(utilityLlm) : createSummarizerForAgent();
+  const exploreLlm = config.exploreLlmConfig ? createLLMService(config.exploreLlmConfig) : createExploreLLMService(config.exploreModelId);
   const toolManager = createToolManager({
     ...config.toolManagerConfig,
     llm,
     exploreLlm,
-    contextWindow: config.modelSpec.contextWindow,
+    contextWindow: modelDefinition.contextWindow ?? config.modelSpec.contextWindow,
     summarizer,
   });
   const systemPromptModule = new SystemPromptContext(config.systemPrompt);
   registerSystemPromptSegments(systemPromptModule, config.systemPromptSegments);
   const contextManager = new ContextManager({
     systemPromptModule,
-    config: { contextWindow: config.modelSpec.contextWindow },
+    config: { contextWindow: modelDefinition.contextWindow ?? config.modelSpec.contextWindow },
   });
   return {
     llm,
+    utilityLlm,
     toolManager,
     contextManager,
     thinkingEnabled: config.thinkingEnabled,
     modelSpec: config.modelSpec,
+    modelDefinition,
+    modelKey,
+    utilityModelKey: config.utilityModelKey,
+    exploreModelKey: config.exploreModelKey,
     summarizer,
   };
 }
@@ -299,14 +464,16 @@ export async function createAgentForSession(
   config: AgentConfig,
   options: { sessionPath?: string } = {},
 ): Promise<AgentDeps> {
+  const { modelDefinition, modelKey } = resolveConfigModelIdentity(config);
   const llm = createLLMService(config.llmConfig);
-  const summarizer = createSummarizerForAgent();
-  const exploreLlm = createExploreLLMService(config.exploreModelId);
+  const utilityLlm = config.utilityLlmConfig ? createLLMService(config.utilityLlmConfig) : undefined;
+  const summarizer = utilityLlm ? createSummarizer(utilityLlm) : createSummarizerForAgent();
+  const exploreLlm = config.exploreLlmConfig ? createLLMService(config.exploreLlmConfig) : createExploreLLMService(config.exploreModelId);
   const toolManager = createToolManager({
     ...config.toolManagerConfig,
     llm,
     exploreLlm,
-    contextWindow: config.modelSpec.contextWindow,
+    contextWindow: modelDefinition.contextWindow ?? config.modelSpec.contextWindow,
     summarizer,
   });
   const systemPromptModule = new SystemPromptContext(config.systemPrompt);
@@ -314,15 +481,53 @@ export async function createAgentForSession(
   const contextManager = await ContextManager.createForSession({
     systemPromptModule,
     sessionPath: options.sessionPath,
-    config: { contextWindow: config.modelSpec.contextWindow },
+    config: { contextWindow: modelDefinition.contextWindow ?? config.modelSpec.contextWindow },
   });
   return {
     llm,
+    utilityLlm,
     toolManager,
     contextManager,
     thinkingEnabled: config.thinkingEnabled,
     modelSpec: config.modelSpec,
+    modelDefinition,
+    modelKey,
+    utilityModelKey: config.utilityModelKey,
+    exploreModelKey: config.exploreModelKey,
     summarizer,
+  };
+}
+
+function resolveConfigModelIdentity(config: AgentConfig): {
+  modelDefinition: ModelDefinition;
+  modelKey: ModelKey;
+} {
+  const modelDefinition = config.modelDefinition ?? resolveModelDefinition(config.modelSpec.id);
+  if (!modelDefinition) {
+    throw new LLMServiceError("Agent model is not registered.", "invalid_request", false);
+  }
+  return {
+    modelDefinition,
+    modelKey: config.modelKey ?? modelDefinition.key,
+  };
+}
+
+function modelDefinitionToCompatSpec(definition: ModelDefinition): ModelSpec {
+  return {
+    id: definition.apiModel as ModelId,
+    label: definition.label,
+    api: definition.api,
+    provider: definition.provider as ModelSpec["provider"],
+    apiModel: definition.apiModel,
+    defaultBaseUrl: PROVIDER_REGISTRY[definition.provider].defaultBaseUrl,
+    thinkingDefault: definition.thinkingDefault,
+    supportsThinkingToggle: definition.capabilities.thinkingToggle,
+    reasoning: definition.capabilities.reasoning,
+    input: [...definition.capabilities.input],
+    contextWindow: definition.contextWindow ?? 128_000,
+    maxTokens: definition.maxTokens ?? 8192,
+    visibility: "public",
+    ...(definition.pricing && { pricing: { ...definition.pricing } }),
   };
 }
 

@@ -21,5 +21,5 @@ Provider-native `$web_search` 会让搜索链路分叉：一部分搜索隐藏�
 - `packages/agent-core/src/llm/services/openai-completions.ts`
 - `packages/agent-core/src/llm/types.ts`
 - `packages/agent-core/src/llm/test/kimi-service.test.ts`
-- `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`
-- `docs/design-docs/agent-web-tools.md`
+- `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`
+- `docs/design-docs/tool-system/agent-web-tools.md`

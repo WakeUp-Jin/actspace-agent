@@ -8,14 +8,14 @@
 
 ## 设计来源
 
-- `docs/design-docs/agent-backend-design.md`
+- `docs/design-docs/agent-runtime/agent-backend-design.md`
 - `.agents/skills/llm-agent-dev/references/context/mgmt-context-architecture.md`（核心：Message/Content/Context 类型层次）
 - `.agents/skills/llm-agent-dev/references/llm/llm-service.md`（AssistantMessage 结构、Usage、stopReason）
 - `.agents/skills/llm-agent-dev/references/tools/tool-definition.md`（InternalTool、ToolResult）
 - `.agents/skills/llm-agent-dev/examples/context-manager.ts`（类型使用示例）
 - `.agents/skills/llm-agent-dev/examples/llm-service.ts`（类型定义参考）
 - `docs/ARCHITECTURE.md`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
 
 ## 相关路径
 

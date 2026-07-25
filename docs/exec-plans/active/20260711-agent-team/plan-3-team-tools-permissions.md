@@ -12,9 +12,9 @@
 
 ## 附加必读
 
-- `docs/design-docs/agent-权限设计规则和原则.md`
-- `docs/design-docs/agent-bash工具设计文档.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
+- `docs/design-docs/execution-safety/agent-bash工具设计文档.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `packages/agent-core/src/tools/manager.ts`
 - `packages/agent-core/src/tools/scheduler.ts`
 - `packages/agent-core/src/tools/tools/bash/permissions.ts`

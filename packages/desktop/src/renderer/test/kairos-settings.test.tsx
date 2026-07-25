@@ -6,15 +6,20 @@ import type {
   KairosBridgeApi,
   KairosBudgetRuntime,
   KairosRuntimeState,
+  UsableModelView,
 } from "@actspace/shared";
 import { emptyKairosUsageSummary } from "@actspace/shared";
 import { KairosSettings } from "../components/settings/KairosSettings";
 
 function makeSettings(): AppSettings {
   return {
-    version: 1,
+    version: 2,
     defaultModelId: null,
-    providers: { deepseek: { hasApiKey: true }, kimi: { hasApiKey: false } },
+    providers: { deepseek: { hasApiKey: true }, kimi: { hasApiKey: false }, openrouter: { hasApiKey: true } },
+    installedModels: {},
+    customModels: {},
+    taskModels: { defaultChatModel: null, utilityModel: null, exploreModel: null },
+    kairosModelKey: null,
     searchProviders: {
       zhipu: { hasApiKey: false },
       tavily: { hasApiKey: false },
@@ -49,6 +54,22 @@ function makeState(budget: KairosBudgetRuntime): KairosRuntimeState {
 }
 
 type KairosBridge = NonNullable<typeof window.kairos>;
+type ActspaceBridge = NonNullable<typeof window.actspace>;
+
+const openRouterKairosModel: UsableModelView = {
+  key: "openrouter:anthropic/claude-sonnet-4",
+  label: "Claude Sonnet 4",
+  provider: "openrouter",
+  apiModel: "anthropic/claude-sonnet-4",
+  contextWindow: 200_000,
+  thinkingDefault: false,
+  capabilities: {
+    input: ["text"],
+    toolUse: "declared",
+    reasoning: true,
+    thinkingToggle: true,
+  },
+};
 
 function installKairosBridge(budget: KairosBudgetRuntime): {
   control: ReturnType<typeof vi.fn>;
@@ -75,6 +96,23 @@ function installKairosBridge(budget: KairosBudgetRuntime): {
 describe("KairosSettings 额度护栏控件", () => {
   afterEach(() => {
     delete (window as { kairos?: KairosBridge }).kairos;
+    delete (window as { actspace?: ActspaceBridge }).actspace;
+  });
+
+  it("discovers purpose-filtered Kairos models and saves a provider-qualified ModelKey", async () => {
+    installKairosBridge({ enabled: false, balanceCny: 0, exhausted: false });
+    const listUsableModels = vi.fn(async () => ({ models: [openRouterKairosModel] }));
+    const updateKairosModel = vi.fn(async () => ({ modelKey: openRouterKairosModel.key }));
+    const onChanged = vi.fn();
+    window.actspace = { listUsableModels, updateKairosModel } as unknown as ActspaceBridge;
+
+    render(<KairosSettings settings={makeSettings()} onUpdate={() => {}} onChanged={onChanged} />);
+    const select = await screen.findByLabelText("Kairos 模型");
+    await waitFor(() => expect(listUsableModels).toHaveBeenCalledWith({ purpose: "kairos" }));
+    await userEvent.selectOptions(select, openRouterKairosModel.key);
+
+    await waitFor(() => expect(updateKairosModel).toHaveBeenCalledWith({ modelKey: openRouterKairosModel.key }));
+    expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
   it("回填 getState().budget：开关与剩余额度", async () => {

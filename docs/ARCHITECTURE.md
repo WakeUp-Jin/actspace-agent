@@ -53,23 +53,24 @@ desktop --(file contract)--> plugins/fs-watch
 
 ## 架构阅读路线
 
-- `docs/design-docs/agent-turn-layers.md`：Agent Turn 从前端输入到结果返回的四层职责边界（Renderer → Main Process → Bridge → Agent），也是运行拓扑、IPC 双通道和 turn 数据流的主要入口。
-- `docs/design-docs/agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块清单，包括 LLM、prompt、tools、context、engine、persistence、observability、env 和兼容层。
+- `docs/design-docs/agent-runtime/agent-turn-layers.md`：Agent Turn 从前端输入到结果返回的四层职责边界（Renderer → Main Process → Bridge → Agent），也是运行拓扑、IPC 双通道和 turn 数据流的主要入口。
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块清单，包括 LLM、prompt、tools、context、engine、persistence、observability、env 和兼容层。
+- `docs/design-docs/model-context/agent-multi-provider-llm.md`：已落地的多供应商 LLM 架构，统一 DeepSeek / Kimi / OpenRouter 的服务商连接、模型目录、服务商级代理和任务模型选择；真实 OpenRouter 场景待用户统一手动验收。
 - `docs/design-docs/core-storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
-- `docs/design-docs/agent-backend-design.md`：后端 Agent Runtime 的长期设计事实来源，解释为什么采用这些模块边界。
-- `docs/design-docs/agent-members.md`：跨 Room 持久 Agent Member 的身份、配置版本、Activity、设置页与 Room 私有上下文边界。
-- `docs/design-docs/agent-token-usage-and-context-state.md`：token usage、成本统计、context snapshot 与 context state 的数据分层设计。
-- `docs/design-docs/agent-skill-loading.md`：Agent Skill 设计与加载规范，约束 `.actspace/skills`、`.agents/skills`、`.claude/skills` 的发现优先级、catalog 注入和 `read_file` 读取边界。
+- `docs/design-docs/agent-runtime/agent-backend-design.md`：后端 Agent Runtime 的长期设计事实来源，解释为什么采用这些模块边界。
+- `docs/design-docs/collaboration/agent-members.md`：跨 Room 持久 Agent Member 的身份、配置版本、Activity、设置页与 Room 私有上下文边界。
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：token usage、成本统计、context snapshot 与 context state 的数据分层设计。
+- `docs/design-docs/tool-system/agent-skill-loading.md`：Agent Skill 设计与加载规范，约束 `.actspace/skills`、`.agents/skills`、`.claude/skills` 的发现优先级、catalog 注入和 `read_file` 读取边界。
 - `docs/design-docs/agent-plugins-fs-watch.md`：插件（Plugins）模式与 fs-watch 文件监听插件——外部 Rust 二进制的文件契约（事件 JSONL / 心跳 / config）、main 进程生命周期管理、设置页「插件」「Skills」分区和 Kairos Skill 白名单。插件源码在 `plugins/fs-watch/`。
-- `docs/design-docs/agent-browser-use-index.md`：Browser Use 专题入口，统一 Agent Core、Go Command Engine、Injected Locator runtime 与 Chrome Extension 的职责边界。
-- `docs/design-docs/agent-browser-use-command-surface.md`：Browser Use 62 条命令面分类详解。
-- `docs/design-docs/agent-browser-use-integration-design.md`：Browser Use 集成方案设计。
-- `docs/design-docs/agent-browser-use-command-implementation.md`：Browser Use 62 条命令的核心实现设计——CDP 调用链、Go/Extension/Injected runtime 职责，以及 Plan 5 前历史基线与当前 62/62 实现矩阵。
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约。
-- `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入边界。
-- `docs/design-docs/front-index.md`：前端工作台设计文档入口。
-- `docs/design-docs/agent-kairos-autonomous-mode.md`：Kairos 自治模式设计——独立 prompt + 短期记忆、tick 调度、IPC 契约和页面规范。
-- `docs/design-docs/lab-index.md`：Lab 能力实验台设计入口，约束实验矩阵、实验生命周期、产物晋升和分版本构建路线。
+- `docs/design-docs/browser/agent-browser-use-index.md`：Browser Use 专题入口，统一 Agent Core、Go Command Engine、Injected Locator runtime 与 Chrome Extension 的职责边界。
+- `docs/design-docs/browser/agent-browser-use-command-surface.md`：Browser Use 62 条命令面分类详解。
+- `docs/design-docs/browser/agent-browser-use-integration-design.md`：Browser Use 集成方案设计。
+- `docs/design-docs/browser/agent-browser-use-command-implementation.md`：Browser Use 62 条命令的核心实现设计——CDP 调用链、Go/Extension/Injected runtime 职责，以及 Plan 5 前历史基线与当前 62/62 实现矩阵。
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约。
+- `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入边界。
+- `docs/design-docs/frontend/README.md`：前端工作台设计文档入口。
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`：Kairos 自治模式设计——独立 prompt + 短期记忆、tick 调度、IPC 契约和页面规范。
+- `docs/design-docs/lab/README.md`：Lab 能力实验台设计入口，约束实验矩阵、实验生命周期、产物晋升和分版本构建路线。
 - `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档，不作为主线架构事实来源。
 
 ## 当前已确认的实现方向
@@ -87,6 +88,6 @@ desktop --(file contract)--> plugins/fs-watch
 
 - `ARCHITECTURE.md` 只做顶层导航，不继续堆实现清单。
 - 长期设计原则优先放入 `docs/design-docs/`。
-- 已落地模块清单优先维护在 `docs/design-docs/agent-current-module-map.md`。
+- 已落地模块清单优先维护在 `docs/design-docs/agent-runtime/agent-current-module-map.md`。
 - 存储、日志和可观测性边界优先维护在 `docs/design-docs/core-storage-and-observability.md`。
 - 只要架构变化会让文档过期，就在同一轮任务里同步更新相关文档。

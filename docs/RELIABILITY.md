@@ -12,7 +12,7 @@
 - 应用启动后必须至少能完成两条路径之一：
   - 恢复本地已有会话
   - 在没有旧会话时，跑起一轮默认 turn
-- 普通桌面会话默认走真实 DeepSeek provider，也可通过 `LLM_PROVIDER=kimi` 选择 Kimi；mock 只用于测试、浏览器 fixture 或显式 demo，不允许静默替代 Electron 真实 turn：
+- 普通桌面会话通过统一可用模型解析器选择 DeepSeek、Kimi 或已添加的 OpenRouter 模型；连接测试为可选诊断，已保存 Key 且未明确测试失败的 provider 可直接使用。mock 只用于测试、浏览器 fixture 或显式 demo，不允许静默替代 Electron 真实 turn：
   - 启动应用
   - 请求 bootstrap state
   - 读取 session list
@@ -82,7 +82,7 @@
 
 - 启动、健康检查和基本可用性要求。
 - 日志、指标、链路的采集和访问约定。
-- timeout、retry、backoff 的默认策略。LLM 可重试错误的自动重试已落地：默认最多 2 次重试、退避 1s → 3s，可通过 `AgentLoopConfig.llmRetry` 配置，详见 `docs/design-docs/agent-backend-design.md` 的「LLM 错误分类与自动重试」。
+- timeout、retry、backoff 的默认策略。LLM 可重试错误的自动重试已落地：默认最多 2 次重试、退避 1s → 3s，可通过 `AgentLoopConfig.llmRetry` 配置，详见 `docs/design-docs/agent-runtime/agent-backend-design.md` 的「LLM 错误分类与自动重试」。
 - 本地和 CI 的关键路径验证方式。
 - 常见故障、排查路径和恢复步骤。
 

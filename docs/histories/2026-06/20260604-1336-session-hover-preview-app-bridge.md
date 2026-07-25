@@ -31,4 +31,4 @@ Review V1 已接入真实 Git provider，Composer 规范继续保留旧 demo 数
 
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
-- `docs/design-docs/front-聊天输入框规范.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`

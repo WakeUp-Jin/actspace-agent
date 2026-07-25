@@ -17,7 +17,7 @@
 **Key Actions:**
 
 - **[Flatten Design Docs]**: 将 `agent-core/`、`frontend-ui/`、`lab/`、`llm-agent-fix-plan/` 下的 `.md` 设计文档移动到 `docs/design-docs/` 一层，并统一改为 `agent-`、`front-`、`lab-`、`fix-` 前缀。
-- **[Public Assets]**: 将前端图片、前端 HTML prototype、Lab HTML prototype 移到 `docs/design-docs/public/front/` 与 `docs/design-docs/public/lab/`。
+- **[Public Assets]**: 将前端图片、前端 HTML prototype、Lab HTML prototype 移到 `docs/design-docs/frontend/` 与 `docs/design-docs/lab/`。
 - **[Navigation Sync]**: 重写 `docs/design-docs/index.md`、`agent-index.md`、`front-index.md`、`lab-index.md`，并同步 `AGENTS.md`、`README.md`、`docs/ARCHITECTURE.md`、`docs/FRONTEND.md` 等入口。
 - **[Link Migration]**: 全仓替换旧专题子目录引用，并修复迁移中出现的重复前缀和重复 `public/` 路径。
 - **[Verification]**: 执行文档骨架检查，并用脚本扫描 765 个文本文件中的 `design-docs` 路径，确认仍指向现有文件。
@@ -30,10 +30,10 @@
 
 - `docs/design-docs/index.md`
 - `docs/design-docs/agent-index.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/lab-index.md`
-- `docs/design-docs/public/front/*`
-- `docs/design-docs/public/lab/*`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/lab/README.md`
+- `docs/design-docs/frontend/*`
+- `docs/design-docs/lab/*`
 - `AGENTS.md`
 - `README.md`
 - `docs/ARCHITECTURE.md`

@@ -5,7 +5,7 @@
 收尾 Kairos 项目：
 
 - 跑一整套端到端验证场景（实机 Electron + 浏览器 mock），证明前 6 份 plan 装配后行为符合设计文档。
-- 把 Kairos 的最终模块布局、IPC 契约、配置文件、事件流、调度规则、压缩策略 **完整反向同步**到 `docs/design-docs/agent-current-module-map.md`、`docs/design-docs/core-storage-and-observability.md`（如有）、`docs/QUALITY_SCORE.md` 与 `docs/exec-plans/README.md`。
+- 把 Kairos 的最终模块布局、IPC 契约、配置文件、事件流、调度规则、压缩策略 **完整反向同步**到 `docs/design-docs/agent-runtime/agent-current-module-map.md`、`docs/design-docs/core-storage-and-observability.md`（如有）、`docs/QUALITY_SCORE.md` 与 `docs/exec-plans/README.md`。
 - 把所有 Kairos plan 从 `active/` 移到 `completed/`，写一条覆盖整个项目的总结 history。
 - 评估是否命中 `docs/learnings/WRITING_GUIDE.md` 标准并按需新建 learning。
 
@@ -13,7 +13,7 @@
 
 - 包含：
   - 端到端测试场景的设计与执行记录（写入 history）
-  - `docs/design-docs/agent-current-module-map.md` 增补 Kairos 章节
+  - `docs/design-docs/agent-runtime/agent-current-module-map.md` 增补 Kairos 章节
   - `docs/design-docs/core-storage-and-observability.md` 增补 Kairos 存储 + observe（如该文件不存在，则在 `kairos-autonomous-mode.md` 末尾补一份"实测目录树"）
   - `docs/QUALITY_SCORE.md` 评分更新（如 Kairos 项目质量影响整体评分）
   - `docs/exec-plans/README.md` 更新（把 7 份 Kairos plan 移到 completed 列表，从 active 列表删除）
@@ -36,7 +36,7 @@
 ## 必读
 
 - `AGENTS.md`
-- `docs/design-docs/agent-kairos-autonomous-mode.md` 全文（最终对照标准）
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md` 全文（最终对照标准）
 - `docs/FRONTEND_VERIFICATION.md`（实机验收规范）
 - `docs/HISTORY_GUIDE.md`、`docs/learnings/WRITING_GUIDE.md`
 - 前 6 份 Kairos plan 的"决策记录"章节（汇总到 history）

@@ -7,13 +7,13 @@
 当前验收目标来自：
 
 - `docs/FRONTEND_VERIFICATION.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-前端设计文档.md`
-- `docs/design-docs/front-左侧会话栏规范.md`
-- `docs/design-docs/front-聊天输入框规范.md`
-- `docs/design-docs/front-中间消息区规范.md`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/public/front/*.png`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/*.png`
 
 ## 当前验收方式
 
@@ -164,7 +164,7 @@ http://localhost:5173/
 
 验收标准：
 
-- 首屏截图接近 `docs/design-docs/public/front/overview-two-column.png`。
+- 首屏截图接近 `docs/design-docs/frontend/overview-two-column.png`。
 - 消息流和 Composer 视觉比例自然。
 - 1024px 以上桌面宽度不出现内容挤压。
 

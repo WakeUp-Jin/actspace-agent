@@ -23,7 +23,7 @@
 - **设置页网络搜索区块**：`shared` 新增 `SearchProviderId` / `SecretProviderId` / `searchProviders` / `SearchUsageResult` 契约；settings-service 统一管理 6 个 secret provider 的加密落盘与 env 应用，新增 `getSearchUsage()`（Tavily `GET /usage`）+ IPC + preload；设置页「模型」区新增 4 个搜索供应商行与 Tavily 额度显示。
 - **前端预览**：bridge 按 toolName 区分 `Web Fetch <url>` / `Web Search <query>`。
 - **（追加 2026-07-07）输出以国际线为主参考**：用户反馈中文搜索结果质量普遍不佳，重复内容希望以英文来源为准。国际组排前、URL 去重优先保留国际条目、分组标题附渠道特性说明 + primary/supplementary 标注（双通道有结果时）；讨论后放弃静态供应商数字比重方案（理由见 agent-web-tools.md 决策记录）。
-- **测试与文档**：新增/重写 web-fetch、web-search executor/providers 测试与暴露、deps 测试，全仓 typecheck + 1178 个测试全绿；新增 `docs/design-docs/agent-web-tools.md` 设计事实来源，同步更新 hybrid-capabilities、module-map、testing、kairos、SECURITY、RELIABILITY、设置页规范等文档。
+- **测试与文档**：新增/重写 web-fetch、web-search executor/providers 测试与暴露、deps 测试，全仓 typecheck + 1178 个测试全绿；新增 `docs/design-docs/tool-system/agent-web-tools.md` 设计事实来源，同步更新 hybrid-capabilities、module-map、testing、kairos、SECURITY、RELIABILITY、设置页规范等文档。
 
 ### 🧠 Design Intent (Why)
 
@@ -40,4 +40,4 @@ Kimi `$web_search` 本质是搜索工具而非爬虫：给定 URL 时经常搜�
 - `packages/desktop/src/main/settings-service.ts`、`main/index.ts`、`main/kairos-bootstrap.ts`、`preload/index.ts`、`src/global.d.ts`
 - `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`
 - 各包相关测试文件
-- `docs/design-docs/agent-web-tools.md`（新增）及多份既有文档同步
+- `docs/design-docs/tool-system/agent-web-tools.md`（新增）及多份既有文档同步

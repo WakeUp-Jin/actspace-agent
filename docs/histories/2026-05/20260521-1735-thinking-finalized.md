@@ -26,8 +26,8 @@ Thinking 是消息区的关键组件，先把折叠/展开规则与视觉边界�
 
 ### 📁 Files Modified
 
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-中间消息区规范.md`
-- `docs/design-docs/public/front/README.md`
-- `docs/design-docs/public/front/thinking-final.png`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/thinking-final.png`
 - `docs/histories/2026-05/20260521-1735-thinking-finalized.md`

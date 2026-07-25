@@ -23,17 +23,18 @@ import {
   buildAssistantMessage,
   buildErrorMessage,
 } from "../convert";
+import {
+  applyOpenAIProviderRequestParams,
+  providerDefaultHeaders,
+  providerDisplayName,
+} from "../provider-adapter";
+import { createProviderFetch } from "../provider-transport";
 
 const DEFAULT_BASE_URLS: Record<string, string> = {
   deepseek: "https://api.deepseek.com",
   kimi: "https://api.moonshot.cn/v1",
+  openrouter: "https://openrouter.ai/api/v1",
 };
-
-function providerDisplayName(provider: string): string {
-  if (provider === "deepseek") return "DeepSeek";
-  if (provider === "kimi") return "Kimi";
-  return provider;
-}
 
 export class OpenAICompletionsService implements LLMService {
   protected client: OpenAI;
@@ -41,9 +42,16 @@ export class OpenAICompletionsService implements LLMService {
 
   constructor(config: LLMConfig) {
     this.config = config;
+    const defaultHeaders = {
+      ...providerDefaultHeaders(config.provider),
+      ...config.defaultHeaders,
+    };
+    const providerFetch = config.transport?.fetch ?? createProviderFetch(config.transport?.proxyUrl);
     this.client = new OpenAI({
       apiKey: config.apiKey || "placeholder",
       baseURL: config.baseUrl ?? DEFAULT_BASE_URLS[config.provider] ?? "https://api.openai.com/v1",
+      ...(providerFetch && { fetch: providerFetch }),
+      ...(Object.keys(defaultHeaders).length > 0 && { defaultHeaders }),
       dangerouslyAllowBrowser: true,
     });
   }
@@ -105,7 +113,7 @@ export class OpenAICompletionsService implements LLMService {
 
       const acc = createAccumulator();
       const requestTools = options?.tools ?? toRequestTools(tools ?? []);
-      const requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
+      let requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
         model: self.config.model,
         messages,
         stream: true,
@@ -117,9 +125,11 @@ export class OpenAICompletionsService implements LLMService {
       if (requestTools.length > 0) {
         (requestParams as any).tools = requestTools;
       }
-      if (self.config.provider === "kimi" && options?.thinkingEnabled === true) {
-        (requestParams as any).thinking = { type: "enabled" };
-      }
+      requestParams = applyOpenAIProviderRequestParams(
+        self.config.provider,
+        requestParams as unknown as Record<string, unknown>,
+        options,
+      ) as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming;
 
       try {
         const stream = await self.client.chat.completions.create(

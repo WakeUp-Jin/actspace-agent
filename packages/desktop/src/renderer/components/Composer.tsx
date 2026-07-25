@@ -20,13 +20,13 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import type { ComposerAttachment, ContextUsageSnapshot, ModelId } from "@actspace/shared";
+import type { ComposerAttachment, ContextUsageSnapshot, ModelSelectionId, UsableModelView } from "@actspace/shared";
 import { MODEL_LIST, MODEL_REGISTRY, DEFAULT_MODEL_ID } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 export type ComposerSendOptions = {
-  model: ModelId;
+  model: ModelSelectionId;
   thinkingEnabled: boolean;
   attachments?: ComposerAttachment[];
 };
@@ -184,7 +184,21 @@ const SECONDARY_COMMAND_ITEMS: CommandMenuItem[] = [
 
 const DEFAULT_MODEL_SPEC = MODEL_REGISTRY[DEFAULT_MODEL_ID];
 
-function isModelEditable(_modelId: ModelId): boolean {
+type ComposerModelOption = {
+  id: ModelSelectionId;
+  label: string;
+  thinkingDefault: boolean;
+  supportsThinkingToggle: boolean;
+};
+
+const LEGACY_MODEL_OPTIONS: ComposerModelOption[] = MODEL_LIST.map((spec) => ({
+  id: spec.id,
+  label: spec.label,
+  thinkingDefault: spec.thinkingDefault,
+  supportsThinkingToggle: spec.supportsThinkingToggle,
+}));
+
+function isModelEditable(_modelId: ModelSelectionId): boolean {
   return true;
 }
 
@@ -269,6 +283,7 @@ export function Composer({
   onSelectWorkspace,
   reviewSummary,
   onOpenReview,
+  models,
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
   isStreaming?: boolean;
@@ -277,10 +292,10 @@ export function Composer({
   onAbort?: () => void;
   surface?: ComposerSurface;
   /** 来自设置页的默认模型；首次到达时同步选中，用户手动选过后不再覆盖。 */
-  defaultModelId?: ModelId;
+  defaultModelId?: ModelSelectionId;
   /** 会话级当前模型；提供时由上层持有，避免 initial/followup Composer 切换时丢选择。 */
-  selectedModelId?: ModelId;
-  onSelectedModelChange?: (modelId: ModelId) => void;
+  selectedModelId?: ModelSelectionId;
+  onSelectedModelChange?: (modelId: ModelSelectionId) => void;
   /** 提供时 Context 弹窗显示「展开完整视图」按钮，点击在右侧面板打开 Context Tab。 */
   onExpandContext?: () => void;
   workspaceOptions?: ComposerWorkspaceOption[];
@@ -288,19 +303,23 @@ export function Composer({
   onSelectWorkspace?: (workspaceRoot: string) => void;
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
+  models?: UsableModelView[];
 }) {
+  const modelList: ComposerModelOption[] = models === undefined
+    ? LEGACY_MODEL_OPTIONS
+    : models.map((model) => ({ id: model.key, label: model.label, thinkingDefault: model.thinkingDefault, supportsThinkingToggle: model.capabilities.thinkingToggle }));
   const initialModelId = controlledSelectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID;
   const [commandOpen, setCommandOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [modelOptionsOpen, setModelOptionsOpen] = useState(false);
   const [contextSelectorOpen, setContextSelectorOpen] = useState<ContextSelectorKind | null>(null);
-  const [localSelectedModelId, setLocalSelectedModelId] = useState<ModelId>(initialModelId);
+  const [localSelectedModelId, setLocalSelectedModelId] = useState<ModelSelectionId>(initialModelId);
   const selectedModelId = controlledSelectedModelId ?? localSelectedModelId;
-  const [editingModelId, setEditingModelId] = useState<ModelId>(initialModelId);
-  const [hoveredModelId, setHoveredModelId] = useState<ModelId | null>(null);
-  const [focusedModelId, setFocusedModelId] = useState<ModelId | null>(null);
+  const [editingModelId, setEditingModelId] = useState<ModelSelectionId>(initialModelId);
+  const [hoveredModelId, setHoveredModelId] = useState<ModelSelectionId | null>(null);
+  const [focusedModelId, setFocusedModelId] = useState<ModelSelectionId | null>(null);
   const [thinkingEnabled, setThinkingEnabled] = useState(
-    (MODEL_REGISTRY[initialModelId] ?? DEFAULT_MODEL_SPEC).thinkingDefault,
+    modelList.find((model) => model.id === initialModelId)?.thinkingDefault ?? DEFAULT_MODEL_SPEC.thinkingDefault,
   );
   const userPickedModelRef = useRef(false);
   const [contextOpen, setContextOpen] = useState(false);
@@ -317,8 +336,9 @@ export function Composer({
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const modelOptionsRef = useRef<HTMLDivElement | null>(null);
   const hasAttachments = attachments.length > 0;
-  const canSendMessage = Boolean(message.trim() || attachments.length > 0);
-  const editingModelSpec = MODEL_LIST.find((spec) => spec.id === editingModelId);
+  const selectedModelAvailable = modelList.some((model) => model.id === selectedModelId);
+  const canSendMessage = Boolean((message.trim() || attachments.length > 0) && selectedModelAvailable);
+  const editingModelSpec = modelList.find((spec) => spec.id === editingModelId);
   const contextUsagePercent = contextSnapshot?.percentUsed ?? 0;
   const contextRingPercent = Math.max(0, Math.min(100, contextUsagePercent));
   // 有内容但占比不足 1% 时显示「<1」，避免「明明有数据却是 0%」的误解。
@@ -341,14 +361,14 @@ export function Composer({
     if (!defaultModelId || controlledSelectedModelId || userPickedModelRef.current) return;
     setLocalSelectedModelId(defaultModelId);
     setEditingModelId(defaultModelId);
-    setThinkingEnabled((MODEL_REGISTRY[defaultModelId] ?? DEFAULT_MODEL_SPEC).thinkingDefault);
-  }, [controlledSelectedModelId, defaultModelId]);
+    setThinkingEnabled(modelList.find((model) => model.id === defaultModelId)?.thinkingDefault ?? DEFAULT_MODEL_SPEC.thinkingDefault);
+  }, [controlledSelectedModelId, defaultModelId, models]);
 
   useEffect(() => {
     if (!controlledSelectedModelId) return;
     setEditingModelId(controlledSelectedModelId);
-    setThinkingEnabled((MODEL_REGISTRY[controlledSelectedModelId] ?? DEFAULT_MODEL_SPEC).thinkingDefault);
-  }, [controlledSelectedModelId]);
+    setThinkingEnabled(modelList.find((model) => model.id === controlledSelectedModelId)?.thinkingDefault ?? DEFAULT_MODEL_SPEC.thinkingDefault);
+  }, [controlledSelectedModelId, models]);
 
   // 原生 textarea 不会随内容自动长高（粘贴大段文本时只会内部滚动）。
   // 多行判定必须始终按 inline 布局的可用宽度测量：如果在 stacked 的全宽输入框中测量，
@@ -676,12 +696,12 @@ export function Composer({
             setContextOpen(false);
           }}
         >
-          <span className={MODEL_BUTTON_TEXT_CLASS}>{selectedModelId}</span>
+          <span className={MODEL_BUTTON_TEXT_CLASS}>{modelList.find((model) => model.id === selectedModelId)?.label ?? selectedModelId}</span>
           <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
         </button>
         {modelOpen ? (
           <div className={modelMenuClass} ref={modelMenuRef}>
-            {MODEL_LIST.map((spec) => {
+            {modelList.map((spec) => {
               const showEdit = spec.id === selectedModelId || hoveredModelId === spec.id || focusedModelId === spec.id;
               return (
                 <div
@@ -722,7 +742,7 @@ export function Composer({
                       setModelOpen(false);
                     }}
                   >
-                    <span>{spec.id}</span>
+                    <span>{spec.label}</span>
                   </button>
                   <div className={`${MODEL_ROW_ACTIONS_CLASS} ${
                     spec.id === selectedModelId ? MODEL_ROW_ACTIONS_SELECTED_CLASS : ""

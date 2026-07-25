@@ -30,4 +30,4 @@
 - `packages/desktop/src/main/index.ts`
 - `packages/desktop/src/preload/index.ts`
 - `packages/desktop/src/renderer/App.tsx`
-- `docs/design-docs/agent-eval-failure-candidate.md`
+- `docs/design-docs/evaluation/agent-eval-failure-candidate.md`

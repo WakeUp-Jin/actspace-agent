@@ -6,7 +6,7 @@ Review 是把「本次会话或工作区中可评审的改动」整理成一个�
 
 它不是 Git 面板的别名，也不是单纯把 `git diff` 原文展示出来。actspace 的主 Review 应优先学习 Codex App 的 Git-first 行为：Review 默认反映 Git repository state，而不是只反映 Agent 本轮改过什么。Session diff、snapshot 和 external diff 是后续 provider / scope，不应取代 Git 作为首版真实工作区变更来源。
 
-本文只定义 Review 的数据来源、baseline、右侧视图边界和分阶段路线。具体右侧 UI 视觉规则仍见 `front-右侧面板与文件渲染规范.md`；工具 preview 契约仍见 `agent-tool-preview-design-guidelines.md`。
+本文只定义 Review 的数据来源、baseline、右侧视图边界和分阶段路线。具体右侧 UI 视觉规则仍见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`；工具 preview 契约仍见 `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`。
 
 ## 设计动机
 

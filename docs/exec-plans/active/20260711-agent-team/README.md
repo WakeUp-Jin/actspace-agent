@@ -4,10 +4,10 @@
 
 设计来源：
 
-- `docs/design-docs/agent-form-team.md`
-- `docs/design-docs/agent-subagent-runtime.md`
-- `docs/design-docs/agent-权限设计规则和原则.md`
-- `docs/design-docs/agent-testing.md`
+- `docs/design-docs/collaboration/agent-form-team.md`
+- `docs/design-docs/collaboration/agent-subagent-runtime.md`
+- `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
 
 ## 目标
 
@@ -167,7 +167,7 @@ pnpm check:docs
 - `docs/REPO_COLLAB_GUIDE.md`
 - `docs/ARCHITECTURE.md`
 - `docs/design-docs/core-beliefs.md`
-- `docs/design-docs/agent-form-team.md`
+- `docs/design-docs/collaboration/agent-form-team.md`
 - `docs/CODING_BEHAVIOR.md`
 - `docs/HISTORY_GUIDE.md`
 - 本子计划文件列出的附加文档

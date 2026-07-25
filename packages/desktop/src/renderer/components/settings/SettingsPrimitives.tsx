@@ -11,17 +11,22 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 export function SectionShell({
   title,
   description,
+  action,
   children,
 }: {
   title: string;
   description?: string;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-7 px-8 py-8">
-      <header className="flex flex-col gap-1">
-        <h2 className="text-[22px] font-bold tracking-tight text-text-main">{title}</h2>
-        {description ? <p className="text-[13px] leading-relaxed text-text-faint">{description}</p> : null}
+      <header className="flex items-start justify-between gap-5">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="text-[22px] font-bold tracking-tight text-text-main">{title}</h2>
+          {description ? <p className="text-[13px] leading-relaxed text-text-faint">{description}</p> : null}
+        </div>
+        {action ? <div className="shrink-0 pt-0.5">{action}</div> : null}
       </header>
       {children}
     </div>

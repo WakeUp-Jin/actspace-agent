@@ -58,4 +58,4 @@
 - `packages/desktop/src/renderer/test/kairos-context-sheet.test.tsx`
 - `packages/desktop/src/renderer/test/kairos-page.test.tsx`
 - `packages/desktop/src/renderer/test/right-panel-kairos.test.tsx`
-- `docs/design-docs/front-Kairos监控页规范.md`
+- `docs/design-docs/kairos/front-Kairos监控页规范.md`

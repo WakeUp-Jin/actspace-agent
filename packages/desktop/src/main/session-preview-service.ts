@@ -9,7 +9,6 @@ import type {
   ContextState,
   ContextUsageSnapshot,
   LlmUsagePayload,
-  ModelId,
   SessionEvent,
   SessionPreviewInput,
   SessionPreviewResult,
@@ -52,14 +51,14 @@ function latestModelFromEvents(events: SessionEvent[]): Pick<SessionPreviewResul
       if (typeof payload.model === "string" || typeof payload.modelId === "string") {
         return {
           ...(typeof payload.model === "string" ? { model: payload.model } : {}),
-          ...(typeof payload.modelId === "string" ? { modelId: payload.modelId as ModelId } : {}),
+          ...(typeof payload.modelId === "string" ? { modelId: payload.modelId } : {}),
         };
       }
     }
 
     if (event.type === "assistant_message" || event.type === "assistant_reply") {
       const model = typeof event.payload.model === "string" ? event.payload.model : undefined;
-      const modelId = typeof event.payload.modelId === "string" ? event.payload.modelId as ModelId : undefined;
+      const modelId = typeof event.payload.modelId === "string" ? event.payload.modelId : undefined;
       if (model || modelId) {
         return {
           ...(model ? { model } : {}),

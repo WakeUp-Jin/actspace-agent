@@ -20,7 +20,7 @@
 ## 背景
 
 - 相关文档：
-  - `docs/design-docs/agent-turn-layers.md`
+  - `docs/design-docs/agent-runtime/agent-turn-layers.md`
   - `docs/FRONTEND_VERIFICATION.md`
 - 相关代码路径：
   - `packages/shared/src/session.ts`

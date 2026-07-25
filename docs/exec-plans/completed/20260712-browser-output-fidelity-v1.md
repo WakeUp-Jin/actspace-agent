@@ -22,9 +22,9 @@
 ## 背景
 
 - 相关文档：
-  - `docs/design-docs/agent-browser-use-command-surface.md`
-  - `docs/design-docs/agent-browser-use-command-implementation.md`
-  - `docs/design-docs/agent-context-compression.md`
+  - `docs/design-docs/browser/agent-browser-use-command-surface.md`
+  - `docs/design-docs/browser/agent-browser-use-command-implementation.md`
+  - `docs/design-docs/model-context/agent-context-compression.md`
 - 相关代码路径：
   - `plugins/browser-bridge/apps/cli/internal/locator/runtime.js`
   - `plugins/browser-bridge/apps/cli/internal/commands/registry.go`

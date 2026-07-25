@@ -39,10 +39,10 @@
 - `docs/CODING_BEHAVIOR.md`
 - `docs/SECURITY.md`
 - `docs/HISTORY_GUIDE.md`
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-backend-design.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
-- `docs/design-docs/agent-testing.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/agent-runtime/agent-backend-design.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`
 - `.agents/skills/llm-agent-dev/references/foundations/overview.md`
 - `.agents/skills/llm-agent-dev/references/foundations/skill-integration.md`
@@ -64,8 +64,8 @@
 - `packages/desktop/src/main/index.ts`
 - `packages/desktop/src/preload/index.ts`
 - `packages/desktop/src/renderer/**`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
-- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
 
 ## 设计原则
 

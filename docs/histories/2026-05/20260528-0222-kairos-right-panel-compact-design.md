@@ -28,9 +28,9 @@ Kairos 完整页面适合专门监控，右侧 compact 视图适合聊天时伴�
 
 ### Files Modified
 
-- `docs/design-docs/front-Kairos监控页规范.md`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/front-index.md`
+- `docs/design-docs/kairos/front-Kairos监控页规范.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/README.md`
 - `docs/design-docs/index.md`
 - `docs/exec-plans/active/20260528-kairos-right-panel-compact-view.md`
 - `docs/exec-plans/active/20260527-right-panel-views.md`

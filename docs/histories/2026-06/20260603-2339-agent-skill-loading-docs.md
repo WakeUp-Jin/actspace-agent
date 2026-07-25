@@ -26,7 +26,7 @@ Skill 加载需要兼容当前主流生态，同时避免一次性注入所有 S
 
 ### 📁 Files Modified
 
-- `docs/design-docs/agent-skill-loading.md`
+- `docs/design-docs/tool-system/agent-skill-loading.md`
 - `docs/exec-plans/completed/20260603-agent-skill-loading.md`
 - `docs/design-docs/index.md`
 - `docs/design-docs/agent-index.md`

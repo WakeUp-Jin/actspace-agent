@@ -18,7 +18,7 @@
 
 ## 背景
 
-- 必读文档：`AGENTS.md`、`docs/design-docs/agent-explore-subagent.md`（本计划的设计事实来源）、`docs/design-docs/agent-subagent-runtime.md`（运行时机制）、`docs/design-docs/front-中间消息区规范.md`（工具流与 ToolActivityGroup）、`docs/design-docs/agent-tool-preview-design-guidelines.md`（新工具前端预览契约）。
+- 必读文档：`AGENTS.md`、`docs/design-docs/collaboration/agent-explore-subagent.md`（本计划的设计事实来源）、`docs/design-docs/collaboration/agent-subagent-runtime.md`（运行时机制）、`docs/design-docs/frontend/front-中间消息区规范.md`（工具流与 ToolActivityGroup）、`docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`（新工具前端预览契约）。
 - 相关代码路径：
   - `packages/shared/src/settings.ts`：`AgentSettings`（加 `exploreModelId`）、`SettingsUpdateInput`。
   - `packages/shared/src/session.ts`：`ToolPreviewKind` / `ToolUiPreview` / `MessageBlock`（加 `explore`）。

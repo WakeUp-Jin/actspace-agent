@@ -31,6 +31,6 @@
 - `packages/desktop/src/main/agent-runtime-context.ts`
 - `packages/desktop/src/main/test/agents-md-service.test.ts`
 - `packages/desktop/src/main/test/context-describe-service.test.ts`
-- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
 - `docs/exec-plans/active/20260527-agent-tool-capabilities-breakdown/01-bash-tool-choice-boundary.md`
 - `docs/learnings/2026-06/runtime-inspection-reuses-runtime-loaders.md`

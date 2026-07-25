@@ -21,11 +21,11 @@
 - **[列头]**: 新增 4-5% 阶段色背景块 + 左侧 3px 阶段色线作为身份徽章，承担"温和色块帮助区分阶段"的语义，同时不让色彩污染列体。列头数字徽标改 11px text-faint tabular-nums。
 - **[卡片]**: 卡片胶囊高度从 22px 缩到 18px，字号统一 11px；卡片标题从 13px font-semibold 改为 13px font-medium 让视觉更克制；hover 状态去掉 `-translate-y-px` 抖动，回到纯颜色变化；selected 态由"整圈品牌色边框"改为"`border-brand` + `brand-soft/40` 背景 + 左侧 2px 蓝条"。
 - **[空列处理]**: 移除每列 5 个虚线 placeholder 占位框（原本让晋升列变成一片虚框）。空列改为一行 `暂无{阶段名}。` 文本提示，让列自然结束。
-- **[设计文档同步]**: 在 `docs/design-docs/lab-frontend-page-design.md` "视觉约束" 一节加入这次实现决策——白底列 + 列头色块、卡片不染色、不渲染空槽 placeholder，避免后续再回到老做法。
+- **[设计文档同步]**: 在 `docs/design-docs/lab/lab-frontend-page-design.md` "视觉约束" 一节加入这次实现决策——白底列 + 列头色块、卡片不染色、不渲染空槽 placeholder，避免后续再回到老做法。
 
 ### 🧠 Design Intent (Why)
 
-旧版四列各染一种饱和纸张色（淡蓝/淡橙/淡青/淡金）+ 每张卡片再叠一个高饱和度标签胶囊（主假说蓝/草稿灰/阻塞红/候选蓝/验证中黄/通过绿/CLI 青/待评审金）+ 每列 5 个虚线空 placeholder，结果是页面变成"幼儿园彩色看板"，违反 `docs/design-docs/front-全局视觉语言规范.md` 中"黑色负责阅读、灰白负责承载、蓝色负责行动；蓝色不用于大面积页面背景"的核心原则，也违反 `frontend-page-design.md` 中"四列可以有非常浅的纸张色区分，但不能变成彩色看板"。
+旧版四列各染一种饱和纸张色（淡蓝/淡橙/淡青/淡金）+ 每张卡片再叠一个高饱和度标签胶囊（主假说蓝/草稿灰/阻塞红/候选蓝/验证中黄/通过绿/CLI 青/待评审金）+ 每列 5 个虚线空 placeholder，结果是页面变成"幼儿园彩色看板"，违反 `docs/design-docs/frontend/front-全局视觉语言规范.md` 中"黑色负责阅读、灰白负责承载、蓝色负责行动；蓝色不用于大面积页面背景"的核心原则，也违反 `frontend-page-design.md` 中"四列可以有非常浅的纸张色区分，但不能变成彩色看板"。
 
 这次的处理思路：**色彩只在列头作为身份徽章存在，列体保持白底；卡片只展示小而克制的标签胶囊**。这样桌面工作台的密度感和长时间阅读舒适度回到设计文档约定的基线。
 
@@ -42,8 +42,8 @@
 
 后续追加：
 
-- **[Prototype]**: 新增 `docs/design-docs/public/lab/prototype-refresh.html` —— 一个 self-contained HTML 原型，把这次修改后的视觉抽出可独立预览的版本（不依赖 vite dev server），方便后续设计评审和回归对比。保留旧的 `public/lab/prototype.html` 作为对比基线，不覆盖。
-- **[Design Doc 强化]**: `docs/design-docs/lab-frontend-page-design.md` "视觉约束" 一节加入具体实现决策——列底白色 + 列头温和色块 + 不渲染空槽 placeholder，避免后续重写又回到老做法。
+- **[Prototype]**: 新增 `docs/design-docs/lab/prototype-refresh.html` —— 一个 self-contained HTML 原型，把这次修改后的视觉抽出可独立预览的版本（不依赖 vite dev server），方便后续设计评审和回归对比。保留旧的 `public/lab/prototype.html` 作为对比基线，不覆盖。
+- **[Design Doc 强化]**: `docs/design-docs/lab/lab-frontend-page-design.md` "视觉约束" 一节加入具体实现决策——列底白色 + 列头温和色块 + 不渲染空槽 placeholder，避免后续重写又回到老做法。
 - **[最终对账]**: React 应用与 HTML 原型并排截图对比，确认 1:1 对齐；跑完完整 typecheck（除 Kairos 历史遗留外干净）+ build + 103/103 测试全绿。
 
 ### 🔁 Follow-up: 卡片"实物感"加固（17:26）
@@ -60,5 +60,5 @@
 ### 📁 Files Modified
 
 - `packages/desktop/src/renderer/components/LabPage.tsx`
-- `docs/design-docs/lab-frontend-page-design.md`
-- `docs/design-docs/public/lab/prototype-refresh.html`（新增 + 二次同步）
+- `docs/design-docs/lab/lab-frontend-page-design.md`
+- `docs/design-docs/lab/prototype-refresh.html`（新增 + 二次同步）

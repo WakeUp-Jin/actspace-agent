@@ -2,7 +2,7 @@
 
 状态：首个完整里程碑已完成
 
-设计来源：`docs/design-docs/agent-evaluation.md`
+设计来源：`docs/design-docs/evaluation/agent-evaluation.md`
 
 ## 目标
 
@@ -30,12 +30,12 @@
 - `docs/REPO_COLLAB_GUIDE.md`
 - `docs/ARCHITECTURE.md`
 - `docs/design-docs/core-beliefs.md`
-- `docs/design-docs/agent-evaluation.md`
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-testing.md`
-- `docs/design-docs/agent-权限设计规则和原则.md`
-- `docs/design-docs/agent-tool-approval-pause-resume.md`
-- `docs/design-docs/agent-bash-policy-allowlist-design.md`
+- `docs/design-docs/evaluation/agent-evaluation.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
+- `docs/design-docs/execution-safety/agent-tool-approval-pause-resume.md`
+- `docs/design-docs/execution-safety/agent-bash-policy-allowlist-design.md`
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
 
@@ -108,7 +108,7 @@ context-snapshots/
 grader-results.json
 ```
 
-第一版 ActSpace 实现可以只输出首个外部运行器需要的子集，但如果文件名变更，必须同步更新 `docs/design-docs/agent-evaluation.md`。
+第一版 ActSpace 实现可以只输出首个外部运行器需要的子集，但如果文件名变更，必须同步更新 `docs/design-docs/evaluation/agent-evaluation.md`。
 
 ## 阶段 1：ActSpace Agent 命令行入口基础
 
@@ -319,7 +319,7 @@ npm run ci
 - `src/schemas/artifacts.ts`
 - `src/schemas/report.ts`
 
-契约必须和 `docs/design-docs/agent-evaluation.md` 保持一致。
+契约必须和 `docs/design-docs/evaluation/agent-evaluation.md` 保持一致。
 
 验证方式：
 
@@ -749,7 +749,7 @@ node dist/cli.js run \
 
 实现行为变化时同步更新：
 
-- `docs/design-docs/agent-evaluation.md`
+- `docs/design-docs/evaluation/agent-evaluation.md`
 - `docs/design-docs/agent-index.md`
 - 如果 `yolo` 模式改变审批语义，更新相关权限/工具设计文档
 - 每个完成的实现切片都补 `docs/histories/YYYY-MM/`

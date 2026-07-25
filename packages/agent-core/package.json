@@ -30,7 +30,8 @@
     "@vscode/ripgrep": "^1.18.0",
     "diff": "^9.0.0",
     "openai": "^6.39.0",
-    "turndown": "^7.2.4"
+    "turndown": "^7.2.4",
+    "undici": "^8.9.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

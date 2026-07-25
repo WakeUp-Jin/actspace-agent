@@ -1,7 +1,7 @@
 /**
  * bash 文本层规则分级表（单一事实源）
  *
- * 三级语义（docs/design-docs/agent-bash工具设计文档.md「权限层与沙盒的关系」）：
+ * 三级语义（docs/design-docs/execution-safety/agent-bash工具设计文档.md「权限层与沙盒的关系」）：
  *
  * 1. **hard reject（deny）**：不存在正当场景，任何环境、任何审批都不跑。
  *    准入标准苛刻——一旦列入，用户批准也救不回，所以只放「永远不该发生」的。

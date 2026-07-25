@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-状态：参考分析归档。本文是 Bash 工具设计的调研底稿，**正式设计事实来源是 `docs/design-docs/agent-bash工具设计文档.md`**；两文冲突时以正式设计文档为准。
+状态：参考分析归档。本文是 Bash 工具设计的调研底稿，**正式设计事实来源是 `docs/design-docs/execution-safety/agent-bash工具设计文档.md`**；两文冲突时以正式设计文档为准。
 
 本文回答三个问题：
 

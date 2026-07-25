@@ -1,4 +1,18 @@
-import type { ModelId } from "./model-config";
+import type {
+  ModelDefinition,
+  ModelId,
+  ModelKey,
+} from "./model-config";
+import type { ModelPurpose, ModelUnavailabilityReason } from "./model-resolver";
+import type { ProviderId } from "./provider-config";
+import type { CatalogCacheState, CatalogModelView } from "./openrouter-catalog";
+import type {
+  InstalledModelSettings,
+  ProviderConnectionErrorKind,
+  ProviderProxySettings,
+  ProviderSettingsView,
+  TaskModelSettings,
+} from "./settings";
 
 export type BootstrapState = {
   appVersion: string;
@@ -14,11 +28,22 @@ export {
   DEFAULT_MODEL_ID,
   MODEL_LIST,
   MODEL_REGISTRY,
+  BUILTIN_MODEL_LIST,
+  BUILTIN_MODEL_REGISTRY,
+  DEFAULT_MODEL_KEY,
+  LEGACY_MODEL_KEY_MAP,
   isPublicModelId,
+  legacyModelIdFromKey,
+  normalizeModelKey,
+  resolveModelDefinition,
+  resolveModelDefinitionByApiModel,
   type ModelApi,
+  type ModelDefinition,
   type ModelId,
   type ModelInputKind,
+  type ModelKey,
   type ModelProvider,
+  type ModelSelectionId,
   type ModelSpec,
   type ModelVisibility,
   resolveModelSpec,
@@ -31,16 +56,20 @@ export type RunTurnInput = {
   turnId: string;
   userInput: string;
   attachments?: import("./session").ComposerAttachment[];
+  /** 旧 renderer 兼容；Plan 5 新 UI 改发 modelKey。 */
   model?: ModelId;
+  modelKey?: ModelKey;
   thinkingEnabled?: boolean;
   /** 内置 Explore 聚焦子代理模型；null/缺省 = deepseek-v4-flash。由 main 从 settings 注入。 */
   exploreModelId?: ModelId | null;
+  exploreModelKey?: ModelKey | null;
 };
 
 export type CompactContextInput = {
   sessionId: string;
   turnId: string;
   model?: ModelId;
+  modelKey?: ModelKey;
 };
 
 export type CompactContextResult = {
@@ -63,6 +92,7 @@ export type GenerateEvalCandidateInput = {
   /** `/eval` 后的可选失败说明。 */
   reason?: string;
   model?: ModelId;
+  modelKey?: ModelKey;
   thinkingEnabled?: boolean;
 };
 
@@ -79,6 +109,131 @@ export type GenerateEvalCandidateResult = {
     message: string;
   };
 };
+
+// ─── 多供应商与模型管理 IPC（Plan 0 只锁契约，Plan 2/3/5 接实现） ───
+
+export type ProviderOperationErrorCode =
+  | "invalid_provider"
+  | "invalid_api_key"
+  | "invalid_base_url"
+  | "invalid_proxy_url"
+  | "secret_storage_unavailable"
+  | "write_failed"
+  | "connection_failed";
+
+export type ProviderOperationError = {
+  code: ProviderOperationErrorCode;
+  message: string;
+  errorKind?: ProviderConnectionErrorKind;
+};
+
+export type ProvidersListResult = {
+  providers: Record<ProviderId, ProviderSettingsView>;
+};
+
+export type ProviderConnectInput = {
+  provider: ProviderId;
+  apiKey: string;
+  baseUrl?: string | null;
+  proxy?: ProviderProxySettings;
+};
+
+export type ProviderUpdateInput = {
+  provider: ProviderId;
+  baseUrl?: string | null;
+  proxy?: ProviderProxySettings;
+  enabled?: boolean;
+};
+
+export type ProviderIdInput = { provider: ProviderId };
+
+export type ProviderOperationResult =
+  | { ok: true; provider: ProviderSettingsView }
+  | { ok: false; error: ProviderOperationError };
+
+export type ProviderTestResult =
+  | {
+      ok: true;
+      provider: ProviderSettingsView;
+      message: string;
+      checkedAt: string;
+    }
+  | {
+      ok: false;
+      provider: ProviderSettingsView;
+      message: string;
+      checkedAt: string;
+      errorKind: ProviderConnectionErrorKind;
+      statusCode?: number;
+    };
+
+export type InstalledModelView = {
+  definition: ModelDefinition;
+  settings: InstalledModelSettings;
+  unavailableReasons: Partial<Record<ModelPurpose, ModelUnavailabilityReason>>;
+};
+
+export type ModelsListInstalledResult = { models: InstalledModelView[] };
+
+export type ModelsListUsableInput = { purpose: ModelPurpose };
+
+export type UsableModelView = {
+  key: ModelKey;
+  label: string;
+  provider: ProviderId;
+  apiModel: string;
+  contextWindow: number | null;
+  thinkingDefault: boolean;
+  capabilities: ModelDefinition["capabilities"];
+  pricing?: ModelDefinition["pricing"];
+};
+
+export type ModelsListUsableResult = { models: UsableModelView[] };
+
+export type ModelsCatalogListInput = {
+  provider: Extract<ProviderId, "openrouter">;
+  query?: string;
+};
+
+export type ModelsCatalogListResult = {
+  provider: "openrouter";
+  state: CatalogCacheState;
+  fetchedAt?: string;
+  stale: boolean;
+  models: CatalogModelView[];
+  skippedCount: number;
+  error?: { code: string; message: string };
+};
+
+export type ModelsAddInput = {
+  provider: Extract<ProviderId, "openrouter">;
+  apiModel: string;
+};
+
+export type ModelsUpdateInput = {
+  modelKey: ModelKey;
+  enabled?: boolean;
+  customLabel?: string | null;
+};
+
+export type ModelsRemoveInput = { modelKey: ModelKey };
+
+export type ModelMutationResult =
+  | { ok: true; model?: InstalledModelView }
+  | {
+      ok: false;
+      error: {
+        code: "model_missing" | "model_in_use" | "model_not_removable" | "invalid_model" | "write_failed";
+        message: string;
+        references?: Array<"defaultChatModel" | "utilityModel" | "exploreModel" | "kairosModel">;
+      };
+    };
+
+export type TaskModelsUpdateInput = Partial<TaskModelSettings>;
+export type TaskModelsUpdateResult = { taskModels: TaskModelSettings };
+
+export type KairosModelUpdateInput = { modelKey: ModelKey | null };
+export type KairosModelUpdateResult = { modelKey: ModelKey | null };
 
 export type SelectFilesResult = {
   canceled: boolean;
@@ -162,7 +317,10 @@ export type SessionPreviewResult = {
   workspaceId?: string;
   workspaceRoot?: string;
   model?: string;
-  modelId?: ModelId;
+  /** 旧 session / renderer 兼容字段。 */
+  modelId?: string;
+  /** 新写入的 provider-qualified 模型身份。 */
+  modelKey?: ModelKey;
   contextSnapshot?: import("./session").ContextUsageSnapshot | null;
 };
 
@@ -180,6 +338,7 @@ export type VisualizeReplyInput = {
   /** 强制重新生成，忽略缓存命中。 */
   regenerate?: boolean;
   model?: ModelId;
+  modelKey?: ModelKey;
 };
 
 export type VisualizeReplyResult = {
@@ -317,7 +476,7 @@ export type ReviewInitGitResult = {
   message?: string;
 };
 
-// ─── 工作区文件浏览器（见 `docs/design-docs/front-右侧面板与文件渲染规范.md`）───
+// ─── 工作区文件浏览器（见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`）───
 
 /** 懒加载一层工作区目录。renderer 不直接读 FS，全部经此 IPC。 */
 export type WorkspaceListDirInput = {
@@ -531,7 +690,10 @@ export type UsageStatisticsRequestRow = {
   workspaceRoot?: string;
   /** Primary model in this turn, chosen by largest token share. */
   model: string;
-  modelId?: ModelId;
+  /** 旧 usage 兼容字段。 */
+  modelId?: string;
+  /** 新 usage 的 provider-qualified 模型身份。 */
+  modelKey?: ModelKey;
   provider?: string;
   /** Number of llm_usage calls folded into this turn row. */
   modelCallCount: number;

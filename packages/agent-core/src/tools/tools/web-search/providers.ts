@@ -4,7 +4,7 @@
  * 每个 provider 是一个薄适配器：query → 结构化结果列表（title/url/snippet/date）。
  * 不做任何 LLM 加工——搜索结果原样交给主模型，需要精读时由模型调用 web_fetch。
  *
- * 双通道设计（见 docs/design-docs/agent-web-tools.md）：
+ * 双通道设计（见 docs/design-docs/tool-system/agent-web-tools.md）：
  * - 国内通道：智谱（有 key 就参与，中文内容覆盖）
  * - 国际通道：Tavily → TinyFish → Exa，按优先级取第一个可用的；
  *   命中配额/认证类错误时同一次调用内自动降级到下一家

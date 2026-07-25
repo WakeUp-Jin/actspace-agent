@@ -34,4 +34,4 @@ Review 是工作台工具面板，不需要大 summary card，也不应该把 sc
 - `packages/desktop/src/renderer/components/right-panel/RightPanelObjectMenu.tsx`
 - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
 - `packages/desktop/src/renderer/test/right-panel-review.test.tsx`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`

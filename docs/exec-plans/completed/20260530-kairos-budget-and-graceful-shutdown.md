@@ -37,9 +37,9 @@
 ## 背景
 
 - 相关文档：
-  - `docs/design-docs/agent-kairos-autonomous-mode.md`（Kairos 自治事实来源；"非目标"曾写"不做配额护栏"，本期是 **cost budget** 演进，需更新；存储布局补 `memory/budget-state.json`）。
-  - `docs/design-docs/agent-token-usage-and-context-state.md`（`llm_usage.cost` 成本事实来源）。
-  - `docs/design-docs/front-设置页规范.md`（智能体分区信息架构）。
+  - `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`（Kairos 自治事实来源；"非目标"曾写"不做配额护栏"，本期是 **cost budget** 演进，需更新；存储布局补 `memory/budget-state.json`）。
+  - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`（`llm_usage.cost` 成本事实来源）。
+  - `docs/design-docs/frontend/front-设置页规范.md`（智能体分区信息架构）。
 - 相关代码路径（必读，已读完）：
   - 运行循环：`packages/agent-core/src/kairos/scheduler.ts`（`QueueProcessor.loop()` 尾递归 tick→sleep；空队列时 `pickNextTick` 投 tick）。
   - 装配中枢：`packages/agent-core/src/kairos/controller.ts`（`eventSink` 的 `llm_usage` 分支累加 usage、`start/stop/resetToday`、`setEnabledPreference` 的 merge-write 范式、`reloadConfig`、`setState`、`KairosRuntimeState` 初始化）。

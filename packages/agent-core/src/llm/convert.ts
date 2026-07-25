@@ -11,6 +11,7 @@
  */
 
 import OpenAI from "openai";
+import { isProviderProxyError } from "./provider-transport";
 import type {
   Context,
   AssistantMessage,
@@ -253,6 +254,9 @@ export function mapStopReason(reason: string): StopReason {
 // ─── SDK 错误映射 ───
 
 export function mapSdkError(error: unknown, providerName: string): LLMServiceError {
+  if (isProviderProxyError(error)) {
+    return new LLMServiceError(`${providerName} proxy connection failed.`, "proxy", true);
+  }
   if (error instanceof OpenAI.APIError) {
     const status = error.status;
     const msg = error.message;

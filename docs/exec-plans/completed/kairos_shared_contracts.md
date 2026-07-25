@@ -36,13 +36,13 @@
 新会话开始执行前必读：
 
 - `AGENTS.md`
-- `docs/design-docs/agent-kairos-autonomous-mode.md` 的「契约定义」「事件存储与前端聚合」两章
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md` 的「契约定义」「事件存储与前端聚合」两章
 - `packages/shared/src/session.ts`（理解现有 SessionEvent 形态、命名约定）
 - `packages/shared/src/index.ts`（理解现有导出风格）
 
 ## 背景
 
-- 相关设计文档：`docs/design-docs/agent-kairos-autonomous-mode.md`
+- 相关设计文档：`docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
 - 相关代码路径：
   - `packages/shared/src/session.ts`
   - `packages/shared/src/index.ts`
@@ -249,7 +249,7 @@ export { aggregateKairosEvents } from "./kairos-aggregator";
 - [ ] Step 4：新建 `packages/shared/test/fixtures/kairos-events.ts`，提供 §5 列出的全部工厂和场景级 sample。
 - [ ] Step 5：新建 `packages/shared/src/__tests__/kairos-aggregator.test.ts`，按 §4 八类用例覆盖。运行 `pnpm --filter @actspace/shared test` 应全过。
 - [ ] Step 6：更新 `packages/shared/src/index.ts` 导出新模块；运行 `pnpm typecheck` 在 monorepo 根目录确认无下游编译错误（agent-core / desktop 都不直接 import Kairos 类型时应保持现状）。
-- [ ] Step 7：在 `docs/design-docs/agent-kairos-autonomous-mode.md` 的「契约定义」一节顶部加一行链接指向本 plan，作为"已实现"标记；不改其它正文。
+- [ ] Step 7：在 `docs/design-docs/kairos/agent-kairos-autonomous-mode.md` 的「契约定义」一节顶部加一行链接指向本 plan，作为"已实现"标记；不改其它正文。
 - [ ] Step 8：补一条 history：`docs/histories/<month>/<timestamp>-kairos-shared-contracts.md`，记录扩展的 type、aggregator 行为、覆盖测试数量。
 
 ## 验证方式

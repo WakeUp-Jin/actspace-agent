@@ -38,5 +38,5 @@
 - `packages/agent-cli/src/types.ts`
 - `packages/agent-cli/src/test/run.test.ts`
 - `packages/agent-cli/src/test/artifacts.test.ts`
-- `docs/design-docs/agent-evaluation.md`
-- `docs/design-docs/agent-testing.md`
+- `docs/design-docs/evaluation/agent-evaluation.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`

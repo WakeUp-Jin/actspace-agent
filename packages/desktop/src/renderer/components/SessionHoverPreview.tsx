@@ -1,13 +1,13 @@
 import { BarChart3, Folder, Hash, Sparkles } from "lucide-react";
 import { MODEL_REGISTRY, resolveModelSpecByApiModel } from "@actspace/shared";
-import type { ContextUsageSnapshot, ModelId, SessionListItem } from "@actspace/shared";
+import type { ContextUsageSnapshot, SessionListItem } from "@actspace/shared";
 
 export type SessionHoverPreview = {
   sessionId: string;
   workspaceId?: string;
   workspaceRoot?: string;
   model?: string;
-  modelId?: ModelId;
+  modelId?: string;
   contextSnapshot?: ContextUsageSnapshot | null;
 };
 
@@ -42,7 +42,10 @@ function formatContextPercent(snapshot: ContextUsageSnapshot): string {
 function resolveModelLabel(preview: SessionHoverPreview | null | undefined): string | null {
   if (!preview) return null;
   if (preview.modelId && preview.modelId in MODEL_REGISTRY) {
-    return MODEL_REGISTRY[preview.modelId].label;
+    return MODEL_REGISTRY[preview.modelId as keyof typeof MODEL_REGISTRY].label;
+  }
+  if (preview.modelId?.includes(":")) {
+    return preview.modelId;
   }
   if (preview.model) {
     return resolveModelSpecByApiModel(preview.model)?.label ?? preview.model;

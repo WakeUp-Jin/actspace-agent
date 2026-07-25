@@ -162,7 +162,7 @@ export class KairosShortTermMemoryContext {
 
 /**
  * 翻译规则（重放保真：重放消息的块结构必须与现场发送一致，否则前缀缓存在
- * 分歧处断裂；见 docs/design-docs/agent-kairos-prompt-cache-optimization.md §5.2）：
+ * 分歧处断裂；见 docs/design-docs/kairos/agent-kairos-prompt-cache-optimization.md §5.2）：
  *
  * | SessionEvent.type | LLM message |
  * | --- | --- |

@@ -25,5 +25,5 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/front-前端设计文档.md`
+- `docs/design-docs/frontend/README.md`
 - `docs/histories/2026-05/20260521-1525-actspace-brand-fix.md`

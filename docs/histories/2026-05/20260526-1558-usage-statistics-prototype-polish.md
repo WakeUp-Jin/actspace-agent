@@ -12,7 +12,7 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `docs/design-docs/front-usage-statistics.md`
+**Scope:** `docs/design-docs/frontend/front-usage-statistics.md`
 
 **Key Actions:**
 
@@ -32,5 +32,5 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/public/front/usage-statistics-prototype.html`
+- `docs/design-docs/frontend/usage-statistics-prototype.html`
 - `docs/histories/2026-05/20260526-1558-usage-statistics-prototype-polish.md`

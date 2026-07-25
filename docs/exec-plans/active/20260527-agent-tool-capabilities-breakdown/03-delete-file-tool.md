@@ -37,14 +37,14 @@
 - `docs/CODING_BEHAVIOR.md`
 - `docs/SECURITY.md`
 - `docs/HISTORY_GUIDE.md`
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-backend-design.md`
-- `docs/design-docs/agent-testing.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/agent-runtime/agent-backend-design.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/FRONTEND.md`
 - `docs/FRONTEND_VERIFICATION.md`
-- `docs/design-docs/front-主题与配色规范.md`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-主题与配色规范.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`
 - `.agents/skills/llm-agent-dev/references/tools/overview.md`
 
@@ -70,7 +70,7 @@
 - `packages/desktop/src/renderer/components/messages/ToolLogLine.tsx`
 - `packages/desktop/src/renderer/components/messages/DeleteFileBlock.tsx`
 - `packages/desktop/src/renderer/components/messages/**`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 
 ## 契约草案
 

@@ -23,15 +23,12 @@ import {
   processAnthropicStream,
   toAnthropicClientTools,
 } from "../anthropic-convert";
+import { providerDefaultHeaders, providerDisplayName } from "../provider-adapter";
+import { createProviderFetch, isProviderProxyError } from "../provider-transport";
 
 const DEFAULT_BASE_URLS: Record<string, string> = {
   deepseek: "https://api.deepseek.com/anthropic",
 };
-
-function providerDisplayName(provider: string): string {
-  if (provider === "deepseek") return "DeepSeek";
-  return provider;
-}
 
 export class AnthropicMessagesService implements LLMService {
   protected client: Anthropic;
@@ -39,10 +36,17 @@ export class AnthropicMessagesService implements LLMService {
 
   constructor(config: LLMConfig) {
     this.config = config;
+    const defaultHeaders = {
+      ...providerDefaultHeaders(config.provider),
+      ...config.defaultHeaders,
+    };
+    const providerFetch = config.transport?.fetch ?? createProviderFetch(config.transport?.proxyUrl);
     this.client = new Anthropic({
       apiKey: config.apiKey || "placeholder",
       baseURL: config.baseUrl ?? DEFAULT_BASE_URLS[config.provider],
       maxRetries: config.maxRetries,
+      ...(providerFetch && { fetch: providerFetch }),
+      ...(Object.keys(defaultHeaders).length > 0 && { defaultHeaders }),
     });
   }
 
@@ -152,6 +156,9 @@ export class AnthropicMessagesService implements LLMService {
 }
 
 function mapAnthropicError(error: unknown, providerName: string): LLMServiceError {
+  if (isProviderProxyError(error)) {
+    return new LLMServiceError(`${providerName} proxy connection failed.`, "proxy", true);
+  }
   if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
     return new LLMServiceError(`${providerName} authentication failed: ${error.message}`, "auth", false, error.status);
   }

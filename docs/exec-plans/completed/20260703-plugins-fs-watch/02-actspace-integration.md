@@ -12,7 +12,7 @@
 ## 必读文档与代码
 
 - `docs/design-docs/agent-plugins-fs-watch.md`（契约事实来源）。
-- `docs/design-docs/agent-skill-loading.md`（Skill 目录生态与 catalog 格式）。
+- `docs/design-docs/tool-system/agent-skill-loading.md`（Skill 目录生态与 catalog 格式）。
 - 代码：`packages/shared/src/settings.ts`、`packages/desktop/src/main/settings-service.ts`、`packages/desktop/src/main/agent-runtime-context.ts`、`packages/agent-core/src/skills/{registry,catalog}.ts`、`packages/agent-core/src/kairos/{controller,prompt,prompt-assembler}.ts`、`packages/desktop/src/main/index.ts`（`ensureKairosController` / `rebuildKairosController`）、`packages/desktop/src/renderer/components/settings/*`。
 
 ## 关键设计落点（与现状代码对齐）

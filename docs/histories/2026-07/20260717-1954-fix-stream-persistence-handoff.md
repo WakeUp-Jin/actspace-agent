@@ -33,5 +33,5 @@
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/desktop/src/renderer/components/ConversationView.tsx`
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
-- `docs/design-docs/agent-turn-layers.md`
+- `docs/design-docs/agent-runtime/agent-turn-layers.md`
 - `docs/learnings/2026-07/streaming-ui-handoff-needs-source-exclusivity.html`

@@ -11,11 +11,11 @@
 - `docs/ARCHITECTURE.md`
 - `docs/CODING_BEHAVIOR.md`
 - `docs/SECURITY.md`
-- `docs/design-docs/agent-turn-layers.md`
+- `docs/design-docs/agent-runtime/agent-turn-layers.md`
 - `docs/design-docs/core-storage-and-observability.md`
 - `docs/design-docs/core-review-change-sources.md`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/front-设置页规范.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/front-设置页规范.md`
 
 ## 重点代码与文件范围
 
@@ -93,16 +93,16 @@
 
 ### 发现 3：设置页 Kairos 存储文档与当前实现相互矛盾
 
-- 偏移点：`front-设置页规范.md` 仍写着 Kairos 模型写 `preferences.json`、思考链走 settings/env，并在配置生效段写“模型不再走 settings/env，唯一来源是 `preferences.json`”（`docs/design-docs/front-设置页规范.md:61`、`docs/design-docs/front-设置页规范.md:99`）；但当前 Kairos 设计文档明确说模型/思考链真来源是 `settings.json` 的 `kairos` 分区（`docs/design-docs/agent-kairos-autonomous-mode.md:50`）。
+- 偏移点：`front-设置页规范.md` 仍写着 Kairos 模型写 `preferences.json`、思考链走 settings/env，并在配置生效段写“模型不再走 settings/env，唯一来源是 `preferences.json`”（`docs/design-docs/frontend/front-设置页规范.md:61`、`docs/design-docs/frontend/front-设置页规范.md:99`）；但当前 Kairos 设计文档明确说模型/思考链真来源是 `settings.json` 的 `kairos` 分区（`docs/design-docs/kairos/agent-kairos-autonomous-mode.md:50`）。
 - 不合理设计：实现也按 `settings.json` 走：共享契约声明 `KairosSettings.modelId` 持久化在 settings（`packages/shared/src/settings.ts:47`、`packages/shared/src/settings.ts:52`），main 创建 Kairos controller 时从 `getSettingsService().get().kairos` 读取模型与 thinking（`packages/desktop/src/main/index.ts:627`、`packages/desktop/src/main/index.ts:632`），settings 更新后重建 controller（`packages/desktop/src/main/index.ts:1066`、`packages/desktop/src/main/index.ts:1075`）。
 - 可读性问题：两个设计文档给出相反事实，审查者无法只靠文档判断 settings、preferences、env 的责任边界。
 - 耦合问题：设置页、Kairos runtime 和 docs 已经形成三方耦合；文档漂移会让后续开发把同一个字段重新写回 `preferences.json` 或 env，破坏当前实现。
-- 死代码/兼容残留：`docs/design-docs/front-设置页规范.md` 中关于 `preferences.json` / `KAIROS_THINKING` 的描述属于兼容残留或过期描述。
+- 死代码/兼容残留：`docs/design-docs/frontend/front-设置页规范.md` 中关于 `preferences.json` / `KAIROS_THINKING` 的描述属于兼容残留或过期描述。
 - 建议动作：补文档。把 `front-设置页规范.md` 与 `agent-kairos-autonomous-mode.md` 对齐：Kairos 模型/思考链来源为 `settings.json.kairos`；`preferences.json` 只保留 enabled/sleep/rhythm 等运行偏好；env 不再作为 Kairos 模型/思考链来源。
 
 ### 发现 4：主 Agent system prompt 路径可被 settings 指向任意绝对路径
 
-- 偏移点：设置页规范说正文由 `settings:read-agent-system-prompt` / `settings:write-agent-system-prompt` 读写 `<userData>/prompts/main-agent.md`（`docs/design-docs/front-设置页规范.md:99`），但 `SettingsService` 会保留 settings 中的绝对 `systemPromptPath`：`sanitizeSystemPromptPath()` 对绝对路径直接返回（`packages/desktop/src/main/settings-service.ts:418`、`packages/desktop/src/main/settings-service.ts:422`）。
+- 偏移点：设置页规范说正文由 `settings:read-agent-system-prompt` / `settings:write-agent-system-prompt` 读写 `<userData>/prompts/main-agent.md`（`docs/design-docs/frontend/front-设置页规范.md:99`），但 `SettingsService` 会保留 settings 中的绝对 `systemPromptPath`：`sanitizeSystemPromptPath()` 对绝对路径直接返回（`packages/desktop/src/main/settings-service.ts:418`、`packages/desktop/src/main/settings-service.ts:422`）。
 - 不合理设计：`readAgentSystemPrompt()` 和 `writeAgentSystemPrompt()` 会直接读写 `this.settings.agent.systemPromptPath`（`packages/desktop/src/main/settings-service.ts:155`、`packages/desktop/src/main/settings-service.ts:166`）。如果 `<userData>/settings.json` 被写入任意绝对路径，设置页保存 prompt 可能覆盖 userData 外文件。该风险需要结合本地 settings 文件写入权限评估，待确认。
 - 可读性问题：共享类型仍把 `systemPromptPath` 暴露为 renderer 可见设置字段（`packages/shared/src/settings.ts:27`、`packages/shared/src/settings.ts:29`），但写接口本身只接收 `content`（`packages/shared/src/settings.ts:83`）；“路径是否可配置”在 UI 和服务层语义不一致。
 - 耦合问题：system prompt 路径既是持久化配置，又被真实 turn/context describe runtime loader 读取（`packages/desktop/src/main/index.ts:768`、`packages/desktop/src/main/index.ts:905`），路径策略一旦偏离 userData 会影响模型输入与设置页写盘。
@@ -111,7 +111,7 @@
 
 ### 发现 5：`main/index.ts` 已承担过多服务装配与副作用协调
 
-- 偏移点：`agent-turn-layers.md` 要求 main 进程主要负责 Electron 生命周期、IPC、依赖准备、持久化和服务调用（`docs/design-docs/agent-turn-layers.md`），但当前 `packages/desktop/src/main/index.ts` 长度约 1249 行，集中包含启动日志、DeepSeek 余额 HTTP、provider 测试、Kairos controller lifecycle、approval registry、workspace registry helper、usage 全局聚合、local update 初始化和全部 IPC 注册。
+- 偏移点：`agent-turn-layers.md` 要求 main 进程主要负责 Electron 生命周期、IPC、依赖准备、持久化和服务调用（`docs/design-docs/agent-runtime/agent-turn-layers.md`），但当前 `packages/desktop/src/main/index.ts` 长度约 1249 行，集中包含启动日志、DeepSeek 余额 HTTP、provider 测试、Kairos controller lifecycle、approval registry、workspace registry helper、usage 全局聚合、local update 初始化和全部 IPC 注册。
 - 不合理设计：例如 provider 测试直接在 main 入口中拼 URL 并发 fetch（`packages/desktop/src/main/index.ts:468`、`packages/desktop/src/main/index.ts:478`），Kairos 重建和 settings 更新副作用也在同一文件协调（`packages/desktop/src/main/index.ts:689`、`packages/desktop/src/main/index.ts:1066`）。这不是单个缺陷，但已经超过“路由注册 + 服务调用”的轻量边界。
 - 可读性问题：同一文件内既有 Electron window 配置（`packages/desktop/src/main/index.ts:547`）、IPC 注册（`packages/desktop/src/main/index.ts:735`）、数据目录创建（`packages/desktop/src/main/index.ts:253`）和业务服务状态机（`packages/desktop/src/main/index.ts:620`），定位某个 IPC 的实际数据边界成本较高。
 - 耦合问题：settings 更新会直接触发 Kairos controller 重建（`packages/desktop/src/main/index.ts:1073`），agent turn 会直接 notify Kairos 让位（`packages/desktop/src/main/index.ts:748`、`packages/desktop/src/main/index.ts:753`），local update ready 又直接 `app.quit()`（`packages/desktop/src/main/index.ts:1171`、`packages/desktop/src/main/index.ts:1178`）；main 入口成为多个服务间的隐式协调中心。

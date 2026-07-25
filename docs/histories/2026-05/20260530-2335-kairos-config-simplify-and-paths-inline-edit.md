@@ -31,7 +31,7 @@
 
 - `packages/desktop/src/renderer/components/settings/KairosSettings.tsx`（运行偏好/屏蔽规则精简 + 可访问路径 `InlineEdit` 重设计 + 默认行保护；移除 Stepper 导入/常量）
 - `packages/desktop/src/renderer/test/kairos-config-files.test.tsx`（+2 例，import `within`）
-- `docs/design-docs/front-设置页规范.md`
+- `docs/design-docs/frontend/front-设置页规范.md`
 - `docs/exec-plans/active/20260530-kairos-config-editor.md`
 
 ### ✅ Verification

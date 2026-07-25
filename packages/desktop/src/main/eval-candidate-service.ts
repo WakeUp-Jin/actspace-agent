@@ -11,6 +11,7 @@ import {
   Agent,
   appendEvents,
   buildAgentConfig,
+  buildAgentConfigFromRuntime,
   createAgentFromConfig,
   createPersistedSessionEvent,
   createSessionStorePaths,
@@ -18,6 +19,7 @@ import {
   updateMeta,
 } from "@actspace/agent-core";
 import type { AppDataRoots } from "./agent-turn";
+import type { ModelRuntimeService } from "./model-runtime-service";
 
 const EVAL_CANDIDATE_SYSTEM_PROMPT = [
   "You generate a minimal regression evaluation candidate from a failed Actspace session turn.",
@@ -58,6 +60,7 @@ type EvalCandidateAgentRunInput = {
   originalUserInput: string;
   failureReason: string;
   model?: GenerateEvalCandidateInput["model"];
+  modelKey?: GenerateEvalCandidateInput["modelKey"];
   thinkingEnabled?: boolean;
 };
 
@@ -90,7 +93,8 @@ type CandidateMetadata = {
 export async function generateEvalCandidate(
   input: GenerateEvalCandidateInput,
   roots: AppDataRoots,
-  runAgent: EvalCandidateAgentRunner = runEvalCandidateAgent,
+  runAgent?: EvalCandidateAgentRunner,
+  modelRuntime?: ModelRuntimeService,
 ): Promise<GenerateEvalCandidateResult> {
   const sessionPaths = createSessionStorePaths(join(roots.sessionRoot, input.sessionId));
   const record = await readSessionRecord(sessionPaths);
@@ -126,7 +130,10 @@ export async function generateEvalCandidate(
   await writeCandidateMetadata(candidateRoot, metadata);
 
   try {
-    const generated = await runAgent({
+    const runner = runAgent ?? (modelRuntime
+      ? (agentInput: EvalCandidateAgentRunInput) => runEvalCandidateAgentWithRuntime(agentInput, modelRuntime)
+      : runEvalCandidateAgent);
+    const generated = await runner({
       candidateRoot,
       originalWorkspaceRoot: record.meta.workspaceRoot ?? roots.defaultWorkspaceRoot,
       sessionPath: sessionPaths.sessionPath,
@@ -134,6 +141,7 @@ export async function generateEvalCandidate(
       originalUserInput: target.content,
       failureReason,
       model: input.model,
+      modelKey: input.modelKey,
       thinkingEnabled: input.thinkingEnabled,
     });
     await validateGeneratedCandidate(candidateRoot);
@@ -198,7 +206,43 @@ async function runEvalCandidateAgent(
 
   try {
     const finalText = await agent.runAndGetText(buildGeneratorTask(input));
-    return { modelId: deps.modelSpec.id, finalText };
+    return { modelId: deps.modelKey, finalText };
+  } finally {
+    await deps.toolManager.dispose();
+  }
+}
+
+async function runEvalCandidateAgentWithRuntime(
+  input: EvalCandidateAgentRunInput,
+  runtime: ModelRuntimeService,
+): Promise<EvalCandidateAgentRunResult> {
+  const main = runtime.resolveMainModel(input.modelKey ?? input.model);
+  if ("message" in main) throw new Error(main.message);
+  const utility = runtime.resolveUtilityModel(main.model);
+  const explore = runtime.resolveExploreModel(main.model);
+  const config = buildAgentConfigFromRuntime({
+    main: { definition: main.model.definition, runtime: main.model.providerRuntime },
+    ...(utility.ok && { utility: { definition: utility.model.definition, runtime: utility.model.providerRuntime } }),
+    ...(explore.ok && { explore: { definition: explore.model.definition, runtime: explore.model.providerRuntime } }),
+    thinkingEnabled: input.thinkingEnabled,
+    toolEnvironment: runtime.getToolEnvironment(),
+  }, input.candidateRoot, undefined, {
+    systemPrompt: EVAL_CANDIDATE_SYSTEM_PROMPT,
+    sessionId: `eval-${Date.now()}`,
+    turnId: input.targetTurnId,
+  });
+  config.toolManagerConfig.disabledTools = [
+    ...new Set([...(config.toolManagerConfig.disabledTools ?? []), ...DISABLED_GENERATOR_TOOLS]),
+  ];
+  const deps = createAgentFromConfig(config);
+  const agent = new Agent({
+    ...deps,
+    toolExecution: "sequential",
+    shouldStopAfterTurn: ({ turnIndex }) => turnIndex >= 12,
+  });
+  try {
+    const finalText = await agent.runAndGetText(buildGeneratorTask(input));
+    return { modelId: deps.modelKey, finalText };
   } finally {
     await deps.toolManager.dispose();
   }

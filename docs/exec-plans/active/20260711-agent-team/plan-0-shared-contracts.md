@@ -12,8 +12,8 @@
 
 ## 附加必读
 
-- `docs/design-docs/agent-form-team.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
+- `docs/design-docs/collaboration/agent-form-team.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 - `packages/shared/src/session.ts`
 - `packages/shared/src/ipc.ts`
 - `packages/agent-core/src/persistence/meta.ts`

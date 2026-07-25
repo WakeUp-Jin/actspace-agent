@@ -33,4 +33,4 @@ Codex 的窗口层级不是在应用内容上方再放一条系统标题栏，�
 - `packages/desktop/src/main/index.ts`
 - `packages/desktop/src/renderer/main.tsx`
 - `packages/desktop/src/renderer/styles.css`
-- `docs/design-docs/front-工作台布局与面板交互规范.md`
+- `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`

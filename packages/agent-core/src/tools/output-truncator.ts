@@ -8,7 +8,7 @@
  *
  * bash 不进此流水线（bash 在 run-process/executor 自处理：流式落盘 + 头部截断）。
  *
- * 设计事实来源：docs/design-docs/agent-context-compression.md
+ * 设计事实来源：docs/design-docs/model-context/agent-context-compression.md
  * 「非 bash 工具压缩流水线（OutputTruncator）」。
  */
 

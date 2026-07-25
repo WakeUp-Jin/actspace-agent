@@ -32,6 +32,6 @@
 - `packages/agent-core/src/tools/test/permission-mode.test.ts`
 - `packages/agent-cli/src/permission.ts`
 - `packages/agent-cli/src/types.ts`
-- `docs/design-docs/agent-evaluation.md`
+- `docs/design-docs/evaluation/agent-evaluation.md`
 - `docs/exec-plans/active/20260708-agent-evaluation/README.md`
 - `docs/histories/2026-07/20260709-2325-agent-permission-mode-core-policy.md`

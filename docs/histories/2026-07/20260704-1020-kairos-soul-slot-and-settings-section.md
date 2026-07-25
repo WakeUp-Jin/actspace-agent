@@ -8,7 +8,7 @@ Kairos 的系统提示词希望开放给用户修改，并讨论两种形式：�
 
 ### 文档
 
-- 新增 `docs/design-docs/agent-kairos-prompt-design.md`：Kairos 系统提示词分层设计（soul 插槽契约、预设人格、rule.md/briefs 分工与授权覆盖原则、机制段边界、设置页信息架构、被排除方案）。
+- 新增 `docs/design-docs/kairos/agent-kairos-prompt-design.md`：Kairos 系统提示词分层设计（soul 插槽契约、预设人格、rule.md/briefs 分工与授权覆盖原则、机制段边界、设置页信息架构、被排除方案）。
 - 新增执行计划 `docs/exec-plans/active/20260704-kairos-soul-and-config.md`（完成后归档至 completed/）。
 - 同步 `agent-kairos-autonomous-mode.md`（[1] 段拆 {soul} 插槽、场景应对表授权覆盖原则、存储布局加 soul.md）、`front-设置页规范.md`（新增「Kairos」分区、智能体分区瘦身）、`core-storage-and-observability.md`（config 5 份 + briefs IPC）、`agent-index.md`（收录新设计文档）。
 
@@ -45,7 +45,7 @@ Kairos 的系统提示词希望开放给用户修改，并讨论两种形式：�
 
 ## 关键文件
 
-- `docs/design-docs/agent-kairos-prompt-design.md`
+- `docs/design-docs/kairos/agent-kairos-prompt-design.md`
 - `packages/shared/src/kairos-soul-presets.ts`、`kairos-contracts.ts`
 - `packages/agent-core/src/kairos/prompt.ts`、`prompt-assembler.ts`、`config/loader.ts`、`controller.ts`
 - `packages/desktop/src/main/kairos-ipc-internals.ts`、`kairos-ipc.ts`

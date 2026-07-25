@@ -2,7 +2,7 @@
 
 ## 目标
 
-按 `docs/design-docs/agent-kairos-prompt-design.md` 落地：Kairos 系统提示词拆出用户可改的 soul 插槽（soul.md + 4 个内置预设），身份段替换塞巴斯设定为中性「时机之神」默认 soul；机制段补授权覆盖原则；设置页新增独立「Kairos」分区，归拢人格 / 规则 / 任务表（briefs 编辑，新 IPC）/ 现有 Kairos 控件。
+按 `docs/design-docs/kairos/agent-kairos-prompt-design.md` 落地：Kairos 系统提示词拆出用户可改的 soul 插槽（soul.md + 4 个内置预设），身份段替换塞巴斯设定为中性「时机之神」默认 soul；机制段补授权覆盖原则；设置页新增独立「Kairos」分区，归拢人格 / 规则 / 任务表（briefs 编辑，新 IPC）/ 现有 Kairos 控件。
 
 ## 范围
 
@@ -11,7 +11,7 @@
 
 ## 背景
 
-- 必读：`AGENTS.md`、`docs/design-docs/agent-kairos-prompt-design.md`（本 plan 的设计事实来源）、`docs/design-docs/agent-kairos-prompt-cache-optimization.md`（缓存约束）、`docs/design-docs/front-设置页规范.md`（设置页交互约定）。
+- 必读：`AGENTS.md`、`docs/design-docs/kairos/agent-kairos-prompt-design.md`（本 plan 的设计事实来源）、`docs/design-docs/kairos/agent-kairos-prompt-cache-optimization.md`（缓存约束）、`docs/design-docs/frontend/front-设置页规范.md`（设置页交互约定）。
 - 相关代码：
   - `packages/shared/src/kairos-contracts.ts`（`KairosConfigName`）、`packages/shared/src/index.ts`
   - `packages/agent-core/src/kairos/prompt.ts`、`prompt-assembler.ts`、`config/loader.ts`、`controller.ts`、`briefs/index-manager.ts`、`briefs/parser.ts`

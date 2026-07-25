@@ -113,4 +113,4 @@ v1.4 工具列表 chip 化进一步印证了同一个 takeaway——同样是把
 
 - `packages/desktop/src/renderer/components/kairos/KairosContextSheet.tsx`
 - `packages/desktop/src/renderer/test/kairos-context-sheet.test.tsx`
-- `docs/design-docs/front-Kairos监控页规范.md`
+- `docs/design-docs/kairos/front-Kairos监控页规范.md`

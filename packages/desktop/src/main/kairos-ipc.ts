@@ -189,7 +189,7 @@ export function registerKairosIpc(opts: RegisterKairosIpcOptions): KairosIpcHand
     return { ok: true };
   });
 
-  // ─── 通知中心（详见 docs/design-docs/agent-kairos-notifications.md） ───
+  // ─── 通知中心（详见 docs/design-docs/kairos/agent-kairos-notifications.md） ───
   register(KAIROS_IPC_CHANNELS.notificationsList, async (): Promise<KairosNotificationsListResponse> => {
     return opts.controller.notificationsList();
   });

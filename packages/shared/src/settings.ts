@@ -8,11 +8,15 @@
  *   `secrets.json`；不再读取 .env 里的 Key。非敏感项落 `settings.json`。
  * - UI 偏好（主题等）不在这里，走 renderer localStorage。
  */
-import type { ModelId } from "./model-config";
+import type { ModelDefinition, ModelId, ModelKey } from "./model-config";
+import type { ProviderId as LlmProviderId } from "./provider-config";
 
-export type ProviderId = "deepseek" | "kimi";
+/** Settings v1 仍只包含两家 LLM provider；Plan 2 迁移后改用完整 ProviderId。 */
+export type LegacySettingsProviderId = Extract<LlmProviderId, "deepseek" | "kimi">;
+/** @deprecated Plan 2 前保持当前 settings/renderer 的两供应商语义。 */
+export type ProviderId = LegacySettingsProviderId;
 
-export const SETTINGS_PROVIDER_IDS: readonly ProviderId[] = ["deepseek", "kimi"];
+export const SETTINGS_PROVIDER_IDS: readonly LegacySettingsProviderId[] = ["deepseek", "kimi"];
 
 /** 网络搜索供应商（web_search 工具）。zhipu = 国内通道；其余为国际通道候选。 */
 export type SearchProviderId = "zhipu" | "tavily" | "tinyfish" | "exa";
@@ -25,7 +29,7 @@ export const SEARCH_PROVIDER_IDS: readonly SearchProviderId[] = [
 ];
 
 /** 可在设置页保存加密密钥的全部供应商（LLM + 搜索）。 */
-export type SecretProviderId = ProviderId | SearchProviderId;
+export type SecretProviderId = LlmProviderId | SearchProviderId;
 
 export type KairosThinkingMode = "auto" | "on" | "off";
 
@@ -38,6 +42,58 @@ export type KairosModelId = Extract<ModelId, "deepseek-v4-pro" | "kimi-k2.6" | "
 export interface ProviderSettingsView {
   /** 用户已在页面配置该供应商密钥（safeStorage 中存在）；决定卡片"已连接/可断开"。 */
   hasApiKey: boolean;
+  /** Settings v2：供应商是否允许参与新请求。v1 读取时缺省为 true。 */
+  enabled?: boolean;
+  /** Settings v2：用户覆盖的 Base URL；null 表示 Provider Registry 默认值。 */
+  baseUrl?: string | null;
+  /** Settings v2：非敏感、无认证信息的服务商级代理配置。 */
+  proxy?: ProviderProxySettings;
+  /** Settings v2：最近一次显式连接测试结果。 */
+  lastConnection?: ProviderConnectionState;
+  installedModelCount?: number;
+  enabledModelCount?: number;
+}
+
+export type ProviderConnectionStatus = "untested" | "available" | "unavailable";
+export type ProviderConnectionErrorKind =
+  | "proxy"
+  | "network"
+  | "timeout"
+  | "auth"
+  | "rate_limit"
+  | "insufficient_balance"
+  | "invalid_request"
+  | "server";
+
+export interface ProviderProxySettings {
+  enabled: boolean;
+  url: string | null;
+}
+
+export interface ProviderConnectionState {
+  status: ProviderConnectionStatus;
+  checkedAt?: string;
+  errorKind?: ProviderConnectionErrorKind;
+  message?: string;
+}
+
+export interface ProviderConnectionSettings {
+  enabled: boolean;
+  baseUrl: string | null;
+  proxy: ProviderProxySettings;
+  lastConnection: ProviderConnectionState;
+}
+
+export interface InstalledModelSettings {
+  enabled: boolean;
+  addedAt: string;
+  customLabel?: string;
+}
+
+export interface TaskModelSettings {
+  defaultChatModel: ModelKey | null;
+  utilityModel: ModelKey | null;
+  exploreModel: ModelKey | null;
 }
 
 export interface AgentSettings {
@@ -55,7 +111,7 @@ export interface AgentSettings {
    * 内置 Explore 聚焦子代理模型。
    *
    * null = 默认 `deepseek-v4-flash`（便宜、快）；显式值覆盖为指定模型。
-   * 缺 DeepSeek key 时运行时回落主模型，见 docs/design-docs/agent-explore-subagent.md。
+   * 缺 DeepSeek key 时运行时回落主模型，见 docs/design-docs/collaboration/agent-explore-subagent.md。
    */
   exploreModelId: ModelId | null;
 }
@@ -104,11 +160,11 @@ export interface SkillsSettings {
   disabled: string[];
 }
 
-export interface AppSettings {
+export interface AppSettingsV1 {
   version: 1;
   /** 默认模型；null = 用内置 DEFAULT_MODEL_ID。决定 Composer 初始选中。 */
   defaultModelId: ModelId | null;
-  providers: Record<ProviderId, ProviderSettingsView>;
+  providers: Record<LegacySettingsProviderId, ProviderSettingsView>;
   /** 网络搜索供应商的密钥状态（web_search 工具）。 */
   searchProviders: Record<SearchProviderId, ProviderSettingsView>;
   agent: AgentSettings;
@@ -117,12 +173,58 @@ export interface AppSettings {
   skills: SkillsSettings;
 }
 
+export type AgentSettingsV2 = Omit<AgentSettings, "exploreModelId">;
+export type KairosSettingsV2 = Omit<KairosSettings, "modelId"> & { modelId: ModelKey | null };
+
+export interface AppSettingsV2 {
+  version: 2;
+  providers: Record<LlmProviderId, ProviderSettingsView>;
+  installedModels: Partial<Record<ModelKey, InstalledModelSettings>>;
+  customModels: Partial<Record<ModelKey, ModelDefinition>>;
+  taskModels: TaskModelSettings;
+  /** 网络搜索供应商继续独立于 LLM Provider Registry。 */
+  searchProviders: Record<SearchProviderId, ProviderSettingsView>;
+  agent: AgentSettingsV2;
+  kairos: KairosSettingsV2;
+  plugins: PluginsSettings;
+  skills: SkillsSettings;
+}
+
+/**
+ * Settings v2 迁移期 renderer 视图。
+ *
+ * settings.json 已使用纯 v2 结构；旧字段只为 Plan 4/5 尚未迁移的消费方并行保留，
+ * 不再作为持久化事实来源。消费方迁移完成后删除该兼容层并直接使用 AppSettingsV2。
+ */
+export interface AppSettings extends Omit<AppSettingsV1, "version" | "providers"> {
+  /** 生产返回 2；测试/旧 renderer fixture 在 Plan 5 前仍允许 1。 */
+  version: 1 | 2;
+  providers: Record<LegacySettingsProviderId, ProviderSettingsView> &
+    Partial<Record<Exclude<LlmProviderId, LegacySettingsProviderId>, ProviderSettingsView>>;
+  installedModels?: Partial<Record<ModelKey, InstalledModelSettings>>;
+  customModels?: Partial<Record<ModelKey, ModelDefinition>>;
+  taskModels?: TaskModelSettings;
+  /** v2 Kairos ModelKey；旧 `kairos.modelId` 仍供当前消费方过渡读取。 */
+  kairosModelKey?: ModelKey | null;
+}
+
 // ─── IPC 输入 / 输出 ───
 
 export type SettingsUpdateInput = Partial<{
   defaultModelId: ModelId | null;
   agent: Partial<AgentSettings>;
   kairos: Partial<KairosSettings>;
+  plugins: Partial<PluginsSettings>;
+  skills: Partial<SkillsSettings>;
+}>;
+
+export type SettingsV2UpdateInput = Partial<{
+  providers: Partial<Record<LlmProviderId, Partial<ProviderConnectionSettings>>>;
+  installedModels: Partial<Record<ModelKey, Partial<InstalledModelSettings>>>;
+  customModels: Partial<Record<ModelKey, ModelDefinition | null>>;
+  taskModels: Partial<TaskModelSettings>;
+  agent: Partial<AgentSettingsV2>;
+  kairos: Partial<KairosSettingsV2>;
   plugins: Partial<PluginsSettings>;
   skills: Partial<SkillsSettings>;
 }>;

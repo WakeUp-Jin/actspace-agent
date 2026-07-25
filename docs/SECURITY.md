@@ -9,6 +9,8 @@
 - **集中管理**：所有环境变量通过 `packages/agent-core/src/env.ts` 统一读取和验证，禁止在业务代码中散落 `process.env.XXX` 直接读取。
 - **DeepSeek API 格式边界**：`DEEPSEEK_API_FORMAT=openai|anthropic` 只影响 agent-core 里的 DeepSeek service 选择。当前默认是 `anthropic`，使用 `DEEPSEEK_ANTHROPIC_BASE_URL`；`openai` 是临时回退路线，使用 `DEEPSEEK_BASE_URL`。两个 base URL 都不应传入 renderer。
 - **Kimi key 边界**：`KIMI_API_KEY` 只作为 Kimi 主模型密钥使用。该 key 只在 main/agent-core 运行时读取，不进入 renderer、session 事件、前端状态或测试快照。
+- **OpenRouter key 边界**：OpenRouter API Key 与 DeepSeek / Kimi 使用同一安全边界，通过 Electron `safeStorage` 加密落盘；renderer 只读取是否已配置、连接状态和脱敏诊断，不读取明文。
+- **服务商级代理目标边界**：代理配置归属于单个 LLM 服务商，只注入该服务商的 HTTP client，不写入全局 `HTTP_PROXY` / `HTTPS_PROXY`，也不影响工具、更新器或其他服务商。首版只接受 `http://` / `https://` 代理地址，不在代理 URL 中保存用户名和密码。
 - **搜索 provider key 边界**：`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY` 是 `web_search` 工具的外部搜索 API 密钥，边界与 LLM key 相同——只在 main/agent-core 运行时读取，经设置页加密落盘，不进入 renderer 明文状态。
 - **工具暴露最小化**：可通过 `ACTSPACE_DISABLED_TOOLS` 明确关闭不希望暴露给模型的工具，关闭发生在注册阶段，而不是只在执行时拒绝。
 - **优先级**：`process.env` 已有值 > `.env` 文件值 > schema 默认值。这保证 CI/Docker 场景可通过系统变量覆盖。
@@ -27,7 +29,7 @@
 
 - **写类工具受 workspace 守卫**：`write_file` / `edit_file` / `bash` 的文件/目录写操作必须经 `workspace-guard.ts#guardWritablePath`，禁止 `..` 逃逸、禁止逃出 `workspaceRoot`。
   - **写越界改为用户审批（2026-07-05）**：`write_file` / `edit_file` 目标越界时不再硬拒绝，权限检查器返回 `ask`（medium 风险、不提供 allow_similar），用户批准后 scheduler 以 `sanitizedArgs` 执行，executor 依据其中的 `APPROVED_OUTSIDE_BOUNDARY_ARG` 标记放行该次写入。该标记只由权限检查器写入，模型自行在参数中传入会在检查阶段被剥除，无法绕过审批。bash 的写路径守卫不变。
-- **读类工具放开 workspace 边界**：`read_file` / `grep` / `glob` / `list_directory` 改用 `workspace-guard.ts#resolveReadablePath`，**只解析路径、不做越界检查**。原因：上下文压缩会把 bash 大输出落盘到 `<userData>/tmp/tool-output/`、把完整历史指向 `<userData>/sessions/<id>/session.jsonl`，模型需要用读类工具回读这些 workspace 之外的 Agent 内部产物（见 `docs/design-docs/agent-context-compression.md`「读边界放开」）。
+- **读类工具放开 workspace 边界**：`read_file` / `grep` / `glob` / `list_directory` 改用 `workspace-guard.ts#resolveReadablePath`，**只解析路径、不做越界检查**。原因：上下文压缩会把 bash 大输出落盘到 `<userData>/tmp/tool-output/`、把完整历史指向 `<userData>/sessions/<id>/session.jsonl`，模型需要用读类工具回读这些 workspace 之外的 Agent 内部产物（见 `docs/design-docs/model-context/agent-context-compression.md`「读边界放开」）。
   - **本期明确接受的取舍**：放开读边界后，主 Agent 理论上可读任意本机文件（含 `~/.ssh`、密钥文件等）。用「读不应被 workspace 硬框」换「可回读 Agent 内部产物」。
   - **Kairos 不受影响**：Kairos 调用路径在 scheduler 层仍按 `allowedRoots + blocklist` 双校验（`checkKairosGuard`），读类工具放开只影响主 Agent。
   - **后续收口方向**（记入 `docs/exec-plans/tech-debt-tracker.md`）：补「敏感路径 blocklist + 按需读审核」，而不是恢复 workspace 硬限制。
@@ -40,6 +42,7 @@
 ## 真实模型调用
 
 - 真实 DeepSeek 与 Kimi 请求仅从 main 进程内的 Agent runtime 发起，renderer 只接收结构化事件与最终结果。
+- OpenRouter 的连接测试、模型目录拉取和真实模型请求都由 main 进程发起，renderer 只消费裁剪后的服务商、模型与连接状态；供应商级代理不写全局代理环境变量。
 - 普通会话默认使用真实 DeepSeek provider，且 DeepSeek 默认走 Anthropic-compatible route；`LLM_PROVIDER=kimi` 可切换 Kimi 主模型。Electron 真实 turn 不允许被 mock 配置静默替代，mock 仅用于测试、浏览器 fixture 或显式 demo。
 - Usage 页 DeepSeek 余额查询通过 main 进程调用 `GET /user/balance`，renderer 只接收已裁剪的余额展示模型，不接触 `DEEPSEEK_API_KEY`、鉴权头或 DeepSeek 原始响应。
 - `web_search`（外部搜索 API 双通道）任一搜索 provider key 存在时注册，`web_fetch`（本地抓取）始终注册（见 `agent-web-tools.md`）。缺 key 时 executor 的兜底错误只提示需要配置的 key 名，不泄露其它运行时信息。

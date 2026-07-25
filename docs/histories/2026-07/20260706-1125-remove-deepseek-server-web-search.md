@@ -42,7 +42,7 @@
 - `packages/agent-core/src/llm/test/anthropic-convert.test.ts`
 - `packages/desktop/src/main/kairos-bootstrap.ts`
 - `packages/desktop/src/main/test/kairos-bootstrap.test.ts`
-- `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`

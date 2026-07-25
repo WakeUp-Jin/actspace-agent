@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { ModelSpec, SessionEvent } from "@actspace/shared";
-import { MODEL_REGISTRY } from "@actspace/shared";
-import { buildLLMConfig } from "../create-agent-deps";
+import type { ModelDefinition, ModelSpec, SessionEvent } from "@actspace/shared";
+import { BUILTIN_MODEL_REGISTRY, MODEL_REGISTRY } from "@actspace/shared";
+import { buildLLMConfig, buildLLMConfigFromRuntime } from "../create-agent-deps";
 import type { AgentEnvConfig, AgentConfig } from "../create-agent-deps";
 import { appendEvents } from "../../persistence/jsonl";
 
@@ -123,10 +123,10 @@ describe("buildLLMConfig", () => {
     });
     const config = buildLLMConfig(spec, envConfig);
 
-    expect(config.baseUrl).toBeUndefined();
+    expect(config.baseUrl).toBe("https://api.deepseek.com");
   });
 
-  it("should return empty apiKey for unknown provider", () => {
+  it("should reject an unknown legacy provider instead of returning an empty key", () => {
     const unknownSpec: ModelSpec = {
       id: "deepseek-v4-flash",
       label: "Unknown",
@@ -137,9 +137,73 @@ describe("buildLLMConfig", () => {
       contextWindow: 100_000,
     };
     const envConfig = createTestEnvConfig();
-    const config = buildLLMConfig(unknownSpec, envConfig);
+    expect(() => buildLLMConfig(unknownSpec, envConfig)).toThrow("Provider is not registered");
+  });
+});
 
-    expect(config.apiKey).toBe("");
+describe("buildLLMConfigFromRuntime", () => {
+  const openRouterModel: ModelDefinition = {
+    key: "openrouter:anthropic/claude-sonnet-4",
+    provider: "openrouter",
+    api: "openai-completions",
+    apiModel: "anthropic/claude-sonnet-4",
+    label: "Claude Sonnet 4",
+    source: "custom",
+    contextWindow: 200_000,
+    maxTokens: 8192,
+    thinkingDefault: false,
+    capabilities: {
+      input: ["text"],
+      toolUse: "declared",
+      reasoning: true,
+      thinkingToggle: false,
+    },
+  };
+
+  it("builds an explicit OpenRouter runtime with scoped proxy and headers", () => {
+    const config = buildLLMConfigFromRuntime(
+      openRouterModel,
+      {
+        provider: "openrouter",
+        apiKey: "sk-or-test",
+        baseUrl: "https://openrouter.ai/api/v1/",
+        transport: { proxyUrl: "http://127.0.0.1:7890" },
+      },
+      { temperature: 0.2 },
+    );
+
+    expect(config).toMatchObject({
+      provider: "openrouter",
+      api: "openai-completions",
+      apiKey: "sk-or-test",
+      baseUrl: "https://openrouter.ai/api/v1",
+      model: "anthropic/claude-sonnet-4",
+      temperature: 0.2,
+      maxTokens: 8192,
+      transport: { proxyUrl: "http://127.0.0.1:7890" },
+      defaultHeaders: { "X-OpenRouter-Title": "Actspace" },
+    });
+  });
+
+  it("rejects missing keys, mismatched providers, and invalid base URLs", () => {
+    expect(() => buildLLMConfigFromRuntime(openRouterModel, {
+      provider: "openrouter",
+      apiKey: "",
+      baseUrl: "https://openrouter.ai/api/v1",
+    })).toThrow("API key");
+
+    expect(() => buildLLMConfigFromRuntime(openRouterModel, {
+      provider: "kimi",
+      apiKey: "sk-test",
+      baseUrl: "https://api.moonshot.cn/v1",
+    })).toThrow("do not match");
+
+    const deepSeek = BUILTIN_MODEL_REGISTRY["deepseek:deepseek-v4-pro"]!;
+    expect(() => buildLLMConfigFromRuntime(deepSeek, {
+      provider: "deepseek",
+      apiKey: "sk-test",
+      baseUrl: "file:///tmp/not-http",
+    })).toThrow("HTTP or HTTPS");
   });
 });
 

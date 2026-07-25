@@ -38,7 +38,7 @@
 - `packages/desktop/src/renderer/test/usage-statistics-page.test.tsx`
 - `packages/desktop/src/renderer/test/fixtures/usageStatisticsFixture.ts`
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
-- `docs/design-docs/front-usage-statistics.md`
+- `docs/design-docs/frontend/front-usage-statistics.md`
 
 ## [2026-06-05 01:01] | Follow-up: Request Row Pagination
 
@@ -78,4 +78,4 @@
 - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
 - `packages/desktop/src/renderer/test/usage-statistics-page.test.tsx`
 - `packages/desktop/src/renderer/test/fixtures/usageStatisticsFixture.ts`
-- `docs/design-docs/front-usage-statistics.md`
+- `docs/design-docs/frontend/front-usage-statistics.md`

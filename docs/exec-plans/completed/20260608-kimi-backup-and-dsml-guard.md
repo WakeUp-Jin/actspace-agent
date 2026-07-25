@@ -35,9 +35,9 @@
   - `AGENTS.md`
   - `docs/REPO_COLLAB_GUIDE.md`
   - `docs/ARCHITECTURE.md`
-  - `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`（双模型能力事实来源）
-  - `docs/design-docs/agent-current-module-map.md`
-  - `docs/design-docs/agent-kairos-autonomous-mode.md`
+  - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`（双模型能力事实来源）
+  - `docs/design-docs/agent-runtime/agent-current-module-map.md`
+  - `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
   - `docs/SECURITY.md`
   - `docs/PLANS_GUIDE.md`
 - 相关代码路径：
@@ -145,7 +145,7 @@ Kimi `$web_search` 协议（来源：platform.kimi.ai/docs/guide/use-web-search�
    - 扩展 `packages/agent-core/src/llm/test/kimi-service.test.ts` 或新增 `openai-completions-web-search.test.ts`：fake client 先返回 `finish_reason=tool_calls`($web_search) 再返回 `finish_reason=stop`，断言 service 自动回填 arguments、最终返回 stop 文本、usage 累加、且不向 agent loop emit `$web_search` 工具事件。
    - 断言 Kimi 主模型请求里 `tools` 含 builtin `$web_search` 且 `thinking=disabled`。
    - 断言本地 ToolManager 未为 Kimi 注册 `web_search`（exposure 测试不变即可）。
-6. 更新 `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`：
+6. 更新 `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`：
    - 新增「Kimi 作为公开主模型时，联网搜索由 provider-native `$web_search` builtin 在 LLM service 内部管理，不进入 ToolManager」一节。
    - 把旧非目标「不重新开放 Kimi 作为公开主模型」修订为历史决策，并补本轮新决策。
 
@@ -208,7 +208,7 @@ Kimi `$web_search` 协议（来源：platform.kimi.ai/docs/guide/use-web-search�
 验收命令：
 - `pnpm --filter @actspace/shared build`
 - `pnpm --filter @actspace/desktop test`
-- 手工：在 Usage 页同时看到 DeepSeek/Kimi 两张余额卡，浅色/深色主题都验（遵循 `docs/design-docs/front-主题与配色规范.md`，禁止 `text-black`/`bg-white`/`#hex` 非主题字面量）。
+- 手工：在 Usage 页同时看到 DeepSeek/Kimi 两张余额卡，浅色/深色主题都验（遵循 `docs/design-docs/frontend/front-主题与配色规范.md`，禁止 `text-black`/`bg-white`/`#hex` 非主题字面量）。
 
 回退策略：移除 Kimi 余额卡渲染与 `kimi:balance:get` handler；`ProviderBalanceSnapshot` 别名保证旧 DeepSeek 卡不受影响。
 

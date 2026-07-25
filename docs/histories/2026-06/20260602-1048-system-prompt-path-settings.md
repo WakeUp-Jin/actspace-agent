@@ -34,4 +34,4 @@
 - `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`
 - `packages/desktop/src/renderer/test/settings-page.test.tsx`
 - `packages/desktop/src/main/test/settings-service.test.ts`
-- `docs/design-docs/front-设置页规范.md`
+- `docs/design-docs/frontend/front-设置页规范.md`

@@ -12,7 +12,7 @@
 
 ## 附加必读
 
-- `docs/design-docs/agent-turn-layers.md`
+- `docs/design-docs/agent-runtime/agent-turn-layers.md`
 - `docs/design-docs/core-storage-and-observability.md`
 - `docs/FRONTEND_VERIFICATION.md`
 - `packages/desktop/src/main/agent-turn.ts`

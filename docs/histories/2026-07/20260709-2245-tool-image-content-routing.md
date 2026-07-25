@@ -41,4 +41,4 @@ OpenAI-compatible APIs require every assistant tool call to be followed by the c
 - `packages/agent-core/src/tools/test/bash.test.ts`
 - `packages/agent-core/src/engine/test/loop.test.ts`
 - `packages/agent-core/src/llm/test/convert.test.ts`
-- `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`
+- `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`

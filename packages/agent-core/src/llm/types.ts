@@ -8,13 +8,36 @@
  * 4. 服务接口 — LLMService（取代旧的 BaseLLMService 抽象类）
  */
 
-import type { ModelApi, ModelInputKind } from "@actspace/shared";
+import type { LlmProviderId as ProviderId, ModelApi, ModelInputKind } from "@actspace/shared";
 import type { AssistantMessage, Context, Tool } from "../messages";
 
 // ─── LLM 配置 ───
 
+export type ProviderFetch = (
+  input: string | URL | Request,
+  init?: RequestInit,
+) => Promise<Response>;
+
+export interface ProviderRuntimeConfig {
+  provider: ProviderId;
+  apiKey: string;
+  baseUrl: string;
+  transport?: { proxyUrl?: string };
+}
+
+export interface RuntimeInferenceSettings {
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface LLMTransportConfig {
+  proxyUrl?: string;
+  /** Internal injection point for tests and non-default transports. */
+  fetch?: ProviderFetch;
+}
+
 export interface LLMConfig {
-  provider: string;
+  provider: ProviderId | "mock" | "deepseek-mock";
   /** API protocol family. Prefer this over apiFormat for new code. */
   api?: ModelApi;
   /** Legacy DeepSeek route switch retained while env/settings migrate to ModelApi. */
@@ -26,6 +49,8 @@ export interface LLMConfig {
   temperature?: number;
   maxTokens?: number;
   maxRetries?: number;
+  transport?: LLMTransportConfig;
+  defaultHeaders?: Record<string, string>;
 }
 
 // ─── Stream Options ───
@@ -132,6 +157,7 @@ export class AssistantMessageEventStream {
 // ─── Provider 错误分类 ───
 
 export type LLMErrorKind =
+  | "proxy"
   | "network"
   | "rate_limit"
   | "auth"

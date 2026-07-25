@@ -19,8 +19,8 @@
 - `docs/SECURITY.md`
 - `docs/FRONTEND_VERIFICATION.md`
 - `docs/QUALITY_SCORE.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
-- `docs/design-docs/agent-testing.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`
 - `.agents/skills/llm-agent-dev/references/context/overview.md`
 - `.agents/skills/llm-agent-dev/references/llm/llm-service.md`

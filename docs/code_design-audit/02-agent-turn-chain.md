@@ -10,10 +10,10 @@
 - `docs/REPO_COLLAB_GUIDE.md`
 - `docs/ARCHITECTURE.md`
 - `docs/CODING_BEHAVIOR.md`
-- `docs/design-docs/agent-turn-layers.md`
-- `docs/design-docs/agent-backend-design.md`
+- `docs/design-docs/agent-runtime/agent-turn-layers.md`
+- `docs/design-docs/agent-runtime/agent-backend-design.md`
 - `docs/design-docs/core-storage-and-observability.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 
 ## 重点代码与文件范围
 
@@ -75,7 +75,7 @@
 
 ### 发现 1：图片附件分析在 Main 进程里绕过 Agent/Bridge 的工具事件模型（待确认）
 
-- 偏移点：`docs/design-docs/agent-turn-layers.md` 约束 Main Process 做 IPC、依赖装配、session meta 读取和结果持久化，不处理 Agent 内部事件；Bridge/Agent 负责事件翻译、工具执行和结果聚合。当前 `packages/desktop/src/main/agent-turn.ts:248-254` 在进入 `runTurnWithAgent()` 前调用 `analyzeImageAttachmentsForTurn()`，而 `packages/desktop/src/main/media-analysis.ts:1-3` 直接读本地文件并从 `@actspace/agent-core` 调 `analyzeMediaWithKimi()`，`packages/desktop/src/main/media-analysis.ts:81-123` 还手工发送 `tool_started` / `tool_finished` 风格 stream event。
+- 偏移点：`docs/design-docs/agent-runtime/agent-turn-layers.md` 约束 Main Process 做 IPC、依赖装配、session meta 读取和结果持久化，不处理 Agent 内部事件；Bridge/Agent 负责事件翻译、工具执行和结果聚合。当前 `packages/desktop/src/main/agent-turn.ts:248-254` 在进入 `runTurnWithAgent()` 前调用 `analyzeImageAttachmentsForTurn()`，而 `packages/desktop/src/main/media-analysis.ts:1-3` 直接读本地文件并从 `@actspace/agent-core` 调 `analyzeMediaWithKimi()`，`packages/desktop/src/main/media-analysis.ts:81-123` 还手工发送 `tool_started` / `tool_finished` 风格 stream event。
 - 不合理设计：图片分析表现为工具运行流，但不是 Agent loop 的 tool call；`packages/agent-core/src/engine/test/bridge.test.ts:280-345` 明确断言附件分析只落在 `user_message` payload，且不会产生 `tool_call` / `tool_result`。这会让 stream 上看到“工具”，持久化事实里却没有同一工具事件。
 - 可读性问题：读代码时需要同时理解 main 侧预处理、Bridge 的 `formatUserMessageForModel()` 注入、shared 的附件 payload，才能知道图片分析到底算不算一类工具；`packages/agent-core/src/adapters.ts:72-109` 又把附件和分析结果拼回用户消息，进一步弱化了它和普通工具事件的边界。
 - 耦合问题：Main 进程对 Kimi 辅助能力、文件读取、媒体分析 stream preview 产生直接认知，和 Agent 层已有 `analyze_media` tool（`packages/agent-core/src/tools/tools/analyze-media/executor.ts`，搜索确认存在）形成两条能力入口。

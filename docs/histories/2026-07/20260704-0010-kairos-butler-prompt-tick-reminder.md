@@ -41,4 +41,4 @@
 - `packages/agent-core/src/kairos/test/prompt-assembler.test.ts`
 - `packages/agent-core/src/kairos/test/runner.test.ts`
 - `packages/agent-core/src/kairos/test/replay-fidelity.test.ts`
-- `docs/design-docs/agent-kairos-autonomous-mode.md`
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`

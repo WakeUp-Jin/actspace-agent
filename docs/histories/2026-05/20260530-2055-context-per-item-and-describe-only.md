@@ -48,6 +48,6 @@
 
 ### 🔗 Related
 
-- 规范：`docs/design-docs/front-右侧面板与文件渲染规范.md`
+- 规范：`docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
 - 上一轮：`docs/histories/2026-05/20260530-1655-right-panel-fixes-and-reply-html.md`
-- 数据分层：`docs/design-docs/agent-token-usage-and-context-state.md`
+- 数据分层：`docs/design-docs/model-context/agent-token-usage-and-context-state.md`

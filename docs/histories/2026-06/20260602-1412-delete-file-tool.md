@@ -39,5 +39,5 @@
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/desktop/src/renderer/components/messages/DeleteFileBlock.tsx`
 - `packages/desktop/src/renderer/components/messages/ToolLogLine.tsx`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`

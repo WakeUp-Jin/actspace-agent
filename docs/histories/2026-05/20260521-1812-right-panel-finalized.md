@@ -26,11 +26,11 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/public/front/README.md`
-- `docs/design-docs/public/front/right-panel-markdown-final.png`
-- `docs/design-docs/public/front/right-panel-html-final.png`
-- `docs/design-docs/public/front/right-panel-image-final.png`
-- `docs/design-docs/public/front/right-panel-diff-final.png`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/right-panel-markdown-final.png`
+- `docs/design-docs/frontend/right-panel-html-final.png`
+- `docs/design-docs/frontend/right-panel-image-final.png`
+- `docs/design-docs/frontend/right-panel-diff-final.png`
 - `docs/histories/2026-05/20260521-1812-right-panel-finalized.md`

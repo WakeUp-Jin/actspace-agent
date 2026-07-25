@@ -16,7 +16,7 @@
 
 ## 文档同步
 
-- 新增 `docs/design-docs/agent-subprocess-runner-guidelines.md`，说明通用 runner 与命令 adapter 的职责边界。
+- 新增 `docs/design-docs/tool-system/agent-subprocess-runner-guidelines.md`，说明通用 runner 与命令 adapter 的职责边界。
 - 更新工具预览设计、agent-core 模块地图、前端中间消息区规范与设计文档索引。
 - 新增 `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-04-skill-rg-tools-fix.md`，保留未来修复 `llm-agent-dev` skill 的源码计划，不在本轮执行。
 

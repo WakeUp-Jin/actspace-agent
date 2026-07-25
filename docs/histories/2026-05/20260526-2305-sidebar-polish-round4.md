@@ -49,7 +49,7 @@
   - `.session-row-marker` 改为 relative 容器，dot + pin 叠层；新 `.session-row-marker .session-row-pin` 样式（14×14 absolute）。
   - `.session-row-archive` 独立样式（之前与 pin 共享）。
   - `.workspace-icon-slot` 加 button 行为、Folder/Chevron 同位叠加；`.workspace-add-button` 改成行尾 22×22 普通按钮。
-- `docs/design-docs/front-左侧会话栏规范.md`：
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`：
   - 分组标题字重改为 440 + 说明理由。
   - 「Workspace 文件夹行」改写为"左 = 折叠、右 = 新建"的语义分工。
   - 「会话行」拆成「marker 叠层（dot + pin）」「右侧 actions（只剩 archive）」两小节，明确 pin 在左、archive 在右的理由。

@@ -11,7 +11,7 @@
 
 ## 背景
 
-- 相关文档：`docs/design-docs/agent-eval-failure-candidate.md`、`docs/design-docs/agent-turn-layers.md`。
+- 相关文档：`docs/design-docs/evaluation/agent-eval-failure-candidate.md`、`docs/design-docs/agent-runtime/agent-turn-layers.md`。
 - 相关代码路径：`packages/shared/src/ipc.ts`、`packages/shared/src/session.ts`、`packages/desktop/src/renderer/App.tsx`、`packages/desktop/src/main/`、`packages/agent-core/src/engine/create-agent-deps.ts`、Eval 仓库 `src/actspace_agent_eval/cli.py`。
 - 已知约束：复用现有文件工具；Candidate 仅在显式 `/eval` 后产生；Eval 仓库保持黑盒边界。
 

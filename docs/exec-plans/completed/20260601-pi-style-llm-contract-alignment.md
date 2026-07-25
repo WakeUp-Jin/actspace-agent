@@ -28,9 +28,9 @@
   - `docs/REPO_COLLAB_GUIDE.md`
   - `docs/ARCHITECTURE.md`
   - `docs/design-docs/core-beliefs.md`
-  - `docs/design-docs/agent-backend-design.md`
-  - `docs/design-docs/agent-current-module-map.md`
-  - `docs/design-docs/agent-token-usage-and-context-state.md`
+  - `docs/design-docs/agent-runtime/agent-backend-design.md`
+  - `docs/design-docs/agent-runtime/agent-current-module-map.md`
+  - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
   - `/Users/wakeup-jin/Desktop/code-project/back-code/pi-project/docs/pi-ai-type-system.md`
   - `/Users/wakeup-jin/Desktop/code-project/back-code/pi-project/docs/pi-ai-message-architecture.md`
   - `/Users/wakeup-jin/Desktop/code-project/back-code/pi-project/docs/pi-ai-transform-messages.md`

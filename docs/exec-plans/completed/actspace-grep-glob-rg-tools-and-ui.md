@@ -29,10 +29,10 @@
 ## 背景
 
 - 相关设计文档：
-  - `docs/design-docs/agent-tool-preview-design-guidelines.md`
-  - `docs/design-docs/agent-subprocess-runner-guidelines.md`
-  - `docs/design-docs/agent-current-module-map.md`
-  - `docs/design-docs/front-中间消息区规范.md`
+  - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+  - `docs/design-docs/tool-system/agent-subprocess-runner-guidelines.md`
+  - `docs/design-docs/agent-runtime/agent-current-module-map.md`
+  - `docs/design-docs/frontend/front-中间消息区规范.md`
 - 相关 skill 调研：
   - `.agents/skills/llm-agent-dev/references/tools/search-tools.md`
   - `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-04-skill-rg-tools-fix.md`
@@ -172,9 +172,9 @@ type ToolPreviewKind = "grep" | "glob" | ...
 
 更新：
 
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/design-docs/index.md`
 - `docs/design-docs/agent-index.md`
 

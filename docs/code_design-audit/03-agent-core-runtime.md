@@ -11,13 +11,13 @@
 - `docs/ARCHITECTURE.md`
 - `docs/CODING_BEHAVIOR.md`
 - `docs/design-docs/agent-index.md`
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-backend-design.md`
-- `docs/design-docs/agent-context-compression.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
-- `docs/design-docs/agent-skill-loading.md`
-- `docs/design-docs/agent-cache-loss-audit.md`
-- `docs/design-docs/agent-testing.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/agent-runtime/agent-backend-design.md`
+- `docs/design-docs/model-context/agent-context-compression.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
+- `docs/design-docs/tool-system/agent-skill-loading.md`
+- `docs/design-docs/model-context/agent-cache-loss-audit.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
 
 ## 重点代码与文件范围
 
@@ -78,7 +78,7 @@
 
 ### 发现 1：历史压缩安全切点兜底仍可能生成连续 user 消息（待确认）
 
-- 偏移点：`docs/design-docs/agent-context-compression.md` 要求历史压缩切点“不动区以 assistant turn 开头”，避免合成 `UserMessage(source:"compaction")` 后紧跟普通 user；但 `packages/agent-core/src/context/modules/conversation.ts:111-119` 的兜底只找“第一条非 toolResult”，如果 target 之后没有 assistant、第一条非 toolResult 是 user，就可能形成 `user(compaction) -> user`。现有测试只覆盖 assistant 边界和非 toolResult 的基本约束，见 `packages/agent-core/src/context/test/conversation-compact.test.ts:60-74`。
+- 偏移点：`docs/design-docs/model-context/agent-context-compression.md` 要求历史压缩切点“不动区以 assistant turn 开头”，避免合成 `UserMessage(source:"compaction")` 后紧跟普通 user；但 `packages/agent-core/src/context/modules/conversation.ts:111-119` 的兜底只找“第一条非 toolResult”，如果 target 之后没有 assistant、第一条非 toolResult 是 user，就可能形成 `user(compaction) -> user`。现有测试只覆盖 assistant 边界和非 toolResult 的基本约束，见 `packages/agent-core/src/context/test/conversation-compact.test.ts:60-74`。
 - 不合理设计：主路径和兜底路径的安全条件不一致；兜底把“不要以孤儿 toolResult 开头”和“必须以 assistant 开头”混成了弱约束。
 - 可读性问题：`findCompactionSplit()` 注释写“优先 assistant，兜底非 toolResult”，但没有显式说明兜底可能破坏 user/assistant 交替，读者容易以为它仍满足设计文档中的强约束。
 - 耦合问题：压缩算法依赖 Anthropic/OpenAI provider 对消息序列的接受策略，但这个约束只隐含在 context 模块注释里，没有由 LLM 转换层或测试共同守住。
@@ -96,7 +96,7 @@
 
 ### 发现 3：cache audit 低缓存写盘失败时会留下无 `cacheAuditId` 的低缓存索引
 
-- 偏移点：`docs/design-docs/agent-cache-loss-audit.md` 约定 `cacheStatus === true` 时 `cacheAuditId` 必填，用来指向旁路审计目录；但 `packages/agent-core/src/observability/cache-audit.ts:216-230` 在低缓存且写审计文件失败时返回 `{ cacheStatus: true, cacheHitRatio }`，没有 `cacheAuditId`。bridge 会把这些字段写入 `llm_usage.payload`，见 `packages/agent-core/src/engine/bridge.ts:541-549`。
+- 偏移点：`docs/design-docs/model-context/agent-cache-loss-audit.md` 约定 `cacheStatus === true` 时 `cacheAuditId` 必填，用来指向旁路审计目录；但 `packages/agent-core/src/observability/cache-audit.ts:216-230` 在低缓存且写审计文件失败时返回 `{ cacheStatus: true, cacheHitRatio }`，没有 `cacheAuditId`。bridge 会把这些字段写入 `llm_usage.payload`，见 `packages/agent-core/src/engine/bridge.ts:541-549`。
 - 不合理设计：失败路径把“真实低缓存事实”和“可定位审计证据”拆开了，但 payload 没有记录旁路写盘失败原因，后续脚本看到 `cacheStatus: true` 却没有目录 ID 时只能猜。
 - 可读性问题：`CacheAuditUsageMetadata.cacheAuditId?` 是可选类型，弱化了设计文档里“低缓存索引必须可定位”的语义。
 - 耦合问题：observability 的旁路写盘失败会改变 persistence 中 `llm_usage` 的解释方式；但 bridge/persistence 不知道这是“审计证据缺失”而不是“无需审计目录”。

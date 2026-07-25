@@ -22,14 +22,14 @@
 ## 背景
 
 - 设计文档：
-  - `docs/design-docs/agent-subagent-runtime.md`
-  - `docs/design-docs/agent-turn-layers.md`
-  - `docs/design-docs/agent-current-module-map.md`
-  - `docs/design-docs/agent-tool-preview-design-guidelines.md`
-  - `docs/design-docs/front-中间消息区规范.md`
-  - `docs/design-docs/front-主题与配色规范.md`
+  - `docs/design-docs/collaboration/agent-subagent-runtime.md`
+  - `docs/design-docs/agent-runtime/agent-turn-layers.md`
+  - `docs/design-docs/agent-runtime/agent-current-module-map.md`
+  - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+  - `docs/design-docs/frontend/front-中间消息区规范.md`
+  - `docs/design-docs/frontend/front-主题与配色规范.md`
 - 前端原型：
-  - `docs/design-docs/public/front/agent-subagent-flow-prototype.html`
+  - `docs/design-docs/frontend/agent-subagent-flow-prototype.html`
 - 参考项目：
   - Claude Code 当前主工具名为 `Agent`，`Task` 是 legacy alias。
   - 参考路径：`/Users/wakeup-jin/Desktop/code-project/back-code/claudecode-src/tools/AgentTool/`
@@ -198,12 +198,12 @@
 
 修改文件：
 
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/design-docs/index.md`
 - `docs/design-docs/agent-index.md`
-- `docs/design-docs/front-index.md`
+- `docs/design-docs/frontend/README.md`
 - `docs/histories/YYYY-MM/...`
 - 如命中学习沉淀标准，新增 `docs/learnings/YYYY-MM/...`
 
@@ -228,7 +228,7 @@
   - `pnpm build`
   - `pnpm test`
 - 手工检查：
-  - 打开 `docs/design-docs/public/front/agent-subagent-flow-prototype.html` 对照 UI。
+  - 打开 `docs/design-docs/frontend/agent-subagent-flow-prototype.html` 对照 UI。
   - 浅色和深色主题下检查 Agent block 和 modal。
   - 执行中点击 Agent block 能看到实时 transcript。
   - 完成后主消息流 summary 不撑爆布局。

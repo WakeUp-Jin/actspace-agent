@@ -26,7 +26,7 @@ Context 弹窗是 Composer 的一部分，先定稿它，后续讨论中间消�
 
 ### 📁 Files Modified
 
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-聊天输入框规范.md`
-- `docs/design-docs/public/front/context-popup-final.png`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`
+- `docs/design-docs/frontend/context-popup-final.png`
 - `docs/histories/2026-05/20260521-1715-context-popup-finalized.md`

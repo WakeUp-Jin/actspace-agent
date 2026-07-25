@@ -28,9 +28,9 @@
   - `docs/REPO_COLLAB_GUIDE.md`
   - `docs/ARCHITECTURE.md`
   - `docs/design-docs/core-beliefs.md`
-  - `docs/design-docs/agent-kairos-autonomous-mode.md`
-  - `docs/design-docs/lab-runtime-architecture.md`
-  - `docs/design-docs/lab-product-design.md`
+  - `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
+  - `docs/design-docs/lab/lab-runtime-architecture.md`
+  - `docs/design-docs/lab/lab-product-design.md`
   - `docs/design-docs/core-storage-and-observability.md`
 - 相关代码路径：
   - `packages/desktop/src/main/kairos-bootstrap.ts`
@@ -138,9 +138,9 @@ Main Agent 最近在桌面端前端验证时多次卡在浏览器 mock。
    - 验证：写入函数单测覆盖字段转义、缺省字段、来源路由、append 顺序和并发下不覆盖已有内容。
 
 5. 文档与收尾
-   - 更新 `docs/design-docs/agent-kairos-autonomous-mode.md`。
+   - 更新 `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`。
    - 更新 `docs/design-docs/core-storage-and-observability.md` 的 Kairos 目录树与存储边界，加入 `<userData>/kairos/inbox/`。
-   - 根据实现结果补 `docs/design-docs/lab-runtime-architecture.md` 中 Lab 与 Kairos 的通信说明。
+   - 根据实现结果补 `docs/design-docs/lab/lab-runtime-architecture.md` 中 Lab 与 Kairos 的通信说明。
    - 记录 history；如果行为对用户可见，再补对应 UI / 验收说明。
 
 ## 验证方式

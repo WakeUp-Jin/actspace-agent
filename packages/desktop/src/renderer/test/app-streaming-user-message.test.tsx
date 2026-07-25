@@ -875,8 +875,8 @@ describe("App streaming user message", () => {
 
     renderApp();
 
-    await userEvent.click(await screen.findByRole("button", { name: /deepseek-v4-pro/ }));
-    await userEvent.click(screen.getByRole("button", { name: "deepseek-v4-flash" }));
+    await userEvent.click(await screen.findByRole("button", { name: /DeepSeek V4 Pro/i }));
+    await userEvent.click(screen.getByRole("button", { name: "DeepSeek V4 Flash" }));
 
     let composer = await screen.findByLabelText("Message composer");
     await userEvent.type(composer, "start with flash");

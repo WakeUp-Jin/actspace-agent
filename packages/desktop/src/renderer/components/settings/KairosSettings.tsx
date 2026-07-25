@@ -8,9 +8,10 @@ import {
   type KairosBriefPriority,
   type KairosBudgetRuntime,
   type KairosConfigName,
-  type KairosModelId,
   type KairosThinkingMode,
+  type ModelKey,
   type SettingsUpdateInput,
+  type UsableModelView,
 } from "@actspace/shared";
 import {
   MultiSelect,
@@ -23,6 +24,7 @@ import {
   type SelectOption,
 } from "./SettingsPrimitives";
 import { TOOL_ITEMS } from "./tool-catalog";
+import { ModelPurposeSelect } from "./ModelPurposeSelect";
 
 /**
  * Kairos 设置：结构化表单编辑 `<userData>/kairos/config/` 下的配置。
@@ -41,15 +43,6 @@ const ICON_BTN =
   "grid h-9 w-9 shrink-0 place-items-center rounded-act-md border border-line bg-surface text-text-faint transition-colors hover:border-on-danger/40 hover:text-on-danger";
 
 const RULE_MAX_CHARS = 20_000;
-const DEFAULT_MODEL_VALUE = "__default__";
-
-const MODEL_OPTIONS: SelectOption[] = [
-  { value: DEFAULT_MODEL_VALUE, label: "DeepSeek V4 Flash（默认）" },
-  { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" },
-  { value: "kimi-k2.6", label: "Kimi K2.6（偏贵）" },
-  { value: "kimi-k2.7-code", label: "Kimi K2.7 Code（偏贵）" },
-];
-
 const THINKING_OPTIONS: SelectOption[] = [
   { value: "auto", label: "自动" },
   { value: "on", label: "开启" },
@@ -139,11 +132,14 @@ function getKairosBridge() {
 export function KairosSettings({
   settings,
   onUpdate,
+  onChanged,
 }: {
   settings: AppSettings;
   onUpdate: (input: SettingsUpdateInput) => void;
+  onChanged?: () => void | Promise<void>;
 }) {
   const bridgeAvailable = Boolean(getKairosBridge());
+  const modelBridgeAvailable = typeof window !== "undefined" && Boolean(window.actspace?.listUsableModels && window.actspace?.updateKairosModel);
   const [budget, setBudget] = useState<KairosBudgetRuntime | null>(null);
   const [prefs, setPrefs] = useState<Parsed | null>(null);
   const [pathsObj, setPathsObj] = useState<Parsed | null>(null);
@@ -152,6 +148,9 @@ export function KairosSettings({
   const [soulText, setSoulText] = useState("");
   const [loading, setLoading] = useState(bridgeAvailable);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [kairosModels, setKairosModels] = useState<UsableModelView[]>([]);
+  const [modelSaving, setModelSaving] = useState(false);
+  const [modelError, setModelError] = useState<string | null>(null);
 
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
@@ -192,6 +191,29 @@ export function KairosSettings({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!modelBridgeAvailable || !window.actspace?.listUsableModels) return;
+    void window.actspace.listUsableModels({ purpose: "kairos" })
+      .then((result) => { if (!cancelled) setKairosModels(result.models); })
+      .catch(() => { if (!cancelled) setModelError("读取 Kairos 可用模型失败。"); });
+    return () => { cancelled = true; };
+  }, [modelBridgeAvailable]);
+
+  const updateKairosModel = async (modelKey: ModelKey | null) => {
+    if (!window.actspace?.updateKairosModel) return;
+    setModelSaving(true);
+    setModelError(null);
+    try {
+      await window.actspace.updateKairosModel({ modelKey });
+      await onChanged?.();
+    } catch (error) {
+      setModelError(error instanceof Error ? error.message : "Kairos 模型保存失败。");
+    } finally {
+      setModelSaving(false);
+    }
+  };
 
   // 额度护栏（开关 + 剩余额度）走 window.kairos，与上面的 config 文件读写独立：
   // 初值取 getState().budget，并订阅 onState 让运行时余额递减 / 充值后实时反映到 UI。
@@ -333,41 +355,21 @@ export function KairosSettings({
   }, [writeObj]);
 
   const prefsParseError = prefs?.parseError ?? false;
-  const modelValue = settings.kairos.modelId ?? DEFAULT_MODEL_VALUE;
   const formsReady = bridgeAvailable && !loading && !loadError;
 
   return (
     <>
       <SettingGroup title="Kairos 自主智能体">
-        <SettingRow
-          title="模型"
-          description={
-            bridgeAvailable
-              ? "Kairos 自主模式使用的模型，保存到 settings.json；改后会立即重建 Kairos 并生效。Kimi 单价更高，自主模式量大建议配合下方额度护栏。"
-              : "Kairos 模型仅在桌面端可配置（保存在 settings.json）。"
-          }
-          align="start"
-          control={
-            <div className="flex flex-col items-end gap-1">
-              <SettingsSelect
-                value={modelValue}
-                options={MODEL_OPTIONS}
-                onChange={(value) => {
-                  onUpdate({
-                    kairos: { modelId: value === DEFAULT_MODEL_VALUE ? null : (value as KairosModelId) },
-                  });
-                }}
-                disabled={!bridgeAvailable || loading}
-                ariaLabel="Kairos 模型"
-              />
-              {prefsParseError ? (
-                <span className="max-w-[220px] text-right text-[11px] leading-snug text-on-danger">
-                  preferences.json 解析失败；模型设置仍会保存到 settings.json。
-                </span>
-              ) : null}
-            </div>
-          }
+        <ModelPurposeSelect
+          label="Kairos 模型"
+          description="只显示已经连接、启用且支持 Agent 工具调用的模型；保存后立即重建 Kairos。模型不可用时 Kairos 会暂停，不会静默切换供应商。"
+          value={settings.kairosModelKey ?? null}
+          models={kairosModels}
+          disabled={!modelBridgeAvailable || modelSaving}
+          onChange={(value) => void updateKairosModel(value)}
         />
+        {modelError ? <p role="alert" className="px-4 pb-3 text-[12px] text-on-danger">{modelError}</p> : null}
+        {prefsParseError ? <p className="px-4 pb-3 text-[11px] leading-snug text-on-danger">preferences.json 解析失败；模型设置仍由 settings.json 独立维护。</p> : null}
         <SettingRow
           title="思考链"
           description="是否启用模型的思考过程。"

@@ -17,9 +17,9 @@
 - `docs/FRONTEND_VERIFICATION.md`
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
-- `docs/design-docs/front-左侧会话栏规范.md`
-- `docs/design-docs/front-设置页规范.md`
-- `docs/design-docs/front-主题与配色规范.md`
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`
+- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/design-docs/frontend/front-主题与配色规范.md`
 - `docs/design-docs/core-storage-and-observability.md`
 
 ## 范围
@@ -44,7 +44,7 @@
 ## 背景与现状
 
 - 左侧会话行已有 Archive 图标按钮，但当前 `title` 是 `Archive (coming soon)`，只触发占位回调。
-- `docs/design-docs/front-左侧会话栏规范.md` 目前记录「完整 Archive 功能留作 follow-up」，本计划完成时需要同步更新。
+- `docs/design-docs/frontend/front-左侧会话栏规范.md` 目前记录「完整 Archive 功能留作 follow-up」，本计划完成时需要同步更新。
 - session 元数据由 `<userData>/sessions/<sessionId>/meta.json` 承载；当前已有 `pinned?: boolean`，归档状态应沿用同一模式。
 - `listSessionRecords(sessionRoot)` 当前列出全部 session 摘要，并由 renderer 直接用于侧边栏。
 - 设置页已存在整页接管结构：`SettingsPage` + `SettingsNav`，首版分区包括通用、模型、智能体、工具、外观。
@@ -72,8 +72,8 @@
   - `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`
   - `packages/desktop/src/renderer/test/settings-page.test.tsx`
 - 文档：
-  - `docs/design-docs/front-左侧会话栏规范.md`
-  - `docs/design-docs/front-设置页规范.md`
+  - `docs/design-docs/frontend/front-左侧会话栏规范.md`
+  - `docs/design-docs/frontend/front-设置页规范.md`
   - `docs/histories/`
 
 ## 数据与 IPC 契约
@@ -253,8 +253,8 @@ IPC 通道：
 
 修改文件：
 
-- `docs/design-docs/front-左侧会话栏规范.md`
-- `docs/design-docs/front-设置页规范.md`
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`
+- `docs/design-docs/frontend/front-设置页规范.md`
 - `docs/histories/YYYY-MM/<timestamp>-archived-chats.md`
 
 任务：

@@ -26,4 +26,4 @@ The previous assistant identity chrome reserved a left avatar column. After remo
 ### 📁 Files Modified
 
 - `packages/desktop/src/renderer/styles.css`
-- `docs/design-docs/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`

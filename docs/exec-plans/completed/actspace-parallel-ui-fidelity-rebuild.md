@@ -2,7 +2,7 @@
 
 ## 目标
 
-按 `docs/design-docs/front-index.md` 的定稿文档和图片重建桌面端工作台 UI，让实际 Electron 窗口接近已认可的浅色蓝白设计，而不是当前骨架页面。完成后，即使后端仍是 mock，前端也能独立展示完整的用户消息、助手回复、Thinking、Read/Search、Edit diff、Composer、Context popup、左侧会话栏和右侧面板。
+按 `docs/design-docs/frontend/README.md` 的定稿文档和图片重建桌面端工作台 UI，让实际 Electron 窗口接近已认可的浅色蓝白设计，而不是当前骨架页面。完成后，即使后端仍是 mock，前端也能独立展示完整的用户消息、助手回复、Thinking、Read/Search、Edit diff、Composer、Context popup、左侧会话栏和右侧面板。
 
 ## 并行边界
 
@@ -17,13 +17,13 @@
 - `AGENTS.md`：仓库导航和工作规则。
 - `docs/FRONTEND.md`：前端入口文档。
 - `docs/FRONTEND_VERIFICATION.md`：浏览器 mock、Electron、Computer Use 验收方式。
-- `docs/design-docs/front-index.md`：定稿图目录。
-- `docs/design-docs/front-前端设计文档.md`：整体原则。
-- `docs/design-docs/front-左侧会话栏规范.md`：左侧栏还原标准。
-- `docs/design-docs/front-聊天输入框规范.md`：Composer 和 Context popup 标准。
-- `docs/design-docs/front-中间消息区规范.md`：消息组件语法。
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`：右侧 Tab 和文件预览标准。
-- `docs/design-docs/public/front/actspace-deepseek-workbench.html`：高保真 HTML 原型参考。
+- `docs/design-docs/frontend/README.md`：定稿图目录。
+- `docs/design-docs/frontend/README.md`：整体原则。
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`：左侧栏还原标准。
+- `docs/design-docs/frontend/front-聊天输入框规范.md`：Composer 和 Context popup 标准。
+- `docs/design-docs/frontend/front-中间消息区规范.md`：消息组件语法。
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`：右侧 Tab 和文件预览标准。
+- `docs/design-docs/frontend/actspace-deepseek-workbench.html`：高保真 HTML 原型参考。
 - `.agents/skills/frontend-design/SKILL.md`：前端设计实现约束。
 - `.agents/skills/ui-ux-pro-max/SKILL.md`：UI/UX 验收约束。
 

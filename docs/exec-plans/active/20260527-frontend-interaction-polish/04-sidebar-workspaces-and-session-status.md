@@ -32,8 +32,8 @@
 
 相关文档：
 
-- `docs/design-docs/front-左侧会话栏规范.md`
-- `docs/design-docs/front-工作台布局与面板交互规范.md`
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`
+- `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`
 - `docs/FRONTEND_VERIFICATION.md`
 
 相关代码路径：

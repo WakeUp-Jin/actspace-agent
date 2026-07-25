@@ -4,7 +4,7 @@
 
 让主 Agent 能兼容 actspace 私有 Skill、跨客户端 `.agents/skills` 生态和 `.claude/skills` 生态：每轮 turn 能看到可用 Skill catalog，并能按 catalog 中的绝对 `location` 用既有 `read_file` 工具读取 Skill 正文。
 
-本计划以 `docs/design-docs/agent-skill-loading.md` 为设计事实来源，并替代旧计划 `docs/exec-plans/active/20260527-agent-tool-capabilities-breakdown/04-skill-backend-integration.md` 中“只扫描项目 `.agents/skills`”的第一版范围。
+本计划以 `docs/design-docs/tool-system/agent-skill-loading.md` 为设计事实来源，并替代旧计划 `docs/exec-plans/active/20260527-agent-tool-capabilities-breakdown/04-skill-backend-integration.md` 中“只扫描项目 `.agents/skills`”的第一版范围。
 
 > 状态：已完成并归档。实现已落地到 `packages/agent-core/src/skills/` 和 `packages/desktop/src/main/agent-runtime-context.ts`；Skill 正文读取复用 `read_file`，不保留专用读取工具。
 
@@ -51,12 +51,12 @@
 - `docs/SECURITY.md`
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
-- `docs/design-docs/agent-skill-loading.md`
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-backend-design.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
-- `docs/design-docs/agent-testing.md`
+- `docs/design-docs/tool-system/agent-skill-loading.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/agent-runtime/agent-backend-design.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`
 - `.agents/skills/llm-agent-dev/references/foundations/skill-integration.md`
 
@@ -73,7 +73,7 @@
 - `packages/desktop/src/main/test/agents-md-service.test.ts`
 - `packages/desktop/src/main/test/context-describe-service.test.ts`
 - `packages/shared/src/context-buckets.ts`
-- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
 - `docs/histories/`
 
 ## 契约草案
@@ -142,10 +142,10 @@ Agent 读取 `SKILL.md` 后，再以该文件所在目录为基准解析正文�
    - 验证：context/test 或 engine/test 中加入 skills bucket 断言。
 
 5. 文档同步与收尾
-   - 更新 `docs/design-docs/agent-current-module-map.md`。
-   - 如 context state 文档受影响，更新 `docs/design-docs/agent-token-usage-and-context-state.md`。
+   - 更新 `docs/design-docs/agent-runtime/agent-current-module-map.md`。
+   - 如 context state 文档受影响，更新 `docs/design-docs/model-context/agent-token-usage-and-context-state.md`。
    - 按 `docs/HISTORY_GUIDE.md` 记录本次代码变更。
-   - 如实现中发现设计变更，回写 `docs/design-docs/agent-skill-loading.md` 和本计划决策记录。
+   - 如实现中发现设计变更，回写 `docs/design-docs/tool-system/agent-skill-loading.md` 和本计划决策记录。
 
 ## 验证方式
 
@@ -181,7 +181,7 @@ Agent 读取 `SKILL.md` 后，再以该文件所在目录为基准解析正文�
 
 ## 进度记录
 
-- [x] 设计文档落地到 `docs/design-docs/agent-skill-loading.md`。
+- [x] 设计文档落地到 `docs/design-docs/tool-system/agent-skill-loading.md`。
 - [x] 完成 Skill discovery 和 parser。
 - [x] 完成 Skill catalog 注入。
 - [x] 完成基于 `read_file` 的 Skill 正文读取路径。

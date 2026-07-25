@@ -57,7 +57,7 @@ export const bashDefinition: ToolDefinitionSpec = {
       intent: {
         type: "string",
         description:
-          "Optional one-line summary (max ~60 chars) describing what this command accomplishes. Prefer writing this value in Simplified Chinese so end users can read it easily. It is shown as a comment above the command in the approval card and history views.",
+          "Required one-line summary (max ~60 chars) describing what this command accomplishes. Write this value in Simplified Chinese so end users can read it easily. It is shown as a comment above the command in the approval card and history views.",
       },
       notifyOnOutput: {
         type: "object",
@@ -78,7 +78,7 @@ export const bashDefinition: ToolDefinitionSpec = {
           "so the user can see why escalation is needed.",
       },
     },
-    required: ["command"],
+    required: ["command", "intent"],
     additionalProperties: false,
   },
   isReadOnly: false,

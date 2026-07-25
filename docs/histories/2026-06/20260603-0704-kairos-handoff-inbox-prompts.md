@@ -38,7 +38,7 @@ Lab 目前只有 renderer mock，没有后端 Runtime / IPC / Persistence，所�
 - `packages/agent-core/src/prompt/lab-agent.ts`
 - `packages/desktop/src/main/index.ts`
 - `packages/desktop/src/main/kairos-bootstrap.ts`
-- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
 - `docs/design-docs/core-storage-and-observability.md`
-- `docs/design-docs/lab-runtime-architecture.md`
-- `docs/design-docs/lab-implementation-progress.md`
+- `docs/design-docs/lab/lab-runtime-architecture.md`
+- `docs/design-docs/lab/lab-implementation-progress.md`

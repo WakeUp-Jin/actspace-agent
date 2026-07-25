@@ -45,8 +45,8 @@
 - `packages/desktop/src/renderer/test/right-panel-kairos.test.tsx`
 - `packages/desktop/src/renderer/test/right-panel-review.test.tsx`
 - `packages/desktop/src/renderer/test/right-panel-workspace.test.tsx`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/front-index.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/README.md`
 - `docs/design-docs/index.md`
 
 ### 📚 Learning Check

@@ -26,8 +26,8 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/public/front/review-v1-git-review-prototype.html`
-- `docs/design-docs/public/front/README.md`
+- `docs/design-docs/frontend/review-v1-git-review-prototype.html`
+- `docs/design-docs/frontend/README.md`
 
 ### 🔁 Follow-up Refinement
 

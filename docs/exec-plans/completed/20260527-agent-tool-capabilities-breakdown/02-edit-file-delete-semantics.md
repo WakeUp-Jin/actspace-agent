@@ -31,9 +31,9 @@
 - `docs/ARCHITECTURE.md`
 - `docs/CODING_BEHAVIOR.md`
 - `docs/HISTORY_GUIDE.md`
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-testing.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`
 - `.agents/skills/llm-agent-dev/references/tools/overview.md`
 
@@ -47,7 +47,7 @@
 - `packages/shared/src/session.ts`
 - `packages/shared/src/session-selectors.ts`
 - `packages/desktop/src/renderer/components/messages/**`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 
 ## 已知现状
 

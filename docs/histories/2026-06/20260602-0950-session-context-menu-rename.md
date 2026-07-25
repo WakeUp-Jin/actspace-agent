@@ -40,4 +40,4 @@
 - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
 - `packages/agent-core/src/persistence/test/session-store.test.ts`
 - `packages/desktop/src/renderer/test/sidebar.test.tsx`
-- `docs/design-docs/front-左侧会话栏规范.md`
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`

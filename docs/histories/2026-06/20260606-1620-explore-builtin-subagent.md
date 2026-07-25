@@ -47,7 +47,7 @@
 - `packages/desktop/src/renderer/components/messages/{ExploreRunBlock.tsx（新增）,ToolActivityGroup.tsx,SubAgentTranscriptModal.tsx}`
 - `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`
 - `packages/desktop/src/renderer/test/{explore-run-block.test.tsx（新增）,settings-page,app-streaming-user-message,kairos-settings,kairos-config-files}.test.tsx`
-- docs：`design-docs/agent-explore-subagent.md`、`design-docs/agent-subagent-runtime.md`、`design-docs/index.md`、`exec-plans/active/20260606-explore-subagent.md`
+- docs：`design-docs/collaboration/agent-explore-subagent.md`、`design-docs/collaboration/agent-subagent-runtime.md`、`design-docs/index.md`、`exec-plans/active/20260606-explore-subagent.md`
 
 ### ✅ 验证
 

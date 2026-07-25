@@ -34,5 +34,5 @@
 - `packages/desktop/src/global.d.ts`
 - `packages/desktop/src/renderer/components/settings/PluginsSettings.tsx`
 - `packages/desktop/src/renderer/components/settings/fs-watch-shared.ts`
-- `docs/design-docs/agent-browser-bridge-design.md`
+- `docs/design-docs/browser/agent-browser-bridge-design.md`
 - `docs/histories/2026-07/20260709-0000-browser-bridge-init-ui.md`

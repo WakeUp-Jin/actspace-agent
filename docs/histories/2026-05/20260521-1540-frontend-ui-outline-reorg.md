@@ -27,10 +27,10 @@
 ### 📁 Files Modified
 
 - `docs/design-docs/index.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-前端设计文档.md`
-- `docs/design-docs/front-左侧会话栏规范.md`
-- `docs/design-docs/front-中间消息区规范.md`
-- `docs/design-docs/front-聊天输入框规范.md`
-- `docs/design-docs/public/front/overview-two-column.png`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`
+- `docs/design-docs/frontend/overview-two-column.png`
 - `docs/histories/2026-05/20260521-1540-frontend-ui-outline-reorg.md`

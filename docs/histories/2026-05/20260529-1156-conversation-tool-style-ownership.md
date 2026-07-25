@@ -38,7 +38,7 @@
 - `packages/desktop/src/renderer/styles/base.css`
 - `packages/desktop/src/renderer/styles/diff.css`
 - `packages/desktop/src/renderer/styles/legacy-conversation.css`
-- `docs/design-docs/front-tailwind-style-architecture.md`
+- `docs/design-docs/frontend/front-tailwind-style-architecture.md`
 - `docs/coding-standards/team/frontend-style-scope-conventions.md`
 - `docs/exec-plans/active/actspace-tailwind-style-architecture.md`
 - `docs/exec-plans/active/20260528-tailwind-remaining-ui-migration.md`

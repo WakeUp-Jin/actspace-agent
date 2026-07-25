@@ -13,8 +13,8 @@
 ## 附加必读
 
 - `.agents/skills/llm-agent-dev/references/agent-runtime/agent-patterns.md`
-- `docs/design-docs/agent-form-team.md`
-- `docs/design-docs/agent-subagent-runtime.md`
+- `docs/design-docs/collaboration/agent-form-team.md`
+- `docs/design-docs/collaboration/agent-subagent-runtime.md`
 - `packages/agent-core/src/engine/loop.ts`
 - `packages/agent-core/src/engine/types.ts`
 - `packages/agent-core/src/tools/tools/agent/runner.ts`

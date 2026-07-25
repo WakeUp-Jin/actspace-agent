@@ -27,7 +27,7 @@
 ### 📁 Files Modified
 
 - `docs/design-docs/index.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-聊天输入框规范.md`
-- `docs/design-docs/public/front/composer-final.png`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`
+- `docs/design-docs/frontend/composer-final.png`
 - `docs/histories/2026-05/20260521-1648-composer-finalized.md`

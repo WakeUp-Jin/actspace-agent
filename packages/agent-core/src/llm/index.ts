@@ -7,6 +7,18 @@ export { DeepSeekService } from "./services/deepseek";
 export { DeepSeekAnthropicService } from "./services/deepseek-anthropic";
 export { KimiService } from "./services/kimi";
 export { OpenAICompletionsService } from "./services/openai-completions";
+export {
+  applyOpenAIProviderRequestParams,
+  providerDefaultHeaders,
+  providerDisplayName,
+} from "./provider-adapter";
+export {
+  closeProviderTransports,
+  createProviderFetch,
+  isProviderProxyError,
+  normalizeProxyUrl,
+  ProviderProxyError,
+} from "./provider-transport";
 export { convertMessages, toRequestTools, mapSdkError, mapStopReason, parseToolCall } from "./convert";
 export {
   convertContextToAnthropic,

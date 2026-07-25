@@ -16,7 +16,7 @@
 
 **Key Actions:**
 
-- **[测试设计文档]**：创建 `docs/design-docs/agent-testing.md`，定义测试策略、目录约定和覆盖范围
+- **[测试设计文档]**：创建 `docs/design-docs/agent-runtime/agent-testing.md`，定义测试策略、目录约定和覆盖范围
 - **[vitest 基础设施]**：安装 vitest v3，创建 `vitest.config.ts`，配置 package.json scripts（test/test:watch），tsconfig exclude 排除测试文件
 - **[端到端 smoke]**：`src/test/smoke.test.ts` — Agent.run 全链路验证（事件序列、最终回复、usage、tool events）
 - **[引擎测试]**：`engine/test/loop.test.ts` — runAgentLoop 双层循环、shouldStopAfterTurn、abort；`engine/test/agent.test.ts` — Agent.run/runAndGetText/abort
@@ -50,6 +50,6 @@ QUALITY_SCORE.md 测试评分为 C，明确建议"增加首条端到端 smoke pa
 - `packages/agent-core/src/persistence/test/jsonl.test.ts`
 - `packages/agent-core/src/persistence/test/meta.test.ts`
 - `packages/agent-core/src/persistence/test/recovery.test.ts`
-- `docs/design-docs/agent-testing.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
 - `docs/design-docs/index.md`
 - `docs/QUALITY_SCORE.md`

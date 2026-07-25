@@ -36,8 +36,8 @@
 
 ### 文档更新
 
-- `docs/design-docs/agent-current-module-map.md`：记录新工具和 shared helper
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`：增加 write_file 展示规范
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`：记录新工具和 shared helper
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`：增加 write_file 展示规范
 - `docs/references/llm-agent-dev-skill-fixes/README.md`：索引新增修复文档
 
 ## 设计决策

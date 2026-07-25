@@ -23,11 +23,11 @@
 ## 背景
 
 - 相关文档：
-  - `docs/design-docs/front-index.md`
-  - `docs/design-docs/front-左侧会话栏规范.md`
-  - `docs/design-docs/front-中间消息区规范.md`
-  - `docs/design-docs/front-聊天输入框规范.md`
-  - `docs/design-docs/front-右侧面板与文件渲染规范.md`
+  - `docs/design-docs/frontend/README.md`
+  - `docs/design-docs/frontend/front-左侧会话栏规范.md`
+  - `docs/design-docs/frontend/front-中间消息区规范.md`
+  - `docs/design-docs/frontend/front-聊天输入框规范.md`
+  - `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
   - `docs/exec-plans/active/actspace-v1-foundation.md`
   - `docs/exec-plans/active/actspace-v1-agent-runtime.md`
   - `docs/exec-plans/active/actspace-v1-integration-and-acceptance.md`

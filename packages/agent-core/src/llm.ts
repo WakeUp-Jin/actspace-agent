@@ -81,6 +81,14 @@ export {
   createMockLLMConfig,
   AssistantMessageEventStream,
   LLMServiceError,
+  applyOpenAIProviderRequestParams,
+  closeProviderTransports,
+  createProviderFetch,
+  isProviderProxyError,
+  normalizeProxyUrl,
+  providerDefaultHeaders,
+  providerDisplayName,
+  ProviderProxyError,
 } from "./llm/index";
 
 export type {
@@ -92,4 +100,8 @@ export type {
   APIToolCall,
   AssistantMessageEvent,
   LLMErrorKind,
+  LLMTransportConfig,
+  ProviderFetch,
+  ProviderRuntimeConfig,
+  RuntimeInferenceSettings,
 } from "./llm/index";

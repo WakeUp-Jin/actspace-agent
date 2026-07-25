@@ -32,10 +32,10 @@
   - `docs/FRONTEND.md`
   - `docs/FRONTEND_VERIFICATION.md`
   - `docs/CODING_BEHAVIOR.md`
-  - `docs/design-docs/front-前端设计文档.md`
-  - `docs/design-docs/front-工作台布局与面板交互规范.md`
-  - `docs/design-docs/front-左侧会话栏规范.md`
-  - `docs/design-docs/front-右侧面板与文件渲染规范.md`
+  - `docs/design-docs/frontend/README.md`
+  - `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`
+  - `docs/design-docs/frontend/front-左侧会话栏规范.md`
+  - `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
 - 相关代码路径：
   - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
   - `packages/desktop/src/renderer/components/Sidebar.tsx`

@@ -44,7 +44,7 @@
 
 ## 文档同步
 
-- `docs/design-docs/agent-context-compression.md`：治疗层示意、手动 /compact、「压缩算法」一节、文件清单。
-- `docs/design-docs/agent-current-module-map.md`：conversation / manager / compression 三条目。
+- `docs/design-docs/model-context/agent-context-compression.md`：治疗层示意、手动 /compact、「压缩算法」一节、文件清单。
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`：conversation / manager / compression 三条目。
 - `ARCHITECTURE_MAP.html` context 表格、`ARCHITECTURE_GRAPH.html` context 子图（节点与依赖边方向）。
 - 学习沉淀：`docs/learnings/2026-06/rich-model-compression-ownership.md`。

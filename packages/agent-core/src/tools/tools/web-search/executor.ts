@@ -6,7 +6,7 @@
  * 输出以国际通道为主参考（排前、去重优先保留），智谱作为补充——中文独有内容
  * 靠它兜底，但重复内容以英文来源为准。
  * 不经过任何 LLM 中间层；精读单个页面用 web_fetch。
- * 设计事实来源：docs/design-docs/agent-web-tools.md
+ * 设计事实来源：docs/design-docs/tool-system/agent-web-tools.md
  */
 
 import type { ToolResult } from "../../../internal-tools";

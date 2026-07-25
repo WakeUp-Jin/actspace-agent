@@ -53,5 +53,5 @@
 - `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`
 - `packages/desktop/src/renderer/test/usage-statistics-page.test.tsx`
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
-- `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`
+- `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`
 - `docs/exec-plans/completed/20260608-kimi-backup-and-dsml-guard.md`

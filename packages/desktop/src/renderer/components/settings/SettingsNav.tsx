@@ -1,8 +1,9 @@
 import type { ComponentType } from "react";
-import { Archive, ArrowLeft, Boxes, FolderSearch, Hourglass, Library, Plug, RefreshCw, Settings, Sparkles, Sun, Wrench } from "lucide-react";
+import { Archive, ArrowLeft, Boxes, FolderSearch, Hourglass, Library, Plug, RefreshCw, Server, Settings, Sparkles, Sun, Wrench } from "lucide-react";
 
 export type SettingsSectionId =
   | "general"
+  | "providers"
   | "model"
   | "agent"
   | "kairos"
@@ -18,6 +19,7 @@ type IconComponent = ComponentType<{ size?: number | string; strokeWidth?: numbe
 
 export const SETTINGS_SECTIONS: { id: SettingsSectionId; label: string; icon: IconComponent }[] = [
   { id: "general", label: "通用", icon: Settings },
+  { id: "providers", label: "服务商", icon: Server },
   { id: "model", label: "模型", icon: Boxes },
   { id: "agent", label: "智能体", icon: Sparkles },
   { id: "kairos", label: "Kairos", icon: Hourglass },

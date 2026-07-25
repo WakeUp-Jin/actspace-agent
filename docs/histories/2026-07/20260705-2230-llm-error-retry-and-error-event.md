@@ -42,6 +42,6 @@
 - `packages/agent-core/src/engine/test/bridge.test.ts`
 - `packages/shared/src/session.ts`
 - `packages/desktop/src/renderer/App.tsx`
-- `docs/design-docs/agent-backend-design.md`
+- `docs/design-docs/agent-runtime/agent-backend-design.md`
 - `docs/RELIABILITY.md`
 - `docs/QUALITY_SCORE.md`

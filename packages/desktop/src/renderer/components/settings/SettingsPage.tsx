@@ -2,21 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, CircleAlert, Loader2, Monitor, Moon, Sun, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
-  DEFAULT_MODEL_ID,
-  MODEL_LIST,
   type AgentSystemPromptFile,
   type AppSettings,
   type LocalUpdateProgressPhase,
   type LocalUpdateState,
-  type ModelId,
-  type ProviderId,
   type SearchProviderId,
   type SearchUsageResult,
   type SecretProviderId,
   type SessionListItem,
   type SetProviderKeyResult,
   type SettingsUpdateInput,
-  type TestConnectionResult,
 } from "@actspace/shared";
 import { SettingsNav, type SettingsSectionId } from "./SettingsNav";
 import { KairosSettings } from "./KairosSettings";
@@ -24,6 +19,8 @@ import { FileWatchSection } from "./FileWatchSettings";
 import { PluginsSection } from "./PluginsSettings";
 import { SkillsSection } from "./SkillsSettings";
 import { TOOL_ITEMS } from "./tool-catalog";
+import { ProviderSettings } from "./ProviderSettings";
+import { ModelSettings } from "./ModelSettings";
 import {
   SectionShell,
   SettingGroup,
@@ -58,14 +55,6 @@ const BTN_DANGER =
   "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-on-danger transition hover:border-on-danger/40 hover:bg-danger-soft";
 const AGENT_SYSTEM_PROMPT_MAX_CHARS = 20_000;
 const LOCAL_UPDATE_POLL_MS = 700;
-
-const MODEL_OPTIONS: SelectOption[] = MODEL_LIST.map((spec) => ({ value: spec.id, label: spec.label }));
-
-const EXPLORE_DEFAULT_VALUE = "__default__";
-const EXPLORE_MODEL_OPTIONS: SelectOption[] = [
-  { value: EXPLORE_DEFAULT_VALUE, label: "DeepSeek V4 Flash（默认）" },
-  ...MODEL_OPTIONS,
-];
 
 function hasSettingsBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace?.getSettings);
@@ -116,7 +105,7 @@ function previewSetKeyState(
   provider: SecretProviderId,
   hasApiKey: boolean,
 ): AppSettings {
-  if (provider === "deepseek" || provider === "kimi") {
+  if (provider === "deepseek" || provider === "kimi" || provider === "openrouter") {
     return { ...current, providers: { ...current.providers, [provider]: { hasApiKey } } };
   }
   return { ...current, searchProviders: { ...current.searchProviders, [provider]: { hasApiKey } } };
@@ -177,11 +166,13 @@ export function SettingsPage({
   const refresh = useCallback(async () => {
     if (!hasSettingsBridge()) return;
     try {
-      setSettings(await window.actspace.getSettings());
+      const next = await window.actspace.getSettings();
+      setSettings(next);
+      onSettingsChange?.(next);
     } catch (error) {
       console.error("Failed to refresh settings", error);
     }
-  }, []);
+  }, [onSettingsChange]);
 
   const handleUpdate = useCallback(
     (input: SettingsUpdateInput) => {
@@ -225,13 +216,6 @@ export function SettingsPage({
     [refresh],
   );
 
-  const handleTestConnection = useCallback(async (provider: ProviderId): Promise<TestConnectionResult> => {
-    if (!hasSettingsBridge()) {
-      return { ok: false, message: "浏览器预览模式下无法测试连接。" };
-    }
-    return window.actspace.testProviderConnection({ provider });
-  }, []);
-
   return (
     <div
       data-testid="settings-page-shell"
@@ -253,8 +237,8 @@ export function SettingsPage({
               onUpdate={handleUpdate}
               onConnectProvider={setKeyModalProvider}
               onClearProvider={handleClearKey}
-              onTestProvider={handleTestConnection}
               onArchivedSessionsChange={onArchivedSessionsChange}
+              onRefresh={refresh}
             />
           ) : settingsError ? (
             <div className="flex h-full items-center justify-center px-6 text-center text-[13px] text-text-faint">
@@ -282,16 +266,18 @@ type SectionProps = {
   onUpdate: (input: SettingsUpdateInput) => void;
   onConnectProvider: (provider: SecretProviderId) => void;
   onClearProvider: (provider: SecretProviderId) => Promise<void>;
-  onTestProvider: (provider: ProviderId) => Promise<TestConnectionResult>;
   onArchivedSessionsChange?: () => void;
+  onRefresh: () => Promise<void>;
 };
 
 function SettingsContent({ section, ...rest }: SectionProps & { section: SettingsSectionId }) {
   switch (section) {
     case "general":
       return <GeneralSection {...rest} />;
+    case "providers":
+      return <ProvidersSection {...rest} />;
     case "model":
-      return <ModelSection {...rest} />;
+      return <ModelSettings settings={rest.settings} onChanged={rest.onRefresh} />;
     case "agent":
       return <AgentSection {...rest} />;
     case "kairos":
@@ -313,6 +299,24 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
     default:
       return null;
   }
+}
+
+function ProvidersSection({ settings, onConnectProvider, onClearProvider, onRefresh }: SectionProps) {
+  return (
+    <>
+      <ProviderSettings onChanged={onRefresh} />
+      <SectionShell title="联网搜索服务" description="搜索工具的凭据独立于 LLM 服务商，不参与模型列表和代理设置。">
+        <div className="w-full max-w-[720px]">
+          <SettingGroup>
+            {SEARCH_PROVIDER_ROWS.map(({ provider, label, description }) => (
+              <SearchProviderRow key={provider} provider={provider} label={label} description={description} hasApiKey={settings.searchProviders[provider].hasApiKey} onConnect={onConnectProvider} onClear={onClearProvider} />
+            ))}
+            <TavilyUsageRow hasApiKey={settings.searchProviders.tavily.hasApiKey} />
+          </SettingGroup>
+        </div>
+      </SectionShell>
+    </>
+  );
 }
 
 function GeneralSection({ settings, onUpdate }: SectionProps) {
@@ -659,85 +663,6 @@ function LocalUpdateProgressDialog({
   );
 }
 
-function ProviderRow({
-  provider,
-  label,
-  description,
-  hasApiKey,
-  onConnect,
-  onClear,
-  onTest,
-}: {
-  provider: ProviderId;
-  label: string;
-  description: string;
-  hasApiKey: boolean;
-  onConnect: (provider: ProviderId) => void;
-  onClear: (provider: ProviderId) => Promise<void>;
-  onTest: (provider: ProviderId) => Promise<TestConnectionResult>;
-}) {
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
-
-  const runTest = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const result = await onTest(provider);
-      setTestResult({ ok: result.ok, text: result.message });
-    } catch {
-      setTestResult({ ok: false, text: "测试连接失败，请稍后重试。" });
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  // 徽标语义：未保存 Key → 未连接；保存了但最近一次测试失败 → 连接异常；否则 → 已连接。
-  // 避免「测试不通却仍显示已连接」误导用户。
-  const badge = !hasApiKey
-    ? { text: "未连接", className: "bg-surface-subtle text-text-faint" }
-    : testResult && !testResult.ok
-      ? { text: "连接异常", className: "bg-danger-soft text-on-danger" }
-      : { text: "已连接", className: "bg-success-soft text-on-success" };
-
-  return (
-    <div className="flex flex-col gap-2 px-4 py-3.5">
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[14px] font-semibold text-text-main">{label}</span>
-            <span
-              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}
-            >
-              {badge.text}
-            </span>
-          </div>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">{description}</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {hasApiKey ? (
-            <>
-              <button type="button" className={BTN_SECONDARY} onClick={runTest} disabled={testing}>
-                {testing ? "测试中…" : "测试连接"}
-              </button>
-              <button type="button" className={BTN_DANGER} onClick={() => void onClear(provider)}>
-                断开连接
-              </button>
-            </>
-          ) : (
-            <button type="button" className={BTN_PRIMARY} onClick={() => onConnect(provider)}>
-              连接
-            </button>
-          )}
-        </div>
-      </div>
-      {testResult ? (
-        <p className={`text-[12px] ${testResult.ok ? "text-on-success" : "text-on-danger"}`}>{testResult.text}</p>
-      ) : null}
-    </div>
-  );
-}
-
 const SEARCH_PROVIDER_ROWS: Array<{
   provider: SearchProviderId;
   label: string;
@@ -785,30 +710,28 @@ function SearchProviderRow({
     : { text: "未连接", className: "bg-surface-subtle text-text-faint" };
 
   return (
-    <div className="flex flex-col gap-2 px-4 py-3.5">
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[14px] font-semibold text-text-main">{label}</span>
-            <span
-              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}
-            >
-              {badge.text}
-            </span>
-          </div>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">{description}</p>
+    <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[14px] font-semibold text-text-main">{label}</span>
+          <span
+            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}
+          >
+            {badge.text}
+          </span>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {hasApiKey ? (
-            <button type="button" className={BTN_DANGER} onClick={() => void onClear(provider)}>
-              断开连接
-            </button>
-          ) : (
-            <button type="button" className={BTN_PRIMARY} onClick={() => onConnect(provider)}>
-              连接
-            </button>
-          )}
-        </div>
+        <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">{description}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {hasApiKey ? (
+          <button type="button" className={BTN_DANGER} onClick={() => void onClear(provider)}>
+            断开连接
+          </button>
+        ) : (
+          <button type="button" className={BTN_PRIMARY} onClick={() => onConnect(provider)}>
+            连接
+          </button>
+        )}
       </div>
     </div>
   );
@@ -860,63 +783,6 @@ function TavilyUsageRow({ hasApiKey }: { hasApiKey: boolean }) {
             : usage?.error ?? "Tavily 用量暂不可用。"}
       </p>
     </div>
-  );
-}
-
-function ModelSection({ settings, onUpdate, onConnectProvider, onClearProvider, onTestProvider }: SectionProps) {
-  return (
-    <SectionShell title="模型" description="管理模型供应商连接与默认模型。">
-      <SettingGroup title="供应商">
-        <ProviderRow
-          provider="deepseek"
-          label="DeepSeek"
-          description="DeepSeek V4 系列模型供应商。"
-          hasApiKey={settings.providers.deepseek.hasApiKey}
-          onConnect={onConnectProvider}
-          onClear={onClearProvider}
-          onTest={onTestProvider}
-        />
-        <ProviderRow
-          provider="kimi"
-          label="Kimi"
-          description="Kimi K 系列模型供应商。"
-          hasApiKey={settings.providers.kimi.hasApiKey}
-          onConnect={onConnectProvider}
-          onClear={onClearProvider}
-          onTest={onTestProvider}
-        />
-      </SettingGroup>
-
-      <SettingGroup title="网络搜索">
-        {SEARCH_PROVIDER_ROWS.map(({ provider, label, description }) => (
-          <SearchProviderRow
-            key={provider}
-            provider={provider}
-            label={label}
-            description={description}
-            hasApiKey={settings.searchProviders[provider].hasApiKey}
-            onConnect={onConnectProvider}
-            onClear={onClearProvider}
-          />
-        ))}
-        <TavilyUsageRow hasApiKey={settings.searchProviders.tavily.hasApiKey} />
-      </SettingGroup>
-
-      <SettingGroup title="默认模型">
-        <SettingRow
-          title="默认模型"
-          description="新建对话时 Composer 默认选中的模型。"
-          control={
-            <SettingsSelect
-              value={settings.defaultModelId ?? DEFAULT_MODEL_ID}
-              options={MODEL_OPTIONS}
-              onChange={(value) => onUpdate({ defaultModelId: value as ModelId })}
-              ariaLabel="默认模型"
-            />
-          }
-        />
-      </SettingGroup>
-    </SectionShell>
   );
 }
 
@@ -1031,35 +897,17 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
         </div>
       </SettingGroup>
 
-      <SettingGroup title="Explore 子代理">
-        <SettingRow
-          title="模型"
-          description="内置 Explore 聚焦子代理使用的模型；默认便宜快速的 Flash。缺对应供应商密钥时运行时自动回落主模型。Explore 调用频繁，选 Kimi 等较贵模型会显著增加成本。"
-          control={
-            <SettingsSelect
-              value={settings.agent.exploreModelId ?? EXPLORE_DEFAULT_VALUE}
-              options={EXPLORE_MODEL_OPTIONS}
-              onChange={(value) =>
-                onUpdate({
-                  agent: { exploreModelId: value === EXPLORE_DEFAULT_VALUE ? null : (value as ModelId) },
-                })
-              }
-              ariaLabel="Explore 子代理模型"
-            />
-          }
-        />
-      </SettingGroup>
     </SectionShell>
   );
 }
 
-function KairosSection({ settings, onUpdate }: SectionProps) {
+function KairosSection({ settings, onUpdate, onRefresh }: SectionProps) {
   return (
     <SectionShell
       title="Kairos"
       description="自主智能体的模型、人格、规则、任务表与运行边界（2026-07-04 由「智能体」分区拆出）。"
     >
-      <KairosSettings settings={settings} onUpdate={onUpdate} />
+      <KairosSettings settings={settings} onUpdate={onUpdate} onChanged={onRefresh} />
     </SectionShell>
   );
 }
@@ -1339,6 +1187,7 @@ function AppearanceSection() {
 const PROVIDER_LABELS: Record<SecretProviderId, string> = {
   deepseek: "DeepSeek",
   kimi: "Kimi",
+  openrouter: "OpenRouter",
   zhipu: "智谱 Web Search",
   tavily: "Tavily",
   tinyfish: "TinyFish",

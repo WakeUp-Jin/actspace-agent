@@ -12,7 +12,10 @@ import type {
   ContextState,
   ContextUsageSnapshot,
   MessageBlock,
+  ModelSelectionId,
   ModelId,
+  ModelKey,
+  UsableModelView,
   ReviewGetWorkspaceChangesResult,
   RunTurnInput,
   RuntimeStreamEvent,
@@ -26,6 +29,7 @@ import type {
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
+import { resolvePreferredChatModel } from "./model-selection";
 import type { ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 
@@ -580,6 +584,10 @@ function nextTurnId(): string {
   return `turn-${Date.now()}-${++turnCounter}`;
 }
 
+function modelSelectionPayload(model: ModelSelectionId): { model?: ModelId; modelKey?: ModelKey } {
+  return model.includes(":") ? { modelKey: model as ModelKey } : { model: model as ModelId };
+}
+
 export function App() {
   const [bootstrapState, setBootstrapState] = useState<BootstrapState | null>(null);
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
@@ -595,8 +603,9 @@ export function App() {
   // 后台 bash 任务状态（taskId → 最新状态）；bash_task_update 事件驱动，覆写块显示
   const [bashTaskUpdates, setBashTaskUpdates] = useState<Record<string, { status: BashBackgroundStatus; exitCode?: number | null }>>({});
   const [sendScrollRequestId, setSendScrollRequestId] = useState(0);
-  const [defaultModelId, setDefaultModelId] = useState<ModelId | undefined>(undefined);
-  const [selectedChatModelId, setSelectedChatModelId] = useState<ModelId>(DEFAULT_MODEL_ID);
+  const [defaultModelId, setDefaultModelId] = useState<ModelSelectionId | undefined>(undefined);
+  const [selectedChatModelId, setSelectedChatModelId] = useState<ModelSelectionId>(DEFAULT_MODEL_ID);
+  const [usableChatModels, setUsableChatModels] = useState<UsableModelView[] | undefined>(undefined);
   const [approvalPendingSessionIds, setApprovalPendingSessionIds] = useState<Set<string>>(() => new Set());
   const [failedSessionIds, setFailedSessionIds] = useState<Set<string>>(() => new Set());
   const [selectedWorkspaceRoot, setSelectedWorkspaceRoot] = useState<string | null>(null);
@@ -745,12 +754,29 @@ export function App() {
   useEffect(() => {
     if (!hasActspaceBridge() || !window.actspace.getSettings) return;
 
-    window.actspace
-      .getSettings()
-      .then((settings) => {
-        setDefaultModelId(settings.defaultModelId ?? undefined);
+    if (!window.actspace.listUsableModels) {
+      window.actspace.getSettings()
+        .then((settings) => {
+          const configured = settings.taskModels?.defaultChatModel ?? settings.defaultModelId ?? DEFAULT_MODEL_ID;
+          setDefaultModelId(configured);
+          if (!userPickedChatModelRef.current) setSelectedChatModelId(configured);
+        })
+        .catch((error: unknown) => {
+          console.error("Failed to load settings", error);
+        });
+      return;
+    }
+
+    Promise.all([
+      window.actspace.getSettings(),
+      window.actspace.listUsableModels({ purpose: "chat" }),
+    ])
+      .then(([settings, usable]) => {
+        const configured = resolvePreferredChatModel(settings, usable.models);
+        setUsableChatModels(usable.models);
+        setDefaultModelId(configured);
         if (!userPickedChatModelRef.current) {
-          setSelectedChatModelId(settings.defaultModelId ?? DEFAULT_MODEL_ID);
+          setSelectedChatModelId(configured);
         }
       })
       .catch((error: unknown) => {
@@ -759,13 +785,23 @@ export function App() {
   }, []);
 
   const handleSettingsChange = useCallback((settings: AppSettings) => {
-    setDefaultModelId(settings.defaultModelId ?? undefined);
-    if (!userPickedChatModelRef.current) {
-      setSelectedChatModelId(settings.defaultModelId ?? DEFAULT_MODEL_ID);
+    if (!window.actspace.listUsableModels) {
+      const configured = settings.taskModels?.defaultChatModel ?? settings.defaultModelId ?? DEFAULT_MODEL_ID;
+      setDefaultModelId(configured);
+      if (!userPickedChatModelRef.current) setSelectedChatModelId(configured);
+      return;
     }
+    void window.actspace.listUsableModels({ purpose: "chat" }).then((result) => {
+      const configured = resolvePreferredChatModel(settings, result.models);
+      setUsableChatModels(result.models);
+      setDefaultModelId(configured);
+      if (!userPickedChatModelRef.current) {
+        setSelectedChatModelId(configured);
+      }
+    });
   }, []);
 
-  const handleSelectedChatModelChange = useCallback((modelId: ModelId) => {
+  const handleSelectedChatModelChange = useCallback((modelId: ModelSelectionId) => {
     userPickedChatModelRef.current = true;
     setSelectedChatModelId(modelId);
   }, []);
@@ -1241,7 +1277,7 @@ export function App() {
           const input: CompactContextInput = {
             sessionId,
             turnId,
-            model: options.model,
+            ...modelSelectionPayload(options.model),
           };
           const result = await window.actspace.compactContext(input);
           if (isCurrentVisibleTurn()) {
@@ -1277,7 +1313,7 @@ export function App() {
             sessionId,
             turnId,
             reason: evalFailureReason,
-            model: options.model,
+            ...modelSelectionPayload(options.model),
             thinkingEnabled: options.thinkingEnabled,
           };
           const result = await window.actspace.generateEvalCandidate(input);
@@ -1310,7 +1346,7 @@ export function App() {
           turnId,
           userInput: text,
           attachments: options.attachments,
-          model: options.model,
+          ...modelSelectionPayload(options.model),
           thinkingEnabled: options.thinkingEnabled,
         };
         const result = await window.actspace.runTurn(input);
@@ -1714,6 +1750,7 @@ export function App() {
         getSessionPreview={getSessionPreview}
         reviewSummary={reviewSummary}
         onReviewChanged={handleReviewChanged}
+        models={usableChatModels}
       />
       <ShutdownOverlay />
     </RightPanelProvider>

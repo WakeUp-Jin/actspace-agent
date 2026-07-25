@@ -36,7 +36,7 @@ DeepSeek 按 64-token 块匹配前缀缓存。原实现每 tick 重组 system pr
 - `packages/agent-core/src/kairos/test/`（prompt-assembler / runner / inbox / replay-fidelity / sessions-digest / dispatcher 测试）
 - `packages/desktop/src/main/index.ts`、`kairos-bootstrap.ts`
 - `packages/desktop/src/renderer/pages/KairosPage.tsx`、`state/kairosSelectors.ts`
-- `docs/design-docs/agent-kairos-autonomous-mode.md`（上下文构成同步）、`docs/exec-plans/active/kairos_prompt_cache_optimization.md`（进度与决策记录）
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`（上下文构成同步）、`docs/exec-plans/active/kairos_prompt_cache_optimization.md`（进度与决策记录）
 
 ### ✅ 验证
 

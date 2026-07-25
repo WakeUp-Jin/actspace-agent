@@ -33,5 +33,5 @@
 
 - `packages/agent-core/src/tools/tools/agent/runner.ts`
 - `packages/agent-core/src/tools/test/agent-tool.test.ts`
-- `docs/design-docs/agent-subagent-runtime.md`
+- `docs/design-docs/collaboration/agent-subagent-runtime.md`
 - `docs/histories/2026-06/20260604-0252-subagent-max-turns.md`

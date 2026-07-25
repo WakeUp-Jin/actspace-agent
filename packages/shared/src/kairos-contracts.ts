@@ -185,7 +185,7 @@ export type KairosWriteConfigResponse = { ok: true };
 /** `kairos:control` 响应统一格式。 */
 export type KairosControlResponse = { ok: true };
 
-// ─── briefs（任务表）编辑 IPC（详见 docs/design-docs/agent-kairos-prompt-design.md §7） ───
+// ─── briefs（任务表）编辑 IPC（详见 docs/design-docs/kairos/agent-kairos-prompt-design.md §7） ───
 
 /** brief 生命周期状态；UI 只在 active/paused 间切换，done/failed 由系统写入。 */
 export type KairosBriefStatus = "active" | "paused" | "done" | "failed";
@@ -230,7 +230,7 @@ export type KairosBriefWriteResponse = { ok: true };
 export type KairosBriefDeleteRequest = { id: string };
 export type KairosBriefDeleteResponse = { ok: true };
 
-// ─── 通知中心（详见 docs/design-docs/agent-kairos-notifications.md） ───
+// ─── 通知中心（详见 docs/design-docs/kairos/agent-kairos-notifications.md） ───
 
 /** 通知级别；`important` 会额外触发 macOS 系统通知。 */
 export type KairosNotificationLevel = "info" | "important";
@@ -274,7 +274,7 @@ export type KairosNotificationsRemoveResponse = {
   unreadCount: number;
 };
 
-// ─── 上下文 Sheet 快照（详见 docs/design-docs/front-Kairos监控页规范.md） ───
+// ─── 上下文 Sheet 快照（详见 docs/design-docs/kairos/front-Kairos监控页规范.md） ───
 
 /** prompt-assembler 推导出的当前节奏阶段；UI 概览段直接渲染。 */
 export type KairosContextPhase = "work" | "quiet" | "weekend" | "off";

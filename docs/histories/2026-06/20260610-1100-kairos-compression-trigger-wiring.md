@@ -36,7 +36,7 @@
 - `packages/agent-core/src/kairos/storage/short-memory-store.ts`（导出 `toIsoDate`）
 - `packages/agent-core/src/kairos/controller.ts`（装配 + onSleepStart 接线）
 - `packages/agent-core/src/kairos/index.ts`（导出 trigger）
-- `docs/design-docs/agent-kairos-autonomous-mode.md`（压缩触发章节按实现重写）
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`（压缩触发章节按实现重写）
 - `docs/QUALITY_SCORE.md`（短板条目更新）
 
 ### ✅ Verification

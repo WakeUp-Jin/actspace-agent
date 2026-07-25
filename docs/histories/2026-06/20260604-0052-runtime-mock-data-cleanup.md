@@ -54,7 +54,7 @@ This follows the existing learning note `docs/learnings/2026-05/runtime-empty-st
 - `packages/desktop/src/renderer/test/fixtures/workbenchFixture.ts`
 - `packages/desktop/src/renderer/test/fixtures/usageStatisticsFixture.ts`
 - `docs/FRONTEND_VERIFICATION.md`
-- `docs/design-docs/lab-implementation-progress.md`
-- `docs/design-docs/lab-frontend-page-design.md`
+- `docs/design-docs/lab/lab-implementation-progress.md`
+- `docs/design-docs/lab/lab-frontend-page-design.md`
 - `docs/QUALITY_SCORE.md`
 - `docs/exec-plans/completed/20260604-runtime-mock-data-cleanup.md`

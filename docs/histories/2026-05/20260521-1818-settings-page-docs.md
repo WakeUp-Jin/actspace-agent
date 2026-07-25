@@ -27,11 +27,11 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/front-左侧会话栏规范.md`
-- `docs/design-docs/front-设置页规范.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-前端设计文档.md`
-- `docs/design-docs/public/front/README.md`
-- `docs/design-docs/public/front/sidebar-chat-final.png`
-- `docs/design-docs/public/front/settings-page-final.png`
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`
+- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/sidebar-chat-final.png`
+- `docs/design-docs/frontend/settings-page-final.png`
 - `docs/histories/2026-05/20260521-1818-settings-page-docs.md`

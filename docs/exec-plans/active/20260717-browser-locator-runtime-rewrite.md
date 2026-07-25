@@ -25,9 +25,9 @@
 ## 背景
 
 - 相关文档：
-  - `docs/design-docs/agent-browser-use-index.md`
-  - `docs/design-docs/agent-browser-use-integration-design.md`
-  - `docs/design-docs/agent-browser-use-command-implementation.md`
+  - `docs/design-docs/browser/agent-browser-use-index.md`
+  - `docs/design-docs/browser/agent-browser-use-integration-design.md`
+  - `docs/design-docs/browser/agent-browser-use-command-implementation.md`
   - `docs/RELIABILITY.md`
   - `docs/SECURITY.md`
 - 相关代码路径：

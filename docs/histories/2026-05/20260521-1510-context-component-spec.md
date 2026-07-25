@@ -27,7 +27,7 @@
 ### 📁 Files Modified
 
 - `docs/design-docs/index.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-前端设计文档.md`
-- `docs/design-docs/front-聊天输入框规范.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`
 - `docs/histories/2026-05/20260521-1510-context-component-spec.md`

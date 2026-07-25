@@ -35,7 +35,7 @@
 - **[测试]**：
   - 新增 `packages/agent-core/src/persistence/test/usage-statistics.test.ts`（6 用例）：单 session 聚合、跨多 session 合流、Kairos 事件并入、day/week/month/total 时间窗、CNY→USD 折算、空输入稳健性。
   - 扩展 `packages/agent-core/src/kairos/storage/test/short-memory-store.test.ts`：补 `loadAll` 跨月跨段顺序 + 空目录返回空数组两条用例。
-- **[文档]**：`docs/design-docs/front-usage-statistics.md` 「数据来源」段重写，明确 scope/range 二维语义，并显式说明 Kairos `usage-accumulator.json` 不进入 Usage 账本。
+- **[文档]**：`docs/design-docs/frontend/front-usage-statistics.md` 「数据来源」段重写，明确 scope/range 二维语义，并显式说明 Kairos `usage-accumulator.json` 不进入 Usage 账本。
 
 ### 🧠 Design Intent (Why)
 
@@ -68,4 +68,4 @@
 - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
 - `packages/desktop/src/renderer/components/UsageStatisticsPage.tsx`
 - `packages/desktop/src/renderer/fixtures/usageStatisticsFixture.ts`
-- `docs/design-docs/front-usage-statistics.md`
+- `docs/design-docs/frontend/front-usage-statistics.md`

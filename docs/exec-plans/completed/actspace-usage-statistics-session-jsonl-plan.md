@@ -19,11 +19,11 @@
 - `docs/SECURITY.md`
 - `docs/FRONTEND_VERIFICATION.md`
 - `docs/QUALITY_SCORE.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-usage-statistics.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-usage-statistics.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 - `docs/design-docs/core-storage-and-observability.md`
-- `docs/design-docs/agent-testing.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
 
 不要读取 `.env` 文件内容；只允许检查字段名、默认值、示例值和运行时错误信息。
 
@@ -31,8 +31,8 @@
 
 当前仓库已经有：
 
-- `docs/design-docs/front-usage-statistics.md`：统计页视觉与结构规范。
-- `docs/design-docs/public/front/usage-statistics-prototype.html`：当前高保真单文件原型。
+- `docs/design-docs/frontend/front-usage-statistics.md`：统计页视觉与结构规范。
+- `docs/design-docs/frontend/usage-statistics-prototype.html`：当前高保真单文件原型。
 - `session.jsonl` / `meta.json` / `context-state.json` 的会话存储边界。
 - `packages/desktop` 的 Electron 主进程、preload 与 renderer 骨架。
 
@@ -86,8 +86,8 @@
 
 ## 相关代码路径
 
-- `docs/design-docs/front-usage-statistics.md`
-- `docs/design-docs/public/front/usage-statistics-prototype.html`
+- `docs/design-docs/frontend/front-usage-statistics.md`
+- `docs/design-docs/frontend/usage-statistics-prototype.html`
 - `packages/shared/src/ipc.ts`
 - `packages/shared/src/session.ts`
 - `packages/shared/src/session-selectors.ts`
@@ -265,8 +265,8 @@ export type UsageStatisticsSnapshot = {
 
 修改目标：
 
-- `docs/design-docs/front-usage-statistics.md`
-- `docs/design-docs/front-index.md`
+- `docs/design-docs/frontend/front-usage-statistics.md`
+- `docs/design-docs/frontend/README.md`
 - `docs/histories/2026-05/*`
 - 必要时补 learning 文档
 

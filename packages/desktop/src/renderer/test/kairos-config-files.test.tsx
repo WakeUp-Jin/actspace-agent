@@ -1,14 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { KAIROS_SOUL_PRESETS, type AppSettings, type KairosBridgeApi, type KairosConfigName } from "@actspace/shared";
+import {
+  KAIROS_SOUL_PRESETS,
+  type AppSettings,
+  type KairosBridgeApi,
+  type KairosConfigName,
+  type UsableModelView,
+} from "@actspace/shared";
 import { KairosSettings } from "../components/settings/KairosSettings";
 
 function makeSettings(): AppSettings {
   return {
-    version: 1,
+    version: 2,
     defaultModelId: null,
-    providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: false } },
+    providers: {
+      deepseek: { hasApiKey: true },
+      kimi: { hasApiKey: false },
+      openrouter: { hasApiKey: false },
+    },
+    installedModels: {},
+    customModels: {},
+    taskModels: { defaultChatModel: null, utilityModel: null, exploreModel: null },
+    kairosModelKey: null,
     searchProviders: {
       zhipu: { hasApiKey: false },
       tavily: { hasApiKey: false },
@@ -43,6 +57,21 @@ type BridgeOverrides = Partial<{
   writeImpl: KairosBridgeApi["writeConfig"];
 }>;
 
+const deepSeekKairosModel: UsableModelView = {
+  key: "deepseek:deepseek-v4-pro",
+  label: "DeepSeek V4 Pro",
+  provider: "deepseek",
+  apiModel: "deepseek-v4-pro",
+  contextWindow: 1_000_000,
+  thinkingDefault: true,
+  capabilities: {
+    input: ["text"],
+    toolUse: "declared",
+    reasoning: true,
+    thinkingToggle: true,
+  },
+};
+
 function installBridge(over: BridgeOverrides = {}) {
   const contents: Record<KairosConfigName, string> = {
     preferences: over.contents?.preferences ?? JSON.stringify({ enabled: false }, null, 2) + "\n",
@@ -66,6 +95,8 @@ function installBridge(over: BridgeOverrides = {}) {
   const briefsList = vi.fn(async () => ({ briefs: [] }));
   const briefsWrite = vi.fn(async () => ({ ok: true }) as const);
   const briefsDelete = vi.fn(async () => ({ ok: true }) as const);
+  const listUsableModels = vi.fn(async () => ({ models: [deepSeekKairosModel] }));
+  const updateKairosModel = vi.fn(async () => ({ modelKey: deepSeekKairosModel.key }));
   const bridge = {
     getState: vi.fn(),
     getEventsRecent: vi.fn(),
@@ -85,7 +116,18 @@ function installBridge(over: BridgeOverrides = {}) {
     onNotification: () => () => {},
   } as unknown as KairosBridgeApi;
   (window as unknown as { kairos: KairosBridgeApi }).kairos = bridge;
-  return { bridge, readConfig, writeConfig, contents, briefsList, briefsWrite, briefsDelete };
+  window.actspace = { listUsableModels, updateKairosModel } as unknown as NonNullable<typeof window.actspace>;
+  return {
+    bridge,
+    readConfig,
+    writeConfig,
+    contents,
+    briefsList,
+    briefsWrite,
+    briefsDelete,
+    listUsableModels,
+    updateKairosModel,
+  };
 }
 
 /** 取某文件最后一次写入的解析对象。 */
@@ -97,10 +139,12 @@ function lastWrite(writeConfig: ReturnType<typeof vi.fn>, name: KairosConfigName
 
 beforeEach(() => {
   delete (window as unknown as { kairos?: KairosBridgeApi }).kairos;
+  delete window.actspace;
 });
 
 afterEach(() => {
   delete (window as unknown as { kairos?: KairosBridgeApi }).kairos;
+  delete window.actspace;
 });
 
 describe("KairosSettings — 结构化配置表单", () => {
@@ -276,21 +320,19 @@ describe("KairosSettings — 结构化配置表单", () => {
   });
 
   it("改模型下拉通过统一设置写回 settings.kairos.modelId", async () => {
-    const onUpdate = vi.fn();
-    const { writeConfig } = installBridge({
+    const { writeConfig, updateKairosModel } = installBridge({
       contents: {
         preferences: JSON.stringify({ enabled: true, tickBudget: { perDay: 7 } }, null, 2) + "\n",
       },
     });
-    render(<KairosSettings settings={makeSettings()} onUpdate={onUpdate} />);
+    render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
 
     const trigger = await screen.findByLabelText("Kairos 模型");
     await waitFor(() => expect(trigger).not.toBeDisabled());
-    await userEvent.click(trigger);
-    await userEvent.click(await screen.findByRole("option", { name: "DeepSeek V4 Pro" }));
+    await userEvent.selectOptions(trigger, deepSeekKairosModel.key);
 
     await waitFor(() => {
-      expect(onUpdate).toHaveBeenCalledWith({ kairos: { modelId: "deepseek-v4-pro" } });
+      expect(updateKairosModel).toHaveBeenCalledWith({ modelKey: deepSeekKairosModel.key });
     });
     expect(writeConfig).not.toHaveBeenCalledWith(expect.objectContaining({ name: "preferences" }));
   });
@@ -418,15 +460,13 @@ describe("KairosSettings — 结构化配置表单", () => {
   });
 
   it("preferences.json 解析失败时模型下拉仍可用，并可用默认值覆盖恢复运行偏好", async () => {
-    const { writeConfig } = installBridge({ contents: { preferences: "{ broken json" } });
-    const onUpdate = vi.fn();
-    render(<KairosSettings settings={makeSettings()} onUpdate={onUpdate} />);
+    const { writeConfig, updateKairosModel } = installBridge({ contents: { preferences: "{ broken json" } });
+    render(<KairosSettings settings={makeSettings()} onUpdate={vi.fn()} />);
 
     const trigger = await screen.findByLabelText("Kairos 模型");
     await waitFor(() => expect(trigger).not.toBeDisabled());
-    await userEvent.click(trigger);
-    await userEvent.click(await screen.findByRole("option", { name: "DeepSeek V4 Pro" }));
-    expect(onUpdate).toHaveBeenCalledWith({ kairos: { modelId: "deepseek-v4-pro" } });
+    await userEvent.selectOptions(trigger, deepSeekKairosModel.key);
+    expect(updateKairosModel).toHaveBeenCalledWith({ modelKey: deepSeekKairosModel.key });
 
     await userEvent.click(screen.getByRole("button", { name: "用默认值覆盖 preferences.json" }));
 

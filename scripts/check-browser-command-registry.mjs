@@ -14,7 +14,7 @@ const generatedPath = path.join(
 );
 const commandSurfacePath = path.join(
   repoRoot,
-  "docs/design-docs/agent-browser-use-command-surface.md",
+  "docs/design-docs/browser/agent-browser-use-command-surface.md",
 );
 
 const raw = execFileSync("go", ["run", ".", "commands", "--json"], {

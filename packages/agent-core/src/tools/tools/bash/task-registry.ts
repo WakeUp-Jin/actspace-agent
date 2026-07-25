@@ -5,7 +5,7 @@
  * 后台任务必须活在能跨 turn 存活的位置。按 sessionId 分组，不持久化——
  * 进程活不过应用退出，恢复注册表无意义（设计文档「被排除的方案」）。
  *
- * 设计事实来源：docs/design-docs/agent-bash工具设计文档.md「后台运行与通知机制」。
+ * 设计事实来源：docs/design-docs/execution-safety/agent-bash工具设计文档.md「后台运行与通知机制」。
  */
 
 import { readFile } from "node:fs/promises";

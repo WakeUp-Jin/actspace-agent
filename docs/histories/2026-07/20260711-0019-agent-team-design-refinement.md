@@ -30,7 +30,7 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/agent-form-team.md`
+- `docs/design-docs/collaboration/agent-form-team.md`
 - `docs/design-docs/index.md`
 - `docs/histories/2026-07/20260711-0019-agent-team-design-refinement.md`
 

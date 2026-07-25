@@ -12,8 +12,8 @@
 
 ## 附加必读
 
-- `docs/design-docs/agent-form-team.md`
-- `docs/design-docs/agent-testing.md`
+- `docs/design-docs/collaboration/agent-form-team.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
 - `docs/FRONTEND_VERIFICATION.md`
 - `docs/RELIABILITY.md`
 - `docs/SECURITY.md`
@@ -27,8 +27,8 @@
 - `packages/desktop/src/main/team/test/team-ipc-e2e.test.ts`（新增）
 - `packages/desktop/src/renderer/team/test/team-workbench-e2e.test.tsx`（新增）
 - 发现缺口对应的 Team 专属实现文件
-- `docs/design-docs/agent-form-team.md`
-- `docs/design-docs/agent-current-module-map.md`
+- `docs/design-docs/collaboration/agent-form-team.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
 - `docs/ARCHITECTURE.md`（只在顶层导航需要变化时）
 - `docs/QUALITY_SCORE.md`
 - `docs/releases/README.md` 或当期 release note

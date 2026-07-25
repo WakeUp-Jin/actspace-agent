@@ -38,6 +38,6 @@
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/shared/src/session.ts`
 - `packages/shared/src/session-selectors.ts`
-- `docs/design-docs/agent-turn-layers.md`
+- `docs/design-docs/agent-runtime/agent-turn-layers.md`
 - `docs/design-docs/core-storage-and-observability.md`
 - `docs/learnings/2026-07/agent-turn-cancellation-is-a-lifecycle-protocol.html`

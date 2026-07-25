@@ -33,7 +33,7 @@
 - `packages/desktop/src/main/plugins/browser-bridge-service.ts`
 - `packages/desktop/src/main/test/agent-runtime-context.test.ts`
 - `packages/desktop/src/main/test/browser-bridge-service.test.ts`
-- `docs/design-docs/agent-browser-bridge-design.md`
+- `docs/design-docs/browser/agent-browser-bridge-design.md`
 - `docs/histories/2026-07/20260709-1739-browser-bridge-agent-context.md`
 
 ### Superseded on 2026-07-10

@@ -26,8 +26,8 @@
   - `docs/REPO_COLLAB_GUIDE.md`
   - `docs/ARCHITECTURE.md`
   - `docs/design-docs/core-beliefs.md`
-  - `docs/design-docs/agent-kairos-autonomous-mode.md`
-  - `docs/design-docs/front-Kairos监控页规范.md`
+  - `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
+  - `docs/design-docs/kairos/front-Kairos监控页规范.md`
   - `docs/FRONTEND_VERIFICATION.md`
   - `docs/HISTORY_GUIDE.md`
   - `docs/QUALITY_SCORE.md`

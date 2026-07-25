@@ -26,7 +26,7 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/front-中间消息区规范.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/public/front/README.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/README.md`
 - `docs/histories/2026-05/20260521-1705-message-area-grammar.md`

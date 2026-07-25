@@ -21,7 +21,7 @@
   - 命令失败 report 也会保留 run metadata，方便复验 Docker 或 live model 环境失败。
   - 更新 runner、CLI、report schema 和相关测试。
 - ActSpace 文档：
-  - 更新 `docs/design-docs/agent-evaluation.md`，将 run mode、执行命令、Docker 命令和 artifacts 目录列入单次报告要求。
+  - 更新 `docs/design-docs/evaluation/agent-evaluation.md`，将 run mode、执行命令、Docker 命令和 artifacts 目录列入单次报告要求。
   - 更新执行计划，记录 dry-run/report 已能区分 `mock-command`、`docker-mock-agent` 和 `docker-live-agent`。
 - 外部 eval 文档：
   - 更新 README 和架构文档，说明 run mode 和 report run metadata。

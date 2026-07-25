@@ -28,4 +28,4 @@ Settings page bypasses the normal `SplitView` shell, so it needs to define its o
 
 - `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`
 - `packages/desktop/src/renderer/test/settings-page.test.tsx`
-- `docs/design-docs/front-设置页规范.md`
+- `docs/design-docs/frontend/front-设置页规范.md`

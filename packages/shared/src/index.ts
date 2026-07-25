@@ -1,5 +1,14 @@
 export * from "./ipc";
+export {
+  PROVIDER_IDS,
+  PROVIDER_REGISTRY,
+  isProviderId,
+  type ProviderId as LlmProviderId,
+  type ProviderSpec,
+} from "./provider-config";
 export * from "./model-config";
+export * from "./model-resolver";
+export * from "./openrouter-catalog";
 export * from "./settings";
 export * from "./plugins";
 export * from "./context-buckets";

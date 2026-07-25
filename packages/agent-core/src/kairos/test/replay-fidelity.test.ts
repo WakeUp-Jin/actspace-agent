@@ -1,5 +1,5 @@
 /**
- * 重放保真回归（docs/design-docs/agent-kairos-prompt-cache-optimization.md §5.2）：
+ * 重放保真回归（docs/design-docs/kairos/agent-kairos-prompt-cache-optimization.md §5.2）：
  *
  * 用同一个 tick 的事件流双向验证——现场发送给 LLM 的请求消息（含 thinking/
  * text/toolCall 块结构）与「落盘事件 → toLlmMessages 重放」的消息，经

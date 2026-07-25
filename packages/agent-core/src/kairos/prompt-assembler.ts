@@ -1,7 +1,7 @@
 /**
  * Kairos prompt 组装层。
  *
- * 缓存约束（docs/design-docs/agent-kairos-prompt-cache-optimization.md）：
+ * 缓存约束（docs/design-docs/kairos/agent-kairos-prompt-cache-optimization.md）：
  * - `assembleSystemPrompt`：只拼低频内容（静态指令头 / config tips / user rules / 历史摘要），
  *   产出在配置、rule.md、压缩摘要不变时逐字节稳定 → 可被 DeepSeek 前缀缓存复用。
  * - `assembleTickMessage`：每 tick 必变的内容（时间、phase、briefs 数、观测增量、brief 正文）

@@ -41,5 +41,5 @@
 - `packages/desktop/src/main/test/{kairos-bootstrap,settings-service}.test.ts`
 - `packages/desktop/src/renderer/components/settings/{KairosSettings,SettingsPage}.tsx`
 - `packages/desktop/src/renderer/test/{kairos-config-files,settings-page,app-streaming-user-message}.test.tsx`
-- `docs/design-docs/front-设置页规范.md`、`docs/design-docs/agent-kairos-autonomous-mode.md`、`.env.example`
+- `docs/design-docs/frontend/front-设置页规范.md`、`docs/design-docs/kairos/agent-kairos-autonomous-mode.md`、`.env.example`
 - `docs/exec-plans/active/20260530-kairos-config-editor.md`

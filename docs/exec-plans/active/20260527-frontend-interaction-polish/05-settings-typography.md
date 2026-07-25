@@ -11,7 +11,7 @@
 包含：
 
 - Settings 按钮从 noop 改为页面态入口。
-- 设置态布局符合 `docs/design-docs/front-设置页规范.md`：左侧设置导航，右侧设置内容。
+- 设置态布局符合 `docs/design-docs/frontend/front-设置页规范.md`：左侧设置导航，右侧设置内容。
 - Appearance / Typography 区域包含 UI Font Size、Code Font Size、UI Font Family、Code Font Family 或等价基础项。
 - 第一版用 renderer localStorage 或组件状态持久化，不新增 main/preload 设置 IPC。
 - 字体设置改变后影响 renderer 可见文本；界面字号通过 Electron zoom / renderer appearance 应用，代码字号通过 CSS variable 应用。
@@ -28,9 +28,9 @@
 
 相关文档：
 
-- `docs/design-docs/front-设置页规范.md`
-- `docs/design-docs/front-全局视觉语言规范.md`
-- `docs/design-docs/front-工作台布局与面板交互规范.md`
+- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/design-docs/frontend/front-全局视觉语言规范.md`
+- `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`
 - `docs/exec-plans/tech-debt-tracker.md`
 
 相关代码路径：

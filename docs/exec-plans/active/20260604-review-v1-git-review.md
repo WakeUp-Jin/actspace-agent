@@ -4,7 +4,7 @@
 
 实现 V1 Codex-style Git Review：Composer 上方的 Review 入口不再使用硬编码统计，而是读取当前 workspace 的 Git repository state；右侧 `Review` Tab 默认展示 `Uncommitted` changes（staged + unstaged + untracked），无 Git repository 时提示用户显式创建 Git repository。V1 只做人工浏览和 Git 初始化引导，不启动 AI Review，不把 Review 等同于提交动作。
 
-派生自 `docs/design-docs/core-review-change-sources.md` 和 `docs/design-docs/front-右侧面板与文件渲染规范.md`。设计文档回答为什么 Git-first；本计划回答按什么文件、什么顺序实现，以及如何验证。
+派生自 `docs/design-docs/core-review-change-sources.md` 和 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`。设计文档回答为什么 Git-first；本计划回答按什么文件、什么顺序实现，以及如何验证。
 
 ## Required Reading
 
@@ -21,10 +21,10 @@
 - `docs/QUALITY_SCORE.md`
 - `docs/SECURITY.md`
 - `docs/design-docs/core-review-change-sources.md`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/front-工作台布局与面板交互规范.md`
-- `docs/design-docs/front-主题与配色规范.md`
-- `docs/design-docs/agent-subprocess-runner-guidelines.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`
+- `docs/design-docs/frontend/front-主题与配色规范.md`
+- `docs/design-docs/tool-system/agent-subprocess-runner-guidelines.md`
 
 ## 范围
 

@@ -28,8 +28,8 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/agent-browser-use-command-surface.md`（新建）
-- `docs/design-docs/agent-browser-use-integration-design.md`（新建）
+- `docs/design-docs/browser/agent-browser-use-command-surface.md`（新建）
+- `docs/design-docs/browser/agent-browser-use-integration-design.md`（新建）
 - `docs/design-docs/index.md`（追加索引）
 - `docs/exec-plans/active/20260710-browser-use/README.md`（新建）
 - `docs/exec-plans/active/20260710-browser-use/plan-0-pre-repo-merge.md`（新建）

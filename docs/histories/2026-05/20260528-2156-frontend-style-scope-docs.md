@@ -75,7 +75,7 @@
 - `packages/desktop/src/renderer/components/PlaceholderView.tsx`
 - `packages/desktop/src/renderer/pages/KairosPage.tsx`
 - `packages/desktop/src/main/index.ts`
-- `docs/design-docs/front-tailwind-style-architecture.md`
+- `docs/design-docs/frontend/front-tailwind-style-architecture.md`
 - `docs/exec-plans/active/actspace-tailwind-style-architecture.md`
 - `docs/exec-plans/active/20260528-tailwind-remaining-ui-migration.md`
 - `docs/exec-plans/active/20260527-frontend-interaction-polish/01-composer-visual-and-model-menu.md`
@@ -86,6 +86,6 @@
 - `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-bash-session-allowlist-plan.md`
 - `docs/exec-plans/active/frontend-ui-components-foundation.md`
 - `docs/exec-plans/active/lab-v0-frontend-mock-implementation.md`
-- `docs/design-docs/front-usage-statistics.md`
+- `docs/design-docs/frontend/front-usage-statistics.md`
 - `docs/learnings/2026-05/global-css-reset-vs-tailwind.md`
 - `docs/learnings/2026-05/tailwind-page-slice-migration.md`

@@ -11,7 +11,7 @@ bash 支持后台运行：`blockMs: 0` 显式后台、`blockMs` 到点自动转�
 
 ## 背景
 
-- 相关文档：设计文档「工具契约」「后台运行与通知机制」节；`docs/design-docs/agent-tool-preview-design-guidelines.md`（preview 必须以最终态收尾）。
+- 相关文档：设计文档「工具契约」「后台运行与通知机制」节；`docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`（preview 必须以最终态收尾）。
 - 相关代码路径：
   - `packages/agent-core/src/tools/subprocess/run-process.ts`（现有 sink 模式）
   - `packages/agent-core/src/tools/tools/bash/`（definition / executor / permissions / render-result / index）
@@ -79,7 +79,7 @@ bash 支持后台运行：`blockMs: 0` 显式后台、`blockMs` 到点自动转�
    - `session-selectors.ts` bash 块映射透传新字段。
 9. main → renderer 推送：任务终态回调里 `getMainWindow()?.webContents.send("agent:stream", bash_task_update)`（turn 内外统一走这条通道）；preload 无需改（`agent:stream` 已透传）。
 10. `BashRunBlock.tsx`：`backgroundStatus` 存在时显示运行中/终态徽标 + 已运行时长；终态后显示 exitCode。不做输出流式滚动（记 tech-debt）。
-    - 验证：`pnpm --filter @actspace/desktop test`（含 selectors 与组件测试各 1 例）；手工走查浅/深双主题（若新增颜色，先读 `docs/design-docs/front-主题与配色规范.md`）。
+    - 验证：`pnpm --filter @actspace/desktop test`（含 selectors 与组件测试各 1 例）；手工走查浅/深双主题（若新增颜色，先读 `docs/design-docs/frontend/front-主题与配色规范.md`）。
 
 ## 验证方式
 

@@ -14,6 +14,7 @@ import { join } from "node:path";
 import type { AgentTurnResult, ComposerAttachment, RunTurnInput, RuntimeStreamEvent } from "@actspace/shared";
 import {
   buildAgentConfig,
+  buildAgentConfigFromRuntime,
   createAgentForSession,
   type AgentRuntimeContext,
   type AgentRunLogger,
@@ -21,7 +22,6 @@ import {
   cleanupOldToolOutputs,
   createAgentRunLogger,
   createCacheAuditTracker,
-  createTitlerLLMService,
   generateSessionTitle,
   isDefaultSessionTitle,
   appendEvents,
@@ -34,6 +34,7 @@ import {
 } from "@actspace/agent-core";
 import type { SessionMeta } from "@actspace/shared";
 import type { PendingApprovalRegistry } from "./approval-registry";
+import type { ModelRuntimeService } from "./model-runtime-service";
 
 export type AppDataRoots = {
   dataRoot: string;
@@ -140,17 +141,15 @@ async function maybeGenerateSessionTitle(input: {
   priorMessageCount: number;
   result: AgentTurnResult;
   userInput: string;
+  titler: import("@actspace/agent-core").LLMService;
 }): Promise<void> {
   // 仅首轮（turn 前上下文为空）+ 仍是默认标题 + 本轮正常完成时才生成。
   if (input.priorMessageCount > 0) return;
   if (!isDefaultSessionTitle(input.sessionMeta?.title)) return;
   if (input.result.status !== "completed") return;
 
-  const titler = createTitlerLLMService();
-  if (!titler) return;
-
   try {
-    const title = await generateSessionTitle(titler, {
+    const title = await generateSessionTitle(input.titler, {
       userInput: input.userInput,
       replyText: input.result.finalReply?.content ?? "",
     });
@@ -185,13 +184,14 @@ export async function runAndPersistTurn(
   getMainWindow: () => BrowserWindow | undefined,
   approvalRegistry?: PendingApprovalRegistry,
   loadRuntimeContext?: AgentRuntimeContextLoader,
+  modelRuntime?: ModelRuntimeService,
 ): Promise<AgentTurnResult> {
   logAgentTurn("run turn requested", {
     sessionId: input.sessionId,
     turnId: input.turnId,
     userInputLength: input.userInput.length,
     userInputPreview: preview(input.userInput),
-    model: input.model,
+    model: input.modelKey ?? input.model,
     thinkingEnabled: Boolean(input.thinkingEnabled),
   });
 
@@ -235,17 +235,33 @@ export async function runAndPersistTurn(
   const turnWorkspaceRoot = sessionMeta?.workspaceRoot ?? roots.defaultWorkspaceRoot;
   const runtimeContext = await loadRuntimeContext?.(turnWorkspaceRoot);
 
-  const config = buildAgentConfig(
-    { model: input.model, thinkingEnabled: input.thinkingEnabled, exploreModelId: input.exploreModelId },
-    turnWorkspaceRoot,
-    approvalRegistry,
-    {
-      tmpRoot: roots.tmpRoot,
-      sessionId: input.sessionId,
-      turnId: input.turnId,
-      ...runtimeContext,
-    },
-  );
+  const runtimeOptions = {
+    tmpRoot: roots.tmpRoot,
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    ...runtimeContext,
+  };
+  const config = modelRuntime
+    ? (() => {
+        const main = modelRuntime.resolveMainModel(input.modelKey ?? input.model);
+        if (!("model" in main)) throw createModelUnavailableError(main.message, main.modelKey, main.reason ?? main.code);
+        const utility = modelRuntime.resolveUtilityModel(main.model);
+        const explore = modelRuntime.resolveExploreModel(main.model);
+        if (!("model" in utility) || !("model" in explore)) throw createModelUnavailableError("任务模型无法解析。", undefined, "task_model_unavailable");
+        return buildAgentConfigFromRuntime({
+          main: { definition: main.model.definition, runtime: main.model.providerRuntime },
+          utility: { definition: utility.model.definition, runtime: utility.model.providerRuntime },
+          explore: { definition: explore.model.definition, runtime: explore.model.providerRuntime },
+          thinkingEnabled: input.thinkingEnabled,
+          toolEnvironment: modelRuntime.getToolEnvironment(),
+        }, turnWorkspaceRoot, approvalRegistry, runtimeOptions);
+      })()
+    : buildAgentConfig(
+        { model: input.model, thinkingEnabled: input.thinkingEnabled, exploreModelId: input.exploreModelId },
+        turnWorkspaceRoot,
+        approvalRegistry,
+        runtimeOptions,
+      );
   const deps = await createAgentForSession(config, {
     sessionPath: sessionPaths.sessionPath,
   });
@@ -253,9 +269,11 @@ export async function runAndPersistTurn(
   const priorMessageCount = deps.contextManager.getMessageCount();
   logAgentTurn("agent dependencies ready", {
     workspaceRoot: turnWorkspaceRoot,
-    modelId: deps.modelSpec.id,
-    provider: deps.modelSpec.provider,
-    apiModel: deps.modelSpec.apiModel,
+    modelId: deps.modelKey,
+    provider: deps.modelDefinition.provider,
+    apiModel: deps.modelDefinition.apiModel,
+    utilityModelKey: deps.utilityModelKey,
+    exploreModelKey: deps.exploreModelKey,
     thinkingEnabled: deps.thinkingEnabled,
     priorMessageCount,
   });
@@ -274,9 +292,9 @@ export async function runAndPersistTurn(
       rootDir: join(roots.dataRoot, "cache-audit"),
       sessionId: input.sessionId,
       turnId: input.turnId,
-      provider: deps.modelSpec.provider,
-      model: deps.modelSpec.apiModel,
-      modelId: deps.modelSpec.id,
+      provider: deps.modelDefinition.provider,
+      model: deps.modelDefinition.apiModel,
+      modelId: deps.modelKey,
       thinkingEnabled: input.thinkingEnabled ?? deps.thinkingEnabled,
     }),
     abort: undefined as (() => void) | undefined,
@@ -312,7 +330,7 @@ export async function runAndPersistTurn(
 
     const modelAttachments = await prepareAttachmentsForModel(
       input.attachments,
-      deps.modelSpec.input.includes("image"),
+      deps.modelDefinition.capabilities.input.includes("image"),
     );
 
     const resultPromise = runTurnWithAgent(
@@ -367,6 +385,7 @@ export async function runAndPersistTurn(
       priorMessageCount,
       result,
       userInput: input.userInput,
+      titler: deps.utilityLlm ?? deps.llm,
     });
 
     return {
@@ -380,4 +399,13 @@ export async function runAndPersistTurn(
       console.error("[agent-turn] failed to dispose tool manager", error);
     });
   }
+}
+
+function createModelUnavailableError(message: string, modelKey?: string, reason?: string): Error {
+  const error = new Error(message) as Error & { code?: string; modelKey?: string; reason?: string };
+  error.name = "ModelUnavailableError";
+  error.code = "model_unavailable";
+  error.modelKey = modelKey;
+  error.reason = reason;
+  return error;
 }

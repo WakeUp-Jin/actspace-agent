@@ -11,18 +11,18 @@
 - `docs/CODING_BEHAVIOR.md`
 - `docs/FRONTEND.md`
 - `docs/FRONTEND_VERIFICATION.md`
-- `docs/design-docs/front-index.md`
-- `docs/design-docs/front-前端设计文档.md`
-- `docs/design-docs/front-全局视觉语言规范.md`
-- `docs/design-docs/front-主题与配色规范.md`
-- `docs/design-docs/front-tailwind-style-architecture.md`
-- `docs/design-docs/front-基础组件封装规范.md`
-- `docs/design-docs/front-工作台布局与面板交互规范.md`
-- `docs/design-docs/front-中间消息区规范.md`
-- `docs/design-docs/front-聊天输入框规范.md`
-- `docs/design-docs/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/front-Kairos监控页规范.md`
-- `docs/design-docs/lab-index.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/README.md`
+- `docs/design-docs/frontend/front-全局视觉语言规范.md`
+- `docs/design-docs/frontend/front-主题与配色规范.md`
+- `docs/design-docs/frontend/front-tailwind-style-architecture.md`
+- `docs/design-docs/frontend/front-基础组件封装规范.md`
+- `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`
+- `docs/design-docs/frontend/front-中间消息区规范.md`
+- `docs/design-docs/frontend/front-聊天输入框规范.md`
+- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
+- `docs/design-docs/kairos/front-Kairos监控页规范.md`
+- `docs/design-docs/lab/README.md`
 
 ## 重点代码与文件范围
 
@@ -83,7 +83,7 @@
 
 ### 发现 1：左侧折叠态从规范要求的 icon rail 退化为完全隐藏
 
-- 偏移点：`docs/design-docs/front-工作台布局与面板交互规范.md` 要求左侧会话栏“首版支持折叠为 icon rail，不先做完全隐藏”；但 `packages/desktop/src/renderer/components/Sidebar.tsx:23` 只定义 `SidebarMode = "expanded" | "hidden"`，`packages/desktop/src/renderer/components/WorkbenchLayout.tsx:56-58` 还把旧 `rail` 存储值统一映射成 `hidden`，`packages/desktop/src/renderer/components/WorkbenchLayout.tsx:159-160` / `441-443` 在 hidden 时把左槽宽度置 0 并传给 `SplitView` 完全隐藏。
+- 偏移点：`docs/design-docs/frontend/front-工作台布局与面板交互规范.md` 要求左侧会话栏“首版支持折叠为 icon rail，不先做完全隐藏”；但 `packages/desktop/src/renderer/components/Sidebar.tsx:23` 只定义 `SidebarMode = "expanded" | "hidden"`，`packages/desktop/src/renderer/components/WorkbenchLayout.tsx:56-58` 还把旧 `rail` 存储值统一映射成 `hidden`，`packages/desktop/src/renderer/components/WorkbenchLayout.tsx:159-160` / `441-443` 在 hidden 时把左槽宽度置 0 并传给 `SplitView` 完全隐藏。
 - 不合理设计：折叠态不再保留品牌、新建会话、搜索、设置等高频入口，用户在窄窗口或主动折叠后失去左侧导航 affordance，也和设计文档里的桌面工作台心智不一致。
 - 可读性问题：代码注释同时出现“rail 模式已退役”“hidden 态”等说法（`packages/desktop/src/renderer/components/WorkbenchLayout.tsx:27`、`56`、`58`），但设计文档仍把 rail 当作当前首版能力，读者无法判断真实产品事实。
 - 耦合问题：`WorkbenchLayout` 同时承担存储兼容、宽度 snap、左侧交互语义和 `SplitView` hidden 控制，导致“折叠为 rail”与“完全隐藏 pane”被同一状态吞掉。
@@ -119,7 +119,7 @@
 
 ### 发现 5：Lab 页面确认为 V0 renderer mock，但代码内没有运行时边界提示
 
-- 偏移点：`docs/design-docs/lab-index.md` 明确“V0 renderer mock 已落地；后端 Lab Runtime、IPC 和持久化尚未实现”；实现上 `packages/desktop/src/renderer/components/LabPage.tsx:242-253` 完全用本地 `useState` 管理 cards、completedExperiments、dialog、newTitle 等状态，`281-291` 创建实验也只写本地状态，没有 IPC 或持久化。
+- 偏移点：`docs/design-docs/lab/README.md` 明确“V0 renderer mock 已落地；后端 Lab Runtime、IPC 和持久化尚未实现”；实现上 `packages/desktop/src/renderer/components/LabPage.tsx:242-253` 完全用本地 `useState` 管理 cards、completedExperiments、dialog、newTitle 等状态，`281-291` 创建实验也只写本地状态，没有 IPC 或持久化。
 - 不合理设计：页面已作为真实 `SidebarView` 进入主工作台（`packages/desktop/src/renderer/components/WorkbenchLayout.tsx:350-352`），但 UI 中未看到“未接后端 / mock”状态提示，用户可能把本地临时矩阵误认为可追溯实验事实。
 - 可读性问题：Lab 组件内部类型名如 `LabCardView`、`LabCompletedExperimentView` 看起来像稳定 view model，但数据全是 renderer 临时状态，和长期设计里的实验事实落盘要求不匹配。
 - 耦合问题：当前未接后端，耦合风险主要是未来 Runtime 接入时需要替换大量本地状态流；状态、弹窗和阶段推进都在单个组件内。

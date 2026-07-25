@@ -34,7 +34,7 @@
 ## 必读
 
 - `AGENTS.md`
-- `docs/design-docs/agent-kairos-autonomous-mode.md` 的「上下文构成」「Config 详设」「工具系统扩展」三章
+- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md` 的「上下文构成」「Config 详设」「工具系统扩展」三章
 - `packages/agent-core/src/tools/workspace-guard.ts`（理解 `guardWorkspacePath` 单 root 校验）
 - `packages/agent-core/src/tools/types.ts`（理解 `ToolDefinitionSpec` 现有字段）
 - 任一 `packages/agent-core/src/tools/tools/<x>/definition.ts`（理解工具 def 写法）

@@ -28,13 +28,13 @@
 - `docs/PLANS_GUIDE.md`
 - `docs/CODING_BEHAVIOR.md`
 - `docs/HISTORY_GUIDE.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 
 按子计划补读：
 
 - 任务 1：`docs/exec-plans/completed/20260529-deepseek-anthropic-service.md`、`docs/exec-plans/completed/actspace-usage-statistics-session-jsonl-plan.md`
-- 任务 2：`/Users/wakeup-jin/Desktop/code-project/back-code/deepseek-reasonix-learing/docs/design-docs/reasonix-cache-first-architecture.md`、`docs/design-docs/agent-current-module-map.md`（context 段）
-- 任务 3：`docs/FRONTEND.md`、`docs/FRONTEND_VERIFICATION.md`、`docs/design-docs/front-主题与配色规范.md`、`docs/exec-plans/active/20260527-frontend-interaction-polish/03-context-readonly-popover.md`、`.agents/skills/frontend-design/SKILL.md`
+- 任务 2：`/Users/wakeup-jin/Desktop/code-project/back-code/deepseek-reasonix-learing/docs/design-docs/reasonix-cache-first-architecture.md`、`docs/design-docs/agent-runtime/agent-current-module-map.md`（context 段）
+- 任务 3：`docs/FRONTEND.md`、`docs/FRONTEND_VERIFICATION.md`、`docs/design-docs/frontend/front-主题与配色规范.md`、`docs/exec-plans/active/20260527-frontend-interaction-polish/03-context-readonly-popover.md`、`.agents/skills/frontend-design/SKILL.md`
 
 ## 总范围
 

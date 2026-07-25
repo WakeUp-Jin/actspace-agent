@@ -24,4 +24,4 @@
 - `packages/agent-core/src/engine/bridge.ts`
 - `packages/desktop/src/main/agent-turn.ts`
 - `packages/desktop/src/main/agent-runtime-context.ts`
-- `docs/design-docs/agent-deepseek-kimi-hybrid-capabilities.md`
+- `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`

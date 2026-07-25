@@ -26,7 +26,7 @@
 - 不修改 `bash` 权限审批 UI。
 - 不调整 bash 命令 allowlist / denylist；相关工作由 `docs/exec-plans/active/Bash工具和工具权限调度开发计划/` 承接。
 - 不实现 `delete_file`；该能力由 `03-delete-file-tool.md` 承接。
-- 不修改工具输出压缩；该能力已由 `docs/design-docs/agent-context-compression.md` 描述并落地。
+- 不修改工具输出压缩；该能力已由 `docs/design-docs/model-context/agent-context-compression.md` 描述并落地。
 - 不做多 prompt mode（`append` / `override` / `default`）设计；第一版只有一个主系统提示词文件，用户想改就直接改这个文件。
 - 不做 instruction glob 列表；额外 instruction 文件后续再加。
 - 不做嵌套目录级 `AGENTS.md` 动态加载；第一版只做固定层级。
@@ -40,11 +40,11 @@
 - `docs/ARCHITECTURE.md`
 - `docs/PLANS_GUIDE.md`
 - `docs/CODING_BEHAVIOR.md`
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-backend-design.md`
-- `docs/design-docs/agent-testing.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/agent-runtime/agent-backend-design.md`
+- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`
 - `.agents/skills/llm-agent-dev/references/tools/overview.md`
 
@@ -68,9 +68,9 @@
 - `packages/desktop/src/preload/index.ts`
 - `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`
 - `packages/desktop/src/renderer/test/settings-page.test.tsx`
-- `docs/design-docs/agent-current-module-map.md`
-- `docs/design-docs/agent-token-usage-and-context-state.md`
-- `docs/design-docs/agent-tool-preview-design-guidelines.md`
+- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 
 ## 约束
 

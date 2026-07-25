@@ -26,7 +26,7 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/front-全局视觉语言规范.md`
-- `docs/design-docs/front-index.md`
+- `docs/design-docs/frontend/front-全局视觉语言规范.md`
+- `docs/design-docs/frontend/README.md`
 - `docs/FRONTEND.md`
 - `docs/histories/2026-05/20260523-1348-global-visual-language.md`
