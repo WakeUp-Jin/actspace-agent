@@ -108,6 +108,7 @@
   2. argsProgress：解析出 path 后变为 `Write config.ts`，开始累积 content 时**展开 code preview + 光标动画**（cursor 风格边写边看）。
   3. executing（`tool_started`）：保持 streamingContent 继续显示，避免闪烁消失（bridge.ts 的 `createToolUiPreview` 在 output 为空时把 args.content 当作 streamingContent 输出）。
   4. finished（`tool_finished`）：streamingContent 清空，切换为折叠态 `Write config.ts +15 ›`（deletions=0 不展示），点击展开看完整 diff。
+- 流式 code preview 是独立的有界滚动容器：用户仍在底部时，内容增长必须继续自动贴底；用户主动上滚查看早期内容后暂停跟随，滚回底部附近时恢复。
 - diff 由 `diff` 库 `createTwoFilesPatch` 生成，新建时旧内容为空字符串。
 - 磁盘写入仍在 tool execute 阶段原子写入（tmpfile → fsync → rename），**不**在 LLM 流式期间写盘，避免半文件出现或 LLM 重试导致脏写。
 - diff/统计来源、`status` / `errorMessage` 语义、越界写入审批流程与 `edit_file` 一致（见上）。

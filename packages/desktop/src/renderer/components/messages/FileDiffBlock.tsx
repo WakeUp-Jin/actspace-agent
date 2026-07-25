@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type UIEvent } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 import {
@@ -15,6 +15,8 @@ type FileDiffMessage =
   | Extract<MessageBlock, { kind: "write_diff" }>;
 
 type FileDiffDecision = "approve_once" | "deny";
+
+const STREAMING_BOTTOM_THRESHOLD_PX = 24;
 
 const DIFF_APPROVAL_CLASS =
   "message-row file-diff-approval w-full max-w-[800px] overflow-hidden rounded-act-md border border-line bg-surface";
@@ -151,11 +153,30 @@ function FileDiffApprovalCard({
 
 export function FileDiffBlock({ message, className }: { message: FileDiffMessage; className?: string }) {
   const [expanded, setExpanded] = useState(false);
+  const streamingContentRef = useRef<HTMLPreElement | null>(null);
+  const stickToStreamingBottomRef = useRef(true);
   const actionLabel = message.kind === "write_diff" ? "Write" : "Edit";
   const isRunning = message.status === "running";
   const fileLabel = message.filePath || "file\u2026";
   const streamingContent =
     message.kind === "write_diff" ? message.streamingContent : undefined;
+
+  useLayoutEffect(() => {
+    stickToStreamingBottomRef.current = true;
+  }, [message.id]);
+
+  useLayoutEffect(() => {
+    if (!isRunning || !streamingContent || !stickToStreamingBottomRef.current) return;
+    const element = streamingContentRef.current;
+    if (!element) return;
+    element.scrollTop = element.scrollHeight;
+  }, [isRunning, streamingContent]);
+
+  const handleStreamingScroll = useCallback((event: UIEvent<HTMLPreElement>) => {
+    const element = event.currentTarget;
+    stickToStreamingBottomRef.current =
+      element.scrollHeight - element.scrollTop - element.clientHeight < STREAMING_BOTTOM_THRESHOLD_PX;
+  }, []);
 
   if (message.status === "pending") {
     return <FileDiffApprovalCard message={message} actionLabel={actionLabel} className={className} />;
@@ -190,7 +211,12 @@ export function FileDiffBlock({ message, className }: { message: FileDiffMessage
             {actionLabel} {fileLabel}
           </span>
         </div>
-        <pre className="file-diff-content is-streaming-content">
+        <pre
+          ref={streamingContentRef}
+          className="file-diff-content is-streaming-content"
+          aria-label={`Streaming ${actionLabel.toLowerCase()} preview for ${fileLabel}`}
+          onScroll={handleStreamingScroll}
+        >
           {streamingContent}
           <span className="streaming-cursor" aria-hidden />
         </pre>

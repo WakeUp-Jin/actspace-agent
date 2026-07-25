@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
@@ -94,6 +94,96 @@ describe("FileDiffBlock running state", () => {
 
     expect(screen.getByText(/Write 夜雨\.md/)).toBeInTheDocument();
     expect(screen.getByText(/半夜醒来/)).toBeInTheDocument();
+  });
+
+  it("keeps the streaming write preview pinned to its latest content", () => {
+    const { rerender } = render(
+      <FileDiffBlock
+        message={makeWriteBlock({
+          status: "running",
+          additions: 0,
+          deletions: 0,
+          diff: "",
+          collapsedLines: 0,
+          streamingContent: "line 1",
+        })}
+      />,
+    );
+
+    const preview = screen.getByLabelText("Streaming write preview for 夜雨.md");
+    Object.defineProperty(preview, "scrollHeight", { configurable: true, value: 360 });
+    Object.defineProperty(preview, "clientHeight", { configurable: true, value: 120 });
+    Object.defineProperty(preview, "scrollTop", { configurable: true, writable: true, value: 0 });
+
+    rerender(
+      <FileDiffBlock
+        message={makeWriteBlock({
+          status: "running",
+          additions: 0,
+          deletions: 0,
+          diff: "",
+          collapsedLines: 0,
+          streamingContent: "line 1\nline 2",
+        })}
+      />,
+    );
+
+    expect(preview.scrollTop).toBe(360);
+  });
+
+  it("pauses streaming preview follow while the user reads earlier content and resumes near the bottom", () => {
+    const { rerender } = render(
+      <FileDiffBlock
+        message={makeWriteBlock({
+          status: "running",
+          additions: 0,
+          deletions: 0,
+          diff: "",
+          collapsedLines: 0,
+          streamingContent: "line 1",
+        })}
+      />,
+    );
+
+    const preview = screen.getByLabelText("Streaming write preview for 夜雨.md");
+    Object.defineProperty(preview, "scrollHeight", { configurable: true, value: 360 });
+    Object.defineProperty(preview, "clientHeight", { configurable: true, value: 120 });
+    Object.defineProperty(preview, "scrollTop", { configurable: true, writable: true, value: 0 });
+    fireEvent.scroll(preview);
+
+    rerender(
+      <FileDiffBlock
+        message={makeWriteBlock({
+          status: "running",
+          additions: 0,
+          deletions: 0,
+          diff: "",
+          collapsedLines: 0,
+          streamingContent: "line 1\nline 2",
+        })}
+      />,
+    );
+
+    expect(preview.scrollTop).toBe(0);
+
+    preview.scrollTop = 240;
+    fireEvent.scroll(preview);
+    Object.defineProperty(preview, "scrollHeight", { configurable: true, value: 480 });
+
+    rerender(
+      <FileDiffBlock
+        message={makeWriteBlock({
+          status: "running",
+          additions: 0,
+          deletions: 0,
+          diff: "",
+          collapsedLines: 0,
+          streamingContent: "line 1\nline 2\nline 3",
+        })}
+      />,
+    );
+
+    expect(preview.scrollTop).toBe(480);
   });
 
   it("edit running state stays single-line even with new_string in args", () => {
