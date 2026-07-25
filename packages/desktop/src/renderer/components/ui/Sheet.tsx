@@ -163,7 +163,7 @@ export function Sheet(props: PropsWithChildren<SheetProps>) {
         data-state={state}
         onClick={close}
         className={
-          "absolute inset-0 bg-black/35 backdrop-blur-[1px] " +
+          "absolute inset-0 bg-overlay backdrop-blur-[1px] " +
           "transition-opacity duration-150 motion-reduce:transition-none " +
           "data-[state=open]:opacity-100 data-[state=closed]:opacity-0"
         }

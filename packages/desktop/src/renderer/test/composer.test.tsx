@@ -192,7 +192,7 @@ describe("Composer follow-up bar", () => {
     const sendButton = screen.getByRole("button", { name: "Enter a message to send" });
     expect(sendButton.className).toContain("bg-text-main");
     expect(sendButton.className).toContain("text-surface");
-    expect(sendButton.className).not.toContain("bg-brand");
+    expect(sendButton.className).not.toContain("bg-operational");
   });
 
   it("grows the input height to fit pasted multi-line content", async () => {
@@ -382,15 +382,15 @@ describe("Composer follow-up bar", () => {
     const toggle = screen.getByLabelText("deepseek-v4-flash Thinking") as HTMLInputElement;
     const track = toggle.parentElement?.querySelector(".toggle-track");
     expect(toggle.checked).toBe(true);
-    expect(track).toHaveClass("bg-brand");
+    expect(track).toHaveClass("bg-operational");
 
     await user.click(toggle);
     expect(toggle.checked).toBe(false);
-    expect(track).not.toHaveClass("bg-brand");
+    expect(track).not.toHaveClass("bg-operational");
 
     await user.click(toggle);
     expect(toggle.checked).toBe(true);
-    expect(track).toHaveClass("bg-brand");
+    expect(track).toHaveClass("bg-operational");
   });
 
   it("sends follow-up text with the selected model", async () => {

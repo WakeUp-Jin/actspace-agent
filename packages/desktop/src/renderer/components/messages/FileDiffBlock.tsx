@@ -33,7 +33,7 @@ const DIFF_ACTION_CLASS =
 const DIFF_ACTION_GHOST_CLASS =
   "file-diff-action-ghost bg-transparent text-text-muted hover:bg-surface-subtle focus-visible:bg-surface-subtle";
 const DIFF_ACTION_PRIMARY_CLASS =
-  "file-diff-action-primary bg-brand text-white hover:bg-brand-strong focus-visible:bg-brand-strong";
+  "file-diff-action-primary bg-action text-on-action hover:bg-action-hover focus-visible:bg-action-hover";
 const DIFF_ERROR_DETAIL_CLASS =
   "file-diff-error-detail mx-[var(--conversation-text-inset)] mt-1 rounded-act-sm bg-surface-subtle px-[9px] py-[7px] font-mono text-xs leading-[1.55] text-text-muted [overflow-wrap:anywhere]";
 

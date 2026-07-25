@@ -18,7 +18,7 @@ type ToolLogStatus = "running" | "completed" | "failed" | "denied" | undefined;
 const TOOL_LOG_LINE_TOOLTIP_CONTAINER_CLASS = "has-overflow-text max-w-full outline-none";
 const TOOL_LOG_LINE_TOOLTIP_OPEN_CLASS = "is-tooltip-open";
 const TOOL_LOG_TOOLTIP_CLASS =
-  "tool-log-tooltip pointer-events-none absolute left-[var(--conversation-text-inset)] top-[calc(100%_+_6px)] z-40 max-w-[min(720px,calc(100vw_-_96px))] rounded-act-sm border border-[rgba(223,228,234,0.84)] bg-[rgba(32,33,36,0.96)] px-[9px] py-[7px] text-xs font-normal leading-[1.55] text-[#f7f8fa] shadow-act-popover [overflow-wrap:anywhere] whitespace-normal";
+  "tool-log-tooltip pointer-events-none absolute left-[var(--conversation-text-inset)] top-[calc(100%_+_6px)] z-40 max-w-[min(720px,calc(100vw_-_96px))] rounded-act-sm border border-line bg-action px-[9px] py-[7px] text-xs font-normal leading-[1.55] text-on-action shadow-act-popover [overflow-wrap:anywhere] whitespace-normal";
 
 function OverflowToolLine({
   className,

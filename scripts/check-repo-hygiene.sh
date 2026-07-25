@@ -20,6 +20,7 @@ for path in "${required_files[@]}"; do
 done
 
 "${repo_root}/scripts/check-secrets.sh"
+node "${repo_root}/scripts/check-frontend-theme-colors.mjs"
 
 if [[ "${failed}" -ne 0 ]]; then
   exit 1

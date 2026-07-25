@@ -17,7 +17,7 @@ const BASH_RUN_TRAILING_CLASS = "bash-run-trailing inline-flex flex-none items-c
 const BASH_OUTPUT_SHELL_CLASS =
   "bash-output-shell relative mt-[7px] max-h-[236px] overflow-auto rounded-act-md border border-line bg-surface-subtle";
 const BASH_OUTPUT_MENU_CLASS =
-  "bash-output-menu absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-brand-soft hover:text-brand focus-visible:bg-brand-soft focus-visible:text-brand";
+  "bash-output-menu absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-hover-overlay hover:text-text-main focus-visible:bg-selected focus-visible:text-text-main";
 const BASH_OUTPUT_TEXT_CLASS =
   "bash-output-text m-0 min-w-0 whitespace-pre-wrap pt-[10px] pr-[38px] pb-3 pl-[var(--conversation-card-padding)] font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.52] text-text-muted [word-break:break-word]";
 const BASH_PROMPT_CLASS = "bash-prompt text-text-faint";
@@ -28,7 +28,7 @@ const BASH_APPROVAL_HEADER_CLASS =
 const BASH_APPROVAL_TITLE_CLASS =
   "bash-approval-title inline-flex min-w-0 items-center gap-[7px] text-sm font-medium text-text-muted";
 const BASH_APPROVAL_MENU_CLASS =
-  "bash-approval-menu grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-brand-soft hover:text-brand focus-visible:bg-brand-soft focus-visible:text-brand";
+  "bash-approval-menu grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-hover-overlay hover:text-text-main focus-visible:bg-selected focus-visible:text-text-main";
 const BASH_INTENT_COMMENT_CLASS =
   "bash-intent-comment font-mono text-[length:var(--act-font-mono-size,13px)] italic leading-[1.55] text-text-faint";
 const BASH_INTENT_BLOCK_CLASS =
@@ -50,9 +50,9 @@ const BASH_ACTION_CLASS =
 const BASH_ACTION_GHOST_CLASS =
   "bash-action-ghost bg-transparent text-text-muted hover:bg-surface-subtle focus-visible:bg-surface-subtle";
 const BASH_ACTION_SOFT_CLASS =
-  "bash-action-soft bg-[#eeeff1] text-text-main hover:bg-[#e4e7eb] focus-visible:bg-[#e4e7eb] dark:bg-[#2f3237] dark:hover:bg-[#383b41] dark:focus-visible:bg-[#383b41]";
+  "bash-action-soft bg-surface-subtle text-text-main hover:bg-hover-overlay focus-visible:bg-selected";
 const BASH_ACTION_PRIMARY_CLASS =
-  "bash-action-primary bg-[#2f83c9] text-white hover:bg-[#2676b8] focus-visible:bg-[#2676b8] dark:bg-[#3f93d6] dark:hover:bg-[#4f9fda] dark:focus-visible:bg-[#4f9fda]";
+  "bash-action-primary bg-action text-on-action hover:bg-action-hover focus-visible:bg-action-hover";
 
 async function submitApproval(requestId: string, decision: ApprovalDecision): Promise<boolean> {
   if (typeof window === "undefined" || !window.actspace?.submitApproval) {
@@ -93,7 +93,7 @@ const BACKGROUND_BADGE_TEXT: Record<NonNullable<BashMessage["backgroundStatus"]>
 const BASH_SANDBOX_BADGE_CLASS =
   "bash-sandbox-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-xs font-medium text-text-faint";
 const BASH_REAL_ENV_BADGE_CLASS =
-  "bash-real-env-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-warm-soft px-1.5 py-px text-xs font-medium text-on-warm";
+  "bash-real-env-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-warning-soft px-1.5 py-px text-xs font-medium text-on-warning";
 
 function SandboxBadge({ sandboxed }: { sandboxed: boolean | undefined }) {
   if (sandboxed === undefined) return null;

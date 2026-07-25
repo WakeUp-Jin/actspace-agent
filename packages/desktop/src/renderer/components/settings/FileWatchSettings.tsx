@@ -153,7 +153,7 @@ export function FileWatchSection() {
               {status.runState === "error" ? (
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 font-semibold text-brand hover:underline"
+                  className="inline-flex items-center gap-1 font-semibold text-info hover:text-info-hover hover:underline"
                   onClick={() => void retry()}
                   disabled={busy}
                 >

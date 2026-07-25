@@ -37,16 +37,23 @@ type Props = {
 const RANGE_TABS = ["day", "week", "month", "total"] as const;
 const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 const MONTH_LABELS = ["1月", "2月", "3月", "4月", "5月"];
-const TOOL_COLORS = ["#2f6fff", "#28b7d8", "#8b5cf6", "#9aa8bb", "#4f7cff", "#93a4b8"];
+const TOOL_COLORS = [
+  "var(--act-chart-series-1)",
+  "var(--act-chart-series-2)",
+  "var(--act-chart-series-3)",
+  "var(--act-chart-series-4)",
+  "var(--act-chart-series-5)",
+  "var(--act-chart-series-6)",
+];
 
 const panelClass =
   "w-full rounded-[18px] border border-line/90 bg-surface/95 shadow-act-soft";
 const metricCardClass =
   "rounded-act-lg border border-line bg-surface px-4 py-3 shadow-none";
 const iconButtonClass =
-  "inline-flex h-9 w-9 items-center justify-center rounded-act-md border border-line bg-surface text-text-main transition hover:border-brand/30 hover:bg-brand-soft hover:text-brand";
+  "inline-flex h-9 w-9 items-center justify-center rounded-act-md border border-line bg-surface text-text-main transition hover:border-line-strong hover:bg-hover-overlay";
 const actionButtonClass =
-  "inline-flex h-9 items-center justify-center gap-2 rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-brand/30 hover:bg-brand-soft hover:text-brand";
+  "inline-flex h-9 items-center justify-center gap-2 rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-line-strong hover:bg-hover-overlay";
 
 const REQUEST_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -139,10 +146,10 @@ function clampLevel(value: number): 0 | 1 | 2 | 3 {
 
 function heatmapCellClass(level: 0 | 1 | 2 | 3): string {
   const colors = [
-    "bg-[#e9edf3] dark:bg-[#2a2d33]",
-    "bg-[#cfe0ff] dark:bg-[#27406e]",
-    "bg-[#78a9ff] dark:bg-[#3f6fc4]",
-    "bg-brand",
+    "bg-surface-subtle",
+    "bg-chart-series-1/20",
+    "bg-chart-series-1/55",
+    "bg-chart-series-1",
   ];
   return `h-3.5 w-3.5 shrink-0 rounded-[4px] ${colors[level]}`;
 }
@@ -196,7 +203,7 @@ function ToolDetailModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-900/30 p-7 backdrop-blur-md" role="presentation" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-overlay p-7 backdrop-blur-md" role="presentation" onClick={onClose}>
       <div
         className="max-h-[calc(100vh-56px)] w-[640px] max-w-full overflow-auto rounded-2xl border border-line bg-surface-raised shadow-act-popover"
         role="dialog"
@@ -251,7 +258,7 @@ function CostDetailModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-900/30 p-7 backdrop-blur-md" role="presentation" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-overlay p-7 backdrop-blur-md" role="presentation" onClick={onClose}>
       <div
         className="w-[660px] max-w-[calc(100vw-48px)] rounded-[20px] border border-line bg-surface-raised shadow-act-popover"
         role="dialog"
@@ -300,7 +307,7 @@ function ToolRow({
 }) {
   return (
     <button
-      className="grid w-full grid-cols-[12px_minmax(0,1fr)_auto] items-center gap-2 rounded-md py-0.5 text-left text-xs text-text-muted transition hover:text-brand"
+      className="grid w-full grid-cols-[12px_minmax(0,1fr)_auto] items-center gap-2 rounded-md py-0.5 text-left text-xs text-text-muted transition hover:text-text-main"
       type="button"
       onClick={() => onOpen(tool)}
     >
@@ -468,7 +475,7 @@ function HeatmapGrid({ columns }: { columns: HeatmapCell[][] }) {
                 key={`${columnIndex}-${rowIndex}`}
                 role="button"
                 tabIndex={cell.dailyRow ? 0 : -1}
-                className={`${heatmapCellClass(cell.level)} cursor-pointer ring-offset-1 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
+                className={`${heatmapCellClass(cell.level)} cursor-pointer ring-offset-1 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}
                 aria-label={cell.dailyRow
                   ? `${cell.iso}：${cell.dailyRow.totalTokens.toLocaleString()} tokens`
                   : `${cell.iso}：无数据`}
@@ -675,7 +682,7 @@ function RequestUsageTable({
                   <td className="border-b border-line p-3 text-right">
                     <button
                       type="button"
-                      className="rounded-act-sm px-1.5 py-1 text-right font-mono text-xs font-bold tabular-nums text-text-main transition hover:bg-brand-soft hover:text-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      className="rounded-act-sm px-1.5 py-1 text-right font-mono text-xs font-bold tabular-nums text-text-main transition hover:bg-hover-overlay focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
                       aria-label={`${row.totalTokens.toLocaleString()} tokens, show token breakdown`}
                       onMouseEnter={(event) => setHover({ row, anchorRect: event.currentTarget.getBoundingClientRect() })}
                       onMouseLeave={() => setHover((current) => (current?.row === row ? null : current))}
@@ -813,7 +820,7 @@ export function UsageStatisticsPage({
 
           <div className="grid min-h-[calc(100vh-48px)] place-items-center">
             <section className={`${panelClass} grid max-w-[560px] gap-4 p-7 text-center`}>
-              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-brand-soft text-brand">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-info-soft text-info">
                 <Info size={22} strokeWidth={2} />
               </div>
               <div>
@@ -823,7 +830,7 @@ export function UsageStatisticsPage({
                 </p>
               </div>
               {error ? (
-                <div className="rounded-act-lg border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-700">
+                <div className="rounded-act-lg border border-danger/30 bg-danger-soft px-4 py-3 text-left text-sm text-on-danger">
                   {error}
                 </div>
               ) : null}
@@ -832,7 +839,7 @@ export function UsageStatisticsPage({
                   <button
                     key={tab}
                     className={`h-8 min-w-14 rounded-full px-3.5 text-[13px] font-semibold transition ${
-                      tab === range ? "bg-brand-soft text-brand" : "border border-line bg-surface text-text-muted hover:text-brand"
+                      tab === range ? "bg-selected font-semibold text-text-main" : "border border-line bg-surface text-text-muted hover:bg-hover-overlay hover:text-text-main"
                     }`}
                     type="button"
                     onClick={() => {
@@ -959,7 +966,7 @@ export function UsageStatisticsPage({
                 查看详情
               </button>
             </div>
-            <div className="rounded-act-lg border border-brand/20 bg-brand-soft p-4">
+            <div className="rounded-act-lg border border-line bg-surface-subtle p-4">
               <div className="mb-2.5 flex items-center justify-between gap-3 text-xs font-bold text-text-faint">
                 <span>本月工具调用分布</span>
                 <strong className="text-[17px] font-bold tabular-nums text-text-main">{effectiveSnapshot.summary.toolCallCount.toLocaleString()} 次</strong>
@@ -1001,7 +1008,7 @@ export function UsageStatisticsPage({
                   <button
                     key={tab}
                     className={`h-8 min-w-14 rounded-full px-3.5 text-[13px] font-semibold transition ${
-                      tab === range ? "bg-brand-soft text-brand" : "text-text-muted hover:text-brand"
+                      tab === range ? "bg-selected font-semibold text-text-main" : "text-text-muted hover:bg-hover-overlay hover:text-text-main"
                     }`}
                     type="button"
                     role="tab"
@@ -1036,7 +1043,7 @@ export function UsageStatisticsPage({
               <div className="text-[clamp(56px,5.1vw,72px)] font-bold leading-[0.9] tracking-[-0.02em] text-text-main tabular-nums">
                 {effectiveSnapshot.summary.totalTokens.toLocaleString()}
               </div>
-              <button className="inline-flex items-center gap-1.5 text-xl font-bold text-brand transition hover:text-brand-strong" type="button" onClick={() => setShowCostDetail(true)}>
+              <button className="inline-flex items-center gap-1.5 text-xl font-bold text-info transition hover:text-info-hover" type="button" onClick={() => setShowCostDetail(true)}>
                 {formatMoney(effectiveSnapshot.summary.costUsd)}
                 <Info size={16} strokeWidth={2} />
               </button>
@@ -1044,7 +1051,7 @@ export function UsageStatisticsPage({
 
             <div className="flex h-2 w-full overflow-hidden rounded-full bg-surface-subtle" aria-hidden="true">
               <span
-                className="block h-full rounded-full bg-gradient-to-r from-brand via-[var(--act-chart-series-2)] to-[var(--act-chart-series-3)]"
+                className="block h-full rounded-full bg-gradient-to-r from-chart-series-1 via-chart-series-2 to-chart-series-3"
                 style={{ width: `${Math.min(100, effectiveSnapshot.summary.cacheEfficiencyPercent)}%` }}
               />
             </div>
@@ -1064,9 +1071,9 @@ export function UsageStatisticsPage({
             <div className="grid grid-cols-[minmax(0,0.76fr)_1.24fr] items-center gap-5">
               <div>
                 <div className="text-base font-semibold text-text-main">缓存效率</div>
-                <div className="mt-3 text-[42px] font-bold leading-none tracking-[-0.02em] text-brand tabular-nums">{formatPercent(cachePercent)}</div>
+                <div className="mt-3 text-[42px] font-bold leading-none tracking-[-0.02em] text-text-main tabular-nums">{formatPercent(cachePercent)}</div>
                 <div className="mt-[18px] h-[9px] overflow-hidden rounded-full bg-surface-subtle" aria-hidden="true">
-                  <span className="block h-full rounded-full bg-gradient-to-r from-brand to-[#72a5ff]" style={{ width: `${cachePercent}%` }} />
+                  <span className="block h-full rounded-full bg-gradient-to-r from-chart-series-1 to-chart-series-2" style={{ width: `${cachePercent}%` }} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -1114,7 +1121,7 @@ export function UsageStatisticsPage({
                         <td className="border-b border-line p-3 text-right font-mono text-xs tabular-nums text-text-muted">{row.completionTokens.toLocaleString()}</td>
                         <td className="border-b border-line p-3 text-right font-mono text-xs tabular-nums text-text-muted">{row.cacheHitTokens.toLocaleString()}</td>
                         <td className="border-b border-line p-3 text-right font-mono text-xs tabular-nums text-text-muted">{row.reasoningTokens.toLocaleString()}</td>
-                        <td className="border-b border-line p-3 text-right font-mono text-xs font-bold tabular-nums text-brand">{row.conversationCount.toLocaleString()}</td>
+                        <td className="border-b border-line p-3 text-right font-mono text-xs font-bold tabular-nums text-text-main">{row.conversationCount.toLocaleString()}</td>
                       </tr>
                     ))
                   ) : (

@@ -44,11 +44,11 @@ const TURN_BODY_CLASS = "turn-body flex flex-col gap-[9px]";
 const TURN_ACTIONS_CLASS = "turn-actions mt-[-12px] flex min-h-6 justify-end";
 const TURN_ACTION_ANCHOR_CLASS = "turn-action-anchor relative flex-none";
 const TURN_ACTION_TRIGGER_CLASS =
-  "turn-action-trigger grid h-[30px] w-[30px] place-items-center rounded-act-md border-0 bg-transparent text-text-faint opacity-65 transition-[background,color,opacity] duration-[150ms] ease-in-out hover:bg-brand-soft hover:text-brand-strong hover:opacity-100 aria-disabled:cursor-default aria-expanded:bg-brand-soft aria-expanded:text-brand-strong aria-expanded:opacity-100";
+  "turn-action-trigger grid h-[30px] w-[30px] place-items-center rounded-act-md border-0 bg-transparent text-text-faint opacity-65 transition-[background,color,opacity] duration-[150ms] ease-in-out hover:bg-hover-overlay hover:text-text-main hover:opacity-100 aria-disabled:cursor-default aria-expanded:bg-selected aria-expanded:text-text-main aria-expanded:opacity-100";
 const TURN_ACTION_MENU_CLASS =
   "turn-action-menu absolute bottom-[30px] right-0 z-40 w-[178px] rounded-act-md border border-line bg-surface-raised/98 p-1.5 shadow-act-popover";
 const TURN_ACTION_MENU_BUTTON_CLASS =
-  "flex min-h-[34px] w-full items-center rounded-act-sm border-0 bg-transparent px-2.5 text-left text-sm font-semibold text-text-main transition-colors duration-[150ms] ease-in-out hover:bg-brand-soft hover:text-brand disabled:cursor-default disabled:text-text-faint";
+  "flex min-h-[34px] w-full items-center rounded-act-sm border-0 bg-transparent px-2.5 text-left text-sm font-semibold text-text-main transition-colors duration-[150ms] ease-in-out hover:bg-hover-overlay disabled:cursor-default disabled:text-text-faint";
 const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-[13px] leading-[1.4] text-text-faint";
 const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-on-danger";
 const COMPACT_MESSAGE_RELATION_CLASS = "-mt-1";

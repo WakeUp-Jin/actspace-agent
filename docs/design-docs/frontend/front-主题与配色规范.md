@@ -8,7 +8,7 @@
 
 > 组件只消费语义 token；颜色随主题翻转；action、operational、semantic 和 data visualization 必须分离。
 
-`Ink & Emerald` 是目标设计，当前代码仍存在蓝色 `brand` token。本轮文档更新不代表 token 迁移已经完成。
+`Ink & Emerald` 已在 renderer 落地。旧蓝色 `brand` 与旧 `warm` 消费已清零，后续新增颜色必须通过 `pnpm check:frontend-theme` 的 token 完整性与防回流检查。
 
 ## 三态主题机制
 
@@ -38,7 +38,7 @@ ActSpace 支持：
 
 ### Operational
 
-负责 running、connected、enabled、healthy、success 和 diff additions。目标 accent 为翡翠绿。
+负责 running、connected、enabled、healthy 和显式 success。目标 accent 为翡翠绿；diff additions 仍使用独立 diff token。
 
 ### Semantic
 
@@ -51,21 +51,21 @@ ActSpace 支持：
 
 Chart、Context bucket、热力图等使用独立数据色，不映射到 action 或 operational。
 
-## 目标 token 拆分
+## 已落地 token 拆分
 
-后续实现不得把当前 `--act-color-brand` 直接改成绿色后结束。建议拆成：
+当前实现按以下职责落地，禁止重新合并成单一强调色：
 
 ```css
 /* neutral */
---act-color-app-bg;
+--act-color-bg;
 --act-color-sidebar;
 --act-color-surface;
 --act-color-surface-subtle;
 --act-color-selected;
 --act-color-hover-overlay;
---act-color-line;
---act-color-line-strong;
---act-color-text-main;
+--act-color-border;
+--act-color-border-strong;
+--act-color-text;
 --act-color-text-muted;
 --act-color-text-faint;
 
@@ -87,17 +87,23 @@ Chart、Context bucket、热力图等使用独立数据色，不映射到 action
 --act-color-warning-soft;
 --act-color-danger;
 --act-color-danger-soft;
+--act-color-on-danger;
+--act-color-on-danger-solid;
 --act-color-success;
 --act-color-success-soft;
+--act-color-on-success;
 
 /* specialized */
 --act-chart-series-1;
 --act-chart-series-2;
 --act-context-system;
 --act-context-tools;
---act-diff-addition;
---act-diff-removal;
+--act-color-diff-add-bg;
+--act-color-diff-add-text;
+--act-color-diff-remove-bg;
+--act-color-diff-remove-text;
 --act-color-focus-ring;
+--act-color-operational-focus-ring;
 ```
 
 具体命名在代码迁移计划中可以结合现有 token 收敛，但职责不能重新合并。
@@ -203,23 +209,18 @@ text-[rgba(...)]
 - warning = warning，failed = danger。
 - selected row = neutral，不使用绿色或蓝色大面积底色。
 
-## 迁移纪律
+## 维护纪律
 
-后续代码迁移按顺序进行：
-
-1. 统计当前 `brand` token 的所有消费者，并按 action / operational / info / visualization 分类。
-2. 新增语义 token 与浅深值。
-3. 迁移基础组件：Button、Toggle、Input、Tabs、Status、Tooltip。
-4. 迁移 Sidebar、Composer、Settings 样板。
-5. 迁移其余工作台和专项页面。
-6. 删除无消费者的旧 brand alias。
-
-禁止通过全局搜索替换把 `brand` 一次性改成 `operational`。
+- renderer 中不再允许旧强调色 alias 或 utility 回流。
+- 新增语义 token 必须同时定义 light、dark、system-dark 三个分支。
+- Tailwind 颜色映射只能引用 `tokens.css` 已定义的 token。
+- 组件颜色字面量只允许精确用途 allowlist，不允许目录级豁免。
+- 运行 `pnpm check:frontend-theme` 验证上述契约。
 
 ## 自检
 
 ```sh
-rg -n "text-black|bg-black|bg-white|text-\[#|bg-\[#|border-\[#|rgba\(" packages/desktop/src/renderer/<改动文件>
+pnpm check:frontend-theme
 ```
 
 逐项检查：

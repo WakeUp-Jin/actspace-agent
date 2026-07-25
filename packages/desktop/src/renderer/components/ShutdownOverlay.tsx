@@ -36,7 +36,7 @@ export function ShutdownOverlay() {
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-app-bg/80 backdrop-blur-sm"
     >
       <div className="flex flex-col items-center gap-4 rounded-act-lg border border-line bg-surface px-9 py-8 text-center shadow-act-soft">
-        <Loader2 size={30} className="animate-spin text-brand" aria-hidden="true" />
+        <Loader2 size={30} className="animate-spin text-operational" aria-hidden="true" />
         <div className="flex flex-col gap-1.5">
           <p className="m-0 text-[16px] font-semibold text-text-main">
             {isLocalUpdate ? "Actspace 准备替换应用…" : "Kairos 正在安全关闭…"}

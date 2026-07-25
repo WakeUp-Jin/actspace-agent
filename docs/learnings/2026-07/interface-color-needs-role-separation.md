@@ -22,6 +22,8 @@ selected 只回答“当前在哪里”，operational 回答“系统正在做�
 - running 使用小状态点、细环或克制 shimmer。
 - 需要同时表达 selected + running 时，两种信号可并存，不会互相覆盖。
 
+但还有一个容易忽略的可访问性陷阱：中性 selected 的底色差通常很低，可能只有约 1.1–1.3:1。它适合建立克制层级，却不适合独立承担状态表达。因此还需要字重、单色 glyph、轮廓或位置等冗余提示。
+
 ## Token 建模顺序
 
 不要先建一个 `brand` token，再为所有组件提供 `brand-soft` 和 `brand-strong`。应该先列出产品中真实的视觉职责，再建立语义 token：
@@ -36,6 +38,29 @@ chart-series-* / context-* / diff-*
 
 这样即使未来更换品牌色，也不会把按钮、运行状态和图表一起重染。
 
+## 主题模式与实际渲染分支
+
+“浅色 / 深色 / 跟随系统”是三个用户选择，但不是三个渲染结果。跟随系统必须拆成两个验收分支：
+
+```text
+Light
+Dark
+System + OS Light
+System + OS Dark
+```
+
+只检查 `data-theme="system"` 是否存在并不能证明 system-dark token 完整，也不能证明系统切换后已打开的浮层和图表会更新。
+
+## 视觉审批应包含测量
+
+颜色样板不能只靠“看起来舒服”批准。至少要同时检查：
+
+- 普通文字与背景 4.5:1。
+- 关键非文本边界与 focus ring 3:1。
+- 浅色和深色分别测量，不从一套主题推断另一套。
+- selected、warning、running 等状态是否有非颜色冗余。
+- 低对比 divider 与需要识别的 control boundary 是否使用了不同 token。
+
 ## 常见陷阱
 
 - 把旧的蓝色 `brand` 全局替换为绿色：只是换色，没有解决职责混乱。
@@ -43,12 +68,17 @@ chart-series-* / context-* / diff-*
 - 用绿色表示既定导航又表示成功：同一颜色同时回答两个不同问题。
 - 为了“有品牌感”给大面积 surface 加彩色：容器会抢走内容的注意力。
 - 将 info blue 完全禁用：设计系统丢失语义工具；正确做法是限定职责，不是删除色相。
+- 用宽泛的文件 allowlist 放行颜色字面量：同一文件之后新增的非法颜色也会被静默放过。
 
 ## 自检问题
 
 1. 去掉所有彩色后，页面的层级、选中和主操作是否仍然清楚？
 2. 一个 accent 是在表示用户操作、系统运行，还是风险状态？它是否只回答了一个问题？
 3. 换掉 operational 色后，是否会意外改变导航、CTA、链接或图表？如果会，token 仍然耦合过度。
+4. system 主题是否实际验证了 OS Light 和 OS Dark 两个分支？
 
-相关变更记录：`docs/histories/2026-07/20260725-0021-ink-emerald-design-system.md`。
+相关变更记录：
 
+- `docs/histories/2026-07/20260725-0021-ink-emerald-design-system.md`
+- `docs/histories/2026-07/20260725-1041-frontend-color-preview.md`
+- `docs/histories/2026-07/20260725-1530-frontend-color-system-migration.md`

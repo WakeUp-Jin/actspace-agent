@@ -75,7 +75,7 @@ const ATTACHMENT_REMOVE_BASE_CLASS =
 const IMAGE_ATTACHMENT_REMOVE_CLASS =
   `${ATTACHMENT_REMOVE_BASE_CLASS} image-attachment-remove absolute right-[-5px] top-[-5px] h-6 w-6 bg-[rgba(45,51,58,0.86)] text-white shadow-[0_6px_14px_rgba(25,35,52,0.2)] group-hover/image-attachment:pointer-events-auto group-hover/image-attachment:opacity-100 group-focus-within/image-attachment:pointer-events-auto group-focus-within/image-attachment:opacity-100 hover:bg-[rgba(31,36,42,0.94)]`;
 const FILE_ATTACHMENT_REMOVE_CLASS =
-  `${ATTACHMENT_REMOVE_BASE_CLASS} file-attachment-remove h-[22px] w-[22px] text-text-faint group-hover/file-attachment:pointer-events-auto group-hover/file-attachment:opacity-100 group-focus-within/file-attachment:pointer-events-auto group-focus-within/file-attachment:opacity-100 hover:bg-brand-soft hover:text-brand-strong`;
+  `${ATTACHMENT_REMOVE_BASE_CLASS} file-attachment-remove h-[22px] w-[22px] text-text-faint group-hover/file-attachment:pointer-events-auto group-hover/file-attachment:opacity-100 group-focus-within/file-attachment:pointer-events-auto group-focus-within/file-attachment:opacity-100 hover:bg-hover-overlay hover:text-text-main`;
 // Composer 输入布局对齐 Cursor：单行内容 inline（+ / 输入 / 模型 / 发送同一行），
 // 内容折行到两行及以上自动切 stacked（输入全宽在上、控件行贴底）。
 // 用同一个 grid 容器切换 grid-template-areas，DOM 结构不变——textarea 是同一节点，
@@ -93,7 +93,7 @@ const COMPOSER_INITIAL_INPUT_CLASS =
 const COMPOSER_SINGLE_LINE_MAX_PX = 40;
 const CONTROL_GROUP_CLASS = "control-group relative";
 const COMMAND_BUTTON_CLASS =
-  "command-button grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-surface-subtle text-text-muted transition-[background,border,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-brand-soft hover:text-brand-strong aria-expanded:border-brand/30 aria-expanded:bg-brand-soft aria-expanded:text-brand-strong";
+  "command-button grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-surface-subtle text-text-muted transition-[background,border,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-hover-overlay hover:text-text-main aria-expanded:border-line-strong aria-expanded:bg-selected aria-expanded:text-text-main";
 const MODEL_BUTTON_CLASS =
   "model-button inline-flex h-8 max-w-[220px] items-center gap-[6px] rounded-full border-0 bg-transparent px-1.5 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main";
 const MODEL_BUTTON_TEXT_CLASS = "model-button-text truncate";
@@ -109,13 +109,13 @@ const COMMAND_MENU_CLASS = `${DROPDOWN_MENU_CLASS} command-menu w-[240px] min-w-
 const COMMAND_MENU_HINT_CLASS = "px-2 pb-2 pt-1 text-sm text-text-subtle";
 const COMMAND_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
 const COMMAND_MENU_BUTTON_CLASS =
-  "command-menu-button flex min-h-[34px] w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 text-left text-sm font-medium text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-brand-soft focus-visible:bg-brand-soft focus-visible:outline-none";
+  "command-menu-button flex min-h-[34px] w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 text-left text-sm font-medium text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none";
 const COMMAND_MENU_ICON_CLASS = "text-text-muted";
 // 模型菜单展开方向随布局态切换：inline 时模型按钮在右侧，菜单向左展开（right-0）
 // 避免 280px 宽列表撞右边界；stacked 时按钮在控件行左侧，菜单向右展开（left-0）。
 const MODEL_MENU_BASE_CLASS = `${DROPDOWN_MENU_BASE_CLASS} model-menu max-h-[222px] min-w-[280px] overflow-y-auto`;
 const MODEL_MENU_ROW_CLASS = "model-menu-row relative flex items-center rounded-lg";
-const MODEL_MENU_ROW_SELECTED_CLASS = "is-selected-row bg-brand-soft";
+const MODEL_MENU_ROW_SELECTED_CLASS = "is-selected-row bg-selected font-semibold";
 const MODEL_SELECT_BUTTON_CLASS =
   "model-select-button flex min-w-0 flex-1 justify-start rounded-lg border-0 bg-transparent px-[9px] py-2 pr-[54px] text-left text-text-main";
 const MODEL_SELECT_BUTTON_SELECTED_CLASS = "pr-[72px]";
@@ -131,14 +131,14 @@ const MODEL_CHECK_ICON_CLASS = "model-check-icon text-text-main";
 const MODEL_OPTIONS_MENU_BASE_CLASS = `${DROPDOWN_MENU_BASE_CLASS} model-options-menu bottom-0 z-40 w-[220px] min-w-[220px]`;
 const DROPDOWN_LABEL_CLASS = "dropdown-label px-2.5 pb-[5px] pt-[7px] text-xs font-semibold text-text-faint";
 const OPTION_TOGGLE_ROW_CLASS =
-  "option-toggle-row flex min-h-9 cursor-pointer items-center gap-2.5 rounded-lg px-[9px] py-[7px] text-text-main hover:bg-brand-soft";
+  "option-toggle-row flex min-h-9 cursor-pointer items-center gap-2.5 rounded-lg px-[9px] py-[7px] text-text-main hover:bg-hover-overlay";
 const OPTION_TOGGLE_LABEL_CLASS = "flex-1";
 const OPTION_TOGGLE_INPUT_CLASS = "absolute opacity-0 pointer-events-none";
-// 注意：track 的底色不写进基类，由 on/off 分支二选一给出，避免 `bg-line-strong` 与 `bg-brand`
+// 注意：track 的底色不写进基类，由 on/off 分支二选一给出，避免同属性 utility 互相覆盖。
 // 同优先级、按样式表顺序覆盖导致开启时不变主题色。
 const TOGGLE_TRACK_CLASS =
   "toggle-track relative inline-flex h-5 w-8 rounded-full transition-colors duration-[120ms] ease-in-out";
-const TOGGLE_TRACK_ON_CLASS = "bg-brand";
+const TOGGLE_TRACK_ON_CLASS = "bg-operational";
 const TOGGLE_TRACK_OFF_CLASS = "bg-line-strong";
 const TOGGLE_THUMB_CLASS =
   "toggle-thumb absolute left-[3px] top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_4px_rgba(31,45,61,0.22)] transition-transform duration-[120ms] ease-in-out";
@@ -157,7 +157,7 @@ const STATUS_USAGE_DOT_MASK =
 const INITIAL_CHIP_ROW_CLASS = "initial-chip-row flex min-h-8 items-center";
 const INITIAL_CHIP_CLASS =
   "initial-plan-chip inline-flex h-8 items-center rounded-full border border-line bg-surface px-3 text-sm font-medium text-text-muted shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
-const COMPOSER_DROP_ACTIVE_CLASS = "border-brand/40 bg-brand-soft";
+const COMPOSER_DROP_ACTIVE_CLASS = "border-line-strong bg-selected";
 
 type CommandMenuItem = {
   label: string;
@@ -341,6 +341,12 @@ export function Composer({
   const editingModelSpec = modelList.find((spec) => spec.id === editingModelId);
   const contextUsagePercent = contextSnapshot?.percentUsed ?? 0;
   const contextRingPercent = Math.max(0, Math.min(100, contextUsagePercent));
+  const contextRingColor =
+    contextRingPercent >= 90
+      ? "var(--act-color-danger)"
+      : contextRingPercent >= 75
+        ? "var(--act-color-warning)"
+        : "var(--act-color-text-faint)";
   // 有内容但占比不足 1% 时显示「<1」，避免「明明有数据却是 0%」的误解。
   const contextPercentLabel =
     contextSnapshot && contextSnapshot.totalTokens > 0 && contextUsagePercent <= 0
@@ -953,7 +959,7 @@ export function Composer({
             className={STATUS_USAGE_DOT_CLASS}
             aria-hidden="true"
             style={{
-              background: `conic-gradient(var(--act-color-brand-strong) ${contextRingPercent}%, var(--act-color-border-strong) ${contextRingPercent}%)`,
+              background: `conic-gradient(${contextRingColor} ${contextRingPercent}%, var(--act-color-border) ${contextRingPercent}%)`,
               WebkitMask: STATUS_USAGE_DOT_MASK,
               mask: STATUS_USAGE_DOT_MASK
             }}

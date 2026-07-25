@@ -99,8 +99,8 @@ const TRACE_SEGMENT_BASE_PX = 20;
 const TRACE_SEGMENT_PX_PER_SECOND = 5;
 const TRACE_SEGMENT_MAX_PX = 100;
 const TRACE_TONE_COLORS: Record<ReturnType<typeof traceTone>, string> = {
-  reply: "var(--act-color-brand)",
-  sleep: "var(--act-color-warm)",
+  reply: "var(--act-color-info)",
+  sleep: "var(--act-color-text-faint)",
   error: "var(--act-color-danger)",
   other: "var(--act-color-border-strong)",
 };
@@ -127,10 +127,10 @@ const headerUsageBadgeModeChipClass =
   "ml-[2px] inline-flex items-center rounded-full bg-surface-subtle px-[6px] py-[1px] text-[10.5px] tracking-wide text-text-faint";
 const kairosButtonClass =
   "inline-flex h-8 items-center justify-center gap-1.5 rounded-[7px] border border-line bg-surface px-3 text-[13px] font-medium text-text-main transition hover:border-line-strong hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-55";
-// 独立完整类，不叠加在 kairosButtonClass 上（bg-surface/bg-brand-soft 同属性类
+// 独立完整类，不叠加在 kairosButtonClass 上（surface / operational soft 同属性类
 // 的胜负取决于生成 CSS 的顺序，叠加时品牌色底可能不生效——与分页按钮同一个坑）。
 const kairosPrimaryButtonClass =
-  "inline-flex h-8 items-center justify-center gap-1.5 rounded-[7px] border border-brand/40 bg-brand-soft px-3 text-[13px] font-medium text-text-main transition hover:border-brand/60 hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-55";
+  "inline-flex h-8 items-center justify-center gap-1.5 rounded-[7px] border border-operational/40 bg-operational-soft px-3 text-[13px] font-medium text-operational transition hover:border-operational/60 hover:bg-operational-soft disabled:cursor-not-allowed disabled:opacity-55";
 const traceClass =
   "shrink-0 border-b border-line bg-surface px-7 pb-3.5 pt-4 max-[760px]:px-4";
 const traceHeadClass =
@@ -150,10 +150,10 @@ const eventsFooterClass =
   "mt-auto grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-4 py-3 text-xs text-text-faint";
 const pageButtonClass =
   "inline-flex h-7 w-7 items-center justify-center rounded-[7px] border border-line bg-surface text-xs text-text-muted hover:border-line-strong hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-45";
-// 激活页按钮是独立完整类，不在 pageButtonClass 上叠加覆盖——bg-surface / bg-brand
+// 激活页按钮是独立完整类，不在 pageButtonClass 上叠加覆盖——surface / selected
 // 同属性类的胜负取决于生成 CSS 的顺序而非 class 顺序，叠加曾导致白底白字（数字不可见）。
 const pageButtonActiveClass =
-  "inline-flex h-7 w-7 items-center justify-center rounded-[7px] border border-brand bg-brand text-xs font-medium text-white";
+  "inline-flex h-7 w-7 items-center justify-center rounded-[7px] border border-line-strong bg-selected text-xs font-semibold text-text-main";
 const sideClass = "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 max-[1100px]:min-h-[520px]";
 const statsClass =
   "grid grid-cols-4 overflow-hidden rounded-act-md border border-line bg-surface max-[760px]:grid-cols-2";
@@ -348,8 +348,8 @@ function KairosRuntimeTrace(props: KairosRuntimeTraceProps) {
           <span className="ml-2 text-xs text-text-faint">近 60 分钟</span>
         </div>
         <div className={traceLegendClass} aria-label="运行轨迹图例">
-          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-brand" data-tone="reply" />回复</span>
-          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-warm" data-tone="sleep" />睡眠</span>
+          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-info" data-tone="reply" />回复</span>
+          <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-text-faint" data-tone="sleep" />睡眠</span>
           <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-danger" data-tone="error" />异常</span>
           <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-line-strong" data-tone="other" />其他</span>
         </div>
@@ -373,7 +373,7 @@ function KairosRuntimeTrace(props: KairosRuntimeTraceProps) {
                   data-testid="kairos-trace-block"
                   className={cn(
                     traceBlockBaseClass,
-                    props.selectedRowId === row.id && "border-brand shadow-[0_0_0_2px_rgba(47,111,255,0.16)]",
+                    props.selectedRowId === row.id && "border-focus-ring ring-2 ring-focus-ring/20",
                   )}
                   style={{
                     width: `${segments[index].widthPx}px`,
@@ -689,7 +689,7 @@ function KairosExecutionList(props: KairosExecutionListProps) {
               className={cn(
                 "cursor-pointer transition hover:bg-surface-subtle",
                 row.status === "failed" && "bg-danger-soft",
-                props.selectedRowId === row.id && "bg-brand-soft shadow-[inset_2px_0_0_var(--act-color-brand)]",
+                props.selectedRowId === row.id && "bg-selected shadow-[inset_2px_0_0_var(--act-color-border-strong)]",
               )}
               onClick={() => props.onSelectRow(row.id)}
               role="row"
@@ -899,7 +899,7 @@ function KairosDetailPanel(props: KairosDetailPanelProps) {
                 key={id}
                 type="button"
                 role="menuitem"
-                className={cn(headerMoreItemClass, tab === id && "bg-brand-soft text-brand-strong")}
+                className={cn(headerMoreItemClass, tab === id && "bg-selected font-semibold text-text-main")}
                 onClick={() => {
                   setMoreOpen(false);
                   props.onTabChange(id);
@@ -1052,10 +1052,10 @@ function statusToneClass(status: KairosEventRow["status"]): string {
     case "success":
       return "bg-success-soft text-on-success";
     case "running":
-      return "bg-brand-soft text-brand-strong";
+      return "bg-operational-soft text-operational";
     case "failed":
       return "bg-danger-soft text-on-danger";
     case "interrupted":
-      return "bg-warm-soft text-on-warm";
+      return "bg-warning-soft text-on-warning";
   }
 }

@@ -28,11 +28,11 @@ const compactStatusClass =
 const compactActionsClass = "grid grid-cols-3 gap-1.5";
 const compactButtonClass =
   "inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-[7px] border border-line bg-surface px-2 text-xs text-text-main transition hover:border-line-strong hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50 max-[980px]:[&>span]:hidden";
-// 主按钮是独立完整类，不叠加在 compactButtonClass 上——bg-surface/bg-brand、
-// text-text-main/text-white 同属性类的胜负取决于生成 CSS 的顺序，叠加曾导致
+// 主按钮是独立完整类，不叠加在 compactButtonClass 上——surface / action、
+// 同属性的前景 utility 叠加时，最终结果取决于生成 CSS 的顺序，曾导致
 // 「开启」按钮白底白字不可见（与分页激活按钮同一个坑）。
 const compactPrimaryButtonClass =
-  "inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-[7px] border border-brand bg-brand px-2 text-xs font-medium text-white transition hover:border-brand-strong hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50 max-[980px]:[&>span]:hidden";
+  "inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-[7px] bg-action px-2 text-xs font-medium text-on-action transition hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-50 max-[980px]:[&>span]:hidden";
 const compactErrorClass =
   "rounded-[7px] border border-on-danger/30 bg-danger-soft px-[9px] py-[7px] text-xs leading-[1.45] text-on-danger";
 const compactPanelClass = "grid min-w-0 min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-surface";
@@ -263,17 +263,17 @@ function statusToneClass(status: KairosEventRow["status"]): string {
     case "success":
       return "bg-success-soft text-on-success";
     case "running":
-      return "bg-brand-soft text-brand-strong";
+      return "bg-operational-soft text-operational";
     case "failed":
       return "bg-danger-soft text-on-danger";
     case "interrupted":
-      return "bg-warm-soft text-on-warm";
+      return "bg-warning-soft text-on-warning";
   }
 }
 
 function compactRowToneClass(row: KairosEventRow): string {
-  if (row.kind === "reply") return "shadow-[inset_2px_0_0_var(--act-color-brand)]";
-  if (row.kind === "sleep") return "shadow-[inset_2px_0_0_var(--act-color-warm)]";
+  if (row.kind === "reply") return "shadow-[inset_2px_0_0_var(--act-color-info)]";
+  if (row.kind === "sleep") return "shadow-[inset_2px_0_0_var(--act-color-border-strong)]";
   if (row.kind === "error" || row.status === "failed") return "shadow-[inset_2px_0_0_var(--act-color-danger)]";
   return "shadow-[inset_2px_0_0_var(--act-color-border-strong)]";
 }

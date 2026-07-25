@@ -9,9 +9,9 @@ import { useCallback, useEffect, useState } from "react";
 import type { BrowserBridgeStatus, FsWatchStatus } from "@actspace/shared";
 
 export const FS_WATCH_BTN_PRIMARY =
-  "inline-flex h-8 items-center rounded-act-md bg-brand px-3.5 text-[13px] font-semibold text-white transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-8 items-center rounded-act-md bg-action px-3.5 text-[13px] font-semibold text-on-action transition hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-60";
 export const FS_WATCH_BTN_SECONDARY =
-  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-line-strong hover:bg-hover-overlay disabled:cursor-not-allowed disabled:opacity-60";
 
 const STATUS_POLL_MS = 2000;
 const STATUS_ERROR_POLL_MS = 5000;
@@ -27,7 +27,7 @@ export function runStateBadge(status: FsWatchStatus): { text: string; className:
     case "running":
       return status.heartbeatFresh
         ? { text: "运行中", className: "bg-success-soft text-on-success" }
-        : { text: "启动中", className: "bg-brand-soft text-brand" };
+        : { text: "启动中", className: "bg-operational-soft text-operational" };
     case "error":
       return { text: "异常", className: "bg-danger-soft text-on-danger" };
     default:

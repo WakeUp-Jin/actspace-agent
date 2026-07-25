@@ -176,7 +176,7 @@ export function KairosNotificationTabBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
     <span
-      className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white"
+      className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-on-danger-solid"
       data-testid="kairos-notification-badge"
       aria-label={`${count} 条未读通知`}
     >
@@ -230,7 +230,7 @@ export function KairosNotificationList({ store, size = "default" }: KairosNotifi
           </span>
           <button
             type="button"
-            className="shrink-0 border-0 bg-transparent font-semibold text-brand hover:underline"
+            className="shrink-0 border-0 bg-transparent font-semibold text-action hover:underline"
             onClick={store.undoRemove}
           >
             撤销
@@ -370,7 +370,7 @@ function NotificationItem({
       className={cn(
         "group relative grid w-full cursor-pointer border-b border-line text-left transition last:border-b-0 hover:bg-surface-subtle",
         compact ? "gap-[3px] py-2 pl-0.5 pr-7" : "gap-1 py-2.5 pl-1 pr-8",
-        !n.read && "bg-brand-soft/40",
+        !n.read && "bg-selected/60",
       )}
       data-testid="kairos-notification-item"
       data-read={n.read ? "true" : "false"}
@@ -404,13 +404,13 @@ function NotificationItem({
         <i
           className={cn(
             "h-1.5 w-1.5 shrink-0 rounded-full",
-            n.level === "important" ? "bg-danger" : "bg-brand",
+            n.level === "important" ? "bg-danger" : "bg-info",
           )}
           aria-hidden="true"
         />
         <time dateTime={n.timestamp}>{formatKairosTime(n.timestamp)}</time>
         {n.level === "important" ? <span className="text-on-danger">重要</span> : null}
-        {!n.read ? <span className="text-brand-strong">未读</span> : null}
+        {!n.read ? <span className="font-semibold text-text-main">未读</span> : null}
       </span>
       <span
         className={cn(

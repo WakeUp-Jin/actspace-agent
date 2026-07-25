@@ -87,7 +87,7 @@ export function Toggle({
       onClick={() => onChange(!checked)}
       className={[
         "relative inline-flex h-[24px] w-[42px] shrink-0 items-center rounded-full transition-colors duration-150",
-        checked ? "bg-brand" : "bg-line-strong",
+        checked ? "bg-operational" : "bg-line-strong",
         disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
       ].join(" ")}
     >
@@ -172,8 +172,8 @@ export function SettingsSelect({
           disabled
             ? "cursor-not-allowed border-line opacity-60"
             : open
-              ? "cursor-pointer border-brand"
-              : "cursor-pointer border-line hover:border-brand/40",
+              ? "cursor-pointer border-focus-ring ring-2 ring-focus-ring/20"
+              : "cursor-pointer border-line hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20",
         ].join(" ")}
       >
         <span className="truncate">{selected?.label ?? value}</span>
@@ -208,7 +208,7 @@ export function SettingsSelect({
                       className={[
                         "flex w-full items-center gap-2 rounded-[7px] px-2 py-1.5 text-left text-[13px] transition-colors",
                         isSelected
-                          ? "bg-brand font-semibold text-white"
+                          ? "bg-selected font-semibold text-text-main"
                           : "font-medium text-text-main hover:bg-[var(--act-color-hover-overlay)]",
                       ].join(" ")}
                     >
@@ -307,8 +307,8 @@ export function MultiSelect({
           disabled
             ? "cursor-not-allowed border-line opacity-60"
             : open
-              ? "cursor-pointer border-brand"
-              : "cursor-pointer border-line hover:border-brand/40",
+              ? "cursor-pointer border-focus-ring ring-2 ring-focus-ring/20"
+              : "cursor-pointer border-line hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20",
         ].join(" ")}
       >
         <span className="truncate">
@@ -343,14 +343,14 @@ export function MultiSelect({
                       className={[
                         "flex w-full items-center gap-2 rounded-[7px] px-2 py-1.5 text-left text-[13px] transition-colors",
                         isSelected
-                          ? "bg-brand font-semibold text-white"
+                          ? "bg-selected font-semibold text-text-main"
                           : "font-medium text-text-main hover:bg-[var(--act-color-hover-overlay)]",
                       ].join(" ")}
                     >
                       <span
                         className={[
                           "grid h-[15px] w-[15px] shrink-0 place-items-center rounded-[4px] border",
-                          isSelected ? "border-white/80 bg-white/15" : "border-line-strong",
+                          isSelected ? "border-line-strong bg-surface" : "border-line-strong",
                         ].join(" ")}
                       >
                         <Check
@@ -508,7 +508,7 @@ export function NumberField({
         }}
         className={[
           "h-9 w-[120px] rounded-act-md border border-line bg-surface px-3 text-right text-[13px] font-medium tabular-nums text-text-main outline-none transition-colors",
-          disabled ? "cursor-not-allowed opacity-60" : "hover:border-brand/40 focus-visible:border-brand",
+          disabled ? "cursor-not-allowed opacity-60" : "hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20",
         ].join(" ")}
       />
       {suffix ? <span className="text-[12px] text-text-faint">{suffix}</span> : null}
@@ -568,7 +568,7 @@ export function TextField({
       className={[
         "h-9 rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none transition-colors",
         mono ? "font-mono" : "font-medium",
-        disabled ? "cursor-not-allowed opacity-60" : "hover:border-brand/40 focus-visible:border-brand",
+        disabled ? "cursor-not-allowed opacity-60" : "hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20",
         className ?? "w-full",
       ].join(" ")}
     />

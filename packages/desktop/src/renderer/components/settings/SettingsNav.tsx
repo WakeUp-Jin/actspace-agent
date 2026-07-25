@@ -34,7 +34,7 @@ export const SETTINGS_SECTIONS: { id: SettingsSectionId; label: string; icon: Ic
 
 const NAV_ITEM_CLASS =
   "flex h-9 items-center gap-2.5 rounded-act-md px-2.5 text-left text-[13px] font-medium transition-colors duration-[130ms] ease-in-out";
-const NAV_ITEM_ACTIVE_CLASS = "bg-brand-soft text-brand";
+const NAV_ITEM_ACTIVE_CLASS = "bg-selected font-semibold text-text-main";
 const NAV_ITEM_IDLE_CLASS = "text-text-muted hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 
 export function SettingsNav({

@@ -12,7 +12,7 @@ import type { AppSettings, SettingsUpdateInput, SkillCatalogItem } from "@actspa
 import { SectionShell, SettingGroup, Toggle } from "./SettingsPrimitives";
 
 const BTN_SECONDARY =
-  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-8 items-center rounded-act-md border border-line bg-surface px-3 text-[13px] font-semibold text-text-main transition hover:border-line-strong hover:bg-hover-overlay disabled:cursor-not-allowed disabled:opacity-60";
 
 function hasSkillsBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace?.listSkills);

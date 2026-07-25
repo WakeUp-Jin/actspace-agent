@@ -15,7 +15,7 @@ import { useRightPanel, type RightPanelTab } from "./RightPanelContext";
 const RAIL_CLASS = "flex h-full w-[200px] shrink-0 flex-col overflow-hidden border-r border-line bg-surface";
 const RAIL_BODY_CLASS = "scrollbar-none min-h-0 flex-1 overflow-auto py-1";
 const ROW_CLASS =
-  "flex w-full items-center gap-1.5 border-0 bg-transparent py-1 pr-2 text-left text-[12px] leading-none text-text-muted hover:bg-brand-soft hover:text-text-main [cursor:pointer]";
+  "flex w-full items-center gap-1.5 border-0 bg-transparent py-1 pr-2 text-left text-[12px] leading-none text-text-muted hover:bg-hover-overlay hover:text-text-main [cursor:pointer]";
 const ROW_NAME_CLASS = "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap";
 const STATE_CLASS = "px-3 py-2 text-[12px] text-text-faint";
 

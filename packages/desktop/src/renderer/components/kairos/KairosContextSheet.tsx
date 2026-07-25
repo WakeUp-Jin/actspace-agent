@@ -272,7 +272,7 @@ function PromptSegmentItem({
           {segment.sourceFiles && segment.sourceFiles.length > 0 ? (
             segment.sourceFiles.map((file) => <SourceFileBadge key={file} file={file} />)
           ) : (
-            <span className="inline-flex h-[19px] items-center rounded-full bg-warm-soft px-2 text-[10.5px] font-medium text-on-warm">
+            <span className="inline-flex h-[19px] items-center rounded-full bg-surface-subtle px-2 text-[10.5px] font-medium text-text-muted">
               运行时生成
             </span>
           )}
@@ -305,11 +305,11 @@ function SourceFileBadge({ file }: { file: string }) {
       type="button"
       onClick={onCopy}
       title={`${file}（点击复制完整路径）`}
-      className="inline-flex h-5 items-center gap-1 rounded-full border border-line bg-surface-subtle px-2 text-[11px] text-text-muted transition hover:border-line-strong hover:bg-brand-soft"
+      className="inline-flex h-5 items-center gap-1 rounded-full border border-line bg-surface-subtle px-2 text-[11px] text-text-muted transition hover:border-line-strong hover:bg-hover-overlay"
     >
       <FileText size={10} aria-hidden="true" />
       <span className="font-mono">{base}</span>
-      {copied ? <span className="ml-0.5 text-brand-strong">已复制</span> : null}
+      {copied ? <span className="ml-0.5 text-on-success">已复制</span> : null}
     </button>
   );
 }
@@ -421,7 +421,7 @@ function HistoryMessageRow({ msg }: { msg: KairosContextMessage }) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-2 text-xs text-brand-strong hover:underline"
+          className="mt-2 text-xs text-info hover:text-info-hover hover:underline"
         >
           {expanded ? "折叠" : "展开本条"}
         </button>
@@ -558,12 +558,12 @@ function roleLabel(role: KairosContextMessage["role"]): string {
 function roleBadgeClass(role: KairosContextMessage["role"]): string {
   switch (role) {
     case "user":
-      return "bg-brand-soft text-brand-strong";
+      return "bg-info-soft text-on-info";
     case "assistant":
-      return "bg-success-soft text-on-success";
+      return "bg-surface-subtle text-text-main";
     case "tool":
       return "bg-surface-subtle text-text-muted";
     case "system":
-      return "bg-warm-soft text-on-warm";
+      return "bg-surface-subtle text-text-muted";
   }
 }

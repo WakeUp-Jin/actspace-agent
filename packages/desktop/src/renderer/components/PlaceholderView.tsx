@@ -12,8 +12,8 @@ const PLACEHOLDER_VIEW_CLASS =
   "flex h-full min-h-0 items-center justify-center overflow-auto bg-app-bg px-8 py-12";
 const PLACEHOLDER_CARD_CLASS =
   "flex w-full max-w-[540px] flex-col items-start gap-3 rounded-act-lg border border-line bg-surface p-8 shadow-act-soft";
-const PLACEHOLDER_ICON_CLASS = "mb-1 grid h-12 w-12 place-items-center rounded-act-md bg-brand-soft text-brand";
-const PLACEHOLDER_EYEBROW_CLASS = "text-xs font-semibold uppercase tracking-[0.08em] text-brand";
+const PLACEHOLDER_ICON_CLASS = "mb-1 grid h-12 w-12 place-items-center rounded-act-md bg-surface-subtle text-text-muted";
+const PLACEHOLDER_EYEBROW_CLASS = "text-xs font-semibold uppercase tracking-[0.08em] text-text-muted";
 const PLACEHOLDER_TITLE_CLASS = "m-0 text-xl font-semibold leading-[1.3] text-text-main";
 const PLACEHOLDER_DESCRIPTION_CLASS = "m-0 text-sm leading-[1.55] text-text-muted";
 const PLACEHOLDER_BULLETS_CLASS =

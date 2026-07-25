@@ -150,13 +150,13 @@ const SESSION_STATUS_META: Record<SessionUiStatusKind, SessionStatusMeta> = {
   running: {
     label: "Running",
     detail: "Agent turn is currently running.",
-    dotClass: "animate-[session-status-pulse_1500ms_ease-in-out_infinite] bg-brand",
+    dotClass: "animate-[session-status-pulse_1500ms_ease-in-out_infinite] bg-operational",
     rowClass: "is-busy",
   },
   waiting_approval: {
     label: "Waiting approval",
     detail: "A tool call is paused until approval is resolved.",
-    dotClass: "animate-[session-status-pulse_1500ms_ease-in-out_infinite] bg-warm",
+    dotClass: "animate-[session-status-pulse_1500ms_ease-in-out_infinite] bg-warning",
     rowClass: "is-waiting-approval",
   },
   failed: {
@@ -168,7 +168,7 @@ const SESSION_STATUS_META: Record<SessionUiStatusKind, SessionStatusMeta> = {
   scheduled: {
     label: "Scheduled",
     detail: "A scheduled run is planned for this session.",
-    dotClass: "bg-warm",
+    dotClass: "bg-text-faint opacity-70",
     rowClass: "is-scheduled",
   },
 };
@@ -182,7 +182,7 @@ const SIDEBAR_CLASS =
 const SIDEBAR_PRIMARY_ACTIONS_CLASS = "mt-1.5 flex min-w-0 flex-col gap-px p-0";
 const SIDEBAR_PRIMARY_ACTION_CLASS =
   "flex min-h-[34px] min-w-0 items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2.5 py-0 text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
-const SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS = "text-text-main";
+const SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS = "bg-selected font-semibold text-text-main";
 const SIDEBAR_PRIMARY_ACTION_LABEL_CLASS = "min-w-0 flex-1 text-left";
 const SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS = "text-xs font-medium tracking-[0.02em] text-text-faint";
 const SIDEBAR_BUTTON_RESET_CLASS = "appearance-none border-0 bg-transparent font-[inherit]";
@@ -197,32 +197,31 @@ const NAV_SECTION_ACTION_BUTTON_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} grid h-5 w-5 place-items-center rounded-act-sm opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/nav-title:opacity-100 group-focus-within/nav-title:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-muted`;
 const SESSION_LIST_CLASS = "flex min-w-0 flex-col gap-px";
 const SESSION_ROW_CLASS =
-  "session-row group/session-row relative grid min-h-9 w-full min-w-0 grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2 rounded-act-md px-2 transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)]";
+  "session-row group/session-row relative grid min-h-9 w-full min-w-0 grid-cols-[14px_minmax(0,1fr)_46px_auto] items-center gap-2 rounded-act-md px-2 transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)]";
 const SESSION_ROW_ACTIVE_CLASS = "is-active bg-sidebar-selected";
 const SESSION_ROW_PINNED_CLASS = "is-pinned";
 const SESSION_ROW_MUTED_CLASS = "is-muted";
 const SESSION_ROW_MARKER_CLASS = "relative flex h-[14px] w-[14px] flex-none items-center justify-center";
 const SESSION_ROW_TITLE_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium";
-const SESSION_ROW_TIME_CLASS = "text-[11px] whitespace-nowrap text-text-faint";
+const SESSION_ROW_TIME_CLASS = "min-w-[22px] whitespace-nowrap text-right text-[11px] text-text-faint";
 const SESSION_ROW_MAIN_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 p-0 text-left text-text-muted transition-colors duration-[130ms] ease-in-out group-hover/session-row:text-text-main group-[.is-active]/session-row:text-text-main`;
+  `${SIDEBAR_BUTTON_RESET_CLASS} grid min-w-0 grid-cols-[minmax(0,1fr)] items-center p-0 text-left text-text-muted transition-colors duration-[130ms] ease-in-out group-hover/session-row:text-text-main group-[.is-active]/session-row:text-text-main`;
 const SESSION_ROW_MAIN_MUTED_CLASS = "text-text-muted";
 const SESSION_ROW_RENAME_INPUT_CLASS =
-  "min-w-0 rounded-act-sm border border-brand bg-surface-raised px-1.5 py-0.5 text-[13px] font-medium text-text-main outline-none shadow-[0_0_0_2px_var(--act-color-brand-soft)]";
-const SESSION_ROW_ACTIONS_CLASS = "inline-flex flex-none items-center gap-0.5";
+  "min-w-0 rounded-act-sm border border-focus-ring bg-surface-raised px-1.5 py-0.5 text-[13px] font-medium text-text-main outline-none ring-2 ring-focus-ring/20";
+const SESSION_ROW_ACTIONS_CLASS = "inline-flex w-[46px] flex-none items-center justify-end gap-0.5";
 const SESSION_ROW_ARCHIVE_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} grid h-[22px] w-[22px] flex-none place-items-center rounded-act-sm text-text-faint opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
-const SESSION_STATUS_CONTAINER_CLASS = "relative grid h-[22px] w-[22px] flex-none place-items-center";
+const SESSION_STATUS_CONTAINER_CLASS = "relative grid h-[22px] w-[14px] flex-none place-items-center";
 const SESSION_STATUS_BUTTON_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} session-status-button grid h-[22px] w-[22px] place-items-center rounded-act-sm text-text-faint transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main focus-visible:bg-[var(--act-color-hover-overlay)] focus-visible:text-text-main`;
-const SESSION_STATUS_BUTTON_DOT_CLASS = "h-1.5 w-1.5 rounded-full";
 const SESSION_STATUS_MENU_CLASS =
-  "session-status-menu absolute right-0 top-6 z-20 w-44 rounded-act-md border border-line bg-surface-raised px-2 py-1.5 text-left text-[12px] shadow-act-popover";
+  "session-status-menu absolute left-0 top-6 z-20 w-44 rounded-act-md border border-line bg-surface-raised px-2 py-1.5 text-left text-[12px] shadow-act-popover";
 const SESSION_STATUS_MENU_LABEL_CLASS = "font-medium text-text-main";
 const SESSION_STATUS_MENU_DETAIL_CLASS = "mt-0.5 leading-snug text-text-faint";
 const SESSION_ROW_PIN_CLASS =
-  `${SIDEBAR_BUTTON_RESET_CLASS} session-row-pin absolute inset-0 grid h-[14px] w-[14px] place-items-center rounded-act-sm text-text-muted opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
-const SESSION_ROW_PIN_ACTIVE_CLASS = "is-active opacity-100 text-text-main";
+  `${SIDEBAR_BUTTON_RESET_CLASS} session-row-pin grid h-[22px] w-[22px] flex-none place-items-center rounded-act-sm text-text-muted opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/session-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
+const SESSION_ROW_PIN_ACTIVE_CLASS = "is-active text-text-main";
 const SESSION_CONTEXT_MENU_CLASS =
   "session-context-menu fixed z-[80] rounded-act-md border border-line bg-surface-raised p-1 text-[13px] text-text-main shadow-act-popover";
 const SESSION_CONTEXT_MENU_ITEM_CLASS =
@@ -230,10 +229,10 @@ const SESSION_CONTEXT_MENU_ITEM_CLASS =
 const SESSION_CONTEXT_MENU_ICON_CLASS = "h-4 w-4 text-text-muted";
 const SESSION_CONTEXT_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
 const SESSION_STATUS_DOT_CLASS =
-  "session-status-dot h-1.5 w-1.5 rounded-full bg-brand transition-opacity duration-[130ms] ease-in-out";
+  "session-status-dot h-1.5 w-1.5 rounded-full bg-operational transition-opacity duration-[130ms] ease-in-out";
 const SESSION_STATUS_DOT_MUTED_CLASS = "is-muted bg-text-faint opacity-55";
-const SESSION_STATUS_DOT_ACTIVE_CLASS = "is-active bg-brand";
-const SESSION_STATUS_DOT_BUSY_CLASS = "is-busy animate-[session-status-pulse_1500ms_ease-in-out_infinite] bg-brand";
+const SESSION_STATUS_DOT_ACTIVE_CLASS = "is-active bg-operational";
+const SESSION_STATUS_DOT_BUSY_CLASS = "is-busy animate-[session-status-pulse_1500ms_ease-in-out_infinite] bg-operational";
 const SESSION_LIST_TOGGLE_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} inline-flex h-[26px] items-center px-[18px] pt-0.5 text-left text-xs font-medium text-text-faint transition-colors duration-[130ms] ease-in-out hover:text-text-main`;
 const WORKSPACE_SECTION_CLASS = `${NAV_SECTION_CLASS} gap-0.5`;
@@ -304,7 +303,7 @@ type SessionRowProps = {
   onArchive?: () => void;
 };
 
-function SessionStatusButton({ status }: { status: unknown }) {
+function SessionStatusButton({ status, dotClass }: { status: unknown; dotClass: string }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const resolvedStatus = resolveSessionStatus(status);
@@ -345,7 +344,7 @@ function SessionStatusButton({ status }: { status: unknown }) {
           setOpen((value) => !value);
         }}
       >
-        <span className={`${SESSION_STATUS_BUTTON_DOT_CLASS} ${meta.dotClass}`} aria-hidden="true" />
+        <span className={dotClass} aria-hidden="true" />
       </button>
       {open ? (
         <div className={SESSION_STATUS_MENU_CLASS} role="status">
@@ -475,7 +474,34 @@ function SessionRow({
       role="presentation"
     >
       <span className={`session-row-marker ${SESSION_ROW_MARKER_CLASS}`}>
-        <span className={dotClass} aria-hidden="true" />
+        <SessionStatusButton status={resolvedStatus} dotClass={dotClass} />
+      </span>
+      {isRenaming ? (
+        <div
+          className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && resolvedStatus === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
+        >
+          <input
+            ref={inputRef}
+            className={`session-row-rename-input ${SESSION_ROW_RENAME_INPUT_CLASS}`}
+            value={draftTitle}
+            aria-label={`Rename session ${displayTitle}`}
+            onChange={(event) => setDraftTitle(event.target.value)}
+            onClick={(event) => event.stopPropagation()}
+            onBlur={commitRename}
+            onKeyDown={handleRenameKeyDown}
+          />
+        </div>
+      ) : (
+        <button
+          className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && resolvedStatus === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
+          type="button"
+          onClick={onSelect}
+          aria-current={isActive ? "page" : undefined}
+        >
+          <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>{displayTitle}</span>
+        </button>
+      )}
+      <div className={`session-row-actions ${SESSION_ROW_ACTIONS_CLASS}`}>
         {onTogglePin ? (
           <button
             className={`${SESSION_ROW_PIN_CLASS} ${session.pinned ? SESSION_ROW_PIN_ACTIVE_CLASS : ""}`}
@@ -494,42 +520,8 @@ function SessionRow({
             )}
           </button>
         ) : null}
-      </span>
-      {isRenaming ? (
-        <div
-          className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && resolvedStatus === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
-        >
-          <input
-            ref={inputRef}
-            className={`session-row-rename-input ${SESSION_ROW_RENAME_INPUT_CLASS}`}
-            value={draftTitle}
-            aria-label={`Rename session ${displayTitle}`}
-            onChange={(event) => setDraftTitle(event.target.value)}
-            onClick={(event) => event.stopPropagation()}
-            onBlur={commitRename}
-            onKeyDown={handleRenameKeyDown}
-          />
-          <span className={`session-row-time ${SESSION_ROW_TIME_CLASS} opacity-0`} aria-hidden="true">
-            {formatRelativeTime(session.updatedAt)}
-          </span>
-        </div>
-      ) : (
         <button
-          className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && resolvedStatus === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
-          type="button"
-          onClick={onSelect}
-          aria-current={isActive ? "page" : undefined}
-        >
-          <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>{displayTitle}</span>
-          <span className={`session-row-time ${SESSION_ROW_TIME_CLASS} ${isActive ? "opacity-0" : ""}`} aria-hidden={isActive}>
-            {formatRelativeTime(session.updatedAt)}
-          </span>
-        </button>
-      )}
-      <div className={`session-row-actions ${SESSION_ROW_ACTIONS_CLASS}`}>
-        <SessionStatusButton status={resolvedStatus} />
-        <button
-          className={`session-row-archive ${SESSION_ROW_ARCHIVE_CLASS} ${archiveDisabled ? "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-text-faint" : ""}`}
+          className={`session-row-archive ${SESSION_ROW_ARCHIVE_CLASS} ${archiveDisabled ? "cursor-not-allowed group-hover/session-row:opacity-40 focus-visible:opacity-40 hover:bg-transparent hover:text-text-faint" : ""}`}
           type="button"
           disabled={archiveDisabled}
           aria-label={archiveLabel}
@@ -542,6 +534,9 @@ function SessionRow({
           <Archive size={12} strokeWidth={1.9} />
         </button>
       </div>
+      <span className={`session-row-time ${SESSION_ROW_TIME_CLASS}`}>
+        {formatRelativeTime(session.updatedAt)}
+      </span>
       {menuPosition ? (
         <div
           ref={menuRef}

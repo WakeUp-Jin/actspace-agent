@@ -67,8 +67,9 @@ const BRIDGE_SCRIPT = `<script>(function(){
 })();</script>`;
 
 function baselineStyle(theme: ResolvedTheme): string {
-  const bg = theme === "dark" ? "#1b1d22" : "#ffffff";
-  const fg = theme === "dark" ? "#e6e7ea" : "#1f2329";
+  // srcDoc 不能继承父文档 CSS variables，因此这里与 tokens.css 的 surface / text 主色保持精确同步。
+  const bg = theme === "dark" ? "#242522" : "#ffffff";
+  const fg = theme === "dark" ? "#f1f1ed" : "#20201e";
   // 只设默认色与排版基线，不覆盖产物自带样式。
   return `<style>:root{color-scheme:${theme};}html{background:${bg};color:${fg};}body{margin:0;padding:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.6;}</style>`;
 }

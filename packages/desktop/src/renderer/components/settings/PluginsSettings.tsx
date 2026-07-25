@@ -306,7 +306,7 @@ export function PluginsSection({
               {status.runState === "error" ? (
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 font-semibold text-brand hover:underline"
+                  className="inline-flex items-center gap-1 font-semibold text-info hover:text-info-hover hover:underline"
                   onClick={() => void retry()}
                   disabled={busy}
                 >
@@ -509,9 +509,9 @@ function browserBridgeBadge(status: BrowserBridgeStatus | null): { text: string;
     case "ready":
       return { text: "已连接", className: "bg-success-soft text-on-success" };
     case "extension_offline":
-      return { text: "扩展未连接", className: "bg-warm-soft text-on-warm" };
+      return { text: "扩展未连接", className: "bg-warning-soft text-on-warning" };
     case "host_not_installed":
-      return { text: "Host 未安装", className: "bg-warm-soft text-on-warm" };
+      return { text: "Host 未安装", className: "bg-warning-soft text-on-warning" };
     case "error":
       return { text: "异常", className: "bg-danger-soft text-on-danger" };
     case "not_installed":

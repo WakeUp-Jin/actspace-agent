@@ -2,11 +2,11 @@
 
 ## 状态
 
-- 状态：Active / 等待执行批准
+- 状态：Active / 代码与工程验证完成，等待用户最终人工 UI 验收
 - 设计系统：`ActSpace Editor Design System`
 - 视觉方向：`Ink & Emerald / 墨色与翡翠绿`
 - 改动类型：前端主题 token、组件状态和页面视觉迁移
-- 当前阶段：只完成计划，未修改 renderer 代码
+- 当前阶段：里程碑 0–7 的代码与文档迁移已完成；未归档前保留人工 UI 验收门
 
 ## 目标
 
@@ -42,9 +42,9 @@
 
 历史 PNG / HTML 可用于理解结构和交互，不能覆盖上述文字规范的颜色职责。
 
-## 当前实现基线
+## 迁移前实现基线
 
-2026-07-25 扫描 `packages/desktop/src/renderer` 得到：
+2026-07-25 在主仓库未提交工作区扫描 `packages/desktop/src/renderer` 得到以下历史快照：
 
 - 40 个 TSX / TS / CSS 文件仍消费 `brand` 或 `--act-color-brand*`。
 - 159 行直接包含 `brand` 相关使用。
@@ -62,6 +62,10 @@ rg -l --glob '*.{tsx,ts,css}' "brand|--act-color-brand" packages/desktop/src/ren
 rg -n --glob '*.{tsx,ts,css}' "brand|--act-color-brand" packages/desktop/src/renderer
 rg -n --glob '*.{tsx,ts,css}' "text-black|bg-black|bg-white|text-\[#|bg-\[#|border-\[#|rgba\(" packages/desktop/src/renderer
 ```
+
+完整逐行分类见 `20260725-frontend-color-system-migration-audit.md`。该审计保留主仓库未提交工作区的 40 文件 / 159 行历史快照；用户选择以独立 worktree 一次性交付，因此实际迁移基线为 36 文件 / 147 行。多供应商分支额外 4 个 Settings 文件没有在开发阶段跨功能复制；合并到 `main` 时统一纳入 `check:frontend-theme` 集成检查。
+
+迁移结果：当前 worktree 的 renderer 中旧 `brand` 与旧 `warm` 命名均为 0；三态 token、Tailwind 映射、语义测试和防回流脚本已落地。
 
 ## 范围
 
@@ -150,12 +154,12 @@ selected / focus-ring / operational-focus-ring
 
 1. 用 `rg` 生成完整 `brand` 消费者清单。
 2. 为每个消费点标记 `neutral / action / operational / info / warning / danger / visualization / diff / legal-literal`。
-3. 保存当前浅色、深色的 Sidebar、Composer、Settings、Usage、Kairos 截图作为 before 基线。
+3. 保存浅色、深色的 Sidebar、Composer、Settings、Usage、Kairos before 基线；主仓库 40 文件 / 159 行快照用于完整分类，当前 worktree 的实际迁移范围为 36 文件 / 147 行。
 4. 记录当前 computed style，至少包含 app background、sidebar、surface、selected row、send button、Toggle on、focus ring 和 danger state。
 
 ### 产物
 
-- plan 内更新后的消费者分类统计。
+- plan 内更新后的消费者分类统计，以及 `20260725-frontend-color-system-migration-audit.md` 全量逐行分类表。
 - before 截图和 computed-style 记录，放入当次 history 或明确的验收记录。
 
 ### 验收
@@ -168,13 +172,15 @@ selected / focus-ring / operational-focus-ring
 ### 任务
 
 1. 新增 `docs/design-docs/frontend/ink-emerald-color-preview.html`。
-2. 同一 HTML 内提供 Light / Dark 切换，不依赖外部资源。
+2. 同一 HTML 内提供 Light / Dark / System-Light / System-Dark 切换，不依赖外部资源。
 3. 样板只覆盖三个代表切片：
    - Sidebar：normal / hover / selected / running / waiting approval / failed。
    - Composer：idle / focused / attachment / context warning / running / disabled send。
    - Settings：nav selected / group surface / Toggle on-off / primary-secondary-danger button / input focus。
 4. 展示 neutral、action、operational、info、warning、danger 和图表系列的完整状态组，但不把样板做成营销式色板页。
-5. 在 `docs/design-docs/frontend/README.md` 中增加样板入口和审批状态。
+5. 内置关键前景 / 背景对比度矩阵；低于阈值的 selected 或弱边界必须展示非颜色冗余表达，不允许把不合格组合留到迁移后再修。
+6. 将本轮相对 DESIGN.md 起始色值的可访问性校准单独列出，样板批准后再回写最终 token 值。
+7. 在 `docs/design-docs/frontend/README.md` 中增加样板入口和审批状态。
 
 ### 视觉审批门
 
@@ -387,8 +393,8 @@ selected / focus-ring / operational-focus-ring
 3. 删除 `tokens.css` 中无消费者的 `--act-color-brand*`、`--color-brand*`、`--accent*` 和 `--surface-blue` alias。
 4. 新增 `scripts/check-frontend-theme-colors.mjs`：
    - 拒绝新增 `brand` utility / variable 消费。
-   - 拒绝交互组件中新增 `text-black / bg-white / arbitrary hex / arbitrary rgba`。
-   - 允许 token 定义、overlay、shadow、Toggle thumb、媒体装饰和第三方品牌色的窄范围 allowlist。
+   - 拒绝交互组件中新增 `text-black / text-white / bg-black / bg-white`，以及 text / bg / border / ring / outline / fill / stroke / gradient 中的 arbitrary hex、rgb(a)、hsl(a)、oklch。
+   - 允许 token 定义、overlay、shadow、Toggle thumb、媒体装饰和第三方品牌色的窄范围 allowlist；allowlist 精确到文件 + 字面量或模式 + 用途说明，不豁免整个目录。
    - 检查新语义 token 在 light / dark / system-dark 三处都存在。
 5. 在根 `package.json` 增加 `check:frontend-theme`，并纳入仓库 CI 或 `check:repo` 的稳定检查链。
 6. 更新 `front-主题与配色规范.md`，将“目标设计”状态改为“已落地”，并写清最终 token 名。
@@ -451,7 +457,7 @@ git diff --check
 
 使用 `http://127.0.0.1:5173/` 验证布局和组件状态，覆盖：
 
-- 浅色 / 深色 / system。
+- Light / Dark / System-Light / System-Dark。
 - 1440×900 标准工作台尺寸。
 - 1100×720 紧凑桌面尺寸。
 - Sidebar、Composer、Settings、Message tools、Right Panel、Usage、Kairos。
@@ -528,16 +534,19 @@ git diff --check
 
 - [x] 确认 `Ink & Emerald` 设计方向和颜色职责。
 - [x] 扫描当前 renderer 的 brand 与颜色字面量基线。
+- [x] 完成 40 文件 / 159 行 brand 消费者逐行分类审计。
 - [x] 生成可执行的配色迁移计划。
-- [ ] 用户批准本 plan。
-- [ ] 完成三个浅深视觉样板并获得确认。
-- [ ] 完成 token 地基与契约检查。
-- [ ] 完成 Sidebar、Composer、Settings 黄金切片。
-- [ ] 完成消息流、右侧面板和 Kairos。
-- [ ] 完成 Usage、Context 和 Lab。
-- [ ] 删除旧 brand alias，建立防回流检查。
-- [ ] 完成全量工程、浏览器、Electron 和可访问性验收。
-- [ ] 同步 history / learning / 设计文档并将 plan 归档。
+- [x] 用户批准本 plan，并批准在当前 worktree 一次性执行全部里程碑。
+- [x] 生成 Sidebar、Composer、Settings Light / Dark / System-Light / System-Dark 视觉样板。
+- [x] 获得视觉样板人工确认。
+- [x] 完成 token 地基与契约检查。
+- [x] 完成 Sidebar、Composer、Settings 黄金切片。
+- [x] 完成消息流、右侧面板和 Kairos。
+- [x] 完成 Usage、Context 和 Lab。
+- [x] 删除旧 brand / warm alias，建立防回流检查。
+- [x] 合并到 `main`，并迁移多供应商 Settings 新增消费者中的旧 `brand` 用法。
+- [ ] 完成用户人工 UI 验收（Light / Dark / System、Electron Retina、完整页面状态）。
+- [x] 同步 history / learning / 设计文档；人工验收通过后将 plan 归档。
 
 ## 决策记录
 
@@ -546,3 +555,9 @@ git diff --check
 - 2026-07-25：发送按钮保留 ink action，Toggle / running / connected 迁移为 operational green。
 - 2026-07-25：selected / hover / normal focus 改为 neutral，info blue 只保留在信息和数据编码中。
 - 2026-07-25：旧 brand alias 只在消费者清零、全量验收通过后删除。
+- 2026-07-25：视觉样板阶段将 text-faint、light warning 和 line-strong 做可访问性候选校准；确认后才回写生产 token。
+- 2026-07-25：system 主题验收拆为 System-Light 与 System-Dark 两个实际渲染分支。
+- 2026-07-25：用户确认视觉样板无明显问题，并授权当前 worktree 一次性完成剩余里程碑。
+- 2026-07-25：实际交付以 worktree 的 36 文件 / 147 行快照为准；不把主仓库未提交的多供应商功能跨边界复制进配色分支。
+- 2026-07-25：用户选择自行完成最终 UI 人工验收；Agent 完成工程验证并保留本地 renderer 服务供检查。
+- 2026-07-25：配色分支合并到含多供应商功能的 `main`；保留主线业务逻辑与规范化文档目录，并由主题防回流检查驱动迁移 5 处新出现的旧 `brand` 消费者。

@@ -4,6 +4,12 @@
 
 当前产品级设计系统名称为 **ActSpace Editor Design System**，内部视觉方向为 **Ink & Emerald / 墨色与翡翠绿**。总纲见仓库根目录 `DESIGN.md`。
 
+## 当前阶段
+
+- `Ink & Emerald` renderer token 与组件迁移已完成，旧 `brand` / `warm` 消费者已清零。
+- 工程验证与防回流检查已落地；真实 Electron / Retina 与完整页面状态保留人工验收。
+- [打开 Sidebar / Composer / Settings 四态主题样板](ink-emerald-color-preview.html)。
+
 ## 总目标
 
 - 让 ActSpace 呈现为真实的桌面编辑与 Agent 工作工具，而不是普通网页聊天页。
