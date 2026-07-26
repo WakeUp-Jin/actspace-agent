@@ -1,3 +1,5 @@
+import { isAbsolute, relative, resolve, sep } from "node:path";
+
 /**
  * bash 文本层规则分级表（单一事实源）
  *
@@ -24,6 +26,7 @@ const UNICODE_WHITESPACE_RE = /[\u00A0\u1680\u180E\u2000-\u200B\u2028\u2029\u202
 const UNSUPPORTED_SHELL_SYNTAX_RE = /[|<>`$(){}]/;
 const EVAL_LIKE_COMMANDS = new Set(["eval", "source", ".", "exec", "builtin", "fc", "trap"]);
 const DELETE_COMMANDS = new Set(["rm", "rmdir"]);
+const SHELL_GLOB_RE = /[*?\[]/;
 
 /** 整条命令级 hard reject（不依赖分段）。 */
 export function getCommandHardRejectReason(command: string): string | undefined {
@@ -63,14 +66,46 @@ export function getSegmentHardRejectReason(segment: string): string | undefined 
 }
 
 function isDangerousDelete(segment: string): boolean {
-  const tokens = segment.split(/\s+/).slice(1);
-  if (!tokens.length) return true;
+  const tokens = tokenizeSimpleShellSegment(segment);
+  if (!tokens || tokens.length < 2) return true;
 
-  return tokens.some((token) => {
-    if (token.startsWith("-")) return token.includes("r") || token.includes("f");
-    if (token.includes("*")) return true;
+  return getCommandTargets(tokens).some((token) => {
+    if (SHELL_GLOB_RE.test(token)) return true;
     return isCriticalPath(token);
   });
+}
+
+/**
+ * Bash 可以承担目录删除，但只有明确位于 workspace 内部的目标才能进入 ask。
+ * workspace 根、越界路径、glob 和 .git 树仍然 hard reject。
+ */
+export function getDeleteBoundaryHardRejectReason(
+  segment: string,
+  cwd: string,
+  workspaceRoot: string,
+): string | undefined {
+  const tokens = tokenizeSimpleShellSegment(segment);
+  if (!tokens) return "Delete command arguments cannot be safely parsed";
+  if (!DELETE_COMMANDS.has(tokens[0] ?? "")) return undefined;
+
+  const targets = getCommandTargets(tokens);
+  if (targets.length === 0) return "Delete command has no explicit target";
+
+  for (const target of targets) {
+    if (SHELL_GLOB_RE.test(target)) return "Delete command uses a glob target";
+
+    const resolvedTarget = resolve(cwd, target);
+    const relativeTarget = relative(workspaceRoot, resolvedTarget);
+    if (relativeTarget === "") return "Delete command targets the workspace root";
+    if (relativeTarget === ".." || relativeTarget.startsWith(`..${sep}`) || isAbsolute(relativeTarget)) {
+      return "Delete command target escapes the workspace boundary";
+    }
+
+    const pathParts = relativeTarget.split(/[\\/]+/).filter(Boolean);
+    if (pathParts.includes(".git")) return "Delete command targets the .git directory tree";
+  }
+
+  return undefined;
 }
 
 function isCriticalPath(token: string): boolean {
@@ -89,7 +124,8 @@ function isCriticalPath(token: string): boolean {
 }
 
 function targetsGitDirectory(segment: string): boolean {
-  const tokens = segment.trim().split(/\s+/);
+  const tokens = tokenizeSimpleShellSegment(segment);
+  if (!tokens) return false;
   const first = tokens[0];
   if (first !== "rm" && first !== "rmdir" && first !== "mv") return false;
   return tokens.slice(1).some((token) => {
@@ -206,9 +242,66 @@ export function isAllowedDevelopmentCommand(segment: string): boolean {
 // ─── 共用小工具 ───
 
 export function getFirstToken(segment: string): string {
-  return segment.trim().split(/\s+/)[0] ?? "";
+  return tokenizeSimpleShellSegment(segment)?.[0] ?? "";
 }
 
 function stripQuotes(token: string): string {
   return token.replace(/^['"]|['"]$/g, "");
+}
+
+function getCommandTargets(tokens: string[]): string[] {
+  const targets: string[] = [];
+  let optionsEnded = false;
+  for (const token of tokens.slice(1)) {
+    if (!optionsEnded && token === "--") {
+      optionsEnded = true;
+      continue;
+    }
+    if (!optionsEnded && token.startsWith("-")) continue;
+    targets.push(token);
+  }
+  return targets;
+}
+
+/** 解析本工具允许的简单 shell 子集：空白、单双引号与反斜杠转义。 */
+function tokenizeSimpleShellSegment(segment: string): string[] | undefined {
+  const tokens: string[] = [];
+  let current = "";
+  let quote: "single" | "double" | undefined;
+  let escaping = false;
+
+  const pushCurrent = () => {
+    if (current.length === 0) return;
+    tokens.push(current);
+    current = "";
+  };
+
+  for (const char of segment.trim()) {
+    if (escaping) {
+      current += char;
+      escaping = false;
+      continue;
+    }
+    if (char === "\\" && quote !== "single") {
+      escaping = true;
+      continue;
+    }
+    if (char === "'" && quote !== "double") {
+      quote = quote === "single" ? undefined : "single";
+      continue;
+    }
+    if (char === '"' && quote !== "single") {
+      quote = quote === "double" ? undefined : "double";
+      continue;
+    }
+    if (/\s/.test(char) && quote === undefined) {
+      pushCurrent();
+      continue;
+    }
+    current += char;
+  }
+
+  if (escaping || quote !== undefined) return undefined;
+  pushCurrent();
+  return tokens;
 }

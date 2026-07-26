@@ -475,7 +475,7 @@ interface PersistedSettingsV2 {
 - renderer 的 `AppSettings` 只收到 `hasApiKey`、连接状态和非敏感配置。
 - 明文 key 只在 main / agent-core 创建 runtime config、连接测试和目录请求时短暂使用。
 
-Electron 真实 turn 应逐步从“把设置写回 `process.env` 后再读取”迁移到显式 `ProviderRuntimeConfig` 装配。环境变量入口继续保留给 CLI、CI、测试和兼容场景，但新增供应商不应继续扩张散落的手写 Map。
+Electron 的真实 turn、上下文压缩、Explore/Kairos、评估候选和回复可视化等直接 LLM 消费路径统一通过 `ModelRuntimeService` 装配显式 `ProviderRuntimeConfig`；不把 `safeStorage` 中的 LLM Key 回写 `process.env`。环境变量入口继续只保留给 CLI、CI、测试和兼容场景，但新增供应商不应继续扩张散落的手写 Map。
 
 ## IPC 边界
 

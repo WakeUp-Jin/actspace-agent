@@ -19,6 +19,16 @@
 - `cache-audit/`：缓存低命中排障旁路目录，仅在低缓存事件附近固化上下文快照。
 - `eval-candidates/`：只在用户显式执行 `/eval` 后生成的失败回归 Candidate，包含 `candidate.json`、`case.json` 和 `fixture/`。
 
+### 会话 Fork
+
+会话 Fork 以源会话当前已持久化的目录为快照，创建一个可独立继续运行的新会话。它不是简单复用源目录：持久化层会复制 `meta.json`、`session.jsonl`、`context-state.json`、`attachments/`、SubAgent transcript 与其他 session sidecar，并在复制后的结构化 JSON / JSONL 中重写会话身份和指向源会话目录的内部路径引用。
+
+- 新会话使用新的 `sessionId`，标题为 `<原标题> (fork)`，继承 workspace、turn 计数和已有上下文。
+- 新会话默认取消 pinned / archived 状态，创建完成后源会话保持不变。
+- 已完成历史事件的 event / turn 标识继续保留，用来表达分支前的共同历史；后续新 turn 再生成自己的事件标识。
+- renderer 通过 preload + `session:fork` IPC 请求 Fork，不能直接复制 `userData` 文件。
+- 运行中或等待审批的会话禁止 Fork；renderer 负责禁用入口，Main Process 仍会用 active turn 状态做第二层拒绝，避免复制半截 turn。
+
 ## `session.jsonl` 与 `context-state.json`
 
 `session.jsonl` 是会话恢复事实来源，保存稳定的 SessionEvent。

@@ -1072,16 +1072,18 @@ function createToolUiPreview(
     case "bash": {
       const command = stringArg(args.command, "") || getBashManagementCommand(toolName, args);
       const intent = typeof args.intent === "string" && args.intent.trim().length > 0 ? args.intent.trim() : undefined;
+      const denied = !ok && isBashDeniedBeforeExecutionOutput(output);
       return {
         kind: "bash",
-        status: ok ? "success" : "failed",
-        title: ok ? "Bash command" : "Bash command failed",
+        status: ok ? "success" : denied ? "denied" : "failed",
+        title: ok ? "Bash command" : denied ? "Bash command denied" : "Bash command failed",
         command,
         commandPreview: command.split(/\s+/).slice(0, 3).join(" "),
         cwd: typeof args.cwd === "string" ? args.cwd : undefined,
         stdout: ok ? output : undefined,
         stderr: ok ? undefined : output,
         intent,
+        notExecuted: !ok && isBashNotExecutedOutput(output) ? true : undefined,
       };
     }
 
@@ -1253,6 +1255,16 @@ function isDeleteDeniedOutput(output: string): boolean {
     /\bApproval timed out for tool:\s*delete_file\b/.test(output);
 }
 
+function isBashDeniedBeforeExecutionOutput(output: string): boolean {
+  return /\bPermission denied before execution for tool bash\b/.test(output) ||
+    /\bUser denied tool:\s*bash\b/.test(output);
+}
+
+function isBashNotExecutedOutput(output: string): boolean {
+  return isBashDeniedBeforeExecutionOutput(output) ||
+    /\bBash sandbox initialization failed before execution\b/.test(output);
+}
+
 function getMediaAnalysisPreviewText(mediaName: string, mediaKind: "image" | "video" | "media"): string {
   const label = mediaKind === "image" ? "image" : mediaKind === "video" ? "video" : "media";
   return `Analyze ${label} ${mediaName}`;
@@ -1399,6 +1411,7 @@ function mapAgentEventToStreamEvent(
         command: typeof event.request.args.command === "string" ? event.request.args.command : undefined,
         riskLevel: event.request.riskLevel,
         approvalScope: event.request.approvalScope,
+        executionEnvironment: event.request.executionEnvironment,
         sessionId,
         turnId,
       };

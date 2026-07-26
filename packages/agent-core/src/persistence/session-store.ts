@@ -5,7 +5,7 @@
  * 所有写入操作返回 WriteResult，错误不抛出。
  */
 
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type {
   AgentTurnResult,
@@ -63,6 +63,147 @@ export async function createSessionRecord(
     throw new Error(`Failed to read created session: ${sessionId}`);
   }
   return record;
+}
+
+const SESSION_SCOPED_PATH_KEYS = new Set([
+  "attachmentsDir",
+  "filePath",
+  "historyRefPath",
+  "outputFilePath",
+  "outputPath",
+  "path",
+  "root",
+  "sessionJsonlPath",
+  "sessionPath",
+]);
+
+function rewriteSessionScopedValue(
+  value: unknown,
+  source: { id: string; root: string },
+  target: { id: string; root: string },
+  key?: string,
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => rewriteSessionScopedValue(item, source, target));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [
+        entryKey,
+        rewriteSessionScopedValue(entryValue, source, target, entryKey),
+      ]),
+    );
+  }
+
+  if (typeof value !== "string") return value;
+  if (key === "sessionId" && value === source.id) return target.id;
+  if (!key || !SESSION_SCOPED_PATH_KEYS.has(key)) return value;
+
+  if (value === source.root) return target.root;
+  if (value.startsWith(`${source.root}/`) || value.startsWith(`${source.root}\\`)) {
+    return `${target.root}${value.slice(source.root.length)}`;
+  }
+  return value;
+}
+
+async function rewriteStructuredSessionFile(
+  filePath: string,
+  source: { id: string; root: string },
+  target: { id: string; root: string },
+): Promise<void> {
+  const raw = await readFile(filePath, "utf-8");
+
+  if (filePath.endsWith(".jsonl")) {
+    const rewritten = raw.split("\n").map((line) => {
+      if (!line.trim()) return line;
+      try {
+        return JSON.stringify(rewriteSessionScopedValue(JSON.parse(line), source, target));
+      } catch {
+        return line;
+      }
+    }).join("\n");
+    await writeFile(filePath, rewritten);
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    const rewritten = rewriteSessionScopedValue(parsed, source, target);
+    await writeFile(filePath, JSON.stringify(rewritten, null, 2));
+  } catch {
+    // 非结构化或损坏的 sidecar 保持原样；canonical 恢复逻辑仍会报告其解析问题。
+  }
+}
+
+async function rewriteStructuredSessionFiles(
+  root: string,
+  source: { id: string; root: string },
+  target: { id: string; root: string },
+): Promise<void> {
+  const entries = await readdir(root, { withFileTypes: true });
+  await Promise.all(entries.map(async (entry) => {
+    const path = join(root, entry.name);
+    if (entry.isDirectory()) {
+      await rewriteStructuredSessionFiles(path, source, target);
+      return;
+    }
+    if (entry.isFile() && (entry.name.endsWith(".json") || entry.name.endsWith(".jsonl"))) {
+      await rewriteStructuredSessionFile(path, source, target);
+    }
+  }));
+}
+
+/**
+ * 从一个稳定 session head 创建独立分支。
+ * 复制 session 目录内全部产物，并重写结构化文件中的 sessionId 与会话目录引用。
+ */
+export async function forkSessionRecord(
+  sessionRoot: string,
+  sourceSessionId: string,
+): Promise<SessionRecord> {
+  if (!isSafePathSegment(sourceSessionId)) {
+    throw new Error("Invalid source session id");
+  }
+
+  const sourceRoot = join(sessionRoot, sourceSessionId);
+  const sourcePaths = createSessionStorePaths(sourceRoot);
+  const sourceRecord = await readSessionRecord(sourcePaths);
+  if (!sourceRecord) {
+    throw new Error(`Session not found: ${sourceSessionId}`);
+  }
+
+  const targetSessionId = createSessionId();
+  const targetRoot = join(sessionRoot, targetSessionId);
+  const targetPaths = createSessionStorePaths(targetRoot);
+  const sourceRef = { id: sourceSessionId, root: sourceRoot };
+  const targetRef = { id: targetSessionId, root: targetRoot };
+
+  try {
+    await cp(sourceRoot, targetRoot, { recursive: true, errorOnExist: true, force: false });
+    await rewriteStructuredSessionFiles(targetRoot, sourceRef, targetRef);
+
+    const now = new Date().toISOString();
+    const targetMeta = {
+      ...sourceRecord.meta,
+      id: targetSessionId,
+      title: `${sourceRecord.meta.title} (fork)`,
+      createdAt: now,
+      updatedAt: now,
+      pinned: false,
+      archived: false,
+    };
+    await writeFile(targetPaths.metaPath, JSON.stringify(targetMeta, null, 2));
+
+    const targetRecord = await readSessionRecord(targetPaths);
+    if (!targetRecord) {
+      throw new Error(`Failed to read forked session: ${targetSessionId}`);
+    }
+    return targetRecord;
+  } catch (error) {
+    await rm(targetRoot, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 /** 更新 session 的 pinned 状态 */

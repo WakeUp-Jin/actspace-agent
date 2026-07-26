@@ -74,6 +74,7 @@ import type {
   SessionArchiveInput,
   SessionArchiveResult,
   SessionCreateInput,
+  SessionForkInput,
   SessionEvent,
   SessionGetInput,
   SessionListInput,
@@ -169,6 +170,7 @@ contextBridge.exposeInMainWorld("actspace", {
   getProviderBalance: (input: ProviderBalanceGetInput) =>
     ipcRenderer.invoke("provider:balance:get", input) as Promise<ProviderBalanceSnapshot>,
   createSession: (input?: SessionCreateInput) => ipcRenderer.invoke("session:create", input ?? {}) as Promise<SessionRecord>,
+  forkSession: (input: SessionForkInput) => ipcRenderer.invoke("session:fork", input) as Promise<SessionRecord>,
   pinSession: (input: SessionPinInput) => ipcRenderer.invoke("session:pin", input) as Promise<SessionPinResult>,
   renameSession: (input: SessionRenameInput) =>
     ipcRenderer.invoke("session:rename", input) as Promise<SessionRenameResult>,

@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import {
+  AlignLeft,
   Archive,
   ArrowDownUp,
   BarChart3,
   ChevronDown,
   ChevronRight,
+  Copy,
   Folder,
   FolderPlus,
+  GitFork,
+  Hash,
   MoreHorizontal,
   Pencil,
   Pin,
@@ -32,7 +36,7 @@ const DEFAULT_WORKSPACE_KEY = "__default__";
 const DEFAULT_WORKSPACE_LABEL = "Default workspace";
 const SESSION_VISIBLE_LIMIT = 8;
 const SESSION_CONTEXT_MENU_WIDTH = 184;
-const SESSION_CONTEXT_MENU_MAX_HEIGHT = 140;
+const SESSION_CONTEXT_MENU_MAX_HEIGHT = 220;
 const SESSION_CONTEXT_MENU_MARGIN = 8;
 
 function formatRelativeTime(timestamp: string): string {
@@ -223,6 +227,8 @@ const SESSION_ROW_PIN_CLASS =
 const SESSION_ROW_PIN_ACTIVE_CLASS = "is-active text-text-main";
 const SESSION_CONTEXT_MENU_CLASS =
   "session-context-menu fixed z-[80] rounded-act-md border border-line bg-surface-raised p-1 text-[13px] text-text-main shadow-act-popover";
+const SESSION_CONTEXT_SUBMENU_CLASS =
+  "session-context-submenu absolute left-[calc(100%+4px)] top-0 z-[81] w-52 rounded-act-md border border-line bg-surface-raised p-1 text-[13px] text-text-main shadow-act-popover";
 const SESSION_CONTEXT_MENU_ITEM_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} flex h-8 w-full items-center gap-2 rounded-act-sm px-2 text-left text-text-main transition-[background,color] duration-[120ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] disabled:cursor-not-allowed disabled:text-text-faint disabled:hover:bg-transparent`;
 const SESSION_CONTEXT_MENU_ICON_CLASS = "h-4 w-4 text-text-muted";
@@ -299,6 +305,9 @@ type SessionRowProps = {
   onSelect: () => void;
   onTogglePin?: () => void;
   onRename?: (title: string) => void;
+  onCopySessionId?: () => void;
+  onCopyTranscript?: () => void;
+  onFork?: () => void;
   onArchive?: () => void;
 };
 
@@ -362,6 +371,9 @@ function SessionRow({
   onSelect,
   onTogglePin,
   onRename,
+  onCopySessionId,
+  onCopyTranscript,
+  onFork,
   onArchive,
 }: SessionRowProps) {
   const displayTitle = formatSessionTitle(session.title);
@@ -369,7 +381,12 @@ function SessionRow({
   const statusMeta = SESSION_STATUS_META[resolvedStatus];
   const archiveDisabled = isActive || !onArchive;
   const archiveLabel = isActive ? "Current session cannot be archived" : "Archive session";
+  const forkDisabled = resolvedStatus === "running" || resolvedStatus === "waiting_approval" || !onFork;
+  const forkLabel = forkDisabled && onFork
+    ? "Wait for the current turn to finish before forking"
+    : "Fork session";
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftTitle, setDraftTitle] = useState(displayTitle);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -398,11 +415,13 @@ function SessionRow({
     const handlePointerDown = (event: MouseEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) {
         setMenuPosition(null);
+        setCopyMenuOpen(false);
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setMenuPosition(null);
+        setCopyMenuOpen(false);
       }
     };
 
@@ -426,6 +445,7 @@ function SessionRow({
     setDraftTitle(displayTitle);
     setIsRenaming(true);
     setMenuPosition(null);
+    setCopyMenuOpen(false);
   };
 
   const commitRename = () => {
@@ -462,7 +482,13 @@ function SessionRow({
   const handleContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    setCopyMenuOpen(false);
     setMenuPosition(clampContextMenuPosition({ x: event.clientX, y: event.clientY }));
+  };
+
+  const closeContextMenu = () => {
+    setCopyMenuOpen(false);
+    setMenuPosition(null);
   };
 
   return (
@@ -577,6 +603,83 @@ function SessionRow({
             <Pencil size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
             Rename
           </button>
+          <div
+            className="relative"
+            onMouseEnter={() => setCopyMenuOpen(true)}
+          >
+            <button
+              className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+              type="button"
+              role="menuitem"
+              aria-haspopup="menu"
+              aria-expanded={copyMenuOpen}
+              disabled={!onCopySessionId && !onCopyTranscript}
+              onFocus={() => setCopyMenuOpen(true)}
+              onClick={() => setCopyMenuOpen(true)}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowRight") {
+                  event.preventDefault();
+                  setCopyMenuOpen(true);
+                }
+                if (event.key === "ArrowLeft") {
+                  event.preventDefault();
+                  setCopyMenuOpen(false);
+                }
+              }}
+            >
+              <Copy size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+              <span className="flex-1">Copy</span>
+              <ChevronRight size={14} strokeWidth={1.9} className="text-text-faint" aria-hidden="true" />
+            </button>
+            {copyMenuOpen ? (
+              <div
+                className={SESSION_CONTEXT_SUBMENU_CLASS}
+                role="menu"
+                aria-label={`Copy session ${displayTitle}`}
+              >
+                <button
+                  className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+                  type="button"
+                  role="menuitem"
+                  disabled={!onCopySessionId}
+                  onClick={() => {
+                    closeContextMenu();
+                    onCopySessionId?.();
+                  }}
+                >
+                  <Hash size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+                  Copy ID
+                </button>
+                <button
+                  className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+                  type="button"
+                  role="menuitem"
+                  disabled={!onCopyTranscript}
+                  onClick={() => {
+                    closeContextMenu();
+                    onCopyTranscript?.();
+                  }}
+                >
+                  <AlignLeft size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+                  Copy Transcript
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <button
+            className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+            type="button"
+            role="menuitem"
+            disabled={forkDisabled}
+            title={forkLabel}
+            onClick={() => {
+              closeContextMenu();
+              if (!forkDisabled) onFork?.();
+            }}
+          >
+            <GitFork size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+            Fork
+          </button>
           <div className={SESSION_CONTEXT_MENU_SEPARATOR_CLASS} role="separator" />
           <button
             className={SESSION_CONTEXT_MENU_ITEM_CLASS}
@@ -585,7 +688,7 @@ function SessionRow({
             disabled={archiveDisabled}
             title={archiveLabel}
             onClick={() => {
-              setMenuPosition(null);
+              closeContextMenu();
               if (!archiveDisabled) onArchive?.();
             }}
           >
@@ -606,6 +709,9 @@ type CollapsibleSessionListProps = {
   onSelectSession?: (sessionId: string) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   onRename?: (sessionId: string, title: string) => void;
+  onCopySessionId?: (sessionId: string) => void;
+  onCopyTranscript?: (sessionId: string) => void;
+  onFork?: (sessionId: string) => void;
   onArchive?: (sessionId: string) => void;
   groupKey: string;
 };
@@ -618,6 +724,9 @@ function CollapsibleSessionList({
   onSelectSession,
   onTogglePin,
   onRename,
+  onCopySessionId,
+  onCopyTranscript,
+  onFork,
   onArchive,
   groupKey,
 }: CollapsibleSessionListProps) {
@@ -636,6 +745,9 @@ function CollapsibleSessionList({
           onSelect={() => onSelectSession?.(session.id)}
           onTogglePin={onTogglePin ? () => onTogglePin(session.id, !session.pinned) : undefined}
           onRename={onRename ? (title) => onRename(session.id, title) : undefined}
+          onCopySessionId={onCopySessionId ? () => onCopySessionId(session.id) : undefined}
+          onCopyTranscript={onCopyTranscript ? () => onCopyTranscript(session.id) : undefined}
+          onFork={onFork ? () => onFork(session.id) : undefined}
           onArchive={onArchive ? () => onArchive(session.id) : undefined}
         />
       ))}
@@ -666,6 +778,9 @@ export function Sidebar({
   onTogglePin,
   onSelectView,
   onRename,
+  onCopySessionId,
+  onCopyTranscript,
+  onFork,
   onArchive,
 }: {
   sessions: SessionListItem[];
@@ -684,6 +799,9 @@ export function Sidebar({
   onSelectView?: (next: SidebarView) => void;
   onOpenSearch?: () => void;
   onRename?: (sessionId: string, title: string) => void;
+  onCopySessionId?: (sessionId: string) => void;
+  onCopyTranscript?: (sessionId: string) => void;
+  onFork?: (sessionId: string) => void;
   /** Archive 占位回调；未传时按钮仅做视觉占位。 */
   onArchive?: (sessionId: string) => void;
 }) {
@@ -767,6 +885,9 @@ export function Sidebar({
                 onSelectSession={handleSelectChatSession}
                 onTogglePin={onTogglePin}
                 onRename={onRename}
+                onCopySessionId={onCopySessionId}
+                onCopyTranscript={onCopyTranscript}
+                onFork={onFork}
                 onArchive={onArchive}
                 groupKey="pinned"
               />
@@ -856,6 +977,9 @@ export function Sidebar({
                   onNewSession={handleNewAgent}
                   onTogglePin={onTogglePin}
                   onRename={onRename}
+                  onCopySessionId={onCopySessionId}
+                  onCopyTranscript={onCopyTranscript}
+                  onFork={onFork}
                   onArchive={onArchive}
                 />
               ))}
@@ -883,6 +1007,9 @@ type WorkspaceSectionProps = {
   onNewSession?: (input?: NewSessionInput) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   onRename?: (sessionId: string, title: string) => void;
+  onCopySessionId?: (sessionId: string) => void;
+  onCopyTranscript?: (sessionId: string) => void;
+  onFork?: (sessionId: string) => void;
   onArchive?: (sessionId: string) => void;
 };
 
@@ -895,6 +1022,9 @@ function WorkspaceSection({
   onNewSession,
   onTogglePin,
   onRename,
+  onCopySessionId,
+  onCopyTranscript,
+  onFork,
   onArchive,
 }: WorkspaceSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -948,6 +1078,9 @@ function WorkspaceSection({
           onSelectSession={onSelectSession}
           onTogglePin={onTogglePin}
           onRename={onRename}
+          onCopySessionId={onCopySessionId}
+          onCopyTranscript={onCopyTranscript}
+          onFork={onFork}
           onArchive={onArchive}
           groupKey={group.key}
         />

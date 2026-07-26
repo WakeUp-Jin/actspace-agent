@@ -1,6 +1,6 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
 import { ConversationView } from "../components/ConversationView";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
@@ -46,6 +46,10 @@ function renderConversation(inputMessages: MessageBlock[] = messages) {
     </TooltipProvider>,
   );
 }
+
+afterEach(() => {
+  delete (window as unknown as { actspace?: unknown }).actspace;
+});
 
 describe("ConversationView tooltips", () => {
   it("keeps the message viewport pinned when streaming content resizes at the bottom", () => {
@@ -124,5 +128,65 @@ describe("ConversationView tooltips", () => {
     const divider = screen.getByRole("separator", { name: "Context compacted · 8 messages" });
 
     expect(actionsButton.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("visualizes only the final reply and sends an explicit regenerate request", async () => {
+    const visualizeReply = vi.fn(async () => ({
+      html: "<!doctype html><html><body>generated</body></html>",
+      sourceHash: "hash",
+      cached: false,
+    }));
+    Object.defineProperty(window, "actspace", {
+      configurable: true,
+      value: { visualizeReply },
+    });
+    renderConversation([
+      {
+        kind: "user",
+        id: "user-visualize",
+        content: "执行并总结",
+        createdAt: "2026-06-02T00:00:00.000Z",
+      },
+      {
+        kind: "assistant",
+        id: "assistant-progress",
+        content: "正在执行第一步。",
+        createdAt: "2026-06-02T00:00:01.000Z",
+      },
+      {
+        kind: "thinking",
+        id: "thinking-visualize",
+        title: "Thinking",
+        content: "检查结果",
+        collapsedByDefault: true,
+        createdAt: "2026-06-02T00:00:02.000Z",
+      },
+      {
+        kind: "assistant",
+        id: "assistant-final",
+        content: "这是最终回复。",
+        createdAt: "2026-06-02T00:00:03.000Z",
+      },
+    ]);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "可视化这条回复" }));
+    await waitFor(() => expect(visualizeReply).toHaveBeenCalledOnce());
+    expect(visualizeReply).toHaveBeenNthCalledWith(1, {
+      sessionId: "session-1",
+      messageId: "assistant-final",
+      content: "这是最终回复。",
+      regenerate: false,
+    });
+
+    await user.click(screen.getByRole("button", { name: "更多消息操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "重新生成可视化" }));
+    await waitFor(() => expect(visualizeReply).toHaveBeenCalledTimes(2));
+    expect(visualizeReply).toHaveBeenNthCalledWith(2, {
+      sessionId: "session-1",
+      messageId: "assistant-final",
+      content: "这是最终回复。",
+      regenerate: true,
+    });
   });
 });

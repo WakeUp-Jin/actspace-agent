@@ -252,6 +252,25 @@ describe("sandboxed bash execution (darwin only)", () => {
     }
   });
 
+  it("does not silently fall back to the real environment when sandbox setup fails", async (ctx) => {
+    if (!sandboxAvailable) return ctx.skip();
+    const workspace = await createWorkspace();
+    const target = join(workspace, "must-not-run.txt");
+    try {
+      const result = await bashExecutor(
+        { command: "touch must-not-run.txt" },
+        workspace,
+        { sandbox: true, tmpRoot: "/dev/null", sessionId: "sbx-setup-failure" },
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("sandbox initialization failed before execution");
+      await expect(stat(target)).rejects.toThrow();
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
+
   it("points TMPDIR at the session sandbox tmp", async (ctx) => {
     if (!sandboxAvailable) return ctx.skip();
     const workspace = await createWorkspace();

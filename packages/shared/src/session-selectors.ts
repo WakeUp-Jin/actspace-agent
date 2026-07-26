@@ -234,6 +234,7 @@ function messageBlockFromToolPreview(
         backgroundStatus: preview.backgroundStatus,
         outputFilePath: preview.outputFilePath,
         sandboxed: preview.sandboxed,
+        notExecuted: preview.notExecuted,
         createdAt: getDisplayTime(timestamp)
       };
     case "agent":

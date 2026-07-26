@@ -23,6 +23,7 @@ import { env } from "../../../env";
 import { probeSandbox } from "./sandbox";
 import {
   getCommandHardRejectReason,
+  getDeleteBoundaryHardRejectReason,
   getSegmentHardRejectReason,
   getIrreversibleAskReason,
   isAllowedDevelopmentCommand,
@@ -98,6 +99,10 @@ export async function bashCheckPermissions(
     if (segmentReject) {
       return deny(segmentReject, normalized.command);
     }
+    const boundaryReject = getDeleteBoundaryHardRejectReason(segment, normalized.cwd, workspaceRoot);
+    if (boundaryReject) {
+      return deny(boundaryReject, normalized.command);
+    }
   }
 
   const requiredPermissions = parseRequiredPermissions(args.requiredPermissions);
@@ -127,6 +132,7 @@ export async function bashCheckPermissions(
       summary: summarizeCommand(normalized.command),
       riskLevel: "high",
       allowSimilar: false,
+      executionEnvironment: "real",
       sanitizedArgs,
     };
   }
@@ -142,6 +148,7 @@ export async function bashCheckPermissions(
         summary: summarizeCommand(normalized.command),
         riskLevel: "high",
         allowSimilar: false,
+        executionEnvironment: options.sandboxAvailable === true ? "sandbox" : "real",
         sanitizedArgs,
       };
     }
@@ -154,6 +161,7 @@ export async function bashCheckPermissions(
       reason: `Bash always-ask mode is enabled (ACTSPACE_BASH_ALWAYS_ASK=1)`,
       summary: summarizeCommand(normalized.command),
       riskLevel: "low",
+      executionEnvironment: options.sandboxAvailable === true ? "sandbox" : "real",
       sanitizedArgs,
     };
   }
@@ -185,6 +193,7 @@ export async function bashCheckPermissions(
     reason: `Command is not in the Bash allowlist: ${segments.join(" && ")}`,
     summary: summarizeCommand(normalized.command),
     riskLevel: "medium",
+    executionEnvironment: "real",
     sanitizedArgs,
   };
 }

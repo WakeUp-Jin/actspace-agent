@@ -13,6 +13,7 @@ export * from "./settings";
 export * from "./plugins";
 export * from "./context-buckets";
 export * from "./session";
+export * from "./session-transcript";
 export * from "./usage-cost";
 export * from "./session-selectors";
 export * from "./kairos-contracts";

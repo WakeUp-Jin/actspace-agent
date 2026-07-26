@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   createSessionRecord,
+  forkSessionRecord,
   listSessionRecords,
   readContextState,
   readSubAgentTranscript,
@@ -320,5 +321,117 @@ describe("session store", () => {
       error: "Invalid SubAgent transcript reference.",
     });
     await expect(readSubAgentTranscript(paths, unsafeRef)).resolves.toEqual([]);
+  });
+
+  it("forks a session into an independent snapshot and rewrites session-scoped references", async () => {
+    const source = await createSessionRecord(sessionRoot, {
+      title: "Branch me",
+      workspaceId: "ws_branch",
+      workspaceRoot: "/Users/test/projects/branch",
+    });
+    const sourcePaths = createSessionStorePaths(join(sessionRoot, source.meta.id));
+    const turnId = "turn-branch";
+    const timestamp = "2026-07-26T00:00:00.000Z";
+    const userEvent: SessionEvent = {
+      id: "evt-user-branch",
+      sessionId: source.meta.id,
+      turnId,
+      type: "user_message",
+      timestamp,
+      schemaVersion: 1,
+      payload: { content: "Create a branch." },
+    };
+    const assistantEvent: SessionEvent = {
+      id: "evt-assistant-branch",
+      sessionId: source.meta.id,
+      turnId,
+      type: "assistant_message",
+      timestamp,
+      schemaVersion: 1,
+      payload: {
+        content: "Ready.",
+        stopReason: "stop",
+        model: "mock-model",
+        provider: "mock",
+      },
+    };
+    const transcriptRef = createTranscriptRef(source.meta.id, { turnId, runId: "run-branch" });
+    const transcriptEvent = createTranscriptEvent(source.meta.id, `${turnId}:subagent:run-branch`);
+    const contextState = {
+      sessionId: source.meta.id,
+      activeTurnId: turnId,
+      updatedAt: timestamp,
+      estimator: { name: "char-ratio", version: "1" },
+      totalEstimatedTokens: 10,
+      maxTokens: 100,
+      percentUsed: 10,
+      buckets: [{ key: "conversation" as const, tokens: 10 }],
+      entries: [],
+    };
+
+    await expect(appendEvents(sourcePaths.sessionPath, [userEvent])).resolves.toEqual({ ok: true });
+    await expect(writeSessionResult(sourcePaths, {
+      sessionId: source.meta.id,
+      turnId,
+      events: [assistantEvent],
+      subagentTranscripts: [{ transcriptRef, events: [transcriptEvent] }],
+      status: "completed",
+      contextSnapshot: {
+        totalTokens: 10,
+        maxTokens: 100,
+        percentUsed: 10,
+        buckets: [{ key: "conversation", tokens: 10 }],
+      },
+      contextState,
+    })).resolves.toEqual({ ok: true });
+    await expect(setSessionPinned(sessionRoot, source.meta.id, true)).resolves.toEqual({ ok: true });
+    await writeFile(join(sourcePaths.attachmentsDir, "note.txt"), "fork attachment");
+    await writeFile(
+      join(sourcePaths.root, "visualizations.json"),
+      JSON.stringify({
+        sessionId: source.meta.id,
+        outputPath: join(sourcePaths.root, "reply.html"),
+      }),
+    );
+    await writeFile(join(sourcePaths.root, "reply.html"), "<!doctype html><title>Fork</title>");
+
+    const fork = await forkSessionRecord(sessionRoot, source.meta.id);
+    const forkPaths = createSessionStorePaths(join(sessionRoot, fork.meta.id));
+    const forkRef = { ...transcriptRef, sessionId: fork.meta.id };
+
+    expect(fork.meta).toEqual(expect.objectContaining({
+      title: "Branch me (fork)",
+      workspaceId: "ws_branch",
+      workspaceRoot: "/Users/test/projects/branch",
+      turnCount: 1,
+      pinned: false,
+      archived: false,
+    }));
+    expect(fork.meta.id).not.toBe(source.meta.id);
+    expect(fork.events).toHaveLength(2);
+    expect(fork.events.every((event) => event.sessionId === fork.meta.id)).toBe(true);
+    expect(fork.contextState?.sessionId).toBe(fork.meta.id);
+    await expect(readSubAgentTranscript(forkPaths, forkRef)).resolves.toEqual([
+      expect.objectContaining({ sessionId: fork.meta.id }),
+    ]);
+    await expect(readFile(join(forkPaths.attachmentsDir, "note.txt"), "utf-8")).resolves.toBe("fork attachment");
+
+    const visualization = JSON.parse(
+      await readFile(join(forkPaths.root, "visualizations.json"), "utf-8"),
+    ) as { sessionId: string; outputPath: string };
+    expect(visualization.sessionId).toBe(fork.meta.id);
+    expect(visualization.outputPath).toBe(join(forkPaths.root, "reply.html"));
+
+    const sourceAfterFork = await readSessionRecord(sourcePaths);
+    expect(sourceAfterFork?.meta).toEqual(expect.objectContaining({
+      id: source.meta.id,
+      title: "Branch me",
+      pinned: true,
+    }));
+    expect(sourceAfterFork?.events.every((event) => event.sessionId === source.meta.id)).toBe(true);
+  });
+
+  it("rejects a fork when the source session does not exist", async () => {
+    await expect(forkSessionRecord(sessionRoot, "session-missing")).rejects.toThrow("Session not found");
   });
 });

@@ -12,7 +12,12 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { convertReplyToHtml } from "@actspace/agent-core";
+import {
+  convertReplyToHtml,
+  isCompleteHtmlDocument,
+  type ConvertReplyToHtmlResult,
+  type LLMConfig,
+} from "@actspace/agent-core";
 import type {
   ListVisualizationsInput,
   ListVisualizationsResult,
@@ -34,6 +39,13 @@ type StoredVisualization = {
 };
 
 type VisualizationStore = Record<string, StoredVisualization>;
+
+export type VisualizeReplyDependencies = {
+  resolveMainModel: (
+    requestedModel?: string | null,
+  ) => { ok: true; llmConfig: LLMConfig } | { ok: false; message: string };
+  convertReply?: (input: { content: string; llmConfig: LLMConfig }) => Promise<ConvertReplyToHtmlResult>;
+};
 
 function sourceHashOf(content: string): string {
   return createHash("sha256").update(content, "utf8").digest("hex").slice(0, 16);
@@ -74,6 +86,7 @@ async function writeStore(path: string, store: VisualizationStore): Promise<void
 export async function visualizeReply(
   input: VisualizeReplyInput,
   roots: AppDataRoots,
+  dependencies: VisualizeReplyDependencies,
 ): Promise<VisualizeReplyResult> {
   const sourceHash = sourceHashOf(input.content);
   const cacheKey = cacheKeyOf(input.messageId, sourceHash);
@@ -81,7 +94,7 @@ export async function visualizeReply(
   const store = await readStore(path);
 
   const hit = store[cacheKey];
-  if (!input.regenerate && hit) {
+  if (!input.regenerate && hit && isCompleteHtmlDocument(hit.html)) {
     return {
       html: hit.html,
       sourceHash,
@@ -92,10 +105,14 @@ export async function visualizeReply(
     };
   }
 
-  const result = await convertReplyToHtml({
+  const resolution = dependencies.resolveMainModel(input.modelKey ?? input.model ?? null);
+  if (resolution.ok === false) {
+    throw new Error(resolution.message);
+  }
+
+  const result = await (dependencies.convertReply ?? convertReplyToHtml)({
     content: input.content,
-    workspaceRoot: roots.workspaceRoot,
-    model: input.model,
+    llmConfig: resolution.llmConfig,
   });
 
   store[cacheKey] = {
@@ -128,6 +145,7 @@ export async function listVisualizations(
   const path = storePath(roots.sessionRoot, input.sessionId);
   const store = await readStore(path);
   const items = Object.values(store)
+    .filter((entry) => isCompleteHtmlDocument(entry.html))
     .map((entry) => ({
       messageId: entry.messageId,
       sourceHash: entry.sourceHash,

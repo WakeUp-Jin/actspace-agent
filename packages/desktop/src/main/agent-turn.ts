@@ -178,6 +178,11 @@ export function abortTurn(input: { sessionId: string; turnId: string }): boolean
   return true;
 }
 
+export function isSessionTurnActive(sessionId: string): boolean {
+  const prefix = `${sessionId}:`;
+  return [...activeTurnAborts.keys()].some((turnKey) => turnKey.startsWith(prefix));
+}
+
 export async function runAndPersistTurn(
   input: RunTurnInput,
   roots: AppDataRoots,

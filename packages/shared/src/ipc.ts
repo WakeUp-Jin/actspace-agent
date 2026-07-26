@@ -564,6 +564,10 @@ export type SessionCreateInput = {
   workspaceRoot?: string;
 };
 
+export type SessionForkInput = {
+  sessionId: string;
+};
+
 export type SessionPinInput = {
   sessionId: string;
   pinned: boolean;

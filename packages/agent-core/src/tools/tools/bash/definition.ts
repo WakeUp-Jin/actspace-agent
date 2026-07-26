@@ -26,13 +26,16 @@ export const bashDefinition: ToolDefinitionSpec = {
     "Sandbox: by default commands run inside a sandbox that restricts writes to the workspace and temp directories " +
     "and denies reads of sensitive paths (~/.ssh, ~/.aws, etc.); network is currently unrestricted. " +
     "Use $TMPDIR for temp files instead of hardcoding /tmp. " +
-    "Irreversible operations always require user approval even in the sandbox: rm/rmdir, find -delete, dd/shred/truncate, " +
+    "Irreversible operations always require user approval even in the sandbox: rm/rmdir with explicit workspace-local targets, find -delete, dd/shred/truncate, " +
     "git reset --hard, git clean, git restore, git checkout with pathspec, git stash drop/clear, git push --force. " +
-    "When running one of these, explain why in `intent`. Prefer non-destructive alternatives when possible " +
+    "Directory deletion is handled through Bash because delete_file supports regular files only. " +
+    "Delete targets that are the workspace root, outside the workspace, globbed, ambiguous, or inside .git are hard-rejected and cannot be approved. " +
+    "When running an approvable irreversible command, explain why in `intent`. Prefer non-destructive alternatives when possible " +
     "(e.g. move files aside instead of rm, git stash instead of git reset --hard). " +
     "If a command fails ONLY because of sandbox restrictions — evidence in the output such as 'Operation not permitted', EPERM, " +
     "'Read-only file system', or an explicit [sandbox] annotation — you may retry once with requiredPermissions: [\"no_sandbox\"], " +
     "which asks the user for approval to run in the real environment. " +
+    "A permission-denied result means the command was not run and no approval request was created; never tell the user to click approval after such a result. " +
     "Most failures (wrong path, missing dependency, compile error) are NOT sandbox-related: never escalate without evidence, " +
     "and evaluate each command independently instead of carrying requiredPermissions over by habit. " +
     "Beware that a failed sandboxed run may have already applied partial side effects inside the workspace before hitting the restriction.",

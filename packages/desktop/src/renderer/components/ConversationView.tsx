@@ -693,7 +693,9 @@ export function ConversationView({
                   <TurnActions
                     sessionId={sessionId}
                     assistantMessages={
-                      turn.messages.filter((message): message is AssistantMessageBlock => message.kind === "assistant")
+                      splitTurnMessages(turn.messages).finalReply.filter(
+                        (message): message is AssistantMessageBlock => message.kind === "assistant",
+                      )
                     }
                   />
                 </div>

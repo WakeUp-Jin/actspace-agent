@@ -112,11 +112,16 @@
 - 当前 active session 不允许归档，Archive 按钮保持占位但禁用，`aria-label` / `title` 为 `Current session cannot be archived`，避免当前工作区被操作清空或自动跳转。
 - 行尾不显示状态点，避免左右两边出现语义相同的圆点。
 
-### 右键菜单与重命名
+### 右键菜单、Copy、Fork 与重命名
 
-- 会话行支持右键上下文菜单，首版菜单项为 **Pin / Unpin**、**Rename**、**Archive**。
+- 会话行支持右键上下文菜单，顺序为 **Pin / Unpin**、**Rename**、**Copy**、**Fork**、**Archive**。
 - 右键菜单是 renderer 内的轻量浮层，不调用 Electron 原生菜单；原因是 Rename 需要直接切换当前 React 行内编辑状态。
 - 菜单浮层使用 `bg-surface-raised` / `border-line` / `shadow-act-popover` / `text-text-main` 等主题 token，随浅色 / 深色主题翻转。
+- **Copy** 使用向右展开的二级菜单，并同时支持 hover、click 与 keyboard focus：
+  - `Copy ID` 复制稳定的 `sessionId`。
+  - `Copy Transcript` 复制 Markdown 文本，只包含会话标题、User / Assistant 正文和用户附件名；不复制 Thinking、工具原始输出或 diff。
+- **Fork** 从会话当前已持久化 head 创建独立分支。成功后自动打开新会话，源会话不变化；新标题使用 `<原标题> (fork)`。
+- 运行中或等待审批的会话禁用 **Fork**，提示用户等待当前 turn 完成，避免复制不完整状态。
 - 点击 **Rename** 后，当前会话标题位置进入原地输入态：
   - `Enter` 保存，`Esc` 取消，失焦保存。
   - 空标题不保存，回退原标题。
@@ -199,6 +204,8 @@
 - 后端 `agent-core` 在创建 session 时根据 `SessionCreateInput.workspaceRoot` 写入 meta；列出时直接透出。
 - 切换 pin 走 `pinSession({ sessionId, pinned })`，主进程调用 `setSessionPinned` 重写 meta。
 - 重命名走 `renameSession({ sessionId, title })`，主进程调用 `setSessionTitle` 重写既有 `SessionMeta.title`。
+- Fork 走 `forkSession({ sessionId })` / `session:fork`；主进程拒绝 active turn，并调用 agent-core 的 `forkSessionRecord` 创建独立会话目录后返回完整 `SessionRecord`。
+- Copy ID 只使用列表已有 `sessionId`；Copy Transcript 对当前会话复用 renderer 消息，对其他会话按需读取完整 `SessionRecord`，再通过 shared formatter 过滤为 User / Assistant Markdown。
 - 切换 archive 走 `archiveSession({ sessionId, archived })`，主进程调用 `setSessionArchived` 重写 meta；普通 `listSessions()` 默认只返回未归档会话，设置页通过 `listSessions({ archived: true })` 读取归档列表。
 - 会话 hover 信息卡的非当前会话摘要走 `getSessionPreview({ sessionId })` / `session:get-preview`，只返回 `workspaceId`、`workspaceRoot`、最近模型和 context snapshot，不返回完整事件流或消息内容。
 

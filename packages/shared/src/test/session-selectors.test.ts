@@ -405,6 +405,7 @@ describe("session selectors", () => {
           backgroundTaskId: "bash_abc123",
           backgroundStatus: "running",
           outputFilePath: "/tmp/tool-output/s1/x-bash.txt",
+          sandboxed: true,
         },
       }),
     ]);
@@ -415,6 +416,32 @@ describe("session selectors", () => {
       backgroundTaskId: "bash_abc123",
       backgroundStatus: "running",
       outputFilePath: "/tmp/tool-output/s1/x-bash.txt",
+      sandboxed: true,
+    });
+  });
+
+  it("restores a denied Bash result as not executed", () => {
+    const blocks = createMessageBlocks([
+      toolResultEvent({
+        toolName: "bash",
+        toolCallId: "tool-bash-denied",
+        ok: false,
+        summary: "Bash command denied",
+        modelOutput: "Permission denied before execution for tool bash",
+        uiPreview: {
+          kind: "bash",
+          status: "denied",
+          title: "Bash command denied",
+          command: "rm -rf .",
+          notExecuted: true,
+        },
+      }),
+    ]);
+
+    expect(blocks[0]).toMatchObject({
+      kind: "bash",
+      status: "denied",
+      notExecuted: true,
     });
   });
 

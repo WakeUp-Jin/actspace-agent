@@ -234,10 +234,10 @@ interface BashTask {
 沙盒不是审批的附属品，而是**默认执行路径**：
 
 ```txt
-① hard reject：控制字符、危险删除（rm -rf 关键路径）、eval 类、
-   删除/移动 .git 本体 → 直接拒绝。
-   保留原因：沙盒管不住 workspace 内部（workspace 本来就是可写区，
-   rm -rf ./src 在沙盒里畅通无阻），文本层的极端危险拦截不可少。
+① hard reject：控制字符、危险删除目标（workspace 根 / 越界 / glob / .git）、
+   eval 类、删除/移动 .git 本体 → 直接拒绝。
+   `rm -rf` 的递归/强制 flag 本身不再等于危险；明确位于 workspace 子目录的
+   目标有正当删除场景，进入下一层不可逆 ask。
    ↓ 通过
 ②' 不可逆操作：rm、git reset --hard 等 → 强制 ask（沙盒放宽不豁免）。
    见下方「文本层规则分级表」。
@@ -254,6 +254,7 @@ interface BashTask {
 - **证据驱动**：命令失败的原因大多与沙盒无关（路径错、参数错、依赖缺、编译不过）。只有输出中出现沙盒拦截痕迹（EPERM、非白名单连接失败、违规标注）才允许升级重试，否则等于把沙盒变成摆设还重复副作用。工具描述中写明合法证据清单。
 - **逐条评估**：每条命令独立决定是否升级，不因上一条豁免过就默认下一条也豁免。
 - **强制 ask**：携带 `requiredPermissions` 的调用无条件走审批，审批卡片展示升级原因（"上次沙盒执行被拦：试图连接 registry.npmjs.org"），让用户带着证据决策。
+- **禁止静默降级**：沙盒 profile 创建失败时命令不执行，返回明确的初始化错误；只有模型显式携带 `requiredPermissions: ["no_sandbox"]` 并获得审批后，才能进入真实环境。
 - **副作用提醒**：命令可能在沙盒里执行了一半才撞墙（先写了几个 workspace 内文件、再写外部路径失败），升级重跑会重复前半段副作用。对非幂等命令（append、发请求）在工具描述中提醒模型注意，不做机制。
 
 ### 权限层与沙盒的关系
@@ -271,14 +272,15 @@ interface BashTask {
 
 | 级别 | 语义 | 判据 | 清单 |
 | --- | --- | --- | --- |
-| hard reject | deny，任何环境、任何审批都不跑 | 不存在正当场景 | 控制字符 / Unicode 空白、不支持的 shell 语法（`\| < > $() {}` 等）、eval 类 builtin、危险删除（`rm -rf` 关键路径 / 通配 / 递归强制）、删除或移动 `.git` 本体 |
-| 不可逆 ask | ask，**沙盒放宽不豁免**，逐条评估（`allowSimilar: false`） | 有正当场景（用户可能真的要丢弃改动），但出错无法回滚 | `rm` / `rmdir`、`find -delete`、`dd` / `shred` / `truncate`、`git reset --hard/--merge`、`git clean`（非 dry-run）、`git restore`、`git checkout` 丢弃形态（`--` / `.` / 多参数 pathspec）、`git stash drop/clear`、`git push --force[-with-lease]` |
+| hard reject | deny，任何环境、任何审批都不跑 | 不存在正当场景 | 控制字符 / Unicode 空白、不支持的 shell 语法（`\| < > $() {}` 等）、eval 类 builtin、删除目标为 workspace 根 / workspace 外路径 / glob / `.git` 树、删除或移动 `.git` 本体 |
+| 不可逆 ask | ask，**沙盒放宽不豁免**，逐条评估（`allowSimilar: false`） | 有正当场景（用户可能真的要丢弃改动），但出错无法回滚 | workspace 内明确目标的 `rm` / `rmdir`（包括 `rm -rf <子目录>`）、`find -delete`、`dd` / `shred` / `truncate`、`git reset --hard/--merge`、`git clean`（非 dry-run）、`git restore`、`git checkout` 丢弃形态（`--` / `.` / 多参数 pathspec）、`git stash drop/clear`、`git push --force[-with-lease]` |
 | allowlist | allow，任何环境免审 | 只读或幂等的高频开发命令 | `pwd`、`ls`、`git status/diff`、`node -v`、`pnpm typecheck/test/build` 等 |
 | 其余 | 沙盒可用 → allow；否则 ask | 沙盒兜底爆炸半径 | — |
 
 分级的关键取舍：
 
 - **不可逆类放 ask 而不是 deny**：`git reset --hard`、`git push --force` 有正当场景（用户明确要丢弃/强推），deny 会把这些任务堵死；它们与 rm 同属"有正当场景但不可逆"。deny 的准入标准是"永远不该发生"。
+- **判断删除目标而不是判断 `-rf` flag**：目录递归删除本身有正当场景，真正不可审批的是 workspace 根、越界、glob 和 `.git` 等目标边界。
 - **写/编辑文件不进 ask**：git 提供了回滚路径（diff / revert），这也是 `write_file` 工具本身 allow 的原因；而 rm 与 `delete_file` 工具的永远 ask 对齐，否则 bash 成为绕过 `delete_file` 审批的后门。
 - **git 分支/commit 级操作（`branch -D`、rebase 等）不列**：reflog 可恢复，保持清单短。
 - **可信度前提**：不支持的 shell 语法在 hard reject 一级整体拒绝，变量展开 / 子 shell 不存在，因此 token 级文本匹配所见即所得，不会被 `rm $DIR` 绕过。
@@ -293,7 +295,8 @@ interface BashTask {
 4. 大输出：不要用 `| head` / `| tail` 截断重跑（全量已落盘），用 `read_file` offset/limit 或 `grep` 检索落盘文件。
 5. 沙盒：默认沙盒执行；只有看到沙盒拦截证据才申请 `requiredPermissions`，逐条评估；临时文件用 `$TMPDIR` 不要硬编码 `/tmp`。
 6. `intent` 是 Bash 调用的必填非空字段，必须用一行中文解释命令目的；不可逆操作（rm、git reset --hard 等）沙盒内也会进审批，并应在 `intent` 里说明原因，优先用非破坏性替代（挪走文件而不是 rm、git stash 而不是 reset --hard）。
-7. 沿用现状：读/搜/改文件用专用工具；引号包裹含空格路径；`cwd` 参数替代 `cd`。
+7. `delete_file` 只删除普通文件；用户明确要求删除目录时使用 Bash。若 Bash 返回 `Permission denied before execution`，表示命令未运行且不存在审批请求，不得让用户寻找审批按钮。
+8. 沿用现状：读/搜/改文件用专用工具；引号包裹含空格路径；`cwd` 参数替代 `cd`。
 
 ## 前端展示契约
 
@@ -301,10 +304,11 @@ interface BashTask {
 
 - **两段最终态**：转后台时 bash 工具调用本身以 "backgrounded" 收尾；任务卡片（新预览类型）随任务状态独立更新到 completed / failed / killed 终态。
 - 运行中任务卡片：滚动尾部输出（复用现有 UI 预览流）、已运行时长、kill 按钮（用户手动终止 → 走 killed 通知）。
-- **沙盒标签三态**（审批卡片 + 历史记录均展示）：
-  - `沙盒`：默认态，弱化显示（灰色小标签）。
-  - `真实环境`：非沙盒执行，醒目显示。
-  - `沙盒 → 升级`：审批卡片重点状态，标签旁展示升级原因证据。
+- **执行环境标签**（审批卡片 + 实时执行 + 历史记录均展示）：
+  - `沙盒`：审批时表示计划环境，执行完成后表示实际环境。
+  - `真实环境`：审批时表示将无沙盒执行，执行完成后表示实际环境。
+  - `未执行`：权限硬拒绝或用户拒绝，命令未进入任何执行环境。
+  - 沙盒初始化失败同样不执行；错误正文说明可在必要时申请 `no_sandbox`，不能静默切换真实环境。
   - 必要性：沙盒优先意味着大量命令跳过审批，用户失去逐条确认机会，"命令在什么约束下跑"必须在别处可见，否则安全模型对用户是黑盒。
 
 ## 分阶段路线

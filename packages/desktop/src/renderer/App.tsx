@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_MODEL_ID, createMessageBlocks, getLatestContextSnapshot } from "@actspace/shared";
+import {
+  DEFAULT_MODEL_ID,
+  createMessageBlocks,
+  formatSessionTranscript,
+  getLatestContextSnapshot,
+} from "@actspace/shared";
 import type {
   AbortTurnInput,
   AgentTurnResult,
@@ -33,7 +38,6 @@ import { resolvePreferredChatModel } from "./model-selection";
 import type { ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 
-const MIN_TOOL_RUNNING_MS = 300;
 const DEFAULT_WORKSPACE_LABEL = "Default workspace";
 
 function hasActspaceBridge(): boolean {
@@ -112,7 +116,6 @@ type ToolEntry = {
   preview?: ToolUiPreview;
   isError?: boolean;
   finished?: boolean;
-  startedAt: number;
   approvalPending?: boolean;
   approvalRequestId?: string;
   approvalReason?: string;
@@ -196,16 +199,81 @@ function createLocalEmptySession(input: NewSessionInput = {}): SessionRecord {
   };
 }
 
+function rewriteLocalSessionId<T>(value: T, sourceSessionId: string, targetSessionId: string, key?: string): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => rewriteLocalSessionId(item, sourceSessionId, targetSessionId)) as T;
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [
+        entryKey,
+        rewriteLocalSessionId(entryValue, sourceSessionId, targetSessionId, entryKey),
+      ]),
+    ) as T;
+  }
+  if (key === "sessionId" && value === sourceSessionId) {
+    return targetSessionId as T;
+  }
+  return value;
+}
+
+function createLocalForkSession(source: SessionRecord): SessionRecord {
+  const now = new Date().toISOString();
+  const targetSessionId = `local-session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const fork = rewriteLocalSessionId(source, source.meta.id, targetSessionId);
+  return {
+    ...fork,
+    meta: {
+      ...fork.meta,
+      id: targetSessionId,
+      title: `${source.meta.title} (fork)`,
+      createdAt: now,
+      updatedAt: now,
+      pinned: false,
+      archived: false,
+    },
+  };
+}
+
+function copyWithSelection(value: string): void {
+  const textArea = document.createElement("textarea");
+  textArea.value = value;
+  textArea.setAttribute("readonly", "");
+  textArea.style.position = "fixed";
+  textArea.style.opacity = "0";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  document.execCommand("copy");
+  textArea.remove();
+}
+
+async function copyTextToClipboard(value: string): Promise<void> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+    } else {
+      copyWithSelection(value);
+    }
+  } catch {
+    copyWithSelection(value);
+  }
+}
+
 function getStreamingBashStatus(tool: {
   isError?: boolean;
   finished?: boolean;
   approvalPending?: boolean;
-}): BashStatus {
+}, previewStatus?: BashStatus): BashStatus {
   if (tool.approvalPending) {
     return "pending";
   }
   if (!tool.finished) {
     return "running";
+  }
+
+  if (previewStatus === "denied" || previewStatus === "expired" || previewStatus === "cancelled") {
+    return previewStatus;
   }
 
   return tool.isError ? "failed" : "success";
@@ -271,7 +339,7 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, turn
     return {
       kind: "bash",
       id: blockId,
-      status: getStreamingBashStatus(tool),
+      status: getStreamingBashStatus(tool, tool.preview.status),
       title: tool.approvalPending
         ? (tool.approvalSummary ?? "Bash command needs approval")
         : tool.preview.title,
@@ -286,6 +354,8 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, turn
       backgroundTaskId: tool.preview.backgroundTaskId,
       backgroundStatus: tool.preview.backgroundStatus,
       outputFilePath: tool.preview.outputFilePath,
+      sandboxed: tool.preview.sandboxed,
+      notExecuted: tool.preview.notExecuted,
       createdAt: now,
     };
   }
@@ -612,7 +682,6 @@ export function App() {
   const [reviewSummary, setReviewSummary] = useState<ComposerReviewSummary | null>(null);
   const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
-  const toolFinishTimersRef = useRef<Map<string, number>>(new Map());
   const activeSessionIdRef = useRef<string | null>(null);
   const activeStreamTurnRef = useRef<{ sessionId: string; turnId: string } | null>(null);
   const reviewRefreshRequestIdRef = useRef(0);
@@ -638,13 +707,6 @@ export function App() {
     );
     const currentUserBlock = userBlock ?? streamingUserBlockRef.current;
     setStreamingBlocks(currentUserBlock ? [currentUserBlock, ...newStreamBlocks] : newStreamBlocks);
-  }, []);
-
-  const clearToolFinishTimers = useCallback(() => {
-    for (const timerId of toolFinishTimersRef.current.values()) {
-      window.clearTimeout(timerId);
-    }
-    toolFinishTimersRef.current.clear();
   }, []);
 
   const setApprovalPendingForSession = useCallback((sessionId: string | null | undefined, pending: boolean) => {
@@ -929,7 +991,6 @@ export function App() {
           state.activeTools.set(event.toolCallId, {
             toolName: event.toolName,
             preview: event.preview,
-            startedAt: Date.now(),
           });
           state.segments.push({ type: "tool", toolCallId: event.toolCallId });
         }
@@ -945,7 +1006,6 @@ export function App() {
           state.activeTools.set(event.toolCallId, {
             toolName: event.toolName,
             preview: event.preview,
-            startedAt: Date.now(),
           });
           state.segments.push({ type: "tool", toolCallId: event.toolCallId });
         }
@@ -958,26 +1018,8 @@ export function App() {
           if (event.preview) {
             tool.preview = event.preview;
           }
-          const finishTool = () => {
-            const latest = streamStateRef.current.activeTools.get(event.toolCallId);
-            if (!latest) return;
-            latest.finished = true;
-            latest.isError = event.isError;
-            toolFinishTimersRef.current.delete(event.toolCallId);
-            refreshStreamingBlocks();
-          };
-          const elapsedMs = Date.now() - tool.startedAt;
-          const remainingMs = Math.max(0, MIN_TOOL_RUNNING_MS - elapsedMs);
-          const existingTimer = toolFinishTimersRef.current.get(event.toolCallId);
-          if (existingTimer !== undefined) {
-            window.clearTimeout(existingTimer);
-          }
-          if (remainingMs > 0) {
-            const timerId = window.setTimeout(finishTool, remainingMs);
-            toolFinishTimersRef.current.set(event.toolCallId, timerId);
-          } else {
-            finishTool();
-          }
+          tool.finished = true;
+          tool.isError = event.isError;
         }
         break;
       }
@@ -999,7 +1041,6 @@ export function App() {
           state.activeTools.set(event.toolCallId, {
             toolName: "agent",
             preview: event.preview,
-            startedAt: Date.now(),
             transcriptEvents: [event.event],
           });
           state.segments.push({ type: "tool", toolCallId: event.toolCallId });
@@ -1015,8 +1056,15 @@ export function App() {
           tool.approvalReason = event.reason;
           tool.approvalSummary = event.summary;
           tool.approvalScope = event.approvalScope;
-          if (tool.preview?.kind === "bash" && event.command) {
-            tool.preview = { ...tool.preview, command: event.command };
+          if (tool.preview?.kind === "bash") {
+            tool.preview = {
+              ...tool.preview,
+              command: event.command ?? tool.preview.command,
+              sandboxed: event.executionEnvironment === undefined
+                ? tool.preview.sandboxed
+                : event.executionEnvironment === "sandbox",
+              notExecuted: undefined,
+            };
           }
           if (tool.preview?.kind === "delete") {
             tool.preview = {
@@ -1041,6 +1089,17 @@ export function App() {
               ...tool.preview,
               displayText: `Denied delete ${tool.preview.filePath || "file..."}`,
               status: "denied",
+            };
+          }
+          if (tool.preview?.kind === "bash" && event.decision === "deny") {
+            tool.finished = true;
+            tool.isError = true;
+            tool.preview = {
+              ...tool.preview,
+              status: "denied",
+              title: "Bash command denied",
+              sandboxed: undefined,
+              notExecuted: true,
             };
           }
         }
@@ -1212,7 +1271,6 @@ export function App() {
     activeStreamTurnRef.current = { sessionId, turnId };
     setApprovalPendingForSession(sessionId, false);
     setFailedForSession(sessionId, false);
-    clearToolFinishTimers();
     streamStateRef.current = createEmptyStreamingState();
 
     if (isCompactCommand) {
@@ -1257,7 +1315,6 @@ export function App() {
     const finishCurrentVisibleTurn = () => {
       if (!isCurrentVisibleTurn()) return false;
 
-      clearToolFinishTimers();
       if (hasActspaceBridge()) {
         void refreshReviewSummary(nextWorkspaceRoot);
       }
@@ -1400,7 +1457,6 @@ export function App() {
     refreshWorkspaces,
     sessionRecord?.meta.workspaceRoot,
     bootstrapState?.workspaceRoot,
-    clearToolFinishTimers,
     refreshReviewSummary,
     refreshPendingApprovalStatuses,
     setApprovalPendingForSession,
@@ -1436,12 +1492,11 @@ export function App() {
     setActiveTurnId(null);
     setTurnResult(null);
     setStreamingBlocks([]);
-    clearToolFinishTimers();
     streamStateRef.current = createEmptyStreamingState();
     streamingUserBlockRef.current = null;
 
     await createSessionForInput(input);
-  }, [clearToolFinishTimers, createSessionForInput]);
+  }, [createSessionForInput]);
 
   const handleAddWorkspace = useCallback(async () => {
     if (!hasActspaceBridge()) {
@@ -1471,7 +1526,6 @@ export function App() {
       setIsAborting(false);
       setActiveTurnId(null);
       setStreamingBlocks([]);
-      clearToolFinishTimers();
       streamStateRef.current = createEmptyStreamingState();
       streamingUserBlockRef.current = null;
       setTurnResult(null);
@@ -1498,14 +1552,8 @@ export function App() {
         console.error("Failed to select session", error);
       }
     },
-    [bootstrapState?.workspaceRoot, localSessionRecords, clearToolFinishTimers, refreshPendingApprovalStatuses],
+    [bootstrapState?.workspaceRoot, localSessionRecords, refreshPendingApprovalStatuses],
   );
-
-  useEffect(() => {
-    return () => {
-      clearToolFinishTimers();
-    };
-  }, [clearToolFinishTimers]);
 
   const persistedEvents = sessionRecord?.events ?? turnResult?.events ?? [];
   const persistedMessages = useMemo<MessageBlock[]>(() => {
@@ -1590,6 +1638,109 @@ export function App() {
     }
     return statuses;
   }, [approvalPendingSessionIds, busySessionIds, failedSessionIds]);
+
+  const handleCopySessionId = useCallback(async (sessionId: string) => {
+    if (!sessionId) return;
+    try {
+      await copyTextToClipboard(sessionId);
+    } catch (error) {
+      console.error("Failed to copy session id", error);
+    }
+  }, []);
+
+  const handleCopyTranscript = useCallback(async (sessionId: string) => {
+    if (!sessionId) return;
+
+    try {
+      const listedSession = sessions.find((session) => session.id === sessionId);
+      let transcriptMessages: MessageBlock[];
+      let transcriptTitle = listedSession?.title ?? "Untitled session";
+
+      if (sessionId === activeSessionId) {
+        transcriptMessages = messages;
+        transcriptTitle = sessionRecord?.meta.title ?? transcriptTitle;
+      } else {
+        const record = !hasActspaceBridge()
+          ? localSessionRecords[sessionId] ?? null
+          : await window.actspace.getSession({ sessionId });
+        if (!record) {
+          throw new Error(`Session not found: ${sessionId}`);
+        }
+        transcriptTitle = record.meta.title;
+        transcriptMessages = record.messageBlocks?.length
+          ? record.messageBlocks
+          : createMessageBlocks(record.events);
+      }
+
+      await copyTextToClipboard(formatSessionTranscript(transcriptTitle, transcriptMessages));
+    } catch (error) {
+      console.error("Failed to copy session transcript", error);
+    }
+  }, [activeSessionId, localSessionRecords, messages, sessionRecord?.meta.title, sessions]);
+
+  const handleForkSession = useCallback(async (sessionId: string) => {
+    if (
+      !sessionId ||
+      busySessionIds.has(sessionId) ||
+      approvalPendingSessionIds.has(sessionId)
+    ) {
+      return;
+    }
+
+    try {
+      let forked: SessionRecord;
+      if (!hasActspaceBridge()) {
+        const source = localSessionRecords[sessionId] ?? (sessionRecord?.meta.id === sessionId ? sessionRecord : null);
+        if (!source) throw new Error(`Session not found: ${sessionId}`);
+        forked = createLocalForkSession(source);
+        setLocalSessionRecords((current) => ({ ...current, [forked.meta.id]: forked }));
+        setSessions((current) => [
+          {
+            id: forked.meta.id,
+            title: forked.meta.title,
+            updatedAt: forked.meta.updatedAt,
+            turnCount: forked.meta.turnCount,
+            workspaceId: forked.meta.workspaceId,
+            workspaceRoot: forked.meta.workspaceRoot,
+          },
+          ...current,
+        ]);
+      } else {
+        if (!window.actspace.forkSession) {
+          throw new Error("Session fork is not available");
+        }
+        forked = await window.actspace.forkSession({ sessionId });
+        const refreshed = await window.actspace.listSessions();
+        setSessions(refreshed);
+        await refreshWorkspaces();
+      }
+
+      activeStreamTurnRef.current = null;
+      activeSessionIdRef.current = forked.meta.id;
+      setIsStreaming(false);
+      setIsAborting(false);
+      setActiveTurnId(null);
+      setTurnResult(null);
+      setStreamingBlocks([]);
+      streamStateRef.current = createEmptyStreamingState();
+      streamingUserBlockRef.current = null;
+      setSessionRecord(forked);
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(forked.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
+      setApprovalPendingForSession(forked.meta.id, false);
+      setFailedForSession(forked.meta.id, false);
+    } catch (error) {
+      console.error("Failed to fork session", error);
+    }
+  }, [
+    approvalPendingSessionIds,
+    bootstrapState?.workspaceRoot,
+    busySessionIds,
+    localSessionRecords,
+    refreshWorkspaces,
+    sessionRecord,
+    setApprovalPendingForSession,
+    setFailedForSession,
+  ]);
 
   const handleTogglePin = useCallback(
     async (sessionId: string, nextPinned: boolean) => {
@@ -1738,6 +1889,9 @@ export function App() {
         onSelectSession={handleSelectSession}
         onTogglePin={handleTogglePin}
         onRenameSession={handleRenameSession}
+        onCopySessionId={handleCopySessionId}
+        onCopyTranscript={handleCopyTranscript}
+        onForkSession={handleForkSession}
         onArchiveSession={handleArchiveSession}
         isSessionReady={isSessionReady}
         defaultModelId={defaultModelId}

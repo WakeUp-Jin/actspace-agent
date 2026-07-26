@@ -13,6 +13,7 @@ function createTool(name: string, options?: {
   decision?: "allow" | "deny" | "ask";
   reason?: string;
   allowSimilar?: boolean;
+  executionEnvironment?: "sandbox" | "real";
 }): InternalTool {
   const decision = options?.decision ?? "ask";
   return {
@@ -28,6 +29,7 @@ function createTool(name: string, options?: {
       summary: `Run ${name}`,
       riskLevel: "medium" as const,
       allowSimilar: options?.allowSimilar,
+      executionEnvironment: options?.executionEnvironment,
       sanitizedArgs: { command: "test-cmd" },
     }),
   };
@@ -185,7 +187,7 @@ describe("ToolScheduler approval flow", () => {
   it("should call onApprovalRequired before waiting", async () => {
     const gate = createMockGate();
     const scheduler = new ToolScheduler({ truncateThreshold: 2000, approvalGate: gate });
-    const tool = createTool("bash");
+    const tool = createTool("bash", { executionEnvironment: "sandbox" });
 
     const promise = scheduler.execute(tool, "bash", { command: "pnpm install" });
     await tick();
@@ -193,6 +195,7 @@ describe("ToolScheduler approval flow", () => {
     expect(gate.onApprovalRequired).toHaveBeenCalledTimes(1);
     const calledRequest = (gate.onApprovalRequired as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(calledRequest.toolName).toBe("bash");
+    expect(calledRequest.executionEnvironment).toBe("sandbox");
 
     gate.approve(gate.pendingRequests[0].id);
     await promise;
@@ -240,6 +243,7 @@ describe("ToolScheduler approval flow", () => {
 
     const execution = await scheduler.execute(tool, "bash", { command: "rm -rf /" });
     expect(execution.result.success).toBe(false);
+    expect(execution.result.error).toContain("no approval request was created");
     expect(execution.record.status).toBe("cancelled");
     expect(gate.pendingRequests).toHaveLength(0);
   });

@@ -1513,6 +1513,53 @@ describe("runTurnWithAgent bridge", () => {
     });
   });
 
+  it("marks a hard-rejected Bash command as denied and not executed", async () => {
+    const deps = createDeps();
+    deps.toolManager.register({
+      name: "bash",
+      description: "Run Bash",
+      parameters: {
+        type: "object",
+        properties: { command: { type: "string", description: "command" } },
+        required: ["command"],
+      },
+      isReadOnly: false,
+      previewKind: "bash",
+      checkPermissions: async () => ({
+        decision: "deny",
+        reason: "Delete command targets the workspace root",
+      }),
+      handler: async (): Promise<ToolResult> => {
+        throw new Error("denied Bash handler must not run");
+      },
+    });
+    deps.llm.setResponses([
+      mockToolCall("bash", { command: "rm -rf ." }, { id: "tc-bash-denied" }),
+      mockText("Denied."),
+    ]);
+
+    const result = await runTurnWithAgent(
+      {
+        sessionId: "session-test",
+        turnId: "turn-test",
+        userInput: "Delete the workspace.",
+      },
+      deps,
+    );
+
+    const toolResult = result.events.find((event) => event.type === "tool_result");
+    expect(toolResult?.payload).toMatchObject({
+      toolName: "bash",
+      ok: false,
+      modelOutput: expect.stringContaining("no approval request was created"),
+      uiPreview: {
+        kind: "bash",
+        status: "denied",
+        notExecuted: true,
+      },
+    });
+  });
+
   it("synthesizes a pseudo command for bash_output previews so the UI shows what ran", async () => {
     const deps = createDeps();
     deps.toolManager.register({

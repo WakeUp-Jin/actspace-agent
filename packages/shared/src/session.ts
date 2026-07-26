@@ -91,7 +91,7 @@ export type RuntimeStreamEvent =
       event: SessionEvent;
       preview: AgentToolPreview;
     }
-  | { type: "tool_approval_required"; sessionId: SessionId; turnId: TurnId; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string; approvalScope?: "browser_session" }
+  | { type: "tool_approval_required"; sessionId: SessionId; turnId: TurnId; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string; approvalScope?: "browser_session"; executionEnvironment?: "sandbox" | "real" }
   | { type: "tool_approval_resolved"; sessionId: SessionId; turnId: TurnId; toolCallId: ToolCallId; requestId: string; decision: string; approvalScope?: "browser_session" }
   | {
       /** LLM 调用命中可重试错误、agent loop 正在退避重试；renderer 据此清掉半截 streaming 内容并显示重试提示 */
@@ -462,6 +462,8 @@ export type BashPreview = {
   outputFilePath?: string;
   /** 本次命令是否在沙盒内执行（true 沙盒 / false 真实环境 / 缺省未知——历史数据）。 */
   sandboxed?: boolean;
+  /** 命令在进程启动前被拒绝或取消，没有进入任何执行环境。 */
+  notExecuted?: boolean;
 };
 
 export type ToolExecutionResult = {

@@ -249,16 +249,17 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 - `idle` / `error` 用 `Wand2`，`generating` 用旋转 `Loader2`，`ready` 用 `Eye`。
 - 状态机：`idle -> generating -> ready`；失败进入 `error` 可重试。
 - 已生成内容提供显式「重新生成」入口，只有显式触发才重算。
+- 输入只取当前 turn 的最终可见回复段；工具执行过程、工具间旁白和更早会话历史都不进入转换内容。
 
 缓存与数据流：
 
 - 缓存键 = `messageId | turnId` + `sourceHash`。
 - sidecar 存 HTML、sourceHash、model、generatedAt、usage 和派生 title。
-- renderer 点击 -> IPC -> main -> agent-core LLM 服务用主模型转换 -> main 写 sidecar -> renderer 打开 / 聚焦 HTML Tab。
+- renderer 点击 -> IPC -> main 的 `ModelRuntimeService` 解析当前主模型和仅 main 可见的 `ProviderRuntimeConfig` -> agent-core LLM 服务转换 -> main 写 sidecar -> renderer 打开 / 聚焦 HTML Tab。Desktop 路径不得回退到依赖环境变量读取 LLM Key 的旧 builder。
 - `visualize:list({ sessionId })` 读取同一 sidecar，供 Reply 聚合视图按 createdAt 倒序浏览本会话全部产物。
 - usage 计入使用统计；缓存命中不新增模型调用。
 
-生成提示词要求输出单个自包含 HTML 文档；如果模型输出 ```html 围栏，解析围栏内内容；解析失败不污染缓存。产物按半可信处理，一律走 HTML sandbox 路径，不因为「是自己模型生成的」就放宽权限。
+生成提示词要求输出单个自包含 HTML 文档；如果模型输出 ```html 围栏，解析围栏内内容。`stopReason=error/aborted/length/toolUse`、空输出、缺少 doctype 或缺少 `</html>` 都按失败处理且不得写入缓存；历史空缓存不命中，也不出现在 Reply 聚合列表。产物按半可信处理，一律走 HTML sandbox 路径，不因为「是自己模型生成的」就放宽权限。
 
 ## 首版边界
 

@@ -89,6 +89,9 @@ export function WorkbenchLayout({
   onSelectSession,
   onTogglePin,
   onRenameSession,
+  onCopySessionId,
+  onCopyTranscript,
+  onForkSession,
   onArchiveSession,
   isSessionReady = true,
   defaultModelId,
@@ -123,6 +126,9 @@ export function WorkbenchLayout({
   onSelectSession?: (sessionId: string) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   onRenameSession?: (sessionId: string, title: string) => void;
+  onCopySessionId?: (sessionId: string) => void;
+  onCopyTranscript?: (sessionId: string) => void;
+  onForkSession?: (sessionId: string) => void;
   onArchiveSession?: (sessionId: string) => void;
   isSessionReady?: boolean;
   defaultModelId?: ModelSelectionId;
@@ -406,6 +412,9 @@ export function WorkbenchLayout({
             onSelectSession={onSelectSession}
             onTogglePin={onTogglePin}
             onRename={onRenameSession}
+            onCopySessionId={onCopySessionId}
+            onCopyTranscript={onCopyTranscript}
+            onFork={onForkSession}
             onArchive={onArchiveSession}
             onSelectView={handleSelectView}
           />

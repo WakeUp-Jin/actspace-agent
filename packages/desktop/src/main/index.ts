@@ -27,6 +27,7 @@ import type {
   SelectWorkspaceDirectoryResult,
   SessionArchiveInput,
   SessionCreateInput,
+  SessionForkInput,
   SessionGetInput,
   SessionListInput,
   SessionPinInput,
@@ -83,6 +84,7 @@ import {
   createUsageStatisticsSnapshot,
   loadEnv,
   createSessionRecord,
+  forkSessionRecord,
   createSessionStorePaths,
   listSessionRecords,
   readSubAgentTranscript,
@@ -102,7 +104,13 @@ import {
   type KairosSkillCatalogEntry,
 } from "@actspace/agent-core";
 import type { SessionEvent, SessionRecord } from "@actspace/shared";
-import { runAndPersistTurn, abortTurn, type AgentRuntimeContextLoader, type AppDataRoots } from "./agent-turn";
+import {
+  runAndPersistTurn,
+  abortTurn,
+  isSessionTurnActive,
+  type AgentRuntimeContextLoader,
+  type AppDataRoots,
+} from "./agent-turn";
 import { compactAndPersistContext } from "./context-compact";
 import { generateEvalCandidate } from "./eval-candidate-service";
 import { listVisualizations, visualizeReply } from "./visualize-service";
@@ -782,6 +790,7 @@ const approvalRegistry = new PendingApprovalRegistry({
       command: typeof request.args.command === "string" ? request.args.command : undefined,
       riskLevel: request.riskLevel,
       approvalScope: request.approvalScope,
+      executionEnvironment: request.executionEnvironment,
       sessionId,
       turnId,
     });
@@ -942,17 +951,29 @@ async function registerIpc() {
   ipcMain.handle("visualize:convert-reply", async (_event, input: VisualizeReplyInput) => {
     const roots = await ensureDataDirectories();
     try {
-      const result = await visualizeReply(input, roots);
+      const result = await visualizeReply(input, roots, {
+        resolveMainModel: (requestedModel) => {
+          const resolution = getModelRuntimeService().resolveMainModel(requestedModel);
+          return "model" in resolution
+            ? { ok: true, llmConfig: resolution.model.llmConfig }
+            : { ok: false, message: resolution.message };
+        },
+      });
       logMain("visualize reply", {
         sessionId: input.sessionId,
         messageId: input.messageId,
+        regenerate: input.regenerate === true,
         cached: result.cached,
+        model: result.model,
+        provider: result.provider,
+        totalTokens: result.usage?.totalTokens,
       });
       return result;
     } catch (error) {
       logMain("visualize reply failed", {
         sessionId: input.sessionId,
         messageId: input.messageId,
+        regenerate: input.regenerate === true,
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -1120,6 +1141,14 @@ async function registerIpc() {
       workspaceId: workspace.workspaceId,
       workspaceRoot: workspace.workspaceRoot,
     });
+  });
+
+  ipcMain.handle("session:fork", async (_event, input: SessionForkInput) => {
+    if (isSessionTurnActive(input.sessionId)) {
+      throw new Error("Cannot fork a session while its turn is running or waiting for approval.");
+    }
+    const roots = await ensureDataDirectories();
+    return forkSessionRecord(roots.sessionRoot, input.sessionId);
   });
 
   ipcMain.handle("session:pin", async (_event, input: SessionPinInput) => {

@@ -52,6 +52,9 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
   const onSelectView = vi.fn();
   const onRename = vi.fn();
   const onArchive = vi.fn();
+  const onCopySessionId = vi.fn();
+  const onCopyTranscript = vi.fn();
+  const onFork = vi.fn();
 
   const result = render(
     <TooltipProvider delayDuration={0}>
@@ -66,12 +69,26 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
         onSelectView={onSelectView}
         onRename={onRename}
         onArchive={onArchive}
+        onCopySessionId={onCopySessionId}
+        onCopyTranscript={onCopyTranscript}
+        onFork={onFork}
         {...overrides}
       />
     </TooltipProvider>,
   );
 
-  return { onNewSession, onSelectSession, onTogglePin, onSelectView, onRename, onArchive, ...result };
+  return {
+    onNewSession,
+    onSelectSession,
+    onTogglePin,
+    onSelectView,
+    onRename,
+    onArchive,
+    onCopySessionId,
+    onCopyTranscript,
+    onFork,
+    ...result,
+  };
 }
 
 describe("Sidebar (cursor-aligned layout)", () => {
@@ -154,6 +171,41 @@ describe("Sidebar (cursor-aligned layout)", () => {
     await user.type(input, "重命名后的会话{Enter}");
 
     expect(onRename).toHaveBeenCalledWith("s-actspace-1", "重命名后的会话");
+  });
+
+  it("opens the Copy submenu and invokes Copy ID / Copy Transcript", async () => {
+    const user = userEvent.setup();
+    const { onCopySessionId, onCopyTranscript } = renderSidebar();
+    const row = screen.getByText("工具定义格式和命名规范").closest(".session-row");
+    expect(row).not.toBeNull();
+
+    fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
+    await user.click(screen.getByRole("menuitem", { name: "Copy" }));
+    await user.click(screen.getByRole("menuitem", { name: "Copy ID" }));
+    expect(onCopySessionId).toHaveBeenCalledWith("s-actspace-1");
+
+    fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
+    await user.hover(screen.getByRole("menuitem", { name: "Copy" }));
+    await user.click(screen.getByRole("menuitem", { name: "Copy Transcript" }));
+    expect(onCopyTranscript).toHaveBeenCalledWith("s-actspace-1");
+  });
+
+  it("invokes Fork and disables it while the session is busy", async () => {
+    const user = userEvent.setup();
+    const first = renderSidebar();
+    const row = screen.getByText("工具定义格式和命名规范").closest(".session-row");
+    fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
+    await user.click(screen.getByRole("menuitem", { name: "Fork" }));
+    expect(first.onFork).toHaveBeenCalledWith("s-actspace-1");
+
+    first.unmount();
+    const busy = renderSidebar({ busySessionIds: new Set(["s-actspace-1"]) });
+    const busyRow = screen.getByText("工具定义格式和命名规范").closest(".session-row");
+    fireEvent.contextMenu(busyRow as HTMLElement, { clientX: 120, clientY: 80 });
+    const fork = screen.getByRole("menuitem", { name: "Fork" });
+    expect(fork).toBeDisabled();
+    await user.click(fork);
+    expect(busy.onFork).not.toHaveBeenCalled();
   });
 
   it("disables archive on the active session row", async () => {

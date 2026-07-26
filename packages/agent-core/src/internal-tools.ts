@@ -88,6 +88,8 @@ export interface PermissionResult {
   allowSimilar?: boolean;
   /** 审批作用域；Browser Use 用 session 级租约替代逐命令审批。 */
   approvalScope?: "browser_session";
+  /** 审批通过后计划使用的执行环境；当前用于 Bash 审批展示。 */
+  executionEnvironment?: "sandbox" | "real";
   /** 验证通过后可修正参数（如路径展开、超时值清洗） */
   sanitizedArgs?: Record<string, unknown>;
 }

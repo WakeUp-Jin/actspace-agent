@@ -45,6 +45,7 @@
 - 不在前端组件里根据 `toolName` 分支推断展示；新增工具应通过 `previewKind` 和 `ToolUiPreview` 建模。
 - 工具调用进行中阶段（`tool_started` 之后、`tool_finished` 之前）所有工具行使用 text shimmer 视觉，详见 [中间消息区规范 - 工具执行中态规范](../frontend/front-中间消息区规范.md#工具执行中态规范)。
 - running 阶段后端 `tool_started.preview` 只推送当前能确定的最小字段（filePath / command / query），不传未生成的数值（diff stats、entryCount 等）；完成态字段在 `tool_finished` / 持久化事件中补齐。
+- `tool_finished` 是单个工具调用的完成事实。renderer 必须按 `toolCallId` 立即切换该工具的最终状态，不能为了最短动画时长等待同批其他工具完成；视觉平滑不能延迟真实生命周期状态。
 - **`tool_call_streaming` 事件契约**：bridge 在 LLM 流式输出 `tool_call_delta` 时累积 partial args，按 50ms throttle emit `tool_call_streaming { toolCallId, toolName, isInitial?, preview: ToolUiPreview }`。前端**零解析**直接消费 typed preview，复用与 `tool_started` 相同的渲染分支。`isInitial=true` 是首帧（dispatched 阶段），filePath 此时可能为空字符串，前端用 `Write file…` 等 fallback 文案展示。新工具接入只需在 `engine/streaming-preview-extractors.ts` 注册按 previewKind 的 extractor，前端无需改动。详见 [docs/learnings/2026-05/llm-tool-call-streaming.md](../../learnings/2026-05/llm-tool-call-streaming.md) 的流式协议设计原则。
 - **`subagent_event` 事件契约**：Agent 工具执行 SubAgent run 时，bridge emit `subagent_event { toolCallId, transcriptRef, event, preview }`，其中 `preview` 是完整 typed `AgentToolPreview`。renderer 只用它覆盖同一个 Agent block 的 running state，不解析 SubAgent 原始工具参数；最终完成态仍由 `tool_result.uiPreview.kind === "agent"` 持久化恢复。
 
@@ -131,6 +132,9 @@
 - 折叠态使用 `commandPreview`。
 - 展示：`Running pnpm test`、`Ran pnpm test`、`Denied rm -rf ...`。
 - 完整 `command` 只在展开态展示。
+- `sandboxed: true / false` 分别展示 `沙盒` / `真实环境` badge；renderer 的实时消息转换和 session 恢复必须透传同一个字段。
+- 审批 pending 时 badge 表示计划执行环境，最终 preview 以 executor 返回的实际环境覆盖；权限拒绝使用 `notExecuted: true` 展示 `未执行`。
+- hard reject 的模型回填必须明确说明“执行前拒绝、没有创建审批请求”，不能只返回含糊的 dangerous 文案让模型误以为仍可审批。
 
 ### `web_search`
 

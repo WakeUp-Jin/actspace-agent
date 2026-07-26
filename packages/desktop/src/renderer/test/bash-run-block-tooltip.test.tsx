@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
 import { BashRunBlock } from "../components/messages/BashRunBlock";
 import { TooltipProvider } from "../components/ui/Tooltip";
@@ -169,6 +169,66 @@ describe("BashRunBlock tooltips", () => {
 
     expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
     expect(screen.queryByText("真实环境")).not.toBeInTheDocument();
+  });
+
+  it("shows not executed when Bash was denied before process start", () => {
+    renderBash({
+      id: "bash-denied-1",
+      kind: "bash",
+      createdAt: "2026-07-25T00:00:00.000Z",
+      title: "Bash command denied",
+      status: "denied",
+      command: "rm -rf /",
+      notExecuted: true,
+    });
+
+    expect(screen.getByText("未执行")).toBeInTheDocument();
+    expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
+    expect(screen.queryByText("真实环境")).not.toBeInTheDocument();
+  });
+
+  it("shows the planned environment in a Bash approval card", () => {
+    renderBash({
+      id: "bash-approval-env-1",
+      kind: "bash",
+      createdAt: "2026-07-25T00:00:00.000Z",
+      title: "Delete directory",
+      status: "pending",
+      command: "rm -rf user-management",
+      approvalRequestId: "approval-env-1",
+      sandboxed: true,
+    });
+
+    expect(screen.getByText("沙盒")).toBeInTheDocument();
+  });
+
+  it("switches an approval card to not executed after Skip", async () => {
+    const originalActspace = window.actspace;
+    const submitApproval = vi.fn(async () => ({ ok: true }));
+    window.actspace = { ...originalActspace, submitApproval } as typeof window.actspace;
+    try {
+      renderBash({
+        id: "bash-approval-deny-1",
+        kind: "bash",
+        createdAt: "2026-07-25T00:00:00.000Z",
+        title: "Delete directory",
+        status: "pending",
+        command: "rm -rf user-management",
+        approvalRequestId: "approval-deny-1",
+        sandboxed: true,
+      });
+
+      await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+
+      expect(await screen.findByText("未执行")).toBeInTheDocument();
+      expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
+      expect(submitApproval).toHaveBeenCalledWith({
+        requestId: "approval-deny-1",
+        decision: "deny",
+      });
+    } finally {
+      window.actspace = originalActspace;
+    }
   });
 
   it("shows a readable tooltip for approval actions", async () => {

@@ -1199,6 +1199,148 @@ describe("App streaming user message", () => {
     });
   });
 
+  it("finishes multiple write tools independently as each tool_finished event arrives", async () => {
+    const sessionId = "session-write-status";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "Write status",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    let activeTurnId = "";
+    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+      null;
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      getKimiBalance: async () => ({
+        provider: "kimi",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) {
+            streamHandler = null;
+          }
+        };
+      },
+      runTurn: (input: RunTurnInput) =>
+        new Promise((resolve) => {
+          activeTurnId = input.turnId;
+          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          for (const [index, filePath] of ["first.ts", "second.ts", "third.ts"].entries()) {
+            streamHandler?.({
+              type: "tool_started",
+              sessionId: input.sessionId,
+              turnId: input.turnId,
+              toolCallId: `tool-write-${index + 1}`,
+              toolName: "write_file",
+              argsPreview: JSON.stringify({ path: filePath }),
+              preview: {
+                kind: "write",
+                filePath,
+                additions: 0,
+                deletions: 0,
+                diff: "",
+                collapsedLines: 5,
+                status: "running",
+                streamingContent: `export const value${index + 1} = ${index + 1};`,
+              },
+            });
+          }
+          resolveRunTurn = resolve;
+        }),
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "write three files");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    for (const filePath of ["first.ts", "second.ts", "third.ts"]) {
+      const runningText = await screen.findByText(`Write ${filePath}`);
+      expect(runningText.closest(".file-diff-block")).toHaveClass("is-streaming");
+    }
+
+    const finishWrite = async (index: number, filePath: string) => {
+      await act(async () => {
+        streamHandler?.({
+          type: "tool_finished",
+          sessionId,
+          turnId: activeTurnId,
+          toolCallId: `tool-write-${index}`,
+          toolName: "write_file",
+          resultEventId: `evt-write-${index}`,
+          isError: false,
+          preview: {
+            kind: "write",
+            filePath,
+            additions: 1,
+            deletions: 0,
+            diff: `+export const value${index} = ${index};`,
+            collapsedLines: 5,
+            status: "completed",
+          },
+        });
+      });
+    };
+
+    await finishWrite(1, "first.ts");
+    expect(screen.getByRole("button", { name: /Write first\.ts/ })).toBeInTheDocument();
+    expect(screen.getByText("Write second.ts").closest(".file-diff-block")).toHaveClass("is-streaming");
+    expect(screen.getByText("Write third.ts").closest(".file-diff-block")).toHaveClass("is-streaming");
+
+    await finishWrite(2, "second.ts");
+    expect(screen.getByRole("button", { name: /Write second\.ts/ })).toBeInTheDocument();
+    expect(screen.getByText("Write third.ts").closest(".file-diff-block")).toHaveClass("is-streaming");
+
+    await finishWrite(3, "third.ts");
+    expect(screen.getByRole("button", { name: /Write third\.ts/ })).toBeInTheDocument();
+
+    await act(async () => {
+      resolveRunTurn?.({
+        sessionId,
+        turnId: activeTurnId,
+        status: "completed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      });
+    });
+  });
+
   it("renders a streaming Agent block from SubAgent events and opens the live transcript", async () => {
     const sessionId = "session-subagent-stream";
     const record = createEmptySessionRecord(sessionId);
@@ -1931,6 +2073,7 @@ describe("App streaming user message", () => {
             summary: "Run install",
             reason: "Bash command requires approval",
             command: "pnpm install",
+            executionEnvironment: "sandbox",
           });
           resolveRunTurn = resolve;
         }),
@@ -1943,6 +2086,7 @@ describe("App streaming user message", () => {
     await userEvent.click(screen.getByLabelText("Send message"));
 
     expect(await screen.findByRole("button", { name: "Session status: Waiting approval" })).toBeTruthy();
+    expect(screen.getByText("沙盒")).toBeInTheDocument();
 
     await act(async () => {
       approvalPending = false;
@@ -1953,6 +2097,23 @@ describe("App streaming user message", () => {
         toolCallId: "tool-bash-approval",
         requestId: "approval-bash-1",
         decision: "approve_once",
+      });
+      streamHandler?.({
+        type: "tool_finished",
+        sessionId,
+        turnId: activeTurnId,
+        toolCallId: "tool-bash-approval",
+        toolName: "bash",
+        resultEventId: "event-bash-approval-result",
+        isError: false,
+        preview: {
+          kind: "bash",
+          status: "success",
+          title: "Bash command",
+          command: "pnpm install",
+          commandPreview: "pnpm install",
+          sandboxed: true,
+        },
       });
       resolveRunTurn?.({
         sessionId,

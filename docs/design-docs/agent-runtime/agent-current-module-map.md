@@ -105,7 +105,7 @@ Agent Turn 的跨层职责边界见 `docs/design-docs/agent-runtime/agent-turn-l
 - `loadEnv()`：应用启动时调用，自动探测并加载 `.env` 文件，合并到 `process.env`（不覆盖已有值）。
 - `env` proxy：类型安全的只读对象，任意文件 `import { env }` 后直接访问 `env.DEEPSEEK_API_KEY` 等。
 - `envToLLMConfig()`：从 env 生成 `LLMConfig`，仅用于测试和 mock fallback 场景；Electron 真实 turn 使用 `engine/create-agent-deps.ts` 中的 `buildAgentConfig()` + `createAgentFromConfig()` 两步完成。
-- `engine/create-agent-deps.ts`：`buildLLMConfigFromRuntime(model, providerRuntime, inferenceSettings)` 已由 desktop 真实 turn、compact、Explore、Kairos、context describe 和 eval candidate 路径消费；env builder 只保留非 Desktop 兼容入口。
+- `engine/create-agent-deps.ts`：`buildLLMConfigFromRuntime(model, providerRuntime, inferenceSettings)` 已由 desktop 真实 turn、compact、Explore、Kairos、context describe、eval candidate 和回复可视化路径消费；env builder 只保留非 Desktop 兼容入口。
 - `EnvValidationError`：缺失必填项或值不合法时抛出，携带所有问题列表。
 
 项目根目录的 `.env.example` 列出全部可配置项和默认值，`.env` 已被 `.gitignore` 忽略。

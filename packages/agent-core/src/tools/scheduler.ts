@@ -38,6 +38,7 @@ export interface ToolApprovalRequest {
   reason: string;
   riskLevel?: ToolRiskLevel;
   approvalScope?: "browser_session";
+  executionEnvironment?: "sandbox" | "real";
   sessionId?: string;
   turnId?: string;
   createdAt: number;
@@ -171,9 +172,12 @@ export class ToolScheduler {
       }
 
       if (permission.decision === "deny") {
+        const reason = permission.reason ?? `Permission denied for tool: ${toolName}`;
         const result = {
           success: false,
-          error: permission.reason ?? `Permission denied for tool: ${toolName}`,
+          error:
+            `Permission denied before execution for tool ${toolName}; ` +
+            `no approval request was created. Reason: ${reason}`,
         };
         return this.finish(record, "cancelled", result);
       }
@@ -291,6 +295,7 @@ export class ToolScheduler {
       reason: permission.reason ?? `Tool requires approval: ${tool.name}`,
       riskLevel: permission.riskLevel,
       approvalScope: permission.approvalScope,
+      executionEnvironment: permission.executionEnvironment,
       sessionId: this.approvalContext?.sessionId,
       turnId: this.approvalContext?.turnId,
       createdAt: this.now(),

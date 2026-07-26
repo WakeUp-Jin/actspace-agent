@@ -94,8 +94,13 @@ const BASH_SANDBOX_BADGE_CLASS =
   "bash-sandbox-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-xs font-medium text-text-faint";
 const BASH_REAL_ENV_BADGE_CLASS =
   "bash-real-env-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-warning-soft px-1.5 py-px text-xs font-medium text-on-warning";
+const BASH_NOT_EXECUTED_BADGE_CLASS =
+  "bash-not-executed-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-xs font-medium text-text-faint";
 
-function SandboxBadge({ sandboxed }: { sandboxed: boolean | undefined }) {
+function EnvironmentBadge({ sandboxed, notExecuted }: Pick<BashMessage, "sandboxed" | "notExecuted">) {
+  if (notExecuted) {
+    return <span className={BASH_NOT_EXECUTED_BADGE_CLASS}>未执行</span>;
+  }
   if (sandboxed === undefined) return null;
   if (sandboxed) {
     return <span className={BASH_SANDBOX_BADGE_CLASS}>沙盒</span>;
@@ -132,7 +137,7 @@ function BashExecutionBlock({ message }: { message: BashMessage }) {
         )}
         {message.commandPreview ? <span className={BASH_COMMAND_PREVIEW_CLASS}>{message.commandPreview}</span> : null}
         <span className={BASH_RUN_TRAILING_CLASS}>
-          <SandboxBadge sandboxed={message.sandboxed} />
+          <EnvironmentBadge sandboxed={message.sandboxed} notExecuted={message.notExecuted} />
           {message.backgroundStatus ? (
             <span className={BASH_BACKGROUND_BADGE_CLASS}>{BACKGROUND_BADGE_TEXT[message.backgroundStatus]}</span>
           ) : null}
@@ -196,6 +201,8 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
           ...message,
           status: resolvedDecision === "deny" ? "denied" : "running",
           approvalRequestId: undefined,
+          sandboxed: resolvedDecision === "deny" ? undefined : message.sandboxed,
+          notExecuted: resolvedDecision === "deny" ? true : undefined,
         }}
       />
     );
@@ -207,6 +214,7 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
         <span className={BASH_APPROVAL_TITLE_CLASS}>
           <TerminalSquare className="text-text-faint" size={14} strokeWidth={2} aria-hidden="true" />
           {message.title}
+          <EnvironmentBadge sandboxed={message.sandboxed} notExecuted={message.notExecuted} />
         </span>
         <Tooltip>
           <TooltipTrigger asChild>

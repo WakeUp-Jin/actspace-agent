@@ -294,8 +294,14 @@ export const bashExecutor = async (
       });
       spawnSpec = sandboxSpawn;
       sandboxed = true;
-    } catch {
-      // profile 写盘失败等基础设施故障：降级真实环境，sandboxed 如实为 false
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        error:
+          "Bash sandbox initialization failed before execution; the command was not run. " +
+          `Reason: ${message}. Retry with requiredPermissions: [\"no_sandbox\"] only if real-environment execution is necessary.`,
+      };
     }
   }
 

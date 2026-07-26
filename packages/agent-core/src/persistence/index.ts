@@ -23,6 +23,7 @@ export {
   createSessionStorePaths,
   ensureSessionStore,
   createSessionRecord,
+  forkSessionRecord,
   setSessionPinned,
   setSessionTitle,
   setSessionArchived,

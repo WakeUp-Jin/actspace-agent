@@ -124,6 +124,34 @@ describe("Bash tool permissions", () => {
     expect(result.decision).toBe("deny");
   });
 
+  it("asks before recursively deleting an explicit workspace directory", async () => {
+    const workspace = await createWorkspace();
+    for (const command of [
+      "rm -rf user-management",
+      `rm -rf ${join(workspace, "user-management")}`,
+      'rm -rf "project with spaces"',
+      "rm -rf ..cache",
+    ]) {
+      const result = await checkBashPermissions({ command }, workspace, { sandboxAvailable: true });
+      expect(result.decision, command).toBe("ask");
+      expect(result.executionEnvironment, command).toBe("sandbox");
+      expect(result.allowSimilar, command).toBe(false);
+    }
+  });
+
+  it("hard-rejects recursive delete targets outside the safe workspace boundary", async () => {
+    const workspace = await createWorkspace();
+    for (const command of [
+      `rm -rf ${workspace}`,
+      "rm -rf ../outside",
+      "rm -rf *",
+      "rm -rf .git/hooks",
+    ]) {
+      const result = await checkBashPermissions({ command }, workspace, { sandboxAvailable: true });
+      expect(result.decision, command).toBe("deny");
+    }
+  });
+
   describe("irreversible operations ask even when sandboxed", () => {
     const irreversibleCommands = [
       "rm notes.txt",
@@ -209,6 +237,7 @@ describe("Bash tool permissions", () => {
     expect(result.riskLevel).toBe("high");
     expect(result.allowSimilar).toBe(false);
     expect(result.reason).toContain("real environment");
+    expect(result.executionEnvironment).toBe("real");
     expect(result.sanitizedArgs).toMatchObject({ requiredPermissions: ["no_sandbox"] });
   });
 
