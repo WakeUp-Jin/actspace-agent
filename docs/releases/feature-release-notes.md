@@ -6,6 +6,10 @@
 
 | 日期 | 功能域 | 用户价值 | 变更摘要 |
 | --- | --- | --- | --- |
+| 2026-07-26 | 会话分支与复制 | 现有会话可以分叉成一个能独立继续的新会话，也能快速复制会话 ID 或可读对话文本，方便尝试不同方向、分享和排障。 | 会话右键菜单新增 Fork、Copy ID 和 Copy Transcript；Fork 从当前已持久化状态复制事件、Context、附件与 SubAgent 记录，并重写新会话身份及内部路径；运行中或等待审批时禁止分叉，Transcript 只导出 User / Assistant 正文和附件名。 |
+| 2026-07-26 | 回复可视化稳定性 | 点击回复可视化后不再出现空白面板，重新生成能真正绕过缓存，且只转换当前点击的回复。 | 可视化生成统一使用 Settings 中的当前主模型与安全存储密钥；写缓存前校验模型终止状态和 HTML 完整性，自动淘汰历史空产物，显式重新生成始终重新调用模型，输入范围收口到当前 turn 的最终可见回复。 |
+| 2026-07-26 | Bash 删除审批与环境反馈 | workspace 内明确子目录的递归删除可以由用户确认后执行，同时审批、拒绝和完成状态会清楚说明命令是否执行以及所在环境。 | `rm -rf` 改为按目标路径边界决策：workspace 子目录进入不可逆审批，根目录、越界、glob 和 `.git` 目标继续硬拒绝；Bash 预览恢复计划与实际执行环境，执行前拒绝显示“未执行”，沙盒初始化失败时中止而不再静默降级。 |
+| 2026-07-26 | 工具执行反馈 | 多个工具连续执行时，每个已完成的工具都会立即结束运行态，不再等到最后一个工具完成后才成批刷新。 | Renderer 移除工具完成态的定时延迟，收到 `tool_finished` 后立即按 `toolCallId` 更新完成、失败和最终 preview；回归测试锁定同批工具逐个完成的中间状态。 |
 | 2026-07-25 | Browser 工具按需加载 | Agent 默认只加载浏览器入口，需要操作网页时再展开完整工具组，减少上下文占用和误调用；Browser 设置也更简洁。 | Browser 工具改为 progressive disclosure：每个 Turn 默认只暴露 `browser_help`，调用 gateway 后从下一次模型请求开始披露完整工具组，并在新 Turn 或 Kairos tick 重置；Context 与压缩链路统一读取当前可见工具，设置页收口为 Browser 总开关和折叠的能力选项。 |
 | 2026-07-25 | Ink & Emerald 视觉系统 | 浅色、深色与跟随系统主题的界面层级更统一，主操作、运行状态、语义提示和数据配色更容易区分，悬浮与选中反馈也更明确。 | 建立 neutral、action、operational、semantic、chart、context 与 diff 语义 token，迁移 Sidebar、Composer、Settings、消息流、右侧面板、Kairos、Usage 和 Context；清除旧 `brand` alias，增加颜色防回流检查，并补齐模型、Review 与右侧 Tab 的交互状态。 |
 | 2026-07-25 | 服务商余额管理 | DeepSeek、Kimi、OpenRouter 的余额回到各自服务商卡片中查看，模型用量与账户余额不再混在 Usage 页面。 | 新增统一 provider balance IPC；OpenRouter 模型 Key 与 Management Key 分开加密保存；服务商卡支持进入刷新、手动刷新和定时刷新，失败时保留上次结果；Usage 移除余额卡。 |
