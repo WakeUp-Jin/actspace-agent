@@ -20,6 +20,7 @@
 - `core-review-change-sources.md`：Review 变更来源与 Git-first baseline。
 - `agent-index.md`：Agent Runtime 和全部 Agent 专题的总入口。
 - `agent-plugins-fs-watch.md`：独立 fs-watch 插件设计；当前没有其他同级插件设计与它形成稳定专题。
+- `website-introduction-site-design.md`：`packages/site` 官网、公开文档、博客、更新页、视觉系统和静态部署的长期设计规范。
 
 ## 一级专题目录
 
@@ -58,6 +59,12 @@
 2. `lab/lab-product-design.md`
 3. `lab/lab-runtime-architecture.md`
 4. `lab/lab-versions-index.md`
+
+### 官网与公开内容
+
+1. `website-introduction-site-design.md`
+2. `docs/releases/README.md`
+3. `docs/releases/feature-release-notes.md`
 
 ## 设计文档与其他资料的边界
 
