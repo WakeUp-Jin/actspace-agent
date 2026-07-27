@@ -23,6 +23,8 @@ export interface ProviderRuntimeConfig {
   apiKey: string;
   baseUrl: string;
   transport?: { proxyUrl?: string };
+  /** 本次调用所用凭据的价格倍率；未配置时为 1。 */
+  pricingMultiplier?: number;
 }
 
 export interface RuntimeInferenceSettings {

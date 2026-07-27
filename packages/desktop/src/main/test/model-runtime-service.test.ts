@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadEnv } from "@actspace/agent-core";
+import type { ModelMetadataView } from "@actspace/shared";
 import { ModelRuntimeService } from "../model-runtime-service";
 import { ModelStoreService } from "../model-store-service";
 import { SettingsService, type SecretCrypto } from "../settings-service";
@@ -13,17 +14,30 @@ const crypto: SecretCrypto = {
   decrypt: (cipher) => cipher.toString().slice(4),
 };
 const checkedAt = "2026-07-24T12:00:00.000Z";
+const duckMetadata: ModelMetadataView = {
+  key: "models.dev:xai:grok-4.5",
+  source: "models.dev",
+  provider: "xai",
+  modelId: "grok-4.5",
+  name: "Grok 4.5",
+  aliases: ["grok-4.5"],
+  contextWindow: 256000,
+  maxTokens: 32000,
+  capabilities: { input: ["text"], toolUse: "declared", reasoning: true, thinkingToggle: true },
+  pricing: { currency: "USD", inputCacheHitPerMillion: 0.5, inputCacheMissPerMillion: 5, inputCacheWritePerMillion: 6.25, outputPerMillion: 30 },
+  fetchedAt: checkedAt,
+};
 
 async function setup() {
   const dataRoot = await mkdtemp(join(tmpdir(), "actspace-runtime-test-"));
-  const settings = new SettingsService({ dataRoot, crypto, reloadEnv: () => loadEnv({ envPath: "/private/tmp/no-env", mergeToProcessEnv: false }) });
+  const settings = new SettingsService({ dataRoot, crypto, reloadEnv: () => loadEnv({ envPath: "/private/tmp/no-env", mergeToProcessEnv: false }), createCredentialId: () => "codex-sale" });
   await settings.load();
-  const models = new ModelStoreService({ settings });
+  const models = new ModelStoreService({ settings, findMetadataModel: (key) => key === duckMetadata.key ? duckMetadata : undefined });
   const runtime = new ModelRuntimeService(settings, models);
   return { settings, models, runtime };
 }
 
-async function connect(settings: SettingsService, provider: "deepseek" | "kimi" | "openrouter") {
+async function connect(settings: SettingsService, provider: "deepseek" | "kimi" | "openrouter" | "duckding") {
   await settings.updateProviderConnection({ provider, apiKey: `sk-${provider}` });
   await settings.markProviderConnectionResult(provider, { ok: true, message: "ok", checkedAt });
 }
@@ -77,5 +91,25 @@ describe("ModelRuntimeService", () => {
     await settings.updateProviderConnection({ provider: "deepseek", apiKey: null });
     process.env.DEEPSEEK_API_KEY = "stale-env-key";
     expect(runtime.resolveMainModel("deepseek:deepseek-v4-pro")).toMatchObject({ ok: false, reason: "provider_disconnected" });
+  });
+
+  it("uses the model-selected DuckDing Key and applies its pricing multiplier without fallback", async () => {
+    const { settings, models, runtime } = await setup();
+    await connect(settings, "duckding");
+    await settings.addProviderCredential({ provider: "duckding", label: "CodeX-Sale", apiKey: "sk-sale", pricingMultiplier: 0.2 });
+    await settings.markProviderCredentialConnectionResult("duckding", "codex-sale", { ok: true, message: "ok", checkedAt });
+    await models.addCustomModel({ provider: "duckding", apiModel: "grok-4.5", credentialId: "codex-sale", metadataKey: duckMetadata.key });
+
+    const resolved = runtime.resolveMainModel("duckding:grok-4.5");
+    expect(resolved).toMatchObject({
+      ok: true,
+      model: {
+        providerRuntime: { apiKey: "sk-sale", pricingMultiplier: 0.2 },
+        definition: { pricing: { inputCacheMissPerMillion: 1, inputCacheWritePerMillion: 1.25, outputPerMillion: 6 } },
+      },
+    });
+
+    await settings.markProviderCredentialConnectionResult("duckding", "codex-sale", { ok: false, message: "bad", checkedAt, errorKind: "auth" });
+    expect(runtime.resolveMainModel("duckding:grok-4.5")).toMatchObject({ ok: false, reason: "credential_unavailable" });
   });
 });

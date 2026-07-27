@@ -55,7 +55,7 @@ desktop --(file contract)--> plugins/fs-watch
 
 - `docs/design-docs/agent-runtime/agent-turn-layers.md`：Agent Turn 从前端输入到结果返回的四层职责边界（Renderer → Main Process → Bridge → Agent），也是运行拓扑、IPC 双通道和 turn 数据流的主要入口。
 - `docs/design-docs/agent-runtime/agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块清单，包括 LLM、prompt、tools、context、engine、persistence、observability、env 和兼容层。
-- `docs/design-docs/model-context/agent-multi-provider-llm.md`：已落地的多供应商 LLM 架构，统一 DeepSeek / Kimi / OpenRouter 的服务商连接、模型目录、服务商级代理和任务模型选择；真实 OpenRouter 场景待用户统一手动验收。
+- `docs/design-docs/model-context/agent-multi-provider-llm.md`：已落地的多供应商 LLM 架构，统一 DeepSeek / Kimi / OpenRouter / DuckDing 的服务商连接、模型目录、服务商级代理和任务模型选择；DuckDing 多 Key 与公共模型目录详见同目录专题，真实 provider 场景待用户统一手动验收。
 - `docs/design-docs/core-storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
 - `docs/design-docs/agent-runtime/agent-backend-design.md`：后端 Agent Runtime 的长期设计事实来源，解释为什么采用这些模块边界。
 - `docs/design-docs/collaboration/agent-members.md`：跨 Room 持久 Agent Member 的身份、配置版本、Activity、设置页与 Room 私有上下文边界。

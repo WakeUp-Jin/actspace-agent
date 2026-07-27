@@ -8,6 +8,7 @@ import {
   type InstalledModelView,
   type ModelDefinition,
   type ModelKey,
+  type ModelMetadataView,
   type ModelPurpose,
   type ModelSnapshot,
   type LlmProviderId,
@@ -19,22 +20,25 @@ const PURPOSES: readonly ModelPurpose[] = ["chat", "utility", "explore", "kairos
 
 export type ModelStoreResult =
   | { ok: true; model?: InstalledModelView }
-  | { ok: false; code: "invalid_provider" | "model_not_found" | "model_not_installed" | "model_not_removable" | "model_in_use"; message: string; references?: string[] };
+  | { ok: false; code: "invalid_provider" | "model_not_found" | "model_not_installed" | "model_not_removable" | "model_in_use" | "credential_missing"; message: string; references?: string[] };
 
 export interface ModelStoreServiceOptions {
   settings: SettingsService;
   findCatalogModel?: (apiModel: string) => CatalogModelView | undefined;
+  findMetadataModel?: (metadataKey: string) => ModelMetadataView | undefined;
   now?: () => Date;
 }
 
 export class ModelStoreService {
   private readonly settings: SettingsService;
   private readonly findCatalogModel: (apiModel: string) => CatalogModelView | undefined;
+  private readonly findMetadataModel: (metadataKey: string) => ModelMetadataView | undefined;
   private readonly now: () => Date;
 
   constructor(options: ModelStoreServiceOptions) {
     this.settings = options.settings;
     this.findCatalogModel = options.findCatalogModel ?? (() => undefined);
+    this.findMetadataModel = options.findMetadataModel ?? (() => undefined);
     this.now = options.now ?? (() => new Date());
   }
 
@@ -50,6 +54,10 @@ export class ModelStoreService {
         enabled: state.enabled ?? true,
         hasApiKey: state.hasApiKey,
         lastConnection: state.lastConnection ?? { status: "untested" },
+        additionalCredentials: Object.fromEntries((state.additionalCredentials ?? []).map((credential) => [credential.id, {
+          hasApiKey: credential.hasApiKey,
+          lastConnection: credential.lastConnection,
+        }])),
       }])) as ModelSnapshot["providers"],
       definitions,
       installedModels: clone(stored.installedModels),
@@ -121,6 +129,46 @@ export class ModelStoreService {
     return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === key) };
   }
 
+  async addCustomModel(input: {
+    provider: Extract<LlmProviderId, "duckding">;
+    apiModel: string;
+    label?: string;
+    credentialId?: string | null;
+    metadataKey?: string | null;
+  }): Promise<ModelStoreResult> {
+    const apiModel = input.apiModel.trim();
+    if (!apiModel || apiModel.length > 300 || /\s/.test(apiModel)) {
+      return { ok: false, code: "model_not_found", message: "模型名称不能为空、不能包含空白，且不能超过 300 个字符。" };
+    }
+    const key = `duckding:${apiModel}` as ModelKey;
+    const stored = this.settings.getModelStorageState();
+    if (stored.installedModels[key]) {
+      return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === key) };
+    }
+    const credentialId = input.credentialId?.trim() || undefined;
+    if (credentialId && !this.settings.getV2().providers.duckding.additionalCredentials?.some(
+      (credential) => credential.id === credentialId && credential.hasApiKey,
+    )) {
+      return { ok: false, code: "credential_missing", message: "选择的额外 API Key 不存在。" };
+    }
+    const metadata = input.metadataKey ? this.findMetadataModel(input.metadataKey) : undefined;
+    if (input.metadataKey && !metadata) {
+      return { ok: false, code: "model_not_found", message: "选择的公共模型元数据已失效，请重新搜索。" };
+    }
+    const definition = metadataToCustomDefinition(key, apiModel, input.label, metadata, this.now().toISOString());
+    await this.settings.updateModelStorage({
+      installedModels: {
+        [key]: {
+          enabled: true,
+          addedAt: this.now().toISOString(),
+          ...(credentialId && { credentialId }),
+        },
+      },
+      customModels: { [key]: definition },
+    });
+    return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === key) };
+  }
+
   async refreshInstalledCatalogModels(): Promise<number> {
     const stored = this.settings.getModelStorageState();
     const updates: Partial<Record<ModelKey, ModelDefinition>> = {};
@@ -138,10 +186,41 @@ export class ModelStoreService {
   }
 
   async setModelEnabled(modelKey: ModelKey, enabled: boolean): Promise<ModelStoreResult> {
+    return this.updateModelSettings(modelKey, { enabled });
+  }
+
+  async updateModelSettings(
+    modelKey: ModelKey,
+    patch: { enabled?: boolean; customLabel?: string | null; credentialId?: string | null },
+  ): Promise<ModelStoreResult> {
     const stored = this.settings.getModelStorageState();
     const current = stored.installedModels[modelKey];
     if (!current) return { ok: false, code: "model_not_installed", message: "模型尚未添加。" };
-    await this.settings.updateModelStorage({ installedModels: { [modelKey]: { ...current, enabled } } });
+    const definition = this.getModelSnapshot().definitions[modelKey];
+    if (!definition) return { ok: false, code: "model_not_found", message: "模型不存在。" };
+    const credentialId = patch.credentialId === undefined
+      ? current.credentialId
+      : patch.credentialId?.trim() || undefined;
+    if (credentialId && !this.settings.getV2().providers[definition.provider].additionalCredentials?.some(
+      (credential) => credential.id === credentialId && credential.hasApiKey,
+    )) {
+      return { ok: false, code: "credential_missing", message: "选择的额外 API Key 不存在。" };
+    }
+    const customLabel = patch.customLabel === undefined
+      ? current.customLabel
+      : patch.customLabel?.trim() || undefined;
+    await this.settings.updateModelStorage({
+      installedModels: {
+        [modelKey]: {
+          ...current,
+          enabled: patch.enabled ?? current.enabled,
+          ...(customLabel && { customLabel }),
+          ...(credentialId && { credentialId }),
+          ...(!customLabel && { customLabel: undefined }),
+          ...(!credentialId && { credentialId: undefined }),
+        },
+      },
+    });
     return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === modelKey) };
   }
 
@@ -175,6 +254,42 @@ export class ModelStoreService {
     if (stored.kairos.modelId === modelKey) references.push("kairosModel");
     return references;
   }
+}
+
+function metadataToCustomDefinition(
+  key: ModelKey,
+  apiModel: string,
+  label: string | undefined,
+  metadata: ModelMetadataView | undefined,
+  catalogUpdatedAt: string,
+): ModelDefinition {
+  return {
+    key,
+    provider: "duckding",
+    api: "openai-completions",
+    apiModel,
+    label: label?.trim().slice(0, 180) || metadata?.name || apiModel,
+    source: "custom",
+    contextWindow: metadata?.contextWindow ?? null,
+    maxTokens: metadata?.maxTokens ?? null,
+    thinkingDefault: metadata?.capabilities.reasoning ?? false,
+    capabilities: metadata ? clone(metadata.capabilities) : {
+      input: ["text"],
+      toolUse: "unknown",
+      reasoning: false,
+      thinkingToggle: false,
+    },
+    ...(metadata?.pricing && { pricing: clone(metadata.pricing) }),
+    ...(metadata && {
+      metadata: {
+        source: metadata.source,
+        provider: metadata.provider,
+        modelId: metadata.modelId,
+        fetchedAt: metadata.fetchedAt,
+      },
+    }),
+    catalogUpdatedAt,
+  };
 }
 
 function catalogToDefinition(model: CatalogModelView, catalogUpdatedAt: string): ModelDefinition {

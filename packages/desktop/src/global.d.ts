@@ -111,10 +111,16 @@ declare global {
       updateProvider?: (input: import("@actspace/shared").ProviderUpdateInput) => Promise<import("@actspace/shared").ProviderOperationResult>;
       testProvider?: (input: import("@actspace/shared").ProviderIdInput) => Promise<import("@actspace/shared").ProviderTestResult>;
       disconnectProvider?: (input: import("@actspace/shared").ProviderIdInput) => Promise<import("@actspace/shared").ProviderOperationResult>;
+      addProviderCredential?: (input: import("@actspace/shared").ProviderCredentialAddInput) => Promise<import("@actspace/shared").ProviderCredentialOperationResult>;
+      updateProviderCredential?: (input: import("@actspace/shared").ProviderCredentialUpdateInput) => Promise<import("@actspace/shared").ProviderCredentialOperationResult>;
+      testProviderCredential?: (input: import("@actspace/shared").ProviderCredentialInput) => Promise<import("@actspace/shared").ProviderCredentialOperationResult>;
+      removeProviderCredential?: (input: import("@actspace/shared").ProviderCredentialInput) => Promise<import("@actspace/shared").ProviderCredentialOperationResult>;
       listInstalledModels?: () => Promise<import("@actspace/shared").ModelsListInstalledResult>;
       listUsableModels?: (input: import("@actspace/shared").ModelsListUsableInput) => Promise<import("@actspace/shared").ModelsListUsableResult>;
       listModelCatalog?: (input: import("@actspace/shared").ModelsCatalogListInput) => Promise<import("@actspace/shared").ModelsCatalogListResult>;
       reloadModelCatalog?: (input: import("@actspace/shared").ModelsCatalogListInput) => Promise<import("@actspace/shared").ModelsCatalogListResult>;
+      searchModelMetadata?: (input: import("@actspace/shared").ModelMetadataSearchInput) => Promise<import("@actspace/shared").ModelMetadataCatalogResult>;
+      reloadModelMetadata?: () => Promise<import("@actspace/shared").ModelMetadataCatalogResult>;
       addModel?: (input: import("@actspace/shared").ModelsAddInput) => Promise<import("@actspace/shared").ModelMutationResult>;
       updateModel?: (input: import("@actspace/shared").ModelsUpdateInput) => Promise<import("@actspace/shared").ModelMutationResult>;
       removeModel?: (input: import("@actspace/shared").ModelsRemoveInput) => Promise<import("@actspace/shared").ModelMutationResult>;

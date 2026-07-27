@@ -24,8 +24,16 @@ export type ModelPricing = {
   currency: "USD" | "CNY";
   inputCacheHitPerMillion: number;
   inputCacheMissPerMillion: number;
+  inputCacheWritePerMillion?: number;
   outputPerMillion: number;
   reasoningPerMillion?: number;
+};
+
+export type ModelMetadataReference = {
+  source: "models.dev" | "openrouter";
+  provider: string;
+  modelId: string;
+  fetchedAt: string;
 };
 
 export interface ModelSpec {
@@ -71,6 +79,7 @@ export interface ModelDefinition {
   capabilities: ModelCapabilities;
   pricing?: ModelPricing;
   catalogUpdatedAt?: string;
+  metadata?: ModelMetadataReference;
 }
 
 export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
@@ -297,7 +306,7 @@ export function normalizeModelKey(value: unknown): ModelKey | undefined {
   const separatorIndex = value.indexOf(":");
   if (separatorIndex <= 0 || separatorIndex === value.length - 1) return undefined;
   const provider = value.slice(0, separatorIndex);
-  if (provider !== "deepseek" && provider !== "kimi" && provider !== "openrouter") return undefined;
+  if (provider !== "deepseek" && provider !== "kimi" && provider !== "openrouter" && provider !== "duckding") return undefined;
   return value as ModelKey;
 }
 

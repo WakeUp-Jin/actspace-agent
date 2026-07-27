@@ -2,7 +2,7 @@
 
 本文档记录 `packages/agent-core` 当前已经落地的模块结构。它回答“现在代码分布在哪里、各模块负责什么”，长期设计动机见 `docs/design-docs/agent-runtime/agent-backend-design.md`。
 
-> DeepSeek / Kimi / OpenRouter 多供应商实现见 `docs/design-docs/model-context/agent-multi-provider-llm.md`。shared 契约、agent-core 显式 runtime/代理 transport、desktop settings v2、目录/模型存储、任务模型消费方和 renderer 已贯通；真实 OpenRouter 代理与跨任务场景保留为用户统一手动验收项。
+> DeepSeek / Kimi / OpenRouter / DuckDing 多供应商实现见 `docs/design-docs/model-context/agent-multi-provider-llm.md` 与 `agent-duckding-multi-key-model-catalog.md`。shared 契约、agent-core 显式 runtime/代理 transport、desktop settings v2、多 Key、公共目录/模型存储、任务模型消费方和 renderer 已贯通；真实 OpenRouter 代理、DuckDing 调用与跨任务场景保留为用户统一手动验收项。
 
 ## 顶层类型与契约
 
@@ -207,6 +207,8 @@ flowchart TB
 
 Desktop 集成（`packages/desktop`）：
 
+- `src/main/settings-service.ts` + `model-store-service.ts` + `model-runtime-service.ts`：provider 默认 Key 与额外命名 Key 分层持久化；模型用可选 `credentialId` 引用同 provider 凭据，runtime 解析目标密钥并把 Key 倍率应用到本次调用的价格快照。缺失或不可用的绑定明确失败，不回退默认 Key。
+- `src/main/model-metadata-catalog-service.ts`：匿名聚合 models.dev 与 OpenRouter 公共模型列表，归一化能力/价格、维护原子缓存与 stale/offline 状态，为 DuckDing 手动模型提供可选元数据快照；该服务不依赖用户是否配置 OpenRouter。
 - `src/main/agent-runtime-context.ts` + `agents-md-service.ts`：主 Agent runtime context 装配入口。`SettingsService.readAgentSystemPrompt()` 读取 `<userData>/prompts/main-agent.md` 作为主系统提示词；`agents-md-service` 固定加载 `<userData>/AGENTS.md` 与 `<workspaceRoot>/AGENTS.md`，缺失静默跳过、读取失败只 warning，并以 `rules` segment 注入 `SystemPromptContext`。同一 loader 还注入 Main Agent → Kairos handoff 段，给出真实绝对路径 `<userData>/kairos/inbox/main-agent.md`，并把 `<userData>/kairos/inbox/` 作为主 Agent `write_file/edit_file` 的额外可写根；随后调用 `loadSkillRegistry()` 扫描项目级/用户级 Skill，把 `<available_skills>` 注入 `skills` segment。Skill 正文由 Agent 按 catalog 中的绝对 `location` 使用 `read_file` 读取。真实 turn、`context:describe` 和 `/compact` 共用该 loader，避免上下文检查视图和 LLM 实际输入漂移。
 - `src/main/context-describe-service.ts`：按需重建某个 session 的 Context 明细，不调用 LLM；现在通过同一 runtime context loader 注入主系统提示词文件和 `AGENTS.md` rules，再用 `buildContextEntries` 生成 systemPrompt / rules / tools / conversation 逐条全文。
 - `src/main/kairos-bootstrap.ts`：`ensureKairosScaffolding(kairosRoot)` 幂等建目录 + 落 4 份默认 config；`createKairosLlm()` 复用 `buildLLMConfig`；`createKairosToolManagerFactory({ workspaceRoot })` 把 `blocklist.toolsDenied` 合并进 `disabledTools`。

@@ -72,8 +72,8 @@ describe("model config", () => {
     expect(resolveModelSpecByApiModel("kimi-k2.7-code", "kimi")?.id).toBe("kimi-k2.7-code");
   });
 
-  it("registers the three supported providers without storing user credentials", () => {
-    expect(PROVIDER_IDS).toEqual(["deepseek", "kimi", "openrouter"]);
+  it("registers supported providers without storing user credentials", () => {
+    expect(PROVIDER_IDS).toEqual(["deepseek", "kimi", "openrouter", "duckding"]);
     expect(PROVIDER_REGISTRY.openrouter).toMatchObject({
       defaultBaseUrl: "https://openrouter.ai/api/v1",
       supportedApis: ["openai-completions"],
@@ -81,6 +81,11 @@ describe("model config", () => {
       supportsProxy: true,
     });
     expect(JSON.stringify(PROVIDER_REGISTRY)).not.toMatch(/apiKey|authorization/i);
+    expect(PROVIDER_REGISTRY.duckding).toMatchObject({
+      defaultBaseUrl: "https://www.duckcoding.ai/v1",
+      supportedApis: ["openai-completions"],
+      supportsRemoteModelCatalog: false,
+    });
     expect(isProviderId("openrouter")).toBe(true);
     expect(isProviderId("other")).toBe(false);
   });
@@ -112,6 +117,7 @@ describe("model config", () => {
     expect(normalizeModelKey("openrouter:anthropic/claude-example")).toBe(
       "openrouter:anthropic/claude-example",
     );
+    expect(normalizeModelKey("duckding:grok-4.5")).toBe("duckding:grok-4.5");
     expect(normalizeModelKey("unknown-model")).toBeUndefined();
     expect(normalizeModelKey("other:model")).toBeUndefined();
     expect(legacyModelIdFromKey("kimi:kimi-k2.6")).toBe("kimi-k2.6");

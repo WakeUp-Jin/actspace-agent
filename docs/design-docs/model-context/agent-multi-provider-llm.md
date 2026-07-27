@@ -4,9 +4,9 @@
 
 - 状态：代码已落地，待用户统一手动验收。
 - 确认日期：2026-07-24。
-- 首批供应商：DeepSeek、Kimi、OpenRouter。
+- 当前供应商：DeepSeek、Kimi、OpenRouter、DuckDing。
 - 对应 execution plan：`docs/exec-plans/active/20260724-multi-provider-llm/README.md`。
-- 当前实现已贯通 DeepSeek / Kimi / OpenRouter 的 settings v2、动态模型解析、服务商级代理 transport、任务模型 runtime、IPC 与设置页；OpenRouter 真实代理和跨任务模型场景仍按 execution plan 由用户统一手动验收。
+- 当前实现已贯通 DeepSeek / Kimi / OpenRouter / DuckDing 的 settings v2、动态模型解析、服务商级代理 transport、任务模型 runtime、IPC 与设置页；DuckDing 额外支持渐进式多 Key、公共模型目录和 Key 倍率。OpenRouter 真实代理、DuckDing 真实调用和跨任务模型场景仍按 execution plan 由用户统一手动验收。
 
 本文是 actspace 多供应商 LLM、用户模型管理、服务商级代理和任务模型分配的长期设计事实来源。
 
@@ -16,6 +16,7 @@
 - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`：当前 DeepSeek / Kimi 协议与能力边界。
 - `docs/design-docs/frontend/front-设置页规范.md`：设置页信息架构和交互基线。
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：模型 usage、价格快照和成本统计。
+- `docs/design-docs/model-context/agent-duckding-multi-key-model-catalog.md`：DuckDing、多 Key、公共模型目录与倍率定价的已实现首版边界。
 
 ## 背景
 
@@ -398,7 +399,7 @@ Kairos
 页面分组：
 
 1. 模型服务商
-   - 已连接的 DeepSeek / Kimi / OpenRouter 卡片。
+   - 已配置的 DeepSeek / Kimi / OpenRouter / DuckDing 卡片。
    - 主操作“添加服务”。
    - 编辑、测试连接、断开。
    - 展示账户余额、状态、已启用模型数、接入方式、Base URL、代理状态。余额查询通过通用 provider IPC 分发到各服务商适配器，不与 Usage 统计页耦合。
@@ -406,7 +407,7 @@ Kairos
    - 迁移当前智谱 / Tavily / TinyFish / Exa 配置。
    - 保持它们属于 ToolManager 搜索通道，不与 LLM Model Registry 混合。
 
-“添加服务”只展示尚未连接的三家受支持服务商，不展示尚未实现的供应商。
+“添加服务”只展示尚未配置的四家受支持服务商，不展示尚未实现的供应商。DuckDing 即使默认 Key 缺失，只要仍有额外 Key，也继续保留卡片和管理入口。
 
 连接流程：
 
@@ -414,6 +415,7 @@ Kairos
 选择服务商
 → 填 API Key
 → OpenRouter 可选填 Management Key（账户余额专用）
+→ DuckDing 可配置默认 Key 倍率，并在连接后管理额外 Key
 → 展开高级配置（Base URL / 代理）
 → 保存并测试
 → available 后安装默认模型
@@ -651,6 +653,7 @@ Provider request adapter 只处理请求差异，不拥有消息历史：
 - OpenRouter 直连失败但经本地 HTTP 代理成功。
 - 关闭 OpenRouter 代理不影响 DeepSeek / Kimi。
 - OpenRouter 目录加载、添加模型、Composer 使用、usage 落盘完整。
+- DuckDing 默认 Key / 额外 Key 分别绑定模型，确认请求密钥与倍率后的 Usage 估算正确。
 - utility 选择 OpenRouter 模型后，会话标题和 `/compact` 不再请求 DeepSeek。
 
 真实探针不得携带仓库、session 或个人数据。
@@ -670,6 +673,7 @@ Provider request adapter 只处理请求差异，不拥有消息历史：
 ## 已确认决策
 
 - 首批只支持 DeepSeek、Kimi、OpenRouter 三家服务商。
+- 2026-07-27 的 Plan 7 在首批三家之外新增 DuckDing；现有默认 Key 路径不迁移，额外 Key 采用可选 `credentialId` 渐进扩展。
 - 服务商与模型在设置页分成两个入口。
 - 代理按服务商配置，不做全局代理。
 - OpenRouter 采用“精选默认模型 + 远端目录手动添加”。

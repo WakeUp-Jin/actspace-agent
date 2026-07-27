@@ -6,6 +6,7 @@ import type {
 import type { ModelPurpose, ModelUnavailabilityReason } from "./model-resolver";
 import type { ProviderId } from "./provider-config";
 import type { CatalogCacheState, CatalogModelView } from "./openrouter-catalog";
+import type { ModelMetadataCatalogResult, ModelMetadataSearchInput } from "./model-metadata-catalog";
 import type {
   InstalledModelSettings,
   ProviderConnectionErrorKind,
@@ -122,7 +123,9 @@ export type ProviderOperationErrorCode =
   | "invalid_proxy_url"
   | "secret_storage_unavailable"
   | "write_failed"
-  | "connection_failed";
+  | "connection_failed"
+  | "credential_not_found"
+  | "credential_in_use";
 
 export type ProviderOperationError = {
   code: ProviderOperationErrorCode;
@@ -140,6 +143,7 @@ export type ProviderConnectInput = {
   managementKey?: string | null;
   baseUrl?: string | null;
   proxy?: ProviderProxySettings;
+  defaultPricingMultiplier?: number;
 };
 
 export type ProviderUpdateInput = {
@@ -148,7 +152,31 @@ export type ProviderUpdateInput = {
   baseUrl?: string | null;
   proxy?: ProviderProxySettings;
   enabled?: boolean;
+  defaultPricingMultiplier?: number;
 };
+
+export type ProviderCredentialAddInput = {
+  provider: ProviderId;
+  label: string;
+  apiKey: string;
+  pricingMultiplier?: number;
+};
+
+export type ProviderCredentialUpdateInput = {
+  provider: ProviderId;
+  credentialId: string;
+  label: string;
+  pricingMultiplier?: number;
+};
+
+export type ProviderCredentialInput = {
+  provider: ProviderId;
+  credentialId: string;
+};
+
+export type ProviderCredentialOperationResult =
+  | { ok: true; provider: ProviderSettingsView }
+  | { ok: false; error: ProviderOperationError & { references?: ModelKey[] } };
 
 export type ProviderIdInput = { provider: ProviderId };
 
@@ -211,14 +239,18 @@ export type ModelsCatalogListResult = {
 };
 
 export type ModelsAddInput = {
-  provider: Extract<ProviderId, "openrouter">;
+  provider: Extract<ProviderId, "openrouter" | "duckding">;
   apiModel: string;
+  label?: string;
+  credentialId?: string | null;
+  metadataKey?: string | null;
 };
 
 export type ModelsUpdateInput = {
   modelKey: ModelKey;
   enabled?: boolean;
   customLabel?: string | null;
+  credentialId?: string | null;
 };
 
 export type ModelsRemoveInput = { modelKey: ModelKey };
@@ -228,7 +260,7 @@ export type ModelMutationResult =
   | {
       ok: false;
       error: {
-        code: "model_missing" | "model_in_use" | "model_not_removable" | "invalid_model" | "write_failed";
+        code: "model_missing" | "model_in_use" | "model_not_removable" | "invalid_model" | "credential_missing" | "write_failed";
         message: string;
         references?: Array<"defaultChatModel" | "utilityModel" | "exploreModel" | "kairosModel">;
       };
@@ -236,6 +268,8 @@ export type ModelMutationResult =
 
 export type TaskModelsUpdateInput = Partial<TaskModelSettings>;
 export type TaskModelsUpdateResult = { taskModels: TaskModelSettings };
+
+export type { ModelMetadataCatalogResult, ModelMetadataSearchInput };
 
 export type KairosModelUpdateInput = { modelKey: ModelKey | null };
 export type KairosModelUpdateResult = { modelKey: ModelKey | null };
@@ -754,7 +788,7 @@ export type ProviderBalanceDisplay = {
 };
 
 /** 余额 / 额度可读取的供应商。 */
-export type BalanceProviderId = ProviderId;
+export type BalanceProviderId = Extract<ProviderId, "deepseek" | "kimi" | "openrouter">;
 
 export type ProviderBalanceGetInput = {
   provider: BalanceProviderId;

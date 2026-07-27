@@ -54,6 +54,10 @@ export interface ProviderSettingsView {
   lastConnection?: ProviderConnectionState;
   installedModelCount?: number;
   enabledModelCount?: number;
+  /** 默认 Key 的价格倍率；旧数据和未配置值按 1 处理。 */
+  defaultPricingMultiplier?: number;
+  /** 额外 Key 的脱敏视图，不包含密钥明文或密文。 */
+  additionalCredentials?: ProviderCredentialView[];
 }
 
 export type ProviderConnectionStatus = "untested" | "available" | "unavailable";
@@ -84,12 +88,27 @@ export interface ProviderConnectionSettings {
   baseUrl: string | null;
   proxy: ProviderProxySettings;
   lastConnection: ProviderConnectionState;
+  defaultPricingMultiplier: number;
+  additionalCredentials: ProviderCredentialSettings[];
+}
+
+export interface ProviderCredentialSettings {
+  id: string;
+  label: string;
+  pricingMultiplier: number;
+  lastConnection: ProviderConnectionState;
+}
+
+export interface ProviderCredentialView extends ProviderCredentialSettings {
+  hasApiKey: boolean;
 }
 
 export interface InstalledModelSettings {
   enabled: boolean;
   addedAt: string;
   customLabel?: string;
+  /** 缺省使用 provider 默认 Key；有值时引用同 provider 下已保存的额外 Key。 */
+  credentialId?: string;
 }
 
 export interface TaskModelSettings {

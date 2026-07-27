@@ -6,6 +6,7 @@ import type {
   AppSettings,
   CatalogModelView,
   InstalledModelView,
+  ModelMetadataView,
   ProviderSettingsView,
   UsableModelView,
 } from "@actspace/shared";
@@ -15,7 +16,7 @@ import { OpenRouterModelCatalogDialog } from "../components/settings/OpenRouterM
 
 type ActspaceBridge = NonNullable<typeof window.actspace>;
 
-const providerViews: Record<"deepseek" | "kimi" | "openrouter", ProviderSettingsView> = {
+const providerViews: Record<"deepseek" | "kimi" | "openrouter" | "duckding", ProviderSettingsView> = {
   deepseek: {
     hasApiKey: true,
     baseUrl: null,
@@ -36,6 +37,15 @@ const providerViews: Record<"deepseek" | "kimi" | "openrouter", ProviderSettings
     proxy: { enabled: false, url: null },
     installedModelCount: 3,
     enabledModelCount: 3,
+  },
+  duckding: {
+    hasApiKey: false,
+    baseUrl: null,
+    proxy: { enabled: false, url: null },
+    installedModelCount: 0,
+    enabledModelCount: 0,
+    defaultPricingMultiplier: 1,
+    additionalCredentials: [],
   },
 };
 
@@ -107,6 +117,37 @@ const catalogInstalledModel: InstalledModelView = {
     enabled: true,
     addedAt: "2026-07-24T00:00:00.000Z",
   },
+  unavailableReasons: {},
+};
+const duckMetadata: ModelMetadataView = {
+  key: "models.dev:xai:grok-4.5",
+  source: "models.dev",
+  provider: "xai",
+  modelId: "grok-4.5",
+  name: "Grok 4.5",
+  aliases: ["grok-4.5"],
+  contextWindow: 256000,
+  maxTokens: 32000,
+  capabilities: { input: ["text"], toolUse: "declared", reasoning: true, thinkingToggle: true },
+  pricing: { currency: "USD", inputCacheHitPerMillion: 0.5, inputCacheMissPerMillion: 5, outputPerMillion: 30 },
+  fetchedAt: "2026-07-27T00:00:00.000Z",
+};
+const duckModel: InstalledModelView = {
+  definition: {
+    key: "duckding:grok-4.5",
+    provider: "duckding",
+    api: "openai-completions",
+    apiModel: "grok-4.5",
+    label: "Grok 4.5",
+    source: "custom",
+    contextWindow: 256000,
+    maxTokens: 32000,
+    thinkingDefault: true,
+    capabilities: duckMetadata.capabilities,
+    pricing: duckMetadata.pricing,
+    metadata: { source: "models.dev", provider: "xai", modelId: "grok-4.5", fetchedAt: duckMetadata.fetchedAt },
+  },
+  settings: { enabled: true, addedAt: "2026-07-27T00:00:00.000Z" },
   unavailableReasons: {},
 };
 
@@ -212,6 +253,35 @@ describe("provider and model settings", () => {
     expect(screen.queryByRole("heading", { name: "OpenRouter" })).not.toBeInTheDocument();
   });
 
+  it("keeps DuckDing manageable when the default Key is absent but an extra Key remains", async () => {
+    const extraOnly = {
+      ...providerViews,
+      duckding: {
+        ...providerViews.duckding,
+        additionalCredentials: [{
+          id: "codex-sale",
+          label: "CodeX-Sale",
+          pricingMultiplier: 0.2,
+          hasApiKey: true,
+          lastConnection: { status: "available" as const },
+        }],
+      },
+    };
+    window.actspace = {
+      listProviders: async () => ({ providers: extraOnly }),
+    } as unknown as ActspaceBridge;
+
+    render(<ProviderSettings />);
+
+    const heading = await screen.findByRole("heading", { name: "DuckDing" });
+    const card = heading.closest("article");
+    expect(card).not.toBeNull();
+    expect(within(card!).queryByRole("button", { name: "断开" })).not.toBeInTheDocument();
+    await userEvent.click(within(card!).getByRole("button", { name: "编辑" }));
+    expect(screen.getByRole("dialog", { name: "编辑 DuckDing" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("CodeX-Sale")).toBeInTheDocument();
+  });
+
   it("uses purpose-filtered models for task selection and updates model enablement", async () => {
     const updateTaskModels = vi.fn(async () => ({
       taskModels: { ...settings.taskModels, utilityModel: usableModel.key },
@@ -231,6 +301,94 @@ describe("provider and model settings", () => {
 
     await userEvent.click(await screen.findByRole("switch", { name: `启用 ${usableModel.label}` }));
     await waitFor(() => expect(updateModel).toHaveBeenCalledWith({ modelKey: usableModel.key, enabled: false }));
+  });
+
+  it("keeps the model Key selector hidden for a single-key DuckDing provider", async () => {
+    const singleKeySettings = {
+      ...settings,
+      providers: { ...settings.providers, duckding: { ...providerViews.duckding, hasApiKey: true } },
+    } as AppSettings;
+    window.actspace = {
+      listInstalledModels: async () => ({ models: [duckModel] }),
+      listUsableModels: async () => ({ models: [] }),
+    } as unknown as ActspaceBridge;
+
+    render(<ModelSettings settings={singleKeySettings} />);
+
+    expect(await screen.findByText("Grok 4.5")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Grok 4.5 调用 Key")).not.toBeInTheDocument();
+  });
+
+  it("shows a selector only after DuckDing has extra Keys and persists the selected Key", async () => {
+    const updateModel = vi.fn(async () => ({ ok: true as const, model: duckModel }));
+    const multiKeySettings = {
+      ...settings,
+      providers: {
+        ...settings.providers,
+        duckding: {
+          ...providerViews.duckding,
+          hasApiKey: true,
+          additionalCredentials: [{
+            id: "codex-sale",
+            label: "CodeX-Sale",
+            pricingMultiplier: 0.2,
+            hasApiKey: true,
+            lastConnection: { status: "available" as const },
+          }],
+        },
+      },
+    } as AppSettings;
+    window.actspace = {
+      listInstalledModels: async () => ({ models: [duckModel] }),
+      listUsableModels: async () => ({ models: [] }),
+      updateModel,
+    } as unknown as ActspaceBridge;
+
+    render(<ModelSettings settings={multiKeySettings} />);
+    await userEvent.selectOptions(await screen.findByLabelText("Grok 4.5 调用 Key"), "codex-sale");
+
+    await waitFor(() => expect(updateModel).toHaveBeenCalledWith({ modelKey: "duckding:grok-4.5", credentialId: "codex-sale" }));
+  });
+
+  it("adds a DuckDing API model from public metadata and chooses only a provider-owned Key", async () => {
+    const addModel = vi.fn(async () => ({ ok: true as const, model: duckModel }));
+    const multiKeySettings = {
+      ...settings,
+      providers: {
+        ...settings.providers,
+        duckding: {
+          ...providerViews.duckding,
+          hasApiKey: true,
+          additionalCredentials: [{
+            id: "codex-sale",
+            label: "CodeX-Sale",
+            pricingMultiplier: 0.2,
+            hasApiKey: true,
+            lastConnection: { status: "available" as const },
+          }],
+        },
+      },
+    } as AppSettings;
+    window.actspace = {
+      listInstalledModels: async () => ({ models: [] }),
+      listUsableModels: async () => ({ models: [] }),
+      searchModelMetadata: async () => ({ state: "ready" as const, stale: false, models: [duckMetadata], skippedCount: 0, sources: [{ source: "models.dev" as const, status: "ready" as const }] }),
+      addModel,
+    } as unknown as ActspaceBridge;
+
+    render(<ModelSettings settings={multiKeySettings} />);
+    await userEvent.click(await screen.findByRole("button", { name: "添加 DuckDing 模型" }));
+    await userEvent.type(screen.getByLabelText("DuckDing API 模型名"), "grok-4.5");
+    await userEvent.click(await screen.findByRole("radio", { name: /Grok 4\.5/ }));
+    await userEvent.selectOptions(screen.getByLabelText("DuckDing 模型调用 Key"), "codex-sale");
+    await userEvent.click(screen.getByRole("button", { name: "添加模型" }));
+
+    await waitFor(() => expect(addModel).toHaveBeenCalledWith({
+      provider: "duckding",
+      apiModel: "grok-4.5",
+      metadataKey: duckMetadata.key,
+      credentialId: "codex-sale",
+    }));
   });
 
   it("shows the blocking references when an in-use catalog model cannot be removed", async () => {

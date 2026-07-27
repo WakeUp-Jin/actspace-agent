@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { loadEnv } from "@actspace/agent-core";
-import type { CatalogModelView } from "@actspace/shared";
+import type { CatalogModelView, ModelMetadataView } from "@actspace/shared";
 import { ModelStoreService } from "../model-store-service";
 import { SettingsService, type SecretCrypto } from "../settings-service";
 
@@ -29,6 +29,19 @@ const CATALOG: CatalogModelView = {
   isFree: false,
   pricing: { currency: "USD", inputCacheHitPerMillion: 0.1, inputCacheMissPerMillion: 1, outputPerMillion: 2 },
   added: false,
+};
+const METADATA: ModelMetadataView = {
+  key: "models.dev:xai:grok-4.5",
+  source: "models.dev",
+  provider: "xai",
+  modelId: "grok-4.5",
+  name: "Grok 4.5",
+  aliases: ["grok-4.5", "xai/grok-4.5"],
+  contextWindow: 256000,
+  maxTokens: 32000,
+  capabilities: { input: ["text", "image"], toolUse: "declared", reasoning: true, thinkingToggle: true },
+  pricing: { currency: "USD", inputCacheHitPerMillion: 0.5, inputCacheMissPerMillion: 5, inputCacheWritePerMillion: 6.25, outputPerMillion: 30 },
+  fetchedAt: NOW.toISOString(),
 };
 
 async function setup() {
@@ -130,5 +143,41 @@ describe("ModelStoreService", () => {
     const model = store.listInstalledModels().find((item) => item.definition.apiModel === CATALOG.apiModel);
     expect(model).toBeTruthy();
     expect(model?.unavailableReasons.chat).toBe("provider_disconnected");
+  });
+
+  it("adds a DuckDing API model with selected public metadata and an existing provider Key", async () => {
+    const dataRoot = await mkdtemp(join(tmpdir(), "actspace-model-store-test-"));
+    const settings = new SettingsService({
+      dataRoot,
+      crypto: CRYPTO,
+      reloadEnv: () => loadEnv({ envPath: "/private/tmp/no-env", mergeToProcessEnv: false }),
+      createCredentialId: () => "codex-sale",
+    });
+    await settings.load();
+    await settings.updateProviderConnection({ provider: "duckding", apiKey: "sk-default" });
+    await settings.addProviderCredential({ provider: "duckding", label: "CodeX-Sale", apiKey: "sk-sale", pricingMultiplier: 0.2 });
+    const store = new ModelStoreService({
+      settings,
+      findMetadataModel: (key) => key === METADATA.key ? METADATA : undefined,
+      now: () => NOW,
+    });
+
+    const added = await store.addCustomModel({
+      provider: "duckding",
+      apiModel: "grok-4.5",
+      credentialId: "codex-sale",
+      metadataKey: METADATA.key,
+    });
+
+    expect(added).toMatchObject({ ok: true, model: { settings: { credentialId: "codex-sale" } } });
+    expect(settings.getModelStorageState().customModels["duckding:grok-4.5"]).toMatchObject({
+      apiModel: "grok-4.5",
+      label: "Grok 4.5",
+      metadata: { source: "models.dev", provider: "xai", modelId: "grok-4.5" },
+      pricing: { inputCacheMissPerMillion: 5, inputCacheWritePerMillion: 6.25, outputPerMillion: 30 },
+      capabilities: { input: ["text", "image"], toolUse: "declared", reasoning: true },
+    });
+    await expect(store.updateModelSettings("duckding:grok-4.5", { credentialId: "missing" })).resolves.toMatchObject({ ok: false, code: "credential_missing" });
+    await expect(store.addCustomModel({ provider: "duckding", apiModel: "missing-model", metadataKey: "models.dev:xai:missing" })).resolves.toMatchObject({ ok: false, code: "model_not_found" });
   });
 });

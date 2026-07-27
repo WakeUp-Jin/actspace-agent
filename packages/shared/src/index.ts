@@ -8,6 +8,7 @@ export {
 } from "./provider-config";
 export * from "./model-config";
 export * from "./model-resolver";
+export * from "./model-metadata-catalog";
 export * from "./openrouter-catalog";
 export * from "./settings";
 export * from "./plugins";

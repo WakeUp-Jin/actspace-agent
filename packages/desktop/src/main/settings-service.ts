@@ -3,6 +3,7 @@
  * Renderer-facing views contain status only; decrypted keys and runtime transports stay in main.
  */
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { dirname, isAbsolute, join } from "node:path";
 import {
   getEnv,
@@ -35,6 +36,7 @@ import {
   type PluginsSettings,
   type ProviderConnectionSettings,
   type ProviderConnectionState,
+  type ProviderCredentialSettings,
   type ProviderProxySettings,
   type SearchProviderId,
   type SearchUsageResult,
@@ -70,6 +72,7 @@ export interface SettingsServiceOptions {
   reloadEnv?: () => void;
   /** Test seam for deterministic write failures; production uses temp file + rename. */
   writeJson?: AtomicJsonWriter;
+  createCredentialId?: () => string;
 }
 
 export interface ProviderConnectionMutationInput {
@@ -79,13 +82,18 @@ export interface ProviderConnectionMutationInput {
   enabled?: boolean;
   baseUrl?: string | null;
   proxy?: ProviderProxySettings;
+  defaultPricingMultiplier?: number;
 }
 
 export interface ProviderRuntimeError {
   ok: false;
-  code: "provider_disabled" | "api_key_missing" | "invalid_base_url" | "invalid_proxy_url";
+  code: "provider_disabled" | "api_key_missing" | "credential_missing" | "invalid_base_url" | "invalid_proxy_url";
   message: string;
 }
+
+export type ProviderCredentialMutationResult =
+  | { ok: true }
+  | { ok: false; code: "credential_not_found" | "credential_in_use"; message: string; references?: ModelKey[] };
 
 export interface ModelStorageMutationInput {
   installedModels?: Partial<Record<ModelKey, InstalledModelSettings | null>>;
@@ -121,7 +129,10 @@ export interface PersistedSettingsV2 {
 
 type OpenRouterManagementSecretId = "openrouter-management";
 type PersistedSecretProviderId = LlmProviderId | SearchProviderId | OpenRouterManagementSecretId;
-type PersistedSecrets = { version: 1 } & Partial<Record<PersistedSecretProviderId, string>>;
+type PersistedSecrets = {
+  version: 1;
+  providerCredentials: Record<string, string>;
+} & Partial<Record<PersistedSecretProviderId, string>>;
 
 interface ReadSettingsResult {
   settings: PersistedSettingsV2;
@@ -149,9 +160,10 @@ export class SettingsService {
   private readonly crypto: SecretCrypto;
   private readonly reloadEnv: () => void;
   private readonly writeJson: AtomicJsonWriter;
+  private readonly createCredentialId: () => string;
 
   private settings: PersistedSettingsV2;
-  private secrets: PersistedSecrets = { version: 1 };
+  private secrets: PersistedSecrets = { version: 1, providerCredentials: {} };
   private mutationTail: Promise<void> = Promise.resolve();
   private lastLoadError?: string;
 
@@ -160,6 +172,7 @@ export class SettingsService {
     this.crypto = options.crypto;
     this.reloadEnv = options.reloadEnv ?? (() => loadEnv());
     this.writeJson = options.writeJson ?? writeJsonAtomic;
+    this.createCredentialId = options.createCredentialId ?? randomUUID;
     this.settings = defaultSettingsFromEnv(this.dataRoot);
   }
 
@@ -240,6 +253,12 @@ export class SettingsService {
         lastConnection: { ...settings.lastConnection },
         installedModelCount: installed.length,
         enabledModelCount: enabled.length,
+        defaultPricingMultiplier: settings.defaultPricingMultiplier,
+        additionalCredentials: settings.additionalCredentials.map((credential) => ({
+          ...credential,
+          lastConnection: { ...credential.lastConnection },
+          hasApiKey: Boolean(this.getDecryptedProviderCredential(provider, credential.id)),
+        })),
       }];
     })) as AppSettingsV2["providers"];
 
@@ -399,7 +418,7 @@ export class SettingsService {
   async updateProviderConnection(input: ProviderConnectionMutationInput): Promise<AppSettings> {
     return this.enqueueMutation(async () => {
       const previousSettings = cloneJson(this.settings);
-      const previousSecrets = { ...this.secrets };
+      const previousSecrets = cloneJson(this.secrets);
       let secretsWritten = false;
       try {
         const current = this.settings.providers[input.provider];
@@ -408,6 +427,10 @@ export class SettingsService {
           baseUrl: input.baseUrl === undefined ? current.baseUrl : normalizeOptionalBaseUrl(input.baseUrl),
           proxy: input.proxy === undefined ? { ...current.proxy } : normalizeProxySettings(input.proxy),
           lastConnection: { status: "untested" },
+          defaultPricingMultiplier: input.defaultPricingMultiplier === undefined
+            ? current.defaultPricingMultiplier
+            : normalizePricingMultiplier(input.defaultPricingMultiplier),
+          additionalCredentials: cloneJson(current.additionalCredentials),
         };
 
         if (input.apiKey !== undefined) {
@@ -455,14 +478,29 @@ export class SettingsService {
   }
 
   getProviderRuntimeConfig(provider: LlmProviderId): ProviderRuntimeConfig | ProviderRuntimeError {
+    return this.getProviderRuntimeConfigForCredential(provider);
+  }
+
+  getProviderRuntimeConfigForCredential(
+    provider: LlmProviderId,
+    credentialId?: string,
+  ): ProviderRuntimeConfig | ProviderRuntimeError {
     const settings = this.settings.providers[provider];
     if (!settings.enabled) {
       return { ok: false, code: "provider_disabled", message: "该服务商已停用。" };
     }
-    const apiKey = this.getDecryptedKey(provider);
-    if (!apiKey) {
-      return { ok: false, code: "api_key_missing", message: "尚未配置 API Key。" };
+    const credential = credentialId
+      ? settings.additionalCredentials.find((item) => item.id === credentialId)
+      : undefined;
+    if (credentialId && !credential) {
+      return { ok: false, code: "credential_missing", message: "模型绑定的额外 API Key 不存在。" };
     }
+    const apiKey = credentialId
+      ? this.getDecryptedProviderCredential(provider, credentialId)
+      : this.getDecryptedKey(provider);
+    if (!apiKey) return credentialId
+      ? { ok: false, code: "credential_missing", message: "模型绑定的额外 API Key 无法读取。" }
+      : { ok: false, code: "api_key_missing", message: "尚未配置 API Key。" };
 
     let baseUrl: string;
     try {
@@ -487,8 +525,134 @@ export class SettingsService {
       provider,
       apiKey,
       baseUrl,
+      pricingMultiplier: credential?.pricingMultiplier ?? settings.defaultPricingMultiplier ?? 1,
       ...(proxyUrl && { transport: { proxyUrl } }),
     };
+  }
+
+  async addProviderCredential(input: {
+    provider: LlmProviderId;
+    label: string;
+    apiKey: string;
+    pricingMultiplier?: number;
+  }): Promise<AppSettings> {
+    return this.enqueueMutation(async () => {
+      const previousSettings = cloneJson(this.settings);
+      const previousSecrets = cloneJson(this.secrets);
+      let secretsWritten = false;
+      try {
+        const apiKey = input.apiKey.trim();
+        if (!apiKey) throw new ProviderSettingsError("API Key 不能为空。", "invalid_api_key");
+        if (!this.crypto.isAvailable()) {
+          throw new ProviderSettingsError("系统密钥串不可用，无法安全保存 API Key。", "secret_storage_unavailable");
+        }
+        const id = this.createCredentialId();
+        if (!isValidCredentialId(id)) throw new ProviderSettingsError("额外 API Key 标识无效。", "write_failed");
+        if (this.settings.providers[input.provider].additionalCredentials.some((credential) => credential.id === id)) {
+          throw new ProviderSettingsError("额外 API Key 标识冲突，请重试。", "write_failed");
+        }
+        this.settings.providers[input.provider].additionalCredentials.push({
+          id,
+          label: normalizeCredentialLabel(input.label),
+          pricingMultiplier: normalizePricingMultiplier(input.pricingMultiplier ?? 1),
+          lastConnection: { status: "untested" },
+        });
+        this.secrets.providerCredentials[providerCredentialSecretId(input.provider, id)] =
+          this.crypto.encrypt(apiKey).toString("base64");
+        await this.writeSecretsFile();
+        secretsWritten = true;
+        await this.writeSettingsFile();
+        return this.get();
+      } catch (error) {
+        this.settings = previousSettings;
+        this.secrets = previousSecrets;
+        if (secretsWritten) await this.restoreFilesBestEffort(previousSettings, previousSecrets);
+        if (error instanceof ProviderSettingsError) throw error;
+        throw new ProviderSettingsError("额外 API Key 写入失败。", "write_failed");
+      }
+    });
+  }
+
+  async updateProviderCredential(
+    provider: LlmProviderId,
+    credentialId: string,
+    label: string,
+    pricingMultiplier?: number,
+  ): Promise<ProviderCredentialMutationResult> {
+    return this.enqueueMutation(async () => {
+      const previous = cloneJson(this.settings);
+      const credential = this.settings.providers[provider].additionalCredentials.find((item) => item.id === credentialId);
+      if (!credential) return { ok: false, code: "credential_not_found", message: "额外 API Key 不存在。" };
+      try {
+        credential.label = normalizeCredentialLabel(label);
+        if (pricingMultiplier !== undefined) credential.pricingMultiplier = normalizePricingMultiplier(pricingMultiplier);
+        await this.writeSettingsFile();
+        return { ok: true };
+      } catch {
+        this.settings = previous;
+        throw new ProviderSettingsError("额外 API Key 设置写入失败。", "write_failed");
+      }
+    });
+  }
+
+  async removeProviderCredential(
+    provider: LlmProviderId,
+    credentialId: string,
+  ): Promise<ProviderCredentialMutationResult> {
+    return this.enqueueMutation(async () => {
+      const credentials = this.settings.providers[provider].additionalCredentials;
+      if (!credentials.some((item) => item.id === credentialId)) {
+        return { ok: false, code: "credential_not_found", message: "额外 API Key 不存在。" };
+      }
+      const references = Object.entries(this.settings.installedModels)
+        .filter(([key, model]) => key.startsWith(`${provider}:`) && model?.credentialId === credentialId)
+        .map(([key]) => key as ModelKey);
+      if (references.length > 0) {
+        return { ok: false, code: "credential_in_use", message: "该 API Key 仍被模型使用。", references };
+      }
+
+      const previousSettings = cloneJson(this.settings);
+      const previousSecrets = cloneJson(this.secrets);
+      let secretsWritten = false;
+      try {
+        this.settings.providers[provider].additionalCredentials = credentials.filter((item) => item.id !== credentialId);
+        delete this.secrets.providerCredentials[providerCredentialSecretId(provider, credentialId)];
+        await this.writeSecretsFile();
+        secretsWritten = true;
+        await this.writeSettingsFile();
+        return { ok: true };
+      } catch {
+        this.settings = previousSettings;
+        this.secrets = previousSecrets;
+        if (secretsWritten) await this.restoreFilesBestEffort(previousSettings, previousSecrets);
+        throw new ProviderSettingsError("额外 API Key 删除失败。", "write_failed");
+      }
+    });
+  }
+
+  async markProviderCredentialConnectionResult(
+    provider: LlmProviderId,
+    credentialId: string,
+    result: ProviderConnectionProbeResult,
+  ): Promise<ProviderCredentialMutationResult> {
+    return this.enqueueMutation(async () => {
+      const previous = cloneJson(this.settings);
+      const credential = this.settings.providers[provider].additionalCredentials.find((item) => item.id === credentialId);
+      if (!credential) return { ok: false, code: "credential_not_found", message: "额外 API Key 不存在。" };
+      try {
+        credential.lastConnection = {
+          status: result.ok ? "available" : "unavailable",
+          checkedAt: result.checkedAt,
+          ...(result.errorKind && { errorKind: result.errorKind }),
+          message: result.message.slice(0, 300),
+        };
+        await this.writeSettingsFile();
+        return { ok: true };
+      } catch {
+        this.settings = previous;
+        throw new ProviderSettingsError("额外 API Key 状态写入失败。", "write_failed");
+      }
+    });
   }
 
   getOpenRouterManagementRuntimeConfig(): ProviderRuntimeConfig | ProviderRuntimeError {
@@ -539,7 +703,7 @@ export class SettingsService {
 
   /** Compatibility API for the current key modal; all LLM providers share the v2 connection path. */
   async setProviderKey(provider: SecretProviderId, apiKey: string): Promise<{ ok: boolean; error?: string }> {
-    if (provider === "deepseek" || provider === "kimi" || provider === "openrouter") {
+    if (provider === "deepseek" || provider === "kimi" || provider === "openrouter" || provider === "duckding") {
       try {
         await this.updateProviderConnection({ provider, apiKey });
         return { ok: true };
@@ -551,7 +715,7 @@ export class SettingsService {
   }
 
   async clearProviderKey(provider: SecretProviderId): Promise<{ ok: boolean }> {
-    if (provider === "deepseek" || provider === "kimi" || provider === "openrouter") {
+    if (provider === "deepseek" || provider === "kimi" || provider === "openrouter" || provider === "duckding") {
       try {
         await this.updateProviderConnection({ provider, apiKey: null });
         return { ok: true };
@@ -587,6 +751,16 @@ export class SettingsService {
   /** Main-only decryption boundary. */
   getDecryptedKey(provider: PersistedSecretProviderId): string | undefined {
     const base64 = this.secrets[provider];
+    if (!base64) return undefined;
+    try {
+      return this.crypto.decrypt(Buffer.from(base64, "base64"));
+    } catch {
+      return undefined;
+    }
+  }
+
+  private getDecryptedProviderCredential(provider: LlmProviderId, credentialId: string): string | undefined {
+    const base64 = this.secrets.providerCredentials[providerCredentialSecretId(provider, credentialId)];
     if (!base64) return undefined;
     try {
       return this.crypto.decrypt(Buffer.from(base64, "base64"));
@@ -698,14 +872,21 @@ export class SettingsService {
     try {
       const raw = await readFile(join(this.dataRoot, SECRETS_FILE), "utf8");
       const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const out: PersistedSecrets = { version: 1 };
+      const out: PersistedSecrets = { version: 1, providerCredentials: {} };
       for (const id of ALL_SECRET_PROVIDER_IDS) {
         const value = parsed[id];
         if (typeof value === "string" && value.length > 0) out[id] = value;
       }
+      if (isRecord(parsed.providerCredentials)) {
+        for (const [id, value] of Object.entries(parsed.providerCredentials)) {
+          if (typeof value === "string" && value.length > 0 && isProviderCredentialSecretId(id)) {
+            out.providerCredentials[id] = value;
+          }
+        }
+      }
       return out;
     } catch {
-      return { version: 1 };
+      return { version: 1, providerCredentials: {} };
     }
   }
 
@@ -753,6 +934,8 @@ function defaultProviderSettings(): ProviderConnectionSettings {
     baseUrl: null,
     proxy: { enabled: false, url: null },
     lastConnection: { status: "untested" },
+    defaultPricingMultiplier: 1,
+    additionalCredentials: [],
   };
 }
 
@@ -858,7 +1041,28 @@ function sanitizeProviderSettings(input: unknown, fallback: ProviderConnectionSe
     baseUrl,
     proxy: sanitizeProxySettings(value.proxy, fallback.proxy),
     lastConnection: sanitizeConnectionState(value.lastConnection, fallback.lastConnection),
+    defaultPricingMultiplier: normalizePricingMultiplier(value.defaultPricingMultiplier, fallback.defaultPricingMultiplier),
+    additionalCredentials: sanitizeProviderCredentials(value.additionalCredentials),
   };
+}
+
+function sanitizeProviderCredentials(input: unknown): ProviderCredentialSettings[] {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: ProviderCredentialSettings[] = [];
+  for (const value of input) {
+    if (!isRecord(value) || !isValidCredentialId(value.id) || seen.has(value.id)) continue;
+    const label = typeof value.label === "string" ? value.label.trim().slice(0, 80) : "";
+    if (!label) continue;
+    seen.add(value.id);
+    out.push({
+      id: value.id,
+      label,
+      pricingMultiplier: normalizePricingMultiplier(value.pricingMultiplier, 1),
+      lastConnection: sanitizeConnectionState(value.lastConnection, { status: "untested" }),
+    });
+  }
+  return out;
 }
 
 function sanitizeProxySettings(input: unknown, fallback: ProviderProxySettings): ProviderProxySettings {
@@ -884,6 +1088,36 @@ function normalizeOptionalBaseUrl(value: string | null): string | null {
   try { return normalizeBaseUrl(value); } catch {
     throw new ProviderSettingsError("Base URL 无效，仅支持不含认证信息的 HTTP(S) 地址。", "invalid_base_url");
   }
+}
+
+function normalizeCredentialLabel(value: string): string {
+  const label = value.trim();
+  if (!label) throw new ProviderSettingsError("API Key 名称不能为空。", "invalid_api_key");
+  return label.slice(0, 80);
+}
+
+function normalizePricingMultiplier(value: unknown, fallback?: number): number {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100) {
+    return Math.round(value * 10_000) / 10_000;
+  }
+  if (fallback !== undefined) return fallback;
+  throw new ProviderSettingsError("价格倍率必须是 0 到 100 之间的数字。", "write_failed");
+}
+
+function isValidCredentialId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
+}
+
+function providerCredentialSecretId(provider: LlmProviderId, credentialId: string): string {
+  return `${provider}:${credentialId}`;
+}
+
+function isProviderCredentialSecretId(value: string): boolean {
+  const separator = value.indexOf(":");
+  if (separator <= 0 || value.indexOf(":", separator + 1) !== -1) return false;
+  const provider = value.slice(0, separator);
+  const credentialId = value.slice(separator + 1);
+  return (PROVIDER_IDS as readonly string[]).includes(provider) && isValidCredentialId(credentialId);
 }
 
 function normalizeBaseUrl(value: string): string {
@@ -926,6 +1160,7 @@ function sanitizeInstalledModel(input: unknown, fallback: InstalledModelSettings
     enabled: typeof value.enabled === "boolean" ? value.enabled : fallback.enabled,
     addedAt: typeof value.addedAt === "string" && value.addedAt ? value.addedAt : fallback.addedAt,
     ...(typeof value.customLabel === "string" && value.customLabel.trim() && { customLabel: value.customLabel.trim() }),
+    ...(isValidCredentialId(value.credentialId) && { credentialId: value.credentialId }),
   };
 }
 
