@@ -78,6 +78,8 @@ import type {
   SessionEvent,
   SessionGetInput,
   SessionListInput,
+  UpdateImageGenerationSettingsInput,
+  UpdateImageGenerationSettingsResult,
   SessionListItem,
   SessionPinInput,
   SessionPinResult,
@@ -193,6 +195,8 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("settings:set-provider-key", input) as Promise<SetProviderKeyResult>,
   clearProviderKey: (input: ClearProviderKeyInput) =>
     ipcRenderer.invoke("settings:clear-provider-key", input) as Promise<ClearProviderKeyResult>,
+  updateImageGeneration: (input: UpdateImageGenerationSettingsInput) =>
+    ipcRenderer.invoke("settings:update-image-generation", input) as Promise<UpdateImageGenerationSettingsResult>,
   testProviderConnection: (input: TestConnectionInput) =>
     ipcRenderer.invoke("settings:test-connection", input) as Promise<TestConnectionResult>,
   getSearchUsage: () =>

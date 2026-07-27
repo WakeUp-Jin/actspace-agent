@@ -46,6 +46,41 @@ function agentToolResultEvent(uiPreview: AgentToolPreview): SessionEvent<ToolExe
 }
 
 describe("session selectors", () => {
+  it("restores generated image artifacts from a completed tool preview", () => {
+    const image = {
+      type: "image" as const,
+      name: "generated-01.png",
+      path: "/tmp/session/artifacts/generated-01.png",
+      mimeType: "image/png",
+    };
+    const [block] = createMessageBlocks([toolResultEvent({
+      toolCallId: "toolu-image-1",
+      toolName: "generate_image",
+      ok: true,
+      summary: "Generated 1 image",
+      uiPreview: {
+        kind: "image_generation",
+        status: "completed",
+        promptPreview: "A serene koi pond",
+        requestedCount: 1,
+        generatedCount: 1,
+        model: "gpt-image-2",
+        size: "1024x1024",
+        displayText: "Generated 1 image",
+        images: [image],
+      },
+      artifacts: [image],
+    })]);
+
+    expect(block).toMatchObject({
+      kind: "image_generation",
+      status: "completed",
+      requestedCount: 1,
+      generatedCount: 1,
+      images: [image],
+    });
+  });
+
   it("derives turn-scoped render keys independently from persisted event ids", () => {
     const timestamp = "2026-07-17T07:00:00.000Z";
     const blocks = createMessageBlocks([

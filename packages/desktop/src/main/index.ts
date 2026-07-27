@@ -39,6 +39,8 @@ import type {
   SettingsUpdateInput,
   TestConnectionInput,
   TestConnectionResult,
+  UpdateImageGenerationSettingsInput,
+  UpdateImageGenerationSettingsResult,
   UsageStatisticsGetInput,
   ListVisualizationsInput,
   VisualizeReplyInput,
@@ -1379,6 +1381,21 @@ async function registerIpc() {
     logMain("settings clear provider key", { provider: input.provider, ok: result.ok });
     return result;
   });
+
+  ipcMain.handle(
+    "settings:update-image-generation",
+    async (_event, input: UpdateImageGenerationSettingsInput): Promise<UpdateImageGenerationSettingsResult> => {
+      try {
+        const settings = await getSettingsService().updateImageGeneration(input);
+        logMain("settings update image generation", { ok: true, hasApiKey: settings.hasApiKey });
+        return { ok: true, settings };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "图片生成配置保存失败。";
+        logMain("settings update image generation", { ok: false, error: message });
+        return { ok: false, error: message };
+      }
+    },
+  );
 
   ipcMain.handle("settings:test-connection", async (_event, input: TestConnectionInput) => {
     const service = getSettingsService();

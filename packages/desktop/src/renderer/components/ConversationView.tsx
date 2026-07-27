@@ -11,6 +11,7 @@ import { BrowserApprovalBlock } from "./messages/BrowserApprovalBlock";
 import { CompactCommandBlock } from "./messages/CompactCommandBlock";
 import { DeleteFileBlock } from "./messages/DeleteFileBlock";
 import { FileDiffBlock } from "./messages/FileDiffBlock";
+import { GeneratedImageBlock } from "./messages/GeneratedImageBlock";
 import { SubAgentTranscriptPanel } from "./messages/SubAgentTranscriptModal";
 import { ThinkingBlock } from "./messages/ThinkingBlock";
 import { ToolActivityGroup } from "./messages/ToolActivityGroup";
@@ -189,6 +190,8 @@ function renderMessage(
         return <BrowserApprovalBlock key={renderKey} message={message} className={className} />;
       }
       return <ToolLogLine key={renderKey} message={message} className={className} />;
+    case "image_generation":
+      return <GeneratedImageBlock key={renderKey} message={message} className={className} />;
     case "status":
       return (
         <div

@@ -57,6 +57,7 @@ export interface AgentEnvConfig {
   kimiBaseUrl?: string;
   /** 是否配置了任一 web_search provider key（智谱 / Tavily / TinyFish / Exa） */
   hasWebSearchKey: boolean;
+  imageGeneration?: { apiKey: string; baseUrl: string; model: string };
   /** 仅当 .env 显式覆盖默认值时有值 */
   temperature?: number;
   /** 仅当 .env 显式覆盖默认值时有值 */
@@ -120,6 +121,8 @@ export interface AgentRuntimeContext {
   turnId?: string;
   /** Browser Bridge Native Host 的稳定 Unix socket。 */
   browserBridgeSocketPath?: string;
+  /** 当前 session 的图片生成产物目录。 */
+  artifactRoot?: string;
   /** 主 Agent 当前使用的完整系统提示词；不传则使用代码默认值。 */
   systemPrompt?: string;
   /** 附加规则/技能等系统级上下文段，例如 AGENTS.md。 */
@@ -137,6 +140,7 @@ export interface ExplicitAgentRuntimeInput {
     hasWebSearchKey: boolean;
     disabledTools: string[];
     hasKimiKey: boolean;
+    imageGeneration?: { apiKey: string; baseUrl: string; model: string };
   };
 }
 
@@ -159,6 +163,13 @@ export function resolveAgentEnvConfig(): AgentEnvConfig {
     hasWebSearchKey: Boolean(
       env.ZHIPU_API_KEY || env.TAVILY_API_KEY || env.TINYFISH_API_KEY || env.EXA_API_KEY,
     ),
+    ...(env.IMAGE_GENERATION_API_KEY && {
+      imageGeneration: {
+        apiKey: env.IMAGE_GENERATION_API_KEY,
+        baseUrl: env.IMAGE_GENERATION_BASE_URL,
+        model: env.IMAGE_GENERATION_MODEL,
+      },
+    }),
     temperature: env.LLM_TEMPERATURE !== 0 ? env.LLM_TEMPERATURE : undefined,
     maxTokens: env.LLM_MAX_TOKENS !== 8192 ? env.LLM_MAX_TOKENS : undefined,
     disabledTools: env.ACTSPACE_DISABLED_TOOLS,
@@ -302,6 +313,8 @@ export function buildAgentConfig(
     apiFormat: llmConfig.apiFormat,
     hasKimiKey: Boolean(envConfig.kimiApiKey),
     hasWebSearchKey: envConfig.hasWebSearchKey,
+    hasImageGenerationKey: Boolean(envConfig.imageGeneration?.apiKey),
+    imageGeneration: envConfig.imageGeneration,
     disabledTools: envConfig.disabledTools,
     approvalGate,
     tmpRoot: runtimeContext?.tmpRoot,
@@ -309,6 +322,7 @@ export function buildAgentConfig(
     additionalWritableRoots: runtimeContext?.additionalWritableRoots,
     turnId: runtimeContext?.turnId,
     browserBridgeSocketPath: runtimeContext?.browserBridgeSocketPath,
+    artifactRoot: runtimeContext?.artifactRoot,
   };
   return {
     llmConfig,
@@ -335,6 +349,7 @@ export function buildAgentConfigFromRuntime(
     hasWebSearchKey: envConfig.hasWebSearchKey,
     disabledTools: envConfig.disabledTools,
     hasKimiKey: Boolean(envConfig.kimiApiKey),
+    imageGeneration: envConfig.imageGeneration,
   };
   const mainConfig = buildLLMConfigFromRuntime(input.main.definition, input.main.runtime, input.inferenceSettings);
   const utilityConfig = input.utility
@@ -362,6 +377,8 @@ export function buildAgentConfigFromRuntime(
       apiFormat: mainConfig.apiFormat,
       hasKimiKey: toolEnvironment.hasKimiKey,
       hasWebSearchKey: toolEnvironment.hasWebSearchKey,
+      hasImageGenerationKey: Boolean(toolEnvironment.imageGeneration?.apiKey),
+      imageGeneration: toolEnvironment.imageGeneration,
       disabledTools: toolEnvironment.disabledTools,
       approvalGate,
       tmpRoot: runtimeContext?.tmpRoot,
@@ -369,6 +386,7 @@ export function buildAgentConfigFromRuntime(
       additionalWritableRoots: runtimeContext?.additionalWritableRoots,
       turnId: runtimeContext?.turnId,
       browserBridgeSocketPath: runtimeContext?.browserBridgeSocketPath,
+      artifactRoot: runtimeContext?.artifactRoot,
     },
     thinkingEnabled,
     ...(reasoningEffort && { reasoningEffort }),

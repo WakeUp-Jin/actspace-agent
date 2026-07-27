@@ -344,6 +344,7 @@ export type ToolPreviewKind =
   | "glob"
   | "web_search"
   | "media_analysis"
+  | "image_generation"
   | "directory_list"
   | "edit_diff"
   | "write"
@@ -385,6 +386,19 @@ export type ToolUiPreview =
   | { kind: "glob"; pattern: string; scope?: string; resultCount?: number; displayText: string }
   | { kind: "web_search"; mode: "query" | "url"; query?: string; url?: string; displayText: string; resultUrls?: string[]; contentPreview?: string }
   | { kind: "media_analysis"; mediaName: string; mediaKind: "image" | "video" | "media"; displayText: string }
+  | {
+      kind: "image_generation";
+      status: "running" | "completed" | "partial" | "failed";
+      promptPreview: string;
+      requestedCount: number;
+      generatedCount?: number;
+      model?: string;
+      size: string;
+      displayText: string;
+      images?: ToolArtifact[];
+      warning?: string;
+      errorMessage?: string;
+    }
   | { kind: "directory_list"; path: string; entryCount?: number; displayText: string }
   | {
       kind: "edit_diff";
@@ -682,6 +696,21 @@ export type MessageBlock = {
       createdAt: string;
       status?: "running" | "completed";
       isError?: boolean;
+    }
+  | {
+      kind: "image_generation";
+      id: EventId;
+      status: "running" | "completed" | "partial" | "failed";
+      promptPreview: string;
+      requestedCount: number;
+      generatedCount?: number;
+      model?: string;
+      size: string;
+      displayText: string;
+      images?: ToolArtifact[];
+      warning?: string;
+      errorMessage?: string;
+      createdAt: string;
     }
   | {
       kind: "directory_list";

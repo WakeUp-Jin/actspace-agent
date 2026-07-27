@@ -28,8 +28,18 @@ export const SEARCH_PROVIDER_IDS: readonly SearchProviderId[] = [
   "exa",
 ];
 
-/** 可在设置页保存加密密钥的全部供应商（LLM + 搜索）。 */
-export type SecretProviderId = LlmProviderId | SearchProviderId;
+export const DEFAULT_IMAGE_GENERATION_BASE_URL = "https://www.duckcoding.ai/v1";
+export const DEFAULT_IMAGE_GENERATION_MODEL = "gpt-image-2";
+export type ImageGenerationSecretId = "image-generation";
+
+export interface ImageGenerationSettingsView {
+  hasApiKey: boolean;
+  baseUrl: string;
+  model: string;
+}
+
+/** 可在设置页保存加密密钥的全部供应商（LLM + 搜索 + 图片生成）。 */
+export type SecretProviderId = LlmProviderId | SearchProviderId | ImageGenerationSecretId;
 
 export type KairosThinkingMode = "auto" | "on" | "off";
 
@@ -186,6 +196,8 @@ export interface AppSettingsV2 {
   taskModels: TaskModelSettings;
   /** 网络搜索供应商继续独立于 LLM Provider Registry。 */
   searchProviders: Record<SearchProviderId, ProviderSettingsView>;
+  /** OpenAI-compatible 图片生成连接；与 LLM/search provider 布局保持独立。 */
+  imageGeneration: ImageGenerationSettingsView;
   agent: AgentSettingsV2;
   kairos: KairosSettingsV2;
   plugins: PluginsSettings;
@@ -208,6 +220,8 @@ export interface AppSettings extends Omit<AppSettingsV1, "version" | "providers"
   taskModels?: TaskModelSettings;
   /** v2 Kairos ModelKey；旧 `kairos.modelId` 仍供当前消费方过渡读取。 */
   kairosModelKey?: ModelKey | null;
+  /** 迁移期可选，旧测试 fixture 缺失时 renderer 使用内置默认值。 */
+  imageGeneration?: ImageGenerationSettingsView;
 }
 
 // ─── IPC 输入 / 输出 ───
@@ -257,6 +271,19 @@ export type ClearProviderKeyInput = {
 
 export type ClearProviderKeyResult = {
   ok: boolean;
+};
+
+export type UpdateImageGenerationSettingsInput = {
+  /** 缺省表示保留现有密钥；空白字符串视为无效输入。 */
+  apiKey?: string;
+  baseUrl: string;
+  model: string;
+};
+
+export type UpdateImageGenerationSettingsResult = {
+  ok: boolean;
+  settings?: ImageGenerationSettingsView;
+  error?: string;
 };
 
 export type TestConnectionInput = {

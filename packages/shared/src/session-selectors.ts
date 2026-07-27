@@ -164,6 +164,22 @@ function messageBlockFromToolPreview(
         createdAt: getDisplayTime(timestamp),
         isError
       };
+    case "image_generation":
+      return {
+        kind: "image_generation",
+        id: eventId,
+        status: preview.status,
+        promptPreview: preview.promptPreview,
+        requestedCount: preview.requestedCount,
+        generatedCount: preview.generatedCount,
+        model: preview.model,
+        size: preview.size,
+        displayText: preview.displayText,
+        images: preview.images,
+        warning: preview.warning,
+        errorMessage: preview.errorMessage,
+        createdAt: getDisplayTime(timestamp),
+      };
     case "directory_list":
       return {
         kind: "directory_list",

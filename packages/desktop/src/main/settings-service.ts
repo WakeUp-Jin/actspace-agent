@@ -13,6 +13,8 @@ import {
 } from "@actspace/agent-core";
 import {
   BUILTIN_MODEL_LIST,
+  DEFAULT_IMAGE_GENERATION_BASE_URL,
+  DEFAULT_IMAGE_GENERATION_MODEL,
   LEGACY_MODEL_KEY_MAP,
   PROVIDER_IDS,
   PROVIDER_REGISTRY,
@@ -25,6 +27,7 @@ import {
   type AppSettings,
   type AppSettingsV2,
   type InstalledModelSettings,
+  type ImageGenerationSettingsView,
   type KairosModelId,
   type KairosSettingsV2,
   type KairosThinkingMode,
@@ -43,6 +46,7 @@ import {
   type SettingsV2UpdateInput,
   type SkillsSettings,
   type TaskModelSettings,
+  type UpdateImageGenerationSettingsInput,
 } from "@actspace/shared";
 import type { ProviderConnectionProbeResult } from "./provider-connection-service";
 
@@ -98,6 +102,7 @@ export class ProviderSettingsError extends Error {
     public readonly code:
       | "invalid_api_key"
       | "invalid_base_url"
+      | "invalid_model"
       | "invalid_proxy_url"
       | "secret_storage_unavailable"
       | "write_failed",
@@ -113,6 +118,10 @@ export interface PersistedSettingsV2 {
   installedModels: Partial<Record<ModelKey, InstalledModelSettings>>;
   customModels: Partial<Record<ModelKey, ModelDefinition>>;
   taskModels: TaskModelSettings;
+  imageGeneration: {
+    baseUrl: string;
+    model: string;
+  };
   agent: AgentSettingsV2;
   kairos: KairosSettingsV2;
   plugins: PluginsSettings;
@@ -120,7 +129,7 @@ export interface PersistedSettingsV2 {
 }
 
 type OpenRouterManagementSecretId = "openrouter-management";
-type PersistedSecretProviderId = LlmProviderId | SearchProviderId | OpenRouterManagementSecretId;
+type PersistedSecretProviderId = LlmProviderId | SearchProviderId | OpenRouterManagementSecretId | "image-generation";
 type PersistedSecrets = { version: 1 } & Partial<Record<PersistedSecretProviderId, string>>;
 
 interface ReadSettingsResult {
@@ -135,7 +144,14 @@ const ALL_SECRET_PROVIDER_IDS: readonly PersistedSecretProviderId[] = [
   ...PROVIDER_IDS,
   ...SEARCH_PROVIDER_IDS,
   "openrouter-management",
+  "image-generation",
 ];
+
+export interface ImageGenerationRuntimeConfig {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
 
 const SEARCH_PROVIDER_ENV_KEYS = {
   zhipu: "ZHIPU_API_KEY",
@@ -210,6 +226,7 @@ export class SettingsService {
       taskModels: v2.taskModels,
       kairosModelKey: v2.kairos.modelId,
       searchProviders: v2.searchProviders,
+      imageGeneration: v2.imageGeneration,
       agent: { ...v2.agent, exploreModelId },
       kairos: {
         ...v2.kairos,
@@ -255,6 +272,7 @@ export class SettingsService {
         tinyfish: { hasApiKey: Boolean(this.getDecryptedKey("tinyfish")) },
         exa: { hasApiKey: Boolean(this.getDecryptedKey("exa")) },
       },
+      imageGeneration: this.getImageGenerationSettingsView(),
       agent: { ...this.settings.agent, disabledTools: [...this.settings.agent.disabledTools] },
       kairos: { ...this.settings.kairos, enabledSkills: [...this.settings.kairos.enabledSkills] },
       plugins: { repoRoot: this.settings.plugins.repoRoot, fsWatch: { ...this.settings.plugins.fsWatch } },
@@ -491,6 +509,50 @@ export class SettingsService {
     };
   }
 
+  getImageGenerationRuntimeConfig(): ImageGenerationRuntimeConfig | undefined {
+    const apiKey = this.getDecryptedKey("image-generation");
+    if (!apiKey) return undefined;
+    return {
+      apiKey,
+      baseUrl: this.settings.imageGeneration.baseUrl,
+      model: this.settings.imageGeneration.model,
+    };
+  }
+
+  async updateImageGeneration(
+    input: UpdateImageGenerationSettingsInput,
+  ): Promise<ImageGenerationSettingsView> {
+    return this.enqueueMutation(async () => {
+      const previousSettings = cloneJson(this.settings);
+      const previousSecrets = { ...this.secrets };
+      let secretsWritten = false;
+      try {
+        const baseUrl = normalizeImageGenerationBaseUrl(input.baseUrl);
+        const model = normalizeImageGenerationModel(input.model);
+        if (input.apiKey !== undefined) {
+          const trimmed = input.apiKey.trim();
+          if (!trimmed) throw new ProviderSettingsError("API Key 不能为空。", "invalid_api_key");
+          if (!this.crypto.isAvailable()) {
+            throw new ProviderSettingsError("系统密钥串不可用，无法安全保存 API Key。", "secret_storage_unavailable");
+          }
+          this.secrets["image-generation"] = this.crypto.encrypt(trimmed).toString("base64");
+          await this.writeSecretsFile();
+          secretsWritten = true;
+        }
+        this.settings.imageGeneration = { baseUrl, model };
+        await this.writeSettingsFile();
+        this.applyToEnv();
+        return this.getImageGenerationSettingsView();
+      } catch (error) {
+        this.settings = previousSettings;
+        this.secrets = previousSecrets;
+        if (secretsWritten) await this.restoreFilesBestEffort(previousSettings, previousSecrets);
+        if (error instanceof ProviderSettingsError) throw error;
+        throw new ProviderSettingsError("图片生成配置写入失败。", "write_failed");
+      }
+    });
+  }
+
   getOpenRouterManagementRuntimeConfig(): ProviderRuntimeConfig | ProviderRuntimeError {
     const runtime = this.getProviderRuntimeConfig("openrouter");
     if ("code" in runtime) return runtime;
@@ -547,6 +609,18 @@ export class SettingsService {
         return { ok: false, error: error instanceof Error ? error.message : "API Key 保存失败。" };
       }
     }
+    if (provider === "image-generation") {
+      try {
+        await this.updateImageGeneration({
+          apiKey,
+          baseUrl: this.settings.imageGeneration.baseUrl,
+          model: this.settings.imageGeneration.model,
+        });
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : "API Key 保存失败。" };
+      }
+    }
     return this.setSearchProviderKey(provider, apiKey);
   }
 
@@ -558,6 +632,20 @@ export class SettingsService {
       } catch {
         return { ok: false };
       }
+    }
+    if (provider === "image-generation") {
+      return this.enqueueMutation(async () => {
+        const previous = { ...this.secrets };
+        try {
+          delete this.secrets["image-generation"];
+          await this.writeSecretsFile();
+          this.applyToEnv();
+          return { ok: true };
+        } catch {
+          this.secrets = previous;
+          return { ok: false };
+        }
+      });
     }
     return this.clearSearchProviderKey(provider);
   }
@@ -640,11 +728,21 @@ export class SettingsService {
     delete process.env.DEEPSEEK_API_KEY;
     delete process.env.KIMI_API_KEY;
     for (const id of SEARCH_PROVIDER_IDS) this.applyProviderKey(id, SEARCH_PROVIDER_ENV_KEYS[id]);
+    process.env.IMAGE_GENERATION_BASE_URL = this.settings.imageGeneration.baseUrl;
+    process.env.IMAGE_GENERATION_MODEL = this.settings.imageGeneration.model;
     process.env.ACTSPACE_DISABLED_TOOLS = this.settings.agent.disabledTools.join(",");
     process.env.ACTSPACE_BASH_ALWAYS_ASK = this.settings.agent.bashAlwaysAsk ? "1" : "0";
     setOrDeleteEnv("LLM_TEMPERATURE", this.settings.agent.temperature === null ? undefined : String(this.settings.agent.temperature));
     setOrDeleteEnv("LLM_MAX_TOKENS", this.settings.agent.maxTokens === null ? undefined : String(this.settings.agent.maxTokens));
     this.reloadEnv();
+  }
+
+  private getImageGenerationSettingsView(): ImageGenerationSettingsView {
+    return {
+      hasApiKey: Boolean(this.getDecryptedKey("image-generation")),
+      baseUrl: this.settings.imageGeneration.baseUrl,
+      model: this.settings.imageGeneration.model,
+    };
   }
 
   private async readSettingsFile(): Promise<ReadSettingsResult> {
@@ -765,12 +863,17 @@ function defaultInstalledModels(): Partial<Record<ModelKey, InstalledModelSettin
 
 function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV2 {
   const env = getEnv();
+  const imageGeneration = safeImageGenerationDefaults(
+    env.IMAGE_GENERATION_BASE_URL,
+    env.IMAGE_GENERATION_MODEL,
+  );
   return {
     version: 2,
     providers: Object.fromEntries(PROVIDER_IDS.map((id) => [id, defaultProviderSettings()])) as PersistedSettingsV2["providers"],
     installedModels: defaultInstalledModels(),
     customModels: {},
     taskModels: { defaultChatModel: null, utilityModel: null, exploreModel: null },
+    imageGeneration,
     agent: {
       systemPromptPath: defaultSystemPromptPath(dataRoot),
       temperature: env.LLM_TEMPERATURE !== LLM_TEMPERATURE_DEFAULT ? env.LLM_TEMPERATURE : null,
@@ -782,6 +885,20 @@ function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV2 {
     plugins: { repoRoot: null, fsWatch: { enabled: false } },
     skills: { disabled: [] },
   };
+}
+
+function safeImageGenerationDefaults(baseUrl: string, model: string): PersistedSettingsV2["imageGeneration"] {
+  try {
+    return {
+      baseUrl: normalizeImageGenerationBaseUrl(baseUrl),
+      model: normalizeImageGenerationModel(model),
+    };
+  } catch {
+    return {
+      baseUrl: DEFAULT_IMAGE_GENERATION_BASE_URL,
+      model: DEFAULT_IMAGE_GENERATION_MODEL,
+    };
+  }
 }
 
 function migrateV1Settings(
@@ -834,6 +951,7 @@ function mergePersistedSettingsV2(raw: Record<string, unknown>, dataRoot: string
   seed.installedModels = sanitizeInstalledModels(raw.installedModels, seed.installedModels);
   seed.customModels = sanitizeCustomModels(raw.customModels);
   seed.taskModels = sanitizeTaskModels(raw.taskModels);
+  seed.imageGeneration = sanitizeImageGenerationSettings(raw.imageGeneration, seed.imageGeneration);
   seed.agent = sanitizeAgentV2(isRecord(raw.agent) ? raw.agent : {}, seed.agent);
   seed.kairos = sanitizeKairosV2(isRecord(raw.kairos) ? raw.kairos : {}, seed.kairos);
   seed.plugins = sanitizePlugins(isRecord(raw.plugins) ? raw.plugins : {});
@@ -842,8 +960,55 @@ function mergePersistedSettingsV2(raw: Record<string, unknown>, dataRoot: string
 }
 
 function hasRequiredV2Sections(raw: Record<string, unknown>): boolean {
-  return ["providers", "installedModels", "customModels", "taskModels", "agent", "kairos", "plugins", "skills"]
+  return ["providers", "installedModels", "customModels", "taskModels", "imageGeneration", "agent", "kairos", "plugins", "skills"]
     .every((key) => isRecord(raw[key]));
+}
+
+function sanitizeImageGenerationSettings(
+  input: unknown,
+  fallback: PersistedSettingsV2["imageGeneration"],
+): PersistedSettingsV2["imageGeneration"] {
+  if (!isRecord(input)) return { ...fallback };
+  try {
+    return {
+      baseUrl: normalizeImageGenerationBaseUrl(
+        typeof input.baseUrl === "string" ? input.baseUrl : fallback.baseUrl,
+      ),
+      model: normalizeImageGenerationModel(
+        typeof input.model === "string" ? input.model : fallback.model,
+      ),
+    };
+  } catch {
+    return { ...fallback };
+  }
+}
+
+function normalizeImageGenerationBaseUrl(value: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(value.trim());
+  } catch {
+    throw new ProviderSettingsError("Base URL 格式无效。", "invalid_base_url");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new ProviderSettingsError("Base URL 仅支持 HTTP(S)。", "invalid_base_url");
+  }
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new ProviderSettingsError("Base URL 不能包含认证信息、查询参数或锚点。", "invalid_base_url");
+  }
+  const normalized = parsed.toString().replace(/\/$/, "");
+  if (/\/images\/generations$/i.test(normalized)) {
+    throw new ProviderSettingsError("Base URL 请填写服务根路径，不要包含 /images/generations。", "invalid_base_url");
+  }
+  return normalized;
+}
+
+function normalizeImageGenerationModel(value: string): string {
+  const model = value.trim();
+  if (!model || model.length > 200 || /[\u0000-\u001f\u007f]/.test(model)) {
+    throw new ProviderSettingsError("模型名称无效。", "invalid_model");
+  }
+  return model;
 }
 
 function sanitizeProviderSettings(input: unknown, fallback: ProviderConnectionSettings): ProviderConnectionSettings {

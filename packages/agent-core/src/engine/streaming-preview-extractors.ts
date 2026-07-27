@@ -78,6 +78,15 @@ const EXTRACTORS: Record<ToolPreviewKind, Extractor> = {
     };
   },
 
+  image_generation: (s) => ({
+    kind: "image_generation",
+    status: "running",
+    promptPreview: getField(s, "prompt")?.slice(0, 160) ?? "",
+    requestedCount: extractIntegerField(s, "n") ?? 1,
+    size: getField(s, "size") ?? "1024x1024",
+    displayText: "Generating image",
+  }),
+
   directory_list: (s) => ({
     kind: "directory_list",
     path: getField(s, "path") ?? "",
@@ -162,6 +171,13 @@ const EXTRACTORS: Record<ToolPreviewKind, Extractor> = {
     content: "",
   }),
 };
+
+function extractIntegerField(partialJson: string, name: string): number | undefined {
+  const match = new RegExp(`"${name}"\\s*:\\s*(\\d+)`).exec(partialJson);
+  if (!match) return undefined;
+  const value = Number(match[1]);
+  return Number.isInteger(value) ? value : undefined;
+}
 
 function browserCategoryPreview(title: string, partialArgsText: string): ToolUiPreview {
   const action = getField(partialArgsText, "action") ?? "";

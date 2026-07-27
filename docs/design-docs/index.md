@@ -28,7 +28,7 @@
 |---|---|---|
 | `agent-runtime/` | Agent 主运行时、Turn 分层、当前模块和内部测试 | `docs/design-docs/agent-runtime/agent-backend-design.md` |
 | `model-context/` | 模型供应商、模型能力、token、上下文压缩和缓存审计 | `docs/design-docs/model-context/agent-multi-provider-llm.md` |
-| `tool-system/` | Skill、Web 工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md` |
+| `tool-system/` | Skill、Web/图片生成工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md` |
 | `execution-safety/` | 工具权限、审批暂停恢复、Bash 策略和执行模型 | `docs/design-docs/execution-safety/agent-权限设计规则和原则.md` |
 | `browser/` | Browser Bridge、ActSpace 集成和 canonical command | `docs/design-docs/browser/agent-browser-use-index.md` |
 | `collaboration/` | Member、Subagent、Explore、Room 和 Team | `docs/design-docs/collaboration/agent-members.md` |

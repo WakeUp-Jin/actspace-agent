@@ -19,6 +19,7 @@ import type {
   SubAgentTranscriptRef,
   ToolPreviewKind,
   ToolOutputRef,
+  ToolArtifact,
 } from "@actspace/shared";
 
 // ─── ToolResult（统一返回类型） ───
@@ -27,6 +28,8 @@ export interface ToolResult {
   success: boolean;
   data?: unknown;
   error?: string;
+  /** 会话级产物引用；只保存本地路径和 MIME，不内联大文件。 */
+  artifacts?: ToolArtifact[];
   /**
    * Optional rich content returned to the next LLM call. Use this when a tool
    * produces native model input such as an image; `data` remains the textual
@@ -110,6 +113,9 @@ export interface ToolParameterProperty {
   description: string;
   enum?: string[];
   items?: { type: string; enum?: string[] };
+  minimum?: number;
+  maximum?: number;
+  default?: string | number | boolean;
 }
 
 export interface ToolParameterSchema {

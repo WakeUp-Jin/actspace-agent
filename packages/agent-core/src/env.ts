@@ -66,6 +66,11 @@ export interface AppEnv {
   /** Exa 搜索 API Key（web_search 工具，国际通道优先级 3） */
   EXA_API_KEY: string;
 
+  /** OpenAI-compatible 图片生成工具配置。 */
+  IMAGE_GENERATION_API_KEY: string;
+  IMAGE_GENERATION_BASE_URL: string;
+  IMAGE_GENERATION_MODEL: string;
+
   /** 日志级别 */
   LOG_LEVEL: "debug" | "info" | "warn" | "error";
   /** 是否在 mock 模式下运行（快捷开关） */
@@ -218,6 +223,24 @@ const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
     envKey: "EXA_API_KEY",
     required: false,
     default: "",
+    parse: str,
+  },
+  IMAGE_GENERATION_API_KEY: {
+    envKey: "IMAGE_GENERATION_API_KEY",
+    required: false,
+    default: "",
+    parse: str,
+  },
+  IMAGE_GENERATION_BASE_URL: {
+    envKey: "IMAGE_GENERATION_BASE_URL",
+    required: false,
+    default: "https://www.duckcoding.ai/v1",
+    parse: str,
+  },
+  IMAGE_GENERATION_MODEL: {
+    envKey: "IMAGE_GENERATION_MODEL",
+    required: false,
+    default: "gpt-image-2",
     parse: str,
   },
 

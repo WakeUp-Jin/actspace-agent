@@ -102,6 +102,9 @@ declare global {
       clearProviderKey: (
         input: import("@actspace/shared").ClearProviderKeyInput
       ) => Promise<import("@actspace/shared").ClearProviderKeyResult>;
+      updateImageGeneration?: (
+        input: import("@actspace/shared").UpdateImageGenerationSettingsInput
+      ) => Promise<import("@actspace/shared").UpdateImageGenerationSettingsResult>;
       testProviderConnection: (
         input: import("@actspace/shared").TestConnectionInput
       ) => Promise<import("@actspace/shared").TestConnectionResult>;

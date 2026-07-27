@@ -439,6 +439,26 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, turn
     };
   }
 
+  if (tool.preview?.kind === "image_generation") {
+    return {
+      kind: "image_generation",
+      id: blockId,
+      status: tool.finished
+        ? tool.isError ? "failed" : tool.preview.status
+        : "running",
+      promptPreview: tool.preview.promptPreview,
+      requestedCount: tool.preview.requestedCount,
+      generatedCount: tool.finished ? tool.preview.generatedCount : undefined,
+      model: tool.preview.model,
+      size: tool.preview.size,
+      displayText: tool.preview.displayText,
+      images: tool.finished ? tool.preview.images : undefined,
+      warning: tool.preview.warning,
+      errorMessage: tool.isError ? tool.preview.errorMessage : undefined,
+      createdAt: now,
+    };
+  }
+
   if (tool.preview?.kind === "directory_list") {
     return {
       kind: "directory_list",
