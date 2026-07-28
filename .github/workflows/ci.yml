@@ -42,6 +42,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check site
+        run: pnpm check:site
+
+      - name: Test site
+        run: pnpm test:site
+
+      - name: Build site
+        env:
+          SITE_URL: https://wakeup-jin.github.io
+          SITE_BASE: /actspace-agent
+        run: pnpm build:site
+
       - name: Set up Go for Browser Bridge
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:

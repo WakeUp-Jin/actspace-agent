@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>静态内容站需要显式构建契约</title>
+  <style>
+    :root { color-scheme: light dark; --canvas:#f3f2ec; --surface:#fffefa; --ink:#1b1c19; --body:#5f625c; --line:#d9dad3; --green:#2b9a68; --soft:#dceee4; }
+    @media (prefers-color-scheme: dark) { :root { --canvas:#111512; --surface:#1d2420; --ink:#f0f2ec; --body:#b6bbb2; --line:#303830; --green:#53c58b; --soft:#173829; } }
+    * { box-sizing:border-box; }
+    html { background:var(--canvas); scroll-behavior:smooth; }
+    body { margin:0; color:var(--ink); background:var(--canvas); font-family:"Avenir Next","PingFang SC",sans-serif; line-height:1.7; }
+    header, main, footer { width:min(1100px,calc(100% - 40px)); margin:auto; }
+    header { padding:90px 0 64px; }
+    .kicker { color:var(--green); font:700 11px/1.2 ui-monospace,monospace; letter-spacing:.15em; text-transform:uppercase; }
+    h1 { max-width:900px; margin:24px 0; font-size:clamp(46px,8vw,92px); font-weight:550; letter-spacing:-.065em; line-height:.98; }
+    .lede { max-width:720px; color:var(--body); font-size:19px; }
+    nav { display:flex; flex-wrap:wrap; gap:10px; margin-top:34px; }
+    nav a { border:1px solid var(--line); border-radius:999px; padding:7px 12px; color:var(--body); text-decoration:none; font-size:12px; }
+    section { border-top:1px solid var(--line); padding:64px 0; }
+    h2 { margin:0 0 20px; font-size:clamp(32px,5vw,54px); letter-spacing:-.045em; line-height:1.05; }
+    h3 { margin:34px 0 12px; font-size:21px; }
+    p, li { color:var(--body); }
+    .map { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:32px; }
+    .node { border:1px solid var(--line); border-radius:12px; padding:18px; background:var(--surface); }
+    .node strong { display:block; margin-bottom:8px; }
+    .node small { color:var(--body); }
+    .contract { border-left:4px solid var(--green); margin:26px 0; padding:18px 22px; background:var(--soft); }
+    pre { overflow:auto; border:1px solid var(--line); border-radius:12px; padding:20px; color:var(--ink); background:var(--surface); font:13px/1.7 ui-monospace,monospace; }
+    table { width:100%; border-collapse:collapse; margin-top:24px; }
+    th, td { border-bottom:1px solid var(--line); padding:14px 10px; text-align:left; vertical-align:top; }
+    th { font-size:12px; }
+    td { color:var(--body); }
+    .trap { display:grid; grid-template-columns:130px 1fr; border-top:1px solid var(--line); padding:20px 0; }
+    .trap b { color:var(--green); font:700 11px/1.4 ui-monospace,monospace; letter-spacing:.08em; }
+    footer { padding:40px 0 80px; color:var(--body); font-size:12px; }
+    @media (max-width:760px) { .map { grid-template-columns:1fr; } .trap { grid-template-columns:1fr; gap:8px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="kicker">Reusable engineering lesson</div>
+    <h1>静态内容站不是一堆页面，而是一组构建契约。</h1>
+    <p class="lede">当站点进入 monorepo、读取仓库 Markdown、部署到 project Pages 并支持手动主题时，真正容易出错的不是卡片 CSS，而是路径、数据、资源和主题之间没有显式契约。</p>
+    <nav>
+      <a href="#map">四个边界</a><a href="#ast">AST 数据契约</a><a href="#paths">路径契约</a><a href="#themes">主题契约</a><a href="#traps">常见陷阱</a>
+    </nav>
+  </header>
+  <main>
+    <section id="map">
+      <h2>四个必须同时成立的边界</h2>
+      <div class="map">
+        <div class="node"><strong>数据</strong><small>内容从哪里来，怎样验证，失败时是否阻止发布。</small></div>
+        <div class="node"><strong>路径</strong><small>源码位置、构建 cwd、站点 base 和最终 URL 如何对应。</small></div>
+        <div class="node"><strong>资源</strong><small>图片固有尺寸、CSS 响应式尺寸和部署资源路径谁负责。</small></div>
+        <div class="node"><strong>主题</strong><small>语义 token、第三方代码高亮和 system 模式怎样使用同一状态。</small></div>
+      </div>
+      <div class="contract"><strong>核心判断：</strong>静态生成不代表运行时简单。复杂度只是提前到了 build time，因此构建失败必须足够明确，构建输入必须足够可追溯。</div>
+    </section>
+    <section id="ast">
+      <h2>用 AST 把 Markdown 变成可验证的数据源</h2>
+      <p>正则适合寻找简单标记，不适合承担 GFM 表格、inline code、强调、链接和源码行号。把 Markdown 先解析为 AST，可以只选择符合约定的节点，再对每一行建立明确错误位置。</p>
+      <pre>Markdown file
+  → remark-parse + remark-gfm
+  → select: heading(depth=2, YYYY-MM)
+  → select: table(exact headers)
+  → validate date / month / required cells
+  → sanitize inline Markdown
+  → ReleaseEntry[]
+  → static pages</pre>
+      <h3>为什么解析错误应该让构建失败</h3>
+      <p>更新页如果静默跳过一行，发布动作仍会显示成功，但用户看到的是旧数据或缺失数据。内容 schema 属于产品契约，违反契约与 TypeScript 编译错误没有本质区别。</p>
+    </section>
+    <section id="paths">
+      <h2>monorepo 有三种“根目录”</h2>
+      <table>
+        <thead><tr><th>根</th><th>例子</th><th>风险</th></tr></thead>
+        <tbody>
+          <tr><td>仓库根</td><td>lockfile、release、workspace scripts</td><td>Action 若从 package 目录运行，会丢失根 lockfile。</td></tr>
+          <tr><td>站点根</td><td>Astro config、src、public、dist</td><td>输出路径需要相对站点，而依赖安装可能仍在仓库根。</td></tr>
+          <tr><td>部署根</td><td><code>/repo-name/</code></td><td>开发环境的 <code>/</code> 正常，不代表 project Pages 链接正常。</td></tr>
+        </tbody>
+      </table>
+      <div class="contract">可靠做法：从仓库根安装和执行 workspace 命令；让构建工具显式输出站点目录；所有内部 URL 经过同一个 base-path helper；读取跨包文件时从 <code>import.meta.url</code> 推导，而不是相信 <code>process.cwd()</code>。</div>
+    </section>
+    <section id="themes">
+      <h2>主题状态必须传播到第三方产物</h2>
+      <p>站点使用 <code>html[data-theme]</code> 手动切换，而代码高亮器常默认只生成 <code>prefers-color-scheme</code> CSS。两者各自正确，但组合后会出现“页面已变暗、代码仍使用浅色 token”的低对比度问题。</p>
+      <pre>html[data-theme="dark"] .astro-code span {
+  color: var(--shiki-dark) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-theme="system"] .astro-code span {
+    color: var(--shiki-dark) !important;
+  }
+}</pre>
+      <p>任何有独立主题状态的第三方输出——图表、编辑器、代码高亮、嵌入式组件——都需要显式接入产品主题，而不是假设它会自动继承。</p>
+    </section>
+    <section id="traps">
+      <h2>这次暴露出的通用陷阱</h2>
+      <div class="trap"><b>IMAGE SIZE</b><p>HTML 的 <code>width</code>/<code>height</code> 能防止布局抖动，但响应式 CSS 只改 width 时，height 仍可能保留固有像素值。全局 <code>img { height:auto }</code> 是关键配套。</p></div>
+      <div class="trap"><b>ACTION PATH</b><p>部署 Action 的 <code>path</code> 往往同时决定工作目录和 lockfile 探测位置。monorepo 不能只把它指向子包；应检查 Action 源码，确认 build command 与 artifact path 可以独立配置。</p></div>
+      <div class="trap"><b>STATIC SAFETY</b><p>静态站也会处理不可信 Markdown。只渲染需要的 inline 节点并经过 sanitize，比开启 raw HTML 后依赖作者自律更可靠。</p></div>
+      <div class="trap"><b>VISUAL QA</b><p>类型检查与静态构建无法证明 Hero 没有遮挡。至少在一个桌面和一个移动 viewport 检查真实 production preview，并验证滚动宽度、主题和交互状态。</p></div>
+    </section>
+    <section>
+      <h2>自检问题</h2>
+      <ol>
+        <li>如果 CI 从任意工作目录启动，内容解析器还能找到唯一事实源吗？</li>
+        <li>把站点从根域迁移到 project Pages 后，canonical、图片、robots 和内部链接是否仍一致？</li>
+        <li>手动选择 dark 时，所有第三方渲染产物是否真的切到 dark，而不是只改变页面背景？</li>
+      </ol>
+    </section>
+  </main>
+  <footer>来源：ActSpace 官网首版实现 · 对应 history：20260727-2300-implement-actspace-site.md</footer>
+</body>
+</html>

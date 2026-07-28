@@ -1,0 +1,148 @@
+<section class="statement site-section">
+  <div class="site-page statement-grid">
+    <p class="site-kicker">Act + Space</p>
+    <div>
+      <h2>不是另一个聊天窗口，<br />而是模型的运行空间。</h2>
+      <p>
+        Agent 的价值不止是生成答案。模型需要持续获得正确上下文，工具调用需要明确权限，
+        每一步执行、成本和缓存都应该能够被检查。ActSpace 把这些能力放进同一个本地工作台。
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="principles site-section" id="principles" aria-labelledby="principles-title">
+  <div class="site-page">
+    <div class="principles-heading">
+      <p class="site-kicker">Three operating truths</p>
+      <h2 id="principles-title">Agent 需要的不只是模型。</h2>
+    </div>
+    <ol>
+      <li>
+        <span>01</span>
+        <div>
+          <h3>看见上下文</h3>
+          <p>模型看到什么、占用多少、缓存是否命中，都应该从黑箱变成可检查的事实。</p>
+        </div>
+      </li>
+      <li>
+        <span>02</span>
+        <div>
+          <h3>控制执行</h3>
+          <p>文件、Bash、Browser 和权限审批形成一条完整执行链，而不是散落的工具调用。</p>
+        </div>
+      </li>
+      <li>
+        <span>03</span>
+        <div>
+          <h3>选择 Agent 形态</h3>
+          <p>Solo、Explore、Team 与 Kairos 分别承担专注执行、隔离探索、协作和主动观察。</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<style>
+  .statement {
+    background: var(--site-canvas);
+  }
+
+  .statement-grid {
+    display: grid;
+    grid-template-columns: minmax(160px, 0.6fr) minmax(0, 1.65fr);
+    gap: clamp(40px, 8vw, 130px);
+  }
+
+  h2 {
+    margin-bottom: 32px;
+    font-size: clamp(46px, 6vw, 78px);
+    font-weight: 520;
+    letter-spacing: -0.06em;
+    line-height: 1.04;
+  }
+
+  .statement-grid > div > p {
+    max-width: 760px;
+    color: var(--site-body);
+    font-size: clamp(18px, 1.8vw, 22px);
+    line-height: 1.8;
+  }
+
+  .principles {
+    border-block: 1px solid var(--site-line);
+    background: var(--site-canvas-soft);
+  }
+
+  .principles-heading {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 40px;
+    align-items: end;
+    margin-bottom: 70px;
+  }
+
+  .principles-heading h2 {
+    margin-bottom: 0;
+  }
+
+  ol {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 40px;
+    border-top: 1px solid var(--site-line);
+    padding-block: 36px;
+  }
+
+  li > span {
+    color: var(--site-muted);
+    font-family: var(--site-font-mono);
+    font-size: 12px;
+  }
+
+  li > div {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.5fr);
+    gap: 40px;
+  }
+
+  h3 {
+    margin-bottom: 0;
+    font-size: clamp(24px, 2.6vw, 36px);
+    font-weight: 560;
+    letter-spacing: -0.04em;
+  }
+
+  li p {
+    margin-bottom: 0;
+    color: var(--site-body);
+    font-size: 17px;
+    line-height: 1.75;
+  }
+
+  @media (max-width: 760px) {
+    .statement-grid,
+    .principles-heading,
+    li,
+    li > div {
+      grid-template-columns: 1fr;
+    }
+
+    .statement-grid,
+    .principles-heading {
+      gap: 28px;
+    }
+
+    li,
+    li > div {
+      gap: 16px;
+    }
+  }
+</style>

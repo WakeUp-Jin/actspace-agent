@@ -1,0 +1,159 @@
+---
+import { sitePath } from "../../lib/site-path";
+---
+
+<section class="architecture site-section" id="architecture" aria-labelledby="architecture-title">
+  <div class="site-page architecture-grid">
+    <div class="architecture-copy">
+      <p class="site-kicker">Built as a harness</p>
+      <h2 id="architecture-title">本地运行，结构清楚，边界可改。</h2>
+      <p>
+        ActSpace 不是不可见的远端黑箱。桌面工作台、Agent Core、共享契约和插件各自承担清楚职责，
+        你可以阅读它、替换它，也可以沿着相同边界扩展新的执行能力。
+      </p>
+      <a href={sitePath("/docs/contributing/")}>阅读开发与贡献指南 <span aria-hidden="true">→</span></a>
+    </div>
+
+    <div class="topology" role="img" aria-label="Desktop 依赖 Agent Core，Agent Core 依赖 Shared，并连接 Browser Bridge 与 fs-watch">
+      <div class="node node--desktop">
+        <span>Interface</span>
+        <strong>Desktop</strong>
+      </div>
+      <span class="connector" aria-hidden="true">↓</span>
+      <div class="node node--core">
+        <span>Runtime</span>
+        <strong>Agent Core</strong>
+      </div>
+      <div class="branches">
+        <div class="node">
+          <span>Contracts</span>
+          <strong>Shared</strong>
+        </div>
+        <div class="node">
+          <span>Browser</span>
+          <strong>Bridge</strong>
+        </div>
+        <div class="node">
+          <span>Filesystem</span>
+          <strong>fs-watch</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .architecture {
+    color: var(--site-inverse-ink);
+    background: var(--site-inverse-surface);
+  }
+
+  .architecture-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+    gap: clamp(60px, 9vw, 140px);
+    align-items: center;
+  }
+
+  .architecture-copy :global(.site-kicker) {
+    color: var(--site-inverse-muted);
+  }
+
+  h2 {
+    margin-block: 28px;
+    font-size: clamp(48px, 5vw, 72px);
+    font-weight: 520;
+    letter-spacing: -0.06em;
+    line-height: 1.04;
+  }
+
+  .architecture-copy > p:last-of-type {
+    max-width: 600px;
+    color: var(--site-inverse-muted);
+    font-size: 17px;
+    line-height: 1.8;
+  }
+
+  .architecture-copy a {
+    display: inline-flex;
+    gap: 8px;
+    margin-top: 18px;
+    color: var(--site-inverse-ink);
+    text-decoration: none;
+    font-weight: 650;
+  }
+
+  .topology {
+    border: 1px solid var(--site-inverse-line);
+    border-radius: 18px;
+    padding: clamp(24px, 4vw, 48px);
+    background: var(--site-inverse-panel);
+  }
+
+  .node {
+    display: grid;
+    gap: 6px;
+    border: 1px solid var(--site-inverse-line);
+    border-radius: 12px;
+    padding: 20px;
+    background: var(--site-inverse-panel);
+  }
+
+  .node span {
+    color: var(--site-inverse-muted);
+    font-family: var(--site-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .node strong {
+    font-size: 19px;
+    font-weight: 600;
+  }
+
+  .node--desktop,
+  .node--core {
+    margin-inline: auto;
+  }
+
+  .node--desktop {
+    width: 72%;
+  }
+
+  .node--core {
+    width: 86%;
+    border-color: var(--site-operational);
+  }
+
+  .connector {
+    display: block;
+    padding-block: 12px;
+    color: var(--site-inverse-muted);
+    text-align: center;
+  }
+
+  .branches {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  @media (max-width: 900px) {
+    .architecture-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .branches {
+      grid-template-columns: 1fr;
+    }
+
+    .node--desktop,
+    .node--core {
+      width: 100%;
+    }
+  }
+</style>

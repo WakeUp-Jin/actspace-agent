@@ -1,0 +1,109 @@
+---
+import { render, type CollectionEntry } from "astro:content";
+import DocsSidebar from "../../components/docs/DocsSidebar.astro";
+import DocsToc from "../../components/docs/DocsToc.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { docsHref, getPublicDocs } from "../../lib/docs-navigation";
+import "../../styles/prose.css";
+
+interface Props {
+  entry: CollectionEntry<"docs">;
+}
+
+export async function getStaticPaths() {
+  const docs = await getPublicDocs();
+  return docs.map((entry) => ({
+    params: { slug: docsHref(entry).replace(/^\/docs\//, "").replace(/\/$/, "") },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const docs = await getPublicDocs();
+const { Content, headings } = await render(entry);
+---
+
+<BaseLayout title={`${entry.data.title} — ActSpace 文档`} description={entry.data.description}>
+  <main id="main-content" class="docs-article-grid site-page">
+    <DocsSidebar {docs} currentId={entry.id} />
+    <article>
+      <header>
+        <p class="site-kicker">ActSpace Docs</p>
+        <h1>{entry.data.title}</h1>
+        <p>{entry.data.description}</p>
+        <time datetime={entry.data.updatedAt.toISOString()}>更新于 {entry.data.updatedAt.toLocaleDateString("zh-CN")}</time>
+      </header>
+      <div class="docs-prose">
+        <Content />
+      </div>
+    </article>
+    <DocsToc {headings} />
+  </main>
+</BaseLayout>
+
+<script>
+  import { initializeDocsCopy } from "../../scripts/docs-copy";
+
+  initializeDocsCopy();
+  document.addEventListener("astro:page-load", initializeDocsCopy);
+</script>
+
+<style>
+  .docs-article-grid {
+    display: grid;
+    grid-template-columns: 210px minmax(0, 760px) minmax(150px, 1fr);
+    gap: clamp(28px, 4vw, 64px);
+    justify-content: center;
+    padding-block: 96px 130px;
+  }
+
+  article {
+    min-width: 0;
+    padding-top: clamp(42px, 7vw, 86px);
+  }
+
+  article > header {
+    border-bottom: 1px solid var(--site-line);
+    margin-bottom: 42px;
+    padding-bottom: 38px;
+  }
+
+  h1 {
+    margin-block: 24px 20px;
+    font-family: var(--site-font-sans);
+    font-size: clamp(50px, 6vw, 76px);
+    font-weight: 500;
+    letter-spacing: -0.06em;
+    line-height: 1.04;
+  }
+
+  header > p:not(.site-kicker) {
+    max-width: 650px;
+    color: var(--site-body);
+    font-size: 17px;
+    line-height: 1.75;
+  }
+
+  time {
+    color: var(--site-muted);
+    font-family: var(--site-font-mono);
+    font-size: 10px;
+  }
+
+  @media (max-width: 1160px) {
+    .docs-article-grid {
+      grid-template-columns: 200px minmax(0, 760px);
+    }
+  }
+
+  @media (max-width: 980px) {
+    .docs-article-grid {
+      grid-template-columns: 1fr;
+      padding-top: 92px;
+    }
+
+    article {
+      padding-top: 20px;
+    }
+  }
+</style>

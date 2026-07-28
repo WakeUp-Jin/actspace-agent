@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">ActSpace</title>
+  <desc id="desc">给模型一个真正能行动的空间</desc>
+  <rect width="1200" height="630" fill="#111512"/>
+  <path d="M0 470C220 382 378 542 614 453s356-32 586 34v143H0Z" fill="#1d2c26"/>
+  <circle cx="930" cy="155" r="108" fill="#dceee4" opacity=".14"/>
+  <g fill="#f0f2ec">
+    <rect x="100" y="126" width="24" height="24" rx="6"/>
+    <rect x="120" y="96" width="34" height="34" rx="11"/>
+    <circle cx="170" cy="78" r="22" fill="#53c58b"/>
+  </g>
+  <text x="100" y="245" fill="#f0f2ec" font-family="Avenir Next, PingFang SC, sans-serif" font-size="80" font-weight="600">ActSpace</text>
+  <text x="100" y="340" fill="#b6bbb2" font-family="Avenir Next, PingFang SC, sans-serif" font-size="42">给模型一个真正能行动的空间。</text>
+  <text x="100" y="530" fill="#828980" font-family="SFMono-Regular, monospace" font-size="22" letter-spacing="3">LOCAL-FIRST AGENT RUNTIME</text>
+</svg>

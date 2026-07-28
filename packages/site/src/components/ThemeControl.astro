@@ -1,0 +1,31 @@
+<label class="theme-control">
+  <span class="sr-only">颜色主题</span>
+  <select data-theme-control aria-label="颜色主题">
+    <option value="system">跟随系统</option>
+    <option value="light">浅色</option>
+    <option value="dark">深色</option>
+  </select>
+</label>
+
+<script>
+  import { initThemeControls } from "../scripts/theme";
+
+  initThemeControls();
+</script>
+
+<style>
+  .theme-control {
+    display: inline-flex;
+  }
+
+  select {
+    min-height: 40px;
+    border: 1px solid var(--site-line);
+    border-radius: 9px;
+    padding: 0 30px 0 12px;
+    color: var(--site-body);
+    background: var(--site-surface);
+    cursor: pointer;
+    font-size: 12px;
+  }
+</style>

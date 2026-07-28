@@ -1,0 +1,37 @@
+---
+import { sitePath } from "../lib/site-path";
+
+interface Props {
+  title: string;
+  description: string;
+  image?: string;
+  type?: "website" | "article";
+}
+
+const {
+  title,
+  description,
+  image = "/brand/og-default.svg",
+  type = "website",
+} = Astro.props;
+
+const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site) : Astro.url;
+const socialImage = image.startsWith("http")
+  ? image
+  : new URL(sitePath(image), Astro.site ?? Astro.url.origin).toString();
+---
+
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+<meta property="og:locale" content="zh_CN" />
+<meta property="og:type" content={type} />
+<meta property="og:site_name" content="ActSpace" />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={socialImage} />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={socialImage} />
+<title>{title}</title>

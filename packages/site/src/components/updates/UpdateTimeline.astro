@@ -1,0 +1,275 @@
+---
+import type { ReleaseMonth } from "../../lib/releases/model";
+
+interface Props {
+  months: ReleaseMonth[];
+  compact?: boolean;
+}
+
+const { months, compact = false } = Astro.props;
+const formatMonth = (value: string) => {
+  const [year, month] = value.split("-");
+  return `${year} 年 ${Number(month)} 月`;
+};
+const formatDay = (value: string) => {
+  const [, month, day] = value.split("-");
+  return `${Number(month)} 月 ${Number(day)} 日`;
+};
+---
+
+<div class:list={["update-layout", { "update-layout--compact": compact }] }>
+  {!compact && (
+    <nav class="month-nav" aria-label="更新月份">
+      <p>时间线</p>
+      <ol>
+        {months.map(({ month }, index) => (
+          <li><a class:list={{ active: index === 0 }} href={`#month-${month}`}>{formatMonth(month)}</a></li>
+        ))}
+      </ol>
+    </nav>
+  )}
+
+  <div class="month-list">
+    {months.map(({ month, entries }) => (
+      <section class="release-month" id={`month-${month}`} aria-labelledby={`month-${month}-title`}>
+        <header>
+          <p>{month}</p>
+          <h2 id={`month-${month}-title`}>{formatMonth(month)}</h2>
+        </header>
+
+        <ol class="release-list">
+          {entries.map((entry) => (
+            <li class="release-entry" id={entry.anchor}>
+              <div class="release-marker" aria-hidden="true"></div>
+              <article>
+                <div class="release-meta">
+                  <time datetime={entry.date}>{formatDay(entry.date)}</time>
+                  <span>{entry.area}</span>
+                </div>
+                <h3 set:html={entry.userValueHtml}></h3>
+                {!compact && (
+                  <details>
+                    <summary>技术摘要</summary>
+                    <p set:html={entry.summaryHtml}></p>
+                  </details>
+                )}
+              </article>
+            </li>
+          ))}
+        </ol>
+      </section>
+    ))}
+  </div>
+</div>
+
+<style>
+  .update-layout {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: clamp(44px, 8vw, 120px);
+  }
+
+  .month-nav {
+    position: sticky;
+    top: 112px;
+    align-self: start;
+  }
+
+  .month-nav > p {
+    margin-bottom: 18px;
+    color: var(--site-muted);
+    font-family: var(--site-font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .month-nav ol,
+  .release-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .month-nav a {
+    display: block;
+    border-left: 1px solid var(--site-line);
+    padding: 9px 0 9px 18px;
+    color: var(--site-muted);
+    text-decoration: none;
+    font-size: 14px;
+  }
+
+  .month-nav a:hover,
+  .month-nav a.active {
+    border-color: var(--site-ink);
+    color: var(--site-ink);
+  }
+
+  .month-list {
+    min-width: 0;
+  }
+
+  .release-month {
+    scroll-margin-top: 112px;
+  }
+
+  .release-month + .release-month {
+    margin-top: clamp(72px, 9vw, 120px);
+  }
+
+  .release-month > header {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    align-items: end;
+    border-bottom: 1px solid var(--site-line-strong);
+    padding-bottom: 22px;
+  }
+
+  .release-month > header p {
+    margin: 0;
+    color: var(--site-muted);
+    font-family: var(--site-font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+
+  .release-month > header h2 {
+    margin: 0;
+    font-family: var(--site-font-serif);
+    font-size: clamp(34px, 4vw, 52px);
+    font-weight: 500;
+    letter-spacing: -0.045em;
+  }
+
+  .release-entry {
+    position: relative;
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    border-bottom: 1px solid var(--site-line);
+  }
+
+  .release-marker {
+    position: relative;
+    border-right: 1px solid var(--site-line);
+  }
+
+  .release-marker::after {
+    position: absolute;
+    top: 35px;
+    right: -4px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--site-ink);
+    content: "";
+  }
+
+  article {
+    padding: 30px 0 32px clamp(24px, 4vw, 52px);
+  }
+
+  .release-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 14px;
+    color: var(--site-muted);
+    font-family: var(--site-font-mono);
+    font-size: 11px;
+  }
+
+  .release-meta span {
+    border: 1px solid var(--site-line);
+    border-radius: 999px;
+    padding: 4px 8px;
+  }
+
+  h3 {
+    max-width: 800px;
+    margin: 0;
+    font-size: clamp(20px, 2.3vw, 28px);
+    font-weight: 550;
+    letter-spacing: -0.025em;
+    line-height: 1.45;
+  }
+
+  details {
+    max-width: 800px;
+    margin-top: 18px;
+  }
+
+  summary {
+    width: fit-content;
+    color: var(--site-body);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  details p {
+    margin: 14px 0 0;
+    color: var(--site-body);
+    font-size: 14px;
+    line-height: 1.75;
+  }
+
+  .update-layout--compact {
+    display: block;
+  }
+
+  .update-layout--compact .release-month > header {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+
+  .update-layout--compact .release-entry {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+
+  .update-layout--compact .release-month + .release-month {
+    margin-top: 52px;
+  }
+
+  @media (max-width: 760px) {
+    .update-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .month-nav {
+      position: static;
+      overflow-x: auto;
+    }
+
+    .month-nav ol {
+      display: flex;
+    }
+
+    .month-nav a {
+      border-bottom: 1px solid var(--site-line);
+      border-left: 0;
+      padding: 9px 18px 12px 0;
+      white-space: nowrap;
+    }
+
+    .release-month > header,
+    .release-entry,
+    .update-layout--compact .release-month > header,
+    .update-layout--compact .release-entry {
+      grid-template-columns: 1fr;
+    }
+
+    .release-month > header p {
+      margin-bottom: 8px;
+    }
+
+    .release-marker {
+      display: none;
+    }
+
+    article {
+      padding-left: 0;
+    }
+  }
+</style>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Context as an interface</title>
+  <desc id="desc">抽象的窗口、轨道和节点组成一个可观察的 Agent 上下文界面</desc>
+  <rect width="1200" height="720" fill="#dceee4"/>
+  <path d="M0 552C180 468 332 500 484 416C637 332 726 224 944 210C1044 204 1127 226 1200 256V720H0Z" fill="#b9d9c5"/>
+  <circle cx="966" cy="150" r="62" fill="#fffefa"/>
+  <rect x="164" y="128" width="700" height="440" rx="22" fill="#fffefa" stroke="#1b1c19" stroke-width="4"/>
+  <rect x="208" y="176" width="612" height="64" rx="10" fill="#1b1c19"/>
+  <circle cx="246" cy="208" r="8" fill="#53c58b"/>
+  <circle cx="274" cy="208" r="8" fill="#fffefa" opacity=".46"/>
+  <circle cx="302" cy="208" r="8" fill="#fffefa" opacity=".46"/>
+  <g fill="none" stroke="#1b1c19" stroke-width="4">
+    <path d="M252 306H756"/>
+    <path d="M252 386H756"/>
+    <path d="M252 466H756"/>
+  </g>
+  <g fill="#2b9a68">
+    <circle cx="306" cy="306" r="16"/>
+    <circle cx="502" cy="386" r="16"/>
+    <circle cx="694" cy="466" r="16"/>
+  </g>
+  <path d="M306 306C388 306 408 386 502 386S596 466 694 466" fill="none" stroke="#2b9a68" stroke-width="9" stroke-linecap="round"/>
+  <rect x="908" y="346" width="168" height="126" rx="18" fill="#1b1c19"/>
+  <path d="M952 388H1034M952 416H1014M952 444H1040" stroke="#fffefa" stroke-width="8" stroke-linecap="round"/>
+  <text x="164" y="642" fill="#1b1c19" font-family="Arial, sans-serif" font-size="34" font-weight="700" letter-spacing="2">ACTSPACE / CONTEXT 01</text>
+</svg>

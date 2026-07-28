@@ -1,0 +1,316 @@
+---
+import heroImage from "../../assets/hero/cloud-expanse.png";
+import homeScreenshot from "../../assets/screenshots/workbench-home.png";
+import { sitePath } from "../../lib/site-path";
+---
+
+<section class="hero" aria-labelledby="hero-title">
+  <img
+    class="hero-media"
+    src={heroImage.src}
+    width={heroImage.width}
+    height={heroImage.height}
+    alt=""
+    loading="eager"
+    fetchpriority="high"
+  />
+  <div class="hero-overlay" aria-hidden="true"></div>
+
+  <div class="site-page hero-content">
+    <p class="hero-eyebrow hero-enter"><span></span>Local-first agent runtime</p>
+    <h1 id="hero-title" class="hero-enter">给模型一个真正<br />能行动的空间。</h1>
+    <p class="hero-lede hero-enter">
+      ActSpace 是一个本地优先的 Agent 桌面应用与 Harness。看见上下文、控制执行，
+      让模型在真实工具和权限边界中完成工作。
+    </p>
+    <div class="hero-actions hero-enter">
+      <a class="hero-button hero-button--primary" href={sitePath("/docs/getting-started/")}>探索 ActSpace</a>
+      <a class="hero-button" href="https://github.com/WakeUp-Jin/actspace-agent" target="_blank" rel="noreferrer noopener">
+        查看源代码 <span aria-hidden="true">↗</span>
+      </a>
+    </div>
+    <nav class="capability-line hero-enter" aria-label="ActSpace 核心能力">
+      <a href={sitePath("/docs/context/")}>Context</a>
+      <a href={sitePath("/docs/tools-and-approvals/")}>Tools</a>
+      <a href={sitePath("/docs/browser/")}>Browser</a>
+      <a href={sitePath("/docs/skills/")}>Skills</a>
+      <a href={sitePath("/docs/kairos/")}>Kairos</a>
+    </nav>
+  </div>
+
+  <div class="site-page hero-window hero-enter" aria-label="ActSpace 桌面工作台预览">
+    <div class="window-bar" aria-hidden="true">
+      <span></span><span></span><span></span>
+      <small>ActSpace · Local workspace</small>
+    </div>
+    <img
+      src={homeScreenshot.src}
+      width={homeScreenshot.width}
+      height={homeScreenshot.height}
+      alt="ActSpace 桌面工作台，左侧为工作区与会话，中间展示 Agent 执行过程"
+      loading="eager"
+    />
+  </div>
+</section>
+
+<style>
+  .hero {
+    position: relative;
+    min-height: clamp(1120px, 112vw, 1580px);
+    overflow: hidden;
+    color: var(--site-hero-ink);
+    background: var(--site-canvas-soft);
+    isolation: isolate;
+  }
+
+  .hero-media {
+    position: absolute;
+    z-index: -4;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .hero-media {
+    object-fit: cover;
+    object-position: 50% 50%;
+    filter: saturate(0.78) contrast(1.04) brightness(0.86);
+    transform: scale(1.015);
+  }
+
+  .hero-overlay {
+    position: absolute;
+    z-index: -3;
+    inset: 0;
+    background:
+      linear-gradient(180deg, var(--site-hero-overlay-top), var(--site-hero-overlay-middle) 46%, var(--site-hero-overlay-bottom)),
+      radial-gradient(circle at 50% 24%, transparent 0, var(--site-overlay) 120%);
+  }
+
+  .hero-content {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    padding-top: clamp(132px, 13vw, 190px);
+    text-align: center;
+  }
+
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 26px;
+    color: var(--site-hero-muted);
+    font-family: var(--site-font-mono);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .hero-eyebrow span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--site-operational);
+    box-shadow: 0 0 0 6px var(--site-hero-glow);
+  }
+
+  h1 {
+    max-width: 1040px;
+    margin-bottom: 28px;
+    font-size: clamp(66px, 8vw, 108px);
+    font-weight: 520;
+    letter-spacing: -0.075em;
+    line-height: 0.94;
+  }
+
+  .hero-lede {
+    max-width: 720px;
+    margin-bottom: 34px;
+    color: var(--site-hero-muted);
+    font-size: clamp(16px, 1.5vw, 20px);
+    line-height: 1.75;
+  }
+
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .hero-button {
+    display: inline-flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px solid var(--site-hero-line);
+    border-radius: 10px;
+    padding: 0 20px;
+    color: var(--site-hero-ink);
+    background: var(--site-hero-surface);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 650;
+    backdrop-filter: blur(12px);
+    transition: transform 180ms ease, background-color 180ms ease;
+  }
+
+  .hero-button:hover {
+    background: var(--site-hero-surface-strong);
+    transform: translateY(-1px);
+  }
+
+  .hero-button--primary {
+    border-color: var(--site-hero-ink);
+    color: var(--site-hero-on-primary);
+    background: var(--site-hero-ink);
+  }
+
+  .hero-button--primary:hover {
+    background: var(--site-hero-ink);
+  }
+
+  .capability-line {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 22px;
+    margin-top: 34px;
+    color: var(--site-hero-muted);
+    font-family: var(--site-font-mono);
+    font-size: 11px;
+  }
+
+  .capability-line a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .capability-line a:hover {
+    color: var(--site-hero-ink);
+  }
+
+  .hero-window {
+    position: absolute;
+    bottom: clamp(76px, 7vw, 112px);
+    left: 50%;
+    width: min(86vw, 1380px);
+    border: 1px solid var(--site-hero-line);
+    border-radius: 17px;
+    padding: 7px;
+    background: var(--site-hero-surface);
+    box-shadow: 0 32px 100px var(--site-overlay);
+    transform: translateX(-50%);
+    backdrop-filter: blur(16px);
+  }
+
+  .hero-window :global(img) {
+    width: 100%;
+  }
+
+  .hero-window :global(img) {
+    aspect-ratio: 16 / 9.5;
+    border-radius: 10px;
+    object-fit: cover;
+    object-position: top center;
+  }
+
+  .window-bar {
+    display: flex;
+    min-height: 32px;
+    align-items: center;
+    gap: 6px;
+    padding-inline: 8px;
+  }
+
+  .window-bar span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--site-hero-line);
+  }
+
+  .window-bar small {
+    margin-left: 8px;
+    color: var(--site-hero-muted);
+    font-family: var(--site-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+  }
+
+  .js .hero-enter {
+    animation: hero-enter 650ms both cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .js .hero-enter:nth-child(2) { animation-delay: 70ms; }
+  .js .hero-enter:nth-child(3) { animation-delay: 140ms; }
+  .js .hero-enter:nth-child(4) { animation-delay: 210ms; }
+  .js .hero-enter:nth-child(5) { animation-delay: 280ms; }
+
+  @keyframes hero-enter {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+  }
+
+  @media (max-width: 1100px) {
+    .hero {
+      min-height: 1280px;
+    }
+
+    .hero-window {
+      width: calc(100vw - 34px);
+      bottom: 80px;
+    }
+  }
+
+  @media (max-width: 620px) {
+    .hero {
+      min-height: 1080px;
+    }
+
+    .hero-content {
+      padding-top: 116px;
+    }
+
+    h1 {
+      font-size: clamp(48px, 14vw, 64px);
+      line-height: 0.98;
+    }
+
+    .hero-lede {
+      font-size: 15px;
+    }
+
+    .hero-actions {
+      width: 100%;
+      flex-direction: column;
+    }
+
+    .hero-button {
+      width: min(100%, 300px);
+    }
+
+    .capability-line {
+      max-width: 340px;
+    }
+
+    .hero-window {
+      width: calc(100vw - 18px);
+      bottom: 54px;
+      border-radius: 12px;
+      padding: 4px;
+    }
+
+    .window-bar {
+      min-height: 27px;
+    }
+
+    .hero-window :global(img) {
+      border-radius: 8px;
+    }
+  }
+</style>

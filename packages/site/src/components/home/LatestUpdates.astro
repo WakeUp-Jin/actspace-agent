@@ -1,0 +1,62 @@
+---
+import UpdateTimeline from "../updates/UpdateTimeline.astro";
+import { groupReleaseNotes, loadReleaseNotes } from "../../lib/releases/parse-release-notes";
+import { sitePath } from "../../lib/site-path";
+
+const latest = (await loadReleaseNotes()).slice(0, 3);
+const months = groupReleaseNotes(latest);
+---
+
+<section class="latest-updates site-section" aria-labelledby="latest-updates-title">
+  <div class="site-page">
+    <div class="section-heading">
+      <div>
+        <p class="site-kicker">What changed</p>
+        <h2 id="latest-updates-title">每一次更新，都说清楚用户得到了什么。</h2>
+      </div>
+      <a href={sitePath("/updates/")}>查看完整更新 <span aria-hidden="true">→</span></a>
+    </div>
+    <UpdateTimeline {months} compact />
+  </div>
+</section>
+
+<style>
+  .latest-updates {
+    background: var(--site-canvas-soft);
+  }
+
+  .section-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 32px;
+    align-items: end;
+    margin-bottom: clamp(48px, 7vw, 86px);
+  }
+
+  h2 {
+    max-width: 850px;
+    margin: 26px 0 0;
+    font-size: clamp(42px, 5vw, 70px);
+    font-weight: 520;
+    letter-spacing: -0.06em;
+    line-height: 1.05;
+  }
+
+  .section-heading > a {
+    padding-bottom: 8px;
+    color: var(--site-body);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 650;
+  }
+
+  .section-heading > a:hover {
+    color: var(--site-ink);
+  }
+
+  @media (max-width: 720px) {
+    .section-heading {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

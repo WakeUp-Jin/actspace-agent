@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="ActSpace">
+  <rect width="64" height="64" rx="14" fill="#111512"/>
+  <rect x="12" y="40" width="11" height="11" rx="3" fill="#f0f2ec"/>
+  <rect x="22" y="27" width="15" height="15" rx="5" fill="#f0f2ec"/>
+  <circle cx="45" cy="18" r="10" fill="#53c58b"/>
+</svg>

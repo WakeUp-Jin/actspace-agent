@@ -1,0 +1,268 @@
+---
+import { sitePath } from "../lib/site-path";
+import ThemeControl from "./ThemeControl.astro";
+
+interface Props {
+  hero?: boolean;
+}
+
+const { hero = false } = Astro.props;
+const currentPath = Astro.url.pathname;
+const navigation = [
+  { href: "/docs/", label: "文档" },
+  { href: "/blog/", label: "博客" },
+  { href: "/updates/", label: "更新" },
+];
+---
+
+<header class:list={["site-header", { "site-header--hero": hero }]} data-site-header data-hero={hero}>
+  <div class="site-page header-inner">
+    <a class="brand" href={sitePath("/")} aria-label="ActSpace 首页">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>ActSpace</span>
+    </a>
+
+    <nav class="desktop-nav" aria-label="主要导航">
+      {navigation.map((item) => (
+        <a
+          href={sitePath(item.href)}
+          aria-current={currentPath.includes(item.href) ? "page" : undefined}
+        >
+          {item.label}
+        </a>
+      ))}
+    </nav>
+
+    <div class="desktop-actions">
+      <ThemeControl />
+      <a class="github-link" href="https://github.com/WakeUp-Jin/actspace-agent" target="_blank" rel="noreferrer noopener">
+        GitHub <span aria-hidden="true">↗</span>
+      </a>
+      <a class="start-link" href={sitePath("/docs/getting-started/")}>开始使用</a>
+    </div>
+
+    <details class="mobile-nav">
+      <summary>菜单</summary>
+      <div class="mobile-panel">
+        <nav aria-label="移动端导航">
+          {navigation.map((item) => <a href={sitePath(item.href)}>{item.label}</a>)}
+          <a href="https://github.com/WakeUp-Jin/actspace-agent" target="_blank" rel="noreferrer noopener">GitHub ↗</a>
+        </nav>
+        <ThemeControl />
+      </div>
+    </details>
+  </div>
+</header>
+
+<script>
+  import { initSiteHeader } from "../scripts/site-header";
+
+  initSiteHeader();
+</script>
+
+<style>
+  .site-header {
+    position: sticky;
+    z-index: 80;
+    top: 0;
+    border-bottom: 1px solid var(--site-line);
+    color: var(--site-ink);
+    background: var(--site-backdrop);
+    backdrop-filter: blur(18px) saturate(1.1);
+  }
+
+  .site-header--hero {
+    position: fixed;
+    width: 100%;
+    border-color: transparent;
+    color: var(--site-hero-ink);
+    background: transparent;
+    backdrop-filter: none;
+    transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, backdrop-filter 180ms ease;
+  }
+
+  .site-header--hero.is-scrolled {
+    border-color: var(--site-line);
+    color: var(--site-ink);
+    background: var(--site-backdrop);
+    backdrop-filter: blur(18px) saturate(1.1);
+  }
+
+  .header-inner {
+    display: grid;
+    min-height: 72px;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .brand {
+    display: inline-flex;
+    width: max-content;
+    align-items: center;
+    gap: 10px;
+    color: inherit;
+    text-decoration: none;
+    font-size: 18px;
+    font-weight: 680;
+    letter-spacing: -0.03em;
+  }
+
+  .brand-mark {
+    position: relative;
+    width: 23px;
+    height: 23px;
+  }
+
+  .brand-mark i {
+    position: absolute;
+    display: block;
+    background: currentColor;
+  }
+
+  .brand-mark i:nth-child(1) {
+    bottom: 0;
+    left: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+  }
+
+  .brand-mark i:nth-child(2) {
+    bottom: 7px;
+    left: 6px;
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+  }
+
+  .brand-mark i:nth-child(3) {
+    top: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .desktop-nav,
+  .desktop-actions {
+    display: flex;
+    align-items: center;
+  }
+
+  .desktop-nav {
+    gap: 28px;
+  }
+
+  .desktop-nav a,
+  .github-link {
+    color: inherit;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 590;
+    opacity: 0.76;
+  }
+
+  .desktop-nav a:hover,
+  .desktop-nav a[aria-current="page"],
+  .github-link:hover {
+    opacity: 1;
+  }
+
+  .desktop-actions {
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  .start-link {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    border: 1px solid currentColor;
+    border-radius: 9px;
+    padding: 0 14px;
+    color: inherit;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  .is-scrolled .start-link,
+  .site-header:not(.site-header--hero) .start-link {
+    border-color: var(--site-action);
+    color: var(--site-on-action);
+    background: var(--site-action);
+  }
+
+  .mobile-nav {
+    display: none;
+    justify-self: end;
+  }
+
+  .mobile-nav summary {
+    min-width: 44px;
+    min-height: 44px;
+    cursor: pointer;
+    align-content: center;
+    list-style: none;
+    text-align: center;
+    font-size: 13px;
+  }
+
+  .mobile-nav summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mobile-panel {
+    position: absolute;
+    top: calc(100% + 1px);
+    right: 16px;
+    left: 16px;
+    display: grid;
+    gap: 20px;
+    border: 1px solid var(--site-line);
+    border-radius: 14px;
+    padding: 18px;
+    color: var(--site-ink);
+    background: var(--site-surface);
+    box-shadow: 0 18px 42px var(--site-shadow);
+  }
+
+  .mobile-panel nav {
+    display: grid;
+  }
+
+  .mobile-panel nav a {
+    min-height: 44px;
+    align-content: center;
+    border-bottom: 1px solid var(--site-line);
+    text-decoration: none;
+  }
+
+  @media (max-width: 920px) {
+    .header-inner {
+      grid-template-columns: 1fr auto auto;
+    }
+
+    .desktop-nav,
+    .desktop-actions :global(.theme-control),
+    .github-link {
+      display: none;
+    }
+
+    .mobile-nav {
+      display: block;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .header-inner {
+      min-height: 64px;
+    }
+
+    .start-link {
+      min-height: 38px;
+      padding-inline: 11px;
+    }
+  }
+</style>

@@ -1,5 +1,5 @@
 ---
-status: target-design
+status: implemented-v1
 owner: packages/site
 product: ActSpace Website
 visual_direction: Cloudfield & Ink
@@ -10,7 +10,7 @@ last_updated: 2026-07-27
 
 ## 1. 文档定位
 
-本文档定义 ActSpace 对外网站的长期产品、内容、视觉和交付边界。目标工程位于 `packages/site`，但本文档本身不代表该工程已经创建或完成。
+本文档定义 ActSpace 对外网站的长期产品、内容、视觉和交付边界。首版工程已在 `packages/site` 落地；后续迭代继续以本文档作为事实与取舍入口。
 
 网站包含四个主要产品面：
 
@@ -791,8 +791,8 @@ Dark 起点：
 
 - 原始 Hero 资产进入 `packages/site/public/hero` 或由构建脚本从明确源文件生成。
 - 不引用 Downloads、临时目录或个人路径。
-- 保留一份高质量母版，并生成 AVIF / WebP 响应式版本和必要 fallback。
-- 使用 `<picture>`、明确尺寸和合理 preload，降低 LCP 与布局跳动。
+- 保留一份高质量母版。首版按用户决定直接使用带固有尺寸的 PNG，不引入 Sharp；AVIF / WebP 响应式转换在真实部署性能测量后作为独立优化接入。
+- 首屏图片明确尺寸并合理 preload，降低 LCP 与布局跳动；引入响应式衍生图后再切换为 `<picture>`。
 - 默认禁止在 CSS 中内嵌超大 base64 Hero。
 
 ### 14.2 产品截图
@@ -962,6 +962,8 @@ deploy GitHub Pages
 - 更新页从 `docs/releases/feature-release-notes.md` 构建时生成。
 - 公开文档和内部仓库文档保持明确边界。
 - 首版优先静态生成并通过 GitHub Actions 部署到 GitHub Pages。
+- GitHub Pages 构建从 monorepo 根目录执行，复用根 `pnpm-lock.yaml`，输出目录指向 `packages/site/dist`；这是 Astro 官方 Action 在 pnpm workspace 下的实际配置边界。
+- 首版产品展示使用通过脱敏检查的 Context、Tools、Kairos、Usage 与 Review 截图；仓库暂时没有可公开的 Browser 实机截图，不用不相关图片伪装该能力。
 - 实现前另写 execution plan，不在本设计文档中维护逐步施工流水账。
 
 ## 23. 维护规则

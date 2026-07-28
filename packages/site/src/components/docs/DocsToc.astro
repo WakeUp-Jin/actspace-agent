@@ -1,0 +1,74 @@
+---
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  headings: Heading[];
+}
+
+const { headings } = Astro.props;
+const visible = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+---
+
+{visible.length > 0 && (
+  <nav class="docs-toc" aria-label="本页内容">
+    <p>本页内容</p>
+    <ol>
+      {visible.map((heading) => (
+        <li class:list={{ nested: heading.depth === 3 }}>
+          <a href={`#${heading.slug}`}>{heading.text}</a>
+        </li>
+      ))}
+    </ol>
+  </nav>
+)}
+
+<style>
+  .docs-toc {
+    position: sticky;
+    top: 96px;
+    max-height: calc(100vh - 116px);
+    overflow-y: auto;
+    padding: 10px 0 30px 18px;
+  }
+
+  p {
+    margin-bottom: 14px;
+    color: var(--site-ink);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  ol {
+    margin: 0;
+    border-left: 1px solid var(--site-line);
+    padding: 0;
+    list-style: none;
+  }
+
+  li.nested a {
+    padding-left: 28px;
+  }
+
+  a {
+    display: block;
+    padding: 6px 0 6px 18px;
+    color: var(--site-muted);
+    text-decoration: none;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  a:hover {
+    color: var(--site-ink);
+  }
+
+  @media (max-width: 1160px) {
+    .docs-toc {
+      display: none;
+    }
+  }
+</style>

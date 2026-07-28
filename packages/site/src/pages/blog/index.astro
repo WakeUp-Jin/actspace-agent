@@ -1,0 +1,231 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { blogHref, getPublicPosts, readingTime } from "../../lib/blog";
+import { sitePath } from "../../lib/site-path";
+
+const posts = await getPublicPosts();
+const allTags = Array.from(new Set(posts.flatMap((post) => post.data.tags)));
+---
+
+<BaseLayout title="ActSpace 博客" description="关于 Agent、工具、上下文与产品设计的思考。">
+  <main id="main-content">
+    <header class="blog-hero site-page">
+      <p class="site-kicker">Ideas from the runtime</p>
+      <h1>关于 Agent，写下那些值得反复推敲的部分。</h1>
+      <p>Context、工具、权限、产品设计与真实开发过程。不是公告的延长版，而是把取舍讲清楚。</p>
+    </header>
+
+    <section class="blog-browser site-page" aria-labelledby="all-posts-title">
+      <aside>
+        <p>浏览主题</p>
+        <a href="#all-posts">全部文章 <span>{posts.length}</span></a>
+        {allTags.map((tag) => <a href={`#tag-${tag.toLowerCase().replace(/\s+/g, "-")}`}>{tag}</a>)}
+      </aside>
+
+      <div id="all-posts">
+        <div class="posts-heading">
+          <h2 id="all-posts-title">全部文章</h2>
+          <p>{posts.length} 篇</p>
+        </div>
+        <div class="post-grid">
+          {posts.map((post) => (
+            <article>
+              <a class="cover" href={sitePath(blogHref(post))}>
+                <img src={sitePath(post.data.cover)} alt="" />
+              </a>
+              <div class="post-copy">
+                <div class="meta">
+                  <time datetime={post.data.publishedAt.toISOString()}>{post.data.publishedAt.toLocaleDateString("zh-CN")}</time>
+                  <span>{readingTime(post.body ?? "")} 分钟阅读</span>
+                </div>
+                <h3><a href={sitePath(blogHref(post))}>{post.data.title}</a></h3>
+                <p>{post.data.description}</p>
+                <div class="tags">
+                  {post.data.tags.map((tag) => <span id={`tag-${tag.toLowerCase().replace(/\s+/g, "-")}`}>{tag}</span>)}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  </main>
+</BaseLayout>
+
+<style>
+  .blog-hero {
+    padding-block: clamp(140px, 17vw, 250px) clamp(76px, 10vw, 130px);
+  }
+
+  h1 {
+    max-width: 1050px;
+    margin-block: 26px;
+    font-family: var(--site-font-serif);
+    font-size: clamp(60px, 8.5vw, 118px);
+    font-weight: 500;
+    letter-spacing: -0.075em;
+    line-height: 0.98;
+  }
+
+  .blog-hero > p:last-child {
+    max-width: 700px;
+    color: var(--site-body);
+    font-size: 18px;
+    line-height: 1.8;
+  }
+
+  .blog-browser {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: clamp(46px, 7vw, 100px);
+    padding-bottom: clamp(110px, 15vw, 190px);
+  }
+
+  aside {
+    position: sticky;
+    top: 110px;
+    align-self: start;
+    display: grid;
+  }
+
+  aside > p {
+    border-bottom: 1px solid var(--site-line-strong);
+    margin: 0 0 9px;
+    padding-bottom: 14px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  aside a {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--site-line);
+    padding-block: 12px;
+    color: var(--site-body);
+    text-decoration: none;
+    font-size: 12px;
+  }
+
+  aside a:hover {
+    color: var(--site-ink);
+  }
+
+  .posts-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--site-line-strong);
+    margin-bottom: 28px;
+    padding-bottom: 16px;
+  }
+
+  .posts-heading h2,
+  .posts-heading p {
+    margin: 0;
+  }
+
+  .posts-heading h2 {
+    font-size: 18px;
+  }
+
+  .posts-heading p {
+    color: var(--site-muted);
+    font-family: var(--site-font-mono);
+    font-size: 10px;
+  }
+
+  .post-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 30px 22px;
+  }
+
+  article {
+    overflow: hidden;
+    border: 1px solid var(--site-line);
+    border-radius: 18px;
+    background: var(--site-surface);
+  }
+
+  .cover {
+    display: block;
+    overflow: hidden;
+    aspect-ratio: 5 / 3;
+    background: var(--site-operational-soft);
+  }
+
+  .cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 320ms ease;
+  }
+
+  article:hover .cover img {
+    transform: scale(1.015);
+  }
+
+  .post-copy {
+    min-height: 320px;
+    padding: clamp(24px, 3vw, 38px);
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    color: var(--site-muted);
+    font-family: var(--site-font-mono);
+    font-size: 10px;
+  }
+
+  h3 {
+    margin: 30px 0 16px;
+    font-family: var(--site-font-serif);
+    font-size: clamp(28px, 3vw, 38px);
+    font-weight: 500;
+    letter-spacing: -0.04em;
+    line-height: 1.08;
+  }
+
+  h3 a {
+    text-decoration: none;
+  }
+
+  .post-copy > p {
+    color: var(--site-body);
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 30px;
+  }
+
+  .tags span {
+    border: 1px solid var(--site-line);
+    border-radius: 999px;
+    padding: 5px 9px;
+    color: var(--site-muted);
+    font-size: 10px;
+  }
+
+  @media (max-width: 900px) {
+    .blog-browser {
+      grid-template-columns: 1fr;
+    }
+
+    aside {
+      position: static;
+    }
+  }
+
+  @media (max-width: 680px) {
+    .post-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

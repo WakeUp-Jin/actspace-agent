@@ -1,0 +1,148 @@
+.docs-prose {
+  min-width: 0;
+  color: var(--site-body);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.docs-prose > :first-child {
+  margin-top: 0;
+}
+
+.docs-prose h2,
+.docs-prose h3 {
+  scroll-margin-top: 104px;
+  color: var(--site-ink);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.docs-prose h2 {
+  margin: 58px 0 20px;
+  font-family: var(--site-font-sans);
+  font-size: 34px;
+}
+
+.docs-prose h3 {
+  margin: 38px 0 14px;
+  font-size: 22px;
+}
+
+.docs-prose p,
+.docs-prose ul,
+.docs-prose ol,
+.docs-prose blockquote {
+  margin-bottom: 22px;
+}
+
+.docs-prose li + li {
+  margin-top: 8px;
+}
+
+.docs-prose strong {
+  color: var(--site-ink);
+}
+
+.docs-prose a {
+  color: var(--site-ink);
+  text-decoration-color: var(--site-line-strong);
+  text-underline-offset: 3px;
+}
+
+.docs-prose code:not(pre code) {
+  border: 1px solid var(--site-line);
+  border-radius: 5px;
+  padding: 0.12em 0.35em;
+  color: var(--site-ink);
+  background: var(--site-canvas-soft);
+  font-family: var(--site-font-mono);
+  font-size: 0.88em;
+}
+
+.docs-prose pre {
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid var(--site-line);
+  border-radius: 12px;
+  padding: 42px 22px 22px;
+  background: var(--site-canvas-soft) !important;
+  box-shadow: 0 10px 32px var(--site-shadow);
+}
+
+.docs-prose pre code {
+  font-family: var(--site-font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+html[data-theme="dark"] .docs-prose .astro-code,
+html[data-theme="dark"] .docs-prose .astro-code span {
+  color: var(--shiki-dark) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+  text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]):not([data-theme="dark"]) .docs-prose .astro-code,
+  html:not([data-theme="light"]):not([data-theme="dark"]) .docs-prose .astro-code span,
+  html[data-theme="system"] .docs-prose .astro-code,
+  html[data-theme="system"] .docs-prose .astro-code span {
+    color: var(--shiki-dark) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+}
+
+.docs-prose .docs-copy-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: 1px solid var(--site-line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: var(--site-body);
+  background: var(--site-surface);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.docs-prose .docs-code-language {
+  position: absolute;
+  top: 14px;
+  left: 22px;
+  color: var(--site-muted);
+  font-family: var(--site-font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.docs-prose blockquote {
+  margin-inline: 0;
+  border-left: 3px solid var(--site-operational);
+  padding: 10px 0 10px 20px;
+  color: var(--site-body);
+}
+
+.docs-prose table {
+  width: 100%;
+  margin-block: 26px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.docs-prose th,
+.docs-prose td {
+  border-bottom: 1px solid var(--site-line);
+  padding: 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.docs-prose th {
+  color: var(--site-ink);
+  font-weight: 700;
+}

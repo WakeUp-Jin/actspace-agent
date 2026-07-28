@@ -9,6 +9,7 @@
 - `packages/desktop`：Electron main、preload、renderer 所在的桌面端应用。
 - `packages/agent-core`：Agent 运行层、模型接入、上下文、工具与执行循环。
 - `packages/shared`：IPC contracts、session schema、跨进程共享类型。
+- `packages/site`：Astro 静态官网、公开文档、博客与从 release 文档生成的更新页。
 - `plugins/browser-bridge`：Browser Use Go bridge CLI、Chrome Extension 和协议层。
 - `plugins/fs-watch`：文件监听 Rust 插件。
 - `infra/`：部署、基础设施和环境定义。
@@ -27,6 +28,11 @@
 - `packages/shared`
   - 只放跨进程共享契约和类型
   - 不依赖 `desktop` 或 `agent-core`
+
+- `packages/site`
+  - 独立消费公开 Markdown 与脱敏后的静态资产
+  - 构建时只读根目录 `docs/releases/feature-release-notes.md` 生成更新页
+  - 不依赖桌面端运行时、用户数据、密钥或 Electron 构建产物
 
 - `plugins/browser-bridge`
   - 独立 Go 模块，不参与 pnpm workspace
