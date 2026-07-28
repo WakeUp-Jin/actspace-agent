@@ -51,6 +51,8 @@ export interface LLMConfig {
   temperature?: number;
   maxTokens?: number;
   maxRetries?: number;
+  /** Stable, non-sensitive bucket key for provider prompt-cache routing. */
+  promptCacheKey?: string;
   transport?: LLMTransportConfig;
   defaultHeaders?: Record<string, string>;
 }

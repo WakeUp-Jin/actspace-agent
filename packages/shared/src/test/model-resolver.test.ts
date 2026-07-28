@@ -31,7 +31,7 @@ function makeSnapshot(): ModelSnapshot {
         hasApiKey: true,
         lastConnection: { status: "available", checkedAt: now },
       },
-      duckding: {
+      duckcoding: {
         enabled: true,
         hasApiKey: false,
         lastConnection: { status: "untested" },
@@ -190,8 +190,8 @@ describe("model resolver", () => {
   it("uses an explicitly bound extra credential without requiring the default Key", () => {
     const snapshot = makeSnapshot();
     const definition = dynamicModel({
-      key: "duckding:grok-4.5",
-      provider: "duckding",
+      key: "duckcoding:grok-4.5",
+      provider: "duckcoding",
       apiModel: "grok-4.5",
       source: "custom",
       capabilities: {
@@ -207,7 +207,7 @@ describe("model resolver", () => {
       addedAt: now,
       credentialId: "sale",
     };
-    snapshot.providers.duckding.additionalCredentials = {
+    snapshot.providers.duckcoding.additionalCredentials = {
       sale: { hasApiKey: true, lastConnection: { status: "available", checkedAt: now } },
     };
 
@@ -216,10 +216,10 @@ describe("model resolver", () => {
 
   it("does not silently fall back when a bound credential is missing or unavailable", () => {
     const snapshot = makeSnapshot();
-    snapshot.providers.duckding.hasApiKey = true;
+    snapshot.providers.duckcoding.hasApiKey = true;
     const definition = dynamicModel({
-      key: "duckding:grok-4.5",
-      provider: "duckding",
+      key: "duckcoding:grok-4.5",
+      provider: "duckcoding",
       apiModel: "grok-4.5",
       source: "custom",
     });
@@ -235,7 +235,7 @@ describe("model resolver", () => {
       reason: "credential_missing",
     });
 
-    snapshot.providers.duckding.additionalCredentials = {
+    snapshot.providers.duckcoding.additionalCredentials = {
       missing: {
         hasApiKey: true,
         lastConnection: { status: "unavailable", checkedAt: now },

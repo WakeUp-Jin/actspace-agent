@@ -11,13 +11,13 @@ export type ModelId = LegacyModelId;
 export type ModelKey = `${ProviderId}:${string}`;
 export type ModelSelectionId = ModelKey | LegacyModelId;
 
-export type ModelApi = "openai-completions" | "anthropic-messages";
+export type ModelApi = "openai-completions" | "openai-responses" | "anthropic-messages";
 export type ModelProvider = Extract<ProviderId, "deepseek" | "kimi">;
 export type ModelInputKind = "text" | "image";
 export type ModelVisibility = "public" | "internal";
 export type ModelSource = "builtin" | "curated" | "provider-catalog" | "custom";
 export type ModelToolUseCapability = "verified" | "declared" | "unsupported" | "unknown";
-export const MODEL_REASONING_EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export const MODEL_REASONING_EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max", "ultra"] as const;
 export type ModelReasoningEffort = (typeof MODEL_REASONING_EFFORTS)[number];
 
 export type ModelPricing = {
@@ -27,13 +27,6 @@ export type ModelPricing = {
   inputCacheWritePerMillion?: number;
   outputPerMillion: number;
   reasoningPerMillion?: number;
-};
-
-export type ModelMetadataReference = {
-  source: "models.dev" | "openrouter";
-  provider: string;
-  modelId: string;
-  fetchedAt: string;
 };
 
 export interface ModelSpec {
@@ -77,9 +70,12 @@ export interface ModelDefinition {
   maxTokens: number | null;
   thinkingDefault: boolean;
   capabilities: ModelCapabilities;
+  /** Optional provider-specific model names used when reasoning effort is encoded in `model`. */
+  requestModelByReasoningEffort?: Partial<Record<ModelReasoningEffort, string>>;
+  /** Provider-local catalog grouping such as `codex` or `grok`. */
+  family?: string;
   pricing?: ModelPricing;
   catalogUpdatedAt?: string;
-  metadata?: ModelMetadataReference;
 }
 
 export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
@@ -306,7 +302,7 @@ export function normalizeModelKey(value: unknown): ModelKey | undefined {
   const separatorIndex = value.indexOf(":");
   if (separatorIndex <= 0 || separatorIndex === value.length - 1) return undefined;
   const provider = value.slice(0, separatorIndex);
-  if (provider !== "deepseek" && provider !== "kimi" && provider !== "openrouter" && provider !== "duckding") return undefined;
+  if (provider !== "deepseek" && provider !== "kimi" && provider !== "openrouter" && provider !== "duckcoding") return undefined;
   return value as ModelKey;
 }
 

@@ -6,7 +6,6 @@ import type {
 import type { ModelPurpose, ModelUnavailabilityReason } from "./model-resolver";
 import type { ProviderId } from "./provider-config";
 import type { CatalogCacheState, CatalogModelView } from "./openrouter-catalog";
-import type { ModelMetadataCatalogResult, ModelMetadataSearchInput } from "./model-metadata-catalog";
 import type {
   InstalledModelSettings,
   ProviderConnectionErrorKind,
@@ -239,11 +238,13 @@ export type ModelsCatalogListResult = {
 };
 
 export type ModelsAddInput = {
-  provider: Extract<ProviderId, "openrouter" | "duckding">;
+  provider: Extract<ProviderId, "openrouter" | "duckcoding">;
   apiModel: string;
   label?: string;
   credentialId?: string | null;
-  metadataKey?: string | null;
+  catalogModelId?: string | null;
+  contextWindow?: number | null;
+  maxTokens?: number | null;
 };
 
 export type ModelsUpdateInput = {
@@ -268,8 +269,6 @@ export type ModelMutationResult =
 
 export type TaskModelsUpdateInput = Partial<TaskModelSettings>;
 export type TaskModelsUpdateResult = { taskModels: TaskModelSettings };
-
-export type { ModelMetadataCatalogResult, ModelMetadataSearchInput };
 
 export type KairosModelUpdateInput = { modelKey: ModelKey | null };
 export type KairosModelUpdateResult = { modelKey: ModelKey | null };

@@ -15,6 +15,10 @@ import { SubAgentTranscriptPanel } from "./messages/SubAgentTranscriptModal";
 import { ThinkingBlock } from "./messages/ThinkingBlock";
 import { ToolActivityGroup } from "./messages/ToolActivityGroup";
 import { ToolLogLine } from "./messages/ToolLogLine";
+import {
+  getToolLogRunningTextAttrs,
+  TOOL_LOG_LINE_TEXT_RUNNING_CLASS,
+} from "./messages/toolLogStyles";
 import { UserMessage } from "./messages/UserMessage";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 import { formatUsdCost } from "../usage-format";
@@ -57,6 +61,7 @@ const TURN_ACTION_MENU_BUTTON_CLASS =
 const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-[13px] leading-[1.4] text-text-faint";
 const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-on-danger";
 const COMPACT_MESSAGE_RELATION_CLASS = "-mt-1";
+const MODEL_WAITING_DELAY_MS = 300;
 
 const MESSAGE_TIME_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
   hour: "2-digit",
@@ -190,6 +195,9 @@ function renderMessage(
       }
       return <ToolLogLine key={renderKey} message={message} className={className} />;
     case "status":
+      if (message.id.endsWith(":model-wait") || message.id === "model-wait") {
+        return <ModelWaitingStatus key={renderKey} content={message.content} />;
+      }
       return (
         <div
           key={renderKey}
@@ -202,6 +210,34 @@ function renderMessage(
     case "write_diff":
       return <FileDiffBlock key={renderKey} message={message} className={className} />;
   }
+}
+
+function ModelWaitingStatus({ content }: { content: string }) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(true), MODEL_WAITING_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <div
+      className={`${TURN_STATUS_LINE_CLASS} px-[var(--conversation-text-inset)]`}
+      role="status"
+      aria-live="polite"
+    >
+      <span
+        className={TOOL_LOG_LINE_TEXT_RUNNING_CLASS}
+        {...getToolLogRunningTextAttrs(content)}
+      >
+        {content}
+      </span>
+    </div>
+  );
 }
 
 function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTurn[] {

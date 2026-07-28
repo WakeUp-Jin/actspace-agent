@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadEnv } from "@actspace/agent-core";
-import type { ModelMetadataView } from "@actspace/shared";
 import { ModelRuntimeService } from "../model-runtime-service";
 import { ModelStoreService } from "../model-store-service";
 import { SettingsService, type SecretCrypto } from "../settings-service";
@@ -14,30 +13,16 @@ const crypto: SecretCrypto = {
   decrypt: (cipher) => cipher.toString().slice(4),
 };
 const checkedAt = "2026-07-24T12:00:00.000Z";
-const duckMetadata: ModelMetadataView = {
-  key: "models.dev:xai:grok-4.5",
-  source: "models.dev",
-  provider: "xai",
-  modelId: "grok-4.5",
-  name: "Grok 4.5",
-  aliases: ["grok-4.5"],
-  contextWindow: 256000,
-  maxTokens: 32000,
-  capabilities: { input: ["text"], toolUse: "declared", reasoning: true, thinkingToggle: true },
-  pricing: { currency: "USD", inputCacheHitPerMillion: 0.5, inputCacheMissPerMillion: 5, inputCacheWritePerMillion: 6.25, outputPerMillion: 30 },
-  fetchedAt: checkedAt,
-};
-
 async function setup() {
   const dataRoot = await mkdtemp(join(tmpdir(), "actspace-runtime-test-"));
   const settings = new SettingsService({ dataRoot, crypto, reloadEnv: () => loadEnv({ envPath: "/private/tmp/no-env", mergeToProcessEnv: false }), createCredentialId: () => "codex-sale" });
   await settings.load();
-  const models = new ModelStoreService({ settings, findMetadataModel: (key) => key === duckMetadata.key ? duckMetadata : undefined });
+  const models = new ModelStoreService({ settings });
   const runtime = new ModelRuntimeService(settings, models);
   return { settings, models, runtime };
 }
 
-async function connect(settings: SettingsService, provider: "deepseek" | "kimi" | "openrouter" | "duckding") {
+async function connect(settings: SettingsService, provider: "deepseek" | "kimi" | "openrouter" | "duckcoding") {
   await settings.updateProviderConnection({ provider, apiKey: `sk-${provider}` });
   await settings.markProviderConnectionResult(provider, { ok: true, message: "ok", checkedAt });
 }
@@ -93,23 +78,23 @@ describe("ModelRuntimeService", () => {
     expect(runtime.resolveMainModel("deepseek:deepseek-v4-pro")).toMatchObject({ ok: false, reason: "provider_disconnected" });
   });
 
-  it("uses the model-selected DuckDing Key and applies its pricing multiplier without fallback", async () => {
+  it("uses the model-selected DuckCoding Key and applies its pricing multiplier without fallback", async () => {
     const { settings, models, runtime } = await setup();
-    await connect(settings, "duckding");
-    await settings.addProviderCredential({ provider: "duckding", label: "CodeX-Sale", apiKey: "sk-sale", pricingMultiplier: 0.2 });
-    await settings.markProviderCredentialConnectionResult("duckding", "codex-sale", { ok: true, message: "ok", checkedAt });
-    await models.addCustomModel({ provider: "duckding", apiModel: "grok-4.5", credentialId: "codex-sale", metadataKey: duckMetadata.key });
+    await connect(settings, "duckcoding");
+    await settings.addProviderCredential({ provider: "duckcoding", label: "CodeX-Sale", apiKey: "sk-sale", pricingMultiplier: 0.2 });
+    await settings.markProviderCredentialConnectionResult("duckcoding", "codex-sale", { ok: true, message: "ok", checkedAt });
+    await models.addCustomModel({ provider: "duckcoding", apiModel: "gpt-5.6-sol", credentialId: "codex-sale", catalogModelId: "codex:gpt-5.6-sol" });
 
-    const resolved = runtime.resolveMainModel("duckding:grok-4.5");
+    const resolved = runtime.resolveMainModel("duckcoding:gpt-5.6-sol");
     expect(resolved).toMatchObject({
       ok: true,
       model: {
         providerRuntime: { apiKey: "sk-sale", pricingMultiplier: 0.2 },
-        definition: { pricing: { inputCacheMissPerMillion: 1, inputCacheWritePerMillion: 1.25, outputPerMillion: 6 } },
+        definition: { pricing: { inputCacheHitPerMillion: 0.1, inputCacheMissPerMillion: 1, inputCacheWritePerMillion: 1.25, outputPerMillion: 6 } },
       },
     });
 
-    await settings.markProviderCredentialConnectionResult("duckding", "codex-sale", { ok: false, message: "bad", checkedAt, errorKind: "auth" });
-    expect(runtime.resolveMainModel("duckding:grok-4.5")).toMatchObject({ ok: false, reason: "credential_unavailable" });
+    await settings.markProviderCredentialConnectionResult("duckcoding", "codex-sale", { ok: false, message: "bad", checkedAt, errorKind: "auth" });
+    expect(runtime.resolveMainModel("duckcoding:gpt-5.6-sol")).toMatchObject({ ok: false, reason: "credential_unavailable" });
   });
 });

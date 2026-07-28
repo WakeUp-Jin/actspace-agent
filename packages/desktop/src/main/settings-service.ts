@@ -703,7 +703,7 @@ export class SettingsService {
 
   /** Compatibility API for the current key modal; all LLM providers share the v2 connection path. */
   async setProviderKey(provider: SecretProviderId, apiKey: string): Promise<{ ok: boolean; error?: string }> {
-    if (provider === "deepseek" || provider === "kimi" || provider === "openrouter" || provider === "duckding") {
+    if (provider === "deepseek" || provider === "kimi" || provider === "openrouter" || provider === "duckcoding") {
       try {
         await this.updateProviderConnection({ provider, apiKey });
         return { ok: true };
@@ -715,7 +715,7 @@ export class SettingsService {
   }
 
   async clearProviderKey(provider: SecretProviderId): Promise<{ ok: boolean }> {
-    if (provider === "deepseek" || provider === "kimi" || provider === "openrouter" || provider === "duckding") {
+    if (provider === "deepseek" || provider === "kimi" || provider === "openrouter" || provider === "duckcoding") {
       try {
         await this.updateProviderConnection({ provider, apiKey: null });
         return { ok: true };
@@ -1178,7 +1178,7 @@ function isValidModelDefinition(value: unknown, key: ModelKey): value is ModelDe
   if (!isRecord(value)) return false;
   const normalized = normalizeModelKey(value.key);
   return normalized === key && value.provider === key.slice(0, key.indexOf(":")) &&
-    (value.api === "openai-completions" || value.api === "anthropic-messages") &&
+    (value.api === "openai-completions" || value.api === "openai-responses" || value.api === "anthropic-messages") &&
     typeof value.apiModel === "string" && value.apiModel.length > 0 && typeof value.label === "string";
 }
 

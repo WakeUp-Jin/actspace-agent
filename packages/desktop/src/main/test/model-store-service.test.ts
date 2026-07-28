@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { loadEnv } from "@actspace/agent-core";
-import type { CatalogModelView, ModelMetadataView } from "@actspace/shared";
+import type { CatalogModelView } from "@actspace/shared";
 import { ModelStoreService } from "../model-store-service";
 import { SettingsService, type SecretCrypto } from "../settings-service";
 
@@ -30,20 +30,6 @@ const CATALOG: CatalogModelView = {
   pricing: { currency: "USD", inputCacheHitPerMillion: 0.1, inputCacheMissPerMillion: 1, outputPerMillion: 2 },
   added: false,
 };
-const METADATA: ModelMetadataView = {
-  key: "models.dev:xai:grok-4.5",
-  source: "models.dev",
-  provider: "xai",
-  modelId: "grok-4.5",
-  name: "Grok 4.5",
-  aliases: ["grok-4.5", "xai/grok-4.5"],
-  contextWindow: 256000,
-  maxTokens: 32000,
-  capabilities: { input: ["text", "image"], toolUse: "declared", reasoning: true, thinkingToggle: true },
-  pricing: { currency: "USD", inputCacheHitPerMillion: 0.5, inputCacheMissPerMillion: 5, inputCacheWritePerMillion: 6.25, outputPerMillion: 30 },
-  fetchedAt: NOW.toISOString(),
-};
-
 async function setup() {
   const dataRoot = await mkdtemp(join(tmpdir(), "actspace-model-store-test-"));
   const settings = new SettingsService({ dataRoot, crypto: CRYPTO, reloadEnv: () => loadEnv({ envPath: "/private/tmp/no-env", mergeToProcessEnv: false }) });
@@ -145,7 +131,7 @@ describe("ModelStoreService", () => {
     expect(model?.unavailableReasons.chat).toBe("provider_disconnected");
   });
 
-  it("adds a DuckDing API model with selected public metadata and an existing provider Key", async () => {
+  it("adds a DuckCoding local-catalog model with a context override and an existing provider Key", async () => {
     const dataRoot = await mkdtemp(join(tmpdir(), "actspace-model-store-test-"));
     const settings = new SettingsService({
       dataRoot,
@@ -154,30 +140,69 @@ describe("ModelStoreService", () => {
       createCredentialId: () => "codex-sale",
     });
     await settings.load();
-    await settings.updateProviderConnection({ provider: "duckding", apiKey: "sk-default" });
-    await settings.addProviderCredential({ provider: "duckding", label: "CodeX-Sale", apiKey: "sk-sale", pricingMultiplier: 0.2 });
-    const store = new ModelStoreService({
-      settings,
-      findMetadataModel: (key) => key === METADATA.key ? METADATA : undefined,
-      now: () => NOW,
-    });
+    await settings.updateProviderConnection({ provider: "duckcoding", apiKey: "sk-default" });
+    await settings.addProviderCredential({ provider: "duckcoding", label: "CodeX-Sale", apiKey: "sk-sale", pricingMultiplier: 0.2 });
+    const store = new ModelStoreService({ settings, now: () => NOW });
 
     const added = await store.addCustomModel({
-      provider: "duckding",
+      provider: "duckcoding",
       apiModel: "grok-4.5",
       credentialId: "codex-sale",
-      metadataKey: METADATA.key,
+      catalogModelId: "grok:grok-4.5",
+      contextWindow: 256000,
     });
 
     expect(added).toMatchObject({ ok: true, model: { settings: { credentialId: "codex-sale" } } });
-    expect(settings.getModelStorageState().customModels["duckding:grok-4.5"]).toMatchObject({
+    expect(settings.getModelStorageState().customModels["duckcoding:grok-4.5"]).toMatchObject({
       apiModel: "grok-4.5",
       label: "Grok 4.5",
-      metadata: { source: "models.dev", provider: "xai", modelId: "grok-4.5" },
-      pricing: { inputCacheMissPerMillion: 5, inputCacheWritePerMillion: 6.25, outputPerMillion: 30 },
-      capabilities: { input: ["text", "image"], toolUse: "declared", reasoning: true },
+      family: "grok",
+      contextWindow: 256000,
+      capabilities: { input: ["text"], toolUse: "declared", reasoning: true, reasoningMandatory: true },
     });
-    await expect(store.updateModelSettings("duckding:grok-4.5", { credentialId: "missing" })).resolves.toMatchObject({ ok: false, code: "credential_missing" });
-    await expect(store.addCustomModel({ provider: "duckding", apiModel: "missing-model", metadataKey: "models.dev:xai:missing" })).resolves.toMatchObject({ ok: false, code: "model_not_found" });
+    await expect(store.updateModelSettings("duckcoding:grok-4.5", { credentialId: "missing" })).resolves.toMatchObject({ ok: false, code: "credential_missing" });
+    await expect(store.addCustomModel({ provider: "duckcoding", apiModel: "missing-model", catalogModelId: "grok:missing" })).resolves.toMatchObject({ ok: false, code: "model_not_found" });
+    await expect(store.addCustomModel({ provider: "duckcoding", apiModel: "grok-4.5", catalogModelId: "codex:gpt-5.6-sol" })).resolves.toMatchObject({ ok: false, code: "invalid_model" });
+    await expect(store.addCustomModel({ provider: "duckcoding", apiModel: "bad-context", contextWindow: 10 })).resolves.toMatchObject({ ok: false, code: "invalid_model" });
+  });
+
+  it("backfills Codex pricing and Responses protocol for an already-installed DuckCoding model", async () => {
+    const dataRoot = await mkdtemp(join(tmpdir(), "actspace-model-store-pricing-test-"));
+    const settings = new SettingsService({
+      dataRoot,
+      crypto: CRYPTO,
+      reloadEnv: () => loadEnv({ envPath: "/private/tmp/no-env", mergeToProcessEnv: false }),
+    });
+    await settings.load();
+    await settings.updateModelStorage({
+      installedModels: {
+        "duckcoding:gpt-5.6-sol": { enabled: true, addedAt: NOW.toISOString() },
+      },
+      customModels: {
+        "duckcoding:gpt-5.6-sol": {
+          key: "duckcoding:gpt-5.6-sol",
+          provider: "duckcoding",
+          api: "openai-completions",
+          apiModel: "gpt-5.6-sol",
+          label: "5.6 Sol",
+          source: "custom",
+          contextWindow: 255_000,
+          maxTokens: null,
+          thinkingDefault: true,
+          capabilities: { input: ["text"], toolUse: "declared", reasoning: true, thinkingToggle: false },
+        },
+      },
+    });
+
+    const store = new ModelStoreService({ settings, now: () => NOW });
+    expect(store.getModelSnapshot().definitions["duckcoding:gpt-5.6-sol"]?.api).toBe("openai-responses");
+    expect(store.getModelSnapshot().definitions["duckcoding:gpt-5.6-sol"]?.pricing).toEqual({
+      currency: "USD",
+      inputCacheHitPerMillion: 0.5,
+      inputCacheMissPerMillion: 5,
+      inputCacheWritePerMillion: 6.25,
+      outputPerMillion: 30,
+    });
+    expect(settings.getModelStorageState().customModels["duckcoding:gpt-5.6-sol"]?.pricing).toBeUndefined();
   });
 });

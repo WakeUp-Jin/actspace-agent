@@ -39,10 +39,12 @@
 ### Provider
 
 ```ts
-type ProviderId = "deepseek" | "kimi" | "openrouter";
-type ModelApi = "openai-completions" | "anthropic-messages";
+type ProviderId = "deepseek" | "kimi" | "openrouter" | "duckcoding";
+type ModelApi = "openai-completions" | "openai-responses" | "anthropic-messages";
 type ModelPurpose = "chat" | "utility" | "explore" | "kairos" | "vision";
 ```
+
+> 2026-07-28：Plan 7 接入 DuckCoding Codex 时增量加入 `duckcoding` ProviderId 与 `openai-responses` 协议；上面的联合类型已同步当前事实。
 
 `ProviderSpec` 固定包含：
 

@@ -45,9 +45,18 @@ describe("provider adapter", () => {
     });
   });
 
+  it("does not add reasoning attributes for DuckCoding", () => {
+    const base = { model: "gpt-5.6-sol-high", messages: [] };
+    expect(applyOpenAIProviderRequestParams("duckcoding", base, {
+      thinkingEnabled: true,
+      reasoningEffort: "high",
+    })).toEqual(base);
+  });
+
   it("returns stable provider display names", () => {
     expect(providerDisplayName("deepseek")).toBe("DeepSeek");
     expect(providerDisplayName("kimi")).toBe("Kimi");
     expect(providerDisplayName("openrouter")).toBe("OpenRouter");
+    expect(providerDisplayName("duckcoding")).toBe("DuckCoding");
   });
 });

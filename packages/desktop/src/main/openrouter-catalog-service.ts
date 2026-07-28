@@ -251,7 +251,7 @@ function normalizeCatalogModel(value: unknown): CatalogModelView | undefined {
   };
 }
 
-const REASONING_EFFORTS = new Set<ModelReasoningEffort>(["minimal", "low", "medium", "high", "xhigh", "max"]);
+const REASONING_EFFORTS = new Set<ModelReasoningEffort>(["minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
 
 function isReasoningEffort(value: unknown): value is ModelReasoningEffort {
   return typeof value === "string" && REASONING_EFFORTS.has(value as ModelReasoningEffort);

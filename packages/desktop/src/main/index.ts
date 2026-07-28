@@ -80,8 +80,6 @@ import type {
   TaskModelsUpdateResult,
   KairosModelUpdateInput,
   KairosModelUpdateResult,
-  ModelMetadataCatalogResult,
-  ModelMetadataSearchInput,
 } from "@actspace/shared";
 import { isProviderId, normalizeModelKey, resolveConfiguredModel } from "@actspace/shared";
 import {
@@ -138,7 +136,6 @@ import { registerKairosConfigIpc, registerKairosIpc, type KairosIpcHandle } from
 import { SettingsService, type SecretCrypto } from "./settings-service";
 import { ModelStoreService, type ModelStoreResult } from "./model-store-service";
 import { OpenRouterCatalogService } from "./openrouter-catalog-service";
-import { ModelMetadataCatalogService } from "./model-metadata-catalog-service";
 import { ModelRuntimeService } from "./model-runtime-service";
 import { testProviderConnection } from "./provider-connection-service";
 import {
@@ -418,7 +415,6 @@ const electronSecretCrypto: SecretCrypto = {
 let settingsService: SettingsService | undefined;
 let modelStoreService: ModelStoreService | undefined;
 let openRouterCatalogService: OpenRouterCatalogService | undefined;
-let modelMetadataCatalogService: ModelMetadataCatalogService | undefined;
 let modelRuntimeService: ModelRuntimeService | undefined;
 let localUpdateService: LocalUpdateService | undefined;
 let localUpdateQuitRequested = false;
@@ -440,11 +436,6 @@ function getModelStoreService(): ModelStoreService {
 function getOpenRouterCatalogService(): OpenRouterCatalogService {
   if (!openRouterCatalogService) throw new Error("OpenRouterCatalogService 尚未初始化。");
   return openRouterCatalogService;
-}
-
-function getModelMetadataCatalogService(): ModelMetadataCatalogService {
-  if (!modelMetadataCatalogService) throw new Error("ModelMetadataCatalogService 尚未初始化。");
-  return modelMetadataCatalogService;
 }
 
 function getModelRuntimeService(): ModelRuntimeService {
@@ -1359,24 +1350,20 @@ async function registerIpc() {
     }
     return { provider: "openrouter", ...result };
   });
-  ipcMain.handle("models:metadata:search", async (_event, input: ModelMetadataSearchInput): Promise<ModelMetadataCatalogResult> => {
-    return getModelMetadataCatalogService().search(typeof input?.query === "string" ? input.query : "");
-  });
-  ipcMain.handle("models:metadata:reload", async (): Promise<ModelMetadataCatalogResult> => {
-    return getModelMetadataCatalogService().reload();
-  });
   ipcMain.handle("models:add", async (_event, input: ModelsAddInput): Promise<ModelMutationResult> => {
-    if ((input?.provider !== "openrouter" && input?.provider !== "duckding") || typeof input.apiModel !== "string") {
+    if ((input?.provider !== "openrouter" && input?.provider !== "duckcoding") || typeof input.apiModel !== "string") {
       return { ok: false, error: { code: "invalid_model", message: "模型添加参数无效。" } };
     }
     return toModelMutationResult(input.provider === "openrouter"
       ? await getModelStoreService().addCatalogModel(input.provider, input.apiModel)
       : await getModelStoreService().addCustomModel({
-        provider: "duckding",
+        provider: "duckcoding",
         apiModel: input.apiModel,
         label: input.label,
         credentialId: input.credentialId,
-        metadataKey: input.metadataKey,
+        catalogModelId: input.catalogModelId,
+        contextWindow: input.contextWindow,
+        maxTokens: input.maxTokens,
       }));
   });
   ipcMain.handle("models:update", async (_event, input: ModelsUpdateInput): Promise<ModelMutationResult> => {
@@ -1731,15 +1718,12 @@ app.whenReady().then(async () => {
   modelStoreService = new ModelStoreService({
     settings: settingsService,
     findCatalogModel: (apiModel) => openRouterCatalogService?.findModel(apiModel),
-    findMetadataModel: (metadataKey) => modelMetadataCatalogService?.find(metadataKey),
   });
   openRouterCatalogService = new OpenRouterCatalogService({
     dataRoot: roots.dataRoot,
     isAdded: (apiModel) => modelStoreService?.isCatalogModelAdded(apiModel) ?? false,
   });
   await openRouterCatalogService.load();
-  modelMetadataCatalogService = new ModelMetadataCatalogService({ dataRoot: roots.dataRoot });
-  await modelMetadataCatalogService.load();
   modelRuntimeService = new ModelRuntimeService(settingsService, modelStoreService);
   localUpdateService = new LocalUpdateService({
     dataRoot: roots.dataRoot,

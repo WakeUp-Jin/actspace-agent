@@ -124,7 +124,7 @@ svg {
   display: inline-block;
   max-width: 100%;
   overflow: hidden;
-  color: var(--act-color-text-muted);
+  color: var(--act-color-text);
   text-overflow: ellipsis;
   vertical-align: baseline;
   -webkit-text-fill-color: currentColor;
@@ -144,7 +144,7 @@ svg {
       90deg,
       transparent 0%,
       transparent 35%,
-      var(--act-color-operational) 50%,
+      var(--act-color-text-subtle) 50%,
       transparent 65%,
       transparent 100%
     );
@@ -161,10 +161,8 @@ svg {
 
 @media (prefers-reduced-motion: reduce) {
   .tool-log-text-running::after {
-    color: var(--act-color-operational);
-    background: none;
+    display: none;
     animation: none;
-    -webkit-text-fill-color: currentColor;
   }
 }
 

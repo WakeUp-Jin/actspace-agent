@@ -11,6 +11,7 @@ import {
 } from "../adapters";
 import type { UserMessage, AssistantMessage, ToolResultMessage } from "../messages";
 import { createEmptyUsage } from "../messages";
+import { convertContextToResponses } from "../llm/responses-convert";
 import {
   createMockUserMessage,
   createMockAssistantWithToolCalls,
@@ -178,6 +179,57 @@ describe("Adapters: SessionEvent -> Message (recovery)", () => {
     if (recovered?.role === "assistant") {
       expect(recovered.content.map((block) => block.type)).toEqual(["thinking", "text", "toolCall"]);
     }
+  });
+
+  it("preserves provider reasoning signatures through session persistence", () => {
+    const signature = "openai-responses-reasoning:{\"id\":\"rs_1\",\"type\":\"reasoning\",\"summary\":[]}";
+    const assistant: AssistantMessage = {
+      role: "assistant",
+      content: [
+        { type: "thinking", thinking: "", signature },
+        { type: "toolCall", id: "call_1", name: "read_file", arguments: { path: "README.md" } },
+      ],
+      api: "openai-responses",
+      model: "gpt-5.6-sol",
+      provider: "duckcoding",
+      usage: createEmptyUsage(),
+      stopReason: "toolUse",
+      timestamp: Date.now(),
+    };
+
+    const events = assistantMessageToEvents(assistant, SESSION_ID, TURN_ID);
+    expect(events.find((event) => event.type === "thinking")?.payload).toMatchObject({
+      signature,
+      api: "openai-responses",
+      model: "gpt-5.6-sol",
+      provider: "duckcoding",
+    });
+    expect(events.find((event) => event.type === "tool_call")?.payload).toMatchObject({
+      api: "openai-responses",
+      model: "gpt-5.6-sol",
+      provider: "duckcoding",
+    });
+
+    const { messages, errors } = sessionEventsToMessages(events);
+    expect(errors).toHaveLength(0);
+    const recovered = messages.find((message) => message.role === "assistant");
+    expect(recovered).toMatchObject({
+      role: "assistant",
+      api: "openai-responses",
+      model: "gpt-5.6-sol",
+      provider: "duckcoding",
+    });
+    expect(recovered?.content).toContainEqual({ type: "thinking", thinking: "", signature });
+
+    const converted = convertContextToResponses({ messages, tools: [] }, {
+      provider: "duckcoding",
+      api: "openai-responses",
+      apiKey: "test-key",
+      baseUrl: "https://api.duckcoding.ai/v1",
+      model: "gpt-5.6-sol",
+      input: ["text"],
+    });
+    expect(converted.input[0]).toMatchObject({ id: "rs_1", type: "reasoning" });
   });
 
   it("should handle full turn round-trip", () => {

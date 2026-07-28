@@ -67,6 +67,24 @@ const reasoningModels: UsableModelView[] = [
   },
 ];
 
+const duckCodingModels: UsableModelView[] = [{
+  key: "duckcoding:gpt-5.6-sol",
+  label: "5.6 Sol",
+  provider: "duckcoding",
+  apiModel: "gpt-5.6-sol",
+  contextWindow: 255_000,
+  thinkingDefault: true,
+  capabilities: {
+    input: ["text"],
+    toolUse: "declared",
+    reasoning: true,
+    thinkingToggle: false,
+    reasoningMandatory: true,
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "ultra"],
+    reasoningDefaultEffort: "medium",
+  },
+}];
+
 describe("Composer follow-up bar", () => {
   it("renders the follow-up shell with review preview and status row", () => {
     renderComposer({
@@ -469,6 +487,34 @@ describe("Composer follow-up bar", () => {
       model: "openrouter:openai/gpt-5",
       thinkingEnabled: true,
       reasoningEffort: "high",
+    });
+  });
+
+  it("shows DuckCoding's five named effort levels and defaults to Medium", async () => {
+    const user = userEvent.setup();
+    const { onSend } = renderComposer({
+      models: duckCodingModels,
+      defaultModelId: "duckcoding:gpt-5.6-sol",
+    });
+
+    await user.click(screen.getByRole("button", { name: /5\.6 Sol/i }));
+    const modelMenu = screen.getByRole("menu", { name: "Models" });
+    await user.hover(within(modelMenu).getByText("5.6 Sol"));
+    await user.click(screen.getByRole("button", { name: "Edit duckcoding:gpt-5.6-sol options" }));
+
+    expect(screen.queryByRole("button", { name: "Auto" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Light" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Medium" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "High" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Extra High" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ultra" })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Message composer"), "use the default effort");
+    await user.click(screen.getByRole("button", { name: "Send message" }));
+    expect(onSend).toHaveBeenCalledWith("use the default effort", {
+      model: "duckcoding:gpt-5.6-sol",
+      thinkingEnabled: true,
+      reasoningEffort: "medium",
     });
   });
 

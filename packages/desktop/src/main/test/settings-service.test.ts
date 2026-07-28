@@ -218,7 +218,7 @@ describe("SettingsService", () => {
     expect(svc.getV2().providers.openrouter).toMatchObject({ hasApiKey: false, hasManagementKey: false });
   });
 
-  it("DuckDing 额外 Key 与倍率绑定、密钥只进 secrets 且被模型引用时禁止删除", async () => {
+  it("DuckCoding 额外 Key 与倍率绑定、密钥只进 secrets 且被模型引用时禁止删除", async () => {
     const dataRoot = await makeDataRoot();
     const svc = new SettingsService({
       dataRoot,
@@ -228,40 +228,40 @@ describe("SettingsService", () => {
     });
     await svc.load();
     await svc.updateProviderConnection({
-      provider: "duckding",
+      provider: "duckcoding",
       apiKey: "sk-duck-default",
       defaultPricingMultiplier: 1,
     });
     await svc.addProviderCredential({
-      provider: "duckding",
+      provider: "duckcoding",
       label: "CodeX-Sale",
       apiKey: "sk-duck-sale",
       pricingMultiplier: 0.2,
     });
 
-    expect(svc.getV2().providers.duckding).toMatchObject({
+    expect(svc.getV2().providers.duckcoding).toMatchObject({
       hasApiKey: true,
       defaultPricingMultiplier: 1,
       additionalCredentials: [{ id: "codex-sale", label: "CodeX-Sale", pricingMultiplier: 0.2, hasApiKey: true }],
     });
-    expect(svc.getProviderRuntimeConfigForCredential("duckding", "codex-sale")).toMatchObject({
+    expect(svc.getProviderRuntimeConfigForCredential("duckcoding", "codex-sale")).toMatchObject({
       apiKey: "sk-duck-sale",
       pricingMultiplier: 0.2,
     });
     expect(JSON.stringify(svc.getV2())).not.toContain("sk-duck-sale");
 
     const secrets = JSON.parse(await readFile(join(dataRoot, "secrets.json"), "utf8"));
-    expect(Buffer.from(secrets.providerCredentials["duckding:codex-sale"], "base64").toString("utf8")).toBe("enc:sk-duck-sale");
+    expect(Buffer.from(secrets.providerCredentials["duckcoding:codex-sale"], "base64").toString("utf8")).toBe("enc:sk-duck-sale");
 
     await svc.updateModelStorage({
       installedModels: {
-        "duckding:grok-4.5": { enabled: true, addedAt: "2026-07-27T00:00:00.000Z", credentialId: "codex-sale" },
+        "duckcoding:grok-4.5": { enabled: true, addedAt: "2026-07-27T00:00:00.000Z", credentialId: "codex-sale" },
       },
     });
-    await expect(svc.removeProviderCredential("duckding", "codex-sale")).resolves.toMatchObject({
+    await expect(svc.removeProviderCredential("duckcoding", "codex-sale")).resolves.toMatchObject({
       ok: false,
       code: "credential_in_use",
-      references: ["duckding:grok-4.5"],
+      references: ["duckcoding:grok-4.5"],
     });
   });
 
@@ -404,7 +404,7 @@ describe("SettingsService", () => {
 
     const view = svc.getV2();
     expect(view.version).toBe(2);
-    expect(Object.keys(view.providers)).toEqual(["deepseek", "kimi", "openrouter", "duckding"]);
+    expect(Object.keys(view.providers)).toEqual(["deepseek", "kimi", "openrouter", "duckcoding"]);
     expect(view.providers.openrouter).toMatchObject({
       hasApiKey: false,
       enabled: true,
@@ -412,7 +412,7 @@ describe("SettingsService", () => {
       proxy: { enabled: false, url: null },
       lastConnection: { status: "untested" },
     });
-    expect(view.providers.duckding).toMatchObject({
+    expect(view.providers.duckcoding).toMatchObject({
       hasApiKey: false,
       defaultPricingMultiplier: 1,
       additionalCredentials: [],

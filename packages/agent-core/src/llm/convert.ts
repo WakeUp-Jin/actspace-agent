@@ -292,6 +292,9 @@ export interface StreamChunkAccumulator {
   usage: Usage;
   stopReason: StopReason;
   rawStopReason?: string;
+  responseId?: string;
+  responseModel?: string;
+  reasoningSignatures: string[];
 }
 
 export function createAccumulator(): StreamChunkAccumulator {
@@ -302,6 +305,9 @@ export function createAccumulator(): StreamChunkAccumulator {
     usage: createEmptyUsage(),
     stopReason: "stop",
     rawStopReason: undefined,
+    responseId: undefined,
+    responseModel: undefined,
+    reasoningSignatures: [],
   };
 }
 
@@ -405,8 +411,15 @@ export function buildContentFromAccumulator(
 ): (TextContent | ThinkingContent | ToolCallContent)[] {
   const content: (TextContent | ThinkingContent | ToolCallContent)[] = [];
 
-  if (acc.thinkingParts.length > 0) {
-    content.push({ type: "thinking", thinking: acc.thinkingParts.join("") });
+  if (acc.thinkingParts.length > 0 || acc.reasoningSignatures.length > 0) {
+    const thinking = acc.thinkingParts.join("");
+    if (acc.reasoningSignatures.length > 0) {
+      for (const signature of acc.reasoningSignatures) {
+        content.push({ type: "thinking", thinking, signature });
+      }
+    } else {
+      content.push({ type: "thinking", thinking });
+    }
   }
   if (acc.textParts.length > 0) {
     content.push({ type: "text", text: acc.textParts.join("") });
@@ -436,6 +449,8 @@ export function buildAssistantMessage(
     ...(config.api && { api: config.api }),
     model: config.model,
     provider: providerName,
+    ...(acc.responseId && { responseId: acc.responseId }),
+    ...(acc.responseModel && acc.responseModel !== config.model && { responseModel: acc.responseModel }),
     usage: acc.usage,
     stopReason,
     ...(acc.rawStopReason && { diagnostics: [{ rawStopReason: acc.rawStopReason }] }),

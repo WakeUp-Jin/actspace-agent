@@ -156,6 +156,7 @@ function transformThinkingBlock(
   sameTarget: boolean,
 ): (ThinkingContent | TextContent)[] {
   if (block.redacted) return sameTarget ? [block] : [];
+  if (sameTarget && block.signature) return [block];
   if (!block.thinking || block.thinking.trim() === "") return [];
   if (sameTarget) return [block];
   return [{ type: "text", text: block.thinking }];

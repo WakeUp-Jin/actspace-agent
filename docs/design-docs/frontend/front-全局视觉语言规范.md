@@ -253,7 +253,7 @@ Usage 等数据页允许出现 42–72px 的数据数字，但它们不是营销
 ### Message flow
 
 - 普通回复和工具行使用黑灰文字。
-- running shimmer 的基础文字保持中性，叠加层可以使用 operational token。
+- running shimmer 的基础文字使用主文本色，叠加层使用主题中性浅灰；浅色主题呈现黑字上的浅灰扫光，深色主题自动反转为浅字上的深灰扫光。
 - completed 回到 muted，不显示整行绿色。
 - diff additions / removals 使用低饱和绿红。
 

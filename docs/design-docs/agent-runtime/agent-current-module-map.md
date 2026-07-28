@@ -2,7 +2,7 @@
 
 本文档记录 `packages/agent-core` 当前已经落地的模块结构。它回答“现在代码分布在哪里、各模块负责什么”，长期设计动机见 `docs/design-docs/agent-runtime/agent-backend-design.md`。
 
-> DeepSeek / Kimi / OpenRouter / DuckDing 多供应商实现见 `docs/design-docs/model-context/agent-multi-provider-llm.md` 与 `agent-duckding-multi-key-model-catalog.md`。shared 契约、agent-core 显式 runtime/代理 transport、desktop settings v2、多 Key、公共目录/模型存储、任务模型消费方和 renderer 已贯通；真实 OpenRouter 代理、DuckDing 调用与跨任务场景保留为用户统一手动验收项。
+> DeepSeek / Kimi / OpenRouter / DuckCoding 多供应商实现见 `docs/design-docs/model-context/agent-multi-provider-llm.md` 与 `agent-duckcoding-multi-key-model-catalog.md`。shared 契约、agent-core 显式 runtime/代理 transport、desktop settings v2、多 Key、本地 DuckCoding 档案/模型存储、Codex Responses、任务模型消费方和 renderer 已贯通；真实 OpenRouter 代理、DuckCoding Agent 工具循环与跨任务场景保留为用户统一手动验收项。
 
 ## 顶层类型与契约
 
@@ -18,16 +18,18 @@
 - `llm/provider-adapter.ts`：供应商品牌差异的小型函数表。当前只承担 display name、OpenRouter 非敏感默认 header 和 Kimi thinking 请求修饰，不持有消息历史或协议转换状态。
 - `llm/provider-transport.ts`：供应商级 fetch/代理边界。无代理时沿用 SDK 默认 fetch；有代理时按标准化 HTTP(S) URL 复用 Undici `ProxyAgent`，拒绝认证 URL，并把失败脱敏归一为 `proxy` 错误。
 - `llm/convert.ts`：OpenAI 协议的共享消息转换、工具转换、流式 chunk 处理和 SDK 错误映射逻辑。包含防御性消息处理（跳过 error/aborted 的 assistant messages、为孤儿 tool calls 插入 synthetic toolResult）。
+- `llm/responses-convert.ts`：OpenAI Responses 协议适配层。把 Context 转成 instructions/input/function tools，保留 assistant phase 与 `call_id` 对账，并把加密 reasoning item 编码为可持久化的 opaque provider signature 后在后续工具轮次回放。
 - `llm/anthropic-convert.ts`：Anthropic 协议适配层。Context↔Anthropic system/messages/tools 转换、server/client tool 映射、usage 归一（`anthropicUsageToUsage`），以及真流式处理（`createAnthropicAccumulator` + `processAnthropicStream` 逐增量累积 → `buildAnthropicAssistantMessage` / `buildAnthropicErrorMessage`，设计思路与 `convert.ts` 同构，差异仅在协议）。
-- `llm/transform-messages.ts`：跨 provider 通用预处理层。负责图片降级、thinking 降级、tool call id 规范化、孤儿 tool result 修复，以及 error/aborted assistant 消息过滤；OpenAI / Anthropic 协议服务都先过这一层再做各自协议转换。
+- `llm/transform-messages.ts`：跨 provider 通用预处理层。负责图片降级、thinking 降级、tool call id 规范化、孤儿 tool result 修复，以及 error/aborted assistant 消息过滤；OpenAI Chat / Responses / Anthropic 协议服务都先过这一层再做各自协议转换。
 - `llm/services/anthropic-messages.ts`：AnthropicMessagesService，真正的 Anthropic Messages 协议实现层，负责 provider-native tools、usage 归一和真流式事件组装。
 - `llm/services/openai-completions.ts`：OpenAICompletionsService，真正的 OpenAI Chat Completions 协议实现层，负责公共消息转换、tool call 重组和 usage 归一。
+- `llm/services/openai-responses.ts`：OpenAIResponsesService，真正的 OpenAI Responses 协议实现层，负责 Responses 流式事件、工具调用、`store: false` 无状态上下文、session 缓存键、加密 reasoning item 和 usage 归一。
 - 协议服务是 LLM 职责事实来源；品牌 service 只保留兼容包装，不再新增消息转换、tool call 重组或 usage 归一逻辑。
 - `llm/services/deepseek.ts`：DeepSeekService 兼容包装层，普通对话实际复用 `OpenAICompletionsService`；只负责 DeepSeek 的 provider 默认值和 api 兜底。
 - `llm/services/deepseek-anthropic.ts`：DeepSeekAnthropicService 兼容包装层，普通对话实际复用 `AnthropicMessagesService`；只负责 DeepSeek 的 provider 默认值和 api 兜底。
 - `llm/services/kimi.ts`：KimiService 兼容包装层，普通 Kimi 对话复用 `OpenAICompletionsService`；只兜底 provider 默认值。
 - `llm/services/mock.ts`：MockLLMService，支持 response queue 模式（通过 `setResponses`/`appendResponses` 预设响应序列）和默认行为模式（向后兼容）。提供 `mockText`、`mockToolCall`、`mockError` 辅助工厂函数。
-- `llm/factory.ts`：createLLMService 工厂函数。当前按 `LLMConfig.api` 选 `AnthropicMessagesService` / `OpenAICompletionsService`，OpenRouter 复用后者；provider 品牌包装层只保留兼容入口。
+- `llm/factory.ts`：createLLMService 工厂函数。当前按 `LLMConfig.api` 选 `AnthropicMessagesService` / `OpenAICompletionsService` / `OpenAIResponsesService`；OpenRouter 复用 Chat Completions，DuckCoding Codex 使用 Responses，provider 品牌包装层只保留兼容入口。
 
 ## `prompt/` - 提示词集中管理
 
@@ -208,7 +210,7 @@ flowchart TB
 Desktop 集成（`packages/desktop`）：
 
 - `src/main/settings-service.ts` + `model-store-service.ts` + `model-runtime-service.ts`：provider 默认 Key 与额外命名 Key 分层持久化；模型用可选 `credentialId` 引用同 provider 凭据，runtime 解析目标密钥并把 Key 倍率应用到本次调用的价格快照。缺失或不可用的绑定明确失败，不回退默认 Key。
-- `src/main/model-metadata-catalog-service.ts`：匿名聚合 models.dev 与 OpenRouter 公共模型列表，归一化能力/价格、维护原子缓存与 stale/offline 状态，为 DuckDing 手动模型提供可选元数据快照；该服务不依赖用户是否配置 OpenRouter。
+- `packages/shared/src/duckcoding-model-catalog.ts` + `src/main/model-store-service.ts`：共享本地 Codex/Grok 档案，保存 DuckCoding 精确请求模型名、名称变体和用户覆盖后的上下文/输出限制；未知模型仍可按安全默认能力手动添加，不依赖外部公共目录。
 - `src/main/agent-runtime-context.ts` + `agents-md-service.ts`：主 Agent runtime context 装配入口。`SettingsService.readAgentSystemPrompt()` 读取 `<userData>/prompts/main-agent.md` 作为主系统提示词；`agents-md-service` 固定加载 `<userData>/AGENTS.md` 与 `<workspaceRoot>/AGENTS.md`，缺失静默跳过、读取失败只 warning，并以 `rules` segment 注入 `SystemPromptContext`。同一 loader 还注入 Main Agent → Kairos handoff 段，给出真实绝对路径 `<userData>/kairos/inbox/main-agent.md`，并把 `<userData>/kairos/inbox/` 作为主 Agent `write_file/edit_file` 的额外可写根；随后调用 `loadSkillRegistry()` 扫描项目级/用户级 Skill，把 `<available_skills>` 注入 `skills` segment。Skill 正文由 Agent 按 catalog 中的绝对 `location` 使用 `read_file` 读取。真实 turn、`context:describe` 和 `/compact` 共用该 loader，避免上下文检查视图和 LLM 实际输入漂移。
 - `src/main/context-describe-service.ts`：按需重建某个 session 的 Context 明细，不调用 LLM；现在通过同一 runtime context loader 注入主系统提示词文件和 `AGENTS.md` rules，再用 `buildContextEntries` 生成 systemPrompt / rules / tools / conversation 逐条全文。
 - `src/main/kairos-bootstrap.ts`：`ensureKairosScaffolding(kairosRoot)` 幂等建目录 + 落 4 份默认 config；`createKairosLlm()` 复用 `buildLLMConfig`；`createKairosToolManagerFactory({ workspaceRoot })` 把 `blocklist.toolsDenied` 合并进 `disabledTools`。

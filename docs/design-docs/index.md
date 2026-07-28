@@ -27,7 +27,7 @@
 | 目录 | 内容边界 | 入口或代表文档 |
 |---|---|---|
 | `agent-runtime/` | Agent 主运行时、Turn 分层、当前模块和内部测试 | `docs/design-docs/agent-runtime/agent-backend-design.md` |
-| `model-context/` | 模型供应商、模型能力、公共模型目录、token、上下文压缩和缓存审计 | `docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/model-context/agent-duckding-multi-key-model-catalog.md` |
+| `model-context/` | 模型供应商、模型能力、远端/本地模型目录、token、上下文压缩和缓存审计 | `docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/model-context/agent-duckcoding-multi-key-model-catalog.md` |
 | `tool-system/` | Skill、Web 工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md` |
 | `execution-safety/` | 工具权限、审批暂停恢复、Bash 策略和执行模型 | `docs/design-docs/execution-safety/agent-权限设计规则和原则.md` |
 | `browser/` | Browser Bridge、ActSpace 集成和 canonical command | `docs/design-docs/browser/agent-browser-use-index.md` |

@@ -66,7 +66,7 @@ export interface ReadFileRangeCacheEntry {
 }
 
 export interface ToolRuntimeConfig {
-  primaryProvider?: "deepseek" | "kimi" | "openrouter" | "duckding" | "mock";
+  primaryProvider?: "deepseek" | "kimi" | "openrouter" | "duckcoding" | "mock";
   apiFormat?: "openai" | "anthropic";
   hasKimiKey?: boolean;
   /** 是否配置了任一 web_search provider key（智谱 / Tavily / TinyFish / Exa） */

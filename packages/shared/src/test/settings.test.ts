@@ -23,7 +23,7 @@ describe("settings v2 contract", () => {
           proxy: { enabled: true, url: "http://127.0.0.1:7890" },
           lastConnection: { status: "untested" },
         },
-        duckding: {
+        duckcoding: {
           hasApiKey: true,
           enabled: true,
           defaultPricingMultiplier: 1,
@@ -38,7 +38,7 @@ describe("settings v2 contract", () => {
       },
       installedModels: {
         "deepseek:deepseek-v4-pro": { enabled: true, addedAt: "2026-07-24T00:00:00.000Z" },
-        "duckding:grok-4.5": {
+        "duckcoding:grok-4.5": {
           enabled: true,
           addedAt: "2026-07-24T00:00:00.000Z",
           credentialId: "sale",

@@ -1,6 +1,8 @@
 import {
   BUILTIN_MODEL_LIST,
   CURATED_OPENROUTER_MODEL_LIST,
+  findDuckCodingCatalogModel,
+  findDuckCodingCatalogModelByApiModel,
   listUsableModels,
   resolveConfiguredModel,
   type CatalogModelView,
@@ -8,7 +10,6 @@ import {
   type InstalledModelView,
   type ModelDefinition,
   type ModelKey,
-  type ModelMetadataView,
   type ModelPurpose,
   type ModelSnapshot,
   type LlmProviderId,
@@ -20,25 +21,22 @@ const PURPOSES: readonly ModelPurpose[] = ["chat", "utility", "explore", "kairos
 
 export type ModelStoreResult =
   | { ok: true; model?: InstalledModelView }
-  | { ok: false; code: "invalid_provider" | "model_not_found" | "model_not_installed" | "model_not_removable" | "model_in_use" | "credential_missing"; message: string; references?: string[] };
+  | { ok: false; code: "invalid_provider" | "invalid_model" | "model_not_found" | "model_not_installed" | "model_not_removable" | "model_in_use" | "credential_missing"; message: string; references?: string[] };
 
 export interface ModelStoreServiceOptions {
   settings: SettingsService;
   findCatalogModel?: (apiModel: string) => CatalogModelView | undefined;
-  findMetadataModel?: (metadataKey: string) => ModelMetadataView | undefined;
   now?: () => Date;
 }
 
 export class ModelStoreService {
   private readonly settings: SettingsService;
   private readonly findCatalogModel: (apiModel: string) => CatalogModelView | undefined;
-  private readonly findMetadataModel: (metadataKey: string) => ModelMetadataView | undefined;
   private readonly now: () => Date;
 
   constructor(options: ModelStoreServiceOptions) {
     this.settings = options.settings;
     this.findCatalogModel = options.findCatalogModel ?? (() => undefined);
-    this.findMetadataModel = options.findMetadataModel ?? (() => undefined);
     this.now = options.now ?? (() => new Date());
   }
 
@@ -47,7 +45,10 @@ export class ModelStoreService {
     const stored = this.settings.getModelStorageState();
     const definitions = Object.fromEntries(
       [...BUILTIN_MODEL_LIST, ...CURATED_OPENROUTER_MODEL_LIST, ...Object.values(stored.customModels).filter(isDefined)]
-        .map((definition) => [definition.key, clone(definition)]),
+        .map((definition) => {
+          const resolved = applyDuckCodingCatalogDefinition(clone(definition));
+          return [resolved.key, resolved];
+        }),
     ) as ModelSnapshot["definitions"];
     return {
       providers: Object.fromEntries(Object.entries(view.providers).map(([provider, state]) => [provider, {
@@ -130,32 +131,51 @@ export class ModelStoreService {
   }
 
   async addCustomModel(input: {
-    provider: Extract<LlmProviderId, "duckding">;
+    provider: Extract<LlmProviderId, "duckcoding">;
     apiModel: string;
     label?: string;
     credentialId?: string | null;
-    metadataKey?: string | null;
+    catalogModelId?: string | null;
+    contextWindow?: number | null;
+    maxTokens?: number | null;
   }): Promise<ModelStoreResult> {
     const apiModel = input.apiModel.trim();
     if (!apiModel || apiModel.length > 300 || /\s/.test(apiModel)) {
       return { ok: false, code: "model_not_found", message: "模型名称不能为空、不能包含空白，且不能超过 300 个字符。" };
     }
-    const key = `duckding:${apiModel}` as ModelKey;
+    if (input.contextWindow != null && !isValidTokenLimit(input.contextWindow)) {
+      return { ok: false, code: "invalid_model", message: "最大上下文必须是 1,024 到 10,000,000 之间的整数。" };
+    }
+    if (input.maxTokens != null && !isValidTokenLimit(input.maxTokens)) {
+      return { ok: false, code: "invalid_model", message: "最大输出必须是 1,024 到 10,000,000 之间的整数。" };
+    }
+    const catalog = input.catalogModelId ? findDuckCodingCatalogModel(input.catalogModelId) : undefined;
+    if (input.catalogModelId && !catalog) {
+      return { ok: false, code: "model_not_found", message: "选择的 DuckCoding 本地模型档案不存在。" };
+    }
+    if (catalog && catalog.apiModel !== apiModel) {
+      return { ok: false, code: "invalid_model", message: "模型名称与选择的 DuckCoding 本地档案不一致。" };
+    }
+    const key = `duckcoding:${apiModel}` as ModelKey;
     const stored = this.settings.getModelStorageState();
     if (stored.installedModels[key]) {
       return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === key) };
     }
     const credentialId = input.credentialId?.trim() || undefined;
-    if (credentialId && !this.settings.getV2().providers.duckding.additionalCredentials?.some(
+    if (credentialId && !this.settings.getV2().providers.duckcoding.additionalCredentials?.some(
       (credential) => credential.id === credentialId && credential.hasApiKey,
     )) {
       return { ok: false, code: "credential_missing", message: "选择的额外 API Key 不存在。" };
     }
-    const metadata = input.metadataKey ? this.findMetadataModel(input.metadataKey) : undefined;
-    if (input.metadataKey && !metadata) {
-      return { ok: false, code: "model_not_found", message: "选择的公共模型元数据已失效，请重新搜索。" };
-    }
-    const definition = metadataToCustomDefinition(key, apiModel, input.label, metadata, this.now().toISOString());
+    const definition = duckCodingToCustomDefinition({
+      key,
+      apiModel,
+      label: input.label,
+      catalog,
+      contextWindow: input.contextWindow,
+      maxTokens: input.maxTokens,
+      catalogUpdatedAt: this.now().toISOString(),
+    });
     await this.settings.updateModelStorage({
       installedModels: {
         [key]: {
@@ -256,39 +276,53 @@ export class ModelStoreService {
   }
 }
 
-function metadataToCustomDefinition(
-  key: ModelKey,
-  apiModel: string,
-  label: string | undefined,
-  metadata: ModelMetadataView | undefined,
-  catalogUpdatedAt: string,
-): ModelDefinition {
+function duckCodingToCustomDefinition(input: {
+  key: ModelKey;
+  apiModel: string;
+  label?: string;
+  catalog?: NonNullable<ReturnType<typeof findDuckCodingCatalogModel>>;
+  contextWindow?: number | null;
+  maxTokens?: number | null;
+  catalogUpdatedAt: string;
+}): ModelDefinition {
+  const { key, apiModel, catalog } = input;
   return {
     key,
-    provider: "duckding",
-    api: "openai-completions",
+    provider: "duckcoding",
+    api: catalog?.api ?? "openai-completions",
     apiModel,
-    label: label?.trim().slice(0, 180) || metadata?.name || apiModel,
+    label: input.label?.trim().slice(0, 180) || catalog?.label || apiModel,
     source: "custom",
-    contextWindow: metadata?.contextWindow ?? null,
-    maxTokens: metadata?.maxTokens ?? null,
-    thinkingDefault: metadata?.capabilities.reasoning ?? false,
-    capabilities: metadata ? clone(metadata.capabilities) : {
+    contextWindow: input.contextWindow ?? catalog?.contextWindow ?? null,
+    maxTokens: input.maxTokens ?? catalog?.maxTokens ?? null,
+    thinkingDefault: catalog?.thinkingDefault ?? false,
+    capabilities: catalog ? clone(catalog.capabilities) : {
       input: ["text"],
-      toolUse: "unknown",
+      toolUse: "declared",
       reasoning: false,
       thinkingToggle: false,
     },
-    ...(metadata?.pricing && { pricing: clone(metadata.pricing) }),
-    ...(metadata && {
-      metadata: {
-        source: metadata.source,
-        provider: metadata.provider,
-        modelId: metadata.modelId,
-        fetchedAt: metadata.fetchedAt,
-      },
+    ...(catalog?.requestModelByReasoningEffort && {
+      requestModelByReasoningEffort: clone(catalog.requestModelByReasoningEffort),
     }),
-    catalogUpdatedAt,
+    ...(catalog?.family && { family: catalog.family }),
+    ...(catalog?.pricing && { pricing: clone(catalog.pricing) }),
+    catalogUpdatedAt: input.catalogUpdatedAt,
+  };
+}
+
+function isValidTokenLimit(value: number): boolean {
+  return Number.isInteger(value) && value >= 1_024 && value <= 10_000_000;
+}
+
+function applyDuckCodingCatalogDefinition(definition: ModelDefinition): ModelDefinition {
+  if (definition.provider !== "duckcoding") return definition;
+  const catalog = findDuckCodingCatalogModelByApiModel(definition.apiModel);
+  if (!catalog) return definition;
+  return {
+    ...definition,
+    api: catalog.api,
+    ...(catalog.pricing && { pricing: clone(catalog.pricing) }),
   };
 }
 

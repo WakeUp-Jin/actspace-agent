@@ -1,6 +1,6 @@
 import type { ModelApi } from "./model-config";
 
-export type ProviderId = "deepseek" | "kimi" | "openrouter" | "duckding";
+export type ProviderId = "deepseek" | "kimi" | "openrouter" | "duckcoding";
 
 export interface ProviderSpec {
   id: ProviderId;
@@ -11,7 +11,7 @@ export interface ProviderSpec {
   supportsProxy: boolean;
 }
 
-export const PROVIDER_IDS = ["deepseek", "kimi", "openrouter", "duckding"] as const satisfies readonly ProviderId[];
+export const PROVIDER_IDS = ["deepseek", "kimi", "openrouter", "duckcoding"] as const satisfies readonly ProviderId[];
 
 export const PROVIDER_REGISTRY: Record<ProviderId, ProviderSpec> = {
   deepseek: {
@@ -38,11 +38,11 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderSpec> = {
     supportsRemoteModelCatalog: true,
     supportsProxy: true,
   },
-  duckding: {
-    id: "duckding",
-    label: "DuckDing",
-    defaultBaseUrl: "https://www.duckcoding.ai/v1",
-    supportedApis: ["openai-completions"],
+  duckcoding: {
+    id: "duckcoding",
+    label: "DuckCoding",
+    defaultBaseUrl: "https://api.duckcoding.ai/v1",
+    supportedApis: ["openai-completions", "openai-responses"],
     supportsRemoteModelCatalog: false,
     supportsProxy: true,
   },

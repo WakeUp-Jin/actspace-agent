@@ -5,7 +5,7 @@ export function providerDisplayName(provider: ProviderId | string): string {
   if (provider === "deepseek") return "DeepSeek";
   if (provider === "kimi") return "Kimi";
   if (provider === "openrouter") return "OpenRouter";
-  if (provider === "duckding") return "DuckDing";
+  if (provider === "duckcoding") return "DuckCoding";
   return provider;
 }
 

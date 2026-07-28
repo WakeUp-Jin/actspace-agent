@@ -63,8 +63,8 @@ const PROVIDERS: ProviderMeta[] = [
     supportsBalance: true,
   },
   {
-    id: "duckding",
-    label: "DuckDing",
+    id: "duckcoding",
+    label: "DuckCoding",
     description: "DuckCoding OpenAI 兼容中转",
     compatibility: "第三方兼容",
     group: "compatible",
@@ -318,7 +318,7 @@ function ProviderCard({
             {busy ? <Loader2 className="animate-spin motion-reduce:animate-none" size={14} aria-label="测试中" /> : "测试"}
           </button>
           <button type="button" className="h-7 rounded-act-md px-1.5 text-[11px] font-medium text-text-muted hover:bg-surface-subtle hover:text-text-main" onClick={onEdit}>编辑</button>
-          {state?.hasApiKey ? <button type="button" className="h-7 rounded-act-md px-1.5 text-[11px] font-medium text-text-faint hover:bg-danger-soft hover:text-on-danger" onClick={onDisconnect} disabled={busy}>{provider.id === "duckding" && (state.additionalCredentials?.length ?? 0) > 0 ? "断开默认" : "断开"}</button> : null}
+          {state?.hasApiKey ? <button type="button" className="h-7 rounded-act-md px-1.5 text-[11px] font-medium text-text-faint hover:bg-danger-soft hover:text-on-danger" onClick={onDisconnect} disabled={busy}>{provider.id === "duckcoding" && (state.additionalCredentials?.length ?? 0) > 0 ? "断开默认" : "断开"}</button> : null}
         </div>
       </div>
 
@@ -331,7 +331,7 @@ function ProviderCard({
         <ProviderFact label="接入方式" value="API Key" />
         <ProviderFact label="接入地址" value={compactAddress(address)} title={address} />
         <ProviderFact label="代理" value={state?.proxy?.enabled ? compactAddress(state.proxy.url ?? "已开启") : "关闭"} title={state?.proxy?.url ?? undefined} />
-        {provider.id === "duckding" ? <ProviderFact label="默认 Key 倍率" value={`${state?.defaultPricingMultiplier ?? 1}x`} /> : null}
+        {provider.id === "duckcoding" ? <ProviderFact label="默认 Key 倍率" value={`${state?.defaultPricingMultiplier ?? 1}x`} /> : null}
       </dl>
     </article>
   );
@@ -517,7 +517,7 @@ function ProviderDialog({
             ...(provider === "openrouter" && managementKey.trim() && { managementKey: managementKey.trim() }),
             baseUrl: baseUrl || null,
             proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl : null },
-            ...(provider === "duckding" && { defaultPricingMultiplier: Number(defaultPricingMultiplier) }),
+            ...(provider === "duckcoding" && { defaultPricingMultiplier: Number(defaultPricingMultiplier) }),
           })
         : await window.actspace.connectProvider?.({
             provider,
@@ -525,7 +525,7 @@ function ProviderDialog({
             ...(provider === "openrouter" && { managementKey: managementKey.trim() || null }),
             baseUrl: baseUrl || null,
             proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl : null },
-            ...(provider === "duckding" && { defaultPricingMultiplier: Number(defaultPricingMultiplier) }),
+            ...(provider === "duckcoding" && { defaultPricingMultiplier: Number(defaultPricingMultiplier) }),
           });
       if (!result || !result.ok) { setError(result && "error" in result ? result.error.message : "保存失败。"); return; }
       await onSaved();
@@ -552,7 +552,7 @@ function ProviderDialog({
             </Field>
           ) : null}
           <Field label="Base URL（可选）"><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="使用服务商默认地址" className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field>
-          {provider === "duckding" ? (
+          {provider === "duckcoding" ? (
             <Field label="默认 Key 价格倍率">
               <div className="relative">
                 <input aria-label="默认 Key 价格倍率" type="number" min="0" max="100" step="0.0001" value={defaultPricingMultiplier} onChange={(event) => setDefaultPricingMultiplier(event.target.value)} className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 pr-8 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" />
@@ -563,12 +563,12 @@ function ProviderDialog({
           ) : null}
           <label className="flex min-h-11 items-center justify-between rounded-act-md border border-line px-3"><span className="text-[13px] font-medium text-text-main">仅为此服务商启用代理</span><input type="checkbox" checked={proxyEnabled} onChange={(event) => setProxyEnabled(event.target.checked)} /></label>
           {proxyEnabled ? <Field label="HTTP(S) 代理地址"><input value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder="http://127.0.0.1:7890" className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field> : null}
-          {provider === "duckding" && configured ? (
+          {provider === "duckcoding" && configured ? (
             <ProviderCredentialManager provider={provider} current={providerState} onChanged={async (next) => { setProviderState(next); await onProviderChanged(next); }} />
           ) : null}
           {error ? <p role="alert" className="text-[12px] text-on-danger">{error}</p> : null}
         </div>
-        <div className="mt-6 flex justify-end gap-2"><button type="button" className="h-10 rounded-act-md border border-line px-4 text-[13px] font-semibold text-text-main hover:bg-surface-subtle" onClick={onClose}>取消</button><button type="button" className="h-10 rounded-act-md bg-text-main px-4 text-[13px] font-semibold text-surface transition-opacity hover:opacity-85 disabled:opacity-40" disabled={saving || (!configured && !apiKey.trim()) || (proxyEnabled && !proxyUrl.trim()) || (provider === "duckding" && !isValidMultiplierValue(defaultPricingMultiplier))} onClick={() => void save()}>{saving ? "保存中…" : "保存"}</button></div>
+        <div className="mt-6 flex justify-end gap-2"><button type="button" className="h-10 rounded-act-md border border-line px-4 text-[13px] font-semibold text-text-main hover:bg-surface-subtle" onClick={onClose}>取消</button><button type="button" className="h-10 rounded-act-md bg-text-main px-4 text-[13px] font-semibold text-surface transition-opacity hover:opacity-85 disabled:opacity-40" disabled={saving || (!configured && !apiKey.trim()) || (proxyEnabled && !proxyUrl.trim()) || (provider === "duckcoding" && !isValidMultiplierValue(defaultPricingMultiplier))} onClick={() => void save()}>{saving ? "保存中…" : "保存"}</button></div>
       </div>
     </div>
   );
@@ -579,7 +579,7 @@ function ProviderCredentialManager({
   current,
   onChanged,
 }: {
-  provider: Extract<LlmProviderId, "duckding">;
+  provider: Extract<LlmProviderId, "duckcoding">;
   current?: ProviderSettingsView;
   onChanged: (provider: ProviderSettingsView) => void;
 }) {
@@ -635,7 +635,7 @@ function ProviderCredentialRow({
   credential,
   onChanged,
 }: {
-  provider: Extract<LlmProviderId, "duckding">;
+  provider: Extract<LlmProviderId, "duckcoding">;
   credential: NonNullable<ProviderSettingsView["additionalCredentials"]>[number];
   onChanged: (provider: ProviderSettingsView) => void;
 }) {
