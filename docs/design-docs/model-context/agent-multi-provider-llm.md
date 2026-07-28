@@ -4,9 +4,9 @@
 
 - 状态：代码已落地，待用户统一手动验收。
 - 确认日期：2026-07-24。
-- 首批供应商：DeepSeek、Kimi、OpenRouter。
+- 当前供应商：DeepSeek、Kimi、OpenRouter、DuckCoding。
 - 对应 execution plan：`docs/exec-plans/active/20260724-multi-provider-llm/README.md`。
-- 当前实现已贯通 DeepSeek / Kimi / OpenRouter 的 settings v2、动态模型解析、服务商级代理 transport、任务模型 runtime、IPC 与设置页；OpenRouter 真实代理和跨任务模型场景仍按 execution plan 由用户统一手动验收。
+- 当前实现已贯通 DeepSeek / Kimi / OpenRouter / DuckCoding 的 settings v2、动态模型解析、服务商级代理 transport、任务模型 runtime、IPC 与设置页；DuckCoding 额外支持渐进式多 Key、本地 Codex/Grok 档案、Codex Responses、请求模型名变体和 Key 倍率。OpenRouter 真实代理、DuckCoding 真实 Agent 工具循环和跨任务模型场景仍按 execution plan 由用户统一手动验收。
 
 本文是 actspace 多供应商 LLM、用户模型管理、服务商级代理和任务模型分配的长期设计事实来源。
 
@@ -16,10 +16,11 @@
 - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`：当前 DeepSeek / Kimi 协议与能力边界。
 - `docs/design-docs/frontend/front-设置页规范.md`：设置页信息架构和交互基线。
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：模型 usage、价格快照和成本统计。
+- `docs/design-docs/model-context/agent-duckcoding-multi-key-model-catalog.md`：DuckCoding、多 Key、本地模型档案、名称变体与倍率定价的已实现首版边界。
 
 ## 背景
 
-当前系统已经具备协议层复用基础：模型元数据区分 `api` 与 `provider`，LLM 工厂按 `openai-completions` / `anthropic-messages` 创建协议服务。但多供应商能力仍有以下结构性限制：
+当前系统已经具备协议层复用基础：模型元数据区分 `api` 与 `provider`，LLM 工厂按 `openai-completions` / `openai-responses` / `anthropic-messages` 创建协议服务。但多供应商能力仍有以下结构性限制：
 
 - `ProviderId`、API Key、Base URL 和设置页供应商列表只覆盖 DeepSeek / Kimi。
 - `buildLLMConfig()` 通过手写 provider Map 选择密钥和端点，新增供应商需要修改多处分支。
@@ -32,18 +33,18 @@
 
 ## 目标
 
-- 用户可以独立连接 DeepSeek、Kimi、OpenRouter，并分别配置 API Key、Base URL 与代理。
+- 用户可以独立连接 DeepSeek、Kimi、OpenRouter、DuckCoding，并分别配置 API Key、Base URL 与代理。
 - OpenRouter 默认提供少量经过验证的精选模型，同时允许用户从远端目录搜索并添加其他模型。
 - 用户可以控制哪些模型出现在主会话和任务模型选择器中。
 - 默认会话模型、轻量任务模型、Explore 模型由用户显式选择。
 - 轻量任务模型用于会话标题、工具输出摘要、上下文压缩等低成本、纯文本任务，不再固定绑定 DeepSeek。
 - Composer、轻量任务、Explore、Kairos 使用统一的可用模型发现逻辑，但按任务能力要求过滤。
-- 保持协议服务 provider-neutral：OpenRouter 复用 OpenAI-compatible 协议服务，不复制完整 service 实现。
+- 保持协议服务 provider-neutral：OpenRouter 复用 Chat Completions，DuckCoding Codex 复用 Responses，不在 Agent loop 复制供应商品牌分支。
 - API Key、代理认证等敏感值不进入 renderer、session、日志或普通 settings 文件。
 
 ## 非目标
 
-- 首版不开放任意自定义供应商；供应商类型固定为 DeepSeek、Kimi、OpenRouter。
+- 首版不开放任意自定义供应商；供应商类型固定为 DeepSeek、Kimi、OpenRouter、DuckCoding。
 - 首版不接入 OpenRouter provider-native 工具、搜索、自动模型路由或模型 fallback。
 - 首版不把 OpenRouter 数百个模型全部直接展示在 Composer。
 - 首版不支持带用户名密码的代理 URL，也不支持 PAC、系统全局代理或按请求自动切换代理。
@@ -61,9 +62,10 @@
 负责“消息、工具、流式响应如何编码”。当前为：
 
 - `openai-completions`
+- `openai-responses`
 - `anthropic-messages`
 
-Provider 与协议不是一一对应。DeepSeek 可走 Anthropic-compatible 或 OpenAI-compatible；OpenRouter 首版走 OpenAI-compatible。
+Provider 与协议不是一一对应。DeepSeek 可走 Anthropic-compatible 或 OpenAI Chat Completions；OpenRouter 首版走 Chat Completions；DuckCoding 的 Codex 档案走 Responses，Grok 与未知手动模型默认走 Chat Completions。
 
 ### Catalog Model（目录模型）
 
@@ -92,7 +94,7 @@ flowchart LR
   ModelSpec["Resolved ModelSpec\nprovider + api + apiModel + capabilities"]
   Runtime["ProviderRuntimeConfig\napiKey + baseUrl + transport"]
   Factory["LLM Factory\n按协议创建 Service"]
-  Protocol["OpenAI / Anthropic\nProtocol Service"]
+  Protocol["OpenAI Chat / Responses / Anthropic\nProtocol Service"]
   Endpoint["Provider Endpoint"]
 
   Settings --> Runtime
@@ -120,8 +122,8 @@ flowchart LR
 以下类型用于表达设计边界，命名可在实现时按现有 shared 风格调整。
 
 ```ts
-type ProviderId = "deepseek" | "kimi" | "openrouter";
-type ModelApi = "openai-completions" | "anthropic-messages";
+type ProviderId = "deepseek" | "kimi" | "openrouter" | "duckcoding";
+type ModelApi = "openai-completions" | "openai-responses" | "anthropic-messages";
 type ModelKey = `${ProviderId}:${string}`;
 
 interface ProviderSpec {
@@ -200,13 +202,14 @@ openrouter:anthropic/claude-...
 
 ## 服务商注册表
 
-首版注册三家：
+首版当前注册四家：
 
 | Provider | 默认协议 | 默认 Base URL | 远端模型目录 | 默认代理 |
 | --- | --- | --- | --- | --- |
 | DeepSeek | Anthropic-compatible，可显式回退 OpenAI-compatible | 当前 DeepSeek 默认端点 | 否 | 关闭 |
 | Kimi | OpenAI-compatible | `https://api.moonshot.cn/v1` | 首版不使用 | 关闭 |
 | OpenRouter | OpenAI-compatible | `https://openrouter.ai/api/v1` | 是 | 关闭，由用户开启 |
+| DuckCoding | Codex: Responses；Grok/未知模型: Chat Completions | `https://api.duckcoding.ai/v1` | 否，本地档案 | 关闭 |
 
 Provider adapter 可提供：
 
@@ -398,7 +401,7 @@ Kairos
 页面分组：
 
 1. 模型服务商
-   - 已连接的 DeepSeek / Kimi / OpenRouter 卡片。
+   - 已配置的 DeepSeek / Kimi / OpenRouter / DuckCoding 卡片。
    - 主操作“添加服务”。
    - 编辑、测试连接、断开。
    - 展示账户余额、状态、已启用模型数、接入方式、Base URL、代理状态。余额查询通过通用 provider IPC 分发到各服务商适配器，不与 Usage 统计页耦合。
@@ -406,7 +409,7 @@ Kairos
    - 迁移当前智谱 / Tavily / TinyFish / Exa 配置。
    - 保持它们属于 ToolManager 搜索通道，不与 LLM Model Registry 混合。
 
-“添加服务”只展示尚未连接的三家受支持服务商，不展示尚未实现的供应商。
+“添加服务”只展示尚未配置的四家受支持服务商，不展示尚未实现的供应商。DuckCoding 即使默认 Key 缺失，只要仍有额外 Key，也继续保留卡片和管理入口。
 
 连接流程：
 
@@ -414,6 +417,7 @@ Kairos
 选择服务商
 → 填 API Key
 → OpenRouter 可选填 Management Key（账户余额专用）
+→ DuckCoding 可配置默认 Key 倍率，并在连接后管理额外 Key
 → 展开高级配置（Base URL / 代理）
 → 保存并测试
 → available 后安装默认模型
@@ -509,6 +513,7 @@ renderer 只调用结构化 IPC：
 - OpenRouter → `OpenAICompletionsService`。
 - Kimi → `OpenAICompletionsService`。
 - DeepSeek 默认 → `AnthropicMessagesService`。
+- DuckCoding Codex → `OpenAIResponsesService`；Grok 与未知手动模型 → `OpenAICompletionsService`。
 
 `LLMConfig` 目标扩展：
 
@@ -521,6 +526,7 @@ interface LLMConfig {
   model: string;
   transport?: { proxyUrl?: string };
   defaultHeaders?: Record<string, string>;
+  promptCacheKey?: string;
   // existing input / temperature / maxTokens / retry...
 }
 ```
@@ -534,6 +540,8 @@ Provider request adapter 只处理请求差异，不拥有消息历史：
 - provider display name 与错误分类补充。
 
 消息转换、tool call 对账、usage 归一仍归协议服务。
+
+Responses 协议使用本地上下文管理：请求保持 `store: false`，不依赖 `previous_response_id`。主 Agent 的 `promptCacheKey` 由 session id 哈希派生，只用于稳定前缀缓存；加密 reasoning item 作为 opaque provider signature 进入 session 事件并在后续工具轮次回放，不能把缓存键或普通文本消息误当作完整的 Responses 会话状态。
 
 ### 推理强度能力与请求链路
 
@@ -652,6 +660,8 @@ Provider request adapter 只处理请求差异，不拥有消息历史：
 - OpenRouter 直连失败但经本地 HTTP 代理成功。
 - 关闭 OpenRouter 代理不影响 DeepSeek / Kimi。
 - OpenRouter 目录加载、添加模型、Composer 使用、usage 落盘完整。
+- DuckCoding 默认 Key / 额外 Key 分别绑定模型，确认请求密钥与倍率后的 Usage 估算正确；Codex 强度通过请求模型名变体生效。
+- DuckCoding Codex 用 Responses 完成至少一次工具调用和后续轮次，确认 session 缓存键命中、加密 reasoning item 回放及 cached token usage 正确；Grok 保持 Chat Completions。
 - utility 选择 OpenRouter 模型后，会话标题和 `/compact` 不再请求 DeepSeek。
 
 真实探针不得携带仓库、session 或个人数据。
@@ -671,6 +681,8 @@ Provider request adapter 只处理请求差异，不拥有消息历史：
 ## 已确认决策
 
 - 首批只支持 DeepSeek、Kimi、OpenRouter 三家服务商。
+- 2026-07-27 的 Plan 7 在首批三家之外新增 DuckCoding；现有默认 Key 路径不迁移，额外 Key 采用可选 `credentialId` 渐进扩展。2026-07-28 将模型来源收敛为本地 Codex/Grok 档案和手动兜底。
+- 2026-07-28 的缓存归因探针只在 Responses 对照中确认 Codex 缓存命中，因此 Codex 本地档案使用 `openai-responses`，Grok 与未知手动模型默认保留 `openai-completions`。
 - 服务商与模型在设置页分成两个入口。
 - 代理按服务商配置，不做全局代理。
 - OpenRouter 采用“精选默认模型 + 远端目录手动添加”。

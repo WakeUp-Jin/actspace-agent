@@ -16,6 +16,12 @@ export interface ProviderAvailability {
   enabled: boolean;
   hasApiKey: boolean;
   lastConnection: ProviderConnectionState;
+  additionalCredentials?: Record<string, ProviderCredentialAvailability>;
+}
+
+export interface ProviderCredentialAvailability {
+  hasApiKey: boolean;
+  lastConnection: ProviderConnectionState;
 }
 
 export interface ModelSnapshot {
@@ -29,6 +35,8 @@ export type ModelUnavailabilityReason =
   | "provider_disabled"
   | "provider_disconnected"
   | "connection_unavailable"
+  | "credential_missing"
+  | "credential_unavailable"
   | "model_not_installed"
   | "model_disabled"
   | "capability_mismatch";
@@ -70,16 +78,23 @@ export function resolveConfiguredModel(
 
   const provider = snapshot.providers[definition.provider];
   if (!provider.enabled) return { ok: false, key, definition, reason: "provider_disabled" };
-  if (!provider.hasApiKey) return { ok: false, key, definition, reason: "provider_disconnected" };
-  // A configured credential is usable before the optional connection test runs.
-  // Only an explicit failed test should remove the provider from model choices.
-  if (provider.lastConnection.status === "unavailable") {
-    return { ok: false, key, definition, reason: "connection_unavailable" };
-  }
-
   const installed = snapshot.installedModels[key];
   if (!installed) return { ok: false, key, definition, reason: "model_not_installed" };
   if (!installed.enabled) return { ok: false, key, definition, reason: "model_disabled" };
+  if (installed.credentialId) {
+    const credential = provider.additionalCredentials?.[installed.credentialId];
+    if (!credential?.hasApiKey) return { ok: false, key, definition, reason: "credential_missing" };
+    if (credential.lastConnection.status === "unavailable") {
+      return { ok: false, key, definition, reason: "credential_unavailable" };
+    }
+  } else {
+    if (!provider.hasApiKey) return { ok: false, key, definition, reason: "provider_disconnected" };
+    // A configured credential is usable before the optional connection test runs.
+    // Only an explicit failed test should remove models inheriting the default Key.
+    if (provider.lastConnection.status === "unavailable") {
+      return { ok: false, key, definition, reason: "connection_unavailable" };
+    }
+  }
   if (!capabilityMatchesPurpose(definition, purpose)) {
     return { ok: false, key, definition, reason: "capability_mismatch" };
   }

@@ -20,6 +20,6 @@
 | 前后端对接 | B+ | 双通道流式架构已落地，Composer 可真实发送；普通会话默认走 DeepSeek，最终展示以恢复后的 `SessionRecord` 为事实来源。 | 继续打磨 streaming UI、工具状态和真实 Electron 回归。 |
 | 测试 | B+ | vitest 测试体系覆盖核心模块与 E2E smoke；新增 bridge 测试锁定 `user_message -> thinking/tool -> assistant -> context` 事件顺序。 | 补自动化的 provider integration gate、前端 UI/turn 测试和 CI。 |
 | 可观测性 | C | 已有应用数据 `logs/` 目录初始化、根目录本地开发日志入口 `pnpm dev:log`、即时 console 链路日志，以及每次 Agent turn 一个最近 1 天保留的 JSONL 排障文件。 | 补统一错误面板、renderer 错误按 turn 归因和 provider/tool 故障排查约定。 |
-| 安全 | B- | Electron 边界采用 `contextIsolation` + preload bridge，workspace-guard 路径守卫，env.ts 集中管密钥（.env 不提交、Object.freeze 冻结、验证前置），SECURITY.md 已补充密钥管理和进程隔离约束。 | 真实 provider 接入时补充 API Key 轮换、错误暴露策略和数据脱敏规则。 |
+| 安全 | B | Electron 边界采用 `contextIsolation` + preload bridge；provider 默认 Key、额外命名 Key 与搜索 Key 均由 main 使用 `safeStorage` 管理，renderer 只接收脱敏状态；DuckCoding 本地模型档案不读取外部目录或携带用户凭据。 | 补 API Key 替换/轮换流程、更完整的错误脱敏和敏感路径按需读审核。 |
 | 学习沉淀 | B | 体系已经跑起来，且已有学习文档。 | 随着 DeepSeek 接入和前端对接，继续补真正有迁移价值的学习文档。 |
 | Kairos 自治模式 | B+ | v1 闭环已落地，KairosPage 已从原始事件表改成监控台式两列 UI；上下文已重构为「静态前缀 + 动态尾部」（system prompt 静态化、观测增量进 tick message、thinking 全链路落盘/重放/展示、contextWindow 接模型注册表），重放保真有序列化层 deepEqual 回归锁住；短期记忆压缩已接线（tick 闭合后异步触发 week 压缩，`compression/trigger.ts`）。 | 真实 tick 缓存命中率（目标 ≥85%）待手动验收；intra-day 压缩与压缩 LLM 调用的用量计费未做；继续补 notes 编辑、external 数据源插件。 |

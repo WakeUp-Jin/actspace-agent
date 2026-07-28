@@ -23,9 +23,26 @@ describe("settings v2 contract", () => {
           proxy: { enabled: true, url: "http://127.0.0.1:7890" },
           lastConnection: { status: "untested" },
         },
+        duckcoding: {
+          hasApiKey: true,
+          enabled: true,
+          defaultPricingMultiplier: 1,
+          additionalCredentials: [{
+            id: "sale",
+            label: "CodeX-Sale",
+            pricingMultiplier: 0.2,
+            lastConnection: { status: "available", checkedAt: "2026-07-24T00:00:00.000Z" },
+            hasApiKey: true,
+          }],
+        },
       },
       installedModels: {
         "deepseek:deepseek-v4-pro": { enabled: true, addedAt: "2026-07-24T00:00:00.000Z" },
+        "duckcoding:grok-4.5": {
+          enabled: true,
+          addedAt: "2026-07-24T00:00:00.000Z",
+          credentialId: "sale",
+        },
       },
       customModels: {},
       taskModels: {

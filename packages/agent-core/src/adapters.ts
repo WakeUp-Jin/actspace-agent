@@ -24,10 +24,11 @@ import type {
   ImageContent,
   Message,
   TextContent,
+  ThinkingContent,
   ToolResultMessage,
   UserMessage,
 } from "./messages";
-import { getTextContent, getThinkingContent, getToolCalls } from "./messages";
+import { getTextContent, getToolCalls } from "./messages";
 import { sanitizeBrowserToolArgs } from "./tools/tools/browser/redaction";
 
 // ─── 事件 ID 生成 ───
@@ -160,12 +161,17 @@ export function assistantMessageToEvents(
 ): SessionEvent[] {
   const events: SessionEvent[] = [];
 
-  const thinking = getThinkingContent(msg);
-  if (thinking) {
+  const thinkingBlocks = msg.content.filter((block): block is ThinkingContent => block.type === "thinking");
+  for (const thinking of thinkingBlocks) {
+    if (!thinking.thinking && !thinking.signature) continue;
     events.push(
       createSessionEvent(sessionId, turnId, "thinking", {
-        content: thinking,
+        content: thinking.thinking,
         collapsedByDefault: true,
+        ...(thinking.signature && { signature: thinking.signature }),
+        ...(msg.api && { api: msg.api }),
+        model: msg.model,
+        provider: msg.provider,
       }, msg.timestamp),
     );
   }
@@ -177,6 +183,9 @@ export function assistantMessageToEvents(
         id: tc.id,
         name: tc.name,
         arguments: sanitizeBrowserToolArgs(tc.name, tc.arguments),
+        ...(msg.api && { api: msg.api }),
+        model: msg.model,
+        provider: msg.provider,
       }, msg.timestamp),
     );
   }
@@ -189,6 +198,7 @@ export function assistantMessageToEvents(
     const reply: AssistantReply = {
       content: text,
       stopReason: msg.stopReason,
+      ...(msg.api && { api: msg.api }),
       model: msg.model,
       provider: msg.provider,
       usage: {
@@ -276,8 +286,9 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
   const errors: Array<{ index: number; error: string }> = [];
   const now = Date.now();
 
-  let pendingThinking: string | undefined;
+  let pendingThinking: ThinkingContent[] = [];
   let pendingToolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> = [];
+  let pendingAssistantIdentity: Pick<AssistantMessage, "api" | "model" | "provider"> | undefined;
 
   for (let i = 0; i < events.length; i++) {
     const event = events[i];
@@ -300,8 +311,19 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
         }
 
         case "thinking": {
-          const payload = event.payload as { content: string };
-          pendingThinking = payload.content;
+          const payload = event.payload as {
+            content: string;
+            signature?: string;
+            api?: AssistantMessage["api"];
+            model?: string;
+            provider?: string;
+          };
+          pendingThinking.push({
+            type: "thinking",
+            thinking: payload.content,
+            ...(payload.signature && { signature: payload.signature }),
+          });
+          pendingAssistantIdentity = mergePendingAssistantIdentity(pendingAssistantIdentity, payload);
           break;
         }
 
@@ -310,12 +332,16 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
             id: string;
             name: string;
             arguments: Record<string, unknown>;
+            api?: AssistantMessage["api"];
+            model?: string;
+            provider?: string;
           };
           pendingToolCalls.push({
             id: payload.id,
             name: payload.name,
             arguments: payload.arguments,
           });
+          pendingAssistantIdentity = mergePendingAssistantIdentity(pendingAssistantIdentity, payload);
           break;
         }
 
@@ -342,10 +368,8 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
           // 还原原始消息的块顺序 [thinking, text, ...toolCalls]（与流式组装一致）。
           // tool_use 必须是 assistant 消息的末尾块：DeepSeek Anthropic 兼容端要求
           // tool_use 之后紧跟 tool_result，若 text 排在 tool_use 后会被 400 拒绝。
-          if (pendingThinking) {
-            content.push({ type: "thinking", thinking: pendingThinking });
-            pendingThinking = undefined;
-          }
+          content.push(...pendingThinking);
+          pendingThinking = [];
           if (payload.content) {
             content.push({ type: "text", text: payload.content });
           }
@@ -353,10 +377,12 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
             content.push({ type: "toolCall", id: tc.id, name: tc.name, arguments: tc.arguments });
           }
           pendingToolCalls = [];
+          pendingAssistantIdentity = undefined;
 
           messages.push({
             role: "assistant",
             content,
+            ...(payload.api && { api: payload.api }),
             model: payload.model,
             provider: payload.provider,
             usage: {
@@ -390,8 +416,9 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
           break;
 
         case "turn_aborted":
-          pendingThinking = undefined;
+          pendingThinking = [];
           pendingToolCalls = [];
+          pendingAssistantIdentity = undefined;
           break;
       }
     } catch (err) {
@@ -407,24 +434,25 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
   return { messages, errors };
 
   function flushPendingAssistant(): void {
-    if (!pendingThinking && pendingToolCalls.length === 0) return;
+    if (pendingThinking.length === 0 && pendingToolCalls.length === 0) return;
 
     const content: AssistantMessage["content"] = [];
-    if (pendingThinking) {
-      content.push({ type: "thinking", thinking: pendingThinking });
-      pendingThinking = undefined;
-    }
+    content.push(...pendingThinking);
+    pendingThinking = [];
     for (const tc of pendingToolCalls) {
       content.push({ type: "toolCall", id: tc.id, name: tc.name, arguments: tc.arguments });
     }
     pendingToolCalls = [];
 
     if (content.length > 0) {
+      const identity = pendingAssistantIdentity;
+      pendingAssistantIdentity = undefined;
       messages.push({
         role: "assistant",
         content,
-        model: "unknown",
-        provider: "unknown",
+        ...(identity?.api && { api: identity.api }),
+        model: identity?.model ?? "unknown",
+        provider: identity?.provider ?? "unknown",
         usage: {
           input: 0,
           output: 0,
@@ -440,6 +468,18 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
         timestamp: now,
       });
     }
+  }
+
+  function mergePendingAssistantIdentity(
+    current: Pick<AssistantMessage, "api" | "model" | "provider"> | undefined,
+    next: { api?: AssistantMessage["api"]; model?: string; provider?: string },
+  ): Pick<AssistantMessage, "api" | "model" | "provider"> | undefined {
+    if (!next.model || !next.provider) return current;
+    return {
+      ...(next.api && { api: next.api }),
+      model: next.model,
+      provider: next.provider,
+    };
   }
 }
 

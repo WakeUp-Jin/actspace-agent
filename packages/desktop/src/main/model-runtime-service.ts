@@ -9,6 +9,7 @@ import {
   resolveConfiguredModel,
   type ModelDefinition,
   type ModelKey,
+  type ModelPricing,
   type ModelPurpose,
   type UsableModel,
   type UsableModelView,
@@ -103,18 +104,22 @@ export class ModelRuntimeService {
   }
 
   private fromUsable(model: UsableModel, source: ResolvedRuntimeModel["source"]): RuntimeModelResolution {
-    const runtime = this.settings.getProviderRuntimeConfig(model.definition.provider);
+    const runtime = this.settings.getProviderRuntimeConfigForCredential(
+      model.definition.provider,
+      model.installed.credentialId,
+    );
     if ("code" in runtime) {
       return { ok: false, code: runtime.code, message: runtime.message, modelKey: model.key };
     }
     const agentSettings = this.settings.getV2().agent;
+    const definition = applyPricingMultiplier(model.definition, runtime.pricingMultiplier ?? 1);
     return {
       ok: true,
       model: {
         key: model.key,
-        definition: model.definition,
+        definition,
         providerRuntime: runtime,
-        llmConfig: buildLLMConfigFromRuntime(model.definition, runtime, {
+        llmConfig: buildLLMConfigFromRuntime(definition, runtime, {
           ...(agentSettings.temperature !== null && { temperature: agentSettings.temperature }),
           ...(agentSettings.maxTokens !== null && { maxTokens: agentSettings.maxTokens }),
         }),
@@ -122,4 +127,25 @@ export class ModelRuntimeService {
       },
     };
   }
+}
+
+function applyPricingMultiplier(definition: ModelDefinition, multiplier: number): ModelDefinition {
+  if (!definition.pricing || multiplier === 1) return definition;
+  return { ...definition, pricing: multiplyPricing(definition.pricing, multiplier) };
+}
+
+function multiplyPricing(pricing: ModelPricing, multiplier: number): ModelPricing {
+  const multiply = (value: number): number => Number((value * multiplier).toFixed(8));
+  return {
+    currency: pricing.currency,
+    inputCacheHitPerMillion: multiply(pricing.inputCacheHitPerMillion),
+    inputCacheMissPerMillion: multiply(pricing.inputCacheMissPerMillion),
+    ...(pricing.inputCacheWritePerMillion !== undefined && {
+      inputCacheWritePerMillion: multiply(pricing.inputCacheWritePerMillion),
+    }),
+    outputPerMillion: multiply(pricing.outputPerMillion),
+    ...(pricing.reasoningPerMillion !== undefined && {
+      reasoningPerMillion: multiply(pricing.reasoningPerMillion),
+    }),
+  };
 }

@@ -31,6 +31,12 @@ function makeSnapshot(): ModelSnapshot {
         hasApiKey: true,
         lastConnection: { status: "available", checkedAt: now },
       },
+      duckcoding: {
+        enabled: true,
+        hasApiKey: false,
+        lastConnection: { status: "untested" },
+        additionalCredentials: {},
+      },
     },
     definitions: { ...BUILTIN_MODEL_REGISTRY },
     installedModels: Object.fromEntries(
@@ -179,5 +185,65 @@ describe("model resolver", () => {
     const keys = listUsableModels(snapshot, "chat").map((model) => model.key);
     expect(keys).toContain("kimi:kimi-k2.6");
     expect(keys).toContain("openrouter:kimi-k2.6");
+  });
+
+  it("uses an explicitly bound extra credential without requiring the default Key", () => {
+    const snapshot = makeSnapshot();
+    const definition = dynamicModel({
+      key: "duckcoding:grok-4.5",
+      provider: "duckcoding",
+      apiModel: "grok-4.5",
+      source: "custom",
+      capabilities: {
+        input: ["text"],
+        toolUse: "declared",
+        reasoning: true,
+        thinkingToggle: false,
+      },
+    });
+    install(snapshot, definition);
+    snapshot.installedModels[definition.key] = {
+      enabled: true,
+      addedAt: now,
+      credentialId: "sale",
+    };
+    snapshot.providers.duckcoding.additionalCredentials = {
+      sale: { hasApiKey: true, lastConnection: { status: "available", checkedAt: now } },
+    };
+
+    expect(resolveConfiguredModel(snapshot, definition.key, "chat").ok).toBe(true);
+  });
+
+  it("does not silently fall back when a bound credential is missing or unavailable", () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers.duckcoding.hasApiKey = true;
+    const definition = dynamicModel({
+      key: "duckcoding:grok-4.5",
+      provider: "duckcoding",
+      apiModel: "grok-4.5",
+      source: "custom",
+    });
+    install(snapshot, definition);
+    snapshot.installedModels[definition.key] = {
+      enabled: true,
+      addedAt: now,
+      credentialId: "missing",
+    };
+
+    expect(resolveConfiguredModel(snapshot, definition.key, "utility")).toMatchObject({
+      ok: false,
+      reason: "credential_missing",
+    });
+
+    snapshot.providers.duckcoding.additionalCredentials = {
+      missing: {
+        hasApiKey: true,
+        lastConnection: { status: "unavailable", checkedAt: now },
+      },
+    };
+    expect(resolveConfiguredModel(snapshot, definition.key, "utility")).toMatchObject({
+      ok: false,
+      reason: "credential_unavailable",
+    });
   });
 });

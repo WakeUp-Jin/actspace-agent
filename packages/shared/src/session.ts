@@ -1,4 +1,5 @@
 import type { ContextUsageBucketName } from "./context-buckets";
+import type { ModelApi } from "./model-config";
 
 export type SessionId = string;
 export type TurnId = string;
@@ -153,17 +154,20 @@ export type ThinkingPayload = {
   content: string;
   durationMs?: number;
   collapsedByDefault?: boolean;
-  /**
-   * Provider 签名（Anthropic extended thinking）。重放时必须原样带回——
-   * anthropic-convert 只在 signature 存在时才把 thinking 块回发给 API。
-   */
+  /** Provider opaque signature/state. Replay only to the same provider, model, and API. */
   signature?: string;
+  api?: ModelApi;
+  model?: string;
+  provider?: string;
 };
 
 export type ToolCallPayload = {
   id: ToolCallId;
   name: string;
   arguments: Record<string, unknown>;
+  api?: ModelApi;
+  model?: string;
+  provider?: string;
 };
 
 export type LlmUsagePayload = {
@@ -560,6 +564,7 @@ export type ContextState = {
 export type AssistantReply = {
   content: string;
   stopReason: "stop" | "toolUse" | "length" | "error" | "aborted";
+  api?: ModelApi;
   model: string;
   provider: string;
   modelId?: string;

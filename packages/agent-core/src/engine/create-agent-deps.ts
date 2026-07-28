@@ -13,6 +13,7 @@
  * 打开本文件就能看到：前端传了什么，env 补了什么，最终 LLM 收到什么。
  */
 
+import { createHash } from "node:crypto";
 import type { ModelDefinition, ModelId, ModelKey, ModelReasoningEffort, ModelSpec } from "@actspace/shared";
 import { normalizeModelKey, resolveModelDefinition, resolveModelSpec, MODEL_REGISTRY, PROVIDER_REGISTRY } from "@actspace/shared";
 import type {
@@ -351,23 +352,27 @@ export function buildAgentConfigFromRuntime(
     hasKimiKey: Boolean(envConfig.kimiApiKey),
     imageGeneration: envConfig.imageGeneration,
   };
-  const mainConfig = buildLLMConfigFromRuntime(input.main.definition, input.main.runtime, input.inferenceSettings);
-  const utilityConfig = input.utility
-    ? buildLLMConfigFromRuntime(input.utility.definition, input.utility.runtime, input.inferenceSettings)
-    : undefined;
-  const exploreConfig = input.explore
-    ? buildLLMConfigFromRuntime(input.explore.definition, input.explore.runtime, input.inferenceSettings)
-    : undefined;
-  const modelSpec = modelDefinitionToCompatSpec(input.main.definition);
   const thinkingEnabled = input.main.definition.capabilities.reasoningMandatory
     ? true
     : input.thinkingEnabled ?? input.main.definition.thinkingDefault;
   const reasoningEffort = thinkingEnabled
     ? resolveReasoningEffort(input.main.definition, input.reasoningEffort)
     : undefined;
+  const mainDefinition = applyRequestModelVariant(input.main.definition, reasoningEffort);
+  const mainConfig = buildLLMConfigFromRuntime(mainDefinition, input.main.runtime, input.inferenceSettings);
+  if (mainDefinition.api === "openai-responses" && runtimeContext?.sessionId) {
+    mainConfig.promptCacheKey = createPromptCacheKey(runtimeContext.sessionId);
+  }
+  const utilityConfig = input.utility
+    ? buildLLMConfigFromRuntime(input.utility.definition, input.utility.runtime, input.inferenceSettings)
+    : undefined;
+  const exploreConfig = input.explore
+    ? buildLLMConfigFromRuntime(input.explore.definition, input.explore.runtime, input.inferenceSettings)
+    : undefined;
+  const modelSpec = modelDefinitionToCompatSpec(mainDefinition);
   return {
     llmConfig: mainConfig,
-    modelDefinition: input.main.definition,
+    modelDefinition: mainDefinition,
     modelKey: input.main.definition.key,
     ...(utilityConfig && { utilityLlmConfig: utilityConfig, utilityModelKey: input.utility!.definition.key }),
     ...(exploreConfig && { exploreLlmConfig: exploreConfig, exploreModelKey: input.explore!.definition.key }),
@@ -537,6 +542,21 @@ function resolveReasoningEffort(
   const supported = definition.capabilities.reasoningEfforts;
   if (supported === null || supported?.includes(requested)) return requested;
   return undefined;
+}
+
+function applyRequestModelVariant(
+  definition: ModelDefinition,
+  effort?: ModelReasoningEffort,
+): ModelDefinition {
+  if (!effort) return definition;
+  const requestModel = definition.requestModelByReasoningEffort?.[effort]?.trim();
+  if (!requestModel || requestModel === definition.apiModel) return definition;
+  return { ...definition, apiModel: requestModel };
+}
+
+function createPromptCacheKey(sessionId: string): string {
+  const digest = createHash("sha256").update(sessionId).digest("hex").slice(0, 48);
+  return `actspace:${digest}`;
 }
 
 function resolveConfigModelIdentity(config: AgentConfig): {

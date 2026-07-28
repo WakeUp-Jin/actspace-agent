@@ -218,6 +218,7 @@ type ComposerModelOption = {
   thinkingDefault: boolean;
   supportsThinkingToggle: boolean;
   reasoningEfforts?: ModelReasoningEffort[] | null;
+  reasoningDefaultEffort?: ModelReasoningEffort;
   reasoningMandatory: boolean;
 };
 
@@ -233,6 +234,7 @@ const REASONING_EFFORT_LABELS: Record<ModelReasoningEffort, string> = {
   high: "High",
   xhigh: "Extra High",
   max: "Max",
+  ultra: "Ultra",
 };
 
 const LEGACY_MODEL_OPTIONS: ComposerModelOption[] = MODEL_LIST.map((spec) => ({
@@ -252,7 +254,15 @@ function isModelEditable(model: ComposerModelOption): boolean {
 function modelDefaultRuntimeOptions(model: ComposerModelOption | undefined): ComposerModelRuntimeOptions {
   return {
     thinkingEnabled: model?.reasoningMandatory || model?.thinkingDefault || false,
+    ...(model?.provider === "duckcoding" && model.reasoningDefaultEffort && {
+      reasoningEffort: model.reasoningDefaultEffort,
+    }),
   };
+}
+
+function reasoningEffortLabel(model: ComposerModelOption | undefined, effort: ModelReasoningEffort): string {
+  if (model?.provider === "duckcoding" && effort === "low") return "Light";
+  return REASONING_EFFORT_LABELS[effort];
 }
 
 function modelReasoningEfforts(model: ComposerModelOption | undefined): ModelReasoningEffort[] {
@@ -373,6 +383,7 @@ export function Composer({
         thinkingDefault: model.thinkingDefault,
         supportsThinkingToggle: model.capabilities.thinkingToggle,
         reasoningEfforts: model.capabilities.reasoningEfforts,
+        reasoningDefaultEffort: model.capabilities.reasoningDefaultEffort,
         reasoningMandatory: model.capabilities.reasoningMandatory === true,
       }));
   const initialModelId = controlledSelectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID;
@@ -1008,19 +1019,21 @@ export function Composer({
                       <div className={OPTION_SEPARATOR_CLASS} />
                     ) : null}
                     <div className={DROPDOWN_LABEL_CLASS}>Effort</div>
-                    <button
-                      type="button"
-                      className={OPTION_CHOICE_CLASS}
-                      disabled={!editingModelOptions.thinkingEnabled}
-                      onClick={() => updateModelRuntimeOptions(editingModelId, (current) => ({
-                        thinkingEnabled: current.thinkingEnabled,
-                      }))}
-                    >
-                      <span className={OPTION_CHOICE_LABEL_CLASS}>Auto</span>
-                      {!editingModelOptions.reasoningEffort ? (
-                        <Check size={14} strokeWidth={2.2} aria-hidden="true" />
-                      ) : null}
-                    </button>
+                    {editingModelSpec?.provider !== "duckcoding" ? (
+                      <button
+                        type="button"
+                        className={OPTION_CHOICE_CLASS}
+                        disabled={!editingModelOptions.thinkingEnabled}
+                        onClick={() => updateModelRuntimeOptions(editingModelId, (current) => ({
+                          thinkingEnabled: current.thinkingEnabled,
+                        }))}
+                      >
+                        <span className={OPTION_CHOICE_LABEL_CLASS}>Auto</span>
+                        {!editingModelOptions.reasoningEffort ? (
+                          <Check size={14} strokeWidth={2.2} aria-hidden="true" />
+                        ) : null}
+                      </button>
+                    ) : null}
                     {editingReasoningEfforts.map((effort) => (
                       <button
                         type="button"
@@ -1032,7 +1045,7 @@ export function Composer({
                           reasoningEffort: effort,
                         }))}
                       >
-                        <span className={OPTION_CHOICE_LABEL_CLASS}>{REASONING_EFFORT_LABELS[effort]}</span>
+                        <span className={OPTION_CHOICE_LABEL_CLASS}>{reasoningEffortLabel(editingModelSpec, effort)}</span>
                         {editingModelOptions.reasoningEffort === effort ? (
                           <Check size={14} strokeWidth={2.2} aria-hidden="true" />
                         ) : null}

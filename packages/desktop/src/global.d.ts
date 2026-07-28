@@ -120,6 +120,10 @@ declare global {
       updateProvider?: (input: import("@actspace/shared").ProviderUpdateInput) => Promise<import("@actspace/shared").ProviderOperationResult>;
       testProvider?: (input: import("@actspace/shared").ProviderIdInput) => Promise<import("@actspace/shared").ProviderTestResult>;
       disconnectProvider?: (input: import("@actspace/shared").ProviderIdInput) => Promise<import("@actspace/shared").ProviderOperationResult>;
+      addProviderCredential?: (input: import("@actspace/shared").ProviderCredentialAddInput) => Promise<import("@actspace/shared").ProviderCredentialOperationResult>;
+      updateProviderCredential?: (input: import("@actspace/shared").ProviderCredentialUpdateInput) => Promise<import("@actspace/shared").ProviderCredentialOperationResult>;
+      testProviderCredential?: (input: import("@actspace/shared").ProviderCredentialInput) => Promise<import("@actspace/shared").ProviderCredentialOperationResult>;
+      removeProviderCredential?: (input: import("@actspace/shared").ProviderCredentialInput) => Promise<import("@actspace/shared").ProviderCredentialOperationResult>;
       listInstalledModels?: () => Promise<import("@actspace/shared").ModelsListInstalledResult>;
       listUsableModels?: (input: import("@actspace/shared").ModelsListUsableInput) => Promise<import("@actspace/shared").ModelsListUsableResult>;
       listModelCatalog?: (input: import("@actspace/shared").ModelsCatalogListInput) => Promise<import("@actspace/shared").ModelsCatalogListResult>;

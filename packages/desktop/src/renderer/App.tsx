@@ -134,12 +134,25 @@ type StreamingState = {
   segments: StreamingSegment[];
   activeTools: Map<string, ToolEntry>;
   activeCompactions: Map<string, Extract<MessageBlock, { kind: "context_compaction" }>>;
+  /** 已发起模型请求、但尚未收到可见回复或工具活动。仅用于当前流式 UI，不写入会话。 */
+  waitingForModel: boolean;
   /** LLM 可重试错误退避中：显示重试提示；新 delta 到达（重试成功）时清除 */
   retryNotice?: { attempt: number; maxAttempts: number };
 };
 
 function createEmptyStreamingState(): StreamingState {
-  return { segments: [], activeTools: new Map(), activeCompactions: new Map() };
+  return {
+    segments: [],
+    activeTools: new Map(),
+    activeCompactions: new Map(),
+    waitingForModel: false,
+  };
+}
+
+function hasFinishedAllActiveTools(state: StreamingState): boolean {
+  return state.activeTools.size > 0 && [...state.activeTools.values()].every(
+    (tool) => tool.finished && !tool.approvalPending,
+  );
 }
 
 function updateStringSet(current: Set<string>, value: string, included: boolean): Set<string> {
@@ -639,6 +652,16 @@ function streamingStateToBlocks(state: StreamingState, turnId?: string): Message
     });
   }
 
+  if (state.waitingForModel && !state.retryNotice) {
+    blocks.push({
+      kind: "status",
+      id: turnId ? `turn:${turnId}:model-wait` : "model-wait",
+      content: "Operating Space · Expanding",
+      createdAt: now,
+      tone: "muted",
+    });
+  }
+
   return blocks;
 }
 
@@ -933,9 +956,11 @@ export function App() {
 
     switch (event.type) {
       case "turn_started":
+        state.waitingForModel = true;
         break;
 
       case "context_compaction_started":
+        state.waitingForModel = false;
         upsertCompactionSegment(state, event.turnId);
         state.activeCompactions.set(event.turnId, createCompactionBlock({
           turnId: event.turnId,
@@ -948,6 +973,7 @@ export function App() {
         break;
 
       case "context_compaction_progress": {
+        state.waitingForModel = false;
         upsertCompactionSegment(state, event.turnId);
         const existing = state.activeCompactions.get(event.turnId);
         state.activeCompactions.set(event.turnId, {
@@ -978,10 +1004,12 @@ export function App() {
             ? (event.summary ?? "Nothing to compact")
             : formatContextCompactionSummary(removedCount),
         }));
+        state.waitingForModel = event.trigger === "auto";
         break;
       }
 
       case "context_compaction_failed":
+        state.waitingForModel = false;
         upsertCompactionSegment(state, event.turnId);
         state.activeCompactions.set(event.turnId, createCompactionBlock({
           turnId: event.turnId,
@@ -994,20 +1022,28 @@ export function App() {
 
       case "assistant_thinking_delta":
         state.retryNotice = undefined;
+        if (event.delta.length > 0) {
+          state.waitingForModel = false;
+        }
         appendOrMergeSegment(state.segments, "thinking", event.delta);
         break;
 
       case "assistant_text_delta":
         state.retryNotice = undefined;
+        if (event.delta.length > 0) {
+          state.waitingForModel = false;
+        }
         appendOrMergeSegment(state.segments, "text", event.delta);
         break;
 
       case "llm_retry":
         dropTrailingStreamSegments(state.segments);
+        state.waitingForModel = false;
         state.retryNotice = { attempt: event.attempt, maxAttempts: event.maxAttempts };
         break;
 
       case "tool_call_streaming": {
+        state.waitingForModel = false;
         const existing = state.activeTools.get(event.toolCallId);
         if (existing) {
           existing.preview = event.preview;
@@ -1022,6 +1058,7 @@ export function App() {
       }
 
       case "tool_started": {
+        state.waitingForModel = false;
         const existing = state.activeTools.get(event.toolCallId);
         if (existing) {
           existing.preview = event.preview;
@@ -1045,6 +1082,7 @@ export function App() {
           tool.finished = true;
           tool.isError = event.isError;
         }
+        state.waitingForModel = hasFinishedAllActiveTools(state);
         break;
       }
 
@@ -1057,6 +1095,7 @@ export function App() {
       }
 
       case "subagent_event": {
+        state.waitingForModel = false;
         const existing = state.activeTools.get(event.toolCallId);
         if (existing) {
           existing.preview = event.preview;
@@ -1073,6 +1112,7 @@ export function App() {
       }
 
       case "tool_approval_required": {
+        state.waitingForModel = false;
         const tool = state.activeTools.get(event.toolCallId);
         if (tool) {
           tool.approvalPending = true;
@@ -1127,16 +1167,20 @@ export function App() {
             };
           }
         }
+        state.waitingForModel = hasFinishedAllActiveTools(state);
         break;
       }
 
       case "turn_finished":
+        state.waitingForModel = false;
         return;
 
       case "turn_aborted":
+        state.waitingForModel = false;
         return;
 
       case "turn_failed":
+        state.waitingForModel = false;
         return;
     }
 
@@ -1325,7 +1369,8 @@ export function App() {
         attachments: options.attachments,
       };
       streamingUserBlockRef.current = userBlock;
-      setStreamingBlocks([userBlock]);
+      streamStateRef.current.waitingForModel = true;
+      refreshStreamingBlocks(userBlock);
     }
     setSendScrollRequestId((value) => value + 1);
 

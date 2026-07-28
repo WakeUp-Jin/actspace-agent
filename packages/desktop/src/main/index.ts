@@ -62,6 +62,10 @@ import type {
   SkillUninstallInput,
   ProviderConnectInput,
   ProviderUpdateInput,
+  ProviderCredentialAddInput,
+  ProviderCredentialUpdateInput,
+  ProviderCredentialInput,
+  ProviderCredentialOperationResult,
   ProviderIdInput,
   ProviderBalanceGetInput,
   ProviderOperationResult,
@@ -461,7 +465,7 @@ function providerOperationFailure(code: "invalid_provider" | "invalid_api_key" |
 }
 
 function emptyProviderView() {
-  return { hasApiKey: false, enabled: false, baseUrl: null, proxy: { enabled: false, url: null }, lastConnection: { status: "untested" as const }, installedModelCount: 0, enabledModelCount: 0 };
+  return { hasApiKey: false, enabled: false, baseUrl: null, proxy: { enabled: false, url: null }, lastConnection: { status: "untested" as const }, installedModelCount: 0, enabledModelCount: 0, defaultPricingMultiplier: 1, additionalCredentials: [] };
 }
 
 function toModelMutationResult(result: ModelStoreResult): ModelMutationResult {
@@ -472,6 +476,8 @@ function toModelMutationResult(result: ModelStoreResult): ModelMutationResult {
       ? "model_not_removable"
       : result.code === "model_not_found" || result.code === "model_not_installed"
         ? "model_missing"
+        : result.code === "credential_missing"
+          ? "credential_missing"
         : "invalid_model";
   return { ok: false, error: { code, message: result.message, ...(result.references && { references: result.references as any }) } };
 }
@@ -1242,11 +1248,61 @@ async function registerIpc() {
         managementKey: input.managementKey,
         baseUrl: input.baseUrl,
         proxy: input.proxy,
+        defaultPricingMultiplier: input.defaultPricingMultiplier,
         enabled: true,
       });
       return { ok: true, provider: getSettingsService().getV2().providers[input.provider] };
     } catch (error) {
       return providerOperationFailure(providerErrorCode(error), safeErrorMessage(error));
+    }
+  });
+
+  ipcMain.handle("provider-credentials:add", async (_event, input: ProviderCredentialAddInput): Promise<ProviderCredentialOperationResult> => {
+    if (!isProviderId(input?.provider)) return { ok: false, error: { code: "invalid_provider", message: "未知服务商。" } };
+    try {
+      await getSettingsService().addProviderCredential(input);
+      return { ok: true, provider: getSettingsService().getV2().providers[input.provider] };
+    } catch (error) {
+      return { ok: false, error: { code: providerErrorCode(error), message: safeErrorMessage(error) } };
+    }
+  });
+
+  ipcMain.handle("provider-credentials:update", async (_event, input: ProviderCredentialUpdateInput): Promise<ProviderCredentialOperationResult> => {
+    if (!isProviderId(input?.provider)) return { ok: false, error: { code: "invalid_provider", message: "未知服务商。" } };
+    try {
+      const result = await getSettingsService().updateProviderCredential(
+        input.provider,
+        input.credentialId,
+        input.label,
+        input.pricingMultiplier,
+      );
+      if ("code" in result) return { ok: false, error: { code: result.code, message: result.message, references: result.references } };
+      return { ok: true, provider: getSettingsService().getV2().providers[input.provider] };
+    } catch (error) {
+      return { ok: false, error: { code: providerErrorCode(error), message: safeErrorMessage(error) } };
+    }
+  });
+
+  ipcMain.handle("provider-credentials:test", async (_event, input: ProviderCredentialInput): Promise<ProviderCredentialOperationResult> => {
+    if (!isProviderId(input?.provider)) return { ok: false, error: { code: "invalid_provider", message: "未知服务商。" } };
+    const runtime = getSettingsService().getProviderRuntimeConfigForCredential(input.provider, input.credentialId);
+    if ("code" in runtime) return { ok: false, error: { code: "credential_not_found", message: runtime.message } };
+    const probe = await testProviderConnection(runtime);
+    const marked = await getSettingsService().markProviderCredentialConnectionResult(input.provider, input.credentialId, probe);
+    if ("code" in marked) return { ok: false, error: { code: marked.code, message: marked.message } };
+    if (!probe.ok) return { ok: false, error: { code: "connection_failed", message: probe.message, errorKind: probe.errorKind } };
+    return { ok: true, provider: getSettingsService().getV2().providers[input.provider] };
+  });
+
+  ipcMain.handle("provider-credentials:remove", async (_event, input: ProviderCredentialInput): Promise<ProviderCredentialOperationResult> => {
+    if (!isProviderId(input?.provider)) return { ok: false, error: { code: "invalid_provider", message: "未知服务商。" } };
+    try {
+      const result = await getSettingsService().removeProviderCredential(input.provider, input.credentialId);
+      if ("code" in result) return { ok: false, error: { code: result.code, message: result.message, references: result.references } };
+      await reconcileKairosModelChange(await ensureDataDirectories());
+      return { ok: true, provider: getSettingsService().getV2().providers[input.provider] };
+    } catch (error) {
+      return { ok: false, error: { code: providerErrorCode(error), message: safeErrorMessage(error) } };
     }
   });
 
@@ -1312,15 +1368,27 @@ async function registerIpc() {
     return { provider: "openrouter", ...result };
   });
   ipcMain.handle("models:add", async (_event, input: ModelsAddInput): Promise<ModelMutationResult> => {
-    if (input?.provider !== "openrouter" || typeof input.apiModel !== "string") {
+    if ((input?.provider !== "openrouter" && input?.provider !== "duckcoding") || typeof input.apiModel !== "string") {
       return { ok: false, error: { code: "invalid_model", message: "模型添加参数无效。" } };
     }
-    return toModelMutationResult(await getModelStoreService().addCatalogModel(input.provider, input.apiModel));
+    return toModelMutationResult(input.provider === "openrouter"
+      ? await getModelStoreService().addCatalogModel(input.provider, input.apiModel)
+      : await getModelStoreService().addCustomModel({
+        provider: "duckcoding",
+        apiModel: input.apiModel,
+        label: input.label,
+        credentialId: input.credentialId,
+        catalogModelId: input.catalogModelId,
+        contextWindow: input.contextWindow,
+        maxTokens: input.maxTokens,
+      }));
   });
   ipcMain.handle("models:update", async (_event, input: ModelsUpdateInput): Promise<ModelMutationResult> => {
     const key = normalizeModelKey(input?.modelKey);
-    if (!key || typeof input.enabled !== "boolean") return { ok: false, error: { code: "invalid_model", message: "模型更新参数无效。" } };
-    const result = await getModelStoreService().setModelEnabled(key, input.enabled);
+    if (!key || (input.enabled === undefined && input.customLabel === undefined && input.credentialId === undefined)) {
+      return { ok: false, error: { code: "invalid_model", message: "模型更新参数无效。" } };
+    }
+    const result = await getModelStoreService().updateModelSettings(key, input);
     await reconcileKairosModelChange(await ensureDataDirectories());
     return toModelMutationResult(result);
   });

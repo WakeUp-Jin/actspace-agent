@@ -7,6 +7,7 @@ export type UsageCostInput = {
   reasoningTokens?: number;
   cacheHitTokens?: number;
   cacheMissTokens?: number;
+  cacheWriteTokens?: number;
 };
 
 export function calculateUsageCost(
@@ -26,23 +27,28 @@ export function calculateUsageCost(
 
   const cacheHitTokens = usage.cacheHitTokens ?? 0;
   const cacheMissTokens = usage.cacheMissTokens ?? Math.max(usage.inputTokens - cacheHitTokens, 0);
+  const cacheWriteTokens = usage.cacheWriteTokens ?? 0;
+  const uncachedInputTokens = Math.max(cacheMissTokens - cacheWriteTokens, 0);
   const outputTokens = usage.outputTokens;
   const reasoningTokens = usage.reasoningTokens ?? 0;
 
-  const input = (cacheMissTokens / 1_000_000) * pricing.inputCacheMissPerMillion;
+  const input = (uncachedInputTokens / 1_000_000) * pricing.inputCacheMissPerMillion;
   const cacheRead = (cacheHitTokens / 1_000_000) * pricing.inputCacheHitPerMillion;
+  const cacheWrite = pricing.inputCacheWritePerMillion === undefined
+    ? 0
+    : (cacheWriteTokens / 1_000_000) * pricing.inputCacheWritePerMillion;
   const output = (outputTokens / 1_000_000) * pricing.outputPerMillion;
   const reasoning = pricing.reasoningPerMillion
     ? (reasoningTokens / 1_000_000) * pricing.reasoningPerMillion
     : 0;
 
-  const total = input + cacheRead + output + reasoning;
+  const total = input + cacheRead + cacheWrite + output + reasoning;
 
   return {
     input,
     output: output + reasoning,
     cacheRead,
-    cacheWrite: 0,
+    cacheWrite,
     total,
     currency: pricing.currency,
   };

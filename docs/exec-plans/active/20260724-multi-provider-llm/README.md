@@ -1,12 +1,13 @@
 # 多供应商 LLM、模型管理与任务模型执行计划
 
-状态：实现完成，待用户统一手动验收（Plan 0-5 完成，Plan 6 离线自动化与桌面基础验收完成）
+状态：Plan 0-5 与 Plan 7 完成；Plan 6 及 DuckCoding 真实连接仍待用户统一手动验收
 
 设计来源：
 
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`
 - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`
 - `docs/design-docs/model-context/agent-context-compression.md`
+- `docs/design-docs/model-context/agent-duckcoding-multi-key-model-catalog.md`
 - `docs/design-docs/collaboration/agent-explore-subagent.md`
 - `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
 - `docs/design-docs/frontend/front-设置页规范.md`
@@ -61,6 +62,8 @@ Plan 4：主会话 / utility / Explore / Kairos 运行时消费方迁移
 Plan 5：类型化 IPC、设置页、Composer 与模型目录 UI
     ↓
 Plan 6：跨层回归、迁移、代理、安全和真实 Electron 验收
+    ↓
+Plan 7：DuckCoding、多 Key、本地模型档案与名称变体
 ```
 
 Plan 5 的纯展示组件可以在 Plan 0 契约稳定后准备，但不能在 Plan 2/3 IPC 完成前接入私有 mock 存储或直接请求 OpenRouter。最终集成仍按 Plan 0 → 6 顺序验收。
@@ -76,6 +79,7 @@ Plan 5 的纯展示组件可以在 Plan 0 契约稳定后准备，但不能在 P
 | [Plan 4](plan-4-task-model-runtime.md) | 迁移 main/utility/Explore/Kairos 及其他静态模型消费方 | Agent turn、compact、title、Kairos、usage/display | Plan 0-3 |
 | [Plan 5](plan-5-renderer-provider-model-ui.md) | 接入 IPC/preload，拆分服务商/模型设置页并联动 Composer | provider/model components、catalog dialog、renderer state | Plan 0-4 |
 | [Plan 6](plan-6-e2e-acceptance.md) | 完成自动化、故障注入、安全和真实 provider/Electron 验收 | acceptance evidence、docs/history/release 收口 | Plan 0-5 |
+| [Plan 7](plan-7-duckcoding-multi-key.md) | 接入 DuckCoding，并让模型仅在供应商存在额外 Key 时选择凭据；Codex 强度通过请求模型名变体生效 | provider credentials、local catalog、runtime/UI binding | Plan 0-5 |
 
 ## 全局数据流
 
@@ -88,7 +92,7 @@ ResolvedRuntimeModel
         ↓ buildLLMConfigFromRuntime
 OpenAI / Anthropic protocol service
         ↓ provider-scoped fetch/dispatcher
-DeepSeek / Kimi / OpenRouter
+DeepSeek / Kimi / OpenRouter / DuckCoding
 ```
 
 Renderer 只接收：
@@ -204,6 +208,7 @@ pnpm check:secrets
 - [x] Plan 4：任务模型和运行时消费方迁移。
 - [x] Plan 5：IPC / preload / renderer UI。
 - [ ] Plan 6：离线故障注入、迁移与真实 Electron 基础 UI 已验；OpenRouter 代理、跨任务模型、跟随系统主题和完整键盘路径由用户统一手动验收。
+- [x] Plan 7：DuckCoding、额外 Key、本地 Codex/Grok 档案、模型级 Key 选择、名称变体与倍率定价已实现；真实 Key 调用待手动验收。
 
 ## 决策记录
 
@@ -217,3 +222,5 @@ pnpm check:secrets
 - 2026-07-25：真实 Electron 已确认 v1→v2 备份迁移、DeepSeek/Kimi 连接测试、主会话与轻量模型候选、OpenRouter 目录空态及浅深主题；用户要求停止开发进程并在最后统一完成剩余手动验收。
 - 2026-07-25：补齐 402/404、缓存写权限、半截临时文件、在用模型删除和 stale 目录恢复等离线故障注入；所有启动项目保持关闭，Plan 6 只剩用户统一手动验收项。
 - 2026-07-25：完成最终运行时审计：余额查询不再读取 env，Kairos 改用动态 ModelKey 并删除静态 allowlist/env 路径，设置页移除重复静态模型控件；离线全量回归为 shared 53、agent-core 826、desktop 458 项全部通过。
+- 2026-07-27：DuckCoding 沿用 OpenAI-compatible 协议；现有 provider Key 继续作为默认 Key，不迁移。额外 Key 只在供应商下管理，模型仅在存在额外 Key 时显示选择器，未绑定 `credentialId` 的模型继续继承默认 Key。
+- 2026-07-28：纠正服务商名称与内部 id；DuckCoding 模型来源改为应用内 Codex/Grok 档案和手动兜底，Codex 推理强度通过精确模型名变体传递，最大上下文允许覆盖。

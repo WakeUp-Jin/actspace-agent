@@ -10,6 +10,7 @@ import { LLMServiceError } from "./types";
 import { MockLLMService } from "./services/mock";
 import { AnthropicMessagesService } from "./services/anthropic-messages";
 import { OpenAICompletionsService } from "./services/openai-completions";
+import { OpenAIResponsesService } from "./services/openai-responses";
 import { envToLLMConfig } from "../env";
 
 function resolveConfigApi(config: LLMConfig): NonNullable<LLMConfig["api"]> | "mock" {
@@ -27,11 +28,13 @@ export function createLLMService(config: LLMConfig): LLMService {
       return new AnthropicMessagesService(config);
     case "openai-completions":
       return new OpenAICompletionsService(config);
+    case "openai-responses":
+      return new OpenAIResponsesService(config);
     case "mock":
       return new MockLLMService(config);
     default:
       throw new LLMServiceError(
-        `Unknown LLM api: "${config.api ?? config.apiFormat ?? config.provider}". Available: openai-completions, anthropic-messages, mock`,
+        `Unknown LLM api: "${config.api ?? config.apiFormat ?? config.provider}". Available: openai-completions, openai-responses, anthropic-messages, mock`,
         "invalid_request",
         false,
       );

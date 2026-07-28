@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createLLMService } from "../factory";
 import { AnthropicMessagesService } from "../services/anthropic-messages";
 import { OpenAICompletionsService } from "../services/openai-completions";
+import { OpenAIResponsesService } from "../services/openai-responses";
 
 describe("createLLMService", () => {
   it("creates OpenAI-compatible DeepSeek service when apiFormat is omitted", () => {
@@ -49,6 +50,17 @@ describe("createLLMService", () => {
     expect((service as any).client._options.defaultHeaders).toMatchObject({
       "X-OpenRouter-Title": "Actspace",
     });
+  });
+
+  it("routes Responses models through the dedicated service", () => {
+    const service = createLLMService({
+      provider: "duckcoding",
+      api: "openai-responses",
+      apiKey: "sk-duck-test",
+      model: "gpt-5.6-sol",
+    });
+
+    expect(service).toBeInstanceOf(OpenAIResponsesService);
   });
 
   it("injects the configured fetch into both protocol SDK clients", () => {

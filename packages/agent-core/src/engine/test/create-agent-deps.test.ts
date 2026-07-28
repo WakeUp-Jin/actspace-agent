@@ -264,6 +264,69 @@ describe("buildAgentConfigFromRuntime reasoning controls", () => {
     expect(config.thinkingEnabled).toBe(true);
     expect(config.reasoningEffort).toBe("medium");
   });
+
+  it("encodes DuckCoding Codex effort in the exact request model name", () => {
+    const duckCodingModel: ModelDefinition = {
+      key: "duckcoding:gpt-5.6-sol",
+      provider: "duckcoding",
+      api: "openai-responses",
+      apiModel: "gpt-5.6-sol",
+      label: "GPT 5.6 Sol",
+      source: "custom",
+      contextWindow: 255_000,
+      maxTokens: null,
+      thinkingDefault: true,
+      capabilities: {
+        input: ["text"],
+        toolUse: "declared",
+        reasoning: true,
+        thinkingToggle: false,
+        reasoningMandatory: true,
+        reasoningEfforts: ["low", "medium", "high", "xhigh", "ultra"],
+        reasoningDefaultEffort: "medium",
+      },
+      requestModelByReasoningEffort: {
+        low: "gpt-5.6-sol-low",
+        medium: "gpt-5.6-sol",
+        high: "gpt-5.6-sol-high",
+        xhigh: "gpt-5.6-sol-xhigh",
+        ultra: "gpt-5.6-sol-ultra",
+      },
+    };
+    const config = buildAgentConfigFromRuntime({
+      main: {
+        definition: duckCodingModel,
+        runtime: {
+          provider: "duckcoding",
+          apiKey: "sk-duckcoding-test",
+          baseUrl: "https://api.duckcoding.ai/v1",
+        },
+      },
+      thinkingEnabled: true,
+      reasoningEffort: "high",
+    }, "/tmp/workspace", undefined, { sessionId: "session-cache" });
+
+    expect(config.reasoningEffort).toBe("high");
+    expect(config.llmConfig.model).toBe("gpt-5.6-sol-high");
+    expect(config.modelDefinition?.apiModel).toBe("gpt-5.6-sol-high");
+    expect(config.modelKey).toBe("duckcoding:gpt-5.6-sol");
+    expect(config.llmConfig.promptCacheKey).toMatch(/^actspace:[a-f0-9]{48}$/);
+    expect(config.llmConfig.promptCacheKey).not.toContain("session-cache");
+
+    const ultra = buildAgentConfigFromRuntime({
+      main: {
+        definition: duckCodingModel,
+        runtime: {
+          provider: "duckcoding",
+          apiKey: "sk-duckcoding-test",
+          baseUrl: "https://api.duckcoding.ai/v1",
+        },
+      },
+      reasoningEffort: "ultra",
+    }, "/tmp/workspace", undefined, { sessionId: "session-cache" });
+    expect(ultra.llmConfig.model).toBe("gpt-5.6-sol-ultra");
+    expect(ultra.llmConfig.promptCacheKey).toBe(config.llmConfig.promptCacheKey);
+  });
 });
 
 describe("buildAgentConfig (via dynamic import to reset env)", () => {

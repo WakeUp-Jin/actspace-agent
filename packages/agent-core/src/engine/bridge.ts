@@ -662,6 +662,7 @@ function createLlmUsageEvent(
         reasoningTokens: message.usage.reasoning,
         cacheHitTokens: message.usage.cacheHit || message.usage.cacheRead,
         cacheMissTokens: message.usage.cacheMiss,
+        cacheWriteTokens: message.usage.cacheWrite,
       },
       matchesRuntimeModel ? runtimeModelDefinition?.pricing : modelSpec?.pricing,
     ),

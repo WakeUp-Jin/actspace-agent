@@ -153,6 +153,46 @@ describe("session selectors", () => {
     ]);
   });
 
+  it("hides signature-only thinking state while keeping readable thinking visible", () => {
+    const base = {
+      sessionId: "session-thinking",
+      turnId: "turn-thinking",
+      timestamp: "2026-07-28T04:10:00.000Z",
+      schemaVersion: 1 as const,
+      type: "thinking" as const,
+    };
+    const blocks = createMessageBlocks([
+      {
+        ...base,
+        id: "thinking-signature-only",
+        payload: {
+          content: "",
+          signature: "openai-responses-reasoning:{\"id\":\"rs_1\",\"type\":\"reasoning\"}",
+          api: "openai-responses",
+          model: "gpt-5.6-sol",
+          provider: "duckcoding",
+        },
+      },
+      {
+        ...base,
+        id: "thinking-readable",
+        payload: { content: "I should inspect the workspace." },
+      },
+    ]);
+
+    expect(blocks).toEqual([
+      {
+        kind: "thinking",
+        id: "thinking-readable",
+        renderKey: "turn:turn-thinking:thinking:0",
+        title: "Thinking",
+        content: "I should inspect the workspace.",
+        createdAt: "2026-07-28T04:10:00.000Z",
+        collapsedByDefault: true,
+      },
+    ]);
+  });
+
   it("attaches the full turn usage to the final visible assistant reply", () => {
     const base = {
       sessionId: "session-usage",

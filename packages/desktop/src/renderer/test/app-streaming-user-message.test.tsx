@@ -537,6 +537,142 @@ describe("App streaming user message", () => {
     });
   });
 
+  it("shows the shared running shimmer while waiting for model activity", async () => {
+    const sessionId = "session-model-wait";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "Model wait",
+        updatedAt: record.meta.updatedAt,
+        turnCount: 0,
+      },
+    ];
+
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    let activeTurnId = "";
+    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+      null;
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      getKimiBalance: async () => ({
+        provider: "kimi",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) {
+            streamHandler = null;
+          }
+        };
+      },
+      runTurn: (input: RunTurnInput) => new Promise((resolve) => {
+        activeTurnId = input.turnId;
+        streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+        resolveRunTurn = resolve;
+      }),
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "wait for the model");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
+
+    const initialWaitingText = await screen.findByText("Operating Space · Expanding");
+    expect(initialWaitingText).toHaveClass("tool-log-text-running");
+    expect(initialWaitingText).toHaveAttribute("data-shimmer-text", "Operating Space · Expanding");
+
+    await act(async () => {
+      streamHandler?.({
+        type: "tool_started",
+        sessionId,
+        turnId: activeTurnId,
+        toolCallId: "tool-wait-read",
+        toolName: "read_file",
+        argsPreview: "{\"path\":\"README.md\"}",
+        preview: {
+          kind: "read",
+          filePath: "README.md",
+          displayText: "Read README.md",
+        },
+      });
+    });
+    expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
+
+    await act(async () => {
+      streamHandler?.({
+        type: "tool_finished",
+        sessionId,
+        turnId: activeTurnId,
+        toolCallId: "tool-wait-read",
+        toolName: "read_file",
+        resultEventId: "evt-wait-read-finished",
+        isError: false,
+        preview: {
+          kind: "read",
+          filePath: "README.md",
+          displayText: "Read README.md",
+        },
+      });
+    });
+
+    expect(await screen.findByText("Operating Space · Expanding")).toHaveClass("tool-log-text-running");
+
+    await act(async () => {
+      streamHandler?.({
+        type: "assistant_text_delta",
+        sessionId,
+        turnId: activeTurnId,
+        messageId: "evt-wait-answer",
+        delta: "Model response",
+      });
+    });
+
+    expect(await screen.findByText("Model response")).toBeInTheDocument();
+    expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
+
+    await act(async () => {
+      resolveRunTurn?.({
+        sessionId,
+        turnId: activeTurnId,
+        status: "completed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      });
+    });
+  });
+
   it("routes overlapping turns through one stream listener without duplicating or clearing the visible turn", async () => {
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,

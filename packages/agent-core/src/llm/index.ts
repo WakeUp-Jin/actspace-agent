@@ -7,6 +7,8 @@ export { DeepSeekService } from "./services/deepseek";
 export { DeepSeekAnthropicService } from "./services/deepseek-anthropic";
 export { KimiService } from "./services/kimi";
 export { OpenAICompletionsService } from "./services/openai-completions";
+export { OpenAIResponsesService } from "./services/openai-responses";
+export { convertContextToResponses, convertMessagesToResponses, toResponsesTools } from "./responses-convert";
 export {
   applyOpenAIProviderRequestParams,
   providerDefaultHeaders,

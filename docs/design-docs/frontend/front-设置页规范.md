@@ -86,6 +86,17 @@
 - 模型按服务商分组展示，可独立启用或停用。OpenRouter 首次连接自动加入少量推荐模型，并支持从远端模型目录搜索、筛选和添加其他模型。
 - 大模型目录采用搜索优先、渐进披露和列表虚拟化；所有状态同时用文字与图标表达，交互支持键盘访问，并继续遵守浅色 / 深色主题 token 规范。
 
+### DuckCoding 与多 Key 扩展（首版已实现）
+
+目标交互以 `docs/design-docs/model-context/agent-duckcoding-multi-key-model-catalog.md` 为事实来源：
+
+- DuckCoding 复用现有服务商卡片和 OpenAI-compatible 连接流程；默认 Key 保持当前交互，只在供应商页增加价格倍率与可选的“额外 API Key”管理区。
+- 额外 Key 只在供应商页添加、测试、重命名和删除。模型页不得输入 Key；只有供应商已经存在额外 Key 时，模型添加或编辑界面才显示 Key 下拉。
+- 添加模型默认展示应用内置的 Codex/Grok 本地档案，并允许修改最大上下文和最大输出。自定义模式填写 DuckCoding 接口接受的精确模型名，不自动添加厂商前缀，也不依赖用户是否连接 OpenRouter。
+- Codex 推理强度在弹窗中展示为精确模型名变体；Composer 仍选择统一强度，但请求体不增加 DuckCoding reasoning 属性。
+- 模型价格同时展示公共目录基础价、所选 Key 倍率和有效估算价，并注明实际账单以服务商为准。
+- 绑定 Key 缺失或不可用时显示明确错误，不自动切回默认 Key；删除被模型引用的额外 Key 时阻止操作并展示引用模型。
+
 - 成员 Members（事实来源 `docs/design-docs/collaboration/agent-members.md`）
   - Member 是跨多个 Room 持久存在的 Agent 身份，不是某个 Room 内临时复制的角色。V0 只管理 Agent，不展示 Humans、邀请或 Owner/Admin 权限。
   - 首屏显示成员列表，顶部主操作为「创建 Agent」；每项展示图标、名称、描述、状态文字、模型和已加入 Room 数量。

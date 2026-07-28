@@ -169,8 +169,8 @@ Bash 是命令执行工具，包含正常执行态和审核 pending 态。
 
 ### 视觉
 
-- 文本始终可读：底层使用 `text-text-muted` / `--act-color-text-muted`，任意时刻、任意快慢的工具都能立即看清文字。
-- 目标设计使用 operational token 作为**叠加**高光，从右向左扫过文本一次为一轮；不再把全局 brand 色当作运行语义，也不允许出现「文字消失」的瞬间。
+- 文本始终可读：底层使用 `text-text-main` / `--act-color-text`，让 running 比 completed 的 muted 文字更明确。
+- 目标设计使用 `--act-color-text-subtle` 作为中性浅灰**叠加**层，从右向左扫过文本一次为一轮；浅色主题是黑字上的浅灰扫光，深色主题自动反转为浅字上的深灰扫光，不允许出现「文字消失」的瞬间。
 - 实现方式：running 文本使用 `.tool-log-text-running`。真实文本保留为主题色；`::after` 通过 `content: attr(data-shimmer-text)` 复制同一段文字，再用 `background-clip: text` 裁出扫光层。动画背景必须限制在 inline 文本盒子内，不允许占满整条工具行。
 - 颜色必须走主题 token，禁止在 running shimmer 中写死 `#hex` 作为基础色或高光色。
 - 完成态文字色直接回到默认 muted 灰，无切换动画。
@@ -180,7 +180,7 @@ Bash 是命令执行工具，包含正常执行态和审核 pending 态。
 - 一轮 shimmer 约 1.1s。
 - shimmer 自然循环：工具执行时间长就多扫几次，执行时间短就直接进入完成态。
 - 不为了显示 shimmer 而人为延长 running 态。`MIN_TOOL_RUNNING_MS`（约 300ms）只是用于防 UI 闪烁，不是为了让 shimmer 扫完一轮。
-- `prefers-reduced-motion` 下取消扫光；保持中性文字，并通过静态 operational 绿点或克制绿色状态文字表达 running。
+- `prefers-reduced-motion` 下取消扫光，保留主文本色；running 与 completed 仍通过 main / muted 文字层级区分。
 
 ### 文案
 
@@ -320,7 +320,7 @@ Context Compaction 展示上下文压缩生命周期。它可能由用户在 Com
 ## Ink & Emerald 颜色职责
 
 - 普通回复、Thinking、Read、Grep、Glob、Web Search 和 completed 工具行默认使用黑灰文本。
-- running 只在状态点、细环或 shimmer 叠加层使用少量 operational green；基础文字保持主题可读色。
+- running 状态点和细环可以使用少量 operational green；消息工具的 shimmer 使用中性主文字 + 主题浅灰扫光，避免绿色进入连续文本流。
 - completed 不逐条变绿，完成后回到 muted 灰阶。
 - approval 使用 warning，failed / error 使用 danger。
 - `+N` / `-N` 和 diff 行继续使用低饱和 addition / removal token，但不复用 Toggle 或危险按钮背景色。

@@ -397,6 +397,8 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
       }
       case "thinking": {
         const payload = event.payload as ThinkingPayload;
+        // Signature-only thinking events are provider replay state, not visible content.
+        if (!payload.content.trim()) return [];
         return [
           {
             kind: "thinking",

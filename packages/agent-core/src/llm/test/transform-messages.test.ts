@@ -46,6 +46,28 @@ describe("transformMessages", () => {
     expect((result[0] as AssistantMessage).content[1]).not.toHaveProperty("textSignature");
   });
 
+  it("does not replay opaque reasoning state to a different API on the same provider model", () => {
+    const result = transformMessages([
+      assistant({
+        api: "openai-responses",
+        provider: "duckcoding",
+        model: "gpt-5.6-sol",
+        content: [{
+          type: "thinking",
+          thinking: "",
+          signature: "openai-responses-reasoning:{\"id\":\"rs_1\",\"type\":\"reasoning\"}",
+        }],
+      }),
+    ], {
+      api: "openai-completions",
+      provider: "duckcoding",
+      apiKey: "sk",
+      model: "gpt-5.6-sol",
+    });
+
+    expect(result).toEqual([]);
+  });
+
   it("replaces images when target model does not support image input", () => {
     const result = transformMessages([
       {
