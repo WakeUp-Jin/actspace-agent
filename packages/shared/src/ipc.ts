@@ -536,6 +536,46 @@ export type WorkspaceReadFileResult = {
   error?: "not_found" | "not_a_file" | "too_large" | "binary" | "escapes_root";
 };
 
+/** 读取当前会话内由工具生成的图片产物。renderer 不能直接加载 file://。 */
+export type SessionArtifactReadInput = {
+  sessionId: string;
+  artifactPath: string;
+};
+
+export type SessionArtifactReadResult = {
+  name: string;
+  relativePath: string;
+  mimeType?: "image/png" | "image/jpeg" | "image/webp";
+  size: number;
+  dataUrl?: string;
+  error?:
+    | "invalid_session"
+    | "escapes_root"
+    | "not_found"
+    | "not_a_file"
+    | "too_large"
+    | "unsupported_format"
+    | "read_failed";
+};
+
+/** 在桌面端为受控 Artifact 打开原生右键菜单。路径必须由 main 重新解析。 */
+export type ArtifactContextMenuInput =
+  | {
+      kind: "session_image";
+      sessionId: string;
+      artifactPath: string;
+    }
+  | {
+      kind: "workspace_file";
+      workspaceRoot?: string;
+      relativePath: string;
+    };
+
+export type ArtifactContextMenuResult = {
+  shown: boolean;
+  error?: "invalid_target" | "not_found" | "not_a_file";
+};
+
 export type WorkspaceEntryKind = "default" | "folder";
 
 export type WorkspaceEntry = {

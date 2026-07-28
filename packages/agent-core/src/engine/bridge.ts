@@ -895,6 +895,8 @@ function getFileChangeStructured(structured: unknown): {
   diff?: string;
   additions?: number;
   deletions?: number;
+  filePath?: string;
+  relativePath?: string;
 } | undefined {
   if (structured === null || typeof structured !== "object") return undefined;
   const record = structured as Record<string, unknown>;
@@ -902,6 +904,8 @@ function getFileChangeStructured(structured: unknown): {
     diff: typeof record.diff === "string" ? record.diff : undefined,
     additions: typeof record.additions === "number" ? record.additions : undefined,
     deletions: typeof record.deletions === "number" ? record.deletions : undefined,
+    filePath: typeof record.filePath === "string" ? record.filePath : undefined,
+    relativePath: typeof record.relativePath === "string" ? record.relativePath : undefined,
   };
 }
 
@@ -1058,6 +1062,8 @@ function createToolUiPreview(
       return {
         kind: "edit_diff",
         filePath: displayFileName(filePath),
+        ...(ok && fileChange?.filePath ? { outputPath: fileChange.filePath } : {}),
+        ...(ok && fileChange?.relativePath ? { outputRelativePath: fileChange.relativePath } : {}),
         additions: ok ? fileChange?.additions ?? countDiffLines(diff, "+") : 0,
         deletions: ok ? fileChange?.deletions ?? countDiffLines(diff, "-") : 0,
         diff,
@@ -1078,6 +1084,8 @@ function createToolUiPreview(
       return {
         kind: "write",
         filePath: displayFileName(filePath),
+        ...(ok && hasOutput && fileChange?.filePath ? { outputPath: fileChange.filePath } : {}),
+        ...(ok && hasOutput && fileChange?.relativePath ? { outputRelativePath: fileChange.relativePath } : {}),
         additions: ok && hasOutput ? fileChange?.additions ?? countDiffLines(diff, "+") : 0,
         deletions: ok && hasOutput ? fileChange?.deletions ?? countDiffLines(diff, "-") : 0,
         diff,

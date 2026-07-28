@@ -89,6 +89,10 @@ import type {
   SessionRenameResult,
   SessionWorkspaceInput,
   SessionWorkspaceResult,
+  ArtifactContextMenuInput,
+  ArtifactContextMenuResult,
+  SessionArtifactReadInput,
+  SessionArtifactReadResult,
   SessionRecord,
   SearchUsageResult,
   SetProviderKeyInput,
@@ -151,6 +155,10 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("workspace:list-dir", input) as Promise<WorkspaceListDirResult>,
   readWorkspaceFile: (input: WorkspaceReadFileInput) =>
     ipcRenderer.invoke("workspace:read-file", input) as Promise<WorkspaceReadFileResult>,
+  readSessionArtifact: (input: SessionArtifactReadInput) =>
+    ipcRenderer.invoke("session:read-artifact", input) as Promise<SessionArtifactReadResult>,
+  showArtifactContextMenu: (input: ArtifactContextMenuInput) =>
+    ipcRenderer.invoke("artifact:show-context-menu", input) as Promise<ArtifactContextMenuResult>,
   getWorkspaceReview: (input: ReviewGetWorkspaceChangesInput) =>
     ipcRenderer.invoke("review:get-workspace-changes", input) as Promise<ReviewGetWorkspaceChangesResult>,
   initGitRepository: (input: ReviewInitGitInput) =>

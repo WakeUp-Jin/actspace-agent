@@ -145,6 +145,16 @@
 - url 模式展示：`Web Search https://example.com/path`（2026-07-06 起两种模式统一 `Web Search` 前缀，`mode` 字段仍保留区分）。
 - 不在工具日志行里展示搜索结果正文、来源摘要或页面摘要；这些内容只保留在 `tool_result.rawOutput` / `modelOutput` 中，供模型继续推理和排障使用。
 
+### `generate_image`
+
+- `previewKind`: `image_generation`。
+- running 与 completed 都使用 Read 同级的单行工具日志，不使用图标、外围卡片或聊天区缩略图。
+- 参数顺序为动作词、size、数量、prompt preview、model；整行使用视觉截断，完整参数仍保留在 tool call 与 preview 契约中。
+- completed / partial 产生的本地图片由 turn 级 `Artifacts` 组件聚合，放在最终回复之后；工具行只表达执行事实，不承担产物浏览。
+- 点击图片必须通过 main/preload 的 Session Artifact 读取通道，renderer 不拼接 `file://`，不从绝对路径直接读盘。
+- 产物行的完整路径只在悬浮 Tooltip 中显示；右键系统操作必须由 main 侧按 session artifacts 或 workspace realpath 边界重新解析，不信任 renderer 传入的绝对路径。
+- `tool_finished` 仍按 `toolCallId` 立即更新该行；产物栏只消费 completed / partial 的最终图片引用。
+
 ### `agent`
 
 - `previewKind`: `agent`

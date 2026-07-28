@@ -34,6 +34,8 @@ import type {
   SessionPreviewInput,
   SessionRenameInput,
   SessionWorkspaceInput,
+  ArtifactContextMenuInput,
+  SessionArtifactReadInput,
   SubAgentTranscriptGetInput,
   SetProviderKeyInput,
   SettingsUpdateInput,
@@ -119,6 +121,8 @@ import { listVisualizations, visualizeReply } from "./visualize-service";
 import { describeSessionContext } from "./context-describe-service";
 import { loadMainAgentRuntimeContext } from "./agent-runtime-context";
 import { listWorkspaceDir, readWorkspaceFile } from "./workspace-fs-service";
+import { readSessionArtifact } from "./session-artifact-service";
+import { showArtifactContextMenu } from "./artifact-context-menu-service";
 import { getWorkspaceGitChanges, initializeGitRepository } from "./review-git-service";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "./workspace-registry-service";
 import { getSessionPreview } from "./session-preview-service";
@@ -1000,6 +1004,17 @@ async function registerIpc() {
   ipcMain.handle("workspace:read-file", async (_event, input: WorkspaceReadFileInput) => {
     const roots = await ensureDataDirectories();
     return readWorkspaceFile(input, roots);
+  });
+
+  ipcMain.handle("session:read-artifact", async (_event, input: SessionArtifactReadInput) => {
+    const roots = await ensureDataDirectories();
+    return readSessionArtifact(input, roots);
+  });
+
+  ipcMain.handle("artifact:show-context-menu", async (event, input: ArtifactContextMenuInput) => {
+    const roots = await ensureDataDirectories();
+    const window = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    return showArtifactContextMenu(input, roots, window);
   });
 
   ipcMain.handle("review:get-workspace-changes", async (_event, input: ReviewGetWorkspaceChangesInput = {}) => {

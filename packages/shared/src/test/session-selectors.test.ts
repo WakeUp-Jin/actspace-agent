@@ -81,6 +81,34 @@ describe("session selectors", () => {
     });
   });
 
+  it("restores write output paths for the turn artifact shelf", () => {
+    const [block] = createMessageBlocks([toolResultEvent({
+      toolCallId: "toolu-write-1",
+      toolName: "write_file",
+      ok: true,
+      summary: "Write report.md",
+      uiPreview: {
+        kind: "write",
+        filePath: "report.md",
+        outputPath: "/workspace/docs/report.md",
+        outputRelativePath: "docs/report.md",
+        additions: 4,
+        deletions: 0,
+        diff: "",
+        collapsedLines: 0,
+        status: "completed",
+      },
+    })]);
+
+    expect(block).toMatchObject({
+      kind: "write_diff",
+      filePath: "report.md",
+      outputPath: "/workspace/docs/report.md",
+      outputRelativePath: "docs/report.md",
+      status: "completed",
+    });
+  });
+
   it("derives turn-scoped render keys independently from persisted event ids", () => {
     const timestamp = "2026-07-17T07:00:00.000Z";
     const blocks = createMessageBlocks([

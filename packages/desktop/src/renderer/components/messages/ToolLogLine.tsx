@@ -11,7 +11,7 @@ import {
 } from "./toolLogStyles";
 
 type ToolLogMessage = Extract<MessageBlock, {
-  kind: "read" | "search" | "grep" | "glob" | "web_search" | "media_analysis" | "directory_list" | "delete" | "tool" | "error";
+  kind: "read" | "search" | "grep" | "glob" | "web_search" | "media_analysis" | "image_generation" | "directory_list" | "delete" | "tool" | "error";
 }>;
 type ToolLogStatus = "running" | "completed" | "failed" | "denied" | undefined;
 
@@ -238,6 +238,35 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
           {message.displayText}
         </span>
       </div>
+    );
+  }
+
+  if (message.kind === "image_generation") {
+    const count = message.status === "running"
+      ? message.requestedCount
+      : message.generatedCount ?? message.requestedCount;
+    const action = message.status === "running"
+      ? "Generate image"
+      : message.status === "failed"
+        ? "Generate image failed"
+        : "Generated image";
+    const countLabel = message.status === "partial"
+      ? `${count}/${message.requestedCount}`
+      : String(count);
+    const text = [action, message.status === "failed" ? message.errorMessage : undefined, message.size, countLabel, message.promptPreview, message.model]
+      .filter(Boolean)
+      .join(" · ");
+    const status: ToolLogStatus = message.status === "running"
+      ? "running"
+      : message.status === "failed"
+        ? "failed"
+        : "completed";
+    return (
+      <OverflowToolLine
+        className={getToolLogLineClass(status, className)}
+        status={status}
+        text={text}
+      />
     );
   }
 

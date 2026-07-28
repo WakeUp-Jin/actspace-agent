@@ -6,7 +6,7 @@
 
 ## 1. 目标
 
-图片生成是一个独立的 Agent 工具能力，不是主对话模型的附属配置。用户完成 API Key、Base URL 与模型名称配置后，可以直接在对话中要求 Agent 生成一张或多张图片，生成结果作为当前会话的持久产物保存，并在消息流中直接预览。
+图片生成是一个独立的 Agent 工具能力，不是主对话模型的附属配置。用户完成 API Key、Base URL 与模型名称配置后，可以直接在对话中要求 Agent 生成一张或多张图片，生成结果作为当前会话的持久产物保存；工具过程使用单行日志展示，最终图片从回复下方的产物栏打开到右侧面板预览。
 
 V0 需要满足：
 
@@ -336,20 +336,21 @@ type ImageGenerationPreview = {
 
 生命周期：
 
-- streaming / dispatched：参数不完整时展示 `Generate image…`。
-- running：已解析 prompt 后展示生成数量、prompt 摘要与旋转进度指示。
-- completed：立即按该 `toolCallId` 切换最终态并展示图片。
-- partial：展示已成功图片与轻量 warning，不把整个块标成全失败。
-- failed：展示单行失败摘要，不渲染空图片容器。
+- streaming / dispatched：参数不完整时展示单行 `Generate image…`。
+- running：与 Read 同级展示 `Generate image · size · n · prompt · model`，使用文字 shimmer，不使用图标、边框卡片或行内缩略图。
+- completed：立即按该 `toolCallId` 切换为 `Generated image · size · count · prompt · model`。
+- partial：工具行展示实际数量 `generated/requested`；已成功图片仍进入本轮产物栏。
+- failed：展示单行失败摘要，不产生图片产物行。
 
-图片布局：
+工具行和图片产物必须分层：
 
-- 1 张：单张大预览。
-- 2 到 4 张：两列网格。
-- 5 到 10 张：响应式网格，窄窗口退回两列或单列。
-- 图片使用 `object-contain`，不能裁掉生成内容来填满卡片。
-- 点击图片打开右侧图片预览或等价大图查看，不直接暴露远程 URL。
-- 块内展示模型、尺寸与“实际生成 M 张”；完整 prompt 默认不占据主消息流，可截断或折叠。
+- `image_generation` 属于工具过程，进入 `Worked for` 分组，不在消息流中占据大面积媒体卡片。
+- 最终回复后渲染本轮 `Artifacts` 组件，逐行展示图片文件名与 session-relative artifact 路径。
+- 点击图片行后，renderer 通过 `session:read-artifact` IPC 请求 main 读取文件；main 必须校验文件位于当前 `<sessionId>/artifacts/` 子树、大小与真实图片签名，再返回单张 data URL。
+- 悬浮图片产物行时展示完整绝对路径；右键菜单由 main 进程创建，支持打开、复制路径、复制图片与 Finder 定位。上下文菜单与预览共享同一 session realpath 边界，不扩大 renderer 的文件系统权限。
+- renderer 禁止自行拼接或加载 `file://`，也不在聊天区预加载全部图片 Base64。
+- 右侧 Image Tab 使用 `object-contain` 展示完整图片，不裁掉生成内容。
+- 产物栏可同时展示本轮 `write_file` / `edit_file` 的完成输出，但不收录 Read/Grep 等输入对象。
 - UI 颜色必须使用主题 token，浅色与深色主题都要验证。
 
 Renderer 只消费 `MessageBlock`，不能从 raw tool args、raw provider response 或 Base64 反推图片列表。
@@ -413,8 +414,10 @@ packages/agent-core/src/engine/bridge.ts
 packages/agent-core/src/engine/streaming-preview-extractors.ts
 
 packages/desktop/src/main/settings-service.ts
+packages/desktop/src/main/session-artifact-service.ts
 packages/desktop/src/renderer/components/settings/SettingsPage.tsx
-packages/desktop/src/renderer/components/messages/GeneratedImageBlock.tsx
+packages/desktop/src/renderer/components/messages/ToolLogLine.tsx
+packages/desktop/src/renderer/components/messages/TurnOutputArtifacts.tsx
 ```
 
 provider 请求构造和响应解析放在薄 adapter 中，definition、网络传输、artifact 写盘和 UI preview 不应揉成一个大 executor。
@@ -441,7 +444,8 @@ provider 请求构造和响应解析放在薄 adapter 中，definition、网络�
 
 - settings：图片生成 Key 只返回 `hasApiKey`，Base URL 与模型名称可读写，Key 加密存储与清除路径正确。
 - session selectors：running / completed / partial / failed preview 都能恢复。
-- renderer：1、2、4、10 张图片布局；窄窗口；图片加载失败兜底。
+- renderer：图片工具单行状态、长 prompt 截断、本轮产物栏、点击加载与右侧 Image Tab。
+- session artifact：合法图片读取、越界路径、逃逸 symlink、伪造扩展名和大小上限。
 - tool lifecycle：每个 `toolCallId` 完成后立即更新自己的图片块。
 - 主题：浅色、深色和系统主题下无字面量颜色回归。
 - Fork：图片目录被复制，持久化路径重写后仍可预览。
@@ -480,3 +484,6 @@ V1 可以引入：
 - 2026-07-27：生成图片保存为 session artifacts，消息流展示本地产物；不把 Base64 或短期 URL 持久化。
 - 2026-07-27：图片默认不作为 `ToolResult.content` 自动注入模型上下文，需要检查时再由视觉模型显式读取。
 - 2026-07-27：V0 只向主 Agent 暴露，不向 Kairos、Explore 或通用 SubAgent 默认开放付费生成能力。
+- 2026-07-28：工具执行状态改为 Read 风格单行日志；生成图片不再直接占据消息流，而是在最终回复后的本轮产物栏中展示。
+- 2026-07-28：开发态 renderer 不加载 `file://`；点击图片时通过按 session artifacts 边界校验的 IPC 返回单张 data URL，再在右侧面板打开。
+- 2026-07-28：Artifacts 行新增完整路径 Tooltip 和 main-owned 原生右键菜单；系统操作仍只允许当前 session artifacts 或 workspace 边界内的真实文件。

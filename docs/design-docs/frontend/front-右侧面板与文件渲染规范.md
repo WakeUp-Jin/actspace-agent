@@ -186,6 +186,30 @@ type WorkspaceReadFileResult = {
 };
 ```
 
+会话生成图片不属于 workspace 文件树，使用独立 Session Artifact IPC：
+
+```ts
+type SessionArtifactReadInput = {
+  sessionId: string;
+  artifactPath: string;
+};
+
+type SessionArtifactReadResult = {
+  name: string;
+  relativePath: string;
+  mimeType?: "image/png" | "image/jpeg" | "image/webp";
+  size: number;
+  dataUrl?: string;
+  error?: string;
+};
+```
+
+- renderer 不能直接加载 `file://`，开发态 HTTP origin 会被 Electron 拒绝，本地绝对路径也不应成为 renderer 文件读取能力。
+- main 同时校验 `sessionId`、目标 realpath 与 `<sessionRoot>/<sessionId>/artifacts/` 边界，拒绝 `..`、绝对路径逃逸和 symlink 逃逸。
+- 只允许 PNG / JPEG / WebP，按文件魔数确认 MIME，单图沿用生成工具 25 MB 上限。
+- data URL 只在用户点击某一产物后按需返回，不在消息恢复或聊天区首屏批量注入。
+- 生成图片作为对象 Tab 打开，不带 workspace `relativePath`，避免误进入 Workspace 文件浏览 shell。
+
 main 侧服务规则：
 
 - renderer 不直接访问文件系统；树展开和文件读取都走 preload + IPC。

@@ -1251,8 +1251,15 @@ describe("runTurnWithAgent bridge", () => {
       previewKind: "edit_diff",
       handler: async (): Promise<ToolResult> => ({
         success: true,
-        data: "--- a/src/index.ts\n+++ b/src/index.ts\n@@ -1 +1,2 @@\n-old\n+new\n+line",
+        data: {
+          filePath: "/workspace/packages/desktop/src/index.ts",
+          relativePath: "packages/desktop/src/index.ts",
+          diff: "--- a/src/index.ts\n+++ b/src/index.ts\n@@ -1 +1,2 @@\n-old\n+new\n+line",
+          additions: 2,
+          deletions: 1,
+        },
       }),
+      renderResult: (toolResult) => String((toolResult.data as { diff?: string } | undefined)?.diff ?? ""),
     });
     deps.llm.setResponses([
       mockToolCall("read_file", { path: "/workspace/packages/desktop/package.json" }, { id: "tc-read-short-name" }),
@@ -1284,6 +1291,8 @@ describe("runTurnWithAgent bridge", () => {
       uiPreview: {
         kind: "edit_diff",
         filePath: "index.ts",
+        outputPath: "/workspace/packages/desktop/src/index.ts",
+        outputRelativePath: "packages/desktop/src/index.ts",
         additions: 2,
         deletions: 1,
       },

@@ -403,6 +403,8 @@ export type ToolUiPreview =
   | {
       kind: "edit_diff";
       filePath: string;
+      outputPath?: string;
+      outputRelativePath?: string;
       additions: number;
       deletions: number;
       diff: string;
@@ -415,6 +417,8 @@ export type ToolUiPreview =
   | {
       kind: "write";
       filePath: string;
+      outputPath?: string;
+      outputRelativePath?: string;
       additions: number;
       deletions: number;
       diff: string;
@@ -725,6 +729,8 @@ export type MessageBlock = {
       kind: "edit_diff";
       id: EventId;
       filePath: string;
+      outputPath?: string;
+      outputRelativePath?: string;
       additions: number;
       deletions: number;
       diff: string;
@@ -741,6 +747,8 @@ export type MessageBlock = {
       kind: "write_diff";
       id: EventId;
       filePath: string;
+      outputPath?: string;
+      outputRelativePath?: string;
       additions: number;
       deletions: number;
       diff: string;
