@@ -575,7 +575,7 @@ async function createMainWindow() {
   const win = new BrowserWindow({
     width: 1440,
     height: 960,
-    minWidth: 1120,
+    minWidth: 480,
     minHeight: 760,
     title: "actspace",
     titleBarStyle: "hidden",

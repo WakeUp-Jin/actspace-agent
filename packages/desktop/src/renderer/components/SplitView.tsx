@@ -157,7 +157,8 @@ export function SplitView({
     }
 
     function publishWidth(width: number) {
-      const roundedWidth = Math.round(width);
+      const measuredWidth = width > 0 ? width : window.innerWidth;
+      const roundedWidth = Math.round(measuredWidth);
       setContainerWidth(roundedWidth);
       onContainerWidthChange(roundedWidth);
     }

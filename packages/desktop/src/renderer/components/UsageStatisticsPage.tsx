@@ -550,7 +550,7 @@ function RequestUsageTable({
   const lastRowNumber = page.totalRows > 0 ? firstRowNumber + rows.length - 1 : 0;
 
   return (
-    <section className={`${panelClass} col-span-2 flex min-h-[340px] flex-col px-6 pb-5 pt-6`}>
+    <section className={`${panelClass} col-span-2 flex min-h-[340px] flex-col px-6 pb-5 pt-6 max-[980px]:col-span-1 max-[600px]:px-4`}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <div className="text-base font-semibold text-text-main">会话明细</div>
@@ -790,11 +790,11 @@ export function UsageStatisticsPage({
   const lastDailyRowNumber = dailyRowsTotal > 0 ? dailyRowsStartIndex + visibleDailyRows.length : 0;
 
   return (
-    <main className="h-full overflow-auto bg-app-bg px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main">
-      <div className="grid min-h-[calc(100vh-48px)] min-w-0 grid-cols-[340px_minmax(0,1fr)] items-start gap-4">
+    <main className="h-full overflow-auto bg-app-bg px-6 pb-6 pt-[calc(var(--window-chrome-strip-height)+12px)] text-text-main max-[600px]:px-3 max-[600px]:pb-3">
+      <div className="grid min-h-[calc(100vh-48px)] min-w-0 grid-cols-[340px_minmax(0,1fr)] items-start gap-4 max-[980px]:grid-cols-1">
         <section className="flex min-w-0 flex-col gap-4 self-stretch">
           <article className={`${panelClass} grid gap-3.5 p-4`}>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-2 max-[520px]:grid-cols-2">
               {[
                 [formatMillions(recent7d), "7d"],
                 [formatMillions(recent30d), "30d"],
@@ -903,7 +903,7 @@ export function UsageStatisticsPage({
           ) : null}
 
           <section className={`${panelClass} grid justify-items-center gap-4 px-6 pb-6 pt-6`}>
-            <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex w-full items-center justify-between gap-3 max-[600px]:flex-col max-[600px]:items-stretch">
               <div className="inline-flex gap-1.5 rounded-full border border-line bg-surface/85 p-1 shadow-[0_8px_24px_rgba(31,45,61,0.04)]" role="tablist" aria-label="Usage range">
                 {RANGE_TABS.map((tab) => (
                   <button
@@ -924,7 +924,7 @@ export function UsageStatisticsPage({
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-end gap-2">
                 <button
                   className={actionButtonClass}
                   type="button"
@@ -961,7 +961,7 @@ export function UsageStatisticsPage({
               <span>缓存效率 {formatPercent(effectiveSnapshot.summary.cacheEfficiencyPercent)}</span>
               <span>{effectiveSnapshot.summary.toolCallCount.toLocaleString()} tool calls</span>
             </div>
-            <section className="grid w-full grid-cols-4 gap-3">
+            <section className="grid w-full grid-cols-4 gap-3 max-[520px]:grid-cols-2">
               <BreakdownCard label="输入" value={formatMillions(effectiveSnapshot.summary.promptTokens)} />
               <BreakdownCard label="输出" value={formatMillions(effectiveSnapshot.summary.completionTokens)} />
               <BreakdownCard label="缓存" value={formatMillions(effectiveSnapshot.summary.cacheHitTokens)} />
@@ -970,7 +970,7 @@ export function UsageStatisticsPage({
           </section>
 
           <section className={`${panelClass} p-6`}>
-            <div className="grid grid-cols-[minmax(0,0.76fr)_1.24fr] items-center gap-5">
+            <div className="grid grid-cols-[minmax(0,0.76fr)_1.24fr] items-center gap-5 max-[600px]:grid-cols-1">
               <div>
                 <div className="text-base font-semibold text-text-main">缓存效率</div>
                 <div className="mt-3 text-[42px] font-bold leading-none tracking-[-0.02em] text-text-main tabular-nums">{formatPercent(cachePercent)}</div>

@@ -31,6 +31,8 @@ const MAIN_MIN_WIDTH = 560;
 const RIGHT_DEFAULT_WIDTH = 390;
 const RIGHT_MIN_WIDTH = 320;
 const RIGHT_MAX_WIDTH = 640;
+/** 低于该宽度时，左右面板改为覆盖层，避免继续挤压主聊天区。 */
+const COMPACT_LAYOUT_MAX_WIDTH = 820;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -146,10 +148,13 @@ export function WorkbenchLayout({
   onReviewChanged?: () => void;
 }) {
   const [storedLayout] = useState(loadStoredLayout);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(() =>
+    typeof window === "undefined" ? 0 : window.innerWidth,
+  );
   const [leftMode, setLeftMode] = useState<SidebarMode>(storedLayout.leftMode);
   const [leftWidth, setLeftWidth] = useState(storedLayout.leftWidth);
   const [rightWidth, setRightWidth] = useState(storedLayout.rightWidth);
+  const [compactSidebarOpen, setCompactSidebarOpen] = useState(false);
   const {
     isOpen: isRightPanelOpen,
     openPanel: openRightPanel,
@@ -161,6 +166,7 @@ export function WorkbenchLayout({
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState<string | null>(null);
   const reviewTabRefreshCounterRef = useRef(0);
+  const isCompactLayout = containerWidth > 0 && containerWidth <= COMPACT_LAYOUT_MAX_WIDTH;
   const isSidebarHidden = leftMode === "hidden";
   const displayedLeftWidth = isSidebarHidden ? 0 : leftWidth;
   const rightMaxWidth = containerWidth > 0 ? Math.max(RIGHT_MIN_WIDTH, Math.min(RIGHT_MAX_WIDTH, containerWidth / 2)) : RIGHT_MAX_WIDTH;
@@ -189,6 +195,10 @@ export function WorkbenchLayout({
       return;
     }
 
+    if (isCompactLayout) {
+      return;
+    }
+
     if (leftMode === "expanded" && containerWidth - leftWidth < MAIN_MIN_WIDTH) {
       setLeftMode("hidden");
       return;
@@ -213,9 +223,42 @@ export function WorkbenchLayout({
     if (rightWidth > allowedRightWidth) {
       setRightWidth(clamp(allowedRightWidth, RIGHT_MIN_WIDTH, rightMaxWidth));
     }
-  }, [containerWidth, isRightPanelOpen, isSidebarHidden, leftMode, leftWidth, rightMaxWidth, rightWidth]);
+  }, [containerWidth, isCompactLayout, isRightPanelOpen, isSidebarHidden, leftMode, leftWidth, rightMaxWidth, rightWidth]);
+
+  useEffect(() => {
+    if (!isCompactLayout) {
+      setCompactSidebarOpen(false);
+    }
+  }, [isCompactLayout]);
+
+  useEffect(() => {
+    if (!isCompactLayout || (!compactSidebarOpen && !isRightPanelOpen)) {
+      return;
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+      setCompactSidebarOpen(false);
+      closeRightPanel();
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [closeRightPanel, compactSidebarOpen, isCompactLayout, isRightPanelOpen]);
 
   function toggleSidebarMode() {
+    if (isCompactLayout) {
+      setCompactSidebarOpen((open) => {
+        if (!open && isRightPanelOpen) {
+          closeRightPanel();
+        }
+        return !open;
+      });
+      return;
+    }
+
     if (leftMode === "expanded") {
       setLeftMode("hidden");
       return;
@@ -240,6 +283,12 @@ export function WorkbenchLayout({
   function toggleRightPanel() {
     if (isRightPanelOpen) {
       closeRightPanel();
+      return;
+    }
+
+    if (isCompactLayout) {
+      setCompactSidebarOpen(false);
+      openRightPanel();
       return;
     }
 
@@ -378,11 +427,45 @@ export function WorkbenchLayout({
   const currentSession = view === "chat"
     ? sessions.find((session) => session.id === activeSessionId) ?? null
     : null;
+  const chromeLeftMode: SidebarMode = isCompactLayout
+    ? compactSidebarOpen ? "expanded" : "hidden"
+    : leftMode;
+  const sidebar = (
+    <Sidebar
+      sessions={sessions}
+      workspaces={workspaces}
+      activeSessionId={activeSessionId}
+      mode={isCompactLayout ? "expanded" : leftMode}
+      view={view}
+      busySessionIds={busySessionIds}
+      sessionStatuses={sessionStatuses}
+      onToggleMode={toggleSidebarMode}
+      onNewSession={onNewSession}
+      onAddWorkspace={onAddWorkspace}
+      onSelectSession={onSelectSession}
+      onTogglePin={onTogglePin}
+      onRename={onRenameSession}
+      onCopySessionId={onCopySessionId}
+      onCopyTranscript={onCopyTranscript}
+      onFork={onForkSession}
+      onArchive={onArchiveSession}
+      onSelectView={handleSelectView}
+    />
+  );
+  const rightPanel = (
+    <RightPanel
+      contextState={contextState}
+      sessionId={activeSessionId}
+      workspaceRoot={selectedWorkspaceRoot ?? undefined}
+      onOpenReview={openReviewTab}
+      onReviewChanged={onReviewChanged}
+    />
+  );
 
   return (
     <>
       <WindowChromeBar
-        leftMode={leftMode}
+        leftMode={chromeLeftMode}
         rightOpen={isRightPanelOpen}
         title={chromeTitle}
         onToggleLeft={toggleSidebarMode}
@@ -397,30 +480,9 @@ export function WorkbenchLayout({
         }
       />
       <SplitView
-        left={
-          <Sidebar
-            sessions={sessions}
-            workspaces={workspaces}
-            activeSessionId={activeSessionId}
-            mode={leftMode}
-            view={view}
-            busySessionIds={busySessionIds}
-            sessionStatuses={sessionStatuses}
-            onToggleMode={toggleSidebarMode}
-            onNewSession={onNewSession}
-            onAddWorkspace={onAddWorkspace}
-            onSelectSession={onSelectSession}
-            onTogglePin={onTogglePin}
-            onRename={onRenameSession}
-            onCopySessionId={onCopySessionId}
-            onCopyTranscript={onCopyTranscript}
-            onFork={onForkSession}
-            onArchive={onArchiveSession}
-            onSelectView={handleSelectView}
-          />
-        }
-        leftWidth={displayedLeftWidth}
-        leftHidden={isSidebarHidden}
+        left={sidebar}
+        leftWidth={isCompactLayout ? 0 : displayedLeftWidth}
+        leftHidden={isCompactLayout || isSidebarHidden}
         leftBounds={{ minWidth: LEFT_MIN_WIDTH, maxWidth: LEFT_MAX_WIDTH }}
         leftSeparatorLabel="Resize session sidebar"
         main={mainContent}
@@ -439,21 +501,37 @@ export function WorkbenchLayout({
         onLeftSeparatorDoubleClick={toggleSidebarMode}
         onRightResize={(width) => setRightWidth(clamp(width, RIGHT_MIN_WIDTH, rightMaxWidth))}
         onRightSeparatorDoubleClick={() => setRightWidth(RIGHT_DEFAULT_WIDTH)}
-        right={
-          view === "chat" && isRightPanelOpen ? (
-            <RightPanel
-              contextState={contextState}
-              sessionId={activeSessionId}
-              workspaceRoot={selectedWorkspaceRoot ?? undefined}
-              onOpenReview={openReviewTab}
-              onReviewChanged={onReviewChanged}
-            />
-          ) : undefined
-        }
+        right={view === "chat" && isRightPanelOpen && !isCompactLayout ? rightPanel : undefined}
         rightBounds={{ minWidth: RIGHT_MIN_WIDTH, maxWidth: rightMaxWidth }}
         rightSeparatorLabel="Resize preview panel"
         rightWidth={rightWidth}
       />
+      {isCompactLayout && compactSidebarOpen ? (
+        <div className="fixed inset-0 z-[50]" data-testid="compact-sidebar-overlay">
+          <button
+            type="button"
+            className="absolute inset-0 border-0 bg-overlay"
+            aria-label="Close session sidebar overlay"
+            onClick={() => setCompactSidebarOpen(false)}
+          />
+          <div className="absolute inset-y-0 left-0 w-[min(360px,calc(100vw-48px))] min-w-[280px] overflow-hidden border-r border-line bg-sidebar shadow-act-float">
+            {sidebar}
+          </div>
+        </div>
+      ) : null}
+      {isCompactLayout && view === "chat" && isRightPanelOpen ? (
+        <div className="fixed inset-0 z-[50]" data-testid="compact-right-panel-overlay">
+          <button
+            type="button"
+            className="absolute inset-0 border-0 bg-overlay"
+            aria-label="Close right panel overlay"
+            onClick={closeRightPanel}
+          />
+          <div className="absolute inset-y-0 right-0 w-[min(100%,640px)] overflow-hidden bg-surface shadow-act-float">
+            {rightPanel}
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

@@ -68,6 +68,8 @@ Composer 有 `surface`（`followup` / `initial`）一个外部维度，内部布
 - Composer 不提供上下文长度选择器。模型使用注册表声明的原生最大上下文，Context 入口只负责展示当前占用。
 - 主菜单和 Options 打开时使用约 `140ms` 的 opacity + transform 轻量过渡；系统启用 reduced motion 时取消过渡。
 - 模型列表保留滚动能力，但不通过扩大菜单宽度或行高承载更多信息。
+- 窗口不超过 `600px` 时，即使输入内容仍是单行，也强制使用 stacked grid：输入占第一行，`+ / model / send` 位于第二行；Composer 两侧留白收敛为 `18px`，模型标签继续截断而不挤压发送按钮。
+- initial composer 的 workspace / branch / runtime 选择行在窄窗允许横向滚动，不把三个入口压成不可读窄条。
 
 | surface | 布局 | 结构 |
 | --- | --- | --- |

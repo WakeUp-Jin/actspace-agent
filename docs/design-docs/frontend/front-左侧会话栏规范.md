@@ -172,6 +172,13 @@
 - localStorage 中旧值 `leftMode: "rail"` 会在反序列化时映射成 `hidden`，避免破坏用户偏好。
 - 拖拽左侧分隔条到 `LEFT_HIDE_SNAP_WIDTH`（148px）以下时，sidebar 自动 snap 到 hidden 态。
 
+### 紧凑窗口覆盖态
+
+- 窗口宽度不超过 `820px` 时，sidebar 不进入 SplitView 分栏，主聊天区始终占满窗口。
+- chrome 左侧按钮在紧凑窗口中打开覆盖式 sidebar；面板最大宽度 `360px`，并至少给主区保留 `48px` 的可见边缘。
+- 覆盖态不修改持久化的桌面 `leftMode / leftWidth`，窗口重新变宽后恢复原桌面偏好。
+- 点击遮罩、再次点击 chrome 折叠按钮或按 `Escape` 都能关闭；打开右侧对象面板时会先关闭左侧覆盖层。
+
 ## 字体
 
 字体栈与 Cursor 对齐，详细约定见 [全局视觉语言规范.md](./全局视觉语言规范.md) 的「字体栈」「字体特性」「字号阶梯」「字重与行高」四段。Sidebar 这里只列与本组件直接相关的字号字重表：

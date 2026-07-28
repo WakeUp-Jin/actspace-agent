@@ -242,7 +242,7 @@ export function SettingsPage({
         <div className="chrome-right" />
       </div>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden pt-[var(--window-chrome-strip-height)]">
+      <div className="flex min-h-0 flex-1 overflow-hidden pt-[var(--window-chrome-strip-height)] max-[820px]:flex-col">
         <SettingsNav active={section} onSelect={setSection} onBack={onBack} />
         <main aria-label="设置内容" className="min-h-0 flex-1 overflow-y-auto bg-app-bg">
           {settings ? (

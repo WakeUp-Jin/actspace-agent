@@ -33,7 +33,7 @@ export const SETTINGS_SECTIONS: { id: SettingsSectionId; label: string; icon: Ic
 ];
 
 const NAV_ITEM_CLASS =
-  "flex h-9 items-center gap-2.5 rounded-act-md px-2.5 text-left text-[13px] font-medium transition-colors duration-[130ms] ease-in-out";
+  "flex h-9 shrink-0 items-center gap-2.5 rounded-act-md px-2.5 text-left text-[13px] font-medium transition-colors duration-[130ms] ease-in-out";
 const NAV_ITEM_ACTIVE_CLASS = "bg-selected font-semibold text-text-main";
 const NAV_ITEM_IDLE_CLASS = "text-text-muted hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 
@@ -48,14 +48,14 @@ export function SettingsNav({
 }) {
   return (
     <nav
-      className="flex h-full w-[232px] shrink-0 flex-col gap-0.5 border-r border-line bg-surface-subtle px-3 pb-3 pt-2"
+      className="flex h-full w-[232px] shrink-0 flex-col gap-0.5 border-r border-line bg-surface-subtle px-3 pb-3 pt-2 max-[820px]:h-auto max-[820px]:w-full max-[820px]:flex-row max-[820px]:overflow-x-auto max-[820px]:border-b max-[820px]:border-r-0 max-[820px]:px-2 max-[820px]:py-2"
       aria-label="设置导航"
     >
       <button
         type="button"
         onClick={onBack}
         aria-label="返回应用"
-        className={`${NAV_ITEM_CLASS} ${NAV_ITEM_IDLE_CLASS} mb-1.5`}
+        className={`${NAV_ITEM_CLASS} ${NAV_ITEM_IDLE_CLASS} mb-1.5 max-[820px]:mb-0`}
       >
         <ArrowLeft size={16} strokeWidth={2} />
         <span>返回</span>

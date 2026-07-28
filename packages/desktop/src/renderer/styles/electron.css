@@ -122,3 +122,13 @@
   outline: 2px solid var(--act-color-focus-ring);
   outline-offset: 2px;
 }
+
+@media (max-width: 600px) {
+  .chrome-title {
+    display: none;
+  }
+
+  .chrome-center {
+    padding: 0 8px;
+  }
+}

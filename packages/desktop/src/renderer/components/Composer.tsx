@@ -61,10 +61,10 @@ export type ComposerReviewSummary = {
 export type ComposerSurface = "followup" | "initial";
 
 const COMPOSER_WRAP_CLASS =
-  "composer-wrap relative mx-auto grid w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] gap-2";
+  "composer-wrap relative mx-auto grid w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] gap-2 max-[600px]:w-[calc(100%_-_36px)]";
 const COMPOSER_INITIAL_WRAP_CLASS =
-  "composer-wrap composer-wrap-initial relative mx-auto grid w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),706px)] gap-2";
-const INITIAL_CONTEXT_ROW_CLASS = "initial-context-row flex min-h-7 items-center gap-3 px-2 text-sm text-text-muted";
+  "composer-wrap composer-wrap-initial relative mx-auto grid w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),706px)] gap-2 max-[600px]:w-[calc(100%_-_36px)]";
+const INITIAL_CONTEXT_ROW_CLASS = "initial-context-row flex min-h-7 items-center gap-3 overflow-x-auto px-2 text-sm text-text-muted";
 const INITIAL_CONTEXT_SELECTOR_CLASS =
   "initial-context-selector inline-flex items-center gap-1 rounded-full border-0 bg-transparent px-1 py-1 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main";
 const COMPOSER_ACTION_STRIP_CLASS = "composer-action-strip flex min-h-[34px] items-center gap-2";
@@ -96,7 +96,7 @@ const FILE_ATTACHMENT_REMOVE_CLASS =
 // 切换布局不 remount、不丢焦点光标；附件存在或 initial surface 强制 stacked。
 const COMPOSER_BODY_BASE_CLASS = "composer-body grid min-h-[48px] items-center gap-x-1.5 px-2 py-1.5";
 const COMPOSER_BODY_INLINE_CLASS =
-  `${COMPOSER_BODY_BASE_CLASS} grid-cols-[auto_minmax(0,1fr)_auto_auto] [grid-template-areas:'plus_input_model_send']`;
+  `${COMPOSER_BODY_BASE_CLASS} grid-cols-[auto_minmax(0,1fr)_auto_auto] [grid-template-areas:'plus_input_model_send'] max-[600px]:gap-y-1 max-[600px]:grid-cols-[auto_auto_minmax(0,1fr)_auto] max-[600px]:[grid-template-areas:'input_input_input_input'_'plus_model_._send']`;
 const COMPOSER_BODY_STACKED_CLASS =
   `${COMPOSER_BODY_BASE_CLASS} gap-y-1 grid-cols-[auto_auto_minmax(0,1fr)_auto] [grid-template-areas:'input_input_input_input'_'plus_model_._send']`;
 const COMPOSER_INPUT_CLASS =
@@ -109,7 +109,7 @@ const CONTROL_GROUP_CLASS = "control-group relative";
 const COMMAND_BUTTON_CLASS =
   "command-button grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-surface-subtle text-text-muted transition-[background,border,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-hover-overlay hover:text-text-main aria-expanded:border-line-strong aria-expanded:bg-selected aria-expanded:text-text-main";
 const MODEL_BUTTON_CLASS =
-  "model-button inline-flex h-8 max-w-[220px] items-center gap-[6px] rounded-full border-0 bg-transparent px-1.5 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main";
+  "model-button inline-flex h-8 max-w-[220px] items-center gap-[6px] rounded-full border-0 bg-transparent px-1.5 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main max-[600px]:max-w-[210px]";
 const MODEL_BUTTON_TEXT_CLASS = "model-button-text truncate";
 // 发送按钮对齐 Cursor：反色圆形按钮 + 上箭头。bg-text-main / text-surface 随主题翻转
 // （浅色 = 近黑底白箭头，深色 = 近白底深箭头），禁用态退为灰底。

@@ -139,15 +139,15 @@ const traceLegendClass = "flex items-center gap-4 text-xs text-text-faint";
 const traceBlockBaseClass =
   "h-[21px] min-w-5 flex-none rounded border border-transparent transition hover:-translate-y-px";
 const mainGridClass =
-  "grid min-h-0 flex-1 grid-cols-[minmax(620px,7fr)_minmax(340px,3fr)] gap-3 px-4 pb-4 pt-3 max-[1100px]:grid-cols-1";
+  "grid min-h-0 flex-1 grid-cols-[minmax(620px,7fr)_minmax(340px,3fr)] gap-3 px-4 pb-4 pt-3 max-[1100px]:grid-cols-1 max-[1100px]:grid-rows-[auto_auto] max-[1100px]:overflow-y-auto max-[600px]:px-3";
 const eventsPanelClass =
   "flex min-h-0 flex-col overflow-hidden rounded-act-md border border-line bg-surface";
-const eventsTableClass = "w-full table-fixed border-collapse text-xs";
+const eventsTableClass = "w-full min-w-[620px] table-fixed border-collapse text-xs";
 const eventsThClass =
   "sticky top-0 z-[1] border-b border-line bg-surface-subtle px-4 py-3 text-left text-xs font-medium text-text-faint";
 const eventsTdClass = "border-b border-line px-4 py-2.5 tabular-nums text-text-main";
 const eventsFooterClass =
-  "mt-auto grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-4 py-3 text-xs text-text-faint";
+  "mt-auto grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-4 py-3 text-xs text-text-faint max-[600px]:grid-cols-1 max-[600px]:justify-items-center";
 const pageButtonClass =
   "inline-flex h-7 w-7 items-center justify-center rounded-[7px] border border-line bg-surface text-xs text-text-muted hover:border-line-strong hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-45";
 // 激活页按钮是独立完整类，不在 pageButtonClass 上叠加覆盖——surface / selected
@@ -672,54 +672,56 @@ function KairosExecutionList(props: KairosExecutionListProps) {
   const pageNumbers = visiblePages(props.page, props.totalPages);
   return (
     <section className={eventsPanelClass} aria-label="执行列表">
-      <table className={eventsTableClass} role="grid">
-        <thead>
-          <tr>
-            <th className={cn(eventsThClass, "w-[92px]")}>时间</th>
-            <th className={cn(eventsThClass, "w-[104px]")}>类型</th>
-            <th className={cn(eventsThClass, "w-[88px]")}>状态</th>
-            <th className={eventsThClass}>摘要</th>
-            <th className={cn(eventsThClass, "w-[72px]")}>耗时</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.id}
-              className={cn(
-                "cursor-pointer transition hover:bg-surface-subtle",
-                row.status === "failed" && "bg-danger-soft",
-                props.selectedRowId === row.id && "bg-selected shadow-[inset_2px_0_0_var(--act-color-border-strong)]",
-              )}
-              onClick={() => props.onSelectRow(row.id)}
-              role="row"
-              aria-selected={props.selectedRowId === row.id}
-              tabIndex={0}
-              onKeyDown={(ev) => {
-                if (ev.key === "Enter" || ev.key === " ") {
-                  ev.preventDefault();
-                  props.onSelectRow(row.id);
-                }
-              }}
-            >
-              <td className={cn(eventsTdClass, "w-[92px]")}>{formatKairosTime(row.startedAt)}</td>
-              <td className={cn(eventsTdClass, "w-[104px]")}>
-                <span className="inline-flex items-center gap-[7px] whitespace-nowrap font-medium text-text-muted [&_svg]:text-text-faint">
-                  <KindIcon kind={row.kind} />
-                  {kairosKindLabel(row.kind)}
-                </span>
-              </td>
-              <td className={cn(eventsTdClass, "w-[88px]")}>
-                <span className={statusBadgeClass(row.status)}>
-                  {row.status}
-                </span>
-              </td>
-              <td className={cn(eventsTdClass, "max-w-[320px] overflow-hidden text-ellipsis whitespace-nowrap")}>{row.summary || "—"}</td>
-              <td className={cn(eventsTdClass, "w-[72px]")}>{row.durationMs ? formatKairosDuration(Math.round(row.durationMs / 1000)) : "—"}</td>
+      <div className="min-h-0 flex-1 overflow-auto">
+        <table className={eventsTableClass} role="grid">
+          <thead>
+            <tr>
+              <th className={cn(eventsThClass, "w-[92px]")}>时间</th>
+              <th className={cn(eventsThClass, "w-[104px]")}>类型</th>
+              <th className={cn(eventsThClass, "w-[88px]")}>状态</th>
+              <th className={eventsThClass}>摘要</th>
+              <th className={cn(eventsThClass, "w-[72px]")}>耗时</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.id}
+                className={cn(
+                  "cursor-pointer transition hover:bg-surface-subtle",
+                  row.status === "failed" && "bg-danger-soft",
+                  props.selectedRowId === row.id && "bg-selected shadow-[inset_2px_0_0_var(--act-color-border-strong)]",
+                )}
+                onClick={() => props.onSelectRow(row.id)}
+                role="row"
+                aria-selected={props.selectedRowId === row.id}
+                tabIndex={0}
+                onKeyDown={(ev) => {
+                  if (ev.key === "Enter" || ev.key === " ") {
+                    ev.preventDefault();
+                    props.onSelectRow(row.id);
+                  }
+                }}
+              >
+                <td className={cn(eventsTdClass, "w-[92px]")}>{formatKairosTime(row.startedAt)}</td>
+                <td className={cn(eventsTdClass, "w-[104px]")}>
+                  <span className="inline-flex items-center gap-[7px] whitespace-nowrap font-medium text-text-muted [&_svg]:text-text-faint">
+                    <KindIcon kind={row.kind} />
+                    {kairosKindLabel(row.kind)}
+                  </span>
+                </td>
+                <td className={cn(eventsTdClass, "w-[88px]")}>
+                  <span className={statusBadgeClass(row.status)}>
+                    {row.status}
+                  </span>
+                </td>
+                <td className={cn(eventsTdClass, "max-w-[320px] overflow-hidden text-ellipsis whitespace-nowrap")}>{row.summary || "—"}</td>
+                <td className={cn(eventsTdClass, "w-[72px]")}>{row.durationMs ? formatKairosDuration(Math.round(row.durationMs / 1000)) : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <div className={eventsFooterClass} aria-label="执行列表分页">
         <span>共 {props.totalRows} 条</span>
         <div className="inline-flex items-center gap-1.5 justify-self-center">
