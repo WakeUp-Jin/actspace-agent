@@ -24,6 +24,7 @@ import {
 import type {
   ComposerAttachment,
   ContextUsageSnapshot,
+  LlmProviderId,
   ModelReasoningEffort,
   ModelSelectionId,
   UsableModelView,
@@ -31,6 +32,11 @@ import type {
 import { DEFAULT_MODEL_ID, MODEL_LIST, MODEL_REASONING_EFFORTS } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
+import {
+  formatSelectedModelLabel,
+  groupModelsByProvider,
+  hasDuplicateModelLabelWithinProvider,
+} from "../model-option-groups";
 
 export type ComposerSendOptions = {
   model: ModelSelectionId;
@@ -129,6 +135,9 @@ const MODEL_SEARCH_WRAP_CLASS =
 const MODEL_SEARCH_INPUT_CLASS =
   "min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] leading-5 text-text-main outline-none placeholder:text-text-subtle";
 const MODEL_SEARCH_EMPTY_CLASS = "px-2.5 py-6 text-center text-[13px] text-text-faint";
+const MODEL_PROVIDER_GROUP_CLASS = "model-provider-group";
+const MODEL_PROVIDER_LABEL_CLASS =
+  "model-provider-label px-2 pb-1 pt-2 text-[11px] font-semibold leading-4 text-text-faint";
 const MODEL_MENU_ROW_CLASS =
   "model-menu-row relative flex min-h-[34px] items-center rounded-act-md transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-within:bg-selected";
 const MODEL_MENU_ROW_SELECTED_CLASS = "is-selected-row";
@@ -204,7 +213,7 @@ const SECONDARY_COMMAND_ITEMS: CommandMenuItem[] = [
 type ComposerModelOption = {
   id: ModelSelectionId;
   label: string;
-  provider: string;
+  provider: LlmProviderId;
   apiModel: string;
   thinkingDefault: boolean;
   supportsThinkingToggle: boolean;
@@ -412,6 +421,13 @@ export function Composer({
         model.apiModel.toLocaleLowerCase().includes(normalizedModelSearchQuery) ||
         model.id.toLocaleLowerCase().includes(normalizedModelSearchQuery))
     : modelList;
+  const filteredModelGroups = groupModelsByProvider(filteredModelList);
+  const selectedModelDisplayLabel = selectedModelSpec
+    ? formatSelectedModelLabel(selectedModelSpec, modelList)
+    : selectedModelId;
+  const selectedModelTitle = selectedModelSpec
+    ? `${selectedModelSpec.provider} / ${selectedModelSpec.label} / ${selectedModelSpec.apiModel}`
+    : selectedModelId;
   const contextUsagePercent = contextSnapshot?.percentUsed ?? 0;
   const contextRingPercent = Math.max(0, Math.min(100, contextUsagePercent));
   const contextRingColor =
@@ -820,7 +836,7 @@ export function Composer({
             setContextOpen(false);
           }}
         >
-          <span className={MODEL_BUTTON_TEXT_CLASS}>{modelList.find((model) => model.id === selectedModelId)?.label ?? selectedModelId}</span>
+          <span className={MODEL_BUTTON_TEXT_CLASS} title={selectedModelTitle}>{selectedModelDisplayLabel}</span>
           <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
         </button>
         {modelOpen ? (
@@ -849,88 +865,106 @@ export function Composer({
                   }}
                 />
               </label>
-              {filteredModelList.map((spec) => {
-                const showEdit =
-                  hoveredModelId === spec.id ||
-                  focusedModelId === spec.id ||
-                  (modelOptionsOpen && editingModelId === spec.id);
-                return (
-                  <div
-                    className={`${MODEL_MENU_ROW_CLASS} ${spec.id === selectedModelId ? MODEL_MENU_ROW_SELECTED_CLASS : ""}`}
-                    key={spec.id}
-                    onPointerEnter={() => setHoveredModelId(spec.id)}
-                    onPointerOver={() => setHoveredModelId(spec.id)}
-                    onPointerLeave={() => {
-                      setHoveredModelId((currentId) => (currentId === spec.id ? null : currentId));
-                    }}
-                    onMouseEnter={() => setHoveredModelId(spec.id)}
-                    onMouseOver={() => setHoveredModelId(spec.id)}
-                    onMouseLeave={() => {
-                      setHoveredModelId((currentId) => (currentId === spec.id ? null : currentId));
-                    }}
-                    onFocusCapture={() => setFocusedModelId(spec.id)}
-                    onBlurCapture={(event) => {
-                      const nextTarget = event.relatedTarget;
-                      if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
-                        setFocusedModelId((currentId) => (currentId === spec.id ? null : currentId));
-                      }
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className={`${MODEL_SELECT_BUTTON_CLASS} ${
-                        spec.id === selectedModelId ? MODEL_SELECT_BUTTON_SELECTED_CLASS : ""
-                      }`}
-                      onClick={() => {
-                        userPickedModelRef.current = true;
-                        setLocalSelectedModelId(spec.id);
-                        onSelectedModelChange?.(spec.id);
-                        setEditingModelId(spec.id);
-                        setHoveredModelId(null);
-                        setFocusedModelId(null);
-                        setModelOptionsOpen(false);
-                        setModelOpen(false);
-                      }}
-                    >
-                      <span>{spec.label}</span>
-                    </button>
-                    <div className={`${MODEL_ROW_ACTIONS_CLASS} ${
-                      spec.id === selectedModelId ? MODEL_ROW_ACTIONS_SELECTED_CLASS : ""
-                    }`}>
-                      {isModelEditable(spec) ? (
+              {filteredModelGroups.map((group) => (
+                <div
+                  className={MODEL_PROVIDER_GROUP_CLASS}
+                  key={group.provider}
+                  role="group"
+                  aria-label={group.label}
+                >
+                  <div className={MODEL_PROVIDER_LABEL_CLASS}>{group.label}</div>
+                  {group.models.map((spec) => {
+                    const showEdit =
+                      hoveredModelId === spec.id ||
+                      focusedModelId === spec.id ||
+                      (modelOptionsOpen && editingModelId === spec.id);
+                    const showApiModel = hasDuplicateModelLabelWithinProvider(spec, modelList);
+                    return (
+                      <div
+                        className={`${MODEL_MENU_ROW_CLASS} ${spec.id === selectedModelId ? MODEL_MENU_ROW_SELECTED_CLASS : ""}`}
+                        key={spec.id}
+                        onPointerEnter={() => setHoveredModelId(spec.id)}
+                        onPointerOver={() => setHoveredModelId(spec.id)}
+                        onPointerLeave={() => {
+                          setHoveredModelId((currentId) => (currentId === spec.id ? null : currentId));
+                        }}
+                        onMouseEnter={() => setHoveredModelId(spec.id)}
+                        onMouseOver={() => setHoveredModelId(spec.id)}
+                        onMouseLeave={() => {
+                          setHoveredModelId((currentId) => (currentId === spec.id ? null : currentId));
+                        }}
+                        onFocusCapture={() => setFocusedModelId(spec.id)}
+                        onBlurCapture={(event) => {
+                          const nextTarget = event.relatedTarget;
+                          if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+                            setFocusedModelId((currentId) => (currentId === spec.id ? null : currentId));
+                          }
+                        }}
+                      >
                         <button
                           type="button"
-                          className={MODEL_EDIT_BUTTON_CLASS}
-                          aria-label={`Edit ${spec.id} options`}
-                          style={{
-                            opacity: showEdit ? 1 : 0,
-                          }}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            const row = event.currentTarget.closest<HTMLElement>(".model-menu-row");
-                            const menu = modelMenuRef.current;
-                            if (row && menu) {
-                              const rowOffset = Math.max(0, row.offsetTop - menu.scrollTop);
-                              const maxOffset = Math.max(0, menu.clientHeight - MODEL_OPTIONS_ESTIMATED_HEIGHT_PX);
-                              setModelOptionsOffset(Math.min(rowOffset, maxOffset));
-                            }
+                          className={`${MODEL_SELECT_BUTTON_CLASS} ${
+                            spec.id === selectedModelId ? MODEL_SELECT_BUTTON_SELECTED_CLASS : ""
+                          }`}
+                          onClick={() => {
+                            userPickedModelRef.current = true;
+                            setLocalSelectedModelId(spec.id);
+                            onSelectedModelChange?.(spec.id);
                             setEditingModelId(spec.id);
-                            setCommandOpen(false);
-                            setContextSelectorOpen(null);
-                            setContextOpen(false);
-                            setModelOptionsOpen(true);
+                            setHoveredModelId(null);
+                            setFocusedModelId(null);
+                            setModelOptionsOpen(false);
+                            setModelOpen(false);
                           }}
                         >
-                          Edit
+                          <span className="min-w-0">
+                            <span className="block truncate">{spec.label}</span>
+                            {showApiModel ? (
+                              <span className="block truncate font-mono text-[10px] leading-3 text-text-faint">
+                                {spec.apiModel}
+                              </span>
+                            ) : null}
+                          </span>
                         </button>
-                      ) : null}
-                      {spec.id === selectedModelId ? (
-                        <Check className={MODEL_CHECK_ICON_CLASS} size={14} strokeWidth={2.2} />
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
+                        <div className={`${MODEL_ROW_ACTIONS_CLASS} ${
+                          spec.id === selectedModelId ? MODEL_ROW_ACTIONS_SELECTED_CLASS : ""
+                        }`}>
+                          {isModelEditable(spec) ? (
+                            <button
+                              type="button"
+                              className={MODEL_EDIT_BUTTON_CLASS}
+                              aria-label={`Edit ${spec.id} options`}
+                              style={{
+                                opacity: showEdit ? 1 : 0,
+                              }}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                const row = event.currentTarget.closest<HTMLElement>(".model-menu-row");
+                                const menu = modelMenuRef.current;
+                                if (row && menu) {
+                                  const rowOffset = Math.max(0, row.offsetTop - menu.scrollTop);
+                                  const maxOffset = Math.max(0, menu.clientHeight - MODEL_OPTIONS_ESTIMATED_HEIGHT_PX);
+                                  setModelOptionsOffset(Math.min(rowOffset, maxOffset));
+                                }
+                                setEditingModelId(spec.id);
+                                setCommandOpen(false);
+                                setContextSelectorOpen(null);
+                                setContextOpen(false);
+                                setModelOptionsOpen(true);
+                              }}
+                            >
+                              Edit
+                            </button>
+                          ) : null}
+                          {spec.id === selectedModelId ? (
+                            <Check className={MODEL_CHECK_ICON_CLASS} size={14} strokeWidth={2.2} />
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
               {filteredModelList.length === 0 ? (
                 <div className={MODEL_SEARCH_EMPTY_CLASS}>No matching models.</div>
               ) : null}

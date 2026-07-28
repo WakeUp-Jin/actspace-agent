@@ -73,6 +73,13 @@ const usableModel: UsableModelView = {
   },
 };
 
+const openRouterUsableModel: UsableModelView = {
+  ...usableModel,
+  key: "openrouter:deepseek/deepseek-v4-pro",
+  provider: "openrouter",
+  apiModel: "deepseek/deepseek-v4-pro",
+};
+
 const installedModel: InstalledModelView = {
   definition: {
     key: usableModel.key,
@@ -213,21 +220,30 @@ describe("provider and model settings", () => {
   });
 
   it("uses purpose-filtered models for task selection and updates model enablement", async () => {
-    const updateTaskModels = vi.fn(async () => ({
-      taskModels: { ...settings.taskModels, utilityModel: usableModel.key },
+    const updateTaskModels = vi.fn(async (input: Partial<AppSettings["taskModels"]>) => ({
+      taskModels: { ...settings.taskModels, ...input },
     }));
     const updateModel = vi.fn(async () => ({ ok: true as const, model: installedModel }));
     window.actspace = {
       listInstalledModels: async () => ({ models: [installedModel] }),
-      listUsableModels: async () => ({ models: [usableModel] }),
+      listUsableModels: async () => ({ models: [usableModel, openRouterUsableModel] }),
       updateTaskModels,
       updateModel,
     } as unknown as ActspaceBridge;
 
     render(<ModelSettings settings={settings} />);
     await screen.findByText("已添加模型");
-    await userEvent.selectOptions(screen.getByLabelText("轻量任务模型"), usableModel.key);
-    await waitFor(() => expect(updateTaskModels).toHaveBeenCalledWith({ utilityModel: usableModel.key }));
+    const utilitySelect = screen.getByLabelText("轻量任务模型") as HTMLSelectElement;
+    const providerGroups = Array.from(utilitySelect.querySelectorAll("optgroup"));
+    expect(providerGroups.map((group) => group.label)).toEqual(["DeepSeek", "OpenRouter"]);
+    expect(Array.from(utilitySelect.options).map((option) => option.text)).toEqual([
+      "未配置",
+      "DeepSeek V4 Pro · DeepSeek",
+      "DeepSeek V4 Pro · OpenRouter",
+    ]);
+
+    await userEvent.selectOptions(utilitySelect, openRouterUsableModel.key);
+    await waitFor(() => expect(updateTaskModels).toHaveBeenCalledWith({ utilityModel: openRouterUsableModel.key }));
 
     await userEvent.click(await screen.findByRole("switch", { name: `启用 ${usableModel.label}` }));
     await waitFor(() => expect(updateModel).toHaveBeenCalledWith({ modelKey: usableModel.key, enabled: false }));

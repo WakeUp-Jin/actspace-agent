@@ -67,6 +67,24 @@ const reasoningModels: UsableModelView[] = [
   },
 ];
 
+const duplicateNamedModels: UsableModelView[] = [
+  reasoningModels[0],
+  {
+    key: "openrouter:deepseek/deepseek-v4-pro",
+    label: "DeepSeek V4 Pro",
+    provider: "openrouter",
+    apiModel: "deepseek/deepseek-v4-pro",
+    contextWindow: 1_000_000,
+    thinkingDefault: true,
+    capabilities: {
+      input: ["text"],
+      toolUse: "declared",
+      reasoning: true,
+      thinkingToggle: true,
+    },
+  },
+];
+
 describe("Composer follow-up bar", () => {
   it("renders the follow-up shell with review preview and status row", () => {
     renderComposer({
@@ -442,6 +460,30 @@ describe("Composer follow-up bar", () => {
     expect(within(menu).getByText("GPT-5 High")).toBeInTheDocument();
     expect(within(menu).queryByText("DeepSeek V4 Pro")).not.toBeInTheDocument();
     expect(search).toHaveFocus();
+  });
+
+  it("groups models by provider and disambiguates duplicate selected labels", async () => {
+    const user = userEvent.setup();
+    const onSelectedModelChange = vi.fn();
+    renderComposer({
+      models: duplicateNamedModels,
+      defaultModelId: "deepseek:deepseek-v4-pro",
+      onSelectedModelChange,
+    });
+
+    const modelButton = screen.getByRole("button", { name: /DeepSeek V4 Pro · DeepSeek/i });
+    expect(modelButton).toHaveTextContent("DeepSeek V4 Pro · DeepSeek");
+    await user.click(modelButton);
+
+    const menu = screen.getByRole("menu", { name: "Models" });
+    const deepSeekGroup = within(menu).getByRole("group", { name: "DeepSeek" });
+    const openRouterGroup = within(menu).getByRole("group", { name: "OpenRouter" });
+    expect(within(deepSeekGroup).getByRole("button", { name: "DeepSeek V4 Pro" })).toBeInTheDocument();
+    expect(within(openRouterGroup).getByRole("button", { name: "DeepSeek V4 Pro" })).toBeInTheDocument();
+
+    await user.click(within(openRouterGroup).getByRole("button", { name: "DeepSeek V4 Pro" }));
+    expect(onSelectedModelChange).toHaveBeenCalledWith("openrouter:deepseek/deepseek-v4-pro");
+    expect(modelButton).toHaveTextContent("DeepSeek V4 Pro · OpenRouter");
   });
 
   it("sends a supported OpenRouter reasoning effort and animates both popovers", async () => {
