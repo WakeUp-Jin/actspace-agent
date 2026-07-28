@@ -60,7 +60,8 @@ packages/agent-core/
 ### 工具系统
 
 - `tools/test/manager.test.ts`：注册/查询/执行/裁剪/未知工具错误
-- `tools/test/exposure.test.ts`：`exposeOnlyTo` / `requiresKey` 工具暴露规则；搜索 key 门控 `web_search`
+- `tools/test/exposure.test.ts`：`exposeOnlyTo` / `requiresKey` 工具暴露规则；搜索 key 门控 `web_search`，独立图片 Key 门控 `generate_image`。
+- `tools/tools/generate-image/test/executor.test.ts`：`n` 默认值与 1–10 边界、Base64 落盘、部分成功和结果脱敏。
 - `tools/test/web-search-executor.test.ts` / `web-search-providers.test.ts` / `web-fetch-executor.test.ts`：web 工具双通道编排、provider 适配与本地抓取（见 `docs/design-docs/tool-system/agent-web-tools.md`）
 
 ### 上下文管道

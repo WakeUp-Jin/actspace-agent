@@ -771,6 +771,7 @@ function createToolExecutionResult(
     truncatedOutput: modelOutput,
     rawOutputRef,
     modelOutput,
+    artifacts: record?.result?.artifacts,
     uiPreview: record?.result?.subagent?.uiPreview
       ?? applyBashBackgroundPreview(
         createToolUiPreview(
@@ -894,6 +895,8 @@ function getFileChangeStructured(structured: unknown): {
   diff?: string;
   additions?: number;
   deletions?: number;
+  filePath?: string;
+  relativePath?: string;
 } | undefined {
   if (structured === null || typeof structured !== "object") return undefined;
   const record = structured as Record<string, unknown>;
@@ -901,6 +904,8 @@ function getFileChangeStructured(structured: unknown): {
     diff: typeof record.diff === "string" ? record.diff : undefined,
     additions: typeof record.additions === "number" ? record.additions : undefined,
     deletions: typeof record.deletions === "number" ? record.deletions : undefined,
+    filePath: typeof record.filePath === "string" ? record.filePath : undefined,
+    relativePath: typeof record.relativePath === "string" ? record.relativePath : undefined,
   };
 }
 
@@ -1000,6 +1005,40 @@ function createToolUiPreview(
       };
     }
 
+    case "image_generation": {
+      const prompt = stringArg(args.prompt, "");
+      const requestedCount = typeof args.n === "number" && Number.isInteger(args.n) ? args.n : 1;
+      const size = stringArg(args.size, "1024x1024");
+      const result = structured !== null && typeof structured === "object"
+        ? structured as Record<string, unknown>
+        : undefined;
+      const images = Array.isArray(result?.images)
+        ? result.images.filter((item): item is import("@actspace/shared").ToolArtifact => (
+          item !== null && typeof item === "object" && (item as { type?: unknown }).type === "image"
+        ))
+        : undefined;
+      const generatedCount = typeof result?.generatedCount === "number" ? result.generatedCount : undefined;
+      const resultStatus = result?.status === "partial" ? "partial" : result?.status === "completed" ? "completed" : undefined;
+      const status = output.length === 0 ? "running" : ok ? resultStatus ?? "completed" : "failed";
+      return {
+        kind: "image_generation",
+        status,
+        promptPreview: typeof result?.promptPreview === "string" ? result.promptPreview : prompt.slice(0, 160),
+        requestedCount,
+        generatedCount,
+        model: typeof result?.model === "string" ? result.model : undefined,
+        size,
+        displayText: status === "running"
+          ? `Generating ${requestedCount} image${requestedCount === 1 ? "" : "s"}`
+          : status === "failed"
+            ? "Image generation failed"
+            : `Generated ${generatedCount ?? images?.length ?? requestedCount} image${(generatedCount ?? images?.length ?? requestedCount) === 1 ? "" : "s"}`,
+        images,
+        warning: typeof result?.warning === "string" ? result.warning : undefined,
+        errorMessage: ok ? undefined : output,
+      };
+    }
+
     case "directory_list": {
       const path = stringArg(args.path, "Unknown directory");
       const displayPath = displayPathTail(path);
@@ -1023,6 +1062,8 @@ function createToolUiPreview(
       return {
         kind: "edit_diff",
         filePath: displayFileName(filePath),
+        ...(ok && fileChange?.filePath ? { outputPath: fileChange.filePath } : {}),
+        ...(ok && fileChange?.relativePath ? { outputRelativePath: fileChange.relativePath } : {}),
         additions: ok ? fileChange?.additions ?? countDiffLines(diff, "+") : 0,
         deletions: ok ? fileChange?.deletions ?? countDiffLines(diff, "-") : 0,
         diff,
@@ -1043,6 +1084,8 @@ function createToolUiPreview(
       return {
         kind: "write",
         filePath: displayFileName(filePath),
+        ...(ok && hasOutput && fileChange?.filePath ? { outputPath: fileChange.filePath } : {}),
+        ...(ok && hasOutput && fileChange?.relativePath ? { outputRelativePath: fileChange.relativePath } : {}),
         additions: ok && hasOutput ? fileChange?.additions ?? countDiffLines(diff, "+") : 0,
         deletions: ok && hasOutput ? fileChange?.deletions ?? countDiffLines(diff, "-") : 0,
         diff,

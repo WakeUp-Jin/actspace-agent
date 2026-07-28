@@ -47,6 +47,12 @@ describe("tool exposure", () => {
     })).toBe(true);
   });
 
+  it("gates generate_image on the dedicated image service key", () => {
+    const spec: ToolDefinitionSpec = { ...baseSpec, name: "generate_image", requiresKey: "imageGeneration" };
+    expect(shouldExposeTool(spec, { hasImageGenerationKey: true })).toBe(true);
+    expect(shouldExposeTool(spec, { hasImageGenerationKey: false })).toBe(false);
+  });
+
   it("registers web tools per key configuration in createToolManager", () => {
     const noKeys = createToolManager({
       workspaceRoot: "/tmp",
@@ -59,6 +65,9 @@ describe("tool exposure", () => {
       primaryProvider: "deepseek",
       hasKimiKey: true,
       hasWebSearchKey: true,
+      hasImageGenerationKey: true,
+      imageGeneration: { apiKey: "test-image-key", baseUrl: "https://example.com/v1", model: "gpt-image-2" },
+      artifactRoot: "/tmp/generated-images",
     });
     const kimiPrimary = createToolManager({
       workspaceRoot: "/tmp",
@@ -70,9 +79,11 @@ describe("tool exposure", () => {
     // web_fetch 无 key 依赖，永远注册
     expect(noKeys.has("web_fetch")).toBe(true);
     expect(noKeys.has("web_search")).toBe(false);
+    expect(noKeys.has("generate_image")).toBe(false);
 
     expect(allKeys.has("web_fetch")).toBe(true);
     expect(allKeys.has("web_search")).toBe(true);
+    expect(allKeys.has("generate_image")).toBe(true);
 
     // web_search / web_fetch 不再绑定 DeepSeek：Kimi 主模型同样可用
     expect(kimiPrimary.has("web_search")).toBe(true);

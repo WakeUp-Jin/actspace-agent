@@ -11,6 +11,7 @@
 - `session.jsonl`：会话事件流持久化文件。
 - `context-state.json`：当前上下文估算、bucket 与只读 entries 状态，可覆盖更新，供 Context 面板和未来上下文控制能力使用。
 - `attachments/`：附件目录。
+- `artifacts/generated-images/`：`generate_image` 生成的会话图片产物；事件流只保存本地路径、MIME 与轻量展示元数据，不保存 Base64 或远程签名 URL。
 
 当前应用启动时会初始化应用数据目录：
 
@@ -62,6 +63,8 @@ DeepSeek Anthropic provider-native server tool 不会产生本地 `tool_call` / 
 - `kairos/inbox/`
 - `plugins/<name>/`：外部插件的二进制与配置（如 `plugins/fs-watch/{bin/fs-watch, config.json}`），见 `agent-plugins-fs-watch.md`。
 - `skills/<name>/`：设置页安装 / actspace 物化的用户级 Skill 目录（`SKILL.md` + `references/`）；fs-watch 插件的事件日志落在 `skills/fs-watch/references/watch-log/`。
+
+图片生成产物使用 `<userData>/sessions/<sessionId>/artifacts/generated-images/<generationId>/`。它们属于会话事实的一部分，不进入会自动清理的 `tmp/tool-output`；`tool_result.payload.artifacts` 与 `uiPreview.images` 只保存本地文件引用，供重启后的 session selector 恢复本轮产物栏。renderer 点击图片时通过受控 IPC 按需读取单张 data URL，不持久化 Base64，也不直接加载 `file://`。
 
 `cache-audit/` 使用 `<userData>/cache-audit/<sessionId>/last.context.json` 保存上一轮真实 provider 输入的滚动快照；当模型返回的 cache hit ratio 低于阈值时，才在 `<cacheAuditId>/` 下固化 `summary.json`、`previous.context.json`、`current.context.json`、`diff.txt`。这些文件可能包含完整用户输入、工具结果和文件片段，只能保存在本地，不应上传或提交。
 

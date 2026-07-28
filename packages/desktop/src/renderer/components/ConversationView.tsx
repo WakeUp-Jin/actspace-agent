@@ -11,6 +11,7 @@ import { BrowserApprovalBlock } from "./messages/BrowserApprovalBlock";
 import { CompactCommandBlock } from "./messages/CompactCommandBlock";
 import { DeleteFileBlock } from "./messages/DeleteFileBlock";
 import { FileDiffBlock } from "./messages/FileDiffBlock";
+import { TurnOutputArtifacts } from "./messages/TurnOutputArtifacts";
 import { SubAgentTranscriptPanel } from "./messages/SubAgentTranscriptModal";
 import { ThinkingBlock } from "./messages/ThinkingBlock";
 import { ToolActivityGroup } from "./messages/ToolActivityGroup";
@@ -76,6 +77,7 @@ const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
   "glob",
   "web_search",
   "media_analysis",
+  "image_generation",
   "directory_list",
   "delete",
   "agent",
@@ -178,6 +180,7 @@ function renderMessage(
     case "glob":
     case "web_search":
     case "media_analysis":
+    case "image_generation":
     case "directory_list":
     case "delete":
     case "tool":
@@ -690,6 +693,13 @@ export function ConversationView({
                   <div className={TURN_BODY_CLASS}>
                     {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, setActiveTranscriptMessage)}
                   </div>
+                  {splitTurnMessages(turn.messages).finalReply.length > 0 ? (
+                    <TurnOutputArtifacts
+                      messages={turn.messages}
+                      sessionId={sessionId}
+                      workspaceRoot={selectedWorkspaceRoot}
+                    />
+                  ) : null}
                   <TurnActions
                     sessionId={sessionId}
                     assistantMessages={

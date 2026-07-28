@@ -52,6 +52,7 @@ export { deleteFileDefinition } from "./tools/delete-file/definition";
 export { bashDefinition } from "./tools/bash/definition";
 export { webSearchDefinition } from "./tools/web-search/definition";
 export { webFetchDefinition } from "./tools/web-fetch/definition";
+export { generateImageDefinition } from "./tools/generate-image/definition";
 export { agentDefinition, exploreDefinition } from "./tools/agent/definition";
 export {
   browserDefinitions,
@@ -107,6 +108,7 @@ export type {
 } from "./tools/bash";
 export { webSearchExecutor } from "./tools/web-search/executor";
 export { webFetchExecutor } from "./tools/web-fetch/executor";
+export { generateImageExecutor } from "./tools/generate-image/executor";
 export {
   createAgentTool,
   createExploreTool,
@@ -139,6 +141,8 @@ import { webSearchDefinition } from "./tools/web-search/definition";
 import { webSearchExecutor } from "./tools/web-search/executor";
 import { webFetchDefinition } from "./tools/web-fetch/definition";
 import { webFetchExecutor } from "./tools/web-fetch/executor";
+import { generateImageDefinition } from "./tools/generate-image/definition";
+import { generateImageExecutor } from "./tools/generate-image/executor";
 import { createAgentTool, createExploreTool } from "./tools/agent";
 import {
   browserDefinitions,
@@ -159,6 +163,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     apiFormat: config.apiFormat,
     hasKimiKey: config.hasKimiKey,
     hasWebSearchKey: config.hasWebSearchKey,
+    hasImageGenerationKey: config.hasImageGenerationKey,
   };
   const disabledTools = new Set(config.disabledTools ?? []);
   const entries: ReadonlyArray<
@@ -188,6 +193,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     ],
     [webSearchDefinition, webSearchExecutor],
     [webFetchDefinition, webFetchExecutor],
+    [generateImageDefinition, generateImageExecutor],
   ];
 
   for (const [definition, executor, renderResult, checkPermissions] of entries) {

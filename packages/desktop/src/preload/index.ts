@@ -78,6 +78,8 @@ import type {
   SessionEvent,
   SessionGetInput,
   SessionListInput,
+  UpdateImageGenerationSettingsInput,
+  UpdateImageGenerationSettingsResult,
   SessionListItem,
   SessionPinInput,
   SessionPinResult,
@@ -87,6 +89,10 @@ import type {
   SessionRenameResult,
   SessionWorkspaceInput,
   SessionWorkspaceResult,
+  ArtifactContextMenuInput,
+  ArtifactContextMenuResult,
+  SessionArtifactReadInput,
+  SessionArtifactReadResult,
   SessionRecord,
   SearchUsageResult,
   SetProviderKeyInput,
@@ -149,6 +155,10 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("workspace:list-dir", input) as Promise<WorkspaceListDirResult>,
   readWorkspaceFile: (input: WorkspaceReadFileInput) =>
     ipcRenderer.invoke("workspace:read-file", input) as Promise<WorkspaceReadFileResult>,
+  readSessionArtifact: (input: SessionArtifactReadInput) =>
+    ipcRenderer.invoke("session:read-artifact", input) as Promise<SessionArtifactReadResult>,
+  showArtifactContextMenu: (input: ArtifactContextMenuInput) =>
+    ipcRenderer.invoke("artifact:show-context-menu", input) as Promise<ArtifactContextMenuResult>,
   getWorkspaceReview: (input: ReviewGetWorkspaceChangesInput) =>
     ipcRenderer.invoke("review:get-workspace-changes", input) as Promise<ReviewGetWorkspaceChangesResult>,
   initGitRepository: (input: ReviewInitGitInput) =>
@@ -193,6 +203,8 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("settings:set-provider-key", input) as Promise<SetProviderKeyResult>,
   clearProviderKey: (input: ClearProviderKeyInput) =>
     ipcRenderer.invoke("settings:clear-provider-key", input) as Promise<ClearProviderKeyResult>,
+  updateImageGeneration: (input: UpdateImageGenerationSettingsInput) =>
+    ipcRenderer.invoke("settings:update-image-generation", input) as Promise<UpdateImageGenerationSettingsResult>,
   testProviderConnection: (input: TestConnectionInput) =>
     ipcRenderer.invoke("settings:test-connection", input) as Promise<TestConnectionResult>,
   getSearchUsage: () =>

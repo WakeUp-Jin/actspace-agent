@@ -34,11 +34,15 @@ import type {
   SessionPreviewInput,
   SessionRenameInput,
   SessionWorkspaceInput,
+  ArtifactContextMenuInput,
+  SessionArtifactReadInput,
   SubAgentTranscriptGetInput,
   SetProviderKeyInput,
   SettingsUpdateInput,
   TestConnectionInput,
   TestConnectionResult,
+  UpdateImageGenerationSettingsInput,
+  UpdateImageGenerationSettingsResult,
   UsageStatisticsGetInput,
   ListVisualizationsInput,
   VisualizeReplyInput,
@@ -117,6 +121,8 @@ import { listVisualizations, visualizeReply } from "./visualize-service";
 import { describeSessionContext } from "./context-describe-service";
 import { loadMainAgentRuntimeContext } from "./agent-runtime-context";
 import { listWorkspaceDir, readWorkspaceFile } from "./workspace-fs-service";
+import { readSessionArtifact } from "./session-artifact-service";
+import { showArtifactContextMenu } from "./artifact-context-menu-service";
 import { getWorkspaceGitChanges, initializeGitRepository } from "./review-git-service";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "./workspace-registry-service";
 import { getSessionPreview } from "./session-preview-service";
@@ -1000,6 +1006,17 @@ async function registerIpc() {
     return readWorkspaceFile(input, roots);
   });
 
+  ipcMain.handle("session:read-artifact", async (_event, input: SessionArtifactReadInput) => {
+    const roots = await ensureDataDirectories();
+    return readSessionArtifact(input, roots);
+  });
+
+  ipcMain.handle("artifact:show-context-menu", async (event, input: ArtifactContextMenuInput) => {
+    const roots = await ensureDataDirectories();
+    const window = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    return showArtifactContextMenu(input, roots, window);
+  });
+
   ipcMain.handle("review:get-workspace-changes", async (_event, input: ReviewGetWorkspaceChangesInput = {}) => {
     const roots = await ensureDataDirectories();
     return getWorkspaceGitChanges(input, roots);
@@ -1379,6 +1396,21 @@ async function registerIpc() {
     logMain("settings clear provider key", { provider: input.provider, ok: result.ok });
     return result;
   });
+
+  ipcMain.handle(
+    "settings:update-image-generation",
+    async (_event, input: UpdateImageGenerationSettingsInput): Promise<UpdateImageGenerationSettingsResult> => {
+      try {
+        const settings = await getSettingsService().updateImageGeneration(input);
+        logMain("settings update image generation", { ok: true, hasApiKey: settings.hasApiKey });
+        return { ok: true, settings };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "图片生成配置保存失败。";
+        logMain("settings update image generation", { ok: false, error: message });
+        return { ok: false, error: message };
+      }
+    },
+  );
 
   ipcMain.handle("settings:test-connection", async (_event, input: TestConnectionInput) => {
     const service = getSettingsService();

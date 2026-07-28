@@ -32,6 +32,12 @@ declare global {
       readWorkspaceFile: (
         input: import("@actspace/shared").WorkspaceReadFileInput
       ) => Promise<import("@actspace/shared").WorkspaceReadFileResult>;
+      readSessionArtifact?: (
+        input: import("@actspace/shared").SessionArtifactReadInput
+      ) => Promise<import("@actspace/shared").SessionArtifactReadResult>;
+      showArtifactContextMenu?: (
+        input: import("@actspace/shared").ArtifactContextMenuInput
+      ) => Promise<import("@actspace/shared").ArtifactContextMenuResult>;
       getWorkspaceReview: (
         input: import("@actspace/shared").ReviewGetWorkspaceChangesInput
       ) => Promise<import("@actspace/shared").ReviewGetWorkspaceChangesResult>;
@@ -102,6 +108,9 @@ declare global {
       clearProviderKey: (
         input: import("@actspace/shared").ClearProviderKeyInput
       ) => Promise<import("@actspace/shared").ClearProviderKeyResult>;
+      updateImageGeneration?: (
+        input: import("@actspace/shared").UpdateImageGenerationSettingsInput
+      ) => Promise<import("@actspace/shared").UpdateImageGenerationSettingsResult>;
       testProviderConnection: (
         input: import("@actspace/shared").TestConnectionInput
       ) => Promise<import("@actspace/shared").TestConnectionResult>;

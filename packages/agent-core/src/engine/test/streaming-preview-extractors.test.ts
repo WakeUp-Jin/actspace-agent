@@ -85,6 +85,20 @@ describe("extractStreamingPreview", () => {
     expect(query).toMatchObject({ kind: "web_search", mode: "query", query: "latest news" });
   });
 
+  it("image_generation extractor reads partial prompt, size and integer n", () => {
+    const preview = extractStreamingPreview(
+      "image_generation",
+      '{"prompt":"three koi posters","size":"1024x1536","n":3',
+    );
+    expect(preview).toMatchObject({
+      kind: "image_generation",
+      status: "running",
+      promptPreview: "three koi posters",
+      size: "1024x1536",
+      requestedCount: 3,
+    });
+  });
+
   it("bash extractor extracts command", () => {
     const preview = extractStreamingPreview("bash", '{"command":"ls -la"}');
     expect(preview).toMatchObject({

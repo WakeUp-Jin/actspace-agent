@@ -25,6 +25,7 @@ export const TOOL_ITEMS: ToolCatalogItem[] = [
   { name: "edit_file_diff", label: "编辑文件", description: "以 diff 形式修改已有文件。" },
   { name: "write_file", label: "写入文件", description: "创建新文件或覆盖已有文件。" },
   { name: "web_search", label: "联网搜索", description: "调用联网搜索获取实时信息。", conditional: true },
+  { name: "generate_image", label: "图片生成", description: "调用已配置的 OpenAI-compatible 服务生成 1–10 张图片。", conditional: true },
   { name: "bash", label: "Bash 终端", description: "在工作区执行 shell 命令。" },
   { name: "browser_cua", label: "浏览器 CUA", description: "截图与坐标级鼠标、键盘操作。", conditional: true, group: "browser", kind: "tool" },
   { name: "browser_dom", label: "浏览器 DOM CUA", description: "基于 snapshot node_id 的稳定页面操作。", conditional: true, group: "browser", kind: "tool" },

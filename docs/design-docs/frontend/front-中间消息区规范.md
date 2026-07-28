@@ -120,6 +120,17 @@ Read、Grep、Glob 和 Web Search 是和 Thinking 同级别的工具调用消息
 
 ![Read / 文本工具行定稿图](read-search-final.png)
 
+## 图片生成工具与本轮产物
+
+- `Generate image` / `Generated image` 与 Read 使用同一单行工具日志语法，无图标、无外围卡片。
+- 行内依次展示尺寸、数量、prompt 摘要与模型名；超出消息宽度时单行省略，不能让 prompt 撑高过程区。
+- 生成成功后不在工具过程区直接放图片。最终回复下新增一层紧凑 `Artifacts` 组件，逐行展示文件名和短路径。
+- `Artifacts` 只收录本轮输出：生成图片和完成的 Write/Edit 文件；Read/Grep/Glob 等输入对象不进入。
+- 点击图片或可预览文件后打开右侧面板。加载中只在对应行显示小型 spinner，错误在组件底部显示轻量说明。
+- 悬浮产物行时用 Tooltip 展示完整绝对路径；列表本身仍只显示文件名和短路径，避免破坏消息密度。
+- 右键产物行打开 Electron 原生菜单，提供 Cursor 打开、默认应用打开、复制路径、复制图片/文件内容和 Finder 定位。Renderer 只传会话产物或 workspace 相对文件身份，main 必须重新校验 realpath 边界。
+- 工具过程与产物浏览分层：折叠 `Worked for` 不应隐藏最终产物栏。
+
 ## Bash 组件
 
 Bash 是命令执行工具，包含正常执行态和审核 pending 态。

@@ -164,6 +164,22 @@ function messageBlockFromToolPreview(
         createdAt: getDisplayTime(timestamp),
         isError
       };
+    case "image_generation":
+      return {
+        kind: "image_generation",
+        id: eventId,
+        status: preview.status,
+        promptPreview: preview.promptPreview,
+        requestedCount: preview.requestedCount,
+        generatedCount: preview.generatedCount,
+        model: preview.model,
+        size: preview.size,
+        displayText: preview.displayText,
+        images: preview.images,
+        warning: preview.warning,
+        errorMessage: preview.errorMessage,
+        createdAt: getDisplayTime(timestamp),
+      };
     case "directory_list":
       return {
         kind: "directory_list",
@@ -178,6 +194,8 @@ function messageBlockFromToolPreview(
         kind: "edit_diff",
         id: eventId,
         filePath: preview.filePath,
+        ...(preview.outputPath ? { outputPath: preview.outputPath } : {}),
+        ...(preview.outputRelativePath ? { outputRelativePath: preview.outputRelativePath } : {}),
         additions: preview.additions,
         deletions: preview.deletions,
         diff: preview.diff,
@@ -192,6 +210,8 @@ function messageBlockFromToolPreview(
         kind: "write_diff",
         id: eventId,
         filePath: preview.filePath,
+        ...(preview.outputPath ? { outputPath: preview.outputPath } : {}),
+        ...(preview.outputRelativePath ? { outputRelativePath: preview.outputRelativePath } : {}),
         additions: preview.additions,
         deletions: preview.deletions,
         diff: preview.diff,

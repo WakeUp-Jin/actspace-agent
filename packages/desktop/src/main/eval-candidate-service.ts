@@ -50,6 +50,7 @@ const DISABLED_GENERATOR_TOOLS = [
   "explore",
   "web_fetch",
   "web_search",
+  "generate_image",
 ];
 
 type EvalCandidateAgentRunInput = {

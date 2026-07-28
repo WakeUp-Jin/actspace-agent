@@ -14,6 +14,9 @@ const MANAGED_ENV_KEYS = [
   "LLM_MAX_TOKENS",
   "KAIROS_MODEL_ID",
   "KAIROS_THINKING",
+  "IMAGE_GENERATION_API_KEY",
+  "IMAGE_GENERATION_BASE_URL",
+  "IMAGE_GENERATION_MODEL",
 ];
 
 /**
@@ -216,6 +219,59 @@ describe("SettingsService", () => {
 
     await svc.updateProviderConnection({ provider: "openrouter", apiKey: null, managementKey: null });
     expect(svc.getV2().providers.openrouter).toMatchObject({ hasApiKey: false, hasManagementKey: false });
+  });
+
+  it("图片生成配置把 Key 加密、Base URL 与模型持久化，并提供 main-only runtime", async () => {
+    const dataRoot = await makeDataRoot();
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    const view = await svc.updateImageGeneration({
+      apiKey: "  test-image-key  ",
+      baseUrl: "https://www.duckcoding.ai/v1/",
+      model: " gpt-image-2 ",
+    });
+
+    expect(view).toEqual({
+      hasApiKey: true,
+      baseUrl: "https://www.duckcoding.ai/v1",
+      model: "gpt-image-2",
+    });
+    expect(svc.getImageGenerationRuntimeConfig()).toEqual({
+      apiKey: "test-image-key",
+      baseUrl: "https://www.duckcoding.ai/v1",
+      model: "gpt-image-2",
+    });
+    expect(process.env.IMAGE_GENERATION_API_KEY).toBeUndefined();
+
+    const persisted = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
+    expect(persisted.imageGeneration).toEqual({
+      baseUrl: "https://www.duckcoding.ai/v1",
+      model: "gpt-image-2",
+    });
+    expect(JSON.stringify(persisted)).not.toContain("test-image-key");
+  });
+
+  it("图片生成 Base URL 拒绝完整 endpoint，更新模型时可保留现有 Key", async () => {
+    const svc = makeService(await makeDataRoot());
+    await svc.load();
+    await svc.updateImageGeneration({
+      apiKey: "test-image-key",
+      baseUrl: "https://www.duckcoding.ai/v1",
+      model: "gpt-image-2",
+    });
+
+    await expect(svc.updateImageGeneration({
+      baseUrl: "https://www.duckcoding.ai/v1/images/generations",
+      model: "gpt-image-3",
+    })).rejects.toThrow("不要包含 /images/generations");
+
+    const next = await svc.updateImageGeneration({
+      baseUrl: "https://example.com/v1",
+      model: "gpt-image-custom",
+    });
+    expect(next.hasApiKey).toBe(true);
+    expect(svc.getImageGenerationRuntimeConfig()?.apiKey).toBe("test-image-key");
   });
 
   it("clearProviderKey 彻底删除密钥，不再回落 .env", async () => {

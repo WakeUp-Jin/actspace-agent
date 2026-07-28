@@ -244,6 +244,7 @@ export async function runAndPersistTurn(
 
   const runtimeOptions = {
     tmpRoot: roots.tmpRoot,
+    artifactRoot: join(sessionDir, "artifacts", "generated-images"),
     sessionId: input.sessionId,
     turnId: input.turnId,
     ...runtimeContext,

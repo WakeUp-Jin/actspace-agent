@@ -9,5 +9,6 @@ export function shouldExposeTool(
   // executor 内仍保留缺 key 兜底错误（防御手动构造 ToolManager 时漏传门控）。
   if (spec.requiresKey === "kimi" && !runtime.hasKimiKey) return false;
   if (spec.requiresKey === "webSearch" && !runtime.hasWebSearchKey) return false;
+  if (spec.requiresKey === "imageGeneration" && !runtime.hasImageGenerationKey) return false;
   return true;
 }

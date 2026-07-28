@@ -39,12 +39,19 @@ export class ModelRuntimeService {
     return this.models.listUsableModels(purpose);
   }
 
-  getToolEnvironment(): { hasWebSearchKey: boolean; disabledTools: string[]; hasKimiKey: boolean } {
+  getToolEnvironment(): {
+    hasWebSearchKey: boolean;
+    disabledTools: string[];
+    hasKimiKey: boolean;
+    imageGeneration?: { apiKey: string; baseUrl: string; model: string };
+  } {
     const settings = this.settings.getV2();
+    const imageGeneration = this.settings.getImageGenerationRuntimeConfig();
     return {
       hasWebSearchKey: Object.values(settings.searchProviders).some((provider) => provider.hasApiKey),
       disabledTools: [...settings.agent.disabledTools],
       hasKimiKey: settings.providers.kimi.hasApiKey,
+      ...(imageGeneration && { imageGeneration }),
     };
   }
 

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Loader2, Monitor, Moon, Sun, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
+  DEFAULT_IMAGE_GENERATION_BASE_URL,
+  DEFAULT_IMAGE_GENERATION_MODEL,
   type AgentSystemPromptFile,
   type AppSettings,
   type LocalUpdateProgressPhase,
@@ -111,6 +113,14 @@ function previewSetKeyState(
 ): AppSettings {
   if (provider === "deepseek" || provider === "kimi" || provider === "openrouter") {
     return { ...current, providers: { ...current.providers, [provider]: { hasApiKey } } };
+  }
+  if (provider === "image-generation") {
+    const currentImage = current.imageGeneration ?? {
+      hasApiKey: false,
+      baseUrl: DEFAULT_IMAGE_GENERATION_BASE_URL,
+      model: DEFAULT_IMAGE_GENERATION_MODEL,
+    };
+    return { ...current, imageGeneration: { ...currentImage, hasApiKey } };
   }
   return { ...current, searchProviders: { ...current.searchProviders, [provider]: { hasApiKey } } };
 }
@@ -319,7 +329,150 @@ function ProvidersSection({ settings, onConnectProvider, onClearProvider, onRefr
           </SettingGroup>
         </div>
       </SectionShell>
+      <ImageGenerationSettingsSection
+        settings={settings}
+        onClear={onClearProvider}
+        onRefresh={onRefresh}
+      />
     </>
+  );
+}
+
+function ImageGenerationSettingsSection({
+  settings,
+  onClear,
+  onRefresh,
+}: {
+  settings: AppSettings;
+  onClear: (provider: SecretProviderId) => Promise<void>;
+  onRefresh: () => Promise<void>;
+}) {
+  const current = settings.imageGeneration ?? {
+    hasApiKey: false,
+    baseUrl: DEFAULT_IMAGE_GENERATION_BASE_URL,
+    model: DEFAULT_IMAGE_GENERATION_MODEL,
+  };
+  const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState(current.baseUrl);
+  const [model, setModel] = useState(current.model);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    setBaseUrl(current.baseUrl);
+    setModel(current.model);
+  }, [current.baseUrl, current.model]);
+
+  const save = async () => {
+    if (!baseUrl.trim() || !model.trim()) {
+      setIsError(true);
+      setMessage("Base URL 和模型名称不能为空。");
+      return;
+    }
+    if (!current.hasApiKey && !apiKey.trim()) {
+      setIsError(true);
+      setMessage("首次配置时请输入 API Key。");
+      return;
+    }
+    setSaving(true);
+    setMessage(null);
+    try {
+      if (!window.actspace.updateImageGeneration) {
+        setIsError(true);
+        setMessage("当前环境不支持保存图片生成配置。");
+        return;
+      }
+      const result = await window.actspace.updateImageGeneration({
+        ...(apiKey.trim() && { apiKey }),
+        baseUrl,
+        model,
+      });
+      if (!result.ok) {
+        setIsError(true);
+        setMessage(result.error ?? "保存失败。");
+        return;
+      }
+      setApiKey("");
+      setIsError(false);
+      setMessage("已保存，后续新工具调用将使用这组配置。");
+      await onRefresh();
+    } catch {
+      setIsError(true);
+      setMessage("保存失败，请稍后重试。");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <SectionShell
+      title="图片生成服务"
+      description="供 generate_image 工具使用的 OpenAI-compatible 连接；与聊天模型和搜索服务独立。"
+    >
+      <SettingGroup>
+        <div className="flex flex-col gap-3.5 px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[14px] font-semibold text-text-main">连接配置</div>
+              <p className="mt-0.5 text-[12px] text-text-faint">
+                {current.hasApiKey ? "已连接；API Key 留空会保留现有密钥。" : "尚未连接；API Key 会经系统密钥串加密保存。"}
+              </p>
+            </div>
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${current.hasApiKey ? "bg-success-soft text-on-success" : "bg-surface-subtle text-text-faint"}`}>
+              {current.hasApiKey ? "已连接" : "未连接"}
+            </span>
+          </div>
+          <label className="flex flex-col gap-1.5 text-[12px] font-semibold text-text-muted">
+            API Key
+            <input
+              type="password"
+              value={apiKey}
+              placeholder={current.hasApiKey ? "留空以保留现有 Key" : "sk-..."}
+              onChange={(event) => setApiKey(event.target.value)}
+              className="h-9 rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none placeholder:text-text-subtle focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5 text-[12px] font-semibold text-text-muted">
+            Base URL
+            <input
+              value={baseUrl}
+              onChange={(event) => setBaseUrl(event.target.value)}
+              className="h-9 rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5 text-[12px] font-semibold text-text-muted">
+            模型名称
+            <input
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+              className="h-9 rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
+            />
+          </label>
+          <p className="text-[11px] leading-relaxed text-text-faint">
+            工具参数只包含 prompt、size 和 n；n 默认 1，模型可按用户意图选择 1–10。
+          </p>
+          {baseUrl.trim().toLowerCase().startsWith("http://") ? (
+            <p className="text-[11px] leading-relaxed text-on-danger">
+              当前 Base URL 使用 HTTP，API Key 和请求内容可能以未加密网络流量传输。
+            </p>
+          ) : null}
+          <div className="flex items-center justify-between gap-3">
+            <div className={`text-[12px] ${isError ? "text-on-danger" : "text-text-faint"}`}>{message}</div>
+            <div className="flex shrink-0 items-center gap-2">
+              {current.hasApiKey ? (
+                <button type="button" className={BTN_DANGER} onClick={() => void onClear("image-generation")} disabled={saving}>
+                  断开连接
+                </button>
+              ) : null}
+              <button type="button" className={BTN_PRIMARY} onClick={() => void save()} disabled={saving}>
+                {saving ? "保存中…" : "保存配置"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </SettingGroup>
+    </SectionShell>
   );
 }
 
@@ -1271,6 +1424,7 @@ const PROVIDER_LABELS: Record<SecretProviderId, string> = {
   tavily: "Tavily",
   tinyfish: "TinyFish",
   exa: "Exa",
+  "image-generation": "图片生成服务",
 };
 
 function ProviderKeyModal({
