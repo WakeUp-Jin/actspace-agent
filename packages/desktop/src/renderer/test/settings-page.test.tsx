@@ -112,6 +112,7 @@ describe("SettingsPage", () => {
   }));
   const listInstalledModels = vi.fn(async () => ({ models: [] }));
   const listUsableModels = vi.fn(async () => ({ models: [] }));
+  const updateImageGeneration = vi.fn(async () => ({ ok: true as const }));
   const getLocalUpdateState = vi.fn(async () => makeLocalUpdateState());
   const selectLocalUpdateSource = vi.fn(async () => ({ canceled: false, state: makeLocalUpdateState({ sourceRoot: "/repo/new" }) }));
   const startLocalUpdate = vi.fn(async () => ({
@@ -147,6 +148,7 @@ describe("SettingsPage", () => {
     getProviderBalance.mockClear();
     listInstalledModels.mockClear();
     listUsableModels.mockClear();
+    updateImageGeneration.mockClear();
     getLocalUpdateState.mockReset();
     selectLocalUpdateSource.mockClear();
     startLocalUpdate.mockReset();
@@ -185,6 +187,7 @@ describe("SettingsPage", () => {
       getProviderBalance,
       listInstalledModels,
       listUsableModels,
+      updateImageGeneration,
       getLocalUpdateState,
       selectLocalUpdateSource,
       startLocalUpdate,
@@ -336,6 +339,70 @@ describe("SettingsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "刷新 Kimi 账户余额" }));
     await waitFor(() => expect(getProviderBalance).toHaveBeenCalledTimes(2));
+  });
+
+  it("图片生成服务用摘要卡片打开配置弹窗，并把兼容地址收进高级设置", async () => {
+    getSettings.mockResolvedValueOnce(makeSettings({
+      imageGeneration: {
+        hasApiKey: false,
+        baseUrl: "https://www.duckcoding.ai/v1",
+        model: "gpt-image-2",
+      },
+    }));
+    renderSettingsPage();
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
+    expect(await screen.findByText("未配置")).toBeInTheDocument();
+    expect(screen.queryByLabelText("图片生成服务 API Key")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "配置图片生成服务" }));
+    expect(screen.getByRole("dialog", { name: "配置图片生成服务" })).toBeInTheDocument();
+    expect(screen.getByLabelText("图片生成服务 API Key")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Base URL")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "高级设置" }));
+    expect(screen.getByLabelText("Base URL")).toHaveValue("https://www.duckcoding.ai/v1");
+    expect(screen.getByLabelText("模型名称")).toHaveValue("gpt-image-2");
+
+    await userEvent.type(screen.getByLabelText("图片生成服务 API Key"), "sk-image-test");
+    await userEvent.click(screen.getByRole("button", { name: "保存配置" }));
+
+    await waitFor(() => {
+      expect(updateImageGeneration).toHaveBeenCalledWith({
+        apiKey: "sk-image-test",
+        baseUrl: "https://www.duckcoding.ai/v1",
+        model: "gpt-image-2",
+      });
+    });
+  });
+
+  it("已配置的图片服务不回显 Key，并可从弹窗更换或断开", async () => {
+    getSettings.mockResolvedValueOnce(makeSettings({
+      imageGeneration: {
+        hasApiKey: true,
+        baseUrl: "https://www.duckcoding.ai/v1",
+        model: "gpt-image-2",
+      },
+    }));
+    renderSettingsPage();
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
+    expect(await screen.findByText("已配置")).toBeInTheDocument();
+    expect(screen.getByText("gpt-image-2 · www.duckcoding.ai")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "编辑图片生成服务配置" }));
+    expect(screen.getByText("API Key 已安全保存")).toBeInTheDocument();
+    expect(screen.queryByLabelText("图片生成服务 API Key")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "更换 Key" }));
+    expect(screen.getByLabelText("图片生成服务 API Key")).toHaveAttribute("placeholder", "输入新 Key；留空保持现有 Key");
+
+    await userEvent.click(screen.getByRole("button", { name: "断开服务" }));
+    await waitFor(() => {
+      expect(clearProviderKey).toHaveBeenCalledWith({ provider: "image-generation" });
+    });
   });
 
   it("OpenRouter 编辑弹窗可保存独立 Management Key", async () => {

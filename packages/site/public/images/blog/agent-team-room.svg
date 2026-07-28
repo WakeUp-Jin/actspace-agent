@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Agent Team and Agent Room</title>
+  <desc id="desc">左侧树状团队和右侧环形讨论房间形成两种协作结构</desc>
+  <rect width="1200" height="720" fill="#dfe3d3"/>
+  <path d="M600 0V720" stroke="#24251f" stroke-width="4"/>
+  <rect x="76" y="72" width="448" height="536" rx="34" fill="#fdfcf6" stroke="#24251f" stroke-width="4"/>
+  <circle cx="300" cy="178" r="48" fill="#6f8060"/>
+  <g fill="#fdfcf6" stroke="#24251f" stroke-width="4">
+    <circle cx="172" cy="404" r="44"/>
+    <circle cx="300" cy="480" r="44"/>
+    <circle cx="428" cy="404" r="44"/>
+  </g>
+  <g fill="none" stroke="#24251f" stroke-width="5" stroke-linecap="round">
+    <path d="M300 226V292"/>
+    <path d="M300 292L172 360"/>
+    <path d="M300 292V436"/>
+    <path d="M300 292L428 360"/>
+  </g>
+  <g fill="#b55f54">
+    <rect x="146" y="518" width="52" height="16" rx="8"/>
+    <rect x="274" y="554" width="52" height="16" rx="8"/>
+    <rect x="402" y="518" width="52" height="16" rx="8"/>
+  </g>
+  <circle cx="900" cy="340" r="226" fill="#bcc6aa" stroke="#24251f" stroke-width="4"/>
+  <circle cx="900" cy="340" r="98" fill="#fdfcf6" stroke="#24251f" stroke-width="4"/>
+  <g fill="#fdfcf6" stroke="#24251f" stroke-width="4">
+    <circle cx="900" cy="98" r="38"/>
+    <circle cx="1104" cy="224" r="38"/>
+    <circle cx="1028" cy="516" r="38"/>
+    <circle cx="772" cy="516" r="38"/>
+    <circle cx="696" cy="224" r="38"/>
+  </g>
+  <path d="M809 307C846 272 884 281 900 307C916 281 954 272 991 307" fill="none" stroke="#b55f54" stroke-width="10" stroke-linecap="round"/>
+  <path d="M820 360H980M846 402H954" stroke="#24251f" stroke-width="8" stroke-linecap="round"/>
+  <text x="76" y="666" fill="#24251f" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="30" font-weight="700" letter-spacing="2">ACTSPACE / FORMS 03</text>
+</svg>

@@ -286,10 +286,12 @@ interface AppSettingsV2 {
 
 配置边界：
 
-- 设置页新增独立「图片生成服务」Section，包含 API Key、Base URL 与模型名称三个字段。
+- 设置页保留独立「图片生成服务」Section，默认只展示「已配置 / 未配置」、当前模型、Base URL host 和 Key 已安全保存的摘要；完整表单通过「立即配置 / 编辑配置」弹窗打开，避免低频配置长期占据页面空间。
+- 首次配置弹窗直接展示 API Key；Base URL 与模型名称收进默认折叠的「高级设置」。已有 Key 只显示安全保存状态，不回显明文，用户主动选择「更换 Key」后才出现新的密码输入框。
 - Base URL 默认预填 `https://www.duckcoding.ai/v1`；用户可以覆盖为其他 OpenAI-compatible API 根地址。
 - 模型名称默认预填 `gpt-image-2`；接受 trim 后非空的字符串，不建立模型白名单，建议最大长度 200 且拒绝控制字符。
 - 用户可以只修改 Base URL 或模型名称而不重新输入已保存的 Key；保存后下一轮 Runtime 使用新配置。
+- 状态使用「已配置」而不是「已连接」：V0 保存时不发起连接探针，不能把本地存在 Key 误表述为上游鉴权已经验证。
 - UI 只读取 `hasApiKey`，不读取旧 Key 明文，也不把 Key 写进 renderer store。
 - Key 经 Electron `safeStorage` 加密写入 `secrets.json`。
 - Base URL 和模型名称规范化后写入 `settings.json`，不进入 `secrets.json`。

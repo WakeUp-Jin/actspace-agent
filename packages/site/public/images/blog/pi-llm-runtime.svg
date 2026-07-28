@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Pi-inspired LLM runtime design</title>
+  <desc id="desc">多个模型服务商通过协议层汇入统一的消息和事件流</desc>
+  <rect width="1200" height="720" fill="#e4ddec"/>
+  <path d="M0 534C222 462 360 508 544 438C750 358 884 242 1200 286V720H0Z" fill="#cbbfd7"/>
+  <g fill="#fffdf8" stroke="#242127" stroke-width="4">
+    <rect x="80" y="120" width="238" height="98" rx="18"/>
+    <rect x="80" y="310" width="238" height="98" rx="18"/>
+    <rect x="80" y="500" width="238" height="98" rx="18"/>
+    <rect x="466" y="222" width="260" height="270" rx="28"/>
+    <rect x="878" y="178" width="238" height="358" rx="28"/>
+  </g>
+  <g fill="#71547f">
+    <circle cx="126" cy="169" r="18"/>
+    <circle cx="126" cy="359" r="18"/>
+    <circle cx="126" cy="549" r="18"/>
+  </g>
+  <g stroke="#242127" stroke-width="8" stroke-linecap="round">
+    <path d="M166 160H268M166 190H238"/>
+    <path d="M166 350H268M166 380H238"/>
+    <path d="M166 540H268M166 570H238"/>
+  </g>
+  <g fill="none" stroke="#242127" stroke-width="5">
+    <path d="M318 169C404 169 392 290 466 302"/>
+    <path d="M318 359H466"/>
+    <path d="M318 549C404 549 392 428 466 416"/>
+  </g>
+  <path d="M518 282H674M518 334H642M518 386H680M518 438H616" stroke="#242127" stroke-width="9" stroke-linecap="round"/>
+  <path d="M726 357H878" stroke="#242127" stroke-width="7" stroke-linecap="round"/>
+  <path d="M850 337L878 357L850 377" fill="none" stroke="#242127" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="none" stroke="#71547f" stroke-width="7" stroke-linecap="round">
+    <path d="M928 254H1064"/>
+    <path d="M928 314H1022"/>
+    <path d="M928 374H1070"/>
+    <path d="M928 434H1006"/>
+  </g>
+  <circle cx="1054" cy="454" r="18" fill="#c4876c"/>
+  <text x="80" y="662" fill="#242127" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="30" font-weight="700" letter-spacing="2">ACTSPACE / LLM 05</text>
+</svg>

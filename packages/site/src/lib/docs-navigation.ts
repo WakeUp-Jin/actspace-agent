@@ -2,12 +2,13 @@ import { getCollection, type CollectionEntry } from "astro:content";
 
 export const docsGroups = [
   { id: "getting-started", label: "开始使用" },
-  { id: "core-concepts", label: "核心概念" },
+  { id: "core-concepts", label: "工作原理" },
   { id: "guides", label: "能力指南" },
-  { id: "contributing", label: "开发与贡献" },
+  { id: "contributing", label: "开发者" },
 ] as const;
 
 export type DocsEntry = CollectionEntry<"docs">;
+export type DocsGroupId = (typeof docsGroups)[number]["id"];
 
 export async function getPublicDocs(): Promise<DocsEntry[]> {
   return (await getCollection("docs", ({ data }) => !data.draft)).sort(
@@ -21,4 +22,10 @@ export async function getPublicDocs(): Promise<DocsEntry[]> {
 
 export function docsHref(entry: DocsEntry): string {
   return `/docs/${entry.id.replace(/\.(md|mdx)$/i, "")}/`;
+}
+
+export function docsGroupHref(groupId: DocsGroupId, docs: DocsEntry[]): string {
+  if (groupId === "getting-started") return "/docs/";
+  const firstEntry = docs.find((entry) => entry.data.group === groupId);
+  return firstEntry ? docsHref(firstEntry) : "/docs/";
 }

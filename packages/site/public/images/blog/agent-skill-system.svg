@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Agent Skill system</title>
+  <desc id="desc">技能目录逐层展开为入口说明、参考资料、脚本和资源</desc>
+  <rect width="1200" height="720" fill="#e7e2d4"/>
+  <path d="M0 518C208 444 390 530 574 430C756 332 928 252 1200 306V720H0Z" fill="#d2c8af"/>
+  <g stroke="#25231e" stroke-width="4">
+    <path d="M112 186H356L400 230H742V574H112Z" fill="#fffdf7"/>
+    <path d="M430 138H670L714 182H1022V526H430Z" fill="#b7c8aa"/>
+  </g>
+  <rect x="490" y="230" width="472" height="222" rx="20" fill="#fffdf7" stroke="#25231e" stroke-width="4"/>
+  <path d="M532 282H822M532 330H906M532 378H774" stroke="#25231e" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="908" cy="378" r="20" fill="#738a64"/>
+  <g fill="#fffdf7" stroke="#25231e" stroke-width="4">
+    <rect x="164" y="288" width="194" height="70" rx="14"/>
+    <rect x="164" y="388" width="194" height="70" rx="14"/>
+    <rect x="164" y="488" width="194" height="70" rx="14"/>
+  </g>
+  <g fill="#bd765a">
+    <circle cx="202" cy="323" r="12"/>
+    <circle cx="202" cy="423" r="12"/>
+    <circle cx="202" cy="523" r="12"/>
+  </g>
+  <path d="M228 323H322M228 423H304M228 523H332" stroke="#25231e" stroke-width="7" stroke-linecap="round"/>
+  <path d="M358 323H430M358 423H430M358 523H430" stroke="#25231e" stroke-width="5" stroke-linecap="round"/>
+  <text x="112" y="650" fill="#25231e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="30" font-weight="700" letter-spacing="2">ACTSPACE / SKILLS 06</text>
+</svg>

@@ -4,83 +4,129 @@ import { parseReleaseNotes, ReleaseParseError } from "../parse-release-notes";
 const source = "docs/releases/feature-release-notes.md";
 
 describe("parseReleaseNotes", () => {
-  it("parses multiple months, preserves same-day order, and sorts newest first", () => {
+  it("parses categorized releases, groups sections, and sorts newest first", () => {
     const result = parseReleaseNotes(`
 ## 2026-06
 
-| 日期 | 功能域 | 用户价值 | 变更摘要 |
-| --- | --- | --- | --- |
-| 2026-06-30 | 旧功能 | 较早记录 | 旧摘要 |
+### 2026-06-30 — 较早更新
+
+#### 改进
+
+- 较早记录。
 
 ## 2026-07
 
-| 日期 | 功能域 | 用户价值 | 变更摘要 |
-| --- | --- | --- | --- |
-| 2026-07-27 | 第一条 | 用户价值一 | 摘要一 |
-| 2026-07-27 | 第二条 | 用户价值二 | 摘要二 |
-| 2026-07-26 | 第三条 | 用户价值三 | 摘要三 |
+### 2026-07-27 — 图片与任务体验
+
+#### 新功能
+
+- 支持图片附件。
+- 支持任务复制。
+
+#### 问题修复
+
+- 修复空白面板。
 `, source);
 
-    expect(result.map((entry) => entry.area)).toEqual(["第一条", "第二条", "第三条", "旧功能"]);
-    expect(result.slice(0, 2).map((entry) => entry.anchor)).toEqual([
-      "release-2026-07-27-1",
-      "release-2026-07-27-2",
-    ]);
+    expect(result.map((entry) => entry.title)).toEqual(["图片与任务体验", "较早更新"]);
+    expect(result[0]?.anchor).toBe("release-2026-07-27");
+    expect(result[0]?.sections.map((section) => section.type)).toEqual(["feature", "fix"]);
+    expect(result[0]?.sections[0]?.itemsHtml).toEqual(["支持图片附件。", "支持任务复制。"]);
   });
 
   it("preserves supported inline markdown and sanitizes dangerous URLs and raw HTML", () => {
     const [entry] = parseReleaseNotes(`
 ## 2026-07
 
-| 日期 | 功能域 | 用户价值 | 变更摘要 |
-| --- | --- | --- | --- |
-| 2026-07-27 | Context | 支持 **强调**、\`代码\` 和 [文档](https://example.com) | <script>alert(1)</script> [危险](javascript:alert(1)) |
+### 2026-07-27 — Context 更新
+
+#### 新功能
+
+- 支持 **强调**、\`代码\` 和 [文档](https://example.com)。
+- 原始 HTML <script>alert(1)</script> [危险](javascript:alert(1))
 `, source);
 
-    expect(entry?.userValueHtml).toContain("<strong>强调</strong>");
-    expect(entry?.userValueHtml).toContain("<code>代码</code>");
-    expect(entry?.userValueHtml).toContain('href="https://example.com"');
-    expect(entry?.summaryHtml).not.toContain("<script>");
-    expect(entry?.summaryHtml).not.toContain("javascript:");
+    const [safe, dangerous] = entry?.sections[0]?.itemsHtml ?? [];
+    expect(safe).toContain("<strong>强调</strong>");
+    expect(safe).toContain("<code>代码</code>");
+    expect(safe).toContain('href="https://example.com"');
+    expect(dangerous).not.toContain("<script>");
+    expect(dangerous).not.toContain("javascript:");
   });
 
   it.each([
     {
       name: "invalid date",
-      row: "| 2026-02-31 | Context | 用户价值 | 摘要 |",
+      release: "### 2026-02-31 — Context",
+      body: "#### 新功能\n\n- 更新。",
       message: "不是合法的 YYYY-MM-DD",
     },
     {
       name: "month mismatch",
-      row: "| 2026-06-27 | Context | 用户价值 | 摘要 |",
+      release: "### 2026-06-27 — Context",
+      body: "#### 新功能\n\n- 更新。",
       message: "不属于标题月份",
     },
     {
-      name: "missing required value",
-      row: "| 2026-07-27 | Context |  | 摘要 |",
-      message: "都不能为空",
+      name: "invalid heading",
+      release: "### 2026-07-27 Context",
+      body: "#### 新功能\n\n- 更新。",
+      message: "必须使用",
     },
-  ])("reports source and line for $name", ({ row, message }) => {
+    {
+      name: "unknown category",
+      release: "### 2026-07-27 — Context",
+      body: "#### 其他\n\n- 更新。",
+      message: "未知分类",
+    },
+    {
+      name: "empty category",
+      release: "### 2026-07-27 — Context",
+      body: "#### 新功能",
+      message: "至少需要一个列表项",
+    },
+  ])("reports source and line for $name", ({ release, body, message }) => {
     expect(() => parseReleaseNotes(`
 ## 2026-07
 
-| 日期 | 功能域 | 用户价值 | 变更摘要 |
-| --- | --- | --- | --- |
-${row}
-`, source)).toThrow(new RegExp(`${source}.*第 6 行.*${message}`));
+${release}
+
+${body}
+`, source)).toThrow(new RegExp(`${source}.*第 \\d+ 行.*${message}`));
   });
 
-  it("rejects a matching table row with the wrong column count", () => {
+  it("rejects duplicate release dates", () => {
     expect(() => parseReleaseNotes(`
 ## 2026-07
 
-| 日期 | 功能域 | 用户价值 | 变更摘要 |
-| --- | --- | --- | --- |
-| 2026-07-27 | Context | 用户价值 |
+### 2026-07-27 — 第一条
+
+#### 新功能
+
+- 更新一。
+
+### 2026-07-27 — 第二条
+
+#### 改进
+
+- 更新二。
+`, source)).toThrow("只能对应一次发布");
+  });
+
+  it("rejects nested list content", () => {
+    expect(() => parseReleaseNotes(`
+## 2026-07
+
+### 2026-07-27 — Context
+
+#### 新功能
+
+- 一级
+  - 二级
 `, source)).toThrow(ReleaseParseError);
   });
 
-  it("fails when no release table exists", () => {
-    expect(() => parseReleaseNotes("## 2026-07\n\n没有表格", source)).toThrow("没有找到");
+  it("fails when no release entry exists", () => {
+    expect(() => parseReleaseNotes("## 2026-07\n\n没有更新", source)).toThrow("没有找到");
   });
 });

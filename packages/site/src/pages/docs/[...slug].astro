@@ -1,9 +1,10 @@
 ---
 import { render, type CollectionEntry } from "astro:content";
 import DocsSidebar from "../../components/docs/DocsSidebar.astro";
+import DocsTabs from "../../components/docs/DocsTabs.astro";
 import DocsToc from "../../components/docs/DocsToc.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { docsHref, getPublicDocs } from "../../lib/docs-navigation";
+import { docsHref, getPublicDocs, type DocsGroupId } from "../../lib/docs-navigation";
 import "../../styles/prose.css";
 
 interface Props {
@@ -24,8 +25,9 @@ const { Content, headings } = await render(entry);
 ---
 
 <BaseLayout title={`${entry.data.title} — ActSpace 文档`} description={entry.data.description}>
+  <DocsTabs {docs} currentGroup={entry.data.group as DocsGroupId} />
   <main id="main-content" class="docs-article-grid site-page">
-    <DocsSidebar {docs} currentId={entry.id} />
+    <DocsSidebar {docs} currentGroup={entry.data.group as DocsGroupId} currentId={entry.id} />
     <article>
       <header>
         <p class="site-kicker">ActSpace Docs</p>
@@ -51,15 +53,15 @@ const { Content, headings } = await render(entry);
 <style>
   .docs-article-grid {
     display: grid;
-    grid-template-columns: 210px minmax(0, 760px) minmax(150px, 1fr);
-    gap: clamp(28px, 4vw, 64px);
+    grid-template-columns: 220px minmax(0, 760px) minmax(150px, 1fr);
+    gap: clamp(28px, 3.5vw, 54px);
     justify-content: center;
-    padding-block: 96px 130px;
+    padding-block: 50px 130px;
   }
 
   article {
     min-width: 0;
-    padding-top: clamp(42px, 7vw, 86px);
+    padding-top: clamp(20px, 4vw, 48px);
   }
 
   article > header {
@@ -69,12 +71,12 @@ const { Content, headings } = await render(entry);
   }
 
   h1 {
-    margin-block: 24px 20px;
+    margin-block: 20px 18px;
     font-family: var(--site-font-sans);
-    font-size: clamp(50px, 6vw, 76px);
-    font-weight: 500;
-    letter-spacing: -0.06em;
-    line-height: 1.04;
+    font-size: clamp(42px, 5vw, 62px);
+    font-weight: 520;
+    letter-spacing: -0.052em;
+    line-height: 1.06;
   }
 
   header > p:not(.site-kicker) {
@@ -92,14 +94,14 @@ const { Content, headings } = await render(entry);
 
   @media (max-width: 1160px) {
     .docs-article-grid {
-      grid-template-columns: 200px minmax(0, 760px);
+      grid-template-columns: 210px minmax(0, 760px);
     }
   }
 
-  @media (max-width: 980px) {
+  @media (max-width: 760px) {
     .docs-article-grid {
       grid-template-columns: 1fr;
-      padding-top: 92px;
+      padding-top: 28px;
     }
 
     article {

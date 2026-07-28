@@ -1,0 +1,255 @@
+---
+import type { DocsEntry, DocsGroupId } from "../../lib/docs-navigation";
+import { docsGroupHref, docsGroups, docsHref } from "../../lib/docs-navigation";
+import { sitePath } from "../../lib/site-path";
+
+interface Props {
+  docs: DocsEntry[];
+  currentGroup: DocsGroupId;
+}
+
+const { docs, currentGroup } = Astro.props;
+const searchId = `docs-search-${currentGroup}`;
+const groupLabels = new Map(docsGroups.map((group) => [group.id, group.label]));
+---
+
+<div class="docs-section-bar">
+  <div class="site-page docs-section-inner">
+    <nav class="docs-tabs" aria-label="文档分类">
+      {docsGroups.map((group) => (
+        <a
+          class:list={{ active: currentGroup === group.id }}
+          href={sitePath(docsGroupHref(group.id, docs))}
+          aria-current={currentGroup === group.id ? "page" : undefined}
+        >
+          {group.label}
+        </a>
+      ))}
+    </nav>
+
+    <div class="docs-search" data-docs-search-root>
+      <label class="sr-only" for={searchId}>搜索全部文档</label>
+      <span class="search-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none">
+          <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"></circle>
+          <path d="m12.5 12.5 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+        </svg>
+      </span>
+      <input
+        id={searchId}
+        type="search"
+        placeholder="搜索文档…"
+        autocomplete="off"
+        aria-controls={`${searchId}-results`}
+        data-docs-search
+      />
+      <div id={`${searchId}-results`} class="docs-search-results" data-docs-search-results hidden>
+        {docs.map((entry) => (
+          <a
+            href={sitePath(docsHref(entry))}
+            data-docs-search-item
+            data-search-text={`${entry.data.title} ${entry.data.description} ${groupLabels.get(entry.data.group) ?? ""}`}
+          >
+            <span>{entry.data.title}</span>
+            <small>{groupLabels.get(entry.data.group)}</small>
+          </a>
+        ))}
+        <p data-docs-search-empty hidden>没有找到匹配文档</p>
+      </div>
+      <p class="sr-only" aria-live="polite" data-docs-search-status></p>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { initializeDocsSearch } from "../../scripts/docs-search";
+
+  initializeDocsSearch();
+  document.addEventListener("astro:page-load", initializeDocsSearch);
+</script>
+
+<style>
+  .docs-section-bar {
+    position: sticky;
+    z-index: 70;
+    top: 72px;
+    border-bottom: 1px solid var(--site-line);
+    background: var(--site-backdrop);
+    backdrop-filter: blur(18px) saturate(1.1);
+  }
+
+  .docs-section-inner {
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 28px;
+  }
+
+  .docs-tabs {
+    display: flex;
+    min-width: 0;
+    align-self: stretch;
+    gap: 30px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .docs-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .docs-tabs a {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    color: var(--site-body);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 610;
+    white-space: nowrap;
+  }
+
+  .docs-tabs a:hover,
+  .docs-tabs a.active {
+    color: var(--site-ink);
+  }
+
+  .docs-tabs a.active::after {
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 2px;
+    background: var(--site-ink);
+    content: "";
+  }
+
+  .docs-search {
+    position: relative;
+    flex: 0 0 260px;
+  }
+
+  .search-icon {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 11px;
+    width: 16px;
+    color: var(--site-muted);
+    pointer-events: none;
+    transform: translateY(-50%);
+  }
+
+  .docs-search input {
+    width: 100%;
+    min-height: 38px;
+    border: 1px solid var(--site-line);
+    border-radius: 9px;
+    padding: 0 34px;
+    color: var(--site-ink);
+    background: var(--site-surface);
+    font-size: 12px;
+  }
+
+  .docs-search input::placeholder {
+    color: var(--site-muted);
+  }
+
+  .docs-search-results {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 8px);
+    right: 0;
+    width: min(380px, calc(100vw - 32px));
+    max-height: min(420px, calc(100vh - 180px));
+    overflow-y: auto;
+    border: 1px solid var(--site-line);
+    border-radius: 12px;
+    padding: 7px;
+    background: var(--site-surface);
+    box-shadow: 0 18px 42px var(--site-shadow);
+  }
+
+  .docs-search-results[hidden],
+  .docs-search-results [hidden] {
+    display: none;
+  }
+
+  .docs-search-results a {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    border-radius: 7px;
+    padding: 10px 11px;
+    text-decoration: none;
+  }
+
+  .docs-search-results a:hover,
+  .docs-search-results a:focus-visible {
+    background: var(--site-canvas-soft);
+  }
+
+  .docs-search-results span {
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 630;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .docs-search-results small {
+    color: var(--site-muted);
+    font-size: 10px;
+  }
+
+  .docs-search-results p {
+    margin: 0;
+    padding: 18px 11px;
+    color: var(--site-muted);
+    text-align: center;
+    font-size: 12px;
+  }
+
+  @media (max-width: 980px) {
+    .docs-tabs {
+      gap: 22px;
+    }
+
+    .docs-search {
+      flex-basis: 220px;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .docs-section-inner {
+      display: grid;
+      gap: 9px;
+      padding-block: 9px 11px;
+    }
+
+    .docs-tabs {
+      width: 100%;
+      min-height: 36px;
+      gap: 24px;
+    }
+
+    .docs-search {
+      width: 100%;
+      max-width: none;
+    }
+
+    .docs-search-results {
+      right: auto;
+      left: 0;
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .docs-section-bar {
+      top: 64px;
+    }
+  }
+</style>

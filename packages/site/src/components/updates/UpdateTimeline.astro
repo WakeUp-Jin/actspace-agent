@@ -1,5 +1,5 @@
 ---
-import type { ReleaseMonth } from "../../lib/releases/model";
+import type { ReleaseMonth, ReleaseSectionType } from "../../lib/releases/model";
 
 interface Props {
   months: ReleaseMonth[];
@@ -11,225 +11,384 @@ const formatMonth = (value: string) => {
   const [year, month] = value.split("-");
   return `${year} 年 ${Number(month)} 月`;
 };
-const formatDay = (value: string) => {
-  const [, month, day] = value.split("-");
-  return `${Number(month)} 月 ${Number(day)} 日`;
+const formatDate = (value: string) => {
+  const [year, month, day] = value.split("-");
+  return `${year} 年 ${Number(month)} 月 ${Number(day)} 日`;
+};
+const formatDay = (value: string) => value.slice(-2);
+const sectionLabels: Record<ReleaseSectionType, string> = {
+  feature: "新功能",
+  improvement: "改进",
+  fix: "问题修复",
 };
 ---
 
-<div class:list={["update-layout", { "update-layout--compact": compact }] }>
+<div class:list={["update-layout", { "update-layout--compact": compact }]} data-update-timeline={!compact || undefined}>
   {!compact && (
-    <nav class="month-nav" aria-label="更新月份">
-      <p>时间线</p>
-      <ol>
-        {months.map(({ month }, index) => (
-          <li><a class:list={{ active: index === 0 }} href={`#month-${month}`}>{formatMonth(month)}</a></li>
-        ))}
-      </ol>
+    <nav class="release-nav" aria-label="历史更新">
+      <p class="release-nav__title">历史更新</p>
+      {months.map(({ month, entries }, monthIndex) => (
+        <section class="release-nav__month" aria-labelledby={`nav-${month}`}>
+          <p id={`nav-${month}`}>{formatMonth(month)}</p>
+          <ol>
+            {entries.map((entry, entryIndex) => {
+              const isFirst = monthIndex === 0 && entryIndex === 0;
+              return (
+                <li>
+                  <a
+                    class:list={{ active: isFirst }}
+                    href={`#${entry.anchor}`}
+                    data-release-link={entry.anchor}
+                    aria-current={isFirst ? "date" : undefined}
+                    title={`${formatDate(entry.date)} · ${entry.title}`}
+                  >
+                    <span class="release-nav__node" aria-hidden="true"></span>
+                    <time datetime={entry.date}>{formatDay(entry.date)}</time>
+                    <span>{entry.title}</span>
+                  </a>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ))}
     </nav>
   )}
 
-  <div class="month-list">
-    {months.map(({ month, entries }) => (
-      <section class="release-month" id={`month-${month}`} aria-labelledby={`month-${month}-title`}>
-        <header>
-          <p>{month}</p>
-          <h2 id={`month-${month}-title`}>{formatMonth(month)}</h2>
-        </header>
+  <div class="release-column">
+    {!compact && (
+      <header class="updates-heading">
+        <p class="site-kicker">Changelog</p>
+        <h1>更新日志</h1>
+        <p>ActSpace 的最新功能、改进与问题修复。</p>
+      </header>
+    )}
 
-        <ol class="release-list">
-          {entries.map((entry) => (
-            <li class="release-entry" id={entry.anchor}>
-              <div class="release-marker" aria-hidden="true"></div>
-              <article>
-                <div class="release-meta">
-                  <time datetime={entry.date}>{formatDay(entry.date)}</time>
-                  <span>{entry.area}</span>
-                </div>
-                <h3 set:html={entry.userValueHtml}></h3>
-                {!compact && (
-                  <details>
-                    <summary>技术摘要</summary>
-                    <p set:html={entry.summaryHtml}></p>
-                  </details>
-                )}
-              </article>
-            </li>
+    {!compact && (
+      <nav class="month-jump" aria-label="按月份跳转">
+        <ol>
+          {months.map(({ month }) => (
+            <li><a href={`#month-${month}`}>{formatMonth(month)}</a></li>
           ))}
         </ol>
-      </section>
-    ))}
+      </nav>
+    )}
+
+    <div class="release-stream">
+      {months.map(({ month, entries }) => (
+        <section class="release-month" id={`month-${month}`} aria-label={formatMonth(month)}>
+          {entries.map((entry) => (
+            <article class="release-entry" id={entry.anchor} data-release-entry={entry.anchor}>
+              <header>
+                <time datetime={entry.date}>{formatDate(entry.date)}</time>
+                <h2>{entry.title}</h2>
+              </header>
+
+              <div class="release-sections">
+                {entry.sections.map((section) => (
+                  <section aria-labelledby={`${entry.anchor}-${section.type}`}>
+                    <h3 id={`${entry.anchor}-${section.type}`}>{sectionLabels[section.type]}</h3>
+                    <ul>
+                      {section.itemsHtml.map((item) => <li set:html={item}></li>)}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            </article>
+          ))}
+        </section>
+      ))}
+    </div>
   </div>
 </div>
+
+<script>
+  const timelines = document.querySelectorAll<HTMLElement>("[data-update-timeline]");
+
+  for (const timeline of timelines) {
+    const links = Array.from(timeline.querySelectorAll<HTMLAnchorElement>("[data-release-link]"));
+    const entries = Array.from(timeline.querySelectorAll<HTMLElement>("[data-release-entry]"));
+    const linksById = new Map(links.map((link) => [link.dataset.releaseLink, link]));
+
+    const setActive = (id: string) => {
+      const activeLink = linksById.get(id);
+      if (!activeLink) return;
+
+      for (const link of links) {
+        const active = link === activeLink;
+        link.classList.toggle("active", active);
+        if (active) link.setAttribute("aria-current", "date");
+        else link.removeAttribute("aria-current");
+      }
+    };
+
+    for (const link of links) {
+      link.addEventListener("click", () => {
+        const id = link.dataset.releaseLink;
+        if (id) setActive(id);
+      });
+    }
+
+    const hashId = window.location.hash.slice(1);
+    if (hashId) setActive(hashId);
+
+    if ("IntersectionObserver" in window) {
+      const observer = new IntersectionObserver(
+        (observedEntries) => {
+          const visible = observedEntries
+            .filter((entry) => entry.isIntersecting)
+            .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top)[0];
+          const id = (visible?.target as HTMLElement | undefined)?.dataset.releaseEntry;
+          if (id) setActive(id);
+        },
+        { rootMargin: "-18% 0px -68% 0px", threshold: 0 },
+      );
+
+      for (const entry of entries) observer.observe(entry);
+    }
+  }
+</script>
 
 <style>
   .update-layout {
     display: grid;
-    grid-template-columns: 180px minmax(0, 1fr);
-    gap: clamp(44px, 8vw, 120px);
+    grid-template-columns: minmax(190px, 230px) minmax(0, 760px);
+    gap: clamp(52px, 8vw, 128px);
+    align-items: start;
   }
 
-  .month-nav {
+  .release-nav {
     position: sticky;
-    top: 112px;
-    align-self: start;
+    top: 104px;
+    max-height: calc(100vh - 128px);
+    overflow-y: auto;
+    padding: 6px 12px 40px 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--site-line-strong) transparent;
   }
 
-  .month-nav > p {
-    margin-bottom: 18px;
+  .release-nav__title {
+    margin-bottom: 26px;
+    color: var(--site-muted);
+    font-size: 12px;
+    font-weight: 650;
+  }
+
+  .release-nav__month + .release-nav__month {
+    margin-top: 28px;
+  }
+
+  .release-nav__month > p {
+    margin: 0 0 8px 22px;
     color: var(--site-muted);
     font-family: var(--site-font-mono);
     font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
-  .month-nav ol,
-  .release-list {
+  .release-nav ol,
+  .month-jump ol {
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .month-nav a {
-    display: block;
-    border-left: 1px solid var(--site-line);
-    padding: 9px 0 9px 18px;
-    color: var(--site-muted);
-    text-decoration: none;
-    font-size: 14px;
-  }
-
-  .month-nav a:hover,
-  .month-nav a.active {
-    border-color: var(--site-ink);
-    color: var(--site-ink);
-  }
-
-  .month-list {
-    min-width: 0;
-  }
-
-  .release-month {
-    scroll-margin-top: 112px;
-  }
-
-  .release-month + .release-month {
-    margin-top: clamp(72px, 9vw, 120px);
-  }
-
-  .release-month > header {
-    display: grid;
-    grid-template-columns: 120px minmax(0, 1fr);
-    align-items: end;
-    border-bottom: 1px solid var(--site-line-strong);
-    padding-bottom: 22px;
-  }
-
-  .release-month > header p {
-    margin: 0;
-    color: var(--site-muted);
-    font-family: var(--site-font-mono);
-    font-size: 11px;
-    letter-spacing: 0.1em;
-  }
-
-  .release-month > header h2 {
-    margin: 0;
-    font-family: var(--site-font-serif);
-    font-size: clamp(34px, 4vw, 52px);
-    font-weight: 500;
-    letter-spacing: -0.045em;
-  }
-
-  .release-entry {
+  .release-nav__month ol {
     position: relative;
-    display: grid;
-    grid-template-columns: 120px minmax(0, 1fr);
-    border-bottom: 1px solid var(--site-line);
   }
 
-  .release-marker {
-    position: relative;
-    border-right: 1px solid var(--site-line);
-  }
-
-  .release-marker::after {
+  .release-nav__month ol::before {
     position: absolute;
-    top: 35px;
-    right: -4px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--site-ink);
+    top: 20px;
+    bottom: 20px;
+    left: 5px;
+    width: 1px;
+    background: var(--site-line);
     content: "";
   }
 
-  article {
-    padding: 30px 0 32px clamp(24px, 4vw, 52px);
+  .release-nav a {
+    position: relative;
+    display: grid;
+    min-height: 44px;
+    grid-template-columns: 12px 30px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    color: var(--site-muted);
+    text-decoration: none;
+    font-size: 12px;
+    transition: color 180ms ease;
   }
 
-  .release-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 14px;
-    color: var(--site-muted);
+  .release-nav a > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .release-nav a time {
+    color: inherit;
     font-family: var(--site-font-mono);
     font-size: 11px;
+    font-variant-numeric: tabular-nums;
   }
 
-  .release-meta span {
-    border: 1px solid var(--site-line);
-    border-radius: 999px;
-    padding: 4px 8px;
+  .release-nav a:hover,
+  .release-nav a.active {
+    color: var(--site-ink);
   }
 
-  h3 {
-    max-width: 800px;
+  .release-nav__node {
+    position: relative;
+    z-index: 1;
+    width: 7px;
+    height: 7px;
+    border: 1px solid var(--site-line-strong);
+    border-radius: 50%;
+    background: var(--site-canvas);
+    transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+  }
+
+  .release-nav a:hover .release-nav__node {
+    border-color: var(--site-ink);
+  }
+
+  .release-nav a.active .release-nav__node {
+    border-color: var(--site-ink);
+    background: var(--site-ink);
+    transform: scale(1.15);
+  }
+
+  .release-column {
+    min-width: 0;
+  }
+
+  .updates-heading {
+    padding: 4px 0 clamp(70px, 8vw, 108px);
+  }
+
+  .updates-heading h1 {
+    margin: 24px 0 18px;
+    font-family: var(--site-font-serif);
+    font-size: clamp(54px, 6vw, 78px);
+    font-weight: 500;
+    letter-spacing: -0.065em;
+    line-height: 0.98;
+  }
+
+  .updates-heading > p:last-child {
     margin: 0;
-    font-size: clamp(20px, 2.3vw, 28px);
-    font-weight: 550;
-    letter-spacing: -0.025em;
-    line-height: 1.45;
-  }
-
-  details {
-    max-width: 800px;
-    margin-top: 18px;
-  }
-
-  summary {
-    width: fit-content;
     color: var(--site-body);
-    cursor: pointer;
-    font-size: 13px;
+    font-size: 17px;
+    line-height: 1.7;
+  }
+
+  .month-jump {
+    display: none;
+  }
+
+  .release-month {
+    scroll-margin-top: 104px;
+  }
+
+  .release-month + .release-month {
+    margin-top: clamp(88px, 11vw, 144px);
+  }
+
+  .release-entry {
+    scroll-margin-top: 104px;
+    padding-bottom: clamp(72px, 8vw, 104px);
+  }
+
+  .release-entry + .release-entry {
+    border-top: 1px solid var(--site-line);
+    padding-top: clamp(72px, 8vw, 104px);
+  }
+
+  .release-entry > header time {
+    display: block;
+    margin-bottom: 16px;
+    color: var(--site-muted);
+    font-family: var(--site-font-mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+  }
+
+  .release-entry h2 {
+    max-width: 720px;
+    margin: 0;
+    font-size: clamp(28px, 3vw, 38px);
+    font-weight: 650;
+    letter-spacing: -0.04em;
+    line-height: 1.25;
+  }
+
+  .release-sections {
+    max-width: 700px;
+    margin-top: 38px;
+  }
+
+  .release-sections > section + section {
+    margin-top: 36px;
+  }
+
+  .release-sections h3 {
+    margin: 0 0 14px;
+    color: var(--site-body);
+    font-size: 14px;
     font-weight: 650;
   }
 
-  details p {
-    margin: 14px 0 0;
+  .release-sections ul {
+    margin: 0;
+    padding-left: 1.3em;
     color: var(--site-body);
-    font-size: 14px;
-    line-height: 1.75;
+  }
+
+  .release-sections li {
+    padding-left: 0.3em;
+    font-size: 16px;
+    line-height: 1.8;
+  }
+
+  .release-sections li + li {
+    margin-top: 10px;
+  }
+
+  .release-sections li::marker {
+    color: var(--site-line-strong);
+  }
+
+  .release-sections :global(code) {
+    color: var(--site-ink);
+    font-family: var(--site-font-mono);
+    font-size: 0.88em;
+  }
+
+  .release-sections :global(a) {
+    color: var(--site-ink);
+    text-underline-offset: 0.18em;
   }
 
   .update-layout--compact {
     display: block;
   }
 
-  .update-layout--compact .release-month > header {
-    grid-template-columns: 112px minmax(0, 1fr);
+  .update-layout--compact .release-entry {
+    padding-bottom: 56px;
   }
 
-  .update-layout--compact .release-entry {
-    grid-template-columns: 112px minmax(0, 1fr);
+  .update-layout--compact .release-entry + .release-entry {
+    padding-top: 56px;
+  }
+
+  .update-layout--compact .release-entry h2 {
+    font-size: clamp(24px, 3vw, 32px);
   }
 
   .update-layout--compact .release-month + .release-month {
-    margin-top: 52px;
+    margin-top: 72px;
   }
 
   @media (max-width: 760px) {
@@ -237,39 +396,73 @@ const formatDay = (value: string) => {
       grid-template-columns: 1fr;
     }
 
-    .month-nav {
-      position: static;
-      overflow-x: auto;
-    }
-
-    .month-nav ol {
-      display: flex;
-    }
-
-    .month-nav a {
-      border-bottom: 1px solid var(--site-line);
-      border-left: 0;
-      padding: 9px 18px 12px 0;
-      white-space: nowrap;
-    }
-
-    .release-month > header,
-    .release-entry,
-    .update-layout--compact .release-month > header,
-    .update-layout--compact .release-entry {
-      grid-template-columns: 1fr;
-    }
-
-    .release-month > header p {
-      margin-bottom: 8px;
-    }
-
-    .release-marker {
+    .release-nav {
       display: none;
     }
 
-    article {
-      padding-left: 0;
+    .updates-heading {
+      padding-bottom: 48px;
+    }
+
+    .updates-heading h1 {
+      font-size: clamp(48px, 15vw, 66px);
+    }
+
+    .month-jump {
+      display: block;
+      overflow-x: auto;
+      margin: 0 0 64px;
+      scrollbar-width: none;
+    }
+
+    .month-jump::-webkit-scrollbar {
+      display: none;
+    }
+
+    .month-jump ol {
+      display: flex;
+      gap: 8px;
+      width: max-content;
+    }
+
+    .month-jump a {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      border-bottom: 1px solid var(--site-line);
+      padding-right: 18px;
+      color: var(--site-muted);
+      text-decoration: none;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .month-jump a:hover,
+    .month-jump a:focus-visible {
+      color: var(--site-ink);
+      border-color: var(--site-ink);
+    }
+
+    .release-entry,
+    .release-entry + .release-entry {
+      padding-block: 0 72px;
+    }
+
+    .release-entry + .release-entry {
+      padding-top: 72px;
+    }
+
+    .release-entry h2 {
+      font-size: clamp(27px, 8vw, 34px);
+    }
+
+    .release-sections {
+      margin-top: 32px;
+    }
+
+    .release-sections li {
+      font-size: 16px;
+      line-height: 1.72;
     }
   }
 </style>

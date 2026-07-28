@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Loader2, Monitor, Moon, Sun, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Image, KeyRound, Loader2, Monitor, Moon, ShieldCheck, Sun, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
   DEFAULT_IMAGE_GENERATION_BASE_URL,
@@ -27,6 +27,7 @@ import {
 } from "./tool-catalog";
 import { ProviderSettings } from "./ProviderSettings";
 import { ModelSettings } from "./ModelSettings";
+import { useDialogFocusTrap } from "./useDialogFocusTrap";
 import {
   SectionShell,
   SettingGroup,
@@ -352,35 +353,103 @@ function ImageGenerationSettingsSection({
     baseUrl: DEFAULT_IMAGE_GENERATION_BASE_URL,
     model: DEFAULT_IMAGE_GENERATION_MODEL,
   };
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const endpointLabel = formatImageGenerationEndpoint(current.baseUrl);
+
+  return (
+    <>
+      <SectionShell
+        title="图片生成服务"
+        description="供 generate_image 工具使用的独立 OpenAI-compatible 连接。"
+      >
+        <SettingGroup>
+          <div className="flex items-center gap-3.5 px-4 py-4">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-act-lg bg-surface-subtle text-text-main">
+              <Image size={18} strokeWidth={1.8} aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[14px] font-semibold text-text-main">连接配置</span>
+                <span className={`rounded-act-pill px-2 py-0.5 text-[10px] font-semibold ${current.hasApiKey ? "bg-operational-soft text-operational" : "bg-surface-subtle text-text-faint"}`}>
+                  {current.hasApiKey ? "已配置" : "未配置"}
+                </span>
+              </div>
+              <p className="mt-1 truncate text-[12px] text-text-faint">
+                {current.hasApiKey
+                  ? `${current.model} · ${endpointLabel}`
+                  : "配置 API Key 后，主 Agent 才能使用图片生成工具。"}
+              </p>
+              {current.hasApiKey ? (
+                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-text-faint">
+                  <ShieldCheck size={12} aria-hidden="true" />
+                  API Key 已安全保存在本机
+                </p>
+              ) : null}
+            </div>
+            <button
+              ref={triggerRef}
+              type="button"
+              className={current.hasApiKey ? BTN_SECONDARY : BTN_PRIMARY}
+              aria-label={current.hasApiKey ? "编辑图片生成服务配置" : "配置图片生成服务"}
+              onClick={() => setDialogOpen(true)}
+            >
+              {current.hasApiKey ? "编辑配置" : "立即配置"}
+            </button>
+          </div>
+        </SettingGroup>
+      </SectionShell>
+      {dialogOpen ? (
+        <ImageGenerationSettingsDialog
+          current={current}
+          restoreFocusTo={triggerRef.current}
+          onClose={() => setDialogOpen(false)}
+          onClear={onClear}
+          onRefresh={onRefresh}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function ImageGenerationSettingsDialog({
+  current,
+  restoreFocusTo,
+  onClose,
+  onClear,
+  onRefresh,
+}: {
+  current: { hasApiKey: boolean; baseUrl: string; model: string };
+  restoreFocusTo?: HTMLElement | null;
+  onClose: () => void;
+  onClear: (provider: SecretProviderId) => Promise<void>;
+  onRefresh: () => Promise<void>;
+}) {
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState(current.baseUrl);
   const [model, setModel] = useState(current.model);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [isError, setIsError] = useState(false);
-
-  useEffect(() => {
-    setBaseUrl(current.baseUrl);
-    setModel(current.model);
-  }, [current.baseUrl, current.model]);
+  const [replaceKey, setReplaceKey] = useState(!current.hasApiKey);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [busy, setBusy] = useState<"save" | "disconnect" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { dialogRef, trapTabKey } = useDialogFocusTrap(restoreFocusTo);
+  const endpointLabel = formatImageGenerationEndpoint(baseUrl);
 
   const save = async () => {
     if (!baseUrl.trim() || !model.trim()) {
-      setIsError(true);
-      setMessage("Base URL 和模型名称不能为空。");
+      setAdvancedOpen(true);
+      setError("Base URL 和模型名称不能为空。");
       return;
     }
     if (!current.hasApiKey && !apiKey.trim()) {
-      setIsError(true);
-      setMessage("首次配置时请输入 API Key。");
+      setError("首次配置时请输入 API Key。");
       return;
     }
-    setSaving(true);
-    setMessage(null);
+    setBusy("save");
+    setError(null);
     try {
       if (!window.actspace.updateImageGeneration) {
-        setIsError(true);
-        setMessage("当前环境不支持保存图片生成配置。");
+        setError("当前环境不支持保存图片生成配置。");
         return;
       }
       const result = await window.actspace.updateImageGeneration({
@@ -389,91 +458,169 @@ function ImageGenerationSettingsSection({
         model,
       });
       if (!result.ok) {
-        setIsError(true);
-        setMessage(result.error ?? "保存失败。");
+        setError(result.error ?? "保存失败。");
         return;
       }
-      setApiKey("");
-      setIsError(false);
-      setMessage("已保存，后续新工具调用将使用这组配置。");
       await onRefresh();
+      onClose();
     } catch {
-      setIsError(true);
-      setMessage("保存失败，请稍后重试。");
+      setError("保存失败，请稍后重试。");
     } finally {
-      setSaving(false);
+      setBusy(null);
+    }
+  };
+
+  const disconnect = async () => {
+    setBusy("disconnect");
+    setError(null);
+    try {
+      await onClear("image-generation");
+      onClose();
+    } catch {
+      setError("断开失败，请稍后重试。");
+    } finally {
+      setBusy(null);
     }
   };
 
   return (
-    <SectionShell
-      title="图片生成服务"
-      description="供 generate_image 工具使用的 OpenAI-compatible 连接；与聊天模型和搜索服务独立。"
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      className="fixed inset-0 z-[150] grid place-items-center bg-scrim px-5"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="image-generation-dialog-title"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !busy) onClose();
+        else trapTabKey(event);
+      }}
     >
-      <SettingGroup>
-        <div className="flex flex-col gap-3.5 px-4 py-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[14px] font-semibold text-text-main">连接配置</div>
-              <p className="mt-0.5 text-[12px] text-text-faint">
-                {current.hasApiKey ? "已连接；API Key 留空会保留现有密钥。" : "尚未连接；API Key 会经系统密钥串加密保存。"}
-              </p>
-            </div>
-            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${current.hasApiKey ? "bg-success-soft text-on-success" : "bg-surface-subtle text-text-faint"}`}>
-              {current.hasApiKey ? "已连接" : "未连接"}
-            </span>
-          </div>
-          <label className="flex flex-col gap-1.5 text-[12px] font-semibold text-text-muted">
-            API Key
-            <input
-              type="password"
-              value={apiKey}
-              placeholder={current.hasApiKey ? "留空以保留现有 Key" : "sk-..."}
-              onChange={(event) => setApiKey(event.target.value)}
-              className="h-9 rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none placeholder:text-text-subtle focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
-            />
-          </label>
-          <label className="flex flex-col gap-1.5 text-[12px] font-semibold text-text-muted">
-            Base URL
-            <input
-              value={baseUrl}
-              onChange={(event) => setBaseUrl(event.target.value)}
-              className="h-9 rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
-            />
-          </label>
-          <label className="flex flex-col gap-1.5 text-[12px] font-semibold text-text-muted">
-            模型名称
-            <input
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-              className="h-9 rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
-            />
-          </label>
-          <p className="text-[11px] leading-relaxed text-text-faint">
-            工具参数只包含 prompt、size 和 n；n 默认 1，模型可按用户意图选择 1–10。
-          </p>
-          {baseUrl.trim().toLowerCase().startsWith("http://") ? (
-            <p className="text-[11px] leading-relaxed text-on-danger">
-              当前 Base URL 使用 HTTP，API Key 和请求内容可能以未加密网络流量传输。
+      <div className="max-h-[86vh] w-full max-w-[520px] overflow-y-auto rounded-act-xl border border-line bg-surface p-5 shadow-act-float">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 id="image-generation-dialog-title" className="text-[18px] font-semibold text-text-main">
+              配置图片生成服务
+            </h2>
+            <p className="mt-1 text-[12px] leading-relaxed text-text-faint">
+              密钥只在 main 进程解密使用；保存后从下一次图片生成调用生效。
             </p>
-          ) : null}
-          <div className="flex items-center justify-between gap-3">
-            <div className={`text-[12px] ${isError ? "text-on-danger" : "text-text-faint"}`}>{message}</div>
-            <div className="flex shrink-0 items-center gap-2">
-              {current.hasApiKey ? (
-                <button type="button" className={BTN_DANGER} onClick={() => void onClear("image-generation")} disabled={saving}>
-                  断开连接
-                </button>
-              ) : null}
-              <button type="button" className={BTN_PRIMARY} onClick={() => void save()} disabled={saving}>
-                {saving ? "保存中…" : "保存配置"}
+          </div>
+          <button
+            type="button"
+            aria-label="关闭图片生成服务配置"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-act-md text-text-faint transition hover:bg-surface-subtle"
+            onClick={onClose}
+            disabled={Boolean(busy)}
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4">
+          {current.hasApiKey && !replaceKey ? (
+            <div className="flex items-center gap-3 rounded-act-lg border border-line bg-surface-subtle px-3.5 py-3">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-act-md bg-operational-soft text-operational">
+                <ShieldCheck size={16} aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-semibold text-text-main">API Key 已安全保存</div>
+                <p className="mt-0.5 text-[11px] text-text-faint">出于安全原因，已保存的 Key 不会回显。</p>
+              </div>
+              <button type="button" autoFocus className={BTN_SECONDARY} onClick={() => setReplaceKey(true)}>
+                更换 Key
               </button>
             </div>
+          ) : (
+            <label className="flex flex-col gap-1.5 text-[12px] font-semibold text-text-muted">
+              API Key
+              <div className="relative">
+                <KeyRound size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" aria-hidden="true" />
+                <input
+                  autoFocus
+                  type="password"
+                  value={apiKey}
+                  placeholder={current.hasApiKey ? "输入新 Key；留空保持现有 Key" : "sk-..."}
+                  aria-label="图片生成服务 API Key"
+                  onChange={(event) => setApiKey(event.target.value)}
+                  className="h-10 w-full rounded-act-md border border-line bg-surface-subtle pl-9 pr-3 text-[13px] text-text-main outline-none placeholder:text-text-subtle focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
+                />
+              </div>
+            </label>
+          )}
+
+          <div className="overflow-hidden rounded-act-lg border border-line">
+            <button
+              type="button"
+              aria-label="高级设置"
+              aria-expanded={advancedOpen}
+              aria-controls="image-generation-advanced-settings"
+              className="flex w-full items-center gap-2 px-3.5 py-3 text-left transition hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring/20"
+              onClick={() => setAdvancedOpen((open) => !open)}
+            >
+              <ChevronRight size={16} className={`shrink-0 text-text-faint transition-transform ${advancedOpen ? "rotate-90" : ""}`} aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-semibold text-text-main">高级设置</span>
+                <span className="mt-0.5 block truncate text-[11px] text-text-faint">{model || "未填写模型"} · {endpointLabel}</span>
+              </span>
+            </button>
+            {advancedOpen ? (
+              <div id="image-generation-advanced-settings" className="grid gap-4 border-t border-line bg-surface-subtle px-3.5 py-3.5">
+                <label className="flex flex-col gap-1.5 text-[12px] font-semibold text-text-muted">
+                  Base URL
+                  <input
+                    value={baseUrl}
+                    onChange={(event) => setBaseUrl(event.target.value)}
+                    className="h-10 rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
+                  />
+                </label>
+                <label className="flex flex-col gap-1.5 text-[12px] font-semibold text-text-muted">
+                  模型名称
+                  <input
+                    value={model}
+                    onChange={(event) => setModel(event.target.value)}
+                    className="h-10 rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none focus-visible:border-focus-ring focus-visible:ring-2 focus-visible:ring-focus-ring/20"
+                  />
+                </label>
+                {baseUrl.trim().toLowerCase().startsWith("http://") ? (
+                  <p className="flex gap-1.5 text-[11px] leading-relaxed text-on-danger">
+                    <CircleAlert size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
+                    当前 Base URL 使用 HTTP，API Key 和请求内容可能以未加密网络流量传输。
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          {error ? <p role="alert" className="text-[12px] text-on-danger">{error}</p> : null}
+        </div>
+
+        <div className="mt-6 flex items-center justify-between gap-3">
+          <div>
+            {current.hasApiKey ? (
+              <button type="button" className={BTN_DANGER} onClick={() => void disconnect()} disabled={Boolean(busy)}>
+                {busy === "disconnect" ? "断开中…" : "断开服务"}
+              </button>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" className={BTN_SECONDARY} onClick={onClose} disabled={Boolean(busy)}>取消</button>
+            <button type="button" className={BTN_PRIMARY} onClick={() => void save()} disabled={Boolean(busy)}>
+              {busy === "save" ? "保存中…" : "保存配置"}
+            </button>
           </div>
         </div>
-      </SettingGroup>
-    </SectionShell>
+      </div>
+    </div>
   );
+}
+
+function formatImageGenerationEndpoint(baseUrl: string): string {
+  try {
+    return new URL(baseUrl).hostname || baseUrl;
+  } catch {
+    return baseUrl || "未填写地址";
+  }
 }
 
 function GeneralSection({ settings, onUpdate }: SectionProps) {

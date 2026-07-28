@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Browser Use architecture</title>
+  <desc id="desc">模型、命令引擎、定位运行时和浏览器扩展组成分层浏览器系统</desc>
+  <rect width="1200" height="720" fill="#dbe5ec"/>
+  <circle cx="1028" cy="126" r="72" fill="#fdfcf8"/>
+  <path d="M0 556C198 452 382 536 574 434C762 334 915 236 1200 278V720H0Z" fill="#b9cedc"/>
+  <g stroke="#20242a" stroke-width="4">
+    <rect x="82" y="112" width="286" height="446" rx="28" fill="#fdfcf8"/>
+    <rect x="456" y="84" width="300" height="502" rx="28" fill="#c7d7e2"/>
+    <rect x="844" y="132" width="274" height="406" rx="28" fill="#fdfcf8"/>
+  </g>
+  <rect x="126" y="160" width="198" height="58" rx="13" fill="#20242a"/>
+  <path d="M140 286H310M140 346H286M140 406H300M140 466H252" stroke="#20242a" stroke-width="9" stroke-linecap="round"/>
+  <g fill="#477d9a">
+    <circle cx="140" cy="286" r="10"/>
+    <circle cx="140" cy="346" r="10"/>
+    <circle cx="140" cy="406" r="10"/>
+    <circle cx="140" cy="466" r="10"/>
+  </g>
+  <rect x="504" y="138" width="204" height="392" rx="20" fill="#fdfcf8" stroke="#20242a" stroke-width="4"/>
+  <rect x="504" y="138" width="204" height="66" rx="20" fill="#20242a"/>
+  <path d="M504 182H708" stroke="#20242a" stroke-width="44"/>
+  <circle cx="540" cy="170" r="7" fill="#d3a158"/>
+  <path d="M548 278H664M548 330H632M548 382H680M548 434H618" stroke="#20242a" stroke-width="8" stroke-linecap="round"/>
+  <rect x="888" y="190" width="186" height="116" rx="18" fill="#20242a"/>
+  <path d="M920 236H1040M920 270H1010" stroke="#fdfcf8" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="938" cy="404" r="44" fill="#d3a158" stroke="#20242a" stroke-width="4"/>
+  <circle cx="1024" cy="450" r="44" fill="#477d9a" stroke="#20242a" stroke-width="4"/>
+  <path d="M368 334H456M756 334H844" stroke="#20242a" stroke-width="7" stroke-linecap="round"/>
+  <path d="M430 314L456 334L430 354M818 314L844 334L818 354" fill="none" stroke="#20242a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="82" y="650" fill="#20242a" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="30" font-weight="700" letter-spacing="2">ACTSPACE / BROWSER 04</text>
+</svg>

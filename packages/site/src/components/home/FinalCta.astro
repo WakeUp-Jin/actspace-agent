@@ -7,7 +7,7 @@ import { sitePath } from "../../lib/site-path";
     <p class="site-kicker">Your runtime, your rules</p>
     <h2 id="final-cta-title">这是你的运行空间。</h2>
     <p>从源码运行 ActSpace，检查每一层边界，再把它改造成适合你的 Agent 工作台。</p>
-    <div>
+    <div class="final-actions">
       <a class="site-button site-button--primary" href={sitePath("/docs/getting-started/")}>开始使用</a>
       <a class="site-button" href="https://github.com/WakeUp-Jin/actspace-agent" target="_blank" rel="noreferrer noopener">在 GitHub 查看 ↗</a>
     </div>
@@ -40,7 +40,7 @@ import { sitePath } from "../../lib/site-path";
     line-height: 1.75;
   }
 
-  .final-cta div {
+  .final-actions {
     display: flex;
     justify-content: center;
     gap: 12px;
@@ -48,7 +48,7 @@ import { sitePath } from "../../lib/site-path";
   }
 
   @media (max-width: 520px) {
-    .final-cta div {
+    .final-actions {
       align-items: center;
       flex-direction: column;
     }

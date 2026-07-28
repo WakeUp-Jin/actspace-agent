@@ -3,7 +3,7 @@ title: 快速开始
 description: 从源码安装依赖、配置环境并启动 ActSpace 桌面应用。
 group: getting-started
 order: 2
-updatedAt: 2026-07-27
+updatedAt: 2026-07-28
 draft: false
 ---
 
@@ -21,15 +21,11 @@ pnpm install
 
 ## 配置模型
 
-复制环境变量示例：
+启动 ActSpace 后，打开「设置 → 服务商」，选择 DeepSeek、Kimi、OpenRouter 或 DuckCoding，并填写对应的 API Key。密钥由主进程使用系统安全存储加密保存在本机，不进入 renderer 或会话事件。
 
-```sh
-cp .env.example .env
-```
+服务商连接建立后，在「设置 → 模型」中安装并启用需要的模型。Composer 只展示当前已经启用且可用于主会话的候选模型。
 
-根据你要使用的服务商填写密钥。密钥由主进程与 Agent Runtime 读取，不应写入 renderer、会话事件或提交到 Git。
-
-应用已经支持 DeepSeek、Kimi 和 OpenRouter 等模型来源。更完整的选择方式见[配置模型](../configure-a-model/)。
+更完整的服务商、代理、模型用途和故障排查说明见[配置模型](../configure-a-model/)。
 
 ## 启动开发环境
 

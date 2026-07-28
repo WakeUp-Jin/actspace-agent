@@ -3,7 +3,7 @@ title: 配置模型
 description: 配置服务商、密钥、代理和模型用途，并理解不同模型在 ActSpace 中的角色。
 group: getting-started
 order: 3
-updatedAt: 2026-07-27
+updatedAt: 2026-07-28
 draft: false
 ---
 
@@ -11,7 +11,7 @@ ActSpace 将“服务商连接”和“模型用途”分开管理。一个服�
 
 ## 添加服务商密钥
 
-打开设置中的服务商区域，选择 DeepSeek、Kimi 或 OpenRouter，填写对应密钥。密钥应保存在主进程的安全存储边界内，不进入 renderer 或 session 事件。
+打开设置中的服务商区域，选择 DeepSeek、Kimi、OpenRouter 或 DuckCoding，填写对应密钥。密钥应保存在主进程的安全存储边界内，不进入 renderer 或 session 事件。
 
 OpenRouter 的模型调用 Key 与账户管理 Key 是两个不同用途。只有需要查询账户余额时才配置 Management Key。
 

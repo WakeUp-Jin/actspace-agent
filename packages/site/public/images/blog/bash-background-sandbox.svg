@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Bash background tasks and sandbox boundaries</title>
+  <desc id="desc">终端任务从前台分流到后台，并被多层沙盒边界包围</desc>
+  <rect width="1200" height="720" fill="#eadfc8"/>
+  <path d="M0 516C208 450 356 536 540 458C736 375 873 260 1200 308V720H0Z" fill="#d4c29e"/>
+  <rect x="112" y="104" width="700" height="470" rx="26" fill="#fffdf7" stroke="#211f1a" stroke-width="4"/>
+  <rect x="112" y="104" width="700" height="76" rx="26" fill="#211f1a"/>
+  <path d="M112 154H812" stroke="#211f1a" stroke-width="52"/>
+  <circle cx="158" cy="142" r="8" fill="#d5855a"/>
+  <circle cx="188" cy="142" r="8" fill="#eadfc8" opacity=".65"/>
+  <circle cx="218" cy="142" r="8" fill="#eadfc8" opacity=".65"/>
+  <path d="M168 238L198 264L168 290M226 290H304" fill="none" stroke="#211f1a" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="none" stroke="#211f1a" stroke-width="4">
+    <rect x="168" y="342" width="190" height="74" rx="14"/>
+    <rect x="522" y="342" width="220" height="74" rx="14"/>
+    <path d="M358 379H522"/>
+    <path d="M438 379V478H522"/>
+  </g>
+  <circle cx="438" cy="379" r="13" fill="#bd6f47"/>
+  <circle cx="522" cy="478" r="13" fill="#bd6f47"/>
+  <path d="M914 168C914 122 952 84 998 84H1080V212H914Z" fill="#fffdf7" stroke="#211f1a" stroke-width="4"/>
+  <path d="M878 218H1116V510C1116 568 1069 615 1011 615H983C925 615 878 568 878 510Z" fill="#c89066" stroke="#211f1a" stroke-width="4"/>
+  <rect x="920" y="268" width="154" height="248" rx="54" fill="#fffdf7" stroke="#211f1a" stroke-width="4"/>
+  <path d="M966 332H1028M966 372H1028M966 412H1028" stroke="#211f1a" stroke-width="8" stroke-linecap="round"/>
+  <text x="112" y="652" fill="#211f1a" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="30" font-weight="700" letter-spacing="2">ACTSPACE / BASH 02</text>
+</svg>

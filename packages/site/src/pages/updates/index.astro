@@ -6,45 +6,16 @@ import { groupReleaseNotes, loadReleaseNotes } from "../../lib/releases/parse-re
 const months = groupReleaseNotes(await loadReleaseNotes());
 ---
 
-<BaseLayout title="ActSpace 更新" description="ActSpace 用户可感知的功能更新与体验改进。">
-  <main id="main-content">
-    <header class="updates-hero site-page">
-      <p class="site-kicker">Changelog</p>
-      <h1>更新，是产品怎样变得更可靠。</h1>
-      <p>
-        这里记录用户真正能感知的功能、体验优化与重要修复。技术摘要默认收起，想了解实现边界时再展开。
-      </p>
-    </header>
-    <section class="updates-content site-page" aria-label="ActSpace 更新记录">
+<BaseLayout title="ActSpace 更新日志" description="ActSpace 的最新功能、改进与问题修复。">
+  <main id="main-content" class="updates-page site-page">
+    <section aria-label="ActSpace 更新日志">
       <UpdateTimeline {months} />
     </section>
   </main>
 </BaseLayout>
 
 <style>
-  .updates-hero {
-    padding-block: clamp(130px, 16vw, 230px) clamp(72px, 9vw, 120px);
-  }
-
-  h1 {
-    max-width: 980px;
-    margin-block: 28px;
-    font-family: var(--site-font-serif);
-    font-size: clamp(58px, 8vw, 112px);
-    font-weight: 500;
-    letter-spacing: -0.07em;
-    line-height: 0.98;
-  }
-
-  .updates-hero > p:last-child {
-    max-width: 720px;
-    margin: 0;
-    color: var(--site-body);
-    font-size: 18px;
-    line-height: 1.8;
-  }
-
-  .updates-content {
-    padding-bottom: clamp(100px, 14vw, 190px);
+  .updates-page {
+    padding-block: clamp(108px, 12vw, 168px) clamp(112px, 14vw, 190px);
   }
 </style>

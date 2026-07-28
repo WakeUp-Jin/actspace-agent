@@ -1,5 +1,5 @@
 import sitemap from "@astrojs/sitemap";
-import { defineConfig } from "astro/config";
+import { defineConfig, passthroughImageService } from "astro/config";
 
 const site = process.env.SITE_URL ?? "https://wakeup-jin.github.io";
 const configuredBase = process.env.SITE_BASE ?? "/actspace-agent";
@@ -12,6 +12,9 @@ export default defineConfig({
   base,
   output: "static",
   trailingSlash: "always",
+  image: {
+    service: passthroughImageService(),
+  },
   integrations: [sitemap()],
   markdown: {
     shikiConfig: {

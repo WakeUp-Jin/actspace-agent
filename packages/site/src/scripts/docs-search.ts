@@ -1,29 +1,44 @@
 export function initializeDocsSearch(): void {
-  document.querySelectorAll<HTMLElement>("[data-docs-sidebar]").forEach((sidebar) => {
-    if (sidebar.dataset.searchReady === "true") return;
-    sidebar.dataset.searchReady = "true";
+  document.querySelectorAll<HTMLElement>("[data-docs-search-root]").forEach((root) => {
+    if (root.dataset.searchReady === "true") return;
+    root.dataset.searchReady = "true";
 
-    const input = sidebar.querySelector<HTMLInputElement>("[data-docs-search]");
-    const status = sidebar.querySelector<HTMLElement>("[data-docs-search-status]");
-    if (!input || !status) return;
+    const input = root.querySelector<HTMLInputElement>("[data-docs-search]");
+    const results = root.querySelector<HTMLElement>("[data-docs-search-results]");
+    const status = root.querySelector<HTMLElement>("[data-docs-search-status]");
+    const empty = root.querySelector<HTMLElement>("[data-docs-search-empty]");
+    const items = Array.from(root.querySelectorAll<HTMLElement>("[data-docs-search-item]"));
+    if (!input || !results || !status || !empty) return;
 
-    input.addEventListener("input", () => {
+    const updateResults = () => {
       const query = input.value.trim().toLocaleLowerCase("zh-CN");
       let visibleCount = 0;
 
-      sidebar.querySelectorAll<HTMLElement>("[data-docs-search-item]").forEach((item) => {
-        const match = !query || item.textContent?.toLocaleLowerCase("zh-CN").includes(query);
+      items.forEach((item) => {
+        const searchText = item.dataset.searchText?.toLocaleLowerCase("zh-CN") ?? "";
+        const match = Boolean(query) && searchText.includes(query);
         item.hidden = !match;
         if (match) visibleCount += 1;
       });
 
-      sidebar.querySelectorAll<HTMLElement>("[data-docs-group]").forEach((group) => {
-        group.hidden = !Array.from(group.querySelectorAll<HTMLElement>("[data-docs-search-item]")).some(
-          (item) => !item.hidden,
-        );
-      });
-
+      empty.hidden = !query || visibleCount > 0;
+      results.hidden = !query;
       status.textContent = query ? `找到 ${visibleCount} 篇文档` : "";
+    };
+
+    input.addEventListener("input", updateResults);
+    input.addEventListener("focus", updateResults);
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      input.value = "";
+      updateResults();
+      input.blur();
+    });
+
+    root.addEventListener("focusout", (event) => {
+      const nextTarget = event.relatedTarget;
+      if (nextTarget instanceof Node && root.contains(nextTarget)) return;
+      results.hidden = true;
     });
   });
 }
