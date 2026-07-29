@@ -71,6 +71,16 @@ import type {
   ReviewGetWorkspaceChangesResult,
   ReviewInitGitInput,
   ReviewInitGitResult,
+  WorkspaceEnvironmentGetInput,
+  WorkspaceEnvironmentSnapshot,
+  WorkspaceGitCommitAndPushInput,
+  WorkspaceGitCommitInput,
+  WorkspaceGitCreateBranchInput,
+  WorkspaceGitMutationResult,
+  WorkspaceGitPushInput,
+  WorkspaceOpenInput,
+  WorkspaceOpenResult,
+  WorkspaceOpenToolsResult,
   RunTurnInput,
   RuntimeStreamEvent,
   SelectFilesResult,
@@ -180,6 +190,20 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("review:get-workspace-changes", input) as Promise<ReviewGetWorkspaceChangesResult>,
   initGitRepository: (input: ReviewInitGitInput) =>
     ipcRenderer.invoke("review:init-git", input) as Promise<ReviewInitGitResult>,
+  getWorkspaceEnvironment: (input: WorkspaceEnvironmentGetInput) =>
+    ipcRenderer.invoke("workspace-environment:get", input) as Promise<WorkspaceEnvironmentSnapshot>,
+  createWorkspaceBranch: (input: WorkspaceGitCreateBranchInput) =>
+    ipcRenderer.invoke("workspace-environment:create-branch", input) as Promise<WorkspaceGitMutationResult>,
+  commitWorkspaceChanges: (input: WorkspaceGitCommitInput) =>
+    ipcRenderer.invoke("workspace-environment:commit", input) as Promise<WorkspaceGitMutationResult>,
+  pushWorkspaceBranch: (input: WorkspaceGitPushInput) =>
+    ipcRenderer.invoke("workspace-environment:push", input) as Promise<WorkspaceGitMutationResult>,
+  commitAndPushWorkspaceChanges: (input: WorkspaceGitCommitAndPushInput) =>
+    ipcRenderer.invoke("workspace-environment:commit-and-push", input) as Promise<WorkspaceGitMutationResult>,
+  listWorkspaceOpenTools: () =>
+    ipcRenderer.invoke("workspace-open:list-tools") as Promise<WorkspaceOpenToolsResult>,
+  openWorkspaceInTool: (input: WorkspaceOpenInput) =>
+    ipcRenderer.invoke("workspace-open:open", input) as Promise<WorkspaceOpenResult>,
   describeContext: (input: DescribeContextInput) =>
     ipcRenderer.invoke("context:describe", input) as Promise<ContextState | null>,
   listSessions: (input?: SessionListInput) => ipcRenderer.invoke("session:list", input ?? {}) as Promise<SessionListItem[]>,

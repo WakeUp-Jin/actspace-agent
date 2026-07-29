@@ -10,6 +10,7 @@ import { Sidebar, type NewSessionInput, type SessionUiStatusKind, type SidebarMo
 import { SplitView } from "./SplitView";
 import { UsageStatisticsPage } from "./UsageStatisticsPage";
 import { WindowChromeBar } from "./WindowChromeBar";
+import { WorkspaceChromeControls } from "./workspace/WorkspaceChromeControls";
 import type { ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
 import type { SessionPreviewResolver } from "./SessionHoverPreview";
 import { KairosPage } from "../pages/KairosPage";
@@ -495,8 +496,22 @@ export function WorkbenchLayout({
         currentSession={currentSession}
         getSessionPreview={view === "chat" ? getSessionPreview : undefined}
         rightLeading={
-          view === "chat" && isRightPanelOpen ? (
-            <RightPanelObjectMenu sessionId={activeSessionId} onOpenReview={openReviewTab} />
+          view === "chat" ? (
+            <>
+              {selectedWorkspaceRoot ? (
+                <WorkspaceChromeControls
+                  workspaceRoot={selectedWorkspaceRoot}
+                  title={title}
+                  messages={messages}
+                  reviewSummary={reviewSummary}
+                  onOpenReview={openReviewTab}
+                  onWorkspaceChanged={onReviewChanged}
+                />
+              ) : null}
+              {isRightPanelOpen ? (
+                <RightPanelObjectMenu sessionId={activeSessionId} onOpenReview={openReviewTab} />
+              ) : null}
+            </>
           ) : undefined
         }
       />

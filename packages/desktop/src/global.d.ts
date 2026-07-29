@@ -51,6 +51,25 @@ declare global {
       initGitRepository: (
         input: import("@actspace/shared").ReviewInitGitInput
       ) => Promise<import("@actspace/shared").ReviewInitGitResult>;
+      getWorkspaceEnvironment?: (
+        input: import("@actspace/shared").WorkspaceEnvironmentGetInput
+      ) => Promise<import("@actspace/shared").WorkspaceEnvironmentSnapshot>;
+      createWorkspaceBranch?: (
+        input: import("@actspace/shared").WorkspaceGitCreateBranchInput
+      ) => Promise<import("@actspace/shared").WorkspaceGitMutationResult>;
+      commitWorkspaceChanges?: (
+        input: import("@actspace/shared").WorkspaceGitCommitInput
+      ) => Promise<import("@actspace/shared").WorkspaceGitMutationResult>;
+      pushWorkspaceBranch?: (
+        input: import("@actspace/shared").WorkspaceGitPushInput
+      ) => Promise<import("@actspace/shared").WorkspaceGitMutationResult>;
+      commitAndPushWorkspaceChanges?: (
+        input: import("@actspace/shared").WorkspaceGitCommitAndPushInput
+      ) => Promise<import("@actspace/shared").WorkspaceGitMutationResult>;
+      listWorkspaceOpenTools?: () => Promise<import("@actspace/shared").WorkspaceOpenToolsResult>;
+      openWorkspaceInTool?: (
+        input: import("@actspace/shared").WorkspaceOpenInput
+      ) => Promise<import("@actspace/shared").WorkspaceOpenResult>;
       describeContext: (
         input: import("@actspace/shared").DescribeContextInput
       ) => Promise<import("@actspace/shared").ContextState | null>;

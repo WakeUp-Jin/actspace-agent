@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   readWorkspaceRegistry,
+  resolveRegisteredWorkspaceSelection,
   resolveWorkspaceSelection,
   setWorkspaceHidden,
   workspaceRegistryPath,
@@ -62,10 +63,9 @@ describe("workspace registry service", () => {
       sessions: [],
     };
 
-    const registries = await Promise.all(
-      Array.from({ length: 6 }, () => readWorkspaceRegistry(options)),
-    );
+    const registries = await Promise.all(Array.from({ length: 8 }, () => readWorkspaceRegistry(options)));
 
+    expect(registries).toHaveLength(8);
     expect(registries.every((registry) => registry.defaultWorkspaceId === "default")).toBe(true);
     const persisted = JSON.parse(await readFile(workspaceRegistryPath(dataRoot), "utf8")) as {
       defaultWorkspaceId?: string;
@@ -241,5 +241,31 @@ describe("workspace registry service", () => {
       ok: false,
       error: "default_workspace_required",
     });
+  });
+
+  it("rejects unregistered paths for privileged workspace actions", async () => {
+    const dataRoot = await makeDataRoot();
+    const defaultWorkspaceRoot = join(dataRoot, "Downloads");
+    const fallbackWorkspaceRoot = join(dataRoot, "actspace-agent");
+
+    await expect(resolveRegisteredWorkspaceSelection({
+      dataRoot,
+      defaultWorkspaceRoot,
+      fallbackWorkspaceRoot,
+      sessions: [],
+    }, { workspaceRoot: join(dataRoot, "unregistered") })).resolves.toEqual({
+      ok: false,
+      error: "workspaceRoot is not registered",
+    });
+
+    await expect(resolveRegisteredWorkspaceSelection({
+      dataRoot,
+      defaultWorkspaceRoot,
+      fallbackWorkspaceRoot,
+      sessions: [],
+    }, { workspaceRoot: fallbackWorkspaceRoot })).resolves.toEqual(expect.objectContaining({
+      ok: true,
+      workspaceRoot: resolve(fallbackWorkspaceRoot),
+    }));
   });
 });

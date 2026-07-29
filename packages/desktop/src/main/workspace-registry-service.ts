@@ -1,5 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, basename, resolve } from "node:path";
 import type { SessionListItem, WorkspaceEntry, WorkspaceRegistry } from "@actspace/shared";
 
@@ -175,6 +175,26 @@ async function setWorkspaceHiddenUnsafe(
   return { ok: true };
 }
 
+export async function resolveRegisteredWorkspaceSelection(
+  options: WorkspaceRegistryOptions,
+  input: WorkspaceSelectionInput = {},
+): Promise<WorkspaceSelectionResult> {
+  const registry = await readWorkspaceRegistry(options);
+  const workspaceId = input.workspaceId?.trim();
+  if (workspaceId) {
+    const entry = registry.items.find((item) => item.id === workspaceId);
+    return entry
+      ? { ok: true, workspaceId: entry.id, workspaceRoot: entry.path }
+      : { ok: false, error: `workspaceId not found: ${workspaceId}` };
+  }
+
+  const workspaceRoot = normalizeWorkspacePath(input.workspaceRoot ?? options.defaultWorkspaceRoot);
+  const entry = registry.items.find((item) => item.path === workspaceRoot);
+  return entry
+    ? { ok: true, workspaceId: entry.id, workspaceRoot: entry.path }
+    : { ok: false, error: "workspaceRoot is not registered" };
+}
+
 function sanitizeWorkspaceRegistry(raw: unknown, fallback: WorkspaceRegistry): WorkspaceRegistry {
   if (!raw || typeof raw !== "object") return fallback;
   const value = raw as Partial<WorkspaceRegistry>;
@@ -318,6 +338,10 @@ async function writeWorkspaceRegistry(dataRoot: string, registry: WorkspaceRegis
   const filePath = workspaceRegistryPath(dataRoot);
   await mkdir(dirname(filePath), { recursive: true });
   const tmp = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
-  await writeFile(tmp, JSON.stringify(registry, null, 2) + "\n", "utf8");
-  await rename(tmp, filePath);
+  try {
+    await writeFile(tmp, JSON.stringify(registry, null, 2) + "\n", "utf8");
+    await rename(tmp, filePath);
+  } finally {
+    await unlink(tmp).catch(() => undefined);
+  }
 }

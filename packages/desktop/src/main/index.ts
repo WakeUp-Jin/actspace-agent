@@ -9,7 +9,7 @@
  * Agent turn 执行逻辑在 ./agent-turn.ts。
  */
 
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, safeStorage } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, safeStorage } from "electron";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { access, mkdir } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
@@ -52,6 +52,12 @@ import type {
   DescribeContextInput,
   ReviewGetWorkspaceChangesInput,
   ReviewInitGitInput,
+  WorkspaceEnvironmentGetInput,
+  WorkspaceGitCommitAndPushInput,
+  WorkspaceGitCommitInput,
+  WorkspaceGitCreateBranchInput,
+  WorkspaceGitPushInput,
+  WorkspaceOpenInput,
   WorkspaceListDirInput,
   WorkspaceListResult,
   WorkspaceIdInput,
@@ -133,7 +139,20 @@ import { listWorkspaceDir, readWorkspaceFile } from "./workspace-fs-service";
 import { readSessionArtifact } from "./session-artifact-service";
 import { showArtifactContextMenu } from "./artifact-context-menu-service";
 import { getWorkspaceGitChanges, initializeGitRepository } from "./review-git-service";
-import { readWorkspaceRegistry, resolveWorkspaceSelection, setWorkspaceHidden } from "./workspace-registry-service";
+import {
+  commitAndPushWorkspaceChanges,
+  commitWorkspaceChanges,
+  createWorkspaceBranch,
+  getWorkspaceEnvironment,
+  pushWorkspaceBranch,
+} from "./workspace-environment-service";
+import { listWorkspaceOpenTools, openWorkspaceInTool } from "./workspace-open-service";
+import {
+  readWorkspaceRegistry,
+  resolveRegisteredWorkspaceSelection,
+  resolveWorkspaceSelection,
+  setWorkspaceHidden,
+} from "./workspace-registry-service";
 import { openWorkspaceInIde } from "./workspace-ide-service";
 import { getSessionPreview } from "./session-preview-service";
 import { LocalUpdateService } from "./local-update-service";
@@ -164,6 +183,7 @@ const APP_ID = "com.actspace.desktop";
 const APP_NAME = "actspace";
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const PREVIEW_LIMIT = 160;
+const workspaceAppIconCache = new Map<string, string>();
 
 const MIME_BY_EXT: Record<string, string> = {
   ".png": "image/png",
@@ -398,6 +418,25 @@ async function workspaceRegistryOptionsForRoots(roots: AppDataRoots) {
     fallbackWorkspaceRoot: roots.workspaceRoot,
     sessions,
   };
+}
+
+async function resolveRegisteredWorkspaceForRoots(
+  roots: AppDataRoots,
+  input: { workspaceRoot?: string },
+) {
+  const sessions = await listAllSessionSummaries(roots.sessionRoot);
+  return resolveRegisteredWorkspaceSelection({
+    dataRoot: roots.dataRoot,
+    defaultWorkspaceRoot: roots.defaultWorkspaceRoot,
+    fallbackWorkspaceRoot: roots.workspaceRoot,
+    sessions,
+  }, input);
+}
+
+async function requireRegisteredWorkspaceRoot(roots: AppDataRoots, workspaceRoot?: string): Promise<string> {
+  const resolved = await resolveRegisteredWorkspaceForRoots(roots, { workspaceRoot });
+  if (resolved.ok === false) throw new Error(resolved.error);
+  return resolved.workspaceRoot;
 }
 
 /**
@@ -1076,6 +1115,65 @@ async function registerIpc() {
   ipcMain.handle("review:init-git", async (_event, input: ReviewInitGitInput = {}) => {
     const roots = await ensureDataDirectories();
     return initializeGitRepository(input, roots);
+  });
+
+  ipcMain.handle("workspace-environment:get", async (_event, input: WorkspaceEnvironmentGetInput = {}) => {
+    const roots = await ensureDataDirectories();
+    const workspaceRoot = await requireRegisteredWorkspaceRoot(roots, input.workspaceRoot);
+    return getWorkspaceEnvironment({ ...input, workspaceRoot }, roots);
+  });
+
+  ipcMain.handle("workspace-environment:create-branch", async (_event, input: WorkspaceGitCreateBranchInput) => {
+    const roots = await ensureDataDirectories();
+    const workspaceRoot = await requireRegisteredWorkspaceRoot(roots, input.workspaceRoot);
+    return createWorkspaceBranch({ ...input, workspaceRoot }, roots);
+  });
+
+  ipcMain.handle("workspace-environment:commit", async (_event, input: WorkspaceGitCommitInput) => {
+    const roots = await ensureDataDirectories();
+    const workspaceRoot = await requireRegisteredWorkspaceRoot(roots, input.workspaceRoot);
+    return commitWorkspaceChanges({ ...input, workspaceRoot }, roots);
+  });
+
+  ipcMain.handle("workspace-environment:push", async (_event, input: WorkspaceGitPushInput) => {
+    const roots = await ensureDataDirectories();
+    const workspaceRoot = await requireRegisteredWorkspaceRoot(roots, input.workspaceRoot);
+    return pushWorkspaceBranch({ ...input, workspaceRoot }, roots);
+  });
+
+  ipcMain.handle("workspace-environment:commit-and-push", async (_event, input: WorkspaceGitCommitAndPushInput) => {
+    const roots = await ensureDataDirectories();
+    const workspaceRoot = await requireRegisteredWorkspaceRoot(roots, input.workspaceRoot);
+    return commitAndPushWorkspaceChanges({ ...input, workspaceRoot }, roots);
+  });
+
+  ipcMain.handle("workspace-open:list-tools", async () => listWorkspaceOpenTools(undefined, async ({ bundlePath, iconPath }) => {
+    const cacheKey = iconPath ?? bundlePath;
+    const cached = workspaceAppIconCache.get(cacheKey);
+    if (cached) return cached;
+    try {
+      const bundleThumbnail = await nativeImage.createThumbnailFromPath(bundlePath, { width: 32, height: 32 });
+      const resourceThumbnail = bundleThumbnail.isEmpty() && iconPath
+        ? await nativeImage.createThumbnailFromPath(iconPath, { width: 32, height: 32 })
+        : undefined;
+      const icon = !bundleThumbnail.isEmpty()
+        ? bundleThumbnail
+        : resourceThumbnail && !resourceThumbnail.isEmpty()
+          ? resourceThumbnail
+          : await app.getFileIcon(bundlePath, { size: "small" });
+      const dataUrl = icon.isEmpty() ? "" : icon.toDataURL();
+      if (dataUrl) workspaceAppIconCache.set(cacheKey, dataUrl);
+      return dataUrl || undefined;
+    } catch (error) {
+      console.warn("Failed to load native workspace app icon", { bundlePath, error });
+      return undefined;
+    }
+  }));
+
+  ipcMain.handle("workspace-open:open", async (_event, input: WorkspaceOpenInput) => {
+    const roots = await ensureDataDirectories();
+    const workspaceRoot = await requireRegisteredWorkspaceRoot(roots, input.workspaceRoot);
+    return openWorkspaceInTool({ ...input, workspaceRoot }, roots);
   });
 
   ipcMain.handle("context:describe", async (_event, input: DescribeContextInput) => {
