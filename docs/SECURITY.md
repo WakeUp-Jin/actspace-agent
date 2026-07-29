@@ -44,6 +44,7 @@
 - `generate_image` 只允许 main Runtime 注入的 session artifact root，图片写入 `<userData>/sessions/<sessionId>/artifacts/generated-images/`；远程 URL 必须先通过 HTTPS/公网地址检查并下载到本地，不能直接作为 renderer 成功产物。
 - renderer 不允许通过生成图片绝对路径自行拼接 `file://`。右侧预览必须走 `session:read-artifact`，main 使用 realpath 校验目标仍位于当前 session `artifacts/` 子树，并按大小和文件魔数确认后才返回 data URL。
 - Artifact 右键菜单里的打开、复制和 Finder 定位也是 main-owned 能力。Renderer 只能传递 `sessionId + artifactPath` 或 `workspaceRoot + relativePath`，main 必须重新校验 realpath 仍位于对应 session artifacts / workspace 边界内，不得直接对 renderer 传入的任意绝对路径调用 `shell.openPath` 或 `showItemInFolder`。
+- 顶部 Environment 的分支创建、Commit、Push，以及“在编辑器中打开”都是 main-owned 本机能力。Renderer 只能传稳定 action / tool id；main 每次都把 `workspaceRoot` 解析回 workspace registry 或已有 session 中登记的路径，再使用固定 Git argv 或固定应用映射执行，不能让 renderer 用任意绝对路径、应用名或 argv 扩大能力边界。
 
 ## 真实模型调用
 

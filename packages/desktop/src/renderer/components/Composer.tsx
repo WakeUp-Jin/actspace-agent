@@ -406,6 +406,7 @@ export function Composer({
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const [message, setMessage] = useState("");
+  const [workspaceBranchLabel, setWorkspaceBranchLabel] = useState("Branch");
   const [isInputMultiline, setIsInputMultiline] = useState(false);
   const composerRef = useRef<HTMLElement | null>(null);
   const composerBodyRef = useRef<HTMLDivElement | null>(null);
@@ -460,6 +461,33 @@ export function Composer({
     workspaceOptions.find((workspace) => workspace.value === selectedWorkspaceRoot)?.label ??
     workspaceOptions[0]?.label ??
     "Workspace";
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadBranch = async () => {
+      const api = window.actspace?.getWorkspaceEnvironment;
+      if (!api || !selectedWorkspaceRoot) {
+        if (!cancelled) setWorkspaceBranchLabel("Branch");
+        return;
+      }
+      try {
+        const snapshot = await api({ workspaceRoot: selectedWorkspaceRoot });
+        if (!cancelled) setWorkspaceBranchLabel(snapshot.git.branch ?? (snapshot.git.repository ? "New branch" : "No Git"));
+      } catch {
+        if (!cancelled) setWorkspaceBranchLabel("Branch");
+      }
+    };
+    const handleGitChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ workspaceRoot?: string }>).detail;
+      if (!detail?.workspaceRoot || detail.workspaceRoot === selectedWorkspaceRoot) void loadBranch();
+    };
+    void loadBranch();
+    window.addEventListener("actspace:workspace-git-changed", handleGitChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("actspace:workspace-git-changed", handleGitChanged);
+    };
+  }, [selectedWorkspaceRoot]);
 
   // 默认模型可能在 Composer 挂载后才异步到达（settings:get）；只在用户尚未手动
   // 选择过模型时同步，避免覆盖用户当前会话里的临时选择。
@@ -1280,7 +1308,7 @@ export function Composer({
     return (
       <div className={INITIAL_CONTEXT_ROW_CLASS} aria-label="Initial composer context selectors">
         {renderContextSelector("workspace", selectedWorkspaceLabel)}
-        {renderContextSelector("branch", "main", "branch")}
+        {renderContextSelector("branch", workspaceBranchLabel, "branch")}
         {renderContextSelector("runtime", "Local", "runtime")}
       </div>
     );

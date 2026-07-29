@@ -514,6 +514,102 @@ export type ReviewInitGitResult = {
   message?: string;
 };
 
+// ─── 顶部 Environment 与本地 Git 操作 ───
+
+export type WorkspaceEnvironmentGetInput = {
+  workspaceRoot?: string;
+};
+
+export type WorkspaceEnvironmentSnapshot = {
+  workspaceRoot: string;
+  workspaceLabel: string;
+  locationKind: "this_mac" | "worktree";
+  git: {
+    available: boolean;
+    repository: boolean;
+    branch?: string;
+    detached: boolean;
+    hasHead: boolean;
+    upstream?: string;
+    remotes: string[];
+  };
+};
+
+export type WorkspaceGitErrorCode =
+  | "invalid_workspace"
+  | "git_not_found"
+  | "not_repository"
+  | "detached_head"
+  | "invalid_branch"
+  | "nothing_to_commit"
+  | "remote_required"
+  | "no_remote"
+  | "command_failed";
+
+export type WorkspaceGitCreateBranchInput = {
+  workspaceRoot?: string;
+  branchName: string;
+};
+
+export type WorkspaceGitCommitInput = {
+  workspaceRoot?: string;
+  message?: string;
+  includeUnstagedChanges?: boolean;
+  branchName?: string;
+};
+
+export type WorkspaceGitPushInput = {
+  workspaceRoot?: string;
+  remote?: string;
+};
+
+export type WorkspaceGitCommitAndPushInput = WorkspaceGitCommitInput & {
+  remote?: string;
+};
+
+export type WorkspaceGitMutationResult = {
+  ok: boolean;
+  action: "create_branch" | "commit" | "push" | "commit_and_push";
+  phase: "branch" | "commit" | "push";
+  workspaceRoot: string;
+  branch?: string;
+  branchCreated?: boolean;
+  commitCreated?: boolean;
+  commitHash?: string;
+  pushed?: boolean;
+  remote?: string;
+  upstreamSet?: boolean;
+  remotes?: string[];
+  error?: WorkspaceGitErrorCode;
+  message?: string;
+};
+
+export type WorkspaceOpenToolId = "vscode" | "cursor" | "finder" | "terminal" | "iterm2";
+
+export type WorkspaceOpenTool = {
+  id: WorkspaceOpenToolId;
+  label: string;
+  available: boolean;
+  iconDataUrl?: string;
+};
+
+export type WorkspaceOpenToolsResult = {
+  tools: WorkspaceOpenTool[];
+};
+
+export type WorkspaceOpenInput = {
+  workspaceRoot?: string;
+  toolId: WorkspaceOpenToolId;
+};
+
+export type WorkspaceOpenResult = {
+  ok: boolean;
+  workspaceRoot: string;
+  toolId: WorkspaceOpenToolId;
+  error?: "invalid_workspace" | "unsupported_platform" | "not_installed" | "open_failed";
+  message?: string;
+};
+
 // ─── 工作区文件浏览器（见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`）───
 
 /** 懒加载一层工作区目录。renderer 不直接读 FS，全部经此 IPC。 */

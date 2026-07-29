@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComposerAttachment, UsableModelView } from "@actspace/shared";
 import { mockContextSnapshot } from "./fixtures/workbenchFixture";
@@ -598,6 +598,14 @@ describe("Composer follow-up bar", () => {
   it("renders initial composer selectors with the input above the toolbar", async () => {
     const user = userEvent.setup();
     const onSelectWorkspace = vi.fn();
+    setPartialActspaceBridge({
+      getWorkspaceEnvironment: vi.fn(async () => ({
+        workspaceRoot: "/work/actspace-agent",
+        workspaceLabel: "actspace-agent",
+        locationKind: "worktree" as const,
+        git: { available: true, repository: true, branch: "feature/ui", detached: false, hasHead: true, remotes: [] },
+      })),
+    });
     const { onSend } = renderComposer({
       surface: "initial",
       selectedWorkspaceRoot: "/work/actspace-agent",
@@ -615,7 +623,7 @@ describe("Composer follow-up bar", () => {
 
     expect(screen.getByLabelText("Initial composer context selectors")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Select workspace" })).toHaveTextContent("actspace-agent");
-    expect(screen.getByRole("button", { name: "Select branch" })).toHaveTextContent("main");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Select branch" })).toHaveTextContent("feature/ui"));
     expect(screen.getByRole("button", { name: "Select runtime" })).toHaveTextContent("Local");
     expect(screen.queryByRole("button", { name: "Review pending changes" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Context usage 36%" })).not.toBeInTheDocument();

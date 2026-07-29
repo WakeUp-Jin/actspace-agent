@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   readWorkspaceRegistry,
+  resolveRegisteredWorkspaceSelection,
   resolveWorkspaceSelection,
   workspaceRegistryPath,
 } from "../workspace-registry-service";
@@ -48,6 +49,22 @@ describe("workspace registry service", () => {
       }),
     ]);
     await expect(readFile(workspaceRegistryPath(dataRoot), "utf8")).resolves.toContain("Default workspace");
+  });
+
+  it("keeps concurrent registry normalization writes isolated", async () => {
+    const dataRoot = await makeDataRoot();
+    const options = {
+      dataRoot,
+      defaultWorkspaceRoot: join(dataRoot, "Downloads"),
+      fallbackWorkspaceRoot: join(dataRoot, "actspace-agent"),
+      sessions: [],
+    };
+
+    const results = await Promise.all(Array.from({ length: 8 }, () => readWorkspaceRegistry(options)));
+
+    expect(results).toHaveLength(8);
+    const persisted = JSON.parse(await readFile(workspaceRegistryPath(dataRoot), "utf8"));
+    expect(persisted.items).toHaveLength(2);
   });
 
   it("repairs an old default workspace path to the current default root", async () => {
@@ -166,5 +183,31 @@ describe("workspace registry service", () => {
       sessions: [],
     });
     expect(registry.items.some((item) => item.path === resolve(newWorkspaceRoot))).toBe(true);
+  });
+
+  it("rejects unregistered paths for privileged workspace actions", async () => {
+    const dataRoot = await makeDataRoot();
+    const defaultWorkspaceRoot = join(dataRoot, "Downloads");
+    const fallbackWorkspaceRoot = join(dataRoot, "actspace-agent");
+
+    await expect(resolveRegisteredWorkspaceSelection({
+      dataRoot,
+      defaultWorkspaceRoot,
+      fallbackWorkspaceRoot,
+      sessions: [],
+    }, { workspaceRoot: join(dataRoot, "unregistered") })).resolves.toEqual({
+      ok: false,
+      error: "workspaceRoot is not registered",
+    });
+
+    await expect(resolveRegisteredWorkspaceSelection({
+      dataRoot,
+      defaultWorkspaceRoot,
+      fallbackWorkspaceRoot,
+      sessions: [],
+    }, { workspaceRoot: fallbackWorkspaceRoot })).resolves.toEqual(expect.objectContaining({
+      ok: true,
+      workspaceRoot: resolve(fallbackWorkspaceRoot),
+    }));
   });
 });

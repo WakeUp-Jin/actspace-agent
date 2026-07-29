@@ -43,6 +43,7 @@
 - `docs/design-docs/frontend/front-基础组件封装规范.md`：基础 UI wrapper 分层和组件抽象边界。
 - `docs/design-docs/frontend/front-icon-button-tooltip-guidelines.md`：图标按钮 Tooltip 和可访问性规范。
 - `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`：SplitView、resize、collapse 和 restore。
+- `docs/design-docs/frontend/front-environment-and-git-actions.md`：顶部 Environment、编辑器选择、本地分支创建、Commit 和 Push 工作流。
 - `docs/design-docs/frontend/front-左侧会话栏规范.md`：会话、Pinned、Scheduled 和 Workspaces 分区。
 - `docs/design-docs/frontend/front-中间消息区规范.md`：消息语法、工具流和执行状态。
 - `docs/design-docs/frontend/front-聊天输入框规范.md`：Composer、模型、附件、Context 和发送。

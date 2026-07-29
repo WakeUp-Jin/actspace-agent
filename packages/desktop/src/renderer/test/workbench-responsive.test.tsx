@@ -53,6 +53,8 @@ describe("WorkbenchLayout narrow window behavior", () => {
 
     expect(screen.queryByTestId("compact-sidebar-overlay")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Expand session sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Choose workspace app" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show workspace environment" })).toBeInTheDocument();
     expect(screen.getByLabelText("Message composer")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Expand session sidebar" }));

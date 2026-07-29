@@ -1,4 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, basename, resolve } from "node:path";
 import type { SessionListItem, WorkspaceEntry, WorkspaceRegistry } from "@actspace/shared";
 
@@ -112,6 +113,26 @@ export async function resolveWorkspaceSelection(
     return { ok: false, error: "default workspace is missing" };
   }
   return { ok: true, workspaceId: defaultEntry.id, workspaceRoot: defaultEntry.path };
+}
+
+export async function resolveRegisteredWorkspaceSelection(
+  options: WorkspaceRegistryOptions,
+  input: WorkspaceSelectionInput = {},
+): Promise<WorkspaceSelectionResult> {
+  const registry = await readWorkspaceRegistry(options);
+  const workspaceId = input.workspaceId?.trim();
+  if (workspaceId) {
+    const entry = registry.items.find((item) => item.id === workspaceId);
+    return entry
+      ? { ok: true, workspaceId: entry.id, workspaceRoot: entry.path }
+      : { ok: false, error: `workspaceId not found: ${workspaceId}` };
+  }
+
+  const workspaceRoot = normalizeWorkspacePath(input.workspaceRoot ?? options.defaultWorkspaceRoot);
+  const entry = registry.items.find((item) => item.path === workspaceRoot);
+  return entry
+    ? { ok: true, workspaceId: entry.id, workspaceRoot: entry.path }
+    : { ok: false, error: "workspaceRoot is not registered" };
 }
 
 function sanitizeWorkspaceRegistry(raw: unknown, fallback: WorkspaceRegistry): WorkspaceRegistry {
@@ -247,7 +268,11 @@ function sortWorkspaceItems(items: WorkspaceEntry[]): WorkspaceEntry[] {
 async function writeWorkspaceRegistry(dataRoot: string, registry: WorkspaceRegistry): Promise<void> {
   const filePath = workspaceRegistryPath(dataRoot);
   await mkdir(dirname(filePath), { recursive: true });
-  const tmp = `${filePath}.tmp`;
-  await writeFile(tmp, JSON.stringify(registry, null, 2) + "\n", "utf8");
-  await rename(tmp, filePath);
+  const tmp = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(tmp, JSON.stringify(registry, null, 2) + "\n", "utf8");
+    await rename(tmp, filePath);
+  } finally {
+    await unlink(tmp).catch(() => undefined);
+  }
 }
