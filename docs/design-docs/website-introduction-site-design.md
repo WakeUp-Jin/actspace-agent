@@ -3,7 +3,7 @@ status: implemented-v1
 owner: packages/site
 product: ActSpace Website
 visual_direction: Cloudfield & Ink
-last_updated: 2026-07-27
+last_updated: 2026-07-29
 ---
 
 # ActSpace 官网、文档、博客与更新页设计规范
@@ -12,12 +12,13 @@ last_updated: 2026-07-27
 
 本文档定义 ActSpace 对外网站的长期产品、内容、视觉和交付边界。首版工程已在 `packages/site` 落地；后续迭代继续以本文档作为事实与取舍入口。
 
-网站包含四个主要产品面：
+网站包含五个主要产品面：
 
 - `/`：ActSpace 产品介绍主页。
 - `/docs`：公开使用文档。
 - `/blog`：产品与技术博客。
 - `/updates`：面向用户的功能更新记录。
+- `/roadmap`：公开已完成能力与后续开发方向。
 
 本文档回答为什么做、做成什么样、内容从哪里来以及实现必须遵守哪些边界。具体依赖版本、文件创建顺序、GitHub Actions 配置和分阶段开发步骤应在实施前另写 execution plan。
 
@@ -32,7 +33,7 @@ ActSpace 官网不是桌面应用界面的网页复制，也不是只用于展�
 
 核心叙事保持：
 
-> 给模型一个真正能行动的空间。
+> 给模型一个真正能行动的空间
 
 补充解释保持克制和可验证：
 
@@ -94,7 +95,8 @@ packages/site/
     │   ├── index.astro
     │   ├── docs/
     │   ├── blog/
-    │   └── updates/
+    │   ├── updates/
+    │   └── roadmap.astro
     └── styles/
 ```
 
@@ -108,6 +110,7 @@ packages/site/
 | 公开文档 | `packages/site/src/content/docs` | 生成 `/docs/**` |
 | 博客 | `packages/site/src/content/blog` | 生成 `/blog/**` |
 | 功能更新 | `docs/releases/feature-release-notes.md` | 构建时解析为 `/updates` |
+| 开发计划 | `docs/roadmap.md` | 构建时解析为 `/roadmap` |
 | 内部设计与实现记录 | `docs/design-docs`、`docs/histories`、`docs/exec-plans` | 默认不公开 |
 
 不得把仓库 `docs/` 整体直接发布成公开文档站。内部设计、history、质量记录、执行计划和安全说明只有经过明确选择和重新组织后，才能成为公开内容。
@@ -132,7 +135,7 @@ packages/site/
 正式顶部导航为：
 
 ```text
-ActSpace    文档    博客    更新             GitHub ↗    开始使用
+ActSpace    文档    博客    更新    开发计划             GitHub ↗    开始使用
 ```
 
 路由行为：
@@ -143,6 +146,7 @@ ActSpace    文档    博客    更新             GitHub ↗    开始使用
 | 文档 | `/docs` | 进入公开文档首页 |
 | 博客 | `/blog` | 进入博客列表 |
 | 更新 | `/updates` | 进入功能更新时间轴 |
+| 开发计划 | `/roadmap` | 查看已经完成和计划开发的功能 |
 | GitHub | 外部仓库地址 | 新标签页打开，并明确外链语义 |
 | 开始使用 | `/docs/getting-started` | 进入安装与首次运行文档 |
 
@@ -155,7 +159,7 @@ ActSpace    文档    博客    更新             GitHub ↗    开始使用
 页脚至少包含：
 
 - 产品：核心能力、开始使用。
-- 资源：文档、博客、更新。
+- 资源：文档、博客、更新、开发计划。
 - 社区：GitHub、Issue。
 - 法务与状态：Apache-2.0、版权信息；隐私或遥测说明在真实需要时加入。
 
@@ -170,7 +174,7 @@ Hero 使用已确认的 `C Cloud Expanse` 云海图作为首版主视觉母版�
 内容顺序：
 
 1. `LOCAL-FIRST AGENT RUNTIME` 小型 eyebrow。
-2. 主标题“给模型一个真正能行动的空间。”
+2. 主标题“给模型一个真正能行动的空间”。
 3. 一段不超过两行到三行的产品解释。
 4. 主 CTA“探索 ActSpace”或“开始使用”。
 5. 次 CTA“查看源代码”。
@@ -189,7 +193,7 @@ Hero 使用已确认的 `C Cloud Expanse` 云海图作为首版主视觉母版�
 
 第二段从图像叙事切换到编辑式文字叙事：
 
-> 不是另一个聊天窗口，而是模型的运行空间。
+> 不是另一个聊天窗口，而是模型的运行空间
 
 该 section 解释：
 
@@ -235,7 +239,7 @@ Browser、Skills、Review 等能力继续在 Hero 索引、公开文档和后续
 
 最终 CTA 强调项目所有权和开源边界：
 
-> 这是你的运行空间。
+> 这是你的运行空间
 
 主要操作为“开始使用”，次要操作为“在 GitHub 查看”。
 
@@ -284,7 +288,7 @@ Browser、Skills、Review 等能力继续在 Hero 索引、公开文档和后续
 
 首页内容顺序：
 
-1. `ActSpace 文档` 标题和一段产品解释。
+1. “理解 Agent 的运行空间”短标题和一段产品解释。
 2. 一张当前真实的桌面应用截图。
 3. “从这里开始”入口组。
 4. “你可以用 ActSpace 做什么”任务入口。
@@ -408,6 +412,7 @@ cover: /blog/agent-runtime-space.webp
 
 ```text
 Blog
+Agent 工程手记
 关于 Agent、工具、上下文与产品设计的思考。
 
 [全部] [产品] [Agent] [工程] [设计]              [搜索]
@@ -686,7 +691,7 @@ Dark 起点：
 | Navigation | 14px | 14px |
 | Metadata | 11–13px | 11–12px |
 
-大标题采用正常或中等字重和紧凑字距，不使用粗黑字制造技术感。正文行长以中文约 28–42 个全角字符为舒适范围。
+大标题采用正常或中等字重和紧凑字距，不使用粗黑字制造技术感。页面级展示标题优先使用短名词短语或短判断句，桌面端尽量控制在两行内，结尾不使用句号；文章原始标题不受此规则影响。正文行长以中文约 28–42 个全角字符为舒适范围。
 
 ### 10.5 空间、形状与层级
 
@@ -940,7 +945,7 @@ deploy GitHub Pages
 ## 22. 已确认决策
 
 - 官网工程位于 `packages/site`。
-- 一级菜单为“文档、博客、更新”。
+- 一级菜单为“文档、博客、更新、开发计划”。
 - “开始使用”进入 `/docs/getting-started`。
 - 主页使用 C Cloud Expanse 作为首版 Hero 主视觉。
 - 官网视觉方向为 `Cloudfield & Ink / 云境与墨色`。
@@ -950,13 +955,36 @@ deploy GitHub Pages
 - 文档文章采用 Claude Code 风格的分类导航与三栏阅读骨架，文档首页采用 Cursor 风格的任务入口和真实截图。
 - 首版 Docs 不提供没有真实检索链路的“向 AI 提问”。
 - 更新页从 `docs/releases/feature-release-notes.md` 构建时生成。
+- 开发计划页从 `docs/roadmap.md` 构建时生成，复选框决定状态，完成日期只出现在已完成项目中。
 - 公开文档和内部仓库文档保持明确边界。
 - 首版优先静态生成并通过 GitHub Actions 部署到 GitHub Pages。
 - GitHub Pages 构建从 monorepo 根目录执行，复用根 `pnpm-lock.yaml`，输出目录指向 `packages/site/dist`；这是 Astro 官方 Action 在 pnpm workspace 下的实际配置边界。
 - 首版首页产品展示使用通过脱敏检查的 Context、Tools、Kairos 与 Usage 截图；Review 素材保留给文档或后续内容。仓库暂时没有可公开的 Browser 实机截图，不用不相关图片伪装该能力。
 - 实现前另写 execution plan，不在本设计文档中维护逐步施工流水账。
 
-## 23. 维护规则
+## 23. 开发计划页
+
+开发计划页用于公开两类信息：已经交付的主要产品能力，以及当前明确计划继续开发的方向。它不承担 issue tracker、版本排期或完成百分比管理。
+
+数据约束：
+
+- `docs/roadmap.md` 是唯一事实来源；官网不得复制维护第二份任务数组。
+- 未完成项目使用 `- [ ] 标题`。
+- 已完成项目使用 `- [x] 标题 — 完成于 YYYY-MM-DD`，页面展示删除线和完成日期。
+- 已完成清单只收录用户可辨认的主要能力，不把每个问题修复、内部重构或实验分支拆成独立任务。
+- 未完成项目不展示创建时间、预计日期或进度百分比，避免把探索方向表达成时间承诺。
+
+页面表现：
+
+- 标题区保留简短说明与未完成、已完成统计。
+- 使用“未完成 / 已完成”两个状态 Tab，默认显示未完成。
+- 列表只显示状态圆点、标题，以及已完成项目的完成日期。
+- 每次显示六项；数量超过六项时通过“加载更多”追加到自然页面流，不使用分页或自动无限滚动。
+- 页面保持静态可读；JavaScript 只负责筛选、加载更多与键盘 Tab 操作，禁用脚本时仍展示完整清单。
+
+“手机端与云端任务协同”等尚未落地的能力必须保持未完成状态。公开文案不得因为存在设计分析或内部文档，就暗示云端 Runner、远程审批或跨端执行已经可用。
+
+## 24. 维护规则
 
 - 页面结构、公开内容来源、release schema、主题机制或部署边界发生变化时，同轮更新本文档。
 - 具体实现清单不持续堆入本文档，实施步骤放 `docs/exec-plans`，完成记录放 `docs/histories`。

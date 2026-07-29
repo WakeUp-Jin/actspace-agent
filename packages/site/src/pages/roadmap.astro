@@ -1,0 +1,361 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { loadRoadmap } from "../lib/roadmap";
+
+const roadmap = await loadRoadmap();
+const openCount = roadmap.filter((item) => item.status === "open").length;
+const completedCount = roadmap.length - openCount;
+---
+
+<BaseLayout
+  title="ActSpace 开发计划"
+  description="查看 ActSpace 已经完成和计划开发的功能。"
+>
+  <main id="main-content" class="roadmap-page" data-roadmap>
+    <section class="roadmap-hero">
+      <div class="site-page roadmap-heading">
+        <div class="roadmap-intro">
+          <span class="site-kicker">Roadmap · 公开开发进度</span>
+          <h1>开发计划</h1>
+          <p>查看 ActSpace 已经完成、正在开发和计划探索的功能。完成的项目会保留勾选记录，未来方向会随着验证结果和用户反馈调整。</p>
+        </div>
+
+        <div class="status-summary" aria-label="开发计划状态统计">
+          <div class="status-stat">
+            <span class="status-circle" aria-hidden="true"></span>
+            <div><strong>{openCount}</strong><span>未完成</span></div>
+          </div>
+          <div class="status-stat status-stat--completed">
+            <span class="status-circle" aria-hidden="true"></span>
+            <div><strong>{completedCount}</strong><span>已完成</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="site-page roadmap-checklist" aria-label="开发计划清单">
+      <div class="roadmap-tabs" role="tablist" aria-label="筛选开发计划状态">
+        <button
+          id="roadmap-tab-open"
+          class="roadmap-tab"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          aria-controls="roadmap-list"
+          data-roadmap-tab="open"
+        >未完成</button>
+        <button
+          id="roadmap-tab-completed"
+          class="roadmap-tab"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="roadmap-list"
+          data-roadmap-tab="completed"
+        >已完成</button>
+      </div>
+
+      <ul
+        class="roadmap-list"
+        id="roadmap-list"
+        role="tabpanel"
+        aria-labelledby="roadmap-tab-open"
+        data-roadmap-list
+      >
+        {roadmap.map((item) => (
+          <li class:list={["roadmap-item", { "roadmap-item--completed": item.status === "completed" }]} data-status={item.status}>
+            <span class="item-circle" aria-hidden="true"></span>
+            <span class="item-title">{item.title}</span>
+            {item.completedAt && (
+              <time class="completed-at" datetime={item.completedAt}>完成于 {item.completedAt}</time>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      <div class="load-more-wrap" data-load-wrap>
+        <button class="load-more" type="button" data-load-more>
+          <span data-load-label>加载更多</span>
+        </button>
+      </div>
+      <p class="sr-only" aria-live="polite" data-roadmap-status></p>
+    </section>
+  </main>
+</BaseLayout>
+
+<script>
+  import { initRoadmap } from "../scripts/roadmap";
+
+  initRoadmap();
+</script>
+
+<style>
+  .roadmap-page {
+    min-height: 72vh;
+  }
+
+  .roadmap-hero {
+    padding-block: clamp(82px, 10vw, 132px) clamp(58px, 7vw, 82px);
+  }
+
+  .roadmap-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: end;
+    gap: 64px;
+  }
+
+  .roadmap-intro h1 {
+    margin: 20px 0 0;
+    font-size: clamp(58px, 7vw, 84px);
+    font-weight: 540;
+    letter-spacing: -0.065em;
+    line-height: 1;
+  }
+
+  .roadmap-intro p {
+    max-width: 720px;
+    margin: 24px 0 0;
+    color: var(--site-body);
+    font-size: 16px;
+    line-height: 1.8;
+  }
+
+  .status-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-left: 1px solid var(--site-line);
+  }
+
+  .status-stat {
+    display: grid;
+    grid-template-columns: 18px auto;
+    align-items: center;
+    gap: 11px;
+    padding-left: 28px;
+  }
+
+  .status-stat + .status-stat {
+    border-left: 1px solid var(--site-line);
+    margin-left: 24px;
+  }
+
+  .status-circle,
+  .item-circle {
+    position: relative;
+    border: 1.5px solid var(--site-line-strong);
+    border-radius: 50%;
+    background: var(--site-surface);
+  }
+
+  .status-circle {
+    width: 15px;
+    height: 15px;
+  }
+
+  .status-stat--completed .status-circle,
+  .roadmap-item--completed .item-circle {
+    border-color: var(--site-operational);
+    background: var(--site-operational);
+  }
+
+  .status-stat--completed .status-circle::after,
+  .roadmap-item--completed .item-circle::after {
+    position: absolute;
+    border-right: 1.5px solid var(--site-surface);
+    border-bottom: 1.5px solid var(--site-surface);
+    content: "";
+    transform: rotate(43deg);
+  }
+
+  .status-stat--completed .status-circle::after {
+    top: 2px;
+    left: 4px;
+    width: 4px;
+    height: 7px;
+  }
+
+  .status-stat strong {
+    display: block;
+    font-size: 24px;
+    font-weight: 640;
+    letter-spacing: -0.04em;
+  }
+
+  .status-stat div span {
+    display: block;
+    margin-top: 3px;
+    color: var(--site-muted);
+    font-size: 11px;
+  }
+
+  .roadmap-checklist {
+    padding-bottom: clamp(112px, 14vw, 190px);
+  }
+
+  .roadmap-tabs {
+    display: flex;
+    gap: 30px;
+    border-bottom: 1px solid var(--site-line-strong);
+  }
+
+  .roadmap-tab {
+    position: relative;
+    padding: 17px 0 15px;
+    border: 0;
+    color: var(--site-muted);
+    background: transparent;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 640;
+  }
+
+  .roadmap-tab:hover,
+  .roadmap-tab[aria-selected="true"] {
+    color: var(--site-ink);
+  }
+
+  .roadmap-tab[aria-selected="true"]::after {
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 2px;
+    background: var(--site-ink);
+    content: "";
+  }
+
+  .roadmap-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .roadmap-item {
+    display: grid;
+    min-height: 60px;
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    border-bottom: 1px solid var(--site-line);
+  }
+
+  .roadmap-item[hidden],
+  .load-more-wrap[hidden] {
+    display: none;
+  }
+
+  :global(html.js) .roadmap-list:not([data-roadmap-ready]) .roadmap-item[data-status="completed"],
+  :global(html.js) .roadmap-list:not([data-roadmap-ready]) .roadmap-item[data-status="open"]:nth-child(n + 7) {
+    display: none;
+  }
+
+  .item-circle {
+    width: 16px;
+    height: 16px;
+  }
+
+  .roadmap-item--completed .item-circle::after {
+    top: 1px;
+    left: 4px;
+    width: 4px;
+    height: 8px;
+  }
+
+  .item-title {
+    font-size: 16px;
+    font-weight: 640;
+    letter-spacing: -0.018em;
+    line-height: 1.45;
+  }
+
+  .roadmap-item--completed .item-title {
+    color: var(--site-muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--site-line-strong);
+    text-decoration-thickness: 1px;
+  }
+
+  .completed-at {
+    color: var(--site-muted);
+    font-family: var(--site-font-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .load-more-wrap {
+    display: flex;
+    justify-content: center;
+    padding-top: 28px;
+  }
+
+  .load-more {
+    min-width: 184px;
+    padding: 11px 18px;
+    border: 1px solid var(--site-line);
+    border-radius: 999px;
+    color: var(--site-body);
+    background: var(--site-surface);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 640;
+    transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
+  }
+
+  .load-more:hover {
+    border-color: var(--site-line-strong);
+    color: var(--site-ink);
+    transform: translateY(-1px);
+  }
+
+  @media (max-width: 760px) {
+    .roadmap-hero {
+      padding-block: 58px 42px;
+    }
+
+    .roadmap-heading {
+      grid-template-columns: 1fr;
+      gap: 36px;
+    }
+
+    .roadmap-intro h1 {
+      font-size: 54px;
+    }
+
+    .status-summary {
+      max-width: 360px;
+      border-left: 0;
+    }
+
+    .status-stat {
+      padding-left: 0;
+    }
+
+    .roadmap-item {
+      min-height: 58px;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .status-stat + .status-stat {
+      margin-left: 16px;
+      padding-left: 16px;
+    }
+
+    .roadmap-tabs {
+      gap: 24px;
+    }
+
+    .roadmap-item {
+      grid-template-columns: 24px minmax(0, 1fr);
+      padding-block: 13px;
+    }
+
+    .completed-at {
+      grid-column: 2;
+      margin-top: -8px;
+    }
+  }
+</style>

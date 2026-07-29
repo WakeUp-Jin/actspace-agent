@@ -31,7 +31,7 @@
 
 - `packages/site`
   - 独立消费公开 Markdown 与脱敏后的静态资产
-  - 构建时只读根目录 `docs/releases/feature-release-notes.md` 生成更新页
+  - 构建时读取根目录 `docs/releases/feature-release-notes.md` 与 `docs/roadmap.md`，生成更新页和开发计划页
   - 不依赖桌面端运行时、用户数据、密钥或 Electron 构建产物
 
 - `plugins/browser-bridge`
