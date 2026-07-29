@@ -11,6 +11,7 @@ export type {
   ToolExecutorFn,
   ToolManagerConfig,
   ToolRuntimeConfig,
+  ToolProfile,
 } from "./types";
 
 // 核心组件
@@ -158,6 +159,8 @@ import { shouldExposeTool } from "./exposure";
 /** 创建预装基础工具的 ToolManager */
 export function createToolManager(config: ToolManagerConfig): ToolManager {
   const manager = new ToolManager(config);
+  const toolProfile = config.toolProfile ?? "full";
+  if (toolProfile === "none") return manager;
   const runtime = {
     primaryProvider: config.primaryProvider,
     apiFormat: config.apiFormat,
@@ -197,13 +200,13 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
   ];
 
   for (const [definition, executor, renderResult, checkPermissions] of entries) {
-    if (!disabledTools.has(definition.name) && shouldExposeTool(definition, runtime)) {
+    if (isToolAllowedByProfile(definition.name, toolProfile) && !disabledTools.has(definition.name) && shouldExposeTool(definition, runtime)) {
       manager.registerFromSpec(definition, executor, renderResult, checkPermissions);
     }
   }
 
   const browserGroupDisabled = disabledTools.has("browser") || disabledTools.has("browser_help");
-  if (config.browserBridgeSocketPath && !browserGroupDisabled) {
+  if (toolProfile === "full" && config.browserBridgeSocketPath && !browserGroupDisabled) {
     const browserExecutors = createBrowserToolExecutors({
       socketPath: config.browserBridgeSocketPath,
       sessionId: config.sessionId ?? `session-${process.pid}`,
@@ -224,11 +227,11 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     manager.registerDisposer(browserExecutors.dispose);
   }
 
-  if (!disabledTools.has("delete_file")) {
+  if (toolProfile === "full" && !disabledTools.has("delete_file")) {
     manager.register(createDeleteFileTool(config.workspaceRoot));
   }
 
-  if (!disabledTools.has("bash")) {
+  if (toolProfile === "full" && !disabledTools.has("bash")) {
     manager.register(
       createBashTool(config.workspaceRoot, {
         tmpRoot: config.tmpRoot,
@@ -242,7 +245,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     manager.register(bashKillTool);
   }
 
-  if (!disabledTools.has("agent") && config.llm) {
+  if (toolProfile === "full" && !disabledTools.has("agent") && config.llm) {
     manager.register(
       createAgentTool({
         llm: config.llm,
@@ -255,7 +258,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
   }
 
   const exploreLlm = config.exploreLlm ?? config.llm;
-  if (!disabledTools.has("explore") && exploreLlm) {
+  if (toolProfile === "full" && !disabledTools.has("explore") && exploreLlm) {
     manager.register(
       createExploreTool({
         llm: exploreLlm,
@@ -268,6 +271,19 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
   }
 
   return manager;
+}
+
+const READ_ONLY_TOOL_NAMES = new Set([
+  "read_file",
+  "grep",
+  "glob",
+  "list_directory",
+  "web_search",
+  "web_fetch",
+]);
+
+function isToolAllowedByProfile(name: string, profile: NonNullable<ToolManagerConfig["toolProfile"]>): boolean {
+  return profile === "full" || (profile === "read-only" && READ_ONLY_TOOL_NAMES.has(name));
 }
 
 function isBrowserToolDisabled(name: string, disabledTools: ReadonlySet<string>): boolean {

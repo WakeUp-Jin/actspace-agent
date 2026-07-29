@@ -75,6 +75,64 @@ describe("loadMainAgentRuntimeContext skill blacklist", () => {
     expect(catalog?.content).not.toContain("<name>alpha</name>");
     expect(catalog?.content).toContain("<name>beta</name>");
   });
+
+  it("injects selected Skill content and rejects unavailable selections", async () => {
+    const workspaceRoot = await makeWorkspaceWithSkills();
+    const dataRoot = await mkdtemp(join(tmpdir(), "actspace-data-"));
+    tempDirs.push(dataRoot);
+    const input = {
+      dataRoot,
+      workspaceRoot,
+      homeDir: join(workspaceRoot, "no-home"),
+      readPromptFile: async () => ({ path: "/tmp/p.md", content: "PROMPT" }),
+      selectedSkills: ["alpha"],
+    };
+
+    const context = await loadMainAgentRuntimeContext(input);
+    const selected = context.systemPromptSegments?.find((segment) => segment.id === "selected_skill:alpha");
+    expect(selected?.content).toContain('<selected_skill name="alpha">');
+    expect(selected?.content).toContain("# alpha");
+
+    await expect(loadMainAgentRuntimeContext({ ...input, selectedSkills: ["missing"] }))
+      .rejects.toThrow("Selected Skill is not available: missing");
+  });
+
+  it("adds Plan rules without writable or browser runtime context", async () => {
+    const workspaceRoot = await makeWorkspaceWithSkills();
+    const dataRoot = await mkdtemp(join(tmpdir(), "actspace-data-"));
+    tempDirs.push(dataRoot);
+    const context = await loadMainAgentRuntimeContext({
+      dataRoot,
+      workspaceRoot,
+      mode: "plan",
+      readPromptFile: async () => ({ path: "/tmp/p.md", content: "PROMPT" }),
+    });
+
+    expect(context.additionalWritableRoots).toEqual([]);
+    expect(context.browserBridgeSocketPath).toBeUndefined();
+    expect(context.systemPromptSegments?.find((segment) => segment.id === "composer_plan_mode")?.content)
+      .toContain("strict read-only tool set");
+    expect(context.systemPromptSegments?.some((segment) => segment.id === "main_agent_kairos_handoff")).toBe(false);
+  });
+
+  it("keeps Chat free of workspace rules and the general Skill catalog", async () => {
+    const workspaceRoot = await makeWorkspaceWithSkills();
+    const dataRoot = await mkdtemp(join(tmpdir(), "actspace-data-"));
+    tempDirs.push(dataRoot);
+    await writeFile(join(workspaceRoot, "AGENTS.md"), "WORKSPACE_ONLY_RULE", "utf8");
+    const context = await loadMainAgentRuntimeContext({
+      dataRoot,
+      workspaceRoot,
+      mode: "chat",
+      selectedSkills: ["alpha"],
+      readPromptFile: async () => ({ path: "/tmp/p.md", content: "PROMPT" }),
+    });
+
+    expect(context.systemPromptSegments?.some((segment) => segment.id.startsWith("agents_md:"))).toBe(false);
+    expect(context.systemPromptSegments?.some((segment) => segment.id === "skill_catalog")).toBe(false);
+    expect(context.systemPromptSegments?.some((segment) => segment.id === "composer_chat_mode")).toBe(true);
+    expect(context.systemPromptSegments?.some((segment) => segment.id === "selected_skill:alpha")).toBe(true);
+  });
 });
 
 describe("loadMainAgentRuntimeContext browser bridge", () => {

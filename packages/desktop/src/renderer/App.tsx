@@ -13,6 +13,7 @@ import type {
   BashStatus,
   BootstrapState,
   CompactContextInput,
+  ComposerMode,
   GenerateEvalCandidateInput,
   ContextState,
   ContextUsageSnapshot,
@@ -39,6 +40,10 @@ import type { ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOptio
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 
 const DEFAULT_WORKSPACE_LABEL = "Default workspace";
+const DEFAULT_COMPOSER_STATE: { mode: ComposerMode; selectedSkills: string[] } = {
+  mode: "agent",
+  selectedSkills: [],
+};
 
 function hasActspaceBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace);
@@ -722,6 +727,9 @@ export function App() {
   const [sendScrollRequestId, setSendScrollRequestId] = useState(0);
   const [defaultModelId, setDefaultModelId] = useState<ModelSelectionId | undefined>(undefined);
   const [selectedChatModelId, setSelectedChatModelId] = useState<ModelSelectionId>(DEFAULT_MODEL_ID);
+  const [composerStateBySession, setComposerStateBySession] = useState<
+    Record<string, { mode: ComposerMode; selectedSkills: string[] }>
+  >({});
   const [usableChatModels, setUsableChatModels] = useState<UsableModelView[] | undefined>(undefined);
   const [approvalPendingSessionIds, setApprovalPendingSessionIds] = useState<Set<string>>(() => new Set());
   const [failedSessionIds, setFailedSessionIds] = useState<Set<string>>(() => new Set());
@@ -1281,6 +1289,10 @@ export function App() {
       : await createSessionForInput(selectedWorkspaceRoot ? { workspaceRoot: selectedWorkspaceRoot } : {});
     const sessionId = activeSessionIdRef.current ?? createdSession?.meta.id;
     if (!sessionId) return;
+    setComposerStateBySession((current) => ({
+      ...current,
+      [sessionId]: { mode: options.mode, selectedSkills: options.selectedSkills },
+    }));
 
     const turnId = nextTurnId();
     const trimmedText = text.trim();
@@ -1473,6 +1485,8 @@ export function App() {
           turnId,
           userInput: text,
           attachments: options.attachments,
+          mode: options.mode,
+          selectedSkills: options.selectedSkills,
           ...modelSelectionPayload(options.model),
           thinkingEnabled: options.thinkingEnabled,
           ...(options.reasoningEffort && { reasoningEffort: options.reasoningEffort }),
@@ -1563,8 +1577,15 @@ export function App() {
     setStreamingBlocks([]);
     streamStateRef.current = createEmptyStreamingState();
     streamingUserBlockRef.current = null;
+    setComposerStateBySession((current) => ({ ...current, __draft__: DEFAULT_COMPOSER_STATE }));
 
-    await createSessionForInput(input);
+    const created = await createSessionForInput(input);
+    if (created) {
+      setComposerStateBySession((current) => ({
+        ...current,
+        [created.meta.id]: DEFAULT_COMPOSER_STATE,
+      }));
+    }
   }, [createSessionForInput]);
 
   const handleAddWorkspace = useCallback(async () => {
@@ -1672,6 +1693,26 @@ export function App() {
 
   const activeSessionId =
     sessionRecord?.meta.id ?? turnResult?.sessionId ?? sessions[0]?.id ?? null;
+  const composerStateKey = activeSessionId ?? "__draft__";
+  const activeComposerState = composerStateBySession[composerStateKey] ?? DEFAULT_COMPOSER_STATE;
+  const handleComposerModeChange = (mode: ComposerMode) => {
+    setComposerStateBySession((current) => ({
+      ...current,
+      [composerStateKey]: {
+        mode,
+        selectedSkills: current[composerStateKey]?.selectedSkills ?? [],
+      },
+    }));
+  };
+  const handleSelectedSkillsChange = (selectedSkills: string[]) => {
+    setComposerStateBySession((current) => ({
+      ...current,
+      [composerStateKey]: {
+        mode: current[composerStateKey]?.mode ?? "agent",
+        selectedSkills,
+      },
+    }));
+  };
   const isSessionReady = Boolean(sessionRecord || turnResult || streamingBlocks.length > 0 || sessionBootstrapComplete);
   const title = getSessionTitle(sessionRecord, sessions);
   const workspaceOptions = useMemo(
@@ -1966,6 +2007,10 @@ export function App() {
         defaultModelId={defaultModelId}
         selectedModelId={selectedChatModelId}
         onSelectedModelChange={handleSelectedChatModelChange}
+        composerMode={activeComposerState.mode}
+        onComposerModeChange={handleComposerModeChange}
+        selectedSkills={activeComposerState.selectedSkills}
+        onSelectedSkillsChange={handleSelectedSkillsChange}
         onSettingsChange={handleSettingsChange}
         onArchivedSessionsChange={handleArchivedSessionsChange}
         workspaces={workspaceRegistry?.items}

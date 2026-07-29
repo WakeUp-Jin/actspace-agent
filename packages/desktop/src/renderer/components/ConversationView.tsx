@@ -1,6 +1,6 @@
 import { Copy, Eye, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
+import type { ComposerMode, ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
 import { Composer, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { AssistantReply } from "./messages/AssistantReply";
@@ -591,6 +591,10 @@ export function ConversationView({
   defaultModelId,
   selectedModelId,
   onSelectedModelChange,
+  composerMode,
+  onComposerModeChange,
+  selectedSkills,
+  onSelectedSkillsChange,
   workspaceOptions,
   selectedWorkspaceRoot,
   onSelectWorkspace,
@@ -610,6 +614,10 @@ export function ConversationView({
   defaultModelId?: ModelSelectionId;
   selectedModelId?: ModelSelectionId;
   onSelectedModelChange?: (modelId: ModelSelectionId) => void;
+  composerMode?: ComposerMode;
+  onComposerModeChange?: (mode: ComposerMode) => void;
+  selectedSkills?: string[];
+  onSelectedSkillsChange?: (skills: string[]) => void;
   models?: UsableModelView[];
   workspaceOptions?: ComposerWorkspaceOption[];
   selectedWorkspaceRoot?: string | null;
@@ -709,6 +717,10 @@ export function ConversationView({
               defaultModelId={defaultModelId}
               selectedModelId={selectedModelId}
               onSelectedModelChange={onSelectedModelChange}
+              mode={composerMode}
+              onModeChange={onComposerModeChange}
+              selectedSkills={selectedSkills}
+              onSelectedSkillsChange={onSelectedSkillsChange}
               onExpandContext={openContextTab}
               workspaceOptions={workspaceOptions}
               selectedWorkspaceRoot={selectedWorkspaceRoot}
@@ -771,6 +783,10 @@ export function ConversationView({
             defaultModelId={defaultModelId}
             selectedModelId={selectedModelId}
             onSelectedModelChange={onSelectedModelChange}
+            mode={composerMode}
+            onModeChange={onComposerModeChange}
+            selectedSkills={selectedSkills}
+            onSelectedSkillsChange={onSelectedSkillsChange}
             onExpandContext={openContextTab}
             workspaceOptions={workspaceOptions}
             selectedWorkspaceRoot={selectedWorkspaceRoot}

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ComposerAttachment, UsableModelView } from "@actspace/shared";
+import type { ComposerAttachment, SkillCatalogItem, UsableModelView } from "@actspace/shared";
 import { mockContextSnapshot } from "./fixtures/workbenchFixture";
 import { Composer } from "../components/Composer";
 import { TooltipProvider } from "../components/ui/Tooltip";
@@ -131,7 +131,7 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByPlaceholderText("Send follow-up")).toBeInTheDocument();
   });
 
-  it("keeps image and file attachments in the attachment area above the input bar", async () => {
+  it("keeps selected images in the attachment area above the input bar", async () => {
     const user = userEvent.setup();
     const selectedAttachments: ComposerAttachment[] = [
       {
@@ -142,21 +142,14 @@ describe("Composer follow-up bar", () => {
         mimeType: "image/png",
         previewUrl: "file:///Users/test/screenshot.png",
       },
-      {
-        id: "selected-file",
-        kind: "file",
-        name: "README.md",
-        path: "/Users/test/README.md",
-        mimeType: "text/markdown",
-      },
     ];
-    const selectFiles = vi.fn(async () => ({ canceled: false, attachments: selectedAttachments }));
-    setPartialActspaceBridge({ selectFiles });
+    const selectImages = vi.fn(async () => ({ canceled: false, attachments: selectedAttachments }));
+    setPartialActspaceBridge({ selectImages });
 
     renderComposer();
 
     await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    await user.click(screen.getByRole("menuitem", { name: "Attach files" }));
+    await user.click(screen.getByRole("menuitem", { name: "Image" }));
 
     const panel = screen.getByLabelText("Message composer panel");
     const attachmentList = within(panel).getByLabelText("Attached files");
@@ -164,8 +157,6 @@ describe("Composer follow-up bar", () => {
     const input = screen.getByLabelText("Message composer");
     const toolbarButtons = within(toolbar).getAllByRole("button");
     expect(within(attachmentList).getByLabelText("Attached image screenshot.png")).toBeInTheDocument();
-    expect(within(attachmentList).getByLabelText("Attached file README.md")).toBeInTheDocument();
-    expect(within(attachmentList).getByText("README.md")).toBeInTheDocument();
     expect(panel).toContainElement(attachmentList);
     expect(panel).toContainElement(input);
     expect(toolbar).not.toContainElement(input);
@@ -239,13 +230,13 @@ describe("Composer follow-up bar", () => {
 
   it("forces stacked layout when attachments exist", async () => {
     const user = userEvent.setup();
-    const selectFiles = vi.fn(async () => ({
+    const selectImages = vi.fn(async () => ({
       canceled: false,
       attachments: [
-        { id: "att-1", kind: "file" as const, name: "notes.md", path: "/Users/test/notes.md" },
+        { id: "att-1", kind: "image" as const, name: "notes.png", path: "/Users/test/notes.png" },
       ],
     }));
-    setPartialActspaceBridge({ selectFiles });
+    setPartialActspaceBridge({ selectImages });
     renderComposer();
 
     const panel = screen.getByLabelText("Message composer panel");
@@ -253,7 +244,7 @@ describe("Composer follow-up bar", () => {
     expect(body.dataset.layout).toBe("inline");
 
     await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    await user.click(screen.getByRole("menuitem", { name: "Attach files" }));
+    await user.click(screen.getByRole("menuitem", { name: "Image" }));
 
     expect(body.dataset.layout).toBe("stacked");
   });
@@ -286,23 +277,85 @@ describe("Composer follow-up bar", () => {
     expect(input.style.height).toBe("96px");
   });
 
-  it("opens the plus command menu with demo agent and capability entries", async () => {
+  it("opens the plus command menu with modes, Image, and Skills only", async () => {
     const user = userEvent.setup();
     renderComposer();
 
     await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
 
-    const menu = screen.getByRole("menu", { name: "Add agents, context, tools" });
-    expect(within(menu).getByText("Add agents, context, tools.")).toBeInTheDocument();
+    const menu = screen.getByRole("menu", { name: "Add context and tools" });
+    expect(within(menu).getByText("Choose mode or add context.")).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Chat" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Plan" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Debug" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Multitask" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Ask" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Attach files" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Agent" })).not.toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Image" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Models" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Skills" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "MCP Servers" })).toBeInTheDocument();
+    expect(within(menu).queryByText(/Debug|Multitask|Ask|MCP Servers|Models|Attach files/)).not.toBeInTheDocument();
+  });
+
+  it("switches modes and renders the selected mode pill with semantic colors", async () => {
+    const user = userEvent.setup();
+    const onModeChange = vi.fn();
+    const { rerender } = renderComposer({ mode: "agent", onModeChange });
+
+    expect(screen.queryByRole("button", { name: /Agent mode/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    await user.click(screen.getByRole("menuitem", { name: "Plan" }));
+    expect(onModeChange).toHaveBeenCalledWith("plan");
+
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <Composer contextSnapshot={mockContextSnapshot} mode="plan" onModeChange={onModeChange} />
+      </TooltipProvider>,
+    );
+    const planPill = screen.getByRole("button", { name: "Remove Plan mode" });
+    expect(planPill).toHaveClass("bg-warning-soft", "text-on-warning");
+    expect(screen.getByPlaceholderText("Refine the plan...")).toBeInTheDocument();
+    await user.click(planPill);
+    expect(onModeChange).toHaveBeenLastCalledWith("agent");
+  });
+
+  it("lists enabled Skills, selects one, and keeps it visible as a pill", async () => {
+    const user = userEvent.setup();
+    const onSelectedSkillsChange = vi.fn();
+    const skill: SkillCatalogItem = {
+      name: "frontend-design",
+      description: "Build polished interfaces",
+      scope: "project",
+      source: ".agents",
+      location: "/work/.agents/skills/frontend-design/SKILL.md",
+      directory: "/work/.agents/skills/frontend-design",
+      status: "available",
+      removable: false,
+      enabledForAgent: true,
+      enabledForKairos: false,
+      shadowed: false,
+    };
+    const listSkills = vi.fn(async () => ({ items: [skill], warnings: [] }));
+    setPartialActspaceBridge({ listSkills });
+
+    const { rerender } = renderComposer({
+      selectedWorkspaceRoot: "/work",
+      selectedSkills: [],
+      onSelectedSkillsChange,
+    });
+    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    await user.hover(screen.getByRole("menuitem", { name: "Skills" }));
+    const skillsMenu = await screen.findByRole("menu", { name: "Skills" });
+    await user.click(within(skillsMenu).getByRole("menuitemcheckbox", { name: /frontend-design/i }));
+    expect(listSkills).toHaveBeenCalledWith({ workspaceRoot: "/work" });
+    expect(onSelectedSkillsChange).toHaveBeenCalledWith(["frontend-design"]);
+
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <Composer
+          contextSnapshot={mockContextSnapshot}
+          selectedSkills={["frontend-design"]}
+          onSelectedSkillsChange={onSelectedSkillsChange}
+        />
+      </TooltipProvider>,
+    );
+    expect(screen.getByLabelText("Selected Skill frontend-design")).toBeInTheDocument();
   });
 
   it("shows a tooltip for the add menu button", async () => {
@@ -326,7 +379,7 @@ describe("Composer follow-up bar", () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it("adds selected files from the Attach files menu", async () => {
+  it("adds selected images from the Image menu", async () => {
     const user = userEvent.setup();
     const attachments: ComposerAttachment[] = [
       {
@@ -337,25 +390,17 @@ describe("Composer follow-up bar", () => {
         mimeType: "image/png",
         previewUrl: "file:///Users/test/screenshot.png",
       },
-      {
-        id: "selected-file",
-        kind: "file",
-        name: "notes.md",
-        path: "/Users/test/notes.md",
-        mimeType: "text/markdown",
-      },
     ];
-    const selectFiles = vi.fn(async () => ({ canceled: false, attachments }));
-    setPartialActspaceBridge({ selectFiles });
+    const selectImages = vi.fn(async () => ({ canceled: false, attachments }));
+    setPartialActspaceBridge({ selectImages });
 
     renderComposer();
 
     await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    await user.click(screen.getByRole("menuitem", { name: "Attach files" }));
+    await user.click(screen.getByRole("menuitem", { name: "Image" }));
 
-    expect(selectFiles).toHaveBeenCalledTimes(1);
+    expect(selectImages).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText("Attached image screenshot.png")).toBeInTheDocument();
-    expect(screen.getByLabelText("Attached file notes.md")).toBeInTheDocument();
   });
 
   it("does not add fake attachments when the Electron file bridge is unavailable", async () => {
@@ -364,7 +409,7 @@ describe("Composer follow-up bar", () => {
     renderComposer();
 
     await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    await user.click(screen.getByRole("menuitem", { name: "Attach files" }));
+    await user.click(screen.getByRole("menuitem", { name: "Image" }));
 
     expect(screen.queryByLabelText("Attached files")).not.toBeInTheDocument();
   });
@@ -389,29 +434,31 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByLabelText("Attached image photo.png")).toBeInTheDocument();
     expect(screen.getByLabelText("Attached file report.pdf")).toBeInTheDocument();
 
-    const removeReport = screen.getByRole("button", { name: "Remove report.pdf" });
-    await user.hover(removeReport);
-    expect((await screen.findAllByText("移除 report.pdf")).length).toBeGreaterThan(0);
+    const removePhoto = screen.getByRole("button", { name: "Remove photo.png" });
+    await user.hover(removePhoto);
+    expect((await screen.findAllByText("移除 photo.png")).length).toBeGreaterThan(0);
 
-    fireEvent.pointerDown(removeReport);
-    expect(screen.queryByLabelText("Attached file report.pdf")).not.toBeInTheDocument();
+    fireEvent.pointerDown(removePhoto);
+    expect(screen.queryByLabelText("Attached image photo.png")).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Message composer"), "analyze this");
     await user.click(screen.getByRole("button", { name: "Send message" }));
 
     expect(onSend).toHaveBeenCalledWith("analyze this", {
+      mode: "agent",
       model: "deepseek-v4-pro",
+      selectedSkills: [],
       thinkingEnabled: true,
       attachments: [
         expect.objectContaining({
-          kind: "image",
-          name: "photo.png",
-          path: "/Users/test/photo.png",
-          mimeType: "image/png",
+          kind: "file",
+          name: "report.pdf",
+          path: "/Users/test/report.pdf",
+          mimeType: "application/pdf",
         }),
       ],
     });
-    expect(screen.queryByLabelText("Attached image photo.png")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Attached file report.pdf")).not.toBeInTheDocument();
   });
 
   it("keeps command menu, model menu, and context popup mutually exclusive", async () => {
@@ -419,10 +466,10 @@ describe("Composer follow-up bar", () => {
     renderComposer();
 
     await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    expect(screen.getByRole("menu", { name: "Add agents, context, tools" })).toBeInTheDocument();
+    expect(screen.getByRole("menu", { name: "Add context and tools" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
-    expect(screen.queryByRole("menu", { name: "Add agents, context, tools" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "Add context and tools" })).not.toBeInTheDocument();
     expect(screen.getByText("DeepSeek V4 Flash")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Context usage 36%" }));
@@ -526,7 +573,9 @@ describe("Composer follow-up bar", () => {
     await user.click(screen.getByRole("button", { name: "Send message" }));
 
     expect(onSend).toHaveBeenCalledWith("reason carefully", {
+      mode: "agent",
       model: "openrouter:openai/gpt-5",
+      selectedSkills: [],
       thinkingEnabled: true,
       reasoningEffort: "high",
     });
@@ -554,7 +603,9 @@ describe("Composer follow-up bar", () => {
     await user.type(screen.getByLabelText("Message composer"), "use the default effort");
     await user.click(screen.getByRole("button", { name: "Send message" }));
     expect(onSend).toHaveBeenCalledWith("use the default effort", {
+      mode: "agent",
       model: "duckcoding:gpt-5.6-sol",
+      selectedSkills: [],
       thinkingEnabled: true,
       reasoningEffort: "medium",
     });
@@ -590,7 +641,9 @@ describe("Composer follow-up bar", () => {
     await user.click(screen.getByRole("button", { name: "Send message" }));
 
     expect(onSend).toHaveBeenCalledWith("continue polishing", {
+      mode: "agent",
       model: "deepseek-v4-pro",
+      selectedSkills: [],
       thinkingEnabled: true,
     });
   });
@@ -637,7 +690,9 @@ describe("Composer follow-up bar", () => {
     await user.click(screen.getByRole("button", { name: "Send message" }));
 
     expect(onSend).toHaveBeenCalledWith("start a new idea", {
+      mode: "agent",
       model: "deepseek-v4-pro",
+      selectedSkills: [],
       thinkingEnabled: true,
     });
   });

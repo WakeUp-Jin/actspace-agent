@@ -1,4 +1,4 @@
-import type { AppSettings, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, SessionListItem, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
+import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, SessionListItem, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlaskConical } from "lucide-react";
 import { ConversationView } from "./ConversationView";
@@ -99,6 +99,10 @@ export function WorkbenchLayout({
   defaultModelId,
   selectedModelId,
   onSelectedModelChange,
+  composerMode,
+  onComposerModeChange,
+  selectedSkills,
+  onSelectedSkillsChange,
   onSettingsChange,
   onArchivedSessionsChange,
   workspaces,
@@ -136,6 +140,10 @@ export function WorkbenchLayout({
   defaultModelId?: ModelSelectionId;
   selectedModelId?: ModelSelectionId;
   onSelectedModelChange?: (modelId: ModelSelectionId) => void;
+  composerMode?: ComposerMode;
+  onComposerModeChange?: (mode: ComposerMode) => void;
+  selectedSkills?: string[];
+  onSelectedSkillsChange?: (skills: string[]) => void;
   models?: UsableModelView[];
   onSettingsChange?: (settings: AppSettings) => void;
   onArchivedSessionsChange?: () => void;
@@ -409,6 +417,10 @@ export function WorkbenchLayout({
         defaultModelId={defaultModelId}
         selectedModelId={selectedModelId}
         onSelectedModelChange={onSelectedModelChange}
+        composerMode={composerMode}
+        onComposerModeChange={onComposerModeChange}
+        selectedSkills={selectedSkills}
+        onSelectedSkillsChange={onSelectedSkillsChange}
         workspaceOptions={workspaceOptions}
         selectedWorkspaceRoot={selectedWorkspaceRoot}
         onSelectWorkspace={onSelectWorkspace}

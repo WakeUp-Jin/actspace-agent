@@ -1859,7 +1859,23 @@ describe("App streaming user message", () => {
         displayBalance: null,
       }),
       listPendingApprovals: async () => [],
-      selectFiles: async () => ({ canceled: false, attachments: [selectedAttachment] }),
+      selectImages: async () => ({ canceled: false, attachments: [selectedAttachment] }),
+      listUsableModels: async () => ({
+        models: [{
+          key: "deepseek:deepseek-v4-pro",
+          label: "DeepSeek V4 Pro",
+          provider: "deepseek",
+          apiModel: "deepseek-v4-pro",
+          contextWindow: 1_000_000,
+          thinkingDefault: true,
+          capabilities: {
+            input: ["text", "image"],
+            toolUse: "verified",
+            reasoning: true,
+            thinkingToggle: true,
+          },
+        }],
+      }),
       ...settingsApiStub,
       onAgentStream: (callback) => {
         streamHandler = callback;
@@ -1881,7 +1897,7 @@ describe("App streaming user message", () => {
 
     const composer = await screen.findByLabelText("Message composer");
     await userEvent.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    await userEvent.click(screen.getByRole("menuitem", { name: "Attach files" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Image" }));
     expect(await screen.findByLabelText("Attached image screenshot.png")).toBeTruthy();
 
     await userEvent.type(composer, "what is in this screenshot?");
@@ -1889,6 +1905,8 @@ describe("App streaming user message", () => {
 
     await waitFor(() => {
       expect(capturedInput?.attachments).toEqual([selectedAttachment]);
+      expect(capturedInput?.mode).toBe("agent");
+      expect(capturedInput?.selectedSkills).toEqual([]);
     });
     expect(await screen.findByLabelText("Attached image screenshot.png")).toBeTruthy();
 

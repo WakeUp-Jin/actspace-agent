@@ -24,6 +24,8 @@ import type {
   ComposerAttachment,
   RunTurnInput,
   SelectFilesResult,
+  SelectImagesResult,
+  SkillListInput,
   SelectWorkspaceDirectoryResult,
   SessionArchiveInput,
   SessionCreateInput,
@@ -857,7 +859,7 @@ async function registerIpc() {
         roots,
         getMainWindow,
         approvalRegistry,
-        (workspaceRoot) => {
+        (workspaceRoot, runtimeOptions) => {
           const browserBridge = getBrowserBridgeService(roots);
           return loadMainAgentRuntimeContext({
             dataRoot: roots.dataRoot,
@@ -865,6 +867,8 @@ async function registerIpc() {
             readPromptFile: () => getSettingsService().readAgentSystemPrompt(),
             disabledSkills: getSettingsService().get().skills.disabled,
             disabledTools: getSettingsService().get().agent.disabledTools,
+            mode: runtimeOptions.mode,
+            selectedSkills: runtimeOptions.selectedSkills,
             browserBridgeAbbPath: browserBridge.binPath,
             browserBridgeSocketPath: browserBridge.socketPath,
             warn: logMain,
@@ -942,6 +946,23 @@ async function registerIpc() {
     return {
       canceled: false,
       attachments: result.filePaths.map(attachmentFromPath),
+    };
+  });
+
+  ipcMain.handle("dialog:select-images", async (): Promise<SelectImagesResult> => {
+    const result = await dialog.showOpenDialog({
+      title: "Select images",
+      properties: ["openFile", "multiSelections"],
+      filters: [
+        { name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "heic", "heif"] },
+      ],
+    });
+    if (result.canceled) {
+      return { canceled: true, attachments: [] };
+    }
+    return {
+      canceled: false,
+      attachments: result.filePaths.map(attachmentFromPath).filter((attachment) => attachment.kind === "image"),
     };
   });
 
@@ -1650,12 +1671,12 @@ async function registerIpc() {
   });
 
   // ─── Skills 管理 ───
-  ipcMain.handle("skills:list", async () => {
+  ipcMain.handle("skills:list", async (_event, input: SkillListInput = {}) => {
     const roots = await ensureDataDirectories();
     const settings = getSettingsService().get();
     return listSkills({
       dataRoot: roots.dataRoot,
-      workspaceRoot: roots.workspaceRoot,
+      workspaceRoot: input.workspaceRoot ?? roots.workspaceRoot,
       disabledForAgent: settings.skills.disabled,
       enabledForKairos: settings.kairos.enabledSkills,
       warn: logMain,
