@@ -7,7 +7,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { SessionId, SessionMeta } from "@actspace/shared";
+import type { SessionId, SessionMeta, SessionWorktreeContext } from "@actspace/shared";
 import type { MetaUpdateFields, WriteResult } from "./types";
 
 /** 创建初始 meta.json */
@@ -15,7 +15,7 @@ export async function createMeta(
   metaPath: string,
   sessionId: SessionId,
   title?: string,
-  options: { workspaceId?: string; workspaceRoot?: string } = {},
+  options: { workspaceId?: string; workspaceRoot?: string; worktree?: SessionWorktreeContext } = {},
 ): Promise<WriteResult> {
   const now = new Date().toISOString();
   const meta: SessionMeta = {
@@ -26,6 +26,7 @@ export async function createMeta(
     turnCount: 0,
     ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}),
     ...(options.workspaceRoot ? { workspaceRoot: options.workspaceRoot } : {}),
+    ...(options.worktree ? { worktree: options.worktree } : {}),
     pinned: false,
   };
 
@@ -59,6 +60,10 @@ export async function updateMeta(
   if (fields.title !== undefined) updated.title = fields.title;
   if (fields.workspaceId !== undefined) updated.workspaceId = fields.workspaceId;
   if (fields.workspaceRoot !== undefined) updated.workspaceRoot = fields.workspaceRoot;
+  if (fields.worktree !== undefined) {
+    if (fields.worktree === null) delete updated.worktree;
+    else updated.worktree = fields.worktree;
+  }
   if (fields.pinned !== undefined) updated.pinned = fields.pinned;
   if (fields.archived !== undefined) updated.archived = fields.archived;
   if (fields.lastModel !== undefined) (updated as Record<string, unknown>).lastModel = fields.lastModel;

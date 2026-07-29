@@ -39,8 +39,9 @@ Renderer ──IPC──▶ Main Process ──调用──▶ Bridge ──驱�
 | `userInput` | `string` | 用户在 Composer 中输入 | 用户消息 |
 | `model` | `ModelId?` | 用户在下拉菜单选择 | 选定的模型 |
 | `thinkingEnabled` | `boolean?` | 用户切换 toggle | 是否启用思考 |
+| `executionContext` | `TurnExecutionContextInput?` | 首轮 Workspace / Branch / Run on 选择 | 由 Main 在首轮发送前准备最终执行目录 |
 
-Workspace 选择器不进入 `RunTurnInput`。用户可在发送前多次切换顶部 Workspace，下拉只更新 renderer 本地状态；真正发送时 renderer 先把最终选择写入当前 session `meta.workspaceRoot`，再发起 `agent:run-turn`。
+首轮 Workspace / Branch / Run on 选择会作为一个 `executionContext` 快照随 `agent:run-turn` 一次性提交。Main 必须先完成 Git/worktree 准备并更新 SessionMeta，再构建 Agent；准备失败不能写入 `user_message`。已有 turn 的会话继续使用已锁定的 `SessionMeta.workspaceRoot`。
 
 `RuntimeStreamEvent` 中所有 turn 级事件都必须携带 `sessionId` 与 `turnId`，包括 assistant delta、工具 streaming/start/finish、审批和 SubAgent 事件。`bash_task_update` 是例外：后台任务可能在原 turn 结束后继续变化，因此它保持 session 级作用域，只按 `sessionId` 路由。
 
@@ -61,6 +62,7 @@ Workspace 选择器不进入 `RunTurnInput`。用户可在发送前多次切换�
 - IPC handler 注册和路由
 - 调用 `buildAgentConfig()` 构建配置（前端参数 + 内部读 env）
 - 读取当前 session `meta.workspaceRoot`，缺省时回退应用默认 `workspaceRoot`
+- 首轮存在 `executionContext` 时，在任何用户事件持久化前完成 branch/worktree 准备、校验和 SessionMeta 更新
 - 调用 `await createAgentForSession(config, { sessionPath })` 创建运行时实例（会话历史在 ContextManager 构造阶段一次性恢复）
 - Agent 依赖和上下文恢复完成后、真正执行 turn 前，先 append 本轮 `user_message`；这样审批等待或工具执行期间被中止时，用户输入也已经成为会话事实
 - 调用 `runTurnWithAgent()` 执行 turn
@@ -84,7 +86,10 @@ Workspace 选择器不进入 `RunTurnInput`。用户可在发送前多次切换�
 ```typescript
 const sessionPaths = createSessionStorePaths(join(roots.sessionRoot, input.sessionId));
 const meta = await readMeta(sessionPaths.metaPath);
-const workspaceRoot = meta?.workspaceRoot ?? roots.workspaceRoot;
+const prepared = input.executionContext
+  ? await prepareExecutionContext(input.executionContext, roots)
+  : null;
+const workspaceRoot = prepared?.workspaceRoot ?? meta?.workspaceRoot ?? roots.workspaceRoot;
 const config = buildAgentConfig({ model, thinkingEnabled }, workspaceRoot);
 const deps = await createAgentForSession(config, { sessionPath: sessionPaths.sessionPath });
 ```
@@ -128,6 +133,8 @@ const deps = await createAgentForSession(config, { sessionPath: sessionPaths.ses
 用户输入 → Renderer
          → [IPC: RunTurnInput]
          → Main Process
+           → prepare executionContext (first turn only)
+           → update SessionMeta.workspaceRoot / worktree metadata
            → readMeta(session.metaPath).workspaceRoot ?? defaultRoot
            → buildAgentConfig(frontendInput, workspaceRoot)          → AgentConfig
            → await createAgentForSession(config, { sessionPath })    → AgentDeps（含已恢复历史的 ContextManager）

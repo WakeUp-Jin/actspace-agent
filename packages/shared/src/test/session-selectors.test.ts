@@ -46,6 +46,53 @@ function agentToolResultEvent(uiPreview: AgentToolPreview): SessionEvent<ToolExe
 }
 
 describe("session selectors", () => {
+  it("maps a completed workspace preparation event to a worktree block", () => {
+    const blocks = createMessageBlocks([{
+      id: "prep-1",
+      sessionId: "session-1",
+      turnId: "turn-1",
+      type: "workspace_preparation",
+      timestamp: "2026-07-29T00:00:00.000Z",
+      payload: {
+        kind: "worktree",
+        status: "completed",
+        sourceWorkspaceRoot: "/work/source",
+        workspaceRoot: "/work/worktree",
+        baseBranch: "main",
+        branch: "actspace/92803054",
+        baseCommit: "a1b2c3d4",
+        durationMs: 240,
+        environmentSetup: "none",
+      },
+    }]);
+
+    expect(blocks).toEqual([{
+      kind: "workspace_preparation",
+      id: "prep-1",
+      renderKey: "turn:turn-1:workspace-preparation:0",
+      status: "completed",
+      sourceWorkspaceRoot: "/work/source",
+      workspaceRoot: "/work/worktree",
+      baseBranch: "main",
+      branch: "actspace/92803054",
+      baseCommit: "a1b2c3d4",
+      durationMs: 240,
+      environmentSetup: "none",
+      createdAt: "2026-07-29T00:00:00.000Z",
+    }]);
+  });
+
+  it("ignores malformed workspace preparation events", () => {
+    expect(createMessageBlocks([{
+      id: "prep-bad",
+      sessionId: "session-1",
+      turnId: "turn-1",
+      type: "workspace_preparation",
+      timestamp: "2026-07-29T00:00:00.000Z",
+      payload: { kind: "worktree", status: "completed" },
+    }])).toEqual([]);
+  });
+
   it("restores generated image artifacts from a completed tool preview", () => {
     const image = {
       type: "image" as const,

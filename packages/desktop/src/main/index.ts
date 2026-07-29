@@ -50,6 +50,10 @@ import type {
   ReviewGetWorkspaceChangesInput,
   ReviewInitGitInput,
   WorkspaceListDirInput,
+  WorkspaceGitContextInput,
+  WorkspaceGitContext,
+  WorkspaceCreateFolderInput,
+  WorkspaceCreateFolderResult,
   WorkspaceListResult,
   WorkspaceReadFileInput,
   BrowserBridgeActionResult,
@@ -128,7 +132,8 @@ import { listWorkspaceDir, readWorkspaceFile } from "./workspace-fs-service";
 import { readSessionArtifact } from "./session-artifact-service";
 import { showArtifactContextMenu } from "./artifact-context-menu-service";
 import { getWorkspaceGitChanges, initializeGitRepository } from "./review-git-service";
-import { readWorkspaceRegistry, resolveWorkspaceSelection } from "./workspace-registry-service";
+import { getWorkspaceGitContext } from "./workspace-git-context-service";
+import { createWorkspaceFolder, readWorkspaceRegistry, resolveWorkspaceSelection } from "./workspace-registry-service";
 import { getSessionPreview } from "./session-preview-service";
 import { LocalUpdateService } from "./local-update-service";
 import { PendingApprovalRegistry } from "./approval-registry";
@@ -959,6 +964,28 @@ async function registerIpc() {
       workspaceRoot: result.filePaths[0],
     };
   });
+
+  ipcMain.handle(
+    "workspace:get-git-context",
+    async (_event, input: WorkspaceGitContextInput): Promise<WorkspaceGitContext> => {
+      const roots = await ensureDataDirectories();
+      return getWorkspaceGitContext(input.workspaceRoot ?? roots.defaultWorkspaceRoot);
+    },
+  );
+
+  ipcMain.handle(
+    "workspace:create-folder",
+    async (_event, input: WorkspaceCreateFolderInput): Promise<WorkspaceCreateFolderResult> => {
+      const roots = await ensureDataDirectories();
+      const sessions = await listSessionRecords(roots.sessionRoot);
+      return createWorkspaceFolder({
+        dataRoot: roots.dataRoot,
+        defaultWorkspaceRoot: roots.defaultWorkspaceRoot,
+        fallbackWorkspaceRoot: roots.workspaceRoot,
+        sessions,
+      }, input);
+    },
+  );
 
   ipcMain.handle("visualize:convert-reply", async (_event, input: VisualizeReplyInput) => {
     const roots = await ensureDataDirectories();

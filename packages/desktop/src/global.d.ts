@@ -26,6 +26,12 @@ declare global {
         input: import("@actspace/shared").ListVisualizationsInput
       ) => Promise<import("@actspace/shared").ListVisualizationsResult>;
       listWorkspaces?: () => Promise<import("@actspace/shared").WorkspaceListResult>;
+      getWorkspaceGitContext?: (
+        input: import("@actspace/shared").WorkspaceGitContextInput
+      ) => Promise<import("@actspace/shared").WorkspaceGitContext>;
+      createWorkspaceFolder?: (
+        input: import("@actspace/shared").WorkspaceCreateFolderInput
+      ) => Promise<import("@actspace/shared").WorkspaceCreateFolderResult>;
       listWorkspaceDir: (
         input: import("@actspace/shared").WorkspaceListDirInput
       ) => Promise<import("@actspace/shared").WorkspaceListDirResult>;

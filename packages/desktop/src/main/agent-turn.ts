@@ -22,6 +22,7 @@ import {
   cleanupOldToolOutputs,
   createAgentRunLogger,
   createCacheAuditTracker,
+  createPersistedSessionEvent,
   generateSessionTitle,
   isDefaultSessionTitle,
   appendEvents,
@@ -32,9 +33,14 @@ import {
   userMessageToEvents,
   writeSessionResult,
 } from "@actspace/agent-core";
-import type { SessionMeta } from "@actspace/shared";
+import type { SessionMeta, WorkspacePreparationPayload } from "@actspace/shared";
 import type { PendingApprovalRegistry } from "./approval-registry";
 import type { ModelRuntimeService } from "./model-runtime-service";
+import {
+  prepareExecutionContext,
+  rollbackPreparedExecution,
+  type PreparedExecutionRollback,
+} from "./workspace-git-context-service";
 
 export type AppDataRoots = {
   dataRoot: string;
@@ -234,51 +240,109 @@ export async function runAndPersistTurn(
     });
   }
 
-  approvalRegistry?.setCurrentTurn(input.sessionId, input.turnId);
-
   const sessionDir = join(roots.sessionRoot, input.sessionId);
   const sessionPaths = createSessionStorePaths(sessionDir);
-  const sessionMeta = await readMeta(sessionPaths.metaPath);
-  const turnWorkspaceRoot = sessionMeta?.workspaceRoot ?? roots.defaultWorkspaceRoot;
-  const runtimeContext = await loadRuntimeContext?.(turnWorkspaceRoot);
-
-  const runtimeOptions = {
-    tmpRoot: roots.tmpRoot,
-    artifactRoot: join(sessionDir, "artifacts", "generated-images"),
-    sessionId: input.sessionId,
-    turnId: input.turnId,
-    ...runtimeContext,
+  let sessionMeta = await readMeta(sessionPaths.metaPath);
+  const originalWorkspaceRoot = sessionMeta?.workspaceRoot ?? roots.defaultWorkspaceRoot;
+  let turnWorkspaceRoot = sessionMeta?.workspaceRoot ?? roots.defaultWorkspaceRoot;
+  let preparationPayload: WorkspacePreparationPayload | undefined;
+  let preparationRollback: PreparedExecutionRollback | undefined;
+  const win = getMainWindow();
+  const forwardStreamEvent = (event: RuntimeStreamEvent) => {
+    logAgentTurn("stream event sent to renderer", {
+      sessionId: "sessionId" in event ? event.sessionId : input.sessionId,
+      turnId: "turnId" in event ? event.turnId : input.turnId,
+      type: event.type,
+    });
+    win?.webContents.send("agent:stream", event);
   };
-  const config = modelRuntime
-    ? (() => {
-        const main = modelRuntime.resolveMainModel(input.modelKey ?? input.model);
-        if (!("model" in main)) throw createModelUnavailableError(main.message, main.modelKey, main.reason ?? main.code);
-        const utility = modelRuntime.resolveUtilityModel(main.model);
-        const explore = modelRuntime.resolveExploreModel(main.model);
-        if (!("model" in utility) || !("model" in explore)) throw createModelUnavailableError("任务模型无法解析。", undefined, "task_model_unavailable");
-        return buildAgentConfigFromRuntime({
-          main: { definition: main.model.definition, runtime: main.model.providerRuntime },
-          utility: { definition: utility.model.definition, runtime: utility.model.providerRuntime },
-          explore: { definition: explore.model.definition, runtime: explore.model.providerRuntime },
-          thinkingEnabled: input.thinkingEnabled,
-          reasoningEffort: input.reasoningEffort,
-          toolEnvironment: modelRuntime.getToolEnvironment(),
-        }, turnWorkspaceRoot, approvalRegistry, runtimeOptions);
-      })()
-    : buildAgentConfig(
-        {
-          model: input.model,
-          thinkingEnabled: input.thinkingEnabled,
-          reasoningEffort: input.reasoningEffort,
-          exploreModelId: input.exploreModelId,
-        },
-        turnWorkspaceRoot,
-        approvalRegistry,
-        runtimeOptions,
-      );
-  const deps = await createAgentForSession(config, {
-    sessionPath: sessionPaths.sessionPath,
-  });
+
+  if (input.executionContext) {
+    if ((sessionMeta?.turnCount ?? 0) > 0) {
+      throw createExecutionContextError("Execution context can only be prepared before the first turn.");
+    }
+    if (input.executionContext.runLocation === "worktree") {
+      forwardStreamEvent({
+        type: "workspace_preparation_started",
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        kind: "worktree",
+        sourceWorkspaceRoot: input.executionContext.sourceWorkspaceRoot,
+        baseBranch: input.executionContext.branch ?? "",
+      });
+    }
+    const prepared = await prepareExecutionContext(input.executionContext, roots);
+    if ("message" in prepared) {
+      throw createExecutionContextError(prepared.message, prepared.code);
+    }
+    const metaWrite = await updateMeta(sessionPaths.metaPath, {
+      ...(prepared.workspaceId ? { workspaceId: prepared.workspaceId } : {}),
+      workspaceRoot: prepared.workspaceRoot,
+      worktree: prepared.worktree ?? null,
+    });
+    if (!metaWrite.ok) {
+      await rollbackPreparedExecution(prepared.rollback);
+      throw createExecutionContextError(metaWrite.error, "meta_update_failed");
+    }
+    sessionMeta = await readMeta(sessionPaths.metaPath);
+    turnWorkspaceRoot = prepared.workspaceRoot;
+    preparationPayload = prepared.preparationEvent;
+    preparationRollback = prepared.rollback;
+  }
+  let deps: Awaited<ReturnType<typeof createAgentForSession>>;
+  try {
+    const runtimeContext = await loadRuntimeContext?.(turnWorkspaceRoot);
+    const runtimeOptions = {
+      tmpRoot: roots.tmpRoot,
+      artifactRoot: join(sessionDir, "artifacts", "generated-images"),
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      ...runtimeContext,
+    };
+    const config = modelRuntime
+      ? (() => {
+          const main = modelRuntime.resolveMainModel(input.modelKey ?? input.model);
+          if (!("model" in main)) throw createModelUnavailableError(main.message, main.modelKey, main.reason ?? main.code);
+          const utility = modelRuntime.resolveUtilityModel(main.model);
+          const explore = modelRuntime.resolveExploreModel(main.model);
+          if (!("model" in utility) || !("model" in explore)) throw createModelUnavailableError("任务模型无法解析。", undefined, "task_model_unavailable");
+          return buildAgentConfigFromRuntime({
+            main: { definition: main.model.definition, runtime: main.model.providerRuntime },
+            utility: { definition: utility.model.definition, runtime: utility.model.providerRuntime },
+            explore: { definition: explore.model.definition, runtime: explore.model.providerRuntime },
+            thinkingEnabled: input.thinkingEnabled,
+            reasoningEffort: input.reasoningEffort,
+            toolEnvironment: modelRuntime.getToolEnvironment(),
+          }, turnWorkspaceRoot, approvalRegistry, runtimeOptions);
+        })()
+      : buildAgentConfig(
+          {
+            model: input.model,
+            thinkingEnabled: input.thinkingEnabled,
+            reasoningEffort: input.reasoningEffort,
+            exploreModelId: input.exploreModelId,
+          },
+          turnWorkspaceRoot,
+          approvalRegistry,
+          runtimeOptions,
+        );
+    deps = await createAgentForSession(config, {
+      sessionPath: sessionPaths.sessionPath,
+    });
+  } catch (error) {
+    if (preparationRollback) {
+      await rollbackPreparedExecution(preparationRollback);
+      await updateMeta(sessionPaths.metaPath, {
+        workspaceRoot: originalWorkspaceRoot,
+        worktree: null,
+      });
+      sessionMeta = await readMeta(sessionPaths.metaPath);
+      turnWorkspaceRoot = originalWorkspaceRoot;
+      preparationPayload = undefined;
+      preparationRollback = undefined;
+    }
+    throw error;
+  }
 
   const priorMessageCount = deps.contextManager.getMessageCount();
   logAgentTurn("agent dependencies ready", {
@@ -299,7 +363,6 @@ export async function runAndPersistTurn(
     priorMessageCount,
   });
 
-  const win = getMainWindow();
   const turnKey = getTurnKey(input);
   const abortableDeps = {
     ...deps,
@@ -316,20 +379,12 @@ export async function runAndPersistTurn(
   };
 
   let abortRequested = false;
+  approvalRegistry?.setCurrentTurn(input.sessionId, input.turnId);
   activeTurnAborts.set(turnKey, () => {
     abortRequested = true;
     abortableDeps.abort?.();
     approvalRegistry?.abortTurn(input.sessionId, input.turnId);
   });
-
-  const forwardStreamEvent = (event: RuntimeStreamEvent) => {
-    logAgentTurn("stream event sent to renderer", {
-      sessionId: "sessionId" in event ? event.sessionId : input.sessionId,
-      turnId: "turnId" in event ? event.turnId : input.turnId,
-      type: event.type,
-    });
-    win?.webContents.send("agent:stream", event);
-  };
 
   try {
     const userEvents = userMessageToEvents({
@@ -338,9 +393,36 @@ export async function runAndPersistTurn(
       timestamp: Date.now(),
       source: "user",
     }, input.sessionId, input.turnId, { attachments: input.attachments });
-    const startWrite = await appendEvents(sessionPaths.sessionPath, userEvents);
+    const preparationEvents = preparationPayload
+      ? [createPersistedSessionEvent(
+          input.sessionId,
+          input.turnId,
+          "workspace_preparation",
+          preparationPayload,
+        )]
+      : [];
+    const startWrite = await appendEvents(sessionPaths.sessionPath, [...userEvents, ...preparationEvents]);
     if (!startWrite.ok) {
+      if (preparationRollback) {
+        await rollbackPreparedExecution(preparationRollback);
+        await updateMeta(sessionPaths.metaPath, {
+          workspaceRoot: originalWorkspaceRoot,
+          worktree: null,
+        });
+        sessionMeta = await readMeta(sessionPaths.metaPath);
+        turnWorkspaceRoot = originalWorkspaceRoot;
+        preparationPayload = undefined;
+        preparationRollback = undefined;
+      }
       throw new Error(startWrite.error);
+    }
+    if (preparationPayload) {
+      forwardStreamEvent({
+        type: "workspace_preparation_finished",
+        sessionId: input.sessionId,
+        turnId: input.turnId,
+        payload: preparationPayload,
+      });
     }
 
     const modelAttachments = await prepareAttachmentsForModel(
@@ -406,7 +488,7 @@ export async function runAndPersistTurn(
 
     return {
       ...result,
-      events: [...userEvents, ...result.events],
+      events: [...userEvents, ...preparationEvents, ...result.events],
     };
   } finally {
     activeTurnAborts.delete(turnKey);
@@ -422,6 +504,14 @@ function createModelUnavailableError(message: string, modelKey?: string, reason?
   error.name = "ModelUnavailableError";
   error.code = "model_unavailable";
   error.modelKey = modelKey;
+  error.reason = reason;
+  return error;
+}
+
+function createExecutionContextError(message: string, reason = "preparation_failed"): Error {
+  const error = new Error(message) as Error & { code?: string; reason?: string };
+  error.name = "ExecutionContextError";
+  error.code = "execution_context_failed";
   error.reason = reason;
   return error;
 }

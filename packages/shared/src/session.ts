@@ -25,6 +25,20 @@ export type LlmUsageCost = {
 export type RuntimeStreamEvent =
   | { type: "turn_started"; sessionId: SessionId; turnId: TurnId }
   | {
+      type: "workspace_preparation_started";
+      sessionId: SessionId;
+      turnId: TurnId;
+      kind: "worktree";
+      sourceWorkspaceRoot: string;
+      baseBranch: string;
+    }
+  | {
+      type: "workspace_preparation_finished";
+      sessionId: SessionId;
+      turnId: TurnId;
+      payload: WorkspacePreparationPayload;
+    }
+  | {
       type: "context_compaction_started";
       sessionId: SessionId;
       turnId: TurnId;
@@ -120,6 +134,7 @@ export type SessionEventType =
   | "diff_preview"
   | "context_snapshot"
   | "context_compaction"
+  | "workspace_preparation"
   | "eval_candidate"
   | "error"
   | "turn_aborted"
@@ -229,6 +244,28 @@ export type EvalCandidatePayload = {
   error?: string;
 };
 
+export type SessionWorktreeContext = {
+  kind: "worktree";
+  sourceWorkspaceRoot: string;
+  workspaceRoot: string;
+  baseBranch: string;
+  branch: string;
+  baseCommit: string;
+  createdAt: string;
+};
+
+export type WorkspacePreparationPayload = {
+  kind: "worktree";
+  status: "completed";
+  sourceWorkspaceRoot: string;
+  workspaceRoot: string;
+  baseBranch: string;
+  branch: string;
+  baseCommit: string;
+  durationMs: number;
+  environmentSetup: "none";
+};
+
 export type ErrorPayload = SessionError;
 
 export type TurnAbortedPayload = {
@@ -273,6 +310,8 @@ export type SessionMeta = {
   workspaceId?: string;
   /** 创建会话时的工作区根目录，用于侧边栏按 Workspace 分组；旧 session 缺这个字段时视为 default。 */
   workspaceRoot?: string;
+  /** Worktree 会话的隔离执行上下文；workspaceId 仍指向原始长期 Workspace。 */
+  worktree?: SessionWorktreeContext;
   /** 用户是否把该会话钉到 Pinned 分区；缺省视为 false。 */
   pinned?: boolean;
   /** 用户是否把该会话归档；缺省视为 false。 */
@@ -812,6 +851,19 @@ export type MessageBlock = {
       summaryText: string;
       reductionLabel?: string;
       progress?: number;
+      createdAt: string;
+    }
+  | {
+      kind: "workspace_preparation";
+      id: EventId;
+      status: "running" | "completed";
+      sourceWorkspaceRoot: string;
+      workspaceRoot?: string;
+      baseBranch: string;
+      branch?: string;
+      baseCommit?: string;
+      durationMs?: number;
+      environmentSetup?: "none";
       createdAt: string;
     }
   | {

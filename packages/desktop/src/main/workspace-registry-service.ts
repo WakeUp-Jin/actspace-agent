@@ -1,10 +1,22 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { dirname, join, basename, resolve } from "node:path";
 import type { SessionListItem, WorkspaceEntry, WorkspaceRegistry } from "@actspace/shared";
 
 const WORKSPACES_FILE = "workspaces.json";
 const DEFAULT_WORKSPACE_ID = "default";
 const DEFAULT_WORKSPACE_LABEL = "Default workspace";
+
+// Registry reads can repair the file, so a read is also a write operation.
+// Serialize the whole read/merge/write transaction to avoid stale concurrent
+// snapshots overwriting each other's newly discovered workspaces.
+let registryOperationQueue: Promise<void> = Promise.resolve();
+
+function enqueueRegistryOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const run = registryOperationQueue.then(operation, operation);
+  registryOperationQueue = run.then(() => undefined, () => undefined);
+  return run;
+}
 
 export type WorkspaceRegistryOptions = {
   dataRoot: string;
@@ -23,6 +35,10 @@ export type WorkspaceSelectionResult =
   | { ok: false; error: string };
 
 export async function readWorkspaceRegistry(options: WorkspaceRegistryOptions): Promise<WorkspaceRegistry> {
+  return enqueueRegistryOperation(() => readWorkspaceRegistryUnlocked(options));
+}
+
+async function readWorkspaceRegistryUnlocked(options: WorkspaceRegistryOptions): Promise<WorkspaceRegistry> {
   const fallback = createFallbackRegistry(options);
   const filePath = workspaceRegistryPath(options.dataRoot);
 
@@ -81,7 +97,14 @@ export async function resolveWorkspaceSelection(
   options: WorkspaceRegistryOptions,
   input: WorkspaceSelectionInput = {},
 ): Promise<WorkspaceSelectionResult> {
-  const registry = await readWorkspaceRegistry(options);
+  return enqueueRegistryOperation(() => resolveWorkspaceSelectionUnlocked(options, input));
+}
+
+async function resolveWorkspaceSelectionUnlocked(
+  options: WorkspaceRegistryOptions,
+  input: WorkspaceSelectionInput = {},
+): Promise<WorkspaceSelectionResult> {
+  const registry = await readWorkspaceRegistryUnlocked(options);
   const workspaceId = input.workspaceId?.trim();
   if (workspaceId) {
     const entry = registry.items.find((item) => item.id === workspaceId);
@@ -112,6 +135,24 @@ export async function resolveWorkspaceSelection(
     return { ok: false, error: "default workspace is missing" };
   }
   return { ok: true, workspaceId: defaultEntry.id, workspaceRoot: defaultEntry.path };
+}
+
+export async function createWorkspaceFolder(
+  options: WorkspaceRegistryOptions,
+  input: { parentRoot: string; name: string },
+): Promise<WorkspaceSelectionResult> {
+  const name = input.name.trim();
+  if (!name || name === "." || name === ".." || /[\\/]/.test(name)) {
+    return { ok: false, error: "Folder name must be a single non-empty path segment." };
+  }
+  const parentRoot = normalizeWorkspacePath(input.parentRoot);
+  const workspaceRoot = join(parentRoot, name);
+  try {
+    await mkdir(workspaceRoot);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+  return resolveWorkspaceSelection(options, { workspaceRoot });
 }
 
 function sanitizeWorkspaceRegistry(raw: unknown, fallback: WorkspaceRegistry): WorkspaceRegistry {
@@ -180,7 +221,10 @@ function mergeSessionWorkspaces(registry: WorkspaceRegistry, sessions: SessionLi
   return mergeWorkspaceEntries(
     registry,
     sessions
-      .map((session) => session.workspaceRoot ? normalizeWorkspacePath(session.workspaceRoot) : "")
+      .map((session) => {
+        const root = session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot;
+        return root ? normalizeWorkspacePath(root) : "";
+      })
       .filter(Boolean)
       .map((root, index) => createFolderWorkspaceEntry(root, registry.items.length + index)),
   );
@@ -247,7 +291,11 @@ function sortWorkspaceItems(items: WorkspaceEntry[]): WorkspaceEntry[] {
 async function writeWorkspaceRegistry(dataRoot: string, registry: WorkspaceRegistry): Promise<void> {
   const filePath = workspaceRegistryPath(dataRoot);
   await mkdir(dirname(filePath), { recursive: true });
-  const tmp = `${filePath}.tmp`;
-  await writeFile(tmp, JSON.stringify(registry, null, 2) + "\n", "utf8");
-  await rename(tmp, filePath);
+  const tmp = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(tmp, JSON.stringify(registry, null, 2) + "\n", "utf8");
+    await rename(tmp, filePath);
+  } finally {
+    await unlink(tmp).catch(() => undefined);
+  }
 }

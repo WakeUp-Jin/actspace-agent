@@ -24,18 +24,20 @@ import type {
   ReviewGetWorkspaceChangesResult,
   RunTurnInput,
   RuntimeStreamEvent,
+  SessionRunLocation,
   SessionEvent,
   SessionListItem,
   SessionRecord,
   ToolUiPreview,
   WorkspaceEntry,
+  WorkspaceGitContext,
   WorkspaceListResult,
 } from "@actspace/shared";
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import { resolvePreferredChatModel } from "./model-selection";
-import type { ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
+import type { ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 
 const DEFAULT_WORKSPACE_LABEL = "Default workspace";
@@ -128,12 +130,14 @@ type StreamingSegment =
   | { type: "thinking"; text: string }
   | { type: "text"; text: string }
   | { type: "tool"; toolCallId: string }
-  | { type: "compaction"; turnId: string };
+  | { type: "compaction"; turnId: string }
+  | { type: "workspace_preparation"; turnId: string };
 
 type StreamingState = {
   segments: StreamingSegment[];
   activeTools: Map<string, ToolEntry>;
   activeCompactions: Map<string, Extract<MessageBlock, { kind: "context_compaction" }>>;
+  activeWorkspacePreparations: Map<string, Extract<MessageBlock, { kind: "workspace_preparation" }>>;
   /** 已发起模型请求、但尚未收到可见回复或工具活动。仅用于当前流式 UI，不写入会话。 */
   waitingForModel: boolean;
   /** LLM 可重试错误退避中：显示重试提示；新 delta 到达（重试成功）时清除 */
@@ -145,6 +149,7 @@ function createEmptyStreamingState(): StreamingState {
     segments: [],
     activeTools: new Map(),
     activeCompactions: new Map(),
+    activeWorkspacePreparations: new Map(),
     waitingForModel: false,
   };
 }
@@ -637,6 +642,9 @@ function streamingStateToBlocks(state: StreamingState, turnId?: string): Message
       if (block) {
         blocks.push(block);
       }
+    } else if (seg.type === "workspace_preparation") {
+      const block = state.activeWorkspacePreparations.get(seg.turnId);
+      if (block) blocks.push(block);
     }
   }
 
@@ -696,6 +704,12 @@ function upsertCompactionSegment(state: StreamingState, turnId: string): void {
   }
 }
 
+function upsertWorkspacePreparationSegment(state: StreamingState, turnId: string): void {
+  if (!state.segments.some((segment) => segment.type === "workspace_preparation" && segment.turnId === turnId)) {
+    state.segments.push({ type: "workspace_preparation", turnId });
+  }
+}
+
 let turnCounter = 0;
 function nextTurnId(): string {
   return `turn-${Date.now()}-${++turnCounter}`;
@@ -726,11 +740,16 @@ export function App() {
   const [approvalPendingSessionIds, setApprovalPendingSessionIds] = useState<Set<string>>(() => new Set());
   const [failedSessionIds, setFailedSessionIds] = useState<Set<string>>(() => new Set());
   const [selectedWorkspaceRoot, setSelectedWorkspaceRoot] = useState<string | null>(null);
+  const [workspaceGitContext, setWorkspaceGitContext] = useState<WorkspaceGitContext | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState<string | undefined>(undefined);
+  const [runLocation, setRunLocation] = useState<SessionRunLocation>("this_mac");
+  const [composerDraftRestore, setComposerDraftRestore] = useState<ComposerDraftRestore | null>(null);
   const [reviewSummary, setReviewSummary] = useState<ComposerReviewSummary | null>(null);
   const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const activeStreamTurnRef = useRef<{ sessionId: string; turnId: string } | null>(null);
+  const activeTurnAcceptedRef = useRef(false);
   const reviewRefreshRequestIdRef = useRef(0);
   const userPickedChatModelRef = useRef(false);
 
@@ -776,7 +795,7 @@ export function App() {
     }
 
     const resolvedWorkspaceRoot = normalizeWorkspaceRoot(
-      workspaceRoot ?? selectedWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+      workspaceRoot ?? sessionRecord?.meta.worktree?.workspaceRoot ?? selectedWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
     );
     const requestId = ++reviewRefreshRequestIdRef.current;
     setReviewSummary({ status: "loading" });
@@ -796,7 +815,7 @@ export function App() {
         reason: "command_failed",
       });
     }
-  }, [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot]);
+  }, [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot, sessionRecord?.meta.worktree?.workspaceRoot]);
 
   const refreshPendingApprovalStatuses = useCallback(async (sessionIds: string[]) => {
     if (!hasActspaceBridge() || !window.actspace.listPendingApprovals) return;
@@ -845,8 +864,43 @@ export function App() {
 
   useEffect(() => {
     if (selectedWorkspaceRoot) return;
-    setSelectedWorkspaceRoot(normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
+    setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
+      sessionRecord?.meta.worktree?.sourceWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+    ));
   }, [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot]);
+
+  useEffect(() => {
+    const lockedWorktree = sessionRecord?.meta.worktree;
+    if (lockedWorktree) {
+      setRunLocation("worktree");
+      setSelectedBranch(lockedWorktree.branch);
+      setWorkspaceGitContext(null);
+      return;
+    }
+    const workspaceRoot = selectedWorkspaceRoot ?? bootstrapState?.workspaceRoot;
+    if (!hasActspaceBridge() || !workspaceRoot || !window.actspace.getWorkspaceGitContext) {
+      setWorkspaceGitContext(null);
+      setSelectedBranch(undefined);
+      setRunLocation("this_mac");
+      return;
+    }
+    let cancelled = false;
+    window.actspace.getWorkspaceGitContext({ workspaceRoot }).then((context) => {
+      if (cancelled) return;
+      setWorkspaceGitContext(context);
+      setSelectedBranch(context.status === "ready" ? context.currentBranch : undefined);
+      setRunLocation("this_mac");
+    }).catch((error: unknown) => {
+      if (cancelled) return;
+      console.error("Failed to load workspace Git context", error);
+      setWorkspaceGitContext(null);
+      setSelectedBranch(undefined);
+      setRunLocation("this_mac");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.id, sessionRecord?.meta.turnCount, sessionRecord?.meta.worktree]);
 
   useEffect(() => {
     if (!hasActspaceBridge()) return;
@@ -928,7 +982,13 @@ export function App() {
         const restored = await window.actspace.getSession({ sessionId: existing.id });
         setSessionRecord(restored);
         setSelectedWorkspaceRoot(
-          normalizeWorkspaceRoot(restored?.meta.workspaceRoot ?? existing.workspaceRoot ?? bootstrapState?.workspaceRoot),
+          normalizeWorkspaceRoot(
+            restored?.meta.worktree?.sourceWorkspaceRoot ??
+            restored?.meta.workspaceRoot ??
+            existing.worktree?.sourceWorkspaceRoot ??
+            existing.workspaceRoot ??
+            bootstrapState?.workspaceRoot,
+          ),
         );
         setSessionBootstrapComplete(true);
         return;
@@ -956,6 +1016,39 @@ export function App() {
 
     switch (event.type) {
       case "turn_started":
+        activeTurnAcceptedRef.current = true;
+        state.waitingForModel = true;
+        break;
+
+      case "workspace_preparation_started":
+        state.waitingForModel = false;
+        upsertWorkspacePreparationSegment(state, event.turnId);
+        state.activeWorkspacePreparations.set(event.turnId, {
+          kind: "workspace_preparation",
+          id: `turn:${event.turnId}:workspace-preparation:0`,
+          status: "running",
+          sourceWorkspaceRoot: event.sourceWorkspaceRoot,
+          baseBranch: event.baseBranch,
+          createdAt: new Date().toISOString(),
+        });
+        break;
+
+      case "workspace_preparation_finished":
+        activeTurnAcceptedRef.current = true;
+        upsertWorkspacePreparationSegment(state, event.turnId);
+        state.activeWorkspacePreparations.set(event.turnId, {
+          kind: "workspace_preparation",
+          id: `turn:${event.turnId}:workspace-preparation:0`,
+          status: "completed",
+          sourceWorkspaceRoot: event.payload.sourceWorkspaceRoot,
+          workspaceRoot: event.payload.workspaceRoot,
+          baseBranch: event.payload.baseBranch,
+          branch: event.payload.branch,
+          baseCommit: event.payload.baseCommit,
+          durationMs: event.payload.durationMs,
+          environmentSetup: event.payload.environmentSetup,
+          createdAt: new Date().toISOString(),
+        });
         state.waitingForModel = true;
         break;
 
@@ -1293,9 +1386,13 @@ export function App() {
     const currentWorkspaceRoot = normalizeWorkspaceRoot(
       (createdSession ?? sessionRecord)?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
     );
+    const currentWorktree = (createdSession ?? sessionRecord)?.meta.worktree;
+    const isFirstTurn = ((createdSession ?? sessionRecord)?.meta.turnCount ?? 0) === 0;
 
     if (
       hasActspaceBridge() &&
+      !isFirstTurn &&
+      !currentWorktree &&
       nextWorkspaceRoot &&
       nextWorkspaceRoot !== currentWorkspaceRoot &&
       window.actspace.setSessionWorkspace
@@ -1337,6 +1434,8 @@ export function App() {
     setIsAborting(false);
     setActiveTurnId(turnId);
     activeStreamTurnRef.current = { sessionId, turnId };
+    activeTurnAcceptedRef.current = false;
+    setComposerDraftRestore(null);
     setApprovalPendingForSession(sessionId, false);
     setFailedForSession(sessionId, false);
     streamStateRef.current = createEmptyStreamingState();
@@ -1385,9 +1484,10 @@ export function App() {
       if (!isCurrentVisibleTurn()) return false;
 
       if (hasActspaceBridge()) {
-        void refreshReviewSummary(nextWorkspaceRoot);
+        void refreshReviewSummary();
       }
       activeStreamTurnRef.current = null;
+      activeTurnAcceptedRef.current = false;
       setIsStreaming(false);
       setIsAborting(false);
       setActiveTurnId(null);
@@ -1476,6 +1576,14 @@ export function App() {
           ...modelSelectionPayload(options.model),
           thinkingEnabled: options.thinkingEnabled,
           ...(options.reasoningEffort && { reasoningEffort: options.reasoningEffort }),
+          ...(isFirstTurn && nextWorkspaceRoot ? {
+            executionContext: {
+              runLocation,
+              ...(nextWorkspace?.id ? { workspaceId: nextWorkspace.id } : {}),
+              sourceWorkspaceRoot: nextWorkspaceRoot,
+              ...(selectedBranch ? { branch: selectedBranch } : {}),
+            },
+          } : {}),
         };
         const result = await window.actspace.runTurn(input);
 
@@ -1505,6 +1613,14 @@ export function App() {
     } catch (error) {
       console.error("Failed to run turn", error);
       if (isCurrentVisibleTurn()) {
+        if (!activeTurnAcceptedRef.current && !isCompactCommand && !isEvalCommand) {
+          setComposerDraftRestore({
+            id: Date.now(),
+            text,
+            attachments: options.attachments,
+            error: error instanceof Error ? error.message : "Could not prepare the execution context.",
+          });
+        }
         setApprovalPendingForSession(sessionId, false);
         setFailedForSession(sessionId, true);
       } else {
@@ -1531,6 +1647,8 @@ export function App() {
     setApprovalPendingForSession,
     setFailedForSession,
     createSessionForInput,
+    runLocation,
+    selectedBranch,
   ]);
 
   const handleAbort = useCallback(async () => {
@@ -1556,6 +1674,7 @@ export function App() {
 
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
     activeStreamTurnRef.current = null;
+    activeTurnAcceptedRef.current = false;
     setIsStreaming(false);
     setIsAborting(false);
     setActiveTurnId(null);
@@ -1586,11 +1705,47 @@ export function App() {
     }
   }, [handleCreateSession]);
 
+  const handleUseExistingWorkspace = useCallback(async () => {
+    if (!hasActspaceBridge() || !window.actspace.selectWorkspaceDirectory) return;
+    try {
+      const result = await window.actspace.selectWorkspaceDirectory();
+      if (result.canceled || !result.workspaceRoot) return;
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(result.workspaceRoot));
+    } catch (error) {
+      console.error("Failed to select workspace", error);
+    }
+  }, []);
+
+  const handleCreateWorkspaceFolder = useCallback(async (name: string) => {
+    if (
+      !hasActspaceBridge() ||
+      !window.actspace.selectWorkspaceDirectory ||
+      !window.actspace.createWorkspaceFolder
+    ) return;
+    try {
+      const parent = await window.actspace.selectWorkspaceDirectory();
+      if (parent.canceled || !parent.workspaceRoot) return;
+      const result = await window.actspace.createWorkspaceFolder({
+        parentRoot: parent.workspaceRoot,
+        name,
+      });
+      if ("error" in result) {
+        console.error("Failed to create workspace folder", result.error);
+        return;
+      }
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(result.workspaceRoot));
+      await refreshWorkspaces();
+    } catch (error) {
+      console.error("Failed to create workspace folder", error);
+    }
+  }, [refreshWorkspaces]);
+
   const handleSelectSession = useCallback(
     async (sessionId: string) => {
       if (!sessionId || sessionId === activeSessionIdRef.current) return;
 
       activeStreamTurnRef.current = null;
+      activeTurnAcceptedRef.current = false;
       setIsStreaming(false);
       setIsAborting(false);
       setActiveTurnId(null);
@@ -1607,7 +1762,9 @@ export function App() {
         const selected = localSessionRecords[sessionId];
         if (selected) {
           setSessionRecord(selected);
-          setSelectedWorkspaceRoot(normalizeWorkspaceRoot(selected.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
+          setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
+            selected.meta.worktree?.sourceWorkspaceRoot ?? selected.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+          ));
           return;
         }
         return;
@@ -1616,7 +1773,9 @@ export function App() {
       try {
         const restored = await window.actspace.getSession({ sessionId });
         setSessionRecord(restored);
-        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(restored?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
+        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
+          restored?.meta.worktree?.sourceWorkspaceRoot ?? restored?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+        ));
       } catch (error) {
         console.error("Failed to select session", error);
       }
@@ -1675,17 +1834,42 @@ export function App() {
   const isSessionReady = Boolean(sessionRecord || turnResult || streamingBlocks.length > 0 || sessionBootstrapComplete);
   const title = getSessionTitle(sessionRecord, sessions);
   const workspaceOptions = useMemo(
-    () =>
-      workspaceRegistry
+    () => {
+      const registryOptions = workspaceRegistry
         ? createWorkspaceOptionsFromRegistry(workspaceRegistry.items)
-        : createWorkspaceOptionsFromRoots([
-            selectedWorkspaceRoot,
-            sessionRecord?.meta.workspaceRoot,
-            bootstrapState?.workspaceRoot,
-            ...sessions.map((session) => session.workspaceRoot),
-          ], bootstrapState?.workspaceRoot),
+        : [];
+      const fallbackOptions = createWorkspaceOptionsFromRoots([
+        selectedWorkspaceRoot,
+        sessionRecord?.meta.worktree?.sourceWorkspaceRoot,
+        sessionRecord?.meta.workspaceRoot,
+        bootstrapState?.workspaceRoot,
+        ...sessions.map((session) => session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot),
+      ], bootstrapState?.workspaceRoot);
+      const merged = new Map(registryOptions.map((option) => [option.value, option]));
+      for (const option of fallbackOptions) {
+        if (!merged.has(option.value)) merged.set(option.value, option);
+      }
+      return [...merged.values()];
+    },
     [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot, sessions, workspaceRegistry],
   );
+  const executionContext = useMemo<ComposerExecutionContext>(() => ({
+    gitContext: workspaceGitContext,
+    selectedBranch,
+    runLocation,
+    locked: (sessionRecord?.meta.turnCount ?? 0) > 0,
+    onSelectBranch: setSelectedBranch,
+    onSelectRunLocation: setRunLocation,
+    onUseExistingWorkspace: handleUseExistingWorkspace,
+    onCreateWorkspaceFolder: handleCreateWorkspaceFolder,
+  }), [
+    handleCreateWorkspaceFolder,
+    handleUseExistingWorkspace,
+    runLocation,
+    selectedBranch,
+    sessionRecord?.meta.turnCount,
+    workspaceGitContext,
+  ]);
   const busySessionIds = useMemo<Set<string>>(() => {
     const set = new Set<string>();
     if (isStreaming) {
@@ -1794,7 +1978,9 @@ export function App() {
       streamStateRef.current = createEmptyStreamingState();
       streamingUserBlockRef.current = null;
       setSessionRecord(forked);
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(forked.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
+        forked.meta.worktree?.sourceWorkspaceRoot ?? forked.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+      ));
       setApprovalPendingForSession(forked.meta.id, false);
       setFailedForSession(forked.meta.id, false);
     } catch (error) {
@@ -1972,6 +2158,8 @@ export function App() {
         workspaceOptions={workspaceOptions}
         selectedWorkspaceRoot={selectedWorkspaceRoot}
         onSelectWorkspace={setSelectedWorkspaceRoot}
+        executionContext={executionContext}
+        draftRestore={composerDraftRestore}
         getSessionPreview={getSessionPreview}
         reviewSummary={reviewSummary}
         onReviewChanged={handleReviewChanged}

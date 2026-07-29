@@ -1,7 +1,7 @@
-import { Copy, Eye, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
+import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
-import { Composer, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
+import { Composer, type ComposerDraftRestore, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { AssistantReply } from "./messages/AssistantReply";
 import { AgentRunBlock } from "./messages/AgentRunBlock";
@@ -90,7 +90,7 @@ const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
   "error",
 ]);
 const DIFF_MESSAGE_KINDS = new Set<MessageBlock["kind"]>(["edit_diff", "write_diff"]);
-const SYSTEM_MESSAGE_KINDS = new Set<MessageBlock["kind"]>(["context_compaction", "status"]);
+const SYSTEM_MESSAGE_KINDS = new Set<MessageBlock["kind"]>(["context_compaction", "workspace_preparation", "status"]);
 
 function copyWithSelection(value: string) {
   const textArea = document.createElement("textarea");
@@ -179,6 +179,8 @@ function renderMessage(
       return <BashRunBlock key={renderKey} message={message} />;
     case "context_compaction":
       return <CompactCommandBlock key={renderKey} message={message} className={className} />;
+    case "workspace_preparation":
+      return <WorkspacePreparationBlock key={renderKey} message={message} />;
     case "read":
     case "search":
     case "grep":
@@ -213,6 +215,34 @@ function renderMessage(
     case "write_diff":
       return <FileDiffBlock key={renderKey} message={message} className={className} />;
   }
+}
+
+function WorkspacePreparationBlock({
+  message,
+}: {
+  message: Extract<MessageBlock, { kind: "workspace_preparation" }>;
+}) {
+  const completed = message.status === "completed";
+  return (
+    <details className="group/worktree rounded-act-md border border-line bg-surface-subtle/70 px-3 py-2 text-sm text-text-muted" open={!completed}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-text-main">
+        {completed ? <Check size={15} aria-hidden="true" /> : <Loader2 className="animate-spin" size={15} aria-hidden="true" />}
+        <span className="font-medium">{completed ? "Created worktree" : "Creating worktree"}</span>
+        {completed && message.durationMs !== undefined ? (
+          <span className="text-xs text-text-faint">{Math.max(0, message.durationMs / 1000).toFixed(1)}s</span>
+        ) : null}
+      </summary>
+      <div className="mt-2 grid gap-1.5 border-t border-line pt-2 text-xs leading-5 text-text-faint">
+        <div className="flex items-center gap-1.5 text-text-muted">
+          <GitBranch size={13} aria-hidden="true" />
+          <span>{message.branch ?? `from ${message.baseBranch}`}</span>
+        </div>
+        {message.workspaceRoot ? <code className="break-all font-mono">{message.workspaceRoot}</code> : null}
+        {message.baseCommit ? <span>Base commit {message.baseCommit.slice(0, 8)}</span> : null}
+        {completed ? <span>No local environment setup was run automatically.</span> : null}
+      </div>
+    </details>
+  );
 }
 
 function ModelWaitingStatus({ content }: { content: string }) {
@@ -258,7 +288,7 @@ function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTurn[] {
       continue;
     }
 
-    if (message.kind === "context_compaction") {
+    if (message.kind === "context_compaction" || message.kind === "workspace_preparation") {
       currentTurn = null;
       turns.push({
         id: message.renderKey ?? message.id,
@@ -341,18 +371,21 @@ function renderTurnBody(
   onOpenAgentTranscript?: AgentTranscriptHandler,
 ) {
   const { workItems, finalReply } = splitTurnMessages(turn.messages);
+  const preparationItems = workItems.filter((message) => message.kind === "workspace_preparation");
+  const processItems = workItems.filter((message) => message.kind !== "workspace_preparation");
 
-  if (!hasToolLikeItem(workItems)) {
+  if (!hasToolLikeItem(processItems)) {
     return renderMessageList(turn.messages, onOpenAgentTranscript);
   }
 
   return (
     <>
+      {preparationItems.length > 0 ? renderMessageList(preparationItems, onOpenAgentTranscript) : null}
       <ToolActivityGroup
         running={isActive}
-        durationMs={workDurationMs(workItems, finalReply)}
+        durationMs={workDurationMs(processItems, finalReply)}
       >
-        {renderMessageList(workItems, onOpenAgentTranscript)}
+        {renderMessageList(processItems, onOpenAgentTranscript)}
       </ToolActivityGroup>
       {finalReply.length > 0 ? renderMessageList(finalReply, onOpenAgentTranscript) : null}
     </>
@@ -594,6 +627,8 @@ export function ConversationView({
   workspaceOptions,
   selectedWorkspaceRoot,
   onSelectWorkspace,
+  executionContext,
+  draftRestore,
   reviewSummary,
   onOpenReview,
   models,
@@ -614,6 +649,8 @@ export function ConversationView({
   workspaceOptions?: ComposerWorkspaceOption[];
   selectedWorkspaceRoot?: string | null;
   onSelectWorkspace?: (workspaceRoot: string) => void;
+  executionContext?: ComposerExecutionContext;
+  draftRestore?: ComposerDraftRestore | null;
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
 }) {
@@ -713,6 +750,8 @@ export function ConversationView({
               workspaceOptions={workspaceOptions}
               selectedWorkspaceRoot={selectedWorkspaceRoot}
               onSelectWorkspace={onSelectWorkspace}
+              executionContext={executionContext}
+              draftRestore={draftRestore}
               models={models}
             />
           </div>
@@ -775,6 +814,8 @@ export function ConversationView({
             workspaceOptions={workspaceOptions}
             selectedWorkspaceRoot={selectedWorkspaceRoot}
             onSelectWorkspace={onSelectWorkspace}
+            executionContext={executionContext}
+            draftRestore={draftRestore}
             reviewSummary={latestActiveTranscriptMessage ? null : reviewSummary}
             onOpenReview={onOpenReview}
             models={models}

@@ -10,7 +10,7 @@ import { Sidebar, type NewSessionInput, type SessionUiStatusKind, type SidebarMo
 import { SplitView } from "./SplitView";
 import { UsageStatisticsPage } from "./UsageStatisticsPage";
 import { WindowChromeBar } from "./WindowChromeBar";
-import type { ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
+import type { ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
 import type { SessionPreviewResolver } from "./SessionHoverPreview";
 import { KairosPage } from "../pages/KairosPage";
 import { SettingsPage } from "./settings/SettingsPage";
@@ -105,6 +105,8 @@ export function WorkbenchLayout({
   workspaceOptions,
   selectedWorkspaceRoot,
   onSelectWorkspace,
+  executionContext,
+  draftRestore,
   getSessionPreview,
   reviewSummary,
   onReviewChanged,
@@ -143,6 +145,8 @@ export function WorkbenchLayout({
   workspaceOptions?: ComposerWorkspaceOption[];
   selectedWorkspaceRoot?: string | null;
   onSelectWorkspace?: (workspaceRoot: string) => void;
+  executionContext?: ComposerExecutionContext;
+  draftRestore?: ComposerDraftRestore | null;
   getSessionPreview?: SessionPreviewResolver;
   reviewSummary?: ComposerReviewSummary | null;
   onReviewChanged?: () => void;
@@ -412,6 +416,8 @@ export function WorkbenchLayout({
         workspaceOptions={workspaceOptions}
         selectedWorkspaceRoot={selectedWorkspaceRoot}
         onSelectWorkspace={onSelectWorkspace}
+        executionContext={executionContext}
+        draftRestore={draftRestore}
         reviewSummary={reviewSummary}
         onOpenReview={openReviewTab}
         models={models}
