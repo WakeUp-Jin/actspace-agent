@@ -8,7 +8,7 @@
 
 - 默认态是低高度的贴底输入面板，优先服务“继续追问 / 继续指挥当前会话”。
 - 复杂能力通过左侧 `+` 菜单展开，不在默认态把所有入口铺开。
-- 输入栏下方展示会话状态行，让 branch、local runtime 和 context usage 成为稳定状态信息。
+- 输入栏下方展示会话状态行，让 branch、This Mac / Worktree 和 context usage 成为稳定状态信息。
 - 输入栏上方预留 `Review / overflow` 操作层，未来承载 diff review、批量操作和更多会话动作。
 - 新会话首屏使用 `initial composer`，发送首条消息后切换回底部 follow-up composer。
 
@@ -21,7 +21,7 @@
 - 模型按钮下拉。
 - Image 附件与 Skills 入口。
 - 发送按钮。
-- 会话状态行：branch、local runtime、context usage。
+- 会话状态行：branch、This Mac / Worktree、context usage。
 - 新会话上下文选择行：workspace、branch、runtime。
 - 上下文弹窗。
 
@@ -36,7 +36,7 @@
 - `model` 选择保持文字化，不加边框。
 - Context usage 只在 follow-up 底部状态行右侧显示和打开，不再放在输入 panel 内。
 - 普通 focus ring 使用高对比中性 token；运行状态可使用 operational green。Context usage 默认保持中性，只有接近阈值时切 warning / danger；Thinking toggle 不再默认使用品牌蓝。
-- workspace、branch、runtime 都应表现为下拉入口，即使第一版只有静态选项。
+- workspace、branch、runtime 都应表现为下拉入口；真实交互、Git 和 Worktree 边界统一遵循 `front-workspace-git-worktree-context.md`。
 - Chat / Plan / Agent 不是只改 placeholder 的视觉标签；每次发送都必须把模式作为显式运行参数传入 main 和 Agent Runtime，由工具暴露层强制能力边界。Prompt 只负责行为指导，不承担权限隔离。
 - Slash Command 在发送前由 renderer 分流：`/compact` 触发上下文压缩，`/eval [失败说明]` 触发最近失败 Turn 的回归 Candidate 生成；命令文本不作为普通用户消息显示。
 
@@ -47,7 +47,7 @@
 - Composer 使用主题 `surface` 和 1px 中性 hairline，不使用蓝色描边或蓝色光晕建立默认层级。
 - 发送按钮继续使用主题反色的 ink action：浅色近黑底、深色近白底，不改成绿色 CTA。
 - 运行 / 停止状态可以使用小型 operational 绿点、细环或中性停止控件。
-- Context usage、branch、Local runtime 等状态行默认使用 muted / faint 灰阶。
+- Context usage、branch、This Mac / Worktree 等状态行默认使用 muted / faint 灰阶。
 - operational green 只表示运行、连接或确认，不用于模型选择、附件、普通 `+` 按钮或菜单选中。
 - 模式 pill 是对当前能力 profile 的持续编码，允许使用三种语义色：Chat = info soft，Plan = warning soft，Agent = operational soft。色彩必须同时有文字和图标表达，不能成为唯一区分依据。
 - 菜单行的 hover / selected 仍使用中性底色和勾选，不把整行涂成模式色；模式色只出现在图标、文字小范围和 Composer 中的当前模式 pill。
@@ -87,7 +87,7 @@ Composer 有 `surface`（`followup` / `initial`）一个外部维度，内部布
 
 创建新会话时，Composer 位于消息区中部，包含三层：
 
-1. 上下文选择行：`actspace-agent` workspace、`main` branch、`Local` runtime，三者都是下拉入口。
+1. 上下文选择行：当前 workspace、真实 Git branch（非 Git Workspace 隐藏）以及 `This Mac` / `New Worktree` runtime，三者都是下拉入口；Worktree 细节见 `front-workspace-git-worktree-context.md`。
 2. 输入 panel：输入框在面板上半部；底部 toolbar 从左到右包含 `+`、当前模式 pill、模型入口和发送按钮。
 3. 可选快捷 chip：`Plan New Idea`。如果保留，点击或 `Shift+Tab` 必须真实切换到 Plan；不允许继续作为无行为的 demo 控件。
 
@@ -99,7 +99,7 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 
 1. Review 操作层：位于输入栏上方，Git workspace 存在未提交改动时显示真实 `Review +N -M` 汇总和 `...`；无改动时不显示 Review 入口；当前 workspace 不是 Git repository 时显示无计数的 `Review` 入口，引导用户到右侧 Review 面板初始化 Git。
 2. 输入面板：输入框全宽在上；底部控件行左侧为 `+`、当前模式 pill 与模型选择，右侧为发送 / 停止按钮。
-3. 状态行：左侧显示 branch 与 `Local`，右侧显示 context usage 百分比或等价统计入口，也是打开 Context 弹窗的唯一入口。
+3. 状态行：左侧显示真实 branch 与 `This Mac` / `Worktree`，右侧显示 context usage 百分比或等价统计入口，也是打开 Context 弹窗的唯一入口。
 
 ### `+` command menu
 

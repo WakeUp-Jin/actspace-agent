@@ -1912,15 +1912,17 @@ describe("App streaming user message", () => {
     await userEvent.type(composer, "use the alternate workspace");
     await userEvent.click(screen.getByLabelText("Send message"));
 
-    await waitFor(() => {
-      expect(setSessionWorkspace).toHaveBeenCalledWith({
-        sessionId,
+    await waitFor(() => expect(runTurn).toHaveBeenCalledTimes(1));
+    expect(setSessionWorkspace).not.toHaveBeenCalled();
+    expect(runTurn).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId,
+      executionContext: {
+        runLocation: "this_mac",
         workspaceId: "ws_alt",
-        workspaceRoot: "/tmp/alt-workspace",
-      });
-      expect(runTurn).toHaveBeenCalledTimes(1);
-    });
-    expect(callOrder).toEqual(["set-workspace", "run-turn"]);
+        sourceWorkspaceRoot: "/tmp/alt-workspace",
+      },
+    }));
+    expect(callOrder).toEqual(["run-turn"]);
   });
 
   it("sends attachments through RunTurnInput and keeps the attachment chip while running", async () => {

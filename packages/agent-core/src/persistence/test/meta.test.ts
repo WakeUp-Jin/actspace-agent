@@ -98,4 +98,23 @@ describe("meta.json operations", () => {
     expect(meta!.pinned).toBe(true);
     expect(meta!.workspaceRoot).toBe("/tmp/ws");
   });
+
+  it("round-trips and clears worktree metadata", async () => {
+    const worktree = {
+      kind: "worktree" as const,
+      sourceWorkspaceRoot: "/tmp/source",
+      workspaceRoot: "/tmp/worktree",
+      baseBranch: "main",
+      branch: "actspace/92803054",
+      baseCommit: "a1b2c3d4",
+      createdAt: "2026-07-29T00:00:00.000Z",
+    };
+    await createMeta(metaPath, "session-1", "Worktree", { worktree });
+
+    expect((await readMeta(metaPath))?.worktree).toEqual(worktree);
+
+    const result = await updateMeta(metaPath, { worktree: null });
+    expect(result.ok).toBe(true);
+    expect((await readMeta(metaPath))?.worktree).toBeUndefined();
+  });
 });

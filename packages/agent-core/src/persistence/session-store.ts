@@ -422,6 +422,7 @@ export async function listSessionRecords(
         };
         if (meta.workspaceId) item.workspaceId = meta.workspaceId;
         if (meta.workspaceRoot) item.workspaceRoot = meta.workspaceRoot;
+        if (meta.worktree) item.worktree = meta.worktree;
         if (meta.pinned) item.pinned = true;
         if (meta.archived) item.archived = true;
         return item;

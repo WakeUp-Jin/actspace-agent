@@ -59,6 +59,10 @@ import type {
   WorkspaceGitPushInput,
   WorkspaceOpenInput,
   WorkspaceListDirInput,
+  WorkspaceGitContextInput,
+  WorkspaceGitContext,
+  WorkspaceCreateFolderInput,
+  WorkspaceCreateFolderResult,
   WorkspaceListResult,
   WorkspaceIdInput,
   WorkspaceVisibilityInput,
@@ -146,8 +150,10 @@ import {
   getWorkspaceEnvironment,
   pushWorkspaceBranch,
 } from "./workspace-environment-service";
+import { getWorkspaceGitContext } from "./workspace-git-context-service";
 import { listWorkspaceOpenTools, openWorkspaceInTool } from "./workspace-open-service";
 import {
+  createWorkspaceFolder,
   readWorkspaceRegistry,
   resolveRegisteredWorkspaceSelection,
   resolveWorkspaceSelection,
@@ -1033,6 +1039,28 @@ async function registerIpc() {
       workspaceRoot: result.filePaths[0],
     };
   });
+
+  ipcMain.handle(
+    "workspace:get-git-context",
+    async (_event, input: WorkspaceGitContextInput): Promise<WorkspaceGitContext> => {
+      const roots = await ensureDataDirectories();
+      return getWorkspaceGitContext(input.workspaceRoot ?? roots.defaultWorkspaceRoot);
+    },
+  );
+
+  ipcMain.handle(
+    "workspace:create-folder",
+    async (_event, input: WorkspaceCreateFolderInput): Promise<WorkspaceCreateFolderResult> => {
+      const roots = await ensureDataDirectories();
+      const sessions = await listSessionRecords(roots.sessionRoot);
+      return createWorkspaceFolder({
+        dataRoot: roots.dataRoot,
+        defaultWorkspaceRoot: roots.defaultWorkspaceRoot,
+        fallbackWorkspaceRoot: roots.workspaceRoot,
+        sessions,
+      }, input);
+    },
+  );
 
   ipcMain.handle("visualize:convert-reply", async (_event, input: VisualizeReplyInput) => {
     const roots = await ensureDataDirectories();

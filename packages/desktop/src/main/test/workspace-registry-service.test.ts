@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -267,5 +267,25 @@ describe("workspace registry service", () => {
       ok: true,
       workspaceRoot: resolve(fallbackWorkspaceRoot),
     }));
+  });
+
+  it("serializes concurrent registry repairs and preserves concurrent path registrations", async () => {
+    const dataRoot = await makeDataRoot();
+    const options = {
+      dataRoot,
+      defaultWorkspaceRoot: join(dataRoot, "Downloads"),
+      fallbackWorkspaceRoot: join(dataRoot, "actspace-agent"),
+      sessions: [],
+    };
+
+    await expect(Promise.all(Array.from({ length: 8 }, () => readWorkspaceRegistry(options)))).resolves.toHaveLength(8);
+
+    const roots = Array.from({ length: 6 }, (_, index) => join(dataRoot, `project-${index}`));
+    await expect(Promise.all(roots.map((workspaceRoot) => resolveWorkspaceSelection(options, { workspaceRoot })))).resolves.toHaveLength(6);
+
+    const registry = await readWorkspaceRegistry(options);
+    expect(roots.every((workspaceRoot) => registry.items.some((item) => item.path === resolve(workspaceRoot)))).toBe(true);
+    await expect(readFile(workspaceRegistryPath(dataRoot), "utf8")).resolves.toContain("project-5");
+    await expect(readdir(dataRoot)).resolves.not.toEqual(expect.arrayContaining([expect.stringMatching(/\.tmp$/)]));
   });
 });

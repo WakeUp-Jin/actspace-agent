@@ -119,8 +119,8 @@ describe("Composer follow-up bar", () => {
     expect(reviewButton).toHaveClass("hover:bg-surface-subtle", "hover:border-line-strong", "hover:text-text-main");
     expect(reviewOverflowButton).toHaveClass("hover:bg-surface-subtle", "hover:border-line-strong", "hover:text-text-main");
     expect(screen.getByPlaceholderText("Send follow-up")).toBeInTheDocument();
-    expect(screen.getByText("main")).toBeInTheDocument();
-    expect(screen.getByText("Local")).toBeInTheDocument();
+    expect(screen.queryByText("main")).not.toBeInTheDocument();
+    expect(screen.getByText("This Mac")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Context usage 36%" })).toBeInTheDocument();
   });
 
@@ -668,6 +668,18 @@ describe("Composer follow-up bar", () => {
         { value: "/work/actspace-agent", label: "actspace-agent" },
       ],
       onSelectWorkspace,
+      executionContext: {
+        runLocation: "this_mac",
+        selectedBranch: "main",
+        gitContext: {
+          status: "ready",
+          workspaceRoot: "/work/actspace-agent",
+          repositoryRoot: "/work/actspace-agent",
+          currentBranch: "main",
+          headCommit: "0123456789abcdef",
+          branches: [{ name: "main", current: true }],
+        },
+      },
     });
     const panel = screen.getByLabelText("Message composer panel");
     const toolbar = screen.getByLabelText("Composer toolbar");
@@ -676,8 +688,8 @@ describe("Composer follow-up bar", () => {
 
     expect(screen.getByLabelText("Initial composer context selectors")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Select workspace" })).toHaveTextContent("actspace-agent");
-    await waitFor(() => expect(screen.getByRole("button", { name: "Select branch" })).toHaveTextContent("feature/ui"));
-    expect(screen.getByRole("button", { name: "Select runtime" })).toHaveTextContent("Local");
+    expect(screen.getByRole("button", { name: "Select branch" })).toHaveTextContent("main");
+    expect(screen.getByRole("button", { name: "Select runtime" })).toHaveTextContent("This Mac");
     expect(screen.queryByRole("button", { name: "Review pending changes" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Context usage 36%" })).not.toBeInTheDocument();
     expect(panel).toContainElement(input);
@@ -688,11 +700,24 @@ describe("Composer follow-up bar", () => {
 
     await user.click(screen.getByRole("button", { name: "Select workspace" }));
     const workspaceMenu = screen.getByRole("menu", { name: "actspace-agent options" });
+    expect(screen.getByLabelText("Initial composer context selectors")).toHaveClass("overflow-visible");
+    expect(workspaceMenu).toHaveClass("top-[calc(100%_+_8px)]");
     expect(within(workspaceMenu).getByRole("menuitem", { name: "wakeup-Jin-wiki" })).toBeInTheDocument();
     expect(within(workspaceMenu).getByRole("menuitem", { name: "code-tool-work" })).toBeInTheDocument();
     await user.click(within(workspaceMenu).getByRole("menuitem", { name: "code-tool-work" }));
     expect(onSelectWorkspace).toHaveBeenCalledWith("/work/code-tool-work");
     expect(onSend).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Select branch" }));
+    const branchMenu = screen.getByRole("menu", { name: "Branch options" });
+    expect(branchMenu).toHaveClass("top-[calc(100%_+_8px)]");
+    expect(within(branchMenu).getByRole("menuitemradio", { name: "main" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Select runtime" }));
+    const runtimeMenu = screen.getByRole("menu", { name: "Run on options" });
+    expect(runtimeMenu).toHaveClass("top-[calc(100%_+_8px)]");
+    expect(within(runtimeMenu).getByRole("menuitemradio", { name: "This Mac" })).toBeInTheDocument();
+    expect(within(runtimeMenu).getByRole("menuitemradio", { name: "New Worktree" })).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Message composer"), "start a new idea");
     await user.click(screen.getByRole("button", { name: "Send message" }));

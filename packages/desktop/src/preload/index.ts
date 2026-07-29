@@ -126,6 +126,10 @@ import type {
   VisualizeReplyInput,
   VisualizeReplyResult,
   WorkspaceListDirInput,
+  WorkspaceGitContextInput,
+  WorkspaceGitContext,
+  WorkspaceCreateFolderInput,
+  WorkspaceCreateFolderResult,
   WorkspaceListDirResult,
   WorkspaceListResult,
   WorkspaceIdInput,
@@ -178,6 +182,10 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("workspace:open-in-ide", input) as Promise<WorkspaceOpenInIdeResult>,
   setWorkspaceVisibility: (input: WorkspaceVisibilityInput) =>
     ipcRenderer.invoke("workspace:set-visibility", input) as Promise<WorkspaceVisibilityResult>,
+  getWorkspaceGitContext: (input: WorkspaceGitContextInput) =>
+    ipcRenderer.invoke("workspace:get-git-context", input) as Promise<WorkspaceGitContext>,
+  createWorkspaceFolder: (input: WorkspaceCreateFolderInput) =>
+    ipcRenderer.invoke("workspace:create-folder", input) as Promise<WorkspaceCreateFolderResult>,
   listWorkspaceDir: (input: WorkspaceListDirInput) =>
     ipcRenderer.invoke("workspace:list-dir", input) as Promise<WorkspaceListDirResult>,
   readWorkspaceFile: (input: WorkspaceReadFileInput) =>

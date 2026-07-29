@@ -15,6 +15,10 @@ import {
   MessageCircle,
   MoreHorizontal,
   Plus,
+  Cloud,
+  FolderOpen,
+  FolderPlus,
+  Server,
   Search,
   Square,
   X,
@@ -28,7 +32,9 @@ import type {
   ModelReasoningEffort,
   ModelSelectionId,
   SkillCatalogItem,
+  SessionRunLocation,
   UsableModelView,
+  WorkspaceGitContext,
 } from "@actspace/shared";
 import { DEFAULT_MODEL_ID, MODEL_LIST, MODEL_REASONING_EFFORTS } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
@@ -54,6 +60,24 @@ export type ComposerWorkspaceOption = {
   workspaceId?: string;
 };
 
+export type ComposerExecutionContext = {
+  gitContext: WorkspaceGitContext | null;
+  selectedBranch?: string;
+  runLocation: SessionRunLocation;
+  locked?: boolean;
+  onSelectBranch?: (branch: string) => void;
+  onSelectRunLocation?: (location: SessionRunLocation) => void;
+  onUseExistingWorkspace?: () => void;
+  onCreateWorkspaceFolder?: (name: string) => void;
+};
+
+export type ComposerDraftRestore = {
+  id: number;
+  text: string;
+  attachments?: ComposerAttachment[];
+  error?: string;
+};
+
 export type ComposerReviewSummary = {
   status: "loading" | "changes" | "empty" | "notAvailable" | "noBaseline" | "partial" | "failed";
   additions?: number;
@@ -67,7 +91,7 @@ const COMPOSER_WRAP_CLASS =
   "composer-wrap relative mx-auto grid w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] gap-2 max-[600px]:w-[calc(100%_-_36px)]";
 const COMPOSER_INITIAL_WRAP_CLASS =
   "composer-wrap composer-wrap-initial relative mx-auto grid w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),706px)] gap-2 max-[600px]:w-[calc(100%_-_36px)]";
-const INITIAL_CONTEXT_ROW_CLASS = "initial-context-row flex min-h-7 items-center gap-3 overflow-x-auto px-2 text-sm text-text-muted";
+const INITIAL_CONTEXT_ROW_CLASS = "initial-context-row relative z-20 flex min-h-7 items-center gap-3 overflow-visible px-2 text-sm text-text-muted max-[600px]:flex-wrap";
 const INITIAL_CONTEXT_SELECTOR_CLASS =
   "initial-context-selector inline-flex items-center gap-1 rounded-full border-0 bg-transparent px-1 py-1 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main";
 const COMPOSER_ACTION_STRIP_CLASS = "composer-action-strip flex min-h-[34px] items-center gap-2";
@@ -139,6 +163,10 @@ const COMMAND_MENU_CLASS =
   "command-menu w-[240px] min-w-[240px] overflow-hidden rounded-xl border border-line bg-surface-raised/96 p-2 shadow-act-popover";
 const SKILL_MENU_CLASS =
   "skill-menu max-h-[360px] w-[300px] min-w-[300px] overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-2 shadow-act-popover max-[600px]:w-[260px] max-[600px]:min-w-[260px]";
+const INITIAL_DROPDOWN_MENU_BASE_CLASS =
+  "dropdown-menu absolute top-[calc(100%_+_8px)] z-30 max-h-[min(360px,calc(100vh_-_120px))] overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
+const INITIAL_DROPDOWN_MENU_CLASS = `${INITIAL_DROPDOWN_MENU_BASE_CLASS} left-0`;
+const RECENT_WORKSPACE_LIMIT = 5;
 const COMMAND_MENU_HINT_CLASS = "px-2 pb-2 pt-1 text-sm text-text-subtle";
 const COMMAND_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
 const COMMAND_MENU_BUTTON_CLASS =
@@ -373,6 +401,8 @@ export function Composer({
   workspaceOptions = [],
   selectedWorkspaceRoot,
   onSelectWorkspace,
+  executionContext,
+  draftRestore,
   reviewSummary,
   onOpenReview,
   models,
@@ -397,6 +427,8 @@ export function Composer({
   workspaceOptions?: ComposerWorkspaceOption[];
   selectedWorkspaceRoot?: string | null;
   onSelectWorkspace?: (workspaceRoot: string) => void;
+  executionContext?: ComposerExecutionContext;
+  draftRestore?: ComposerDraftRestore | null;
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
   models?: UsableModelView[];
@@ -441,7 +473,8 @@ export function Composer({
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const [message, setMessage] = useState("");
-  const [workspaceBranchLabel, setWorkspaceBranchLabel] = useState("Branch");
+  const [workspaceFolderName, setWorkspaceFolderName] = useState("");
+  const [creatingWorkspaceFolder, setCreatingWorkspaceFolder] = useState(false);
   const [isInputMultiline, setIsInputMultiline] = useState(false);
   const composerRef = useRef<HTMLElement | null>(null);
   const composerBodyRef = useRef<HTMLDivElement | null>(null);
@@ -507,33 +540,9 @@ export function Composer({
     workspaceOptions.find((workspace) => workspace.value === selectedWorkspaceRoot)?.label ??
     workspaceOptions[0]?.label ??
     "Workspace";
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadBranch = async () => {
-      const api = window.actspace?.getWorkspaceEnvironment;
-      if (!api || !selectedWorkspaceRoot) {
-        if (!cancelled) setWorkspaceBranchLabel("Branch");
-        return;
-      }
-      try {
-        const snapshot = await api({ workspaceRoot: selectedWorkspaceRoot });
-        if (!cancelled) setWorkspaceBranchLabel(snapshot.git.branch ?? (snapshot.git.repository ? "New branch" : "No Git"));
-      } catch {
-        if (!cancelled) setWorkspaceBranchLabel("Branch");
-      }
-    };
-    const handleGitChanged = (event: Event) => {
-      const detail = (event as CustomEvent<{ workspaceRoot?: string }>).detail;
-      if (!detail?.workspaceRoot || detail.workspaceRoot === selectedWorkspaceRoot) void loadBranch();
-    };
-    void loadBranch();
-    window.addEventListener("actspace:workspace-git-changed", handleGitChanged);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("actspace:workspace-git-changed", handleGitChanged);
-    };
-  }, [selectedWorkspaceRoot]);
+  const gitReady = executionContext?.gitContext?.status === "ready";
+  const selectedBranch = executionContext?.selectedBranch ?? executionContext?.gitContext?.currentBranch;
+  const runLocation = executionContext?.runLocation ?? "this_mac";
 
   // 默认模型可能在 Composer 挂载后才异步到达（settings:get）；只在用户尚未手动
   // 选择过模型时同步，避免覆盖用户当前会话里的临时选择。
@@ -547,6 +556,13 @@ export function Composer({
     if (!controlledSelectedModelId) return;
     setEditingModelId(controlledSelectedModelId);
   }, [controlledSelectedModelId, models]);
+
+  useEffect(() => {
+    if (!draftRestore) return;
+    setMessage(draftRestore.text);
+    setAttachments(draftRestore.attachments ?? []);
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  }, [draftRestore]);
 
   useLayoutEffect(() => {
     if (!modelOpen) {
@@ -1464,13 +1480,15 @@ export function Composer({
     return (
       <div className={STATUS_ROW_CLASS}>
         <div className={STATUS_GROUP_CLASS}>
-          <span className={STATUS_ITEM_CLASS}>
-            <GitBranch className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
-            <span>main</span>
-          </span>
+          {gitReady || executionContext?.locked ? (
+            <span className={STATUS_ITEM_CLASS} title={selectedBranch}>
+              <GitBranch className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
+              <span className="max-w-[240px] truncate">{selectedBranch ?? "Detached HEAD"}</span>
+            </span>
+          ) : null}
           <span className={STATUS_ITEM_CLASS}>
             <Laptop className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
-            <span>Local</span>
+            <span>{runLocation === "worktree" ? "Worktree" : "This Mac"}</span>
           </span>
         </div>
         <button
@@ -1502,10 +1520,7 @@ export function Composer({
 
   function renderContextSelector(kind: ContextSelectorKind, label: string, icon?: "branch" | "runtime") {
     const isWorkspaceSelector = kind === "workspace";
-    const menuItems =
-      isWorkspaceSelector && workspaceOptions.length > 0
-        ? workspaceOptions
-        : [{ value: label, label }];
+    const menuItems = isWorkspaceSelector ? workspaceOptions.slice(0, RECENT_WORKSPACE_LIMIT) : [];
 
     return (
       <div className={CONTROL_GROUP_CLASS}>
@@ -1528,8 +1543,9 @@ export function Composer({
           <span>{label}</span>
           <ChevronDown size={13} strokeWidth={2.2} aria-hidden="true" />
         </button>
-        {contextSelectorOpen === kind ? (
-          <div className={DROPDOWN_MENU_CLASS} role="menu" aria-label={`${label} options`}>
+        {contextSelectorOpen === kind && kind === "workspace" ? (
+          <div className={`${INITIAL_DROPDOWN_MENU_CLASS} w-[240px]`} role="menu" aria-label={`${label} options`}>
+            <div className={DROPDOWN_LABEL_CLASS}>Recents</div>
             {menuItems.map((item) => (
               <button
                 className={COMMAND_MENU_BUTTON_CLASS}
@@ -1546,6 +1562,122 @@ export function Composer({
                 <span>{item.label}</span>
               </button>
             ))}
+            <div className={COMMAND_MENU_SEPARATOR_CLASS} />
+            <button
+              className={COMMAND_MENU_BUTTON_CLASS}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                executionContext?.onUseExistingWorkspace?.();
+                setContextSelectorOpen(null);
+              }}
+            >
+              <FolderOpen className={COMMAND_MENU_ICON_CLASS} size={15} aria-hidden="true" />
+              <span>Use Existing...</span>
+            </button>
+            {creatingWorkspaceFolder ? (
+              <form
+                className="flex items-center gap-1.5 px-2 py-1"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const name = workspaceFolderName.trim();
+                  if (!name) return;
+                  executionContext?.onCreateWorkspaceFolder?.(name);
+                  setWorkspaceFolderName("");
+                  setCreatingWorkspaceFolder(false);
+                  setContextSelectorOpen(null);
+                }}
+              >
+                <input
+                  className="min-w-0 flex-1 rounded-act-sm border border-line bg-surface px-2 py-1 text-sm text-text-main outline-none focus:border-line-strong"
+                  aria-label="New folder name"
+                  autoFocus
+                  value={workspaceFolderName}
+                  onChange={(event) => setWorkspaceFolderName(event.target.value)}
+                  placeholder="Folder name"
+                />
+                <button className="rounded-act-sm px-2 py-1 text-sm text-text-main hover:bg-hover-overlay" type="submit">
+                  Create
+                </button>
+              </form>
+            ) : (
+              <button
+                className={COMMAND_MENU_BUTTON_CLASS}
+                type="button"
+                role="menuitem"
+                onClick={() => setCreatingWorkspaceFolder(true)}
+              >
+                <FolderPlus className={COMMAND_MENU_ICON_CLASS} size={15} aria-hidden="true" />
+                <span>New Folder</span>
+              </button>
+            )}
+          </div>
+        ) : null}
+        {contextSelectorOpen === kind && kind === "branch" ? (
+          <div className={`${INITIAL_DROPDOWN_MENU_CLASS} max-h-[320px] w-[300px]`} role="menu" aria-label="Branch options">
+            <div className={DROPDOWN_LABEL_CLASS}>Branches</div>
+            {executionContext?.gitContext?.branches.map((branch) => (
+              <button
+                className={COMMAND_MENU_BUTTON_CLASS}
+                type="button"
+                role="menuitemradio"
+                aria-checked={branch.name === selectedBranch}
+                key={branch.name}
+                onClick={() => {
+                  executionContext.onSelectBranch?.(branch.name);
+                  setContextSelectorOpen(null);
+                }}
+              >
+                <span className="min-w-0 flex-1 truncate">{branch.name}</span>
+                {branch.name === selectedBranch ? <Check size={15} aria-hidden="true" /> : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {contextSelectorOpen === kind && kind === "runtime" ? (
+          <div className={`${INITIAL_DROPDOWN_MENU_CLASS} w-[240px]`} role="menu" aria-label="Run on options">
+            <div className={DROPDOWN_LABEL_CLASS}>Run on</div>
+            <button className={COMMAND_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
+              <Cloud className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
+              <span className="flex-1">Cloud</span>
+              <span className="text-[11px] text-text-faint">Coming soon</span>
+            </button>
+            <button
+              className={COMMAND_MENU_BUTTON_CLASS}
+              type="button"
+              role="menuitemradio"
+              aria-checked={runLocation === "this_mac"}
+              onClick={() => {
+                executionContext?.onSelectRunLocation?.("this_mac");
+                setContextSelectorOpen(null);
+              }}
+            >
+              <Laptop className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
+              <span className="flex-1">This Mac</span>
+              {runLocation === "this_mac" ? <Check size={15} aria-hidden="true" /> : null}
+            </button>
+            <button className={COMMAND_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
+              <Server className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
+              <span className="flex-1">Remote SSH</span>
+              <span className="text-[11px] text-text-faint">Coming soon</span>
+            </button>
+            {gitReady ? <div className={COMMAND_MENU_SEPARATOR_CLASS} /> : null}
+            {gitReady ? (
+              <button
+                className={COMMAND_MENU_BUTTON_CLASS}
+                type="button"
+                role="menuitemradio"
+                aria-checked={runLocation === "worktree"}
+                onClick={() => {
+                  executionContext?.onSelectRunLocation?.("worktree");
+                  setContextSelectorOpen(null);
+                }}
+              >
+                <Plus className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
+                <span className="flex-1">New Worktree</span>
+                {runLocation === "worktree" ? <Check size={15} aria-hidden="true" /> : null}
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -1558,8 +1690,17 @@ export function Composer({
     return (
       <div className={INITIAL_CONTEXT_ROW_CLASS} aria-label="Initial composer context selectors">
         {renderContextSelector("workspace", selectedWorkspaceLabel)}
-        {renderContextSelector("branch", workspaceBranchLabel, "branch")}
-        {renderContextSelector("runtime", "Local", "runtime")}
+        {gitReady ? renderContextSelector("branch", selectedBranch ?? "Detached HEAD", "branch") : null}
+        {renderContextSelector("runtime", runLocation === "worktree" ? "New Worktree" : "This Mac", "runtime")}
+      </div>
+    );
+  }
+
+  function renderDraftError() {
+    if (!draftRestore?.error) return null;
+    return (
+      <div className="rounded-act-md border border-danger/30 bg-danger-subtle px-3 py-2 text-sm text-danger" role="alert">
+        {draftRestore.error}
       </div>
     );
   }
@@ -1599,6 +1740,7 @@ export function Composer({
       ) : null}
       {renderReviewActionsStrip()}
       {renderInitialContextRow()}
+      {renderDraftError()}
       {renderPanel()}
       {renderComposerStatusRow()}
       {renderPlanNewIdeaChip()}

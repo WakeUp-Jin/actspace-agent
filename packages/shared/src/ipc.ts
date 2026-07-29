@@ -58,6 +58,8 @@ export type RunTurnInput = {
   sessionId: string;
   turnId: string;
   userInput: string;
+  /** 首个普通 turn 的执行目录准备；已有 turn 的 session 忽略该字段。 */
+  executionContext?: TurnExecutionContextInput;
   attachments?: import("./session").ComposerAttachment[];
   mode?: ComposerMode;
   selectedSkills?: string[];
@@ -70,6 +72,54 @@ export type RunTurnInput = {
   exploreModelId?: ModelId | null;
   exploreModelKey?: ModelKey | null;
 };
+
+export type SessionRunLocation = "this_mac" | "worktree";
+
+export type TurnExecutionContextInput = {
+  runLocation: SessionRunLocation;
+  workspaceId?: string;
+  sourceWorkspaceRoot: string;
+  /** This Mac 下是目标 checkout；Worktree 下是 base branch。 */
+  branch?: string;
+};
+
+export type GitBranchItem = {
+  name: string;
+  current: boolean;
+  /** 存在时表示该 branch 已被某个 worktree checkout。 */
+  checkedOutPath?: string;
+};
+
+export type WorkspaceGitContextStatus =
+  | "ready"
+  | "not_repository"
+  | "no_head"
+  | "git_not_found"
+  | "failed";
+
+export type WorkspaceGitContextInput = {
+  workspaceRoot?: string;
+};
+
+export type WorkspaceGitContext = {
+  status: WorkspaceGitContextStatus;
+  workspaceRoot: string;
+  repositoryRoot?: string;
+  currentBranch?: string;
+  detachedCommit?: string;
+  headCommit?: string;
+  branches: GitBranchItem[];
+  error?: string;
+};
+
+export type WorkspaceCreateFolderInput = {
+  parentRoot: string;
+  name: string;
+};
+
+export type WorkspaceCreateFolderResult =
+  | { ok: true; workspaceId: string; workspaceRoot: string }
+  | { ok: false; error: string };
 
 export type CompactContextInput = {
   sessionId: string;
@@ -332,6 +382,8 @@ export type SessionListItem = {
   workspaceId?: string;
   /** 创建会话时的工作区根目录；旧 session 缺这个字段时由前端视作 default workspace。 */
   workspaceRoot?: string;
+  /** Worktree 会话的隔离执行上下文；普通会话缺省。 */
+  worktree?: import("./session").SessionWorktreeContext;
   /** 用户是否把该会话钉到 Pinned 分区。 */
   pinned?: boolean;
   /** 用户是否把该会话归档。 */

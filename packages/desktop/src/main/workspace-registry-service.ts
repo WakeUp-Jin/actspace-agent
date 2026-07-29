@@ -195,6 +195,24 @@ export async function resolveRegisteredWorkspaceSelection(
     : { ok: false, error: "workspaceRoot is not registered" };
 }
 
+export async function createWorkspaceFolder(
+  options: WorkspaceRegistryOptions,
+  input: { parentRoot: string; name: string },
+): Promise<WorkspaceSelectionResult> {
+  const name = input.name.trim();
+  if (!name || name === "." || name === ".." || /[\\/]/.test(name)) {
+    return { ok: false, error: "Folder name must be a single non-empty path segment." };
+  }
+  const parentRoot = normalizeWorkspacePath(input.parentRoot);
+  const workspaceRoot = join(parentRoot, name);
+  try {
+    await mkdir(workspaceRoot);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+  return resolveWorkspaceSelection(options, { workspaceRoot });
+}
+
 function sanitizeWorkspaceRegistry(raw: unknown, fallback: WorkspaceRegistry): WorkspaceRegistry {
   if (!raw || typeof raw !== "object") return fallback;
   const value = raw as Partial<WorkspaceRegistry>;
@@ -262,7 +280,10 @@ function mergeSessionWorkspaces(registry: WorkspaceRegistry, sessions: SessionLi
   return mergeWorkspaceEntries(
     registry,
     sessions
-      .map((session) => session.workspaceRoot ? normalizeWorkspacePath(session.workspaceRoot) : "")
+      .map((session) => {
+        const root = session.worktree?.sourceWorkspaceRoot ?? session.workspaceRoot;
+        return root ? normalizeWorkspacePath(root) : "";
+      })
       .filter(Boolean)
       .map((root, index) => createFolderWorkspaceEntry(root, registry.items.length + index)),
   );

@@ -11,7 +11,8 @@ import type {
   SessionId,
   ThinkingPayload,
   ToolUiPreview,
-  UserMessagePayload
+  UserMessagePayload,
+  WorkspacePreparationPayload,
 } from "./session";
 import { convertUsageCostToUsd } from "./usage-cost";
 
@@ -320,6 +321,36 @@ function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
   ];
 }
 
+function workspacePreparationBlock(event: SessionEvent): MessageBlock[] {
+  const payload = isRecord(event.payload) ? event.payload as WorkspacePreparationPayload : null;
+  if (
+    !payload ||
+    payload.kind !== "worktree" ||
+    payload.status !== "completed" ||
+    typeof payload.sourceWorkspaceRoot !== "string" ||
+    typeof payload.workspaceRoot !== "string" ||
+    typeof payload.baseBranch !== "string" ||
+    typeof payload.branch !== "string" ||
+    typeof payload.baseCommit !== "string"
+  ) {
+    return [];
+  }
+
+  return [{
+    kind: "workspace_preparation",
+    id: event.id,
+    status: "completed",
+    sourceWorkspaceRoot: payload.sourceWorkspaceRoot,
+    workspaceRoot: payload.workspaceRoot,
+    baseBranch: payload.baseBranch,
+    branch: payload.branch,
+    baseCommit: payload.baseCommit,
+    durationMs: payload.durationMs,
+    environmentSetup: payload.environmentSetup,
+    createdAt: getDisplayTime(event.timestamp),
+  }];
+}
+
 export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
   const lastAssistantEventIdByTurn = new Map<string, EventId>();
   const usageByTurn = new Map<string, { totalTokens: number; costUsd: number }>();
@@ -464,6 +495,10 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
       case "context_compaction":
         return contextCompactionBlock(event).map((block) =>
           withRenderKey(block, nextRenderKey(event, "context-compaction")),
+        );
+      case "workspace_preparation":
+        return workspacePreparationBlock(event).map((block) =>
+          withRenderKey(block, nextRenderKey(event, "workspace-preparation")),
         );
       case "eval_candidate": {
         const payload = event.payload as EvalCandidatePayload;

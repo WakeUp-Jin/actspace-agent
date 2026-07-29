@@ -33,6 +33,12 @@ declare global {
       setWorkspaceVisibility?: (
         input: import("@actspace/shared").WorkspaceVisibilityInput
       ) => Promise<import("@actspace/shared").WorkspaceVisibilityResult>;
+      getWorkspaceGitContext?: (
+        input: import("@actspace/shared").WorkspaceGitContextInput
+      ) => Promise<import("@actspace/shared").WorkspaceGitContext>;
+      createWorkspaceFolder?: (
+        input: import("@actspace/shared").WorkspaceCreateFolderInput
+      ) => Promise<import("@actspace/shared").WorkspaceCreateFolderResult>;
       listWorkspaceDir: (
         input: import("@actspace/shared").WorkspaceListDirInput
       ) => Promise<import("@actspace/shared").WorkspaceListDirResult>;

@@ -79,6 +79,8 @@ Agent 文件工具的 `workspaceRoot` 与 Electron `userData` 分离：
 - 应用默认根解析顺序为 `ACTSPACE_WORKSPACE_ROOT` -> 当前仓库根目录。
 - 普通聊天 turn 的实际根优先读当前 session `meta.workspaceRoot`；旧 session 或未设置时才回退应用默认根。
 - 顶部 Workspace 选择器的切换只是 renderer 临时状态；用户发送消息时才把最终选择写入当前 session `meta.workspaceRoot`，避免多次选择造成多次迁移。
+- Worktree 会话中 `workspaceId` 仍指向用户选择的长期 Workspace，`meta.workspaceRoot` 改为 Agent 实际运行的 worktree 目录，并通过可选 worktree metadata 保留原 Workspace path、base branch、任务 branch 和 base commit；ActSpace 创建的临时 worktree 不注册为新的 Workspace item。
+- Worktree V1 不因 Session 归档、删除或应用退出自动清理，也不自动复制原目录未提交改动、untracked 文件、环境配置或依赖目录。完整交互和生命周期见 `docs/design-docs/frontend/front-workspace-git-worktree-context.md`。
 
 renderer 不能直接访问文件系统，所有文件与 session 读写都必须走 preload + IPC。
 

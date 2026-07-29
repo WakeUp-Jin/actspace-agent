@@ -9,6 +9,7 @@ import type {
   SessionEvent,
   SessionId,
   SessionMeta,
+  SessionWorktreeContext,
 } from "@actspace/shared";
 import type { Message } from "../messages";
 
@@ -61,6 +62,8 @@ export interface MetaUpdateFields {
   lastContextSnapshot?: ContextUsageSnapshot;
   workspaceId?: string;
   workspaceRoot?: string;
+  /** null 表示清除已有 worktree metadata。 */
+  worktree?: SessionWorktreeContext | null;
   pinned?: boolean;
   archived?: boolean;
 }
