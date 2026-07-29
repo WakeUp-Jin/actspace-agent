@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import {
   readWorkspaceRegistry,
   resolveWorkspaceSelection,
+  setWorkspaceHidden,
   workspaceRegistryPath,
 } from "../workspace-registry-service";
 
@@ -48,6 +49,30 @@ describe("workspace registry service", () => {
       }),
     ]);
     await expect(readFile(workspaceRegistryPath(dataRoot), "utf8")).resolves.toContain("Default workspace");
+  });
+
+  it("serializes concurrent startup reads without sharing a temporary file", async () => {
+    const dataRoot = await makeDataRoot();
+    const defaultWorkspaceRoot = join(dataRoot, "Downloads");
+    const fallbackWorkspaceRoot = join(dataRoot, "actspace-agent");
+    const options = {
+      dataRoot,
+      defaultWorkspaceRoot,
+      fallbackWorkspaceRoot,
+      sessions: [],
+    };
+
+    const registries = await Promise.all(
+      Array.from({ length: 6 }, () => readWorkspaceRegistry(options)),
+    );
+
+    expect(registries.every((registry) => registry.defaultWorkspaceId === "default")).toBe(true);
+    const persisted = JSON.parse(await readFile(workspaceRegistryPath(dataRoot), "utf8")) as {
+      defaultWorkspaceId?: string;
+      items?: unknown[];
+    };
+    expect(persisted.defaultWorkspaceId).toBe("default");
+    expect(persisted.items).toHaveLength(2);
   });
 
   it("repairs an old default workspace path to the current default root", async () => {
@@ -166,5 +191,55 @@ describe("workspace registry service", () => {
       sessions: [],
     });
     expect(registry.items.some((item) => item.path === resolve(newWorkspaceRoot))).toBe(true);
+  });
+
+  it("persists hidden workspaces across session merging and restores them by selecting the same path", async () => {
+    const dataRoot = await makeDataRoot();
+    const defaultWorkspaceRoot = join(dataRoot, "Downloads");
+    const workspaceRoot = join(dataRoot, "hidden-project");
+    const options = {
+      dataRoot,
+      defaultWorkspaceRoot,
+      fallbackWorkspaceRoot: defaultWorkspaceRoot,
+      sessions: [{
+        id: "session-1",
+        title: "Hidden project session",
+        createdAt: "2026-07-29T00:00:00.000Z",
+        updatedAt: "2026-07-29T00:00:00.000Z",
+        turnCount: 1,
+        workspaceRoot,
+      }],
+    };
+    const initial = await readWorkspaceRegistry(options);
+    const workspace = initial.items.find((item) => item.path === resolve(workspaceRoot));
+    expect(workspace).toBeDefined();
+
+    await expect(setWorkspaceHidden(options, workspace!.id, true)).resolves.toEqual({ ok: true });
+    const hidden = await readWorkspaceRegistry(options);
+    expect(hidden.items.find((item) => item.id === workspace!.id)?.hidden).toBe(true);
+
+    await expect(resolveWorkspaceSelection(options, { workspaceRoot })).resolves.toEqual({
+      ok: true,
+      workspaceId: workspace!.id,
+      workspaceRoot: resolve(workspaceRoot),
+    });
+    const restored = await readWorkspaceRegistry(options);
+    expect(restored.items.find((item) => item.id === workspace!.id)?.hidden).toBe(false);
+  });
+
+  it("does not allow the default workspace to be hidden", async () => {
+    const dataRoot = await makeDataRoot();
+    const defaultWorkspaceRoot = join(dataRoot, "Downloads");
+    const options = {
+      dataRoot,
+      defaultWorkspaceRoot,
+      fallbackWorkspaceRoot: defaultWorkspaceRoot,
+      sessions: [],
+    };
+
+    await expect(setWorkspaceHidden(options, "default", true)).resolves.toEqual({
+      ok: false,
+      error: "default_workspace_required",
+    });
   });
 });

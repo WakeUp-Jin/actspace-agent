@@ -95,7 +95,7 @@ function createWorkspaceOptionsFromRoots(
 }
 
 function createWorkspaceOptionsFromRegistry(items: WorkspaceEntry[]): ComposerWorkspaceOption[] {
-  return items.map((workspace) => ({
+  return items.filter((workspace) => !workspace.hidden).map((workspace) => ({
     value: workspace.path,
     label: workspace.label,
     workspaceId: workspace.id,
@@ -837,13 +837,6 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!hasActspaceBridge()) return;
-    refreshWorkspaces().catch((error: unknown) => {
-      console.error("Failed to load workspaces", error);
-    });
-  }, [refreshWorkspaces]);
-
-  useEffect(() => {
     if (selectedWorkspaceRoot) return;
     setSelectedWorkspaceRoot(normalizeWorkspaceRoot(sessionRecord?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
   }, [bootstrapState?.workspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot]);
@@ -919,10 +912,19 @@ export function App() {
     if (!hasActspaceBridge()) return;
 
     async function bootstrapSession() {
-      const listedSessions = await window.actspace.listSessions();
+      const [listedSessions, registry] = await Promise.all([
+        window.actspace.listSessions(),
+        window.actspace.listWorkspaces?.() ?? Promise.resolve(null),
+      ]);
       setSessions(listedSessions);
+      if (registry) setWorkspaceRegistry(registry);
 
-      const existing = listedSessions[0];
+      const hiddenWorkspaceIds = new Set(registry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.id));
+      const hiddenWorkspacePaths = new Set(registry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.path));
+      const existing = listedSessions.find((session) =>
+        !hiddenWorkspaceIds.has(session.workspaceId ?? "") &&
+        !hiddenWorkspacePaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
+      );
       if (existing) {
         activeSessionIdRef.current = existing.id;
         const restored = await window.actspace.getSession({ sessionId: existing.id });
@@ -937,7 +939,10 @@ export function App() {
       activeSessionIdRef.current = null;
       setSessionRecord(null);
       setTurnResult(null);
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(bootstrapState?.workspaceRoot));
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
+        registry?.items.find((workspace) => workspace.id === registry.defaultWorkspaceId)?.path ??
+        bootstrapState?.workspaceRoot,
+      ));
       setSessionBootstrapComplete(true);
     }
 
@@ -1670,10 +1675,23 @@ export function App() {
   const contextState: ContextState | null =
     sessionRecord?.contextState ?? turnResult?.contextState ?? null;
 
+  const visibleSessions = useMemo(() => {
+    if (!workspaceRegistry) return sessions;
+    const hiddenWorkspaceIds = new Set(
+      workspaceRegistry.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.id),
+    );
+    const hiddenWorkspacePaths = new Set(
+      workspaceRegistry.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.path),
+    );
+    return sessions.filter((session) =>
+      !hiddenWorkspaceIds.has(session.workspaceId ?? "") &&
+      !hiddenWorkspacePaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
+    );
+  }, [sessions, workspaceRegistry]);
   const activeSessionId =
-    sessionRecord?.meta.id ?? turnResult?.sessionId ?? sessions[0]?.id ?? null;
+    sessionRecord?.meta.id ?? turnResult?.sessionId ?? visibleSessions[0]?.id ?? null;
   const isSessionReady = Boolean(sessionRecord || turnResult || streamingBlocks.length > 0 || sessionBootstrapComplete);
-  const title = getSessionTitle(sessionRecord, sessions);
+  const title = getSessionTitle(sessionRecord, visibleSessions);
   const workspaceOptions = useMemo(
     () =>
       workspaceRegistry
@@ -1917,6 +1935,127 @@ export function App() {
     [activeSessionId],
   );
 
+  const handleOpenWorkspace = useCallback(async (workspaceId: string) => {
+    if (!hasActspaceBridge() || !window.actspace.openWorkspaceInIde) return;
+    const result = await window.actspace.openWorkspaceInIde({ workspaceId });
+    if (!result.ok) {
+      console.error("Failed to open workspace in IDE", result.error);
+    }
+  }, []);
+
+  const handleArchiveWorkspace = useCallback(async (workspaceId: string, workspaceRoot?: string) => {
+    if (!workspaceRoot && workspaceId === workspaceRegistry?.defaultWorkspaceId) {
+      workspaceRoot = workspaceRegistry.items.find((workspace) => workspace.id === workspaceId)?.path;
+    }
+    const targetSessionIds = sessions
+      .filter((session) =>
+        session.workspaceId === workspaceId ||
+        (!session.workspaceId && normalizeWorkspaceRoot(session.workspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)) ||
+        (!session.workspaceId && !session.workspaceRoot && workspaceId === workspaceRegistry?.defaultWorkspaceId),
+      )
+      .map((session) => session.id);
+    if (targetSessionIds.length === 0) return;
+    if (targetSessionIds.some((sessionId) => busySessionIds.has(sessionId) || approvalPendingSessionIds.has(sessionId))) {
+      return;
+    }
+
+    if (activeSessionId && targetSessionIds.includes(activeSessionId)) {
+      const hiddenWorkspaces = workspaceRegistry?.items.filter((workspace) => workspace.hidden) ?? [];
+      const hiddenIds = new Set(hiddenWorkspaces.map((workspace) => workspace.id));
+      const hiddenPaths = new Set(hiddenWorkspaces.map((workspace) => normalizeWorkspaceRoot(workspace.path)));
+      const fallback = sessions.find((session) =>
+        !targetSessionIds.includes(session.id) &&
+        !hiddenIds.has(session.workspaceId ?? "") &&
+        !hiddenPaths.has(normalizeWorkspaceRoot(session.workspaceRoot)),
+      );
+      if (fallback) {
+        await handleSelectSession(fallback.id);
+      } else {
+        const created = await createSessionForInput({ workspaceId, workspaceRoot });
+        if (!created) return;
+      }
+    }
+
+    if (!hasActspaceBridge()) {
+      const targets = new Set(targetSessionIds);
+      setSessions((current) => current.filter((session) => !targets.has(session.id)));
+      setLocalSessionRecords((current) => Object.fromEntries(
+        Object.entries(current).filter(([sessionId]) => !targets.has(sessionId)),
+      ));
+      return;
+    }
+    if (!window.actspace.archiveSessions) return;
+    const result = await window.actspace.archiveSessions({ sessionIds: targetSessionIds });
+    const refreshed = await window.actspace.listSessions();
+    setSessions(refreshed);
+    if (!result.ok) {
+      console.error("Some workspace sessions could not be archived", result.failedSessionIds);
+    }
+  }, [activeSessionId, approvalPendingSessionIds, busySessionIds, createSessionForInput, handleSelectSession, sessions, workspaceRegistry]);
+
+  const handleRemoveWorkspace = useCallback(async (workspaceId: string, workspaceRoot?: string) => {
+    if (!workspaceRegistry || workspaceId === workspaceRegistry.defaultWorkspaceId) return;
+    const targetSessionIds = new Set(sessions
+      .filter((session) =>
+        session.workspaceId === workspaceId ||
+        (!session.workspaceId && normalizeWorkspaceRoot(session.workspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)),
+      )
+      .map((session) => session.id));
+
+    if (activeSessionId && targetSessionIds.has(activeSessionId)) {
+      const hiddenWorkspaces = workspaceRegistry.items.filter((workspace) => workspace.hidden);
+      const hiddenIds = new Set(hiddenWorkspaces.map((workspace) => workspace.id));
+      const hiddenPaths = new Set(hiddenWorkspaces.map((workspace) => workspace.path));
+      const fallback = sessions.find((session) =>
+        !targetSessionIds.has(session.id) &&
+        !hiddenIds.has(session.workspaceId ?? "") &&
+        !hiddenPaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
+      );
+      if (fallback) {
+        const restored = hasActspaceBridge()
+          ? await window.actspace.getSession({ sessionId: fallback.id })
+          : localSessionRecords[fallback.id] ?? null;
+        if (!restored) return;
+        activeStreamTurnRef.current = null;
+        activeSessionIdRef.current = fallback.id;
+        setIsStreaming(false);
+        setIsAborting(false);
+        setActiveTurnId(null);
+        setSessionRecord(restored);
+        setTurnResult(null);
+        setStreamingBlocks([]);
+        streamStateRef.current = createEmptyStreamingState();
+        streamingUserBlockRef.current = null;
+        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
+          restored.meta.workspaceRoot ?? fallback.workspaceRoot ?? bootstrapState?.workspaceRoot,
+        ));
+      } else {
+        const created = await createSessionForInput({ workspaceId: workspaceRegistry.defaultWorkspaceId });
+        if (!created) return;
+      }
+    }
+
+    if (!hasActspaceBridge() || !window.actspace.setWorkspaceVisibility) {
+      setWorkspaceRegistry((current) => current ? {
+        ...current,
+        items: current.items.map((workspace) => workspace.id === workspaceId ? { ...workspace, hidden: true } : workspace),
+      } : current);
+      return;
+    }
+    const result = await window.actspace.setWorkspaceVisibility({ workspaceId, hidden: true });
+    if (!result.ok) {
+      console.error("Failed to remove workspace from sidebar", result.error);
+      return;
+    }
+    await refreshWorkspaces();
+    if (normalizeWorkspaceRoot(selectedWorkspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)) {
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
+        workspaceRegistry.items.find((workspace) => workspace.id === workspaceRegistry.defaultWorkspaceId)?.path ??
+        bootstrapState?.workspaceRoot,
+      ));
+    }
+  }, [activeSessionId, bootstrapState?.workspaceRoot, createSessionForInput, localSessionRecords, refreshWorkspaces, selectedWorkspaceRoot, sessions, workspaceRegistry]);
+
   const handleArchivedSessionsChange = useCallback(async () => {
     if (!hasActspaceBridge()) return;
 
@@ -1940,7 +2079,7 @@ export function App() {
   return (
     <RightPanelProvider>
       <WorkbenchLayout
-        sessions={sessions}
+        sessions={visibleSessions}
         activeSessionId={activeSessionId}
         title={title}
         messages={messages}
@@ -1962,13 +2101,16 @@ export function App() {
         onCopyTranscript={handleCopyTranscript}
         onForkSession={handleForkSession}
         onArchiveSession={handleArchiveSession}
+        onOpenWorkspace={handleOpenWorkspace}
+        onArchiveWorkspace={handleArchiveWorkspace}
+        onRemoveWorkspace={handleRemoveWorkspace}
         isSessionReady={isSessionReady}
         defaultModelId={defaultModelId}
         selectedModelId={selectedChatModelId}
         onSelectedModelChange={handleSelectedChatModelChange}
         onSettingsChange={handleSettingsChange}
         onArchivedSessionsChange={handleArchivedSessionsChange}
-        workspaces={workspaceRegistry?.items}
+        workspaces={workspaceRegistry?.items.filter((workspace) => !workspace.hidden)}
         workspaceOptions={workspaceOptions}
         selectedWorkspaceRoot={selectedWorkspaceRoot}
         onSelectWorkspace={setSelectedWorkspaceRoot}

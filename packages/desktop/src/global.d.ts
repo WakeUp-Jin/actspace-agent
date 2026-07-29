@@ -26,6 +26,12 @@ declare global {
         input: import("@actspace/shared").ListVisualizationsInput
       ) => Promise<import("@actspace/shared").ListVisualizationsResult>;
       listWorkspaces?: () => Promise<import("@actspace/shared").WorkspaceListResult>;
+      openWorkspaceInIde?: (
+        input: import("@actspace/shared").WorkspaceIdInput
+      ) => Promise<import("@actspace/shared").WorkspaceOpenInIdeResult>;
+      setWorkspaceVisibility?: (
+        input: import("@actspace/shared").WorkspaceVisibilityInput
+      ) => Promise<import("@actspace/shared").WorkspaceVisibilityResult>;
       listWorkspaceDir: (
         input: import("@actspace/shared").WorkspaceListDirInput
       ) => Promise<import("@actspace/shared").WorkspaceListDirResult>;
@@ -85,6 +91,9 @@ declare global {
       archiveSession: (
         input: import("@actspace/shared").SessionArchiveInput
       ) => Promise<import("@actspace/shared").SessionArchiveResult>;
+      archiveSessions?: (
+        input: import("@actspace/shared").SessionArchiveManyInput
+      ) => Promise<import("@actspace/shared").SessionArchiveManyResult>;
       onAgentStream: (
         callback: (event: import("@actspace/shared").RuntimeStreamEvent) => void
       ) => () => void;

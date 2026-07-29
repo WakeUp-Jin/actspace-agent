@@ -1,10 +1,12 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { dirname, join, basename, resolve } from "node:path";
 import type { SessionListItem, WorkspaceEntry, WorkspaceRegistry } from "@actspace/shared";
 
 const WORKSPACES_FILE = "workspaces.json";
 const DEFAULT_WORKSPACE_ID = "default";
 const DEFAULT_WORKSPACE_LABEL = "Default workspace";
+const workspaceRegistryOperationChains = new Map<string, Promise<void>>();
 
 export type WorkspaceRegistryOptions = {
   dataRoot: string;
@@ -22,7 +24,15 @@ export type WorkspaceSelectionResult =
   | { ok: true; workspaceId: string; workspaceRoot: string }
   | { ok: false; error: string };
 
-export async function readWorkspaceRegistry(options: WorkspaceRegistryOptions): Promise<WorkspaceRegistry> {
+export type WorkspaceVisibilityResult =
+  | { ok: true }
+  | { ok: false; error: "workspace_not_found" | "default_workspace_required" };
+
+export function readWorkspaceRegistry(options: WorkspaceRegistryOptions): Promise<WorkspaceRegistry> {
+  return runWorkspaceRegistryOperation(options.dataRoot, () => readWorkspaceRegistryUnsafe(options));
+}
+
+async function readWorkspaceRegistryUnsafe(options: WorkspaceRegistryOptions): Promise<WorkspaceRegistry> {
   const fallback = createFallbackRegistry(options);
   const filePath = workspaceRegistryPath(options.dataRoot);
 
@@ -77,11 +87,21 @@ export function workspaceRegistryPath(dataRoot: string): string {
   return join(dataRoot, WORKSPACES_FILE);
 }
 
-export async function resolveWorkspaceSelection(
+export function resolveWorkspaceSelection(
   options: WorkspaceRegistryOptions,
   input: WorkspaceSelectionInput = {},
 ): Promise<WorkspaceSelectionResult> {
-  const registry = await readWorkspaceRegistry(options);
+  return runWorkspaceRegistryOperation(
+    options.dataRoot,
+    () => resolveWorkspaceSelectionUnsafe(options, input),
+  );
+}
+
+async function resolveWorkspaceSelectionUnsafe(
+  options: WorkspaceRegistryOptions,
+  input: WorkspaceSelectionInput,
+): Promise<WorkspaceSelectionResult> {
+  const registry = await readWorkspaceRegistryUnsafe(options);
   const workspaceId = input.workspaceId?.trim();
   if (workspaceId) {
     const entry = registry.items.find((item) => item.id === workspaceId);
@@ -95,6 +115,14 @@ export async function resolveWorkspaceSelection(
   if (workspaceRoot) {
     const existing = registry.items.find((item) => item.path === workspaceRoot);
     if (existing) {
+      if (existing.hidden) {
+        await writeWorkspaceRegistry(options.dataRoot, {
+          ...registry,
+          items: registry.items.map((item) => item.id === existing.id
+            ? { ...item, hidden: false, updatedAt: new Date().toISOString() }
+            : item),
+        });
+      }
       return { ok: true, workspaceId: existing.id, workspaceRoot: existing.path };
     }
 
@@ -112,6 +140,39 @@ export async function resolveWorkspaceSelection(
     return { ok: false, error: "default workspace is missing" };
   }
   return { ok: true, workspaceId: defaultEntry.id, workspaceRoot: defaultEntry.path };
+}
+
+export function setWorkspaceHidden(
+  options: WorkspaceRegistryOptions,
+  workspaceId: string,
+  hidden: boolean,
+): Promise<WorkspaceVisibilityResult> {
+  return runWorkspaceRegistryOperation(
+    options.dataRoot,
+    () => setWorkspaceHiddenUnsafe(options, workspaceId, hidden),
+  );
+}
+
+async function setWorkspaceHiddenUnsafe(
+  options: WorkspaceRegistryOptions,
+  workspaceId: string,
+  hidden: boolean,
+): Promise<WorkspaceVisibilityResult> {
+  const registry = await readWorkspaceRegistryUnsafe(options);
+  const workspace = registry.items.find((item) => item.id === workspaceId);
+  if (!workspace) return { ok: false, error: "workspace_not_found" };
+  if (hidden && workspace.kind === "default") {
+    return { ok: false, error: "default_workspace_required" };
+  }
+  if (Boolean(workspace.hidden) === hidden) return { ok: true };
+
+  await writeWorkspaceRegistry(options.dataRoot, {
+    ...registry,
+    items: registry.items.map((item) => item.id === workspaceId
+      ? { ...item, hidden, updatedAt: new Date().toISOString() }
+      : item),
+  });
+  return { ok: true };
 }
 
 function sanitizeWorkspaceRegistry(raw: unknown, fallback: WorkspaceRegistry): WorkspaceRegistry {
@@ -140,6 +201,7 @@ function sanitizeWorkspaceRegistry(raw: unknown, fallback: WorkspaceRegistry): W
       label,
       path,
       order: typeof entry.order === "number" ? entry.order : items.length,
+      hidden: kind === "default" ? false : entry.hidden === true,
       createdAt: typeof entry.createdAt === "string" ? entry.createdAt : now,
       updatedAt: typeof entry.updatedAt === "string" ? entry.updatedAt : now,
     });
@@ -227,6 +289,14 @@ function workspaceIdFromPath(path: string): string {
   return `ws_${slug}_${hash}`;
 }
 
+function runWorkspaceRegistryOperation<T>(dataRoot: string, operation: () => Promise<T>): Promise<T> {
+  const key = workspaceRegistryPath(dataRoot);
+  const previous = workspaceRegistryOperationChains.get(key) ?? Promise.resolve();
+  const result = previous.then(operation, operation);
+  workspaceRegistryOperationChains.set(key, result.then(() => undefined, () => undefined));
+  return result;
+}
+
 function hashString(value: string): string {
   let hash = 2166136261;
   for (let i = 0; i < value.length; i += 1) {
@@ -247,7 +317,7 @@ function sortWorkspaceItems(items: WorkspaceEntry[]): WorkspaceEntry[] {
 async function writeWorkspaceRegistry(dataRoot: string, registry: WorkspaceRegistry): Promise<void> {
   const filePath = workspaceRegistryPath(dataRoot);
   await mkdir(dirname(filePath), { recursive: true });
-  const tmp = `${filePath}.tmp`;
+  const tmp = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(tmp, JSON.stringify(registry, null, 2) + "\n", "utf8");
   await rename(tmp, filePath);
 }

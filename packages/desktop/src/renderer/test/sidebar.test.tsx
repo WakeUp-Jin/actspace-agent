@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { ContextUsageSnapshot, SessionListItem } from "@actspace/shared";
+import type { ContextUsageSnapshot, SessionListItem, WorkspaceEntry } from "@actspace/shared";
 import { Sidebar } from "../components/Sidebar";
 import { WindowChromeBar } from "../components/WindowChromeBar";
 import { TooltipProvider } from "../components/ui/Tooltip";
@@ -45,6 +45,36 @@ const HOVER_CONTEXT: ContextUsageSnapshot = {
   buckets: [{ key: "conversation", tokens: 56_000 }],
 };
 
+const WORKSPACES: WorkspaceEntry[] = [
+  {
+    id: "default",
+    kind: "default",
+    label: "Default workspace",
+    path: "/Users/me/Downloads",
+    order: 0,
+    createdAt: "2026-07-29T00:00:00.000Z",
+    updatedAt: "2026-07-29T00:00:00.000Z",
+  },
+  {
+    id: "ws-actspace",
+    kind: "folder",
+    label: "actspace-agent",
+    path: "/Users/me/projects/actspace-agent",
+    order: 1,
+    createdAt: "2026-07-29T00:00:00.000Z",
+    updatedAt: "2026-07-29T00:00:00.000Z",
+  },
+  {
+    id: "ws-harness",
+    kind: "folder",
+    label: "agent-harness-dev",
+    path: "/Users/me/projects/agent-harness-dev",
+    order: 2,
+    createdAt: "2026-07-29T00:00:00.000Z",
+    updatedAt: "2026-07-29T00:00:00.000Z",
+  },
+];
+
 function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
   const onNewSession = vi.fn();
   const onSelectSession = vi.fn();
@@ -55,11 +85,15 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
   const onCopySessionId = vi.fn();
   const onCopyTranscript = vi.fn();
   const onFork = vi.fn();
+  const onOpenWorkspace = vi.fn();
+  const onArchiveWorkspace = vi.fn();
+  const onRemoveWorkspace = vi.fn();
 
   const result = render(
     <TooltipProvider delayDuration={0}>
       <Sidebar
         sessions={SESSIONS}
+        workspaces={WORKSPACES}
         activeSessionId={null}
         mode="expanded"
         view="chat"
@@ -72,6 +106,9 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
         onCopySessionId={onCopySessionId}
         onCopyTranscript={onCopyTranscript}
         onFork={onFork}
+        onOpenWorkspace={onOpenWorkspace}
+        onArchiveWorkspace={onArchiveWorkspace}
+        onRemoveWorkspace={onRemoveWorkspace}
         {...overrides}
       />
     </TooltipProvider>,
@@ -87,6 +124,9 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
     onCopySessionId,
     onCopyTranscript,
     onFork,
+    onOpenWorkspace,
+    onArchiveWorkspace,
+    onRemoveWorkspace,
     ...result,
   };
 }
@@ -109,6 +149,36 @@ describe("Sidebar (cursor-aligned layout)", () => {
     // Workspace folders 在 Workspaces 父级下方仍可见
     expect(screen.getByText("actspace-agent")).toBeInTheDocument();
     expect(screen.getByText("agent-harness-dev")).toBeInTheDocument();
+  });
+
+  it("opens the workspace menu from the folder name and invokes its actions", async () => {
+    const user = userEvent.setup();
+    const { onOpenWorkspace, onArchiveWorkspace, onRemoveWorkspace } = renderSidebar();
+
+    await user.click(screen.getByRole("button", { name: "actspace-agent" }));
+    expect(screen.getByRole("menu", { name: "Workspace actions for actspace-agent" })).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Open in IDE" }));
+    expect(onOpenWorkspace).toHaveBeenCalledWith("ws-actspace");
+
+    await user.click(screen.getByRole("button", { name: "actspace-agent" }));
+    await user.click(screen.getByRole("menuitem", { name: "Archive All" }));
+    expect(onArchiveWorkspace).toHaveBeenCalledWith("ws-actspace", "/Users/me/projects/actspace-agent");
+
+    await user.click(screen.getByRole("button", { name: "actspace-agent" }));
+    await user.click(screen.getByRole("menuitem", { name: "Remove from Sidebar" }));
+    expect(onRemoveWorkspace).toHaveBeenCalledWith("ws-actspace", "/Users/me/projects/actspace-agent");
+  });
+
+  it("keeps the chevron dedicated to collapse and disables default workspace removal", async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+
+    await user.click(screen.getByRole("button", { name: "Collapse actspace-agent" }));
+    expect(screen.queryByText("Conversation context lookup")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "Workspace actions for actspace-agent" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Default workspace" }));
+    expect(screen.getByRole("menuitem", { name: "Remove from Sidebar" })).toBeDisabled();
   });
 
   it("keeps the session list on vertical scrolling only", () => {
@@ -347,12 +417,20 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(container.querySelector(".session-row-actions + .session-row-time")).not.toBeNull();
   });
 
-  it("does not show the session detail hover card from sidebar rows", async () => {
+  it("shows the complete session title and workspace path on hover", async () => {
     const user = userEvent.setup();
     renderSidebar();
 
-    await user.hover(screen.getByText("工具定义格式和命名规范"));
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    const title = screen.getByText("工具定义格式和命名规范");
+    const row = title.closest(".session-row");
+    expect(row).not.toBeNull();
+    expect(row).toHaveAttribute("data-state", "closed");
+
+    await user.hover(row as HTMLElement);
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("工具定义格式和命名规范");
+    expect(tooltip).toHaveTextContent("/Users/me/projects/actspace-agent");
+    expect(row).not.toHaveAttribute("data-state", "closed");
   });
 
   it("closes the hover card while the context menu or rename input owns the row", async () => {
