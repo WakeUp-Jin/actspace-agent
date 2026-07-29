@@ -2,11 +2,12 @@ import {
   createSkillCatalogSegment,
   CACHE_STABILITY,
   loadSkillRegistry,
+  parseSkillFile,
   type AgentRuntimeContext,
   type AgentSystemPromptSegment,
 } from "@actspace/agent-core";
-import type { AgentSystemPromptFile } from "@actspace/shared";
-import { access } from "node:fs/promises";
+import type { AgentSystemPromptFile, ComposerMode } from "@actspace/shared";
+import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadAgentsMdSegments } from "./agents-md-service";
 
@@ -25,6 +26,8 @@ export type MainAgentRuntimeContextInput = {
   browserBridgeSocketPath?: string;
   /** 主 Agent 工具黑名单；`browser` 或历史 `browser_help` 会关闭整个 Browser 工具组。 */
   disabledTools?: string[];
+  mode?: ComposerMode;
+  selectedSkills?: string[];
   warn?: WarningLogger;
 };
 
@@ -34,14 +37,19 @@ export async function loadMainAgentRuntimeContext(
   const promptFile = await input.readPromptFile();
   const kairosInboxRoot = join(input.dataRoot, "kairos", "inbox");
   const mainAgentInboxPath = join(kairosInboxRoot, "main-agent.md");
-  const systemPromptSegments = await loadAgentsMdSegments({
-    dataRoot: input.dataRoot,
-    workspaceRoot: input.workspaceRoot,
-    warn: input.warn,
-  });
-  systemPromptSegments.push(createMainAgentKairosHandoffSegment(mainAgentInboxPath));
+  const mode = input.mode ?? "agent";
+  const systemPromptSegments = mode === "chat"
+    ? []
+    : await loadAgentsMdSegments({
+        dataRoot: input.dataRoot,
+        workspaceRoot: input.workspaceRoot,
+        warn: input.warn,
+      });
+  if (mode === "agent") {
+    systemPromptSegments.push(createMainAgentKairosHandoffSegment(mainAgentInboxPath));
+  }
   const disabledTools = new Set(input.disabledTools ?? []);
-  const browserBridgeRuntime = disabledTools.has("browser") || disabledTools.has("browser_help")
+  const browserBridgeRuntime = mode !== "agent" || disabledTools.has("browser") || disabledTools.has("browser_help")
     ? undefined
     : await resolveBrowserBridgeRuntime(
         input.browserBridgeAbbPath,
@@ -61,16 +69,104 @@ export async function loadMainAgentRuntimeContext(
   const filteredRegistry = disabled.size === 0
     ? skillRegistry
     : { ...skillRegistry, skills: skillRegistry.skills.filter((s) => !disabled.has(s.name)) };
-  const skillCatalogSegment = createSkillCatalogSegment(filteredRegistry);
+  const skillCatalogSegment = mode === "chat" ? undefined : createSkillCatalogSegment(filteredRegistry);
   if (skillCatalogSegment) {
     systemPromptSegments.push(skillCatalogSegment);
   }
+  if (mode === "chat") {
+    systemPromptSegments.push(createChatModeSegment());
+  } else if (mode === "plan") {
+    systemPromptSegments.push(createPlanModeSegment());
+  }
+  systemPromptSegments.push(...await createSelectedSkillSegments({
+    selectedSkills: input.selectedSkills ?? [],
+    registry: filteredRegistry,
+  }));
   return {
     systemPrompt: promptFile.content,
     systemPromptSegments,
-    additionalWritableRoots: [kairosInboxRoot],
+    additionalWritableRoots: mode === "agent" ? [kairosInboxRoot] : [],
     browserBridgeSocketPath: browserBridgeRuntime?.socketPath,
   };
+}
+
+function createChatModeSegment(): AgentSystemPromptSegment {
+  return {
+    id: "composer_chat_mode",
+    title: "Chat mode",
+    content: [
+      "Chat mode is active.",
+      "- Respond as a conversational assistant without using tools or claiming to inspect the workspace.",
+      "- Use only the user's messages and explicitly attached Image or selected Skill context.",
+      "- Do not claim that files were read, commands were run, or external information was checked.",
+    ].join("\n"),
+    bucket: "rules",
+    priority: 92,
+    stability: CACHE_STABILITY.STABLE,
+  };
+}
+
+function createPlanModeSegment(): AgentSystemPromptSegment {
+  return {
+    id: "composer_plan_mode",
+    title: "Plan mode",
+    content: [
+      "Plan mode is active.",
+      "- Investigate the current implementation and constraints before proposing a plan.",
+      "- Ask a concise clarification only when missing information would materially change the design.",
+      "- Otherwise provide a concrete plan covering goals, affected boundaries, key decisions, implementation order, verification, and major risks.",
+      "- You have a strict read-only tool set. Do not claim that files were edited, commands were executed, tests passed, or implementation was completed.",
+    ].join("\n"),
+    bucket: "rules",
+    priority: 92,
+    stability: CACHE_STABILITY.STABLE,
+  };
+}
+
+async function createSelectedSkillSegments(input: {
+  selectedSkills: string[];
+  registry: Awaited<ReturnType<typeof loadSkillRegistry>>;
+}): Promise<AgentSystemPromptSegment[]> {
+  const selectedNames = [...new Set(input.selectedSkills.map((name) => name.trim()).filter(Boolean))];
+  if (selectedNames.length === 0) return [];
+
+  const availableByName = new Map(
+    input.registry.skills
+      .filter((skill) => skill.status === "available")
+      .map((skill) => [skill.name, skill] as const),
+  );
+  const segments: AgentSystemPromptSegment[] = [];
+  for (const name of selectedNames) {
+    const skill = availableByName.get(name);
+    if (!skill) {
+      throw new Error(`Selected Skill is not available: ${name}`);
+    }
+    const parsed = parseSkillFile(await readFile(skill.location, "utf8"), skill.directory);
+    if (parsed.warning) {
+      throw new Error(`Selected Skill cannot be loaded: ${name}`);
+    }
+    segments.push({
+      id: `selected_skill:${name}`,
+      title: `Selected Skill: ${name}`,
+      content: [
+        `<selected_skill name="${escapeXmlAttribute(name)}">`,
+        parsed.body.trim(),
+        "</selected_skill>",
+      ].join("\n"),
+      bucket: "skills",
+      priority: 88,
+      stability: CACHE_STABILITY.STABLE,
+    });
+  }
+  return segments;
+}
+
+function escapeXmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 async function resolveBrowserBridgeRuntime(

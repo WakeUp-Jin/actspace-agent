@@ -38,7 +38,7 @@ export async function describeSessionContext(
   // lastModel 由 meta.json 动态写入，未声明在 SessionMeta 类型上；缺省时由 resolveModelSpec 取默认模型。
   const model = (meta as { lastModel?: ModelSelectionId }).lastModel;
   const workspaceRoot = meta.workspaceRoot ?? roots.defaultWorkspaceRoot;
-  const runtimeContext = await loadRuntimeContext?.(workspaceRoot);
+  const runtimeContext = await loadRuntimeContext?.(workspaceRoot, { mode: "agent", selectedSkills: [] });
 
   const agentRuntimeContext = {
     tmpRoot: roots.tmpRoot,

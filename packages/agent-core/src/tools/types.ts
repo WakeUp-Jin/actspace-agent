@@ -82,7 +82,10 @@ export interface ToolRuntimeConfig {
   hasWebSearchKey?: boolean;
   hasImageGenerationKey?: boolean;
   disabledTools?: string[];
+  toolProfile?: ToolProfile;
 }
+
+export type ToolProfile = "none" | "read-only" | "full";
 
 /** ToolManager 配置 */
 export interface ToolManagerConfig extends ToolRuntimeConfig {

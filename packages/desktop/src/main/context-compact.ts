@@ -26,7 +26,7 @@ export async function compactAndPersistContext(
   const sessionPaths = createSessionStorePaths(sessionDir);
   const sessionMeta = await readMeta(sessionPaths.metaPath);
   const workspaceRoot = sessionMeta?.workspaceRoot ?? roots.defaultWorkspaceRoot;
-  const runtimeContext = await loadRuntimeContext?.(workspaceRoot);
+  const runtimeContext = await loadRuntimeContext?.(workspaceRoot, { mode: "agent", selectedSkills: [] });
   const runtimeOptions = { tmpRoot: roots.tmpRoot, sessionId: input.sessionId, ...runtimeContext };
   const config = modelRuntime
     ? (() => {

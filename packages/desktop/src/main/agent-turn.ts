@@ -11,7 +11,7 @@
 import type { BrowserWindow } from "electron";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AgentTurnResult, ComposerAttachment, RunTurnInput, RuntimeStreamEvent } from "@actspace/shared";
+import type { AgentTurnResult, ComposerAttachment, ComposerMode, RunTurnInput, RuntimeStreamEvent } from "@actspace/shared";
 import {
   buildAgentConfig,
   buildAgentConfigFromRuntime,
@@ -93,6 +93,7 @@ async function prepareAttachmentsForModel(
 
 export type AgentRuntimeContextLoader = (
   workspaceRoot: string,
+  options: { mode: ComposerMode; selectedSkills: string[] },
 ) => Promise<Pick<AgentRuntimeContext, "systemPrompt" | "systemPromptSegments" | "additionalWritableRoots" | "browserBridgeSocketPath">>;
 
 const PREVIEW_LIMIT = 160;
@@ -197,6 +198,8 @@ export async function runAndPersistTurn(
     userInputLength: input.userInput.length,
     userInputPreview: preview(input.userInput),
     model: input.modelKey ?? input.model,
+    mode: input.mode ?? "agent",
+    selectedSkills: input.selectedSkills ?? [],
     thinkingEnabled: Boolean(input.thinkingEnabled),
     reasoningEffort: input.reasoningEffort,
   });
@@ -240,13 +243,18 @@ export async function runAndPersistTurn(
   const sessionPaths = createSessionStorePaths(sessionDir);
   const sessionMeta = await readMeta(sessionPaths.metaPath);
   const turnWorkspaceRoot = sessionMeta?.workspaceRoot ?? roots.defaultWorkspaceRoot;
-  const runtimeContext = await loadRuntimeContext?.(turnWorkspaceRoot);
+  const mode = input.mode ?? "agent";
+  const selectedSkills = [...new Set((input.selectedSkills ?? []).map((name) => name.trim()).filter(Boolean))];
+  const runtimeContext = await loadRuntimeContext?.(turnWorkspaceRoot, { mode, selectedSkills });
 
-  const runtimeOptions = {
+  const toolProfile: import("@actspace/agent-core").ToolProfile =
+    mode === "chat" ? "none" : mode === "plan" ? "read-only" : "full";
+  const runtimeOptions: AgentRuntimeContext = {
     tmpRoot: roots.tmpRoot,
     artifactRoot: join(sessionDir, "artifacts", "generated-images"),
     sessionId: input.sessionId,
     turnId: input.turnId,
+    toolProfile,
     ...runtimeContext,
   };
   const config = modelRuntime

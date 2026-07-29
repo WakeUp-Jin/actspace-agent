@@ -52,11 +52,15 @@ export {
 
 // ─── IPC 输入类型 ───
 
+export type ComposerMode = "chat" | "plan" | "agent";
+
 export type RunTurnInput = {
   sessionId: string;
   turnId: string;
   userInput: string;
   attachments?: import("./session").ComposerAttachment[];
+  mode?: ComposerMode;
+  selectedSkills?: string[];
   /** 旧 renderer 兼容；Plan 5 新 UI 改发 modelKey。 */
   model?: ModelId;
   modelKey?: ModelKey;
@@ -276,6 +280,12 @@ export type KairosModelUpdateResult = { modelKey: ModelKey | null };
 export type SelectFilesResult = {
   canceled: boolean;
   attachments: import("./session").ComposerAttachment[];
+};
+
+export type SelectImagesResult = SelectFilesResult;
+
+export type SkillListInput = {
+  workspaceRoot?: string;
 };
 
 export type SelectWorkspaceDirectoryResult = {

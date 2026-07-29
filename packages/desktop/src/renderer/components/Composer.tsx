@@ -2,19 +2,18 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import {
   ArrowUp,
   BookOpen,
-  Boxes,
-  Bug,
   Check,
   ChevronDown,
-  CircleHelp,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   GitBranch,
   Image,
-  Infinity,
   Laptop,
+  ListChecks,
+  Loader2,
+  MessageCircle,
   MoreHorizontal,
-  Network,
-  Paperclip,
   Plus,
   Search,
   Square,
@@ -22,11 +21,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type {
+  ComposerMode,
   ComposerAttachment,
   ContextUsageSnapshot,
   LlmProviderId,
   ModelReasoningEffort,
   ModelSelectionId,
+  SkillCatalogItem,
   UsableModelView,
 } from "@actspace/shared";
 import { DEFAULT_MODEL_ID, MODEL_LIST, MODEL_REASONING_EFFORTS } from "@actspace/shared";
@@ -40,6 +41,8 @@ import {
 
 export type ComposerSendOptions = {
   model: ModelSelectionId;
+  mode: ComposerMode;
+  selectedSkills: string[];
   thinkingEnabled: boolean;
   reasoningEffort?: ModelReasoningEffort;
   attachments?: ComposerAttachment[];
@@ -96,8 +99,12 @@ const FILE_ATTACHMENT_REMOVE_CLASS =
 // 切换布局不 remount、不丢焦点光标；附件存在或 initial surface 强制 stacked。
 const COMPOSER_BODY_BASE_CLASS = "composer-body grid min-h-[48px] items-center gap-x-1.5 px-2 py-1.5";
 const COMPOSER_BODY_INLINE_CLASS =
-  `${COMPOSER_BODY_BASE_CLASS} grid-cols-[auto_minmax(0,1fr)_auto_auto] [grid-template-areas:'plus_input_model_send'] max-[600px]:gap-y-1 max-[600px]:grid-cols-[auto_auto_minmax(0,1fr)_auto] max-[600px]:[grid-template-areas:'input_input_input_input'_'plus_model_._send']`;
+  `${COMPOSER_BODY_BASE_CLASS} grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] [grid-template-areas:'plus_mode_input_model_send'] max-[600px]:gap-y-1 max-[600px]:grid-cols-[auto_auto_auto_minmax(0,1fr)_auto] max-[600px]:[grid-template-areas:'input_input_input_input_input'_'plus_mode_model_._send']`;
 const COMPOSER_BODY_STACKED_CLASS =
+  `${COMPOSER_BODY_BASE_CLASS} gap-y-1 grid-cols-[auto_auto_auto_minmax(0,1fr)_auto] [grid-template-areas:'input_input_input_input_input'_'plus_mode_model_._send']`;
+const COMPOSER_BODY_AGENT_INLINE_CLASS =
+  `${COMPOSER_BODY_BASE_CLASS} grid-cols-[auto_minmax(0,1fr)_auto_auto] [grid-template-areas:'plus_input_model_send'] max-[600px]:gap-y-1 max-[600px]:grid-cols-[auto_auto_minmax(0,1fr)_auto] max-[600px]:[grid-template-areas:'input_input_input_input'_'plus_model_._send']`;
+const COMPOSER_BODY_AGENT_STACKED_CLASS =
   `${COMPOSER_BODY_BASE_CLASS} gap-y-1 grid-cols-[auto_auto_minmax(0,1fr)_auto] [grid-template-areas:'input_input_input_input'_'plus_model_._send']`;
 const COMPOSER_INPUT_CLASS =
   "composer-input block w-full min-h-[34px] max-h-[142px] [grid-area:input] resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-[7px] text-[15px] leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
@@ -108,6 +115,13 @@ const COMPOSER_SINGLE_LINE_MAX_PX = 40;
 const CONTROL_GROUP_CLASS = "control-group relative";
 const COMMAND_BUTTON_CLASS =
   "command-button grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-surface-subtle text-text-muted transition-[background,border,color] duration-[120ms] ease-in-out hover:border-line-strong hover:bg-hover-overlay hover:text-text-main aria-expanded:border-line-strong aria-expanded:bg-selected aria-expanded:text-text-main";
+const MODE_BUTTON_BASE_CLASS =
+  "mode-button inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border-0 px-2.5 text-sm font-medium transition-[filter,opacity] duration-[120ms] ease-in-out hover:brightness-95";
+const MODE_BUTTON_CLASS: Record<ComposerMode, string> = {
+  chat: "bg-info-soft text-on-info",
+  plan: "bg-warning-soft text-on-warning",
+  agent: "bg-operational-soft text-operational",
+};
 const MODEL_BUTTON_CLASS =
   "model-button inline-flex h-8 max-w-[220px] items-center gap-[6px] rounded-full border-0 bg-transparent px-1.5 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-in-out hover:text-text-main max-[600px]:max-w-[210px]";
 const MODEL_BUTTON_TEXT_CLASS = "model-button-text truncate";
@@ -119,12 +133,21 @@ const SEND_BUTTON_CLASS =
 const DROPDOWN_MENU_BASE_CLASS =
   "dropdown-menu absolute bottom-[calc(100%_+_8px)] z-30 min-w-[180px] overflow-hidden rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover";
 const DROPDOWN_MENU_CLASS = `${DROPDOWN_MENU_BASE_CLASS} left-0`;
-const COMMAND_MENU_CLASS = `${DROPDOWN_MENU_CLASS} command-menu w-[240px] min-w-[240px] p-2`;
+const COMMAND_MENU_CLUSTER_CLASS =
+  "command-menu-cluster absolute bottom-[calc(100%_+_8px)] left-0 z-30 flex items-end gap-2 max-[600px]:w-[260px]";
+const COMMAND_MENU_CLASS =
+  "command-menu w-[240px] min-w-[240px] overflow-hidden rounded-xl border border-line bg-surface-raised/96 p-2 shadow-act-popover";
+const SKILL_MENU_CLASS =
+  "skill-menu max-h-[360px] w-[300px] min-w-[300px] overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-2 shadow-act-popover max-[600px]:w-[260px] max-[600px]:min-w-[260px]";
 const COMMAND_MENU_HINT_CLASS = "px-2 pb-2 pt-1 text-sm text-text-subtle";
 const COMMAND_MENU_SEPARATOR_CLASS = "my-1 h-px bg-line";
 const COMMAND_MENU_BUTTON_CLASS =
   "command-menu-button flex min-h-[34px] w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 text-left text-sm font-medium text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none";
 const COMMAND_MENU_ICON_CLASS = "text-text-muted";
+const SKILL_DESCRIPTION_CLASS = "line-clamp-2 text-xs font-normal leading-4 text-text-faint";
+const SKILL_SCOPE_CLASS = "ml-auto shrink-0 text-[10px] uppercase tracking-wide text-text-faint";
+const SKILL_PILL_CLASS =
+  "group/skill-pill inline-flex h-9 max-w-[240px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-sm font-medium text-text-main shadow-[0_6px_16px_rgba(31,45,61,0.06)]";
 // 模型菜单维持 Cursor 式紧凑单列：主菜单只负责选择，Options 作为贴行的轻量二级浮层。
 const MODEL_MENU_CLUSTER_CLASS =
   "absolute bottom-[calc(100%_+_8px)] z-30 w-[244px]";
@@ -187,28 +210,23 @@ const INITIAL_CHIP_CLASS =
   "initial-plan-chip inline-flex h-8 items-center rounded-full border border-line bg-surface px-3 text-sm font-medium text-text-muted shadow-[0_1px_2px_rgba(31,45,61,0.04)]";
 const COMPOSER_DROP_ACTIVE_CLASS = "border-line-strong bg-selected";
 
-type CommandMenuItem = {
+type ModeMenuItem = {
+  mode: ComposerMode;
   label: string;
   icon: LucideIcon;
 };
 
 type ContextSelectorKind = "workspace" | "branch" | "runtime";
 
-const PRIMARY_COMMAND_ITEMS: CommandMenuItem[] = [
-  { label: "Plan", icon: FileText },
-  { label: "Debug", icon: Bug },
-  { label: "Multitask", icon: Infinity },
-  { label: "Ask", icon: CircleHelp },
+const MODE_MENU_ITEMS: ModeMenuItem[] = [
+  { mode: "chat", label: "Chat", icon: MessageCircle },
+  { mode: "plan", label: "Plan", icon: ListChecks },
 ];
 
-const ATTACH_COMMAND_ITEM: CommandMenuItem = { label: "Attach files", icon: Paperclip };
-
-const SECONDARY_COMMAND_ITEMS: CommandMenuItem[] = [
-  { label: "Image", icon: Image },
-  { label: "Models", icon: Boxes },
-  { label: "Skills", icon: BookOpen },
-  { label: "MCP Servers", icon: Network },
-];
+const MODE_META: Record<Exclude<ComposerMode, "agent">, Omit<ModeMenuItem, "mode">> = {
+  chat: { label: "Chat", icon: MessageCircle },
+  plan: { label: "Plan", icon: ListChecks },
+};
 
 type ComposerModelOption = {
   id: ModelSelectionId;
@@ -220,6 +238,7 @@ type ComposerModelOption = {
   reasoningEfforts?: ModelReasoningEffort[] | null;
   reasoningDefaultEffort?: ModelReasoningEffort;
   reasoningMandatory: boolean;
+  supportsImages: boolean;
 };
 
 type ComposerModelRuntimeOptions = {
@@ -245,6 +264,7 @@ const LEGACY_MODEL_OPTIONS: ComposerModelOption[] = MODEL_LIST.map((spec) => ({
   thinkingDefault: spec.thinkingDefault,
   supportsThinkingToggle: spec.supportsThinkingToggle,
   reasoningMandatory: false,
+  supportsImages: spec.input.includes("image"),
 }));
 
 function isModelEditable(model: ComposerModelOption): boolean {
@@ -345,6 +365,10 @@ export function Composer({
   defaultModelId,
   selectedModelId: controlledSelectedModelId,
   onSelectedModelChange,
+  mode = "agent",
+  onModeChange,
+  selectedSkills = [],
+  onSelectedSkillsChange,
   onExpandContext,
   workspaceOptions = [],
   selectedWorkspaceRoot,
@@ -364,6 +388,10 @@ export function Composer({
   /** 会话级当前模型；提供时由上层持有，避免 initial/followup Composer 切换时丢选择。 */
   selectedModelId?: ModelSelectionId;
   onSelectedModelChange?: (modelId: ModelSelectionId) => void;
+  mode?: ComposerMode;
+  onModeChange?: (mode: ComposerMode) => void;
+  selectedSkills?: string[];
+  onSelectedSkillsChange?: (skills: string[]) => void;
   /** 提供时 Context 弹窗显示「展开完整视图」按钮，点击在右侧面板打开 Context Tab。 */
   onExpandContext?: () => void;
   workspaceOptions?: ComposerWorkspaceOption[];
@@ -385,9 +413,16 @@ export function Composer({
         reasoningEfforts: model.capabilities.reasoningEfforts,
         reasoningDefaultEffort: model.capabilities.reasoningDefaultEffort,
         reasoningMandatory: model.capabilities.reasoningMandatory === true,
+        supportsImages: model.capabilities.input.includes("image"),
       }));
   const initialModelId = controlledSelectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID;
   const [commandOpen, setCommandOpen] = useState(false);
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [skillItems, setSkillItems] = useState<SkillCatalogItem[]>([]);
+  const [skillsLoading, setSkillsLoading] = useState(false);
+  const [skillsError, setSkillsError] = useState<string | null>(null);
+  const skillLoadWorkspaceRef = useRef<string | null>(null);
+  const skillsCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [modelOptionsOpen, setModelOptionsOpen] = useState(false);
   const [contextSelectorOpen, setContextSelectorOpen] = useState<ContextSelectorKind | null>(null);
@@ -411,17 +446,22 @@ export function Composer({
   const composerBodyRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const commandButtonRef = useRef<HTMLButtonElement | null>(null);
+  const modeButtonRef = useRef<HTMLButtonElement | null>(null);
   const commandMenuRef = useRef<HTMLDivElement | null>(null);
   const modelButtonRef = useRef<HTMLButtonElement | null>(null);
   const modelSearchInputRef = useRef<HTMLInputElement | null>(null);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const modelOptionsRef = useRef<HTMLDivElement | null>(null);
-  const hasAttachments = attachments.length > 0;
+  const hasAttachments = attachments.length > 0 || selectedSkills.length > 0;
   const selectedModelAvailable = modelList.some((model) => model.id === selectedModelId);
-  const canSendMessage = Boolean((message.trim() || attachments.length > 0) && selectedModelAvailable);
+  const selectedModelSpec = modelList.find((spec) => spec.id === selectedModelId);
+  const hasImageAttachments = attachments.some((attachment) => attachment.kind === "image");
+  const imagesUnsupported = hasImageAttachments && selectedModelSpec?.supportsImages !== true;
+  const canSendMessage = Boolean(
+    (message.trim() || attachments.length > 0) && selectedModelAvailable && !imagesUnsupported,
+  );
   const editingModelSpec = modelList.find((spec) => spec.id === editingModelId);
   const editingModelOptions = modelRuntimeOptions[editingModelId] ?? modelDefaultRuntimeOptions(editingModelSpec);
-  const selectedModelSpec = modelList.find((spec) => spec.id === selectedModelId);
   const selectedModelOptions = modelRuntimeOptions[selectedModelId] ?? modelDefaultRuntimeOptions(selectedModelSpec);
   const editingReasoningEfforts = modelReasoningEfforts(editingModelSpec);
   const normalizedModelSearchQuery = modelSearchQuery.trim().toLocaleLowerCase();
@@ -455,7 +495,13 @@ export function Composer({
   // 单行内容用 inline 紧凑布局；内容折行、有附件或 initial surface 切 stacked（参考 Cursor）。
   const resolvedLayout: "inline" | "stacked" =
     surface === "initial" || hasAttachments || isInputMultiline ? "stacked" : "inline";
-  const placeholder = surface === "initial" ? "Plan, Build, / for commands, @ for context" : "Send follow-up";
+  const placeholder = mode === "chat"
+    ? surface === "initial" ? "Ask anything..." : "Continue the conversation..."
+    : mode === "plan"
+      ? surface === "initial" ? "Plan and design before coding..." : "Refine the plan..."
+      : surface === "initial"
+        ? "Plan, build, or ask..."
+        : "Send follow-up";
   const selectedWorkspaceLabel =
     workspaceOptions.find((workspace) => workspace.value === selectedWorkspaceRoot)?.label ??
     workspaceOptions[0]?.label ??
@@ -514,11 +560,12 @@ export function Composer({
       const paddingWidth = paddingLeft + paddingRight;
       const columnGap = Number.parseFloat(bodyStyle.columnGap) || 0;
       const commandWidth = commandButtonRef.current?.offsetWidth ?? 0;
+      const modeWidth = modeButtonRef.current?.offsetWidth ?? 0;
       const modelWidth = modelButtonRef.current?.offsetWidth ?? 0;
       const sendWidth = body.querySelector<HTMLElement>(".send-button")?.offsetWidth ?? 0;
       const inlineInputWidth = Math.max(
         1,
-        body.clientWidth - paddingWidth - commandWidth - modelWidth - sendWidth - columnGap * 3,
+        body.clientWidth - paddingWidth - commandWidth - modeWidth - modelWidth - sendWidth - columnGap * 4,
       );
       const previousWidth = input.style.width;
 
@@ -543,10 +590,11 @@ export function Composer({
     });
     resizeObserver.observe(body);
     return () => resizeObserver.disconnect();
-  }, [message, resolvedLayout, selectedModelId, surface]);
+  }, [message, mode, resolvedLayout, selectedModelId, surface]);
 
   function closeFloatingPanels() {
     setCommandOpen(false);
+    setSkillsOpen(false);
     setModelOpen(false);
     setHoveredModelId(null);
     setFocusedModelId(null);
@@ -571,22 +619,73 @@ export function Composer({
     setAttachments((current) => dedupeAttachments([...current, ...nextAttachments]));
   }
 
-  async function handleAttachFiles() {
+  async function handleSelectImages() {
     setCommandOpen(false);
+    setSkillsOpen(false);
 
-    if (window.actspace?.selectFiles) {
+    if (window.actspace?.selectImages) {
       try {
-        const result = await window.actspace.selectFiles();
+        const result = await window.actspace.selectImages();
         if (!result.canceled) {
           appendAttachments(result.attachments);
         }
       } catch (error) {
-        console.error("Failed to select files", error);
+        console.error("Failed to select images", error);
       }
       return;
     }
 
-    console.warn("File attachment picker is only available in the desktop app.");
+    console.warn("Image picker is only available in the desktop app.");
+  }
+
+  async function handleOpenSkills(forceReload = false) {
+    setSkillsOpen(true);
+    if (!window.actspace?.listSkills) {
+      setSkillsError("Skills are only available in the desktop app.");
+      return;
+    }
+    const workspaceKey = selectedWorkspaceRoot ?? "__default__";
+    if (!forceReload && skillLoadWorkspaceRef.current === workspaceKey) return;
+    skillLoadWorkspaceRef.current = workspaceKey;
+    setSkillsLoading(true);
+    setSkillsError(null);
+    try {
+      const result = await window.actspace.listSkills({ workspaceRoot: selectedWorkspaceRoot ?? undefined });
+      setSkillItems(result.items
+        .filter((skill) => skill.enabledForAgent && !skill.shadowed && skill.status === "available")
+        .sort((left, right) => {
+          if (left.scope !== right.scope) return left.scope === "project" ? -1 : 1;
+          return left.name.localeCompare(right.name);
+        }));
+    } catch (error) {
+      skillLoadWorkspaceRef.current = null;
+      console.error("Failed to list Skills", error);
+      setSkillsError("Failed to load Skills.");
+    } finally {
+      setSkillsLoading(false);
+    }
+  }
+
+  function toggleSkill(name: string) {
+    onSelectedSkillsChange?.(
+      selectedSkills.includes(name)
+        ? selectedSkills.filter((skill) => skill !== name)
+        : [...selectedSkills, name],
+    );
+  }
+
+  function cancelSkillsClose() {
+    if (!skillsCloseTimerRef.current) return;
+    clearTimeout(skillsCloseTimerRef.current);
+    skillsCloseTimerRef.current = null;
+  }
+
+  function scheduleSkillsClose() {
+    cancelSkillsClose();
+    skillsCloseTimerRef.current = setTimeout(() => {
+      setSkillsOpen(false);
+      skillsCloseTimerRef.current = null;
+    }, 120);
   }
 
   function sendCurrentMessage() {
@@ -594,6 +693,8 @@ export function Composer({
     const nextAttachments = attachments;
     const options: ComposerSendOptions = {
       model: selectedModelId,
+      mode,
+      selectedSkills,
       thinkingEnabled: selectedModelOptions.thinkingEnabled,
     };
     if (selectedModelOptions.thinkingEnabled && selectedModelOptions.reasoningEffort) {
@@ -622,7 +723,9 @@ export function Composer({
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node;
       const clickedInsideCommandPopover =
-        commandButtonRef.current?.contains(target) || commandMenuRef.current?.contains(target);
+        commandButtonRef.current?.contains(target) ||
+        modeButtonRef.current?.contains(target) ||
+        commandMenuRef.current?.contains(target);
       const clickedInsideModelPopover =
         modelButtonRef.current?.contains(target) ||
         modelMenuRef.current?.contains(target) ||
@@ -630,6 +733,7 @@ export function Composer({
 
       if (!clickedInsideCommandPopover) {
         setCommandOpen(false);
+        setSkillsOpen(false);
       }
 
       if (!clickedInsideModelPopover) {
@@ -656,39 +760,29 @@ export function Composer({
     document.addEventListener("keydown", handleKeyDown);
 
     return () => {
+      cancelSkillsClose();
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
-  function renderCommandMenuButton(item: CommandMenuItem) {
+  function renderModeMenuButton(item: ModeMenuItem) {
     const Icon = item.icon;
     return (
       <button
         className={COMMAND_MENU_BUTTON_CLASS}
         type="button"
         role="menuitem"
-        key={item.label}
-        onClick={() => setCommandOpen(false)}
+        key={item.mode}
+        onClick={() => {
+          onModeChange?.(item.mode);
+          setCommandOpen(false);
+          setSkillsOpen(false);
+        }}
       >
         <Icon className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
         <span>{item.label}</span>
-      </button>
-    );
-  }
-
-  function renderAttachMenuButton() {
-    const Icon = ATTACH_COMMAND_ITEM.icon;
-    return (
-      <button
-        className={COMMAND_MENU_BUTTON_CLASS}
-        type="button"
-        role="menuitem"
-        key={ATTACH_COMMAND_ITEM.label}
-        onClick={() => void handleAttachFiles()}
-      >
-        <Icon className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
-        <span>{ATTACH_COMMAND_ITEM.label}</span>
+        {mode === item.mode ? <Check className="ml-auto text-text-muted" size={15} strokeWidth={2.2} /> : null}
       </button>
     );
   }
@@ -705,6 +799,11 @@ export function Composer({
         disabled={isStreaming}
         onChange={(event) => setMessage(event.target.value)}
         onKeyDown={(event) => {
+          if (event.key === "Tab" && event.shiftKey) {
+            event.preventDefault();
+            onModeChange?.("plan");
+            return;
+          }
           if (event.key !== "Enter" || event.shiftKey) return;
           // IME 输入法（中文/日文等）在候选词面板按回车"上屏"时，
           // nativeEvent.isComposing 为 true 或 keyCode 为 229，此时不应触发发送。
@@ -776,6 +875,80 @@ export function Composer({
             </div>
           );
         })}
+        {selectedSkills.map((skill) => (
+          <div className={SKILL_PILL_CLASS} aria-label={`Selected Skill ${skill}`} key={skill}>
+            <BookOpen size={16} strokeWidth={1.9} aria-hidden="true" />
+            <span className="truncate">{skill}</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-lg text-text-faint transition-colors hover:bg-hover-overlay hover:text-text-main"
+                  type="button"
+                  aria-label={`Remove Skill ${skill}`}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    toggleSkill(skill);
+                  }}
+                >
+                  <X size={13} strokeWidth={2.4} aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>移除 Skill {skill}</TooltipContent>
+            </Tooltip>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function renderSkillsMenu() {
+    return (
+      <div className={SKILL_MENU_CLASS} role="menu" aria-label="Skills">
+        <button
+          className={`${COMMAND_MENU_BUTTON_CLASS} hidden max-[600px]:flex`}
+          type="button"
+          onClick={() => setSkillsOpen(false)}
+        >
+          <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
+          <span>Back</span>
+        </button>
+        <div className={COMMAND_MENU_HINT_CLASS}>Available Skills</div>
+        {skillsLoading ? (
+          <div className="flex items-center gap-2 px-2 py-4 text-sm text-text-faint">
+            <Loader2 className="animate-spin" size={16} aria-hidden="true" /> Loading Skills...
+          </div>
+        ) : skillsError ? (
+          <div className="px-2 py-4 text-sm text-on-danger">
+            <span>{skillsError}</span>
+            <button
+              className="ml-2 rounded-act-sm px-1.5 py-0.5 font-medium text-text-main hover:bg-hover-overlay"
+              type="button"
+              onClick={() => void handleOpenSkills(true)}
+            >
+              Retry
+            </button>
+          </div>
+        ) : skillItems.length === 0 ? (
+          <div className="px-2 py-4 text-sm text-text-faint">No enabled skills</div>
+        ) : skillItems.map((skill) => (
+          <button
+            className={COMMAND_MENU_BUTTON_CLASS}
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={selectedSkills.includes(skill.name)}
+            key={`${skill.scope}:${skill.name}`}
+            onClick={() => toggleSkill(skill.name)}
+          >
+            <BookOpen className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate">{skill.name}</span>
+              <span className={SKILL_DESCRIPTION_CLASS}>{skill.description || "No description"}</span>
+            </span>
+            <span className={SKILL_SCOPE_CLASS}>{skill.scope}</span>
+            {selectedSkills.includes(skill.name) ? <Check size={15} strokeWidth={2.2} aria-hidden="true" /> : null}
+          </button>
+        ))}
       </div>
     );
   }
@@ -794,6 +967,7 @@ export function Composer({
               ref={commandButtonRef}
               onClick={() => {
                 setCommandOpen((value) => !value);
+                setSkillsOpen(false);
                 setModelOpen(false);
                 setModelOptionsOpen(false);
                 setContextSelectorOpen(null);
@@ -806,15 +980,75 @@ export function Composer({
           <TooltipContent>添加上下文、工具或附件</TooltipContent>
         </Tooltip>
         {commandOpen ? (
-          <div className={COMMAND_MENU_CLASS} ref={commandMenuRef} role="menu" aria-label="Add agents, context, tools">
-            <div className={COMMAND_MENU_HINT_CLASS}>Add agents, context, tools.</div>
-            {PRIMARY_COMMAND_ITEMS.map(renderCommandMenuButton)}
-            <div className={COMMAND_MENU_SEPARATOR_CLASS} />
-            {renderAttachMenuButton()}
-            {SECONDARY_COMMAND_ITEMS.map(renderCommandMenuButton)}
+          <div
+            className={COMMAND_MENU_CLUSTER_CLASS}
+            ref={commandMenuRef}
+            onPointerEnter={cancelSkillsClose}
+            onPointerLeave={scheduleSkillsClose}
+          >
+            <div
+              className={`${COMMAND_MENU_CLASS}${skillsOpen ? " max-[600px]:hidden" : ""}`}
+              role="menu"
+              aria-label="Add context and tools"
+            >
+            <div className={COMMAND_MENU_HINT_CLASS}>Choose mode or add context.</div>
+              {MODE_MENU_ITEMS.map(renderModeMenuButton)}
+              <div className={COMMAND_MENU_SEPARATOR_CLASS} />
+              <button
+                className={COMMAND_MENU_BUTTON_CLASS}
+                type="button"
+                role="menuitem"
+                onClick={() => void handleSelectImages()}
+              >
+                <Image className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
+                <span>Image</span>
+              </button>
+              <button
+                className={COMMAND_MENU_BUTTON_CLASS}
+                type="button"
+                role="menuitem"
+                aria-expanded={skillsOpen}
+                onPointerEnter={() => void handleOpenSkills()}
+                onFocus={() => void handleOpenSkills()}
+                onClick={() => void handleOpenSkills()}
+              >
+                <BookOpen className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
+                <span>Skills</span>
+                <ChevronRight className="ml-auto text-text-faint" size={16} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </div>
+            {skillsOpen ? renderSkillsMenu() : null}
           </div>
         ) : null}
       </div>
+    );
+  }
+
+  function renderModeSelector() {
+    if (mode === "agent") return null;
+    const selectedMode = MODE_META[mode];
+    const Icon = selectedMode.icon;
+    return (
+      <button
+        className={`${MODE_BUTTON_BASE_CLASS} ${MODE_BUTTON_CLASS[mode]} [grid-area:mode]`}
+        type="button"
+        ref={modeButtonRef}
+        aria-label={`Remove ${selectedMode.label} mode`}
+        disabled={isStreaming}
+        onClick={() => {
+          onModeChange?.("agent");
+          setCommandOpen(false);
+          setSkillsOpen(false);
+          setModelOpen(false);
+          setModelOptionsOpen(false);
+          setContextSelectorOpen(null);
+          setContextOpen(false);
+        }}
+      >
+        <Icon size={15} strokeWidth={2} aria-hidden="true" />
+        <span>{selectedMode.label}</span>
+        <X size={14} strokeWidth={2.2} aria-hidden="true" />
+      </button>
     );
   }
 
@@ -1065,8 +1299,20 @@ export function Composer({
 
   function renderSendButton() {
     const sendDisabled = isAborting || (!isStreaming && !canSendMessage);
-    const tooltipLabel = isStreaming ? "停止 Agent" : canSendMessage ? "发送消息" : "输入消息后发送";
-    const ariaLabel = isStreaming ? "Stop agent" : canSendMessage ? "Send message" : "Enter a message to send";
+    const tooltipLabel = isStreaming
+      ? "停止 Agent"
+      : imagesUnsupported
+        ? "当前模型不支持图片输入"
+        : canSendMessage
+          ? "发送消息"
+          : "输入消息后发送";
+    const ariaLabel = isStreaming
+      ? "Stop agent"
+      : imagesUnsupported
+        ? "Selected model does not support image input"
+        : canSendMessage
+          ? "Send message"
+          : "Enter a message to send";
 
     return (
       <div className="[grid-area:send] grid">
@@ -1105,6 +1351,7 @@ export function Composer({
     return (
       <div className="composer-bar contents" aria-label="Composer toolbar">
         {renderAddMenuButton()}
+        {renderModeSelector()}
         {renderModelSelector()}
         {renderSendButton()}
       </div>
@@ -1112,6 +1359,9 @@ export function Composer({
   }
 
   function renderPanel() {
+    const composerBodyClass = mode === "agent"
+      ? resolvedLayout === "inline" ? COMPOSER_BODY_AGENT_INLINE_CLASS : COMPOSER_BODY_AGENT_STACKED_CLASS
+      : resolvedLayout === "inline" ? COMPOSER_BODY_INLINE_CLASS : COMPOSER_BODY_STACKED_CLASS;
     return (
       <div
         className={`${getComposerPanelClass(surface)}${isDragActive ? ` ${COMPOSER_DROP_ACTIVE_CLASS}` : ""}`}
@@ -1133,7 +1383,7 @@ export function Composer({
         {renderAttachmentStrip()}
         <div
           ref={composerBodyRef}
-          className={resolvedLayout === "inline" ? COMPOSER_BODY_INLINE_CLASS : COMPOSER_BODY_STACKED_CLASS}
+          className={composerBodyClass}
           data-layout={resolvedLayout}
         >
           {renderComposerInput()}
@@ -1291,7 +1541,12 @@ export function Composer({
 
     return (
       <div className={INITIAL_CHIP_ROW_CLASS}>
-        <button className={INITIAL_CHIP_CLASS} type="button">
+        <button
+          className={INITIAL_CHIP_CLASS}
+          type="button"
+          disabled={isStreaming}
+          onClick={() => onModeChange?.("plan")}
+        >
           Plan New Idea <span className="ml-1 text-text-faint">⇧Tab</span>
         </button>
       </div>

@@ -432,6 +432,16 @@ describe("buildAgentConfig (via dynamic import to reset env)", () => {
     expect(config.toolManagerConfig.additionalWritableRoots).toEqual(["/tmp/actspace/kairos/inbox"]);
   });
 
+  it("should pass the runtime tool profile into toolManagerConfig", async () => {
+    process.env.DEEPSEEK_API_KEY = "sk-test";
+    const { loadEnv } = await import("../../env");
+    const { buildAgentConfig } = await import("../create-agent-deps");
+    loadEnv({ envPath: EMPTY_ENV_PATH, mergeToProcessEnv: false });
+    const config = buildAgentConfig({}, "/my/project", undefined, { toolProfile: "read-only" });
+
+    expect(config.toolManagerConfig.toolProfile).toBe("read-only");
+  });
+
   it("should read env for llmConfig apiKey", async () => {
     process.env.DEEPSEEK_API_KEY = "sk-env-deepseek";
     const { loadEnv } = await import("../../env");
@@ -515,6 +525,46 @@ describe("createAgentFromConfig", () => {
     const deps = createAgentFromConfig(config);
 
     expect(deps.toolManager.has("bash")).toBe(false);
+  });
+
+  it("should expose no tools for the none profile", async () => {
+    const { createAgentFromConfig } = await import("../create-agent-deps");
+    const deps = createAgentFromConfig(createTestAgentConfig({
+      toolManagerConfig: {
+        workspaceRoot: "/tmp/workspace",
+        primaryProvider: "deepseek",
+        apiFormat: "openai",
+        hasKimiKey: true,
+        hasWebSearchKey: true,
+        toolProfile: "none",
+      },
+    }));
+
+    expect(deps.toolManager.getAll()).toEqual([]);
+  });
+
+  it("should expose only the explicit read-only allowlist", async () => {
+    const { createAgentFromConfig } = await import("../create-agent-deps");
+    const deps = createAgentFromConfig(createTestAgentConfig({
+      toolManagerConfig: {
+        workspaceRoot: "/tmp/workspace",
+        primaryProvider: "deepseek",
+        apiFormat: "openai",
+        hasKimiKey: true,
+        hasWebSearchKey: true,
+        hasImageGenerationKey: true,
+        toolProfile: "read-only",
+      },
+    }));
+
+    expect(deps.toolManager.getAll().map((tool) => tool.name).sort()).toEqual([
+      "glob",
+      "grep",
+      "list_directory",
+      "read_file",
+      "web_fetch",
+      "web_search",
+    ]);
   });
 
   it("should register web_search only when a search provider key is configured", async () => {

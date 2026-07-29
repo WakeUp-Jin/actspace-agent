@@ -17,6 +17,7 @@ declare global {
         input: import("@actspace/shared").AbortTurnInput
       ) => Promise<boolean>;
       selectFiles?: () => Promise<import("@actspace/shared").SelectFilesResult>;
+      selectImages?: () => Promise<import("@actspace/shared").SelectImagesResult>;
       selectWorkspaceDirectory?: () => Promise<import("@actspace/shared").SelectWorkspaceDirectoryResult>;
       getPathForFile?: (file: File) => string;
       visualizeReply: (
@@ -149,7 +150,9 @@ declare global {
       getBrowserBridgeStatus?: () => Promise<import("@actspace/shared").BrowserBridgeStatus>;
       installBrowserBridgeFromRepo?: () => Promise<import("@actspace/shared").BrowserBridgeInstallResult>;
       installBrowserBridgeNativeHost?: () => Promise<import("@actspace/shared").BrowserBridgeActionResult>;
-      listSkills?: () => Promise<import("@actspace/shared").SkillListResult>;
+      listSkills?: (
+        input?: import("@actspace/shared").SkillListInput
+      ) => Promise<import("@actspace/shared").SkillListResult>;
       installSkill?: () => Promise<import("@actspace/shared").SkillInstallResult>;
       uninstallSkill?: (
         input: import("@actspace/shared").SkillUninstallInput

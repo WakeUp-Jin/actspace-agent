@@ -74,6 +74,8 @@ import type {
   RunTurnInput,
   RuntimeStreamEvent,
   SelectFilesResult,
+  SelectImagesResult,
+  SkillListInput,
   SelectWorkspaceDirectoryResult,
   SessionArchiveInput,
   SessionArchiveResult,
@@ -147,6 +149,7 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("eval:generate-candidate", input) as Promise<GenerateEvalCandidateResult>,
   abortTurn: (input: AbortTurnInput) => ipcRenderer.invoke("agent:abort-turn", input) as Promise<boolean>,
   selectFiles: () => ipcRenderer.invoke("dialog:select-files") as Promise<SelectFilesResult>,
+  selectImages: () => ipcRenderer.invoke("dialog:select-images") as Promise<SelectImagesResult>,
   selectWorkspaceDirectory: () =>
     ipcRenderer.invoke("dialog:select-workspace-directory") as Promise<SelectWorkspaceDirectoryResult>,
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
@@ -255,7 +258,7 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("plugins:browser-bridge:install-from-repo") as Promise<BrowserBridgeInstallResult>,
   installBrowserBridgeNativeHost: () =>
     ipcRenderer.invoke("plugins:browser-bridge:install-native-host") as Promise<BrowserBridgeActionResult>,
-  listSkills: () => ipcRenderer.invoke("skills:list") as Promise<SkillListResult>,
+  listSkills: (input: SkillListInput = {}) => ipcRenderer.invoke("skills:list", input) as Promise<SkillListResult>,
   installSkill: () => ipcRenderer.invoke("skills:install") as Promise<SkillInstallResult>,
   uninstallSkill: (input: SkillUninstallInput) =>
     ipcRenderer.invoke("skills:uninstall", input) as Promise<SkillUninstallResult>,

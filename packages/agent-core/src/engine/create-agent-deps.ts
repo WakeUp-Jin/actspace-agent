@@ -128,6 +128,8 @@ export interface AgentRuntimeContext {
   systemPrompt?: string;
   /** 附加规则/技能等系统级上下文段，例如 AGENTS.md。 */
   systemPromptSegments?: AgentSystemPromptSegment[];
+  /** Composer mode applies a hard tool-registration profile for this turn. */
+  toolProfile?: import("../tools/types").ToolProfile;
 }
 
 export interface ExplicitAgentRuntimeInput {
@@ -317,6 +319,7 @@ export function buildAgentConfig(
     hasImageGenerationKey: Boolean(envConfig.imageGeneration?.apiKey),
     imageGeneration: envConfig.imageGeneration,
     disabledTools: envConfig.disabledTools,
+    toolProfile: runtimeContext?.toolProfile,
     approvalGate,
     tmpRoot: runtimeContext?.tmpRoot,
     sessionId: runtimeContext?.sessionId,
@@ -385,6 +388,7 @@ export function buildAgentConfigFromRuntime(
       hasImageGenerationKey: Boolean(toolEnvironment.imageGeneration?.apiKey),
       imageGeneration: toolEnvironment.imageGeneration,
       disabledTools: toolEnvironment.disabledTools,
+      toolProfile: runtimeContext?.toolProfile,
       approvalGate,
       tmpRoot: runtimeContext?.tmpRoot,
       sessionId: runtimeContext?.sessionId,
