@@ -12,6 +12,7 @@
 - 应用启动后必须至少能完成两条路径之一：
   - 恢复本地已有会话
   - 在没有旧会话时，跑起一轮默认 turn
+- `workspaces.json` 等会在启动期执行 reconciliation 的本地 registry，完整读改写流程必须串行化；原子替换使用唯一临时文件，禁止多个并发请求共享固定 `.tmp` 路径。
 - 普通桌面会话通过统一可用模型解析器选择 DeepSeek、Kimi 或已添加的 OpenRouter 模型；连接测试为可选诊断，已保存 Key 且未明确测试失败的 provider 可直接使用。mock 只用于测试、浏览器 fixture 或显式 demo，不允许静默替代 Electron 真实 turn：
   - 启动应用
   - 请求 bootstrap state

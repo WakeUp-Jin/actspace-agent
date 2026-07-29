@@ -28,6 +28,7 @@ import type {
   SkillListInput,
   SelectWorkspaceDirectoryResult,
   SessionArchiveInput,
+  SessionArchiveManyInput,
   SessionCreateInput,
   SessionForkInput,
   SessionGetInput,
@@ -53,6 +54,8 @@ import type {
   ReviewInitGitInput,
   WorkspaceListDirInput,
   WorkspaceListResult,
+  WorkspaceIdInput,
+  WorkspaceVisibilityInput,
   WorkspaceReadFileInput,
   BrowserBridgeActionResult,
   BrowserBridgeInstallResult,
@@ -130,7 +133,8 @@ import { listWorkspaceDir, readWorkspaceFile } from "./workspace-fs-service";
 import { readSessionArtifact } from "./session-artifact-service";
 import { showArtifactContextMenu } from "./artifact-context-menu-service";
 import { getWorkspaceGitChanges, initializeGitRepository } from "./review-git-service";
-import { readWorkspaceRegistry, resolveWorkspaceSelection } from "./workspace-registry-service";
+import { readWorkspaceRegistry, resolveWorkspaceSelection, setWorkspaceHidden } from "./workspace-registry-service";
+import { openWorkspaceInIde } from "./workspace-ide-service";
 import { getSessionPreview } from "./session-preview-service";
 import { LocalUpdateService } from "./local-update-service";
 import { PendingApprovalRegistry } from "./approval-registry";
@@ -384,6 +388,16 @@ async function resolveWorkspaceForRoots(
     fallbackWorkspaceRoot: roots.workspaceRoot,
     sessions,
   }, input);
+}
+
+async function workspaceRegistryOptionsForRoots(roots: AppDataRoots) {
+  const sessions = await listAllSessionSummaries(roots.sessionRoot);
+  return {
+    dataRoot: roots.dataRoot,
+    defaultWorkspaceRoot: roots.defaultWorkspaceRoot,
+    fallbackWorkspaceRoot: roots.workspaceRoot,
+    sessions,
+  };
 }
 
 /**
@@ -1023,6 +1037,16 @@ async function registerIpc() {
     return readWorkspaceRegistryForRoots(roots);
   });
 
+  ipcMain.handle("workspace:open-in-ide", async (_event, input: WorkspaceIdInput) => {
+    const roots = await ensureDataDirectories();
+    return openWorkspaceInIde(await workspaceRegistryOptionsForRoots(roots), input.workspaceId);
+  });
+
+  ipcMain.handle("workspace:set-visibility", async (_event, input: WorkspaceVisibilityInput) => {
+    const roots = await ensureDataDirectories();
+    return setWorkspaceHidden(await workspaceRegistryOptionsForRoots(roots), input.workspaceId, input.hidden);
+  });
+
   ipcMain.handle("workspace:list-dir", async (_event, input: WorkspaceListDirInput) => {
     const roots = await ensureDataDirectories();
     return listWorkspaceDir(input, roots);
@@ -1240,6 +1264,32 @@ async function registerIpc() {
       logMain("session archive failed", { sessionId: input.sessionId, error: result.error });
     }
     return result;
+  });
+
+  ipcMain.handle("session:archive-many", async (_event, input: SessionArchiveManyInput) => {
+    const roots = await ensureDataDirectories();
+    const sessionIds = [...new Set(input.sessionIds.filter(Boolean))];
+    const archivedSessionIds: string[] = [];
+    const failedSessionIds: string[] = [];
+
+    for (const sessionId of sessionIds) {
+      if (isSessionTurnActive(sessionId)) {
+        failedSessionIds.push(sessionId);
+        continue;
+      }
+      try {
+        const result = await setSessionArchived(roots.sessionRoot, sessionId, true);
+        (result.ok ? archivedSessionIds : failedSessionIds).push(sessionId);
+      } catch {
+        failedSessionIds.push(sessionId);
+      }
+    }
+
+    return {
+      ok: failedSessionIds.length === 0,
+      archivedSessionIds,
+      failedSessionIds,
+    };
   });
 
   ipcMain.handle("approval:decide", async (_event, input: ApprovalDecideInput) => {

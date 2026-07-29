@@ -95,6 +95,9 @@ export function WorkbenchLayout({
   onCopyTranscript,
   onForkSession,
   onArchiveSession,
+  onOpenWorkspace,
+  onArchiveWorkspace,
+  onRemoveWorkspace,
   isSessionReady = true,
   defaultModelId,
   selectedModelId,
@@ -136,6 +139,9 @@ export function WorkbenchLayout({
   onCopyTranscript?: (sessionId: string) => void;
   onForkSession?: (sessionId: string) => void;
   onArchiveSession?: (sessionId: string) => void;
+  onOpenWorkspace?: (workspaceId: string) => void;
+  onArchiveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
+  onRemoveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
   isSessionReady?: boolean;
   defaultModelId?: ModelSelectionId;
   selectedModelId?: ModelSelectionId;
@@ -461,6 +467,9 @@ export function WorkbenchLayout({
       onCopyTranscript={onCopyTranscript}
       onFork={onForkSession}
       onArchive={onArchiveSession}
+      onOpenWorkspace={onOpenWorkspace}
+      onArchiveWorkspace={onArchiveWorkspace}
+      onRemoveWorkspace={onRemoveWorkspace}
       onSelectView={handleSelectView}
     />
   );

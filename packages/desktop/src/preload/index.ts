@@ -78,6 +78,8 @@ import type {
   SkillListInput,
   SelectWorkspaceDirectoryResult,
   SessionArchiveInput,
+  SessionArchiveManyInput,
+  SessionArchiveManyResult,
   SessionArchiveResult,
   SessionCreateInput,
   SessionForkInput,
@@ -116,6 +118,10 @@ import type {
   WorkspaceListDirInput,
   WorkspaceListDirResult,
   WorkspaceListResult,
+  WorkspaceIdInput,
+  WorkspaceOpenInIdeResult,
+  WorkspaceVisibilityInput,
+  WorkspaceVisibilityResult,
   WorkspaceReadFileInput,
   WorkspaceReadFileResult,
   WriteAgentSystemPromptInput,
@@ -158,6 +164,10 @@ contextBridge.exposeInMainWorld("actspace", {
   listVisualizations: (input: ListVisualizationsInput) =>
     ipcRenderer.invoke("visualize:list", input) as Promise<ListVisualizationsResult>,
   listWorkspaces: () => ipcRenderer.invoke("workspace:list") as Promise<WorkspaceListResult>,
+  openWorkspaceInIde: (input: WorkspaceIdInput) =>
+    ipcRenderer.invoke("workspace:open-in-ide", input) as Promise<WorkspaceOpenInIdeResult>,
+  setWorkspaceVisibility: (input: WorkspaceVisibilityInput) =>
+    ipcRenderer.invoke("workspace:set-visibility", input) as Promise<WorkspaceVisibilityResult>,
   listWorkspaceDir: (input: WorkspaceListDirInput) =>
     ipcRenderer.invoke("workspace:list-dir", input) as Promise<WorkspaceListDirResult>,
   readWorkspaceFile: (input: WorkspaceReadFileInput) =>
@@ -195,6 +205,8 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("session:set-workspace", input) as Promise<SessionWorkspaceResult>,
   archiveSession: (input: SessionArchiveInput) =>
     ipcRenderer.invoke("session:archive", input) as Promise<SessionArchiveResult>,
+  archiveSessions: (input: SessionArchiveManyInput) =>
+    ipcRenderer.invoke("session:archive-many", input) as Promise<SessionArchiveManyResult>,
 
   submitApproval: (input: ApprovalDecideInput) => ipcRenderer.invoke("approval:decide", input) as Promise<ApprovalDecideResult>,
   listPendingApprovals: (input?: ApprovalListPendingInput) => ipcRenderer.invoke("approval:list-pending", input ?? {}) as Promise<PendingApprovalInfo[]>,

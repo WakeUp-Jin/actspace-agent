@@ -626,6 +626,7 @@ export type WorkspaceEntry = {
   kind: WorkspaceEntryKind;
   label: string;
   path: string;
+  hidden?: boolean;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -638,6 +639,24 @@ export type WorkspaceRegistry = {
 };
 
 export type WorkspaceListResult = WorkspaceRegistry;
+
+export type WorkspaceIdInput = {
+  workspaceId: string;
+};
+
+export type WorkspaceOpenInIdeResult = {
+  ok: boolean;
+  error?: "workspace_not_found" | "workspace_hidden" | "directory_not_found" | "open_failed";
+};
+
+export type WorkspaceVisibilityInput = WorkspaceIdInput & {
+  hidden: boolean;
+};
+
+export type WorkspaceVisibilityResult = {
+  ok: boolean;
+  error?: "workspace_not_found" | "default_workspace_required";
+};
 
 export type SessionCreateInput = {
   title?: string;
@@ -690,6 +709,16 @@ export type SessionArchiveInput = {
 export type SessionArchiveResult = {
   ok: boolean;
   error?: string;
+};
+
+export type SessionArchiveManyInput = {
+  sessionIds: string[];
+};
+
+export type SessionArchiveManyResult = {
+  ok: boolean;
+  archivedSessionIds: string[];
+  failedSessionIds: string[];
 };
 
 export type UsageStatisticsRange = "day" | "week" | "month" | "total";

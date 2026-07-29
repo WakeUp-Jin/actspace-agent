@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   AlignLeft,
   Archive,
@@ -9,12 +10,14 @@ import {
   ChevronRight,
   Copy,
   Folder,
+  FolderOpen,
   FolderPlus,
   GitFork,
   Hash,
   MoreHorizontal,
   Pencil,
   Pin,
+  PanelLeftClose,
   Plus,
   Settings,
   Sparkles,
@@ -38,6 +41,8 @@ const SESSION_VISIBLE_LIMIT = 8;
 const SESSION_CONTEXT_MENU_WIDTH = 184;
 const SESSION_CONTEXT_MENU_MAX_HEIGHT = 220;
 const SESSION_CONTEXT_MENU_MARGIN = 8;
+const WORKSPACE_CONTEXT_MENU_WIDTH = 208;
+const WORKSPACE_CONTEXT_MENU_MAX_HEIGHT = 152;
 
 function formatRelativeTime(timestamp: string): string {
   const diffMs = Date.now() - new Date(timestamp).getTime();
@@ -94,6 +99,13 @@ type WorkspaceGroup = {
   workspaceRoot?: string;
   sessions: SessionListItem[];
 };
+
+function sessionWorkspaceRoot(session: SessionListItem, workspaces: WorkspaceEntry[]): string | undefined {
+  return workspaces.find((workspace) => workspace.id === session.workspaceId)?.path ??
+    workspaces.find((workspace) => session.workspaceRoot && workspace.path === session.workspaceRoot)?.path ??
+    session.workspaceRoot ??
+    workspaces.find((workspace) => workspace.kind === "default")?.path;
+}
 
 function groupSessionsByWorkspace(sessions: SessionListItem[], workspaces: WorkspaceEntry[] = []): WorkspaceGroup[] {
   const groups = new Map<string, WorkspaceGroup>();
@@ -255,6 +267,10 @@ const WORKSPACE_NAME_CLASS = "workspace-folder-name min-w-0 overflow-hidden text
 const WORKSPACE_ACTIONS_CLASS = NAV_SECTION_ACTIONS_CLASS;
 const WORKSPACE_ADD_BUTTON_CLASS =
   `${SIDEBAR_BUTTON_RESET_CLASS} workspace-add-button grid h-[22px] w-[22px] place-items-center rounded-act-sm text-text-faint opacity-0 transition-[opacity,background,color] duration-[130ms] ease-in-out group-hover/workspace-row:opacity-100 focus-visible:opacity-100 hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main`;
+const WORKSPACE_CONTEXT_MENU_CLASS =
+  "workspace-context-menu fixed z-[90] rounded-act-md border border-line bg-surface-raised p-1 text-[13px] text-text-main shadow-act-popover";
+const WORKSPACE_CONTEXT_MENU_ITEM_CLASS = SESSION_CONTEXT_MENU_ITEM_CLASS;
+const WORKSPACE_CONTEXT_MENU_DANGER_ITEM_CLASS = `${WORKSPACE_CONTEXT_MENU_ITEM_CLASS} text-danger`;
 const SETTINGS_ENTRY_CLASS =
   "flex min-h-[34px] min-w-0 items-center gap-[9px] rounded-act-md border-0 bg-transparent px-2.5 py-0 text-left text-[13px] font-medium text-text-muted transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 
@@ -300,6 +316,7 @@ function NavSectionHeader({ label, collapsed, onToggle, extraActions }: NavSecti
 
 type SessionRowProps = {
   session: SessionListItem;
+  workspaceRoot?: string;
   isActive: boolean;
   status: unknown;
   onSelect: () => void;
@@ -366,6 +383,7 @@ function SessionStatusButton({ status, dotClass }: { status: unknown; dotClass: 
 
 function SessionRow({
   session,
+  workspaceRoot,
   isActive,
   status,
   onSelect,
@@ -388,6 +406,7 @@ function SessionRow({
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
   const [draftTitle, setDraftTitle] = useState(displayTitle);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -483,6 +502,7 @@ function SessionRow({
     event.preventDefault();
     event.stopPropagation();
     setCopyMenuOpen(false);
+    setTooltipOpen(false);
     setMenuPosition(clampContextMenuPosition({ x: event.clientX, y: event.clientY }));
   };
 
@@ -492,213 +512,262 @@ function SessionRow({
   };
 
   return (
-    <div
-      className={rowClass}
-      data-session-id={session.id}
-      onContextMenu={handleContextMenu}
-      role="presentation"
+    <Tooltip
+      delayDuration={350}
+      open={tooltipOpen && !menuPosition && !isRenaming}
+      onOpenChange={setTooltipOpen}
     >
-      <span className={`session-row-marker ${SESSION_ROW_MARKER_CLASS}`}>
-        <SessionStatusButton status={resolvedStatus} dotClass={dotClass} />
-      </span>
-      {isRenaming ? (
+      <TooltipTrigger asChild>
         <div
-          className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && resolvedStatus === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
+          className={rowClass}
+          data-session-id={session.id}
+          onContextMenu={handleContextMenu}
+          role="presentation"
         >
-          <input
-            ref={inputRef}
-            className={`session-row-rename-input ${SESSION_ROW_RENAME_INPUT_CLASS}`}
-            value={draftTitle}
-            aria-label={`Rename session ${displayTitle}`}
-            onChange={(event) => setDraftTitle(event.target.value)}
-            onClick={(event) => event.stopPropagation()}
-            onBlur={commitRename}
-            onKeyDown={handleRenameKeyDown}
-          />
-        </div>
-      ) : (
-        <button
-          className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && resolvedStatus === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
-          type="button"
-          onClick={onSelect}
-          aria-current={isActive ? "page" : undefined}
-        >
-          <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>{displayTitle}</span>
-        </button>
-      )}
-      <div className={`session-row-actions ${SESSION_ROW_ACTIONS_CLASS}`}>
-        {onTogglePin ? (
-          <button
-            className={`${SESSION_ROW_PIN_CLASS} ${session.pinned ? SESSION_ROW_PIN_ACTIVE_CLASS : ""}`}
-            type="button"
-            aria-label={session.pinned ? "Unpin session" : "Pin session"}
-            title={session.pinned ? "Unpin session" : "Pin to top"}
-            onClick={(event) => {
-              event.stopPropagation();
-              onTogglePin();
-            }}
-          >
-            {session.pinned ? (
-              <Pin size={11} strokeWidth={1.9} fill="currentColor" />
-            ) : (
-              <Pin size={11} strokeWidth={1.9} />
-            )}
-          </button>
-        ) : null}
-        <button
-          className={`session-row-archive ${SESSION_ROW_ARCHIVE_CLASS} ${archiveDisabled ? "cursor-not-allowed group-hover/session-row:opacity-40 focus-visible:opacity-40 hover:bg-transparent hover:text-text-faint" : ""}`}
-          type="button"
-          disabled={archiveDisabled}
-          aria-label={archiveLabel}
-          title={archiveLabel}
-          onClick={(event) => {
-            event.stopPropagation();
-            if (!archiveDisabled) onArchive?.();
-          }}
-        >
-          <Archive size={12} strokeWidth={1.9} />
-        </button>
-      </div>
-      <span className={`session-row-time ${SESSION_ROW_TIME_CLASS}`}>
-        {formatRelativeTime(session.updatedAt)}
-      </span>
-      {menuPosition ? (
-        <div
-          ref={menuRef}
-          className={SESSION_CONTEXT_MENU_CLASS}
-          role="menu"
-          aria-label={`Session actions for ${displayTitle}`}
-          style={{
-            left: menuPosition.x,
-            top: menuPosition.y,
-            width: SESSION_CONTEXT_MENU_WIDTH,
-          }}
-        >
-          <button
-            className={SESSION_CONTEXT_MENU_ITEM_CLASS}
-            type="button"
-            role="menuitem"
-            disabled={!onTogglePin}
-            onClick={() => {
-              setMenuPosition(null);
-              onTogglePin?.();
-            }}
-          >
-            <Pin
-              size={16}
-              strokeWidth={1.9}
-              fill={session.pinned ? "currentColor" : "none"}
-              className={SESSION_CONTEXT_MENU_ICON_CLASS}
-              aria-hidden="true"
-            />
-            {session.pinned ? "Unpin" : "Pin"}
-          </button>
-          <button
-            className={SESSION_CONTEXT_MENU_ITEM_CLASS}
-            type="button"
-            role="menuitem"
-            disabled={!onRename}
-            onClick={startRename}
-          >
-            <Pencil size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
-            Rename
-          </button>
-          <div
-            className="relative"
-            onMouseEnter={() => setCopyMenuOpen(true)}
-          >
+          <span className={`session-row-marker ${SESSION_ROW_MARKER_CLASS}`}>
+            <SessionStatusButton status={resolvedStatus} dotClass={dotClass} />
+          </span>
+          {isRenaming ? (
+            <div
+              className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && resolvedStatus === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
+            >
+              <input
+                ref={inputRef}
+                className={`session-row-rename-input ${SESSION_ROW_RENAME_INPUT_CLASS}`}
+                value={draftTitle}
+                aria-label={`Rename session ${displayTitle}`}
+                onChange={(event) => setDraftTitle(event.target.value)}
+                onClick={(event) => event.stopPropagation()}
+                onBlur={commitRename}
+                onKeyDown={handleRenameKeyDown}
+              />
+            </div>
+          ) : (
             <button
-              className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+              className={`${SESSION_ROW_MAIN_CLASS} ${!isActive && resolvedStatus === "idle" ? SESSION_ROW_MAIN_MUTED_CLASS : ""}`}
               type="button"
-              role="menuitem"
-              aria-haspopup="menu"
-              aria-expanded={copyMenuOpen}
-              disabled={!onCopySessionId && !onCopyTranscript}
-              onFocus={() => setCopyMenuOpen(true)}
-              onClick={() => setCopyMenuOpen(true)}
-              onKeyDown={(event) => {
-                if (event.key === "ArrowRight") {
-                  event.preventDefault();
-                  setCopyMenuOpen(true);
-                }
-                if (event.key === "ArrowLeft") {
-                  event.preventDefault();
-                  setCopyMenuOpen(false);
-                }
+              onClick={onSelect}
+              aria-current={isActive ? "page" : undefined}
+            >
+              <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>{displayTitle}</span>
+            </button>
+          )}
+          <div className={`session-row-actions ${SESSION_ROW_ACTIONS_CLASS}`}>
+            {onTogglePin ? (
+              <button
+                className={`${SESSION_ROW_PIN_CLASS} ${session.pinned ? SESSION_ROW_PIN_ACTIVE_CLASS : ""}`}
+                type="button"
+                aria-label={session.pinned ? "Unpin session" : "Pin session"}
+                title={session.pinned ? "Unpin session" : "Pin to top"}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onTogglePin();
+                }}
+              >
+                {session.pinned ? (
+                  <Pin size={11} strokeWidth={1.9} fill="currentColor" />
+                ) : (
+                  <Pin size={11} strokeWidth={1.9} />
+                )}
+              </button>
+            ) : null}
+            <button
+              className={`session-row-archive ${SESSION_ROW_ARCHIVE_CLASS} ${archiveDisabled ? "cursor-not-allowed group-hover/session-row:opacity-40 focus-visible:opacity-40 hover:bg-transparent hover:text-text-faint" : ""}`}
+              type="button"
+              disabled={archiveDisabled}
+              aria-label={archiveLabel}
+              title={archiveLabel}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (!archiveDisabled) onArchive?.();
               }}
             >
-              <Copy size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
-              <span className="flex-1">Copy</span>
-              <ChevronRight size={14} strokeWidth={1.9} className="text-text-faint" aria-hidden="true" />
+              <Archive size={12} strokeWidth={1.9} />
             </button>
-            {copyMenuOpen ? (
-              <div
-                className={SESSION_CONTEXT_SUBMENU_CLASS}
-                role="menu"
-                aria-label={`Copy session ${displayTitle}`}
-              >
-                <button
-                  className={SESSION_CONTEXT_MENU_ITEM_CLASS}
-                  type="button"
-                  role="menuitem"
-                  disabled={!onCopySessionId}
-                  onClick={() => {
-                    closeContextMenu();
-                    onCopySessionId?.();
-                  }}
-                >
-                  <Hash size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
-                  Copy ID
-                </button>
-                <button
-                  className={SESSION_CONTEXT_MENU_ITEM_CLASS}
-                  type="button"
-                  role="menuitem"
-                  disabled={!onCopyTranscript}
-                  onClick={() => {
-                    closeContextMenu();
-                    onCopyTranscript?.();
-                  }}
-                >
-                  <AlignLeft size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
-                  Copy Transcript
-                </button>
-              </div>
-            ) : null}
           </div>
-          <button
-            className={SESSION_CONTEXT_MENU_ITEM_CLASS}
-            type="button"
-            role="menuitem"
-            disabled={forkDisabled}
-            title={forkLabel}
-            onClick={() => {
-              closeContextMenu();
-              if (!forkDisabled) onFork?.();
-            }}
-          >
-            <GitFork size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
-            Fork
-          </button>
-          <div className={SESSION_CONTEXT_MENU_SEPARATOR_CLASS} role="separator" />
-          <button
-            className={SESSION_CONTEXT_MENU_ITEM_CLASS}
-            type="button"
-            role="menuitem"
-            disabled={archiveDisabled}
-            title={archiveLabel}
-            onClick={() => {
-              closeContextMenu();
-              if (!archiveDisabled) onArchive?.();
-            }}
-          >
-            <Archive size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
-            Archive
-          </button>
+          <span className={`session-row-time ${SESSION_ROW_TIME_CLASS}`}>
+            {formatRelativeTime(session.updatedAt)}
+          </span>
+          {menuPosition ? (
+            <div
+              ref={menuRef}
+              className={SESSION_CONTEXT_MENU_CLASS}
+              role="menu"
+              aria-label={`Session actions for ${displayTitle}`}
+              style={{
+                left: menuPosition.x,
+                top: menuPosition.y,
+                width: SESSION_CONTEXT_MENU_WIDTH,
+              }}
+            >
+              <button
+                className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+                type="button"
+                role="menuitem"
+                disabled={!onTogglePin}
+                onClick={() => {
+                  setMenuPosition(null);
+                  onTogglePin?.();
+                }}
+              >
+                <Pin
+                  size={16}
+                  strokeWidth={1.9}
+                  fill={session.pinned ? "currentColor" : "none"}
+                  className={SESSION_CONTEXT_MENU_ICON_CLASS}
+                  aria-hidden="true"
+                />
+                {session.pinned ? "Unpin" : "Pin"}
+              </button>
+              <button
+                className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+                type="button"
+                role="menuitem"
+                disabled={!onRename}
+                onClick={startRename}
+              >
+                <Pencil
+                  size={16}
+                  strokeWidth={1.9}
+                  className={SESSION_CONTEXT_MENU_ICON_CLASS}
+                  aria-hidden="true"
+                />
+                Rename
+              </button>
+              <div className="relative" onMouseEnter={() => setCopyMenuOpen(true)}>
+                <button
+                  className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+                  type="button"
+                  role="menuitem"
+                  aria-haspopup="menu"
+                  aria-expanded={copyMenuOpen}
+                  disabled={!onCopySessionId && !onCopyTranscript}
+                  onFocus={() => setCopyMenuOpen(true)}
+                  onClick={() => setCopyMenuOpen(true)}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowRight") {
+                      event.preventDefault();
+                      setCopyMenuOpen(true);
+                    }
+                    if (event.key === "ArrowLeft") {
+                      event.preventDefault();
+                      setCopyMenuOpen(false);
+                    }
+                  }}
+                >
+                  <Copy size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+                  <span className="flex-1">Copy</span>
+                  <ChevronRight size={14} strokeWidth={1.9} className="text-text-faint" aria-hidden="true" />
+                </button>
+                {copyMenuOpen ? (
+                  <div
+                    className={SESSION_CONTEXT_SUBMENU_CLASS}
+                    role="menu"
+                    aria-label={`Copy session ${displayTitle}`}
+                  >
+                    <button
+                      className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+                      type="button"
+                      role="menuitem"
+                      disabled={!onCopySessionId}
+                      onClick={() => {
+                        closeContextMenu();
+                        onCopySessionId?.();
+                      }}
+                    >
+                      <Hash
+                        size={16}
+                        strokeWidth={1.9}
+                        className={SESSION_CONTEXT_MENU_ICON_CLASS}
+                        aria-hidden="true"
+                      />
+                      Copy ID
+                    </button>
+                    <button
+                      className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+                      type="button"
+                      role="menuitem"
+                      disabled={!onCopyTranscript}
+                      onClick={() => {
+                        closeContextMenu();
+                        onCopyTranscript?.();
+                      }}
+                    >
+                      <AlignLeft
+                        size={16}
+                        strokeWidth={1.9}
+                        className={SESSION_CONTEXT_MENU_ICON_CLASS}
+                        aria-hidden="true"
+                      />
+                      Copy Transcript
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              <button
+                className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+                type="button"
+                role="menuitem"
+                disabled={forkDisabled}
+                title={forkLabel}
+                onClick={() => {
+                  closeContextMenu();
+                  if (!forkDisabled) onFork?.();
+                }}
+              >
+                <GitFork
+                  size={16}
+                  strokeWidth={1.9}
+                  className={SESSION_CONTEXT_MENU_ICON_CLASS}
+                  aria-hidden="true"
+                />
+                Fork
+              </button>
+              <div className={SESSION_CONTEXT_MENU_SEPARATOR_CLASS} role="separator" />
+              <button
+                className={SESSION_CONTEXT_MENU_ITEM_CLASS}
+                type="button"
+                role="menuitem"
+                disabled={archiveDisabled}
+                title={archiveLabel}
+                onClick={() => {
+                  closeContextMenu();
+                  if (!archiveDisabled) onArchive?.();
+                }}
+              >
+                <Archive
+                  size={16}
+                  strokeWidth={1.9}
+                  className={SESSION_CONTEXT_MENU_ICON_CLASS}
+                  aria-hidden="true"
+                />
+                Archive
+              </button>
+            </div>
+          ) : null}
         </div>
-      ) : null}
-    </div>
+      </TooltipTrigger>
+      <TooltipContent
+        side="right"
+        align="start"
+        sideOffset={8}
+        className="max-w-[360px] select-none px-2.5 py-2 font-normal"
+      >
+        <span className="block text-[12px] font-medium text-text-main">{displayTitle}</span>
+        <span className="mt-0.5 block text-[11px] font-normal text-text-muted [overflow-wrap:anywhere]">
+          {workspaceRoot ?? "Workspace path unavailable"}
+        </span>
+      </TooltipContent>
+    </Tooltip>
   );
+}
+
+function resolvedSessionStatus(
+  sessionId: string,
+  busySessionIds: Set<string>,
+  sessionStatuses?: Record<string, unknown>,
+): SessionUiStatusKind {
+  return resolveSessionStatus(sessionStatuses?.[sessionId] ?? (busySessionIds.has(sessionId) ? "running" : "idle"));
 }
 
 type CollapsibleSessionListProps = {
@@ -714,6 +783,7 @@ type CollapsibleSessionListProps = {
   onFork?: (sessionId: string) => void;
   onArchive?: (sessionId: string) => void;
   groupKey: string;
+  workspaces?: WorkspaceEntry[];
 };
 
 function CollapsibleSessionList({
@@ -729,6 +799,7 @@ function CollapsibleSessionList({
   onFork,
   onArchive,
   groupKey,
+  workspaces = [],
 }: CollapsibleSessionListProps) {
   const [expanded, setExpanded] = useState(false);
   const hasOverflow = sessions.length > SESSION_VISIBLE_LIMIT;
@@ -740,8 +811,9 @@ function CollapsibleSessionList({
         <SessionRow
           key={session.id}
           session={session}
+          workspaceRoot={sessionWorkspaceRoot(session, workspaces)}
           isActive={session.id === activeSessionId}
-          status={sessionStatuses?.[session.id] ?? (busySessionIds.has(session.id) ? "running" : "idle")}
+          status={resolvedSessionStatus(session.id, busySessionIds, sessionStatuses)}
           onSelect={() => onSelectSession?.(session.id)}
           onTogglePin={onTogglePin ? () => onTogglePin(session.id, !session.pinned) : undefined}
           onRename={onRename ? (title) => onRename(session.id, title) : undefined}
@@ -782,6 +854,9 @@ export function Sidebar({
   onCopyTranscript,
   onFork,
   onArchive,
+  onOpenWorkspace,
+  onArchiveWorkspace,
+  onRemoveWorkspace,
 }: {
   sessions: SessionListItem[];
   workspaces?: WorkspaceEntry[];
@@ -804,6 +879,9 @@ export function Sidebar({
   onFork?: (sessionId: string) => void;
   /** Archive 占位回调；未传时按钮仅做视觉占位。 */
   onArchive?: (sessionId: string) => void;
+  onOpenWorkspace?: (workspaceId: string) => void;
+  onArchiveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
+  onRemoveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
 }) {
   const [pinnedCollapsed, setPinnedCollapsed] = useState(false);
   const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
@@ -823,6 +901,20 @@ export function Sidebar({
     () => groupSessionsByWorkspace(unpinnedSessions, workspaces),
     [unpinnedSessions, workspaces],
   );
+  const workspaceGroupSessions = useMemo(() => {
+    const groups = new Map<string, SessionListItem[]>();
+    for (const session of sessions) {
+      const matchedWorkspace =
+        workspaces.find((workspace) => workspace.id === session.workspaceId) ??
+        workspaces.find((workspace) => session.workspaceRoot && workspace.path === session.workspaceRoot) ??
+        (!session.workspaceRoot ? workspaces.find((workspace) => workspace.kind === "default") : undefined);
+      const key = matchedWorkspace?.id ?? session.workspaceId ?? workspaceKey(session.workspaceRoot);
+      const current = groups.get(key) ?? [];
+      current.push(session);
+      groups.set(key, current);
+    }
+    return groups;
+  }, [sessions, workspaces]);
 
   if (mode === "hidden") {
     return null;
@@ -890,6 +982,7 @@ export function Sidebar({
                 onFork={onFork}
                 onArchive={onArchive}
                 groupKey="pinned"
+                workspaces={workspaces}
               />
             )}
           </section>
@@ -970,6 +1063,8 @@ export function Sidebar({
                 <WorkspaceSection
                   key={group.key}
                   group={group}
+                  allSessions={workspaceGroupSessions.get(group.key) ?? []}
+                  workspaces={workspaces}
                   activeSessionId={activeSessionId}
                   busySessionIds={busyIds}
                   sessionStatuses={statuses}
@@ -981,6 +1076,9 @@ export function Sidebar({
                   onCopyTranscript={onCopyTranscript}
                   onFork={onFork}
                   onArchive={onArchive}
+                  onOpenWorkspace={onOpenWorkspace}
+                  onArchiveWorkspace={onArchiveWorkspace}
+                  onRemoveWorkspace={onRemoveWorkspace}
                 />
               ))}
         </section>
@@ -1000,6 +1098,8 @@ export function Sidebar({
 
 type WorkspaceSectionProps = {
   group: WorkspaceGroup;
+  allSessions: SessionListItem[];
+  workspaces: WorkspaceEntry[];
   activeSessionId: string | null;
   busySessionIds: Set<string>;
   sessionStatuses?: Record<string, unknown>;
@@ -1011,10 +1111,15 @@ type WorkspaceSectionProps = {
   onCopyTranscript?: (sessionId: string) => void;
   onFork?: (sessionId: string) => void;
   onArchive?: (sessionId: string) => void;
+  onOpenWorkspace?: (workspaceId: string) => void;
+  onArchiveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
+  onRemoveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
 };
 
 function WorkspaceSection({
   group,
+  allSessions,
+  workspaces,
   activeSessionId,
   busySessionIds,
   sessionStatuses,
@@ -1026,12 +1131,88 @@ function WorkspaceSection({
   onCopyTranscript,
   onFork,
   onArchive,
+  onOpenWorkspace,
+  onArchiveWorkspace,
+  onRemoveWorkspace,
 }: WorkspaceSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const labelRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const archiveDisabled = allSessions.length === 0 || allSessions.some((session) => {
+    const status = resolvedSessionStatus(session.id, busySessionIds, sessionStatuses);
+    return status === "running" || status === "waiting_approval";
+  });
+  const archiveTitle = archiveDisabled
+    ? allSessions.length === 0 ? "No sessions to archive" : "Wait for running or pending sessions to finish"
+    : "Archive all sessions";
+  const removeDisabled = group.workspaceId === workspaces.find((workspace) => workspace.kind === "default")?.id;
+
+  useEffect(() => {
+    if (!menuPosition) return;
+    const close = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node) && !labelRef.current?.contains(event.target as Node)) {
+        setMenuPosition(null);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuPosition(null);
+        labelRef.current?.focus();
+      }
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuPosition]);
+
+  const openMenu = (position?: { x: number; y: number }) => {
+    const rect = labelRef.current?.getBoundingClientRect();
+    const next = position ?? { x: rect?.left ?? 8, y: (rect?.bottom ?? 8) + 4 };
+    setMenuPosition({
+      x: Math.max(8, Math.min(next.x, window.innerWidth - WORKSPACE_CONTEXT_MENU_WIDTH - 8)),
+      y: Math.max(8, Math.min(next.y, window.innerHeight - WORKSPACE_CONTEXT_MENU_MAX_HEIGHT - 8)),
+    });
+  };
+
+  const closeMenu = (restoreFocus = false) => {
+    setMenuPosition(null);
+    if (restoreFocus) labelRef.current?.focus();
+  };
+
+  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const items = Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]:not(:disabled)') ?? [],
+    );
+    if (items.length === 0) return;
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    const delta = event.key === "ArrowDown" ? 1 : -1;
+    const nextIndex = currentIndex < 0 ? (delta > 0 ? 0 : items.length - 1) : (currentIndex + delta + items.length) % items.length;
+    items[nextIndex]?.focus();
+  };
+
+  useEffect(() => {
+    if (menuPosition) {
+      menuRef.current?.querySelector<HTMLButtonElement>('button[role="menuitem"]:not(:disabled)')?.focus();
+    }
+  }, [menuPosition]);
 
   return (
-    <section className={`nav-section nav-section-workspace ${WORKSPACE_SECTION_CLASS}${collapsed ? " is-collapsed" : " is-expanded"}`}>
-      <div className={`nav-section-title ${NAV_SECTION_TITLE_CLASS} ${WORKSPACE_TITLE_ROW_CLASS}`}>
+    <section
+      className={`nav-section nav-section-workspace ${WORKSPACE_SECTION_CLASS}${collapsed ? " is-collapsed" : " is-expanded"}${menuPosition ? " is-menu-open" : ""}`}
+    >
+      <div
+        className={`nav-section-title ${NAV_SECTION_TITLE_CLASS} ${WORKSPACE_TITLE_ROW_CLASS}${menuPosition ? " rounded-act-md bg-[var(--act-color-hover-overlay)]" : ""}`}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          openMenu({ x: event.clientX, y: event.clientY });
+        }}
+      >
         <button
           className={WORKSPACE_ICON_SLOT_CLASS}
           type="button"
@@ -1045,9 +1226,12 @@ function WorkspaceSection({
             : <ChevronDown size={13} strokeWidth={1.9} className={WORKSPACE_CHEVRON_GLYPH_CLASS} aria-hidden="true" />}
         </button>
         <button
+          ref={labelRef}
           className={`nav-section-label ${WORKSPACE_LABEL_CLASS}`}
           type="button"
-          onClick={() => setCollapsed((value) => !value)}
+          aria-haspopup="menu"
+          aria-expanded={Boolean(menuPosition)}
+          onClick={() => menuPosition ? closeMenu() : openMenu()}
         >
           <span className={WORKSPACE_NAME_CLASS}>{group.label}</span>
         </button>
@@ -1083,8 +1267,63 @@ function WorkspaceSection({
           onFork={onFork}
           onArchive={onArchive}
           groupKey={group.key}
+          workspaces={workspaces}
         />
       )}
+      {menuPosition && typeof document !== "undefined" ? createPortal(
+        <div
+          ref={menuRef}
+          className={WORKSPACE_CONTEXT_MENU_CLASS}
+          role="menu"
+          aria-label={`Workspace actions for ${group.label}`}
+          onKeyDown={handleMenuKeyDown}
+          style={{ left: menuPosition.x, top: menuPosition.y, width: WORKSPACE_CONTEXT_MENU_WIDTH }}
+        >
+          <button
+            className={WORKSPACE_CONTEXT_MENU_ITEM_CLASS}
+            type="button"
+            role="menuitem"
+            disabled={!group.workspaceId || !onOpenWorkspace}
+            onClick={() => {
+              closeMenu(true);
+              if (group.workspaceId) onOpenWorkspace?.(group.workspaceId);
+            }}
+          >
+            <FolderOpen size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+            Open in IDE
+          </button>
+          <button
+            className={WORKSPACE_CONTEXT_MENU_ITEM_CLASS}
+            type="button"
+            role="menuitem"
+            disabled={archiveDisabled || !group.workspaceId || !onArchiveWorkspace}
+            title={archiveTitle}
+            onClick={() => {
+              closeMenu(true);
+              if (!archiveDisabled && group.workspaceId) onArchiveWorkspace?.(group.workspaceId, group.workspaceRoot);
+            }}
+          >
+            <Archive size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+            Archive All
+          </button>
+          <div className={SESSION_CONTEXT_MENU_SEPARATOR_CLASS} role="separator" />
+          <button
+            className={WORKSPACE_CONTEXT_MENU_DANGER_ITEM_CLASS}
+            type="button"
+            role="menuitem"
+            disabled={removeDisabled || !group.workspaceId || !onRemoveWorkspace}
+            title={removeDisabled ? "Default workspace cannot be removed" : "Remove from sidebar"}
+            onClick={() => {
+              closeMenu(true);
+              if (!removeDisabled && group.workspaceId) onRemoveWorkspace?.(group.workspaceId, group.workspaceRoot);
+            }}
+          >
+            <PanelLeftClose size={16} strokeWidth={1.9} className="h-4 w-4" aria-hidden="true" />
+            Remove from Sidebar
+          </button>
+        </div>,
+        document.body,
+      ) : null}
     </section>
   );
 }

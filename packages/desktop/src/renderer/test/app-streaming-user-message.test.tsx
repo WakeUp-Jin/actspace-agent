@@ -78,6 +78,11 @@ const settingsApiStub = {
   listWorkspaceDir: async () => ({ root: "/tmp/workspace", relativePath: "", entries: [] }),
   readWorkspaceFile: async () => ({ relativePath: "", renderKind: "text" as const, size: 0, content: "" }),
   archiveSession: async () => ({ ok: true }),
+  archiveSessions: async (input: { sessionIds: string[] }) => ({
+    ok: true,
+    archivedSessionIds: input.sessionIds,
+    failedSessionIds: [],
+  }),
   setUiZoom: () => {},
   setNativeTheme: () => {},
   onShuttingDown: () => () => {},
@@ -188,6 +193,114 @@ describe("App streaming user message", () => {
     } else {
       delete (HTMLElement.prototype as unknown as { clientWidth?: number }).clientWidth;
     }
+  });
+
+  it("archives every workspace session including pinned sessions", async () => {
+    const user = userEvent.setup();
+    const now = new Date().toISOString();
+    const active = createEmptySessionRecord("session-active");
+    active.meta.title = "Active workspace session";
+    active.meta.workspaceId = "ws_source";
+    active.meta.workspaceRoot = "/tmp/workspace";
+    const fallback = createEmptySessionRecord("session-fallback");
+    fallback.meta.title = "Fallback session";
+    fallback.meta.workspaceId = "ws_alt";
+    fallback.meta.workspaceRoot = "/tmp/alt-workspace";
+    const sessions: SessionListItem[] = [
+      { id: active.meta.id, title: active.meta.title, updatedAt: now, turnCount: 1, workspaceId: "ws_source", workspaceRoot: "/tmp/workspace" },
+      { id: "session-pinned", title: "Pinned workspace session", updatedAt: now, turnCount: 1, workspaceId: "ws_source", workspaceRoot: "/tmp/workspace", pinned: true },
+      { id: fallback.meta.id, title: fallback.meta.title, updatedAt: now, turnCount: 1, workspaceId: "ws_alt", workspaceRoot: "/tmp/alt-workspace" },
+    ];
+    const archiveSessions = vi.fn(async (input: { sessionIds: string[] }) => ({
+      ok: true,
+      archivedSessionIds: input.sessionIds,
+      failedSessionIds: [],
+    }));
+    const records = new Map([[active.meta.id, active], [fallback.meta.id, fallback]]);
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(now),
+      listSessions: async () => sessions,
+      getSession: async ({ sessionId }) => records.get(sessionId) ?? null,
+      createSession: async () => active,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({ provider: "deepseek", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
+      getKimiBalance: async () => ({ provider: "kimi", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      archiveSessions,
+      onAgentStream: () => () => {},
+      runTurn: async () => ({ sessionId: active.meta.id, turnId: "unused", status: "completed", events: [], contextSnapshot: null, contextState: null }),
+    };
+
+    renderApp();
+    await screen.findByRole("button", { name: "Show session details for Active workspace session" });
+    await user.click(screen.getByRole("button", { name: "workspace" }));
+    await user.click(screen.getByRole("menuitem", { name: "Archive All" }));
+
+    await waitFor(() => {
+      expect(archiveSessions).toHaveBeenCalledWith({ sessionIds: ["session-active", "session-pinned"] });
+    });
+  });
+
+  it("hides a workspace and moves the active session to a visible fallback", async () => {
+    const user = userEvent.setup();
+    const now = new Date().toISOString();
+    const active = createEmptySessionRecord("session-hidden-active");
+    active.meta.title = "Hidden active session";
+    active.meta.workspaceId = "ws_source";
+    active.meta.workspaceRoot = "/tmp/workspace";
+    const fallback = createEmptySessionRecord("session-visible-fallback");
+    fallback.meta.title = "Visible fallback session";
+    fallback.meta.workspaceId = "ws_alt";
+    fallback.meta.workspaceRoot = "/tmp/alt-workspace";
+    const sessions: SessionListItem[] = [
+      { id: active.meta.id, title: active.meta.title, updatedAt: now, turnCount: 1, workspaceId: "ws_source", workspaceRoot: "/tmp/workspace" },
+      { id: fallback.meta.id, title: fallback.meta.title, updatedAt: now, turnCount: 1, workspaceId: "ws_alt", workspaceRoot: "/tmp/alt-workspace" },
+    ];
+    let registry = createWorkspaceRegistryFixture(now);
+    const setWorkspaceVisibility = vi.fn(async () => {
+      registry = {
+        ...registry,
+        items: registry.items.map((workspace) => workspace.id === "ws_source" ? { ...workspace, hidden: true } : workspace),
+      };
+      return { ok: true as const };
+    });
+    const records = new Map([[active.meta.id, active], [fallback.meta.id, fallback]]);
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => registry,
+      listSessions: async () => sessions,
+      getSession: async ({ sessionId }) => records.get(sessionId) ?? null,
+      createSession: async () => active,
+      setWorkspaceVisibility,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({ provider: "deepseek", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
+      getKimiBalance: async () => ({ provider: "kimi", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      onAgentStream: () => () => {},
+      runTurn: async () => ({ sessionId: active.meta.id, turnId: "unused", status: "completed", events: [], contextSnapshot: null, contextState: null }),
+    };
+
+    renderApp();
+    await screen.findByRole("button", { name: "Show session details for Hidden active session" });
+    await user.click(screen.getByRole("button", { name: "workspace" }));
+    await user.click(screen.getByRole("menuitem", { name: "Remove from Sidebar" }));
+
+    await waitFor(() => {
+      expect(setWorkspaceVisibility).toHaveBeenCalledWith({ workspaceId: "ws_source", hidden: true });
+      expect(screen.queryByText("Hidden active session")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Show session details for Visible fallback session" })).toBeInTheDocument();
+    });
   });
 
   it("refreshes the composer review summary from workspace review state", async () => {
