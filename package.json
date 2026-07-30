@@ -7,6 +7,7 @@
     "clean": "pnpm --filter @actspace/shared clean && pnpm --filter @actspace/agent-core clean && pnpm --filter @actspace/agent-cli clean && pnpm --filter @actspace/desktop clean",
     "dev": "pnpm --filter @actspace/desktop dev",
     "dev:log": "./scripts/dev-with-logs.sh",
+    "dev:stop": "bash ./scripts/kill-dev-ports.sh",
     "dev:site": "pnpm --filter @actspace/site dev",
     "build": "pnpm --filter @actspace/agent-cli build && pnpm --filter @actspace/desktop build",
     "build:site": "pnpm --filter @actspace/site build",

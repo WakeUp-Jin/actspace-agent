@@ -76,7 +76,7 @@ const settingsApiStub = {
     contextState: null,
   }),
   listWorkspaceDir: async () => ({ root: "/tmp/workspace", relativePath: "", entries: [] }),
-  readWorkspaceFile: async () => ({ relativePath: "", renderKind: "text" as const, size: 0, content: "" }),
+  readWorkspaceFile: async () => ({ relativePath: "", renderKind: "text" as const, size: 0, mtimeMs: 0, content: "" }),
   archiveSession: async () => ({ ok: true }),
   archiveSessions: async (input: { sessionIds: string[] }) => ({
     ok: true,

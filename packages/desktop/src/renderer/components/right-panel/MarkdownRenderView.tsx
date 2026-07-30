@@ -2,6 +2,8 @@ import { useState, type AnchorHTMLAttributes } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import { CodeRenderView } from "./CodeRenderView";
+import { LANGUAGE_MODULES } from "./highlight";
 import { PreviewSourceToggle, type PreviewMode } from "./PreviewSourceToggle";
 
 /**
@@ -12,14 +14,25 @@ import { PreviewSourceToggle, type PreviewMode } from "./PreviewSourceToggle";
  * 配色：包一层 `markdown-doc`，代码块与 hljs token 配色在 `markdown.css` 内随主题翻转。
  */
 
-// 相对路径已统一在工作区操作栏展示，这里只保留 Preview/源码 切换（右对齐）。
+// 只有「聊天生成的 markdown」才用到这条工具栏：它没有工作区操作栏可以挂切换按钮。
 const TOOLBAR_CLASS = "flex shrink-0 items-center justify-end gap-2 border-b border-line px-3 py-1.5";
 const PREVIEW_SCROLL_CLASS = "min-h-0 flex-1 overflow-auto p-[18px] text-[13px] leading-[1.7] text-text-main";
-const SOURCE_CLASS =
-  "m-0 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-[12px] leading-[1.55] text-text-main";
 
 const REMARK_PLUGINS = [remarkGfm];
-const REHYPE_PLUGINS = [[rehypeHighlight, { detect: true, ignoreMissing: true }]] as const;
+
+/**
+ * fenced code 复用文件视图那套语言表。
+ *
+ * `languages` 是**替换**默认的 lowlight `common`，不是追加。换掉的收益是覆盖面对齐：
+ * dockerfile / protobuf / dart / cmake / powershell 等原来在 fence 里根本不着色。
+ * 代价是 common 独有的 arduino / objectivec / php-template / python-repl / vbnet / wasm
+ * 不再支持 —— 本仓库不写这些语言，够换。
+ *
+ * 注意这里换不来体积：rehype-highlight 无条件静态 import 了 `common`，摇不掉。
+ */
+const REHYPE_PLUGINS = [
+  [rehypeHighlight, { detect: true, ignoreMissing: true, languages: LANGUAGE_MODULES }],
+] as const;
 
 function MarkdownLink({ href, children, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement>) {
   return (
@@ -31,15 +44,30 @@ function MarkdownLink({ href, children, ...rest }: AnchorHTMLAttributes<HTMLAnch
 
 const MARKDOWN_COMPONENTS = { a: MarkdownLink };
 
-export function MarkdownRenderView({ source }: { source: string }) {
-  const [mode, setMode] = useState<PreviewMode>("preview");
+/**
+ * `mode` / `onModeChange` 一起传 = 受控（切换按钮在工作区操作栏上，视图不再自带工具栏）；
+ * 都不传 = 自持状态并渲染视图内的分段控件，供没有操作栏的聊天 markdown 使用。
+ */
+export function MarkdownRenderView({
+  source,
+  mode,
+  onModeChange,
+}: {
+  source: string;
+  mode?: PreviewMode;
+  onModeChange?: (mode: PreviewMode) => void;
+}) {
+  const [ownMode, setOwnMode] = useState<PreviewMode>("preview");
+  const activeMode = mode ?? ownMode;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className={TOOLBAR_CLASS}>
-        <PreviewSourceToggle mode={mode} onChange={setMode} />
-      </div>
-      {mode === "preview" ? (
+      {onModeChange ? null : (
+        <div className={TOOLBAR_CLASS}>
+          <PreviewSourceToggle mode={activeMode} onChange={setOwnMode} />
+        </div>
+      )}
+      {activeMode === "preview" ? (
         <div className={PREVIEW_SCROLL_CLASS}>
           <div className="markdown-prose markdown-doc act-code-hl">
             <Markdown
@@ -53,9 +81,9 @@ export function MarkdownRenderView({ source }: { source: string }) {
           </div>
         </div>
       ) : (
-        <pre className={SOURCE_CLASS}>
-          <code>{source}</code>
-        </pre>
+        // 源码态复用代码视图：早期这里是裸 <pre>，既没有行号也不高亮，
+        // 和「代码文件 Tab」两套体验不一致。
+        <CodeRenderView content={source} language="markdown" />
       )}
     </div>
   );

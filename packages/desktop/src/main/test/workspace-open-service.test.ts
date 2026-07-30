@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -64,5 +64,70 @@ describe("workspace open service", () => {
 
     expect(result).toMatchObject({ ok: false, error: "invalid_workspace" });
     expect(runner).not.toHaveBeenCalled();
+  });
+
+  describe("opening a file inside the workspace", () => {
+    /** 每个工具接受的目标形态不同，所以按工具分别锁住实际传给 `open` 的参数。 */
+    it.runIf(process.platform === "darwin")("hands the file itself to an editor", async () => {
+      const roots = await makeRoots();
+      await mkdir(join(roots.workspaceRoot, "src"), { recursive: true });
+      await writeFile(join(roots.workspaceRoot, "src", "main.ts"), "export const x = 1;\n");
+      const runner = vi.fn(async () => ({ ok: true }));
+
+      const result = await openWorkspaceInTool(
+        { toolId: "cursor", relativePath: "src/main.ts" },
+        roots,
+        runner,
+      );
+
+      expect(result).toMatchObject({ ok: true, relativePath: "src/main.ts" });
+      expect(runner).toHaveBeenLastCalledWith(["-a", "Cursor", join(roots.workspaceRoot, "src", "main.ts")]);
+    });
+
+    it.runIf(process.platform === "darwin")("reveals a file in Finder instead of running it", async () => {
+      const roots = await makeRoots();
+      await writeFile(join(roots.workspaceRoot, "notes.md"), "# hi\n");
+      const runner = vi.fn(async () => ({ ok: true }));
+
+      // `open -a Finder <file>` 会用默认应用打开这个文件；`-R` 才是「在 Finder 里定位」。
+      await openWorkspaceInTool({ toolId: "finder", relativePath: "notes.md" }, roots, runner);
+
+      expect(runner).toHaveBeenLastCalledWith(["-R", join(roots.workspaceRoot, "notes.md")]);
+    });
+
+    it.runIf(process.platform === "darwin")("gives a terminal the containing directory", async () => {
+      const roots = await makeRoots();
+      await mkdir(join(roots.workspaceRoot, "src"), { recursive: true });
+      await writeFile(join(roots.workspaceRoot, "src", "main.ts"), "export const x = 1;\n");
+      const runner = vi.fn(async () => ({ ok: true }));
+
+      await openWorkspaceInTool({ toolId: "terminal", relativePath: "src/main.ts" }, roots, runner);
+
+      expect(runner).toHaveBeenLastCalledWith(["-a", "Terminal", join(roots.workspaceRoot, "src")]);
+    });
+
+    it("refuses a target outside the workspace root without calling open", async () => {
+      const roots = await makeRoots();
+      const runner = vi.fn(async () => ({ ok: true }));
+
+      const result = await openWorkspaceInTool(
+        { toolId: "cursor", relativePath: "../../etc/hosts" },
+        roots,
+        runner,
+      );
+
+      expect(result).toMatchObject({ ok: false, error: "escapes_root" });
+      expect(runner).not.toHaveBeenCalled();
+    });
+
+    it("refuses a target that does not exist without calling open", async () => {
+      const roots = await makeRoots();
+      const runner = vi.fn(async () => ({ ok: true }));
+
+      const result = await openWorkspaceInTool({ toolId: "cursor", relativePath: "nope.ts" }, roots, runner);
+
+      expect(result).toMatchObject({ ok: false, error: "invalid_workspace" });
+      expect(runner).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,28 +1,60 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Bot, ChevronDown, Eye, FolderTree, GitBranch, MessageSquare, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
-import hljs from "highlight.js";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Bot,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  FolderTree,
+  GitBranch,
+  MessageSquare,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+import { WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES } from "@actspace/shared";
 import type { ContextState } from "@actspace/shared";
+import { CodeRenderView } from "./right-panel/CodeRenderView";
 import { ContextRenderView } from "./right-panel/ContextRenderView";
+import { CsvRenderView } from "./right-panel/CsvRenderView";
 import { HtmlRenderView } from "./right-panel/HtmlRenderView";
 import { KairosRightPanelView } from "./right-panel/KairosRightPanelView";
 import { MarkdownRenderView } from "./right-panel/MarkdownRenderView";
+import { OpenInAppMenu } from "./right-panel/OpenInAppMenu";
+import { PreviewSourceButton } from "./right-panel/PreviewSourceToggle";
 import { ReplyHtmlRenderView } from "./right-panel/ReplyHtmlRenderView";
 import { ReviewRenderView } from "./right-panel/ReviewRenderView";
 import { WorkspaceFileTree } from "./right-panel/WorkspaceFileTree";
-import { isWorkspaceFileTab, useRightPanel, type RightPanelTab } from "./right-panel/RightPanelContext";
+import {
+  isWorkspaceFileTab,
+  useRightPanel,
+  type RightPanelTab,
+  type WorkspaceFileMeta,
+} from "./right-panel/RightPanelContext";
+import { useFileFreshness, useReloadFileTab } from "./right-panel/useFileFreshness";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 const RIGHT_PANEL_CLASS = "flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l border-line bg-surface";
-// 右面板纵向三段（对齐 Cursor 右侧）：① tab 条（全宽）→ ② 工作区操作栏（全宽，仅浏览态出现）→ ③ 两栏 [文件树 | 内容]。
+// 右面板纵向三段（对齐 Cursor 右侧）：① tab 条（全宽）→ ② 工作区操作栏（全宽，仅浏览态出现）→ ③ 两栏 [内容 | 文件树]。
+// 文件树在**右**栏：内容区紧邻聊天区，视线从消息移到代码不用跨过一条树栏。
 const RIGHT_PANEL_SPLIT_CLASS = "flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden";
 const RIGHT_PANEL_CONTENT_CLASS = "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden";
-// ② 工作区操作栏：左=树栏折叠/展开按钮，其后=当前文件的相对路径（相对 workspace）。
-const WORKSPACE_BAR_CLASS = "flex shrink-0 items-center gap-2 border-b border-line px-2.5 py-1.5";
+// ② 工作区操作栏：左=面包屑路径，右=树栏开关 + 外部打开。只放这两个动作，多了就变成第二条工具栏。
+const WORKSPACE_BAR_CLASS = "flex shrink-0 items-center gap-1 border-b border-line px-2.5 py-1.5";
 const WORKSPACE_BAR_TOGGLE_CLASS =
-  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main [cursor:pointer]";
-const WORKSPACE_BAR_PATH_CLASS =
-  "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-text-faint";
-const WORKSPACE_BAR_HINT_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-text-faint";
+  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint hover:bg-line hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
+const WORKSPACE_BAR_TOGGLE_ACTIVE_CLASS = "bg-selected text-text-main";
+// 面包屑：根名弱化、文件名主色，中间用 chevron 分隔（与 Cursor 的 `root › file` 同形）。
+const WORKSPACE_BAR_CRUMBS_CLASS = "flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden text-[12px]";
+const WORKSPACE_BAR_ROOT_CLASS = "shrink-0 text-text-faint";
+const WORKSPACE_BAR_PATH_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-text-main";
+const WORKSPACE_BAR_HINT_CLASS =
+  "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-text-faint";
+// 过期提示用 warning 语义：内容不可信但不是错误，需要用户注意并显式重载。
+const WORKSPACE_STALE_BAR_CLASS =
+  "flex shrink-0 items-center gap-2 border-b border-line bg-warning-soft px-2.5 py-1.5 text-[11px] text-on-warning";
+const WORKSPACE_STALE_ACTION_CLASS =
+  "shrink-0 rounded-act-sm border-0 bg-transparent px-1.5 py-0.5 text-[11px] font-semibold text-on-warning underline decoration-dotted hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring [cursor:pointer]";
+const WORKSPACE_TRUNCATED_BAR_CLASS =
+  "shrink-0 border-b border-line bg-surface-subtle px-2.5 py-1.5 text-[11px] text-text-faint";
 // 右侧预留两个 chrome 控件（+ 新建对象 / 折叠面板）的宽度，tab 永远不会滑到按钮下方造成重叠。
 const RIGHT_TABS_CLASS =
   "relative z-[61] flex min-h-[var(--window-chrome-strip-height)] shrink-0 items-center border-b border-line py-0 pl-2.5 pr-[calc(2*var(--window-chrome-control-size)+28px)] [pointer-events:none] max-[600px]:pl-[var(--window-chrome-collapsed-left-width)]";
@@ -66,16 +98,20 @@ export function RightPanel({
   contextState,
   sessionId,
   workspaceRoot,
+  fileRevalidateKey,
   onOpenReview,
   onReviewChanged,
 }: {
   contextState?: ContextState | null;
   sessionId?: string | null;
   workspaceRoot?: string;
+  /** 递增即触发已打开文件 Tab 的新鲜度重校验（当前会话 turn 结束时由 App 递增）。 */
+  fileRevalidateKey?: number;
   onOpenReview?: () => void;
   onReviewChanged?: () => void;
 }) {
   const { activeTab, isFileTreeOpen, isFileTreeCollapsed } = useRightPanel();
+  useFileFreshness({ workspaceRoot, revalidateKey: fileRevalidateKey });
 
   // 呈现由「当前 Tab」决定：
   // - 工作区文件 Tab → 进入 shell（树 + 文件预览区），多个文件 Tab 间切换只换 shell 内的内容；
@@ -88,9 +124,8 @@ export function RightPanel({
   return (
     <aside className={RIGHT_PANEL_CLASS}>
       <RightPanelTabs />
-      {showShell ? <WorkspaceOperationBar activeTab={activeTab} /> : null}
+      {showShell ? <WorkspaceOperationBar activeTab={activeTab} workspaceRoot={workspaceRoot} /> : null}
       <div className={RIGHT_PANEL_SPLIT_CLASS}>
-        {showTree ? <WorkspaceFileTree key={workspaceRoot ?? "default-workspace"} workspaceRoot={workspaceRoot} /> : null}
         <div className={RIGHT_PANEL_CONTENT_CLASS}>
           {showShell && !isFileTab ? (
             <WorkspaceFileEmpty />
@@ -104,6 +139,7 @@ export function RightPanel({
             />
           )}
         </div>
+        {showTree ? <WorkspaceFileTree workspaceRoot={workspaceRoot} /> : null}
       </div>
     </aside>
   );
@@ -123,44 +159,114 @@ function WorkspaceFileEmpty() {
     <div className={RIGHT_PANEL_BODY_CLASS}>
       <h2 className={RIGHT_PANEL_HEADING_CLASS}>选择文件查看</h2>
       <p className={RIGHT_PANEL_TEXT_CLASS}>
-        在左侧文件树中点击文件，将在这里打开预览。Kairos、Context、Reply 等对象请关闭「工作区文件」后查看完整视图。
+        在右侧文件树中点击文件，将在这里打开预览。Kairos、Context、Reply 等对象请关闭「工作区文件」后查看完整视图。
       </p>
     </div>
   );
 }
 
+/** workspace 绝对路径的末段目录名，用作面包屑的根标签。 */
+function workspaceLabelOf(workspaceRoot: string | undefined): string | undefined {
+  if (!workspaceRoot) return undefined;
+  return workspaceRoot.replace(/[/\\]+$/, "").split(/[/\\]/).filter(Boolean).at(-1);
+}
+
 /**
  * ② 工作区操作栏：全宽、夹在 tab 条与两栏之间。
- * 折叠按钮只收起/展开左侧树栏（操作栏与内容保持），路径展示当前文件的工作区相对路径。
+ *
+ * 只承载「我在看哪个文件」+ 两个动作（开关树栏、外部打开），刻意不再放刷新：
+ * 需要重新读取的唯一真实场景是文件已变更，而那时下方的 stale 提示条本身就带「重新加载」，
+ * 常驻一个几乎不会被点的刷新图标只是让这一层看起来更满。
  */
-function WorkspaceOperationBar({ activeTab }: { activeTab: RightPanelTab | null }) {
-  const { isFileTreeCollapsed, toggleFileTreeCollapsed } = useRightPanel();
+function WorkspaceOperationBar({
+  activeTab,
+  workspaceRoot,
+}: {
+  activeTab: RightPanelTab | null;
+  workspaceRoot?: string;
+}) {
+  const { isFileTreeCollapsed, toggleFileTreeCollapsed, isSourceShown, setSourceShown } = useRightPanel();
+  const reloadFile = useReloadFileTab(workspaceRoot);
   const path = relativePathOf(activeTab);
+  const rootLabel = workspaceLabelOf(workspaceRoot);
+  const meta = activeTab as WorkspaceFileMeta | null;
+  const isStale = Boolean(meta?.isStale);
+  const isTruncated = Boolean(meta?.truncated);
+  // 只有「渲染态之外还有源码可看」的文件类型才给切换按钮：markdown 与 html。
+  // 必须同时要求 path：浏览态下激活的可能是聊天生成的 markdown（内容区是占位页），
+  // 那时按钮点了没有任何视图会响应。
+  const dualViewTab =
+    path && activeTab && (activeTab.kind === "markdown" || activeTab.kind === "html") ? activeTab : null;
+
+  const reload = () => {
+    if (!path || !activeTab) return;
+    void reloadFile(path, activeTab.kind === "context" ? path : (activeTab as { title: string }).title);
+  };
+
   return (
-    <div className={WORKSPACE_BAR_CLASS}>
-      <button
-        type="button"
-        className={WORKSPACE_BAR_TOGGLE_CLASS}
-        aria-label={isFileTreeCollapsed ? "展开文件树" : "收起文件树"}
-        aria-expanded={!isFileTreeCollapsed}
-        title={isFileTreeCollapsed ? "展开文件树" : "收起文件树"}
-        onClick={toggleFileTreeCollapsed}
-      >
-        {isFileTreeCollapsed ? (
-          <PanelLeftOpen size={15} strokeWidth={1.8} />
+    <>
+      <div className={WORKSPACE_BAR_CLASS}>
+        {path ? (
+          <span className={WORKSPACE_BAR_CRUMBS_CLASS}>
+            {rootLabel ? (
+              <>
+                <span className={WORKSPACE_BAR_ROOT_CLASS} title={workspaceRoot}>
+                  {rootLabel}
+                </span>
+                <ChevronRight size={12} strokeWidth={1.8} className="shrink-0 text-text-faint" aria-hidden="true" />
+              </>
+            ) : null}
+            <span className={WORKSPACE_BAR_PATH_CLASS} title={path}>
+              {path}
+            </span>
+          </span>
         ) : (
-          <PanelLeftClose size={15} strokeWidth={1.8} />
+          <span className={WORKSPACE_BAR_HINT_CLASS}>工作区文件</span>
         )}
-      </button>
-      {path ? (
-        <span className={WORKSPACE_BAR_PATH_CLASS} title={path}>
-          {path}
-        </span>
-      ) : (
-        <span className={WORKSPACE_BAR_HINT_CLASS}>工作区文件</span>
-      )}
-    </div>
+        {dualViewTab ? (
+          <PreviewSourceButton
+            mode={isSourceShown(dualViewTab.id) ? "source" : "preview"}
+            onChange={(next) => setSourceShown(dualViewTab.id, next === "source")}
+          />
+        ) : null}
+        {path ? <OpenInAppMenu workspaceRoot={workspaceRoot} relativePath={path} /> : null}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className={`${WORKSPACE_BAR_TOGGLE_CLASS} ${isFileTreeCollapsed ? "" : WORKSPACE_BAR_TOGGLE_ACTIVE_CLASS}`}
+              aria-label={isFileTreeCollapsed ? "展开文件树" : "收起文件树"}
+              aria-expanded={!isFileTreeCollapsed}
+              onClick={toggleFileTreeCollapsed}
+            >
+              <FolderTree size={14} strokeWidth={1.8} aria-hidden="true" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{isFileTreeCollapsed ? "展开文件树" : "收起文件树"}</TooltipContent>
+        </Tooltip>
+      </div>
+      {isStale ? (
+        <div className={WORKSPACE_STALE_BAR_CLASS} role="status">
+          <TriangleAlert size={13} strokeWidth={2} className="shrink-0" aria-hidden="true" />
+          <span className="min-w-0 flex-1">文件已在磁盘上变更，当前显示的是旧内容。</span>
+          <button type="button" className={WORKSPACE_STALE_ACTION_CLASS} onClick={reload}>
+            重新加载
+          </button>
+        </div>
+      ) : null}
+      {isTruncated ? (
+        <div className={WORKSPACE_TRUNCATED_BAR_CLASS} role="status">
+          {`文件过大，仅显示前 ${formatBytes(WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES)} 内的完整行（共 ${formatBytes(meta?.size ?? 0)}）。`}
+        </div>
+      ) : null}
+    </>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
 }
 
 /**
@@ -360,22 +466,60 @@ function RightPanelBody({
   }
 
   if (tab.kind === "html") {
-    return <HtmlRenderView html={tab.html} trust={tab.trust} relativePath={tab.relativePath} />;
+    return <HtmlTab tab={tab} />;
   }
 
   if (tab.kind === "markdown") {
-    return <MarkdownRenderView source={tab.source} />;
+    return <MarkdownTab tab={tab} />;
   }
 
   if (tab.kind === "image") {
     return <ImageRenderView src={tab.src} relativePath={tab.relativePath} />;
   }
 
+  if (tab.kind === "csv") {
+    return <CsvRenderView content={tab.content} relativePath={tab.relativePath} />;
+  }
+
   if (tab.kind === "text") {
-    return <TextRenderView content={tab.content} language={tab.language} />;
+    return <CodeRenderView content={tab.content} language={tab.language} />;
   }
 
   return <ContextRenderView contextState={contextState} sessionId={sessionId} />;
+}
+
+/**
+ * 工作区文件 Tab 的预览 / 源码由操作栏按钮控制（受控）；
+ * 聊天生成的 markdown/html 没有操作栏，交给视图自己带切换控件（不受控）。
+ */
+function MarkdownTab({ tab }: { tab: Extract<RightPanelTab, { kind: "markdown" }> }) {
+  const { isSourceShown, setSourceShown } = useRightPanel();
+  if (!isWorkspaceFileTab(tab)) {
+    return <MarkdownRenderView source={tab.source} />;
+  }
+  return (
+    <MarkdownRenderView
+      source={tab.source}
+      mode={isSourceShown(tab.id) ? "source" : "preview"}
+      onModeChange={(next) => setSourceShown(tab.id, next === "source")}
+    />
+  );
+}
+
+function HtmlTab({ tab }: { tab: Extract<RightPanelTab, { kind: "html" }> }) {
+  const { isSourceShown, setSourceShown } = useRightPanel();
+  if (!isWorkspaceFileTab(tab)) {
+    return <HtmlRenderView html={tab.html} trust={tab.trust} relativePath={tab.relativePath} />;
+  }
+  return (
+    <HtmlRenderView
+      html={tab.html}
+      trust={tab.trust}
+      relativePath={tab.relativePath}
+      mode={isSourceShown(tab.id) ? "source" : "preview"}
+      onModeChange={(next) => setSourceShown(tab.id, next === "source")}
+    />
+  );
 }
 
 function RightPanelLauncher({
@@ -446,42 +590,11 @@ function LauncherButton({
   );
 }
 
-const TEXT_BODY_CLASS =
-  "m-0 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-[12px] leading-[1.55] text-text-main";
-
 // 路径已统一移到工作区操作栏（②），各文件视图不再自带 path 工具条，避免相邻两行重复同一路径。
 function ImageRenderView({ src, relativePath }: { src: string; relativePath?: string }) {
   return (
     <div className="grid min-h-0 flex-1 place-items-center overflow-auto bg-surface-subtle p-4">
       <img src={src} alt={relativePath ?? "预览图片"} className="max-h-full max-w-full object-contain" />
     </div>
-  );
-}
-
-/**
- * 文本 / 代码文件视图。带 `language`（ts/js/css/yaml/json…）时用 highlight.js 语法高亮，
- * 复用 Markdown 的主题感知 hljs 配色（共享 `.act-code-hl` 作用域）；无语言或高亮失败回退纯等宽。
- */
-function TextRenderView({ content, language }: { content: string; language?: string }) {
-  const highlighted = useMemo(() => {
-    if (!language || !hljs.getLanguage(language)) return null;
-    try {
-      return hljs.highlight(content, { language, ignoreIllegals: true }).value;
-    } catch {
-      return null;
-    }
-  }, [content, language]);
-
-  if (highlighted) {
-    return (
-      <pre className={`${TEXT_BODY_CLASS} act-code-hl`}>
-        <code className="hljs" dangerouslySetInnerHTML={{ __html: highlighted }} />
-      </pre>
-    );
-  }
-  return (
-    <pre className={TEXT_BODY_CLASS}>
-      <code>{content}</code>
-    </pre>
   );
 }

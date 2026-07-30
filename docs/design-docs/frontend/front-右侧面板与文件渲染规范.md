@@ -58,9 +58,9 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `Markdown`：Markdown 文件渲染。
 - `HTML`：HTML 预览。
 - `Image`：图片渲染。
-- `PDF`：PDF 预览。
-- `CSV`：表格预览。
-- `Text`：纯文本或代码文件查看。
+- `PDF`：PDF 预览。**未实现**，V2；当前 `.pdf` 走不到独立 Tab。
+- `CSV`：表格预览。2026-07-30 实现（`CsvRenderView`）。
+- `Text`：纯文本或代码文件查看（`CodeRenderView`，见「代码视图能力」）。
 - `Review`：Git-first review diff；V1 默认展示当前 Git repository 的 uncommitted changes，Session / Last Turn 视角属于 V2。
 - `Kairos`：聊天态右侧紧凑状态视图；具体布局和数据边界见 `docs/design-docs/kairos/front-Kairos监控页规范.md`。
 - `Context`：完整只读上下文视图；见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`。
@@ -88,12 +88,42 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 
 不同文件类型使用不同渲染组件。
 
-- `md`：默认渲染为可读文档，可切源码。
+- `md`：默认渲染为可读文档，可切源码；源码态复用 `CodeRenderView`（有行号、有 markdown 高亮），不是裸 `<pre>`。
 - `html`：渲染为可交互预览。
-- `csv`：渲染为表格视图。
-- `pdf`：渲染为分页阅读视图。
+- `csv` / `tsv`：渲染为表格视图，见「CSV 表格预览」。
+- `pdf`：渲染为分页阅读视图。**未实现**，V2。
 - `图片`：直接预览。
 - `review` / `diff`：展示 Git Review 聚合改动；V2 可切换到当前会话累计改动，不放在单条消息里替代消息流中的局部 diff。
+
+### 代码视图能力（2026-07-30）
+
+`CodeRenderView` 是 `Text` Tab 与 Markdown 源码态的共同实现。
+
+**这个视图没有工具栏**（2026-07-30 收口）：行号、折行、复制、查找四个开关曾经都摆在顶部一条 icon 栏里，实际效果是每个文件上方多出一层几乎不点的按钮。文件级动作统一收到 Workspace 操作栏，视图本身只负责把内容读清楚。
+
+- **行号**：CSS grid 双列，一个逻辑行一个 grid row，所以折行的续行仍落在同一 row 内、不与行号错位。gutter `select-none` + `aria-hidden`，复制和读屏都不会带上行号；`sticky left-0` + 不透明底色，遇到不可断的超长 token 顶出横向滚动时钉在左边。
+- **折行固定开启，不提供开关**：右侧面板本来就窄，长行横向滚动比折行更难读。实现约束：折行时 grid 必须是 `w-full`，`w-max` 会让宽度取 max-content、代码列等于「最长行宽」，`pre-wrap` 永远没有折行的机会（这个坑踩过，见执行计划决策记录）。
+- **不做复制 / 文件内查找**：两者都是编辑器动作，放在只读预览的每个文件头上性价比太低。要整份内容就用操作栏的「在外部应用中打开」。搜索命中标记那套（`injectMatchMarks` + `mark.act-code-match` 配色）已随之删除，不留未用代码。
+- **分块高亮**：超过 4000 行时先同步高亮首 500 行让首屏立刻可读，其余按 1000 行一批在空闲时推进，未高亮的行先按转义纯文本落地（不留空白）。已知代价：跨批的多行 token（块注释）会在批边界断开。行组件必须 `memo` —— 每批都换掉整个数组，不 memo 就等于每批重渲染全部行。
+- **渲染行数上限 20000**：每个逻辑行是两个 DOM 节点，2MB 日志有 19 万行 = 38 万节点，实测 5 万行要 13.5s 才打开。超出部分不渲染，并在**内容末尾**（不是顶部）说明还有多少行未显示 —— 用户滚到底发现没了，答案就在原地。这是按行渲染换来行号所必须付的代价（旧的单 `<pre>` 实现不受影响）。
+
+### 文件新鲜度与重新加载（2026-07-30）
+
+文件内容是打开那一刻的快照，磁盘随后可能被 Agent、外部编辑器或 `git checkout` 改掉。检测用**两级信号**，都不依赖 fs-watch 插件（理由见执行计划决策记录）：
+
+1. **Agent 编辑事件**（主力，零新增设施）：`edit_diff` / `write_diff` 消息块自带 `filePath`，renderer 本来就实时收到。
+2. **mtime 重校验**（兜底，O(1)）：只在 Tab 激活、窗口重获焦点、turn 结束三个时机各 `statWorkspaceFile` 一次，**不轮询**。
+
+检测到变化只打 stale 标记并显示提示条，内容替换必须由用户点提示条上的「重新加载」触发 —— 用户可能正在阅读或选中文本，内容被自动抽换比看到旧内容更糟。操作栏不再常驻刷新按钮（理由见「Workspace 文件浏览器」的取舍）。
+
+`fs.watch` 实时监听属于 V2 体验增量；真要做时应 watch 已打开文件的**父目录**而非文件本身（Agent 与编辑器常用 rename 原子写，watch 文件路径会丢 inode）。
+
+### CSV 表格预览（2026-07-30）
+
+- 首行当表头，表头 sticky，左侧行号列复用 gutter 样式。
+- 解析走小状态机而不是 `split(",")`：字段内的分隔符、引号包裹、`""` 转义、CRLF 都要处理对 —— 错位的表格比纯文本更误导人。`.tsv` 按 `\t` 切。
+- 行数不齐时按最大列数补空，单元格不会串列。
+- 超过 2000 行只渲染前 2000 行并提示；解析不出多列时降级为纯文本视图并说明原因；随时可切「以纯文本查看」。
 
 ## Markdown 渲染
 
@@ -103,10 +133,11 @@ V1 渲染栈：
 
 - `react-markdown` + `remark-gfm`，支持表格、任务列表、删除线和自动链接。
 - `rehype-highlight` 负责同步代码高亮；Shiki 作为 V2 可选升级。
+- fenced code 的语言集显式传 `languages`，与 `CodeRenderView` 共用 `right-panel/highlight.ts` 的那一份，而不是沿用 lowlight 默认的 `common`：后者缺 dockerfile / protobuf / dart / cmake / powershell 等，与代码 Tab 覆盖面不一致。这里换不来体积（`rehype-highlight` 无条件静态 import 了 `common`，摇不掉）。
 - 不引入 `rehype-raw`，Markdown 中的原始 HTML 不直接执行。
 - 链接只放行 `http` / `https` / `mailto`，外链使用 `target="_blank" rel="noreferrer"`。
 - 复用 `.markdown-prose` 和 `styles/markdown.css`，代码块使用 `markdown-code-block`。
-- Preview / 源码 两态切换，切换状态只属于当前 Tab。
+- 预览 / 源码 两态切换，切换状态只属于当前 Tab。**工作区文件**的切换按钮在 Workspace 操作栏上（对齐 Cursor 的 `View source` / `View preview`），视图本身不再挂工具栏；聊天生成的 markdown / html 没有操作栏，仍用视图内那组分段控件。同一个组件按受控（传 `mode` + `onModeChange`）/ 不受控自动切换这两种壳，状态按 Tab 记在 `RightPanelContext`。
 
 代码高亮配色必须随浅 / 深主题翻转。`hljs-*` token 颜色使用主题 token 或专用 CSS 变量，禁止写死 `#hex`、`text-black`、`bg-white` 这类非主题感知字面量。
 
@@ -133,19 +164,47 @@ V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `lo
 
 ## Workspace 文件浏览器
 
-右侧面板提供一个轻量的 Workspace 文件浏览器：树 rail 常驻在浏览态左栏，点文件在右侧以普通 Tab 打开。树根来自顶部 Workspace 选择器的当前选择；发送消息前该选择只停留在 renderer 本地状态，发送时才写入当前 session 的 `workspaceRoot`，随后与 Agent 文件工具操作的根一致。
+右侧面板提供一个轻量的 Workspace 文件浏览器：树 rail 常驻在浏览态**右**栏，点文件在其左侧以普通 Tab 打开。树根来自顶部 Workspace 选择器的当前选择；发送消息前该选择只停留在 renderer 本地状态，发送时才写入当前 session 的 `workspaceRoot`，随后与 Agent 文件工具操作的根一致。
 
-结构为纵向三段：
+结构为纵向三段（2026-07-30 对齐 Cursor 重排）：
 
 1. Tab 条横跨整条右面板。
-2. Workspace 操作栏展示树栏折叠按钮和当前文件的 workspace 相对路径。
-3. 两栏 `[文件树 | 文件预览区]`，文件树无独立头部。
+2. Workspace 操作栏：**左**是面包屑 `<workspace 名> › <相对路径>`（根名弱化、文件路径主色），**右**是「查看源码 / 查看预览」文字按钮（仅 markdown、html 这类渲染态之外还有源码的文件出现）+ 两个图标动作 ——「在外部应用中打开」与「收起 / 展开文件树」（文件夹图标，展开态用 `bg-selected` 表示）。下方按需挂「已变更」与「已截断」两条提示条。
+3. 两栏 `[文件预览区 | 文件树]`，文件树无独立头部；树顶有文件名过滤框与刷新按钮。
+
+这一层的取舍：
+
+- **文件树放右栏**，让预览区紧邻中间聊天区 —— 视线从消息移到代码不用跨过一条树栏，且树作为导航件靠外侧更符合「主内容居中」的重心。
+- **操作栏只放两个动作**，刻意去掉了常驻的「重新读取当前文件」按钮：需要重新读取的真实场景只有「文件已变更」，而那时下方的 stale 提示条自带「重新加载」。常驻一个几乎不会被点的刷新图标只会让这一层看起来像第二条工具栏。文件树自己的刷新按钮保留（它刷的是目录列举缓存，是另一件事）。
+- **过滤框常态无边框无填充**，只在 hover / 聚焦时浮出底色。200px 窄栏里，输入框边框会和下方每行树项的缩进线抢视觉层级，把最该看清的文件名压下去。
+- **「查看源码」用文字而不是图标**，且显示的是**目标态**而不是当前态：这一层已经有两个 icon 按钮，第三个图标会让人分不清哪个是模式切换；单个文字按钮点一下去对面，比分段控件省一半宽度。它必须要求当前 Tab 有 `relativePath` —— 浏览态下激活的可能是聊天生成的 markdown（内容区显示的是占位页），那时按钮点了没有任何视图会响应。
 
 呈现由当前 Tab 决定：
 
 - 激活工作区文件 Tab（文件类且有 `relativePath`）时进入 shell。
 - 激活对象 Tab（Kairos / Context / Reply / 聊天生成 HTML 等）时退出 shell，整面板展示对象视图。
 - `isFileTreeOpen` 表示显式进入浏览态；`isFileTreeCollapsed` 只折叠树栏，不关闭内容区。
+
+树状态规则（2026-07-30）：
+
+- 展开层级与目录列举缓存都**提升到 `RightPanelContext`**，不放在 `WorkspaceFileTree` 里 —— 该组件会随树栏折叠、切到对象 Tab 反复挂载卸载，状态留在组件里会被反复清空。
+- 「上次是哪个 workspaceRoot」同样记在 Provider（`{ known, root }`）。只有 root **真的变化**才清空展开层级；`known: false` 表示还没有树挂载过，此时同步 root 不算换根。若把它记成组件内的 ref，重挂载时 ref 一起重建，每次挂载都会误判成换根，等于这层状态白提升。
+- 过滤框只作用于**已加载层级**，不做递归搜索（跨文件快速打开属于 V2）。
+- 当前打开的文件在树里高亮。
+
+### 在外部应用中打开（2026-07-30）
+
+操作栏右侧的外部打开入口复用顶部 chrome 已有的那套工具目录（`workspace-open:list-tools` / `workspace-open:open`），但目标是**当前文件**而不是 workspace 根：`WorkspaceOpenInput` 增了可选 `relativePath`，越界按 `escapes_root` 拒绝 —— 这个入口来自可点 UI，和文件浏览器同一条边界，不因为「只是调 `/usr/bin/open`」就放开整盘。
+
+不同工具能接受的目标形态不同，main 侧按工具分派，三条各有单测锁住实际参数：
+
+| 工具 | 传给 `open` 的目标 | 原因 |
+| --- | --- | --- |
+| VS Code / Cursor | 文件本身 | 编辑器就是用来打开文件的 |
+| Finder | `open -R <文件>` | `-a Finder <文件>` 会用**默认应用运行**这个文件，不是定位它 |
+| Terminal / iTerm2 | 文件的**父目录** | 终端只能接目录，给它文件等于让终端去执行/打开它 |
+
+交互约定：图标点击后先出菜单、选中应用才真正打开，不做「点图标直接用上次的应用打开」—— 这一栏图标很小，误触会直接拉起外部程序。选择记在 localStorage，与顶部 chrome 的打开按钮**共用同一个 key**（同一个偏好不能有两个互相矛盾的值），菜单里用「上次」标出。无 preload 时整个按钮不渲染，而不是渲染一个点了报错的按钮。
 
 IPC 契约：
 
@@ -174,7 +233,10 @@ type WorkspaceReadFileInput = {
   relativePath: string;
 };
 
-type WorkspaceFileRenderKind = "markdown" | "html" | "image" | "text";
+type WorkspaceFileRenderKind = "markdown" | "html" | "image" | "csv" | "text";
+
+/** 文本预览字节上限。定义在契约层：main 用它决定读多少，renderer 要在提示条里复述同一个数。 */
+const WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES = 2 * 1024 * 1024;
 
 type WorkspaceReadFileResult = {
   relativePath: string;
@@ -182,9 +244,42 @@ type WorkspaceReadFileResult = {
   content?: string;
   dataUrl?: string;
   language?: string;
+  /** 磁盘上的完整字节数，不因截断变小。 */
   size: number;
+  /** 文本超限，`content` 只含上限内的完整行；消费方必须显式告知用户内容不完整。 */
   truncated?: boolean;
+  /** 最后修改时间（epoch ms），供已打开 Tab 做新鲜度比对；错误分支为 0。 */
+  mtimeMs: number;
   error?: "not_found" | "not_a_file" | "too_large" | "binary" | "escapes_root";
+};
+
+/** 只取 size 与 mtime，不读内容；供三个时机的 O(1) 新鲜度重校验使用。 */
+type WorkspaceStatFileInput = {
+  workspaceRoot?: string;
+  relativePath: string;
+};
+
+type WorkspaceStatFileResult = {
+  relativePath: string;
+  size: number;
+  mtimeMs: number;
+  error?: "not_found" | "not_a_file" | "escapes_root";
+};
+
+/** 在外部应用中打开。`relativePath` 为空表示打开 workspace 根本身。 */
+type WorkspaceOpenInput = {
+  workspaceRoot?: string;
+  toolId: WorkspaceOpenToolId;
+  relativePath?: string;
+};
+
+type WorkspaceOpenResult = {
+  ok: boolean;
+  workspaceRoot: string;
+  toolId: WorkspaceOpenToolId;
+  relativePath?: string;
+  error?: "invalid_workspace" | "unsupported_platform" | "not_installed" | "open_failed" | "escapes_root";
+  message?: string;
 };
 ```
 
@@ -219,11 +314,13 @@ main 侧服务规则：
 - UI 浏览强约束在 `workspaceRoot` 内，`..` 逃逸返回 `escapes_root`。
 - 固定忽略 `node_modules`、`.git`、`.pnpm-store`、`dist`、`.next`、`.turbo`、`coverage`、`.DS_Store`。
 - 单目录最多列出 1000 条，目录在前、文件在后，各自按名称升序。
-- 文本类上限 2MB，图片类上限 5MB；大文件返回 `too_large` 或截断提示。
+- 文本类上限 `WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES`（2MB），图片类 5MB。**文本超限是部分读**：返回上限内的**完整行** + `truncated: true`，不再整体拒绝（2026-07-30 起）。图片超限仍返回 `too_large`，因为部分图片字节无法解码。
 - 图片用 data URL，HTML 文件用 `trust="file"` 的 strict CSP 沙箱。
-- text 类按扩展名确定 highlight.js 语言，不使用 `highlightAuto` 猜测。
+- text 类语言判定顺序：**完整 basename**（`Dockerfile` / `Makefile` / `.gitignore` / `go.mod` …）→ **basename 前缀**（`Dockerfile.dev`、`.env.local` …）→ **扩展名**；一律确定性映射，不使用 `highlightAuto` 猜测，识别不出就不给 `language`（渲染回退纯等宽 + 行号）。
+- 映射值域必须都是 highlight.js 真实存在的语言，两侧各有一条防漂移测试锁住：main 侧断言每个映射值 `hljs.getLanguage()` 拿得到，renderer 侧断言按需注册的实例覆盖 main 的全部映射值。否则文件会静默退回纯文本且没人会发现。（这条测试当场抓出 highlight.js 不内置 `hcl`，`.tf` / `.hcl` 因此映射到 `ini` 近似。）
+- `readWorkspaceFile` 与 `statWorkspaceFile` 都返回 `mtimeMs`，供右侧面板的新鲜度比对。
 
-V1 不做写 / 删 / 重命名、`.gitignore` 解析、快速打开、多 root、PDF/CSV 预览和 Kairos 配置编辑。V3 若做 Kairos 配置编辑，保存必须走 `kairos:read-config` / `kairos:write-config` 这类带 schema 校验的专用通道。
+V1 不做写 / 删 / 重命名、`.gitignore` 解析、快速打开、多 root、PDF 预览和 Kairos 配置编辑。V3 若做 Kairos 配置编辑，保存必须走 `kairos:read-config` / `kairos:write-config` 这类带 schema 校验的专用通道。
 
 ## Context 完整只读视图
 
