@@ -47,6 +47,7 @@
 - `docs/design-docs/frontend/front-左侧会话栏规范.md`：会话、Pinned、Scheduled 和 Workspaces 分区。
 - `docs/design-docs/frontend/front-中间消息区规范.md`：消息语法、工具流和执行状态。
 - `docs/design-docs/frontend/front-聊天输入框规范.md`：Composer、模型、附件、Context 和发送。
+- `docs/design-docs/frontend/front-composer-slash-command.md`：Composer 内 `/` 快捷菜单的 Functions / Skills 分组、命令语义、键盘交互和验证边界。
 - `docs/design-docs/frontend/front-workspace-git-worktree-context.md`：初始 Composer 的 Workspace、Git branch、This Mac 与 New Worktree 执行上下文。
 - `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`：对象启动页、文件预览、Workspace 文件树和 diff。
 - `docs/design-docs/frontend/front-设置页规范.md`：设置态布局和导航分组。
