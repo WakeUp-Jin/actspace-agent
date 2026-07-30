@@ -28,7 +28,8 @@
  *  - 容器 pointer-events: none → 不会偷下方任何元素的点击（如 sidebar list、
  *    conversation 内容、composer 等）。三段子元素恢复 pointer-events: auto。
  *  - 唯一窗口拖动区在 .chrome-center；所有按钮 -webkit-app-region: no-drag。
- *  - chrome bar 自身无背景、无边框，三栏的背景从窗口顶端自然贯顶。
+ *  - chrome bar 使用与 SplitView 同步的三列 grid，让标题和操作归属于真实 pane。
+ *  - chrome bar 自身无背景，只绘制一条统一的底部分隔线，三栏背景仍从窗口顶端自然贯顶。
  */
 .window-chrome-bar {
   position: fixed;
@@ -36,10 +37,15 @@
   left: 0;
   right: 0;
   height: var(--window-chrome-strip-height);
-  display: flex;
+  display: grid;
+  grid-template-columns:
+    var(--window-chrome-left-column-width)
+    minmax(0, 1fr)
+    var(--window-chrome-right-column-width);
   align-items: center;
   z-index: 60;
   pointer-events: none;
+  box-shadow: inset 0 -1px var(--act-color-border);
 }
 
 .chrome-left,
@@ -48,31 +54,61 @@
   display: flex;
   align-items: center;
   height: 100%;
-  pointer-events: auto;
+  min-width: 0;
 }
 
 .chrome-left {
-  flex: 0 0 auto;
   gap: 4px;
   padding-left: var(--window-chrome-left-padding);
   padding-right: 8px;
+  pointer-events: auto;
 }
 
 .chrome-center {
-  flex: 1 1 auto;
-  justify-content: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 0 16px;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 12px 0 16px;
+  pointer-events: auto;
   -webkit-app-region: drag;
 }
 
 .chrome-right {
-  flex: 0 0 auto;
   justify-content: flex-end;
+  pointer-events: none;
+}
+
+.chrome-center-title {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+}
+
+.chrome-center-actions,
+.chrome-right-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
   gap: 4px;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.chrome-right-actions {
   padding-left: 8px;
   padding-right: 16px;
+}
+
+/* 紧凑布局的右侧对象面板是覆盖层；此时中间标题/工作区操作退场，避免盖住面板 Tab 的命中区。 */
+.window-chrome-bar[data-compact-panel-open="true"] .chrome-center {
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+}
+
+.window-chrome-bar[data-compact-panel-open="true"] .chrome-center-title,
+.window-chrome-bar[data-compact-panel-open="true"] .chrome-center-actions {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .chrome-button {
@@ -97,8 +133,9 @@
 }
 
 .chrome-title {
+  display: block;
   margin: 0;
-  max-width: min(460px, 60vw);
+  max-width: 100%;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-soft);

@@ -25,10 +25,12 @@ const WORKSPACE_BAR_PATH_CLASS =
 const WORKSPACE_BAR_HINT_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-text-faint";
 // 右侧预留两个 chrome 控件（+ 新建对象 / 折叠面板）的宽度，tab 永远不会滑到按钮下方造成重叠。
 const RIGHT_TABS_CLASS =
-  "relative z-[61] flex min-h-[var(--window-chrome-strip-height)] shrink-0 items-center border-b border-line py-0 pl-2.5 pr-[calc(2*var(--window-chrome-control-size)+28px)] [pointer-events:none]";
+  "relative z-[61] flex min-h-[var(--window-chrome-strip-height)] shrink-0 items-center border-b border-line py-0 pl-2.5 pr-[calc(2*var(--window-chrome-control-size)+28px)] [pointer-events:none] max-[600px]:pl-[var(--window-chrome-collapsed-left-width)]";
 // 横向滚动条隐藏（scrollbar-none 见 electron.css）；溢出靠下拉而非可见滚动条。
 const RIGHT_TAB_SCROLL_CLASS =
   "scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [pointer-events:auto]";
+const RIGHT_PANEL_EMPTY_TITLE_CLASS =
+  "px-2 text-[13px] font-medium leading-none text-text-muted";
 const RIGHT_TAB_GROUP_BASE =
   "group inline-flex shrink-0 items-center gap-1 rounded-act-sm pl-2 pr-1 text-[12px] leading-none transition-colors duration-[120ms] ease-in-out [pointer-events:auto] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_INACTIVE_CLASS = "bg-transparent text-text-muted hover:bg-hover-overlay hover:text-text-main";
@@ -170,7 +172,7 @@ function WorkspaceOperationBar({ activeTab }: { activeTab: RightPanelTab | null 
  * - 整条右侧预留两个浮层 chrome 控件宽度，tab 不会被「+ / 折叠」按钮盖住造成重叠。
  */
 function RightPanelTabs() {
-  const { tabs, activeTabId, setActiveTab, closeTab } = useRightPanel();
+  const { tabs, activeTabId, setActiveTab, closeTab, isFileTreeOpen } = useRightPanel();
   const scrollRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState(false);
@@ -223,6 +225,9 @@ function RightPanelTabs() {
   return (
     <div className={RIGHT_TABS_CLASS} role="tablist" aria-label="右侧面板">
       <div ref={scrollRef} className={RIGHT_TAB_SCROLL_CLASS}>
+        {tabs.length === 0 ? (
+          <span className={RIGHT_PANEL_EMPTY_TITLE_CLASS}>{isFileTreeOpen ? "Files" : "Objects"}</span>
+        ) : null}
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           return (

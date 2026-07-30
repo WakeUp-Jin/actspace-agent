@@ -496,24 +496,29 @@ export function WorkbenchLayout({
         leftMode={chromeLeftMode}
         rightOpen={isRightPanelOpen}
         title={chromeTitle}
+        leftPaneWidth={displayedLeftWidth}
+        rightPaneWidth={rightWidth}
+        compactLayout={isCompactLayout}
         onToggleLeft={toggleSidebarMode}
         onToggleRight={toggleRightPanel}
         showRightToggle={view !== "kairos"}
         currentSession={currentSession}
         getSessionPreview={view === "chat" ? getSessionPreview : undefined}
+        centerTrailing={
+          view === "chat" && selectedWorkspaceRoot ? (
+            <WorkspaceChromeControls
+              workspaceRoot={selectedWorkspaceRoot}
+              title={title}
+              messages={messages}
+              reviewSummary={reviewSummary}
+              onOpenReview={openReviewTab}
+              onWorkspaceChanged={onReviewChanged}
+            />
+          ) : undefined
+        }
         rightLeading={
           view === "chat" ? (
             <>
-              {selectedWorkspaceRoot ? (
-                <WorkspaceChromeControls
-                  workspaceRoot={selectedWorkspaceRoot}
-                  title={title}
-                  messages={messages}
-                  reviewSummary={reviewSummary}
-                  onOpenReview={openReviewTab}
-                  onWorkspaceChanged={onReviewChanged}
-                />
-              ) : null}
               {isRightPanelOpen ? (
                 <RightPanelObjectMenu sessionId={activeSessionId} onOpenReview={openReviewTab} />
               ) : null}

@@ -24,11 +24,11 @@
 ## 顶部窗口区
 
 - 自左到右：macOS 红绿灯（系统）、折叠按钮（PanelLeft icon）、搜索按钮（Search icon）。这两个按钮放在窗口级 chrome 浮层的左段（`.chrome-left`），不属于 sidebar 内部。
-- **chrome 按钮由 `WindowChromeBar` 渲染**（参考 Cursor Agent Window 的 `.part.titlebar`）。它是 `position: fixed top:0 left:0 right:0 height:44px z-index:60 pointer-events:none` 的全宽浮层，三段子元素恢复 `pointer-events: auto`：
+- **chrome 按钮由 `WindowChromeBar` 渲染**（参考 Cursor Agent Window 的 `.part.titlebar`）。它是 `position: fixed top:0 left:0 right:0 height:44px z-index:60 pointer-events:none` 的全宽浮层，并使用与 `SplitView` 实际 pane 宽度同步的三列 grid：
   - `.chrome-left`：红绿灯安全区（`padding-left: 86px`）+ PanelLeft + Search
-  - `.chrome-center`：当前 view 的标题（chat 时是 session title；lab/usage/kairos 时是对应名）+ 窗口拖动区（`-webkit-app-region: drag`）
-  - `.chrome-right`：右 panel 的 PanelRight toggle
-- chrome bar 自身透明、无边框；sidebar / main / right panel 三栏各自顶部留 `var(--window-chrome-strip-height) = 44px` 的 padding-top，让浮层覆盖到自己顶部时不挡内容，视觉上「三栏直接贯顶 + 按钮浮在顶部」。
+  - `.chrome-center`：左对齐的当前 view 标题（chat 时是 session title；lab/usage/kairos 时是对应名）+ 中间栏尾部的 IDE / Environment + 窗口拖动区（`-webkit-app-region: drag`）
+  - `.chrome-right`：右 panel 的对象菜单和 PanelRight toggle；空白区域不恢复 pointer events，避免遮挡右栏 Tab
+- chrome bar 自身透明，只绘制统一的主题感知底部分隔线；sidebar / main / right panel 三栏各自顶部留 `var(--window-chrome-strip-height) = 44px` 的 padding-top，让浮层覆盖到自己顶部时不挡内容，视觉上「三栏直接贯顶 + 标题与操作各归其位」。
 - 折叠按钮在 `expanded ↔ hidden` 之间切换；hidden 态时它的 aria-label 变成 `Expand session sidebar`，`aria-pressed=false`。
 - 搜索按钮是图标级别的"操作"按钮，不是导航项；点击触发全局会话/工作区搜索。搜索功能本身在首版可暂未实现，但入口必须保留。
 - 不再有 main pane 自管的 `.topbar`，所有窗口级 chrome 元素都统一挂在 chrome bar 上。

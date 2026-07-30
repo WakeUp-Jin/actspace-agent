@@ -39,12 +39,15 @@ describe("RightPanel 工作区浏览态", () => {
     (window as { actspace?: unknown }).actspace = undefined;
     renderPanel();
 
+    expect(screen.getByText("Objects")).toBeInTheDocument();
+
     // 未进入浏览态：没有操作栏（折叠按钮）也没有树栏。
     expect(screen.queryByRole("button", { name: "收起文件树" })).toBeNull();
     expect(screen.queryByText("当前环境不支持文件浏览。")).toBeNull();
 
     // 进入浏览态：② 操作栏折叠按钮 + ③ 左侧树栏同时出现。
     await user.click(screen.getByRole("button", { name: "probe-toggle" }));
+    expect(screen.getByText("Files")).toBeInTheDocument();
     const collapseBtn = screen.getByRole("button", { name: "收起文件树" });
     expect(collapseBtn).toBeInTheDocument();
     expect(screen.getByText("当前环境不支持文件浏览。")).toBeInTheDocument();

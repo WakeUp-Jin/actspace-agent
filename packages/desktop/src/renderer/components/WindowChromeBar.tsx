@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { PanelLeft, PanelRight, Search } from "lucide-react";
 import type { SessionListItem } from "@actspace/shared";
 import type { SidebarMode } from "./Sidebar";
@@ -19,8 +19,9 @@ const CHROME_TITLE_HOVER_CONTENT_CLASS = "!max-w-[420px] !p-0 !font-normal !lead
  *    内部三段（chrome-left / chrome-center / chrome-right）再恢复 `pointer-events: auto`。
  *  - Window drag region 唯一保留在 `.chrome-center`，所有按钮显式 `no-drag`，
  *    避免 Electron 在 macOS 上「父级 drag + 浮层 no-drag」的 hit-test bug 抢点击。
- *  - 三段沿 X 轴拼接，互不重叠：左侧固定按钮宽 + 右侧固定按钮宽 + 中间 flex 1。
- *  - chrome bar 自身透明，没有 background / border-bottom；下方三栏的背景自然贯顶。
+ *  - 桌面布局使用与 SplitView 相同的左 / 中 / 右列宽；面板隐藏或进入紧凑布局时退回窗口边缘控制宽度。
+ *  - 中间列承载 session title 与主工作区操作，右列只承载对象面板操作，信息归属不跨 pane。
+ *  - chrome bar 自身透明，只绘制统一底部分隔线；下方三栏的背景自然贯顶。
  *
  * 三栏（Sidebar / ConversationView / RightPanel）需要各自顶部留出
  * `var(--window-chrome-strip-height)` 的 `padding-top`，让浮层覆盖到自己顶部时
@@ -30,12 +31,17 @@ export type WindowChromeBarProps = {
   leftMode: SidebarMode;
   rightOpen: boolean;
   title: string;
+  leftPaneWidth?: number;
+  rightPaneWidth?: number;
+  compactLayout?: boolean;
   onToggleLeft: () => void;
   onToggleRight: () => void;
   onOpenSearch?: () => void;
   showRightToggle?: boolean;
   currentSession?: SessionListItem | null;
   getSessionPreview?: SessionPreviewResolver;
+  /** 当前主工作区的尾部控件（如 IDE / Environment），归属于中间栏。 */
+  centerTrailing?: ReactNode;
   /** 渲染在右侧折叠按钮左侧的额外控件（如「+ 新建对象」菜单）。 */
   rightLeading?: ReactNode;
 };
@@ -44,18 +50,38 @@ export function WindowChromeBar({
   leftMode,
   rightOpen,
   title,
+  leftPaneWidth,
+  rightPaneWidth,
+  compactLayout = false,
   onToggleLeft,
   onToggleRight,
   onOpenSearch,
   showRightToggle = true,
   currentSession,
   getSessionPreview,
+  centerTrailing,
   rightLeading,
 }: WindowChromeBarProps) {
   const isLeftHidden = leftMode === "hidden";
+  const useDesktopPaneWidths = !compactLayout;
+  const style = {
+    "--window-chrome-left-column-width":
+      useDesktopPaneWidths && !isLeftHidden && leftPaneWidth
+        ? `${leftPaneWidth}px`
+        : "var(--window-chrome-collapsed-left-width)",
+    "--window-chrome-right-column-width":
+      useDesktopPaneWidths && rightOpen && rightPaneWidth
+        ? `${rightPaneWidth}px`
+        : "var(--window-chrome-collapsed-right-width)",
+  } as CSSProperties;
 
   return (
-    <div className="window-chrome-bar" role="presentation">
+    <div
+      className="window-chrome-bar"
+      role="presentation"
+      style={style}
+      data-compact-panel-open={compactLayout && rightOpen ? "true" : undefined}
+    >
       <div className="chrome-left">
         <button
           className="chrome-button chrome-toggle-left"
@@ -78,26 +104,31 @@ export function WindowChromeBar({
         </button>
       </div>
       <div className="chrome-center">
-        <ChromeTitle
-          title={title}
-          currentSession={currentSession ?? null}
-          getSessionPreview={getSessionPreview}
-        />
+        <div className="chrome-center-title">
+          <ChromeTitle
+            title={title}
+            currentSession={currentSession ?? null}
+            getSessionPreview={getSessionPreview}
+          />
+        </div>
+        {centerTrailing ? <div className="chrome-center-actions">{centerTrailing}</div> : null}
       </div>
       <div className="chrome-right">
-        {rightLeading}
-        {showRightToggle ? (
-          <button
-            className="chrome-button chrome-toggle-right"
-            type="button"
-            aria-label={rightOpen ? "Close panel" : "Open panel"}
-            aria-pressed={rightOpen}
-            title={rightOpen ? "Close right panel" : "Open right panel"}
-            onClick={onToggleRight}
-          >
-            <PanelRight size={15} strokeWidth={1.8} />
-          </button>
-        ) : null}
+        <div className="chrome-right-actions">
+          {rightLeading}
+          {showRightToggle ? (
+            <button
+              className="chrome-button chrome-toggle-right"
+              type="button"
+              aria-label={rightOpen ? "Close panel" : "Open panel"}
+              aria-pressed={rightOpen}
+              title={rightOpen ? "Close right panel" : "Open right panel"}
+              onClick={onToggleRight}
+            >
+              <PanelRight size={15} strokeWidth={1.8} />
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -167,7 +198,7 @@ function ChromeTitle({
       </TooltipTrigger>
       <TooltipContent
         side="bottom"
-        align="center"
+        align="start"
         sideOffset={10}
         className={CHROME_TITLE_HOVER_CONTENT_CLASS}
         onPointerDown={(event) => event.preventDefault()}

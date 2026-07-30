@@ -488,6 +488,40 @@ describe("WindowChromeBar", () => {
     expect(screen.queryByRole("combobox", { name: "Select workspace for next message" })).not.toBeInTheDocument();
   });
 
+  it("aligns the chrome columns to the visible SplitView pane widths", () => {
+    const { container } = renderChromeBar({
+      leftPaneWidth: 280,
+      rightPaneWidth: 420,
+      rightOpen: true,
+      centerTrailing: <span>center action</span>,
+      rightLeading: <span>right action</span>,
+    });
+
+    const chrome = container.querySelector(".window-chrome-bar") as HTMLElement;
+    expect(chrome.style.getPropertyValue("--window-chrome-left-column-width")).toBe("280px");
+    expect(chrome.style.getPropertyValue("--window-chrome-right-column-width")).toBe("420px");
+    expect(container.querySelector(".chrome-center-actions")).toHaveTextContent("center action");
+    expect(container.querySelector(".chrome-right-actions")).toHaveTextContent("right action");
+  });
+
+  it("uses compact chrome edge columns instead of desktop pane widths in compact layout", () => {
+    const { container } = renderChromeBar({
+      leftPaneWidth: 280,
+      rightPaneWidth: 420,
+      rightOpen: true,
+      compactLayout: true,
+    });
+
+    const chrome = container.querySelector(".window-chrome-bar") as HTMLElement;
+    expect(chrome.getAttribute("data-compact-panel-open")).toBe("true");
+    expect(chrome.style.getPropertyValue("--window-chrome-left-column-width")).toBe(
+      "var(--window-chrome-collapsed-left-width)",
+    );
+    expect(chrome.style.getPropertyValue("--window-chrome-right-column-width")).toBe(
+      "var(--window-chrome-collapsed-right-width)",
+    );
+  });
+
   it("flips the left toggle aria-label / aria-pressed when sidebar is hidden", () => {
     renderChromeBar({ leftMode: "hidden" });
 

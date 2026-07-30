@@ -37,14 +37,16 @@
 - 承担消息流、工具流和 Composer。
 - 必须保留最低可用宽度。
 - 左右面板争抢空间时，中间区优先于右侧预览区和左侧展开态。
-- 顶部栏保持单行，只展示当前会话标题和操作入口，不重复展示工作区状态副标题。
-- 聊天态顶部右侧依次放置编辑器选择、Environment、对象菜单和右侧面板入口；Environment 的本地工作区、Git 与 Sources 规则见 `front-environment-and-git-actions.md`。
+- 顶部栏保持单行，不重复展示工作区状态副标题；标题和操作必须归属于真实 pane，而不是相对整窗居中或全部堆到窗口右端。
+- 中间栏顶部左侧展示当前会话标题，右侧放置编辑器选择和 Environment；对象菜单与右侧面板入口只属于右栏。Environment 的本地工作区、Git 与 Sources 规则见 `front-environment-and-git-actions.md`。
 - 消息流滚动容器应占满中间主区 viewport，让滚动条贴近主区右边界；消息内容和 Composer 再由内层容器限制阅读宽度并居中。
 - 不要用父级 padding 加负 margin 对冲来决定滚动条位置，避免左侧隐藏态、右侧面板和窗口缩放时出现不一致的留白。
 
 #### 顶部 chrome bar 让位（强约束）
 
-桌面端 `WindowChromeBar` 是一条 `position: fixed; top: 0; height: var(--window-chrome-strip-height)` 的浮层，z-index 在所有内容之上，自身 `pointer-events: none`，但内部 `chrome-left / chrome-center / chrome-right` 三段恢复了 `pointer-events: auto`。
+桌面端 `WindowChromeBar` 是一条 `position: fixed; top: 0; height: var(--window-chrome-strip-height)` 的浮层，z-index 在所有内容之上。它使用与 `SplitView` 同源的三列 grid：左列宽度等于可见 Sidebar，中列为主工作区，右列宽度等于已打开的对象面板；对应宽度由 `WorkbenchLayout` 注入 CSS 变量。左栏隐藏、右栏关闭或进入紧凑布局时，相应列退回只容纳窗口控制入口的边缘宽度。
+
+`window-chrome-bar` 自身 `pointer-events: none`；左列和中间拖拽区按需恢复命中，右列只有操作按钮组恢复命中，避免整块右栏浮层盖住下方 Tab。中间列标题左对齐，IDE / Environment 在同列尾部；右列只承载对象 `+` 与面板开关。三列共享同一条主题感知底部分隔线。
 
 > 这意味着 chrome bar **既是视觉遮罩、也是点击劫持源**——任何作为 `SplitView.main` 的根容器，如果不在顶部留出 chrome bar 的高度，第一屏内容会被 chrome bar 视觉覆盖，且右上角区域的按钮 / 表头 / 操作条点击会被 `chrome-right` 的 panel-toggle 按钮拦截。
 
@@ -54,6 +56,7 @@
 - `Sidebar` 已经按这条规则做了顶部 padding，`.conversation-shell` 和 `.kairos-page` 是参考实现。
 - `.placeholder-view` 利用 flex 居中规避了顶部遮挡，但严格意义上仍应补 padding-top；任何新页面别照搬 placeholder 模式。
 - 不要试图改 `WindowChromeBar` 的 `z-index` 或 `pointer-events` 来"避让" chrome bar——chrome bar 浮层语义是这条规范的契约前提。
+- 紧凑布局打开右侧覆盖面板时，中间标题和主工作区操作必须退场，同时关闭中间拖拽命中，让右侧 Tab 可以接收点击；左右窗口级入口仍保持可用。
 
 新增页面（如 Kairos、Lab、Settings 全屏视图）前，先用这条规则自检：**根容器的 y=0 一带是否会出现可交互元素？** 若会，必须先让位。
 
