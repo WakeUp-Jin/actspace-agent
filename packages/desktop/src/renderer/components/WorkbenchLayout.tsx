@@ -1,10 +1,11 @@
 import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, SessionListItem, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlaskConical } from "lucide-react";
 import { ConversationView } from "./ConversationView";
 import { PlaceholderView } from "./PlaceholderView";
 import { RightPanel } from "./RightPanel";
 import { useRightPanel } from "./right-panel/RightPanelContext";
+import { useAgentEditSignals } from "./right-panel/useFileFreshness";
 import { RightPanelObjectMenu } from "./right-panel/RightPanelObjectMenu";
 import { Sidebar, type NewSessionInput, type SessionUiStatusKind, type SidebarMode, type SidebarView } from "./Sidebar";
 import { SplitView } from "./SplitView";
@@ -455,6 +456,21 @@ export function WorkbenchLayout({
   const chromeLeftMode: SidebarMode = isCompactLayout
     ? compactSidebarOpen ? "expanded" : "hidden"
     : leftMode;
+  // 右侧文件 Tab 的新鲜度信号（见 `right-panel/useFileFreshness.ts`）：
+  // ① Agent 本轮编辑过的文件路径 → 精确打过期标记；
+  // ② turn 从「进行中」变为「结束」时递增一个 key → 触发一次 mtime 兜底重校验，
+  //    覆盖 bash 脚本写文件这类不产生 diff 块的间接改动。
+  const agentEditedPaths = useMemo(() => collectEditedFilePaths(messages), [messages]);
+  useAgentEditSignals(agentEditedPaths);
+  const [fileRevalidateKey, setFileRevalidateKey] = useState(0);
+  const wasStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    if (wasStreamingRef.current && !isStreaming) {
+      setFileRevalidateKey((key) => key + 1);
+    }
+    wasStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
   const sidebar = (
     <Sidebar
       sessions={sessions}
@@ -485,6 +501,7 @@ export function WorkbenchLayout({
       contextState={contextState}
       sessionId={activeSessionId}
       workspaceRoot={selectedWorkspaceRoot ?? undefined}
+      fileRevalidateKey={fileRevalidateKey}
       onOpenReview={openReviewTab}
       onReviewChanged={onReviewChanged}
     />
@@ -576,4 +593,21 @@ export function WorkbenchLayout({
       ) : null}
     </>
   );
+}
+
+/**
+ * 从消息流里收集 Agent 改过的文件路径。
+ *
+ * 只看已完成的编辑/写入块：`pending`（等审批）和 `running`（还在写）时磁盘内容尚未定型，
+ * 这时就打过期标记会让提示条来回闪。优先用工作区相对路径，缺失时退回 `filePath`。
+ */
+function collectEditedFilePaths(messages: MessageBlock[]): string[] {
+  const paths = new Set<string>();
+  for (const message of messages) {
+    if (message.kind !== "edit_diff" && message.kind !== "write_diff") continue;
+    if (message.status !== "completed") continue;
+    const path = message.outputRelativePath || message.filePath;
+    if (path) paths.add(path);
+  }
+  return [...paths];
 }

@@ -2,7 +2,11 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { RightPanel } from "../components/RightPanel";
-import { RightPanelProvider, useRightPanel } from "../components/right-panel/RightPanelContext";
+import {
+  RightPanelProvider,
+  useRightPanel,
+  workspaceFileTabId,
+} from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
 const originalActspace = (window as { actspace?: unknown }).actspace;
@@ -21,11 +25,33 @@ function WorkspaceToggleProbe() {
   );
 }
 
+/** 测试用入口：像文件树那样打开一个 markdown 工作区文件 Tab。 */
+function OpenMarkdownFileProbe() {
+  const { openTab } = useRightPanel();
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        openTab({
+          id: workspaceFileTabId("docs/a.md"),
+          kind: "markdown",
+          title: "a.md",
+          source: "# 标题",
+          relativePath: "docs/a.md",
+        })
+      }
+    >
+      probe-open-md
+    </button>
+  );
+}
+
 function renderPanel() {
   return render(
     <TooltipProvider delayDuration={0}>
       <RightPanelProvider>
         <WorkspaceToggleProbe />
+        <OpenMarkdownFileProbe />
         <RightPanel />
       </RightPanelProvider>
     </TooltipProvider>,
@@ -43,7 +69,7 @@ describe("RightPanel 工作区浏览态", () => {
     expect(screen.queryByRole("button", { name: "收起文件树" })).toBeNull();
     expect(screen.queryByText("当前环境不支持文件浏览。")).toBeNull();
 
-    // 进入浏览态：② 操作栏折叠按钮 + ③ 左侧树栏同时出现。
+    // 进入浏览态：② 操作栏折叠按钮 + ③ 右侧树栏同时出现。
     await user.click(screen.getByRole("button", { name: "probe-toggle" }));
     const collapseBtn = screen.getByRole("button", { name: "收起文件树" });
     expect(collapseBtn).toBeInTheDocument();
@@ -78,6 +104,23 @@ describe("RightPanel 工作区浏览态", () => {
     expect(screen.queryByRole("heading", { name: "选择文件查看" })).toBeNull();
     expect(screen.queryByRole("button", { name: /文件树$/ })).toBeNull();
     expect(screen.getByLabelText("Kairos 右侧紧凑视图")).toBeInTheDocument();
+  });
+
+  it("markdown 文件的预览/源码切换由操作栏承担，视图内不再自带控件", async () => {
+    const user = userEvent.setup();
+    (window as { actspace?: unknown }).actspace = undefined;
+    renderPanel();
+
+    await user.click(screen.getByRole("button", { name: "probe-open-md" }));
+    // 默认预览态；视图内那组分段控件只留给没有操作栏的聊天 markdown。
+    expect(screen.getByRole("heading", { name: "标题" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "源码" })).toBeNull();
+
+    // 操作栏按钮显示的是**目标**：预览态写「查看源码」，切过去后写「查看预览」。
+    await user.click(screen.getByRole("button", { name: "查看源码" }));
+    expect(screen.getByText("# 标题")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "标题" })).toBeNull();
+    expect(screen.getByRole("button", { name: "查看预览" })).toBeInTheDocument();
   });
 
   it("shows a readable tooltip for the tab close button", async () => {

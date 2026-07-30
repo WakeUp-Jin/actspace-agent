@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
-  Code2,
   File,
   Folder,
   GitBranch,
@@ -15,7 +14,6 @@ import {
   Loader2,
   MonitorUp,
   Plus,
-  Terminal,
   X,
 } from "lucide-react";
 import type {
@@ -27,8 +25,8 @@ import type {
 } from "@actspace/shared";
 import type { ComposerReviewSummary } from "../Composer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
+import { OPEN_TOOL_LABELS, readStoredOpenTool, storeOpenTool, toolIcon } from "./workspaceOpenTool";
 
-const LAST_TOOL_KEY = "actspace.workspace.open-tool.v1";
 const BRANCH_PREFIX_KEY = "actspace.workspace.branch-prefix.v1";
 const DEFAULT_BRANCH_PREFIX = "actspace";
 
@@ -73,23 +71,6 @@ function slugifyBranchPart(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48) || "new-work";
-}
-
-function readStoredTool(): WorkspaceOpenToolId {
-  const stored = window.localStorage.getItem(LAST_TOOL_KEY);
-  return stored === "vscode" || stored === "cursor" || stored === "finder" || stored === "terminal" || stored === "iterm2"
-    ? stored
-    : "finder";
-}
-
-function toolIcon(tool: Pick<WorkspaceOpenTool, "id" | "label" | "iconDataUrl">, size = 14) {
-  if (tool.iconDataUrl) {
-    return <img src={tool.iconDataUrl} alt="" className="shrink-0 rounded-[3px] object-contain" style={{ width: size, height: size }} />;
-  }
-  if (tool.id === "finder") return <Folder size={size} aria-hidden="true" />;
-  if (tool.id === "terminal" || tool.id === "iterm2") return <Terminal size={size} aria-hidden="true" />;
-  if (tool.id === "cursor") return <MonitorUp size={size} aria-hidden="true" />;
-  return <Code2 size={size} aria-hidden="true" />;
 }
 
 function sourceIcon(kind: SourceItem["kind"]) {
@@ -140,7 +121,7 @@ export function WorkspaceChromeControls({
   onOpenReview: () => void;
   onWorkspaceChanged?: () => void;
 }) {
-  const [preferredTool, setPreferredTool] = useState<WorkspaceOpenToolId>(readStoredTool);
+  const [preferredTool, setPreferredTool] = useState<WorkspaceOpenToolId>(readStoredOpenTool);
   const [tools, setTools] = useState<WorkspaceOpenTool[]>([]);
   const [toolMenuOpen, setToolMenuOpen] = useState(false);
   const [environmentOpen, setEnvironmentOpen] = useState(false);
@@ -164,7 +145,7 @@ export function WorkspaceChromeControls({
       const selected = result.tools.find((tool) => tool.id === preferredTool);
       if (selected && !selected.available) {
         setPreferredTool("finder");
-        window.localStorage.setItem(LAST_TOOL_KEY, "finder");
+        storeOpenTool("finder");
       }
     } catch (error) {
       console.error("Failed to list workspace tools", error);
@@ -235,7 +216,7 @@ export function WorkspaceChromeControls({
         return;
       }
       setPreferredTool(toolId);
-      window.localStorage.setItem(LAST_TOOL_KEY, toolId);
+      storeOpenTool(toolId);
       setToolMenuOpen(false);
     } catch (error) {
       setFeedback({ tone: "danger", message: error instanceof Error ? error.message : "Failed to open workspace." });
@@ -297,7 +278,7 @@ export function WorkspaceChromeControls({
 
   const preferredToolView = tools.find((tool) => tool.id === preferredTool) ?? {
     id: preferredTool,
-    label: preferredTool === "finder" ? "Finder" : preferredTool,
+    label: OPEN_TOOL_LABELS[preferredTool],
     available: true,
   };
   const hasChanges = reviewSummary?.status === "changes" || reviewSummary?.status === "partial";

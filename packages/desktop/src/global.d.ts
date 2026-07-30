@@ -45,6 +45,10 @@ declare global {
       readWorkspaceFile: (
         input: import("@actspace/shared").WorkspaceReadFileInput
       ) => Promise<import("@actspace/shared").WorkspaceReadFileResult>;
+      /** 可选：浏览器 renderer 无 preload 时缺席，调用方必须先判存在再用。 */
+      statWorkspaceFile?: (
+        input: import("@actspace/shared").WorkspaceStatFileInput
+      ) => Promise<import("@actspace/shared").WorkspaceStatFileResult>;
       readSessionArtifact?: (
         input: import("@actspace/shared").SessionArtifactReadInput
       ) => Promise<import("@actspace/shared").SessionArtifactReadResult>;

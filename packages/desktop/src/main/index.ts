@@ -67,6 +67,7 @@ import type {
   WorkspaceIdInput,
   WorkspaceVisibilityInput,
   WorkspaceReadFileInput,
+  WorkspaceStatFileInput,
   BrowserBridgeActionResult,
   BrowserBridgeInstallResult,
   FsWatchConfigUpdateInput,
@@ -139,7 +140,7 @@ import { generateEvalCandidate } from "./eval-candidate-service";
 import { listVisualizations, visualizeReply } from "./visualize-service";
 import { describeSessionContext } from "./context-describe-service";
 import { loadMainAgentRuntimeContext } from "./agent-runtime-context";
-import { listWorkspaceDir, readWorkspaceFile } from "./workspace-fs-service";
+import { listWorkspaceDir, readWorkspaceFile, statWorkspaceFile } from "./workspace-fs-service";
 import { readSessionArtifact } from "./session-artifact-service";
 import { showArtifactContextMenu } from "./artifact-context-menu-service";
 import { getWorkspaceGitChanges, initializeGitRepository } from "./review-git-service";
@@ -1122,6 +1123,11 @@ async function registerIpc() {
   ipcMain.handle("workspace:read-file", async (_event, input: WorkspaceReadFileInput) => {
     const roots = await ensureDataDirectories();
     return readWorkspaceFile(input, roots);
+  });
+
+  ipcMain.handle("workspace:stat-file", async (_event, input: WorkspaceStatFileInput) => {
+    const roots = await ensureDataDirectories();
+    return statWorkspaceFile(input, roots);
   });
 
   ipcMain.handle("session:read-artifact", async (_event, input: SessionArtifactReadInput) => {

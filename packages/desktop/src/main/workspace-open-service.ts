@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 import type {
   WorkspaceOpenInput,
   WorkspaceOpenResult,
@@ -91,6 +91,27 @@ async function findAppBundle(candidates: string[]): Promise<string | undefined> 
   return undefined;
 }
 
+/**
+ * 每个工具能接受的目标形态不同，不能一律把文件路径丢给 `open -a`：
+ * - 终端类只能接目录，给它一个文件会变成「用终端执行/打开这个文件」；
+ * - Finder 给文件时用 `-R` 在父目录里选中它，比打开文件本身（等于用默认应用运行）更符合预期；
+ * - 编辑器类直接接文件路径。
+ */
+function openArgsFor(
+  toolId: WorkspaceOpenToolId,
+  appName: string,
+  target: string,
+  targetIsDirectory: boolean,
+): string[] {
+  if (toolId === "terminal" || toolId === "iterm2") {
+    return ["-a", appName, targetIsDirectory ? target : dirname(target)];
+  }
+  if (toolId === "finder") {
+    return targetIsDirectory ? ["-a", appName, target] : ["-R", target];
+  }
+  return ["-a", appName, target];
+}
+
 export async function openWorkspaceInTool(
   input: WorkspaceOpenInput,
   roots: AppDataRoots,
@@ -109,19 +130,38 @@ export async function openWorkspaceInTool(
     return { ok: false, workspaceRoot, toolId: input.toolId, error: "invalid_workspace", message: "Workspace root was not found." };
   }
 
+  // 目标解析必须在「root 是合法目录」之后做，否则越界判断的基准本身就不可信。
+  let target = workspaceRoot;
+  let targetIsDirectory = true;
+  const requested = (input.relativePath ?? "").replace(/\\/g, "/").replace(/^\/+/, "");
+  if (requested) {
+    const abs = resolve(workspaceRoot, requested);
+    const rel = relative(workspaceRoot, abs);
+    if (rel.startsWith("..") || isAbsolute(rel)) {
+      return { ok: false, workspaceRoot, toolId: input.toolId, relativePath: requested, error: "escapes_root", message: "Target escapes the workspace root." };
+    }
+    try {
+      targetIsDirectory = (await stat(abs)).isDirectory();
+    } catch {
+      return { ok: false, workspaceRoot, toolId: input.toolId, relativePath: requested, error: "invalid_workspace", message: "Target was not found." };
+    }
+    target = abs;
+  }
+  const relativePath = requested || undefined;
+
   if (process.platform !== "darwin") {
-    return { ok: false, workspaceRoot, toolId: input.toolId, error: "unsupported_platform", message: "Workspace opening is currently available on macOS." };
+    return { ok: false, workspaceRoot, toolId: input.toolId, relativePath, error: "unsupported_platform", message: "Workspace opening is currently available on macOS." };
   }
 
   const installed = await runner(["-Ra", definition.appName]);
   if (!installed.ok) {
-    return { ok: false, workspaceRoot, toolId: input.toolId, error: "not_installed", message: `${definition.label} is not installed.` };
+    return { ok: false, workspaceRoot, toolId: input.toolId, relativePath, error: "not_installed", message: `${definition.label} is not installed.` };
   }
 
-  const opened = await runner(["-a", definition.appName, workspaceRoot]);
+  const opened = await runner(openArgsFor(input.toolId, definition.appName, target, targetIsDirectory));
   return opened.ok
-    ? { ok: true, workspaceRoot, toolId: input.toolId }
-    : { ok: false, workspaceRoot, toolId: input.toolId, error: "open_failed", message: opened.message ?? `Failed to open ${definition.label}.` };
+    ? { ok: true, workspaceRoot, toolId: input.toolId, relativePath }
+    : { ok: false, workspaceRoot, toolId: input.toolId, relativePath, error: "open_failed", message: opened.message ?? `Failed to open ${definition.label}.` };
 }
 
 function runOpenCommand(args: string[]): Promise<{ ok: boolean; message?: string }> {

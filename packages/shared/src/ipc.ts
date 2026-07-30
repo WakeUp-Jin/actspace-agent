@@ -662,13 +662,22 @@ export type WorkspaceOpenToolsResult = {
 export type WorkspaceOpenInput = {
   workspaceRoot?: string;
   toolId: WorkspaceOpenToolId;
+  /**
+   * 要打开的目标（相对 workspaceRoot）；不传则打开根目录本身。
+   *
+   * 越界路径按 `escapes_root` 拒绝——这个入口来自右侧面板的可点 UI，
+   * 和文件浏览器同一条边界，不能因为「只是调用 /usr/bin/open」就放开整盘。
+   */
+  relativePath?: string;
 };
 
 export type WorkspaceOpenResult = {
   ok: boolean;
   workspaceRoot: string;
   toolId: WorkspaceOpenToolId;
-  error?: "invalid_workspace" | "unsupported_platform" | "not_installed" | "open_failed";
+  /** 回显实际打开的相对路径；打开根目录时为 undefined。 */
+  relativePath?: string;
+  error?: "invalid_workspace" | "unsupported_platform" | "not_installed" | "open_failed" | "escapes_root";
   message?: string;
 };
 
@@ -709,22 +718,52 @@ export type WorkspaceReadFileInput = {
   relativePath: string;
 };
 
-export type WorkspaceFileRenderKind = "markdown" | "html" | "image" | "text";
+export type WorkspaceFileRenderKind = "markdown" | "html" | "image" | "csv" | "text";
+
+/**
+ * 文本预览的字节上限：超过就只返回上限内的完整行并置 `truncated`。
+ *
+ * 放在契约层是因为两侧都要用同一个数：main 用它决定读多少，renderer 要在提示条里
+ * 复述「仅显示前 X」。各留一份的话，改了 main 的上限就会让提示文案说谎。
+ */
+export const WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES = 2 * 1024 * 1024;
 
 export type WorkspaceReadFileResult = {
   relativePath: string;
   renderKind: WorkspaceFileRenderKind;
-  /** text / markdown / html：UTF-8 文本；image：空。 */
+  /** text / markdown / html / csv：UTF-8 文本；image：空。 */
   content?: string;
   /** image：data URL（base64）；其余空。 */
   dataUrl?: string;
-  /** text 类的语法高亮语言（highlight.js 语言 id，按扩展名推断）；无法识别 / 截断 / 二进制时缺省，渲染回退纯等宽。 */
+  /** text 类的语法高亮语言（highlight.js 语言 id，按 basename 与扩展名推断）；无法识别 / 二进制时缺省，渲染回退纯等宽。 */
   language?: string;
-  /** 文件字节数。 */
+  /** 文件字节数（磁盘上的完整大小，不因截断而变小）。 */
   size: number;
-  /** 文本超过大小上限被截断。 */
+  /**
+   * 文本超过大小上限，`content` 只含上限内的完整行。
+   * 消费方必须显式告知用户内容不完整，不能当完整文件对待。
+   */
   truncated?: boolean;
+  /** 最后修改时间（epoch 毫秒），供右侧面板判断已打开的 Tab 是否过期；错误分支为 0。 */
+  mtimeMs: number;
   error?: "not_found" | "not_a_file" | "too_large" | "binary" | "escapes_root";
+};
+
+/**
+ * 只取文件的大小与 mtime，不读内容。
+ * 右侧面板用它在「Tab 激活 / 窗口重获焦点 / turn 结束」三个时机做 O(1) 新鲜度重校验，
+ * 不做轮询；详见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`。
+ */
+export type WorkspaceStatFileInput = {
+  workspaceRoot?: string;
+  relativePath: string;
+};
+
+export type WorkspaceStatFileResult = {
+  relativePath: string;
+  size: number;
+  mtimeMs: number;
+  error?: "not_found" | "not_a_file" | "escapes_root";
 };
 
 /** 读取当前会话内由工具生成的图片产物。renderer 不能直接加载 file://。 */

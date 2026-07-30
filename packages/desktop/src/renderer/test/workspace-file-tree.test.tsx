@@ -35,7 +35,7 @@ function installBridge(overrides: {
   (window as { actspace?: unknown }).actspace = {
     listWorkspaceDir: overrides.listWorkspaceDir ?? (async () => ({ root: "/ws", relativePath: "", entries: [] })),
     readWorkspaceFile:
-      overrides.readWorkspaceFile ?? (async () => ({ relativePath: "", renderKind: "text", size: 0, content: "" })),
+      overrides.readWorkspaceFile ?? (async () => ({ relativePath: "", renderKind: "text", size: 0, mtimeMs: 0, content: "" })),
   };
 }
 
@@ -81,6 +81,7 @@ describe("WorkspaceFileTree", () => {
         relativePath: "main.ts",
         renderKind: "text",
         size: 18,
+        mtimeMs: 1_700_000_000_000,
         content: "export const x = 1;",
         language: "typescript",
       }),

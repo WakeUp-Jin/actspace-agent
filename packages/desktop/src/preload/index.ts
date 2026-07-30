@@ -138,6 +138,8 @@ import type {
   WorkspaceVisibilityResult,
   WorkspaceReadFileInput,
   WorkspaceReadFileResult,
+  WorkspaceStatFileInput,
+  WorkspaceStatFileResult,
   WriteAgentSystemPromptInput,
   ProviderConnectInput,
   ProviderUpdateInput,
@@ -190,6 +192,8 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("workspace:list-dir", input) as Promise<WorkspaceListDirResult>,
   readWorkspaceFile: (input: WorkspaceReadFileInput) =>
     ipcRenderer.invoke("workspace:read-file", input) as Promise<WorkspaceReadFileResult>,
+  statWorkspaceFile: (input: WorkspaceStatFileInput) =>
+    ipcRenderer.invoke("workspace:stat-file", input) as Promise<WorkspaceStatFileResult>,
   readSessionArtifact: (input: SessionArtifactReadInput) =>
     ipcRenderer.invoke("session:read-artifact", input) as Promise<SessionArtifactReadResult>,
   showArtifactContextMenu: (input: ArtifactContextMenuInput) =>

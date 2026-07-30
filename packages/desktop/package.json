@@ -15,7 +15,7 @@
     "dev:agent-core": "pnpm --filter @actspace/agent-core dev",
     "dev:renderer": "vite",
     "dev:electron:build": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput",
-    "dev:electron:run": "wait-on tcp:5173 file:dist-electron/main/index.js && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron dist-electron/main/index.js",
+    "dev:electron:run": "node ./scripts/dev-electron-run.mjs",
     "clean": "rm -rf dist dist-electron",
     "build:deps": "pnpm --filter @actspace/shared build && pnpm --filter @actspace/agent-core build",
     "build": "pnpm run clean && pnpm run build:deps && pnpm build:renderer && pnpm build:electron",

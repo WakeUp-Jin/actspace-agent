@@ -19,7 +19,7 @@ const CSP_RELAXED =
 const MIN_IFRAME_HEIGHT = 160;
 const MAX_IFRAME_HEIGHT = 20000;
 
-// 相对路径已统一在工作区操作栏展示，这里只保留 Preview/源码 切换（右对齐）。
+// 只有「聊天生成的 html」才用到这条工具栏：它没有工作区操作栏可以挂切换按钮。
 const TOOLBAR_CLASS = "flex shrink-0 items-center justify-end gap-2 border-b border-line px-3 py-1.5";
 const ERROR_BAR_CLASS =
   "flex shrink-0 items-center gap-1.5 border-b border-line bg-danger-soft px-3 py-1.5 text-[11px] text-danger";
@@ -106,16 +106,25 @@ function composeSrcDoc(html: string, csp: string, theme: ResolvedTheme): string 
   return out;
 }
 
+/**
+ * `mode` / `onModeChange` 一起传 = 受控（切换按钮在工作区操作栏上，视图不再自带工具栏）；
+ * 都不传 = 自持状态并渲染视图内的分段控件，供没有操作栏的聊天 html 使用。
+ */
 export function HtmlRenderView({
   html,
   trust,
   relativePath,
+  mode,
+  onModeChange,
 }: {
   html: string;
   trust: "chat" | "file";
   relativePath?: string;
+  mode?: PreviewMode;
+  onModeChange?: (mode: PreviewMode) => void;
 }) {
-  const [mode, setMode] = useState<PreviewMode>("preview");
+  const [ownMode, setOwnMode] = useState<PreviewMode>("preview");
+  const activeMode = mode ?? ownMode;
   const [height, setHeight] = useState(MIN_IFRAME_HEIGHT);
   const [error, setError] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -151,16 +160,18 @@ export function HtmlRenderView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className={TOOLBAR_CLASS}>
-        <PreviewSourceToggle mode={mode} onChange={setMode} />
-      </div>
+      {onModeChange ? null : (
+        <div className={TOOLBAR_CLASS}>
+          <PreviewSourceToggle mode={activeMode} onChange={setOwnMode} />
+        </div>
+      )}
       {error ? (
         <div className={ERROR_BAR_CLASS} role="alert">
           <AlertTriangle size={13} strokeWidth={2.2} />
           <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">预览出错：{error}</span>
         </div>
       ) : null}
-      {mode === "preview" ? (
+      {activeMode === "preview" ? (
         <div className="min-h-0 flex-1 overflow-auto bg-surface">
           <iframe
             ref={iframeRef}
