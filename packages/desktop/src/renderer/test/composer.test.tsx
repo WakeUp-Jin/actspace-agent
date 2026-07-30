@@ -34,6 +34,23 @@ function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {})
   return { onSend, onAbort, ...result };
 }
 
+function createSkill(overrides: Partial<SkillCatalogItem> = {}): SkillCatalogItem {
+  return {
+    name: "frontend-design",
+    description: "Build polished interfaces",
+    scope: "project",
+    source: ".agents",
+    location: "/work/.agents/skills/frontend-design/SKILL.md",
+    directory: "/work/.agents/skills/frontend-design",
+    status: "available",
+    removable: false,
+    enabledForAgent: true,
+    enabledForKairos: false,
+    shadowed: false,
+    ...overrides,
+  };
+}
+
 const reasoningModels: UsableModelView[] = [
   {
     key: "deepseek:deepseek-v4-pro",
@@ -293,6 +310,178 @@ describe("Composer follow-up bar", () => {
     expect(within(menu).queryByText(/Debug|Multitask|Ask|MCP Servers|Models|Attach files/)).not.toBeInTheDocument();
   });
 
+  it("opens the slash menu with Functions and workspace Skills", async () => {
+    const user = userEvent.setup();
+    const listSkills = vi.fn(async () => ({ items: [createSkill()], warnings: [] }));
+    setPartialActspaceBridge({ listSkills });
+    renderComposer({ selectedWorkspaceRoot: "/work" });
+
+    const input = screen.getByLabelText("Message composer");
+    await user.type(input, "/");
+
+    const menu = await screen.findByRole("listbox", { name: "Slash commands" });
+    expect(within(menu).getByText("Functions")).toBeInTheDocument();
+    expect(within(menu).getByRole("option", { name: /Chat mode \/chat/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("option", { name: /Compact context \/compact/ })).toBeInTheDocument();
+    expect(await within(menu).findByRole("option", { name: /frontend-design/i })).toBeInTheDocument();
+    expect(listSkills).toHaveBeenCalledWith({ workspaceRoot: "/work" });
+    expect(input).toHaveAttribute("aria-expanded", "true");
+    expect(input).toHaveAttribute("aria-controls", "composer-slash-command-menu");
+  });
+
+  it("opens the initial Composer slash menu below the input with a viewport-safe height", async () => {
+    const user = userEvent.setup();
+    renderComposer({ surface: "initial" });
+
+    await user.type(screen.getByLabelText("Message composer"), "/");
+
+    const menu = await screen.findByRole("listbox", { name: "Slash commands" });
+    expect(menu).toHaveClass(
+      "top-[calc(100%_+_8px)]",
+      "max-h-[min(280px,calc(50vh_-_90px))]",
+    );
+    expect(menu).not.toHaveClass("bottom-[calc(100%_+_8px)]");
+  });
+
+  it("refreshes slash Skills when the selected workspace changes", async () => {
+    const user = userEvent.setup();
+    let resolveFirstLoad: ((value: { items: SkillCatalogItem[]; warnings: string[] }) => void) | undefined;
+    const listSkills = vi.fn(({ workspaceRoot }: { workspaceRoot?: string }) => {
+      if (workspaceRoot === "/work/a") {
+        return new Promise<{ items: SkillCatalogItem[]; warnings: string[] }>((resolve) => {
+          resolveFirstLoad = resolve;
+        });
+      }
+      return Promise.resolve({
+        items: [createSkill({ name: "workspace-b-skill", location: "/work/b/.agents/skills/workspace-b-skill/SKILL.md" })],
+        warnings: [],
+      });
+    });
+    setPartialActspaceBridge({ listSkills });
+    const { rerender } = renderComposer({ selectedWorkspaceRoot: "/work/a" });
+
+    await user.type(screen.getByLabelText("Message composer"), "/");
+    await waitFor(() => expect(listSkills).toHaveBeenCalledWith({ workspaceRoot: "/work/a" }));
+
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <Composer contextSnapshot={mockContextSnapshot} selectedWorkspaceRoot="/work/b" />
+      </TooltipProvider>,
+    );
+
+    expect(await screen.findByRole("option", { name: /workspace-b-skill/i })).toBeInTheDocument();
+    resolveFirstLoad?.({
+      items: [createSkill({ name: "stale-workspace-a-skill" })],
+      warnings: [],
+    });
+    await waitFor(() => expect(screen.queryByText("stale-workspace-a-skill")).not.toBeInTheDocument());
+  });
+
+  it("navigates slash results with arrows and switches modes without sending", async () => {
+    const user = userEvent.setup();
+    const onModeChange = vi.fn();
+    const { onSend } = renderComposer({ mode: "agent", onModeChange });
+    const input = screen.getByLabelText("Message composer");
+
+    await user.type(input, "/");
+    expect(input).toHaveAttribute("aria-activedescendant", "composer-slash-function-chat");
+    await user.keyboard("{ArrowDown}{Enter}");
+
+    expect(onModeChange).toHaveBeenCalledWith("plan");
+    expect(onSend).not.toHaveBeenCalled();
+    expect(input).toHaveValue("");
+    expect(screen.queryByRole("listbox", { name: "Slash commands" })).not.toBeInTheDocument();
+  });
+
+  it("runs compact immediately without consuming attachments or selected Skills", async () => {
+    const user = userEvent.setup();
+    const attachments: ComposerAttachment[] = [{
+      id: "selected-image",
+      kind: "image",
+      name: "screenshot.png",
+      path: "/Users/test/screenshot.png",
+      mimeType: "image/png",
+      previewUrl: "file:///Users/test/screenshot.png",
+    }];
+    setPartialActspaceBridge({
+      listSkills: vi.fn(async () => ({ items: [], warnings: [] })),
+      selectImages: vi.fn(async () => ({ canceled: false, attachments })),
+    });
+    const { onSend } = renderComposer({ selectedSkills: ["frontend-design"] });
+
+    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    await user.click(screen.getByRole("menuitem", { name: "Image" }));
+    expect(screen.getByLabelText("Attached image screenshot.png")).toBeInTheDocument();
+
+    const input = screen.getByLabelText("Message composer");
+    await user.type(input, "/compact");
+    await user.keyboard("{Enter}");
+
+    expect(onSend).toHaveBeenCalledWith("/compact", {
+      mode: "agent",
+      model: "deepseek-v4-pro",
+      selectedSkills: ["frontend-design"],
+      thinkingEnabled: true,
+    });
+    expect(screen.getByLabelText("Attached image screenshot.png")).toBeInTheDocument();
+    expect(screen.getByLabelText("Selected Skill frontend-design")).toBeInTheDocument();
+  });
+
+  it("completes eval for a failure reason instead of running it immediately", async () => {
+    const user = userEvent.setup();
+    const { onSend } = renderComposer();
+    const input = screen.getByLabelText("Message composer");
+
+    await user.type(input, "/eval");
+    await user.keyboard("{Enter}");
+
+    expect(input).toHaveValue("/eval ");
+    expect(onSend).not.toHaveBeenCalled();
+    await user.type(input, "tool output was incomplete");
+    await user.keyboard("{Enter}");
+    expect(onSend).toHaveBeenCalledWith("/eval tool output was incomplete", expect.objectContaining({
+      mode: "agent",
+      selectedSkills: [],
+    }));
+  });
+
+  it("opens Context and Review from slash functions and binds a filtered Skill", async () => {
+    const user = userEvent.setup();
+    const onExpandContext = vi.fn();
+    const onOpenReview = vi.fn();
+    const onSelectedSkillsChange = vi.fn();
+    setPartialActspaceBridge({ listSkills: vi.fn(async () => ({ items: [createSkill()], warnings: [] })) });
+    renderComposer({ onExpandContext, onOpenReview, onSelectedSkillsChange });
+    const input = screen.getByLabelText("Message composer");
+
+    await user.type(input, "/status");
+    await user.keyboard("{Enter}");
+    expect(onExpandContext).toHaveBeenCalledTimes(1);
+
+    await user.type(input, "/review");
+    await user.keyboard("{Enter}");
+    expect(onOpenReview).toHaveBeenCalledTimes(1);
+
+    await user.type(input, "/polished");
+    const skillOption = await screen.findByRole("option", { name: /frontend-design/i });
+    await user.click(skillOption);
+    expect(onSelectedSkillsChange).toHaveBeenCalledWith(["frontend-design"]);
+  });
+
+  it("keeps slash selection inert while an IME composition is active", async () => {
+    const user = userEvent.setup();
+    const onModeChange = vi.fn();
+    const { onSend } = renderComposer({ onModeChange });
+    const input = screen.getByLabelText("Message composer");
+
+    await user.type(input, "/plan");
+    fireEvent.keyDown(input, { key: "Enter", code: "Enter", keyCode: 229, isComposing: true });
+
+    expect(onModeChange).not.toHaveBeenCalled();
+    expect(onSend).not.toHaveBeenCalled();
+    expect(input).toHaveValue("/plan");
+  });
+
   it("switches modes and renders the selected mode pill with semantic colors", async () => {
     const user = userEvent.setup();
     const onModeChange = vi.fn();
@@ -465,7 +654,11 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     renderComposer();
 
+    await user.type(screen.getByLabelText("Message composer"), "/");
+    expect(await screen.findByRole("listbox", { name: "Slash commands" })).toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    expect(screen.queryByRole("listbox", { name: "Slash commands" })).not.toBeInTheDocument();
     expect(screen.getByRole("menu", { name: "Add context and tools" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));

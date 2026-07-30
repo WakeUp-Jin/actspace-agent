@@ -38,7 +38,7 @@
 - 普通 focus ring 使用高对比中性 token；运行状态可使用 operational green。Context usage 默认保持中性，只有接近阈值时切 warning / danger；Thinking toggle 不再默认使用品牌蓝。
 - workspace、branch、runtime 都应表现为下拉入口；真实交互、Git 和 Worktree 边界统一遵循 `front-workspace-git-worktree-context.md`。
 - Chat / Plan / Agent 不是只改 placeholder 的视觉标签；每次发送都必须把模式作为显式运行参数传入 main 和 Agent Runtime，由工具暴露层强制能力边界。Prompt 只负责行为指导，不承担权限隔离。
-- Slash Command 在发送前由 renderer 分流：`/compact` 触发上下文压缩，`/eval [失败说明]` 触发最近失败 Turn 的回归 Candidate 生成；命令文本不作为普通用户消息显示。
+- Slash Command 在普通 Agent Turn 之前分流：`/compact` 触发上下文压缩，`/eval [失败说明]` 触发最近失败 Turn 的回归 Candidate 生成；命令文本不作为普通用户消息显示。可发现菜单、键盘行为、Functions / Skills 分组及 V1 边界统一见 `front-composer-slash-command.md`。
 
 ## Composer 形态
 
@@ -120,6 +120,14 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 - `MCP Servers`：当前不实现 MCP，不展示空入口、占位态或“即将推出”。
 
 菜单与 model menu、model options、Context popup 互斥。选择模式后关闭菜单；Image 在调起系统文件选择器前关闭菜单；鼠标悬浮到 Skills 行时展开二级菜单，鼠标离开主菜单与二级菜单组成的整个浮层后关闭。
+
+### `/` Slash Command 菜单
+
+- 用户在空白草稿中输入 `/` 后，Composer 打开键盘优先的 Slash Command 菜单。
+- 菜单只包含 `Functions` 与 `Skills` 两个一级分组，并复用现有模式回调、Context / Review 入口、`/compact` / `/eval` 路由和 Skill registry。
+- `/` 与 `+` 是同一批能力的不同发现入口：`+` 偏鼠标、附件和多选，`/` 偏搜索、键盘和快捷调用；两者不要求展示完全相同的项目。
+- Slash 菜单与 `+`、model menu、model options、Context popup 互斥，不新增常驻按钮，也不改变 Composer 默认视觉密度。
+- 完整触发规则、命令清单、选择语义、键盘 / IME、可访问性、视觉和验收要求见 `docs/design-docs/frontend/front-composer-slash-command.md`。
 
 ### Chat / Plan / Agent 运行模式
 

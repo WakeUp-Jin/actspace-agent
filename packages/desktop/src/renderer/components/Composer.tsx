@@ -44,6 +44,15 @@ import {
   groupModelsByProvider,
   hasDuplicateModelLabelWithinProvider,
 } from "../model-option-groups";
+import {
+  composerSlashFunctionOptionId,
+  composerSlashSkillOptionId,
+  filterComposerSlashFunctions,
+  filterComposerSlashSkills,
+  parseComposerSlashQuery,
+  type ComposerSlashFunction,
+  type ComposerSlashFunctionId,
+} from "./composer-slash-commands";
 
 export type ComposerSendOptions = {
   model: ModelSelectionId;
@@ -176,6 +185,26 @@ const SKILL_DESCRIPTION_CLASS = "line-clamp-2 text-xs font-normal leading-4 text
 const SKILL_SCOPE_CLASS = "ml-auto shrink-0 text-[10px] uppercase tracking-wide text-text-faint";
 const SKILL_PILL_CLASS =
   "group/skill-pill inline-flex h-9 max-w-[240px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-sm font-medium text-text-main shadow-[0_6px_16px_rgba(31,45,61,0.06)]";
+const SLASH_MENU_ID = "composer-slash-command-menu";
+const SLASH_FUNCTIONS_LABEL_ID = "composer-slash-functions-label";
+const SLASH_SKILLS_LABEL_ID = "composer-slash-skills-label";
+const SLASH_MENU_BASE_CLASS =
+  "slash-command-menu absolute left-0 z-40 w-[min(380px,calc(100vw_-_36px))] max-w-full overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover transition-[opacity,transform] duration-[140ms] ease-out motion-reduce:transition-none max-[600px]:right-0 max-[600px]:w-auto";
+const SLASH_MENU_POSITION_CLASS: Record<ComposerSurface, string> = {
+  initial: "top-[calc(100%_+_8px)] max-h-[min(280px,calc(50vh_-_90px))]",
+  followup: "bottom-[calc(100%_+_8px)] max-h-[min(420px,calc(100vh_-_120px))]",
+};
+const SLASH_GROUP_LABEL_CLASS =
+  "sticky top-0 z-10 bg-surface-raised/96 px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint";
+const SLASH_OPTION_CLASS =
+  "slash-command-option flex min-h-[46px] w-full items-start gap-2 rounded-act-md border-0 bg-transparent px-2 py-1.5 text-left text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:outline-none";
+const SLASH_OPTION_ACTIVE_CLASS = "bg-selected";
+const SLASH_OPTION_ICON_CLASS = "mt-0.5 shrink-0 text-text-muted";
+const SLASH_OPTION_LABEL_CLASS = "block truncate text-[13px] font-medium leading-5";
+const SLASH_OPTION_DESCRIPTION_CLASS = "block line-clamp-1 text-[11px] font-normal leading-4 text-text-faint";
+const SLASH_OPTION_COMMAND_CLASS = "ml-auto shrink-0 pt-0.5 font-mono text-[11px] leading-5 text-text-faint";
+const SLASH_STATUS_CLASS = "px-2 py-4 text-[13px] text-text-faint";
+const SLASH_EMPTY_CLASS = "px-3 py-7 text-center text-[13px] text-text-faint";
 // 模型菜单维持 Cursor 式紧凑单列：主菜单只负责选择，Options 作为贴行的轻量二级浮层。
 const MODEL_MENU_CLUSTER_CLASS =
   "absolute bottom-[calc(100%_+_8px)] z-30 w-[244px]";
@@ -244,6 +273,10 @@ type ModeMenuItem = {
   icon: LucideIcon;
 };
 
+type ComposerSlashResult =
+  | { kind: "function"; item: ComposerSlashFunction }
+  | { kind: "skill"; item: SkillCatalogItem };
+
 type ContextSelectorKind = "workspace" | "branch" | "runtime";
 
 const MODE_MENU_ITEMS: ModeMenuItem[] = [
@@ -254,6 +287,16 @@ const MODE_MENU_ITEMS: ModeMenuItem[] = [
 const MODE_META: Record<Exclude<ComposerMode, "agent">, Omit<ModeMenuItem, "mode">> = {
   chat: { label: "Chat", icon: MessageCircle },
   plan: { label: "Plan", icon: ListChecks },
+};
+
+const SLASH_FUNCTION_ICONS: Record<ComposerSlashFunctionId, LucideIcon> = {
+  chat: MessageCircle,
+  plan: ListChecks,
+  agent: Server,
+  compact: ChevronDown,
+  eval: Search,
+  status: MoreHorizontal,
+  review: GitBranch,
 };
 
 type ComposerModelOption = {
@@ -450,11 +493,16 @@ export function Composer({
   const initialModelId = controlledSelectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID;
   const [commandOpen, setCommandOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
+  const [slashDismissed, setSlashDismissed] = useState(false);
+  const [slashActiveIndex, setSlashActiveIndex] = useState(0);
+  const [slashMenuEntered, setSlashMenuEntered] = useState(false);
   const [skillItems, setSkillItems] = useState<SkillCatalogItem[]>([]);
   const [skillsLoading, setSkillsLoading] = useState(false);
   const [skillsError, setSkillsError] = useState<string | null>(null);
   const skillLoadWorkspaceRef = useRef<string | null>(null);
+  const skillLoadRequestRef = useRef(0);
   const skillsCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const slashFocusFrameRef = useRef<number | null>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [modelOptionsOpen, setModelOptionsOpen] = useState(false);
   const [contextSelectorOpen, setContextSelectorOpen] = useState<ContextSelectorKind | null>(null);
@@ -482,6 +530,7 @@ export function Composer({
   const commandButtonRef = useRef<HTMLButtonElement | null>(null);
   const modeButtonRef = useRef<HTMLButtonElement | null>(null);
   const commandMenuRef = useRef<HTMLDivElement | null>(null);
+  const slashMenuRef = useRef<HTMLDivElement | null>(null);
   const modelButtonRef = useRef<HTMLButtonElement | null>(null);
   const modelSearchInputRef = useRef<HTMLInputElement | null>(null);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
@@ -507,6 +556,23 @@ export function Composer({
         model.id.toLocaleLowerCase().includes(normalizedModelSearchQuery))
     : modelList;
   const filteredModelGroups = groupModelsByProvider(filteredModelList);
+  const slashQuery = isStreaming ? null : parseComposerSlashQuery(message);
+  const slashOpen = slashQuery !== null && !slashDismissed;
+  const filteredSlashFunctions = slashQuery === null ? [] : filterComposerSlashFunctions(slashQuery);
+  const filteredSlashSkills = slashQuery === null ? [] : filterComposerSlashSkills(skillItems, slashQuery);
+  const slashResults: ComposerSlashResult[] = [
+    ...filteredSlashFunctions.map((item): ComposerSlashResult => ({ kind: "function", item })),
+    ...filteredSlashSkills.map((item): ComposerSlashResult => ({ kind: "skill", item })),
+  ];
+  const slashResultKey = slashResults
+    .map((result) => result.kind === "function" ? `function:${result.item.id}` : `skill:${result.item.scope}:${result.item.name}`)
+    .join("|");
+  const activeSlashResult = slashResults[Math.min(slashActiveIndex, Math.max(0, slashResults.length - 1))];
+  const activeSlashOptionId = activeSlashResult
+    ? activeSlashResult.kind === "function"
+      ? composerSlashFunctionOptionId(activeSlashResult.item.id)
+      : composerSlashSkillOptionId(activeSlashResult.item.name)
+    : undefined;
   const selectedModelDisplayLabel = selectedModelSpec
     ? formatSelectedModelLabel(selectedModelSpec, modelList)
     : selectedModelId;
@@ -561,8 +627,47 @@ export function Composer({
     if (!draftRestore) return;
     setMessage(draftRestore.text);
     setAttachments(draftRestore.attachments ?? []);
+    setSlashDismissed(false);
     window.requestAnimationFrame(() => inputRef.current?.focus());
   }, [draftRestore]);
+
+  useLayoutEffect(() => {
+    if (!slashOpen) {
+      setSlashMenuEntered(false);
+      return;
+    }
+    setSlashMenuEntered(false);
+    const handle = window.requestAnimationFrame(() => setSlashMenuEntered(true));
+    return () => window.cancelAnimationFrame(handle);
+  }, [slashOpen]);
+
+  useEffect(() => {
+    if (!slashOpen) return;
+    setCommandOpen(false);
+    setSkillsOpen(false);
+    setModelOpen(false);
+    setHoveredModelId(null);
+    setFocusedModelId(null);
+    setModelOptionsOpen(false);
+    setContextSelectorOpen(null);
+    setContextOpen(false);
+    void loadSkills();
+  }, [selectedWorkspaceRoot, slashOpen]);
+
+  useEffect(() => {
+    if (!commandOpen && !skillsOpen && !modelOpen && !modelOptionsOpen && !contextSelectorOpen && !contextOpen) return;
+    setSlashDismissed(true);
+  }, [commandOpen, contextOpen, contextSelectorOpen, modelOpen, modelOptionsOpen, skillsOpen]);
+
+  useEffect(() => {
+    if (!slashOpen) return;
+    setSlashActiveIndex(0);
+  }, [slashOpen, slashQuery, slashResultKey]);
+
+  useEffect(() => {
+    if (!slashOpen || !activeSlashOptionId) return;
+    document.getElementById(activeSlashOptionId)?.scrollIntoView?.({ block: "nearest" });
+  }, [activeSlashOptionId, slashOpen]);
 
   useLayoutEffect(() => {
     if (!modelOpen) {
@@ -639,6 +744,7 @@ export function Composer({
   function closeFloatingPanels() {
     setCommandOpen(false);
     setSkillsOpen(false);
+    setSlashDismissed(true);
     setModelOpen(false);
     setHoveredModelId(null);
     setFocusedModelId(null);
@@ -682,19 +788,23 @@ export function Composer({
     console.warn("Image picker is only available in the desktop app.");
   }
 
-  async function handleOpenSkills(forceReload = false) {
-    setSkillsOpen(true);
+  async function loadSkills(forceReload = false) {
     if (!window.actspace?.listSkills) {
+      skillLoadRequestRef.current += 1;
+      setSkillsLoading(false);
       setSkillsError("Skills are only available in the desktop app.");
       return;
     }
     const workspaceKey = selectedWorkspaceRoot ?? "__default__";
     if (!forceReload && skillLoadWorkspaceRef.current === workspaceKey) return;
     skillLoadWorkspaceRef.current = workspaceKey;
+    const requestId = skillLoadRequestRef.current + 1;
+    skillLoadRequestRef.current = requestId;
     setSkillsLoading(true);
     setSkillsError(null);
     try {
       const result = await window.actspace.listSkills({ workspaceRoot: selectedWorkspaceRoot ?? undefined });
+      if (skillLoadRequestRef.current !== requestId) return;
       setSkillItems(result.items
         .filter((skill) => skill.enabledForAgent && !skill.shadowed && skill.status === "available")
         .sort((left, right) => {
@@ -702,12 +812,18 @@ export function Composer({
           return left.name.localeCompare(right.name);
         }));
     } catch (error) {
+      if (skillLoadRequestRef.current !== requestId) return;
       skillLoadWorkspaceRef.current = null;
       console.error("Failed to list Skills", error);
       setSkillsError("Failed to load Skills.");
     } finally {
-      setSkillsLoading(false);
+      if (skillLoadRequestRef.current === requestId) setSkillsLoading(false);
     }
+  }
+
+  async function handleOpenSkills(forceReload = false) {
+    setSkillsOpen(true);
+    await loadSkills(forceReload);
   }
 
   function toggleSkill(name: string) {
@@ -732,9 +848,7 @@ export function Composer({
     }, 120);
   }
 
-  function sendCurrentMessage() {
-    if (!canSendMessage || !onSend || isStreaming) return;
-    const nextAttachments = attachments;
+  function createSendOptions(includeAttachments: boolean): ComposerSendOptions {
     const options: ComposerSendOptions = {
       model: selectedModelId,
       mode,
@@ -744,10 +858,72 @@ export function Composer({
     if (selectedModelOptions.thinkingEnabled && selectedModelOptions.reasoningEffort) {
       options.reasoningEffort = selectedModelOptions.reasoningEffort;
     }
-    if (nextAttachments.length > 0) {
-      options.attachments = nextAttachments;
+    if (includeAttachments && attachments.length > 0) {
+      options.attachments = attachments;
     }
-    onSend(message.trim(), options);
+    return options;
+  }
+
+  function cancelSlashFocusFrame() {
+    if (slashFocusFrameRef.current === null) return;
+    window.cancelAnimationFrame(slashFocusFrameRef.current);
+    slashFocusFrameRef.current = null;
+  }
+
+  function finishSlashSelection(nextMessage = "") {
+    cancelSlashFocusFrame();
+    setMessage(nextMessage);
+    setSlashDismissed(true);
+    inputRef.current?.focus();
+    if (!nextMessage) return;
+    slashFocusFrameRef.current = window.requestAnimationFrame(() => {
+      slashFocusFrameRef.current = null;
+      const input = inputRef.current;
+      if (!input || input.value !== nextMessage) return;
+      input.focus();
+      input.setSelectionRange(nextMessage.length, nextMessage.length);
+    });
+  }
+
+  function executeSlashFunction(item: ComposerSlashFunction) {
+    switch (item.id) {
+      case "chat":
+      case "plan":
+      case "agent":
+        onModeChange?.(item.id);
+        finishSlashSelection();
+        return;
+      case "compact":
+        if (!onSend || isStreaming || !selectedModelAvailable) return;
+        onSend("/compact", createSendOptions(false));
+        finishSlashSelection();
+        return;
+      case "eval":
+        finishSlashSelection("/eval ");
+        return;
+      case "status":
+        onExpandContext?.();
+        finishSlashSelection();
+        return;
+      case "review":
+        onOpenReview?.();
+        finishSlashSelection();
+    }
+  }
+
+  function selectSlashResult(result: ComposerSlashResult | undefined) {
+    if (!result) return;
+    if (result.kind === "function") {
+      executeSlashFunction(result.item);
+      return;
+    }
+    toggleSkill(result.item.name);
+    finishSlashSelection();
+  }
+
+  function sendCurrentMessage() {
+    if (!canSendMessage || !onSend || isStreaming) return;
+    onSend(message.trim(), createSendOptions(true));
     setMessage("");
     setAttachments([]);
     closeFloatingPanels();
@@ -805,6 +981,7 @@ export function Composer({
 
     return () => {
       cancelSkillsClose();
+      cancelSlashFocusFrame();
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
@@ -836,22 +1013,48 @@ export function Composer({
       <textarea
         className={surface === "initial" ? COMPOSER_INITIAL_INPUT_CLASS : COMPOSER_INPUT_CLASS}
         aria-label="Message composer"
+        aria-autocomplete={slashOpen ? "list" : undefined}
+        aria-controls={slashOpen ? SLASH_MENU_ID : undefined}
+        aria-expanded={slashOpen}
+        aria-activedescendant={slashOpen ? activeSlashOptionId : undefined}
+        aria-haspopup="listbox"
         placeholder={placeholder}
         rows={1}
         ref={inputRef}
         value={message}
         disabled={isStreaming}
-        onChange={(event) => setMessage(event.target.value)}
+        onChange={(event) => {
+          cancelSlashFocusFrame();
+          setMessage(event.target.value);
+          setSlashDismissed(false);
+        }}
         onKeyDown={(event) => {
           if (event.key === "Tab" && event.shiftKey) {
             event.preventDefault();
             onModeChange?.("plan");
             return;
           }
+          if (slashOpen && event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            setSlashDismissed(true);
+            return;
+          }
+          if (slashOpen && slashResults.length > 0 && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+            event.preventDefault();
+            const direction = event.key === "ArrowDown" ? 1 : -1;
+            setSlashActiveIndex((current) => (current + direction + slashResults.length) % slashResults.length);
+            return;
+          }
           if (event.key !== "Enter" || event.shiftKey) return;
           // IME 输入法（中文/日文等）在候选词面板按回车"上屏"时，
           // nativeEvent.isComposing 为 true 或 keyCode 为 229，此时不应触发发送。
           if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+          if (slashOpen && activeSlashResult) {
+            event.preventDefault();
+            selectSlashResult(activeSlashResult);
+            return;
+          }
           event.preventDefault();
           sendCurrentMessage();
         }}
@@ -993,6 +1196,128 @@ export function Composer({
             {selectedSkills.includes(skill.name) ? <Check size={15} strokeWidth={2.2} aria-hidden="true" /> : null}
           </button>
         ))}
+      </div>
+    );
+  }
+
+  function renderSlashMenu() {
+    if (!slashOpen || slashQuery === null) return null;
+    const slashMenuMotionClass = slashMenuEntered
+      ? "translate-y-0 scale-100 opacity-100"
+      : `pointer-events-none ${surface === "initial" ? "-translate-y-1" : "translate-y-1"} scale-[0.985] opacity-0`;
+    const showSkillsGroup =
+      skillsLoading ||
+      Boolean(skillsError) ||
+      filteredSlashSkills.length > 0 ||
+      (slashQuery === "" && skillItems.length === 0);
+    const showTotalEmpty =
+      slashQuery !== "" &&
+      filteredSlashFunctions.length === 0 &&
+      filteredSlashSkills.length === 0 &&
+      !skillsLoading &&
+      !skillsError;
+
+    return (
+      <div
+        className={`${SLASH_MENU_BASE_CLASS} ${SLASH_MENU_POSITION_CLASS[surface]} ${slashMenuMotionClass}`}
+        id={SLASH_MENU_ID}
+        ref={slashMenuRef}
+        role="listbox"
+        aria-label="Slash commands"
+      >
+        {filteredSlashFunctions.length > 0 ? (
+          <div role="group" aria-labelledby={SLASH_FUNCTIONS_LABEL_ID}>
+            <div className={SLASH_GROUP_LABEL_CLASS} id={SLASH_FUNCTIONS_LABEL_ID}>Functions</div>
+            {filteredSlashFunctions.map((item) => {
+              const Icon = SLASH_FUNCTION_ICONS[item.id];
+              const optionId = composerSlashFunctionOptionId(item.id);
+              const isActive = activeSlashOptionId === optionId;
+              const isSelectedMode = item.id === mode;
+              return (
+                <button
+                  className={`${SLASH_OPTION_CLASS}${isActive ? ` ${SLASH_OPTION_ACTIVE_CLASS}` : ""}`}
+                  id={optionId}
+                  type="button"
+                  role="option"
+                  aria-label={`${item.label} ${item.command}: ${item.description}`}
+                  aria-selected={isSelectedMode}
+                  key={item.id}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => {
+                    const index = slashResults.findIndex((result) => result.kind === "function" && result.item.id === item.id);
+                    if (index >= 0) setSlashActiveIndex(index);
+                  }}
+                  onClick={() => executeSlashFunction(item)}
+                >
+                  <Icon className={SLASH_OPTION_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className={SLASH_OPTION_LABEL_CLASS}>{item.label}</span>
+                    <span className={SLASH_OPTION_DESCRIPTION_CLASS}>{item.description}</span>
+                  </span>
+                  {isSelectedMode ? <Check className="mt-1 shrink-0 text-text-muted" size={14} strokeWidth={2.2} aria-hidden="true" /> : null}
+                  <span className={SLASH_OPTION_COMMAND_CLASS}>{item.command}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {showSkillsGroup ? (
+          <div role="group" aria-labelledby={SLASH_SKILLS_LABEL_ID}>
+            <div className={SLASH_GROUP_LABEL_CLASS} id={SLASH_SKILLS_LABEL_ID}>Skills</div>
+            {skillsLoading ? (
+              <div className={`${SLASH_STATUS_CLASS} flex items-center gap-2`}>
+                <Loader2 className="animate-spin" size={15} aria-hidden="true" /> Loading Skills...
+              </div>
+            ) : skillsError ? (
+              <div className={SLASH_STATUS_CLASS}>
+                <span>Skills unavailable.</span>
+                <button
+                  className="ml-2 rounded-act-sm px-1.5 py-0.5 font-medium text-text-main hover:bg-hover-overlay"
+                  type="button"
+                  onPointerDown={(event) => event.preventDefault()}
+                  onClick={() => void loadSkills(true)}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : filteredSlashSkills.length > 0 ? filteredSlashSkills.map((skill) => {
+              const optionId = composerSlashSkillOptionId(skill.name);
+              const isActive = activeSlashOptionId === optionId;
+              const isSelected = selectedSkills.includes(skill.name);
+              return (
+                <button
+                  className={`${SLASH_OPTION_CLASS}${isActive ? ` ${SLASH_OPTION_ACTIVE_CLASS}` : ""}`}
+                  id={optionId}
+                  type="button"
+                  role="option"
+                  aria-label={`${skill.name}: ${skill.description || "No description"}. ${isSelected ? "Selected" : "Not selected"}`}
+                  aria-selected={isSelected}
+                  key={`${skill.scope}:${skill.name}`}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => {
+                    const index = slashResults.findIndex((result) => result.kind === "skill" && result.item.name === skill.name);
+                    if (index >= 0) setSlashActiveIndex(index);
+                  }}
+                  onClick={() => selectSlashResult({ kind: "skill", item: skill })}
+                >
+                  <BookOpen className={SLASH_OPTION_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className={SLASH_OPTION_LABEL_CLASS}>{skill.name}</span>
+                    <span className={SKILL_DESCRIPTION_CLASS}>{skill.description || "No description"}</span>
+                  </span>
+                  {isSelected ? <Check className="mt-1 shrink-0 text-text-muted" size={14} strokeWidth={2.2} aria-hidden="true" /> : null}
+                </button>
+              );
+            }) : (
+              <div className={SLASH_STATUS_CLASS}>No enabled Skills</div>
+            )}
+          </div>
+        ) : null}
+
+        {showTotalEmpty ? (
+          <div className={SLASH_EMPTY_CLASS}>No matching functions or Skills</div>
+        ) : null}
       </div>
     );
   }
@@ -1433,6 +1758,7 @@ export function Composer({
           {renderComposerInput()}
           {renderToolbar()}
         </div>
+        {renderSlashMenu()}
       </div>
     );
   }
