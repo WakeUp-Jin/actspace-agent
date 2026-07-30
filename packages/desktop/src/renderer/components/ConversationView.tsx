@@ -1,7 +1,9 @@
 import { Copy, Eye, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComposerMode, ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
 import { Composer, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
+import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
+import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { AssistantReply } from "./messages/AssistantReply";
 import { AgentRunBlock } from "./messages/AgentRunBlock";
@@ -36,9 +38,10 @@ type ConversationTurn = {
 
 const CONVERSATION_SHELL_CLASS =
   "conversation-shell grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-surface pt-[var(--window-chrome-strip-height)]";
-const MESSAGE_SCROLL_CLASS = "message-scroll min-h-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
+const MESSAGE_VIEWPORT_CLASS = "conversation-message-viewport relative min-h-0";
+const MESSAGE_SCROLL_CLASS = "message-scroll h-full min-h-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
 const MESSAGE_SCROLL_INITIAL_CLASS =
-  "message-scroll message-scroll-initial min-h-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
+  "message-scroll message-scroll-initial h-full min-h-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
 const MESSAGE_STACK_CLASS =
   "message-stack mx-auto flex w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] flex-col gap-7 pb-7";
 const INITIAL_COMPOSER_STAGE_CLASS =
@@ -63,6 +66,9 @@ const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-[13px] leadin
 const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-on-danger";
 const COMPACT_MESSAGE_RELATION_CLASS = "-mt-1";
 const MODEL_WAITING_DELAY_MS = 300;
+const SCROLL_BOTTOM_THRESHOLD_PX = 80;
+const TURN_RAIL_MIN_TURNS = 3;
+const TURN_RAIL_MIN_VIEWPORT_WIDTH_PX = 640;
 
 const MESSAGE_TIME_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
   hour: "2-digit",
@@ -312,6 +318,31 @@ function splitTurnMessages(messages: MessageBlock[]): {
     workItems: messages.slice(0, splitIndex),
     finalReply: messages.slice(splitIndex),
   };
+}
+
+function normalizeTurnPreviewText(content: string): string {
+  return content.replace(/\s+/g, " ").trim();
+}
+
+function createTurnNavigationItems(
+  turns: ConversationTurn[],
+  isStreaming: boolean,
+): ConversationTurnNavigationItem[] {
+  const userTurns = turns.filter((turn): turn is ConversationTurn & { user: UserMessageBlock } => Boolean(turn.user));
+
+  return userTurns.map((turn, index) => {
+    const finalReply = splitTurnMessages(turn.messages).finalReply
+      .filter((message): message is AssistantMessageBlock => message.kind === "assistant")
+      .map((message) => message.content)
+      .join("\n\n");
+
+    return {
+      id: turn.id,
+      input: normalizeTurnPreviewText(turn.user.content),
+      reply: finalReply ? normalizeTurnPreviewText(finalReply) : null,
+      pending: isStreaming && index === userTurns.length - 1,
+    };
+  });
 }
 
 function workDurationMs(workItems: MessageBlock[], finalReply: MessageBlock[]): number | undefined {
@@ -625,14 +656,23 @@ export function ConversationView({
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
 }) {
-  const turns = groupMessagesIntoTurns(messages);
+  const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
+  const turnNavigationItems = useMemo(
+    () => createTurnNavigationItems(turns, isStreaming),
+    [isStreaming, turns],
+  );
   const isInitialComposer = isSessionReady && messages.length === 0 && !isStreaming;
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const messageStackRef = useRef<HTMLDivElement | null>(null);
+  const turnElementsRef = useRef(new Map<string, HTMLElement>());
+  const updateConversationViewportRef = useRef<() => void>(() => {});
   // 是否「贴底自动跟随」：流式输出时保持视图贴底；用户向上滚动阅读历史则暂停，
   // 滚回接近底部时恢复（类似 Cursor 的聊天滚动）。
   const stickToBottomRef = useRef(true);
+  const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
+  const [turnRailVisible, setTurnRailVisible] = useState(false);
+  const [activeTurnId, setActiveTurnId] = useState<string | null>(turnNavigationItems[0]?.id ?? null);
   const [activeTranscriptMessage, setActiveTranscriptMessage] = useState<AgentMessageBlock | null>(null);
   const { openTab } = useRightPanel();
   const openContextTab = () => openTab({ id: "context", kind: "context", title: "Context" });
@@ -641,27 +681,56 @@ export function ConversationView({
     ? messages.find((message): message is AgentMessageBlock => message.kind === "agent" && message.id === activeTranscriptMessage.id) ?? activeTranscriptMessage
     : null;
 
-  useEffect(() => {
-    if (sendScrollRequestId === 0) {
+  const updateConversationViewport = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const scrollable = el.scrollHeight > el.clientHeight + 1;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = !scrollable || distanceFromBottom < SCROLL_BOTTOM_THRESHOLD_PX;
+    stickToBottomRef.current = atBottom;
+    setIsAwayFromBottom(scrollable && !atBottom);
+    setTurnRailVisible(
+      scrollable &&
+      el.clientWidth >= TURN_RAIL_MIN_VIEWPORT_WIDTH_PX &&
+      turnNavigationItems.length >= TURN_RAIL_MIN_TURNS,
+    );
+
+    if (turnNavigationItems.length === 0) {
+      setActiveTurnId(null);
       return;
     }
 
-    // 发送新消息时强制回到底部并恢复自动跟随。
-    stickToBottomRef.current = true;
-    bottomAnchorRef.current?.scrollIntoView({ block: "end" });
-  }, [sendScrollRequestId]);
+    if (atBottom) {
+      setActiveTurnId(turnNavigationItems[turnNavigationItems.length - 1].id);
+      return;
+    }
 
-  // 切换会话时重置为贴底状态，避免上一会话的「已上滚」状态影响新会话。
-  useEffect(() => {
-    stickToBottomRef.current = true;
-  }, [sessionId]);
+    const viewportRect = el.getBoundingClientRect();
+    const readingLine = viewportRect.top + Math.min(el.clientHeight * 0.32, 180);
+    let nextActiveTurnId = turnNavigationItems[0].id;
 
-  // 用户滚动时判断是否贴底（距底 < 80px 视为贴底），决定是否继续自动跟随。
+    for (const item of turnNavigationItems) {
+      const turnElement = turnElementsRef.current.get(item.id);
+      if (!turnElement) continue;
+      if (turnElement.getBoundingClientRect().top <= readingLine) {
+        nextActiveTurnId = item.id;
+        continue;
+      }
+      break;
+    }
+
+    setActiveTurnId(nextActiveTurnId);
+  }, [turnNavigationItems]);
+
+  useLayoutEffect(() => {
+    updateConversationViewportRef.current = updateConversationViewport;
+  }, [updateConversationViewport]);
+
+  // 用户滚动时统一更新贴底状态、回底按钮和当前轮次。
   const handleMessagesScroll = useCallback(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-  }, []);
+    updateConversationViewport();
+  }, [updateConversationViewport]);
 
   // 流式输出 / 消息增长时，若仍处于贴底状态则跟随滚动到底部。
   const scrollToBottomIfStuck = useCallback(() => {
@@ -669,25 +738,73 @@ export function ConversationView({
     const el = scrollContainerRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
+    updateConversationViewportRef.current();
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    stickToBottomRef.current = true;
+    bottomAnchorRef.current?.scrollIntoView?.({ block: "end" });
+    el.scrollTop = el.scrollHeight;
+    setIsAwayFromBottom(false);
+    updateConversationViewportRef.current();
+  }, []);
+
+  const navigateToTurn = useCallback((turnId: string) => {
+    const turnElement = turnElementsRef.current.get(turnId);
+    if (!turnElement) return;
+    stickToBottomRef.current = false;
+    setIsAwayFromBottom(true);
+    setActiveTurnId(turnId);
+    turnElement.scrollIntoView({ block: "start" });
+    updateConversationViewport();
+  }, [updateConversationViewport]);
+
+  const setTurnElement = useCallback((turnId: string, element: HTMLElement | null) => {
+    if (element) {
+      turnElementsRef.current.set(turnId, element);
+      return;
+    }
+    turnElementsRef.current.delete(turnId);
   }, []);
 
   useEffect(() => {
+    if (sendScrollRequestId === 0) {
+      return;
+    }
+
+    // 发送新消息时强制回到底部并恢复自动跟随。
+    scrollToBottom();
+  }, [scrollToBottom, sendScrollRequestId]);
+
+  // 切换会话时重置为贴底状态，避免上一会话的「已上滚」状态影响新会话。
+  useEffect(() => {
+    stickToBottomRef.current = true;
+    setIsAwayFromBottom(false);
+  }, [sessionId]);
+
+  useLayoutEffect(() => {
     scrollToBottomIfStuck();
-  }, [messages, isStreaming, scrollToBottomIfStuck]);
+    updateConversationViewport();
+  }, [messages, isStreaming, scrollToBottomIfStuck, updateConversationViewport]);
 
   // 同一条 running 消息内部变高时（例如 write_file 持续追加 code preview），
   // messages 引用可能不变；观察消息栈尺寸，保持贴底状态继续跟随尾部。
   useEffect(() => {
     if (typeof ResizeObserver === "undefined") return;
+    const viewport = scrollContainerRef.current;
     const stack = messageStackRef.current;
-    if (!stack) return;
+    if (!viewport) return;
 
     const observer = new ResizeObserver(() => {
       scrollToBottomIfStuck();
+      updateConversationViewport();
     });
-    observer.observe(stack);
+    observer.observe(viewport);
+    if (stack) observer.observe(stack);
     return () => observer.disconnect();
-  }, [messages, isStreaming, scrollToBottomIfStuck]);
+  }, [messages, isStreaming, scrollToBottomIfStuck, updateConversationViewport]);
 
   useEffect(() => {
     if (!activeTranscriptMessage) return;
@@ -699,70 +816,86 @@ export function ConversationView({
 
   return (
     <main className={CONVERSATION_SHELL_CLASS}>
-      <section
-        ref={scrollContainerRef}
-        onScroll={handleMessagesScroll}
-        className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS}
-        aria-label="Conversation messages"
-      >
-        {isInitialComposer ? (
-          <div className={INITIAL_COMPOSER_STAGE_CLASS}>
-            <Composer
-              contextSnapshot={contextSnapshot}
-              isStreaming={isStreaming}
-              isAborting={isAborting}
-              onSend={onSend}
-              onAbort={onAbort}
-              surface="initial"
-              defaultModelId={defaultModelId}
-              selectedModelId={selectedModelId}
-              onSelectedModelChange={onSelectedModelChange}
-              mode={composerMode}
-              onModeChange={onComposerModeChange}
-              selectedSkills={selectedSkills}
-              onSelectedSkillsChange={onSelectedSkillsChange}
-              onExpandContext={openContextTab}
-              workspaceOptions={workspaceOptions}
-              selectedWorkspaceRoot={selectedWorkspaceRoot}
-              onSelectWorkspace={onSelectWorkspace}
-              models={models}
-            />
-          </div>
-        ) : (
-          <div ref={messageStackRef} className={MESSAGE_STACK_CLASS}>
-            {turns.map((turn, turnIndex) => (
-              <section className={MESSAGE_TURN_CLASS} key={turn.id}>
-                {turn.user ? (
-                  <div className={TURN_PROMPT_CLASS}>
-                    <UserMessage message={turn.user} />
-                  </div>
-                ) : null}
-                <div className={ASSISTANT_TURN_GROUP_CLASS}>
-                  <div className={TURN_BODY_CLASS}>
-                    {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, setActiveTranscriptMessage)}
-                  </div>
-                  {splitTurnMessages(turn.messages).finalReply.length > 0 ? (
-                    <TurnOutputArtifacts
-                      messages={turn.messages}
-                      sessionId={sessionId}
-                      workspaceRoot={selectedWorkspaceRoot}
-                    />
+      <div className={MESSAGE_VIEWPORT_CLASS}>
+        <section
+          ref={scrollContainerRef}
+          onScroll={handleMessagesScroll}
+          className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS}
+          aria-label="Conversation messages"
+        >
+          {isInitialComposer ? (
+            <div className={INITIAL_COMPOSER_STAGE_CLASS}>
+              <Composer
+                contextSnapshot={contextSnapshot}
+                isStreaming={isStreaming}
+                isAborting={isAborting}
+                onSend={onSend}
+                onAbort={onAbort}
+                surface="initial"
+                defaultModelId={defaultModelId}
+                selectedModelId={selectedModelId}
+                onSelectedModelChange={onSelectedModelChange}
+                mode={composerMode}
+                onModeChange={onComposerModeChange}
+                selectedSkills={selectedSkills}
+                onSelectedSkillsChange={onSelectedSkillsChange}
+                onExpandContext={openContextTab}
+                workspaceOptions={workspaceOptions}
+                selectedWorkspaceRoot={selectedWorkspaceRoot}
+                onSelectWorkspace={onSelectWorkspace}
+                models={models}
+              />
+            </div>
+          ) : (
+            <div ref={messageStackRef} className={MESSAGE_STACK_CLASS}>
+              {turns.map((turn, turnIndex) => (
+                <section
+                  className={MESSAGE_TURN_CLASS}
+                  key={turn.id}
+                  ref={turn.user ? (element) => setTurnElement(turn.id, element) : undefined}
+                  data-conversation-turn-id={turn.user ? turn.id : undefined}
+                >
+                  {turn.user ? (
+                    <div className={TURN_PROMPT_CLASS}>
+                      <UserMessage message={turn.user} />
+                    </div>
                   ) : null}
-                  <TurnActions
-                    sessionId={sessionId}
-                    assistantMessages={
-                      splitTurnMessages(turn.messages).finalReply.filter(
-                        (message): message is AssistantMessageBlock => message.kind === "assistant",
-                      )
-                    }
-                  />
-                </div>
-              </section>
-            ))}
-            <div ref={bottomAnchorRef} aria-hidden="true" />
-          </div>
-        )}
-      </section>
+                  <div className={ASSISTANT_TURN_GROUP_CLASS}>
+                    <div className={TURN_BODY_CLASS}>
+                      {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, setActiveTranscriptMessage)}
+                    </div>
+                    {splitTurnMessages(turn.messages).finalReply.length > 0 ? (
+                      <TurnOutputArtifacts
+                        messages={turn.messages}
+                        sessionId={sessionId}
+                        workspaceRoot={selectedWorkspaceRoot}
+                      />
+                    ) : null}
+                    <TurnActions
+                      sessionId={sessionId}
+                      assistantMessages={
+                        splitTurnMessages(turn.messages).finalReply.filter(
+                          (message): message is AssistantMessageBlock => message.kind === "assistant",
+                        )
+                      }
+                    />
+                  </div>
+                </section>
+              ))}
+              <div ref={bottomAnchorRef} aria-hidden="true" />
+            </div>
+          )}
+        </section>
+
+        {turnRailVisible ? (
+          <ConversationTurnRail
+            items={turnNavigationItems}
+            activeTurnId={activeTurnId}
+            onNavigate={navigateToTurn}
+          />
+        ) : null}
+        {isAwayFromBottom ? <ScrollToBottomButton onClick={scrollToBottom} /> : null}
+      </div>
 
       {isSessionReady && !isInitialComposer ? (
         <div className="composer-zone grid w-full gap-3 overflow-visible pb-5">
