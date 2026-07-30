@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
@@ -34,6 +34,45 @@ const messagesWithCompaction: MessageBlock[] = [
     trigger: "manual",
     summaryText: "Context compacted · 8 messages",
     createdAt: "2026-06-02T00:00:02.000Z",
+  },
+];
+
+const navigationMessages: MessageBlock[] = [
+  {
+    kind: "user",
+    id: "user-navigation-1",
+    content: "第一轮：分析需求",
+    createdAt: "2026-06-02T00:00:00.000Z",
+  },
+  {
+    kind: "assistant",
+    id: "assistant-navigation-1",
+    content: "第一轮回复：需求已经拆分完成。",
+    createdAt: "2026-06-02T00:00:01.000Z",
+  },
+  {
+    kind: "user",
+    id: "user-navigation-2",
+    content: "第二轮：开始实现",
+    createdAt: "2026-06-02T00:00:02.000Z",
+  },
+  {
+    kind: "assistant",
+    id: "assistant-navigation-2",
+    content: "第二轮回复：核心功能已经完成。",
+    createdAt: "2026-06-02T00:00:03.000Z",
+  },
+  {
+    kind: "user",
+    id: "user-navigation-3",
+    content: "第三轮：验证结果",
+    createdAt: "2026-06-02T00:00:04.000Z",
+  },
+  {
+    kind: "assistant",
+    id: "assistant-navigation-3",
+    content: "第三轮回复：所有检查均已通过。",
+    createdAt: "2026-06-02T00:00:05.000Z",
   },
 ];
 
@@ -128,6 +167,75 @@ describe("ConversationView tooltips", () => {
     const divider = screen.getByRole("separator", { name: "Context compacted · 8 messages" });
 
     expect(actionsButton.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows a turn rail for long conversations, previews the turn, and navigates to it", async () => {
+    const { container } = renderConversation(navigationMessages);
+    const viewport = screen.getByLabelText("Conversation messages");
+    Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1800 });
+    Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 500 });
+    Object.defineProperty(viewport, "clientWidth", { configurable: true, value: 900 });
+    Object.defineProperty(viewport, "scrollTop", { configurable: true, writable: true, value: 400 });
+
+    const turnElements = Array.from(container.querySelectorAll<HTMLElement>("[data-conversation-turn-id]"));
+    const turnTops = [-120, 100, 720];
+    turnElements.forEach((element, index) => {
+      element.getBoundingClientRect = vi.fn(() => ({
+        top: turnTops[index],
+        bottom: turnTops[index] + 200,
+        left: 0,
+        right: 800,
+        width: 800,
+        height: 200,
+        x: 0,
+        y: turnTops[index],
+        toJSON: () => ({}),
+      }));
+    });
+    const firstTurnScrollIntoView = vi.fn();
+    turnElements[0].scrollIntoView = firstTurnScrollIntoView;
+    fireEvent.scroll(viewport);
+
+    const rail = screen.getByRole("navigation", { name: "会话轮次导航" });
+    const firstMarker = within(rail).getByRole("button", { name: /第一轮：分析需求/ });
+    const secondMarker = within(rail).getByRole("button", { name: /第二轮：开始实现/ });
+    expect(secondMarker).toHaveAttribute("aria-current", "location");
+
+    const user = userEvent.setup();
+    await user.hover(firstMarker);
+    const preview = await screen.findByRole("tooltip");
+    expect(preview).toHaveTextContent("第一轮：分析需求");
+    expect(preview).toHaveTextContent("第一轮回复：需求已经拆分完成。");
+
+    await user.click(firstMarker);
+    expect(firstTurnScrollIntoView).toHaveBeenCalledWith({ block: "start" });
+  });
+
+  it("shows scroll-to-bottom only while away from the bottom and restores sticky following", async () => {
+    renderConversation(navigationMessages);
+    const viewport = screen.getByLabelText("Conversation messages");
+    Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1800 });
+    Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 500 });
+    Object.defineProperty(viewport, "clientWidth", { configurable: true, value: 900 });
+    Object.defineProperty(viewport, "scrollTop", { configurable: true, writable: true, value: 500 });
+    fireEvent.scroll(viewport);
+
+    const scrollButton = screen.getByRole("button", { name: "滚动到底部" });
+    const user = userEvent.setup();
+    await user.hover(scrollButton);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("滚动到底部");
+
+    await user.click(scrollButton);
+    expect(viewport.scrollTop).toBe(1800);
+    expect(screen.queryByRole("button", { name: "滚动到底部" })).not.toBeInTheDocument();
+
+    viewport.scrollTop = 300;
+    fireEvent.scroll(viewport);
+    expect(screen.getByRole("button", { name: "滚动到底部" })).toBeInTheDocument();
+
+    viewport.scrollTop = 1300;
+    fireEvent.scroll(viewport);
+    expect(screen.queryByRole("button", { name: "滚动到底部" })).not.toBeInTheDocument();
   });
 
   it("visualizes only the final reply and sends an explicit regenerate request", async () => {
