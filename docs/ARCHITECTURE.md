@@ -76,6 +76,7 @@ desktop --(file contract)--> plugins/fs-watch
 - `docs/design-docs/tool-system/agent-image-generation-tool.md`：图片生成工具的 provider/key 边界、`generate_image` 参数、会话产物、上下文控制和多图预览规范。
 - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的混合接入边界。
 - `docs/design-docs/frontend/README.md`：前端工作台设计文档入口。
+- `docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md`：右侧交互式 Terminal 的 Electron main / preload / renderer 边界、PTY 会话、输出背压、进程清理和 native 发布制品要求。
 - `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`：Kairos 自治模式设计——独立 prompt + 短期记忆、tick 调度、IPC 契约和页面规范。
 - `docs/design-docs/lab/README.md`：Lab 能力实验台设计入口，约束实验矩阵、实验生命周期、产物晋升和分版本构建路线。
 - `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档，不作为主线架构事实来源。

@@ -8,7 +8,7 @@
 
 ## 文档范围
 
-本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件渲染、Workspace 文件浏览、Context 完整只读视图、Reply 和 HTML 沙箱安全。Review / Diff 的数据来源、baseline 和无 Git 工作区策略见 `core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
+本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件渲染、Workspace 文件浏览、Context 完整只读视图、Reply 和 HTML 沙箱安全。Review / Diff 的数据来源、baseline 和无 Git 工作区策略见 `core-review-change-sources.md`。Terminal 在面板中的 Tab 语义由本文约束，PTY、会话生命周期、背压、进程清理与打包边界见 `front-右侧终端与会话生命周期规范.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
 
 ## 交互模型
 
@@ -27,9 +27,10 @@
 
 右侧面板没有打开对象时，不默认塞入 Kairos 或其它业务 Tab，而是展示一个参考 Cursor 空面板入口密度的对象启动页。启动页只借用“方块入口 + 大留白”的形式，入口名称与数量由 Actspace 当前真实对象决定。
 
-当前固定展示五个入口：
+当前固定展示六个入口：
 
 - `Files`：进入 Workspace 文件浏览态，不新增对象 Tab。
+- `Terminal`：创建或聚焦绑定当前会话 workspace / worktree 的交互式 shell；详见 `front-右侧终端与会话生命周期规范.md`。
 - `Review`：打开当前 workspace 的 Git `Uncommitted` Review Tab。
 - `Context`：打开主 Agent 当前会话的完整只读上下文 Tab。
 - `Kairos`：打开聊天态 Kairos 紧凑状态 Tab。
@@ -37,8 +38,8 @@
 
 布局与状态规则：
 
-- 默认宽度下使用两列：前四项组成 `2 × 2`，第五项 `Reply` 保持同尺寸并在第三行居中。
-- 卡片使用中性 surface、语义边框和统一 Lucide 线性图标；当前状态使用中性 selected 层级，focus-visible 使用高对比主题 token，颜色只承担语义状态或数据可视化，不把五个入口做成五种彩色功能卡。
+- 默认宽度下使用 `2 × 3`：`Files / Terminal`、`Review / Context`、`Kairos / Reply`。
+- 卡片使用中性 surface、语义边框和统一 Lucide 线性图标；当前状态使用中性 selected 层级，focus-visible 使用高对比主题 token，颜色只承担语义状态或数据可视化，不把六个入口做成六种彩色功能卡。
 - 关闭最后一个对象 Tab 后回到启动页；折叠面板时若仍有已打开对象，重新展开继续恢复原 Tab。
 - 启动页和右上角 `+` 菜单打开的是同一组对象语义，不能出现名称或行为漂移。
 - 启动页入口必须是键盘可达的原生按钮，具备明确 hover、pressed、focus-visible 和 disabled 状态。
@@ -65,11 +66,12 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `Kairos`：聊天态右侧紧凑状态视图；具体布局和数据边界见 `docs/design-docs/kairos/front-Kairos监控页规范.md`。
 - `Context`：完整只读上下文视图；见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`。
 - `Reply`：当前会话已生成的可视化回复浏览器（见下文）；内部当前由 HTML 产物承载。
+- `Terminal`：用户交互式 shell；Tab 只保存 terminalId / sessionId / title，不保存 PTY、xterm 实例或输出缓冲。
 
 ## 「+ 新建对象」菜单（2026-05-30，2026-06-04 补 Review）
 
 - 隐藏标题栏 chrome 右段、右侧折叠（PanelRight）按钮**左侧**放一个 `+` 按钮（参考 Cursor 顶栏的 +）。
-- 点开是一个轻量菜单，可往右侧面板新增对象：`工作区文件` / `Review` / `Reply` / `Kairos` / `Context`。对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；`工作区文件` 只切换工作区浏览态，不新增 Tab。
+- 点开是一个轻量菜单，可往右侧面板新增对象：`工作区文件` / `Terminal` / `Review` / `Reply` / `Kairos` / `Context`。非 Terminal 对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；Terminal 底层允许每会话多实例，标题按创建顺序区分。`工作区文件` 只切换工作区浏览态，不新增 Tab。
 - `Review` 入口复用 Composer 的 Review 打开逻辑，默认打开当前 workspace 的 Git `Uncommitted` scope。
 - 菜单与右侧折叠按钮同属 chrome-right，`-webkit-app-region: no-drag`；Kairos 全屏页下与右侧折叠按钮一起隐藏。
 - **`+` 仅在右侧面板打开时显示**（`view === "chat" && isRightPanelOpen`）：`+` 的语义是「往面板里加对象」，面板关着时无意义；面板关闭时 chrome-right 只保留 PanelRight 折叠按钮。

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -14,6 +14,10 @@ import { emptyKairosUsageSummary } from "@actspace/shared";
 import { RightPanel } from "../components/RightPanel";
 import { RightPanelProvider, type RightPanelTab } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
+
+vi.mock("../components/right-panel/TerminalRenderView", () => ({
+  TerminalRenderView: ({ shellName }: { shellName: string }) => <div aria-label="mock terminal">{shellName}</div>,
+}));
 
 function renderPanel({
   sessionId = null,
@@ -31,6 +35,28 @@ function renderPanel({
       </RightPanelProvider>
     </TooltipProvider>,
   );
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise; });
+  return { promise, resolve };
+}
+
+function terminalCreateSuccess(id = "terminal-1") {
+  return {
+    ok: true as const,
+    terminal: {
+      id,
+      sessionId: "session-terminal",
+      title: "Terminal 1",
+      shellName: "zsh",
+      status: "running" as const,
+      cols: 80,
+      rows: 24,
+      createdAt: "2026-07-30T08:00:00.000Z",
+    },
+  };
 }
 
 type FakeKairosOptions = Partial<{
@@ -117,6 +143,10 @@ function makeEvent(overrides: Partial<SessionEvent> & { type: SessionEvent["type
 
 beforeEach(() => {
   delete (window as unknown as { kairos?: KairosBridgeApi }).kairos;
+  (window as unknown as { actspace?: Window["actspace"] }).actspace ??= {} as Window["actspace"];
+  delete window.actspace.createTerminal;
+  delete window.actspace.closeTerminal;
+  delete window.actspace.listTerminals;
 });
 
 describe("RightPanel Kairos tab", () => {
@@ -142,15 +172,16 @@ describe("RightPanel Kairos tab", () => {
     expect(inactiveTab).toHaveClass("hover:bg-hover-overlay", "hover:text-text-main");
   });
 
-  it("shows five launcher objects and returns to the launcher after closing the only tab", async () => {
+  it("shows six launcher objects and returns to the launcher after closing the only tab", async () => {
     const user = userEvent.setup();
     const onOpenReview = vi.fn();
     renderPanel({ sessionId: "session-launcher", onOpenReview });
 
     const launcher = screen.getByRole("navigation", { name: "右侧面板对象" });
-    expect(within(launcher).getAllByRole("button")).toHaveLength(5);
+    expect(within(launcher).getAllByRole("button")).toHaveLength(6);
     expect(within(launcher).getByRole("button", { name: "Files" })).toBeInTheDocument();
     expect(within(launcher).getByRole("button", { name: "Review" })).toBeInTheDocument();
+    expect(within(launcher).getByRole("button", { name: "Terminal" })).toBeEnabled();
     expect(within(launcher).getByRole("button", { name: "Context" })).toBeInTheDocument();
     expect(within(launcher).getByRole("button", { name: "Kairos" })).toBeInTheDocument();
     expect(within(launcher).getByRole("button", { name: "Reply" })).toBeInTheDocument();
@@ -162,6 +193,92 @@ describe("RightPanel Kairos tab", () => {
     expect(screen.getByLabelText("Kairos 右侧紧凑视图")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "关闭 Kairos" }));
     expect(screen.getByRole("navigation", { name: "右侧面板对象" })).toBeInTheDocument();
+  });
+
+  it("creates a session-bound terminal tab and closes its backend resource", async () => {
+    const user = userEvent.setup();
+    const createTerminal = vi.fn(async () => terminalCreateSuccess());
+    const closeTerminal = vi.fn(async () => ({ ok: true as const }));
+    window.actspace.createTerminal = createTerminal;
+    window.actspace.closeTerminal = closeTerminal;
+    renderPanel({ sessionId: "session-terminal" });
+
+    await user.click(screen.getByRole("button", { name: "Terminal" }));
+    expect(createTerminal).toHaveBeenCalledWith({ sessionId: "session-terminal", cols: 80, rows: 24 });
+    expect(await screen.findByRole("tab", { name: "Terminal 1" })).toBeInTheDocument();
+    expect(await screen.findByLabelText("mock terminal")).toHaveTextContent("zsh");
+
+    await user.click(screen.getByRole("button", { name: "关闭 Terminal 1" }));
+    expect(closeTerminal).toHaveBeenCalledWith({ terminalId: "terminal-1" });
+  });
+
+  it("shows one starting tab while the terminal backend and renderer module initialize", async () => {
+    const user = userEvent.setup();
+    const creation = deferred<ReturnType<typeof terminalCreateSuccess>>();
+    window.actspace.createTerminal = vi.fn(() => creation.promise);
+    window.actspace.closeTerminal = vi.fn(async () => ({ ok: true as const }));
+    renderPanel({ sessionId: "session-terminal" });
+
+    await user.click(screen.getByRole("button", { name: "Terminal" }));
+    expect(screen.getByRole("tab", { name: "Starting…" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Terminal 正在启动")).toBeInTheDocument();
+
+    creation.resolve(terminalCreateSuccess());
+    expect(await screen.findByRole("tab", { name: "Terminal 1" })).toBeInTheDocument();
+    expect(screen.getByLabelText("mock terminal")).toHaveTextContent("zsh");
+  });
+
+  it("shows closing feedback until the terminal process tree has been cleaned", async () => {
+    const user = userEvent.setup();
+    const closing = deferred<{ ok: true }>();
+    window.actspace.createTerminal = vi.fn(async () => terminalCreateSuccess());
+    window.actspace.closeTerminal = vi.fn(() => closing.promise);
+    renderPanel({ sessionId: "session-terminal" });
+
+    await user.click(screen.getByRole("button", { name: "Terminal" }));
+    await screen.findByRole("tab", { name: "Terminal 1" });
+    await user.click(screen.getByRole("button", { name: "关闭 Terminal 1" }));
+
+    expect(screen.getByRole("tab", { name: "Closing…" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "正在关闭 Terminal 1" })).toBeDisabled();
+
+    closing.resolve({ ok: true });
+    await waitFor(() => expect(screen.queryByRole("tab", { name: "Closing…" })).not.toBeInTheDocument());
+  });
+
+  it("closes a backend that finishes starting after its pending tab was dismissed", async () => {
+    const user = userEvent.setup();
+    const creation = deferred<ReturnType<typeof terminalCreateSuccess>>();
+    const closeTerminal = vi.fn(async () => ({ ok: true as const }));
+    window.actspace.createTerminal = vi.fn(() => creation.promise);
+    window.actspace.closeTerminal = closeTerminal;
+    renderPanel({ sessionId: "session-terminal" });
+
+    await user.click(screen.getByRole("button", { name: "Terminal" }));
+    await user.click(screen.getByRole("button", { name: "关闭 Terminal" }));
+    expect(screen.getByRole("navigation", { name: "右侧面板对象" })).toBeInTheDocument();
+
+    creation.resolve(terminalCreateSuccess("terminal-cancelled"));
+    await waitFor(() => expect(closeTerminal).toHaveBeenCalledWith({ terminalId: "terminal-cancelled" }));
+    expect(screen.queryByRole("tab", { name: "Terminal 1" })).not.toBeInTheDocument();
+  });
+
+  it("restores in-memory terminal tabs after the renderer remounts", async () => {
+    window.actspace.listTerminals = vi.fn(async () => ({
+      terminals: [{
+        id: "terminal-restored",
+        sessionId: "session-restored",
+        title: "Terminal 2",
+        shellName: "zsh",
+        status: "running" as const,
+        cols: 100,
+        rows: 30,
+        createdAt: "2026-07-30T08:00:00.000Z",
+      }],
+    }));
+    renderPanel({ sessionId: "session-restored" });
+    expect(await screen.findByRole("tab", { name: "Terminal 2" })).toBeInTheDocument();
+    expect(window.actspace.listTerminals).toHaveBeenCalledWith({ sessionId: "session-restored" });
   });
 
   it("shows a compact unavailable state when the Kairos bridge is missing", async () => {

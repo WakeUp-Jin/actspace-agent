@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import type { WorkspaceDirEntry } from "@actspace/shared";
+import type { TerminalSessionSnapshot, WorkspaceDirEntry } from "@actspace/shared";
 
 /**
  * 右侧面板的 Tab 模型。`id` 同时是去重 key：用稳定 id（如 `context`、`html:<turnId>`、
@@ -31,6 +31,9 @@ export type RightPanelTab = { id: string } & (
   | { kind: "kairos"; title: string }
   | { kind: "review"; title: string; workspaceRoot?: string; scope: "uncommitted"; refreshKey?: number }
   | { kind: "replyHtml"; title: string; sessionId: string | null }
+  | { kind: "terminalStarting"; title: string; requestId: string; sessionId: string }
+  | { kind: "terminalError"; title: string; sessionId: string; message: string }
+  | { kind: "terminal"; title: string; terminalId: string; sessionId: string; shellName: string }
 );
 
 export type RightPanelTabKind = RightPanelTab["kind"];
@@ -115,6 +118,7 @@ type RightPanelContextValue = {
    */
   isSourceShown: (tabId: string) => boolean;
   setSourceShown: (tabId: string, shown: boolean) => void;
+  syncTerminalTabs: (sessionId: string, terminals: TerminalSessionSnapshot[]) => void;
 };
 
 const RightPanelStateContext = createContext<RightPanelContextValue | null>(null);
@@ -293,6 +297,28 @@ export function RightPanelProvider({
     });
   }, []);
 
+  const syncTerminalTabs = useCallback((sessionId: string, terminals: TerminalSessionSnapshot[]) => {
+    setTabs((current) => {
+      const existingByTerminalId = new Map(
+        current.flatMap((tab) => tab.kind === "terminal" ? [[tab.terminalId, tab] as const] : []),
+      );
+      const visibleTerminalTabs: RightPanelTab[] = terminals.map((terminal) => {
+        const existing = existingByTerminalId.get(terminal.id);
+        return existing ?? {
+          id: `terminal:${terminal.id}`,
+          kind: "terminal",
+          title: terminal.title,
+          terminalId: terminal.id,
+          sessionId,
+          shellName: terminal.shellName,
+        };
+      });
+      const next = [...current.filter((tab) => tab.kind !== "terminal"), ...visibleTerminalTabs];
+      setActiveTabId((activeId) => activeId && next.some((tab) => tab.id === activeId) ? activeId : null);
+      return next;
+    });
+  }, []);
+
   const value = useMemo<RightPanelContextValue>(() => {
     const active = tabs.find((tab) => tab.id === activeTabId) ?? null;
     return {
@@ -323,6 +349,7 @@ export function RightPanelProvider({
       syncFileTreeRoot,
       isSourceShown,
       setSourceShown,
+      syncTerminalTabs,
     };
   }, [
     isOpen,
@@ -351,6 +378,7 @@ export function RightPanelProvider({
     syncFileTreeRoot,
     isSourceShown,
     setSourceShown,
+    syncTerminalTabs,
   ]);
 
   return <RightPanelStateContext.Provider value={value}>{children}</RightPanelStateContext.Provider>;

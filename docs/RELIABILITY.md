@@ -43,7 +43,8 @@
 
 - 根目录 `logs/` 只存本机运行日志，不提交到 Git。
 - `pnpm dev:log` 会保留最近约 2 天的 `*.log`，并自动清理更旧文件。
-- 终端日志通过 `pnpm dev 2>&1 | tee -a <log-file>` 写入文件：`2>&1` 合并错误输出，`tee` 同时显示到终端和写入日志。
+- `pnpm dev` 与 `pnpm dev:log` 统一由 `scripts/desktop-dev.mjs` 管理开发进程。监督器为每个受管阶段创建独立进程组，收到 SIGINT / SIGTERM 时把信号转发给整个子进程树，4 秒后仍未退出才升级为 SIGKILL；受管根命令因端口冲突或构建错误自行退出时，也会再次收割残留进程组，避免 Vite、tsc、Electron、`wait-on` 或它们的后代成为孤儿进程。
+- `pnpm dev:log` 不再使用 shell pipeline + `tee`；监督器直接复制子进程 stdout / stderr 到当前终端和 `logs/dev-*.log`，同时更新 `logs/latest-dev.log`。这样日志复制不会改变 Ctrl+C 的所有权和传播路径。
 - Agent 排查启动、构建、Electron 或 provider 问题时，优先读取 `logs/latest-dev.log`。
 - Agent 排查安装版启动问题时，优先读取 `~/Library/Application Support/actspace/logs/main-startup.log`。该日志由 main 进程直接写入，包含 app path 配置、数据目录初始化、窗口创建、renderer 加载成功/失败、renderer console、renderer 进程退出和 main 进程未捕获异常。
 - 排查本地更新时，优先读取设置页显示的 `<userData>/tmp/local-update/status.json` 和 `update.log`；这些文件由外部 helper 写入，替换阶段可能发生在主 app 退出之后。

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Bot,
   ChevronDown,
@@ -6,12 +6,14 @@ import {
   Eye,
   FolderTree,
   GitBranch,
+  Loader2,
   MessageSquare,
+  SquareTerminal,
   TriangleAlert,
   X,
 } from "lucide-react";
 import { WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES } from "@actspace/shared";
-import type { ContextState } from "@actspace/shared";
+import type { ContextState, TerminalSessionSnapshot } from "@actspace/shared";
 import { CodeRenderView } from "./right-panel/CodeRenderView";
 import { ContextRenderView } from "./right-panel/ContextRenderView";
 import { CsvRenderView } from "./right-panel/CsvRenderView";
@@ -30,6 +32,8 @@ import {
   type WorkspaceFileMeta,
 } from "./right-panel/RightPanelContext";
 import { useFileFreshness, useReloadFileTab } from "./right-panel/useFileFreshness";
+import { cancelTerminalStart, useOpenTerminal } from "./right-panel/useOpenTerminal";
+import { LazyTerminalRenderView, preloadTerminalRenderView } from "./right-panel/terminal-render-loader";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 const RIGHT_PANEL_CLASS = "flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l border-line bg-surface";
@@ -89,8 +93,6 @@ const RIGHT_PANEL_LAUNCHER_CLASS =
 const RIGHT_PANEL_LAUNCHER_GRID_CLASS = "grid w-full max-w-[300px] grid-cols-2 gap-3";
 const RIGHT_PANEL_LAUNCHER_BUTTON_CLASS =
   "group flex h-[108px] min-w-0 flex-col items-center justify-center gap-3 rounded-act-lg border border-line bg-surface px-3 text-[13px] font-medium text-text-muted transition-[background-color,border-color,color,transform] duration-150 hover:border-line-strong hover:bg-surface-subtle hover:text-text-main active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-app-bg disabled:opacity-45 disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-text-muted [cursor:pointer] disabled:[cursor:not-allowed]";
-const RIGHT_PANEL_LAUNCHER_LAST_BUTTON_CLASS =
-  "col-span-2 w-[calc(50%_-_6px)] justify-self-center";
 const RIGHT_PANEL_LAUNCHER_ICON_CLASS =
   "text-text-faint transition-colors duration-150 group-hover:text-text-muted group-focus-visible:text-text-main";
 
@@ -110,8 +112,21 @@ export function RightPanel({
   onOpenReview?: () => void;
   onReviewChanged?: () => void;
 }) {
-  const { activeTab, isFileTreeOpen, isFileTreeCollapsed } = useRightPanel();
+  const { activeTab, isFileTreeOpen, isFileTreeCollapsed, syncTerminalTabs } = useRightPanel();
   useFileFreshness({ workspaceRoot, revalidateKey: fileRevalidateKey });
+
+  useEffect(() => {
+    const listTerminals = window.actspace?.listTerminals;
+    if (!sessionId || !listTerminals) {
+      if (!sessionId) syncTerminalTabs("", []);
+      return;
+    }
+    let cancelled = false;
+    void listTerminals({ sessionId }).then((result) => {
+      if (!cancelled) syncTerminalTabs(sessionId, result.terminals);
+    });
+    return () => { cancelled = true; };
+  }, [sessionId, syncTerminalTabs]);
 
   // 呈现由「当前 Tab」决定：
   // - 工作区文件 Tab → 进入 shell（树 + 文件预览区），多个文件 Tab 间切换只换 shell 内的内容；
@@ -283,6 +298,53 @@ function RightPanelTabs() {
   const anchorRef = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [closeErrors, setCloseErrors] = useState<Record<string, string>>({});
+  const [closingTabIds, setClosingTabIds] = useState<Set<string>>(() => new Set());
+
+  const closeRightTab = async (tab: RightPanelTab) => {
+    if (closingTabIds.has(tab.id)) return;
+    if (tab.kind === "terminalStarting") {
+      cancelTerminalStart(tab.requestId);
+    }
+    if (tab.kind === "terminal") {
+      setClosingTabIds((current) => new Set(current).add(tab.id));
+      try {
+        const result = await window.actspace.closeTerminal?.({ terminalId: tab.terminalId });
+        if (result?.ok === false) {
+          setCloseErrors((current) => ({ ...current, [tab.id]: result.error.message }));
+          setClosingTabIds((current) => {
+            const next = new Set(current);
+            next.delete(tab.id);
+            return next;
+          });
+          return;
+        }
+      } catch (error) {
+        setCloseErrors((current) => ({
+          ...current,
+          [tab.id]: error instanceof Error ? error.message : String(error),
+        }));
+        setClosingTabIds((current) => {
+          const next = new Set(current);
+          next.delete(tab.id);
+          return next;
+        });
+        return;
+      }
+    }
+    setCloseErrors((current) => {
+      const next = { ...current };
+      delete next[tab.id];
+      return next;
+    });
+    setClosingTabIds((current) => {
+      if (!current.has(tab.id)) return current;
+      const next = new Set(current);
+      next.delete(tab.id);
+      return next;
+    });
+    closeTab(tab.id);
+  };
 
   // 检测横向溢出：scrollWidth > clientWidth 时显示溢出下拉按钮。
   useEffect(() => {
@@ -336,6 +398,8 @@ function RightPanelTabs() {
         ) : null}
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
+          const isClosing = closingTabIds.has(tab.id);
+          const tabLabel = isClosing ? "Closing…" : tab.kind === "terminalStarting" ? "Starting…" : tab.title;
           return (
             <span
               key={tab.id}
@@ -347,23 +411,24 @@ function RightPanelTabs() {
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                title={tab.title}
+                title={tabLabel}
                 onClick={() => setActiveTab(tab.id)}
               >
-                {tab.title}
+                {tabLabel}
               </button>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    className={RIGHT_TAB_CLOSE_CLASS}
+                    className={`${RIGHT_TAB_CLOSE_CLASS} ${isClosing ? "opacity-100" : ""}`}
                     type="button"
-                    aria-label={`关闭 ${tab.title}`}
-                    onClick={() => closeTab(tab.id)}
+                    aria-label={isClosing ? `正在关闭 ${tab.title}` : `关闭 ${tab.title}`}
+                    disabled={isClosing}
+                    onClick={() => void closeRightTab(tab)}
                   >
-                    <X size={12} strokeWidth={2.2} aria-hidden="true" />
+                    {isClosing ? <Loader2 size={12} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <X size={12} strokeWidth={2.2} aria-hidden="true" />}
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>关闭 {tab.title}</TooltipContent>
+                <TooltipContent>{closeErrors[tab.id] ?? (isClosing ? "正在关闭…" : `关闭 ${tab.title}`)}</TooltipContent>
               </Tooltip>
             </span>
           );
@@ -386,6 +451,8 @@ function RightPanelTabs() {
             <div className={RIGHT_TAB_MENU_CLASS} role="menu">
               {tabs.map((tab) => {
                 const isActive = tab.id === activeTabId;
+                const isClosing = closingTabIds.has(tab.id);
+                const tabLabel = isClosing ? "Closing…" : tab.kind === "terminalStarting" ? "Starting…" : tab.title;
                 return (
                   <div
                     key={tab.id}
@@ -405,19 +472,20 @@ function RightPanelTabs() {
                       }
                     }}
                   >
-                    <span className={RIGHT_TAB_MENU_LABEL_CLASS} title={tab.title}>
-                      {tab.title}
+                    <span className={RIGHT_TAB_MENU_LABEL_CLASS} title={tabLabel}>
+                      {tabLabel}
                     </span>
                     <button
                       type="button"
                       className={RIGHT_TAB_MENU_CLOSE_CLASS}
-                      aria-label={`关闭 ${tab.title}`}
+                      aria-label={isClosing ? `正在关闭 ${tab.title}` : `关闭 ${tab.title}`}
+                      disabled={isClosing}
                       onClick={(event) => {
                         event.stopPropagation();
-                        closeTab(tab.id);
+                        void closeRightTab(tab);
                       }}
                     >
-                      <X size={12} strokeWidth={2.2} />
+                      {isClosing ? <Loader2 size={12} className="animate-spin motion-reduce:animate-none" /> : <X size={12} strokeWidth={2.2} />}
                     </button>
                   </div>
                 );
@@ -443,6 +511,7 @@ function RightPanelBody({
   onOpenReview?: () => void;
   onReviewChanged?: () => void;
 }) {
+  const { openTab } = useRightPanel();
   if (!tab) {
     return <RightPanelLauncher sessionId={sessionId ?? null} onOpenReview={onOpenReview} />;
   }
@@ -463,6 +532,32 @@ function RightPanelBody({
         onReviewChanged={onReviewChanged}
       />
     );
+  }
+
+  if (tab.kind === "terminal") {
+    return (
+      <Suspense fallback={<div className={RIGHT_PANEL_BODY_CLASS}>正在加载终端…</div>}>
+        <LazyTerminalRenderView
+          terminalId={tab.terminalId}
+          sessionId={tab.sessionId}
+          shellName={tab.shellName}
+          onRestart={(terminal: TerminalSessionSnapshot) => openTab({
+            ...tab,
+            title: terminal.title,
+            terminalId: terminal.id,
+            shellName: terminal.shellName,
+          })}
+        />
+      </Suspense>
+    );
+  }
+
+  if (tab.kind === "terminalStarting") {
+    return <TerminalStartingView />;
+  }
+
+  if (tab.kind === "terminalError") {
+    return <TerminalErrorView message={tab.message} />;
   }
 
   if (tab.kind === "html") {
@@ -530,6 +625,7 @@ function RightPanelLauncher({
   onOpenReview?: () => void;
 }) {
   const { openFileTree, openTab } = useRightPanel();
+  const { openTerminal, creatingTerminal } = useOpenTerminal(sessionId);
 
   return (
     <nav className={RIGHT_PANEL_LAUNCHER_CLASS} aria-label="右侧面板对象">
@@ -552,10 +648,17 @@ function RightPanelLauncher({
           onClick={() => openTab({ id: "kairos", kind: "kairos", title: "Kairos" })}
         />
         <LauncherButton
+          label={creatingTerminal ? "Starting…" : "Terminal"}
+          icon={<SquareTerminal size={19} strokeWidth={1.7} />}
+          onClick={() => void openTerminal()}
+          onPointerEnter={() => void preloadTerminalRenderView()}
+          onFocus={() => void preloadTerminalRenderView()}
+          disabled={!sessionId || creatingTerminal}
+        />
+        <LauncherButton
           label="Reply"
           icon={<MessageSquare size={19} strokeWidth={1.7} />}
           onClick={() => openTab({ id: "reply", kind: "replyHtml", title: "Reply", sessionId })}
-          centered
         />
       </div>
     </nav>
@@ -566,21 +669,25 @@ function LauncherButton({
   label,
   icon,
   onClick,
-  centered = false,
+  onPointerEnter,
+  onFocus,
   disabled = false,
 }: {
   label: string;
   icon: ReactNode;
   onClick?: () => void;
-  centered?: boolean;
+  onPointerEnter?: () => void;
+  onFocus?: () => void;
   disabled?: boolean;
 }) {
   return (
     <button
       type="button"
-      className={`${RIGHT_PANEL_LAUNCHER_BUTTON_CLASS} ${centered ? RIGHT_PANEL_LAUNCHER_LAST_BUTTON_CLASS : ""}`}
+      className={RIGHT_PANEL_LAUNCHER_BUTTON_CLASS}
       disabled={disabled}
       onClick={onClick}
+      onPointerEnter={onPointerEnter}
+      onFocus={onFocus}
     >
       <span className={RIGHT_PANEL_LAUNCHER_ICON_CLASS} aria-hidden="true">
         {icon}
@@ -590,6 +697,30 @@ function LauncherButton({
   );
 }
 
+function TerminalStartingView() {
+  return (
+    <section className="grid min-h-0 flex-1 place-items-center bg-surface px-6" aria-label="Terminal 正在启动">
+      <div className="flex max-w-[260px] flex-col items-center text-center">
+        <span className="mb-4 inline-flex h-9 w-9 items-center justify-center rounded-act-md border border-line bg-surface-subtle text-text-muted">
+          <Loader2 size={17} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        </span>
+        <h2 className="m-0 text-[13px] font-semibold text-text-main">正在启动 Terminal</h2>
+        <p className="mb-0 mt-1.5 text-[11px] leading-relaxed text-text-faint">正在读取本机 Shell 环境并连接当前工作区。</p>
+      </div>
+    </section>
+  );
+}
+
+function TerminalErrorView({ message }: { message: string }) {
+  return (
+    <section className="grid min-h-0 flex-1 place-items-center bg-surface px-6" aria-label="Terminal 启动失败">
+      <div className="max-w-[280px] rounded-act-md border border-line bg-surface-subtle px-4 py-3">
+        <h2 className="m-0 text-[13px] font-semibold text-text-main">Terminal 启动失败</h2>
+        <p className="mb-0 mt-1.5 text-[11px] leading-relaxed text-text-muted" role="alert">{message}</p>
+      </div>
+    </section>
+  );
+}
 // 路径已统一移到工作区操作栏（②），各文件视图不再自带 path 工具条，避免相邻两行重复同一路径。
 function ImageRenderView({ src, relativePath }: { src: string; relativePath?: string }) {
   return (

@@ -124,6 +124,33 @@ declare global {
       archiveSessions?: (
         input: import("@actspace/shared").SessionArchiveManyInput
       ) => Promise<import("@actspace/shared").SessionArchiveManyResult>;
+      createTerminal?: (
+        input: import("@actspace/shared").TerminalCreateInput
+      ) => Promise<import("@actspace/shared").TerminalSessionResult>;
+      listTerminals?: (
+        input: import("@actspace/shared").TerminalListInput
+      ) => Promise<import("@actspace/shared").TerminalListResult>;
+      attachTerminal?: (
+        input: import("@actspace/shared").TerminalAttachInput
+      ) => Promise<import("@actspace/shared").TerminalSessionResult>;
+      detachTerminal?: (
+        input: import("@actspace/shared").TerminalDetachInput
+      ) => Promise<import("@actspace/shared").TerminalOperationResult>;
+      writeTerminal?: (
+        input: import("@actspace/shared").TerminalWriteInput
+      ) => Promise<import("@actspace/shared").TerminalOperationResult>;
+      resizeTerminal?: (
+        input: import("@actspace/shared").TerminalResizeInput
+      ) => Promise<import("@actspace/shared").TerminalOperationResult>;
+      ackTerminal?: (
+        input: import("@actspace/shared").TerminalAckInput
+      ) => Promise<import("@actspace/shared").TerminalOperationResult>;
+      closeTerminal?: (
+        input: import("@actspace/shared").TerminalCloseInput
+      ) => Promise<import("@actspace/shared").TerminalOperationResult>;
+      onTerminalEvent?: (
+        callback: (event: import("@actspace/shared").TerminalEvent) => void
+      ) => () => void;
       onAgentStream: (
         callback: (event: import("@actspace/shared").RuntimeStreamEvent) => void
       ) => () => void;

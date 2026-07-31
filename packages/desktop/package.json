@@ -10,7 +10,7 @@
     "dist-electron"
   ],
   "scripts": {
-    "dev": "pnpm run build:deps && concurrently -k \"pnpm:dev:shared\" \"pnpm:dev:agent-core\" \"pnpm:dev:renderer\" \"pnpm:dev:electron:build\" \"pnpm:dev:electron:run\"",
+    "dev": "node ../../scripts/desktop-dev.mjs",
     "dev:shared": "pnpm --filter @actspace/shared dev",
     "dev:agent-core": "pnpm --filter @actspace/agent-core dev",
     "dev:renderer": "vite",
@@ -21,6 +21,9 @@
     "build": "pnpm run clean && pnpm run build:deps && pnpm build:renderer && pnpm build:electron",
     "build:renderer": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
+    "native:prepare": "node ../../scripts/terminal-native-spike/prepare-node-pty.mjs",
+    "native:spike": "pnpm native:prepare && node ../../scripts/terminal-native-spike/run-spike.mjs",
+    "native:spike:package": "pnpm native:prepare && node ../../scripts/terminal-native-spike/package-spike.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
     "test": "vitest run"
   },
@@ -28,8 +31,11 @@
     "@actspace/agent-core": "workspace:*",
     "@actspace/shared": "workspace:*",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
     "highlight.js": "^11.11.1",
     "lucide-react": "^1.16.0",
+    "node-pty": "1.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",

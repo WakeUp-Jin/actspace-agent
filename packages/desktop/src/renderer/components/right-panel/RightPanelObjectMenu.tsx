@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Eye, FolderTree, GitBranch, MessageSquare, Plus } from "lucide-react";
+import { Bot, Eye, FolderTree, GitBranch, MessageSquare, Plus, SquareTerminal } from "lucide-react";
 import { useRightPanel } from "./RightPanelContext";
+import { useOpenTerminal } from "./useOpenTerminal";
+import { preloadTerminalRenderView } from "./terminal-render-loader";
 
 /**
  * 右侧面板「+ 新建对象」菜单（参考 Cursor 顶栏的 +）。
@@ -26,6 +28,7 @@ export function RightPanelObjectMenu({
   onOpenReview?: () => void;
 }) {
   const { openFileTree, openTab } = useRightPanel();
+  const { openTerminal, creatingTerminal } = useOpenTerminal(sessionId);
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
 
@@ -91,6 +94,21 @@ export function RightPanelObjectMenu({
               Review
             </button>
           ) : null}
+          <button
+            type="button"
+            role="menuitem"
+            className={`${MENU_ITEM_CLASS} disabled:opacity-45 disabled:[cursor:not-allowed]`}
+            disabled={!sessionId || creatingTerminal}
+            onPointerEnter={() => void preloadTerminalRenderView()}
+            onFocus={() => void preloadTerminalRenderView()}
+            onClick={() => {
+              setOpen(false);
+              void openTerminal();
+            }}
+          >
+            <SquareTerminal size={15} strokeWidth={2} />
+            {creatingTerminal ? "正在启动…" : "Terminal"}
+          </button>
           <button
             type="button"
             role="menuitem"
