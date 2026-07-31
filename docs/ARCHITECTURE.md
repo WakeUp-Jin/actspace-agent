@@ -63,6 +63,7 @@ desktop --(file contract)--> plugins/fs-watch
 - `docs/design-docs/agent-runtime/agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块清单，包括 LLM、prompt、tools、context、engine、persistence、observability、env 和兼容层。
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`：已落地的多供应商 LLM 架构，统一 DeepSeek / Kimi / OpenRouter / DuckCoding 的服务商连接、模型目录、服务商级代理、协议服务和任务模型选择；DuckCoding 多 Key、本地 Codex/Grok 档案、Codex Responses 与名称变体详见同目录专题，真实 provider 场景待用户统一手动验收。
 - `docs/design-docs/core-storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
+- `docs/design-docs/core-review-change-sources.md`：Git-first Review Workbench 总规范，定义六种 scope、upstream Branch、结构化 diff、Review Options、Git mutation 和右侧 Tab 边界。
 - `docs/design-docs/agent-runtime/agent-backend-design.md`：后端 Agent Runtime 的长期设计事实来源，解释为什么采用这些模块边界。
 - `docs/design-docs/collaboration/agent-members.md`：跨 Room 持久 Agent Member 的身份、配置版本、Activity、设置页与 Room 私有上下文边界。
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：token usage、成本统计、context snapshot 与 context state 的数据分层设计。

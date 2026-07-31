@@ -8,7 +8,7 @@
 
 ## 文档范围
 
-本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件渲染、Workspace 文件浏览、Context 完整只读视图、Reply 和 HTML 沙箱安全。Review / Diff 的数据来源、baseline 和无 Git 工作区策略见 `core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
+本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件渲染、Workspace 文件浏览、Context 完整只读视图、Reply 和 HTML 沙箱安全。Review 作为右侧对象 Tab 直接在面板内展示；六种 scope、upstream Branch、结构化 diff、Review Options 和 Git actions 统一见 `docs/design-docs/core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
 
 ## 交互模型
 
@@ -28,7 +28,7 @@
 当前固定展示五个入口：
 
 - `Files`：进入 Workspace 文件浏览态，不新增对象 Tab。
-- `Review`：打开当前 workspace 的 Git `Uncommitted` Review Tab。
+- `Review`：打开当前 workspace 的 Review，并创建/聚焦稳定的右侧 Review Tab。
 - `Context`：打开主 Agent 当前会话的完整只读上下文 Tab。
 - `Kairos`：打开聊天态 Kairos 紧凑状态 Tab。
 - `Reply`：打开当前会话生成过的可视化回复聚合视图；HTML 是当前内部渲染格式，不进入入口名称。
@@ -59,7 +59,7 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `PDF`：PDF 预览。
 - `CSV`：表格预览。
 - `Text`：纯文本或代码文件查看。
-- `Review`：Git-first review diff；V1 默认展示当前 Git repository 的 uncommitted changes，Session / Last Turn 视角属于 V2。
+- `Review`：完整代码审阅工作台入口；支持 Git-first scope 与 `Last Turn` Agent 视角，具体契约见 `docs/design-docs/core-review-change-sources.md`。
 - `Kairos`：聊天态右侧紧凑状态视图；具体布局和数据边界见 `docs/design-docs/kairos/front-Kairos监控页规范.md`。
 - `Context`：完整只读上下文视图；见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`。
 - `Reply`：当前会话已生成的可视化回复浏览器（见下文）；内部当前由 HTML 产物承载。
@@ -68,7 +68,7 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 
 - 隐藏标题栏 chrome 右段、右侧折叠（PanelRight）按钮**左侧**放一个 `+` 按钮（参考 Cursor 顶栏的 +）。
 - 点开是一个轻量菜单，可往右侧面板新增对象：`工作区文件` / `Review` / `Reply` / `Kairos` / `Context`。对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；`工作区文件` 只切换工作区浏览态，不新增 Tab。
-- `Review` 入口复用 Composer 的 Review 打开逻辑，默认打开当前 workspace 的 Git `Uncommitted` scope。
+- `Review` 入口复用 Composer 的 Review 打开逻辑，首次默认选择当前 workspace 的 Git `Uncommitted` scope；后续打开恢复该 workspace 最近 selection。
 - 菜单与右侧折叠按钮同属 chrome-right，`-webkit-app-region: no-drag`；Kairos 全屏页下与右侧折叠按钮一起隐藏。
 - **`+` 仅在右侧面板打开时显示**（`view === "chat" && isRightPanelOpen`）：`+` 的语义是「往面板里加对象」，面板关着时无意义；面板关闭时 chrome-right 只保留 PanelRight 折叠按钮。
 
@@ -91,7 +91,7 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `csv`：渲染为表格视图。
 - `pdf`：渲染为分页阅读视图。
 - `图片`：直接预览。
-- `review` / `diff`：展示 Git Review 聚合改动；V2 可切换到当前会话累计改动，不放在单条消息里替代消息流中的局部 diff。
+- `review` / `diff`：进入完整 Review Workbench；Git scope 与 `Last Turn` 共用结构化 file/hunk/line renderer，不放在单条消息里替代消息流中的局部 diff。
 
 ## Markdown 渲染
 
@@ -288,17 +288,17 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 ## 首版边界
 
 - 先支持 `md`、`html`、`图片` 三种文件预览优先级。
-- Git-first Review 作为第二主线；无 Git 时提示创建 Git repository，Session Review 只作为 V2 的 Last Turn / Session 视角。
+- Git-first Review 作为第二主线；无 Git 时提示创建 Git repository，`Last Turn` 仍可展示 Agent 本轮记录到的局部改动，但必须标明不代表完整工作区状态。
 - 其他类型后续再补，不抢首版设计重点。
 
-## 定稿图
+## 历史基线链接
 
 - [右侧 Markdown 定稿图](right-panel-markdown-final.png)
 - [右侧 HTML 定稿图](right-panel-html-final.png)
 - [右侧 Image 定稿图](right-panel-image-final.png)
-- [右侧 Diff / Review 定稿图](right-panel-diff-final.png)
+- [Review V1 历史基线图](right-panel-diff-final.png)
 
-## 定稿图
+## 历史基线图
 
 ![Markdown 定稿图](right-panel-markdown-final.png)
 
@@ -306,16 +306,14 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 
 ![Image 定稿图](right-panel-image-final.png)
 
-![Diff / Review 定稿图](right-panel-diff-final.png)
+![Review V1 历史基线图](right-panel-diff-final.png)
 
 ## Review / Diff 展示边界
 
-- 聊天区保留单次工具调用或编辑动作的局部 diff。
-- 右侧 `Review` Tab 的 V1 来源是 Git provider，默认展示 `Uncommitted` scope。
-- 右侧 `Review` Tab 按文件浏览，适合审核当前 repo 真实修改结果。
-- V1 Review 采用 Codex-style 极简文件级 accordion：顶部是一条单行操作栏，左侧显示轻量无边框的 `Folder + N Uncommitted Changes + Chevron` scope 触发器和总 `+N -M`（新增用 success 语义色、删除用 danger 语义色），右侧放更多、搜索、diff display、刷新等图标按钮；不做大 summary card。
-- 点击 scope 触发器会打开轻量浮层。V1 真实数据只支持 `Uncommitted`；菜单可以先展示 `Uncommitted` / `Unstaged` / `Staged` / `All Branch Changes`，其中非 `Uncommitted` 项弱化为不可切换的未来 scope。
-- 文件列表是主体；每个文件一行显示 chevron、状态图标、path 和 `+N -M`，视觉行尾只保留增删统计。`New` / `Deleted` / `Renamed` / `Modified` 通过状态图标、颜色和文件行 `aria-label` / accessible name 表达，不再作为固定可见文字标签列。
-- 点击文件行展开 / 收起该文件的具体 unified diff。
-- 默认只展开第一个有 diff body 的文件，其余折叠，避免大变更一次性铺满右侧面板；文件行必须键盘可达并用 `aria-expanded` 表达展开状态。
-- Session / Last Turn diff 属于 V2 scope，只表示 Agent 会话改动，不能代表完整工作区状态。
+- 聊天区继续保留单次工具调用或编辑动作的局部 diff；Review Workbench 负责跨文件、跨 scope 的完整审阅。
+- Composer、Environment 和右侧对象菜单都可以打开 Review；入口去重到同一 workspace Review 实例。
+- 完整 Review 直接渲染在右侧对象面板，聊天主区和 Composer 保持可用。
+- `Last Turn`、`Uncommitted`、`Unstaged`、`Staged`、`Committed`、`Branch` 都必须接真实数据，不再展示 disabled 的未来 scope。
+- Review 内部以单列 Diff Canvas 为主；Changed Files 在 Review 容器不小于 `560px` 时停靠于右侧，更窄时切换为独占内容区的文件列表。它不使用遮罩覆盖 Diff；大 diff 继续按单文件与 capped 策略加载。
+- unified/split、上下文折叠、Jump to file、viewed、Review Options 和 Git actions 的完整规则以 `docs/design-docs/core-review-change-sources.md` 为准。
+- 旧 `right-panel-diff-final.png` 和 `review-v1-git-review-prototype.html` 只保留为 V1 历史参考，不再代表目标 Review Workbench。

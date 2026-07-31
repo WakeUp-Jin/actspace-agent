@@ -22,7 +22,7 @@ import type {
   ModelId,
   ModelKey,
   UsableModelView,
-  ReviewGetWorkspaceChangesResult,
+  ReviewGetSnapshotResult,
   RunTurnInput,
   RuntimeStreamEvent,
   SessionRunLocation,
@@ -109,12 +109,17 @@ function createWorkspaceOptionsFromRegistry(items: WorkspaceEntry[]): ComposerWo
   }));
 }
 
-function reviewResultToSummary(result: ReviewGetWorkspaceChangesResult): ComposerReviewSummary {
+function reviewResultToSummary(result: ReviewGetSnapshotResult): ComposerReviewSummary {
+  if (result.ok === false) {
+    return {
+      status: result.code === "not_a_repository" ? "notAvailable" : "failed",
+      reason: result.code,
+    };
+  }
   return {
-    status: result.status,
-    additions: result.changeSet?.totalAdditions,
-    deletions: result.changeSet?.totalDeletions,
-    reason: result.reason,
+    status: result.snapshot.status === "ready" ? "changes" : result.snapshot.status,
+    additions: result.snapshot.totals.additions,
+    deletions: result.snapshot.totals.deletions,
   };
 }
 
@@ -796,7 +801,7 @@ export function App() {
   const refreshReviewSummary = useCallback(async (workspaceRoot?: string | null) => {
     if (!hasActspaceBridge()) return;
 
-    const api = window.actspace?.getWorkspaceReview;
+    const api = window.actspace?.getReviewSnapshot;
     if (!api) {
       setReviewSummary(null);
       return;
@@ -811,7 +816,8 @@ export function App() {
     try {
       const result = await api({
         workspaceRoot: resolvedWorkspaceRoot ?? undefined,
-        scope: "uncommitted",
+        sessionId: sessionRecord?.meta.id,
+        selection: { kind: "uncommitted" },
       });
       if (requestId !== reviewRefreshRequestIdRef.current) return;
       setReviewSummary(reviewResultToSummary(result));

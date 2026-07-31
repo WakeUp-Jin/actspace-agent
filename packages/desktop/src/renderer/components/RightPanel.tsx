@@ -66,12 +66,14 @@ export function RightPanel({
   workspaceRoot,
   onOpenReview,
   onReviewChanged,
+  onSendToAgent,
 }: {
   contextState?: ContextState | null;
   sessionId?: string | null;
   workspaceRoot?: string;
   onOpenReview?: () => void;
   onReviewChanged?: () => void;
+  onSendToAgent?: (text: string) => void;
 }) {
   const { activeTab, isFileTreeOpen, isFileTreeCollapsed } = useRightPanel();
 
@@ -97,8 +99,10 @@ export function RightPanel({
               tab={activeTab}
               contextState={contextState}
               sessionId={sessionId}
+              workspaceRoot={workspaceRoot}
               onOpenReview={onOpenReview}
               onReviewChanged={onReviewChanged}
+              onSendToAgent={onSendToAgent}
             />
           )}
         </div>
@@ -323,14 +327,18 @@ function RightPanelBody({
   tab,
   contextState,
   sessionId,
+  workspaceRoot,
   onOpenReview,
   onReviewChanged,
+  onSendToAgent,
 }: {
   tab: RightPanelTab | null;
   contextState?: ContextState | null;
   sessionId?: string | null;
+  workspaceRoot?: string;
   onOpenReview?: () => void;
   onReviewChanged?: () => void;
+  onSendToAgent?: (text: string) => void;
 }) {
   if (!tab) {
     return <RightPanelLauncher sessionId={sessionId ?? null} onOpenReview={onOpenReview} />;
@@ -347,7 +355,8 @@ function RightPanelBody({
   if (tab.kind === "review") {
     return (
       <ReviewRenderView
-        workspaceRoot={tab.workspaceRoot}
+        workspaceRoot={workspaceRoot}
+        sessionId={sessionId}
         refreshKey={tab.refreshKey}
         onReviewChanged={onReviewChanged}
       />

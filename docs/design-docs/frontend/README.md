@@ -44,6 +44,7 @@
 - `docs/design-docs/frontend/front-icon-button-tooltip-guidelines.md`：图标按钮 Tooltip 和可访问性规范。
 - `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`：SplitView、resize、collapse 和 restore。
 - `docs/design-docs/frontend/front-environment-and-git-actions.md`：顶部 Environment、编辑器选择、本地分支创建、Commit 和 Push 工作流。
+- `docs/design-docs/core-review-change-sources.md`：Git-first Review Workbench 总规范；右侧 Review Tab、六种 scope、upstream Branch、Review Options 与 Git actions 都以此为准。
 - `docs/design-docs/frontend/front-左侧会话栏规范.md`：会话、Pinned、Scheduled 和 Workspaces 分区。
 - `docs/design-docs/frontend/front-中间消息区规范.md`：消息语法、工具流和执行状态。
 - `docs/design-docs/frontend/front-聊天输入框规范.md`：Composer、模型、附件、Context 和发送。
@@ -76,7 +77,7 @@ Kairos 监控页与 Kairos Runtime 强关联，统一维护在相邻的 `../kair
 
 ![右侧 Image 定稿图](right-panel-image-final.png)
 
-![右侧 Diff 定稿图](right-panel-diff-final.png)
+![Review V1 历史基线图](right-panel-diff-final.png)
 
 ![设置页定稿图](settings-page-final.png)
 
@@ -86,7 +87,7 @@ Kairos 监控页与 Kairos Runtime 强关联，统一维护在相邻的 `../kair
 - `agent-subagent-flow-prototype.html`：Agent 工具与 Subagent 执行流原型。
 - `usage-statistics-prototype.html`：Usage Statistics 高保真原型。
 - `compact-command-states.html`：`/compact` 消息流三态及浅深主题原型。
-- `review-v1-git-review-prototype.html`：Review V1 Git-first 右侧面板原型。
+- `review-v1-git-review-prototype.html`：Review V1 Git-first 右侧面板历史原型；新 Workbench 以 `../core-review-change-sources.md` 为准。
 
 ## 资产约定
 

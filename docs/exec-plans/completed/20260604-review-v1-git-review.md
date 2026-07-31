@@ -1,5 +1,7 @@
 # 2026-06-04 Review V1 Git Review 执行计划
 
+> 状态：已被 `docs/exec-plans/active/20260730-review-workbench/README.md` 取代。本文只保留 V1 历史基线，剩余未勾选任务不得继续按本文执行；新实现以 `docs/design-docs/core-review-change-sources.md` 和 20260730 总计划为准。
+
 ## 目标
 
 实现 V1 Codex-style Git Review：Composer 上方的 Review 入口不再使用硬编码统计，而是读取当前 workspace 的 Git repository state；右侧 `Review` Tab 默认展示 `Uncommitted` changes（staged + unstaged + untracked），无 Git repository 时提示用户显式创建 Git repository。V1 只做人工浏览和 Git 初始化引导，不启动 AI Review，不把 Review 等同于提交动作。

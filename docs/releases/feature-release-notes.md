@@ -4,6 +4,21 @@
 
 ## 2026-07
 
+### 2026-07-30 — 完整代码审阅工作台
+
+#### 新功能
+
+- Review 升级为可与聊天并行使用的右侧审阅面板，支持 Last Turn、Uncommitted、Unstaged、Staged、Committed 和 Branch 六种真实变更范围。
+- Branch 会自动比较本地分支与对应 upstream，并显示类似 `main → origin/main` 的关系和 ahead/behind 状态。
+- 可以通过按需文件导航、搜索跳转、unified/split、词级高亮、空白显示、完整文件上下文、图片预览和 viewed 状态集中审阅多文件改动。
+- 支持文件与 hunk 的 stage、unstage、revert，以及 Commit、Push 和 Create PR；过期 diff 会先要求刷新，未跟踪文件回退时移入废纸篓。
+- Review Options 可以刷新、切换换行/完整文件/富预览/词级差异/空白字符，并复制安全生成的 `git apply` 命令。
+
+#### 改进
+
+- Composer 的 Review 统计与完整工作台使用同一份 Git snapshot，不再存在摘要和详情两套结果。
+- 工具栏压缩为单行动作栏，零变更不再显示 `+0` 或 `-0`；大变更会自动进入单文件降级模式。
+
 ### 2026-07-29 — 开发计划、长会话导航与更清晰的官网标题
 
 #### 新功能

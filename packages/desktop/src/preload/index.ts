@@ -67,10 +67,26 @@ import type {
   LocalUpdateStartResult,
   LocalUpdateState,
   PendingApprovalInfo,
-  ReviewGetWorkspaceChangesInput,
-  ReviewGetWorkspaceChangesResult,
   ReviewInitGitInput,
   ReviewInitGitResult,
+  ReviewApplyMutationInput,
+  ReviewChangeNotification,
+  ReviewCreatePullRequestInput,
+  ReviewCreatePullRequestResult,
+  ReviewCopyApplyCommandInput,
+  ReviewCopyApplyCommandResult,
+  ReviewGetFileContentsInput,
+  ReviewGetFileContentsResult,
+  ReviewGetFileDiffsInput,
+  ReviewGetFileDiffsResult,
+  ReviewGetSnapshotInput,
+  ReviewGetSnapshotResult,
+  ReviewListBranchesResult,
+  ReviewMutationResult,
+  ReviewPullRequestCapabilityResult,
+  ReviewSetFileViewedInput,
+  ReviewSetFileViewedResult,
+  ReviewWorkspaceInput,
   WorkspaceEnvironmentGetInput,
   WorkspaceEnvironmentSnapshot,
   WorkspaceGitCommitAndPushInput,
@@ -194,10 +210,33 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("session:read-artifact", input) as Promise<SessionArtifactReadResult>,
   showArtifactContextMenu: (input: ArtifactContextMenuInput) =>
     ipcRenderer.invoke("artifact:show-context-menu", input) as Promise<ArtifactContextMenuResult>,
-  getWorkspaceReview: (input: ReviewGetWorkspaceChangesInput) =>
-    ipcRenderer.invoke("review:get-workspace-changes", input) as Promise<ReviewGetWorkspaceChangesResult>,
   initGitRepository: (input: ReviewInitGitInput) =>
     ipcRenderer.invoke("review:init-git", input) as Promise<ReviewInitGitResult>,
+  getReviewSnapshot: (input: ReviewGetSnapshotInput) =>
+    ipcRenderer.invoke("review:get-snapshot", input) as Promise<ReviewGetSnapshotResult>,
+  refreshReviewSnapshot: (input: ReviewGetSnapshotInput) =>
+    ipcRenderer.invoke("review:refresh-snapshot", input) as Promise<ReviewGetSnapshotResult>,
+  getReviewFileDiffs: (input: ReviewGetFileDiffsInput) =>
+    ipcRenderer.invoke("review:get-file-diffs", input) as Promise<ReviewGetFileDiffsResult>,
+  getReviewFileContents: (input: ReviewGetFileContentsInput) =>
+    ipcRenderer.invoke("review:get-file-contents", input) as Promise<ReviewGetFileContentsResult>,
+  applyReviewMutation: (input: ReviewApplyMutationInput) =>
+    ipcRenderer.invoke("review:apply-mutation", input) as Promise<ReviewMutationResult>,
+  setReviewFileViewed: (input: ReviewSetFileViewedInput) =>
+    ipcRenderer.invoke("review:set-file-viewed", input) as Promise<ReviewSetFileViewedResult>,
+  listReviewBranches: (input: ReviewWorkspaceInput) =>
+    ipcRenderer.invoke("review:list-branches", input) as Promise<ReviewListBranchesResult>,
+  copyReviewGitApplyCommand: (input: ReviewCopyApplyCommandInput) =>
+    ipcRenderer.invoke("review:copy-apply-command", input) as Promise<ReviewCopyApplyCommandResult>,
+  getReviewPullRequestCapability: (input: ReviewWorkspaceInput & { baseBranch?: string }) =>
+    ipcRenderer.invoke("review:get-pr-capability", input) as Promise<ReviewPullRequestCapabilityResult>,
+  createReviewPullRequest: (input: ReviewCreatePullRequestInput) =>
+    ipcRenderer.invoke("review:create-pr", input) as Promise<ReviewCreatePullRequestResult>,
+  onReviewChanged: (callback: (notification: ReviewChangeNotification) => void) => {
+    const handler = (_: unknown, notification: ReviewChangeNotification) => callback(notification);
+    ipcRenderer.on("review:changed", handler);
+    return () => ipcRenderer.removeListener("review:changed", handler);
+  },
   getWorkspaceEnvironment: (input: WorkspaceEnvironmentGetInput) =>
     ipcRenderer.invoke("workspace-environment:get", input) as Promise<WorkspaceEnvironmentSnapshot>,
   createWorkspaceBranch: (input: WorkspaceGitCreateBranchInput) =>

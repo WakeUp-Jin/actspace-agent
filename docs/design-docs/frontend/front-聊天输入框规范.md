@@ -97,7 +97,7 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 
 从上到下分三层：
 
-1. Review 操作层：位于输入栏上方，Git workspace 存在未提交改动时显示真实 `Review +N -M` 汇总和 `...`；无改动时不显示 Review 入口；当前 workspace 不是 Git repository 时显示无计数的 `Review` 入口，引导用户到右侧 Review 面板初始化 Git。
+1. Review 操作层：位于输入栏上方，Git workspace 存在未提交改动时显示真实 `Review +N -M` 汇总和 quick actions；无改动时不显示 Review 入口；当前 workspace 不是 Git repository 时显示无计数的 `Review` 入口，引导用户在右侧 Review Tab 查看初始化提示。
 2. 输入面板：输入框全宽在上；底部控件行左侧为 `+`、当前模式 pill 与模型选择，右侧为发送 / 停止按钮。
 3. 状态行：左侧显示真实 branch 与 `This Mac` / `Worktree`，右侧显示 context usage 百分比或等价统计入口，也是打开 Context 弹窗的唯一入口。
 
@@ -226,10 +226,10 @@ placeholder 随模式改变，但不代替彩色 pill 和运行时契约：
 输入栏上方的轻量 action strip 用于进入 Review：
 
 - 左侧 Review 按钮由 Git Review summary 驱动：有未提交改动时显示 `Review +N -M`。
-- 无 Git repository 时显示无计数的 `Review`，点击打开右侧 Review 空态。
+- 无 Git repository 时显示无计数的 `Review`，点击进入右侧 Review Tab 的 Git 初始化空态。
 - 无未提交改动时不显示 Review strip，避免 Composer 常驻无效操作。
 - SubAgent transcript panel 打开期间不显示 Review strip，优先保证当前 panel 和 follow-up 输入的视觉关系；关闭 panel 后恢复。
-- 右侧或相邻 overflow `...` 保留位置，后续接入更多 Review / Git 操作。
+- 相邻 overflow `...` 只保留真实 Review quick actions，例如打开 `Last Turn` 或 `Uncommitted`；能力不可用时展示明确 disabled reason，不保留 AI Review 或无行为占位。
 
 ## Context 弹窗
 

@@ -13,12 +13,12 @@
 
 | 区域 | 评分 | 原因 | 下一步 |
 | --- | --- | --- | --- |
-| 产品面 | B | 产品方向、界面语法和核心交互已明确；桌面工作台现已具备真实 Environment、Review、分支创建、Commit/Push 与本机编辑器打开工作流。 | 继续补真实 Electron 回归、远端认证引导和更完整的工作区状态可观测性。 |
+| 产品面 | B+ | 产品方向、界面语法和核心交互已明确；桌面工作台现已具备右侧 Git-first Review、六种真实 scope、upstream Branch、结构化 diff、真实 Review Options、Git actions、Environment、分支创建、Commit/Push 与本机编辑器打开工作流。 | 完成真实 Electron、大仓库、disposable Git mutation 与 GitHub remote 的用户验收。 |
 | 官网与公开内容 | B+ | `packages/site` 已交付静态主页、10 篇公开文档、博客、release 驱动的更新页、三态主题与 GitHub Pages workflow；站点 check、单测、base-path build 和桌面/移动浏览器验收通过。 | 在真实 Pages 环境测量 LCP，再决定是否引入 Sharp、AVIF/WebP 与搜索全文索引；补公开 Browser 实机截图后更新产品展示。 |
 | 架构文档 | A- | 三层骨架已落地，agent-core 模块化重构完成，ARCHITECTURE.md 已收敛为顶层导航，细节拆入 agent-core 模块地图、四层职责规范与存储可观测性专题。 | 补充模块间交互时序图。 |
 | 后端 agent-core | B+ | 模块化架构已就位，DeepSeek 真实 SSE provider、测试专用 mock provider、IPC bridge 与集中 env 入口均已落地；bridge 已保证每轮 turn 写入 `user_message`；provider 可重试错误已有 loop 层自动重试 + 失败轮次 error 事件兜底。 | 补高级上下文策略。 |
-| 前后端对接 | B+ | 双通道流式架构已落地，Composer 可真实发送；普通会话默认走 DeepSeek，最终展示以恢复后的 `SessionRecord` 为事实来源。 | 继续打磨 streaming UI、工具状态和真实 Electron 回归。 |
-| 测试 | B+ | vitest 测试体系覆盖核心模块与 E2E smoke；新增 bridge 测试锁定 `user_message -> thinking/tool -> assistant -> context` 事件顺序。 | 补自动化的 provider integration gate、前端 UI/turn 测试和 CI。 |
+| 前后端对接 | B+ | 双通道流式架构已落地；Review 使用 typed preload、main-owned Coordinator、generation cancellation、批量 Git worker、独立 full-content contract 和虚拟 renderer 贯通 renderer 与 Git，并移除了无产品需求的独立 AI Review runtime。 | 继续打磨 streaming UI、窗口关闭时的后台任务观测和真实 Electron 回归。 |
+| 测试 | B+ | vitest 覆盖核心模块与 E2E smoke；Review 新增真实临时 Git repo、50 文件单批命令预算、阈值边界、9,000 行 DOM 上限、capped 单文件请求、Coordinator 去重/取消/Retry、worker crash lifecycle、upstream Branch、mutation guard 和右侧 Tab 回归。 | 补真实 Electron 快速切换/双主题验收、真实远端验收和 CI 中可运行的 Browser socket 测试环境。 |
 | 可观测性 | C | 已有应用数据 `logs/` 目录初始化、根目录本地开发日志入口 `pnpm dev:log`、即时 console 链路日志，以及每次 Agent turn 一个最近 1 天保留的 JSONL 排障文件。 | 补统一错误面板、renderer 错误按 turn 归因和 provider/tool 故障排查约定。 |
 | 安全 | B | Electron 边界采用 `contextIsolation` + typed preload；provider Key 由 main 使用 `safeStorage` 管理；本机文件、Git 与应用打开能力使用窄 IPC，并把写操作重新绑定到已登记 workspace。 | 补 API Key 替换/轮换流程、更完整的错误脱敏和敏感路径按需读审核。 |
 | 学习沉淀 | B | 体系已经跑起来，且已有学习文档。 | 随着 DeepSeek 接入和前端对接，继续补真正有迁移价值的学习文档。 |

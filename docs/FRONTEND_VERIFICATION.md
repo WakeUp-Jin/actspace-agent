@@ -94,6 +94,16 @@ http://127.0.0.1:5173/
 pnpm dev
 ```
 
+macOS 开发启动不会直接暴露依赖目录里的默认 `Electron.app`。启动器会在系统临时目录缓存一份当前 workspace 专属的开发 runtime，并为它设置唯一的应用名、bundle ID 与可执行文件名。启动日志中的 `[dev-runtime]` JSON 是本次运行的事实来源，例如：
+
+```text
+[dev-runtime] {"appName":"Actspace Dev d11e-ab10","appId":"com.actspace.desktop.dev.wab10a3c4",...}
+```
+
+Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的 `Electron`。优先使用可读的 `appName`；若自动化工具不接受 display name，就使用同一行日志里的 `appId`。不同 worktree 因此可以并存，自动化也不会被 macOS LaunchServices 路由到另一份源码的 Electron 欢迎页。临时开发身份只改变系统识别与进程名称；main 进程仍使用既有的 `actspace` userData 目录，因此会话和设置不会因 workspace hash 改变。
+
+开发启动默认不弹出独立 DevTools 窗口，避免它与主窗口共享应用身份并抢走 Computer Use 焦点。需要 DevTools 时显式运行 `ACTSPACE_OPEN_DEVTOOLS=1 pnpm dev:log`。
+
 需要确认：
 
 - Electron 窗口可以弹出。
@@ -102,7 +112,7 @@ pnpm dev
 - 首次启动可以创建或恢复会话。
 - 本地数据目录正常初始化。
 
-有 Computer Use 的 Agent 应该直接观察 Electron 窗口，必要时点击核心交互并截图确认。
+有 Computer Use 的 Agent 应该从 `[dev-runtime]` 读取当前 `appName` / `appId`，直接观察对应 Electron 窗口，必要时点击核心交互并截图确认。
 
 没有 Computer Use 的 Agent 应说明无法直接观察桌面窗口，并请用户提供：
 

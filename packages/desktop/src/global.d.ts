@@ -51,12 +51,42 @@ declare global {
       showArtifactContextMenu?: (
         input: import("@actspace/shared").ArtifactContextMenuInput
       ) => Promise<import("@actspace/shared").ArtifactContextMenuResult>;
-      getWorkspaceReview: (
-        input: import("@actspace/shared").ReviewGetWorkspaceChangesInput
-      ) => Promise<import("@actspace/shared").ReviewGetWorkspaceChangesResult>;
       initGitRepository: (
         input: import("@actspace/shared").ReviewInitGitInput
       ) => Promise<import("@actspace/shared").ReviewInitGitResult>;
+      getReviewSnapshot?: (
+        input: import("@actspace/shared").ReviewGetSnapshotInput
+      ) => Promise<import("@actspace/shared").ReviewGetSnapshotResult>;
+      refreshReviewSnapshot?: (
+        input: import("@actspace/shared").ReviewGetSnapshotInput
+      ) => Promise<import("@actspace/shared").ReviewGetSnapshotResult>;
+      getReviewFileDiffs?: (
+        input: import("@actspace/shared").ReviewGetFileDiffsInput
+      ) => Promise<import("@actspace/shared").ReviewGetFileDiffsResult>;
+      getReviewFileContents?: (
+        input: import("@actspace/shared").ReviewGetFileContentsInput
+      ) => Promise<import("@actspace/shared").ReviewGetFileContentsResult>;
+      applyReviewMutation?: (
+        input: import("@actspace/shared").ReviewApplyMutationInput
+      ) => Promise<import("@actspace/shared").ReviewMutationResult>;
+      setReviewFileViewed?: (
+        input: import("@actspace/shared").ReviewSetFileViewedInput
+      ) => Promise<import("@actspace/shared").ReviewSetFileViewedResult>;
+      listReviewBranches?: (
+        input: import("@actspace/shared").ReviewWorkspaceInput
+      ) => Promise<import("@actspace/shared").ReviewListBranchesResult>;
+      copyReviewGitApplyCommand?: (
+        input: import("@actspace/shared").ReviewCopyApplyCommandInput
+      ) => Promise<import("@actspace/shared").ReviewCopyApplyCommandResult>;
+      getReviewPullRequestCapability?: (
+        input: import("@actspace/shared").ReviewWorkspaceInput & { baseBranch?: string }
+      ) => Promise<import("@actspace/shared").ReviewPullRequestCapabilityResult>;
+      createReviewPullRequest?: (
+        input: import("@actspace/shared").ReviewCreatePullRequestInput
+      ) => Promise<import("@actspace/shared").ReviewCreatePullRequestResult>;
+      onReviewChanged?: (
+        callback: (notification: import("@actspace/shared").ReviewChangeNotification) => void
+      ) => () => void;
       getWorkspaceEnvironment?: (
         input: import("@actspace/shared").WorkspaceEnvironmentGetInput
       ) => Promise<import("@actspace/shared").WorkspaceEnvironmentSnapshot>;

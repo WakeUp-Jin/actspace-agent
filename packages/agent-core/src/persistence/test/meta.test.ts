@@ -117,4 +117,5 @@ describe("meta.json operations", () => {
     expect(result.ok).toBe(true);
     expect((await readMeta(metaPath))?.worktree).toBeUndefined();
   });
+
 });

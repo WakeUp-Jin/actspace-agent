@@ -1,325 +1,260 @@
-# Review 变更来源设计
+# Git-first Review Workbench 设计规范
+
+## 文档状态
+
+- 状态：功能基线已完成；大 Diff 的加载调度、批量 Git、完整正文和虚拟渲染仍待按性能纠偏计划实施。disposable Git mutation 和真实远端操作仍由用户手动验收。
+- 事实源：本文件定义 Review 的 scope、结构化 diff、工具栏、显示选项、Git actions、刷新和安全边界。
+- 性能事实源：`docs/design-docs/core-review-large-diff-loading.md` 定义 Standard/capped 双模式、批量请求、完整正文和虚拟渲染边界。
+- 产品边界：Review 是人工 Git 审阅工作台，不包含 AI Review、Review 专用模型、findings、独立审查任务或评论回注 Agent。
+- 视觉关联：右侧对象系统见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`；布局见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色见 `docs/design-docs/frontend/front-主题与配色规范.md`。
+
+## 当前实现映射（2026-07-30）
+
+- 共享契约：`packages/shared/src/review.ts`。
+- 查询、缓存与失效：`packages/desktop/src/main/review-coordinator.ts`。
+- Git 查询与 mutation：`packages/desktop/src/main/review-git-engine.ts`。
+- Last Turn：`packages/desktop/src/main/review-last-turn-service.ts`。
+- PR capability：`packages/desktop/src/main/review-pr-service.ts`。
+- Renderer：`packages/desktop/src/renderer/components/review/`。
 
 ## 定位
 
-Review 是把「本次会话或工作区中可评审的改动」整理成一个稳定对象，供右侧面板浏览、后续 AI Review、Commit / Push / PR 等动作复用。
+Review 连续回答三个问题：
 
-它不是 Git 面板的别名，也不是单纯把 `git diff` 原文展示出来。actspace 的主 Review 应优先学习 Codex App 的 Git-first 行为：Review 默认反映 Git repository state，而不是只反映 Agent 本轮改过什么。Session diff、snapshot 和 external diff 是后续 provider / scope，不应取代 Git 作为首版真实工作区变更来源。
+1. 当前选择的 Git 范围里改了什么？
+2. 用户怎样快速定位、比较和阅读这些变化？
+3. 用户怎样在明确 capability 与 stale guard 下执行 stage、unstage、revert、commit、push 或 Create PR？
 
-本文只定义 Review 的数据来源、baseline、右侧视图边界和分阶段路线。具体右侧 UI 视觉规则仍见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`；工具 preview 契约仍见 `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`。
+Review 保持为右侧对象 Tab。它不替换聊天区，不接管整个窗口，也不重复实现一套会话或模型运行时。
 
-## 设计动机
+## Codex 参考与采用边界
 
-Codex App 的 Review 方向值得优先学习：Review pane 只服务 Git repository；如果项目还不是 Git repository，就提示创建一个；展示范围是 repository state，包括 Codex 改动、用户手动改动和其它未提交变更。默认聚焦 uncommitted changes，并允许切换到 branch changes、last turn changes、staged / unstaged 等 scope。Codex CLI 的 `/review` 也围绕用户选择的 diff 运行，包括 base branch、uncommitted changes 和指定 commit。
+采用可观察的交互模型：
 
-Cursor 的 Review / BugBot 类能力也有一个值得借鉴的方向：模型消费的是结构化 changed files / chunks / context，而不是只能依赖一段 raw `git diff` 文本。这样做有三个好处：
+- Scope：`Last Turn`、`Uncommitted`、`Unstaged`、`Staged`、`Committed`、`Branch`。
+- 工具栏：Scope 与非零统计在左，Review options、折叠、跳转、Diff 模式、Files、Commit or push 在同一行右侧。
+- Branch 关系单独显示为 `local → upstream`，例如 `main → origin/main`。
+- Review options 包含 Refresh、word wrap、full-file loading、rich preview、word diff、white space 和 Copy git apply command。
 
-- UI 可以稳定渲染文件列表、统计、chunk 和上下文，不受 diff 文本格式细节影响。
-- AI Review 可以选择性注入上下文、规则和文件片段，避免把所有内容拼成一个超长提示词。
-- Git 之外的来源也能接入，例如 Agent pending diff、会话内工具结果、远端 PR diff 或本地 snapshot diff。
+不复制 Codex 私有 bundle 代码、类名、颜色或不可验证的内部状态结构。具体 Git 命令由 ActSpace 自己的安全边界决定。
 
-actspace 的默认策略应是：优先把变更归一化成内部 `ReviewChangeSet`，再由 UI、AI Review 和提交动作各取所需。
+## 核心原则
 
-## 核心概念
+### Git-first
 
-### Review Source
+Git repository state 是默认事实来源。`Last Turn` 是 Agent 行为视角，只覆盖最近 turn 能证明的文件变化，不能伪装成完整 workspace 状态。
 
-Review Source 是产生变更的来源。首版至少区分：
+### Main-owned Git
 
-- `git`: Git repository 的 staged / working tree / untracked 变更。
-- `session`: 当前会话事件流里的 Agent 文件改动，来自 `edit_file` / `write_file` 等工具 preview。
-- `snapshot`: actspace 自己保存的 workspace baseline 与当前文件系统比较得到的变更。
-- `external`: 未来远端 PR、patch 文件、issue 附件等外部 diff。
+Renderer 只发送稳定 selection、snapshot id 和用户意图。Main 重新解析 registered workspace，使用固定 argv 调用 Git。Renderer 不运行 Git、不拼 shell、不解析 raw file header。
 
-### Baseline
+### 摘要先行、Diff 按需加载
 
-Baseline 是判断「改了什么」的参照物。没有 baseline 就不能诚实地计算 diff。
+打开 Review 先返回文件 summary 和 totals。Standard mode 批量读取当前 snapshot 的 patch，并虚拟渲染全部文件；大变更进入 capped mode，只请求和挂载当前选中文件。完整文件正文独立于 patch，按可见范围懒加载。详细规则见 `core-review-large-diff-loading.md`。
 
-- Git 仓库的 baseline 通常是 `HEAD`、index、指定 base branch 或 merge base。
-- Agent 会话改动的 baseline 是工具执行时记录的 before / after preview。
-- Snapshot baseline 是 actspace 在某个时刻保存的文件内容摘要和必要文本内容。
-- 如果没有 Git、没有 Agent preview、也没有 snapshot，就只能展示当前文件内容，不能声称有 changed files。
+### 状态与能力显式化
 
-### ReviewChangeSet
+Snapshot 返回 capability matrix。UI 不根据 scope 名字猜 stage、revert、commit 或 load full file 是否可用。
 
-内部建议使用一个结构化对象表示 Review 结果：
+### Mutation 绑定 generation
+
+写操作携带 snapshot generation；hunk 写操作额外携带 patch fingerprint。工作区变化后拒绝旧动作并要求刷新。
+
+## 共享契约
+
+### ReviewSelection
 
 ```ts
-type ReviewChangeSet = {
+type ReviewSelection =
+  | { kind: "lastTurn"; sessionId: string; turnId?: string }
+  | { kind: "uncommitted" }
+  | { kind: "unstaged" }
+  | { kind: "staged" }
+  | { kind: "commit"; sha: string }
+  | { kind: "branch"; branch: string };
+```
+
+### Scope 语义
+
+| Selection | 内容 | 展示关系 | Mutation |
+| --- | --- | --- | --- |
+| `lastTurn` | 最近完成 turn 的文件工具变化 | turn baseline → turn result | 只读 |
+| `uncommitted` | HEAD 到 working tree，含 staged、unstaged、untracked | HEAD → Working tree | 文件级 stage/revert |
+| `unstaged` | index 到 working tree | Index → Working tree | stage/revert |
+| `staged` | HEAD 到 index | HEAD → Index | unstage/revert |
+| `commit` | 指定 commit 引入的变化 | parent → commit | 只读 |
+| `branch` | 本地分支相对 upstream 的本地独有提交 | `local → upstream` | 只读 |
+
+`Committed` 和 `Branch` 是带子视图的菜单项。Commit 接收经过 main 校验的 ref；Branch 只能选择 main 返回的、已经配置 upstream 的本地分支。
+
+### Branch 与远程跟踪语义
+
+Branch 不是自由输入“基准分支”。Main 必须：
+
+1. 列出 `refs/heads/*` 及其 upstream。
+2. Renderer 只回传本地 branch 名称。
+3. Main 重新验证 `refs/heads/<branch>`，再解析 `<branch>@{upstream}`。
+4. 计算 `merge-base(upstream, local)` 到 `local` 的 Diff，表示本地尚未进入 upstream 的提交。
+5. Snapshot 额外返回 `comparison: { from: local, to: upstream }`，用于展示 `main → origin/main`。
+6. 分支落后 upstream 时显示 warning；Diff 仍只显示本地独有提交，不把远程独有提交伪装成本地改动。
+
+打开或刷新 Review 不自动执行 `git fetch`。`origin/main` 表示本机已有的 remote-tracking ref；联网更新 remote 状态必须由显式 Git 操作完成。
+
+### ReviewSnapshot
+
+```ts
+type ReviewSnapshot = {
   id: string;
-  sessionId?: string;
-  workspaceRoot?: string;
-  source: "session" | "git" | "snapshot" | "external";
-  baseline?: {
-    kind: "session-preview" | "git-ref" | "snapshot";
-    label: string;
+  generation: number;
+  workspaceId: string;
+  workspaceRoot: string;
+  repoRoot?: string;
+  selection: ReviewSelection;
+  baseline?: ReviewBaseline;
+  target?: ReviewTargetLabel;
+  comparison?: { from: string; to: string };
+  status: "ready" | "empty" | "partial" | "notAvailable" | "noBaseline" | "failed";
+  files: ReviewFileSummary[];
+  totals: ReviewMetrics;
+  capabilities: ReviewCapabilities;
+  loadPolicy: {
+    mode: "all-files" | "single-file";
+    reason?: "file-count" | "changed-lines" | "changed-bytes";
   };
-  files: ReviewFileChange[];
-  totalAdditions: number;
-  totalDeletions: number;
+  queryOptions: { ignoreWhitespaceChanges: boolean };
   generatedAt: string;
   warnings?: ReviewWarning[];
 };
-
-type ReviewFileChange = {
-  path: string;
-  status: "added" | "modified" | "deleted" | "renamed";
-  previousPath?: string;
-  additions: number;
-  deletions: number;
-  chunks: ReviewChunk[];
-  // 缺省按文本 diff 渲染；"image" 表示该文件渲染图片预览（复用 workspace:read-file 的 data URL）。
-  // 图片类 untracked / 修改文件不再走文本上限与二进制检测，也不产生 truncated / binary_skipped 警告。
-  renderKind?: "image";
-  sourceEventIds?: string[];
-};
-
-type ReviewChunk = {
-  oldStart: number;
-  oldLines: number;
-  newStart: number;
-  newLines: number;
-  oldText?: string[];
-  newText?: string[];
-  unifiedText?: string;
-};
-
-type ReviewWarning = {
-  kind: "truncated" | "binary_skipped" | "ignored_path" | "provider_failed";
-  message: string;
-  filePath?: string;
-};
 ```
 
-`SessionDiffSummary` 只能视作 `ReviewChangeSet` 的 `session` provider 投影，不能作为 Review 的完整模型。V1 即使先用最小 Git provider，也应尽早输出 `ReviewChangeSet`，避免 renderer 和后续 AI Review 直接依赖 raw `git diff`。
+### ReviewFileDiff
 
-## 数据来源分层
+文件 Diff 使用结构化 hunk 和 line，不把 raw unified text 作为主渲染契约。`ReviewLine.wordDiffs` 可由显示选项决定是否渲染；关闭 word diff 不重新查询 Git。
 
-### V1: Git Review
+### ReviewCapabilities
 
-第一版先做 Codex-style Git Review，用 Git repository state 回答「当前工作区到底改了什么」。
+包含 file/hunk stage、unstage、revert、load full file、open file、commit、push、Create PR 与 disabled reasons。不存在 `runAgentReview` capability。
 
-数据来源：
+## Git 查询规则
 
-- unstaged / working tree 变更。
-- staged / index 变更。
-- untracked 文件。
-- 可选 base ref，例如当前分支相对 `main` / merge base 的 diff。
+- repository：`git rev-parse --show-toplevel`。
+- 文件身份：NUL-delimited `--name-status -z`。
+- 统计：`--numstat -z`。
+- rename：启用 `--find-renames`。
+- commit：先 `git cat-file -e <ref>^{commit}`。
+- branch：只接受已验证的本地 ref，再解析 upstream。
+- workspace 是 repo 子目录时，所有查询强制携带相对 repoRoot 的 pathspec。
+- 无 HEAD 时 staged/uncommitted 使用 empty tree。
+- 所有 Git 调用使用参数数组，不通过 shell。
 
-特点：
+## Review Options
 
-- 能发现 Codex / actspace Agent 改动、用户手动改动和其它未提交变更。
-- baseline 语义成熟，默认以 Git 的 `HEAD`、index、merge base 等引用为参照。
-- 适合后续 Commit / Push / PR 复用，因为 Git provider 是提交动作的事实来源。
-- 需要当前 workspace 是 Git repository。
+### Refresh
 
-首版默认 scope：
+增加 generation、清空 snapshot/file-diff cache，并重新执行当前 selection。Refresh 不 fetch remote。
 
-- `Uncommitted`: staged + unstaged + untracked，作为 Review 主入口默认视图。
-- `Staged`: 只看 index 中待提交内容。
-- `Unstaged`: 只看 working tree 中未 staged 内容。
-- `Since Base`: 可后置到同一阶段尾部或下一阶段，用 merge base 对比 base branch。
+### Enable word wrap
 
-第一版按钮行为：
+只影响 renderer 长行布局，不重新查询 Git。
 
-- 有 Git 且没有文件改动时，不显示按钮，或显示禁用空态。
-- 有改动时显示真实 `+N -M`。
-- 点击后打开右侧 `Review` tab。
-- 右侧 tab 使用稳定 id，例如 `review:<workspaceRoot>:git`；重复点击只聚焦和刷新内容。
-- 当前 workspace 不是 Git repository 时，显示创建 Git repository 的引导，不把它伪装成「没有改动」。
+### Load full files / Don't load full files
 
-第一版右侧视图：
+- 开启时先展示 patch，再为正在展示或接近视口的文件异步读取完整 baseline/target 文本并补齐未修改上下文。
+- 关闭时只加载 patch 默认上下文；用户可以逐步扩展 context。
+- Standard mode 不立即读取全部文件正文；capped mode 最多读取当前选中文件正文。
+- Full content 使用独立、安全且有界的 object/file 读取，不使用超大 unified context 模拟完整文件。
+- 单文件 patch 和 full content 分别受硬上限保护，超限返回 partial warning，不能静默截断。
 
-- 顶部采用 Codex-style 极简对象区：右侧 Tab 显示 `Review`，内容顶部只保留单行操作栏，左侧是 `Uncommitted` scope 和总 `+N -M`，右侧是必要图标操作。
-- `N Uncommitted Changes` 作为可访问摘要、tooltip 或测试稳定读取字段保留；不再要求渲染成大 summary card。
-- 文件列表按 status / path 稳定排序。
-- 每个文件行显示 chevron、状态图标、path、`+N -M`；`New` / `Deleted` / `Renamed` / `Modified` 通过状态图标、颜色和文件行 `aria-label` / accessible name 表达，视觉上不额外显示状态文字列。
-- V1 右侧展示采用文件级 accordion：文件行先展示摘要，点击后展开该文件具体 unified diff；默认展开第一个有 diff body 的文件。
-- 空态要区分「Git provider 成功运行但没有改动」和「当前 workspace 还不是 Git repository」。
-- 若 diff 被裁剪，只显示裁剪提示，不伪装成完整 diff。
+### Enable rich preview
 
-实现约束：
+支持的图片展示当前工作区图片预览；关闭后回退为“图片已变化”的结构化提示。未知二进制文件始终不注入文本 renderer。
 
-- renderer 不直接运行 Git，也不读文件系统。
-- main process 提供 IPC，内部可以通过受控子进程或专用库调用 Git。
-- 所有路径必须回到 workspaceRoot 边界内。
-- `.git` 目录内容不作为普通文件 diff 展示。
-- Git provider 失败时返回结构化 `failed` / `notAvailable` 状态。
+### Enable word diffs
 
-无 Git 时：
+控制增删行内部的 token/word 高亮。关闭后仍保留普通行级 Diff。
 
-- Git provider 返回明确状态 `not_a_repository`。
-- UI 提示创建 Git repository；初始化 Git 必须是显式用户动作。
-- 如果当前 session 有 Agent diff，可提供 `Session changes only` 兜底入口，但必须说明它只包含 actspace / Agent 会话改动，不代表完整工作区状态。
+### Hide white space / Show white space
 
-### V2: Session Review
+- 控制当前 Review 查询是否忽略纯空白变化，并生成语义一致的新 snapshot。
+- Standard 和 capped mode 都有效；capped mode 仍只加载当前选中文件。
+- 该选项不负责把空格或 Tab 渲染成可见符号；可见空白字符不属于当前 Review Options。
 
-第二版接入 session provider，用于展示 Agent 本轮或当前会话产生的变更视角。
+### Copy git apply command
 
-数据来源：
+Main 基于已加载、generation 匹配的 snapshot 生成 binary/full-index patch，写入应用临时目录，并只返回：
 
-- `session.jsonl` 里的 `tool_result` / `diff_preview`。
-- `ToolUiPreview.kind === "edit_diff"` 和 `ToolUiPreview.kind === "write"`。
-- `createSessionDiffSummary(sessionId, events)` 聚合出的文件列表和总增删行。
-
-特点：
-
-- 不依赖 Git，可以作为无 Git workspace 的轻量兜底。
-- 只展示 actspace / Agent 已经产生过 preview 的改动。
-- 不能发现用户在外部编辑器手动改过但没有经过 actspace 工具链的文件。
-- 更适合作为 `Last Turn` / `Current Session` scope，而不是 Review 主入口。
-
-右侧视图：
-
-- 顶部显示来源 `Session changes`、总文件数、总增删行。
-- 文件列表按最近来源事件或路径稳定排序。
-- 空态要说明「当前会话还没有可评审的 Agent 文件改动」。
-- 若 diff 被裁剪，只显示裁剪提示，不伪装成完整 diff。
-
-### V3: Snapshot Review
-
-第三版可以为长期无 Git 工作区提供 actspace baseline，但它不应阻塞 V1 Git Review 或 V2 Session Review。
-
-基本流程：
-
-1. 用户首次在无 Git workspace 打开 Review 时，提示创建 baseline。
-2. main process 扫描 workspace 中可文本化、未被忽略、未超限的文件。
-3. 保存文件摘要、mtime/size 和必要文本内容到本地 userData，而不是写入项目目录。
-4. 后续 Review 用当前文件系统与 snapshot baseline 计算 diff。
-5. 用户可以刷新 baseline，此动作必须是显式的。
-
-存储边界：
-
-- snapshot 属于 actspace 本地应用数据，不提交到项目。
-- snapshot 可能包含源码正文，必须只保存在本机。
-- 不上传，不进入 `session.jsonl`，只在必要时记录轻量引用。
-
-性能边界：
-
-- 默认忽略 `node_modules`、`.git`、`dist`、`.next`、`.turbo`、`coverage` 等目录。
-- 单文件大小和总扫描大小必须有限制。
-- 二进制文件只记录状态和大小，不生成文本 diff。
-- 大仓库应增量扫描，避免每次打开 Review 全量读取。
-
-## Provider 选择策略
-
-Review 入口应 Git-first，再按当前场景组合其它 provider：
-
-1. 工作区是 Git 仓库：默认显示 `git` 的 `Uncommitted` scope，因为这是当前工作区真实变更。
-2. 当前会话已有 Agent diff：允许切换到 `Last Turn` / `Session` scope，用于追踪 Agent 本轮行为。
-3. 无 Git 但有 snapshot baseline：显示 `snapshot`。
-4. 无 Git 且无 snapshot baseline：显示创建 Git repository 的引导；如果当前 session 有 diff，可提供 `Session changes only` 但必须标明不完整。
-5. 无任何 baseline 且无 session diff：显示 `noBaseline`，不要说「没有改动」。
-
-后续 UI 可以有 scope segmented control：
-
-- `Uncommitted`
-- `Unstaged`
-- `Staged`
-- `Since Base`
-- `Last Turn`
-- `Session`
-
-V1 至少做 `Uncommitted`；`Staged` / `Unstaged` 可以在同一阶段内渐进实现。`Last Turn` / `Session` 属于 V2。
-
-## AI Review 边界
-
-AI Review 是 ReviewChangeSet 的消费者，不是 changed-file provider。
-
-输入应包含：
-
-- 结构化 diff chunks。
-- 用户自定义 Review 指令。
-- 相关 rules / AGENTS.md 摘要。
-- 必要的文件上下文片段。
-- 语言、测试、lint 信息等可选证据。
-
-输出应是结构化 finding：
-
-```ts
-type ReviewFinding = {
-  id: string;
-  severity: "high" | "medium" | "low" | "note";
-  filePath: string;
-  line?: number;
-  title: string;
-  body: string;
-  sourceChunkId?: string;
-};
+```sh
+git apply -- '<validated temporary patch path>'
 ```
 
-V1 右侧 Review 只做人工浏览，不启动模型审查。AI Review 按钮和 finding 渲染单独规划，避免把「查看变更」和「让模型审查」混成一个不可测行为。
+包含 untracked 文件、Last Turn、空 patch 或超出上限时拒绝生成，并给出明确原因。Renderer 只负责把 main 返回的命令复制到剪贴板。
 
-## 与 Commit / Push / PR 的关系
+## 工具栏与布局
 
-Commit / Push / PR 可以复用 ReviewChangeSet，但不能反过来要求 Review 必须来自 Git。
+主工具栏固定为一行：
 
-- `session` provider 的改动可能已经写盘，也可能只是待应用 preview；提交前必须确认文件系统状态。
-- `git` provider 是提交动作的事实来源。
-- `snapshot` provider 可以辅助审查，但不能直接 commit；最终仍需要 Git 或其他 VCS provider。
+```text
+[Scope⌄] [+N] [-N]    […] [Collapse] [Jump] [Diff mode] [Files] [Commit or push⌄]
+```
 
-因此第一版 Composer 上方可以保留「Review」和未来「Commit / push」两个概念：Review 是看变化，Commit / Push 是 VCS 动作。V1 即使已经展示 Git diff，也不要直接把「打开 Review」等同于「准备提交全部文件」。
+- additions 为 0 时不显示 `+0`。
+- deletions 为 0 时不显示 `-0`。
+- 两者都为 0 时不渲染 totals 容器。
+- Branch 的 `local → upstream` 放在主工具栏下方的轻量 metadata 行，不创建第二排 action toolbar。
+- Changed Files 按 Review 容器宽度响应：宽度不小于 `560px` 时停靠在 Diff 右侧，不使用遮罩；更窄时切换为独占 Review 内容区的文件列表，选中文件后自动返回 Diff。
+- split diff 只在 Review 容器宽度不小于 `640px` 时可用；判断依据是 Review 自身宽度，不是 `window.innerWidth`。
+- Scope、Options、Jump 和 Commit 菜单通过顶层 portal 定位，不能作为横向滚动 toolbar 的子元素，否则会被 `overflow` 裁切成“点击无反应”。
+- Files、Jump、Expand 与 split 在当前 snapshot 不具备数据或宽度条件时显示明确 disabled 状态，不执行空操作。
+- Review Tab 的关闭由右侧对象 Tab chrome 负责，不在 Review 工具栏重复增加关闭按钮。
 
-## 错误与空态
+## Git Mutation
 
-必须区分以下状态：
+- `unstaged` file/hunk 可以 stage。
+- `staged` file/hunk 可以 unstage。
+- revert 前必须明确确认；untracked 文件优先进入系统废纸篓。
+- mutation 成功或部分成功后增加 generation 并刷新。
+- Commit/Push 复用 workspace environment 的既有状态机。
+- Create PR 由 main 检查 `gh`、GitHub remote、认证、当前分支、upstream 和已有 PR。
 
-- `empty`: provider 成功运行，但没有改动。
-- `notAvailable`: provider 在当前 workspace 不适用，例如不是 Git 仓库。
-- `noBaseline`: 没有可比较的 baseline。
-- `partial`: 结果可用但存在裁剪、二进制跳过、忽略目录等警告。
-- `failed`: provider 运行失败。
+## Viewed 状态
 
-不要把 `noBaseline` 展示成 `empty`。这会误导用户以为工作区没有变化。
+Viewed 是本机 UI 偏好，保存在 app data 下有上限的 sidecar：
 
-## 安全与隐私
+- key 包含 workspace、selection、path 和 file fingerprint。
+- 不写入 Git、不写入 session JSONL。
+- 不保存 Diff、文件正文或密钥。
+- 文件 fingerprint 改变后默认回到未阅。
 
-- renderer 只消费结构化 Review 数据，不直接读文件。
-- 所有 workspace 路径由 main process 做边界校验。
-- Review 数据可能包含源码，默认只在本地持久化。
-- AI Review 需要明确走模型调用时，才把必要 diff 和上下文发给 provider。
-- 对超大 diff 必须裁剪，并在 UI 和模型输入中都保留裁剪标记。
+## 大变更与失败状态
 
-## 实施路线
+- 文件数超过 128、总增删超过 9,000 行或估算变更内容超过 12 MiB 时进入 capped mode。
+- capped mode 保留完整文件树，但只请求、挂载和渲染当前选中的一个文件，并在 Diff 底部显示轻量说明。
+- Standard mode 通过批量 patch 请求和虚拟 row renderer 展示全部文件 Diff，不使用逐文件 IPC fan-out。
+- Git 命令与 patch 解析运行在专用 Review worker；tracked full content 使用最多 4 个 blob 的 `cat-file --batch`，不逐文件 `git show`。
+- 单文件 patch 上限 1 MiB；untracked summary/full content 上限 2 MiB。
+- 单文件请求支持 `idle`、`loading`、`ready`、`partial`、`failed` 与 Retry；generation 变化会取消或忽略旧结果。
+- Snapshot 支持 `empty`、`partial`、`notAvailable`、`failed`、`stale` 和 mutation `partialSuccess`。
+- Git 错误裁剪并脱敏；不向 renderer 暴露任意命令执行能力。
 
-### Phase 1: Git Review Tab
+## 验证要求
 
-- main process 增加 Git provider 和 `review:get-workspace-changes` IPC。
-- 支持 Git repository 检测、uncommitted diff、staged / unstaged / untracked 汇总。
-- Composer Review 按钮接入真实 Git 统计，替换硬编码 `+4253 -5`。
-- 新增右侧 `Review` tab 类型和视图组件，默认展示 `Uncommitted` scope。
-- 无 Git 时提示创建 Git repository，初始化动作必须由用户显式触发。
-- 补 renderer / main 测试，覆盖按钮显示、Git 空态、not_a_repository、tab 打开和基础 diff 渲染。
+自动化至少覆盖：
 
-### Phase 2: ReviewChangeSet 抽象
+- 六种 scope、Branch upstream、ahead/behind、repo 子目录和复杂路径。
+- full-file loading、word diff 数据、copy apply patch、stage/unstage/revert stale guard。
+- toolbar 单行结构、零值统计隐藏、portal 菜单、Files 停靠/窄宽独占布局、Review Tab 与聊天共存。
+- shared build、desktop typecheck、targeted/full Vitest、主题检查和 `git diff --check`。
 
-- 在 shared 中引入 `ReviewChangeSet` 类型。
-- 把 Git provider 输出迁移或适配为 `ReviewChangeSet`。
-- renderer 不自行解析 raw diff，而只消费结构化 Review 数据。
+手动验收单独记录：
 
-### Phase 3: Session Provider
+- 浅色/深色主题与 390–640px 右侧面板视觉；核心 Electron 验收已覆盖 620px 停靠 Files、菜单和按钮命中，390px 降级另有 renderer regression 覆盖。
+- Branch 展示真实 `local → origin/*`。
+- disposable repo 的 stage/revert/commit。
+- 真实 Push/Create PR；自动化通过不等于真实远端验收通过。
 
-- 把 `SessionDiffSummary` 适配为 `ReviewChangeSet` 的 `session` provider。
-- main process 提供 `review:get-session` IPC，renderer 不自行拼复杂状态。
-- UI 增加 `Last Turn` / `Session` scope，并明确该 scope 只代表 Agent 会话改动。
+## 明确不做
 
-### Phase 4: Snapshot Provider
-
-- 为无 Git workspace 提供显式 baseline 创建 / 刷新。
-- 增量扫描和本地 snapshot 存储。
-- UI 区分 `noBaseline`、`empty` 和 `partial`。
-
-### Phase 5: AI Review
-
-- 基于 ReviewChangeSet 触发模型审查。
-- 输出结构化 findings。
-- 右侧 Review tab 增加 findings 层和文件行定位。
-
-## 非目标
-
-- V1 不实现 Session Review 主入口。
-- V1 不实现 snapshot baseline。
-- V1 不自动运行 AI Review。
-- V1 不把 Review 结果直接等同于可提交文件集合。
-- V1 不要求实现 stage / unstage / revert 等 Git 写操作；这些动作可以在只读 Review 稳定后补齐。
-- V1 不支持跨 workspace 聚合。
+- 不提供 AI Review、Review 模型、findings、Review activity 或 detached review task。
+- 不自动 fetch、pull、push、commit 或应用任何修改。
+- 不同步远端 PR review comments。
+- 不让 renderer 执行任意 Git、shell 或文件系统命令。
