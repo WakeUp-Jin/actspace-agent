@@ -14,6 +14,7 @@
 - 左侧会话栏支持 `expanded / hidden` 两态；旧 icon rail 已退役。
 - 窗口宽度不超过 `820px` 时进入紧凑布局，左右面板改为覆盖层，不再参与主区分栏。
 - 中间聊天区始终是优先保护的主工作区。
+- Review 是右侧对象系统中的普通对象 Tab；打开后保持聊天主区、Composer 和左侧会话栏，不建立全屏例外。
 - SplitView 自研，不把工作台面板语义直接绑定到通用 splitter 依赖。
 - 桌面端窗口隐藏系统标题栏，应用的左、中、右区域直接从窗口顶部开始；左侧栏为 macOS 窗口控制按钮预留安全距离，而不是在三栏外再套一条全局标题栏。
 
@@ -67,6 +68,17 @@
 - 对象 Tab 与内容渲染规则继续由 `右侧面板与文件渲染规范.md` 约束。
 - Terminal 的 PTY、会话归属、背压、进程清理与打包签名见 `front-右侧终端与会话生命周期规范.md`。
 
+### Review 右侧对象模式
+
+- Composer、Environment 或右侧对象菜单打开 Review 时，以稳定 workspace Review 对象去重并激活右侧 Tab。
+- Review 不替换 `SplitView.main`，不主动隐藏左侧栏，也不修改聊天 scroll、Composer draft 或长期布局偏好。
+- Review 顶部先经过右侧 Tab 行的 chrome 安全高度；内部工具栏属于 `no-drag` 点击区域。
+- Changed files 不再使用覆盖 Diff 的遮罩浮层：Review 容器宽度不小于 `560px` 时停靠在右侧，更窄时成为独占内容区的文件列表，选中文件后返回 Diff。
+- Review 内部响应式必须测量 Review 容器自身。Files 的 `560px` 阈值和 split diff 的 `640px` 阈值都不能用整个窗口宽度代替。
+- Toolbar 可以横向滚动，但 Scope、Options、Jump、Commit 等弹层必须 portal 到顶层并按触发器定位，避免被 toolbar 的 `overflow` 裁切。
+- `<= 820px` 时 Review 复用普通 compact right-panel overlay；关闭遮罩或按 `Escape` 返回聊天。
+- Review 的 scope、upstream Branch、diff、Options 和 Git action 规则见 `docs/design-docs/core-review-change-sources.md`。
+
 ## SplitView 底座
 
 首版 SplitView 应把通用面板交互和 `actspace` 的区域语义分开。
@@ -87,6 +99,8 @@
 | 中间聊天区 | 自适应 | `560px` | 空间不足时优先保护 |
 | 右侧对象区 | `390px` | `320px` | 建议最大 `min(640px, 50vw)` |
 | 桌面窗口 | `1440px` | `480px` | `<= 820px` 使用紧凑覆盖模式 |
+
+Review 同样遵守上述右侧对象区宽度；窄宽度优先 unified diff，并把 Changed files 降级为独占 Review 内容区，而不是覆盖一半 Diff。
 
 当窗口空间不足时：
 

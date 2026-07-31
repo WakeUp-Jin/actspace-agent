@@ -8,7 +8,7 @@ Environment 是聊天态工作台顶部的本地工作区控制面。它回答�
 2. 当前工作区有哪些未提交变更、位于哪个分支？
 3. 用户要把工作区交给哪个本机工具，或执行哪一个明确的本地 Git 动作？
 
-本规范参考 Codex 的紧凑信息层级和渐进式操作，但视觉继续使用 ActSpace Editor Design System / Ink & Emerald。它不是远程代码托管中心，也不替代右侧 Review 面板。
+本规范参考 Codex 的紧凑信息层级和渐进式操作，但视觉继续使用 ActSpace Editor Design System / Ink & Emerald。它不是远程代码托管中心，也不替代完整 Review Workbench。
 
 ## 产品目标
 
@@ -38,7 +38,7 @@ Environment 是聊天态工作台顶部的本地工作区控制面。它回答�
 
 - 展示当前 workspace 相对 `HEAD` 的 staged、unstaged 和 untracked 全部变更。
 - 行尾展示 `+N -M`；没有变更时展示中性 `Clean`。
-- 点击后打开现有右侧 Review Tab，不在 popover 内重复渲染 diff。
+- 点击后创建或聚焦当前 workspace 的右侧 Review Tab；不在 popover 内重复渲染 diff。
 - Review 返回 partial 或 warning 时仍展示可用统计，并在 Environment 中提供有限错误提示。
 
 ### This Mac / Worktree
@@ -139,7 +139,7 @@ renderer UI
 - popover 每次打开时刷新环境状态，workspace 变化时清空旧状态。
 - create branch、commit 和 push 同一时间只允许一个进行中的 Git mutation。
 - mutation 进行中禁用重复动作，并显示动作级 loading 文案。
-- mutation 完成后统一刷新 Environment 与 Composer Review summary；用户下一次打开 Review Tab 时使用新的 refresh key 读取真实状态。
+- mutation 完成后统一触发 Review Coordinator invalidation，Environment、Composer summary 和已打开 Review Workbench 消费同一新 generation，不再依赖下一次打开 tab 时递增 refresh key。
 - Agent 正在运行不自动禁止 Git 操作；Git 是否可执行由真实 repository 状态决定。但 UI 必须避免用户连点产生并发写操作。
 
 ## 视觉与交互

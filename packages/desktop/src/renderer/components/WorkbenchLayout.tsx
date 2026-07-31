@@ -1,3 +1,4 @@
+import { DEFAULT_MODEL_ID } from "@actspace/shared";
 import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, SessionListItem, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlaskConical } from "lucide-react";
@@ -320,10 +321,9 @@ export function WorkbenchLayout({
   }
 
   const openReviewTab = useCallback(() => {
-    const workspaceKey = selectedWorkspaceRoot ?? "default";
     const refreshKey = ++reviewTabRefreshCounterRef.current;
     openTab({
-      id: `review:${workspaceKey}:git:uncommitted`,
+      id: "review",
       kind: "review",
       title: "Review",
       workspaceRoot: selectedWorkspaceRoot ?? undefined,
@@ -504,6 +504,12 @@ export function WorkbenchLayout({
       fileRevalidateKey={fileRevalidateKey}
       onOpenReview={openReviewTab}
       onReviewChanged={onReviewChanged}
+      onSendToAgent={onSend ? (text) => onSend(text, {
+        model: selectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID,
+        mode: composerMode ?? "agent",
+        selectedSkills: selectedSkills ?? [],
+        thinkingEnabled: false,
+      }) : undefined}
     />
   );
 

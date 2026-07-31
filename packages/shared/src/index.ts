@@ -1,4 +1,5 @@
 export * from "./ipc";
+export * from "./review";
 export {
   PROVIDER_IDS,
   PROVIDER_REGISTRY,

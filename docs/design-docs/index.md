@@ -17,7 +17,8 @@
 
 - `core-beliefs.md`：Agent-first 的工作原则和模板设计出发点。
 - `core-storage-and-observability.md`：本地存储、workspace root 和可观测性边界。
-- `core-review-change-sources.md`：Review 变更来源与 Git-first baseline。
+- `core-review-change-sources.md`：Git-first Review Workbench 单一事实源，覆盖六种 scope、upstream Branch、结构化 diff、Review Options、Git actions 与验收边界。
+- `core-review-large-diff-loading.md`：Review Standard/capped 双模式、批量 patch、完整文件正文、虚拟渲染和性能验收规范。
 - `agent-index.md`：Agent Runtime 和全部 Agent 专题的总入口。
 - `agent-plugins-fs-watch.md`：独立 fs-watch 插件设计；当前没有其他同级插件设计与它形成稳定专题。
 - `website-introduction-site-design.md`：`packages/site` 官网、公开文档、博客、更新页、视觉系统和静态部署的长期设计规范。

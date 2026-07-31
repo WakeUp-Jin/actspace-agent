@@ -9,9 +9,9 @@
  * Agent turn 执行逻辑在 ./agent-turn.ts。
  */
 
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, safeStorage } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, safeStorage, shell } from "electron";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
-import { access, mkdir } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type {
@@ -50,8 +50,15 @@ import type {
   ListVisualizationsInput,
   VisualizeReplyInput,
   DescribeContextInput,
-  ReviewGetWorkspaceChangesInput,
   ReviewInitGitInput,
+  ReviewApplyMutationInput,
+  ReviewCreatePullRequestInput,
+  ReviewCopyApplyCommandInput,
+  ReviewGetFileContentsInput,
+  ReviewGetFileDiffsInput,
+  ReviewGetSnapshotInput,
+  ReviewSetFileViewedInput,
+  ReviewWorkspaceInput,
   WorkspaceEnvironmentGetInput,
   WorkspaceGitCommitAndPushInput,
   WorkspaceGitCommitInput,
@@ -143,7 +150,13 @@ import { loadMainAgentRuntimeContext } from "./agent-runtime-context";
 import { listWorkspaceDir, readWorkspaceFile, statWorkspaceFile } from "./workspace-fs-service";
 import { readSessionArtifact } from "./session-artifact-service";
 import { showArtifactContextMenu } from "./artifact-context-menu-service";
-import { getWorkspaceGitChanges, initializeGitRepository } from "./review-git-service";
+import { initializeGitRepository } from "./review-git-service";
+import { ReviewCoordinator } from "./review-coordinator";
+import { ReviewGitEngine } from "./review-git-engine";
+import { ReviewGitWorkerClient } from "./review-git-worker-client";
+import { ReviewLastTurnService } from "./review-last-turn-service";
+import { ReviewPullRequestService } from "./review-pr-service";
+import { ReviewViewStateService } from "./review-view-state-service";
 import {
   commitAndPushWorkspaceChanges,
   commitWorkspaceChanges,
@@ -189,9 +202,11 @@ import { BrowserBridgeService } from "./plugins/browser-bridge-service";
 import { FsWatchService } from "./plugins/fs-watch-service";
 import { installSkillFromDirectory, listSkills, uninstallSkillDirectory } from "./skills-service";
 
-const APP_ID = "com.actspace.desktop";
-const APP_NAME = "actspace";
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
+const APP_ID = process.env.ACTSPACE_DEV_APP_ID?.trim() || "com.actspace.desktop";
+const APP_DISPLAY_NAME = process.env.ACTSPACE_DEV_APP_NAME?.trim() || "actspace";
+const APP_DATA_DIRECTORY_NAME = "actspace";
+const IS_PACKAGED_BUILD = app.isPackaged && !DEV_SERVER_URL;
 const PREVIEW_LIMIT = 160;
 const workspaceAppIconCache = new Map<string, string>();
 
@@ -284,7 +299,8 @@ function initializeStartupLogging(): void {
   writeStartupLog("main", "startup log initialized", {
     logPath: startupLogPath,
     runLogPath: startupRunLogPath,
-    isPackaged: app.isPackaged,
+    isPackaged: IS_PACKAGED_BUILD,
+    electronIsPackaged: app.isPackaged,
     version: app.getVersion(),
     execPath: process.execPath,
   });
@@ -442,7 +458,7 @@ async function workspaceRegistryOptionsForRoots(roots: AppDataRoots) {
 
 async function resolveRegisteredWorkspaceForRoots(
   roots: AppDataRoots,
-  input: { workspaceRoot?: string },
+  input: { workspaceId?: string; workspaceRoot?: string },
 ) {
   const sessions = await listAllSessionSummaries(roots.sessionRoot);
   return resolveRegisteredWorkspaceSelection({
@@ -501,6 +517,75 @@ let localUpdateService: LocalUpdateService | undefined;
 let localUpdateQuitRequested = false;
 let browserBridgeService: BrowserBridgeService | undefined;
 let fsWatchService: FsWatchService | undefined;
+let reviewCoordinator: ReviewCoordinator | undefined;
+let reviewCoordinatorDataRoot: string | undefined;
+let reviewGitEngine: ReviewGitEngine | undefined;
+let reviewGitWorkerClient: ReviewGitWorkerClient | undefined;
+let reviewPullRequestService: ReviewPullRequestService | undefined;
+
+function getReviewPullRequestService(): ReviewPullRequestService {
+  reviewPullRequestService ??= new ReviewPullRequestService();
+  return reviewPullRequestService;
+}
+
+function isSafeSessionId(value: string): boolean {
+  return value.length > 0 && value !== "." && value !== ".." && !value.includes("/") && !value.includes("\\");
+}
+
+async function resolveReviewWorkspace(roots: AppDataRoots, input: ReviewWorkspaceInput) {
+  let workspaceId = input.workspaceId;
+  let workspaceRoot = input.workspaceRoot;
+  if ((!workspaceId && !workspaceRoot) && input.sessionId && isSafeSessionId(input.sessionId)) {
+    const record = await readSessionRecord(createSessionStorePaths(join(roots.sessionRoot, input.sessionId)));
+    workspaceId = record?.meta.workspaceId;
+    workspaceRoot = record?.meta.workspaceRoot;
+  }
+  const resolved = await resolveRegisteredWorkspaceForRoots(roots, { workspaceId, workspaceRoot });
+  return resolved.ok === true
+    ? { ok: true as const, workspace: { workspaceId: resolved.workspaceId, workspaceRoot: resolved.workspaceRoot } }
+    : { ok: false as const, message: resolved.error };
+}
+
+function getReviewCoordinator(roots: AppDataRoots): ReviewCoordinator {
+  if (reviewCoordinator && reviewCoordinatorDataRoot === roots.dataRoot) return reviewCoordinator;
+  reviewCoordinator?.dispose();
+  reviewGitWorkerClient?.dispose();
+  const lastTurn = new ReviewLastTurnService(roots.sessionRoot);
+  const worker = new ReviewGitWorkerClient();
+  const engine = new ReviewGitEngine({
+    runner: worker.runGit,
+    patchParser: worker.parsePatches,
+    objectLoader: worker.loadGitObjects,
+    trashFile: (absolutePath) => shell.trashItem(absolutePath),
+    loadLastTurn: (input) => lastTurn.getSnapshot(input),
+    loadLastTurnFileDiff: (input) => lastTurn.getFileDiff(input),
+  });
+  reviewGitWorkerClient = worker;
+  reviewGitEngine = engine;
+  reviewCoordinator = new ReviewCoordinator({
+    resolveWorkspace: (input) => resolveReviewWorkspace(roots, input),
+    queryProvider: engine,
+    mutationProvider: engine,
+    viewState: new ReviewViewStateService({ filePath: join(roots.dataRoot, "review", "view-state.json") }),
+  });
+  reviewCoordinator.subscribe((notification) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send("review:changed", notification);
+    }
+  });
+  reviewCoordinatorDataRoot = roots.dataRoot;
+  return reviewCoordinator;
+}
+
+function getReviewGitEngine(roots: AppDataRoots): ReviewGitEngine {
+  getReviewCoordinator(roots);
+  if (!reviewGitEngine) throw new Error("Review Git engine is unavailable.");
+  return reviewGitEngine;
+}
+
+function quoteShellArgument(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
 
 function getSettingsService(): SettingsService {
   if (!settingsService) {
@@ -618,11 +703,11 @@ function getLocalUpdateService(): LocalUpdateService {
 // ─── Electron 配置 ───
 
 function configureAppPaths() {
-  app.setName(APP_NAME);
-  const userDataRoot = join(app.getPath("appData"), APP_NAME);
+  app.setName(APP_DISPLAY_NAME);
+  const userDataRoot = join(app.getPath("appData"), APP_DATA_DIRECTORY_NAME);
   app.setPath("userData", userDataRoot);
   initializeStartupLogging();
-  logMain("app paths configured", { userDataRoot });
+  logMain("app paths configured", { appId: APP_ID, appName: APP_DISPLAY_NAME, userDataRoot });
 }
 
 function mapConsoleLevel(level: number): "log" | "warn" | "error" | "debug" | "info" {
@@ -729,7 +814,9 @@ async function createMainWindow() {
       console.error(`Failed to load dev server URL: ${DEV_SERVER_URL}`, error);
       throw error;
     }
-    win.webContents.openDevTools({ mode: "detach" });
+    if (process.env.ACTSPACE_OPEN_DEVTOOLS === "1") {
+      win.webContents.openDevTools({ mode: "detach" });
+    }
   } else {
     const filePath = join(__dirname, "..", "..", "dist", "index.html");
     logMain("loading packaged renderer", { filePath });
@@ -931,7 +1018,7 @@ async function registerIpc() {
       sessionRoot: roots.sessionRoot,
       logRoot: roots.logRoot,
       tmpRoot: roots.tmpRoot,
-      workspaceRoot: roots.defaultWorkspaceRoot,
+      workspaceRoot: roots.workspaceRoot,
     });
   });
 
@@ -1177,14 +1264,88 @@ async function registerIpc() {
     return showArtifactContextMenu(input, roots, window);
   });
 
-  ipcMain.handle("review:get-workspace-changes", async (_event, input: ReviewGetWorkspaceChangesInput = {}) => {
-    const roots = await ensureDataDirectories();
-    return getWorkspaceGitChanges(input, roots);
-  });
-
   ipcMain.handle("review:init-git", async (_event, input: ReviewInitGitInput = {}) => {
     const roots = await ensureDataDirectories();
     return initializeGitRepository(input, roots);
+  });
+
+  ipcMain.handle("review:get-snapshot", async (_event, input: ReviewGetSnapshotInput) => {
+    const roots = await ensureDataDirectories();
+    return getReviewCoordinator(roots).getSnapshot(input);
+  });
+
+  ipcMain.handle("review:refresh-snapshot", async (_event, input: ReviewGetSnapshotInput) => {
+    const roots = await ensureDataDirectories();
+    return getReviewCoordinator(roots).refreshSnapshot(input);
+  });
+
+  ipcMain.handle("review:get-file-diffs", async (_event, input: ReviewGetFileDiffsInput) => {
+    const roots = await ensureDataDirectories();
+    return getReviewCoordinator(roots).getFileDiffs(input);
+  });
+
+  ipcMain.handle("review:get-file-contents", async (_event, input: ReviewGetFileContentsInput) => {
+    const roots = await ensureDataDirectories();
+    return getReviewCoordinator(roots).getFileContents(input);
+  });
+
+  ipcMain.handle("review:apply-mutation", async (_event, input: ReviewApplyMutationInput) => {
+    const roots = await ensureDataDirectories();
+    return getReviewCoordinator(roots).applyMutation(input);
+  });
+
+  ipcMain.handle("review:set-file-viewed", async (_event, input: ReviewSetFileViewedInput) => {
+    const roots = await ensureDataDirectories();
+    return getReviewCoordinator(roots).setFileViewed(input);
+  });
+
+  ipcMain.handle("review:list-branches", async (_event, input: ReviewWorkspaceInput) => {
+    const roots = await ensureDataDirectories();
+    const resolved = await resolveReviewWorkspace(roots, input);
+    if (!resolved.ok) return { ok: false, code: "invalid_workspace", message: resolved.message };
+    try {
+      return { ok: true, branches: await getReviewGitEngine(roots).listBranches(resolved.workspace) };
+    } catch (error) {
+      return { ok: false, code: "command_failed", message: safeErrorMessage(error) };
+    }
+  });
+
+  ipcMain.handle("review:copy-apply-command", async (_event, input: ReviewCopyApplyCommandInput) => {
+    const roots = await ensureDataDirectories();
+    const loaded = await getReviewCoordinator(roots).getLoadedSnapshot(input);
+    if (!loaded.ok) return loaded;
+    try {
+      const patch = await getReviewGitEngine(roots).createPatch(loaded.workspace, loaded.snapshot);
+      const directory = join(roots.tmpRoot, "review-patches");
+      await mkdir(directory, { recursive: true });
+      const patchPath = join(directory, `${loaded.snapshot.id}.patch`);
+      await writeFile(patchPath, patch, "utf8");
+      return { ok: true, patchPath, command: `git apply -- ${quoteShellArgument(patchPath)}` };
+    } catch (error) {
+      return { ok: false, code: "command_failed", message: safeErrorMessage(error) };
+    }
+  });
+
+  ipcMain.handle("review:get-pr-capability", async (_event, input: ReviewWorkspaceInput & { baseBranch?: string }) => {
+    const roots = await ensureDataDirectories();
+    const resolved = await resolveReviewWorkspace(roots, input);
+    if (!resolved.ok) return { ok: false, code: "invalid_workspace", message: resolved.message };
+    return getReviewPullRequestService().getCapability(resolved.workspace.workspaceRoot, input.baseBranch);
+  });
+
+  ipcMain.handle("review:create-pr", async (_event, input: ReviewCreatePullRequestInput) => {
+    const roots = await ensureDataDirectories();
+    const resolved = await resolveReviewWorkspace(roots, input);
+    if (!resolved.ok) return { ok: false, code: "invalid_workspace", message: resolved.message };
+    const result = await getReviewPullRequestService().create({
+      workspaceRoot: resolved.workspace.workspaceRoot,
+      title: input.title,
+      body: input.body,
+      baseBranch: input.baseBranch,
+      draft: input.draft,
+    });
+    if (result.ok) await shell.openExternal(result.url);
+    return result;
   });
 
   ipcMain.handle("workspace-environment:get", async (_event, input: WorkspaceEnvironmentGetInput = {}) => {
@@ -2001,7 +2162,7 @@ app.whenReady().then(async () => {
   localUpdateService = new LocalUpdateService({
     dataRoot: roots.dataRoot,
     appPath: process.execPath,
-    isPackaged: app.isPackaged,
+    isPackaged: IS_PACKAGED_BUILD,
     onReadyToReplace: () => {
       localUpdateQuitRequested = true;
       logMain("local update ready to replace, quitting app");
@@ -2010,7 +2171,7 @@ app.whenReady().then(async () => {
   });
   try {
     await localUpdateService.load();
-    logMain("local update service ready", { dataRoot: roots.dataRoot, packaged: app.isPackaged });
+    logMain("local update service ready", { dataRoot: roots.dataRoot, packaged: IS_PACKAGED_BUILD });
   } catch (err) {
     logMain("local update service load failed", { error: err instanceof Error ? err.message : String(err) });
   }
@@ -2094,6 +2255,8 @@ app.on("before-quit", (event) => {
   }
   // fs-watch 插件：同步 best-effort SIGTERM；插件自己会 flush 事件并写最后一次心跳
   fsWatchService?.shutdownSync();
+  reviewCoordinator?.dispose();
+  reviewGitWorkerClient?.dispose();
   if (!kairosController) {
     disposeTerminalIpc?.();
     kairosIpcHandle?.dispose();

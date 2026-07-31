@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UI 展开状态不是后台请求计划</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f7f8f6; --surface:#fff; --text:#20231f; --muted:#667067; --line:#d9ddd7; --accent:#087f5b; --danger:#c92a2a; --code:#eef1ed; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#171917; --surface:#202320; --text:#edf0ec; --muted:#a6afa6; --line:#383e38; --accent:#63e6be; --danger:#ff8787; --code:#292d29; } }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:16px/1.7 system-ui,-apple-system,"PingFang SC",sans-serif; }
+    main { width:min(920px,calc(100% - 32px)); margin:0 auto; padding:56px 0 80px; }
+    header { border-bottom:1px solid var(--line); padding-bottom:28px; }
+    h1 { margin:0 0 12px; font-size:clamp(30px,5vw,52px); line-height:1.12; letter-spacing:0; }
+    h2 { margin:44px 0 12px; font-size:24px; letter-spacing:0; }
+    p { margin:10px 0; }
+    .lead { max-width:760px; color:var(--muted); font-size:18px; }
+    .flow { display:grid; grid-template-columns:1fr auto 1fr; gap:16px; align-items:center; margin:24px 0; }
+    .flow > div { border-left:4px solid var(--accent); padding:14px 16px; background:var(--surface); }
+    .flow .bad { border-color:var(--danger); }
+    .arrow { color:var(--muted); font-size:24px; }
+    pre { overflow:auto; margin:16px 0; padding:18px; border:1px solid var(--line); background:var(--code); font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    table { width:100%; border-collapse:collapse; margin:18px 0; }
+    th,td { border-bottom:1px solid var(--line); padding:11px 10px; text-align:left; vertical-align:top; }
+    th { color:var(--muted); font-size:13px; }
+    .takeaway { margin-top:40px; padding:20px 22px; border:1px solid var(--line); background:var(--surface); }
+    ul { padding-left:22px; }
+    @media (max-width:680px) { .flow { grid-template-columns:1fr; } .arrow { transform:rotate(90deg); justify-self:center; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>UI 展开状态不是后台请求计划</h1>
+    <p class="lead">当列表、树或 Diff 页面很大时，用户看到什么、数据加载什么、DOM 挂载什么，是三个不同的问题。把它们绑在一个 <code>expandedIds</code> 上，会把一次普通点击放大成不可控的 I/O 和渲染风暴。</p>
+  </header>
+
+  <h2>反直觉的失败模式</h2>
+  <p>“Expand all”看起来只是展示动作。旧实现却把每个展开 ID 直接变成一次请求，因此复杂度沿链路逐层放大。</p>
+  <div class="flow">
+    <div class="bad"><strong>展示状态</strong><br>N 个文件被标记为展开</div>
+    <span class="arrow">→</span>
+    <div class="bad"><strong>后台副作用</strong><br>N 次 IPC、N 个 Git child、N 份 patch、N 组 DOM</div>
+  </div>
+  <p>即使画面只显示当前文件，只要 store 仍保留全部 expanded ID，系统就是“视觉 capped、后台 uncapped”。这类 bug 很难从截图判断，必须看 producer 到 consumer 的完整调用链。</p>
+
+  <h2>把三个集合分开</h2>
+  <table>
+    <thead><tr><th>集合</th><th>回答的问题</th><th>应该由谁决定</th></tr></thead>
+    <tbody>
+      <tr><td><code>displayedIds</code></td><td>当前界面有哪些 section？</td><td>load policy + selection + filter</td></tr>
+      <tr><td><code>requestedIds</code></td><td>后台现在允许读取哪些数据？</td><td>snapshot load policy</td></tr>
+      <tr><td><code>mountedRows</code></td><td>此刻 DOM 中保留哪些行？</td><td>virtualizer visible range</td></tr>
+    </tbody>
+  </table>
+
+  <pre><code>// 错误：交互状态隐式决定 I/O
+useEffect(() =&gt; {
+  expandedIds.forEach(loadFileDiff)
+}, [expandedIds])
+
+// 正确：策略显式决定唯一请求集合
+const requestedIds = loadPolicy.mode === "single-file"
+  ? [selectedFileId]
+  : snapshot.textFileIds
+
+loadFileDiffs(requestedIds)</code></pre>
+
+  <h2>为什么只加并发限制还不够</h2>
+  <p>Semaphore 能把 100 个并发压成 8 个，但不能消除 100 次重复的 repository 解析、Git 启动和 patch 组装。它降低峰值，却保留总工作量与长尾。</p>
+  <p>更有效的顺序是：先缩小请求集合，再把同基线、同参数的 tracked files 合成批量命令，最后才对无法批处理的 untracked/file reads 使用有界并发。</p>
+
+  <h2>Generation 是取消边界</h2>
+  <p>scope、workspace、whitespace 语义或 Git 状态变化后，旧请求即使最终成功，也不再属于当前界面。每个 generation 应有自己的 AbortController、pending cache 和 prepared context。</p>
+  <pre><code>invalidate(workspaceId) {
+  state.abortController.abort()
+  state.abortController = new AbortController()
+  state.generation += 1
+  state.pending.clear()
+  state.prepared.clear()
+}</code></pre>
+  <p>取消 child process 解决资源浪费；snapshot/generation guard 解决迟到结果污染。两者缺一不可。</p>
+
+  <h2>虚拟化解决的是 DOM，不是数据</h2>
+  <p>虚拟列表只限制挂载行。如果后台仍加载全部完整文件，内存和 Git I/O 依然会爆。反过来，只做 capped 数据加载但把 9,000 行一次挂进 DOM，滚动与 React commit 仍会卡。</p>
+  <div class="flow">
+    <div><strong>Data policy</strong><br>Standard 批量 patch；capped 当前文件；full content 仅可见附近</div>
+    <span class="arrow">+</span>
+    <div><strong>Render policy</strong><br>扁平稳定 row key；可变高度测量；有限 overscan</div>
+  </div>
+
+  <h2>常见陷阱</h2>
+  <ul>
+    <li>失败 Promise 留在 cache，Retry 永远拿到同一个失败结果。</li>
+    <li>只取消网络/child，不做 generation guard，迟到结果覆盖新 selection。</li>
+    <li>full-file 开关复用 patch 请求，导致关掉显示选项时重新执行全部 Git。</li>
+    <li>虚拟列表用 DOM ID 跳转，目标行未挂载时定位失效；应使用 virtual index。</li>
+    <li>jsdom 没有真实布局，尺寸观察得到 0；测试保底视口必须在真实尺寸出现后让位。</li>
+  </ul>
+
+  <div class="takeaway">
+    <strong>自检问题</strong>
+    <ol>
+      <li>一次 Expand all 最终会产生几次 IPC、几条 Git 命令和多少 live DOM row？</li>
+      <li>切换 scope 后，旧 child 是否被取消？旧结果是否还能写入新 state？</li>
+      <li>关闭 full content 时，patch 是否无需重取且仍可阅读？</li>
+    </ol>
+    <p>来源：Review Workbench 大 Diff 性能纠偏，关联 history <code>20260730-1832-review-workbench.md</code>。</p>
+  </div>
+</main>
+</body>
+</html>

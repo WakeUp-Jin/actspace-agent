@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, BootstrapState, CompactContextInput, GenerateEvalCandidateInput, ReviewGetWorkspaceChangesResult, RunTurnInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
+import type { AppSettings, BootstrapState, CompactContextInput, GenerateEvalCandidateInput, ReviewGetSnapshotResult, RunTurnInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
@@ -53,10 +53,7 @@ const settingsApiStub = {
   visualizeReply: async () => ({ html: "<!doctype html><html></html>", sourceHash: "stub", cached: false }),
   listVisualizations: async () => ({ items: [] }),
   describeContext: async () => null,
-  getWorkspaceReview: async () => ({
-    provider: "git" as const,
-    status: "empty" as const,
-  }),
+  getReviewSnapshot: async () => createReviewChanges(0, 0),
   initGitRepository: async () => ({
     ok: true,
     alreadyRepository: true,
@@ -141,27 +138,52 @@ function createEmptySessionRecord(sessionId: string): SessionRecord {
   };
 }
 
-function createReviewChanges(additions: number, deletions: number): ReviewGetWorkspaceChangesResult {
+function createReviewChanges(additions: number, deletions: number): ReviewGetSnapshotResult {
+  const hasChanges = additions + deletions > 0;
   return {
-    provider: "git",
-    status: "changes",
-    changeSet: {
+    ok: true,
+    snapshot: {
       id: `review-${additions}-${deletions}`,
-      source: "git",
-      scope: "uncommitted",
+      generation: 1,
+      workspaceId: "ws_source",
       workspaceRoot: "/tmp/workspace",
+      repoRoot: "/tmp/workspace",
+      selection: { kind: "uncommitted" },
       baseline: { kind: "git-ref", label: "HEAD" },
-      files: [
+      target: { label: "Working tree" },
+      status: hasChanges ? "ready" : "empty",
+      files: hasChanges ? [
         {
+          id: "src/example.ts",
           path: "src/example.ts",
           status: "modified",
           additions,
           deletions,
-          chunks: [],
+          binary: false,
+          renderKind: "text",
+          source: "workingTree",
+          diffLoadStatus: "idle",
+          viewed: false,
+          fingerprint: "example-fingerprint",
         },
-      ],
-      totalAdditions: additions,
-      totalDeletions: deletions,
+      ] : [],
+      totals: { files: hasChanges ? 1 : 0, additions, deletions, changedLines: additions + deletions, estimatedChangedBytes: 0 },
+      capabilities: {
+        canStageFile: hasChanges,
+        canStageHunk: hasChanges,
+        canUnstageFile: false,
+        canUnstageHunk: false,
+        canRevertFile: hasChanges,
+        canRevertHunk: hasChanges,
+        canLoadFullFile: true,
+        canOpenFile: true,
+        canCommit: hasChanges,
+        canPush: false,
+        canCreatePullRequest: false,
+        disabledReasons: {},
+      },
+      loadPolicy: { mode: "all-files" },
+      queryOptions: { ignoreWhitespaceChanges: false },
       generatedAt: new Date().toISOString(),
     },
   };
@@ -328,7 +350,7 @@ describe("App streaming user message", () => {
     let reviewDeletions = 2;
     let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
       null;
-    const getWorkspaceReview = vi.fn(async () => createReviewChanges(reviewAdditions, reviewDeletions));
+    const getReviewSnapshot = vi.fn(async () => createReviewChanges(reviewAdditions, reviewDeletions));
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
       writable: true,
@@ -361,7 +383,7 @@ describe("App streaming user message", () => {
       }),
       listPendingApprovals: async () => [],
       ...settingsApiStub,
-      getWorkspaceReview,
+      getReviewSnapshot,
       onAgentStream: () => () => {},
       runTurn: () =>
         new Promise((resolve) => {
@@ -373,9 +395,10 @@ describe("App streaming user message", () => {
 
     expect(await screen.findByRole("button", { name: "Review pending changes +7 -2" })).toHaveTextContent("Review+7-2");
     await waitFor(() => {
-      expect(getWorkspaceReview).toHaveBeenCalledWith({
+      expect(getReviewSnapshot).toHaveBeenCalledWith({
         workspaceRoot: "/tmp/workspace",
-        scope: "uncommitted",
+        sessionId,
+        selection: { kind: "uncommitted" },
       });
     });
 
@@ -1613,7 +1636,7 @@ describe("App streaming user message", () => {
         arguments: { path: "packages/desktop/src/renderer/App.tsx" },
       },
     };
-    const getWorkspaceReview = vi.fn(async () => createReviewChanges(7, 2));
+    const getReviewSnapshot = vi.fn(async () => createReviewChanges(7, 2));
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
@@ -1645,7 +1668,7 @@ describe("App streaming user message", () => {
       listPendingApprovals: async () => [],
       getSubAgentTranscript: async () => [],
       ...settingsApiStub,
-      getWorkspaceReview,
+      getReviewSnapshot,
       onAgentStream: (callback) => {
         streamHandler = callback;
         return () => {

@@ -103,6 +103,7 @@ export function RightPanel({
   fileRevalidateKey,
   onOpenReview,
   onReviewChanged,
+  onSendToAgent,
 }: {
   contextState?: ContextState | null;
   sessionId?: string | null;
@@ -111,6 +112,7 @@ export function RightPanel({
   fileRevalidateKey?: number;
   onOpenReview?: () => void;
   onReviewChanged?: () => void;
+  onSendToAgent?: (text: string) => void;
 }) {
   const { activeTab, isFileTreeOpen, isFileTreeCollapsed, syncTerminalTabs } = useRightPanel();
   useFileFreshness({ workspaceRoot, revalidateKey: fileRevalidateKey });
@@ -149,8 +151,10 @@ export function RightPanel({
               tab={activeTab}
               contextState={contextState}
               sessionId={sessionId}
+              workspaceRoot={workspaceRoot}
               onOpenReview={onOpenReview}
               onReviewChanged={onReviewChanged}
+              onSendToAgent={onSendToAgent}
             />
           )}
         </div>
@@ -502,14 +506,18 @@ function RightPanelBody({
   tab,
   contextState,
   sessionId,
+  workspaceRoot,
   onOpenReview,
   onReviewChanged,
+  onSendToAgent,
 }: {
   tab: RightPanelTab | null;
   contextState?: ContextState | null;
   sessionId?: string | null;
+  workspaceRoot?: string;
   onOpenReview?: () => void;
   onReviewChanged?: () => void;
+  onSendToAgent?: (text: string) => void;
 }) {
   const { openTab } = useRightPanel();
   if (!tab) {
@@ -527,7 +535,8 @@ function RightPanelBody({
   if (tab.kind === "review") {
     return (
       <ReviewRenderView
-        workspaceRoot={tab.workspaceRoot}
+        workspaceRoot={workspaceRoot}
+        sessionId={sessionId}
         refreshKey={tab.refreshKey}
         onReviewChanged={onReviewChanged}
       />

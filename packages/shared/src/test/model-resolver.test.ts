@@ -106,6 +106,10 @@ describe("model resolver", () => {
       ok: false,
       reason: "capability_mismatch",
     });
+    expect(resolveConfiguredModel(snapshot, definition.key, "review")).toMatchObject({
+      ok: false,
+      reason: "capability_mismatch",
+    });
     expect(resolveConfiguredModel(snapshot, definition.key, "kairos")).toMatchObject({
       ok: false,
       reason: "capability_mismatch",
@@ -129,6 +133,7 @@ describe("model resolver", () => {
     expect(capabilityMatchesPurpose(definition, "chat")).toBe(true);
     expect(capabilityMatchesPurpose(definition, "vision")).toBe(true);
     expect(resolveConfiguredModel(snapshot, definition.key, "chat").ok).toBe(true);
+    expect(resolveConfiguredModel(snapshot, definition.key, "review").ok).toBe(true);
     expect(resolveConfiguredModel(snapshot, definition.key, "vision").ok).toBe(true);
   });
 

@@ -659,4 +659,5 @@ describe("session selectors", () => {
       recentEvents: preview.recentEvents,
     });
   });
+
 });
