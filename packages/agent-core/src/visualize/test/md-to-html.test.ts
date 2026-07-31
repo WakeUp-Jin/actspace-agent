@@ -11,9 +11,9 @@ vi.mock("../../llm/factory", () => ({
 
 const llmConfig: LLMConfig = {
   provider: "deepseek",
-  api: "anthropic-messages",
+  api: "openai-completions",
   apiKey: "sk-main-only",
-  baseUrl: "https://api.deepseek.com/anthropic",
+  baseUrl: "https://api.deepseek.com",
   model: "deepseek-v4-pro",
 };
 

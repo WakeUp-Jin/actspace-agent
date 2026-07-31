@@ -17,8 +17,8 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderSpec> = {
   deepseek: {
     id: "deepseek",
     label: "DeepSeek",
-    defaultBaseUrl: "https://api.deepseek.com/anthropic",
-    supportedApis: ["anthropic-messages", "openai-completions"],
+    defaultBaseUrl: "https://api.deepseek.com",
+    supportedApis: ["openai-completions"],
     supportsRemoteModelCatalog: false,
     supportsProxy: true,
   },

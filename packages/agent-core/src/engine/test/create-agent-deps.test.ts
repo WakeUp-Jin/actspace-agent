@@ -11,9 +11,7 @@ import { appendEvents } from "../../persistence/jsonl";
 function createTestEnvConfig(overrides?: Partial<AgentEnvConfig>): AgentEnvConfig {
   return {
     deepseekApiKey: "sk-test-deepseek",
-    deepseekApiFormat: "anthropic",
     deepseekBaseUrl: undefined,
-    deepseekAnthropicBaseUrl: undefined,
     kimiApiKey: "sk-test-kimi",
     kimiBaseUrl: undefined,
     temperature: undefined,
@@ -50,7 +48,7 @@ describe("buildLLMConfig", () => {
     const config = buildLLMConfig(spec, envConfig);
 
     expect(config.provider).toBe("deepseek");
-    expect(config.apiFormat).toBe("anthropic");
+    expect(config.apiFormat).toBe("openai");
     expect(config.apiKey).toBe("sk-test-deepseek");
     expect(config.model).toBe("deepseek-v4-flash");
     expect(config.temperature).toBeUndefined();
@@ -94,7 +92,6 @@ describe("buildLLMConfig", () => {
   it("should include baseUrl when provided", () => {
     const spec = MODEL_REGISTRY["deepseek-v4-flash"];
     const envConfig = createTestEnvConfig({
-      deepseekApiFormat: "openai",
       deepseekBaseUrl: "https://custom.api.com",
     });
     const config = buildLLMConfig(spec, envConfig);
@@ -102,23 +99,9 @@ describe("buildLLMConfig", () => {
     expect(config.baseUrl).toBe("https://custom.api.com");
   });
 
-  it("should use Anthropic baseUrl when DeepSeek apiFormat is anthropic", () => {
-    const spec = MODEL_REGISTRY["deepseek-v4-flash"];
-    const envConfig = createTestEnvConfig({
-      deepseekApiFormat: "anthropic",
-      deepseekBaseUrl: "https://openai-compatible.example",
-      deepseekAnthropicBaseUrl: "https://anthropic-compatible.example",
-    });
-    const config = buildLLMConfig(spec, envConfig);
-
-    expect(config.apiFormat).toBe("anthropic");
-    expect(config.baseUrl).toBe("https://anthropic-compatible.example");
-  });
-
   it("should omit baseUrl when not provided", () => {
     const spec = MODEL_REGISTRY["deepseek-v4-flash"];
     const envConfig = createTestEnvConfig({
-      deepseekApiFormat: "openai",
       deepseekBaseUrl: undefined,
     });
     const config = buildLLMConfig(spec, envConfig);
@@ -332,7 +315,7 @@ describe("buildAgentConfigFromRuntime reasoning controls", () => {
 describe("buildAgentConfig (via dynamic import to reset env)", () => {
   const ENV_KEYS = [
     "DEEPSEEK_API_KEY", "KIMI_API_KEY",
-    "DEEPSEEK_API_FORMAT", "DEEPSEEK_BASE_URL", "DEEPSEEK_ANTHROPIC_BASE_URL",
+    "DEEPSEEK_BASE_URL",
     "LLM_TEMPERATURE", "LLM_MAX_TOKENS",
     "ACTSPACE_DISABLED_TOOLS",
   ];
@@ -453,9 +436,8 @@ describe("buildAgentConfig (via dynamic import to reset env)", () => {
     expect(config.llmConfig.apiKey).toBe("sk-env-deepseek");
   });
 
-  it("should route DeepSeek config to Anthropic format by default", async () => {
+  it("should route DeepSeek config to OpenAI-compatible format by default", async () => {
     process.env.DEEPSEEK_API_KEY = "sk-env-deepseek";
-    process.env.DEEPSEEK_ANTHROPIC_BASE_URL = "https://anthropic.example";
     const { loadEnv } = await import("../../env");
     const { buildAgentConfig } = await import("../create-agent-deps");
     loadEnv({ envPath: EMPTY_ENV_PATH, mergeToProcessEnv: false });
@@ -464,16 +446,15 @@ describe("buildAgentConfig (via dynamic import to reset env)", () => {
 
     expect(config.llmConfig).toMatchObject({
       provider: "deepseek",
-      apiFormat: "anthropic",
+      apiFormat: "openai",
       apiKey: "sk-env-deepseek",
-      baseUrl: "https://anthropic.example",
+      baseUrl: "https://api.deepseek.com",
     });
-    expect(config.toolManagerConfig.apiFormat).toBe("anthropic");
+    expect(config.toolManagerConfig.apiFormat).toBe("openai");
   });
 
-  it("should keep the OpenAI-compatible route as an explicit DeepSeek fallback", async () => {
+  it("should honor a custom DeepSeek OpenAI-compatible base URL", async () => {
     process.env.DEEPSEEK_API_KEY = "sk-env-deepseek";
-    process.env.DEEPSEEK_API_FORMAT = "openai";
     process.env.DEEPSEEK_BASE_URL = "https://openai.example";
     const { loadEnv } = await import("../../env");
     const { buildAgentConfig } = await import("../create-agent-deps");
@@ -597,19 +578,19 @@ describe("createAgentFromConfig", () => {
     expect(withoutKey.toolManager.has("web_fetch")).toBe(true);
   });
 
-  it("should register web tools for DeepSeek Anthropic format", async () => {
+  it("should register web tools for DeepSeek OpenAI format", async () => {
     const { createAgentFromConfig } = await import("../create-agent-deps");
     const config = createTestAgentConfig({
       llmConfig: {
         provider: "deepseek",
-        apiFormat: "anthropic",
+        apiFormat: "openai",
         apiKey: "sk-test-deepseek",
         model: "deepseek-v4-flash",
       },
       toolManagerConfig: {
         workspaceRoot: "/tmp/workspace",
         primaryProvider: "deepseek",
-        apiFormat: "anthropic",
+        apiFormat: "openai",
         hasKimiKey: true,
         hasWebSearchKey: true,
         disabledTools: [],

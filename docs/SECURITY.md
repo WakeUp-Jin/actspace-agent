@@ -7,7 +7,7 @@
 - **不提交密钥**：`.env` 已在 `.gitignore` 中，API Key 等敏感值只存在本地 `.env` 文件或系统环境变量中。
 - **模板文件**：`.env.example` 列出全部可配置项和说明，新开发者克隆仓库后复制为 `.env` 即可。
 - **集中管理**：所有环境变量通过 `packages/agent-core/src/env.ts` 统一读取和验证，禁止在业务代码中散落 `process.env.XXX` 直接读取。
-- **DeepSeek API 格式边界**：`DEEPSEEK_API_FORMAT=openai|anthropic` 只影响 agent-core 里的 DeepSeek service 选择。当前默认是 `anthropic`，使用 `DEEPSEEK_ANTHROPIC_BASE_URL`；`openai` 是临时回退路线，使用 `DEEPSEEK_BASE_URL`。两个 base URL 都不应传入 renderer。
+- **DeepSeek API 格式边界**：DeepSeek 固定使用 OpenAI-compatible Chat Completions，配置只保留 `DEEPSEEK_BASE_URL`（默认 `https://api.deepseek.com`）。旧 `DEEPSEEK_API_FORMAT` / `DEEPSEEK_ANTHROPIC_BASE_URL` 不再读取；官方 `/anthropic` 设置值只在 main 进程加载时迁移为默认根地址，renderer 仍不接收实际运行时 URL 或密钥。
 - **Kimi key 边界**：`KIMI_API_KEY` 只作为 Kimi 主模型密钥使用。该 key 只在 main/agent-core 运行时读取，不进入 renderer、session 事件、前端状态或测试快照。
 - **OpenRouter key 边界**：OpenRouter API Key 与 DeepSeek / Kimi 使用同一安全边界，通过 Electron `safeStorage` 加密落盘；renderer 只读取是否已配置、连接状态和脱敏诊断，不读取明文。
 - **DuckCoding 多 Key 边界**：默认 Key 沿用 provider 级 `safeStorage` 密文；额外 Key 以 `<provider>:<credentialId>` 为密文索引，普通 settings 只保存稳定 id、label、倍率和连接状态。模型只保存同 provider 的 `credentialId` 引用，renderer 不能读取、回显或在模型页创建 Key。被模型引用的额外 Key 禁止删除，缺失引用不得静默回退默认 Key。
@@ -53,12 +53,12 @@
 - OpenRouter 的连接测试、模型目录拉取和真实模型请求都由 main 进程发起，renderer 只消费裁剪后的服务商、模型与连接状态；供应商级代理不写全局代理环境变量。
 - DuckCoding 复用 main 进程的 OpenAI-compatible runtime。每次调用先按模型 `credentialId` 解析同 provider 的目标密钥；默认 Key 与额外 Key 的连接状态、倍率和密文彼此独立，不做自动轮询或失败切换。Codex 使用 Responses API，推理强度只改变精确请求模型名，不向请求体增加 OpenRouter 风格的 reasoning effort 属性；Grok 与未知手动模型默认使用 Chat Completions。
 - DuckCoding Codex 的 `prompt_cache_key` 由 session id 单向哈希派生，避免把原始本地 session 标识发送给外部服务。Responses 请求使用 `store: false`，不依赖外部会话存储；供应商返回的加密 reasoning item 会作为 opaque signature 随本地 session 事件持久化并在工具循环中回放，不应记录进普通日志、当作可读思考展示或传给无关 provider/API。
-- 普通会话默认使用真实 DeepSeek provider，且 DeepSeek 默认走 Anthropic-compatible route；`LLM_PROVIDER=kimi` 可切换 Kimi 主模型。Electron 真实 turn 不允许被 mock 配置静默替代，mock 仅用于测试、浏览器 fixture 或显式 demo。
+- 普通会话默认使用真实 DeepSeek provider，并固定走 OpenAI-compatible Chat Completions；`LLM_PROVIDER=kimi` 可切换 Kimi 主模型。Electron 真实 turn 不允许被 mock 配置静默替代，mock 仅用于测试、浏览器 fixture 或显式 demo。
 - Usage 页 DeepSeek 余额查询通过 main 进程调用 `GET /user/balance`，renderer 只接收已裁剪的余额展示模型，不接触 `DEEPSEEK_API_KEY`、鉴权头或 DeepSeek 原始响应。
 - `web_search`（外部搜索 API 双通道）任一搜索 provider key 存在时注册，`web_fetch`（本地抓取）始终注册（见 `agent-web-tools.md`）。缺 key 时 executor 的兜底错误只提示需要配置的 key 名，不泄露其它运行时信息。
 - `generate_image` 仅在配置图片服务 Key 时向主 Agent 注册；默认模型为 `gpt-image-2`，但模型名和 Base URL 均由设置页覆盖。完整生成请求不自动重试，避免上游已计费时产生重复费用。
 - 图片附件只在当前模型 `input` 包含 `image` 时进入 LLM 请求；本地图片会在 turn 边界临时转成 data URL，但不会写入 session、renderer 状态或日志。text-only 模型只接收附件元信息和 runtime model 能力提示。
-- 2026-07-06 起 DeepSeek Anthropic-compatible 路线不再声明 provider-native server tool `web_search_20250305`（server 搜索与本地工具混用会触发网关 DSML 泄漏，见 `agent-deepseek-kimi-hybrid-capabilities.md` 决策记录）。
+- DeepSeek 当前 OpenAI-compatible 路线不声明 provider-native server search，联网能力统一由受密钥和工具权限控制的本地 `web_search` / `web_fetch` 提供。历史 Anthropic 路线的 DSML guard 只为协议兼容测试与旧记录保留。
 - 历史 session 中的 Anthropic server `server_tool_use`、`web_search_tool_result` 属于 provider 响应协议，不应当作为本地 ToolManager 执行日志写入；session / run log 只保留 `serverToolUse` 请求计数，不应将未裁剪网页全文或 provider tool result 原文写入 session。
 - 验收真实 provider 时应先发送不含仓库内容和隐私的固定探针，确认连接后再决定是否允许工具结果进入外部模型上下文。
 - API 错误仅暴露必要的结构化诊断信息，不把鉴权请求头或密钥写入日志、session 或界面。

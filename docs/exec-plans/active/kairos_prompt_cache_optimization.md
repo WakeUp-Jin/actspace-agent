@@ -33,7 +33,7 @@
   - `packages/desktop/src/main/index.ts`（`createKairos` 调用点，硬编码 `contextWindow: 32_000`）
   - `packages/desktop/src/renderer/state/kairosSelectors.ts`、`components/right-panel/KairosRightPanelView.tsx`
 - 已知约束：
-  - DeepSeek Anthropic 兼容端要求 assistant 消息块顺序 `[thinking, text, ...toolCalls]`，`tool_use` 必须为末尾块。
+  - 历史 DeepSeek Anthropic 会话重放仍要求 assistant 消息块顺序 `[thinking, text, ...toolCalls]`，`tool_use` 必须为末尾块；当前 DeepSeek 主线已切到 OpenAI Chat Completions。
   - `anthropic-convert.ts` 仅在 thinking 块带 `signature` 时才回发给 API。
   - 发送 = 落盘 = 重放：tick content 与重放消息结构必须与现场逐字节一致。
   - `MODEL_REGISTRY` contextWindow：deepseek-v4-flash / v4-pro = 1_000_000，kimi-k2.6 = 256_000。

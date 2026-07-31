@@ -14,12 +14,12 @@
 
 当前 LLM 分层以 `api` 而不是品牌 service 为主线：
 
-- `AnthropicMessagesService`：Anthropic Messages 协议实现层，承接 DeepSeek 默认路线。
-- `OpenAICompletionsService`：OpenAI Chat Completions 协议实现层，承接 OpenAI-compatible fallback 和普通 Kimi 内部调用。
+- `AnthropicMessagesService`：通用 Anthropic Messages 协议实现层；不再承接内置 DeepSeek 模型。
+- `OpenAICompletionsService`：OpenAI Chat Completions 协议实现层，承接当前 DeepSeek 与 Kimi 普通调用。
 - `KimiService`：兼容包装层，只兜底 Kimi 的 provider 默认值；普通对话复用 `OpenAICompletionsService`。
 - `DeepSeekService` / `DeepSeekAnthropicService`：兼容包装层，只兜底 provider 默认值；协议职责归属 `OpenAICompletionsService` / `AnthropicMessagesService`。
 
-2026-05-29 后，DeepSeek 默认走 Anthropic-compatible 路线：主 Agent 默认模型为 `deepseek-v4-pro` 且默认开启 thinking；Kairos 默认模型独立为 `deepseek-v4-flash` 且默认开启 thinking。两条链路都会用 Anthropic Messages API。原有 OpenAI-compatible 路线继续保留，可通过 `DEEPSEEK_API_FORMAT=openai` 显式回退。
+2026-07-31 起，DeepSeek 内置模型与 provider 固定走 OpenAI-compatible Chat Completions，默认 Base URL 为 `https://api.deepseek.com`。主 Agent 默认模型仍为 `deepseek-v4-pro`，Kairos 默认模型仍为 `deepseek-v4-flash`；两者默认开启 Thinking，并显式使用 `reasoning_effort=max`。Composer 只提供 `High` / `Max` 两档，不提供 Auto。旧 `DEEPSEEK_API_FORMAT` / `DEEPSEEK_ANTHROPIC_BASE_URL` 已退出运行时配置，精确的官方 `/anthropic` 设置地址会迁移回 provider 默认根地址。
 
 2026-07-06 起，DeepSeek 的联网搜索不再使用 provider-native server tool `web_search_20250305`。原因：DeepSeek Anthropic 网关在「server 搜索 + 本地工具混用」的轮次会稳定触发 DSML 泄漏（模型的本地工具调用被当正文吐出），导致整轮失败且自动重试无效。移除 server tool 后所有工具调用统一走标准 `tool_use` 链路，泄漏触发器消失。
 
@@ -31,7 +31,7 @@
 
 - 公开 UI 让用户在 DeepSeek `deepseek-v4-flash` / `deepseek-v4-pro` 与 Kimi `kimi-k2.6` 之间选择；Kimi 作为 DeepSeek 降智时的备用主模型。
 - Kimi 作为主模型时也不挂 provider-native `$web_search`；联网搜索统一由本地 `web_search` / `web_fetch` 工具承担。
-- 跨模型续聊：DeepSeek（Anthropic）与 Kimi（OpenAI-compatible）之间切换由 `transform-messages` 归一兜底（thinking 降级为文本、tool call id/signature 标准化），避免格式不兼容导致崩溃。
+- 跨模型续聊：DeepSeek 与 Kimi 当前都走 OpenAI-compatible；`transform-messages` 仍负责 thinking 降级、tool call id/signature 标准化和历史 Anthropic 消息兼容，避免旧会话或后续跨协议模型切换崩溃。
 - 联网搜索与网页读取由独立的 `web_search` / `web_fetch` 工具承担（见 `docs/design-docs/tool-system/agent-web-tools.md`），不依赖 Kimi key。
 - 图片输入按 `MODEL_REGISTRY.input` 显式路由：支持 `image` 的主模型直接接收图片 content parts；不支持 `image` 的主模型只接收附件元信息和“不应做视觉判断”的文本提示。
 - 供应商细节不泄露给主模型。DeepSeek 不需要知道 `$web_search`、`moonshot/web-search:latest` 或 `kimi-k2.6`。
@@ -73,21 +73,22 @@
 
 ### DeepSeek
 
-DeepSeek 是低成本主力模型。它应看到稳定、供应商无关的工具。当前有两条实现路线：
+DeepSeek 是低成本主力模型。它应看到稳定、供应商无关的工具。当前只有一条内置运行路线：
 
-**OpenAI-compatible 路线（显式回退）**
+**OpenAI-compatible 路线**
 
-- 通过 `DEEPSEEK_API_FORMAT=openai` 启用。
+- 内置模型和 provider 固定选择 `openai-completions`，无需协议开关。
 - 普通对话由 `OpenAICompletionsService` 处理；`DeepSeekService` 只保留为兼容包装入口。
+- Thinking 开关映射为 `thinking: { type: "enabled" | "disabled" }`；开启时强度只允许 `reasoning_effort: "high" | "max"`，默认显式发送 `max`。
 - 本地文件工具与 `web_fetch`：默认可见。
 - `web_search`：任一搜索 provider key（智谱 / Tavily / TinyFish / Exa）存在时可见，与 Kimi key 无关（见 `docs/design-docs/tool-system/agent-web-tools.md`）。
 - DeepSeek 当前模型元数据声明为 `input: ["text"]`，不能接收图片附件或 Computer Use 截图。Browser Use / Computer Use 的提示词应根据 `<runtime_model>.input` 选择策略：支持 `image` 时可直接使用截图；text-only 时优先 DOM、accessibility tree、URL、可见文本和结构化状态，必要时请用户切换到 image-capable 模型。
 
 DeepSeek 不直接处理 Kimi 的内置工具协议，也不直接消费 Kimi Formula 的 encrypted output。
 
-**Anthropic-compatible 路线**
+**Anthropic-compatible 路线（历史兼容）**
 
-- 当前 DeepSeek 默认 API 路线，主 Agent 与 Kairos 都会沿用；主 Agent 默认模型为 `deepseek-v4-pro`，Kairos 默认模型为 `deepseek-v4-flash`。
+- 内置 DeepSeek 模型、provider 注册表和 env 已不再选择该路线。
 - 由 `AnthropicMessagesService` 使用 Anthropic Messages API 真流式（`client.messages.stream`）调用 DeepSeek，逐增量转发 text/thinking/tool_use，结束后由流式累加器组装最终消息。
 - `DeepSeekAnthropicService` 只保留为兼容包装层，不再是协议职责事实来源。
 - 2026-07-06 起不再声明 server tool `web_search_20250305`；联网搜索与 OpenAI-compatible 路线一致，走独立的 `web_search` / `web_fetch` 工具（搜索 key 门控见 `docs/design-docs/tool-system/agent-web-tools.md`）。历史 session 中的 `server_tool_use` / `web_search_tool_result` 响应块仍按 provider 响应块处理，不映射成本地工具事件。
@@ -163,20 +164,15 @@ input: text,image
 
 Kimi provider-native `builtin_function.$web_search` 不再使用。联网搜索统一走本地 `web_search` / `web_fetch` 工具，避免 provider 隐式回填循环与本地工具链分叉。
 
-## DeepSeek Anthropic 路线与联网搜索（历史：server web search 已移除）
+## DeepSeek Anthropic 路线与联网搜索（历史：主线已退休）
 
-> **2026-07-06 起 DeepSeek 不再使用 Anthropic server web search**。原因：DeepSeek Anthropic 网关在「server 搜索 + 本地工具混用」的轮次会稳定把模型的本地工具调用以 DSML 标记文本泄漏成正文（见决策记录 2026-06-08 / 2026-07-06），整轮失败且自动重试无效。联网搜索改走本地 `web_search` 工具（当前实现为外部搜索 API 双通道，见 `docs/design-docs/tool-system/agent-web-tools.md`）；DSML guard 与 LLM 自动重试保留作二道防线。
+> 该节记录 2026-07-31 之前的兼容实现。当前内置 DeepSeek 已固定使用 OpenAI Chat Completions；Anthropic service、转换器与 DSML guard 仅为通用协议能力、历史测试和旧记录保留。
 
 配置方式：
 
 ```env
-# 默认路线
-DEEPSEEK_API_FORMAT=anthropic
-DEEPSEEK_ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
-
-# 临时回退到旧 OpenAI-compatible 路线时使用
-# DEEPSEEK_API_FORMAT=openai
-# DEEPSEEK_BASE_URL=https://api.deepseek.com
+# 当前唯一路线
+DEEPSEEK_BASE_URL=https://api.deepseek.com
 ```
 
 边界：
@@ -230,7 +226,7 @@ Formula 可以作为后续扩展方向，但应单独设计“托管工具平台
 ## 测试原则
 
 - Kimi provider 测试使用 fake client，不依赖真实网络或真实密钥。
-- DeepSeek Anthropic service 测试使用 fake SDK client，不依赖真实网络或真实密钥。
+- DeepSeek OpenAI-compatible 请求测试必须覆盖默认 Max、显式 High 和关闭 Thinking；历史 Anthropic service 测试继续使用 fake SDK client，不依赖真实网络或真实密钥。
 - Anthropic route 测试必须覆盖请求中**不**声明 server tool（tools 只含 client tools、`web_search` 只出现一次），以及历史 `server_tool_use` / `web_search_tool_result` 响应块不被误映射成本地工具调用。
 - DSML 泄漏兜底测试必须覆盖：裸 DSML tool-call 标记被识别为可重试 `server_error` 且不落库；正常正文与含 “DSML” 词的普通正文不被误判。
 - Kimi 主模型测试必须覆盖：默认不声明 builtin `$web_search`，关闭或未传 Thinking 时不发送 `thinking: disabled`，显式开启 Thinking 时发送 `thinking: enabled`。
@@ -256,3 +252,4 @@ Formula 可以作为后续扩展方向，但应单独设计“托管工具平台
 - 2026-07-06（同日后续）：拆除 Kimi-backed `web_search`。`$web_search` 对给定 URL 爬取不可靠（页面不可达时幻觉内容），且嵌套一层 LLM 导致质量与 token 消耗不可控。联网能力改由独立工具承担：`web_fetch`（本地确定性抓取，始终注册）+ `web_search`（智谱 + Tavily/TinyFish/Exa 双通道外部搜索 API，`requiresKey: "webSearch"` 门控）。删除 `searchWithKimi`、`KimiService.streamWithBuiltinWebSearch`、`prompt/kimi-assistants/web-search.ts`；`analyze_media` 显式声明 `requiresKey: "kimi"`。Kimi 主模型的 provider-native `$web_search` 不受影响。设计事实来源迁至 `docs/design-docs/tool-system/agent-web-tools.md`。
 - 2026-07-09：删除 `analyze_media` 工具、Kimi media helper 和附件图片预分析链路。模型多模态能力改由 `MODEL_REGISTRY.input` 显式声明：支持 `image` 的主模型直接接收 image content parts；不支持 `image` 的主模型不再隐式调用 Kimi，只接收附件元信息和 runtime model 后缀。DeepSeek 未来支持图片时，只需把对应模型的 `input` 调整为 `["text", "image"]` 并验证 provider 协议即可启用图片输入。
 - 2026-07-09（同日后续）：Kimi 主模型不再挂 provider-native `$web_search`，联网搜索统一使用本地 `web_search` / `web_fetch` 工具。Kimi OpenAI-compatible 请求也不再发送 `thinking: { type: "disabled" }`；只有显式开启 Thinking 时才发送 `thinking: { type: "enabled" }`，避免 `kimi-k2.7-code` 这类只接受 enabled 的模型被 disabled 参数拦截。
+- 2026-07-31：DeepSeek 内置模型与 provider 从 Anthropic Messages 主线迁移到 OpenAI Chat Completions；移除运行时协议开关与 Anthropic 专用 env，精确迁移旧官方 `/anthropic` 设置。Thinking 只提供 High / Max，默认显式 Max；通用 Anthropic 协议实现与历史测试继续保留。

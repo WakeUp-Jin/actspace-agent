@@ -27,6 +27,27 @@ describe("provider adapter", () => {
     });
   });
 
+  it("maps DeepSeek thinking and effort to the OpenAI-compatible request", () => {
+    const base = { model: "deepseek-v4-pro", messages: [] };
+    expect(applyOpenAIProviderRequestParams("deepseek", base, { thinkingEnabled: true })).toEqual({
+      ...base,
+      thinking: { type: "enabled" },
+      reasoning_effort: "max",
+    });
+    expect(applyOpenAIProviderRequestParams("deepseek", base, {
+      thinkingEnabled: true,
+      reasoningEffort: "high",
+    })).toEqual({
+      ...base,
+      thinking: { type: "enabled" },
+      reasoning_effort: "high",
+    });
+    expect(applyOpenAIProviderRequestParams("deepseek", base, { thinkingEnabled: false })).toEqual({
+      ...base,
+      thinking: { type: "disabled" },
+    });
+  });
+
   it("maps OpenRouter reasoning controls to the unified reasoning object", () => {
     const base = { model: "openai/gpt-5", messages: [] };
     expect(applyOpenAIProviderRequestParams("openrouter", base, {

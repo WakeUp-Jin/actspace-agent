@@ -51,9 +51,7 @@ export interface FrontendTurnInput {
 /** 从 env / 配置文件读取的后端环境配置 */
 export interface AgentEnvConfig {
   deepseekApiKey: string;
-  deepseekApiFormat: "openai" | "anthropic";
   deepseekBaseUrl?: string;
-  deepseekAnthropicBaseUrl?: string;
   kimiApiKey: string;
   kimiBaseUrl?: string;
   /** 是否配置了任一 web_search provider key（智谱 / Tavily / TinyFish / Exa） */
@@ -158,9 +156,7 @@ export interface ExplicitAgentRuntimeInput {
 export function resolveAgentEnvConfig(): AgentEnvConfig {
   return {
     deepseekApiKey: env.DEEPSEEK_API_KEY,
-    deepseekApiFormat: env.DEEPSEEK_API_FORMAT,
     deepseekBaseUrl: env.DEEPSEEK_BASE_URL || undefined,
-    deepseekAnthropicBaseUrl: env.DEEPSEEK_ANTHROPIC_BASE_URL || undefined,
     kimiApiKey: env.KIMI_API_KEY,
     kimiBaseUrl: env.KIMI_BASE_URL || undefined,
     hasWebSearchKey: Boolean(
@@ -222,7 +218,7 @@ function buildLLMConfigFromRuntimeInternal(
     provider: providerRuntime.provider,
     api: model.api,
     ...(providerRuntime.provider === "deepseek" && {
-      apiFormat: model.api === "anthropic-messages" ? "anthropic" as const : "openai" as const,
+      apiFormat: "openai" as const,
     }),
     apiKey: providerRuntime.apiKey,
     baseUrl,
@@ -259,19 +255,13 @@ export function buildLLMConfigFromRuntime(
  * - temperature / maxTokens 来自 AgentEnvConfig（仅在显式覆盖时传递）
  */
 export function buildLLMConfig(spec: ModelSpec, envConfig: AgentEnvConfig): LLMConfig {
-  const api = spec.provider === "deepseek"
-    ? envConfig.deepseekApiFormat === "anthropic"
-      ? "anthropic-messages"
-      : "openai-completions"
-    : spec.api;
+  const api = spec.provider === "deepseek" ? "openai-completions" : spec.api;
   const apiKeyMap = {
     deepseek: envConfig.deepseekApiKey,
     kimi: envConfig.kimiApiKey,
   };
   const baseUrlMap = {
-    deepseek: envConfig.deepseekApiFormat === "anthropic"
-      ? envConfig.deepseekAnthropicBaseUrl ?? "https://api.deepseek.com/anthropic"
-      : envConfig.deepseekBaseUrl ?? "https://api.deepseek.com",
+    deepseek: envConfig.deepseekBaseUrl ?? "https://api.deepseek.com",
     kimi: envConfig.kimiBaseUrl ?? "https://api.moonshot.cn/v1",
   };
   const builtinDefinition = resolveModelDefinition(spec.id);
@@ -309,6 +299,9 @@ export function buildAgentConfig(
   const modelDefinition = resolveModelDefinition(modelSpec.id)!;
   const modelKey = normalizeModelKey(modelSpec.id)!;
   const thinkingEnabled = frontendInput.thinkingEnabled ?? modelSpec.thinkingDefault;
+  const reasoningEffort = thinkingEnabled
+    ? resolveReasoningEffort(modelDefinition, frontendInput.reasoningEffort)
+    : undefined;
   const llmConfig = buildLLMConfig(modelSpec, envConfig);
   const toolManagerConfig: ToolManagerConfig = {
     workspaceRoot,
@@ -334,6 +327,7 @@ export function buildAgentConfig(
     modelKey,
     toolManagerConfig,
     thinkingEnabled,
+    ...(reasoningEffort && { reasoningEffort }),
     modelSpec,
     systemPrompt: runtimeContext?.systemPrompt ?? MAIN_AGENT_SYSTEM_PROMPT,
     systemPromptSegments: runtimeContext?.systemPromptSegments ?? [],
@@ -542,9 +536,12 @@ function resolveReasoningEffort(
   definition: ModelDefinition,
   requested?: ModelReasoningEffort,
 ): ModelReasoningEffort | undefined {
-  if (!requested || !definition.capabilities.reasoning) return undefined;
+  if (!definition.capabilities.reasoning) return undefined;
   const supported = definition.capabilities.reasoningEfforts;
-  if (supported === null || supported?.includes(requested)) return requested;
+  const fallback = definition.capabilities.reasoningDefaultEffort;
+  const candidate = requested ?? fallback;
+  if (!candidate) return undefined;
+  if (supported === null || supported?.includes(candidate)) return candidate;
   return undefined;
 }
 
@@ -588,6 +585,8 @@ function modelDefinitionToCompatSpec(definition: ModelDefinition): ModelSpec {
     thinkingDefault: definition.thinkingDefault,
     supportsThinkingToggle: definition.capabilities.thinkingToggle,
     reasoning: definition.capabilities.reasoning,
+    ...(definition.capabilities.reasoningEfforts && { reasoningEfforts: [...definition.capabilities.reasoningEfforts] }),
+    ...(definition.capabilities.reasoningDefaultEffort && { reasoningDefaultEffort: definition.capabilities.reasoningDefaultEffort }),
     input: [...definition.capabilities.input],
     contextWindow: definition.contextWindow ?? 128_000,
     maxTokens: definition.maxTokens ?? 8192,

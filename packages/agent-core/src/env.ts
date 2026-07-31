@@ -43,12 +43,8 @@ export interface AppEnv {
 
   /** DeepSeek API Key */
   DEEPSEEK_API_KEY: string;
-  /** DeepSeek API protocol format */
-  DEEPSEEK_API_FORMAT: "openai" | "anthropic";
   /** DeepSeek Base URL（自部署时使用） */
   DEEPSEEK_BASE_URL: string;
-  /** DeepSeek Anthropic-compatible Base URL */
-  DEEPSEEK_ANTHROPIC_BASE_URL: string;
 
   /** Kimi API Key */
   KIMI_API_KEY: string;
@@ -160,25 +156,10 @@ const ENV_SCHEMA: { [K in keyof AppEnv]: EnvField<AppEnv[K]> } = {
     default: "",
     parse: str,
   },
-  DEEPSEEK_API_FORMAT: {
-    envKey: "DEEPSEEK_API_FORMAT",
-    required: false,
-    default: "anthropic" as const,
-    parse: (raw): AppEnv["DEEPSEEK_API_FORMAT"] => {
-      const v = raw.trim().toLowerCase();
-      return v === "anthropic" ? "anthropic" : "openai";
-    },
-  },
   DEEPSEEK_BASE_URL: {
     envKey: "DEEPSEEK_BASE_URL",
     required: false,
     default: "https://api.deepseek.com",
-    parse: str,
-  },
-  DEEPSEEK_ANTHROPIC_BASE_URL: {
-    envKey: "DEEPSEEK_ANTHROPIC_BASE_URL",
-    required: false,
-    default: "https://api.deepseek.com/anthropic",
     parse: str,
   },
 
@@ -467,15 +448,10 @@ export function envToLLMConfig(): LLMConfig {
   }
 
   return {
-    api: e.DEEPSEEK_API_FORMAT === "anthropic"
-      ? "anthropic-messages" as const
-      : "openai-completions" as const,
+    api: "openai-completions" as const,
     provider: "deepseek",
-    apiFormat: e.DEEPSEEK_API_FORMAT,
     apiKey: e.DEEPSEEK_API_KEY,
-    baseUrl: e.DEEPSEEK_API_FORMAT === "anthropic"
-      ? e.DEEPSEEK_ANTHROPIC_BASE_URL || undefined
-      : e.DEEPSEEK_BASE_URL || undefined,
+    baseUrl: e.DEEPSEEK_BASE_URL || undefined,
     model: e.LLM_MODEL,
     temperature: e.LLM_TEMPERATURE,
     maxTokens: e.LLM_MAX_TOKENS,

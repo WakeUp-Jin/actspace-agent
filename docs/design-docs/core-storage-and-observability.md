@@ -42,7 +42,7 @@
 
 `llm_usage` 按每次模型回复写入，而不是按 turn 或 session 聚合。成本按当时共享模型配置计算后写入 usage，价格配置本身不写入事件。低缓存排障只在该 payload 中写轻量索引：`cacheStatus`、`cacheAuditId`、`cacheHitRatio`；完整上下文证据不进入 `session.jsonl`。
 
-DeepSeek Anthropic provider-native server tool 不会产生本地 `tool_call` / `tool_result` 事件；真实触发次数保存在 `llm_usage.payload.serverToolUse` 中，例如 `webSearchRequests` / `webFetchRequests`。
+`llm_usage.payload.serverToolUse` 仅保留为历史 provider-native server tool 的兼容观测字段。当前 DeepSeek OpenAI-compatible 主线的 `web_search` / `web_fetch` 都是本地工具，会产生标准 `tool_call` / `tool_result` 事件。
 
 `context-state.json` 是当前可变视图，用于 Context 面板和未来上下文控制能力；完整设计见 `docs/design-docs/model-context/agent-token-usage-and-context-state.md`。
 

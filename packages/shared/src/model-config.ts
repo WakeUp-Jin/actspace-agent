@@ -41,6 +41,8 @@ export interface ModelSpec {
   thinkingDefault: boolean;
   supportsThinkingToggle: boolean;
   reasoning: boolean;
+  reasoningEfforts?: ModelReasoningEffort[];
+  reasoningDefaultEffort?: ModelReasoningEffort;
   input: ModelInputKind[];
   contextWindow: number;
   maxTokens: number;
@@ -82,13 +84,15 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
   "deepseek-v4-flash": {
     id: "deepseek-v4-flash",
     label: "DeepSeek V4 Flash",
-    api: "anthropic-messages",
+    api: "openai-completions",
     provider: "deepseek",
     apiModel: "deepseek-v4-flash",
-    defaultBaseUrl: "https://api.deepseek.com/anthropic",
+    defaultBaseUrl: "https://api.deepseek.com",
     thinkingDefault: true,
     supportsThinkingToggle: true,
     reasoning: true,
+    reasoningEfforts: ["high", "max"],
+    reasoningDefaultEffort: "max",
     input: ["text"],
     contextWindow: 1_000_000,
     maxTokens: 8192,
@@ -105,13 +109,15 @@ export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
   "deepseek-v4-pro": {
     id: "deepseek-v4-pro",
     label: "DeepSeek V4 Pro",
-    api: "anthropic-messages",
+    api: "openai-completions",
     provider: "deepseek",
     apiModel: "deepseek-v4-pro",
-    defaultBaseUrl: "https://api.deepseek.com/anthropic",
+    defaultBaseUrl: "https://api.deepseek.com",
     thinkingDefault: true,
     supportsThinkingToggle: true,
     reasoning: true,
+    reasoningEfforts: ["high", "max"],
+    reasoningDefaultEffort: "max",
     input: ["text"],
     contextWindow: 1_000_000,
     maxTokens: 8192,
@@ -204,6 +210,8 @@ export const BUILTIN_MODEL_REGISTRY: Partial<Record<ModelKey, ModelDefinition>> 
         toolUse: "verified" as const,
         reasoning: spec.reasoning,
         thinkingToggle: spec.supportsThinkingToggle,
+        ...(spec.reasoningEfforts && { reasoningEfforts: [...spec.reasoningEfforts] }),
+        ...(spec.reasoningDefaultEffort && { reasoningDefaultEffort: spec.reasoningDefaultEffort }),
       },
       ...(spec.pricing && { pricing: { ...spec.pricing } }),
     } satisfies ModelDefinition,

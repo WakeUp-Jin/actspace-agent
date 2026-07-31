@@ -655,7 +655,7 @@ node dist/cli.js run \
   --case final-response \
   --docker \
   --env DEEPSEEK_API_KEY \
-  --env DEEPSEEK_API_FORMAT \
+  --env DEEPSEEK_BASE_URL \
   --judge-command "node scripts/judge/static-judge.mjs" \
   --actspace-path /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent
 ```
@@ -668,7 +668,7 @@ node dist/cli.js run \
 - `node dist/cli.js run --dataset coding-basic --case auth.empty-password --docker --mock-agent --actspace-path /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent` 通过执行并生成结构化报告。
 - `node dist/cli.js run --dataset judge-basic --case auth.response-context --docker --mock-agent --judge-command "node scripts/judge/static-judge.mjs" --actspace-path /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent` 通过并生成 passed 报告。
 - `node dist/cli.js run --dataset judge-basic --case auth.response-context --docker --judge-command "node scripts/judge/static-judge.mjs" --actspace-path /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent` 已验证真实 Agent 模式能发起 Docker 命令，并在模型环境不可用时生成结构化失败报告。
-- `DEEPSEEK_API_FORMAT=anthropic node dist/cli.js run --dataset judge-basic --case auth.response-context --docker --dry-run --env DEEPSEEK_API_FORMAT --actspace-path /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent` 已验证 `--env` 会显式进入 Docker 命令。
+- `DEEPSEEK_BASE_URL=https://api.deepseek.com node dist/cli.js run --dataset judge-basic --case auth.response-context --docker --dry-run --env DEEPSEEK_BASE_URL --actspace-path /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent` 已验证 `--env` 会显式进入 Docker 命令。
 
 ### 任务 6.2：裁判模型评分器
 

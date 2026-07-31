@@ -34,9 +34,9 @@ function sourceHashOf(content: string): string {
 
 const llmConfig: LLMConfig = {
   provider: "deepseek",
-  api: "anthropic-messages",
+  api: "openai-completions",
   apiKey: "sk-from-settings",
-  baseUrl: "https://api.deepseek.com/anthropic",
+  baseUrl: "https://api.deepseek.com",
   model: "deepseek-v4-pro",
 };
 

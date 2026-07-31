@@ -22,6 +22,14 @@ export function applyOpenAIProviderRequestParams<T extends Record<string, unknow
   requestParams: T,
   options?: StreamOptions,
 ): T {
+  if (provider === "deepseek") {
+    const thinking = options?.thinkingEnabled !== false;
+    return {
+      ...requestParams,
+      thinking: { type: thinking ? "enabled" : "disabled" },
+      ...(thinking && { reasoning_effort: options?.reasoningEffort === "high" ? "high" : "max" }),
+    };
+  }
   if (provider === "kimi" && options?.thinkingEnabled === true) {
     return { ...requestParams, thinking: { type: "enabled" } };
   }

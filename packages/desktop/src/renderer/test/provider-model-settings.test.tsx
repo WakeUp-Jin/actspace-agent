@@ -259,7 +259,7 @@ describe("provider and model settings", () => {
     expect(card).not.toBeNull();
     expect(screen.getByText("官方 API（直连）")).toBeInTheDocument();
     expect(within(card!).getByText("官方直连")).toBeInTheDocument();
-    expect(within(card!).getByText("api.deepseek.com/anthropic")).toBeInTheDocument();
+    expect(within(card!).getByText("api.deepseek.com")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Kimi" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "OpenRouter" })).not.toBeInTheDocument();
   });

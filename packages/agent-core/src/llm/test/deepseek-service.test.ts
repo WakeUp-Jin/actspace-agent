@@ -38,7 +38,7 @@ describe("DeepSeekService", () => {
       },
     ]);
 
-    vi.spyOn(llm["client"].chat.completions, "create").mockResolvedValue(mockStream as any);
+    const createSpy = vi.spyOn(llm["client"].chat.completions, "create").mockResolvedValue(mockStream as any);
 
     const result = await llm.complete(context);
 
@@ -48,6 +48,10 @@ describe("DeepSeekService", () => {
     expect(result.usage.cacheHit).toBe(1);
     expect(result.usage.cacheMiss).toBe(2);
     expect(result.usage.reasoning).toBe(1);
+    expect(createSpy.mock.calls[0][0]).toMatchObject({
+      thinking: { type: "enabled" },
+      reasoning_effort: "max",
+    });
   });
 
   it("keeps DeepSeek request model controlled by the injected config", async () => {
@@ -62,6 +66,25 @@ describe("DeepSeekService", () => {
 
     const params = createSpy.mock.calls[0][0] as Record<string, unknown>;
     expect(params.model).toBe("deepseek-reasoner");
+    expect(params.thinking).toEqual({ type: "enabled" });
+    expect(params.reasoning_effort).toBe("max");
+  });
+
+  it("maps explicit DeepSeek effort and thinking-off requests", async () => {
+    const llm = new DeepSeekService({ provider: "deepseek", apiKey: "test-key", model: "deepseek-chat" });
+    const createSpy = vi.spyOn(llm["client"].chat.completions, "create")
+      .mockResolvedValueOnce(createMockStream([{ choices: [{ delta: { content: "high" }, finish_reason: "stop" }] }]) as any)
+      .mockResolvedValueOnce(createMockStream([{ choices: [{ delta: { content: "off" }, finish_reason: "stop" }] }]) as any);
+
+    await llm.complete(context, { thinkingEnabled: true, reasoningEffort: "high" });
+    await llm.complete(context, { thinkingEnabled: false });
+
+    expect(createSpy.mock.calls[0][0]).toMatchObject({
+      thinking: { type: "enabled" },
+      reasoning_effort: "high",
+    });
+    expect(createSpy.mock.calls[1][0]).toMatchObject({ thinking: { type: "disabled" } });
+    expect(createSpy.mock.calls[1][0]).not.toHaveProperty("reasoning_effort");
   });
 
   it("reassembles streamed tool calls for the execution engine", async () => {

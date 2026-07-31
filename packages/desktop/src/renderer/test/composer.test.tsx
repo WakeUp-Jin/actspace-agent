@@ -64,6 +64,8 @@ const reasoningModels: UsableModelView[] = [
       toolUse: "verified",
       reasoning: true,
       thinkingToggle: true,
+      reasoningEfforts: ["high", "max"],
+      reasoningDefaultEffort: "max",
     },
   },
   {
@@ -760,6 +762,7 @@ describe("Composer follow-up bar", () => {
     await user.click(screen.getByRole("button", { name: "Edit openrouter:openai/gpt-5 options" }));
     const options = container.querySelector(".model-options-menu");
     expect(options).toHaveClass("duration-[140ms]");
+    expect(screen.getByRole("button", { name: "Auto" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "High" }));
 
     await user.type(screen.getByLabelText("Message composer"), "reason carefully");
@@ -771,6 +774,35 @@ describe("Composer follow-up bar", () => {
       selectedSkills: [],
       thinkingEnabled: true,
       reasoningEffort: "high",
+    });
+  });
+
+  it("shows only High and Max for DeepSeek and sends Max by default", async () => {
+    const user = userEvent.setup();
+    const { onSend } = renderComposer({
+      models: reasoningModels,
+      defaultModelId: "deepseek:deepseek-v4-pro",
+    });
+
+    await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
+    const modelMenu = screen.getByRole("menu", { name: "Models" });
+    await user.hover(within(modelMenu).getByText("DeepSeek V4 Pro"));
+    await user.click(screen.getByRole("button", { name: "Edit deepseek:deepseek-v4-pro options" }));
+
+    expect(screen.queryByRole("button", { name: "Auto" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "High" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Max" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Light" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Medium" })).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Message composer"), "use maximum reasoning");
+    await user.click(screen.getByRole("button", { name: "Send message" }));
+    expect(onSend).toHaveBeenCalledWith("use maximum reasoning", {
+      mode: "agent",
+      model: "deepseek:deepseek-v4-pro",
+      selectedSkills: [],
+      thinkingEnabled: true,
+      reasoningEffort: "max",
     });
   });
 

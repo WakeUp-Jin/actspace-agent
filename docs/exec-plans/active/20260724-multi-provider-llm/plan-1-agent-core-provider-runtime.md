@@ -80,7 +80,7 @@ buildLLMConfigFromRuntime(model, providerRuntime, inferenceSettings): LLMConfig
 
 - Kimi 只有 `thinkingEnabled === true` 时添加 `thinking: {type:"enabled"}`。
 - OpenRouter 添加 `X-OpenRouter-Title: Actspace`；没有稳定公开 URL 时不发送 `HTTP-Referer`。
-- DeepSeek 现有 Anthropic DSML guard 保持不变。
+- DeepSeek OpenAI-compatible adapter 映射 `thinking.type` 与 `reasoning_effort`；历史 Anthropic DSML guard 保持不变。
 - provider adapter 不持有消息历史，不做 tool call 转换。
 
 ### 1.2 Provider-scoped fetch 与连接池
@@ -114,7 +114,7 @@ buildLLMConfigFromRuntime(model, providerRuntime, inferenceSettings): LLMConfig
 
 ## 测试要求
 
-- OpenRouter 选择 OpenAICompletionsService，DeepSeek 默认选择 AnthropicMessagesService。
+- OpenRouter 与 DeepSeek 选择 OpenAICompletionsService；历史 Anthropic route 的转换测试继续保留。
 - Kimi thinking 分支不影响 OpenRouter。
 - OpenRouter headers 存在且不包含 secret。
 - 代理只注入目标 config；direct config 不获得 dispatcher。

@@ -4,6 +4,14 @@
 
 ## 2026-07
 
+### 2026-07-31 — DeepSeek 思考强度与 OpenAI 兼容路线
+
+#### 改进
+
+- DeepSeek 统一使用 OpenAI-compatible Chat Completions，不再需要在 Anthropic 与 OpenAI 格式之间切换。
+- DeepSeek Thinking 现在只提供 High 和 Max 两档，并默认使用 Max；关闭 Thinking 时也会向服务端发送明确的关闭状态。
+- 旧版保存的官方 Anthropic 地址会自动迁移到当前 DeepSeek 默认地址，自定义网关地址保持不变。
+
 ### 2026-07-30 — 工作台内置交互式终端
 
 #### 新功能

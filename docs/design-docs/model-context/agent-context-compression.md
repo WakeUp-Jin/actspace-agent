@@ -203,7 +203,7 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 压缩执行权在会话历史的所有者模块自身（充血模型）：`ContextManager` 只发指令（阈值/防抖判断），`ConversationContext.compress()` 编排 `planCompaction → 序列化 → 摘要 → applyCompaction` 全流程；`context/compression/` 是被它消费的纯函数工具库（`history-serializer.ts` 序列化、`history-prompts.ts` 模板、`summarizer.ts` 服务）。算法步骤：
 
 1. 不动区 = 最近 `compressKeepRatio`（默认 0.3）比例的消息。
-2. 可压区 = 其余较旧消息。**切点必须落在完整的 `assistant(toolCall) + 全部对应 toolResult` 配对之后，且让不动区以 assistant turn 开头**——这样既不拆 `tool_calls`/`tool` 结果，又能与合成的 `UserMessage` 摘要天然形成 `user→assistant` 交替（Anthropic 格式要求严格交替，连续两条 user 会被拒；DeepSeek 默认走 Anthropic-compatible route，故不能让摘要 user 后紧跟另一条 user）。最近的 user 提问位于尾部、本就在不动区，不受影响。实现见 `ConversationContext.planCompaction`（找 target 之后第一条 assistant，兜底第一条非 toolResult）。`llm/convert.ts` 已有孤儿兜底，但压缩仍主动切干净边界。
+2. 可压区 = 其余较旧消息。**切点必须落在完整的 `assistant(toolCall) + 全部对应 toolResult` 配对之后，且让不动区以 assistant turn 开头**——这样既不拆 `tool_calls`/`tool` 结果，又能与合成的 `UserMessage` 摘要天然形成 `user→assistant` 交替，并保持跨 OpenAI / Anthropic 协议重放兼容。最近的 user 提问位于尾部、本就在不动区，不受影响。实现见 `ConversationContext.planCompaction`（找 target 之后第一条 assistant，兜底第一条非 toolResult）。`llm/convert.ts` 已有孤儿兜底，但压缩仍主动切干净边界。
 3. 把可压区序列化后调 `summarizer.complete()`，用 **ClaudeCode 8 节结构化摘要** prompt（主请求/意图、关键技术概念、文件与代码片段、错误与修复、问题解决、所有用户消息、待处理任务、当前工作）。8 节偏完整性，适合写代码场景。
 4. 用一条合成消息替换可压区。合成消息为 `UserMessage`（`source: "compaction"`），正文 = 开篇语（「上下文已用结构化 8 节算法压缩，必要信息已保留」）+ 摘要正文 + **该会话 `session.jsonl` 绝对路径**（「完整历史见 `<path>`，可 `read_file` 读取」）。
 5. `compressionCount += 1`，并 emit 观测事件（见「观测与持久化」）。

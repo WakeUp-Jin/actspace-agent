@@ -12,7 +12,7 @@ const NOW = new Date("2026-07-25T08:00:00.000Z");
 
 function runtime(provider: LlmProviderId): ProviderRuntimeConfig {
   const baseUrl = provider === "deepseek"
-    ? "https://api.deepseek.com/anthropic"
+    ? "https://api.deepseek.com"
     : provider === "kimi"
       ? "https://api.moonshot.cn/v1"
       : "https://openrouter.ai/api/v1";

@@ -15,7 +15,7 @@
 ## `llm/` - LLM 服务层
 
 - `llm/types.ts`：LLMConfig、StreamOptions、LLMService 接口、AssistantMessageEventStream、LLMServiceError。LLMConfig 现在把 `api` / `apiFormat` / `input` 拆开，error 事件仍携带完整 `AssistantMessage`（含部分内容 + `stopReason` + `errorMessage`），而非 `Error` 对象。
-- `llm/provider-adapter.ts`：供应商品牌差异的小型函数表。当前只承担 display name、OpenRouter 非敏感默认 header 和 Kimi thinking 请求修饰，不持有消息历史或协议转换状态。
+- `llm/provider-adapter.ts`：供应商品牌差异的小型函数表。当前承担 display name、OpenRouter 非敏感默认 header、Kimi thinking 请求修饰，以及 DeepSeek `thinking.type` / `reasoning_effort` 映射；不持有消息历史或协议转换状态。
 - `llm/provider-transport.ts`：供应商级 fetch/代理边界。无代理时沿用 SDK 默认 fetch；有代理时按标准化 HTTP(S) URL 复用 Undici `ProxyAgent`，拒绝认证 URL，并把失败脱敏归一为 `proxy` 错误。
 - `llm/convert.ts`：OpenAI 协议的共享消息转换、工具转换、流式 chunk 处理和 SDK 错误映射逻辑。包含防御性消息处理（跳过 error/aborted 的 assistant messages、为孤儿 tool calls 插入 synthetic toolResult）。
 - `llm/responses-convert.ts`：OpenAI Responses 协议适配层。把 Context 转成 instructions/input/function tools，保留 assistant phase 与 `call_id` 对账，并把加密 reasoning item 编码为可持久化的 opaque provider signature 后在后续工具轮次回放。
@@ -26,7 +26,7 @@
 - `llm/services/openai-responses.ts`：OpenAIResponsesService，真正的 OpenAI Responses 协议实现层，负责 Responses 流式事件、工具调用、`store: false` 无状态上下文、session 缓存键、加密 reasoning item 和 usage 归一。
 - 协议服务是 LLM 职责事实来源；品牌 service 只保留兼容包装，不再新增消息转换、tool call 重组或 usage 归一逻辑。
 - `llm/services/deepseek.ts`：DeepSeekService 兼容包装层，普通对话实际复用 `OpenAICompletionsService`；只负责 DeepSeek 的 provider 默认值和 api 兜底。
-- `llm/services/deepseek-anthropic.ts`：DeepSeekAnthropicService 兼容包装层，普通对话实际复用 `AnthropicMessagesService`；只负责 DeepSeek 的 provider 默认值和 api 兜底。
+- `llm/services/deepseek-anthropic.ts`：DeepSeekAnthropicService 历史兼容包装层，复用 `AnthropicMessagesService`；内置 DeepSeek 模型和 provider 已不再进入该路线。
 - `llm/services/kimi.ts`：KimiService 兼容包装层，普通 Kimi 对话复用 `OpenAICompletionsService`；只兜底 provider 默认值。
 - `llm/services/mock.ts`：MockLLMService，支持 response queue 模式（通过 `setResponses`/`appendResponses` 预设响应序列）和默认行为模式（向后兼容）。提供 `mockText`、`mockToolCall`、`mockError` 辅助工厂函数。
 - `llm/factory.ts`：createLLMService 工厂函数。当前按 `LLMConfig.api` 选 `AnthropicMessagesService` / `OpenAICompletionsService` / `OpenAIResponsesService`；OpenRouter 复用 Chat Completions，DuckCoding Codex 使用 Responses，provider 品牌包装层只保留兼容入口。

@@ -8,7 +8,6 @@ const stubLlm = {} as LLMService;
 function baseEnv(overrides: Partial<AgentEnvConfig> = {}): AgentEnvConfig {
   return {
     deepseekApiKey: "sk-deepseek",
-    deepseekApiFormat: "openai",
     kimiApiKey: "",
     disabledTools: [],
     ...overrides,

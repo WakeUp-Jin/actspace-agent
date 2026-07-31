@@ -23,6 +23,7 @@
 
 已完成的 `actspace` 计划：
 
+- `completed/20260731-deepseek-openai-thinking-effort.md`
 - `completed/20260731-terminal-startup-shutdown-reliability.md`
 - `completed/actspace-v1-foundation.md`
 - `completed/actspace-v1-agent-runtime.md`

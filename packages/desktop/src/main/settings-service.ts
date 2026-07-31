@@ -392,6 +392,7 @@ export class SettingsService {
             this.settings.providers[provider] = sanitizeProviderSettings(
               { ...this.settings.providers[provider], ...patch, proxy: { ...this.settings.providers[provider].proxy, ...patch.proxy } },
               this.settings.providers[provider],
+              provider,
             );
           }
         }
@@ -442,7 +443,9 @@ export class SettingsService {
         const current = this.settings.providers[input.provider];
         const next: ProviderConnectionSettings = {
           enabled: input.enabled ?? current.enabled,
-          baseUrl: input.baseUrl === undefined ? current.baseUrl : normalizeOptionalBaseUrl(input.baseUrl),
+          baseUrl: input.baseUrl === undefined
+            ? current.baseUrl
+            : migrateLegacyProviderBaseUrl(input.provider, normalizeOptionalBaseUrl(input.baseUrl)),
           proxy: input.proxy === undefined ? { ...current.proxy } : normalizeProxySettings(input.proxy),
           lastConnection: { status: "untested" },
           defaultPricingMultiplier: input.defaultPricingMultiplier === undefined
@@ -1129,6 +1132,7 @@ function mergePersistedSettingsV2(raw: Record<string, unknown>, dataRoot: string
     seed.providers[id] = sanitizeProviderSettings(
       isRecord(providers[id]) ? providers[id] : {},
       seed.providers[id],
+      id,
     );
   }
   seed.installedModels = sanitizeInstalledModels(raw.installedModels, seed.installedModels);
@@ -1194,12 +1198,19 @@ function normalizeImageGenerationModel(value: string): string {
   return model;
 }
 
-function sanitizeProviderSettings(input: unknown, fallback: ProviderConnectionSettings): ProviderConnectionSettings {
+function sanitizeProviderSettings(
+  input: unknown,
+  fallback: ProviderConnectionSettings,
+  provider?: LlmProviderId,
+): ProviderConnectionSettings {
   const value = isRecord(input) ? input : {};
   let baseUrl = fallback.baseUrl;
   if (value.baseUrl === null) baseUrl = null;
   else if (typeof value.baseUrl === "string") {
-    try { baseUrl = normalizeBaseUrl(value.baseUrl); } catch { baseUrl = fallback.baseUrl; }
+    try {
+      const normalized = normalizeBaseUrl(value.baseUrl);
+      baseUrl = provider ? migrateLegacyProviderBaseUrl(provider, normalized) : normalized;
+    } catch { baseUrl = fallback.baseUrl; }
   }
   return {
     enabled: typeof value.enabled === "boolean" ? value.enabled : fallback.enabled,
@@ -1209,6 +1220,13 @@ function sanitizeProviderSettings(input: unknown, fallback: ProviderConnectionSe
     defaultPricingMultiplier: normalizePricingMultiplier(value.defaultPricingMultiplier, fallback.defaultPricingMultiplier),
     additionalCredentials: sanitizeProviderCredentials(value.additionalCredentials),
   };
+}
+
+function migrateLegacyProviderBaseUrl(provider: LlmProviderId, baseUrl: string | null): string | null {
+  // Preserve custom gateways; only the retired official DeepSeek Anthropic endpoint is migrated.
+  return provider === "deepseek" && baseUrl === "https://api.deepseek.com/anthropic"
+    ? null
+    : baseUrl;
 }
 
 function sanitizeProviderCredentials(input: unknown): ProviderCredentialSettings[] {

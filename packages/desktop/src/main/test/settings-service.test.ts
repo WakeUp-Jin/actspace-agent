@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rename, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { loadEnv, MAIN_AGENT_SYSTEM_PROMPT } from "@actspace/agent-core";
+import { PROVIDER_REGISTRY } from "@actspace/shared";
 import { SettingsService, type SecretCrypto } from "../settings-service";
 
 const MANAGED_ENV_KEYS = [
@@ -479,6 +480,22 @@ describe("SettingsService", () => {
     expect(persisted.version).toBe(2);
     expect(persisted.defaultModelId).toBeUndefined();
     expect(persisted.agent.exploreModelId).toBeUndefined();
+  });
+
+  it("loads the retired official DeepSeek Anthropic URL as the OpenAI-compatible default", async () => {
+    const dataRoot = await makeDataRoot();
+    const first = makeService(dataRoot);
+    await first.load();
+
+    const filePath = join(dataRoot, "settings.json");
+    const persisted = JSON.parse(await readFile(filePath, "utf8"));
+    persisted.providers.deepseek.baseUrl = "https://api.deepseek.com/anthropic";
+    await writeFile(filePath, JSON.stringify(persisted), "utf8");
+
+    const migrated = makeService(dataRoot);
+    await migrated.load();
+    expect(migrated.getV2().providers.deepseek.baseUrl).toBeNull();
+    expect(PROVIDER_REGISTRY.deepseek.defaultBaseUrl).toBe("https://api.deepseek.com");
   });
 
   it("v1 迁移无损、生成一次性备份且重复加载 addedAt 稳定", async () => {

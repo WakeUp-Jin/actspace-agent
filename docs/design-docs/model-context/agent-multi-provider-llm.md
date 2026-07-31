@@ -65,7 +65,7 @@
 - `openai-responses`
 - `anthropic-messages`
 
-Provider 与协议不是一一对应。DeepSeek 可走 Anthropic-compatible 或 OpenAI Chat Completions；OpenRouter 首版走 Chat Completions；DuckCoding 的 Codex 档案走 Responses，Grok 与未知手动模型默认走 Chat Completions。
+Provider 与协议不是一一对应，但每个已安装模型必须显式声明当前协议。DeepSeek 内置模型固定走 OpenAI Chat Completions；OpenRouter 首版走 Chat Completions；DuckCoding 的 Codex 档案走 Responses，Grok 与未知手动模型默认走 Chat Completions。通用 Anthropic Messages 实现继续保留供其他模型或历史兼容测试使用。
 
 ### Catalog Model（目录模型）
 
@@ -206,7 +206,7 @@ openrouter:anthropic/claude-...
 
 | Provider | 默认协议 | 默认 Base URL | 远端模型目录 | 默认代理 |
 | --- | --- | --- | --- | --- |
-| DeepSeek | Anthropic-compatible，可显式回退 OpenAI-compatible | 当前 DeepSeek 默认端点 | 否 | 关闭 |
+| DeepSeek | OpenAI-compatible Chat Completions | `https://api.deepseek.com` | 否 | 关闭 |
 | Kimi | OpenAI-compatible | `https://api.moonshot.cn/v1` | 首版不使用 | 关闭 |
 | OpenRouter | OpenAI-compatible | `https://openrouter.ai/api/v1` | 是 | 关闭，由用户开启 |
 | DuckCoding | Codex: Responses；Grok/未知模型: Chat Completions | `https://api.duckcoding.ai/v1` | 否，本地档案 | 关闭 |
@@ -512,7 +512,7 @@ renderer 只调用结构化 IPC：
 
 - OpenRouter → `OpenAICompletionsService`。
 - Kimi → `OpenAICompletionsService`。
-- DeepSeek 默认 → `AnthropicMessagesService`。
+- DeepSeek → `OpenAICompletionsService`，请求适配层发送 `thinking.type=enabled|disabled`；开启时只发送 `reasoning_effort=high|max`，缺省为 `max`。
 - DuckCoding Codex → `OpenAIResponsesService`；Grok 与未知手动模型 → `OpenAICompletionsService`。
 
 `LLMConfig` 目标扩展：

@@ -46,8 +46,11 @@ describe("model config", () => {
 
   it("declares api separately from provider", () => {
     expect(MODEL_REGISTRY["deepseek-v4-pro"]).toMatchObject({
-      api: "anthropic-messages",
+      api: "openai-completions",
       provider: "deepseek",
+      defaultBaseUrl: "https://api.deepseek.com",
+      reasoningEfforts: ["high", "max"],
+      reasoningDefaultEffort: "max",
     });
     expect(MODEL_REGISTRY["kimi-k2.6"]).toMatchObject({
       api: "openai-completions",

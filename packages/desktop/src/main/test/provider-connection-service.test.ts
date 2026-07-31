@@ -9,7 +9,7 @@ function runtime(provider: ProviderRuntimeConfig["provider"]): ProviderRuntimeCo
     provider,
     apiKey: "sk-test-secret",
     baseUrl: provider === "deepseek"
-      ? "https://api.deepseek.com/anthropic"
+      ? "https://api.deepseek.com"
       : provider === "kimi"
         ? "https://api.moonshot.cn/v1"
         : provider === "openrouter"
