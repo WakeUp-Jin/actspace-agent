@@ -62,9 +62,10 @@
 
 ### 右侧对象浏览区
 
-- 承担文件预览、图片预览、HTML 预览和会话级 diff。
+- 承担文件预览、图片预览、HTML 预览、会话级 diff 和绑定当前会话 workspace / worktree 的交互式 Terminal。
 - 打开后可调宽，关闭后不保留右侧 rail。
 - 对象 Tab 与内容渲染规则继续由 `右侧面板与文件渲染规范.md` 约束。
+- Terminal 的 PTY、会话归属、背压、进程清理与打包签名见 `front-右侧终端与会话生命周期规范.md`。
 
 ## SplitView 底座
 
@@ -119,7 +120,7 @@
 ## 首版不做
 
 - 不做 tab 拖动换区。
-- 不做底部 terminal / panel region。
+- 不做底部 terminal / panel region；用户 Terminal 作为右侧对象 Tab 存在。
 - 不做多编辑区 grid。
 - 不做右侧 rail。
 - 不做移动端独立导航模型。

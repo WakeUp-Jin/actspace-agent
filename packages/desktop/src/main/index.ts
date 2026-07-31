@@ -161,6 +161,9 @@ import {
 } from "./workspace-registry-service";
 import { openWorkspaceInIde } from "./workspace-ide-service";
 import { getSessionPreview } from "./session-preview-service";
+import { createNodePtyBackend } from "./terminal/node-pty-terminal-backend";
+import { registerTerminalIpc, sendTerminalEvent } from "./terminal/terminal-ipc";
+import { TerminalSessionService } from "./terminal/terminal-session-service";
 import { LocalUpdateService } from "./local-update-service";
 import { PendingApprovalRegistry } from "./approval-registry";
 import {
@@ -331,7 +334,9 @@ function attachmentFromPath(filePath: string, index: number): ComposerAttachment
 
 // ─── 数据目录 ───
 
-async function ensureDataDirectories(): Promise<AppDataRoots> {
+let dataDirectoriesPromise: Promise<AppDataRoots> | undefined;
+
+async function initializeDataDirectories(): Promise<AppDataRoots> {
   const roots = await resolveAppDataRoots({
     dataRoot: app.getPath("userData"),
     defaultWorkspaceRoot: app.getPath("downloads"),
@@ -356,6 +361,14 @@ async function ensureDataDirectories(): Promise<AppDataRoots> {
   });
 
   return roots;
+}
+
+function ensureDataDirectories(): Promise<AppDataRoots> {
+  dataDirectoriesPromise ??= initializeDataDirectories().catch((error) => {
+    dataDirectoriesPromise = undefined;
+    throw error;
+  });
+  return dataDirectoriesPromise;
 }
 
 /**
@@ -630,6 +643,24 @@ function getMainWindow(): BrowserWindow | undefined {
   return BrowserWindow.getAllWindows()[0];
 }
 
+let terminalSessionService: TerminalSessionService | undefined;
+let disposeTerminalIpc: (() => void) | undefined;
+
+function initializeTerminalService(roots: AppDataRoots): void {
+  if (terminalSessionService) return;
+  terminalSessionService = new TerminalSessionService({
+    readSession: async (sessionId) => {
+      const record = await readSessionRecord(createSessionStorePaths(join(roots.sessionRoot, sessionId)));
+      return record ? { workspaceRoot: record.meta.workspaceRoot } : null;
+    },
+    resolveWorkspaceRoot: (workspaceRoot) => requireRegisteredWorkspaceRoot(roots, workspaceRoot),
+    createBackend: createNodePtyBackend,
+    sendEvent: sendTerminalEvent,
+    log: (message, detail) => logMain(message, detail),
+  });
+  disposeTerminalIpc = registerTerminalIpc(terminalSessionService);
+}
+
 async function createMainWindow() {
   const preloadPath = join(__dirname, "..", "preload", "index.js");
   logMain("create main window start", { preloadPath });
@@ -653,6 +684,11 @@ async function createMainWindow() {
       contextIsolation: true,
       nodeIntegration: false
     }
+  });
+
+  const ownerId = win.webContents.id;
+  win.webContents.once("destroyed", () => {
+    void terminalSessionService?.closeOwner(ownerId);
   });
 
   win.webContents.on("console-message", (_event, level, message, line, sourceId) => {
@@ -1385,6 +1421,7 @@ async function registerIpc() {
 
   ipcMain.handle("session:archive", async (_event, input: SessionArchiveInput) => {
     const roots = await ensureDataDirectories();
+    if (input.archived) await terminalSessionService?.closeSession(input.sessionId);
     const result = await setSessionArchived(roots.sessionRoot, input.sessionId, input.archived);
     if (!result.ok) {
       logMain("session archive failed", { sessionId: input.sessionId, error: result.error });
@@ -1404,6 +1441,7 @@ async function registerIpc() {
         continue;
       }
       try {
+        await terminalSessionService?.closeSession(sessionId);
         const result = await setSessionArchived(roots.sessionRoot, sessionId, true);
         (result.ok ? archivedSessionIds : failedSessionIds).push(sessionId);
       } catch {
@@ -1970,6 +2008,7 @@ app.whenReady().then(async () => {
   } catch (err) {
     logMain("local update service load failed", { error: err instanceof Error ? err.message : String(err) });
   }
+  initializeTerminalService(roots);
   await registerIpc();
   await ensureKairosConfigIpc(roots);
   await createMainWindow();
@@ -2043,9 +2082,14 @@ app.on("before-quit", (event) => {
   if (harvested > 0) {
     logMain("harvested background bash tasks on quit", { count: harvested });
   }
+  const terminalHarvested = terminalSessionService?.harvestAllSync() ?? 0;
+  if (terminalHarvested > 0) {
+    logMain("harvested terminal sessions on quit", { count: terminalHarvested });
+  }
   // fs-watch 插件：同步 best-effort SIGTERM；插件自己会 flush 事件并写最后一次心跳
   fsWatchService?.shutdownSync();
   if (!kairosController) {
+    disposeTerminalIpc?.();
     kairosIpcHandle?.dispose();
     kairosConfigIpcHandle?.dispose();
     void closeProviderTransports();
@@ -2077,6 +2121,7 @@ app.on("before-quit", (event) => {
       clearTimeout(timer);
       kairosIpcHandle?.dispose();
       kairosConfigIpcHandle?.dispose();
+      disposeTerminalIpc?.();
       await closeProviderTransports();
       finish();
     }

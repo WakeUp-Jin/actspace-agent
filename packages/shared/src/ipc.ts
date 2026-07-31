@@ -23,6 +23,81 @@ export type BootstrapState = {
   workspaceRoot: string;
 };
 
+// ─── 右侧终端 IPC ───
+
+export const TERMINAL_LIMITS = {
+  maxPerSession: 4,
+  maxPerWindow: 12,
+  maxInputBytes: 64 * 1024,
+  minCols: 2,
+  maxCols: 500,
+  minRows: 1,
+  maxRows: 300,
+} as const;
+
+export type TerminalStatus = "running" | "exited" | "closing" | "closed";
+
+export type TerminalErrorCode =
+  | "session_not_found"
+  | "workspace_not_found"
+  | "workspace_not_registered"
+  | "terminal_not_found"
+  | "terminal_owned_by_another_window"
+  | "terminal_limit_reached"
+  | "shell_not_found"
+  | "shell_environment_failed"
+  | "pty_spawn_failed"
+  | "invalid_terminal_size"
+  | "invalid_terminal_input"
+  | "terminal_closed"
+  | "native_module_unavailable";
+
+export type TerminalOperationError = {
+  code: TerminalErrorCode;
+  message: string;
+};
+
+export type TerminalSessionSnapshot = {
+  id: string;
+  sessionId: string;
+  title: string;
+  shellName: string;
+  status: TerminalStatus;
+  exitCode?: number;
+  cols: number;
+  rows: number;
+  createdAt: string;
+};
+
+export type TerminalCreateInput = { sessionId: string; cols: number; rows: number };
+export type TerminalAttachInput = { terminalId: string; cols: number; rows: number };
+export type TerminalDetachInput = { terminalId: string };
+export type TerminalListInput = { sessionId: string };
+export type TerminalWriteInput = { terminalId: string; data: string };
+export type TerminalResizeInput = { terminalId: string; cols: number; rows: number };
+export type TerminalAckInput = { terminalId: string; bytes: number };
+export type TerminalCloseInput = { terminalId: string };
+
+export type TerminalOperationResult =
+  | { ok: true }
+  | { ok: false; error: TerminalOperationError };
+
+export type TerminalSessionResult =
+  | { ok: true; terminal: TerminalSessionSnapshot }
+  | { ok: false; error: TerminalOperationError };
+
+export type TerminalListResult = {
+  terminals: TerminalSessionSnapshot[];
+};
+
+export type TerminalEvent =
+  | { type: "attached"; terminal: TerminalSessionSnapshot }
+  | { type: "init_log"; terminalId: string; data: string; truncated: boolean }
+  | { type: "data"; terminalId: string; data: string; bytes: number }
+  | { type: "title"; terminalId: string; title: string }
+  | { type: "exit"; terminalId: string; exitCode: number }
+  | { type: "error"; terminalId?: string; error: TerminalOperationError };
+
 export {
   ALL_MODEL_LIST,
   DEFAULT_MODEL_ID,

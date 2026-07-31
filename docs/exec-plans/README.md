@@ -23,6 +23,7 @@
 
 已完成的 `actspace` 计划：
 
+- `completed/20260731-terminal-startup-shutdown-reliability.md`
 - `completed/actspace-v1-foundation.md`
 - `completed/actspace-v1-agent-runtime.md`
 - `completed/actspace-v1-workbench-ui.md`
@@ -63,6 +64,7 @@
 - `completed/actspace-ui-bug-fix-plan.md`
 - `completed/actspace-workbench-split-view-foundation.md`
 - `completed/sidebar-cursor-alignment.md`
+- `completed/20260730-right-panel-terminal/README.md`
 
 已完成的 `kairos` 计划（按依赖顺序）：
 

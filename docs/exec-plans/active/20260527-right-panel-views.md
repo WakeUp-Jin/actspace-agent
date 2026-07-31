@@ -34,7 +34,7 @@
 
 包含：
 
-- `#21` 打开终端：本计划明确暂不做，仅保留入口状态或禁用说明。
+- `#21` 打开终端：已由 `docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md` 与 `docs/exec-plans/completed/20260730-right-panel-terminal/` 完成；本计划不再承担 Terminal 实现。
 - `#22` 打开浏览器：V1 只做 sandbox iframe 的简单 HTML 渲染（自包含），不做完整外部浏览器；相对资源 / 独立 origin 属 V2（见 `front-右侧面板与文件渲染规范.md`）。
 - `#23` 打开文件并显示预览（Markdown / 文本 / 图片，见 `front-右侧面板与文件渲染规范.md`）。
 - `#24` 打开文件改变：明确后置，不在第一版实现。
@@ -43,7 +43,7 @@
 
 不包含：
 
-- 不实现终端嵌入。
+- 不在本计划内实现终端嵌入；Terminal 由 2026-07-30 独立计划先做 native PTY 验证，再单独推进。
 - 不实现真实 Chrome / 外部浏览器控制。
 - 不实现文件编辑保存。
 - 不实现 Context 增删改。

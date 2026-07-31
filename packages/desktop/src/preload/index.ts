@@ -158,6 +158,18 @@ import type {
   TaskModelsUpdateResult,
   KairosModelUpdateInput,
   KairosModelUpdateResult,
+  TerminalAckInput,
+  TerminalAttachInput,
+  TerminalCloseInput,
+  TerminalCreateInput,
+  TerminalDetachInput,
+  TerminalEvent,
+  TerminalListInput,
+  TerminalListResult,
+  TerminalOperationResult,
+  TerminalResizeInput,
+  TerminalSessionResult,
+  TerminalWriteInput,
 } from "@actspace/shared";
 
 contextBridge.exposeInMainWorld("actspace", {
@@ -239,6 +251,28 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("session:archive", input) as Promise<SessionArchiveResult>,
   archiveSessions: (input: SessionArchiveManyInput) =>
     ipcRenderer.invoke("session:archive-many", input) as Promise<SessionArchiveManyResult>,
+
+  createTerminal: (input: TerminalCreateInput) =>
+    ipcRenderer.invoke("terminal:create", input) as Promise<TerminalSessionResult>,
+  listTerminals: (input: TerminalListInput) =>
+    ipcRenderer.invoke("terminal:list", input) as Promise<TerminalListResult>,
+  attachTerminal: (input: TerminalAttachInput) =>
+    ipcRenderer.invoke("terminal:attach", input) as Promise<TerminalSessionResult>,
+  detachTerminal: (input: TerminalDetachInput) =>
+    ipcRenderer.invoke("terminal:detach", input) as Promise<TerminalOperationResult>,
+  writeTerminal: (input: TerminalWriteInput) =>
+    ipcRenderer.invoke("terminal:write", input) as Promise<TerminalOperationResult>,
+  resizeTerminal: (input: TerminalResizeInput) =>
+    ipcRenderer.invoke("terminal:resize", input) as Promise<TerminalOperationResult>,
+  ackTerminal: (input: TerminalAckInput) =>
+    ipcRenderer.invoke("terminal:ack", input) as Promise<TerminalOperationResult>,
+  closeTerminal: (input: TerminalCloseInput) =>
+    ipcRenderer.invoke("terminal:close", input) as Promise<TerminalOperationResult>,
+  onTerminalEvent: (callback: (event: TerminalEvent) => void) => {
+    const handler = (_: unknown, event: TerminalEvent) => callback(event);
+    ipcRenderer.on("terminal:event", handler);
+    return () => ipcRenderer.removeListener("terminal:event", handler);
+  },
 
   submitApproval: (input: ApprovalDecideInput) => ipcRenderer.invoke("approval:decide", input) as Promise<ApprovalDecideResult>,
   listPendingApprovals: (input?: ApprovalListPendingInput) => ipcRenderer.invoke("approval:list-pending", input ?? {}) as Promise<PendingApprovalInfo[]>,
