@@ -59,12 +59,12 @@ export async function chatCommand(
   });
 
   let current = await createLockedSession(sessionRoot, workspace);
-  let activeTurn: { sessionId: string; turnId: string } | undefined;
+  let activeAgentRun: { sessionId: string; agentRunId: string } | undefined;
   let exitRequested = false;
   const removeSigint = io.input.onSigint(() => {
-    if (activeTurn) {
-      runtime.abortTurn(activeTurn);
-      approvalBroker.abortTurn(activeTurn.sessionId, activeTurn.turnId);
+    if (activeAgentRun) {
+      runtime.abortAgentRun(activeAgentRun);
+      approvalBroker.abortAgentRun(activeAgentRun.sessionId, activeAgentRun.agentRunId);
       io.input.cancelCurrent();
       return;
     }
@@ -109,12 +109,12 @@ export async function chatCommand(
         continue;
       }
 
-      const turnId = `turn-${randomUUID()}`;
-      activeTurn = { sessionId: current.sessionId, turnId };
-      renderer.beginTurn();
-      const result = await runtime.runTurn({
+      const agentRunId = `run-${randomUUID()}`;
+      activeAgentRun = { sessionId: current.sessionId, agentRunId };
+      renderer.beginAgentRun();
+      const result = await runtime.runAgentRun({
         sessionId: current.sessionId,
-        turnId,
+        agentRunId,
         userInput: line,
         workspaceRoot: workspace,
         roots: {
@@ -131,11 +131,11 @@ export async function chatCommand(
       if (!renderer.hasAssistantText() && result.finalReply?.content) {
         io.write(`${result.finalReply.content}\n`);
       }
-      activeTurn = undefined;
+      activeAgentRun = undefined;
     }
     return 0;
   } finally {
-    activeTurn = undefined;
+    activeAgentRun = undefined;
     removeSigint();
     await runtime.dispose();
     await current.lock.release();
@@ -169,7 +169,7 @@ function renderSessions(sessions: SessionListItem[], write: (text: string) => vo
     return;
   }
   for (const session of sessions) {
-    write(`${session.id}\t${session.turnCount}\t${session.title}\n`);
+    write(`${session.id}\t${session.agentRunCount}\t${session.title}\n`);
   }
 }
 

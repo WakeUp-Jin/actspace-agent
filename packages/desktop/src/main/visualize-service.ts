@@ -24,7 +24,7 @@ import type {
   VisualizeReplyInput,
   VisualizeReplyResult,
 } from "@actspace/shared";
-import type { AppDataRoots } from "./agent-turn";
+import type { AppDataRoots } from "./agent-run";
 
 type StoredVisualization = {
   messageId: string;

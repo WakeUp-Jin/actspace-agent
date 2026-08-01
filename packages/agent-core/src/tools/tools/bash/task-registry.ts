@@ -1,7 +1,7 @@
 /**
  * Bash 后台任务注册表
  *
- * 模块级单例：Agent 及其依赖是每 turn 新建的（见 desktop/main/agent-turn.ts），
+ * 模块级单例：Agent 及其依赖是每 turn 新建的（见 desktop/main/agent-run.ts），
  * 后台任务必须活在能跨 turn 存活的位置。按 sessionId 分组，不持久化——
  * 进程活不过应用退出，恢复注册表无意义（设计文档「被排除的方案」）。
  *
@@ -376,5 +376,5 @@ export class BashTaskRegistry {
   }
 }
 
-/** 模块级单例：跨 turn 存活（对照 agent-turn.ts activeTurnAborts 先例）。 */
+/** 模块级单例：跨 turn 存活（对照 agent-run.ts activeAgentRunAborts 先例）。 */
 export const bashTaskRegistry = new BashTaskRegistry();

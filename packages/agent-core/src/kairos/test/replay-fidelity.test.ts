@@ -148,10 +148,10 @@ describe("Kairos replay fidelity (现场 === 重放)", () => {
     const mk = (type: SessionEvent["type"], payload: unknown): SessionEvent => ({
       id: `evt_${Math.random().toString(36).slice(2, 8)}`,
       sessionId: "kairos-test",
-      turnId: "turn_1",
+      agentRunId: "turn_1",
       type,
       timestamp: "2026-06-10T01:00:00.000Z",
-      schemaVersion: 1,
+      schemaVersion: 2,
       payload,
     });
 
@@ -162,7 +162,16 @@ describe("Kairos replay fidelity (现场 === 重放)", () => {
       mk("assistant_message", { content: "我来读文件", model: "m", provider: "p" }),
       mk("tool_call", { id: "tc_a", name: "read_file", arguments: { path: "a.md" } }),
       mk("tool_call", { id: "tc_b", name: "read_file", arguments: { path: "b.md" } }),
-      mk("llm_usage", { callId: "c1", provider: "p", model: "m", promptTokens: 1, completionTokens: 1, totalTokens: 2 }),
+      mk("llm_usage", {
+        llmCallId: "c1",
+        attempt: 1,
+        durationMs: 10,
+        provider: "p",
+        model: "m",
+        promptTokens: 1,
+        completionTokens: 1,
+        totalTokens: 2,
+      }),
       mk("tool_result", { toolCallId: "tc_a", toolName: "read_file", ok: true, summary: "A", modelOutput: "A" }),
       mk("tool_result", { toolCallId: "tc_b", toolName: "read_file", ok: true, summary: "B", modelOutput: "B" }),
       // 第二次 LLM 回复（纯文本）

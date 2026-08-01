@@ -67,7 +67,7 @@ describe("CacheAuditTracker", () => {
     const tracker = createCacheAuditTracker({
       rootDir: testDir,
       sessionId: "session-a",
-      turnId: "turn-a",
+      agentRunId: "turn-a",
       provider: "deepseek",
       model: "deepseek-v4-pro",
       modelId: "deepseek-v4-pro",

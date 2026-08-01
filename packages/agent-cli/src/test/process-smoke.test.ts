@@ -49,7 +49,17 @@ describe("built CLI process", () => {
     expect(jsonl.code).toBe(0);
     const lines = jsonl.stdout.trim().split("\n").map((line) => JSON.parse(line));
     expect(lines.at(-1)).toMatchObject({ type: "run_result", result: { exitCode: 0 } });
-    expect(lines.filter((line) => line.type === "runtime_event")).toHaveLength(3);
+    const runtimeEvents = lines.filter((line) => line.type === "runtime_event");
+    expect(runtimeEvents.map((line) => line.event.type)).toEqual([
+      "agent_run_started",
+      "agent_turn_started",
+      "llm_call_started",
+      "assistant_text_delta",
+      "llm_call_finished",
+      "agent_turn_finished",
+      "agent_run_finished",
+    ]);
+    expect(runtimeEvents.every((line) => line.event.agentRunId)).toBe(true);
   });
 
   it("uses stable usage and SIGINT exit codes", async () => {

@@ -41,7 +41,7 @@ type RequestModelAccumulator = {
 type RequestAccumulator = {
   timestamp: string;
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   workspaceId?: string;
   workspaceRoot?: string;
   modelCallCount: number;
@@ -195,7 +195,7 @@ function buildToolEntries(tools: Map<string, ToolAccumulator>, totalToolCalls: n
 }
 
 function requestKey(event: SessionEvent): string {
-  return `${event.sessionId}:${event.turnId}`;
+  return `${event.sessionId}:${event.agentRunId}`;
 }
 
 function getOrCreateRequestRow(
@@ -209,7 +209,7 @@ function getOrCreateRequestRow(
   const row: RequestAccumulator = {
     timestamp: event.timestamp,
     sessionId: event.sessionId,
-    turnId: event.turnId,
+    agentRunId: event.agentRunId,
     ...(sourceMetadata?.workspaceId ? { workspaceId: sourceMetadata.workspaceId } : {}),
     ...(sourceMetadata?.workspaceRoot ? { workspaceRoot: sourceMetadata.workspaceRoot } : {}),
     modelCallCount: 0,
@@ -237,7 +237,7 @@ function buildRequestRows(rows: Map<string, RequestAccumulator>): UsageStatistic
       return {
         timestamp: row.timestamp,
         sessionId: row.sessionId,
-        turnId: row.turnId,
+        agentRunId: row.agentRunId,
         ...(row.workspaceId ? { workspaceId: row.workspaceId } : {}),
         ...(row.workspaceRoot ? { workspaceRoot: row.workspaceRoot } : {}),
         model: primaryModel?.name ?? "unknown",
@@ -256,7 +256,7 @@ function buildRequestRows(rows: Map<string, RequestAccumulator>): UsageStatistic
     .sort((a, b) => {
       const byTimestamp = b.timestamp.localeCompare(a.timestamp);
       if (byTimestamp !== 0) return byTimestamp;
-      return a.sessionId.localeCompare(b.sessionId) || a.turnId.localeCompare(b.turnId);
+      return a.sessionId.localeCompare(b.sessionId) || a.agentRunId.localeCompare(b.agentRunId);
     });
 }
 

@@ -19,11 +19,12 @@ export async function createMeta(
 ): Promise<WriteResult> {
   const now = new Date().toISOString();
   const meta: SessionMeta = {
+    schemaVersion: 2,
     id: sessionId,
     title: title ?? `Session ${sessionId}`,
     createdAt: now,
     updatedAt: now,
-    turnCount: 0,
+    agentRunCount: 0,
     ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}),
     ...(options.workspaceRoot ? { workspaceRoot: options.workspaceRoot } : {}),
     ...(options.worktree ? { worktree: options.worktree } : {}),
@@ -37,7 +38,18 @@ export async function createMeta(
 export async function readMeta(metaPath: string): Promise<SessionMeta | null> {
   try {
     const raw = await readFile(metaPath, "utf-8");
-    return JSON.parse(raw) as SessionMeta;
+    const parsed = JSON.parse(raw) as Partial<SessionMeta>;
+    if (
+      parsed.schemaVersion !== 2 ||
+      typeof parsed.id !== "string" ||
+      typeof parsed.title !== "string" ||
+      typeof parsed.createdAt !== "string" ||
+      typeof parsed.updatedAt !== "string" ||
+      typeof parsed.agentRunCount !== "number"
+    ) {
+      return null;
+    }
+    return parsed as SessionMeta;
   } catch {
     return null;
   }
@@ -55,7 +67,7 @@ export async function updateMeta(
 
   const updated: SessionMeta & Record<string, unknown> = { ...existing };
 
-  if (fields.turnCount !== undefined) updated.turnCount = fields.turnCount;
+  if (fields.agentRunCount !== undefined) updated.agentRunCount = fields.agentRunCount;
   if (fields.updatedAt !== undefined) updated.updatedAt = fields.updatedAt;
   if (fields.title !== undefined) updated.title = fields.title;
   if (fields.workspaceId !== undefined) updated.workspaceId = fields.workspaceId;
@@ -75,8 +87,8 @@ export async function updateMeta(
   return writeMeta(metaPath, updated);
 }
 
-/** 递增 turnCount 并更新 updatedAt */
-export async function incrementTurnCount(
+/** 递增 agentRunCount 并更新 updatedAt */
+export async function incrementAgentRunCount(
   metaPath: string,
   lastModel?: string,
 ): Promise<WriteResult> {
@@ -86,7 +98,7 @@ export async function incrementTurnCount(
   }
 
   return updateMeta(metaPath, {
-    turnCount: existing.turnCount + 1,
+    agentRunCount: existing.agentRunCount + 1,
     updatedAt: new Date().toISOString(),
     lastModel,
   });

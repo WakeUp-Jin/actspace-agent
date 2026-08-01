@@ -16,7 +16,7 @@ export type CreateAgentToolOptions = {
   llm: LLMService;
   workspaceRoot: string;
   sessionId?: string;
-  turnId?: string;
+  agentRunId?: string;
   contextWindow?: number;
 };
 
@@ -25,7 +25,7 @@ export function createAgentTool(options: CreateAgentToolOptions): InternalTool {
     llm: options.llm,
     workspaceRoot: options.workspaceRoot,
     sessionId: options.sessionId,
-    turnId: options.turnId,
+    agentRunId: options.agentRunId,
     contextWindow: options.contextWindow,
     display: "panel",
   };
@@ -69,7 +69,7 @@ export function createExploreTool(options: CreateExploreToolOptions): InternalTo
     llm: options.llm,
     workspaceRoot: options.workspaceRoot,
     sessionId: options.sessionId,
-    turnId: options.turnId,
+    agentRunId: options.agentRunId,
     contextWindow: options.contextWindow,
     systemPrompt: FOCUSED_EXPLORE_SYSTEM_PROMPT,
     maxTurns: FOCUSED_EXPLORE_MAX_TURNS,

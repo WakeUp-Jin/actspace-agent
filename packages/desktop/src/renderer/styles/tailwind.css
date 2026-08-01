@@ -73,6 +73,13 @@
   --color-chart-series-5: var(--act-chart-series-5);
   --color-chart-series-6: var(--act-chart-series-6);
 
+  --color-analysis-canvas: var(--act-analysis-canvas);
+  --color-analysis-selection-soft: var(--act-analysis-selection-soft);
+  --color-analysis-user-soft: var(--act-analysis-user-soft);
+  --color-analysis-assistant-soft: var(--act-analysis-assistant-soft);
+  --color-analysis-tool-soft: var(--act-analysis-tool-soft);
+  --color-analysis-thinking-soft: var(--act-analysis-thinking-soft);
+
   --radius-act-xs: var(--act-radius-xs);
   --radius-act-sm: var(--act-radius-sm);
   --radius-act-md: var(--act-radius-md);

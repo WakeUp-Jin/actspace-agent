@@ -8,7 +8,7 @@ describe("TerminalApprovalBroker", () => {
     const input = new ScriptedLineInput(["y", "a", "n"]);
     let output = "";
     const broker = new TerminalApprovalBroker("default", "/tmp/work", input, (text) => { output += text; });
-    broker.setCurrentTurn("session-1", "turn-1");
+    broker.setCurrentAgentRun("session-1", "run-1");
 
     await expect(broker.waitForDecision(request("request-1", "write_file"))).resolves.toMatchObject({
       decision: "approve_once",
@@ -26,10 +26,10 @@ describe("TerminalApprovalBroker", () => {
   it("resolves a pending approval when the turn aborts", async () => {
     const input = new ScriptedLineInput([]);
     const broker = new TerminalApprovalBroker("default", "/tmp/work", input, () => {});
-    broker.setCurrentTurn("session-1", "turn-1");
+    broker.setCurrentAgentRun("session-1", "run-1");
     const pending = broker.waitForDecision(request("request-1", "write_file"));
     await Promise.resolve();
-    expect(broker.abortTurn("session-1", "turn-1")).toBe(1);
+    expect(broker.abortAgentRun("session-1", "run-1")).toBe(1);
     await expect(pending).resolves.toMatchObject({ decision: "abort" });
   });
 });
@@ -42,7 +42,7 @@ function request(id: string, toolName: string): ToolApprovalRequest {
     summary: `Run ${toolName}`,
     reason: "Needs approval",
     sessionId: "session-1",
-    turnId: "turn-1",
+    agentRunId: "run-1",
     createdAt: Date.now(),
   };
 }

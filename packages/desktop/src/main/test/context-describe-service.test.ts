@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createMeta, MAIN_AGENT_SYSTEM_PROMPT } from "@actspace/agent-core";
 import { describeSessionContext } from "../context-describe-service";
-import type { AppDataRoots } from "../agent-turn";
+import type { AppDataRoots } from "../agent-run";
 
 const created: string[] = [];
 

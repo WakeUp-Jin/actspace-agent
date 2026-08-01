@@ -4,20 +4,20 @@ import type {
   SessionEvent,
   SessionId,
   ToolPreviewKind,
-  TurnId,
+  AgentRunId,
   ToolExecutionResult
 } from "@actspace/shared";
 
-export type AgentTurnInput = {
+export type AgentRunInput = {
   sessionId: SessionId;
-  turnId: TurnId;
+  agentRunId: AgentRunId;
   userInput: string;
   contextSnapshot?: ContextUsageSnapshot;
 };
 
-export type AgentTurnOutcome = {
+export type AgentRunOutcome = {
   sessionId: SessionId;
-  turnId: TurnId;
+  agentRunId: AgentRunId;
   events: SessionEvent[];
   finalReply?: AssistantReply;
   contextSnapshot: ContextUsageSnapshot;
@@ -49,7 +49,7 @@ export type ModelTurnOutput = {
 
 export type ModelProviderInput = {
   sessionId: SessionId;
-  turnId: TurnId;
+  agentRunId: AgentRunId;
   userInput: string;
   contextSnapshot?: ContextUsageSnapshot;
 };
@@ -69,7 +69,7 @@ export type ToolDefinition = {
 
 export type ToolExecutionContext = {
   sessionId: SessionId;
-  turnId: TurnId;
+  agentRunId: AgentRunId;
 };
 
 export type ToolExecutor = (

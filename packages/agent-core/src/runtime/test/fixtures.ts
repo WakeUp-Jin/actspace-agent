@@ -1,6 +1,6 @@
-import type { AgentTurnResult, RuntimeStreamEvent, SessionEvent } from "@actspace/shared";
+import type { AgentRunResult, RuntimeStreamEvent, SessionEvent } from "@actspace/shared";
 import type { AgentDeps } from "../../engine/create-agent-deps";
-import type { RuntimeInteractionMode, RuntimePersistenceMode, RuntimeTurnRequest } from "../types";
+import type { RuntimeAgentRunRequest, RuntimeInteractionMode, RuntimePersistenceMode } from "../types";
 
 export type HostFixtureProfile = {
   name: "desktop" | "cli-headless" | "cli-interactive";
@@ -14,10 +14,10 @@ export const HOST_FIXTURE_PROFILES: HostFixtureProfile[] = [
   { name: "cli-interactive", persistenceMode: "persistent", interactionMode: "cli-interactive" },
 ];
 
-export function createHostFixtureRequest(root: string, profile: HostFixtureProfile): RuntimeTurnRequest {
+export function createHostFixtureRequest(root: string, profile: HostFixtureProfile): RuntimeAgentRunRequest {
   return {
     sessionId: `session-${profile.name}`,
-    turnId: `turn-${profile.name}`,
+    agentRunId: `run-${profile.name}`,
     userInput: "hello",
     workspaceRoot: `${root}/workspace`,
     roots: {
@@ -52,19 +52,19 @@ export function createHostFixtureDeps(): AgentDeps {
 }
 
 export function createHostFixtureResult(
-  request: RuntimeTurnRequest,
-  status: AgentTurnResult["status"] = "completed",
-): AgentTurnResult {
+  request: RuntimeAgentRunRequest,
+  status: AgentRunResult["status"] = "completed",
+): AgentRunResult {
   const events: SessionEvent[] = status === "completed"
     ? [sessionEvent(request, "assistant_message", { content: "ok" })]
     : status === "failed"
       ? [sessionEvent(request, "error", { code: "TEST_FAILED", message: "failed" })]
-      : [sessionEvent(request, "turn_aborted", {})];
+      : [sessionEvent(request, "agent_run_aborted", {})];
   return {
     sessionId: request.sessionId,
-    turnId: request.turnId,
+    agentRunId: request.agentRunId,
     events,
-    contextSnapshot: { totalTokens: 1 } as AgentTurnResult["contextSnapshot"],
+    contextSnapshot: { totalTokens: 1 } as AgentRunResult["contextSnapshot"],
     status,
     ...(status === "failed" ? { error: { code: "TEST_FAILED", message: "failed" } } : {}),
   };
@@ -75,16 +75,17 @@ export function eventTypes(events: RuntimeStreamEvent[]): string[] {
 }
 
 function sessionEvent(
-  request: RuntimeTurnRequest,
+  request: RuntimeAgentRunRequest,
   type: SessionEvent["type"],
   payload: unknown,
 ): SessionEvent {
   return {
-    id: `${request.turnId}-${type}`,
+    id: `${request.agentRunId}-${type}`,
     sessionId: request.sessionId,
-    turnId: request.turnId,
+    agentRunId: request.agentRunId,
     type,
     timestamp: new Date(0).toISOString(),
+    schemaVersion: 2,
     payload,
   };
 }

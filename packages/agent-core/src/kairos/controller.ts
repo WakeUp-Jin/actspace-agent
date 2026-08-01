@@ -5,7 +5,7 @@
  * 1. 拉起 ShortMemoryStore / RingBuffer / SessionsDigest / BriefsIndex /
  *    BriefsDispatcher / KairosRunner / QueueProcessor。
  * 2. 暴露 start / stop / wakeNow / resetToday 控制；emit `state` / `event`。
- * 3. 主 Agent 在 runTurn 边界调 notifyMainAgentTurn{Start,End}，让 scheduler 礼让用户。
+ * 3. 主 Agent 在 runAgent 边界调 notifyMainAgentRun{Start,End}，让 scheduler 礼让用户。
  * 4. eventSink 保证"先写盘 → 再 push ring buffer → 再回调 listener"。
  *
  * V1 简化：
@@ -185,8 +185,8 @@ export interface KairosController {
   on(event: "event", listener: (e: SessionEvent) => void): void;
   on(event: "notification", listener: (n: KairosNotification) => void): void;
   off(event: "state" | "event" | "notification", listener: (...args: unknown[]) => void): void;
-  notifyMainAgentTurnStart(): void;
-  notifyMainAgentTurnEnd(): void;
+  notifyMainAgentRunStart(): void;
+  notifyMainAgentRunEnd(): void;
   /** 测试/调试用：返回当前 ring buffer 内事件。 */
   getRecentEvents(limit: number): SessionEvent[];
   /**
@@ -417,10 +417,10 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
       eventSink({
         id: makeId("evt"),
         sessionId: `kairos-${currentSessionDate}`,
-        turnId: `turn-${Date.now()}`,
+        agentRunId: `turn-${Date.now()}`,
         type: "context_compaction",
         timestamp: new Date().toISOString(),
-        schemaVersion: 1,
+        schemaVersion: 2,
         payload,
       }),
     onWarning: (message, cause) => {
@@ -520,10 +520,10 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
       await eventSink({
         id: makeId("evt"),
         sessionId: `kairos-${currentSessionDate}`,
-        turnId: `turn-${Date.now()}`,
+        agentRunId: `turn-${Date.now()}`,
         type: "error",
         timestamp: new Date().toISOString(),
-        schemaVersion: 1,
+        schemaVersion: 2,
         payload: { message: "额度不足，Kairos 已暂停。请在设置页调高剩余额度后重新开启。" },
       });
     } catch {
@@ -553,10 +553,10 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
       await eventSink({
         id: makeId("evt"),
         sessionId: `kairos-${currentSessionDate}`,
-        turnId: `turn-${Date.now()}`,
+        agentRunId: `turn-${Date.now()}`,
         type: "kairos_sleep_start",
         timestamp: new Date().toISOString(),
-        schemaVersion: 1,
+        schemaVersion: 2,
         payload: { plannedSeconds, reason: "after_tick" },
       });
       // tick 已闭合、进入睡眠期——后台检查压缩阈值（fire-and-forget）
@@ -567,20 +567,20 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
         await eventSink({
           id: makeId("evt"),
           sessionId: `kairos-${currentSessionDate}`,
-          turnId: `turn-${Date.now()}`,
+          agentRunId: `turn-${Date.now()}`,
           type: "kairos_sleep_interrupted",
           timestamp: new Date().toISOString(),
-          schemaVersion: 1,
+          schemaVersion: 2,
           payload: { reason: info.interruptedBy, remainingSeconds: info.remainingSeconds },
         });
       } else {
         await eventSink({
           id: makeId("evt"),
           sessionId: `kairos-${currentSessionDate}`,
-          turnId: `turn-${Date.now()}`,
+          agentRunId: `turn-${Date.now()}`,
           type: "kairos_sleep_end",
           timestamp: new Date().toISOString(),
-          schemaVersion: 1,
+          schemaVersion: 2,
           payload: { actualSeconds: info.actualSeconds },
         });
       }
@@ -738,11 +738,11 @@ export async function createKairos(opts: CreateKairosOptions): Promise<KairosCon
     off(event, listener) {
       emitter.off(event, listener);
     },
-    notifyMainAgentTurnStart() {
-      processor.notifyMainAgentTurnStart();
+    notifyMainAgentRunStart() {
+      processor.notifyMainAgentRunStart();
     },
-    notifyMainAgentTurnEnd() {
-      processor.notifyMainAgentTurnEnd();
+    notifyMainAgentRunEnd() {
+      processor.notifyMainAgentRunEnd();
     },
     getRecentEvents(limit: number) {
       return ringBuffer.tail(limit);

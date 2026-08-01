@@ -12,7 +12,7 @@ import {
   updateMeta,
   writeContextState,
 } from "@actspace/agent-core";
-import type { AgentRuntimeContextLoader, AppDataRoots } from "./agent-turn";
+import type { AgentRuntimeContextLoader, AppDataRoots } from "./agent-run";
 import type { ModelRuntimeService } from "./model-runtime-service";
 
 export async function compactAndPersistContext(

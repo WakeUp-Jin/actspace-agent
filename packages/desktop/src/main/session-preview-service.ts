@@ -14,7 +14,7 @@ import type {
   SessionPreviewResult,
 } from "@actspace/shared";
 import { getLatestContextSnapshot } from "@actspace/shared";
-import type { AppDataRoots } from "./agent-turn";
+import type { AppDataRoots } from "./agent-run";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

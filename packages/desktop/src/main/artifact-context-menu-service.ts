@@ -3,7 +3,7 @@ import { readFile, realpath, stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import type { ArtifactContextMenuInput, ArtifactContextMenuResult } from "@actspace/shared";
-import type { AppDataRoots } from "./agent-turn";
+import type { AppDataRoots } from "./agent-run";
 import { readSessionArtifact, resolveSessionArtifactFile } from "./session-artifact-service";
 
 type ResolvedArtifactContextTarget = {

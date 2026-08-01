@@ -92,7 +92,7 @@ describe("Review workbench", () => {
   it("opens Review from the object menu inside the right panel and keeps chat visible", async () => {
     const user = userEvent.setup();
     window.actspace = reviewBridge(emptySnapshot()) as unknown as Window["actspace"];
-    render(<RightPanelProvider initialOpen><WorkbenchLayout sessions={[{ id: "session-review", title: "Review menu", updatedAt: new Date().toISOString(), turnCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-review" title="Review menu" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
+    render(<RightPanelProvider initialOpen><WorkbenchLayout sessions={[{ id: "session-review", title: "Review menu", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-review" title="Review menu" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
     await user.click(screen.getByRole("button", { name: "New right panel object" }));
     await user.click(screen.getByRole("menuitem", { name: "Review" }));
     expect(await screen.findByRole("region", { name: "Review workspace" })).toBeInTheDocument();
@@ -106,7 +106,7 @@ describe("Review workbench", () => {
   it("opens Review from the right panel launcher", async () => {
     const user = userEvent.setup();
     window.actspace = reviewBridge(emptySnapshot()) as unknown as Window["actspace"];
-    render(<RightPanelProvider initialOpen><WorkbenchLayout sessions={[{ id: "session-launcher", title: "Review launcher", updatedAt: new Date().toISOString(), turnCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-launcher" title="Review launcher" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
+    render(<RightPanelProvider initialOpen><WorkbenchLayout sessions={[{ id: "session-launcher", title: "Review launcher", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-launcher" title="Review launcher" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
     await user.click(screen.getByRole("button", { name: "Review" }));
     expect(await screen.findByRole("region", { name: "Review workspace" })).toBeInTheDocument();
   });
@@ -116,7 +116,7 @@ describe("Review workbench", () => {
     const bridge = reviewBridge(emptySnapshot());
     window.actspace = bridge as unknown as Window["actspace"];
     const props = {
-      sessions: [{ id: "session-workspace", title: "Workspace review", updatedAt: new Date().toISOString(), turnCount: 0, workspaceRoot: "/tmp/workspace-a" }],
+      sessions: [{ id: "session-workspace", title: "Workspace review", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace-a" }],
       activeSessionId: "session-workspace",
       title: "Workspace review",
       messages: [],

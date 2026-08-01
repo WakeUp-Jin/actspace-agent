@@ -26,7 +26,7 @@ async function fixture() {
       title: "Project session",
       createdAt: "2026-07-29T00:00:00.000Z",
       updatedAt: "2026-07-29T00:00:00.000Z",
-      turnCount: 1,
+      agentRunCount: 1,
       workspaceRoot,
     }],
   };

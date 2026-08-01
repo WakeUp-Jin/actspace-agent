@@ -158,7 +158,7 @@
    - `SessionCreateInput` 增加 `workspaceId?: string`。
    - `SessionWorkspaceInput` 增加 `workspaceId?: string`，保留 `workspaceRoot` 兼容。
    - `createSessionRecord()` / `setSessionWorkspace()` 支持写 `workspaceId`。
-   - `agent-turn.ts` 仍使用 session meta resolved path 作为 turn workspace root。
+   - `agent-run.ts` 仍使用 session meta resolved path 作为 Agent Run workspace root。
    - 验证：`session-store.test.ts` 覆盖 `workspaceId + workspaceRoot` 写入与保留。
 
 4. Renderer 数据流

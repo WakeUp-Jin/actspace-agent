@@ -10,7 +10,7 @@ import {
   readWorkspaceFile,
   statWorkspaceFile,
 } from "../workspace-fs-service";
-import type { AppDataRoots } from "../agent-turn";
+import type { AppDataRoots } from "../agent-run";
 
 const created: string[] = [];
 

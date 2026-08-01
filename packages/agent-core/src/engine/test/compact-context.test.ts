@@ -87,7 +87,7 @@ describe("compactContextWithAgent", () => {
   it("forces manual compaction and emits lifecycle stream events", async () => {
     const streamEvents: RuntimeStreamEvent[] = [];
     const result = await compactContextWithAgent(
-      { sessionId: "session-1", turnId: "turn-compact" },
+      { sessionId: "session-1", agentRunId: "turn-compact" },
       {
         contextManager: makeContextManager(heavyMessages()),
         toolManager: new ToolManager({ workspaceRoot: "/tmp" }),
@@ -116,7 +116,7 @@ describe("compactContextWithAgent", () => {
   it("returns skipped when manual compaction has no safe region", async () => {
     const streamEvents: RuntimeStreamEvent[] = [];
     const result = await compactContextWithAgent(
-      { sessionId: "session-1", turnId: "turn-skip" },
+      { sessionId: "session-1", agentRunId: "turn-skip" },
       {
         contextManager: makeContextManager([user("hi")]),
         toolManager: new ToolManager({ workspaceRoot: "/tmp" }),

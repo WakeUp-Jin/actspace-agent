@@ -20,7 +20,7 @@ describe("PendingApprovalRegistry", () => {
   it("notifies when an approval decision resolves", async () => {
     const onApprovalResolved = vi.fn();
     const registry = new PendingApprovalRegistry({ onApprovalResolved });
-    registry.setCurrentTurn("session-1", "turn-1");
+    registry.setCurrentAgentRun("session-1", "turn-1");
     const request = makeRequest();
 
     const promise = registry.waitForDecision(request);
@@ -40,7 +40,7 @@ describe("PendingApprovalRegistry", () => {
   it("rejects allow_similar for delete_file approvals", async () => {
     const onApprovalResolved = vi.fn();
     const registry = new PendingApprovalRegistry({ onApprovalResolved });
-    registry.setCurrentTurn("session-delete", "turn-delete");
+    registry.setCurrentAgentRun("session-delete", "turn-delete");
     const request = makeRequest({
       id: "approval-delete-1",
       toolCallId: "tool-delete-1",
@@ -70,11 +70,11 @@ describe("PendingApprovalRegistry", () => {
   it("aborts all pending approvals for the stopped turn", async () => {
     const onApprovalResolved = vi.fn();
     const registry = new PendingApprovalRegistry({ onApprovalResolved });
-    registry.setCurrentTurn("session-abort", "turn-abort");
+    registry.setCurrentAgentRun("session-abort", "turn-abort");
     const request = makeRequest({ id: "approval-abort" });
 
     const decisionPromise = registry.waitForDecision(request);
-    expect(registry.abortTurn("session-abort", "turn-abort")).toBe(1);
+    expect(registry.abortAgentRun("session-abort", "turn-abort")).toBe(1);
 
     await expect(decisionPromise).resolves.toMatchObject({
       requestId: request.id,
@@ -97,7 +97,7 @@ describe("PendingApprovalRegistry", () => {
       toolName: "browser_tabs",
       approvalScope: "browser_session",
       sessionId: "session-browser",
-      turnId: "turn-1",
+      agentRunId: "turn-1",
     });
 
     const firstDecision = registry.waitForDecision(first);
@@ -112,7 +112,7 @@ describe("PendingApprovalRegistry", () => {
       toolName: "browser_cua",
       approvalScope: "browser_session",
       sessionId: "session-browser",
-      turnId: "turn-2",
+      agentRunId: "turn-2",
     });
     await expect(registry.waitForDecision(second)).resolves.toMatchObject({ decision: "approve_once" });
     registry.onApprovalRequired(second);
@@ -127,21 +127,21 @@ describe("PendingApprovalRegistry", () => {
       toolName: "browser_tabs",
       approvalScope: "browser_session",
       sessionId: "session-browser",
-      turnId: "turn-1",
+      agentRunId: "turn-1",
     });
 
     const firstDecision = registry.waitForDecision(first);
     registry.onApprovalRequired(first);
     registry.decide(first.id, "deny");
     await expect(firstDecision).resolves.toMatchObject({ decision: "deny" });
-    expect(registry.isBrowserDeniedForTurn("session-browser", "turn-1")).toBe(true);
+    expect(registry.isBrowserDeniedForAgentRun("session-browser", "turn-1")).toBe(true);
 
     const sameTurn = makeRequest({
       id: "browser-deny-2",
       toolName: "browser_navigation",
       approvalScope: "browser_session",
       sessionId: "session-browser",
-      turnId: "turn-1",
+      agentRunId: "turn-1",
     });
     await expect(registry.waitForDecision(sameTurn)).resolves.toMatchObject({ decision: "deny" });
     registry.onApprovalRequired(sameTurn);
@@ -152,7 +152,7 @@ describe("PendingApprovalRegistry", () => {
       toolName: "browser_tabs",
       approvalScope: "browser_session",
       sessionId: "session-browser",
-      turnId: "turn-2",
+      agentRunId: "turn-2",
     });
     const nextDecision = registry.waitForDecision(nextTurn);
     registry.onApprovalRequired(nextTurn);

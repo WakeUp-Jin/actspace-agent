@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { AgentToolPreview, SessionEvent, ToolExecutionResult } from "../session";
-import { createMessageBlocks } from "../session-selectors";
+import { createMessageBlocks, normalizeSessionEvents } from "../session-selectors";
 
 function toolResultEvent(payload: ToolExecutionResult): SessionEvent<ToolExecutionResult> {
   return {
     id: `evt-${payload.uiPreview?.kind ?? "tool"}`,
     sessionId: "session-delete",
-    turnId: "turn-delete",
+    agentRunId: "turn-delete",
     type: "tool_result",
     timestamp: "2026-06-02T12:00:00.000Z",
-    schemaVersion: 1,
+    schemaVersion: 2,
     payload,
   };
 }
@@ -18,10 +18,10 @@ function contextCompactionEvent(payload: Record<string, unknown>): SessionEvent<
   return {
     id: `evt-${String(payload.status ?? "legacy")}`,
     sessionId: "session-compact",
-    turnId: "turn-compact",
+    agentRunId: "turn-compact",
     type: "context_compaction",
     timestamp: "2026-06-02T00:00:00.000Z",
-    schemaVersion: 1,
+    schemaVersion: 2,
     payload,
   };
 }
@@ -30,10 +30,10 @@ function agentToolResultEvent(uiPreview: AgentToolPreview): SessionEvent<ToolExe
   return {
     id: "evt_agent_result",
     sessionId: "session-1",
-    turnId: "turn-1",
+    agentRunId: "turn-1",
     type: "tool_result",
     timestamp: "2026-06-02T10:00:00.000Z",
-    schemaVersion: 1,
+    schemaVersion: 2,
     payload: {
       toolCallId: "toolu-agent-1",
       toolName: "agent",
@@ -50,9 +50,10 @@ describe("session selectors", () => {
     const blocks = createMessageBlocks([{
       id: "prep-1",
       sessionId: "session-1",
-      turnId: "turn-1",
+      agentRunId: "turn-1",
       type: "workspace_preparation",
       timestamp: "2026-07-29T00:00:00.000Z",
+      schemaVersion: 2,
       payload: {
         kind: "worktree",
         status: "completed",
@@ -86,11 +87,24 @@ describe("session selectors", () => {
     expect(createMessageBlocks([{
       id: "prep-bad",
       sessionId: "session-1",
-      turnId: "turn-1",
+      agentRunId: "turn-1",
       type: "workspace_preparation",
       timestamp: "2026-07-29T00:00:00.000Z",
+      schemaVersion: 2,
       payload: { kind: "worktree", status: "completed" },
     }])).toEqual([]);
+  });
+
+  it("accepts only SessionEvent V2 records", () => {
+    const v2 = toolResultEvent({
+      toolCallId: "tool-v2",
+      toolName: "read_file",
+      ok: true,
+      summary: "ok",
+    });
+    const v1 = { ...v2, id: "evt-v1", schemaVersion: 1 };
+
+    expect(normalizeSessionEvents([v1, v2])).toEqual([v2]);
   });
 
   it("restores generated image artifacts from a completed tool preview", () => {
@@ -162,28 +176,28 @@ describe("session selectors", () => {
       {
         id: "evt-random-user",
         sessionId: "session-render-key",
-        turnId: "turn-render-key",
+        agentRunId: "turn-render-key",
         type: "user_message",
         timestamp,
-        schemaVersion: 1,
+        schemaVersion: 2,
         payload: { content: "Prompt" },
       },
       {
         id: "evt-random-thinking",
         sessionId: "session-render-key",
-        turnId: "turn-render-key",
+        agentRunId: "turn-render-key",
         type: "thinking",
         timestamp,
-        schemaVersion: 1,
+        schemaVersion: 2,
         payload: { content: "Reasoning" },
       },
       {
         id: "evt-random-assistant",
         sessionId: "session-render-key",
-        turnId: "turn-render-key",
+        agentRunId: "turn-render-key",
         type: "assistant_message",
         timestamp,
-        schemaVersion: 1,
+        schemaVersion: 2,
         payload: {
           content: "Reply",
           stopReason: "stop",
@@ -203,9 +217,9 @@ describe("session selectors", () => {
   it("hides signature-only thinking state while keeping readable thinking visible", () => {
     const base = {
       sessionId: "session-thinking",
-      turnId: "turn-thinking",
+      agentRunId: "turn-thinking",
       timestamp: "2026-07-28T04:10:00.000Z",
-      schemaVersion: 1 as const,
+      schemaVersion: 2 as const,
       type: "thinking" as const,
     };
     const blocks = createMessageBlocks([
@@ -243,9 +257,9 @@ describe("session selectors", () => {
   it("attaches the full turn usage to the final visible assistant reply", () => {
     const base = {
       sessionId: "session-usage",
-      turnId: "turn-usage",
+      agentRunId: "turn-usage",
       timestamp: "2026-07-25T12:00:00.000Z",
-      schemaVersion: 1 as const,
+      schemaVersion: 2 as const,
     };
     const blocks = createMessageBlocks([
       {
@@ -259,7 +273,9 @@ describe("session selectors", () => {
         id: "usage-usd",
         type: "llm_usage",
         payload: {
-          callId: "call-1",
+          llmCallId: "call-1",
+          attempt: 1,
+          durationMs: 10,
           provider: "provider-a",
           model: "model-a",
           promptTokens: 100,
@@ -279,7 +295,9 @@ describe("session selectors", () => {
         id: "usage-cny",
         type: "llm_usage",
         payload: {
-          callId: "call-2",
+          llmCallId: "call-2",
+          attempt: 1,
+          durationMs: 10,
           provider: "provider-a",
           model: "model-a",
           promptTokens: 150,
@@ -306,10 +324,10 @@ describe("session selectors", () => {
     const blocks = createMessageBlocks([{
       id: "evt-aborted",
       sessionId: "session-aborted",
-      turnId: "turn-aborted",
-      type: "turn_aborted",
+      agentRunId: "turn-aborted",
+      type: "agent_run_aborted",
       timestamp: "2026-07-17T07:00:00.000Z",
-      schemaVersion: 1,
+      schemaVersion: 2,
       payload: { reason: "user" },
     }]);
 
@@ -327,10 +345,10 @@ describe("session selectors", () => {
     const blocks = createMessageBlocks([{
       id: "evt-eval",
       sessionId: "session-eval",
-      turnId: "turn-eval",
+      agentRunId: "turn-eval",
       type: "eval_candidate",
       timestamp: "2026-07-19T07:00:00.000Z",
-      schemaVersion: 1,
+      schemaVersion: 2,
       payload: {
         candidateId: "failure-1",
         relativePath: "eval-candidates/failure-1",
@@ -508,7 +526,7 @@ describe("session selectors", () => {
       transcriptRef: {
         kind: "subagent_transcript",
         sessionId: "session-1",
-        turnId: "turn-1",
+        agentRunId: "turn-1",
         runId: "run-1",
       },
       stats: {
@@ -600,10 +618,10 @@ describe("session selectors", () => {
       {
         id: "evt-notify",
         sessionId: "session-1",
-        turnId: "turn-1",
+        agentRunId: "turn-1",
         type: "user_message",
         timestamp: "2026-07-03T12:00:00.000Z",
-        schemaVersion: 1,
+        schemaVersion: 2,
         payload: {
           content: [
             "<task_notification>",
@@ -619,10 +637,10 @@ describe("session selectors", () => {
       {
         id: "evt-user",
         sessionId: "session-1",
-        turnId: "turn-1",
+        agentRunId: "turn-1",
         type: "user_message",
         timestamp: "2026-07-03T12:00:01.000Z",
-        schemaVersion: 1,
+        schemaVersion: 2,
         payload: { content: "看看进度" },
       },
     ]);

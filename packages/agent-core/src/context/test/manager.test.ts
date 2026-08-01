@@ -185,10 +185,10 @@ describe("ContextManager.createForSession", () => {
     return {
       id: `evt_${idx}`,
       sessionId: "test-session",
-      turnId: "turn-1",
+      agentRunId: "turn-1",
       type: type as SessionEvent["type"],
       timestamp: new Date().toISOString(),
-      schemaVersion: 1,
+      schemaVersion: 2,
       payload,
     };
   }

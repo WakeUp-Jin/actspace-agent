@@ -10,7 +10,7 @@ import type {
   WorkspaceGitMutationResult,
   WorkspaceGitPushInput,
 } from "@actspace/shared";
-import type { AppDataRoots } from "./agent-turn";
+import type { AppDataRoots } from "./agent-run";
 
 const GIT_TIMEOUT_MS = 15_000;
 const GIT_PUSH_TIMEOUT_MS = 30_000;

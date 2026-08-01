@@ -54,7 +54,7 @@ export interface SessionRecoveryResult {
 
 /** meta.json 增量更新字段 */
 export interface MetaUpdateFields {
-  turnCount?: number;
+  agentRunCount?: number;
   updatedAt?: string;
   title?: string;
   lastModel?: string;

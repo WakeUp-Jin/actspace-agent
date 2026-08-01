@@ -36,7 +36,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: "/tmp/browser-bridge-test.sock",
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       approvalGate: allowBrowser,
     });
 
@@ -103,7 +103,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       approvalGate: allowBrowser,
     });
 
@@ -145,7 +145,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       approvalGate: allowBrowser,
     });
 
@@ -179,7 +179,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       approvalGate: allowBrowser,
     });
 
@@ -196,7 +196,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: "/tmp/browser-bridge-test.sock",
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
     });
 
     const result = await manager.execute("browser_tabs", { action: "list" });
@@ -211,7 +211,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: "/tmp/browser-bridge-test.sock",
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       disabledTools: ["browser_capability_clipboard_write"],
     });
 
@@ -277,7 +277,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       approvalGate,
     });
     const actions = [{
@@ -296,7 +296,7 @@ describe("browser tool runtime", () => {
       stopOnError: true,
       approval: "signed-token",
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
     });
     await manager.dispose();
   });
@@ -348,7 +348,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       approvalGate,
     });
 
@@ -397,7 +397,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       approvalGate: allowBrowser,
     });
 
@@ -440,7 +440,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       approvalGate: allowBrowser,
     });
 
@@ -470,7 +470,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
     });
 
     expect(manager.getToolDefinitions().map((tool) => tool.name)).toContain("browser_help");
@@ -519,7 +519,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       approvalGate: allowBrowser,
     });
 
@@ -588,7 +588,7 @@ describe("browser tool runtime", () => {
       workspaceRoot: "/tmp",
       browserBridgeSocketPath: socketPath,
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       approvalGate: allowBrowser,
     });
 

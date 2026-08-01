@@ -4,10 +4,10 @@ import {
   desktopRootsFromRuntimeRequest,
   toDesktopRuntimeRequest,
 } from "../desktop-agent-runtime";
-import type { AppDataRoots } from "../agent-turn";
+import type { AppDataRoots } from "../agent-run";
 
 describe("Desktop Agent Runtime Adapter", () => {
-  it("maps Electron data roots and preserves the shared turn contract", () => {
+  it("maps Electron data roots and preserves the shared Agent Run contract", () => {
     const roots: AppDataRoots = {
       dataRoot: "/data",
       sessionRoot: "/data/sessions",
@@ -19,7 +19,7 @@ describe("Desktop Agent Runtime Adapter", () => {
 
     const request = toDesktopRuntimeRequest({
       sessionId: "session-1",
-      turnId: "turn-1",
+      agentRunId: "run-1",
       userInput: "hello",
       mode: "plan",
       selectedSkills: ["llm-agent-dev"],
@@ -27,7 +27,7 @@ describe("Desktop Agent Runtime Adapter", () => {
 
     expect(request).toMatchObject({
       sessionId: "session-1",
-      turnId: "turn-1",
+      agentRunId: "run-1",
       userInput: "hello",
       mode: "plan",
       selectedSkills: ["llm-agent-dev"],
@@ -46,10 +46,10 @@ describe("Desktop Agent Runtime Adapter", () => {
     expect(desktopRootsFromRuntimeRequest(request)).toEqual(roots);
   });
 
-  it("derives workspace preparation roots from each turn request", () => {
+  it("derives workspace preparation roots from each Agent Run request", () => {
     const first = toDesktopRuntimeRequest({
       sessionId: "session-1",
-      turnId: "turn-1",
+      agentRunId: "run-1",
       userInput: "first",
     }, {
       dataRoot: "/data",
@@ -62,7 +62,7 @@ describe("Desktop Agent Runtime Adapter", () => {
     const second = {
       ...first,
       sessionId: "session-2",
-      turnId: "turn-2",
+      agentRunId: "run-2",
       workspaceRoot: "/workspace/second",
     };
 

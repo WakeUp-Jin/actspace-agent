@@ -103,6 +103,14 @@ export class MockLLMService implements LLMService {
     this.config = config;
   }
 
+  get provider(): string {
+    return this.config.provider;
+  }
+
+  get model(): string {
+    return this.config.model;
+  }
+
   get state(): { callCount: number } {
     return this._state;
   }

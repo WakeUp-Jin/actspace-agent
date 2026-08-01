@@ -49,7 +49,7 @@ describe("ContextRenderView", () => {
   it("fills missing previews with on-demand describeContext content when a sessionId is given", async () => {
     const base: ContextState = {
       sessionId: "s1",
-      activeTurnId: "t1",
+      activeAgentRunId: "t1",
       updatedAt: new Date().toISOString(),
       estimator: { name: "test", version: "1" },
       totalEstimatedTokens: 1879,
@@ -77,7 +77,7 @@ describe("ContextRenderView", () => {
   it("falls back to describeContext entirely when no persisted state exists", async () => {
     const fresh: ContextState = {
       sessionId: "s2",
-      activeTurnId: "live",
+      activeAgentRunId: "live",
       updatedAt: new Date().toISOString(),
       estimator: { name: "test", version: "1" },
       totalEstimatedTokens: 12,

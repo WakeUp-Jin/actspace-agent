@@ -67,9 +67,11 @@ function toolResult(sessionId: string, turnId: string, filePath: string, addedLi
   return {
     id: `${turnId}-${filePath}`,
     sessionId,
+    agentRunId: `run-${turnId}`,
     turnId,
     type: "tool_result",
     timestamp: new Date().toISOString(),
+    schemaVersion: 2,
     payload: {
       toolName: "write_file",
       ok: true,

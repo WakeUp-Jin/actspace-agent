@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>观测 ID 必须跟随真实生命周期</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f4f2eb; --paper:#fffdf7; --ink:#202721; --muted:#677068; --line:#d9ddd5; --green:#15795c; --soft:#e4f2e9; --red:#a8483d; --code:#17231e; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#171d19; --paper:#202823; --ink:#e8eee8; --muted:#aab5ac; --line:#39443c; --green:#75d1ab; --soft:#273f34; --red:#ef998d; --code:#111713; } }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif} main{width:min(980px,calc(100% - 32px));margin:40px auto 80px}.hero,.card{background:var(--paper);border:1px solid var(--line);border-radius:18px}.hero{padding:42px}.kicker{color:var(--green);font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{font-size:clamp(32px,6vw,58px);line-height:1.05;letter-spacing:-.04em;margin:12px 0 20px;max-width:780px}h2{margin:0 0 14px;font-size:23px}p{margin:0 0 14px}.lead{font-size:19px;color:var(--muted);max-width:760px}.stack{display:grid;gap:14px;margin-top:26px}.layer{display:grid;grid-template-columns:150px 1fr auto;gap:18px;align-items:center;padding:17px 18px;border:1px solid var(--line);border-radius:13px;background:color-mix(in srgb,var(--paper) 78%,var(--soft))}.layer code{font-weight:800;color:var(--green)}.layer small{color:var(--muted)}.arrow{text-align:center;color:var(--muted);font-size:22px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}.card{padding:26px}pre{margin:14px 0 0;padding:18px;border-radius:12px;background:var(--code);color:#d9f5e5;overflow:auto;font:13px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace}.bad{color:var(--red)}.good{color:var(--green)}ul{padding-left:20px;margin-bottom:0}.questions{counter-reset:q}.question{counter-increment:q;padding:13px 0;border-top:1px solid var(--line)}.question:before{content:counter(q) ". ";font-weight:800;color:var(--green)}footer{margin-top:18px;color:var(--muted);font-size:13px}@media(max-width:720px){.hero{padding:27px}.grid{grid-template-columns:1fr}.layer{grid-template-columns:1fr}.layer small{justify-self:start}}
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="kicker">Architecture learning · Observability</div>
+    <h1>观测 ID 必须跟随真实生命周期</h1>
+    <p class="lead">一个页面标签可以随时改名，但关联键必须表达实体何时创建、何时结束、何时重试。否则日志看似完整，实际上无法回答“这次请求属于哪一步”。</p>
+    <div class="stack">
+      <div class="layer"><code>agentRunId</code><span>一次用户输入触发的完整 Agent 运行</span><small>agent_start → agent_end</small></div>
+      <div class="arrow">↓ 包含多个</div>
+      <div class="layer"><code>turnId</code><span>一次内部推理及其后续工具执行步骤</span><small>turn_start → turn_end</small></div>
+      <div class="arrow">↓ 正常一次，重试多次</div>
+      <div class="layer"><code>llmCallId</code><span>一次真实 provider API 请求</span><small>llm_call_start → llm_call_end</small></div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>问题从哪里来</h2>
+      <p>最常见的错误是把“用户看到的一轮对话”直接命名为 Turn，再把后端真实的内部 Turn 忽略掉。此时 Abort、usage、重试和持久化都会共享一个含义模糊的 ID。</p>
+      <pre><span class="bad">// 含义漂移：同一个 turnId 同时表示两种生命周期</span>
+runTurn({ turnId })
+emit({ type: "turn_started", turnId })
+persist({ turnId, usage })</pre>
+    </section>
+    <section class="card">
+      <h2>正确的建模顺序</h2>
+      <p>先找生产事件的代码，再画生命周期，最后命名 ID。不要从现有按钮文字或数据库字段名倒推领域模型。</p>
+      <pre><span class="good">agentRunId</span> = user submission boundary
+<span class="good">turnId</span>     = engine step boundary
+<span class="good">llmCallId</span>  = network attempt boundary
+attempt    = retry ordinal</pre>
+    </section>
+    <section class="card">
+      <h2>重试是最好的验尸刀</h2>
+      <p>如果无法确定两个 ID 是否应该分开，问一句：失败后自动重试时，哪个实体继续存在，哪个实体重新创建？</p>
+      <ul>
+        <li>Agent Run 不变：用户没有重新提交。</li>
+        <li>Turn 不变：仍在完成同一个内部步骤。</li>
+        <li>LLM Call 改变：发生了新的真实网络请求。</li>
+      </ul>
+    </section>
+    <section class="card">
+      <h2>恢复事实与分析证据分开</h2>
+      <p>完整请求快照很适合分析，却会放大会话文件并引入敏感信息风险。事件存储应只保留恢复所需的稳定事实；深度 Trace 独立、脱敏、可删除。</p>
+      <pre>session.jsonl  → 恢复消息与状态
+traces/*.jsonl → 请求、响应、差异与耗时
+
+删除 Trace ≠ 破坏会话恢复</pre>
+    </section>
+    <section class="card">
+      <h2>长 Trace 的三件套</h2>
+      <p>append-only JSONL 适合保存证据，却不适合每次打开列表时全量扫描。生产读取应拆成事实、索引和护栏三层。</p>
+      <pre>trace.jsonl        → append-only evidence
+trace.summary.json → atomic navigation index
+bounded reader     → byte/event/symlink limits</pre>
+      <ul>
+        <li>列表只读 sidecar，选中对象后才懒加载完整 Trace。</li>
+        <li>sidecar 损坏时只回退重建该对象，不能拖垮整个会话。</li>
+        <li>达到体积上限时停止记录分析证据，但主业务继续运行。</li>
+      </ul>
+    </section>
+    <section class="card">
+      <h2>常见陷阱</h2>
+      <ul>
+        <li>只重命名 TypeScript 字段，却不修改事件生产位置。</li>
+        <li>用数组索引充当长期 ID，过滤或排序后关联失效。</li>
+        <li>失败重试覆盖前一次 usage，导致成本与耗时少算。</li>
+        <li>把 Authorization、data URL 或上游错误体原样写入 Trace。</li>
+        <li>让 renderer 直接拼文件路径读取本地分析数据。</li>
+      </ul>
+    </section>
+    <section class="card questions">
+      <h2>自检问题</h2>
+      <div class="question">同一内部步骤重试三次时，应该有几个 Turn、几个 LLM Call？</div>
+      <div class="question">删除分析 Trace 后，历史会话还能否完整恢复？</div>
+      <div class="question">一个字段的名称来自 UI 文案，还是来自事件生命周期？</div>
+    </section>
+  </div>
+  <footer>来源：Agent 分析观测数据对齐任务 · 关联 history：docs/histories/2026-07/20260729-2324-align-agent-observability-data.md</footer>
+</main>
+</body>
+</html>

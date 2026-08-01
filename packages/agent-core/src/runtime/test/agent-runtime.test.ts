@@ -1,11 +1,11 @@
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentTurnResult, RuntimeStreamEvent, SessionEvent } from "@actspace/shared";
+import type { AgentRunResult, RuntimeStreamEvent, SessionEvent } from "@actspace/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentDeps } from "../../engine/create-agent-deps";
 import { createAgentHostRuntime } from "../agent-runtime";
-import { AgentRuntimeError, type RuntimeTurnRequest } from "../types";
+import { AgentRuntimeError, type RuntimeAgentRunRequest } from "../types";
 
 const tempRoots: string[] = [];
 
@@ -14,32 +14,34 @@ afterEach(async () => {
 });
 
 describe("Agent Runtime", () => {
-  it("runs ephemeral turns without product session writes and owns the terminal event", async () => {
+  it("runs ephemeral Agent Runs without product session writes and owns the terminal event", async () => {
     const root = await createTempRoot();
     const events: RuntimeStreamEvent[] = [];
     const harness = vi.fn(async (_input, _deps, options) => {
       options?.onStreamEvent?.({
         type: "assistant_text_delta",
         sessionId: "session-1",
+        agentRunId: "run-1",
         turnId: "turn-1",
+        llmCallId: "call-1",
         messageId: "message-1",
         delta: "ok",
       });
       expect(options?.includeUserEvent).toBe(true);
       expect(options?.emitTerminalEvent).toBe(false);
-      expect(options?.emitTurnStartedEvent).toBe(false);
+      expect(options?.emitAgentRunStartedEvent).toBe(false);
       return createResult("completed");
     });
     const runtime = createRuntime(root, events, { runHarness: harness });
 
-    const result = await runtime.runTurn(createRequest(root, "ephemeral"));
+    const result = await runtime.runAgentRun(createRequest(root, "ephemeral"));
 
     expect(result.status).toBe("completed");
     expect(harness).toHaveBeenCalledTimes(1);
     expect(events.map((event) => event.type)).toEqual([
-      "turn_started",
+      "agent_run_started",
       "assistant_text_delta",
-      "turn_finished",
+      "agent_run_finished",
     ]);
     await expect(readdir(join(root, "sessions"))).rejects.toThrow();
   });
@@ -58,7 +60,7 @@ describe("Agent Runtime", () => {
       runHarness: harness,
       eventSink: {
         emit: async (event) => {
-          if (event.type === "turn_finished") {
+          if (event.type === "agent_run_finished") {
             const committed = await readEvents(sessionPath);
             expect(committed.map((item) => item.type)).toEqual([
               "user_message",
@@ -71,34 +73,34 @@ describe("Agent Runtime", () => {
       },
     });
 
-    const result = await runtime.runTurn(createRequest(root, "persistent"));
+    const result = await runtime.runAgentRun(createRequest(root, "persistent"));
 
     expect(result.events.map((event) => event.type)).toEqual([
       "user_message",
       "assistant_message",
       "context_snapshot",
     ]);
-    expect(events.at(-1)?.type).toBe("turn_finished");
+    expect(events.at(-1)?.type).toBe("agent_run_finished");
   });
 
-  it("maps a failed Agent result to turn_failed instead of turn_finished", async () => {
+  it("maps a failed Agent result to agent_run_failed instead of agent_run_finished", async () => {
     const root = await createTempRoot();
     const events: RuntimeStreamEvent[] = [];
     const runtime = createRuntime(root, events, {
       runHarness: async () => createResult("failed"),
     });
 
-    const result = await runtime.runTurn(createRequest(root, "ephemeral"));
+    const result = await runtime.runAgentRun(createRequest(root, "ephemeral"));
 
     expect(result.status).toBe("failed");
     expect(events.at(-1)).toMatchObject({
-      type: "turn_failed",
+      type: "agent_run_failed",
       error: { code: "LLM_ERROR" },
     });
-    expect(events.some((event) => event.type === "turn_finished")).toBe(false);
+    expect(events.some((event) => event.type === "agent_run_finished")).toBe(false);
   });
 
-  it("does not emit turn_finished when persistent commit fails", async () => {
+  it("does not emit agent_run_finished when persistent commit fails", async () => {
     const root = await createTempRoot();
     await mkdir(join(root, "sessions"), { recursive: true });
     await writeFile(join(root, "sessions", "session-1"), "not a directory");
@@ -106,30 +108,30 @@ describe("Agent Runtime", () => {
     const dispose = vi.fn(async () => {});
     const runtime = createRuntime(root, events, { dispose });
 
-    await expect(runtime.runTurn(createRequest(root, "persistent"))).rejects.toMatchObject({
+    await expect(runtime.runAgentRun(createRequest(root, "persistent"))).rejects.toMatchObject({
       code: "PERSISTENCE_ERROR",
     });
     expect(events.at(-1)).toMatchObject({
-      type: "turn_failed",
+      type: "agent_run_failed",
       error: { code: "PERSISTENCE_ERROR" },
     });
-    expect(events.some((event) => event.type === "turn_finished")).toBe(false);
+    expect(events.some((event) => event.type === "agent_run_finished")).toBe(false);
     expect(dispose).toHaveBeenCalledOnce();
   });
 
-  it("rejects a concurrent turn for the same session but isolates Runtime instances", async () => {
+  it("rejects a concurrent Agent Run for the same session but isolates Runtime instances", async () => {
     const root = await createTempRoot();
-    const first = deferred<AgentTurnResult>();
+    const first = deferred<AgentRunResult>();
     const runtime = createRuntime(root, [], { runHarness: () => first.promise });
     const otherRuntime = createRuntime(root, [], { runHarness: async () => createResult("completed") });
 
-    const running = runtime.runTurn(createRequest(root, "ephemeral"));
+    const running = runtime.runAgentRun(createRequest(root, "ephemeral"));
     expect(runtime.isSessionActive("session-1")).toBe(true);
-    await expect(runtime.runTurn({
+    await expect(runtime.runAgentRun({
       ...createRequest(root, "ephemeral"),
-      turnId: "turn-2",
+      agentRunId: "run-2",
     })).rejects.toMatchObject({ code: "SESSION_ACTIVE" });
-    await expect(otherRuntime.runTurn(createRequest(root, "ephemeral"))).resolves.toMatchObject({
+    await expect(otherRuntime.runAgentRun(createRequest(root, "ephemeral"))).resolves.toMatchObject({
       status: "completed",
     });
 
@@ -142,7 +144,7 @@ describe("Agent Runtime", () => {
     const root = await createTempRoot();
     const abortHarness = vi.fn();
     const approvalAbort = vi.fn();
-    const result = deferred<AgentTurnResult>();
+    const result = deferred<AgentRunResult>();
     const harnessStarted = deferred<void>();
     const runtime = createRuntime(root, [], {
       approvalAbort,
@@ -156,24 +158,24 @@ describe("Agent Runtime", () => {
       },
     });
 
-    const running = runtime.runTurn(createRequest(root, "ephemeral"));
+    const running = runtime.runAgentRun(createRequest(root, "ephemeral"));
     await harnessStarted.promise;
-    expect(runtime.abortTurn({ sessionId: "session-1", turnId: "turn-1" })).toBe(true);
+    expect(runtime.abortAgentRun({ sessionId: "session-1", agentRunId: "run-1" })).toBe(true);
     await expect(running).resolves.toMatchObject({ status: "aborted" });
     expect(abortHarness).toHaveBeenCalledOnce();
-    expect(approvalAbort).toHaveBeenCalledWith("session-1", "turn-1");
+    expect(approvalAbort).toHaveBeenCalledWith("session-1", "run-1");
 
-    const second = deferred<AgentTurnResult>();
+    const second = deferred<AgentRunResult>();
     const runtimeForDispose = createRuntime(root, [], {
       runHarness: async (_input, deps) => {
         deps.abort = () => second.resolve(createResult("aborted"));
         return second.promise;
       },
     });
-    const secondRun = runtimeForDispose.runTurn(createRequest(root, "ephemeral"));
+    const secondRun = runtimeForDispose.runAgentRun(createRequest(root, "ephemeral"));
     await runtimeForDispose.dispose();
     await expect(secondRun).resolves.toMatchObject({ status: "aborted" });
-    await expect(runtimeForDispose.runTurn(createRequest(root, "ephemeral"))).rejects.toMatchObject({
+    await expect(runtimeForDispose.runAgentRun(createRequest(root, "ephemeral"))).rejects.toMatchObject({
       code: "RUNTIME_DISPOSED",
     });
   });
@@ -196,9 +198,9 @@ describe("Agent Runtime", () => {
       createDependencies: async () => createDeps(async () => {}),
       runHarness: harness,
     });
-    const running = runtime.runTurn(createRequest(root, "ephemeral"));
+    const running = runtime.runAgentRun(createRequest(root, "ephemeral"));
     await contextReady.promise;
-    expect(runtime.abortTurn({ sessionId: "session-1", turnId: "turn-1" })).toBe(true);
+    expect(runtime.abortAgentRun({ sessionId: "session-1", agentRunId: "run-1" })).toBe(true);
     continueContext.resolve();
 
     await expect(running).resolves.toMatchObject({ status: "aborted" });
@@ -215,7 +217,7 @@ describe("Agent Runtime", () => {
       onDiagnostic: (diagnostic) => diagnostics.push(diagnostic.code),
     });
 
-    await expect(runtime.runTurn(createRequest(root, "ephemeral"))).resolves.toMatchObject({
+    await expect(runtime.runAgentRun(createRequest(root, "ephemeral"))).resolves.toMatchObject({
       status: "completed",
     });
     expect(harness).toHaveBeenCalledOnce();
@@ -245,7 +247,7 @@ describe("Agent Runtime", () => {
       },
     });
 
-    await expect(runtime.runTurn({
+    await expect(runtime.runAgentRun({
       ...createRequest(root, "persistent"),
       executionContext: {
         runLocation: "worktree",
@@ -265,11 +267,11 @@ async function createTempRoot(): Promise<string> {
 
 function createRequest(
   root: string,
-  persistenceMode: RuntimeTurnRequest["persistenceMode"],
-): RuntimeTurnRequest {
+  persistenceMode: RuntimeAgentRunRequest["persistenceMode"],
+): RuntimeAgentRunRequest {
   return {
     sessionId: "session-1",
-    turnId: "turn-1",
+    agentRunId: "run-1",
     userInput: "hello",
     workspaceRoot: join(root, "workspace"),
     roots: {
@@ -287,11 +289,11 @@ function createRuntime(
   root: string,
   events: RuntimeStreamEvent[],
   overrides: {
-    runHarness?: (...args: any[]) => Promise<AgentTurnResult>;
+    runHarness?: (...args: any[]) => Promise<AgentRunResult>;
     eventSink?: { emit(event: RuntimeStreamEvent): Promise<void> | void };
     onDiagnostic?: (diagnostic: any) => void;
     dispose?: () => Promise<void>;
-    approvalAbort?: (sessionId: string, turnId: string) => void;
+    approvalAbort?: (sessionId: string, agentRunId: string) => void;
     workspaceExecutionProvider?: any;
     createDependencies?: (...args: any[]) => Promise<AgentDeps>;
   } = {},
@@ -304,7 +306,7 @@ function createRuntime(
     eventSink: overrides.eventSink ?? { emit: (event) => { events.push(event); } },
     approvalBroker: {
       waitForDecision: async (request) => ({ requestId: request.id, decision: "approve_once" }),
-      abortTurn: overrides.approvalAbort,
+      abortAgentRun: overrides.approvalAbort,
     },
     createDependencies: overrides.createDependencies ?? (async () => deps),
     runHarness: (overrides.runHarness ?? (async () => createResult("completed"))) as any,
@@ -332,20 +334,20 @@ function createDeps(dispose: () => Promise<void>): AgentDeps {
   };
 }
 
-function createResult(status: AgentTurnResult["status"]): AgentTurnResult {
+function createResult(status: AgentRunResult["status"]): AgentRunResult {
   const events: SessionEvent[] = status === "completed"
     ? [
         createSessionEvent("assistant_message", { content: "ok" }, "assistant"),
         createSessionEvent("context_snapshot", { totalTokens: 1 }, "snapshot"),
       ]
     : status === "aborted"
-      ? [createSessionEvent("turn_aborted", {}, "aborted")]
+      ? [createSessionEvent("agent_run_aborted", {}, "aborted")]
       : [createSessionEvent("error", { code: "LLM_ERROR", message: "failed" }, "error")];
   return {
     sessionId: "session-1",
-    turnId: "turn-1",
+    agentRunId: "run-1",
     events,
-    contextSnapshot: { totalTokens: 1 } as AgentTurnResult["contextSnapshot"],
+    contextSnapshot: { totalTokens: 1 } as AgentRunResult["contextSnapshot"],
     status,
     ...(status === "failed" ? { error: { code: "LLM_ERROR", message: "failed" } } : {}),
   };
@@ -355,9 +357,10 @@ function createSessionEvent(type: SessionEvent["type"], payload: unknown, id: st
   return {
     id,
     sessionId: "session-1",
-    turnId: "turn-1",
+    agentRunId: "run-1",
     type,
     timestamp: new Date(0).toISOString(),
+    schemaVersion: 2,
     payload,
   };
 }

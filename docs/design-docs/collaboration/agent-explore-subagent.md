@@ -49,7 +49,7 @@ Explore 的系统 prompt 在现有 `EXPLORE_SUBAGENT_SYSTEM_PROMPT` 基础上**�
 
 - `packages/shared`
   - Explore 与 `agent` 的展示区分**不**新开 `ToolPreviewKind`/`MessageBlock` kind，而是在既有 `AgentToolPreview` 上加判别字段 `display: "panel" | "inline"`（缺省 `panel`）。`explore` 复用 `agent` 的 preview kind / MessageBlock / 流式 partial-args 解析，渲染层按 `display` 路由。这样把改动面收敛到一个可选字段，避免穿透所有 `ToolUiPreview`/`MessageBlock` 的 exhaustive switch。
-  - `exploreModelId` 进入设置类型（`AgentSettings`）与 IPC 契约（`RunTurnInput`，由 main 从 settings 注入，renderer 不每轮上送）。
+  - `exploreModelId` 进入设置类型（`AgentSettings`）与 IPC 契约（`RunAgentInput`，由 main 从 settings 注入，renderer 不每轮上送）。
 - `packages/agent-core`
   - 新增 `explore` 工具定义、executor，复用 `runExploreSubAgent` 运行时，但接收独立的 flash `llm` 与聚焦 prompt。
   - `createToolManager` 配置新增 `exploreLlm`（flash 服务）；`agent` 工具继续用主 `llm`。

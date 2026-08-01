@@ -24,6 +24,7 @@
     "check:frontend-theme": "node scripts/check-frontend-theme-colors.mjs",
     "check:actions": "./scripts/check-action-pinning.sh",
     "repo:stats": "node scripts/repo-stats.mjs",
+    "reset:session-data": "node scripts/reset-session-data.mjs",
     "build:browser-locator": "node scripts/build-browser-locator-runtime.mjs",
     "build:agent-cli:bundle": "node scripts/build-agent-cli-binary.mjs --bundle-only",
     "build:agent-cli:binary": "node scripts/build-agent-cli-binary.mjs",

@@ -50,7 +50,7 @@ function fakeLLM(replyText: string): LLMService {
 const makeUser = (id: string, content: string, ts: string): SessionEvent => ({
   id,
   sessionId: "s",
-  turnId: id,
+  agentRunId: id,
   type: "user_message",
   timestamp: ts,
   payload: { content },

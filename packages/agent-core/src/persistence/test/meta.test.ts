@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { createMeta, readMeta, updateMeta, incrementTurnCount } from "../meta";
-import { mkdir, rm } from "node:fs/promises";
+import { createMeta, readMeta, updateMeta, incrementAgentRunCount } from "../meta";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -26,7 +26,8 @@ describe("meta.json operations", () => {
     expect(meta).not.toBeNull();
     expect(meta!.id).toBe("session-1");
     expect(meta!.title).toBe("Test Session");
-    expect(meta!.turnCount).toBe(0);
+    expect(meta!.schemaVersion).toBe(2);
+    expect(meta!.agentRunCount).toBe(0);
     expect(meta!.createdAt).toBeDefined();
     expect(meta!.updatedAt).toBeDefined();
   });
@@ -36,15 +37,27 @@ describe("meta.json operations", () => {
     expect(meta).toBeNull();
   });
 
+  it("rejects pre-V2 session metadata", async () => {
+    await writeFile(metaPath, JSON.stringify({
+      id: "session-v1",
+      title: "Old session",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      agentRunCount: 1,
+    }));
+
+    await expect(readMeta(metaPath)).resolves.toBeNull();
+  });
+
   it("should update specific fields", async () => {
     await createMeta(metaPath, "session-1");
 
-    const result = await updateMeta(metaPath, { title: "Updated Title", turnCount: 5 });
+    const result = await updateMeta(metaPath, { title: "Updated Title", agentRunCount: 5 });
     expect(result.ok).toBe(true);
 
     const meta = await readMeta(metaPath);
     expect(meta!.title).toBe("Updated Title");
-    expect(meta!.turnCount).toBe(5);
+    expect(meta!.agentRunCount).toBe(5);
     expect(meta!.id).toBe("session-1");
   });
 
@@ -54,29 +67,29 @@ describe("meta.json operations", () => {
     expect(result.error).toContain("not found");
   });
 
-  it("should increment turn count", async () => {
+  it("should increment agent run count", async () => {
     await createMeta(metaPath, "session-1");
 
-    await incrementTurnCount(metaPath, "deepseek-v3");
+    await incrementAgentRunCount(metaPath, "deepseek-v3");
     let meta = await readMeta(metaPath);
-    expect(meta!.turnCount).toBe(1);
+    expect(meta!.agentRunCount).toBe(1);
 
-    await incrementTurnCount(metaPath);
+    await incrementAgentRunCount(metaPath);
     meta = await readMeta(metaPath);
-    expect(meta!.turnCount).toBe(2);
+    expect(meta!.agentRunCount).toBe(2);
   });
 
   it("should preserve existing fields during increment", async () => {
     await createMeta(metaPath, "session-1", "My Session");
     const original = await readMeta(metaPath);
 
-    await incrementTurnCount(metaPath);
+    await incrementAgentRunCount(metaPath);
     const updated = await readMeta(metaPath);
 
     expect(updated!.id).toBe(original!.id);
     expect(updated!.title).toBe(original!.title);
     expect(updated!.createdAt).toBe(original!.createdAt);
-    expect(updated!.turnCount).toBe(original!.turnCount + 1);
+    expect(updated!.agentRunCount).toBe(original!.agentRunCount + 1);
   });
 
   it("should persist workspaceRoot when provided at creation", async () => {

@@ -18,6 +18,7 @@
 
 - [`docs/design-docs/frontend/README.md`](design-docs/frontend/README.md)
 - [`docs/design-docs/frontend/front-全局视觉语言规范.md`](design-docs/frontend/front-全局视觉语言规范.md)
+- [`docs/design-docs/frontend/front-agent-analysis-observability.md`](design-docs/frontend/front-agent-analysis-observability.md)
 - [`docs/FRONTEND_VERIFICATION.md`](FRONTEND_VERIFICATION.md)
 
 其中已经包含：

@@ -1,238 +1,164 @@
-# Agent Turn 五层职责规范
+# Agent Run 五层职责规范
 
-> 约束从前端用户输入到 Agent 执行结果返回的完整数据链路，明确每一层"做什么"和"不做什么"。
+> 约束一次用户输入从宿主界面进入 Agent，到执行、持久化、观测和结果展示的完整链路。文件名沿用历史命名；正文中的 Turn 只表示 Agent Loop 内真实的 `turn_start -> turn_end`。
 
-## 概览
+## 核心层级
 
 ```text
-Desktop / CLI Client -> Host Adapter -> Agent Runtime -> Bridge -> Agent Harness
+Session
+└─ User Message
+   └─ Agent Run (agentRunId)
+      ├─ Turn 1 (turnId, turnIndex=1)
+      │  └─ LLM Call 1..N (llmCallId, attempt)
+      └─ Turn 2 (turnId, turnIndex=2)
+         └─ LLM Call 1..N
+```
+
+- `agentRunId`：一次 `agent_start -> agent_end`。普通聊天中，一次用户发送触发一次 Agent Run，也是 UI、Abort、审批和持久化提交的顶层运行身份。
+- `turnId`：Agent Loop 内一次推理及其后续工具执行的边界。工具结果需要再次交给模型时进入下一个 Turn。
+- `llmCallId`：一次真实 provider 请求。自动重试会让同一个 Turn 出现多个 LLM Call。
+- `attempt`：同一 Turn 内的请求尝试序号，从 1 开始。
+
+完整字段与 Trace Schema 见 `agent-observability-trace-model.md`。
+
+## 五层拓扑
+
+```text
+Desktop / CLI Client -> Host Adapter -> Agent Runtime -> Bridge -> Agent Loop
         <- presentation <- Event Sink  <- stream/result <- Agent events
 ```
 
-| 层 | 包/文件 | 核心职责 | 输入 | 输出 |
-|---|---|---|---|---|
-| Renderer | `desktop/src/renderer/` | 收集用户输入，展示流式结果 | 用户交互 | `RunTurnInput`（经 IPC） |
-| Host Adapter | `desktop/src/main/desktop-agent-runtime.ts`、`agent-cli/src/runtime-adapter.ts` | 把 Electron / process / TTY 能力映射为 Runtime Ports | Host 输入 | `RuntimeTurnRequest` + Ports |
-| Agent Runtime | `agent-core/src/runtime/` | Session、Context、模型、审批、Abort、提交和清理 | `RuntimeTurnRequest` | `AgentTurnResult` + `RuntimeStreamEvent` |
-| Bridge | `agent-core/src/engine/bridge.ts` | 将 Agent 内部事件翻译为 `RuntimeStreamEvent`，聚合为 `AgentTurnResult` | `AgentDeps` + turn 参数 | `AgentTurnResult` + stream 回调 |
-| Agent | `agent-core/src/engine/agent.ts` + `loop.ts` | LLM 循环（思考→工具→回复），上下文管理，工具执行 | `ContextManager` + `LLMService` + `ToolManager` | `AgentEvent` 流 |
+| 层 | 核心职责 | 输入 | 输出 |
+| --- | --- | --- | --- |
+| Renderer / CLI Client | 收集输入、生成 `agentRunId`、展示流式状态 | 用户交互 | `RunAgentInput` |
+| Host Adapter | 把 Electron、process、TTY 等能力映射为 Runtime Ports | Host 输入 | `RuntimeAgentRunRequest` + Ports |
+| Agent Runtime | Session、Workspace、Context、模型、审批、Abort、提交与 Trace 生命周期 | Runtime request | `AgentRunResult` + stream |
+| Bridge | 翻译内部事件、建立三层归属、聚合产品事件 | Agent deps + Run 参数 | SessionEvent + RuntimeStreamEvent |
+| Agent Loop | 维护真实 Turn / LLM Call、重试、上下文和工具循环 | Context + LLM + Tools | `AgentEvent` |
 
-## 1. Renderer 层
+## 1. Renderer / CLI Client
 
-**做什么：**
-- 通过 `Composer.tsx` 收集 `{ model, thinkingEnabled, userInput }` 三个字段
-- 调用 `window.api.runTurn(input)` 发起 IPC 请求
-- 在 `App` 生命周期内只注册一次 `agent:stream` 监听，驱动 `ConversationView` 实时渲染
-- 按 `{ sessionId, turnId }` 路由 turn 级事件，只有当前可见 turn 可以修改共享 streaming state
-- 管理 UI 状态（loading、abort 按钮等）
+Desktop 通过 `window.actspace.runAgent()` 发起运行，通过唯一的 `agent:stream` 监听消费事件。CLI 使用同一 Runtime contract，经终端 renderer 输出。
 
-**不做什么：**
-- 不读取 `.env`，不接触 API Key
-- 不构造 `LLMConfig`，不创建 LLM/Tool 实例
-- 不直接导入 `@actspace/agent-core`
+`RunAgentInput` 的主要字段：
 
-**前端传递的字段（`RunTurnInput`）：**
+| 字段 | 语义 |
+| --- | --- |
+| `sessionId` | 会话身份 |
+| `agentRunId` | 本次 Agent Run 身份 |
+| `userInput` | 用户消息 |
+| `attachments` | Composer 附件 |
+| `model` / `modelKey` | 模型选择；新路径优先 `modelKey` |
+| `thinkingEnabled` / `reasoningEffort` | 推理选项 |
+| `executionContext` | 首次运行的 Workspace / Branch / Run on 快照 |
 
-| 字段 | 类型 | 来源 | 用途 |
-|---|---|---|---|
-| `sessionId` | `string` | 前端 session 管理 | 会话标识 |
-| `turnId` | `string` | 前端生成 | turn 标识 |
-| `userInput` | `string` | 用户在 Composer 中输入 | 用户消息 |
-| `model` | `ModelId?` | 用户在下拉菜单选择 | 选定的模型 |
-| `thinkingEnabled` | `boolean?` | 用户切换 toggle | 是否启用思考 |
-| `executionContext` | `TurnExecutionContextInput?` | 首轮 Workspace / Branch / Run on 选择 | 由 Main 在首轮发送前准备最终执行目录 |
+Renderer 的运行状态按 `{ sessionId, agentRunId }` 路由。`agent_turn_*` 与 `llm_call_*` 是分析观测的细粒度事件；assistant delta、工具和 usage 可携带真实 `turnId + llmCallId`，但不能用它们替代 Agent Run 的可见状态身份。
 
-首轮 Workspace / Branch / Run on 选择会作为一个 `executionContext` 快照随 `agent:run-turn` 一次性提交。Main 必须先完成 Git/worktree 准备并更新 SessionMeta，再构建 Agent；准备失败不能写入 `user_message`。已有 turn 的会话继续使用已锁定的 `SessionMeta.workspaceRoot`。
+流式结束后，Renderer 必须在同一次交接中恢复 `SessionRecord`、切换 streaming → persisted 数据源并收尾运行状态。旧 Agent Run 的迟到事件不能覆盖当前会话或当前 Run。
 
-`RuntimeStreamEvent` 中所有 turn 级事件都必须携带 `sessionId` 与 `turnId`，包括 assistant delta、工具 streaming/start/finish、审批和 SubAgent 事件。`bash_task_update` 是例外：后台任务可能在原 turn 结束后继续变化，因此它保持 session 级作用域，只按 `sessionId` 路由。
+客户端不读取 `.env`、API Key、`session.jsonl` 或 Trace 文件。Desktop 分析观测只调用 typed preload 暴露的 Trace IPC。
 
-切换会话只会把旧 turn 从当前可见 streaming state 脱离，不会隐式中止 main 进程中的执行。旧 turn 后续返回的 delta、结果和 finally 收尾都不能覆盖新会话或新 turn 的 UI。
+## 2. Host Adapter
 
-流式 turn 完成并恢复 `SessionRecord` 时，Renderer 必须遵守以下交接不变量：
+Host Adapter 负责宿主差异：
 
-- 同一个 `turnId` 在一个渲染帧内只能来自 streaming blocks 或 persisted blocks，不能同时来自两份状态源。
-- 恢复后的 `SessionRecord`、streaming blocks 清理和运行状态收尾必须在同一个同步交接阶段完成；会话列表、Review 等辅助刷新不能插在消息交接中间。
-- `MessageBlock.id` 保留持久化事件身份，用于消息操作和数据引用；`MessageBlock.renderKey` 是 turn 级展示身份，流式块与持久化块通过相同 render key 复用 React DOM，避免完成时重新播放入场动画。
+- Desktop 注册 IPC，注入 Electron roots、settings、BrowserWindow Event Sink、审批和 Workspace Execution Provider。
+- CLI 解析 argv、stdin、TTY、stdout/stderr、退出码、Session lock 和 runtime assets。
+- Desktop 使用 `persistent + desktop`；`run` 使用 `ephemeral + cli-headless`；`chat` 使用 `persistent + cli-interactive`。
+- Host 只构造 `RuntimeAgentRunRequest` 和 Ports，不复制 Session、Context、Harness 或提交编排。
 
-`/compact` 与 `/eval [失败说明]` 是例外命令路径：renderer 在普通 turn 前分流到独立 IPC。两者都不创建普通用户消息，不进入 `RunTurnInput.userInput`，也不进入主 Agent conversation。`/eval` 使用独立系统提示词和独立 ContextManager，在 `<userData>/eval-candidates/<candidateId>/` 生成回归 Candidate。
+关键文件：
 
-## 2. Host Adapter 层
+- `packages/desktop/src/main/agent-run.ts`：Desktop 兼容 wrapper，委托统一 Runtime。
+- `packages/desktop/src/main/desktop-agent-runtime.ts`：Electron Host Adapter。
+- `packages/agent-cli/src/runtime-adapter.ts`：CLI Host Adapter。
+- `packages/agent-core/src/runtime/`：唯一运行编排实现。
 
-**做什么：**
-- Electron app 生命周期（`configureAppPaths`、`createMainWindow`）
-- Desktop 注册 IPC、注入 Electron roots / settings / `BrowserWindow` Event Sink 和 `PendingApprovalRegistry`
-- CLI 解析 argv、stdin、TTY、stdout/stderr、退出码、Session lock 和 runtime assets
-- 调用 `createAgentHostRuntime()`，把宿主能力注入显式 Port
-- 把输入映射为 `RuntimeTurnRequest`；Desktop 使用 `persistent + desktop`，`run` 使用 `ephemeral + cli-headless`，`chat` 使用 `persistent + cli-interactive`
-- 处理 `context:compact` 手动压缩：为当前 session 装配相同的 Agent deps，调用 `compactContextWithAgent()`，追加 `context_compaction` / `context_snapshot` 并刷新 `context-state.json`
-- 处理 `eval:generate-candidate`：定位最近一个普通用户 Turn，以 Candidate 目录作为独立生成 Agent 的 workspace，完成后追加 `eval_candidate` 系统事件
-- 管理 abort 闭包
+## 3. Agent Runtime
 
-**不做什么：**
-- 不恢复 Context、不追加 SessionEvent、不决定提交顺序
-- 不直接读取 `process.env` 来拼 API Key（委托给 `resolveAgentEnvConfig`）
-- 不处理 Agent 内部事件（委托给 Bridge）
-
-**关键文件：**
-- `main/index.ts`：Electron 生命周期 + IPC 路由（精简，不含 Agent 逻辑）
-- `main/agent-turn.ts`：保留 `runAndPersistTurn` 兼容 wrapper，实际委托 Desktop Adapter / Runtime
-- `main/desktop-agent-runtime.ts`：Electron Host Adapter
-- `agent-cli/src/runtime-adapter.ts`：CLI Host Adapter
-- `main/context-compact.ts`：手动上下文压缩编排（`compactAndPersistContext`）
-
-## 3. Agent Runtime 层
-
-Runtime 是唯一的 Turn 应用编排层：恢复 Session、准备 workspace、组装 Context、解析模型、创建 Harness 依赖、预写用户输入、执行 Harness、检查持久化结果、发送终态并清理工具。活动 Turn 状态属于 Runtime 实例，不能使用跨 Host 的模块全局 Map。
+Runtime 是唯一 Agent Run 应用编排层：恢复 Session、准备 Workspace、组装 Context、解析模型、创建 Harness 依赖、预写用户输入、创建 Trace Writer、执行 Harness、提交结果、发送终态并清理工具。
 
 关键不变量：
 
 - persistent 输入在 Harness 前提交；ephemeral 不创建产品 Session。
-- `turn_finished` 只在结果提交成功后发送；写盘失败必须是 `turn_failed`。
-- Runtime 负责唯一的 `turn_started` 和 terminal event；Bridge 的兼容生命周期事件在 Runtime 路径关闭。
-- Abort 覆盖初始化窗口、Harness、审批等待和 ToolManager dispose。
-- Event Sink 与观测 sidecar 失败不能重新执行 Harness。
+- `agent_run_finished` 只在结果成功提交后发送；写盘失败必须是 `agent_run_failed`。
+- Runtime 负责唯一的 `agent_run_started` 与 terminal event；Bridge 在 Runtime 路径不重复发顶层生命周期事件。
+- 活动状态以 `{ sessionId, agentRunId }` 标识，并属于 Runtime 实例，不能使用跨 Host 的模块全局 Map。
+- Abort 覆盖初始化窗口、Harness、等待审批和 ToolManager dispose。
+- Event Sink、短期日志或 Trace sidecar 失败不能重新执行 Harness；Trace 不可用时必须 fail-soft 并输出诊断事件。
+- 首次运行的 Workspace / Branch 准备失败时，不能写入 `user_message`。
 
-**配置两步法：**
-```typescript
-const runtime = createAgentHostRuntime({
-  contextProvider,
-  modelResolver,
-  eventSink,
-  approvalBroker,
-  workspaceExecutionProvider,
-});
-await runtime.runTurn(request);
+## 4. Bridge
+
+Bridge 入口为 `runAgentWithBridge()`，职责包括：
+
+- 把 `agent_start/end` 映射为 Agent Run 生命周期（兼容直连 Harness；Runtime 路径关闭重复顶层事件）。
+- 把真实 `turn_start/end` 映射为 `agent_turn_started/finished`。
+- 把 `llm_call_start/end` 映射为 `llm_call_started/finished`。
+- 给 assistant、tool、usage 和 SessionEvent 附上正确的 `agentRunId/turnId/llmCallId`。
+- 将每次 LLM Call 的 usage 独立保存，不把重试或多 Turn 压成一个汇总。
+- 把完整但脱敏的请求/响应写入独立 Trace；Trace 写失败不影响 Agent 主流程。
+
+Bridge 不操作 Electron IPC，不拥有 Session 路径，也不决定持久化提交顺序。
+
+## 5. Agent Loop
+
+`runAgentLoop()` 维护模型响应、工具执行与 follow-up 循环。每次进入内层推理生成新的 `turnId`；每次真正调用 `llm.stream()` 前生成新的 `llmCallId` 并递增 `attempt`。
+
+关键事件顺序：
+
+```text
+agent_start
+turn_start
+llm_call_start
+message_delta / message_end
+llm_call_end / llm_retry
+tool_start / tool_end
+turn_end
+agent_end
 ```
 
-`createAgentFromConfig`（同步签名）保留，仅供 mock / 单元测试 / 纯内存场景使用。
+Agent Loop 不知道 Session、Electron、IPC 或 Trace 路径；`agentRunId` 由上层持有并在 Bridge 翻译时附加。
 
-## 4. Bridge 层
+## Session 与 Trace 分工
 
-**做什么：**
-- 接收 `AgentDeps` + turn 参数，启动 Agent
-- 将 `AgentEvent` 流（来自 Agent 内部）翻译成 `RuntimeStreamEvent`（前端约定的协议）
-- 根据工具的 `previewKind` 聚合执行结果为 `ToolUiPreview`
-- 汇总所有事件为最终的 `AgentTurnResult`
-- 使用 `AgentLoopResult.status` 判断 turn 终态；abort 不从最后一条 assistant message 的 `stopReason` 反推
-- abort 时产出带 `{ sessionId, turnId }` 的 `turn_aborted` stream event，并聚合可持久化的同名 SessionEvent
+- `session.jsonl`：可恢复的稳定事实，Schema V2；事件必须有 `agentRunId`，细粒度事件按需带 `turnId/llmCallId`。
+- `context-state.json`：可覆盖的当前 Context 视图。
+- `traces/<agentRunId>.jsonl`：完整但脱敏的请求/响应证据，用于分析观测与请求差异。
+- `logs/agent-runs/*.jsonl`：短期开发排障日志，不是产品分析事实源。
 
-**不做什么：**
-- 不创建 LLM/Tool 实例（接收已创建好的）
-- 不持久化数据
-- 不处理 IPC 传输
-- 不感知会话历史恢复——拿到的 `deps.contextManager` 在构造阶段就已经包含完整历史，`getContext()` 同步可见
+旧 Session 不做兼容读取。开发期升级后可显式清理：
 
-## 5. Agent Harness 层
-
-**做什么：**
-- 管理 LLM 对话循环（`runAgentLoop`）
-- 上下文管理（system prompt、历史消息、token 估算）
-- 工具执行（通过 `ToolManager`）
-- 产出 `AgentEvent` 流（thinking、text、toolCall、toolResult 等）
-- 支持 abort
-- abort 是独立的 turn 终态；即使中止发生在 tool call、审批等待或尚未收到首条 assistant message 时，也返回 `status: "aborted"`
-
-**不做什么：**
-- 不知道 Electron 的存在
-- 不持久化任何数据
-- 不关心 IPC 协议或 `RuntimeStreamEvent` 格式
-
-## 数据流向
-
-```
-用户输入 → Renderer
-         → [IPC: RunTurnInput]
-         → Desktop Host Adapter
-           → RuntimeTurnRequest + Electron Ports
-         → Agent Runtime
-           → prepare executionContext (first turn only)
-           → resolve SessionMeta.workspaceRoot / Context / model / approval
-           → await createAgentForSession(config, { sessionPath })
-           → persistent: append user_message
-           → runTurnWithAgent(..., { emitTerminalEvent: false })
-         → Bridge
-           → new Agent(deps).run(userInput)
-         → Agent
-           ← AgentEvent stream
-         ← Bridge: 翻译为 RuntimeStreamEvent，回调 onStreamEvent
-         ← Main Process: 通过 webContents.send 推送给 Renderer
-         ← Renderer: 单一监听按 sessionId + turnId 路由后实时渲染
-
-Agent 结束
-  → Bridge: 聚合为 AgentTurnResult
-  → Agent Runtime: 追加剩余事件并检查 WriteResult
-  → Agent Runtime: 提交成功后发送唯一 terminal event
-  → Desktop Host Adapter: 返回 IPC caller
-  → Renderer: 重新读取 SessionRecord
-    → 同步完成 streaming → persisted 单一数据源交接
-    → 使用稳定 renderKey 保留当前 turn DOM
-    → 再刷新会话列表和 Review 等辅助状态
+```sh
+pnpm reset:session-data -- --data-root /absolute/path/to/actspace --confirm
 ```
 
-### Stop / Abort 收敛链路
+## Stop / Abort
 
-```txt
-Renderer: 点击 Stop
-  → [IPC: agent:abort-turn]
-  → Main Process: 命中 active turn abort closure
-    → Agent.abort() 触发当前 turn AbortSignal
-    → PendingApprovalRegistry.abortTurn(sessionId, turnId)
-      → 若正在等待审批，立即 resolve 为 abort，executor 不启动
-    → 若前台 Bash 已启动，signal listener 终止对应进程
-  → Agent loop 返回显式 status: "aborted"
-  → Bridge: 追加 turn_aborted SessionEvent，并推送 turn_aborted RuntimeStreamEvent
-  → Main Process: append 剩余事件并更新 meta.turnCount
-  → Renderer: getSession(sessionId)，清空临时 streamingBlocks，Composer 恢复输入
+```text
+Client: Stop
+  -> abortAgentRun { sessionId, agentRunId }
+  -> Runtime 命中 active Agent Run
+  -> Agent.abort() + ApprovalBroker.abortAgentRun()
+  -> Agent Loop 返回 aborted
+  -> Runtime 提交 agent_run_aborted 并发送唯一终态
 ```
 
-`Stopped` 不是 renderer 临时拼出的占位块，而是 `turn_aborted` SessionEvent 派生出的持久化状态块。因此切换 Session、发送下一轮消息或重启应用后，中止记录仍然存在。
+`Stopped` 来自持久化的 `agent_run_aborted`，不是 Renderer 临时占位。Approval 与 Abort 竞态使用 pending entry 先到先得，并在执行工具前再次检查 AbortSignal。
 
-abort 与 Allow/Run 可能同时发生。PendingApprovalRegistry 对 pending entry 采用先到先得的删除语义，scheduler 在 approval 返回后还会再次检查 `AbortSignal`；一旦 abort 获胜，工具 executor 不能启动。
+## 特殊命令
 
-手动 `/compact` 数据流：
+`/compact` 与 `/eval` 在普通 Agent Run 前分流。它们可以用 `agentRunId` 做操作关联，但没有进入主 Agent Loop 时不能伪造 `turnId/llmCallId`。
 
-```txt
-Renderer: `/compact`
-  → [IPC: CompactContextInput]
-  → Main Process
-    → readMeta(session.metaPath).workspaceRoot ?? defaultRoot
-    → buildAgentConfig({ model }, workspaceRoot)
-    → await createAgentForSession(config, { sessionPath })
-    → compactContextWithAgent(input, deps, { onStreamEvent })
-  ← RuntimeStreamEvent: context_compaction_started/progress/finished/failed
-  → append context_compaction + context_snapshot
-  → write context-state.json
-  ← Renderer: 恢复 SessionRecord，消息流显示 context_compaction block
-```
+## 修改检查清单
 
-手动 `/eval` 数据流：
-
-```txt
-Renderer: `/eval [失败说明]`
-  → [IPC: GenerateEvalCandidateInput]
-  → Main Process
-    → 定位最近一个普通 user_message Turn
-    → 创建 <userData>/eval-candidates/<candidateId>/
-    → buildAgentConfig(candidateRoot + 独立 system prompt)
-    → 独立 Agent 用绝对路径只读 session.jsonl / 原工作区
-    → write_file / edit_file 写 case.json + fixture/
-    → 校验必要产物
-    → append eval_candidate SessionEvent
-  ← Renderer: 恢复 SessionRecord，显示 Candidate 成功/失败状态
-```
-
-## 新增代码时的检查清单
-
-- [ ] 前端传递的字段是否只在 `RunTurnInput` 中定义？
-- [ ] 配置构建是否通过 `buildAgentConfig` 完成？（不要在 main 直接拼 LLMConfig）
-- [ ] 新 Host 是否只实现 Adapter / Port，而没有复制 Session、Context 或 Harness 编排？
-- [ ] terminal event 是否仍由 Runtime 在提交成功后唯一发送？
-- [ ] Main 进程是否仅透传 `sessionPath` 给 `createAgentForSession`，没有自行读 `session.jsonl` 或调 `sessionEventsToMessages`？
-- [ ] Agent 内部新增的事件是否在 Bridge 中有对应的 `RuntimeStreamEvent` 翻译？
-- [ ] 新增的 turn 级 `RuntimeStreamEvent` 是否包含 `sessionId` 与 `turnId`？
-- [ ] Renderer 是否继续保持单一 `agent:stream` 订阅，且旧 turn 收尾不会修改新 turn 状态？
-- [ ] abort 是否同时覆盖 Agent signal、pending approval 和仍在前台等待的 Bash，且不会误杀已经 backgrounded 的 task？
-- [ ] aborted turn 是否从持久化 `turn_aborted` 恢复，而不是依赖 renderer 临时状态？
-- [ ] Agent 层的代码是否依赖了 Electron API？（不应该）
-- [ ] 持久化是否只在 Main Process 层完成？
-- [ ] Slash command 是否明确分流，不把命令文本写入主 Agent conversation？
+- [ ] 顶层运行身份是否使用 `agentRunId`，没有复用真实 `turnId`？
+- [ ] 新的 provider 请求是否拥有 `llmCallId + attempt`？
+- [ ] 新 Host 是否只实现 Adapter / Port，没有复制 Runtime 编排？
+- [ ] terminal event 是否仍由 Runtime 在持久化提交后唯一发送？
+- [ ] 新 AgentEvent 是否在 Bridge 中有 RuntimeStreamEvent 映射？
+- [ ] assistant、tool 和 usage 是否关联到正确的三层身份？
+- [ ] SessionEvent 是否为 `schemaVersion: 2`？
+- [ ] 完整上下文是否只进入脱敏 Trace，而不是重复塞进 `session.jsonl`？
+- [ ] Abort 是否覆盖 Agent、等待审批与前台工具执行？
+- [ ] 修改存储或事件契约时，是否同步更新观测模型与存储文档？

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import type { TerminalSessionSnapshot, WorkspaceDirEntry } from "@actspace/shared";
 
 /**
- * 右侧面板的 Tab 模型。`id` 同时是去重 key：用稳定 id（如 `context`、`html:<turnId>`、
+ * 右侧面板的 Tab 模型。`id` 同时是去重 key：用稳定 id（如 `context`、`html:<agentRunId>`、
  * `file:<相对路径>`）打开同一对象时只更新内容并聚焦，不重复堆 Tab。
  *
  * 工作区文件类 Tab 额外带一组**新鲜度**字段（`mtimeMs` / `size` / `isStale` / `truncated`）。

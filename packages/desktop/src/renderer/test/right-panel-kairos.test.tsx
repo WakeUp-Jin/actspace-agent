@@ -133,9 +133,9 @@ function makeEvent(overrides: Partial<SessionEvent> & { type: SessionEvent["type
   return {
     id: overrides.id ?? `evt-${overrides.type}`,
     sessionId: "kairos-2026-05-28",
-    turnId: overrides.turnId ?? "turn-1",
+    agentRunId: overrides.agentRunId ?? "turn-1",
     timestamp: overrides.timestamp ?? "2026-05-28T02:03:51.000Z",
-    schemaVersion: 1,
+    schemaVersion: 2,
     payload: {},
     ...overrides,
   } as SessionEvent;

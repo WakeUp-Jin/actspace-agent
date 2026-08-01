@@ -9,7 +9,7 @@ import type {
   WorkspaceOpenToolId,
   WorkspaceOpenToolsResult,
 } from "@actspace/shared";
-import type { AppDataRoots } from "./agent-turn";
+import type { AppDataRoots } from "./agent-run";
 
 type AppDefinition = { label: string; appName: string; bundlePaths: string[]; iconFiles: string[] };
 

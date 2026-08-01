@@ -26,14 +26,14 @@ export async function compactContextWithAgent(
   deps: CompactContextDeps,
   options: CompactContextOptions = {},
 ): Promise<CompactContextResult> {
-  const { sessionId, turnId } = input;
+  const { sessionId, agentRunId } = input;
   const emit = options.onStreamEvent;
 
   try {
     emit?.({
       type: "context_compaction_started",
       sessionId,
-      turnId,
+      agentRunId,
       trigger: "manual",
       stage: "preparing",
     });
@@ -43,33 +43,33 @@ export async function compactContextWithAgent(
     emit?.({
       type: "context_compaction_progress",
       sessionId,
-      turnId,
+      agentRunId,
       trigger: "manual",
       stage: "summarizing",
     });
 
     const report = await deps.contextManager.compactNow(deps.summarizer);
     const payload = createCompactionPayload(report);
-    const compactionEvent = createPersistedSessionEvent(sessionId, turnId, "context_compaction", payload);
+    const compactionEvent = createPersistedSessionEvent(sessionId, agentRunId, "context_compaction", payload);
 
     emit?.({
       type: "context_compaction_progress",
       sessionId,
-      turnId,
+      agentRunId,
       trigger: "manual",
       stage: "writing",
       summary: createCompactionSummary(payload),
     });
 
     const contextSnapshot = deps.contextManager.getUsageSnapshot();
-    const contextState = createContextState(contextSnapshot, sessionId, turnId);
-    const snapshotEvent = contextSnapshotToEvent(contextSnapshot, sessionId, turnId);
+    const contextState = createContextState(contextSnapshot, sessionId, agentRunId);
+    const snapshotEvent = contextSnapshotToEvent(contextSnapshot, sessionId, agentRunId);
     const events: SessionEvent[] = [compactionEvent, snapshotEvent];
 
     emit?.({
       type: "context_compaction_finished",
       sessionId,
-      turnId,
+      agentRunId,
       trigger: "manual",
       stage: "completed",
       status: report.status,
@@ -80,7 +80,7 @@ export async function compactContextWithAgent(
 
     return {
       sessionId,
-      turnId,
+      agentRunId,
       status: report.status,
       events,
       contextSnapshot,
@@ -92,17 +92,17 @@ export async function compactContextWithAgent(
     emit?.({
       type: "context_compaction_failed",
       sessionId,
-      turnId,
+      agentRunId,
       trigger: "manual",
       stage: "failed",
       error: sessionError,
     });
 
     const contextSnapshot = deps.contextManager.getUsageSnapshot();
-    const contextState = createContextState(contextSnapshot, sessionId, turnId);
+    const contextState = createContextState(contextSnapshot, sessionId, agentRunId);
     return {
       sessionId,
-      turnId,
+      agentRunId,
       status: "failed",
       events: [],
       contextSnapshot,

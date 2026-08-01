@@ -40,7 +40,7 @@ export interface ToolApprovalRequest {
   approvalScope?: "browser_session";
   executionEnvironment?: "sandbox" | "real";
   sessionId?: string;
-  turnId?: string;
+  agentRunId?: string;
   createdAt: number;
 }
 
@@ -90,7 +90,7 @@ export interface ToolSchedulerConfig {
   /** flash 摘要器；缺省时非 bash 工具退化为确定性头尾截断 */
   summarizer?: Summarizer;
   approvalGate?: ApprovalGate;
-  approvalContext?: { sessionId?: string; turnId?: string };
+  approvalContext?: { sessionId?: string; agentRunId?: string };
   now?: () => number;
   createId?: () => string;
 }
@@ -106,7 +106,7 @@ export class ToolScheduler {
   private absoluteMaxChars?: number;
   private summarizer?: Summarizer;
   private approvalGate?: ApprovalGate;
-  private approvalContext?: { sessionId?: string; turnId?: string };
+  private approvalContext?: { sessionId?: string; agentRunId?: string };
   private now: () => number;
   private createId: () => string;
 
@@ -297,7 +297,7 @@ export class ToolScheduler {
       approvalScope: permission.approvalScope,
       executionEnvironment: permission.executionEnvironment,
       sessionId: this.approvalContext?.sessionId,
-      turnId: this.approvalContext?.turnId,
+      agentRunId: this.approvalContext?.agentRunId,
       createdAt: this.now(),
     };
   }

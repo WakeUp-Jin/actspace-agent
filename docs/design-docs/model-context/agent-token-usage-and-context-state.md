@@ -103,7 +103,7 @@ sessions/{sessionId}/context-state.json
 - title
 - createdAt
 - updatedAt
-- turnCount
+- agentRunCount
 
 它不保存 usage 明细和上下文条目。
 

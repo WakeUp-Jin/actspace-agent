@@ -15,7 +15,7 @@
 - `docs/design-docs/agent-runtime/agent-turn-layers.md`
 - `docs/design-docs/core-storage-and-observability.md`
 - `docs/FRONTEND_VERIFICATION.md`
-- `packages/desktop/src/main/agent-turn.ts`
+- `packages/desktop/src/main/agent-run.ts`
 - `packages/desktop/src/main/agent-runtime-context.ts`
 - `packages/desktop/src/main/index.ts`
 - `packages/desktop/src/preload/index.ts`
@@ -27,7 +27,7 @@
 - `packages/desktop/src/main/team/team-ipc.ts`（新增）
 - `packages/desktop/src/main/team/team-preset-service.ts`（新增或薄包装）
 - `packages/desktop/src/main/team/test/*.test.ts`（新增）
-- `packages/desktop/src/main/agent-turn.ts`
+- `packages/desktop/src/main/agent-run.ts`
 - `packages/desktop/src/main/agent-runtime-context.ts`
 - `packages/desktop/src/main/index.ts`
 - `packages/desktop/src/main/app-paths.ts`

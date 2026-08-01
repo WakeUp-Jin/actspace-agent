@@ -147,16 +147,22 @@ function mergeSettings(current: AppSettings, input: SettingsUpdateInput): AppSet
 
 export function SettingsPage({
   onBack,
+  onOpenAnalysis,
+  initialSection = "general",
+  onSectionChange,
   onSettingsChange,
   onArchivedSessionsChange,
 }: {
   onBack: () => void;
+  onOpenAnalysis?: () => void;
+  initialSection?: SettingsSectionId;
+  onSectionChange?: (section: SettingsSectionId) => void;
   /** 设置变更后回传最新快照，供上层（如 Composer 默认模型）联动。 */
   onSettingsChange?: (settings: AppSettings) => void;
   /** 归档会话恢复后通知上层刷新普通会话列表。 */
   onArchivedSessionsChange?: () => void;
 }) {
-  const [section, setSection] = useState<SettingsSectionId>("general");
+  const [section, setSection] = useState<SettingsSectionId>(initialSection);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [keyModalProvider, setKeyModalProvider] = useState<SecretProviderId | null>(null);
@@ -243,7 +249,15 @@ export function SettingsPage({
       </div>
 
       <div className="flex min-h-0 flex-1 overflow-hidden pt-[var(--window-chrome-strip-height)] max-[820px]:flex-col">
-        <SettingsNav active={section} onSelect={setSection} onBack={onBack} />
+        <SettingsNav
+          active={section}
+          onSelect={(nextSection) => {
+            setSection(nextSection);
+            onSectionChange?.(nextSection);
+          }}
+          onBack={onBack}
+          onOpenAnalysis={onOpenAnalysis}
+        />
         <main aria-label="设置内容" className="min-h-0 flex-1 overflow-y-auto bg-app-bg">
           {settings ? (
             <SettingsContent
@@ -1407,7 +1421,7 @@ function ArchivedChatsSection({
                 <div className="truncate text-[14px] font-semibold text-text-main">{session.title}</div>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-text-faint">
                   <span>{formatUpdatedAt(session.updatedAt)}</span>
-                  <span>{session.turnCount} turns</span>
+                  <span>{session.agentRunCount} runs</span>
                   <span>{workspaceLabelFromRoot(session.workspaceRoot)}</span>
                 </div>
               </div>

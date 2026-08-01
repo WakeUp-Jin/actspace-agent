@@ -1,15 +1,15 @@
 /**
- * AgentEvent -> AgentTurnResult + RuntimeStreamEvent 桥接
+ * AgentEvent -> AgentRunResult + RuntimeStreamEvent 桥接
  *
- * 连接新 engine（Agent.run）与旧 IPC 契约（AgentTurnResult + RuntimeStreamEvent）。
+ * 连接新 engine（Agent.run）与旧 IPC 契约（AgentRunResult + RuntimeStreamEvent）。
  *
  * 双通道输出：
  * 1. onStreamEvent 回调：实时推送 RuntimeStreamEvent 给 IPC 层
- * 2. 返回值：聚合为 AgentTurnResult 供 persistence 和 renderer 最终消费
+ * 2. 返回值：聚合为 AgentRunResult 供 persistence 和 renderer 最终消费
  */
 
 import type {
-  AgentTurnResult,
+  AgentRunResult,
   ComposerAttachment,
   ModelDefinition,
   ModelKey,
@@ -33,7 +33,7 @@ import type { LLMService } from "../llm/types";
 import type { ToolManager } from "../tools/manager";
 import type { ContextManager } from "../context/manager";
 import type { Summarizer } from "../context/compression/summarizer";
-import type { AgentRunLogger } from "../observability";
+import type { AgentRunLogger, AgentTraceWriter } from "../observability";
 import type { CacheAuditTracker } from "../observability/cache-audit";
 import type { ToolResult } from "../internal-tools";
 import { Agent } from "./agent";
@@ -105,9 +105,9 @@ function logAgentRun(message: string, details?: Record<string, unknown>): void {
   );
 }
 
-export interface RunTurnWithAgentInput {
+export interface RunAgentWithBridgeInput {
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   userInput: string;
   attachments?: ComposerAttachment[];
   modelAttachments?: ComposerAttachment[];
@@ -115,7 +115,7 @@ export interface RunTurnWithAgentInput {
   reasoningEffort?: ModelReasoningEffort;
 }
 
-export interface RunTurnWithAgentDeps {
+export interface RunAgentWithBridgeDeps {
   llm: LLMService;
   toolManager: ToolManager;
   contextManager: ContextManager;
@@ -135,37 +135,40 @@ export interface RunTurnWithAgentDeps {
   abort?: () => void;
 }
 
-export interface RunTurnWithAgentOptions {
+export interface RunAgentWithBridgeOptions {
   onStreamEvent?: (event: RuntimeStreamEvent) => void;
   runLogger?: AgentRunLogger;
+  /** Session 内长期保留、供分析观测读取的脱敏请求 Trace。 */
+  traceWriter?: AgentTraceWriter;
   /** Main 已预写 user_message 时关闭，避免同一 turn 重复持久化用户输入。 */
   includeUserEvent?: boolean;
   /** 兼容旧调用方；正式 AgentRuntime 关闭后在提交成功时自行发送终态。 */
   emitTerminalEvent?: boolean;
-  /** 兼容旧调用方；正式 AgentRuntime 已在 Harness 启动前发送 turn_started。 */
-  emitTurnStartedEvent?: boolean;
+  /** 兼容旧调用方；正式 AgentRuntime 已在 Harness 启动前发送 agent_run_started。 */
+  emitAgentRunStartedEvent?: boolean;
   /** Host-owned diagnostic log channel. Omit to preserve the legacy console logger. */
   onLog?: (message: string, details?: Record<string, unknown>) => void;
 }
 
 /**
- * 用新 Agent 引擎执行一轮 turn，同时桥接旧的 AgentTurnResult 契约。
+ * 用新 Agent 引擎执行一轮 turn，同时桥接旧的 AgentRunResult 契约。
  *
  * 内部流程：
  * 1. Agent.run() 执行，通过 onEvent 实时将 AgentEvent 映射为 RuntimeStreamEvent
  * 2. 执行结束后，将 AgentLoopResult 中的 messages 转为 SessionEvent[]
  * 3. 附加 contextSnapshot 事件
- * 4. 组装并返回 AgentTurnResult
+ * 4. 组装并返回 AgentRunResult
  */
-export async function runTurnWithAgent(
-  input: RunTurnWithAgentInput,
-  deps: RunTurnWithAgentDeps,
-  options?: RunTurnWithAgentOptions,
-): Promise<AgentTurnResult> {
-  const { sessionId, turnId, userInput } = input;
+export async function runAgentWithBridge(
+  input: RunAgentWithBridgeInput,
+  deps: RunAgentWithBridgeDeps,
+  options?: RunAgentWithBridgeOptions,
+): Promise<AgentRunResult> {
+  const { sessionId, agentRunId, userInput } = input;
   const streamCb = options?.onStreamEvent;
   const runLogger = options?.runLogger;
   const hostLog = options?.onLog ?? logAgentRun;
+  let traceWriter = options?.traceWriter;
   let eventIdCounter = 0;
   const streamStats = {
     textDeltaCount: 0,
@@ -186,7 +189,7 @@ export async function runTurnWithAgent(
   const compactions: ContextCompactionInfo[] = [];
 
   function nextEventId(): string {
-    return `evt_${turnId}_${++eventIdCounter}`;
+    return `evt_${agentRunId}_${++eventIdCounter}`;
   }
 
   const getBashTaskSteeringMessages = createBashTaskSteeringProvider(sessionId);
@@ -209,7 +212,7 @@ export async function runTurnWithAgent(
         const streamEvent: RuntimeStreamEvent = {
           type: "subagent_event",
           sessionId,
-          turnId,
+          agentRunId,
           toolCallId: subagentEvent.toolCallId,
           transcriptRef: subagentEvent.transcriptRef,
           event: subagentEvent.event,
@@ -220,20 +223,28 @@ export async function runTurnWithAgent(
       },
     },
     onEvent: async (agentEvent) => {
+      if (traceWriter) {
+        try {
+          await writeAgentTraceEvent(traceWriter, agentEvent, sessionId, agentRunId);
+        } catch (error) {
+          console.error("[agent-trace] failed to append trace; disabling for this run", error);
+          traceWriter = undefined;
+        }
+      }
       recordToolExecution(toolExecutions, agentEvent);
       if (agentEvent.type === "context_compaction") {
         compactions.push(agentEvent.info);
       }
-      logAgentEvent(agentEvent, sessionId, turnId, streamStats, hostLog);
+      logAgentEvent(agentEvent, sessionId, agentRunId, streamStats, hostLog);
       const bufferedStreamDelta = bufferStreamLogDelta(agentEvent, streamLogBuffer);
       if (!bufferedStreamDelta) {
         await flushStreamLogBuffer(runLogger, streamLogBuffer);
         await writeAgentEventRunLog(runLogger, agentEvent);
       }
       if (!streamCb) return;
-      const mapped = mapAgentEventToStreamEvent(agentEvent, sessionId, turnId, nextEventId, deps.toolManager, toolCallStreaming, toolExecutions);
+      const mapped = mapAgentEventToStreamEvent(agentEvent, sessionId, agentRunId, nextEventId, deps.toolManager, toolCallStreaming, toolExecutions);
       if (mapped) {
-        if (mapped.type === "turn_started" && options?.emitTurnStartedEvent === false) return;
+        if (mapped.type === "agent_run_started" && options?.emitAgentRunStartedEvent === false) return;
         if (!isStreamDeltaEvent(mapped)) {
           await flushStreamLogBuffer(runLogger, streamLogBuffer);
           await writeRunLog(runLogger, "stream_event", mapped);
@@ -246,7 +257,7 @@ export async function runTurnWithAgent(
 
   await writeRunLog(runLogger, "run_started", {
     sessionId,
-    turnId,
+    agentRunId,
     userInput,
     logFilePath: runLogger?.filePath,
   });
@@ -254,9 +265,9 @@ export async function runTurnWithAgent(
   let loopResult: AgentLoopResult;
   try {
     const modelSpec = deps.modelSpec ?? resolveModelSpec();
-    hostLog("turn execution started", {
+    hostLog("agent run execution started", {
       sessionId,
-      turnId,
+      agentRunId,
       userInputLength: userInput.length,
       userInputPreview: preview(userInput),
     });
@@ -267,26 +278,36 @@ export async function runTurnWithAgent(
   } catch (err) {
     await flushStreamLogBuffer(runLogger, streamLogBuffer);
     const errorMsg = err instanceof Error ? err.message : String(err);
-    hostLog("turn execution threw", {
+    if (traceWriter) {
+      await traceWriter.write({
+        type: "agent_run_end",
+        sessionId,
+        agentRunId,
+        payload: { status: "failed", error: err },
+      }).catch((traceError) => {
+        console.error("[agent-trace] failed to append failed run terminal event", traceError);
+      });
+    }
+    hostLog("agent run execution threw", {
       sessionId,
-      turnId,
+      agentRunId,
       error: errorMsg,
     });
 
     if (streamCb && (options?.emitTerminalEvent ?? true)) {
       const failedEvent: RuntimeStreamEvent = {
-        type: "turn_failed",
+        type: "agent_run_failed",
         sessionId,
-        turnId,
+        agentRunId,
         error: { code: "AGENT_ERROR", message: errorMsg, recoverable: false },
       };
       await writeRunLog(runLogger, "stream_event", failedEvent);
       streamCb(failedEvent);
     }
 
-    const failedResult: AgentTurnResult = {
+    const failedResult: AgentRunResult = {
       sessionId,
-      turnId,
+      agentRunId,
       events: [],
       contextSnapshot: deps.contextManager.getUsageSnapshot(),
       status: "failed",
@@ -299,7 +320,7 @@ export async function runTurnWithAgent(
   const sessionEvents = buildSessionEvents(
     loopResult,
     sessionId,
-    turnId,
+    agentRunId,
     input,
     deps.toolManager,
     toolExecutions,
@@ -309,13 +330,13 @@ export async function runTurnWithAgent(
   );
   const subagentTranscripts = collectSubAgentTranscripts(toolExecutions);
   for (const info of compactions) {
-    sessionEvents.push(createCompactionEvent(info, sessionId, turnId));
+    sessionEvents.push(createCompactionEvent(info, sessionId, agentRunId));
   }
   const contextSnapshot = deps.contextManager.getUsageSnapshot();
   // 方案 B：持久化只存 token 统计（buckets/总量），不再随每轮写盘塞逐条明细。
   // 完整逐条内容由 main 进程 `context:describe` 打开视图时现场重算（见 context-describe-service）。
-  const contextState = createContextState(contextSnapshot, sessionId, turnId);
-  const snapshotEvent = contextSnapshotToEvent(contextSnapshot, sessionId, turnId);
+  const contextState = createContextState(contextSnapshot, sessionId, agentRunId);
+  const snapshotEvent = contextSnapshotToEvent(contextSnapshot, sessionId, agentRunId);
   sessionEvents.push(snapshotEvent);
 
   const finalReply = loopResult.status === "aborted" ? undefined : toAssistantReply(loopResult.message);
@@ -323,20 +344,20 @@ export async function runTurnWithAgent(
 
   if (streamCb && (options?.emitTerminalEvent ?? true)) {
     const terminalEvent: RuntimeStreamEvent = loopResult.status === "aborted"
-      ? { type: "turn_aborted", sessionId, turnId }
+      ? { type: "agent_run_aborted", sessionId, agentRunId }
       : {
-          type: "turn_finished",
+          type: "agent_run_finished",
           sessionId,
-          turnId,
+          agentRunId,
           resultEventIds: sessionEvents.map((e) => e.id),
         };
     await writeRunLog(runLogger, "stream_event", terminalEvent);
     streamCb(terminalEvent);
   }
 
-  hostLog("turn execution completed", {
+  hostLog("agent run execution completed", {
     sessionId,
-    turnId,
+    agentRunId,
     status: loopResult.status,
     stopReason: loopResult.message.stopReason,
     sessionEventCount: sessionEvents.length,
@@ -347,9 +368,9 @@ export async function runTurnWithAgent(
     totalTokens: contextSnapshot.totalTokens,
   });
 
-  const result: AgentTurnResult = {
+  const result: AgentRunResult = {
     sessionId,
-    turnId,
+    agentRunId,
     events: sessionEvents,
     subagentTranscripts,
     finalReply,
@@ -380,7 +401,7 @@ export async function runTurnWithAgent(
  *
  * 两部分内容合并为一条 UserMessage：
  * 1. 待投递的 <task_notification>（终态 / output_match / stalled），每个调用边界均可注入新事件；
- * 2. 运行中任务清单附件，仅在本次用户 turn 的第一次调用前注入。
+ * 2. 运行中任务清单附件，仅在本次 Agent Run 的第一次调用前注入。
  *
  * 无通知且无运行中任务时返回空数组（loop 不注入任何消息）。
  */
@@ -544,12 +565,12 @@ export function buildContextEntries(ctx: Context): ContextStateEntry[] {
 export function createContextState(
   snapshot: ContextUsageSnapshot,
   sessionId: string,
-  turnId: string,
+  agentRunId: string,
   entries: ContextStateEntry[] = [],
 ): ContextState {
   return {
     sessionId,
-    activeTurnId: turnId,
+    activeAgentRunId: agentRunId,
     updatedAt: new Date().toISOString(),
     estimator: snapshot.estimator ?? { name: "unknown", version: "0" },
     totalEstimatedTokens: snapshot.totalTokens,
@@ -563,8 +584,8 @@ export function createContextState(
 function buildSessionEvents(
   result: AgentLoopResult,
   sessionId: string,
-  turnId: string,
-  input: RunTurnWithAgentInput,
+  agentRunId: string,
+  input: RunAgentWithBridgeInput,
   toolManager: ToolManager,
   toolExecutions: Map<string, ToolExecutionRecord>,
   includeUserEvent: boolean,
@@ -578,57 +599,66 @@ function buildSessionEvents(
     source: "user",
   };
   const events: SessionEvent[] = includeUserEvent
-    ? userMessageToEvents(userMessage, sessionId, turnId, { attachments: input.attachments })
+    ? userMessageToEvents(userMessage, sessionId, agentRunId, { attachments: input.attachments })
     : [];
   let usageCallIndex = 0;
+  let latestAssociation: { turnId?: string; llmCallId?: string } | undefined;
   for (const msg of result.messages) {
     if (msg.role === "toolResult") {
       events.push(
         ...messageToEvents(
           msg,
           sessionId,
-          turnId,
+          agentRunId,
           createToolExecutionResult(msg, toolManager, toolExecutions.get(msg.toolCallId)),
+          latestAssociation,
         ),
       );
       continue;
     }
 
-    // 被 loop 重试掉的中间失败尝试：半截 thinking/text 不落内容事件（实时流里已被
-    // llm_retry 清掉，重开会话不应再出现），但 llm_usage 照常落——钱已经花了。
-    const isRetriedErrorAttempt =
-      msg.role === "assistant" && msg.stopReason === "error" && msg !== result.message;
-    const messageEvents = isRetriedErrorAttempt ? [] : messageToEvents(msg, sessionId, turnId);
-    events.push(...messageEvents);
-
     if (msg.role === "assistant") {
       const usageCall = result.usageCalls[usageCallIndex++];
+      const association = usageCall
+        ? { turnId: usageCall.turnId, llmCallId: usageCall.llmCallId }
+        : undefined;
+      latestAssociation = association;
+      // 被 loop 重试掉的中间失败尝试：半截 thinking/text 不落内容事件（实时流里已被
+      // llm_retry 清掉，重开会话不应再出现），但 llm_usage 照常落——钱已经花了。
+      const isRetriedErrorAttempt = msg.stopReason === "error" && msg !== result.message;
+      const messageEvents = isRetriedErrorAttempt
+        ? []
+        : messageToEvents(msg, sessionId, agentRunId, undefined, association);
+      events.push(...messageEvents);
       const relatedEventIds = messageEvents.map((event) => event.id);
       events.push(createLlmUsageEvent(
         usageCall,
         msg,
         sessionId,
-        turnId,
+        agentRunId,
         relatedEventIds,
-        `llm_call_${turnId}_${usageCallIndex}`,
+        `llm_call_${agentRunId}_${usageCallIndex}`,
         runtimeModelDefinition,
         runtimeModelKey,
       ));
+      continue;
     }
+
+    events.push(...messageToEvents(msg, sessionId, agentRunId));
   }
 
   // 失败轮次落一条 error 事件：selector 会渲染成错误块（实时流与重开会话一致），
   // 替代原本"空 assistant_message → 空白气泡"的表现。
   const finalMessage = result.message;
   if (finalMessage.stopReason === "error") {
-    events.push(createPersistedSessionEvent(sessionId, turnId, "error", {
+    events.push(createPersistedSessionEvent(sessionId, agentRunId, "error", {
       code: finalMessage.errorKind ? `LLM_${finalMessage.errorKind.toUpperCase()}` : "LLM_ERROR",
       message: finalMessage.errorMessage ?? "LLM call failed",
       recoverable: true,
     }));
   }
   if (result.status === "aborted") {
-    events.push(createPersistedSessionEvent(sessionId, turnId, "turn_aborted", {
+    events.push(createPersistedSessionEvent(sessionId, agentRunId, "agent_run_aborted", {
       reason: "user",
     }));
   }
@@ -639,7 +669,7 @@ function createLlmUsageEvent(
   usageCall: LLMUsageCall | undefined,
   message: AssistantMessage,
   sessionId: string,
-  turnId: string,
+  agentRunId: string,
   relatedEventIds: string[],
   fallbackCallId: string,
   runtimeModelDefinition?: ModelDefinition,
@@ -651,7 +681,9 @@ function createLlmUsageEvent(
     ? undefined
     : resolveModelSpecByApiModel(message.model, message.provider as "deepseek" | "kimi" | undefined);
   const payload: LlmUsagePayload = {
-    callId: usageCall?.callId ?? fallbackCallId,
+    llmCallId: usageCall?.llmCallId ?? fallbackCallId,
+    attempt: usageCall?.attempt ?? 1,
+    durationMs: usageCall?.durationMs ?? 0,
     provider: message.provider,
     model: message.model,
     modelId: matchesRuntimeModel ? runtimeModelKey : modelSpec?.id,
@@ -686,15 +718,21 @@ function createLlmUsageEvent(
     payload.cacheHitRatio = usageCall.cacheAudit.cacheHitRatio;
   }
 
-  return createPersistedSessionEvent(sessionId, turnId, "llm_usage", payload);
+  return createPersistedSessionEvent(
+    sessionId,
+    agentRunId,
+    "llm_usage",
+    payload,
+    usageCall ? { turnId: usageCall.turnId, llmCallId: usageCall.llmCallId } : undefined,
+  );
 }
 
 function createCompactionEvent(
   info: ContextCompactionInfo,
   sessionId: string,
-  turnId: string,
+  agentRunId: string,
 ): SessionEvent<ContextCompactionPayload> {
-  return createPersistedSessionEvent(sessionId, turnId, "context_compaction", createContextCompactionPayload(info));
+  return createPersistedSessionEvent(sessionId, agentRunId, "context_compaction", createContextCompactionPayload(info));
 }
 
 function createContextCompactionPayload(info: ContextCompactionInfo): ContextCompactionPayload {
@@ -809,8 +847,8 @@ function createToolExecutionResult(
 
 function collectSubAgentTranscripts(
   toolExecutions: Map<string, ToolExecutionRecord>,
-): AgentTurnResult["subagentTranscripts"] {
-  const transcripts: NonNullable<AgentTurnResult["subagentTranscripts"]> = [];
+): AgentRunResult["subagentTranscripts"] {
+  const transcripts: NonNullable<AgentRunResult["subagentTranscripts"]> = [];
   for (const record of toolExecutions.values()) {
     const subagent = record.result?.subagent;
     if (!subagent) continue;
@@ -1381,7 +1419,7 @@ function countDiffLines(diff: string, marker: "+" | "-"): number {
 function mapAgentEventToStreamEvent(
   event: AgentEvent,
   sessionId: string,
-  turnId: string,
+  agentRunId: string,
   nextId: () => string,
   toolManager: ToolManager,
   toolCallStreaming: Map<string, ToolCallStreamingEntry>,
@@ -1389,18 +1427,60 @@ function mapAgentEventToStreamEvent(
 ): RuntimeStreamEvent | null {
   switch (event.type) {
     case "agent_start":
-      return { type: "turn_started", sessionId, turnId };
+      return { type: "agent_run_started", sessionId, agentRunId };
+
+    case "turn_start":
+      return {
+        type: "agent_turn_started",
+        sessionId,
+        agentRunId,
+        turnId: event.turnId,
+        turnIndex: event.turnIndex,
+      };
+
+    case "turn_end":
+      return {
+        type: "agent_turn_finished",
+        sessionId,
+        agentRunId,
+        turnId: event.turnId,
+        turnIndex: event.turnIndex,
+      };
+
+    case "llm_call_start":
+      return {
+        type: "llm_call_started",
+        sessionId,
+        agentRunId,
+        turnId: event.turnId,
+        turnIndex: event.turnIndex,
+        llmCallId: event.llmCallId,
+        attempt: event.attempt,
+      };
+
+    case "llm_call_end":
+      return {
+        type: "llm_call_finished",
+        sessionId,
+        agentRunId,
+        turnId: event.turnId,
+        turnIndex: event.turnIndex,
+        llmCallId: event.llmCallId,
+        attempt: event.attempt,
+        durationMs: event.durationMs,
+        stopReason: event.message.stopReason,
+      };
 
     case "message_delta": {
       const delta = event.delta;
       if (delta.type === "text_delta") {
-        return { type: "assistant_text_delta", sessionId, turnId, messageId: nextId(), delta: delta.delta };
+        return { type: "assistant_text_delta", sessionId, agentRunId, turnId: event.turnId, llmCallId: event.llmCallId, messageId: nextId(), delta: delta.delta };
       }
       if (delta.type === "thinking_delta") {
-        return { type: "assistant_thinking_delta", sessionId, turnId, messageId: nextId(), delta: delta.delta };
+        return { type: "assistant_thinking_delta", sessionId, agentRunId, turnId: event.turnId, llmCallId: event.llmCallId, messageId: nextId(), delta: delta.delta };
       }
       if (delta.type === "tool_call_delta") {
-        return handleToolCallDelta(delta, sessionId, turnId, toolManager, toolCallStreaming);
+        return handleToolCallDelta(delta, sessionId, agentRunId, event.turnId, event.llmCallId, toolManager, toolCallStreaming);
       }
       return null;
     }
@@ -1417,7 +1497,9 @@ function mapAgentEventToStreamEvent(
         const startedEvent: RuntimeStreamEvent = {
           type: "tool_started",
           sessionId,
-          turnId,
+          agentRunId,
+          turnId: event.turnId,
+          llmCallId: event.llmCallId,
           toolCallId: event.toolCallId,
           toolName: event.toolName,
           argsPreview: JSON.stringify(sanitizeBrowserToolArgs(event.toolName, event.args)).slice(0, 200),
@@ -1439,7 +1521,9 @@ function mapAgentEventToStreamEvent(
       return {
         type: "tool_finished",
         sessionId,
-        turnId,
+        agentRunId,
+        turnId: event.turnId,
+        llmCallId: event.llmCallId,
         toolCallId: event.toolCallId,
         toolName: event.toolName,
         resultEventId: nextId(),
@@ -1465,7 +1549,7 @@ function mapAgentEventToStreamEvent(
         approvalScope: event.request.approvalScope,
         executionEnvironment: event.request.executionEnvironment,
         sessionId,
-        turnId,
+        agentRunId,
       };
 
     case "tool_approval_resolved":
@@ -1475,7 +1559,7 @@ function mapAgentEventToStreamEvent(
         requestId: event.decision.requestId,
         decision: event.decision.decision,
         sessionId,
-        turnId,
+        agentRunId,
       };
 
     case "context_compaction": {
@@ -1483,7 +1567,7 @@ function mapAgentEventToStreamEvent(
       return {
         type: "context_compaction_finished",
         sessionId,
-        turnId,
+        agentRunId,
         trigger: payload.trigger ?? "auto",
         stage: "completed",
         status: payload.status === "skipped" ? "skipped" : "compacted",
@@ -1497,7 +1581,10 @@ function mapAgentEventToStreamEvent(
       return {
         type: "llm_retry",
         sessionId,
-        turnId,
+        agentRunId,
+        turnId: event.turnId,
+        turnIndex: event.turnIndex,
+        failedLlmCallId: event.failedLlmCallId,
         attempt: event.attempt,
         maxAttempts: event.maxAttempts,
         reason: event.reason,
@@ -1508,8 +1595,6 @@ function mapAgentEventToStreamEvent(
       toolCallStreaming.clear();
       return null;
 
-    case "turn_start":
-    case "turn_end":
     case "message_start":
     case "message_end":
       return null;
@@ -1519,7 +1604,9 @@ function mapAgentEventToStreamEvent(
 function handleToolCallDelta(
   delta: { toolCallId?: string; toolName?: string; delta: string },
   sessionId: string,
+  agentRunId: string,
   turnId: string,
+  llmCallId: string,
   toolManager: ToolManager,
   toolCallStreaming: Map<string, ToolCallStreamingEntry>,
 ): RuntimeStreamEvent | null {
@@ -1553,7 +1640,9 @@ function handleToolCallDelta(
   return {
     type: "tool_call_streaming",
     sessionId,
+    agentRunId,
     turnId,
+    llmCallId,
     toolCallId: delta.toolCallId,
     toolName: delta.toolName,
     isInitial,
@@ -1564,7 +1653,7 @@ function handleToolCallDelta(
 function logAgentEvent(
   event: AgentEvent,
   sessionId: string,
-  turnId: string,
+  agentRunId: string,
   stats: {
     textDeltaCount: number;
     textChars: number;
@@ -1575,21 +1664,21 @@ function logAgentEvent(
 ): void {
   switch (event.type) {
     case "agent_start":
-      log("agent started", { sessionId, turnId });
+      log("agent started", { sessionId, agentRunId });
       return;
 
     case "agent_end":
-      log("agent ended", { sessionId, turnId, messageCount: event.messages.length });
+      log("agent ended", { sessionId, agentRunId, messageCount: event.messages.length });
       return;
 
     case "turn_start":
-      log("loop turn started", { sessionId, turnId, turnIndex: event.turnIndex });
+      log("loop turn started", { sessionId, agentRunId, turnIndex: event.turnIndex });
       return;
 
     case "turn_end":
       log("loop turn ended", {
         sessionId,
-        turnId,
+        agentRunId,
         turnIndex: event.turnIndex,
         stopReason: event.message.stopReason,
         toolResultCount: event.toolResults.length,
@@ -1597,11 +1686,11 @@ function logAgentEvent(
       return;
 
     case "message_start":
-      log("message started", { sessionId, turnId, role: event.message.role });
+      log("message started", { sessionId, agentRunId, role: event.message.role });
       return;
 
     case "message_end":
-      log("message ended", { sessionId, turnId, role: event.message.role });
+      log("message ended", { sessionId, agentRunId, role: event.message.role });
       return;
 
     case "message_delta":
@@ -1611,7 +1700,7 @@ function logAgentEvent(
         if (stats.textDeltaCount === 1 || stats.textDeltaCount % 20 === 0) {
           log("assistant text streaming", {
             sessionId,
-            turnId,
+            agentRunId,
             deltaCount: stats.textDeltaCount,
             chars: stats.textChars,
           });
@@ -1622,7 +1711,7 @@ function logAgentEvent(
         if (stats.thinkingDeltaCount === 1 || stats.thinkingDeltaCount % 20 === 0) {
           log("assistant thinking streaming", {
             sessionId,
-            turnId,
+            agentRunId,
             deltaCount: stats.thinkingDeltaCount,
             chars: stats.thinkingChars,
           });
@@ -1633,7 +1722,7 @@ function logAgentEvent(
     case "tool_start":
       log("tool started", {
         sessionId,
-        turnId,
+        agentRunId,
         toolCallId: event.toolCallId,
         toolName: event.toolName,
         argsPreview: preview(sanitizeBrowserToolArgs(event.toolName, event.args)),
@@ -1643,7 +1732,7 @@ function logAgentEvent(
     case "tool_end":
       log("tool finished", {
         sessionId,
-        turnId,
+        agentRunId,
         toolCallId: event.toolCallId,
         toolName: event.toolName,
         isError: event.isError,
@@ -1658,7 +1747,7 @@ function logAgentEvent(
     case "tool_approval_required":
       log("tool approval required", {
         sessionId,
-        turnId,
+        agentRunId,
         toolCallId: event.toolCallId,
         toolName: event.toolName,
         requestId: event.request.id,
@@ -1669,7 +1758,7 @@ function logAgentEvent(
     case "tool_approval_resolved":
       log("tool approval resolved", {
         sessionId,
-        turnId,
+        agentRunId,
         toolCallId: event.toolCallId,
         toolName: event.toolName,
         decision: event.decision.decision,
@@ -1679,7 +1768,7 @@ function logAgentEvent(
     case "context_compaction":
       log("history compacted", {
         sessionId,
-        turnId,
+        agentRunId,
         triggerTokens: event.info.triggerTokens,
         thresholdTokens: event.info.thresholdTokens,
         beforeCount: event.info.beforeCount,
@@ -1692,7 +1781,7 @@ function logAgentEvent(
     case "llm_retry":
       log("llm retrying after error", {
         sessionId,
-        turnId,
+        agentRunId,
         attempt: event.attempt,
         maxAttempts: event.maxAttempts,
         reason: preview(event.reason),
@@ -1936,4 +2025,104 @@ function getRunLogEventType(event: AgentEvent): "agent_event" | "tool_event" | "
   if (event.type === "tool_start" || event.type === "tool_end") return "tool_event";
   if (event.type === "context_compaction") return "context_compaction";
   return "agent_event";
+}
+
+async function writeAgentTraceEvent(
+  traceWriter: AgentTraceWriter,
+  event: AgentEvent,
+  sessionId: string,
+  agentRunId: string,
+): Promise<void> {
+  const association = {
+    sessionId,
+    agentRunId,
+  };
+
+  switch (event.type) {
+    case "agent_start":
+      await traceWriter.write({
+        ...association,
+        type: "agent_run_start",
+        payload: {},
+      });
+      return;
+
+    case "agent_end":
+      await traceWriter.write({
+        ...association,
+        type: "agent_run_end",
+        payload: { messageCount: event.messages.length },
+      });
+      return;
+
+    case "turn_start":
+      await traceWriter.write({
+        ...association,
+        type: "turn_start",
+        turnId: event.turnId,
+        turnIndex: event.turnIndex,
+        payload: {},
+      });
+      return;
+
+    case "turn_end":
+      await traceWriter.write({
+        ...association,
+        type: "turn_end",
+        turnId: event.turnId,
+        turnIndex: event.turnIndex,
+        payload: {
+          stopReason: event.message.stopReason,
+          toolResultCount: event.toolResults.length,
+        },
+      });
+      return;
+
+    case "llm_call_start":
+      await traceWriter.write({
+        ...association,
+        type: "llm_request",
+        turnId: event.turnId,
+        turnIndex: event.turnIndex,
+        llmCallId: event.llmCallId,
+        attempt: event.attempt,
+        payload: event.request,
+      });
+      return;
+
+    case "llm_call_end":
+      await traceWriter.write({
+        ...association,
+        type: "llm_response",
+        turnId: event.turnId,
+        turnIndex: event.turnIndex,
+        llmCallId: event.llmCallId,
+        attempt: event.attempt,
+        payload: {
+          durationMs: event.durationMs,
+          stopReason: event.message.stopReason,
+          message: event.message,
+        },
+      });
+      return;
+
+    case "llm_retry":
+      await traceWriter.write({
+        ...association,
+        type: "llm_retry",
+        turnId: event.turnId,
+        turnIndex: event.turnIndex,
+        llmCallId: event.failedLlmCallId,
+        attempt: event.attempt - 1,
+        payload: {
+          nextAttempt: event.attempt,
+          maxAttempts: event.maxAttempts,
+          reason: event.reason,
+        },
+      });
+      return;
+
+    default:
+      return;
+  }
 }

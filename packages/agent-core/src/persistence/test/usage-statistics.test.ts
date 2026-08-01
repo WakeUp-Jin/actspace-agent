@@ -22,12 +22,12 @@ const NOW = new Date("2026-05-28T12:00:00.000Z");
 function ev<T>(
   type: SessionEvent["type"],
   payload: T,
-  opts: { id: string; timestamp: string; sessionId?: string; turnId?: string },
+  opts: { id: string; timestamp: string; sessionId?: string; agentRunId?: string },
 ): SessionEvent {
   return {
     id: opts.id,
     sessionId: opts.sessionId ?? "session-test",
-    turnId: opts.turnId ?? "turn-1",
+    agentRunId: opts.agentRunId ?? "turn-1",
     type,
     timestamp: opts.timestamp,
     payload,
@@ -38,7 +38,7 @@ function llmUsage(opts: {
   id: string;
   timestamp: string;
   sessionId?: string;
-  turnId?: string;
+  agentRunId?: string;
   model?: string;
   modelId?: string;
   provider?: string;
@@ -63,7 +63,7 @@ function llmUsage(opts: {
     cacheMissTokens: opts.cacheMiss ?? 0,
     cost: opts.cost ?? { total: 0.02, currency: "USD" },
   };
-  return ev("llm_usage", payload, { id: opts.id, timestamp: opts.timestamp, sessionId: opts.sessionId, turnId: opts.turnId });
+  return ev("llm_usage", payload, { id: opts.id, timestamp: opts.timestamp, sessionId: opts.sessionId, agentRunId: opts.agentRunId });
 }
 
 function toolCall(opts: {
@@ -114,7 +114,7 @@ function fakeRecord(id: string, title: string, events: SessionEvent[]): SessionR
       title,
       createdAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),
-      turnCount: 1,
+      agentRunCount: 1,
       workspaceId: "ws_tmp",
       workspaceRoot: "/tmp/ws",
     },
@@ -166,7 +166,7 @@ describe("createUsageStatisticsSnapshot (single session)", () => {
     expect(snapshot.toolDistribution[0]).toMatchObject({ name: "Read", callCount: 1, failedCount: 0 });
     expect(snapshot.requestRows[0]).toMatchObject({
       sessionId: "session-a",
-      turnId: "turn-1",
+      agentRunId: "turn-1",
       workspaceId: "ws_tmp",
       workspaceRoot: "/tmp/ws",
       modelCallCount: 1,
@@ -323,7 +323,7 @@ describe("createGlobalUsageStatisticsSnapshot", () => {
         id: "older",
         timestamp: "2026-05-27T09:00:00.000Z",
         sessionId: "session-a",
-        turnId: "turn-older",
+        agentRunId: "turn-older",
         model: "gpt-5.5",
         total: 100,
         prompt: 80,
@@ -335,7 +335,7 @@ describe("createGlobalUsageStatisticsSnapshot", () => {
         id: "new-a",
         timestamp: "2026-05-28T08:00:00.000Z",
         sessionId: "session-a",
-        turnId: "turn-new",
+        agentRunId: "turn-new",
         model: "gpt-5.5",
         total: 300,
         prompt: 200,
@@ -347,7 +347,7 @@ describe("createGlobalUsageStatisticsSnapshot", () => {
         id: "new-b",
         timestamp: "2026-05-28T08:02:00.000Z",
         sessionId: "session-a",
-        turnId: "turn-new",
+        agentRunId: "turn-new",
         model: "claude-4.6-sonnet",
         total: 700,
         prompt: 600,
@@ -367,7 +367,7 @@ describe("createGlobalUsageStatisticsSnapshot", () => {
     expect(snapshot.requestRows[0]).toMatchObject({
       timestamp: "2026-05-28T08:02:00.000Z",
       sessionId: "session-a",
-      turnId: "turn-new",
+      agentRunId: "turn-new",
       workspaceId: "ws_tmp",
       workspaceRoot: "/tmp/ws",
       model: "claude-4.6-sonnet",
@@ -378,7 +378,7 @@ describe("createGlobalUsageStatisticsSnapshot", () => {
       cacheHitTokens: 900,
       cacheMissTokens: 100,
     });
-    expect(snapshot.requestRows[1].turnId).toBe("turn-older");
+    expect(snapshot.requestRows[1].agentRunId).toBe("turn-older");
     expect(snapshot.requestRowsPage).toEqual({
       page: 1,
       pageSize: 10,
@@ -393,7 +393,7 @@ describe("createGlobalUsageStatisticsSnapshot", () => {
         id: `page-${index + 1}`,
         timestamp: `2026-05-28T${String(index).padStart(2, "0")}:00:00.000Z`,
         sessionId: "session-a",
-        turnId: `turn-${index + 1}`,
+        agentRunId: `turn-${index + 1}`,
         total: 100 + index,
         prompt: 80 + index,
         completion: 20,
@@ -415,7 +415,7 @@ describe("createGlobalUsageStatisticsSnapshot", () => {
 
     expect(firstPage.summary.totalTokens).toBe(1266);
     expect(firstPage.requestRows).toHaveLength(10);
-    expect(firstPage.requestRows[0].turnId).toBe("turn-12");
+    expect(firstPage.requestRows[0].agentRunId).toBe("turn-12");
     expect(firstPage.requestRowsPage).toEqual({
       page: 1,
       pageSize: 10,
@@ -423,7 +423,7 @@ describe("createGlobalUsageStatisticsSnapshot", () => {
       totalPages: 2,
     });
     expect(secondPage.summary.totalTokens).toBe(1266);
-    expect(secondPage.requestRows.map((row) => row.turnId)).toEqual(["turn-2", "turn-1"]);
+    expect(secondPage.requestRows.map((row) => row.agentRunId)).toEqual(["turn-2", "turn-1"]);
     expect(secondPage.requestRowsPage).toEqual({
       page: 2,
       pageSize: 10,

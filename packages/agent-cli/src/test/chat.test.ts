@@ -30,7 +30,7 @@ describe("chatCommand", () => {
     expect(sessions[0]?.workspaceRoot).toBe(workspace);
   });
 
-  it("persists multiple turns in one shared session", async () => {
+  it("persists multiple Agent Runs in one shared session", async () => {
     const workspace = await mkdtemp(join(tmpdir(), "actspace-chat-work-"));
     const dataDir = await mkdtemp(join(tmpdir(), "actspace-chat-data-"));
     const input = new ScriptedLineInput(["first", "second", "/exit"]);
@@ -51,7 +51,7 @@ describe("chatCommand", () => {
 
     const sessions = await listSessionRecords(join(dataDir, "sessions"));
     expect(sessions).toHaveLength(1);
-    expect(sessions[0]).toMatchObject({ turnCount: 2, workspaceRoot: workspace });
+    expect(sessions[0]).toMatchObject({ agentRunCount: 2, workspaceRoot: workspace });
     expect(output.match(/Mock ActSpace Agent response\./g)).toHaveLength(2);
     expect(input.closed).toBe(true);
   });
@@ -85,8 +85,8 @@ describe("chatCommand", () => {
     });
 
     const sessions = await listSessionRecords(sessionRoot);
-    expect(sessions.find((session) => session.id === existing.meta.id)?.turnCount).toBe(1);
-    expect(sessions.filter((session) => session.turnCount === 1)).toHaveLength(2);
+    expect(sessions.find((session) => session.id === existing.meta.id)?.agentRunCount).toBe(1);
+    expect(sessions.filter((session) => session.agentRunCount === 1)).toHaveLength(2);
     expect(status).toContain(existing.meta.id);
   });
 });

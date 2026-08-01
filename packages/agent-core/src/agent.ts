@@ -1,7 +1,7 @@
 /**
  * Agent 兼容层
  *
- * 保留旧版 createAgentRuntime/AgentRuntimeDeps/TurnTrace 接口，
+ * 保留旧版 createAgentRuntime/AgentRuntimeDeps/AgentRunTrace 接口，
  * 供 desktop/main/index.ts 等现有消费者使用。
  *
  * 新代码应直接使用 engine/ 目录下的 Agent 类和 runAgentLoop。
@@ -10,7 +10,7 @@
 
 import type {
   AssistantReply,
-  AgentTurnResult,
+  AgentRunResult,
   ContextUsageSnapshot,
   SessionEvent,
   SessionId,
@@ -30,7 +30,7 @@ export type AgentRuntimeDeps = {
   tools: ToolRegistry;
 };
 
-export type TurnTrace = {
+export type AgentRunTrace = {
   events: SessionEvent[];
   toolResults: ToolExecutionResult[];
   finalReply?: AssistantReply;
@@ -45,26 +45,26 @@ function createEventId() {
   return `evt_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function createEvent<TPayload>(sessionId: SessionId, turnId: string, type: SessionEvent["type"], payload: TPayload): SessionEvent<TPayload> {
+function createEvent<TPayload>(sessionId: SessionId, agentRunId: string, type: SessionEvent["type"], payload: TPayload): SessionEvent<TPayload> {
   return {
     id: createEventId(),
     sessionId,
-    turnId,
+    agentRunId,
     type,
     timestamp: createTimestamp(),
-    schemaVersion: 1,
+    schemaVersion: 2,
     payload
   };
 }
 
 export function createAgentRuntime(deps: AgentRuntimeDeps) {
   return {
-    async runTurn(input: ModelProviderInput): Promise<AgentTurnResult> {
+    async runAgent(input: ModelProviderInput): Promise<AgentRunResult> {
       const contextState = createEmptyContextState(input.sessionId);
       const events: SessionEvent[] = [];
       const toolResults: ToolExecutionResult[] = [];
 
-      const userEvent = createEvent(input.sessionId, input.turnId, "user_message", {
+      const userEvent = createEvent(input.sessionId, input.agentRunId, "user_message", {
         content: input.userInput
       });
       events.push(userEvent);
@@ -73,7 +73,7 @@ export function createAgentRuntime(deps: AgentRuntimeDeps) {
       const modelOutput = await deps.provider.completeTurn(input);
 
       if (modelOutput.thinking) {
-        const thinkingEvent = createEvent(input.sessionId, input.turnId, "thinking", {
+        const thinkingEvent = createEvent(input.sessionId, input.agentRunId, "thinking", {
           content: modelOutput.thinking
         });
         events.push(thinkingEvent);
@@ -81,17 +81,17 @@ export function createAgentRuntime(deps: AgentRuntimeDeps) {
       }
 
       for (const toolCall of modelOutput.toolCalls) {
-        const toolCallEvent = createEvent(input.sessionId, input.turnId, "tool_call", toolCall);
+        const toolCallEvent = createEvent(input.sessionId, input.agentRunId, "tool_call", toolCall);
         events.push(toolCallEvent);
         contextState.events.push(toolCallEvent);
 
         const toolResult = await deps.tools.execute(toolCall.name, toolCall.arguments, {
           sessionId: input.sessionId,
-          turnId: input.turnId
+          agentRunId: input.agentRunId
         });
         toolResults.push(toolResult);
 
-        const toolResultEvent = createEvent(input.sessionId, input.turnId, "tool_result", toolResult);
+        const toolResultEvent = createEvent(input.sessionId, input.agentRunId, "tool_result", toolResult);
         events.push(toolResultEvent);
         contextState.events.push(toolResultEvent);
       }
@@ -107,19 +107,19 @@ export function createAgentRuntime(deps: AgentRuntimeDeps) {
         : undefined;
 
       if (finalReply) {
-        const replyEvent = createEvent(input.sessionId, input.turnId, "assistant_message", finalReply);
+        const replyEvent = createEvent(input.sessionId, input.agentRunId, "assistant_message", finalReply);
         events.push(replyEvent);
         contextState.events.push(replyEvent);
       }
 
       const contextSnapshot = input.contextSnapshot ?? createUsageSnapshot(modelOutput.usage.totalTokens);
-      const snapshotEvent = createEvent(input.sessionId, input.turnId, "context_snapshot", contextSnapshot);
+      const snapshotEvent = createEvent(input.sessionId, input.agentRunId, "context_snapshot", contextSnapshot);
       events.push(snapshotEvent);
       contextState.events.push(snapshotEvent);
 
-      const outcome: AgentTurnResult = {
+      const outcome: AgentRunResult = {
         sessionId: input.sessionId,
-        turnId: input.turnId,
+        agentRunId: input.agentRunId,
         events,
         finalReply,
         contextSnapshot,

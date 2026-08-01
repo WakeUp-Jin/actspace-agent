@@ -116,5 +116,5 @@
 - 2026-06-06：`exploreModelId` 默认 flash、可覆盖，镜像 `KairosSettings.modelId` 既有先例，不发明新模式。
 - 2026-06-06：Explore 走内联折叠（复用 `ToolActivityGroup`）而非 Panel。理由：Explore 是主流程里顺手的小探索，内联折叠强调它是主流程一部分；通用 `agent` 才用 Panel 强调独立对象。
 - 2026-06-06（实现期偏差）：A2/B3/B4/C1–C4 未新增 `explore` 的 `ToolPreviewKind`/`ToolUiPreview`/`MessageBlock` kind，改为在既有 `AgentToolPreview` 上加 `display: "panel" | "inline"` 判别字段，`explore` 复用 `agent` 的 preview/block/流式解析，渲染层按 `display` 路由到新增 `ExploreRunBlock`。理由：收敛改动面到一个可选字段，避免穿透所有 `ToolUiPreview`/`MessageBlock` 的 exhaustive switch，功能等价。已同步更新设计文档「后端模块边界 / 渲染契约」。
-- 2026-06-06（实现期偏差）：`exploreModelId` 经 `RunTurnInput` 由 main 从 settings 注入（renderer 不每轮上送），而非新增 env 通道；与 `model` 同源、可测。
+- 2026-06-06（实现期偏差）：`exploreModelId` 经 `RunAgentInput` 由 main 从 settings 注入（renderer 不每轮上送），而非新增 env 通道；与 `model` 同源、可测。
 - 2026-06-06：`explore` block 不纳入主 turn 的 `WORK_TOOL_LIKE_KINDS`，保持自身独立的内联折叠，避免与外层 `Worked for` 组双重折叠。

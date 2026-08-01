@@ -22,35 +22,35 @@ interface PendingEntry {
   resolve: (decision: ToolApprovalDecision) => void;
   request: ToolApprovalRequest;
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   expiresAt: number;
   timer: ReturnType<typeof setTimeout>;
 }
 
 export interface ApprovalRegistryConfig {
   timeoutMs?: number;
-  onApprovalRequired?: (request: ToolApprovalRequest, sessionId: string, turnId: string) => void;
+  onApprovalRequired?: (request: ToolApprovalRequest, sessionId: string, agentRunId: string) => void;
   onApprovalResolved?: (
     request: ToolApprovalRequest,
     decision: ToolApprovalDecision,
     sessionId: string,
-    turnId: string,
+    agentRunId: string,
   ) => void;
 }
 
 export class PendingApprovalRegistry implements ApprovalGate {
   private pending = new Map<string, PendingEntry>();
   private browserAuthorizedSessions = new Set<string>();
-  private browserDeniedTurns = new Set<string>();
+  private browserDeniedAgentRuns = new Set<string>();
   private timeoutMs: number;
   private sessionId = "";
-  private turnId = "";
-  private externalOnApprovalRequired?: (request: ToolApprovalRequest, sessionId: string, turnId: string) => void;
+  private agentRunId = "";
+  private externalOnApprovalRequired?: (request: ToolApprovalRequest, sessionId: string, agentRunId: string) => void;
   private externalOnApprovalResolved?: (
     request: ToolApprovalRequest,
     decision: ToolApprovalDecision,
     sessionId: string,
-    turnId: string,
+    agentRunId: string,
   ) => void;
 
   constructor(config?: ApprovalRegistryConfig) {
@@ -59,16 +59,16 @@ export class PendingApprovalRegistry implements ApprovalGate {
     this.externalOnApprovalResolved = config?.onApprovalResolved;
   }
 
-  setCurrentTurn(sessionId: string, turnId: string): void {
+  setCurrentAgentRun(sessionId: string, agentRunId: string): void {
     this.sessionId = sessionId;
-    this.turnId = turnId;
+    this.agentRunId = agentRunId;
   }
 
   // ─── ApprovalGate 接口实现 ───
 
   waitForDecision(request: ToolApprovalRequest): Promise<ToolApprovalDecision> {
     const sessionId = request.sessionId ?? this.sessionId;
-    const turnId = request.turnId ?? this.turnId;
+    const agentRunId = request.agentRunId ?? this.agentRunId;
     if (request.approvalScope === "browser_session") {
       if (this.browserAuthorizedSessions.has(sessionId)) {
         return Promise.resolve({
@@ -77,7 +77,7 @@ export class PendingApprovalRegistry implements ApprovalGate {
           decidedAt: Date.now(),
         });
       }
-      if (this.browserDeniedTurns.has(browserTurnKey(sessionId, turnId))) {
+      if (this.browserDeniedAgentRuns.has(browserAgentRunKey(sessionId, agentRunId))) {
         return Promise.resolve({
           requestId: request.id,
           decision: "deny",
@@ -96,16 +96,16 @@ export class PendingApprovalRegistry implements ApprovalGate {
           decision: "timeout",
           decidedAt: Date.now(),
         };
-        this.rememberBrowserDecision(request, decision, sessionId, turnId);
+        this.rememberBrowserDecision(request, decision, sessionId, agentRunId);
         resolve(decision);
-        this.externalOnApprovalResolved?.(request, decision, sessionId, turnId);
+        this.externalOnApprovalResolved?.(request, decision, sessionId, agentRunId);
       }, this.timeoutMs);
 
       this.pending.set(request.id, {
         resolve,
         request,
         sessionId,
-        turnId,
+        agentRunId,
         expiresAt,
         timer,
       });
@@ -115,7 +115,7 @@ export class PendingApprovalRegistry implements ApprovalGate {
   onApprovalRequired(request: ToolApprovalRequest): void {
     const entry = this.pending.get(request.id);
     if (!entry) return;
-    this.externalOnApprovalRequired?.(request, entry.sessionId, entry.turnId);
+    this.externalOnApprovalRequired?.(request, entry.sessionId, entry.agentRunId);
   }
 
   // ─── IPC 消费的公共方法 ───
@@ -136,10 +136,10 @@ export class PendingApprovalRegistry implements ApprovalGate {
     return { ok: true };
   }
 
-  abortTurn(sessionId: string, turnId: string): number {
+  abortAgentRun(sessionId: string, agentRunId: string): number {
     let count = 0;
     for (const [id, entry] of this.pending) {
-      if (entry.sessionId !== sessionId || entry.turnId !== turnId) continue;
+      if (entry.sessionId !== sessionId || entry.agentRunId !== agentRunId) continue;
       this.resolveEntry(id, entry, "abort");
       count++;
     }
@@ -182,24 +182,24 @@ export class PendingApprovalRegistry implements ApprovalGate {
     return this.browserAuthorizedSessions.has(sessionId);
   }
 
-  isBrowserDeniedForTurn(sessionId: string, turnId: string): boolean {
-    return this.browserDeniedTurns.has(browserTurnKey(sessionId, turnId));
+  isBrowserDeniedForAgentRun(sessionId: string, agentRunId: string): boolean {
+    return this.browserDeniedAgentRuns.has(browserAgentRunKey(sessionId, agentRunId));
   }
 
   private rememberBrowserDecision(
     request: ToolApprovalRequest,
     decision: ToolApprovalDecision,
     sessionId: string,
-    turnId: string,
+    agentRunId: string,
   ): void {
     if (request.approvalScope !== "browser_session") return;
     if (decision.decision === "abort") return;
     if (decision.decision === "approve_once" || decision.decision === "allow_similar") {
       this.browserAuthorizedSessions.add(sessionId);
-      this.browserDeniedTurns.delete(browserTurnKey(sessionId, turnId));
+      this.browserDeniedAgentRuns.delete(browserAgentRunKey(sessionId, agentRunId));
       return;
     }
-    this.browserDeniedTurns.add(browserTurnKey(sessionId, turnId));
+    this.browserDeniedAgentRuns.add(browserAgentRunKey(sessionId, agentRunId));
   }
 
   private resolveEntry(
@@ -214,17 +214,17 @@ export class PendingApprovalRegistry implements ApprovalGate {
       decision,
       decidedAt: Date.now(),
     };
-    this.rememberBrowserDecision(entry.request, resolvedDecision, entry.sessionId, entry.turnId);
+    this.rememberBrowserDecision(entry.request, resolvedDecision, entry.sessionId, entry.agentRunId);
     entry.resolve(resolvedDecision);
     this.externalOnApprovalResolved?.(
       entry.request,
       resolvedDecision,
       entry.sessionId,
-      entry.turnId,
+      entry.agentRunId,
     );
   }
 }
 
-function browserTurnKey(sessionId: string, turnId: string): string {
-  return `${sessionId}\u0000${turnId}`;
+function browserAgentRunKey(sessionId: string, agentRunId: string): string {
+  return `${sessionId}\u0000${agentRunId}`;
 }

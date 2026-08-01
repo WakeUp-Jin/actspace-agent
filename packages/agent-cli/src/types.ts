@@ -31,7 +31,7 @@ export interface CliArtifactResult {
   status: "completed" | "failed" | "aborted" | "approval_required";
   exitCode: CliExitCode;
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   finalText: string;
   model?: string;
   provider?: string;

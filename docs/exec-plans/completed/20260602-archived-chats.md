@@ -86,7 +86,7 @@ export type SessionMeta = {
   title: string;
   updatedAt: string;
   createdAt: string;
-  turnCount: number;
+  agentRunCount: number;
   workspaceRoot?: string;
   pinned?: boolean;
   archived?: boolean;

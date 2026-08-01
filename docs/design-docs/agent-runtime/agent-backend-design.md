@@ -110,18 +110,18 @@ V1 采用 `llm-agent-dev` skill 中推荐的纯函数执行循环。
 
 核心流程：
 
-1. renderer 通过 IPC 发起 `agent:run-turn`。
-2. main 调用 `agent-core`，传入 session、turn、用户输入、附件和当前 workspace 边界。
+1. renderer 通过 IPC 发起 `agent:run`，传入 `sessionId + agentRunId`。
+2. main 调用 `agent-core`，传入 session、Agent Run、用户输入、附件和当前 workspace 边界。
 3. Agent Runtime 追加 `user_message` 事件。
 4. Context Pipeline 组装本轮输入上下文。
-5. LLM Service 调用 provider，流式产出 thinking、文本和 tool calls。
+5. Agent Loop 创建真实 `turnId`，LLM Service 每次 provider 请求创建 `llmCallId + attempt`，流式产出 thinking、文本和 tool calls。
 6. Execution Engine 将模型生命周期转换成 runtime events。
 7. 如出现 tool calls，Tool Scheduler 校验、执行、裁剪输出。
 8. 工具结果进入 `tool_result`，裁剪后的 `modelOutput` 回填上下文。
 9. Execution Engine 再次调用模型，直到模型停止调用工具并给出最终回复。
 10. 追加 `assistant_message` 和 `context_snapshot`。
 11. Session Persistence 写入 `session.jsonl` 和 `meta.json`。
-12. main 返回 `AgentTurnResult` 给 renderer。
+12. main 返回 `AgentRunResult` 给 renderer，并把脱敏请求/响应追加到独立 Trace。
 
 执行循环应支持：
 
@@ -277,6 +277,7 @@ Context buckets 首版沿用前端需要的分类：
     <session-id>/
       meta.json
       session.jsonl
+      traces/
       attachments/
   logs/
   tmp/
@@ -290,7 +291,7 @@ Context buckets 首版沿用前端需要的分类：
 - `title`
 - `createdAt`
 - `updatedAt`
-- `turnCount`
+- `agentRunCount`
 - 可选 `lastModel`
 - 可选 `lastError`
 
@@ -310,13 +311,15 @@ renderer 只能通过 preload 暴露的最小 API 调用后端。
 - `app:get-bootstrap-state`：返回数据目录、版本、默认 provider。
 - `session:list`：列出会话摘要。
 - `session:get`：读取并恢复会话事件。
-- `agent:run-turn`：运行一轮 Agent。
+- `agent:run`：运行一次 Agent Run。
+- `agent:abort-run`：中止指定 Agent Run。
+- `agent-trace:list/read`：由 Main 校验后读取分析 Trace。
 
 后续可以增加流式 IPC，但不应破坏现有最终结果返回结构。
 
 前端依赖：
 
-- `AgentTurnResult`
+- `AgentRunResult`
 - `SessionEvent`
 - `MessageBlock`
 - `ContextUsageSnapshot`
@@ -336,7 +339,7 @@ renderer 只能通过 preload 暴露的最小 API 调用后端。
 
 目标：
 
-- 稳定 `packages/shared` 中的 `SessionEvent`、`RuntimeStreamEvent`、`ToolExecutionResult`、`ContextUsageSnapshot`、`AgentTurnResult`。
+- 稳定 `packages/shared` 中的 `SessionEvent`、`RuntimeStreamEvent`、`ToolExecutionResult`、`ContextUsageSnapshot`、`AgentRunResult`。
 - 定义 runtime event 到 session event 的 adapter。
 - 增加 mock fixtures，覆盖 thinking、read/grep、edit_file、context snapshot、error。
 

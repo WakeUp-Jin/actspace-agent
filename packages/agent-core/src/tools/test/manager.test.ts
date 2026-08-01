@@ -116,7 +116,9 @@ describe("ToolManager", () => {
 
     const result = await manager.execute("denied", {});
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Dangerous operation");
+    expect(result.error).toContain("Permission denied before execution");
+    expect(result.error).toContain("no approval request was created");
+    expect(result.error).toContain("Dangerous operation");
     expect(called).toBe(false);
   });
 

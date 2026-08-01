@@ -8,11 +8,11 @@ import {
   updateMeta,
   type AgentRuntime,
   type AgentRuntimeContext,
-  type RuntimeTurnRequest,
+  type RuntimeAgentRunRequest,
 } from "@actspace/agent-core";
 import type { ComposerMode } from "@actspace/shared";
 import type { PendingApprovalRegistry } from "./approval-registry";
-import type { AppDataRoots } from "./agent-turn";
+import type { AppDataRoots } from "./agent-run";
 import type { ModelRuntimeService } from "./model-runtime-service";
 import {
   prepareExecutionContext,
@@ -103,7 +103,7 @@ export function createDesktopAgentRuntime(options: DesktopAgentRuntimeOptions): 
       },
     },
     titleHook: {
-      afterCommittedTurn: async ({ request, sessionMeta, priorMessageCount, result, deps }) => {
+      afterCommittedAgentRun: async ({ request, sessionMeta, priorMessageCount, result, deps }) => {
         if (priorMessageCount > 0 || !isDefaultSessionTitle(sessionMeta?.title) || result.status !== "completed") {
           return;
         }
@@ -125,9 +125,9 @@ export function createDesktopAgentRuntime(options: DesktopAgentRuntimeOptions): 
 }
 
 export function toDesktopRuntimeRequest(
-  input: Omit<RuntimeTurnRequest, "roots" | "persistenceMode" | "interactionMode" | "workspaceRoot">,
+  input: Omit<RuntimeAgentRunRequest, "roots" | "persistenceMode" | "interactionMode" | "workspaceRoot">,
   roots: AppDataRoots,
-): RuntimeTurnRequest {
+): RuntimeAgentRunRequest {
   return {
     ...input,
     roots: {
@@ -143,7 +143,7 @@ export function toDesktopRuntimeRequest(
   };
 }
 
-export function desktopRootsFromRuntimeRequest(request: RuntimeTurnRequest): AppDataRoots {
+export function desktopRootsFromRuntimeRequest(request: RuntimeAgentRunRequest): AppDataRoots {
   return {
     dataRoot: request.roots.dataRoot,
     sessionRoot: request.roots.sessionRoot,

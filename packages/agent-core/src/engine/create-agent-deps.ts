@@ -6,7 +6,7 @@
  * 2a. createAgentFromConfig() — 同步入口，构造空会话历史的运行时实例（mock / 内存场景）
  * 2b. createAgentForSession() — async 入口，面向 sessionPath 在构造阶段一次性恢复会话历史
  *
- * Main 进程的真实 turn 走 createAgentForSession：
+ * Main 进程的真实 Agent Run 走 createAgentForSession：
  *   const config = buildAgentConfig({ model, thinkingEnabled }, workspaceRoot);
  *   const deps = await createAgentForSession(config, { sessionPath });
  *
@@ -39,7 +39,7 @@ import { env } from "../env";
 // ─── 类型定义 ───
 
 /** 前端收集并传递过来的字段 —— 只有这些是前端负责的 */
-export interface FrontendTurnInput {
+export interface FrontendAgentRunInput {
   model?: ModelId;
   modelKey?: ModelKey;
   thinkingEnabled?: boolean;
@@ -117,7 +117,7 @@ export interface AgentRuntimeContext {
   /** write_file/edit_file 除 workspaceRoot 外可写入的绝对目录。 */
   additionalWritableRoots?: string[];
   /** 当前主 Agent turn id，用于 SubAgent transcript 关联 */
-  turnId?: string;
+  agentRunId?: string;
   /** Browser Bridge Native Host 的稳定 Unix socket。 */
   browserBridgeSocketPath?: string;
   /** 当前 session 的图片生成产物目录。 */
@@ -289,7 +289,7 @@ export function buildLLMConfig(spec: ModelSpec, envConfig: AgentEnvConfig): LLMC
  * 调用方只传前端收集的参数 + workspaceRoot，env 读取在内部完成。
  */
 export function buildAgentConfig(
-  frontendInput: FrontendTurnInput,
+  frontendInput: FrontendAgentRunInput,
   workspaceRoot: string,
   approvalGate?: ApprovalGate,
   runtimeContext?: AgentRuntimeContext,
@@ -317,7 +317,7 @@ export function buildAgentConfig(
     tmpRoot: runtimeContext?.tmpRoot,
     sessionId: runtimeContext?.sessionId,
     additionalWritableRoots: runtimeContext?.additionalWritableRoots,
-    turnId: runtimeContext?.turnId,
+    agentRunId: runtimeContext?.agentRunId,
     browserBridgeSocketPath: runtimeContext?.browserBridgeSocketPath,
     artifactRoot: runtimeContext?.artifactRoot,
   };
@@ -387,7 +387,7 @@ export function buildAgentConfigFromRuntime(
       tmpRoot: runtimeContext?.tmpRoot,
       sessionId: runtimeContext?.sessionId,
       additionalWritableRoots: runtimeContext?.additionalWritableRoots,
-      turnId: runtimeContext?.turnId,
+      agentRunId: runtimeContext?.agentRunId,
       browserBridgeSocketPath: runtimeContext?.browserBridgeSocketPath,
       artifactRoot: runtimeContext?.artifactRoot,
     },

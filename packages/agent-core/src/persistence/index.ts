@@ -16,7 +16,7 @@ export type {
 export { appendEvent, appendEvents, parseJsonl } from "./jsonl";
 
 // Meta 管理
-export { createMeta, readMeta, updateMeta, incrementTurnCount } from "./meta";
+export { createMeta, readMeta, updateMeta, incrementAgentRunCount } from "./meta";
 
 // Session Store（完整操作集合）
 export {

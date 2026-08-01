@@ -15,10 +15,10 @@ afterEach(async () => {
   await rm(rootDir, { recursive: true, force: true });
 });
 
-const evt = (type: SessionEvent["type"], payload: unknown, id = "ev-1", turnId = "t-1"): SessionEvent => ({
+const evt = (type: SessionEvent["type"], payload: unknown, id = "ev-1", agentRunId = "t-1"): SessionEvent => ({
   id,
   sessionId: "s",
-  turnId,
+  agentRunId,
   type,
   timestamp: "2026-05-27T00:00:00.000Z",
   payload,

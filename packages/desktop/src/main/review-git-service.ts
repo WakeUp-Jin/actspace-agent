@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { ReviewInitGitInput, ReviewInitGitResult } from "@actspace/shared";
-import type { AppDataRoots } from "./agent-turn";
+import type { AppDataRoots } from "./agent-run";
 
 const GIT_TIMEOUT_MS = 8_000;
 const GIT_MAX_OUTPUT_CHARS = 2 * 1024 * 1024;

@@ -7,45 +7,51 @@ import { ExploreRunBlock } from "../components/messages/ExploreRunBlock";
 const transcriptRef = {
   kind: "subagent_transcript" as const,
   sessionId: "session-1",
-  turnId: "turn-1",
+  agentRunId: "turn-1",
   runId: "run-1",
 };
 
 const promptEvent: SessionEvent = {
   id: "evt-prompt",
   sessionId: "session-1",
-  turnId: "turn-1:subagent:run-1",
+  agentRunId: "turn-1:subagent:run-1",
   type: "user_message",
   timestamp: "2026-06-06T10:00:00.000Z",
+  schemaVersion: 2,
   payload: { content: "Where is ToolManager defined?" },
 };
 
 const readCallEvent: SessionEvent = {
   id: "evt-read-call",
   sessionId: "session-1",
-  turnId: "turn-1:subagent:run-1",
+  agentRunId: "turn-1:subagent:run-1",
   type: "tool_call",
   timestamp: "2026-06-06T10:00:01.000Z",
+  schemaVersion: 2,
   payload: { id: "tc-read", name: "read_file", arguments: { path: "packages/agent-core/src/tools/manager.ts" } },
 };
 
 const readResultEvent: SessionEvent = {
   id: "evt-read-result",
   sessionId: "session-1",
-  turnId: "turn-1:subagent:run-1",
+  agentRunId: "turn-1:subagent:run-1",
   type: "tool_result",
   timestamp: "2026-06-06T10:00:01.500Z",
+  schemaVersion: 2,
   payload: { toolCallId: "tc-read", toolName: "read_file", ok: true, summary: "Read manager.ts", modelOutput: "class ToolManager {}" },
 };
 
 const usageEvent: SessionEvent = {
   id: "evt-usage",
   sessionId: "session-1",
-  turnId: "turn-1:subagent:run-1",
+  agentRunId: "turn-1:subagent:run-1",
   type: "llm_usage",
   timestamp: "2026-06-06T10:00:01.800Z",
+  schemaVersion: 2,
   payload: {
-    callId: "call-1",
+    llmCallId: "call-1",
+    attempt: 1,
+    durationMs: 10,
     provider: "mock",
     model: "mock",
     promptTokens: 2102,

@@ -62,7 +62,7 @@
 - `packages/desktop/src/preload/index.ts` — renderer API 暴露
 - `packages/agent-core/src/engine/bridge.ts` — 事件映射
 - `packages/agent-core/src/engine/create-agent-deps.ts` — 配置链路
-- `packages/desktop/src/main/agent-turn.ts` — 接通 registry
+- `packages/desktop/src/main/agent-run.ts` — 接通 registry
 
 ## 维护规则
 

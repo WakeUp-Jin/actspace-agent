@@ -8,7 +8,7 @@ import type {
   WorkspaceGitContext,
   WorkspacePreparationPayload,
 } from "@actspace/shared";
-import type { AppDataRoots } from "./agent-turn";
+import type { AppDataRoots } from "./agent-run";
 
 const GIT_TIMEOUT_MS = 10_000;
 const GIT_MAX_OUTPUT_CHARS = 1024 * 1024;

@@ -56,6 +56,14 @@ export class OpenAIResponsesService implements LLMService {
     });
   }
 
+  get provider(): string {
+    return this.config.provider;
+  }
+
+  get model(): string {
+    return this.config.model;
+  }
+
   stream(context: Context, options?: StreamOptions): AssistantMessageEventStream {
     const converted = convertContextToResponses(context, this.config);
     return this._stream(converted, context.tools, options);

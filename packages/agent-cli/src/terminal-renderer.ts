@@ -12,7 +12,7 @@ export class TerminalRenderer {
 
   constructor(private readonly options: TerminalRendererOptions) {}
 
-  beginTurn(): void {
+  beginAgentRun(): void {
     this.wroteAssistantText = false;
     this.thinkingBuffer = "";
   }
@@ -38,13 +38,13 @@ export class TerminalRenderer {
       case "llm_retry":
         this.status(`retry ${event.attempt}/${event.maxAttempts}: ${event.reason}`);
         return;
-      case "turn_failed":
+      case "agent_run_failed":
         this.status(`error [${event.error.code}]: ${event.error.message}`, true);
         return;
-      case "turn_aborted":
-        this.status("turn aborted");
+      case "agent_run_aborted":
+        this.status("agent run aborted");
         return;
-      case "turn_finished":
+      case "agent_run_finished":
         if (this.wroteAssistantText) this.options.write("\n");
         return;
       default:

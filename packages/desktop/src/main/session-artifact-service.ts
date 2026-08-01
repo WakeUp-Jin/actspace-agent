@@ -1,7 +1,7 @@
 import { readFile, realpath, stat } from "node:fs/promises";
 import { basename, isAbsolute, relative, resolve } from "node:path";
 import type { SessionArtifactReadInput, SessionArtifactReadResult } from "@actspace/shared";
-import type { AppDataRoots } from "./agent-turn";
+import type { AppDataRoots } from "./agent-run";
 
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 

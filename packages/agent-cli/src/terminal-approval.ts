@@ -11,7 +11,7 @@ import type { PermissionMode } from "./types";
 type PendingApproval = {
   request: ToolApprovalRequest;
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   resolve: (decision: ToolApprovalDecision) => void;
   timer: ReturnType<typeof setTimeout>;
 };
@@ -20,7 +20,7 @@ export class TerminalApprovalBroker implements RuntimeApprovalBroker {
   private readonly automaticGate;
   private readonly pending = new Map<string, PendingApproval>();
   private sessionId = "";
-  private turnId = "";
+  private agentRunId = "";
   private disposed = false;
   private askQueue = Promise.resolve();
   private activeRequestId: string | undefined;
@@ -35,9 +35,9 @@ export class TerminalApprovalBroker implements RuntimeApprovalBroker {
     this.automaticGate = createApprovalGateForPermissionMode(mode, workspaceRoot);
   }
 
-  setCurrentTurn(sessionId: string, turnId: string): void {
+  setCurrentAgentRun(sessionId: string, agentRunId: string): void {
     this.sessionId = sessionId;
-    this.turnId = turnId;
+    this.agentRunId = agentRunId;
   }
 
   waitForDecision(request: ToolApprovalRequest): Promise<ToolApprovalDecision> {
@@ -47,7 +47,7 @@ export class TerminalApprovalBroker implements RuntimeApprovalBroker {
       const entry: PendingApproval = {
         request,
         sessionId: request.sessionId ?? this.sessionId,
-        turnId: request.turnId ?? this.turnId,
+        agentRunId: request.agentRunId ?? this.agentRunId,
         resolve,
         timer: setTimeout(() => this.resolve(request.id, "timeout"), this.timeoutMs),
       };
@@ -58,10 +58,10 @@ export class TerminalApprovalBroker implements RuntimeApprovalBroker {
     });
   }
 
-  abortTurn(sessionId: string, turnId: string): number {
+  abortAgentRun(sessionId: string, agentRunId: string): number {
     let count = 0;
     for (const [requestId, entry] of this.pending) {
-      if (entry.sessionId !== sessionId || entry.turnId !== turnId) continue;
+      if (entry.sessionId !== sessionId || entry.agentRunId !== agentRunId) continue;
       this.resolve(requestId, "abort");
       count += 1;
     }

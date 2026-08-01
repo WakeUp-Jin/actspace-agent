@@ -129,11 +129,11 @@ export {
 
 export type ComposerMode = "chat" | "plan" | "agent";
 
-export type RunTurnInput = {
+export type RunAgentInput = {
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   userInput: string;
-  /** 首个普通 turn 的执行目录准备；已有 turn 的 session 忽略该字段。 */
+  /** 首个普通 Agent Run 的执行目录准备；已有运行记录的 session 忽略该字段。 */
   executionContext?: TurnExecutionContextInput;
   attachments?: import("./session").ComposerAttachment[];
   mode?: ComposerMode;
@@ -196,16 +196,109 @@ export type WorkspaceCreateFolderResult =
   | { ok: true; workspaceId: string; workspaceRoot: string }
   | { ok: false; error: string };
 
+export type AgentTraceListInput = {
+  sessionId: string;
+};
+
+export type AgentTraceReadInput = {
+  sessionId: string;
+  agentRunId: string;
+};
+
+export type AgentTraceTurnSummary = {
+  turnId: string;
+  turnIndex: number;
+  startedAt: string;
+  endedAt?: string;
+  llmCallCount: number;
+  retryCount: number;
+  toolNames: string[];
+  modelNames: string[];
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  durationMs: number;
+};
+
+export type AgentTraceSummary = {
+  schemaVersion: 1;
+  sessionId: string;
+  agentRunId: string;
+  startedAt: string;
+  endedAt?: string;
+  status: "recording" | "completed" | "failed";
+  truncated: boolean;
+  turnCount: number;
+  llmCallCount: number;
+  retryCount: number;
+  eventCount: number;
+  toolNames: string[];
+  modelNames: string[];
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  durationMs: number;
+  byteSize: number;
+  turns: AgentTraceTurnSummary[];
+};
+
+export type AgentTraceListResult = {
+  traces: AgentTraceSummary[];
+};
+
+export type AgentTraceReadResult = {
+  trace: AgentTraceSummary;
+  events: import("./session").AgentTraceEvent[];
+};
+
+export type AgentAnalysisTotals = {
+  agentRunCount: number;
+  turnCount: number;
+  llmCallCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  durationMs: number;
+};
+
+export type AgentAnalysisRunSummary = AgentTraceSummary & {
+  userMessagePreview: string;
+};
+
+export type AgentAnalysisIndexInput = {
+  sessionId: string;
+};
+
+export type AgentAnalysisIndexResult = {
+  sessionId: string;
+  title: string;
+  totals: AgentAnalysisTotals;
+  toolNames: string[];
+  runs: AgentAnalysisRunSummary[];
+};
+
+export type AgentTraceClearInput =
+  | { scope: "session"; sessionId: string }
+  | { scope: "all" };
+
+export type AgentTraceClearResult = {
+  filesDeleted: number;
+  bytesFreed: number;
+};
+
 export type CompactContextInput = {
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   model?: ModelId;
   modelKey?: ModelKey;
 };
 
 export type CompactContextResult = {
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   status: "compacted" | "skipped" | "failed";
   events: import("./session").SessionEvent[];
   contextSnapshot: import("./session").ContextUsageSnapshot;
@@ -219,7 +312,7 @@ export type CompactContextResult = {
 export type GenerateEvalCandidateInput = {
   sessionId: string;
   /** `/eval` 命令自身的系统 turn id；不写成普通 user_message。 */
-  turnId: string;
+  agentRunId: string;
   /** `/eval` 后的可选失败说明。 */
   reason?: string;
   model?: ModelId;
@@ -230,8 +323,8 @@ export type GenerateEvalCandidateInput = {
 
 export type GenerateEvalCandidateResult = {
   sessionId: string;
-  turnId: string;
-  targetTurnId?: string;
+  agentRunId: string;
+  targetAgentRunId?: string;
   status: "generated" | "failed";
   candidateId?: string;
   candidatePath?: string;
@@ -418,9 +511,9 @@ export type SelectWorkspaceDirectoryResult = {
   workspaceRoot?: string;
 };
 
-export type AbortTurnInput = {
+export type AbortAgentRunInput = {
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
 };
 
 export type ApprovalDecideInput = {
@@ -452,7 +545,7 @@ export type SessionListItem = {
   id: string;
   title: string;
   updatedAt: string;
-  turnCount: number;
+  agentRunCount: number;
   /** workspace registry 的稳定 id；旧 session 可能缺失。 */
   workspaceId?: string;
   /** 创建会话时的工作区根目录；旧 session 缺这个字段时由前端视作 default workspace。 */
@@ -554,8 +647,8 @@ export type ListVisualizationsResult = {
 /**
  * 按需重建某会话的完整 Context（含各 bucket 的内容预览），供右侧 Context 完整视图实时展示。
  *
- * 持久化的 context-state.json 只在每轮 turn 结束时写入；老会话或旧版本写入的快照可能缺少
- * 内容预览。该接口在 main 进程重新装配该会话的 ContextManager（一次性吃完 session.jsonl），
+ * 持久化的 context-state.json 只在每次 Agent Run 结束时写入，且为控制体积不保存逐条内容预览。
+ * 该接口在 main 进程重新装配该会话的 ContextManager（一次性吃完 session.jsonl），
  * 重新算出 systemPrompt / tools / conversation 等 bucket 的预览，不调用 LLM。
  */
 export type DescribeContextInput = {
@@ -976,13 +1069,13 @@ export type UsageStatisticsDailyRow = {
 };
 
 export type UsageStatisticsRequestRow = {
-  /** Latest llm_usage timestamp in this user turn. */
+  /** Latest llm_usage timestamp in this Agent Run. */
   timestamp: string;
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   workspaceId?: string;
   workspaceRoot?: string;
-  /** Primary model in this turn, chosen by largest token share. */
+  /** Primary model in this Agent Run, chosen by largest token share. */
   model: string;
   /** 旧 usage 兼容字段。 */
   modelId?: string;

@@ -124,21 +124,21 @@ SubAgent transcript 是完整可恢复事件流，不是摘要字符串。
 建议路径：
 
 ```txt
-<userData>/sessions/<sessionId>/subagents/<turnId>/<runId>.jsonl
+<userData>/sessions/<sessionId>/subagents/<agentRunId>/<runId>.jsonl
 ```
 
 当前落地路径为：
 
 ```txt
-<sessionDir>/subagents/<parentTurnId>/<runId>.jsonl
+<sessionDir>/subagents/<parentAgentRunId>/<runId>.jsonl
 ```
 
-每行是 `SessionEvent`。事件的 `sessionId` 仍使用父 sessionId；transcript 内部事件的 `turnId` 使用 `${parentTurnId}:subagent:${runId}`，而 `SubAgentTranscriptRef.turnId` 保留父 turnId，用于从主 session 定位 sidecar 文件。
+每行是 Session V2 `SessionEvent`。事件的 `sessionId` 仍使用父 sessionId；transcript 内部事件的 `agentRunId` 使用 `${parentAgentRunId}:subagent:${runId}`，而 `SubAgentTranscriptRef.agentRunId` 保留父 Agent Run ID，用于从主 session 定位 sidecar 文件。
 
 读取边界：
 
-- `writeSessionResult()` 先追加主 `session.jsonl`，再写 `AgentTurnResult.subagentTranscripts`。
-- `readSubAgentTranscript()` 只接受 `SubAgentTranscriptRef`，并校验 `sessionId`、`turnId`、`runId` 都是安全 path segment。
+- `writeSessionResult()` 先追加主 `session.jsonl`，再写 `AgentRunResult.subagentTranscripts`。
+- `readSubAgentTranscript()` 只接受 `SubAgentTranscriptRef`，并校验 `sessionId`、`agentRunId`、`runId` 都是安全 path segment。
 - `getSafeSubAgentTranscriptPath()` 要求 `basename(sessionDir) === transcriptRef.sessionId`，拒绝 renderer 传跨 session ref。
 - renderer 通过 preload 调用 `subagent:get-transcript`，不接触文件系统路径。
 

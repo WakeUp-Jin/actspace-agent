@@ -111,6 +111,14 @@
   --act-context-conversation: #b96831;
   --act-context-fallback: #8c8c85;
 
+  /* Analysis 数据角色编码：只用于分析页面内容，不作为全局导航或 action 色。 */
+  --act-analysis-canvas: #fbfcfd;
+  --act-analysis-selection-soft: #edf6ff;
+  --act-analysis-user-soft: #f0f7ff;
+  --act-analysis-assistant-soft: #eef9f2;
+  --act-analysis-tool-soft: #f6f2fc;
+  --act-analysis-thinking-soft: #f5f6f7;
+
   /* 会话顶部「当前轮提问」的贴顶渐隐遮罩（从 surface 渐隐到透明）。 */
   --act-gradient-surface-fade: linear-gradient(
     180deg,
@@ -295,6 +303,13 @@
   --act-context-conversation: #dfa06a;
   --act-context-fallback: #96968f;
 
+  --act-analysis-canvas: #1d1e1c;
+  --act-analysis-selection-soft: #21303d;
+  --act-analysis-user-soft: #202d38;
+  --act-analysis-assistant-soft: #1d3028;
+  --act-analysis-tool-soft: #2a2535;
+  --act-analysis-thinking-soft: #272825;
+
   --act-gradient-surface-fade: linear-gradient(
     180deg,
     #242522 0%,
@@ -399,6 +414,13 @@
     --act-context-summarized: #dc8db4;
     --act-context-conversation: #dfa06a;
     --act-context-fallback: #96968f;
+
+    --act-analysis-canvas: #1d1e1c;
+    --act-analysis-selection-soft: #21303d;
+    --act-analysis-user-soft: #202d38;
+    --act-analysis-assistant-soft: #1d3028;
+    --act-analysis-tool-soft: #2a2535;
+    --act-analysis-thinking-soft: #272825;
 
     --act-gradient-surface-fade: linear-gradient(
       180deg,

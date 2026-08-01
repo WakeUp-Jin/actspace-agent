@@ -1,6 +1,6 @@
 import type {
-  AgentTurnResult,
-  RunTurnInput,
+  AgentRunResult,
+  RunAgentInput,
   RuntimeStreamEvent,
   SessionMeta,
   SessionWorktreeContext,
@@ -21,7 +21,7 @@ export interface RuntimeRoots {
   defaultWorkspaceRoot: string;
 }
 
-export interface RuntimeTurnRequest extends RunTurnInput {
+export interface RuntimeAgentRunRequest extends RunAgentInput {
   roots: RuntimeRoots;
   persistenceMode: RuntimePersistenceMode;
   interactionMode: RuntimeInteractionMode;
@@ -31,7 +31,7 @@ export interface RuntimeTurnRequest extends RunTurnInput {
 
 export interface RuntimeContextProvider {
   load(
-    request: RuntimeTurnRequest,
+    request: RuntimeAgentRunRequest,
     workspaceRoot: string,
     sessionMeta: SessionMeta | null,
   ): Promise<Pick<
@@ -42,7 +42,7 @@ export interface RuntimeContextProvider {
 
 export interface RuntimeModelResolver {
   resolveConfig(input: {
-    request: RuntimeTurnRequest;
+    request: RuntimeAgentRunRequest;
     workspaceRoot: string;
     runtimeContext: AgentRuntimeContext;
     approvalGate?: ApprovalGate;
@@ -54,8 +54,8 @@ export interface RuntimeEventSink {
 }
 
 export interface RuntimeApprovalBroker extends ApprovalGate {
-  setCurrentTurn?(sessionId: string, turnId: string): void;
-  abortTurn?(sessionId: string, turnId: string): unknown;
+  setCurrentAgentRun?(sessionId: string, agentRunId: string): void;
+  abortAgentRun?(sessionId: string, agentRunId: string): unknown;
   dispose?(): Promise<void> | void;
 }
 
@@ -69,31 +69,31 @@ export interface PreparedRuntimeWorkspace {
 
 export interface WorkspaceExecutionProvider {
   prepare(input: {
-    request: RuntimeTurnRequest;
+    request: RuntimeAgentRunRequest;
     roots: RuntimeRoots;
     sessionMeta: SessionMeta | null;
   }): Promise<PreparedRuntimeWorkspace>;
 }
 
 export interface RuntimeTitleHook {
-  afterCommittedTurn(input: {
-    request: RuntimeTurnRequest;
+  afterCommittedAgentRun(input: {
+    request: RuntimeAgentRunRequest;
     sessionMeta: SessionMeta | null;
     priorMessageCount: number;
-    result: AgentTurnResult;
+    result: AgentRunResult;
     deps: AgentDeps;
   }): Promise<void> | void;
 }
 
 export interface RuntimeHarnessObserver {
   createCacheAudit?(input: {
-    request: RuntimeTurnRequest;
+    request: RuntimeAgentRunRequest;
     deps: AgentDeps;
     defaultTracker: CacheAuditTracker;
   }): CacheAuditTracker | undefined;
   afterHarness?(input: {
-    request: RuntimeTurnRequest;
-    result: AgentTurnResult;
+    request: RuntimeAgentRunRequest;
+    result: AgentRunResult;
     deps: AgentDeps;
   }): Promise<void> | void;
 }
@@ -116,7 +116,7 @@ export interface AgentRuntimeOptions {
   harnessLog?: (message: string, details?: Record<string, unknown>) => void;
   onDiagnostic?: (diagnostic: RuntimeDiagnostic) => void;
   createDependencies?: (config: AgentConfig, options: { sessionPath?: string }) => Promise<AgentDeps>;
-  runHarness?: typeof import("../engine/bridge").runTurnWithAgent;
+  runHarness?: typeof import("../engine/bridge").runAgentWithBridge;
 }
 
 export type AgentRuntimeErrorCode =
@@ -137,8 +137,8 @@ export class AgentRuntimeError extends Error {
 }
 
 export interface AgentRuntime {
-  runTurn(request: RuntimeTurnRequest): Promise<AgentTurnResult>;
-  abortTurn(ref: { sessionId: string; turnId: string }): boolean;
+  runAgentRun(request: RuntimeAgentRunRequest): Promise<AgentRunResult>;
+  abortAgentRun(ref: { sessionId: string; agentRunId: string }): boolean;
   isSessionActive(sessionId: string): boolean;
   dispose(): Promise<void>;
 }

@@ -14,7 +14,7 @@
 - 支持把文件拖拽到 Composer 面板添加附件。
 - 浏览器 mock 没有 preload 时提供 fallback fixture，不白屏、不无响应。
 - Composer 从 demo 布尔值改成真实 attachments 数组。
-- 发送消息时把 attachments 传入 `RunTurnInput`，并持久化到 `user_message.payload.attachments`。
+- 发送消息时把 attachments 传入 `RunAgentInput`，并持久化到 `user_message.payload.attachments`。
 - 恢复 session 时 `MessageBlock.kind === "user"` 能继续展示附件元信息。
 - 普通文件附件在当前 turn 的 Agent 输入中追加结构化附件清单，提示可用 `read_file` 读取对应路径。
 - 图片附件发送前由 main / agent-core 调用已有视觉分析能力（`analyze_media` 底层 Kimi vision），把分析结果作为文本附加到当前 turn 输入；renderer 通过 runtime stream event 展示该工具正在执行，但该临时工具状态不作为普通 tool log 持久化。
@@ -43,7 +43,7 @@
 - `packages/desktop/src/global.d.ts`
 - `packages/desktop/src/preload/index.ts`
 - `packages/desktop/src/main/index.ts`
-- `packages/desktop/src/main/agent-turn.ts`
+- `packages/desktop/src/main/agent-run.ts`
 - `packages/desktop/src/main/media-analysis.ts`（如需拆出图片预分析服务）
 - `packages/agent-core/src/engine/bridge.ts`
 - `packages/agent-core/src/adapters.ts`
@@ -58,7 +58,7 @@
 - `ComposerAttachment` 类型已存在，字段包括 `id`、`kind`、`name`、`path`、`mimeType`、`previewUrl`。
 - `UserMessagePayload` 已支持 `attachments?: ComposerAttachment[]`。
 - `createMessageBlocks` 已把 `payload.attachments` 转成 user message block。
-- `RunTurnInput` 当前还没有 attachments 字段，`runTurnWithAgent` / `userMessageToEvents` 当前只持久化文本 content。
+- `RunAgentInput` 当前还没有 attachments 字段，`runAgentWithBridge` / `userMessageToEvents` 当前只持久化文本 content。
 - `Composer` 当前左侧 `+` 已是 command menu；附件入口应作为菜单项接入，而不是替换 `+` 的语义。
 - `read_file` 实现已可读取用户提供的绝对路径，但工具描述仍偏向 workspace，需要同步调整描述，避免模型不知道可以读取附件路径。
 - `ImageContent` 和 LLM provider 转换层已具备图片内容类型，但 DeepSeek 当前不可依赖原生图片理解；已有 `analyze_media` 工具可通过 Kimi vision 把图片转成文本摘要。
@@ -68,7 +68,7 @@
 
 ### Step 1: 共享契约补齐
 
-- 在 `RunTurnInput` 中增加 `attachments?: ComposerAttachment[]`。
+- 在 `RunAgentInput` 中增加 `attachments?: ComposerAttachment[]`。
 - 在 `UserMessagePayload` 中增加图片预分析结果字段，例如 `attachmentAnalyses?: AttachmentAnalysis[]`；字段与附件 id 绑定，保存 `toolName: "analyze_media"`、`status`、`summary?`、`errorMessage?`、`analyzedAt?` 等文本元信息。
 - 定义轻量 `SelectFilesResult = { canceled: boolean; attachments: ComposerAttachment[] }`，不要引入复杂文件模型。
 - 保持 `ComposerAttachment` 只保存元信息：`id`、`kind`、`name`、`path`、`mimeType`、`previewUrl?`；不要增加二进制字段。
@@ -117,7 +117,7 @@
 
 - 扩展 `ComposerSendOptions` 或 `onSend` 参数，让 attachments 随发送提交。
 - `App.handleSend` 构造 streaming user block 时带 attachments。
-- `RunTurnInput` 传给 main 时带 attachments。
+- `RunAgentInput` 传给 main 时带 attachments。
 - `runAndPersistTurn` 传给 `runTurnWithAgent` 时带 attachments。
 - `runTurnWithAgent` / `buildSessionEvents` / adapter 层将 attachments 写入 `user_message` payload。
 - 普通文件附件不自动读内容；在当前 turn 的 Agent 输入中追加结构化附件清单，提示 Agent 可按需 `read_file`。
@@ -155,8 +155,8 @@
 ### Step 6: 测试
 
 - renderer 测试覆盖 `Attach files` 菜单项、添加 mock 附件、拖拽添加、删除附件、发送 payload。
-- app / streaming 测试覆盖发送时 current user block 和 `RunTurnInput.attachments`。
-- shared / agent-core 测试覆盖 `RunTurnInput.attachments` 最终进入 `user_message.payload.attachments`。
+- app / streaming 测试覆盖发送时 current user block 和 `RunAgentInput.attachments`。
+- shared / agent-core 测试覆盖 `RunAgentInput.attachments` 最终进入 `user_message.payload.attachments`。
 - shared / agent-core 测试覆盖图片预分析结果进入 `user_message.payload.attachmentAnalyses`，且不进入 assistant message 原文。
 - agent-core / main 测试覆盖普通文件附件清单注入、图片预分析文本注入、图片二进制不持久化、图片预分析不落普通 tool log。
 

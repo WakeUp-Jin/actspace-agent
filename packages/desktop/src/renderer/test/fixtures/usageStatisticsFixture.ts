@@ -111,7 +111,7 @@ export const mockUsageStatistics: UsageStatisticsSnapshot = {
     {
       timestamp: "2026-05-26T09:07:00.000Z",
       sessionId: "session-usage-latest-00001",
-      turnId: "turn-latest",
+      agentRunId: "turn-latest",
       workspaceId: "ws_actspace_agent",
       workspaceRoot: "/Users/me/projects/actspace-agent",
       model: "deepseek-v4-pro",
@@ -129,7 +129,7 @@ export const mockUsageStatistics: UsageStatisticsSnapshot = {
     {
       timestamp: "2026-05-25T22:18:00.000Z",
       sessionId: "session-usage-older-00002",
-      turnId: "turn-older",
+      agentRunId: "turn-older",
       workspaceRoot: "/Users/me/projects/agent-harness-dev",
       model: "claude-opus-4-8-thinking-xhigh",
       provider: "anthropic",

@@ -6,8 +6,8 @@ export interface SessionDigestItem {
   id: string;
   title: string;
   updatedAt: string;
-  turnCount: number;
-  unreadTurnsForKairos: number;
+  agentRunCount: number;
+  unreadAgentRunsForKairos: number;
   lastUserPreview: string;                           // 最近一条 user_message 的前 80 字符
 }
 
@@ -18,7 +18,7 @@ export interface SessionsDigestResult {
   }>;
   generatedAt: string;
   /**
-   * 本次计算观察到的最新 turn 游标（sessionId → lastTurnId）。
+   * 本次计算观察到的最新 turn 游标（sessionId → lastAgentRunId）。
    * 由调用方在 tick 正常闭合后传给 `commitCursor` 持久化；
    * 失败 tick 不提交 → 下个 tick 重新看到同一批未读。
    */
@@ -28,8 +28,8 @@ export interface SessionsDigestResult {
 const PREVIEW_MAX = 80;
 
 interface KairosSessionsState {
-  /** sessionId → 最后一次 Kairos 已读到的 turnId */
-  lastSeenTurnId: Record<string, string>;
+  /** sessionId → 最后一次 Kairos 已读到的 agentRunId */
+  lastSeenAgentRunId: Record<string, string>;
 }
 
 export class SessionsDigestBuilder {
@@ -39,7 +39,7 @@ export class SessionsDigestBuilder {
 
   constructor(opts: {
     paths: PathsConfig;
-    /** `<kairosRoot>/memory/state.json`，记录 lastSeenTurnId。 */
+    /** `<kairosRoot>/memory/state.json`，记录 lastSeenAgentRunId。 */
     stateFile: string;
     /** `<kairosRoot>/observe/sessions-digest.json`。 */
     outputFile: string;
@@ -83,7 +83,7 @@ export class SessionsDigestBuilder {
   async commitCursor(cursor: Record<string, string>): Promise<void> {
     if (Object.keys(cursor).length === 0) return;
     const state = await this.loadState();
-    Object.assign(state.lastSeenTurnId, cursor);
+    Object.assign(state.lastSeenAgentRunId, cursor);
     await this.saveState(state);
   }
 
@@ -117,67 +117,67 @@ export class SessionsDigestBuilder {
     const sessionId = baseName(sessionRoot);
     let title = sessionId;
     let updatedAt = new Date(0).toISOString();
-    let turnCount = 0;
+    let agentRunCount = 0;
     try {
       const meta = JSON.parse(await readFile(metaPath, "utf8")) as {
         id?: string;
         title?: string;
         updatedAt?: string;
-        turnCount?: number;
+        agentRunCount?: number;
       };
       if (typeof meta.id === "string") title = meta.title ?? meta.id;
       if (typeof meta.title === "string") title = meta.title;
       if (typeof meta.updatedAt === "string") updatedAt = meta.updatedAt;
-      if (typeof meta.turnCount === "number") turnCount = meta.turnCount;
+      if (typeof meta.agentRunCount === "number") agentRunCount = meta.agentRunCount;
     } catch {
       // 没有 meta 也能继续
     }
 
-    const { lastUserPreview, lastTurnId, observedTurns } = await this.scanJsonlTail(jsonlPath);
-    const lastSeen = state.lastSeenTurnId[sessionId];
+    const { lastUserPreview, lastAgentRunId, observedAgentRuns } = await this.scanJsonlTail(jsonlPath);
+    const lastSeen = state.lastSeenAgentRunId[sessionId];
     const unread = lastSeen
-      ? observedTurns.indexOf(lastSeen) === -1
-        ? observedTurns.length
-        : observedTurns.length - observedTurns.indexOf(lastSeen) - 1
-      : observedTurns.length;
+      ? observedAgentRuns.indexOf(lastSeen) === -1
+        ? observedAgentRuns.length
+        : observedAgentRuns.length - observedAgentRuns.indexOf(lastSeen) - 1
+      : observedAgentRuns.length;
 
-    if (lastTurnId) cursor[sessionId] = lastTurnId;
+    if (lastAgentRunId) cursor[sessionId] = lastAgentRunId;
 
     return {
       id: sessionId,
       title,
       updatedAt,
-      turnCount: turnCount || observedTurns.length,
-      unreadTurnsForKairos: unread,
+      agentRunCount: agentRunCount || observedAgentRuns.length,
+      unreadAgentRunsForKairos: unread,
       lastUserPreview,
     };
   }
 
   private async scanJsonlTail(
     jsonlPath: string,
-  ): Promise<{ lastUserPreview: string; lastTurnId: string | null; observedTurns: string[] }> {
+  ): Promise<{ lastUserPreview: string; lastAgentRunId: string | null; observedAgentRuns: string[] }> {
     let text = "";
     try {
       text = await readFile(jsonlPath, "utf8");
     } catch {
-      return { lastUserPreview: "", lastTurnId: null, observedTurns: [] };
+      return { lastUserPreview: "", lastAgentRunId: null, observedAgentRuns: [] };
     }
     const lines = text.split("\n").filter((l) => l.trim().length > 0);
     let lastUserPreview = "";
-    let lastTurnId: string | null = null;
+    let lastAgentRunId: string | null = null;
     const turnSet: string[] = [];
     const seen = new Set<string>();
     for (const line of lines) {
       try {
         const obj = JSON.parse(line) as {
           type: string;
-          turnId?: string;
+          agentRunId?: string;
           payload?: { content?: string };
         };
-        if (typeof obj.turnId === "string" && !seen.has(obj.turnId)) {
-          turnSet.push(obj.turnId);
-          seen.add(obj.turnId);
-          lastTurnId = obj.turnId;
+        if (typeof obj.agentRunId === "string" && !seen.has(obj.agentRunId)) {
+          turnSet.push(obj.agentRunId);
+          seen.add(obj.agentRunId);
+          lastAgentRunId = obj.agentRunId;
         }
         if (obj.type === "user_message" && typeof obj.payload?.content === "string") {
           lastUserPreview = truncate(obj.payload.content, PREVIEW_MAX);
@@ -186,7 +186,7 @@ export class SessionsDigestBuilder {
         // 坏行：忽略
       }
     }
-    return { lastUserPreview, lastTurnId, observedTurns: turnSet };
+    return { lastUserPreview, lastAgentRunId, observedAgentRuns: turnSet };
   }
 
   private async safeListDirs(root: string): Promise<string[]> {
@@ -201,10 +201,10 @@ export class SessionsDigestBuilder {
   private async loadState(): Promise<KairosSessionsState> {
     try {
       const raw = await readFile(this.stateFile, "utf8");
-      const parsed = JSON.parse(raw) as { lastSeenTurnId?: Record<string, string> };
-      return { lastSeenTurnId: parsed.lastSeenTurnId ?? {} };
+      const parsed = JSON.parse(raw) as { lastSeenAgentRunId?: Record<string, string> };
+      return { lastSeenAgentRunId: parsed.lastSeenAgentRunId ?? {} };
     } catch {
-      return { lastSeenTurnId: {} };
+      return { lastSeenAgentRunId: {} };
     }
   }
 

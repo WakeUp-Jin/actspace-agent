@@ -70,7 +70,7 @@ describe("Agent Runtime host parity", () => {
         }),
         harnessObserver: { createCacheAudit: () => undefined },
       });
-      await runtime.runTurn(request);
+      await runtime.runAgentRun(request);
       await runtime.dispose();
     }
 
@@ -82,9 +82,9 @@ describe("Agent Runtime host parity", () => {
   });
 
   it.each([
-    ["completed", ["turn_started", "turn_finished"]],
-    ["failed", ["turn_started", "turn_failed"]],
-    ["aborted", ["turn_started", "turn_aborted"]],
+    ["completed", ["agent_run_started", "agent_run_finished"]],
+    ["failed", ["agent_run_started", "agent_run_failed"]],
+    ["aborted", ["agent_run_started", "agent_run_aborted"]],
   ] as const)("keeps %s terminal ordering stable", async (status, expected) => {
     const root = await mkdtemp(join(tmpdir(), "actspace-host-events-"));
     const profile = HOST_FIXTURE_PROFILES[1];
@@ -99,7 +99,7 @@ describe("Agent Runtime host parity", () => {
       harnessObserver: { createCacheAudit: () => undefined },
     });
 
-    await runtime.runTurn(request);
+    await runtime.runAgentRun(request);
     expect(eventTypes(events)).toEqual(expected);
   });
 });

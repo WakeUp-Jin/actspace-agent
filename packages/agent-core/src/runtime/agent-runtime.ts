@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
-  AgentTurnResult,
+  AgentRunResult,
   ComposerAttachment,
   RuntimeStreamEvent,
   SessionMeta,
@@ -16,12 +16,14 @@ import {
   type AgentDeps,
   type AgentRuntimeContext,
 } from "../engine/create-agent-deps";
-import { runTurnWithAgent } from "../engine/bridge";
+import { runAgentWithBridge } from "../engine/bridge";
 import {
   cleanupOldAgentRunLogs,
   createAgentRunLogger,
+  createAgentTraceWriter,
   createCacheAuditTracker,
   type AgentRunLogger,
+  type AgentTraceWriter,
 } from "../observability";
 import { cleanupOldToolOutputs } from "../tools";
 import {
@@ -36,12 +38,12 @@ import type {
   AgentRuntimeOptions,
   PreparedRuntimeWorkspace,
   RuntimeDiagnostic,
-  RuntimeTurnRequest,
+  RuntimeAgentRunRequest,
 } from "./types";
 import { AgentRuntimeError } from "./types";
 
-type ActiveTurn = {
-  turnId: string;
+type ActiveAgentRun = {
+  agentRunId: string;
   abort: () => void;
   done: Promise<void>;
 };
@@ -63,24 +65,24 @@ export function createAgentHostRuntime(options: AgentRuntimeOptions): AgentRunti
 }
 
 class DefaultAgentRuntime implements AgentRuntime {
-  private readonly activeTurns = new Map<string, ActiveTurn>();
+  private readonly activeAgentRuns = new Map<string, ActiveAgentRun>();
   private readonly createDependencies: NonNullable<AgentRuntimeOptions["createDependencies"]>;
   private readonly runHarness: NonNullable<AgentRuntimeOptions["runHarness"]>;
   private disposed = false;
 
   constructor(private readonly options: AgentRuntimeOptions) {
     this.createDependencies = options.createDependencies ?? createAgentForSession;
-    this.runHarness = options.runHarness ?? runTurnWithAgent;
+    this.runHarness = options.runHarness ?? runAgentWithBridge;
   }
 
-  runTurn(request: RuntimeTurnRequest): Promise<AgentTurnResult> {
+  runAgentRun(request: RuntimeAgentRunRequest): Promise<AgentRunResult> {
     if (this.disposed) {
       return Promise.reject(new AgentRuntimeError("RUNTIME_DISPOSED", "Agent Runtime has been disposed."));
     }
-    if (this.activeTurns.has(request.sessionId)) {
+    if (this.activeAgentRuns.has(request.sessionId)) {
       return Promise.reject(new AgentRuntimeError(
         "SESSION_ACTIVE",
-        `Session ${request.sessionId} already has an active turn.`,
+        `Session ${request.sessionId} already has an active Agent Run.`,
       ));
     }
 
@@ -90,57 +92,57 @@ class DefaultAgentRuntime implements AgentRuntime {
     const done = new Promise<void>((resolve) => {
       resolveDone = resolve;
     });
-    const active: ActiveTurn = {
-      turnId: request.turnId,
+    const active: ActiveAgentRun = {
+      agentRunId: request.agentRunId,
       done,
       abort: () => {
         abortRequested = true;
         abortHarness?.();
-        this.options.approvalBroker?.abortTurn?.(request.sessionId, request.turnId);
+        this.options.approvalBroker?.abortAgentRun?.(request.sessionId, request.agentRunId);
       },
     };
-    this.activeTurns.set(request.sessionId, active);
+    this.activeAgentRuns.set(request.sessionId, active);
 
-    return this.executeTurn(request, {
+    return this.executeAgentRun(request, {
       isAbortRequested: () => abortRequested,
       setAbortHarness: (abort) => {
         abortHarness = abort;
       },
     }).finally(() => {
-      if (this.activeTurns.get(request.sessionId) === active) {
-        this.activeTurns.delete(request.sessionId);
+      if (this.activeAgentRuns.get(request.sessionId) === active) {
+        this.activeAgentRuns.delete(request.sessionId);
       }
       resolveDone();
     });
   }
 
-  abortTurn(ref: { sessionId: string; turnId: string }): boolean {
-    const active = this.activeTurns.get(ref.sessionId);
-    if (!active || active.turnId !== ref.turnId) return false;
+  abortAgentRun(ref: { sessionId: string; agentRunId: string }): boolean {
+    const active = this.activeAgentRuns.get(ref.sessionId);
+    if (!active || active.agentRunId !== ref.agentRunId) return false;
     active.abort();
     return true;
   }
 
   isSessionActive(sessionId: string): boolean {
-    return this.activeTurns.has(sessionId);
+    return this.activeAgentRuns.has(sessionId);
   }
 
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
-    const turns = [...this.activeTurns.values()];
+    const turns = [...this.activeAgentRuns.values()];
     turns.forEach((turn) => turn.abort());
     await Promise.allSettled(turns.map((turn) => turn.done));
     await this.options.approvalBroker?.dispose?.();
   }
 
-  private async executeTurn(
-    request: RuntimeTurnRequest,
+  private async executeAgentRun(
+    request: RuntimeAgentRunRequest,
     abortControl: {
       isAbortRequested: () => boolean;
       setAbortHarness: (abort: (() => void) | undefined) => void;
     },
-  ): Promise<AgentTurnResult> {
+  ): Promise<AgentRunResult> {
     const eventQueue = new OrderedEventQueue(this.options.eventSink, (diagnostic) => this.diagnose(diagnostic));
     const emit = (event: RuntimeStreamEvent) => eventQueue.emit(event);
     const persistent = request.persistenceMode === "persistent";
@@ -152,13 +154,30 @@ class DefaultAgentRuntime implements AgentRuntime {
     let prepared: PreparedRuntimeWorkspace | undefined;
     let deps: AgentDeps | undefined;
     let runLogger: AgentRunLogger | undefined;
+    let traceWriter: AgentTraceWriter | undefined;
     let resultStarted = false;
 
-    this.options.approvalBroker?.setCurrentTurn?.(request.sessionId, request.turnId);
-    emit({ type: "turn_started", sessionId: request.sessionId, turnId: request.turnId });
+    this.options.approvalBroker?.setCurrentAgentRun?.(request.sessionId, request.agentRunId);
+    emit({ type: "agent_run_started", sessionId: request.sessionId, agentRunId: request.agentRunId });
 
     try {
       runLogger = await this.prepareRunLogger(request);
+      if (persistent) {
+        try {
+          traceWriter = await createAgentTraceWriter({
+            sessionDir: sessionPaths.root,
+            sessionId: request.sessionId,
+            agentRunId: request.agentRunId,
+          });
+        } catch (error) {
+          this.diagnose({
+            level: "warn",
+            code: "TRACE_UNAVAILABLE",
+            message: "Failed to prepare Agent analysis trace.",
+            error,
+          });
+        }
+      }
       prepared = await this.prepareWorkspace(request, sessionMeta, emit);
       const workspaceRoot = prepared.workspaceRoot;
 
@@ -187,7 +206,7 @@ class DefaultAgentRuntime implements AgentRuntime {
         tmpRoot: request.roots.tmpRoot,
         artifactRoot: join(sessionPaths.root, "artifacts", "generated-images"),
         sessionId: request.sessionId,
-        turnId: request.turnId,
+        agentRunId: request.agentRunId,
         toolProfile: mode === "chat" ? "none" : mode === "plan" ? "read-only" : "full",
         ...hostContext,
       };
@@ -207,11 +226,11 @@ class DefaultAgentRuntime implements AgentRuntime {
         content: request.userInput,
         timestamp: Date.now(),
         source: "user",
-      }, request.sessionId, request.turnId, { attachments: request.attachments });
+      }, request.sessionId, request.agentRunId, { attachments: request.attachments });
       const preparationEvents = prepared.preparationEvent
         ? [createPersistedSessionEvent(
             request.sessionId,
-            request.turnId,
+            request.agentRunId,
             "workspace_preparation",
             prepared.preparationEvent,
           )]
@@ -231,15 +250,15 @@ class DefaultAgentRuntime implements AgentRuntime {
         emit({
           type: "workspace_preparation_finished",
           sessionId: request.sessionId,
-          turnId: request.turnId,
+          agentRunId: request.agentRunId,
           payload: prepared.preparationEvent,
         });
       }
 
       if (abortControl.isAbortRequested()) {
-        const abortedHarnessResult: AgentTurnResult = {
+        const abortedHarnessResult: AgentRunResult = {
           sessionId: request.sessionId,
-          turnId: request.turnId,
+          agentRunId: request.agentRunId,
           events: persistent ? [] : [...userEvents, ...preparationEvents],
           contextSnapshot: deps.contextManager.getUsageSnapshot(),
           status: "aborted",
@@ -265,7 +284,7 @@ class DefaultAgentRuntime implements AgentRuntime {
       const defaultCacheAudit = createCacheAuditTracker({
         rootDir: join(request.roots.dataRoot, "cache-audit"),
         sessionId: request.sessionId,
-        turnId: request.turnId,
+        agentRunId: request.agentRunId,
         provider: deps.modelDefinition.provider,
         model: deps.modelDefinition.apiModel,
         modelId: deps.modelKey,
@@ -282,7 +301,7 @@ class DefaultAgentRuntime implements AgentRuntime {
       const resultPromise = this.runHarness(
         {
           sessionId: request.sessionId,
-          turnId: request.turnId,
+          agentRunId: request.agentRunId,
           userInput: request.userInput,
           attachments: request.attachments,
           modelAttachments,
@@ -293,9 +312,10 @@ class DefaultAgentRuntime implements AgentRuntime {
         {
           onStreamEvent: emit,
           runLogger,
+          traceWriter,
           includeUserEvent: !persistent,
           emitTerminalEvent: false,
-          emitTurnStartedEvent: false,
+          emitAgentRunStartedEvent: false,
           onLog: this.options.harnessLog,
         },
       );
@@ -327,9 +347,9 @@ class DefaultAgentRuntime implements AgentRuntime {
       }
       const runtimeError = normalizeRuntimeError(error);
       emit({
-        type: "turn_failed",
+        type: "agent_run_failed",
         sessionId: request.sessionId,
-        turnId: request.turnId,
+        agentRunId: request.agentRunId,
         error: {
           code: runtimeError.code,
           message: runtimeError.message,
@@ -340,7 +360,7 @@ class DefaultAgentRuntime implements AgentRuntime {
       throw runtimeError;
     } finally {
       abortControl.setAbortHarness(undefined);
-      this.options.approvalBroker?.abortTurn?.(request.sessionId, request.turnId);
+      this.options.approvalBroker?.abortAgentRun?.(request.sessionId, request.agentRunId);
       await deps?.toolManager.dispose().catch((error) => {
         this.diagnose({
           level: "error",
@@ -353,7 +373,7 @@ class DefaultAgentRuntime implements AgentRuntime {
   }
 
   private async prepareWorkspace(
-    request: RuntimeTurnRequest,
+    request: RuntimeAgentRunRequest,
     sessionMeta: SessionMeta | null,
     emit: (event: RuntimeStreamEvent) => void,
   ): Promise<PreparedRuntimeWorkspace> {
@@ -367,14 +387,14 @@ class DefaultAgentRuntime implements AgentRuntime {
         "This Runtime host does not support workspace preparation.",
       );
     }
-    if ((sessionMeta?.turnCount ?? 0) > 0) {
+    if ((sessionMeta?.agentRunCount ?? 0) > 0) {
       throw new Error("Execution context can only be prepared before the first turn.");
     }
     if (request.executionContext.runLocation === "worktree") {
       emit({
         type: "workspace_preparation_started",
         sessionId: request.sessionId,
-        turnId: request.turnId,
+        agentRunId: request.agentRunId,
         kind: "worktree",
         sourceWorkspaceRoot: request.executionContext.sourceWorkspaceRoot,
         baseBranch: request.executionContext.branch ?? "",
@@ -407,7 +427,7 @@ class DefaultAgentRuntime implements AgentRuntime {
     }
   }
 
-  private async prepareRunLogger(request: RuntimeTurnRequest): Promise<AgentRunLogger | undefined> {
+  private async prepareRunLogger(request: RuntimeAgentRunRequest): Promise<AgentRunLogger | undefined> {
     if (!request.roots.logRoot) return undefined;
     try {
       await cleanupOldAgentRunLogs(request.roots.logRoot);
@@ -415,7 +435,7 @@ class DefaultAgentRuntime implements AgentRuntime {
       return await createAgentRunLogger({
         logRoot: request.roots.logRoot,
         sessionId: request.sessionId,
-        turnId: request.turnId,
+        agentRunId: request.agentRunId,
       });
     } catch (error) {
       this.diagnose({
@@ -429,14 +449,14 @@ class DefaultAgentRuntime implements AgentRuntime {
   }
 
   private async runTitleHook(
-    request: RuntimeTurnRequest,
+    request: RuntimeAgentRunRequest,
     sessionMeta: SessionMeta | null,
     priorMessageCount: number,
-    result: AgentTurnResult,
+    result: AgentRunResult,
     deps: AgentDeps,
   ): Promise<void> {
     try {
-      await this.options.titleHook?.afterCommittedTurn({
+      await this.options.titleHook?.afterCommittedAgentRun({
         request,
         sessionMeta,
         priorMessageCount,
@@ -454,8 +474,8 @@ class DefaultAgentRuntime implements AgentRuntime {
   }
 
   private async runHarnessObserver(
-    request: RuntimeTurnRequest,
-    result: AgentTurnResult,
+    request: RuntimeAgentRunRequest,
+    result: AgentRunResult,
     deps: AgentDeps,
   ): Promise<void> {
     try {
@@ -508,17 +528,17 @@ class OrderedEventQueue {
 
 function emitTerminalEvent(
   emit: (event: RuntimeStreamEvent) => void,
-  result: AgentTurnResult,
+  result: AgentRunResult,
 ): void {
   if (result.status === "aborted") {
-    emit({ type: "turn_aborted", sessionId: result.sessionId, turnId: result.turnId });
+    emit({ type: "agent_run_aborted", sessionId: result.sessionId, agentRunId: result.agentRunId });
     return;
   }
   if (result.status === "failed") {
     emit({
-      type: "turn_failed",
+      type: "agent_run_failed",
       sessionId: result.sessionId,
-      turnId: result.turnId,
+      agentRunId: result.agentRunId,
       error: {
         code: result.error?.code ?? "AGENT_ERROR",
         message: result.error?.message ?? "Agent turn failed.",
@@ -528,9 +548,9 @@ function emitTerminalEvent(
     return;
   }
   emit({
-    type: "turn_finished",
+    type: "agent_run_finished",
     sessionId: result.sessionId,
-    turnId: result.turnId,
+    agentRunId: result.agentRunId,
     resultEventIds: result.events.map((event) => event.id),
   });
 }

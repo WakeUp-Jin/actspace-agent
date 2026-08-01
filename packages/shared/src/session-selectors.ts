@@ -16,19 +16,8 @@ import type {
 } from "./session";
 import { convertUsageCostToUsd } from "./usage-cost";
 
-type LegacyTurnResultRecord = {
-  type: "turn_result";
-  payload?: {
-    events?: SessionEvent[];
-  };
-};
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function isLegacyTurnResultRecord(value: unknown): value is LegacyTurnResultRecord {
-  return isRecord(value) && value.type === "turn_result";
 }
 
 function isSessionEvent(value: unknown): value is SessionEvent {
@@ -36,7 +25,8 @@ function isSessionEvent(value: unknown): value is SessionEvent {
     isRecord(value) &&
     typeof value.id === "string" &&
     typeof value.sessionId === "string" &&
-    typeof value.turnId === "string" &&
+    typeof value.agentRunId === "string" &&
+    value.schemaVersion === 2 &&
     typeof value.type === "string" &&
     typeof value.timestamp === "string" &&
     "payload" in value
@@ -51,11 +41,6 @@ export function normalizeSessionEvents(records: unknown[]): SessionEvent[] {
   const events: SessionEvent[] = [];
 
   for (const record of records) {
-    if (isLegacyTurnResultRecord(record) && Array.isArray(record.payload?.events)) {
-      events.push(...record.payload.events.filter(isSessionEvent));
-      continue;
-    }
-
     if (isSessionEvent(record)) {
       events.push(record);
     }
@@ -357,7 +342,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
 
   for (const event of events) {
     if (event.type === "assistant_message" || event.type === "assistant_reply") {
-      lastAssistantEventIdByTurn.set(event.turnId, event.id);
+      lastAssistantEventIdByTurn.set(event.agentRunId, event.id);
       continue;
     }
 
@@ -369,22 +354,22 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
     const total = cost.total;
     if ((currency !== "USD" && currency !== "CNY") || typeof total !== "number") continue;
 
-    const current = usageByTurn.get(event.turnId) ?? { totalTokens: 0, costUsd: 0 };
+    const current = usageByTurn.get(event.agentRunId) ?? { totalTokens: 0, costUsd: 0 };
     current.totalTokens += totalTokens;
     current.costUsd += convertUsageCostToUsd({ total, currency });
-    usageByTurn.set(event.turnId, current);
+    usageByTurn.set(event.agentRunId, current);
   }
 
   const renderKeyCounters = new Map<string, number>();
   const nextRenderKey = (event: SessionEvent, slot: string, stableIdentity?: string): string => {
     if (stableIdentity) {
-      return `turn:${event.turnId}:${slot}:${stableIdentity}`;
+      return `turn:${event.agentRunId}:${slot}:${stableIdentity}`;
     }
 
-    const counterKey = `${event.turnId}:${slot}`;
+    const counterKey = `${event.agentRunId}:${slot}`;
     const index = renderKeyCounters.get(counterKey) ?? 0;
     renderKeyCounters.set(counterKey, index + 1);
-    return `turn:${event.turnId}:${slot}:${index}`;
+    return `turn:${event.agentRunId}:${slot}:${index}`;
   };
 
   return events.flatMap((event): MessageBlock[] => {
@@ -410,8 +395,8 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
       case "assistant_message":
       case "assistant_reply": {
         const payload = event.payload as AssistantMessagePayload;
-        const usage = lastAssistantEventIdByTurn.get(event.turnId) === event.id
-          ? usageByTurn.get(event.turnId)
+        const usage = lastAssistantEventIdByTurn.get(event.agentRunId) === event.id
+          ? usageByTurn.get(event.agentRunId)
           : undefined;
         return [
           {
@@ -477,7 +462,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
           }
         ];
       }
-      case "turn_aborted":
+      case "agent_run_aborted":
         return [
           {
             kind: "status",

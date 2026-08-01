@@ -2,7 +2,9 @@ import type { ContextUsageBucketName } from "./context-buckets";
 import type { ModelApi } from "./model-config";
 
 export type SessionId = string;
+export type AgentRunId = string;
 export type TurnId = string;
+export type LlmCallId = string;
 export type EventId = string;
 export type ToolCallId = string;
 
@@ -23,11 +25,33 @@ export type LlmUsageCost = {
 };
 
 export type RuntimeStreamEvent =
-  | { type: "turn_started"; sessionId: SessionId; turnId: TurnId }
+  | { type: "agent_run_started"; sessionId: SessionId; agentRunId: AgentRunId }
+  | { type: "agent_turn_started"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; turnIndex: number }
+  | { type: "agent_turn_finished"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; turnIndex: number }
+  | {
+      type: "llm_call_started";
+      sessionId: SessionId;
+      agentRunId: AgentRunId;
+      turnId: TurnId;
+      turnIndex: number;
+      llmCallId: LlmCallId;
+      attempt: number;
+    }
+  | {
+      type: "llm_call_finished";
+      sessionId: SessionId;
+      agentRunId: AgentRunId;
+      turnId: TurnId;
+      turnIndex: number;
+      llmCallId: LlmCallId;
+      attempt: number;
+      durationMs: number;
+      stopReason: AssistantReply["stopReason"];
+    }
   | {
       type: "workspace_preparation_started";
       sessionId: SessionId;
-      turnId: TurnId;
+      agentRunId: AgentRunId;
       kind: "worktree";
       sourceWorkspaceRoot: string;
       baseBranch: string;
@@ -35,13 +59,13 @@ export type RuntimeStreamEvent =
   | {
       type: "workspace_preparation_finished";
       sessionId: SessionId;
-      turnId: TurnId;
+      agentRunId: AgentRunId;
       payload: WorkspacePreparationPayload;
     }
   | {
       type: "context_compaction_started";
       sessionId: SessionId;
-      turnId: TurnId;
+      agentRunId: AgentRunId;
       trigger: "manual" | "auto";
       stage: "queued" | "preparing" | "summarizing" | "writing" | "completed";
       progress?: number;
@@ -49,7 +73,7 @@ export type RuntimeStreamEvent =
   | {
       type: "context_compaction_progress";
       sessionId: SessionId;
-      turnId: TurnId;
+      agentRunId: AgentRunId;
       trigger: "manual" | "auto";
       stage: "queued" | "preparing" | "summarizing" | "writing" | "completed";
       progress?: number;
@@ -58,7 +82,7 @@ export type RuntimeStreamEvent =
   | {
       type: "context_compaction_finished";
       sessionId: SessionId;
-      turnId: TurnId;
+      agentRunId: AgentRunId;
       trigger: "manual" | "auto";
       stage: "completed";
       status: "compacted" | "skipped";
@@ -69,17 +93,19 @@ export type RuntimeStreamEvent =
   | {
       type: "context_compaction_failed";
       sessionId: SessionId;
-      turnId: TurnId;
+      agentRunId: AgentRunId;
       trigger: "manual" | "auto";
       stage: "failed";
       error: SessionError;
     }
-  | { type: "assistant_text_delta"; sessionId: SessionId; turnId: TurnId; messageId: EventId; delta: string }
-  | { type: "assistant_thinking_delta"; sessionId: SessionId; turnId: TurnId; messageId: EventId; delta: string }
+  | { type: "assistant_text_delta"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; messageId: EventId; delta: string }
+  | { type: "assistant_thinking_delta"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; messageId: EventId; delta: string }
   | {
       type: "tool_call_streaming";
       sessionId: SessionId;
+      agentRunId: AgentRunId;
       turnId: TurnId;
+      llmCallId: LlmCallId;
       toolCallId: ToolCallId;
       toolName: string;
       /** 首帧（dispatched 阶段）为 true，后续帧 false/undefined */
@@ -87,8 +113,8 @@ export type RuntimeStreamEvent =
       /** 后端按 previewKind 解析 partial args 得到的 typed preview，前端直接渲染 */
       preview: ToolUiPreview;
     }
-  | { type: "tool_started"; sessionId: SessionId; turnId: TurnId; toolCallId: ToolCallId; toolName: string; argsPreview: string; preview?: ToolUiPreview }
-  | { type: "tool_finished"; sessionId: SessionId; turnId: TurnId; toolCallId: ToolCallId; toolName: string; resultEventId: EventId; isError: boolean; preview?: ToolUiPreview }
+  | { type: "tool_started"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; toolCallId: ToolCallId; toolName: string; argsPreview: string; preview?: ToolUiPreview }
+  | { type: "tool_finished"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; toolCallId: ToolCallId; toolName: string; resultEventId: EventId; isError: boolean; preview?: ToolUiPreview }
   | {
       /** 后台 bash 任务状态更新：turn 内外统一走 agent:stream 推送，前端按 taskId 更新对应块 */
       type: "bash_task_update";
@@ -100,28 +126,34 @@ export type RuntimeStreamEvent =
   | {
       type: "subagent_event";
       sessionId: SessionId;
-      turnId: TurnId;
+      agentRunId: AgentRunId;
+      turnId?: TurnId;
+      llmCallId?: LlmCallId;
       toolCallId: ToolCallId;
       transcriptRef: SubAgentTranscriptRef;
       event: SessionEvent;
       preview: AgentToolPreview;
     }
-  | { type: "tool_approval_required"; sessionId: SessionId; turnId: TurnId; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string; approvalScope?: "browser_session"; executionEnvironment?: "sandbox" | "real" }
-  | { type: "tool_approval_resolved"; sessionId: SessionId; turnId: TurnId; toolCallId: ToolCallId; requestId: string; decision: string; approvalScope?: "browser_session" }
+  | { type: "tool_approval_required"; sessionId: SessionId; agentRunId: AgentRunId; turnId?: TurnId; llmCallId?: LlmCallId; toolCallId: ToolCallId; toolName: string; requestId: string; summary: string; reason: string; command?: string; riskLevel?: string; approvalScope?: "browser_session"; executionEnvironment?: "sandbox" | "real" }
+  | { type: "tool_approval_resolved"; sessionId: SessionId; agentRunId: AgentRunId; turnId?: TurnId; llmCallId?: LlmCallId; toolCallId: ToolCallId; requestId: string; decision: string; approvalScope?: "browser_session" }
   | {
       /** LLM 调用命中可重试错误、agent loop 正在退避重试；renderer 据此清掉半截 streaming 内容并显示重试提示 */
       type: "llm_retry";
       sessionId: SessionId;
+      agentRunId: AgentRunId;
       turnId: TurnId;
-      /** 第几次重试（从 1 开始） */
+      turnIndex: number;
+      /** 触发重试的失败请求；下一次请求尚未创建自己的 llmCallId。 */
+      failedLlmCallId: LlmCallId;
+      /** 即将开始的请求尝试序号（首次为 1，因此重试事件从 2 开始）。 */
       attempt: number;
       /** 最大重试次数 */
       maxAttempts: number;
       reason: string;
     }
-  | { type: "turn_aborted"; sessionId: SessionId; turnId: TurnId }
-  | { type: "turn_finished"; sessionId: SessionId; turnId: TurnId; resultEventIds: EventId[] }
-  | { type: "turn_failed"; sessionId: SessionId; turnId: TurnId; error: SessionError };
+  | { type: "agent_run_aborted"; sessionId: SessionId; agentRunId: AgentRunId }
+  | { type: "agent_run_finished"; sessionId: SessionId; agentRunId: AgentRunId; resultEventIds: EventId[] }
+  | { type: "agent_run_failed"; sessionId: SessionId; agentRunId: AgentRunId; error: SessionError };
 
 export type SessionEventType =
   | "user_message"
@@ -137,7 +169,7 @@ export type SessionEventType =
   | "workspace_preparation"
   | "eval_candidate"
   | "error"
-  | "turn_aborted"
+  | "agent_run_aborted"
   // ↓ Kairos 自治模式专属生命周期事件（追加在末尾，不允许调换顺序，详见
   // docs/exec-plans/active/kairos_shared_contracts.md §1）↓
   | "kairos_tick_injected"
@@ -148,11 +180,35 @@ export type SessionEventType =
 export type SessionEvent<TPayload = unknown> = {
   id: EventId;
   sessionId: SessionId;
-  turnId: TurnId;
+  agentRunId: AgentRunId;
+  turnId?: TurnId;
+  llmCallId?: LlmCallId;
   type: SessionEventType;
   timestamp: string;
-  schemaVersion?: 1;
+  schemaVersion: 2;
   payload: TPayload;
+};
+
+export type AgentTraceEventType =
+  | "agent_run_start"
+  | "agent_run_end"
+  | "turn_start"
+  | "turn_end"
+  | "llm_request"
+  | "llm_response"
+  | "llm_retry";
+
+export type AgentTraceEvent = {
+  schemaVersion: 1;
+  timestamp: string;
+  sessionId: SessionId;
+  agentRunId: AgentRunId;
+  turnId?: TurnId;
+  turnIndex?: number;
+  llmCallId?: LlmCallId;
+  attempt?: number;
+  type: AgentTraceEventType;
+  payload: unknown;
 };
 
 export type UserMessagePayload = {
@@ -186,7 +242,9 @@ export type ToolCallPayload = {
 };
 
 export type LlmUsagePayload = {
-  callId: string;
+  llmCallId: LlmCallId;
+  attempt: number;
+  durationMs: number;
   provider: string;
   model: string;
   modelId?: string;
@@ -268,7 +326,7 @@ export type WorkspacePreparationPayload = {
 
 export type ErrorPayload = SessionError;
 
-export type TurnAbortedPayload = {
+export type AgentRunAbortedPayload = {
   reason: "user";
 };
 
@@ -301,14 +359,15 @@ export type KairosSleepInterruptedPayload = {
 };
 
 export type SessionMeta = {
+  schemaVersion: 2;
   id: SessionId;
   title: string;
   updatedAt: string;
   createdAt: string;
-  turnCount: number;
-  /** 工作区注册表里的稳定 id；旧 session 缺这个字段时按 workspaceRoot 或默认 workspace 兼容。 */
+  agentRunCount: number;
+  /** 工作区注册表里的稳定 id；缺省时按 workspaceRoot 或默认 workspace 解析。 */
   workspaceId?: string;
-  /** 创建会话时的工作区根目录，用于侧边栏按 Workspace 分组；旧 session 缺这个字段时视为 default。 */
+  /** 创建会话时的工作区根目录，用于侧边栏按 Workspace 分组；缺省时视为 default。 */
   workspaceRoot?: string;
   /** Worktree 会话的隔离执行上下文；workspaceId 仍指向原始长期 Workspace。 */
   worktree?: SessionWorktreeContext;
@@ -337,7 +396,7 @@ export type SubAgentRunStatus = "running" | "completed" | "failed" | "aborted";
 export type SubAgentTranscriptRef = {
   kind: "subagent_transcript";
   sessionId: SessionId;
-  turnId: TurnId;
+  agentRunId: AgentRunId;
   runId: string;
   path?: string;
 };
@@ -587,7 +646,7 @@ export type ContextStateEntry = {
 
 export type ContextState = {
   sessionId: SessionId;
-  activeTurnId?: TurnId;
+  activeAgentRunId?: AgentRunId;
   updatedAt: string;
   estimator: {
     name: string;
@@ -622,9 +681,9 @@ export type AssistantReply = {
   };
 };
 
-export type AgentTurnResult = {
+export type AgentRunResult = {
   sessionId: SessionId;
-  turnId: TurnId;
+  agentRunId: AgentRunId;
   events: SessionEvent[];
   subagentTranscripts?: Array<{
     transcriptRef: SubAgentTranscriptRef;

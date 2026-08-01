@@ -20,6 +20,7 @@
 
 ## 最近完成
 
+- Agent 分析观测生产页面：`completed/20260730-agent-analysis-observability-page.md`
 - 文档计划生命周期清理：`completed/20260801-docs-exec-plan-lifecycle-cleanup.md`
 - 本地 Agent CLI 与 host-neutral runtime：`completed/20260731-agent-runtime-desktop-cli.md`
 - DeepSeek OpenAI Thinking：`completed/20260731-deepseek-openai-thinking-effort.md`

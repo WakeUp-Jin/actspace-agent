@@ -27,7 +27,7 @@ E2 与 E3 合并为一份计划：两者触碰同一批文件（executor / run-p
 
 ## 关键架构事实（写计划时已核实）
 
-- Agent 与其依赖是**每 turn 新建**的（`packages/desktop/src/main/agent-turn.ts` → `createAgentForSession`）。后台任务注册表必须放在能跨 turn 存活的位置：agent-core 模块级单例（对照 `agent-turn.ts` 的 `activeTurnAborts` 先例）。
+- Agent 与其依赖是**每 Agent Run 新建**的（`packages/desktop/src/main/agent-run.ts` → `createAgentForSession`）。后台任务注册表必须放在能跨 Agent Run 存活的位置：agent-core 模块级单例（对照 `agent-run.ts` 的 `activeAgentRunAborts` 先例）。
 - `engine/loop.ts` 的 `getSteeringMessages` 在每次 LLM 调用前（含首次）被拉取，是通知注入的现成入口；但 `engine/bridge.ts` 尚未把它接到 `Agent` 构造参数，需要接线。
 - 推流通道：turn 进行中走 `onStreamEvent`；turn 结束后 main 进程仍可随时 `win.webContents.send("agent:stream", …)`（对照 `context-compact.ts` 先例）。
 - 输出落盘路径复用 `packages/agent-core/src/tools/tool-output-paths.ts`，清理复用 `cleanup-tool-outputs.ts`。

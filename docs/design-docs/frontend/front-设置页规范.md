@@ -42,6 +42,7 @@
   - `Skills`
   - `外观 Appearance`
   - `归档会话 Archived Chats`
+  - `分析观测 Analysis`（直接操作入口，不是设置表单分区）
   - `更新 Update`
 - 当前选中项使用轻量高亮背景，延续聊天态侧栏的克制视觉，不变成后台控制台。
 
@@ -153,10 +154,15 @@
   - 外观偏好（字体、缩放、代码字号、主题）走 renderer `localStorage`，不进 `settings.json`；开机在 `main.tsx` 渲染前重放，避免闪烁。
 - 归档会话 Archived Chats
   - 通过 `listSessions({ archived: true })` 读取已归档会话，不混入普通侧边栏列表。
-  - 每条展示标题、更新时间、turn 数和 workspace 摘要。
+  - 每条展示标题、更新时间、Agent Run 数和 workspace 摘要。
   - 「恢复」按钮调用 `archiveSession({ sessionId, archived: false })`，恢复后刷新归档列表，并通知应用刷新普通会话列表。
   - 恢复不会自动切换到该会话；它只重新出现在普通会话列表中。
   - 空状态显示「暂无归档会话」。
+- 分析观测 Analysis
+  - 放在「归档会话」与「更新」之间，点击后直接把应用切换到独立 Analysis 工作区，不渲染右侧 SettingsContent。
+  - Analysis 打开后设置导航整体消失，页面采用自己的两栏布局；左上角「返回设置」恢复进入前的设置分区。
+  - 首版默认分析当前活动 Session，不在 Analysis 中增加常驻 Session 导航。
+  - 页面、交互与 Trace 可靠性事实来源为 `front-agent-analysis-observability.md`。
 - 更新 Update
   - 作为设置导航里的独立页面，放在「归档会话」下方；不再塞进「通用」分区。
   - 选择本机 `actspace` 源码目录后，可触发“构建并更新”。

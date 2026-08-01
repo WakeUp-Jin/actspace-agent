@@ -15,7 +15,9 @@ import type {
   ComposerAttachment,
   SessionEvent,
   SessionId,
+  AgentRunId,
   TurnId,
+  LlmCallId,
   ToolExecutionResult,
   ContextUsageSnapshot,
 } from "@actspace/shared";
@@ -41,12 +43,13 @@ function createEventId(): string {
 
 function createSessionEvent<TPayload>(
   sessionId: SessionId,
-  turnId: TurnId,
+  agentRunId: AgentRunId,
   type: SessionEvent["type"],
   payload: TPayload,
   // 源消息的真实发生时间（epoch ms）。事件是在一轮结束时批量落盘的，如果都用 flush 时刻，
   // 整轮事件会挤在同一毫秒，导致前端「Worked for」之类基于时间差的展示恒为 ~0。
   occurredAtMs?: number,
+  association?: { turnId?: TurnId; llmCallId?: LlmCallId },
 ): SessionEvent<TPayload> {
   const timestamp =
     typeof occurredAtMs === "number" && Number.isFinite(occurredAtMs)
@@ -55,21 +58,24 @@ function createSessionEvent<TPayload>(
   return {
     id: createEventId(),
     sessionId,
-    turnId,
+    agentRunId,
+    ...(association?.turnId ? { turnId: association.turnId } : {}),
+    ...(association?.llmCallId ? { llmCallId: association.llmCallId } : {}),
     type,
     timestamp,
-    schemaVersion: 1,
+    schemaVersion: 2,
     payload,
   };
 }
 
 export function createPersistedSessionEvent<TPayload>(
   sessionId: SessionId,
-  turnId: TurnId,
+  agentRunId: AgentRunId,
   type: SessionEvent["type"],
   payload: TPayload,
+  association?: { turnId?: TurnId; llmCallId?: LlmCallId },
 ): SessionEvent<TPayload> {
-  return createSessionEvent(sessionId, turnId, type, payload);
+  return createSessionEvent(sessionId, agentRunId, type, payload, undefined, association);
 }
 
 export function formatUserMessageForModel(
@@ -132,7 +138,7 @@ export function formatUserMessageForModel(
 export function userMessageToEvents(
   msg: UserMessage,
   sessionId: SessionId,
-  turnId: TurnId,
+  agentRunId: AgentRunId,
   payload?: {
     attachments?: ComposerAttachment[];
   },
@@ -145,7 +151,7 @@ export function userMessageToEvents(
         .join("");
 
   return [
-    createSessionEvent(sessionId, turnId, "user_message", {
+    createSessionEvent(sessionId, agentRunId, "user_message", {
       content,
       ...(payload?.attachments?.length ? { attachments: payload.attachments } : {}),
       // 注入消息（如后台任务通知）标记来源；前端 selectors 按来源隐藏，恢复时也不会混入用户消息
@@ -157,7 +163,8 @@ export function userMessageToEvents(
 export function assistantMessageToEvents(
   msg: AssistantMessage,
   sessionId: SessionId,
-  turnId: TurnId,
+  agentRunId: AgentRunId,
+  association?: { turnId?: TurnId; llmCallId?: LlmCallId },
 ): SessionEvent[] {
   const events: SessionEvent[] = [];
 
@@ -165,28 +172,28 @@ export function assistantMessageToEvents(
   for (const thinking of thinkingBlocks) {
     if (!thinking.thinking && !thinking.signature) continue;
     events.push(
-      createSessionEvent(sessionId, turnId, "thinking", {
+      createSessionEvent(sessionId, agentRunId, "thinking", {
         content: thinking.thinking,
         collapsedByDefault: true,
         ...(thinking.signature && { signature: thinking.signature }),
         ...(msg.api && { api: msg.api }),
         model: msg.model,
         provider: msg.provider,
-      }, msg.timestamp),
+      }, msg.timestamp, association),
     );
   }
 
   const toolCalls = getToolCalls(msg);
   for (const tc of toolCalls) {
     events.push(
-      createSessionEvent(sessionId, turnId, "tool_call", {
+      createSessionEvent(sessionId, agentRunId, "tool_call", {
         id: tc.id,
         name: tc.name,
         arguments: sanitizeBrowserToolArgs(tc.name, tc.arguments),
         ...(msg.api && { api: msg.api }),
         model: msg.model,
         provider: msg.provider,
-      }, msg.timestamp),
+      }, msg.timestamp, association),
     );
   }
 
@@ -212,7 +219,7 @@ export function assistantMessageToEvents(
       },
     };
     events.push(
-      createSessionEvent(sessionId, turnId, "assistant_message", reply, msg.timestamp),
+      createSessionEvent(sessionId, agentRunId, "assistant_message", reply, msg.timestamp, association),
     );
   }
 
@@ -222,8 +229,9 @@ export function assistantMessageToEvents(
 export function toolResultMessageToEvents(
   msg: ToolResultMessage,
   sessionId: SessionId,
-  turnId: TurnId,
+  agentRunId: AgentRunId,
   executionResult?: ToolExecutionResult,
+  association?: { turnId?: TurnId; llmCallId?: LlmCallId },
 ): SessionEvent[] {
   const text = msg.content
     .filter((c) => c.type === "text")
@@ -246,31 +254,32 @@ export function toolResultMessageToEvents(
   };
 
   return [
-    createSessionEvent(sessionId, turnId, "tool_result", result, msg.timestamp),
+    createSessionEvent(sessionId, agentRunId, "tool_result", result, msg.timestamp, association),
   ];
 }
 
 export function contextSnapshotToEvent(
   snapshot: ContextUsageSnapshot,
   sessionId: SessionId,
-  turnId: TurnId,
+  agentRunId: AgentRunId,
 ): SessionEvent {
-  return createSessionEvent(sessionId, turnId, "context_snapshot", snapshot);
+  return createSessionEvent(sessionId, agentRunId, "context_snapshot", snapshot);
 }
 
 export function messageToEvents(
   msg: Message,
   sessionId: SessionId,
-  turnId: TurnId,
+  agentRunId: AgentRunId,
   executionResult?: ToolExecutionResult,
+  association?: { turnId?: TurnId; llmCallId?: LlmCallId },
 ): SessionEvent[] {
   switch (msg.role) {
     case "user":
-      return userMessageToEvents(msg, sessionId, turnId);
+      return userMessageToEvents(msg, sessionId, agentRunId);
     case "assistant":
-      return assistantMessageToEvents(msg, sessionId, turnId);
+      return assistantMessageToEvents(msg, sessionId, agentRunId, association);
     case "toolResult":
-      return toolResultMessageToEvents(msg, sessionId, turnId, executionResult);
+      return toolResultMessageToEvents(msg, sessionId, agentRunId, executionResult, association);
   }
 }
 
@@ -415,7 +424,7 @@ export function sessionEventsToMessages(events: SessionEvent[]): RecoveryResult 
         case "diff_preview":
           break;
 
-        case "turn_aborted":
+        case "agent_run_aborted":
           pendingThinking = [];
           pendingToolCalls = [];
           pendingAssistantIdentity = undefined;

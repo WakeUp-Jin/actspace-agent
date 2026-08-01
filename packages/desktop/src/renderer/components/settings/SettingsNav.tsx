@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Archive, ArrowLeft, Boxes, FolderSearch, Hourglass, Library, Plug, RefreshCw, Server, Settings, Sparkles, Sun, Wrench } from "lucide-react";
+import { Activity, Archive, ArrowLeft, Boxes, FolderSearch, Hourglass, Library, Plug, RefreshCw, Server, Settings, Sparkles, Sun, Wrench } from "lucide-react";
 
 export type SettingsSectionId =
   | "general"
@@ -41,10 +41,12 @@ export function SettingsNav({
   active,
   onSelect,
   onBack,
+  onOpenAnalysis,
 }: {
   active: SettingsSectionId;
   onSelect: (id: SettingsSectionId) => void;
   onBack: () => void;
+  onOpenAnalysis?: () => void;
 }) {
   return (
     <nav
@@ -62,7 +64,7 @@ export function SettingsNav({
       </button>
       {SETTINGS_SECTIONS.map(({ id, label, icon: Icon }) => {
         const isActive = id === active;
-        return (
+        return [
           <button
             key={id}
             type="button"
@@ -72,8 +74,19 @@ export function SettingsNav({
           >
             <Icon size={16} strokeWidth={1.9} />
             <span>{label}</span>
-          </button>
-        );
+          </button>,
+          id === "archivedChats" && onOpenAnalysis ? (
+            <button
+              key="analysis"
+              type="button"
+              onClick={onOpenAnalysis}
+              className={`${NAV_ITEM_CLASS} ${NAV_ITEM_IDLE_CLASS}`}
+            >
+              <Activity size={16} strokeWidth={1.9} />
+              <span>分析观测</span>
+            </button>
+          ) : null,
+        ];
       })}
     </nav>
   );

@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ActSpace · 分析观测原型</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: oklch(0.991 0.002 250);
+      --surface: oklch(1 0 0);
+      --surface-raised: oklch(1 0 0);
+      --surface-muted: oklch(0.973 0.004 250);
+      --surface-hover: oklch(0.956 0.012 245);
+      --ink: oklch(0.235 0.012 250);
+      --ink-muted: oklch(0.5 0.012 250);
+      --ink-faint: oklch(0.68 0.01 250);
+      --line: oklch(0.91 0.007 245);
+      --line-strong: oklch(0.82 0.012 245);
+      --emerald: oklch(0.61 0.135 158);
+      --emerald-deep: oklch(0.46 0.115 158);
+      --emerald-soft: oklch(0.965 0.035 158);
+      --blue: oklch(0.59 0.13 245);
+      --blue-soft: oklch(0.962 0.03 245);
+      --amber: oklch(0.68 0.14 72);
+      --amber-soft: oklch(0.95 0.045 78);
+      --red: oklch(0.59 0.17 25);
+      --red-soft: oklch(0.968 0.03 25);
+      --violet: oklch(0.58 0.15 292);
+      --violet-soft: oklch(0.968 0.028 292);
+      --shadow: 0 16px 42px oklch(0.28 0.018 250 / 0.1);
+      --shadow-soft: 0 4px 14px oklch(0.28 0.018 250 / 0.045);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace;
+      --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --canvas: oklch(0.18 0.013 165);
+      --surface: oklch(0.215 0.014 165);
+      --surface-raised: oklch(0.245 0.015 165);
+      --surface-muted: oklch(0.27 0.016 165);
+      --surface-hover: oklch(0.31 0.024 160);
+      --ink: oklch(0.91 0.012 155);
+      --ink-muted: oklch(0.71 0.017 158);
+      --ink-faint: oklch(0.55 0.018 158);
+      --line: oklch(0.34 0.018 160);
+      --line-strong: oklch(0.43 0.023 160);
+      --emerald: oklch(0.72 0.13 158);
+      --emerald-deep: oklch(0.79 0.12 158);
+      --emerald-soft: oklch(0.31 0.055 158);
+      --blue: oklch(0.74 0.105 245);
+      --blue-soft: oklch(0.3 0.055 245);
+      --amber: oklch(0.78 0.12 78);
+      --amber-soft: oklch(0.31 0.055 78);
+      --red: oklch(0.72 0.13 25);
+      --red-soft: oklch(0.3 0.06 25);
+      --violet: oklch(0.75 0.11 292);
+      --violet-soft: oklch(0.3 0.055 292);
+      --shadow: 0 18px 44px oklch(0.08 0.01 165 / 0.34);
+      --shadow-soft: 0 7px 22px oklch(0.08 0.01 165 / 0.25);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 14px;
+    }
+    button, input { font: inherit; }
+    button { color: inherit; }
+
+    .app { height: 100%; display: grid; grid-template-rows: auto 1fr; }
+    .topbar {
+      min-height: 68px;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 20px;
+      background: color-mix(in oklch, var(--surface-raised) 94%, transparent);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(18px);
+      z-index: 10;
+    }
+    .brand, .top-actions, .summary { display: flex; align-items: center; }
+    .brand { gap: 11px; min-width: 0; }
+    .back, .icon-button {
+      width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 10px;
+      background: var(--surface); cursor: pointer; display: grid; place-items: center;
+    }
+    .back:hover, .icon-button:hover { background: var(--surface-hover); border-color: var(--line-strong); }
+    .brand-copy { min-width: 0; }
+    .eyebrow { color: var(--ink-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 2px 0 0; font-size: 16px; font-weight: 720; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mock-badge {
+      margin-left: 4px; padding: 3px 7px; border-radius: 999px;
+      background: var(--surface-muted); color: var(--ink-muted); font-size: 10px; font-weight: 700;
+    }
+    .summary {
+      min-width: 0; gap: 15px; justify-content: flex-end; overflow-x: auto;
+      padding: 3px 2px; scrollbar-width: none;
+    }
+    .summary::-webkit-scrollbar { display: none; }
+    .metric { flex: 0 0 auto; display: flex; align-items: baseline; gap: 5px; }
+    .metric-label { color: var(--ink-faint); font-size: 10px; letter-spacing: .025em; white-space: nowrap; }
+    .metric-value { font-family: var(--mono); font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .metric-value em { color: var(--ink); font-style: normal; }
+    .top-actions { justify-content: flex-end; gap: 8px; }
+    .status {
+      display: inline-flex; align-items: center; gap: 7px; padding: 8px 11px;
+      background: var(--emerald-soft); color: var(--emerald-deep); border-radius: 999px; font-size: 12px; font-weight: 700;
+    }
+    .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--emerald); box-shadow: 0 0 0 4px color-mix(in oklch, var(--emerald) 16%, transparent); }
+
+    .workspace { min-height: 0; display: grid; grid-template-columns: 350px minmax(0, 1fr); }
+    .sidebar {
+      min-width: 0; overflow: hidden; display: grid; grid-template-rows: auto auto 1fr;
+      background: var(--surface); border-right: 1px solid var(--line);
+    }
+    .search-wrap { padding: 14px 14px 10px; position: relative; }
+    .search-icon { position: absolute; left: 27px; top: 25px; color: var(--ink-faint); pointer-events: none; }
+    .search {
+      width: 100%; height: 40px; padding: 0 38px; border: 1px solid var(--line); border-radius: 10px;
+      background: var(--surface-raised); color: var(--ink); outline: none;
+    }
+    .search:focus { border-color: var(--line-strong); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ink) 12%, transparent); }
+    .clear-search { position: absolute; right: 25px; top: 23px; border: 0; background: transparent; color: var(--ink-faint); cursor: pointer; display: none; }
+    .tools { padding: 0 14px 13px; border-bottom: 1px solid var(--line); }
+    .section-kicker { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; color: var(--ink-muted); font-size: 11px; font-weight: 700; }
+    .tool-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      border: 1px solid var(--line); border-radius: 999px; padding: 4px 9px; background: var(--surface-raised);
+      color: var(--ink-muted); font-family: var(--mono); font-size: 11px; cursor: pointer;
+    }
+    .chip:hover { border-color: var(--line-strong); color: var(--ink); }
+    .chip.active { border-color: color-mix(in oklch, var(--blue) 42%, var(--line)); background: var(--blue-soft); color: var(--blue); }
+    .turn-list { min-height: 0; overflow: auto; padding-bottom: 24px; }
+    .user-group { border-bottom: 1px solid var(--line); }
+    .user-heading {
+      width: 100%; min-height: 54px; border: 0; padding: 11px 14px; background: var(--surface-muted);
+      cursor: pointer; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; text-align: left;
+    }
+    .user-heading:hover { background: var(--surface-hover); }
+    .user-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); }
+    .user-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 680; }
+    .group-count { color: var(--ink-faint); font-family: var(--mono); font-size: 11px; }
+    .chevron { color: var(--ink-faint); transition: transform .18s ease; }
+    .user-group.collapsed .chevron { transform: rotate(-90deg); }
+    .user-group.collapsed .turns { display: none; }
+    .turn-item {
+      width: 100%; min-height: 88px; border: 0; border-left: 3px solid transparent; border-bottom: 1px solid var(--line);
+      padding: 12px 14px 10px 16px; background: var(--surface); cursor: pointer; text-align: left;
+    }
+    .turn-item:hover { background: var(--surface-hover); }
+    .turn-item.selected { background: var(--blue-soft); border-left-color: var(--blue); }
+    .turn-title-row, .turn-meta-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .turn-title { font-weight: 750; font-size: 14px; }
+    .call-count { color: var(--violet); background: var(--violet-soft); padding: 2px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; }
+    .model-badge { max-width: 140px; color: var(--ink-muted); background: var(--surface-muted); padding: 3px 7px; border-radius: 5px; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .turn-meta-row { margin-top: 8px; font-family: var(--mono); font-size: 11px; }
+    .tokens { color: var(--ink); }
+    .duration { color: var(--ink-muted); }
+    .timestamp { color: var(--ink-faint); }
+    .turn-endpoint { margin-top: 6px; color: var(--ink-faint); font-family: var(--mono); font-size: 10px; }
+    .empty-state { padding: 34px 18px; text-align: center; color: var(--ink-muted); line-height: 1.7; }
+
+    .detail { min-width: 0; min-height: 0; overflow: auto; padding: 18px 22px 44px; }
+    .detail-inner { max-width: 1480px; margin: 0 auto; }
+    .detail-head {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: start;
+      padding: 17px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-raised); box-shadow: var(--shadow-soft);
+    }
+    .detail-title-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .detail-title-line h2 { margin: 0; font-size: 18px; }
+    .id-tag { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); }
+    .detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+    .action {
+      min-height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 0 11px; background: var(--surface);
+      cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 7px;
+    }
+    .action:hover { border-color: var(--line-strong); background: var(--surface-hover); }
+    .action.primary { border-color: color-mix(in oklch, var(--blue) 38%, var(--line)); background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+    .call-strip { display: flex; gap: 7px; align-items: center; margin: 12px 0; min-height: 35px; }
+    .call-label { color: var(--ink-faint); font-size: 11px; margin-right: 3px; }
+    .call-tab {
+      border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 7px 10px; cursor: pointer; font-family: var(--mono); font-size: 11px;
+    }
+    .call-tab:hover { background: var(--surface-hover); }
+    .call-tab.active { border-color: color-mix(in oklch, var(--emerald) 42%, var(--line)); background: var(--emerald-soft); color: var(--emerald-deep); }
+    .call-tab.failed { color: var(--red); }
+    .call-status { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--emerald); margin-right: 5px; vertical-align: 1px; }
+    .call-tab.failed .call-status { background: var(--red); }
+    .call-meta {
+      display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0 0 14px; padding: 0 2px; color: var(--ink-muted); font-size: 11px;
+    }
+    .call-meta strong { color: var(--ink); font-family: var(--mono); }
+    .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; background: var(--blue); }
+    .dot.out { background: var(--emerald); }
+    .dot.cache { background: var(--violet); }
+    .dot.time { background: var(--amber); }
+    .accordion { display: grid; gap: 10px; }
+    .panel { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-raised); box-shadow: var(--shadow-soft); overflow: hidden; }
+    .panel-head {
+      width: 100%; min-height: 48px; border: 0; background: transparent; padding: 0 15px;
+      display: flex; align-items: center; gap: 10px; cursor: pointer; text-align: left;
+    }
+    .panel-head:hover { background: var(--surface-hover); }
+    .panel-head .panel-chevron { color: var(--ink-faint); transition: transform .18s ease; }
+    .panel.open .panel-chevron { transform: rotate(90deg); }
+    .panel-title { font-weight: 720; }
+    .panel-count { margin-left: auto; color: var(--ink-faint); background: var(--surface-muted); padding: 3px 8px; border-radius: 999px; font-size: 10px; }
+    .panel-copy { margin-left: 4px; border: 0; background: transparent; color: var(--ink-faint); font-size: 11px; cursor: pointer; }
+    .panel-copy:hover { color: var(--emerald); }
+    .panel-body { display: none; border-top: 1px solid var(--line); }
+    .panel.open .panel-body { display: block; }
+    pre {
+      margin: 0; padding: 17px 18px 22px; min-height: 90px; max-height: 440px; overflow: auto;
+      background: color-mix(in oklch, var(--surface-muted) 44%, var(--surface-raised)); color: var(--ink);
+      font: 12px/1.7 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2;
+    }
+    .tool-definitions { padding: 12px; display: grid; gap: 9px; }
+    .tool-definition { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+    .tool-definition-head { padding: 12px 13px 11px; border-bottom: 1px solid var(--line); }
+    .tool-definition-title { display: flex; align-items: center; gap: 9px; }
+    .tool-definition-name { color: var(--ink); font: 700 12px/1 var(--mono); }
+    .tool-definition-description { margin: 7px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.6; }
+    .tool-parameters { padding: 10px; display: grid; gap: 6px; }
+    .tool-parameters-title { padding: 0 2px 3px; color: var(--ink-muted); font-size: 11px; font-weight: 720; }
+    .tool-parameter {
+      display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: 14px;
+      padding: 10px 11px; border-radius: 7px; background: var(--surface-muted);
+    }
+    .tool-parameter-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; align-content: start; }
+    .tool-parameter-name { color: var(--ink); font: 700 11px/1.4 var(--mono); }
+    .tool-parameter-type { color: var(--ink-muted); background: var(--surface-raised); border: 1px solid var(--line); padding: 1px 5px; border-radius: 4px; font: 10px/1.3 var(--mono); }
+    .tool-required { color: var(--red); background: var(--red-soft); padding: 2px 5px; border-radius: 4px; font-size: 9px; font-weight: 750; }
+    .tool-parameter-description { color: var(--ink-muted); font-size: 11px; line-height: 1.55; }
+    .messages { padding: 12px; display: grid; gap: 9px; }
+    .message { border: 1px solid var(--line); border-radius: 9px; padding: 12px 13px; background: var(--surface-muted); }
+    .message.user { border-color: color-mix(in oklch, var(--blue) 24%, var(--line)); background: var(--blue-soft); }
+    .message.assistant { border-color: color-mix(in oklch, var(--emerald) 24%, var(--line)); background: var(--emerald-soft); }
+    .message.tool { border-color: color-mix(in oklch, var(--violet) 24%, var(--line)); border-left: 3px solid color-mix(in oklch, var(--violet) 52%, var(--line)); background: var(--violet-soft); }
+    .message-role { font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); }
+    .message.user .message-role { color: var(--blue); }
+    .message.assistant .message-role { color: var(--emerald-deep); }
+    .message.tool .message-role { color: var(--violet); }
+    .message-content { margin-top: 7px; font: 12px/1.65 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .response-view { padding: 12px; display: grid; gap: 10px; }
+    .response-thinking, .response-text, .response-error, .response-tool-call { border-radius: 9px; }
+    .response-thinking { padding: 13px 14px; border: 1px solid var(--line); background: var(--surface-muted); }
+    .response-section-label { margin-bottom: 8px; color: var(--ink-faint); font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+    .response-thinking-content { color: var(--ink-muted); font: 12px/1.7 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .response-text { padding: 3px 2px 8px; font-size: 14px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .response-tool-call { border: 1px solid color-mix(in oklch, var(--violet) 24%, var(--line)); border-left: 3px solid color-mix(in oklch, var(--violet) 52%, var(--line)); background: var(--violet-soft); overflow: hidden; }
+    .response-tool-call-head { padding: 10px 12px; color: var(--violet); font: 700 11px/1.4 var(--mono); }
+    .response-tool-call pre { min-height: 0; max-height: 230px; padding: 11px 12px; border-top: 1px solid color-mix(in oklch, var(--violet) 18%, var(--line)); background: color-mix(in oklch, var(--violet-soft) 58%, var(--surface-raised)); }
+    .response-error { padding: 13px 14px; border: 1px solid color-mix(in oklch, var(--red) 35%, var(--line)); background: var(--red-soft); color: var(--red); font: 12px/1.65 var(--mono); }
+
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 40; display: none; place-items: center; padding: 28px;
+      background: oklch(0.18 0.01 250 / .32); backdrop-filter: blur(7px);
+    }
+    .modal-backdrop.open { display: grid; }
+    .modal { width: min(1040px, 94vw); max-height: 86vh; display: grid; grid-template-rows: auto 1fr; background: var(--surface-raised); border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+    .modal.compare { width: min(1400px, calc(100vw - 48px)); height: min(820px, calc(100vh - 56px)); max-height: none; }
+    .modal-head {
+      min-height: 58px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: center; gap: 14px; padding: 0 18px; border-bottom: 1px solid var(--line);
+    }
+    .modal-title-area { min-width: 0; display: flex; align-items: center; gap: 9px; }
+    .modal-head h3 { margin: 0; font-size: 15px; white-space: nowrap; }
+    .modal-controls { display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .compare-control-label { color: var(--ink-muted); font-size: 11px; white-space: nowrap; }
+    .compare-select {
+      max-width: 250px; height: 32px; border: 1px solid var(--line); border-radius: 7px; padding: 0 28px 0 9px;
+      background: var(--surface-muted); color: var(--ink); font: 11px var(--mono); outline: none;
+    }
+    .compare-select:focus { border-color: var(--line-strong); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ink) 12%, transparent); }
+    .compare-nav {
+      display: none; width: 34px; height: 30px; border: 1px solid var(--line); border-radius: 7px;
+      background: var(--surface-muted); color: var(--ink-muted); cursor: pointer;
+    }
+    .modal.compare .compare-nav { display: grid; place-items: center; }
+    .compare-nav:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
+    .compare-nav:disabled { opacity: .38; cursor: default; }
+    .modal-close { justify-self: end; }
+    .modal-body { min-height: 0; overflow: auto; padding: 16px; }
+    .modal.compare .modal-body { padding: 0; background: var(--canvas); }
+    .diff { display: grid; gap: 10px; }
+    .diff-block { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .diff-title { padding: 9px 12px; background: var(--surface-muted); font-weight: 700; font-size: 11px; }
+    .diff-line { padding: 7px 12px; border-top: 1px solid var(--line); font: 11px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .diff-line.add { background: var(--emerald-soft); color: var(--emerald-deep); }
+    .diff-line.remove { background: var(--red-soft); color: var(--red); }
+    .compare-view { min-height: 100%; padding: 0 16px 26px; }
+    .compare-stats {
+      position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px;
+      min-height: 52px; padding: 9px 14px; border-bottom: 1px solid var(--line);
+      background: color-mix(in oklch, var(--surface-raised) 94%, transparent); backdrop-filter: blur(14px);
+    }
+    .compare-stat { display: flex; align-items: baseline; gap: 6px; color: var(--ink-muted); font-size: 11px; }
+    .compare-stat strong { color: var(--ink); font: 700 11px var(--mono); }
+    .compare-delta-up, .compare-delta-down { color: var(--ink); }
+    .compare-section { margin-top: 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-raised); overflow: hidden; box-shadow: var(--shadow-soft); }
+    .compare-section-head { min-height: 46px; display: flex; align-items: center; gap: 9px; padding: 0 14px; border-bottom: 1px solid var(--line); }
+    .compare-section-title { font-weight: 740; }
+    .change-count { padding: 3px 7px; border-radius: 999px; background: var(--emerald-soft); color: var(--emerald-deep); font-size: 10px; font-weight: 700; }
+    .change-count.removed { background: var(--red-soft); color: var(--red); }
+    .unchanged-summary { margin: 12px 14px; padding: 10px 12px; border-radius: 8px; background: var(--surface-muted); color: var(--ink-faint); font-size: 11px; }
+    .unchanged-summary::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--line-strong); vertical-align: 1px; }
+    .context-changes { padding: 0 14px 14px; display: grid; gap: 9px; }
+    .context-message { position: relative; border: 1px solid var(--line); border-radius: 8px; padding: 13px 16px; background: var(--surface-muted); }
+    .context-message.user { border-color: color-mix(in oklch, var(--blue) 24%, var(--line)); background: var(--blue-soft); }
+    .context-message.assistant { border-color: color-mix(in oklch, var(--emerald) 24%, var(--line)); background: var(--emerald-soft); }
+    .context-message.tool { border-color: color-mix(in oklch, var(--violet) 24%, var(--line)); background: var(--violet-soft); }
+    .context-message.added { box-shadow: inset 3px 0 0 var(--emerald); }
+    .context-message.removed { box-shadow: inset 3px 0 0 var(--red); opacity: .82; }
+    .change-marker { position: absolute; top: 9px; right: 10px; padding: 3px 7px; border-radius: 5px; background: var(--emerald-soft); color: var(--emerald-deep); font-size: 9px; font-weight: 700; }
+    .context-message.removed .change-marker { background: var(--red-soft); color: var(--red); }
+    .context-role { display: inline-flex; padding: 3px 7px; border: 1px solid var(--line); border-radius: 5px; background: color-mix(in oklch, var(--surface-raised) 78%, transparent); color: var(--ink-muted); font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .context-message.user .context-role { color: var(--blue); }
+    .context-message.assistant .context-role { color: var(--emerald-deep); }
+    .context-message.tool .context-role { color: var(--violet); }
+    .context-content { margin-top: 10px; font: 12px/1.65 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .context-empty { padding: 30px 18px; text-align: center; color: var(--ink-muted); }
+    .context-empty strong { display: block; margin-bottom: 7px; color: var(--ink); font-size: 14px; }
+    .secondary-change { margin: 0 14px 14px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .secondary-change-label { padding: 8px 10px; background: var(--surface-muted); color: var(--ink-muted); font-size: 10px; font-weight: 750; }
+    .secondary-change-grid { display: grid; grid-template-columns: 1fr 1fr; }
+    .secondary-change-value { min-width: 0; padding: 10px 12px; font: 11px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .secondary-change-value + .secondary-change-value { border-left: 1px solid var(--line); }
+    .secondary-change-value.before { background: var(--red-soft); box-shadow: inset 3px 0 0 var(--red); }
+    .secondary-change-value.after { background: var(--emerald-soft); box-shadow: inset 3px 0 0 var(--emerald); }
+    .toast { position: fixed; right: 22px; bottom: 22px; z-index: 60; padding: 10px 13px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-raised); box-shadow: var(--shadow); opacity: 0; transform: translateY(8px); pointer-events: none; transition: .18s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    html[data-theme="dark"] .chip.active,
+    html[data-theme="dark"] .action.primary,
+    html[data-theme="dark"] .call-tab.active { border-color: var(--line-strong); background: var(--surface-hover); color: var(--ink); }
+    html[data-theme="dark"] .turn-item.selected { background: var(--surface-hover); border-left-color: var(--line-strong); }
+    html[data-theme="dark"] .call-count { color: var(--ink-muted); background: var(--surface-muted); }
+    html[data-theme="dark"] .call-status { background: var(--ink-faint); }
+    html[data-theme="dark"] .message.user { border-color: var(--line); background: var(--surface); }
+    html[data-theme="dark"] .message.assistant { border-color: var(--line); background: var(--surface-muted); }
+    html[data-theme="dark"] .message.tool { border-color: var(--line); border-left-color: var(--line-strong); background: color-mix(in oklch, var(--surface-muted) 72%, var(--surface-raised)); }
+    html[data-theme="dark"] .message.user .message-role,
+    html[data-theme="dark"] .message.assistant .message-role,
+    html[data-theme="dark"] .message.tool .message-role { color: var(--ink-muted); }
+    html[data-theme="dark"] .response-tool-call { border-color: var(--line); border-left-color: var(--line-strong); background: var(--surface-muted); }
+    html[data-theme="dark"] .response-tool-call-head { color: var(--ink); }
+    html[data-theme="dark"] .response-tool-call pre { border-top-color: var(--line); background: color-mix(in oklch, var(--surface-muted) 58%, var(--surface-raised)); }
+    html[data-theme="dark"] .modal-backdrop { background: oklch(0.12 0.012 165 / .55); backdrop-filter: blur(9px); }
+    html[data-theme="dark"] .change-count,
+    html[data-theme="dark"] .change-count.removed { background: var(--surface-muted); color: var(--ink-muted); }
+    html[data-theme="dark"] .context-message.user { border-color: var(--line); background: var(--surface); }
+    html[data-theme="dark"] .context-message.assistant { border-color: var(--line); background: var(--surface-muted); }
+    html[data-theme="dark"] .context-message.tool { border-color: var(--line); background: color-mix(in oklch, var(--surface-muted) 72%, var(--surface-raised)); }
+    html[data-theme="dark"] .context-message.user .context-role,
+    html[data-theme="dark"] .context-message.assistant .context-role,
+    html[data-theme="dark"] .context-message.tool .context-role { color: var(--ink-muted); }
+    html[data-theme="dark"] .secondary-change-value.before,
+    html[data-theme="dark"] .secondary-change-value.after { background: var(--surface); }
+
+    @media (max-width: 1120px) {
+      .status { display: none; }
+      .workspace { grid-template-columns: 310px minmax(0, 1fr); }
+      .detail { padding-inline: 16px; }
+    }
+    @media (max-width: 760px) {
+      body { overflow: auto; }
+      .app { min-height: 100%; height: auto; }
+      .topbar { position: sticky; top: 0; grid-template-columns: 1fr auto; padding: 10px 12px; }
+      .summary { display: none; }
+      .status { display: none; }
+      .workspace { min-height: calc(100vh - 61px); grid-template-columns: 275px minmax(520px, 1fr); overflow: auto; }
+      .sidebar { position: sticky; left: 0; height: calc(100vh - 61px); z-index: 5; }
+      .detail-head { grid-template-columns: 1fr; }
+      .detail-actions { justify-content: flex-start; }
+      .tool-parameter { grid-template-columns: 1fr; gap: 6px; }
+      .modal-head { grid-template-columns: minmax(0, 1fr) auto; }
+      .modal-controls { grid-column: 1 / -1; grid-row: 2; padding-bottom: 10px; }
+      .modal-close { grid-column: 2; grid-row: 1; }
+      .secondary-change-grid { grid-template-columns: 1fr; }
+      .secondary-change-value + .secondary-change-value { border-left: 0; border-top: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <button class="back" type="button" title="返回设置" aria-label="返回设置">←</button>
+        <div class="brand-copy">
+          <div class="eyebrow">Settings / Analysis</div>
+          <h1>分析观测 <span class="mock-badge">MOCK DATA</span></h1>
+        </div>
+      </div>
+      <div class="summary" id="summary"></div>
+      <div class="top-actions">
+        <span class="status">本地记录</span>
+        <button class="icon-button" id="themeToggle" type="button" title="切换主题" aria-label="切换主题">◐</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="sidebar">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input class="search" id="search" placeholder="搜索消息、模型或 Turn…" autocomplete="off">
+          <button class="clear-search" id="clearSearch" type="button" aria-label="清空搜索">×</button>
+        </div>
+        <section class="tools">
+          <div class="section-kicker"><span>TOOLS</span><span id="toolHint">点击筛选 Turn</span></div>
+          <div class="tool-chips" id="toolChips"></div>
+        </section>
+        <div class="turn-list" id="turnList"></div>
+      </aside>
+
+      <section class="detail" aria-live="polite">
+        <div class="detail-inner" id="detail"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <div class="modal-head">
+        <div class="modal-title-area">
+          <button class="compare-nav" id="comparePrevious" type="button" aria-label="选择更早的对比对象">◀</button>
+          <h3 id="modalTitle">详情</h3>
+          <button class="compare-nav" id="compareNext" type="button" aria-label="选择更新的对比对象">▶</button>
+        </div>
+        <div class="modal-controls" id="modalControls"></div>
+        <button class="icon-button modal-close" id="modalClose" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast">已复制</div>
+
+  <script>
+    const toolDefinitions = {
+      read_file: {
+        description: "读取本地文本文件，可指定行范围。适合查看源代码、配置和文档内容。",
+        parameters: {
+          path: { type: "string", required: true, description: "要读取的文件路径，支持工作区相对路径或绝对路径。" },
+          line_start: { type: "number", description: "起始行号，从 1 开始；不传时从文件开头读取。" },
+          line_end: { type: "number", description: "结束行号；不传时读取到当前安全上限。" }
+        }
+      },
+      grep: {
+        description: "在工作区中按正则表达式搜索文本，并返回匹配文件与行号。",
+        parameters: {
+          pattern: { type: "string", required: true, description: "需要搜索的正则表达式。" },
+          path: { type: "string", description: "限定搜索目录或文件；默认搜索当前工作区。" }
+        }
+      },
+      glob: {
+        description: "按文件名模式查找文件，用于快速定位目录中的候选文件。",
+        parameters: {
+          pattern: { type: "string", required: true, description: "文件匹配模式，例如 packages/**/*.ts。" },
+          path: { type: "string", description: "查找根目录；默认使用当前工作区。" }
+        }
+      },
+      bash: {
+        description: "执行经过权限检查的 shell 命令，并返回标准输出、错误输出和退出码。",
+        parameters: {
+          command: { type: "string", required: true, description: "需要执行的 shell 命令。" },
+          timeout: { type: "number", description: "命令超时时间，单位为秒。" }
+        }
+      },
+      edit_file: {
+        description: "对现有文件执行精确文本替换。",
+        parameters: {
+          path: { type: "string", required: true, description: "目标文件路径。" },
+          old_string: { type: "string", required: true, description: "需要被替换的原始文本。" },
+          new_string: { type: "string", required: true, description: "替换后的新文本。" }
+        }
+      },
+      write_file: {
+        description: "创建或覆写文本文件。",
+        parameters: {
+          path: { type: "string", required: true, description: "目标文件路径。" },
+          content: { type: "string", required: true, description: "需要写入的完整文本内容。" }
+        }
+      }
+    };
+
+    const runs = [
+      {
+        id: "agent_run_01J2A8FK9M",
+        user: "检查 Agent 事件层级，并告诉我 turn_start 和 LLM 调用之间的关系。",
+        turns: [
+          {
+            id: "turn_01J2A8G1", index: 1, model: "Kimi K2.7 Code", time: "14:22:09", duration: 1.8,
+            tools: ["glob", "grep"], endpoint: "POST /chat/completions",
+            calls: [{
+              id: "llm_call_01J2A8G2", attempt: 1, status: "completed", input: 18840, output: 312, cache: 15210, duration: 1.8,
+              system: "You are ActSpace, a local AI coding agent. Inspect the repository before making claims. Keep runtime identities distinct from UI labels.",
+              messages: [{ role: "user", content: "检查 Agent 事件层级，并告诉我 turn_start 和 LLM 调用之间的关系。" }],
+              response: { stopReason: "toolUse", content: [{ type: "thinking", text: "需要先定位 loop 与 bridge 的事件生产和映射。" }, { type: "toolCall", name: "glob", arguments: { pattern: "packages/agent-core/src/engine/*.ts" } }] }
+            }]
+          },
+          {
+            id: "turn_01J2A8HB", index: 2, model: "Kimi K2.7 Code", time: "14:22:13", duration: 4.7,
+            tools: ["read_file", "grep"], endpoint: "POST /chat/completions",
+            calls: [
+              {
+                id: "llm_call_01J2A8HC", attempt: 1, status: "failed", input: 21450, output: 0, cache: 18120, duration: .9,
+                system: "You are ActSpace, a local AI coding agent. Inspect the repository before making claims. Keep runtime identities distinct from UI labels.",
+                messages: [{ role: "user", content: "检查 Agent 事件层级，并告诉我 turn_start 和 LLM 调用之间的关系。" }, { role: "assistant", content: "调用 glob 查找 engine 文件。" }, { role: "tool", name: "glob", content: "loop.ts\nbridge.ts\ntypes.ts\nagent.ts" }],
+                response: { stopReason: "error", errorKind: "rate_limit", errorMessage: "Provider rate limit; retry scheduled." }
+              },
+              {
+                id: "llm_call_01J2A8J7", attempt: 2, status: "completed", input: 21450, output: 428, cache: 18120, duration: 3.8,
+                system: "You are ActSpace, a local AI coding agent. Inspect the repository before making claims. Keep runtime identities distinct from UI labels.",
+                messages: [{ role: "user", content: "检查 Agent 事件层级，并告诉我 turn_start 和 LLM 调用之间的关系。" }, { role: "assistant", content: "调用 glob 查找 engine 文件。" }, { role: "tool", name: "glob", content: "loop.ts\nbridge.ts\ntypes.ts\nagent.ts" }],
+                response: { stopReason: "toolUse", content: [{ type: "thinking", text: "glob 已经定位到事件循环与桥接层。接下来读取两处关键实现，确认真实 turn_start 的产生位置，以及它如何被映射到持久化事件。" }, { type: "toolCall", name: "read_file", arguments: { path: "packages/agent-core/src/engine/loop.ts", line_start: 60, line_end: 230 } }, { type: "toolCall", name: "read_file", arguments: { path: "packages/agent-core/src/engine/bridge.ts", line_start: 1360, line_end: 1430 } }] }
+              }
+            ]
+          },
+          {
+            id: "turn_01J2A8MV", index: 3, model: "Kimi K2.7 Code", time: "14:22:20", duration: 3.1,
+            tools: [], endpoint: "POST /chat/completions",
+            calls: [{
+              id: "llm_call_01J2A8MW", attempt: 1, status: "completed", input: 26780, output: 706, cache: 22340, duration: 3.1,
+              system: "You are ActSpace, a local AI coding agent. Inspect the repository before making claims. Keep runtime identities distinct from UI labels.",
+              messages: [{ role: "user", content: "检查 Agent 事件层级，并告诉我 turn_start 和 LLM 调用之间的关系。" }, { role: "assistant", content: "读取 loop.ts 与 bridge.ts。" }, { role: "tool", name: "read_file", content: "runAgentLoop emits turn_start once for each internal reasoning/tool step…" }, { role: "tool", name: "read_file", content: "bridge previously mapped agent_start to turn_started and ignored true turn_start…" }],
+              response: { stopReason: "stop", content: [{ type: "text", text: "当前一次用户输入对应一次 Agent Run。Agent Run 内会有多个真实 Turn；每个 Turn 通常有一次 LLM Call，只有自动重试时同一 Turn 才会出现多个 LLM Call。" }] }
+            }]
+          }
+        ]
+      },
+      {
+        id: "agent_run_01J2AB2N4Q",
+        user: "把前端与持久化的数据结构对齐方案整理出来，并给观测页面一个两栏布局。",
+        turns: [
+          {
+            id: "turn_01J2AB31", index: 1, model: "DeepSeek V4 Pro", time: "14:31:42", duration: 6.2,
+            tools: ["grep", "read_file"], endpoint: "POST /chat/completions",
+            calls: [{
+              id: "llm_call_01J2AB32", attempt: 1, status: "completed", input: 31890, output: 512, cache: 0, duration: 6.2,
+              system: "You are ActSpace. Preserve explicit product boundaries between evaluation and analysis observability.",
+              messages: [{ role: "user", content: "把前端与持久化的数据结构对齐方案整理出来，并给观测页面一个两栏布局。" }],
+              response: { stopReason: "toolUse", content: [{ type: "toolCall", name: "grep", arguments: { pattern: "turnId", path: "packages" } }] }
+            }]
+          },
+          {
+            id: "turn_01J2AB6X", index: 2, model: "DeepSeek V4 Pro", time: "14:31:50", duration: 5.6,
+            tools: [], endpoint: "POST /chat/completions",
+            calls: [{
+              id: "llm_call_01J2AB6Y", attempt: 1, status: "completed", input: 35420, output: 884, cache: 0, duration: 5.6,
+              system: "You are ActSpace. Preserve explicit product boundaries between evaluation and analysis observability.",
+              messages: [{ role: "user", content: "把前端与持久化的数据结构对齐方案整理出来，并给观测页面一个两栏布局。" }, { role: "assistant", content: "搜索 agentRunId 与 turnId 消费方。" }, { role: "tool", name: "grep", content: "shared/session.ts\ndesktop/main/agent-run.ts\ndesktop/renderer/App.tsx\n…" }],
+              response: { stopReason: "stop", content: [{ type: "text", text: "建议直接升级为 Session V2：一次用户输入使用 agentRunId；真实 turn_start 使用 turnId；每次 provider 请求使用 llmCallId。分析页面保持两栏，左侧只放搜索、Tools 与按用户输入折叠的 Turn，右侧显示当前 Turn 的 LLM Call 和请求详情。" }] }
+            }]
+          }
+        ]
+      }
+    ];
+
+    const state = { selectedTurnId: runs[0].turns[1].id, selectedCallId: runs[0].turns[1].calls[1].id, compareCallId: null, tool: "all", search: "", openPanels: new Set(["messages", "response"]) };
+    const allTurns = runs.flatMap((run) => run.turns.map((turn) => ({ ...turn, run })));
+    const tools = [...new Set(allTurns.flatMap((turn) => turn.tools))];
+    const fmt = (n) => new Intl.NumberFormat("zh-CN").format(n);
+    const escapeHtml = (value) => String(value ?? "").replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char]));
+    const pretty = (value) => JSON.stringify(value, null, 2);
+
+    function current() {
+      const turn = allTurns.find((item) => item.id === state.selectedTurnId) ?? allTurns[0];
+      const call = turn.calls.find((item) => item.id === state.selectedCallId) ?? turn.calls[0];
+      return { turn, call };
+    }
+
+    function renderSummary() {
+      const calls = allTurns.flatMap((turn) => turn.calls);
+      const totalInput = calls.reduce((sum, call) => sum + call.input, 0);
+      const totalOutput = calls.reduce((sum, call) => sum + call.output, 0);
+      const totalCache = calls.reduce((sum, call) => sum + call.cache, 0);
+      const totalTime = allTurns.reduce((sum, turn) => sum + turn.duration, 0);
+      const cacheHitRate = totalInput ? Math.round(totalCache / totalInput * 100) : 0;
+      document.querySelector("#summary").innerHTML = [
+        ["Agent Run", runs.length], ["Turn", allTurns.length], ["LLM Call", calls.length],
+        ["累计 API Token", `<em>${fmt(totalInput + totalOutput)}</em>`], ["In", fmt(totalInput)], ["Out", fmt(totalOutput)],
+        ["Cache R", fmt(totalCache)], ["Cache Hit", `${cacheHitRate}%`], ["耗时", `${totalTime.toFixed(1)}s`]
+      ].map(([label, value]) => `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div></div>`).join("");
+    }
+
+    function renderTools() {
+      const chips = [{ name: "all", label: "All" }, ...tools.map((name) => ({ name, label: name }))];
+      document.querySelector("#toolChips").innerHTML = chips.map((tool) => `<button class="chip ${state.tool === tool.name ? "active" : ""}" type="button" data-tool="${tool.name}">${tool.label}</button>`).join("");
+      document.querySelectorAll("[data-tool]").forEach((button) => button.addEventListener("click", () => { state.tool = button.dataset.tool; renderTools(); renderTurnList(); }));
+    }
+
+    function matches(turn) {
+      const toolMatch = state.tool === "all" || turn.tools.includes(state.tool);
+      const q = state.search.trim().toLowerCase();
+      if (!q) return toolMatch;
+      const content = [turn.run.user, turn.model, turn.id, turn.endpoint, ...turn.tools, ...turn.calls.flatMap((call) => [call.id, pretty(call.messages), pretty(call.response)])].join(" ").toLowerCase();
+      return toolMatch && content.includes(q);
+    }
+
+    function renderTurnList() {
+      const root = document.querySelector("#turnList");
+      let visible = 0;
+      root.innerHTML = runs.map((run, runIndex) => {
+        const turns = run.turns.filter((turn) => matches({ ...turn, run }));
+        visible += turns.length;
+        if (!turns.length) return "";
+        const tokenTotal = (turn) => turn.calls.reduce((sum, call) => sum + call.input + call.output, 0);
+        return `<section class="user-group" data-run="${run.id}">
+          <button class="user-heading" type="button" data-collapse="${run.id}" title="${escapeHtml(run.user)}">
+            <span class="user-dot"></span><span class="user-text">用户输入 ${runIndex + 1} · ${escapeHtml(run.user)}</span>
+            <span class="group-count">${turns.length} <span class="chevron">⌄</span></span>
+          </button>
+          <div class="turns">${turns.map((turn) => `<button class="turn-item ${turn.id === state.selectedTurnId ? "selected" : ""}" type="button" data-turn="${turn.id}">
+            <div class="turn-title-row"><span><span class="turn-title">Turn ${turn.index}</span> ${turn.calls.length > 1 ? `<span class="call-count">${turn.calls.length} calls</span>` : ""}</span><span class="model-badge">${turn.model}</span></div>
+            <div class="turn-meta-row"><span><span class="tokens">${fmt(tokenTotal(turn))} tok</span> · <span class="duration">${turn.duration}s</span></span><span class="timestamp">${turn.time}</span></div>
+            <div class="turn-endpoint">${turn.endpoint}</div>
+          </button>`).join("")}</div>
+        </section>`;
+      }).join("");
+      if (!visible) root.innerHTML = `<div class="empty-state">没有匹配的 Turn。<br>尝试清空搜索或取消工具筛选。</div>`;
+      root.querySelectorAll("[data-turn]").forEach((button) => button.addEventListener("click", () => { const turn = allTurns.find((item) => item.id === button.dataset.turn); state.selectedTurnId = turn.id; state.selectedCallId = turn.calls[turn.calls.length - 1].id; renderTurnList(); renderDetail(); }));
+      root.querySelectorAll("[data-collapse]").forEach((button) => button.addEventListener("click", () => button.closest(".user-group").classList.toggle("collapsed")));
+    }
+
+    function requestPayload(turn, call) {
+      return {
+        model: turn.model,
+        messages: call.messages,
+        tools: turn.tools.map((name) => {
+          const definition = toolDefinitions[name];
+          const entries = Object.entries(definition.parameters);
+          return {
+            type: "function",
+            function: {
+              name,
+              description: definition.description,
+              parameters: {
+                type: "object",
+                properties: Object.fromEntries(entries.map(([key, parameter]) => [key, { type: parameter.type, description: parameter.description }])),
+                required: entries.filter(([, parameter]) => parameter.required).map(([key]) => key)
+              }
+            }
+          };
+        }),
+        stream: true,
+        thinking: true
+      };
+    }
+
+    function renderMessages(messages) {
+      return `<div class="messages">${messages.map((message) => `<article class="message ${escapeHtml(message.role)}"><div class="message-role">${escapeHtml(message.role)}${message.name ? ` · ${escapeHtml(message.name)}` : ""}</div><div class="message-content">${escapeHtml(message.content)}</div></article>`).join("")}</div>`;
+    }
+
+    function renderToolDefinitions(toolNames) {
+      return `<div class="tool-definitions">${toolNames.map((name) => {
+        const definition = toolDefinitions[name];
+        return `<article class="tool-definition">
+          <div class="tool-definition-head">
+            <div class="tool-definition-title"><span class="tool-definition-name">${escapeHtml(name)}</span></div>
+            <p class="tool-definition-description">${escapeHtml(definition.description)}</p>
+          </div>
+          <div class="tool-parameters">
+            <div class="tool-parameters-title">参数</div>
+            ${Object.entries(definition.parameters).map(([parameterName, parameter]) => `<div class="tool-parameter">
+              <div class="tool-parameter-key"><span class="tool-parameter-name">${escapeHtml(parameterName)}</span><span class="tool-parameter-type">${escapeHtml(parameter.type)}</span>${parameter.required ? `<span class="tool-required">必填</span>` : ""}</div>
+              <div class="tool-parameter-description">${escapeHtml(parameter.description)}</div>
+            </div>`).join("")}
+          </div>
+        </article>`;
+      }).join("")}</div>`;
+    }
+
+    function renderResponse(response, status) {
+      if (status === "failed" || response.stopReason === "error") {
+        return `<div class="response-view"><div class="response-error">${escapeHtml(response.errorMessage ?? "模型请求失败")}</div></div>`;
+      }
+      const content = response.content ?? [];
+      const rendered = content.map((item) => {
+        if (item.type === "thinking") {
+          return `<section class="response-thinking"><div class="response-section-label">思考</div><div class="response-thinking-content">${escapeHtml(item.text)}</div></section>`;
+        }
+        if (item.type === "text") {
+          return `<div class="response-text">${escapeHtml(item.text)}</div>`;
+        }
+        if (item.type === "toolCall") {
+          return `<article class="response-tool-call"><div class="response-tool-call-head">工具调用 · ${escapeHtml(item.name)}</div><pre>${escapeHtml(pretty(item.arguments))}</pre></article>`;
+        }
+        return "";
+      }).join("");
+      return `<div class="response-view">${rendered || `<div class="empty-state">这次响应没有可显示的内容。</div>`}</div>`;
+    }
+
+    function responseLabel(response, status) {
+      if (status === "failed" || response.stopReason === "error") return "失败";
+      const toolCallCount = (response.content ?? []).filter((item) => item.type === "toolCall").length;
+      if (toolCallCount) return `${toolCallCount} 个工具调用`;
+      return (response.content ?? []).some((item) => item.type === "text") ? "文本" : response.stopReason;
+    }
+
+    function panel(id, title, count, body, copyText) {
+      const open = state.openPanels.has(id);
+      return `<article class="panel ${open ? "open" : ""}" data-panel="${id}"><button class="panel-head" type="button" data-panel-toggle="${id}"><span class="panel-chevron">›</span><span class="panel-title">${title}</span>${copyText ? `<span class="panel-copy" data-copy="${escapeHtml(copyText)}">复制</span>` : ""}<span class="panel-count">${count}</span></button><div class="panel-body">${body}</div></article>`;
+    }
+
+    function renderDetail() {
+      const { turn, call } = current();
+      const calls = turn.calls;
+      const request = requestPayload(turn, call);
+      const toolJson = turn.tools.map((name) => ({ name, ...toolDefinitions[name] }));
+      const full = { schemaVersion: 1, sessionId: "session_demo_01", agentRunId: turn.run.id, turnId: turn.id, llmCallId: call.id, turnIndex: turn.index, attempt: call.attempt, request, response: call.response, usage: { input: call.input, output: call.output, cacheRead: call.cache }, durationMs: Math.round(call.duration * 1000) };
+      document.querySelector("#detail").innerHTML = `
+        <div class="detail-head">
+          <div class="detail-title-line"><h2>Turn ${turn.index}</h2><span class="model-badge">${turn.model}</span><span class="id-tag">${turn.id}</span></div>
+          <div class="detail-actions"><button class="action primary" type="button" data-modal="diff">≠ 对比上次</button><button class="action" type="button" data-modal="json">{} 请求 JSON</button><button class="action" type="button" data-modal="curl">›_ cURL</button></div>
+        </div>
+        <div class="call-strip" ${calls.length === 1 ? "hidden" : ""}><span class="call-label">LLM CALL</span>${calls.map((item) => `<button class="call-tab ${item.id === call.id ? "active" : ""} ${item.status === "failed" ? "failed" : ""}" type="button" data-call="${item.id}"><span class="call-status"></span>调用 ${item.attempt}${item.status === "failed" ? " · 失败" : ""}</button>`).join("")}</div>
+        <div class="call-meta"><span><i class="dot"></i>输入 <strong>${fmt(call.input)}</strong></span><span><i class="dot out"></i>输出 <strong>${fmt(call.output)}</strong></span><span><i class="dot cache"></i>缓存读取 <strong>${fmt(call.cache)}</strong></span><span><i class="dot time"></i>耗时 <strong>${call.duration}s</strong></span><span>attempt <strong>${call.attempt}</strong></span><span class="id-tag">${call.id}</span></div>
+        <div class="accordion">
+          ${panel("tools", "工具定义", `${turn.tools.length} 个工具`, renderToolDefinitions(turn.tools), pretty(toolJson))}
+          ${panel("system", "系统提示词", `${call.system.length} chars`, `<pre>${escapeHtml(call.system)}</pre>`, call.system)}
+          ${panel("messages", "消息", `${call.messages.length} 条消息`, renderMessages(call.messages))}
+          ${panel("response", "响应", responseLabel(call.response, call.status), renderResponse(call.response, call.status), pretty(call.response))}
+          ${panel("full", "完整 JSON", "Trace event", `<pre>${escapeHtml(pretty(full))}</pre>`, pretty(full))}
+        </div>`;
+      document.querySelectorAll("[data-call]").forEach((button) => button.addEventListener("click", () => { state.selectedCallId = button.dataset.call; renderDetail(); }));
+      document.querySelectorAll("[data-panel-toggle]").forEach((button) => button.addEventListener("click", (event) => { if (event.target.closest("[data-copy]")) return; const id = button.dataset.panelToggle; state.openPanels.has(id) ? state.openPanels.delete(id) : state.openPanels.add(id); renderDetail(); }));
+      document.querySelectorAll("[data-copy]").forEach((button) => button.addEventListener("click", (event) => { event.stopPropagation(); copy(button.dataset.copy); }));
+      document.querySelectorAll("[data-modal]").forEach((button) => button.addEventListener("click", () => openModal(button.dataset.modal, turn, call, request)));
+    }
+
+    function callSequenceForRun(runId) {
+      return allTurns.filter((item) => item.run.id === runId).flatMap((item) => item.calls.map((entry) => ({ turn: item, call: entry })));
+    }
+
+    function comparisonCandidates(turn, call) {
+      const sequence = callSequenceForRun(turn.run.id);
+      const currentIndex = sequence.findIndex((item) => item.call.id === call.id);
+      return currentIndex > 0 ? sequence.slice(0, currentIndex) : [];
+    }
+
+    function previousCall(turn, call) {
+      const candidates = comparisonCandidates(turn, call);
+      return candidates[candidates.length - 1] ?? null;
+    }
+
+    function compareHeading(before, after) {
+      if (before.turn.id === after.turn.id) return `Turn ${after.turn.index} · 调用 ${before.call.attempt} → 调用 ${after.call.attempt}`;
+      return `Turn ${before.turn.index} → Turn ${after.turn.index}`;
+    }
+
+    function compareOptionLabel(item) {
+      return `Turn ${item.turn.index} · 调用 ${item.call.attempt} · ${item.turn.model}`;
+    }
+
+    function messageIdentity(message) {
+      return pretty({ role: message.role, name: message.name ?? null, content: message.content });
+    }
+
+    function renderContextMessage(message, change) {
+      const role = message.role === "tool" ? "tool" : message.role;
+      const roleLabel = `${message.role}${message.name ? ` · ${message.name}` : ""}`;
+      return `<article class="context-message ${role} ${change}">
+        <span class="change-marker">${change === "added" ? "新增" : "删除"}</span>
+        <span class="context-role">${escapeHtml(roleLabel)}</span>
+        <div class="context-content">${escapeHtml(message.content)}</div>
+      </article>`;
+    }
+
+    function renderSecondaryChange(label, before, after) {
+      return `<div class="secondary-change"><div class="secondary-change-label">${escapeHtml(label)}</div><div class="secondary-change-grid"><div class="secondary-change-value before">− ${escapeHtml(before)}</div><div class="secondary-change-value after">+ ${escapeHtml(after)}</div></div></div>`;
+    }
+
+    function signedDelta(value) {
+      if (value === 0) return `<strong>0</strong>`;
+      const className = value > 0 ? "compare-delta-up" : "compare-delta-down";
+      return `<strong class="${className}">${value > 0 ? "+" : "−"}${fmt(Math.abs(value))}</strong>`;
+    }
+
+    function renderComparison(turn, call) {
+      const candidates = comparisonCandidates(turn, call);
+      if (!candidates.length) {
+        document.querySelector("#modalTitle").textContent = "没有可对比的调用";
+        document.querySelector("#modalControls").innerHTML = "";
+        document.querySelector("#comparePrevious").disabled = true;
+        document.querySelector("#compareNext").disabled = true;
+        document.querySelector("#modalBody").innerHTML = `<div class="context-empty"><strong>这是当前 Agent Run 的第一次 LLM Call</strong>还没有更早的请求可以比较。</div>`;
+        return;
+      }
+
+      if (!candidates.some((item) => item.call.id === state.compareCallId)) state.compareCallId = candidates[candidates.length - 1].call.id;
+      const before = candidates.find((item) => item.call.id === state.compareCallId) ?? candidates[candidates.length - 1];
+      const after = { turn, call };
+      const candidateIndex = candidates.findIndex((item) => item.call.id === before.call.id);
+      const beforeMessages = before.call.messages;
+      const afterMessages = call.messages;
+      let commonPrefix = 0;
+      while (commonPrefix < beforeMessages.length && commonPrefix < afterMessages.length && messageIdentity(beforeMessages[commonPrefix]) === messageIdentity(afterMessages[commonPrefix])) commonPrefix += 1;
+      const removedMessages = beforeMessages.slice(commonPrefix);
+      const addedMessages = afterMessages.slice(commonPrefix);
+      const toolsBefore = before.turn.tools.join(", ") || "无工具";
+      const toolsAfter = turn.tools.join(", ") || "无工具";
+      const secondaryChanges = [
+        before.turn.model !== turn.model ? renderSecondaryChange("模型", before.turn.model, turn.model) : "",
+        before.call.system !== call.system ? renderSecondaryChange("系统提示词", before.call.system, call.system) : "",
+        toolsBefore !== toolsAfter ? renderSecondaryChange("工具定义", toolsBefore, toolsAfter) : ""
+      ].filter(Boolean).join("");
+      const contextUnchanged = !removedMessages.length && !addedMessages.length && !secondaryChanges;
+
+      document.querySelector("#modalTitle").textContent = compareHeading(before, after);
+      document.querySelector("#modalControls").innerHTML = `<span class="compare-control-label">对比对象</span><select class="compare-select" id="compareSelect">${candidates.map((item) => `<option value="${escapeHtml(item.call.id)}" ${item.call.id === before.call.id ? "selected" : ""}>${escapeHtml(compareOptionLabel(item))}</option>`).join("")}</select>`;
+      document.querySelector("#comparePrevious").disabled = candidateIndex <= 0;
+      document.querySelector("#compareNext").disabled = candidateIndex >= candidates.length - 1;
+      document.querySelector("#modalBody").innerHTML = `<div class="compare-view">
+        <div class="compare-stats">
+          <span class="compare-stat">输入 Token ${signedDelta(call.input - before.call.input)}</span>
+          <span class="compare-stat">缓存读取 ${signedDelta(call.cache - before.call.cache)}</span>
+          <span class="compare-stat">消息 <strong>${beforeMessages.length} → ${afterMessages.length}</strong></span>
+          <span class="compare-stat">工具 <strong>${before.turn.tools.length} → ${turn.tools.length}</strong></span>
+          <span class="compare-stat">Attempt <strong>${before.call.attempt} → ${call.attempt}</strong></span>
+        </div>
+        <section class="compare-section">
+          <div class="compare-section-head"><span class="compare-section-title">消息</span>${addedMessages.length ? `<span class="change-count">+${addedMessages.length} 新增</span>` : ""}${removedMessages.length ? `<span class="change-count removed">−${removedMessages.length} 删除</span>` : ""}</div>
+          ${commonPrefix ? `<div class="unchanged-summary">前 ${commonPrefix} 条消息未变化（消息 #1 ～ #${commonPrefix}）</div>` : ""}
+          ${removedMessages.length || addedMessages.length ? `<div class="context-changes">${removedMessages.map((message) => renderContextMessage(message, "removed")).join("")}${addedMessages.map((message) => renderContextMessage(message, "added")).join("")}</div>` : `<div class="context-empty"><strong>${contextUnchanged ? "请求上下文没有变化" : "消息没有变化"}</strong>${before.turn.id === turn.id ? "这是同一 Turn 内的再次调用，消息内容保持一致。" : "两次请求携带了相同的消息序列。"}</div>`}
+        </section>
+        ${secondaryChanges ? `<section class="compare-section"><div class="compare-section-head"><span class="compare-section-title">其他请求变化</span></div>${secondaryChanges}</section>` : ""}
+      </div>`;
+
+      document.querySelector("#compareSelect").addEventListener("change", (event) => { state.compareCallId = event.target.value; renderComparison(turn, call); });
+      document.querySelector("#comparePrevious").onclick = () => { if (candidateIndex > 0) { state.compareCallId = candidates[candidateIndex - 1].call.id; renderComparison(turn, call); } };
+      document.querySelector("#compareNext").onclick = () => { if (candidateIndex < candidates.length - 1) { state.compareCallId = candidates[candidateIndex + 1].call.id; renderComparison(turn, call); } };
+    }
+
+    function openModal(kind, turn, call, request) {
+      const title = document.querySelector("#modalTitle");
+      const body = document.querySelector("#modalBody");
+      const modal = document.querySelector(".modal");
+      const controls = document.querySelector("#modalControls");
+      modal.classList.toggle("compare", kind === "diff");
+      controls.innerHTML = "";
+      if (kind === "json") {
+        title.textContent = "请求 JSON";
+        body.innerHTML = `<pre>${escapeHtml(pretty(request))}</pre><div style="margin-top:10px"><button class="action primary" id="modalCopy" type="button">复制 JSON</button></div>`;
+        queueMicrotask(() => document.querySelector("#modalCopy").addEventListener("click", () => copy(pretty(request))));
+      } else if (kind === "curl") {
+        const curl = `curl https://api.example.local/v1/chat/completions \\\n+  -H 'Content-Type: application/json' \\\n+  -H 'Authorization: Bearer [REDACTED]' \\\n+  --data '${JSON.stringify(request).replaceAll("'", "'\\''")}'`;
+        title.textContent = "cURL";
+        body.innerHTML = `<pre>${escapeHtml(curl)}</pre><div style="margin-top:10px"><button class="action primary" id="modalCopy" type="button">复制 cURL</button></div>`;
+        queueMicrotask(() => document.querySelector("#modalCopy").addEventListener("click", () => copy(curl)));
+      } else {
+        const previous = previousCall(turn, call);
+        state.compareCallId = previous?.call.id ?? null;
+        if (!previous) {
+          renderComparison(turn, call);
+        } else {
+          renderComparison(turn, call);
+        }
+      }
+      document.querySelector("#modalBackdrop").classList.add("open");
+    }
+
+    function closeModal() { document.querySelector("#modalBackdrop").classList.remove("open"); document.querySelector(".modal").classList.remove("compare"); document.querySelector("#modalControls").innerHTML = ""; }
+    async function copy(text) { try { await navigator.clipboard.writeText(text); } catch { /* file preview may not grant clipboard */ } const toast = document.querySelector("#toast"); toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 1200); }
+
+    document.querySelector("#search").addEventListener("input", (event) => { state.search = event.target.value; document.querySelector("#clearSearch").style.display = state.search ? "block" : "none"; renderTurnList(); });
+    document.querySelector("#clearSearch").addEventListener("click", () => { state.search = ""; document.querySelector("#search").value = ""; document.querySelector("#clearSearch").style.display = "none"; renderTurnList(); });
+    document.querySelector("#themeToggle").addEventListener("click", () => { const html = document.documentElement; html.dataset.theme = html.dataset.theme === "light" ? "dark" : "light"; });
+    document.querySelector("#modalClose").addEventListener("click", closeModal);
+    document.querySelector("#modalBackdrop").addEventListener("click", (event) => { if (event.target.id === "modalBackdrop") closeModal(); });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeModal(); });
+    document.querySelector(".back").addEventListener("click", () => { const toast = document.querySelector("#toast"); toast.textContent = "生产版返回设置；原型保留当前页面"; toast.classList.add("show"); setTimeout(() => { toast.classList.remove("show"); toast.textContent = "已复制"; }, 1600); });
+
+    renderSummary(); renderTools(); renderTurnList(); renderDetail();
+  </script>
+</body>
+</html>

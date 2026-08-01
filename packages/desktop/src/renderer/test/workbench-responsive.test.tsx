@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WorkbenchLayout } from "../components/WorkbenchLayout";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
@@ -15,14 +16,15 @@ function setViewportWidth(width: number) {
 
 function renderWorkbench() {
   return render(
-    <RightPanelProvider>
-      <WorkbenchLayout
+    <StrictMode>
+      <RightPanelProvider>
+        <WorkbenchLayout
         sessions={[
           {
             id: "session-responsive",
             title: "Responsive layout",
             updatedAt: new Date().toISOString(),
-            turnCount: 0,
+            agentRunCount: 0,
             workspaceRoot: "/tmp/workspace",
           },
         ]}
@@ -31,8 +33,9 @@ function renderWorkbench() {
         messages={[]}
         contextSnapshot={null}
         selectedWorkspaceRoot="/tmp/workspace"
-      />
-    </RightPanelProvider>,
+        />
+      </RightPanelProvider>
+    </StrictMode>,
   );
 }
 
@@ -110,16 +113,20 @@ describe("WorkbenchLayout narrow window behavior", () => {
     expect(screen.getByRole("separator", { name: "Resize preview panel" })).toHaveAttribute("aria-valuemax", "1488");
   });
 
-  it("switches to Settings and back without changing the component hook order", async () => {
+  it("switches between the workbench, Settings, and the standalone analysis workspace without changing hook order", async () => {
     const user = userEvent.setup();
     setViewportWidth(1120);
     renderWorkbench();
 
     await user.click(screen.getByRole("button", { name: "Settings" }));
-
     expect(screen.getByRole("button", { name: "返回应用" })).toBeInTheDocument();
     expect(screen.getByText("设置仅在桌面端可用。")).toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: "分析观测" }));
+    expect(screen.getByRole("heading", { name: "分析观测" })).toBeInTheDocument();
+    expect(screen.getByText("分析观测需要在 ActSpace 桌面端中打开。")).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole("button", { name: "返回设置" })[0]);
     await user.click(screen.getByRole("button", { name: "返回应用" }));
     expect(screen.getByLabelText("Message composer")).toBeInTheDocument();
   });

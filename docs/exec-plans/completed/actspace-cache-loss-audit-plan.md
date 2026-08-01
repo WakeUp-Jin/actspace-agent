@@ -43,7 +43,7 @@
 - `packages/agent-core/src/engine/loop.ts`
 - `packages/agent-core/src/observability/cache-audit.ts`
 - `packages/agent-core/src/persistence/session-store.ts`
-- `packages/desktop/src/main/agent-turn.ts`
+- `packages/desktop/src/main/agent-run.ts`
 - `scripts/analyze-cache-audit.mjs`
 
 已知约束：

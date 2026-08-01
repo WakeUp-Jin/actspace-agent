@@ -319,7 +319,7 @@ Context Compaction 展示上下文压缩生命周期。它可能由用户在 Com
 ### 交互
 
 - 本轮不提供展开详情。
-- `/compact` exact command 由 renderer 在发送前分流到 `context:compact` IPC，不进入 `RunTurnInput.userInput`，也不写入 LLM conversation。
+- `/compact` exact command 由 renderer 在发送前分流到 `context:compact` IPC，不进入 `RunAgentInput.userInput`，也不写入 LLM conversation。
 - running 进度条只表达阶段进度；后端没有真实百分比时使用 indeterminate 样式，不伪造精确百分比。
 - running 文本不做 opacity pulse、扫光或省略号动画；动态只交给进度条，避免在阅读流里产生重复闪动。
 

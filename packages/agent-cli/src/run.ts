@@ -12,7 +12,7 @@ import type { CliArtifactResult, RunCommandOptions } from "./types";
 
 export type RunCommandControl = {
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   abort: () => boolean;
 };
 
@@ -38,7 +38,7 @@ export async function runCommand(
   const startedAt = (io.now?.() ?? new Date()).toISOString();
   const id = randomUUID();
   const sessionId = `run-${id}`;
-  const turnId = `turn-${id}`;
+  const agentRunId = `run-${id}`;
   const collector = new CliTraceCollector();
   const contextSnapshots = options.out ? new ContextSnapshotCollector() : undefined;
   const { runtime, headlessApprovalBroker } = createCliAgentRuntime({
@@ -61,14 +61,14 @@ export async function runCommand(
 
   io.onControl?.({
     sessionId,
-    turnId,
-    abort: () => runtime.abortTurn({ sessionId, turnId }),
+    agentRunId,
+    abort: () => runtime.abortAgentRun({ sessionId, agentRunId }),
   });
 
   try {
-    const runtimeResultPromise = runtime.runTurn({
+    const runtimeResultPromise = runtime.runAgentRun({
       sessionId,
-      turnId,
+      agentRunId,
       userInput: input,
       workspaceRoot: workspace,
       roots: {
@@ -81,7 +81,7 @@ export async function runCommand(
       interactionMode: "cli-headless",
       mode: "agent",
     });
-    if (io.isInterrupted?.()) runtime.abortTurn({ sessionId, turnId });
+    if (io.isInterrupted?.()) runtime.abortAgentRun({ sessionId, agentRunId });
     const runtimeResult = await runtimeResultPromise;
     collector.captureHarness(runtimeResult.events);
 
@@ -101,7 +101,7 @@ export async function runCommand(
       status,
       exitCode,
       sessionId,
-      turnId,
+      agentRunId,
       finalText: finalReply?.content ?? "",
       model: finalReply?.model,
       provider: finalReply?.provider,

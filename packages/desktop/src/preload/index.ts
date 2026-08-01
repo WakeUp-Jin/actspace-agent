@@ -1,8 +1,16 @@
 import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 import type {
-  AbortTurnInput,
+  AbortAgentRunInput,
+  AgentAnalysisIndexInput,
+  AgentAnalysisIndexResult,
+  AgentTraceClearInput,
+  AgentTraceClearResult,
+  AgentTraceListInput,
+  AgentTraceListResult,
+  AgentTraceReadInput,
+  AgentTraceReadResult,
   AgentSystemPromptFile,
-  AgentTurnResult,
+  AgentRunResult,
   AppSettings,
   ApprovalDecideInput,
   ApprovalDecideResult,
@@ -97,7 +105,7 @@ import type {
   WorkspaceOpenInput,
   WorkspaceOpenResult,
   WorkspaceOpenToolsResult,
-  RunTurnInput,
+  RunAgentInput,
   RuntimeStreamEvent,
   SelectFilesResult,
   SelectImagesResult,
@@ -192,12 +200,20 @@ import type {
 
 contextBridge.exposeInMainWorld("actspace", {
   getBootstrapState: () => ipcRenderer.invoke("app:get-bootstrap-state") as Promise<BootstrapState>,
-  runTurn: (input: RunTurnInput) => ipcRenderer.invoke("agent:run-turn", input) as Promise<AgentTurnResult>,
+  runAgent: (input: RunAgentInput) => ipcRenderer.invoke("agent:run", input) as Promise<AgentRunResult>,
   compactContext: (input: CompactContextInput) =>
     ipcRenderer.invoke("context:compact", input) as Promise<CompactContextResult>,
   generateEvalCandidate: (input: GenerateEvalCandidateInput) =>
     ipcRenderer.invoke("eval:generate-candidate", input) as Promise<GenerateEvalCandidateResult>,
-  abortTurn: (input: AbortTurnInput) => ipcRenderer.invoke("agent:abort-turn", input) as Promise<boolean>,
+  abortAgentRun: (input: AbortAgentRunInput) => ipcRenderer.invoke("agent:abort-run", input) as Promise<boolean>,
+  listAgentTraces: (input: AgentTraceListInput) =>
+    ipcRenderer.invoke("agent-trace:list", input) as Promise<AgentTraceListResult>,
+  readAgentTrace: (input: AgentTraceReadInput) =>
+    ipcRenderer.invoke("agent-trace:read", input) as Promise<AgentTraceReadResult>,
+  getAgentAnalysisIndex: (input: AgentAnalysisIndexInput) =>
+    ipcRenderer.invoke("agent-analysis:index", input) as Promise<AgentAnalysisIndexResult>,
+  clearAgentTraces: (input: AgentTraceClearInput) =>
+    ipcRenderer.invoke("agent-trace:clear", input) as Promise<AgentTraceClearResult>,
   selectFiles: () => ipcRenderer.invoke("dialog:select-files") as Promise<SelectFilesResult>,
   selectImages: () => ipcRenderer.invoke("dialog:select-images") as Promise<SelectImagesResult>,
   selectWorkspaceDirectory: () =>

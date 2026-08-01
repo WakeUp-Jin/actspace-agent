@@ -18,7 +18,7 @@ import { SystemPromptContext } from "../../context/modules/system-prompt";
 import type { Context, Message } from "../../messages";
 import { MockLLMService, mockText } from "../../llm/services/mock";
 import { ToolManager } from "../../tools/manager";
-import { runTurnWithAgent } from "../bridge";
+import { runAgentWithBridge } from "../bridge";
 import { writeSessionResult } from "../../persistence/session-store";
 import { createSessionStorePaths } from "../../persistence/session-store";
 
@@ -69,10 +69,10 @@ describe("session history replay end-to-end", () => {
       },
     ]);
 
-    const firstResult = await runTurnWithAgent(
+    const firstResult = await runAgentWithBridge(
       {
         sessionId,
-        turnId: "turn-1",
+        agentRunId: "turn-1",
         userInput: "Hello, who are you?",
       },
       depsFirst,
@@ -99,10 +99,10 @@ describe("session history replay end-to-end", () => {
       },
     ]);
 
-    const secondResult = await runTurnWithAgent(
+    const secondResult = await runAgentWithBridge(
       {
         sessionId,
-        turnId: "turn-2",
+        agentRunId: "turn-2",
         userInput: "Are you still there?",
       },
       depsSecond,
@@ -148,10 +148,10 @@ describe("session history replay end-to-end", () => {
       },
     ]);
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "brand-new",
-        turnId: "turn-1",
+        agentRunId: "turn-1",
         userInput: "First time hello.",
       },
       deps,

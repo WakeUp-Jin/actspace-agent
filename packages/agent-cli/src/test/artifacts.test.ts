@@ -15,7 +15,7 @@ describe("writeArtifacts", () => {
         status: "completed",
         exitCode: 0,
         sessionId: "session-1",
-        turnId: "turn-1",
+        agentRunId: "run-1",
         finalText: "Done",
         messageCount: 1,
         eventCount: 1,
@@ -28,7 +28,7 @@ describe("writeArtifacts", () => {
         {
           timestamp: "2026-07-08T00:00:00.000Z",
           source: "runtime",
-          event: { type: "turn_started", sessionId: "session-1", turnId: "turn-1" },
+          event: { type: "agent_run_started", sessionId: "session-1", agentRunId: "run-1" },
         },
       ],
       finalText: "Done",

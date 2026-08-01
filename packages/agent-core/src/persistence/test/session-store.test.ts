@@ -33,14 +33,14 @@ afterEach(async () => {
   await rm(sessionRoot, { recursive: true, force: true });
 });
 
-function createTranscriptEvent(sessionId: string, turnId: string): SessionEvent {
+function createTranscriptEvent(sessionId: string, agentRunId: string): SessionEvent {
   return {
     id: "evt-subagent-report",
     sessionId,
-    turnId,
+    agentRunId,
     type: "assistant_message",
     timestamp: "2026-06-02T10:00:00.000Z",
-    schemaVersion: 1,
+    schemaVersion: 2,
     payload: {
       content: "SubAgent report",
       stopReason: "stop",
@@ -54,7 +54,7 @@ function createTranscriptRef(sessionId: string, partial: Partial<SubAgentTranscr
   return {
     kind: "subagent_transcript",
     sessionId,
-    turnId: "turn-1",
+    agentRunId: "turn-1",
     runId: "run-1",
     ...partial,
   };
@@ -65,7 +65,7 @@ describe("session store", () => {
     const record = await createSessionRecord(sessionRoot, { title: "New chat" });
 
     expect(record.meta.title).toBe("New chat");
-    expect(record.meta.turnCount).toBe(0);
+    expect(record.meta.agentRunCount).toBe(0);
     expect(record.events).toEqual([]);
 
     const listed = await listSessionRecords(sessionRoot);
@@ -73,7 +73,7 @@ describe("session store", () => {
       expect.objectContaining({
         id: record.meta.id,
         title: "New chat",
-        turnCount: 0,
+        agentRunCount: 0,
       }),
     ]);
 
@@ -88,31 +88,31 @@ describe("session store", () => {
   it("keeps one prewritten user message and the aborted terminal event", async () => {
     const record = await createSessionRecord(sessionRoot, { title: "Abort recovery" });
     const paths = createSessionStorePaths(join(sessionRoot, record.meta.id));
-    const turnId = "turn-aborted";
+    const agentRunId = "turn-aborted";
     const timestamp = new Date().toISOString();
     const userEvent: SessionEvent = {
       id: "evt-user-aborted",
       sessionId: record.meta.id,
-      turnId,
+      agentRunId,
       type: "user_message",
       timestamp,
-      schemaVersion: 1,
+      schemaVersion: 2,
       payload: { content: "stop this turn" },
     };
     const abortedEvent: SessionEvent = {
       id: "evt-turn-aborted",
       sessionId: record.meta.id,
-      turnId,
-      type: "turn_aborted",
+      agentRunId,
+      type: "agent_run_aborted",
       timestamp,
-      schemaVersion: 1,
+      schemaVersion: 2,
       payload: { reason: "user" },
     };
 
     await expect(appendEvents(paths.sessionPath, [userEvent])).resolves.toEqual({ ok: true });
     await expect(writeSessionResult(paths, {
       sessionId: record.meta.id,
-      turnId,
+      agentRunId,
       events: [abortedEvent],
       status: "aborted",
       contextSnapshot: {
@@ -124,8 +124,8 @@ describe("session store", () => {
     })).resolves.toEqual({ ok: true });
 
     const restored = await readSessionRecord(paths);
-    expect(restored?.events.map((event) => event.type)).toEqual(["user_message", "turn_aborted"]);
-    expect(restored?.meta.turnCount).toBe(1);
+    expect(restored?.events.map((event) => event.type)).toEqual(["user_message", "agent_run_aborted"]);
+    expect(restored?.meta.agentRunCount).toBe(1);
   });
 
   it("persists workspaceRoot on session meta when creating", async () => {
@@ -255,7 +255,7 @@ describe("session store", () => {
 
     const state = {
       sessionId: record.meta.id,
-      activeTurnId: "turn-1",
+      activeAgentRunId: "turn-1",
       updatedAt: new Date().toISOString(),
       estimator: { name: "char-ratio", version: "1" },
       totalEstimatedTokens: 10,
@@ -313,7 +313,7 @@ describe("session store", () => {
   it("rejects unsafe SubAgent transcript path segments", async () => {
     const record = await createSessionRecord(sessionRoot, { title: "Unsafe transcript" });
     const paths = createSessionStorePaths(join(sessionRoot, record.meta.id));
-    const unsafeRef = createTranscriptRef(record.meta.id, { turnId: "../turn-1", runId: "run-1" });
+    const unsafeRef = createTranscriptRef(record.meta.id, { agentRunId: "../turn-1", runId: "run-1" });
     const event = createTranscriptEvent(record.meta.id, "turn-1:subagent:run-1");
 
     await expect(writeSubAgentTranscripts(paths, [{ transcriptRef: unsafeRef, events: [event] }])).resolves.toEqual({
@@ -330,24 +330,24 @@ describe("session store", () => {
       workspaceRoot: "/Users/test/projects/branch",
     });
     const sourcePaths = createSessionStorePaths(join(sessionRoot, source.meta.id));
-    const turnId = "turn-branch";
+    const agentRunId = "turn-branch";
     const timestamp = "2026-07-26T00:00:00.000Z";
     const userEvent: SessionEvent = {
       id: "evt-user-branch",
       sessionId: source.meta.id,
-      turnId,
+      agentRunId,
       type: "user_message",
       timestamp,
-      schemaVersion: 1,
+      schemaVersion: 2,
       payload: { content: "Create a branch." },
     };
     const assistantEvent: SessionEvent = {
       id: "evt-assistant-branch",
       sessionId: source.meta.id,
-      turnId,
+      agentRunId,
       type: "assistant_message",
       timestamp,
-      schemaVersion: 1,
+      schemaVersion: 2,
       payload: {
         content: "Ready.",
         stopReason: "stop",
@@ -355,11 +355,11 @@ describe("session store", () => {
         provider: "mock",
       },
     };
-    const transcriptRef = createTranscriptRef(source.meta.id, { turnId, runId: "run-branch" });
-    const transcriptEvent = createTranscriptEvent(source.meta.id, `${turnId}:subagent:run-branch`);
+    const transcriptRef = createTranscriptRef(source.meta.id, { agentRunId, runId: "run-branch" });
+    const transcriptEvent = createTranscriptEvent(source.meta.id, `${agentRunId}:subagent:run-branch`);
     const contextState = {
       sessionId: source.meta.id,
-      activeTurnId: turnId,
+      activeAgentRunId: agentRunId,
       updatedAt: timestamp,
       estimator: { name: "char-ratio", version: "1" },
       totalEstimatedTokens: 10,
@@ -372,7 +372,7 @@ describe("session store", () => {
     await expect(appendEvents(sourcePaths.sessionPath, [userEvent])).resolves.toEqual({ ok: true });
     await expect(writeSessionResult(sourcePaths, {
       sessionId: source.meta.id,
-      turnId,
+      agentRunId,
       events: [assistantEvent],
       subagentTranscripts: [{ transcriptRef, events: [transcriptEvent] }],
       status: "completed",
@@ -403,7 +403,7 @@ describe("session store", () => {
       title: "Branch me (fork)",
       workspaceId: "ws_branch",
       workspaceRoot: "/Users/test/projects/branch",
-      turnCount: 1,
+      agentRunCount: 1,
       pinned: false,
       archived: false,
     }));
