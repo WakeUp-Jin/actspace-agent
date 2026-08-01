@@ -207,7 +207,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     const browserExecutors = createBrowserToolExecutors({
       socketPath: config.browserBridgeSocketPath,
       sessionId: config.sessionId ?? `session-${process.pid}`,
-      turnId: config.turnId ?? `turn-${Date.now()}`,
+      agentRunId: config.agentRunId ?? `turn-${Date.now()}`,
     });
     for (const definition of browserDefinitions) {
       if (isBrowserToolDisabled(definition.name, disabledTools)) continue;
@@ -248,7 +248,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
         llm: config.llm,
         workspaceRoot: config.workspaceRoot,
         sessionId: config.sessionId,
-        turnId: config.turnId,
+        agentRunId: config.agentRunId,
         contextWindow: config.contextWindow,
       }),
     );
@@ -261,7 +261,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
         llm: exploreLlm,
         workspaceRoot: config.workspaceRoot,
         sessionId: config.sessionId,
-        turnId: config.turnId,
+        agentRunId: config.agentRunId,
         contextWindow: config.contextWindow,
       }),
     );

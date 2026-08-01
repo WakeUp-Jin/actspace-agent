@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WorkbenchLayout } from "../components/WorkbenchLayout";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
@@ -15,14 +16,15 @@ function setViewportWidth(width: number) {
 
 function renderWorkbench() {
   return render(
-    <RightPanelProvider>
-      <WorkbenchLayout
+    <StrictMode>
+      <RightPanelProvider>
+        <WorkbenchLayout
         sessions={[
           {
             id: "session-responsive",
             title: "Responsive layout",
             updatedAt: new Date().toISOString(),
-            turnCount: 0,
+            agentRunCount: 0,
             workspaceRoot: "/tmp/workspace",
           },
         ]}
@@ -31,8 +33,9 @@ function renderWorkbench() {
         messages={[]}
         contextSnapshot={null}
         selectedWorkspaceRoot="/tmp/workspace"
-      />
-    </RightPanelProvider>,
+        />
+      </RightPanelProvider>
+    </StrictMode>,
   );
 }
 
@@ -93,5 +96,18 @@ describe("WorkbenchLayout narrow window behavior", () => {
     expect(screen.queryByTestId("compact-right-panel-overlay")).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "右侧面板对象" })).toBeInTheDocument();
     expect(screen.getByRole("separator", { name: "Resize preview panel" })).toBeInTheDocument();
+  });
+
+  it("opens settings and then the standalone analysis workspace", async () => {
+    const user = userEvent.setup();
+    setViewportWidth(1120);
+    renderWorkbench();
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByTestId("settings-page-shell")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "分析观测" }));
+    expect(screen.getByRole("heading", { name: "分析观测" })).toBeInTheDocument();
+    expect(screen.getByText("分析观测需要在 ActSpace 桌面端中打开。")).toBeInTheDocument();
   });
 });

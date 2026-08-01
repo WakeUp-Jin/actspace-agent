@@ -118,7 +118,8 @@ async function runDualLoop(
       if (turnIndex >= maxTurns) return "exhausted";
 
       turnIndex++;
-      await emit({ type: "turn_start", turnIndex });
+      const turnId = createTurnId(turnIndex);
+      await emit({ type: "turn_start", turnId, turnIndex });
 
       // 注入 pending/steering 消息
       if (pendingMessages.length > 0) {
@@ -138,7 +139,7 @@ async function runDualLoop(
       if (compaction) {
         const { messages: compactedMessages, ...info } = compaction;
         context.messages = compactedMessages;
-        await emit({ type: "context_compaction", info });
+        await emit({ type: "context_compaction", turnId, turnIndex, info });
       }
 
       // 流式 LLM 调用（可重试错误自动重试，见 AgentLoopConfig.llmRetry）
@@ -146,25 +147,58 @@ async function runDualLoop(
       const backoffMs = config.llmRetry?.backoffMs ?? DEFAULT_LLM_RETRY_BACKOFF_MS;
       let retryCount = 0;
       let assistantMsg: AssistantMessage;
+      let completedLlmCallId = "";
 
       while (true) {
         config.toolManager.commitProgressiveDisclosure();
         context.tools = config.refreshToolDefinitions?.() ?? config.toolManager.getToolDefinitions();
-        const callId = `llm_call_${Date.now()}_${turnIndex}`;
-        const cacheAuditCall = await prepareCacheAuditCall(config, context, callId, turnIndex);
+        const attempt = retryCount + 1;
+        const llmCallId = createLlmCallId(turnIndex, attempt);
+        completedLlmCallId = llmCallId;
+        const cacheAuditCall = await prepareCacheAuditCall(config, context, llmCallId, turnIndex);
+        await emit({
+          type: "llm_call_start",
+          turnId,
+          turnIndex,
+          llmCallId,
+          attempt,
+          request: createLlmRequestSnapshot(context, config, llm),
+        });
+        const startedAt = Date.now();
         assistantMsg = await streamAssistantResponse(
           context,
           llm,
           signal,
           emit,
+          turnId,
+          llmCallId,
           config.thinkingEnabled,
           config.reasoningEffort,
         );
+        const durationMs = Math.max(0, Date.now() - startedAt);
         const cacheAudit = await finishCacheAuditCall(config, cacheAuditCall, assistantMsg);
+        await emit({
+          type: "llm_call_end",
+          turnId,
+          turnIndex,
+          llmCallId,
+          attempt,
+          durationMs,
+          message: assistantMsg,
+        });
         // 失败尝试的 usage 也照常累进：钱已经花了，计费审计不能丢
         newMessages.push(assistantMsg);
         accumulateUsage(totalUsage, assistantMsg.usage);
-        usageCalls.push({ callId, message: assistantMsg, usage: assistantMsg.usage, ...(cacheAudit ? { cacheAudit } : {}) });
+        usageCalls.push({
+          turnId,
+          turnIndex,
+          llmCallId,
+          attempt,
+          durationMs,
+          message: assistantMsg,
+          usage: assistantMsg.usage,
+          ...(cacheAudit ? { cacheAudit } : {}),
+        });
 
         const shouldRetry =
           assistantMsg.stopReason === "error" &&
@@ -181,8 +215,11 @@ async function runDualLoop(
         }
         await emit({
           type: "llm_retry",
-          attempt: retryCount,
-          maxAttempts: maxRetries,
+          turnId,
+          turnIndex,
+          failedLlmCallId: llmCallId,
+          attempt: retryCount + 1,
+          maxAttempts: maxRetries + 1,
           reason: assistantMsg.errorMessage ?? "LLM error",
         });
         const delay = backoffMs[Math.min(retryCount - 1, backoffMs.length - 1)] ?? 0;
@@ -192,7 +229,7 @@ async function runDualLoop(
 
       // 错误/中止 → 直接退出
       if (assistantMsg.stopReason === "error" || assistantMsg.stopReason === "aborted") {
-        await emit({ type: "turn_end", turnIndex, message: assistantMsg, toolResults: [] });
+        await emit({ type: "turn_end", turnId, turnIndex, message: assistantMsg, toolResults: [] });
         return assistantMsg.stopReason === "aborted" ? "aborted" : "completed";
       }
 
@@ -207,6 +244,7 @@ async function runDualLoop(
           toolCalls,
           config.toolExecution ?? "sequential",
           emit,
+          { turnId, turnIndex, llmCallId: completedLlmCallId },
           {
             ...config.toolExecuteOptions,
             signal,
@@ -224,7 +262,7 @@ async function runDualLoop(
         hasMoreToolCalls = true;
       }
 
-      await emit({ type: "turn_end", turnIndex, message: assistantMsg, toolResults });
+      await emit({ type: "turn_end", turnId, turnIndex, message: assistantMsg, toolResults });
 
       if (signal?.aborted) {
         return "aborted";
@@ -262,6 +300,8 @@ async function streamAssistantResponse(
   llm: LLMService,
   signal: AbortSignal | undefined,
   emit: AgentEventSink,
+  turnId: string,
+  llmCallId: string,
   thinkingEnabled: boolean | undefined,
   reasoningEffort: ModelReasoningEffort | undefined,
 ): Promise<AssistantMessage> {
@@ -272,7 +312,7 @@ async function streamAssistantResponse(
       case "text_delta":
       case "thinking_delta":
       case "tool_call_delta":
-        await emit({ type: "message_delta", delta: event });
+        await emit({ type: "message_delta", turnId, llmCallId, delta: event });
         break;
 
       case "done": {
@@ -304,11 +344,13 @@ async function executeToolCalls(
   toolCalls: ToolCallContent[],
   mode: ToolExecutionMode,
   emit: AgentEventSink,
+  scope: { turnId: string; turnIndex: number; llmCallId: string },
   toolExecuteOptions?: import("../tools/manager").ToolExecuteOptions,
 ): Promise<ToolResultMessage[]> {
   const execOne = async (tc: ToolCallContent): Promise<ToolResultMessage> => {
     await emit({
       type: "tool_start",
+      ...scope,
       toolCallId: tc.id,
       toolName: tc.name,
       args: tc.arguments,
@@ -323,6 +365,7 @@ async function executeToolCalls(
 
     await emit({
       type: "tool_end",
+      ...scope,
       toolCallId: tc.id,
       toolName: tc.name,
       result,
@@ -361,6 +404,33 @@ async function executeToolCalls(
     results.push(await execOne(tc));
   }
   return results;
+}
+
+function createTurnId(turnIndex: number): string {
+  return `turn_${Date.now()}_${turnIndex}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createLlmCallId(turnIndex: number, attempt: number): string {
+  return `llm_call_${Date.now()}_${turnIndex}_${attempt}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createLlmRequestSnapshot(
+  context: Context,
+  config: AgentLoopConfig,
+  llm: LLMService,
+): import("./types").LlmRequestSnapshot {
+  return {
+    ...(llm.provider !== undefined ? { provider: llm.provider } : {}),
+    ...(llm.model !== undefined ? { model: llm.model } : {}),
+    ...(context.systemPrompt !== undefined ? { systemPrompt: context.systemPrompt } : {}),
+    ...(context.systemPromptParts !== undefined ? { systemPromptParts: structuredClone(context.systemPromptParts) } : {}),
+    messages: structuredClone(context.messages),
+    tools: structuredClone(context.tools ?? []),
+    options: {
+      ...(config.thinkingEnabled !== undefined ? { thinkingEnabled: config.thinkingEnabled } : {}),
+      ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),
+    },
+  };
 }
 
 // ─── 工具函数 ───

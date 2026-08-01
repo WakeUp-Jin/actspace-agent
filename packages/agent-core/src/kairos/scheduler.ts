@@ -10,7 +10,7 @@
  * V1 简化（与 plan 比的取舍）：
  * - 不实现 blocklist.timeWindows 推迟（由 system prompt 引导 LLM 自行尊重）。
  * - 不实现 tickBudget 限额（同上；可作为 v2 增强）。
- * - 不显式实现"等主 Agent 完成"信号；改为：controller 在主 Agent runTurn 期间
+ * - 不显式实现"等主 Agent 完成"信号；改为：controller 在主 Agent runAgent 期间
  *   把 `mainAgentBusy` 标志置 true，scheduler 在每次"取下一条"前轮询，若 busy 则
  *   等待信号清除（通过 Promise + listener）。
  */
@@ -194,14 +194,14 @@ export class QueueProcessor {
     }
   }
 
-  /** 主 Agent runTurn 开始 → scheduler 后续不投新 tick；同时唤醒任何进行中的 sleep。 */
-  notifyMainAgentTurnStart(): void {
+  /** 主 Agent runAgent 开始 → scheduler 后续不投新 tick；同时唤醒任何进行中的 sleep。 */
+  notifyMainAgentRunStart(): void {
     this.mainAgentBusy = true;
     this.triggerWake("user_message");
   }
 
-  /** 主 Agent runTurn 结束 → scheduler 可以继续投 tick（但要 delay 5s）。 */
-  notifyMainAgentTurnEnd(): void {
+  /** 主 Agent runAgent 结束 → scheduler 可以继续投 tick（但要 delay 5s）。 */
+  notifyMainAgentRunEnd(): void {
     this.mainAgentBusy = false;
     const resolvers = this.mainAgentDoneResolvers;
     this.mainAgentDoneResolvers = [];

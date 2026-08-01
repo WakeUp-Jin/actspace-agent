@@ -11,11 +11,11 @@ import type { InternalTool, ToolResult } from "../../internal-tools";
 import { createEmptyUsage } from "../../messages";
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "../../messages";
 import { MockLLMService, mockError, mockText, mockToolCall } from "../../llm/services/mock";
-import { createCacheAuditTracker, type AgentRunLogEvent, type AgentRunLogger } from "../../observability";
+import { createAgentTraceWriter, createCacheAuditTracker, type AgentRunLogEvent, type AgentRunLogger } from "../../observability";
 import { ToolManager } from "../../tools/manager";
-import { runTurnWithAgent } from "../bridge";
+import { runAgentWithBridge } from "../bridge";
 import { bashExecutor, bashTaskRegistry } from "../../tools/tools/bash";
-import type { RunTurnWithAgentDeps } from "../bridge";
+import type { RunAgentWithBridgeDeps } from "../bridge";
 
 function createTestTool(name: string): InternalTool {
   return {
@@ -293,13 +293,13 @@ function createCompactionDeps() {
   return { llm, toolManager, contextManager, summarizer: compactionSummarizer };
 }
 
-describe("runTurnWithAgent bridge", () => {
+describe("runAgentWithBridge bridge", () => {
   it("persists the user message before assistant and tool events", async () => {
     const streamEvents: RuntimeStreamEvent[] = [];
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Please inspect the README.",
       },
       createDeps(),
@@ -308,7 +308,7 @@ describe("runTurnWithAgent bridge", () => {
 
     expect(result.events[0]).toMatchObject({
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       type: "user_message",
       payload: { content: "Please inspect the README." },
     });
@@ -325,23 +325,23 @@ describe("runTurnWithAgent bridge", () => {
       "llm_usage",
       "context_snapshot",
     ]);
-    expect(result.events.every((event) => event.turnId === "turn-test")).toBe(true);
+    expect(result.events.every((event) => event.agentRunId === "turn-test")).toBe(true);
     expect(
       streamEvents.every((event) =>
         event.sessionId === "session-test" &&
-        (event.type === "bash_task_update" || event.turnId === "turn-test"),
+        (event.type === "bash_task_update" || event.agentRunId === "turn-test"),
       ),
     ).toBe(true);
     expect(streamEvents).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: "assistant_thinking_delta",
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
       }),
       expect.objectContaining({
         type: "assistant_text_delta",
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
       }),
     ]));
   });
@@ -350,8 +350,8 @@ describe("runTurnWithAgent bridge", () => {
     const deps = createDeps();
     deps.llm.setResponses([mockText("done")]);
 
-    const result = await runTurnWithAgent(
-      { sessionId: "session-prewritten", turnId: "turn-prewritten", userInput: "already stored" },
+    const result = await runAgentWithBridge(
+      { sessionId: "session-prewritten", agentRunId: "turn-prewritten", userInput: "already stored" },
       deps,
       { includeUserEvent: false },
     );
@@ -387,10 +387,10 @@ describe("runTurnWithAgent bridge", () => {
         mimeType: "text/markdown",
       },
     ];
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-attachments",
-        turnId: "turn-attachments",
+        agentRunId: "turn-attachments",
         userInput: "What does this show?",
         attachments,
       },
@@ -421,8 +421,8 @@ describe("runTurnWithAgent bridge", () => {
       mockError("upstream gateway exploded", "error", { errorKind: "server_error", errorRetryable: true }),
     ]);
 
-    const result = await runTurnWithAgent(
-      { sessionId: "session-fail", turnId: "turn-fail", userInput: "hello" },
+    const result = await runAgentWithBridge(
+      { sessionId: "session-fail", agentRunId: "turn-fail", userInput: "hello" },
       deps,
     );
 
@@ -453,27 +453,87 @@ describe("runTurnWithAgent bridge", () => {
     ]);
     const streamEvents: RuntimeStreamEvent[] = [];
 
-    const result = await runTurnWithAgent(
-      { sessionId: "session-retry", turnId: "turn-retry", userInput: "hello" },
+    const result = await runAgentWithBridge(
+      { sessionId: "session-retry", agentRunId: "turn-retry", userInput: "hello" },
       deps,
       { onStreamEvent: (event) => streamEvents.push(event) },
     );
 
     expect(result.status).toBe("completed");
-    expect(streamEvents).toContainEqual({
+    const failedCall = streamEvents.find((event) => event.type === "llm_call_finished" && event.stopReason === "error");
+    expect(failedCall).toBeDefined();
+    expect(streamEvents).toContainEqual(expect.objectContaining({
       type: "llm_retry",
       sessionId: "session-retry",
-      turnId: "turn-retry",
-      attempt: 1,
-      maxAttempts: 1,
+      agentRunId: "turn-retry",
+      turnIndex: 1,
+      failedLlmCallId: failedCall && "llmCallId" in failedCall ? failedCall.llmCallId : undefined,
+      attempt: 2,
+      maxAttempts: 2,
       reason: "gateway hiccup",
-    });
+    }));
     // 重试成功后不落 error 事件；失败尝试不留 content 事件，但 llm_usage 全量保留
     expect(result.events.some((event) => event.type === "error")).toBe(false);
     expect(result.events.filter((event) => event.type === "llm_usage")).toHaveLength(2);
     const assistantEvents = result.events.filter((event) => event.type === "assistant_message");
     expect(assistantEvents).toHaveLength(1);
     expect(assistantEvents[0].payload).toMatchObject({ content: "recovered final reply" });
+  });
+
+  it("persists request and response trace events with true turn and call identities", async () => {
+    const deps = createDeps();
+    deps.llm.setResponses([mockText("trace reply")]);
+    const sessionDir = await mkdtemp(join(tmpdir(), "actspace-bridge-trace-"));
+    const traceWriter = await createAgentTraceWriter({
+      sessionDir,
+      sessionId: "session-trace",
+      agentRunId: "agent-run-trace",
+    });
+
+    await runAgentWithBridge(
+      { sessionId: "session-trace", agentRunId: "agent-run-trace", userInput: "inspect trace" },
+      deps,
+      { traceWriter },
+    );
+
+    const events = (await readFile(traceWriter.filePath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(events.map((event) => event.type)).toEqual([
+      "agent_run_start",
+      "turn_start",
+      "llm_request",
+      "llm_response",
+      "turn_end",
+      "agent_run_end",
+    ]);
+    const request = events.find((event) => event.type === "llm_request");
+    const response = events.find((event) => event.type === "llm_response");
+    expect(request).toMatchObject({
+      sessionId: "session-trace",
+      agentRunId: "agent-run-trace",
+      turnIndex: 1,
+      attempt: 1,
+      payload: {
+        provider: "mock",
+        model: "deepseek-mock",
+        systemPrompt: expect.stringContaining("You are a test assistant."),
+        messages: expect.any(Array),
+        tools: expect.any(Array),
+      },
+    });
+    expect(request).toHaveProperty("turnId");
+    expect(request).toHaveProperty("llmCallId");
+    expect(response).toMatchObject({
+      turnId: request?.turnId,
+      llmCallId: request?.llmCallId,
+      payload: {
+        stopReason: "stop",
+        durationMs: expect.any(Number),
+      },
+    });
+    await rm(sessionDir, { recursive: true, force: true });
   });
 
   it("persists a context_compaction event and run-log entry when history is compacted", async () => {
@@ -485,8 +545,8 @@ describe("runTurnWithAgent bridge", () => {
       },
     };
 
-    const result = await runTurnWithAgent(
-      { sessionId: "session-compact", turnId: "turn-compact", userInput: "new question" },
+    const result = await runAgentWithBridge(
+      { sessionId: "session-compact", agentRunId: "turn-compact", userInput: "new question" },
       createCompactionDeps(),
       { runLogger },
     );
@@ -504,10 +564,10 @@ describe("runTurnWithAgent bridge", () => {
   });
 
   it("persists one llm_usage event for each model response", async () => {
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Please inspect the README.",
       },
       createDeps(),
@@ -548,10 +608,10 @@ describe("runTurnWithAgent bridge", () => {
         },
       ]);
 
-      const result = await runTurnWithAgent(
+      const result = await runAgentWithBridge(
         {
           sessionId: "session-cache-audit",
-          turnId: "turn-cache-audit",
+          agentRunId: "turn-cache-audit",
           userInput: "Trigger low cache.",
         },
         {
@@ -559,7 +619,7 @@ describe("runTurnWithAgent bridge", () => {
           cacheAudit: createCacheAuditTracker({
             rootDir: auditRoot,
             sessionId: "session-cache-audit",
-            turnId: "turn-cache-audit",
+            agentRunId: "turn-cache-audit",
             provider: "mock",
             model: "deepseek-mock",
             threshold: 0.9,
@@ -598,10 +658,10 @@ describe("runTurnWithAgent bridge", () => {
       },
     };
 
-    await runTurnWithAgent(
+    await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Please inspect the README.",
       },
       createDeps(),
@@ -669,10 +729,10 @@ describe("runTurnWithAgent bridge", () => {
       },
     };
 
-    await runTurnWithAgent(
+    await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Please inspect the README.",
       },
       createDeps(),
@@ -747,10 +807,10 @@ describe("runTurnWithAgent bridge", () => {
       },
     };
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Write the clipboard.",
       },
       deps,
@@ -797,10 +857,10 @@ describe("runTurnWithAgent bridge", () => {
       },
     };
 
-    await runTurnWithAgent(
+    await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Read a web page.",
       },
       deps,
@@ -828,10 +888,10 @@ describe("runTurnWithAgent bridge", () => {
       mockText("Directory listed."),
     ]);
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "List the llm folder.",
       },
       deps,
@@ -858,10 +918,10 @@ describe("runTurnWithAgent bridge", () => {
       mockText("Search summarized."),
     ]);
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Search latest news.",
       },
       deps,
@@ -892,10 +952,10 @@ describe("runTurnWithAgent bridge", () => {
       mockText("Page summarized."),
     ]);
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Read this page.",
       },
       deps,
@@ -922,10 +982,10 @@ describe("runTurnWithAgent bridge", () => {
       mockText("File removed."),
     ]);
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Delete notes.md.",
       },
       deps,
@@ -955,10 +1015,10 @@ describe("runTurnWithAgent bridge", () => {
       mockText("Search tools inspected."),
     ]);
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Inspect search tools.",
       },
       deps,
@@ -1019,8 +1079,8 @@ describe("runTurnWithAgent bridge", () => {
     // Before the call, deps.abort should be undefined
     expect(deps.abort).toBeUndefined();
 
-    const resultPromise = runTurnWithAgent(
-      { sessionId: "s-abort", turnId: "t-abort", userInput: "Do something slow." },
+    const resultPromise = runAgentWithBridge(
+      { sessionId: "s-abort", agentRunId: "t-abort", userInput: "Do something slow." },
       deps,
       { onStreamEvent: (event) => streamEvents.push(event) },
     );
@@ -1035,8 +1095,8 @@ describe("runTurnWithAgent bridge", () => {
     const result = await resultPromise;
     expect(result.status).toBe("aborted");
     expect(result.events.some((event) => event.type === "user_message")).toBe(true);
-    expect(result.events.some((event) => event.type === "turn_aborted")).toBe(true);
-    expect(streamEvents.some((event) => event.type === "turn_aborted")).toBe(true);
+    expect(result.events.some((event) => event.type === "agent_run_aborted")).toBe(true);
+    expect(streamEvents.some((event) => event.type === "agent_run_aborted")).toBe(true);
   });
 
   it("emits tool_call_streaming with typed preview before tool_started", async () => {
@@ -1070,10 +1130,10 @@ describe("runTurnWithAgent bridge", () => {
 
     const streamEvents: RuntimeStreamEvent[] = [];
 
-    await runTurnWithAgent(
+    await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Write the file.",
       },
       deps,
@@ -1095,7 +1155,7 @@ describe("runTurnWithAgent bridge", () => {
     expect(firstStreaming).toMatchObject({
       type: "tool_call_streaming",
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       toolCallId: "tc-write-streaming",
       toolName: "write_file",
       isInitial: true,
@@ -1112,7 +1172,7 @@ describe("runTurnWithAgent bridge", () => {
     expect(finishedEvents[0]).toMatchObject({
       type: "tool_finished",
       sessionId: "session-test",
-      turnId: "turn-test",
+      agentRunId: "turn-test",
       toolCallId: "tc-write-streaming",
       toolName: "write_file",
       isError: false,
@@ -1147,10 +1207,10 @@ describe("runTurnWithAgent bridge", () => {
 
     const streamEvents: RuntimeStreamEvent[] = [];
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Launch an Agent run.",
       },
       deps,
@@ -1166,7 +1226,7 @@ describe("runTurnWithAgent bridge", () => {
         expect.objectContaining({
           type: "tool_call_streaming",
           sessionId: "session-test",
-          turnId: "turn-test",
+          agentRunId: "turn-test",
           toolCallId: "tc-agent-preview",
           toolName: "agent",
           preview: {
@@ -1180,7 +1240,7 @@ describe("runTurnWithAgent bridge", () => {
         expect.objectContaining({
           type: "tool_started",
           sessionId: "session-test",
-          turnId: "turn-test",
+          agentRunId: "turn-test",
           toolCallId: "tc-agent-preview",
           toolName: "agent",
           preview: expect.objectContaining({
@@ -1216,10 +1276,10 @@ describe("runTurnWithAgent bridge", () => {
 
     const streamEvents: RuntimeStreamEvent[] = [];
 
-    await runTurnWithAgent(
+    await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Use unknown tool.",
       },
       deps,
@@ -1267,10 +1327,10 @@ describe("runTurnWithAgent bridge", () => {
       mockText("Done."),
     ]);
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Read and edit files.",
       },
       deps,
@@ -1337,8 +1397,8 @@ describe("runTurnWithAgent bridge", () => {
       mockText("Done."),
     ]);
 
-    const result = await runTurnWithAgent(
-      { sessionId: "session-test", turnId: "turn-test", userInput: "Edit the big file." },
+    const result = await runAgentWithBridge(
+      { sessionId: "session-test", agentRunId: "turn-test", userInput: "Edit the big file." },
       deps,
     );
 
@@ -1379,8 +1439,8 @@ describe("runTurnWithAgent bridge", () => {
       mockText("Done."),
     ]);
 
-    const result = await runTurnWithAgent(
-      { sessionId: "session-test", turnId: "turn-test", userInput: "Edit the file." },
+    const result = await runAgentWithBridge(
+      { sessionId: "session-test", agentRunId: "turn-test", userInput: "Edit the file." },
       deps,
     );
 
@@ -1425,10 +1485,10 @@ describe("runTurnWithAgent bridge", () => {
       mockText("Done."),
     ]);
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Delete a line.",
       },
       deps,
@@ -1455,10 +1515,10 @@ describe("runTurnWithAgent bridge", () => {
       mockText("Done."),
     ]);
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Run the compiler.",
       },
       deps,
@@ -1502,10 +1562,10 @@ describe("runTurnWithAgent bridge", () => {
       mockText("Done."),
     ]);
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Say hi.",
       },
       deps,
@@ -1547,10 +1607,10 @@ describe("runTurnWithAgent bridge", () => {
       mockText("Denied."),
     ]);
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Delete the workspace.",
       },
       deps,
@@ -1594,10 +1654,10 @@ describe("runTurnWithAgent bridge", () => {
       mockText("Done."),
     ]);
 
-    const result = await runTurnWithAgent(
+    const result = await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Check the background task.",
       },
       deps,
@@ -1630,10 +1690,10 @@ describe("runTurnWithAgent bridge", () => {
       },
     };
 
-    await runTurnWithAgent(
+    await runAgentWithBridge(
       {
         sessionId: "session-test",
-        turnId: "turn-test",
+        agentRunId: "turn-test",
         userInput: "Run the compiler.",
       },
       deps,
@@ -1688,8 +1748,8 @@ describe("background bash task notifications", () => {
       },
     ]);
 
-    const result = await runTurnWithAgent(
-      { sessionId: "session-notify", turnId: "turn-notify", userInput: "继续" },
+    const result = await runAgentWithBridge(
+      { sessionId: "session-notify", agentRunId: "turn-notify", userInput: "继续" },
       deps,
     );
 
@@ -1715,8 +1775,8 @@ describe("background bash task notifications", () => {
       text: "<task_notification>other</task_notification>",
     });
 
-    const result = await runTurnWithAgent(
-      { sessionId: "session-no-notify", turnId: "turn-x", userInput: "hello" },
+    const result = await runAgentWithBridge(
+      { sessionId: "session-no-notify", agentRunId: "turn-x", userInput: "hello" },
       deps,
     );
 
@@ -1763,8 +1823,8 @@ describe("background bash task notifications", () => {
       },
     ]);
 
-    const result = await runTurnWithAgent(
-      { sessionId, turnId: "turn-running-list", userInput: "继续" },
+    const result = await runAgentWithBridge(
+      { sessionId, agentRunId: "turn-running-list", userInput: "继续" },
       deps,
     );
 

@@ -131,7 +131,7 @@ describe("ReviewRenderView", () => {
               id: "session-review-menu",
               title: "Review menu",
               updatedAt: new Date().toISOString(),
-              turnCount: 0,
+              agentRunCount: 0,
               workspaceRoot: "/tmp/workspace",
             },
           ]}
@@ -170,7 +170,7 @@ describe("ReviewRenderView", () => {
               id: "session-review-launcher",
               title: "Review launcher",
               updatedAt: new Date().toISOString(),
-              turnCount: 0,
+              agentRunCount: 0,
               workspaceRoot: "/tmp/workspace",
             },
           ]}

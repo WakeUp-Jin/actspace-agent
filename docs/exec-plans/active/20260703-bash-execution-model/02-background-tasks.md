@@ -18,7 +18,7 @@ bash 支持后台运行：`blockMs: 0` 显式后台、`blockMs` 到点自动转�
   - `packages/agent-core/src/tools/index.ts`（工具注册，140 行附近）
   - `packages/agent-core/src/engine/bridge.ts`（`new Agent({...})` 处接 `getSteeringMessages`）
   - `packages/agent-core/src/engine/loop.ts`（steering 注入点，已存在，不改）
-  - `packages/desktop/src/main/agent-turn.ts`（每 turn 新建 deps 的事实；`activeTurnAborts` 单例先例）
+  - `packages/desktop/src/main/agent-run.ts`（每 Agent Run 新建 deps 的事实；`activeAgentRunAborts` 单例先例）
   - `packages/desktop/src/main/index.ts`（app 退出钩子，1312 行附近 `app:shutting-down`）
   - `packages/shared/src/session.ts`（`ToolUiPreview` bash 分支、`RuntimeStreamEvent`）
   - `packages/shared/src/session-selectors.ts`（bash 块映射，204 行附近）

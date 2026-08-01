@@ -56,7 +56,7 @@ export class ToolManager {
       absoluteMaxChars: config.absoluteMaxChars,
       summarizer: config.summarizer,
       approvalGate: config.approvalGate,
-      approvalContext: { sessionId: config.sessionId, turnId: config.turnId },
+      approvalContext: { sessionId: config.sessionId, agentRunId: config.agentRunId },
     });
   }
 

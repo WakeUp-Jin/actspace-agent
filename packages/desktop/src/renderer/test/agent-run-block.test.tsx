@@ -8,16 +8,17 @@ import { SubAgentTranscriptPanel } from "../components/messages/SubAgentTranscri
 const transcriptRef = {
   kind: "subagent_transcript" as const,
   sessionId: "session-1",
-  turnId: "turn-1",
+  agentRunId: "turn-1",
   runId: "run-1",
 };
 
 const promptEvent: SessionEvent = {
   id: "evt-prompt",
   sessionId: "session-1",
-  turnId: "turn-1:subagent:run-1",
+  agentRunId: "turn-1:subagent:run-1",
   type: "user_message",
   timestamp: "2026-06-02T10:00:00.000Z",
+  schemaVersion: 2,
   payload: { content: "Inspect the renderer Agent block." },
 };
 
@@ -40,9 +41,10 @@ const longPromptEvent: SessionEvent = {
 const reportEvent: SessionEvent = {
   id: "evt-report",
   sessionId: "session-1",
-  turnId: "turn-1:subagent:run-1",
+  agentRunId: "turn-1:subagent:run-1",
   type: "assistant_message",
   timestamp: "2026-06-02T10:00:02.000Z",
+  schemaVersion: 2,
   payload: {
     content: "The block renders summaries and opens a transcript panel.",
     stopReason: "stop",
@@ -54,18 +56,20 @@ const reportEvent: SessionEvent = {
 const thinkingEvent: SessionEvent = {
   id: "evt-thinking",
   sessionId: "session-1",
-  turnId: "turn-1:subagent:run-1",
+  agentRunId: "turn-1:subagent:run-1",
   type: "thinking",
   timestamp: "2026-06-02T10:00:01.000Z",
+  schemaVersion: 2,
   payload: { content: "Need to inspect renderer files.", collapsedByDefault: true },
 };
 
 const readCallEvent: SessionEvent = {
   id: "evt-read-call",
   sessionId: "session-1",
-  turnId: "turn-1:subagent:run-1",
+  agentRunId: "turn-1:subagent:run-1",
   type: "tool_call",
   timestamp: "2026-06-02T10:00:01.100Z",
+  schemaVersion: 2,
   payload: {
     id: "tc-read",
     name: "read_file",
@@ -76,9 +80,10 @@ const readCallEvent: SessionEvent = {
 const readResultEvent: SessionEvent = {
   id: "evt-read-result",
   sessionId: "session-1",
-  turnId: "turn-1:subagent:run-1",
+  agentRunId: "turn-1:subagent:run-1",
   type: "tool_result",
   timestamp: "2026-06-02T10:00:01.200Z",
+  schemaVersion: 2,
   payload: {
     toolCallId: "tc-read",
     toolName: "read_file",
@@ -91,9 +96,10 @@ const readResultEvent: SessionEvent = {
 const globCallEvent: SessionEvent = {
   id: "evt-glob-call",
   sessionId: "session-1",
-  turnId: "turn-1:subagent:run-1",
+  agentRunId: "turn-1:subagent:run-1",
   type: "tool_call",
   timestamp: "2026-06-02T10:00:01.300Z",
+  schemaVersion: 2,
   payload: {
     id: "tc-glob",
     name: "glob",
@@ -104,9 +110,10 @@ const globCallEvent: SessionEvent = {
 const globResultEvent: SessionEvent = {
   id: "evt-glob-result",
   sessionId: "session-1",
-  turnId: "turn-1:subagent:run-1",
+  agentRunId: "turn-1:subagent:run-1",
   type: "tool_result",
   timestamp: "2026-06-02T10:00:01.400Z",
+  schemaVersion: 2,
   payload: {
     toolCallId: "tc-glob",
     toolName: "glob",
@@ -119,11 +126,14 @@ const globResultEvent: SessionEvent = {
 const usageEvent: SessionEvent = {
   id: "evt-usage",
   sessionId: "session-1",
-  turnId: "turn-1:subagent:run-1",
+  agentRunId: "turn-1:subagent:run-1",
   type: "llm_usage",
   timestamp: "2026-06-02T10:00:01.500Z",
+  schemaVersion: 2,
   payload: {
-    callId: "call-1",
+    llmCallId: "call-1",
+    attempt: 1,
+    durationMs: 10,
     provider: "mock",
     model: "mock",
     promptTokens: 100,

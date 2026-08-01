@@ -159,7 +159,7 @@ describe("KairosUsageAccumulator", () => {
       {
         id: "u1",
         sessionId: "kairos-2026-05-28",
-        turnId: "t1",
+        agentRunId: "t1",
         type: "llm_usage",
         timestamp: new Date().toISOString(),
         schemaVersion: 1,
@@ -168,7 +168,7 @@ describe("KairosUsageAccumulator", () => {
       {
         id: "u2",
         sessionId: "kairos-2026-05-28",
-        turnId: "t2",
+        agentRunId: "t2",
         type: "llm_usage",
         timestamp: new Date().toISOString(),
         schemaVersion: 1,

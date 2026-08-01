@@ -9,7 +9,7 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 function makeSession(partial: Partial<SessionListItem> & Pick<SessionListItem, "id" | "title">): SessionListItem {
   return {
     updatedAt: new Date().toISOString(),
-    turnCount: 1,
+    agentRunCount: 1,
     ...partial,
   };
 }

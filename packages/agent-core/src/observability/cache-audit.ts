@@ -32,7 +32,7 @@ export type CacheAuditCallMeta = {
 export type CacheAuditSnapshotFile = {
   schemaVersion: typeof SNAPSHOT_SCHEMA_VERSION;
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   callId: string;
   createdAt: string;
   provider?: string;
@@ -61,7 +61,7 @@ export interface CacheAuditTracker {
 export type CacheAuditTrackerOptions = {
   rootDir: string;
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   provider?: ModelSpec["provider"] | string;
   model?: string;
   modelId?: string;
@@ -243,7 +243,7 @@ class FileCacheAuditTracker implements CacheAuditTracker {
     return {
       schemaVersion: SNAPSHOT_SCHEMA_VERSION,
       sessionId: this.options.sessionId,
-      turnId: this.options.turnId,
+      agentRunId: this.options.agentRunId,
       callId: meta.callId,
       createdAt: this.now().toISOString(),
       provider: this.options.provider,
@@ -294,7 +294,7 @@ class FileCacheAuditTracker implements CacheAuditTracker {
       schemaVersion: SNAPSHOT_SCHEMA_VERSION,
       auditId,
       sessionId: this.options.sessionId,
-      turnId: this.options.turnId,
+      agentRunId: this.options.agentRunId,
       callId: call.meta.callId,
       createdAt: this.now().toISOString(),
       provider: message.provider || this.options.provider,
@@ -336,7 +336,7 @@ class FileCacheAuditTracker implements CacheAuditTracker {
       .toISOString()
       .replace(/[-:]/g, "")
       .replace(/\.\d{3}Z$/, "Z");
-    return `${stamp}-${sanitizeSegment(this.options.turnId)}-${sanitizeSegment(call.meta.callId)}`;
+    return `${stamp}-${sanitizeSegment(this.options.agentRunId)}-${sanitizeSegment(call.meta.callId)}`;
   }
 
   private lastSnapshotPath(): string {

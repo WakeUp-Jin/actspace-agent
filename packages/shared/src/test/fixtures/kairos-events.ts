@@ -16,7 +16,7 @@ import type {
  * 共享 fixture：所有 Kairos 单测都从这里 import，避免在各测试文件里重复定义。
  *
  * - `nextEvent` 自增计数器既驱动 id 也驱动 timestamp，保证 fixture 默认升序。
- * - 各工厂只接受 `Partial<Payload> & { sessionId?; turnId?; id?; timestamp?; }`，
+ * - 各工厂只接受 `Partial<Payload> & { sessionId?; agentRunId?; id?; timestamp?; }`，
  *   未覆盖的字段走默认值；要测时间顺序时手动指定 timestamp。
  */
 
@@ -30,7 +30,7 @@ export function resetFixtureCounter(): void {
 type EventOverrides = {
   id?: string;
   sessionId?: string;
-  turnId?: string;
+  agentRunId?: string;
   timestamp?: string;
 };
 
@@ -43,7 +43,7 @@ function nextEvent<TPayload>(
   return {
     id: overrides?.id ?? `ev-${counter}`,
     sessionId: overrides?.sessionId ?? "kairos-2026-05-27",
-    turnId: overrides?.turnId ?? "tick-1",
+    agentRunId: overrides?.agentRunId ?? "tick-1",
     type,
     timestamp: overrides?.timestamp ?? new Date(BASE_TIME + counter * 1000).toISOString(),
     payload
@@ -246,22 +246,22 @@ export function sampleSleepInterrupted(): SessionEvent[] {
 /** 多 tick 混杂：tick1 含 tool + reply；tick2 含 reply + 触发 error。 */
 export function sampleMultiTickMix(): SessionEvent[] {
   resetFixtureCounter();
-  const tick1 = makeTickInjected({ trigger: "auto" }, { turnId: "tick-1" });
+  const tick1 = makeTickInjected({ trigger: "auto" }, { agentRunId: "tick-1" });
   const toolCall1 = makeToolCall(
     { id: "tc-1", name: "grep", arguments: { pattern: "kairos", path: "./" } },
-    { turnId: "tick-1" }
+    { agentRunId: "tick-1" }
   );
   const toolResult1 = makeToolResult(
     { toolCallId: "tc-1", toolName: "grep", ok: true, summary: "3 matches" },
-    { turnId: "tick-1" }
+    { agentRunId: "tick-1" }
   );
-  const reply1 = makeAssistantReply({ content: "Found 3 kairos mentions." }, { turnId: "tick-1" });
-  const sleepStart1 = makeSleepStart({ plannedSeconds: 30 }, { turnId: "tick-1" });
-  const sleepEnd1 = makeSleepEnd({ actualSeconds: 30 }, { turnId: "tick-1" });
+  const reply1 = makeAssistantReply({ content: "Found 3 kairos mentions." }, { agentRunId: "tick-1" });
+  const sleepStart1 = makeSleepStart({ plannedSeconds: 30 }, { agentRunId: "tick-1" });
+  const sleepEnd1 = makeSleepEnd({ actualSeconds: 30 }, { agentRunId: "tick-1" });
 
-  const tick2 = makeTickInjected({ trigger: "brief", briefId: "summary" }, { turnId: "tick-2" });
-  const reply2 = makeAssistantReply({ content: "Drafted summary." }, { turnId: "tick-2" });
-  const error2 = makeError({ message: "compressor timeout" }, { turnId: "tick-2" });
+  const tick2 = makeTickInjected({ trigger: "brief", briefId: "summary" }, { agentRunId: "tick-2" });
+  const reply2 = makeAssistantReply({ content: "Drafted summary." }, { agentRunId: "tick-2" });
+  const error2 = makeError({ message: "compressor timeout" }, { agentRunId: "tick-2" });
 
   return [
     tick1, toolCall1, toolResult1, reply1, sleepStart1, sleepEnd1,

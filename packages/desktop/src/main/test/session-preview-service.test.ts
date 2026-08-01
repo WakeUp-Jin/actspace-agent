@@ -15,7 +15,7 @@ import type {
   SessionEvent,
 } from "@actspace/shared";
 import { getSessionPreview } from "../session-preview-service";
-import type { AppDataRoots } from "../agent-turn";
+import type { AppDataRoots } from "../agent-run";
 
 const created: string[] = [];
 
@@ -47,9 +47,10 @@ function makeEvent<TPayload>(
   return {
     id: `event-${index}`,
     sessionId,
-    turnId: "turn-1",
+    agentRunId: "turn-1",
     type,
     timestamp: new Date(2026, 5, 3, 10, index).toISOString(),
+    schemaVersion: 2,
     payload,
   };
 }
@@ -77,7 +78,9 @@ describe("getSessionPreview", () => {
         sessionId,
         "llm_usage",
         {
-          callId: "call-1",
+          llmCallId: "call-1",
+          attempt: 1,
+          durationMs: 12,
           provider: "deepseek",
           model: "deepseek-v4-flash",
           modelId: "deepseek-v4-flash",
@@ -92,7 +95,9 @@ describe("getSessionPreview", () => {
         sessionId,
         "llm_usage",
         {
-          callId: "call-2",
+          llmCallId: "call-2",
+          attempt: 1,
+          durationMs: 18,
           provider: "deepseek",
           model: "deepseek-v4-pro",
           modelId: "deepseek-v4-pro",

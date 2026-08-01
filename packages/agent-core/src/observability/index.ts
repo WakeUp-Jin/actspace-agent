@@ -8,6 +8,18 @@ export type {
   AgentRunLoggerInput,
 } from "./agent-run-log";
 export {
+  AGENT_TRACE_MAX_BYTES,
+  createAgentTraceWriter,
+  getAgentTraceFilePath,
+  getAgentTraceSummaryFilePath,
+  sanitizeTraceValue,
+} from "./agent-trace";
+export type {
+  AgentTraceWriter,
+  AgentTraceWriterInput,
+  AgentTraceWriteInput,
+} from "./agent-trace";
+export {
   calculateCacheHitRatio,
   createCacheAuditTracker,
   describeContextForCacheAudit,

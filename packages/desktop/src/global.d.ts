@@ -4,18 +4,30 @@ declare global {
   interface Window {
     actspace: {
       getBootstrapState: () => Promise<import("@actspace/shared").BootstrapState>;
-      runTurn: (
-        input: import("@actspace/shared").RunTurnInput
-      ) => Promise<import("@actspace/shared").AgentTurnResult>;
+      runAgent: (
+        input: import("@actspace/shared").RunAgentInput
+      ) => Promise<import("@actspace/shared").AgentRunResult>;
       compactContext: (
         input: import("@actspace/shared").CompactContextInput
       ) => Promise<import("@actspace/shared").CompactContextResult>;
       generateEvalCandidate?: (
         input: import("@actspace/shared").GenerateEvalCandidateInput
       ) => Promise<import("@actspace/shared").GenerateEvalCandidateResult>;
-      abortTurn: (
-        input: import("@actspace/shared").AbortTurnInput
+      abortAgentRun: (
+        input: import("@actspace/shared").AbortAgentRunInput
       ) => Promise<boolean>;
+      listAgentTraces?: (
+        input: import("@actspace/shared").AgentTraceListInput
+      ) => Promise<import("@actspace/shared").AgentTraceListResult>;
+      readAgentTrace?: (
+        input: import("@actspace/shared").AgentTraceReadInput
+      ) => Promise<import("@actspace/shared").AgentTraceReadResult>;
+      getAgentAnalysisIndex?: (
+        input: import("@actspace/shared").AgentAnalysisIndexInput
+      ) => Promise<import("@actspace/shared").AgentAnalysisIndexResult>;
+      clearAgentTraces?: (
+        input: import("@actspace/shared").AgentTraceClearInput
+      ) => Promise<import("@actspace/shared").AgentTraceClearResult>;
       selectFiles?: () => Promise<import("@actspace/shared").SelectFilesResult>;
       selectWorkspaceDirectory?: () => Promise<import("@actspace/shared").SelectWorkspaceDirectoryResult>;
       getPathForFile?: (file: File) => string;

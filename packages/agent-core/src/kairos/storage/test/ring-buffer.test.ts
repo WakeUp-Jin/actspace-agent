@@ -5,7 +5,7 @@ import { SessionEventRingBuffer } from "../ring-buffer";
 const evt = (id: string): SessionEvent => ({
   id,
   sessionId: "s",
-  turnId: "t",
+  agentRunId: "t",
   type: "user_message",
   timestamp: new Date().toISOString(),
   payload: {},

@@ -8,7 +8,7 @@
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type {
-  AgentTurnResult,
+  AgentRunResult,
   ContextState,
   SessionCreateInput,
   SessionListInput,
@@ -20,7 +20,7 @@ import type {
 import type { SessionStorePaths, WriteResult } from "./types";
 import { appendEvents } from "./jsonl";
 import { parseJsonl } from "./jsonl";
-import { createMeta, incrementTurnCount, readMeta, updateMeta } from "./meta";
+import { createMeta, incrementAgentRunCount, readMeta, updateMeta } from "./meta";
 import { recoverSession } from "./recovery";
 
 /** 构造 session 目录路径 */
@@ -260,7 +260,7 @@ export async function setSessionWorkspace(
 /** 写入一轮完整的 turn 结果（events + meta 更新） */
 export async function writeSessionResult(
   paths: SessionStorePaths,
-  result: AgentTurnResult,
+  result: AgentRunResult,
 ): Promise<WriteResult> {
   await ensureSessionStore(paths.root);
 
@@ -280,7 +280,7 @@ export async function writeSessionResult(
 
   // 增量更新 meta
   const model = result.finalReply?.model;
-  const metaResult = await incrementTurnCount(paths.metaPath, model);
+  const metaResult = await incrementAgentRunCount(paths.metaPath, model);
   if (!metaResult.ok) return metaResult;
 
   if (result.contextState) {
@@ -307,7 +307,7 @@ function getSafeSubAgentTranscriptPath(
 ): string | null {
   if (
     !isSafePathSegment(transcriptRef.sessionId) ||
-    !isSafePathSegment(transcriptRef.turnId) ||
+    !isSafePathSegment(transcriptRef.agentRunId) ||
     !isSafePathSegment(transcriptRef.runId)
   ) {
     return null;
@@ -315,7 +315,7 @@ function getSafeSubAgentTranscriptPath(
   if (basename(paths.root) !== transcriptRef.sessionId) {
     return null;
   }
-  return join(paths.root, "subagents", transcriptRef.turnId, `${transcriptRef.runId}.jsonl`);
+  return join(paths.root, "subagents", transcriptRef.agentRunId, `${transcriptRef.runId}.jsonl`);
 }
 
 export async function writeSubAgentTranscripts(
@@ -418,7 +418,7 @@ export async function listSessionRecords(
           id: meta.id,
           title: meta.title,
           updatedAt: meta.updatedAt,
-          turnCount: meta.turnCount,
+          agentRunCount: meta.agentRunCount,
         };
         if (meta.workspaceId) item.workspaceId = meta.workspaceId;
         if (meta.workspaceRoot) item.workspaceRoot = meta.workspaceRoot;

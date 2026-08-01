@@ -18,7 +18,7 @@ import {
   readSessionRecord,
   updateMeta,
 } from "@actspace/agent-core";
-import type { AppDataRoots } from "./agent-turn";
+import type { AppDataRoots } from "./agent-run";
 import type { ModelRuntimeService } from "./model-runtime-service";
 
 const EVAL_CANDIDATE_SYSTEM_PROMPT = [
@@ -57,7 +57,7 @@ type EvalCandidateAgentRunInput = {
   candidateRoot: string;
   originalWorkspaceRoot: string;
   sessionPath: string;
-  targetTurnId: string;
+  targetAgentRunId: string;
   originalUserInput: string;
   failureReason: string;
   model?: GenerateEvalCandidateInput["model"];
@@ -81,7 +81,7 @@ type CandidateMetadata = {
   status: "generating" | "generated" | "failed";
   source: {
     sessionId: string;
-    turnId: string;
+    agentRunId: string;
     userInput: string;
     failureReason: string;
     capturedAt: string;
@@ -120,7 +120,7 @@ export async function generateEvalCandidate(
     status: "generating",
     source: {
       sessionId: input.sessionId,
-      turnId: target.turnId,
+      agentRunId: target.agentRunId,
       userInput: target.content,
       failureReason,
       capturedAt,
@@ -139,7 +139,7 @@ export async function generateEvalCandidate(
       candidateRoot,
       originalWorkspaceRoot: record.meta.workspaceRoot ?? roots.defaultWorkspaceRoot,
       sessionPath: sessionPaths.sessionPath,
-      targetTurnId: target.turnId,
+      targetAgentRunId: target.agentRunId,
       originalUserInput: target.content,
       failureReason,
       model: input.model,
@@ -157,7 +157,7 @@ export async function generateEvalCandidate(
     return persistResult(input, sessionPaths, {
       candidateId,
       candidatePath: candidateRoot,
-      targetTurnId: target.turnId,
+      targetAgentRunId: target.agentRunId,
       status: "generated",
       relativePath: join("eval-candidates", candidateId),
       summary: `Eval candidate generated · ${candidateRoot}`,
@@ -172,7 +172,7 @@ export async function generateEvalCandidate(
     return persistResult(input, sessionPaths, {
       candidateId,
       candidatePath: candidateRoot,
-      targetTurnId: target.turnId,
+      targetAgentRunId: target.agentRunId,
       status: "failed",
       relativePath: join("eval-candidates", candidateId),
       summary: `Eval candidate generation failed · ${message}`,
@@ -191,7 +191,7 @@ async function runEvalCandidateAgent(
     {
       systemPrompt: EVAL_CANDIDATE_SYSTEM_PROMPT,
       sessionId: `eval-${Date.now()}`,
-      turnId: input.targetTurnId,
+      agentRunId: input.targetAgentRunId,
     },
   );
   config.toolManagerConfig.disabledTools = [
@@ -233,7 +233,7 @@ async function runEvalCandidateAgentWithRuntime(
   }, input.candidateRoot, undefined, {
     systemPrompt: EVAL_CANDIDATE_SYSTEM_PROMPT,
     sessionId: `eval-${Date.now()}`,
-    turnId: input.targetTurnId,
+    agentRunId: input.targetAgentRunId,
   });
   config.toolManagerConfig.disabledTools = [
     ...new Set([...(config.toolManagerConfig.disabledTools ?? []), ...DISABLED_GENERATOR_TOOLS]),
@@ -259,7 +259,7 @@ function buildGeneratorTask(input: EvalCandidateAgentRunInput): string {
     `Candidate directory: ${input.candidateRoot}`,
     `Original workspace (read only): ${input.originalWorkspaceRoot}`,
     `Session history JSONL (read only): ${input.sessionPath}`,
-    `Target turn id: ${input.targetTurnId}`,
+    `Target turn id: ${input.targetAgentRunId}`,
     "",
     "Original user input:",
     input.originalUserInput,
@@ -271,14 +271,14 @@ function buildGeneratorTask(input: EvalCandidateAgentRunInput): string {
   ].join("\n");
 }
 
-function findLatestUserTurn(events: SessionEvent[]): { turnId: string; content: string } | null {
+function findLatestUserTurn(events: SessionEvent[]): { agentRunId: string; content: string } | null {
   for (let index = events.length - 1; index >= 0; index--) {
     const event = events[index];
     if (event.type !== "user_message") continue;
     const payload = event.payload as UserMessagePayload;
     if (payload.source) continue;
     if (!payload.content.trim()) continue;
-    return { turnId: event.turnId, content: payload.content };
+    return { agentRunId: event.agentRunId, content: payload.content };
   }
   return null;
 }
@@ -324,7 +324,7 @@ async function persistResult(
     summary: string;
     candidateId?: string;
     candidatePath?: string;
-    targetTurnId?: string;
+    targetAgentRunId?: string;
     relativePath?: string;
     error?: string;
   },
@@ -338,7 +338,7 @@ async function persistResult(
   };
   const event = createPersistedSessionEvent(
     input.sessionId,
-    input.turnId,
+    input.agentRunId,
     "eval_candidate",
     payload,
   );
@@ -353,8 +353,8 @@ async function persistResult(
 
   return {
     sessionId: input.sessionId,
-    turnId: input.turnId,
-    targetTurnId: result.targetTurnId,
+    agentRunId: input.agentRunId,
+    targetAgentRunId: result.targetAgentRunId,
     status: result.status,
     candidateId: result.candidateId,
     candidatePath: result.candidatePath,

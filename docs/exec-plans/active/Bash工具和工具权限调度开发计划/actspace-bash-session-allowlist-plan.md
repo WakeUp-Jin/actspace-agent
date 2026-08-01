@@ -49,7 +49,7 @@
   - `packages/shared/src/ipc.ts`
 - main
   - `packages/desktop/src/main/approval-registry.ts`
-  - `packages/desktop/src/main/agent-turn.ts`
+  - `packages/desktop/src/main/agent-run.ts`
   - `packages/desktop/src/main/index.ts`
   - `packages/desktop/src/main/user-config.ts`（新增）
 - preload / renderer
@@ -156,7 +156,7 @@
 - 启动时读 user allowlist，构造 main 进程持有的 `BashAllowlistStore`（实际是 wrapper：内部维护 in-memory，promote 时调 `writeBashAllowlist`）。
 - 注册 IPC：`allowlist:promote`（输入 `{ prefix }`）、`allowlist:list`（返回 session + user）。
 
-`packages/desktop/src/main/agent-turn.ts`：
+`packages/desktop/src/main/agent-run.ts`：
 
 - 把 main 持有的 store 注入到 `buildAgentConfig`。
 - session 加载时按 session.jsonl 的 `bash_allowlist_added` 事件 replay 到 store（仅 session 桶）。
@@ -223,7 +223,7 @@
    - 验证：`pnpm --filter @actspace/agent-core test` 全绿；`pnpm typecheck` 全绿。
 
 7. **main: user-config + IPC 通道**
-   - 文件：`user-config.ts`、`main/index.ts`、`main/agent-turn.ts`、`approval-registry.ts`。
+   - 文件：`user-config.ts`、`main/index.ts`、`main/agent-run.ts`、`approval-registry.ts`。
    - 验证：`pnpm typecheck` 全绿；手动构造一个 `bash-allowlist.json` 读出来正确。
 
 8. **preload + global.d.ts**

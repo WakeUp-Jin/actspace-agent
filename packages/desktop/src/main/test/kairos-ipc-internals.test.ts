@@ -225,9 +225,9 @@ function makeEvent(id: string): SessionEvent {
   return {
     id,
     sessionId: "kairos-2026-05-27",
-    turnId: "turn-1",
+    agentRunId: "turn-1",
     timestamp: new Date().toISOString(),
-    schemaVersion: 1,
+    schemaVersion: 2,
     type: "kairos_tick_injected",
     payload: { trigger: "auto", content: "<tick/>" },
   } as SessionEvent;

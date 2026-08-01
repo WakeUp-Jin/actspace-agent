@@ -57,6 +57,14 @@ export class OpenAICompletionsService implements LLMService {
     });
   }
 
+  get provider(): string {
+    return this.config.provider;
+  }
+
+  get model(): string {
+    return this.config.model;
+  }
+
   stream(context: Context, options?: StreamOptions): AssistantMessageEventStream {
     return this._stream(convertMessages(context, this.config), context.tools, options);
   }

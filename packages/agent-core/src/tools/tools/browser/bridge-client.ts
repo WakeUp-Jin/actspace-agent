@@ -57,7 +57,7 @@ export class BridgeClient {
       // Send session.start
       await this.send("agent_browser_bridge.session.start", {
         sessionId: this.options.sessionId,
-        turnId: this.options.turnId,
+        agentRunId: this.options.agentRunId,
       });
     } catch (error) {
       this.cleanup();
@@ -96,7 +96,7 @@ export class BridgeClient {
       try {
         await this.send("agent_browser_bridge.session.end", {
           sessionId: this.options.sessionId,
-          turnId: this.options.turnId,
+          agentRunId: this.options.agentRunId,
         });
       } catch {
         // Best effort

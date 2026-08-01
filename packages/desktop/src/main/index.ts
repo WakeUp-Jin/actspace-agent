@@ -6,7 +6,7 @@
  * - 窗口创建与管理
  * - IPC 路由注册（把请求分发给对应模块）
  *
- * Agent turn 执行逻辑在 ./agent-turn.ts。
+ * Agent turn 执行逻辑在 ./agent-run.ts。
  */
 
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, safeStorage } from "electron";
@@ -15,14 +15,18 @@ import { access, mkdir } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type {
-  AbortTurnInput,
+  AbortAgentRunInput,
+  AgentAnalysisIndexInput,
+  AgentTraceClearInput,
+  AgentTraceListInput,
+  AgentTraceReadInput,
   ApprovalDecideInput,
   ApprovalListPendingInput,
   ClearProviderKeyInput,
   CompactContextInput,
   GenerateEvalCandidateInput,
   ComposerAttachment,
-  RunTurnInput,
+  RunAgentInput,
   SelectFilesResult,
   SelectWorkspaceDirectoryResult,
   SessionArchiveInput,
@@ -113,12 +117,12 @@ import {
 } from "@actspace/agent-core";
 import type { SessionEvent, SessionRecord } from "@actspace/shared";
 import {
-  runAndPersistTurn,
-  abortTurn,
-  isSessionTurnActive,
+  runAndPersistAgentRun,
+  abortAgentRun,
+  isSessionAgentRunActive,
   type AgentRuntimeContextLoader,
   type AppDataRoots,
-} from "./agent-turn";
+} from "./agent-run";
 import { compactAndPersistContext } from "./context-compact";
 import { generateEvalCandidate } from "./eval-candidate-service";
 import { listVisualizations, visualizeReply } from "./visualize-service";
@@ -130,6 +134,7 @@ import { showArtifactContextMenu } from "./artifact-context-menu-service";
 import { getWorkspaceGitChanges, initializeGitRepository } from "./review-git-service";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "./workspace-registry-service";
 import { getSessionPreview } from "./session-preview-service";
+import { clearAgentTraces, enforceAgentTraceRetention, getAgentAnalysisIndex, listAgentTraces, readAgentTrace } from "./agent-trace-service";
 import { LocalUpdateService } from "./local-update-service";
 import { PendingApprovalRegistry } from "./approval-registry";
 import {
@@ -789,7 +794,7 @@ async function reconcileKairosModelChange(roots: AppDataRoots): Promise<void> {
 // ─── 审核注册表（单例） ───
 
 const approvalRegistry = new PendingApprovalRegistry({
-  onApprovalRequired: (request, sessionId, turnId) => {
+  onApprovalRequired: (request, sessionId, agentRunId) => {
     const win = getMainWindow();
     if (!win) return;
     win.webContents.send("agent:stream", {
@@ -804,10 +809,10 @@ const approvalRegistry = new PendingApprovalRegistry({
       approvalScope: request.approvalScope,
       executionEnvironment: request.executionEnvironment,
       sessionId,
-      turnId,
+      agentRunId,
     });
   },
-  onApprovalResolved: (request, decision, sessionId, turnId) => {
+  onApprovalResolved: (request, decision, sessionId, agentRunId) => {
     const win = getMainWindow();
     if (!win) return;
     win.webContents.send("agent:stream", {
@@ -817,7 +822,7 @@ const approvalRegistry = new PendingApprovalRegistry({
       decision: decision.decision,
       approvalScope: request.approvalScope,
       sessionId,
-      turnId,
+      agentRunId,
     });
   },
 });
@@ -837,22 +842,22 @@ async function registerIpc() {
     });
   });
 
-  ipcMain.handle("agent:run-turn", async (_event, input: RunTurnInput) => {
+  ipcMain.handle("agent:run", async (_event, input: RunAgentInput) => {
     const roots = await ensureDataDirectories();
     // Kairos 礼让钩子：让正在 sleep 的 Kairos 让位给 user，turn 结束后 5s 才允许 Kairos 重新投 tick。
     // controller 尚未初始化时（用户没开启 Kairos）跳过 hook，避免不必要的副作用。
     try {
-      kairosController?.notifyMainAgentTurnStart();
+      kairosController?.notifyMainAgentRunStart();
     } catch (err) {
-      logMain("kairos notifyMainAgentTurnStart threw", { error: err instanceof Error ? err.message : String(err) });
+      logMain("kairos notifyMainAgentRunStart threw", { error: err instanceof Error ? err.message : String(err) });
     }
     try {
       // exploreModelId 是全局设置，不由 renderer 每轮上送；在 main 从 settings 注入到 turn 输入。
-      const turnInput: RunTurnInput = {
+      const turnInput: RunAgentInput = {
         ...input,
         exploreModelId: input.exploreModelId ?? getSettingsService().get().agent.exploreModelId,
       };
-      const result = await runAndPersistTurn(
+      const result = await runAndPersistAgentRun(
         turnInput,
         roots,
         getMainWindow,
@@ -872,30 +877,30 @@ async function registerIpc() {
         },
         getModelRuntimeService(),
       );
-      logMain("run turn completed", {
+      logMain("agent run completed", {
         sessionId: input.sessionId,
-        turnId: input.turnId,
+        agentRunId: input.agentRunId,
         status: result.status,
       });
       return result;
     } catch (error) {
-      logMain("run turn failed", {
+      logMain("agent run failed", {
         sessionId: input.sessionId,
-        turnId: input.turnId,
+        agentRunId: input.agentRunId,
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     } finally {
       try {
-        kairosController?.notifyMainAgentTurnEnd();
+        kairosController?.notifyMainAgentRunEnd();
       } catch (err) {
-        logMain("kairos notifyMainAgentTurnEnd threw", { error: err instanceof Error ? err.message : String(err) });
+        logMain("kairos notifyMainAgentRunEnd threw", { error: err instanceof Error ? err.message : String(err) });
       }
     }
   });
 
-  ipcMain.handle("agent:abort-turn", async (_event, input: AbortTurnInput) => {
-    return abortTurn(input);
+  ipcMain.handle("agent:abort-run", async (_event, input: AbortAgentRunInput) => {
+    return abortAgentRun(input);
   });
 
   ipcMain.handle("context:compact", async (_event, input: CompactContextInput) => {
@@ -1068,6 +1073,26 @@ async function registerIpc() {
     return readSessionRecord(createSessionStorePaths(join(roots.sessionRoot, input.sessionId)));
   });
 
+  ipcMain.handle("agent-trace:list", async (_event, input: AgentTraceListInput) => {
+    const roots = await ensureDataDirectories();
+    return listAgentTraces(roots.sessionRoot, input);
+  });
+
+  ipcMain.handle("agent-trace:read", async (_event, input: AgentTraceReadInput) => {
+    const roots = await ensureDataDirectories();
+    return readAgentTrace(roots.sessionRoot, input);
+  });
+
+  ipcMain.handle("agent-analysis:index", async (_event, input: AgentAnalysisIndexInput) => {
+    const roots = await ensureDataDirectories();
+    return getAgentAnalysisIndex(roots.sessionRoot, input);
+  });
+
+  ipcMain.handle("agent-trace:clear", async (_event, input: AgentTraceClearInput) => {
+    const roots = await ensureDataDirectories();
+    return clearAgentTraces(roots.sessionRoot, input);
+  });
+
   ipcMain.handle("session:get-preview", async (_event, input: SessionPreviewInput) => {
     const roots = await ensureDataDirectories();
     return getSessionPreview(input, roots);
@@ -1167,7 +1192,7 @@ async function registerIpc() {
   });
 
   ipcMain.handle("session:fork", async (_event, input: SessionForkInput) => {
-    if (isSessionTurnActive(input.sessionId)) {
+    if (isSessionAgentRunActive(input.sessionId)) {
       throw new Error("Cannot fork a session while its turn is running or waiting for approval.");
     }
     const roots = await ensureDataDirectories();
@@ -1738,6 +1763,15 @@ process.on("unhandledRejection", (reason) => {
 app.whenReady().then(async () => {
   app.setAppUserModelId(APP_ID);
   const roots = await ensureDataDirectories();
+  void enforceAgentTraceRetention(roots.sessionRoot).then((result) => {
+    if (result.filesDeleted > 0) {
+      logMain("agent trace retention cleanup completed", result);
+    }
+  }).catch((error: unknown) => {
+    logMain("agent trace retention cleanup failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
   // 先初始化设置：load() 会把持久化设置覆盖到 process.env 并刷新 env，
   // 这样后续的 Kairos 初始化与首个 agent turn 都能拿到生效后的配置。
   settingsService = new SettingsService({ dataRoot: roots.dataRoot, crypto: electronSecretCrypto });

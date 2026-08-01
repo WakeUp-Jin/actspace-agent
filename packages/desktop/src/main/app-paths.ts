@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AppDataRoots } from "./agent-turn";
+import type { AppDataRoots } from "./agent-run";
 
 type ReadText = (path: string) => Promise<string>;
 

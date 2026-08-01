@@ -71,7 +71,7 @@ describe("Agent tool Explore runner", () => {
         llm,
         workspaceRoot,
         sessionId: "session-agent",
-        turnId: "turn-main",
+        agentRunId: "turn-main",
       },
       parentToolCallId: "tc-agent",
       eventSink: (event) => {
@@ -84,7 +84,7 @@ describe("Agent tool Explore runner", () => {
     expect(output.transcriptRef).toMatchObject({
       kind: "subagent_transcript",
       sessionId: "session-agent",
-      turnId: "turn-main",
+      agentRunId: "turn-main",
     });
     expect(output.stats.toolCallCount).toBe(1);
     expect(output.stats.exploredFileCount).toBe(1);
@@ -139,7 +139,7 @@ describe("Agent tool Explore runner", () => {
         llm,
         workspaceRoot,
         sessionId: "session-agent",
-        turnId: "turn-main",
+        agentRunId: "turn-main",
       },
       parentToolCallId: "tc-agent",
     });

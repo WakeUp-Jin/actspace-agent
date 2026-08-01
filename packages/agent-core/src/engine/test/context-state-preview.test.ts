@@ -119,6 +119,6 @@ describe("createContextState", () => {
     const state = createContextState(snapshot, "session-1", "live", entries);
 
     expect(state.entries).toBe(entries);
-    expect(state.activeTurnId).toBe("live");
+    expect(state.activeAgentRunId).toBe("live");
   });
 });

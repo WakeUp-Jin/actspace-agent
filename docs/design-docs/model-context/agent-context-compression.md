@@ -14,7 +14,7 @@ actspace 的长期产品原则之一是「上下文的绝对控制」。但当�
 | Bash 输出 | `run-process` 内存上限 64000 字符 → scheduler 再切到 2000 | 全量结果无处可查，模型无法回看 |
 | 历史压缩 | `ContextManager.needsCompression()` 存在但从未被调用，无 `compact()` 方法，`compressKeepRatio` 配置闲置 | 主 Agent 没有任何历史压缩，长会话会撑爆窗口 |
 | 上下文窗口 | `ContextManager` 默认 `contextWindow=200_000`，`createForSession` 不传 config | 与 `modelSpec.contextWindow`（DeepSeek 1_000_000 / Kimi 256_000）脱节，阈值判断不准 |
-| tmp 目录 | `<userData>/tmp` 已由 `main/index.ts` 创建并经 `AppDataRoots.tmpRoot` 传到 `agent-turn.ts` | 未透传进 agent-core，工具拿不到落盘目录 |
+| tmp 目录 | `<userData>/tmp` 已由 `main/index.ts` 创建并经 `AppDataRoots.tmpRoot` 传到 `agent-run.ts` | 未透传进 agent-core，工具拿不到落盘目录 |
 
 `packages/shared/src/session.ts` 的 `ToolExecutionResult` 已预留 `rawOutput` / `truncatedOutput` / `modelOutput` / `rawOutputRef: { kind: "inline" | "file" }` 四个字段，但 `engine/bridge.ts#createToolExecutionResult` 当前把它们都填成同一份截断文本。本设计正好把这四个字段填出真实语义。
 
@@ -190,7 +190,7 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 3. `ContextManager.compactNow(summarizer)` 跳过 token 阈值和最小调用间隔检查，但仍复用 `ConversationContext.compress` 的安全切点、结构化摘要和 fallback 逻辑。
 4. 无可压区时返回 `skipped`，消息流显示 `Nothing to compact`；有可压区时写入 `context_compaction` 和最新 `context_snapshot`，刷新 `context-state.json`。
 
-手动压缩是系统事件，不递增普通对话 `turnCount`，但会更新 session `updatedAt`，便于侧边栏按最近操作排序。
+手动压缩是系统事件，不递增普通对话 `agentRunCount`，但会更新 session `updatedAt`，便于侧边栏按最近操作排序。
 
 ### 触发位置与时机
 
@@ -281,7 +281,7 @@ processToolOutput(tool, renderedText, ctx):     # tool.kind != bash
 - `engine/agent.ts`：把 `contextManager.compactIfNeeded` 包成 `maybeCompact` 传入 loop。
 - `engine/create-agent-deps.ts`：`buildAgentConfig` 增加 `tmpRoot` / `sessionId` 入参并填 `ToolManagerConfig`；构造 `summarizer`。
 - `engine/bridge.ts`：`createToolExecutionResult` 如实填四字段。
-- `desktop/src/main/agent-turn.ts`：把 `roots.tmpRoot` + `input.sessionId` 透传进 `buildAgentConfig`。
+- `desktop/src/main/agent-run.ts`：把 `roots.tmpRoot` + `input.sessionId` 透传进 `buildAgentConfig`。
 - 读取类四工具 executor + `workspace-guard`：放开读边界。
 
 ## 观测与持久化

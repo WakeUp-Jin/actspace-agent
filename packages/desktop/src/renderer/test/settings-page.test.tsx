@@ -63,7 +63,7 @@ const archivedSessions: SessionListItem[] = [
     id: "session-archived-1",
     title: "Archived planning session",
     updatedAt: "2026-06-01T10:00:00.000Z",
-    turnCount: 4,
+    agentRunCount: 4,
     workspaceRoot: "/repo/actspace-agent",
     archived: true,
   },
@@ -88,6 +88,13 @@ describe("SettingsPage", () => {
     path: "/tmp/actspace/prompts/main-agent.md",
     content: input.content,
   }));
+
+  it("opens analysis observability from the settings navigation", async () => {
+    const onOpenAnalysis = vi.fn();
+    renderSettingsPage({ onBack: () => {}, onOpenAnalysis });
+    await userEvent.click(await screen.findByRole("button", { name: "分析观测" }));
+    expect(onOpenAnalysis).toHaveBeenCalledTimes(1);
+  });
   const setProviderKey = vi.fn(async () => ({ ok: true }));
   const clearProviderKey = vi.fn(async () => ({ ok: true }));
   const testProviderConnection = vi.fn(async () => ({ ok: true, message: "连接成功" }));

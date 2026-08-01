@@ -24,7 +24,7 @@ import type { SessionListItem, WorkspaceEntry } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 export type SidebarMode = "expanded" | "hidden";
-export type SidebarView = "chat" | "lab" | "usage" | "kairos" | "settings";
+export type SidebarView = "chat" | "lab" | "usage" | "kairos" | "settings" | "analysis";
 export type NewSessionInput = {
   workspaceId?: string;
   workspaceRoot?: string;

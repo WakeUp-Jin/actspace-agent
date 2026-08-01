@@ -17,7 +17,7 @@ export type AgentRunLogger = {
 export type AgentRunLoggerInput = {
   logRoot: string;
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   now?: Date;
 };
 
@@ -48,7 +48,7 @@ export async function createAgentRunLogger(input: AgentRunLoggerInput): Promise<
   const createdAt = input.now ?? new Date();
   const filePath = join(
     dir,
-    `${formatDateForFileName(createdAt)}-${sanitizePart(input.sessionId)}-${sanitizePart(input.turnId)}.jsonl`,
+    `${formatDateForFileName(createdAt)}-${sanitizePart(input.sessionId)}-${sanitizePart(input.agentRunId)}.jsonl`,
   );
 
   const write: AgentRunLogger["write"] = async (event) => {

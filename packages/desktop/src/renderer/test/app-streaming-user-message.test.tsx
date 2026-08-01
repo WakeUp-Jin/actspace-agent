@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, BootstrapState, CompactContextInput, GenerateEvalCandidateInput, ReviewGetWorkspaceChangesResult, RunTurnInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
+import type { AppSettings, BootstrapState, CompactContextInput, GenerateEvalCandidateInput, ReviewGetWorkspaceChangesResult, RunAgentInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
@@ -64,7 +64,7 @@ const settingsApiStub = {
   }),
   compactContext: async (input: CompactContextInput) => ({
     sessionId: input.sessionId,
-    turnId: input.turnId,
+    agentRunId: input.agentRunId,
     status: "skipped" as const,
     events: [],
     contextSnapshot: {
@@ -123,11 +123,12 @@ function createEmptySessionRecord(sessionId: string): SessionRecord {
   const now = new Date().toISOString();
   return {
     meta: {
+      schemaVersion: 2,
       id: sessionId,
       title: "New chat",
       createdAt: now,
       updatedAt: now,
-      turnCount: 0,
+      agentRunCount: 0,
     },
     events: [],
     messageBlocks: [],
@@ -207,13 +208,13 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "Review summary",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
         workspaceRoot: "/tmp/workspace",
       },
     ];
     let reviewAdditions = 7;
     let reviewDeletions = 2;
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
     const getWorkspaceReview = vi.fn(async () => createReviewChanges(reviewAdditions, reviewDeletions));
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -228,7 +229,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -250,9 +251,9 @@ describe("App streaming user message", () => {
       ...settingsApiStub,
       getWorkspaceReview,
       onAgentStream: () => () => {},
-      runTurn: () =>
+      runAgent: () =>
         new Promise((resolve) => {
-          resolveRunTurn = resolve;
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -273,9 +274,9 @@ describe("App streaming user message", () => {
     reviewAdditions = 10;
     reviewDeletions = 1;
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: "turn-review-summary-finished",
+        agentRunId: "turn-review-summary-finished",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -302,7 +303,7 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "Hover preview",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
         workspaceRoot: "/tmp/workspace",
       },
     ];
@@ -325,7 +326,7 @@ describe("App streaming user message", () => {
       getSession: async () => record,
       getSessionPreview,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -346,9 +347,9 @@ describe("App streaming user message", () => {
       listPendingApprovals: async () => [],
       ...settingsApiStub,
       onAgentStream: () => () => {},
-      runTurn: async () => ({
+      runAgent: async () => ({
         sessionId,
-        turnId: "turn-unused",
+        agentRunId: "turn-unused",
         status: "completed",
         events: [],
         contextSnapshot: null,
@@ -377,7 +378,7 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
 
@@ -388,7 +389,7 @@ describe("App streaming user message", () => {
       value: scrollIntoViewMock,
     });
 
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
 
     window.actspace = {
@@ -397,7 +398,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -418,9 +419,9 @@ describe("App streaming user message", () => {
       listPendingApprovals: async () => [],
       ...settingsApiStub,
       onAgentStream: () => () => {},
-      runTurn: () =>
+      runAgent: () =>
         new Promise((resolve) => {
-          resolveRunTurn = resolve;
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -435,9 +436,9 @@ describe("App streaming user message", () => {
     });
 
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: "turn-scroll-finished",
+        agentRunId: "turn-scroll-finished",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -459,12 +460,12 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
 
     window.actspace = {
@@ -473,7 +474,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -501,10 +502,10 @@ describe("App streaming user message", () => {
           }
         };
       },
-      runTurn: (input: RunTurnInput) =>
+      runAgent: (input: RunAgentInput) =>
         new Promise((resolve) => {
-          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
-          resolveRunTurn = resolve;
+          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -521,9 +522,9 @@ describe("App streaming user message", () => {
     });
 
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: "turn-finished",
+        agentRunId: "turn-finished",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -545,13 +546,13 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "Model wait",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let activeTurnId = "";
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let activeAgentRunId = "";
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
 
     window.actspace = {
@@ -560,7 +561,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -588,10 +589,10 @@ describe("App streaming user message", () => {
           }
         };
       },
-      runTurn: (input: RunTurnInput) => new Promise((resolve) => {
-        activeTurnId = input.turnId;
-        streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
-        resolveRunTurn = resolve;
+      runAgent: (input: RunAgentInput) => new Promise((resolve) => {
+        activeAgentRunId = input.agentRunId;
+        streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+        resolveRunAgent = resolve;
       }),
     };
 
@@ -610,8 +611,10 @@ describe("App streaming user message", () => {
     await act(async () => {
       streamHandler?.({
         type: "tool_started",
-        sessionId,
-        turnId: activeTurnId,
+        turnId: "turn-stream",
+        llmCallId: "llm-call-stream",
+sessionId,
+        agentRunId: activeAgentRunId,
         toolCallId: "tool-wait-read",
         toolName: "read_file",
         argsPreview: "{\"path\":\"README.md\"}",
@@ -627,8 +630,10 @@ describe("App streaming user message", () => {
     await act(async () => {
       streamHandler?.({
         type: "tool_finished",
-        sessionId,
-        turnId: activeTurnId,
+        turnId: "turn-stream",
+        llmCallId: "llm-call-stream",
+sessionId,
+        agentRunId: activeAgentRunId,
         toolCallId: "tool-wait-read",
         toolName: "read_file",
         resultEventId: "evt-wait-read-finished",
@@ -646,8 +651,10 @@ describe("App streaming user message", () => {
     await act(async () => {
       streamHandler?.({
         type: "assistant_text_delta",
-        sessionId,
-        turnId: activeTurnId,
+        turnId: "turn-stream",
+        llmCallId: "llm-call-stream",
+sessionId,
+        agentRunId: activeAgentRunId,
         messageId: "evt-wait-answer",
         delta: "Model response",
       });
@@ -657,9 +664,9 @@ describe("App streaming user message", () => {
     expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
 
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: activeTurnId,
+        agentRunId: activeAgentRunId,
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -694,17 +701,17 @@ describe("App streaming user message", () => {
         id: alphaSessionId,
         title: alphaRecord.meta.title,
         updatedAt: "2026-07-17T07:10:00.000Z",
-        turnCount: 0,
+        agentRunCount: 0,
       },
       {
         id: betaSessionId,
         title: betaRecord.meta.title,
         updatedAt: "2026-07-17T07:09:00.000Z",
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
     const streamListeners = new Set<(event: RuntimeStreamEvent) => void>();
-    const turnIds = new Map<string, string>();
+    const agentRunIds = new Map<string, string>();
     const resolveTurns = new Map<string, () => void>();
     const emit = (event: RuntimeStreamEvent) => {
       for (const listener of streamListeners) listener(event);
@@ -715,7 +722,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async ({ sessionId }) => records[sessionId] ?? null,
       createSession: async () => alphaRecord,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -741,21 +748,23 @@ describe("App streaming user message", () => {
           streamListeners.delete(callback);
         };
       },
-      runTurn: (input: RunTurnInput) => new Promise((resolve) => {
-        turnIds.set(input.sessionId, input.turnId);
-        emit({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+      runAgent: (input: RunAgentInput) => new Promise((resolve) => {
+        agentRunIds.set(input.sessionId, input.agentRunId);
+        emit({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
         if (input.sessionId === betaSessionId) {
           emit({
             type: "assistant_text_delta",
-            sessionId: input.sessionId,
-            turnId: input.turnId,
+            turnId: "turn-stream",
+            llmCallId: "llm-call-stream",
+sessionId: input.sessionId,
+            agentRunId: input.agentRunId,
             messageId: "evt-beta-text",
             delta: "beta streamed once",
           });
         }
         resolveTurns.set(input.sessionId, () => resolve({
           sessionId: input.sessionId,
-          turnId: input.turnId,
+          agentRunId: input.agentRunId,
           status: "completed" as const,
           events: [],
           contextSnapshot: {
@@ -775,7 +784,7 @@ describe("App streaming user message", () => {
     await userEvent.type(composer, "alpha prompt");
     await userEvent.click(screen.getByLabelText("Send message"));
     await waitFor(() => {
-      expect(turnIds.has(alphaSessionId)).toBe(true);
+      expect(agentRunIds.has(alphaSessionId)).toBe(true);
       expect(streamListeners.size).toBe(1);
     });
 
@@ -790,12 +799,14 @@ describe("App streaming user message", () => {
     expect(screen.queryByText("beta streamed oncebeta streamed once")).toBeNull();
     expect(streamListeners.size).toBe(1);
 
-    const alphaTurnId = turnIds.get(alphaSessionId)!;
+    const alphaAgentRunId = agentRunIds.get(alphaSessionId)!;
     await act(async () => {
       emit({
         type: "assistant_text_delta",
-        sessionId: alphaSessionId,
-        turnId: alphaTurnId,
+        turnId: "turn-stream",
+        llmCallId: "llm-call-stream",
+sessionId: alphaSessionId,
+        agentRunId: alphaAgentRunId,
         messageId: "evt-stale-alpha",
         delta: "stale alpha text",
       });
@@ -826,12 +837,12 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
     let currentRecord = record;
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
     let resolveFinalSessionList: ((value: SessionListItem[]) => void) | null = null;
     let listSessionsCallCount = 0;
@@ -848,7 +859,7 @@ describe("App streaming user message", () => {
       },
       getSession,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -874,13 +885,15 @@ describe("App streaming user message", () => {
           if (streamHandler === callback) streamHandler = null;
         };
       },
-      runTurn: (input: RunTurnInput) =>
+      runAgent: (input: RunAgentInput) =>
         new Promise((resolve) => {
-          streamHandler?.({ type: "turn_started", sessionId, turnId: input.turnId });
+          streamHandler?.({ type: "agent_run_started", sessionId, agentRunId: input.agentRunId });
           streamHandler?.({
             type: "assistant_text_delta",
-            sessionId,
-            turnId: input.turnId,
+            turnId: "turn-stream",
+            llmCallId: "llm-call-stream",
+sessionId,
+            agentRunId: input.agentRunId,
             messageId: "evt-stream-delta",
             delta: "handoff reply",
           });
@@ -889,19 +902,19 @@ describe("App streaming user message", () => {
             {
               id: "evt-handoff-user",
               sessionId,
-              turnId: input.turnId,
+              agentRunId: input.agentRunId,
               type: "user_message",
               timestamp,
-              schemaVersion: 1,
+              schemaVersion: 2,
               payload: { content: "handoff prompt" },
             },
             {
               id: "evt-handoff-assistant",
               sessionId,
-              turnId: input.turnId,
+              agentRunId: input.agentRunId,
               type: "assistant_message",
               timestamp,
-              schemaVersion: 1,
+              schemaVersion: 2,
               payload: {
                 content: "handoff reply",
                 stopReason: "stop",
@@ -912,11 +925,11 @@ describe("App streaming user message", () => {
           ];
           currentRecord = {
             ...record,
-            meta: { ...record.meta, updatedAt: timestamp, turnCount: 1 },
+            meta: { ...record.meta, updatedAt: timestamp, agentRunCount: 1 },
             events,
             messageBlocks: createMessageBlocks(events),
           };
-          resolveRunTurn = resolve;
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -932,9 +945,9 @@ describe("App streaming user message", () => {
     expect(streamingAssistantNode).not.toBeNull();
 
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: currentRecord.events[0].turnId,
+        agentRunId: currentRecord.events[0].agentRunId,
         status: "completed",
         events: currentRecord.events,
         contextSnapshot: {
@@ -965,9 +978,9 @@ describe("App streaming user message", () => {
   it("keeps the selected model after creating a new session and switching composer surfaces", async () => {
     const sessionId = "session-created-model";
     const record = createEmptySessionRecord(sessionId);
-    const runTurn = vi.fn(async (input: RunTurnInput) => ({
+    const runAgent = vi.fn(async (input: RunAgentInput) => ({
       sessionId: input.sessionId,
-      turnId: input.turnId,
+      agentRunId: input.agentRunId,
       status: "completed" as const,
       events: [],
       contextSnapshot: {
@@ -985,7 +998,7 @@ describe("App streaming user message", () => {
       listSessions: async () => [],
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -1006,7 +1019,7 @@ describe("App streaming user message", () => {
       listPendingApprovals: async () => [],
       ...settingsApiStub,
       onAgentStream: () => () => {},
-      runTurn,
+      runAgent,
     };
 
     renderApp();
@@ -1019,7 +1032,7 @@ describe("App streaming user message", () => {
     await userEvent.click(screen.getByLabelText("Send message"));
 
     await waitFor(() => {
-      expect(runTurn).toHaveBeenCalledTimes(1);
+      expect(runAgent).toHaveBeenCalledTimes(1);
     });
 
     composer = await screen.findByLabelText("Message composer");
@@ -1027,9 +1040,9 @@ describe("App streaming user message", () => {
     await userEvent.click(screen.getByLabelText("Send message"));
 
     await waitFor(() => {
-      expect(runTurn).toHaveBeenCalledTimes(2);
+      expect(runAgent).toHaveBeenCalledTimes(2);
     });
-    expect(runTurn.mock.calls.map(([input]) => input.model)).toEqual([
+    expect(runAgent.mock.calls.map(([input]) => input.model)).toEqual([
       "deepseek-v4-flash",
       "deepseek-v4-flash",
     ]);
@@ -1043,24 +1056,24 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    const runTurn = vi.fn();
+    const runAgent = vi.fn();
     let resolveCompactContext: (() => void) | null = null;
     const compactContext = vi.fn((input: CompactContextInput) => new Promise<Awaited<ReturnType<NonNullable<typeof window.actspace>["compactContext"]>>>((resolve) => {
       streamHandler?.({
         type: "context_compaction_started",
         sessionId: input.sessionId,
-        turnId: input.turnId,
+        agentRunId: input.agentRunId,
         trigger: "manual",
         stage: "preparing",
       });
       streamHandler?.({
         type: "context_compaction_finished",
         sessionId: input.sessionId,
-        turnId: input.turnId,
+        agentRunId: input.agentRunId,
         trigger: "manual",
         stage: "completed",
         status: "compacted",
@@ -1078,7 +1091,7 @@ describe("App streaming user message", () => {
       });
       resolveCompactContext = () => resolve({
         sessionId: input.sessionId,
-        turnId: input.turnId,
+        agentRunId: input.agentRunId,
         status: "compacted" as const,
         events: [],
         contextSnapshot: {
@@ -1097,7 +1110,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -1126,7 +1139,7 @@ describe("App streaming user message", () => {
           }
         };
       },
-      runTurn,
+      runAgent,
     };
 
     renderApp();
@@ -1139,7 +1152,7 @@ describe("App streaming user message", () => {
       expect(compactContext).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByRole("separator", { name: "Context compacted · 5 messages" })).toBeInTheDocument();
-    expect(runTurn).not.toHaveBeenCalled();
+    expect(runAgent).not.toHaveBeenCalled();
 
     await act(async () => {
       resolveCompactContext?.();
@@ -1152,27 +1165,27 @@ describe("App streaming user message", () => {
     record.events.push({
       id: "evt-user",
       sessionId,
-      turnId: "turn-user",
+      agentRunId: "turn-user",
       type: "user_message",
       timestamp: record.meta.createdAt,
-      schemaVersion: 1,
+      schemaVersion: 2,
       payload: { content: "Fix login and add tests" },
     });
     const sessions: SessionListItem[] = [{
       id: sessionId,
       title: "Eval session",
       updatedAt: record.meta.updatedAt,
-      turnCount: 1,
+      agentRunCount: 1,
     }];
-    const runTurn = vi.fn();
+    const runAgent = vi.fn();
     const generateEvalCandidate = vi.fn(async (input: GenerateEvalCandidateInput) => {
       const event: SessionEvent = {
         id: "evt-eval",
         sessionId,
-        turnId: input.turnId,
+        agentRunId: input.agentRunId,
         type: "eval_candidate",
         timestamp: new Date().toISOString(),
-        schemaVersion: 1,
+        schemaVersion: 2,
         payload: {
           candidateId: "failure-1",
           relativePath: "eval-candidates/failure-1",
@@ -1183,8 +1196,8 @@ describe("App streaming user message", () => {
       record.events.push(event);
       return {
         sessionId,
-        turnId: input.turnId,
-        targetTurnId: "turn-user",
+        agentRunId: input.agentRunId,
+        targetAgentRunId: "turn-user",
         status: "generated" as const,
         candidateId: "failure-1",
         candidatePath: "/tmp/actspace/eval-candidates/failure-1",
@@ -1198,7 +1211,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -1220,7 +1233,7 @@ describe("App streaming user message", () => {
       ...settingsApiStub,
       generateEvalCandidate,
       onAgentStream: () => () => {},
-      runTurn,
+      runAgent,
     };
 
     renderApp();
@@ -1237,7 +1250,7 @@ describe("App streaming user message", () => {
       reason: "Agent did not add tests",
     });
     expect(await screen.findByText("Eval candidate generated · /tmp/actspace/eval-candidates/failure-1")).toBeInTheDocument();
-    expect(runTurn).not.toHaveBeenCalled();
+    expect(runAgent).not.toHaveBeenCalled();
   });
 
   it("renders read tool arguments as soon as tool_started arrives", async () => {
@@ -1248,12 +1261,12 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
 
     window.actspace = {
@@ -1262,7 +1275,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -1290,13 +1303,15 @@ describe("App streaming user message", () => {
           }
         };
       },
-      runTurn: (input: RunTurnInput) =>
+      runAgent: (input: RunAgentInput) =>
         new Promise((resolve) => {
-          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
           streamHandler?.({
             type: "tool_started",
-            sessionId: input.sessionId,
-            turnId: input.turnId,
+            turnId: "turn-stream",
+            llmCallId: "llm-call-stream",
+sessionId: input.sessionId,
+            agentRunId: input.agentRunId,
             toolCallId: "tool-read-1",
             toolName: "read_file",
             argsPreview: "{\"path\":\"src/main.ts\"}",
@@ -1306,7 +1321,7 @@ describe("App streaming user message", () => {
               displayText: "Read src/main.ts",
             },
           });
-          resolveRunTurn = resolve;
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -1319,9 +1334,9 @@ describe("App streaming user message", () => {
     expect(await screen.findByText("Read src/main.ts")).toBeTruthy();
 
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: "turn-read-finished",
+        agentRunId: "turn-read-finished",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -1343,13 +1358,13 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "Write status",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let activeTurnId = "";
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let activeAgentRunId = "";
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
 
     window.actspace = {
@@ -1358,7 +1373,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -1386,15 +1401,17 @@ describe("App streaming user message", () => {
           }
         };
       },
-      runTurn: (input: RunTurnInput) =>
+      runAgent: (input: RunAgentInput) =>
         new Promise((resolve) => {
-          activeTurnId = input.turnId;
-          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          activeAgentRunId = input.agentRunId;
+          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
           for (const [index, filePath] of ["first.ts", "second.ts", "third.ts"].entries()) {
             streamHandler?.({
               type: "tool_started",
-              sessionId: input.sessionId,
-              turnId: input.turnId,
+              turnId: "turn-stream",
+              llmCallId: "llm-call-stream",
+sessionId: input.sessionId,
+              agentRunId: input.agentRunId,
               toolCallId: `tool-write-${index + 1}`,
               toolName: "write_file",
               argsPreview: JSON.stringify({ path: filePath }),
@@ -1410,7 +1427,7 @@ describe("App streaming user message", () => {
               },
             });
           }
-          resolveRunTurn = resolve;
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -1429,8 +1446,10 @@ describe("App streaming user message", () => {
       await act(async () => {
         streamHandler?.({
           type: "tool_finished",
-          sessionId,
-          turnId: activeTurnId,
+          turnId: "turn-stream",
+          llmCallId: "llm-call-stream",
+sessionId,
+          agentRunId: activeAgentRunId,
           toolCallId: `tool-write-${index}`,
           toolName: "write_file",
           resultEventId: `evt-write-${index}`,
@@ -1461,9 +1480,9 @@ describe("App streaming user message", () => {
     expect(screen.getByRole("button", { name: /Write third\.ts/ })).toBeInTheDocument();
 
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: activeTurnId,
+        agentRunId: activeAgentRunId,
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -1485,15 +1504,16 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "SubAgent stream",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
     const transcriptEvent: SessionEvent = {
       id: "evt-subagent-tool",
       sessionId,
-      turnId: "turn-subagent:subagent:run-1",
+      agentRunId: "turn-subagent:subagent:run-1",
       type: "tool_call",
       timestamp: "2026-06-03T10:00:00.000Z",
+      schemaVersion: 2,
       payload: {
         id: "tool-read-app",
         name: "read_file",
@@ -1503,7 +1523,7 @@ describe("App streaming user message", () => {
     const getWorkspaceReview = vi.fn(async () => createReviewChanges(7, 2));
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
 
     window.actspace = {
@@ -1511,7 +1531,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -1541,13 +1561,15 @@ describe("App streaming user message", () => {
           }
         };
       },
-      runTurn: (input: RunTurnInput) =>
+      runAgent: (input: RunAgentInput) =>
         new Promise((resolve) => {
-          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
           streamHandler?.({
             type: "tool_call_streaming",
-            sessionId: input.sessionId,
-            turnId: input.turnId,
+            turnId: "turn-stream",
+            llmCallId: "llm-call-stream",
+sessionId: input.sessionId,
+            agentRunId: input.agentRunId,
             toolCallId: "tool-agent-1",
             toolName: "agent",
             isInitial: true,
@@ -1562,12 +1584,12 @@ describe("App streaming user message", () => {
           streamHandler?.({
             type: "subagent_event",
             sessionId: input.sessionId,
-            turnId: input.turnId,
+            agentRunId: input.agentRunId,
             toolCallId: "tool-agent-1",
             transcriptRef: {
               kind: "subagent_transcript",
               sessionId,
-              turnId: input.turnId,
+              agentRunId: input.agentRunId,
               runId: "run-1",
             },
             event: transcriptEvent,
@@ -1580,7 +1602,7 @@ describe("App streaming user message", () => {
               transcriptRef: {
                 kind: "subagent_transcript",
                 sessionId,
-                turnId: input.turnId,
+                agentRunId: input.agentRunId,
                 runId: "run-1",
               },
               recentEvents: [
@@ -1594,7 +1616,7 @@ describe("App streaming user message", () => {
               ],
             },
           });
-          resolveRunTurn = resolve;
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -1617,9 +1639,9 @@ describe("App streaming user message", () => {
     expect(screen.queryByRole("button", { name: "Review pending changes +7 -2" })).not.toBeInTheDocument();
 
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: "turn-subagent-finished",
+        agentRunId: "turn-subagent-finished",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -1643,7 +1665,7 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "Workspace source",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
     const selectWorkspaceDirectory = vi.fn(async () => ({
@@ -1657,7 +1679,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -1679,9 +1701,9 @@ describe("App streaming user message", () => {
       selectWorkspaceDirectory,
       ...settingsApiStub,
       onAgentStream: () => () => {},
-      runTurn: async () => ({
+      runAgent: async () => ({
         sessionId,
-        turnId: "turn-unused",
+        agentRunId: "turn-unused",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -1716,21 +1738,21 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "Workspace source",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
         workspaceRoot: "/tmp/workspace",
       },
       {
         id: "session-other-workspace",
         title: "Other workspace",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
         workspaceRoot: "/tmp/alt-workspace",
       },
       {
         id: "session-default-workspace",
         title: "Default workspace chat",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
     const callOrder: string[] = [];
@@ -1738,11 +1760,11 @@ describe("App streaming user message", () => {
       callOrder.push("set-workspace");
       return { ok: true };
     });
-    const runTurn = vi.fn(async () => {
+    const runAgent = vi.fn(async () => {
       callOrder.push("run-turn");
       return {
         sessionId,
-        turnId: "turn-workspace-switch",
+        agentRunId: "turn-workspace-switch",
         status: "completed" as const,
         events: [],
         contextSnapshot: {
@@ -1761,7 +1783,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       setSessionWorkspace,
@@ -1783,7 +1805,7 @@ describe("App streaming user message", () => {
       listPendingApprovals: async () => [],
       ...settingsApiStub,
       onAgentStream: () => () => {},
-      runTurn,
+      runAgent,
     };
 
     renderApp();
@@ -1805,12 +1827,12 @@ describe("App streaming user message", () => {
         workspaceId: "ws_alt",
         workspaceRoot: "/tmp/alt-workspace",
       });
-      expect(runTurn).toHaveBeenCalledTimes(1);
+      expect(runAgent).toHaveBeenCalledTimes(1);
     });
     expect(callOrder).toEqual(["set-workspace", "run-turn"]);
   });
 
-  it("sends attachments through RunTurnInput and keeps the attachment chip while running", async () => {
+  it("sends attachments through RunAgentInput and keeps the attachment chip while running", async () => {
     const sessionId = "session-attachments";
     const record = createEmptySessionRecord(sessionId);
     const sessions: SessionListItem[] = [
@@ -1818,7 +1840,7 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
     const selectedAttachment = {
@@ -1831,8 +1853,8 @@ describe("App streaming user message", () => {
     };
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let capturedInput: RunTurnInput | null = null;
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let capturedInput: RunAgentInput | null = null;
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
 
     window.actspace = {
@@ -1840,7 +1862,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -1869,11 +1891,11 @@ describe("App streaming user message", () => {
           }
         };
       },
-      runTurn: (input: RunTurnInput) =>
+      runAgent: (input: RunAgentInput) =>
         new Promise((resolve) => {
           capturedInput = input;
-          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
-          resolveRunTurn = resolve;
+          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -1893,9 +1915,9 @@ describe("App streaming user message", () => {
     expect(await screen.findByLabelText("Attached image screenshot.png")).toBeTruthy();
 
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: "turn-attachments-finished",
+        agentRunId: "turn-attachments-finished",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -1917,12 +1939,12 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
 
     window.actspace = {
@@ -1930,7 +1952,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -1958,13 +1980,15 @@ describe("App streaming user message", () => {
           }
         };
       },
-      runTurn: (input: RunTurnInput) =>
+      runAgent: (input: RunAgentInput) =>
         new Promise((resolve) => {
-          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
           streamHandler?.({
             type: "tool_started",
-            sessionId: input.sessionId,
-            turnId: input.turnId,
+            turnId: "turn-stream",
+            llmCallId: "llm-call-stream",
+sessionId: input.sessionId,
+            agentRunId: input.agentRunId,
             toolCallId: "tool-web-search-1",
             toolName: "web_search",
             argsPreview: "{\"query\":\"最新新闻 今天\"}",
@@ -1975,7 +1999,7 @@ describe("App streaming user message", () => {
               displayText: "Web Search 最新新闻 今天",
             },
           });
-          resolveRunTurn = resolve;
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -1990,9 +2014,9 @@ describe("App streaming user message", () => {
     expect(screen.queryByText("result answer body")).toBeNull();
 
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: "turn-web-search-finished",
+        agentRunId: "turn-web-search-finished",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -2014,12 +2038,12 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
 
     window.actspace = {
@@ -2027,7 +2051,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -2055,13 +2079,15 @@ describe("App streaming user message", () => {
           }
         };
       },
-      runTurn: (input: RunTurnInput) =>
+      runAgent: (input: RunAgentInput) =>
         new Promise((resolve) => {
-          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
           streamHandler?.({
             type: "tool_started",
-            sessionId: input.sessionId,
-            turnId: input.turnId,
+            turnId: "turn-stream",
+            llmCallId: "llm-call-stream",
+sessionId: input.sessionId,
+            agentRunId: input.agentRunId,
             toolCallId: "tool-grep-1",
             toolName: "grep",
             argsPreview: "{\"pattern\":\"ToolUiPreview\",\"glob\":\"*.ts\"}",
@@ -2074,8 +2100,10 @@ describe("App streaming user message", () => {
           });
           streamHandler?.({
             type: "tool_started",
-            sessionId: input.sessionId,
-            turnId: input.turnId,
+            turnId: "turn-stream",
+            llmCallId: "llm-call-stream",
+sessionId: input.sessionId,
+            agentRunId: input.agentRunId,
             toolCallId: "tool-glob-1",
             toolName: "glob",
             argsPreview: "{\"pattern\":\"src/**/*.ts\",\"path\":\"packages/agent-core\"}",
@@ -2086,7 +2114,7 @@ describe("App streaming user message", () => {
               displayText: "Glob src/**/*.ts in packages/agent-core",
             },
           });
-          resolveRunTurn = resolve;
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -2101,9 +2129,9 @@ describe("App streaming user message", () => {
     expect(screen.queryByText("Searched files *.ts for ToolUiPreview")).toBeNull();
 
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: "turn-grep-glob-finished",
+        agentRunId: "turn-grep-glob-finished",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -2125,14 +2153,14 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "Approval session",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
 
     let approvalPending = false;
-    let activeTurnId = "";
+    let activeAgentRunId = "";
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
 
     window.actspace = {
@@ -2140,7 +2168,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -2179,14 +2207,16 @@ describe("App streaming user message", () => {
           }
         };
       },
-      runTurn: (input: RunTurnInput) =>
+      runAgent: (input: RunAgentInput) =>
         new Promise((resolve) => {
-          activeTurnId = input.turnId;
-          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          activeAgentRunId = input.agentRunId;
+          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
           streamHandler?.({
             type: "tool_started",
-            sessionId: input.sessionId,
-            turnId: input.turnId,
+            turnId: "turn-stream",
+            llmCallId: "llm-call-stream",
+sessionId: input.sessionId,
+            agentRunId: input.agentRunId,
             toolCallId: "tool-bash-approval",
             toolName: "bash",
             argsPreview: "{\"command\":\"pnpm install\"}",
@@ -2202,7 +2232,7 @@ describe("App streaming user message", () => {
           streamHandler?.({
             type: "tool_approval_required",
             sessionId: input.sessionId,
-            turnId: input.turnId,
+            agentRunId: input.agentRunId,
             toolCallId: "tool-bash-approval",
             toolName: "bash",
             requestId: "approval-bash-1",
@@ -2211,7 +2241,7 @@ describe("App streaming user message", () => {
             command: "pnpm install",
             executionEnvironment: "sandbox",
           });
-          resolveRunTurn = resolve;
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -2229,15 +2259,17 @@ describe("App streaming user message", () => {
       streamHandler?.({
         type: "tool_approval_resolved",
         sessionId,
-        turnId: activeTurnId,
+        agentRunId: activeAgentRunId,
         toolCallId: "tool-bash-approval",
         requestId: "approval-bash-1",
         decision: "approve_once",
       });
       streamHandler?.({
         type: "tool_finished",
-        sessionId,
-        turnId: activeTurnId,
+        turnId: "turn-stream",
+        llmCallId: "llm-call-stream",
+sessionId,
+        agentRunId: activeAgentRunId,
         toolCallId: "tool-bash-approval",
         toolName: "bash",
         resultEventId: "event-bash-approval-result",
@@ -2251,9 +2283,9 @@ describe("App streaming user message", () => {
           sandboxed: true,
         },
       });
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: "turn-approval-finished",
+        agentRunId: "turn-approval-finished",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -2275,14 +2307,14 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "Delete approval session",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
 
     let approvalPending = false;
-    let activeTurnId = "";
+    let activeAgentRunId = "";
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
     const submitApproval = vi.fn(async () => ({ ok: true }));
 
@@ -2291,7 +2323,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval,
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -2329,14 +2361,16 @@ describe("App streaming user message", () => {
           }
         };
       },
-      runTurn: (input: RunTurnInput) =>
+      runAgent: (input: RunAgentInput) =>
         new Promise((resolve) => {
-          activeTurnId = input.turnId;
-          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          activeAgentRunId = input.agentRunId;
+          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
           streamHandler?.({
             type: "tool_call_streaming",
-            sessionId: input.sessionId,
-            turnId: input.turnId,
+            turnId: "turn-stream",
+            llmCallId: "llm-call-stream",
+sessionId: input.sessionId,
+            agentRunId: input.agentRunId,
             toolCallId: "tool-delete-1",
             toolName: "delete_file",
             isInitial: true,
@@ -2351,7 +2385,7 @@ describe("App streaming user message", () => {
           streamHandler?.({
             type: "tool_approval_required",
             sessionId: input.sessionId,
-            turnId: input.turnId,
+            agentRunId: input.agentRunId,
             toolCallId: "tool-delete-1",
             toolName: "delete_file",
             requestId: "approval-delete-1",
@@ -2359,7 +2393,7 @@ describe("App streaming user message", () => {
             reason: "delete_file is a destructive file operation and requires approval.",
             riskLevel: "high",
           });
-          resolveRunTurn = resolve;
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -2386,7 +2420,7 @@ describe("App streaming user message", () => {
       streamHandler?.({
         type: "tool_approval_resolved",
         sessionId,
-        turnId: activeTurnId,
+        agentRunId: activeAgentRunId,
         toolCallId: "tool-delete-1",
         requestId: "approval-delete-1",
         decision: "approve_once",
@@ -2396,8 +2430,10 @@ describe("App streaming user message", () => {
     await act(async () => {
       streamHandler?.({
         type: "tool_finished",
-        sessionId,
-        turnId: activeTurnId,
+        turnId: "turn-stream",
+        llmCallId: "llm-call-stream",
+sessionId,
+        agentRunId: activeAgentRunId,
         toolCallId: "tool-delete-1",
         toolName: "delete_file",
         resultEventId: "evt-delete-result",
@@ -2408,9 +2444,9 @@ describe("App streaming user message", () => {
     expect(await screen.findByText("Deleted notes.md")).toBeInTheDocument();
 
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: "turn-delete-approval-finished",
+        agentRunId: "turn-delete-approval-finished",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -2432,12 +2468,12 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "Browser approval session",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
     const submitApproval = vi.fn(async () => ({ ok: true }));
 
@@ -2446,7 +2482,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval,
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -2472,13 +2508,15 @@ describe("App streaming user message", () => {
           if (streamHandler === callback) streamHandler = null;
         };
       },
-      runTurn: (input: RunTurnInput) =>
+      runAgent: (input: RunAgentInput) =>
         new Promise((resolve) => {
-          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
           streamHandler?.({
             type: "tool_started",
-            sessionId: input.sessionId,
-            turnId: input.turnId,
+            turnId: "turn-stream",
+            llmCallId: "llm-call-stream",
+sessionId: input.sessionId,
+            agentRunId: input.agentRunId,
             toolCallId: "tool-browser-1",
             toolName: "browser_tabs",
             argsPreview: '{"action":"list"}',
@@ -2486,7 +2524,7 @@ describe("App streaming user message", () => {
           streamHandler?.({
             type: "tool_approval_required",
             sessionId: input.sessionId,
-            turnId: input.turnId,
+            agentRunId: input.agentRunId,
             toolCallId: "tool-browser-1",
             toolName: "browser_tabs",
             requestId: "approval-browser-1",
@@ -2494,7 +2532,7 @@ describe("App streaming user message", () => {
             reason: "Browser tools require session authorization.",
             approvalScope: "browser_session",
           });
-          resolveRunTurn = resolve;
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -2513,9 +2551,9 @@ describe("App streaming user message", () => {
     });
 
     await act(async () => {
-      resolveRunTurn?.({
+      resolveRunAgent?.({
         sessionId,
-        turnId: "turn-browser-approval-finished",
+        agentRunId: "turn-browser-approval-finished",
         status: "completed",
         events: [],
         contextSnapshot: {
@@ -2537,7 +2575,7 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "Failure session",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
 
@@ -2546,7 +2584,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: async () => record,
       createSession: async () => record,
-      abortTurn: async () => true,
+      abortAgentRun: async () => true,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -2571,9 +2609,9 @@ describe("App streaming user message", () => {
           void callback;
         };
       },
-      runTurn: async (input: RunTurnInput) => ({
+      runAgent: async (input: RunAgentInput) => ({
         sessionId: input.sessionId,
-        turnId: input.turnId,
+        agentRunId: input.agentRunId,
         status: "failed",
         events: [],
         contextSnapshot: {
@@ -2672,7 +2710,7 @@ describe("App streaming user message", () => {
     expect(tooltip.closest(".tool-log-line")?.classList.contains("is-tooltip-open")).toBe(true);
   });
 
-  it("switches the send button into a stop button and calls abortTurn while streaming", async () => {
+  it("switches the send button into a stop button and calls abortAgentRun while streaming", async () => {
     const sessionId = "session-abort";
     const record = createEmptySessionRecord(sessionId);
     let currentRecord = record;
@@ -2682,13 +2720,13 @@ describe("App streaming user message", () => {
         id: sessionId,
         title: "New chat",
         updatedAt: record.meta.updatedAt,
-        turnCount: 0,
+        agentRunCount: 0,
       },
     ];
 
-    const abortTurnMock = vi.fn(async () => true);
+    const abortAgentRunMock = vi.fn(async () => true);
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveRunTurn: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runTurn"]>>) => void) | null =
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
       null;
 
     window.actspace = {
@@ -2696,7 +2734,7 @@ describe("App streaming user message", () => {
       listSessions: async () => sessions,
       getSession: getSessionMock,
       createSession: async () => record,
-      abortTurn: abortTurnMock,
+      abortAgentRun: abortAgentRunMock,
       submitApproval: async () => ({ ok: true }),
       pinSession: async () => ({ ok: true }),
       getUsageStatistics: async () => null,
@@ -2724,10 +2762,10 @@ describe("App streaming user message", () => {
           }
         };
       },
-      runTurn: (input: RunTurnInput) =>
+      runAgent: (input: RunAgentInput) =>
         new Promise((resolve) => {
-          streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
-          resolveRunTurn = resolve;
+          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+          resolveRunAgent = resolve;
         }),
     };
 
@@ -2741,7 +2779,7 @@ describe("App streaming user message", () => {
     await userEvent.click(stopButton);
 
     await waitFor(() => {
-      expect(abortTurnMock).toHaveBeenCalledTimes(1);
+      expect(abortAgentRunMock).toHaveBeenCalledTimes(1);
     });
 
     await act(async () => {
@@ -2750,31 +2788,31 @@ describe("App streaming user message", () => {
         {
           id: "evt-user-abort",
           sessionId,
-          turnId: "turn-abort-finished",
+          agentRunId: "turn-abort-finished",
           type: "user_message",
           timestamp,
-          schemaVersion: 1,
+          schemaVersion: 2,
           payload: { content: "stop me" },
         },
         {
           id: "evt-turn-aborted",
           sessionId,
-          turnId: "turn-abort-finished",
-          type: "turn_aborted",
+          agentRunId: "turn-abort-finished",
+          type: "agent_run_aborted",
           timestamp,
-          schemaVersion: 1,
+          schemaVersion: 2,
           payload: { reason: "user" },
         },
       ];
       currentRecord = {
         ...record,
-        meta: { ...record.meta, updatedAt: timestamp, turnCount: 1 },
+        meta: { ...record.meta, updatedAt: timestamp, agentRunCount: 1 },
         events,
       };
-      streamHandler?.({ type: "turn_aborted", sessionId, turnId: "turn-abort-finished" });
-      resolveRunTurn?.({
+      streamHandler?.({ type: "agent_run_aborted", sessionId, agentRunId: "turn-abort-finished" });
+      resolveRunAgent?.({
         sessionId,
-        turnId: "turn-abort-finished",
+        agentRunId: "turn-abort-finished",
         status: "aborted",
         events,
         contextSnapshot: {

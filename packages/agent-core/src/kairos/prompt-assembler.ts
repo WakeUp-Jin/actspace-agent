@@ -238,15 +238,15 @@ function inboxHasNewMessages(summary: KairosInboxSummary): boolean {
 function buildSessionsDigestSummary(sessionsDigest: SessionsDigestResult): string {
   const unread = sessionsDigest.workspaces
     .flatMap((w) => w.sessions.map((s) => ({ workspace: w.rootPath, session: s })))
-    .filter((x) => x.session.unreadTurnsForKairos > 0)
-    .sort((a, b) => b.session.unreadTurnsForKairos - a.session.unreadTurnsForKairos);
+    .filter((x) => x.session.unreadAgentRunsForKairos > 0)
+    .sort((a, b) => b.session.unreadAgentRunsForKairos - a.session.unreadAgentRunsForKairos);
   if (unread.length === 0) return "";
 
-  const sections: string[] = ["## 主 Agent 有未读 turn 的 sessions（按未读数降序）"];
+  const sections: string[] = ["## 主 Agent 有未读 Agent Run 的 sessions（按未读数降序）"];
   for (const { workspace, session } of unread.slice(0, 12)) {
     sections.push(
       `- [${baseName(workspace)}] session-${session.id} "${session.title}" ` +
-        `(${session.turnCount} turns, ${session.unreadTurnsForKairos} unread)`,
+        `(${session.agentRunCount} agent runs, ${session.unreadAgentRunsForKairos} unread)`,
     );
     if (session.lastUserPreview) {
       sections.push(`  最新 user: "${session.lastUserPreview}"`);

@@ -20,7 +20,7 @@ import {
   createSessionStorePaths,
   readMeta,
 } from "@actspace/agent-core";
-import type { AgentRuntimeContextLoader, AppDataRoots } from "./agent-turn";
+import type { AgentRuntimeContextLoader, AppDataRoots } from "./agent-run";
 import type { ModelRuntimeService } from "./model-runtime-service";
 
 export async function describeSessionContext(
@@ -59,7 +59,7 @@ export async function describeSessionContext(
 
   const snapshot = deps.contextManager.getUsageSnapshot();
   const entries = buildContextEntries(deps.contextManager.getContext());
-  // 这是「实时重建」而非某轮 turn 的快照，activeTurnId 用 "live" 标识来源。
+  // 这是「实时重建」而非某轮 turn 的快照，activeAgentRunId 用 "live" 标识来源。
   return createContextState(snapshot, input.sessionId, "live", entries);
 }
 

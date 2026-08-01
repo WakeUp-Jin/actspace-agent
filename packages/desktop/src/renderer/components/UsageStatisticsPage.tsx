@@ -581,7 +581,7 @@ function RequestUsageTable({
           <tbody>
             {rows.length > 0 ? (
               rows.map((row) => (
-                <tr key={`${row.sessionId}:${row.turnId}`} className="hover:bg-surface-subtle">
+                <tr key={`${row.sessionId}:${row.agentRunId}`} className="hover:bg-surface-subtle">
                   <td className="border-b border-line p-3 text-[13px] tabular-nums text-text-faint">
                     {formatRequestTimestamp(row.timestamp)}
                   </td>

@@ -147,7 +147,7 @@ provider enabled
 
 ### 0.3 IPC 与持久化身份调整
 
-- `RunTurnInput`、`CompactContextInput`、visualize/eval 输入在迁移期保留旧 `model?: ModelId`，并增加并行 `modelKey?: ModelKey`；main 优先读取 modelKey，否则 normalize 旧字段。Plan 5 的新 renderer 只发送 ModelKey 字段，旧客户端/fixture 无需同步升级。
+- `RunAgentInput`、`CompactContextInput`、visualize/eval 输入在迁移期保留旧 `model?: ModelId`，并增加并行 `modelKey?: ModelKey`；main 优先读取 modelKey，否则 normalize 旧字段。Plan 5 的新 renderer 只发送 ModelKey 字段，旧客户端/fixture 无需同步升级。
 - 旧 session/usage 中 `modelId?: string` 保持宽松读取；新写入同时保存 `modelKey` 或把 provider-qualified 值写入现有 string 字段，二选一后在本计划内统一。
 - Session Preview、Usage row 的类型允许新 key，不把动态模型收窄回有限联合。
 - Settings provider/model/catalog/task model IPC 类型在 shared 一次定义，Plan 2/3/5 直接消费。
@@ -204,5 +204,5 @@ pnpm --filter @actspace/desktop typecheck
 仍依赖 deprecated `MODEL_LIST` / `MODEL_REGISTRY` / `ModelId` 的生产消费方，交由 Plan 4/5 清理：
 
 - Agent Core：`engine/create-agent-deps.ts`、`kairos/env.ts`、`visualize/md-to-html.ts`。
-- Desktop main：`agent-turn.ts`、`context-describe-service.ts`、`index.ts`、`kairos-bootstrap.ts`、`session-preview-service.ts`、`settings-service.ts`。
+- Desktop main：`agent-run.ts`、`context-describe-service.ts`、`index.ts`、`kairos-bootstrap.ts`、`session-preview-service.ts`、`settings-service.ts`。
 - Renderer：`App.tsx`、`Composer.tsx`、`ConversationView.tsx`、`SessionHoverPreview.tsx`、`UsageStatisticsPage.tsx`、`WorkbenchLayout.tsx`、`settings/KairosSettings.tsx`、`settings/SettingsPage.tsx`。

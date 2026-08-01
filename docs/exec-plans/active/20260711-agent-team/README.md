@@ -65,7 +65,7 @@ Plan 5 的纯组件骨架可以在 Plan 0 契约完成后并行准备，但不�
 ### Session 是 Agent Form 的事实来源
 
 - `SessionMeta.agentForm` 是会话形态唯一事实来源。
-- `session:create` 接收 form；`agent:run-turn` 不允许 renderer 每轮覆盖 form。
+- `session:create` 接收 form；`agent:run` 不允许 renderer 每次 Agent Run 覆盖 form。
 - Team runtime 从 session meta 和 Team runtime snapshot 恢复。
 - 不新增 `setSessionAgentForm` IPC。
 
@@ -191,4 +191,3 @@ pnpm check:docs
 - 2026-07-11：TeamMember 复用 `runAgentLoop`，不复用 Explore 专用 runner。
 - 2026-07-11：Team runtime 文件是恢复事实来源，主 session 不展开成员完整 transcript。
 - 2026-07-11：V1 不引入 worktree 自动合并，先用 writeScope 约束并行写入。
-

@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listWorkspaceDir, readWorkspaceFile } from "../workspace-fs-service";
-import type { AppDataRoots } from "../agent-turn";
+import type { AppDataRoots } from "../agent-run";
 
 const created: string[] = [];
 

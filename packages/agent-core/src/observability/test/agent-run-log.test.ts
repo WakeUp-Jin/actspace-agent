@@ -22,7 +22,7 @@ describe("agent run log", () => {
     const logger = await createAgentRunLogger({
       logRoot: testDir,
       sessionId: "session/1",
-      turnId: "turn:1",
+      agentRunId: "turn:1",
       now: new Date(2026, 4, 24, 13, 30, 0),
     });
 
@@ -43,13 +43,13 @@ describe("agent run log", () => {
     const oldLogger = await createAgentRunLogger({
       logRoot: testDir,
       sessionId: "old",
-      turnId: "turn",
+      agentRunId: "turn",
       now: new Date(2026, 4, 23, 12, 0, 0),
     });
     const freshLogger = await createAgentRunLogger({
       logRoot: testDir,
       sessionId: "fresh",
-      turnId: "turn",
+      agentRunId: "turn",
       now: new Date(2026, 4, 24, 12, 30, 0),
     });
 

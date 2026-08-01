@@ -981,9 +981,9 @@ spawn
 | `packages/agent-core/src/engine/loop.ts` | 团队成员复用现有 Agent Loop |
 | `packages/agent-core/src/engine/agent.ts` | 团队成员使用独立 Agent 实例和上下文 |
 | `packages/agent-core/src/engine/bridge.ts` | 增加 Team 编排与消息注入逻辑 |
-| `packages/desktop/src/main/agent-turn.ts` | 根据 AgentForm 构建 Team Runtime |
+| `packages/desktop/src/main/agent-run.ts` | 根据 AgentForm 构建 Team Runtime |
 | `packages/desktop/src/renderer/` | 新增 Team 标签、任务页和成员页 |
-| IPC `RunTurnInput` | 增加 `agentForm` 字段 |
+| IPC `RunAgentInput` | 增加 `agentForm` 字段 |
 | 新增 `packages/agent-core/src/team/` | Team 编排、成员、Task、Mailbox 和恢复逻辑 |
 
 ```text

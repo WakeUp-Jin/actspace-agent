@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { LLMConfig } from "@actspace/agent-core";
 import { listVisualizations, visualizeReply } from "../visualize-service";
-import type { AppDataRoots } from "../agent-turn";
+import type { AppDataRoots } from "../agent-run";
 
 const created: string[] = [];
 

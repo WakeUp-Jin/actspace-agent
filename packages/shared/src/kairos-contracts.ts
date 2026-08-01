@@ -7,7 +7,7 @@ import type { EventId, LlmUsageCost, SessionEvent } from "./session";
  * - `idle`：已启动但当前没有 tick 在跑，也不在 sleep。
  * - `ticking`：正在执行一次 tick（runner 在调 LLM / 工具）。
  * - `sleeping`：tick 已结束，处于可被中断的 setTimeout 等待。
- * - `interrupted`：被主 Agent 的 user message 中断，正在等主 Agent runTurn 完成。
+ * - `interrupted`：被主 Agent 的 user message 中断，正在等主 Agent runAgent 完成。
  * - `cooldown`：达到熔断阈值，进入冷却期。
  * - `stopped`：用户主动停止 / preferences.enabled=false，整体闲置。
  * - `budget_exhausted`：额度余额 ≤ 0 被动暂停（区别于用户主动 stopped）。

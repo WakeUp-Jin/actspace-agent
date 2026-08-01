@@ -22,7 +22,7 @@ export interface BridgeEvent {
 export interface BridgeClientOptions {
   socketPath: string;
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   timeoutMs?: number;
 }
 

@@ -37,7 +37,7 @@ const INTERRUPT_SUMMARY_MAX = 80;
  * - `tool_call` + 同 toolCallId 的 `tool_result` 折叠成单行 `tool`；缺 result 标 running。
  * - `assistant_message` / `assistant_reply` 各自单行 `reply`。
  * - `thinking` 各自单行 `thinking`（弱化展示；summary 取首行截断）。
- * - `kairos_sleep_start` + 同 turnId 的下一个 sleep_end / sleep_interrupted 折叠成单行 `sleep`；
+ * - `kairos_sleep_start` + 同 agentRunId 的下一个 sleep_end / sleep_interrupted 折叠成单行 `sleep`；
  *   被打断时**额外**产出一行独立的 `interrupt`。
  * - `error` 各自单行 `error`，并把所在 tick 行的 status 推为 failed。
  *

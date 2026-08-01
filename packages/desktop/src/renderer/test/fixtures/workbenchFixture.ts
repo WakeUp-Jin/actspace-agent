@@ -1,5 +1,5 @@
 import type {
-  AgentTurnResult,
+  AgentRunResult,
   BootstrapState,
   ContextState,
   ContextUsageSnapshot,
@@ -28,7 +28,7 @@ export const mockContextSnapshot: ContextUsageSnapshot = {
 
 export const mockContextState: ContextState = {
   sessionId: "session-learning-doc-plan",
-  activeTurnId: "mock-turn-1",
+  activeAgentRunId: "mock-turn-1",
   updatedAt: now,
   estimator: { name: "char-heuristic", version: "1" },
   totalEstimatedTokens: 71_781,
@@ -107,7 +107,7 @@ export const mockSessions: SessionListItem[] = [
     id: "session-learning-doc-plan",
     title: "Learning documentation plan",
     updatedAt: now,
-    turnCount: 4,
+    agentRunCount: 4,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY,
     pinned: true
   },
@@ -115,7 +115,7 @@ export const mockSessions: SessionListItem[] = [
     id: "session-bash-pipeline",
     title: "Bash 工具开发与权限调度",
     updatedAt: hoursAgo(2),
-    turnCount: 8,
+    agentRunCount: 8,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY,
     pinned: true
   },
@@ -123,91 +123,91 @@ export const mockSessions: SessionListItem[] = [
     id: "session-tool-naming",
     title: "工具定义格式和命名规范",
     updatedAt: daysAgo(3),
-    turnCount: 3,
+    agentRunCount: 3,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY
   },
   {
     id: "session-tool-addition-doc",
     title: "Tool addition and documentation",
     updatedAt: daysAgo(1),
-    turnCount: 5,
+    agentRunCount: 5,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY
   },
   {
     id: "session-context-lookup",
     title: "Conversation context lookup",
     updatedAt: daysAgo(1),
-    turnCount: 2,
+    agentRunCount: 2,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY
   },
   {
     id: "session-key-sandtrigger",
     title: "Enter key sand trigger behavior",
     updatedAt: daysAgo(2),
-    turnCount: 2,
+    agentRunCount: 2,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY
   },
   {
     id: "session-stats-prototype",
     title: "统计页面设计",
     updatedAt: daysAgo(2),
-    turnCount: 4,
+    agentRunCount: 4,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY
   },
   {
     id: "session-search-tool",
     title: "Search tool parameter handling",
     updatedAt: daysAgo(4),
-    turnCount: 1,
+    agentRunCount: 1,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY
   },
   {
     id: "session-agent-tool-bugs",
     title: "Agent tool bugs and fixes",
     updatedAt: daysAgo(5),
-    turnCount: 6,
+    agentRunCount: 6,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY
   },
   {
     id: "session-frontend-llm-init",
     title: "Front-end LLM initialization",
     updatedAt: daysAgo(6),
-    turnCount: 3,
+    agentRunCount: 3,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY
   },
   {
     id: "session-harness-readme",
     title: "README file improvement",
     updatedAt: hoursAgo(5),
-    turnCount: 3,
+    agentRunCount: 3,
     workspaceRoot: MOCK_WORKSPACE_HARNESS
   },
   {
     id: "session-harness-skill",
     title: "Skill usage and installation",
     updatedAt: hoursAgo(8),
-    turnCount: 7,
+    agentRunCount: 7,
     workspaceRoot: MOCK_WORKSPACE_HARNESS
   },
   {
     id: "session-harness-review",
     title: "Project review and documentation",
     updatedAt: daysAgo(2),
-    turnCount: 2,
+    agentRunCount: 2,
     workspaceRoot: MOCK_WORKSPACE_HARNESS
   },
   {
     id: "session-auth-refactor",
     title: "Authentication flow refactor",
     updatedAt: daysAgo(1),
-    turnCount: 2,
+    agentRunCount: 2,
     workspaceRoot: MOCK_WORKSPACE_HARNESS
   },
   {
     id: "session-ci-design",
     title: "CI/CD pipeline design",
     updatedAt: daysAgo(2),
-    turnCount: 1,
+    agentRunCount: 1,
     workspaceRoot: MOCK_WORKSPACE_HARNESS
   }
 ];
@@ -217,7 +217,7 @@ export const mockArchivedSessions: SessionListItem[] = [
     id: "session-archived-release-notes",
     title: "Release notes cleanup",
     updatedAt: daysAgo(9),
-    turnCount: 3,
+    agentRunCount: 3,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY,
     archived: true
   },
@@ -225,7 +225,7 @@ export const mockArchivedSessions: SessionListItem[] = [
     id: "session-archived-old-review",
     title: "Old project review",
     updatedAt: daysAgo(18),
-    turnCount: 6,
+    agentRunCount: 6,
     workspaceRoot: MOCK_WORKSPACE_HARNESS,
     archived: true
   }
@@ -502,11 +502,12 @@ export const mockBootstrapState: BootstrapState = {
 
 export const mockSessionRecord: SessionRecord = {
   meta: {
+    schemaVersion: 2,
     id: "session-learning-doc-plan",
     title: "Learning documentation plan",
     createdAt: now,
     updatedAt: now,
-    turnCount: 4,
+    agentRunCount: 4,
     workspaceRoot: MOCK_WORKSPACE_PRIMARY,
     pinned: true
   },
@@ -516,9 +517,9 @@ export const mockSessionRecord: SessionRecord = {
   contextState: mockContextState
 };
 
-export const mockTurnResult: AgentTurnResult = {
+export const mockTurnResult: AgentRunResult = {
   sessionId: "session-learning-doc-plan",
-  turnId: "mock-turn-1",
+  agentRunId: "mock-turn-1",
   events: [],
   contextSnapshot: mockContextSnapshot,
   status: "completed"

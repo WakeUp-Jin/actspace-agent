@@ -118,7 +118,7 @@ describe("UsageStatisticsPage heatmap tooltip", () => {
         ...mockUsageStatistics.requestRows[0],
         timestamp: `2026-05-26T${String(9 - index).padStart(2, "0")}:07:00.000Z`,
         sessionId: `session-page-${index + 1}`,
-        turnId: `turn-page-${index + 1}`,
+        agentRunId: `turn-page-${index + 1}`,
         totalTokens: 1_000 + index,
       })),
       requestRowsPage: {

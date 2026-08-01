@@ -14,7 +14,7 @@
   - ✅ `kairos_short_term_memory.md`（ShortMemoryStore 移植自 heartclaw + SessionEventRingBuffer + KairosShortTermMemoryContext 按 token budget 加载 + sanitizeOrphanToolPairs + compressKairosSegments 调 LLMService + 20 单测）— 2026-05-27 完成。
   - ✅ `kairos_observe_and_briefs.md`（watch-scanner 手写递归 + WatchDiffEngine sha1 manifest + SessionsDigestBuilder 不挑食策略 + briefs parser/index-manager/dispatcher，27 单测）— 2026-05-27 完成。务实调整：briefs v1 改用 `intervalSec` 替代 5 段 cron；不引入 gray-matter/cron-parser/chokidar，配置写入时由 main IPC 主动调 `rebuildFromDisk()`。
   - ✅ `kairos_controller_runner.md`（KAIROS_SYSTEM_PROMPT + prompt-assembler 全段拼装 + clampSleep/sleepBias + MessageQueue + QueueProcessor 可中断 sleep 与熔断 + KairosRunner.processTick 提取 sleep 工具参数 + KairosController 闭环 + engine/loop.ts 加 `toolExecuteOptions` 透传，26 单测）— 2026-05-27 完成。务实调整：v1 不内建 `_internal/monthly-archive` brief；blocklist.timeWindows / tickBudget 不在调度层硬执行，靠 prompt 提示让 LLM 自尊重；configWatcher 由 main IPC 主动 await `reloadConfig()`。
-  - ✅ `kairos_main_ipc_and_renderer.md`（`kairos-bootstrap.ts` scaffolding + LLM/ToolManager 工厂 + `kairos-ipc.ts` 5 invoke + 50ms debounce event/state 推送 + preload `window.kairos` + `KairosPage` 状态条/事件表/详情面板/4 个 raw config tab + `useKairos` hook + `agent:run-turn` try/finally 调 `notifyMainAgentTurn{Start,End}`，7 组件级单测）— 2026-05-27 完成。务实调整：不引入 zustand/router/Monaco；notes Tab 按决策不实现；`get-events-recent` 暂不回退 jsonl（ring 200 条够首屏）；main IPC 单测留给 e2e 实机验证补。
+  - ✅ `kairos_main_ipc_and_renderer.md`（`kairos-bootstrap.ts` scaffolding + LLM/ToolManager 工厂 + `kairos-ipc.ts` 5 invoke + 50ms debounce event/state 推送 + preload `window.kairos` + `KairosPage` 状态条/事件表/详情面板/4 个 raw config tab + `useKairos` hook + `agent:run` try/finally 调 `notifyMainAgentRun{Start,End}`，7 组件级单测）— 2026-05-27 完成。务实调整：不引入 zustand/router/Monaco；notes Tab 按决策不实现；`get-events-recent` 暂不回退 jsonl（ring 200 条够首屏）；main IPC 单测留给 e2e 实机验证补。
   - ✅ `20260602-kairos-agent-inbox.md`（Main Agent / Lab Agent → Kairos 的两份 Markdown 收件箱；Kairos 每 tick 读取，作为观察信号注入 prompt [5] 段；`inbox.ts` 提供 append-only 写入和摘要 loader）— 2026-06-02 完成。
 
 ## 设计动机
@@ -416,7 +416,7 @@ v1 当前只从 main 进程内存 ring buffer 返回最近事件，`hasMore=fals
 | 层 | 主 Agent | Kairos |
 |---|---|---|
 | 触发源 | 用户在 Composer 发消息 | scheduler 投递 tick / brief / wake_now |
-| 入口文件 | `desktop/src/main/agent-turn.ts` → `engine/bridge.ts` → `Agent.run()` | `kairos/controller.ts` → `kairos/scheduler.ts` → `kairos/runner.ts` |
+| 入口文件 | `desktop/src/main/agent-run.ts` → `engine/bridge.ts` → `Agent.run()` | `kairos/controller.ts` → `kairos/scheduler.ts` → `kairos/runner.ts` |
 | user message | 真实用户输入，写入主 session | controller 注入的 tick 文本，写入 Kairos short-term |
 | system prompt | `prompt/main-agent.ts` + 主会话上下文 | `kairos/prompt.ts` + config tips / rule.md / 历史摘要（低频内容；观测增量走 tick message） |
 | 工具注入 | `Agent.run()` 从 ToolManager 注入 tools | `KairosRunner.processTick()` 从 ToolManager 注入 tools |
@@ -1090,7 +1090,7 @@ emit warning 提示，不做日内压缩。后续若真实触达再补。
           "id": "session-xxx",
           "title": "Kairos 设计讨论",
           "updatedAt": "2026-05-27T16:00:00+08:00",
-          "turnCount": 12,
+          "agentRunCount": 12,
           "unreadTurnsForKairos": 2,        // 自 Kairos 上次访问后新增的 turn
           "lastUserPreview": "上下文如何注入..."
         }
@@ -1468,7 +1468,7 @@ packages/agent-core/src/kairos/
 packages/desktop/src/main/
 ├── kairos-bootstrap.ts       # scaffolding + LLM/ToolManager 工厂
 ├── kairos-ipc.ts             # 5 invoke + 50ms debounce 推送
-└── index.ts                  # 集成点（whenReady + agent:run-turn 钩子）
+└── index.ts                  # 集成点（whenReady + agent:run 钩子）
 
 packages/desktop/src/renderer/
 ├── pages/KairosPage.tsx      # KairosHeader/EventTable/DetailPanel/ConfigTab

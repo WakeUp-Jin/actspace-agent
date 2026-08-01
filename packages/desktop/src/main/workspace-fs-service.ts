@@ -19,7 +19,7 @@ import type {
   WorkspaceReadFileInput,
   WorkspaceReadFileResult,
 } from "@actspace/shared";
-import type { AppDataRoots } from "./agent-turn";
+import type { AppDataRoots } from "./agent-run";
 
 /** 一次性铺开会拖垮 UI 的大目录，直接从树里隐藏。 */
 const IGNORED_DIR_NAMES = new Set([

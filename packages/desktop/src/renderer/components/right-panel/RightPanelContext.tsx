@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 /**
- * 右侧面板的 Tab 模型。`id` 同时是去重 key：用稳定 id（如 `context`、`html:<turnId>`、
+ * 右侧面板的 Tab 模型。`id` 同时是去重 key：用稳定 id（如 `context`、`html:<agentRunId>`、
  * `file:<相对路径>`）打开同一对象时只更新内容并聚焦，不重复堆 Tab。
  */
 export type RightPanelTab = { id: string } & (

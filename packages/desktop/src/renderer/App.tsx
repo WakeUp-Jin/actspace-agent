@@ -6,8 +6,8 @@ import {
   getLatestContextSnapshot,
 } from "@actspace/shared";
 import type {
-  AbortTurnInput,
-  AgentTurnResult,
+  AbortAgentRunInput,
+  AgentRunResult,
   AppSettings,
   BashBackgroundStatus,
   BashStatus,
@@ -22,7 +22,7 @@ import type {
   ModelKey,
   UsableModelView,
   ReviewGetWorkspaceChangesResult,
-  RunTurnInput,
+  RunAgentInput,
   RuntimeStreamEvent,
   SessionEvent,
   SessionListItem,
@@ -128,7 +128,7 @@ type StreamingSegment =
   | { type: "thinking"; text: string }
   | { type: "text"; text: string }
   | { type: "tool"; toolCallId: string }
-  | { type: "compaction"; turnId: string };
+  | { type: "compaction"; agentRunId: string };
 
 type StreamingState = {
   segments: StreamingSegment[];
@@ -199,11 +199,12 @@ function createLocalEmptySession(input: NewSessionInput = {}): SessionRecord {
   const id = `local-session-${Date.now()}`;
   return {
     meta: {
+      schemaVersion: 2,
       id,
       title: "New chat",
       createdAt: now,
       updatedAt: now,
-      turnCount: 0,
+      agentRunCount: 0,
       workspaceRoot: input.workspaceRoot,
     },
     events: [],
@@ -345,8 +346,8 @@ function getStreamingDeleteText(
   return `Delete ${fileLabel}`;
 }
 
-function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, turnId?: string): MessageBlock {
-  const blockId = turnId ? `turn:${turnId}:tool:${toolCallId}` : `streaming-tool-${toolCallId}`;
+function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agentRunId?: string): MessageBlock {
+  const blockId = agentRunId ? `turn:${agentRunId}:tool:${toolCallId}` : `streaming-tool-${toolCallId}`;
 
   if (tool.preview?.kind === "bash") {
     return {
@@ -602,7 +603,7 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, turn
   };
 }
 
-function streamingStateToBlocks(state: StreamingState, turnId?: string): MessageBlock[] {
+function streamingStateToBlocks(state: StreamingState, agentRunId?: string): MessageBlock[] {
   const now = new Date().toISOString();
   const blocks: MessageBlock[] = [];
   let thinkingIdx = 0;
@@ -613,7 +614,7 @@ function streamingStateToBlocks(state: StreamingState, turnId?: string): Message
       const index = thinkingIdx++;
       blocks.push({
         kind: "thinking",
-        id: turnId ? `turn:${turnId}:thinking:${index}` : `streaming-thinking-${index}`,
+        id: agentRunId ? `turn:${agentRunId}:thinking:${index}` : `streaming-thinking-${index}`,
         title: "Thinking...",
         content: seg.text,
         createdAt: now,
@@ -623,17 +624,17 @@ function streamingStateToBlocks(state: StreamingState, turnId?: string): Message
       const index = textIdx++;
       blocks.push({
         kind: "assistant",
-        id: turnId ? `turn:${turnId}:assistant:${index}` : `streaming-assistant-${index}`,
+        id: agentRunId ? `turn:${agentRunId}:assistant:${index}` : `streaming-assistant-${index}`,
         content: seg.text,
         createdAt: now,
       });
     } else if (seg.type === "tool") {
       const tool = state.activeTools.get(seg.toolCallId);
       if (tool) {
-        blocks.push(toolEntryToBlock(seg.toolCallId, tool, now, turnId));
+        blocks.push(toolEntryToBlock(seg.toolCallId, tool, now, agentRunId));
       }
     } else if (seg.type === "compaction") {
-      const block = state.activeCompactions.get(seg.turnId);
+      const block = state.activeCompactions.get(seg.agentRunId);
       if (block) {
         blocks.push(block);
       }
@@ -643,8 +644,8 @@ function streamingStateToBlocks(state: StreamingState, turnId?: string): Message
   if (state.retryNotice) {
     blocks.push({
       kind: "status",
-      id: turnId
-        ? `turn:${turnId}:retry:${state.retryNotice.attempt}`
+      id: agentRunId
+        ? `turn:${agentRunId}:retry:${state.retryNotice.attempt}`
         : `llm-retry-${state.retryNotice.attempt}`,
       content: `网关异常，正在重试 (${state.retryNotice.attempt}/${state.retryNotice.maxAttempts})`,
       createdAt: now,
@@ -655,7 +656,7 @@ function streamingStateToBlocks(state: StreamingState, turnId?: string): Message
   if (state.waitingForModel && !state.retryNotice) {
     blocks.push({
       kind: "status",
-      id: turnId ? `turn:${turnId}:model-wait` : "model-wait",
+      id: agentRunId ? `turn:${agentRunId}:model-wait` : "model-wait",
       content: "Operating Space · Expanding",
       createdAt: now,
       tone: "muted",
@@ -666,7 +667,7 @@ function streamingStateToBlocks(state: StreamingState, turnId?: string): Message
 }
 
 function createCompactionBlock(input: {
-  turnId: string;
+  agentRunId: string;
   status: Extract<MessageBlock, { kind: "context_compaction" }>["status"];
   trigger?: "manual" | "auto";
   stage?: string;
@@ -675,7 +676,7 @@ function createCompactionBlock(input: {
 }): Extract<MessageBlock, { kind: "context_compaction" }> {
   return {
     kind: "context_compaction",
-    id: `turn:${input.turnId}:context-compaction:0`,
+    id: `turn:${input.agentRunId}:context-compaction:0`,
     status: input.status,
     trigger: input.trigger ?? "manual",
     stage: input.stage,
@@ -690,15 +691,15 @@ function formatContextCompactionSummary(removedCount: number): string {
   return `Context compacted · ${removedCount} ${removedCount === 1 ? "message" : "messages"}`;
 }
 
-function upsertCompactionSegment(state: StreamingState, turnId: string): void {
-  if (!state.segments.some((segment) => segment.type === "compaction" && segment.turnId === turnId)) {
-    state.segments.push({ type: "compaction", turnId });
+function upsertCompactionSegment(state: StreamingState, agentRunId: string): void {
+  if (!state.segments.some((segment) => segment.type === "compaction" && segment.agentRunId === agentRunId)) {
+    state.segments.push({ type: "compaction", agentRunId });
   }
 }
 
-let turnCounter = 0;
-function nextTurnId(): string {
-  return `turn-${Date.now()}-${++turnCounter}`;
+let agentRunCounter = 0;
+function nextAgentRunId(): string {
+  return `agent-run-${Date.now()}-${++agentRunCounter}`;
 }
 
 function modelSelectionPayload(model: ModelSelectionId): { model?: ModelId; modelKey?: ModelKey } {
@@ -710,12 +711,12 @@ export function App() {
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [sessionRecord, setSessionRecord] = useState<SessionRecord | null>(null);
   const [localSessionRecords, setLocalSessionRecords] = useState<Record<string, SessionRecord>>({});
-  const [turnResult, setTurnResult] = useState<AgentTurnResult | null>(null);
+  const [agentRunResult, setAgentRunResult] = useState<AgentRunResult | null>(null);
   const [workspaceRegistry, setWorkspaceRegistry] = useState<WorkspaceListResult | null>(null);
   const [sessionBootstrapComplete, setSessionBootstrapComplete] = useState(!hasActspaceBridge());
   const [isStreaming, setIsStreaming] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
-  const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
+  const [activeAgentRunId, setActiveAgentRunId] = useState<string | null>(null);
   const [streamingBlocks, setStreamingBlocks] = useState<MessageBlock[]>([]);
   // 后台 bash 任务状态（taskId → 最新状态）；bash_task_update 事件驱动，覆写块显示
   const [bashTaskUpdates, setBashTaskUpdates] = useState<Record<string, { status: BashBackgroundStatus; exitCode?: number | null }>>({});
@@ -730,7 +731,7 @@ export function App() {
   const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
-  const activeStreamTurnRef = useRef<{ sessionId: string; turnId: string } | null>(null);
+  const activeStreamAgentRunRef = useRef<{ sessionId: string; agentRunId: string } | null>(null);
   const reviewRefreshRequestIdRef = useRef(0);
   const userPickedChatModelRef = useRef(false);
 
@@ -750,7 +751,7 @@ export function App() {
   const refreshStreamingBlocks = useCallback((userBlock?: MessageBlock | null) => {
     const newStreamBlocks = streamingStateToBlocks(
       streamStateRef.current,
-      activeStreamTurnRef.current?.turnId,
+      activeStreamAgentRunRef.current?.agentRunId,
     );
     const currentUserBlock = userBlock ?? streamingUserBlockRef.current;
     setStreamingBlocks(currentUserBlock ? [currentUserBlock, ...newStreamBlocks] : newStreamBlocks);
@@ -936,7 +937,7 @@ export function App() {
 
       activeSessionIdRef.current = null;
       setSessionRecord(null);
-      setTurnResult(null);
+      setAgentRunResult(null);
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(bootstrapState?.workspaceRoot));
       setSessionBootstrapComplete(true);
     }
@@ -946,7 +947,7 @@ export function App() {
       activeSessionIdRef.current = null;
       setSessions([]);
       setSessionRecord(null);
-      setTurnResult(null);
+      setAgentRunResult(null);
       setSessionBootstrapComplete(true);
     });
   }, []);
@@ -955,15 +956,15 @@ export function App() {
     const state = streamStateRef.current;
 
     switch (event.type) {
-      case "turn_started":
+      case "agent_run_started":
         state.waitingForModel = true;
         break;
 
       case "context_compaction_started":
         state.waitingForModel = false;
-        upsertCompactionSegment(state, event.turnId);
-        state.activeCompactions.set(event.turnId, createCompactionBlock({
-          turnId: event.turnId,
+        upsertCompactionSegment(state, event.agentRunId);
+        state.activeCompactions.set(event.agentRunId, createCompactionBlock({
+          agentRunId: event.agentRunId,
           status: "running",
           trigger: event.trigger,
           stage: event.stage,
@@ -974,11 +975,11 @@ export function App() {
 
       case "context_compaction_progress": {
         state.waitingForModel = false;
-        upsertCompactionSegment(state, event.turnId);
-        const existing = state.activeCompactions.get(event.turnId);
-        state.activeCompactions.set(event.turnId, {
+        upsertCompactionSegment(state, event.agentRunId);
+        const existing = state.activeCompactions.get(event.agentRunId);
+        state.activeCompactions.set(event.agentRunId, {
           ...(existing ?? createCompactionBlock({
-            turnId: event.turnId,
+            agentRunId: event.agentRunId,
             status: "running",
             trigger: event.trigger,
             summaryText: "Compacting context",
@@ -992,10 +993,10 @@ export function App() {
       }
 
       case "context_compaction_finished": {
-        upsertCompactionSegment(state, event.turnId);
+        upsertCompactionSegment(state, event.agentRunId);
         const removedCount = event.payload.removedCount ?? Math.max(event.payload.beforeCount - event.payload.afterCount, 0);
-        state.activeCompactions.set(event.turnId, createCompactionBlock({
-          turnId: event.turnId,
+        state.activeCompactions.set(event.agentRunId, createCompactionBlock({
+          agentRunId: event.agentRunId,
           status: event.status === "compacted" ? "completed" : "skipped",
           trigger: event.trigger,
           stage: event.stage,
@@ -1010,9 +1011,9 @@ export function App() {
 
       case "context_compaction_failed":
         state.waitingForModel = false;
-        upsertCompactionSegment(state, event.turnId);
-        state.activeCompactions.set(event.turnId, createCompactionBlock({
-          turnId: event.turnId,
+        upsertCompactionSegment(state, event.agentRunId);
+        state.activeCompactions.set(event.agentRunId, createCompactionBlock({
+          agentRunId: event.agentRunId,
           status: "failed",
           trigger: event.trigger,
           stage: event.stage,
@@ -1171,15 +1172,15 @@ export function App() {
         break;
       }
 
-      case "turn_finished":
+      case "agent_run_finished":
         state.waitingForModel = false;
         return;
 
-      case "turn_aborted":
+      case "agent_run_aborted":
         state.waitingForModel = false;
         return;
 
-      case "turn_failed":
+      case "agent_run_failed":
         state.waitingForModel = false;
         return;
     }
@@ -1195,18 +1196,18 @@ export function App() {
         setApprovalPendingForSession(event.sessionId, true);
       } else if (
         event.type === "tool_approval_resolved" ||
-        event.type === "turn_aborted" ||
-        event.type === "turn_finished" ||
-        event.type === "turn_failed"
+        event.type === "agent_run_aborted" ||
+        event.type === "agent_run_finished" ||
+        event.type === "agent_run_failed"
       ) {
         refreshPendingApprovalStatuses([event.sessionId]).catch((error: unknown) => {
           console.error("Failed to refresh stream approval status", error);
         });
       }
 
-      if (event.type === "turn_finished" || event.type === "turn_aborted") {
+      if (event.type === "agent_run_finished" || event.type === "agent_run_aborted") {
         setFailedForSession(event.sessionId, false);
-      } else if (event.type === "turn_failed") {
+      } else if (event.type === "agent_run_failed") {
         setFailedForSession(event.sessionId, true);
       }
 
@@ -1217,11 +1218,11 @@ export function App() {
         return;
       }
 
-      const activeTurn = activeStreamTurnRef.current;
+      const activeAgentRun = activeStreamAgentRunRef.current;
       if (
-        !activeTurn ||
-        event.sessionId !== activeTurn.sessionId ||
-        event.turnId !== activeTurn.turnId ||
+        !activeAgentRun ||
+        event.sessionId !== activeAgentRun.sessionId ||
+        event.agentRunId !== activeAgentRun.agentRunId ||
         event.sessionId !== activeSessionIdRef.current
       ) {
         return;
@@ -1243,7 +1244,7 @@ export function App() {
           id: created.meta.id,
           title: created.meta.title,
           updatedAt: created.meta.updatedAt,
-          turnCount: created.meta.turnCount,
+          agentRunCount: created.meta.agentRunCount,
           workspaceRoot: created.meta.workspaceRoot,
         },
         ...current,
@@ -1282,7 +1283,7 @@ export function App() {
     const sessionId = activeSessionIdRef.current ?? createdSession?.meta.id;
     if (!sessionId) return;
 
-    const turnId = nextTurnId();
+    const agentRunId = nextAgentRunId();
     const trimmedText = text.trim();
     const isCompactCommand = trimmedText === "/compact";
     const evalCommandMatch = /^\/eval(?:\s+([\s\S]+))?$/.exec(trimmedText);
@@ -1335,27 +1336,27 @@ export function App() {
 
     setIsStreaming(true);
     setIsAborting(false);
-    setActiveTurnId(turnId);
-    activeStreamTurnRef.current = { sessionId, turnId };
+    setActiveAgentRunId(agentRunId);
+    activeStreamAgentRunRef.current = { sessionId, agentRunId };
     setApprovalPendingForSession(sessionId, false);
     setFailedForSession(sessionId, false);
     streamStateRef.current = createEmptyStreamingState();
 
     if (isCompactCommand) {
       const pendingBlock = createCompactionBlock({
-        turnId,
+        agentRunId,
         status: "pending",
         summaryText: "/compact",
       });
-      upsertCompactionSegment(streamStateRef.current, turnId);
-      streamStateRef.current.activeCompactions.set(turnId, pendingBlock);
+      upsertCompactionSegment(streamStateRef.current, agentRunId);
+      streamStateRef.current.activeCompactions.set(agentRunId, pendingBlock);
       streamingUserBlockRef.current = null;
       setStreamingBlocks([pendingBlock]);
     } else if (isEvalCommand) {
       streamingUserBlockRef.current = null;
       setStreamingBlocks([{
         kind: "status",
-        id: `turn:${turnId}:eval-candidate:0`,
+        id: `turn:${agentRunId}:eval-candidate:0`,
         content: "Generating eval candidate...",
         createdAt: new Date().toISOString(),
         tone: "muted",
@@ -1363,7 +1364,7 @@ export function App() {
     } else {
       const userBlock: MessageBlock = {
         kind: "user",
-        id: `turn:${turnId}:user:0`,
+        id: `turn:${agentRunId}:user:0`,
         content: text,
         createdAt: new Date().toISOString(),
         attachments: options.attachments,
@@ -1375,9 +1376,9 @@ export function App() {
     setSendScrollRequestId((value) => value + 1);
 
     const isCurrentVisibleTurn = () => {
-      const activeTurn = activeStreamTurnRef.current;
-      return activeTurn?.sessionId === sessionId &&
-        activeTurn.turnId === turnId &&
+      const activeAgentRun = activeStreamAgentRunRef.current;
+      return activeAgentRun?.sessionId === sessionId &&
+        activeAgentRun.agentRunId === agentRunId &&
         activeSessionIdRef.current === sessionId;
     };
 
@@ -1387,10 +1388,10 @@ export function App() {
       if (hasActspaceBridge()) {
         void refreshReviewSummary(nextWorkspaceRoot);
       }
-      activeStreamTurnRef.current = null;
+      activeStreamAgentRunRef.current = null;
       setIsStreaming(false);
       setIsAborting(false);
-      setActiveTurnId(null);
+      setActiveAgentRunId(null);
       setStreamingBlocks([]);
       streamStateRef.current = createEmptyStreamingState();
       streamingUserBlockRef.current = null;
@@ -1402,7 +1403,7 @@ export function App() {
         if (isCompactCommand) {
           const input: CompactContextInput = {
             sessionId,
-            turnId,
+            agentRunId,
             ...modelSelectionPayload(options.model),
           };
           const result = await window.actspace.compactContext(input);
@@ -1413,16 +1414,17 @@ export function App() {
             if (isCurrentVisibleTurn()) {
               setSessionRecord(restored ?? {
                 meta: {
+                  schemaVersion: 2,
                   id: result.sessionId,
                   title: "New chat",
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
-                  turnCount: sessionRecord?.meta.turnCount ?? 0,
+                  agentRunCount: sessionRecord?.meta.agentRunCount ?? 0,
                 },
                 events: result.events,
                 contextSnapshot: result.contextSnapshot,
               });
-              setTurnResult(null);
+              setAgentRunResult(null);
               finishCurrentVisibleTurn();
             }
           }
@@ -1437,7 +1439,7 @@ export function App() {
           }
           const input: GenerateEvalCandidateInput = {
             sessionId,
-            turnId,
+            agentRunId,
             reason: evalFailureReason,
             ...modelSelectionPayload(options.model),
             thinkingEnabled: options.thinkingEnabled,
@@ -1451,15 +1453,16 @@ export function App() {
             if (isCurrentVisibleTurn()) {
               setSessionRecord(restored ?? {
                 meta: {
+                  schemaVersion: 2,
                   id: result.sessionId,
                   title: "New chat",
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
-                  turnCount: sessionRecord?.meta.turnCount ?? 0,
+                  agentRunCount: sessionRecord?.meta.agentRunCount ?? 0,
                 },
                 events: result.events,
               });
-              setTurnResult(null);
+              setAgentRunResult(null);
               finishCurrentVisibleTurn();
             }
           }
@@ -1468,16 +1471,16 @@ export function App() {
           return;
         }
 
-        const input: RunTurnInput = {
+        const input: RunAgentInput = {
           sessionId,
-          turnId,
+          agentRunId,
           userInput: text,
           attachments: options.attachments,
           ...modelSelectionPayload(options.model),
           thinkingEnabled: options.thinkingEnabled,
           ...(options.reasoningEffort && { reasoningEffort: options.reasoningEffort }),
         };
-        const result = await window.actspace.runTurn(input);
+        const result = await window.actspace.runAgent(input);
 
         if (isCurrentVisibleTurn()) {
           setApprovalPendingForSession(sessionId, false);
@@ -1486,16 +1489,17 @@ export function App() {
           if (isCurrentVisibleTurn()) {
             setSessionRecord(restored ?? {
               meta: {
+                schemaVersion: 2,
                 id: result.sessionId,
                 title: "New chat",
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-                turnCount: 1,
+                agentRunCount: 1,
               },
               events: result.events,
               contextSnapshot: result.contextSnapshot,
             });
-            setTurnResult(null);
+            setAgentRunResult(null);
             finishCurrentVisibleTurn();
           }
         }
@@ -1503,13 +1507,13 @@ export function App() {
         setSessions(refreshed);
       }
     } catch (error) {
-      console.error("Failed to run turn", error);
+      console.error("Failed to run Agent", error);
       if (isCurrentVisibleTurn()) {
         setApprovalPendingForSession(sessionId, false);
         setFailedForSession(sessionId, true);
       } else {
-        const activeTurn = activeStreamTurnRef.current;
-        if (!activeTurn || activeTurn.sessionId !== sessionId) {
+        const activeAgentRun = activeStreamAgentRunRef.current;
+        if (!activeAgentRun || activeAgentRun.sessionId !== sessionId) {
           setFailedForSession(sessionId, true);
         }
         refreshPendingApprovalStatuses([sessionId]).catch((refreshError: unknown) => {
@@ -1535,16 +1539,16 @@ export function App() {
 
   const handleAbort = useCallback(async () => {
     const sessionId = activeSessionIdRef.current;
-    if (!hasActspaceBridge() || !activeTurnId || !sessionId) return;
+    if (!hasActspaceBridge() || !activeAgentRunId || !sessionId) return;
 
-    const input: AbortTurnInput = {
+    const input: AbortAgentRunInput = {
       sessionId,
-      turnId: activeTurnId,
+      agentRunId: activeAgentRunId,
     };
 
     try {
       setIsAborting(true);
-      const aborted = await window.actspace.abortTurn(input);
+      const aborted = await window.actspace.abortAgentRun(input);
       if (!aborted) {
         setIsAborting(false);
       }
@@ -1552,14 +1556,14 @@ export function App() {
       console.error("Failed to abort turn", error);
       setIsAborting(false);
     }
-  }, [activeTurnId]);
+  }, [activeAgentRunId]);
 
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
-    activeStreamTurnRef.current = null;
+    activeStreamAgentRunRef.current = null;
     setIsStreaming(false);
     setIsAborting(false);
-    setActiveTurnId(null);
-    setTurnResult(null);
+    setActiveAgentRunId(null);
+    setAgentRunResult(null);
     setStreamingBlocks([]);
     streamStateRef.current = createEmptyStreamingState();
     streamingUserBlockRef.current = null;
@@ -1590,14 +1594,14 @@ export function App() {
     async (sessionId: string) => {
       if (!sessionId || sessionId === activeSessionIdRef.current) return;
 
-      activeStreamTurnRef.current = null;
+      activeStreamAgentRunRef.current = null;
       setIsStreaming(false);
       setIsAborting(false);
-      setActiveTurnId(null);
+      setActiveAgentRunId(null);
       setStreamingBlocks([]);
       streamStateRef.current = createEmptyStreamingState();
       streamingUserBlockRef.current = null;
-      setTurnResult(null);
+      setAgentRunResult(null);
       activeSessionIdRef.current = sessionId;
       refreshPendingApprovalStatuses([sessionId]).catch((error: unknown) => {
         console.error("Failed to refresh selected session approvals", error);
@@ -1624,13 +1628,13 @@ export function App() {
     [bootstrapState?.workspaceRoot, localSessionRecords, refreshPendingApprovalStatuses],
   );
 
-  const persistedEvents = sessionRecord?.events ?? turnResult?.events ?? [];
+  const persistedEvents = sessionRecord?.events ?? agentRunResult?.events ?? [];
   const persistedMessages = useMemo<MessageBlock[]>(() => {
-    const streamingTurnId = streamingBlocks.length > 0 ? activeTurnId : null;
-    const streamingTurnEventIds = streamingTurnId
+    const streamingAgentRunId = streamingBlocks.length > 0 ? activeAgentRunId : null;
+    const streamingTurnEventIds = streamingAgentRunId
       ? new Set(
           persistedEvents
-            .filter((event) => event.turnId === streamingTurnId)
+            .filter((event) => event.agentRunId === streamingAgentRunId)
             .map((event) => event.id),
         )
       : null;
@@ -1641,13 +1645,13 @@ export function App() {
         : fromRecord;
     }
 
-    const visibleEvents = streamingTurnId
-      ? persistedEvents.filter((event) => event.turnId !== streamingTurnId)
+    const visibleEvents = streamingAgentRunId
+      ? persistedEvents.filter((event) => event.agentRunId !== streamingAgentRunId)
       : persistedEvents;
     const fromEvents = createMessageBlocks(visibleEvents);
     if (fromEvents.length > 0) return fromEvents;
     return [];
-  }, [activeTurnId, persistedEvents, sessionRecord?.messageBlocks, streamingBlocks.length]);
+  }, [activeAgentRunId, persistedEvents, sessionRecord?.messageBlocks, streamingBlocks.length]);
 
   const messages = useMemo<MessageBlock[]>(() => {
     const merged = streamingBlocks.length === 0 ? persistedMessages : [...persistedMessages, ...streamingBlocks];
@@ -1664,15 +1668,15 @@ export function App() {
 
   const contextSnapshot: ContextUsageSnapshot | null =
     sessionRecord?.contextSnapshot ??
-    turnResult?.contextSnapshot ??
+    agentRunResult?.contextSnapshot ??
     getLatestContextSnapshot(persistedEvents);
 
   const contextState: ContextState | null =
-    sessionRecord?.contextState ?? turnResult?.contextState ?? null;
+    sessionRecord?.contextState ?? agentRunResult?.contextState ?? null;
 
   const activeSessionId =
-    sessionRecord?.meta.id ?? turnResult?.sessionId ?? sessions[0]?.id ?? null;
-  const isSessionReady = Boolean(sessionRecord || turnResult || streamingBlocks.length > 0 || sessionBootstrapComplete);
+    sessionRecord?.meta.id ?? agentRunResult?.sessionId ?? sessions[0]?.id ?? null;
+  const isSessionReady = Boolean(sessionRecord || agentRunResult || streamingBlocks.length > 0 || sessionBootstrapComplete);
   const title = getSessionTitle(sessionRecord, sessions);
   const workspaceOptions = useMemo(
     () =>
@@ -1768,7 +1772,7 @@ export function App() {
             id: forked.meta.id,
             title: forked.meta.title,
             updatedAt: forked.meta.updatedAt,
-            turnCount: forked.meta.turnCount,
+            agentRunCount: forked.meta.agentRunCount,
             workspaceId: forked.meta.workspaceId,
             workspaceRoot: forked.meta.workspaceRoot,
           },
@@ -1784,12 +1788,12 @@ export function App() {
         await refreshWorkspaces();
       }
 
-      activeStreamTurnRef.current = null;
+      activeStreamAgentRunRef.current = null;
       activeSessionIdRef.current = forked.meta.id;
       setIsStreaming(false);
       setIsAborting(false);
-      setActiveTurnId(null);
-      setTurnResult(null);
+      setActiveAgentRunId(null);
+      setAgentRunResult(null);
       setStreamingBlocks([]);
       streamStateRef.current = createEmptyStreamingState();
       streamingUserBlockRef.current = null;

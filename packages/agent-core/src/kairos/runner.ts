@@ -53,7 +53,7 @@ export interface KairosRunnerOptions {
   observeRefresh: () => Promise<{
     sessionsDigest: SessionsDigestResult;
     /**
-     * 提交本次观测的游标（sessions lastSeenTurnId）。
+     * 提交本次观测的游标（sessions lastSeenAgentRunId）。
      * runner 仅在 tick 正常闭合后调用；失败 tick 不提交 → 下个 tick 重见同批增量。
      */
     commit?: () => Promise<void>;
@@ -104,7 +104,7 @@ export class KairosRunner {
     }
     const payload = msg.payload;
     const now = (this.opts.now ?? (() => new Date()))();
-    const turnId = makeId("turn", this.opts.newId);
+    const agentRunId = makeId("turn", this.opts.newId);
     const sessionId = this.opts.pseudoSessionId
       ? this.opts.pseudoSessionId(now)
       : `kairos-${toIsoDate(now)}`;
@@ -137,10 +137,10 @@ export class KairosRunner {
     await this.opts.eventSink({
       id: makeId("evt", this.opts.newId),
       sessionId,
-      turnId,
+      agentRunId,
       type: "kairos_tick_injected",
       timestamp: now.toISOString(),
-      schemaVersion: 1,
+      schemaVersion: 2,
       payload: {
         trigger: payload.trigger,
         ...(payload.trigger === "brief" ? { briefId: payload.briefId } : {}),
@@ -173,10 +173,10 @@ export class KairosRunner {
     const onEvent = async (ev: AgentEvent) => {
       const sessionEvents = agentEventToSessionEvents(ev, {
         sessionId,
-        turnId,
+        agentRunId,
         now: this.opts.now ?? (() => new Date()),
         newId: () => makeId("evt", this.opts.newId),
-        nextUsageCallId: () => `llm_call_${turnId}_${++usageCallIndex}`,
+        nextUsageCallId: () => `llm_call_${agentRunId}_${++usageCallIndex}`,
       });
       for (const se of sessionEvents) {
         turnEventBuffer.push(se);
@@ -231,7 +231,7 @@ export class KairosRunner {
 
 interface AgentEventConvertCtx {
   sessionId: string;
-  turnId: string;
+  agentRunId: string;
   now: () => Date;
   newId: () => string;
   /**
@@ -355,7 +355,9 @@ function buildKairosLlmUsagePayload(
   const cacheHitTokens = usage.cacheHit || usage.cacheRead || undefined;
   const cacheMissTokens = usage.cacheMiss || undefined;
   return {
-    callId,
+    llmCallId: callId,
+    attempt: 1,
+    durationMs: 0,
     provider,
     model: message.model,
     modelId: modelSpec?.id,
@@ -389,10 +391,10 @@ function makeEvent<T>(
   return {
     id: ctx.newId(),
     sessionId: ctx.sessionId,
-    turnId: ctx.turnId,
+    agentRunId: ctx.agentRunId,
     type,
     timestamp,
-    schemaVersion: 1,
+    schemaVersion: 2,
     payload,
   };
 }

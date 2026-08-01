@@ -1,31 +1,33 @@
 /**
- * Agent Turn 编排
+ * Agent Run 编排
  *
- * 从 main/index.ts 抽出的 Agent turn 执行逻辑。
- * 职责：构建配置 → 创建实例 → 执行 turn → 持久化结果。
+ * 从 main/index.ts 抽出的 Agent Run 执行逻辑。
+ * 职责：构建配置 → 创建实例 → 执行 Agent Run → 持久化结果。
  *
  * main/index.ts 只负责 Electron 生命周期和 IPC 路由，
- * Agent 相关逻辑集中在这个文件。
+ * Agent 相关运行逻辑集中在这个文件。
  */
 
 import type { BrowserWindow } from "electron";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AgentTurnResult, ComposerAttachment, RunTurnInput, RuntimeStreamEvent } from "@actspace/shared";
+import type { AgentRunResult, ComposerAttachment, RunAgentInput, RuntimeStreamEvent } from "@actspace/shared";
 import {
   buildAgentConfig,
   buildAgentConfigFromRuntime,
   createAgentForSession,
   type AgentRuntimeContext,
   type AgentRunLogger,
+  type AgentTraceWriter,
   cleanupOldAgentRunLogs,
   cleanupOldToolOutputs,
   createAgentRunLogger,
+  createAgentTraceWriter,
   createCacheAuditTracker,
   generateSessionTitle,
   isDefaultSessionTitle,
   appendEvents,
-  runTurnWithAgent,
+  runAgentWithBridge,
   createSessionStorePaths,
   readMeta,
   updateMeta,
@@ -108,9 +110,9 @@ function preview(value: unknown, limit = PREVIEW_LIMIT): string {
   return text.length > limit ? `${text.slice(0, limit)}...` : text;
 }
 
-function logAgentTurn(message: string, details?: Record<string, unknown>): void {
+function logAgentRun(message: string, details?: Record<string, unknown>): void {
   console.log(
-    `[agent-turn] ${message}`,
+    `[agent-run] ${message}`,
     details ? JSON.stringify(details) : "",
   );
 }
@@ -132,18 +134,18 @@ async function writeAgentRunLog(
 /**
  * 首轮对话结束后，用 flash 模型把「用户首条输入 + 助手回复」浓缩成会话标题，替换 "New chat"。
  *
- * 全程 best-effort：缺 key / 非首轮 / 标题已被用户改过 / 生成失败，都静默跳过，绝不阻塞或污染 turn。
- * await 完成后再返回，让 renderer 在 turn 结束后的 listSessions 刷新里直接拿到新标题（无需额外 IPC）。
+ * 全程 best-effort：缺 key / 非首轮 / 标题已被用户改过 / 生成失败，都静默跳过，绝不阻塞或污染 Agent Run。
+ * await 完成后再返回，让 renderer 在 Agent Run 结束后的 listSessions 刷新里直接拿到新标题（无需额外 IPC）。
  */
 async function maybeGenerateSessionTitle(input: {
   metaPath: string;
   sessionMeta: SessionMeta | null;
   priorMessageCount: number;
-  result: AgentTurnResult;
+  result: AgentRunResult;
   userInput: string;
   titler: import("@actspace/agent-core").LLMService;
 }): Promise<void> {
-  // 仅首轮（turn 前上下文为空）+ 仍是默认标题 + 本轮正常完成时才生成。
+  // 仅首次 Agent Run（运行前上下文为空）+ 仍是默认标题 + 本次正常完成时才生成。
   if (input.priorMessageCount > 0) return;
   if (!isDefaultSessionTitle(input.sessionMeta?.title)) return;
   if (input.result.status !== "completed") return;
@@ -156,44 +158,44 @@ async function maybeGenerateSessionTitle(input: {
     if (!title) return;
     const write = await updateMeta(input.metaPath, { title });
     if (write.ok) {
-      logAgentTurn("session title generated", { title });
+      logAgentRun("session title generated", { title });
     } else {
-      console.error("[agent-turn] failed to persist generated title", write.error);
+      console.error("[agent-run] failed to persist generated title", write.error);
     }
   } catch (error) {
-    console.error("[agent-turn] session title generation failed", error);
+    console.error("[agent-run] session title generation failed", error);
   }
 }
 
-const activeTurnAborts = new Map<string, () => void>();
+const activeAgentRunAborts = new Map<string, () => void>();
 
-function getTurnKey(input: { sessionId: string; turnId: string }): string {
-  return `${input.sessionId}:${input.turnId}`;
+function getAgentRunKey(input: { sessionId: string; agentRunId: string }): string {
+  return `${input.sessionId}:${input.agentRunId}`;
 }
 
-export function abortTurn(input: { sessionId: string; turnId: string }): boolean {
-  const abort = activeTurnAborts.get(getTurnKey(input));
+export function abortAgentRun(input: { sessionId: string; agentRunId: string }): boolean {
+  const abort = activeAgentRunAborts.get(getAgentRunKey(input));
   if (!abort) return false;
   abort();
   return true;
 }
 
-export function isSessionTurnActive(sessionId: string): boolean {
+export function isSessionAgentRunActive(sessionId: string): boolean {
   const prefix = `${sessionId}:`;
-  return [...activeTurnAborts.keys()].some((turnKey) => turnKey.startsWith(prefix));
+  return [...activeAgentRunAborts.keys()].some((agentRunKey) => agentRunKey.startsWith(prefix));
 }
 
-export async function runAndPersistTurn(
-  input: RunTurnInput,
+export async function runAndPersistAgentRun(
+  input: RunAgentInput,
   roots: AppDataRoots,
   getMainWindow: () => BrowserWindow | undefined,
   approvalRegistry?: PendingApprovalRegistry,
   loadRuntimeContext?: AgentRuntimeContextLoader,
   modelRuntime?: ModelRuntimeService,
-): Promise<AgentTurnResult> {
-  logAgentTurn("run turn requested", {
+): Promise<AgentRunResult> {
+  logAgentRun("run requested", {
     sessionId: input.sessionId,
-    turnId: input.turnId,
+    agentRunId: input.agentRunId,
     userInputLength: input.userInput.length,
     userInputPreview: preview(input.userInput),
     model: input.modelKey ?? input.model,
@@ -204,22 +206,22 @@ export async function runAndPersistTurn(
   let runLogger: AgentRunLogger | undefined;
   try {
     await cleanupOldAgentRunLogs(roots.logRoot);
-    // best-effort 回收 bash 落盘溢出文件，失败不影响 turn
+    // best-effort 回收 bash 落盘溢出文件，失败不影响 Agent Run
     await cleanupOldToolOutputs(roots.tmpRoot).catch((error) => {
       console.error("[tool-output-cleanup] failed to clean overflow files", error);
     });
     runLogger = await createAgentRunLogger({
       logRoot: roots.logRoot,
       sessionId: input.sessionId,
-      turnId: input.turnId,
+      agentRunId: input.agentRunId,
     });
   } catch (error) {
     console.error("[agent-run-log] failed to prepare run log", error);
   }
   await writeAgentRunLog(runLogger, "main_event", {
-    stage: "run_turn_requested",
+    stage: "run_requested",
     sessionId: input.sessionId,
-    turnId: input.turnId,
+    agentRunId: input.agentRunId,
     userInput: input.userInput,
     model: input.model,
     thinkingEnabled: Boolean(input.thinkingEnabled),
@@ -227,26 +229,36 @@ export async function runAndPersistTurn(
     runLogFilePath: runLogger?.filePath,
   });
   if (runLogger) {
-    logAgentTurn("run log created", {
+    logAgentRun("run log created", {
       sessionId: input.sessionId,
-      turnId: input.turnId,
+      agentRunId: input.agentRunId,
       filePath: runLogger.filePath,
     });
   }
 
-  approvalRegistry?.setCurrentTurn(input.sessionId, input.turnId);
+  approvalRegistry?.setCurrentAgentRun(input.sessionId, input.agentRunId);
 
   const sessionDir = join(roots.sessionRoot, input.sessionId);
   const sessionPaths = createSessionStorePaths(sessionDir);
+  let traceWriter: AgentTraceWriter | undefined;
+  try {
+    traceWriter = await createAgentTraceWriter({
+      sessionDir,
+      sessionId: input.sessionId,
+      agentRunId: input.agentRunId,
+    });
+  } catch (error) {
+    console.error("[agent-trace] failed to prepare session trace", error);
+  }
   const sessionMeta = await readMeta(sessionPaths.metaPath);
-  const turnWorkspaceRoot = sessionMeta?.workspaceRoot ?? roots.defaultWorkspaceRoot;
-  const runtimeContext = await loadRuntimeContext?.(turnWorkspaceRoot);
+  const agentRunWorkspaceRoot = sessionMeta?.workspaceRoot ?? roots.defaultWorkspaceRoot;
+  const runtimeContext = await loadRuntimeContext?.(agentRunWorkspaceRoot);
 
   const runtimeOptions = {
     tmpRoot: roots.tmpRoot,
     artifactRoot: join(sessionDir, "artifacts", "generated-images"),
     sessionId: input.sessionId,
-    turnId: input.turnId,
+    agentRunId: input.agentRunId,
     ...runtimeContext,
   };
   const config = modelRuntime
@@ -263,7 +275,7 @@ export async function runAndPersistTurn(
           thinkingEnabled: input.thinkingEnabled,
           reasoningEffort: input.reasoningEffort,
           toolEnvironment: modelRuntime.getToolEnvironment(),
-        }, turnWorkspaceRoot, approvalRegistry, runtimeOptions);
+        }, agentRunWorkspaceRoot, approvalRegistry, runtimeOptions);
       })()
     : buildAgentConfig(
         {
@@ -272,7 +284,7 @@ export async function runAndPersistTurn(
           reasoningEffort: input.reasoningEffort,
           exploreModelId: input.exploreModelId,
         },
-        turnWorkspaceRoot,
+        agentRunWorkspaceRoot,
         approvalRegistry,
         runtimeOptions,
       );
@@ -281,8 +293,8 @@ export async function runAndPersistTurn(
   });
 
   const priorMessageCount = deps.contextManager.getMessageCount();
-  logAgentTurn("agent dependencies ready", {
-    workspaceRoot: turnWorkspaceRoot,
+  logAgentRun("agent dependencies ready", {
+    workspaceRoot: agentRunWorkspaceRoot,
     modelId: deps.modelKey,
     provider: deps.modelDefinition.provider,
     apiModel: deps.modelDefinition.apiModel,
@@ -294,19 +306,19 @@ export async function runAndPersistTurn(
   });
   await writeAgentRunLog(runLogger, "main_event", {
     stage: "agent_dependencies_ready",
-    workspaceRoot: turnWorkspaceRoot,
+    workspaceRoot: agentRunWorkspaceRoot,
     sessionPath: sessionPaths.sessionPath,
     priorMessageCount,
   });
 
   const win = getMainWindow();
-  const turnKey = getTurnKey(input);
+  const agentRunKey = getAgentRunKey(input);
   const abortableDeps = {
     ...deps,
     cacheAudit: createCacheAuditTracker({
       rootDir: join(roots.dataRoot, "cache-audit"),
       sessionId: input.sessionId,
-      turnId: input.turnId,
+      agentRunId: input.agentRunId,
       provider: deps.modelDefinition.provider,
       model: deps.modelDefinition.apiModel,
       modelId: deps.modelKey,
@@ -316,16 +328,16 @@ export async function runAndPersistTurn(
   };
 
   let abortRequested = false;
-  activeTurnAborts.set(turnKey, () => {
+  activeAgentRunAborts.set(agentRunKey, () => {
     abortRequested = true;
     abortableDeps.abort?.();
-    approvalRegistry?.abortTurn(input.sessionId, input.turnId);
+    approvalRegistry?.abortAgentRun(input.sessionId, input.agentRunId);
   });
 
   const forwardStreamEvent = (event: RuntimeStreamEvent) => {
-    logAgentTurn("stream event sent to renderer", {
+    logAgentRun("stream event sent to renderer", {
       sessionId: "sessionId" in event ? event.sessionId : input.sessionId,
-      turnId: "turnId" in event ? event.turnId : input.turnId,
+      agentRunId: "agentRunId" in event ? event.agentRunId : input.agentRunId,
       type: event.type,
     });
     win?.webContents.send("agent:stream", event);
@@ -337,7 +349,7 @@ export async function runAndPersistTurn(
       content: input.userInput,
       timestamp: Date.now(),
       source: "user",
-    }, input.sessionId, input.turnId, { attachments: input.attachments });
+    }, input.sessionId, input.agentRunId, { attachments: input.attachments });
     const startWrite = await appendEvents(sessionPaths.sessionPath, userEvents);
     if (!startWrite.ok) {
       throw new Error(startWrite.error);
@@ -348,10 +360,10 @@ export async function runAndPersistTurn(
       deps.modelDefinition.capabilities.input.includes("image"),
     );
 
-    const resultPromise = runTurnWithAgent(
+    const resultPromise = runAgentWithBridge(
       {
         sessionId: input.sessionId,
-        turnId: input.turnId,
+        agentRunId: input.agentRunId,
         userInput: input.userInput,
         attachments: input.attachments,
         modelAttachments,
@@ -362,6 +374,7 @@ export async function runAndPersistTurn(
       {
         onStreamEvent: forwardStreamEvent,
         runLogger,
+        traceWriter,
         includeUserEvent: false,
       },
     );
@@ -372,26 +385,26 @@ export async function runAndPersistTurn(
     const result = await resultPromise;
 
     await writeAgentRunLog(runLogger, "main_event", {
-      stage: "persisting_turn_result",
+      stage: "persisting_agent_run_result",
       sessionDir,
       status: result.status,
       eventCount: result.events.length,
     });
-    logAgentTurn("persisting turn result", {
+    logAgentRun("persisting agent run result", {
       sessionId: input.sessionId,
-      turnId: input.turnId,
+      agentRunId: input.agentRunId,
       sessionDir,
       status: result.status,
       eventCount: result.events.length,
     });
     await writeSessionResult(sessionPaths, result);
     await writeAgentRunLog(runLogger, "main_event", {
-      stage: "turn_result_persisted",
+      stage: "agent_run_result_persisted",
       status: result.status,
     });
-    logAgentTurn("turn result persisted", {
+    logAgentRun("agent run result persisted", {
       sessionId: input.sessionId,
-      turnId: input.turnId,
+      agentRunId: input.agentRunId,
       status: result.status,
     });
 
@@ -409,10 +422,10 @@ export async function runAndPersistTurn(
       events: [...userEvents, ...result.events],
     };
   } finally {
-    activeTurnAborts.delete(turnKey);
-    approvalRegistry?.abortTurn(input.sessionId, input.turnId);
+    activeAgentRunAborts.delete(agentRunKey);
+    approvalRegistry?.abortAgentRun(input.sessionId, input.agentRunId);
     await deps.toolManager.dispose().catch((error) => {
-      console.error("[agent-turn] failed to dispose tool manager", error);
+      console.error("[agent-run] failed to dispose tool manager", error);
     });
   }
 }

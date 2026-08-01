@@ -63,7 +63,7 @@
 - `packages/shared/src/ipc.ts`
 - `packages/desktop/src/main/settings-service.ts`
 - `packages/desktop/src/main/index.ts`
-- `packages/desktop/src/main/agent-turn.ts`
+- `packages/desktop/src/main/agent-run.ts`
 - `packages/desktop/src/main/context-describe-service.ts`
 - `packages/desktop/src/preload/index.ts`
 - `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`

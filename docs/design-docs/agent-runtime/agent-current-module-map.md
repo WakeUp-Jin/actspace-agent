@@ -14,7 +14,7 @@
 
 ## `llm/` - LLM 服务层
 
-- `llm/types.ts`：LLMConfig、StreamOptions、LLMService 接口、AssistantMessageEventStream、LLMServiceError。LLMConfig 现在把 `api` / `apiFormat` / `input` 拆开，error 事件仍携带完整 `AssistantMessage`（含部分内容 + `stopReason` + `errorMessage`），而非 `Error` 对象。
+- `llm/types.ts`：LLMConfig、StreamOptions、LLMService 接口、AssistantMessageEventStream、LLMServiceError。LLMService 暴露非敏感 `provider/model` 运行身份供 Trace 使用；LLMConfig 把 `api` / `apiFormat` / `input` 拆开，error 事件仍携带完整 `AssistantMessage`，而非 `Error` 对象。
 - `llm/provider-adapter.ts`：供应商品牌差异的小型函数表。当前只承担 display name、OpenRouter 非敏感默认 header 和 Kimi thinking 请求修饰，不持有消息历史或协议转换状态。
 - `llm/provider-transport.ts`：供应商级 fetch/代理边界。无代理时沿用 SDK 默认 fetch；有代理时按标准化 HTTP(S) URL 复用 Undici `ProxyAgent`，拒绝认证 URL，并把失败脱敏归一为 `proxy` 错误。
 - `llm/convert.ts`：OpenAI 协议的共享消息转换、工具转换、流式 chunk 处理和 SDK 错误映射逻辑。包含防御性消息处理（跳过 error/aborted 的 assistant messages、为孤儿 tool calls 插入 synthetic toolResult）。
@@ -76,28 +76,29 @@
 
 ## `engine/` - 执行引擎
 
-- `engine/types.ts`：AgentEvent（discriminated union，含 `context_compaction`）、AgentLoopConfig（含 `maybeCompact?`、`cacheAudit?`）、AgentLoopResult、`ContextCompactionInfo` / `CompactionOutcome`。`LLMUsageCall` 可携带 `cacheAudit` 元数据，供 bridge 写入 `llm_usage.payload`。
-- `engine/loop.ts`：runAgentLoop 纯函数双层循环（内层工具调用+转向、外层跟进）。每次模型调用前 `await config.maybeCompact?.()`，发生压缩时用返回的新数组刷新 `context.messages` 引用并 emit `context_compaction` 事件；随后在 `llm.stream` 前后调用可选 `cacheAudit.beforeLlmCall/afterLlmCall`，快照真实 provider 输入并根据模型返回 usage 确认低缓存。
+- `engine/types.ts`：AgentEvent（discriminated union，含 Agent Run 内真实 `turn_start/end`、`llm_call_start/end` 与 `context_compaction`）、AgentLoopConfig、AgentLoopResult、`ContextCompactionInfo` / `CompactionOutcome`。`LLMUsageCall` 保存 `turnId/llmCallId/attempt/durationMs`，并可携带 cache audit 元数据。
+- `engine/loop.ts`：runAgentLoop 纯函数双层循环（内层工具调用+转向、外层跟进）。每个内部 Turn 生成真实 `turnId`，每次 `llm.stream` 尝试生成 `llmCallId + attempt`；调用前捕获 provider/model、系统提示词、消息、工具和推理选项，调用后记录响应、usage 与耗时。自动重试留在同一 Turn，但拥有新的 LLM Call。
 - `engine/agent.ts`：Agent 入口类（run/abort），编排 ContextManager + ToolManager + LLMService；持有 `summarizer` 与可选 `cacheAudit`，把 `contextManager.compactIfNeeded` 包成 `maybeCompact` 传入 loop。
-- `engine/bridge.ts`：IPC 桥接层，将 AgentEvent 实时映射为 RuntimeStreamEvent，并根据工具 `previewKind` 将执行结果聚合为带 `ToolUiPreview` 的 AgentTurnResult。`createToolExecutionResult` 据 `ToolResult.outputRef` 填 `rawOutput` / `rawOutputRef`（bash 为 file ref、其余 inline）；收集 `context_compaction` 事件落 run-log、生成 `context_compaction` SessionEvent 追加到 session 事件，并把自动压缩完成态映射为 `context_compaction_finished` stream event。透传 `summarizer` / `cacheAudit` 给 Agent，并把 `LLMUsageCall.cacheAudit` 的 `cacheStatus/cacheAuditId/cacheHitRatio` 写入 `llm_usage.payload`。`tool_call_delta` 阶段维护 `toolCallStreaming` 状态机（按 toolCallId 累积 partial args + 50ms throttle），调用 `streaming-preview-extractors` 把 partial args 解析为 typed `ToolUiPreview`，emit `tool_call_streaming` 让前端在 tool_start 前就能展示 `Write filename` 甚至 streaming content。SubAgent run 走独立 `RuntimeStreamEvent.subagent_event`：bridge 透传 transcriptRef、单条 transcript event 和最新 `AgentToolPreview`，主 session 只持久化 Agent 工具调用/结果，不展开写入完整 transcript。
+- `engine/bridge.ts`：IPC 桥接层，将 AgentEvent 实时映射为 RuntimeStreamEvent，并把一次用户输入聚合为 `AgentRunResult`。Bridge 给所有 SessionEvent 附加粗粒度 `agentRunId`，给内部 Turn/LLM Call 事件附加真实 `turnId/llmCallId`；同时把请求、响应与重试写入可选 Trace Writer。工具预览、压缩、cache audit 和 SubAgent sidecar transcript 仍沿用既有边界。
 - `engine/compact-context.ts`：手动 `/compact` 后端入口。接收 `CompactContextInput` + 已装配 `AgentDeps`，发送 `context_compaction_started/progress/finished/failed` stream event，调用 `contextManager.compactNow()`，返回 `CompactContextResult` 并产出 `context_compaction` / `context_snapshot` 事件。
 - `engine/partial-args.ts`：partial JSON 字符串字段提取状态机，正确处理 `\"` `\\` `\n` `\uXXXX` 等 JSON escape，未闭合时返回当前累积部分。仅给 streaming-preview-extractors 使用。
 - `engine/streaming-preview-extractors.ts`：按 `ToolPreviewKind` 注册的 extractor 表，把 LLM 流式 `tool_call_delta` 累积的 partial JSON 解析成 typed `ToolUiPreview`。write_file 同时提取 path 与 content（content 作为 `streamingContent` 让前端 cursor 风格边写边看）；edit_file 和 delete_file 只提取 path（edit 的 diff 需要文件上下文 + 替换执行才能生成，delete 的审批/执行状态由权限事件和工具结果决定）。新工具按 previewKind 注册一行 extractor 即可。
 - `engine/create-agent-deps.ts`：Agent 配置构建与实例创建，两步分离。Desktop 通过 provider-qualified `modelDefinition`、`modelKey` 和显式 `ProviderRuntimeConfig` 装配主模型；utility summarizer 也由已解析任务模型构造。旧 `modelSpec`/env builder 仅保留测试、CLI 和兼容入口。`createAgentFromConfig(config)` 用于空历史 mock/测试，`createAgentForSession(config, { sessionPath })` 在 main 进程恢复真实会话。
 
-Agent Turn 的跨层职责边界见 `docs/design-docs/agent-runtime/agent-turn-layers.md`。
+Agent Run、内部 Turn 与 LLM Call 的跨层职责边界见 `docs/design-docs/agent-runtime/agent-turn-layers.md`，Trace 契约见 `agent-observability-trace-model.md`。
 
 ## `persistence/` - 持久化与恢复
 
 - `persistence/types.ts`：SessionStorePaths、JsonlParseResult、WriteResult、SessionRecoveryResult。
 - `persistence/jsonl.ts`：健壮 JSONL 读写（坏行容错 + 结构化错误传播）。
-- `persistence/meta.ts`：meta.json 增量更新（turnCount/updatedAt/lastModel）。
+- `persistence/meta.ts`：Session V2 `meta.json` 增量更新（`agentRunCount/updatedAt/lastModel`），拒绝旧 Schema。
 - `persistence/recovery.ts`：多维恢复（events -> Messages/Blocks/Snapshot/DiffSummary）。
-- `persistence/session-store.ts`：会话存储生命周期（create/ensure/write/read/list）。`writeSessionResult()` 先追加主 `session.jsonl`，再把 `AgentTurnResult.subagentTranscripts` 写到 `<sessionDir>/subagents/<parentTurnId>/<runId>.jsonl`；`readSubAgentTranscript()` 只接受 typed `SubAgentTranscriptRef`，并通过 sessionId / turnId / runId 的 path segment 校验和 session root basename 校验拒绝跨 session 或路径穿越读取。
+- `persistence/session-store.ts`：会话存储生命周期（create/ensure/write/read/list）。`writeSessionResult()` 追加 Session V2 事实事件，并把 `AgentRunResult.subagentTranscripts` 写到独立 sidecar；`readSubAgentTranscript()` 通过 typed ref 和路径段校验拒绝跨 session 或路径穿越读取。
 
-## `observability/` - 本地运行排障日志
+## `observability/` - 本地排障与分析 Trace
 
-- `observability/agent-run-log.ts`：每次 Agent turn 一个 JSONL 文件，记录从用户输入、main 边界、AgentEvent、RuntimeStreamEvent 到最终结果的完整链路（含 `context_compaction` 历史压缩记录），并清理超过 24 小时的 run 日志。
+- `observability/agent-run-log.ts`：每次 Agent Run 一个短期 JSONL 排障文件，记录 main、AgentEvent、RuntimeStreamEvent 和最终结果，超过 24 小时清理。
+- `observability/agent-trace.ts`：每次 Agent Run 一个 append-only、安全脱敏的长期分析 Trace，保存 Run/Turn/LLM request/response/retry 事件；写入失败 fail-soft，不影响主流程。
 - `observability/cache-audit.ts`：缓存失效旁路审计器。模型调用前对真实 Context 生成稳定 hash 指纹并读取滚动 `last.context.json` 做 prefix / append-only 比较；模型返回后按 `cacheHit/cacheRead + cacheMiss` 计算命中率，低于阈值时在 `<userData>/cache-audit/<sessionId>/<cacheAuditId>/` 固化 `summary.json`、`previous.context.json`、`current.context.json`、`diff.txt`，并始终 best-effort 覆盖滚动 `last.context.json`。
 
 日志和 session 持久化的边界见 `../core-storage-and-observability.md`。
@@ -186,7 +187,7 @@ flowchart TB
 模块速读：
 
 - `controller.ts`：单例装配中枢。`createKairos(opts)` 接收 `kairosRoot / llm / toolManagerFactory / contextWindow`，内部串起所有子模块并 emit `event` / `state`。`eventSink` 严格按"写盘 → 推 ring buffer → 回调 listener"顺序，保证消费方任何时刻看到的都是已持久化事实。**额度护栏**：持有 `KairosBudgetStore`，`eventSink` 处理 `llm_usage` 后按 `budget.enabled` 扣减余额、耗尽则 `triggerWake`；scheduler emit `budget_exhausted` 时走 `haltForBudget`（enabled=false + 持久化 preferences.enabled=false + emit error）；`setBudget()` 写盘 + 重算 + 耗尽态清理；`start({force})` 耗尽时 throw。**优雅退出**：持有每轮重建的 `AbortController`，`shutdown()` = abort 在飞请求 + stop 循环 + flush usage/budget。
-- `scheduler.ts`：`MessageQueue` FIFO + `QueueProcessor` 主循环。`runInterruptibleSleep` 用 `Promise + setTimeout + clearTimeout` 实现可中断 sleep；`mainAgentBusy` 标志让主 Agent runTurn 期间 scheduler 暂停取下一条；连续 `errorThreshold` 次失败进 cooldown。`sleepBiasAt(now, prefs)` 按 `preferences.rhythm` 调节 sleep 系数，`clampSleep` 卡住 LLM 请求范围。注入的 `canStartTick()`（额度耗尽时返回 false）在投/取 tick 前 + tick 后 sleep 前各检查一次，命中即 `onStateChange("budget_exhausted")` + break。
+- `scheduler.ts`：`MessageQueue` FIFO + `QueueProcessor` 主循环。`runInterruptibleSleep` 用 `Promise + setTimeout + clearTimeout` 实现可中断 sleep；`mainAgentBusy` 标志让主 Agent Run 期间 scheduler 暂停取下一条；连续 `errorThreshold` 次失败进 cooldown。`sleepBiasAt(now, prefs)` 按 `preferences.rhythm` 调节 sleep 系数，`clampSleep` 卡住 LLM 请求范围。注入的 `canStartTick()`（额度耗尽时返回 false）在投/取 tick 前 + tick 后 sleep 前各检查一次，命中即 `onStateChange("budget_exhausted")` + break。
 - `runner.ts`：`KairosRunner.processTick(msg)` 执行单次 tick：刷新观察（sessions digest + Agent inbox；目录变化已改由 fs-watch Skill 主动读取，2026-07-03 起不进观测）→ 加载 short-term context（token budget）→ assemble system prompt → emit `kairos_tick_injected` → 从 Kairos 专属 ToolManager 注入工具定义 → 直接调用共享 `runAgentLoop({ toolExecuteOptions: { callerAgent:"kairos", kairosGuard } }, getAbortSignal?.())`（透传退出用 AbortSignal）→ 把 `tool_start/tool_end/message_end` 转成 Kairos `SessionEvent` → 解析最后一次 `sleep(seconds)` 工具参数返回给 scheduler。
 - `prompt-assembler.ts`：把 5 段（pacing / observation / config tip / history / rule.md）拼到 `KAIROS_SYSTEM_PROMPT` 占位符；每段独立 token budget。观测增量把 sessions digest、Agent inbox 分块截断，避免某一类长内容把其它观测信号完全挤掉。
 - `inbox.ts`：V0 Agent 文件收件箱。幂等创建 `<kairosRoot>/inbox/main-agent.md` / `lab-agent.md`，提供 `appendKairosInboxMessage()` 和 `loadKairosInboxSummary()`；写入只 append 到文件末尾，读取时按最近消息数与字符预算截断。inbox 只作为 Kairos prompt 观测信号，不作为短期记忆事实源。

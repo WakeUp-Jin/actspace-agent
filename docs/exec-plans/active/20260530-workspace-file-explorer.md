@@ -48,7 +48,7 @@
 - `packages/shared/src/ipc.ts`（IPC 契约）
 - `packages/desktop/src/main/workspace-fs-service.ts`（新增）
 - `packages/desktop/src/main/index.ts`（注册 handler）
-- `packages/desktop/src/main/agent-turn.ts`（`AppDataRoots` 类型来源，复用其 `workspaceRoot`）
+- `packages/desktop/src/main/agent-run.ts`（`AppDataRoots` 类型来源，复用其 `workspaceRoot`）
 - `packages/desktop/src/preload/index.ts`
 - `packages/desktop/src/global.d.ts`
 - `packages/desktop/src/renderer/components/right-panel/RightPanelContext.tsx`

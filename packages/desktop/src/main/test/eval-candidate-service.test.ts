@@ -53,7 +53,7 @@ describe("eval candidate service", () => {
     const result = await generateEvalCandidate(
       {
         sessionId,
-        turnId: "turn-eval-command",
+        agentRunId: "turn-eval-command",
         reason: "No test was added",
       },
       roots,
@@ -76,14 +76,14 @@ describe("eval candidate service", () => {
     );
 
     expect(result.status).toBe("generated");
-    expect(result.targetTurnId).toBe("turn-user");
+    expect(result.targetAgentRunId).toBe("turn-user");
     expect(result.candidatePath).toContain(join("eval-candidates", "failure-"));
     const metadata = JSON.parse(await readFile(join(result.candidatePath!, "candidate.json"), "utf8"));
     expect(metadata).toMatchObject({
       status: "generated",
       source: {
         sessionId,
-        turnId: "turn-user",
+        agentRunId: "turn-user",
         userInput: "Fix login",
         failureReason: "No test was added",
       },
@@ -92,7 +92,7 @@ describe("eval candidate service", () => {
 
     const restored = await readSessionRecord(createSessionStorePaths(join(roots.sessionRoot, sessionId)));
     expect(restored?.events.at(-1)).toMatchObject({
-      turnId: "turn-eval-command",
+      agentRunId: "turn-eval-command",
       type: "eval_candidate",
       payload: { status: "generated" },
     });
@@ -105,7 +105,7 @@ describe("eval candidate service", () => {
     await createMeta(paths.metaPath, sessionId, "Empty session", { workspaceRoot: roots.defaultWorkspaceRoot });
 
     const result = await generateEvalCandidate(
-      { sessionId, turnId: "turn-eval-command" },
+      { sessionId, agentRunId: "turn-eval-command" },
       roots,
       async () => {
         throw new Error("should not run");

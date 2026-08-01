@@ -19,7 +19,7 @@ afterEach(async () => {
 const makeUser = (id: string, content: string, ts: string): SessionEvent => ({
   id,
   sessionId: "s",
-  turnId: id,
+  agentRunId: id,
   type: "user_message",
   timestamp: ts,
   payload: { content },
@@ -28,7 +28,7 @@ const makeUser = (id: string, content: string, ts: string): SessionEvent => ({
 const makeReply = (id: string, content: string, ts: string): SessionEvent => ({
   id,
   sessionId: "s",
-  turnId: id,
+  agentRunId: id,
   type: "assistant_message",
   timestamp: ts,
   payload: { content, model: "mock", provider: "mock", stopReason: "stop" },
@@ -96,7 +96,7 @@ describe("sanitizeOrphanToolPairs", () => {
       {
         id: "tc-1",
         sessionId: "s",
-        turnId: "t",
+        agentRunId: "t",
         type: "tool_call",
         timestamp: "2026-05-27T00:00:00.000Z",
         payload: { id: "tc-A", name: "read_file", arguments: { path: "a.txt" } },
@@ -104,7 +104,7 @@ describe("sanitizeOrphanToolPairs", () => {
       {
         id: "tr-orphan",
         sessionId: "s",
-        turnId: "t",
+        agentRunId: "t",
         type: "tool_result",
         timestamp: "2026-05-27T00:00:01.000Z",
         payload: { toolCallId: "tc-OTHER", toolName: "read_file", ok: true, summary: "x" },
@@ -121,7 +121,7 @@ describe("sanitizeOrphanToolPairs", () => {
       {
         id: "tc-1",
         sessionId: "s",
-        turnId: "t",
+        agentRunId: "t",
         type: "tool_call",
         timestamp: "2026-05-27T00:00:00.000Z",
         payload: { id: "tc-A", name: "read_file", arguments: { path: "a.txt" } },
@@ -129,7 +129,7 @@ describe("sanitizeOrphanToolPairs", () => {
       {
         id: "tr-1",
         sessionId: "s",
-        turnId: "t",
+        agentRunId: "t",
         type: "tool_result",
         timestamp: "2026-05-27T00:00:01.000Z",
         payload: { toolCallId: "tc-A", toolName: "read_file", ok: true, summary: "ok" },

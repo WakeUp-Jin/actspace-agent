@@ -59,7 +59,7 @@ export type AgentToolRuntime = {
   llm: LLMService;
   workspaceRoot: string;
   sessionId?: string;
-  turnId?: string;
+  agentRunId?: string;
   contextWindow?: number;
   /** 子代理系统提示词；缺省用通用 Explore SubAgent prompt。 */
   systemPrompt?: string;
@@ -98,12 +98,12 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
   const startedAt = Date.now();
   const runId = createRunId();
   const sessionId = input.runtime.sessionId ?? "session";
-  const parentTurnId = input.runtime.turnId ?? "turn";
-  const transcriptTurnId = `${parentTurnId}:subagent:${runId}`;
+  const parentAgentRunId = input.runtime.agentRunId ?? "turn";
+  const transcriptAgentRunId = `${parentAgentRunId}:subagent:${runId}`;
   const transcriptRef: SubAgentTranscriptRef = {
     kind: "subagent_transcript",
     sessionId,
-    turnId: parentTurnId,
+    agentRunId: parentAgentRunId,
     runId,
   };
   const transcript: TranscriptState = { events: [], recentEvents: [] };
@@ -129,7 +129,7 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
   contextManager.appendMessage(userMessage);
   contextManager.setTools(subToolManager.getToolDefinitions());
 
-  for (const event of userMessageToEvents(userMessage, sessionId, transcriptTurnId)) {
+  for (const event of userMessageToEvents(userMessage, sessionId, transcriptAgentRunId)) {
     await appendTranscriptEvent({
       event,
       transcript,
@@ -162,7 +162,7 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
         await appendEventsFromAgentEvent({
           event,
           sessionId,
-          transcriptTurnId,
+          transcriptAgentRunId,
           transcriptRef,
           transcript,
           description: input.args.description,
@@ -181,7 +181,7 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
   } catch (error) {
     status = input.parentSignal?.aborted ? "aborted" : "failed";
     summary = error instanceof Error ? error.message : String(error);
-    const errorEvent = createPersistedSessionEvent(sessionId, transcriptTurnId, "error", {
+    const errorEvent = createPersistedSessionEvent(sessionId, transcriptAgentRunId, "error", {
       code: status === "aborted" ? "SUBAGENT_ABORTED" : "SUBAGENT_ERROR",
       message: summary,
       recoverable: status !== "aborted",
@@ -199,7 +199,7 @@ export async function runExploreSubAgent(input: RunExploreSubAgentInput): Promis
   }
 
   if (status === "aborted" && !transcript.events.some((event) => event.type === "error")) {
-    const abortedEvent = createPersistedSessionEvent(sessionId, transcriptTurnId, "error", {
+    const abortedEvent = createPersistedSessionEvent(sessionId, transcriptAgentRunId, "error", {
       code: "SUBAGENT_ABORTED",
       message: "SubAgent run was aborted.",
       recoverable: false,
@@ -322,7 +322,7 @@ function createAgentPreview(input: {
 async function appendEventsFromAgentEvent(input: {
   event: AgentEvent;
   sessionId: string;
-  transcriptTurnId: string;
+  transcriptAgentRunId: string;
   transcriptRef: SubAgentTranscriptRef;
   transcript: TranscriptState;
   description: string;
@@ -333,7 +333,7 @@ async function appendEventsFromAgentEvent(input: {
 }): Promise<void> {
   if (input.event.type !== "message_end") return;
 
-  const messageEvents = messageToEvents(input.event.message, input.sessionId, input.transcriptTurnId);
+  const messageEvents = messageToEvents(input.event.message, input.sessionId, input.transcriptAgentRunId);
   for (const event of messageEvents) {
     await appendTranscriptEvent({
       event,
@@ -352,7 +352,7 @@ async function appendEventsFromAgentEvent(input: {
       event: createLlmUsageEvent(
         input.event.message,
         input.sessionId,
-        input.transcriptTurnId,
+        input.transcriptAgentRunId,
         input.usageCallId,
         messageEvents.map((event) => event.id),
       ),
@@ -370,7 +370,7 @@ async function appendEventsFromAgentEvent(input: {
 function createLlmUsageEvent(
   message: Extract<Message, { role: "assistant" }>,
   sessionId: string,
-  turnId: string,
+  agentRunId: string,
   callId: string,
   relatedEventIds: string[],
 ): SessionEvent<LlmUsagePayload> {
@@ -380,7 +380,9 @@ function createLlmUsageEvent(
     provider === "deepseek" || provider === "kimi" ? provider : undefined,
   );
   const payload: LlmUsagePayload = {
-    callId,
+    llmCallId: callId,
+    attempt: 1,
+    durationMs: 0,
     provider,
     model: message.model,
     modelId: modelSpec?.id,
@@ -404,7 +406,7 @@ function createLlmUsageEvent(
     ),
     relatedEventIds,
   };
-  return createPersistedSessionEvent(sessionId, turnId, "llm_usage", payload);
+  return createPersistedSessionEvent(sessionId, agentRunId, "llm_usage", payload);
 }
 
 async function appendTranscriptEvent(input: {

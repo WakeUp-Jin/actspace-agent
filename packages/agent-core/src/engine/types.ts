@@ -12,6 +12,7 @@
 
 import type {
   AssistantMessage,
+  Context,
   Message,
   Tool,
   ToolResultMessage,
@@ -29,10 +30,27 @@ import type { ModelReasoningEffort } from "@actspace/shared";
 export type ToolExecutionMode = "sequential" | "parallel";
 
 export interface LLMUsageCall {
-  callId: string;
+  turnId: string;
+  turnIndex: number;
+  llmCallId: string;
+  attempt: number;
+  durationMs: number;
   message: AssistantMessage;
   usage: Usage;
   cacheAudit?: CacheAuditUsageMetadata;
+}
+
+export interface LlmRequestSnapshot {
+  provider?: string;
+  model?: string;
+  systemPrompt?: Context["systemPrompt"];
+  systemPromptParts?: Context["systemPromptParts"];
+  messages: Message[];
+  tools: Tool[];
+  options: {
+    thinkingEnabled?: boolean;
+    reasoningEffort?: ModelReasoningEffort;
+  };
 }
 
 // ─── 历史压缩观测元数据 ───
@@ -69,16 +87,18 @@ export interface CompactionOutcome extends ContextCompactionInfo {
 export type AgentEvent =
   | { type: "agent_start" }
   | { type: "agent_end"; messages: Message[] }
-  | { type: "turn_start"; turnIndex: number }
-  | { type: "turn_end"; turnIndex: number; message: AssistantMessage; toolResults: ToolResultMessage[] }
+  | { type: "turn_start"; turnId: string; turnIndex: number }
+  | { type: "turn_end"; turnId: string; turnIndex: number; message: AssistantMessage; toolResults: ToolResultMessage[] }
+  | { type: "llm_call_start"; turnId: string; turnIndex: number; llmCallId: string; attempt: number; request: LlmRequestSnapshot }
+  | { type: "llm_call_end"; turnId: string; turnIndex: number; llmCallId: string; attempt: number; durationMs: number; message: AssistantMessage }
   | { type: "message_start"; message: Message }
-  | { type: "message_delta"; delta: AssistantMessageEvent }
+  | { type: "message_delta"; turnId: string; llmCallId: string; delta: AssistantMessageEvent }
   | { type: "message_end"; message: Message }
-  | { type: "context_compaction"; info: ContextCompactionInfo }
-  /** LLM 调用命中可重试错误、即将退避重试。attempt 从 1 开始计数（第 1 次重试 = 1）。 */
-  | { type: "llm_retry"; attempt: number; maxAttempts: number; reason: string }
-  | { type: "tool_start"; toolCallId: string; toolName: string; args: Record<string, unknown> }
-  | { type: "tool_end"; toolCallId: string; toolName: string; result: ToolResult; isError: boolean }
+  | { type: "context_compaction"; turnId: string; turnIndex: number; info: ContextCompactionInfo }
+  /** LLM 调用命中可重试错误、即将退避重试。attempt 表示即将开始的尝试序号。 */
+  | { type: "llm_retry"; turnId: string; turnIndex: number; failedLlmCallId: string; attempt: number; maxAttempts: number; reason: string }
+  | { type: "tool_start"; turnId: string; turnIndex: number; llmCallId: string; toolCallId: string; toolName: string; args: Record<string, unknown> }
+  | { type: "tool_end"; turnId: string; turnIndex: number; llmCallId: string; toolCallId: string; toolName: string; result: ToolResult; isError: boolean }
   | { type: "tool_approval_required"; toolCallId: string; toolName: string; request: ToolApprovalRequest }
   | { type: "tool_approval_resolved"; toolCallId: string; toolName: string; decision: ToolApprovalDecision };
 

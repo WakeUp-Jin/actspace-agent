@@ -14,6 +14,8 @@ import type { ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOptio
 import type { SessionPreviewResolver } from "./SessionHoverPreview";
 import { KairosPage } from "../pages/KairosPage";
 import { SettingsPage } from "./settings/SettingsPage";
+import type { SettingsSectionId } from "./settings/SettingsNav";
+import { AgentAnalysisPage } from "./analysis/AgentAnalysisPage";
 
 type StoredWorkbenchLayout = {
   leftMode?: SidebarMode | "rail";
@@ -162,6 +164,7 @@ export function WorkbenchLayout({
     openTab,
   } = useRightPanel();
   const [view, setView] = useState<SidebarView>("chat");
+  const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("general");
   const [usageSnapshot, setUsageSnapshot] = useState<UsageStatisticsSnapshot | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState<string | null>(null);
@@ -358,8 +361,23 @@ export function WorkbenchLayout({
     return (
       <SettingsPage
         onBack={() => setView("chat")}
+        onOpenAnalysis={() => setView("analysis")}
+        initialSection={settingsSection}
+        onSectionChange={setSettingsSection}
         onSettingsChange={onSettingsChange}
         onArchivedSessionsChange={onArchivedSessionsChange}
+      />
+    );
+  }
+
+  if (view === "analysis") {
+    const analysisSessionId = activeSessionId ?? sessions[0]?.id ?? null;
+    const analysisSession = sessions.find((session) => session.id === analysisSessionId);
+    return (
+      <AgentAnalysisPage
+        sessionId={analysisSessionId}
+        fallbackTitle={analysisSession?.title}
+        onBack={() => setView("settings")}
       />
     );
   }

@@ -388,9 +388,16 @@ describe("runAgentLoop", () => {
     expect(result.usageCalls[0].message.stopReason).toBe("error");
     // llm_retry 事件带 attempt/maxAttempts/reason
     const retryEvents = events.filter((e) => e.type === "llm_retry");
-    expect(retryEvents).toEqual([
-      { type: "llm_retry", attempt: 1, maxAttempts: 2, reason: "gateway hiccup" },
-    ]);
+    expect(retryEvents).toHaveLength(1);
+    expect(retryEvents[0]).toMatchObject({
+      type: "llm_retry",
+      turnIndex: 1,
+      attempt: 2,
+      maxAttempts: 3,
+      reason: "gateway hiccup",
+    });
+    expect(retryEvents[0]).toHaveProperty("turnId");
+    expect(retryEvents[0]).toHaveProperty("failedLlmCallId");
     // 脏 error message 必须从 context 弹出，不污染重试请求
     const errorInContext = context.messages.filter(
       (m) => m.role === "assistant" && m.stopReason === "error",

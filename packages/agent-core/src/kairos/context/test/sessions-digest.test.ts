@@ -12,7 +12,7 @@ let builder: SessionsDigestBuilder;
 
 async function writeSession(
   id: string,
-  payloads: Array<{ type: string; turnId: string; payload?: unknown }>,
+  payloads: Array<{ type: string; agentRunId: string; payload?: unknown }>,
   meta?: Record<string, unknown>,
 ): Promise<void> {
   const dir = join(sessionsRoot, id);
@@ -49,13 +49,13 @@ describe("SessionsDigestBuilder", () => {
   it("discovers 2 sessions and returns their digests", async () => {
     await writeSession(
       "s1",
-      [{ type: "user_message", turnId: "t-1", payload: { content: "hi from s1" } }],
-      { id: "s1", title: "First", updatedAt: "2026-05-27T10:00:00.000Z", turnCount: 1 },
+      [{ type: "user_message", agentRunId: "t-1", payload: { content: "hi from s1" } }],
+      { id: "s1", title: "First", updatedAt: "2026-05-27T10:00:00.000Z", agentRunCount: 1 },
     );
     await writeSession(
       "s2",
-      [{ type: "user_message", turnId: "t-2", payload: { content: "hello s2" } }],
-      { id: "s2", title: "Second", updatedAt: "2026-05-27T11:00:00.000Z", turnCount: 1 },
+      [{ type: "user_message", agentRunId: "t-2", payload: { content: "hello s2" } }],
+      { id: "s2", title: "Second", updatedAt: "2026-05-27T11:00:00.000Z", agentRunCount: 1 },
     );
     const res = await builder.refresh();
     expect(res.workspaces).toHaveLength(1);
@@ -68,39 +68,39 @@ describe("SessionsDigestBuilder", () => {
 
   it("counts all turns as unread until cursor is committed", async () => {
     await writeSession("s1", [
-      { type: "user_message", turnId: "t-1", payload: { content: "one" } },
-      { type: "assistant_message", turnId: "t-1", payload: { content: "ok" } },
+      { type: "user_message", agentRunId: "t-1", payload: { content: "one" } },
+      { type: "assistant_message", agentRunId: "t-1", payload: { content: "ok" } },
     ]);
     const first = await builder.refresh();
-    expect(first.workspaces[0].sessions[0].unreadTurnsForKairos).toBe(1);
+    expect(first.workspaces[0].sessions[0].unreadAgentRunsForKairos).toBe(1);
 
     // 计算/提交分离：未提交游标时再次 refresh，未读不变（失败 tick 不丢增量）
     const recompute = await builder.refresh();
-    expect(recompute.workspaces[0].sessions[0].unreadTurnsForKairos).toBe(1);
+    expect(recompute.workspaces[0].sessions[0].unreadAgentRunsForKairos).toBe(1);
 
     await builder.commitCursor(first.cursor);
     const second = await builder.refresh();
-    expect(second.workspaces[0].sessions[0].unreadTurnsForKairos).toBe(0);
+    expect(second.workspaces[0].sessions[0].unreadAgentRunsForKairos).toBe(0);
   });
 
   it("reports unread delta after new turn appended", async () => {
     await writeSession("s1", [
-      { type: "user_message", turnId: "t-1", payload: { content: "one" } },
+      { type: "user_message", agentRunId: "t-1", payload: { content: "one" } },
     ]);
     const first = await builder.refresh();
     await builder.commitCursor(first.cursor);        // tick 闭合：Kairos 已读 t-1
     // append a new turn
     const jsonlPath = join(sessionsRoot, "s1", "session.jsonl");
-    const more = `\n${JSON.stringify({ id: "ev-extra", sessionId: "s1", turnId: "t-2", type: "user_message", payload: { content: "two" }, timestamp: "2026-05-27T12:00:00.000Z" })}\n`;
+    const more = `\n${JSON.stringify({ id: "ev-extra", sessionId: "s1", agentRunId: "t-2", type: "user_message", payload: { content: "two" }, timestamp: "2026-05-27T12:00:00.000Z" })}\n`;
     const { appendFile } = await import("node:fs/promises");
     await appendFile(jsonlPath, more, "utf8");
     const second = await builder.refresh();
-    expect(second.workspaces[0].sessions[0].unreadTurnsForKairos).toBe(1);
+    expect(second.workspaces[0].sessions[0].unreadAgentRunsForKairos).toBe(1);
   });
 
   it("ignores subdir without session.jsonl", async () => {
     await mkdir(join(sessionsRoot, "not-a-session"), { recursive: true });
-    await writeSession("s1", [{ type: "user_message", turnId: "t-1", payload: { content: "x" } }]);
+    await writeSession("s1", [{ type: "user_message", agentRunId: "t-1", payload: { content: "x" } }]);
     const res = await builder.refresh();
     expect(res.workspaces[0].sessions.map((s) => s.id)).toEqual(["s1"]);
   });

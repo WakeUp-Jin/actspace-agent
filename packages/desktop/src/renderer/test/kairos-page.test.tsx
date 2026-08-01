@@ -105,9 +105,9 @@ function makeEvent(overrides: Partial<SessionEvent> & { type: SessionEvent["type
   return {
     id: `evt-${Math.random().toString(36).slice(2, 8)}`,
     sessionId: "kairos-2026-05-27",
-    turnId: "turn-1",
+    agentRunId: "turn-1",
     timestamp: new Date().toISOString(),
-    schemaVersion: 1,
+    schemaVersion: 2,
     payload: {},
     ...overrides,
   } as SessionEvent;

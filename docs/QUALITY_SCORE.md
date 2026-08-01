@@ -19,7 +19,7 @@
 | 后端 agent-core | B+ | 模块化架构已就位，DeepSeek 真实 SSE provider、测试专用 mock provider、IPC bridge 与集中 env 入口均已落地；bridge 已保证每轮 turn 写入 `user_message`；provider 可重试错误已有 loop 层自动重试 + 失败轮次 error 事件兜底。 | 补高级上下文策略。 |
 | 前后端对接 | B+ | 双通道流式架构已落地，Composer 可真实发送；普通会话默认走 DeepSeek，最终展示以恢复后的 `SessionRecord` 为事实来源。 | 继续打磨 streaming UI、工具状态和真实 Electron 回归。 |
 | 测试 | B+ | vitest 测试体系覆盖核心模块与 E2E smoke；新增 bridge 测试锁定 `user_message -> thinking/tool -> assistant -> context` 事件顺序。 | 补自动化的 provider integration gate、前端 UI/turn 测试和 CI。 |
-| 可观测性 | C | 已有应用数据 `logs/` 目录初始化、根目录本地开发日志入口 `pnpm dev:log`、即时 console 链路日志，以及每次 Agent turn 一个最近 1 天保留的 JSONL 排障文件。 | 补统一错误面板、renderer 错误按 turn 归因和 provider/tool 故障排查约定。 |
+| 可观测性 | B+ | Session V2 已统一 `agentRunId → turnId → llmCallId`；生产分析观测页可按用户输入、Turn、LLM Call 查看脱敏请求上下文、响应和差异，并具备 summary sidecar、64 MiB 单 Run 上限、30 天 / 512 MiB retention、损坏隔离与显式清理。 | 完成真实 Electron 长会话、Retina 和多 provider 人工验收；若要对齐网络代理级观测，再补原始 HTTP wire request/stream 的安全采集。 |
 | 安全 | B | Electron 边界采用 `contextIsolation` + preload bridge；provider 默认 Key、额外命名 Key 与搜索 Key 均由 main 使用 `safeStorage` 管理，renderer 只接收脱敏状态；DuckCoding 本地模型档案不读取外部目录或携带用户凭据。 | 补 API Key 替换/轮换流程、更完整的错误脱敏和敏感路径按需读审核。 |
 | 学习沉淀 | B | 体系已经跑起来，且已有学习文档。 | 随着 DeepSeek 接入和前端对接，继续补真正有迁移价值的学习文档。 |
 | Kairos 自治模式 | B+ | v1 闭环已落地，KairosPage 已从原始事件表改成监控台式两列 UI；上下文已重构为「静态前缀 + 动态尾部」（system prompt 静态化、观测增量进 tick message、thinking 全链路落盘/重放/展示、contextWindow 接模型注册表），重放保真有序列化层 deepEqual 回归锁住；短期记忆压缩已接线（tick 闭合后异步触发 week 压缩，`compression/trigger.ts`）。 | 真实 tick 缓存命中率（目标 ≥85%）待手动验收；intra-day 压缩与压缩 LLM 调用的用量计费未做；继续补 notes 编辑、external 数据源插件。 |

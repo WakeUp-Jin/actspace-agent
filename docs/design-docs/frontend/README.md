@@ -49,6 +49,7 @@
 - `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`：对象启动页、文件预览、Workspace 文件树和 diff。
 - `docs/design-docs/frontend/front-设置页规范.md`：设置态布局和导航分组。
 - `docs/design-docs/frontend/front-usage-statistics.md`：Usage Statistics 页面和数据展示规范。
+- `docs/design-docs/frontend/front-agent-analysis-observability.md`：分析观测的产品边界、两栏信息架构、请求详情、上下文对比、主题与 Trace 可靠性规范。
 
 Kairos 监控页与 Kairos Runtime 强关联，统一维护在相邻的 `../kairos/` 专题目录。
 
@@ -85,6 +86,7 @@ Kairos 监控页与 Kairos Runtime 强关联，统一维护在相邻的 `../kair
 - `usage-statistics-prototype.html`：Usage Statistics 高保真原型。
 - `compact-command-states.html`：`/compact` 消息流三态及浅深主题原型。
 - `review-v1-git-review-prototype.html`：Review V1 Git-first 右侧面板原型。
+- `front-agent-analysis-observability-prototype.html`：分析观测两栏原型，验证 Tools 筛选、用户输入折叠、Turn/LLM Call 切换、请求差异、JSON 与 cURL 信息架构；生产实现以 `front-agent-analysis-observability.md` 为准。
 
 ## 资产约定
 

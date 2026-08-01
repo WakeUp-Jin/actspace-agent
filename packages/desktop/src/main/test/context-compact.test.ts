@@ -14,7 +14,7 @@ import {
   readMeta,
 } from "@actspace/agent-core";
 import { compactAndPersistContext } from "../context-compact";
-import type { AppDataRoots } from "../agent-turn";
+import type { AppDataRoots } from "../agent-run";
 
 const created: string[] = [];
 
@@ -51,7 +51,7 @@ describe("compactAndPersistContext", () => {
   it("persists manual compaction events, context state, meta update, and renderer stream events", async () => {
     const roots = await makeRoots();
     const sessionId = "session-compact-main";
-    const turnId = "turn-compact";
+    const agentRunId = "turn-compact";
     const sessionDir = join(roots.sessionRoot, sessionId);
     const paths = createSessionStorePaths(sessionDir);
     await mkdir(sessionDir, { recursive: true });
@@ -65,7 +65,7 @@ describe("compactAndPersistContext", () => {
 
     const beforeMeta = await readMeta(paths.metaPath);
     const result = await compactAndPersistContext(
-      { sessionId, turnId },
+      { sessionId, agentRunId },
       roots,
       () => ({ webContents } as never),
     );
@@ -83,19 +83,19 @@ describe("compactAndPersistContext", () => {
     ]);
 
     const parsed = await parseJsonl(paths.sessionPath);
-    const persistedCompaction = parsed.events.find((event) => event.turnId === turnId && event.type === "context_compaction");
+    const persistedCompaction = parsed.events.find((event) => event.agentRunId === agentRunId && event.type === "context_compaction");
     expect(persistedCompaction?.payload).toMatchObject({
       trigger: "manual",
       status: "compacted",
     });
-    expect(parsed.events.some((event) => event.turnId === turnId && event.type === "context_snapshot")).toBe(true);
+    expect(parsed.events.some((event) => event.agentRunId === agentRunId && event.type === "context_snapshot")).toBe(true);
 
     const persistedState = await readContextState(paths);
     expect(persistedState?.sessionId).toBe(sessionId);
-    expect(persistedState?.activeTurnId).toBe(turnId);
+    expect(persistedState?.activeAgentRunId).toBe(agentRunId);
 
     const afterMeta = await readMeta(paths.metaPath);
-    expect(afterMeta?.turnCount).toBe(beforeMeta?.turnCount);
+    expect(afterMeta?.agentRunCount).toBe(beforeMeta?.agentRunCount);
     expect(afterMeta?.updatedAt).not.toBe(beforeMeta?.updatedAt);
 
     const rawSession = await readFile(paths.sessionPath, "utf8");

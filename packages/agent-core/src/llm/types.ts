@@ -186,6 +186,9 @@ export class LLMServiceError extends Error {
 // ─── LLM Service 接口 ───
 
 export interface LLMService {
+  /** Non-sensitive runtime identity used by observability and diagnostics. */
+  readonly provider?: string;
+  readonly model?: string;
   stream(context: Context, options?: StreamOptions): AssistantMessageEventStream;
   complete(context: Context, options?: StreamOptions): Promise<AssistantMessage>;
   streamSimple(context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;

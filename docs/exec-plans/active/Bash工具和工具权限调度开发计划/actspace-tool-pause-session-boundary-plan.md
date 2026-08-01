@@ -83,7 +83,7 @@
 
 ### Agent abort
 
-- `agent:abort-turn` 同时触发当前 Agent 的 `AbortSignal` 与 PendingApprovalRegistry 的 turn 级取消。
+- `agent:abort-run` 同时触发当前 Agent 的 `AbortSignal` 与 PendingApprovalRegistry 的 Agent Run 级取消。
 - 如果 scheduler 正在等待 approval，registry 立即返回 `abort` decision，不等待 `expiresAt`，executor 不启动。
 - approval 与 abort 竞争时，以 pending entry 的第一次有效 resolve 为准；scheduler 在 approval 返回后再次检查 signal，防止 Allow 刚返回时 abort 已经发生。
 - 已启动且仍在前台等待的 Bash 消费相同 signal 并终止进程；已经切到 background task 的 Bash 脱离当前 turn，由 `bash_kill` 单独管理。
@@ -99,7 +99,7 @@
 
 ## 重点问题
 
-1. 当前 `agent:run-turn` 是 invoke 返回最终结果，pending 时如何保持调用？
+1. 当前 `agent:run` 是 invoke 返回最终结果，pending 时如何保持调用？
    - 需要评估：长 Promise 等待、可恢复 continuation、或 turn 暂停返回 pending 状态。
 2. 如果用户不处理 approval，composer 是否允许继续发新消息？
    - 倾向：允许输入，但当前 pending turn 有明确状态；后续消息是否排队另定。

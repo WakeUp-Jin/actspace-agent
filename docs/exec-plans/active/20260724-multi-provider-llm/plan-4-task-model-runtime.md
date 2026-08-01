@@ -17,14 +17,14 @@
 - `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 - `packages/agent-core/src/engine/create-agent-deps.ts`
-- `packages/desktop/src/main/agent-turn.ts`
+- `packages/desktop/src/main/agent-run.ts`
 - `packages/desktop/src/main/context-compact.ts`
 - `packages/desktop/src/main/kairos-bootstrap.ts`
 
 ## 允许修改的文件
 
 - `packages/desktop/src/main/model-runtime-service.ts`（新增）
-- `packages/desktop/src/main/agent-turn.ts`
+- `packages/desktop/src/main/agent-run.ts`
 - `packages/desktop/src/main/context-compact.ts`
 - `packages/desktop/src/main/context-describe-service.ts`
 - `packages/desktop/src/main/eval-candidate-service.ts`

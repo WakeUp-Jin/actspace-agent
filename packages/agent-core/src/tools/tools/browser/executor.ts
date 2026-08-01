@@ -43,7 +43,7 @@ export function createBrowserToolExecutors(options: BridgeClientOptions): Browse
     await client.send("agent_browser_bridge.command.preflight", {
       actions,
       sessionId: options.sessionId,
-      turnId: options.turnId,
+      agentRunId: options.agentRunId,
     })
   ) as BrowserPreflightResult;
 
@@ -86,7 +86,7 @@ export function createBrowserToolExecutors(options: BridgeClientOptions): Browse
       stopOnError: args.stop_on_error !== false,
       approval: getBrowserApproval(args),
       sessionId: options.sessionId,
-      turnId: options.turnId,
+      agentRunId: options.agentRunId,
     })) as BrowserRunResult;
     return {
       success: true,
