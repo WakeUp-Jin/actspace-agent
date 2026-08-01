@@ -3,7 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ModelDefinition, ModelSpec, SessionEvent } from "@actspace/shared";
-import { BUILTIN_MODEL_REGISTRY, MODEL_REGISTRY } from "@actspace/shared";
+import { BUILTIN_MODEL_REGISTRY, IMAGE_INSPECTION_MODEL_LIST, MODEL_REGISTRY } from "@actspace/shared";
 import { buildAgentConfigFromRuntime, buildLLMConfig, buildLLMConfigFromRuntime } from "../create-agent-deps";
 import type { AgentEnvConfig, AgentConfig } from "../create-agent-deps";
 import { appendEvents } from "../../persistence/jsonl";
@@ -246,6 +246,45 @@ describe("buildAgentConfigFromRuntime reasoning controls", () => {
 
     expect(config.thinkingEnabled).toBe(true);
     expect(config.reasoningEffort).toBe("medium");
+  });
+
+  it("injects image inspection only for text-only main models", () => {
+    const imageInspection = {
+      definition: IMAGE_INSPECTION_MODEL_LIST[0]!,
+      runtime: {
+        provider: "openrouter" as const,
+        apiKey: "sk-or-vision",
+        baseUrl: "https://openrouter.ai/api/v1",
+      },
+    };
+    const runtimeContext = {
+      sessionArtifactRoot: "/tmp/session/artifacts",
+      imageInspectionAllowedPaths: ["/tmp/attachment.png"],
+    };
+
+    const textOnly = buildAgentConfigFromRuntime({
+      main: { definition: model, runtime },
+      imageInspection,
+    }, "/tmp/workspace", undefined, runtimeContext);
+    expect(textOnly.imageInspectionLlmConfig).toMatchObject({
+      provider: "openrouter",
+      model: "openai/gpt-5.6-luna",
+      maxRetries: 0,
+    });
+    expect(textOnly.imageInspectionToolConfig).toMatchObject({
+      allowedImagePaths: ["/tmp/attachment.png"],
+      artifactRoot: "/tmp/session/artifacts",
+    });
+
+    const nativeVision = buildAgentConfigFromRuntime({
+      main: {
+        definition: { ...model, capabilities: { ...model.capabilities, input: ["text", "image"] } },
+        runtime,
+      },
+      imageInspection,
+    }, "/tmp/workspace", undefined, runtimeContext);
+    expect(nativeVision.imageInspectionLlmConfig).toBeUndefined();
+    expect(nativeVision.imageInspectionToolConfig).toBeUndefined();
   });
 
   it("encodes DuckCoding Codex effort in the exact request model name", () => {

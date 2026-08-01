@@ -53,6 +53,12 @@ describe("tool exposure", () => {
     expect(shouldExposeTool(spec, { hasImageGenerationKey: false })).toBe(false);
   });
 
+  it("gates inspect_image on a resolved image inspection runtime", () => {
+    const spec: ToolDefinitionSpec = { ...baseSpec, name: "inspect_image", requiresKey: "imageInspection" };
+    expect(shouldExposeTool(spec, { hasImageInspectionModel: true })).toBe(true);
+    expect(shouldExposeTool(spec, { hasImageInspectionModel: false })).toBe(false);
+  });
+
   it("registers web tools per key configuration in createToolManager", () => {
     const noKeys = createToolManager({
       workspaceRoot: "/tmp",

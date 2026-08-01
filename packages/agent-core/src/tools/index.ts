@@ -54,6 +54,7 @@ export { bashDefinition } from "./tools/bash/definition";
 export { webSearchDefinition } from "./tools/web-search/definition";
 export { webFetchDefinition } from "./tools/web-fetch/definition";
 export { generateImageDefinition } from "./tools/generate-image/definition";
+export { inspectImageDefinition } from "./tools/inspect-image/definition";
 export { agentDefinition, exploreDefinition } from "./tools/agent/definition";
 export {
   browserDefinitions,
@@ -110,6 +111,7 @@ export type {
 export { webSearchExecutor } from "./tools/web-search/executor";
 export { webFetchExecutor } from "./tools/web-fetch/executor";
 export { generateImageExecutor } from "./tools/generate-image/executor";
+export { inspectImageExecutor } from "./tools/inspect-image/executor";
 export {
   createAgentTool,
   createExploreTool,
@@ -144,6 +146,8 @@ import { webFetchDefinition } from "./tools/web-fetch/definition";
 import { webFetchExecutor } from "./tools/web-fetch/executor";
 import { generateImageDefinition } from "./tools/generate-image/definition";
 import { generateImageExecutor } from "./tools/generate-image/executor";
+import { inspectImageDefinition } from "./tools/inspect-image/definition";
+import { inspectImageExecutor } from "./tools/inspect-image/executor";
 import { createAgentTool, createExploreTool } from "./tools/agent";
 import {
   browserDefinitions,
@@ -167,6 +171,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     hasKimiKey: config.hasKimiKey,
     hasWebSearchKey: config.hasWebSearchKey,
     hasImageGenerationKey: config.hasImageGenerationKey,
+    hasImageInspectionModel: Boolean(config.imageInspection?.llm),
   };
   const disabledTools = new Set(config.disabledTools ?? []);
   const entries: ReadonlyArray<
@@ -197,6 +202,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     [webSearchDefinition, webSearchExecutor],
     [webFetchDefinition, webFetchExecutor],
     [generateImageDefinition, generateImageExecutor],
+    [inspectImageDefinition, inspectImageExecutor],
   ];
 
   for (const [definition, executor, renderResult, checkPermissions] of entries) {
@@ -280,6 +286,7 @@ const READ_ONLY_TOOL_NAMES = new Set([
   "list_directory",
   "web_search",
   "web_fetch",
+  "inspect_image",
 ]);
 
 function isToolAllowedByProfile(name: string, profile: NonNullable<ToolManagerConfig["toolProfile"]>): boolean {

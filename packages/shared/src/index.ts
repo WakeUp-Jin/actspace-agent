@@ -11,6 +11,7 @@ export * from "./model-config";
 export * from "./model-resolver";
 export * from "./duckcoding-model-catalog";
 export * from "./openrouter-catalog";
+export * from "./image-inspection-config";
 export * from "./settings";
 export * from "./plugins";
 export * from "./context-buckets";

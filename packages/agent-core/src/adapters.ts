@@ -78,10 +78,14 @@ export function formatUserMessageForModel(
   options?: {
     modelId?: string;
     input?: string[];
+    canInspectImages?: boolean;
   },
 ): string | (TextContent | ImageContent)[] {
   const input = options?.input ?? ["text"];
   const supportsImages = input.includes("image");
+  const hasLocalImageAttachment = attachments?.some(
+    (attachment) => attachment.kind === "image" && Boolean(attachment.path),
+  ) ?? false;
   const runtimeModel = [
     "<runtime_model>",
     options?.modelId ? `model_id: ${options.modelId}` : undefined,
@@ -100,18 +104,22 @@ export function formatUserMessageForModel(
           const mimeType = attachment.mimeType ? ` mime=${attachment.mimeType}` : "";
           return `${index + 1}. [${attachment.kind}] ${attachment.name}${path}${mimeType}`;
         }),
-        supportsImages
-          ? "Image attachments are also provided as image input when a local path is available."
-          : "The current model does not support image input. Do not make visual claims from image attachments; ask the user to switch to an image-capable model if visual inspection is required.",
+        hasLocalImageAttachment
+          ? supportsImages
+            ? "Image attachments are also provided as image input when a local path is available."
+            : options?.canInspectImages
+              ? "The current model does not accept image input. Use inspect_image with the provided local image path when visual inspection is needed. Do not make visual claims before using the tool."
+              : "The current model does not support image input. Do not make visual claims from image attachments; ask the user to switch to an image-capable model if visual inspection is required."
+          : undefined,
         "For ordinary file attachments, use read_file with the provided path only if you need the file contents.",
-      ].join("\n"),
+      ].filter(Boolean).join("\n"),
     );
   }
 
   sections.push(runtimeModel);
 
   const text = sections.filter((section) => section.trim().length > 0).join("\n\n");
-  if (!supportsImages || !attachments?.some((attachment) => attachment.kind === "image" && attachment.path)) {
+  if (!supportsImages || !hasLocalImageAttachment) {
     return text;
   }
 

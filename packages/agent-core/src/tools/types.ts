@@ -28,7 +28,7 @@ export interface ToolDefinitionSpec {
    * - "kimi"：Kimi provider-native or Kimi-backed capability
    * - "webSearch"：任一搜索 provider key（ZHIPU / TAVILY / TINYFISH / EXA_API_KEY）
    */
-  requiresKey?: "kimi" | "webSearch" | "imageGeneration";
+  requiresKey?: "kimi" | "webSearch" | "imageGeneration" | "imageInspection";
   /**
    * 渐进式工具披露。executor 仍正常注册，但 deferred 工具只有在同组 gateway
    * 成功执行并进入下一次 LLM 调用后，才会出现在模型 definitions 中。
@@ -60,6 +60,7 @@ export interface ToolExecutorRuntime {
   readFileCache?: Map<string, ReadFileRangeCacheEntry>;
   signal?: AbortSignal;
   imageGeneration?: ImageGenerationRuntimeConfig;
+  imageInspection?: ImageInspectionRuntimeConfig;
   artifactRoot?: string;
 }
 
@@ -67,6 +68,15 @@ export interface ImageGenerationRuntimeConfig {
   apiKey: string;
   baseUrl: string;
   model: string;
+}
+
+export interface ImageInspectionRuntimeConfig {
+  llm: LLMService;
+  provider: "kimi" | "openrouter";
+  model: string;
+  modelLabel: string;
+  allowedImagePaths: string[];
+  artifactRoot?: string;
 }
 
 export interface ReadFileRangeCacheEntry {
@@ -81,6 +91,7 @@ export interface ToolRuntimeConfig {
   /** 是否配置了任一 web_search provider key（智谱 / Tavily / TinyFish / Exa） */
   hasWebSearchKey?: boolean;
   hasImageGenerationKey?: boolean;
+  hasImageInspectionModel?: boolean;
   disabledTools?: string[];
   toolProfile?: ToolProfile;
 }
@@ -95,6 +106,7 @@ export interface ToolManagerConfig extends ToolRuntimeConfig {
   /** Extra absolute roots writable by write_file/edit_file in addition to workspaceRoot. */
   additionalWritableRoots?: string[];
   imageGeneration?: ImageGenerationRuntimeConfig;
+  imageInspection?: ImageInspectionRuntimeConfig;
   /** 当前 session 的图片生成产物根目录。 */
   artifactRoot?: string;
   /** 硬截断阈值（字符数），默认 2000。通用工具（web/generic）的 flash 摘要触发阈值。 */

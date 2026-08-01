@@ -7,6 +7,7 @@ import {
   DEFAULT_MODEL_KEY,
   normalizeModelKey,
   resolveConfiguredModel,
+  resolveImageInspectionModel as resolveImageInspectionModelDefinition,
   type ModelDefinition,
   type ModelKey,
   type ModelPricing,
@@ -92,6 +93,29 @@ export class ModelRuntimeService {
       return { ok: false, code: "model_unavailable", message: "Kairos 尚未选择可用模型。", reason: "not_configured" };
     }
     return this.resolve(configured, "kairos", "configured");
+  }
+
+  resolveImageInspectionModel(): RuntimeModelResolution {
+    const configured = this.settings.getV2().imageInspection;
+    const definition = resolveImageInspectionModelDefinition(configured.modelKey);
+    const runtime = this.settings.getProviderRuntimeConfigForCredential(
+      definition.provider,
+      configured.credentialId,
+    );
+    if ("code" in runtime) {
+      return { ok: false, code: runtime.code, message: runtime.message, modelKey: definition.key };
+    }
+    const pricedDefinition = applyPricingMultiplier(definition, runtime.pricingMultiplier ?? 1);
+    return {
+      ok: true,
+      model: {
+        key: pricedDefinition.key,
+        definition: pricedDefinition,
+        providerRuntime: runtime,
+        llmConfig: buildLLMConfigFromRuntime(pricedDefinition, runtime),
+        source: "configured",
+      },
+    };
   }
 
   private resolve(key: ModelKey, purpose: ModelPurpose, source: ResolvedRuntimeModel["source"]): RuntimeModelResolution {

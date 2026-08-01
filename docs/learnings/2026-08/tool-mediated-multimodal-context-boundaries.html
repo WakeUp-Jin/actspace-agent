@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>工具委托式多模态：从图片到可信上下文</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f7f4;
+      --surface: #ffffff;
+      --text: #1b2822;
+      --muted: #5e6d65;
+      --line: #ced8d1;
+      --accent: #087a55;
+      --accent-soft: #dff3e9;
+      --warn: #9b4d14;
+      --warn-soft: #fff0df;
+      --code: #edf1ee;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121714;
+        --surface: #1a211d;
+        --text: #edf4ef;
+        --muted: #aab8af;
+        --line: #344139;
+        --accent: #5ed1a1;
+        --accent-soft: #173d2d;
+        --warn: #f0a66b;
+        --warn-soft: #3b291c;
+        --code: #222b26;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.72;
+      letter-spacing: 0;
+    }
+    main { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 56px 0 80px; }
+    header { border-bottom: 1px solid var(--line); padding-bottom: 32px; }
+    .eyebrow { color: var(--accent); font-size: 13px; font-weight: 700; }
+    h1 { max-width: 760px; margin: 10px 0 12px; font-size: clamp(32px, 6vw, 58px); line-height: 1.08; }
+    h2 { margin: 48px 0 16px; font-size: 25px; }
+    h3 { margin: 0 0 8px; font-size: 16px; }
+    p { margin: 10px 0; }
+    .lead { max-width: 760px; color: var(--muted); font-size: 18px; }
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 28px 0; }
+    .step { min-width: 0; border-top: 3px solid var(--accent); background: var(--surface); padding: 14px; }
+    .step b { display: block; font-size: 12px; color: var(--accent); }
+    .step span { display: block; margin-top: 6px; font-size: 13px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .panel { border: 1px solid var(--line); background: var(--surface); padding: 20px; }
+    .panel strong { color: var(--accent); }
+    .warning { border-left: 4px solid var(--warn); background: var(--warn-soft); padding: 16px 18px; }
+    code { border-radius: 3px; background: var(--code); padding: 2px 5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    pre { overflow: auto; border: 1px solid var(--line); background: var(--code); padding: 18px; font-size: 13px; line-height: 1.55; }
+    ul { padding-left: 20px; }
+    a { color: var(--accent); }
+    footer { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 20px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 720px) {
+      main { width: min(100% - 24px, 920px); padding-top: 32px; }
+      .flow, .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 38px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Agent architecture note</div>
+      <h1>工具委托式多模态：从图片到可信上下文</h1>
+      <p class="lead">文本模型调用视觉模型，不等于文本模型获得了视觉能力。真正需要设计的是一条受控的数据管道：谁能读取哪张图片、图片发给谁、视觉结果如何变成主模型可以依赖的上下文。</p>
+    </header>
+
+    <section>
+      <h2>一条请求里有五个不同责任</h2>
+      <div class="flow" aria-label="图片分析数据流">
+        <div class="step"><b>01 Intent</b><span>主模型判断是否真的需要看图</span></div>
+        <div class="step"><b>02 Guard</b><span>宿主验证路径、格式和大小</span></div>
+        <div class="step"><b>03 Observe</b><span>视觉模型只接收问题与图片</span></div>
+        <div class="step"><b>04 Normalize</b><span>工具包装稳定、版本化结果</span></div>
+        <div class="step"><b>05 Reason</b><span>主模型基于文字证据继续工作</span></div>
+      </div>
+      <p>这五步不能合并成“把图片传给另一个模型”。一旦跳过 Guard，工具可能变成本地文件外传通道；一旦跳过 Normalize，Provider 的自由文本、错误对象和提示词注入会直接污染主模型上下文。</p>
+    </section>
+
+    <section>
+      <h2>能力、输入和证据不是同一件事</h2>
+      <div class="grid">
+        <div class="panel"><h3>原生多模态</h3><p>主模型协议直接接收 image content part。图片属于这次主 LLM 调用的输入。</p></div>
+        <div class="panel"><h3>工具委托</h3><p>主模型只看到工具定义和最终文字结果。视觉能力属于独立 LLM，主模型得到的是二手证据。</p></div>
+        <div class="panel"><h3>工具结果</h3><p>它不是 Provider 原始响应，而是宿主承诺的稳定上下文契约，必须能版本化、截断和脱敏。</p></div>
+        <div class="panel"><h3>可观察事实</h3><p>视觉输出仍可能出错。提示词必须区分直接可见事实、推断和无法确认区域。</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>为什么要三层视觉报告</h2>
+      <pre><code>&lt;image_inspection_result version="1"&gt;
+status: success
+provider: openrouter
+model: openai/gpt-5.6-luna
+
+&lt;visual_report&gt;
+## Image brief
+## Answer to question
+## Detailed evidence
+### Layout
+### Visible text
+### Elements and states
+### Relationships
+### Visual details
+### Anomalies and uncertainties
+&lt;/visual_report&gt;
+&lt;/image_inspection_result&gt;</code></pre>
+      <p><strong>Image brief</strong> 给主模型一个整体识别概念，<strong>Answer to question</strong> 提供当前任务的直接结论，<strong>Detailed evidence</strong> 保留足够细节让主模型复核、比较和继续推理。外层 envelope 属于工具，内层 Markdown 属于视觉报告，两者职责不同。</p>
+    </section>
+
+    <section>
+      <h2>最容易踩的四个坑</h2>
+      <ul>
+        <li><strong>把附件等同于授权：</strong>当前轮附件可以精确放行，但不能由此允许模型读取任意绝对路径。</li>
+        <li><strong>只信扩展名：</strong><code>photo.png</code> 可能不是 PNG，发送前应检查文件魔数和普通文件类型。</li>
+        <li><strong>把图片文字当指令：</strong>图片中的“忽略之前规则”只是待描述的像素证据，不是新的 system prompt。</li>
+        <li><strong>失败后自动换模型：</strong>这既可能重复计费，也会把同一图片发送给用户没有预期的第二个 Provider。</li>
+      </ul>
+      <div class="warning"><strong>关键判断：</strong>工具的只读属性只表示它不修改本地文件，不表示它没有隐私或费用影响。向外部视觉 Provider 发送图片仍然是一次有数据边界的外部操作。</div>
+    </section>
+
+    <section>
+      <h2>实现自检</h2>
+      <ul>
+        <li>主模型原生支持图片时，是否避免重复注册视觉工具？</li>
+        <li>工具请求是否只包含固定提示词、问题、安全文件名和单张图片？</li>
+        <li>Base64、绝对路径、Key、原始错误体是否都被挡在 session 与 renderer 之外？</li>
+        <li>超时、取消、空响应、输出超限是否有稳定且不自动重试的行为？</li>
+        <li>主模型拿到的究竟是 Provider 输出，还是工具承诺的版本化上下文？</li>
+      </ul>
+    </section>
+
+    <footer>
+      来源任务：<a href="../../histories/2026-08/20260801-1547-add-image-inspection-tool.md">Add configurable image inspection</a>
+    </footer>
+  </main>
+</body>
+</html>

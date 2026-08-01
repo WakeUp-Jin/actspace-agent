@@ -21,6 +21,7 @@ import type { Tool } from "../messages";
 import type {
   ReadFileRangeCacheEntry,
   ImageGenerationRuntimeConfig,
+  ImageInspectionRuntimeConfig,
   ToolDefinitionSpec,
   ToolExecutorFn,
   ToolManagerConfig,
@@ -42,12 +43,14 @@ export class ToolManager {
   private scheduler: ToolScheduler;
   private readFileCache = new Map<string, ReadFileRangeCacheEntry>();
   private imageGeneration?: ImageGenerationRuntimeConfig;
+  private imageInspection?: ImageInspectionRuntimeConfig;
   private artifactRoot?: string;
 
   constructor(config: ToolManagerConfig) {
     this.workspaceRoot = config.workspaceRoot;
     this.additionalWritableRoots = config.additionalWritableRoots ?? [];
     this.imageGeneration = config.imageGeneration;
+    this.imageInspection = config.imageInspection;
     this.artifactRoot = config.artifactRoot;
     this.truncateThreshold = config.truncateThreshold ?? DEFAULT_TRUNCATE_THRESHOLD;
     this.scheduler = new ToolScheduler({
@@ -79,6 +82,7 @@ export class ToolManager {
         readFileCache: this.readFileCache,
         signal: options?.signal,
         imageGeneration: this.imageGeneration,
+        imageInspection: this.imageInspection,
         artifactRoot: this.artifactRoot,
       }),
       isReadOnly: spec.isReadOnly,

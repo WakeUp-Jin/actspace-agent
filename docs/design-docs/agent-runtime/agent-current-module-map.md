@@ -52,7 +52,7 @@
 
 ## `tools/` - 模块化工具系统
 
-- `tools/types.ts`：ToolDefinitionSpec、ToolExecutorFn、ToolManagerConfig；工具定义必须声明 `previewKind` 作为前端展示语义，并可用 `exposeOnlyTo` / `requiresKey` 做轻量暴露筛选。`ToolManagerConfig` 除压缩字段外，还可注入图片生成 runtime 与当前 session `artifactRoot`；这些运行时密钥不进入共享 session 契约。
+- `tools/types.ts`：ToolDefinitionSpec、ToolExecutorFn、ToolManagerConfig；工具定义必须声明 `previewKind` 作为前端展示语义，并可用 `exposeOnlyTo` / `requiresKey` 做轻量暴露筛选。`ToolManagerConfig` 除压缩字段外，还可注入图片生成 runtime、独立图片分析 LLM 与当前 session artifact 边界；这些运行时密钥不进入共享 session 契约。
 - `tools/workspace-guard.ts`：路径解析与边界守卫。写类工具（write/edit/bash）走 `guardWorkspacePath` 拒绝越界；**读类工具（read_file/grep/glob/list_directory）走 `resolveReadablePath` 只解析不越界**（为支持回读 `<userData>/tmp` 落盘文件与 `session.jsonl`），`displayReadablePath` 决定 workspace 外结果展示绝对路径。取舍与后续 blocklist 见 `docs/SECURITY.md`、`docs/design-docs/execution-safety/agent-权限设计规则和原则.md`。
 - `tools/manager.ts`：ToolManager（注册/获取/导出工具定义），执行入口委托给 ToolScheduler；把 `readTruncateThreshold` / `absoluteMaxChars` / `summarizer` 透传给 scheduler。
 - `tools/scheduler.ts`：ToolScheduler（权限三态决策、工具状态记录、执行、结果渲染与裁剪）。`ask` 通过 `ApprovalGate` 暂停工具执行，向桌面端 pending approval registry 发出审核请求，用户 `approve_once` / `deny` / 超时后再恢复调度；`allow_similar` 只有工具权限显式允许时才可继续执行。`postProcess` 异步化：bash 由 executor 自处理（流式落盘 + 头部截断 + outputRef），其余工具走 `output-truncator`（flash 摘要 / 头尾确定性截断兜底）。
@@ -65,8 +65,8 @@
 - `tools/tools/{grep,glob}/`：文件搜索工具。grep 通过 ripgrep 正则搜索文件内容，glob 通过 `rg --files --glob` 按文件名模式查找。
 - `tools/tools/{web-search,web-fetch}/`：联网工具（设计见 `docs/design-docs/tool-system/agent-web-tools.md`）。`web_search` 走外部搜索 API 双通道（智谱 + Tavily/TinyFish/Exa failover），任一搜索 key 存在时注册；`web_fetch` 本地确定性抓取 URL 转 Markdown，始终注册。
 - `tools/tools/generate-image/`：主 Agent 图片生成工具（设计见 `docs/design-docs/tool-system/agent-image-generation-tool.md`）。`generate_image` 由独立图片服务 Key 门控，接受 `prompt / size / n`，把 URL/Base64 结果校验后写入当前 session artifacts；Kairos/Explore 不注入该 runtime，因此默认不可用。
+- `tools/tools/inspect-image/`：text-only 主 Agent 的按需图片分析工具（设计见 `docs/design-docs/tool-system/agent-image-inspection-tool.md`）。`inspect_image(path, question)` 在 workspace、当前轮附件与 session artifacts 的 `realpath` 边界内读取 JPEG / PNG / WebP，通过独立 Kimi 或 OpenRouter LLM 返回固定分层视觉报告；原生视觉主模型、Chat、Kairos 与 Explore 不注入该工具 runtime。
 - `tools/tools/browser/`：Browser Use 的薄 Agent adapter。`definition.ts` 只暴露 9 个分类工具、`browser_help`、`browser_run`；`generated-actions.ts` 从 Go 62 条 registry 生成 action/risk/status/legacy alias；`permissions.ts` 对单 action 做 metadata 审批、对 batch 调 Go preflight 并携带绑定 session/turn/action hash 的短期 token；`executor.ts` 通过单一长连接调用 `command.execute/describe/run`，不实现 CDP、Locator 或 Chrome API 逻辑。旧 15 个工具名只保留禁用配置 alias 与历史 preview 读取兼容。
-- `tools/tools/analyze-media/`：DeepSeek-only Kimi 辅助工具（多模态识别）；只有 DeepSeek 为主模型且配置 Kimi key 时注册。
 - `tools/tools/agent/`：Agent 工具（用户可见名 `Agent`，内部工具名 `agent`）。`definition.ts` 声明 `description` / `prompt` / `subagent_type:"explore"` 输入和 `previewKind:"agent"`；`runner.ts` 创建隔离 Explore SubAgent runtime，复用父 turn 的 LLMService，但只注册 `read_file`、`grep`、`glob`、`list_directory` 四个只读工具，不恢复主 session 历史，也不允许递归 Agent。runner 把 SubAgent 内部事件转成 sidecar transcript、`AgentToolPreview.recentEvents`、最终 summary/stats/transcriptRef，并通过 `ToolResult.subagent` 返回给 bridge。
 
 新增工具时，先读 `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`，确保 `previewKind` 和 `ToolUiPreview` 语义稳定。

@@ -10,6 +10,7 @@
  */
 import type { ModelDefinition, ModelId, ModelKey } from "./model-config";
 import type { ProviderId as LlmProviderId } from "./provider-config";
+import type { ImageInspectionModelKey } from "./image-inspection-config";
 
 /** Settings v1 仍只包含两家 LLM provider；Plan 2 迁移后改用完整 ProviderId。 */
 export type LegacySettingsProviderId = Extract<LlmProviderId, "deepseek" | "kimi">;
@@ -36,6 +37,12 @@ export interface ImageGenerationSettingsView {
   hasApiKey: boolean;
   baseUrl: string;
   model: string;
+}
+
+export interface ImageInspectionSettings {
+  modelKey: ImageInspectionModelKey;
+  /** 缺省使用 provider 默认 Key；有值时选择该 provider 下已保存的额外 Key。 */
+  credentialId?: string;
 }
 
 /** 可在设置页保存加密密钥的全部供应商（LLM + 搜索 + 图片生成）。 */
@@ -217,6 +224,8 @@ export interface AppSettingsV2 {
   searchProviders: Record<SearchProviderId, ProviderSettingsView>;
   /** OpenAI-compatible 图片生成连接；与 LLM/search provider 布局保持独立。 */
   imageGeneration: ImageGenerationSettingsView;
+  /** inspect_image 使用的视觉模型与已有 provider 凭据引用。 */
+  imageInspection: ImageInspectionSettings;
   agent: AgentSettingsV2;
   kairos: KairosSettingsV2;
   plugins: PluginsSettings;
@@ -241,6 +250,8 @@ export interface AppSettings extends Omit<AppSettingsV1, "version" | "providers"
   kairosModelKey?: ModelKey | null;
   /** 迁移期可选，旧测试 fixture 缺失时 renderer 使用内置默认值。 */
   imageGeneration?: ImageGenerationSettingsView;
+  /** 旧测试 fixture 缺失时 renderer 使用内置默认值。 */
+  imageInspection?: ImageInspectionSettings;
 }
 
 // ─── IPC 输入 / 输出 ───
@@ -251,6 +262,7 @@ export type SettingsUpdateInput = Partial<{
   kairos: Partial<KairosSettings>;
   plugins: Partial<PluginsSettings>;
   skills: Partial<SkillsSettings>;
+  imageInspection: ImageInspectionSettings;
 }>;
 
 export type SettingsV2UpdateInput = Partial<{

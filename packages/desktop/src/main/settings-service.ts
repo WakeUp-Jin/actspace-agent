@@ -16,11 +16,13 @@ import {
   BUILTIN_MODEL_LIST,
   DEFAULT_IMAGE_GENERATION_BASE_URL,
   DEFAULT_IMAGE_GENERATION_MODEL,
+  DEFAULT_IMAGE_INSPECTION_MODEL_KEY,
   LEGACY_MODEL_KEY_MAP,
   PROVIDER_IDS,
   PROVIDER_REGISTRY,
   SEARCH_PROVIDER_IDS,
   isPublicModelId,
+  isImageInspectionModelKey,
   legacyModelIdFromKey,
   normalizeModelKey,
   type AgentSettingsV2,
@@ -29,6 +31,7 @@ import {
   type AppSettingsV2,
   type InstalledModelSettings,
   type ImageGenerationSettingsView,
+  type ImageInspectionSettings,
   type KairosModelId,
   type KairosSettingsV2,
   type KairosThinkingMode,
@@ -130,6 +133,7 @@ export interface PersistedSettingsV2 {
     baseUrl: string;
     model: string;
   };
+  imageInspection: ImageInspectionSettings;
   agent: AgentSettingsV2;
   kairos: KairosSettingsV2;
   plugins: PluginsSettings;
@@ -240,6 +244,7 @@ export class SettingsService {
       kairosModelKey: v2.kairos.modelId,
       searchProviders: v2.searchProviders,
       imageGeneration: v2.imageGeneration,
+      imageInspection: v2.imageInspection,
       agent: { ...v2.agent, exploreModelId },
       kairos: {
         ...v2.kairos,
@@ -292,6 +297,7 @@ export class SettingsService {
         exa: { hasApiKey: Boolean(this.getDecryptedKey("exa")) },
       },
       imageGeneration: this.getImageGenerationSettingsView(),
+      imageInspection: { ...this.settings.imageInspection },
       agent: { ...this.settings.agent, disabledTools: [...this.settings.agent.disabledTools] },
       kairos: { ...this.settings.kairos, enabledSkills: [...this.settings.kairos.enabledSkills] },
       plugins: { repoRoot: this.settings.plugins.repoRoot, fsWatch: { ...this.settings.plugins.fsWatch } },
@@ -370,6 +376,9 @@ export class SettingsService {
         }
         if (input.skills) {
           this.settings.skills = sanitizeSkills({ ...this.settings.skills, ...input.skills });
+        }
+        if (input.imageInspection) {
+          this.settings.imageInspection = sanitizeImageInspectionSettings(input.imageInspection);
         }
         await this.writeSettingsFile();
         this.applyToEnv();
@@ -672,6 +681,12 @@ export class SettingsService {
       const references = Object.entries(this.settings.installedModels)
         .filter(([key, model]) => key.startsWith(`${provider}:`) && model?.credentialId === credentialId)
         .map(([key]) => key as ModelKey);
+      if (
+        this.settings.imageInspection.modelKey.startsWith(`${provider}:`) &&
+        this.settings.imageInspection.credentialId === credentialId
+      ) {
+        references.push(this.settings.imageInspection.modelKey);
+      }
       if (references.length > 0) {
         return { ok: false, code: "credential_in_use", message: "该 API Key 仍被模型使用。", references };
       }
@@ -1060,6 +1075,7 @@ function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV2 {
     customModels: {},
     taskModels: { defaultChatModel: null, utilityModel: null, exploreModel: null },
     imageGeneration,
+    imageInspection: { modelKey: DEFAULT_IMAGE_INSPECTION_MODEL_KEY },
     agent: {
       systemPromptPath: defaultSystemPromptPath(dataRoot),
       temperature: env.LLM_TEMPERATURE !== LLM_TEMPERATURE_DEFAULT ? env.LLM_TEMPERATURE : null,
@@ -1139,11 +1155,24 @@ function mergePersistedSettingsV2(raw: Record<string, unknown>, dataRoot: string
   seed.customModels = sanitizeCustomModels(raw.customModels);
   seed.taskModels = sanitizeTaskModels(raw.taskModels);
   seed.imageGeneration = sanitizeImageGenerationSettings(raw.imageGeneration, seed.imageGeneration);
+  seed.imageInspection = sanitizeImageInspectionSettings(raw.imageInspection);
   seed.agent = sanitizeAgentV2(isRecord(raw.agent) ? raw.agent : {}, seed.agent);
   seed.kairos = sanitizeKairosV2(isRecord(raw.kairos) ? raw.kairos : {}, seed.kairos);
   seed.plugins = sanitizePlugins(isRecord(raw.plugins) ? raw.plugins : {});
   seed.skills = sanitizeSkills(isRecord(raw.skills) ? raw.skills : {});
   return seed;
+}
+
+function sanitizeImageInspectionSettings(input: unknown): ImageInspectionSettings {
+  const value = isRecord(input) ? input : {};
+  const modelKey = isImageInspectionModelKey(value.modelKey)
+    ? value.modelKey
+    : DEFAULT_IMAGE_INSPECTION_MODEL_KEY;
+  const credentialId = isValidCredentialId(value.credentialId) ? value.credentialId : undefined;
+  return {
+    modelKey,
+    ...(credentialId && { credentialId }),
+  };
 }
 
 function hasRequiredV2Sections(raw: Record<string, unknown>): boolean {

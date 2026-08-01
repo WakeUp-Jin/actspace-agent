@@ -25,7 +25,7 @@
 
 同日晚些时候，Kimi-backed 的本地 `web_search`（`searchWithKimi` 借道 `$web_search` 做 search + crawl）也被拆除——`$web_search` 对给定 URL 爬取不可靠、页面不可达时会幻觉内容，且嵌套一层 LLM 导致质量与 token 消耗不可控。现在联网能力由两个不依赖 Kimi 的独立工具承担：`web_fetch`（本地确定性抓取转 Markdown，始终注册）与 `web_search`（智谱 + Tavily/TinyFish/Exa 双通道外部搜索 API，任一搜索 key 存在时注册）。设计事实来源见 `docs/design-docs/tool-system/agent-web-tools.md`。
 
-2026-07-09 起，Kimi 不再作为 DeepSeek 的隐藏多模态 helper。`analyze_media` 工具与图片预分析链路已删除；如果当前主模型 `input` 不包含 `image`，Agent 不会偷偷调用 Kimi 代看图片，而是在用户消息后缀注入最小 runtime model 状态并明确要求模型不要做视觉判断。用户需要视觉能力时应切换到 `input` 包含 `image` 的模型。
+2026-07-09 起，Kimi 不再作为 DeepSeek 的隐藏多模态 helper，旧 `analyze_media` 与附件预分析链路已经删除。2026-08-01 新增显式、按需的 `inspect_image`：text-only 主模型只有在视觉证据确有必要时才调用用户配置的 Kimi `kimi-k2.7-code` 或 OpenRouter `openai/gpt-5.6-luna`；用户附图本身不会触发隐藏请求。主模型原生支持 `image` 时仍直接接收图片，不重复注册该工具。
 
 ## 设计目标
 
@@ -33,17 +33,17 @@
 - Kimi 作为主模型时也不挂 provider-native `$web_search`；联网搜索统一由本地 `web_search` / `web_fetch` 工具承担。
 - 跨模型续聊：DeepSeek 与 Kimi 当前都走 OpenAI-compatible；`transform-messages` 仍负责 thinking 降级、tool call id/signature 标准化和历史 Anthropic 消息兼容，避免旧会话或后续跨协议模型切换崩溃。
 - 联网搜索与网页读取由独立的 `web_search` / `web_fetch` 工具承担（见 `docs/design-docs/tool-system/agent-web-tools.md`），不依赖 Kimi key。
-- 图片输入按 `MODEL_REGISTRY.input` 显式路由：支持 `image` 的主模型直接接收图片 content parts；不支持 `image` 的主模型只接收附件元信息和“不应做视觉判断”的文本提示。
+- 图片输入按 `MODEL_REGISTRY.input` 显式路由：支持 `image` 的主模型直接接收图片 content parts；不支持 `image` 的主模型只接收附件元信息，并在 `inspect_image` 可用时收到“先调用工具、再做视觉判断”的提示。
 - 供应商细节不泄露给主模型。DeepSeek 不需要知道 `$web_search`、`moonshot/web-search:latest` 或 `kimi-k2.6`。
 - 首版不引入复杂 Capability Router，只使用工具定义上的轻量暴露属性和少量 provider 判断。
 
 ## 非目标
 
-- 不支持第三个真实 provider。
+- 不把任意第三方多模态模型自动加入图片分析候选；首版只维护 Kimi 与 OpenRouter Luna 两项受控配置。
 - 不做通用模型能力市场。
 - 不把 Kimi Formula 作为首版统一工具平台。
 - 不把 Kimi Formula `web-search` 的 encrypted output 直接返回给 DeepSeek。
-- 不把 Kimi 原生能力强行注册成普通 ToolManager 工具。
+- 不把主 Kimi 模型的原生图片能力伪装成工具；`inspect_image` 是独立、显式配置的视觉委托能力，不携带主会话上下文。
 - 不再使用 Kimi 主模型的 provider-native `$web_search`；搜索能力统一收敛到 ToolManager 管理的 `web_search` / `web_fetch`。
 - 不引入新的 Agent runtime 来承载搜索子代理。
 
@@ -65,7 +65,7 @@
 
 3. **能力包装层**
    - Provider 原生能力由协议服务在请求构造层处理；DeepSeek server web search 与 Kimi `$web_search` 均已移除，联网搜索统一走本地工具。
-   - 应用级工具由 ToolManager 暴露给主模型，例如 `read_file`、`grep`、`glob`、`web_search`、`web_fetch`。
+   - 应用级工具由 ToolManager 暴露给主模型，例如 `read_file`、`grep`、`glob`、`web_search`、`web_fetch`、`inspect_image`。
 
 这些层级不能混在一起。`api` 解决“用哪套协议和消息转换”的问题；`provider` 解决“用哪个供应商身份和凭据”的问题；应用级工具解决“主模型能在 actspace 中做什么”的问题。
 
@@ -115,7 +115,7 @@ Kimi 主模型能力：
 
 ```ts
 exposeOnlyTo?: "deepseek" | "kimi";        // 主模型范围；缺省 = 两个主模型都可见
-requiresKey?: "kimi" | "webSearch";        // 依赖的外部 key；缺 key 时不注册
+requiresKey?: "kimi" | "webSearch" | "imageGeneration" | "imageInspection";
 ```
 
 筛选逻辑保持简单（`tools/exposure.ts`）：
@@ -125,11 +125,12 @@ function shouldExposeTool(spec, runtime) {
   if (spec.exposeOnlyTo && spec.exposeOnlyTo !== runtime.primaryProvider) return false;
   if (spec.requiresKey === "kimi" && !runtime.hasKimiKey) return false;
   if (spec.requiresKey === "webSearch" && !runtime.hasWebSearchKey) return false;
+  if (spec.requiresKey === "imageInspection" && !runtime.hasImageInspectionModel) return false;
   return true;
 }
 ```
 
-当前使用：`web_search` 声明 `requiresKey: "webSearch"`（任一搜索 provider key 存在即注册，与主模型无关）；`web_fetch` 无门控。这个函数不应扩展成多层策略框架，等第三个 provider 真正出现后，再重新评估是否抽象 Capability Profile。
+当前使用：`web_search` 声明 `requiresKey: "webSearch"`；`inspect_image` 声明 `requiresKey: "imageInspection"`，只有专用视觉 LLM runtime 已解析时才注册；`web_fetch` 无门控。主模型是否原生支持图片由构造 Agent config 时决定，不塞进 exposure 的轻量字段判断。
 
 ## 图片输入与 runtime model 状态
 
@@ -154,9 +155,11 @@ input: text,image
 该后缀只表达当前模型事实，不写 Browser Use / Computer Use 策略。工具、Skill 或系统提示词中的 Browser Use / Computer Use 指南应读取 `<runtime_model>.input`：
 
 - `input` 包含 `image`：可把截图作为视觉观察输入，模型可以直接基于截图判断 UI。
-- `input` 只有 `text`：不得基于截图做视觉判断；Browser Use 应优先 DOM / accessibility tree / URL / 可见文本 / 结构化 browser state；Computer Use 的纯视觉任务应要求用户切到 image-capable 模型。
+- `input` 只有 `text`：不得在没有视觉证据时基于截图做判断；优先使用 DOM / accessibility tree / URL / 可见文本 / 结构化 browser state，需要读取图片本身时按需调用 `inspect_image`。工具不可用时再要求用户切到 image-capable 模型。
 
 图片附件的原始文件内容不写入 session。支持图片的模型在 turn 边界临时把本地图片读成 data URL 放入 LLM 请求；持久化的 `user_message.payload.attachments` 只保存附件元信息和预览 URL。
+
+`inspect_image` 只在工具调用当下读取已授权图片，并把固定 system prompt、问题、安全文件名和单张图片交给独立视觉 LLM。工具回给主模型的是 `<image_inspection_result version="1">` 包裹的分层文字报告，不包含 Base64、完整绝对路径、主会话历史、Provider 原始响应或隐藏推理。
 
 工具返回图片也走同一类结构化 content part，而不是把图片当普通文本或 base64 dump 塞回上下文。`read_file` 读取支持的图片文件时会返回 text + image content；bash 前台输出如果是完整 `data:image/...;base64,...`，执行循环会保留 image content。OpenAI-compatible 路线会保留原 `tool` 文本结果用于 tool-call 对账，并追加一条 user visual observation 承载图片；Anthropic-compatible 路线可在 `tool_result` block 内直接携带图片。
 
@@ -231,9 +234,10 @@ Formula 可以作为后续扩展方向，但应单独设计“托管工具平台
 - DSML 泄漏兜底测试必须覆盖：裸 DSML tool-call 标记被识别为可重试 `server_error` 且不落库；正常正文与含 “DSML” 词的普通正文不被误判。
 - Kimi 主模型测试必须覆盖：默认不声明 builtin `$web_search`，关闭或未传 Thinking 时不发送 `thinking: disabled`，显式开启 Thinking 时发送 `thinking: enabled`。
 - `web_search` / `web_fetch` 工具测试约定见 `docs/design-docs/tool-system/agent-web-tools.md`。
-- 附件图片测试必须覆盖：image-capable 模型收到结构化 image content part；text-only 模型只收到附件元信息和 runtime model 状态。
+- 附件图片测试必须覆盖：image-capable 模型收到结构化 image content part；text-only 模型只收到附件元信息和 runtime model 状态，且视觉工具可用时明确先调用 `inspect_image`。
 - 工具暴露测试必须覆盖：
   - `web_search`：有/无搜索 provider key（与 Kimi key 无关）。
+  - `inspect_image`：视觉 runtime 有/无、text-only / 原生视觉主模型、Agent / Plan / Chat 模式。
 
 ## 决策记录
 
@@ -253,3 +257,4 @@ Formula 可以作为后续扩展方向，但应单独设计“托管工具平台
 - 2026-07-09：删除 `analyze_media` 工具、Kimi media helper 和附件图片预分析链路。模型多模态能力改由 `MODEL_REGISTRY.input` 显式声明：支持 `image` 的主模型直接接收 image content parts；不支持 `image` 的主模型不再隐式调用 Kimi，只接收附件元信息和 runtime model 后缀。DeepSeek 未来支持图片时，只需把对应模型的 `input` 调整为 `["text", "image"]` 并验证 provider 协议即可启用图片输入。
 - 2026-07-09（同日后续）：Kimi 主模型不再挂 provider-native `$web_search`，联网搜索统一使用本地 `web_search` / `web_fetch` 工具。Kimi OpenAI-compatible 请求也不再发送 `thinking: { type: "disabled" }`；只有显式开启 Thinking 时才发送 `thinking: { type: "enabled" }`，避免 `kimi-k2.7-code` 这类只接受 enabled 的模型被 disabled 参数拦截。
 - 2026-07-31：DeepSeek 内置模型与 provider 从 Anthropic Messages 主线迁移到 OpenAI Chat Completions；移除运行时协议开关与 Anthropic 专用 env，精确迁移旧官方 `/anthropic` 设置。Thinking 只提供 High / Max，默认显式 Max；通用 Anthropic 协议实现与历史测试继续保留。
+- 2026-08-01：新增按需 `inspect_image`，默认使用 OpenRouter `openai/gpt-5.6-luna`，可选 Kimi `kimi-k2.7-code`，只复用 Provider 已有凭据。它不恢复旧的隐藏预分析：工具调用和费用可见，失败不自动重试或跨 Provider fallback，输出只保留固定分层文字证据。

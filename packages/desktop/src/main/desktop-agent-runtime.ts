@@ -60,6 +60,7 @@ export function createDesktopAgentRuntime(options: DesktopAgentRuntimeOptions): 
         }
         const utility = options.modelRuntime.resolveUtilityModel(main.model);
         const explore = options.modelRuntime.resolveExploreModel(main.model);
+        const imageInspection = options.modelRuntime.resolveImageInspectionModel();
         if (!("model" in utility) || !("model" in explore)) {
           throw createModelUnavailableError("任务模型无法解析。", undefined, "task_model_unavailable");
         }
@@ -67,6 +68,12 @@ export function createDesktopAgentRuntime(options: DesktopAgentRuntimeOptions): 
           main: { definition: main.model.definition, runtime: main.model.providerRuntime },
           utility: { definition: utility.model.definition, runtime: utility.model.providerRuntime },
           explore: { definition: explore.model.definition, runtime: explore.model.providerRuntime },
+          ...("model" in imageInspection && {
+            imageInspection: {
+              definition: imageInspection.model.definition,
+              runtime: imageInspection.model.providerRuntime,
+            },
+          }),
           thinkingEnabled: request.thinkingEnabled,
           reasoningEffort: request.reasoningEffort,
           toolEnvironment: options.modelRuntime.getToolEnvironment(),

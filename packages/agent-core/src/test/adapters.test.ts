@@ -321,6 +321,7 @@ describe("Adapters: attachment formatting", () => {
     expect(formatted).toContain("Attached files:");
     expect(formatted).toContain("[file] notes.md path=/Users/test/notes.md mime=text/markdown");
     expect(formatted).toContain("use read_file with the provided path");
+    expect(formatted).not.toContain("inspect_image");
     expect(formatted).toContain("model_id: deepseek-v4-pro");
     expect(formatted).toContain("input: text");
   });
@@ -345,6 +346,18 @@ describe("Adapters: attachment formatting", () => {
       expect.objectContaining({ type: "text", text: expect.stringContaining("model_id: kimi-k2.6") }),
       { type: "image", data: "data:image/png;base64,abc", mimeType: "image/png" },
     ]);
+  });
+
+  it("directs a text-only model to inspect_image when the helper is available", () => {
+    const formatted = formatUserMessageForModel(
+      "What is on screen?",
+      [{ id: "att-image-1", kind: "image", name: "screen.png", path: "/tmp/screen.png", mimeType: "image/png" }],
+      { modelId: "deepseek-v4-pro", input: ["text"], canInspectImages: true },
+    );
+
+    expect(formatted).toContain("Use inspect_image with the provided local image path");
+    expect(formatted).toContain("Do not make visual claims before using the tool");
+    expect(formatted).not.toContain("ask the user to switch");
   });
 
   it("routes Kimi K2.7 Code image attachments as native image input", () => {
