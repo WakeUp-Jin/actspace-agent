@@ -11,8 +11,9 @@
     "dev:site": "pnpm --filter @actspace/site dev",
     "build": "pnpm --filter @actspace/agent-cli build && pnpm --filter @actspace/desktop build",
     "build:site": "pnpm --filter @actspace/site build",
-    "test": "pnpm run test:dev-runner && pnpm -r --if-present test",
+    "test": "pnpm run test:dev-runner && pnpm run test:repo-stats && pnpm -r --if-present test",
     "test:dev-runner": "node --test scripts/test/dev-process-runner.test.mjs",
+    "test:repo-stats": "node --test scripts/test/repo-stats.test.mjs",
     "test:site": "pnpm --filter @actspace/site test",
     "typecheck": "pnpm -r typecheck",
     "check:site": "pnpm --filter @actspace/site check",
@@ -22,11 +23,19 @@
     "check:repo": "./scripts/check-repo-hygiene.sh",
     "check:frontend-theme": "node scripts/check-frontend-theme-colors.mjs",
     "check:actions": "./scripts/check-action-pinning.sh",
+    "repo:stats": "node scripts/repo-stats.mjs",
     "build:browser-locator": "node scripts/build-browser-locator-runtime.mjs",
+    "build:agent-cli:bundle": "node scripts/build-agent-cli-binary.mjs --bundle-only",
+    "build:agent-cli:binary": "node scripts/build-agent-cli-binary.mjs",
+    "test:agent-cli:binary": "node scripts/test-agent-cli-binary.mjs",
     "check:browser": "node --check plugins/browser-bridge/apps/chrome-extension/src/background.js && node --check plugins/browser-bridge/apps/chrome-extension/src/cursor-overlay.js && pnpm --dir packages/desktop exec tsc -p ../../plugins/browser-bridge/apps/cli/internal/locator/runtime-src/tsconfig.json && node scripts/build-browser-locator-runtime.mjs --check && node scripts/check-browser-command-registry.mjs && node scripts/test-browser-locator-runtime.mjs && node scripts/test-browser-cursor-runtime.mjs && node scripts/test-browser-extension-contract.mjs",
     "hooks:install": "./scripts/install-git-hooks.sh",
     "package:desktop": "./scripts/release-package.sh",
     "package:desktop:dmg": "./scripts/release-package.sh",
     "release-package": "./scripts/release-package.sh"
+  },
+  "devDependencies": {
+    "esbuild": "0.21.5",
+    "postject": "1.0.0-alpha.6"
   }
 }

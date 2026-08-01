@@ -762,7 +762,6 @@ export function App() {
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const activeStreamTurnRef = useRef<{ sessionId: string; turnId: string } | null>(null);
-  const activeTurnAcceptedRef = useRef(false);
   const reviewRefreshRequestIdRef = useRef(0);
   const userPickedChatModelRef = useRef(false);
 
@@ -895,7 +894,11 @@ export function App() {
     window.actspace.getWorkspaceGitContext({ workspaceRoot }).then((context) => {
       if (cancelled) return;
       setWorkspaceGitContext(context);
-      setSelectedBranch(context.status === "ready" ? context.currentBranch : undefined);
+      setSelectedBranch(
+        context.status === "ready" || context.status === "no_head"
+          ? context.currentBranch
+          : undefined,
+      );
       setRunLocation("this_mac");
     }).catch((error: unknown) => {
       if (cancelled) return;
@@ -1035,7 +1038,6 @@ export function App() {
 
     switch (event.type) {
       case "turn_started":
-        activeTurnAcceptedRef.current = true;
         state.waitingForModel = true;
         break;
 
@@ -1053,7 +1055,6 @@ export function App() {
         break;
 
       case "workspace_preparation_finished":
-        activeTurnAcceptedRef.current = true;
         upsertWorkspacePreparationSegment(state, event.turnId);
         state.activeWorkspacePreparations.set(event.turnId, {
           kind: "workspace_preparation",
@@ -1457,7 +1458,6 @@ export function App() {
     setIsAborting(false);
     setActiveTurnId(turnId);
     activeStreamTurnRef.current = { sessionId, turnId };
-    activeTurnAcceptedRef.current = false;
     setComposerDraftRestore(null);
     setApprovalPendingForSession(sessionId, false);
     setFailedForSession(sessionId, false);
@@ -1510,7 +1510,6 @@ export function App() {
         void refreshReviewSummary();
       }
       activeStreamTurnRef.current = null;
-      activeTurnAcceptedRef.current = false;
       setIsStreaming(false);
       setIsAborting(false);
       setActiveTurnId(null);
@@ -1638,7 +1637,21 @@ export function App() {
     } catch (error) {
       console.error("Failed to run turn", error);
       if (isCurrentVisibleTurn()) {
-        if (!activeTurnAcceptedRef.current && !isCompactCommand && !isEvalCommand) {
+        let restored: SessionRecord | null = null;
+        if (hasActspaceBridge() && !isCompactCommand && !isEvalCommand) {
+          try {
+            restored = await window.actspace.getSession({ sessionId });
+          } catch (restoreError) {
+            console.error("Failed to inspect session after turn error", restoreError);
+          }
+        }
+        if (!isCurrentVisibleTurn()) return;
+        const inputPersisted = restored?.events.some(
+          (event) => event.turnId === turnId && event.type === "user_message",
+        ) ?? false;
+        if (inputPersisted && restored) {
+          setSessionRecord(restored);
+        } else if (!isCompactCommand && !isEvalCommand) {
           setComposerDraftRestore({
             id: Date.now(),
             text,
@@ -1699,7 +1712,6 @@ export function App() {
 
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
     activeStreamTurnRef.current = null;
-    activeTurnAcceptedRef.current = false;
     setIsStreaming(false);
     setIsAborting(false);
     setActiveTurnId(null);
@@ -1777,7 +1789,6 @@ export function App() {
       if (!sessionId || sessionId === activeSessionIdRef.current) return;
 
       activeStreamTurnRef.current = null;
-      activeTurnAcceptedRef.current = false;
       setIsStreaming(false);
       setIsAborting(false);
       setActiveTurnId(null);

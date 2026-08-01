@@ -1,18 +1,19 @@
-# Agent Turn 四层职责规范
+# Agent Turn 五层职责规范
 
 > 约束从前端用户输入到 Agent 执行结果返回的完整数据链路，明确每一层"做什么"和"不做什么"。
 
 ## 概览
 
-```
-Renderer ──IPC──▶ Main Process ──调用──▶ Bridge ──驱动──▶ Agent
-   ◀──stream──      ◀──persist──       ◀──events──     ◀──loop──
+```text
+Desktop / CLI Client -> Host Adapter -> Agent Runtime -> Bridge -> Agent Harness
+        <- presentation <- Event Sink  <- stream/result <- Agent events
 ```
 
 | 层 | 包/文件 | 核心职责 | 输入 | 输出 |
 |---|---|---|---|---|
 | Renderer | `desktop/src/renderer/` | 收集用户输入，展示流式结果 | 用户交互 | `RunTurnInput`（经 IPC） |
-| Main Process | `desktop/src/main/` | Electron 生命周期、IPC 路由、Agent 依赖准备、结果持久化 | `RunTurnInput` | `AgentTurnResult` |
+| Host Adapter | `desktop/src/main/desktop-agent-runtime.ts`、`agent-cli/src/runtime-adapter.ts` | 把 Electron / process / TTY 能力映射为 Runtime Ports | Host 输入 | `RuntimeTurnRequest` + Ports |
+| Agent Runtime | `agent-core/src/runtime/` | Session、Context、模型、审批、Abort、提交和清理 | `RuntimeTurnRequest` | `AgentTurnResult` + `RuntimeStreamEvent` |
 | Bridge | `agent-core/src/engine/bridge.ts` | 将 Agent 内部事件翻译为 `RuntimeStreamEvent`，聚合为 `AgentTurnResult` | `AgentDeps` + turn 参数 | `AgentTurnResult` + stream 回调 |
 | Agent | `agent-core/src/engine/agent.ts` + `loop.ts` | LLM 循环（思考→工具→回复），上下文管理，工具执行 | `ContextManager` + `LLMService` + `ToolManager` | `AgentEvent` 流 |
 
@@ -55,48 +56,57 @@ Renderer ──IPC──▶ Main Process ──调用──▶ Bridge ──驱�
 
 `/compact` 与 `/eval [失败说明]` 是例外命令路径：renderer 在普通 turn 前分流到独立 IPC。两者都不创建普通用户消息，不进入 `RunTurnInput.userInput`，也不进入主 Agent conversation。`/eval` 使用独立系统提示词和独立 ContextManager，在 `<userData>/eval-candidates/<candidateId>/` 生成回归 Candidate。
 
-## 2. Main Process 层
+## 2. Host Adapter 层
 
 **做什么：**
 - Electron app 生命周期（`configureAppPaths`、`createMainWindow`）
-- IPC handler 注册和路由
-- 调用 `buildAgentConfig()` 构建配置（前端参数 + 内部读 env）
-- 读取当前 session `meta.workspaceRoot`，缺省时回退应用默认 `workspaceRoot`
-- 首轮存在 `executionContext` 时，在任何用户事件持久化前完成 branch/worktree 准备、校验和 SessionMeta 更新
-- 调用 `await createAgentForSession(config, { sessionPath })` 创建运行时实例（会话历史在 ContextManager 构造阶段一次性恢复）
-- Agent 依赖和上下文恢复完成后、真正执行 turn 前，先 append 本轮 `user_message`；这样审批等待或工具执行期间被中止时，用户输入也已经成为会话事实
-- 调用 `runTurnWithAgent()` 执行 turn
-- 持久化 `AgentTurnResult` 中剩余事件到 session store；bridge 在这条真实桌面端路径关闭重复的 user event 聚合
+- Desktop 注册 IPC、注入 Electron roots / settings / `BrowserWindow` Event Sink 和 `PendingApprovalRegistry`
+- CLI 解析 argv、stdin、TTY、stdout/stderr、退出码、Session lock 和 runtime assets
+- 调用 `createAgentHostRuntime()`，把宿主能力注入显式 Port
+- 把输入映射为 `RuntimeTurnRequest`；Desktop 使用 `persistent + desktop`，`run` 使用 `ephemeral + cli-headless`，`chat` 使用 `persistent + cli-interactive`
 - 处理 `context:compact` 手动压缩：为当前 session 装配相同的 Agent deps，调用 `compactContextWithAgent()`，追加 `context_compaction` / `context_snapshot` 并刷新 `context-state.json`
 - 处理 `eval:generate-candidate`：定位最近一个普通用户 Turn，以 Candidate 目录作为独立生成 Agent 的 workspace，完成后追加 `eval_candidate` 系统事件
 - 管理 abort 闭包
 
 **不做什么：**
-- 不直接构造 `LLMConfig`（委托给 `buildAgentConfig`）
+- 不恢复 Context、不追加 SessionEvent、不决定提交顺序
 - 不直接读取 `process.env` 来拼 API Key（委托给 `resolveAgentEnvConfig`）
-- **不读 `session.jsonl`、不调 `recoverMessages` / `sessionEventsToMessages`、不感知任何会话恢复细节**——只把 `sessionPath` 透传给 `createAgentForSession`，由 ConversationContext 自己完成读盘 + 转换 + 灌 message。
 - 不处理 Agent 内部事件（委托给 Bridge）
 
 **关键文件：**
 - `main/index.ts`：Electron 生命周期 + IPC 路由（精简，不含 Agent 逻辑）
-- `main/agent-turn.ts`：Agent turn 编排（`runAndPersistTurn`）
+- `main/agent-turn.ts`：保留 `runAndPersistTurn` 兼容 wrapper，实际委托 Desktop Adapter / Runtime
+- `main/desktop-agent-runtime.ts`：Electron Host Adapter
+- `agent-cli/src/runtime-adapter.ts`：CLI Host Adapter
 - `main/context-compact.ts`：手动上下文压缩编排（`compactAndPersistContext`）
+
+## 3. Agent Runtime 层
+
+Runtime 是唯一的 Turn 应用编排层：恢复 Session、准备 workspace、组装 Context、解析模型、创建 Harness 依赖、预写用户输入、执行 Harness、检查持久化结果、发送终态并清理工具。活动 Turn 状态属于 Runtime 实例，不能使用跨 Host 的模块全局 Map。
+
+关键不变量：
+
+- persistent 输入在 Harness 前提交；ephemeral 不创建产品 Session。
+- `turn_finished` 只在结果提交成功后发送；写盘失败必须是 `turn_failed`。
+- Runtime 负责唯一的 `turn_started` 和 terminal event；Bridge 的兼容生命周期事件在 Runtime 路径关闭。
+- Abort 覆盖初始化窗口、Harness、审批等待和 ToolManager dispose。
+- Event Sink 与观测 sidecar 失败不能重新执行 Harness。
 
 **配置两步法：**
 ```typescript
-const sessionPaths = createSessionStorePaths(join(roots.sessionRoot, input.sessionId));
-const meta = await readMeta(sessionPaths.metaPath);
-const prepared = input.executionContext
-  ? await prepareExecutionContext(input.executionContext, roots)
-  : null;
-const workspaceRoot = prepared?.workspaceRoot ?? meta?.workspaceRoot ?? roots.workspaceRoot;
-const config = buildAgentConfig({ model, thinkingEnabled }, workspaceRoot);
-const deps = await createAgentForSession(config, { sessionPath: sessionPaths.sessionPath });
+const runtime = createAgentHostRuntime({
+  contextProvider,
+  modelResolver,
+  eventSink,
+  approvalBroker,
+  workspaceExecutionProvider,
+});
+await runtime.runTurn(request);
 ```
 
 `createAgentFromConfig`（同步签名）保留，仅供 mock / 单元测试 / 纯内存场景使用。
 
-## 3. Bridge 层
+## 4. Bridge 层
 
 **做什么：**
 - 接收 `AgentDeps` + turn 参数，启动 Agent
@@ -112,7 +122,7 @@ const deps = await createAgentForSession(config, { sessionPath: sessionPaths.ses
 - 不处理 IPC 传输
 - 不感知会话历史恢复——拿到的 `deps.contextManager` 在构造阶段就已经包含完整历史，`getContext()` 同步可见
 
-## 4. Agent 层
+## 5. Agent Harness 层
 
 **做什么：**
 - 管理 LLM 对话循环（`runAgentLoop`）
@@ -132,14 +142,14 @@ const deps = await createAgentForSession(config, { sessionPath: sessionPaths.ses
 ```
 用户输入 → Renderer
          → [IPC: RunTurnInput]
-         → Main Process
+         → Desktop Host Adapter
+           → RuntimeTurnRequest + Electron Ports
+         → Agent Runtime
            → prepare executionContext (first turn only)
-           → update SessionMeta.workspaceRoot / worktree metadata
-           → readMeta(session.metaPath).workspaceRoot ?? defaultRoot
-           → buildAgentConfig(frontendInput, workspaceRoot)          → AgentConfig
-           → await createAgentForSession(config, { sessionPath })    → AgentDeps（含已恢复历史的 ContextManager）
-           → append user_message                                    → session.jsonl
-           → runTurnWithAgent(input, deps, { onStreamEvent, includeUserEvent: false })
+           → resolve SessionMeta.workspaceRoot / Context / model / approval
+           → await createAgentForSession(config, { sessionPath })
+           → persistent: append user_message
+           → runTurnWithAgent(..., { emitTerminalEvent: false })
          → Bridge
            → new Agent(deps).run(userInput)
          → Agent
@@ -150,7 +160,9 @@ const deps = await createAgentForSession(config, { sessionPath: sessionPaths.ses
 
 Agent 结束
   → Bridge: 聚合为 AgentTurnResult
-  → Main Process: 追加剩余事件到 session store，返回给 IPC caller
+  → Agent Runtime: 追加剩余事件并检查 WriteResult
+  → Agent Runtime: 提交成功后发送唯一 terminal event
+  → Desktop Host Adapter: 返回 IPC caller
   → Renderer: 重新读取 SessionRecord
     → 同步完成 streaming → persisted 单一数据源交接
     → 使用稳定 renderKey 保留当前 turn DOM
@@ -213,6 +225,8 @@ Renderer: `/eval [失败说明]`
 
 - [ ] 前端传递的字段是否只在 `RunTurnInput` 中定义？
 - [ ] 配置构建是否通过 `buildAgentConfig` 完成？（不要在 main 直接拼 LLMConfig）
+- [ ] 新 Host 是否只实现 Adapter / Port，而没有复制 Session、Context 或 Harness 编排？
+- [ ] terminal event 是否仍由 Runtime 在提交成功后唯一发送？
 - [ ] Main 进程是否仅透传 `sessionPath` 给 `createAgentForSession`，没有自行读 `session.jsonl` 或调 `sessionEventsToMessages`？
 - [ ] Agent 内部新增的事件是否在 Bridge 中有对应的 `RuntimeStreamEvent` 翻译？
 - [ ] 新增的 turn 级 `RuntimeStreamEvent` 是否包含 `sessionId` 与 `turnId`？

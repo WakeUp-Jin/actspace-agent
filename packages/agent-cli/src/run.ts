@@ -1,134 +1,185 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import {
-  Agent,
-  type AssistantMessage,
-  ContextManager,
-  MockLLMService,
-  SystemPromptContext,
-  buildAgentConfig,
-  createEmptyUsage,
-  createAgentFromConfig,
-  getTextContent,
-  type AgentDeps,
-} from "@actspace/agent-core";
-import type { ModelId } from "@actspace/shared";
-import { AgentEventCollector } from "./event-collector";
-import { createApprovalGate } from "./permission";
+import { randomUUID } from "node:crypto";
+import { readFile, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import type { RuntimeStreamEvent } from "@actspace/shared";
 import { writeArtifacts } from "./artifacts";
-import type { CliArtifactResult, RunCommandOptions } from "./types";
 import { ContextSnapshotCollector } from "./context-snapshot-collector";
+import { CliUsageError } from "./errors";
+import { CliTraceCollector } from "./event-collector";
+import { createCliAgentRuntime, resolveCliDataDir } from "./runtime-adapter";
+import type { CliArtifactResult, RunCommandOptions } from "./types";
 
-export async function runCommand(options: RunCommandOptions): Promise<CliArtifactResult> {
-  const workspace = resolveRequiredWorkspace(options.workspace);
-  const input = await resolveInput(options);
-  const startedAt = new Date().toISOString();
-  const collector = new AgentEventCollector();
-  const deps = createDeps(options, workspace);
+export type RunCommandControl = {
+  sessionId: string;
+  turnId: string;
+  abort: () => boolean;
+};
+
+export type RunCommandIo = {
+  stdinIsTTY?: boolean;
+  readStdin?: () => Promise<string>;
+  onRuntimeEvent?: (event: RuntimeStreamEvent) => void | Promise<void>;
+  onControl?: (control: RunCommandControl) => void;
+  isInterrupted?: () => boolean;
+  onDiagnostic?: (code: string, message: string, error?: unknown) => void;
+  env?: NodeJS.ProcessEnv;
+  now?: () => Date;
+  cwd?: () => string;
+};
+
+export async function runCommand(
+  options: RunCommandOptions,
+  io: RunCommandIo = {},
+): Promise<CliArtifactResult> {
+  const workspace = await resolveWorkspace(options.workspace, io.cwd?.() ?? process.cwd());
+  const input = await resolveInput(options, io);
+  const dataDir = resolveCliDataDir(options.dataDir, io.env);
+  const startedAt = (io.now?.() ?? new Date()).toISOString();
+  const id = randomUUID();
+  const sessionId = `run-${id}`;
+  const turnId = `turn-${id}`;
+  const collector = new CliTraceCollector();
   const contextSnapshots = options.out ? new ContextSnapshotCollector() : undefined;
-
-  const agent = new Agent({
-    llm: deps.llm,
-    contextManager: deps.contextManager,
-    toolManager: deps.toolManager,
-    thinkingEnabled: deps.thinkingEnabled,
-    summarizer: deps.summarizer,
-    onEvent: (event) => {
-      collector.sink(event);
-      if (event.type === "context_compaction") {
-        contextSnapshots?.capturePostCompaction(deps.contextManager.getMessages());
-      }
+  const { runtime, headlessApprovalBroker } = createCliAgentRuntime({
+    workspace,
+    dataDir,
+    permissionMode: options.permissionMode,
+    mock: options.mock,
+    model: options.model,
+    contextSnapshots,
+    eventSink: async (event) => {
+      collector.captureRuntime(event);
+      await io.onRuntimeEvent?.(event);
     },
-    cacheAudit: contextSnapshots,
+    onDiagnostic: (diagnostic) => io.onDiagnostic?.(
+      diagnostic.code,
+      diagnostic.message,
+      diagnostic.error,
+    ),
   });
 
-  const loopResult = await agent.run(input);
-  const finalText = getTextContent(loopResult.message);
-  const endedAt = new Date().toISOString();
-  const events = collector.getEvents();
+  io.onControl?.({
+    sessionId,
+    turnId,
+    abort: () => runtime.abortTurn({ sessionId, turnId }),
+  });
 
-  const result: CliArtifactResult = {
-    ok: loopResult.message.stopReason !== "error" && loopResult.message.stopReason !== "aborted",
-    finalText,
-    model: loopResult.message.model,
-    provider: loopResult.message.provider,
-    stopReason: loopResult.message.stopReason,
-    totalUsage: loopResult.totalUsage,
-    messageCount: loopResult.messages.length,
-    eventCount: events.length,
-    permissionMode: options.permissionMode,
-    workspace,
-    startedAt,
-    endedAt,
-  };
-
-  if (options.out) {
-    contextSnapshots?.captureFinal(loopResult.messages);
-    await writeArtifacts({
-      outDir: options.out,
-      result,
-      events,
-      finalText,
-      contextSnapshots: contextSnapshots?.getSnapshots(),
+  try {
+    const runtimeResultPromise = runtime.runTurn({
+      sessionId,
+      turnId,
+      userInput: input,
+      workspaceRoot: workspace,
+      roots: {
+        dataRoot: dataDir,
+        sessionRoot: join(dataDir, "sessions"),
+        tmpRoot: tmpdir(),
+        defaultWorkspaceRoot: workspace,
+      },
+      persistenceMode: "ephemeral",
+      interactionMode: "cli-headless",
+      mode: "agent",
     });
-  }
+    if (io.isInterrupted?.()) runtime.abortTurn({ sessionId, turnId });
+    const runtimeResult = await runtimeResultPromise;
+    collector.captureHarness(runtimeResult.events);
 
-  return result;
-}
-
-function createDeps(options: RunCommandOptions, workspace: string): AgentDeps {
-  const approvalGate = createApprovalGate(options.permissionMode, workspace);
-
-  if (options.mock) {
-    const config = buildAgentConfig({}, workspace, approvalGate);
-    const deps = createAgentFromConfig(config);
-    const llm = new MockLLMService({ provider: "mock", apiKey: "test", model: "mock-model" });
-    llm.setResponses([createMockText("Mock ActSpace Agent response.")]);
-    return {
-      ...deps,
-      llm,
-      contextManager: new ContextManager({
-        systemPromptModule: new SystemPromptContext(config.systemPrompt),
-        config: { contextWindow: config.modelSpec.contextWindow },
-      }),
+    const approval = headlessApprovalBroker?.approvalRequired;
+    const interrupted = io.isInterrupted?.() ?? false;
+    const status = approval
+      ? "approval_required"
+      : runtimeResult.status;
+    const exitCode = approval
+      ? 4
+      : runtimeResult.status === "completed" ? 0
+        : interrupted && runtimeResult.status === "aborted" ? 130 : 1;
+    const finalReply = runtimeResult.finalReply;
+    const result: CliArtifactResult = {
+      schemaVersion: 1,
+      ok: exitCode === 0,
+      status,
+      exitCode,
+      sessionId,
+      turnId,
+      finalText: finalReply?.content ?? "",
+      model: finalReply?.model,
+      provider: finalReply?.provider,
+      stopReason: finalReply?.stopReason,
+      totalUsage: finalReply?.usage,
+      messageCount: runtimeResult.events.filter((event) => (
+        event.type === "user_message"
+        || event.type === "assistant_message"
+        || event.type === "assistant_reply"
+      )).length,
+      eventCount: collector.getEvents().length,
+      permissionMode: options.permissionMode,
+      workspace,
+      startedAt,
+      endedAt: (io.now?.() ?? new Date()).toISOString(),
+      ...(approval ? {
+        error: {
+          code: "APPROVAL_REQUIRED",
+          message: `${approval.toolName} requires interactive approval; use chat or an automatic policy.`,
+        },
+      } : runtimeResult.error ? { error: runtimeResult.error } : {}),
     };
+
+    if (options.out) {
+      await writeArtifacts({
+        outDir: options.out,
+        result,
+        events: collector.getEvents(),
+        finalText: result.finalText,
+        contextSnapshots: contextSnapshots?.getSnapshots(),
+      });
+    }
+    return result;
+  } finally {
+    await runtime.dispose();
   }
-
-  const config = buildAgentConfig(
-    { model: options.model as ModelId | undefined },
-    workspace,
-    approvalGate,
-  );
-  return createAgentFromConfig(config);
 }
 
-function createMockText(text: string): AssistantMessage {
-  return {
-    role: "assistant",
-    content: [{ type: "text", text }],
-    model: "mock-model",
-    provider: "mock",
-    usage: createEmptyUsage(),
-    stopReason: "stop",
-    timestamp: Date.now(),
-    source: "llm",
-  };
-}
-
-async function resolveInput(options: RunCommandOptions): Promise<string> {
+async function resolveInput(options: RunCommandOptions, io: RunCommandIo): Promise<string> {
   if (options.input && options.inputFile) {
-    throw new Error("Use only one of --input or --input-file");
+    throw new CliUsageError("Use only one of --input, --input-file, or stdin");
   }
-  if (options.input) return options.input;
-  if (options.inputFile) {
-    return readFile(resolve(options.inputFile), "utf8");
+
+  const canReadStdin = io.stdinIsTTY === false && io.readStdin;
+  if (options.input || options.inputFile) {
+    if (options.input !== undefined) return requireNonEmptyInput(options.input);
+    try {
+      return requireNonEmptyInput(await readFile(resolve(options.inputFile!), "utf8"));
+    } catch (error) {
+      if (error instanceof CliUsageError) throw error;
+      throw new CliUsageError(`Cannot read --input-file: ${formatError(error)}`, "INPUT_FILE_ERROR");
+    }
   }
-  throw new Error("Missing --input or --input-file");
+
+  if (!canReadStdin) {
+    throw new CliUsageError("Missing input: use --input, --input-file, or non-TTY stdin");
+  }
+  return requireNonEmptyInput(await io.readStdin!());
 }
 
-function resolveRequiredWorkspace(workspace: string | undefined): string {
-  if (!workspace) {
-    throw new Error("Missing --workspace");
+function requireNonEmptyInput(input: string): string {
+  if (!input.trim()) throw new CliUsageError("Agent input must not be empty");
+  return input;
+}
+
+async function resolveWorkspace(workspace: string | undefined, cwd: string): Promise<string> {
+  const absolute = resolve(workspace ?? cwd);
+  try {
+    if (!(await stat(absolute)).isDirectory()) {
+      throw new CliUsageError(`Workspace is not a directory: ${absolute}`, "INVALID_WORKSPACE");
+    }
+  } catch (error) {
+    if (error instanceof CliUsageError) throw error;
+    throw new CliUsageError(`Workspace is not accessible: ${absolute}`, "INVALID_WORKSPACE");
   }
-  return resolve(workspace);
+  return absolute;
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

@@ -1,0 +1,11 @@
+{
+  "nodeVersion": "22.22.2",
+  "assetKey": "actspace-ripgrep",
+  "targets": {
+    "darwin-arm64": { "runner": "macos-14", "artifact": "actspace-agent" },
+    "darwin-x64": { "runner": "macos-13", "artifact": "actspace-agent" },
+    "linux-x64": { "runner": "ubuntu-24.04", "artifact": "actspace-agent" },
+    "linux-arm64": { "runner": "ubuntu-24.04-arm", "artifact": "actspace-agent" },
+    "win32-x64": { "runner": "windows-2025", "artifact": "actspace-agent.exe" }
+  }
+}

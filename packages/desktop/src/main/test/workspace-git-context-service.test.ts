@@ -86,6 +86,44 @@ describe("workspace Git context service", () => {
     expect(result.branches[1].checkedOutPath).toMatch(/source-repo$/);
   });
 
+  it("reports the symbolic branch for an unborn repository", async () => {
+    if (!gitAvailable) return;
+    const roots = await createRoots();
+    await git(roots.workspaceRoot, ["init", "-b", "main"]);
+    await writeFile(join(roots.workspaceRoot, "README.md"), "staged\n", "utf8");
+    await git(roots.workspaceRoot, ["add", "README.md"]);
+
+    const result = await getWorkspaceGitContext(roots.workspaceRoot);
+
+    expect(result).toMatchObject({
+      status: "no_head",
+      currentBranch: "main",
+      branches: [{ name: "main", current: true }],
+    });
+    expect(result.repositoryRoot).toMatch(/source-repo$/);
+  });
+
+  it("runs an unborn repository in place on This Mac", async () => {
+    if (!gitAvailable) return;
+    const roots = await createRoots();
+    await git(roots.workspaceRoot, ["init", "-b", "main"]);
+    await writeFile(join(roots.workspaceRoot, "README.md"), "staged\n", "utf8");
+    await git(roots.workspaceRoot, ["add", "README.md"]);
+
+    const result = await prepareExecutionContext({
+      runLocation: "this_mac",
+      sourceWorkspaceRoot: roots.workspaceRoot,
+      branch: "main",
+    }, roots);
+
+    expect(result).toEqual({
+      ok: true,
+      workspaceId: undefined,
+      workspaceRoot: roots.workspaceRoot,
+      branch: "main",
+    });
+  });
+
   it("switches an existing branch for This Mac", async () => {
     if (!gitAvailable) return;
     const roots = await createRoots();

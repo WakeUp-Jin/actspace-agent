@@ -49,7 +49,7 @@
 
 ```bash
 actspace-agent run \
-  --input task.md \
+  --input-file task.md \
   --workspace /workspace \
   --permission-mode yolo
 ```
@@ -58,7 +58,7 @@ actspace-agent run \
 
 ```bash
 actspace-agent run \
-  --input task.md \
+  --input-file task.md \
   --workspace /workspace \
   --permission-mode yolo \
   --json
@@ -68,7 +68,7 @@ actspace-agent run \
 
 ```bash
 actspace-agent run \
-  --input task.md \
+  --input-file task.md \
   --workspace /workspace \
   --permission-mode yolo \
   --out /eval-output
@@ -89,8 +89,7 @@ type PermissionMode = "default" | "trusted" | "yolo";
 
 契约规则：
 
-- `default` 保持高风险操作的交互式审批行为。
-- `trusted` 允许普通工作区写入，但仍保护高风险动作。
+- `default` / `trusted` 在无头 `run` 遇到未自动解决的审批时立即返回退出码 `4`；交互审批只属于 Desktop / `chat`。
 - `yolo` 自动批准工作区内的评估操作。
 - `yolo` 不能绕过工作区、密钥路径或网络硬边界。
 

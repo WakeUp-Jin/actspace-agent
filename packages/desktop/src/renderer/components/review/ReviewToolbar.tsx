@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, Columns2, Copy, Eye, Files, GitPullRequestArrow, ListCollapse, ListTree, MoreHorizontal, RefreshCw, Search } from "lucide-react";
+import { ArrowRightFromLine, Check, ChevronDown, Clipboard, Columns2, Eye, File, FileDiff, Folder, GitPullRequestArrow, Image, ListCollapse, ListTree, MoreHorizontal, RefreshCw, Search } from "lucide-react";
 import type { ReviewFileSummary, ReviewSelection, ReviewSnapshot } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import type { ReviewDiffMode } from "./review-store";
@@ -80,13 +80,13 @@ export function ReviewToolbar({ snapshot, selection, workspaceRoot, sessionId, f
           <Tooltip><TooltipTrigger asChild><button ref={optionsRef} type="button" className={ICON} aria-label="Review options" onClick={() => setMenu(menu === "options" ? null : "options")}><MoreHorizontal size={15} /></button></TooltipTrigger><TooltipContent>Review options</TooltipContent></Tooltip>
           {menu === "options" ? <AnchoredPopover anchorRef={optionsRef} popoverRef={popoverRef} className="w-[220px] p-1.5">
             <button type="button" className={MENU_ITEM} onClick={() => { onRefresh(); setMenu(null); }}><RefreshCw size={13} />Refresh</button>
-            <Option checked={wrap} label="Enable word wrap" onClick={onWrap} />
-            <button type="button" className={MENU_ITEM} onClick={onLoadFullFiles}><ListTree size={13} />{loadFullFiles ? "Don't load full files" : "Load full files"}</button>
-            <Option checked={richPreview} label="Enable rich preview" icon={<Eye size={13} />} onClick={onRichPreview} />
-            <Option checked={wordDiff} label="Enable word diffs" onClick={onWordDiff} />
-            <Option checked={!ignoreWhitespaceChanges} label={ignoreWhitespaceChanges ? "Show white space" : "Hide white space"} onClick={onWhitespace} />
+            <Option checked={wrap} label="Enable word wrap" icon={<ArrowRightFromLine size={13} />} onClick={onWrap} />
+            <button type="button" className={MENU_ITEM} onClick={onLoadFullFiles}><File size={13} />{loadFullFiles ? "Don't load full files" : "Load full files"}</button>
+            <Option checked={richPreview} label="Enable rich preview" icon={<Image size={13} />} onClick={onRichPreview} />
+            <Option checked={wordDiff} label="Enable word diffs" icon={<FileDiff size={13} />} onClick={onWordDiff} />
+            <Option checked={!ignoreWhitespaceChanges} label={ignoreWhitespaceChanges ? "Show white space" : "Hide white space"} icon={<Eye size={13} />} onClick={onWhitespace} />
             <div className="mx-1 my-1 border-t border-line" />
-            <button type="button" disabled={!snapshot} className={`${MENU_ITEM} disabled:opacity-40`} onClick={() => { onCopyApply(); setMenu(null); }}><Copy size={13} />Copy git apply command</button>
+            <button type="button" disabled={!snapshot} className={`${MENU_ITEM} disabled:opacity-40`} onClick={() => { onCopyApply(); setMenu(null); }}><Clipboard size={13} />Copy git apply command</button>
           </AnchoredPopover> : null}
         </div>
         <Tooltip><TooltipTrigger asChild><button type="button" className={ICON} aria-label={allExpanded ? (singleFileMode ? "Collapse current diff" : "Collapse all diffs") : (singleFileMode ? "Expand current diff" : "Expand all diffs")} aria-disabled={!hasFiles} onClick={() => { if (hasFiles) onToggleAll(!allExpanded); }}>{allExpanded ? <ListCollapse size={15} /> : <ListTree size={15} />}</button></TooltipTrigger><TooltipContent>{fileActionHint ?? (allExpanded ? (singleFileMode ? "Collapse current diff" : "Collapse all diffs") : (singleFileMode ? "Expand current diff" : "Expand all diffs"))}</TooltipContent></Tooltip>
@@ -98,7 +98,7 @@ export function ReviewToolbar({ snapshot, selection, workspaceRoot, sessionId, f
           </AnchoredPopover> : null}
         </div>
         <Tooltip><TooltipTrigger asChild><button type="button" className={`${ICON} ${diffMode === "split" ? "bg-selected text-text-main" : ""}`} aria-label={diffMode === "split" ? "Switch to unified diff" : "Switch to split diff"} aria-pressed={diffMode === "split"} aria-disabled={!hasFiles || !splitAvailable} onClick={() => { if (hasFiles && splitAvailable) onDiffMode(diffMode === "split" ? "unified" : "split"); }}><Columns2 size={15} /></button></TooltipTrigger><TooltipContent>{splitHint}</TooltipContent></Tooltip>
-        <Tooltip><TooltipTrigger asChild><button type="button" className={`${ICON} ${filesVisible ? "bg-selected text-text-main" : ""}`} aria-label={filesVisible ? "Hide files" : "Show files"} aria-pressed={filesVisible} aria-disabled={!hasFiles} onClick={() => { if (hasFiles) onToggleFiles(); }}><Files size={15} /></button></TooltipTrigger><TooltipContent>{fileActionHint ?? (filesVisible ? "Hide files" : "Show files")}</TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger asChild><button type="button" className={`${ICON} ${filesVisible ? "bg-selected text-text-main" : ""}`} aria-label={filesVisible ? "Hide files" : "Show files"} aria-pressed={filesVisible} aria-disabled={!hasFiles} onClick={() => { if (hasFiles) onToggleFiles(); }}><Folder size={15} /></button></TooltipTrigger><TooltipContent>{fileActionHint ?? (filesVisible ? "Hide files" : "Show files")}</TooltipContent></Tooltip>
         <div className="shrink-0">
           <button ref={gitRef} type="button" className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-act-sm border border-line bg-surface px-2 text-[12px] font-medium text-text-main hover:bg-surface-subtle" onClick={() => setMenu(menu === "git" ? null : "git")}><GitPullRequestArrow size={14} />Commit or push<ChevronDown size={12} /></button>
           {menu === "git" ? <AnchoredPopover anchorRef={gitRef} popoverRef={popoverRef} className="w-[190px] p-1.5"><button type="button" className={MENU_ITEM} onClick={() => { onCommitOrPush(); setMenu(null); }}>Commit or push</button><button type="button" className={MENU_ITEM} onClick={() => { onCreatePr(); setMenu(null); }}>Create PR</button></AnchoredPopover> : null}
@@ -157,6 +157,6 @@ function AnchoredPopover({ anchorRef, popoverRef, align = "end", className, chil
   );
 }
 
-function Option({ checked, label, icon, onClick }: { checked: boolean; label: string; icon?: React.ReactNode; onClick: () => void }) {
-  return <button type="button" className={MENU_ITEM} role="menuitemcheckbox" aria-checked={checked} onClick={onClick}><span className="inline-flex h-4 w-4 items-center justify-center">{icon ?? (checked ? <Check size={13} /> : null)}</span><span className="flex-1">{label}</span>{icon && checked ? <Check size={13} /> : null}</button>;
+function Option({ checked, label, icon, onClick }: { checked: boolean; label: string; icon: React.ReactNode; onClick: () => void }) {
+  return <button type="button" className={MENU_ITEM} role="menuitemcheckbox" aria-checked={checked} onClick={onClick}><span className="inline-flex h-4 w-4 items-center justify-center">{icon}</span><span className="flex-1">{label}</span>{checked ? <Check size={13} /> : null}</button>;
 }

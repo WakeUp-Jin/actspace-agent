@@ -33,12 +33,19 @@ const LEFT_HIDE_SNAP_WIDTH = 148;
 const MAIN_MIN_WIDTH = 560;
 const RIGHT_DEFAULT_WIDTH = 390;
 const RIGHT_MIN_WIDTH = 320;
-const RIGHT_MAX_WIDTH = 640;
 /** 低于该宽度时，左右面板改为覆盖层，避免继续挤压主聊天区。 */
 const COMPACT_LAYOUT_MAX_WIDTH = 820;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function getRightMaxWidth(containerWidth: number, displayedLeftWidth: number): number {
+  if (containerWidth <= 0) {
+    return RIGHT_DEFAULT_WIDTH;
+  }
+
+  return Math.max(RIGHT_MIN_WIDTH, containerWidth - displayedLeftWidth - MAIN_MIN_WIDTH);
 }
 
 type ResolvedLayout = {
@@ -61,10 +68,15 @@ function loadStoredLayout(): ResolvedLayout {
     // 老版本可能落了 leftMode: "rail"，rail 已退役，统一映射成 hidden。
     const resolvedMode: SidebarMode =
       stored.leftMode === "hidden" || stored.leftMode === "rail" ? "hidden" : "expanded";
+    const resolvedLeftWidth = clamp(stored.leftWidth ?? LEFT_DEFAULT_WIDTH, LEFT_MIN_WIDTH, LEFT_MAX_WIDTH);
+    const initialRightMaxWidth = getRightMaxWidth(
+      window.innerWidth,
+      resolvedMode === "hidden" ? 0 : resolvedLeftWidth,
+    );
     return {
       leftMode: resolvedMode,
-      leftWidth: clamp(stored.leftWidth ?? LEFT_DEFAULT_WIDTH, LEFT_MIN_WIDTH, LEFT_MAX_WIDTH),
-      rightWidth: clamp(stored.rightWidth ?? RIGHT_DEFAULT_WIDTH, RIGHT_MIN_WIDTH, RIGHT_MAX_WIDTH)
+      leftWidth: resolvedLeftWidth,
+      rightWidth: clamp(stored.rightWidth ?? RIGHT_DEFAULT_WIDTH, RIGHT_MIN_WIDTH, initialRightMaxWidth)
     };
   } catch {
     return {
@@ -190,7 +202,7 @@ export function WorkbenchLayout({
   const isCompactLayout = containerWidth > 0 && containerWidth <= COMPACT_LAYOUT_MAX_WIDTH;
   const isSidebarHidden = leftMode === "hidden";
   const displayedLeftWidth = isSidebarHidden ? 0 : leftWidth;
-  const rightMaxWidth = containerWidth > 0 ? Math.max(RIGHT_MIN_WIDTH, Math.min(RIGHT_MAX_WIDTH, containerWidth / 2)) : RIGHT_MAX_WIDTH;
+  const rightMaxWidth = getRightMaxWidth(containerWidth, displayedLeftWidth);
 
   const handleContainerWidthChange = useCallback((width: number) => {
     setContainerWidth(width);
@@ -373,17 +385,6 @@ export function WorkbenchLayout({
     });
   }, [view, loadUsageStatistics]);
 
-  // 设置走「整页接管」：不渲染聊天侧栏与右栏，由 SettingsPage 自带导航 + 内容两栏。
-  if (view === "settings") {
-    return (
-      <SettingsPage
-        onBack={() => setView("chat")}
-        onSettingsChange={onSettingsChange}
-        onArchivedSessionsChange={onArchivedSessionsChange}
-      />
-    );
-  }
-
   let mainContent;
   if (view === "lab") {
     // Lab 仍在产品设计阶段：原型实现保留在 LabPage.tsx，功能定型后换回 <LabPage />。
@@ -470,6 +471,18 @@ export function WorkbenchLayout({
     }
     wasStreamingRef.current = isStreaming;
   }, [isStreaming]);
+
+  // 设置走「整页接管」：不渲染聊天侧栏与右栏，由 SettingsPage 自带导航 + 内容两栏。
+  // 该返回必须位于本组件的 Hooks 之后，确保切换页面时 Hook 调用顺序稳定。
+  if (view === "settings") {
+    return (
+      <SettingsPage
+        onBack={() => setView("chat")}
+        onSettingsChange={onSettingsChange}
+        onArchivedSessionsChange={onArchivedSessionsChange}
+      />
+    );
+  }
 
   const sidebar = (
     <Sidebar

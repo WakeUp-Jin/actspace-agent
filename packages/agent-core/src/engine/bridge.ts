@@ -140,6 +140,12 @@ export interface RunTurnWithAgentOptions {
   runLogger?: AgentRunLogger;
   /** Main 已预写 user_message 时关闭，避免同一 turn 重复持久化用户输入。 */
   includeUserEvent?: boolean;
+  /** 兼容旧调用方；正式 AgentRuntime 关闭后在提交成功时自行发送终态。 */
+  emitTerminalEvent?: boolean;
+  /** 兼容旧调用方；正式 AgentRuntime 已在 Harness 启动前发送 turn_started。 */
+  emitTurnStartedEvent?: boolean;
+  /** Host-owned diagnostic log channel. Omit to preserve the legacy console logger. */
+  onLog?: (message: string, details?: Record<string, unknown>) => void;
 }
 
 /**
@@ -159,6 +165,7 @@ export async function runTurnWithAgent(
   const { sessionId, turnId, userInput } = input;
   const streamCb = options?.onStreamEvent;
   const runLogger = options?.runLogger;
+  const hostLog = options?.onLog ?? logAgentRun;
   let eventIdCounter = 0;
   const streamStats = {
     textDeltaCount: 0,
@@ -217,7 +224,7 @@ export async function runTurnWithAgent(
       if (agentEvent.type === "context_compaction") {
         compactions.push(agentEvent.info);
       }
-      logAgentEvent(agentEvent, sessionId, turnId, streamStats);
+      logAgentEvent(agentEvent, sessionId, turnId, streamStats, hostLog);
       const bufferedStreamDelta = bufferStreamLogDelta(agentEvent, streamLogBuffer);
       if (!bufferedStreamDelta) {
         await flushStreamLogBuffer(runLogger, streamLogBuffer);
@@ -226,6 +233,7 @@ export async function runTurnWithAgent(
       if (!streamCb) return;
       const mapped = mapAgentEventToStreamEvent(agentEvent, sessionId, turnId, nextEventId, deps.toolManager, toolCallStreaming, toolExecutions);
       if (mapped) {
+        if (mapped.type === "turn_started" && options?.emitTurnStartedEvent === false) return;
         if (!isStreamDeltaEvent(mapped)) {
           await flushStreamLogBuffer(runLogger, streamLogBuffer);
           await writeRunLog(runLogger, "stream_event", mapped);
@@ -246,7 +254,7 @@ export async function runTurnWithAgent(
   let loopResult: AgentLoopResult;
   try {
     const modelSpec = deps.modelSpec ?? resolveModelSpec();
-    logAgentRun("turn execution started", {
+    hostLog("turn execution started", {
       sessionId,
       turnId,
       userInputLength: userInput.length,
@@ -259,13 +267,13 @@ export async function runTurnWithAgent(
   } catch (err) {
     await flushStreamLogBuffer(runLogger, streamLogBuffer);
     const errorMsg = err instanceof Error ? err.message : String(err);
-    logAgentRun("turn execution threw", {
+    hostLog("turn execution threw", {
       sessionId,
       turnId,
       error: errorMsg,
     });
 
-    if (streamCb) {
+    if (streamCb && (options?.emitTerminalEvent ?? true)) {
       const failedEvent: RuntimeStreamEvent = {
         type: "turn_failed",
         sessionId,
@@ -313,7 +321,7 @@ export async function runTurnWithAgent(
   const finalReply = loopResult.status === "aborted" ? undefined : toAssistantReply(loopResult.message);
   await flushStreamLogBuffer(runLogger, streamLogBuffer);
 
-  if (streamCb) {
+  if (streamCb && (options?.emitTerminalEvent ?? true)) {
     const terminalEvent: RuntimeStreamEvent = loopResult.status === "aborted"
       ? { type: "turn_aborted", sessionId, turnId }
       : {
@@ -326,7 +334,7 @@ export async function runTurnWithAgent(
     streamCb(terminalEvent);
   }
 
-  logAgentRun("turn execution completed", {
+  hostLog("turn execution completed", {
     sessionId,
     turnId,
     status: loopResult.status,
@@ -1563,22 +1571,23 @@ function logAgentEvent(
     thinkingDeltaCount: number;
     thinkingChars: number;
   },
+  log: (message: string, details?: Record<string, unknown>) => void,
 ): void {
   switch (event.type) {
     case "agent_start":
-      logAgentRun("agent started", { sessionId, turnId });
+      log("agent started", { sessionId, turnId });
       return;
 
     case "agent_end":
-      logAgentRun("agent ended", { sessionId, turnId, messageCount: event.messages.length });
+      log("agent ended", { sessionId, turnId, messageCount: event.messages.length });
       return;
 
     case "turn_start":
-      logAgentRun("loop turn started", { sessionId, turnId, turnIndex: event.turnIndex });
+      log("loop turn started", { sessionId, turnId, turnIndex: event.turnIndex });
       return;
 
     case "turn_end":
-      logAgentRun("loop turn ended", {
+      log("loop turn ended", {
         sessionId,
         turnId,
         turnIndex: event.turnIndex,
@@ -1588,11 +1597,11 @@ function logAgentEvent(
       return;
 
     case "message_start":
-      logAgentRun("message started", { sessionId, turnId, role: event.message.role });
+      log("message started", { sessionId, turnId, role: event.message.role });
       return;
 
     case "message_end":
-      logAgentRun("message ended", { sessionId, turnId, role: event.message.role });
+      log("message ended", { sessionId, turnId, role: event.message.role });
       return;
 
     case "message_delta":
@@ -1600,7 +1609,7 @@ function logAgentEvent(
         stats.textDeltaCount += 1;
         stats.textChars += event.delta.delta.length;
         if (stats.textDeltaCount === 1 || stats.textDeltaCount % 20 === 0) {
-          logAgentRun("assistant text streaming", {
+          log("assistant text streaming", {
             sessionId,
             turnId,
             deltaCount: stats.textDeltaCount,
@@ -1611,7 +1620,7 @@ function logAgentEvent(
         stats.thinkingDeltaCount += 1;
         stats.thinkingChars += event.delta.delta.length;
         if (stats.thinkingDeltaCount === 1 || stats.thinkingDeltaCount % 20 === 0) {
-          logAgentRun("assistant thinking streaming", {
+          log("assistant thinking streaming", {
             sessionId,
             turnId,
             deltaCount: stats.thinkingDeltaCount,
@@ -1622,7 +1631,7 @@ function logAgentEvent(
       return;
 
     case "tool_start":
-      logAgentRun("tool started", {
+      log("tool started", {
         sessionId,
         turnId,
         toolCallId: event.toolCallId,
@@ -1632,7 +1641,7 @@ function logAgentEvent(
       return;
 
     case "tool_end":
-      logAgentRun("tool finished", {
+      log("tool finished", {
         sessionId,
         turnId,
         toolCallId: event.toolCallId,
@@ -1647,7 +1656,7 @@ function logAgentEvent(
       return;
 
     case "tool_approval_required":
-      logAgentRun("tool approval required", {
+      log("tool approval required", {
         sessionId,
         turnId,
         toolCallId: event.toolCallId,
@@ -1658,7 +1667,7 @@ function logAgentEvent(
       return;
 
     case "tool_approval_resolved":
-      logAgentRun("tool approval resolved", {
+      log("tool approval resolved", {
         sessionId,
         turnId,
         toolCallId: event.toolCallId,
@@ -1668,7 +1677,7 @@ function logAgentEvent(
       return;
 
     case "context_compaction":
-      logAgentRun("history compacted", {
+      log("history compacted", {
         sessionId,
         turnId,
         triggerTokens: event.info.triggerTokens,
@@ -1681,7 +1690,7 @@ function logAgentEvent(
       return;
 
     case "llm_retry":
-      logAgentRun("llm retrying after error", {
+      log("llm retrying after error", {
         sessionId,
         turnId,
         attempt: event.attempt,

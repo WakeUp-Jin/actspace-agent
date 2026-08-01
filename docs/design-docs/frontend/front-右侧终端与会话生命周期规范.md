@@ -74,8 +74,10 @@ Terminal Tab 使用 `Terminal` 作为基础标题；存在多个终端时可显�
 
 ### 宽度与紧凑布局
 
-- Terminal 沿用右侧面板 `390px` 默认、`320px` 最小和 `min(640px, 50vw)` 最大宽度。
+- Terminal 沿用右侧面板 `390px` 默认和 `320px` 最小宽度；最大宽度使用保护左侧栏与 `560px` 中间聊天区后的全部剩余空间。
 - xterm 容器占满右侧 Tab 的剩余宽高，不叠加文档预览的 `18px` 内容 padding。
+- xterm 的水平滚动层保持隐藏，不能在终端底部形成没有状态含义的横线。
+- `connecting` / `running` 不显示常驻底部状态栏；只有 shell 退出或连接失败时才显示状态、错误信息和 Restart 入口。
 - 面板宽高变化由 `ResizeObserver` 触发 xterm `fit()`，实际 `cols / rows` 变化后再通知 main resize PTY。
 - `<= 820px` 时 Terminal 跟随右侧覆盖层；480px 窗口下占满可用主区，不生成第二套移动终端交互。
 - Terminal 消费主题语义 token，浅色、深色和 system 主题下均可读；禁止引入不随主题翻转的颜色字面量。

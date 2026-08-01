@@ -34,7 +34,7 @@ Slash Command 是 Composer 内的键盘优先能力入口。用户在空白输�
 
 Functions 使用固定顺序，不按字母排序。当前模式项显示勾选，但 selected 仍使用中性底色，不用大面积语义色。
 
-| 命令 | 菜单名称 | 行为 | 选择后的输入框 |
+| 命令 | 检索别名 | 行为 | 选择后的输入框 |
 | --- | --- | --- | --- |
 | `/chat` | Chat mode | 调用现有 `onModeChange("chat")`，切换为无工具对话模式 | 清除 Slash 查询并恢复焦点 |
 | `/plan` | Plan mode | 调用现有 `onModeChange("plan")`，切换为只读计划模式 | 清除 Slash 查询并恢复焦点 |
@@ -125,7 +125,7 @@ Slash 菜单中的项目分成三种行为，但视觉上仍只属于 `Functions
 - Textarea 在 Slash 菜单打开时暴露 `aria-expanded`、`aria-controls` 与当前项 `aria-activedescendant`。
 - 结果容器使用 `role="listbox"`，Function 和 Skill 行使用稳定 id 与 `role="option"`。
 - 分组标题不进入键盘结果序列。
-- 每个 Function 的可访问名称包含 label、command 和简短作用。
+- 每个 Function 的可访问名称包含不带 `/` 前缀的展示命令和简短作用；检索仍使用完整 Slash command，检索别名不作为重复的可见名称。
 - Skill 的可访问名称包含 name、description 和当前是否已绑定。
 - selected、active、disabled 不能只依赖颜色区分，必须同时使用勾选、图标、文本或 aria 状态。
 
@@ -133,13 +133,13 @@ Slash 菜单中的项目分成三种行为，但视觉上仍只属于 `Functions
 
 Slash 菜单延续 ActSpace Editor Design System 的 Ink & Emerald 方向，重点是紧凑、安静和快速扫描，而不是做成大型命令中心。
 
-- 宽窗口：菜单锚定输入区域左侧，宽度约 `380px`，最大宽度不超过 Composer 可用宽度。
+- 宽窗口：菜单锚定输入区域左侧，宽度约 `520px`，最大宽度不超过 Composer 可用宽度。
 - initial surface 位于页面中部，菜单向下展开并把可见高度限制在约半个视口内，避免固定向上展开时越出窗口顶部。
 - follow-up surface 位于消息区底部，菜单向上展开，最大高度 `420px`。
 - 内容区内部滚动，不推动消息流或 Composer 布局。
 - 窄窗口（不超过 `600px`）：左右贴 Composer 内边界，宽度使用可用空间，不创建横向二级菜单。
-- 行高保持紧凑；Function 主行显示 label，command 作为弱化右侧文本，description 只在需要解释时显示一行。
-- Skill 显示 name 与最多两行 description，不显示绝对路径、scope 路径或管理操作。
+- Function 使用紧凑单行布局：左侧依次显示小尺寸语义图标、不带 `/` 前缀的 command 和可选选中勾，description 在最右侧右对齐并保持一行；空间不足时优先截断 description，command 必须完整可见。`compact` 使用 `Asterisk`，`status` 使用 `ChartPie`。
+- Skill 与 Function 使用相同的紧凑单行密度：左侧显示小尺寸 Skill 图标和 name，可选勾选紧随其后，description 在最右侧右对齐并保持一行；空间不足时截断 description，不显示绝对路径、scope 路径或管理操作。
 - active / hover / selected 使用 neutral surface；模式语义色只允许出现在小图标或已有 mode pill，不把菜单行整块染色。
 - 普通 focus 使用高对比中性 ring；operational green 不用于普通 active item。
 - 动画使用现有约 `140ms` opacity + translate / scale 过渡；`prefers-reduced-motion` 下取消。

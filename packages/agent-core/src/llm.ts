@@ -79,6 +79,7 @@ export {
   createLLMService,
   createLLMServiceFromEnv,
   createMockLLMConfig,
+  mockText,
   AssistantMessageEventStream,
   LLMServiceError,
   applyOpenAIProviderRequestParams,

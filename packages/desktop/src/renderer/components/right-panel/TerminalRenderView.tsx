@@ -204,13 +204,15 @@ export function TerminalRenderView({
     }
   };
 
+  const showStatusBar = status === "exited" || status === "error";
+
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-surface" aria-label={`终端 ${shellName}`}>
-      <div ref={hostRef} className="min-h-0 flex-1 overflow-hidden px-2 py-2 [&_.xterm]:h-full" />
-      <div className="flex min-h-7 shrink-0 items-center justify-between gap-3 border-t border-line bg-surface-subtle px-2.5 text-[11px] text-text-faint">
-        <span className="min-w-0 truncate">{message}</span>
-        <div className="flex shrink-0 items-center gap-2">
-          {status === "exited" || status === "error" ? (
+      <div ref={hostRef} className="min-h-0 flex-1 overflow-hidden px-2 py-2 [&_.scrollbar.horizontal]:hidden [&_.xterm]:h-full" />
+      {showStatusBar ? (
+        <div className="flex min-h-7 shrink-0 items-center justify-between gap-3 border-t border-line bg-surface-subtle px-2.5 text-[11px] text-text-faint">
+          <span className="min-w-0 truncate">{message}</span>
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               className="inline-flex items-center gap-1 rounded-act-sm border-0 bg-transparent px-1.5 py-0.5 text-text-muted hover:bg-hover-overlay hover:text-text-main disabled:opacity-45 [cursor:pointer]"
@@ -220,10 +222,10 @@ export function TerminalRenderView({
               <RotateCcw size={11} strokeWidth={2} />
               {restarting ? "重启中" : "重启"}
             </button>
-          ) : null}
-          <span data-terminal-status={status}>{status}</span>
+            <span data-terminal-status={status}>{status}</span>
+          </div>
         </div>
-      </div>
+      ) : null}
     </section>
   );
 }

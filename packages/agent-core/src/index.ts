@@ -15,6 +15,7 @@ export * from "./session-title";
 export * from "./internal-tools";
 export * from "./adapters";
 export * from "./fixtures";
+export * from "./runtime";
 
 // Kairos 自治模式入口。Main 进程一处 import 即可装配。
 export * from "./kairos";

@@ -138,6 +138,7 @@ import type { SessionEvent, SessionRecord } from "@actspace/shared";
 import {
   runAndPersistTurn,
   abortTurn,
+  disposeDesktopAgentRuntime,
   isSessionTurnActive,
   type AgentRuntimeContextLoader,
   type AppDataRoots,
@@ -2258,6 +2259,7 @@ app.on("before-quit", (event) => {
   reviewCoordinator?.dispose();
   reviewGitWorkerClient?.dispose();
   if (!kairosController) {
+    void disposeDesktopAgentRuntime();
     disposeTerminalIpc?.();
     kairosIpcHandle?.dispose();
     kairosConfigIpcHandle?.dispose();
@@ -2283,6 +2285,7 @@ app.on("before-quit", (event) => {
 
   void (async () => {
     try {
+      await disposeDesktopAgentRuntime();
       await kairosController?.shutdown();
     } catch (err) {
       logMain("kairos shutdown threw", { error: err instanceof Error ? err.message : String(err) });

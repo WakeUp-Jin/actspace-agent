@@ -360,6 +360,36 @@ describe("runTurnWithAgent bridge", () => {
     expect(result.events.some((event) => event.type === "assistant_message")).toBe(true);
   });
 
+  it("keeps terminal events in the compatibility path but lets Agent Runtime suppress them", async () => {
+    const compatibilityDeps = createDeps();
+    compatibilityDeps.llm.setResponses([mockText("done")]);
+    const compatibilityEvents: RuntimeStreamEvent[] = [];
+
+    await runTurnWithAgent(
+      { sessionId: "session-terminal", turnId: "turn-compat", userInput: "hello" },
+      compatibilityDeps,
+      { onStreamEvent: (event) => compatibilityEvents.push(event) },
+    );
+
+    expect(compatibilityEvents.at(-1)?.type).toBe("turn_finished");
+
+    const runtimeDeps = createDeps();
+    runtimeDeps.llm.setResponses([mockText("done")]);
+    const runtimeEvents: RuntimeStreamEvent[] = [];
+    await runTurnWithAgent(
+      { sessionId: "session-terminal", turnId: "turn-runtime", userInput: "hello" },
+      runtimeDeps,
+      {
+        onStreamEvent: (event) => runtimeEvents.push(event),
+        emitTerminalEvent: false,
+      },
+    );
+
+    expect(runtimeEvents.some((event) => (
+      event.type === "turn_finished" || event.type === "turn_aborted" || event.type === "turn_failed"
+    ))).toBe(false);
+  });
+
   it("injects attachments into the model input and persists them only on the user message", async () => {
     const deps = createDeps();
     let modelUserInput = "";

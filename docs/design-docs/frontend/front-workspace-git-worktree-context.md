@@ -91,6 +91,7 @@ actspace-agent   main   New Worktree
 ```
 
 - 使用 Lucide 线性图标和现有语义颜色 token。
+- Workspace chrome 的 Environment 入口使用 `Bookmark`，与 Workspace 文件夹入口和层级树入口保持语义区分。
 - 普通选中态只使用中性灰阶和勾选，不使用 operational green。
 - 选择器最小点击区保持桌面端舒适尺寸；键盘 focus 必须清晰可见。
 - 三个菜单互斥；打开一个菜单时关闭其它 Composer 浮层。
@@ -181,6 +182,8 @@ New Worktree
 - `This Mac` 为默认值。
 - `Cloud` 与 `Remote SSH` 可见但禁用，带 `Coming soon`；不能表现为点击后无反馈的可用项。
 - `New Worktree` 仅在 Workspace 是带有效 `HEAD` 的 Git repository 时可用。
+- Git repository 尚无首次提交时，Branch 仍只显示 symbolic branch 名称（例如 `main`）；`This Mac` 可以直接运行，`New Worktree` 保持禁用并在入口显示 `Requires commit`。
+- ActSpace 不为启用 Worktree 自动创建首次提交，也不使用 `git worktree add --orphan` 复制当前 Index；后者会得到独立的空 Index，不代表当前 staged workspace。
 - 非 Git Workspace 中保留禁用项并显示 `Requires Git`，帮助用户理解能力边界。
 - 菜单标题、disabled state、选中状态和二级说明都必须被屏幕阅读器正确宣布。
 
@@ -228,6 +231,7 @@ Worktree 基于 commit 创建，原目录中的以下内容不会自动进入新
 - 用户输入必须保留，Composer 不进入已发送状态。
 - 错误显示在执行上下文行或 Composer 附近，并通过 `role="alert"` 宣布。
 - 错误必须包含原因和恢复动作，例如重试、选择其它 base branch 或切回 `This Mac`。
+- 首轮准备失败且 user event 尚未持久化时，Renderer 必须恢复原输入和附件并显示错误；若同 Turn 的 user event 已持久化，则从 Session 恢复真实记录，避免把同一输入重复放回 Composer。
 - 创建了一半但校验失败时，只允许清理本次调用明确创建且尚未承载用户内容的目标；不得删除既有目录、既有 branch 或其它 worktree。
 - 失败不能启动 Agent，也不能把不完整 worktree 写成 Session execution root。
 
@@ -356,6 +360,7 @@ type SessionMeta = {
 | 场景 | 预期结果 |
 | --- | --- |
 | 普通 Git Workspace | 显示 Workspace、当前 branch、This Mac |
+| Git Workspace 尚无首次提交 | Branch 只显示 symbolic branch 名称；This Mac 可运行；New Worktree 禁用并显示 Requires commit |
 | 非 Git Workspace | 隐藏 Branch；New Worktree 禁用并说明 Requires Git |
 | Git 缺失或检查失败 | 显示可恢复错误，不伪装成非 Git |
 | 选择其它 branch 后取消 | 磁盘不发生变化 |

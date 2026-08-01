@@ -77,13 +77,20 @@ export async function getWorkspaceGitContext(
   }
 
   const repositoryRoot = resolve(repository.stdout.trim());
-  const head = await runGit(runner, ["rev-parse", "--verify", "HEAD"], repositoryRoot);
-  if (!isGitSuccess(head)) {
-    return contextFailure("no_head", resolvedRoot, "Git repository has no commits yet.", repositoryRoot);
-  }
-
   const branch = await runGit(runner, ["symbolic-ref", "--quiet", "--short", "HEAD"], repositoryRoot);
   const currentBranch = isGitSuccess(branch) ? branch.stdout.trim() : undefined;
+  const head = await runGit(runner, ["rev-parse", "--verify", "HEAD"], repositoryRoot);
+  if (!isGitSuccess(head)) {
+    return {
+      status: "no_head",
+      workspaceRoot: resolvedRoot,
+      repositoryRoot,
+      currentBranch,
+      branches: currentBranch ? [{ name: currentBranch, current: true }] : [],
+      error: "Git repository has no commits yet.",
+    };
+  }
+
   const headCommit = head.stdout.trim();
   const refs = await runGit(
     runner,
@@ -142,6 +149,18 @@ export async function prepareExecutionContext(
         ok: true,
         workspaceId: input.workspaceId,
         workspaceRoot: sourceWorkspaceRoot,
+      };
+    }
+    if (gitContext.status === "no_head") {
+      const targetBranch = input.branch?.trim();
+      if (targetBranch && targetBranch !== gitContext.currentBranch) {
+        return failed("branch_not_found", `Branch '${targetBranch}' was not found.`);
+      }
+      return {
+        ok: true,
+        workspaceId: input.workspaceId,
+        workspaceRoot: sourceWorkspaceRoot,
+        branch: gitContext.currentBranch,
       };
     }
     const gitFailure = gitContextToPreparationFailure(gitContext);

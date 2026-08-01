@@ -301,8 +301,6 @@ function detectEnvFilePath(): string | undefined {
   const candidates = [
     resolve(process.cwd(), ".env"),
     resolve(process.cwd(), ".env.local"),
-    resolve(__dirname, "..", "..", "..", ".env"),
-    resolve(__dirname, "..", "..", "..", ".env.local"),
   ];
   return candidates.find(existsSync);
 }
