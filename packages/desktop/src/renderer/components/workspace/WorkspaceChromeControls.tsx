@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
+  Bookmark,
   ChevronDown,
   File,
   Folder,
@@ -10,7 +11,6 @@ import {
   Image,
   Laptop,
   Link,
-  ListTree,
   Loader2,
   MonitorUp,
   Plus,
@@ -356,7 +356,7 @@ export function WorkspaceChromeControls({
                 }
               }}
             >
-              <ListTree size={15} strokeWidth={1.8} aria-hidden="true" />
+              <Bookmark size={15} strokeWidth={1.8} aria-hidden="true" />
             </button>
           </TooltipTrigger>
           <TooltipContent>Workspace environment</TooltipContent>

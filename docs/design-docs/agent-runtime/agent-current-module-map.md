@@ -12,6 +12,19 @@
 - `fixtures.ts`：测试用 mock 数据工厂。
 - `types.ts`：agent-core 内部辅助类型。
 
+## `runtime/` - 宿主无关应用编排
+
+- `runtime/types.ts`：`RuntimeTurnRequest`、Runtime 实例和 Context / Model / Event / Approval / Workspace Ports。
+- `runtime/agent-runtime.ts`：活动 Turn、Session 恢复、workspace 准备、Context 与模型装配、Harness 调用、Abort、提交顺序、terminal event 和清理。
+- `runtime/context-loader.ts`：Desktop / CLI 共用的 AGENTS.md、Skills、Composer mode 与 Kairos handoff Context 装配。
+- Runtime 不导入 Electron、TTY、stdout 或 `node:sea`。Desktop 通过 `desktop-agent-runtime.ts` 接入；CLI 通过 `runtime-adapter.ts` 接入。
+
+## `packages/agent-cli` - Terminal Host
+
+- `run.ts`：ephemeral 无头 Turn，支持显式输入或 stdin、text / JSON / JSONL、稳定退出码、SIGINT 和可选评估 sidecar。
+- `chat.ts`：persistent 行式交互、多轮 Session、`/new` / `/sessions` / `/resume`、TTY 审批与 Session 独占锁。
+- `binary/` + `scripts/build-agent-cli-binary.mjs`：Node SEA runtime asset 释放、standalone bundle、原生 `rg` 和单平台可执行文件。
+
 ## `llm/` - LLM 服务层
 
 - `llm/types.ts`：LLMConfig、StreamOptions、LLMService 接口、AssistantMessageEventStream、LLMServiceError。LLMConfig 现在把 `api` / `apiFormat` / `input` 拆开，error 事件仍携带完整 `AssistantMessage`（含部分内容 + `stopReason` + `errorMessage`），而非 `Error` 对象。
@@ -105,7 +118,7 @@ Agent Turn 的跨层职责边界见 `docs/design-docs/agent-runtime/agent-turn-l
 ## 环境变量管理
 
 - `env.ts`：集中式环境变量管理模块。自带轻量 `.env` 文件解析器（无第三方依赖），按 Schema 驱动验证、解析、冻结。
-- `loadEnv()`：应用启动时调用，自动探测并加载 `.env` 文件，合并到 `process.env`（不覆盖已有值）。
+- `loadEnv()`：显式 `envPath` 或当前工作目录 `.env` / `.env.local`，合并到 `process.env`（不覆盖已有值）；不再从 `__dirname` 向仓库根探测，避免 SEA executable 目录影响配置。
 - `env` proxy：类型安全的只读对象，任意文件 `import { env }` 后直接访问 `env.DEEPSEEK_API_KEY` 等。
 - `envToLLMConfig()`：从 env 生成 `LLMConfig`，仅用于测试和 mock fallback 场景；Electron 真实 turn 使用 `engine/create-agent-deps.ts` 中的 `buildAgentConfig()` + `createAgentFromConfig()` 两步完成。
 - `engine/create-agent-deps.ts`：`buildLLMConfigFromRuntime(model, providerRuntime, inferenceSettings)` 已由 desktop 真实 turn、compact、Explore、Kairos、context describe、eval candidate 和回复可视化路径消费；env builder 只保留非 Desktop 兼容入口。

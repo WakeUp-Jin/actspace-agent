@@ -60,6 +60,7 @@ desktop --(file contract)--> plugins/fs-watch
 ## 架构阅读路线
 
 - `docs/design-docs/agent-runtime/agent-turn-layers.md`：Agent Turn 从前端输入到结果返回的四层职责边界（Renderer → Main Process → Bridge → Agent），也是运行拓扑、IPC 双通道和 turn 数据流的主要入口。
+- `docs/design-docs/agent-runtime/agent-host-neutral-runtime-and-cli.md`：已落地的宿主无关 Runtime、Desktop Adapter、CLI `run` / `chat` 双模式与 SEA 单文件分发边界。
 - `docs/design-docs/agent-runtime/agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块清单，包括 LLM、prompt、tools、context、engine、persistence、observability、env 和兼容层。
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`：已落地的多供应商 LLM 架构，统一 DeepSeek / Kimi / OpenRouter / DuckCoding 的服务商连接、模型目录、服务商级代理、协议服务和任务模型选择；DuckCoding 多 Key、本地 Codex/Grok 档案、Codex Responses 与名称变体详见同目录专题，真实 provider 场景待用户统一手动验收。
 - `docs/design-docs/core-storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。

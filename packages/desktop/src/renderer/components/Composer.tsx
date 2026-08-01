@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import {
   ArrowUp,
+  Asterisk,
   BookOpen,
+  ChartPie,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -189,20 +191,22 @@ const SLASH_MENU_ID = "composer-slash-command-menu";
 const SLASH_FUNCTIONS_LABEL_ID = "composer-slash-functions-label";
 const SLASH_SKILLS_LABEL_ID = "composer-slash-skills-label";
 const SLASH_MENU_BASE_CLASS =
-  "slash-command-menu absolute left-0 z-40 w-[min(380px,calc(100vw_-_36px))] max-w-full overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover transition-[opacity,transform] duration-[140ms] ease-out motion-reduce:transition-none max-[600px]:right-0 max-[600px]:w-auto";
+  "slash-command-menu absolute left-0 z-40 w-[min(520px,calc(100vw_-_36px))] max-w-full overflow-y-auto rounded-xl border border-line bg-surface-raised/96 p-1.5 shadow-act-popover transition-[opacity,transform] duration-[140ms] ease-out motion-reduce:transition-none max-[600px]:right-0 max-[600px]:w-auto";
 const SLASH_MENU_POSITION_CLASS: Record<ComposerSurface, string> = {
   initial: "top-[calc(100%_+_8px)] max-h-[min(280px,calc(50vh_-_90px))]",
   followup: "bottom-[calc(100%_+_8px)] max-h-[min(420px,calc(100vh_-_120px))]",
 };
 const SLASH_GROUP_LABEL_CLASS =
   "sticky top-0 z-10 bg-surface-raised/96 px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint";
-const SLASH_OPTION_CLASS =
-  "slash-command-option flex min-h-[46px] w-full items-start gap-2 rounded-act-md border-0 bg-transparent px-2 py-1.5 text-left text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:outline-none";
+const SLASH_FUNCTION_OPTION_CLASS =
+  "slash-command-option flex min-h-9 w-full items-center gap-2 rounded-act-md border-0 bg-transparent px-2 py-1 text-left text-text-main transition-colors duration-[120ms] ease-in-out hover:bg-hover-overlay focus-visible:outline-none";
+const SLASH_SKILL_OPTION_CLASS = SLASH_FUNCTION_OPTION_CLASS;
 const SLASH_OPTION_ACTIVE_CLASS = "bg-selected";
-const SLASH_OPTION_ICON_CLASS = "mt-0.5 shrink-0 text-text-muted";
-const SLASH_OPTION_LABEL_CLASS = "block truncate text-[13px] font-medium leading-5";
-const SLASH_OPTION_DESCRIPTION_CLASS = "block line-clamp-1 text-[11px] font-normal leading-4 text-text-faint";
-const SLASH_OPTION_COMMAND_CLASS = "ml-auto shrink-0 pt-0.5 font-mono text-[11px] leading-5 text-text-faint";
+const SLASH_FUNCTION_ICON_CLASS = "shrink-0 text-text-muted";
+const SLASH_FUNCTION_COMMAND_CLASS = "shrink-0 font-mono text-[12px] font-medium leading-5 text-text-main";
+const SLASH_FUNCTION_DESCRIPTION_CLASS = "ml-auto min-w-0 flex-1 truncate text-right text-[12px] font-normal leading-5 text-text-faint";
+const SLASH_SKILL_NAME_CLASS = "max-w-[42%] shrink-0 truncate text-[12px] font-medium leading-5 text-text-main";
+const SLASH_SKILL_DESCRIPTION_CLASS = SLASH_FUNCTION_DESCRIPTION_CLASS;
 const SLASH_STATUS_CLASS = "px-2 py-4 text-[13px] text-text-faint";
 const SLASH_EMPTY_CLASS = "px-3 py-7 text-center text-[13px] text-text-faint";
 // 模型菜单维持 Cursor 式紧凑单列：主菜单只负责选择，Options 作为贴行的轻量二级浮层。
@@ -293,11 +297,15 @@ const SLASH_FUNCTION_ICONS: Record<ComposerSlashFunctionId, LucideIcon> = {
   chat: MessageCircle,
   plan: ListChecks,
   agent: Server,
-  compact: ChevronDown,
+  compact: Asterisk,
   eval: Search,
-  status: MoreHorizontal,
+  status: ChartPie,
   review: GitBranch,
 };
+
+function getSlashCommandDisplayName(command: string): string {
+  return command.startsWith("/") ? command.slice(1) : command;
+}
 
 type ComposerModelOption = {
   id: ModelSelectionId;
@@ -575,10 +583,14 @@ export function Composer({
     : undefined;
   const selectedModelDisplayLabel = selectedModelSpec
     ? formatSelectedModelLabel(selectedModelSpec, modelList)
-    : selectedModelId;
+    : modelList.length === 0
+      ? "未连接模型"
+      : selectedModelId;
   const selectedModelTitle = selectedModelSpec
     ? `${selectedModelSpec.provider} / ${selectedModelSpec.label} / ${selectedModelSpec.apiModel}`
-    : selectedModelId;
+    : modelList.length === 0
+      ? "请先在设置中连接模型服务"
+      : selectedModelId;
   const contextUsagePercent = contextSnapshot?.percentUsed ?? 0;
   const contextRingPercent = Math.max(0, Math.min(100, contextUsagePercent));
   const contextRingColor =
@@ -606,7 +618,9 @@ export function Composer({
     workspaceOptions.find((workspace) => workspace.value === selectedWorkspaceRoot)?.label ??
     workspaceOptions[0]?.label ??
     "Workspace";
-  const gitReady = executionContext?.gitContext?.status === "ready";
+  const gitStatus = executionContext?.gitContext?.status;
+  const gitReady = gitStatus === "ready";
+  const gitHasBranch = gitReady || gitStatus === "no_head";
   const selectedBranch = executionContext?.selectedBranch ?? executionContext?.gitContext?.currentBranch;
   const runLocation = executionContext?.runLocation ?? "this_mac";
 
@@ -1230,16 +1244,17 @@ export function Composer({
             <div className={SLASH_GROUP_LABEL_CLASS} id={SLASH_FUNCTIONS_LABEL_ID}>Functions</div>
             {filteredSlashFunctions.map((item) => {
               const Icon = SLASH_FUNCTION_ICONS[item.id];
+              const commandDisplayName = getSlashCommandDisplayName(item.command);
               const optionId = composerSlashFunctionOptionId(item.id);
               const isActive = activeSlashOptionId === optionId;
               const isSelectedMode = item.id === mode;
               return (
                 <button
-                  className={`${SLASH_OPTION_CLASS}${isActive ? ` ${SLASH_OPTION_ACTIVE_CLASS}` : ""}`}
+                  className={`${SLASH_FUNCTION_OPTION_CLASS}${isActive ? ` ${SLASH_OPTION_ACTIVE_CLASS}` : ""}`}
                   id={optionId}
                   type="button"
                   role="option"
-                  aria-label={`${item.label} ${item.command}: ${item.description}`}
+                  aria-label={`${commandDisplayName}: ${item.description}`}
                   aria-selected={isSelectedMode}
                   key={item.id}
                   onPointerDown={(event) => event.preventDefault()}
@@ -1249,13 +1264,10 @@ export function Composer({
                   }}
                   onClick={() => executeSlashFunction(item)}
                 >
-                  <Icon className={SLASH_OPTION_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
-                  <span className="min-w-0 flex-1">
-                    <span className={SLASH_OPTION_LABEL_CLASS}>{item.label}</span>
-                    <span className={SLASH_OPTION_DESCRIPTION_CLASS}>{item.description}</span>
-                  </span>
-                  {isSelectedMode ? <Check className="mt-1 shrink-0 text-text-muted" size={14} strokeWidth={2.2} aria-hidden="true" /> : null}
-                  <span className={SLASH_OPTION_COMMAND_CLASS}>{item.command}</span>
+                  <Icon className={SLASH_FUNCTION_ICON_CLASS} size={14} strokeWidth={1.9} aria-hidden="true" />
+                  <span className={SLASH_FUNCTION_COMMAND_CLASS}>{commandDisplayName}</span>
+                  {isSelectedMode ? <Check className="shrink-0 text-text-muted" size={13} strokeWidth={2.2} aria-hidden="true" /> : null}
+                  <span className={SLASH_FUNCTION_DESCRIPTION_CLASS}>{item.description}</span>
                 </button>
               );
             })}
@@ -1287,7 +1299,7 @@ export function Composer({
               const isSelected = selectedSkills.includes(skill.name);
               return (
                 <button
-                  className={`${SLASH_OPTION_CLASS}${isActive ? ` ${SLASH_OPTION_ACTIVE_CLASS}` : ""}`}
+                  className={`${SLASH_SKILL_OPTION_CLASS}${isActive ? ` ${SLASH_OPTION_ACTIVE_CLASS}` : ""}`}
                   id={optionId}
                   type="button"
                   role="option"
@@ -1301,12 +1313,10 @@ export function Composer({
                   }}
                   onClick={() => selectSlashResult({ kind: "skill", item: skill })}
                 >
-                  <BookOpen className={SLASH_OPTION_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
-                  <span className="min-w-0 flex-1">
-                    <span className={SLASH_OPTION_LABEL_CLASS}>{skill.name}</span>
-                    <span className={SKILL_DESCRIPTION_CLASS}>{skill.description || "No description"}</span>
-                  </span>
-                  {isSelected ? <Check className="mt-1 shrink-0 text-text-muted" size={14} strokeWidth={2.2} aria-hidden="true" /> : null}
+                  <BookOpen className={SLASH_FUNCTION_ICON_CLASS} size={14} strokeWidth={1.9} aria-hidden="true" />
+                  <span className={SLASH_SKILL_NAME_CLASS}>{skill.name}</span>
+                  {isSelected ? <Check className="shrink-0 text-text-muted" size={13} strokeWidth={2.2} aria-hidden="true" /> : null}
+                  <span className={SLASH_SKILL_DESCRIPTION_CLASS}>{skill.description || "No description"}</span>
                 </button>
               );
             }) : (
@@ -1668,20 +1678,25 @@ export function Composer({
 
   function renderSendButton() {
     const sendDisabled = isAborting || (!isStreaming && !canSendMessage);
+    const modelUnavailable = !selectedModelAvailable;
     const tooltipLabel = isStreaming
       ? "停止 Agent"
       : imagesUnsupported
         ? "当前模型不支持图片输入"
-        : canSendMessage
-          ? "发送消息"
-          : "输入消息后发送";
+        : modelUnavailable
+          ? "请先在设置中连接模型服务"
+          : canSendMessage
+            ? "发送消息"
+            : "输入消息后发送";
     const ariaLabel = isStreaming
       ? "Stop agent"
       : imagesUnsupported
         ? "Selected model does not support image input"
-        : canSendMessage
-          ? "Send message"
-          : "Enter a message to send";
+        : modelUnavailable
+          ? "No available model. Open Settings to connect a provider"
+          : canSendMessage
+            ? "Send message"
+            : "Enter a message to send";
 
     return (
       <div className="[grid-area:send] grid">
@@ -1806,7 +1821,7 @@ export function Composer({
     return (
       <div className={STATUS_ROW_CLASS}>
         <div className={STATUS_GROUP_CLASS}>
-          {gitReady || executionContext?.locked ? (
+          {gitHasBranch || executionContext?.locked ? (
             <span className={STATUS_ITEM_CLASS} title={selectedBranch}>
               <GitBranch className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
               <span className="max-w-[240px] truncate">{selectedBranch ?? "Detached HEAD"}</span>
@@ -2003,6 +2018,12 @@ export function Composer({
                 <span className="flex-1">New Worktree</span>
                 {runLocation === "worktree" ? <Check size={15} aria-hidden="true" /> : null}
               </button>
+            ) : gitStatus === "no_head" ? (
+              <button className={COMMAND_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
+                <Plus className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
+                <span className="flex-1">New Worktree</span>
+                <span className="text-[11px] text-text-faint">Requires commit</span>
+              </button>
             ) : null}
           </div>
         ) : null}
@@ -2016,7 +2037,7 @@ export function Composer({
     return (
       <div className={INITIAL_CONTEXT_ROW_CLASS} aria-label="Initial composer context selectors">
         {renderContextSelector("workspace", selectedWorkspaceLabel)}
-        {gitReady ? renderContextSelector("branch", selectedBranch ?? "Detached HEAD", "branch") : null}
+        {gitHasBranch ? renderContextSelector("branch", selectedBranch ?? "Detached HEAD", "branch") : null}
         {renderContextSelector("runtime", runLocation === "worktree" ? "New Worktree" : "This Mac", "runtime")}
       </div>
     );

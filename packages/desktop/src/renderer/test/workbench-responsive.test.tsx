@@ -96,4 +96,31 @@ describe("WorkbenchLayout narrow window behavior", () => {
     expect(screen.getByRole("navigation", { name: "右侧面板对象" })).toBeInTheDocument();
     expect(screen.getByRole("separator", { name: "Resize preview panel" })).toBeInTheDocument();
   });
+
+  it("lets the right panel use the wide-screen space left after protecting the conversation", async () => {
+    const user = userEvent.setup();
+    setViewportWidth(2048);
+    renderWorkbench();
+
+    await user.click(screen.getByRole("button", { name: "Open panel" }));
+
+    expect(screen.getByRole("separator", { name: "Resize preview panel" })).toHaveAttribute("aria-valuemax", "1228");
+
+    await user.click(screen.getByRole("button", { name: "Collapse session sidebar" }));
+    expect(screen.getByRole("separator", { name: "Resize preview panel" })).toHaveAttribute("aria-valuemax", "1488");
+  });
+
+  it("switches to Settings and back without changing the component hook order", async () => {
+    const user = userEvent.setup();
+    setViewportWidth(1120);
+    renderWorkbench();
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(screen.getByRole("button", { name: "返回应用" })).toBeInTheDocument();
+    expect(screen.getByText("设置仅在桌面端可用。")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "返回应用" }));
+    expect(screen.getByLabelText("Message composer")).toBeInTheDocument();
+  });
 });

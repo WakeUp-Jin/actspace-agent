@@ -673,6 +673,77 @@ describe("App streaming user message", () => {
     });
   });
 
+  it("restores the draft and shows a preparation error after turn_started", async () => {
+    const sessionId = "session-preparation-failed";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [{
+      id: sessionId,
+      title: "New chat",
+      updatedAt: record.meta.updatedAt,
+      turnCount: 0,
+    }];
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortTurn: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      getKimiBalance: async () => ({
+        provider: "kimi",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: new Date().toISOString(),
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) streamHandler = null;
+        };
+      },
+      runTurn: async (input: RunTurnInput) => {
+        streamHandler?.({ type: "turn_started", sessionId: input.sessionId, turnId: input.turnId });
+        streamHandler?.({
+          type: "turn_failed",
+          sessionId: input.sessionId,
+          turnId: input.turnId,
+          error: {
+            code: "RUNTIME_ERROR",
+            message: "Git repository has no commits yet.",
+            recoverable: false,
+          },
+        });
+        throw new Error("Git repository has no commits yet.");
+      },
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "keep this input");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    await waitFor(() => {
+      expect(composer).toHaveValue("keep this input");
+      expect(screen.getByRole("alert")).toHaveTextContent("Git repository has no commits yet.");
+    });
+  });
+
   it("shows the shared running shimmer while waiting for model activity", async () => {
     const sessionId = "session-model-wait";
     const record = createEmptySessionRecord(sessionId);

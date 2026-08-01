@@ -1,17 +1,20 @@
-import type { AgentEvent, AgentEventSink } from "@actspace/agent-core";
-import type { SerializableAgentEvent } from "./types";
+import type { RuntimeStreamEvent, SessionEvent } from "@actspace/shared";
+import type { SerializableTraceEvent } from "./types";
 
-export class AgentEventCollector {
-  private events: SerializableAgentEvent[] = [];
+export class CliTraceCollector {
+  private events: SerializableTraceEvent[] = [];
 
-  readonly sink: AgentEventSink = (event: AgentEvent) => {
-    this.events.push({
-      timestamp: new Date().toISOString(),
-      event,
-    });
-  };
+  captureRuntime(event: RuntimeStreamEvent): void {
+    this.events.push({ timestamp: new Date().toISOString(), source: "runtime", event });
+  }
 
-  getEvents(): SerializableAgentEvent[] {
+  captureHarness(events: SessionEvent[]): void {
+    for (const event of events) {
+      this.events.push({ timestamp: new Date().toISOString(), source: "harness", event });
+    }
+  }
+
+  getEvents(): SerializableTraceEvent[] {
     return [...this.events];
   }
 }

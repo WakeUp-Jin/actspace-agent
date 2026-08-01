@@ -38,7 +38,7 @@ ActSpace 侧的第一个交付物是封装 `agent-core` 的命令行入口。文
 
 ```bash
 actspace-agent run \
-  --input task.md \
+  --input-file task.md \
   --workspace /workspace \
   --permission-mode yolo
 ```
@@ -54,17 +54,19 @@ actspace-agent run \
 
 ```bash
 actspace-agent run \
-  --input task.md \
+  --input-file task.md \
   --workspace /workspace \
   --permission-mode yolo \
   --json
 ```
 
+需要逐事件消费时使用 `--jsonl`；每一行都是独立 JSON，最后一行固定为 `run_result`。日志和警告只写 stderr。
+
 只有传入 `--out` 才启用评估产物：
 
 ```bash
 actspace-agent run \
-  --input task.md \
+  --input-file task.md \
   --workspace /workspace \
   --permission-mode yolo \
   --out /eval-output
@@ -93,13 +95,12 @@ type PermissionMode = "default" | "trusted" | "yolo";
 
 `default`：
 
-- 面向普通桌面端使用。
-- 写文件、删除、bash 等高风险操作可以要求用户审核。
+- Desktop / `chat` 可以通过宿主审批 Broker 等待用户决定。
+- 无头 `run` 遇到 `ask` 必须立即返回 `APPROVAL_REQUIRED` 和退出码 `4`，不能从任务 stdin 偷读审批答案。
 
 `trusted`：
 
-- 面向用户接受常规编辑的工作区。
-- 允许普通工作区读写，但高风险 bash、删除、网络动作仍可要求审核。
+- 仍遵守工具自身 permission policy；无头 `run` 对未自动解决的审批同样返回退出码 `4`。
 
 `yolo`：
 
@@ -183,7 +184,7 @@ actspace-agent-eval/
 
 ```bash
 node /actspace/packages/agent-cli/dist/cli.js run \
-  --input /eval/case/input.md \
+  --input-file /eval/case/input.md \
   --workspace /workspace \
   --permission-mode yolo \
   --out /eval-output
@@ -202,7 +203,7 @@ Docker 容器挂载：
 
 ```bash
 docker run actspace-agent:local run \
-  --input /eval/case/input.md \
+  --input-file /eval/case/input.md \
   --workspace /workspace \
   --permission-mode yolo \
   --out /eval-output

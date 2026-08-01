@@ -7,6 +7,7 @@ Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；�
 ## Runtime
 
 - `agent-runtime/agent-backend-design.md`：后端 Agent Runtime 总体设计事实来源。
+- `agent-runtime/agent-host-neutral-runtime-and-cli.md`：宿主无关 Runtime、Desktop Adapter，以及 CLI `run` / `chat` 双模式的目标边界。
 - `agent-runtime/agent-turn-layers.md`：Renderer、Main Process、Bridge、Agent 四层职责规范。
 - `agent-runtime/agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块地图。
 - `agent-runtime/agent-testing.md`：后端 Agent 内部测试策略和覆盖范围。

@@ -1,11 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve, relative, isAbsolute } from "node:path";
-import type { CliArtifactResult, ContextSnapshotArtifact, SerializableAgentEvent } from "./types";
+import type { CliArtifactResult, ContextSnapshotArtifact, SerializableTraceEvent } from "./types";
 
 export interface WriteArtifactsInput {
   outDir: string;
   result: CliArtifactResult;
-  events: SerializableAgentEvent[];
+  events: SerializableTraceEvent[];
   finalText: string;
   contextSnapshots?: ContextSnapshotArtifact[];
 }

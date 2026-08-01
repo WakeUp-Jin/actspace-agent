@@ -120,7 +120,9 @@ describe("WorkspaceChromeControls", () => {
     const user = userEvent.setup();
     renderControls();
 
-    await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
+    const environmentButton = screen.getByRole("button", { name: "Show workspace environment" });
+    expect(environmentButton.querySelector("svg")).toHaveClass("lucide-bookmark");
+    await user.click(environmentButton);
     const popover = await screen.findByRole("dialog", { name: "Workspace environment" });
 
     expect(within(popover).getByText("Worktree")).toBeInTheDocument();

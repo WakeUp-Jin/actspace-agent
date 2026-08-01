@@ -27,7 +27,7 @@
 
 | 目录 | 内容边界 | 入口或代表文档 |
 |---|---|---|
-| `agent-runtime/` | Agent 主运行时、Turn 分层、当前模块和内部测试 | `docs/design-docs/agent-runtime/agent-backend-design.md` |
+| `agent-runtime/` | Agent 主运行时、宿主 Adapter、CLI、Turn 分层、当前模块和内部测试 | `docs/design-docs/agent-runtime/agent-backend-design.md`、`docs/design-docs/agent-runtime/agent-host-neutral-runtime-and-cli.md` |
 | `model-context/` | 模型供应商、模型能力、远端/本地模型目录、token、上下文压缩和缓存审计 | `docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/model-context/agent-duckcoding-multi-key-model-catalog.md` |
 | `tool-system/` | Skill、Web/图片生成工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md` |
 | `execution-safety/` | 工具权限、审批暂停恢复、Bash 策略和执行模型 | `docs/design-docs/execution-safety/agent-权限设计规则和原则.md` |
@@ -44,8 +44,9 @@
 
 1. `agent-index.md`
 2. `agent-runtime/agent-backend-design.md`
-3. `agent-runtime/agent-turn-layers.md`
-4. 根据任务进入 `model-context/`、`tool-system/`、`execution-safety/`、`browser/`、`collaboration/`、`kairos/` 或 `evaluation/`
+3. 涉及 Desktop / CLI 多宿主时读 `agent-runtime/agent-host-neutral-runtime-and-cli.md`
+4. `agent-runtime/agent-turn-layers.md`
+5. 根据任务进入 `model-context/`、`tool-system/`、`execution-safety/`、`browser/`、`collaboration/`、`kairos/` 或 `evaluation/`
 
 ### 前端
 

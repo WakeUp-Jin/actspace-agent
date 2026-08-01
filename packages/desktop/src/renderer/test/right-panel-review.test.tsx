@@ -42,9 +42,13 @@ describe("Review workbench", () => {
     expect(screen.queryByRole("button", { name: "Run AI Review" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Review options" }));
     expect(await screen.findByRole("button", { name: "Refresh" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitemcheckbox", { name: "Enable word wrap" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Don't load full files" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Copy git apply command" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemcheckbox", { name: "Enable word wrap" }).querySelector("svg")).toHaveClass("lucide-arrow-right-from-line");
+    expect(screen.getByRole("button", { name: "Don't load full files" }).querySelector("svg")).toHaveClass("lucide-file");
+    expect(screen.getByRole("menuitemcheckbox", { name: "Enable rich preview" }).querySelector("svg")).toHaveClass("lucide-image");
+    expect(screen.getByRole("menuitemcheckbox", { name: "Enable word diffs" }).querySelector("svg")).toHaveClass("lucide-file-diff");
+    expect(screen.getByRole("menuitemcheckbox", { name: "Hide white space" }).querySelector("svg")).toHaveClass("lucide-eye");
+    expect(screen.getByRole("button", { name: "Copy git apply command" }).querySelector("svg")).toHaveClass("lucide-clipboard");
+    expect(screen.getByRole("button", { name: "Show files" }).querySelector("svg")).toHaveClass("lucide-folder");
   });
 
   it("refreshes through the coordinator bridge when refreshKey changes", async () => {

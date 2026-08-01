@@ -5,3 +5,4 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 
 "${repo_root}/scripts/check-secrets.sh"
+node "${repo_root}/scripts/repo-stats.mjs"

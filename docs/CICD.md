@@ -21,6 +21,16 @@
 - `pnpm test:site`
 - `pnpm build:site`
 - `pnpm run ci`
+- `pnpm repo:stats`
+
+## 本地 Pre-Push
+
+运行 `pnpm hooks:install` 会把当前 clone 的 `core.hooksPath` 指向仓库内 `.githooks/`。之后每次从该 clone 执行 `git push` 时，`.githooks/pre-push` 会依次：
+
+1. 运行密钥扫描。
+2. 输出当前 Git 已跟踪文件的仓库统计。
+
+仓库统计包含不含测试文件的源代码文件数与物理行数、`docs/**/*.md` 文件数与非空白 Unicode 字符数，以及常见 `test` / `spec` 命名的测试文件数。统计本身不设置阈值；数字变化不会阻止 push，只有扫描或统计脚本执行失败时才会中止。
 
 ## 当前现状说明
 

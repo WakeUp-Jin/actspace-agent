@@ -1,0 +1,74 @@
+name: Agent CLI binaries
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - packages/agent-cli/**
+      - packages/agent-core/**
+      - packages/shared/**
+      - scripts/build-agent-cli-binary.mjs
+      - scripts/test-agent-cli-binary.mjs
+      - scripts/agent-cli-binary-targets.json
+      - package.json
+      - pnpm-lock.yaml
+
+permissions:
+  contents: read
+
+jobs:
+  build-native-binary:
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            runner: macos-14
+          - target: darwin-x64
+            runner: macos-13
+          - target: linux-x64
+            runner: ubuntu-24.04
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+          - target: win32-x64
+            runner: windows-2025
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up pinned Node SEA builder
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22.22.2
+          package-manager-cache: false
+
+      - name: Enable pnpm
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare "$(node -p "require('./package.json').packageManager")" --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build native SEA artifact
+        run: pnpm build:agent-cli:binary -- --target ${{ matrix.target }}
+
+      - name: Smoke native SEA artifact
+        run: pnpm test:agent-cli:binary
+
+      - name: Read CLI version
+        id: cli
+        shell: bash
+        run: echo "version=$(node -p "require('./packages/agent-cli/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload binary and checksum
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: actspace-agent-${{ steps.cli.outputs.version }}-${{ matrix.target }}
+          path: artifacts/agent-cli/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14

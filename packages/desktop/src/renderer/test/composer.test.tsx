@@ -277,6 +277,24 @@ describe("Composer follow-up bar", () => {
     expect(sendButton.className).not.toContain("bg-operational");
   });
 
+  it("explains why sending is unavailable when no provider model can be used", async () => {
+    const user = userEvent.setup();
+    renderComposer({
+      models: [],
+      selectedModelId: "deepseek:deepseek-v4-pro",
+    });
+
+    await user.type(screen.getByLabelText("Message composer"), "hello");
+
+    expect(screen.getByText("未连接模型")).toBeInTheDocument();
+    const sendButton = screen.getByRole("button", {
+      name: "No available model. Open Settings to connect a provider",
+    });
+    expect(sendButton).toHaveAttribute("aria-disabled", "true");
+    await user.hover(sendButton);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("请先在设置中连接模型服务");
+  });
+
   it("grows the input height to fit pasted multi-line content", async () => {
     const user = userEvent.setup();
     renderComposer();
@@ -323,12 +341,21 @@ describe("Composer follow-up bar", () => {
 
     const menu = await screen.findByRole("listbox", { name: "Slash commands" });
     expect(within(menu).getByText("Functions")).toBeInTheDocument();
-    expect(within(menu).getByRole("option", { name: /Chat mode \/chat/ })).toBeInTheDocument();
-    expect(within(menu).getByRole("option", { name: /Compact context \/compact/ })).toBeInTheDocument();
-    expect(await within(menu).findByRole("option", { name: /frontend-design/i })).toBeInTheDocument();
+    const chatCommand = within(menu).getByRole("option", { name: /^chat:/ });
+    expect(chatCommand).toHaveTextContent("chatTalk without tools.");
+    expect(chatCommand).toHaveClass("min-h-9", "items-center");
+    expect(within(chatCommand).queryByText("Chat mode")).not.toBeInTheDocument();
+    const compactCommand = within(menu).getByRole("option", { name: /^compact:/ });
+    expect(compactCommand.querySelector("svg")).toHaveClass("lucide-asterisk");
+    const statusCommand = within(menu).getByRole("option", { name: /^status:/ });
+    expect(statusCommand.querySelector("svg")).toHaveClass("lucide-chart-pie");
+    const skillOption = await within(menu).findByRole("option", { name: /frontend-design/i });
+    expect(skillOption).toHaveClass("min-h-9", "items-center");
+    expect(skillOption).toHaveTextContent("frontend-designBuild polished interfaces");
     expect(listSkills).toHaveBeenCalledWith({ workspaceRoot: "/work" });
     expect(input).toHaveAttribute("aria-expanded", "true");
     expect(input).toHaveAttribute("aria-controls", "composer-slash-command-menu");
+    expect(menu).toHaveClass("w-[min(520px,calc(100vw_-_36px))]");
   });
 
   it("opens the initial Composer slash menu below the input with a viewport-safe height", async () => {
@@ -953,5 +980,33 @@ describe("Composer follow-up bar", () => {
       selectedSkills: [],
       thinkingEnabled: true,
     });
+  });
+
+  it("shows an unborn branch name and keeps New Worktree unavailable", async () => {
+    const user = userEvent.setup();
+    renderComposer({
+      surface: "initial",
+      selectedWorkspaceRoot: "/work/new-repository",
+      workspaceOptions: [{ value: "/work/new-repository", label: "new-repository" }],
+      executionContext: {
+        runLocation: "this_mac",
+        selectedBranch: "main",
+        gitContext: {
+          status: "no_head",
+          workspaceRoot: "/work/new-repository",
+          repositoryRoot: "/work/new-repository",
+          currentBranch: "main",
+          branches: [{ name: "main", current: true }],
+        },
+      },
+    });
+
+    expect(screen.getByRole("button", { name: "Select branch" })).toHaveTextContent("main");
+    expect(screen.queryByText("No commits yet")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Select runtime" }));
+    const runtimeMenu = screen.getByRole("menu", { name: "Run on options" });
+    const worktreeEntry = within(runtimeMenu).getByRole("menuitem", { name: /New Worktree Requires commit/i });
+    expect(worktreeEntry).toBeDisabled();
   });
 });

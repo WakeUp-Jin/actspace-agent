@@ -28,6 +28,7 @@ packages/agent-core/
     members/test/         # 持久 Member、配置版本与 Activity 投影测试
     room/test/            # Agent Room 调度、Draft、预算和恢复协议测试
     persistence/test/     # 持久化层测试
+    runtime/test/         # Host-neutral Runtime 生命周期与跨 Host parity
     test/                 # 跨模块类型测试 + 端到端 smoke
 ```
 
@@ -43,8 +44,21 @@ packages/agent-core/
 ### 端到端 smoke
 
 - `src/test/smoke.test.ts`：MockLLMService + ToolManager + ContextManager + Agent → 完整 turn → 事件序列 + 最终回复 + usage
-- `packages/agent-cli/src/test/run.test.ts`：无 `--out` 时 artifact-free；显式 `--out` 时写 result/trace/final response，以及 pre-LLM/final context snapshots。
+- `packages/agent-cli/src/test/run.test.ts`：统一 Runtime 的 ephemeral `run`、stdin 优先级、无 `--out` artifact-free，以及显式 sidecar。
 - `packages/agent-cli/src/test/artifacts.test.ts`：context snapshot 文件名、字段和输出目录逃逸保护。
+- `packages/agent-cli/src/test/process-smoke.test.ts`：真实 `dist/cli.js` 子进程的 text / JSON / JSONL、usage code 和 SIGINT 130。
+- `packages/agent-cli/src/test/chat*.test.ts`：persistent 多轮、new/resume、workspace 绑定和跨进程 Session lock。
+- `packages/agent-cli/src/test/terminal-*.test.ts`：Runtime Event 终端呈现、TTY 审批、abort / EOF / dispose。
+- `packages/agent-cli/src/test/runtime-assets.test.ts`：SEA `rg` 的哈希、原子释放、损坏修复、并发与显式覆盖。
+- `pnpm test:agent-cli:binary`：本机 SEA 的最小 PATH、只读目录、结构化输出、并发资产释放和内嵌 `rg` smoke。
+
+### Agent Runtime
+
+- `runtime/test/agent-runtime.test.ts`：ephemeral / persistent、提交前后事件、同 Session 并发、初始化窗口 Abort、dispose、workspace rollback 和观测失败隔离。
+- `runtime/test/host-parity.test.ts`：Desktop、CLI headless、CLI interactive profile 的 Context / Harness 契约与 completed / failed / aborted 终态顺序。
+- `packages/desktop/src/main/test/workspace-git-context-service.test.ts`：Desktop Host 的 Git Context 与执行目录准备，包括 unborn symbolic branch、`This Mac` 原位运行和 Worktree 对有效 `HEAD` 的要求。
+- `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`：Desktop 流式消息与失败恢复，包括工作区准备失败时按 Session 持久事实恢复输入。
+- 自动化通过不代表真实 Electron UI、真实 provider 或未在本机运行的二进制目标已验收。
 
 ### 执行引擎
 

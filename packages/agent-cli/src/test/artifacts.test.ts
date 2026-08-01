@@ -10,7 +10,12 @@ describe("writeArtifacts", () => {
     await writeArtifacts({
       outDir,
       result: {
+        schemaVersion: 1,
         ok: true,
+        status: "completed",
+        exitCode: 0,
+        sessionId: "session-1",
+        turnId: "turn-1",
         finalText: "Done",
         messageCount: 1,
         eventCount: 1,
@@ -22,7 +27,8 @@ describe("writeArtifacts", () => {
       events: [
         {
           timestamp: "2026-07-08T00:00:00.000Z",
-          event: { type: "agent_start" },
+          source: "runtime",
+          event: { type: "turn_started", sessionId: "session-1", turnId: "turn-1" },
         },
       ],
       finalText: "Done",
@@ -38,7 +44,7 @@ describe("writeArtifacts", () => {
     });
 
     await expect(readFile(join(outDir, "result.json"), "utf8")).resolves.toContain('"ok": true');
-    await expect(readFile(join(outDir, "trace.jsonl"), "utf8")).resolves.toContain('"agent_start"');
+    await expect(readFile(join(outDir, "trace.jsonl"), "utf8")).resolves.toContain('"source":"runtime"');
     await expect(readFile(join(outDir, "final-response.md"), "utf8")).resolves.toBe("Done");
     await expect(readFile(join(outDir, "context-snapshots", "001-final.json"), "utf8"))
       .resolves.toContain('"messageCount": 1');

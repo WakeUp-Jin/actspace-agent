@@ -35,6 +35,7 @@ Review 保持为右侧对象 Tab。它不替换聊天区，不接管整个窗口
 - 工具栏：Scope 与非零统计在左，Review options、折叠、跳转、Diff 模式、Files、Commit or push 在同一行右侧。
 - Branch 关系单独显示为 `local → upstream`，例如 `main → origin/main`。
 - Review options 包含 Refresh、word wrap、full-file loading、rich preview、word diff、white space 和 Copy git apply command。
+- Review options 使用稳定的 Lucide 语义图标：word wrap=`ArrowRightFromLine`、full files=`File`、rich preview=`Image`、word diff=`FileDiff`、white space=`Eye`、copy apply=`Clipboard`；Files 工具栏入口使用 `Folder`。Toggle 的语义图标固定留在左侧，启用勾选显示在右侧。
 
 不复制 Codex 私有 bundle 代码、类名、颜色或不可验证的内部状态结构。具体 Git 命令由 ActSpace 自己的安全边界决定。
 
