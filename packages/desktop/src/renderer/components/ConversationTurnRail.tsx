@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 export type ConversationTurnNavigationItem = {
@@ -17,8 +18,11 @@ const MARKER_BUTTON_CLASS =
 const MARKER_BUTTON_DEFAULT_CLASS = "h-3.5";
 const MARKER_BUTTON_DENSE_CLASS = "min-h-[2px] flex-1";
 const MARKER_CLASS =
-  "h-[2px] w-3 rounded-act-pill bg-line-strong transition-[width,background-color] duration-[150ms] ease-in-out group-hover:w-5 group-hover:bg-text-main group-focus-visible:w-5 group-focus-visible:bg-text-main";
-const MARKER_ACTIVE_CLASS = "w-5 bg-text-main";
+  "h-[2px] rounded-act-pill bg-line-strong transition-[width,background-color] duration-[150ms] ease-out group-hover:bg-text-main group-focus-visible:bg-text-main motion-reduce:transition-none";
+const MARKER_ACTIVE_CLASS = "bg-text-main";
+const MARKER_RESTING_CLASS = "w-1.5";
+const MARKER_ACTIVE_WIDTH_CLASS = "w-5";
+const MARKER_WAVE_WIDTH_CLASSES = ["w-6", "w-5", "w-4", "w-3", "w-2"] as const;
 const PREVIEW_CARD_CLASS =
   "w-[min(340px,calc(100vw-64px))] rounded-act-md border border-line bg-surface-raised px-3 py-2.5 text-left shadow-act-popover";
 const PREVIEW_INPUT_CLASS =
@@ -32,6 +36,13 @@ function previewLabel(item: ConversationTurnNavigationItem, index: number): stri
   return `跳到第 ${index + 1} 轮对话${suffix}`;
 }
 
+function markerWidthClass(index: number, waveCenterIndex: number | null, active: boolean): string {
+  if (waveCenterIndex === null) return active ? MARKER_ACTIVE_WIDTH_CLASS : MARKER_RESTING_CLASS;
+  const distance = Math.abs(index - waveCenterIndex);
+  const waveWidth = MARKER_WAVE_WIDTH_CLASSES[distance] ?? MARKER_RESTING_CLASS;
+  return active && distance > 1 ? MARKER_ACTIVE_WIDTH_CLASS : waveWidth;
+}
+
 export function ConversationTurnRail({
   items,
   activeTurnId,
@@ -42,12 +53,16 @@ export function ConversationTurnRail({
   onNavigate: (turnId: string) => void;
 }) {
   const dense = items.length > 14;
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const waveCenterIndex = hoveredIndex ?? focusedIndex;
 
   return (
-    <nav className={RAIL_CLASS} aria-label="会话轮次导航">
+    <nav className={RAIL_CLASS} aria-label="会话轮次导航" onPointerLeave={() => setHoveredIndex(null)}>
       <div className={dense ? RAIL_STACK_DENSE_CLASS : RAIL_STACK_CLASS}>
         {items.map((item, index) => {
           const active = item.id === activeTurnId;
+          const markerWidth = markerWidthClass(index, waveCenterIndex, active);
           return (
             <Tooltip key={item.id} delayDuration={120}>
               <TooltipTrigger asChild>
@@ -56,9 +71,12 @@ export function ConversationTurnRail({
                   className={`${MARKER_BUTTON_CLASS} ${dense ? MARKER_BUTTON_DENSE_CLASS : MARKER_BUTTON_DEFAULT_CLASS}`}
                   aria-label={previewLabel(item, index)}
                   aria-current={active ? "location" : undefined}
+                  onPointerEnter={() => setHoveredIndex(index)}
+                  onFocus={() => setFocusedIndex(index)}
+                  onBlur={() => setFocusedIndex(null)}
                   onClick={() => onNavigate(item.id)}
                 >
-                  <span className={`${MARKER_CLASS}${active ? ` ${MARKER_ACTIVE_CLASS}` : ""}`} aria-hidden="true" />
+                  <span className={`${MARKER_CLASS} ${markerWidth}${active ? ` ${MARKER_ACTIVE_CLASS}` : ""}`} aria-hidden="true" />
                 </button>
               </TooltipTrigger>
               <TooltipContent

@@ -416,5 +416,6 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 - 完整 Review 直接渲染在右侧对象面板，聊天主区和 Composer 保持可用。
 - `Last Turn`、`Uncommitted`、`Unstaged`、`Staged`、`Committed`、`Branch` 都必须接真实数据，不再展示 disabled 的未来 scope。
 - Review 内部以单列 Diff Canvas 为主；Changed Files 在 Review 容器不小于 `560px` 时停靠于右侧，更窄时切换为独占内容区的文件列表。它不使用遮罩覆盖 Diff；大 diff 继续按单文件与 capped 策略加载。
+- 不换行时，Diff Canvas 是唯一的横向滚动所有者，行号、增删标记和代码随 Canvas 同步移动；禁止给每个 `<code>` 行单独设置横向滚动。开启 word wrap 后 Canvas 回到面板宽度并由代码列折行。
 - unified/split、上下文折叠、Jump to file、viewed、Review Options 和 Git actions 的完整规则以 `docs/design-docs/core-review-change-sources.md` 为准。
 - 旧 `right-panel-diff-final.png` 和 `review-v1-git-review-prototype.html` 只保留为 V1 历史参考，不再代表目标 Review Workbench。

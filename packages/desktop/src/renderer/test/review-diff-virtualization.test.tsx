@@ -54,7 +54,94 @@ describe("Review diff virtualization", () => {
     expect(virtualRowCount).toBeLessThan(1_000);
     expect(container.querySelectorAll("[data-review-row]").length).toBe(virtualRowCount);
   });
+
+  it("keeps horizontal scrolling on the canvas instead of individual code lines", async () => {
+    const file = fileSummary();
+    const diff = singleLineDiff(file, `const integrity = "${"sha512-long-value".repeat(12)}";`);
+    const { container } = renderCanvas(file, diff, false);
+
+    const canvas = container.querySelector<HTMLElement>("[data-review-horizontal-scroll='canvas']");
+    const content = container.querySelector<HTMLElement>("[data-review-content-width]");
+    const code = await waitFor(() => {
+      const element = container.querySelector("code");
+      expect(element).not.toBeNull();
+      return element!;
+    });
+
+    expect(canvas).toHaveClass("overflow-auto");
+    expect(content?.dataset.reviewContentWidth).toMatch(/^max\(100%, \d+ch\)$/);
+    expect(code).toHaveClass("whitespace-pre");
+    expect(code).not.toHaveClass("overflow-x-auto");
+    expect(container.querySelectorAll("code.overflow-x-auto")).toHaveLength(0);
+  });
+
+  it("collapses the canvas width and wraps code when word wrap is enabled", async () => {
+    const file = fileSummary();
+    const diff = singleLineDiff(file, "a long line that should wrap with the Review viewport");
+    const { container } = renderCanvas(file, diff, true);
+
+    const content = container.querySelector<HTMLElement>("[data-review-content-width]");
+    const code = await waitFor(() => {
+      const element = container.querySelector("code");
+      expect(element).not.toBeNull();
+      return element!;
+    });
+
+    expect(content?.dataset.reviewContentWidth).toBe("100%");
+    expect(code).toHaveClass("whitespace-pre-wrap", "break-all");
+    expect(code).not.toHaveClass("overflow-x-auto");
+  });
 });
+
+function renderCanvas(file: ReviewFileSummary, diff: ReviewFileDiff, wrap: boolean) {
+  return render(
+    <ReviewDiffCanvas
+      files={[file]}
+      diffs={new Map([[file.id, diff]])}
+      fileRequests={new Map([[file.id, { status: "ready" }]])}
+      fileContents={new Map()}
+      capabilities={capabilities()}
+      expandedFileIds={new Set([file.id])}
+      selectedFileId={file.id}
+      mode="unified"
+      wrap={wrap}
+      wordDiff={false}
+      richPreview={false}
+      loadFullFiles={false}
+      singleFileMode={false}
+      onToggleFile={vi.fn()}
+      onSelectFile={vi.fn()}
+      onExpandContext={vi.fn()}
+      onRetryDiff={vi.fn()}
+      onVisibleFiles={vi.fn()}
+      onViewed={vi.fn()}
+      onMutation={vi.fn()}
+    />,
+  );
+}
+
+function singleLineDiff(file: ReviewFileSummary, text: string): ReviewFileDiff {
+  return {
+    snapshotId: "snapshot",
+    generation: 1,
+    fileId: file.id,
+    path: file.path,
+    hunks: [{
+      id: "hunk",
+      header: "@@ -1 +1 @@",
+      oldStart: 1,
+      oldLines: 0,
+      newStart: 1,
+      newLines: 1,
+      lines: [{ id: "line", kind: "addition", newLine: 1, text }],
+      patchFingerprint: "hunk",
+    }],
+    oldContentAvailable: true,
+    newContentAvailable: true,
+    partial: false,
+    patchFingerprint: "patch",
+  };
+}
 
 function fileSummary(): ReviewFileSummary {
   return {

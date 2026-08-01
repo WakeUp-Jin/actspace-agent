@@ -199,10 +199,16 @@ describe("ConversationView tooltips", () => {
     const rail = screen.getByRole("navigation", { name: "会话轮次导航" });
     const firstMarker = within(rail).getByRole("button", { name: /第一轮：分析需求/ });
     const secondMarker = within(rail).getByRole("button", { name: /第二轮：开始实现/ });
+    const thirdMarker = within(rail).getByRole("button", { name: /第三轮：验证结果/ });
     expect(secondMarker).toHaveAttribute("aria-current", "location");
+    expect(firstMarker.firstElementChild).toHaveClass("w-1.5");
+    expect(secondMarker.firstElementChild).toHaveClass("w-5");
 
     const user = userEvent.setup();
     await user.hover(firstMarker);
+    expect(firstMarker.firstElementChild).toHaveClass("w-6");
+    expect(secondMarker.firstElementChild).toHaveClass("w-5");
+    expect(thirdMarker.firstElementChild).toHaveClass("w-4");
     const preview = await screen.findByRole("tooltip");
     expect(preview).toHaveTextContent("第一轮：分析需求");
     expect(preview).toHaveTextContent("第一轮回复：需求已经拆分完成。");

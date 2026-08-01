@@ -156,7 +156,7 @@ type ReviewSnapshot = {
 
 ### Enable word wrap
 
-只影响 renderer 长行布局，不重新查询 Git。
+只影响 renderer 长行布局，不重新查询 Git。关闭时整个 Diff Canvas 是唯一横向滚动容器，所有行同步横移；单个代码行不得创建自己的滚动条。开启时 Canvas 收回到可视宽度，代码按行内宽度折行。
 
 ### Load full files / Don't load full files
 
@@ -205,6 +205,7 @@ git apply -- '<validated temporary patch path>'
 - Changed Files 按 Review 容器宽度响应：宽度不小于 `560px` 时停靠在 Diff 右侧，不使用遮罩；更窄时切换为独占 Review 内容区的文件列表，选中文件后自动返回 Diff。
 - split diff 只在 Review 容器宽度不小于 `640px` 时可用；判断依据是 Review 自身宽度，不是 `window.innerWidth`。
 - Scope、Options、Jump 和 Commit 菜单通过顶层 portal 定位，不能作为横向滚动 toolbar 的子元素，否则会被 `overflow` 裁切成“点击无反应”。
+- Diff Canvas 同时拥有纵向虚拟列表和横向滚动位置；虚拟行共享根据结构化 Diff 预估的稳定内容宽度，避免长行进入或离开挂载窗口时横向范围跳变。
 - Files、Jump、Expand 与 split 在当前 snapshot 不具备数据或宽度条件时显示明确 disabled 状态，不执行空操作。
 - Review Tab 的关闭由右侧对象 Tab chrome 负责，不在 Review 工具栏重复增加关闭按钮。
 

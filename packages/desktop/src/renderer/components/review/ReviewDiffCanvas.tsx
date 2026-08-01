@@ -20,6 +20,10 @@ type DiffRow =
   | { key: string; kind: "split-line"; file: ReviewFileSummary; oldLine?: ReviewLine; newLine?: ReviewLine }
   | { key: string; kind: "state"; file: ReviewFileSummary; state: "loading" | "failed" | "empty" | "binary" | "image"; message?: string };
 
+const UNIFIED_DIFF_GUTTER_COLUMNS = 16;
+const SPLIT_DIFF_GUTTER_COLUMNS = UNIFIED_DIFF_GUTTER_COLUMNS * 2;
+const MAX_STABLE_DIFF_COLUMNS = 480;
+
 export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fileContents, capabilities, expandedFileIds, selectedFileId, mode, wrap, wordDiff, richPreview, loadFullFiles, singleFileMode, onToggleFile, onSelectFile, onExpandContext, onRetryDiff, onVisibleFiles, onViewed, onMutation }: {
   workspaceRoot?: string;
   files: ReviewFileSummary[];
@@ -46,6 +50,7 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
   const parentRef = useRef<HTMLElement>(null);
   const visibleSignature = useRef("");
   const rows = useMemo(() => buildRows(files, diffs, fileRequests, fileContents, expandedFileIds, mode, loadFullFiles, richPreview), [diffs, expandedFileIds, fileContents, fileRequests, files, loadFullFiles, mode, richPreview]);
+  const canvasColumns = useMemo(() => estimateCanvasColumns(rows), [rows]);
   const fileIndexes = useMemo(() => {
     const indexes = new Map<string, number>();
     rows.forEach((row, index) => { if (row.kind === "file") indexes.set(row.file.id, index); });
@@ -80,9 +85,10 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
   }, [loadFullFiles, onVisibleFiles, rows, virtualItems]);
 
   const footerHeight = singleFileMode ? 34 : 0;
+  const canvasWidth = wrap ? "100%" : `max(100%, ${canvasColumns}ch)`;
   return (
-    <main ref={parentRef} className="min-h-0 min-w-0 flex-1 overflow-auto bg-surface" aria-label="Review diff canvas">
-      <div className="relative min-w-full" style={{ height: virtualizer.getTotalSize() + footerHeight }} data-review-total-row-count={rows.length} data-review-virtual-row-count={virtualItems.length}>
+    <main ref={parentRef} className="min-h-0 min-w-0 flex-1 overflow-auto bg-surface" aria-label="Review diff canvas" data-review-horizontal-scroll="canvas">
+      <div className="relative min-w-full" style={{ height: virtualizer.getTotalSize() + footerHeight, width: canvasWidth }} data-review-content-width={canvasWidth} data-review-total-row-count={rows.length} data-review-virtual-row-count={virtualItems.length}>
         {virtualItems.map((item) => {
           const row = rows[item.index];
           if (!row) return null;
@@ -260,6 +266,33 @@ function estimateRowSize(row: DiffRow | undefined, wrap: boolean): number {
   return wrap ? 42 : 22;
 }
 
+function estimateCanvasColumns(rows: DiffRow[]): number {
+  let columns = 0;
+  for (const row of rows) {
+    if (row.kind === "line") {
+      columns = Math.max(columns, textColumns(row.line.text) + UNIFIED_DIFF_GUTTER_COLUMNS);
+      continue;
+    }
+    if (row.kind === "split-line") {
+      const sideColumns = Math.max(textColumns(row.oldLine?.text ?? ""), textColumns(row.newLine?.text ?? ""));
+      columns = Math.max(columns, sideColumns * 2 + SPLIT_DIFF_GUTTER_COLUMNS);
+    }
+  }
+  return Math.min(columns, MAX_STABLE_DIFF_COLUMNS);
+}
+
+function textColumns(text: string): number {
+  let columns = 0;
+  for (const character of text) {
+    if (character === "\t") {
+      columns += 4 - (columns % 4);
+      continue;
+    }
+    columns += character.codePointAt(0)! > 0xff ? 2 : 1;
+  }
+  return columns;
+}
+
 function ReviewImageDiff({ workspaceRoot, file }: { workspaceRoot?: string; file: ReviewFileSummary }) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -301,5 +334,5 @@ function SplitDiffLine({ oldLine, newLine, wrap, wordDiff }: { oldLine?: ReviewL
 function DiffLine({ line, side, wrap, wordDiff }: { line?: ReviewLine; side: "old" | "new"; wrap: boolean; wordDiff: boolean }) {
   const number = side === "old" ? line?.oldLine : line?.newLine;
   const tone = line?.kind === "addition" ? "bg-success-soft" : line?.kind === "deletion" ? "bg-danger-soft" : "bg-surface";
-  return <div className={`${tone} min-w-0`}><div className="grid min-h-[22px] grid-cols-[42px_22px_minmax(0,1fr)] font-mono text-[11px] leading-[22px]"><span className="select-none border-r border-line/70 pr-2 text-right tabular-nums text-text-faint">{number ?? ""}</span><span className="select-none text-center text-text-faint">{line?.kind === "addition" ? "+" : line?.kind === "deletion" ? "−" : ""}</span><code className={`${wrap ? "whitespace-pre-wrap break-all" : "whitespace-pre"} min-w-0 overflow-x-auto pr-8 text-text-main`}>{line && wordDiff && line.wordDiffs?.length ? line.wordDiffs.map((part, index) => <span key={index} className={part.kind === "addition" ? "rounded-[2px] bg-success/20" : part.kind === "deletion" ? "rounded-[2px] bg-danger/20" : ""}>{part.text}</span>) : line?.text || " "}</code></div></div>;
+  return <div className={`${tone} min-w-0`}><div className="grid min-h-[22px] grid-cols-[42px_22px_minmax(0,1fr)] font-mono text-[11px] leading-[22px]"><span className="select-none border-r border-line/70 pr-2 text-right tabular-nums text-text-faint">{number ?? ""}</span><span className="select-none text-center text-text-faint">{line?.kind === "addition" ? "+" : line?.kind === "deletion" ? "−" : ""}</span><code className={`${wrap ? "whitespace-pre-wrap break-all" : "whitespace-pre"} block min-w-0 pr-8 text-text-main`}>{line && wordDiff && line.wordDiffs?.length ? line.wordDiffs.map((part, index) => <span key={index} className={part.kind === "addition" ? "rounded-[2px] bg-success/20" : part.kind === "deletion" ? "rounded-[2px] bg-danger/20" : ""}>{part.text}</span>) : line?.text || " "}</code></div></div>;
 }
