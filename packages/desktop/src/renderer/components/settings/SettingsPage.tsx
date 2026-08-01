@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Image, KeyRound, Loader2, Monitor, Moon, ShieldCheck, Sun, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Image, KeyRound, Loader2, Monitor, Moon, ScanSearch, ShieldCheck, Sun, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
   DEFAULT_IMAGE_GENERATION_BASE_URL,
   DEFAULT_IMAGE_GENERATION_MODEL,
+  DEFAULT_IMAGE_INSPECTION_MODEL_KEY,
+  IMAGE_INSPECTION_MODEL_LIST,
+  resolveImageInspectionModel,
   type AgentSystemPromptFile,
   type AppSettings,
   type LocalUpdateProgressPhase,
@@ -142,6 +145,7 @@ function mergeSettings(current: AppSettings, input: SettingsUpdateInput): AppSet
         }
       : current.plugins,
     skills: input.skills ? { ...current.skills, ...input.skills } : current.skills,
+    imageInspection: input.imageInspection ?? current.imageInspection,
   };
 }
 
@@ -330,7 +334,7 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
   }
 }
 
-function ProvidersSection({ settings, onConnectProvider, onClearProvider, onRefresh }: SectionProps) {
+function ProvidersSection({ settings, onUpdate, onConnectProvider, onClearProvider, onRefresh }: SectionProps) {
   return (
     <>
       <ProviderSettings onChanged={onRefresh} />
@@ -349,7 +353,97 @@ function ProvidersSection({ settings, onConnectProvider, onClearProvider, onRefr
         onClear={onClearProvider}
         onRefresh={onRefresh}
       />
+      <ImageInspectionSettingsSection settings={settings} onUpdate={onUpdate} />
     </>
+  );
+}
+
+function ImageInspectionSettingsSection({
+  settings,
+  onUpdate,
+}: Pick<SectionProps, "settings" | "onUpdate">) {
+  const current = settings.imageInspection ?? { modelKey: DEFAULT_IMAGE_INSPECTION_MODEL_KEY };
+  const selectedModel = resolveImageInspectionModel(current.modelKey);
+  const provider = settings.providers[selectedModel.provider];
+  const credentials = provider?.additionalCredentials ?? [];
+  const selectedCredential = credentials.find((credential) => credential.id === current.credentialId);
+  const credentialAvailable = current.credentialId
+    ? selectedCredential?.hasApiKey === true
+    : provider?.hasApiKey === true;
+  const providerLabel = selectedModel.provider === "openrouter" ? "OpenRouter" : "Kimi";
+  const modelOptions = IMAGE_INSPECTION_MODEL_LIST.map((model) => ({
+    value: model.key,
+    label: `${model.label} · ${model.provider === "openrouter" ? "OpenRouter" : "Kimi"}`,
+  }));
+
+  return (
+    <SectionShell
+      title="图片分析"
+      description="为 inspect_image 选择独立的多模态模型；调用时会把本地图片发送给所选 Provider。"
+    >
+      <SettingGroup>
+        <div className="flex items-center gap-3.5 px-4 py-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-act-lg bg-surface-subtle text-text-main">
+            <ScanSearch size={18} strokeWidth={1.8} aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[14px] font-semibold text-text-main">视觉模型</span>
+              <span className={`rounded-act-pill px-2 py-0.5 text-[10px] font-semibold ${credentialAvailable ? "bg-operational-soft text-operational" : "bg-surface-subtle text-text-faint"}`}>
+                {credentialAvailable ? "可用" : "缺少可用 Key"}
+              </span>
+            </div>
+            <p className="mt-1 truncate font-mono text-[11px] text-text-faint">
+              {selectedModel.apiModel}
+            </p>
+          </div>
+          <SettingsSelect
+            value={current.modelKey}
+            options={modelOptions}
+            ariaLabel="图片分析模型"
+            onChange={(modelKey) => {
+              const nextModel = resolveImageInspectionModel(modelKey);
+              const nextProvider = settings.providers[nextModel.provider];
+              const fallbackCredential = nextProvider?.hasApiKey
+                ? undefined
+                : nextProvider?.additionalCredentials?.find((credential) => credential.hasApiKey)?.id;
+              onUpdate({ imageInspection: { modelKey: nextModel.key as typeof current.modelKey, credentialId: fallbackCredential } });
+            }}
+          />
+        </div>
+        {credentials.length > 0 ? (
+          <SettingRow
+            title="调用 Key"
+            description={`${providerLabel} 已保存的凭据；Key 本身不会进入 renderer 设置。`}
+            control={
+              <select
+                aria-label="图片分析调用 Key"
+                value={current.credentialId ?? ""}
+                onChange={(event) => onUpdate({
+                  imageInspection: {
+                    modelKey: current.modelKey,
+                    credentialId: event.target.value || undefined,
+                  },
+                })}
+                className="h-9 min-w-[220px] rounded-act-md border border-line bg-surface px-3 text-[13px] font-medium text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20 max-[600px]:w-full"
+              >
+                <option value="" disabled={!provider?.hasApiKey}>
+                  默认 Key{provider?.hasApiKey ? "" : "（不可用）"}
+                </option>
+                {current.credentialId && !selectedCredential ? (
+                  <option value={current.credentialId} disabled>已删除的 Key（不可用）</option>
+                ) : null}
+                {credentials.map((credential) => (
+                  <option key={credential.id} value={credential.id} disabled={!credential.hasApiKey}>
+                    {credential.label}{credential.hasApiKey ? "" : "（不可用）"}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+        ) : null}
+      </SettingGroup>
+    </SectionShell>
   );
 }
 

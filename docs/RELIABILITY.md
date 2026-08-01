@@ -30,7 +30,8 @@
 - `pnpm dev:log`：本地开发启动桌面端，并把终端 stdout/stderr 同步写入根目录 `logs/dev-*.log`，同时更新 `logs/latest-dev.log` 供 Agent 排障读取。
 - 文件工具默认使用 workspace root，而不是 Electron `userData`。如需指定工作区，设置 `ACTSPACE_WORKSPACE_ROOT`。
 - `web_search` 需要任一搜索 provider key（`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY`）；`web_fetch` 无 key 要求。未配置搜索 key 时 `web_search` 不会注册，避免运行中暴露一个必然失败的能力；executor 内另有缺 key 兜底错误作防御（见 `agent-web-tools.md`）。
-- 多模态输入由模型注册表的 `input` 能力决定。当前模型不支持 `image` 时，图片附件不会被隐式分析，Agent 只看到附件元信息和 runtime model 能力提示。
+- 多模态输入由模型注册表的 `input` 能力决定。原生支持 `image` 的主模型直接接收图片；text-only 主模型不会自动分析附件，但在已配置 Kimi `kimi-k2.7-code` 或 OpenRouter `openai/gpt-5.6-luna` 时可按需调用 `inspect_image`。工具缺凭据、被禁用或主模型原生支持图片时不注册。
+- `inspect_image` 的外部视觉请求固定 90 秒超时并响应 turn abort；空响应、格式不支持、图片超限和 Provider 错误均映射为稳定错误，不自动重试或跨 Provider fallback。视觉报告最多保留 20,000 字符并明确标记截断，不再经过通用摘要器二次压缩。
 - 如需长期禁用某些工具，可设置 `ACTSPACE_DISABLED_TOOLS=read_file,bash`；工具会在注册阶段直接跳过，不会暴露给模型，也不会出现在运行时工具列表里。
 - `pnpm typecheck`：检查跨包类型契约。
 - `pnpm build`：检查当前桌面端和共享包是否可构建。

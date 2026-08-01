@@ -25,7 +25,7 @@ import type {
 import { LLMServiceError } from "../llm/types";
 import { createLLMService } from "../llm/factory";
 import { providerDefaultHeaders } from "../llm/provider-adapter";
-import type { ToolManagerConfig } from "../tools/types";
+import type { ImageInspectionRuntimeConfig, ToolManagerConfig } from "../tools/types";
 import type { ApprovalGate } from "../tools/scheduler";
 import { ToolManager } from "../tools/manager";
 import { createToolManager } from "../tools/index";
@@ -74,6 +74,8 @@ export interface AgentConfig {
   utilityModelKey?: ModelKey;
   exploreLlmConfig?: LLMConfig;
   exploreModelKey?: ModelKey;
+  imageInspectionLlmConfig?: LLMConfig;
+  imageInspectionToolConfig?: Omit<ImageInspectionRuntimeConfig, "llm">;
   toolManagerConfig: ToolManagerConfig;
   thinkingEnabled: boolean;
   reasoningEffort?: ModelReasoningEffort;
@@ -122,6 +124,10 @@ export interface AgentRuntimeContext {
   browserBridgeSocketPath?: string;
   /** 当前 session 的图片生成产物目录。 */
   artifactRoot?: string;
+  /** 当前 session 的全部工具产物根目录，供 inspect_image 读取已注册产物。 */
+  sessionArtifactRoot?: string;
+  /** 当前轮用户显式附加的图片绝对路径。 */
+  imageInspectionAllowedPaths?: string[];
   /** 主 Agent 当前使用的完整系统提示词；不传则使用代码默认值。 */
   systemPrompt?: string;
   /** 附加规则/技能等系统级上下文段，例如 AGENTS.md。 */
@@ -134,6 +140,7 @@ export interface ExplicitAgentRuntimeInput {
   main: { definition: ModelDefinition; runtime: ProviderRuntimeConfig };
   utility?: { definition: ModelDefinition; runtime: ProviderRuntimeConfig };
   explore?: { definition: ModelDefinition; runtime: ProviderRuntimeConfig };
+  imageInspection?: { definition: ModelDefinition; runtime: ProviderRuntimeConfig };
   thinkingEnabled?: boolean;
   reasoningEffort?: ModelReasoningEffort;
   inferenceSettings?: RuntimeInferenceSettings;
@@ -366,6 +373,13 @@ export function buildAgentConfigFromRuntime(
   const exploreConfig = input.explore
     ? buildLLMConfigFromRuntime(input.explore.definition, input.explore.runtime, input.inferenceSettings)
     : undefined;
+  const imageInspectionEnabled = Boolean(
+    input.imageInspection && !mainDefinition.capabilities.input.includes("image"),
+  );
+  const imageInspectionConfig = imageInspectionEnabled
+    ? buildLLMConfigFromRuntime(input.imageInspection!.definition, input.imageInspection!.runtime)
+    : undefined;
+  if (imageInspectionConfig) imageInspectionConfig.maxRetries = 0;
   const modelSpec = modelDefinitionToCompatSpec(mainDefinition);
   return {
     llmConfig: mainConfig,
@@ -373,6 +387,16 @@ export function buildAgentConfigFromRuntime(
     modelKey: input.main.definition.key,
     ...(utilityConfig && { utilityLlmConfig: utilityConfig, utilityModelKey: input.utility!.definition.key }),
     ...(exploreConfig && { exploreLlmConfig: exploreConfig, exploreModelKey: input.explore!.definition.key }),
+    ...(imageInspectionConfig && {
+      imageInspectionLlmConfig: imageInspectionConfig,
+      imageInspectionToolConfig: {
+        provider: input.imageInspection!.definition.provider as "kimi" | "openrouter",
+        model: input.imageInspection!.definition.apiModel,
+        modelLabel: input.imageInspection!.definition.label,
+        allowedImagePaths: [...(runtimeContext?.imageInspectionAllowedPaths ?? [])],
+        artifactRoot: runtimeContext?.sessionArtifactRoot,
+      },
+    }),
     toolManagerConfig: {
       workspaceRoot,
       primaryProvider: input.main.definition.provider,
@@ -455,10 +479,14 @@ export function createAgentFromConfig(config: AgentConfig): AgentDeps {
   const utilityLlm = config.utilityLlmConfig ? createLLMService(config.utilityLlmConfig) : undefined;
   const summarizer = utilityLlm ? createSummarizer(utilityLlm) : createSummarizerForAgent();
   const exploreLlm = config.exploreLlmConfig ? createLLMService(config.exploreLlmConfig) : createExploreLLMService(config.exploreModelId);
+  const imageInspectionLlm = config.imageInspectionLlmConfig ? createLLMService(config.imageInspectionLlmConfig) : undefined;
   const toolManager = createToolManager({
     ...config.toolManagerConfig,
     llm,
     exploreLlm,
+    ...(imageInspectionLlm && config.imageInspectionToolConfig && {
+      imageInspection: { ...config.imageInspectionToolConfig, llm: imageInspectionLlm },
+    }),
     contextWindow: modelDefinition.contextWindow ?? config.modelSpec.contextWindow,
     summarizer,
   });
@@ -502,10 +530,14 @@ export async function createAgentForSession(
   const utilityLlm = config.utilityLlmConfig ? createLLMService(config.utilityLlmConfig) : undefined;
   const summarizer = utilityLlm ? createSummarizer(utilityLlm) : createSummarizerForAgent();
   const exploreLlm = config.exploreLlmConfig ? createLLMService(config.exploreLlmConfig) : createExploreLLMService(config.exploreModelId);
+  const imageInspectionLlm = config.imageInspectionLlmConfig ? createLLMService(config.imageInspectionLlmConfig) : undefined;
   const toolManager = createToolManager({
     ...config.toolManagerConfig,
     llm,
     exploreLlm,
+    ...(imageInspectionLlm && config.imageInspectionToolConfig && {
+      imageInspection: { ...config.imageInspectionToolConfig, llm: imageInspectionLlm },
+    }),
     contextWindow: modelDefinition.contextWindow ?? config.modelSpec.contextWindow,
     summarizer,
   });

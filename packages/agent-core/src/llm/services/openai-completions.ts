@@ -51,6 +51,7 @@ export class OpenAICompletionsService implements LLMService {
     this.client = new OpenAI({
       apiKey: config.apiKey || "placeholder",
       baseURL: config.baseUrl ?? DEFAULT_BASE_URLS[config.provider] ?? "https://api.openai.com/v1",
+      maxRetries: config.maxRetries,
       ...(providerFetch && { fetch: providerFetch }),
       ...(Object.keys(defaultHeaders).length > 0 && { defaultHeaders }),
       dangerouslyAllowBrowser: true,

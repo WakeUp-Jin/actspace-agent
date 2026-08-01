@@ -15,6 +15,7 @@
 - **服务商级代理目标边界**：代理配置归属于单个 LLM 服务商，只注入该服务商的 HTTP client，不写入全局 `HTTP_PROXY` / `HTTPS_PROXY`，也不影响工具、更新器或其他服务商。首版只接受 `http://` / `https://` 代理地址，不在代理 URL 中保存用户名和密码。
 - **搜索 provider key 边界**：`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY` 是 `web_search` 工具的外部搜索 API 密钥，边界与 LLM key 相同——只在 main/agent-core 运行时读取，经设置页加密落盘，不进入 renderer 明文状态。
 - **图片生成 key 边界**：`IMAGE_GENERATION_API_KEY` 经 Electron `safeStorage` 加密保存，只在 main 解密并以内存配置注入 `generate_image` executor；renderer 只接收 `hasApiKey`、Base URL、模型名和本地产物引用。上游 Base64、Authorization header、签名 URL 与原始错误正文不得进入 session、renderer 或日志。
+- **图片分析凭据边界**：`inspect_image` 只引用 Kimi / OpenRouter 已有的默认或附加 Key；settings 只保存 provider-qualified 模型 ID 与 `credentialId`，renderer 不接收明文。被图片分析配置引用的附加 Key 禁止删除，调用失败不回落其他 Key 或 Provider。
 - **工具暴露最小化**：可通过 `ACTSPACE_DISABLED_TOOLS` 明确关闭不希望暴露给模型的工具，关闭发生在注册阶段，而不是只在执行时拒绝。
 - **优先级**：`process.env` 已有值 > `.env` 文件值 > schema 默认值。这保证 CI/Docker 场景可通过系统变量覆盖。
 - **验证前置**：`loadEnv()` 在应用启动时尽早调用，缺失 required 字段或值不合法时立即抛 `EnvValidationError`，不让无效配置流入运行时。
@@ -42,6 +43,7 @@
 - Bash 工具当前以当前进程的 `process.env` 启动子进程，因此命令执行不会把密钥提交到 Git，但允许被执行命令读取运行时环境变量。后续如要开放更高风险命令，应改为白名单环境变量或显式脱敏环境。
 - Bash 大输出流式落盘到 `<userData>/tmp/tool-output/<sessionId>/`，不写进 workspace；落盘文件由后续定时清理回收（见 context-compression.md「M5 清理」）。
 - `generate_image` 只允许 main Runtime 注入的 session artifact root，图片写入 `<userData>/sessions/<sessionId>/artifacts/generated-images/`；远程 URL 必须先通过 HTTPS/公网地址检查并下载到本地，不能直接作为 renderer 成功产物。
+- `inspect_image` 只允许读取 workspace 内普通文件、当前轮显式注册的图片附件，或当前 session `artifacts/` 子树；执行器对目标与允许根目录做 `realpath` 复验，拒绝符号链接逃逸、目录、设备、远程 URL 和未登记的工作区外路径。只接受文件签名匹配的 JPEG / PNG / WebP，单张上限 20 MiB。
 - renderer 不允许通过生成图片绝对路径自行拼接 `file://`。右侧预览必须走 `session:read-artifact`，main 使用 realpath 校验目标仍位于当前 session `artifacts/` 子树，并按大小和文件魔数确认后才返回 data URL。
 - Artifact 右键菜单里的打开、复制和 Finder 定位也是 main-owned 能力。Renderer 只能传递 `sessionId + artifactPath` 或 `workspaceRoot + relativePath`，main 必须重新校验 realpath 仍位于对应 session artifacts / workspace 边界内，不得直接对 renderer 传入的任意绝对路径调用 `shell.openPath` 或 `showItemInFolder`。
 - Sidebar 的 `Open in IDE` 同样是 main-owned Workspace 能力。Renderer 只传稳定 `workspaceId`，main 从 `<userData>/workspaces.json` 重新解析路径，并确认条目未隐藏、目标存在且是目录后，才能启动 Cursor；不接受 renderer 指定的任意绝对路径。
@@ -57,7 +59,8 @@
 - Usage 页 DeepSeek 余额查询通过 main 进程调用 `GET /user/balance`，renderer 只接收已裁剪的余额展示模型，不接触 `DEEPSEEK_API_KEY`、鉴权头或 DeepSeek 原始响应。
 - `web_search`（外部搜索 API 双通道）任一搜索 provider key 存在时注册，`web_fetch`（本地抓取）始终注册（见 `agent-web-tools.md`）。缺 key 时 executor 的兜底错误只提示需要配置的 key 名，不泄露其它运行时信息。
 - `generate_image` 仅在配置图片服务 Key 时向主 Agent 注册；默认模型为 `gpt-image-2`，但模型名和 Base URL 均由设置页覆盖。完整生成请求不自动重试，避免上游已计费时产生重复费用。
-- 图片附件只在当前模型 `input` 包含 `image` 时进入 LLM 请求；本地图片会在 turn 边界临时转成 data URL，但不会写入 session、renderer 状态或日志。text-only 模型只接收附件元信息和 runtime model 能力提示。
+- 图片附件在当前模型 `input` 包含 `image` 时直接进入主 LLM 请求；text-only 主模型只接收附件元信息、runtime model 状态和可用时的 `inspect_image` 调用指引。`inspect_image` 的视觉请求只包含固定 system prompt、问题、安全文件名和单张图片，不携带主会话历史、主 system prompt 或其他附件。
+- `inspect_image` 的图片 Base64 只存在于单次视觉请求内存，不进入工具输出、session、renderer 或日志。图片内文字一律视为不可信证据；视觉模型只返回最终观察，不返回隐藏推理。单次请求 90 秒超时、SDK 重试为 0，失败不自动切换 Kimi / OpenRouter，避免重复计费和不可解释的数据发送。
 - DeepSeek 当前 OpenAI-compatible 路线不声明 provider-native server search，联网能力统一由受密钥和工具权限控制的本地 `web_search` / `web_fetch` 提供。历史 Anthropic 路线的 DSML guard 只为协议兼容测试与旧记录保留。
 - 历史 session 中的 Anthropic server `server_tool_use`、`web_search_tool_result` 属于 provider 响应协议，不应当作为本地 ToolManager 执行日志写入；session / run log 只保留 `serverToolUse` 请求计数，不应将未裁剪网页全文或 provider tool result 原文写入 session。
 - 验收真实 provider 时应先发送不含仓库内容和隐私的固定探针，确认连接后再决定是否允许工具结果进入外部模型上下文。

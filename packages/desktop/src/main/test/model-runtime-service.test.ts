@@ -28,6 +28,30 @@ async function connect(settings: SettingsService, provider: "deepseek" | "kimi" 
 }
 
 describe("ModelRuntimeService", () => {
+  it("defaults image inspection to Luna on OpenRouter and can switch to Kimi", async () => {
+    const { settings, runtime } = await setup();
+    expect(runtime.resolveImageInspectionModel()).toMatchObject({ ok: false, code: "api_key_missing" });
+
+    await connect(settings, "openrouter");
+    expect(runtime.resolveImageInspectionModel()).toMatchObject({
+      ok: true,
+      model: {
+        key: "openrouter:openai/gpt-5.6-luna",
+        llmConfig: { provider: "openrouter", model: "openai/gpt-5.6-luna", apiKey: "sk-openrouter" },
+      },
+    });
+
+    await connect(settings, "kimi");
+    await settings.update({ imageInspection: { modelKey: "kimi:kimi-k2.7-code" } });
+    expect(runtime.resolveImageInspectionModel()).toMatchObject({
+      ok: true,
+      model: {
+        key: "kimi:kimi-k2.7-code",
+        llmConfig: { provider: "kimi", model: "kimi-k2.7-code", apiKey: "sk-kimi" },
+      },
+    });
+  });
+
   it("resolves requested main model with explicit provider runtime", async () => {
     const { settings, runtime } = await setup();
     await connect(settings, "deepseek");

@@ -384,6 +384,32 @@ describe("SettingsPage", () => {
     });
   });
 
+  it("图片分析默认使用 OpenRouter Luna，并可切换到 Kimi 已有凭据", async () => {
+    getSettings.mockResolvedValueOnce(makeSettings({
+      providers: {
+        deepseek: { hasApiKey: false },
+        kimi: { hasApiKey: true },
+        openrouter: { hasApiKey: true },
+      },
+      imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" },
+    }));
+    renderSettingsPage();
+    await screen.findByRole("switch", { name: "自动审查" });
+
+    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
+    expect(await screen.findByText("openai/gpt-5.6-luna")).toBeInTheDocument();
+    expect(screen.getByText("可用")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText("图片分析模型"));
+    await userEvent.click(await screen.findByRole("option", { name: "Kimi K2.7 Code · Kimi" }));
+
+    await waitFor(() => {
+      expect(updateSettings).toHaveBeenCalledWith({
+        imageInspection: { modelKey: "kimi:kimi-k2.7-code", credentialId: undefined },
+      });
+    });
+  });
+
   it("已配置的图片服务不回显 Key，并可从弹窗更换或断开", async () => {
     getSettings.mockResolvedValueOnce(makeSettings({
       imageGeneration: {

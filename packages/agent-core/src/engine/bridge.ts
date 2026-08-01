@@ -274,6 +274,7 @@ export async function runAgentWithBridge(
     loopResult = await agent.run(formatUserMessageForModel(userInput, input.modelAttachments ?? input.attachments, {
       modelId: deps.modelKey ?? modelSpec.id,
       input: deps.modelDefinition?.capabilities.input ?? modelSpec.input,
+      canInspectImages: deps.toolManager.has("inspect_image"),
     }));
   } catch (err) {
     await flushStreamLogBuffer(runLogger, streamLogBuffer);
@@ -1041,9 +1042,9 @@ function createToolUiPreview(
     }
 
     case "media_analysis": {
-      const source = stringArg(args.source, "media");
+      const source = stringArg(args.path, stringArg(args.source, "media"));
       const mediaName = displayFileName(source);
-      const mediaKind = getMediaKind(args);
+      const mediaKind = toolName === "inspect_image" ? "image" : getMediaKind(args);
       return {
         kind: "media_analysis",
         mediaName,
@@ -1246,8 +1247,8 @@ function getToolSummary(
       return `Web Search ${query || url || "..."}`;
     }
     case "media_analysis": {
-      const mediaName = displayFileName(stringArg(args.source, "media"));
-      return getMediaAnalysisPreviewText(mediaName, getMediaKind(args));
+      const mediaName = displayFileName(stringArg(args.path, stringArg(args.source, "media")));
+      return getMediaAnalysisPreviewText(mediaName, toolName === "inspect_image" ? "image" : getMediaKind(args));
     }
     case "directory_list":
       return `Listed ${displayPathTail(stringArg(args.path, "directory"))}`;

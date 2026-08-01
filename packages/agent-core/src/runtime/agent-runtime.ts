@@ -205,6 +205,10 @@ class DefaultAgentRuntime implements AgentRuntime {
       const runtimeContext: AgentRuntimeContext = {
         tmpRoot: request.roots.tmpRoot,
         artifactRoot: join(sessionPaths.root, "artifacts", "generated-images"),
+        sessionArtifactRoot: join(sessionPaths.root, "artifacts"),
+        imageInspectionAllowedPaths: (request.attachments ?? [])
+          .filter((attachment) => attachment.kind === "image" && Boolean(attachment.path))
+          .map((attachment) => attachment.path!),
         sessionId: request.sessionId,
         agentRunId: request.agentRunId,
         toolProfile: mode === "chat" ? "none" : mode === "plan" ? "read-only" : "full",

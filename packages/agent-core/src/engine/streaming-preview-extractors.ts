@@ -63,7 +63,7 @@ const EXTRACTORS: Record<ToolPreviewKind, Extractor> = {
   },
 
   media_analysis: (s) => {
-    const source = getField(s, "source") ?? "";
+    const source = getField(s, "path") ?? getField(s, "source") ?? "";
     const mimeType = getField(s, "mimeType");
     const mediaKind = mimeType?.startsWith("image/")
       ? "image"

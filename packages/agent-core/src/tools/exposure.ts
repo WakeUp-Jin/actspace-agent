@@ -10,5 +10,6 @@ export function shouldExposeTool(
   if (spec.requiresKey === "kimi" && !runtime.hasKimiKey) return false;
   if (spec.requiresKey === "webSearch" && !runtime.hasWebSearchKey) return false;
   if (spec.requiresKey === "imageGeneration" && !runtime.hasImageGenerationKey) return false;
+  if (spec.requiresKey === "imageInspection" && !runtime.hasImageInspectionModel) return false;
   return true;
 }

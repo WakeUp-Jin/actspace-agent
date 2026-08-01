@@ -322,6 +322,51 @@ describe("SettingsService", () => {
     });
   });
 
+  it("图片分析默认使用 OpenRouter Luna，并保护被引用的已有 Key", async () => {
+    const dataRoot = await makeDataRoot();
+    const svc = new SettingsService({
+      dataRoot,
+      crypto: makeCrypto(),
+      reloadEnv,
+      createCredentialId: () => "vision-key",
+    });
+    await svc.load();
+
+    expect(svc.getV2().imageInspection).toEqual({
+      modelKey: "openrouter:openai/gpt-5.6-luna",
+    });
+
+    await svc.addProviderCredential({
+      provider: "openrouter",
+      label: "Vision",
+      apiKey: "test-openrouter-vision-key",
+      pricingMultiplier: 1,
+    });
+    await svc.update({
+      imageInspection: {
+        modelKey: "openrouter:openai/gpt-5.6-luna",
+        credentialId: "vision-key",
+      },
+    });
+
+    expect(svc.getProviderRuntimeConfigForCredential("openrouter", "vision-key")).toMatchObject({
+      apiKey: "test-openrouter-vision-key",
+    });
+    await expect(svc.removeProviderCredential("openrouter", "vision-key")).resolves.toMatchObject({
+      ok: false,
+      code: "credential_in_use",
+      references: ["openrouter:openai/gpt-5.6-luna"],
+    });
+
+    const reopened = makeService(dataRoot);
+    await reopened.load();
+    expect(reopened.getV2().imageInspection).toEqual({
+      modelKey: "openrouter:openai/gpt-5.6-luna",
+      credentialId: "vision-key",
+    });
+    expect(JSON.stringify(reopened.getV2())).not.toContain("test-openrouter-vision-key");
+  });
+
   it("clearProviderKey 彻底删除密钥，不再回落 .env", async () => {
     process.env.DEEPSEEK_API_KEY = "sk-from-dotenv";
     reloadEnv();
