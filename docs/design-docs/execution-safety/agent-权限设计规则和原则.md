@@ -10,7 +10,7 @@
 - `docs/exec-plans/completed/actspace-tool-permission-scheduler-plan.md`
 - `docs/exec-plans/completed/actspace-bash-tool-plan.md`
 - `docs/exec-plans/completed/actspace-bash-approval-ui-plan.md`
-- `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-tool-pause-session-boundary-plan.md`
+- `docs/exec-plans/completed/actspace-tool-pause-session-boundary-plan.md`
 - `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-bash-session-allowlist-plan.md`
 
 ## 设计目标

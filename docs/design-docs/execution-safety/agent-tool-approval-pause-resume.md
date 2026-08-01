@@ -4,7 +4,7 @@
 
 状态：已实现首版。ApprovalGate、PendingApprovalRegistry、IPC 通道、单测已完成。待 Electron 手动验收。
 
-相关实施计划：`docs/exec-plans/active/Bash工具和工具权限调度开发计划/`
+相关实施计划：`docs/exec-plans/completed/actspace-tool-pause-session-boundary-plan.md`；后续 allowlist 工作见 `docs/exec-plans/active/Bash工具和工具权限调度开发计划/`。
 
 ## 问题
 

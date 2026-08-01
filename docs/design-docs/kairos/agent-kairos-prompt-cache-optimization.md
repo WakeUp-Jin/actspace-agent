@@ -1,6 +1,6 @@
 # Kairos Prompt 缓存优化与 Thinking 全链路设计
 
-状态：设计定稿（2026-06-10），对应执行计划 `docs/exec-plans/active/kairos_prompt_cache_optimization.md`。
+状态：设计定稿并完成实施（2026-06-10），对应执行计划 `docs/exec-plans/completed/kairos_prompt_cache_optimization.md`。
 
 ## 1. 为什么做
 

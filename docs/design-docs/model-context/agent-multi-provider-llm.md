@@ -5,7 +5,7 @@
 - 状态：代码已落地，待用户统一手动验收。
 - 确认日期：2026-07-24。
 - 当前供应商：DeepSeek、Kimi、OpenRouter、DuckCoding。
-- 对应 execution plan：`docs/exec-plans/active/20260724-multi-provider-llm/README.md`。
+- 对应 execution plan：`docs/exec-plans/completed/20260724-multi-provider-llm/README.md`。
 - 当前实现已贯通 DeepSeek / Kimi / OpenRouter / DuckCoding 的 settings v2、动态模型解析、服务商级代理 transport、任务模型 runtime、IPC 与设置页；DuckCoding 额外支持渐进式多 Key、本地 Codex/Grok 档案、Codex Responses、请求模型名变体和 Key 倍率。OpenRouter 真实代理、DuckCoding 真实 Agent 工具循环和跨任务模型场景仍按 execution plan 由用户统一手动验收。
 
 本文是 actspace 多供应商 LLM、用户模型管理、服务商级代理和任务模型分配的长期设计事实来源。

@@ -1,6 +1,6 @@
 # 上下文压缩设计
 
-本文是 actspace 主 Agent「上下文压缩」的长期设计事实来源。它回答：为什么压缩、压缩什么、在哪里压缩、压缩后如何恢复，以及哪些方案被排除。具体实施步骤见 `docs/exec-plans/active/20260529-context-compression.md`。
+本文是 actspace 主 Agent「上下文压缩」的长期设计事实来源。它回答：为什么压缩、压缩什么、在哪里压缩、压缩后如何恢复，以及哪些方案被排除。具体实施记录见 `docs/exec-plans/completed/20260529-context-compression.md`。
 
 设计原则来源：`.agents/skills/llm-agent-dev/references/context/mgmt-compression.md`、`.agents/skills/llm-agent-dev/references/context/mgmt-token-strategies.md`、`.agents/skills/llm-agent-dev/references/tools/tool-scheduling.md`。
 

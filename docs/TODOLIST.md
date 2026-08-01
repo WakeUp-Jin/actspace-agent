@@ -1,48 +1,29 @@
 # TODO List
 
-这个文件记录当前需要持续推进的仓库级任务。它不替代 execution plan；复杂任务仍以 `docs/exec-plans/` 中的计划文件为准。
+这个文件只记录当前需要持续推进的仓库级任务。复杂任务的范围、依赖和验收以 `docs/exec-plans/active/` 中的计划为准。
 
 ## 当前焦点
 
 | 事项 | 状态 | 入口 | 下一步 |
 | --- | --- | --- | --- |
-| 2026-05-27 使用问题拆分计划 | 进行中 | `docs/exec-plans/active/20260527-bugfix-foundation_代码编完需手动验证.md`、`docs/exec-plans/active/20260527-agent-tool-capabilities.md`、`docs/exec-plans/active/20260527-frontend-interaction-polish/README.md`、`docs/exec-plans/active/20260527-right-panel-views.md` | 按各 plan 的并行边界推进，避免同时改同一块 UI / tool contract。 |
-| Bash 真实审核与暂停恢复验收 | 待验收 | `docs/exec-plans/active/Bash工具和工具权限调度开发计划/README.md`、`docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-tool-pause-session-boundary-plan.md` | 用真实 Bash `ask` 触发审核面板，覆盖 `Run / Allow / Skip`、会话切换、刷新/重启、超时和幂等。 |
-| Bash 会话级动态 allowlist + Allow 子命令拆分授权 | 待执行 | `docs/design-docs/execution-safety/agent-bash-policy-allowlist-design.md`、`docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-bash-session-allowlist-plan.md` | 按 Phase 1 plan 从共享契约、split-for-authorization、store、permissions/scheduler、renderer dropdown 和 session replay 推进。 |
-| Tailwind 样式架构迁移 | 进行中 | `docs/exec-plans/active/actspace-tailwind-style-architecture.md`、`docs/exec-plans/active/20260528-tailwind-remaining-ui-migration.md` | Usage 样板和 Lab V0 已完成；下一步按剩余 UI 迁移计划优先推进 RightPanel / Kairos Compact 切片。 |
+| Agent Team V1 | 待执行 | `docs/exec-plans/active/20260711-agent-team/README.md` | 按共享契约、存储、runtime、工具权限、桌面接入、Team UI 和端到端验收的依赖顺序推进。 |
+| Bash 会话级动态 allowlist | 待执行 | `docs/exec-plans/active/Bash工具和工具权限调度开发计划/README.md` | 完成子命令拆分授权、会话与用户级 allowlist、审批 UI 和 session replay。 |
+| 前端 UI 组件基础 | 待执行 | `docs/exec-plans/active/frontend-ui-components-foundation.md` | 先确认组件边界和迁移顺序，再以小切片替换重复实现。 |
 
-## 验收缺口
+## Bash Allowlist 验收重点
 
-- Bash `allow` 应直接执行，不显示审核面板。
-- Bash `deny` 应硬拒绝，不进入审核面板。
-- Bash `ask` 应生成 approval request，并显示 Bash 审核面板。
-- `Run` 应只允许本次命令。
-- `Allow` 应允许本会话内相似操作，授权范围必须可见。
-- `Skip` 应取消本次执行，并在消息流中显示 cancelled。
-- 会话切换或应用重启后，pending 状态不能丢失、重复执行或错误自动放行。
-- `docs/exec-plans/completed/actspace-ui-bug-fix-plan.md` 与 `docs/exec-plans/completed/actspace-workbench-split-view-foundation.md` 仍保留 Electron 真实验收缺口；后续可在相关前端回归中一并补验。
-
-## 已完成入口
-
-- Bash 工具、权限调度和审核 UI 已归档到：
-  - `docs/exec-plans/completed/actspace-tool-permission-scheduler-plan.md`
-  - `docs/exec-plans/completed/actspace-bash-tool-plan.md`
-  - `docs/exec-plans/completed/actspace-bash-approval-ui-plan.md`
-- DeepSeek + Kimi 混合能力已归档到 `docs/exec-plans/completed/actspace-deepseek-kimi-hybrid-capabilities.md`。
-- Grep / Glob / rg 工具链已归档到 `docs/exec-plans/completed/actspace-grep-glob-rg-tools-and-ui.md`。
-- Sidebar Cursor 对齐已归档到 `docs/exec-plans/completed/sidebar-cursor-alignment.md`。
-- Kairos v1 七份基础计划已归档到 `docs/exec-plans/completed/kairos_*.md`。
-- Kairos 监控页产品化已归档到 `docs/exec-plans/completed/kairos-monitor-page-redesign.md`。
-- Token Usage / Context Control 数据地基已归档到 `docs/exec-plans/completed/actspace-token-usage-context-control-foundation.md`。
-- Usage Statistics session.jsonl 计划已归档到 `docs/exec-plans/completed/actspace-usage-statistics-session-jsonl-plan.md`。
+- 复合命令必须按子命令拆分授权，危险片段不能被安全前缀掩盖。
+- `Run` 只允许本次执行；`Allow` 的授权范围必须可见并限制在当前会话。
+- 会话级授权需要随 session replay 恢复，升级为用户级授权时必须经过 main 进程持久化。
+- hard reject 仍直接拒绝，不进入可以被用户放行的审核面板。
 
 ## 未来方向
 
-- Bash 全局执行策略选择器和真沙箱以 `docs/design-docs/execution-safety/agent-bash-policy-allowlist-design.md` 的 Phase 2 / Phase 3 为准，Phase 1 验收完成后再单独立项。
-- Settings -> General -> Typography 已移入 `docs/exec-plans/tech-debt-tracker.md`，并由 `docs/exec-plans/active/20260527-frontend-interaction-polish/05-settings-typography.md` 承接。
+- Bash 全局执行策略选择器和网络隔离以 `docs/design-docs/execution-safety/agent-bash-policy-allowlist-design.md` 的 Phase 2 / Phase 3 为准，Phase 1 完成后再单独立项。
+- 尚未进入 execution plan 的工作继续记录在 `docs/exec-plans/tech-debt-tracker.md`，不要为了占位创建空计划。
 
-## 后续维护规则
+## 维护规则
 
-- 新增跨多轮任务时，先在这里加一行总控 TODO，再视复杂度落 execution plan。
-- 完成任务后，把状态改为 `完成`，并链接 history 或 completed plan。
-- 如果 TODO 已经沉淀成独立计划簇，保留这里的摘要和入口，不把所有细节复制进来。
+- 新增跨多轮任务时，先在这里增加一行总控 TODO，再视复杂度创建 execution plan。
+- 任务完成后从当前焦点移除，并将计划归档到 `completed/`；不在这里维护第二份完成清单。
+- 被替代或放弃的计划移动到 `discarded/`，不要删除历史决策上下文。

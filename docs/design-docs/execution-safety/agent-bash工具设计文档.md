@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-状态：E1–E4 已实现（2026-07-03，见 `docs/exec-plans/active/20260703-bash-execution-model/`）；E5 沙盒第一期已实现（2026-07-04，见 `docs/exec-plans/active/20260704-bash-sandbox/`），随后落地了文本层规则分级（hard reject / 不可逆 ask / allowlist，见「文本层规则分级表」）与 `.git` 延迟执行点定向禁写。2026-07-17 补齐后台任务治理：统一 30 分钟最大运行时间、单会话最多 8 个任务、相同 `cwd + command` 去重，以及每个新用户 turn 首次模型调用前注入一次运行清单。
+状态：E1–E4 已实现（2026-07-03，见 `docs/exec-plans/completed/20260703-bash-execution-model/`）；E5 沙盒第一期已实现（2026-07-04，见 `docs/exec-plans/completed/20260704-bash-sandbox/`），随后落地了文本层规则分级（hard reject / 不可逆 ask / allowlist，见「文本层规则分级表」）与 `.git` 延迟执行点定向禁写。2026-07-17 补齐后台任务治理：统一 30 分钟最大运行时间、单会话最多 8 个任务、相同 `cwd + command` 去重，以及每个新用户 turn 首次模型调用前注入一次运行清单。
 
 E5 第一期与本文的裁剪偏差（后续阶段收敛）：
 

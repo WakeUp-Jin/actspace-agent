@@ -1,5 +1,7 @@
 # 2026-05-27 Agent 工具能力补齐计划
 
+> 生命周期：2026-08-01 丢弃。该母计划已经被 `20260527-agent-tool-capabilities-breakdown/`、对应 completed plans，以及当前 `docs/design-docs/tool-system/` 与 `docs/design-docs/model-context/` 设计文档替代。正文保留为历史方案，不应继续作为执行入口。
+
 ## 目标
 
 补齐当前 Agent 工具系统中导致 Bash 过度使用、文件修改语义不完整、上下文过大不可控和 Skill 能力缺席的问题。完成后，Agent 应优先使用专门工具完成文件与上下文任务，Bash 只承担真正需要 shell 的操作。

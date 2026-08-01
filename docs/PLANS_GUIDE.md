@@ -13,6 +13,7 @@ execution plan 适合用在那些超出单轮聊天上下文、需要多次推�
 
 - 进行中的 plan 放在 `docs/exec-plans/active/`
 - 已完成的 plan 移到 `docs/exec-plans/completed/`
+- 已失效、被取代或明确不再执行，但仍需保留决策上下文的 plan 移到 `docs/exec-plans/discarded/`
 - 复用模板在 `docs/exec-plans/templates/execution-plan.md`
 - 暂不处理但值得保留的债务放到 `docs/exec-plans/tech-debt-tracker.md`
 
@@ -20,8 +21,10 @@ execution plan 适合用在那些超出单轮聊天上下文、需要多次推�
 
 - 写清目标、范围、约束、风险和验证方式。
 - 推进过程和关键决定要落在仓库里，不要只存在聊天记录里。
-- 状态变化要同步更新。
-- 过期 plan 要及时关闭、归档或清理，保证 active 目录可信。
+- 状态变化要同步更新；完成后应在同一轮移动到 `completed/`。
+- 实现已经完成、仅保留人工验收边界的 plan 也应进入 `completed/`，并在正文明确尚未验证的范围。
+- 被后续方案替代或不再采用的 plan 不直接删除，移动到 `discarded/`，在顶部写明丢弃日期、原因和替代入口。
+- `active/` 的每个一级入口必须出现在 `docs/exec-plans/README.md`，并具有可执行的下一步，保证目录可信。
 
 ## 从设计文档生成 plan
 

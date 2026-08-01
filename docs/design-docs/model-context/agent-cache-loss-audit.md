@@ -1,7 +1,7 @@
 # Cache Loss Audit 设计
 
 > 状态：设计规范
-> 关联计划：`docs/exec-plans/active/actspace-cache-loss-audit-plan.md`
+> 关联计划：`docs/exec-plans/completed/actspace-cache-loss-audit-plan.md`
 > 适用范围：`packages/agent-core`、`packages/shared`、本地 session 存储与排障脚本
 
 ## 背景
