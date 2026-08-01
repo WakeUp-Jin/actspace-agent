@@ -263,7 +263,7 @@
 
 ## 验收矩阵
 
-- Workspace 文件夹：左侧 chevron 只折叠，名称点击/右键打开同一菜单，右侧 `+` 仍只新建 Agent。
+- Workspace 文件夹：左侧 chevron 只折叠；名称左键只聚焦，右键打开菜单，`Shift+F10` / Context Menu 键提供键盘入口；右侧 `+` 仍只新建 Agent。
 - 菜单：顺序、图标、separator、danger 文字、键盘方向键、Escape 回焦和窗口 collision 正常。
 - `Open in IDE`：只打开 registry 对应目录；未注册、已隐藏、不存在和非目录目标都不启动外部程序。
 - `Archive All`：包含 Pinned 会话；存在 running/waiting approval 会话时禁用；active session 有导航落点；部分失败保留未成功条目。

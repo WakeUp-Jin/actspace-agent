@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import {
   Check,
   Bookmark,
@@ -14,9 +15,11 @@ import {
   Loader2,
   MonitorUp,
   Plus,
+  Search,
   X,
 } from "lucide-react";
 import type {
+  GitBranchItem,
   MessageBlock,
   WorkspaceEnvironmentSnapshot,
   WorkspaceGitMutationResult,
@@ -44,6 +47,8 @@ const INPUT_CLASS =
   "h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none placeholder:text-text-subtle focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20";
 const PRIMARY_BUTTON_CLASS =
   "inline-flex h-9 items-center justify-center rounded-act-md bg-action px-4 text-[13px] font-semibold text-on-action transition hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-50";
+const SECONDARY_BUTTON_CLASS =
+  "inline-flex h-9 items-center justify-center rounded-act-md border border-line bg-surface-subtle px-4 text-[13px] font-medium text-text-main transition hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-50";
 
 type GitDialogState =
   | { kind: "branch" }
@@ -125,6 +130,7 @@ export function WorkspaceChromeControls({
   const [tools, setTools] = useState<WorkspaceOpenTool[]>([]);
   const [toolMenuOpen, setToolMenuOpen] = useState(false);
   const [environmentOpen, setEnvironmentOpen] = useState(false);
+  const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const [environment, setEnvironment] = useState<WorkspaceEnvironmentSnapshot | null>(null);
   const [loadingEnvironment, setLoadingEnvironment] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -132,6 +138,8 @@ export function WorkspaceChromeControls({
   const [dialog, setDialog] = useState<GitDialogState>(null);
   const toolAnchorRef = useRef<HTMLDivElement>(null);
   const environmentAnchorRef = useRef<HTMLDivElement>(null);
+  const branchAnchorRef = useRef<HTMLButtonElement>(null);
+  const branchMenuRef = useRef<HTMLDivElement>(null);
   const toolToggleRef = useRef<HTMLButtonElement>(null);
   const environmentToggleRef = useRef<HTMLButtonElement>(null);
   const sources = useMemo(() => collectSources(workspaceRoot, messages), [messages, workspaceRoot]);
@@ -174,6 +182,7 @@ export function WorkspaceChromeControls({
     setFeedback(null);
     setDialog(null);
     setEnvironmentOpen(false);
+    setBranchMenuOpen(false);
     setToolMenuOpen(false);
     void loadTools();
   }, [workspaceRoot]);
@@ -183,12 +192,22 @@ export function WorkspaceChromeControls({
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node;
       if (!toolAnchorRef.current?.contains(target)) setToolMenuOpen(false);
-      if (!environmentAnchorRef.current?.contains(target)) {
+      const insideBranchMenu = branchMenuRef.current?.contains(target);
+      const insideEnvironment = environmentAnchorRef.current?.contains(target);
+      if (!insideEnvironment && !insideBranchMenu) {
         setEnvironmentOpen(false);
+        setBranchMenuOpen(false);
+      } else if (branchMenuOpen && !insideBranchMenu && !branchAnchorRef.current?.contains(target)) {
+        setBranchMenuOpen(false);
       }
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
+      if (branchMenuOpen) {
+        setBranchMenuOpen(false);
+        queueMicrotask(() => branchAnchorRef.current?.focus());
+        return;
+      }
       const focusTarget = toolMenuOpen ? toolToggleRef.current : environmentToggleRef.current;
       setToolMenuOpen(false);
       setEnvironmentOpen(false);
@@ -200,7 +219,7 @@ export function WorkspaceChromeControls({
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [environmentOpen, toolMenuOpen]);
+  }, [branchMenuOpen, environmentOpen, toolMenuOpen]);
 
   const openInTool = async (toolId: WorkspaceOpenToolId) => {
     const api = window.actspace?.openWorkspaceInTool;
@@ -230,21 +249,24 @@ export function WorkspaceChromeControls({
     queueMicrotask(() => environmentToggleRef.current?.focus());
   };
 
-  const handleMutationResult = async (result: WorkspaceGitMutationResult) => {
+  const handleMutationResult = async (result: WorkspaceGitMutationResult, closeMutationDialog = true) => {
     if (!result.ok && result.error === "remote_required" && result.remotes?.length) {
       return false;
     }
     if (result.ok) {
       const message = result.action === "create_branch"
-        ? `Created branch ${result.branch}.`
+        ? `Created and checked out ${result.branch}.`
+        : result.action === "switch_branch"
+          ? `Switched to ${result.branch}.`
         : result.action === "commit"
           ? `Committed ${result.commitHash ?? "workspace changes"}.`
           : result.action === "commit_and_push"
             ? `Committed ${result.commitHash ?? "changes"} and pushed.`
             : `Pushed ${result.branch ?? "branch"}.`;
       setEnvironmentOpen(true);
+      setBranchMenuOpen(false);
       setFeedback({ tone: "success", message });
-      closeDialog();
+      if (closeMutationDialog) closeDialog();
       await loadEnvironment();
       window.dispatchEvent(new CustomEvent("actspace:workspace-git-changed", { detail: { workspaceRoot } }));
       onWorkspaceChanged?.();
@@ -252,8 +274,9 @@ export function WorkspaceChromeControls({
     }
     const prefix = result.commitCreated && result.commitHash ? `Commit ${result.commitHash} was created. ` : "";
     setEnvironmentOpen(true);
+    setBranchMenuOpen(false);
     setFeedback({ tone: "danger", message: `${prefix}${result.message ?? "Git action failed."}` });
-    closeDialog();
+    if (closeMutationDialog) closeDialog();
     await loadEnvironment();
     window.dispatchEvent(new CustomEvent("actspace:workspace-git-changed", { detail: { workspaceRoot } }));
     onWorkspaceChanged?.();
@@ -271,6 +294,25 @@ export function WorkspaceChromeControls({
       } else {
         await handleMutationResult(result);
       }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const switchBranch = async (branchName: string) => {
+    if (branchName === environment?.git.branch) {
+      setBranchMenuOpen(false);
+      queueMicrotask(() => branchAnchorRef.current?.focus());
+      return;
+    }
+    const api = window.actspace?.switchWorkspaceBranch;
+    if (!api) {
+      setFeedback({ tone: "danger", message: "Switching branches is available in the desktop app." });
+      return;
+    }
+    setBusy(true);
+    try {
+      await handleMutationResult(await api({ workspaceRoot, branchName }), false);
     } finally {
       setBusy(false);
     }
@@ -350,6 +392,7 @@ export function WorkspaceChromeControls({
               onClick={() => {
                 const next = !environmentOpen;
                 setEnvironmentOpen(next);
+                if (!next) setBranchMenuOpen(false);
                 if (next) {
                   setFeedback(null);
                   void loadEnvironment();
@@ -384,10 +427,19 @@ export function WorkspaceChromeControls({
                 <span className="min-w-0 flex-1">{environment?.locationKind === "worktree" ? "Worktree" : "This Mac"}</span>
               </div>
               {environment?.git.branch ? (
-                <div className={ROW_CLASS} title={environment.git.branch}>
+                <button
+                  ref={branchAnchorRef}
+                  type="button"
+                  className={ROW_CLASS}
+                  title={environment.git.branch}
+                  aria-haspopup="menu"
+                  aria-expanded={branchMenuOpen}
+                  onClick={() => setBranchMenuOpen((value) => !value)}
+                >
                   <GitBranch size={15} aria-hidden="true" />
                   <span className="min-w-0 flex-1 truncate">{environment.git.branch}</span>
-                </div>
+                  <ChevronDown size={13} className="text-text-faint" aria-hidden="true" />
+                </button>
               ) : (
                 <button
                   type="button"
@@ -451,6 +503,20 @@ export function WorkspaceChromeControls({
         ) : null}
       </div>
 
+      {branchMenuOpen && environment?.git.branch ? (
+        <BranchMenu
+          anchorRef={branchAnchorRef}
+          menuRef={branchMenuRef}
+          branches={environment.git.branches ?? [{ name: environment.git.branch, current: true }]}
+          busy={busy}
+          onSelect={(branchName) => void switchBranch(branchName)}
+          onCreate={() => {
+            setBranchMenuOpen(false);
+            setDialog({ kind: "branch" });
+          }}
+        />
+      ) : null}
+
       {dialog ? (
         <GitActionDialog
           state={dialog}
@@ -507,6 +573,115 @@ export function WorkspaceChromeControls({
   );
 }
 
+function BranchMenu({
+  anchorRef,
+  menuRef,
+  branches,
+  busy,
+  onSelect,
+  onCreate,
+}: {
+  anchorRef: RefObject<HTMLButtonElement | null>;
+  menuRef: RefObject<HTMLDivElement | null>;
+  branches: GitBranchItem[];
+  busy: boolean;
+  onSelect: (branchName: string) => void;
+  onCreate: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [position, setPosition] = useState<CSSProperties>({ visibility: "hidden" });
+  const filteredBranches = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase();
+    if (!normalized) return branches;
+    return branches.filter((branch) => branch.name.toLocaleLowerCase().includes(normalized));
+  }, [branches, query]);
+
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    const menu = menuRef.current;
+    if (!anchor || !menu) return;
+    const updatePosition = () => {
+      const anchorRect = anchor.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+      const viewportPadding = 8;
+      const gap = 6;
+      const preferredLeft = anchorRect.left - menuRect.width - gap;
+      const fallbackLeft = anchorRect.right + gap;
+      const availableLeft = preferredLeft >= viewportPadding ? preferredLeft : fallbackLeft;
+      const left = Math.min(Math.max(viewportPadding, availableLeft), window.innerWidth - menuRect.width - viewportPadding);
+      const top = Math.min(
+        Math.max(viewportPadding, anchorRect.top),
+        window.innerHeight - menuRect.height - viewportPadding,
+      );
+      setPosition({ left, top });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [anchorRef, menuRef]);
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      className="fixed z-[120] flex w-[288px] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-act-xl border border-line bg-surface-raised shadow-act-popover [-webkit-app-region:no-drag]"
+      role="menu"
+      aria-label="Branches"
+      style={position}
+    >
+      <div className="p-2">
+        <label className="flex h-8 items-center gap-2 rounded-act-md border border-line bg-surface-subtle px-2.5 text-text-faint focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring/20">
+          <Search size={13} aria-hidden="true" />
+          <span className="sr-only">Search branches</span>
+          <input
+            autoFocus
+            type="search"
+            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] text-text-main outline-none placeholder:text-text-faint"
+            placeholder="Search branches"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+      </div>
+      <div className="px-2 pb-1 text-[12px] font-medium text-text-faint">Branches</div>
+      <div className="max-h-[240px] overflow-y-auto px-1.5 pb-1.5">
+        {filteredBranches.length ? filteredBranches.map((branch) => {
+          const occupied = Boolean(branch.checkedOutPath && !branch.current);
+          return (
+            <button
+              key={branch.name}
+              type="button"
+              role="menuitemradio"
+              aria-checked={branch.current}
+              className={MENU_ITEM_CLASS}
+              disabled={busy || occupied}
+              title={occupied ? `Checked out in ${branch.checkedOutPath}` : branch.name}
+              onClick={() => onSelect(branch.name)}
+            >
+              <GitBranch size={14} aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate">{branch.name}</span>
+              {occupied ? <span className="shrink-0 text-[11px] text-text-faint">In worktree</span> : null}
+              {branch.current ? <Check size={13} className="shrink-0 text-text-main" aria-hidden="true" /> : null}
+            </button>
+          );
+        }) : (
+          <div className="px-2.5 py-4 text-center text-[12px] text-text-faint">No branches found</div>
+        )}
+      </div>
+      <div className="border-t border-line p-1.5">
+        <button type="button" role="menuitem" className={MENU_ITEM_CLASS} disabled={busy} onClick={onCreate}>
+          <Plus size={15} aria-hidden="true" />
+          <span>Create and checkout new branch...</span>
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function GitActionDialog({
   state,
   title,
@@ -560,28 +735,20 @@ function GitActionDialog({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [branchName, busy, canCommit, includeUnstagedChanges, message, onClose, onGitAction, state.kind, useNewBranch]);
 
-  const dialogTitle = state.kind === "branch" ? "Work here" : state.kind === "git" ? "Commit or push" : "Choose remote";
+  const dialogTitle = state.kind === "branch" ? "Create and checkout branch" : state.kind === "git" ? "Commit or push" : "Choose remote";
 
   return (
     <div className={DIALOG_OVERLAY_CLASS} role="presentation" onMouseDown={() => { if (!busy) onClose(); }}>
       <div className={DIALOG_CLASS} role="dialog" aria-modal="true" aria-label={dialogTitle} onMouseDown={(event) => event.stopPropagation()}>
         {state.kind === "branch" ? (
-          <div className="p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="mb-3 grid h-8 w-8 place-items-center rounded-act-md bg-surface-subtle text-text-main">
-                  <GitBranch size={17} aria-hidden="true" />
-                </div>
-                <h2 className="m-0 text-[20px] font-semibold text-text-main">Work here</h2>
-                <p className="mb-0 mt-1.5 text-[13px] leading-relaxed text-text-muted">
-                  Create a branch to commit and push changes from the current workspace.
-                </p>
-              </div>
+          <form onSubmit={(event) => { event.preventDefault(); if (!busy && branchName.trim()) void onCreateBranch(branchName); }}>
+            <div className="flex items-center justify-between gap-4 px-5 pb-3 pt-5">
+              <h2 className="m-0 text-[20px] font-semibold text-text-main">Create and checkout branch</h2>
               <button type="button" className="grid h-8 w-8 shrink-0 place-items-center rounded-act-md text-text-faint hover:bg-hover-overlay hover:text-text-main" aria-label="Close Git action" disabled={busy} onClick={onClose}>
                 <X size={15} aria-hidden="true" />
               </button>
             </div>
-            <div className="mt-5 grid gap-3">
+            <div className="grid gap-3 px-5 pb-5">
               <div className="grid gap-1.5 text-[12px] font-medium text-text-muted">
                 <div className="flex items-center justify-between">
                   Branch name
@@ -603,11 +770,14 @@ function GitActionDialog({
                   />
                 </label>
               ) : null}
-              <button type="button" className={`${PRIMARY_BUTTON_CLASS} mt-1 w-full`} disabled={busy || !branchName.trim()} onClick={() => void onCreateBranch(branchName)}>
-                {busy ? <Loader2 size={14} className="mr-2 animate-spin" aria-hidden="true" /> : null} Create
+            </div>
+            <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
+              <button type="button" className={SECONDARY_BUTTON_CLASS} disabled={busy} onClick={onClose}>Close</button>
+              <button type="submit" className={PRIMARY_BUTTON_CLASS} disabled={busy || !branchName.trim()}>
+                {busy ? <Loader2 size={14} className="mr-2 animate-spin" aria-hidden="true" /> : null} Create and checkout
               </button>
             </div>
-          </div>
+          </form>
         ) : null}
 
         {state.kind === "git" ? (

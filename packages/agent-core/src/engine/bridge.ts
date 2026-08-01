@@ -957,6 +957,18 @@ function getFileChangeStructured(structured: unknown): {
   };
 }
 
+function getFileOutputStructured(structured: unknown): {
+  filePath?: string;
+  relativePath?: string;
+} | undefined {
+  if (structured === null || typeof structured !== "object") return undefined;
+  const record = structured as Record<string, unknown>;
+  return {
+    filePath: typeof record.filePath === "string" ? record.filePath : undefined,
+    relativePath: typeof record.relativePath === "string" ? record.relativePath : undefined,
+  };
+}
+
 function isFileWriteDeniedOutput(output: string): boolean {
   return /\bUser denied tool:\s*(edit_file|write_file)\b/.test(output) ||
     /\bApproval timed out for tool:\s*(edit_file|write_file)\b/.test(output);
@@ -1150,11 +1162,14 @@ function createToolUiPreview(
     case "delete": {
       const filePath = stringArg(args.path, "Unknown file");
       const displayPath = displayFileName(filePath);
+      const deletedFile = getFileOutputStructured(structured);
       const denied = !ok && isDeleteDeniedOutput(output);
       const status = output.length === 0 ? "running" : ok ? "completed" : denied ? "denied" : "failed";
       return {
         kind: "delete",
         filePath: displayPath,
+        ...(ok && deletedFile?.filePath ? { outputPath: deletedFile.filePath } : {}),
+        ...(ok && deletedFile?.relativePath ? { outputRelativePath: deletedFile.relativePath } : {}),
         displayText: getDeletePreviewText(displayPath, status),
         status,
       };

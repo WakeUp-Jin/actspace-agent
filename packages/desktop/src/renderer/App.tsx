@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  DEFAULT_QUICK_OPEN_ACCELERATOR,
   DEFAULT_MODEL_ID,
   createMessageBlocks,
   formatSessionTranscript,
@@ -13,6 +14,7 @@ import type {
   BashStatus,
   BootstrapState,
   CompactContextInput,
+  ComposerAttachment,
   ComposerMode,
   GenerateEvalCandidateInput,
   ContextState,
@@ -40,6 +42,7 @@ import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import { resolvePreferredChatModel } from "./model-selection";
 import type { ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
+import { resolveQuickOpenTarget } from "./quick-open-routing";
 
 const DEFAULT_WORKSPACE_LABEL = "Default workspace";
 const DEFAULT_COMPOSER_STATE: { mode: ComposerMode; selectedSkills: string[] } = {
@@ -49,6 +52,11 @@ const DEFAULT_COMPOSER_STATE: { mode: ComposerMode; selectedSkills: string[] } =
 
 function hasActspaceBridge(): boolean {
   return typeof window !== "undefined" && Boolean(window.actspace);
+}
+
+function attachmentForRuntime(attachment: ComposerAttachment): ComposerAttachment {
+  const { previewUrl: _previewUrl, ...runtimeAttachment } = attachment;
+  return runtimeAttachment;
 }
 
 function getSessionTitle(sessionRecord: SessionRecord | null, sessions: SessionListItem[]): string {
@@ -512,6 +520,8 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       kind: "delete",
       id: blockId,
       filePath: displayFileName(tool.preview.filePath || "file..."),
+      ...(tool.preview.outputPath ? { outputPath: tool.preview.outputPath } : {}),
+      ...(tool.preview.outputRelativePath ? { outputRelativePath: tool.preview.outputRelativePath } : {}),
       displayText: getStreamingDeleteText(tool.preview, status),
       createdAt: now,
       status,
@@ -624,7 +634,7 @@ function streamingStateToBlocks(state: StreamingState, agentRunId?: string): Mes
   let thinkingIdx = 0;
   let textIdx = 0;
 
-  for (const seg of state.segments) {
+  for (const [segmentIndex, seg] of state.segments.entries()) {
     if (seg.type === "thinking") {
       const index = thinkingIdx++;
       blocks.push({
@@ -634,6 +644,7 @@ function streamingStateToBlocks(state: StreamingState, agentRunId?: string): Mes
         content: seg.text,
         createdAt: now,
         collapsedByDefault: false,
+        status: segmentIndex === state.segments.length - 1 ? "running" : "completed",
       });
     } else if (seg.type === "text") {
       const index = textIdx++;
@@ -745,6 +756,7 @@ export function App() {
   // 后台 bash 任务状态（taskId → 最新状态）；bash_task_update 事件驱动，覆写块显示
   const [bashTaskUpdates, setBashTaskUpdates] = useState<Record<string, { status: BashBackgroundStatus; exitCode?: number | null }>>({});
   const [sendScrollRequestId, setSendScrollRequestId] = useState(0);
+  const [composerFocusRequestId, setComposerFocusRequestId] = useState(0);
   const [defaultModelId, setDefaultModelId] = useState<ModelSelectionId | undefined>(undefined);
   const [selectedChatModelId, setSelectedChatModelId] = useState<ModelSelectionId>(DEFAULT_MODEL_ID);
   const [composerStateBySession, setComposerStateBySession] = useState<
@@ -923,6 +935,13 @@ export function App() {
   useEffect(() => {
     if (!hasActspaceBridge()) return;
     void refreshReviewSummary();
+  }, [refreshReviewSummary]);
+
+  useEffect(() => {
+    if (!hasActspaceBridge() || !window.actspace.onReviewChanged) return;
+    return window.actspace.onReviewChanged(() => {
+      void refreshReviewSummary();
+    });
   }, [refreshReviewSummary]);
 
   useEffect(() => {
@@ -1597,7 +1616,7 @@ export function App() {
           sessionId,
           agentRunId,
           userInput: text,
-          attachments: options.attachments,
+          attachments: options.attachments?.map(attachmentForRuntime),
           mode: options.mode,
           selectedSkills: options.selectedSkills,
           ...modelSelectionPayload(options.model),
@@ -1829,6 +1848,59 @@ export function App() {
     },
     [bootstrapState?.workspaceRoot, localSessionRecords, refreshPendingApprovalStatuses],
   );
+
+  useEffect(() => {
+    const bridge = window.actspace;
+    if (
+      !sessionBootstrapComplete ||
+      !bridge?.consumeQuickOpenRequest ||
+      !bridge.onQuickOpenRequested
+    ) return;
+    let disposed = false;
+
+    const consumeRequest = async () => {
+      const request = await bridge.consumeQuickOpenRequest();
+      if (!request || disposed) return;
+      const [settings, listedSessions, registry] = await Promise.all([
+        bridge.getSettings(),
+        bridge.listSessions(),
+        bridge.listWorkspaces?.() ?? Promise.resolve(workspaceRegistry),
+      ]);
+      if (disposed) return;
+      setSessions(listedSessions);
+      if (registry) setWorkspaceRegistry(registry);
+      const shortcut = settings.shortcuts?.quickOpen ?? {
+        enabled: true,
+        accelerator: DEFAULT_QUICK_OPEN_ACCELERATOR,
+        target: { kind: "automatic" as const },
+      };
+      const resolution = resolveQuickOpenTarget(shortcut, registry?.items ?? [], listedSessions);
+      if (resolution.kind === "session") {
+        await handleSelectSession(resolution.sessionId);
+      } else if (resolution.kind === "workspace") {
+        await handleCreateSession({
+          workspaceId: resolution.workspaceId,
+          workspaceRoot: resolution.workspaceRoot,
+        });
+      } else {
+        await handleCreateSession();
+      }
+      if (!disposed) setComposerFocusRequestId((value) => value + 1);
+    };
+
+    const unsubscribe = bridge.onQuickOpenRequested(() => {
+      void consumeRequest().catch((error: unknown) => {
+        console.error("Failed to handle quick open request", error);
+      });
+    });
+    void consumeRequest().catch((error: unknown) => {
+      console.error("Failed to consume pending quick open request", error);
+    });
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, [handleCreateSession, handleSelectSession, sessionBootstrapComplete, workspaceRegistry]);
 
   const persistedEvents = sessionRecord?.events ?? agentRunResult?.events ?? [];
   const persistedMessages = useMemo<MessageBlock[]>(() => {
@@ -2336,6 +2408,7 @@ export function App() {
         isStreaming={isStreaming}
         isAborting={isAborting}
         sendScrollRequestId={sendScrollRequestId}
+        composerFocusRequestId={composerFocusRequestId}
         busySessionIds={busySessionIds}
         sessionStatuses={sessionStatuses}
         onSend={handleSend}

@@ -1,8 +1,8 @@
 import type { AgentAnalysisIndexResult, AgentAnalysisRunSummary, AgentTraceTurnSummary } from "@actspace/shared";
 import {
   Activity,
-  ArrowLeft,
   Braces,
+  ChevronLeft,
   ChevronDown,
   ChevronRight,
   Code2,
@@ -10,12 +10,12 @@ import {
   GitCompareArrows,
   Menu,
   Search,
-  Trash2,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MarkdownProse } from "../messages/MarkdownProse";
 import { useDialogFocusTrap } from "../settings/useDialogFocusTrap";
+import { AnalysisBackButton } from "./AnalysisBackButton";
 import {
   buildAnalysisRunDetail,
   createSanitizedCurl,
@@ -42,12 +42,13 @@ type CodeModal = {
 
 export function AgentAnalysisPage({
   sessionId,
-  fallbackTitle,
   onBack,
+  backLabel = "返回设置",
 }: {
   sessionId: string | null;
   fallbackTitle?: string;
   onBack: () => void;
+  backLabel?: string;
 }) {
   const [index, setIndex] = useState<AgentAnalysisIndexResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,7 +61,6 @@ export function AgentAnalysisPage({
   const [toolFilter, setToolFilter] = useState("all");
   const [codeModal, setCodeModal] = useState<CodeModal>(null);
   const [diffOpen, setDiffOpen] = useState(false);
-  const [compareCallId, setCompareCallId] = useState<string | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const detailCacheRef = useRef(details);
   detailCacheRef.current = details;
@@ -134,16 +134,19 @@ export function AgentAnalysisPage({
   const selectedTurn = selectedDetail?.turns.find((turn) => turn.turnId === selection?.turnId);
   const selectedCall = selectedTurn?.calls.find((call) => call.llmCallId === selection?.llmCallId)
     ?? selectedTurn?.calls.at(-1);
-  const previousCalls = selectedDetail && selectedCall
-    ? selectedDetail.calls.slice(0, selectedDetail.calls.findIndex((call) => call.llmCallId === selectedCall.llmCallId))
-    : [];
-  const compareCall = previousCalls.find((call) => call.llmCallId === compareCallId) ?? previousCalls.at(-1);
+  const selectedCallIndex = selectedDetail && selectedCall
+    ? selectedDetail.calls.findIndex((call) => call.llmCallId === selectedCall.llmCallId)
+    : -1;
+  const queryFilteredRuns = useMemo(() => filterRuns(index?.runs ?? [], query, "all"), [index?.runs, query]);
+  const availableToolNames = useMemo(
+    () => uniqueStrings(queryFilteredRuns.flatMap((run) => run.turns.flatMap((turn) => turn.toolNames))),
+    [queryFilteredRuns],
+  );
+  const filteredRuns = useMemo(() => filterRuns(index?.runs ?? [], query, toolFilter), [index?.runs, query, toolFilter]);
 
   useEffect(() => {
-    if (diffOpen) setCompareCallId(previousCalls.at(-1)?.llmCallId ?? null);
-  }, [diffOpen, selectedCall?.llmCallId]);
-
-  const filteredRuns = useMemo(() => filterRuns(index?.runs ?? [], query, toolFilter), [index?.runs, query, toolFilter]);
+    if (toolFilter !== "all" && !availableToolNames.includes(toolFilter)) setToolFilter("all");
+  }, [availableToolNames, toolFilter]);
 
   useEffect(() => {
     const selectionVisible = selection && filteredRuns.some((run) => (
@@ -170,14 +173,6 @@ export function AgentAnalysisPage({
     setMobileSidebarOpen(false);
   }, [details]);
 
-  const handleClear = useCallback(async () => {
-    if (!sessionId || !window.actspace?.clearAgentTraces) return;
-    if (!window.confirm("清除当前会话的分析记录？聊天消息不会被删除。")) return;
-    await window.actspace.clearAgentTraces({ scope: "session", sessionId });
-    setDetails({});
-    await loadIndex();
-  }, [loadIndex, sessionId]);
-
   return (
     <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-analysis-canvas text-text-main" data-testid="agent-analysis-page">
       <div className="window-chrome-bar" role="presentation">
@@ -186,20 +181,19 @@ export function AgentAnalysisPage({
         <div className="chrome-right" />
       </div>
       <AnalysisHeader
-        title={index?.title ?? fallbackTitle ?? "分析观测"}
         index={index}
         onBack={onBack}
-        onClear={sessionId ? handleClear : undefined}
+        backLabel={backLabel}
       />
 
       {!sessionId ? (
-        <EmptyState title="暂无活动会话" description="请先回到聊天并选择一个会话，再从设置打开分析观测。" onBack={onBack} />
+        <EmptyState title="暂无活动会话" description="请先回到聊天并选择一个会话，再从设置打开分析观测。" onBack={onBack} backLabel={backLabel} />
       ) : loading ? (
         <div className="flex flex-1 items-center justify-center text-[13px] text-text-faint">正在建立分析索引…</div>
       ) : error && !index ? (
-        <EmptyState title="分析记录加载失败" description={error} onBack={onBack} />
+        <EmptyState title="分析记录加载失败" description={error} onBack={onBack} backLabel={backLabel} />
       ) : !index?.runs.length ? (
-        <EmptyState title="该会话暂无分析记录" description="新的 Agent Run 完成后，请求、响应与上下文差异会出现在这里。" onBack={onBack} />
+        <EmptyState title="该会话暂无分析记录" description="新的 Agent Run 完成后，请求、响应与上下文差异会出现在这里。" onBack={onBack} backLabel={backLabel} />
       ) : (
         <div className="relative flex min-h-0 flex-1 overflow-hidden border-t border-line">
           <button
@@ -212,7 +206,7 @@ export function AgentAnalysisPage({
           <div className={`${mobileSidebarOpen ? "max-[820px]:translate-x-0" : "max-[820px]:-translate-x-full"} w-[320px] shrink-0 border-r border-line bg-surface transition-transform max-[820px]:absolute max-[820px]:inset-y-0 max-[820px]:left-0 max-[820px]:z-40 max-[820px]:w-[min(340px,calc(100vw-44px))]`}>
             <AnalysisSidebar
               runs={filteredRuns}
-              allToolNames={index.toolNames}
+              availableToolNames={availableToolNames}
               selection={selection}
               expandedRuns={expandedRuns}
               query={query}
@@ -238,7 +232,7 @@ export function AgentAnalysisPage({
                 turn={selectedTurn}
                 call={selectedCall}
                 traceTruncated={selectedDetail.trace.truncated}
-                canCompare={previousCalls.length > 0}
+                canCompare={selectedCallIndex > 0}
                 onSelectCall={(llmCallId) => setSelection((current) => current ? { ...current, llmCallId } : current)}
                 onOpenDiff={() => setDiffOpen(true)}
                 onOpenJson={() => setCodeModal({ title: "请求 JSON", content: JSON.stringify(selectedCall.request, null, 2), language: "json" })}
@@ -252,12 +246,10 @@ export function AgentAnalysisPage({
       )}
 
       {codeModal ? <CodeViewerModal modal={codeModal} onClose={() => setCodeModal(null)} /> : null}
-      {diffOpen && selectedCall && compareCall ? (
+      {diffOpen && selectedDetail && selectedCall ? (
         <RequestDiffModal
-          current={selectedCall}
-          previous={compareCall}
-          candidates={previousCalls}
-          onSelectPrevious={setCompareCallId}
+          calls={selectedDetail.calls}
+          initialCurrentCallId={selectedCall.llmCallId}
           onClose={() => setDiffOpen(false)}
         />
       ) : null}
@@ -266,15 +258,13 @@ export function AgentAnalysisPage({
 }
 
 function AnalysisHeader({
-  title,
   index,
   onBack,
-  onClear,
+  backLabel,
 }: {
-  title: string;
   index: AgentAnalysisIndexResult | null;
   onBack: () => void;
-  onClear?: () => void;
+  backLabel: string;
 }) {
   const totals = index?.totals;
   const cacheRate = totals && totals.inputTokens > 0
@@ -282,16 +272,8 @@ function AnalysisHeader({
     : null;
   return (
     <header className="flex min-h-[68px] shrink-0 items-center gap-5 bg-surface px-5 pt-[var(--window-chrome-strip-height)] max-[900px]:gap-3 max-[900px]:px-3">
-      <button type="button" onClick={onBack} aria-label="返回设置" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-act-md border border-line text-text-muted hover:bg-hover-overlay hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">
-        <ArrowLeft size={17} />
-      </button>
-      <div className="min-w-[150px] shrink-0">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-faint">Settings / Analysis</div>
-        <div className="mt-0.5 flex items-center gap-2">
-          <h1 className="truncate text-[16px] font-semibold">分析观测</h1>
-          <span className="max-w-[180px] truncate text-[11px] text-text-faint">{title}</span>
-        </div>
-      </div>
+      <AnalysisBackButton label={backLabel} onClick={onBack} />
+      <h1 className="min-w-[72px] shrink-0 text-[16px] font-semibold">分析观测</h1>
       <div className="flex min-w-0 flex-1 items-center justify-center gap-5 overflow-x-auto whitespace-nowrap py-2 max-[900px]:justify-start">
         <Stat label="Agent Run" value={totals?.agentRunCount} />
         <Stat label="Turn" value={totals?.turnCount} />
@@ -305,9 +287,6 @@ function AnalysisHeader({
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <span className="flex h-8 items-center gap-1.5 rounded-act-pill bg-operational-soft px-3 text-[11px] font-semibold text-on-success"><Activity size={13} /> 本地记录</span>
-        {onClear ? (
-          <button type="button" onClick={onClear} aria-label="清除当前会话分析记录" className="flex h-8 w-8 items-center justify-center rounded-act-md border border-line text-text-faint hover:bg-danger-soft hover:text-on-danger"><Trash2 size={14} /></button>
-        ) : null}
       </div>
     </header>
   );
@@ -319,7 +298,7 @@ function Stat({ label, value, accent = false }: { label: string; value?: number 
 
 function AnalysisSidebar({
   runs,
-  allToolNames,
+  availableToolNames,
   selection,
   expandedRuns,
   query,
@@ -331,7 +310,7 @@ function AnalysisSidebar({
   onCloseMobile,
 }: {
   runs: AgentAnalysisRunSummary[];
-  allToolNames: string[];
+  availableToolNames: string[];
   selection: Selection | null;
   expandedRuns: Set<string>;
   query: string;
@@ -351,7 +330,7 @@ function AnalysisSidebar({
         </div>
         <div className="mt-3 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted"><span>Tools</span><span className="normal-case tracking-normal text-text-faint">点击筛选 Turn</span></div>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {["all", ...allToolNames].map((tool) => (
+          {["all", ...availableToolNames].map((tool) => (
             <button key={tool} type="button" onClick={() => onToolFilterChange(tool)} className={`rounded-act-pill border px-2 py-1 font-mono text-[10px] ${toolFilter === tool ? "border-info bg-analysis-selection-soft text-on-info" : "border-line bg-surface text-text-muted hover:bg-hover-overlay"}`}>{tool === "all" ? "All" : tool}</button>
           ))}
         </div>
@@ -476,10 +455,15 @@ function Accordion({ title, badge, defaultOpen = false, children }: { title: str
   return <section className="overflow-hidden rounded-act-lg border border-line bg-surface shadow-act-soft"><button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-hover-overlay">{open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}<strong className="text-[13px]">{title}</strong>{badge ? <span className="ml-auto rounded-act-pill bg-surface-subtle px-2 py-1 text-[9px] text-text-faint">{badge}</span> : null}</button>{open ? <div className="border-t border-line p-3">{children}</div> : null}</section>;
 }
 
-function RequestDiffModal({ current, previous, candidates, onSelectPrevious, onClose }: { current: AnalysisCallView; previous: AnalysisCallView; candidates: AnalysisCallView[]; onSelectPrevious: (id: string) => void; onClose: () => void }) {
+function RequestDiffModal({ calls, initialCurrentCallId, onClose }: { calls: AnalysisCallView[]; initialCurrentCallId: string; onClose: () => void }) {
+  const initialIndex = calls.findIndex((call) => call.llmCallId === initialCurrentCallId);
+  const [currentIndex, setCurrentIndex] = useState(Math.max(1, initialIndex));
+  const current = calls[currentIndex];
+  const previous = calls[currentIndex - 1];
+  if (!current || !previous) return null;
   const diff = diffAnalysisRequests(previous, current);
-  const title = previous.turnId === current.turnId ? `Turn ${current.turnIndex} · 调用 ${previous.attempt} → 调用 ${current.attempt}` : `Turn ${previous.turnIndex} → Turn ${current.turnIndex}`;
-  return <ModalShell onClose={onClose}><div className="flex h-full min-h-0 flex-col"><div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3"><h2 className="text-[15px] font-semibold">{title}</h2><label className="ml-auto flex items-center gap-2 text-[11px] text-text-muted">对比对象<select value={previous.llmCallId} onChange={(event) => onSelectPrevious(event.target.value)} className="h-9 rounded-act-md border border-line bg-surface px-3 text-[11px] outline-none focus:ring-2 focus:ring-focus-ring">{candidates.map((call) => <option key={call.llmCallId} value={call.llmCallId}>Turn {call.turnIndex} · 调用 {call.attempt} · {call.model ?? "模型未知"}</option>)}</select></label><button type="button" onClick={onClose} aria-label="关闭请求对比" className="flex h-9 w-9 items-center justify-center rounded-act-md border border-line hover:bg-hover-overlay"><X size={15} /></button></div><div className="flex flex-wrap gap-5 border-b border-line bg-surface-subtle px-5 py-3 font-mono text-[10px]"><span>输入 Token <strong>{signed(current.usage.input - previous.usage.input)}</strong></span><span>缓存读取 <strong>{signed(current.usage.cacheRead - previous.usage.cacheRead)}</strong></span><span>消息 <strong>{previous.messages.length} → {current.messages.length}</strong></span><span>工具 <strong>{previous.tools.length} → {current.tools.length}</strong></span><span>Attempt <strong>{previous.attempt} → {current.attempt}</strong></span></div><div className="min-h-0 flex-1 overflow-y-auto bg-analysis-canvas p-4"><div className="space-y-4">{diff.requestContextUnchanged ? <div className="rounded-act-md border border-line bg-analysis-thinking-soft px-4 py-4 text-center text-[12px] text-text-muted">请求上下文未变化；本次差异只来自 Attempt、耗时或上次失败状态。</div> : null}<section className="rounded-act-lg border border-line bg-surface p-3"><div className="mb-3 flex items-center gap-2 text-[12px] font-semibold">消息 <span className="rounded-act-pill bg-analysis-assistant-soft px-2 py-1 text-[9px] text-on-success">+{diff.addedMessages.length} 新增</span>{diff.removedMessages.length ? <span className="rounded-act-pill bg-danger-soft px-2 py-1 text-[9px] text-on-danger">-{diff.removedMessages.length} 移除</span> : null}</div>{diff.unchangedMessageCount ? <div className="mb-3 rounded-act-md bg-analysis-thinking-soft px-3 py-2 text-[10px] text-text-faint">前 {diff.unchangedMessageCount} 条消息未变化</div> : null}<div className="space-y-2">{diff.removedMessages.map((message, index) => <MessageCard key={`removed-${index}`} message={message} diffState="removed" />)}{diff.addedMessages.map((message, index) => <MessageCard key={`added-${index}`} message={message} diffState="added" />)}</div></section>{diff.systemPromptChanged || diff.toolsChanged || diff.modelChanged ? <section className="rounded-act-lg border border-line bg-surface p-3"><h3 className="mb-3 text-[12px] font-semibold">其他请求变化</h3><div className="space-y-2">{diff.modelChanged ? <DiffPair label="模型" previous={diff.previousModel ?? "—"} current={diff.currentModel ?? "—"} /> : null}{diff.toolsChanged ? <DiffPair label="工具定义" previous={diff.previousTools.join(", ") || "—"} current={diff.currentTools.join(", ") || "—"} /> : null}{diff.systemPromptChanged ? <DiffPair label="系统提示词" previous={diff.previousSystemPrompt || "—"} current={diff.currentSystemPrompt || "—"} multiline /> : null}</div></section> : null}</div></div></div></ModalShell>;
+  const title = `${formatDiffCallLabel(previous, calls)} → ${formatDiffCallLabel(current, calls)}`;
+  return <ModalShell onClose={onClose}><div className="flex h-full min-h-0 flex-col"><div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3"><button type="button" onClick={() => setCurrentIndex((value) => Math.max(1, value - 1))} disabled={currentIndex <= 1} aria-label="查看上一组请求对比" title="上一组请求对比" className="flex h-8 w-8 items-center justify-center rounded-act-md border border-line text-text-muted hover:bg-hover-overlay hover:text-text-main disabled:cursor-not-allowed disabled:opacity-35"><ChevronLeft size={15} /></button><h2 className="min-w-0 text-[15px] font-semibold">{title}</h2><button type="button" onClick={() => setCurrentIndex((value) => Math.min(calls.length - 1, value + 1))} disabled={currentIndex >= calls.length - 1} aria-label="查看下一组请求对比" title="下一组请求对比" className="flex h-8 w-8 items-center justify-center rounded-act-md border border-line text-text-muted hover:bg-hover-overlay hover:text-text-main disabled:cursor-not-allowed disabled:opacity-35"><ChevronRight size={15} /></button><button type="button" onClick={onClose} aria-label="关闭请求对比" className="ml-auto flex h-9 w-9 items-center justify-center rounded-act-md border border-line hover:bg-hover-overlay"><X size={15} /></button></div><div className="flex flex-wrap gap-5 border-b border-line bg-surface-subtle px-5 py-3 font-mono text-[10px]"><span>输入 Token <strong>{signed(current.usage.input - previous.usage.input)}</strong></span><span>缓存读取 <strong>{signed(current.usage.cacheRead - previous.usage.cacheRead)}</strong></span><span>消息 <strong>{previous.messages.length} → {current.messages.length}</strong></span><span>工具 <strong>{previous.tools.length} → {current.tools.length}</strong></span><span>Attempt <strong>{previous.attempt} → {current.attempt}</strong></span></div><div className="min-h-0 flex-1 overflow-y-auto bg-analysis-canvas p-4"><div className="space-y-4">{diff.requestContextUnchanged ? <div className="rounded-act-md border border-line bg-analysis-thinking-soft px-4 py-4 text-center text-[12px] text-text-muted">请求上下文未变化；本次差异只来自 Attempt、耗时或上次失败状态。</div> : null}<section className="rounded-act-lg border border-line bg-surface p-3"><div className="mb-3 flex items-center gap-2 text-[12px] font-semibold">消息 <span className="rounded-act-pill bg-analysis-assistant-soft px-2 py-1 text-[9px] text-on-success">+{diff.addedMessages.length} 新增</span>{diff.removedMessages.length ? <span className="rounded-act-pill bg-danger-soft px-2 py-1 text-[9px] text-on-danger">-{diff.removedMessages.length} 移除</span> : null}</div>{diff.unchangedMessageCount ? <div className="mb-3 rounded-act-md bg-analysis-thinking-soft px-3 py-2 text-[10px] text-text-faint">前 {diff.unchangedMessageCount} 条消息未变化</div> : null}<div className="space-y-2">{diff.removedMessages.map((message, index) => <MessageCard key={`removed-${index}`} message={message} diffState="removed" />)}{diff.addedMessages.map((message, index) => <MessageCard key={`added-${index}`} message={message} diffState="added" />)}</div></section>{diff.systemPromptChanged || diff.toolsChanged || diff.modelChanged ? <section className="rounded-act-lg border border-line bg-surface p-3"><h3 className="mb-3 text-[12px] font-semibold">其他请求变化</h3><div className="space-y-2">{diff.modelChanged ? <DiffPair label="模型" previous={diff.previousModel ?? "—"} current={diff.currentModel ?? "—"} /> : null}{diff.toolsChanged ? <DiffPair label="工具定义" previous={diff.previousTools.join(", ") || "—"} current={diff.currentTools.join(", ") || "—"} /> : null}{diff.systemPromptChanged ? <DiffPair label="系统提示词" previous={diff.previousSystemPrompt || "—"} current={diff.currentSystemPrompt || "—"} multiline /> : null}</div></section> : null}</div></div></div></ModalShell>;
 }
 
 function DiffPair({ label, previous, current, multiline = false }: { label: string; previous: string; current: string; multiline?: boolean }) {
@@ -502,7 +486,7 @@ function ActionButton({ icon, label, onClick, disabled = false }: { icon: ReactN
 
 function MetaDot({ color, label }: { color: string; label: string }) { return <span className="flex items-center gap-1.5"><i className={`h-1.5 w-1.5 rounded-full ${color}`} />{label}</span>; }
 function Preformatted({ value }: { value: string }) { return <pre className="max-h-[520px] overflow-auto whitespace-pre-wrap break-words rounded-act-md bg-analysis-thinking-soft p-3 font-mono text-[11px] leading-5 text-text-main">{value}</pre>; }
-function EmptyState({ title, description, onBack }: { title: string; description: string; onBack: () => void }) { return <div className="flex flex-1 items-center justify-center px-6"><div className="max-w-md text-center"><Activity size={30} className="mx-auto text-text-faint" /><h2 className="mt-4 text-[17px] font-semibold">{title}</h2><p className="mt-2 text-[12px] leading-5 text-text-muted">{description}</p><button type="button" onClick={onBack} className="mt-5 rounded-act-md bg-action px-4 py-2 text-[12px] font-semibold text-on-action">返回设置</button></div></div>; }
+function EmptyState({ title, description, onBack, backLabel }: { title: string; description: string; onBack: () => void; backLabel: string }) { return <div className="flex flex-1 items-center justify-center px-6"><div className="max-w-md text-center"><Activity size={30} className="mx-auto text-text-faint" /><h2 className="mt-4 text-[17px] font-semibold">{title}</h2><p className="mt-2 text-[12px] leading-5 text-text-muted">{description}</p><button type="button" onClick={onBack} className="mt-5 rounded-act-md bg-action px-4 py-2 text-[12px] font-semibold text-on-action">{backLabel}</button></div></div>; }
 function filterRuns(runs: AgentAnalysisRunSummary[], query: string, toolFilter: string): AgentAnalysisRunSummary[] { const normalized = query.trim().toLowerCase(); return runs.map((run) => ({ ...run, turns: run.turns.filter((turn) => { const toolMatches = toolFilter === "all" || turn.toolNames.includes(toolFilter); const queryMatches = !normalized || run.userMessagePreview.toLowerCase().includes(normalized) || turn.modelNames.some((model) => model.toLowerCase().includes(normalized)) || turn.toolNames.some((tool) => tool.toLowerCase().includes(normalized)) || `turn ${turn.turnIndex}`.includes(normalized); return toolMatches && queryMatches; }) })).filter((run) => run.turns.length > 0); }
 function toggleSetValue(current: Set<string>, value: string): Set<string> { const next = new Set(current); if (next.has(value)) next.delete(value); else next.add(value); return next; }
 function asRecord(value: unknown): Record<string, unknown> { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
@@ -510,3 +494,5 @@ function formatNumber(value: number): string { return new Intl.NumberFormat("zh-
 function formatDuration(value: number): string { if (!value) return "—"; return value < 1000 ? `${Math.round(value)}ms` : `${(value / 1000).toFixed(1)}s`; }
 function formatTime(value: string): string { const date = new Date(value); return Number.isNaN(date.getTime()) ? "—" : date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
 function signed(value: number): string { return value > 0 ? `+${formatNumber(value)}` : formatNumber(value); }
+function formatDiffCallLabel(call: AnalysisCallView, calls: AnalysisCallView[]): string { const turnCalls = calls.filter((entry) => entry.turnId === call.turnId); if (turnCalls.length <= 1) return `Turn ${call.turnIndex}`; return `Turn ${call.turnIndex} · 调用 ${turnCalls.findIndex((entry) => entry.llmCallId === call.llmCallId) + 1}`; }
+function uniqueStrings(values: string[]): string[] { return [...new Set(values)]; }

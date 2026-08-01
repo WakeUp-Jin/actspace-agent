@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MessageBlock } from "@actspace/shared";
 import { UserMessage } from "../components/messages/UserMessage";
 
@@ -86,5 +86,31 @@ describe("UserMessage", () => {
     await user.click(screen.getByRole("button", { name: "elsewhere" }));
     expect(content).toHaveAttribute("aria-expanded", "false");
     expect(content.className).toContain("overflow-hidden");
+  });
+
+  it("opens a sent image attachment through the provided preview action", async () => {
+    const user = userEvent.setup();
+    const onOpenAttachmentPreview = vi.fn();
+    const attachment = {
+      id: "attachment-1",
+      kind: "image" as const,
+      name: "reference.png",
+      path: "/tmp/reference.png",
+      mimeType: "image/png",
+      previewUrl: "data:image/png;base64,preview",
+    };
+
+    render(
+      <UserMessage
+        message={{ ...makeUserBlock("看看这张图"), attachments: [attachment] }}
+        onOpenAttachmentPreview={onOpenAttachmentPreview}
+      />,
+    );
+
+    const previewButton = screen.getByRole("button", { name: "Preview message image reference.png" });
+    expect(previewButton).toHaveStyle({ backgroundImage: 'url("data:image/png;base64,preview")' });
+
+    await user.click(previewButton);
+    expect(onOpenAttachmentPreview).toHaveBeenCalledWith(attachment);
   });
 });

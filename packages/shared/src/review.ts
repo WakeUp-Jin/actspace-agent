@@ -342,6 +342,16 @@ export type ReviewListBranchesResult =
   | { ok: true; branches: ReviewBranch[] }
   | { ok: false; code: ReviewErrorCode; message: string };
 
+export type ReviewCommit = {
+  sha: string;
+  subject: string;
+  authoredAt: string;
+};
+
+export type ReviewListCommitsResult =
+  | { ok: true; commits: ReviewCommit[] }
+  | { ok: false; code: ReviewErrorCode; message: string };
+
 export type ReviewCopyApplyCommandInput = ReviewWorkspaceInput & {
   snapshotId: string;
   expectedGeneration: number;

@@ -11,6 +11,8 @@ type TurnOutputArtifact = {
   displayPath: string;
   sourcePath: string;
   workspaceRelativePath?: string;
+  additions?: number;
+  deletions?: number;
 };
 
 const ARTIFACT_PANEL_CLASS =
@@ -18,7 +20,7 @@ const ARTIFACT_PANEL_CLASS =
 const ARTIFACT_HEADER_CLASS =
   "flex min-h-9 items-center justify-between gap-3 px-3 text-xs font-semibold text-text-muted";
 const ARTIFACT_ROW_CLASS =
-  "flex min-h-12 w-full items-center gap-2.5 border-0 border-t border-line bg-transparent px-3 py-2 text-left transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default disabled:hover:bg-transparent";
+  "flex min-h-9 w-full items-center gap-2 border-0 border-t border-line bg-transparent px-3 py-1.5 text-left transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default disabled:hover:bg-transparent";
 
 function displayArtifactPath(path: string): string {
   const normalized = path.replace(/\\/g, "/");
@@ -35,18 +37,29 @@ function fileName(path: string): string {
   return normalized.split(/[\\/]+/).filter(Boolean).pop() ?? normalized;
 }
 
+function normalizedRelativePath(path: string | undefined): string | undefined {
+  if (!path || /^(?:[A-Za-z]:)?[\\/]/.test(path)) return undefined;
+  return path.replace(/\\/g, "/");
+}
+
+function normalizedPath(path: string | undefined): string | undefined {
+  return path?.replace(/\\/g, "/");
+}
+
+function fileArtifactKey(sourcePath: string, relativePath: string | undefined): string {
+  return `file:${relativePath ?? normalizedPath(sourcePath)}`;
+}
+
 export function collectTurnOutputArtifacts(messages: MessageBlock[]): TurnOutputArtifact[] {
-  const outputs: TurnOutputArtifact[] = [];
-  const seen = new Set<string>();
+  const outputs = new Map<string, TurnOutputArtifact>();
 
   for (const message of messages) {
     if (message.kind === "image_generation" && (message.status === "completed" || message.status === "partial")) {
       for (const image of message.images ?? []) {
         if (image.type !== "image" || !image.path) continue;
         const key = `image:${image.path}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        outputs.push({
+        if (outputs.has(key)) continue;
+        outputs.set(key, {
           id: key,
           kind: "image",
           name: image.name || fileName(image.path),
@@ -57,29 +70,55 @@ export function collectTurnOutputArtifacts(messages: MessageBlock[]): TurnOutput
       continue;
     }
 
+    if (message.kind === "delete" && message.status === "completed") {
+      const deletedRelativePath = normalizedRelativePath(message.outputRelativePath);
+      const deletedSourcePath = normalizedPath(message.outputPath);
+      let removedExactMatch = false;
+
+      for (const [key, artifact] of outputs) {
+        if (artifact.kind !== "file") continue;
+        if (
+          (deletedRelativePath && artifact.workspaceRelativePath === deletedRelativePath)
+          || (deletedSourcePath && normalizedPath(artifact.sourcePath) === deletedSourcePath)
+        ) {
+          outputs.delete(key);
+          removedExactMatch = true;
+        }
+      }
+
+      // Older persisted delete previews only contain a basename. Remove it only
+      // when that basename identifies exactly one output in this turn.
+      if (!removedExactMatch && !deletedRelativePath && !deletedSourcePath) {
+        const legacyMatches = [...outputs.entries()].filter(([, artifact]) => (
+          artifact.kind === "file" && artifact.name === message.filePath
+        ));
+        if (legacyMatches.length === 1) outputs.delete(legacyMatches[0][0]);
+      }
+      continue;
+    }
+
     if (
       (message.kind === "write_diff" || message.kind === "edit_diff")
       && message.status === "completed"
       && message.outputPath
     ) {
-      const key = `file:${message.outputPath}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const relativePath = message.outputRelativePath && !/^(?:[A-Za-z]:)?[\\/]/.test(message.outputRelativePath)
-        ? message.outputRelativePath.replace(/\\/g, "/")
-        : undefined;
-      outputs.push({
+      const relativePath = normalizedRelativePath(message.outputRelativePath);
+      const key = fileArtifactKey(message.outputPath, relativePath);
+      const existing = outputs.get(key);
+      outputs.set(key, {
         id: key,
         kind: "file",
         name: message.filePath || fileName(message.outputPath),
         displayPath: relativePath ?? fileName(message.outputPath),
         sourcePath: message.outputPath,
         workspaceRelativePath: relativePath,
+        additions: (existing?.additions ?? 0) + message.additions,
+        deletions: (existing?.deletions ?? 0) + message.deletions,
       });
     }
   }
 
-  return outputs;
+  return [...outputs.values()];
 }
 
 function workspaceTab(result: WorkspaceReadFileResult): RightPanelTab | null {
@@ -110,6 +149,15 @@ function artifactReadError(error: string | undefined): string {
   if (error === "unsupported_format") return "图片格式不受支持。";
   if (error === "escapes_root" || error === "invalid_session") return "图片路径不属于当前会话。";
   return "图片读取失败。";
+}
+
+function workspaceReadError(error: WorkspaceReadFileResult["error"]): string {
+  if (error === "not_found") return "文件已不存在。";
+  if (error === "too_large") return "文件过大，无法预览。";
+  if (error === "binary") return "暂不支持预览二进制文件。";
+  if (error === "not_a_file") return "该路径不是文件。";
+  if (error === "escapes_root") return "文件路径不属于当前工作区。";
+  return "文件读取失败。";
 }
 
 export function TurnOutputArtifacts({
@@ -162,6 +210,10 @@ export function TurnOutputArtifacts({
         workspaceRoot,
         relativePath: artifact.workspaceRelativePath,
       });
+      if (result.error) {
+        setError(workspaceReadError(result.error));
+        return;
+      }
       const tab = workspaceTab(result);
       if (!tab) {
         setError("文件读取失败。");
@@ -199,11 +251,26 @@ export function TurnOutputArtifacts({
     }
   }
 
+  const fileOutputs = outputs.filter((artifact) => artifact.kind === "file");
+  const imageCount = outputs.length - fileOutputs.length;
+  const additions = fileOutputs.reduce((total, artifact) => total + (artifact.additions ?? 0), 0);
+  const deletions = fileOutputs.reduce((total, artifact) => total + (artifact.deletions ?? 0), 0);
+  const summaryLabel = fileOutputs.length > 0 && imageCount > 0
+    ? `${fileOutputs.length} ${fileOutputs.length === 1 ? "file" : "files"} · ${imageCount} ${imageCount === 1 ? "image" : "images"}`
+    : fileOutputs.length > 0
+      ? `Edited ${fileOutputs.length} ${fileOutputs.length === 1 ? "file" : "files"}`
+      : `Generated ${imageCount} ${imageCount === 1 ? "image" : "images"}`;
+
   return (
     <section className={ARTIFACT_PANEL_CLASS} aria-label="Turn output artifacts">
       <header className={ARTIFACT_HEADER_CLASS}>
-        <span>{outputs.length} {outputs.length === 1 ? "Artifact" : "Artifacts"}</span>
-        <span className="font-normal text-text-faint">Open in panel</span>
+        <span>{summaryLabel}</span>
+        {fileOutputs.length > 0 ? (
+          <span className="flex shrink-0 gap-1 font-medium tabular-nums" aria-label={`${additions} additions, ${deletions} deletions`}>
+            <span className="text-success">+{additions}</span>
+            <span className="text-danger">-{deletions}</span>
+          </span>
+        ) : null}
       </header>
       <div>
         {outputs.map((artifact) => {
@@ -222,17 +289,22 @@ export function TurnOutputArtifacts({
                   disabled={!canOpen || loadingId === artifact.id}
                   aria-label={`Open ${artifact.name}`}
                 >
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-act-sm bg-surface-subtle text-text-muted" aria-hidden="true">
+                  <span className="grid h-5 w-5 shrink-0 place-items-center text-text-faint" aria-hidden="true">
                     {loadingId === artifact.id
-                      ? <Loader2 size={15} className="animate-spin" />
+                      ? <Loader2 size={14} className="animate-spin" />
                       : artifact.kind === "image"
-                        ? <ImageIcon size={15} />
-                        : <FileText size={15} />}
+                        ? <ImageIcon size={14} />
+                        : <FileText size={14} />}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-text-main">{artifact.name}</span>
-                    <span className="block truncate text-xs text-text-faint">{artifact.displayPath}</span>
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-text-muted">
+                    {artifact.displayPath}
                   </span>
+                  {artifact.kind === "file" ? (
+                    <span className="flex shrink-0 gap-1 text-[11px] font-medium tabular-nums" aria-label={`${artifact.additions ?? 0} additions, ${artifact.deletions ?? 0} deletions`}>
+                      <span className="text-success">+{artifact.additions ?? 0}</span>
+                      <span className="text-danger">-{artifact.deletions ?? 0}</span>
+                    </span>
+                  ) : null}
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" align="start" className="max-w-[420px] break-all font-normal">

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AppSettings, BootstrapState, CompactContextInput, GenerateEvalCandidateInput, ReviewGetSnapshotResult, RunAgentInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { createMessageBlocks } from "@actspace/shared";
@@ -262,7 +262,7 @@ describe("App streaming user message", () => {
 
     renderApp();
     await screen.findByRole("button", { name: "Show session details for Active workspace session" });
-    await user.click(screen.getByRole("button", { name: "workspace" }));
+    fireEvent.contextMenu(screen.getByRole("button", { name: "workspace" }), { clientX: 24, clientY: 60 });
     await user.click(screen.getByRole("menuitem", { name: "Archive All" }));
 
     await waitFor(() => {
@@ -316,7 +316,7 @@ describe("App streaming user message", () => {
 
     renderApp();
     await screen.findByRole("button", { name: "Show session details for Hidden active session" });
-    await user.click(screen.getByRole("button", { name: "workspace" }));
+    fireEvent.contextMenu(screen.getByRole("button", { name: "workspace" }), { clientX: 24, clientY: 60 });
     await user.click(screen.getByRole("menuitem", { name: "Remove from Sidebar" }));
 
     await waitFor(() => {
@@ -817,6 +817,23 @@ describe("App streaming user message", () => {
 
     await act(async () => {
       streamHandler?.({
+        type: "assistant_thinking_delta",
+        turnId: "turn-stream",
+        llmCallId: "llm-call-stream",
+        sessionId,
+        agentRunId: activeAgentRunId,
+        messageId: "evt-wait-thinking",
+        delta: "Inspect the request before using a tool.",
+      });
+    });
+
+    const runningThinkingTitle = await screen.findByText("Thinking...");
+    expect(runningThinkingTitle).toHaveClass("tool-log-text-running");
+    expect(runningThinkingTitle).toHaveAttribute("data-shimmer-text", "Thinking...");
+    expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
+
+    await act(async () => {
+      streamHandler?.({
         type: "tool_started",
         turnId: "turn-stream",
         llmCallId: "llm-call-stream",
@@ -833,6 +850,7 @@ sessionId,
       });
     });
     expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
+    expect(screen.getByText("Thinking...")).not.toHaveClass("tool-log-text-running");
 
     await act(async () => {
       streamHandler?.({
@@ -2058,7 +2076,7 @@ sessionId: input.sessionId,
       name: "screenshot.png",
       path: "/Users/test/screenshot.png",
       mimeType: "image/png",
-      previewUrl: "file:///Users/test/screenshot.png",
+      previewUrl: "data:image/png;base64,preview",
     };
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
@@ -2100,7 +2118,7 @@ sessionId: input.sessionId,
           contextWindow: 1_000_000,
           thinkingDefault: true,
           capabilities: {
-            input: ["text", "image"],
+            input: ["text"],
             toolUse: "verified",
             reasoning: true,
             thinkingToggle: true,
@@ -2130,16 +2148,35 @@ sessionId: input.sessionId,
     await userEvent.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Image" }));
     expect(await screen.findByLabelText("Attached image screenshot.png")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Preview attached image screenshot.png" }));
+    expect(await screen.findByRole("img", { name: "预览图片" })).toHaveAttribute(
+      "src",
+      "data:image/png;base64,preview",
+    );
 
     await userEvent.type(composer, "what is in this screenshot?");
     await userEvent.click(screen.getByLabelText("Send message"));
 
     await waitFor(() => {
-      expect(capturedInput?.attachments).toEqual([selectedAttachment]);
+      expect(capturedInput?.attachments).toEqual([{
+        id: "att-screenshot",
+        kind: "image",
+        name: "screenshot.png",
+        path: "/Users/test/screenshot.png",
+        mimeType: "image/png",
+      }]);
       expect(capturedInput?.mode).toBe("agent");
       expect(capturedInput?.selectedSkills).toEqual([]);
     });
-    expect(await screen.findByLabelText("Attached image screenshot.png")).toBeTruthy();
+    const sentImagePreview = await screen.findByRole("button", {
+      name: "Preview message image screenshot.png",
+    });
+    expect(sentImagePreview).toBeEnabled();
+    await userEvent.click(sentImagePreview);
+    expect(await screen.findByRole("img", { name: "预览图片" })).toHaveAttribute(
+      "src",
+      "data:image/png;base64,preview",
+    );
 
     await act(async () => {
       resolveRunAgent?.({

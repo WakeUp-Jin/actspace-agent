@@ -132,8 +132,12 @@ function createDeleteTool(): InternalTool {
     previewKind: "delete",
     handler: async (): Promise<ToolResult> => ({
       success: true,
-      data: "File deleted: notes.md",
+      data: {
+        filePath: "/workspace/notes.md",
+        relativePath: "notes.md",
+      },
     }),
+    renderResult: () => "File deleted: notes.md",
   };
 }
 
@@ -1029,6 +1033,8 @@ describe("runAgentWithBridge bridge", () => {
       uiPreview: {
         kind: "delete",
         filePath: "notes.md",
+        outputPath: "/workspace/notes.md",
+        outputRelativePath: "notes.md",
         displayText: "Deleted notes.md",
         status: "completed",
       },

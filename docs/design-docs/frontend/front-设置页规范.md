@@ -31,6 +31,7 @@
 - 保持窄而稳定的宽度，纯列表导航，不做聊天会话展示。
 - 当前分区：
   - `通用 General`
+  - `快捷键 Shortcuts`
   - `服务商 Providers`
   - `模型 Models`
   - `成员 Members`
@@ -70,6 +71,13 @@
   - 权限设置 ·「自动审查」：开 = 每条 bash 命令执行前都要确认（绕过 allowlist，硬拒绝仍生效）。
   - 通用 ·「语言」：固定「简体中文」。
   - （已删除「工作模式」「完全访问」两条。）
+- 快捷键 Shortcuts
+  - 首版只提供「快速打开 Actspace」一个系统级快捷动作，默认启用 `CommandOrControl+Shift+Space`，macOS 显示为 `⌘⇧Space`。
+  - 快捷键使用录制按钮而不是自由文本输入；只接受至少包含一个修饰键的组合键，`Escape` 退出录制，支持恢复默认。
+  - 打开目标分为自动、指定工作区和指定会话。指定工作区始终创建空会话；指定会话恢复原会话；自动使用侧边栏排序后的第一个非默认、非隐藏项目。
+  - 保存的目标已被删除或隐藏时退回自动选择；没有任何项目时进入空白 New chat。
+  - 系统注册失败时显示占用错误并保留上一个有效快捷键。快捷键注册状态属于 main 进程运行态，不伪装成持久化配置。
+  - 唤起后主窗口收敛到约 `640px` 宽并在当前屏幕居中，复用现有 compact layout；Composer 在目标路由完成后获得焦点。
 - 模型 Model（按供应商而非按模型，参考 OpenCode）
   - DeepSeek / Kimi 供应商卡，徽标显示是否已连接。
   - 未连接「连接」→ API Key 输入弹窗；已连接「断开连接」。
@@ -173,6 +181,7 @@
 ## 配置存储与安全
 
 - 非敏感配置落 `<userData>/settings.json`（原子写）。
+- 全局快捷键的组合键与打开目标落 `settings.shortcuts.quickOpen`；Electron main 先注册候选组合键，再持久化并注销旧组合键，避免冲突配置被保存成已生效状态。
 - **供应商 API Key 用 Electron `safeStorage` 加密**单独落盘；UI 与 IPC 永不回传明文，仅返回「是否已配置」。
 - 本地更新源码目录落 `<userData>/local-update.json`，只保存路径；更新日志写 `<userData>/tmp/local-update/update.log`，阶段状态写同目录 `status.json`。`local-update:start` 只接受已保存且通过校验的源码目录，不接受 renderer 传入的任意命令或脚本内容。
 - 配置生效：main 把 env-backed 设置覆盖到 `process.env` 后 `loadEnv()` 刷新冻结的 `env`，**下一轮对话自动生效，无需重启**；`settings.json` 只保存主 Agent 系统提示词文件路径，正文由 `settings:read-agent-system-prompt` / `settings:write-agent-system-prompt` 读写 `<userData>/prompts/main-agent.md`，真实 turn 和 `context:describe` 都从同一 prompt 文件注入；Kairos 思考链变更时在空闲态重建 Kairos LLM。Kairos 模型不再走 settings/env：其唯一来源是 `preferences.json` 的 `modelId`，由 `kairos:write-config` 保存后按 modelId 变化触发空闲态重建。

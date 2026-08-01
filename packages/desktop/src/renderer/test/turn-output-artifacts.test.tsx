@@ -84,6 +84,96 @@ describe("image generation presentation", () => {
 
     expect(outputs.map((output) => output.name)).toEqual(["generated-01.png", "result.md"]);
     expect(outputs[0].displayPath).toBe("generated-images/batch/generated-01.png");
+    expect(outputs[1]).toMatchObject({ additions: 2, deletions: 0 });
+  });
+
+  it("merges repeated file changes and removes files deleted later in the turn", () => {
+    const outputs = collectTurnOutputArtifacts([
+      {
+        kind: "write_diff",
+        id: "write-report",
+        filePath: "report.md",
+        outputPath: "/workspace/docs/report.md",
+        outputRelativePath: "docs/report.md",
+        additions: 4,
+        deletions: 0,
+        diff: "",
+        collapsedLines: 0,
+        status: "completed",
+        createdAt: "2026-07-28T00:00:01.000Z",
+      },
+      {
+        kind: "edit_diff",
+        id: "edit-report",
+        filePath: "report.md",
+        outputPath: "/workspace/docs/report.md",
+        outputRelativePath: "docs/report.md",
+        additions: 2,
+        deletions: 1,
+        diff: "",
+        collapsedLines: 0,
+        status: "completed",
+        createdAt: "2026-07-28T00:00:02.000Z",
+      },
+      {
+        kind: "write_diff",
+        id: "write-temp",
+        filePath: "tmp-test.mjs",
+        outputPath: "/workspace/tmp-test.mjs",
+        outputRelativePath: "tmp-test.mjs",
+        additions: 10,
+        deletions: 0,
+        diff: "",
+        collapsedLines: 0,
+        status: "completed",
+        createdAt: "2026-07-28T00:00:03.000Z",
+      },
+      {
+        kind: "delete",
+        id: "delete-temp",
+        filePath: "tmp-test.mjs",
+        outputPath: "/workspace/tmp-test.mjs",
+        outputRelativePath: "tmp-test.mjs",
+        displayText: "Deleted tmp-test.mjs",
+        status: "completed",
+        createdAt: "2026-07-28T00:00:04.000Z",
+      },
+    ]);
+
+    expect(outputs).toHaveLength(1);
+    expect(outputs[0]).toMatchObject({
+      displayPath: "docs/report.md",
+      additions: 6,
+      deletions: 1,
+    });
+  });
+
+  it("removes a uniquely named file for legacy delete previews without output paths", () => {
+    const outputs = collectTurnOutputArtifacts([
+      {
+        kind: "write_diff",
+        id: "write-temp",
+        filePath: "tmp-test-orders.mjs",
+        outputPath: "/workspace/tmp-test-orders.mjs",
+        outputRelativePath: "tmp-test-orders.mjs",
+        additions: 46,
+        deletions: 0,
+        diff: "",
+        collapsedLines: 0,
+        status: "completed",
+        createdAt: "2026-07-28T00:00:01.000Z",
+      },
+      {
+        kind: "delete",
+        id: "delete-temp",
+        filePath: "tmp-test-orders.mjs",
+        displayText: "Deleted tmp-test-orders.mjs",
+        status: "completed",
+        createdAt: "2026-07-28T00:00:02.000Z",
+      },
+    ]);
+
+    expect(outputs).toEqual([]);
   });
 
   it("loads a session image through preload and opens a data URL in the right panel", async () => {
@@ -187,6 +277,70 @@ describe("image generation presentation", () => {
     expect(screen.getByTestId("active-tab-title")).toHaveTextContent("markdown:report.md");
   });
 
+  it("shows a specific error when a workspace artifact no longer exists", async () => {
+    const readWorkspaceFile = vi.fn(async () => ({
+      relativePath: "tmp-test.mjs",
+      renderKind: "text" as const,
+      size: 0,
+      mtimeMs: 0,
+      error: "not_found" as const,
+    }));
+    Object.defineProperty(window, "actspace", {
+      configurable: true,
+      value: { readWorkspaceFile },
+    });
+    const writeMessage: Extract<MessageBlock, { kind: "write_diff" }> = {
+      kind: "write_diff",
+      id: "write-missing",
+      filePath: "tmp-test.mjs",
+      outputPath: "/workspace/tmp-test.mjs",
+      outputRelativePath: "tmp-test.mjs",
+      additions: 4,
+      deletions: 0,
+      diff: "",
+      collapsedLines: 0,
+      status: "completed",
+      createdAt: "2026-07-28T00:00:01.000Z",
+    };
+
+    render(
+      <RightPanelProvider>
+        <TurnOutputArtifacts messages={[writeMessage]} sessionId="session-1" workspaceRoot="/workspace" />
+      </RightPanelProvider>,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Open tmp-test.mjs" }));
+
+    expect(await screen.findByText("文件已不存在。")).toBeInTheDocument();
+  });
+
+  it("renders workspace outputs as a compact file list with per-file and total diff stats", () => {
+    const writeMessage: Extract<MessageBlock, { kind: "write_diff" }> = {
+      kind: "write_diff",
+      id: "write-output-list",
+      filePath: "report.md",
+      outputPath: "/workspace/docs/report.md",
+      outputRelativePath: "docs/report.md",
+      additions: 3,
+      deletions: 1,
+      diff: "",
+      collapsedLines: 0,
+      status: "completed",
+      createdAt: "2026-07-28T00:00:01.000Z",
+    };
+
+    render(
+      <RightPanelProvider>
+        <TurnOutputArtifacts messages={[writeMessage]} sessionId="session-1" workspaceRoot="/workspace" />
+      </RightPanelProvider>,
+    );
+
+    expect(screen.getByText("Edited 1 file")).toBeInTheDocument();
+    expect(screen.getByText("docs/report.md")).toBeInTheDocument();
+    expect(screen.getAllByText("+3")).toHaveLength(2);
+    expect(screen.getAllByText("-1")).toHaveLength(2);
+  });
+
   it("asks main to open a workspace output context menu by relative path", () => {
     const showArtifactContextMenu = vi.fn(async () => ({ shown: true }));
     Object.defineProperty(window, "actspace", {
@@ -252,6 +406,29 @@ describe("image generation presentation", () => {
       </RightPanelProvider>,
     );
 
+    expect(screen.queryByRole("region", { name: "Turn output artifacts" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the artifact shelf hidden while the final reply is still streaming", () => {
+    const messages: MessageBlock[] = [
+      { kind: "user", id: "user-1", content: "Generate it", createdAt: "2026-07-28T00:00:00.000Z" },
+      imageMessage,
+      { kind: "assistant", id: "assistant-streaming", content: "正在整理结果。", createdAt: "2026-07-28T00:00:03.000Z" },
+    ];
+
+    render(
+      <RightPanelProvider>
+        <ConversationView
+          messages={messages}
+          contextSnapshot={null}
+          sessionId="session-1"
+          isSessionReady={false}
+          isStreaming
+        />
+      </RightPanelProvider>,
+    );
+
+    expect(screen.getByText("正在整理结果。")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Turn output artifacts" })).not.toBeInTheDocument();
   });
 });

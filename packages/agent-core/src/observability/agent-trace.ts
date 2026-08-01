@@ -100,6 +100,7 @@ export function getAgentTraceSummaryFilePath(sessionDir: string, agentRunId: str
 function createEmptyTraceSummary(sessionId: string, agentRunId: string): AgentTraceSummary {
   return {
     schemaVersion: 1,
+    toolSummaryVersion: 2,
     sessionId,
     agentRunId,
     startedAt: new Date().toISOString(),
@@ -166,7 +167,6 @@ function updateTraceSummary(
       ...next,
       llmCallCount: llmCallIds.size,
       modelNames: appendUnique(next.modelNames, readString(payload.model)),
-      toolNames: appendUniqueMany(next.toolNames, readToolNames(payload.tools)),
     };
   }
 
@@ -177,6 +177,7 @@ function updateTraceSummary(
     next = {
       ...next,
       modelNames: appendUnique(next.modelNames, readString(message.model)),
+      toolNames: appendUniqueMany(next.toolNames, readToolCallNames(message.content)),
       inputTokens: next.inputTokens + readNumber(usage.input),
       outputTokens: next.outputTokens + readNumber(usage.output),
       cacheReadTokens: next.cacheReadTokens + readNumber(usage.cacheRead),
@@ -223,7 +224,6 @@ function updateTurnSummary(
       ...next,
       llmCallCount: calls.size,
       modelNames: appendUnique(next.modelNames, readString(payload.model)),
-      toolNames: appendUniqueMany(next.toolNames, readToolNames(payload.tools)),
     };
   }
   if (event.type === "llm_response") {
@@ -233,6 +233,7 @@ function updateTurnSummary(
     next = {
       ...next,
       modelNames: appendUnique(next.modelNames, readString(message.model)),
+      toolNames: appendUniqueMany(next.toolNames, readToolCallNames(message.content)),
       inputTokens: next.inputTokens + readNumber(usage.input),
       outputTokens: next.outputTokens + readNumber(usage.output),
       cacheReadTokens: next.cacheReadTokens + readNumber(usage.cacheRead),
@@ -263,9 +264,10 @@ function readString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
 }
 
-function readToolNames(value: unknown): string[] {
+function readToolCallNames(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value
+    .filter((entry) => asRecord(entry).type === "toolCall")
     .map((entry) => readString(asRecord(entry).name))
     .filter((entry): entry is string => Boolean(entry));
 }

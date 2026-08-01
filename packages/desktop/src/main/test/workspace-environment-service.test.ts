@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -11,6 +11,7 @@ import {
   createWorkspaceBranch,
   getWorkspaceEnvironment,
   pushWorkspaceBranch,
+  switchWorkspaceBranch,
 } from "../workspace-environment-service";
 
 const execFileAsync = promisify(execFile);
@@ -71,6 +72,7 @@ describe("workspace environment service", () => {
     }
     expect(snapshot.locationKind).toBe("this_mac");
     expect(snapshot.git).toMatchObject({ repository: true, branch: "main", detached: false, hasHead: false });
+    expect(snapshot.git.branches).toEqual([{ name: "main", current: true }]);
   });
 
   it("reports linked Git worktrees", async () => {
@@ -101,6 +103,65 @@ describe("workspace environment service", () => {
     expect(invalid).toMatchObject({ ok: false, error: "invalid_branch" });
     expect(createdBranch).toMatchObject({ ok: true, branch: "actspace/environment" });
     expect((await git(roots.workspaceRoot, ["branch", "--show-current"])).stdout.trim()).toBe("actspace/environment");
+  });
+
+  it("lists local branches and switches to a selected branch", async () => {
+    const roots = await makeRoots();
+    await initRepo(roots);
+    await writeFile(join(roots.workspaceRoot, "README.md"), "initial\n", "utf8");
+    await commitAll(roots);
+    await git(roots.workspaceRoot, ["branch", "feature/selector"]);
+
+    const before = await getWorkspaceEnvironment({}, roots);
+    const switched = await switchWorkspaceBranch({ branchName: "feature/selector" }, roots);
+
+    if (!gitAvailable) return;
+    expect(before.git.branches).toEqual([
+      { name: "main", current: true },
+      { name: "feature/selector", current: false },
+    ]);
+    expect(switched).toMatchObject({ ok: true, action: "switch_branch", branch: "feature/selector" });
+    expect((await git(roots.workspaceRoot, ["branch", "--show-current"])).stdout.trim()).toBe("feature/selector");
+  });
+
+  it("keeps the current branch when uncommitted changes block switching", async () => {
+    const roots = await makeRoots();
+    await initRepo(roots);
+    await writeFile(join(roots.workspaceRoot, "README.md"), "main\n", "utf8");
+    await commitAll(roots);
+    await git(roots.workspaceRoot, ["switch", "-c", "feature/conflict"]);
+    await writeFile(join(roots.workspaceRoot, "README.md"), "feature\n", "utf8");
+    await commitAll(roots, "feature change");
+    await git(roots.workspaceRoot, ["switch", "main"]);
+    await writeFile(join(roots.workspaceRoot, "README.md"), "dirty main\n", "utf8");
+
+    const result = await switchWorkspaceBranch({ branchName: "feature/conflict" }, roots);
+
+    if (!gitAvailable) return;
+    expect(result).toMatchObject({ ok: false, action: "switch_branch", error: "command_failed", branch: "main" });
+    expect((await git(roots.workspaceRoot, ["branch", "--show-current"])).stdout.trim()).toBe("main");
+    expect(await readFile(join(roots.workspaceRoot, "README.md"), "utf8")).toBe("dirty main\n");
+  });
+
+  it("marks and rejects a branch checked out by another worktree", async () => {
+    const roots = await makeRoots();
+    await initRepo(roots);
+    await writeFile(join(roots.workspaceRoot, "README.md"), "main\n", "utf8");
+    await commitAll(roots);
+    const linkedRoot = await mkdtemp(join(tmpdir(), "actspace-occupied-parent-"));
+    created.push(linkedRoot);
+    const linkedWorkspace = join(linkedRoot, "occupied");
+    await git(roots.workspaceRoot, ["worktree", "add", "-b", "feature/occupied", linkedWorkspace]);
+
+    const snapshot = await getWorkspaceEnvironment({}, roots);
+    const result = await switchWorkspaceBranch({ branchName: "feature/occupied" }, roots);
+
+    if (!gitAvailable) return;
+    const occupied = snapshot.git.branches.find((branch) => branch.name === "feature/occupied");
+    expect(occupied).toMatchObject({ name: "feature/occupied", current: false });
+    expect(await realpath(occupied!.checkedOutPath!)).toBe(await realpath(linkedWorkspace));
+    expect(result).toMatchObject({ ok: false, error: "branch_checked_out", branch: "feature/occupied" });
+    expect((await git(roots.workspaceRoot, ["branch", "--show-current"])).stdout.trim()).toBe("main");
   });
 
   it("commits tracked, untracked, and deleted workspace changes", async () => {

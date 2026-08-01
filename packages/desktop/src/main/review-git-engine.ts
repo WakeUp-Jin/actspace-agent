@@ -6,6 +6,7 @@ import type {
   ReviewApplyMutationInput,
   ReviewBranch,
   ReviewCapabilities,
+  ReviewCommit,
   ReviewDiffQueryOptions,
   ReviewDiffRequest,
   ReviewFileContentSide,
@@ -173,6 +174,29 @@ export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvi
       branches.push({ branch, upstream, current: head === "*", ahead, behind });
     }
     return branches.sort((left, right) => Number(right.current) - Number(left.current) || left.branch.localeCompare(right.branch));
+  }
+
+  async listCommits(workspace: ResolvedReviewWorkspace, limit = 50): Promise<ReviewCommit[]> {
+    const repository = await this.resolveRepository(workspace);
+    if (repository.ok === false) throw new Error(repository.message);
+    if (!repository.context.hasHead) return [];
+    const maxCount = Math.min(100, Math.max(1, Math.floor(limit)));
+    const result = await this.git(repository.context.repoRoot, [
+      "log",
+      `--max-count=${maxCount}`,
+      "--format=%H%x00%s%x00%aI",
+      "--",
+      repository.context.pathspec,
+    ], SUMMARY_OUTPUT_LIMIT);
+    if (!gitSucceeded(result)) throw new Error(sanitizeGitFailure(result));
+    const commits: ReviewCommit[] = [];
+    for (const record of result.stdout.split(/\r?\n/)) {
+      if (!record) continue;
+      const [sha, subject, authoredAt] = record.split("\0");
+      if (!sha || subject === undefined || !authoredAt) continue;
+      commits.push({ sha, subject, authoredAt });
+    }
+    return commits;
   }
 
   async createPatch(workspace: ResolvedReviewWorkspace, snapshot: ReviewSnapshot): Promise<string> {

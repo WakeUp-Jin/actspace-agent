@@ -1,8 +1,10 @@
-import { lstat, readFile, readdir, rm, unlink } from "node:fs/promises";
+import { lstat, readFile, readdir, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   AgentAnalysisIndexInput,
   AgentAnalysisIndexResult,
+  AgentAnalysisSessionIndexResult,
+  AgentAnalysisSessionSummary,
   AgentAnalysisTotals,
   AgentTraceClearInput,
   AgentTraceClearResult,
@@ -21,6 +23,7 @@ import {
   createSessionStorePaths,
   getAgentTraceFilePath,
   getAgentTraceSummaryFilePath,
+  listSessionRecords,
   readSessionRecord,
 } from "@actspace/agent-core";
 
@@ -70,7 +73,9 @@ export async function readAgentTrace(
   const filePath = getAgentTraceFilePath(sessionDir, input.agentRunId);
   const events = await readTraceFile(filePath);
   const sidecar = await readTraceSummary(sessionDir, input.sessionId, input.agentRunId).catch(() => null);
-  const trace = sidecar ?? summarizeTrace(events, (await lstat(filePath)).size);
+  const rebuilt = summarizeTrace(events, (await lstat(filePath)).size);
+  const trace = sidecar?.toolSummaryVersion === 2 ? sidecar : mergeActualToolSummary(sidecar, rebuilt);
+  if (sidecar?.toolSummaryVersion !== 2) await writeTraceSummaryFile(sessionDir, input.agentRunId, trace).catch(() => undefined);
   if (trace.sessionId !== input.sessionId || trace.agentRunId !== input.agentRunId) {
     throw new Error("Agent trace identity does not match the requested session and run");
   }
@@ -107,6 +112,67 @@ export async function getAgentAnalysisIndex(
     totals,
     toolNames,
     runs,
+  };
+}
+
+export async function getAgentAnalysisSessionIndex(
+  sessionRoot: string,
+): Promise<AgentAnalysisSessionIndexResult> {
+  const sessions = await listSessionRecords(sessionRoot);
+  const summaries = await Promise.all(sessions.map(async (session): Promise<AgentAnalysisSessionSummary> => {
+    let traces: AgentTraceSummary[] = [];
+    let unavailable = false;
+    try {
+      traces = await listAgentTraceSidecars(sessionRoot, session.id);
+    } catch {
+      unavailable = true;
+    }
+
+    const totals = traces.reduce<AgentAnalysisTotals>((current, trace) => ({
+      agentRunCount: current.agentRunCount + 1,
+      turnCount: current.turnCount + trace.turnCount,
+      llmCallCount: current.llmCallCount + trace.llmCallCount,
+      inputTokens: current.inputTokens + trace.inputTokens,
+      outputTokens: current.outputTokens + trace.outputTokens,
+      cacheReadTokens: current.cacheReadTokens + trace.cacheReadTokens,
+      cacheWriteTokens: current.cacheWriteTokens + trace.cacheWriteTokens,
+      durationMs: current.durationMs + trace.durationMs,
+    }), emptyAnalysisTotals());
+
+    return {
+      sessionId: session.id,
+      title: session.title,
+      updatedAt: session.updatedAt,
+      ...(session.workspaceId ? { workspaceId: session.workspaceId } : {}),
+      ...(session.workspaceRoot ? { workspaceRoot: session.workspaceRoot } : {}),
+      status: unavailable
+        ? "unavailable"
+        : traces.some((trace) => trace.status === "recording")
+          ? "recording"
+          : traces.some((trace) => trace.status === "failed")
+            ? "failed"
+            : traces.length > 0 ? "completed" : "empty",
+      ...totals,
+      modelNames: uniqueStrings(traces.flatMap((trace) => trace.modelNames)),
+    };
+  }));
+
+  const totals = summaries.reduce<AgentAnalysisSessionIndexResult["totals"]>((current, session) => ({
+    sessionCount: current.sessionCount + 1,
+    agentRunCount: current.agentRunCount + session.agentRunCount,
+    turnCount: current.turnCount + session.turnCount,
+    llmCallCount: current.llmCallCount + session.llmCallCount,
+    inputTokens: current.inputTokens + session.inputTokens,
+    outputTokens: current.outputTokens + session.outputTokens,
+    cacheReadTokens: current.cacheReadTokens + session.cacheReadTokens,
+    cacheWriteTokens: current.cacheWriteTokens + session.cacheWriteTokens,
+    durationMs: current.durationMs + session.durationMs,
+  }), { sessionCount: 0, ...emptyAnalysisTotals() });
+
+  return {
+    totals,
+    modelNames: uniqueStrings(summaries.flatMap((session) => session.modelNames)),
+    sessions: summaries,
   };
 }
 
@@ -211,9 +277,10 @@ async function readSummaryWithTraceFallback(
   sessionId: string,
   agentRunId: string,
 ): Promise<AgentTraceSummary | null> {
+  let sidecar: AgentTraceSummary | null = null;
   try {
-    const summary = await readTraceSummary(sessionDir, sessionId, agentRunId);
-    if (summary) return summary;
+    sidecar = await readTraceSummary(sessionDir, sessionId, agentRunId);
+    if (sidecar?.toolSummaryVersion === 2) return sidecar;
   } catch {
     // 单个 sidecar 损坏不能阻断同一 Session 的其他 Agent Run。
   }
@@ -221,11 +288,32 @@ async function readSummaryWithTraceFallback(
   try {
     const filePath = getAgentTraceFilePath(sessionDir, agentRunId);
     const events = await readTraceFile(filePath);
-    return summarizeTrace(events, (await lstat(filePath)).size);
+    const summary = mergeActualToolSummary(sidecar, summarizeTrace(events, (await lstat(filePath)).size));
+    await writeTraceSummaryFile(sessionDir, agentRunId, summary).catch(() => undefined);
+    return summary;
   } catch {
     // JSONL 也不可读时只跳过该 Run，聊天历史与其他 Trace 仍可继续使用。
-    return null;
+    return sidecar ? mergeActualToolSummary(sidecar, null) : null;
   }
+}
+
+async function listAgentTraceSidecars(sessionRoot: string, sessionId: string): Promise<AgentTraceSummary[]> {
+  assertSafeId("sessionId", sessionId);
+  const sessionDir = join(sessionRoot, sessionId);
+  const traceDir = join(sessionDir, "traces");
+  const entries = await readdir(traceDir, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  });
+  const summaries = await Promise.all(entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".summary.json"))
+    .map((entry) => {
+      const agentRunId = entry.name.slice(0, -".summary.json".length);
+      return readTraceSummary(sessionDir, sessionId, agentRunId).catch(() => null);
+    }));
+  return summaries
+    .filter((summary): summary is AgentTraceSummary => Boolean(summary))
+    .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
 
 async function readTraceFile(filePath: string): Promise<AgentTraceEvent[]> {
@@ -303,6 +391,7 @@ function isAgentTraceSummary(value: unknown): value is AgentTraceSummary {
   if (!value || typeof value !== "object") return false;
   const summary = value as Partial<AgentTraceSummary>;
   return summary.schemaVersion === 1
+    && (summary.toolSummaryVersion === undefined || summary.toolSummaryVersion === 2)
     && typeof summary.sessionId === "string"
     && typeof summary.agentRunId === "string"
     && typeof summary.startedAt === "string"
@@ -349,13 +438,13 @@ function summarizeTrace(events: AgentTraceEvent[], byteSize: number): AgentTrace
     if (event.type === "llm_request") {
       const payload = asRecord(event.payload);
       pushUnique(modelNames, readString(payload.model));
-      for (const toolName of readToolNames(payload.tools)) pushUnique(toolNames, toolName);
     }
     if (event.type === "llm_response") {
       const payload = asRecord(event.payload);
       const message = asRecord(payload.message);
       const usage = asRecord(message.usage);
       pushUnique(modelNames, readString(message.model));
+      for (const toolName of readToolCallNames(message.content)) pushUnique(toolNames, toolName);
       inputTokens += readNumber(usage.input);
       outputTokens += readNumber(usage.output);
       cacheReadTokens += readNumber(usage.cacheRead);
@@ -366,6 +455,7 @@ function summarizeTrace(events: AgentTraceEvent[], byteSize: number): AgentTrace
 
   return {
     schemaVersion: 1,
+    toolSummaryVersion: 2,
     sessionId: first.sessionId,
     agentRunId: first.agentRunId,
     startedAt: first.timestamp,
@@ -420,13 +510,13 @@ function updateFallbackTurn(
     next.llmCallCount = calls.size;
     const payload = asRecord(event.payload);
     pushUnique(next.modelNames, readString(payload.model));
-    for (const name of readToolNames(payload.tools)) pushUnique(next.toolNames, name);
   }
   if (event.type === "llm_response") {
     const payload = asRecord(event.payload);
     const message = asRecord(payload.message);
     const usage = asRecord(message.usage);
     pushUnique(next.modelNames, readString(message.model));
+    for (const name of readToolCallNames(message.content)) pushUnique(next.toolNames, name);
     next.inputTokens += readNumber(usage.input);
     next.outputTokens += readNumber(usage.output);
     next.cacheReadTokens += readNumber(usage.cacheRead);
@@ -520,9 +610,10 @@ function readNumber(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function readToolNames(value: unknown): string[] {
+function readToolCallNames(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value
+    .filter((entry) => asRecord(entry).type === "toolCall")
     .map((entry) => readString(asRecord(entry).name))
     .filter((entry): entry is string => Boolean(entry));
 }
@@ -533,4 +624,23 @@ function pushUnique(values: string[], value?: string): void {
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function mergeActualToolSummary(sidecar: AgentTraceSummary | null, rebuilt: AgentTraceSummary | null): AgentTraceSummary {
+  const source = sidecar ?? rebuilt;
+  if (!source) throw new Error("Agent trace summary cannot be rebuilt");
+  const rebuiltTurns = new Map((rebuilt?.turns ?? []).map((turn) => [turn.turnId, turn.toolNames]));
+  return {
+    ...source,
+    toolSummaryVersion: 2,
+    toolNames: rebuilt?.toolNames ?? [],
+    turns: source.turns.map((turn) => ({ ...turn, toolNames: rebuiltTurns.get(turn.turnId) ?? [] })),
+  };
+}
+
+async function writeTraceSummaryFile(sessionDir: string, agentRunId: string, summary: AgentTraceSummary): Promise<void> {
+  const filePath = getAgentTraceSummaryFilePath(sessionDir, agentRunId);
+  const tempPath = `${filePath}.tmp`;
+  await writeFile(tempPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
+  await rename(tempPath, filePath);
 }

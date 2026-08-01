@@ -25,11 +25,15 @@ declare global {
       getAgentAnalysisIndex?: (
         input: import("@actspace/shared").AgentAnalysisIndexInput
       ) => Promise<import("@actspace/shared").AgentAnalysisIndexResult>;
+      getAgentAnalysisSessionIndex?: () => Promise<import("@actspace/shared").AgentAnalysisSessionIndexResult>;
       clearAgentTraces?: (
         input: import("@actspace/shared").AgentTraceClearInput
       ) => Promise<import("@actspace/shared").AgentTraceClearResult>;
       selectFiles?: () => Promise<import("@actspace/shared").SelectFilesResult>;
       selectImages?: () => Promise<import("@actspace/shared").SelectImagesResult>;
+      importComposerImage?: (
+        input: import("@actspace/shared").ImportComposerImageInput
+      ) => Promise<import("@actspace/shared").ImportComposerImageResult>;
       selectWorkspaceDirectory?: () => Promise<import("@actspace/shared").SelectWorkspaceDirectoryResult>;
       getPathForFile?: (file: File) => string;
       visualizeReply: (
@@ -91,6 +95,9 @@ declare global {
       listReviewBranches?: (
         input: import("@actspace/shared").ReviewWorkspaceInput
       ) => Promise<import("@actspace/shared").ReviewListBranchesResult>;
+      listReviewCommits?: (
+        input: import("@actspace/shared").ReviewWorkspaceInput
+      ) => Promise<import("@actspace/shared").ReviewListCommitsResult>;
       copyReviewGitApplyCommand?: (
         input: import("@actspace/shared").ReviewCopyApplyCommandInput
       ) => Promise<import("@actspace/shared").ReviewCopyApplyCommandResult>;
@@ -108,6 +115,9 @@ declare global {
       ) => Promise<import("@actspace/shared").WorkspaceEnvironmentSnapshot>;
       createWorkspaceBranch?: (
         input: import("@actspace/shared").WorkspaceGitCreateBranchInput
+      ) => Promise<import("@actspace/shared").WorkspaceGitMutationResult>;
+      switchWorkspaceBranch?: (
+        input: import("@actspace/shared").WorkspaceGitSwitchBranchInput
       ) => Promise<import("@actspace/shared").WorkspaceGitMutationResult>;
       commitWorkspaceChanges?: (
         input: import("@actspace/shared").WorkspaceGitCommitInput
@@ -203,6 +213,12 @@ declare global {
         input?: import("@actspace/shared").ApprovalListPendingInput
       ) => Promise<import("@actspace/shared").PendingApprovalInfo[]>;
       getSettings: () => Promise<import("@actspace/shared").AppSettings>;
+      consumeQuickOpenRequest?: () => Promise<import("@actspace/shared").QuickOpenRequest | null>;
+      getQuickOpenShortcutStatus?: () => Promise<import("@actspace/shared").QuickOpenShortcutStatus>;
+      updateQuickOpenShortcut?: (
+        input: import("@actspace/shared").QuickOpenShortcutUpdateInput
+      ) => Promise<import("@actspace/shared").QuickOpenShortcutUpdateResult>;
+      onQuickOpenRequested?: (callback: () => void) => () => void;
       readAgentSystemPrompt: () => Promise<import("@actspace/shared").AgentSystemPromptFile>;
       writeAgentSystemPrompt: (
         input: import("@actspace/shared").WriteAgentSystemPromptInput

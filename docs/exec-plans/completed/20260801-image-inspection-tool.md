@@ -1,6 +1,6 @@
 # 图片分析工具实施计划
 
-> 状态：2026-08-01 实现与自动化验证已完成并归档。浏览器 mock、Electron 视觉检查和真实 Provider 付费验收仍作为人工验收边界保留，不阻塞计划归档。
+> 状态：2026-08-01 实现与自动化验证已完成并归档；同日已通过 Computer Use 完成 Electron 设置 UI 与持久化验收。真实 Provider 付费调用仍因本机未连接 Kimi / OpenRouter 而未执行。
 
 ## 目标
 
@@ -170,8 +170,8 @@ git diff --check
 - [x] 完成工具注册、曝光、附件提示和预览。
 - [x] 完成设置页读写、模型 / 已有 Key 选择和 renderer 自动化测试。
 - [x] 完成定向自动化与文档收尾。
-- [ ] 完成浏览器 mock 视觉检查与 Electron 验收。
-- [ ] 由用户完成 Kimi 与 OpenRouter 真实 Provider 付费验收。
+- [x] 2026-08-01：通过 Computer Use 完成 Electron 设置 UI 验收：浅色 / 深色主题、Luna / Kimi 切换、工具启停、跨页面状态和 renderer 重载后的持久化均符合预期；验收后恢复 Luna、工具开启和浅色主题。
+- [ ] 完成真实工具运行预览，并分别执行 Kimi 与 OpenRouter 付费调用；当前应用未连接这两个 Provider，因此不能宣称该链路已验收。
 
 ## 决策记录
 

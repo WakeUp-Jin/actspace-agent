@@ -142,6 +142,28 @@ describe("ReviewGitEngine", () => {
     }
   });
 
+  it("lists recent commits for the current workspace path", async () => {
+    const root = await makeRepo();
+    if (!gitAvailable) return;
+    await mkdir(join(root, "app"));
+    await mkdir(join(root, "sibling"));
+    await writeFile(join(root, "app", "app.txt"), "base\n", "utf8");
+    await writeFile(join(root, "sibling", "sibling.txt"), "base\n", "utf8");
+    await commitAll(root, "base workspace");
+    await writeFile(join(root, "sibling", "sibling.txt"), "sibling change\n", "utf8");
+    await commitAll(root, "sibling only");
+    await writeFile(join(root, "app", "app.txt"), "app change\n", "utf8");
+    const appSha = await commitAll(root, "app only");
+
+    const commits = await new ReviewGitEngine().listCommits({
+      workspaceId: "workspace-app",
+      workspaceRoot: join(root, "app"),
+    });
+
+    expect(commits.map(({ subject }) => subject)).toEqual(["app only", "base workspace"]);
+    expect(commits[0]).toEqual(expect.objectContaining({ sha: appSha, authoredAt: expect.any(String) }));
+  });
+
   it("stages and unstages a file through mutation results", async () => {
     const root = await makeRepo();
     if (!gitAvailable) return;

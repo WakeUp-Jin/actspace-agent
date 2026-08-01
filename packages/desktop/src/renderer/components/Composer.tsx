@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type CSSProperties,
+  type DragEvent,
+} from "react";
 import {
   ArrowUp,
   Asterisk,
@@ -117,15 +125,16 @@ const COMPOSER_PANEL_CLASS =
 const COMPOSER_PANEL_INITIAL_CLASS =
   "composer-panel composer-panel-initial relative grid overflow-visible rounded-[18px] border border-line bg-surface shadow-act-soft";
 const COMPOSER_ATTACHMENTS_CLASS = "composer-attachments flex min-h-14 flex-wrap items-center gap-2.5 px-3 pb-1 pt-3";
+const IMAGE_ATTACHMENT_WRAPPER_CLASS = "group/image-attachment relative h-12 w-12 shrink-0";
 const IMAGE_ATTACHMENT_CLASS =
-  "image-attachment group/image-attachment relative h-12 w-12 rounded-lg [background:linear-gradient(135deg,rgba(18,92,210,0.12),rgba(255,255,255,0.36)),linear-gradient(155deg,transparent_0_48%,rgba(25,170,110,0.28)_49%_60%,transparent_61%),repeating-linear-gradient(0deg,#ffffff_0_7px,#dce7f5_7px_8px)] [box-shadow:inset_0_0_0_1px_rgba(81,109,158,0.16),0_8px_18px_rgba(54,83,134,0.08)]";
+  "image-attachment block h-12 w-12 overflow-hidden rounded-lg border border-line bg-surface-subtle bg-cover bg-center shadow-[0_4px_12px_rgba(20,21,18,0.08)] transition-[border-color,opacity] duration-[120ms] hover:border-line-strong hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring";
 const FILE_ATTACHMENT_CLASS =
   "file-attachment group/file-attachment inline-flex h-9 max-w-[220px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-sm font-medium text-text-main shadow-[0_6px_16px_rgba(31,45,61,0.06)]";
 const FILE_ATTACHMENT_NAME_CLASS = "truncate";
 const ATTACHMENT_REMOVE_BASE_CLASS =
   "attachment-remove grid place-items-center rounded-lg opacity-0 pointer-events-none transition-[background,color,opacity] duration-[150ms] ease-in-out";
 const IMAGE_ATTACHMENT_REMOVE_CLASS =
-  `${ATTACHMENT_REMOVE_BASE_CLASS} image-attachment-remove absolute right-[-5px] top-[-5px] h-6 w-6 bg-[rgba(45,51,58,0.86)] text-white shadow-[0_6px_14px_rgba(25,35,52,0.2)] group-hover/image-attachment:pointer-events-auto group-hover/image-attachment:opacity-100 group-focus-within/image-attachment:pointer-events-auto group-focus-within/image-attachment:opacity-100 hover:bg-[rgba(31,36,42,0.94)]`;
+  `${ATTACHMENT_REMOVE_BASE_CLASS} image-attachment-remove absolute right-[-4px] top-[-4px] h-[18px] w-[18px] rounded-full bg-text-main text-surface shadow-[0_3px_8px_rgba(20,21,18,0.2)] group-hover/image-attachment:pointer-events-auto group-hover/image-attachment:opacity-100 group-focus-within/image-attachment:pointer-events-auto group-focus-within/image-attachment:opacity-100 hover:opacity-80`;
 const FILE_ATTACHMENT_REMOVE_CLASS =
   `${ATTACHMENT_REMOVE_BASE_CLASS} file-attachment-remove h-[22px] w-[22px] text-text-faint group-hover/file-attachment:pointer-events-auto group-hover/file-attachment:opacity-100 group-focus-within/file-attachment:pointer-events-auto group-focus-within/file-attachment:opacity-100 hover:bg-hover-overlay hover:text-text-main`;
 // Composer 输入布局对齐 Cursor：单行内容 inline（+ / 输入 / 模型 / 发送同一行），
@@ -317,7 +326,6 @@ type ComposerModelOption = {
   reasoningEfforts?: ModelReasoningEffort[] | null;
   reasoningDefaultEffort?: ModelReasoningEffort;
   reasoningMandatory: boolean;
-  supportsImages: boolean;
 };
 
 type ComposerModelRuntimeOptions = {
@@ -343,7 +351,6 @@ const LEGACY_MODEL_OPTIONS: ComposerModelOption[] = MODEL_LIST.map((spec) => ({
   thinkingDefault: spec.thinkingDefault,
   supportsThinkingToggle: spec.supportsThinkingToggle,
   reasoningMandatory: false,
-  supportsImages: spec.input.includes("image"),
 }));
 
 function isModelEditable(model: ComposerModelOption): boolean {
@@ -392,11 +399,6 @@ function inferAttachmentKind(file: File, path?: string): ComposerAttachment["kin
   return "file";
 }
 
-function fileUrlFromPath(path?: string): string | undefined {
-  if (!path?.startsWith("/")) return undefined;
-  return `file://${path.split("/").map(encodeURIComponent).join("/")}`;
-}
-
 function attachmentFromDroppedFile(file: File): ComposerAttachment {
   const path = window.actspace?.getPathForFile?.(file) || undefined;
   const kind = inferAttachmentKind(file, path);
@@ -407,9 +409,15 @@ function attachmentFromDroppedFile(file: File): ComposerAttachment {
     path,
     mimeType: file.type || undefined,
     previewUrl: kind === "image"
-      ? fileUrlFromPath(path) ?? (typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : undefined)
+      ? (typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : undefined)
       : undefined,
   };
+}
+
+function revokeAttachmentPreview(attachment: ComposerAttachment): void {
+  if (attachment.previewUrl?.startsWith("blob:") && typeof URL.revokeObjectURL === "function") {
+    URL.revokeObjectURL(attachment.previewUrl);
+  }
 }
 
 function dedupeAttachments(attachments: ComposerAttachment[]): ComposerAttachment[] {
@@ -448,12 +456,14 @@ export function Composer({
   onModeChange,
   selectedSkills = [],
   onSelectedSkillsChange,
+  onOpenAttachmentPreview,
   onExpandContext,
   workspaceOptions = [],
   selectedWorkspaceRoot,
   onSelectWorkspace,
   executionContext,
   draftRestore,
+  focusRequestId = 0,
   reviewSummary,
   onOpenReview,
   models,
@@ -461,7 +471,7 @@ export function Composer({
   contextSnapshot: ContextUsageSnapshot | null;
   isStreaming?: boolean;
   isAborting?: boolean;
-  onSend?: (text: string, options: ComposerSendOptions) => void;
+  onSend?: (text: string, options: ComposerSendOptions) => void | Promise<void>;
   onAbort?: () => void;
   surface?: ComposerSurface;
   /** 来自设置页的默认模型；首次到达时同步选中，用户手动选过后不再覆盖。 */
@@ -473,6 +483,7 @@ export function Composer({
   onModeChange?: (mode: ComposerMode) => void;
   selectedSkills?: string[];
   onSelectedSkillsChange?: (skills: string[]) => void;
+  onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
   /** 提供时 Context 弹窗显示「展开完整视图」按钮，点击在右侧面板打开 Context Tab。 */
   onExpandContext?: () => void;
   workspaceOptions?: ComposerWorkspaceOption[];
@@ -480,6 +491,7 @@ export function Composer({
   onSelectWorkspace?: (workspaceRoot: string) => void;
   executionContext?: ComposerExecutionContext;
   draftRestore?: ComposerDraftRestore | null;
+  focusRequestId?: number;
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
   models?: UsableModelView[];
@@ -496,7 +508,6 @@ export function Composer({
         reasoningEfforts: model.capabilities.reasoningEfforts,
         reasoningDefaultEffort: model.capabilities.reasoningDefaultEffort,
         reasoningMandatory: model.capabilities.reasoningMandatory === true,
-        supportsImages: model.capabilities.input.includes("image"),
       }));
   const initialModelId = controlledSelectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID;
   const [commandOpen, setCommandOpen] = useState(false);
@@ -527,6 +538,8 @@ export function Composer({
   const userPickedModelRef = useRef(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
+  const attachmentsRef = useRef<ComposerAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [message, setMessage] = useState("");
   const [workspaceFolderName, setWorkspaceFolderName] = useState("");
@@ -546,10 +559,8 @@ export function Composer({
   const hasAttachments = attachments.length > 0 || selectedSkills.length > 0;
   const selectedModelAvailable = modelList.some((model) => model.id === selectedModelId);
   const selectedModelSpec = modelList.find((spec) => spec.id === selectedModelId);
-  const hasImageAttachments = attachments.some((attachment) => attachment.kind === "image");
-  const imagesUnsupported = hasImageAttachments && selectedModelSpec?.supportsImages !== true;
   const canSendMessage = Boolean(
-    (message.trim() || attachments.length > 0) && selectedModelAvailable && !imagesUnsupported,
+    (message.trim() || attachments.length > 0) && selectedModelAvailable,
   );
   const editingModelSpec = modelList.find((spec) => spec.id === editingModelId);
   const editingModelOptions = modelRuntimeOptions[editingModelId] ?? modelDefaultRuntimeOptions(editingModelSpec);
@@ -640,10 +651,28 @@ export function Composer({
   useEffect(() => {
     if (!draftRestore) return;
     setMessage(draftRestore.text);
-    setAttachments(draftRestore.attachments ?? []);
+    setAttachments((current) => {
+      current.forEach(revokeAttachmentPreview);
+      return draftRestore.attachments ?? [];
+    });
+    setAttachmentError(null);
     setSlashDismissed(false);
     window.requestAnimationFrame(() => inputRef.current?.focus());
   }, [draftRestore]);
+
+  useEffect(() => {
+    if (focusRequestId <= 0) return;
+    const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusRequestId]);
+
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  useEffect(() => () => {
+    attachmentsRef.current.forEach(revokeAttachmentPreview);
+  }, []);
 
   useLayoutEffect(() => {
     if (!slashOpen) {
@@ -780,7 +809,23 @@ export function Composer({
 
   function appendAttachments(nextAttachments: ComposerAttachment[]) {
     if (nextAttachments.length === 0) return;
-    setAttachments((current) => dedupeAttachments([...current, ...nextAttachments]));
+    setAttachments((current) => {
+      const next = dedupeAttachments([...current, ...nextAttachments]);
+      const retainedIds = new Set(next.map((attachment) => attachment.id));
+      nextAttachments
+        .filter((attachment) => !retainedIds.has(attachment.id))
+        .forEach(revokeAttachmentPreview);
+      return next;
+    });
+    setAttachmentError(null);
+  }
+
+  function removeAttachment(attachmentId: string) {
+    setAttachments((current) => {
+      const removed = current.find((attachment) => attachment.id === attachmentId);
+      if (removed) revokeAttachmentPreview(removed);
+      return current.filter((attachment) => attachment.id !== attachmentId);
+    });
   }
 
   async function handleSelectImages() {
@@ -795,11 +840,49 @@ export function Composer({
         }
       } catch (error) {
         console.error("Failed to select images", error);
+        setAttachmentError("图片选择失败。");
       }
       return;
     }
 
     console.warn("Image picker is only available in the desktop app.");
+    setAttachmentError("当前环境不支持图片选择。");
+  }
+
+  async function handlePasteImages(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const imageFiles = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file));
+    if (imageFiles.length === 0) return;
+
+    event.preventDefault();
+    if (!window.actspace?.importComposerImage) {
+      setAttachmentError("当前环境不支持粘贴图片。");
+      return;
+    }
+
+    const results = await Promise.all(imageFiles.map(async (file) => {
+      try {
+        return await window.actspace.importComposerImage!({
+          name: file.name || "pasted-image.png",
+          mimeType: file.type || undefined,
+          bytes: new Uint8Array(await file.arrayBuffer()),
+        });
+      } catch {
+        return { ok: false as const, error: { code: "write_failed" as const, message: "图片粘贴失败。" } };
+      }
+    }));
+    const imported = results.flatMap((result) => result.ok ? [result.attachment] : []);
+    if (imported.length > 0) appendAttachments(imported);
+    let failureMessage: string | undefined;
+    for (const result of results) {
+      if (result.ok === false) {
+        failureMessage = result.error.message;
+        break;
+      }
+    }
+    setAttachmentError(failureMessage ?? null);
   }
 
   async function loadSkills(forceReload = false) {
@@ -937,9 +1020,14 @@ export function Composer({
 
   function sendCurrentMessage() {
     if (!canSendMessage || !onSend || isStreaming) return;
-    onSend(message.trim(), createSendOptions(true));
+    const sentAttachments = [...attachments];
+    const sendResult = onSend(message.trim(), createSendOptions(true));
+    void Promise.resolve(sendResult).finally(() => {
+      sentAttachments.forEach(revokeAttachmentPreview);
+    });
     setMessage("");
     setAttachments([]);
+    setAttachmentError(null);
     closeFloatingPanels();
   }
 
@@ -1042,6 +1130,9 @@ export function Composer({
           setMessage(event.target.value);
           setSlashDismissed(false);
         }}
+        onPaste={(event) => {
+          void handlePasteImages(event);
+        }}
         onKeyDown={(event) => {
           if (event.key === "Tab" && event.shiftKey) {
             event.preventDefault();
@@ -1085,25 +1176,31 @@ export function Composer({
           if (attachment.kind === "image") {
             return (
               <div
-                className={IMAGE_ATTACHMENT_CLASS}
+                className={IMAGE_ATTACHMENT_WRAPPER_CLASS}
                 aria-label={`Attached image ${attachment.name}`}
                 key={attachment.id}
-                style={getAttachmentPreviewStyle(attachment)}
-                title={attachment.name}
               >
+                <button
+                  className={IMAGE_ATTACHMENT_CLASS}
+                  type="button"
+                  aria-label={`Preview attached image ${attachment.name}`}
+                  disabled={!attachment.previewUrl || !onOpenAttachmentPreview}
+                  onClick={() => onOpenAttachmentPreview?.(attachment)}
+                  style={getAttachmentPreviewStyle(attachment)}
+                  title={attachment.name}
+                />
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
                       className={IMAGE_ATTACHMENT_REMOVE_CLASS}
                       type="button"
                       aria-label={`Remove ${attachment.name}`}
-                      onPointerDown={(event) => {
-                        event.preventDefault();
+                      onClick={(event) => {
                         event.stopPropagation();
-                        setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+                        removeAttachment(attachment.id);
                       }}
                     >
-                      <X size={16} strokeWidth={2.4} aria-hidden="true" />
+                      <X size={11} strokeWidth={2.6} aria-hidden="true" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>移除 {attachment.name}</TooltipContent>
@@ -1122,10 +1219,9 @@ export function Composer({
                     className={FILE_ATTACHMENT_REMOVE_CLASS}
                     type="button"
                     aria-label={`Remove ${attachment.name}`}
-                    onPointerDown={(event) => {
-                      event.preventDefault();
+                    onClick={(event) => {
                       event.stopPropagation();
-                      setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+                      removeAttachment(attachment.id);
                     }}
                   >
                     <X size={13} strokeWidth={2.4} aria-hidden="true" />
@@ -1681,18 +1777,14 @@ export function Composer({
     const modelUnavailable = !selectedModelAvailable;
     const tooltipLabel = isStreaming
       ? "停止 Agent"
-      : imagesUnsupported
-        ? "当前模型不支持图片输入"
-        : modelUnavailable
+      : modelUnavailable
           ? "请先在设置中连接模型服务"
           : canSendMessage
             ? "发送消息"
             : "输入消息后发送";
     const ariaLabel = isStreaming
       ? "Stop agent"
-      : imagesUnsupported
-        ? "Selected model does not support image input"
-        : modelUnavailable
+      : modelUnavailable
           ? "No available model. Open Settings to connect a provider"
           : canSendMessage
             ? "Send message"
@@ -1765,6 +1857,11 @@ export function Composer({
         onDrop={handleDropFiles}
       >
         {renderAttachmentStrip()}
+        {attachmentError ? (
+          <div className="px-3 pb-1 text-xs text-danger" role="alert">
+            {attachmentError}
+          </div>
+        ) : null}
         <div
           ref={composerBodyRef}
           className={composerBodyClass}

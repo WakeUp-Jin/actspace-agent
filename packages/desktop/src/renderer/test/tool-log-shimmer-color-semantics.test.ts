@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const rendererRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("Tool log shimmer color semantics", () => {
-  it("uses neutral theme text for running copy and its moving highlight", () => {
+  it("uses the approved high-contrast neutral ink sweep", () => {
     const baseCss = fs.readFileSync(path.join(rendererRoot, "styles/base.css"), "utf8");
     const shimmerStart = baseCss.indexOf(".tool-log-text-running {");
     const shimmerEnd = baseCss.indexOf("@keyframes compact-progress", shimmerStart);
@@ -14,8 +14,8 @@ describe("Tool log shimmer color semantics", () => {
     expect(shimmerEnd).toBeGreaterThan(shimmerStart);
     const shimmerCss = baseCss.slice(shimmerStart, shimmerEnd);
 
-    expect(shimmerCss).toContain("color: var(--act-color-text);");
-    expect(shimmerCss).toContain("var(--act-color-text-subtle) 50%");
+    expect(shimmerCss).toContain("color: var(--act-color-text-faint);");
+    expect(shimmerCss).toContain("var(--act-color-text) 50%");
     expect(shimmerCss).not.toContain("var(--act-color-operational)");
     expect(shimmerCss).toContain("display: none;");
   });

@@ -6,11 +6,11 @@
 - 页面名称：分析观测 / Analysis
 - 数据事实来源：[`../agent-runtime/agent-observability-trace-model.md`](../agent-runtime/agent-observability-trace-model.md)
 - 交互原型：[`front-agent-analysis-observability-prototype.html`](front-agent-analysis-observability-prototype.html)
-- 执行计划：[`../../exec-plans/active/20260730-agent-analysis-observability-page.md`](../../exec-plans/active/20260730-agent-analysis-observability-page.md)
+- 执行计划：[`../../exec-plans/completed/20260801-analysis-session-index.md`](../../exec-plans/completed/20260801-analysis-session-index.md)
 
 ## 定位
 
-分析观测是面向 ActSpace 开发者的本地会话诊断工作区。它把当前 Session 中已经发生的 Agent Run、内部 Turn 与真实 LLM Call 按执行层级还原出来，用于回答：
+分析观测是面向 ActSpace 开发者的本地会话诊断工作区。它先提供全部未归档 Session 的轻量索引，再把选中 Session 中已经发生的 Agent Run、内部 Turn 与真实 LLM Call 按执行层级还原出来，用于回答：
 
 - 一次用户输入触发了多少个内部 Turn？
 - 每个 Turn 发起了哪些真实模型请求，是否发生重试？
@@ -59,21 +59,34 @@ Session
 
 - 在设置导航中新增直接操作项「分析观测」，位置在「归档会话」之后、「更新」之前。
 - 点击后直接把 `WorkbenchLayout.view` 切换为独立 `analysis` 视图，不增加中间说明页。
-- 入口默认打开当前活动 Session；没有活动 Session 时尝试打开最近一个未归档 Session。
-- 当前版本不提供 Session 导航器，避免恢复成三栏结构。后续若需要分析任意历史 Session，应从会话菜单增加“在分析观测中打开”，而不是在本页常驻第三层导航。
+- 入口先打开会话索引首页；当前活动 Session 只标记为「当前」，不自动钻取。
+- 首页列出全部未归档 Session，包括暂无 Trace 的会话；用户显式选择后才加载该 Session 的分析详情。
+- Session 索引与详情是两个页面状态，不在详情页常驻为第三栏。详情仍只保留 Agent Run / Turn 导航与 LLM Call 内容两栏。
 
 ### 独立工作区
 
 - 分析观测打开后，设置导航和聊天侧栏都不保留。
-- 页面左上角提供「返回设置」，返回后恢复进入分析观测前的设置分区。
-- 页面占据完整工作区，只保留分析页自己的两栏。
+- 会话首页不设置独立页面标题栏；纯箭头返回按钮与「会话记录」位于同一内容标题行，返回后恢复进入分析观测前的设置分区。
+- 会话详情左上角提供无边框「返回会话列表」，回到索引首页并保留页面级加载边界。
+- 页面占据完整工作区；索引首页为单列表，详情页为两栏。
 - 切换页面不会启动、停止或重放 Agent Run。
 
 ## 页面总布局
 
 ```text
+会话索引首页
 ┌──────────────────────────────────────────────────────────────────┐
-│ 返回设置  分析观测   Session 汇总统计                    本地记录 │
+│ ←  会话记录  4 个会话                                        │
+│ Session 4 / Run 9 / Turn 49 / LLM Call 49 / Token 832,193      │
+│ [搜索会话或工作区                    ] [状态] [模型]              │
+│ 会话与工作区              Run / Turn  Token    模型  状态       │
+│ · Inspect runtime            1 / 2     28,817   DS    当前    > │
+│   runtime · 07-29 18:05                                      │
+└──────────────────────────────────────────────────────────────────┘
+
+单会话详情
+┌──────────────────────────────────────────────────────────────────┐
+│ 返回会话列表  分析观测   Session 汇总统计                本地记录 │
 ├──────────────────────┬───────────────────────────────────────────┤
 │ 搜索                 │ Turn 2   模型名称                         │
 │ Tools 筛选           │ LLM Call 切换 / 用量 / 耗时 / Attempt     │
@@ -88,9 +101,21 @@ Session
 └──────────────────────┴───────────────────────────────────────────┘
 ```
 
+### 会话索引首页
+
+- 首页通过单次 main IPC 返回聚合后的轻量列表，Renderer 不逐条读取完整 Trace。
+- 首页内容使用约 `1180px` 的居中阅读宽度，不把少量会话横向铺满整个窗口。
+- 每行至少展示最近活动时间、会话标题、工作区、Agent Run 数、Turn 数、API Token、模型和文字状态。
+- 状态包括「记录中」「已完成」「失败」「暂无记录」「不可读取」；单条损坏只降级该行。
+- 搜索覆盖会话标题、工作区和模型；状态与模型筛选使用结构化字段，不解析展示文本。
+- 搜索、状态和模型筛选收进列表顶部工具栏，形成一个连续的浏览工具，不在页面上漂浮成独立表单区。
+- 一级汇总只保留 Session、Agent Run、Turn、LLM Call 与 API Token；Cache 与耗时进入单会话详情，不和入口主指标争夺层级。
+- 列表把工作区与最近活动时间合并为标题次级信息，把 Run / Turn 合并为一列，减少横向扫描距离。
+- 列表默认沿 Session 元数据的最近更新时间排序。当前会话只使用 operational 小圆点和「当前」文字，不使用整行染色。
+
 ### 顶部栏
 
-顶部栏用于表达当前 Session 的总体规模，不重复显示当前用户输入正文。建议依次展示：
+详情顶部栏用于表达当前 Session 的总体规模，不重复显示当前用户输入正文。建议依次展示：
 
 - Agent Run 数
 - Turn 数
@@ -104,10 +129,13 @@ Session
 
 规则：
 
+- 首页与详情均复用设置导航的无边框返回语法，不使用独立描边方形图标按钮。
+- 首页不保留独立页面标题栏；返回动作以纯箭头并入「会话记录」标题行，不重复显示「返回」「分析观测」或「本地记录」文字。
+- 详情保留独立顶部汇总栏，标题区只显示返回动作和「分析观测」，不重复显示设置路径或当前 Session 标题。
 - `Cache Hit Rate = Cache Read Token / Input Token`；provider 未报告缓存数据时显示 `—`，不能显示伪造的 `0%`。
 - 累计耗时使用每次 LLM Call 的 `durationMs` 求和，不把用户等待和工具执行误计入模型耗时。
 - 汇总项在空间不足时横向滚动或收敛标签，不允许挤压页面标题和返回按钮。
-- 「本地记录」只表示数据来自本机，不代表正在监听网络代理。
+- 详情中的「本地记录」只表示数据来自本机，不代表正在监听网络代理。
 
 ## 左栏：导航与筛选
 
@@ -124,9 +152,10 @@ Session
 
 ### Tools 筛选
 
-- 只展示当前 Session 的 LLM 请求实际声明或调用过的工具名称。
+- 只展示模型响应中实际产生过 `toolCall` 的工具名称；请求中仅声明、但从未调用的工具不进入筛选索引。
 - 首项为 `All`。
 - 首版采用单选筛选；点击工具后，只显示包含该工具的 Turn。
+- 工具项随当前搜索结果动态收敛，没有匹配 Turn 或调用数为 0 的工具不显示；当前工具随搜索失效时自动回到 `All`。
 - 工具名按首次出现顺序排列，数量较多时允许换行或在容器内横向滚动。
 - 筛选的是 Turn，不是单个 Tool Call；右侧仍展示完整 LLM Call 上下文。
 
@@ -260,7 +289,8 @@ provider 没有返回的字段显示 `—` 或完全隐藏，不能根据其他�
 - 默认比较当前 Agent Run 内紧邻当前调用之前的真实 LLM Call。
 - 同一 Turn 的重试也属于合法前序调用。
 - 当前调用是本 Agent Run 第一次请求时按钮禁用，并给出原因 Tooltip。
-- 弹窗内可通过前后按钮和下拉选择更早的调用。
+- 不提供任意“对比对象”下拉，避免跳过中间上下文变化。
+- 弹窗标题两侧的前后按钮以相邻调用为窗口翻页，例如 `Turn 1 → Turn 2`、`Turn 2 → Turn 3`；到首尾后禁用。
 
 #### 弹窗标题
 
@@ -319,6 +349,7 @@ analysis-diff-remove-soft
 
 ## 响应式布局
 
+- 会话索引在宽窗下保持居中单列；`<= 1050px` 隐藏模型列，`<= 720px` 将 Run、Turn 与 Token 收入会话次级信息，并让搜索独占一行。
 - `>= 1000px`：固定两栏，左栏建议 300–340px，右栏占剩余空间。
 - `821–999px`：左栏收敛到约 280px；顶部统计允许横向滚动；Turn 标题操作可以换行。
 - `<= 820px`：右栏全宽；左栏变为由“用户输入与 Turn”按钮打开的覆盖式导航 Sheet。
@@ -329,14 +360,14 @@ analysis-diff-remove-soft
 
 ### 加载
 
-- 页面先加载轻量分析索引，再读取当前选中 Agent Run 的完整 Trace。
+- 页面先加载跨 Session 轻量索引；用户选中 Session 后再加载该 Session 的 Run summary，选中 Agent Run 后才读取完整 Trace。
 - 左栏 Skeleton 与右栏 Skeleton 分开，避免一次大读取让整页空白。
 - 切换 Turn 或同一 Run 内 LLM Call 不重复读取文件；切换 Agent Run 时才懒加载并缓存最近读取结果。
 
 ### 空状态
 
-- Session 没有 Trace：说明“该会话暂无可分析记录”，并提示只有启用 V2 Trace 后的新 Agent Run 才会出现。
-- 没有活动 Session：提供“返回聊天”或“返回设置”，不自动创建会话。
+- Session 没有 Trace：首页仍展示该会话并标记「暂无记录」；钻取后说明“该会话暂无可分析记录”。
+- 没有活动 Session：仍展示其他未归档会话；全部为空时显示索引空状态，不自动创建会话。
 - 筛选无结果：保留搜索与工具筛选，提供清除筛选操作。
 
 ### 错误与降级
@@ -359,6 +390,16 @@ type AgentAnalysisSessionView = {
   runs: AgentAnalysisRunView[];
 };
 
+type AgentAnalysisSessionSummary = {
+  sessionId: string;
+  title: string;
+  updatedAt: string;
+  workspaceRoot?: string;
+  status: "recording" | "completed" | "failed" | "empty" | "unavailable";
+  totals: AnalysisTotals;
+  modelNames: string[];
+};
+
 type AgentAnalysisRunView = {
   agentRunId: string;
   userMessagePreview: string;
@@ -379,6 +420,7 @@ type AgentAnalysisTurnDetail = {
 规则：
 
 - SessionEvent 提供用户输入与 Agent Run 对应关系。
+- Session 元数据与 Trace summary sidecar 提供跨 Session 首页；首页不得回退读取完整 JSONL。
 - Trace summary 提供左栏和顶部统计所需的轻量元数据。
 - 完整 Trace 只在选中 Agent Run 时读取。
 - 归一化、排序、消息 diff 和 cURL 生成放在纯函数中，并写单元测试。
@@ -392,7 +434,7 @@ type AgentAnalysisTurnDetail = {
 - 单个 Trace 默认上限 64 MiB；超过后停止写入大请求/响应快照，记录 `truncated` 状态，但不得影响 Agent Run。
 - 全局 Trace 默认保留 30 天且总量不超过 512 MiB；超限时从最旧的已完成 Trace 开始清理。
 - 活跃 Trace 不参与自动清理。
-- 提供“清除当前 Session 分析记录”和“清除全部分析记录”的显式操作，删除前确认；清理 Trace 不删除 `session.jsonl`。
+- Trace 清理 IPC 与自动保留策略继续存在，但分析页顶部不提供删除按钮，避免在高频浏览区暴露低频破坏性操作；任何清理都不得删除 `session.jsonl`。
 - 所有限制使用集中配置常量并有测试，后续再决定是否开放为用户设置。
 
 以上数值是首版建议默认值，属于本设计评审内容；实现前若调整，应同步修改本文与执行计划。
@@ -420,7 +462,8 @@ type AgentAnalysisTurnDetail = {
 ### 包含
 
 - 设置页入口与独立 Analysis 工作区。
-- 当前活动 Session 的 Agent Run / Turn / LLM Call 导航。
+- 未归档 Session 索引、汇总、搜索、状态与模型筛选。
+- 选中 Session 的 Agent Run / Turn / LLM Call 导航。
 - 搜索、单选 Tools 筛选、用户输入折叠。
 - 工具定义、系统提示词、消息、响应与完整 JSON。
 - Request JSON、脱敏 cURL、相邻请求对比。
@@ -433,7 +476,7 @@ type AgentAnalysisTurnDetail = {
 - 多供应商代理流量抓包或中间人代理。
 - 数据集运行、评分、排行榜或回归报告。
 - 独立“工具执行”详情面板。
-- Session 常驻导航或跨 Session 搜索。
+- 详情页常驻 Session 第三栏或跨 Session 全文消息搜索。
 - Trace 导出包、分享链接或云端同步。
 - 修改、重放或重新发送某次请求。
 - 子 Agent 的独立树形分析；首版只显示主 Agent Trace 已捕获的上下文事实。
@@ -441,10 +484,14 @@ type AgentAnalysisTurnDetail = {
 ## 验收标准
 
 - 页面层级与 `agentRunId → turnId → llmCallId` 一致。
+- 从设置进入时先显示会话索引；当前会话仅标记，不自动读取详情。
+- 首页只读取 Session 元数据与 summary sidecar；单条损坏不阻断其他会话。
+- 从首页选择会话后进入详情，详情返回会话列表，首页返回设置。
 - 一个 Turn 的重试可以切换为多个 LLM Call。
 - 选中任意 LLM Call 后，所有详情和顶部操作引用同一请求。
 - 工具定义不是原始 JSON；消息有角色背景；响应不是原始 JSON。
-- 对比弹窗能区分跨 Turn 与同 Turn重试，并且不显示 LLM Call ID 标题。
+- 对比弹窗能区分跨 Turn 与同 Turn重试，按相邻调用前后翻页，并且不显示 LLM Call ID 或任意对象下拉。
+- Tools 只显示当前搜索结果中实际调用数大于 0 的工具，旧 summary 会从有界 JSONL 重建这项派生索引。
 - Settings 侧栏在 Analysis 中消失，页面始终最多两栏。
 - 浅色主题以明亮白色为主，角色色只承担低面积数据编码；深色主题可读。
 - 大 Session 不需要读取全部 Trace 才能渲染左栏。
@@ -460,3 +507,5 @@ type AgentAnalysisTurnDetail = {
 - 2026-07-30：工具定义改为 description + 参数列表；原始 schema 只放完整 JSON。
 - 2026-07-30：浅色主题采用明亮白色与浅蓝、浅绿、浅紫的数据编码；这些颜色不回流为全局导航或 CTA 色。
 - 2026-07-30：对比上次默认比较当前 Agent Run 内的前一个真实 LLM Call，隐藏底层调用 ID。
+- 2026-08-01：恢复原始 claude-tap Demo 已确认的「会话索引 -> 单会话钻取」核心；此决策取代 2026-07-30 的“入口直接打开当前 Session”。详情仍保持两栏，不引入常驻第三栏。
+- 2026-08-01：当前活动 Session 只在首页标记，所有会话钻取都必须由用户显式触发。

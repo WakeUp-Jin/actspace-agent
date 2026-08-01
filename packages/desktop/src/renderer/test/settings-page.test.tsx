@@ -137,6 +137,27 @@ describe("SettingsPage", () => {
   }));
   const listSessions = vi.fn(async (input?: { archived?: boolean }) => (input?.archived ? archivedSessions : []));
   const archiveSession = vi.fn(async () => ({ ok: true }));
+  const listWorkspaces = vi.fn(async () => ({ version: 1 as const, defaultWorkspaceId: "default", items: [] }));
+  const getQuickOpenShortcutStatus = vi.fn(async () => ({
+    registered: true,
+    accelerator: "CommandOrControl+Shift+Space",
+  }));
+  const updateQuickOpenShortcut = vi.fn(async (input: { enabled?: boolean }) => {
+    const settings = makeSettings({
+      shortcuts: {
+        quickOpen: {
+          enabled: input.enabled ?? true,
+          accelerator: "CommandOrControl+Shift+Space",
+          target: { kind: "automatic" },
+        },
+      },
+    });
+    return {
+      ok: true as const,
+      settings,
+      status: { registered: input.enabled ?? true, accelerator: "CommandOrControl+Shift+Space" },
+    };
+  });
   const setUiZoom = vi.fn();
   const setNativeTheme = vi.fn();
 
@@ -161,6 +182,9 @@ describe("SettingsPage", () => {
     startLocalUpdate.mockReset();
     listSessions.mockClear();
     archiveSession.mockClear();
+    listWorkspaces.mockClear();
+    getQuickOpenShortcutStatus.mockClear();
+    updateQuickOpenShortcut.mockClear();
     setUiZoom.mockClear();
     setNativeTheme.mockClear();
     localStorage.clear();
@@ -200,6 +224,9 @@ describe("SettingsPage", () => {
       startLocalUpdate,
       listSessions,
       archiveSession,
+      listWorkspaces,
+      getQuickOpenShortcutStatus,
+      updateQuickOpenShortcut,
       setUiZoom,
       setNativeTheme,
     } as unknown as ActspaceBridge;
@@ -216,6 +243,18 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("button", { name: "更新" })).toBeInTheDocument();
     expect(screen.getByLabelText("界面语言")).toBeDisabled();
     expect(getLocalUpdateState).not.toHaveBeenCalled();
+  });
+
+  it("shows the quick open shortcut section and persists its enabled state", async () => {
+    renderSettingsPage();
+    await userEvent.click(await screen.findByRole("button", { name: "快捷键" }));
+    const toggle = await screen.findByRole("switch", { name: "启用快速唤起" });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("button", { name: "录制快速唤起快捷键" })).toHaveTextContent("CommandOrControl+Shift+Space");
+
+    await userEvent.click(toggle);
+
+    expect(updateQuickOpenShortcut).toHaveBeenCalledWith({ enabled: false });
   });
 
   it("keeps the settings nav fixed while the content pane owns vertical scrolling", async () => {

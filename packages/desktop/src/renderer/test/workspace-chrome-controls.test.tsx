@@ -14,6 +14,11 @@ const environment: WorkspaceEnvironmentSnapshot = {
     available: true,
     repository: true,
     branch: "main",
+    branches: [
+      { name: "main", current: true },
+      { name: "codex/add-branch-selector", current: false },
+      { name: "feature/occupied", current: false, checkedOutPath: "/tmp/other-worktree" },
+    ],
     detached: false,
     hasHead: true,
     remotes: ["origin"],
@@ -52,6 +57,13 @@ function installBridge(overrides: Partial<NonNullable<typeof window.actspace>> =
     createWorkspaceBranch: vi.fn(async (input) => ({
       ok: true as const,
       action: "create_branch" as const,
+      phase: "branch" as const,
+      workspaceRoot: "/tmp/workspace",
+      branch: input.branchName,
+    })),
+    switchWorkspaceBranch: vi.fn(async (input) => ({
+      ok: true as const,
+      action: "switch_branch" as const,
       phase: "branch" as const,
       workspaceRoot: "/tmp/workspace",
       branch: input.branchName,
@@ -133,6 +145,76 @@ describe("WorkspaceChromeControls", () => {
     expect(within(popover).getByText("notes.md")).toBeInTheDocument();
   });
 
+  it("searches local branches, disables occupied worktrees, and switches branches", async () => {
+    const nextEnvironment: WorkspaceEnvironmentSnapshot = {
+      ...environment,
+      git: {
+        ...environment.git,
+        branch: "codex/add-branch-selector",
+        branches: environment.git.branches.map((branch) => ({
+          ...branch,
+          current: branch.name === "codex/add-branch-selector",
+        })),
+      },
+    };
+    const getWorkspaceEnvironment = vi.fn()
+      .mockResolvedValueOnce(environment)
+      .mockResolvedValueOnce(nextEnvironment);
+    const bridge = installBridge({ getWorkspaceEnvironment });
+    const user = userEvent.setup();
+    renderControls();
+
+    await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
+    await user.click(await screen.findByRole("button", { name: "main" }));
+    const menu = await screen.findByRole("menu", { name: "Branches" });
+    expect(within(menu).getByRole("menuitemradio", { name: /feature\/occupied/ })).toBeDisabled();
+
+    await user.type(within(menu).getByRole("searchbox", { name: "Search branches" }), "codex");
+    expect(within(menu).queryByRole("menuitemradio", { name: "main" })).not.toBeInTheDocument();
+    await user.click(within(menu).getByRole("menuitemradio", { name: "codex/add-branch-selector" }));
+
+    expect(bridge.switchWorkspaceBranch).toHaveBeenCalledWith({
+      workspaceRoot: "/tmp/workspace",
+      branchName: "codex/add-branch-selector",
+    });
+    expect(await screen.findByText("Switched to codex/add-branch-selector.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "codex/add-branch-selector" })).toBeInTheDocument();
+  });
+
+  it("opens create and checkout from the branch list footer", async () => {
+    installBridge();
+    const user = userEvent.setup();
+    renderControls();
+
+    await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
+    await user.click(await screen.findByRole("button", { name: "main" }));
+    const menu = await screen.findByRole("menu", { name: "Branches" });
+    await user.click(within(menu).getByRole("menuitem", { name: "Create and checkout new branch..." }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Create and checkout branch" });
+    expect(within(dialog).getByRole("textbox", { name: "Branch name" })).toHaveValue("actspace/environment-controls");
+    expect(within(dialog).getByRole("button", { name: "Close" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Create and checkout" })).toBeInTheDocument();
+  });
+
+  it("keeps the branch menu usable during a dev IPC snapshot version mismatch", async () => {
+    installBridge({
+      getWorkspaceEnvironment: vi.fn(async () => ({
+        ...environment,
+        git: { ...environment.git, branches: undefined },
+      } as unknown as WorkspaceEnvironmentSnapshot)),
+    });
+    const user = userEvent.setup();
+    renderControls();
+
+    await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
+    await user.click(await screen.findByRole("button", { name: "main" }));
+
+    const menu = await screen.findByRole("menu", { name: "Branches" });
+    expect(within(menu).getByRole("menuitemradio", { name: "main" })).toBeChecked();
+    expect(within(menu).getByRole("menuitem", { name: "Create and checkout new branch..." })).toBeInTheDocument();
+  });
+
   it("lists local apps, disables unavailable apps, and remembers a selection", async () => {
     const bridge = installBridge();
     const user = userEvent.setup();
@@ -164,12 +246,12 @@ describe("WorkspaceChromeControls", () => {
 
     await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
     await user.click(await screen.findByRole("button", { name: "Create branch" }));
-    const dialog = await screen.findByRole("dialog", { name: "Work here" });
+    const dialog = await screen.findByRole("dialog", { name: "Create and checkout branch" });
     const input = within(dialog).getByRole("textbox", { name: "Branch name" });
     expect(input).toHaveValue("actspace/environment-controls");
     await user.clear(input);
     await user.type(input, "actspace/new-branch");
-    await user.click(within(dialog).getByRole("button", { name: "Create" }));
+    await user.click(within(dialog).getByRole("button", { name: "Create and checkout" }));
 
     expect(bridge.createWorkspaceBranch).toHaveBeenCalledWith({ workspaceRoot: "/tmp/workspace", branchName: "actspace/new-branch" });
   });

@@ -195,7 +195,7 @@ text-[rgba(...)]
 ### Message tools
 
 - 默认和 completed = neutral。
-- running 文字使用主文本色，shimmer overlay 使用主题中性浅灰；通过文字层级和动态表达进行中，不使用绿色整行文字。
+- running 文字采用 `text-faint` 底字 + `text-main` 墨色扫光的 B 方案高明度差组合；浅深主题依靠 token 自动翻转，通过文字层级和动态表达进行中，不使用绿色整行文字。
 - approval = warning，failed = danger。
 
 ### Settings

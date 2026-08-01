@@ -51,6 +51,7 @@ chrome-right 现有两个浮层控件（`+` 新建对象 + PanelRight 折叠）�
 Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cursor 式的三层兜底：
 
 - Tab 保持内容宽度（标题截断到 160px），不挤压成不可读窄条。
+- 激活 Tab 使用 `surface-subtle` 的轻量中性底色和较高字重，不使用更深的全局 `selected` 填充；非激活 Tab 继续透明，hover 才使用 `hover-overlay`。
 - Tab 行横向可滚动但**隐藏滚动条**（`.scrollbar-none`，见 `electron.css`）；macOS 触控板/滚轮仍可滚动；切换/新增 tab 时激活 tab 自动 `scrollIntoView`。
 - 溢出时（`ResizeObserver` 检测 `scrollWidth > clientWidth`）在 tab 行右侧、预留区左缘显示一个**溢出下拉 ⌄**，列出全部 tab 供点选 / 关闭——这是无滚动条时的可达性兜底。
 

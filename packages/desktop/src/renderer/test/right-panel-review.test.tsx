@@ -1,7 +1,7 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ReviewFileDiff, ReviewSnapshot } from "@actspace/shared";
+import type { ReviewChangeNotification, ReviewFileDiff, ReviewSnapshot } from "@actspace/shared";
 import { ReviewRenderView } from "../components/right-panel/ReviewRenderView";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { WorkbenchLayout } from "../components/WorkbenchLayout";
@@ -64,6 +64,54 @@ describe("Review workbench", () => {
     expect(bridge.getReviewSnapshot).toHaveBeenCalledTimes(1);
     rerender(<ReviewRenderView workspaceRoot="/tmp/workspace" refreshKey={2} />);
     await waitFor(() => expect(bridge.refreshReviewSnapshot).toHaveBeenCalledTimes(1));
+  });
+
+  it("refreshes an open Review when a workspace Git mutation invalidates its snapshot", async () => {
+    let notifyReviewChanged: ((notification: ReviewChangeNotification) => void) | undefined;
+    const bridge = reviewBridge(dirtySnapshot());
+    bridge.getReviewSnapshot
+      .mockResolvedValueOnce({ ok: true as const, snapshot: dirtySnapshot() })
+      .mockResolvedValueOnce({ ok: true as const, snapshot: emptySnapshot() });
+    bridge.onReviewChanged.mockImplementation((callback) => {
+      notifyReviewChanged = callback;
+      return () => undefined;
+    });
+    window.actspace = bridge as unknown as Window["actspace"];
+    render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
+
+    expect(await screen.findByText("packages/desktop/src/renderer/App.tsx")).toBeInTheDocument();
+    await act(async () => {
+      notifyReviewChanged?.({ workspaceId: "ws", generation: 2, reason: "git" });
+    });
+
+    expect(await screen.findByText("No changes")).toBeInTheDocument();
+    expect(screen.queryByText("+2")).not.toBeInTheDocument();
+  });
+
+  it("shows recent Git log entries under Committed and opens the selected commit diff", async () => {
+    const user = userEvent.setup();
+    const bridge = reviewBridge(dirtySnapshot());
+    bridge.listReviewCommits.mockResolvedValue({
+      ok: true as const,
+      commits: [
+        { sha: "a".repeat(40), subject: "fix: keep commit history read-only", authoredAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString() },
+        { sha: "b".repeat(40), subject: "feat: add Review scopes", authoredAt: new Date(Date.now() - 24 * 60 * 60_000).toISOString() },
+      ],
+    });
+    window.actspace = bridge as unknown as Window["actspace"];
+    render(<ReviewRenderView workspaceRoot="/tmp/workspace" sessionId="session-1" />);
+
+    expect(await screen.findByText("packages/desktop/src/renderer/App.tsx")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Review scope" }));
+    await user.click(within(await screen.findByRole("menu", { name: "Review scope options" })).getByRole("menuitem", { name: "Committed" }));
+
+    const commits = await screen.findByRole("menu", { name: "Recent commits" });
+    expect(bridge.listReviewCommits).toHaveBeenCalledWith({ workspaceRoot: "/tmp/workspace", sessionId: "session-1" });
+    expect(within(commits).queryByRole("textbox")).not.toBeInTheDocument();
+    await user.click(within(commits).getByRole("menuitem", { name: /fix: keep commit history read-only/ }));
+    await waitFor(() => expect(bridge.getReviewSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      selection: { kind: "commit", sha: "a".repeat(40) },
+    })));
   });
 
   it("uses a dedicated file-list view and keeps split diff disabled in a narrow Review panel", async () => {
@@ -212,7 +260,8 @@ function reviewBridge(snapshot: ReviewSnapshot) {
     setReviewFileViewed: vi.fn(async (_input: unknown) => ({ ok: true as const, viewed: true })),
     applyReviewMutation: vi.fn(),
     listReviewBranches: vi.fn(async () => ({ ok: true as const, branches: [] })),
+    listReviewCommits: vi.fn(async () => ({ ok: true as const, commits: [] })),
     copyReviewGitApplyCommand: vi.fn(),
-    onReviewChanged: vi.fn(() => () => undefined),
+    onReviewChanged: vi.fn((_callback: (notification: ReviewChangeNotification) => void) => () => undefined),
   };
 }

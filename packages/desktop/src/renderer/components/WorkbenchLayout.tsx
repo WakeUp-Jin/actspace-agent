@@ -18,7 +18,7 @@ import type { SessionPreviewResolver } from "./SessionHoverPreview";
 import { KairosPage } from "../pages/KairosPage";
 import { SettingsPage } from "./settings/SettingsPage";
 import type { SettingsSectionId } from "./settings/SettingsNav";
-import { AgentAnalysisPage } from "./analysis/AgentAnalysisPage";
+import { AgentAnalysisWorkspace } from "./analysis/AgentAnalysisWorkspace";
 
 type StoredWorkbenchLayout = {
   leftMode?: SidebarMode | "rail";
@@ -99,6 +99,7 @@ export function WorkbenchLayout({
   isStreaming = false,
   isAborting = false,
   sendScrollRequestId = 0,
+  composerFocusRequestId = 0,
   busySessionIds,
   sessionStatuses,
   onSend,
@@ -145,6 +146,7 @@ export function WorkbenchLayout({
   isStreaming?: boolean;
   isAborting?: boolean;
   sendScrollRequestId?: number;
+  composerFocusRequestId?: number;
   busySessionIds?: Set<string>;
   sessionStatuses?: Record<string, SessionUiStatusKind>;
   onSend?: (text: string, options: ComposerSendOptions) => void;
@@ -427,6 +429,7 @@ export function WorkbenchLayout({
         isStreaming={isStreaming}
         isAborting={isAborting}
         sendScrollRequestId={sendScrollRequestId}
+        composerFocusRequestId={composerFocusRequestId}
         onSend={onSend}
         onAbort={onAbort}
         isSessionReady={isSessionReady}
@@ -491,12 +494,9 @@ export function WorkbenchLayout({
   }
 
   if (view === "analysis") {
-    const analysisSessionId = activeSessionId ?? sessions[0]?.id ?? null;
-    const analysisSession = sessions.find((session) => session.id === analysisSessionId);
     return (
-      <AgentAnalysisPage
-        sessionId={analysisSessionId}
-        fallbackTitle={analysisSession?.title}
+      <AgentAnalysisWorkspace
+        activeSessionId={activeSessionId}
         onBack={() => setView("settings")}
       />
     );

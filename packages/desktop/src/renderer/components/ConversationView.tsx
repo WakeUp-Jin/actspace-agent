@@ -1,6 +1,6 @@
 import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { ComposerMode, ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
+import type { ComposerAttachment, ComposerMode, ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
 import { Composer, type ComposerDraftRestore, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
@@ -649,6 +649,7 @@ export function ConversationView({
   isStreaming = false,
   isAborting = false,
   sendScrollRequestId = 0,
+  composerFocusRequestId = 0,
   onSend,
   onAbort,
   isSessionReady = true,
@@ -674,6 +675,7 @@ export function ConversationView({
   isStreaming?: boolean;
   isAborting?: boolean;
   sendScrollRequestId?: number;
+  composerFocusRequestId?: number;
   onSend?: (text: string, options: ComposerSendOptions) => void;
   onAbort?: () => void;
   isSessionReady?: boolean;
@@ -713,6 +715,15 @@ export function ConversationView({
   const [activeTranscriptMessage, setActiveTranscriptMessage] = useState<AgentMessageBlock | null>(null);
   const { openTab } = useRightPanel();
   const openContextTab = () => openTab({ id: "context", kind: "context", title: "Context" });
+  const openAttachmentPreview = useCallback((attachment: ComposerAttachment) => {
+    if (!attachment.previewUrl) return;
+    openTab({
+      id: `composer-attachment:${attachment.id}`,
+      kind: "image",
+      title: attachment.name,
+      src: attachment.previewUrl,
+    });
+  }, [openTab]);
 
   const latestActiveTranscriptMessage = activeTranscriptMessage
     ? messages.find((message): message is AgentMessageBlock => message.kind === "agent" && message.id === activeTranscriptMessage.id) ?? activeTranscriptMessage
@@ -876,12 +887,14 @@ export function ConversationView({
                 onModeChange={onComposerModeChange}
                 selectedSkills={selectedSkills}
                 onSelectedSkillsChange={onSelectedSkillsChange}
+                onOpenAttachmentPreview={openAttachmentPreview}
                 onExpandContext={openContextTab}
                 workspaceOptions={workspaceOptions}
                 selectedWorkspaceRoot={selectedWorkspaceRoot}
                 onSelectWorkspace={onSelectWorkspace}
                 executionContext={executionContext}
                 draftRestore={draftRestore}
+                focusRequestId={composerFocusRequestId}
                 models={models}
               />
             </div>
@@ -896,14 +909,15 @@ export function ConversationView({
                 >
                   {turn.user ? (
                     <div className={TURN_PROMPT_CLASS}>
-                      <UserMessage message={turn.user} />
+                      <UserMessage message={turn.user} onOpenAttachmentPreview={openAttachmentPreview} />
                     </div>
                   ) : null}
                   <div className={ASSISTANT_TURN_GROUP_CLASS}>
                     <div className={TURN_BODY_CLASS}>
                       {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, setActiveTranscriptMessage)}
                     </div>
-                    {splitTurnMessages(turn.messages).finalReply.length > 0 ? (
+                    {splitTurnMessages(turn.messages).finalReply.length > 0
+                      && (!isStreaming || turnIndex !== turns.length - 1) ? (
                       <TurnOutputArtifacts
                         messages={turn.messages}
                         sessionId={sessionId}
@@ -959,12 +973,14 @@ export function ConversationView({
             onModeChange={onComposerModeChange}
             selectedSkills={selectedSkills}
             onSelectedSkillsChange={onSelectedSkillsChange}
+            onOpenAttachmentPreview={openAttachmentPreview}
             onExpandContext={openContextTab}
             workspaceOptions={workspaceOptions}
             selectedWorkspaceRoot={selectedWorkspaceRoot}
             onSelectWorkspace={onSelectWorkspace}
             executionContext={executionContext}
             draftRestore={draftRestore}
+            focusRequestId={composerFocusRequestId}
             reviewSummary={latestActiveTranscriptMessage ? null : reviewSummary}
             onOpenReview={onOpenReview}
             models={models}

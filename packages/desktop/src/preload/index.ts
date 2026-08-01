@@ -3,6 +3,7 @@ import type {
   AbortAgentRunInput,
   AgentAnalysisIndexInput,
   AgentAnalysisIndexResult,
+  AgentAnalysisSessionIndexResult,
   AgentTraceClearInput,
   AgentTraceClearResult,
   AgentTraceListInput,
@@ -43,6 +44,8 @@ import type {
   FsWatchStatus,
   GenerateEvalCandidateInput,
   GenerateEvalCandidateResult,
+  ImportComposerImageInput,
+  ImportComposerImageResult,
   SkillInstallResult,
   SkillListResult,
   SkillUninstallInput,
@@ -90,6 +93,7 @@ import type {
   ReviewGetSnapshotInput,
   ReviewGetSnapshotResult,
   ReviewListBranchesResult,
+  ReviewListCommitsResult,
   ReviewMutationResult,
   ReviewPullRequestCapabilityResult,
   ReviewSetFileViewedInput,
@@ -102,6 +106,7 @@ import type {
   WorkspaceGitCreateBranchInput,
   WorkspaceGitMutationResult,
   WorkspaceGitPushInput,
+  WorkspaceGitSwitchBranchInput,
   WorkspaceOpenInput,
   WorkspaceOpenResult,
   WorkspaceOpenToolsResult,
@@ -170,6 +175,10 @@ import type {
   ProviderIdInput,
   ProviderOperationResult,
   ProviderTestResult,
+  QuickOpenRequest,
+  QuickOpenShortcutStatus,
+  QuickOpenShortcutUpdateInput,
+  QuickOpenShortcutUpdateResult,
   ProvidersListResult,
   ModelsListInstalledResult,
   ModelsListUsableInput,
@@ -212,10 +221,14 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("agent-trace:read", input) as Promise<AgentTraceReadResult>,
   getAgentAnalysisIndex: (input: AgentAnalysisIndexInput) =>
     ipcRenderer.invoke("agent-analysis:index", input) as Promise<AgentAnalysisIndexResult>,
+  getAgentAnalysisSessionIndex: () =>
+    ipcRenderer.invoke("agent-analysis:sessions") as Promise<AgentAnalysisSessionIndexResult>,
   clearAgentTraces: (input: AgentTraceClearInput) =>
     ipcRenderer.invoke("agent-trace:clear", input) as Promise<AgentTraceClearResult>,
   selectFiles: () => ipcRenderer.invoke("dialog:select-files") as Promise<SelectFilesResult>,
   selectImages: () => ipcRenderer.invoke("dialog:select-images") as Promise<SelectImagesResult>,
+  importComposerImage: (input: ImportComposerImageInput) =>
+    ipcRenderer.invoke("composer:import-image", input) as Promise<ImportComposerImageResult>,
   selectWorkspaceDirectory: () =>
     ipcRenderer.invoke("dialog:select-workspace-directory") as Promise<SelectWorkspaceDirectoryResult>,
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
@@ -258,6 +271,8 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("review:set-file-viewed", input) as Promise<ReviewSetFileViewedResult>,
   listReviewBranches: (input: ReviewWorkspaceInput) =>
     ipcRenderer.invoke("review:list-branches", input) as Promise<ReviewListBranchesResult>,
+  listReviewCommits: (input: ReviewWorkspaceInput) =>
+    ipcRenderer.invoke("review:list-commits", input) as Promise<ReviewListCommitsResult>,
   copyReviewGitApplyCommand: (input: ReviewCopyApplyCommandInput) =>
     ipcRenderer.invoke("review:copy-apply-command", input) as Promise<ReviewCopyApplyCommandResult>,
   getReviewPullRequestCapability: (input: ReviewWorkspaceInput & { baseBranch?: string }) =>
@@ -273,6 +288,8 @@ contextBridge.exposeInMainWorld("actspace", {
     ipcRenderer.invoke("workspace-environment:get", input) as Promise<WorkspaceEnvironmentSnapshot>,
   createWorkspaceBranch: (input: WorkspaceGitCreateBranchInput) =>
     ipcRenderer.invoke("workspace-environment:create-branch", input) as Promise<WorkspaceGitMutationResult>,
+  switchWorkspaceBranch: (input: WorkspaceGitSwitchBranchInput) =>
+    ipcRenderer.invoke("workspace-environment:switch-branch", input) as Promise<WorkspaceGitMutationResult>,
   commitWorkspaceChanges: (input: WorkspaceGitCommitInput) =>
     ipcRenderer.invoke("workspace-environment:commit", input) as Promise<WorkspaceGitMutationResult>,
   pushWorkspaceBranch: (input: WorkspaceGitPushInput) =>
@@ -337,6 +354,15 @@ contextBridge.exposeInMainWorld("actspace", {
   listPendingApprovals: (input?: ApprovalListPendingInput) => ipcRenderer.invoke("approval:list-pending", input ?? {}) as Promise<PendingApprovalInfo[]>,
 
   getSettings: () => ipcRenderer.invoke("settings:get") as Promise<AppSettings>,
+  consumeQuickOpenRequest: () => ipcRenderer.invoke("quick-open:consume") as Promise<QuickOpenRequest | null>,
+  getQuickOpenShortcutStatus: () => ipcRenderer.invoke("quick-open:get-status") as Promise<QuickOpenShortcutStatus>,
+  updateQuickOpenShortcut: (input: QuickOpenShortcutUpdateInput) =>
+    ipcRenderer.invoke("quick-open:update", input) as Promise<QuickOpenShortcutUpdateResult>,
+  onQuickOpenRequested: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("quick-open:requested", handler);
+    return () => ipcRenderer.removeListener("quick-open:requested", handler);
+  },
   readAgentSystemPrompt: () =>
     ipcRenderer.invoke("settings:read-agent-system-prompt") as Promise<AgentSystemPromptFile>,
   writeAgentSystemPrompt: (input: WriteAgentSystemPromptInput) =>

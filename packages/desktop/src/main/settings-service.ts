@@ -17,6 +17,7 @@ import {
   DEFAULT_IMAGE_GENERATION_BASE_URL,
   DEFAULT_IMAGE_GENERATION_MODEL,
   DEFAULT_IMAGE_INSPECTION_MODEL_KEY,
+  DEFAULT_QUICK_OPEN_ACCELERATOR,
   LEGACY_MODEL_KEY_MAP,
   PROVIDER_IDS,
   PROVIDER_REGISTRY,
@@ -44,12 +45,14 @@ import {
   type ProviderConnectionState,
   type ProviderCredentialSettings,
   type ProviderProxySettings,
+  type QuickOpenShortcutUpdateInput,
   type SearchProviderId,
   type SearchUsageResult,
   type SecretProviderId,
   type SettingsUpdateInput,
   type SettingsV2UpdateInput,
   type SkillsSettings,
+  type ShortcutsSettings,
   type TaskModelSettings,
   type UpdateImageGenerationSettingsInput,
 } from "@actspace/shared";
@@ -138,6 +141,7 @@ export interface PersistedSettingsV2 {
   kairos: KairosSettingsV2;
   plugins: PluginsSettings;
   skills: SkillsSettings;
+  shortcuts: ShortcutsSettings;
 }
 
 type OpenRouterManagementSecretId = "openrouter-management";
@@ -252,6 +256,7 @@ export class SettingsService {
       },
       plugins: v2.plugins,
       skills: v2.skills,
+      shortcuts: v2.shortcuts,
     };
   }
 
@@ -302,6 +307,7 @@ export class SettingsService {
       kairos: { ...this.settings.kairos, enabledSkills: [...this.settings.kairos.enabledSkills] },
       plugins: { repoRoot: this.settings.plugins.repoRoot, fsWatch: { ...this.settings.plugins.fsWatch } },
       skills: { disabled: [...this.settings.skills.disabled] },
+      shortcuts: cloneJson(this.settings.shortcuts),
     };
   }
 
@@ -436,6 +442,25 @@ export class SettingsService {
         await this.writeSettingsFile();
         this.applyToEnv();
         return this.getV2();
+      } catch (error) {
+        this.settings = previous;
+        throw error;
+      }
+    });
+  }
+
+  async updateQuickOpenShortcut(input: QuickOpenShortcutUpdateInput): Promise<AppSettings> {
+    return this.enqueueMutation(async () => {
+      const previous = cloneJson(this.settings);
+      try {
+        this.settings.shortcuts = {
+          quickOpen: sanitizeQuickOpenShortcut({
+            ...this.settings.shortcuts.quickOpen,
+            ...input,
+          }),
+        };
+        await this.writeSettingsFile();
+        return this.get();
       } catch (error) {
         this.settings = previous;
         throw error;
@@ -1086,6 +1111,13 @@ function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV2 {
     kairos: { modelId: null, thinking: "auto", enabledSkills: [] },
     plugins: { repoRoot: null, fsWatch: { enabled: false } },
     skills: { disabled: [] },
+    shortcuts: {
+      quickOpen: {
+        enabled: true,
+        accelerator: DEFAULT_QUICK_OPEN_ACCELERATOR,
+        target: { kind: "automatic" },
+      },
+    },
   };
 }
 
@@ -1160,7 +1192,38 @@ function mergePersistedSettingsV2(raw: Record<string, unknown>, dataRoot: string
   seed.kairos = sanitizeKairosV2(isRecord(raw.kairos) ? raw.kairos : {}, seed.kairos);
   seed.plugins = sanitizePlugins(isRecord(raw.plugins) ? raw.plugins : {});
   seed.skills = sanitizeSkills(isRecord(raw.skills) ? raw.skills : {});
+  seed.shortcuts = sanitizeShortcuts(raw.shortcuts);
   return seed;
+}
+
+function sanitizeShortcuts(input: unknown): ShortcutsSettings {
+  const value = isRecord(input) ? input : {};
+  return {
+    quickOpen: sanitizeQuickOpenShortcut(value.quickOpen),
+  };
+}
+
+function sanitizeQuickOpenShortcut(input: unknown): ShortcutsSettings["quickOpen"] {
+  const value = isRecord(input) ? input : {};
+  const accelerator = typeof value.accelerator === "string" && value.accelerator.trim()
+    ? value.accelerator.trim().slice(0, 120)
+    : DEFAULT_QUICK_OPEN_ACCELERATOR;
+  return {
+    enabled: typeof value.enabled === "boolean" ? value.enabled : true,
+    accelerator,
+    target: sanitizeQuickOpenTarget(value.target),
+  };
+}
+
+function sanitizeQuickOpenTarget(input: unknown): ShortcutsSettings["quickOpen"]["target"] {
+  if (!isRecord(input)) return { kind: "automatic" };
+  if (input.kind === "workspace" && typeof input.workspaceId === "string" && input.workspaceId.trim()) {
+    return { kind: "workspace", workspaceId: input.workspaceId.trim().slice(0, 200) };
+  }
+  if (input.kind === "session" && typeof input.sessionId === "string" && input.sessionId.trim()) {
+    return { kind: "session", sessionId: input.sessionId.trim().slice(0, 200) };
+  }
+  return { kind: "automatic" };
 }
 
 function sanitizeImageInspectionSettings(input: unknown): ImageInspectionSettings {

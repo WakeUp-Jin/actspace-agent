@@ -398,7 +398,6 @@
       <div class="brand">
         <button class="back" type="button" title="返回设置" aria-label="返回设置">←</button>
         <div class="brand-copy">
-          <div class="eyebrow">Settings / Analysis</div>
           <h1>分析观测 <span class="mock-badge">MOCK DATA</span></h1>
         </div>
       </div>
@@ -433,11 +432,11 @@
     <div class="modal">
       <div class="modal-head">
         <div class="modal-title-area">
-          <button class="compare-nav" id="comparePrevious" type="button" aria-label="选择更早的对比对象">◀</button>
+          <button class="compare-nav" id="comparePrevious" type="button" aria-label="查看上一组请求对比">◀</button>
           <h3 id="modalTitle">详情</h3>
-          <button class="compare-nav" id="compareNext" type="button" aria-label="选择更新的对比对象">▶</button>
+          <button class="compare-nav" id="compareNext" type="button" aria-label="查看下一组请求对比">▶</button>
         </div>
-        <div class="modal-controls" id="modalControls"></div>
+        <div class="modal-controls" id="modalControls" hidden></div>
         <button class="icon-button modal-close" id="modalClose" type="button" aria-label="关闭">×</button>
       </div>
       <div class="modal-body" id="modalBody"></div>
@@ -566,9 +565,10 @@
       }
     ];
 
-    const state = { selectedTurnId: runs[0].turns[1].id, selectedCallId: runs[0].turns[1].calls[1].id, compareCallId: null, tool: "all", search: "", openPanels: new Set(["messages", "response"]) };
+    const state = { selectedTurnId: runs[0].turns[1].id, selectedCallId: runs[0].turns[1].calls[1].id, tool: "all", search: "", openPanels: new Set(["messages", "response"]) };
     const allTurns = runs.flatMap((run) => run.turns.map((turn) => ({ ...turn, run })));
-    const tools = [...new Set(allTurns.flatMap((turn) => turn.tools))];
+    const calledTools = (turn) => [...new Set(turn.calls.flatMap((call) => (call.response.content ?? []).filter((item) => item.type === "toolCall").map((item) => item.name)))];
+    const tools = [...new Set(allTurns.flatMap(calledTools))];
     const fmt = (n) => new Intl.NumberFormat("zh-CN").format(n);
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char]));
     const pretty = (value) => JSON.stringify(value, null, 2);
@@ -600,10 +600,10 @@
     }
 
     function matches(turn) {
-      const toolMatch = state.tool === "all" || turn.tools.includes(state.tool);
+      const toolMatch = state.tool === "all" || calledTools(turn).includes(state.tool);
       const q = state.search.trim().toLowerCase();
       if (!q) return toolMatch;
-      const content = [turn.run.user, turn.model, turn.id, turn.endpoint, ...turn.tools, ...turn.calls.flatMap((call) => [call.id, pretty(call.messages), pretty(call.response)])].join(" ").toLowerCase();
+      const content = [turn.run.user, turn.model, turn.id, turn.endpoint, ...calledTools(turn), ...turn.calls.flatMap((call) => [call.id, pretty(call.messages), pretty(call.response)])].join(" ").toLowerCase();
       return toolMatch && content.includes(q);
     }
 
@@ -742,24 +742,9 @@
       return allTurns.filter((item) => item.run.id === runId).flatMap((item) => item.calls.map((entry) => ({ turn: item, call: entry })));
     }
 
-    function comparisonCandidates(turn, call) {
-      const sequence = callSequenceForRun(turn.run.id);
-      const currentIndex = sequence.findIndex((item) => item.call.id === call.id);
-      return currentIndex > 0 ? sequence.slice(0, currentIndex) : [];
-    }
-
-    function previousCall(turn, call) {
-      const candidates = comparisonCandidates(turn, call);
-      return candidates[candidates.length - 1] ?? null;
-    }
-
     function compareHeading(before, after) {
       if (before.turn.id === after.turn.id) return `Turn ${after.turn.index} · 调用 ${before.call.attempt} → 调用 ${after.call.attempt}`;
       return `Turn ${before.turn.index} → Turn ${after.turn.index}`;
-    }
-
-    function compareOptionLabel(item) {
-      return `Turn ${item.turn.index} · 调用 ${item.call.attempt} · ${item.turn.model}`;
     }
 
     function messageIdentity(message) {
@@ -787,8 +772,9 @@
     }
 
     function renderComparison(turn, call) {
-      const candidates = comparisonCandidates(turn, call);
-      if (!candidates.length) {
+      const sequence = callSequenceForRun(turn.run.id);
+      const currentIndex = sequence.findIndex((item) => item.call.id === call.id);
+      if (currentIndex <= 0) {
         document.querySelector("#modalTitle").textContent = "没有可对比的调用";
         document.querySelector("#modalControls").innerHTML = "";
         document.querySelector("#comparePrevious").disabled = true;
@@ -797,10 +783,8 @@
         return;
       }
 
-      if (!candidates.some((item) => item.call.id === state.compareCallId)) state.compareCallId = candidates[candidates.length - 1].call.id;
-      const before = candidates.find((item) => item.call.id === state.compareCallId) ?? candidates[candidates.length - 1];
+      const before = sequence[currentIndex - 1];
       const after = { turn, call };
-      const candidateIndex = candidates.findIndex((item) => item.call.id === before.call.id);
       const beforeMessages = before.call.messages;
       const afterMessages = call.messages;
       let commonPrefix = 0;
@@ -817,9 +801,9 @@
       const contextUnchanged = !removedMessages.length && !addedMessages.length && !secondaryChanges;
 
       document.querySelector("#modalTitle").textContent = compareHeading(before, after);
-      document.querySelector("#modalControls").innerHTML = `<span class="compare-control-label">对比对象</span><select class="compare-select" id="compareSelect">${candidates.map((item) => `<option value="${escapeHtml(item.call.id)}" ${item.call.id === before.call.id ? "selected" : ""}>${escapeHtml(compareOptionLabel(item))}</option>`).join("")}</select>`;
-      document.querySelector("#comparePrevious").disabled = candidateIndex <= 0;
-      document.querySelector("#compareNext").disabled = candidateIndex >= candidates.length - 1;
+      document.querySelector("#modalControls").innerHTML = "";
+      document.querySelector("#comparePrevious").disabled = currentIndex <= 1;
+      document.querySelector("#compareNext").disabled = currentIndex >= sequence.length - 1;
       document.querySelector("#modalBody").innerHTML = `<div class="compare-view">
         <div class="compare-stats">
           <span class="compare-stat">输入 Token ${signedDelta(call.input - before.call.input)}</span>
@@ -836,9 +820,8 @@
         ${secondaryChanges ? `<section class="compare-section"><div class="compare-section-head"><span class="compare-section-title">其他请求变化</span></div>${secondaryChanges}</section>` : ""}
       </div>`;
 
-      document.querySelector("#compareSelect").addEventListener("change", (event) => { state.compareCallId = event.target.value; renderComparison(turn, call); });
-      document.querySelector("#comparePrevious").onclick = () => { if (candidateIndex > 0) { state.compareCallId = candidates[candidateIndex - 1].call.id; renderComparison(turn, call); } };
-      document.querySelector("#compareNext").onclick = () => { if (candidateIndex < candidates.length - 1) { state.compareCallId = candidates[candidateIndex + 1].call.id; renderComparison(turn, call); } };
+      document.querySelector("#comparePrevious").onclick = () => { if (currentIndex > 1) { const target = sequence[currentIndex - 1]; renderComparison(target.turn, target.call); } };
+      document.querySelector("#compareNext").onclick = () => { if (currentIndex < sequence.length - 1) { const target = sequence[currentIndex + 1]; renderComparison(target.turn, target.call); } };
     }
 
     function openModal(kind, turn, call, request) {
@@ -858,13 +841,7 @@
         body.innerHTML = `<pre>${escapeHtml(curl)}</pre><div style="margin-top:10px"><button class="action primary" id="modalCopy" type="button">复制 cURL</button></div>`;
         queueMicrotask(() => document.querySelector("#modalCopy").addEventListener("click", () => copy(curl)));
       } else {
-        const previous = previousCall(turn, call);
-        state.compareCallId = previous?.call.id ?? null;
-        if (!previous) {
-          renderComparison(turn, call);
-        } else {
-          renderComparison(turn, call);
-        }
+        renderComparison(turn, call);
       }
       document.querySelector("#modalBackdrop").classList.add("open");
     }

@@ -151,22 +151,34 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(screen.getByText("agent-harness-dev")).toBeInTheDocument();
   });
 
-  it("opens the workspace menu from the folder name and invokes its actions", async () => {
+  it("opens the workspace menu only from right click and invokes its actions", async () => {
     const user = userEvent.setup();
     const { onOpenWorkspace, onArchiveWorkspace, onRemoveWorkspace } = renderSidebar();
+    const workspaceLabel = screen.getByRole("button", { name: "actspace-agent" });
 
-    await user.click(screen.getByRole("button", { name: "actspace-agent" }));
+    await user.click(workspaceLabel);
+    expect(screen.queryByRole("menu", { name: "Workspace actions for actspace-agent" })).not.toBeInTheDocument();
+
+    fireEvent.contextMenu(workspaceLabel, { clientX: 24, clientY: 60 });
     expect(screen.getByRole("menu", { name: "Workspace actions for actspace-agent" })).toBeInTheDocument();
     await user.click(screen.getByRole("menuitem", { name: "Open in IDE" }));
     expect(onOpenWorkspace).toHaveBeenCalledWith("ws-actspace");
 
-    await user.click(screen.getByRole("button", { name: "actspace-agent" }));
+    fireEvent.contextMenu(workspaceLabel, { clientX: 24, clientY: 60 });
     await user.click(screen.getByRole("menuitem", { name: "Archive All" }));
     expect(onArchiveWorkspace).toHaveBeenCalledWith("ws-actspace", "/Users/me/projects/actspace-agent");
 
-    await user.click(screen.getByRole("button", { name: "actspace-agent" }));
+    fireEvent.contextMenu(workspaceLabel, { clientX: 24, clientY: 60 });
     await user.click(screen.getByRole("menuitem", { name: "Remove from Sidebar" }));
     expect(onRemoveWorkspace).toHaveBeenCalledWith("ws-actspace", "/Users/me/projects/actspace-agent");
+  });
+
+  it("keeps a keyboard context-menu entry point", () => {
+    renderSidebar();
+    const workspaceLabel = screen.getByRole("button", { name: "actspace-agent" });
+
+    fireEvent.keyDown(workspaceLabel, { key: "F10", shiftKey: true });
+    expect(screen.getByRole("menu", { name: "Workspace actions for actspace-agent" })).toBeInTheDocument();
   });
 
   it("keeps the chevron dedicated to collapse and disables default workspace removal", async () => {
@@ -177,7 +189,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(screen.queryByText("Conversation context lookup")).not.toBeInTheDocument();
     expect(screen.queryByRole("menu", { name: "Workspace actions for actspace-agent" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Default workspace" }));
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Default workspace" }), { clientX: 24, clientY: 60 });
     expect(screen.getByRole("menuitem", { name: "Remove from Sidebar" })).toBeDisabled();
   });
 

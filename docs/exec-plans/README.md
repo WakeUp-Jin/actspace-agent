@@ -14,12 +14,18 @@
 
 ## 当前进行中
 
+- 运行态反馈与图片预览回读修复：`active/20260801-running-feedback-and-attachment-rehydration.md`
+- Composer 图片附件可用性修复：`active/20260801-composer-image-attachments.md`
 - Agent Team V1：`active/20260711-agent-team/README.md`
 - Bash 会话级动态 allowlist：`active/Bash工具和工具权限调度开发计划/README.md`
 - 前端 UI 组件基础：`active/frontend-ui-components-foundation.md`
 
 ## 最近完成
 
+- 分析观测会话索引：`completed/20260801-analysis-session-index.md`
+- 全局快捷唤起：`completed/20260801-global-quick-open-shortcut.md`
+- Environment 分支选择与创建：`completed/20260801-environment-branch-selector.md`
+- 分析观测与工作台交互收口：`completed/20260801-analysis-observability-ui-polish.md`
 - Agent 图片分析工具：`completed/20260801-image-inspection-tool.md`
 - Agent 分析观测生产页面：`completed/20260730-agent-analysis-observability-page.md`
 - 文档计划生命周期清理：`completed/20260801-docs-exec-plan-lifecycle-cleanup.md`

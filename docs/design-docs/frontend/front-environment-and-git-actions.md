@@ -53,13 +53,19 @@ Environment 是聊天态工作台顶部的本地工作区控制面。它回答�
 - symbolic branch 存在时显示真实短名称，例如 `main` 或 `feature/environment-menu`。
 - detached HEAD 时显示 `Create branch`。
 - 尚未初始化 Git 时，创建分支动作先明确提示需要初始化仓库，不隐式执行 `git init`。
-- 点击 `Create branch` 打开模态窗口：
-  - 标题为 `Work here`。
+- 点击当前分支行打开本地分支选择器：
+  - 顶部按本地分支名搜索，不触发 fetch，也不混入远端 tracking branch。
+  - 当前分支置顶并用 check 标识；点击其他可用分支后执行安全的 `git switch <branch>`。
+  - 已被其他 worktree checkout 的分支继续展示，但禁用并标记 `In worktree`；完整路径只通过 tooltip 提供。
+  - 列表底部固定提供 `Create and checkout new branch...`。
+  - 切换失败时不自动 stash、不 force、不丢弃改动，保留原 checkout 并展示脱敏后的 Git 错误。
+- 点击 `Create branch` 或列表底部创建动作打开模态窗口：
+  - 标题为 `Create and checkout branch`。
   - 输入框预填 `actspace/<session-title-slug>`。
   - 用户可编辑完整分支名。
   - `Set prefix` 允许保存本机偏好，首版存 renderer localStorage，不进入跨进程 settings。
   - main 使用 `git check-ref-format --branch` 校验后执行 `git switch -c <name>`。
-- 已在分支上时点击分支行只展示当前分支信息；首版不实现分支切换器。
+  - 底部提供 `Close` 与 `Create and checkout`，创建成功后刷新 Environment、Composer 和 Review。
 
 ### Commit or push
 
@@ -167,7 +173,8 @@ renderer UI
 
 - Pull Request、Compare branch、远端 PR 状态。
 - Pull、fetch、rebase、merge、force push。
-- 分支切换、删除、重命名。
+- 远端分支浏览，以及分支删除、重命名。
+- 自动 stash、force switch，或切换前自动提交工作区。
 - 逐文件 stage / unstage、amend、签名选项、跳过 hooks。
 - 基于模型或 diff 的智能 commit message 生成。
 - 修改 remote、Git identity 或 credential 配置。
@@ -176,6 +183,8 @@ renderer UI
 
 - 普通仓库显示 This Mac，Git worktree 显示 Worktree。
 - main、feature branch 和 detached HEAD 三种状态显示正确。
+- 当前分支行能搜索和切换本地分支；其他 worktree 占用分支显示但不可切换。
+- 未提交改动阻止切换时保留原分支和文件内容，并提供可恢复错误。
 - Create branch 能校验非法名称、创建真实分支并刷新 UI。
 - Commit 默认提交全部 tracked/untracked/deleted changes；取消 Include unstaged 后只提交 staged changes；空 message 使用本地默认 message。
 - upstream、单 remote、多个 remote、无 remote 四种 Push 路径行为明确。

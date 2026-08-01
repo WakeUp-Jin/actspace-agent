@@ -214,6 +214,8 @@ function messageBlockFromToolPreview(
         kind: "delete",
         id: eventId,
         filePath: preview.filePath,
+        ...(preview.outputPath ? { outputPath: preview.outputPath } : {}),
+        ...(preview.outputRelativePath ? { outputRelativePath: preview.outputRelativePath } : {}),
         displayText: preview.displayText,
         status,
         isError,

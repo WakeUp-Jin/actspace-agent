@@ -179,9 +179,12 @@ placeholder 随模式改变，但不代替彩色 pill 和运行时契约：
 - 点击 `Image` 立即关闭 command menu，并通过 Electron main 调起 macOS 原生文件选择器。
 - 选择器使用 `openFile + multiSelections`，只显示产品支持的图片扩展名；V1 为 `png / jpg / jpeg / gif / webp / bmp / svg / heic / heif`。
 - 用户取消时不产生附件、错误消息或空占位。重复选择同一路径时去重。
-- 选中后复用现有 Composer 图片缩略图和删除交互；模式切换不清空已选图片。
+- textarea 接收系统剪贴板中的图片文件。PNG、JPEG、WebP 由 Electron main 校验签名后写入应用 `tmpRoot/composer-attachments`，确保附件既有安全预览，也有可供当前轮 Agent 工具读取的真实路径；不把 Base64 当作工具路径。
+- 文件选择由 main 生成有界 `data:` 缩略图；拖放使用当前 renderer 生命周期内的 `blob:` 预览。禁止把本地 `file://` 交给 Vite renderer 加载，也禁止把预览 Base64 持久化到 session 事件。
+- 发送边界必须剥离 `previewUrl`；后续 `session:get` 在 main 进程从已持久化的受信附件路径重新生成有界 `data:` 缩略图，仅丰富本次 IPC 返回值，不修改 `session.jsonl`。源文件不可读时保留附件元数据并安全降级为空预览。
+- 选中后显示 `48px` 图片缩略图；点击缩略图在右侧面板打开 Image Tab。发送后的用户消息图片同样是可聚焦的预览按钮，复用同一个 Image Tab 交互，不退化为只能查看缩略图的静态装饰。删除按钮保持紧凑并与预览按钮分离，模式切换不清空已选图片。
 - Image 表示“把本地图片作为用户输入附件”，不是图片生成工具，不依赖 `generate_image` provider 设置。
-- 发送前必须根据当前模型的 input capability 验证图片支持。有图片但当前模型不支持 image input 时，禁用发送并明确提示“当前模型不支持图片输入”，不得静默降级成只传文件名。
+- Composer 不根据主模型是否原生支持图片来禁用发送。runtime 根据实际能力路由：原生视觉模型接收图片内容；文本主模型接收附件元数据，并在当前模式与配置允许时调用 `inspect_image`。工具不可用时由模型明确说明限制，不得伪造视觉结论。
 - 涉及系统文件选择、preload IPC、本地预览和多模态请求的验收必须在真实 Electron 窗口完成；浏览器 renderer 只能验证菜单、缩略图和错误态样式。
 
 ### Skills 二级菜单
@@ -269,10 +272,10 @@ placeholder 随模式改变，但不代替彩色 pill 和运行时契约：
 
 ## 附件展示
 
-- 图片附件只显示图片本体。
+- 图片附件显示真实缩略图；点击后进入右侧 Image Tab，不新增模态预览层。
 - 文件附件只显示文件名。
 - 附件位于 follow-up 输入栏上方、Review / overflow 层下方，简洁排列。
-- 删除附件的 X 按钮默认隐藏，仅在鼠标悬浮到附件或键盘聚焦到删除按钮时显示。
+- 图片删除按钮使用约 `18px` 点击区与 `11px` X 图标；默认隐藏，仅在鼠标悬浮到附件或键盘聚焦到附件控件时显示。删除只移除当前 Composer 附件，不删除原始文件。
 
 ## Composer 定稿图
 

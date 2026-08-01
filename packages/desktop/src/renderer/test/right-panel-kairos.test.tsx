@@ -168,7 +168,7 @@ describe("RightPanel Kairos tab", () => {
 
     const activeTab = screen.getByRole("tab", { name: "Kairos" }).closest("span");
     const inactiveTab = screen.getByRole("tab", { name: "Review" }).closest("span");
-    expect(activeTab).toHaveClass("bg-selected");
+    expect(activeTab).toHaveClass("bg-surface-subtle");
     expect(inactiveTab).toHaveClass("hover:bg-hover-overlay", "hover:text-text-main");
   });
 

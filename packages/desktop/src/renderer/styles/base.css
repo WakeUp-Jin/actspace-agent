@@ -124,7 +124,7 @@ svg {
   display: inline-block;
   max-width: 100%;
   overflow: hidden;
-  color: var(--act-color-text);
+  color: var(--act-color-text-faint);
   text-overflow: ellipsis;
   vertical-align: baseline;
   -webkit-text-fill-color: currentColor;
@@ -144,7 +144,7 @@ svg {
       90deg,
       transparent 0%,
       transparent 35%,
-      var(--act-color-text-subtle) 50%,
+      var(--act-color-text) 50%,
       transparent 65%,
       transparent 100%
     );

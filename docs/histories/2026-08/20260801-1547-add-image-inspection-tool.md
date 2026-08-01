@@ -44,5 +44,5 @@
 - Shared、Agent Core 与 Desktop 类型检查通过。
 - Agent Core 定向测试通过，覆盖视觉上下文、路径授权、格式 / 大小、曝光和附件提示。
 - Desktop 定向测试通过，覆盖默认 Luna、Kimi 切换、多 Key 引用保护和设置页交互。
-- Electron 开发运行在备用端口完成构建、窗口创建和 renderer 加载；Computer Use 截图捕获超时，因此不宣称肉眼视觉验收完成。
-- 真实 Kimi / OpenRouter 付费调用未执行，留给用户使用自己的凭据完成。
+- 后续在 `main` 的唯一开发运行实例上通过 Computer Use 完成 Electron 设置 UI 验收：浅色 / 深色主题、Luna / Kimi 选择、图片分析工具启停、跨页面状态和 renderer 重载持久化均符合预期；验收后恢复 Luna、工具开启和浅色主题。
+- 开发日志未出现图片分析相关 renderer / main 异常；仅有未连接 Provider 导致的预期不可用状态。由于本机未连接 Kimi / OpenRouter，真实工具运行预览和付费调用仍未执行。

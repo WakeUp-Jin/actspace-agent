@@ -9,11 +9,10 @@
  * Agent turn 执行逻辑在 ./agent-run.ts。
  */
 
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, safeStorage, shell } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, safeStorage, screen, shell } from "electron";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { access, mkdir, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
-import { pathToFileURL } from "node:url";
 import type {
   AbortAgentRunInput,
   AgentAnalysisIndexInput,
@@ -26,6 +25,8 @@ import type {
   CompactContextInput,
   GenerateEvalCandidateInput,
   ComposerAttachment,
+  ImportComposerImageInput,
+  ImportComposerImageResult,
   RunAgentInput,
   SelectFilesResult,
   SelectImagesResult,
@@ -61,13 +62,16 @@ import type {
   ReviewGetFileContentsInput,
   ReviewGetFileDiffsInput,
   ReviewGetSnapshotInput,
+  ReviewListCommitsResult,
   ReviewSetFileViewedInput,
   ReviewWorkspaceInput,
   WorkspaceEnvironmentGetInput,
   WorkspaceGitCommitAndPushInput,
   WorkspaceGitCommitInput,
   WorkspaceGitCreateBranchInput,
+  WorkspaceGitMutationResult,
   WorkspaceGitPushInput,
+  WorkspaceGitSwitchBranchInput,
   WorkspaceOpenInput,
   WorkspaceListDirInput,
   WorkspaceGitContextInput,
@@ -111,7 +115,13 @@ import type {
   TaskModelsUpdateResult,
   KairosModelUpdateInput,
   KairosModelUpdateResult,
+  QuickOpenRequest,
+  QuickOpenShortcutStatus,
+  QuickOpenShortcutUpdateInput,
+  QuickOpenShortcutUpdateResult,
 } from "@actspace/shared";
+import { hydrateSessionAttachmentPreviews, importComposerImage } from "./composer-attachment-service";
+import { QuickOpenShortcutController } from "./quick-open-shortcut-controller";
 import { isProviderId, normalizeModelKey, resolveConfiguredModel } from "@actspace/shared";
 import {
   createBootstrapState,
@@ -168,6 +178,7 @@ import {
   createWorkspaceBranch,
   getWorkspaceEnvironment,
   pushWorkspaceBranch,
+  switchWorkspaceBranch,
 } from "./workspace-environment-service";
 import { getWorkspaceGitContext } from "./workspace-git-context-service";
 import { listWorkspaceOpenTools, openWorkspaceInTool } from "./workspace-open-service";
@@ -183,7 +194,7 @@ import { getSessionPreview } from "./session-preview-service";
 import { createNodePtyBackend } from "./terminal/node-pty-terminal-backend";
 import { registerTerminalIpc, sendTerminalEvent } from "./terminal/terminal-ipc";
 import { TerminalSessionService } from "./terminal/terminal-session-service";
-import { clearAgentTraces, enforceAgentTraceRetention, getAgentAnalysisIndex, listAgentTraces, readAgentTrace } from "./agent-trace-service";
+import { clearAgentTraces, enforceAgentTraceRetention, getAgentAnalysisIndex, getAgentAnalysisSessionIndex, listAgentTraces, readAgentTrace } from "./agent-trace-service";
 import { LocalUpdateService } from "./local-update-service";
 import { PendingApprovalRegistry } from "./approval-registry";
 import {
@@ -342,7 +353,16 @@ function attachmentKind(filePath: string): ComposerAttachment["kind"] {
   return attachmentMimeType(filePath)?.startsWith("image/") ? "image" : "file";
 }
 
-function attachmentFromPath(filePath: string, index: number): ComposerAttachment {
+async function imagePreviewDataUrl(filePath: string): Promise<string | undefined> {
+  try {
+    const thumbnail = await nativeImage.createThumbnailFromPath(filePath, { width: 1600, height: 1600 });
+    return thumbnail.isEmpty() ? undefined : thumbnail.toDataURL();
+  } catch {
+    return undefined;
+  }
+}
+
+async function attachmentFromPath(filePath: string, index: number): Promise<ComposerAttachment> {
   const mimeType = attachmentMimeType(filePath);
   const kind = attachmentKind(filePath);
   return {
@@ -351,7 +371,7 @@ function attachmentFromPath(filePath: string, index: number): ComposerAttachment
     name: basename(filePath),
     path: filePath,
     mimeType,
-    previewUrl: kind === "image" ? pathToFileURL(filePath).toString() : undefined,
+    previewUrl: kind === "image" ? await imagePreviewDataUrl(filePath) : undefined,
   };
 }
 
@@ -481,6 +501,28 @@ async function requireRegisteredWorkspaceRoot(roots: AppDataRoots, workspaceRoot
   return resolved.workspaceRoot;
 }
 
+function workspaceGitMutationMayChangeReview(result: WorkspaceGitMutationResult): boolean {
+  if (result.ok) return result.action !== "push";
+  if (result.commitCreated || result.branchCreated) return true;
+  return (result.action === "commit" || result.action === "commit_and_push") && result.error === "command_failed";
+}
+
+async function refreshReviewAfterWorkspaceGitMutation(
+  roots: AppDataRoots,
+  result: WorkspaceGitMutationResult,
+): Promise<void> {
+  if (!workspaceGitMutationMayChangeReview(result)) return;
+  try {
+    const resolved = await resolveRegisteredWorkspaceForRoots(roots, { workspaceRoot: result.workspaceRoot });
+    if (resolved.ok) getReviewCoordinator(roots).invalidate(resolved.workspaceId, "git");
+  } catch (error) {
+    logMain("workspace git mutation: failed to refresh Review", {
+      action: result.action,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 /**
  * 读取 Kairos 短期记忆下**全部历史段**的 SessionEvent。
  *
@@ -528,6 +570,9 @@ let reviewCoordinatorDataRoot: string | undefined;
 let reviewGitEngine: ReviewGitEngine | undefined;
 let reviewGitWorkerClient: ReviewGitWorkerClient | undefined;
 let reviewPullRequestService: ReviewPullRequestService | undefined;
+let quickOpenShortcutController: QuickOpenShortcutController | undefined;
+let pendingQuickOpenRequest: QuickOpenRequest | null = null;
+let quickOpenRequestSequence = 0;
 
 function getReviewPullRequestService(): ReviewPullRequestService {
   reviewPullRequestService ??= new ReviewPullRequestService();
@@ -735,6 +780,32 @@ function getMainWindow(): BrowserWindow | undefined {
   return BrowserWindow.getAllWindows()[0];
 }
 
+function compactAndFocusWindow(win: BrowserWindow): void {
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const current = win.getBounds();
+  const width = Math.min(640, display.workArea.width);
+  const height = Math.min(Math.max(current.height, 760), display.workArea.height);
+  win.setBounds({
+    x: display.workArea.x + Math.round((display.workArea.width - width) / 2),
+    y: display.workArea.y + Math.round((display.workArea.height - height) / 2),
+    width,
+    height,
+  });
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+async function requestQuickOpen(): Promise<void> {
+  pendingQuickOpenRequest = {
+    requestId: `quick-open-${Date.now().toString(36)}-${++quickOpenRequestSequence}`,
+  };
+  let win = getMainWindow();
+  if (!win) win = await createMainWindow();
+  compactAndFocusWindow(win);
+  win.webContents.send("quick-open:requested");
+}
+
 let terminalSessionService: TerminalSessionService | undefined;
 let disposeTerminalIpc: (() => void) | undefined;
 
@@ -753,7 +824,7 @@ function initializeTerminalService(roots: AppDataRoots): void {
   disposeTerminalIpc = registerTerminalIpc(terminalSessionService);
 }
 
-async function createMainWindow() {
+async function createMainWindow(): Promise<BrowserWindow> {
   const preloadPath = join(__dirname, "..", "preload", "index.js");
   logMain("create main window start", { preloadPath });
   const win = new BrowserWindow({
@@ -829,6 +900,7 @@ async function createMainWindow() {
     await win.loadFile(filePath);
   }
   logMain("create main window loaded", { url: win.webContents.getURL() });
+  return win;
 }
 
 // ─── Kairos 单例（lazy init in app.whenReady） ───
@@ -1134,7 +1206,7 @@ async function registerIpc() {
 
     return {
       canceled: false,
-      attachments: result.filePaths.map(attachmentFromPath),
+      attachments: await Promise.all(result.filePaths.map(attachmentFromPath)),
     };
   });
 
@@ -1151,9 +1223,18 @@ async function registerIpc() {
     }
     return {
       canceled: false,
-      attachments: result.filePaths.map(attachmentFromPath).filter((attachment) => attachment.kind === "image"),
+      attachments: (await Promise.all(result.filePaths.map(attachmentFromPath)))
+        .filter((attachment) => attachment.kind === "image"),
     };
   });
+
+  ipcMain.handle(
+    "composer:import-image",
+    async (_event, input: ImportComposerImageInput): Promise<ImportComposerImageResult> => {
+      const roots = await ensureDataDirectories();
+      return importComposerImage(input, roots.tmpRoot, imagePreviewDataUrl);
+    },
+  );
 
   ipcMain.handle("dialog:select-workspace-directory", async (): Promise<SelectWorkspaceDirectoryResult> => {
     const result = await dialog.showOpenDialog({
@@ -1316,6 +1397,17 @@ async function registerIpc() {
     }
   });
 
+  ipcMain.handle("review:list-commits", async (_event, input: ReviewWorkspaceInput): Promise<ReviewListCommitsResult> => {
+    const roots = await ensureDataDirectories();
+    const resolved = await resolveReviewWorkspace(roots, input);
+    if (!resolved.ok) return { ok: false, code: "invalid_workspace", message: resolved.message };
+    try {
+      return { ok: true, commits: await getReviewGitEngine(roots).listCommits(resolved.workspace) };
+    } catch (error) {
+      return { ok: false, code: "command_failed", message: safeErrorMessage(error) };
+    }
+  });
+
   ipcMain.handle("review:copy-apply-command", async (_event, input: ReviewCopyApplyCommandInput) => {
     const roots = await ensureDataDirectories();
     const loaded = await getReviewCoordinator(roots).getLoadedSnapshot(input);
@@ -1363,13 +1455,25 @@ async function registerIpc() {
   ipcMain.handle("workspace-environment:create-branch", async (_event, input: WorkspaceGitCreateBranchInput) => {
     const roots = await ensureDataDirectories();
     const workspaceRoot = await requireRegisteredWorkspaceRoot(roots, input.workspaceRoot);
-    return createWorkspaceBranch({ ...input, workspaceRoot }, roots);
+    const result = await createWorkspaceBranch({ ...input, workspaceRoot }, roots);
+    await refreshReviewAfterWorkspaceGitMutation(roots, result);
+    return result;
+  });
+
+  ipcMain.handle("workspace-environment:switch-branch", async (_event, input: WorkspaceGitSwitchBranchInput) => {
+    const roots = await ensureDataDirectories();
+    const workspaceRoot = await requireRegisteredWorkspaceRoot(roots, input.workspaceRoot);
+    const result = await switchWorkspaceBranch({ ...input, workspaceRoot }, roots);
+    await refreshReviewAfterWorkspaceGitMutation(roots, result);
+    return result;
   });
 
   ipcMain.handle("workspace-environment:commit", async (_event, input: WorkspaceGitCommitInput) => {
     const roots = await ensureDataDirectories();
     const workspaceRoot = await requireRegisteredWorkspaceRoot(roots, input.workspaceRoot);
-    return commitWorkspaceChanges({ ...input, workspaceRoot }, roots);
+    const result = await commitWorkspaceChanges({ ...input, workspaceRoot }, roots);
+    await refreshReviewAfterWorkspaceGitMutation(roots, result);
+    return result;
   });
 
   ipcMain.handle("workspace-environment:push", async (_event, input: WorkspaceGitPushInput) => {
@@ -1381,7 +1485,9 @@ async function registerIpc() {
   ipcMain.handle("workspace-environment:commit-and-push", async (_event, input: WorkspaceGitCommitAndPushInput) => {
     const roots = await ensureDataDirectories();
     const workspaceRoot = await requireRegisteredWorkspaceRoot(roots, input.workspaceRoot);
-    return commitAndPushWorkspaceChanges({ ...input, workspaceRoot }, roots);
+    const result = await commitAndPushWorkspaceChanges({ ...input, workspaceRoot }, roots);
+    await refreshReviewAfterWorkspaceGitMutation(roots, result);
+    return result;
   });
 
   ipcMain.handle("workspace-open:list-tools", async () => listWorkspaceOpenTools(undefined, async ({ bundlePath, iconPath }) => {
@@ -1445,7 +1551,8 @@ async function registerIpc() {
 
   ipcMain.handle("session:get", async (_event, input: SessionGetInput) => {
     const roots = await ensureDataDirectories();
-    return readSessionRecord(createSessionStorePaths(join(roots.sessionRoot, input.sessionId)));
+    const record = await readSessionRecord(createSessionStorePaths(join(roots.sessionRoot, input.sessionId)));
+    return hydrateSessionAttachmentPreviews(record, imagePreviewDataUrl);
   });
 
   ipcMain.handle("agent-trace:list", async (_event, input: AgentTraceListInput) => {
@@ -1461,6 +1568,11 @@ async function registerIpc() {
   ipcMain.handle("agent-analysis:index", async (_event, input: AgentAnalysisIndexInput) => {
     const roots = await ensureDataDirectories();
     return getAgentAnalysisIndex(roots.sessionRoot, input);
+  });
+
+  ipcMain.handle("agent-analysis:sessions", async () => {
+    const roots = await ensureDataDirectories();
+    return getAgentAnalysisSessionIndex(roots.sessionRoot);
   });
 
   ipcMain.handle("agent-trace:clear", async (_event, input: AgentTraceClearInput) => {
@@ -1662,6 +1774,58 @@ async function registerIpc() {
   ipcMain.handle("settings:get", async () => {
     return getSettingsService().get();
   });
+
+  ipcMain.handle("quick-open:consume", async (): Promise<QuickOpenRequest | null> => {
+    const request = pendingQuickOpenRequest;
+    pendingQuickOpenRequest = null;
+    return request;
+  });
+
+  ipcMain.handle("quick-open:get-status", async (): Promise<QuickOpenShortcutStatus> => {
+    const shortcut = getSettingsService().get().shortcuts!.quickOpen;
+    return quickOpenShortcutController?.getStatus() ?? {
+      registered: false,
+      accelerator: shortcut.accelerator,
+      error: "快捷键服务尚未初始化。",
+    };
+  });
+
+  ipcMain.handle(
+    "quick-open:update",
+    async (_event, input: QuickOpenShortcutUpdateInput): Promise<QuickOpenShortcutUpdateResult> => {
+      const service = getSettingsService();
+      const current = service.get().shortcuts!.quickOpen;
+      const next = {
+        ...current,
+        ...input,
+        accelerator: input.accelerator?.trim() || current.accelerator,
+      };
+      const controller = quickOpenShortcutController;
+      if (!controller) {
+        const error = "快捷键服务尚未初始化。";
+        return {
+          ok: false,
+          settings: service.get(),
+          status: { registered: false, accelerator: current.accelerator, error },
+          error,
+        };
+      }
+      const result = await controller.update(
+        current,
+        next,
+        () => service.updateQuickOpenShortcut(next),
+      );
+      if (result.ok === false) {
+        logMain("quick open shortcut update failed", { error: result.error });
+        return { ...result, settings: service.get() };
+      }
+      logMain("quick open shortcut updated", {
+        enabled: result.settings.shortcuts?.quickOpen.enabled,
+        accelerator: result.settings.shortcuts?.quickOpen.accelerator,
+      });
+      return result;
+    },
+  );
 
   ipcMain.handle("providers:list", async (): Promise<ProvidersListResult> => ({
     providers: getSettingsService().getV2().providers,
@@ -2214,6 +2378,18 @@ app.whenReady().then(async () => {
   await registerIpc();
   await ensureKairosConfigIpc(roots);
   await createMainWindow();
+  const quickOpenSettings = getSettingsService().get().shortcuts!.quickOpen;
+  quickOpenShortcutController = new QuickOpenShortcutController(
+    globalShortcut,
+    () => void requestQuickOpen().catch((error: unknown) => {
+      logMain("quick open request failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }),
+    quickOpenSettings.accelerator,
+  );
+  const quickOpenStatus = quickOpenShortcutController.activate(quickOpenSettings);
+  logMain("quick open shortcut initialized", quickOpenStatus);
   // 后台 bash 任务终态 → 推给 renderer 更新对应块（turn 内外统一走 agent:stream）
   bashTaskRegistry.subscribe((task) => {
     if (task.status === "running") return;
@@ -2270,6 +2446,10 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("will-quit", () => {
+  quickOpenShortcutController?.dispose();
 });
 
 // 优雅退出：Electron 的 before-quit 不会 await async 回调，要拦截退出必须

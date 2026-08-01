@@ -95,6 +95,30 @@ describe("SettingsService", () => {
     expect(s.kairos.modelId).toBeNull();
     expect(s.kairos.thinking).toBe("auto");
     expect(s.defaultModelId).toBeNull();
+    expect(s.shortcuts?.quickOpen).toEqual({
+      enabled: true,
+      accelerator: "CommandOrControl+Shift+Space",
+      target: { kind: "automatic" },
+    });
+  });
+
+  it("persists quick open shortcut settings and restores them in a new service", async () => {
+    const dataRoot = await makeDataRoot();
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    await svc.updateQuickOpenShortcut({
+      accelerator: "CommandOrControl+Alt+A",
+      target: { kind: "workspace", workspaceId: "workspace-1" },
+    });
+
+    const reopened = makeService(dataRoot);
+    await reopened.load();
+    expect(reopened.get().shortcuts?.quickOpen).toEqual({
+      enabled: true,
+      accelerator: "CommandOrControl+Alt+A",
+      target: { kind: "workspace", workspaceId: "workspace-1" },
+    });
   });
 
   it("update 会持久化、刷新 env，并能被新实例读回", async () => {

@@ -535,6 +535,8 @@ export type ToolUiPreview =
   | {
       kind: "delete";
       filePath: string;
+      outputPath?: string;
+      outputRelativePath?: string;
       displayText: string;
       status?: "pending" | "running" | "completed" | "failed" | "denied";
       approvalRequestId?: string;
@@ -742,6 +744,8 @@ export type MessageBlock = {
       content: string;
       createdAt: string;
       collapsedByDefault: boolean;
+      /** 仅用于当前 renderer 流式投影；持久化 Thinking 默认是 completed。 */
+      status?: "running" | "completed";
     }
   | {
       kind: "read";
@@ -870,6 +874,8 @@ export type MessageBlock = {
       kind: "delete";
       id: EventId;
       filePath: string;
+      outputPath?: string;
+      outputRelativePath?: string;
       displayText: string;
       createdAt: string;
       status?: "pending" | "running" | "completed" | "failed" | "denied";

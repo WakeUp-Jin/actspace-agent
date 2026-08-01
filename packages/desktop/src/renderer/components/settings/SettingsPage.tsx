@@ -23,6 +23,7 @@ import { KairosSettings } from "./KairosSettings";
 import { FileWatchSection } from "./FileWatchSettings";
 import { PluginsSection } from "./PluginsSettings";
 import { SkillsSection } from "./SkillsSettings";
+import { ShortcutSettings } from "./ShortcutSettings";
 import {
   BROWSER_TOOL_GROUP,
   BROWSER_TOOL_ITEMS,
@@ -272,6 +273,10 @@ export function SettingsPage({
               onClearProvider={handleClearKey}
               onArchivedSessionsChange={onArchivedSessionsChange}
               onRefresh={refresh}
+              onReplaceSettings={(next) => {
+                setSettings(next);
+                onSettingsChange?.(next);
+              }}
             />
           ) : settingsError ? (
             <div className="flex h-full items-center justify-center px-6 text-center text-[13px] text-text-faint">
@@ -301,12 +306,15 @@ type SectionProps = {
   onClearProvider: (provider: SecretProviderId) => Promise<void>;
   onArchivedSessionsChange?: () => void;
   onRefresh: () => Promise<void>;
+  onReplaceSettings: (settings: AppSettings) => void;
 };
 
 function SettingsContent({ section, ...rest }: SectionProps & { section: SettingsSectionId }) {
   switch (section) {
     case "general":
       return <GeneralSection {...rest} />;
+    case "shortcuts":
+      return <ShortcutSettings settings={rest.settings} onSettingsChange={rest.onReplaceSettings} />;
     case "providers":
       return <ProvidersSection {...rest} />;
     case "model":

@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { realpath, stat } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import type {
+  GitBranchItem,
   WorkspaceEnvironmentGetInput,
   WorkspaceEnvironmentSnapshot,
   WorkspaceGitCommitAndPushInput,
@@ -9,6 +10,7 @@ import type {
   WorkspaceGitCreateBranchInput,
   WorkspaceGitMutationResult,
   WorkspaceGitPushInput,
+  WorkspaceGitSwitchBranchInput,
 } from "@actspace/shared";
 import type { AppDataRoots } from "./agent-run";
 
@@ -39,6 +41,7 @@ type GitRepositoryState = {
   available: boolean;
   repository: boolean;
   branch?: string;
+  branches: GitBranchItem[];
   detached: boolean;
   hasHead: boolean;
   upstream?: string;
@@ -75,6 +78,7 @@ export async function getWorkspaceEnvironment(
       available: git.available,
       repository: git.repository,
       branch: git.branch,
+      branches: git.branches,
       detached: git.detached,
       hasHead: git.hasHead,
       upstream: git.upstream,
@@ -123,6 +127,62 @@ export async function createWorkspaceBranch(
     workspaceRoot: workspace.workspaceRoot,
     branch: branchName,
   };
+}
+
+export async function switchWorkspaceBranch(
+  input: WorkspaceGitSwitchBranchInput,
+  roots: AppDataRoots,
+  runner: WorkspaceGitCommandRunner = runGitCommand,
+): Promise<WorkspaceGitMutationResult> {
+  const workspace = await resolveWorkspace(input.workspaceRoot, roots);
+  if (workspace.ok === false) {
+    return mutationFailure("switch_branch", "branch", workspace.workspaceRoot, "invalid_workspace", workspace.message);
+  }
+
+  const branchName = input.branchName.trim();
+  if (!branchName) {
+    return mutationFailure("switch_branch", "branch", workspace.workspaceRoot, "invalid_branch", "Branch name is required.");
+  }
+
+  const state = await readGitRepositoryState(workspace.workspaceRoot, runner);
+  if (!state.available) {
+    return mutationFailure("switch_branch", "branch", workspace.workspaceRoot, "git_not_found", "Git is not available on this Mac.");
+  }
+  if (!state.repository) {
+    return mutationFailure("switch_branch", "branch", workspace.workspaceRoot, "not_repository", "Current workspace is not a Git repository.");
+  }
+  if (branchName === state.branch) {
+    return { ok: true, action: "switch_branch", phase: "branch", workspaceRoot: workspace.workspaceRoot, branch: branchName };
+  }
+
+  const target = state.branches.find((branch) => branch.name === branchName);
+  if (!target) {
+    return mutationFailure("switch_branch", "branch", workspace.workspaceRoot, "invalid_branch", "Selected local branch is no longer available.");
+  }
+  if (target.checkedOutPath) {
+    return mutationFailure(
+      "switch_branch",
+      "branch",
+      workspace.workspaceRoot,
+      "branch_checked_out",
+      "Selected branch is checked out in another worktree.",
+      { branch: branchName },
+    );
+  }
+
+  const switched = await runGit(runner, ["switch", "--", branchName], workspace.workspaceRoot);
+  if (!isSuccess(switched)) {
+    return mutationFailure(
+      "switch_branch",
+      "branch",
+      workspace.workspaceRoot,
+      gitMissing(switched) ? "git_not_found" : "command_failed",
+      sanitizeGitError(switched, workspace.workspaceRoot),
+      { branch: state.branch },
+    );
+  }
+
+  return { ok: true, action: "switch_branch", phase: "branch", workspaceRoot: workspace.workspaceRoot, branch: branchName };
 }
 
 export async function commitWorkspaceChanges(
@@ -376,9 +436,11 @@ async function readGitRepositoryState(
     return emptyGitState(true);
   }
 
-  const [branchResult, headResult, upstreamResult, remotesResult, gitDirResult, commonDirResult] = await Promise.all([
+  const [branchResult, headResult, branchesResult, worktreesResult, upstreamResult, remotesResult, gitDirResult, commonDirResult] = await Promise.all([
     runGit(runner, ["symbolic-ref", "--quiet", "--short", "HEAD"], workspaceRoot),
     runGit(runner, ["rev-parse", "--verify", "HEAD"], workspaceRoot),
+    runGit(runner, ["for-each-ref", "--format=%(refname:short)", "refs/heads"], workspaceRoot),
+    runGit(runner, ["worktree", "list", "--porcelain"], workspaceRoot),
     runGit(runner, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], workspaceRoot),
     runGit(runner, ["remote"], workspaceRoot),
     runGit(runner, ["rev-parse", "--absolute-git-dir"], workspaceRoot),
@@ -397,10 +459,27 @@ async function readGitRepositoryState(
   }
 
   const branch = isSuccess(branchResult) ? branchResult.stdout.trim() || undefined : undefined;
+  const checkedOutBranches = isSuccess(worktreesResult) ? parseWorktreeBranches(worktreesResult.stdout) : new Map<string, string>();
+  const branches = isSuccess(branchesResult)
+    ? branchesResult.stdout
+      .split(/\r?\n/)
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .sort((left, right) => Number(right === branch) - Number(left === branch) || left.localeCompare(right))
+      .map((name) => ({
+        name,
+        current: name === branch,
+        ...(name !== branch && checkedOutBranches.get(name) ? { checkedOutPath: checkedOutBranches.get(name) } : {}),
+      }))
+    : [];
+  if (branch && !branches.some((item) => item.name === branch)) {
+    branches.unshift({ name: branch, current: true });
+  }
   return {
     available: true,
     repository: true,
     branch,
+    branches,
     detached: !branch,
     hasHead: isSuccess(headResult),
     upstream: isSuccess(upstreamResult) ? upstreamResult.stdout.trim() || undefined : undefined,
@@ -413,11 +492,27 @@ function emptyGitState(available: boolean): GitRepositoryState {
   return {
     available,
     repository: false,
+    branches: [],
     detached: false,
     hasHead: false,
     remotes: [],
     locationKind: "this_mac",
   };
+}
+
+function parseWorktreeBranches(output: string): Map<string, string> {
+  const result = new Map<string, string>();
+  let currentPath: string | undefined;
+  for (const line of output.split(/\r?\n/)) {
+    if (line.startsWith("worktree ")) {
+      currentPath = line.slice("worktree ".length).trim();
+    } else if (line.startsWith("branch refs/heads/") && currentPath) {
+      result.set(line.slice("branch refs/heads/".length).trim(), currentPath);
+    } else if (!line.trim()) {
+      currentPath = undefined;
+    }
+  }
+  return result;
 }
 
 async function resolveWorkspace(workspaceRoot: string | undefined, roots: AppDataRoots): Promise<ResolvedWorkspace> {

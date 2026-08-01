@@ -223,6 +223,7 @@ export type AgentTraceTurnSummary = {
 
 export type AgentTraceSummary = {
   schemaVersion: 1;
+  toolSummaryVersion?: 2;
   sessionId: string;
   agentRunId: string;
   startedAt: string;
@@ -278,6 +279,32 @@ export type AgentAnalysisIndexResult = {
   totals: AgentAnalysisTotals;
   toolNames: string[];
   runs: AgentAnalysisRunSummary[];
+};
+
+export type AgentAnalysisSessionStatus = "recording" | "completed" | "failed" | "empty" | "unavailable";
+
+export type AgentAnalysisSessionSummary = {
+  sessionId: string;
+  title: string;
+  updatedAt: string;
+  workspaceId?: string;
+  workspaceRoot?: string;
+  status: AgentAnalysisSessionStatus;
+  agentRunCount: number;
+  turnCount: number;
+  llmCallCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  durationMs: number;
+  modelNames: string[];
+};
+
+export type AgentAnalysisSessionIndexResult = {
+  totals: AgentAnalysisTotals & { sessionCount: number };
+  modelNames: string[];
+  sessions: AgentAnalysisSessionSummary[];
 };
 
 export type AgentTraceClearInput =
@@ -502,6 +529,22 @@ export type SelectFilesResult = {
 
 export type SelectImagesResult = SelectFilesResult;
 
+export type ImportComposerImageInput = {
+  name: string;
+  mimeType?: string;
+  bytes: Uint8Array;
+};
+
+export type ImportComposerImageResult =
+  | { ok: true; attachment: import("./session").ComposerAttachment }
+  | {
+      ok: false;
+      error: {
+        code: "empty" | "too_large" | "unsupported_format" | "decode_failed" | "write_failed";
+        message: string;
+      };
+    };
+
 export type SkillListInput = {
   workspaceRoot?: string;
 };
@@ -669,6 +712,7 @@ export type WorkspaceEnvironmentSnapshot = {
     available: boolean;
     repository: boolean;
     branch?: string;
+    branches: GitBranchItem[];
     detached: boolean;
     hasHead: boolean;
     upstream?: string;
@@ -682,12 +726,18 @@ export type WorkspaceGitErrorCode =
   | "not_repository"
   | "detached_head"
   | "invalid_branch"
+  | "branch_checked_out"
   | "nothing_to_commit"
   | "remote_required"
   | "no_remote"
   | "command_failed";
 
 export type WorkspaceGitCreateBranchInput = {
+  workspaceRoot?: string;
+  branchName: string;
+};
+
+export type WorkspaceGitSwitchBranchInput = {
   workspaceRoot?: string;
   branchName: string;
 };
@@ -710,7 +760,7 @@ export type WorkspaceGitCommitAndPushInput = WorkspaceGitCommitInput & {
 
 export type WorkspaceGitMutationResult = {
   ok: boolean;
-  action: "create_branch" | "commit" | "push" | "commit_and_push";
+  action: "create_branch" | "switch_branch" | "commit" | "push" | "commit_and_push";
   phase: "branch" | "commit" | "push";
   workspaceRoot: string;
   branch?: string;

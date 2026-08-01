@@ -198,6 +198,23 @@ export interface SkillsSettings {
   disabled: string[];
 }
 
+export const DEFAULT_QUICK_OPEN_ACCELERATOR = "CommandOrControl+Shift+Space";
+
+export type QuickOpenTarget =
+  | { kind: "automatic" }
+  | { kind: "workspace"; workspaceId: string }
+  | { kind: "session"; sessionId: string };
+
+export interface QuickOpenShortcutSettings {
+  enabled: boolean;
+  accelerator: string;
+  target: QuickOpenTarget;
+}
+
+export interface ShortcutsSettings {
+  quickOpen: QuickOpenShortcutSettings;
+}
+
 export interface AppSettingsV1 {
   version: 1;
   /** 默认模型；null = 用内置 DEFAULT_MODEL_ID。决定 Composer 初始选中。 */
@@ -230,6 +247,7 @@ export interface AppSettingsV2 {
   kairos: KairosSettingsV2;
   plugins: PluginsSettings;
   skills: SkillsSettings;
+  shortcuts: ShortcutsSettings;
 }
 
 /**
@@ -252,6 +270,8 @@ export interface AppSettings extends Omit<AppSettingsV1, "version" | "providers"
   imageGeneration?: ImageGenerationSettingsView;
   /** 旧测试 fixture 缺失时 renderer 使用内置默认值。 */
   imageInspection?: ImageInspectionSettings;
+  /** 旧测试 fixture 缺失时 renderer 使用内置快捷键默认值。 */
+  shortcuts?: ShortcutsSettings;
 }
 
 // ─── IPC 输入 / 输出 ───
@@ -275,6 +295,26 @@ export type SettingsV2UpdateInput = Partial<{
   plugins: Partial<PluginsSettings>;
   skills: Partial<SkillsSettings>;
 }>;
+
+export type QuickOpenShortcutUpdateInput = Partial<{
+  enabled: boolean;
+  accelerator: string;
+  target: QuickOpenTarget;
+}>;
+
+export type QuickOpenShortcutStatus = {
+  registered: boolean;
+  accelerator: string;
+  error?: string;
+};
+
+export type QuickOpenShortcutUpdateResult =
+  | { ok: true; settings: AppSettings; status: QuickOpenShortcutStatus }
+  | { ok: false; settings: AppSettings; status: QuickOpenShortcutStatus; error: string };
+
+export type QuickOpenRequest = {
+  requestId: string;
+};
 
 export type AgentSystemPromptFile = {
   path: string;

@@ -10,6 +10,7 @@ import {
   clearAgentTraces,
   enforceAgentTraceRetention,
   getAgentAnalysisIndex,
+  getAgentAnalysisSessionIndex,
   listAgentTraces,
   readAgentTrace,
 } from "../agent-trace-service";
@@ -93,7 +94,7 @@ describe("agent trace service", () => {
         turnIndex: 1,
         llmCallId: "call-1",
         attempt: 1,
-        payload: { model: "kimi-k2", tools: [{ name: "glob" }] },
+        payload: { model: "kimi-k2", tools: [{ name: "glob" }, { name: "read_file" }] },
       },
       {
         ...traceEvent("llm_response", "2026-07-29T10:00:00.800Z"),
@@ -101,11 +102,20 @@ describe("agent trace service", () => {
         turnIndex: 1,
         llmCallId: "call-1",
         attempt: 1,
-        payload: { durationMs: 600, message: { model: "kimi-k2", usage: { input: 100, output: 20, cacheRead: 40, cacheWrite: 0 } } },
+        payload: { durationMs: 600, message: { model: "kimi-k2", content: [{ type: "toolCall", name: "glob", arguments: {} }], usage: { input: 100, output: 20, cacheRead: 40, cacheWrite: 0 } } },
       },
       traceEvent("agent_run_end", "2026-07-29T10:00:01.000Z"),
     ];
     await writeFile(join(traceDir, "agent-run-1.jsonl"), `${events.map((event) => JSON.stringify(event)).join("\n")}\n`);
+
+    await listAgentTraces(sessionRoot, { sessionId: "session-1" });
+    const summaryPath = join(traceDir, "agent-run-1.summary.json");
+    const staleSummary = JSON.parse(await readFile(summaryPath, "utf8")) as Record<string, unknown>;
+    delete staleSummary.toolSummaryVersion;
+    staleSummary.toolNames = ["glob", "read_file"];
+    const staleTurns = staleSummary.turns as Array<Record<string, unknown>>;
+    staleTurns[0].toolNames = ["glob", "read_file"];
+    await writeFile(summaryPath, JSON.stringify(staleSummary));
 
     await expect(getAgentAnalysisIndex(sessionRoot, { sessionId: "session-1" })).resolves.toMatchObject({
       title: "Observability session",
@@ -113,8 +123,94 @@ describe("agent trace service", () => {
       toolNames: ["glob"],
       runs: [{ userMessagePreview: "检查 Agent 事件层级", modelNames: ["kimi-k2"] }],
     });
-    await expect(clearAgentTraces(sessionRoot, { scope: "session", sessionId: "session-1" })).resolves.toMatchObject({ filesDeleted: 1 });
+    await expect(readFile(summaryPath, "utf8").then(JSON.parse)).resolves.toMatchObject({
+      toolSummaryVersion: 2,
+      toolNames: ["glob"],
+      turns: [{ toolNames: ["glob"] }],
+    });
+    await expect(clearAgentTraces(sessionRoot, { scope: "session", sessionId: "session-1" })).resolves.toMatchObject({ filesDeleted: 2 });
     await expect(readFile(join(sessionDir, "session.jsonl"), "utf8")).resolves.toContain("检查 Agent 事件层级");
+  });
+
+  it("builds the analysis session home from metadata and summary sidecars only", async () => {
+    const sessionRoot = await mkdtemp(join(tmpdir(), "actspace-analysis-sessions-"));
+    const firstSessionDir = join(sessionRoot, "session-1");
+    const secondSessionDir = join(sessionRoot, "session-2");
+    await mkdir(join(firstSessionDir, "traces"), { recursive: true });
+    await mkdir(secondSessionDir, { recursive: true });
+    await writeFile(join(firstSessionDir, "meta.json"), JSON.stringify({
+      schemaVersion: 2,
+      id: "session-1",
+      title: "Inspect the runtime",
+      createdAt: "2026-07-29T10:00:00.000Z",
+      updatedAt: "2026-07-29T10:05:00.000Z",
+      agentRunCount: 1,
+      workspaceRoot: "/tmp/runtime",
+    }));
+    await writeFile(join(secondSessionDir, "meta.json"), JSON.stringify({
+      schemaVersion: 2,
+      id: "session-2",
+      title: "No analysis yet",
+      createdAt: "2026-07-29T09:00:00.000Z",
+      updatedAt: "2026-07-29T09:05:00.000Z",
+      agentRunCount: 1,
+    }));
+    await writeFile(join(firstSessionDir, "traces", "run-1.summary.json"), JSON.stringify({
+      schemaVersion: 1,
+      toolSummaryVersion: 2,
+      sessionId: "session-1",
+      agentRunId: "run-1",
+      startedAt: "2026-07-29T10:00:00.000Z",
+      endedAt: "2026-07-29T10:05:00.000Z",
+      status: "completed",
+      truncated: false,
+      turnCount: 2,
+      llmCallCount: 2,
+      retryCount: 0,
+      eventCount: 8,
+      toolNames: ["read_file"],
+      modelNames: ["deepseek-v4-flash"],
+      inputTokens: 28000,
+      outputTokens: 817,
+      cacheReadTokens: 17000,
+      cacheWriteTokens: 125,
+      durationMs: 7400,
+      byteSize: 4096,
+      turns: [],
+    }));
+    // 首页不能为了渲染列表而解析完整 JSONL；这个坏文件不应影响 sidecar 索引。
+    await writeFile(join(firstSessionDir, "traces", "run-1.jsonl"), "not-json\n");
+
+    await expect(getAgentAnalysisSessionIndex(sessionRoot)).resolves.toMatchObject({
+      totals: {
+        sessionCount: 2,
+        agentRunCount: 1,
+        turnCount: 2,
+        llmCallCount: 2,
+        inputTokens: 28000,
+        outputTokens: 817,
+        cacheWriteTokens: 125,
+      },
+      modelNames: ["deepseek-v4-flash"],
+      sessions: [
+        {
+          sessionId: "session-1",
+          title: "Inspect the runtime",
+          workspaceRoot: "/tmp/runtime",
+          status: "completed",
+          agentRunCount: 1,
+          turnCount: 2,
+          inputTokens: 28000,
+          cacheWriteTokens: 125,
+        },
+        {
+          sessionId: "session-2",
+          title: "No analysis yet",
+          status: "empty",
+          agentRunCount: 0,
+        },
+      ],
+    });
   });
 
   it("rejects traversal identifiers and symbolic-link trace files", async () => {

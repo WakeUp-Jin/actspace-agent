@@ -1231,7 +1231,12 @@ function WorkspaceSection({
           type="button"
           aria-haspopup="menu"
           aria-expanded={Boolean(menuPosition)}
-          onClick={() => menuPosition ? closeMenu() : openMenu()}
+          onKeyDown={(event) => {
+            if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+              event.preventDefault();
+              openMenu();
+            }
+          }}
         >
           <span className={WORKSPACE_NAME_CLASS}>{group.label}</span>
         </button>

@@ -80,6 +80,39 @@ describe("agent trace", () => {
     });
   });
 
+  it("summarizes only tools that the model actually called", async () => {
+    const root = await mkdtemp(join(tmpdir(), "actspace-agent-trace-tools-"));
+    const writer = await createAgentTraceWriter({
+      sessionDir: join(root, "session-1"),
+      sessionId: "session-1",
+      agentRunId: "agent-run-1",
+    });
+    await writer.write({
+      type: "llm_request",
+      sessionId: "session-1",
+      agentRunId: "agent-run-1",
+      turnId: "turn-1",
+      turnIndex: 1,
+      llmCallId: "call-1",
+      payload: { model: "kimi-k2", tools: [{ name: "glob" }, { name: "read_file" }] },
+    });
+    await writer.write({
+      type: "llm_response",
+      sessionId: "session-1",
+      agentRunId: "agent-run-1",
+      turnId: "turn-1",
+      turnIndex: 1,
+      llmCallId: "call-1",
+      payload: { message: { content: [{ type: "toolCall", name: "glob", arguments: {} }] } },
+    });
+
+    await expect(readFile(writer.summaryFilePath, "utf8").then(JSON.parse)).resolves.toMatchObject({
+      toolSummaryVersion: 2,
+      toolNames: ["glob"],
+      turns: [{ toolNames: ["glob"] }],
+    });
+  });
+
   it("keeps only safe fields from Error instances", () => {
     const error = Object.assign(new Error("provider failed"), {
       code: "429",

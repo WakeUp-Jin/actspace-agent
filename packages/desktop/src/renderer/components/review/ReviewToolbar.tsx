@@ -72,7 +72,7 @@ export function ReviewToolbar({ snapshot, selection, workspaceRoot, sessionId, f
           <button ref={scopeRef} type="button" className="inline-flex h-8 max-w-[140px] items-center gap-1 rounded-act-sm px-1.5 text-[13px] font-medium text-text-main hover:bg-surface-subtle" aria-label="Review scope" aria-haspopup="menu" aria-expanded={menu === "scope"} onClick={() => setMenu(menu === "scope" ? null : "scope")}>
             <span className="truncate">{scopeLabel}</span><ChevronDown size={13} />
           </button>
-          {menu === "scope" ? <AnchoredPopover anchorRef={scopeRef} popoverRef={popoverRef} align="start" className="w-[250px]"><ReviewScopeMenu selection={selection} sessionId={sessionId} workspaceRoot={workspaceRoot} onSelect={(next) => { onSelectScope(next); setMenu(null); }} /></AnchoredPopover> : null}
+          {menu === "scope" ? <AnchoredPopover anchorRef={scopeRef} popoverRef={popoverRef} align="start" className="w-[min(360px,calc(100vw-16px))]"><ReviewScopeMenu selection={selection} sessionId={sessionId} workspaceRoot={workspaceRoot} onSelect={(next) => { onSelectScope(next); setMenu(null); }} /></AnchoredPopover> : null}
         </div>
         {snapshot && (snapshot.totals.additions > 0 || snapshot.totals.deletions > 0) ? <div className="flex shrink-0 gap-1 text-[12px] tabular-nums">{snapshot.totals.additions > 0 ? <span className="text-success">+{snapshot.totals.additions}</span> : null}{snapshot.totals.deletions > 0 ? <span className="text-danger">-{snapshot.totals.deletions}</span> : null}</div> : null}
         <div className="min-w-2 flex-1" />

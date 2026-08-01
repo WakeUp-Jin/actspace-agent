@@ -19,6 +19,7 @@ afterEach(() => {
 function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {}) {
   const onSend = vi.fn();
   const onAbort = vi.fn();
+  const onOpenAttachmentPreview = vi.fn();
 
   const result = render(
     <TooltipProvider delayDuration={0}>
@@ -26,12 +27,13 @@ function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {})
         contextSnapshot={mockContextSnapshot}
         onSend={onSend}
         onAbort={onAbort}
+        onOpenAttachmentPreview={onOpenAttachmentPreview}
         {...overrides}
       />
     </TooltipProvider>,
   );
 
-  return { onSend, onAbort, ...result };
+  return { onSend, onAbort, onOpenAttachmentPreview, ...result };
 }
 
 function createSkill(overrides: Partial<SkillCatalogItem> = {}): SkillCatalogItem {
@@ -159,7 +161,7 @@ describe("Composer follow-up bar", () => {
         name: "screenshot.png",
         path: "/Users/test/screenshot.png",
         mimeType: "image/png",
-        previewUrl: "file:///Users/test/screenshot.png",
+        previewUrl: "data:image/png;base64,preview",
       },
     ];
     const selectImages = vi.fn(async () => ({ canceled: false, attachments: selectedAttachments }));
@@ -176,6 +178,8 @@ describe("Composer follow-up bar", () => {
     const input = screen.getByLabelText("Message composer");
     const toolbarButtons = within(toolbar).getAllByRole("button");
     expect(within(attachmentList).getByLabelText("Attached image screenshot.png")).toBeInTheDocument();
+    expect(within(attachmentList).getByRole("button", { name: "Preview attached image screenshot.png" }))
+      .toHaveStyle({ backgroundImage: 'url("data:image/png;base64,preview")' });
     expect(panel).toContainElement(attachmentList);
     expect(panel).toContainElement(input);
     expect(toolbar).not.toContainElement(input);
@@ -621,6 +625,71 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByLabelText("Attached image screenshot.png")).toBeInTheDocument();
   });
 
+  it("opens a selected image preview and keeps the remove control compact", async () => {
+    const user = userEvent.setup();
+    const attachment: ComposerAttachment = {
+      id: "selected-image",
+      kind: "image",
+      name: "screenshot.png",
+      path: "/Users/test/screenshot.png",
+      mimeType: "image/png",
+      previewUrl: "data:image/png;base64,preview",
+    };
+    setPartialActspaceBridge({
+      selectImages: vi.fn(async () => ({ canceled: false, attachments: [attachment] })),
+    });
+    const { onOpenAttachmentPreview } = renderComposer();
+
+    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    await user.click(screen.getByRole("menuitem", { name: "Image" }));
+    await user.click(screen.getByRole("button", { name: "Preview attached image screenshot.png" }));
+
+    expect(onOpenAttachmentPreview).toHaveBeenCalledWith(attachment);
+    expect(screen.getByRole("button", { name: "Remove screenshot.png" })).toHaveClass("h-[18px]", "w-[18px]");
+  });
+
+  it("imports pasted images and lets a text-only model send them without persisting preview data", async () => {
+    const pastedAttachment: ComposerAttachment = {
+      id: "pasted-image",
+      kind: "image",
+      name: "pasted-image.png",
+      path: "/tmp/composer-attachments/pasted-image.png",
+      mimeType: "image/png",
+      previewUrl: "data:image/png;base64,preview",
+    };
+    const importComposerImage = vi.fn(async () => ({ ok: true as const, attachment: pastedAttachment }));
+    setPartialActspaceBridge({ importComposerImage });
+    const { onSend } = renderComposer();
+    const input = screen.getByLabelText("Message composer");
+    const file = new File([new Uint8Array([1, 2, 3])], "image.png", { type: "image/png" });
+    Object.defineProperty(file, "arrayBuffer", {
+      value: async () => new Uint8Array([1, 2, 3]).buffer,
+    });
+
+    fireEvent.paste(input, {
+      clipboardData: {
+        items: [{ kind: "file", type: "image/png", getAsFile: () => file }],
+      },
+    });
+
+    await waitFor(() => expect(importComposerImage).toHaveBeenCalledTimes(1));
+    expect(await screen.findByLabelText("Attached image pasted-image.png")).toBeInTheDocument();
+    await userEvent.type(input, "看看这张图");
+    await userEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+    expect(onSend).toHaveBeenCalledWith("看看这张图", expect.objectContaining({
+      model: "deepseek-v4-pro",
+      attachments: [{
+        id: "pasted-image",
+        kind: "image",
+        name: "pasted-image.png",
+        path: "/tmp/composer-attachments/pasted-image.png",
+        mimeType: "image/png",
+        previewUrl: "data:image/png;base64,preview",
+      }],
+    }));
+  });
+
   it("does not add fake attachments when the Electron file bridge is unavailable", async () => {
     const user = userEvent.setup();
 
@@ -656,7 +725,7 @@ describe("Composer follow-up bar", () => {
     await user.hover(removePhoto);
     expect((await screen.findAllByText("移除 photo.png")).length).toBeGreaterThan(0);
 
-    fireEvent.pointerDown(removePhoto);
+    await user.click(removePhoto);
     expect(screen.queryByLabelText("Attached image photo.png")).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Message composer"), "analyze this");
@@ -908,7 +977,15 @@ describe("Composer follow-up bar", () => {
         workspaceRoot: "/work/actspace-agent",
         workspaceLabel: "actspace-agent",
         locationKind: "worktree" as const,
-        git: { available: true, repository: true, branch: "feature/ui", detached: false, hasHead: true, remotes: [] },
+        git: {
+          available: true,
+          repository: true,
+          branch: "feature/ui",
+          branches: [{ name: "feature/ui", current: true }],
+          detached: false,
+          hasHead: true,
+          remotes: [],
+        },
       })),
     });
     const { onSend } = renderComposer({

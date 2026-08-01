@@ -36,6 +36,7 @@
   - **默认折叠**：只露前几行（max-h 88px）、`overflow-hidden` 不出滚动条，底部用随主题翻转的渐隐遮罩（`from-surface to-transparent`）暗示还有内容。turn prompt 是 sticky 定位，折叠态让长消息对下方模型回复的遮挡降到最小。
   - **点击展开**：撑到 `min(240px, 32vh)`、内部滚动；**收起只通过点击卡片以外的任意位置触发**，再点卡片不收起（避免在展开内容里点击/选择时意外合上）；用户拖选文字复制时（存在文本选区）不触发展开。
   - 短消息（未超过折叠高度）不参与：无手型光标、无遮罩、无点击交互。
+- 用户消息中的图片缩略图是可点击、可键盘聚焦的对象入口；激活后在右侧打开 Image Tab，与 Composer 发送前预览保持一致。没有可用预览数据时按钮禁用，不尝试由 renderer 直接读取本地路径。
 - 助手普通回复用正常文本块显示，不在消息正文前重复展示头像、产品名或模型名。
 - Thinking 默认折叠，点击后展开完整内容。
 - Read、Grep、Glob 和 Web Search 保持文本流感，不做重边框。
@@ -152,8 +153,9 @@ Read、Grep、Glob 和 Web Search 是和 Thinking 同级别的工具调用消息
 
 - `Generate image` / `Generated image` 与 Read 使用同一单行工具日志语法，无图标、无外围卡片。
 - 行内依次展示尺寸、数量、prompt 摘要与模型名；超出消息宽度时单行省略，不能让 prompt 撑高过程区。
-- 生成成功后不在工具过程区直接放图片。最终回复下新增一层紧凑 `Artifacts` 组件，逐行展示文件名和短路径。
-- `Artifacts` 只收录本轮输出：生成图片和完成的 Write/Edit 文件；Read/Grep/Glob 等输入对象不进入。
+- 生成成功后不在工具过程区直接放图片。只有当前 Agent Run 结束、最终回复完成后，才在回复下发布紧凑 `Artifacts` 组件；流式文本、工具执行和审批期间都不提前出现。
+- `Artifacts` 是本轮输出的终态投影：收录生成图片和完成的 Write/Edit 文件；同一文件多次修改合并为一行，后续成功 Delete 的文件从列表移除，Read/Grep/Glob 等输入对象不进入。
+- 文件使用单行列表展示 workspace 相对路径，右侧显示本轮 Write/Edit 工具结果累计的 `+additions -deletions`，头部显示文件数与合计；这些数字表达本轮 Agent 操作，不冒充 Git Review 的工作区净 diff。
 - 点击图片或可预览文件后打开右侧面板。加载中只在对应行显示小型 spinner，错误在组件底部显示轻量说明。
 - 悬浮产物行时用 Tooltip 展示完整绝对路径；列表本身仍只显示文件名和短路径，避免破坏消息密度。
 - 右键产物行打开 Electron 原生菜单，提供 Cursor 打开、默认应用打开、复制路径、复制图片/文件内容和 Finder 定位。Renderer 只传会话产物或 workspace 相对文件身份，main 必须重新校验 realpath 边界。
@@ -193,13 +195,13 @@ Bash 是命令执行工具，包含正常执行态和审核 pending 态。
 
 ## 工具执行中态规范
 
-所有工具行（Read、Grep、Glob、Web Search、Directory List、Bash、Edit/Write File）在 running 阶段使用统一的 text shimmer 视觉，不引入额外的图标或动效层。
+所有工具行（包括 Read、Grep、Glob、Web Search、Directory List、Bash、Edit/Write File、图片分析和图片生成）在 running 阶段使用统一的 text shimmer 视觉，不引入额外的图标或动效层。流式 Thinking 标题和模型等待文案复用同一视觉语言，避免运行链路在工具之外重新变成静默。
 
 ### 视觉
 
-- 文本始终可读：底层使用 `text-text-main` / `--act-color-text`，让 running 比 completed 的 muted 文字更明确。
-- 目标设计使用 `--act-color-text-subtle` 作为中性浅灰**叠加**层，从右向左扫过文本一次为一轮；浅色主题是黑字上的浅灰扫光，深色主题自动反转为浅字上的深灰扫光，不允许出现「文字消失」的瞬间。
-- 实现方式：running 文本使用 `.tool-log-text-running`。真实文本保留为主题色；`::after` 通过 `content: attr(data-shimmer-text)` 复制同一段文字，再用 `background-clip: text` 裁出扫光层。动画背景必须限制在 inline 文本盒子内，不允许占满整条工具行。
+- 采用 B 方案的高明度差中性组合：底层使用 `--act-color-text-faint`，扫光中心使用 `--act-color-text`。浅色主题呈现浅灰底字上的深墨扫光，深色主题由同一组 token 自动翻转为暗灰底字上的亮墨扫光。
+- 实现方式：running 文本统一使用 `.tool-log-text-running`。`::after` 通过 `content: attr(data-shimmer-text)` 复制同一段文字，再用 `background-clip: text` 裁出墨色扫光层。动画背景必须限制在 inline 文本盒子内，不允许占满整条工具行。
+- shimmer 使用中性色而不是 operational green；绿色只负责运行圆点等离散状态信号，不把整行文字染成绿色。
 - 颜色必须走主题 token，禁止在 running shimmer 中写死 `#hex` 作为基础色或高光色。
 - 完成态文字色直接回到默认 muted 灰，无切换动画。
 
@@ -207,8 +209,9 @@ Bash 是命令执行工具，包含正常执行态和审核 pending 态。
 
 - 一轮 shimmer 约 1.1s。
 - shimmer 自然循环：工具执行时间长就多扫几次，执行时间短就直接进入完成态。
-- 不为了显示 shimmer 而人为延长 running 态。`MIN_TOOL_RUNNING_MS`（约 300ms）只是用于防 UI 闪烁，不是为了让 shimmer 扫完一轮。
-- `prefers-reduced-motion` 下取消扫光，保留主文本色；running 与 completed 仍通过 main / muted 文字层级区分。
+- 不为了显示 shimmer 而人为延长 running 态；收到 `tool_finished` 后立即切换完成态，即使一轮扫光尚未结束。
+- 流式 Thinking 仅在它是当前最后一个 segment 时保持 running；工具或后续文本 segment 出现后立即停止。持久化回读的 Thinking 默认是 completed，不回放历史动画。
+- `prefers-reduced-motion` 下取消扫光，保留 faint 底字；running 语义由附近的状态文案、运行圆点和当前流式位置共同表达。
 
 ### 文案
 

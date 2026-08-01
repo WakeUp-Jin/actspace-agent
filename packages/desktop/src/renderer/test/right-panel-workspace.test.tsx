@@ -134,4 +134,14 @@ describe("RightPanel 工作区浏览态", () => {
     await user.hover(screen.getByRole("button", { name: "关闭 Kairos" }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("关闭 Kairos");
   });
+
+  it("uses the lighter surface token for the active tab", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(screen.getByRole("button", { name: "Kairos" }));
+    const activeTab = screen.getByRole("tab", { name: "Kairos" }).parentElement;
+    expect(activeTab).toHaveClass("bg-surface-subtle");
+    expect(activeTab).not.toHaveClass("bg-selected");
+  });
 });

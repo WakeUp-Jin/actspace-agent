@@ -16,7 +16,7 @@ const summary: AgentTraceSummary = {
   llmCallCount: 2,
   retryCount: 0,
   eventCount: 8,
-  toolNames: ["glob", "read_file"],
+  toolNames: ["glob"],
   modelNames: ["kimi-k2"],
   inputTokens: 300,
   outputTokens: 60,
@@ -26,7 +26,7 @@ const summary: AgentTraceSummary = {
   byteSize: 4096,
   turns: [
     { turnId: "turn-1", turnIndex: 1, startedAt: "2026-07-30T10:00:00.100Z", llmCallCount: 1, retryCount: 0, toolNames: ["glob"], modelNames: ["kimi-k2"], inputTokens: 100, outputTokens: 20, cacheReadTokens: 40, cacheWriteTokens: 0, durationMs: 600 },
-    { turnId: "turn-2", turnIndex: 2, startedAt: "2026-07-30T10:00:01.000Z", llmCallCount: 1, retryCount: 0, toolNames: ["glob", "read_file"], modelNames: ["kimi-k2"], inputTokens: 200, outputTokens: 40, cacheReadTokens: 80, cacheWriteTokens: 0, durationMs: 1200 },
+    { turnId: "turn-2", turnIndex: 2, startedAt: "2026-07-30T10:00:01.000Z", llmCallCount: 1, retryCount: 0, toolNames: [], modelNames: ["kimi-k2"], inputTokens: 200, outputTokens: 40, cacheReadTokens: 80, cacheWriteTokens: 0, durationMs: 1200 },
   ],
 };
 
@@ -34,7 +34,7 @@ const analysisIndex: AgentAnalysisIndexResult = {
   sessionId: "session-1",
   title: "Agent event analysis",
   totals: { agentRunCount: 1, turnCount: 2, llmCallCount: 2, inputTokens: 300, outputTokens: 60, cacheReadTokens: 120, cacheWriteTokens: 0, durationMs: 1800 },
-  toolNames: ["glob", "read_file"],
+  toolNames: ["glob"],
   runs: [{ ...summary, userMessagePreview: "检查 Agent 事件层级" }],
 };
 
@@ -74,6 +74,11 @@ describe("AgentAnalysisPage", () => {
     expect(screen.getByText("TOOL RESULT · glob")).toBeInTheDocument();
     expect(screen.getByText("Thinking")).toBeInTheDocument();
     expect(screen.getByText("一个 Agent Run 可以包含多个 Turn。")).toBeInTheDocument();
+    expect(screen.queryByText("Settings / Analysis")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent event analysis")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "清除当前会话分析记录" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "glob" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "read_file" })).not.toBeInTheDocument();
   });
 
   it("opens the previous-request comparison without showing call ids", async () => {
@@ -84,6 +89,46 @@ describe("AgentAnalysisPage", () => {
     expect(screen.getByRole("heading", { name: "Turn 1 → Turn 2" })).toBeInTheDocument();
     expect(screen.getByText("前 1 条消息未变化")).toBeInTheDocument();
     expect(screen.queryByText(/call-1|call-2/)).toBeNull();
+    expect(screen.queryByText("对比对象")).not.toBeInTheDocument();
+  });
+
+  it("pages through adjacent request comparisons", async () => {
+    const user = userEvent.setup();
+    const turns = [
+      ...summary.turns,
+      { ...summary.turns[1], turnId: "turn-3", turnIndex: 3, startedAt: "2026-07-30T10:00:02.100Z", toolNames: ["read_file"] },
+      { ...summary.turns[1], turnId: "turn-4", turnIndex: 4, startedAt: "2026-07-30T10:00:03.100Z", toolNames: [] },
+    ];
+    const pagedSummary = { ...summary, turnCount: 4, llmCallCount: 4, turns, toolNames: ["glob", "read_file"] };
+    const pagedEvents = [
+      ...events.slice(0, -1),
+      { ...event("turn_start", "2026-07-30T10:00:02.100Z"), turnId: "turn-3", turnIndex: 3 },
+      request("turn-3", 3, "call-3", "2026-07-30T10:00:02.200Z", [{ role: "user", content: "继续检查" }], ["read_file"]),
+      response("turn-3", 3, "call-3", "2026-07-30T10:00:03.000Z", [{ type: "toolCall", name: "read_file", arguments: { path: "loop.ts" } }], 210, 30, 800),
+      { ...event("turn_start", "2026-07-30T10:00:03.100Z"), turnId: "turn-4", turnIndex: 4 },
+      request("turn-4", 4, "call-4", "2026-07-30T10:00:03.200Z", [{ role: "user", content: "完成检查" }], ["read_file"]),
+      response("turn-4", 4, "call-4", "2026-07-30T10:00:04.000Z", [{ type: "text", text: "完成。" }], 220, 35, 800),
+      event("agent_run_end", "2026-07-30T10:00:04.100Z"),
+    ];
+    window.actspace = {
+      ...window.actspace,
+      getAgentAnalysisIndex: vi.fn(async () => ({ ...analysisIndex, runs: [{ ...pagedSummary, userMessagePreview: "检查 Agent 事件层级" }] })),
+      readAgentTrace: vi.fn(async () => ({ trace: pagedSummary, events: pagedEvents })),
+    };
+
+    render(<AgentAnalysisPage sessionId="session-1" onBack={() => {}} />);
+    await screen.findByRole("heading", { name: "Turn 4" });
+    await user.click(screen.getByRole("button", { name: /Turn 2/ }));
+    await user.click(screen.getByRole("button", { name: "对比上次" }));
+    expect(screen.getByRole("heading", { name: "Turn 1 → Turn 2" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "查看下一组请求对比" }));
+    expect(screen.getByRole("heading", { name: "Turn 2 → Turn 3" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "查看下一组请求对比" }));
+    expect(screen.getByRole("heading", { name: "Turn 3 → Turn 4" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看下一组请求对比" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "查看上一组请求对比" }));
+    expect(screen.getByRole("heading", { name: "Turn 2 → Turn 3" })).toBeInTheDocument();
   });
 
   it("moves selection to the first visible Turn and shows a filter empty state", async () => {
@@ -94,6 +139,12 @@ describe("AgentAnalysisPage", () => {
 
     await user.type(search, "turn 1");
     expect(await screen.findByRole("heading", { name: "Turn 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "glob" })).toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, "turn 2");
+    expect(await screen.findByRole("heading", { name: "Turn 2" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "glob" })).not.toBeInTheDocument();
 
     await user.clear(search);
     await user.type(search, "不存在的模型");

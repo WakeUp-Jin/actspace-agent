@@ -86,7 +86,7 @@ type ReviewSelection =
 | `commit` | 指定 commit 引入的变化 | parent → commit | 只读 |
 | `branch` | 本地分支相对 upstream 的本地独有提交 | `local → upstream` | 只读 |
 
-`Committed` 和 `Branch` 是带子视图的菜单项。Commit 接收经过 main 校验的 ref；Branch 只能选择 main 返回的、已经配置 upstream 的本地分支。
+`Committed` 和 `Branch` 是带子视图的菜单项。Committed 子视图通过 main 查询当前 `HEAD` 的最近提交日志，展示 commit subject 和相对时间；选择一项后 Renderer 只回传 main 已提供的 SHA，不提供自由输入 ref 的提交表单。Branch 只能选择 main 返回的、已经配置 upstream 的本地分支。
 
 ### Branch 与远程跟踪语义
 
@@ -142,7 +142,8 @@ type ReviewSnapshot = {
 - 文件身份：NUL-delimited `--name-status -z`。
 - 统计：`--numstat -z`。
 - rename：启用 `--find-renames`。
-- commit：先 `git cat-file -e <ref>^{commit}`。
+- commit log：从当前 `HEAD` 最多读取最近 50 条；workspace 是 repo 子目录时携带 pathspec，只返回影响该 workspace 的提交。Main 返回结构化 `sha / subject / authoredAt`，Renderer 不解析 Git 输出。
+- commit diff：选择日志项后仍先执行 `git cat-file -e <sha>^{commit}`，再读取其 parent → commit diff；根提交使用 empty tree。
 - branch：只接受已验证的本地 ref，再解析 upstream。
 - workspace 是 repo 子目录时，所有查询强制携带相对 repoRoot 的 pathspec。
 - 无 HEAD 时 staged/uncommitted 使用 empty tree。

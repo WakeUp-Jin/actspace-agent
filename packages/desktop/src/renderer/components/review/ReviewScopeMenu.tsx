@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import type { ReviewBranch, ReviewSelection } from "@actspace/shared";
+import type { ReviewBranch, ReviewCommit, ReviewSelection } from "@actspace/shared";
 
 const ITEM = "flex min-h-8 w-full items-center gap-2 rounded-act-sm border-0 bg-transparent px-2.5 text-left text-[13px] text-text-main hover:bg-surface-subtle [cursor:pointer]";
 
@@ -11,7 +11,9 @@ export function ReviewScopeMenu({ selection, sessionId, workspaceRoot, onSelect 
   onSelect: (selection: ReviewSelection) => void;
 }) {
   const [picker, setPicker] = useState<"commit" | "branch" | null>(null);
-  const [value, setValue] = useState("");
+  const [commits, setCommits] = useState<ReviewCommit[]>([]);
+  const [commitError, setCommitError] = useState<string | null>(null);
+  const [loadingCommits, setLoadingCommits] = useState(false);
   const [branches, setBranches] = useState<ReviewBranch[]>([]);
   const [branchError, setBranchError] = useState<string | null>(null);
   const [loadingBranches, setLoadingBranches] = useState(false);
@@ -21,6 +23,25 @@ export function ReviewScopeMenu({ selection, sessionId, workspaceRoot, onSelect 
     { label: "Unstaged", value: { kind: "unstaged" } },
     { label: "Staged", value: { kind: "staged" } },
   ];
+
+  useEffect(() => {
+    if (picker !== "commit") return;
+    const api = window.actspace?.listReviewCommits;
+    if (!api) {
+      setCommitError("Commit history is unavailable.");
+      return;
+    }
+    let active = true;
+    setLoadingCommits(true);
+    setCommitError(null);
+    void api({ workspaceRoot, sessionId: sessionId ?? undefined }).then((result) => {
+      if (!active) return;
+      setLoadingCommits(false);
+      if (result.ok === true) setCommits(result.commits);
+      else setCommitError(result.message);
+    });
+    return () => { active = false; };
+  }, [picker, sessionId, workspaceRoot]);
 
   useEffect(() => {
     if (picker !== "branch") return;
@@ -43,18 +64,22 @@ export function ReviewScopeMenu({ selection, sessionId, workspaceRoot, onSelect 
 
   if (picker === "commit") {
     return (
-      <form className="grid gap-2 p-2" onSubmit={(event) => {
-        event.preventDefault();
-        const trimmed = value.trim();
-        if (trimmed) onSelect({ kind: "commit", sha: trimmed });
-      }}>
-        <label className="text-[11px] font-medium text-text-muted">Commit SHA or ref</label>
-        <input autoFocus className="h-8 rounded-act-sm border border-line bg-surface px-2 text-[12px] text-text-main outline-none focus:border-focus-ring" value={value} onChange={(event) => setValue(event.target.value)} placeholder="HEAD~1" />
-        <div className="flex justify-between gap-2">
-          <button type="button" className="inline-flex h-7 items-center gap-1 rounded-act-sm px-2 text-[12px] text-text-muted hover:bg-surface-subtle" onClick={() => setPicker(null)}><ChevronLeft size={13} />Back</button>
-          <button type="submit" className="h-7 rounded-act-sm bg-action px-2.5 text-[12px] font-medium text-on-action">Review</button>
-        </div>
-      </form>
+      <div className="grid gap-1 p-1.5" role="menu" aria-label="Recent commits">
+        <button type="button" className={`${ITEM} text-text-muted`} onClick={() => setPicker(null)}><ChevronLeft size={13} />Committed</button>
+        <div className="mx-1 border-t border-line" />
+        {loadingCommits ? <div className="flex min-h-12 items-center justify-center gap-2 text-[12px] text-text-faint"><Loader2 size={13} className="animate-spin" />Loading commits…</div> : null}
+        {!loadingCommits && commitError ? <div className="px-2.5 py-3 text-[12px] leading-relaxed text-danger">{commitError}</div> : null}
+        {!loadingCommits && !commitError && commits.length === 0 ? <div className="px-2.5 py-3 text-[12px] leading-relaxed text-text-faint">No commits in this workspace.</div> : null}
+        {!loadingCommits && !commitError && commits.length > 0 ? <div className="max-h-[min(360px,calc(100vh-120px))] overflow-y-auto">
+          {commits.map((commit) => (
+            <button key={commit.sha} type="button" role="menuitem" className={`${ITEM} min-w-0`} onClick={() => onSelect({ kind: "commit", sha: commit.sha })} title={`${commit.sha.slice(0, 8)} · ${formatCommitTimestamp(commit.authoredAt)}`}>
+              <span className="min-w-0 flex-1 truncate">{commit.subject || commit.sha.slice(0, 8)}</span>
+              <time className="shrink-0 text-[11px] tabular-nums text-text-faint" dateTime={commit.authoredAt}>{formatCommitAge(commit.authoredAt)}</time>
+              {selection.kind === "commit" && selection.sha === commit.sha ? <Check size={14} className="shrink-0" /> : null}
+            </button>
+          ))}
+        </div> : null}
+      </div>
     );
   }
 
@@ -88,8 +113,24 @@ export function ReviewScopeMenu({ selection, sessionId, workspaceRoot, onSelect 
         </button>
       ))}
       <div className="mx-1 my-1 border-t border-line" />
-      <button type="button" role="menuitem" className={ITEM} onClick={() => { setPicker("commit"); setValue(selection.kind === "commit" ? selection.sha : ""); }}><span className="flex-1">Committed</span><ChevronRight size={14} /></button>
+      <button type="button" role="menuitem" className={ITEM} onClick={() => setPicker("commit")}><span className="flex-1">Committed</span><ChevronRight size={14} /></button>
       <button type="button" role="menuitem" className={ITEM} onClick={() => setPicker("branch")}><span className="flex-1">Branch</span><ChevronRight size={14} /></button>
     </div>
   );
+}
+
+function formatCommitAge(timestamp: string): string {
+  const value = new Date(timestamp).getTime();
+  if (!Number.isFinite(value)) return "";
+  const minutes = Math.max(0, Math.round((Date.now() - value) / 60_000));
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+function formatCommitTimestamp(timestamp: string): string {
+  const value = new Date(timestamp);
+  return Number.isNaN(value.getTime()) ? timestamp : value.toLocaleString();
 }

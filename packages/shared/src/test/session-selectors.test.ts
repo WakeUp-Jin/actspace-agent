@@ -378,6 +378,8 @@ describe("session selectors", () => {
         uiPreview: {
           kind: "delete",
           filePath: "notes.md",
+          outputPath: "/workspace/notes.md",
+          outputRelativePath: "notes.md",
           displayText: "Deleted notes.md",
           status: "completed",
         },
@@ -390,6 +392,8 @@ describe("session selectors", () => {
         id: "evt-delete",
         renderKey: "turn:turn-delete:tool:tool-delete-1",
         filePath: "notes.md",
+        outputPath: "/workspace/notes.md",
+        outputRelativePath: "notes.md",
         displayText: "Deleted notes.md",
         status: "completed",
         isError: false,

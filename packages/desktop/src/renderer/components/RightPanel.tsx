@@ -70,7 +70,7 @@ const RIGHT_PANEL_EMPTY_TITLE_CLASS =
 const RIGHT_TAB_GROUP_BASE =
   "group inline-flex shrink-0 items-center gap-1 rounded-act-sm pl-2 pr-1 text-[12px] leading-none transition-colors duration-[120ms] ease-in-out [pointer-events:auto] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_INACTIVE_CLASS = "bg-transparent text-text-muted hover:bg-hover-overlay hover:text-text-main";
-const RIGHT_TAB_ACTIVE_CLASS = "bg-selected font-semibold text-text-main";
+const RIGHT_TAB_ACTIVE_CLASS = "bg-surface-subtle font-semibold text-text-main";
 const RIGHT_TAB_LABEL_CLASS =
   "max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent py-1 text-[inherit] text-[color:inherit] [cursor:pointer] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_CLOSE_CLASS =

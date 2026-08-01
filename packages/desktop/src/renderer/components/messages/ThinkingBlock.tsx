@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
+import {
+  getToolLogRunningTextAttrs,
+  TOOL_LOG_LINE_TEXT_RUNNING_CLASS,
+} from "./toolLogStyles";
 
 const THINKING_BLOCK_CLASS =
   "message-row thinking-block max-w-[800px] px-[var(--conversation-text-inset)] animate-[rise-in_260ms_ease_both]";
@@ -13,11 +17,17 @@ const THINKING_CONTENT_CLASS =
 export function ThinkingBlock({ message, className }: { message: Extract<MessageBlock, { kind: "thinking" }>; className?: string }) {
   const [expanded, setExpanded] = useState(!message.collapsedByDefault);
   const blockClassName = `${THINKING_BLOCK_CLASS} ${className ?? THINKING_BLOCK_DEFAULT_MARGIN_CLASS}`;
+  const running = message.status === "running";
 
   return (
     <article className={blockClassName}>
       <button className={THINKING_TOGGLE_CLASS} type="button" onClick={() => setExpanded((value) => !value)}>
-        <span>{message.title}</span>
+        <span
+          className={running ? TOOL_LOG_LINE_TEXT_RUNNING_CLASS : undefined}
+          {...(running ? getToolLogRunningTextAttrs(message.title) : {})}
+        >
+          {message.title}
+        </span>
         {expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />}
       </button>
       {expanded ? <pre className={THINKING_CONTENT_CLASS}>{message.content}</pre> : null}
