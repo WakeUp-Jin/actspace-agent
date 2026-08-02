@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Image, KeyRound, Loader2, Monitor, Moon, ScanSearch, ShieldCheck, Sun, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -43,6 +43,11 @@ import {
 } from "./SettingsPrimitives";
 import { CODE_FONT_PRESETS, UI_FONT_PRESETS } from "../../appearance/fonts";
 import { applyAppearance } from "../../appearance/apply";
+import {
+  AgentAnalysisSessionIndex,
+  createAgentAnalysisSessionIndexViewState,
+  type AgentAnalysisSessionIndexViewState,
+} from "../analysis/AgentAnalysisSessionIndex";
 import { loadAppearance, saveAppearance } from "../../appearance/storage";
 import {
   CODE_FONT_SIZE_MAX,
@@ -152,25 +157,34 @@ function mergeSettings(current: AppSettings, input: SettingsUpdateInput): AppSet
 
 export function SettingsPage({
   onBack,
-  onOpenAnalysis,
   initialSection = "general",
   onSectionChange,
   onSettingsChange,
   onArchivedSessionsChange,
+  activeSessionId = null,
+  analysisIndexState,
+  onAnalysisIndexStateChange,
+  onOpenAnalysisSession,
 }: {
   onBack: () => void;
-  onOpenAnalysis?: () => void;
   initialSection?: SettingsSectionId;
   onSectionChange?: (section: SettingsSectionId) => void;
   /** 设置变更后回传最新快照，供上层（如 Composer 默认模型）联动。 */
   onSettingsChange?: (settings: AppSettings) => void;
   /** 归档会话恢复后通知上层刷新普通会话列表。 */
   onArchivedSessionsChange?: () => void;
+  activeSessionId?: string | null;
+  analysisIndexState?: AgentAnalysisSessionIndexViewState;
+  onAnalysisIndexStateChange?: Dispatch<SetStateAction<AgentAnalysisSessionIndexViewState>>;
+  onOpenAnalysisSession?: (sessionId: string) => void;
 }) {
   const [section, setSection] = useState<SettingsSectionId>(initialSection);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [keyModalProvider, setKeyModalProvider] = useState<SecretProviderId | null>(null);
+  const [fallbackAnalysisIndexState, setFallbackAnalysisIndexState] = useState(createAgentAnalysisSessionIndexViewState);
+  const currentAnalysisIndexState = analysisIndexState ?? fallbackAnalysisIndexState;
+  const setCurrentAnalysisIndexState = onAnalysisIndexStateChange ?? setFallbackAnalysisIndexState;
 
   useEffect(() => {
     if (!hasSettingsBridge()) {
@@ -261,10 +275,19 @@ export function SettingsPage({
             onSectionChange?.(nextSection);
           }}
           onBack={onBack}
-          onOpenAnalysis={onOpenAnalysis}
         />
-        <main aria-label="设置内容" className="min-h-0 flex-1 overflow-y-auto bg-app-bg">
-          {settings ? (
+        <main
+          aria-label="设置内容"
+          className={`min-h-0 flex-1 bg-app-bg ${section === "analysis" ? "overflow-hidden" : "overflow-y-auto"}`}
+        >
+          {section === "analysis" ? (
+            <AgentAnalysisSessionIndex
+              activeSessionId={activeSessionId}
+              state={currentAnalysisIndexState}
+              onStateChange={setCurrentAnalysisIndexState}
+              onOpenSession={onOpenAnalysisSession ?? (() => {})}
+            />
+          ) : settings ? (
             <SettingsContent
               section={section}
               settings={settings}

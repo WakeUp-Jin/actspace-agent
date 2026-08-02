@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, LocalUpdateState, SessionListItem } from "@actspace/shared";
+import type { AgentAnalysisSessionIndexResult, AppSettings, LocalUpdateState, SessionListItem } from "@actspace/shared";
 import { SettingsPage } from "../components/settings/SettingsPage";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
@@ -88,12 +88,48 @@ describe("SettingsPage", () => {
     path: "/tmp/actspace/prompts/main-agent.md",
     content: input.content,
   }));
+  const analysisSessionIndex: AgentAnalysisSessionIndexResult = {
+    totals: {
+      sessionCount: 1,
+      agentRunCount: 1,
+      turnCount: 2,
+      llmCallCount: 2,
+      inputTokens: 28_000,
+      outputTokens: 817,
+      cacheReadTokens: 17_000,
+      cacheWriteTokens: 0,
+      durationMs: 7_400,
+    },
+    modelNames: ["deepseek-v4-flash"],
+    sessions: [{
+      sessionId: "session-current",
+      title: "Inspect the runtime",
+      updatedAt: "2026-07-29T10:05:00.000Z",
+      status: "completed",
+      agentRunCount: 1,
+      turnCount: 2,
+      llmCallCount: 2,
+      inputTokens: 28_000,
+      outputTokens: 817,
+      cacheReadTokens: 17_000,
+      cacheWriteTokens: 0,
+      durationMs: 7_400,
+      modelNames: ["deepseek-v4-flash"],
+    }],
+  };
+  const getAgentAnalysisSessionIndex = vi.fn(async () => analysisSessionIndex);
 
-  it("opens analysis observability from the settings navigation", async () => {
-    const onOpenAnalysis = vi.fn();
-    renderSettingsPage({ onBack: () => {}, onOpenAnalysis });
+  it("renders analysis observability inside the settings content pane", async () => {
+    const onOpenAnalysisSession = vi.fn();
+    renderSettingsPage({ onBack: () => {}, activeSessionId: "session-current", onOpenAnalysisSession });
     await userEvent.click(await screen.findByRole("button", { name: "分析观测" }));
-    expect(onOpenAnalysis).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole("heading", { name: "分析观测", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "分析观测" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("navigation", { name: "设置导航" })).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "设置内容" })).toHaveClass("overflow-hidden");
+
+    await userEvent.click(screen.getByRole("button", { name: "打开分析会话：Inspect the runtime" }));
+    expect(onOpenAnalysisSession).toHaveBeenCalledWith("session-current");
   });
   const setProviderKey = vi.fn(async () => ({ ok: true }));
   const clearProviderKey = vi.fn(async () => ({ ok: true }));
@@ -229,6 +265,7 @@ describe("SettingsPage", () => {
       updateQuickOpenShortcut,
       setUiZoom,
       setNativeTheme,
+      getAgentAnalysisSessionIndex,
     } as unknown as ActspaceBridge;
   });
 

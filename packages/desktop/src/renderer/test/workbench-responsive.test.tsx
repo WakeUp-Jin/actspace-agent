@@ -48,6 +48,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
   afterEach(() => {
     window.localStorage.clear();
     setViewportWidth(originalInnerWidth);
+    delete (window as { actspace?: typeof window.actspace }).actspace;
   });
 
   it("keeps the main conversation full-width and opens the session sidebar as an overlay", async () => {
@@ -113,9 +114,56 @@ describe("WorkbenchLayout narrow window behavior", () => {
     expect(screen.getByRole("separator", { name: "Resize preview panel" })).toHaveAttribute("aria-valuemax", "1488");
   });
 
-  it("switches between the workbench, Settings, and the standalone analysis workspace without changing hook order", async () => {
+  it("keeps the session index in Settings and opens only a selected session as a standalone workspace", async () => {
     const user = userEvent.setup();
     setViewportWidth(1120);
+    window.actspace = {
+      getAgentAnalysisSessionIndex: async () => ({
+        totals: {
+          sessionCount: 1,
+          agentRunCount: 0,
+          turnCount: 0,
+          llmCallCount: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+          durationMs: 0,
+        },
+        modelNames: ["deepseek-v4-flash"],
+        sessions: [{
+          sessionId: "session-empty",
+          title: "No analysis yet",
+          updatedAt: "2026-07-29T09:05:00.000Z",
+          status: "empty",
+          agentRunCount: 0,
+          turnCount: 0,
+          llmCallCount: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+          durationMs: 0,
+          modelNames: ["deepseek-v4-flash"],
+        }],
+      }),
+      getAgentAnalysisIndex: async ({ sessionId }) => ({
+        sessionId,
+        title: "No analysis yet",
+        totals: {
+          agentRunCount: 0,
+          turnCount: 0,
+          llmCallCount: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+          durationMs: 0,
+        },
+        toolNames: [],
+        runs: [],
+      }),
+    } as NonNullable<typeof window.actspace>;
     renderWorkbench();
 
     await user.click(screen.getByRole("button", { name: "Settings" }));
@@ -123,10 +171,18 @@ describe("WorkbenchLayout narrow window behavior", () => {
     expect(screen.getByText("设置仅在桌面端可用。")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "分析观测" }));
-    expect(screen.getByRole("heading", { name: "分析观测" })).toBeInTheDocument();
-    expect(screen.getByText("分析观测需要在 ActSpace 桌面端中打开。")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "分析观测", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "设置导航" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "分析观测" })).toHaveAttribute("aria-current", "page");
 
-    await user.click(screen.getAllByRole("button", { name: "返回设置" })[0]);
+    await user.selectOptions(screen.getByRole("combobox", { name: "状态筛选" }), "empty");
+    await user.click(screen.getByRole("button", { name: "打开分析会话：No analysis yet" }));
+    expect(await screen.findByText("该会话暂无分析记录")).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "设置导航" })).not.toBeInTheDocument();
+
+    await user.click(screen.getAllByRole("button", { name: "返回分析观测" })[0]);
+    expect(await screen.findByRole("heading", { name: "分析观测", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "状态筛选" })).toHaveValue("empty");
     await user.click(screen.getByRole("button", { name: "返回应用" }));
     expect(screen.getByLabelText("Message composer")).toBeInTheDocument();
   });

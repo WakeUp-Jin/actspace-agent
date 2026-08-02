@@ -19,6 +19,7 @@ import { KairosPage } from "../pages/KairosPage";
 import { SettingsPage } from "./settings/SettingsPage";
 import type { SettingsSectionId } from "./settings/SettingsNav";
 import { AgentAnalysisWorkspace } from "./analysis/AgentAnalysisWorkspace";
+import { createAgentAnalysisSessionIndexViewState } from "./analysis/AgentAnalysisSessionIndex";
 
 type StoredWorkbenchLayout = {
   leftMode?: SidebarMode | "rail";
@@ -200,6 +201,8 @@ export function WorkbenchLayout({
   } = useRightPanel();
   const [view, setView] = useState<SidebarView>("chat");
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("general");
+  const [analysisSessionId, setAnalysisSessionId] = useState<string | null>(null);
+  const [analysisIndexState, setAnalysisIndexState] = useState(createAgentAnalysisSessionIndexViewState);
   const [usageSnapshot, setUsageSnapshot] = useState<UsageStatisticsSnapshot | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState<string | null>(null);
@@ -484,20 +487,30 @@ export function WorkbenchLayout({
     return (
       <SettingsPage
         onBack={() => setView("chat")}
-        onOpenAnalysis={() => setView("analysis")}
         initialSection={settingsSection}
         onSectionChange={setSettingsSection}
         onSettingsChange={onSettingsChange}
         onArchivedSessionsChange={onArchivedSessionsChange}
+        activeSessionId={activeSessionId}
+        analysisIndexState={analysisIndexState}
+        onAnalysisIndexStateChange={setAnalysisIndexState}
+        onOpenAnalysisSession={(sessionId) => {
+          setAnalysisSessionId(sessionId);
+          setView("analysis");
+        }}
       />
     );
   }
 
-  if (view === "analysis") {
+  if (view === "analysis" && analysisSessionId) {
     return (
       <AgentAnalysisWorkspace
-        activeSessionId={activeSessionId}
-        onBack={() => setView("settings")}
+        sessionId={analysisSessionId}
+        onBack={() => {
+          setAnalysisSessionId(null);
+          setSettingsSection("analysis");
+          setView("settings");
+        }}
       />
     );
   }

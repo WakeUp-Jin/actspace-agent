@@ -79,3 +79,42 @@
 - `packages/desktop/src/renderer/test/agent-analysis-page.test.tsx`
 - `docs/design-docs/frontend/front-agent-analysis-observability.md`
 - `docs/learnings/2026-08/diagnostic-interfaces-need-progressive-disclosure.md`
+
+## [2026-08-02 09:15] | Follow-up: 设置内浏览、详情全屏
+
+### 📥 User Query
+
+> 在设置中点击分析观测时不应立即替换整个页面；会话记录可以显示在设置右侧，只有进入具体会话详情时才需要全屏接管。
+
+### 🛠 Changes Overview
+
+- **设置内索引**：将「分析观测」从特殊跳转按钮改为真实设置分区，左侧导航保留并显示选中态。
+- **按需升级工作区**：会话索引在设置右侧展示；只有用户选择 Session 后才进入独立详情工作区。
+- **返回状态恢复**：Workbench 持有索引数据、搜索、状态与模型筛选和滚动位置；详情返回后恢复原浏览现场。
+- **职责拆分**：新增独立 Session 索引组件，原 Analysis workspace 收窄为单会话详情外壳；Trace IPC 与数据契约保持不变。
+- **加载隔离**：分析索引不受设置配置读取成功与否影响，避免设置加载错误阻断本地 Trace 浏览。
+
+### 🧠 Design Intent (Why)
+
+会话索引是低承诺的浏览和对象选择，属于设置中的管理上下文；单会话 Trace 是高密度诊断任务，需要完整工作区。只在用户显式钻取后升级页面层级，可以保留方向感并减少无意义的全屏跳转。
+
+### ✅ Validation
+
+- `pnpm typecheck`、Desktop Renderer 生产构建、Electron TypeScript 构建、前端主题契约、文档骨架与 `git diff --check` 通过；生产构建仅保留既有的大 chunk 提示。
+- 分析索引、详情、设置页与 Workbench 定向测试：4 个测试文件、35 个测试通过，覆盖筛选与滚动位置回传。
+- Desktop 全量测试为 740 / 742 通过；`app-streaming-user-message.test.tsx` 两个会话状态断言受文件内顺序状态污染而失败，按测试名隔离重跑 2 / 2 通过，与本次分析路由无关。
+- 真实 Electron + Computer Use：验证设置导航保留与选中态、选择会话后详情全屏，以及返回后状态筛选恢复；浅色主题下无重叠或异常留白。
+
+### 📁 Files Modified
+
+- `packages/desktop/src/renderer/components/analysis/AgentAnalysisSessionIndex.tsx`
+- `packages/desktop/src/renderer/components/analysis/AgentAnalysisWorkspace.tsx`
+- `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
+- `packages/desktop/src/renderer/components/settings/SettingsNav.tsx`
+- `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`
+- `packages/desktop/src/renderer/test/agent-analysis-workspace.test.tsx`
+- `packages/desktop/src/renderer/test/settings-page.test.tsx`
+- `packages/desktop/src/renderer/test/workbench-responsive.test.tsx`
+- `docs/design-docs/frontend/front-agent-analysis-observability.md`
+- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/learnings/2026-08/diagnostic-interfaces-need-progressive-disclosure.md`

@@ -1,10 +1,14 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentAnalysisSessionIndexResult } from "@actspace/shared";
-import { AgentAnalysisWorkspace } from "../components/analysis/AgentAnalysisWorkspace";
+import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useState } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  AgentAnalysisSessionIndex,
+  createAgentAnalysisSessionIndexViewState,
+} from "../components/analysis/AgentAnalysisSessionIndex";
 
-const sessionIndex: AgentAnalysisSessionIndexResult = {
+const analysisSessionIndexFixture: AgentAnalysisSessionIndexResult = {
   totals: {
     sessionCount: 2,
     agentRunCount: 1,
@@ -52,74 +56,66 @@ const sessionIndex: AgentAnalysisSessionIndexResult = {
   ],
 };
 
-describe("AgentAnalysisWorkspace", () => {
-  const getSessionIndex = vi.fn(async () => sessionIndex);
-  const getAnalysisIndex = vi.fn(async ({ sessionId }: { sessionId: string }) => ({
-    sessionId,
-    title: "No analysis yet",
-    totals: {
-      agentRunCount: 0,
-      turnCount: 0,
-      llmCallCount: 0,
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadTokens: 0,
-      cacheWriteTokens: 0,
-      durationMs: 0,
-    },
-    toolNames: [],
-    runs: [],
-  }));
+function SessionIndexHarness({ onOpenSession }: { onOpenSession: (sessionId: string) => void }) {
+  const [state, setState] = useState(createAgentAnalysisSessionIndexViewState);
+  return (
+    <>
+      <output data-testid="analysis-index-scroll-state">{state.scrollTop}</output>
+      <AgentAnalysisSessionIndex
+        activeSessionId="session-current"
+        state={state}
+        onStateChange={setState}
+        onOpenSession={onOpenSession}
+      />
+    </>
+  );
+}
+
+describe("AgentAnalysisSessionIndex", () => {
+  const getSessionIndex = vi.fn(async () => analysisSessionIndexFixture);
 
   beforeEach(() => {
     getSessionIndex.mockClear();
-    getAnalysisIndex.mockClear();
     window.actspace = {
       ...window.actspace,
       getAgentAnalysisSessionIndex: getSessionIndex,
-      getAgentAnalysisIndex: getAnalysisIndex,
     };
   });
 
-  it("opens on the session index without loading the active session detail", async () => {
-    const onBack = vi.fn();
-    const user = userEvent.setup();
-    render(<AgentAnalysisWorkspace activeSessionId="session-current" onBack={onBack} />);
+  it("renders as an embedded settings section without its own back control", async () => {
+    const onOpenSession = vi.fn();
+    render(<SessionIndexHarness onOpenSession={onOpenSession} />);
 
-    expect(await screen.findByRole("heading", { name: "会话记录", level: 1 })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "分析观测" })).not.toBeInTheDocument();
-    expect(screen.queryByText("本地记录")).not.toBeInTheDocument();
-    expect(screen.queryByText("返回")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "分析观测", level: 2 })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "返回" })).not.toBeInTheDocument();
     expect(screen.getByText("Inspect the runtime")).toBeInTheDocument();
     expect(screen.getByText("No analysis yet")).toBeInTheDocument();
     expect(screen.getByText("当前")).toBeInTheDocument();
     expect(screen.getByText("Run / Turn")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("搜索会话或工作区")).toBeInTheDocument();
-    expect(screen.queryByText("当前会话已在列表中标记")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "打开分析会话：Inspect the runtime" })).toHaveAttribute("aria-current", "true");
-    expect(screen.getByRole("button", { name: "打开分析会话：Inspect the runtime" })).not.toHaveClass("bg-selected");
     expect(getSessionIndex).toHaveBeenCalledTimes(1);
-    expect(getAnalysisIndex).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "返回" }));
-    expect(onBack).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole("button", { name: "打开分析会话：Inspect the runtime" }));
+    expect(onOpenSession).toHaveBeenCalledWith("session-current");
   });
 
-  it("filters the index and drills into one session before returning to the list", async () => {
-    const user = userEvent.setup();
-    render(<AgentAnalysisWorkspace activeSessionId="session-current" onBack={() => {}} />);
+  it("filters the session index without loading any session detail", async () => {
+    const onOpenSession = vi.fn();
+    render(<SessionIndexHarness onOpenSession={onOpenSession} />);
     await screen.findByText("Inspect the runtime");
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "状态筛选" }), "empty");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "状态筛选" }), "empty");
     expect(screen.queryByText("Inspect the runtime")).not.toBeInTheDocument();
     expect(screen.getByText("No analysis yet")).toBeInTheDocument();
+    expect(onOpenSession).not.toHaveBeenCalled();
+  });
 
-    await user.click(screen.getByRole("button", { name: "打开分析会话：No analysis yet" }));
-    await waitFor(() => expect(getAnalysisIndex).toHaveBeenCalledWith({ sessionId: "session-empty" }));
-    expect(await screen.findByText("该会话暂无分析记录")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "返回会话列表" })).toHaveLength(2);
+  it("reports its scroll position so the settings route can restore it", async () => {
+    render(<SessionIndexHarness onOpenSession={() => {}} />);
+    await screen.findByText("Inspect the runtime");
 
-    await user.click(screen.getAllByRole("button", { name: "返回会话列表" })[0]);
-    expect(await screen.findByRole("heading", { name: "会话记录", level: 1 })).toBeInTheDocument();
+    fireEvent.scroll(screen.getByTestId("agent-analysis-session-index"), { target: { scrollTop: 128 } });
+    expect(screen.getByTestId("analysis-index-scroll-state")).toHaveTextContent("128");
   });
 });

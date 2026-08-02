@@ -14,6 +14,7 @@ export type SettingsSectionId =
   | "skills"
   | "appearance"
   | "archivedChats"
+  | "analysis"
   | "update";
 
 type IconComponent = ComponentType<{ size?: number | string; strokeWidth?: number | string; className?: string }>;
@@ -31,6 +32,7 @@ export const SETTINGS_SECTIONS: { id: SettingsSectionId; label: string; icon: Ic
   { id: "skills", label: "Skills", icon: Library },
   { id: "appearance", label: "外观", icon: Sun },
   { id: "archivedChats", label: "归档会话", icon: Archive },
+  { id: "analysis", label: "分析观测", icon: Activity },
   { id: "update", label: "更新", icon: RefreshCw },
 ];
 
@@ -43,12 +45,10 @@ export function SettingsNav({
   active,
   onSelect,
   onBack,
-  onOpenAnalysis,
 }: {
   active: SettingsSectionId;
   onSelect: (id: SettingsSectionId) => void;
   onBack: () => void;
-  onOpenAnalysis?: () => void;
 }) {
   return (
     <nav
@@ -66,7 +66,7 @@ export function SettingsNav({
       </button>
       {SETTINGS_SECTIONS.map(({ id, label, icon: Icon }) => {
         const isActive = id === active;
-        return [
+        return (
           <button
             key={id}
             type="button"
@@ -76,19 +76,8 @@ export function SettingsNav({
           >
             <Icon size={16} strokeWidth={1.9} />
             <span>{label}</span>
-          </button>,
-          id === "archivedChats" && onOpenAnalysis ? (
-            <button
-              key="analysis"
-              type="button"
-              onClick={onOpenAnalysis}
-              className={`${NAV_ITEM_CLASS} ${NAV_ITEM_IDLE_CLASS}`}
-            >
-              <Activity size={16} strokeWidth={1.9} />
-              <span>分析观测</span>
-            </button>
-          ) : null,
-        ];
+          </button>
+        );
       })}
     </nav>
   );
