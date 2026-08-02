@@ -10,6 +10,7 @@ import {
   GitCompareArrows,
   Menu,
   Search,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -267,26 +268,19 @@ function AnalysisHeader({
   backLabel: string;
 }) {
   const totals = index?.totals;
-  const cacheRate = totals && totals.inputTokens > 0
-    ? Math.min(100, Math.round((totals.cacheReadTokens / totals.inputTokens) * 100))
-    : null;
   return (
-    <header className="flex min-h-[68px] shrink-0 items-center gap-5 bg-surface px-5 pt-[var(--window-chrome-strip-height)] max-[900px]:gap-3 max-[900px]:px-3">
-      <AnalysisBackButton label={backLabel} onClick={onBack} />
+    <header className="flex min-h-[64px] shrink-0 items-center gap-4 bg-surface px-5 pt-[var(--window-chrome-strip-height)] max-[900px]:gap-3 max-[900px]:px-3">
+      <AnalysisBackButton label={backLabel} onClick={onBack} iconOnly />
       <h1 className="min-w-[72px] shrink-0 text-[16px] font-semibold">分析观测</h1>
-      <div className="flex min-w-0 flex-1 items-center justify-center gap-5 overflow-x-auto whitespace-nowrap py-2 max-[900px]:justify-start">
+      <div className="flex min-w-0 flex-1 items-center justify-center gap-6 overflow-x-auto whitespace-nowrap py-2 max-[900px]:justify-start">
         <Stat label="Agent Run" value={totals?.agentRunCount} />
         <Stat label="Turn" value={totals?.turnCount} />
         <Stat label="LLM Call" value={totals?.llmCallCount} />
         <Stat label="API Token" value={totals ? totals.inputTokens + totals.outputTokens : undefined} accent />
-        <Stat label="In" value={totals?.inputTokens} />
-        <Stat label="Out" value={totals?.outputTokens} />
-        <Stat label="Cache Read" value={totals?.cacheReadTokens} />
-        <Stat label="Cache Hit" value={cacheRate === null ? undefined : `${cacheRate}%`} />
         <Stat label="耗时" value={totals ? formatDuration(totals.durationMs) : undefined} />
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <span className="flex h-8 items-center gap-1.5 rounded-act-pill bg-operational-soft px-3 text-[11px] font-semibold text-on-success"><Activity size={13} /> 本地记录</span>
+        <span className="flex h-8 items-center gap-1.5 rounded-act-pill bg-surface-subtle px-3 text-[11px] font-medium text-text-muted" title="Trace 数据来自本机"><Activity size={13} /> 本地</span>
       </div>
     </header>
   );
@@ -321,19 +315,37 @@ function AnalysisSidebar({
   onSelectTurn: (run: AgentAnalysisRunSummary, turn: AgentTraceTurnSummary) => void;
   onCloseMobile: () => void;
 }) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
   return (
     <aside className="flex h-full min-h-0 flex-col">
       <div className="border-b border-line p-3">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" />
-          <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索用户输入、模型、工具或 Turn…" className="h-10 w-full rounded-act-md border border-line bg-surface pl-9 pr-3 text-[12px] outline-none focus:border-line-strong focus:ring-2 focus:ring-focus-ring" />
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" />
+            <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索用户输入、模型、工具或 Turn…" className="h-10 w-full rounded-act-md border border-line bg-surface pl-9 pr-3 text-[12px] outline-none focus:border-line-strong focus:ring-2 focus:ring-focus-ring" />
+          </div>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((value) => !value)}
+            aria-label="筛选工具"
+            aria-expanded={filtersOpen}
+            title="筛选工具"
+            className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-act-md border transition-colors duration-[160ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${filtersOpen || toolFilter !== "all" ? "border-line-strong bg-selected text-text-main" : "border-line bg-surface text-text-muted hover:bg-hover-overlay"}`}
+          >
+            <SlidersHorizontal size={15} />
+            {toolFilter !== "all" ? <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-operational" aria-hidden="true" /> : null}
+          </button>
         </div>
-        <div className="mt-3 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted"><span>Tools</span><span className="normal-case tracking-normal text-text-faint">点击筛选 Turn</span></div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {["all", ...availableToolNames].map((tool) => (
-            <button key={tool} type="button" onClick={() => onToolFilterChange(tool)} className={`rounded-act-pill border px-2 py-1 font-mono text-[10px] ${toolFilter === tool ? "border-info bg-analysis-selection-soft text-on-info" : "border-line bg-surface text-text-muted hover:bg-hover-overlay"}`}>{tool === "all" ? "All" : tool}</button>
-          ))}
-        </div>
+        {filtersOpen ? (
+          <div className="mt-3 border-t border-line pt-3">
+            <div className="flex items-center justify-between text-[10px] font-semibold text-text-muted"><span>工具筛选</span><span className="font-normal text-text-faint">匹配包含该工具的 Turn</span></div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {["all", ...availableToolNames].map((tool) => (
+                <button key={tool} type="button" onClick={() => onToolFilterChange(tool)} className={`min-h-7 rounded-act-pill border px-2.5 py-1 font-mono text-[10px] transition-colors duration-[160ms] ${toolFilter === tool ? "border-info bg-analysis-selection-soft text-on-info" : "border-line bg-surface text-text-muted hover:bg-hover-overlay"}`}>{tool === "all" ? "All" : tool}</button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <button type="button" onClick={onCloseMobile} aria-label="关闭导航" className="absolute right-2 top-2 hidden h-8 w-8 items-center justify-center rounded-act-md hover:bg-hover-overlay max-[820px]:flex"><X size={15} /></button>
@@ -348,7 +360,7 @@ function AnalysisSidebar({
                 : { label: "完成", dot: "bg-success", text: "text-on-success" };
           return (
             <section key={run.agentRunId} className="border-b border-line">
-              <button type="button" onClick={() => onToggleRun(run.agentRunId)} aria-expanded={expanded} className="flex w-full items-center gap-2 bg-surface-subtle px-3 py-3 text-left hover:bg-hover-overlay">
+              <button type="button" onClick={() => onToggleRun(run.agentRunId)} aria-expanded={expanded} className="flex w-full items-center gap-2 bg-surface px-3 py-3 text-left transition-colors duration-[160ms] hover:bg-hover-overlay">
                 <span className={`h-2 w-2 shrink-0 rounded-full ${runStatus.dot}`} />
                 <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">用户输入 {runs.length - runIndex} · {run.userMessagePreview}</span>
                 <span className={`text-[9px] font-semibold ${runStatus.text}`}>{runStatus.label}</span>
@@ -358,9 +370,9 @@ function AnalysisSidebar({
               {expanded ? run.turns.map((turn) => {
                 const selected = selection?.agentRunId === run.agentRunId && selection.turnId === turn.turnId;
                 return (
-                  <button key={turn.turnId} type="button" onClick={() => onSelectTurn(run, turn)} className={`w-full border-l-[3px] px-4 py-3 text-left transition-colors ${selected ? "border-info bg-analysis-selection-soft" : "border-transparent bg-surface hover:bg-hover-overlay"}`}>
+                  <button key={turn.turnId} type="button" onClick={() => onSelectTurn(run, turn)} className={`w-full border-l-[3px] px-4 py-3 text-left transition-colors duration-[160ms] ${selected ? "border-info bg-analysis-selection-soft" : "border-transparent bg-surface hover:bg-hover-overlay"}`}>
                     <div className="flex items-center gap-2"><strong className="text-[13px]">Turn {turn.turnIndex}</strong>{turn.llmCallCount > 1 ? <span className="rounded-act-pill bg-analysis-tool-soft px-2 py-0.5 text-[9px] font-semibold text-chart-series-3">{turn.llmCallCount} calls</span> : null}<span className="ml-auto rounded-act-sm bg-surface-subtle px-1.5 py-0.5 text-[9px] text-text-muted">{turn.modelNames[0] ?? "模型未知"}</span></div>
-                    <div className="mt-1 flex items-center gap-2 font-mono text-[10px]"><span className="text-operational">{formatNumber(turn.inputTokens + turn.outputTokens)} tok</span><span className="text-warning">{formatDuration(turn.durationMs)}</span><span className="ml-auto text-text-faint">{formatTime(turn.startedAt)}</span></div>
+                    <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-text-muted"><span>{formatNumber(turn.inputTokens + turn.outputTokens)} tok</span><span className="text-text-faint">{formatDuration(turn.durationMs)}</span><span className="ml-auto text-text-faint">{formatTime(turn.startedAt)}</span></div>
                     <div className="mt-1 truncate font-mono text-[9px] text-text-faint">POST /chat/completions</div>
                   </button>
                 );
@@ -395,44 +407,68 @@ function AnalysisDetail({
   return (
     <div className="mx-auto w-full max-w-[1180px]">
       {traceTruncated ? <div className="mb-3 rounded-act-md border border-warning bg-warning-soft px-3 py-2 text-[12px] text-on-warning">该 Agent Run 的 Trace 已达到体积上限，后续请求内容可能不完整。</div> : null}
-      <div className="rounded-act-lg border border-line bg-surface px-4 py-4 shadow-act-soft">
-        <div className="flex flex-wrap items-start gap-3">
-          <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="text-[18px] font-semibold">Turn {turn.turnIndex}</h2><span className="rounded-act-sm bg-surface-subtle px-2 py-1 text-[10px] text-text-muted">{call.model ?? "模型未知"}</span></div></div>
-          <div className="flex flex-wrap gap-2">
+      <section className="overflow-hidden rounded-act-lg border border-line bg-surface">
+        <div className="px-4 py-4">
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h2 className="text-[18px] font-semibold">Turn {turn.turnIndex}</h2>
+                <span className="rounded-act-sm bg-surface-subtle px-2 py-1 text-[10px] text-text-muted">{call.model ?? "模型未知"}</span>
+              </div>
+              <p className="mt-1 text-[10px] text-text-faint">当前 LLM Call 的响应、请求上下文与脱敏原始数据</p>
+            </div>
             <ActionButton icon={<GitCompareArrows size={14} />} label="对比上次" onClick={onOpenDiff} disabled={!canCompare} />
-            <ActionButton icon={<Braces size={14} />} label="请求 JSON" onClick={onOpenJson} />
-            <ActionButton icon={<Code2 size={14} />} label="cURL" onClick={onOpenCurl} />
           </div>
         </div>
-      </div>
 
-      {turn.calls.length > 1 ? (
-        <div className="mt-3 flex items-center gap-2"><span className="mr-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-faint">LLM Call</span>{turn.calls.map((entry, index) => <button key={entry.llmCallId} type="button" onClick={() => onSelectCall(entry.llmCallId)} className={`rounded-act-md border px-3 py-2 text-[11px] font-medium ${entry.llmCallId === call.llmCallId ? "border-operational bg-analysis-assistant-soft text-on-success" : entry.status === "failed" || entry.status === "retried" ? "border-danger bg-danger-soft text-on-danger" : "border-line bg-surface text-text-muted"}`}><span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${entry.status === "failed" || entry.status === "retried" ? "bg-danger" : "bg-operational"}`} />调用 {index + 1}{entry.status === "retried" ? " · 重试" : entry.status === "failed" ? " · 失败" : ""}</button>)}</div>
-      ) : null}
+        {turn.calls.length > 1 ? (
+          <div className="flex items-center gap-2 border-t border-line px-4 py-3"><span className="mr-1 text-[10px] font-semibold text-text-faint">LLM Call</span>{turn.calls.map((entry, index) => <button key={entry.llmCallId} type="button" onClick={() => onSelectCall(entry.llmCallId)} className={`rounded-act-md border px-3 py-2 text-[11px] font-medium ${entry.llmCallId === call.llmCallId ? "border-operational bg-analysis-assistant-soft text-on-success" : entry.status === "failed" || entry.status === "retried" ? "border-danger bg-danger-soft text-on-danger" : "border-line bg-surface text-text-muted"}`}><span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${entry.status === "failed" || entry.status === "retried" ? "bg-danger" : "bg-operational"}`} />调用 {index + 1}{entry.status === "retried" ? " · 重试" : entry.status === "failed" ? " · 失败" : ""}</button>)}</div>
+        ) : null}
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 px-0.5 font-mono text-[10px] text-text-muted"><MetaDot color="bg-info" label={`输入 ${formatNumber(call.usage.input)}`} /><MetaDot color="bg-operational" label={`输出 ${formatNumber(call.usage.output)}`} /><MetaDot color="bg-chart-series-3" label={`缓存读取 ${formatNumber(call.usage.cacheRead)}`} /><MetaDot color="bg-warning" label={`耗时 ${formatDuration(call.durationMs)}`} /><span>attempt {call.attempt}</span><span>{call.provider ?? "provider unknown"}</span><span>{call.stopReason ?? call.status}</span></div>
+        <div className="flex overflow-x-auto border-t border-line bg-surface-subtle px-4 py-3">
+          <CallMetric label="输入 Token" value={formatNumber(call.usage.input)} />
+          <CallMetric label="输出 Token" value={formatNumber(call.usage.output)} />
+          <CallMetric label="缓存读取" value={formatNumber(call.usage.cacheRead)} />
+          <CallMetric label="缓存命中" value={formatCacheRate(call.usage.input, call.usage.cacheRead)} />
+          <CallMetric label="耗时" value={formatDuration(call.durationMs)} />
+          <CallMetric label="Attempt" value={String(call.attempt)} />
+          <CallMetric label="Provider" value={call.provider ?? "—"} />
+          <CallMetric label="Stop" value={call.stopReason ?? call.status} />
+        </div>
 
-      <div className="mt-4 space-y-2">
-        <Accordion title="工具定义" badge={`${call.tools.length} 个工具`} defaultOpen><ToolDefinitions tools={call.tools} /></Accordion>
-        <Accordion title="系统提示词" badge={`${call.systemPrompt.length} chars`}><Preformatted value={call.systemPrompt || "该请求没有独立 system prompt。"} /></Accordion>
-        <Accordion title="消息" badge={`${call.messages.length} 条消息`} defaultOpen><div className="space-y-2">{call.messages.map((message, index) => <MessageCard key={index} message={message} />)}</div></Accordion>
-        <Accordion title="响应" badge={call.stopReason ?? call.status} defaultOpen><ResponseView call={call} /></Accordion>
-        <Accordion title="完整 JSON" badge="Trace event"><Preformatted value={JSON.stringify({ request: call.request, response: call.response }, null, 2)} /></Accordion>
-      </div>
+        <div className="border-t border-line">
+          <Accordion title="响应" badge={call.stopReason ?? call.status} defaultOpen><ResponseView call={call} /></Accordion>
+          <div className="border-b border-line bg-surface-subtle px-4 py-2 text-[10px] font-semibold text-text-faint">请求上下文</div>
+          <Accordion title="消息" badge={`${call.messages.length} 条`}><div className="space-y-2">{call.messages.map((message, index) => <MessageCard key={index} message={message} />)}</div></Accordion>
+          <Accordion title="系统提示词" badge={`${call.systemPrompt.length} chars`}><Preformatted value={call.systemPrompt || "该请求没有独立 system prompt。"} /></Accordion>
+          <Accordion title="工具定义" badge={`${call.tools.length} 个`}><ToolDefinitions tools={call.tools} /></Accordion>
+          <div className="border-b border-line bg-surface-subtle px-4 py-2 text-[10px] font-semibold text-text-faint">开发者数据</div>
+          <Accordion title="原始数据" badge="JSON · cURL · Trace">
+            <div className="mb-3 flex flex-wrap gap-2">
+              <ActionButton icon={<Braces size={14} />} label="请求 JSON" onClick={onOpenJson} />
+              <ActionButton icon={<Code2 size={14} />} label="cURL" onClick={onOpenCurl} />
+            </div>
+            <Preformatted value={JSON.stringify({ request: call.request, response: call.response }, null, 2)} />
+          </Accordion>
+        </div>
+      </section>
     </div>
   );
 }
 
 function ToolDefinitions({ tools }: { tools: AnalysisToolView[] }) {
   if (!tools.length) return <div className="text-[12px] text-text-faint">该请求没有声明工具。</div>;
-  return <div className="space-y-3">{tools.map((tool) => <article key={tool.name} className="overflow-hidden rounded-act-md border border-line"><div className="border-b border-line bg-surface-subtle px-3 py-2"><strong className="font-mono text-[12px] text-info">{tool.name}</strong><p className="mt-1 text-[12px] leading-5 text-text-muted">{tool.description}</p></div><ParameterList schema={tool.parameters} /></article>)}</div>;
+  return <div className="overflow-hidden rounded-act-md border border-line">{tools.map((tool) => {
+    const parameterCount = Object.keys(asRecord(tool.parameters.properties)).length;
+    return <details key={tool.name} className="group border-b border-line last:border-b-0"><summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 transition-colors duration-[160ms] hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"><ChevronRight size={14} className="shrink-0 text-text-faint transition-transform duration-[160ms] group-open:rotate-90" /><strong className="shrink-0 font-mono text-[12px] text-info">{tool.name}</strong><span className="min-w-0 flex-1 truncate text-[11px] text-text-muted">{tool.description}</span><span className="shrink-0 rounded-act-pill bg-surface-subtle px-2 py-1 font-mono text-[9px] text-text-faint">{parameterCount} 参数</span></summary><div className="border-t border-line"><p className="px-3 py-2 text-[11px] leading-5 text-text-muted">{tool.description}</p><ParameterList schema={tool.parameters} /></div></details>;
+  })}</div>;
 }
 
 function ParameterList({ schema }: { schema: Record<string, unknown> }) {
   const properties = asRecord(schema.properties);
   const required = new Set(Array.isArray(schema.required) ? schema.required.filter((entry): entry is string => typeof entry === "string") : []);
   if (!Object.keys(properties).length) return <div className="px-3 py-3 text-[11px] text-text-faint">无参数</div>;
-  return <div className="divide-y divide-line">{Object.entries(properties).map(([name, value]) => { const parameter = asRecord(value); return <div key={name} className="bg-analysis-thinking-soft px-3 py-2.5"><div className="flex items-center gap-2"><strong className="font-mono text-[11px] text-info">{name}</strong><span className="rounded-act-xs bg-surface px-1.5 py-0.5 font-mono text-[9px] text-warning">{String(parameter.type ?? "unknown")}</span>{required.has(name) ? <span className="text-[9px] font-semibold text-danger">必填</span> : null}</div>{parameter.description ? <p className="mt-1 text-[11px] leading-5 text-text-muted">{String(parameter.description)}</p> : null}{parameter.enum ? <p className="mt-1 font-mono text-[9px] text-text-faint">enum: {JSON.stringify(parameter.enum)}</p> : null}</div>; })}</div>;
+  return <div className="divide-y divide-line border-t border-line">{Object.entries(properties).map(([name, value]) => { const parameter = asRecord(value); return <div key={name} className="bg-analysis-thinking-soft px-3 py-2.5"><div className="flex items-center gap-2"><strong className="font-mono text-[11px] text-info">{name}</strong><span className="rounded-act-xs bg-surface px-1.5 py-0.5 font-mono text-[9px] text-text-muted">{String(parameter.type ?? "unknown")}</span>{required.has(name) ? <span className="text-[9px] font-semibold text-danger">必填</span> : null}</div>{parameter.description ? <p className="mt-1 text-[11px] leading-5 text-text-muted">{String(parameter.description)}</p> : null}{parameter.enum ? <p className="mt-1 font-mono text-[9px] text-text-faint">enum: {JSON.stringify(parameter.enum)}</p> : null}</div>; })}</div>;
 }
 
 function MessageCard({ message, diffState }: { message: AnalysisMessageView; diffState?: "added" | "removed" }) {
@@ -452,7 +488,7 @@ function ResponseView({ call }: { call: AnalysisCallView }) {
 
 function Accordion({ title, badge, defaultOpen = false, children }: { title: string; badge?: string; defaultOpen?: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
-  return <section className="overflow-hidden rounded-act-lg border border-line bg-surface shadow-act-soft"><button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-hover-overlay">{open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}<strong className="text-[13px]">{title}</strong>{badge ? <span className="ml-auto rounded-act-pill bg-surface-subtle px-2 py-1 text-[9px] text-text-faint">{badge}</span> : null}</button>{open ? <div className="border-t border-line p-3">{children}</div> : null}</section>;
+  return <section className="border-b border-line bg-surface last:border-b-0"><button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex min-h-11 w-full items-center gap-2 px-4 py-3 text-left transition-colors duration-[160ms] hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring">{open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}<strong className="text-[13px]">{title}</strong>{badge ? <span className="ml-auto rounded-act-pill bg-surface-subtle px-2 py-1 text-[9px] text-text-faint">{badge}</span> : null}</button>{open ? <div className="border-t border-line p-3">{children}</div> : null}</section>;
 }
 
 function RequestDiffModal({ calls, initialCurrentCallId, onClose }: { calls: AnalysisCallView[]; initialCurrentCallId: string; onClose: () => void }) {
@@ -484,7 +520,7 @@ function ActionButton({ icon, label, onClick, disabled = false }: { icon: ReactN
   return <button type="button" onClick={onClick} disabled={disabled} className="flex h-9 items-center gap-1.5 rounded-act-md border border-line bg-surface px-3 text-[11px] font-medium hover:bg-hover-overlay disabled:cursor-not-allowed disabled:opacity-40">{icon}{label}</button>;
 }
 
-function MetaDot({ color, label }: { color: string; label: string }) { return <span className="flex items-center gap-1.5"><i className={`h-1.5 w-1.5 rounded-full ${color}`} />{label}</span>; }
+function CallMetric({ label, value }: { label: string; value: string }) { return <div className="min-w-[108px] shrink-0 border-l border-line px-4 first:border-l-0 first:pl-0"><div className="text-[9px] text-text-faint">{label}</div><div className="mt-1 truncate font-mono text-[11px] font-semibold tabular-nums text-text-main">{value}</div></div>; }
 function Preformatted({ value }: { value: string }) { return <pre className="max-h-[520px] overflow-auto whitespace-pre-wrap break-words rounded-act-md bg-analysis-thinking-soft p-3 font-mono text-[11px] leading-5 text-text-main">{value}</pre>; }
 function EmptyState({ title, description, onBack, backLabel }: { title: string; description: string; onBack: () => void; backLabel: string }) { return <div className="flex flex-1 items-center justify-center px-6"><div className="max-w-md text-center"><Activity size={30} className="mx-auto text-text-faint" /><h2 className="mt-4 text-[17px] font-semibold">{title}</h2><p className="mt-2 text-[12px] leading-5 text-text-muted">{description}</p><button type="button" onClick={onBack} className="mt-5 rounded-act-md bg-action px-4 py-2 text-[12px] font-semibold text-on-action">{backLabel}</button></div></div>; }
 function filterRuns(runs: AgentAnalysisRunSummary[], query: string, toolFilter: string): AgentAnalysisRunSummary[] { const normalized = query.trim().toLowerCase(); return runs.map((run) => ({ ...run, turns: run.turns.filter((turn) => { const toolMatches = toolFilter === "all" || turn.toolNames.includes(toolFilter); const queryMatches = !normalized || run.userMessagePreview.toLowerCase().includes(normalized) || turn.modelNames.some((model) => model.toLowerCase().includes(normalized)) || turn.toolNames.some((tool) => tool.toLowerCase().includes(normalized)) || `turn ${turn.turnIndex}`.includes(normalized); return toolMatches && queryMatches; }) })).filter((run) => run.turns.length > 0); }
@@ -492,6 +528,7 @@ function toggleSetValue(current: Set<string>, value: string): Set<string> { cons
 function asRecord(value: unknown): Record<string, unknown> { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
 function formatNumber(value: number): string { return new Intl.NumberFormat("zh-CN").format(value); }
 function formatDuration(value: number): string { if (!value) return "—"; return value < 1000 ? `${Math.round(value)}ms` : `${(value / 1000).toFixed(1)}s`; }
+function formatCacheRate(input: number, cacheRead: number): string { return input > 0 ? `${Math.min(100, Math.round((cacheRead / input) * 100))}%` : "—"; }
 function formatTime(value: string): string { const date = new Date(value); return Number.isNaN(date.getTime()) ? "—" : date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
 function signed(value: number): string { return value > 0 ? `+${formatNumber(value)}` : formatNumber(value); }
 function formatDiffCallLabel(call: AnalysisCallView, calls: AnalysisCallView[]): string { const turnCalls = calls.filter((entry) => entry.turnId === call.turnId); if (turnCalls.length <= 1) return `Turn ${call.turnIndex}`; return `Turn ${call.turnIndex} · 调用 ${turnCalls.findIndex((entry) => entry.llmCallId === call.llmCallId) + 1}`; }

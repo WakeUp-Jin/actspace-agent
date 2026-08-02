@@ -48,3 +48,34 @@
 - `packages/desktop/src/renderer/components/analysis/AgentAnalysisPage.tsx`
 - `packages/desktop/src/renderer/components/WorkbenchLayout.tsx`
 - `docs/design-docs/frontend/front-agent-analysis-observability.md`
+
+## [2026-08-02 08:00] | Follow-up: 收口单会话详情层级
+
+### 📥 User Query
+
+> 会话首页调整后，单会话详情显得密度过高且风格不协调；希望继续打磨，并去掉顶部「返回会话列表」可见文字。
+
+### 🛠 Changes Overview
+
+- **紧凑导航**：详情顶部改为纯箭头返回，保留无障碍名称；Session 汇总收敛为 Run、Turn、LLM Call、API Token 与耗时。
+- **诊断优先**：右栏合并为单一平面检查器，默认只展开响应，请求上下文与开发者数据按需展开。
+- **渐进披露**：工具定义默认收起，展开后先显示紧凑工具列表；JSON 与 cURL 移入原始数据区。
+- **降低噪声**：调用元数据改为中性数据列，工具筛选收进搜索框旁按钮，减少多彩圆点、阴影和重复卡片。
+
+### 🧠 Design Intent (Why)
+
+让会话首页的克制目录感延续到详情页，同时保留开发者诊断所需的全部 Trace 能力。首屏优先回答当前调用的结果与成本，底层 Schema 和原始数据仅在用户主动分析时出现。
+
+### ✅ Validation
+
+- 分析详情与会话工作区定向测试：2 个测试文件、7 个测试通过。
+- `pnpm typecheck`、Renderer 生产构建、Electron TypeScript 构建、前端主题契约、文档骨架与 `git diff --check` 通过；生产构建仅保留既有的大 chunk 提示。
+- 真实 Electron + Computer Use：验证纯箭头返回、五项 Session 汇总、响应默认展开、工具筛选、紧凑工具目录和浅色主题无重叠；深色主题由语义 token 契约覆盖，未切换用户当前主题做人工截图。
+
+### 📁 Files Modified
+
+- `packages/desktop/src/renderer/components/analysis/AgentAnalysisPage.tsx`
+- `packages/desktop/src/renderer/components/analysis/AnalysisBackButton.tsx`
+- `packages/desktop/src/renderer/test/agent-analysis-page.test.tsx`
+- `docs/design-docs/frontend/front-agent-analysis-observability.md`
+- `docs/learnings/2026-08/diagnostic-interfaces-need-progressive-disclosure.md`

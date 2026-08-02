@@ -67,18 +67,40 @@ describe("AgentAnalysisPage", () => {
   });
 
   it("renders the two-level navigation and structured request details", async () => {
+    const user = userEvent.setup();
     render(<AgentAnalysisPage sessionId="session-1" onBack={() => {}} />);
     expect(await screen.findByText("检查 Agent 事件层级", { exact: false })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Turn 2" })).toBeInTheDocument();
-    expect(screen.getByText("读取本地文本文件，可指定行范围。")).toBeInTheDocument();
-    expect(screen.getByText("TOOL RESULT · glob")).toBeInTheDocument();
     expect(screen.getByText("Thinking")).toBeInTheDocument();
     expect(screen.getByText("一个 Agent Run 可以包含多个 Turn。")).toBeInTheDocument();
+    expect(screen.queryByText("读取本地文本文件，可指定行范围。")).not.toBeInTheDocument();
+    expect(screen.queryByText("TOOL RESULT · glob")).not.toBeInTheDocument();
     expect(screen.queryByText("Settings / Analysis")).not.toBeInTheDocument();
     expect(screen.queryByText("Agent event analysis")).not.toBeInTheDocument();
+    expect(screen.queryByText("返回设置")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "返回设置" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "清除当前会话分析记录" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /消息/ }));
+    expect(screen.getByText("TOOL RESULT · glob")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /工具定义/ }));
+    expect(screen.getAllByText("读取本地文本文件，可指定行范围。")).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "筛选工具" }));
     expect(screen.getByRole("button", { name: "glob" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "read_file" })).not.toBeInTheDocument();
+  });
+
+  it("keeps raw request controls behind progressive disclosure", async () => {
+    const user = userEvent.setup();
+    render(<AgentAnalysisPage sessionId="session-1" onBack={() => {}} />);
+    await screen.findByRole("heading", { name: "Turn 2" });
+
+    expect(screen.queryByRole("button", { name: "请求 JSON" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "cURL" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /原始数据/ }));
+    expect(screen.getByRole("button", { name: "请求 JSON" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "cURL" })).toBeInTheDocument();
   });
 
   it("opens the previous-request comparison without showing call ids", async () => {
@@ -136,6 +158,7 @@ describe("AgentAnalysisPage", () => {
     render(<AgentAnalysisPage sessionId="session-1" onBack={() => {}} />);
     await screen.findByRole("heading", { name: "Turn 2" });
     const search = screen.getByPlaceholderText("搜索用户输入、模型、工具或 Turn…");
+    await user.click(screen.getByRole("button", { name: "筛选工具" }));
 
     await user.type(search, "turn 1");
     expect(await screen.findByRole("heading", { name: "Turn 1" })).toBeInTheDocument();
