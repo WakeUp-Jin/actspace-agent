@@ -4,17 +4,20 @@
 
 ## 密钥与环境变量管理
 
-- **不提交密钥**：`.env` 已在 `.gitignore` 中，API Key 等敏感值只存在本地 `.env` 文件或系统环境变量中。
+- **不提交密钥**：`.env` 与 Desktop `secrets.json` 都属于本机运行数据，不进入仓库；API Key 等敏感值只允许存在于这两类本地文件、系统环境变量或进程内存中。
 - **模板文件**：`.env.example` 列出全部可配置项和说明，新开发者克隆仓库后复制为 `.env` 即可。
 - **集中管理**：所有环境变量通过 `packages/agent-core/src/env.ts` 统一读取和验证，禁止在业务代码中散落 `process.env.XXX` 直接读取。
 - **DeepSeek API 格式边界**：DeepSeek 固定使用 OpenAI-compatible Chat Completions，配置只保留 `DEEPSEEK_BASE_URL`（默认 `https://api.deepseek.com`）。旧 `DEEPSEEK_API_FORMAT` / `DEEPSEEK_ANTHROPIC_BASE_URL` 不再读取；官方 `/anthropic` 设置值只在 main 进程加载时迁移为默认根地址，renderer 仍不接收实际运行时 URL 或密钥。
 - **Kimi key 边界**：`KIMI_API_KEY` 只作为 Kimi 主模型密钥使用。该 key 只在 main/agent-core 运行时读取，不进入 renderer、session 事件、前端状态或测试快照。
-- **OpenRouter key 边界**：OpenRouter API Key 与 DeepSeek / Kimi 使用同一安全边界，通过 Electron `safeStorage` 加密落盘；renderer 只读取是否已配置、连接状态和脱敏诊断，不读取明文。
-- **DuckCoding 多 Key 边界**：默认 Key 沿用 provider 级 `safeStorage` 密文；额外 Key 以 `<provider>:<credentialId>` 为密文索引，普通 settings 只保存稳定 id、label、倍率和连接状态。模型只保存同 provider 的 `credentialId` 引用，renderer 不能读取、回显或在模型页创建 Key。被模型引用的额外 Key 禁止删除，缺失引用不得静默回退默认 Key。
+- **本地凭据文件**：Desktop 设置页录入的 LLM、搜索和图片服务 Key 以明文写入 `<userData>/secrets.json` v2；目录沿用 `userData`，文件在创建、原子替换和启动读取时都收紧为 `0600`。`0600` 表示仅文件所有者可读写，避免 `0644` 允许同机其他用户读取，但它不是加密：当前 macOS 账号下的进程、备份或同步工具仍可能读取该文件。开发版与安装版共用同一 `userData` 和同一份凭据，稳定性优先于应用身份绑定的系统密钥串。
+- **主进程边界**：`secrets.json` 只由 Electron main 读取；renderer、typed preload、settings view、session、Trace 和普通日志只接收 `hasApiKey`、连接状态或脱敏错误码，不接收文件正文或明文 Key。凭据不提交到仓库，也不得复制到 `settings.json`。
+- **OpenRouter key 边界**：OpenRouter 调用 Key 与 Management Key 在 `secrets.json` 中使用独立字段；renderer 只读取是否已配置、连接状态和脱敏诊断，不读取明文。
+- **DuckCoding 多 Key 边界**：默认 Key 使用 provider 字段；额外 Key 以 `<provider>:<credentialId>` 为明文索引，普通 settings 只保存稳定 id、label、倍率和连接状态。模型只保存同 provider 的 `credentialId` 引用，renderer 不能读取、回显或在模型页创建 Key。单独删除额外 Key 时，被模型引用的 Key 必须阻止删除；用户二次确认完整移除服务商时允许清除全部 Key，但保留模型引用并显式报告凭据缺失，不得静默回退默认 Key。
 - **模型目录边界**：OpenRouter 目录由 main 进程使用对应 provider 连接读取；DuckCoding 的 Codex/Grok 档案随应用打包，不读取外部目录，也不携带用户凭据。外部目录响应仍按不可信数据处理，只归一化白名单字段并限制响应和字符串大小。
 - **服务商级代理目标边界**：代理配置归属于单个 LLM 服务商，只注入该服务商的 HTTP client，不写入全局 `HTTP_PROXY` / `HTTPS_PROXY`，也不影响工具、更新器或其他服务商。首版只接受 `http://` / `https://` 代理地址，不在代理 URL 中保存用户名和密码。
-- **搜索 provider key 边界**：`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY` 是 `web_search` 工具的外部搜索 API 密钥，边界与 LLM key 相同——只在 main/agent-core 运行时读取，经设置页加密落盘，不进入 renderer 明文状态。
-- **图片生成 key 边界**：`IMAGE_GENERATION_API_KEY` 经 Electron `safeStorage` 加密保存，只在 main 解密并以内存配置注入 `generate_image` executor；renderer 只接收 `hasApiKey`、Base URL、模型名和本地产物引用。上游 Base64、Authorization header、签名 URL 与原始错误正文不得进入 session、renderer 或日志。
+- **搜索 provider key 边界**：`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY` 是 `web_search` 工具的外部搜索 API 密钥，边界与 LLM key 相同——经设置页写入 main-only `secrets.json`，只在 main/agent-core 运行时读取，不进入 renderer 明文状态。
+- **图片生成 key 边界**：`IMAGE_GENERATION_API_KEY` 经设置页写入 main-only `secrets.json`，并以内存配置注入 `generate_image` executor；renderer 只接收 `hasApiKey`、Base URL、模型名和本地产物引用。上游 Base64、Authorization header、签名 URL 与原始错误正文不得进入 session、renderer 或日志。
+- **凭据迁移与故障保护**：旧 `secrets.json` v1 密文只在 main 使用 `safeStorage` 迁移。必须先把所有字段完整解密并校验成功，再以 `0600` 原子写入 v2；任何读取、格式、权限或迁移失败都保留原文件、停止所有凭据新增/替换/删除，并向设置页返回脱敏错误，禁止把空内存状态覆盖到磁盘。
 - **图片分析凭据边界**：`inspect_image` 只引用 Kimi / OpenRouter 已有的默认或附加 Key；settings 只保存 provider-qualified 模型 ID 与 `credentialId`，renderer 不接收明文。被图片分析配置引用的附加 Key 禁止删除，调用失败不回落其他 Key 或 Provider。
 - **工具暴露最小化**：可通过 `ACTSPACE_DISABLED_TOOLS` 明确关闭不希望暴露给模型的工具，关闭发生在注册阶段，而不是只在执行时拒绝。
 - **优先级**：`process.env` 已有值 > `.env` 文件值 > schema 默认值。这保证 CI/Docker 场景可通过系统变量覆盖。
@@ -53,7 +56,7 @@
 
 - 真实 DeepSeek 与 Kimi 请求仅从 main 进程内的 Agent runtime 发起，renderer 只接收结构化事件与最终结果。
 - OpenRouter 的连接测试、模型目录拉取和真实模型请求都由 main 进程发起，renderer 只消费裁剪后的服务商、模型与连接状态；供应商级代理不写全局代理环境变量。
-- DuckCoding 复用 main 进程的 OpenAI-compatible runtime。每次调用先按模型 `credentialId` 解析同 provider 的目标密钥；默认 Key 与额外 Key 的连接状态、倍率和密文彼此独立，不做自动轮询或失败切换。Codex 使用 Responses API，推理强度只改变精确请求模型名，不向请求体增加 OpenRouter 风格的 reasoning effort 属性；Grok 与未知手动模型默认使用 Chat Completions。
+- DuckCoding 复用 main 进程的 OpenAI-compatible runtime。每次调用先按模型 `credentialId` 解析同 provider 的目标密钥；默认 Key 与额外 Key 的连接状态、倍率和凭据彼此独立，不做自动轮询或失败切换。Codex 使用 Responses API，推理强度只改变精确请求模型名，不向请求体增加 OpenRouter 风格的 reasoning effort 属性；Grok 与未知手动模型默认使用 Chat Completions。
 - DuckCoding Codex 的 `prompt_cache_key` 由 session id 单向哈希派生，避免把原始本地 session 标识发送给外部服务。Responses 请求使用 `store: false`，不依赖外部会话存储；供应商返回的加密 reasoning item 会作为 opaque signature 随本地 session 事件持久化并在工具循环中回放，不应记录进普通日志、当作可读思考展示或传给无关 provider/API。
 - 普通会话默认使用真实 DeepSeek provider，并固定走 OpenAI-compatible Chat Completions；`LLM_PROVIDER=kimi` 可切换 Kimi 主模型。Electron 真实 turn 不允许被 mock 配置静默替代，mock 仅用于测试、浏览器 fixture 或显式 demo。
 - Usage 页 DeepSeek 余额查询通过 main 进程调用 `GET /user/balance`，renderer 只接收已裁剪的余额展示模型，不接触 `DEEPSEEK_API_KEY`、鉴权头或 DeepSeek 原始响应。

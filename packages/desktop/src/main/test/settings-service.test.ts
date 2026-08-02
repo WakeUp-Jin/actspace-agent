@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { loadEnv, MAIN_AGENT_SYSTEM_PROMPT } from "@actspace/agent-core";
@@ -202,7 +202,7 @@ describe("SettingsService", () => {
     expect(persisted.agent.systemPromptPath).toBe(join(dataRoot, "prompts", "main-agent.md"));
   });
 
-  it("setProviderKey 加密落盘、标记 hasApiKey 且不回写 LLM process.env", async () => {
+  it("setProviderKey 明文只落 0600 secrets、标记 hasApiKey 且不回写 LLM process.env", async () => {
     const dataRoot = await makeDataRoot();
     const svc = makeService(dataRoot);
     await svc.load();
@@ -213,14 +213,14 @@ describe("SettingsService", () => {
     expect(svc.get().providers.deepseek.hasApiKey).toBe(true);
     expect(svc.get().providers.kimi.hasApiKey).toBe(false);
     expect(process.env.DEEPSEEK_API_KEY).toBeUndefined();
-    expect(svc.getDecryptedKey("deepseek")).toBe("sk-abc123");
+    expect(svc.getStoredKey("deepseek")).toBe("sk-abc123");
 
     const secrets = JSON.parse(await readFile(join(dataRoot, "secrets.json"), "utf8"));
-    expect(typeof secrets.deepseek).toBe("string");
-    expect(Buffer.from(secrets.deepseek, "base64").toString("utf8")).toBe("enc:sk-abc123");
+    expect(secrets).toMatchObject({ version: 2, deepseek: "sk-abc123", providerCredentials: {} });
+    expect((await stat(join(dataRoot, "secrets.json"))).mode & 0o777).toBe(0o600);
   });
 
-  it("OpenRouter 调用 Key 与 Management Key 分开加密存储", async () => {
+  it("OpenRouter 调用 Key 与 Management Key 分开存储", async () => {
     const dataRoot = await makeDataRoot();
     const svc = makeService(dataRoot);
     await svc.load();
@@ -239,14 +239,95 @@ describe("SettingsService", () => {
     expect(svc.getOpenRouterManagementRuntimeConfig()).toMatchObject({ apiKey: "sk-or-management" });
 
     const secrets = JSON.parse(await readFile(join(dataRoot, "secrets.json"), "utf8"));
-    expect(Buffer.from(secrets.openrouter, "base64").toString("utf8")).toBe("enc:sk-or-call");
-    expect(Buffer.from(secrets["openrouter-management"], "base64").toString("utf8")).toBe("enc:sk-or-management");
+    expect(secrets.openrouter).toBe("sk-or-call");
+    expect(secrets["openrouter-management"]).toBe("sk-or-management");
 
     await svc.updateProviderConnection({ provider: "openrouter", apiKey: null, managementKey: null });
     expect(svc.getV2().providers.openrouter).toMatchObject({ hasApiKey: false, hasManagementKey: false });
   });
 
-  it("图片生成配置把 Key 加密、Base URL 与模型持久化，并提供 main-only runtime", async () => {
+  it("完整移除服务商会清除全部凭据与连接配置，但保留模型和凭据引用", async () => {
+    const dataRoot = await makeDataRoot();
+    const svc = new SettingsService({
+      dataRoot,
+      crypto: makeCrypto(),
+      reloadEnv,
+      createCredentialId: () => "vision-key",
+    });
+    await svc.load();
+    await svc.updateProviderConnection({
+      provider: "openrouter",
+      apiKey: "sk-or-call",
+      managementKey: "sk-or-management",
+      baseUrl: "https://example.com/v1",
+      proxy: { enabled: true, url: "http://127.0.0.1:7890" },
+    });
+    await svc.addProviderCredential({
+      provider: "openrouter",
+      label: "Vision",
+      apiKey: "sk-or-vision",
+    });
+    await svc.updateModelStorage({
+      installedModels: {
+        "openrouter:openai/gpt-5.6-luna": {
+          enabled: true,
+          addedAt: "2026-08-02T00:00:00.000Z",
+          credentialId: "vision-key",
+        },
+      },
+    });
+    const beforeModels = svc.getV2().installedModels;
+
+    await svc.removeProvider("openrouter");
+
+    expect(svc.getV2().providers.openrouter).toMatchObject({
+      hasApiKey: false,
+      hasManagementKey: false,
+      enabled: true,
+      baseUrl: null,
+      proxy: { enabled: false, url: null },
+      lastConnection: { status: "untested" },
+      additionalCredentials: [],
+    });
+    expect(svc.getV2().installedModels).toEqual(beforeModels);
+    expect(svc.getProviderRuntimeConfigForCredential("openrouter", "vision-key")).toMatchObject({
+      code: "credential_missing",
+    });
+    const secrets = JSON.parse(await readFile(join(dataRoot, "secrets.json"), "utf8"));
+    expect(secrets.openrouter).toBeUndefined();
+    expect(secrets["openrouter-management"]).toBeUndefined();
+    expect(secrets.providerCredentials["openrouter:vision-key"]).toBeUndefined();
+  });
+
+  it("完整移除写入失败时恢复设置与密钥文件", async () => {
+    const dataRoot = await makeDataRoot();
+    let failNextSettingsWrite = false;
+    const svc = new SettingsService({
+      dataRoot,
+      crypto: makeCrypto(),
+      reloadEnv,
+      writeJson: async (filePath, value) => {
+        if (failNextSettingsWrite && filePath.endsWith("settings.json")) {
+          failNextSettingsWrite = false;
+          throw new Error("disk full");
+        }
+        await atomicJsonWriter(filePath, value);
+      },
+    });
+    await svc.load();
+    await svc.updateProviderConnection({ provider: "openrouter", apiKey: "sk-or-call" });
+    const beforeSettings = await readFile(join(dataRoot, "settings.json"), "utf8");
+    const beforeSecrets = await readFile(join(dataRoot, "secrets.json"), "utf8");
+    failNextSettingsWrite = true;
+
+    await expect(svc.removeProvider("openrouter")).rejects.toThrow("服务商移除失败");
+
+    expect(svc.getV2().providers.openrouter.hasApiKey).toBe(true);
+    expect(await readFile(join(dataRoot, "settings.json"), "utf8")).toBe(beforeSettings);
+    expect(await readFile(join(dataRoot, "secrets.json"), "utf8")).toBe(beforeSecrets);
+  });
+
+  it("图片生成配置把 Key 存入 main-only secrets，并持久化 Base URL 与模型", async () => {
     const dataRoot = await makeDataRoot();
     const svc = makeService(dataRoot);
     await svc.load();
@@ -332,7 +413,7 @@ describe("SettingsService", () => {
     expect(JSON.stringify(svc.getV2())).not.toContain("sk-duck-sale");
 
     const secrets = JSON.parse(await readFile(join(dataRoot, "secrets.json"), "utf8"));
-    expect(Buffer.from(secrets.providerCredentials["duckcoding:codex-sale"], "base64").toString("utf8")).toBe("enc:sk-duck-sale");
+    expect(secrets.providerCredentials["duckcoding:codex-sale"]).toBe("sk-duck-sale");
 
     await svc.updateModelStorage({
       installedModels: {
@@ -403,24 +484,106 @@ describe("SettingsService", () => {
     expect(process.env.DEEPSEEK_API_KEY).toBeUndefined();
 
     await svc.clearProviderKey("deepseek");
-    expect(svc.getDecryptedKey("deepseek")).toBeUndefined();
+    expect(svc.getStoredKey("deepseek")).toBeUndefined();
     // 不再回落 .env 兜底：直接从 process.env 删除。
     expect(process.env.DEEPSEEK_API_KEY).toBeUndefined();
     expect(svc.get().providers.deepseek.hasApiKey).toBe(false);
   });
 
-  it("密钥串不可用时拒绝保存且不写任何密文", async () => {
+  it("新 v2 凭据不依赖密钥串，重启时可由不同 crypto 身份直接读取", async () => {
     const dataRoot = await makeDataRoot();
     const svc = makeService(dataRoot, makeCrypto(false));
     await svc.load();
 
     const res = await svc.setProviderKey("deepseek", "sk-abc");
-    expect(res.ok).toBe(false);
-    expect(res.error).toBeTruthy();
-    expect(svc.getDecryptedKey("deepseek")).toBeUndefined();
-    expect(svc.get().providers.deepseek.hasApiKey).toBe(false);
+    expect(res.ok).toBe(true);
 
-    await expect(readFile(join(dataRoot, "secrets.json"), "utf8")).rejects.toBeTruthy();
+    const differentIdentityCrypto: SecretCrypto = {
+      isAvailable: () => true,
+      encrypt: () => Buffer.from("different"),
+      decrypt: () => { throw new Error("different keychain identity"); },
+    };
+    const reopened = makeService(dataRoot, differentIdentityCrypto);
+    await reopened.load();
+
+    expect(reopened.getStoredKey("deepseek")).toBe("sk-abc");
+    expect(reopened.get().providers.deepseek.hasApiKey).toBe(true);
+  });
+
+  it("加载已有 v2 凭据时把 0644 权限收紧为 0600", async () => {
+    const dataRoot = await makeDataRoot();
+    const secretsPath = join(dataRoot, "secrets.json");
+    await writeFile(secretsPath, JSON.stringify({
+      version: 2,
+      deepseek: "sk-existing",
+      providerCredentials: {},
+    }), "utf8");
+    await chmod(secretsPath, 0o644);
+
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    expect(svc.getStoredKey("deepseek")).toBe("sk-existing");
+    expect((await stat(secretsPath)).mode & 0o777).toBe(0o600);
+  });
+
+  it("v1 密文必须全部解密成功后才原子迁移为 v2 明文", async () => {
+    const dataRoot = await makeDataRoot();
+    await writeFile(join(dataRoot, "secrets.json"), JSON.stringify({
+      version: 1,
+      deepseek: Buffer.from("enc:sk-deepseek", "utf8").toString("base64"),
+      "openrouter-management": Buffer.from("enc:sk-management", "utf8").toString("base64"),
+      providerCredentials: {
+        "duckcoding:codex-sale": Buffer.from("enc:sk-extra", "utf8").toString("base64"),
+      },
+    }), "utf8");
+
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    expect(svc.getCredentialStorageView()).toEqual({ status: "ready" });
+    expect(svc.getStoredKey("deepseek")).toBe("sk-deepseek");
+    const migrated = JSON.parse(await readFile(join(dataRoot, "secrets.json"), "utf8"));
+    expect(migrated).toEqual({
+      version: 2,
+      providerCredentials: { "duckcoding:codex-sale": "sk-extra" },
+      deepseek: "sk-deepseek",
+      "openrouter-management": "sk-management",
+    });
+    expect((await stat(join(dataRoot, "secrets.json"))).mode & 0o777).toBe(0o600);
+  });
+
+  it("v1 任一密文无法解密时保留原文件并阻止后续凭据覆盖", async () => {
+    const dataRoot = await makeDataRoot();
+    const original = JSON.stringify({
+      version: 1,
+      deepseek: Buffer.from("enc:sk-deepseek", "utf8").toString("base64"),
+      kimi: Buffer.from("not-valid-for-this-keychain", "utf8").toString("base64"),
+      providerCredentials: {},
+    });
+    await writeFile(join(dataRoot, "secrets.json"), original, "utf8");
+
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    expect(svc.getCredentialStorageView()).toMatchObject({ status: "unavailable", code: "migration_failed" });
+    expect(svc.getV2().providers.deepseek.hasApiKey).toBe(false);
+    const result = await svc.setProviderKey("deepseek", "replacement-key");
+    expect(result).toMatchObject({ ok: false });
+    expect(await readFile(join(dataRoot, "secrets.json"), "utf8")).toBe(original);
+  });
+
+  it("无效 v2 凭据文件不会被服务商移除或新 Key 保存覆盖", async () => {
+    const dataRoot = await makeDataRoot();
+    const original = '{"version":2,"providerCredentials":{},"deepseek":42}';
+    await writeFile(join(dataRoot, "secrets.json"), original, "utf8");
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    expect(svc.getCredentialStorageView()).toMatchObject({ status: "unavailable", code: "invalid_format" });
+    await expect(svc.removeProvider("deepseek")).rejects.toThrow("暂停凭据修改");
+    expect(await svc.setProviderKey("deepseek", "replacement-key")).toMatchObject({ ok: false });
+    expect(await readFile(join(dataRoot, "secrets.json"), "utf8")).toBe(original);
   });
 
   it(".env 里的裸 Key 不再视为已连接：load 后 hasApiKey=false 且 process.env 被清除", async () => {
@@ -589,6 +752,7 @@ describe("SettingsService", () => {
     await writeFile(join(dataRoot, "secrets.json"), JSON.stringify({
       version: 1,
       deepseek: Buffer.from("enc:sk-ds", "utf8").toString("base64"),
+      providerCredentials: {},
     }), "utf8");
 
     const first = makeService(dataRoot);
@@ -607,6 +771,11 @@ describe("SettingsService", () => {
     expect(migrated.plugins).toEqual(v1.plugins);
     expect(migrated.skills).toEqual(v1.skills);
     expect(await readFile(join(dataRoot, "settings.v1.backup.json"), "utf8")).toBe(rawV1);
+    expect(JSON.parse(await readFile(join(dataRoot, "secrets.json"), "utf8"))).toEqual({
+      version: 2,
+      providerCredentials: {},
+      deepseek: "sk-ds",
+    });
 
     const second = makeService(dataRoot);
     await second.load();
@@ -646,7 +815,7 @@ describe("SettingsService", () => {
     expect(await readFile(join(dataRoot, "settings.json"), "utf8")).toBe(stableRaw);
   });
 
-  it("OpenRouter key 只加密落 secrets，runtime 可解密且 renderer view 不含明文", async () => {
+  it("OpenRouter key 只落 main-only secrets，runtime 可读取且 renderer view 不含明文", async () => {
     const dataRoot = await makeDataRoot();
     const svc = makeService(dataRoot);
     await svc.load();
@@ -672,8 +841,7 @@ describe("SettingsService", () => {
     const settingsRaw = await readFile(join(dataRoot, "settings.json"), "utf8");
     const secretsRaw = await readFile(join(dataRoot, "secrets.json"), "utf8");
     expect(settingsRaw).not.toContain("test-openrouter-key");
-    expect(secretsRaw).not.toContain("test-openrouter-key");
-    expect(Buffer.from(JSON.parse(secretsRaw).openrouter, "base64").toString("utf8")).toBe("enc:test-openrouter-key");
+    expect(JSON.parse(secretsRaw)).toMatchObject({ version: 2, openrouter: "test-openrouter-key" });
   });
 
   it("修改连接参数会重置状态，断开 key 不删除模型", async () => {

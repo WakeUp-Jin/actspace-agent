@@ -8,6 +8,7 @@ import {
   Plus,
   RefreshCw,
   Route,
+  Trash2,
   Waves,
   X,
   type LucideIcon,
@@ -16,6 +17,7 @@ import {
   PROVIDER_REGISTRY,
   type LlmProviderId,
   type BalanceProviderId,
+  type CredentialStorageView,
   type ProviderBalanceSnapshot,
   type ProviderSettingsView,
 } from "@actspace/shared";
@@ -82,9 +84,11 @@ const PROVIDER_BALANCE_REFRESH_MS = 5 * 60 * 1000;
 
 export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promise<void> }) {
   const [providers, setProviders] = useState<Partial<Record<LlmProviderId, ProviderSettingsView>>>({});
+  const [credentialStorage, setCredentialStorage] = useState<CredentialStorageView>({ status: "ready" });
   const [loaded, setLoaded] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<{ provider: LlmProviderId; restoreToAddButton: boolean } | null>(null);
+  const [removing, setRemoving] = useState<LlmProviderId | null>(null);
   const [busy, setBusy] = useState<LlmProviderId | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [balances, setBalances] = useState<Partial<Record<BalanceProviderId, ProviderBalanceSnapshot>>>({});
@@ -114,6 +118,7 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
     try {
       const result = await window.actspace.listProviders();
       setProviders(result.providers);
+      setCredentialStorage(result.credentialStorage ?? { status: "ready" });
       await Promise.all(
         PROVIDERS
           .filter((provider): provider is ProviderMeta & { id: BalanceProviderId } => provider.supportsBalance && result.providers[provider.id]?.hasApiKey === true)
@@ -152,6 +157,24 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
     }
   };
 
+  const remove = async (provider: LlmProviderId): Promise<string | null> => {
+    if (!window.actspace.removeProvider) return "当前版本不支持移除服务商。";
+    setBusy(provider);
+    try {
+      const result = await window.actspace.removeProvider({ provider });
+      if (!result.ok) return "error" in result ? result.error.message : "服务商移除失败。";
+      await load();
+      await onChanged?.();
+      setRemoving(null);
+      window.requestAnimationFrame(() => addButtonRef.current?.focus());
+      return null;
+    } catch {
+      return "服务商移除失败，请稍后重试。";
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const connectedBalanceKey = PROVIDERS
     .filter((provider) => provider.supportsBalance && providers[provider.id]?.hasApiKey)
     .map((provider) => provider.id)
@@ -172,7 +195,7 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
 
   const connectedProviders = PROVIDERS.filter((provider) => isProviderConfigured(providers[provider.id]));
   const providersToAdd = PROVIDERS.filter((provider) => !isProviderConfigured(providers[provider.id]));
-  const canAddProvider = loaded && providersToAdd.length > 0;
+  const canAddProvider = loaded && credentialStorage.status === "ready" && providersToAdd.length > 0;
 
   return (
     <>
@@ -195,7 +218,17 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
         <div className="w-full max-w-[720px]">
           {!loaded ? <ProviderCardsSkeleton /> : null}
 
-          {loaded && connectedProviders.length === 0 ? (
+          {loaded && credentialStorage.status === "unavailable" ? (
+            <div role="alert" className="mb-4 flex items-start gap-2 rounded-act-md border border-danger-soft bg-danger-soft px-3 py-2.5 text-on-danger">
+              <CircleAlert className="mt-0.5 shrink-0" size={15} aria-hidden="true" />
+              <div>
+                <p className="text-[12px] font-semibold">本地凭据暂时无法读取</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed">{credentialStorage.message}</p>
+              </div>
+            </div>
+          ) : null}
+
+          {loaded && credentialStorage.status === "ready" && connectedProviders.length === 0 ? (
             <div className="rounded-act-xl border border-dashed border-line bg-surface px-5 py-8 text-center">
               <p className="text-[14px] font-semibold text-text-main">还没有连接模型服务</p>
               <p className="mt-1 text-[12px] leading-relaxed text-text-faint">点击右上角“添加服务”，选择服务商并配置 API Key。</p>
@@ -222,6 +255,7 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
                       onTest={() => void test(provider.id)}
                       onEdit={() => setEditing({ provider: provider.id, restoreToAddButton: false })}
                       onDisconnect={() => void disconnect(provider.id)}
+                      onRemove={() => setRemoving(provider.id)}
                     />
                   ))}
                 </div>
@@ -261,6 +295,15 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
           }}
         />
       ) : null}
+
+      {removing ? (
+        <RemoveProviderDialog
+          provider={PROVIDERS.find((provider) => provider.id === removing)!}
+          busy={busy === removing}
+          onClose={() => setRemoving(null)}
+          onConfirm={() => remove(removing)}
+        />
+      ) : null}
     </>
   );
 }
@@ -276,6 +319,7 @@ function ProviderCard({
   onTest,
   onEdit,
   onDisconnect,
+  onRemove,
 }: {
   provider: ProviderMeta;
   state?: ProviderSettingsView;
@@ -287,6 +331,7 @@ function ProviderCard({
   onTest: () => void;
   onEdit: () => void;
   onDisconnect: () => void;
+  onRemove: () => void;
 }) {
   const Icon = provider.icon;
   const address = state?.baseUrl ?? PROVIDER_REGISTRY[provider.id].defaultBaseUrl;
@@ -318,7 +363,8 @@ function ProviderCard({
             {busy ? <Loader2 className="animate-spin motion-reduce:animate-none" size={14} aria-label="测试中" /> : "测试"}
           </button>
           <button type="button" className="h-7 rounded-act-md px-1.5 text-[11px] font-medium text-text-muted hover:bg-surface-subtle hover:text-text-main" onClick={onEdit}>编辑</button>
-          {state?.hasApiKey ? <button type="button" className="h-7 rounded-act-md px-1.5 text-[11px] font-medium text-text-faint hover:bg-danger-soft hover:text-on-danger" onClick={onDisconnect} disabled={busy}>{provider.id === "duckcoding" && (state.additionalCredentials?.length ?? 0) > 0 ? "断开默认" : "断开"}</button> : null}
+          {state?.hasApiKey && provider.id === "duckcoding" && (state.additionalCredentials?.length ?? 0) > 0 ? <button type="button" className="h-7 rounded-act-md px-1.5 text-[11px] font-medium text-text-faint hover:bg-danger-soft hover:text-on-danger" onClick={onDisconnect} disabled={busy}>断开默认</button> : null}
+          <button type="button" aria-label={`移除 ${provider.label}`} title="移除服务商" className="grid h-7 w-7 place-items-center rounded-act-md text-text-faint hover:bg-danger-soft hover:text-on-danger disabled:opacity-50" onClick={onRemove} disabled={busy}><Trash2 size={14} aria-hidden="true" /></button>
         </div>
       </div>
 
@@ -334,6 +380,39 @@ function ProviderCard({
         {provider.id === "duckcoding" ? <ProviderFact label="默认 Key 倍率" value={`${state?.defaultPricingMultiplier ?? 1}x`} /> : null}
       </dl>
     </article>
+  );
+}
+
+function RemoveProviderDialog({
+  provider,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  provider: ProviderMeta;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => Promise<string | null>;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const { dialogRef, trapTabKey } = useDialogFocusTrap();
+  const confirm = async () => {
+    setError(null);
+    const nextError = await onConfirm();
+    if (nextError) setError(nextError);
+  };
+  return (
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[160] grid place-items-center bg-scrim px-5" role="alertdialog" aria-modal="true" aria-labelledby="remove-provider-dialog-title" aria-describedby="remove-provider-dialog-description" onKeyDown={(event) => { if (event.key === "Escape" && !busy) onClose(); else trapTabKey(event); }}>
+      <div className="w-full max-w-[460px] rounded-act-xl border border-line bg-surface p-5 shadow-act-float">
+        <h2 id="remove-provider-dialog-title" className="text-[18px] font-semibold text-text-main">移除 {provider.label}？</h2>
+        <p id="remove-provider-dialog-description" className="mt-2 text-[12px] leading-relaxed text-text-muted">将清除该服务商的所有 API Key、接入地址、代理和连接状态。已添加模型、历史会话与用量记录会保留，但相关模型将暂时不可用。</p>
+        {error ? <p role="alert" className="mt-3 text-[12px] text-on-danger">{error}</p> : null}
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" autoFocus className="h-10 rounded-act-md border border-line px-4 text-[13px] font-semibold text-text-main hover:bg-surface-subtle disabled:opacity-50" onClick={onClose} disabled={busy}>取消</button>
+          <button type="button" className="h-10 rounded-act-md bg-danger-soft px-4 text-[13px] font-semibold text-on-danger hover:opacity-85 disabled:opacity-50" onClick={() => void confirm()} disabled={busy}>{busy ? "移除中…" : "移除服务商"}</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -511,12 +590,18 @@ function ProviderDialog({
   const save = async () => {
     setSaving(true); setError(null);
     try {
+      const nextProxy = proxyEnabled
+        ? { enabled: true, url: proxyUrl.trim() || null }
+        : { enabled: false, url: null };
+      const updateProxy = proxyEnabled && current?.proxy?.enabled && !proxyUrl.trim()
+        ? undefined
+        : nextProxy;
       const result = hasDefaultKey || (configured && !apiKey.trim())
         ? await window.actspace.updateProvider?.({
             provider,
             ...(provider === "openrouter" && managementKey.trim() && { managementKey: managementKey.trim() }),
             baseUrl: baseUrl || null,
-            proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl : null },
+            ...(updateProxy && { proxy: updateProxy }),
             ...(provider === "duckcoding" && { defaultPricingMultiplier: Number(defaultPricingMultiplier) }),
           })
         : await window.actspace.connectProvider?.({
@@ -524,7 +609,7 @@ function ProviderDialog({
             apiKey,
             ...(provider === "openrouter" && { managementKey: managementKey.trim() || null }),
             baseUrl: baseUrl || null,
-            proxy: { enabled: proxyEnabled, url: proxyEnabled ? proxyUrl : null },
+            proxy: nextProxy,
             ...(provider === "duckcoding" && { defaultPricingMultiplier: Number(defaultPricingMultiplier) }),
           });
       if (!result || !result.ok) { setError(result && "error" in result ? result.error.message : "保存失败。"); return; }
@@ -548,7 +633,7 @@ function ProviderDialog({
                 placeholder={current?.hasManagementKey ? "已配置；留空保持不变" : "sk-or-v1-..."}
                 className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]"
               />
-              <span className="text-[11px] leading-relaxed text-text-faint">只用于 OpenRouter /credits 查询；断开服务时会一并清除。</span>
+              <span className="text-[11px] leading-relaxed text-text-faint">只用于 OpenRouter /credits 查询；移除服务商时会一并清除。</span>
             </Field>
           ) : null}
           <Field label="Base URL（可选）"><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="使用服务商默认地址" className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field>
@@ -562,13 +647,13 @@ function ProviderDialog({
             </Field>
           ) : null}
           <label className="flex min-h-11 items-center justify-between rounded-act-md border border-line px-3"><span className="text-[13px] font-medium text-text-main">仅为此服务商启用代理</span><input type="checkbox" checked={proxyEnabled} onChange={(event) => setProxyEnabled(event.target.checked)} /></label>
-          {proxyEnabled ? <Field label="HTTP(S) 代理地址"><input value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder="http://127.0.0.1:7890" className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field> : null}
+          {proxyEnabled ? <Field label="HTTP(S) 代理地址"><input value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder={current?.proxy?.enabled ? "已配置；留空保持不变" : "http://127.0.0.1:7890"} className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field> : null}
           {provider === "duckcoding" && configured ? (
             <ProviderCredentialManager provider={provider} current={providerState} onChanged={async (next) => { setProviderState(next); await onProviderChanged(next); }} />
           ) : null}
           {error ? <p role="alert" className="text-[12px] text-on-danger">{error}</p> : null}
         </div>
-        <div className="mt-6 flex justify-end gap-2"><button type="button" className="h-10 rounded-act-md border border-line px-4 text-[13px] font-semibold text-text-main hover:bg-surface-subtle" onClick={onClose}>取消</button><button type="button" className="h-10 rounded-act-md bg-text-main px-4 text-[13px] font-semibold text-surface transition-opacity hover:opacity-85 disabled:opacity-40" disabled={saving || (!configured && !apiKey.trim()) || (proxyEnabled && !proxyUrl.trim()) || (provider === "duckcoding" && !isValidMultiplierValue(defaultPricingMultiplier))} onClick={() => void save()}>{saving ? "保存中…" : "保存"}</button></div>
+        <div className="mt-6 flex justify-end gap-2"><button type="button" className="h-10 rounded-act-md border border-line px-4 text-[13px] font-semibold text-text-main hover:bg-surface-subtle" onClick={onClose}>取消</button><button type="button" className="h-10 rounded-act-md bg-text-main px-4 text-[13px] font-semibold text-surface transition-opacity hover:opacity-85 disabled:opacity-40" disabled={saving || (!configured && !apiKey.trim()) || (proxyEnabled && !proxyUrl.trim() && !current?.proxy?.enabled) || (provider === "duckcoding" && !isValidMultiplierValue(defaultPricingMultiplier))} onClick={() => void save()}>{saving ? "保存中…" : "保存"}</button></div>
       </div>
     </div>
   );

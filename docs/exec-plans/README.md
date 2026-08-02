@@ -22,6 +22,7 @@
 
 ## 最近完成
 
+- Actspace 本地明文凭据存储迁移：`completed/20260802-local-plaintext-credential-storage.md`
 - 分析观测会话索引：`completed/20260801-analysis-session-index.md`
 - 全局快捷唤起：`completed/20260801-global-quick-open-shortcut.md`
 - Environment 分支选择与创建：`completed/20260801-environment-branch-selector.md`

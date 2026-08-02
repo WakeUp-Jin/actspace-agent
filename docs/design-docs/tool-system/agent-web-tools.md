@@ -79,7 +79,7 @@ web_search(query)
 
 - env：`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY`（`packages/agent-core/src/env.ts`）。
 - 暴露门控：`ToolRuntimeConfig.hasWebSearchKey`（任一 key 存在即 true），由 `create-agent-deps.ts` 与 `kairos-bootstrap.ts` 注入；`requiresKey: "webSearch"` 在 `exposure.ts` 据此判断。`web_fetch` 无 key 要求，始终注册。
-- 设置页：`packages/shared/src/settings.ts` 新增 `SearchProviderId`（zhipu/tavily/tinyfish/exa）与 `SecretProviderId = ProviderId | SearchProviderId`，密钥统一走 `setProviderKey`/`clearProviderKey` IPC，加密落盘后写回 env。设置页「模型」区新增「网络搜索」组，四个 provider 各一行连接/断开。
+- 设置页：`packages/shared/src/settings.ts` 新增 `SearchProviderId`（zhipu/tavily/tinyfish/exa）与 `SecretProviderId = ProviderId | SearchProviderId`，密钥统一走 `setProviderKey`/`clearProviderKey` IPC，以明文写入 main-only `0600` 凭据文件后更新运行时 env。设置页「模型」区新增「网络搜索」组，四个 provider 各一行连接/断开。
 - Tavily 额度显示：main 进程 `getSearchUsage()` 调 `GET api.tavily.com/usage`，渲染层在 Tavily 已连接时显示「本周期已用 X / Y credits，剩余 Z」。其余 provider 无公开用量接口（TinyFish 免费、智谱/Exa 在各自控制台看账单）。
 
 ### 前端预览

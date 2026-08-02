@@ -1,8 +1,8 @@
 /**
- * SettingsService owns non-sensitive settings.json v2 and encrypted secrets.json.
- * Renderer-facing views contain status only; decrypted keys and runtime transports stay in main.
+ * SettingsService owns non-sensitive settings.json v2 and main-only 0600 secrets.json v2.
+ * Renderer-facing views contain status only; plaintext keys and runtime transports stay in main.
  */
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, isAbsolute, join } from "node:path";
 import {
@@ -30,6 +30,8 @@ import {
   type AgentSystemPromptFile,
   type AppSettings,
   type AppSettingsV2,
+  type CredentialStorageIssueCode,
+  type CredentialStorageView,
   type InstalledModelSettings,
   type ImageGenerationSettingsView,
   type ImageInspectionSettings,
@@ -74,7 +76,7 @@ export interface SecretCrypto {
   decrypt(cipher: Buffer): string;
 }
 
-type AtomicJsonWriter = (filePath: string, value: unknown) => Promise<void>;
+type AtomicJsonWriter = (filePath: string, value: unknown, options?: { mode?: number }) => Promise<void>;
 
 export interface SettingsServiceOptions {
   dataRoot: string;
@@ -146,10 +148,26 @@ export interface PersistedSettingsV2 {
 
 type OpenRouterManagementSecretId = "openrouter-management";
 type PersistedSecretProviderId = LlmProviderId | SearchProviderId | OpenRouterManagementSecretId | "image-generation";
-type PersistedSecrets = {
+type PersistedSecretsV1 = {
   version: 1;
   providerCredentials: Record<string, string>;
 } & Partial<Record<PersistedSecretProviderId, string>>;
+
+type PersistedSecrets = {
+  version: 2;
+  providerCredentials: Record<string, string>;
+} & Partial<Record<PersistedSecretProviderId, string>>;
+
+interface CredentialStorageIssue {
+  code: CredentialStorageIssueCode;
+  message: string;
+}
+
+interface ReadSecretsResult {
+  secrets: PersistedSecrets;
+  source: "missing" | "v1" | "v2" | "unavailable";
+  issue?: CredentialStorageIssue;
+}
 
 interface ReadSettingsResult {
   settings: PersistedSettingsV2;
@@ -187,7 +205,8 @@ export class SettingsService {
   private readonly createCredentialId: () => string;
 
   private settings: PersistedSettingsV2;
-  private secrets: PersistedSecrets = { version: 1, providerCredentials: {} };
+  private secrets: PersistedSecrets = emptySecrets();
+  private credentialStorageIssue?: CredentialStorageIssue;
   private mutationTail: Promise<void> = Promise.resolve();
   private lastLoadError?: string;
 
@@ -201,7 +220,19 @@ export class SettingsService {
   }
 
   async load(): Promise<void> {
-    this.secrets = await this.readSecretsFile();
+    const loadedSecrets = await this.readSecretsFile();
+    this.secrets = loadedSecrets.secrets;
+    this.credentialStorageIssue = loadedSecrets.issue;
+    if (loadedSecrets.source === "v1" && !loadedSecrets.issue) {
+      try {
+        await this.writeSecretsFile();
+      } catch {
+        this.credentialStorageIssue = {
+          code: "migration_failed",
+          message: "旧版凭据已读取，但无法完成本地存储迁移。为避免覆盖现有 Key，Actspace 已暂停凭据修改。",
+        };
+      }
+    }
     const loaded = await this.readSettingsFile();
     this.settings = loaded.settings;
     this.lastLoadError = loaded.warning;
@@ -230,6 +261,12 @@ export class SettingsService {
 
   getLastLoadError(): string | undefined {
     return this.lastLoadError;
+  }
+
+  getCredentialStorageView(): CredentialStorageView {
+    return this.credentialStorageIssue
+      ? { status: "unavailable", ...this.credentialStorageIssue }
+      : { status: "ready" };
   }
 
   /** Renderer transition view: v2 data plus deprecated v1 selection fields. */
@@ -269,8 +306,8 @@ export class SettingsService {
       const enabled = installed.filter((definition) => this.settings.installedModels[definition.key]?.enabled);
       const settings = this.settings.providers[provider];
       return [provider, {
-        hasApiKey: Boolean(this.getDecryptedKey(provider)),
-        ...(provider === "openrouter" && { hasManagementKey: Boolean(this.getDecryptedKey("openrouter-management")) }),
+        hasApiKey: Boolean(this.getStoredKey(provider)),
+        ...(provider === "openrouter" && { hasManagementKey: Boolean(this.getStoredKey("openrouter-management")) }),
         enabled: settings.enabled,
         baseUrl: settings.baseUrl,
         proxy: {
@@ -284,7 +321,7 @@ export class SettingsService {
         additionalCredentials: settings.additionalCredentials.map((credential) => ({
           ...credential,
           lastConnection: { ...credential.lastConnection },
-          hasApiKey: Boolean(this.getDecryptedProviderCredential(provider, credential.id)),
+          hasApiKey: Boolean(this.getStoredProviderCredential(provider, credential.id)),
         })),
       }];
     })) as AppSettingsV2["providers"];
@@ -296,10 +333,10 @@ export class SettingsService {
       customModels: cloneJson(this.settings.customModels),
       taskModels: { ...this.settings.taskModels },
       searchProviders: {
-        zhipu: { hasApiKey: Boolean(this.getDecryptedKey("zhipu")) },
-        tavily: { hasApiKey: Boolean(this.getDecryptedKey("tavily")) },
-        tinyfish: { hasApiKey: Boolean(this.getDecryptedKey("tinyfish")) },
-        exa: { hasApiKey: Boolean(this.getDecryptedKey("exa")) },
+        zhipu: { hasApiKey: Boolean(this.getStoredKey("zhipu")) },
+        tavily: { hasApiKey: Boolean(this.getStoredKey("tavily")) },
+        tinyfish: { hasApiKey: Boolean(this.getStoredKey("tinyfish")) },
+        exa: { hasApiKey: Boolean(this.getStoredKey("exa")) },
       },
       imageGeneration: this.getImageGenerationSettingsView(),
       imageInspection: { ...this.settings.imageInspection },
@@ -489,28 +526,24 @@ export class SettingsService {
         };
 
         if (input.apiKey !== undefined) {
+          this.assertCredentialStorageWritable();
           if (input.apiKey === null) {
             delete this.secrets[input.provider];
           } else {
             const trimmed = input.apiKey.trim();
             if (!trimmed) throw new ProviderSettingsError("API Key 不能为空。", "invalid_api_key");
-            if (!this.crypto.isAvailable()) {
-              throw new ProviderSettingsError("系统密钥串不可用，无法安全保存 API Key。", "secret_storage_unavailable");
-            }
-            this.secrets[input.provider] = this.crypto.encrypt(trimmed).toString("base64");
+            this.secrets[input.provider] = trimmed;
           }
         }
 
         if (input.provider === "openrouter" && input.managementKey !== undefined) {
+          this.assertCredentialStorageWritable();
           if (input.managementKey === null) {
             delete this.secrets["openrouter-management"];
           } else {
             const trimmed = input.managementKey.trim();
             if (!trimmed) throw new ProviderSettingsError("Management Key 不能为空。", "invalid_api_key");
-            if (!this.crypto.isAvailable()) {
-              throw new ProviderSettingsError("系统密钥串不可用，无法安全保存 Management Key。", "secret_storage_unavailable");
-            }
-            this.secrets["openrouter-management"] = this.crypto.encrypt(trimmed).toString("base64");
+            this.secrets["openrouter-management"] = trimmed;
           }
         }
 
@@ -528,6 +561,35 @@ export class SettingsService {
         if (secretsWritten) await this.restoreFilesBestEffort(previousSettings, previousSecrets);
         if (error instanceof ProviderSettingsError) throw error;
         throw new ProviderSettingsError("供应商设置写入失败。", "write_failed");
+      }
+    });
+  }
+
+  async removeProvider(provider: LlmProviderId): Promise<AppSettings> {
+    return this.enqueueMutation(async () => {
+      const previousSettings = cloneJson(this.settings);
+      const previousSecrets = cloneJson(this.secrets);
+      let secretsWritten = false;
+      try {
+        this.assertCredentialStorageWritable();
+        delete this.secrets[provider];
+        if (provider === "openrouter") delete this.secrets["openrouter-management"];
+        for (const secretId of Object.keys(this.secrets.providerCredentials)) {
+          if (secretId.startsWith(`${provider}:`)) delete this.secrets.providerCredentials[secretId];
+        }
+        this.settings.providers[provider] = defaultProviderSettings();
+
+        await this.writeSecretsFile();
+        secretsWritten = true;
+        await this.writeSettingsFile();
+        this.applyToEnv();
+        return this.get();
+      } catch (error) {
+        this.settings = previousSettings;
+        this.secrets = previousSecrets;
+        if (secretsWritten) await this.restoreFilesBestEffort(previousSettings, previousSecrets);
+        if (error instanceof ProviderSettingsError) throw error;
+        throw new ProviderSettingsError("服务商移除失败。", "write_failed");
       }
     });
   }
@@ -551,8 +613,8 @@ export class SettingsService {
       return { ok: false, code: "credential_missing", message: "模型绑定的额外 API Key 不存在。" };
     }
     const apiKey = credentialId
-      ? this.getDecryptedProviderCredential(provider, credentialId)
-      : this.getDecryptedKey(provider);
+      ? this.getStoredProviderCredential(provider, credentialId)
+      : this.getStoredKey(provider);
     if (!apiKey) return credentialId
       ? { ok: false, code: "credential_missing", message: "模型绑定的额外 API Key 无法读取。" }
       : { ok: false, code: "api_key_missing", message: "尚未配置 API Key。" };
@@ -586,7 +648,7 @@ export class SettingsService {
   }
 
   getImageGenerationRuntimeConfig(): ImageGenerationRuntimeConfig | undefined {
-    const apiKey = this.getDecryptedKey("image-generation");
+    const apiKey = this.getStoredKey("image-generation");
     if (!apiKey) return undefined;
     return {
       apiKey,
@@ -606,12 +668,10 @@ export class SettingsService {
         const baseUrl = normalizeImageGenerationBaseUrl(input.baseUrl);
         const model = normalizeImageGenerationModel(input.model);
         if (input.apiKey !== undefined) {
+          this.assertCredentialStorageWritable();
           const trimmed = input.apiKey.trim();
           if (!trimmed) throw new ProviderSettingsError("API Key 不能为空。", "invalid_api_key");
-          if (!this.crypto.isAvailable()) {
-            throw new ProviderSettingsError("系统密钥串不可用，无法安全保存 API Key。", "secret_storage_unavailable");
-          }
-          this.secrets["image-generation"] = this.crypto.encrypt(trimmed).toString("base64");
+          this.secrets["image-generation"] = trimmed;
           await this.writeSecretsFile();
           secretsWritten = true;
         }
@@ -640,11 +700,9 @@ export class SettingsService {
       const previousSecrets = cloneJson(this.secrets);
       let secretsWritten = false;
       try {
+        this.assertCredentialStorageWritable();
         const apiKey = input.apiKey.trim();
         if (!apiKey) throw new ProviderSettingsError("API Key 不能为空。", "invalid_api_key");
-        if (!this.crypto.isAvailable()) {
-          throw new ProviderSettingsError("系统密钥串不可用，无法安全保存 API Key。", "secret_storage_unavailable");
-        }
         const id = this.createCredentialId();
         if (!isValidCredentialId(id)) throw new ProviderSettingsError("额外 API Key 标识无效。", "write_failed");
         if (this.settings.providers[input.provider].additionalCredentials.some((credential) => credential.id === id)) {
@@ -656,8 +714,7 @@ export class SettingsService {
           pricingMultiplier: normalizePricingMultiplier(input.pricingMultiplier ?? 1),
           lastConnection: { status: "untested" },
         });
-        this.secrets.providerCredentials[providerCredentialSecretId(input.provider, id)] =
-          this.crypto.encrypt(apiKey).toString("base64");
+        this.secrets.providerCredentials[providerCredentialSecretId(input.provider, id)] = apiKey;
         await this.writeSecretsFile();
         secretsWritten = true;
         await this.writeSettingsFile();
@@ -720,6 +777,7 @@ export class SettingsService {
       const previousSecrets = cloneJson(this.secrets);
       let secretsWritten = false;
       try {
+        this.assertCredentialStorageWritable();
         this.settings.providers[provider].additionalCredentials = credentials.filter((item) => item.id !== credentialId);
         delete this.secrets.providerCredentials[providerCredentialSecretId(provider, credentialId)];
         await this.writeSecretsFile();
@@ -763,7 +821,7 @@ export class SettingsService {
   getOpenRouterManagementRuntimeConfig(): ProviderRuntimeConfig | ProviderRuntimeError {
     const runtime = this.getProviderRuntimeConfig("openrouter");
     if ("code" in runtime) return runtime;
-    const managementKey = this.getDecryptedKey("openrouter-management");
+    const managementKey = this.getStoredKey("openrouter-management");
     if (!managementKey) {
       return { ok: false, code: "api_key_missing", message: "尚未配置 OpenRouter Management Key。" };
     }
@@ -844,6 +902,7 @@ export class SettingsService {
       return this.enqueueMutation(async () => {
         const previous = { ...this.secrets };
         try {
+          this.assertCredentialStorageWritable();
           delete this.secrets["image-generation"];
           await this.writeSecretsFile();
           this.applyToEnv();
@@ -858,7 +917,7 @@ export class SettingsService {
   }
 
   async getSearchUsage(): Promise<SearchUsageResult> {
-    const key = this.getDecryptedKey("tavily");
+    const key = this.getStoredKey("tavily");
     if (!key) return { ok: false, error: "未配置 Tavily API Key。" };
     try {
       const response = await fetch("https://api.tavily.com/usage", {
@@ -879,25 +938,13 @@ export class SettingsService {
     }
   }
 
-  /** Main-only decryption boundary. */
-  getDecryptedKey(provider: PersistedSecretProviderId): string | undefined {
-    const base64 = this.secrets[provider];
-    if (!base64) return undefined;
-    try {
-      return this.crypto.decrypt(Buffer.from(base64, "base64"));
-    } catch {
-      return undefined;
-    }
+  /** Main-only credential boundary. */
+  getStoredKey(provider: PersistedSecretProviderId): string | undefined {
+    return this.secrets[provider];
   }
 
-  private getDecryptedProviderCredential(provider: LlmProviderId, credentialId: string): string | undefined {
-    const base64 = this.secrets.providerCredentials[providerCredentialSecretId(provider, credentialId)];
-    if (!base64) return undefined;
-    try {
-      return this.crypto.decrypt(Buffer.from(base64, "base64"));
-    } catch {
-      return undefined;
-    }
+  private getStoredProviderCredential(provider: LlmProviderId, credentialId: string): string | undefined {
+    return this.secrets.providerCredentials[providerCredentialSecretId(provider, credentialId)];
   }
 
   private async setSearchProviderKey(
@@ -907,16 +954,19 @@ export class SettingsService {
     return this.enqueueMutation(async () => {
       const previous = { ...this.secrets };
       try {
+        this.assertCredentialStorageWritable();
         const trimmed = apiKey.trim();
         if (!trimmed) return { ok: false, error: "API Key 不能为空。" };
-        if (!this.crypto.isAvailable()) return { ok: false, error: "系统密钥串不可用，无法安全保存 API Key。" };
-        this.secrets[provider] = this.crypto.encrypt(trimmed).toString("base64");
+        this.secrets[provider] = trimmed;
         await this.writeSecretsFile();
         this.applyToEnv();
         return { ok: true };
-      } catch {
+      } catch (error) {
         this.secrets = previous;
-        return { ok: false, error: "API Key 保存失败。" };
+        return {
+          ok: false,
+          error: error instanceof ProviderSettingsError ? error.message : "API Key 保存失败。",
+        };
       }
     });
   }
@@ -925,6 +975,7 @@ export class SettingsService {
     return this.enqueueMutation(async () => {
       const previous = { ...this.secrets };
       try {
+        this.assertCredentialStorageWritable();
         delete this.secrets[provider];
         await this.writeSecretsFile();
         this.applyToEnv();
@@ -937,7 +988,7 @@ export class SettingsService {
   }
 
   private applyProviderKey(provider: PersistedSecretProviderId, envKey: string): void {
-    setOrDeleteEnv(envKey, this.getDecryptedKey(provider));
+    setOrDeleteEnv(envKey, this.getStoredKey(provider));
   }
 
   /** Desktop LLM credentials stay main-only; only search/tool preferences retain env compatibility. */
@@ -956,7 +1007,7 @@ export class SettingsService {
 
   private getImageGenerationSettingsView(): ImageGenerationSettingsView {
     return {
-      hasApiKey: Boolean(this.getDecryptedKey("image-generation")),
+      hasApiKey: Boolean(this.getStoredKey("image-generation")),
       baseUrl: this.settings.imageGeneration.baseUrl,
       model: this.settings.imageGeneration.model,
     };
@@ -992,7 +1043,7 @@ export class SettingsService {
       return { settings: defaultSettingsFromEnv(this.dataRoot), source: "invalid", warning: "设置文件格式无效，已使用安全默认配置。" };
     }
     if (parsed.version === 1) {
-      const migrated = migrateV1Settings(parsed, this.dataRoot, Boolean(this.getDecryptedKey("deepseek")));
+      const migrated = migrateV1Settings(parsed, this.dataRoot, Boolean(this.getStoredKey("deepseek")));
       return { ...migrated, source: "v1", rawV1: raw };
     }
     if (parsed.version === 2) {
@@ -1009,43 +1060,96 @@ export class SettingsService {
     };
   }
 
-  private async readSecretsFile(): Promise<PersistedSecrets> {
+  private async readSecretsFile(): Promise<ReadSecretsResult> {
+    const filePath = join(this.dataRoot, SECRETS_FILE);
+    let raw: string;
     try {
-      const raw = await readFile(join(this.dataRoot, SECRETS_FILE), "utf8");
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const out: PersistedSecrets = { version: 1, providerCredentials: {} };
-      for (const id of ALL_SECRET_PROVIDER_IDS) {
-        const value = parsed[id];
-        if (typeof value === "string" && value.length > 0) out[id] = value;
-      }
-      if (isRecord(parsed.providerCredentials)) {
-        for (const [id, value] of Object.entries(parsed.providerCredentials)) {
-          if (typeof value === "string" && value.length > 0 && isProviderCredentialSecretId(id)) {
-            out.providerCredentials[id] = value;
-          }
-        }
-      }
-      return out;
-    } catch {
-      return { version: 1, providerCredentials: {} };
+      raw = await readFile(filePath, "utf8");
+    } catch (error) {
+      if (isNotFoundError(error)) return { secrets: emptySecrets(), source: "missing" };
+      return unavailableSecrets("read_failed", "凭据文件读取失败。为避免覆盖现有 Key，Actspace 已暂停凭据修改。");
     }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return unavailableSecrets("invalid_format", "凭据文件格式无效。为避免覆盖现有 Key，Actspace 已暂停凭据修改。");
+    }
+    if (!isRecord(parsed)) {
+      return unavailableSecrets("invalid_format", "凭据文件格式无效。为避免覆盖现有 Key，Actspace 已暂停凭据修改。");
+    }
+
+    if (parsed.version === 2) {
+      const secrets = parseSecretsV2(parsed);
+      if (!secrets) {
+        return unavailableSecrets("invalid_format", "凭据文件字段无效。为避免覆盖现有 Key，Actspace 已暂停凭据修改。");
+      }
+      try {
+        await chmod(filePath, 0o600);
+      } catch {
+        return unavailableSecrets("read_failed", "凭据文件权限无法收紧为仅当前用户可读写。Actspace 已暂停凭据修改。");
+      }
+      return { secrets, source: "v2" };
+    }
+
+    if (parsed.version === 1) {
+      const legacy = parseSecretsV1(parsed);
+      if (!legacy) {
+        return unavailableSecrets("invalid_format", "旧版凭据文件字段无效。为避免覆盖现有 Key，Actspace 已暂停凭据修改。");
+      }
+      const migrated = this.decryptLegacySecrets(legacy);
+      if (!migrated) {
+        return unavailableSecrets("migration_failed", "旧版凭据无法解密。请使用最后一次能读取这些 Key 的 Actspace 版本启动后再迁移。");
+      }
+      return { secrets: migrated, source: "v1" };
+    }
+
+    return unavailableSecrets("invalid_format", "凭据文件版本不受支持。为避免覆盖现有 Key，Actspace 已暂停凭据修改。");
   }
 
   private writeSettingsFile(): Promise<void> {
     return this.writeJson(join(this.dataRoot, SETTINGS_FILE), this.settings);
   }
 
-  private writeSecretsFile(): Promise<void> {
-    return this.writeJson(join(this.dataRoot, SECRETS_FILE), this.secrets);
+  private async writeSecretsFile(): Promise<void> {
+    this.assertCredentialStorageWritable();
+    const filePath = join(this.dataRoot, SECRETS_FILE);
+    await this.writeJson(filePath, this.secrets, { mode: 0o600 });
+    await chmod(filePath, 0o600);
   }
 
   private async restoreFilesBestEffort(settings: PersistedSettingsV2, secrets: PersistedSecrets): Promise<void> {
     try {
       await this.writeJson(join(this.dataRoot, SETTINGS_FILE), settings);
-      await this.writeJson(join(this.dataRoot, SECRETS_FILE), secrets);
+      const secretsPath = join(this.dataRoot, SECRETS_FILE);
+      await this.writeJson(secretsPath, secrets, { mode: 0o600 });
+      await chmod(secretsPath, 0o600);
     } catch {
       // Original operation still reports failure; recovery is best effort only.
     }
+  }
+
+  private decryptLegacySecrets(legacy: PersistedSecretsV1): PersistedSecrets | undefined {
+    const entries = secretEntries(legacy);
+    if (entries.length > 0 && !this.crypto.isAvailable()) return undefined;
+    const migrated = emptySecrets();
+    try {
+      for (const [id, cipher] of entries) {
+        const plain = this.crypto.decrypt(Buffer.from(cipher, "base64"));
+        if (!plain) return undefined;
+        if (isProviderCredentialSecretId(id)) migrated.providerCredentials[id] = plain;
+        else migrated[id as PersistedSecretProviderId] = plain;
+      }
+      return migrated;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private assertCredentialStorageWritable(): void {
+    if (!this.credentialStorageIssue) return;
+    throw new ProviderSettingsError(this.credentialStorageIssue.message, "secret_storage_unavailable");
   }
 
   private async ensureAgentSystemPromptFile(legacySystemPrompt?: string): Promise<void> {
@@ -1067,6 +1171,58 @@ export class SettingsService {
     this.mutationTail = run.then(() => undefined, () => undefined);
     return run;
   }
+}
+
+function emptySecrets(): PersistedSecrets {
+  return { version: 2, providerCredentials: {} };
+}
+
+function unavailableSecrets(code: CredentialStorageIssueCode, message: string): ReadSecretsResult {
+  return { secrets: emptySecrets(), source: "unavailable", issue: { code, message } };
+}
+
+function parseSecretsV1(value: Record<string, unknown>): PersistedSecretsV1 | undefined {
+  const parsed = parseSecretFields(value, true);
+  return parsed ? { version: 1, ...parsed } : undefined;
+}
+
+function parseSecretsV2(value: Record<string, unknown>): PersistedSecrets | undefined {
+  const parsed = parseSecretFields(value, false);
+  return parsed ? { version: 2, ...parsed } : undefined;
+}
+
+function parseSecretFields(
+  value: Record<string, unknown>,
+  allowMissingProviderCredentials: boolean,
+): Omit<PersistedSecrets, "version"> | undefined {
+  const allowedTopLevel = new Set<string>(["version", "providerCredentials", ...ALL_SECRET_PROVIDER_IDS]);
+  if (Object.keys(value).some((key) => !allowedTopLevel.has(key))) return undefined;
+  if (!isRecord(value.providerCredentials) && !(allowMissingProviderCredentials && value.providerCredentials === undefined)) {
+    return undefined;
+  }
+
+  const parsed: Omit<PersistedSecrets, "version"> = { providerCredentials: {} };
+  for (const id of ALL_SECRET_PROVIDER_IDS) {
+    const secret = value[id];
+    if (secret === undefined) continue;
+    if (typeof secret !== "string" || secret.length === 0) return undefined;
+    parsed[id] = secret;
+  }
+  for (const [id, secret] of Object.entries(isRecord(value.providerCredentials) ? value.providerCredentials : {})) {
+    if (!isProviderCredentialSecretId(id) || typeof secret !== "string" || secret.length === 0) return undefined;
+    parsed.providerCredentials[id] = secret;
+  }
+  return parsed;
+}
+
+function secretEntries(secrets: PersistedSecretsV1): Array<[string, string]> {
+  const entries: Array<[string, string]> = [];
+  for (const id of ALL_SECRET_PROVIDER_IDS) {
+    const secret = secrets[id];
+    if (secret) entries.push([id, secret]);
+  }
+  entries.push(...Object.entries(secrets.providerCredentials));
+  return entries;
 }
 
 function defaultProviderSettings(): ProviderConnectionSettings {
@@ -1546,11 +1702,16 @@ function setOrDeleteEnv(key: string, value: string | undefined): void {
   else process.env[key] = value;
 }
 
-async function writeJsonAtomic(filePath: string, value: unknown): Promise<void> {
+async function writeJsonAtomic(filePath: string, value: unknown, options?: { mode?: number }): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
   const tmp = `${filePath}.tmp`;
-  await writeFile(tmp, JSON.stringify(value, null, 2) + "\n", "utf8");
+  await writeFile(tmp, JSON.stringify(value, null, 2) + "\n", {
+    encoding: "utf8",
+    ...(options?.mode !== undefined && { mode: options.mode }),
+  });
+  if (options?.mode !== undefined) await chmod(tmp, options.mode);
   await rename(tmp, filePath);
+  if (options?.mode !== undefined) await chmod(filePath, options.mode);
 }
 
 async function writeTextAtomic(filePath: string, value: string): Promise<void> {

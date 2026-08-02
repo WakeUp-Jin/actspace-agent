@@ -135,6 +135,7 @@ describe("SettingsPage", () => {
   const clearProviderKey = vi.fn(async () => ({ ok: true }));
   const testProviderConnection = vi.fn(async () => ({ ok: true, message: "连接成功" }));
   const listProviders = vi.fn(async () => ({
+    credentialStorage: { status: "ready" as const },
     providers: {
       deepseek: { provider: "deepseek" as const, hasApiKey: false, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 2, enabledModelCount: 2 },
       kimi: { provider: "kimi" as const, hasApiKey: true, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 2, enabledModelCount: 2 },
@@ -144,6 +145,7 @@ describe("SettingsPage", () => {
   const connectProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.deepseek }));
   const updateProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.openrouter }));
   const disconnectProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.kimi }));
+  const removeProvider = vi.fn(async () => ({ ok: true as const, provider: (await listProviders()).providers.kimi }));
   const getProviderBalance = vi.fn(async ({ provider }: { provider: "deepseek" | "kimi" | "openrouter" }) => ({
     provider,
     isConfigured: true,
@@ -209,6 +211,7 @@ describe("SettingsPage", () => {
     connectProvider.mockClear();
     updateProvider.mockClear();
     disconnectProvider.mockClear();
+    removeProvider.mockClear();
     getProviderBalance.mockClear();
     listInstalledModels.mockClear();
     listUsableModels.mockClear();
@@ -251,6 +254,7 @@ describe("SettingsPage", () => {
       connectProvider,
       updateProvider,
       disconnectProvider,
+      removeProvider,
       getProviderBalance,
       listInstalledModels,
       listUsableModels,
@@ -516,6 +520,7 @@ describe("SettingsPage", () => {
 
   it("OpenRouter 编辑弹窗可保存独立 Management Key", async () => {
     listProviders.mockResolvedValueOnce({
+      credentialStorage: { status: "ready" },
       providers: {
         deepseek: { provider: "deepseek" as const, hasApiKey: false, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 2, enabledModelCount: 2 },
         kimi: { provider: "kimi" as const, hasApiKey: false, baseUrl: null, proxy: { enabled: false, url: null }, installedModelCount: 2, enabledModelCount: 2 },
@@ -594,7 +599,7 @@ describe("SettingsPage", () => {
     await screen.findByRole("switch", { name: "自动审查" });
 
     await userEvent.click(screen.getByRole("button", { name: "服务商" }));
-    expect(await screen.findByRole("button", { name: "断开" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "移除 Kimi" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "模型" }));
     expect(await screen.findByLabelText("默认会话模型")).toBeInTheDocument();

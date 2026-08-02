@@ -277,7 +277,7 @@ Desktop Broker 继续通过 IPC 收到用户决策。CLI Interactive Broker 在 
 
 ### 8.3 凭据
 
-- Desktop 继续由 Electron Main 和 safeStorage 管理凭据。
+- Desktop 继续由 Electron Main 管理凭据：当前使用 main-only `0600` 明文文件，`safeStorage` 仅用于迁移旧版密文。
 - CLI 只读取显式配置或允许名单内的环境变量，不扫描、复制或挂载宿主 `.env`。
 - 自动化调用方通过显式环境变量注入所需 Key；CLI 只读取模型所需的允许名单。
 - Key 不进入 stdout、JSONL、session、trace 或最终回复。
@@ -415,7 +415,7 @@ Desktop Renderer 和 preload 契约第一阶段保持不变。`packages/desktop/
 - 把 Runtime Event 发送到 `agent:stream`；
 - 把错误映射为现有 IPC Result。
 
-以下能力进入 Runtime 或 Runtime Port：会话恢复、活动 Turn、Abort、结果提交、工具清理和终态事件。以下能力仍归 Desktop：Electron 生命周期、BrowserWindow、safeStorage、Settings 文件位置和 UI 通知。
+以下能力进入 Runtime 或 Runtime Port：会话恢复、活动 Turn、Abort、结果提交、工具清理和终态事件。以下能力仍归 Desktop：Electron 生命周期、BrowserWindow、凭据文件与旧密文迁移、Settings 文件位置和 UI 通知。
 
 迁移期间保留 `runAndPersistTurn()` 兼容入口作为 Adapter wrapper，直到 Desktop characterization tests 和真实 Electron 验收均通过，再决定是否重命名或删除。
 

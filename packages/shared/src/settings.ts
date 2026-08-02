@@ -4,7 +4,7 @@
  * 设计要点：
  * - `AppSettings` 是 renderer 看到的完整视图；供应商 API Key **永不**进入这里，
  *   renderer 只通过 `providers[id].hasApiKey` 得知"是否已在页面配置"。
- * - 供应商 Key 的唯一来源是用户在页面输入、经 Electron safeStorage 加密后单独落
+ * - 供应商 Key 的唯一来源是用户在页面输入，并单独落入 main-only、0600 权限的
  *   `secrets.json`；不再读取 .env 里的 Key。非敏感项落 `settings.json`。
  * - UI 偏好（主题等）不在这里，走 renderer localStorage。
  */
@@ -45,7 +45,7 @@ export interface ImageInspectionSettings {
   credentialId?: string;
 }
 
-/** 可在设置页保存加密密钥的全部供应商（LLM + 搜索 + 图片生成）。 */
+/** 可在设置页保存本地凭据的全部供应商（LLM + 搜索 + 图片生成）。 */
 export type SecretProviderId = LlmProviderId | SearchProviderId | ImageGenerationSecretId;
 
 export type KairosThinkingMode = "auto" | "on" | "off";
@@ -57,7 +57,7 @@ export type KairosThinkingMode = "auto" | "on" | "off";
 export type KairosModelId = Extract<ModelId, "deepseek-v4-pro" | "kimi-k2.6" | "kimi-k2.7-code">;
 
 export interface ProviderSettingsView {
-  /** 用户已在页面配置该供应商密钥（safeStorage 中存在）；决定卡片"已连接/可断开"。 */
+  /** 用户已在页面配置该供应商密钥；决定卡片"已连接/可断开"。 */
   hasApiKey: boolean;
   /** OpenRouter 可选 Management Key，仅用于账户 credits 余额查询。 */
   hasManagementKey?: boolean;
@@ -76,6 +76,12 @@ export interface ProviderSettingsView {
   /** 额外 Key 的脱敏视图，不包含密钥明文或密文。 */
   additionalCredentials?: ProviderCredentialView[];
 }
+
+export type CredentialStorageIssueCode = "read_failed" | "invalid_format" | "migration_failed";
+
+export type CredentialStorageView =
+  | { status: "ready" }
+  | { status: "unavailable"; code: CredentialStorageIssueCode; message: string };
 
 export type ProviderConnectionStatus = "untested" | "available" | "unavailable";
 export type ProviderConnectionErrorKind =
@@ -332,7 +338,7 @@ export type SetProviderKeyInput = {
 
 export type SetProviderKeyResult = {
   ok: boolean;
-  /** 仅在失败时给出（如系统密钥串不可用）；不包含任何明文密钥。 */
+  /** 仅在失败时给出（如凭据文件不可写）；不包含任何明文密钥。 */
   error?: string;
 };
 

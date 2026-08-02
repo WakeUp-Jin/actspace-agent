@@ -14,6 +14,7 @@ import { ModelSettings } from "../components/settings/ModelSettings";
 import { OpenRouterModelCatalogDialog } from "../components/settings/OpenRouterModelCatalogDialog";
 
 type ActspaceBridge = NonNullable<typeof window.actspace>;
+const readyCredentialStorage = { status: "ready" as const };
 
 const providerViews: Record<"deepseek" | "kimi" | "openrouter" | "duckcoding", ProviderSettingsView> = {
   deepseek: {
@@ -201,7 +202,7 @@ describe("provider and model settings", () => {
   it("saves an OpenRouter key and a provider-scoped proxy without echoing the key", async () => {
     const connectProvider = vi.fn(async () => ({ ok: true as const, provider: providerViews.openrouter }));
     window.actspace = {
-      listProviders: async () => ({ providers: providerViews }),
+      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
       connectProvider,
     } as unknown as ActspaceBridge;
 
@@ -225,9 +226,93 @@ describe("provider and model settings", () => {
     expect(screen.queryByDisplayValue("test-openrouter-key")).not.toBeInTheDocument();
   });
 
+  it("surfaces credential storage failures and blocks adding services without claiming keys are absent", async () => {
+    const unavailableProviders = Object.fromEntries(
+      Object.entries(providerViews).map(([id, provider]) => [id, { ...provider, hasApiKey: false }]),
+    ) as typeof providerViews;
+    window.actspace = {
+      listProviders: async () => ({
+        providers: unavailableProviders,
+        credentialStorage: {
+          status: "unavailable" as const,
+          code: "migration_failed" as const,
+          message: "旧版凭据无法解密。请使用最后一次能读取这些 Key 的 Actspace 版本启动后再迁移。",
+        },
+      }),
+    } as unknown as ActspaceBridge;
+
+    render(<ProviderSettings />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("本地凭据暂时无法读取");
+    expect(screen.getByRole("button", { name: "添加服务" })).toBeDisabled();
+    expect(screen.queryByText("还没有连接模型服务")).not.toBeInTheDocument();
+  });
+
+  it("preserves an existing proxy when editing OpenRouter without re-entering its address", async () => {
+    const configured = {
+      ...providerViews,
+      openrouter: {
+        ...providerViews.openrouter,
+        hasApiKey: true,
+        hasManagementKey: true,
+        proxy: { enabled: true, url: "http://127.0.0.1:••••" },
+      },
+    };
+    const updateProvider = vi.fn(async () => ({ ok: true as const, provider: configured.openrouter }));
+    window.actspace = {
+      listProviders: async () => ({ providers: configured, credentialStorage: readyCredentialStorage }),
+      updateProvider,
+    } as unknown as ActspaceBridge;
+
+    render(<ProviderSettings />);
+    const card = (await screen.findByRole("heading", { name: "OpenRouter" })).closest("article");
+    await userEvent.click(within(card!).getByRole("button", { name: "编辑" }));
+
+    const proxyInput = screen.getByLabelText("HTTP(S) 代理地址");
+    expect(proxyInput).toHaveAttribute("placeholder", "已配置；留空保持不变");
+    const save = screen.getByRole("button", { name: "保存" });
+    expect(save).toBeEnabled();
+    await userEvent.type(screen.getByLabelText("OpenRouter Management Key"), "replacement-management-key");
+    await userEvent.click(save);
+
+    await waitFor(() => {
+      expect(updateProvider).toHaveBeenCalledWith({
+        provider: "openrouter",
+        managementKey: "replacement-management-key",
+        baseUrl: null,
+      });
+    });
+  });
+
+  it("removes a provider after confirmation and returns it to the add-service list", async () => {
+    let current = { ...providerViews };
+    const removeProvider = vi.fn(async () => {
+      current = {
+        ...current,
+        deepseek: { ...current.deepseek, hasApiKey: false },
+      };
+      return { ok: true as const, provider: current.deepseek };
+    });
+    window.actspace = {
+      listProviders: async () => ({ providers: current, credentialStorage: readyCredentialStorage }),
+      removeProvider,
+    } as unknown as ActspaceBridge;
+
+    render(<ProviderSettings />);
+    await userEvent.click(await screen.findByRole("button", { name: "移除 DeepSeek" }));
+    const dialog = screen.getByRole("alertdialog", { name: "移除 DeepSeek？" });
+    expect(within(dialog).getByText(/已添加模型、历史会话与用量记录会保留/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "移除服务商" }));
+
+    await waitFor(() => expect(removeProvider).toHaveBeenCalledWith({ provider: "deepseek" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "DeepSeek" })).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "添加服务" }));
+    expect(screen.getByRole("button", { name: "选择 DeepSeek" })).toBeInTheDocument();
+  });
+
   it("traps focus in the provider modal and restores the add-service trigger after Escape", async () => {
     window.actspace = {
-      listProviders: async () => ({ providers: providerViews }),
+      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
     } as unknown as ActspaceBridge;
 
     render(<ProviderSettings />);
@@ -249,7 +334,7 @@ describe("provider and model settings", () => {
 
   it("renders only connected providers as compact grouped cards", async () => {
     window.actspace = {
-      listProviders: async () => ({ providers: providerViews }),
+      listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }),
     } as unknown as ActspaceBridge;
 
     render(<ProviderSettings />);
@@ -279,7 +364,7 @@ describe("provider and model settings", () => {
       },
     };
     window.actspace = {
-      listProviders: async () => ({ providers: extraOnly }),
+      listProviders: async () => ({ providers: extraOnly, credentialStorage: readyCredentialStorage }),
     } as unknown as ActspaceBridge;
 
     render(<ProviderSettings />);
@@ -287,7 +372,8 @@ describe("provider and model settings", () => {
     const heading = await screen.findByRole("heading", { name: "DuckCoding" });
     const card = heading.closest("article");
     expect(card).not.toBeNull();
-    expect(within(card!).queryByRole("button", { name: "断开" })).not.toBeInTheDocument();
+    expect(within(card!).queryByRole("button", { name: "断开默认" })).not.toBeInTheDocument();
+    expect(within(card!).getByRole("button", { name: "移除 DuckCoding" })).toBeInTheDocument();
     await userEvent.click(within(card!).getByRole("button", { name: "编辑" }));
     expect(screen.getByRole("dialog", { name: "编辑 DuckCoding" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("CodeX-Sale")).toBeInTheDocument();

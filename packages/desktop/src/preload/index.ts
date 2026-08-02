@@ -384,6 +384,7 @@ contextBridge.exposeInMainWorld("actspace", {
   updateProvider: (input: ProviderUpdateInput) => ipcRenderer.invoke("providers:update", input) as Promise<ProviderOperationResult>,
   testProvider: (input: ProviderIdInput) => ipcRenderer.invoke("providers:test", input) as Promise<ProviderTestResult>,
   disconnectProvider: (input: ProviderIdInput) => ipcRenderer.invoke("providers:disconnect", input) as Promise<ProviderOperationResult>,
+  removeProvider: (input: ProviderIdInput) => ipcRenderer.invoke("providers:remove", input) as Promise<ProviderOperationResult>,
   addProviderCredential: (input: ProviderCredentialAddInput) => ipcRenderer.invoke("provider-credentials:add", input) as Promise<ProviderCredentialOperationResult>,
   updateProviderCredential: (input: ProviderCredentialUpdateInput) => ipcRenderer.invoke("provider-credentials:update", input) as Promise<ProviderCredentialOperationResult>,
   testProviderCredential: (input: ProviderCredentialInput) => ipcRenderer.invoke("provider-credentials:test", input) as Promise<ProviderCredentialOperationResult>,

@@ -157,8 +157,8 @@ Codex 标准基础价格按 USD / 1M tokens 保存：
 
 ### 持久化边界
 
-- 默认 Key 密文继续保存于现有 provider secret 槽位。
-- 额外 Key 密文保存于 `<provider>:<credentialId>` 对应的 `safeStorage` 槽位。
+- 默认 Key 明文保存于 main-only `secrets.json` v2 的现有 provider 字段。
+- 额外 Key 明文保存于 `<provider>:<credentialId>` 对应字段；凭据文件权限固定为 `0600`。
 - 普通 settings 只保存 id、label、倍率和连接状态。
 - 模型只保存可选 `credentialId`；缺省表示动态继承供应商默认 Key。
 - renderer 永不接收 Key 明文或密文。

@@ -11,6 +11,7 @@ import type {
   ProviderConnectionErrorKind,
   ProviderProxySettings,
   ProviderSettingsView,
+  CredentialStorageView,
   TaskModelSettings,
 } from "./settings";
 
@@ -383,6 +384,7 @@ export type ProviderOperationError = {
 
 export type ProvidersListResult = {
   providers: Record<ProviderId, ProviderSettingsView>;
+  credentialStorage: CredentialStorageView;
 };
 
 export type ProviderConnectInput = {

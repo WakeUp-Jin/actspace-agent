@@ -550,7 +550,7 @@ async function loadAllKairosEvents(shortMemoryRoot: string): Promise<SessionEven
 
 // ─── 设置（Settings） ───
 
-/** 生产环境用 Electron safeStorage 为供应商 API Key 加解密。 */
+/** 仅用于把历史 secrets.json v1 密文一次性迁移为本地明文 v2。 */
 const electronSecretCrypto: SecretCrypto = {
   isAvailable: () => safeStorage.isEncryptionAvailable(),
   encrypt: (plain) => safeStorage.encryptString(plain),
@@ -1829,6 +1829,7 @@ async function registerIpc() {
 
   ipcMain.handle("providers:list", async (): Promise<ProvidersListResult> => ({
     providers: getSettingsService().getV2().providers,
+    credentialStorage: getSettingsService().getCredentialStorageView(),
   }));
 
   ipcMain.handle("providers:connect", async (_event, input: ProviderConnectInput): Promise<ProviderOperationResult> => {
@@ -1934,6 +1935,17 @@ async function registerIpc() {
         apiKey: null,
         ...(input.provider === "openrouter" && { managementKey: null }),
       });
+      await reconcileKairosModelChange(await ensureDataDirectories());
+      return { ok: true, provider: getSettingsService().getV2().providers[input.provider] };
+    } catch (error) {
+      return providerOperationFailure(providerErrorCode(error), safeErrorMessage(error));
+    }
+  });
+
+  ipcMain.handle("providers:remove", async (_event, input: ProviderIdInput): Promise<ProviderOperationResult> => {
+    if (!isProviderId(input?.provider)) return providerOperationFailure("invalid_provider", "未知服务商。");
+    try {
+      await getSettingsService().removeProvider(input.provider);
       await reconcileKairosModelChange(await ensureDataDirectories());
       return { ok: true, provider: getSettingsService().getV2().providers[input.provider] };
     } catch (error) {
@@ -2344,7 +2356,12 @@ app.whenReady().then(async () => {
   settingsService = new SettingsService({ dataRoot: roots.dataRoot, crypto: electronSecretCrypto });
   try {
     await settingsService.load();
-    logMain("settings service ready", { dataRoot: roots.dataRoot });
+    const credentialStorage = settingsService.getCredentialStorageView();
+    logMain("settings service ready", {
+      dataRoot: roots.dataRoot,
+      credentialStorageStatus: credentialStorage.status,
+      ...(credentialStorage.status === "unavailable" && { credentialStorageIssue: credentialStorage.code }),
+    });
   } catch (err) {
     logMain("settings service load failed", { error: err instanceof Error ? err.message : String(err) });
   }

@@ -234,6 +234,7 @@ Provider adapter 可提供：
 - 首版仅接受 `http://` / `https://` 代理地址，典型值为 `http://127.0.0.1:7890`。
 - 首版拒绝 URL 中出现 username/password；未来支持代理认证时，凭据必须进入加密 secrets 存储。
 - 代理地址校验在 main 进程完成，renderer 只提交结构化设置。
+- 编辑已启用代理的服务商时，renderer 不回显脱敏地址；更新契约使用三态语义：省略 `proxy` 保持原值，传入新 URL 表示替换，`{ enabled: false, url: null }` 表示清除。
 
 OpenAI Node SDK 可通过 `fetchOptions.dispatcher` 接受 `undici.ProxyAgent`。实现时 `undici` 必须作为直接依赖，不依赖 lockfile 中的传递依赖。
 
@@ -250,12 +251,14 @@ ProxyAgent 需要按标准化代理 URL 缓存复用，避免每轮 turn 新建�
 | Enabled | 用户允许被选择 | 仍需判断服务商与能力 |
 | Usable | Provider 可用且满足任务能力 | 是，取决于任务类型 |
 
-断开服务商时：
+移除服务商时：
 
 - 保留已添加模型和自定义名称。
 - 模型状态变为 unavailable，不出现在新选择器候选项中。
 - 不修改历史会话中的模型身份。
 - 重新连接并测试成功后自动恢复可用性。
+- 原子清除默认 Key、Management Key、额外 Key、Base URL、代理和连接状态；历史 usage、session 与模型定义不删除。
+- 绑定已移除额外 Key 的模型保留原 `credentialId` 并显式报告凭据缺失，不自动回退到默认 Key。
 
 删除用户添加模型时：
 
@@ -475,11 +478,11 @@ interface PersistedSettingsV2 {
 
 敏感值：
 
-- `secrets.json` 增加 `openrouter` API Key 密文。
+- Desktop Key 集中写入 main-only `<userData>/secrets.json` v2 明文文件，创建、原子替换和启动读取时都收紧为 `0600`。
 - renderer 的 `AppSettings` 只收到 `hasApiKey`、连接状态和非敏感配置。
 - 明文 key 只在 main / agent-core 创建 runtime config、连接测试和目录请求时短暂使用。
 
-Electron 的真实 turn、上下文压缩、Explore/Kairos、评估候选和回复可视化等直接 LLM 消费路径统一通过 `ModelRuntimeService` 装配显式 `ProviderRuntimeConfig`；不把 `safeStorage` 中的 LLM Key 回写 `process.env`。环境变量入口继续只保留给 CLI、CI、测试和兼容场景，但新增供应商不应继续扩张散落的手写 Map。
+Electron 的真实 turn、上下文压缩、Explore/Kairos、评估候选和回复可视化等直接 LLM 消费路径统一通过 `ModelRuntimeService` 装配显式 `ProviderRuntimeConfig`；不把 Desktop 设置页保存的 LLM Key 回写 `process.env`。环境变量入口继续只保留给 CLI、CI、测试和兼容场景，但新增供应商不应继续扩张散落的手写 Map。
 
 ## IPC 边界
 
@@ -590,21 +593,22 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 
 ## 安全约束
 
-- API Key 使用 Electron `safeStorage` 加密，renderer 永不获得明文。
-- OpenRouter 模型调用 Key 与 Management Key 分开加密存储：前者用于模型、目录和连接测试，后者只用于需要 Management Key 的 `/credits` 账户余额请求。
+- API Key 使用 main-only `secrets.json` v2 明文存储，文件权限固定为 `0600`；renderer 永不获得明文。该权限只隔离同机其他用户，不等同于静态加密。
+- OpenRouter 模型调用 Key 与 Management Key 分字段存储：前者用于模型、目录和连接测试，后者只用于需要 Management Key 的 `/credits` 账户余额请求。
+- `secrets.json` 读取、格式校验、权限收紧或旧版迁移失败时，所有凭据写操作必须停止，原文件保持不变，renderer 只显示脱敏存储错误。
 - Base URL 和代理 URL 只允许 `http:` / `https:`；连接测试前解析并规范化。
 - 首版代理 URL 禁止 username/password。
 - catalog item 的 label、ID 等远端字符串只作为文本展示，不拼接 HTML。
 - 自定义模型 ID 设长度上限并拒绝控制字符。
 - 连接测试使用固定、无隐私探针，不发送 workspace、session 或工具内容。
 - 测试成功不代表永久可用；真实请求仍必须正常处理 auth / network 等错误。
-- 断开服务商只删除对应密钥，不应误删历史 usage、session 或用户模型定义。断开 OpenRouter 时同时删除其调用 Key 与 Management Key。
+- DuckCoding 的「断开默认」只删除默认 Key；完整移除服务商会清除其全部密钥和连接设置，但不应误删历史 usage、session 或用户模型定义。移除 OpenRouter 时同时删除调用 Key、Management Key 与额外 Key。
 
 ## 迁移
 
 从 settings v1 迁移到 v2：
 
-1. 现有 DeepSeek / Kimi 密钥保持原 safeStorage 密文，不解密重写。
+1. 现有 settings 字段按下列规则迁移；旧 `secrets.json` v1 则单独执行全量迁移：所有 `safeStorage` 密文先在内存完整解密，全部成功后才原子写为 `0600` 的 v2 明文文件，任一失败都保留原文件并阻止后续覆盖。
 2. DeepSeek / Kimi 内置模型写入 installedModels，保持当前公开模型 enabled。
 3. 现有 `defaultModelId` 映射到 `taskModels.defaultChatModel`。
 4. 现有 `agent.exploreModelId` 映射到 `taskModels.exploreModel`。
@@ -635,7 +639,7 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 
 ### Desktop main
 
-- Key 加密、连接、断开与 renderer 脱敏视图。
+- Key 明文文件权限、旧密文迁移、连接、移除与 renderer 脱敏视图。
 - 连接测试与 catalog reload 使用同一代理配置。
 - cache 成功、stale、离线回退与坏 JSON 恢复。
 - catalog reload 成功后刷新已安装目录模型的能力快照，同时保留 enabled、addedAt 和任务引用。

@@ -91,8 +91,9 @@
 当前实现以 `docs/design-docs/model-context/agent-multi-provider-llm.md` 为事实来源：
 
 - 左侧新增独立的「服务商」分区；现有「模型」分区从连接供应商改为管理已添加模型与任务模型，不再混合连接信息。
-- 「服务商」管理 DeepSeek / Kimi / OpenRouter 的 API Key、Base URL、连接测试、断开连接和服务商级代理。OpenRouter 额外允许配置独立 Management Key，只用于调用 `/credits` 查询账户余额，不参与模型请求、连接测试或目录请求。代理只影响开启它的服务商；搜索供应商仍留在工具相关设置，不并入 LLM 服务商。
-- 服务商首屏只展示已连接项，按「官方 API（直连）」与「第三方 / 中转兼容」分组；页面右上角统一提供「添加服务」，先选择未连接服务商，再进入凭据表单。每个服务商使用桌面端两列、窄窗单列的紧凑卡片：头部承载身份、连接状态和测试/编辑/断开操作，中部统一展示账户余额与刷新状态，下方信息区展示可用模型、接入方式、接入地址与代理状态。进入页面时自动刷新一次，停留期间每 5 分钟刷新，失败保留上次成功结果。
+- 「服务商」管理 DeepSeek / Kimi / OpenRouter / DuckCoding 的 API Key、Base URL、连接测试、完整移除和服务商级代理。OpenRouter 额外允许配置独立 Management Key，只用于调用 `/credits` 查询账户余额，不参与模型请求、连接测试或目录请求。代理只影响开启它的服务商；搜索供应商仍留在工具相关设置，不并入 LLM 服务商。
+- 服务商首屏只展示已连接项，按「官方 API（直连）」与「第三方 / 中转兼容」分组；页面右上角统一提供「添加服务」，先选择未连接服务商，再进入凭据表单。每个服务商使用桌面端两列、窄窗单列的紧凑卡片：头部承载身份、连接状态和测试/编辑/移除操作，中部统一展示账户余额与刷新状态，下方信息区展示可用模型、接入方式、接入地址与代理状态。移除前必须二次确认；成功后清除该服务商全部 Key、Base URL、代理和连接状态，使其回到「添加服务」，但保留模型、历史会话和用量记录。DuckCoding 有额外 Key 时保留独立的「断开默认」动作。进入页面时自动刷新一次，停留期间每 5 分钟刷新，失败保留上次成功结果。
+- 已开启代理的编辑弹窗不回显代理地址；留空表示保持原值，输入新地址表示替换，关闭代理开关表示清除。只有首次开启代理时才要求填写地址，避免只修改 Management Key 等其他字段时被旧代理配置阻断。
 - “联网搜索服务”保持独立的横向列表，不复用 LLM 服务商卡片；每个搜索服务占一行，左侧显示名称、连接状态与说明，右侧显示连接/断开操作，底部保留 Tavily 用量信息。
 - “图片生成服务”同样保持独立，但首屏只使用一行摘要卡片：显示「已配置 / 未配置」、当前模型、服务地址 host 和 Key 安全保存状态。API Key、Base URL 与模型名称统一在弹窗内编辑，其中 Base URL / 模型名称默认折叠为高级设置；已有 Key 不回显，断开入口留在编辑弹窗左下角。由于保存过程不发起连接探针，不使用「已连接」措辞。
 - 「模型」顶部提供主会话默认模型、轻量任务模型和 Explore 模型选择；候选项统一来自已经连接、已添加、已启用且能力匹配的模型，并按供应商分组。跨供应商同名模型在选项文字中追加供应商名称，确保原生 Select 收起后仍可辨识。Kairos 模型继续留在 Kairos 分区，但复用同一个可用模型解析器和分组规则。
@@ -184,7 +185,7 @@
 
 - 非敏感配置落 `<userData>/settings.json`（原子写）。
 - 全局快捷键的组合键与打开目标落 `settings.shortcuts.quickOpen`；Electron main 先注册候选组合键，再持久化并注销旧组合键，避免冲突配置被保存成已生效状态。
-- **供应商 API Key 用 Electron `safeStorage` 加密**单独落盘；UI 与 IPC 永不回传明文，仅返回「是否已配置」。
+- **供应商、搜索与图片 API Key 集中写入 main-only `<userData>/secrets.json` v2 明文文件**；创建、原子替换和启动读取时统一收紧为 `0600`。UI 与 IPC 永不回传明文，仅返回「是否已配置」或脱敏存储错误。读取、格式、权限或旧密文迁移失败时，服务商页显示错误并禁用新增，main 同时阻止所有凭据写入，避免空状态覆盖原文件。
 - 本地更新源码目录落 `<userData>/local-update.json`，只保存路径；更新日志写 `<userData>/tmp/local-update/update.log`，阶段状态写同目录 `status.json`。`local-update:start` 只接受已保存且通过校验的源码目录，不接受 renderer 传入的任意命令或脚本内容。
 - 配置生效：main 把 env-backed 设置覆盖到 `process.env` 后 `loadEnv()` 刷新冻结的 `env`，**下一轮对话自动生效，无需重启**；`settings.json` 只保存主 Agent 系统提示词文件路径，正文由 `settings:read-agent-system-prompt` / `settings:write-agent-system-prompt` 读写 `<userData>/prompts/main-agent.md`，真实 turn 和 `context:describe` 都从同一 prompt 文件注入；Kairos 思考链变更时在空闲态重建 Kairos LLM。Kairos 模型不再走 settings/env：其唯一来源是 `preferences.json` 的 `modelId`，由 `kairos:write-config` 保存后按 modelId 变化触发空闲态重建。
 - UI 偏好（主题、UI/代码字体、界面缩放、代码字号）走 renderer `localStorage`，不进 `settings.json`；开机渲染前重放。

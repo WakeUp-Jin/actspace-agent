@@ -86,7 +86,7 @@ Search providers    → Zhipu / Tavily / TinyFish / Exa
 Image generation    → one user-configured OpenAI-compatible endpoint
 ```
 
-三类服务可以复用同一套 `safeStorage`、连接/断开 IPC 和密钥表单交互，但共享基础设施不代表共享业务类型。V0 使用单例 `imageGeneration` 设置，不虚构 `ImageGenerationProviderId`，也不把它加入 `ProviderId` 或 `SearchProviderId`。
+三类服务可以复用同一套 main-only 凭据文件、连接/断开 IPC 和密钥表单交互，但共享基础设施不代表共享业务类型。V0 使用单例 `imageGeneration` 设置，不虚构 `ImageGenerationProviderId`，也不把它加入 `ProviderId` 或 `SearchProviderId`。
 
 ## 5. 工具参数契约
 
@@ -286,16 +286,16 @@ interface AppSettingsV2 {
 
 配置边界：
 
-- 设置页保留独立「图片生成服务」Section，默认只展示「已配置 / 未配置」、当前模型、Base URL host 和 Key 已安全保存的摘要；完整表单通过「立即配置 / 编辑配置」弹窗打开，避免低频配置长期占据页面空间。
+- 设置页保留独立「图片生成服务」Section，默认只展示「已配置 / 未配置」、当前模型、Base URL host 和 Key 已本地保存的摘要；完整表单通过「立即配置 / 编辑配置」弹窗打开，避免低频配置长期占据页面空间。
 - 首次配置弹窗直接展示 API Key；Base URL 与模型名称收进默认折叠的「高级设置」。已有 Key 只显示安全保存状态，不回显明文，用户主动选择「更换 Key」后才出现新的密码输入框。
 - Base URL 默认预填 `https://www.duckcoding.ai/v1`；用户可以覆盖为其他 OpenAI-compatible API 根地址。
 - 模型名称默认预填 `gpt-image-2`；接受 trim 后非空的字符串，不建立模型白名单，建议最大长度 200 且拒绝控制字符。
 - 用户可以只修改 Base URL 或模型名称而不重新输入已保存的 Key；保存后下一轮 Runtime 使用新配置。
 - 状态使用「已配置」而不是「已连接」：V0 保存时不发起连接探针，不能把本地存在 Key 误表述为上游鉴权已经验证。
 - UI 只读取 `hasApiKey`，不读取旧 Key 明文，也不把 Key 写进 renderer store。
-- Key 经 Electron `safeStorage` 加密写入 `secrets.json`。
+- Key 以明文写入 main-only `secrets.json` v2，文件权限固定为 `0600`；renderer 不读取文件或明文。
 - Base URL 和模型名称规范化后写入 `settings.json`，不进入 `secrets.json`。
-- main 解密 Key，并把 Key/Base URL/模型名称写入当前运行时的 `IMAGE_GENERATION_API_KEY` / `IMAGE_GENERATION_BASE_URL` / `IMAGE_GENERATION_MODEL` overlay。
+- main 读取 Key，并把 Key/Base URL/模型名称写入当前运行时的 `IMAGE_GENERATION_API_KEY` / `IMAGE_GENERATION_BASE_URL` / `IMAGE_GENERATION_MODEL` overlay。
 - `agent-core/env.ts` 集中声明并读取这三个字段，executor 不直接散落读取 `process.env`。
 - `ToolRuntimeConfig.hasImageGenerationKey` 为 true 时才注册 `generate_image`。
 - 缺 Key 时 executor 仍保留防御性错误，但正常路径下模型看不到该工具，避免同一轮反复失败。
