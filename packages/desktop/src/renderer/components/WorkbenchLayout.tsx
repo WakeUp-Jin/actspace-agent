@@ -13,7 +13,7 @@ import { SplitView } from "./SplitView";
 import { UsageStatisticsPage } from "./UsageStatisticsPage";
 import { WindowChromeBar } from "./WindowChromeBar";
 import { WorkspaceChromeControls } from "./workspace/WorkspaceChromeControls";
-import type { ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
+import type { ComposerDraftReader, ComposerDraftRestore, ComposerDraftWriter, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
 import type { SessionPreviewResolver } from "./SessionHoverPreview";
 import { KairosPage } from "../pages/KairosPage";
 import { SettingsPage } from "./settings/SettingsPage";
@@ -207,6 +207,16 @@ export function WorkbenchLayout({
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState<string | null>(null);
   const reviewTabRefreshCounterRef = useRef(0);
+  const composerDraftsRef = useRef(new Map<string, string>());
+  const draftKey = activeSessionId ?? "__draft__";
+  const readDraft = useCallback<ComposerDraftReader>((key) => composerDraftsRef.current.get(key) ?? "", []);
+  const writeDraft = useCallback<ComposerDraftWriter>((key, text) => {
+    if (text.length === 0) {
+      composerDraftsRef.current.delete(key);
+      return;
+    }
+    composerDraftsRef.current.set(key, text);
+  }, []);
   const isCompactLayout = containerWidth > 0 && containerWidth <= COMPACT_LAYOUT_MAX_WIDTH;
   const isSidebarHidden = leftMode === "hidden";
   const displayedLeftWidth = isSidebarHidden ? 0 : leftWidth;
@@ -448,6 +458,9 @@ export function WorkbenchLayout({
         onSelectWorkspace={onSelectWorkspace}
         executionContext={executionContext}
         draftRestore={draftRestore}
+        draftKey={draftKey}
+        readDraft={readDraft}
+        writeDraft={writeDraft}
         reviewSummary={reviewSummary}
         onOpenReview={openReviewTab}
         models={models}

@@ -40,6 +40,14 @@
 - Chat / Plan / Agent 不是只改 placeholder 的视觉标签；每次发送都必须把模式作为显式运行参数传入 main 和 Agent Runtime，由工具暴露层强制能力边界。Prompt 只负责行为指导，不承担权限隔离。
 - Slash Command 在普通 Agent Turn 之前分流：`/compact` 触发上下文压缩，`/eval [失败说明]` 触发最近失败 Turn 的回归 Candidate 生成；命令文本不作为普通用户消息显示。可发现菜单、键盘行为、Functions / Skills 分组及 V1 边界统一见 `front-composer-slash-command.md`。
 
+## 草稿与历史输入
+
+- 未发送的文字草稿按 `sessionId` 隔离，并由比 Conversation 页面生命周期更长的 Workbench 内存状态持有；进入设置、Usage、Kairos 等页面，或在会话之间切换后返回时，恢复该会话自己的文字草稿。
+- 草稿只在当前应用运行期间保留，不写入 `session.jsonl`，关闭或刷新应用后不保证恢复。发送开始后清空当前草稿；如果输入尚未持久化就发送失败，继续使用 Composer 的失败恢复机制回填文字和附件，且失败恢复必须校验原会话 ID，不得跨会话回填。
+- 历史输入来自当前会话已经持久化的用户文字消息，按时间从旧到新排列；不恢复消息当时的附件、模型、模式或 Skills，避免重新绑定已经过期的执行配置。
+- 普通输入框为空时，`ArrowUp` 从最近一条历史输入开始向前浏览；浏览期间 `ArrowDown` 向后移动，越过最新一条后恢复为空输入。
+- 新鲜的非空文字和多行文字继续使用 textarea 原生方向键移动光标。Slash Command 菜单打开时方向键优先导航菜单；IME 组词期间不触发历史回溯。
+
 ## Composer 形态
 
 ### Ink & Emerald 视觉职责

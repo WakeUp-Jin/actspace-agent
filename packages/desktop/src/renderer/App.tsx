@@ -1677,6 +1677,7 @@ export function App() {
         } else if (!isCompactCommand && !isEvalCommand) {
           setComposerDraftRestore({
             id: Date.now(),
+            sessionId,
             text,
             attachments: options.attachments,
             error: error instanceof Error ? error.message : "Could not prepare the execution context.",

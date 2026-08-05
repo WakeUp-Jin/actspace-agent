@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -14,29 +14,38 @@ function setViewportWidth(width: number) {
   });
 }
 
-function renderWorkbench() {
-  return render(
+type WorkbenchProps = Parameters<typeof WorkbenchLayout>[0];
+
+const responsiveSessions: WorkbenchProps["sessions"] = [
+  {
+    id: "session-responsive",
+    title: "Responsive layout",
+    updatedAt: new Date().toISOString(),
+    agentRunCount: 0,
+    workspaceRoot: "/tmp/workspace",
+  },
+];
+
+function WorkbenchFixture(overrides: Partial<WorkbenchProps> = {}) {
+  return (
     <StrictMode>
       <RightPanelProvider>
         <WorkbenchLayout
-        sessions={[
-          {
-            id: "session-responsive",
-            title: "Responsive layout",
-            updatedAt: new Date().toISOString(),
-            agentRunCount: 0,
-            workspaceRoot: "/tmp/workspace",
-          },
-        ]}
-        activeSessionId="session-responsive"
-        title="Responsive layout"
-        messages={[]}
-        contextSnapshot={null}
-        selectedWorkspaceRoot="/tmp/workspace"
+          sessions={responsiveSessions}
+          activeSessionId="session-responsive"
+          title="Responsive layout"
+          messages={[]}
+          contextSnapshot={null}
+          selectedWorkspaceRoot="/tmp/workspace"
+          {...overrides}
         />
       </RightPanelProvider>
-    </StrictMode>,
+    </StrictMode>
   );
+}
+
+function renderWorkbench(overrides: Partial<WorkbenchProps> = {}) {
+  return render(<WorkbenchFixture {...overrides} />);
 }
 
 describe("WorkbenchLayout narrow window behavior", () => {
@@ -99,6 +108,78 @@ describe("WorkbenchLayout narrow window behavior", () => {
     expect(screen.queryByTestId("compact-right-panel-overlay")).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "右侧面板对象" })).toBeInTheDocument();
     expect(screen.getByRole("separator", { name: "Resize preview panel" })).toBeInTheDocument();
+  });
+
+  it("restores an unsent draft after visiting Settings", async () => {
+    const user = userEvent.setup();
+    setViewportWidth(1120);
+    renderWorkbench();
+
+    await user.type(screen.getByLabelText("Message composer"), "keep this draft");
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "返回应用" }));
+
+    expect(screen.getByLabelText("Message composer")).toHaveValue("keep this draft");
+  });
+
+  it("keeps separate unsent drafts for different sessions", async () => {
+    const user = userEvent.setup();
+    setViewportWidth(1120);
+    const sessions: WorkbenchProps["sessions"] = [
+      {
+        id: "session-a",
+        title: "Session A",
+        updatedAt: "2026-08-05T10:00:00.000Z",
+        agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
+      },
+      {
+        id: "session-b",
+        title: "Session B",
+        updatedAt: "2026-08-05T09:00:00.000Z",
+        agentRunCount: 0,
+        workspaceRoot: "/tmp/workspace",
+      },
+    ];
+    const { rerender } = renderWorkbench({ sessions, activeSessionId: "session-a", title: "Session A" });
+
+    await user.type(screen.getByLabelText("Message composer"), "draft for A");
+    rerender(<WorkbenchFixture sessions={sessions} activeSessionId="session-b" title="Session B" />);
+    await waitFor(() => expect(screen.getByLabelText("Message composer")).toHaveValue(""));
+
+    await user.type(screen.getByLabelText("Message composer"), "draft for B");
+    rerender(<WorkbenchFixture sessions={sessions} activeSessionId="session-a" title="Session A" />);
+    await waitFor(() => expect(screen.getByLabelText("Message composer")).toHaveValue("draft for A"));
+
+    rerender(<WorkbenchFixture sessions={sessions} activeSessionId="session-b" title="Session B" />);
+    await waitFor(() => expect(screen.getByLabelText("Message composer")).toHaveValue("draft for B"));
+  });
+
+  it("recalls persisted user messages through the Workbench composer", async () => {
+    const user = userEvent.setup();
+    setViewportWidth(1120);
+    renderWorkbench({
+      messages: [
+        {
+          kind: "user",
+          id: "user-history-1",
+          content: "previous session prompt",
+          createdAt: "2026-08-05T10:00:00.000Z",
+        },
+        {
+          kind: "assistant",
+          id: "assistant-history-1",
+          content: "Previous reply",
+          createdAt: "2026-08-05T10:00:01.000Z",
+        },
+      ],
+    });
+
+    const input = screen.getByLabelText("Message composer");
+    await user.click(input);
+    await user.keyboard("{ArrowUp}");
+
+    expect(input).toHaveValue("previous session prompt");
   });
 
   it("lets the right panel use the wide-screen space left after protecting the conversation", async () => {

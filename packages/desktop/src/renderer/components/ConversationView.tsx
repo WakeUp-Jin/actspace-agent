@@ -1,7 +1,7 @@
 import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComposerAttachment, ComposerMode, ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
-import { Composer, type ComposerDraftRestore, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
+import { Composer, type ComposerDraftReader, type ComposerDraftRestore, type ComposerDraftWriter, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { useRightPanel } from "./right-panel/RightPanelContext";
@@ -665,6 +665,9 @@ export function ConversationView({
   onSelectWorkspace,
   executionContext,
   draftRestore,
+  draftKey,
+  readDraft,
+  writeDraft,
   reviewSummary,
   onOpenReview,
   models,
@@ -692,10 +695,19 @@ export function ConversationView({
   onSelectWorkspace?: (workspaceRoot: string) => void;
   executionContext?: ComposerExecutionContext;
   draftRestore?: ComposerDraftRestore | null;
+  draftKey?: string;
+  readDraft?: ComposerDraftReader;
+  writeDraft?: ComposerDraftWriter;
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
 }) {
   const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
+  const inputHistory = useMemo(
+    () => messages
+      .filter((message): message is UserMessageBlock => message.kind === "user" && message.content.length > 0)
+      .map((message) => message.content),
+    [messages],
+  );
   const turnNavigationItems = useMemo(
     () => createTurnNavigationItems(turns, isStreaming),
     [isStreaming, turns],
@@ -894,6 +906,10 @@ export function ConversationView({
                 onSelectWorkspace={onSelectWorkspace}
                 executionContext={executionContext}
                 draftRestore={draftRestore}
+                draftKey={draftKey}
+                readDraft={readDraft}
+                writeDraft={writeDraft}
+                inputHistory={inputHistory}
                 focusRequestId={composerFocusRequestId}
                 models={models}
               />
@@ -980,6 +996,10 @@ export function ConversationView({
             onSelectWorkspace={onSelectWorkspace}
             executionContext={executionContext}
             draftRestore={draftRestore}
+            draftKey={draftKey}
+            readDraft={readDraft}
+            writeDraft={writeDraft}
+            inputHistory={inputHistory}
             focusRequestId={composerFocusRequestId}
             reviewSummary={latestActiveTranscriptMessage ? null : reviewSummary}
             onOpenReview={onOpenReview}

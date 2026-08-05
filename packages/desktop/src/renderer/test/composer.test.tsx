@@ -125,6 +125,58 @@ const duckCodingModels: UsableModelView[] = [{
 }];
 
 describe("Composer follow-up bar", () => {
+  it("navigates the current session input history from an empty composer", async () => {
+    const user = userEvent.setup();
+    renderComposer({ inputHistory: ["first prompt", "second prompt"] });
+    const input = screen.getByLabelText("Message composer");
+
+    await user.click(input);
+    await user.keyboard("{ArrowUp}");
+    expect(input).toHaveValue("second prompt");
+
+    await user.keyboard("{ArrowUp}");
+    expect(input).toHaveValue("first prompt");
+
+    await user.keyboard("{ArrowUp}");
+    expect(input).toHaveValue("first prompt");
+
+    await user.keyboard("{ArrowDown}");
+    expect(input).toHaveValue("second prompt");
+
+    await user.keyboard("{ArrowDown}");
+    expect(input).toHaveValue("");
+  });
+
+  it("keeps native arrow behavior for fresh text and IME composition", async () => {
+    const user = userEvent.setup();
+    renderComposer({ inputHistory: ["older prompt"] });
+    const input = screen.getByLabelText("Message composer");
+
+    await user.type(input, "current draft");
+    await user.keyboard("{ArrowUp}");
+    expect(input).toHaveValue("current draft");
+
+    await user.clear(input);
+    fireEvent.keyDown(input, { key: "ArrowUp", code: "ArrowUp", keyCode: 229, isComposing: true });
+    expect(input).toHaveValue("");
+  });
+
+  it("does not restore a failed draft into a different session", async () => {
+    renderComposer({
+      draftKey: "session-b",
+      readDraft: () => "draft for B",
+      writeDraft: vi.fn(),
+      draftRestore: {
+        id: 1,
+        sessionId: "session-a",
+        text: "failed draft for A",
+        error: "Preparation failed",
+      },
+    });
+
+    await waitFor(() => expect(screen.getByLabelText("Message composer")).toHaveValue("draft for B"));
+  });
+
   it("renders the follow-up shell with review preview and status row", () => {
     renderComposer({
       reviewSummary: {

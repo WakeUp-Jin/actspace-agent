@@ -92,10 +92,14 @@ export type ComposerExecutionContext = {
 
 export type ComposerDraftRestore = {
   id: number;
+  sessionId: string;
   text: string;
   attachments?: ComposerAttachment[];
   error?: string;
 };
+
+export type ComposerDraftReader = (draftKey: string) => string;
+export type ComposerDraftWriter = (draftKey: string, text: string) => void;
 
 export type ComposerReviewSummary = {
   status: "loading" | "changes" | "empty" | "notAvailable" | "noBaseline" | "partial" | "failed";
@@ -463,6 +467,10 @@ export function Composer({
   onSelectWorkspace,
   executionContext,
   draftRestore,
+  draftKey,
+  readDraft,
+  writeDraft,
+  inputHistory = [],
   focusRequestId = 0,
   reviewSummary,
   onOpenReview,
@@ -491,6 +499,10 @@ export function Composer({
   onSelectWorkspace?: (workspaceRoot: string) => void;
   executionContext?: ComposerExecutionContext;
   draftRestore?: ComposerDraftRestore | null;
+  draftKey?: string;
+  readDraft?: ComposerDraftReader;
+  writeDraft?: ComposerDraftWriter;
+  inputHistory?: string[];
   focusRequestId?: number;
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
@@ -541,13 +553,14 @@ export function Composer({
   const attachmentsRef = useRef<ComposerAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(() => draftKey && readDraft ? readDraft(draftKey) : "");
   const [workspaceFolderName, setWorkspaceFolderName] = useState("");
   const [creatingWorkspaceFolder, setCreatingWorkspaceFolder] = useState(false);
   const [isInputMultiline, setIsInputMultiline] = useState(false);
   const composerRef = useRef<HTMLElement | null>(null);
   const composerBodyRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const historyIndexRef = useRef<number | null>(null);
   const commandButtonRef = useRef<HTMLButtonElement | null>(null);
   const modeButtonRef = useRef<HTMLButtonElement | null>(null);
   const commandMenuRef = useRef<HTMLDivElement | null>(null);
@@ -649,8 +662,17 @@ export function Composer({
   }, [controlledSelectedModelId, models]);
 
   useEffect(() => {
-    if (!draftRestore) return;
+    if (!draftKey || !readDraft) return;
+    setMessage(readDraft(draftKey));
+    historyIndexRef.current = null;
+    setSlashDismissed(false);
+  }, [draftKey, readDraft]);
+
+  useEffect(() => {
+    if (!draftRestore || draftRestore.sessionId !== draftKey) return;
     setMessage(draftRestore.text);
+    if (draftKey) writeDraft?.(draftKey, draftRestore.text);
+    historyIndexRef.current = null;
     setAttachments((current) => {
       current.forEach(revokeAttachmentPreview);
       return draftRestore.attachments ?? [];
@@ -658,7 +680,7 @@ export function Composer({
     setAttachmentError(null);
     setSlashDismissed(false);
     window.requestAnimationFrame(() => inputRef.current?.focus());
-  }, [draftRestore]);
+  }, [draftKey, draftRestore, writeDraft]);
 
   useEffect(() => {
     if (focusRequestId <= 0) return;
@@ -970,6 +992,8 @@ export function Composer({
   function finishSlashSelection(nextMessage = "") {
     cancelSlashFocusFrame();
     setMessage(nextMessage);
+    if (draftKey) writeDraft?.(draftKey, nextMessage);
+    historyIndexRef.current = null;
     setSlashDismissed(true);
     inputRef.current?.focus();
     if (!nextMessage) return;
@@ -1026,9 +1050,50 @@ export function Composer({
       sentAttachments.forEach(revokeAttachmentPreview);
     });
     setMessage("");
+    if (draftKey) writeDraft?.(draftKey, "");
+    historyIndexRef.current = null;
     setAttachments([]);
     setAttachmentError(null);
     closeFloatingPanels();
+  }
+
+  function navigateInputHistory(direction: -1 | 1): boolean {
+    if (inputHistory.length === 0) return false;
+
+    const currentIndex = historyIndexRef.current;
+    if (currentIndex === null) {
+      if (direction === 1 || message.length > 0) return false;
+      const nextIndex = inputHistory.length - 1;
+      const nextMessage = inputHistory[nextIndex] ?? "";
+      historyIndexRef.current = nextIndex;
+      setMessage(nextMessage);
+      if (draftKey) writeDraft?.(draftKey, nextMessage);
+      window.requestAnimationFrame(() => {
+        const input = inputRef.current;
+        input?.setSelectionRange(input.value.length, input.value.length);
+      });
+      return true;
+    }
+
+    const nextIndex = currentIndex + direction;
+    if (nextIndex < 0) return true;
+
+    if (nextIndex >= inputHistory.length) {
+      historyIndexRef.current = null;
+      setMessage("");
+      if (draftKey) writeDraft?.(draftKey, "");
+      return true;
+    }
+
+    const nextMessage = inputHistory[nextIndex] ?? "";
+    historyIndexRef.current = nextIndex;
+    setMessage(nextMessage);
+    if (draftKey) writeDraft?.(draftKey, nextMessage);
+    window.requestAnimationFrame(() => {
+      const input = inputRef.current;
+      input?.setSelectionRange(input.value.length, input.value.length);
+    });
+    return true;
   }
 
   function handleDropFiles(event: DragEvent<HTMLElement>) {
@@ -1128,6 +1193,8 @@ export function Composer({
         onChange={(event) => {
           cancelSlashFocusFrame();
           setMessage(event.target.value);
+          if (draftKey) writeDraft?.(draftKey, event.target.value);
+          historyIndexRef.current = null;
           setSlashDismissed(false);
         }}
         onPaste={(event) => {
@@ -1149,6 +1216,15 @@ export function Composer({
             event.preventDefault();
             const direction = event.key === "ArrowDown" ? 1 : -1;
             setSlashActiveIndex((current) => (current + direction + slashResults.length) % slashResults.length);
+            return;
+          }
+          if (
+            (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+            !event.nativeEvent.isComposing &&
+            event.keyCode !== 229 &&
+            navigateInputHistory(event.key === "ArrowUp" ? -1 : 1)
+          ) {
+            event.preventDefault();
             return;
           }
           if (event.key !== "Enter" || event.shiftKey) return;
