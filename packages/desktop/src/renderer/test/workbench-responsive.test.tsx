@@ -81,6 +81,44 @@ describe("WorkbenchLayout narrow window behavior", () => {
     expect(screen.queryByTestId("compact-sidebar-overlay")).not.toBeInTheDocument();
   });
 
+  it("lets approval content shrink with the 480px conversation column", async () => {
+    const user = userEvent.setup();
+    const { container } = renderWorkbench({
+      messages: [
+        {
+          kind: "user",
+          id: "user-responsive-approval",
+          content: "Check a command that has a long approval explanation at the narrow window width.",
+          createdAt: "2026-08-05T10:00:00.000Z",
+        },
+        {
+          kind: "bash",
+          id: "bash-responsive-approval",
+          status: "pending",
+          title: "Run Bash command: wc",
+          command: 'wc -l "Demos/finding-your-unknowns-box.html"',
+          reason: "Bash always-ask mode is enabled (ACTSPACE_BASH_ALWAYS_ASK=1)",
+          policyLabel: "Allowlist",
+          approvalRequestId: "approval-responsive",
+          createdAt: "2026-08-05T10:00:01.000Z",
+        },
+      ],
+    });
+
+    expect(container.querySelector(".conversation-shell")).toHaveClass(
+      "min-w-0",
+      "grid-cols-[minmax(0,1fr)]",
+    );
+    expect(container.querySelector(".conversation-message-viewport")).toHaveClass("min-w-0");
+    expect(container.querySelector(".message-stack")).toHaveClass("min-w-0");
+    expect(container.querySelector(".message-turn")).toHaveClass("min-w-0");
+    expect(container.querySelector(".turn-body")).toHaveClass("min-w-0");
+    expect(container.querySelector(".composer-zone")).toHaveClass("min-w-0");
+
+    await user.click(screen.getByRole("button", { name: "Worked" }));
+    expect(screen.getByRole("button", { name: "Run" })).toBeInTheDocument();
+  });
+
   it("opens the right panel as an overlay and closes it with Escape", async () => {
     const user = userEvent.setup();
     renderWorkbench();

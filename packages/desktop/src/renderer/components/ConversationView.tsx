@@ -37,20 +37,20 @@ type ConversationTurn = {
 };
 
 const CONVERSATION_SHELL_CLASS =
-  "conversation-shell grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-surface pt-[var(--window-chrome-strip-height)]";
-const MESSAGE_VIEWPORT_CLASS = "conversation-message-viewport relative min-h-0";
+  "conversation-shell grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] bg-surface pt-[var(--window-chrome-strip-height)]";
+const MESSAGE_VIEWPORT_CLASS = "conversation-message-viewport relative min-h-0 min-w-0";
 const MESSAGE_SCROLL_CLASS = "message-scroll h-full min-h-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
 const MESSAGE_SCROLL_INITIAL_CLASS =
   "message-scroll message-scroll-initial h-full min-h-0 overflow-auto bg-surface pb-6 [scrollbar-gutter:stable_both-edges]";
 const MESSAGE_STACK_CLASS =
-  "message-stack mx-auto flex w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] flex-col gap-7 pb-7";
+  "message-stack mx-auto flex min-w-0 w-[min(calc(100%_-_var(--conversation-inline-padding)_*_2),var(--conversation-content-width))] flex-col gap-7 pb-7";
 const INITIAL_COMPOSER_STAGE_CLASS =
   "initial-composer-stage flex h-full min-h-[420px] items-center justify-center px-[var(--conversation-inline-padding)]";
-const MESSAGE_TURN_CLASS = "message-turn relative flex flex-col gap-0";
+const MESSAGE_TURN_CLASS = "message-turn relative flex min-w-0 flex-col gap-0";
 const TURN_PROMPT_CLASS =
-  "turn-prompt sticky top-0 z-12 bg-[image:var(--act-gradient-surface-fade)] py-4";
-const TURN_BODY_CLASS = "turn-body flex flex-col gap-[9px]";
-const ASSISTANT_TURN_GROUP_CLASS = "group/assistant-turn";
+  "turn-prompt sticky top-0 z-12 min-w-0 bg-[image:var(--act-gradient-surface-fade)] py-4";
+const TURN_BODY_CLASS = "turn-body flex min-w-0 flex-col gap-[9px]";
+const ASSISTANT_TURN_GROUP_CLASS = "group/assistant-turn min-w-0";
 const TURN_ACTIONS_CLASS =
   "turn-actions mt-1 flex min-h-7 items-center justify-between gap-3 px-[var(--conversation-text-inset)] text-[12px] text-text-faint opacity-0 pointer-events-none transition-opacity duration-[150ms] ease-in-out group-hover/assistant-turn:pointer-events-auto group-hover/assistant-turn:opacity-100 group-focus-within/assistant-turn:pointer-events-auto group-focus-within/assistant-turn:opacity-100";
 const TURN_ACTIONS_RIGHT_CLASS = "flex items-center justify-end gap-0.5";
@@ -967,7 +967,7 @@ export function ConversationView({
       </div>
 
       {isSessionReady && !isInitialComposer ? (
-        <div className="composer-zone grid w-full gap-3 overflow-visible pb-5">
+        <div className="composer-zone grid min-w-0 w-full gap-3 overflow-visible pb-5">
           {latestActiveTranscriptMessage ? (
             <SubAgentTranscriptPanel
               message={latestActiveTranscriptMessage}
