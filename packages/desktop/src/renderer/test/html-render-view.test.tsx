@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { HtmlRenderView } from "../components/right-panel/HtmlRenderView";
 
 /**
@@ -15,6 +15,46 @@ function getIframe(container: HTMLElement): HTMLIFrameElement {
     throw new Error("iframe not found");
   }
   return iframe;
+}
+
+const OriginalResizeObserver = globalThis.ResizeObserver;
+
+afterEach(() => {
+  globalThis.ResizeObserver = OriginalResizeObserver;
+  vi.restoreAllMocks();
+});
+
+function installResizeObserver() {
+  let callback: ResizeObserverCallback | null = null;
+  globalThis.ResizeObserver = vi.fn((nextCallback: ResizeObserverCallback) => {
+    callback = nextCallback;
+    return {
+      disconnect: vi.fn(),
+      observe: vi.fn(),
+      unobserve: vi.fn(),
+    };
+  }) as unknown as typeof ResizeObserver;
+
+  return (width: number) => {
+    act(() => {
+      callback?.(
+        [{ contentRect: { width } } as ResizeObserverEntry],
+        {} as ResizeObserver,
+      );
+    });
+  };
+}
+
+function publishLayout(
+  iframe: HTMLIFrameElement,
+  layout: { width: number; height: number; viewportWidth: number },
+) {
+  act(() => {
+    window.dispatchEvent(new MessageEvent("message", {
+      source: iframe.contentWindow,
+      data: { __actspacePreview: true, type: "layout", ...layout },
+    }));
+  });
 }
 
 describe("HtmlRenderView", () => {
@@ -50,5 +90,42 @@ describe("HtmlRenderView", () => {
 
     await user.click(screen.getByRole("tab", { name: "源码" }));
     expect(screen.getByText("<section>raw markup</section>")).toBeInTheDocument();
+  });
+
+  it("fits a fixed-width canvas to the preview viewport and follows viewport resizes", () => {
+    const publishResize = installResizeObserver();
+    const { container } = render(<HtmlRenderView html="<main>canvas</main>" trust="file" />);
+    const iframe = getIframe(container);
+    const canvas = container.querySelector<HTMLElement>("[data-html-preview-canvas]");
+
+    expect(canvas).not.toBeNull();
+    publishResize(800);
+    publishLayout(iframe, { width: 1600, height: 1000, viewportWidth: 800 });
+
+    expect(iframe.style.width).toBe("1600px");
+    expect(iframe.style.transform).toBe("scale(0.5)");
+    expect(canvas?.style.width).toBe("800px");
+    expect(canvas?.style.height).toBe("500px");
+
+    publishResize(600);
+
+    expect(iframe.style.transform).toBe("scale(0.375)");
+    expect(canvas?.style.width).toBe("600px");
+    expect(canvas?.style.height).toBe("375px");
+  });
+
+  it("keeps responsive documents at the native preview width", () => {
+    const publishResize = installResizeObserver();
+    const { container } = render(<HtmlRenderView html="<main>responsive</main>" trust="file" />);
+    const iframe = getIframe(container);
+    const canvas = container.querySelector<HTMLElement>("[data-html-preview-canvas]");
+
+    publishResize(800);
+    publishLayout(iframe, { width: 800, height: 1200, viewportWidth: 800 });
+
+    expect(iframe.style.width).toBe("100%");
+    expect(iframe.style.transform).toBe("");
+    expect(canvas?.style.width).toBe("100%");
+    expect(canvas?.style.height).toBe("1200px");
   });
 });

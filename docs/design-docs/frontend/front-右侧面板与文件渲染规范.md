@@ -158,7 +158,8 @@ HTML 来源包括本地 `.html` 文件、聊天生成 HTML、Markdown 回复转 
 - CSP 注入到 `srcDoc` 的 `<meta http-equiv>`。
 - `strict`（本地文件默认）：禁外联，只允许 data/blob 图片、inline style、data 字体和 inline script。
 - `relaxed`（聊天生成 HTML 或用户主动信任外部静态资源）：允许 https 图片 / 样式 / 字体 / 脚本，但 `connect-src 'none'`，阻断数据外传。
-- iframe 只允许单向 `postMessage` 回传运行时错误和内容高度；父窗口校验 `event.source === iframe.contentWindow` 后处理。
+- iframe 只允许单向 `postMessage` 回传运行时错误和布局尺寸；父窗口校验 `event.source === iframe.contentWindow` 后处理。
+- iframe 同时回传内容宽度与自身视口宽度。内容宽度超过视口时视为固定画布：父层锁住自然画布宽度，只做等比缩小、不放大，并用缩放后的宽高承担布局占位；普通响应式页面继续使用 `width: 100%`。预览区、右侧面板或文件树宽度变化时由父层 `ResizeObserver` 重新计算比例，避免固定宽 HTML 被裁切或产生横向滚动。
 - 注入最小 `color-scheme: light dark;` 基线样式，不强行覆盖产物自带样式。
 
 聊天行内 HTML 小片段先用 DOMPurify 净化；需要脚本或复杂结构时升级为 iframe 路径。V1 不支持相对资源、多文件 artifact、页面内导航、keep-alive 池、双向交互桥或 CDP。

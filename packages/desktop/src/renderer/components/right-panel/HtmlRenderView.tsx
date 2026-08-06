@@ -18,6 +18,8 @@ const CSP_RELAXED =
 
 const MIN_IFRAME_HEIGHT = 160;
 const MAX_IFRAME_HEIGHT = 20000;
+const MAX_IFRAME_WIDTH = 20000;
+const FIXED_CANVAS_THRESHOLD = 1;
 
 // 只有「聊天生成的 html」才用到这条工具栏：它没有工作区操作栏可以挂切换按钮。
 const TOOLBAR_CLASS = "flex shrink-0 items-center justify-end gap-2 border-b border-line px-3 py-1.5";
@@ -44,12 +46,21 @@ function resolveTheme(): ResolvedTheme {
 
 const BRIDGE_SCRIPT = `<script>(function(){
   function post(msg){ try { parent.postMessage(Object.assign({ __actspacePreview: true }, msg), '*'); } catch (e) {} }
-  function sendHeight(){
-    var h = Math.max(
-      document.documentElement ? document.documentElement.scrollHeight : 0,
-      document.body ? document.body.scrollHeight : 0
+  function sendLayout(){
+    var root = document.documentElement;
+    var body = document.body;
+    var width = Math.max(
+      window.innerWidth || 0,
+      root ? root.scrollWidth : 0,
+      body ? body.scrollWidth : 0,
+      root ? root.getBoundingClientRect().width : 0,
+      body ? body.getBoundingClientRect().width : 0
     );
-    post({ type: 'height', height: h });
+    var h = Math.max(
+      root ? root.scrollHeight : 0,
+      body ? body.scrollHeight : 0
+    );
+    post({ type: 'layout', width: width, height: h, viewportWidth: window.innerWidth || 0 });
   }
   window.addEventListener('error', function(e){
     var t = e && e.target;
@@ -60,10 +71,17 @@ const BRIDGE_SCRIPT = `<script>(function(){
     }
   }, true);
   window.addEventListener('unhandledrejection', function(){ post({ type: 'error', message: 'Unhandled promise rejection' }); });
-  document.addEventListener('DOMContentLoaded', sendHeight);
-  window.addEventListener('load', sendHeight);
-  if (window.ResizeObserver) { try { new ResizeObserver(sendHeight).observe(document.documentElement); } catch (e) {} }
-  setTimeout(sendHeight, 60);
+  document.addEventListener('DOMContentLoaded', sendLayout);
+  window.addEventListener('load', sendLayout);
+  window.addEventListener('resize', sendLayout);
+  if (window.ResizeObserver) {
+    try {
+      var observer = new ResizeObserver(sendLayout);
+      observer.observe(document.documentElement);
+      if (document.body) observer.observe(document.body);
+    } catch (e) {}
+  }
+  setTimeout(sendLayout, 60);
 })();</script>`;
 
 function baselineStyle(theme: ResolvedTheme): string {
@@ -126,8 +144,11 @@ export function HtmlRenderView({
   const [ownMode, setOwnMode] = useState<PreviewMode>("preview");
   const activeMode = mode ?? ownMode;
   const [height, setHeight] = useState(MIN_IFRAME_HEIGHT);
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const [fixedCanvasWidth, setFixedCanvasWidth] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   const theme = useMemo(resolveTheme, []);
   const csp = trust === "file" ? CSP_STRICT : CSP_RELAXED;
@@ -137,19 +158,60 @@ export function HtmlRenderView({
   useEffect(() => {
     setError(null);
     setHeight(MIN_IFRAME_HEIGHT);
+    setFixedCanvasWidth(null);
   }, [srcDoc]);
+
+  useEffect(() => {
+    if (activeMode !== "preview") return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const publishWidth = (width: number) => {
+      if (Number.isFinite(width) && width > 0) {
+        setViewportWidth(width);
+      }
+    };
+    publishWidth(viewport.clientWidth);
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      publishWidth(entries[0]?.contentRect.width ?? viewport.clientWidth);
+    });
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [activeMode, srcDoc]);
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (event.source !== iframeRef.current?.contentWindow) {
         return;
       }
-      const data = event.data as { __actspacePreview?: boolean; type?: string; height?: number; message?: string };
+      const data = event.data as {
+        __actspacePreview?: boolean;
+        type?: string;
+        width?: number;
+        height?: number;
+        viewportWidth?: number;
+        message?: string;
+      };
       if (!data || data.__actspacePreview !== true) {
         return;
       }
-      if (data.type === "height" && typeof data.height === "number") {
-        setHeight(Math.min(MAX_IFRAME_HEIGHT, Math.max(MIN_IFRAME_HEIGHT, Math.ceil(data.height))));
+      if (data.type === "layout") {
+        if (typeof data.height === "number" && Number.isFinite(data.height)) {
+          setHeight(Math.min(MAX_IFRAME_HEIGHT, Math.max(MIN_IFRAME_HEIGHT, Math.ceil(data.height))));
+        }
+        if (
+          typeof data.width === "number"
+          && Number.isFinite(data.width)
+          && typeof data.viewportWidth === "number"
+          && Number.isFinite(data.viewportWidth)
+          && data.width > data.viewportWidth + FIXED_CANVAS_THRESHOLD
+        ) {
+          const nextWidth = Math.min(MAX_IFRAME_WIDTH, Math.ceil(data.width));
+          // 锁住首次发现的自然画布宽度，避免 iframe 扩宽后又被误判成响应式页面而来回振荡。
+          setFixedCanvasWidth((current) => current === null ? nextWidth : Math.max(current, nextWidth));
+        }
       } else if (data.type === "error" && typeof data.message === "string") {
         setError(data.message);
       }
@@ -157,6 +219,12 @@ export function HtmlRenderView({
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, []);
+
+  const scale = fixedCanvasWidth && viewportWidth > 0
+    ? Math.min(1, viewportWidth / fixedCanvasWidth)
+    : 1;
+  const renderedWidth = fixedCanvasWidth ? Math.ceil(fixedCanvasWidth * scale) : undefined;
+  const renderedHeight = Math.ceil(height * scale);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -172,15 +240,29 @@ export function HtmlRenderView({
         </div>
       ) : null}
       {activeMode === "preview" ? (
-        <div className="min-h-0 flex-1 overflow-auto bg-surface">
-          <iframe
-            ref={iframeRef}
-            title={relativePath ?? "HTML 预览"}
-            sandbox="allow-scripts"
-            srcDoc={srcDoc}
-            className="block w-full border-0"
-            style={{ height }}
-          />
+        <div ref={viewportRef} className="min-h-0 flex-1 overflow-auto bg-surface" data-html-preview-viewport>
+          <div
+            className="relative mx-auto"
+            data-html-preview-canvas
+            style={{
+              width: renderedWidth === undefined ? "100%" : renderedWidth,
+              height: renderedHeight,
+            }}
+          >
+            <iframe
+              ref={iframeRef}
+              title={relativePath ?? "HTML 预览"}
+              sandbox="allow-scripts"
+              srcDoc={srcDoc}
+              className="absolute left-0 top-0 block border-0"
+              style={{
+                width: fixedCanvasWidth ?? "100%",
+                height,
+                transform: fixedCanvasWidth ? `scale(${scale})` : undefined,
+                transformOrigin: "top left",
+              }}
+            />
+          </div>
         </div>
       ) : (
         <pre className={SOURCE_CLASS}>
