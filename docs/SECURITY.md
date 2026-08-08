@@ -69,6 +69,41 @@
 - 验收真实 provider 时应先发送不含仓库内容和隐私的固定探针，确认连接后再决定是否允许工具结果进入外部模型上下文。
 - API 错误仅暴露必要的结构化诊断信息，不把鉴权请求头或密钥写入日志、session 或界面。
 
+## 沙箱执行
+
+夜间模式使用 [nono](https://github.com/nolabs-ai/nono) 作为 Agent 的唯一安全边界。nono 在操作系统内核层（macOS Seatbelt / Linux Landlock）强制隔离，不依赖 Agent 自身的权限控制或提示词约束。
+
+### 隔离设计
+
+- **单层沙箱**：Codex 自身沙箱关闭（`--dangerously-bypass-approvals-and-sandbox`），隔离完全交给 nono。避免双层沙箱互相干扰导致难以排查的失败。
+- **最小权限**：profile 从 `default` 起步，逐项显式授权。未授权的路径默认全拒；写权限仅工作目录和 `~/.codex`；删除由 `unlink_protection` 组全局兜底。
+- **网络白名单**：只放行模型 API 域名。即使 Agent 读到凭证文件，也没有外传通道；push 远端同样被封死。
+- **内核级拦截**：越界操作在系统调用层被拒，与 Agent 内部逻辑无关。deny 规则优先于一切授权。
+
+### Profile 审查
+
+nono profile 分两份维护：仓库通用模板在 `docs/nono-profiles/`，本机副本在 `~/.config/nono/profiles/`（含真实 API 域名和个人敏感目录的 deny，不入库）。修改 profile 等同于修改安全边界，应按代码变更对待：
+
+- 每次修改说明为什么需要新增授权。
+- 用 `nono why -p <profile> --path <target> --op <read|write|readwrite>` 验证路径授权，用 `--host <domain>` 验证网络授权。
+- 用 `nono profile show <profile>` 查看完整解析结果。
+- 完整验证清单见 `docs/nono-profiles/README.md` 的"Profile 维护"章节。
+
+### 残余风险与缓解
+
+nono 挡住了边界外的破坏，但边界内仍有需要人工兜底的风险：
+
+- **工作目录内的破坏**：Agent 对 workdir 有完整写删权。缓解：启动时加 `--rollback` 打快照，次日可整体还原；nono 审计日志默认开启。
+- **`.git/hooks` 投毒**：夜间 Agent 可写入 git 钩子，钩子会在次日沙箱外执行。缓解：晨检时先看 `.git/hooks/` 再跑任何 git 命令。
+- **`~/.codex` 配置污染**：Agent 对 codex 状态目录有写权，可能改动 `config.toml` 影响白天沙箱外的 codex。缓解：晨检核对 `config.toml`。
+- **读取范围内的数据外流**：所有可读内容都可能经模型 API 通道进入 provider。缓解：只读授权按需添加，个人敏感目录显式 deny。
+
+### 已知注意事项
+
+- `/private/tmp` 在内置组 `system_write_macos` 中默认可写，profile 里必须显式 `deny`（实测验证）。
+- deny 优先于 allow/read，不要 deny 工作目录的祖先目录，否则沙箱直接不可用（实测验证）。
+- 提示词预授权用于绕过工作流级别的审批规则，但它**不是安全边界**——安全边界只有 nono 一层。提示词失效的最坏后果是空转，不是做坏事。
+
 ## 待补强
 
 - 认证与授权约束。

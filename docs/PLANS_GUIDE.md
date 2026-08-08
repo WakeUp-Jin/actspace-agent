@@ -26,6 +26,39 @@ execution plan 适合用在那些超出单轮聊天上下文、需要多次推�
 - 被后续方案替代或不再采用的 plan 不直接删除，移动到 `discarded/`，在顶部写明丢弃日期、原因和替代入口。
 - `active/` 的每个一级入口必须出现在 `docs/exec-plans/README.md`，并具有可执行的下一步，保证目录可信。
 
+## 执行模式
+
+plan 执行时，根据任务性质选择执行模式：
+
+### 交互模式
+
+人在线，Agent 操作需逐步审批。适合：
+
+- 架构变更、协议修改等高风险改动。
+- 探索性任务，方向还不确定。
+- 首次执行某类任务，需要观察 Agent 的行为。
+
+### 夜间模式
+
+人离线，Agent 在 nono 沙箱内获得 full-access 自主执行。适合：
+
+- 边界明确的实施任务（plan 已经写清楚了范围和步骤）。
+- 重复性工作。
+- 低风险改动。
+
+夜间模式使用 [nono](https://github.com/nolabs-ai/nono) 作为内核级沙箱，Codex 自身沙箱关闭，隔离完全交给 nono。profile 和启动方式见 `docs/nono-profiles/README.md`。
+
+## 执行文档
+
+无论哪种执行模式，plan 执行时都要在 `docs/exec-runs/<plan-slug>/` 下创建两份文档：
+
+- **执行过程**（`execution-process.md`）：执行过程中持续更新的时间线记录，包含关键步骤、关键决定和遇到的问题。
+- **执行摘要**（`execution-summary.md`）：执行完成后填写，核心部分是人工验证指引——告诉接手的人要验证什么、怎么验证。
+
+模板在 `docs/exec-runs/templates/`。详细使用说明见 `docs/exec-runs/README.md`。
+
+夜间模式下这两份文档的完整性尤为重要——它们是人了解执行全貌的唯一途径。
+
 ## 从设计文档生成 plan
 
 复杂任务应该先有设计文档，再从设计文档拆 execution plan。
