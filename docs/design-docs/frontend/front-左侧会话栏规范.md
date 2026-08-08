@@ -18,7 +18,7 @@
 
 1. **顶部窗口区**（红绿灯 + 折叠按钮 + 搜索按钮）。
 2. **顶部主入口**：`New Agent` / `Usage` / `Kairos`。
-3. **分区列表**：`Pinned` → `Scheduled` → `Workspaces`（父分类 + 多个 Workspace 文件夹）。
+3. **分区列表**：`Pinned` → `Workspaces`（父分类 + 多个 Workspace 文件夹）。当前没有定时任务产品能力，因此不展示 `Scheduled` 占位分区。
 4. **底部** `Settings`。
 
 ## 顶部窗口区
@@ -45,7 +45,7 @@
 
 ### 分组标题统一规范
 
-`Pinned` / `Scheduled` / `Workspaces` 共享同一个 `NavSectionHeader` 组件，行为统一：
+`Pinned` / `Workspaces` 共享同一个 `NavSectionHeader` 组件，行为统一：
 
 - 标题文字字号 **12px / weight 500 / `--color-text-faint`**：
   - 字号比主入口（13px）小一档，颜色比主入口的 muted 弱一档（faint）。
@@ -54,7 +54,7 @@
 - 整个标题区都是点击命中区，点击切换该分组的 `collapsed` 状态。
 - 右侧 `nav-section-actions` 默认全部隐藏，hover / focus 标题区时整体淡入：
   - `chevron`：固定排在 actions 区最右，hover 出现 → 视觉上表达"我可以折叠"，点击同样切换 `collapsed`。
-  - 其它 extra actions（如 Scheduled 的 `More + New scheduled task`、Workspaces 的 `Sort + New folder`）按 section 注入，统一渲染在 chevron 左边。
+  - 其它 extra actions（如 Workspaces 的 `Sort + New folder`）按 section 注入，统一渲染在 chevron 左边。
 - 折叠态下不渲染该 section 的内容；记忆只放组件内 `useState`，不持久化。
 
 ### Pinned
@@ -63,13 +63,6 @@
 - 用户可手动 pin/unpin 任意会话。
 - 至少有一个会话被 pin 时出现，没有则该 section 隐藏。
 - Pinned 区会话 hover 时显示深色填充图钉（`<Pin fill="currentColor" />`），区别于未 pin 状态下的描边图钉；非 hover 时仍隐藏操作，让时间列成为唯一常显的行尾信息。
-
-### Scheduled
-
-- 顶层独立分区，用于定时运行相关会话。
-- 首版可以只放占位条目，等真实定时任务功能落地再接通。
-- 标题右侧提供"更多操作 / 新建定时任务"两个图标按钮（走统一的 `nav-section-actions` hover 显隐规则）。
-- 占位行使用 `session-status-dot.is-muted` 灰点 marker，与正常 session 行保持视觉对齐。
 
 ### Workspaces
 
@@ -237,7 +230,7 @@
   - 主入口（New Agent / Usage / Kairos）：`13px / 500 / --color-text-muted`。
   - 会话标题：`13px / 500`。
   - 会话时间戳：`11px / --color-text-faint`。
-  - 分组标题（Pinned / Scheduled / Workspaces 等）：`12px / 500 / --color-text-faint`。靠字号小一档 + 颜色更浅区分语义，而不是用 440 这种非标字重。
+  - 分组标题（Pinned / Workspaces 等）：`12px / 500 / --color-text-faint`。靠字号小一档 + 颜色更浅区分语义，而不是用 440 这种非标字重。
   - Workspace 文件夹名：`13px / 500`。
   - Settings：`13px / 500`。
 

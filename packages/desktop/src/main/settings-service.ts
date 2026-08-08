@@ -1264,7 +1264,7 @@ function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV2 {
       disabledTools: [...env.ACTSPACE_DISABLED_TOOLS],
       bashAlwaysAsk: env.ACTSPACE_BASH_ALWAYS_ASK,
     },
-    kairos: { modelId: null, thinking: "auto", enabledSkills: [] },
+    kairos: { featureEnabled: false, modelId: null, thinking: "auto", enabledSkills: [] },
     plugins: { repoRoot: null, fsWatch: { enabled: false } },
     skills: { disabled: [] },
     shortcuts: {
@@ -1319,6 +1319,7 @@ function migrateV1Settings(
         bashAlwaysAsk: agent.bashAlwaysAsk,
       }, seed.agent),
       kairos: sanitizeKairosV2({
+        featureEnabled: kairos.featureEnabled,
         modelId: kairosModel,
         thinking: kairos.thinking as KairosThinkingMode | undefined,
         enabledSkills: kairos.enabledSkills,
@@ -1643,6 +1644,7 @@ function sanitizeKairosV2(input: unknown, fallback: KairosSettingsV2): KairosSet
   const value = isRecord(input) ? input : {};
   const thinking = value.thinking;
   return {
+    featureEnabled: typeof value.featureEnabled === "boolean" ? value.featureEnabled : fallback.featureEnabled,
     modelId: value.modelId === undefined ? fallback.modelId : normalizeNullableModelKey(value.modelId),
     thinking: thinking === "auto" || thinking === "on" || thinking === "off" ? thinking : fallback.thinking,
     enabledSkills: sanitizeSkillNameList(value.enabledSkills, fallback.enabledSkills),

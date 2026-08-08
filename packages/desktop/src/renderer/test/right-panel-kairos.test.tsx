@@ -23,15 +23,21 @@ function renderPanel({
   sessionId = null,
   onOpenReview,
   initialTabs,
+  kairosFeatureEnabled = true,
 }: {
   sessionId?: string | null;
   onOpenReview?: () => void;
   initialTabs?: RightPanelTab[];
+  kairosFeatureEnabled?: boolean;
 } = {}) {
   return render(
     <TooltipProvider delayDuration={0}>
       <RightPanelProvider initialTabs={initialTabs}>
-        <RightPanel sessionId={sessionId} onOpenReview={onOpenReview} />
+        <RightPanel
+          sessionId={sessionId}
+          onOpenReview={onOpenReview}
+          kairosFeatureEnabled={kairosFeatureEnabled}
+        />
       </RightPanelProvider>
     </TooltipProvider>,
   );
@@ -150,6 +156,25 @@ beforeEach(() => {
 });
 
 describe("RightPanel Kairos tab", () => {
+  it("hides the Kairos launcher when the feature is disabled", () => {
+    renderPanel({ kairosFeatureEnabled: false });
+
+    const launcher = screen.getByRole("navigation", { name: "右侧面板对象" });
+    expect(within(launcher).getAllByRole("button")).toHaveLength(5);
+    expect(within(launcher).queryByRole("button", { name: "Kairos" })).not.toBeInTheDocument();
+  });
+
+  it("removes an existing Kairos tab without mounting its runtime view when disabled", async () => {
+    renderPanel({
+      kairosFeatureEnabled: false,
+      initialTabs: [{ id: "kairos", kind: "kairos", title: "Kairos" }],
+    });
+
+    expect(screen.queryByRole("region", { name: "Kairos" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("tab", { name: "Kairos" })).not.toBeInTheDocument());
+    expect(screen.getByRole("navigation", { name: "右侧面板对象" })).toBeInTheDocument();
+  });
+
   it("keeps right panel tab buttons out of Electron drag regions", async () => {
     const user = userEvent.setup();
     renderPanel();

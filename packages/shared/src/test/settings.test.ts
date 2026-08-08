@@ -64,6 +64,7 @@ describe("settings v2 contract", () => {
         bashAlwaysAsk: false,
       },
       kairos: {
+        featureEnabled: false,
         modelId: "deepseek:deepseek-v4-flash",
         thinking: "auto",
         enabledSkills: [],

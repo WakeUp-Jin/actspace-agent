@@ -24,7 +24,7 @@ function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
       bashAlwaysAsk: false,
       exploreModelId: null,
     },
-    kairos: { modelId: null, thinking: "auto", enabledSkills: [] },
+    kairos: { featureEnabled: false, modelId: null, thinking: "auto", enabledSkills: [] },
     plugins: { repoRoot: null, fsWatch: { enabled: false } },
     skills: { disabled: [] },
   };
@@ -271,6 +271,20 @@ describe("SettingsPage", () => {
       setNativeTheme,
       getAgentAnalysisSessionIndex,
     } as unknown as ActspaceBridge;
+  });
+
+  it("keeps Kairos hidden behind an explicit feature toggle", async () => {
+    renderSettingsPage();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Kairos" }));
+    const toggle = screen.getByRole("switch", { name: "启用 Kairos 功能" });
+    expect(toggle).not.toBeChecked();
+    expect(screen.queryByLabelText("Kairos 模型")).not.toBeInTheDocument();
+
+    await userEvent.click(toggle);
+
+    expect(updateSettings).toHaveBeenCalledWith({ kairos: { featureEnabled: true } });
+    expect(await screen.findByLabelText("Kairos 模型")).toBeInTheDocument();
   });
 
   afterEach(() => {

@@ -52,7 +52,7 @@ function renderPanel() {
       <RightPanelProvider>
         <WorkspaceToggleProbe />
         <OpenMarkdownFileProbe />
-        <RightPanel />
+        <RightPanel kairosFeatureEnabled />
       </RightPanelProvider>
     </TooltipProvider>,
   );

@@ -27,18 +27,18 @@
 
 右侧面板没有打开对象时，不默认塞入 Kairos 或其它业务 Tab，而是展示一个参考 Cursor 空面板入口密度的对象启动页。启动页只借用“方块入口 + 大留白”的形式，入口名称与数量由 Actspace 当前真实对象决定。
 
-当前固定展示六个入口：
+功能默认关闭时展示五个入口；开启 Kairos 后展示六个入口：
 
 - `Files`：进入 Workspace 文件浏览态，不新增对象 Tab。
 - `Terminal`：创建或聚焦绑定当前会话 workspace / worktree 的交互式 shell；详见 `front-右侧终端与会话生命周期规范.md`。
 - `Review`：打开当前 workspace 的 Review，并创建/聚焦稳定的右侧 Review Tab。
 - `Context`：打开主 Agent 当前会话的完整只读上下文 Tab。
-- `Kairos`：打开聊天态 Kairos 紧凑状态 Tab。
+- `Kairos`：仅在 `settings.kairos.featureEnabled=true` 时出现，打开聊天态 Kairos 紧凑状态 Tab。
 - `Reply`：打开当前会话生成过的可视化回复聚合视图；HTML 是当前内部渲染格式，不进入入口名称。
 
 布局与状态规则：
 
-- 默认宽度下使用 `2 × 3`：`Files / Terminal`、`Review / Context`、`Kairos / Reply`。
+- 默认宽度下使用双列网格；Kairos 开启时形成 `2 × 3`，关闭时第五个入口自然落在最后一行，不保留空占位。
 - 卡片使用中性 surface、语义边框和统一 Lucide 线性图标；当前状态使用中性 selected 层级，focus-visible 使用高对比主题 token，颜色只承担语义状态或数据可视化，不把六个入口做成六种彩色功能卡。
 - 关闭最后一个对象 Tab 后回到启动页；折叠面板时若仍有已打开对象，重新展开继续恢复原 Tab。
 - 启动页和右上角 `+` 菜单打开的是同一组对象语义，不能出现名称或行为漂移。
@@ -72,7 +72,8 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 ## 「+ 新建对象」菜单（2026-05-30，2026-06-04 补 Review）
 
 - 隐藏标题栏 chrome 右段、右侧折叠（PanelRight）按钮**左侧**放一个 `+` 按钮（参考 Cursor 顶栏的 +）。
-- 点开是一个轻量菜单，可往右侧面板新增对象：`工作区文件` / `Terminal` / `Review` / `Reply` / `Kairos` / `Context`。非 Terminal 对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；Terminal 底层允许每会话多实例，标题按创建顺序区分。`工作区文件` 只切换工作区浏览态，不新增 Tab。
+- 点开是一个轻量菜单，可往右侧面板新增对象：`工作区文件` / `Terminal` / `Review` / `Reply` / `Context`，并在 `settings.kairos.featureEnabled=true` 时追加 `Kairos`。非 Terminal 对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；Terminal 底层允许每会话多实例，标题按创建顺序区分。`工作区文件` 只切换工作区浏览态，不新增 Tab。
+- 右侧对象启动页遵守同一门控：Kairos 关闭时使用其余 5 个入口，不保留空占位；关闭过程中如果已有 `id="kairos"` Tab，Workbench 立即将其移除。
 - `Review` 入口复用 Composer 的 Review 打开逻辑，首次默认选择当前 workspace 的 Git `Uncommitted` scope；后续打开恢复该 workspace 最近 selection。
 - 菜单与右侧折叠按钮同属 chrome-right，`-webkit-app-region: no-drag`；Kairos 全屏页下与右侧折叠按钮一起隐藏。
 - **`+` 仅在右侧面板打开时显示**（`view === "chat" && isRightPanelOpen`）：`+` 的语义是「往面板里加对象」，面板关着时无意义；面板关闭时 chrome-right 只保留 PanelRight 折叠按钮。

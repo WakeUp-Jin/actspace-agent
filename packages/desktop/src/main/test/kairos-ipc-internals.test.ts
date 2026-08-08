@@ -15,6 +15,7 @@ import {
   readBrief,
   validateByName,
   writeKairosConfigFile,
+  writeKairosDisabledPreference,
   writeBrief,
   type BatcherSink,
   type BatcherTimer,
@@ -166,6 +167,22 @@ describe("Kairos config files", () => {
     await expect(
       writeKairosConfigFile(kairosRoot, { name: "preferences", content: "{ broken" }),
     ).rejects.toThrow(/Invalid JSON/);
+  });
+
+  it("pauses the runtime while preserving the remaining preferences", async () => {
+    await writeKairosConfigFile(kairosRoot, {
+      name: "preferences",
+      content: JSON.stringify({ enabled: true, sleep: { start: "23:00", end: "07:00" }, custom: "keep" }),
+    });
+
+    await writeKairosDisabledPreference(kairosRoot);
+
+    const result = await readKairosConfigFile(kairosRoot, { name: "preferences" });
+    expect(JSON.parse(result.content)).toEqual({
+      enabled: false,
+      sleep: { start: "23:00", end: "07:00" },
+      custom: "keep",
+    });
   });
 });
 

@@ -116,6 +116,20 @@ export async function writeKairosConfigFile(
   await rename(tmp, filePath);
 }
 
+/** 关闭产品功能时只暂停自主循环，保留用户其余 Kairos 运行偏好。 */
+export async function writeKairosDisabledPreference(kairosRoot: string): Promise<void> {
+  const current = await readKairosConfigFile(kairosRoot, { name: "preferences" });
+  const parsed: unknown = JSON.parse(current.content);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("Kairos preferences must be a JSON object.");
+  }
+  if ((parsed as { enabled?: unknown }).enabled === false) return;
+  await writeKairosConfigFile(kairosRoot, {
+    name: "preferences",
+    content: `${JSON.stringify({ ...parsed, enabled: false }, null, 2)}\n`,
+  });
+}
+
 // ─── briefs（任务表）文件存取 ────────────────────────────────────────────
 //
 // `kairos:briefs-*` 4 条通道的纯逻辑：直接读写 `<kairosRoot>/briefs/tasks/<id>.md`，

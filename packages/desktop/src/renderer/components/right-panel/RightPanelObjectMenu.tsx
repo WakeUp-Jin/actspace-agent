@@ -23,9 +23,11 @@ const MENU_ITEM_CLASS =
 export function RightPanelObjectMenu({
   sessionId,
   onOpenReview,
+  kairosFeatureEnabled = false,
 }: {
   sessionId: string | null;
   onOpenReview?: () => void;
+  kairosFeatureEnabled?: boolean;
 }) {
   const { openFileTree, openTab } = useRightPanel();
   const { openTerminal, creatingTerminal } = useOpenTerminal(sessionId);
@@ -118,15 +120,17 @@ export function RightPanelObjectMenu({
             <MessageSquare size={15} strokeWidth={2} />
             Reply
           </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={MENU_ITEM_CLASS}
-            onClick={() => pick(() => openTab({ id: "kairos", kind: "kairos", title: "Kairos" }))}
-          >
-            <Bot size={15} strokeWidth={2} />
-            Kairos
-          </button>
+          {kairosFeatureEnabled ? (
+            <button
+              type="button"
+              role="menuitem"
+              className={MENU_ITEM_CLASS}
+              onClick={() => pick(() => openTab({ id: "kairos", kind: "kairos", title: "Kairos" }))}
+            >
+              <Bot size={15} strokeWidth={2} />
+              Kairos
+            </button>
+          ) : null}
           <button
             type="button"
             role="menuitem"

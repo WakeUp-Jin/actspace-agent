@@ -22,6 +22,7 @@
 
 ## 最近完成
 
+- Kairos 默认隐藏与功能门控：`completed/20260808-kairos-feature-gate.md`
 - Actspace 本地明文凭据存储迁移：`completed/20260802-local-plaintext-credential-storage.md`
 - 分析观测会话索引：`completed/20260801-analysis-session-index.md`
 - 全局快捷唤起：`completed/20260801-global-quick-open-shortcut.md`

@@ -1345,12 +1345,28 @@ function AgentSection({ settings, onUpdate }: SectionProps) {
 }
 
 function KairosSection({ settings, onUpdate, onRefresh }: SectionProps) {
+  const featureEnabled = settings.kairos.featureEnabled === true;
   return (
     <SectionShell
       title="Kairos"
       description="自主智能体的模型、人格、规则、任务表与运行边界（2026-07-04 由「智能体」分区拆出）。"
     >
-      <KairosSettings settings={settings} onUpdate={onUpdate} onChanged={onRefresh} />
+      <SettingGroup title="功能状态">
+        <SettingRow
+          title="启用 Kairos"
+          description="开启后在工作台显示 Kairos 入口；自治循环仍需在 Kairos 页面单独开启。"
+          control={
+            <Toggle
+              checked={featureEnabled}
+              ariaLabel="启用 Kairos 功能"
+              onChange={(enabled) => onUpdate({ kairos: { featureEnabled: enabled } })}
+            />
+          }
+        />
+      </SettingGroup>
+      {featureEnabled ? (
+        <KairosSettings settings={settings} onUpdate={onUpdate} onChanged={onRefresh} />
+      ) : null}
     </SectionShell>
   );
 }

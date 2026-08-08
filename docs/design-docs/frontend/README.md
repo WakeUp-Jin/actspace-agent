@@ -45,7 +45,7 @@
 - `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`：SplitView、resize、collapse 和 restore。
 - `docs/design-docs/frontend/front-environment-and-git-actions.md`：顶部 Environment、编辑器选择、本地分支创建、Commit 和 Push 工作流。
 - `docs/design-docs/core-review-change-sources.md`：Git-first Review Workbench 总规范；右侧 Review Tab、六种 scope、upstream Branch、Review Options 与 Git actions 都以此为准。
-- `docs/design-docs/frontend/front-左侧会话栏规范.md`：会话、Pinned、Scheduled 和 Workspaces 分区。
+- `docs/design-docs/frontend/front-左侧会话栏规范.md`：会话、Pinned 和 Workspaces 分区。
 - `docs/design-docs/frontend/front-中间消息区规范.md`：消息语法、工具流和执行状态。
 - `docs/design-docs/frontend/front-聊天输入框规范.md`：Composer、模型、附件、Context 和发送。
 - `docs/design-docs/frontend/front-composer-slash-command.md`：Composer 内 `/` 快捷菜单的 Functions / Skills 分组、命令语义、键盘交互和验证边界。

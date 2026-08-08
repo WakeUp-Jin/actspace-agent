@@ -142,6 +142,7 @@ describe("Review workbench", () => {
     window.actspace = reviewBridge(emptySnapshot()) as unknown as Window["actspace"];
     render(<RightPanelProvider initialOpen><WorkbenchLayout sessions={[{ id: "session-review", title: "Review menu", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-review" title="Review menu" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
     await user.click(screen.getByRole("button", { name: "New right panel object" }));
+    expect(screen.queryByRole("menuitem", { name: "Kairos" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("menuitem", { name: "Review" }));
     expect(await screen.findByRole("region", { name: "Review workspace" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Review" })).toBeInTheDocument();

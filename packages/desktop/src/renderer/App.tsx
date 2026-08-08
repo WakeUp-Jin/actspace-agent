@@ -758,6 +758,7 @@ export function App() {
   const [sendScrollRequestId, setSendScrollRequestId] = useState(0);
   const [composerFocusRequestId, setComposerFocusRequestId] = useState(0);
   const [defaultModelId, setDefaultModelId] = useState<ModelSelectionId | undefined>(undefined);
+  const [kairosFeatureEnabled, setKairosFeatureEnabled] = useState(false);
   const [selectedChatModelId, setSelectedChatModelId] = useState<ModelSelectionId>(DEFAULT_MODEL_ID);
   const [composerStateBySession, setComposerStateBySession] = useState<
     Record<string, { mode: ComposerMode; selectedSkills: string[] }>
@@ -950,6 +951,7 @@ export function App() {
     if (!window.actspace.listUsableModels) {
       window.actspace.getSettings()
         .then((settings) => {
+          setKairosFeatureEnabled(settings.kairos.featureEnabled === true);
           const configured = settings.taskModels?.defaultChatModel ?? settings.defaultModelId ?? DEFAULT_MODEL_ID;
           setDefaultModelId(configured);
           if (!userPickedChatModelRef.current) setSelectedChatModelId(configured);
@@ -965,6 +967,7 @@ export function App() {
       window.actspace.listUsableModels({ purpose: "chat" }),
     ])
       .then(([settings, usable]) => {
+        setKairosFeatureEnabled(settings.kairos.featureEnabled === true);
         const configured = resolvePreferredChatModel(settings, usable.models);
         setUsableChatModels(usable.models);
         setDefaultModelId(configured);
@@ -978,6 +981,7 @@ export function App() {
   }, []);
 
   const handleSettingsChange = useCallback((settings: AppSettings) => {
+    setKairosFeatureEnabled(settings.kairos.featureEnabled === true);
     if (!window.actspace.listUsableModels) {
       const configured = settings.taskModels?.defaultChatModel ?? settings.defaultModelId ?? DEFAULT_MODEL_ID;
       setDefaultModelId(configured);
@@ -2435,6 +2439,7 @@ export function App() {
         selectedSkills={activeComposerState.selectedSkills}
         onSelectedSkillsChange={handleSelectedSkillsChange}
         onSettingsChange={handleSettingsChange}
+        kairosFeatureEnabled={kairosFeatureEnabled}
         onArchivedSessionsChange={handleArchivedSessionsChange}
         workspaces={workspaceRegistry?.items.filter((workspace) => !workspace.hidden)}
         workspaceOptions={workspaceOptions}

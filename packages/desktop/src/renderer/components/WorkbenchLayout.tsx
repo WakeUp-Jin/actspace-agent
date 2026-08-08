@@ -126,6 +126,7 @@ export function WorkbenchLayout({
   selectedSkills,
   onSelectedSkillsChange,
   onSettingsChange,
+  kairosFeatureEnabled = false,
   onArchivedSessionsChange,
   workspaces,
   workspaceOptions,
@@ -174,6 +175,7 @@ export function WorkbenchLayout({
   onSelectedSkillsChange?: (skills: string[]) => void;
   models?: UsableModelView[];
   onSettingsChange?: (settings: AppSettings) => void;
+  kairosFeatureEnabled?: boolean;
   onArchivedSessionsChange?: () => void;
   workspaces?: WorkspaceEntry[];
   workspaceOptions?: ComposerWorkspaceOption[];
@@ -275,6 +277,11 @@ export function WorkbenchLayout({
       setRightWidth(clamp(allowedRightWidth, RIGHT_MIN_WIDTH, rightMaxWidth));
     }
   }, [containerWidth, isCompactLayout, isRightPanelOpen, isSidebarHidden, leftMode, leftWidth, rightMaxWidth, rightWidth]);
+
+  useEffect(() => {
+    if (kairosFeatureEnabled) return;
+    setView((current) => current === "kairos" ? "chat" : current);
+  }, [kairosFeatureEnabled]);
 
   useEffect(() => {
     if (!isCompactLayout) {
@@ -551,6 +558,7 @@ export function WorkbenchLayout({
       onArchiveWorkspace={onArchiveWorkspace}
       onRemoveWorkspace={onRemoveWorkspace}
       onSelectView={handleSelectView}
+      showKairos={kairosFeatureEnabled}
     />
   );
   const rightPanel = (
@@ -561,6 +569,7 @@ export function WorkbenchLayout({
       fileRevalidateKey={fileRevalidateKey}
       onOpenReview={openReviewTab}
       onReviewChanged={onReviewChanged}
+      kairosFeatureEnabled={kairosFeatureEnabled}
       onSendToAgent={onSend ? (text) => onSend(text, {
         model: selectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID,
         mode: composerMode ?? "agent",
@@ -600,7 +609,11 @@ export function WorkbenchLayout({
           view === "chat" ? (
             <>
               {isRightPanelOpen ? (
-                <RightPanelObjectMenu sessionId={activeSessionId} onOpenReview={openReviewTab} />
+                <RightPanelObjectMenu
+                  sessionId={activeSessionId}
+                  onOpenReview={openReviewTab}
+                  kairosFeatureEnabled={kairosFeatureEnabled}
+                />
               ) : null}
             </>
           ) : undefined

@@ -14,7 +14,6 @@ import {
   FolderPlus,
   GitFork,
   Hash,
-  MoreHorizontal,
   Pencil,
   Pin,
   PanelLeftClose,
@@ -32,7 +31,7 @@ export type NewSessionInput = {
   workspaceId?: string;
   workspaceRoot?: string;
 };
-export type SessionUiStatusKind = "idle" | "running" | "waiting_approval" | "failed" | "scheduled";
+export type SessionUiStatusKind = "idle" | "running" | "waiting_approval" | "failed";
 type SessionStatusMeta = { label: string; detail: string; dotClass: string; rowClass: string };
 
 const DEFAULT_WORKSPACE_KEY = "__default__";
@@ -180,12 +179,6 @@ const SESSION_STATUS_META: Record<SessionUiStatusKind, SessionStatusMeta> = {
     dotClass: "bg-danger",
     rowClass: "is-failed",
   },
-  scheduled: {
-    label: "Scheduled",
-    detail: "A scheduled run is planned for this session.",
-    dotClass: "bg-text-faint opacity-70",
-    rowClass: "is-scheduled",
-  },
 };
 
 function resolveSessionStatus(status: unknown): SessionUiStatusKind {
@@ -215,7 +208,6 @@ const SESSION_ROW_CLASS =
   "session-row group/session-row relative grid min-h-9 w-full min-w-0 grid-cols-[14px_minmax(0,1fr)_46px_auto] items-center gap-2 rounded-act-md px-2 transition-[background,color] duration-[130ms] ease-in-out hover:bg-[var(--act-color-hover-overlay)]";
 const SESSION_ROW_ACTIVE_CLASS = "is-active bg-sidebar-selected";
 const SESSION_ROW_PINNED_CLASS = "is-pinned";
-const SESSION_ROW_MUTED_CLASS = "is-muted";
 const SESSION_ROW_MARKER_CLASS = "relative flex h-[14px] w-[14px] flex-none items-center justify-center";
 const SESSION_ROW_TITLE_CLASS = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium";
 const SESSION_ROW_TIME_CLASS = "min-w-[22px] whitespace-nowrap text-right text-[11px] text-text-faint";
@@ -283,8 +275,8 @@ type NavSectionHeaderProps = {
 
 /**
  * 分组标题统一渲染：左侧只放纯文字 label（点击折叠），右侧 actions 区在
- * hover 时露出 chevron（视觉指示折叠态）；额外按钮（如 Scheduled 的"新建定时"、
- * Workspaces 的"排序"）通过 extraActions slot 注入，统一布在 chevron 之前。
+ * hover 时露出 chevron（视觉指示折叠态）；额外按钮（如 Workspaces 的"排序"）
+ * 通过 extraActions slot 注入，统一布在 chevron 之前。
  */
 function NavSectionHeader({ label, collapsed, onToggle, extraActions }: NavSectionHeaderProps) {
   return (
@@ -857,6 +849,7 @@ export function Sidebar({
   onOpenWorkspace,
   onArchiveWorkspace,
   onRemoveWorkspace,
+  showKairos = false,
 }: {
   sessions: SessionListItem[];
   workspaces?: WorkspaceEntry[];
@@ -882,9 +875,10 @@ export function Sidebar({
   onOpenWorkspace?: (workspaceId: string) => void;
   onArchiveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
   onRemoveWorkspace?: (workspaceId: string, workspaceRoot?: string) => void;
+  /** 产品功能开关；关闭时不展示 Kairos 普通工作台入口。 */
+  showKairos?: boolean;
 }) {
   const [pinnedCollapsed, setPinnedCollapsed] = useState(false);
-  const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
   const [workspacesCollapsed, setWorkspacesCollapsed] = useState(false);
   const busyIds = busySessionIds ?? new Set<string>();
   const statuses = sessionStatuses ?? {};
@@ -950,14 +944,16 @@ export function Sidebar({
           <BarChart3 size={14} strokeWidth={1.9} />
           <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>Usage</span>
         </button>
-        <button
-          className={`${SIDEBAR_PRIMARY_ACTION_CLASS} ${view === "kairos" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
-          type="button"
-          onClick={() => onSelectView?.("kairos")}
-        >
-          <Sparkles size={14} strokeWidth={1.9} />
-          <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>Kairos</span>
-        </button>
+        {showKairos ? (
+          <button
+            className={`${SIDEBAR_PRIMARY_ACTION_CLASS} ${view === "kairos" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
+            type="button"
+            onClick={() => onSelectView?.("kairos")}
+          >
+            <Sparkles size={14} strokeWidth={1.9} />
+            <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>Kairos</span>
+          </button>
+        ) : null}
       </div>
 
       <nav className={SESSION_NAV_CLASS} aria-label="Sessions">
@@ -987,44 +983,6 @@ export function Sidebar({
             )}
           </section>
         ) : null}
-
-        <section className={`nav-section ${NAV_SECTION_CLASS}`}>
-          <NavSectionHeader
-            label="Scheduled"
-            collapsed={scheduledCollapsed}
-            onToggle={() => setScheduledCollapsed((value) => !value)}
-            extraActions={
-              <>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button className={NAV_SECTION_ACTION_BUTTON_CLASS} type="button" aria-label="More scheduled actions">
-                      <MoreHorizontal size={14} strokeWidth={1.9} aria-hidden="true" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>更多定时任务操作</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button className={NAV_SECTION_ACTION_BUTTON_CLASS} type="button" aria-label="New scheduled task">
-                      <SquarePen size={13} strokeWidth={1.9} aria-hidden="true" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>新建定时任务</TooltipContent>
-                </Tooltip>
-              </>
-            }
-          />
-          {scheduledCollapsed ? null : (
-            <div className={SESSION_LIST_CLASS}>
-              <div className={`${SESSION_ROW_CLASS} ${SESSION_ROW_MUTED_CLASS}`} role="presentation">
-                <span className={`session-row-marker ${SESSION_ROW_MARKER_CLASS}`} aria-hidden="true" />
-                <div className={`${SESSION_ROW_MAIN_CLASS} ${SESSION_ROW_MAIN_MUTED_CLASS}`}>
-                  <span className={`session-row-title ${SESSION_ROW_TITLE_CLASS}`}>No scheduled tasks</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
 
         <section className={`nav-section nav-section-workspaces ${NAV_SECTION_WORKSPACES_CLASS}`}>
           <NavSectionHeader

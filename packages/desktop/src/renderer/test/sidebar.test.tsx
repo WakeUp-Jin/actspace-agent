@@ -132,14 +132,27 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
 }
 
 describe("Sidebar (cursor-aligned layout)", () => {
-  it("renders the three top primary actions (New Agent / Usage / Kairos)", () => {
+  it("hides the Kairos primary action by default", () => {
     renderSidebar();
 
     expect(screen.getByText("New Agent")).toBeInTheDocument();
     expect(screen.queryByText("Lab")).not.toBeInTheDocument();
     expect(screen.getByText("Usage")).toBeInTheDocument();
-    expect(screen.getByText("Kairos")).toBeInTheDocument();
+    expect(screen.queryByText("Kairos")).not.toBeInTheDocument();
     expect(screen.getByText("⌘N")).toBeInTheDocument();
+  });
+
+  it("shows the Kairos primary action after explicit enablement", () => {
+    renderSidebar({ showKairos: true });
+
+    expect(screen.getByRole("button", { name: "Kairos" })).toBeInTheDocument();
+  });
+
+  it("does not render the unavailable Scheduled section", () => {
+    renderSidebar();
+
+    expect(screen.queryByText("Scheduled")).not.toBeInTheDocument();
+    expect(screen.queryByText("No scheduled tasks")).not.toBeInTheDocument();
   });
 
   it("renders a Workspaces parent section above the workspace folders", () => {
@@ -301,7 +314,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
   });
 
   it("calls onSelectView for Usage / Kairos entries", async () => {
-    const { onSelectView } = renderSidebar();
+    const { onSelectView } = renderSidebar({ showKairos: true });
 
     await userEvent.click(screen.getByRole("button", { name: "Usage" }));
     await userEvent.click(screen.getByRole("button", { name: "Kairos" }));
@@ -372,31 +385,6 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(screen.getByText("Bash 工具开发与权限调度")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /^Pinned$/ }));
     expect(screen.queryByText("Bash 工具开发与权限调度")).not.toBeInTheDocument();
-  });
-
-  it("collapses the empty Scheduled section when its label is clicked", async () => {
-    renderSidebar();
-
-    expect(screen.getByText("No scheduled tasks")).toBeInTheDocument();
-    expect(screen.queryByText("Create one when automation is available")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /^Scheduled$/ }));
-    expect(screen.queryByText("No scheduled tasks")).not.toBeInTheDocument();
-  });
-
-  it("shows a readable tooltip for Scheduled more actions", async () => {
-    const user = userEvent.setup();
-    renderSidebar();
-
-    await user.hover(screen.getByRole("button", { name: "More scheduled actions" }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("更多定时任务操作");
-  });
-
-  it("shows a readable tooltip for new Scheduled task", async () => {
-    const user = userEvent.setup();
-    renderSidebar();
-
-    await user.hover(screen.getByRole("button", { name: "New scheduled task" }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("新建定时任务");
   });
 
   it("keeps one status dot on the left and places pin actions on the right", () => {

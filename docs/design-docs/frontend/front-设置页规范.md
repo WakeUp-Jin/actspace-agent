@@ -125,6 +125,8 @@
   - 主 Agent：自定义系统提示词（当前完整系统提示词，保存后下轮主 Agent 对话生效）。
   - Explore 子代理：模型下拉。
 - Kairos（2026-07-04 新增独立分区，聚拢 Kairos 全部配置；提示词分层设计见 `docs/design-docs/kairos/agent-kairos-prompt-design.md`）
+  - 功能状态：分区始终保留一个「启用 Kairos 功能」Toggle，`settings.kairos.featureEnabled` 缺失时按关闭处理。关闭时只展示此开关，不挂载其余配置或运行态控件；开启后才显示完整配置，同时在工作台开放 Kairos 入口。
+  - 功能 Toggle 只决定产品入口与 Controller 是否可用，不等于启动自主循环。由关闭切为开启时必须保持 `preferences.enabled=false`，用户仍需去 Kairos 页显式开启循环。
   - Kairos 自主智能体：模型下拉、思考链（自动/开/关，仍走 settings → `KAIROS_THINKING`）、**额度限制（开关 + 剩余额度 ¥，写入 `memory/budget-state.json`，不进 settings/preferences）**。
     - 额度控件读写走 `window.kairos`（`getState().budget` 回填 + `onState` 订阅运行时余额递减 + `control({type:"set_budget"})` 提交），与下方 config 文件读写独立。开关切换即时提交；剩余额度 commit-on-blur（本地 draft + focus 标志，避免运行时递减打断编辑）；关闭额度时余额输入禁用；耗尽时显示「额度不足」。语义见 `docs/design-docs/kairos/agent-kairos-autonomous-mode.md` 的「额度护栏（单一余额）」。桥不可用（mock）时禁用并提示仅桌面端可配置。
   - 人格 `soul.md`（2026-07-04 新增）：预设下拉（时机之神（默认）/ 极简 / 技术流 / 温暖陪伴 / 自定义）+ markdown 文本框（失焦保存，约 500 token 上限）。预设选中态通过「当前内容与哪个 preset 逐字节相等」反推，都不等显示「自定义」；选预设 = 把预设全文写入 soul.md（覆盖自定义内容前 confirm）。预设字典在 `@actspace/shared` 的 `kairos-soul-presets.ts`。留空 = 使用默认人格（loader fallback）。
@@ -134,7 +136,7 @@
     - 运行偏好 `preferences.json`（精简）：工作时段（固定 `09:00 - 21:00`）/ 晚上时段（固定 `23:00 - 07:00`）只暴露运行频率下拉，选项用「更活跃 / 正常 / 更安静」表述，**不出现「夹紧」字样**；时间不在 UI 中编辑，运行时也固定使用默认起止。另保留睡眠区间（最短/最长/默认，秒）；`rhythm.timezone` / `rhythm.weekend` / `tickBudget` / `circuitBreaker` / `memory` / `tip` 不暴露、写回原样保留。模型下拉与本表单同源。解析失败时禁用并提供「用默认值覆盖」恢复。
     - 可读写路径 `paths.json`（2026-07-03 由「可访问路径」更名，随巡检开关一起移除了每行的 watch Toggle；只读授权由文件监听目录自动获得，说明文案在卡片头部提示）：**「展示 → 点击编辑」列表**（Cursor rule 风格）——路径与说明默认是只读文本、点一下变输入框失焦/回车提交；说明为空时只显示极轻的「+ 添加说明」幽灵按钮，不常驻空输入框；新增行自动进入编辑态；删除按钮 hover 行才浮现。**默认 workspace 行**（路径后缀 `kairos/workspace`）标「默认」徽章、路径只读且禁止删除（防误删工作根目录，说明仍可改）。
     - 屏蔽规则 `blocklist.json`（精简）：屏蔽路径 glob 列表 + **禁用工具多选下拉**（复用「工具」分区清单，选中=对 Kairos 禁用）。`timeWindows`（免打扰时段）/ `maxToolCallsPerTick`（单次唤醒上限）不暴露、写回原样保留。
-  - 不含 Kairos 开启/暂停按钮、也不放 `enabled` 开关（启停留在 Kairos 页）；但**直接改 `preferences.json` 的 `enabled` 保存后仍会真的起/停 Kairos**（main 端按 enabled 调和运行态）。
+  - 不含自主循环的开启/暂停按钮，也不直接暴露 `preferences.enabled`（启停留在 Kairos 页）；顶部 `featureEnabled` 是另一层产品功能开关。直接改 `preferences.json` 的 `enabled` 保存后仍会真的起/停 Kairos（main 端按 enabled 调和运行态）。
 - 工具 Tools
   - 普通基础工具保持逐项开关；当前 provider 下不可用的工具显示禁用态与原因。
   - Browser Use 使用一个“浏览器”总入口，说明默认只向模型披露 gateway、需要时才加载完整工具包；分类执行工具与下载/上传/剪贴板等敏感能力放在默认折叠的“高级设置”中。

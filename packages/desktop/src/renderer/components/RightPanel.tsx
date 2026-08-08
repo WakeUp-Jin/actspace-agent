@@ -104,6 +104,7 @@ export function RightPanel({
   onOpenReview,
   onReviewChanged,
   onSendToAgent,
+  kairosFeatureEnabled = false,
 }: {
   contextState?: ContextState | null;
   sessionId?: string | null;
@@ -113,9 +114,14 @@ export function RightPanel({
   onOpenReview?: () => void;
   onReviewChanged?: () => void;
   onSendToAgent?: (text: string) => void;
+  kairosFeatureEnabled?: boolean;
 }) {
-  const { activeTab, isFileTreeOpen, isFileTreeCollapsed, syncTerminalTabs } = useRightPanel();
+  const { activeTab, closeTab, isFileTreeOpen, isFileTreeCollapsed, syncTerminalTabs } = useRightPanel();
   useFileFreshness({ workspaceRoot, revalidateKey: fileRevalidateKey });
+
+  useEffect(() => {
+    if (!kairosFeatureEnabled) closeTab("kairos");
+  }, [closeTab, kairosFeatureEnabled]);
 
   useEffect(() => {
     const listTerminals = window.actspace?.listTerminals;
@@ -155,6 +161,7 @@ export function RightPanel({
               onOpenReview={onOpenReview}
               onReviewChanged={onReviewChanged}
               onSendToAgent={onSendToAgent}
+              kairosFeatureEnabled={kairosFeatureEnabled}
             />
           )}
         </div>
@@ -510,6 +517,7 @@ function RightPanelBody({
   onOpenReview,
   onReviewChanged,
   onSendToAgent,
+  kairosFeatureEnabled,
 }: {
   tab: RightPanelTab | null;
   contextState?: ContextState | null;
@@ -518,14 +526,29 @@ function RightPanelBody({
   onOpenReview?: () => void;
   onReviewChanged?: () => void;
   onSendToAgent?: (text: string) => void;
+  kairosFeatureEnabled: boolean;
 }) {
   const { openTab } = useRightPanel();
   if (!tab) {
-    return <RightPanelLauncher sessionId={sessionId ?? null} onOpenReview={onOpenReview} />;
+    return (
+      <RightPanelLauncher
+        sessionId={sessionId ?? null}
+        onOpenReview={onOpenReview}
+        kairosFeatureEnabled={kairosFeatureEnabled}
+      />
+    );
   }
 
   if (tab.kind === "kairos") {
-    return <KairosRightPanelView />;
+    return kairosFeatureEnabled ? (
+      <KairosRightPanelView />
+    ) : (
+      <RightPanelLauncher
+        sessionId={sessionId ?? null}
+        onOpenReview={onOpenReview}
+        kairosFeatureEnabled={false}
+      />
+    );
   }
 
   if (tab.kind === "replyHtml") {
@@ -629,9 +652,11 @@ function HtmlTab({ tab }: { tab: Extract<RightPanelTab, { kind: "html" }> }) {
 function RightPanelLauncher({
   sessionId,
   onOpenReview,
+  kairosFeatureEnabled,
 }: {
   sessionId: string | null;
   onOpenReview?: () => void;
+  kairosFeatureEnabled: boolean;
 }) {
   const { openFileTree, openTab } = useRightPanel();
   const { openTerminal, creatingTerminal } = useOpenTerminal(sessionId);
@@ -651,11 +676,13 @@ function RightPanelLauncher({
           icon={<Eye size={19} strokeWidth={1.7} />}
           onClick={() => openTab({ id: "context", kind: "context", title: "Context" })}
         />
-        <LauncherButton
-          label="Kairos"
-          icon={<Bot size={19} strokeWidth={1.7} />}
-          onClick={() => openTab({ id: "kairos", kind: "kairos", title: "Kairos" })}
-        />
+        {kairosFeatureEnabled ? (
+          <LauncherButton
+            label="Kairos"
+            icon={<Bot size={19} strokeWidth={1.7} />}
+            onClick={() => openTab({ id: "kairos", kind: "kairos", title: "Kairos" })}
+          />
+        ) : null}
         <LauncherButton
           label={creatingTerminal ? "Starting…" : "Terminal"}
           icon={<SquareTerminal size={19} strokeWidth={1.7} />}

@@ -92,6 +92,7 @@ describe("SettingsService", () => {
     expect(s.agent.systemPromptPath).toBe(join(s.agent.systemPromptPath.split("/prompts/")[0], "prompts", "main-agent.md"));
     expect(await readFile(s.agent.systemPromptPath, "utf8")).toBe(MAIN_AGENT_SYSTEM_PROMPT);
     expect(s.agent.temperature).toBe(0.5);
+    expect(s.kairos.featureEnabled).toBe(false);
     expect(s.kairos.modelId).toBeNull();
     expect(s.kairos.thinking).toBe("auto");
     expect(s.defaultModelId).toBeNull();
@@ -603,17 +604,18 @@ describe("SettingsService", () => {
     const svc = makeService(dataRoot);
     await svc.load();
 
-    const updated = await svc.update({ kairos: { modelId: "deepseek-v4-pro", thinking: "off" } });
+    const updated = await svc.update({ kairos: { featureEnabled: true, modelId: "deepseek-v4-pro", thinking: "off" } });
+    expect(updated.kairos.featureEnabled).toBe(true);
     expect(updated.kairos.modelId).toBe("deepseek-v4-pro");
     expect(updated.kairos.thinking).toBe("off");
     expect(process.env.KAIROS_THINKING).toBeUndefined();
     expect(process.env.KAIROS_MODEL_ID).toBeUndefined();
 
     const persisted = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
-    expect(persisted.kairos).toEqual({ modelId: "deepseek:deepseek-v4-pro", thinking: "off", enabledSkills: [] });
+    expect(persisted.kairos).toEqual({ featureEnabled: true, modelId: "deepseek:deepseek-v4-pro", thinking: "off", enabledSkills: [] });
 
     const reset = await svc.update({ kairos: { modelId: null, thinking: "auto" } });
-    expect(reset.kairos).toEqual({ modelId: null, thinking: "auto", enabledSkills: [] });
+    expect(reset.kairos).toEqual({ featureEnabled: true, modelId: null, thinking: "auto", enabledSkills: [] });
     expect(process.env.KAIROS_THINKING).toBeUndefined();
   });
 
@@ -767,6 +769,7 @@ describe("SettingsService", () => {
       exploreModel: "kimi:kimi-k2.6",
     });
     expect(migrated.kairos.modelId).toBe("kimi:kimi-k2.7-code");
+    expect(migrated.kairos.featureEnabled).toBe(false);
     expect(migrated.agent.exploreModelId).toBeUndefined();
     expect(migrated.plugins).toEqual(v1.plugins);
     expect(migrated.skills).toEqual(v1.skills);

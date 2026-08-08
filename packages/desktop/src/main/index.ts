@@ -204,6 +204,7 @@ import {
   ensureKairosScaffolding,
 } from "./kairos-bootstrap";
 import { registerKairosConfigIpc, registerKairosIpc, type KairosIpcHandle } from "./kairos-ipc";
+import { writeKairosDisabledPreference } from "./kairos-ipc-internals";
 import { SettingsService, type SecretCrypto } from "./settings-service";
 import { ModelStoreService, type ModelStoreResult } from "./model-store-service";
 import { OpenRouterCatalogService } from "./openrouter-catalog-service";
@@ -924,6 +925,11 @@ async function ensureKairosConfigIpc(roots: AppDataRoots): Promise<void> {
 
 async function ensureKairosController(roots: AppDataRoots): Promise<KairosController> {
   if (kairosController) return kairosController;
+  if (!getSettingsService().getV2().kairos.featureEnabled) {
+    const error = new Error("Kairos 功能尚未启用。") as Error & { code?: string };
+    error.code = "feature_disabled";
+    throw error;
+  }
   const kairosRoot = join(roots.dataRoot, "kairos");
   await ensureKairosScaffolding(kairosRoot);
   const kairosWorkspaceRoot = getKairosWorkspaceRoot(kairosRoot);
@@ -980,6 +986,42 @@ async function ensureKairosController(roots: AppDataRoots): Promise<KairosContro
   return kairosController;
 }
 
+async function persistKairosDisabledPreference(roots: AppDataRoots): Promise<void> {
+  const kairosRoot = join(roots.dataRoot, "kairos");
+  await ensureKairosScaffolding(kairosRoot);
+  await writeKairosDisabledPreference(kairosRoot);
+}
+
+async function disableKairosController(roots: AppDataRoots): Promise<void> {
+  const controller = kairosController;
+  if (!controller) {
+    try {
+      await persistKairosDisabledPreference(roots);
+    } catch (err) {
+      logMain("kairos disable preference write failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    kairosIpcHandle?.dispose();
+    kairosIpcHandle = undefined;
+    return;
+  }
+
+  try {
+    await controller.setEnabledPreference(false);
+  } catch (err) {
+    logMain("kairos disable preference write failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  await controller.shutdown();
+  kairosIpcHandle?.dispose();
+  kairosController = undefined;
+  kairosIpcHandle = undefined;
+  logMain("kairos controller disabled by feature gate");
+}
+
 /**
  * 用户保存 `preferences.json` 后的副作用调和（由 kairos:write-config 经 setImmediate 异步触发）：
  * preferences.json 只保留 enabled / sleep / rhythm 等运行偏好；模型 / 思考链已迁到 settings.json。
@@ -1013,6 +1055,10 @@ async function reconcileKairosAfterPreferences(roots: AppDataRoots, next: Kairos
  * - `start()` 默认尊重 `preferences.enabled`，因此重建后会恢复用户此前的开启/暂停意图。
  */
 async function rebuildKairosController(roots: AppDataRoots): Promise<void> {
+  if (!getSettingsService().getV2().kairos.featureEnabled) {
+    await disableKairosController(roots);
+    return;
+  }
   if (kairosController) {
     try {
       await kairosController.stop();
@@ -1029,6 +1075,10 @@ async function rebuildKairosController(roots: AppDataRoots): Promise<void> {
 }
 
 async function reconcileKairosModelChange(roots: AppDataRoots): Promise<void> {
+  if (!getSettingsService().getV2().kairos.featureEnabled) {
+    await disableKairosController(roots);
+    return;
+  }
   const resolution = getModelRuntimeService().resolveKairosModel();
   if (!("model" in resolution)) {
     if (kairosController) {
@@ -2039,17 +2089,27 @@ async function registerIpc() {
     // （LLM 实例、skillCatalog 注入 guard 与 prompt）；保存后立即重建，保证下一次
     // Kairos 调用使用最新设置。其余 env-backed 设置（Key/工具/温度/bash 审查）由
     // 消费方按 turn 读 env proxy，下一轮自动生效。
-    if (
-      input.kairos &&
-      (beforeKairos.modelId !== next.kairos.modelId ||
-        beforeKairos.thinking !== next.kairos.thinking ||
-        !sameStringSet(beforeKairos.enabledSkills, next.kairos.enabledSkills))
-    ) {
+    if (input.kairos) {
       try {
         const roots = await ensureDataDirectories();
-        await rebuildKairosController(roots);
+        if (beforeKairos.featureEnabled !== next.kairos.featureEnabled) {
+          if (next.kairos.featureEnabled) {
+            // 功能可见性与自主循环是两层状态；首次开放入口时始终保持循环暂停。
+            await persistKairosDisabledPreference(roots);
+            await reconcileKairosModelChange(roots);
+          } else {
+            await disableKairosController(roots);
+          }
+        } else if (
+          next.kairos.featureEnabled &&
+          (beforeKairos.modelId !== next.kairos.modelId ||
+            beforeKairos.thinking !== next.kairos.thinking ||
+            !sameStringSet(beforeKairos.enabledSkills, next.kairos.enabledSkills))
+        ) {
+          await rebuildKairosController(roots);
+        }
       } catch (err) {
-        logMain("kairos rebuild after settings update failed", {
+        logMain("kairos reconcile after settings update failed", {
           error: err instanceof Error ? err.message : String(err),
         });
       }
@@ -2434,13 +2494,17 @@ app.whenReady().then(async () => {
       status: notification.status === "stalled" ? "stalled" : "running",
     });
   });
-  // Kairos 现在仅初始化骨架（preferences.enabled 默认 false → controller 进 stopped 状态）；
-  // renderer 在 KairosPage 显式按"开启"才真正起 tick 循环。
-  try {
-    const controller = await ensureKairosController(roots);
-    await controller.start();
-  } catch (err) {
-    logMain("kairos init failed", { error: err instanceof Error ? err.message : String(err) });
+  // 产品功能默认关闭时不创建 Controller；配置 IPC 仍常驻，保证设置页可以启用 Kairos。
+  if (getSettingsService().getV2().kairos.featureEnabled) {
+    try {
+      const controller = await ensureKairosController(roots);
+      await controller.start();
+    } catch (err) {
+      logMain("kairos init failed", { error: err instanceof Error ? err.message : String(err) });
+    }
+  } else {
+    await disableKairosController(roots);
+    logMain("kairos controller skipped because feature is disabled");
   }
   // fs-watch 插件：按持久化开关自动拉起（未安装/启动失败只记日志，不阻塞启动）
   if (getSettingsService().get().plugins.fsWatch.enabled) {

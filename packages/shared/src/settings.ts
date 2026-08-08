@@ -162,6 +162,13 @@ export interface AgentSettings {
 
 export interface KairosSettings {
   /**
+   * Kairos 产品功能是否可用。
+   *
+   * false / 缺失 = 仅在设置页保留恢复入口，不展示普通工作台入口，也不创建运行时 Controller。
+   * 该字段不表示自治循环正在运行；运行意图仍由 Kairos preferences.enabled 管理。
+   */
+  featureEnabled?: boolean;
+  /**
    * Kairos 自主模式模型。
    *
    * null = Kairos 默认模型 deepseek-v4-flash；显式值当前只允许 deepseek-v4-pro。
@@ -235,7 +242,10 @@ export interface AppSettingsV1 {
 }
 
 export type AgentSettingsV2 = Omit<AgentSettings, "exploreModelId">;
-export type KairosSettingsV2 = Omit<KairosSettings, "modelId"> & { modelId: ModelKey | null };
+export type KairosSettingsV2 = Omit<KairosSettings, "modelId" | "featureEnabled"> & {
+  featureEnabled: boolean;
+  modelId: ModelKey | null;
+};
 
 export interface AppSettingsV2 {
   version: 2;

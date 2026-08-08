@@ -34,12 +34,20 @@ Kairos 不是另一个 Agent，而是和现有 Agent 共享 LLM / 工具 / 长�
 - 单实例：actspace 一个实例只跑一个 Kairos，对应一个本地用户。
 - 极致复用：除 `Sleep` 工具外，Kairos 完全复用主 Agent 的 LLMService / ToolManager / 工具集 / 上下文模块；用 `callerAgent` 标记区分行为差异。
 - 事件驱动：tick / tool / reply / sleep / interrupt 全部表达为 `SessionEvent`，UI 是事件流的视图。
-- 默认关闭：v1 默认不启用，需要用户在 Kairos 页主动 toggle。
+- 默认隐藏：`settings.kairos.featureEnabled` 缺失或为 `false` 时不展示产品入口，也不创建 Controller；用户只能从「设置 > Kairos」显式开放功能。
 - 桌面端约束：通过 Electron IPC stream 暴露事件，不走 HTTP / WebSocket。
 - 本地落盘：复用 actspace 现有 `SessionEvent` 格式，**`memory/short-term/<YYYY-MM>/<YYYY-MM-DD>.jsonl` 是 Kairos 唯一持久化层**，覆盖运行记录、行动日志、事件流三种语义。
 - 数据流稳健：运行时"先写盘成功，再 IPC 推送给前端"；刷新页面先从内存 ring buffer（最近 200 条 SessionEvent）回填，不够再读 jsonl。
 - 控制动作需要回传最终权威态：`start / stop / reset_today` 这类命令在内部副作用完成后，controller 还要再 emit 一次完整 `KairosRuntimeState`，保证 renderer 看到的是最终 `enabled / state / counters` 组合，而不是中间态。
 - 文件收件箱：Main Agent / Lab Agent 可以把希望 Kairos 后台观察、归纳、提醒或形成 Lab 候选的内容追加到各自 inbox Markdown；Kairos 每次 tick 读取这些文件，把它们当作观察信号，而不是用户当前输入或高风险动作授权。
+
+### 三层状态边界
+
+- `settings.kairos.featureEnabled` 是产品功能门控：决定 Kairos 是否出现在左侧栏、右侧对象启动页和对象菜单，以及 main 是否持有 Controller。默认 `false`。
+- `preferences.json.enabled` 是自主循环意图：只在功能开放后生效，由 Kairos 页的「开启 / 暂停」控制。
+- `budget-state.json` 的 `budget.enabled` 是额度护栏开关：不决定功能入口或自主循环是否存在。
+
+关闭产品功能时，main 必须先把 `preferences.enabled` 持久化为 `false`，再停止并释放 Controller，避免留下不可见后台任务。重新开放功能只恢复入口和运行时能力，始终保持自主循环暂停；用户仍需在 Kairos 页显式开启。任务、记忆、模型、Skill 白名单及其他配置均保留。
 
 ## 非目标（v1 明确不做）
 
@@ -164,7 +172,7 @@ Kairos 不新增 `Agent` 工厂入口，也不复用主 Agent 的 `ContextManage
 新增文件，集中处理 Kairos IPC：
 
 - `kairos:read-config` / `kairos:write-config` 是常驻配置通道，在 Kairos 模型未配置、Controller 尚未创建时也必须注册，保证设置页可以读写本地配置。
-- 其余运行态通道跟随 Controller 注册；用户在当前进程选好可用模型后，main 应立即创建 Controller，不要求重启应用。
+- 其余运行态通道跟随 Controller 注册；仅当 `featureEnabled=true` 且模型可用时创建 Controller，不要求重启应用。功能关闭时配置通道仍可用，运行态通道不存在。
 
 - `kairos:get-state` 返回当前 `KairosRuntimeState`（运行状态、计数器）。
 - `kairos:get-events-recent` 从 ring buffer 返回最近 200 条 SessionEvent，不足时从 short-term jsonl 倒序补足。
@@ -316,6 +324,7 @@ export type KairosControl =
 
 补充语义约束：
 
+- `featureEnabled` 不属于 `KairosRuntimeState`，它是 settings 中的产品能力门控；renderer 在进入运行态页面前已经完成该层判断。
 - `state` 描述调度器当前生命周期，例如 `sleeping`、`ticking`、`stopped`、`budget_exhausted`。
 - `enabled` 描述用户意图上的 Kairos 开关，决定 Kairos 页主按钮显示“开启”还是“暂停”。
 - 当 `stop()` 过程中 scheduler 先推送 `state: "stopped"` 时，controller 仍需在 `enabled = false` 落定后再补发一次 state，避免 renderer 停留在 `{ enabled: true, state: "stopped" }` 这样的中间组合。
