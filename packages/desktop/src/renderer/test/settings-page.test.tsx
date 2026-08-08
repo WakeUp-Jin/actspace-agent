@@ -352,7 +352,11 @@ describe("SettingsPage", () => {
     });
     expect(await screen.findByText("本地更新已启动，正在构建。")).toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "本地更新进度" })).toBeInTheDocument();
-    expect(screen.getByText("正在从源码构建 Actspace.app…")).toBeInTheDocument();
+    const progressMessage = screen.getByText("正在从源码构建 Actspace.app…");
+    expect(progressMessage).toBeInTheDocument();
+    expect(progressMessage.parentElement).toHaveClass("flex-wrap");
+    expect(progressMessage.parentElement?.querySelector("h3")).toHaveTextContent("本地更新");
+    expect(progressMessage.parentElement?.previousElementSibling).not.toHaveClass("bg-operational-soft");
     expect(screen.getByText("构建阶段不会退出应用；构建完成后才会关闭窗口并执行替换。")).toBeInTheDocument();
   });
 

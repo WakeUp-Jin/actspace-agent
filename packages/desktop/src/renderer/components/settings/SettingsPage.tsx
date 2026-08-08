@@ -1010,10 +1010,10 @@ function LocalUpdateProgressDialog({
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div
+            <span
               className={[
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-act-lg",
-                isFailed ? "bg-danger-soft text-on-danger" : isSucceeded ? "bg-success-soft text-on-success" : "bg-operational-soft text-operational",
+                "flex h-6 w-6 shrink-0 items-center justify-center",
+                isFailed ? "text-on-danger" : isSucceeded ? "text-on-success" : "text-operational",
               ].join(" ")}
               aria-hidden="true"
             >
@@ -1024,10 +1024,10 @@ function LocalUpdateProgressDialog({
               ) : (
                 <Loader2 size={21} strokeWidth={2.2} className="animate-spin" />
               )}
-            </div>
-            <div className="min-w-0">
+            </span>
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <h3 className="text-[16px] font-bold text-text-main">本地更新</h3>
-              <p className="mt-1 text-[12px] leading-relaxed text-text-faint">{progress.message}</p>
+              <p className="min-w-0 text-[12px] leading-relaxed text-text-faint">{progress.message}</p>
             </div>
           </div>
           {!isActive ? (
