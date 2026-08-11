@@ -50,7 +50,7 @@ describe("transformMessages", () => {
     const result = transformMessages([
       assistant({
         api: "openai-responses",
-        provider: "duckcoding",
+        provider: "openrouter",
         model: "gpt-5.6-sol",
         content: [{
           type: "thinking",
@@ -60,7 +60,7 @@ describe("transformMessages", () => {
       }),
     ], {
       api: "openai-completions",
-      provider: "duckcoding",
+      provider: "openrouter",
       apiKey: "sk",
       model: "gpt-5.6-sol",
     });

@@ -1,4 +1,4 @@
-/** OpenAI Responses API service used by stateless Agent runtimes such as DuckCoding Codex. */
+/** OpenAI Responses API service for providers that expose the Responses protocol. */
 
 import OpenAI from "openai";
 import type {
@@ -32,10 +32,6 @@ import {
   toResponsesTools,
 } from "../responses-convert";
 
-const DEFAULT_BASE_URLS: Record<string, string> = {
-  duckcoding: "https://api.duckcoding.ai/v1",
-};
-
 export class OpenAIResponsesService implements LLMService {
   protected client: OpenAI;
   protected config: LLMConfig;
@@ -49,7 +45,7 @@ export class OpenAIResponsesService implements LLMService {
     const providerFetch = config.transport?.fetch ?? createProviderFetch(config.transport?.proxyUrl);
     this.client = new OpenAI({
       apiKey: config.apiKey || "placeholder",
-      baseURL: config.baseUrl ?? DEFAULT_BASE_URLS[config.provider] ?? "https://api.openai.com/v1",
+      baseURL: config.baseUrl ?? "https://api.openai.com/v1",
       maxRetries: config.maxRetries,
       ...(providerFetch && { fetch: providerFetch }),
       ...(Object.keys(defaultHeaders).length > 0 && { defaultHeaders }),

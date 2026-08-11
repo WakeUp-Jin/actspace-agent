@@ -20,6 +20,7 @@ import type {
   ToolPreviewKind,
   ToolOutputRef,
   ToolArtifact,
+  ToolUiPreview,
 } from "@actspace/shared";
 
 // ─── ToolResult（统一返回类型） ───
@@ -110,9 +111,12 @@ export type ResultRenderer = (result: ToolResult) => string;
 
 export interface ToolParameterProperty {
   type: string;
-  description: string;
+  description?: string;
   enum?: string[];
-  items?: { type: string; enum?: string[] };
+  items?: ToolParameterProperty;
+  properties?: Record<string, ToolParameterProperty>;
+  required?: string[];
+  additionalProperties?: boolean;
   minimum?: number;
   maximum?: number;
   default?: string | number | boolean;
@@ -141,6 +145,8 @@ export interface InternalTool {
   category?: string;
   /** 前端展示语义，由 shared ToolUiPreview.kind 消费 */
   previewKind: ToolPreviewKind;
+  /** Stateful tools can provide a stable running preview without parsing partial args. */
+  createRunningPreview?: (args: Record<string, unknown>) => ToolUiPreview;
   /** 只读标记，影响审批模式和并行调度策略 */
   isReadOnly?: boolean;
   /**

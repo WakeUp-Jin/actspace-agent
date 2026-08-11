@@ -16,6 +16,7 @@ import { FileDiffBlock } from "./messages/FileDiffBlock";
 import { TurnOutputArtifacts } from "./messages/TurnOutputArtifacts";
 import { SubAgentTranscriptPanel } from "./messages/SubAgentTranscriptModal";
 import { ThinkingBlock } from "./messages/ThinkingBlock";
+import { TodoListBlock } from "./messages/TodoListBlock";
 import { ToolActivityGroup } from "./messages/ToolActivityGroup";
 import { ToolLogLine } from "./messages/ToolLogLine";
 import {
@@ -29,6 +30,7 @@ import { formatUsdCost } from "../usage-format";
 type UserMessageBlock = Extract<MessageBlock, { kind: "user" }>;
 type AssistantMessageBlock = Extract<MessageBlock, { kind: "assistant" }>;
 type AgentMessageBlock = Extract<MessageBlock, { kind: "agent" }>;
+type TodoMessageBlock = Extract<MessageBlock, { kind: "todo" }>;
 
 type ConversationTurn = {
   id: string;
@@ -49,6 +51,8 @@ const INITIAL_COMPOSER_STAGE_CLASS =
 const MESSAGE_TURN_CLASS = "message-turn relative flex min-w-0 flex-col gap-0";
 const TURN_PROMPT_CLASS =
   "turn-prompt sticky top-0 z-12 min-w-0 bg-[image:var(--act-gradient-surface-fade)] py-4";
+const TURN_PROMPT_CARD_CLASS =
+  "turn-prompt-card overflow-hidden rounded-act-lg border border-line bg-surface shadow-[0_12px_34px_rgba(31,45,61,0.045)] dark:shadow-[0_12px_34px_rgba(0,0,0,0.3)]";
 const TURN_BODY_CLASS = "turn-body flex min-w-0 flex-col gap-[9px]";
 const ASSISTANT_TURN_GROUP_CLASS = "group/assistant-turn min-w-0";
 const TURN_ACTIONS_CLASS =
@@ -187,6 +191,8 @@ function renderMessage(
       return <CompactCommandBlock key={renderKey} message={message} className={className} />;
     case "workspace_preparation":
       return <WorkspacePreparationBlock key={renderKey} message={message} />;
+    case "todo":
+      return <TodoListBlock key={renderKey} message={message} className={className} />;
     case "read":
     case "search":
     case "grep":
@@ -392,6 +398,40 @@ function renderMessageList(messages: MessageBlock[], onOpenAgentTranscript?: Age
   );
 }
 
+function getLatestTodoMessage(messages: MessageBlock[]): TodoMessageBlock | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.kind === "todo") return message;
+  }
+  return undefined;
+}
+
+function TurnPrompt({
+  turn,
+  onOpenAttachmentPreview,
+}: {
+  turn: ConversationTurn;
+  onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
+}) {
+  if (!turn.user) return null;
+  const latestTodo = getLatestTodoMessage(turn.messages);
+
+  return (
+    <div className={TURN_PROMPT_CLASS}>
+      <div className={TURN_PROMPT_CARD_CLASS}>
+        <UserMessage
+          message={turn.user}
+          onOpenAttachmentPreview={onOpenAttachmentPreview}
+          variant="execution"
+        />
+        {latestTodo && (latestTodo.totalCount > 0 || latestTodo.status === "failed") ? (
+          <TodoListBlock message={latestTodo} attached />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 /**
  * 渲染一个 turn 的正文：含工具时把过程聚合进 ToolActivityGroup（执行中滚动视口 / 完成后 Worked for 折叠），
  * 最终回复始终留在折叠组外正常渲染；没有工具时回退到原来的平铺渲染。
@@ -402,22 +442,29 @@ function renderTurnBody(
   onOpenAgentTranscript?: AgentTranscriptHandler,
 ) {
   const { workItems, finalReply } = splitTurnMessages(turn.messages);
+  const attachTodoToPrompt = Boolean(turn.user);
   const preparationItems = workItems.filter((message) => message.kind === "workspace_preparation");
-  const processItems = workItems.filter((message) => message.kind !== "workspace_preparation");
+  const latestTodo = attachTodoToPrompt ? getLatestTodoMessage(workItems) : undefined;
+  const processItems = workItems.filter(
+    (message) => message.kind !== "workspace_preparation" && (!attachTodoToPrompt || message.kind !== "todo"),
+  );
+  const processContent = processItems.length === 0 ? null : hasToolLikeItem(processItems) ? (
+    <ToolActivityGroup
+      running={isActive}
+      durationMs={workDurationMs(processItems, finalReply)}
+    >
+      {renderMessageList(processItems, onOpenAgentTranscript)}
+    </ToolActivityGroup>
+  ) : renderMessageList(processItems, onOpenAgentTranscript);
 
-  if (!hasToolLikeItem(processItems)) {
+  if (!hasToolLikeItem(processItems) && !latestTodo) {
     return renderMessageList(turn.messages, onOpenAgentTranscript);
   }
 
   return (
     <>
       {preparationItems.length > 0 ? renderMessageList(preparationItems, onOpenAgentTranscript) : null}
-      <ToolActivityGroup
-        running={isActive}
-        durationMs={workDurationMs(processItems, finalReply)}
-      >
-        {renderMessageList(processItems, onOpenAgentTranscript)}
-      </ToolActivityGroup>
+      {processContent}
       {finalReply.length > 0 ? renderMessageList(finalReply, onOpenAgentTranscript) : null}
     </>
   );
@@ -923,11 +970,7 @@ export function ConversationView({
                   ref={turn.user ? (element) => setTurnElement(turn.id, element) : undefined}
                   data-conversation-turn-id={turn.user ? turn.id : undefined}
                 >
-                  {turn.user ? (
-                    <div className={TURN_PROMPT_CLASS}>
-                      <UserMessage message={turn.user} onOpenAttachmentPreview={openAttachmentPreview} />
-                    </div>
-                  ) : null}
+                  <TurnPrompt turn={turn} onOpenAttachmentPreview={openAttachmentPreview} />
                   <div className={ASSISTANT_TURN_GROUP_CLASS}>
                     <div className={TURN_BODY_CLASS}>
                       {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, setActiveTranscriptMessage)}

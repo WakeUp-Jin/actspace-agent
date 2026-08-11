@@ -312,7 +312,9 @@ export class ToolScheduler {
     // 供 bridge 提取 preview 元数据（bash 的 backgrounded taskId、edit/write 的
     // diff/additions/deletions 等），不受后续摘要/截断影响。
     if (!result.success) {
-      return rendered !== undefined ? { ...result, data: rendered, structured: result.data } : result;
+      return rendered !== undefined
+        ? { ...result, data: rendered, structured: result.structured ?? result.data }
+        : result;
     }
 
     const rawData = rendered ?? (typeof result.data === "string" ? result.data : JSON.stringify(result.data));
@@ -345,7 +347,7 @@ export class ToolScheduler {
     return {
       ...result,
       data: processed.modelOutput,
-      ...(rendered !== undefined ? { structured: result.data } : {}),
+      ...(rendered !== undefined ? { structured: result.structured ?? result.data } : {}),
       outputRef: result.outputRef ?? processed.rawOutputRef,
     };
   }

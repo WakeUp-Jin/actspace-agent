@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { recoverSession, recoverMessages, recoverMessageBlocks } from "../recovery";
+import { recoverSession, recoverMessages, recoverMessageBlocks, recoverTodoSnapshot } from "../recovery";
 import { appendEvents } from "../jsonl";
 import { createMeta } from "../meta";
 import { createSessionStorePaths } from "../session-store";
@@ -32,6 +32,41 @@ afterEach(async () => {
 });
 
 describe("Session recovery", () => {
+  it("restores the latest successful todo_write for one exact AgentRun", async () => {
+    const paths = createSessionStorePaths(testDir);
+    const preview = (revision: number, content: string) => ({
+      kind: "todo",
+      todos: [{
+        id: "todo-1",
+        content,
+        status: "in_progress",
+        createdAt: "2026-08-08T00:00:00.000Z",
+        updatedAt: `2026-08-08T00:00:0${revision}.000Z`,
+      }],
+      totalCount: 1,
+      completedCount: 0,
+      revision,
+      displayText: "0 of 1 To-dos Completed",
+    });
+    await appendEvents(paths.sessionPath, [
+      createEvent("tool_result", { toolName: "todo_write", ok: true, uiPreview: preview(1, "Old") }, 1),
+      createEvent("tool_result", { toolName: "todo_write", ok: false, uiPreview: preview(1, "Failed") }, 2),
+      createEvent("tool_result", { toolName: "todo_read", ok: true, uiPreview: preview(9, "Filtered read") }, 3),
+      createEvent("tool_result", { toolName: "todo_write", ok: true, uiPreview: preview(2, "Current") }, 4),
+      { ...createEvent("tool_result", { toolName: "todo_write", ok: true, uiPreview: preview(7, "Other run") }, 5), agentRunId: "turn-2" },
+    ]);
+
+    await expect(recoverTodoSnapshot(paths.sessionPath, "test-session", "turn-1")).resolves.toMatchObject({
+      revision: 2,
+      todos: [{ content: "Current" }],
+    });
+    await expect(recoverTodoSnapshot(paths.sessionPath, "test-session", "turn-new")).resolves.toEqual({
+      todos: [],
+      totalCount: 0,
+      revision: 0,
+    });
+  });
+
   it("should recover messages from events", async () => {
     const paths = createSessionStorePaths(testDir);
     await mkdir(paths.attachmentsDir, { recursive: true });

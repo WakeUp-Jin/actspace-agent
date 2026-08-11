@@ -34,12 +34,12 @@ function completedResponse(overrides: Record<string, unknown> = {}) {
 describe("OpenAIResponsesService", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("streams text and normalizes DuckCoding cache usage", async () => {
+  it("streams text and normalizes OpenAI Responses cache usage", async () => {
     const service = new OpenAIResponsesService({
-      provider: "duckcoding",
+      provider: "openrouter",
       api: "openai-responses",
       apiKey: "test-key",
-      baseUrl: "https://api.duckcoding.ai/v1",
+      baseUrl: "https://api.openai.com/v1",
       model: "gpt-5.6-sol",
       promptCacheKey: "actspace:cache-key",
     });
@@ -79,7 +79,7 @@ describe("OpenAIResponsesService", () => {
 
   it("preserves encrypted reasoning state for the following tool-result request", async () => {
     const service = new OpenAIResponsesService({
-      provider: "duckcoding",
+      provider: "openrouter",
       api: "openai-responses",
       apiKey: "test-key",
       model: "gpt-5.6-sol",
@@ -118,7 +118,7 @@ describe("OpenAIResponsesService", () => {
 
   it("streams function calls with call_id as the Agent tool call id", async () => {
     const service = new OpenAIResponsesService({
-      provider: "duckcoding",
+      provider: "openrouter",
       api: "openai-responses",
       apiKey: "test-key",
       model: "gpt-5.6-sol-high",
@@ -147,7 +147,7 @@ describe("OpenAIResponsesService", () => {
 
   it("maps max-output incomplete responses to length", async () => {
     const service = new OpenAIResponsesService({
-      provider: "duckcoding",
+      provider: "openrouter",
       api: "openai-responses",
       apiKey: "test-key",
       model: "gpt-5.6-sol",
@@ -167,7 +167,7 @@ describe("OpenAIResponsesService", () => {
 
   it("returns an auth error without calling the SDK when the key is missing", async () => {
     const service = new OpenAIResponsesService({
-      provider: "duckcoding",
+      provider: "openrouter",
       api: "openai-responses",
       apiKey: "",
       model: "gpt-5.6-sol",

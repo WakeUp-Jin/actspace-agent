@@ -310,7 +310,7 @@ export function normalizeModelKey(value: unknown): ModelKey | undefined {
   const separatorIndex = value.indexOf(":");
   if (separatorIndex <= 0 || separatorIndex === value.length - 1) return undefined;
   const provider = value.slice(0, separatorIndex);
-  if (provider !== "deepseek" && provider !== "kimi" && provider !== "openrouter" && provider !== "duckcoding") return undefined;
+  if (provider !== "deepseek" && provider !== "kimi" && provider !== "openrouter") return undefined;
   return value as ModelKey;
 }
 

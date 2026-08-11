@@ -16,7 +16,7 @@ import { OpenRouterModelCatalogDialog } from "../components/settings/OpenRouterM
 type ActspaceBridge = NonNullable<typeof window.actspace>;
 const readyCredentialStorage = { status: "ready" as const };
 
-const providerViews: Record<"deepseek" | "kimi" | "openrouter" | "duckcoding", ProviderSettingsView> = {
+const providerViews: Record<"deepseek" | "kimi" | "openrouter", ProviderSettingsView> = {
   deepseek: {
     hasApiKey: true,
     baseUrl: null,
@@ -37,15 +37,6 @@ const providerViews: Record<"deepseek" | "kimi" | "openrouter" | "duckcoding", P
     proxy: { enabled: false, url: null },
     installedModelCount: 3,
     enabledModelCount: 3,
-  },
-  duckcoding: {
-    hasApiKey: false,
-    baseUrl: null,
-    proxy: { enabled: false, url: null },
-    installedModelCount: 0,
-    enabledModelCount: 0,
-    defaultPricingMultiplier: 1,
-    additionalCredentials: [],
   },
 };
 
@@ -126,43 +117,6 @@ const catalogInstalledModel: InstalledModelView = {
   },
   unavailableReasons: {},
 };
-const duckModel: InstalledModelView = {
-  definition: {
-    key: "duckcoding:grok-4.5",
-    provider: "duckcoding",
-    api: "openai-completions",
-    apiModel: "grok-4.5",
-    label: "Grok 4.5",
-    source: "custom",
-    contextWindow: 256000,
-    maxTokens: 32000,
-    thinkingDefault: true,
-    capabilities: { input: ["text"], toolUse: "declared", reasoning: true, thinkingToggle: false, reasoningMandatory: true },
-    family: "grok",
-    pricing: { currency: "USD", inputCacheHitPerMillion: 0.5, inputCacheMissPerMillion: 5, outputPerMillion: 30 },
-  },
-  settings: { enabled: true, addedAt: "2026-07-27T00:00:00.000Z" },
-  unavailableReasons: {},
-};
-const duckCodexModel: InstalledModelView = {
-  definition: {
-    key: "duckcoding:gpt-5.6-sol",
-    provider: "duckcoding",
-    api: "openai-completions",
-    apiModel: "gpt-5.6-sol",
-    label: "5.6 Sol",
-    source: "custom",
-    contextWindow: 255000,
-    maxTokens: null,
-    thinkingDefault: true,
-    capabilities: { input: ["text"], toolUse: "declared", reasoning: true, thinkingToggle: false, reasoningMandatory: true },
-    family: "codex",
-    pricing: { currency: "USD", inputCacheHitPerMillion: 0.5, inputCacheMissPerMillion: 5, inputCacheWritePerMillion: 6.25, outputPerMillion: 30 },
-  },
-  settings: { enabled: true, addedAt: "2026-07-28T00:00:00.000Z", credentialId: "codex-sale" },
-  unavailableReasons: {},
-};
-
 const settings = {
   version: 2,
   defaultModelId: "deepseek-v4-pro",
@@ -349,36 +303,6 @@ describe("provider and model settings", () => {
     expect(screen.queryByRole("heading", { name: "OpenRouter" })).not.toBeInTheDocument();
   });
 
-  it("keeps DuckCoding manageable when the default Key is absent but an extra Key remains", async () => {
-    const extraOnly = {
-      ...providerViews,
-      duckcoding: {
-        ...providerViews.duckcoding,
-        additionalCredentials: [{
-          id: "codex-sale",
-          label: "CodeX-Sale",
-          pricingMultiplier: 0.2,
-          hasApiKey: true,
-          lastConnection: { status: "available" as const },
-        }],
-      },
-    };
-    window.actspace = {
-      listProviders: async () => ({ providers: extraOnly, credentialStorage: readyCredentialStorage }),
-    } as unknown as ActspaceBridge;
-
-    render(<ProviderSettings />);
-
-    const heading = await screen.findByRole("heading", { name: "DuckCoding" });
-    const card = heading.closest("article");
-    expect(card).not.toBeNull();
-    expect(within(card!).queryByRole("button", { name: "断开默认" })).not.toBeInTheDocument();
-    expect(within(card!).getByRole("button", { name: "移除 DuckCoding" })).toBeInTheDocument();
-    await userEvent.click(within(card!).getByRole("button", { name: "编辑" }));
-    expect(screen.getByRole("dialog", { name: "编辑 DuckCoding" })).toBeInTheDocument();
-    expect(screen.getByDisplayValue("CodeX-Sale")).toBeInTheDocument();
-  });
-
   it("uses purpose-filtered models for task selection and updates model enablement", async () => {
     const updateTaskModels = vi.fn(async (input: Partial<AppSettings["taskModels"]>) => ({
       taskModels: { ...settings.taskModels, ...input },
@@ -407,131 +331,6 @@ describe("provider and model settings", () => {
 
     await userEvent.click(await screen.findByRole("switch", { name: `启用 ${usableModel.label}` }));
     await waitFor(() => expect(updateModel).toHaveBeenCalledWith({ modelKey: usableModel.key, enabled: false }));
-  });
-
-  it("keeps the model Key selector hidden for a single-key DuckCoding provider", async () => {
-    const singleKeySettings = {
-      ...settings,
-      providers: { ...settings.providers, duckcoding: { ...providerViews.duckcoding, hasApiKey: true } },
-    } as AppSettings;
-    window.actspace = {
-      listInstalledModels: async () => ({ models: [duckModel] }),
-      listUsableModels: async () => ({ models: [] }),
-    } as unknown as ActspaceBridge;
-
-    render(<ModelSettings settings={singleKeySettings} />);
-
-    expect(await screen.findByText("Grok 4.5")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Grok 4.5 调用 Key")).not.toBeInTheDocument();
-  });
-
-  it("shows a selector only after DuckCoding has extra Keys and persists the selected Key", async () => {
-    const updateModel = vi.fn(async () => ({ ok: true as const, model: duckModel }));
-    const multiKeySettings = {
-      ...settings,
-      providers: {
-        ...settings.providers,
-        duckcoding: {
-          ...providerViews.duckcoding,
-          hasApiKey: true,
-          additionalCredentials: [{
-            id: "codex-sale",
-            label: "CodeX-Sale",
-            pricingMultiplier: 0.2,
-            hasApiKey: true,
-            lastConnection: { status: "available" as const },
-          }],
-        },
-      },
-    } as AppSettings;
-    window.actspace = {
-      listInstalledModels: async () => ({ models: [duckModel] }),
-      listUsableModels: async () => ({ models: [] }),
-      updateModel,
-    } as unknown as ActspaceBridge;
-
-    render(<ModelSettings settings={multiKeySettings} />);
-    await userEvent.selectOptions(await screen.findByLabelText("Grok 4.5 调用 Key"), "codex-sale");
-
-    await waitFor(() => expect(updateModel).toHaveBeenCalledWith({ modelKey: "duckcoding:grok-4.5", credentialId: "codex-sale" }));
-  });
-
-  it("shows the Codex base price after applying the selected Key multiplier", async () => {
-    const multiKeySettings = {
-      ...settings,
-      providers: {
-        ...settings.providers,
-        duckcoding: {
-          ...providerViews.duckcoding,
-          hasApiKey: true,
-          additionalCredentials: [{
-            id: "codex-sale",
-            label: "CodeX-Sale",
-            pricingMultiplier: 0.2,
-            hasApiKey: true,
-            lastConnection: { status: "available" as const },
-          }],
-        },
-      },
-    } as AppSettings;
-    window.actspace = {
-      listInstalledModels: async () => ({ models: [duckCodexModel] }),
-      listUsableModels: async () => ({ models: [] }),
-    } as unknown as ActspaceBridge;
-
-    render(<ModelSettings settings={multiKeySettings} />);
-
-    expect(await screen.findByText(/CodeX-Sale · 0\.2x · 估算输入 \$1 \/ 输出 \$6 \/ 1M/)).toBeInTheDocument();
-  });
-
-  it("adds a DuckCoding local-catalog model with a context override and a provider-owned Key", async () => {
-    const addModel = vi.fn(async () => ({ ok: true as const, model: duckModel }));
-    const multiKeySettings = {
-      ...settings,
-      providers: {
-        ...settings.providers,
-        duckcoding: {
-          ...providerViews.duckcoding,
-          hasApiKey: true,
-          additionalCredentials: [{
-            id: "codex-sale",
-            label: "CodeX-Sale",
-            pricingMultiplier: 0.2,
-            hasApiKey: true,
-            lastConnection: { status: "available" as const },
-          }],
-        },
-      },
-    } as AppSettings;
-    window.actspace = {
-      listInstalledModels: async () => ({ models: [] }),
-      listUsableModels: async () => ({ models: [] }),
-      addModel,
-    } as unknown as ActspaceBridge;
-
-    render(<ModelSettings settings={multiKeySettings} />);
-    await userEvent.click(await screen.findByRole("button", { name: "添加 DuckCoding 模型" }));
-    expect(screen.getByText("5.6 Sol")).toBeInTheDocument();
-    expect(screen.getByText("5.6 Terra")).toBeInTheDocument();
-    expect(screen.getByText("5.6 Luna")).toBeInTheDocument();
-    expect(screen.getByText("gpt-5.6-sol-high")).toBeInTheDocument();
-    expect(screen.getByText("gpt-5.6-sol-ultra")).toBeInTheDocument();
-    expect(screen.getByText("Light")).toBeInTheDocument();
-    expect(screen.getByText("Extra High")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Grok 4\.5/ }));
-    await userEvent.clear(screen.getByLabelText("DuckCoding 最大上下文"));
-    await userEvent.type(screen.getByLabelText("DuckCoding 最大上下文"), "255000");
-    await userEvent.selectOptions(screen.getByLabelText("DuckCoding 模型调用 Key"), "codex-sale");
-    await userEvent.click(screen.getByRole("button", { name: "添加模型" }));
-
-    await waitFor(() => expect(addModel).toHaveBeenCalledWith({
-      provider: "duckcoding",
-      apiModel: "grok-4.5",
-      catalogModelId: "grok:grok-4.5",
-      contextWindow: 255000,
-      maxTokens: null,
-      credentialId: "codex-sale",
-    }));
   });
 
   it("shows the blocking references when an in-use catalog model cannot be removed", async () => {

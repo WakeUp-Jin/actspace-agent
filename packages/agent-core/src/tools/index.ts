@@ -56,6 +56,7 @@ export { webFetchDefinition } from "./tools/web-fetch/definition";
 export { generateImageDefinition } from "./tools/generate-image/definition";
 export { inspectImageDefinition } from "./tools/inspect-image/definition";
 export { agentDefinition, exploreDefinition } from "./tools/agent/definition";
+export { todoReadDefinition, todoWriteDefinition } from "./tools/todo/definition";
 export {
   browserDefinitions,
   browserCuaDefinition,
@@ -118,6 +119,13 @@ export {
   type CreateAgentToolOptions,
   type CreateExploreToolOptions,
 } from "./tools/agent";
+export {
+  createTodoReadTool,
+  createTodoWriteTool,
+  createTodoUiPreview,
+  TodoStore,
+  TodoStoreError,
+} from "./tools/todo";
 export type { AgentToolInput, AgentToolOutput, SubAgentEventSink } from "./tools/agent/runner";
 
 // ─── 便捷函数 ───
@@ -149,6 +157,7 @@ import { generateImageExecutor } from "./tools/generate-image/executor";
 import { inspectImageDefinition } from "./tools/inspect-image/definition";
 import { inspectImageExecutor } from "./tools/inspect-image/executor";
 import { createAgentTool, createExploreTool } from "./tools/agent";
+import { createTodoReadTool, createTodoWriteTool, TodoStore } from "./tools/todo";
 import {
   browserDefinitions,
 } from "./tools/browser/definition";
@@ -174,6 +183,7 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     hasImageInspectionModel: Boolean(config.imageInspection?.llm),
   };
   const disabledTools = new Set(config.disabledTools ?? []);
+  const todoStore = new TodoStore({ initialSnapshot: config.initialTodoSnapshot });
   const entries: ReadonlyArray<
     readonly [
       import("./types").ToolDefinitionSpec,
@@ -251,6 +261,13 @@ export function createToolManager(config: ToolManagerConfig): ToolManager {
     manager.register(bashKillTool);
   }
 
+  if (!disabledTools.has("todo_read")) {
+    manager.register(createTodoReadTool(todoStore));
+  }
+  if (toolProfile === "full" && !disabledTools.has("todo_write")) {
+    manager.register(createTodoWriteTool(todoStore));
+  }
+
   if (toolProfile === "full" && !disabledTools.has("agent") && config.llm) {
     manager.register(
       createAgentTool({
@@ -287,6 +304,7 @@ const READ_ONLY_TOOL_NAMES = new Set([
   "web_search",
   "web_fetch",
   "inspect_image",
+  "todo_read",
 ]);
 
 function isToolAllowedByProfile(name: string, profile: NonNullable<ToolManagerConfig["toolProfile"]>): boolean {

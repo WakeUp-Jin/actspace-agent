@@ -46,6 +46,54 @@ function agentToolResultEvent(uiPreview: AgentToolPreview): SessionEvent<ToolExe
 }
 
 describe("session selectors", () => {
+  it("restores only the latest Todo snapshot for an AgentRun", () => {
+    const base = {
+      sessionId: "session-todo",
+      agentRunId: "run-todo",
+      type: "tool_result" as const,
+      timestamp: "2026-08-08T10:00:00.000Z",
+      schemaVersion: 2 as const,
+    };
+    const todo = (id: string, revision: number, status: "pending" | "completed"): SessionEvent => ({
+      ...base,
+      id,
+      payload: {
+        toolCallId: `call-${revision}`,
+        toolName: "todo_write",
+        ok: true,
+        summary: "Updated todos",
+        uiPreview: {
+          kind: "todo",
+          todos: [{
+            id: "todo-1",
+            content: "Implement Todo tools",
+            status,
+            createdAt: "2026-08-08T09:00:00.000Z",
+            updatedAt: "2026-08-08T09:30:00.000Z",
+          }],
+          totalCount: 1,
+          completedCount: status === "completed" ? 1 : 0,
+          revision,
+          displayText: status === "completed" ? "1 of 1 To-dos Completed" : "0 of 1 To-dos Completed",
+        },
+      },
+    });
+
+    expect(createMessageBlocks([todo("todo-old", 1, "pending"), todo("todo-new", 2, "completed")])).toEqual([{
+      kind: "todo",
+      id: "todo-new",
+      renderKey: "turn:run-todo:todo",
+      todos: [expect.objectContaining({ id: "todo-1", status: "completed" })],
+      totalCount: 1,
+      completedCount: 1,
+      revision: 2,
+      displayText: "1 of 1 To-dos Completed",
+      status: "completed",
+      isError: false,
+      createdAt: base.timestamp,
+    }]);
+  });
+
   it("maps a completed workspace preparation event to a worktree block", () => {
     const blocks = createMessageBlocks([{
       id: "prep-1",
@@ -231,7 +279,7 @@ describe("session selectors", () => {
           signature: "openai-responses-reasoning:{\"id\":\"rs_1\",\"type\":\"reasoning\"}",
           api: "openai-responses",
           model: "gpt-5.6-sol",
-          provider: "duckcoding",
+          provider: "openrouter",
         },
       },
       {

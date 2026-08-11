@@ -12,9 +12,7 @@ function runtime(provider: ProviderRuntimeConfig["provider"]): ProviderRuntimeCo
       ? "https://api.deepseek.com"
       : provider === "kimi"
         ? "https://api.moonshot.cn/v1"
-        : provider === "openrouter"
-          ? "https://openrouter.ai/api/v1"
-          : "https://api.duckcoding.ai/v1",
+        : "https://openrouter.ai/api/v1",
   };
 }
 
@@ -27,7 +25,6 @@ describe("provider connection service", () => {
     ["deepseek", "https://api.deepseek.com/user/balance"],
     ["kimi", "https://api.moonshot.cn/v1/models"],
     ["openrouter", "https://openrouter.ai/api/v1/models"],
-    ["duckcoding", "https://api.duckcoding.ai/v1/models"],
   ] as const)("uses the lightweight %s health endpoint without sending a prompt", async (provider, expectedUrl) => {
     const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as ProviderFetch;
     const result = await testProviderConnection(runtime(provider), options(fetchImpl));

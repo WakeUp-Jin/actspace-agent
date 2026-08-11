@@ -137,6 +137,15 @@ const EXTRACTORS: Record<ToolPreviewKind, Extractor> = {
     };
   },
 
+  todo: () => ({
+    kind: "todo",
+    todos: [],
+    totalCount: 0,
+    completedCount: 0,
+    revision: 0,
+    displayText: "0 of 0 To-dos Completed",
+  }),
+
   browser_cua: (s) => browserCategoryPreview("Browser CUA", s),
   browser_dom: (s) => browserCategoryPreview("Browser DOM", s),
   browser_locator: (s) => browserCategoryPreview("Browser Locator", s),

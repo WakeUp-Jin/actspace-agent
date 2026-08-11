@@ -16,6 +16,7 @@ import { ToolManager } from "../../tools/manager";
 import { runAgentWithBridge } from "../bridge";
 import { bashExecutor, bashTaskRegistry } from "../../tools/tools/bash";
 import type { RunAgentWithBridgeDeps } from "../bridge";
+import { createTodoWriteTool, TodoStore } from "../../tools/tools/todo";
 
 function createTestTool(name: string): InternalTool {
   return {
@@ -1223,6 +1224,55 @@ describe("runAgentWithBridge bridge", () => {
     expect(
       (finishedEvents[0] as Extract<RuntimeStreamEvent, { type: "tool_finished" }>).preview,
     ).toHaveProperty("streamingContent", undefined);
+  });
+
+  it("streams and persists a complete Todo preview without parsing partial arrays", async () => {
+    const deps = createDeps();
+    deps.toolManager.register(createTodoWriteTool(new TodoStore({
+      createId: () => "todo-bridge",
+      now: () => "2026-08-08T00:00:00.000Z",
+    })));
+    deps.llm.setResponses([
+      mockToolCall("todo_write", {
+        todos: [{ content: "Connect Todo previews", status: "in_progress" }],
+      }, { id: "tc-todo" }),
+      mockText("Todo ready."),
+    ]);
+    const streamEvents: RuntimeStreamEvent[] = [];
+
+    const result = await runAgentWithBridge(
+      { sessionId: "session-todo", agentRunId: "run-todo", userInput: "Track the work." },
+      deps,
+      { onStreamEvent: (event) => streamEvents.push(event) },
+    );
+
+    expect(streamEvents.find((event) => event.type === "tool_call_streaming")).toMatchObject({
+      type: "tool_call_streaming",
+      toolCallId: "tc-todo",
+      preview: { kind: "todo", todos: [], revision: 0 },
+    });
+    expect(streamEvents.find((event) => event.type === "tool_started")).toMatchObject({
+      type: "tool_started",
+      toolCallId: "tc-todo",
+      preview: { kind: "todo", todos: [], revision: 0 },
+    });
+    expect(streamEvents.find((event) => event.type === "tool_finished")).toMatchObject({
+      type: "tool_finished",
+      toolCallId: "tc-todo",
+      isError: false,
+      preview: {
+        kind: "todo",
+        revision: 1,
+        totalCount: 1,
+        completedCount: 0,
+        todos: [{ id: "todo-bridge", content: "Connect Todo previews", status: "in_progress" }],
+      },
+    });
+    expect(result.events.find((event) => event.type === "tool_result")?.payload).toMatchObject({
+      toolName: "todo_write",
+      ok: true,
+      uiPreview: { kind: "todo", revision: 1, totalCount: 1 },
+    });
   });
 
   it("streams and persists Agent previews without exposing raw args as UI state", async () => {

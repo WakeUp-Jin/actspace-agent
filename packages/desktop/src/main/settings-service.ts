@@ -165,14 +165,14 @@ interface CredentialStorageIssue {
 
 interface ReadSecretsResult {
   secrets: PersistedSecrets;
-  source: "missing" | "v1" | "v2" | "unavailable";
+  source: "missing" | "v1" | "v2" | "legacy-removed" | "unavailable";
   issue?: CredentialStorageIssue;
 }
 
 interface ReadSettingsResult {
   settings: PersistedSettingsV2;
   legacySystemPrompt?: string;
-  source: "missing" | "v1" | "v2" | "invalid";
+  source: "missing" | "v1" | "v2" | "legacy-removed" | "invalid";
   rawV1?: string;
   warning?: string;
 }
@@ -223,7 +223,7 @@ export class SettingsService {
     const loadedSecrets = await this.readSecretsFile();
     this.secrets = loadedSecrets.secrets;
     this.credentialStorageIssue = loadedSecrets.issue;
-    if (loadedSecrets.source === "v1" && !loadedSecrets.issue) {
+    if ((loadedSecrets.source === "v1" || loadedSecrets.source === "legacy-removed") && !loadedSecrets.issue) {
       try {
         await this.writeSecretsFile();
       } catch {
@@ -242,7 +242,7 @@ export class SettingsService {
       if (loaded.source === "v1" && loaded.rawV1 !== undefined) {
         await writeBackupOnce(join(this.dataRoot, SETTINGS_V1_BACKUP_FILE), loaded.rawV1);
         await this.writeSettingsFile();
-      } else if (loaded.source === "missing") {
+      } else if (loaded.source === "missing" || loaded.source === "legacy-removed") {
         await this.writeSettingsFile();
       }
     } catch {
@@ -866,7 +866,7 @@ export class SettingsService {
 
   /** Compatibility API for the current key modal; all LLM providers share the v2 connection path. */
   async setProviderKey(provider: SecretProviderId, apiKey: string): Promise<{ ok: boolean; error?: string }> {
-    if (provider === "deepseek" || provider === "kimi" || provider === "openrouter" || provider === "duckcoding") {
+    if (provider === "deepseek" || provider === "kimi" || provider === "openrouter") {
       try {
         await this.updateProviderConnection({ provider, apiKey });
         return { ok: true };
@@ -890,7 +890,7 @@ export class SettingsService {
   }
 
   async clearProviderKey(provider: SecretProviderId): Promise<{ ok: boolean }> {
-    if (provider === "deepseek" || provider === "kimi" || provider === "openrouter" || provider === "duckcoding") {
+    if (provider === "deepseek" || provider === "kimi" || provider === "openrouter") {
       try {
         await this.updateProviderConnection({ provider, apiKey: null });
         return { ok: true };
@@ -1049,7 +1049,7 @@ export class SettingsService {
     if (parsed.version === 2) {
       return {
         settings: mergePersistedSettingsV2(parsed, this.dataRoot),
-        source: "v2",
+        source: hasRemovedDuckCodingSettings(parsed) ? "legacy-removed" : "v2",
         ...(!hasRequiredV2Sections(parsed) && { warning: "设置文件字段不完整，已在内存中使用安全默认值。" }),
       };
     }
@@ -1081,8 +1081,8 @@ export class SettingsService {
     }
 
     if (parsed.version === 2) {
-      const secrets = parseSecretsV2(parsed);
-      if (!secrets) {
+      const parsedSecrets = parseSecretsV2(parsed);
+      if (!parsedSecrets) {
         return unavailableSecrets("invalid_format", "凭据文件字段无效。为避免覆盖现有 Key，Actspace 已暂停凭据修改。");
       }
       try {
@@ -1090,7 +1090,7 @@ export class SettingsService {
       } catch {
         return unavailableSecrets("read_failed", "凭据文件权限无法收紧为仅当前用户可读写。Actspace 已暂停凭据修改。");
       }
-      return { secrets, source: "v2" };
+      return { secrets: parsedSecrets.secrets, source: parsedSecrets.legacyProviderRemoved ? "legacy-removed" : "v2" };
     }
 
     if (parsed.version === 1) {
@@ -1098,11 +1098,11 @@ export class SettingsService {
       if (!legacy) {
         return unavailableSecrets("invalid_format", "旧版凭据文件字段无效。为避免覆盖现有 Key，Actspace 已暂停凭据修改。");
       }
-      const migrated = this.decryptLegacySecrets(legacy);
+      const migrated = this.decryptLegacySecrets(legacy.secrets);
       if (!migrated) {
         return unavailableSecrets("migration_failed", "旧版凭据无法解密。请使用最后一次能读取这些 Key 的 Actspace 版本启动后再迁移。");
       }
-      return { secrets: migrated, source: "v1" };
+      return { secrets: migrated, source: legacy.legacyProviderRemoved ? "legacy-removed" : "v1" };
     }
 
     return unavailableSecrets("invalid_format", "凭据文件版本不受支持。为避免覆盖现有 Key，Actspace 已暂停凭据修改。");
@@ -1181,26 +1181,36 @@ function unavailableSecrets(code: CredentialStorageIssueCode, message: string): 
   return { secrets: emptySecrets(), source: "unavailable", issue: { code, message } };
 }
 
-function parseSecretsV1(value: Record<string, unknown>): PersistedSecretsV1 | undefined {
+function parseSecretsV1(value: Record<string, unknown>): { secrets: PersistedSecretsV1; legacyProviderRemoved: boolean } | undefined {
   const parsed = parseSecretFields(value, true);
-  return parsed ? { version: 1, ...parsed } : undefined;
+  return parsed ? { secrets: { version: 1, ...parsed.secrets }, legacyProviderRemoved: parsed.legacyProviderRemoved } : undefined;
 }
 
-function parseSecretsV2(value: Record<string, unknown>): PersistedSecrets | undefined {
+function parseSecretsV2(value: Record<string, unknown>): { secrets: PersistedSecrets; legacyProviderRemoved: boolean } | undefined {
   const parsed = parseSecretFields(value, false);
-  return parsed ? { version: 2, ...parsed } : undefined;
+  return parsed ? { secrets: { version: 2, ...parsed.secrets }, legacyProviderRemoved: parsed.legacyProviderRemoved } : undefined;
 }
+
+type ParsedSecretFields = {
+  secrets: Omit<PersistedSecrets, "version">;
+  legacyProviderRemoved: boolean;
+};
 
 function parseSecretFields(
   value: Record<string, unknown>,
   allowMissingProviderCredentials: boolean,
-): Omit<PersistedSecrets, "version"> | undefined {
-  const allowedTopLevel = new Set<string>(["version", "providerCredentials", ...ALL_SECRET_PROVIDER_IDS]);
+): ParsedSecretFields | undefined {
+  const allowedTopLevel = new Set<string>(["version", "providerCredentials", "duckcoding", ...ALL_SECRET_PROVIDER_IDS]);
   if (Object.keys(value).some((key) => !allowedTopLevel.has(key))) return undefined;
   if (!isRecord(value.providerCredentials) && !(allowMissingProviderCredentials && value.providerCredentials === undefined)) {
     return undefined;
   }
 
+  let legacyProviderRemoved = false;
+  if (value.duckcoding !== undefined) {
+    if (typeof value.duckcoding !== "string" || value.duckcoding.length === 0) return undefined;
+    legacyProviderRemoved = true;
+  }
   const parsed: Omit<PersistedSecrets, "version"> = { providerCredentials: {} };
   for (const id of ALL_SECRET_PROVIDER_IDS) {
     const secret = value[id];
@@ -1209,10 +1219,15 @@ function parseSecretFields(
     parsed[id] = secret;
   }
   for (const [id, secret] of Object.entries(isRecord(value.providerCredentials) ? value.providerCredentials : {})) {
+    if (id.startsWith("duckcoding:")) {
+      if (!isValidCredentialId(id.slice("duckcoding:".length)) || typeof secret !== "string" || secret.length === 0) return undefined;
+      legacyProviderRemoved = true;
+      continue;
+    }
     if (!isProviderCredentialSecretId(id) || typeof secret !== "string" || secret.length === 0) return undefined;
     parsed.providerCredentials[id] = secret;
   }
-  return parsed;
+  return { secrets: parsed, legacyProviderRemoved };
 }
 
 function secretEntries(secrets: PersistedSecretsV1): Array<[string, string]> {
@@ -1351,6 +1366,18 @@ function mergePersistedSettingsV2(raw: Record<string, unknown>, dataRoot: string
   seed.skills = sanitizeSkills(isRecord(raw.skills) ? raw.skills : {});
   seed.shortcuts = sanitizeShortcuts(raw.shortcuts);
   return seed;
+}
+
+function hasRemovedDuckCodingSettings(raw: Record<string, unknown>): boolean {
+  const providers = isRecord(raw.providers) && Object.prototype.hasOwnProperty.call(raw.providers, "duckcoding");
+  const modelKeys = [
+    ...(isRecord(raw.installedModels) ? Object.keys(raw.installedModels) : []),
+    ...(isRecord(raw.customModels) ? Object.keys(raw.customModels) : []),
+  ];
+  const taskModels = isRecord(raw.taskModels) ? Object.values(raw.taskModels) : [];
+  const kairos = isRecord(raw.kairos) ? [raw.kairos.modelId] : [];
+  return providers || modelKeys.some((key) => key.startsWith("duckcoding:")) ||
+    [...taskModels, ...kairos].some((value) => typeof value === "string" && value.startsWith("duckcoding:"));
 }
 
 function sanitizeShortcuts(input: unknown): ShortcutsSettings {

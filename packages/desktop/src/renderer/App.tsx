@@ -178,6 +178,47 @@ function hasFinishedAllActiveTools(state: StreamingState): boolean {
   );
 }
 
+function isEmptyTodoPreview(preview: Extract<ToolUiPreview, { kind: "todo" }>): boolean {
+  return preview.todos.length === 0 && preview.totalCount === 0 && preview.completedCount === 0 && preview.revision === 0;
+}
+
+function upsertStreamingTool(
+  state: StreamingState,
+  toolCallId: string,
+  toolName: string,
+  preview: ToolUiPreview | undefined,
+): void {
+  const existing = state.activeTools.get(toolCallId);
+  if (existing) {
+    if (!(preview?.kind === "todo" && isEmptyTodoPreview(preview) && existing.preview?.kind === "todo")) {
+      existing.preview = preview;
+    }
+    existing.toolName = toolName;
+    return;
+  }
+
+  let effectivePreview = preview;
+  if (preview?.kind === "todo") {
+    const previous = [...state.activeTools.entries()].find(([, tool]) => tool.preview?.kind === "todo");
+    if (previous) {
+      if (isEmptyTodoPreview(preview) && previous[1].preview?.kind === "todo") {
+        effectivePreview = previous[1].preview;
+      }
+      state.activeTools.delete(previous[0]);
+      const segment = state.segments.find(
+        (candidate): candidate is Extract<StreamingSegment, { type: "tool" }> =>
+          candidate.type === "tool" && candidate.toolCallId === previous[0],
+      );
+      if (segment) segment.toolCallId = toolCallId;
+    }
+  }
+
+  state.activeTools.set(toolCallId, { toolName, preview: effectivePreview });
+  if (!state.segments.some((segment) => segment.type === "tool" && segment.toolCallId === toolCallId)) {
+    state.segments.push({ type: "tool", toolCallId });
+  }
+}
+
 function updateStringSet(current: Set<string>, value: string, included: boolean): Set<string> {
   if (current.has(value) === included) {
     return current;
@@ -597,6 +638,21 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       // 仅靠 toolName 兜底为 inline，避免执行前一瞬被渲染成 agent 工具的 panel 框。
       display: tool.preview.display ?? (tool.toolName === "explore" ? "inline" : undefined),
       transcriptEvents: tool.transcriptEvents,
+      createdAt: now,
+    };
+  }
+
+  if (tool.preview?.kind === "todo") {
+    return {
+      kind: "todo",
+      id: agentRunId ? `turn:${agentRunId}:todo` : `streaming-todo-${toolCallId}`,
+      todos: tool.preview.todos,
+      totalCount: tool.preview.totalCount,
+      completedCount: tool.preview.completedCount,
+      revision: tool.preview.revision,
+      displayText: tool.preview.displayText,
+      status: tool.finished ? tool.isError ? "failed" : "completed" : "running",
+      isError: tool.isError,
       createdAt: now,
     };
   }
@@ -1181,32 +1237,13 @@ export function App() {
 
       case "tool_call_streaming": {
         state.waitingForModel = false;
-        const existing = state.activeTools.get(event.toolCallId);
-        if (existing) {
-          existing.preview = event.preview;
-        } else {
-          state.activeTools.set(event.toolCallId, {
-            toolName: event.toolName,
-            preview: event.preview,
-          });
-          state.segments.push({ type: "tool", toolCallId: event.toolCallId });
-        }
+        upsertStreamingTool(state, event.toolCallId, event.toolName, event.preview);
         break;
       }
 
       case "tool_started": {
         state.waitingForModel = false;
-        const existing = state.activeTools.get(event.toolCallId);
-        if (existing) {
-          existing.preview = event.preview;
-          existing.toolName = event.toolName;
-        } else {
-          state.activeTools.set(event.toolCallId, {
-            toolName: event.toolName,
-            preview: event.preview,
-          });
-          state.segments.push({ type: "tool", toolCallId: event.toolCallId });
-        }
+        upsertStreamingTool(state, event.toolCallId, event.toolName, event.preview);
         break;
       }
 

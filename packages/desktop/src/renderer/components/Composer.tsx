@@ -364,14 +364,13 @@ function isModelEditable(model: ComposerModelOption): boolean {
 function modelDefaultRuntimeOptions(model: ComposerModelOption | undefined): ComposerModelRuntimeOptions {
   return {
     thinkingEnabled: model?.reasoningMandatory || model?.thinkingDefault || false,
-    ...((model?.provider === "duckcoding" || model?.provider === "deepseek") && model.reasoningDefaultEffort && {
+    ...(model?.provider === "deepseek" && model.reasoningDefaultEffort && {
       reasoningEffort: model.reasoningDefaultEffort,
     }),
   };
 }
 
 function reasoningEffortLabel(model: ComposerModelOption | undefined, effort: ModelReasoningEffort): string {
-  if (model?.provider === "duckcoding" && effort === "low") return "Light";
   return REASONING_EFFORT_LABELS[effort];
 }
 
@@ -1804,7 +1803,7 @@ export function Composer({
                       <div className={OPTION_SEPARATOR_CLASS} />
                     ) : null}
                     <div className={DROPDOWN_LABEL_CLASS}>Effort</div>
-                    {editingModelSpec?.provider !== "duckcoding" && editingModelSpec?.provider !== "deepseek" ? (
+                    {editingModelSpec?.provider !== "deepseek" ? (
                       <button
                         type="button"
                         className={OPTION_CHOICE_CLASS}

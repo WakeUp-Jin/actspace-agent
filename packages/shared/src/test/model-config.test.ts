@@ -16,7 +16,6 @@ import {
   resolveModelSpec,
   resolveModelSpecByApiModel,
 } from "../model-config";
-import { DUCKCODING_MODEL_CATALOG } from "../duckcoding-model-catalog";
 import { PROVIDER_IDS, PROVIDER_REGISTRY, isProviderId } from "../provider-config";
 
 describe("model config", () => {
@@ -77,7 +76,7 @@ describe("model config", () => {
   });
 
   it("registers supported providers without storing user credentials", () => {
-    expect(PROVIDER_IDS).toEqual(["deepseek", "kimi", "openrouter", "duckcoding"]);
+    expect(PROVIDER_IDS).toEqual(["deepseek", "kimi", "openrouter"]);
     expect(PROVIDER_REGISTRY.openrouter).toMatchObject({
       defaultBaseUrl: "https://openrouter.ai/api/v1",
       supportedApis: ["openai-completions"],
@@ -85,56 +84,9 @@ describe("model config", () => {
       supportsProxy: true,
     });
     expect(JSON.stringify(PROVIDER_REGISTRY)).not.toMatch(/apiKey|authorization/i);
-    expect(PROVIDER_REGISTRY.duckcoding).toMatchObject({
-      defaultBaseUrl: "https://api.duckcoding.ai/v1",
-      supportedApis: ["openai-completions", "openai-responses"],
-      supportsRemoteModelCatalog: false,
-    });
     expect(isProviderId("openrouter")).toBe(true);
+    expect(isProviderId("duckcoding")).toBe(false);
     expect(isProviderId("other")).toBe(false);
-  });
-
-  it("keeps DuckCoding request names provider-local and maps Codex effort through model variants", () => {
-    const codex = DUCKCODING_MODEL_CATALOG.filter((model) => model.family === "codex");
-    const grok = DUCKCODING_MODEL_CATALOG.find((model) => model.family === "grok");
-
-    expect(codex.map((model) => model.apiModel)).toEqual([
-      "gpt-5.6-sol",
-      "gpt-5.6-terra",
-      "gpt-5.6-luna",
-    ]);
-    for (const model of codex) {
-      expect(model).toMatchObject({
-        provider: "duckcoding",
-        api: "openai-responses",
-        contextWindow: 255_000,
-        capabilities: {
-          reasoningEfforts: ["low", "medium", "high", "xhigh", "ultra"],
-          reasoningDefaultEffort: "medium",
-        },
-        requestModelByReasoningEffort: {
-          low: `${model.apiModel}-low`,
-          medium: model.apiModel,
-          high: `${model.apiModel}-high`,
-          xhigh: `${model.apiModel}-xhigh`,
-          ultra: `${model.apiModel}-ultra`,
-        },
-      });
-    }
-    expect(codex.map((model) => model.pricing)).toEqual([
-      { currency: "USD", inputCacheHitPerMillion: 0.5, inputCacheMissPerMillion: 5, inputCacheWritePerMillion: 6.25, outputPerMillion: 30 },
-      { currency: "USD", inputCacheHitPerMillion: 0.25, inputCacheMissPerMillion: 2.5, inputCacheWritePerMillion: 3.125, outputPerMillion: 15 },
-      { currency: "USD", inputCacheHitPerMillion: 0.1, inputCacheMissPerMillion: 1, inputCacheWritePerMillion: 1.25, outputPerMillion: 6 },
-    ]);
-    expect(grok).toMatchObject({
-      provider: "duckcoding",
-      api: "openai-completions",
-      apiModel: "grok-4.5",
-      family: "grok",
-    });
-    expect(DUCKCODING_MODEL_CATALOG.map((model) => model.apiModel)).not.toEqual(
-      expect.arrayContaining([expect.stringMatching(/^(openai|azure|xai)\//)]),
-    );
   });
 
   it("maps every legacy model to a provider-qualified builtin definition", () => {
@@ -164,7 +116,7 @@ describe("model config", () => {
     expect(normalizeModelKey("openrouter:anthropic/claude-example")).toBe(
       "openrouter:anthropic/claude-example",
     );
-    expect(normalizeModelKey("duckcoding:grok-4.5")).toBe("duckcoding:grok-4.5");
+    expect(normalizeModelKey("duckcoding:grok-4.5")).toBeUndefined();
     expect(normalizeModelKey("unknown-model")).toBeUndefined();
     expect(normalizeModelKey("other:model")).toBeUndefined();
     expect(legacyModelIdFromKey("kimi:kimi-k2.6")).toBe("kimi-k2.6");

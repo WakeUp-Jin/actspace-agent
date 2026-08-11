@@ -22,6 +22,7 @@
 
 ## 最近完成
 
+- Agent Todo 工具 V1：`completed/20260808-agent-todo-tools.md`
 - Kairos 默认隐藏与功能门控：`completed/20260808-kairos-feature-gate.md`
 - Actspace 本地明文凭据存储迁移：`completed/20260802-local-plaintext-credential-storage.md`
 - 分析观测会话索引：`completed/20260801-analysis-session-index.md`

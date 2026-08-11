@@ -1721,6 +1721,185 @@ sessionId,
     });
   });
 
+  it("replaces the visible Todo snapshot when a later Todo tool starts in the same run", async () => {
+    const sessionId = "session-todo-stream";
+    const record = createEmptySessionRecord(sessionId);
+    const sessions: SessionListItem[] = [
+      {
+        id: sessionId,
+        title: "Todo stream",
+        updatedAt: record.meta.updatedAt,
+        agentRunCount: 0,
+      },
+    ];
+    const now = new Date().toISOString();
+
+    let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
+    let activeAgentRunId = "";
+    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
+      null;
+
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(record.meta.createdAt, record.meta.updatedAt),
+      listSessions: async () => sessions,
+      getSession: async () => record,
+      createSession: async () => record,
+      abortAgentRun: async () => true,
+      submitApproval: async () => ({ ok: true }),
+      pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null,
+      getDeepSeekBalance: async () => ({
+        provider: "deepseek",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: now,
+        displayBalance: null,
+      }),
+      getKimiBalance: async () => ({
+        provider: "kimi",
+        isConfigured: false,
+        isAvailable: null,
+        generatedAt: now,
+        displayBalance: null,
+      }),
+      listPendingApprovals: async () => [],
+      ...settingsApiStub,
+      onAgentStream: (callback) => {
+        streamHandler = callback;
+        return () => {
+          if (streamHandler === callback) streamHandler = null;
+        };
+      },
+      runAgent: (input: RunAgentInput) =>
+        new Promise((resolve) => {
+          activeAgentRunId = input.agentRunId;
+          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
+          streamHandler?.({
+            type: "tool_started",
+            turnId: "turn-todo-stream",
+            llmCallId: "llm-todo-stream",
+            sessionId: input.sessionId,
+            agentRunId: input.agentRunId,
+            toolCallId: "tool-todo-1",
+            toolName: "todo_write",
+            argsPreview: "{}",
+            preview: {
+              kind: "todo",
+              todos: [{
+                id: "todo-1",
+                content: "Inspect current behavior",
+                status: "in_progress",
+                activeForm: "Inspecting current behavior",
+                createdAt: now,
+                updatedAt: now,
+              }],
+              completedCount: 0,
+              totalCount: 1,
+              revision: 1,
+              displayText: "0/1 completed",
+            },
+          });
+          resolveRunAgent = resolve;
+        }),
+    };
+
+    renderApp();
+
+    const composer = await screen.findByLabelText("Message composer");
+    await userEvent.type(composer, "implement the feature");
+    await userEvent.click(screen.getByLabelText("Send message"));
+
+    expect(await screen.findByRole("listitem", { name: "In progress: Inspect current behavior" })).toBeInTheDocument();
+    expect(screen.getAllByLabelText("Agent Todo list")).toHaveLength(1);
+    const sentUserMessage = screen.getByText("implement the feature").closest(".user-message");
+    const todoBlock = screen.getByLabelText("Agent Todo list");
+    const executionCard = sentUserMessage?.closest(".turn-prompt-card");
+    expect(sentUserMessage).not.toBeNull();
+    expect(executionCard).not.toBeNull();
+    expect(executionCard).toContainElement(todoBlock);
+    expect(sentUserMessage!.compareDocumentPosition(todoBlock) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await act(async () => {
+      streamHandler?.({
+        type: "tool_call_streaming",
+        turnId: "turn-todo-stream",
+        llmCallId: "llm-todo-stream",
+        sessionId,
+        agentRunId: activeAgentRunId,
+        toolCallId: "tool-todo-2-partial",
+        toolName: "todo_write",
+        preview: {
+          kind: "todo",
+          todos: [],
+          completedCount: 0,
+          totalCount: 0,
+          revision: 0,
+          displayText: "0 of 0 To-dos Completed",
+        },
+      });
+    });
+
+    expect(screen.getByRole("listitem", { name: "In progress: Inspect current behavior" })).toBeInTheDocument();
+
+    await act(async () => {
+      streamHandler?.({
+        type: "tool_started",
+        turnId: "turn-todo-stream",
+        llmCallId: "llm-todo-stream",
+        sessionId,
+        agentRunId: activeAgentRunId,
+        toolCallId: "tool-todo-2",
+        toolName: "todo_write",
+        argsPreview: "{}",
+        preview: {
+          kind: "todo",
+          todos: [
+            {
+              id: "todo-1",
+              content: "Inspect current behavior",
+              status: "completed",
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: "todo-2",
+              content: "Add the regression test",
+              status: "in_progress",
+              activeForm: "Adding the regression test",
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+          completedCount: 1,
+          totalCount: 2,
+          revision: 2,
+          displayText: "1/2 completed",
+        },
+      });
+    });
+
+    expect(screen.getAllByLabelText("Agent Todo list")).toHaveLength(1);
+    expect(screen.getByRole("listitem", { name: "Completed: Inspect current behavior" })).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: "In progress: Add the regression test" })).toBeInTheDocument();
+
+    await act(async () => {
+      resolveRunAgent?.({
+        sessionId,
+        agentRunId: activeAgentRunId,
+        status: "completed",
+        events: [],
+        contextSnapshot: {
+          totalTokens: 0,
+          maxTokens: 200_000,
+          percentUsed: 0,
+          buckets: [],
+        },
+        contextState: null,
+      });
+    });
+  });
+
   it("renders a streaming Agent block from SubAgent events and opens the live transcript", async () => {
     const sessionId = "session-subagent-stream";
     const record = createEmptySessionRecord(sessionId);

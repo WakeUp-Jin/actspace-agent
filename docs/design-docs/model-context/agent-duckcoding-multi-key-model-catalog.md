@@ -1,5 +1,7 @@
 # DuckCoding 多 Key、本地模型档案与名称变体设计
 
+> **已退役（2026-08-09）**：本文保留为历史设计与迁移依据，不代表当前 Provider Registry。DuckCoding 文字模型已从 ActSpace 移除；图片生成仍使用独立的 `image-generation` 配置，相关默认端点不受本文退役影响。
+
 - 状态：首版实现完成；缓存归因探针已确认 Codex 应走 Responses API，待使用用户自有 DuckCoding Key 做真实 Agent 工具循环与调用验收。
 - 更新时间：2026-07-28。
 - 对应执行计划：`docs/exec-plans/completed/20260724-multi-provider-llm/plan-7-duckcoding-multi-key.md`。

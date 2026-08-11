@@ -5,6 +5,8 @@ import type { ComposerAttachment, MessageBlock } from "@actspace/shared";
 const USER_MESSAGE_CLASS = "message-row user-message flex justify-start animate-[rise-in_260ms_ease_both]";
 const USER_CARD_CLASS =
   "user-card w-full rounded-act-lg border border-line bg-surface px-[var(--conversation-card-padding)] py-3 leading-[1.55] text-text-main shadow-[0_12px_34px_rgba(31,45,61,0.045)] dark:shadow-[0_12px_34px_rgba(0,0,0,0.3)]";
+const USER_EXECUTION_CARD_CLASS =
+  "user-card w-full px-[var(--conversation-card-padding)] py-3 leading-[1.55] text-text-main";
 // 超长用户消息两态折叠（参考 Cursor）：
 // - 默认折叠只露前几行 + 底部渐隐，不出滚动条，sticky 常驻顶部时遮挡最小；
 // - 点击展开到更大高度、内部滚动，再点收起；拖选文字复制不触发切换。
@@ -89,15 +91,18 @@ function UserMessageContent({ content }: { content: string }) {
 export function UserMessage({
   message,
   onOpenAttachmentPreview,
+  variant = "standalone",
 }: {
   message: Extract<MessageBlock, { kind: "user" }>;
   onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
+  variant?: "standalone" | "execution";
 }) {
   const attachments = message.attachments ?? [];
+  const cardClass = variant === "execution" ? USER_EXECUTION_CARD_CLASS : USER_CARD_CLASS;
 
   return (
     <article className={USER_MESSAGE_CLASS}>
-      <div className={USER_CARD_CLASS}>
+      <div className={cardClass}>
         {message.content ? <UserMessageContent content={message.content} /> : null}
         {attachments.length > 0 ? (
           <div className={USER_ATTACHMENTS_CLASS} aria-label="Message attachments">

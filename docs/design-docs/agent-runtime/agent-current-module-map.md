@@ -2,7 +2,7 @@
 
 本文档记录 `packages/agent-core` 当前已经落地的模块结构。它回答“现在代码分布在哪里、各模块负责什么”，长期设计动机见 `docs/design-docs/agent-runtime/agent-backend-design.md`。
 
-> DeepSeek / Kimi / OpenRouter / DuckCoding 多供应商实现见 `docs/design-docs/model-context/agent-multi-provider-llm.md` 与 `agent-duckcoding-multi-key-model-catalog.md`。shared 契约、agent-core 显式 runtime/代理 transport、desktop settings v2、多 Key、本地 DuckCoding 档案/模型存储、Codex Responses、任务模型消费方和 renderer 已贯通；真实 OpenRouter 代理、DuckCoding Agent 工具循环与跨任务场景保留为用户统一手动验收项。
+> DeepSeek / Kimi / OpenRouter 多供应商实现见 `docs/design-docs/model-context/agent-multi-provider-llm.md`。图片生成连接独立于 LLM Provider Registry，默认仍可指向 DuckCoding Images API。
 
 ## 顶层类型与契约
 
@@ -42,7 +42,7 @@
 - `llm/services/deepseek-anthropic.ts`：DeepSeekAnthropicService 历史兼容包装层，复用 `AnthropicMessagesService`；内置 DeepSeek 模型和 provider 已不再进入该路线。
 - `llm/services/kimi.ts`：KimiService 兼容包装层，普通 Kimi 对话复用 `OpenAICompletionsService`；只兜底 provider 默认值。
 - `llm/services/mock.ts`：MockLLMService，支持 response queue 模式（通过 `setResponses`/`appendResponses` 预设响应序列）和默认行为模式（向后兼容）。提供 `mockText`、`mockToolCall`、`mockError` 辅助工厂函数。
-- `llm/factory.ts`：createLLMService 工厂函数。当前按 `LLMConfig.api` 选 `AnthropicMessagesService` / `OpenAICompletionsService` / `OpenAIResponsesService`；OpenRouter 复用 Chat Completions，DuckCoding Codex 使用 Responses，provider 品牌包装层只保留兼容入口。
+- `llm/factory.ts`：createLLMService 工厂函数。当前按 `LLMConfig.api` 选 `AnthropicMessagesService` / `OpenAICompletionsService` / `OpenAIResponsesService`；provider 品牌包装层只保留兼容入口。
 
 ## `prompt/` - 提示词集中管理
 
@@ -66,6 +66,7 @@
 - `tools/tools/{web-search,web-fetch}/`：联网工具（设计见 `docs/design-docs/tool-system/agent-web-tools.md`）。`web_search` 走外部搜索 API 双通道（智谱 + Tavily/TinyFish/Exa failover），任一搜索 key 存在时注册；`web_fetch` 本地确定性抓取 URL 转 Markdown，始终注册。
 - `tools/tools/generate-image/`：主 Agent 图片生成工具（设计见 `docs/design-docs/tool-system/agent-image-generation-tool.md`）。`generate_image` 由独立图片服务 Key 门控，接受 `prompt / size / n`，把 URL/Base64 结果校验后写入当前 session artifacts；Kairos/Explore 不注入该 runtime，因此默认不可用。
 - `tools/tools/inspect-image/`：text-only 主 Agent 的按需图片分析工具（设计见 `docs/design-docs/tool-system/agent-image-inspection-tool.md`）。`inspect_image(path, question)` 在 workspace、当前轮附件与 session artifacts 的 `realpath` 边界内读取 JPEG / PNG / WebP，通过独立 Kimi 或 OpenRouter LLM 返回固定分层视觉报告；原生视觉主模型、Chat、Kairos 与 Explore 不注入该工具 runtime。
+- `tools/tools/todo/`：主 Agent 的 AgentRun 级执行清单（设计见 `docs/design-docs/tool-system/agent-todo-tools.md`）。`todo_read` 读取当前快照，`todo_write` 以 replace/merge 原子更新；状态只属于 `sessionId + agentRunId`，不进入 Agent Team 的 `TeamTask` 模型。
 - `tools/tools/browser/`：Browser Use 的薄 Agent adapter。`definition.ts` 只暴露 9 个分类工具、`browser_help`、`browser_run`；`generated-actions.ts` 从 Go 62 条 registry 生成 action/risk/status/legacy alias；`permissions.ts` 对单 action 做 metadata 审批、对 batch 调 Go preflight 并携带绑定 session/turn/action hash 的短期 token；`executor.ts` 通过单一长连接调用 `command.execute/describe/run`，不实现 CDP、Locator 或 Chrome API 逻辑。旧 15 个工具名只保留禁用配置 alias 与历史 preview 读取兼容。
 - `tools/tools/agent/`：Agent 工具（用户可见名 `Agent`，内部工具名 `agent`）。`definition.ts` 声明 `description` / `prompt` / `subagent_type:"explore"` 输入和 `previewKind:"agent"`；`runner.ts` 创建隔离 Explore SubAgent runtime，复用父 turn 的 LLMService，但只注册 `read_file`、`grep`、`glob`、`list_directory` 四个只读工具，不恢复主 session 历史，也不允许递归 Agent。runner 把 SubAgent 内部事件转成 sidecar transcript、`AgentToolPreview.recentEvents`、最终 summary/stats/transcriptRef，并通过 `ToolResult.subagent` 返回给 bridge。
 
@@ -95,8 +96,8 @@
 - `engine/bridge.ts`：IPC 桥接层，将 AgentEvent 实时映射为 RuntimeStreamEvent，并把一次用户输入聚合为 `AgentRunResult`。Bridge 给所有 SessionEvent 附加粗粒度 `agentRunId`，给内部 Turn/LLM Call 事件附加真实 `turnId/llmCallId`；同时把请求、响应与重试写入可选 Trace Writer。工具预览、压缩、cache audit 和 SubAgent sidecar transcript 仍沿用既有边界。
 - `engine/compact-context.ts`：手动 `/compact` 后端入口。接收 `CompactContextInput` + 已装配 `AgentDeps`，发送 `context_compaction_started/progress/finished/failed` stream event，调用 `contextManager.compactNow()`，返回 `CompactContextResult` 并产出 `context_compaction` / `context_snapshot` 事件。
 - `engine/partial-args.ts`：partial JSON 字符串字段提取状态机，正确处理 `\"` `\\` `\n` `\uXXXX` 等 JSON escape，未闭合时返回当前累积部分。仅给 streaming-preview-extractors 使用。
-- `engine/streaming-preview-extractors.ts`：按 `ToolPreviewKind` 注册的 extractor 表，把 LLM 流式 `tool_call_delta` 累积的 partial JSON 解析成 typed `ToolUiPreview`。write_file 同时提取 path 与 content（content 作为 `streamingContent` 让前端 cursor 风格边写边看）；edit_file 和 delete_file 只提取 path（edit 的 diff 需要文件上下文 + 替换执行才能生成，delete 的审批/执行状态由权限事件和工具结果决定）。新工具按 previewKind 注册一行 extractor 即可。
-- `engine/create-agent-deps.ts`：Agent 配置构建与实例创建，两步分离。Desktop 通过 provider-qualified `modelDefinition`、`modelKey` 和显式 `ProviderRuntimeConfig` 装配主模型；utility summarizer 也由已解析任务模型构造。旧 `modelSpec`/env builder 仅保留测试、CLI 和兼容入口。`createAgentFromConfig(config)` 用于空历史 mock/测试，`createAgentForSession(config, { sessionPath })` 在 main 进程恢复真实会话。
+- `engine/streaming-preview-extractors.ts`：按 `ToolPreviewKind` 注册的 extractor 表，把 LLM 流式 `tool_call_delta` 累积的 partial JSON 解析成 typed `ToolUiPreview`。write_file 同时提取 path 与 content（content 作为 `streamingContent` 让前端 cursor 风格边写边看）；edit_file 和 delete_file 只提取 path；Todo 不解析未闭合数组，只返回稳定的已有/空快照。新工具按 previewKind 注册一行 extractor 即可。
+- `engine/create-agent-deps.ts`：Agent 配置构建与实例创建，两步分离。Desktop 通过 provider-qualified `modelDefinition`、`modelKey` 和显式 `ProviderRuntimeConfig` 装配主模型；utility summarizer 也由已解析任务模型构造。旧 `modelSpec`/env builder 仅保留测试、CLI 和兼容入口。`createAgentFromConfig(config)` 用于空历史 mock/测试，`createAgentForSession(config, { sessionPath })` 在 main 进程恢复真实会话，并按精确 `agentRunId` 恢复最近成功的 Todo 写入快照。
 
 Agent Run、内部 Turn 与 LLM Call 的跨层职责边界见 `docs/design-docs/agent-runtime/agent-turn-layers.md`，Trace 契约见 `agent-observability-trace-model.md`。
 
@@ -105,7 +106,7 @@ Agent Run、内部 Turn 与 LLM Call 的跨层职责边界见 `docs/design-docs/
 - `persistence/types.ts`：SessionStorePaths、JsonlParseResult、WriteResult、SessionRecoveryResult。
 - `persistence/jsonl.ts`：健壮 JSONL 读写（坏行容错 + 结构化错误传播）。
 - `persistence/meta.ts`：Session V2 `meta.json` 增量更新（`agentRunCount/updatedAt/lastModel`），拒绝旧 Schema。
-- `persistence/recovery.ts`：多维恢复（events -> Messages/Blocks/Snapshot/DiffSummary）。
+- `persistence/recovery.ts`：多维恢复（events -> Messages/Blocks/Snapshot/DiffSummary），以及按 `sessionId + agentRunId` 从最近成功 `todo_write` 的结构化结果恢复 TodoSnapshot。
 - `persistence/session-store.ts`：会话存储生命周期（create/ensure/write/read/list）。`writeSessionResult()` 追加 Session V2 事实事件，并把 `AgentRunResult.subagentTranscripts` 写到独立 sidecar；`readSubAgentTranscript()` 通过 typed ref 和路径段校验拒绝跨 session 或路径穿越读取。
 
 ## `observability/` - 本地排障与分析 Trace
@@ -225,7 +226,7 @@ flowchart TB
 Desktop 集成（`packages/desktop`）：
 
 - `src/main/settings-service.ts` + `model-store-service.ts` + `model-runtime-service.ts`：provider 默认 Key 与额外命名 Key 分层持久化；模型用可选 `credentialId` 引用同 provider 凭据，runtime 解析目标密钥并把 Key 倍率应用到本次调用的价格快照。缺失或不可用的绑定明确失败，不回退默认 Key。
-- `packages/shared/src/duckcoding-model-catalog.ts` + `src/main/model-store-service.ts`：共享本地 Codex/Grok 档案，保存 DuckCoding 精确请求模型名、名称变体和用户覆盖后的上下文/输出限制；未知模型仍可按安全默认能力手动添加，不依赖外部公共目录。
+- `src/main/model-store-service.ts`：管理内置模型和 OpenRouter 目录模型；历史 DuckCoding 模型配置在 settings v2 加载时过滤。
 - `src/main/agent-runtime-context.ts` + `agents-md-service.ts`：主 Agent runtime context 装配入口。`SettingsService.readAgentSystemPrompt()` 读取 `<userData>/prompts/main-agent.md` 作为主系统提示词；`agents-md-service` 固定加载 `<userData>/AGENTS.md` 与 `<workspaceRoot>/AGENTS.md`，缺失静默跳过、读取失败只 warning，并以 `rules` segment 注入 `SystemPromptContext`。同一 loader 还注入 Main Agent → Kairos handoff 段，给出真实绝对路径 `<userData>/kairos/inbox/main-agent.md`，并把 `<userData>/kairos/inbox/` 作为主 Agent `write_file/edit_file` 的额外可写根；随后调用 `loadSkillRegistry()` 扫描项目级/用户级 Skill，把 `<available_skills>` 注入 `skills` segment。Skill 正文由 Agent 按 catalog 中的绝对 `location` 使用 `read_file` 读取。真实 turn、`context:describe` 和 `/compact` 共用该 loader，避免上下文检查视图和 LLM 实际输入漂移。
 - `src/main/context-describe-service.ts`：按需重建某个 session 的 Context 明细，不调用 LLM；现在通过同一 runtime context loader 注入主系统提示词文件和 `AGENTS.md` rules，再用 `buildContextEntries` 生成 systemPrompt / rules / tools / conversation 逐条全文。
 - `src/main/kairos-bootstrap.ts`：`ensureKairosScaffolding(kairosRoot)` 幂等建目录 + 落 4 份默认 config；`createKairosLlm()` 复用 `buildLLMConfig`；`createKairosToolManagerFactory({ workspaceRoot })` 把 `blocklist.toolsDenied` 合并进 `disabledTools`。

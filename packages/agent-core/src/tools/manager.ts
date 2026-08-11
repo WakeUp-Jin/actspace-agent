@@ -18,6 +18,7 @@ import type {
 } from "../internal-tools";
 import { toToolDefinition } from "../internal-tools";
 import type { Tool } from "../messages";
+import type { ToolUiPreview } from "@actspace/shared";
 import type {
   ReadFileRangeCacheEntry,
   ImageGenerationRuntimeConfig,
@@ -121,6 +122,10 @@ export class ToolManager {
 
   getAll(): InternalTool[] {
     return Array.from(this.tools.values());
+  }
+
+  createRunningPreview(name: string, args: Record<string, unknown>): ToolUiPreview | undefined {
+    return this.tools.get(name)?.createRunningPreview?.(args);
   }
 
   /** 导出 LLM 消费的 Tool[] */
