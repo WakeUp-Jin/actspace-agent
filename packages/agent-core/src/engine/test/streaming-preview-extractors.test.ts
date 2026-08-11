@@ -2,6 +2,17 @@ import { describe, expect, it } from "vitest";
 import { extractStreamingPreview } from "../streaming-preview-extractors";
 
 describe("extractStreamingPreview", () => {
+  it("does not infer Todo arrays from partial JSON", () => {
+    expect(extractStreamingPreview("todo", '{"todos":[{"content":"Half')).toEqual({
+      kind: "todo",
+      todos: [],
+      totalCount: 0,
+      completedCount: 0,
+      revision: 0,
+      displayText: "0 of 0 To-dos Completed",
+    });
+  });
+
   it("write extractor parses path and streamingContent", () => {
     const partial = '{"path":"/tmp/夜雨.md","content":"# 夜雨\\n半夜醒来';
     const preview = extractStreamingPreview("write", partial);

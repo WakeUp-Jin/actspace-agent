@@ -64,7 +64,7 @@ desktop --(file contract)--> plugins/fs-watch
 - `docs/design-docs/agent-runtime/agent-observability-trace-model.md`：分析观测的数据契约，解释 Session V2、真实 Turn、LLM Call、重试、Trace 安全边界及读取 IPC。
 - `docs/design-docs/frontend/front-agent-analysis-observability.md`：分析观测生产页面的产品边界、两栏信息架构、请求详情、上下文对比、主题和 Trace 可靠性要求。
 - `docs/design-docs/agent-runtime/agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块清单，包括 LLM、prompt、tools、context、engine、persistence、observability、env 和兼容层。
-- `docs/design-docs/model-context/agent-multi-provider-llm.md`：已落地的多供应商 LLM 架构，统一 DeepSeek / Kimi / OpenRouter / DuckCoding 的服务商连接、模型目录、服务商级代理、协议服务和任务模型选择；DuckCoding 多 Key、本地 Codex/Grok 档案、Codex Responses 与名称变体详见同目录专题，真实 provider 场景待用户统一手动验收。
+- `docs/design-docs/model-context/agent-multi-provider-llm.md`：已落地的多供应商 LLM 架构，统一 DeepSeek / Kimi / OpenRouter 的服务商连接、模型目录、服务商级代理、协议服务和任务模型选择；历史 DuckCoding 设计文档仅用于变更追溯。图片生成仍可独立使用 DuckCoding 的 OpenAI-compatible Images API。
 - `docs/design-docs/core-storage-and-observability.md`：本地 session 存储、`context-state.json`、Electron `userData`、workspace root 和本地排障日志边界。
 - `docs/design-docs/core-review-change-sources.md`：Git-first Review Workbench 总规范，定义六种 scope、upstream Branch、结构化 diff、Review Options、Git mutation 和右侧 Tab 边界。
 - `docs/design-docs/agent-runtime/agent-backend-design.md`：后端 Agent Runtime 的长期设计事实来源，解释为什么采用这些模块边界。

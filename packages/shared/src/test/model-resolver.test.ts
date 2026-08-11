@@ -31,12 +31,6 @@ function makeSnapshot(): ModelSnapshot {
         hasApiKey: true,
         lastConnection: { status: "available", checkedAt: now },
       },
-      duckcoding: {
-        enabled: true,
-        hasApiKey: false,
-        lastConnection: { status: "untested" },
-        additionalCredentials: {},
-      },
     },
     definitions: { ...BUILTIN_MODEL_REGISTRY },
     installedModels: Object.fromEntries(
@@ -195,8 +189,8 @@ describe("model resolver", () => {
   it("uses an explicitly bound extra credential without requiring the default Key", () => {
     const snapshot = makeSnapshot();
     const definition = dynamicModel({
-      key: "duckcoding:grok-4.5",
-      provider: "duckcoding",
+      key: "openrouter:example/extra-credential",
+      provider: "openrouter",
       apiModel: "grok-4.5",
       source: "custom",
       capabilities: {
@@ -212,7 +206,7 @@ describe("model resolver", () => {
       addedAt: now,
       credentialId: "sale",
     };
-    snapshot.providers.duckcoding.additionalCredentials = {
+    snapshot.providers.openrouter.additionalCredentials = {
       sale: { hasApiKey: true, lastConnection: { status: "available", checkedAt: now } },
     };
 
@@ -221,10 +215,10 @@ describe("model resolver", () => {
 
   it("does not silently fall back when a bound credential is missing or unavailable", () => {
     const snapshot = makeSnapshot();
-    snapshot.providers.duckcoding.hasApiKey = true;
+    snapshot.providers.openrouter.hasApiKey = true;
     const definition = dynamicModel({
-      key: "duckcoding:grok-4.5",
-      provider: "duckcoding",
+      key: "openrouter:example/extra-credential",
+      provider: "openrouter",
       apiModel: "grok-4.5",
       source: "custom",
     });
@@ -240,7 +234,7 @@ describe("model resolver", () => {
       reason: "credential_missing",
     });
 
-    snapshot.providers.duckcoding.additionalCredentials = {
+    snapshot.providers.openrouter.additionalCredentials = {
       missing: {
         hasApiKey: true,
         lastConnection: { status: "unavailable", checkedAt: now },

@@ -2022,20 +2022,10 @@ async function registerIpc() {
     return { provider: "openrouter", ...result };
   });
   ipcMain.handle("models:add", async (_event, input: ModelsAddInput): Promise<ModelMutationResult> => {
-    if ((input?.provider !== "openrouter" && input?.provider !== "duckcoding") || typeof input.apiModel !== "string") {
+    if (input?.provider !== "openrouter" || typeof input.apiModel !== "string") {
       return { ok: false, error: { code: "invalid_model", message: "模型添加参数无效。" } };
     }
-    return toModelMutationResult(input.provider === "openrouter"
-      ? await getModelStoreService().addCatalogModel(input.provider, input.apiModel)
-      : await getModelStoreService().addCustomModel({
-        provider: "duckcoding",
-        apiModel: input.apiModel,
-        label: input.label,
-        credentialId: input.credentialId,
-        catalogModelId: input.catalogModelId,
-        contextWindow: input.contextWindow,
-        maxTokens: input.maxTokens,
-      }));
+    return toModelMutationResult(await getModelStoreService().addCatalogModel(input.provider, input.apiModel));
   });
   ipcMain.handle("models:update", async (_event, input: ModelsUpdateInput): Promise<ModelMutationResult> => {
     const key = normalizeModelKey(input?.modelKey);

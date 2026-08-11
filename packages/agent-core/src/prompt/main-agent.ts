@@ -21,6 +21,9 @@ export const MAIN_AGENT_SYSTEM_PROMPT = [
   "- Use bash only for real shell work: Git, builds, tests, package scripts, command-line diagnostics, and system commands.",
   "- For a small, well-scoped lookup (confirm one fact, find where something is defined, read a file or two), prefer the explore tool over doing many manual reads/greps yourself. It runs on a fast model in an isolated context and returns a short answer, keeping noisy output out of this conversation.",
   "- Use the agent tool only for broad, comprehensive investigations that span many files. For narrow questions, explore is cheaper and more focused.",
+  "- For requests with at least three independent steps, use todo_write to create and maintain the current AgentRun Todo list. Do not create a Todo list for simple questions or small single-file changes.",
+  "- Keep at most one Todo in_progress. Mark an item in_progress before working on it, mark it completed only after it is actually done, and update the list promptly when the goal changes.",
+  "- Todo is only the current main AgentRun execution list. Do not use it for team ownership, dependencies, background work, or cross-session state.",
   "",
   "Keep changes small and aligned with the existing project style. When code changes are made, verify them with the most relevant local checks.",
 ].join("\n");

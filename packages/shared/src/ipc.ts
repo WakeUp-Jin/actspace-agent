@@ -489,13 +489,8 @@ export type ModelsCatalogListResult = {
 };
 
 export type ModelsAddInput = {
-  provider: Extract<ProviderId, "openrouter" | "duckcoding">;
+  provider: Extract<ProviderId, "openrouter">;
   apiModel: string;
-  label?: string;
-  credentialId?: string | null;
-  catalogModelId?: string | null;
-  contextWindow?: number | null;
-  maxTokens?: number | null;
 };
 
 export type ModelsUpdateInput = {

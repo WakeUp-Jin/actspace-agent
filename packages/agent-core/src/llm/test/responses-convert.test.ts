@@ -4,10 +4,10 @@ import type { LLMConfig } from "../types";
 import { convertContextToResponses, toResponsesTools } from "../responses-convert";
 
 const target: LLMConfig = {
-  provider: "duckcoding",
+  provider: "openrouter",
   api: "openai-responses",
   apiKey: "test-key",
-  baseUrl: "https://api.duckcoding.ai/v1",
+  baseUrl: "https://api.openai.com/v1",
   model: "gpt-5.6-sol",
   input: ["text", "image"],
 };
@@ -21,7 +21,7 @@ describe("Responses input conversion", () => {
         {
           role: "assistant",
           api: "openai-responses",
-          provider: "duckcoding",
+          provider: "openrouter",
           model: "gpt-5.6-sol",
           content: [
             { type: "text", text: "I will inspect it." },
@@ -97,7 +97,7 @@ describe("Responses input conversion", () => {
       messages: [{
         role: "assistant",
         api: "openai-responses",
-        provider: "duckcoding",
+        provider: "openrouter",
         model: "gpt-5.6-sol",
         content: [
           {

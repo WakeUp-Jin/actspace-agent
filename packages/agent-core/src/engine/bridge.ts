@@ -58,6 +58,8 @@ import {
   sanitizeBrowserToolResult,
   shouldRedactToolResult,
 } from "../tools/tools/browser/redaction";
+import { createTodoUiPreview } from "../tools/tools/todo/preview";
+import type { TodoExecutionStructured } from "../tools/tools/todo/executor";
 
 const PREVIEW_LIMIT = 160;
 
@@ -1207,6 +1209,15 @@ function createToolUiPreview(
       };
     }
 
+    case "todo": {
+      const todoStructured = getTodoStructured(structured);
+      return createTodoUiPreview(todoStructured?.uiSnapshot ?? {
+        todos: [],
+        totalCount: 0,
+        revision: 0,
+      });
+    }
+
     case "browser_cua":
     case "browser_dom":
     case "browser_locator":
@@ -1280,6 +1291,8 @@ function getToolSummary(
       return "Bash command";
     case "agent":
       return stringArg(args.description, "Agent");
+    case "todo":
+      return toolName === "todo_read" ? "Read To-dos" : "Update To-dos";
     case "browser_cua":
     case "browser_dom":
     case "browser_locator":
@@ -1329,6 +1342,12 @@ function extractContentPreview(structured: unknown): string | undefined {
     return (structured as { contentPreview: string }).contentPreview;
   }
   return undefined;
+}
+
+function getTodoStructured(structured: unknown): TodoExecutionStructured | undefined {
+  if (!structured || typeof structured !== "object") return undefined;
+  const candidate = structured as Partial<TodoExecutionStructured>;
+  return candidate.operation && candidate.uiSnapshot ? candidate as TodoExecutionStructured : undefined;
 }
 
 function displayFileName(path: string): string {
@@ -1509,7 +1528,8 @@ function mapAgentEventToStreamEvent(
         const tool = toolManager.get(event.toolName);
         const previewKind = tool?.previewKind ?? "generic";
         const summary = getToolSummary(event.toolName, previewKind, event.args, true);
-        const preview = createToolUiPreview(event.toolName, previewKind, event.args, "", summary, true);
+        const preview = toolManager.createRunningPreview(event.toolName, event.args)
+          ?? createToolUiPreview(event.toolName, previewKind, event.args, "", summary, true);
         const startedEvent: RuntimeStreamEvent = {
           type: "tool_started",
           sessionId,

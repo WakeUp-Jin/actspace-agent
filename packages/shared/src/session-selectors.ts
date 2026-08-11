@@ -261,6 +261,19 @@ function messageBlockFromToolPreview(
         display: preview.display,
         createdAt: getDisplayTime(timestamp)
       };
+    case "todo":
+      return {
+        kind: "todo",
+        id: eventId,
+        todos: preview.todos,
+        totalCount: preview.totalCount,
+        completedCount: preview.completedCount,
+        revision: preview.revision,
+        displayText: preview.displayText,
+        status: isError ? "failed" : "completed",
+        isError,
+        createdAt: getDisplayTime(timestamp),
+      };
     case "generic":
       return {
         kind: "tool",
@@ -340,12 +353,20 @@ function workspacePreparationBlock(event: SessionEvent): MessageBlock[] {
 
 export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
   const lastAssistantEventIdByTurn = new Map<string, EventId>();
+  const latestTodoEventIdByRun = new Map<string, EventId>();
   const usageByTurn = new Map<string, { totalTokens: number; costUsd: number }>();
 
   for (const event of events) {
     if (event.type === "assistant_message" || event.type === "assistant_reply") {
       lastAssistantEventIdByTurn.set(event.agentRunId, event.id);
       continue;
+    }
+
+    if (event.type === "tool_result" && isRecord(event.payload)) {
+      const preview = event.payload.uiPreview;
+      if (isRecord(preview) && preview.kind === "todo") {
+        latestTodoEventIdByRun.set(event.agentRunId, event.id);
+      }
     }
 
     if (event.type !== "llm_usage" || !isRecord(event.payload)) continue;
@@ -432,10 +453,16 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
       case "tool_result": {
         const payload: Record<string, unknown> = isRecord(event.payload) ? event.payload : {};
         const preview = payload.uiPreview;
-        const renderKey = nextRenderKey(event, "tool", getOptionalString(payload, "toolCallId"));
         if (!isToolUiPreview(preview)) {
+          const renderKey = nextRenderKey(event, "tool", getOptionalString(payload, "toolCallId"));
           return [withRenderKey(legacyToolResultBlock(event, payload), renderKey)];
         }
+        if (preview.kind === "todo" && latestTodoEventIdByRun.get(event.agentRunId) !== event.id) {
+          return [];
+        }
+        const renderKey = preview.kind === "todo"
+          ? `turn:${event.agentRunId}:todo`
+          : nextRenderKey(event, "tool", getOptionalString(payload, "toolCallId"));
 
         return [withRenderKey(
           messageBlockFromToolPreview(event.id, event.timestamp, preview, payload.ok === false),

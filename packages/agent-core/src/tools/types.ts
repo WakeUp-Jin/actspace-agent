@@ -12,6 +12,7 @@ import type { ToolPreviewKind } from "@actspace/shared";
 import type { ApprovalGate } from "./scheduler";
 import type { Summarizer } from "../context/compression/summarizer";
 import type { LLMService } from "../llm/types";
+import type { TodoSnapshot } from "@actspace/shared";
 
 /** definition.ts 导出的静态声明——不含任何运行时依赖 */
 export interface ToolDefinitionSpec {
@@ -85,7 +86,7 @@ export interface ReadFileRangeCacheEntry {
 }
 
 export interface ToolRuntimeConfig {
-  primaryProvider?: "deepseek" | "kimi" | "openrouter" | "duckcoding" | "mock";
+  primaryProvider?: "deepseek" | "kimi" | "openrouter" | "mock";
   apiFormat?: "openai" | "anthropic";
   hasKimiKey?: boolean;
   /** 是否配置了任一 web_search provider key（智谱 / Tavily / TinyFish / Exa） */
@@ -127,6 +128,8 @@ export interface ToolManagerConfig extends ToolRuntimeConfig {
   sessionId?: string;
   /** 当前主 Agent turn id，用于 SubAgent transcript 关联 */
   agentRunId?: string;
+  /** Latest successful todo_write snapshot for this exact sessionId + agentRunId. */
+  initialTodoSnapshot?: TodoSnapshot;
   /** 主 Agent LLM service；存在时注册 Agent 工具供 SubAgent run 复用同一模型配置 */
   llm?: LLMService;
   /**

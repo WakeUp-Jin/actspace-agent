@@ -381,53 +381,6 @@ describe("SettingsService", () => {
     expect(svc.getImageGenerationRuntimeConfig()?.apiKey).toBe("test-image-key");
   });
 
-  it("DuckCoding 额外 Key 与倍率绑定、密钥只进 secrets 且被模型引用时禁止删除", async () => {
-    const dataRoot = await makeDataRoot();
-    const svc = new SettingsService({
-      dataRoot,
-      crypto: makeCrypto(),
-      reloadEnv,
-      createCredentialId: () => "codex-sale",
-    });
-    await svc.load();
-    await svc.updateProviderConnection({
-      provider: "duckcoding",
-      apiKey: "sk-duck-default",
-      defaultPricingMultiplier: 1,
-    });
-    await svc.addProviderCredential({
-      provider: "duckcoding",
-      label: "CodeX-Sale",
-      apiKey: "sk-duck-sale",
-      pricingMultiplier: 0.2,
-    });
-
-    expect(svc.getV2().providers.duckcoding).toMatchObject({
-      hasApiKey: true,
-      defaultPricingMultiplier: 1,
-      additionalCredentials: [{ id: "codex-sale", label: "CodeX-Sale", pricingMultiplier: 0.2, hasApiKey: true }],
-    });
-    expect(svc.getProviderRuntimeConfigForCredential("duckcoding", "codex-sale")).toMatchObject({
-      apiKey: "sk-duck-sale",
-      pricingMultiplier: 0.2,
-    });
-    expect(JSON.stringify(svc.getV2())).not.toContain("sk-duck-sale");
-
-    const secrets = JSON.parse(await readFile(join(dataRoot, "secrets.json"), "utf8"));
-    expect(secrets.providerCredentials["duckcoding:codex-sale"]).toBe("sk-duck-sale");
-
-    await svc.updateModelStorage({
-      installedModels: {
-        "duckcoding:grok-4.5": { enabled: true, addedAt: "2026-07-27T00:00:00.000Z", credentialId: "codex-sale" },
-      },
-    });
-    await expect(svc.removeProviderCredential("duckcoding", "codex-sale")).resolves.toMatchObject({
-      ok: false,
-      code: "credential_in_use",
-      references: ["duckcoding:grok-4.5"],
-    });
-  });
-
   it("图片分析默认使用 OpenRouter Luna，并保护被引用的已有 Key", async () => {
     const dataRoot = await makeDataRoot();
     const svc = new SettingsService({
@@ -547,7 +500,7 @@ describe("SettingsService", () => {
     const migrated = JSON.parse(await readFile(join(dataRoot, "secrets.json"), "utf8"));
     expect(migrated).toEqual({
       version: 2,
-      providerCredentials: { "duckcoding:codex-sale": "sk-extra" },
+      providerCredentials: {},
       deepseek: "sk-deepseek",
       "openrouter-management": "sk-management",
     });
@@ -688,14 +641,14 @@ describe("SettingsService", () => {
     expect(persisted.skills).toEqual({ disabled: [] });
   });
 
-  it("干净安装直接生成完整 settings v2 与四家 provider", async () => {
+  it("干净安装直接生成完整 settings v2 与三家 provider", async () => {
     const dataRoot = await makeDataRoot();
     const svc = makeService(dataRoot);
     await svc.load();
 
     const view = svc.getV2();
     expect(view.version).toBe(2);
-    expect(Object.keys(view.providers)).toEqual(["deepseek", "kimi", "openrouter", "duckcoding"]);
+    expect(Object.keys(view.providers)).toEqual(["deepseek", "kimi", "openrouter"]);
     expect(view.providers.openrouter).toMatchObject({
       hasApiKey: false,
       enabled: true,
@@ -703,17 +656,58 @@ describe("SettingsService", () => {
       proxy: { enabled: false, url: null },
       lastConnection: { status: "untested" },
     });
-    expect(view.providers.duckcoding).toMatchObject({
-      hasApiKey: false,
-      defaultPricingMultiplier: 1,
-      additionalCredentials: [],
-    });
     expect(Object.keys(view.installedModels)).toHaveLength(4);
 
     const persisted = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
     expect(persisted.version).toBe(2);
     expect(persisted.defaultModelId).toBeUndefined();
     expect(persisted.agent.exploreModelId).toBeUndefined();
+  });
+
+  it("迁移已移除的 DuckCoding 文字模型配置但保留图片生成连接", async () => {
+    const dataRoot = await makeDataRoot();
+    await writeFile(join(dataRoot, "settings.json"), JSON.stringify({
+      version: 2,
+      providers: {
+        duckcoding: { enabled: true, baseUrl: "https://api.duckcoding.ai/v1" },
+      },
+      installedModels: {
+        "duckcoding:gpt-5.6-sol": { enabled: true, addedAt: "2026-07-27T00:00:00.000Z" },
+      },
+      customModels: {},
+      taskModels: { defaultChatModel: "duckcoding:gpt-5.6-sol" },
+      imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" },
+    }), "utf8");
+    await writeFile(join(dataRoot, "secrets.json"), JSON.stringify({
+      version: 2,
+      duckcoding: "sk-legacy-text",
+      providerCredentials: { "duckcoding:legacy": "sk-legacy-extra" },
+      "image-generation": "sk-image",
+    }), "utf8");
+
+    const svc = makeService(dataRoot);
+    await svc.load();
+
+    expect(Object.keys(svc.getV2().providers)).toEqual(["deepseek", "kimi", "openrouter"]);
+    expect(svc.getV2().taskModels.defaultChatModel).toBeNull();
+    expect(svc.getImageGenerationRuntimeConfig()).toEqual({
+      apiKey: "sk-image",
+      baseUrl: "https://www.duckcoding.ai/v1",
+      model: "gpt-image-2",
+    });
+    expect(JSON.parse(await readFile(join(dataRoot, "secrets.json"), "utf8"))).toEqual({
+      version: 2,
+      providerCredentials: {},
+      "image-generation": "sk-image",
+    });
+    const persistedSettings = JSON.parse(await readFile(join(dataRoot, "settings.json"), "utf8"));
+    expect(Object.keys(persistedSettings.providers)).toEqual(["deepseek", "kimi", "openrouter"]);
+    expect(persistedSettings.installedModels["duckcoding:gpt-5.6-sol"]).toBeUndefined();
+    expect(persistedSettings.taskModels.defaultChatModel).toBeNull();
+    expect(persistedSettings.imageGeneration).toEqual({
+      baseUrl: "https://www.duckcoding.ai/v1",
+      model: "gpt-image-2",
+    });
   });
 
   it("loads the retired official DeepSeek Anthropic URL as the OpenAI-compatible default", async () => {

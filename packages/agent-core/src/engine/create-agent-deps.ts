@@ -35,6 +35,7 @@ import type { PromptSegment } from "../context/types";
 import { MAIN_AGENT_SYSTEM_PROMPT } from "../prompt/main-agent";
 import { createSummarizer, type Summarizer } from "../context/compression/summarizer";
 import { env } from "../env";
+import { recoverTodoSnapshot } from "../persistence/recovery";
 
 // ─── 类型定义 ───
 
@@ -531,8 +532,13 @@ export async function createAgentForSession(
   const summarizer = utilityLlm ? createSummarizer(utilityLlm) : createSummarizerForAgent();
   const exploreLlm = config.exploreLlmConfig ? createLLMService(config.exploreLlmConfig) : createExploreLLMService(config.exploreModelId);
   const imageInspectionLlm = config.imageInspectionLlmConfig ? createLLMService(config.imageInspectionLlmConfig) : undefined;
+  const { sessionId, agentRunId } = config.toolManagerConfig;
+  const initialTodoSnapshot = options.sessionPath && sessionId && agentRunId
+    ? await recoverTodoSnapshot(options.sessionPath, sessionId, agentRunId)
+    : undefined;
   const toolManager = createToolManager({
     ...config.toolManagerConfig,
+    ...(initialTodoSnapshot ? { initialTodoSnapshot } : {}),
     llm,
     exploreLlm,
     ...(imageInspectionLlm && config.imageInspectionToolConfig && {

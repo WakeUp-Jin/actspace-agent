@@ -191,7 +191,7 @@ describe("Adapters: SessionEvent -> Message (recovery)", () => {
       ],
       api: "openai-responses",
       model: "gpt-5.6-sol",
-      provider: "duckcoding",
+      provider: "openrouter",
       usage: createEmptyUsage(),
       stopReason: "toolUse",
       timestamp: Date.now(),
@@ -202,12 +202,12 @@ describe("Adapters: SessionEvent -> Message (recovery)", () => {
       signature,
       api: "openai-responses",
       model: "gpt-5.6-sol",
-      provider: "duckcoding",
+      provider: "openrouter",
     });
     expect(events.find((event) => event.type === "tool_call")?.payload).toMatchObject({
       api: "openai-responses",
       model: "gpt-5.6-sol",
-      provider: "duckcoding",
+      provider: "openrouter",
     });
 
     const { messages, errors } = sessionEventsToMessages(events);
@@ -217,15 +217,15 @@ describe("Adapters: SessionEvent -> Message (recovery)", () => {
       role: "assistant",
       api: "openai-responses",
       model: "gpt-5.6-sol",
-      provider: "duckcoding",
+      provider: "openrouter",
     });
     expect(recovered?.content).toContainEqual({ type: "thinking", thinking: "", signature });
 
     const converted = convertContextToResponses({ messages, tools: [] }, {
-      provider: "duckcoding",
+      provider: "openrouter",
       api: "openai-responses",
       apiKey: "test-key",
-      baseUrl: "https://api.duckcoding.ai/v1",
+      baseUrl: "https://api.openai.com/v1",
       model: "gpt-5.6-sol",
       input: ["text"],
     });

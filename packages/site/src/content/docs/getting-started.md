@@ -21,7 +21,7 @@ pnpm install
 
 ## 配置模型
 
-启动 ActSpace 后，打开「设置 → 服务商」，选择 DeepSeek、Kimi、OpenRouter 或 DuckCoding，并填写对应的 API Key。密钥由主进程使用系统安全存储加密保存在本机，不进入 renderer 或会话事件。
+启动 ActSpace 后，打开「设置 → 服务商」，选择 DeepSeek、Kimi 或 OpenRouter，并填写对应的 API Key。密钥由主进程使用系统安全存储加密保存在本机，不进入 renderer 或会话事件。
 
 服务商连接建立后，在「设置 → 模型」中安装并启用需要的模型。Composer 只展示当前已经启用且可用于主会话的候选模型。
 

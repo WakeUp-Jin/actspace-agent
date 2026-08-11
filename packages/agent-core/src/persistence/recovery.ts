@@ -23,6 +23,8 @@ import type {
   SessionEvent,
   SessionId,
   SessionMeta,
+  TodoItem,
+  TodoSnapshot,
 } from "@actspace/shared";
 import { sessionEventsToMessages } from "../adapters";
 import type { Message } from "../messages";
@@ -100,4 +102,60 @@ export async function recoverDiffSummary(
 ): Promise<SessionDiffSummary> {
   const parseResult = await parseJsonl(sessionPath);
   return createSessionDiffSummary(sessionId, parseResult.events);
+}
+
+/** Restore only the authoritative Todo state for one exact AgentRun. */
+export async function recoverTodoSnapshot(
+  sessionPath: string,
+  sessionId: SessionId,
+  agentRunId: string,
+): Promise<TodoSnapshot> {
+  const parseResult = await parseJsonl(sessionPath);
+  for (let index = parseResult.events.length - 1; index >= 0; index -= 1) {
+    const event = parseResult.events[index];
+    if (
+      event.sessionId !== sessionId ||
+      event.agentRunId !== agentRunId ||
+      event.type !== "tool_result" ||
+      !isRecord(event.payload) ||
+      event.payload.toolName !== "todo_write" ||
+      event.payload.ok !== true
+    ) {
+      continue;
+    }
+    const snapshot = todoSnapshotFromPreview(event.payload.uiPreview);
+    if (snapshot) return snapshot;
+  }
+  return { todos: [], totalCount: 0, revision: 0 };
+}
+
+function todoSnapshotFromPreview(value: unknown): TodoSnapshot | null {
+  if (!isRecord(value) || value.kind !== "todo" || !Array.isArray(value.todos)) return null;
+  if (!Number.isInteger(value.revision) || (value.revision as number) < 0) return null;
+  const todos: TodoItem[] = [];
+  const ids = new Set<string>();
+  let inProgress = 0;
+  for (const candidate of value.todos) {
+    if (!isRecord(candidate)) return null;
+    const { id, content, status, activeForm, createdAt, updatedAt } = candidate;
+    if (
+      typeof id !== "string" || !id || ids.has(id) ||
+      typeof content !== "string" || !content.trim() ||
+      (status !== "pending" && status !== "in_progress" && status !== "completed") ||
+      (activeForm !== undefined && typeof activeForm !== "string") ||
+      typeof createdAt !== "string" || typeof updatedAt !== "string"
+    ) {
+      return null;
+    }
+    ids.add(id);
+    if (status === "in_progress") inProgress += 1;
+    const normalizedActiveForm = typeof activeForm === "string" && activeForm ? activeForm : undefined;
+    todos.push({ id, content, status, ...(normalizedActiveForm ? { activeForm: normalizedActiveForm } : {}), createdAt, updatedAt });
+  }
+  if (inProgress > 1) return null;
+  return { todos, totalCount: todos.length, revision: value.revision as number };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

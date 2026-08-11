@@ -12,8 +12,7 @@
 - **本地凭据文件**：Desktop 设置页录入的 LLM、搜索和图片服务 Key 以明文写入 `<userData>/secrets.json` v2；目录沿用 `userData`，文件在创建、原子替换和启动读取时都收紧为 `0600`。`0600` 表示仅文件所有者可读写，避免 `0644` 允许同机其他用户读取，但它不是加密：当前 macOS 账号下的进程、备份或同步工具仍可能读取该文件。开发版与安装版共用同一 `userData` 和同一份凭据，稳定性优先于应用身份绑定的系统密钥串。
 - **主进程边界**：`secrets.json` 只由 Electron main 读取；renderer、typed preload、settings view、session、Trace 和普通日志只接收 `hasApiKey`、连接状态或脱敏错误码，不接收文件正文或明文 Key。凭据不提交到仓库，也不得复制到 `settings.json`。
 - **OpenRouter key 边界**：OpenRouter 调用 Key 与 Management Key 在 `secrets.json` 中使用独立字段；renderer 只读取是否已配置、连接状态和脱敏诊断，不读取明文。
-- **DuckCoding 多 Key 边界**：默认 Key 使用 provider 字段；额外 Key 以 `<provider>:<credentialId>` 为明文索引，普通 settings 只保存稳定 id、label、倍率和连接状态。模型只保存同 provider 的 `credentialId` 引用，renderer 不能读取、回显或在模型页创建 Key。单独删除额外 Key 时，被模型引用的 Key 必须阻止删除；用户二次确认完整移除服务商时允许清除全部 Key，但保留模型引用并显式报告凭据缺失，不得静默回退默认 Key。
-- **模型目录边界**：OpenRouter 目录由 main 进程使用对应 provider 连接读取；DuckCoding 的 Codex/Grok 档案随应用打包，不读取外部目录，也不携带用户凭据。外部目录响应仍按不可信数据处理，只归一化白名单字段并限制响应和字符串大小。
+- **模型目录边界**：OpenRouter 目录由 main 进程使用对应 provider 连接读取，不携带用户凭据。外部目录响应仍按不可信数据处理，只归一化白名单字段并限制响应和字符串大小。
 - **服务商级代理目标边界**：代理配置归属于单个 LLM 服务商，只注入该服务商的 HTTP client，不写入全局 `HTTP_PROXY` / `HTTPS_PROXY`，也不影响工具、更新器或其他服务商。首版只接受 `http://` / `https://` 代理地址，不在代理 URL 中保存用户名和密码。
 - **搜索 provider key 边界**：`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY` 是 `web_search` 工具的外部搜索 API 密钥，边界与 LLM key 相同——经设置页写入 main-only `secrets.json`，只在 main/agent-core 运行时读取，不进入 renderer 明文状态。
 - **图片生成 key 边界**：`IMAGE_GENERATION_API_KEY` 经设置页写入 main-only `secrets.json`，并以内存配置注入 `generate_image` executor；renderer 只接收 `hasApiKey`、Base URL、模型名和本地产物引用。上游 Base64、Authorization header、签名 URL 与原始错误正文不得进入 session、renderer 或日志。
@@ -56,8 +55,6 @@
 
 - 真实 DeepSeek 与 Kimi 请求仅从 main 进程内的 Agent runtime 发起，renderer 只接收结构化事件与最终结果。
 - OpenRouter 的连接测试、模型目录拉取和真实模型请求都由 main 进程发起，renderer 只消费裁剪后的服务商、模型与连接状态；供应商级代理不写全局代理环境变量。
-- DuckCoding 复用 main 进程的 OpenAI-compatible runtime。每次调用先按模型 `credentialId` 解析同 provider 的目标密钥；默认 Key 与额外 Key 的连接状态、倍率和凭据彼此独立，不做自动轮询或失败切换。Codex 使用 Responses API，推理强度只改变精确请求模型名，不向请求体增加 OpenRouter 风格的 reasoning effort 属性；Grok 与未知手动模型默认使用 Chat Completions。
-- DuckCoding Codex 的 `prompt_cache_key` 由 session id 单向哈希派生，避免把原始本地 session 标识发送给外部服务。Responses 请求使用 `store: false`，不依赖外部会话存储；供应商返回的加密 reasoning item 会作为 opaque signature 随本地 session 事件持久化并在工具循环中回放，不应记录进普通日志、当作可读思考展示或传给无关 provider/API。
 - 普通会话默认使用真实 DeepSeek provider，并固定走 OpenAI-compatible Chat Completions；`LLM_PROVIDER=kimi` 可切换 Kimi 主模型。Electron 真实 turn 不允许被 mock 配置静默替代，mock 仅用于测试、浏览器 fixture 或显式 demo。
 - Usage 页 DeepSeek 余额查询通过 main 进程调用 `GET /user/balance`，renderer 只接收已裁剪的余额展示模型，不接触 `DEEPSEEK_API_KEY`、鉴权头或 DeepSeek 原始响应。
 - `web_search`（外部搜索 API 双通道）任一搜索 provider key 存在时注册，`web_fetch`（本地抓取）始终注册（见 `agent-web-tools.md`）。缺 key 时 executor 的兜底错误只提示需要配置的 key 名，不泄露其它运行时信息。
@@ -68,6 +65,41 @@
 - 历史 session 中的 Anthropic server `server_tool_use`、`web_search_tool_result` 属于 provider 响应协议，不应当作为本地 ToolManager 执行日志写入；session / run log 只保留 `serverToolUse` 请求计数，不应将未裁剪网页全文或 provider tool result 原文写入 session。
 - 验收真实 provider 时应先发送不含仓库内容和隐私的固定探针，确认连接后再决定是否允许工具结果进入外部模型上下文。
 - API 错误仅暴露必要的结构化诊断信息，不把鉴权请求头或密钥写入日志、session 或界面。
+
+## 沙箱执行
+
+夜间模式使用 [nono](https://github.com/nolabs-ai/nono) 作为 Agent 的唯一安全边界。nono 在操作系统内核层（macOS Seatbelt / Linux Landlock）强制隔离，不依赖 Agent 自身的权限控制或提示词约束。
+
+### 隔离设计
+
+- **单层沙箱**：Codex 自身沙箱关闭（`--dangerously-bypass-approvals-and-sandbox`），隔离完全交给 nono。避免双层沙箱互相干扰导致难以排查的失败。
+- **最小权限**：profile 从 `default` 起步，逐项显式授权。未授权的路径默认全拒；写权限仅工作目录和 `~/.codex`；删除由 `unlink_protection` 组全局兜底。
+- **网络白名单**：只放行模型 API 域名。即使 Agent 读到凭证文件，也没有外传通道；push 远端同样被封死。
+- **内核级拦截**：越界操作在系统调用层被拒，与 Agent 内部逻辑无关。deny 规则优先于一切授权。
+
+### Profile 审查
+
+nono profile 分两份维护：仓库通用模板在 `docs/nono-profiles/`，本机副本在 `~/.config/nono/profiles/`（含真实 API 域名和个人敏感目录的 deny，不入库）。修改 profile 等同于修改安全边界，应按代码变更对待：
+
+- 每次修改说明为什么需要新增授权。
+- 用 `nono why -p <profile> --path <target> --op <read|write|readwrite>` 验证路径授权，用 `--host <domain>` 验证网络授权。
+- 用 `nono profile show <profile>` 查看完整解析结果。
+- 完整验证清单见 `docs/nono-profiles/README.md` 的"Profile 维护"章节。
+
+### 残余风险与缓解
+
+nono 挡住了边界外的破坏，但边界内仍有需要人工兜底的风险：
+
+- **工作目录内的破坏**：Agent 对 workdir 有完整写删权。缓解：启动时加 `--rollback` 打快照，次日可整体还原；nono 审计日志默认开启。
+- **`.git/hooks` 投毒**：夜间 Agent 可写入 git 钩子，钩子会在次日沙箱外执行。缓解：晨检时先看 `.git/hooks/` 再跑任何 git 命令。
+- **`~/.codex` 配置污染**：Agent 对 codex 状态目录有写权，可能改动 `config.toml` 影响白天沙箱外的 codex。缓解：晨检核对 `config.toml`。
+- **读取范围内的数据外流**：所有可读内容都可能经模型 API 通道进入 provider。缓解：只读授权按需添加，个人敏感目录显式 deny。
+
+### 已知注意事项
+
+- `/private/tmp` 在内置组 `system_write_macos` 中默认可写，profile 里必须显式 `deny`（实测验证）。
+- deny 优先于 allow/read，不要 deny 工作目录的祖先目录，否则沙箱直接不可用（实测验证）。
+- 提示词预授权用于绕过工作流级别的审批规则，但它**不是安全边界**——安全边界只有 nono 一层。提示词失效的最坏后果是空转，不是做坏事。
 
 ## 待补强
 

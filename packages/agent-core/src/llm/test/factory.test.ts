@@ -54,9 +54,9 @@ describe("createLLMService", () => {
 
   it("routes Responses models through the dedicated service", () => {
     const service = createLLMService({
-      provider: "duckcoding",
+      provider: "openrouter",
       api: "openai-responses",
-      apiKey: "sk-duck-test",
+      apiKey: "sk-openrouter-test",
       model: "gpt-5.6-sol",
     });
 

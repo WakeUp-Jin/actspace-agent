@@ -1,8 +1,6 @@
 import {
   BUILTIN_MODEL_LIST,
   CURATED_OPENROUTER_MODEL_LIST,
-  findDuckCodingCatalogModel,
-  findDuckCodingCatalogModelByApiModel,
   listUsableModels,
   resolveConfiguredModel,
   type CatalogModelView,
@@ -46,8 +44,7 @@ export class ModelStoreService {
     const definitions = Object.fromEntries(
       [...BUILTIN_MODEL_LIST, ...CURATED_OPENROUTER_MODEL_LIST, ...Object.values(stored.customModels).filter(isDefined)]
         .map((definition) => {
-          const resolved = applyDuckCodingCatalogDefinition(clone(definition));
-          return [resolved.key, resolved];
+          return [definition.key, clone(definition)];
         }),
     ) as ModelSnapshot["definitions"];
     return {
@@ -125,65 +122,6 @@ export class ModelStoreService {
     const definition = catalogToDefinition(catalog, this.now().toISOString());
     await this.settings.updateModelStorage({
       installedModels: { [key]: installed },
-      customModels: { [key]: definition },
-    });
-    return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === key) };
-  }
-
-  async addCustomModel(input: {
-    provider: Extract<LlmProviderId, "duckcoding">;
-    apiModel: string;
-    label?: string;
-    credentialId?: string | null;
-    catalogModelId?: string | null;
-    contextWindow?: number | null;
-    maxTokens?: number | null;
-  }): Promise<ModelStoreResult> {
-    const apiModel = input.apiModel.trim();
-    if (!apiModel || apiModel.length > 300 || /\s/.test(apiModel)) {
-      return { ok: false, code: "model_not_found", message: "模型名称不能为空、不能包含空白，且不能超过 300 个字符。" };
-    }
-    if (input.contextWindow != null && !isValidTokenLimit(input.contextWindow)) {
-      return { ok: false, code: "invalid_model", message: "最大上下文必须是 1,024 到 10,000,000 之间的整数。" };
-    }
-    if (input.maxTokens != null && !isValidTokenLimit(input.maxTokens)) {
-      return { ok: false, code: "invalid_model", message: "最大输出必须是 1,024 到 10,000,000 之间的整数。" };
-    }
-    const catalog = input.catalogModelId ? findDuckCodingCatalogModel(input.catalogModelId) : undefined;
-    if (input.catalogModelId && !catalog) {
-      return { ok: false, code: "model_not_found", message: "选择的 DuckCoding 本地模型档案不存在。" };
-    }
-    if (catalog && catalog.apiModel !== apiModel) {
-      return { ok: false, code: "invalid_model", message: "模型名称与选择的 DuckCoding 本地档案不一致。" };
-    }
-    const key = `duckcoding:${apiModel}` as ModelKey;
-    const stored = this.settings.getModelStorageState();
-    if (stored.installedModels[key]) {
-      return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === key) };
-    }
-    const credentialId = input.credentialId?.trim() || undefined;
-    if (credentialId && !this.settings.getV2().providers.duckcoding.additionalCredentials?.some(
-      (credential) => credential.id === credentialId && credential.hasApiKey,
-    )) {
-      return { ok: false, code: "credential_missing", message: "选择的额外 API Key 不存在。" };
-    }
-    const definition = duckCodingToCustomDefinition({
-      key,
-      apiModel,
-      label: input.label,
-      catalog,
-      contextWindow: input.contextWindow,
-      maxTokens: input.maxTokens,
-      catalogUpdatedAt: this.now().toISOString(),
-    });
-    await this.settings.updateModelStorage({
-      installedModels: {
-        [key]: {
-          enabled: true,
-          addedAt: this.now().toISOString(),
-          ...(credentialId && { credentialId }),
-        },
-      },
       customModels: { [key]: definition },
     });
     return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === key) };
@@ -274,56 +212,6 @@ export class ModelStoreService {
     if (stored.kairos.modelId === modelKey) references.push("kairosModel");
     return references;
   }
-}
-
-function duckCodingToCustomDefinition(input: {
-  key: ModelKey;
-  apiModel: string;
-  label?: string;
-  catalog?: NonNullable<ReturnType<typeof findDuckCodingCatalogModel>>;
-  contextWindow?: number | null;
-  maxTokens?: number | null;
-  catalogUpdatedAt: string;
-}): ModelDefinition {
-  const { key, apiModel, catalog } = input;
-  return {
-    key,
-    provider: "duckcoding",
-    api: catalog?.api ?? "openai-completions",
-    apiModel,
-    label: input.label?.trim().slice(0, 180) || catalog?.label || apiModel,
-    source: "custom",
-    contextWindow: input.contextWindow ?? catalog?.contextWindow ?? null,
-    maxTokens: input.maxTokens ?? catalog?.maxTokens ?? null,
-    thinkingDefault: catalog?.thinkingDefault ?? false,
-    capabilities: catalog ? clone(catalog.capabilities) : {
-      input: ["text"],
-      toolUse: "declared",
-      reasoning: false,
-      thinkingToggle: false,
-    },
-    ...(catalog?.requestModelByReasoningEffort && {
-      requestModelByReasoningEffort: clone(catalog.requestModelByReasoningEffort),
-    }),
-    ...(catalog?.family && { family: catalog.family }),
-    ...(catalog?.pricing && { pricing: clone(catalog.pricing) }),
-    catalogUpdatedAt: input.catalogUpdatedAt,
-  };
-}
-
-function isValidTokenLimit(value: number): boolean {
-  return Number.isInteger(value) && value >= 1_024 && value <= 10_000_000;
-}
-
-function applyDuckCodingCatalogDefinition(definition: ModelDefinition): ModelDefinition {
-  if (definition.provider !== "duckcoding") return definition;
-  const catalog = findDuckCodingCatalogModelByApiModel(definition.apiModel);
-  if (!catalog) return definition;
-  return {
-    ...definition,
-    api: catalog.api,
-    ...(catalog.pricing && { pricing: clone(catalog.pricing) }),
-  };
 }
 
 function catalogToDefinition(model: CatalogModelView, catalogUpdatedAt: string): ModelDefinition {

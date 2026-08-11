@@ -3,7 +3,6 @@ import {
   CheckCircle2,
   CircleAlert,
   Loader2,
-  KeyRound,
   MoonStar,
   Plus,
   RefreshCw,
@@ -63,15 +62,6 @@ const PROVIDERS: ProviderMeta[] = [
     group: "compatible",
     icon: Route,
     supportsBalance: true,
-  },
-  {
-    id: "duckcoding",
-    label: "DuckCoding",
-    description: "DuckCoding OpenAI 兼容中转",
-    compatibility: "第三方兼容",
-    group: "compatible",
-    icon: KeyRound,
-    supportsBalance: false,
   },
 ];
 
@@ -138,18 +128,6 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
     try {
       const result = await window.actspace.testProvider({ provider });
       setMessage(result.message);
-      await load();
-      await onChanged?.();
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const disconnect = async (provider: LlmProviderId) => {
-    if (!window.actspace.disconnectProvider) return;
-    setBusy(provider);
-    try {
-      await window.actspace.disconnectProvider({ provider });
       await load();
       await onChanged?.();
     } finally {
@@ -254,7 +232,6 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
                       onRefreshBalance={() => { if (provider.supportsBalance) void loadBalance(provider.id as BalanceProviderId); }}
                       onTest={() => void test(provider.id)}
                       onEdit={() => setEditing({ provider: provider.id, restoreToAddButton: false })}
-                      onDisconnect={() => void disconnect(provider.id)}
                       onRemove={() => setRemoving(provider.id)}
                     />
                   ))}
@@ -284,10 +261,6 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
           current={providers[editing.provider]}
           restoreFocusTo={editing.restoreToAddButton ? addButtonRef.current : undefined}
           onClose={() => setEditing(null)}
-          onProviderChanged={async (next) => {
-            setProviders((current) => ({ ...current, [editing.provider]: next }));
-            await onChanged?.();
-          }}
           onSaved={async () => {
             setEditing(null);
             await load();
@@ -318,7 +291,6 @@ function ProviderCard({
   onRefreshBalance,
   onTest,
   onEdit,
-  onDisconnect,
   onRemove,
 }: {
   provider: ProviderMeta;
@@ -330,7 +302,6 @@ function ProviderCard({
   onRefreshBalance: () => void;
   onTest: () => void;
   onEdit: () => void;
-  onDisconnect: () => void;
   onRemove: () => void;
 }) {
   const Icon = provider.icon;
@@ -363,7 +334,6 @@ function ProviderCard({
             {busy ? <Loader2 className="animate-spin motion-reduce:animate-none" size={14} aria-label="测试中" /> : "测试"}
           </button>
           <button type="button" className="h-7 rounded-act-md px-1.5 text-[11px] font-medium text-text-muted hover:bg-surface-subtle hover:text-text-main" onClick={onEdit}>编辑</button>
-          {state?.hasApiKey && provider.id === "duckcoding" && (state.additionalCredentials?.length ?? 0) > 0 ? <button type="button" className="h-7 rounded-act-md px-1.5 text-[11px] font-medium text-text-faint hover:bg-danger-soft hover:text-on-danger" onClick={onDisconnect} disabled={busy}>断开默认</button> : null}
           <button type="button" aria-label={`移除 ${provider.label}`} title="移除服务商" className="grid h-7 w-7 place-items-center rounded-act-md text-text-faint hover:bg-danger-soft hover:text-on-danger disabled:opacity-50" onClick={onRemove} disabled={busy}><Trash2 size={14} aria-hidden="true" /></button>
         </div>
       </div>
@@ -377,7 +347,6 @@ function ProviderCard({
         <ProviderFact label="接入方式" value="API Key" />
         <ProviderFact label="接入地址" value={compactAddress(address)} title={address} />
         <ProviderFact label="代理" value={state?.proxy?.enabled ? compactAddress(state.proxy.url ?? "已开启") : "关闭"} title={state?.proxy?.url ?? undefined} />
-        {provider.id === "duckcoding" ? <ProviderFact label="默认 Key 倍率" value={`${state?.defaultPricingMultiplier ?? 1}x`} /> : null}
       </dl>
     </article>
   );
@@ -563,14 +532,12 @@ function ProviderDialog({
   current,
   restoreFocusTo,
   onClose,
-  onProviderChanged,
   onSaved,
 }: {
   provider: LlmProviderId;
   current?: ProviderSettingsView;
   restoreFocusTo?: HTMLElement | null;
   onClose: () => void;
-  onProviderChanged: (provider: ProviderSettingsView) => void | Promise<void>;
   onSaved: () => void | Promise<void>;
 }) {
   const meta = PROVIDERS.find((item) => item.id === provider)!;
@@ -579,8 +546,6 @@ function ProviderDialog({
   const [baseUrl, setBaseUrl] = useState(current?.baseUrl ?? "");
   const [proxyEnabled, setProxyEnabled] = useState(Boolean(current?.proxy?.enabled));
   const [proxyUrl, setProxyUrl] = useState("");
-  const [defaultPricingMultiplier, setDefaultPricingMultiplier] = useState(String(current?.defaultPricingMultiplier ?? 1));
-  const [providerState, setProviderState] = useState(current);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasDefaultKey = Boolean(current?.hasApiKey);
@@ -602,7 +567,6 @@ function ProviderDialog({
             ...(provider === "openrouter" && managementKey.trim() && { managementKey: managementKey.trim() }),
             baseUrl: baseUrl || null,
             ...(updateProxy && { proxy: updateProxy }),
-            ...(provider === "duckcoding" && { defaultPricingMultiplier: Number(defaultPricingMultiplier) }),
           })
         : await window.actspace.connectProvider?.({
             provider,
@@ -610,7 +574,6 @@ function ProviderDialog({
             ...(provider === "openrouter" && { managementKey: managementKey.trim() || null }),
             baseUrl: baseUrl || null,
             proxy: nextProxy,
-            ...(provider === "duckcoding" && { defaultPricingMultiplier: Number(defaultPricingMultiplier) }),
           });
       if (!result || !result.ok) { setError(result && "error" in result ? result.error.message : "保存失败。"); return; }
       await onSaved();
@@ -637,141 +600,14 @@ function ProviderDialog({
             </Field>
           ) : null}
           <Field label="Base URL（可选）"><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="使用服务商默认地址" className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field>
-          {provider === "duckcoding" ? (
-            <Field label="默认 Key 价格倍率">
-              <div className="relative">
-                <input aria-label="默认 Key 价格倍率" type="number" min="0" max="100" step="0.0001" value={defaultPricingMultiplier} onChange={(event) => setDefaultPricingMultiplier(event.target.value)} className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 pr-8 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" />
-                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[12px] text-text-faint">x</span>
-              </div>
-              <span className="text-[11px] leading-relaxed text-text-faint">未设置时为 1x；模型基础价格会在调用时乘以所选 Key 的倍率。</span>
-            </Field>
-          ) : null}
           <label className="flex min-h-11 items-center justify-between rounded-act-md border border-line px-3"><span className="text-[13px] font-medium text-text-main">仅为此服务商启用代理</span><input type="checkbox" checked={proxyEnabled} onChange={(event) => setProxyEnabled(event.target.checked)} /></label>
           {proxyEnabled ? <Field label="HTTP(S) 代理地址"><input value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder={current?.proxy?.enabled ? "已配置；留空保持不变" : "http://127.0.0.1:7890"} className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field> : null}
-          {provider === "duckcoding" && configured ? (
-            <ProviderCredentialManager provider={provider} current={providerState} onChanged={async (next) => { setProviderState(next); await onProviderChanged(next); }} />
-          ) : null}
           {error ? <p role="alert" className="text-[12px] text-on-danger">{error}</p> : null}
         </div>
-        <div className="mt-6 flex justify-end gap-2"><button type="button" className="h-10 rounded-act-md border border-line px-4 text-[13px] font-semibold text-text-main hover:bg-surface-subtle" onClick={onClose}>取消</button><button type="button" className="h-10 rounded-act-md bg-text-main px-4 text-[13px] font-semibold text-surface transition-opacity hover:opacity-85 disabled:opacity-40" disabled={saving || (!configured && !apiKey.trim()) || (proxyEnabled && !proxyUrl.trim() && !current?.proxy?.enabled) || (provider === "duckcoding" && !isValidMultiplierValue(defaultPricingMultiplier))} onClick={() => void save()}>{saving ? "保存中…" : "保存"}</button></div>
+        <div className="mt-6 flex justify-end gap-2"><button type="button" className="h-10 rounded-act-md border border-line px-4 text-[13px] font-semibold text-text-main hover:bg-surface-subtle" onClick={onClose}>取消</button><button type="button" className="h-10 rounded-act-md bg-text-main px-4 text-[13px] font-semibold text-surface transition-opacity hover:opacity-85 disabled:opacity-40" disabled={saving || (!configured && !apiKey.trim()) || (proxyEnabled && !proxyUrl.trim() && !current?.proxy?.enabled)} onClick={() => void save()}>{saving ? "保存中…" : "保存"}</button></div>
       </div>
     </div>
   );
-}
-
-function ProviderCredentialManager({
-  provider,
-  current,
-  onChanged,
-}: {
-  provider: Extract<LlmProviderId, "duckcoding">;
-  current?: ProviderSettingsView;
-  onChanged: (provider: ProviderSettingsView) => void;
-}) {
-  const [label, setLabel] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [multiplier, setMultiplier] = useState("1");
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const credentials = current?.additionalCredentials ?? [];
-
-  const add = async () => {
-    if (!window.actspace.addProviderCredential) return;
-    setBusy("add"); setError(null);
-    try {
-      const result = await window.actspace.addProviderCredential({
-        provider,
-        label,
-        apiKey,
-        pricingMultiplier: Number(multiplier),
-      });
-      if ("error" in result) { setError(result.error.message); return; }
-      onChanged(result.provider);
-      setLabel(""); setApiKey(""); setMultiplier("1");
-    } finally { setBusy(null); }
-  };
-
-  return (
-    <section className="rounded-act-lg border border-line bg-surface-subtle p-3">
-      <div>
-        <h3 className="text-[13px] font-semibold text-text-main">额外 API Key</h3>
-        <p className="mt-0.5 text-[11px] leading-relaxed text-text-faint">先在这里添加并命名；模型设置中只能选择这些 Key，不会提供密钥输入框。</p>
-      </div>
-      {credentials.length > 0 ? (
-        <div className="mt-3 grid gap-2">
-          {credentials.map((credential) => (
-            <ProviderCredentialRow key={credential.id} provider={provider} credential={credential} onChanged={onChanged} />
-          ))}
-        </div>
-      ) : <p className="mt-3 rounded-act-md border border-dashed border-line px-3 py-2 text-[11px] text-text-faint">当前只有默认 Key，模型设置保持现有单 Key 交互。</p>}
-      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_100px] gap-2">
-        <input aria-label="额外 Key 名称" value={label} onChange={(event) => setLabel(event.target.value)} placeholder="例如 CodeX-Sale" className="h-9 rounded-act-md border border-line bg-surface px-3 text-[12px] text-text-main outline-none focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" />
-        <div className="relative"><input aria-label="额外 Key 价格倍率" type="number" min="0" max="100" step="0.0001" value={multiplier} onChange={(event) => setMultiplier(event.target.value)} className="h-9 w-full rounded-act-md border border-line bg-surface px-3 pr-7 text-[12px] text-text-main outline-none focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /><span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-[11px] text-text-faint">x</span></div>
-        <input aria-label="额外 API Key" type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="API Key" className="h-9 rounded-act-md border border-line bg-surface px-3 text-[12px] text-text-main outline-none focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" />
-        <button type="button" disabled={busy === "add" || !label.trim() || !apiKey.trim() || !isValidMultiplierValue(multiplier)} onClick={() => void add()} className="h-9 rounded-act-md bg-text-main px-3 text-[12px] font-semibold text-surface disabled:opacity-40">{busy === "add" ? "添加中…" : "添加 Key"}</button>
-      </div>
-      {error ? <p role="alert" className="mt-2 text-[11px] text-on-danger">{error}</p> : null}
-    </section>
-  );
-}
-
-function ProviderCredentialRow({
-  provider,
-  credential,
-  onChanged,
-}: {
-  provider: Extract<LlmProviderId, "duckcoding">;
-  credential: NonNullable<ProviderSettingsView["additionalCredentials"]>[number];
-  onChanged: (provider: ProviderSettingsView) => void;
-}) {
-  const [label, setLabel] = useState(credential.label);
-  const [multiplier, setMultiplier] = useState(String(credential.pricingMultiplier));
-  const [busy, setBusy] = useState<"save" | "test" | "remove" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const run = async (action: "save" | "test" | "remove") => {
-    setBusy(action); setError(null);
-    try {
-      const result = action === "save"
-        ? await window.actspace.updateProviderCredential?.({ provider, credentialId: credential.id, label, pricingMultiplier: Number(multiplier) })
-        : action === "test"
-          ? await window.actspace.testProviderCredential?.({ provider, credentialId: credential.id })
-          : await window.actspace.removeProviderCredential?.({ provider, credentialId: credential.id });
-      if (!result || "error" in result) {
-        if (action === "test" && window.actspace.listProviders) {
-          const refreshed = await window.actspace.listProviders();
-          onChanged(refreshed.providers[provider]);
-        }
-        const references = result && "error" in result && result.error.references?.length ? `（${result.error.references.join("、")}）` : "";
-        setError(`${result && "error" in result ? result.error.message : "操作失败。"}${references}`);
-        return;
-      }
-      onChanged(result.provider);
-    } finally { setBusy(null); }
-  };
-
-  return (
-    <div className="rounded-act-md border border-line bg-surface p-2.5">
-      <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-2">
-        <input aria-label={`${credential.label} 名称`} value={label} onChange={(event) => setLabel(event.target.value)} className="h-8 rounded-act-md border border-line bg-surface-subtle px-2.5 text-[11px] text-text-main outline-none focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" />
-        <div className="relative"><input aria-label={`${credential.label} 价格倍率`} type="number" min="0" max="100" step="0.0001" value={multiplier} onChange={(event) => setMultiplier(event.target.value)} className="h-8 w-full rounded-act-md border border-line bg-surface-subtle px-2.5 pr-6 text-[11px] text-text-main outline-none focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /><span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-text-faint">x</span></div>
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <span className={`text-[10px] ${credential.lastConnection.status === "unavailable" ? "text-on-danger" : "text-text-faint"}`}>{credential.lastConnection.status === "available" ? "连接可用" : credential.lastConnection.status === "unavailable" ? "连接异常" : "尚未测试"}</span>
-        <div className="flex items-center gap-1">
-          <button type="button" disabled={busy !== null} onClick={() => void run("test")} className="h-7 rounded-act-md px-2 text-[10px] font-medium text-text-muted hover:bg-surface-subtle disabled:opacity-40">{busy === "test" ? "测试中…" : "测试"}</button>
-          <button type="button" disabled={busy !== null || !label.trim() || !isValidMultiplierValue(multiplier)} onClick={() => void run("save")} className="h-7 rounded-act-md px-2 text-[10px] font-medium text-text-muted hover:bg-surface-subtle disabled:opacity-40">{busy === "save" ? "保存中…" : "保存"}</button>
-          <button type="button" disabled={busy !== null} onClick={() => void run("remove")} className="h-7 rounded-act-md px-2 text-[10px] font-medium text-text-faint hover:bg-danger-soft hover:text-on-danger disabled:opacity-40">{busy === "remove" ? "删除中…" : "删除"}</button>
-        </div>
-      </div>
-      {error ? <p role="alert" className="mt-1.5 text-[10px] text-on-danger">{error}</p> : null}
-    </div>
-  );
-}
-
-function isValidMultiplierValue(value: string): boolean {
-  const number = Number(value);
-  return value.trim() !== "" && Number.isFinite(number) && number >= 0 && number <= 100;
 }
 
 function isProviderConfigured(provider?: ProviderSettingsView): boolean {

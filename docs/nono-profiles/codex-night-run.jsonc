@@ -1,0 +1,73 @@
+{
+  // 夜间自主执行 profile —— 仓库通用模板
+  //
+  // 本文件是可提交到公开仓库的通用版本。实际使用时拷贝到
+  // ~/.config/nono/profiles/codex-night-run.jsonc，并在本机副本里补充：
+  //   1. network.allow_domain 换成你的真实模型 API 域名（看 ~/.codex/config.toml 的 base_url）
+  //   2. filesystem.deny 里追加个人敏感目录（简历、证件、照片等）
+  //
+  // 使用方式（本机副本按名字引用）：
+  //   cd <项目目录>
+  //   nono run --profile codex-night-run --rollback --no-rollback-prompt \
+  //     -- codex exec --dangerously-bypass-approvals-and-sandbox "$(cat <plan文件>)"
+  //
+  // 设计原则：
+  //   - Codex 自身沙箱关闭，隔离完全交给 nono —— 单一控制点
+  //   - extends default 默认全拒，写权限只授工作目录和 codex 状态目录
+  //   - deny 优先于 allow/read（实测验证），千万不要 deny 工作目录的祖先目录
+
+  "extends": "default",
+  "meta": {
+    "name": "codex-night-run",
+    "version": "2.0.0",
+    "description": "夜间自主执行：写仅限工作目录和 codex 状态，读扩展到常用上下文目录，网络仅模型 API"
+  },
+
+  "workdir": { "access": "readwrite" },
+
+  "filesystem": {
+    // 写权限仅两处：
+    //   - $WORKDIR：项目目录
+    //   - $HOME/.codex：codex 状态（sqlite、sessions 等需要写）
+    "allow": ["$WORKDIR", "$HOME/.codex"],
+
+    // 只读上下文：按需调整。注意 nono 不允许授权整个 $HOME（实测会拒绝启动）
+    // 如需 skills 功能，在这里追加 "$HOME/.agents"
+    "read": ["$HOME/Desktop", "$HOME/Downloads"],
+
+    // deny 优先于 read/allow：
+    //   - /private/tmp：内置组 system_write_macos 默认授了写权限，必须显式收回
+    //   - 本机副本请在此追加个人敏感目录，例如 "$HOME/Desktop/<个人资料目录>"
+    "deny": ["/private/tmp"]
+  },
+
+  // 网络白名单：只放行模型 API 域名。
+  // 第三方 provider 从 ~/.codex/config.toml 的 base_url 读取真实域名后替换。
+  // 域名过滤走 TLS 拦截代理，首跑如遇 TLS 报错，用 nono run --trust-proxy-ca 兜底。
+  "network": {
+    "allow_domain": ["api.openai.com", "chatgpt.com"]
+  },
+
+  // 环境变量：阻止云凭证进入沙箱
+  "environment": {
+    "deny_vars": ["AWS_*", "GITHUB_TOKEN", "GH_TOKEN"]
+  },
+
+  // 安全组：
+  //   - unlink_protection：全局禁止删除，仅显式授予写权限的路径放开
+  //   - deny_credentials / deny_keychains_macos：凭证与钥匙串保护，
+  //     即使 read 授权覆盖到也会被 deny 拦下（实测验证）
+  //   - deny_shell_history / deny_shell_configs：shell 历史和配置保护
+  //   - node_runtime / git_config：运行时所需的最小读取授权
+  "groups": {
+    "include": [
+      "unlink_protection",
+      "deny_credentials",
+      "deny_keychains_macos",
+      "deny_shell_history",
+      "deny_shell_configs",
+      "node_runtime",
+      "git_config"
+    ]
+  }
+}

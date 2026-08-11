@@ -34,7 +34,6 @@ const DEFAULT_BASE_URLS: Record<string, string> = {
   deepseek: "https://api.deepseek.com",
   kimi: "https://api.moonshot.cn/v1",
   openrouter: "https://openrouter.ai/api/v1",
-  duckcoding: "https://api.duckcoding.ai/v1",
 };
 
 export class OpenAICompletionsService implements LLMService {

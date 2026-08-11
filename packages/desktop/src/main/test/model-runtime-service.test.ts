@@ -22,7 +22,7 @@ async function setup() {
   return { settings, models, runtime };
 }
 
-async function connect(settings: SettingsService, provider: "deepseek" | "kimi" | "openrouter" | "duckcoding") {
+async function connect(settings: SettingsService, provider: "deepseek" | "kimi" | "openrouter") {
   await settings.updateProviderConnection({ provider, apiKey: `sk-${provider}` });
   await settings.markProviderConnectionResult(provider, { ok: true, message: "ok", checkedAt });
 }
@@ -102,23 +102,4 @@ describe("ModelRuntimeService", () => {
     expect(runtime.resolveMainModel("deepseek:deepseek-v4-pro")).toMatchObject({ ok: false, reason: "provider_disconnected" });
   });
 
-  it("uses the model-selected DuckCoding Key and applies its pricing multiplier without fallback", async () => {
-    const { settings, models, runtime } = await setup();
-    await connect(settings, "duckcoding");
-    await settings.addProviderCredential({ provider: "duckcoding", label: "CodeX-Sale", apiKey: "sk-sale", pricingMultiplier: 0.2 });
-    await settings.markProviderCredentialConnectionResult("duckcoding", "codex-sale", { ok: true, message: "ok", checkedAt });
-    await models.addCustomModel({ provider: "duckcoding", apiModel: "gpt-5.6-sol", credentialId: "codex-sale", catalogModelId: "codex:gpt-5.6-sol" });
-
-    const resolved = runtime.resolveMainModel("duckcoding:gpt-5.6-sol");
-    expect(resolved).toMatchObject({
-      ok: true,
-      model: {
-        providerRuntime: { apiKey: "sk-sale", pricingMultiplier: 0.2 },
-        definition: { pricing: { inputCacheHitPerMillion: 0.1, inputCacheMissPerMillion: 1, inputCacheWritePerMillion: 1.25, outputPerMillion: 6 } },
-      },
-    });
-
-    await settings.markProviderCredentialConnectionResult("duckcoding", "codex-sale", { ok: false, message: "bad", checkedAt, errorKind: "auth" });
-    expect(runtime.resolveMainModel("duckcoding:gpt-5.6-sol")).toMatchObject({ ok: false, reason: "credential_unavailable" });
-  });
 });

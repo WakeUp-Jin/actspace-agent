@@ -19,7 +19,9 @@
 
 ## 按任务需要选读
 
-- `docs/PLANS_GUIDE.md`：什么时候要写 execution plan，怎么维护。
+- `docs/PLANS_GUIDE.md`：什么时候要写 execution plan，怎么维护，两种执行模式。
+- `docs/exec-runs/README.md`：执行计划时的过程记录和验收文档怎么写。
+- `docs/nono-profiles/README.md`：夜间模式的 nono 沙箱配置和启动方式。
 
 - `docs/PRODUCT_SENSE.md`：产品价值、取舍方式和优先级判断。
 - `docs/RELIABILITY.md`：运行稳定性、观测性和上线前的基本要求。

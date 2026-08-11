@@ -1721,8 +1721,7 @@ function AppearanceSection() {
 const PROVIDER_LABELS: Record<SecretProviderId, string> = {
   deepseek: "DeepSeek",
   kimi: "Kimi",
-      openrouter: "OpenRouter",
-      duckcoding: "DuckCoding",
+  openrouter: "OpenRouter",
   zhipu: "智谱 Web Search",
   tavily: "Tavily",
   tinyfish: "TinyFish",

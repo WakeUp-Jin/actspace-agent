@@ -384,6 +384,29 @@ export type ToolArtifact = {
   mimeType?: string;
 };
 
+export type TodoStatus = "pending" | "in_progress" | "completed";
+
+export type TodoItem = {
+  id: string;
+  content: string;
+  status: TodoStatus;
+  activeForm?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TodoSnapshot = {
+  todos: TodoItem[];
+  totalCount: number;
+  revision: number;
+};
+
+export type TodoUiPreview = TodoSnapshot & {
+  kind: "todo";
+  completedCount: number;
+  displayText: string;
+};
+
 export type ToolExecutionError = SessionError;
 
 export type ToolOutputRef = {
@@ -453,6 +476,7 @@ export type ToolPreviewKind =
   | "delete"
   | "bash"
   | "agent"
+  | "todo"
   | "browser_cua"
   | "browser_dom"
   | "browser_locator"
@@ -543,6 +567,7 @@ export type ToolUiPreview =
     }
   | BashPreview
   | AgentToolPreview
+  | TodoUiPreview
   | { kind: "generic"; title: string; content: string };
 
 export type BashStatus =
@@ -894,6 +919,13 @@ export type MessageBlock = {
       createdAt: string;
       transcriptEvents?: SessionEvent[];
     } & Omit<AgentToolPreview, "kind">)
+  | ({
+      kind: "todo";
+      id: EventId;
+      createdAt: string;
+      status: "running" | "completed" | "failed";
+      isError?: boolean;
+    } & Omit<TodoUiPreview, "kind">)
   | {
       kind: "tool";
       id: EventId;
