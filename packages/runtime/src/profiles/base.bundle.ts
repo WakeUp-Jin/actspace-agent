@@ -1,0 +1,1 @@
+export const BASE_BUNDLE = Object.freeze({ id: "actspace.base", version: "2.0.0", entries: Object.freeze(["scope", "prompt", "tools", "llm", "agent.registry", "agent.loop", "inbox", "todo", "skills", "compaction", "core-tools", "subagent.agent", "subagent.explore"]) });

@@ -1,0 +1,58 @@
+- id: actspace-runtime
+  name: "@actspace/runtime/cordis"
+  inject: [actspace.host]
+- id: session-journal
+  name: "@actspace/session-journal/plugin"
+  inject: [actspace.host.session.codecs]
+- id: session-persistence
+  name: "@actspace/session-persistence/plugin"
+  inject: [actspace.host.session, session.journal]
+- id: session-jsonl
+  name: "@actspace/session-jsonl/plugin"
+- id: session-projection
+  name: "@actspace/session-projection/plugin"
+- id: session-runtime
+  name: "@actspace/runtime/session"
+  inject: [actspace.host.session, session.journal, session.persistence, session.jsonl, session.projection]
+- id: llm-service
+  name: "@actspace/llm-service/plugin"
+  inject: [actspace.host.llm]
+- id: tools-runtime
+  name: "@actspace/tools-runtime/plugin"
+  inject: [tools.approval]
+- id: tools-approval
+  name: "@actspace/tools-approval/plugin"
+- id: context-assembly
+  name: "@actspace/context/plugin"
+  inject: [session.journal]
+- id: prompt-runtime
+  name: "@actspace/prompt/plugin"
+  inject: [actspace.host.prompt, context.assembly]
+- id: compaction-runtime
+  name: "@actspace/compaction/plugin"
+  inject: [llm.service]
+- id: core-tools
+  name: "@actspace/tools-core-tools/plugin"
+  inject: [tools.runtime, llm.service, actspace.host.tools.core]
+- id: browser-tools
+  name: "@actspace/tools-browser-tools/plugin"
+  inject: [tools.runtime]
+- id: core-agent
+  name: "@actspace/core-agent/plugin"
+- id: agent-factory
+  name: "@actspace/runtime/agent-factory"
+  inject: [actspace.host.agent, agent.registry, session.runtime, llm.service, tools.runtime, prompt.runtime, compaction.runtime]
+- id: core-agent-loop
+  name: "@actspace/core-agent-loop/plugin"
+  inject: [core.agent, actspace.agent.factory]
+- id: subagent-surface
+  name: "@actspace/subagent/plugin"
+- id: agent-runtime
+  name: "@actspace/runtime/agent-runtime"
+  inject: [actspace.host.agent, agent.registry, agent.loop, actspace.agent.factory, session.runtime, tools.runtime, subagent.one-shot]
+- id: headless-runner
+  name: "@actspace/headless/plugin"
+  inject: [actspace.host.headless, session.runtime, agent.loop]
+- id: desktop-app
+  name: "@actspace/desktop-app/plugin"
+  inject: [session.runtime, agent.runtime, llm.service, compaction.runtime]

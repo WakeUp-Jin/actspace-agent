@@ -1,328 +1,193 @@
-# Token Usage 与 Context State 设计
+# Token Usage 与 Context Projection
 
-本文记录 actspace 在 token 统计、成本计算、上下文水位和未来上下文控制面板上的设计决策。它回答“哪些数据是事实、哪些数据是估算、分别存在哪里”，具体实施步骤见 `docs/exec-plans/completed/actspace-token-usage-context-control-foundation.md`。
+> 状态：当前 v2 设计与实现事实。v1 的 `context_snapshot`、独立 Context state 文件和可变 conversation 持久化不再使用。
 
-## 背景
+Session、Surface 和 request snapshot 的规范分别见：
 
-actspace 的长期产品原则之一是“上下文的绝对控制”：用户应该能看见当前模型调用会加载哪些上下文、每类上下文占多少 token、每次模型回复真实消耗了多少 token 和成本，并在后续版本中能手动加入、删除、修改上下文。
+- [`agent-target-session-and-context.md`](../agent-plugin-runtime/agent-target-session-and-context.md)
+- [`agent-spec-session-format-v1.md`](../agent-plugin-runtime/agent-spec-session-format-v1.md)
+- [`agent-spec-prompt-context-contributors.md`](../agent-plugin-runtime/agent-spec-prompt-context-contributors.md)
 
-另一个相关原则是优先适配 DeepSeek，尤其是利用 DeepSeek prompt cache 降低成本。因此 token 设计不能只显示总量，还要能记录 cache hit、cache miss、reasoning token 和按模型回复维度聚合的成本。
+## 目标
 
-当前代码已经具备：
+Actspace 需要分别回答三类问题：
 
-- `session.jsonl`：每个会话的持久化事件流。
-- `context_snapshot`：当前较轻量的上下文用量快照。
-- `AssistantMessage.usage`：模型回复上的 usage 汇总。
-- `MODEL_REGISTRY`：当前定义在 `packages/shared/src/model-config.ts`，并由 IPC 契约 re-export 的模型注册表。
+1. **模型实际消耗了多少**：来自 provider / adapter 返回的 usage；
+2. **某次模型请求实际组装了什么**：来自 dispatch 前冻结的 request snapshot；
+3. **用户当前在 UI 中看到什么**：来自 Journal 与 request snapshot 的 Runtime Projection。
 
-但当前设计仍有不足：
+这三类数据有关联，但不能合并为一个可覆盖文件。
 
-- usage 容易按 turn 或最终回复理解，无法稳定表达一轮 Agent 内多次 LLM call。
-- DeepSeek 的 cache hit、cache miss、reasoning token 没有形成统一持久化事实。
-- 成本统计缺少明确数据来源。
-- context snapshot 与未来可编辑 context manifest 的边界不清。
-- 模型配置、上下文窗口和价格配置需要从 IPC 契约中拆出，成为更清晰的共享配置。
+## 唯一持久事实
 
-## 核心原则
-
-### 1. 模型 usage 是事实
-
-每一次模型回复都应该产生一条 usage 事实。这里的“模型回复”指一次 LLM API call 的结果，不是用户的一轮 turn，也不是整个会话。
-
-例如一轮 Agent 可能是：
+持久 Session 只写：
 
 ```text
-user_message
-LLM call 1 -> thinking + tool_call
-tool_result
-LLM call 2 -> assistant_message
+sessions-v2/<sessionId>/journal.jsonl
 ```
 
-这应该产生两条 `llm_usage` 事件，而不是一条 turn usage。
+与本专题相关的关键事件包括：
 
-### 2. 成本写入 usage，但价格配置不写入事件
+- `request/snapshot`：dispatch 前冻结的逻辑请求；
+- `llm/dispatch-started`：请求已经越过副作用边界；
+- `llm/ended` / `llm/error` / `llm/aborted`：请求终态；
+- `llm/usage`：provider usage 与成本；
+- `compaction/started` / `surface/replaced` / `compaction/ended`：Surface 压缩事务。
 
-`llm_usage` 应写入按当时模型配置计算出的 `cost`，这样后续会话统计、每日统计和历史查看不需要重新计算，也不会因为未来价格配置变化而改变旧统计结果。
+不存在独立 `context-state` 文件。UI 的 Context 状态可以随当前 Projection 算法升级而变化，但 Journal 事实保持不变。
 
-跨供应商统计与消息尾栏统一展示 USD：原始 `llm_usage.cost` 继续保留调用时币种，视图层通过 shared 的 `convertUsageCostToUsd()` 折算；当前固定口径为 `7.2 CNY = 1 USD`。折算函数必须由 Usage 页面、会话明细和消息尾栏共同复用，避免不同界面出现口径漂移。
+## Request Snapshot
 
-但 `pricingSnapshot` 不进入 `session.jsonl`。模型价格、上下文窗口和 provider 映射应集中维护在共享模型配置中，例如：
+每次真实模型 dispatch 前，Prompt / Context 与 LLM service 共同形成 JSON-safe、deep-frozen snapshot：
 
 ```text
-packages/shared/src/model-config.ts
+sessionId
+turnId
+stepId
+messages
+systemSections
+facts
+renderedSystemPrompt
+tools
+contributorProvenance
+requestOptions
+compositionDigest
+hostCapabilityDigest
+prepared.route / model / registrationId / adapterVersion
+prepared.defaults / retryPolicy
 ```
 
-第一阶段不做账单级价格版本审计。如果未来需要严格解释历史成本来源，可以引入价格配置版本号或独立 pricing history，而不是在每条 usage 中重复写完整价格快照。
+Snapshot 的作用是：
 
-### 3. Context snapshot 是轻量历史水位
+- 证明一次 request 使用了哪份 Session Surface；
+- 证明哪些 Prompt / Context contributor 参与组装；
+- 关联 route、model、adapter 和 retry policy；
+- 为 Context、Analysis 和故障恢复提供确定输入；
+- 在 request 已 dispatch 但没有终态时判断 `outcome-unknown`。
 
-`context_snapshot` 继续写入 `session.jsonl`，但只承担轻量历史记录职责：
+Snapshot 不得包含 API Key、Authorization、Cookie、proxy credential 或其他 secret-like 字段。`packages/prompt/src/request-snapshot.ts` 会拒绝非 JSON 值、非有限数字、过深对象和敏感字段名。
 
-- 当时上下文估算总量。
-- 模型最大上下文窗口。
-- 使用百分比。
-- 各上下文 bucket 的估算 token。
-- estimator 名称和版本。
+## Usage 与成本
 
-它不存完整可编辑 context entries，也不作为未来 Context 控制面板的主状态源。
-
-### 4. Context state 是当前可变视图
-
-完整 context entries 属于当前视图状态，应单独存到每个会话目录下：
+`llm/usage` 以一次 provider request 为粒度，而不是一次 Agent Run 或 Session 的粗粒度计数。当前字段包括：
 
 ```text
-sessions/{sessionId}/context-state.json
+inputTokens
+outputTokens
+cacheReadTokens
+cacheWriteTokens
+reasoningTokens
+cost
+costCurrency
+source
 ```
 
-这个文件可以覆盖更新，服务前端 Context 弹窗和未来的手动上下文控制能力。它可以包含每个上下文条目的 title、kind、estimatedTokens、preview、sourceEventIds、contentHash、included、pinned、removable 等字段。
+规则：
 
-第一阶段只需要生成和展示，不做用户点击增删改。
+- provider 有精确值时保存精确值；
+- adapter 只能估算时明确 `source`，不能把估算伪装成 provider 事实；
+- provider 未返回某字段时允许为 unknown / null，Projection 不应凭空补出精确数字；
+- cost 是当次请求的事实结果，价格目录或用户设置中的倍率不是 Session 恢复所需的完整快照；
+- retry 的每次真实 request 都有独立 request ID、snapshot 和 usage，不能把多次尝试覆盖为一条。
 
-## 数据分层
+Durable Session projection 聚合：
 
-### `session.jsonl`
+- input；
+- output；
+- cache read；
+- cache write；
+- total；
+- 可确认的 USD cost。
 
-保存不可变或追加式事实：
+Desktop Usage 页面可以再按 Agent Run、模型和日期聚合，但不能修改 Journal usage。
 
-- `user_message`
-- `thinking`
-- `tool_call`
-- `tool_result`
-- `assistant_message`
-- `llm_usage`
-- 轻量 `context_snapshot`
-- `error`
+## Context Projection
 
-它是会话恢复和统计事实来源。
+当前 Desktop Context 面板从最近一次 `request/snapshot` 派生只读 entries：
 
-### `meta.json`
+| Snapshot 来源 | UI bucket |
+| --- | --- |
+| `systemSections` 的核心段 | System Prompt |
+| rules contributor | Rules |
+| skills contributor | Skills |
+| `tools` | Tool Definitions |
+| `facts` | Runtime Facts |
+| `messages` | Conversation |
+| 最近 Compaction summary | Summarized Conversation |
 
-保存会话摘要：
+Context Projection 的 token 数是 UI 估算，不是 provider usage。当前估算器会根据文本字符做近似计算，并展示：
 
-- session id
-- title
-- createdAt
-- updatedAt
-- agentRunCount
+- `totalEstimatedTokens`；
+- `maxTokens`；
+- `percentUsed`；
+- bucket tokens；
+- entry preview、included、pinned、removable。
 
-它不保存 usage 明细和上下文条目。
+因此必须在 UI 和文档中区分：
 
-### `context-state.json`
-
-保存当前上下文可视化和未来可编辑状态：
-
-- updatedAt
-- sessionId
-- activeTurnId
-- estimator
-- totalEstimatedTokens
-- maxTokens
-- percentUsed
-- buckets
-- entries
-
-它是可变视图，可以被覆盖写入。未来当用户手动删除、添加、锁定上下文时，也应优先更新这个文件或由它派生的状态。
-
-### `model-config.ts`
-
-保存模型配置：
-
-- modelId
-- provider
-- apiModel
-- contextWindow
-- thinkingDefault
-- displayName
-- pricing
-
-`packages/shared/src/ipc.ts` 不再作为模型配置的主要承载文件。它可以 re-export 模型配置，保持现有消费方兼容。
-
-## 建议类型
-
-### `LlmUsagePayload`
-
-```ts
-export type LlmUsagePayload = {
-  callId: string;
-  provider: "deepseek" | "kimi" | "mock";
-  model: string;
-  modelId?: string;
-
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-
-  reasoningTokens?: number;
-  cacheHitTokens?: number;
-  cacheMissTokens?: number;
-  serverToolUse?: {
-    webSearchRequests?: number;
-    webFetchRequests?: number;
-  };
-
-  cost: {
-    input: number;
-    output: number;
-    cacheHitInput?: number;
-    cacheMissInput?: number;
-    reasoning?: number;
-    total: number;
-    currency: "CNY" | "USD";
-  };
-
-  relatedEventIds?: string[];
-};
+```text
+Provider usage = 已完成请求的真实或 adapter 标注值
+Context estimate = 当前 snapshot 的前端可解释估算
 ```
 
-字段说明：
+不能用 Context estimate 回写或修正历史 provider usage。
 
-- `callId`：一次 LLM API call 的唯一 ID。
-- `provider`：模型服务商，例如 `deepseek`、`kimi`。
-- `model`：provider API 使用的模型名。
-- `modelId`：产品内模型 ID，便于回到共享模型配置。
-- `promptTokens`：本次请求输入 token，包含系统提示词、工具定义、历史、当前用户输入、工具结果等。
-- `completionTokens`：本次模型输出 token，包含普通文本、工具调用输出和 reasoning token。
-- `totalTokens`：本次总 token。
-- `reasoningTokens`：模型思考 token，DeepSeek reasoner 等模型可返回。
-- `cacheHitTokens`：prompt 中命中缓存的 token。
-- `cacheMissTokens`：prompt 中未命中缓存的 token。
-- `cost`：按当时 `model-config.ts` 中价格计算出的费用。
-- `relatedEventIds`：本次模型回复产生或关联的 session events，例如 `thinking`、`tool_call`、`assistant_message`。
+## Context assembly 所有权
 
-### 轻量 `ContextSnapshotPayload`
+`packages/context` 只编排 contributor，不拥有 Session conversation。输入包括：
 
-```ts
-export type ContextSnapshotPayload = {
-  totalEstimatedTokens: number;
-  maxTokens: number;
-  percentUsed: number;
-  buckets: Array<{
-    key:
-      | "systemPrompt"
-      | "tools"
-      | "rules"
-      | "skills"
-      | "summarizedConversation"
-      | "conversation";
-    label?: string;
-    tokens: number;
-  }>;
-  estimator: {
-    name: string;
-    version: string;
-  };
-};
-```
+- 当前 Session Surface；
+- Host facts；
+- Prompt / Skill / Rule contributor；
+- Tool definition；
+- request-scoped options。
 
-> bucket 的 `key` / `label` / 配色已收口为单一注册表 `packages/shared/src/context-buckets.ts` 的 `CONTEXT_BUCKET_REGISTRY`：
-> `ContextUsageBucketName` 由注册表派生，后端 `createEmptyBuckets()` 遍历注册表生成 bucket，前端 Context 弹窗用 `getContextBucketDisplay(key)` 取 label 与 `--act-context-*` 主题色（浅/深各一套），未知 key 走兜底。
-> 这样「新增一种上下文类型」只需在注册表加一行 + 在 `tokens.css` 加一对主题 token，前后端无需改组件代码（改配置不改代码）。
->
-> 当前注册表已落地 6 个桶：`systemPrompt / tools / rules / skills / summarizedConversation / conversation`。MCP、Subagents 暂未接入产品，故从注册表移除（需要时再加回）。
-> `summarizedConversation` 由 `ContextManager.getUsageSnapshot()` 从会话消息里拆出：`role:"user" && source:"compaction"` 的合成摘要单独计入该桶，其余消息（普通历史 + 最新输入）计入 `conversation`。`systemPrompt` 可能为 0：首次默认值来自代码里的 `MAIN_AGENT_SYSTEM_PROMPT`，当前模板仍可为空；用户在设置页保存主 Agent 系统提示词后，该桶会反映 settings 注入的完整文本。`rules` 来自 `<userData>/AGENTS.md` 与 `<workspaceRoot>/AGENTS.md` 的 system segment；`skills` 来自 `loadSkillRegistry()` 生成的 `<available_skills>` catalog segment，未发现 Skill 时该桶为 0。
+Contributor 必须有稳定 ID、owner plugin、order 和 criticality：
 
-### `ContextState`
+- required contributor 失败时 request 失败；
+- optional contributor 失败时记录 skipped provenance；
+- 排序由 `order + id` 决定，不能依赖注册时机；
+- 结果进入 request snapshot 后冻结，本次 dispatch 期间不再热变更。
 
-```ts
-export type ContextState = {
-  sessionId: string;
-  activeTurnId?: string;
-  updatedAt: string;
-  estimator: {
-    name: string;
-    version: string;
-  };
-  totalEstimatedTokens: number;
-  maxTokens: number;
-  percentUsed: number;
-  buckets: ContextSnapshotPayload["buckets"];
-  entries: ContextStateEntry[];
-};
+## Compaction
 
-export type ContextStateEntry = {
-  id: string;
-  kind:
-    | "systemPrompt"
-    | "toolDefinitions"
-    | "rules"
-    | "skills"
-    | "summarizedConversation"
-    | "conversation";
-  title: string;
-  estimatedTokens: number;
-  included: boolean;
-  pinned?: boolean;
-  removable?: boolean;
-  sourceEventIds?: string[];
-  contentHash?: string;
-  preview?: string;
-};
-```
+Compaction 不删除 Journal 历史，而是为有效 Session Surface 追加 replace transaction：
 
-## Token 估算与真实 usage
+1. 选择可压缩的连续 Surface 区域；
+2. flush 当前 Journal；
+3. 生成 summary；
+4. 写入 compaction transaction；
+5. flush 后让新 Surface 对后续请求生效。
 
-估算 token 和真实 usage 必须分开：
+当前默认 policy 使用 context limit、reserve token、trigger ratio 和最小区域长度决定是否压缩。自动触发和手动触发都必须拒绝在 active turn 中直接改写 Surface。
 
-- 发送前：使用本地 estimator 估算 context 大小，驱动上下文占比、bucket 展示和压缩判断。
-- 发送后：使用 provider 返回的 usage 记录真实消耗，驱动统计和成本。
+## 当前不提供的能力
 
-第一阶段可以继续使用现有字符比例估算器，但需要记录 estimator 名称和版本，避免未来更换 tokenizer 后难以解释旧数据。
+以下仍是未来产品方向，不得写成当前事实：
 
-## DeepSeek Cache 设计影响
+- 用户直接增删改某个 Context entry；
+- 把 entry 编辑结果保存到独立可覆盖文件；
+- 跨 Session 的长期记忆自动注入；
+- 可持久化的 Context pin / exclude 控制面；
+- 独立于 Journal 的 Cache Audit sidecar。
 
-DeepSeek prompt cache 命中依赖请求前缀复用。上下文系统应尽量保持高复用内容的稳定顺序：
+如果未来实现这些能力，必须先定义新的 Journal event 或明确的派生存储失效规则，不能恢复 v1 的“双真相”结构。
 
-1. system prompt
-2. rules
-3. skills
-4. tool definitions
-5. MCP/subagent definitions
-6. conversation and volatile context
+## 代码事实入口
 
-第一阶段只记录 cache hit 和 cache miss。后续 Context 控制面板可以显示 cache-friendly prefix，并提示用户修改前缀上下文会影响缓存命中率。
+- `packages/context/src/assembly.ts`：contributor 排序、required / optional 语义；
+- `packages/prompt/src/request-snapshot.ts`：snapshot 冻结与 secret-like 字段拒绝；
+- `packages/runtime/src/projection/durable-session.ts`：durable usage 聚合；
+- `apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts`：Context、Usage 与 Analysis 投影；
+- `packages/compaction/src/plugin.ts`：Surface compaction transaction；
+- `packages/compaction/src/policy.ts`：默认 compaction policy。
 
-### 缓存稳定性档位（CACHE_STABILITY）
+## 验收
 
-借鉴 reasonix「字节级前缀稳定」的 cache-first 设计（见
-`/Users/wakeup-jin/Desktop/code-project/back-code/deepseek-reasonix-learing/docs/design-docs/reasonix-cache-first-architecture.md`），
-在 `packages/agent-core/src/context/types.ts` 落地一个显式的缓存稳定性档位：
-
-- `CACHE_STABILITY.IMMUTABLE = 100`：整会话不变，如核心系统提示词、工具协议说明。
-- `CACHE_STABILITY.STABLE = 70`：基本稳定，如规则、长期记忆摘要（`registerSegment` 默认值）。
-- `CACHE_STABILITY.SEMI = 40`：会话级注入但本轮内不变。
-- `CACHE_STABILITY.VOLATILE = 10`：每轮常变的动态注入内容。
-
-`PromptSegment` 与 `SystemPart` 都带 `stability` 字段：
-
-- `SystemPromptContext.getPrompt()` 排序键为「stability 降序 → priority 降序 → id 升序」，确定性拼接，避免前缀字节漂移。
-- `ContextManager.buildSystemPrompt()` 收集各模块的 `SystemPart` 后按 `stability` 降序稳定排序（同稳定性按收集 index tie-break），让最不易变的内容（系统提示词 IMMUTABLE）稳定落在请求前缀。
-
-### 三区域映射（actspace 当前落地）
-
-- 不变前缀：系统提示词（按 stability 降序）+ 工具定义。`getContext()` 在多轮间应产出字节级一致的前缀；工具序列化顺序由测试守护（见 `context/test/manager.test.ts`）。
-- 只追加历史（append-only volatile tail）：会话消息由 `ConversationContext` 只追加管理，**禁止重排**——重排会同时破坏 tool_call/tool_result 配对与缓存前缀。历史压缩走 `compression/` 子系统，以「追加一条合成摘要」的方式释放空间，不重写前缀。
-- 临时不入前缀：模型 thinking / reasoning 在 `convert.ts` 转换时不回放进请求消息，临时内容不污染缓存前缀。
-
-## 被排除的方案
-
-### 不把完整 Context Manifest 写入 `session.jsonl`
-
-完整 entries 会随当前上下文视图频繁变化，写入事件流会让 session 膨胀，也会把可变视图误当作不可变事实。第一阶段只把轻量水位写入 `context_snapshot`。
-
-### 不在每条 usage 中保存 `pricingSnapshot`
-
-价格配置统一维护在共享模型配置中。usage 只保存已经计算好的成本和原始 token。这样既能稳定统计，又避免每条事件重复写价格表。
-
-### 不按 turn 聚合 usage 作为事实
-
-turn、session、day 的统计都可以从 `llm_usage` 聚合得出。持久化事实应保持在最细的模型回复粒度。
-
-## 第一阶段验收
-
-- `packages/shared/src/model-config.ts` 成为模型配置事实来源。
-- `session.jsonl` 出现 `llm_usage` 事件，且每次模型回复一条。
-- DeepSeek usage 包含 prompt、completion、total、reasoning、cache hit、cache miss。
-- `llm_usage.payload.cost` 按当前模型配置计算并持久化。
-- `context_snapshot` 保留轻量 bucket 和 estimator 信息。
-- 每个会话目录存在可覆盖的 `context-state.json`，用于前端 Context 弹窗展示。
-- 前端 Context 弹窗能显示整体占比、bucket 和 entries；第一阶段不提供增删改按钮。
+- 持久 Session 只写 `sessions-v2/<id>/journal.jsonl`；
+- 每次 dispatch 前存在可关联的 `request/snapshot`；
+- 每次真实 provider request 的 usage 不被其他 request 覆盖；
+- Context 面板可以仅凭 Journal 重建；
+- 删除派生 UI 状态不会影响 Session 恢复；
+- secret-like 字段无法进入 request snapshot；
+- Compaction 后旧 Journal 行仍保留，后续请求只消费新的有效 Surface。

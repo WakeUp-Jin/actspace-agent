@@ -21,8 +21,8 @@
 - `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`
 - `docs/design-docs/frontend/front-主题与配色规范.md`
 - `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/kairos/front-Kairos监控页规范.md`
-- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
+- `docs/design-docs/v1-legacy/front-Kairos监控页规范.md`
+- `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md`
 
 > 本计划派生自右侧面板母规范与 Kairos 监控页母规范。规范是"为什么 / 做成什么样 / V1-V2 边界 / 安全约束"的事实来源；本计划只负责"谁改哪些文件、按什么顺序、怎么验证"。两者冲突以规范为准。
 
@@ -64,8 +64,8 @@
 - `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
 - `packages/desktop/src/renderer/components/ConversationView.tsx`（`TurnActions` 操作条，可视化按钮入口）
 - `packages/agent-core/src/llm/**`（MD→HTML 转换调用）
-- `docs/design-docs/kairos/front-Kairos监控页规范.md`
-- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
+- `docs/design-docs/v1-legacy/front-Kairos监控页规范.md`
+- `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md`
 
 ## 并行边界
 

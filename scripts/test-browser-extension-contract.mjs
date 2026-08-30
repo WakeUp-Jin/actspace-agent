@@ -7,7 +7,7 @@ import path from "node:path";
 import vm from "node:vm";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const extensionRoot = path.join(repoRoot, "plugins/browser-bridge/apps/chrome-extension");
+const extensionRoot = path.join(repoRoot, "browser-bridge/apps/chrome-extension");
 const source = readFileSync(path.join(extensionRoot, "src/background.js"), "utf8");
 const manifest = JSON.parse(readFileSync(path.join(extensionRoot, "manifest.json"), "utf8"));
 const cursorSource = readFileSync(path.join(extensionRoot, "src/cursor-overlay.js"), "utf8");

@@ -118,7 +118,7 @@ Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的
 
 - Electron 窗口截图。
 - `pnpm dev` 终端日志。
-- 必要时提供本地数据目录里的 `meta.json` 或 `session.jsonl` 摘要。
+- 必要时提供 `sessions-v2/<sessionId>/journal.jsonl` 的脱敏摘要；不要发送完整 Journal、凭据或包含敏感工具输出的原始文件。
 
 ## 默认验收矩阵
 

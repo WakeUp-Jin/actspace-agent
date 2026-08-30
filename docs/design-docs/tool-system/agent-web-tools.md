@@ -2,10 +2,11 @@
 
 本文是 `web_fetch`（URL 精读）与 `web_search`（关键词搜索）两个工具的设计事实来源。
 
-代码位置：
+当前代码位置：
 
-- `packages/agent-core/src/tools/tools/web-fetch/`：`definition.ts`、`executor.ts`、`html-to-markdown.ts`
-- `packages/agent-core/src/tools/tools/web-search/`：`definition.ts`、`executor.ts`、`providers.ts`
+- `packages/tools/core-tools/src/web/`：Node Host 侧 `web_fetch` / `web_search` 端口、provider 与 HTML 转换实现。
+- `packages/tools/core-tools/src/plugin.ts`：作为独立 workspace plugin package 注册工具贡献。
+- `packages/tools/runtime/`：统一 Tool ABI、prepared execution、policy 与生命周期边界。
 
 ## 背景：为什么放弃 Kimi-backed web_search
 
@@ -77,7 +78,7 @@ web_search(query)
 
 ### key 门控与配置链路
 
-- env：`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY`（`packages/agent-core/src/env.ts`）。
+- env：`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY`（由 v2 Host credential resolver 提供）。
 - 暴露门控：`ToolRuntimeConfig.hasWebSearchKey`（任一 key 存在即 true），由 `create-agent-deps.ts` 与 `kairos-bootstrap.ts` 注入；`requiresKey: "webSearch"` 在 `exposure.ts` 据此判断。`web_fetch` 无 key 要求，始终注册。
 - 设置页：`packages/shared/src/settings.ts` 新增 `SearchProviderId`（zhipu/tavily/tinyfish/exa）与 `SecretProviderId = ProviderId | SearchProviderId`，密钥统一走 `setProviderKey`/`clearProviderKey` IPC，以明文写入 main-only `0600` 凭据文件后更新运行时 env。设置页「模型」区新增「网络搜索」组，四个 provider 各一行连接/断开。
 - Tavily 额度显示：main 进程 `getSearchUsage()` 调 `GET api.tavily.com/usage`，渲染层在 Tavily 已连接时显示「本周期已用 X / Y credits，剩余 Z」。其余 provider 无公开用量接口（TinyFish 免费、智谱/Exa 在各自控制台看账单）。

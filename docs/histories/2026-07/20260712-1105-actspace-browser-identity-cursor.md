@@ -3,7 +3,7 @@
 | key | value |
 |-----|-------|
 | date | 2026-07-12 |
-| scope | plugins/browser-bridge, docs/design-docs |
+| scope | browser-bridge, docs/design-docs |
 | status | completed |
 
 ## 用户诉求
@@ -31,10 +31,10 @@ Browser Extension 已具备完整功能，但默认图标、`Agent` 标签组和
 
 ## 主要文件
 
-- `plugins/browser-bridge/apps/chrome-extension/assets/logo-showcase.html`
-- `plugins/browser-bridge/apps/chrome-extension/assets/logo-variants/`
-- `plugins/browser-bridge/apps/chrome-extension/manifest.json`
-- `plugins/browser-bridge/apps/chrome-extension/src/cursor-overlay.js`
-- `plugins/browser-bridge/apps/chrome-extension/src/background.js`
-- `plugins/browser-bridge/apps/cli/internal/cua/engine.go`
+- `browser-bridge/apps/chrome-extension/assets/logo-showcase.html`
+- `browser-bridge/apps/chrome-extension/assets/logo-variants/`
+- `browser-bridge/apps/chrome-extension/manifest.json`
+- `browser-bridge/apps/chrome-extension/src/cursor-overlay.js`
+- `browser-bridge/apps/chrome-extension/src/background.js`
+- `browser-bridge/apps/cli/internal/cua/engine.go`
 - `scripts/test-browser-cursor-runtime.mjs`

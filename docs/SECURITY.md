@@ -4,47 +4,47 @@
 
 ## 密钥与环境变量管理
 
-- **不提交密钥**：`.env` 与 Desktop `secrets.json` 都属于本机运行数据，不进入仓库；API Key 等敏感值只允许存在于这两类本地文件、系统环境变量或进程内存中。
-- **模板文件**：`.env.example` 列出全部可配置项和说明，新开发者克隆仓库后复制为 `.env` 即可。
-- **集中管理**：所有环境变量通过 `packages/agent-core/src/env.ts` 统一读取和验证，禁止在业务代码中散落 `process.env.XXX` 直接读取。
-- **DeepSeek API 格式边界**：DeepSeek 固定使用 OpenAI-compatible Chat Completions，配置只保留 `DEEPSEEK_BASE_URL`（默认 `https://api.deepseek.com`）。旧 `DEEPSEEK_API_FORMAT` / `DEEPSEEK_ANTHROPIC_BASE_URL` 不再读取；官方 `/anthropic` 设置值只在 main 进程加载时迁移为默认根地址，renderer 仍不接收实际运行时 URL 或密钥。
-- **Kimi key 边界**：`KIMI_API_KEY` 只作为 Kimi 主模型密钥使用。该 key 只在 main/agent-core 运行时读取，不进入 renderer、session 事件、前端状态或测试快照。
+- **不提交密钥**：Desktop `secrets.json`、CLI 显式环境变量和进程内存都属于本机运行数据，不进入仓库；`.env.example` 只列出 CLI、CI、调试开关和非敏感首次默认值，不表示 Desktop 会自动加载仓库 `.env`。
+- **Desktop 凭据入口**：模型、搜索和图片服务 Key 只从应用内设置页写入 main-only `<userData>/secrets.json` v2，再由 Host credential resolver 按请求解析。Desktop 不从仓库 `.env` 或 renderer 状态读取 provider key。
+- **CLI 凭据入口**：CLI Host 只读取启动进程显式提供的 provider 环境变量，例如 `DEEPSEEK_API_KEY`、`KIMI_API_KEY` 或 `OPENROUTER_API_KEY`。仓库没有通用 `loadEnv()` / dotenv 启动层，若开发者自行使用 `.env`，必须在启动 CLI 前显式导入到当前 shell。
+- **集中管理**：Runtime 只通过 LLM credential port 接收短生命周期凭据；Desktop 与 CLI 各自在 Host 边界解析来源，领域 package 不直接读取 provider key。
+- **DeepSeek API 格式边界**：Desktop 的 DeepSeek Base URL 与 Key 来自设置存储；CLI 的默认 Base URL 是 `https://api.deepseek.com`，并使用 OpenAI-compatible Chat Completions。旧 `DEEPSEEK_API_FORMAT` / `DEEPSEEK_ANTHROPIC_BASE_URL` 不是 v2 Runtime 配置面。
+- **Kimi key 边界**：Desktop Kimi Key 来自主进程凭据存储；CLI 才读取显式 `KIMI_API_KEY`。两种 Host 都不得把 Key 写入 renderer、Session Journal、Runtime Projection 或测试快照。
 - **本地凭据文件**：Desktop 设置页录入的 LLM、搜索和图片服务 Key 以明文写入 `<userData>/secrets.json` v2；目录沿用 `userData`，文件在创建、原子替换和启动读取时都收紧为 `0600`。`0600` 表示仅文件所有者可读写，避免 `0644` 允许同机其他用户读取，但它不是加密：当前 macOS 账号下的进程、备份或同步工具仍可能读取该文件。开发版与安装版共用同一 `userData` 和同一份凭据，稳定性优先于应用身份绑定的系统密钥串。
 - **主进程边界**：`secrets.json` 只由 Electron main 读取；renderer、typed preload、settings view、session、Trace 和普通日志只接收 `hasApiKey`、连接状态或脱敏错误码，不接收文件正文或明文 Key。凭据不提交到仓库，也不得复制到 `settings.json`。
 - **OpenRouter key 边界**：OpenRouter 调用 Key 与 Management Key 在 `secrets.json` 中使用独立字段；renderer 只读取是否已配置、连接状态和脱敏诊断，不读取明文。
 - **模型目录边界**：OpenRouter 目录由 main 进程使用对应 provider 连接读取，不携带用户凭据。外部目录响应仍按不可信数据处理，只归一化白名单字段并限制响应和字符串大小。
 - **服务商级代理目标边界**：代理配置归属于单个 LLM 服务商，只注入该服务商的 HTTP client，不写入全局 `HTTP_PROXY` / `HTTPS_PROXY`，也不影响工具、更新器或其他服务商。首版只接受 `http://` / `https://` 代理地址，不在代理 URL 中保存用户名和密码。
-- **搜索 provider key 边界**：`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY` 是 `web_search` 工具的外部搜索 API 密钥，边界与 LLM key 相同——经设置页写入 main-only `secrets.json`，只在 main/agent-core 运行时读取，不进入 renderer 明文状态。
+- **搜索 provider key 边界**：`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY` 是 `web_search` 工具的外部搜索 API 密钥，边界与 LLM key 相同——经设置页写入 main-only `secrets.json`，只在 main Host / Runtime 运行时读取，不进入 renderer 明文状态。
 - **图片生成 key 边界**：`IMAGE_GENERATION_API_KEY` 经设置页写入 main-only `secrets.json`，并以内存配置注入 `generate_image` executor；renderer 只接收 `hasApiKey`、Base URL、模型名和本地产物引用。上游 Base64、Authorization header、签名 URL 与原始错误正文不得进入 session、renderer 或日志。
 - **凭据迁移与故障保护**：旧 `secrets.json` v1 密文只在 main 使用 `safeStorage` 迁移。必须先把所有字段完整解密并校验成功，再以 `0600` 原子写入 v2；任何读取、格式、权限或迁移失败都保留原文件、停止所有凭据新增/替换/删除，并向设置页返回脱敏错误，禁止把空内存状态覆盖到磁盘。
 - **图片分析凭据边界**：`inspect_image` 只引用 Kimi / OpenRouter 已有的默认或附加 Key；settings 只保存 provider-qualified 模型 ID 与 `credentialId`，renderer 不接收明文。被图片分析配置引用的附加 Key 禁止删除，调用失败不回落其他 Key 或 Provider。
 - **工具暴露最小化**：可通过 `ACTSPACE_DISABLED_TOOLS` 明确关闭不希望暴露给模型的工具，关闭发生在注册阶段，而不是只在执行时拒绝。
-- **优先级**：`process.env` 已有值 > `.env` 文件值 > schema 默认值。这保证 CI/Docker 场景可通过系统变量覆盖。
-- **验证前置**：`loadEnv()` 在应用启动时尽早调用，缺失 required 字段或值不合法时立即抛 `EnvValidationError`，不让无效配置流入运行时。
-- **冻结对象**：解析后的 `env` 对象通过 `Object.freeze()` 冻结，运行时不可篡改。
+- **非敏感进程变量**：Desktop 可以在首次创建 `settings.json` 时读取 `LLM_TEMPERATURE`、`LLM_MAX_TOKENS`、`ACTSPACE_DISABLED_TOOLS` 和 `ACTSPACE_BASH_ALWAYS_ASK` 作为默认值；设置文件建立后以 main-owned 设置状态为准。
+- **运行时快照**：Host 在每次请求或 Runtime boot 边界生成不可变 credential、composition 和 request snapshot；不得把可变 `process.env` 对象直接暴露给领域 package 或 renderer。
 - **提交前密钥扫描**：`scripts/check-secrets.sh` 会扫描仓库文本文件（包含 `logs/`）里的疑似 API Key、Bearer token、Authorization header 和非空 key 环境变量赋值；`scripts/check-repo-hygiene.sh` 与 `.githooks/pre-push` 都会调用它。新 clone 后运行 `scripts/install-git-hooks.sh`，把本地 Git 的 `core.hooksPath` 指向仓库内 `.githooks/`。
 
 ## Electron 进程隔离
 
 - 使用 `contextIsolation: true` + `nodeIntegration: false`，renderer 不能直接访问 Node.js API。
 - preload 通过 `contextBridge` 只暴露最小、类型化的 bridge API。
-- 环境变量（含 API Key）只在 main 进程中可见，不会泄露到 renderer。
+- Desktop 的 provider Key 只在 main 进程凭据存储和短生命周期 Runtime credential 中可见，不会泄露到 renderer。CLI 环境变量只属于 CLI Host 进程。
 - 本地更新只通过 main 进程 IPC 暴露结构化操作：选择源码目录、读取状态、启动更新。renderer 不传 shell 命令；main 会验证所选目录是 `name: "actspace"` 且包含 `package:desktop:dmg` 与 `scripts/release-package.sh`，并确认当前进程路径解析出的目标是 `Actspace.app` / `actspace.app` 且不是 `node_modules` 下的 Electron 开发 runtime 后，才写入 helper 脚本。helper 位于 `<userData>/tmp/local-update/`，日志写同目录 `update.log`，阶段状态写 `status.json`；main 只在 helper 报告 `ready_to_replace` / `waiting_for_exit` / `replacing` 后触发 app 退出，避免构建阶段提前关闭当前应用。helper 默认对本地更新构建启用 ad-hoc signing，并在替换前验证新 `.app` 的 bundle 元数据、主可执行文件和 code signature；替换后如果系统无法打开新 app，会尝试恢复旧版本。
 
 ## 文件系统访问控制
 
 - **写类工具受 workspace 守卫**：`write_file` / `edit_file` / `bash` 的文件/目录写操作必须经 `workspace-guard.ts#guardWritablePath`，禁止 `..` 逃逸、禁止逃出 `workspaceRoot`。
   - **写越界改为用户审批（2026-07-05）**：`write_file` / `edit_file` 目标越界时不再硬拒绝，权限检查器返回 `ask`（medium 风险、不提供 allow_similar），用户批准后 scheduler 以 `sanitizedArgs` 执行，executor 依据其中的 `APPROVED_OUTSIDE_BOUNDARY_ARG` 标记放行该次写入。该标记只由权限检查器写入，模型自行在参数中传入会在检查阶段被剥除，无法绕过审批。bash 的写路径守卫不变。
-- **读类工具放开 workspace 边界**：`read_file` / `grep` / `glob` / `list_directory` 改用 `workspace-guard.ts#resolveReadablePath`，**只解析路径、不做越界检查**。原因：上下文压缩会把 bash 大输出落盘到 `<userData>/tmp/tool-output/`、把完整历史指向 `<userData>/sessions/<id>/session.jsonl`，模型需要用读类工具回读这些 workspace 之外的 Agent 内部产物（见 `docs/design-docs/model-context/agent-context-compression.md`「读边界放开」）。
-  - **本期明确接受的取舍**：放开读边界后，主 Agent 理论上可读任意本机文件（含 `~/.ssh`、密钥文件等）。用「读不应被 workspace 硬框」换「可回读 Agent 内部产物」。
-  - **Kairos 不受影响**：Kairos 调用路径在 scheduler 层仍按 `allowedRoots + blocklist` 双校验（`checkKairosGuard`），读类工具放开只影响主 Agent。
+- **读类工具边界**：v2 Tool Runtime 由 Host capability、workspace policy 和 plugin manifest 共同约束读写范围；不得沿用 v1 的任意主 Agent 读边界。历史放开读边界的背景见 [`v1-legacy/model-context-context-compression.md`](design-docs/v1-legacy/model-context-context-compression.md)。
+-  - **当前取舍**：需要回读 Session artifact、诊断或工具输出时，通过显式 artifact / projection capability 授权，不把整个 `userData` 目录提升为默认 workspace。
+-  - **v1 guard**：旧 scheduler 双校验属于历史实现，已随 v1 产品路径从 v2 删除；迁移背景见 `docs/design-docs/v1-legacy/`。
   - **后续收口方向**（记入 `docs/exec-plans/tech-debt-tracker.md`）：补「敏感路径 blocklist + 按需读审核」，而不是恢复 workspace 硬限制。
-- session 数据存储在 Electron `userData` 目录下，路径固定、可预测。
+- v2 Session 数据存储在统一的 `<dataRoot>/sessions-v2/<sessionId>/journal.jsonl`；macOS 默认 `<dataRoot>` 为 `~/Library/Application Support/ActSpace`，CLI 与 Electron 共用；旧 lowercase data root 和 `<dataRoot>/sessions/` 仅作为用户历史数据原位保留，v2 不混读或自动迁移。
 - 本地更新源码目录路径存储在 `<userData>/local-update.json`，不存密钥；该路径可暴露用户本机目录结构，日志或截图外发前应按需脱敏。
 - Agent 文件工具的工作区由 `ACTSPACE_WORKSPACE_ROOT` 或当前仓库根目录确定，不使用 `userData` 作为代码文件读取目录，避免把应用数据目录和用户工作区混淆。
 - Bash 工具当前以当前进程的 `process.env` 启动子进程，因此命令执行不会把密钥提交到 Git，但允许被执行命令读取运行时环境变量。后续如要开放更高风险命令，应改为白名单环境变量或显式脱敏环境。
-- Bash 大输出流式落盘到 `<userData>/tmp/tool-output/<sessionId>/`，不写进 workspace；落盘文件由后续定时清理回收（见 context-compression.md「M5 清理」）。
-- `generate_image` 只允许 main Runtime 注入的 session artifact root，图片写入 `<userData>/sessions/<sessionId>/artifacts/generated-images/`；远程 URL 必须先通过 HTTPS/公网地址检查并下载到本地，不能直接作为 renderer 成功产物。
+- Bash 大输出和工具 artifact 由 v2 Tool Runtime 按 Session-owned artifact policy 管理，不写进 workspace；具体落盘和回收边界以 `agent-plugin-runtime/agent-spec-tool-runtime-abi.md` 为准。
+- `generate_image` 只允许 Host 注入的 Session artifact root，图片位于 `<userData>/sessions-v2/<sessionId>/artifacts/` 下的受管子树；远程 URL 必须先通过 HTTPS/公网地址检查并下载到本地，不能直接作为 renderer 成功产物。
 - `inspect_image` 只允许读取 workspace 内普通文件、当前轮显式注册的图片附件，或当前 session `artifacts/` 子树；执行器对目标与允许根目录做 `realpath` 复验，拒绝符号链接逃逸、目录、设备、远程 URL 和未登记的工作区外路径。只接受文件签名匹配的 JPEG / PNG / WebP，单张上限 20 MiB。
 - renderer 不允许通过生成图片绝对路径自行拼接 `file://`。右侧预览必须走 `session:read-artifact`，main 使用 realpath 校验目标仍位于当前 session `artifacts/` 子树，并按大小和文件魔数确认后才返回 data URL。
 - Artifact 右键菜单里的打开、复制和 Finder 定位也是 main-owned 能力。Renderer 只能传递 `sessionId + artifactPath` 或 `workspaceRoot + relativePath`，main 必须重新校验 realpath 仍位于对应 session artifacts / workspace 边界内，不得直接对 renderer 传入的任意绝对路径调用 `shell.openPath` 或 `showItemInFolder`。

@@ -11,11 +11,11 @@
 ## 当前实现映射（2026-07-30）
 
 - 共享契约：`packages/shared/src/review.ts`。
-- 查询、缓存与失效：`packages/desktop/src/main/review-coordinator.ts`。
-- Git 查询与 mutation：`packages/desktop/src/main/review-git-engine.ts`。
-- Last Turn：`packages/desktop/src/main/review-last-turn-service.ts`。
-- PR capability：`packages/desktop/src/main/review-pr-service.ts`。
-- Renderer：`packages/desktop/src/renderer/components/review/`。
+- 查询、缓存与失效：`apps/desktop/src/main/review-coordinator.ts`。
+- Git 查询与 mutation：`apps/desktop/src/main/review-git-engine.ts`。
+- Last Turn：`apps/desktop/src/main/review-last-turn-service.ts`。
+- PR capability：`apps/desktop/src/main/review-pr-service.ts`。
+- Renderer：`apps/desktop/src/renderer/components/review/`。
 
 ## 定位
 

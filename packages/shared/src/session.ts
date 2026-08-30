@@ -167,15 +167,8 @@ export type SessionEventType =
   | "context_snapshot"
   | "context_compaction"
   | "workspace_preparation"
-  | "eval_candidate"
   | "error"
-  | "agent_run_aborted"
-  // ↓ Kairos 自治模式专属生命周期事件（追加在末尾，不允许调换顺序，详见
-  // docs/exec-plans/active/kairos_shared_contracts.md §1）↓
-  | "kairos_tick_injected"
-  | "kairos_sleep_start"
-  | "kairos_sleep_end"
-  | "kairos_sleep_interrupted";
+  | "agent_run_aborted";
 
 export type SessionEvent<TPayload = unknown> = {
   id: EventId;
@@ -294,14 +287,6 @@ export type ContextCompactionPayload = {
   reason?: string;
 };
 
-export type EvalCandidatePayload = {
-  candidateId?: string;
-  relativePath?: string;
-  status: "generated" | "failed";
-  summary: string;
-  error?: string;
-};
-
 export type SessionWorktreeContext = {
   kind: "worktree";
   sourceWorkspaceRoot: string;
@@ -328,34 +313,6 @@ export type ErrorPayload = SessionError;
 
 export type AgentRunAbortedPayload = {
   reason: "user";
-};
-
-/**
- * Kairos tick 注入事件 payload。
- * 每次 Kairos 控制器把一个 tick（自动或 brief 触发）作为 user message 投递给 LLM 时落一条。
- * content 是真正进入 LLM 历史的字符串（与 user_message.content 等价）。
- */
-export type KairosTickInjectedPayload = {
-  trigger: "auto" | "wake_now" | "brief";
-  briefId?: string;
-  content: string;
-};
-
-/** Kairos 进入 sleep 时的 payload。plannedSeconds 是控制器夹紧后的值。 */
-export type KairosSleepStartPayload = {
-  plannedSeconds: number;
-  reason: "after_tick" | "after_error" | "manual";
-};
-
-/** Kairos sleep 自然结束的 payload；actualSeconds 反映实际等待时长。 */
-export type KairosSleepEndPayload = {
-  actualSeconds: number;
-};
-
-/** Kairos sleep 被打断的 payload；reason 标明打断来源，remainingSeconds 是被打断时还剩多久。 */
-export type KairosSleepInterruptedPayload = {
-  reason: "user_message" | "wake_now";
-  remainingSeconds: number;
 };
 
 export type SessionMeta = {
@@ -581,7 +538,7 @@ export type BashStatus =
 
 /**
  * 后台 bash 任务的 UI 状态（shared 为契约权威）。
- * 前四态与 agent-core BashTaskStatus 对齐；"stalled" 是 UI 附加态：
+ * 前四态与 Runtime BashTaskStatus 对齐；"stalled" 是 UI 附加态：
  * 进程仍在运行但疑似阻塞在交互式提问（看门狗事件），输出恢复后回到 running。
  */
 export type BashBackgroundStatus = "running" | "completed" | "failed" | "killed" | "stalled";

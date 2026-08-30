@@ -2,13 +2,13 @@
 
 ## 目标
 
-为 `packages/desktop` renderer 建立一层稳定的基础 UI 组件 wrapper，减少 Composer、Sidebar、ConversationView、RightPanel 等业务组件中重复的按钮、菜单、浮层、开关、输入框和状态样式实现。
+为 `apps/desktop` renderer 建立一层稳定的基础 UI 组件 wrapper，减少 Composer、Sidebar、ConversationView、RightPanel 等业务组件中重复的按钮、菜单、浮层、开关、输入框和状态样式实现。
 
 最终目标是形成：
 
 ```txt
 Radix primitives / 原生 HTML
-  -> packages/desktop/src/renderer/components/ui/*
+  -> apps/desktop/src/renderer/components/ui/*
   -> actspace 业务组件
 ```
 
@@ -17,7 +17,7 @@ Radix primitives / 原生 HTML
 ## 范围
 
 - 包含：
-  - 新增 `packages/desktop/src/renderer/components/ui/*` 基础组件层。
+  - 新增 `apps/desktop/src/renderer/components/ui/*` 基础组件层。
   - 首批封装 `Button`、`IconButton`、`Tooltip`、`DropdownMenu`、`Switch`、`Textarea`、`Tabs`。
   - 逐步迁移 Composer mode/model 菜单、Thinking toggle、消息操作菜单、右侧 tabs 和常见 icon button。
   - 抽出必要的业务组合组件，例如 `ModelSelector`、`ModeSelector`、`MessageActionsMenu`。
@@ -41,15 +41,15 @@ Radix primitives / 原生 HTML
   - `docs/HISTORY_GUIDE.md`
   - `docs/QUALITY_SCORE.md`
 - 相关代码路径：
-  - `packages/desktop/src/renderer/components/Composer.tsx`
-  - `packages/desktop/src/renderer/components/ConversationView.tsx`
-  - `packages/desktop/src/renderer/components/Sidebar.tsx`
-  - `packages/desktop/src/renderer/components/RightPanel.tsx`
-  - `packages/desktop/src/renderer/components/SplitView.tsx`
-  - `packages/desktop/src/renderer/styles/index.css`
-  - `packages/desktop/src/renderer/styles/tokens.css`
-  - `packages/desktop/src/renderer/styles/base.css`
-  - `packages/desktop/src/renderer/test/`
+  - `apps/desktop/src/renderer/components/Composer.tsx`
+  - `apps/desktop/src/renderer/components/ConversationView.tsx`
+  - `apps/desktop/src/renderer/components/Sidebar.tsx`
+  - `apps/desktop/src/renderer/components/RightPanel.tsx`
+  - `apps/desktop/src/renderer/components/SplitView.tsx`
+  - `apps/desktop/src/renderer/styles/index.css`
+  - `apps/desktop/src/renderer/styles/tokens.css`
+  - `apps/desktop/src/renderer/styles/base.css`
+  - `apps/desktop/src/renderer/test/`
 - 已知约束：
   - 仓库架构文档当前倾向 `Radix UI` primitives，而不是直接依赖重样式组件库。
   - 前端视觉规范要求不引入完整第三方设计系统。

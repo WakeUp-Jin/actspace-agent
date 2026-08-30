@@ -10,7 +10,7 @@
 
 V0 需要满足：
 
-- 用户可以在设置页配置图片生成 API Key、Base URL 与模型名称；Key 明文只存在于 Electron main / agent-core 运行时，Base URL 和模型名称作为非敏感配置保存。
+- 用户可以在设置页配置图片生成 API Key、Base URL 与模型名称；Key 明文只存在于 Electron main Host / v2 Runtime 运行时，Base URL 和模型名称作为非敏感配置保存。
 - 主 Agent 在已配置 Key 时获得 `generate_image` 工具；缺 Key 时不暴露该工具。
 - 模型可以选择生成数量 `n`，范围为 1 到 10，未传时默认 1。
 - 一次工具调用对应一次图片生成请求，返回的每张有效图片都保存为独立会话产物。
@@ -27,7 +27,7 @@ V0 不处理以下能力：
 - 不开放 `quality`、`style`、`response_format` 给主模型选择。
 - 不支持图片编辑、局部重绘、参考图生成或蒙版输入。
 - 不把图片生成供应商并入 LLM Provider Registry。
-- 不让 Kairos、Explore 或通用 SubAgent 默认调用付费图片生成能力。
+- 不让已退役的 v1 autonomous runtime、Explore 或通用 SubAgent 默认调用付费图片生成能力。
 - 不提供历史图片资产库、跨会话素材管理或云端同步。
 
 这些能力可以在 V1 以后基于本规范的 provider adapter、artifact 和 preview 契约继续扩展。
@@ -227,23 +227,20 @@ adapter 负责：
 
 图片属于会话产物，不属于工作区代码文件，也不应放进 7 天清理的通用 `tmp/tool-output`。
 
-建议路径：
+当前持久化路径由 Host Artifact Store 统一分配：
 
 ```text
-<userData>/sessions/<sessionId>/artifacts/generated-images/<generationId>/
-  image-01.png
-  image-02.png
-  ...
+<dataRoot>/artifacts-v2/<artifactId>
+<dataRoot>/artifacts-v2/<artifactId>.json
 ```
 
 约束：
 
-- `generationId` 使用进程内唯一 ID，不使用完整 prompt 作为目录或文件名。
-- 先写同目录临时文件，再原子 rename，避免 session 中出现半张图片。
-- 每张图片形成一个 `ToolArtifact`：`{ type: "image", name, path, mimeType }`。
-- session event 只持久化路径、MIME、尺寸、模型、数量和脱敏摘要，不持久化 Base64。
-- 会话 Fork 会复制整个 session 目录并重写内部路径，因此生成图片随 Fork 一起复制。
-- 归档会话继续保留图片；未来若新增删除会话能力，应由会话目录删除统一回收产物。
+- 每张图片使用独立 `artifactId`，不使用完整 prompt 作为文件名。
+- Artifact Store 先完成文件写入和 digest 计算，再把轻量 `ArtifactRef` 交给 Tool result 与 Journal。
+- 元数据记录 owner Session、MIME、大小、digest 和脱敏显示名；Journal 不持久化 Base64、Authorization 或短期签名 URL。
+- Session Fork 复制的是 Journal 事实并重写 lineage；产物是否复制或继续引用由 Artifact Store 的 owner/reference 契约决定，不能假定“复制整个旧 session 目录”。
+- 归档会话不应隐式删除产物；未来删除能力必须先检查 owner/reference，再执行可审计回收。
 
 ## 9. 模型上下文边界
 
@@ -296,7 +293,7 @@ interface AppSettingsV2 {
 - Key 以明文写入 main-only `secrets.json` v2，文件权限固定为 `0600`；renderer 不读取文件或明文。
 - Base URL 和模型名称规范化后写入 `settings.json`，不进入 `secrets.json`。
 - main 读取 Key，并把 Key/Base URL/模型名称写入当前运行时的 `IMAGE_GENERATION_API_KEY` / `IMAGE_GENERATION_BASE_URL` / `IMAGE_GENERATION_MODEL` overlay。
-- `agent-core/env.ts` 集中声明并读取这三个字段，executor 不直接散落读取 `process.env`。
+- v2 Host credential resolver 集中解析这三个字段，executor 不直接散落读取 `process.env`。
 - `ToolRuntimeConfig.hasImageGenerationKey` 为 true 时才注册 `generate_image`。
 - 缺 Key 时 executor 仍保留防御性错误，但正常路径下模型看不到该工具，避免同一轮反复失败。
 - V0 保存 Key 时不额外发起付费图片探针；第一次真实生成请求完成鉴权验证。
@@ -306,7 +303,7 @@ interface AppSettingsV2 {
 ## 11. Agent 暴露范围与调度
 
 - V0 只向主 Agent 注册 `generate_image`。
-- Kairos 默认不注册该工具，避免自治 tick 触发不可预期的付费生成。
+- v1 autonomous runtime 默认不注册该工具，避免后台 tick 触发不可预期的付费生成。
 - Explore 与通用 SubAgent 默认不注册；需要图片时由主 Agent 统一执行并管理产物。
 - `isReadOnly` 设为 `false`：它会产生外部计费副作用并写入会话 artifact。
 - 单次调用内部由 provider 批量生成 `n` 张，不让模型为了多张图片并行发起多个重复工具调用。
@@ -401,25 +398,25 @@ packages/shared/src/settings.ts
 packages/shared/src/session.ts
   image_generation preview / MessageBlock / ToolArtifact
 
-packages/agent-core/src/env.ts
+packages/llm/service/src/image-generation.ts
   IMAGE_GENERATION_API_KEY / IMAGE_GENERATION_BASE_URL / IMAGE_GENERATION_MODEL
 
-packages/agent-core/src/tools/tools/generate-image/
+packages/tools/core-tools/src/generate-image/
   definition.ts
   executor.ts
   provider.ts
 
-packages/agent-core/src/tools/exposure.ts
-packages/agent-core/src/tools/index.ts
-packages/agent-core/src/engine/create-agent-deps.ts
-packages/agent-core/src/engine/bridge.ts
-packages/agent-core/src/engine/streaming-preview-extractors.ts
+packages/tools/core-tools/src/exposure.ts
+packages/tools/core-tools/src/index.ts
+packages/runtime/src/runtime/create-runtime-deps.ts
+packages/runtime/src/projection/bridge.ts
+packages/runtime/src/projection/streaming-preview-extractors.ts
 
-packages/desktop/src/main/settings-service.ts
-packages/desktop/src/main/session-artifact-service.ts
-packages/desktop/src/renderer/components/settings/SettingsPage.tsx
-packages/desktop/src/renderer/components/messages/ToolLogLine.tsx
-packages/desktop/src/renderer/components/messages/TurnOutputArtifacts.tsx
+apps/desktop/src/main/settings-service.ts
+apps/desktop/src/main/session-artifact-service.ts
+apps/desktop/src/renderer/components/settings/SettingsPage.tsx
+apps/desktop/src/renderer/components/messages/ToolLogLine.tsx
+apps/desktop/src/renderer/components/messages/TurnOutputArtifacts.tsx
 ```
 
 provider 请求构造和响应解析放在薄 adapter 中，definition、网络传输、artifact 写盘和 UI preview 不应揉成一个大 executor。
@@ -429,7 +426,7 @@ provider 请求构造和响应解析放在薄 adapter 中，definition、网络�
 ### Agent Core
 
 - definition schema：`prompt` 必填，`n` 默认 1，范围 1 到 10，`additionalProperties: false`。
-- exposure：有 Key 注册、缺 Key 不注册；Kairos / SubAgent 不注册。
+- exposure：有 Key 注册、缺 Key 不注册；v1 autonomous runtime / SubAgent 不注册。
 - Base URL：默认值、用户覆盖、末尾斜线规范化、非法协议、内嵌凭据、query/fragment 和误填完整 endpoint。
 - 模型名称：默认值、用户覆盖、空值、超长值和控制字符校验。
 - 请求构造：使用配置后的 Base URL 与模型名称，正确传递 prompt / size / n。
@@ -462,7 +459,7 @@ provider 请求构造和响应解析放在薄 adapter 中，definition、网络�
 4. 断开 Key，确认下一轮不再暴露 `generate_image`。
 5. 修改为另一个可用的 OpenAI-compatible Base URL 和对应模型名称，确认请求切换且不需要重新显示旧 Key。
 6. 输入无效模型名称，确认返回可诊断错误且不修改工具 schema。
-7. 检查 `session.jsonl`、run log 和 settings 文件没有 Key、Authorization、Base64 或签名 URL；`settings.json` 只包含非敏感 Base URL 与模型名称。
+7. 检查 `sessions-v2/<sessionId>/journal.jsonl`、run log、artifact metadata 和 settings 文件没有 Key、Authorization、Base64 或签名 URL；`settings.json` 只包含非敏感 Base URL 与模型名称。
 
 ## 17. 后续演进
 
@@ -485,7 +482,7 @@ V1 可以引入：
 - 2026-07-27：`n` 由模型按用户意图选择，默认 1，合法范围 1 到 10；越界直接报错，不静默修正。
 - 2026-07-27：生成图片保存为 session artifacts，消息流展示本地产物；不把 Base64 或短期 URL 持久化。
 - 2026-07-27：图片默认不作为 `ToolResult.content` 自动注入模型上下文，需要检查时再由视觉模型显式读取。
-- 2026-07-27：V0 只向主 Agent 暴露，不向 Kairos、Explore 或通用 SubAgent 默认开放付费生成能力。
+- 2026-07-27：V0 只向主 Agent 暴露，不向 v1 autonomous runtime、Explore 或通用 SubAgent 默认开放付费生成能力。
 - 2026-07-28：工具执行状态改为 Read 风格单行日志；生成图片不再直接占据消息流，而是在最终回复后的本轮产物栏中展示。
 - 2026-07-28：开发态 renderer 不加载 `file://`；点击图片时通过按 session artifacts 边界校验的 IPC 返回单张 data URL，再在右侧面板打开。
 - 2026-07-28：Artifacts 行新增完整路径 Tooltip 和 main-owned 原生右键菜单；系统操作仍只允许当前 session artifacts 或 workspace 边界内的真实文件。

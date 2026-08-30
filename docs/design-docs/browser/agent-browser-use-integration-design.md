@@ -9,7 +9,7 @@
 ### 选定方案：薄集成 + 长连接 Socket + Go Bridge 承担高层逻辑
 
 ```
-packages/agent-core             Go command engine          Injected JS          Chrome Extension
+packages/tools/browser-tools       Go command engine          Injected JS          Chrome Extension
 ───────────────────             ─────────────────          ───────────          ────────────────
 11 个稳定注册工具（1→11 披露）    62 条 canonical registry   Locator Runtime      Native Messaging
 approval + preview              CUA / DOM CUA / Locator    DOM 状态与读写        chrome.debugger
@@ -22,12 +22,12 @@ BridgeClient                    waits / events / sessions  TS 构建 + go:embed 
 |------|----------|
 | 纯 CLI bash 调用 | 无状态、无事件、高延迟、输出解析负担 |
 | MCP 接入 | actspace 当前无 MCP 客户端层，只为浏览器加 MCP ROI 不足 |
-| TS 完全集成（重写 browser-client.mjs） | 3000+ 行侵入 agent-core，浏览器逻辑和 Agent Runtime 边界混淆 |
+| TS 完全集成（重写 browser-client.mjs） | 3000+ 行侵入 v2 Runtime，浏览器逻辑和 Agent Runtime 边界混淆 |
 | Codex 进程内插件模式 | 需要 Node REPL 沙箱环境，不适用于 actspace 的 TS 架构 |
 
 ### 核心设计原则
 
-1. **agent-core 保持薄**：只维护工具定义、executor 入口和 socket 客户端。
+1. **Runtime 保持薄**：只维护工具定义、executor 入口和 socket 客户端。
 2. **Go bridge 承担重逻辑**：62 条 registry、CUA、DOM CUA、Locator 注入管理、CDP 会话、导航等待和事件协调。
 3. **Injected JS 只提供页面语义**：它是 ActSpace 自研 Locator Runtime，不复制 Codex、不依赖 Playwright 运行时，也不承载 session/权限或 Chrome API。
 4. **Chrome Extension 做原语执行**：只直接调用 `chrome.debugger` 和 Chrome APIs，维护宿主权限与光标。
@@ -36,10 +36,10 @@ BridgeClient                    waits / events / sessions  TS 构建 + go:embed 
 
 ## 架构分层
 
-### 层 1：agent-core 集成层
+### 层 1：Runtime 集成层
 
 ```
-packages/agent-core/src/tools/tools/browser/
+packages/tools/browser-tools/src/
   ├── definition.ts        ← 9 个分类工具 + help + run
   ├── executor.ts          ← 通用分类/help/run executor
   ├── generated-actions.ts ← 从 Go registry 生成的 action metadata
@@ -64,7 +64,7 @@ packages/agent-core/src/tools/tools/browser/
 ### 层 2：Go Bridge 逻辑层
 
 ```
-plugins/browser-bridge/apps/cli/
+browser-bridge/apps/cli/
   ├── main.go              ← CLI + native-host + socket server 入口
   ├── internal/commands/   ← 62 条 registry、校验和 dispatch
   ├── internal/cua/        ← 坐标操作编排
@@ -77,7 +77,7 @@ plugins/browser-bridge/apps/cli/
 ```
 
 职责：
-- 暴露 Unix socket server（`agent-core` 通过 socket 连接）
+- 暴露 Unix socket server（Runtime 通过 socket 连接）
 - 实现高层命令（`click`、`fill`、`navigate` 等），包含重试、等待、错误包装
 - 管理 CDP attach/detach 状态
 - 将 extension 推送的事件路由到正确的客户端
@@ -86,13 +86,13 @@ plugins/browser-bridge/apps/cli/
 
 不做：
 - 直接调用 Chrome API（那是 extension 的事）
-- 工具权限判断（那是 agent-core 的事）
-- 模型可见 summary 生成（那是 agent-core 的事）
+- 工具权限判断（那是 Runtime 的事）
+- 模型可见 summary 生成（那是 Runtime 的事）
 
 ### 层 3：Injected Locator runtime
 
 职责：
-- 源码位于 `plugins/browser-bridge/apps/cli/internal/locator/runtime-src/`，TypeScript 构建产物位于相邻 `generated/runtime.js`。
+- 源码位于 `browser-bridge/apps/cli/internal/locator/runtime-src/`，TypeScript 构建产物位于相邻 `generated/runtime.js`。
 - 由 Go 使用 `go:embed` 打入二进制，并通过 `Runtime.evaluate` 注入页面；用户运行时不需要 Node。
 - 提供结构化 css/role/text/label/placeholder/test-id Locator、accessible name、隐式 role、open Shadow DOM、单 Frame context 内的定位和 strict match。
 - 提供可见、启用、可编辑、稳定、viewport、hit-test/receives-events 检查及页面内 deadline 自动等待。
@@ -107,7 +107,7 @@ plugins/browser-bridge/apps/cli/
 ### 层 4：Chrome Extension primitive 执行层
 
 ```
-plugins/browser-bridge/apps/chrome-extension/
+browser-bridge/apps/chrome-extension/
   ├── src/background.js    ← Service Worker（命令处理）
   ├── src/content-cursor.js ← Content Script（光标渲染）
   └── manifest.json
@@ -126,11 +126,11 @@ plugins/browser-bridge/apps/chrome-extension/
 
 ## 通信协议
 
-### agent-core ↔ Go bridge
+### Runtime ↔ Go bridge
 
 传输：Native Host 暴露的稳定 Unix socket（macOS 默认 `~/Library/Application Support/AgentBrowserBridge/agent-browser-bridge.sock`）。
 
-`agent-core` 不额外启动 `abb serve`。Chrome Extension 负责拉起 Native Host，Agent turn 内的 `BridgeClient` 直接复用该稳定 socket；测试可通过 `ABB_SOCKET` / `ABB_SUPPORT_DIR` 隔离路径。
+Runtime 不额外启动 `abb serve`。Chrome Extension 负责拉起 Native Host，Agent turn 内的 `BridgeClient` 直接复用该稳定 socket；测试可通过 `ABB_SOCKET` / `ABB_SUPPORT_DIR` 隔离路径。
 
 帧格式：
 ```
@@ -340,10 +340,10 @@ Chrome Native Messaging host 可能长期运行在已注册的 `abb` 路径上�
 
 ### 事件消费模式
 
-事件主要在 **Go bridge 内部** 被消费（用于编排等待逻辑），不需要全部转发给 agent-core。
+事件主要在 **Go bridge 内部** 被消费（用于编排等待逻辑），不需要全部转发给 Runtime。
 
-只有以下场景需要通知 agent-core：
-- 下载完成（agent-core 需要返回文件路径给模型）
+只有以下场景需要通知 Runtime：
+- 下载完成（Runtime 需要返回文件路径给模型）
 - 严重错误（页面崩溃等需要告知模型）
 
 ## 用户可见性设计
@@ -409,7 +409,7 @@ Browser 工具不再按 62 条 action 逐次弹窗，而是使用 Agent Core 内
 - 其余 10 个 Browser 工具第一次调用时统一请求一次“允许 ActSpace 在当前会话中使用浏览器？”。
 - 用户允许后，以 `sessionId` 为键记录内存授权；当前应用运行期间该 Session 的后续 Turn 和 Browser action 自动放行。
 - 用户拒绝或审批超时后，以 `sessionId + turnId` 为键拒绝当前 Turn；本轮后续 Browser 调用直接失败且不重复弹窗，下一次用户输入可以重新申请。
-- 授权不写入 `session.jsonl`，应用重启后自动失效，也不会跨 Session 共享。
+- 授权不写入 Session Journal，应用重启后自动失效，也不会跨 Session 共享。
 
 Go registry 的 `low / medium / high` risk 继续用于能力说明、批处理 preflight 和诊断，不再直接决定 UI 弹窗次数。
 

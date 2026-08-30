@@ -275,7 +275,7 @@ type WorkspacePreparationPayload = {
 };
 ```
 
-运行中的短暂状态通过 runtime stream event 表达；只有完成事实进入 `session.jsonl`。失败发生在消息正式提交前，走 Composer 就近错误，不写伪完成事件。
+运行中的短暂状态通过 runtime stream event 表达；只有完成事实进入 `sessions-v2/<sessionId>/journal.jsonl`。失败发生在消息正式提交前，走 Composer 就近错误，不写伪完成事件。
 
 ## Follow-up 状态行
 

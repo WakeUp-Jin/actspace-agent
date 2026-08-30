@@ -24,7 +24,7 @@
 - `packages/shared/src/`
 - `packages/shared/src/test/`
 - `packages/agent-core/package.json`
-- `packages/desktop/package.json`
+- `apps/desktop/package.json`
 - 根目录配置文件和仓库级检查脚本
 
 ## 审查问题
@@ -72,7 +72,7 @@
 
 ### 发现 1：`RunTurnInput` 设计文档未覆盖当前共享契约
 
-- 偏移点：`docs/design-docs/agent-runtime/agent-turn-layers.md:32` 到 `docs/design-docs/agent-runtime/agent-turn-layers.md:40` 记录的 `RunTurnInput` 只有 `sessionId`、`turnId`、`userInput`、`model`、`thinkingEnabled`，但实际共享契约 `packages/shared/src/ipc.ts:29` 到 `packages/shared/src/ipc.ts:38` 已包含 `attachments` 和 `exploreModelId`。renderer 发送链路也已经使用附件字段，见 `packages/desktop/src/renderer/App.tsx:1001`、`packages/desktop/src/renderer/App.tsx:1082`、`packages/desktop/src/renderer/App.tsx:1131`；main 侧把 `exploreModelId` 注入 agent config，见 `packages/desktop/src/main/agent-turn.ts:190` 到 `packages/desktop/src/main/agent-turn.ts:192`。
+- 偏移点：`docs/design-docs/agent-runtime/agent-turn-layers.md:32` 到 `docs/design-docs/agent-runtime/agent-turn-layers.md:40` 记录的 `RunTurnInput` 只有 `sessionId`、`turnId`、`userInput`、`model`、`thinkingEnabled`，但实际共享契约 `packages/shared/src/ipc.ts:29` 到 `packages/shared/src/ipc.ts:38` 已包含 `attachments` 和 `exploreModelId`。renderer 发送链路也已经使用附件字段，见 `apps/desktop/src/renderer/App.tsx:1001`、`apps/desktop/src/renderer/App.tsx:1082`、`apps/desktop/src/renderer/App.tsx:1131`；main 侧把 `exploreModelId` 注入 agent config，见 `apps/desktop/src/main/agent-turn.ts:190` 到 `apps/desktop/src/main/agent-turn.ts:192`。
 - 不合理设计：共享契约增长后，四层职责文档仍停留在旧字段集，会让后续审查误以为附件和 Explore 模型选择不是正式 turn contract。
 - 可读性问题：`RunTurnInput` 的真实来源需要同时读设计文档、shared 类型、renderer 发送点和 settings 注入点才能拼完整，入口文档失去“契约速读”价值。
 - 耦合问题：`exploreModelId` 注释写“由 main 从 settings 注入”（`packages/shared/src/ipc.ts:36` 到 `packages/shared/src/ipc.ts:37`），但字段仍放在 renderer 可见的 IPC 输入类型中，容易让调用方误以为 renderer 也可以设置该字段；当前实际路径由 main/setting 注入，需在设计文档里明确所有权。
@@ -81,7 +81,7 @@
 
 ### 发现 2：Kairos sleep 事件 payload 在 core 存储文档中仍是旧形态
 
-- 偏移点：`docs/design-docs/core-storage-and-observability.md:127` 到 `docs/design-docs/core-storage-and-observability.md:130` 写 `kairos_sleep_start` payload 为 `{ seconds, sleepEndsAt, biasApplied }`，但共享类型定义为 `{ plannedSeconds, reason }`，见 `packages/shared/src/session.ts:201` 到 `packages/shared/src/session.ts:205`；controller 实际写入也为 `{ plannedSeconds, reason: "after_tick" }`，见 `packages/agent-core/src/kairos/controller.ts:433` 到 `packages/agent-core/src/kairos/controller.ts:441`。同仓库另一份 Kairos 设计文档已使用 `plannedSeconds`，见 `docs/design-docs/kairos/agent-kairos-autonomous-mode.md:221` 到 `docs/design-docs/kairos/agent-kairos-autonomous-mode.md:231`。
+- 偏移点：`docs/design-docs/core-storage-and-observability.md:127` 到 `docs/design-docs/core-storage-and-observability.md:130` 写 `kairos_sleep_start` payload 为 `{ seconds, sleepEndsAt, biasApplied }`，但共享类型定义为 `{ plannedSeconds, reason }`，见 `packages/shared/src/session.ts:201` 到 `packages/shared/src/session.ts:205`；controller 实际写入也为 `{ plannedSeconds, reason: "after_tick" }`，见 `packages/agent-core/src/kairos/controller.ts:433` 到 `packages/agent-core/src/kairos/controller.ts:441`。同仓库另一份 Kairos 设计文档已使用 `plannedSeconds`，见 `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md:221` 到 `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md:231`。
 - 不合理设计：同一事件在两个设计文档中出现两套 payload 事实，`core-storage-and-observability.md` 又是 AGENTS/计划指定的全局存储事实入口，容易误导后续存储或 renderer 聚合改动。
 - 可读性问题：`sleepEndsAt` 实际属于 runtime state（`packages/shared/src/kairos-contracts.ts:74`），不是 `SessionEvent` payload；文档把状态字段和事件字段混在一起，读者需要倒查类型才能分清。
 - 耦合问题：Kairos 聚合器直接读取 `payload.plannedSeconds` 和 `payload.reason` 展示 sleep 行，见 `packages/shared/src/kairos-aggregator.ts:133` 到 `packages/shared/src/kairos-aggregator.ts:142`；如果按 core 文档实现新生产者，会产生无法正确展示的事件。
@@ -90,7 +90,7 @@
 
 ### 发现 3：`@actspace/agent-core/kairos` 被描述为公共入口，但 package exports 未暴露
 
-- 偏移点：`packages/agent-core/src/kairos/index.ts:1` 到 `packages/agent-core/src/kairos/index.ts:4` 注释称主进程通过 `import { createKairos, ... } from "@actspace/agent-core/kairos"` 装配 controller，历史文档也记录过该收口目标（`docs/histories/2026-05/20260527-2035-kairos-controller-runner.md:82`）；但 `packages/agent-core/package.json:10` 到 `packages/agent-core/package.json:16` 只导出 `"."`，没有 `"./kairos"` subpath。当前 desktop 实际从顶层 `@actspace/agent-core` import Kairos 类型和函数，见 `packages/desktop/src/main/kairos-bootstrap.ts:12` 到 `packages/desktop/src/main/kairos-bootstrap.ts:23`、`packages/desktop/src/main/kairos-ipc.ts:29`。
+- 偏移点：`packages/agent-core/src/kairos/index.ts:1` 到 `packages/agent-core/src/kairos/index.ts:4` 注释称主进程通过 `import { createKairos, ... } from "@actspace/agent-core/kairos"` 装配 controller，历史文档也记录过该收口目标（`docs/histories/2026-05/20260527-2035-kairos-controller-runner.md:82`）；但 `packages/agent-core/package.json:10` 到 `packages/agent-core/package.json:16` 只导出 `"."`，没有 `"./kairos"` subpath。当前 desktop 实际从顶层 `@actspace/agent-core` import Kairos 类型和函数，见 `apps/desktop/src/main/kairos-bootstrap.ts:12` 到 `apps/desktop/src/main/kairos-bootstrap.ts:23`、`apps/desktop/src/main/kairos-ipc.ts:29`。
 - 不合理设计：源码注释和历史设计把 subpath 当成公共边界，但包 manifest 没有对应 export；在启用 Node package exports 的消费场景里，`@actspace/agent-core/kairos` 会成为不可解析入口（待确认：当前构建是否有其它 bundler alias 绕过该限制）。
 - 可读性问题：读者会在“顶层 re-export”（`packages/agent-core/src/index.ts:20` 到 `packages/agent-core/src/index.ts:21`）和“Kairos subpath 公共入口”之间看到两个入口说法，不清楚哪个才是稳定 API。
 - 耦合问题：当前 desktop 被迫/实际消费顶层大入口，使 Kairos IPC/bootstrap 可以看到 agent-core 的大量非 Kairos 导出；这弱化了 `kairos/index.ts` 作为窄公共边界的价值。

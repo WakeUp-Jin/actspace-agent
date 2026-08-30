@@ -29,7 +29,7 @@
 - **工具对外 `name`** 一律 **snake_case**，例如 `read_file`, `write_file`, `edit_file`, `list_directory`, `web_search`, `web_fetch`。单词工具（`bash`, `grep`, `glob`）保持单词无分隔符。
   - LLM 工具协议（OpenAI / DeepSeek / Kimi / Anthropic）事实约定都是 snake_case，统一使用 `_` 而不是 `-` 兼容性最好。
   - 历史上 `edit-file` 是 kebab-case 异类，已在 2026-05 统一为 `edit_file`。
-- **目录名**（`packages/agent-core/src/tools/tools/<dir>/`）一律 **kebab-case**，例如 `edit-file-diff/`, `read-file/`, `web-search/`。这是仓库整体的目录命名风格，与工具 `name` 独立。
+- **目录名**（`packages/tools/core-tools/src/<dir>/`）一律 **kebab-case**，例如 `edit-file-diff/`, `read-file/`, `web-search/`。这是仓库整体的目录命名风格，与工具 `name` 独立。
 - **previewKind** 也用 snake_case，例如 `edit_diff`, `directory_list`, `web_search`。
 - **JS/TS 变量与函数名** 使用 camelCase，例如 `editFileDiffDefinition`、`createWebSearchTool`。
 - 新增工具时三处都要照例：kebab 目录 + snake_case `name` + snake_case `previewKind` + camelCase 导出名。
@@ -79,7 +79,7 @@
 - `previewKind`: `glob`
 - `ToolUiPreview.pattern`: glob pattern。
 - `ToolUiPreview.scope`: 搜索根目录。
-- 展示示例：`Glob **/*.ts in packages/agent-core`。
+- 展示示例：`Glob **/*.ts in packages/runtime`。
 
 ### `edit_file`
 

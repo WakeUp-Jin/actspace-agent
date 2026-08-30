@@ -43,7 +43,7 @@
 - `packages/agent-core/src/engine/test/create-agent-deps.test.ts`
 - `packages/agent-core/src/engine/test/session-history-replay.test.ts`（新增）
 - `packages/desktop/src/main/agent-turn.ts`
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
 - `docs/design-docs/agent-runtime/agent-turn-layers.md`
 - `docs/design-docs/core-storage-and-observability.md`
 - `docs/exec-plans/completed/actspace-backend-context-pipeline.md`

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "../..");
-const desktopRequire = createRequire(path.join(repoRoot, "packages/desktop/package.json"));
+const desktopRequire = createRequire(path.join(repoRoot, "apps/desktop/package.json"));
 const packageJsonPath = desktopRequire.resolve("node-pty/package.json");
 const packageRoot = path.dirname(packageJsonPath);
 const targetDir = path.join(packageRoot, "prebuilds", `${process.platform}-${process.arch}`);

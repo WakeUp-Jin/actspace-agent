@@ -5,9 +5,18 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { startManagedCommand } from "../dev-process-runner.mjs";
+import { signalProcessTree, startManagedCommand } from "../dev-process-runner.mjs";
 
 const testRoot = resolve(fileURLToPath(new URL(".", import.meta.url)));
+
+test("desktop dev startup does not call retired native preparation", async () => {
+  const source = await readFile(resolve(testRoot, "..", "desktop-dev.mjs"), "utf8");
+  assert.doesNotMatch(source, /native:prepare/);
+});
+
+test("signaling a process group that no longer exists is a no-op", { skip: process.platform === "win32" }, () => {
+  assert.equal(signalProcessTree(2_000_000_000, "SIGTERM"), false);
+});
 
 function isAlive(pid) {
   try {

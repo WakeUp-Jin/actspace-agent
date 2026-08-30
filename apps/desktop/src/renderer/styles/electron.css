@@ -1,0 +1,190 @@
+/*
+ * Electron chrome and native-window hit-test styles.
+ * Keep this file scoped to chrome-related classes only.
+ */
+
+/* 隐藏横向滚动条（右侧面板 tab 条溢出靠下拉而非可见滚动条；触控板/滚轮仍可滚动）。 */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.window-chrome-bar button {
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+/*
+ * Window chrome 浮层（参考 Cursor Agent Window 的 .part.titlebar）：
+ *
+ *  - 整层 position: fixed 覆盖在所有 split panes 上方，z-index 60。
+ *  - 容器 pointer-events: none → 不会偷下方任何元素的点击（如 sidebar list、
+ *    conversation 内容、composer 等）。三段子元素恢复 pointer-events: auto。
+ *  - 唯一窗口拖动区在 .chrome-center；所有按钮 -webkit-app-region: no-drag。
+ *  - chrome bar 使用与 SplitView 同步的三列 grid，让标题和操作归属于真实 pane。
+ *  - chrome bar 自身无背景，只绘制一条统一的底部分隔线，三栏背景仍从窗口顶端自然贯顶。
+ */
+.window-chrome-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--window-chrome-strip-height);
+  display: grid;
+  grid-template-columns:
+    var(--window-chrome-left-column-width)
+    minmax(0, 1fr)
+    var(--window-chrome-right-column-width);
+  align-items: center;
+  z-index: 60;
+  pointer-events: none;
+  box-shadow: inset 0 -1px var(--act-color-border);
+}
+
+.chrome-left,
+.chrome-center,
+.chrome-right {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+}
+
+.chrome-left {
+  gap: 6px;
+  padding-left: var(--window-chrome-left-padding);
+  padding-right: 8px;
+  pointer-events: auto;
+}
+
+.chrome-navigation {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.chrome-center {
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 4px 0 16px;
+  pointer-events: auto;
+  -webkit-app-region: drag;
+}
+
+.chrome-right {
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.chrome-center-title {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+}
+
+.chrome-center-actions,
+.chrome-right-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.chrome-right-actions {
+  padding-left: 0;
+  padding-right: 12px;
+}
+
+/* 紧凑布局的右侧对象面板是覆盖层；此时中间标题/工作区操作退场，避免盖住面板 Tab 的命中区。 */
+.window-chrome-bar[data-compact-panel-open="true"] .chrome-center {
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+}
+
+.window-chrome-bar[data-compact-panel-open="true"] .chrome-center-title,
+.window-chrome-bar[data-compact-panel-open="true"] .chrome-center-actions {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.chrome-button {
+  display: grid;
+  place-items: center;
+  width: var(--window-chrome-control-size);
+  height: var(--window-chrome-control-size);
+  border-radius: var(--radius-sm);
+  color: var(--text-soft);
+  transition: background 130ms ease, color 130ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.chrome-button:hover,
+.chrome-button:focus-visible {
+  background: var(--act-color-hover-overlay);
+  color: var(--color-text);
+}
+
+.chrome-button[aria-pressed="true"] {
+  color: var(--color-text);
+}
+
+.chrome-button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+  opacity: 0.45;
+}
+
+.chrome-button:disabled:hover,
+.chrome-button:disabled:focus-visible {
+  background: transparent;
+  color: var(--text-faint);
+}
+
+.chrome-title {
+  display: block;
+  margin: 0;
+  max-width: 100%;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none; /* 让 drag region 干净，文本本身不接收 hit-test */
+}
+
+.chrome-title-trigger {
+  border: 0;
+  background: transparent;
+  cursor: default;
+  font: inherit;
+  color: var(--text-soft);
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.chrome-title-trigger:focus-visible {
+  outline: 2px solid var(--act-color-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .chrome-title {
+    display: none;
+  }
+
+  .chrome-center {
+    padding: 0 8px;
+  }
+}

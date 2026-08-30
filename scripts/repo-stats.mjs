@@ -71,7 +71,13 @@ export async function collectRepositoryStats({ repoRoot, trackedFiles }) {
     if (isTestFile(filePath)) stats.testFiles += 1;
 
     if (!isSourceFile(filePath) && !isDocsFile(filePath)) continue;
-    const contents = await readFile(resolve(repoRoot, filePath), "utf8");
+    let contents;
+    try {
+      contents = await readFile(resolve(repoRoot, filePath), "utf8");
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
 
     if (isSourceFile(filePath)) {
       stats.sourceFiles += 1;

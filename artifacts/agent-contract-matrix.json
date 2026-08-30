@@ -1,0 +1,3896 @@
+{
+  "schemaVersion": 1,
+  "generatorVersion": "1.0.0",
+  "sourceRefs": {
+    "events": {
+      "sessionCore": {
+        "path": "packages/session/journal/src/core-codecs.ts",
+        "symbol": "CORE_EVENT_TYPES"
+      },
+      "sessionExtensions": {
+        "path": "packages/session/journal/src/core-codecs.ts",
+        "symbol": "PERSISTED_EXTENSION_EVENT_TYPES"
+      },
+      "loopInterventions": {
+        "path": "packages/cordis-adapter/src/event-contract.ts",
+        "symbol": "AgentLoopIntervention"
+      },
+      "notifications": {
+        "path": "packages/cordis-adapter/src/event-contract.ts",
+        "symbol": "AgentNotification"
+      }
+    },
+    "services": {
+      "path": "packages/cordis-adapter/src/service-contract.ts",
+      "definitionsSymbol": "ACTSPACE_SERVICE_DEFINITIONS",
+      "rolesSymbol": "ACTSPACE_SERVICE_ROLE_METADATA",
+      "idsSymbol": "ACTSPACE_SERVICE_IDS"
+    },
+    "manifests": [
+      "packages/compaction/src/manifest.ts",
+      "packages/context/src/manifest.ts",
+      "packages/core/agent-loop/src/manifest.ts",
+      "packages/core/agent/src/manifest.ts",
+      "packages/core/scope/src/manifest.ts",
+      "packages/desktop-app/src/manifest.ts",
+      "packages/headless/src/manifest.ts",
+      "packages/llm/pi-ai/src/manifest.ts",
+      "packages/llm/service/src/manifest.ts",
+      "packages/prompt/src/manifest.ts",
+      "packages/session/journal/src/manifest.ts",
+      "packages/session/jsonl/src/manifest.ts",
+      "packages/session/persistence/src/manifest.ts",
+      "packages/session/projection/src/manifest.ts",
+      "packages/subagent/src/manifest.ts",
+      "packages/tools/approval/src/manifest.ts",
+      "packages/tools/browser-tools/src/manifest.ts",
+      "packages/tools/core-tools/src/manifest.ts",
+      "packages/tools/runtime/src/manifest.ts"
+    ],
+    "composition": [
+      "packages/runtime/src/profiles/composition.ts",
+      "packages/runtime/src/profiles/base.bundle.ts",
+      "packages/runtime/src/profiles/kernel.bundle.ts",
+      "packages/desktop-app/src/bundle.ts",
+      "packages/bundle/src/index.ts",
+      "packages/composition/src/types.ts",
+      "packages/composition/src/compose.ts"
+    ],
+    "packages": [
+      "packages/boot/package.json",
+      "packages/bundle/package.json",
+      "packages/client/package.json",
+      "packages/compaction/package.json",
+      "packages/composition/package.json",
+      "packages/context/package.json",
+      "packages/cordis-adapter/package.json",
+      "packages/core/agent-loop/package.json",
+      "packages/core/agent/package.json",
+      "packages/core/scope/package.json",
+      "packages/diagnostics/package.json",
+      "packages/headless/package.json",
+      "packages/desktop-app/package.json",
+      "packages/llm/pi-ai/package.json",
+      "packages/llm/service/package.json",
+      "packages/prompt/package.json",
+      "packages/runtime/package.json",
+      "packages/session/journal/package.json",
+      "packages/session/jsonl/package.json",
+      "packages/session/persistence/package.json",
+      "packages/session/projection/package.json",
+      "packages/shared/package.json",
+      "packages/subagent/package.json",
+      "packages/test-support/package.json",
+      "packages/tools/approval/package.json",
+      "packages/tools/browser-tools/package.json",
+      "packages/tools/core-tools/package.json",
+      "packages/tools/runtime/package.json",
+      "packages/util/package.json",
+      "apps/cli/package.json",
+      "apps/desktop/package.json",
+      "apps/site/package.json"
+    ],
+    "verification": [
+      {
+        "id": "session-journal/core-codec-contract",
+        "path": "packages/session/journal/src/test/journal.test.ts",
+        "kind": "contract"
+      },
+      {
+        "id": "session-journal/lifecycle-contract",
+        "path": "packages/session/journal/src/test/lifecycle.test.ts",
+        "kind": "lifecycle"
+      },
+      {
+        "id": "session-persistence/provider-seam",
+        "path": "packages/session/persistence/src/test/provider-seam.test.ts",
+        "kind": "contract"
+      },
+      {
+        "id": "cordis-adapter/event-contract",
+        "path": "packages/cordis-adapter/tests/contract.spec.ts",
+        "kind": "contract"
+      },
+      {
+        "id": "cordis-adapter/service-contract",
+        "path": "packages/cordis-adapter/tests/service-contract.spec.ts",
+        "kind": "contract"
+      },
+      {
+        "id": "composition/admission-contract",
+        "path": "packages/composition/tests/composition.spec.ts",
+        "kind": "contract"
+      },
+      {
+        "id": "runtime/lifecycle-contract",
+        "path": "packages/runtime/src/runtime/agent-runtime-lifecycle.test.ts",
+        "kind": "lifecycle"
+      },
+      {
+        "id": "runtime/profile-composition-contract",
+        "path": "packages/runtime/src/profiles/composition.test.ts",
+        "kind": "contract"
+      },
+      {
+        "id": "desktop-app/lifecycle-contract",
+        "path": "packages/desktop-app/src/test/lifecycle.test.ts",
+        "kind": "lifecycle"
+      }
+    ]
+  },
+  "services": [
+    {
+      "kind": "service",
+      "id": "agent.loop",
+      "owner": "@actspace/core-agent-loop",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.agentLoop"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "agent",
+      "required": true,
+      "description": "Turn and step driver with Cordis intervention points.",
+      "providerId": "agent.loop:default",
+      "providerOwner": "@actspace/core-agent-loop",
+      "consumerIds": [
+        "agent.runtime",
+        "headless.runner"
+      ],
+      "publicSurface": [
+        "followup",
+        "abort",
+        "waitForIdle"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "agent.registry",
+      "owner": "@actspace/core-agent",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.agentRegistry"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "root",
+      "required": true,
+      "description": "Agent identity, scope, inbox and lifecycle owner.",
+      "providerId": "agent.registry:default",
+      "providerOwner": "@actspace/core-agent",
+      "consumerIds": [
+        "agent.loop",
+        "agent.runtime",
+        "subagent.one-shot"
+      ],
+      "publicSurface": [
+        "register",
+        "lookup",
+        "dispose"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "agent.runtime",
+      "owner": "@actspace/runtime",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.agentRuntime"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "root",
+      "required": true,
+      "description": "Run, followup, abort and quiescence orchestration owner.",
+      "providerId": "agent.runtime:default",
+      "providerOwner": "@actspace/runtime",
+      "consumerIds": [
+        "headless.runner",
+        "runtime.handle"
+      ],
+      "publicSurface": [
+        "run",
+        "followup",
+        "flush",
+        "dispose"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "compaction.runtime",
+      "owner": "@actspace/compaction",
+      "status": "optional",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.compaction"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "session",
+      "required": false,
+      "description": "Optional compaction policy and summarizer provider.",
+      "providerId": "compaction.runtime:default",
+      "providerOwner": "@actspace/compaction",
+      "consumerIds": [
+        "agent.loop",
+        "agent.runtime"
+      ],
+      "publicSurface": [
+        "maybeCompact",
+        "compact"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "context.assembly",
+      "owner": "@actspace/context",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.contextAssembler"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "root",
+      "required": true,
+      "description": "Context assembly definition and contributor seam.",
+      "providerId": "context.assembly:default",
+      "providerOwner": "@actspace/context",
+      "consumerIds": [
+        "agent.loop",
+        "prompt.runtime"
+      ],
+      "publicSurface": [
+        "assemble"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "llm.service",
+      "owner": "@actspace/llm-service",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.llmRuntime"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "root",
+      "required": true,
+      "description": "LLM route, provider and request lease owner.",
+      "providerId": "llm.service:default",
+      "providerOwner": "@actspace/llm-service",
+      "consumerIds": [
+        "agent.loop",
+        "compaction.runtime"
+      ],
+      "publicSurface": [
+        "complete",
+        "stream",
+        "models"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "prompt.runtime",
+      "owner": "@actspace/prompt",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.systemPrompt"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "root",
+      "required": true,
+      "description": "System prompt and contributor registry owner.",
+      "providerId": "prompt.runtime:default",
+      "providerOwner": "@actspace/prompt",
+      "consumerIds": [
+        "agent.loop",
+        "context.assembly"
+      ],
+      "publicSurface": [
+        "register",
+        "assemble"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "session.journal",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.sessionJournal"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "root",
+      "required": true,
+      "description": "Session event codecs, envelope validation and Journal replay owner.",
+      "providerId": "session.journal:default",
+      "providerOwner": "@actspace/session-journal",
+      "consumerIds": [],
+      "publicSurface": [
+        "registry",
+        "append",
+        "replay"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "session.persistence",
+      "owner": "@actspace/session-persistence",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.sessionPersistence"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "session",
+      "required": true,
+      "description": "Durability provider for session checkpoints and recovery.",
+      "providerId": "session.persistence:jsonl",
+      "providerOwner": "@actspace/session-persistence",
+      "consumerIds": [
+        "session.runtime",
+        "session.store"
+      ],
+      "publicSurface": [
+        "create",
+        "inspect",
+        "open",
+        "fork"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "session.projection",
+      "owner": "@actspace/session-projection",
+      "status": "optional",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.sessionProjection"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "session",
+      "required": false,
+      "description": "Read-only Session projection builder.",
+      "providerId": "session.projection:default",
+      "providerOwner": "@actspace/session-projection",
+      "consumerIds": [
+        "runtime.projection",
+        "session.runtime"
+      ],
+      "publicSurface": [
+        "project"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "session.store",
+      "owner": "@actspace/session-persistence",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.sessionStore"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "session",
+      "required": true,
+      "description": "Session live log, surface and replay owner.",
+      "providerId": "session.store:default",
+      "providerOwner": "@actspace/session-persistence",
+      "consumerIds": [
+        "agent.loop",
+        "agent.runtime",
+        "session.runtime"
+      ],
+      "publicSurface": [
+        "create",
+        "open",
+        "append",
+        "flush",
+        "close"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "tools.browser",
+      "owner": "@actspace/browser-tools",
+      "status": "optional",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.browserTools"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "agent",
+      "required": false,
+      "description": "Browser Bridge tool contributions.",
+      "providerId": "tools.browser:default",
+      "providerOwner": "@actspace/browser-tools",
+      "consumerIds": [
+        "tools.runtime"
+      ],
+      "publicSurface": [
+        "definitions",
+        "registrations"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "tools.core",
+      "owner": "@actspace/core-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.coreTools"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "agent",
+      "required": true,
+      "description": "ActSpace core tool contributions.",
+      "providerId": "tools.core:default",
+      "providerOwner": "@actspace/core-tools",
+      "consumerIds": [
+        "tools.runtime"
+      ],
+      "publicSurface": [
+        "definitions",
+        "registrations"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    },
+    {
+      "kind": "service",
+      "id": "tools.runtime",
+      "owner": "@actspace/tools-runtime",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.toolsRuntime"
+      ],
+      "tests": [
+        "cordis-adapter/service-contract"
+      ],
+      "abiVersion": 1,
+      "scope": "agent",
+      "required": true,
+      "description": "Tool policy, approval, scheduler and result event owner.",
+      "providerId": "tools.runtime:default",
+      "providerOwner": "@actspace/tools-runtime",
+      "consumerIds": [
+        "agent.loop",
+        "subagent.one-shot"
+      ],
+      "publicSurface": [
+        "prepare",
+        "execute",
+        "dispose"
+      ],
+      "configSchema": {
+        "type": "object"
+      }
+    }
+  ],
+  "events": [
+    {
+      "kind": "event",
+      "id": "intervention:agent/pre-step",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentLoopIntervention"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "intervention",
+      "category": "agent-loop",
+      "eventType": "agent/pre-step",
+      "scope": "agent",
+      "mode": "waterfall",
+      "containment": "step-skip-or-rewrite",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "intervention:agent/request",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentLoopIntervention"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "intervention",
+      "category": "agent-loop",
+      "eventType": "agent/request",
+      "scope": "agent",
+      "mode": "waterfall",
+      "containment": "request-reject",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "intervention:agent/request-error",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentLoopIntervention"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "intervention",
+      "category": "agent-loop",
+      "eventType": "agent/request-error",
+      "scope": "agent",
+      "mode": "waterfall",
+      "containment": "retry-abort-escalate",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "intervention:agent/turn-stopping",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentLoopIntervention"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "intervention",
+      "category": "agent-loop",
+      "eventType": "agent/turn-stopping",
+      "scope": "agent",
+      "mode": "serial",
+      "containment": "stop-or-continue",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "intervention:llm/stream",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentLoopIntervention"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "intervention",
+      "category": "agent-loop",
+      "eventType": "llm/stream",
+      "scope": "agent",
+      "mode": "waterfall",
+      "containment": "abort-or-replace",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "intervention:system-prompt/assemble",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentLoopIntervention"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "intervention",
+      "category": "agent-loop",
+      "eventType": "system-prompt/assemble",
+      "scope": "agent",
+      "mode": "waterfall",
+      "containment": "request-reject",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "intervention:tools/execute",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentLoopIntervention"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "intervention",
+      "category": "agent-loop",
+      "eventType": "tools/execute",
+      "scope": "agent",
+      "mode": "waterfall",
+      "containment": "wrap-or-replace",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "intervention:tools/post-execute",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentLoopIntervention"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "intervention",
+      "category": "agent-loop",
+      "eventType": "tools/post-execute",
+      "scope": "agent",
+      "mode": "waterfall",
+      "containment": "result-fail-or-redact",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "intervention:tools/pre-execute",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentLoopIntervention"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "intervention",
+      "category": "agent-loop",
+      "eventType": "tools/pre-execute",
+      "scope": "agent",
+      "mode": "waterfall",
+      "containment": "deny-or-rewrite",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "notification:agent/error",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentNotification"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "notification",
+      "category": "notification",
+      "eventType": "agent/error",
+      "scope": "agent",
+      "containment": "observer-isolated",
+      "mode": "emit",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "notification:agent/session-start",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentNotification"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "notification",
+      "category": "notification",
+      "eventType": "agent/session-start",
+      "scope": "agent",
+      "containment": "observer-isolated",
+      "mode": "emit",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "notification:agent/status",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentNotification"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "notification",
+      "category": "notification",
+      "eventType": "agent/status",
+      "scope": "agent",
+      "containment": "observer-isolated",
+      "mode": "emit",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "notification:session/event",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentNotification"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "notification",
+      "category": "notification",
+      "eventType": "session/event",
+      "scope": "session",
+      "containment": "post-commit-observer-isolated",
+      "mode": "emit",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "notification:tools/result",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentNotification"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "notification",
+      "category": "notification",
+      "eventType": "tools/result",
+      "scope": "tool",
+      "containment": "observer-isolated",
+      "mode": "emit",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:agent-preset/selected",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "agent-preset/selected",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:agent/inbox/spliced",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "agent/inbox/spliced",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:approval/asked",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "approval/asked",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:approval/decided",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "approval/decided",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:approval/policy",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "approval/policy",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:assistant/chunk",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "assistant/chunk",
+      "scope": "session",
+      "surface": "assistant",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:assistant/message",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "assistant/message",
+      "scope": "session",
+      "surface": "assistant",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:command/done",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "command/done",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:command/run",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "command/run",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:compaction/end",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "compaction/end",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:compaction/prune",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "compaction/prune",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:compaction/start",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "compaction/start",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:compaction/summary",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "compaction/summary",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:delegation/child-terminal",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "delegation/child-terminal",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:delegation/completed",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "delegation/completed",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:delegation/requested",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "delegation/requested",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:feedback/record",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "feedback/record",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:goal/change",
+      "owner": "@actspace/session-journal",
+      "status": "unimplemented",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "goal/change",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "not-implemented",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:hook/invoked",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "hook/invoked",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:hook/result",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "hook/result",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:llm/retry",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "llm/retry",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:llm/retry-started",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "llm/retry-started",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:permission/preset",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "permission/preset",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:plan/mode",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "plan/mode",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:recovery/committed",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "recovery/committed",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:recovery/start",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "recovery/start",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:request/context",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "request/context",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:request/header",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "request/header",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:sandbox/mode",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "sandbox/mode",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:schedule/change",
+      "owner": "@actspace/session-journal",
+      "status": "unimplemented",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "schedule/change",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "not-implemented",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:session/archived-set",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "session/archived-set",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:session/end-seed",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "session/end-seed",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:session/pinned-set",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "session/pinned-set",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:session/title",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "session/title",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:session/title-llm-request",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "session/title-llm-request",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:session/title-set",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "session/title-set",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:session/workspace-set",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "session/workspace-set",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:step/end",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "step/end",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:step/start",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "step/start",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:subagent/descriptor",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "subagent/descriptor",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:surface/replaced",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "surface/replaced",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:todo/write",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "todo/write",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:tool-workflow/agent-end",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "tool-workflow/agent-end",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:tool-workflow/agent-start",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "tool-workflow/agent-start",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:tool-workflow/run-end",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "tool-workflow/run-end",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:tool-workflow/run-start",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "tool-workflow/run-start",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:tool/call",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "tool/call",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:tool/code-dispatch",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "tool/code-dispatch",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:tool/code-dispatch-start",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "tool/code-dispatch-start",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:tool/recovery-outcome",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "tool/recovery-outcome",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:tool/result",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "tool/result",
+      "scope": "session",
+      "surface": "tool-result",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:turn/end",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "turn/end",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:turn/start",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "turn/start",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:user/message",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#CORE_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "core",
+      "eventType": "user/message",
+      "scope": "session",
+      "surface": "user",
+      "codecStatus": "present",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "session:web/deepseek-search-llm-request",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "session",
+      "category": "extension",
+      "eventType": "web/deepseek-search-llm-request",
+      "scope": "session",
+      "surface": "internal",
+      "codecStatus": "present",
+      "producerStatus": "none",
+      "required": true
+    }
+  ],
+  "sessions": [
+    {
+      "kind": "session",
+      "id": "session.journal",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/index.ts#SessionJournal"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "session-persistence/provider-seam"
+      ],
+      "scope": "session",
+      "required": true,
+      "responsibility": "codec registry, envelope validation, replay"
+    },
+    {
+      "kind": "session",
+      "id": "session.persistence",
+      "owner": "@actspace/session-persistence",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/persistence/src/session-persistence.ts#SessionPersistence",
+        "packages/session/persistence/src/session-driver.ts#SessionPersistenceDriver"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "session-persistence/provider-seam"
+      ],
+      "scope": "session",
+      "required": true,
+      "responsibility": "Core/Provider binding and durability lifecycle"
+    },
+    {
+      "kind": "session",
+      "id": "session.projection",
+      "owner": "@actspace/session-projection",
+      "status": "optional",
+      "sourceRefs": [
+        "packages/session/projection/src/index.ts#SessionProjection"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "session-persistence/provider-seam"
+      ],
+      "scope": "session",
+      "required": false,
+      "responsibility": "read-only projection"
+    }
+  ],
+  "capabilities": [
+    {
+      "kind": "capability",
+      "id": "approval",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/manifest.ts#PluginHostRequirement"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "requiredBy": [
+        "actspace.tools.approval"
+      ],
+      "optionalBy": [
+        "actspace.browser-tools"
+      ],
+      "required": true
+    },
+    {
+      "kind": "capability",
+      "id": "browser",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/manifest.ts#PluginHostRequirement"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "requiredBy": [
+        "actspace.browser-tools"
+      ],
+      "optionalBy": [],
+      "required": true
+    },
+    {
+      "kind": "capability",
+      "id": "filesystem.session",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/manifest.ts#PluginHostRequirement"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "requiredBy": [
+        "actspace.session.journal",
+        "actspace.session.jsonl",
+        "actspace.session.persistence"
+      ],
+      "optionalBy": [],
+      "required": true
+    },
+    {
+      "kind": "capability",
+      "id": "headless",
+      "owner": "@actspace/cordis-adapter",
+      "status": "optional",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/manifest.ts#PluginHostRequirement"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "requiredBy": [],
+      "optionalBy": [
+        "actspace.headless"
+      ],
+      "required": false
+    },
+    {
+      "kind": "capability",
+      "id": "network.provider",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/manifest.ts#PluginHostRequirement"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "requiredBy": [
+        "actspace.llm.pi-ai"
+      ],
+      "optionalBy": [
+        "actspace.core-tools",
+        "actspace.llm.service"
+      ],
+      "required": true
+    },
+    {
+      "kind": "capability",
+      "id": "process",
+      "owner": "@actspace/cordis-adapter",
+      "status": "optional",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/manifest.ts#PluginHostRequirement"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "requiredBy": [],
+      "optionalBy": [
+        "actspace.core-tools"
+      ],
+      "required": false
+    },
+    {
+      "kind": "capability",
+      "id": "proxy.scoped",
+      "owner": "@actspace/cordis-adapter",
+      "status": "optional",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/manifest.ts#PluginHostRequirement"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "requiredBy": [],
+      "optionalBy": [
+        "actspace.llm.pi-ai"
+      ],
+      "required": false
+    }
+  ],
+  "plugins": [
+    {
+      "kind": "plugin",
+      "id": "actspace.browser-tools",
+      "owner": "actspace.browser-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/browser-tools/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "2.0.0",
+      "name": "ActSpace Browser Tools",
+      "entryId": "tools.browser",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "tools.browser"
+      ],
+      "injects": [
+        "tools.runtime"
+      ],
+      "tools": [
+        "browser_cua",
+        "browser_debug",
+        "browser_dom",
+        "browser_help",
+        "browser_io",
+        "browser_locator",
+        "browser_navigation",
+        "browser_run",
+        "browser_tabs",
+        "browser_user",
+        "browser_wait"
+      ],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [
+        "browser"
+      ],
+      "optionalCapabilities": [
+        "approval"
+      ]
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.compaction",
+      "owner": "actspace.compaction",
+      "status": "active",
+      "sourceRefs": [
+        "packages/compaction/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Surface Compaction",
+      "entryId": "compaction.surface",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "compaction.runtime",
+        "compaction.surface"
+      ],
+      "injects": [
+        "llm.service"
+      ],
+      "tools": [],
+      "prompts": [],
+      "events": [
+        "session/surface-replaced"
+      ],
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.context",
+      "owner": "actspace.context",
+      "status": "active",
+      "sourceRefs": [
+        "packages/context/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Context",
+      "entryId": "context.default",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "context.assembly"
+      ],
+      "injects": [
+        "session.journal"
+      ],
+      "tools": [],
+      "prompts": [
+        "context.contributor"
+      ],
+      "events": [],
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.core-tools",
+      "owner": "actspace.core-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/core-tools/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "2.0.0",
+      "name": "ActSpace Core Tools",
+      "entryId": "tools.core",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "tools.core"
+      ],
+      "injects": [
+        "actspace.host.tools.core",
+        "llm.service",
+        "tools.runtime"
+      ],
+      "tools": [
+        "bash",
+        "bash_kill",
+        "bash_output",
+        "delete_file",
+        "edit_file",
+        "generate_image",
+        "glob",
+        "grep",
+        "inspect_image",
+        "list_directory",
+        "read_file",
+        "web_fetch",
+        "web_search",
+        "write_file"
+      ],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "network.provider",
+        "process"
+      ]
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.core.agent",
+      "owner": "actspace.core.agent",
+      "status": "active",
+      "sourceRefs": [
+        "packages/core/agent/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Core Agent",
+      "entryId": "core.agent",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "agent.registry",
+        "core.agent"
+      ],
+      "injects": [
+        "core.scope"
+      ],
+      "tools": [],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.core.agent-loop",
+      "owner": "actspace.core.agent-loop",
+      "status": "active",
+      "sourceRefs": [
+        "packages/core/agent-loop/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Agent Loop",
+      "entryId": "core.agent-loop",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "agent.loop",
+        "core.agent-loop"
+      ],
+      "injects": [
+        "actspace.agent.factory"
+      ],
+      "tools": [],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.core.scope",
+      "owner": "actspace.core.scope",
+      "status": "active",
+      "sourceRefs": [
+        "packages/core/scope/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Core Scope",
+      "entryId": "core.scope",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "core.scope"
+      ],
+      "injects": [],
+      "tools": [],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.desktop-app",
+      "owner": "actspace.desktop-app",
+      "status": "active",
+      "sourceRefs": [
+        "packages/desktop-app/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Desktop Application",
+      "entryId": "desktop.app",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "desktop.app"
+      ],
+      "injects": [
+        "agent.runtime",
+        "compaction.runtime",
+        "llm.service",
+        "session.runtime"
+      ],
+      "tools": [],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.headless",
+      "owner": "actspace.headless",
+      "status": "active",
+      "sourceRefs": [
+        "packages/headless/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Headless Runner",
+      "entryId": "headless.runner",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "headless.runner"
+      ],
+      "injects": [
+        "actspace.host.headless",
+        "agent.loop",
+        "session.runtime"
+      ],
+      "tools": [],
+      "prompts": [],
+      "events": [
+        "headless/completed",
+        "headless/failed",
+        "headless/started"
+      ],
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "headless"
+      ]
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.llm.pi-ai",
+      "owner": "actspace.llm.pi-ai",
+      "status": "active",
+      "sourceRefs": [
+        "packages/llm/pi-ai/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace pi-ai Provider",
+      "entryId": "llm.pi-ai",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "llm.route.pi-ai"
+      ],
+      "injects": [
+        "llm.service"
+      ],
+      "tools": [],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [
+        "network.provider"
+      ],
+      "optionalCapabilities": [
+        "proxy.scoped"
+      ]
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.llm.service",
+      "owner": "actspace.llm.service",
+      "status": "active",
+      "sourceRefs": [
+        "packages/llm/service/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace LLM Service",
+      "entryId": "llm.service",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "llm.service"
+      ],
+      "injects": [
+        "actspace.host.llm"
+      ],
+      "tools": [],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [],
+      "optionalCapabilities": [
+        "network.provider"
+      ]
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.prompt",
+      "owner": "actspace.prompt",
+      "status": "active",
+      "sourceRefs": [
+        "packages/prompt/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Prompt",
+      "entryId": "prompt.default",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "prompt.assembly",
+        "prompt.runtime"
+      ],
+      "injects": [
+        "actspace.host.prompt",
+        "context.assembly"
+      ],
+      "tools": [],
+      "prompts": [
+        "prompt.default"
+      ],
+      "events": [],
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.session.journal",
+      "owner": "actspace.session.journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Session Journal",
+      "entryId": "session.journal",
+      "behavior": "./plugin.js",
+      "codec": "./codec.js",
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "session.journal"
+      ],
+      "injects": [
+        "actspace.host.session.codecs"
+      ],
+      "tools": [],
+      "prompts": [],
+      "events": [
+        "plugin/actspace.session.journal/session-metadata"
+      ],
+      "requiredCapabilities": [
+        "filesystem.session"
+      ],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.session.jsonl",
+      "owner": "actspace.session.jsonl",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/jsonl/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Session JSONL",
+      "entryId": "session.jsonl",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "session.jsonl"
+      ],
+      "injects": [
+        "session.journal",
+        "session.persistence"
+      ],
+      "tools": [],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [
+        "filesystem.session"
+      ],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.session.persistence",
+      "owner": "actspace.session.persistence",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/persistence/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Session Persistence",
+      "entryId": "session.persistence",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "session.persistence"
+      ],
+      "injects": [],
+      "tools": [],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [
+        "filesystem.session"
+      ],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.session.projection",
+      "owner": "actspace.session.projection",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/projection/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Session Projection",
+      "entryId": "session.projection",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "session.projection"
+      ],
+      "injects": [
+        "session.journal"
+      ],
+      "tools": [],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.subagent",
+      "owner": "actspace.subagent",
+      "status": "active",
+      "sourceRefs": [
+        "packages/subagent/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace One-shot Subagent",
+      "entryId": "subagent.one-shot",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "subagent.one-shot"
+      ],
+      "injects": [
+        "core.agent",
+        "core.agent-loop",
+        "session.journal",
+        "tools.runtime"
+      ],
+      "tools": [
+        "agent.delegate"
+      ],
+      "prompts": [],
+      "events": [
+        "delegation/completed",
+        "delegation/started"
+      ],
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.tools.approval",
+      "owner": "actspace.tools.approval",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/approval/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Tool Approval",
+      "entryId": "tools.approval",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "tools.approval"
+      ],
+      "injects": [],
+      "tools": [],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [
+        "approval"
+      ],
+      "optionalCapabilities": []
+    },
+    {
+      "kind": "plugin",
+      "id": "actspace.tools.runtime",
+      "owner": "actspace.tools.runtime",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/runtime/src/manifest.ts#manifest"
+      ],
+      "tests": [
+        "cordis-adapter/event-contract",
+        "cordis-adapter/service-contract"
+      ],
+      "version": "0.1.0",
+      "name": "ActSpace Tool Runtime",
+      "entryId": "tools.runtime",
+      "behavior": "./plugin.js",
+      "codec": null,
+      "required": true,
+      "enabled": true,
+      "provides": [
+        "tools.runtime"
+      ],
+      "injects": [
+        "tools.approval"
+      ],
+      "tools": [],
+      "prompts": [],
+      "events": [],
+      "requiredCapabilities": [],
+      "optionalCapabilities": []
+    }
+  ],
+  "packages": [
+    {
+      "kind": "package",
+      "id": "@actspace/agent-cli",
+      "owner": "@actspace/agent-cli",
+      "status": "active",
+      "sourceRefs": [
+        "apps/cli/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "apps/cli/package.json",
+      "exports": [],
+      "dependencies": [
+        "@actspace/llm-pi-ai",
+        "@actspace/llm-service",
+        "@actspace/runtime",
+        "@actspace/shared",
+        "@actspace/tools-approval",
+        "@actspace/tools-core-tools",
+        "@actspace/tools-runtime"
+      ],
+      "packageRole": "host"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/boot",
+      "owner": "@actspace/boot",
+      "status": "active",
+      "sourceRefs": [
+        "packages/boot/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/boot/package.json",
+      "exports": [
+        "."
+      ],
+      "dependencies": [
+        "@actspace/bundle",
+        "@actspace/composition",
+        "@actspace/cordis-adapter",
+        "@actspace/diagnostics",
+        "@actspace/shared"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/bundle",
+      "owner": "@actspace/bundle",
+      "status": "active",
+      "sourceRefs": [
+        "packages/bundle/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/bundle/package.json",
+      "exports": [
+        "."
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/client",
+      "owner": "@actspace/client",
+      "status": "active",
+      "sourceRefs": [
+        "packages/client/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/client/package.json",
+      "exports": [
+        "."
+      ],
+      "dependencies": [
+        "@actspace/shared"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/compaction",
+      "owner": "@actspace/compaction",
+      "status": "active",
+      "sourceRefs": [
+        "packages/compaction/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/compaction/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/context",
+        "@actspace/cordis-adapter",
+        "@actspace/llm-service",
+        "@actspace/session-journal",
+        "@actspace/session-persistence",
+        "@actspace/shared"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/composition",
+      "owner": "@actspace/composition",
+      "status": "active",
+      "sourceRefs": [
+        "packages/composition/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/composition/package.json",
+      "exports": [
+        "."
+      ],
+      "dependencies": [
+        "@actspace/bundle",
+        "@actspace/cordis-adapter",
+        "@actspace/diagnostics"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/context",
+      "owner": "@actspace/context",
+      "status": "active",
+      "sourceRefs": [
+        "packages/context/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/context/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/shared"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/cordis-adapter",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/cordis-adapter/package.json",
+      "exports": [
+        ".",
+        "./behavior",
+        "./codec",
+        "./cordis",
+        "./events",
+        "./manifest",
+        "./plugin-contract",
+        "./service",
+        "./source-loader"
+      ],
+      "dependencies": [
+        "@deepseek-ai/cordis",
+        "@deepseek-ai/cordis-plugin-group",
+        "@deepseek-ai/cordis-plugin-include",
+        "@deepseek-ai/cordis-plugin-loader",
+        "@deepseek-ai/cordis-plugin-timer"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/core-agent",
+      "owner": "@actspace/core-agent",
+      "status": "active",
+      "sourceRefs": [
+        "packages/core/agent/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/core/agent/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/core-scope",
+        "@actspace/session-persistence",
+        "@actspace/shared",
+        "@actspace/tools-runtime"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/core-agent-loop",
+      "owner": "@actspace/core-agent-loop",
+      "status": "active",
+      "sourceRefs": [
+        "packages/core/agent-loop/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/core/agent-loop/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/compaction",
+        "@actspace/context",
+        "@actspace/cordis-adapter",
+        "@actspace/core-agent",
+        "@actspace/core-scope",
+        "@actspace/llm-service",
+        "@actspace/prompt",
+        "@actspace/session-journal",
+        "@actspace/session-persistence",
+        "@actspace/shared",
+        "@actspace/tools-runtime"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/core-scope",
+      "owner": "@actspace/core-scope",
+      "status": "active",
+      "sourceRefs": [
+        "packages/core/scope/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/core/scope/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/desktop",
+      "owner": "@actspace/desktop",
+      "status": "active",
+      "sourceRefs": [
+        "apps/desktop/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "apps/desktop/package.json",
+      "exports": [],
+      "dependencies": [
+        "@actspace/desktop-app",
+        "@actspace/llm-pi-ai",
+        "@actspace/llm-service",
+        "@actspace/runtime",
+        "@actspace/session-journal",
+        "@actspace/shared",
+        "@actspace/tools-approval",
+        "@actspace/tools-browser-tools",
+        "@actspace/tools-core-tools",
+        "@actspace/tools-runtime",
+        "@radix-ui/react-tooltip",
+        "@tanstack/react-virtual",
+        "@xterm/addon-fit",
+        "@xterm/xterm",
+        "highlight.js",
+        "lucide-react",
+        "node-pty",
+        "react",
+        "react-dom",
+        "react-markdown",
+        "rehype-highlight",
+        "remark-gfm"
+      ],
+      "packageRole": "host"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/desktop-app",
+      "owner": "@actspace/desktop-app",
+      "status": "active",
+      "sourceRefs": [
+        "packages/desktop-app/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/desktop-app/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/bundle",
+        "@actspace/compaction",
+        "@actspace/cordis-adapter",
+        "@actspace/llm-service",
+        "@actspace/session-journal",
+        "@actspace/session-persistence",
+        "@actspace/shared"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/diagnostics",
+      "owner": "@actspace/diagnostics",
+      "status": "active",
+      "sourceRefs": [
+        "packages/diagnostics/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/diagnostics/package.json",
+      "exports": [
+        "."
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/headless",
+      "owner": "@actspace/headless",
+      "status": "active",
+      "sourceRefs": [
+        "packages/headless/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/headless/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/core-agent-loop",
+        "@actspace/session-persistence",
+        "@actspace/shared"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/llm-pi-ai",
+      "owner": "@actspace/llm-pi-ai",
+      "status": "active",
+      "sourceRefs": [
+        "packages/llm/pi-ai/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/llm/pi-ai/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/llm-service",
+        "@actspace/shared",
+        "@earendil-works/pi-ai"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/llm-service",
+      "owner": "@actspace/llm-service",
+      "status": "active",
+      "sourceRefs": [
+        "packages/llm/service/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/llm/service/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/shared"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/prompt",
+      "owner": "@actspace/prompt",
+      "status": "active",
+      "sourceRefs": [
+        "packages/prompt/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/prompt/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/context",
+        "@actspace/cordis-adapter",
+        "@actspace/core-agent",
+        "@actspace/core-scope",
+        "@actspace/shared"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/runtime",
+      "owner": "@actspace/runtime",
+      "status": "active",
+      "sourceRefs": [
+        "packages/runtime/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/runtime/package.json",
+      "exports": [
+        ".",
+        "./agent-factory",
+        "./agent-runtime",
+        "./cordis",
+        "./headless",
+        "./loader",
+        "./session"
+      ],
+      "dependencies": [
+        "@actspace/boot",
+        "@actspace/bundle",
+        "@actspace/compaction",
+        "@actspace/composition",
+        "@actspace/context",
+        "@actspace/cordis-adapter",
+        "@actspace/core-agent",
+        "@actspace/core-agent-loop",
+        "@actspace/core-scope",
+        "@actspace/desktop-app",
+        "@actspace/diagnostics",
+        "@actspace/headless",
+        "@actspace/llm-pi-ai",
+        "@actspace/llm-service",
+        "@actspace/prompt",
+        "@actspace/session-journal",
+        "@actspace/session-jsonl",
+        "@actspace/session-persistence",
+        "@actspace/shared",
+        "@actspace/subagent",
+        "@actspace/tools-approval",
+        "@actspace/tools-browser-tools",
+        "@actspace/tools-core-tools",
+        "@actspace/tools-runtime"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/session-journal",
+      "owner": "@actspace/session-journal",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/session/journal/package.json",
+      "exports": [
+        ".",
+        "./codec",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/shared"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/session-jsonl",
+      "owner": "@actspace/session-jsonl",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/jsonl/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/session/jsonl/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/session-journal",
+        "@actspace/shared"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/session-persistence",
+      "owner": "@actspace/session-persistence",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/persistence/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/session/persistence/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/session-journal",
+        "@actspace/session-jsonl",
+        "@actspace/session-projection",
+        "@actspace/shared"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/session-projection",
+      "owner": "@actspace/session-projection",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/projection/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/session/projection/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/session-journal"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/shared",
+      "owner": "@actspace/shared",
+      "status": "active",
+      "sourceRefs": [
+        "packages/shared/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/shared/package.json",
+      "exports": [
+        ".",
+        "./runtime-v2",
+        "./runtime-v2/desktop-ipc",
+        "./runtime-v2/projection",
+        "./runtime-v2/runtime",
+        "./session-selectors"
+      ],
+      "dependencies": [],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/site",
+      "owner": "@actspace/site",
+      "status": "active",
+      "sourceRefs": [
+        "apps/site/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "apps/site/package.json",
+      "exports": [],
+      "dependencies": [
+        "@astrojs/sitemap",
+        "astro",
+        "mdast-util-to-string",
+        "rehype-sanitize",
+        "rehype-stringify",
+        "remark-gfm",
+        "remark-parse",
+        "remark-rehype",
+        "unified"
+      ],
+      "packageRole": "host"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/subagent",
+      "owner": "@actspace/subagent",
+      "status": "active",
+      "sourceRefs": [
+        "packages/subagent/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/subagent/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/core-agent",
+        "@actspace/core-agent-loop",
+        "@actspace/core-scope",
+        "@actspace/llm-service",
+        "@actspace/session-journal",
+        "@actspace/session-jsonl",
+        "@actspace/session-persistence",
+        "@actspace/shared",
+        "@actspace/tools-runtime"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/test-support",
+      "owner": "@actspace/test-support",
+      "status": "active",
+      "sourceRefs": [
+        "packages/test-support/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/test-support/package.json",
+      "exports": [
+        "."
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/tools-approval",
+      "owner": "@actspace/tools-approval",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/approval/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/tools/approval/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/tools-browser-tools",
+      "owner": "@actspace/tools-browser-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/browser-tools/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/tools/browser-tools/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/shared",
+        "@actspace/tools-runtime"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/tools-core-tools",
+      "owner": "@actspace/tools-core-tools",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/core-tools/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/tools/core-tools/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/llm-service",
+        "@actspace/shared",
+        "@actspace/tools-runtime",
+        "turndown"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/tools-runtime",
+      "owner": "@actspace/tools-runtime",
+      "status": "active",
+      "sourceRefs": [
+        "packages/tools/runtime/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/tools/runtime/package.json",
+      "exports": [
+        ".",
+        "./manifest",
+        "./plugin"
+      ],
+      "dependencies": [
+        "@actspace/cordis-adapter",
+        "@actspace/shared",
+        "@actspace/tools-approval"
+      ],
+      "packageRole": "domain"
+    },
+    {
+      "kind": "package",
+      "id": "@actspace/util",
+      "owner": "@actspace/util",
+      "status": "active",
+      "sourceRefs": [
+        "packages/util/package.json#package.json"
+      ],
+      "tests": [
+        "composition/admission-contract"
+      ],
+      "path": "packages/util/package.json",
+      "exports": [
+        "."
+      ],
+      "dependencies": [],
+      "packageRole": "domain"
+    }
+  ],
+  "composition": {
+    "profiles": [
+      {
+        "id": "actspace.headless",
+        "runtimeContract": "actspace.runtime.v2",
+        "orderedBundleIds": [
+          "actspace.kernel",
+          "actspace.base",
+          "actspace.headless"
+        ],
+        "sourceRefs": [
+          "packages/runtime/src/profiles/composition.ts#profileDefinitions"
+        ]
+      },
+      {
+        "id": "actspace.desktop",
+        "runtimeContract": "actspace.runtime.v2",
+        "orderedBundleIds": [
+          "actspace.kernel",
+          "actspace.base",
+          "actspace.desktop-app"
+        ],
+        "sourceRefs": [
+          "packages/runtime/src/profiles/composition.ts#profileDefinitions"
+        ]
+      }
+    ],
+    "bundles": [
+      {
+        "id": "actspace.base",
+        "version": "2.0.0",
+        "entries": [
+          "scope",
+          "prompt",
+          "tools",
+          "llm",
+          "agent.registry",
+          "agent.loop",
+          "inbox",
+          "todo",
+          "skills",
+          "compaction",
+          "core-tools",
+          "subagent.agent",
+          "subagent.explore"
+        ],
+        "sourceRefs": [
+          "packages/runtime/src/profiles/base.bundle.ts#BASE_BUNDLE"
+        ]
+      },
+      {
+        "id": "actspace.desktop-app",
+        "version": "0.1.0",
+        "entries": [
+          "desktop.app"
+        ],
+        "sourceRefs": [
+          "packages/desktop-app/src/bundle.ts#DESKTOP_APP_BUNDLE"
+        ]
+      },
+      {
+        "id": "actspace.headless",
+        "version": "0.1.0",
+        "entries": [
+          "headless.runner"
+        ],
+        "sourceRefs": [
+          "packages/headless/src/manifest.ts#manifest"
+        ]
+      },
+      {
+        "id": "actspace.kernel",
+        "version": "2.0.0",
+        "entries": [
+          "session.codec",
+          "session.persistence",
+          "runtime.diagnostics"
+        ],
+        "sourceRefs": [
+          "packages/runtime/src/profiles/kernel.bundle.ts#KERNEL_BUNDLE"
+        ]
+      }
+    ],
+    "patches": {
+      "supportedKinds": [
+        "insert",
+        "replace-config",
+        "disable",
+        "remove"
+      ],
+      "sourceRefs": [
+        "packages/bundle/src/index.ts#PatchOperation",
+        "packages/composition/src/compose.ts#composeRuntime"
+      ]
+    }
+  },
+  "verification": [
+    {
+      "kind": "verification",
+      "id": "composition/admission-contract",
+      "owner": "@actspace/verification",
+      "status": "active",
+      "sourceRefs": [
+        "packages/composition/tests/composition.spec.ts#contract"
+      ],
+      "tests": [],
+      "evidenceKind": "contract",
+      "required": true
+    },
+    {
+      "kind": "verification",
+      "id": "cordis-adapter/event-contract",
+      "owner": "@actspace/verification",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/tests/contract.spec.ts#contract"
+      ],
+      "tests": [],
+      "evidenceKind": "contract",
+      "required": true
+    },
+    {
+      "kind": "verification",
+      "id": "cordis-adapter/service-contract",
+      "owner": "@actspace/verification",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/tests/service-contract.spec.ts#contract"
+      ],
+      "tests": [],
+      "evidenceKind": "contract",
+      "required": true
+    },
+    {
+      "kind": "verification",
+      "id": "desktop-app/lifecycle-contract",
+      "owner": "@actspace/verification",
+      "status": "active",
+      "sourceRefs": [
+        "packages/desktop-app/src/test/lifecycle.test.ts#lifecycle"
+      ],
+      "tests": [],
+      "evidenceKind": "lifecycle",
+      "required": true
+    },
+    {
+      "kind": "verification",
+      "id": "runtime/lifecycle-contract",
+      "owner": "@actspace/verification",
+      "status": "active",
+      "sourceRefs": [
+        "packages/runtime/src/runtime/agent-runtime-lifecycle.test.ts#lifecycle"
+      ],
+      "tests": [],
+      "evidenceKind": "lifecycle",
+      "required": true
+    },
+    {
+      "kind": "verification",
+      "id": "runtime/profile-composition-contract",
+      "owner": "@actspace/verification",
+      "status": "active",
+      "sourceRefs": [
+        "packages/runtime/src/profiles/composition.test.ts#contract"
+      ],
+      "tests": [],
+      "evidenceKind": "contract",
+      "required": true
+    },
+    {
+      "kind": "verification",
+      "id": "session-journal/core-codec-contract",
+      "owner": "@actspace/verification",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/test/journal.test.ts#contract"
+      ],
+      "tests": [],
+      "evidenceKind": "contract",
+      "required": true
+    },
+    {
+      "kind": "verification",
+      "id": "session-journal/lifecycle-contract",
+      "owner": "@actspace/verification",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/journal/src/test/lifecycle.test.ts#lifecycle"
+      ],
+      "tests": [],
+      "evidenceKind": "lifecycle",
+      "required": true
+    },
+    {
+      "kind": "verification",
+      "id": "session-persistence/provider-seam",
+      "owner": "@actspace/verification",
+      "status": "active",
+      "sourceRefs": [
+        "packages/session/persistence/src/test/provider-seam.test.ts#contract"
+      ],
+      "tests": [],
+      "evidenceKind": "contract",
+      "required": true
+    }
+  ],
+  "sourceDigest": "133b124fe358ee322857e24a83a4b4b5c0b5d70f00c67f4eeb9ce58d29668e8b",
+  "diagnostics": []
+}

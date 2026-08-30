@@ -58,9 +58,9 @@ venv/
 *.tfstate.*
 
 # Plugins build artifacts
-plugins/browser-bridge/apps/cli/abb
-plugins/browser-bridge/cli
-plugins/browser-bridge/skill/scripts/abb
+browser-bridge/apps/cli/abb
+browser-bridge/cli
+browser-bridge/skill/scripts/abb
 plugins/fs-watch/target/
 
 # Misc generated artifacts

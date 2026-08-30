@@ -7,10 +7,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const locatorDir = path.join(repoRoot, "plugins/browser-bridge/apps/cli/internal/locator");
+const locatorDir = path.join(repoRoot, "browser-bridge/apps/cli/internal/locator");
 const sourceDir = path.join(locatorDir, "runtime-src");
 const outputPath = path.join(locatorDir, "generated/runtime.js");
-const requireFromDesktop = createRequire(path.join(repoRoot, "packages/desktop/package.json"));
+const requireFromDesktop = createRequire(path.join(repoRoot, "apps/desktop/package.json"));
 const esbuild = requireFromDesktop("esbuild");
 
 const sourceFiles = readdirSync(sourceDir)

@@ -6,7 +6,7 @@ Terminal 是聊天态工作台右侧对象面板中的用户交互式 shell。�
 
 Terminal 是**用户直接操作的本机能力**，不是 Agent 工具，不与 `bash` / `bash_output` / `bash_kill` 共用运行时、审批流、沙盒或任务注册表。Agent 后台命令未来如果需要终端化展示，只能提供独立的只读输出视图，不能默认接管用户 Terminal。
 
-本文是右侧 Terminal 的长期事实来源，覆盖产品语义、PTY 架构、IPC 契约、会话归属、输出背压、进程收割、环境注入、原生模块打包和分阶段边界。右侧面板通用 Tab 与文件渲染规则仍见 `front-右侧面板与文件渲染规范.md`；面板宽度和紧凑覆盖规则见 `front-工作台布局与面板交互规范.md`；Agent Bash 边界见 `docs/design-docs/execution-safety/agent-bash工具设计文档.md`。
+本文是右侧 Terminal 的长期事实来源，覆盖产品语义、PTY 架构、IPC 契约、会话归属、输出背压、进程收割、环境注入、原生模块打包和分阶段边界。右侧面板通用 Tab 与文件渲染规则仍见 `front-右侧面板与文件渲染规范.md`；面板宽度和紧凑覆盖规则见 `front-工作台布局与面板交互规范.md`；当前 Agent Bash 边界见 `docs/design-docs/execution-safety/README.md`。
 
 ## 设计依据
 
@@ -67,7 +67,7 @@ Terminal 作为右侧对象类型，同时出现在：
 ```text
 Files       Terminal
 Review      Context
-Kairos      Reply
+Objects     Reply
 ```
 
 Terminal Tab 使用 `Terminal` 作为基础标题；存在多个终端时可显示 `Terminal 2`、`Terminal 3`。首版底层支持每会话多终端，UI 在终端视图顶部提供轻量 `+` 创建入口，不引入独立 IDE 终端面板树。
@@ -350,7 +350,7 @@ Terminal 与 Agent Bash 使用独立 registry，但共享“退出时不留孤�
 
 - Unix 优先向 shell 进程组发送温和终止信号，宽限后再强制 kill。
 - 如 `node-pty` 不能稳定终止子孙进程，macOS 可在关闭路径中查询后代并按叶子到根的顺序清理。
-- `before-quit` 必须先收割 Terminal Registry，再进入现有 Kairos / provider / plugin 收尾流程。
+- `before-quit` 必须先收割 Terminal Registry，再等待 RuntimeHandle、provider 和 Host 扩展完成收尾。
 - 清理幂等：重复 close、exit 竞态、BrowserWindow 销毁和 App 退出同时发生时不重复发送错误或死锁。
 
 ## 原生模块打包与签名

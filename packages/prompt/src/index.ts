@@ -1,0 +1,13 @@
+export { manifest } from "./manifest.js";
+export { apply, activate, PROMPT_HOST_PORT_ID } from "./plugin.js";
+export type { PromptHostPort } from "./plugin.js";
+export * from "./assembler.js";
+export * from "./contributor.js";
+export * from "./core-contributors.js";
+export * from "./host-context.js";
+export type { PromptRuntimeService } from "./plugin.js";
+export * from "./registry.js";
+export * from "./request-snapshot.js";
+export * from "./skills/catalog.js";
+export * from "./skills/contributor.js";
+export * from "./skills/discovery.js";

@@ -22,7 +22,9 @@ export function signalProcessTree(pid, signal) {
     process.kill(-pid, signal);
     return true;
   } catch (error) {
-    if (error?.code === "ESRCH") return false;
+    // macOS can report EPERM after a detached launcher exits even when there is
+    // no longer an owned process in the group that this runner can signal.
+    if (error?.code === "ESRCH" || error?.code === "EPERM") return false;
     throw error;
   }
 }

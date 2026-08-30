@@ -27,7 +27,7 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
 - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`
 - `docs/exec-plans/completed/20260601-pi-style-llm-contract-alignment.md`
 - `docs/exec-plans/active/20260601-pi-style-llm-contract-alignment.md`

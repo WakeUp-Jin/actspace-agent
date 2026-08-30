@@ -48,14 +48,6 @@ export interface ImageInspectionSettings {
 /** 可在设置页保存本地凭据的全部供应商（LLM + 搜索 + 图片生成）。 */
 export type SecretProviderId = LlmProviderId | SearchProviderId | ImageGenerationSecretId;
 
-export type KairosThinkingMode = "auto" | "on" | "off";
-
-/**
- * Kairos 设置页允许的显式模型；null 表示 Kairos 默认 Flash。
- * 当前允许显式 DeepSeek V4 Pro 或 Kimi（Kimi 偏贵，建议配合额度护栏）。
- */
-export type KairosModelId = Extract<ModelId, "deepseek-v4-pro" | "kimi-k2.6" | "kimi-k2.7-code">;
-
 export interface ProviderSettingsView {
   /** 用户已在页面配置该供应商密钥；决定卡片"已连接/可断开"。 */
   hasApiKey: boolean;
@@ -160,49 +152,6 @@ export interface AgentSettings {
   exploreModelId: ModelId | null;
 }
 
-export interface KairosSettings {
-  /**
-   * Kairos 产品功能是否可用。
-   *
-   * false / 缺失 = 仅在设置页保留恢复入口，不展示普通工作台入口，也不创建运行时 Controller。
-   * 该字段不表示自治循环正在运行；运行意图仍由 Kairos preferences.enabled 管理。
-   */
-  featureEnabled?: boolean;
-  /**
-   * Kairos 自主模式模型。
-   *
-   * null = Kairos 默认模型 deepseek-v4-flash；显式值当前只允许 deepseek-v4-pro。
-   * 这是设置页与运行时的唯一真来源，持久化在 settings.json。
-   */
-  modelId: KairosModelId | null;
-  /**
-   * 思考链覆写。
-   */
-  thinking: KairosThinkingMode;
-  /**
-   * Kairos 的 Skill 白名单（按 Skill name）。
-   *
-   * 与主 Agent 的黑名单语义相反：默认空数组 = Kairos 一个 Skill 都不加载，
-   * 只有显式列入的 Skill 才会进 Kairos 的 catalog 段并把 Skill 目录并入 allowedRoots。
-   * 变更后 main 会重建 Kairos controller 使其生效。
-   */
-  enabledSkills: string[];
-}
-
-export interface PluginsSettings {
-  /**
-   * 本机 actspace-plugins 仓库的绝对路径（用户 clone 下来的插件源码仓库）。
-   * 设置后插件可以「编译并安装」一键完成 cargo build → 安装 → 启动；null = 未设置，
-   * 仍可退回手动选择二进制安装。
-   */
-  repoRoot: string | null;
-  /** fs-watch 文件监听插件（设计文档 agent-plugins-fs-watch.md）。 */
-  fsWatch: {
-    /** 总开关：开 = app 启动时自动拉起插件进程并守护；关 = 停止进程。 */
-    enabled: boolean;
-  };
-}
-
 export interface SkillsSettings {
   /**
    * 主 Agent 的 Skill 黑名单（按 Skill name）。
@@ -236,17 +185,10 @@ export interface AppSettingsV1 {
   /** 网络搜索供应商的密钥状态（web_search 工具）。 */
   searchProviders: Record<SearchProviderId, ProviderSettingsView>;
   agent: AgentSettings;
-  kairos: KairosSettings;
-  plugins: PluginsSettings;
   skills: SkillsSettings;
 }
 
 export type AgentSettingsV2 = Omit<AgentSettings, "exploreModelId">;
-export type KairosSettingsV2 = Omit<KairosSettings, "modelId" | "featureEnabled"> & {
-  featureEnabled: boolean;
-  modelId: ModelKey | null;
-};
-
 export interface AppSettingsV2 {
   version: 2;
   providers: Record<LlmProviderId, ProviderSettingsView>;
@@ -260,8 +202,6 @@ export interface AppSettingsV2 {
   /** inspect_image 使用的视觉模型与已有 provider 凭据引用。 */
   imageInspection: ImageInspectionSettings;
   agent: AgentSettingsV2;
-  kairos: KairosSettingsV2;
-  plugins: PluginsSettings;
   skills: SkillsSettings;
   shortcuts: ShortcutsSettings;
 }
@@ -280,8 +220,6 @@ export interface AppSettings extends Omit<AppSettingsV1, "version" | "providers"
   installedModels?: Partial<Record<ModelKey, InstalledModelSettings>>;
   customModels?: Partial<Record<ModelKey, ModelDefinition>>;
   taskModels?: TaskModelSettings;
-  /** v2 Kairos ModelKey；旧 `kairos.modelId` 仍供当前消费方过渡读取。 */
-  kairosModelKey?: ModelKey | null;
   /** 迁移期可选，旧测试 fixture 缺失时 renderer 使用内置默认值。 */
   imageGeneration?: ImageGenerationSettingsView;
   /** 旧测试 fixture 缺失时 renderer 使用内置默认值。 */
@@ -295,8 +233,6 @@ export interface AppSettings extends Omit<AppSettingsV1, "version" | "providers"
 export type SettingsUpdateInput = Partial<{
   defaultModelId: ModelId | null;
   agent: Partial<AgentSettings>;
-  kairos: Partial<KairosSettings>;
-  plugins: Partial<PluginsSettings>;
   skills: Partial<SkillsSettings>;
   imageInspection: ImageInspectionSettings;
 }>;
@@ -307,9 +243,10 @@ export type SettingsV2UpdateInput = Partial<{
   customModels: Partial<Record<ModelKey, ModelDefinition | null>>;
   taskModels: Partial<TaskModelSettings>;
   agent: Partial<AgentSettingsV2>;
-  kairos: Partial<KairosSettingsV2>;
-  plugins: Partial<PluginsSettings>;
   skills: Partial<SkillsSettings>;
+  imageGeneration: Partial<Pick<ImageGenerationSettingsView, "baseUrl" | "model">>;
+  imageInspection: Partial<ImageInspectionSettings>;
+  shortcuts: Partial<{ quickOpen: Partial<ShortcutsSettings["quickOpen"]> }>;
 }>;
 
 export type QuickOpenShortcutUpdateInput = Partial<{

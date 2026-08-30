@@ -16,7 +16,7 @@
 
 **Key Actions:**
 
-- **Main service**: 新增 `BrowserBridgeService`，负责从 `actspace-plugins/plugins/browser-bridge/` 构建安装 `abb`、注册 Native Messaging host、读取 `doctor` 与 `capabilities` 状态。
+- **Main service**: 新增 `BrowserBridgeService`，负责从 `actspace-plugins/browser-bridge/` 构建安装 `abb`、注册 Native Messaging host、读取 `doctor` 与 `capabilities` 状态。
 - **IPC contract**: 新增 browser-bridge 状态、安装和 native host 初始化相关共享类型与 IPC/preload bridge。
 - **Settings UI**: 设置页「插件」分区新增 `browser-bridge（Browser Use）` 卡片，展示安装状态、`abb` 路径、Chrome extension 目录与 doctor checks。
 - **Design sync**: 在 Browser Bridge 设计文档补充 v0 初始化流程，明确它不同于 fs-watch 的 spawn/heartbeat 模型。
@@ -28,7 +28,7 @@
 ### 📁 Files Modified
 
 - `packages/shared/src/plugins.ts`
-- `packages/desktop/src/main/plugins/browser-bridge-service.ts`
+- `packages/desktop/src/main/browser-bridge-service.ts`
 - `packages/desktop/src/main/index.ts`
 - `packages/desktop/src/preload/index.ts`
 - `packages/desktop/src/global.d.ts`

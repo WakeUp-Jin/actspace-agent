@@ -7,15 +7,15 @@
 
 ## 目标
 
-在 `plugins/browser-bridge/packages/protocol/` 中扩展协议定义，为后续四个 plan 建立稳定的类型和 method 契约。本 plan 不修改任何运行时代码。
+在 `browser-bridge/packages/protocol/` 中扩展协议定义，为后续四个 plan 建立稳定的类型和 method 契约。本 plan 不修改任何运行时代码。
 
-前置依赖：Plan 0-pre（仓库合并）已完成，代码已在 `plugins/browser-bridge/` 路径。
+前置依赖：Plan 0-pre（仓库合并）已完成，代码已在 `browser-bridge/` 路径。
 
 ## 允许修改的文件
 
-- `plugins/browser-bridge/packages/protocol/protocol.go`（扩展）
-- `plugins/browser-bridge/packages/protocol/protocol_test.go`（新建或扩展）
-- `plugins/browser-bridge/packages/protocol/events.go`（新建）
+- `browser-bridge/packages/protocol/protocol.go`（扩展）
+- `browser-bridge/packages/protocol/protocol_test.go`（新建或扩展）
+- `browser-bridge/packages/protocol/events.go`（新建）
 
 ## 任务清单
 
@@ -267,16 +267,16 @@ ErrorPlaywrightTimeout  = "playwright_timeout"
 
 验证命令：
 ```bash
-cd plugins/browser-bridge && go test ./packages/protocol/ -v
+cd browser-bridge && go test ./packages/protocol/ -v
 ```
 
 预期：所有测试通过，无 lint 警告。
 
 ## 验证方式
 
-- `cd plugins/browser-bridge && go build ./...` 编译通过。
-- `cd plugins/browser-bridge && go test ./packages/protocol/ -v` 全部 PASS。
-- `cd plugins/browser-bridge && go vet ./...` 无警告。
+- `cd browser-bridge && go build ./...` 编译通过。
+- `cd browser-bridge && go test ./packages/protocol/ -v` 全部 PASS。
+- `cd browser-bridge && go vet ./...` 无警告。
 
 ## 回退策略
 

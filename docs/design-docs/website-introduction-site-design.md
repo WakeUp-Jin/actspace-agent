@@ -1,6 +1,6 @@
 ---
-status: implemented-v1
-owner: packages/site
+status: v2-content-refresh-needed
+owner: apps/site
 product: ActSpace Website
 visual_direction: Cloudfield & Ink
 last_updated: 2026-07-29
@@ -10,7 +10,7 @@ last_updated: 2026-07-29
 
 ## 1. 文档定位
 
-本文档定义 ActSpace 对外网站的长期产品、内容、视觉和交付边界。首版工程已在 `packages/site` 落地；后续迭代继续以本文档作为事实与取舍入口。
+本文档定义 ActSpace 对外网站的长期产品、内容、视觉和交付边界。首版工程已在 `apps/site` 落地；后续迭代继续以本文档作为事实与取舍入口。
 
 网站包含五个主要产品面：
 
@@ -27,7 +27,7 @@ last_updated: 2026-07-29
 ActSpace 官网不是桌面应用界面的网页复制，也不是只用于展示一句口号的单页海报。它需要同时完成四件事：
 
 1. 在首屏说明 ActSpace 是什么，以及它和普通聊天界面的区别。
-2. 用真实产品界面证明 Context、Tools、Browser、Skills、Usage 和 Kairos 已经形成可检查的运行空间。
+2. 用真实产品界面证明 Context、Tools、Browser、Skills、Usage 和 Review 已经形成可检查的运行空间。
 3. 给第一次接触项目的人一条清楚的上手路径。
 4. 持续承载公开文档、项目文章和用户可感知的更新记录。
 
@@ -67,7 +67,7 @@ ActSpace 官网不是桌面应用界面的网页复制，也不是只用于展�
 官网工程固定放在：
 
 ```text
-packages/site
+apps/site
 ```
 
 当前 `pnpm-workspace.yaml` 已覆盖 `packages/*`，因此实现官网时不需要新增 `apps/*` 工作区层级。
@@ -75,7 +75,7 @@ packages/site
 目标目录结构：
 
 ```text
-packages/site/
+apps/site/
 ├── package.json
 ├── astro.config.mjs
 ├── tsconfig.json
@@ -106,9 +106,9 @@ packages/site/
 
 | 内容 | 唯一事实来源 | 网站行为 |
 |---|---|---|
-| 产品主页 | `packages/site` 页面与内容配置 | 直接构建为 `/` |
-| 公开文档 | `packages/site/src/content/docs` | 生成 `/docs/**` |
-| 博客 | `packages/site/src/content/blog` | 生成 `/blog/**` |
+| 产品主页 | `apps/site` 页面与内容配置 | 直接构建为 `/` |
+| 公开文档 | `apps/site/src/content/docs` | 生成 `/docs/**` |
+| 博客 | `apps/site/src/content/blog` | 生成 `/blog/**` |
 | 功能更新 | `docs/releases/feature-release-notes.md` | 构建时解析为 `/updates` |
 | 开发计划 | `docs/roadmap.md` | 构建时解析为 `/roadmap` |
 | 内部设计与实现记录 | `docs/design-docs`、`docs/histories`、`docs/exec-plans` | 默认不公开 |
@@ -121,7 +121,7 @@ packages/site/
 
 约束如下：
 
-- `packages/site` 是私有 workspace package，不作为 npm 包发布。
+- `apps/site` 是私有 workspace package，不作为 npm 包发布。
 - 首版必须能够完整静态构建。
 - 页面默认不依赖服务端 API 才能展示核心内容。
 - JavaScript 只用于主题、导航、搜索、展示切换和必要微交互。
@@ -178,7 +178,7 @@ Hero 使用已确认的 `C Cloud Expanse` 云海图作为首版主视觉母版�
 3. 一段不超过两行到三行的产品解释。
 4. 主 CTA“探索 ActSpace”或“开始使用”。
 5. 次 CTA“查看源代码”。
-6. Context、Tools、Browser、Skills、Kairos 能力索引。
+6. Context、Tools、Browser、Skills、Review 能力索引。
 7. 从首屏下方进入的真实桌面产品截图。
 
 视觉约束：
@@ -215,7 +215,7 @@ Hero 使用已确认的 `C Cloud Expanse` 云海图作为首版主视觉母版�
 
 1. Context：上下文组成和 token 占用。
 2. Tools：工具执行、审批和结果反馈。
-3. Kairos：主动观察、运行轨迹和通知。
+3. Review：变更来源、差异和可追溯操作。
 4. Usage：成本、token 和缓存透明度。
 
 Browser、Skills、Review 等能力继续在 Hero 索引、公开文档和后续内容中说明；没有合适公开截图时，不用不相关界面补足首页 Tab 数量。
@@ -269,7 +269,7 @@ Browser、Skills、Review 等能力继续在 Hero 索引、公开文档和后续
   - Browser
   - Skills
   - Explore / SubAgent
-  - Kairos
+  - Review 与文件预览
   - Review 与文件预览
 
 开发与贡献
@@ -298,7 +298,7 @@ Browser、Skills、Review 等能力继续在 Hero 索引、公开文档和后续
 
 ```text
 快速开始      配置模型      核心概念
-Browser       Skills        Kairos
+Browser       Skills        Review
 ```
 
 - 入口卡片只用于文档首页和明确的任务分流，不扩散到所有文章导航。
@@ -384,7 +384,7 @@ draft: false
 
 从已有长文导入博客时，原始文件是正文内容的唯一事实来源。未经作者单独授权，不得改写、压缩、补充或按当前实现重新校正文意；只允许适配 Frontmatter、标题层级、资源路径和 Markdown 渲染格式，并且应通过机械对比确认适配后的正文仍可还原为原文。
 
-博客正文配图默认随仓库版本管理，存放在 `packages/site/src/assets/blog/`，并由 Astro 的本地图片管线生成带部署 `base` 的构建 URL。当前保留原始图片、不要求构建时变换，因此站点使用 Astro passthrough image service，避免为静态图示引入 Sharp 原生依赖。`src/content/blog/*.md` 使用 `../../assets/blog/` 形式引用这些源码资源；不得使用绕过 base 的 `/images/` 根路径，也不得硬编码 `/actspace-agent`。不为当前约 3 MB 的静态图示引入独立云存储，只有视频、用户上传或需要独立生命周期的大型媒体资源再评估对象存储与 CDN。
+博客正文配图默认随仓库版本管理，存放在 `apps/site/src/assets/blog/`，并由 Astro 的本地图片管线生成带部署 `base` 的构建 URL。当前保留原始图片、不要求构建时变换，因此站点使用 Astro passthrough image service，避免为静态图示引入 Sharp 原生依赖。`src/content/blog/*.md` 使用 `../../assets/blog/` 形式引用这些源码资源；不得使用绕过 base 的 `/images/` 根路径，也不得硬编码 `/actspace-agent`。不为当前约 3 MB 的静态图示引入独立云存储，只有视频、用户上传或需要独立生命周期的大型媒体资源再评估对象存储与 CDN。
 
 ### 8.2 博客 frontmatter
 
@@ -508,7 +508,7 @@ docs/releases/feature-release-notes.md
 - 只记录用户可感知的变化，不复制实现路径、测试数量和内部重构过程。
 - 不等同于正式版本号、Git tag 或远程发布通道。
 
-网站不得在 `packages/site` 内复制一份 updates JSON 或 Markdown 快照作为第二事实来源。
+网站不得在 `apps/site` 内复制一份 updates JSON 或 Markdown 快照作为第二事实来源。
 
 ### 9.2 规范化数据模型
 
@@ -548,7 +548,7 @@ interface ReleaseEntry {
 - 格式错误时构建失败，并报告源文件、月份和可定位的行信息。
 - History 与 Git Log 只用于撰写时核对完成范围，构建过程不能从它们自动猜测公开文案。
 
-解析路径必须从仓库根或显式配置解析，不能假设 CI 的 `process.cwd()` 永远等于 `packages/site`。
+解析路径必须从仓库根或显式配置解析，不能假设 CI 的 `process.cwd()` 永远等于 `apps/site`。
 
 ### 9.4 更新页表现
 
@@ -784,7 +784,7 @@ Dark 起点：
 
 ### 14.1 Hero
 
-- 原始 Hero 资产进入 `packages/site/public/hero` 或由构建脚本从明确源文件生成。
+- 原始 Hero 资产进入 `apps/site/public/hero` 或由构建脚本从明确源文件生成。
 - 不引用 Downloads、临时目录或个人路径。
 - 保留一份高质量母版。首版按用户决定直接使用带固有尺寸的 PNG，不引入 Sharp；AVIF / WebP 响应式转换在真实部署性能测量后作为独立优化接入。
 - 首屏图片明确尺寸并合理 preload，降低 LCP 与布局跳动；引入响应式衍生图后再切换为 `<picture>`。
@@ -861,7 +861,7 @@ install workspace dependencies
 validate public content and release Markdown
         |
         v
-build packages/site
+build apps/site
         |
         v
 upload Pages artifact
@@ -922,7 +922,7 @@ deploy GitHub Pages
 
 实现阶段至少执行：
 
-- `packages/site` typecheck、test 和 production build。
+- `apps/site` typecheck、test 和 production build。
 - 根仓库 docs、repo hygiene、secrets、Action pinning 检查。
 - 桌面与移动浏览器视觉检查。
 - 浅色、深色、system-light、system-dark 检查。
@@ -944,7 +944,7 @@ deploy GitHub Pages
 
 ## 22. 已确认决策
 
-- 官网工程位于 `packages/site`。
+- 官网工程位于 `apps/site`。
 - 一级菜单为“文档、博客、更新、开发计划”。
 - “开始使用”进入 `/docs/getting-started`。
 - 主页使用 C Cloud Expanse 作为首版 Hero 主视觉。
@@ -958,8 +958,8 @@ deploy GitHub Pages
 - 开发计划页从 `docs/roadmap.md` 构建时生成，复选框决定状态，完成日期只出现在已完成项目中。
 - 公开文档和内部仓库文档保持明确边界。
 - 首版优先静态生成并通过 GitHub Actions 部署到 GitHub Pages。
-- GitHub Pages 构建从 monorepo 根目录执行，复用根 `pnpm-lock.yaml`，输出目录指向 `packages/site/dist`；这是 Astro 官方 Action 在 pnpm workspace 下的实际配置边界。
-- 首版首页产品展示使用通过脱敏检查的 Context、Tools、Kairos 与 Usage 截图；Review 素材保留给文档或后续内容。仓库暂时没有可公开的 Browser 实机截图，不用不相关图片伪装该能力。
+- GitHub Pages 构建从 monorepo 根目录执行，复用根 `pnpm-lock.yaml`，输出目录指向 `apps/site/dist`；这是 Astro 官方 Action 在 pnpm workspace 下的实际配置边界。
+- 首版首页产品展示使用通过脱敏检查的 Context、Tools、Review 与 Usage 截图；Browser 实机素材保留给文档或后续内容，不用不相关图片伪装该能力。
 - 实现前另写 execution plan，不在本设计文档中维护逐步施工流水账。
 
 ## 23. 开发计划页

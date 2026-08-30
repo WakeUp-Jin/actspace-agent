@@ -16,7 +16,7 @@ return path.resolve(currentDirectory, "../../../../docs/roadmap.md");
 预渲染阶段执行的是 Astro/Vite 生成的模块，而不是原始 TypeScript 文件。此时 `import.meta.url` 可能位于：
 
 ```text
-packages/site/dist/.prerender/chunks/*.mjs
+apps/site/dist/.prerender/chunks/*.mjs
 ```
 
 因此相对路径的起点是构建产物目录。源码文件原本位于 `src/lib` 还是 `src/lib/roadmap`，不会自动保留为运行时路径语义。
@@ -26,8 +26,8 @@ packages/site/dist/.prerender/chunks/*.mjs
 把数据源路径解析放在一个目录深度明确的独立模块中，并同时验证两种执行环境：
 
 ```text
-源码测试：packages/site/src/lib/roadmap/source-path.ts
-构建执行：packages/site/dist/.prerender/chunks/*.mjs
+源码测试：apps/site/src/lib/roadmap/source-path.ts
+构建执行：apps/site/dist/.prerender/chunks/*.mjs
 ```
 
 路径层级需要在这两个位置都能回到仓库根目录。仅测试纯解析函数不够，还要增加一次真实数据源加载测试，并运行生产构建：

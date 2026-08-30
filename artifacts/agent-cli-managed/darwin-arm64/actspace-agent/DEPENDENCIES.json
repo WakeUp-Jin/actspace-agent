@@ -1,0 +1,768 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-26T14:03:10.601Z",
+  "packages": [
+    {
+      "name": "@actspace/boot",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+boot@file+packages+boot/node_modules/@actspace/boot/package.json"
+    },
+    {
+      "name": "@actspace/bundle",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+bundle@file+packages+bundle/node_modules/@actspace/bundle/package.json"
+    },
+    {
+      "name": "@actspace/compaction",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+compaction@file+packages+compaction/node_modules/@actspace/compaction/package.json"
+    },
+    {
+      "name": "@actspace/composition",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+composition@file+packages+composition/node_modules/@actspace/composition/package.json"
+    },
+    {
+      "name": "@actspace/context",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+context@file+packages+context/node_modules/@actspace/context/package.json"
+    },
+    {
+      "name": "@actspace/cordis-adapter",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+cordis-adapter@file+packages+cordis-adapter/node_modules/@actspace/cordis-adapter/package.json"
+    },
+    {
+      "name": "@actspace/core-agent",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+core-agent@file+packages+core+agent/node_modules/@actspace/core-agent/package.json"
+    },
+    {
+      "name": "@actspace/core-agent-loop",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+core-agent-loop@file+packages+core+agent-loop/node_modules/@actspace/core-agent-loop/package.json"
+    },
+    {
+      "name": "@actspace/core-scope",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+core-scope@file+packages+core+scope/node_modules/@actspace/core-scope/package.json"
+    },
+    {
+      "name": "@actspace/diagnostics",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+diagnostics@file+packages+diagnostics/node_modules/@actspace/diagnostics/package.json"
+    },
+    {
+      "name": "@actspace/llm-pi-ai",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+llm-pi-ai@file+packages+llm+pi-ai/node_modules/@actspace/llm-pi-ai/package.json"
+    },
+    {
+      "name": "@actspace/llm-service",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+llm-service@file+packages+llm+service/node_modules/@actspace/llm-service/package.json"
+    },
+    {
+      "name": "@actspace/prompt",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+prompt@file+packages+prompt/node_modules/@actspace/prompt/package.json"
+    },
+    {
+      "name": "@actspace/runtime",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+runtime@file+packages+runtime/node_modules/@actspace/runtime/package.json"
+    },
+    {
+      "name": "@actspace/session-journal",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+session-journal@file+packages+session+journal/node_modules/@actspace/session-journal/package.json"
+    },
+    {
+      "name": "@actspace/session-jsonl",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+session-jsonl@file+packages+session+jsonl/node_modules/@actspace/session-jsonl/package.json"
+    },
+    {
+      "name": "@actspace/session-persistence",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+session-persistence@file+packages+session+persistence/node_modules/@actspace/session-persistence/package.json"
+    },
+    {
+      "name": "@actspace/session-projection",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+session-projection@file+packages+session+projection/node_modules/@actspace/session-projection/package.json"
+    },
+    {
+      "name": "@actspace/shared",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+shared@file+packages+shared/node_modules/@actspace/shared/package.json"
+    },
+    {
+      "name": "@actspace/subagent",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+subagent@file+packages+subagent/node_modules/@actspace/subagent/package.json"
+    },
+    {
+      "name": "@actspace/tools-approval",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+tools-approval@file+packages+tools+approval/node_modules/@actspace/tools-approval/package.json"
+    },
+    {
+      "name": "@actspace/tools-browser-tools",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+tools-browser-tools@file+packages+tools+browser-tools/node_modules/@actspace/tools-browser-tools/package.json"
+    },
+    {
+      "name": "@actspace/tools-core-tools",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+tools-core-tools@file+packages+tools+core-tools/node_modules/@actspace/tools-core-tools/package.json"
+    },
+    {
+      "name": "@actspace/tools-runtime",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@actspace+tools-runtime@file+packages+tools+runtime/node_modules/@actspace/tools-runtime/package.json"
+    },
+    {
+      "name": "@anthropic-ai/sdk",
+      "version": "0.91.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/@anthropic-ai+sdk@0.91.1/node_modules/@anthropic-ai/sdk/package.json"
+    },
+    {
+      "name": "@aws-crypto/sha256-browser",
+      "version": "5.2.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-crypto+sha256-browser@5.2.0/node_modules/@aws-crypto/sha256-browser/package.json"
+    },
+    {
+      "name": "@aws-crypto/sha256-js",
+      "version": "5.2.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-crypto+sha256-js@5.2.0/node_modules/@aws-crypto/sha256-js/package.json"
+    },
+    {
+      "name": "@aws-crypto/supports-web-crypto",
+      "version": "5.2.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-crypto+supports-web-crypto@5.2.0/node_modules/@aws-crypto/supports-web-crypto/package.json"
+    },
+    {
+      "name": "@aws-crypto/util",
+      "version": "5.2.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-crypto+util@5.2.0/node_modules/@aws-crypto/util/package.json"
+    },
+    {
+      "name": "@aws-sdk/client-bedrock-runtime",
+      "version": "3.1048.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+client-bedrock-runtime@3.1048.0/node_modules/@aws-sdk/client-bedrock-runtime/package.json"
+    },
+    {
+      "name": "@aws-sdk/core",
+      "version": "3.977.9",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+core@3.977.9/node_modules/@aws-sdk/core/package.json"
+    },
+    {
+      "name": "@aws-sdk/credential-provider-env",
+      "version": "3.972.70",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+credential-provider-env@3.972.70/node_modules/@aws-sdk/credential-provider-env/package.json"
+    },
+    {
+      "name": "@aws-sdk/credential-provider-http",
+      "version": "3.972.72",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+credential-provider-http@3.972.72/node_modules/@aws-sdk/credential-provider-http/package.json"
+    },
+    {
+      "name": "@aws-sdk/credential-provider-ini",
+      "version": "3.973.15",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+credential-provider-ini@3.973.15/node_modules/@aws-sdk/credential-provider-ini/package.json"
+    },
+    {
+      "name": "@aws-sdk/credential-provider-login",
+      "version": "3.972.77",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+credential-provider-login@3.972.77/node_modules/@aws-sdk/credential-provider-login/package.json"
+    },
+    {
+      "name": "@aws-sdk/credential-provider-node",
+      "version": "3.972.81",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+credential-provider-node@3.972.81/node_modules/@aws-sdk/credential-provider-node/package.json"
+    },
+    {
+      "name": "@aws-sdk/credential-provider-process",
+      "version": "3.972.70",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+credential-provider-process@3.972.70/node_modules/@aws-sdk/credential-provider-process/package.json"
+    },
+    {
+      "name": "@aws-sdk/credential-provider-sso",
+      "version": "3.973.14",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+credential-provider-sso@3.973.14/node_modules/@aws-sdk/credential-provider-sso/package.json"
+    },
+    {
+      "name": "@aws-sdk/credential-provider-web-identity",
+      "version": "3.972.76",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+credential-provider-web-identity@3.972.76/node_modules/@aws-sdk/credential-provider-web-identity/package.json"
+    },
+    {
+      "name": "@aws-sdk/eventstream-handler-node",
+      "version": "3.972.34",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+eventstream-handler-node@3.972.34/node_modules/@aws-sdk/eventstream-handler-node/package.json"
+    },
+    {
+      "name": "@aws-sdk/middleware-eventstream",
+      "version": "3.972.29",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+middleware-eventstream@3.972.29/node_modules/@aws-sdk/middleware-eventstream/package.json"
+    },
+    {
+      "name": "@aws-sdk/middleware-websocket",
+      "version": "3.972.52",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+middleware-websocket@3.972.52/node_modules/@aws-sdk/middleware-websocket/package.json"
+    },
+    {
+      "name": "@aws-sdk/nested-clients",
+      "version": "3.997.44",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+nested-clients@3.997.44/node_modules/@aws-sdk/nested-clients/package.json"
+    },
+    {
+      "name": "@aws-sdk/signature-v4-multi-region",
+      "version": "3.996.46",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+signature-v4-multi-region@3.996.46/node_modules/@aws-sdk/signature-v4-multi-region/package.json"
+    },
+    {
+      "name": "@aws-sdk/token-providers",
+      "version": "3.1048.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+token-providers@3.1048.0/node_modules/@aws-sdk/token-providers/package.json"
+    },
+    {
+      "name": "@aws-sdk/token-providers",
+      "version": "3.1116.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+token-providers@3.1116.0/node_modules/@aws-sdk/token-providers/package.json"
+    },
+    {
+      "name": "@aws-sdk/types",
+      "version": "3.974.5",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+types@3.974.5/node_modules/@aws-sdk/types/package.json"
+    },
+    {
+      "name": "@aws-sdk/util-locate-window",
+      "version": "3.965.10",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+util-locate-window@3.965.10/node_modules/@aws-sdk/util-locate-window/package.json"
+    },
+    {
+      "name": "@aws-sdk/xml-builder",
+      "version": "3.972.40",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws-sdk+xml-builder@3.972.40/node_modules/@aws-sdk/xml-builder/package.json"
+    },
+    {
+      "name": "@aws/lambda-invoke-store",
+      "version": "0.3.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@aws+lambda-invoke-store@0.3.0/node_modules/@aws/lambda-invoke-store/package.json"
+    },
+    {
+      "name": "@babel/runtime",
+      "version": "7.29.2",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/@babel+runtime@7.29.2/node_modules/@babel/runtime/package.json"
+    },
+    {
+      "name": "@deepseek-ai/cordis",
+      "version": "4.0.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/@deepseek-ai+cordis@4.0.1_@deepseek-ai+cordis-plugin-include@1.0.6_@deepseek-ai+cordis-plugin-loader@1.0.2/node_modules/@deepseek-ai/cordis/package.json"
+    },
+    {
+      "name": "@deepseek-ai/cordis-plugin-group",
+      "version": "1.0.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/@deepseek-ai+cordis-plugin-group@1.0.1_@deepseek-ai+cordis-plugin-loader@1.0.2_@deepseek-ai+cordis@4.0.1/node_modules/@deepseek-ai/cordis-plugin-group/package.json"
+    },
+    {
+      "name": "@deepseek-ai/cordis-plugin-include",
+      "version": "1.0.6",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/@deepseek-ai+cordis-plugin-include@1.0.6_@deepseek-ai+cordis-plugin-loader@1.0.2_@deepseek-ai+cordis@4.0.1/node_modules/@deepseek-ai/cordis-plugin-include/package.json"
+    },
+    {
+      "name": "@deepseek-ai/cordis-plugin-loader",
+      "version": "1.0.2",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/@deepseek-ai+cordis-plugin-loader@1.0.2_@deepseek-ai+cordis@4.0.1/node_modules/@deepseek-ai/cordis-plugin-loader/package.json"
+    },
+    {
+      "name": "@deepseek-ai/cordis-plugin-timer",
+      "version": "1.1.3",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/@deepseek-ai+cordis-plugin-timer@1.1.3_@deepseek-ai+cordis@4.0.1/node_modules/@deepseek-ai/cordis-plugin-timer/package.json"
+    },
+    {
+      "name": "@deepseek-ai/cosmokit",
+      "version": "1.8.2",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/@deepseek-ai+cosmokit@1.8.2/node_modules/@deepseek-ai/cosmokit/package.json"
+    },
+    {
+      "name": "@earendil-works/pi-ai",
+      "version": "0.82.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/@earendil-works+pi-ai@0.82.1/node_modules/@earendil-works/pi-ai/package.json"
+    },
+    {
+      "name": "@google/genai",
+      "version": "1.52.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@google+genai@1.52.0/node_modules/@google/genai/package.json"
+    },
+    {
+      "name": "@mistralai/mistralai",
+      "version": "2.2.6",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@mistralai+mistralai@2.2.6_@opentelemetry+api@1.9.0/node_modules/@mistralai/mistralai/package.json"
+    },
+    {
+      "name": "@mixmark-io/domino",
+      "version": "2.2.0",
+      "license": "BSD-2-Clause",
+      "source": "node_modules/.pnpm/@mixmark-io+domino@2.2.0/node_modules/@mixmark-io/domino/package.json"
+    },
+    {
+      "name": "@opentelemetry/api",
+      "version": "1.9.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@opentelemetry+api@1.9.0/node_modules/@opentelemetry/api/package.json"
+    },
+    {
+      "name": "@opentelemetry/semantic-conventions",
+      "version": "1.43.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@opentelemetry+semantic-conventions@1.43.0/node_modules/@opentelemetry/semantic-conventions/package.json"
+    },
+    {
+      "name": "@protobufjs/aspromise",
+      "version": "1.1.2",
+      "license": "BSD-3-Clause",
+      "source": "node_modules/.pnpm/@protobufjs+aspromise@1.1.2/node_modules/@protobufjs/aspromise/package.json"
+    },
+    {
+      "name": "@protobufjs/base64",
+      "version": "1.1.2",
+      "license": "BSD-3-Clause",
+      "source": "node_modules/.pnpm/@protobufjs+base64@1.1.2/node_modules/@protobufjs/base64/package.json"
+    },
+    {
+      "name": "@protobufjs/codegen",
+      "version": "2.0.5",
+      "license": "BSD-3-Clause",
+      "source": "node_modules/.pnpm/@protobufjs+codegen@2.0.5/node_modules/@protobufjs/codegen/package.json"
+    },
+    {
+      "name": "@protobufjs/eventemitter",
+      "version": "1.1.1",
+      "license": "BSD-3-Clause",
+      "source": "node_modules/.pnpm/@protobufjs+eventemitter@1.1.1/node_modules/@protobufjs/eventemitter/package.json"
+    },
+    {
+      "name": "@protobufjs/fetch",
+      "version": "1.1.1",
+      "license": "BSD-3-Clause",
+      "source": "node_modules/.pnpm/@protobufjs+fetch@1.1.1/node_modules/@protobufjs/fetch/package.json"
+    },
+    {
+      "name": "@protobufjs/float",
+      "version": "1.0.2",
+      "license": "BSD-3-Clause",
+      "source": "node_modules/.pnpm/@protobufjs+float@1.0.2/node_modules/@protobufjs/float/package.json"
+    },
+    {
+      "name": "@protobufjs/path",
+      "version": "1.1.2",
+      "license": "BSD-3-Clause",
+      "source": "node_modules/.pnpm/@protobufjs+path@1.1.2/node_modules/@protobufjs/path/package.json"
+    },
+    {
+      "name": "@protobufjs/pool",
+      "version": "1.1.0",
+      "license": "BSD-3-Clause",
+      "source": "node_modules/.pnpm/@protobufjs+pool@1.1.0/node_modules/@protobufjs/pool/package.json"
+    },
+    {
+      "name": "@protobufjs/utf8",
+      "version": "1.1.2",
+      "license": "BSD-3-Clause",
+      "source": "node_modules/.pnpm/@protobufjs+utf8@1.1.2/node_modules/@protobufjs/utf8/package.json"
+    },
+    {
+      "name": "@smithy/core",
+      "version": "3.33.3",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@smithy+core@3.33.3/node_modules/@smithy/core/package.json"
+    },
+    {
+      "name": "@smithy/credential-provider-imds",
+      "version": "4.5.2",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@smithy+credential-provider-imds@4.5.2/node_modules/@smithy/credential-provider-imds/package.json"
+    },
+    {
+      "name": "@smithy/fetch-http-handler",
+      "version": "5.7.2",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@smithy+fetch-http-handler@5.7.2/node_modules/@smithy/fetch-http-handler/package.json"
+    },
+    {
+      "name": "@smithy/is-array-buffer",
+      "version": "2.2.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@smithy+is-array-buffer@2.2.0/node_modules/@smithy/is-array-buffer/package.json"
+    },
+    {
+      "name": "@smithy/node-http-handler",
+      "version": "4.11.3",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@smithy+node-http-handler@4.11.3/node_modules/@smithy/node-http-handler/package.json"
+    },
+    {
+      "name": "@smithy/node-http-handler",
+      "version": "4.7.3",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@smithy+node-http-handler@4.7.3/node_modules/@smithy/node-http-handler/package.json"
+    },
+    {
+      "name": "@smithy/signature-v4",
+      "version": "5.7.3",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@smithy+signature-v4@5.7.3/node_modules/@smithy/signature-v4/package.json"
+    },
+    {
+      "name": "@smithy/types",
+      "version": "4.17.2",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@smithy+types@4.17.2/node_modules/@smithy/types/package.json"
+    },
+    {
+      "name": "@smithy/util-buffer-from",
+      "version": "2.2.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@smithy+util-buffer-from@2.2.0/node_modules/@smithy/util-buffer-from/package.json"
+    },
+    {
+      "name": "@smithy/util-utf8",
+      "version": "2.3.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/@smithy+util-utf8@2.3.0/node_modules/@smithy/util-utf8/package.json"
+    },
+    {
+      "name": "@standard-schema/spec",
+      "version": "1.1.0",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/@standard-schema+spec@1.1.0/node_modules/@standard-schema/spec/package.json"
+    },
+    {
+      "name": "@types/node",
+      "version": "24.12.4",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/@types+node@24.12.4/node_modules/@types/node/package.json"
+    },
+    {
+      "name": "@types/retry",
+      "version": "0.12.0",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/@types+retry@0.12.0/node_modules/@types/retry/package.json"
+    },
+    {
+      "name": "agent-base",
+      "version": "7.1.4",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/agent-base@7.1.4/node_modules/agent-base/package.json"
+    },
+    {
+      "name": "argparse",
+      "version": "2.0.1",
+      "license": "Python-2.0",
+      "source": "node_modules/.pnpm/argparse@2.0.1/node_modules/argparse/package.json"
+    },
+    {
+      "name": "base64-js",
+      "version": "1.5.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/base64-js@1.5.1/node_modules/base64-js/package.json"
+    },
+    {
+      "name": "bignumber.js",
+      "version": "9.3.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/bignumber.js@9.3.1/node_modules/bignumber.js/package.json"
+    },
+    {
+      "name": "bowser",
+      "version": "2.14.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/bowser@2.14.1/node_modules/bowser/package.json"
+    },
+    {
+      "name": "buffer-equal-constant-time",
+      "version": "1.0.1",
+      "license": "BSD-3-Clause",
+      "source": "node_modules/.pnpm/buffer-equal-constant-time@1.0.1/node_modules/buffer-equal-constant-time/package.json"
+    },
+    {
+      "name": "data-uri-to-buffer",
+      "version": "4.0.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/data-uri-to-buffer@4.0.1/node_modules/data-uri-to-buffer/package.json"
+    },
+    {
+      "name": "debug",
+      "version": "4.4.3",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/debug@4.4.3/node_modules/debug/package.json"
+    },
+    {
+      "name": "ecdsa-sig-formatter",
+      "version": "1.0.11",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/ecdsa-sig-formatter@1.0.11/node_modules/ecdsa-sig-formatter/package.json"
+    },
+    {
+      "name": "extend",
+      "version": "3.0.2",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/extend@3.0.2/node_modules/extend/package.json"
+    },
+    {
+      "name": "fetch-blob",
+      "version": "3.2.0",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/fetch-blob@3.2.0/node_modules/fetch-blob/package.json"
+    },
+    {
+      "name": "formdata-polyfill",
+      "version": "4.0.10",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/formdata-polyfill@4.0.10/node_modules/formdata-polyfill/package.json"
+    },
+    {
+      "name": "gaxios",
+      "version": "7.3.1",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/gaxios@7.3.1/node_modules/gaxios/package.json"
+    },
+    {
+      "name": "gcp-metadata",
+      "version": "8.1.2",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/gcp-metadata@8.1.2/node_modules/gcp-metadata/package.json"
+    },
+    {
+      "name": "google-auth-library",
+      "version": "10.9.1",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/google-auth-library@10.9.1/node_modules/google-auth-library/package.json"
+    },
+    {
+      "name": "google-logging-utils",
+      "version": "1.1.3",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/google-logging-utils@1.1.3/node_modules/google-logging-utils/package.json"
+    },
+    {
+      "name": "http-proxy-agent",
+      "version": "7.0.2",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/http-proxy-agent@7.0.2/node_modules/http-proxy-agent/package.json"
+    },
+    {
+      "name": "https-proxy-agent",
+      "version": "7.0.6",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/https-proxy-agent@7.0.6/node_modules/https-proxy-agent/package.json"
+    },
+    {
+      "name": "js-yaml",
+      "version": "4.3.0",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/js-yaml@4.3.0/node_modules/js-yaml/package.json"
+    },
+    {
+      "name": "json-bigint",
+      "version": "1.0.0",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/json-bigint@1.0.0/node_modules/json-bigint/package.json"
+    },
+    {
+      "name": "json-schema-to-ts",
+      "version": "3.1.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/json-schema-to-ts@3.1.1/node_modules/json-schema-to-ts/package.json"
+    },
+    {
+      "name": "jwa",
+      "version": "2.0.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/jwa@2.0.1/node_modules/jwa/package.json"
+    },
+    {
+      "name": "jws",
+      "version": "4.0.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/jws@4.0.1/node_modules/jws/package.json"
+    },
+    {
+      "name": "long",
+      "version": "5.3.2",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/long@5.3.2/node_modules/long/package.json"
+    },
+    {
+      "name": "ms",
+      "version": "2.1.3",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/ms@2.1.3/node_modules/ms/package.json"
+    },
+    {
+      "name": "node-domexception",
+      "version": "1.0.0",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/node-domexception@1.0.0/node_modules/node-domexception/package.json"
+    },
+    {
+      "name": "node-fetch",
+      "version": "3.3.2",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/node-fetch@3.3.2/node_modules/node-fetch/package.json"
+    },
+    {
+      "name": "openai",
+      "version": "6.26.0",
+      "license": "Apache-2.0",
+      "source": "node_modules/.pnpm/openai@6.26.0/node_modules/openai/package.json"
+    },
+    {
+      "name": "p-retry",
+      "version": "4.6.2",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/p-retry@4.6.2/node_modules/p-retry/package.json"
+    },
+    {
+      "name": "partial-json",
+      "version": "0.1.7",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/partial-json@0.1.7/node_modules/partial-json/package.json"
+    },
+    {
+      "name": "protobufjs",
+      "version": "7.6.5",
+      "license": "BSD-3-Clause",
+      "source": "node_modules/.pnpm/protobufjs@7.6.5/node_modules/protobufjs/package.json"
+    },
+    {
+      "name": "retry",
+      "version": "0.13.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/retry@0.13.1/node_modules/retry/package.json"
+    },
+    {
+      "name": "safe-buffer",
+      "version": "5.2.1",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/safe-buffer@5.2.1/node_modules/safe-buffer/package.json"
+    },
+    {
+      "name": "ts-algebra",
+      "version": "2.0.0",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/ts-algebra@2.0.0/node_modules/ts-algebra/package.json"
+    },
+    {
+      "name": "tslib",
+      "version": "2.8.1",
+      "license": "0BSD",
+      "source": "node_modules/.pnpm/tslib@2.8.1/node_modules/tslib/package.json"
+    },
+    {
+      "name": "turndown",
+      "version": "7.2.4",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/turndown@7.2.4/node_modules/turndown/package.json"
+    },
+    {
+      "name": "typebox",
+      "version": "1.1.38",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/typebox@1.1.38/node_modules/typebox/package.json"
+    },
+    {
+      "name": "undici-types",
+      "version": "7.16.0",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/undici-types@7.16.0/node_modules/undici-types/package.json"
+    },
+    {
+      "name": "web-streams-polyfill",
+      "version": "3.3.3",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/web-streams-polyfill@3.3.3/node_modules/web-streams-polyfill/package.json"
+    },
+    {
+      "name": "ws",
+      "version": "8.21.0",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/ws@8.21.0/node_modules/ws/package.json"
+    },
+    {
+      "name": "zod",
+      "version": "4.4.3",
+      "license": "MIT",
+      "source": "node_modules/.pnpm/zod@4.4.3/node_modules/zod/package.json"
+    },
+    {
+      "name": "zod-to-json-schema",
+      "version": "3.25.2",
+      "license": "ISC",
+      "source": "node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@4.4.3/node_modules/zod-to-json-schema/package.json"
+    }
+  ]
+}

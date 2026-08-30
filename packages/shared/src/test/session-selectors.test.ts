@@ -389,32 +389,6 @@ describe("session selectors", () => {
     }]);
   });
 
-  it("restores an eval candidate result as a system status", () => {
-    const blocks = createMessageBlocks([{
-      id: "evt-eval",
-      sessionId: "session-eval",
-      agentRunId: "turn-eval",
-      type: "eval_candidate",
-      timestamp: "2026-07-19T07:00:00.000Z",
-      schemaVersion: 2,
-      payload: {
-        candidateId: "failure-1",
-        relativePath: "eval-candidates/failure-1",
-        status: "generated",
-        summary: "Eval candidate generated · failure-1",
-      },
-    }]);
-
-    expect(blocks).toEqual([{
-      kind: "status",
-      id: "evt-eval",
-      renderKey: "turn:turn-eval:eval-candidate:0",
-      content: "Eval candidate generated · failure-1",
-      createdAt: "2026-07-19T07:00:00.000Z",
-      tone: "muted",
-    }]);
-  });
-
   it("restores a completed delete_file result as a delete message block", () => {
     const blocks = createMessageBlocks([
       toolResultEvent({
@@ -714,7 +688,7 @@ describe("session selectors", () => {
           id: "evt_subagent_tool",
           type: "tool_call",
           title: "Read",
-          summary: "Read packages/agent-core/src/engine/loop.ts",
+          summary: "Read packages/core/agent-loop/src/loop.ts",
           timestamp: "2026-06-02T10:01:00.000Z",
         },
       ],

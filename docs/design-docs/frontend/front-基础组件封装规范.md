@@ -10,7 +10,7 @@
 
 ```txt
 Radix primitives / 原生 HTML
-  -> packages/desktop/src/renderer/components/ui/*
+  -> apps/desktop/src/renderer/components/ui/*
   -> actspace 业务组件
 ```
 
@@ -43,7 +43,7 @@ Radix primitives / 原生 HTML
 基础 UI 组件放在：
 
 ```txt
-packages/desktop/src/renderer/components/ui/
+apps/desktop/src/renderer/components/ui/
 ```
 
 这一层只表达通用控件，不知道 Agent、Session、Model、Context、Tool 或 Message。

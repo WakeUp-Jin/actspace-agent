@@ -75,7 +75,7 @@
 - `docs/design-docs/browser/agent-browser-use-command-implementation.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
-- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
 
@@ -217,7 +217,7 @@ CLI examples
 ### 建议代码位置
 
 ```text
-plugins/browser-bridge/apps/cli/internal/commands/
+browser-bridge/apps/cli/internal/commands/
   registry.go
   metadata.go
   dispatcher.go
@@ -239,7 +239,7 @@ plugins/browser-bridge/apps/cli/internal/commands/
 ### 建议目录
 
 ```text
-plugins/browser-bridge/apps/cli/internal/
+browser-bridge/apps/cli/internal/
   commands/
   backend/
     backend.go
@@ -301,7 +301,7 @@ type BrowserBackend interface {
 ### 代码位置
 
 ```text
-plugins/browser-bridge/apps/cli/internal/locator/runtime.js
+browser-bridge/apps/cli/internal/locator/runtime.js
 ```
 
 由 Go 使用 `go:embed` 打入 `abb` 二进制，通过 `Runtime.evaluate` 注入页面，页面全局固定为：
@@ -438,7 +438,7 @@ agent_browser_bridge.command.run
 
 ### Go -> Extension
 
-只使用 Extension primitive methods。协议类型放在 `plugins/browser-bridge/packages/protocol/`，高层 command schema 由 registry 管理，不为每个 command 重复新增一套手写 Go struct，除非该类型被多个 handler 共享且静态类型能显著降低风险。
+只使用 Extension primitive methods。协议类型放在 `browser-bridge/packages/protocol/`，高层 command schema 由 registry 管理，不为每个 command 重复新增一套手写 Go struct，除非该类型被多个 handler 共享且静态类型能显著降低风险。
 
 ## 权限与安全
 
@@ -531,10 +531,10 @@ pnpm check:docs
 
 允许修改：
 
-- `plugins/browser-bridge/apps/cli/internal/commands/`
-- `plugins/browser-bridge/apps/cli/main.go`
-- `plugins/browser-bridge/apps/cli/main_test.go`
-- `plugins/browser-bridge/packages/protocol/`
+- `browser-bridge/apps/cli/internal/commands/`
+- `browser-bridge/apps/cli/main.go`
+- `browser-bridge/apps/cli/main_test.go`
+- `browser-bridge/packages/protocol/`
 - `packages/agent-core/src/tools/tools/browser/generated-actions.ts`
 - `scripts/check-browser-command-registry.mjs`
 
@@ -550,8 +550,8 @@ pnpm check:docs
 验证：
 
 ```bash
-cd plugins/browser-bridge && GOCACHE=/private/tmp/abb-go-cache go test ./packages/protocol/... ./apps/cli/...
-cd plugins/browser-bridge/apps/cli && GOCACHE=/private/tmp/abb-go-cache go run . commands --json
+cd browser-bridge && GOCACHE=/private/tmp/abb-go-cache go test ./packages/protocol/... ./apps/cli/...
+cd browser-bridge/apps/cli && GOCACHE=/private/tmp/abb-go-cache go run . commands --json
 node scripts/check-browser-command-registry.mjs
 pnpm --filter @actspace/agent-core run typecheck
 ```
@@ -562,13 +562,13 @@ pnpm --filter @actspace/agent-core run typecheck
 
 允许修改：
 
-- `plugins/browser-bridge/apps/cli/internal/backend/`
-- `plugins/browser-bridge/apps/cli/internal/cdp/`
-- `plugins/browser-bridge/apps/cli/server.go`
-- `plugins/browser-bridge/apps/cli/session.go`
-- `plugins/browser-bridge/apps/cli/events.go`
-- `plugins/browser-bridge/apps/chrome-extension/src/background.js`
-- `plugins/browser-bridge/packages/protocol/`
+- `browser-bridge/apps/cli/internal/backend/`
+- `browser-bridge/apps/cli/internal/cdp/`
+- `browser-bridge/apps/cli/server.go`
+- `browser-bridge/apps/cli/session.go`
+- `browser-bridge/apps/cli/events.go`
+- `browser-bridge/apps/chrome-extension/src/background.js`
+- `browser-bridge/packages/protocol/`
 - 对应 Go/Node 测试
 
 任务：
@@ -583,8 +583,8 @@ pnpm --filter @actspace/agent-core run typecheck
 验证：
 
 ```bash
-cd plugins/browser-bridge && GOCACHE=/private/tmp/abb-go-cache go test ./packages/protocol/... ./apps/cli/...
-node --check plugins/browser-bridge/apps/chrome-extension/src/background.js
+cd browser-bridge && GOCACHE=/private/tmp/abb-go-cache go test ./packages/protocol/... ./apps/cli/...
+node --check browser-bridge/apps/chrome-extension/src/background.js
 ```
 
 预期：Go fake backend 能证明高层命令不再直接透传；Extension primitive contract 可单独测试。
@@ -595,11 +595,11 @@ node --check plugins/browser-bridge/apps/chrome-extension/src/background.js
 
 允许修改：
 
-- `plugins/browser-bridge/apps/cli/internal/cua/`
-- `plugins/browser-bridge/apps/cli/internal/domcua/`
-- `plugins/browser-bridge/apps/cli/internal/locator/`
-- `plugins/browser-bridge/apps/cli/internal/cdp/`
-- `plugins/browser-bridge/apps/chrome-extension/src/playwright-injected.js`（迁移完成后删除或仅保留兼容加载）
+- `browser-bridge/apps/cli/internal/cua/`
+- `browser-bridge/apps/cli/internal/domcua/`
+- `browser-bridge/apps/cli/internal/locator/`
+- `browser-bridge/apps/cli/internal/cdp/`
+- `browser-bridge/apps/chrome-extension/src/playwright-injected.js`（迁移完成后删除或仅保留兼容加载）
 - 对应测试和 fixture
 
 任务顺序：
@@ -722,8 +722,8 @@ pnpm run typecheck
 最终验证：
 
 ```bash
-cd plugins/browser-bridge && GOCACHE=/private/tmp/abb-go-cache go test ./packages/protocol/... ./apps/cli/...
-node --check plugins/browser-bridge/apps/chrome-extension/src/background.js
+cd browser-bridge && GOCACHE=/private/tmp/abb-go-cache go test ./packages/protocol/... ./apps/cli/...
+node --check browser-bridge/apps/chrome-extension/src/background.js
 node scripts/check-browser-command-registry.mjs
 pnpm --filter @actspace/agent-core exec vitest run src/tools/tools/browser/test
 pnpm run typecheck

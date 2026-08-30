@@ -29,5 +29,5 @@
 - `packages/agent-core/src/tools/output-truncator.ts`
 - `packages/agent-core/src/context/compression/tool-summary-prompts.ts`
 - `packages/agent-core/src/tools/test/output-truncator.test.ts`
-- `docs/design-docs/model-context/agent-context-compression.md`
+- `docs/design-docs/v1-legacy/model-context-context-compression.md`
 - `docs/learnings/2026-06/raw-prefix-plus-summary-compression.md`

@@ -31,7 +31,7 @@
 
 - `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`：右侧面板唯一前端事实来源，本计划所有行为变化都要回写这里。
 - `docs/design-docs/frontend/front-主题与配色规范.md`：颜色硬约束。行号 gutter、过期提示条、搜索命中高亮都要用语义 token，禁止 `#hex` / `text-black` / `bg-white`，且浅深两态都要验。
-- `docs/design-docs/agent-plugins-fs-watch.md`：fs-watch 插件的文件契约与边界，用于论证为什么不走插件。
+- `docs/design-docs/v1-legacy/agent-plugins-fs-watch.md`：fs-watch 插件的文件契约与边界，用于论证为什么不走插件。
 - `docs/FRONTEND_VERIFICATION.md`：验证分层。本计划同时改了 IPC / preload / main，属于「IPC、preload、session、本地文件」类，必须 `pnpm typecheck` + `pnpm build` + Electron 真实验证。
 
 ### 相关代码路径
@@ -286,7 +286,7 @@ pnpm check:frontend-theme
 
 ## 决策记录
 
-- 2026-07-30：**文件新鲜度不走 fs-watch 插件，改用「Agent 编辑事件 + mtime 重校验」两级信号。** fs-watch 按 `docs/design-docs/agent-plugins-fs-watch.md` 是用户可选安装的 Rust 常驻进程，需要 Rust 工具链手动编译，未安装的用户就完全没有刷新能力，而右侧面板的内容新鲜度是正确性功能，不能建立在可选插件上；它的监听根来自设置页 `config.json` 的 `roots`，与当前 session 的 `workspaceRoot` 无关，用户很可能没把当前工作区加进监听；它的输出是 500ms 去抖后按天轮转的 JSONL 审计日志 + 30s 心跳，为 Agent 的 `read_file` 语义消费设计，把它当 UI 事件总线要叠「去抖 + 落盘 + main 轮询」三层延迟；且该文档明确写了「不做插件与宿主的双向通信」「两仓之间的唯一耦合是文件契约」，让 renderer 依赖 JSONL schema 会破坏这条边界。改用的两级信号成本更低且总是可用：`MessageBlock` 的 `edit_diff` / `write_diff` 已经带 `filePath`，renderer 实时就知道 Agent 改了哪些文件，零新增基础设施即覆盖主场景；`readWorkspaceFile` 本来就 `stat` 过文件，把 `mtimeMs` 带回来后只需在 tab 激活 / 窗口重获焦点 / turn 结束三个时机各做一次 O(1) stat，即可兜住外部编辑器与 git checkout。影响：右侧面板与插件体系保持零耦合，插件仍只服务 Agent 语义消费。
+- 2026-07-30：**文件新鲜度不走 fs-watch 插件，改用「Agent 编辑事件 + mtime 重校验」两级信号。** fs-watch 按 `docs/design-docs/v1-legacy/agent-plugins-fs-watch.md` 是用户可选安装的 Rust 常驻进程，需要 Rust 工具链手动编译，未安装的用户就完全没有刷新能力，而右侧面板的内容新鲜度是正确性功能，不能建立在可选插件上；它的监听根来自设置页 `config.json` 的 `roots`，与当前 session 的 `workspaceRoot` 无关，用户很可能没把当前工作区加进监听；它的输出是 500ms 去抖后按天轮转的 JSONL 审计日志 + 30s 心跳，为 Agent 的 `read_file` 语义消费设计，把它当 UI 事件总线要叠「去抖 + 落盘 + main 轮询」三层延迟；且该文档明确写了「不做插件与宿主的双向通信」「两仓之间的唯一耦合是文件契约」，让 renderer 依赖 JSONL schema 会破坏这条边界。改用的两级信号成本更低且总是可用：`MessageBlock` 的 `edit_diff` / `write_diff` 已经带 `filePath`，renderer 实时就知道 Agent 改了哪些文件，零新增基础设施即覆盖主场景；`readWorkspaceFile` 本来就 `stat` 过文件，把 `mtimeMs` 带回来后只需在 tab 激活 / 窗口重获焦点 / turn 结束三个时机各做一次 O(1) stat，即可兜住外部编辑器与 git checkout。影响：右侧面板与插件体系保持零耦合，插件仍只服务 Agent 语义消费。
 - 2026-07-30：**检测到文件变更后不自动替换内容，只打 stale 标记 + 显式「重新加载」。** 用户可能正在阅读或选中文本，内容被自动抽换比看到旧内容更糟。不提供「自动重载」开关，避免两套行为都要维护。
 - 2026-07-30：**`fs.watch` 实时监听推迟为 V2，不在本计划内。** 阶段 1、2 的两级信号已能保证正确性；`fs.watch` 只是把「点一下才刷新」变成「自动刷新」，属于体验增量。真要做时应 watch 已打开文件的**父目录**而非文件本身（Agent 与编辑器常用 rename 原子写，watch 文件路径会丢 inode），上限 8 个目录、非递归、生命周期跟着 tab 走 —— 这与 fs-watch 插件排除 `fs.watch` 的理由不冲突，插件排除的是长期多目录**递归**监听。
 - 2026-07-30：**继续用 highlight.js，不换 Shiki。** 用户明确选择。改动集中在「按需注册替代全量入口」+「扩表 + basename 兜底」，既修覆盖面又顺手把 176 种用不到的语法从 bundle 里去掉；Shiki 需要引入异步高亮管道并重做主题翻转，成本与本轮目标不匹配。设计文档里 Shiki 作为 V2 可选升级的表述保持不变。

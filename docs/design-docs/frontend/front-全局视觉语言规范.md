@@ -264,11 +264,10 @@ Usage 等数据页允许出现 42–72px 的数据数字，但它们不是营销
 - Toggle 开启使用 operational green。
 - 内容列保持稳定阅读宽度。
 
-### Context / Usage / Kairos
+### Context / Usage
 
 - 允许有限的低饱和数据色，保留 ActSpace 自有特征。
 - 图表色只编码数据，不承担主操作。
-- Kairos running 为绿，sleep / waiting 为灰，warning 为琥珀，failed 为红。
 
 ## 旧资产的地位
 

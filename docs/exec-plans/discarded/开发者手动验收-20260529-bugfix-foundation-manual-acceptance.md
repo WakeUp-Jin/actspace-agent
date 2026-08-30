@@ -33,7 +33,7 @@
 - `docs/histories/2026-05/20260528-0032-foundation-bug-usability.md`
 - `docs/histories/2026-05/20260528-0108-kairos-default-workspace.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
+- `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md`
 - `docs/FRONTEND_VERIFICATION.md`
 
 相关代码路径：
