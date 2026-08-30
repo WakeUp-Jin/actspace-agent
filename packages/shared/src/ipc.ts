@@ -337,32 +337,6 @@ export type CompactContextResult = {
   };
 };
 
-export type GenerateEvalCandidateInput = {
-  sessionId: string;
-  /** `/eval` 命令自身的系统 turn id；不写成普通 user_message。 */
-  agentRunId: string;
-  /** `/eval` 后的可选失败说明。 */
-  reason?: string;
-  model?: ModelId;
-  modelKey?: ModelKey;
-  thinkingEnabled?: boolean;
-  reasoningEffort?: import("./model-config").ModelReasoningEffort;
-};
-
-export type GenerateEvalCandidateResult = {
-  sessionId: string;
-  agentRunId: string;
-  targetAgentRunId?: string;
-  status: "generated" | "failed";
-  candidateId?: string;
-  candidatePath?: string;
-  events: import("./session").SessionEvent[];
-  error?: {
-    code: string;
-    message: string;
-  };
-};
-
 // ─── 多供应商与模型管理 IPC（Plan 0 只锁契约，Plan 2/3/5 接实现） ───
 
 export type ProviderOperationErrorCode =
@@ -509,15 +483,12 @@ export type ModelMutationResult =
       error: {
         code: "model_missing" | "model_in_use" | "model_not_removable" | "invalid_model" | "credential_missing" | "write_failed";
         message: string;
-        references?: Array<"defaultChatModel" | "utilityModel" | "exploreModel" | "kairosModel">;
+        references?: Array<"defaultChatModel" | "utilityModel" | "exploreModel">;
       };
     };
 
 export type TaskModelsUpdateInput = Partial<TaskModelSettings>;
 export type TaskModelsUpdateResult = { taskModels: TaskModelSettings };
-
-export type KairosModelUpdateInput = { modelKey: ModelKey | null };
-export type KairosModelUpdateResult = { modelKey: ModelKey | null };
 
 export type SelectFilesResult = {
   canceled: boolean;
@@ -892,7 +863,7 @@ export type WorkspaceStatFileResult = {
   error?: "not_found" | "not_a_file" | "escapes_root";
 };
 
-/** 读取当前会话内由工具生成的图片产物。renderer 不能直接加载 file://。 */
+/** 读取当前会话引用的 v2 图片 Artifact。字段名为兼容固定 renderer 保留，artifactPath 实际承载 Artifact ID。 */
 export type SessionArtifactReadInput = {
   sessionId: string;
   artifactPath: string;
@@ -1040,7 +1011,7 @@ export type UsageStatisticsRange = "day" | "week" | "month" | "total";
  * Usage 统计的取数范围。
  *
  * - `"session"`：单个 session 的 events 聚合（兼容旧用法，必须传 `sessionId`）；
- * - `"global"`（默认）：跨所有普通对话 session + Kairos 自主模式的全部历史 LLM/工具事件汇总，
+ * - `"global"`（默认）：跨所有普通对话 session 的全部历史 LLM/工具事件汇总，
  *   `sessionId` 字段被忽略。
  *
  * 出于向后兼容考虑，旧调用 `{ sessionId: "..." }` 在不指定 `scope` 时仍按 `"session"` 模式执行。
@@ -1152,7 +1123,7 @@ export type UsageStatisticsRequestRowsPage = {
 };
 
 export type UsageStatisticsSnapshot = {
-  /** "session"=单会话；"global"=跨所有 session + Kairos 全部历史。 */
+  /** "session"=单会话；"global"=跨所有 session 的全部历史。 */
   scope: UsageStatisticsScope;
   /** 仅 scope==="session" 时为对应 session id；global 时为 null。 */
   sessionId: string | null;

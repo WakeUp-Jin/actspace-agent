@@ -1,16 +1,18 @@
 # Agent Members 持久成员设计
 
-## 当前状态
+## 文档状态
 
-本文档定义 actspace 中跨 Room 长期存在的 Agent Member：身份、运行配置、能力、活动记录、设置页管理界面，以及它与 Room 私有上下文之间的边界。
+> 文档等级：future-product-design
+>
+> Agent Member、Room 和 Team 不属于当前 v2 已交付 Runtime。本文保留未来跨 Room 持久身份的产品设计，不定义当前 package、Session layout 或 Host API。
 
-状态：设计已确认，尚未实现。
+本文定义未来可能跨 Room 长期存在的 Agent Member：身份、运行配置、能力、活动记录、设置页管理界面，以及它与 Room 私有上下文之间的边界。文中旧 `sessions/` 与 sidecar 布局属于待重写的 v1 实施提案；未来实现必须服从 v2 Session Journal、Plugin ABI 和 RuntimeHandle 契约。
 
 相关文档：
 
 - `docs/design-docs/collaboration/agent-form-room.md`：Room 如何选择 Member、触发运行、读取 Room Log 和提交消息。
 - `docs/design-docs/frontend/front-设置页规范.md`：设置页整体导航与 Members 分区的信息架构。
-- `docs/design-docs/agent-runtime/agent-testing.md`：Member 与 Room 的后端测试入口。
+- `docs/design-docs/agent-plugin-runtime/agent-spec-agent-and-subagent.md`：v2 Agent / Subagent 与 child Session 的公共契约；Member/Room 的实现测试需遵循当前 Runtime 入口。
 
 参考：
 

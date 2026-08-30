@@ -38,7 +38,7 @@
 - `docs/design-docs/frontend/front-主题与配色规范.md`：**改任何带颜色的样式前必读**。三态主题机制 + 「颜色必须随主题翻转、禁止 `text-black`/`bg-white`/`#hex` 等非主题感知字面量」的硬约束，且要求浅/深双主题都验过。
 
 - `docs/design-docs/index.md`：设计文档总索引；按根层入口或一级强关联专题目录进入对应设计。
-- `docs/design-docs/agent-runtime/agent-testing.md`：后端 Agent 测试策略、目录约定和覆盖范围。
+- `docs/design-docs/agent-plugin-runtime/agent-testing.md`：v2 后端 Agent 测试策略、package lifecycle、Runtime 与 Host 覆盖边界。
 
 - `docs/CODING_BEHAVIOR.md`：编码行为纪律——改代码时的操作级约束。
 - `docs/coding-standards/README.md`：编码规范、Skill 推荐清单和团队自定义约定。
@@ -48,10 +48,10 @@
 - `docs/references/README.md`：沉淀到仓库里的外部参考资料。
 - `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档；需要追溯历史修复方案时再读。
 
-## 插件代码（plugins/）
+## 外部能力代码
 
-- `plugins/browser-bridge/`：Browser Use / Browser Bridge 代码（Go CLI + Chrome Extension + 协议层）。原位于独立仓库 `actspace-plugins`，已于 2026-07-10 合并入主仓库。
-- `plugins/fs-watch/`：文件监听 Rust 插件。同上，已合并入主仓库。
+- `browser-bridge/`：Browser Use / Browser Bridge 代码（Go CLI + Chrome Extension + 协议层），是顶层 Host capability，不属于通用 workspace `plugins/` 目录。
+- 旧 `plugins/fs-watch/`：已退役的历史路径；v2 不再加载或启动它。
 - `/Users/wakeup-jin/Desktop/code-project/side-project/agent-browser-bridge/`：Browser Bridge 最早期来源仓库；仅作历史上下文。
 
 ## 阶段完成后的学习沉淀

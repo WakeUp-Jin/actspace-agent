@@ -154,7 +154,7 @@ export function Sheet({ open, onOpenChange, title, children }: Props) {
 }
 ```
 
-完整版见 `packages/desktop/src/renderer/components/ui/Sheet.tsx`，大约 150 行。
+完整版见 `apps/desktop/src/renderer/components/ui/Sheet.tsx`，大约 150 行。
 
 ---
 

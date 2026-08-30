@@ -89,4 +89,6 @@ if [[ "${missing}" -ne 0 ]]; then
   exit 1
 fi
 
+node "${repo_root}/scripts/check-current-docs.mjs"
+
 echo "文档骨架检查通过"

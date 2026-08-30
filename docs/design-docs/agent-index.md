@@ -1,39 +1,58 @@
 # Agent 设计文档
 
-本入口汇总 `packages/agent-core`、Agent Run/Turn/LLM Call、模型与上下文、工具系统、权限、协作形态、Kairos 和评估相关长期设计原则。这里回答“为什么这么设计、边界在哪里、哪些方案被排除”；具体实施步骤放在 `docs/exec-plans/`。
+本入口汇总 `packages/runtime` 与各领域 workspace package、Agent Run/Turn/LLM Call、模型与上下文、工具系统、权限和协作形态相关的当前 v2 设计原则。这里回答“为什么这么设计、边界在哪里、哪些方案被排除”；具体实施步骤放在 `docs/exec-plans/`。已退役的 v1 Runtime、Kairos、Lab、旧评估和旧工具方案见 [`v1-legacy/`](v1-legacy/)，不作为新功能默认事实来源。
 
 Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；本入口保留在根层，因为它需要跨越全部 Agent 专题。
 
-## Runtime
+## v2 插件化 Runtime 设计
 
-- `agent-runtime/agent-backend-design.md`：后端 Agent Runtime 总体设计事实来源。
-- `agent-runtime/agent-host-neutral-runtime-and-cli.md`：宿主无关 Runtime、Desktop Adapter，以及 CLI `run` / `chat` 双模式的目标边界。
-- `agent-runtime/agent-turn-layers.md`：Renderer、Main Process、Bridge、Agent 四层职责规范。
-- `agent-runtime/agent-observability-trace-model.md`：Session V2 与分析 Trace 的 ID、事件、安全和读取契约。
-- `agent-runtime/agent-current-module-map.md`：当前 `packages/agent-core` 已落地模块地图。
-- `agent-runtime/agent-testing.md`：后端 Agent 内部测试策略和覆盖范围。
+- `agent-plugin-runtime/agent-target-overall-architecture.md`：面向新读者的 v2 总体分层、启动流、单次任务流、Session 真相模型和决策状态。
+- `agent-plugin-runtime/README.md`：研究证据、已确认目标、公共契约和条件采用门禁的总入口。
+- `agent-plugin-runtime/agent-decisions-v2-foundation.md`：当前已确认决策总账、已关闭开放项和完整交付边界。
+- `agent-plugin-runtime/agent-decision-cordis-adoption.md`：DSH Cordis 发布族的采用范围、门禁和回退条件。
+- `agent-plugin-runtime/agent-target-agent-core.md`：ActSpace 自有 Agent Core、固定 Boot 边界和核心不变量。
+- `agent-plugin-runtime/agent-target-session-and-context.md`：append-only Session、Surface、Event Codec 和 Context assembly。
+- `agent-plugin-runtime/agent-target-llm-adapter.md`：pi-ai Adapter 边界、proxy/error/usage 门禁。
+- `agent-plugin-runtime/agent-target-runtime-architecture.md`：Profile / Bundle / Patch 的历史目标基线（RuntimeHandle 表述已由 Profile-first 决策替代）。
+- `agent-plugin-runtime/agent-spec-plugin-runtime-abi.md`：受信任插件来源、manifest / codec / behavior 分离、稳定 identity、Host ceiling、restart-only 和生命周期公共契约。
+- `agent-plugin-runtime/agent-spec-session-format-v1.md`：raw JSONL Session、Header / Event Envelope、Surface、codec、repair、fork、compaction 和 writer lease 规范。
+- `agent-plugin-runtime/agent-spec-tool-runtime-abi.md`：Tool definition / executor、prepared lease、policy、approval、checkpoint、并发和 result 公共契约。
+- `agent-plugin-runtime/agent-spec-runtime-projection.md`：Session、live progress、diagnostics、generic Tool DTO、renderer allowlist 和 fallback 契约。
+- `agent-plugin-runtime/agent-spec-prompt-context-contributors.md`：动态上下文来源、确定性排序、Skills、Host facts 和 logical request snapshot 契约。
+- `agent-plugin-runtime/agent-spec-agent-and-subagent.md`：main Agent、Agent / Explore、static Preset、one-shot Subagent、child Session 和 Todo durable events 契约。
+- `agent-plugin-runtime/agent-testing.md`：package contract、Plugin lifecycle、领域行为、Runtime、Host 与外部人工门禁的测试分层。
+- `agent-plugin-runtime/agent-spec-session-core-persistence-separation.md`：Session Core、Persistence Definition 与 JSONL Provider 的可替换边界。
+- `agent-plugin-runtime/agent-spec-service-definition-provider-consumer.md`：全域 Service Definition / Provider / Consumer ABI、依赖方向与生命周期验证。
+- `agent-plugin-runtime/agent-spec-profile-bundle-patch-layering.md`：Profile / Bundle / Patch 组合、Host capability ceiling 与唯一 BootManifest。
+- `agent-plugin-runtime/agent-spec-contract-matrix-generation.md`：声明驱动的事件、Service、Composition、package export 契约矩阵生成和漂移门禁。
+- `agent-plugin-runtime/agent-research-dsh-architecture.md`：DSH 的 Cordis 生命周期、配置组合、Agent 语义和 Host / Client 扩展机制。
+- `agent-plugin-runtime/agent-research-actspace-current-state.md`：v1 Runtime、Context、Tools、Persistence、Desktop 与 Kairos 耦合的研究证据；v2 去留以相邻目标文档为准。
+- `agent-plugin-runtime/agent-research-capability-disposition.md`：现有能力的 Keep / Adapt / Rewrite / Delete / Defer 判断。
+
+该专题已经确定 v2 产品范围和公共语义，并已生成完整交付计划与当前阶段的 [P1/P2 总 execution plan](../exec-plans/active/20260829-actspace-p1-p2-contract-and-composition/README.md)。当前实现入口已经切换到 v2；P1/P2 尚待实施，外部 registry、packaged Electron 和真实 Provider/Browser 验收仍需在可用环境执行。
+
+## Runtime 观测层
+
+- `agent-runtime/agent-turn-layers.md`：Host、Profile Bootstrap / App Bundle、Agent semantics、capability execution、Journal / Projection 五层职责规范。
+- `agent-runtime/agent-observability-trace-model.md`：Journal 派生的 Agent Run / Turn / request / tool 分析观测契约。
 
 ## 模型与上下文
 
 - `model-context/agent-multi-provider-llm.md`：DeepSeek、Kimi、OpenRouter 多供应商和模型管理目标态。
-- `model-context/agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力边界。
-- `model-context/agent-token-usage-and-context-state.md`：token usage、成本统计和 context state 分层。
-- `model-context/agent-context-compression.md`：上下文压缩与大工具输出边界。
-- `model-context/agent-cache-loss-audit.md`：缓存失效排查设计。
+- `model-context/agent-deepseek-kimi-hybrid-capabilities.md`：DeepSeek 主模型与 Kimi 辅助能力的历史兼容背景；v2 Adapter 边界优先见 `agent-plugin-runtime/agent-target-llm-adapter.md`。
+- `model-context/agent-token-usage-and-context-state.md`：provider usage、request snapshot、成本统计与 Context Projection 分层。
 
 ## 工具系统
 
 - `tool-system/agent-skill-loading.md`：Skill 目录生态、渐进式披露和加载边界。
 - `tool-system/agent-web-tools.md`：`web_fetch` 与多供应商 `web_search` 设计。
 - `tool-system/agent-tool-preview-design-guidelines.md`：新增工具必须遵守的前端预览契约。
-- `tool-system/agent-subprocess-runner-guidelines.md`：agent-core 内部受控子进程规范。
+- `tool-system/agent-subprocess-runner-guidelines.md`：v2 Runtime Core Tools 的受控子进程规范。
 
 ## 执行安全
 
-- `execution-safety/agent-权限设计规则和原则.md`：工具权限、用户审核和风险分层总原则。
-- `execution-safety/agent-tool-approval-pause-resume.md`：工具审核暂停恢复和幂等 decision。
-- `execution-safety/agent-bash-policy-allowlist-design.md`：Bash 全局策略、会话 allowlist 和沙箱路线。
-- `execution-safety/agent-bash工具设计文档.md`：Bash 工具契约、输出管道、后台运行和沙盒执行模型。
+- `execution-safety/README.md`：当前 v2 Tool Runtime、审批、Host capability、Bash hard guard 和 outcome-unknown 边界。
+- `execution-safety/agent-权限设计规则和原则.md`：长期工具权限、用户审核和风险分层原则；具体 API 以 v2 Tool Runtime ABI 为准。
 
 ## Browser Use
 
@@ -45,25 +64,12 @@ Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；�
 
 ## 协作形态
 
-- `collaboration/agent-members.md`：跨 Room 持久 Agent Member 设计。
-- `collaboration/agent-subagent-runtime.md`：通用 Subagent 运行时和 transcript 边界。
-- `collaboration/agent-explore-subagent.md`：只读 Explore 子代理设计。
-- `collaboration/agent-form-room.md`：Agent Room 设计规范。
-- `collaboration/agent-form-team.md`：Agent Team 设计规范。
+- `collaboration/agent-subagent-runtime.md`：当前一次性 Subagent 与 child Session 边界。
+- `collaboration/agent-explore-subagent.md`：当前 Explore 静态 Preset 与只读工具限制。
+- `collaboration/agent-members.md`：未来 Room / Team 产品设计中的持久 Agent Member，不是当前 v2 Runtime 事实。
+- `collaboration/agent-form-room.md`：未来 Agent Room 产品设计；实现机械结构尚未迁入 v2。
+- `collaboration/agent-form-team.md`：未来 Agent Team 产品设计；实现机械结构尚未迁入 v2。
 
-## Kairos
+## 历史设计
 
-- `kairos/agent-kairos-autonomous-mode.md`：Kairos 自治模式、tick 调度和事件流。
-- `kairos/agent-kairos-prompt-design.md`：Kairos Prompt 分层、人格和规则设计。
-- `kairos/agent-kairos-prompt-cache-optimization.md`：Prompt 缓存和观测增量化。
-- `kairos/agent-kairos-notifications.md`：Kairos 通知中心设计。
-- `kairos/front-Kairos监控页规范.md`：Kairos 监控页和聊天态 compact view。
-
-## 评估
-
-- `evaluation/agent-evaluation.md`：Agent 评估模块、独立评估仓库和评分器设计。
-- `evaluation/agent-eval-failure-candidate.md`：`/eval` 失败回归 Candidate 生成与导入边界。
-
-## 独立集成
-
-- `agent-plugins-fs-watch.md`：Plugins 模式与 fs-watch 文件监听设计。
+- `v1-legacy/README.md`：v1 旧 Runtime、旧 CLI、Kairos、Lab、旧评估、旧 Todo、fs-watch 和 DuckCoding 文字模型设计的归档规则与替代入口。

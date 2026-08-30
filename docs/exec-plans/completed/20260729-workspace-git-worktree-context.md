@@ -40,7 +40,7 @@
 - `docs/design-docs/frontend/front-workspace-git-worktree-context.md`
 - `docs/design-docs/core-storage-and-observability.md`
 - `docs/design-docs/core-review-change-sources.md`
-- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
 - 改完代码前读取 `docs/HISTORY_GUIDE.md`、`docs/QUALITY_SCORE.md`；如果满足学习沉淀标准，再读取 `docs/learnings/WRITING_GUIDE.md`。
 
 ## 当前实现基线

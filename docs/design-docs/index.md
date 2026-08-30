@@ -1,6 +1,6 @@
 # 设计文档索引
 
-`docs/design-docs/` 集中管理长期架构设计、产品设计和重要设计决策。目录采用“根层入口或独立文档 + 一级强关联专题目录”的结构。
+`docs/design-docs/` 集中管理当前 v2 架构设计、产品设计和重要设计决策。已经被 v2 替代、删除或暂停的 v1 设计统一放在 [`v1-legacy/`](v1-legacy/)，避免新任务把历史方案误读成当前默认。
 
 ## 目录硬约束
 
@@ -8,7 +8,7 @@
 - 专题目录里面只能直接放文件，禁止继续创建 `assets/`、`public/`、`mockups/`、`runtime/` 等子目录。
 - 只有强关联、需要一起阅读和维护的文档才进入同一专题目录。
 - 跨专题入口、基础原则和无法形成稳定专题的独立设计继续放在根层。
-- 专题目录已经表达归属，现阶段仍保留 `agent-`、`front-`、`lab-` 文件名前缀，避免目录迁移与全面重命名同时发生。
+- 专题目录已经表达归属，现阶段仍保留 `agent-`、`front-` 文件名前缀，避免目录迁移与全面重命名同时发生。
 - HTML prototype 和 PNG 设计图直接放在所属专题目录，通过文件名表达用途。
 
 新增专题目录前应先确认：至少有两份长期强关联文档，并且把它们放在一起能明显降低查找成本。否则不要为了分类而创建空目录或单文件目录。
@@ -20,34 +20,60 @@
 - `core-review-change-sources.md`：Git-first Review Workbench 单一事实源，覆盖六种 scope、upstream Branch、结构化 diff、Review Options、Git actions 与验收边界。
 - `core-review-large-diff-loading.md`：Review Standard/capped 双模式、批量 patch、完整文件正文、虚拟渲染和性能验收规范。
 - `agent-index.md`：Agent Runtime 和全部 Agent 专题的总入口。
-- `agent-plugins-fs-watch.md`：独立 fs-watch 插件设计；当前没有其他同级插件设计与它形成稳定专题。
-- `website-introduction-site-design.md`：`packages/site` 官网、公开文档、博客、更新页、视觉系统和静态部署的长期设计规范。
+- `website-introduction-site-design.md`：`apps/site` 官网、公开文档、博客、更新页、视觉系统和静态部署的长期设计规范。
 
 ## 一级专题目录
 
 | 目录 | 内容边界 | 入口或代表文档 |
 |---|---|---|
-| `agent-runtime/` | Agent 主运行时、宿主 Adapter、CLI、Run/Turn/LLM Call 分层、分析 Trace、当前模块和内部测试 | `docs/design-docs/agent-runtime/agent-backend-design.md`、`docs/design-docs/agent-runtime/agent-host-neutral-runtime-and-cli.md` |
-| `model-context/` | 模型供应商、模型能力、远端模型目录、token、上下文压缩和缓存审计 | `docs/design-docs/model-context/agent-multi-provider-llm.md`（DuckCoding 专题保留为历史记录） |
-| `tool-system/` | Skill、Todo/Web/图片生成/图片分析工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md`、`docs/design-docs/tool-system/agent-todo-tools.md`、`docs/design-docs/tool-system/agent-image-inspection-tool.md` |
-| `execution-safety/` | 工具权限、审批暂停恢复、Bash 策略和执行模型 | `docs/design-docs/execution-safety/agent-权限设计规则和原则.md` |
+| `agent-plugin-runtime/` | v2 后端插件化重构的总体架构、研究证据、已确认决策、目标边界、包结构与公共契约 | `docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md`、`docs/design-docs/agent-plugin-runtime/README.md` |
+| `agent-runtime/` | 当前 Agent Run / Turn / LLM Call 分层与分析观测数据契约 | `docs/design-docs/agent-runtime/agent-turn-layers.md`、`docs/design-docs/agent-runtime/agent-observability-trace-model.md` |
+| `model-context/` | 当前模型供应商、模型能力、request snapshot、token usage 和 Context Projection | `docs/design-docs/model-context/agent-multi-provider-llm.md` |
+| `tool-system/` | 当前 Skill、Web/图片工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md`、`docs/design-docs/tool-system/agent-image-inspection-tool.md` |
+| `execution-safety/` | v2 Tool Runtime、Host policy、审批、Bash hard guard 和副作用恢复边界 | `docs/design-docs/execution-safety/README.md` |
 | `browser/` | Browser Bridge、ActSpace 集成和 canonical command | `docs/design-docs/browser/agent-browser-use-index.md` |
-| `collaboration/` | Member、Subagent、Explore、Room 和 Team | `docs/design-docs/collaboration/agent-members.md` |
-| `kairos/` | Kairos Runtime、Prompt、通知、监控页与通知原型 | `docs/design-docs/kairos/agent-kairos-autonomous-mode.md` |
-| `evaluation/` | Agent 评估架构和失败回归 Candidate | `docs/design-docs/evaluation/agent-evaluation.md` |
+| `collaboration/` | 当前一次性 Subagent / Explore，以及尚未迁入 v2 的未来 Member、Room、Team 产品设计 | `docs/design-docs/collaboration/agent-subagent-runtime.md` |
 | `frontend/` | 桌面端视觉、主题、组件、工作台、页面和前端原型 | `README.md` |
-| `lab/` | Lab 产品、页面、Runtime、版本路线、Rust CLI 和原型 | `README.md` |
+| `v1-legacy/` | 已退役、被 v2 替代或暂停的 v1 设计、研究稿和原型资产；禁止作为新功能事实来源 | `README.md` |
 
 ## 推荐阅读路线
 
 ### Agent Runtime
 
 1. `agent-index.md`
-2. `agent-runtime/agent-backend-design.md`
-3. 涉及 Desktop / CLI 多宿主时读 `agent-runtime/agent-host-neutral-runtime-and-cli.md`
+2. `agent-plugin-runtime/README.md`
+3. 涉及 v2 Desktop / CLI 多宿主时读 `agent-plugin-runtime/agent-target-runtime-architecture.md`
 4. `agent-runtime/agent-turn-layers.md`
 5. 涉及分析观测时读 `agent-runtime/agent-observability-trace-model.md`
-6. 根据任务进入 `model-context/`、`tool-system/`、`execution-safety/`、`browser/`、`collaboration/`、`kairos/` 或 `evaluation/`
+6. 根据任务进入 `model-context/`、`tool-system/`、`execution-safety/`、`browser/` 或 `collaboration/`
+
+### v2 插件化 Runtime 重构设计
+
+1. `agent-plugin-runtime/agent-target-overall-architecture.md`
+2. `agent-plugin-runtime/README.md`
+3. `agent-plugin-runtime/agent-decision-dsh-native-plugin-runtime.md`（本轮 DSH-native 启动提案，待评审）
+4. `agent-plugin-runtime/agent-decisions-v2-foundation.md`
+5. `agent-plugin-runtime/agent-decision-cordis-adoption.md`
+6. `agent-plugin-runtime/agent-target-agent-core.md`
+7. `agent-plugin-runtime/agent-target-session-and-context.md`
+8. `agent-plugin-runtime/agent-target-llm-adapter.md`
+9. `agent-plugin-runtime/agent-target-runtime-architecture.md`
+10. `agent-plugin-runtime/agent-spec-plugin-runtime-abi.md`
+11. `agent-plugin-runtime/agent-spec-dsh-event-model.md`
+12. `agent-plugin-runtime/agent-spec-agent-loop-cordis-surface.md`
+13. `agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md`
+14. `agent-plugin-runtime/agent-spec-dsh-runtime-as-plugin-composition.md`
+15. `agent-plugin-runtime/agent-spec-tool-runtime-boundary.md`
+16. `agent-plugin-runtime/agent-spec-tool-name-contract.md`
+17. `agent-plugin-runtime/agent-spec-session-format-v1.md`
+18. `agent-plugin-runtime/agent-spec-tool-runtime-abi.md`
+19. `agent-plugin-runtime/agent-spec-runtime-projection.md`
+20. `agent-plugin-runtime/agent-spec-prompt-context-contributors.md`
+21. `agent-plugin-runtime/agent-spec-agent-and-subagent.md`
+22. `agent-plugin-runtime/agent-spec-core-cordis-services.md`
+23. 需要复核证据时再读三份 `agent-research-*` 文档
+
+这一专题的产品范围和公共语义已经确认，但仍不是 execution plan，也不授权开始代码重写。当前 v2 实现事实以 `packages/runtime/`、领域 workspace packages、`packages/shared/` 和对应 execution plan 为准；`v1-legacy/` 中的同名旧设计只用于迁移追溯。
 
 ### 前端
 
@@ -56,13 +82,6 @@
 3. `frontend/front-主题与配色规范.md`
 4. 涉及分析观测页面时读 `frontend/front-agent-analysis-observability.md`
 5. 再进入具体工作台区域、组件或页面规范
-
-### Lab
-
-1. `lab/README.md`
-2. `lab/lab-product-design.md`
-3. `lab/lab-runtime-architecture.md`
-4. `lab/lab-versions-index.md`
 
 ### 官网与公开内容
 

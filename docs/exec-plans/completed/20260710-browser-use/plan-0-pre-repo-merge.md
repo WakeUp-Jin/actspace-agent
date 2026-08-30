@@ -15,7 +15,7 @@ actspace-agent 仓库：
 - `plugins/` 目录（新建，整体迁入）
 - `docs/ARCHITECTURE.md`（更新结构说明）
 - `docs/design-docs/browser/agent-browser-bridge-design.md`（更新路径引用）
-- `docs/design-docs/agent-plugins-fs-watch.md`（更新路径引用）
+- `docs/design-docs/v1-legacy/agent-plugins-fs-watch.md`（更新路径引用）
 - `docs/design-docs/browser/agent-browser-use-integration-design.md`（更新路径引用）
 - `.gitignore`（添加 Go/Rust 构建产物排除）
 - `AGENTS.md`（更新"相关平级项目"段落）
@@ -28,7 +28,7 @@ actspace-agent 仓库：
 mkdir -p plugins
 
 # 迁入 browser-bridge（排除 .git）
-cp -R /Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/plugins/browser-bridge plugins/browser-bridge
+cp -R /Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/browser-bridge browser-bridge
 
 # 迁入 fs-watch（排除构建产物）
 cp -R /Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/plugins/fs-watch plugins/fs-watch
@@ -37,14 +37,14 @@ rm -rf plugins/fs-watch/target
 
 验证：
 ```bash
-ls plugins/browser-bridge/apps/cli/main.go  # 文件存在
+ls browser-bridge/apps/cli/main.go  # 文件存在
 ls plugins/fs-watch/src/main.rs             # 文件存在
 ```
 
 ### 任务 pre.2：验证 Go 编译
 
 ```bash
-cd plugins/browser-bridge && go build ./...
+cd browser-bridge && go build ./...
 ```
 
 如果 go.work 中有相对路径引用外部目录，需要调整为本仓库内的相对路径。
@@ -63,7 +63,7 @@ use (
 
 验证：
 ```bash
-cd plugins/browser-bridge && go test ./...
+cd browser-bridge && go test ./...
 ```
 
 ### 任务 pre.3：验证 Rust 编译（fs-watch）
@@ -81,7 +81,7 @@ cd plugins/fs-watch && cargo build --release
 ```gitignore
 # Plugins build artifacts
 plugins/fs-watch/target/
-plugins/browser-bridge/apps/cli/abb
+browser-bridge/apps/cli/abb
 ```
 
 ### 任务 pre.5：更新 AGENTS.md
@@ -90,13 +90,13 @@ plugins/browser-bridge/apps/cli/abb
 
 旧：
 ```
-- `/Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/`：外部能力插件集合仓库；`fs-watch` 位于 `plugins/fs-watch/`，Browser Use / Browser Bridge 主线代码位于 `plugins/browser-bridge/`。
-- `/Users/wakeup-jin/Desktop/code-project/side-project/agent-browser-bridge/`：Browser Bridge 迁移来源仓库；保留作历史上下文，新的主位置以 `actspace-plugins/plugins/browser-bridge/` 为准。
+- `/Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/`：外部能力插件集合仓库；`fs-watch` 位于 `plugins/fs-watch/`，Browser Use / Browser Bridge 主线代码位于 `browser-bridge/`。
+- `/Users/wakeup-jin/Desktop/code-project/side-project/agent-browser-bridge/`：Browser Bridge 迁移来源仓库；保留作历史上下文，新的主位置以 `actspace-plugins/browser-bridge/` 为准。
 ```
 
 新：
 ```
-- `plugins/browser-bridge/`：Browser Use / Browser Bridge 代码（Go CLI + Chrome Extension + 协议层）。原位于独立仓库 `actspace-plugins`，已于 2026-07-10 合并入主仓库。
+- `browser-bridge/`：Browser Use / Browser Bridge 代码（Go CLI + Chrome Extension + 协议层）。原位于独立仓库 `actspace-plugins`，已于 2026-07-10 合并入主仓库。
 - `plugins/fs-watch/`：文件监听 Rust 插件。同上，已合并入主仓库。
 - `/Users/wakeup-jin/Desktop/code-project/side-project/agent-browser-bridge/`：Browser Bridge 最早期来源仓库；仅作历史上下文。
 ```
@@ -106,14 +106,14 @@ plugins/browser-bridge/apps/cli/abb
 在"当前仓库结构"中追加：
 
 ```markdown
-- `plugins/browser-bridge`：Browser Use Go bridge CLI、Chrome Extension 和协议层。
+- `browser-bridge`：Browser Use Go bridge CLI、Chrome Extension 和协议层。
 - `plugins/fs-watch`：文件监听 Rust 插件。
 ```
 
 在"包分层与依赖边界"中追加：
 
 ```markdown
-- `plugins/browser-bridge`
+- `browser-bridge`
   - 独立 Go 模块，不参与 pnpm workspace
   - 通过 Unix socket 与 `agent-core` 通信
   - 不依赖 TS 编译产物
@@ -124,11 +124,11 @@ plugins/browser-bridge/apps/cli/abb
 
 ### 任务 pre.7：更新设计文档路径引用
 
-在以下文档中，将 `actspace-plugins/plugins/browser-bridge/` 路径替换为 `plugins/browser-bridge/`：
+在以下文档中，将 `actspace-plugins/browser-bridge/` 路径替换为 `browser-bridge/`：
 
 - `docs/design-docs/browser/agent-browser-bridge-design.md`
 - `docs/design-docs/browser/agent-browser-use-integration-design.md`
-- `docs/design-docs/agent-plugins-fs-watch.md`
+- `docs/design-docs/v1-legacy/agent-plugins-fs-watch.md`
 
 将 `actspace-plugins` 的"独立仓库"表述改为"plugins/ 目录"。
 
@@ -145,9 +145,9 @@ rg "actspace-plugins" packages/ docs/
 
 ## 验证方式
 
-- `ls plugins/browser-bridge/apps/cli/main.go` 存在
+- `ls browser-bridge/apps/cli/main.go` 存在
 - `ls plugins/fs-watch/src/main.rs` 存在
-- `cd plugins/browser-bridge && go build ./... && go test ./...` 通过
+- `cd browser-bridge && go build ./... && go test ./...` 通过
 - `pnpm build` 通过（TS 侧不受影响）
 - `rg "actspace-plugins" .` 仅剩 history 和决策记录中的历史引用
 

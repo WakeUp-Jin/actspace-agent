@@ -2,8 +2,8 @@
  * Context bucket 单一配置注册表（单一事实来源）。
  *
  * 「改配置不改代码」：新增一种上下文类型时，只在这里加一行，并在
- * `packages/desktop/src/renderer/styles/tokens.css` 加一个对应的主题色 token。
- * 后端 bucket 生成（`agent-core/context/token-estimator.ts`）与前端 Context 弹窗
+ * `apps/desktop/src/renderer/styles/tokens.css` 加一个对应的主题色 token。
+ * Runtime bucket 生成与前端 Context 投影
  * （`desktop/renderer/components/ContextPopup.tsx`）都从这里取展示信息，未知 key 走兜底，
  * 不需要改组件代码。
  */

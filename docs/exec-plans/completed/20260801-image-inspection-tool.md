@@ -104,7 +104,7 @@
 ### 7. 文档、历史与学习判断
 
 1. 实现完成后更新 `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`，删除“没有视觉辅助工具”的过期事实并说明显式委托边界。
-2. 按实际实现更新 `docs/SECURITY.md`、`docs/RELIABILITY.md` 与 `docs/design-docs/agent-runtime/agent-current-module-map.md`。
+2. 按实际实现更新 `docs/SECURITY.md`、`docs/RELIABILITY.md` 与 `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`。
 3. 在 `docs/histories/` 记录功能、配置迁移、验证结果和未完成的真实 Provider 验收。
 4. 对照 `docs/HISTORY_GUIDE.md`、`docs/QUALITY_SCORE.md`，完成脱敏与质量分层检查。
 5. 本任务涉及不可信多模态输入、外部数据发送和工具输出上下文治理，满足学习文档条件；读取 `docs/learnings/WRITING_GUIDE.md` 后沉淀一篇可迁移的设计学习。

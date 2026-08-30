@@ -8,7 +8,7 @@
 
 | 项目 | 结果 | 证据 |
 | --- | --- | --- |
-| 新 `abb` 构建 | 通过 | `plugins/browser-bridge/build.sh` |
+| 新 `abb` 构建 | 通过 | `browser-bridge/build.sh` |
 | Native Host manifest | 通过 | allowlist 指向固定 Extension ID `eneeikpgpieikinaimmgmdiafbgbanei` |
 | Native Host 原子升级 | 通过 | URL wait 修复版构建产物与安装二进制 SHA-256 均为 `a242c58b1a76576e4293c46143f2df38030b33d7231d98ae2eba722cb2d584f0`，并通过同目录临时文件 + rename 替换 |
 | Extension reload | 通过 | 多轮 reload 后 `info.version=0.2.1`，runtime v3、CLI compatibility 和 session-scoped primitives 均进入真实运行路径 |
@@ -84,7 +84,7 @@
 本地 fixture server：
 
 ```bash
-python3 -m http.server 4173 --bind 127.0.0.1 --directory plugins/browser-bridge/test-fixtures/acceptance
+python3 -m http.server 4173 --bind 127.0.0.1 --directory browser-bridge/test-fixtures/acceptance
 ```
 
 以下内容逐条作为新的 Agent 输入发送。每条都要求 Agent 报告实际调用的 Browser 工具、category/action、tab id 和最终读取结果，不允许用 Bash、curl 或通用网页工具替代。
@@ -138,7 +138,7 @@ python3 -m http.server 4173 --bind 127.0.0.1 --directory plugins/browser-bridge/
 
 ```text
 继续使用当前 fixture 标签页，并只使用 Browser Use 工具完成三项高风险操作，每项都先展示审批并等我确认：
-1. 捕获文件选择器，把 /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/plugins/browser-bridge/test-fixtures/acceptance/sample.txt 选择到 #file-input，再读取 #file-output。
+1. 捕获文件选择器，把 /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/browser-bridge/test-fixtures/acceptance/sample.txt 选择到 #file-input，再读取 #file-output。
 2. 捕获下载并点击 #download-link，再报告 download_path 返回的文件名和 URL。
 3. 把纯文本 ABB_PLAN5_CLIPBOARD_20260711 写入剪贴板，再读回并精确比较。
 不要读取或上传其他文件，不要写入其他剪贴板格式，完成后不要关闭标签页。
@@ -186,9 +186,9 @@ python3 -m http.server 4173 --bind 127.0.0.1 --directory plugins/browser-bridge/
 用户重载扩展后先执行：
 
 ```bash
-plugins/browser-bridge/skill/scripts/abb doctor --json
-plugins/browser-bridge/skill/scripts/abb ping --json
-plugins/browser-bridge/skill/scripts/abb info --json
+browser-bridge/skill/scripts/abb doctor --json
+browser-bridge/skill/scripts/abb ping --json
+browser-bridge/skill/scripts/abb info --json
 ```
 
 socket 恢复后继续本文件矩阵，不重新执行已通过的代码层门禁。

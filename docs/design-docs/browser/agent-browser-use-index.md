@@ -19,7 +19,7 @@ Browser Use Plan 5 已完成：62/62 canonical commands 全部由 Go handler 实
 Model
   -> browser_help gateway
   -> next LLM call: 9 category tools + browser_help + browser_run
-  -> packages/agent-core browser adapter
+  -> packages/tools/browser-tools Browser capability adapter
        - definitions / approval / preview
        - BridgeClient / turn lifecycle
   -> Unix socket
@@ -123,7 +123,7 @@ ToolManager 始终注册上述 11 个 executor；渐进披露只改变模型 def
 
 - ToolManager 将“executor 已注册”和“definition 对模型可见”分离；非 Browser 工具继续始终可见。
 - `browser_help` 是 Browser progressive disclosure gateway，成功结果只写入 pending group；Agent Loop 到下一次 LLM 调用前才提交，避免同一批 tool calls 顺序执行时意外放行隐藏工具。
-- 披露范围是单次 `Agent.run()`；下一条用户消息和下一次 Kairos tick 都重置为仅 gateway 可见。
+- 披露范围是单次 `Agent.run()`；下一条用户消息会重置为仅 gateway 可见。
 - Context usage、Context 完整视图和手动 compact 统一消费 `getToolDefinitions()`，不再从全部注册工具重新组装。
 - 设置页首屏只显示“浏览器”总开关；分类工具、批处理和高风险 capability 位于默认折叠的高级设置中。关闭总开关保留子项偏好，并同时移除 Browser prompt segment 与 Socket runtime 注入。
 

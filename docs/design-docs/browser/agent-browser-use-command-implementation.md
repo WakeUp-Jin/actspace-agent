@@ -67,10 +67,10 @@ Chrome DevTools Protocol 是所有浏览器操作的最底层。全部 62 条命
 | Tab Group 管理 | Extension | 创建/命名/移动 tab group |
 | 请求路由与 registry | Go Command Engine | 接收 socket 请求，校验和 dispatch 62 条命令，只把 primitive 调用发给 Extension |
 | Session 生命周期 | Go Command Engine | 管理 session 创建/销毁、attach 状态、native host 连接和事件订阅 |
-| 工具定义 | agent-core | `definition.ts` 中的参数 schema |
-| 工具 executor | agent-core | 调用 BridgeClient 发送请求 |
+| 工具定义 | v2 Runtime | `definition.ts` 中的参数 schema |
+| 工具 executor | v2 Runtime | 调用 BridgeClient 发送请求 |
 | 结构化浏览器错误 | Go Command Engine | 统一 code、phase、retryable 和脱敏 details |
-| 错误呈现 | agent-core | 将 bridge 错误裁剪为模型和用户可读信息 |
+| 错误呈现 | v2 Runtime | 将 bridge 错误裁剪为模型和用户可读信息 |
 
 ---
 

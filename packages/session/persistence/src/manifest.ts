@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.session.persistence", version: "0.1.0", name: "ActSpace Session Persistence", entry: { entryId: "session.persistence", behavior: "./plugin.js" }, host: { required: ["filesystem.session"], optional: [] }, frontend: null, contributions: { services: ["session.persistence"], tools: [], prompts: [], events: [] } });

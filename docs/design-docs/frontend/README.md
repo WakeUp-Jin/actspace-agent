@@ -56,7 +56,7 @@
 - `docs/design-docs/frontend/front-usage-statistics.md`：Usage Statistics 页面和数据展示规范。
 - `docs/design-docs/frontend/front-agent-analysis-observability.md`：分析观测的产品边界、两栏信息架构、请求详情、上下文对比、主题与 Trace 可靠性规范。
 
-Kairos 监控页与 Kairos Runtime 强关联，统一维护在相邻的 `../kairos/` 专题目录。
+Kairos 和 Lab 原型属于已退役/暂停的 v1 设计资产，统一归档在 [`../v1-legacy/`](../v1-legacy/)，不作为当前桌面端页面入口。
 
 ## 当前基线图
 

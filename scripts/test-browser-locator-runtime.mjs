@@ -7,10 +7,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const requireFromDesktop = createRequire(path.join(repoRoot, "packages/desktop/package.json"));
+const requireFromDesktop = createRequire(path.join(repoRoot, "apps/desktop/package.json"));
 const { JSDOM } = requireFromDesktop("jsdom");
 const runtime = readFileSync(
-  path.join(repoRoot, "plugins/browser-bridge/apps/cli/internal/locator/generated/runtime.js"),
+  path.join(repoRoot, "browser-bridge/apps/cli/internal/locator/generated/runtime.js"),
   "utf8",
 );
 

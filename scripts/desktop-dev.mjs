@@ -8,7 +8,7 @@ import { exitCodeForSignal, startManagedCommand } from "./dev-process-runner.mjs
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(scriptPath), "..");
-const desktopRoot = join(repoRoot, "packages", "desktop");
+const desktopRoot = join(repoRoot, "apps", "desktop");
 const logEnabled = process.argv.includes("--log");
 const FORCE_KILL_AFTER_MS = 4_000;
 const EXIT_CLEANUP_GRACE_MS = 250;
@@ -110,14 +110,12 @@ async function closeLog() {
 async function main() {
   await initializeLogging();
   const phases = [
-    ["pnpm", ["--filter", "@actspace/desktop", "native:prepare"], repoRoot],
     ["pnpm", ["--filter", "@actspace/desktop", "run", "build:deps"], repoRoot],
     ["pnpm", [
       "exec",
       "concurrently",
       "-k",
       "pnpm:dev:shared",
-      "pnpm:dev:agent-core",
       "pnpm:dev:renderer",
       "pnpm:dev:electron:build",
       "pnpm:dev:electron:run",

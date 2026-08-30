@@ -42,7 +42,7 @@ export default hljs;
 
 ```sh
 pnpm build
-rg -c 'brainfuck|vhdl|erlang' packages/desktop/dist/assets/*.js   # 期望 0
+rg -c 'brainfuck|vhdl|erlang' apps/desktop/dist/assets/*.js   # 期望 0
 ```
 
 这条 grep 比体积数字更能说明问题：它直接回答「那 176 种语法还在不在」。把它写进执行计划的验证方式，下次有人手滑改回默认入口，一眼就能发现。

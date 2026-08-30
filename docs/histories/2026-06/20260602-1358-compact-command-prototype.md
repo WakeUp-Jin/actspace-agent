@@ -83,7 +83,7 @@
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/desktop/src/renderer/components/ConversationView.tsx`
 - `packages/desktop/src/renderer/components/messages/CompactCommandBlock.tsx`
-- `docs/design-docs/model-context/agent-context-compression.md`
+- `docs/design-docs/v1-legacy/model-context-context-compression.md`
 - `docs/design-docs/agent-runtime/agent-turn-layers.md`
 - `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/exec-plans/completed/20260602-compact-command-ui.md`

@@ -1,8 +1,14 @@
 # Agent 形态 — Agent Room 设计规范
 
-## 当前状态
+## 文档状态
 
-本文档是 Agent Room 形态的设计事实来源。Agent Room 是三种 Agent 形态之一（Solo / Team / Room），用于开放性讨论、搜索、辩论和头脑风暴场景：多个平等 Agent 在共享消息流中各自发言。
+> 文档等级：future-product-design
+>
+> Agent Room 不属于当前 v2 已交付 Runtime。本文只保留未来 Room 的产品语义、调度不变量和 UI 方向，不是当前 package、Session、Event 或 Host API 的事实来源。
+
+本文中的 `sessions/<sessionId>/`、`session.jsonl`、Room sidecar 和 `packages/agent-runtime` 是 v1 时期的机械实施提案。未来实施必须把共享事实建模为 v2 Journal Event / Surface / child Session 或新的已评审领域 package，并单独制定 execution plan；禁止把本文旧路径当作当前接口。
+
+Agent Room 的目标仍是开放性讨论、搜索、辩论和头脑风暴场景：多个平等 Agent 在共享消息流中各自发言。
 
 UI 交互参考原型：`docs/design-docs/collaboration/agent-room-preview.html`。该原型当前只作为消息流与角色布局的早期视觉参考；本文新增的状态文字、运行详情、错误恢复和停止控制尚未同步到原型，实现前需要单独更新。
 
@@ -1135,7 +1141,7 @@ interface RoomAgentDeps {
 ### 建议模块结构
 
 ```text
-packages/agent-core/src/room/
+packages/agent-runtime/src/room/
 ├── coordinator.ts
 ├── agent-runtime.ts
 ├── bridge.ts
@@ -1273,7 +1279,7 @@ Room 的机械协议和真实模型的讨论质量必须分开验证。自动化
 建议目录：
 
 ```text
-packages/agent-core/src/room/test/
+packages/agent-runtime/src/room/test/
 ├── coordinator.test.ts
 ├── draft-manager.test.ts
 └── room-runtime.test.ts
@@ -1337,13 +1343,13 @@ Renderer 首先使用浏览器 Mock 数据验证：
 |---------|---------|
 | `packages/shared/src/session.ts` | 新增共享 Room 消息、cycle、Draft 关联和 Room runtime stream event 契约 |
 | Member registry | Room 运行按 `memberId` 读取全局 AgentMember，并记录 `memberConfigVersion`；事实来源见 `docs/design-docs/collaboration/agent-members.md` |
-| `packages/agent-core/src/engine/loop.ts` | 原则上不改；Room Agent 复用现有执行循环 |
+| `packages/agent-runtime/src/engine/loop.ts` | 原则上不改；Room Agent 复用现有执行循环 |
 | 现有 Solo Bridge | 保持原有单 Agent 语义，不承载 Room 编排 |
-| 新增 `packages/agent-core/src/room/` | Coordinator、Agent Runtime、Room Bridge、DraftManager、事件和 Room 工具 |
-| Room tests | `packages/agent-core/src/room/test/` 使用脚本化 Mock 覆盖调度、Draft、预算、权限、失败隔离和恢复协议 |
+| 新增 `packages/agent-runtime/src/room/` | Coordinator、Agent Runtime、Room Bridge、DraftManager、事件和 Room 工具 |
+| Room tests | `packages/agent-runtime/src/room/test/` 使用脚本化 Mock 覆盖调度、Draft、预算、权限、失败隔离和恢复协议 |
 | Session persistence | `room/config.json` 保存 Member 引用与讨论策略；`session.jsonl` 保存共享 Room Log；`room/members/<memberId>.jsonl` 保存当前 Room 私有历史；`room/state.json` 保存可重建当前视图 |
-| `packages/desktop/src/main/` | 新增 Room IPC 编排、路径准备、事件写盘和 abort 生命周期管理 |
-| `packages/desktop/src/renderer/` | 新增 Room UI、状态订阅、@输入与消息适配 |
+| `apps/desktop/src/main/` | 新增 Room IPC 编排、路径准备、事件写盘和 abort 生命周期管理 |
+| `apps/desktop/src/renderer/` | 新增 Room UI、状态订阅、@输入与消息适配 |
 | IPC 契约 | 新增 Room run/abort/stream/session 恢复相关输入输出类型 |
 
 ## 非目标

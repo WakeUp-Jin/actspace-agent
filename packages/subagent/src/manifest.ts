@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.subagent", version: "0.1.0", name: "ActSpace One-shot Subagent", entry: { entryId: "subagent.one-shot", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: ["core.agent", "core.agent-loop", "session.journal", "tools.runtime"], contributions: { services: ["subagent.one-shot"], tools: ["agent.delegate"], prompts: [], events: ["delegation/started", "delegation/completed"] } });

@@ -16,7 +16,7 @@ ESM file cannot be loaded by `require`.
 对只想让 Vite config 使用 ESM、但不想影响 Electron main / preload CommonJS 编译的项目，最小做法是把配置文件改成 `.mts`：
 
 ```text
-packages/desktop/vite.config.ts  ->  packages/desktop/vite.config.mts
+apps/desktop/vite.config.ts  ->  apps/desktop/vite.config.mts
 ```
 
 然后把 renderer tsconfig 的 include 一起改掉：
@@ -46,7 +46,7 @@ packages/desktop/vite.config.ts  ->  packages/desktop/vite.config.mts
 
 ## 为什么不是直接改 package.json
 
-把整个 `packages/desktop/package.json` 改成 `"type": "module"` 会影响所有 `.js` / `.ts` 产物的默认模块语义，对 Electron main、preload、现有脚本和测试都有更大影响。
+把整个 `apps/desktop/package.json` 改成 `"type": "module"` 会影响所有 `.js` / `.ts` 产物的默认模块语义，对 Electron main、preload、现有脚本和测试都有更大影响。
 
 `.mts` 的好处是边界很窄：只有 Vite config 是 ESM，其他运行时配置保持原状。
 

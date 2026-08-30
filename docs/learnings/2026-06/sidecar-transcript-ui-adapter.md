@@ -30,7 +30,7 @@ SubAgent transcript 的工具事件通常是成对出现：
 tool_call: {
   id: "tc-read",
   name: "read_file",
-  arguments: { path: "packages/desktop/src/renderer/App.tsx" }
+  arguments: { path: "apps/desktop/src/renderer/App.tsx" }
 }
 
 tool_result: {

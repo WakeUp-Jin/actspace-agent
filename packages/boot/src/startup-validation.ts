@@ -1,0 +1,10 @@
+import type { CompositionEntry } from "@actspace/bundle";
+import type { StartupFailureCode, StartupValidationResult } from "./types.js";
+export type EntryActivationFact = { readonly entryId: string; readonly hasFiber: boolean; readonly state: "ACTIVE" | "PENDING" | "FAILED" | "DISPOSED"; readonly unresolvedServices?: readonly string[]; readonly providedServices?: readonly string[]; readonly error?: string };
+export function validateStartup(entries: readonly CompositionEntry[], activations: readonly EntryActivationFact[], requiredProviders: readonly string[]): StartupValidationResult {
+  const byId = new Map(activations.map((fact) => [fact.entryId, fact])); const failures: Array<{ code: StartupFailureCode; entryId: string; message: string }> = [];
+  for (const entry of entries) { if (!entry.enabled || entry.state === "skipped") continue; const fact = byId.get(entry.entryId); if (!fact?.hasFiber) { failures.push({ code: "ENTRY_FIBER_MISSING", entryId: entry.entryId, message: "Enabled Entry has no Fiber." }); continue; } if (fact.state === "FAILED") failures.push({ code: "ENTRY_FAILED", entryId: entry.entryId, message: fact.error ?? "Entry activation failed." }); else if (fact.state === "PENDING") failures.push({ code: "ENTRY_PENDING", entryId: entry.entryId, message: `Missing services: ${fact.unresolvedServices?.join(", ") || "unknown"}.` }); else if (fact.state !== "ACTIVE") failures.push({ code: "ENTRY_NOT_ACTIVE", entryId: entry.entryId, message: `Entry state is ${fact.state}.` }); }
+  const activeServices = new Set(activations.filter((fact) => fact.state === "ACTIVE").flatMap((fact) => fact.providedServices ?? []));
+  for (const provider of requiredProviders) if (!activeServices.has(provider)) failures.push({ code: "REQUIRED_PROVIDER_MISSING", entryId: provider, message: `Required service ${provider} is not provided by an active Entry.` });
+  return Object.freeze({ ok: failures.length === 0, failures: Object.freeze(failures.map((failure) => Object.freeze(failure))) });
+}

@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, "..");
-const desktopRoot = join(repositoryRoot, "packages", "desktop");
+const desktopRoot = join(repositoryRoot, "apps", "desktop");
 const requireFromDesktop = createRequire(join(desktopRoot, "package.json"));
 const electronExecutable = requireFromDesktop("electron");
 const electronVersion = requireFromDesktop("electron/package.json").version;

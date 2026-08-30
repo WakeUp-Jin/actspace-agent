@@ -1,164 +1,211 @@
 # Agent Run 五层职责规范
 
-> 约束一次用户输入从宿主界面进入 Agent，到执行、持久化、观测和结果展示的完整链路。文件名沿用历史命名；正文中的 Turn 只表示 Agent Loop 内真实的 `turn_start -> turn_end`。
+> 状态：当前 v2 Host、Runtime、Agent Loop、Session Journal 与固定 renderer 的职责边界。
 
-## 核心层级
+一次用户输入不是“前端调用一个 Agent 函数”。它会依次经过 Host、Profile Bundle Service、Agent Loop、LLM / Tool 服务和 Journal / Projection。任何新能力都必须先判断自己属于哪一层，避免再次把文件系统、Session、模型调用和 UI 状态集中进一个 Runtime 大包。
 
-```text
-Session
-└─ User Message
-   └─ Agent Run (agentRunId)
-      ├─ Turn 1 (turnId, turnIndex=1)
-      │  └─ LLM Call 1..N (llmCallId, attempt)
-      └─ Turn 2 (turnId, turnIndex=2)
-         └─ LLM Call 1..N
-```
-
-- `agentRunId`：一次 `agent_start -> agent_end`。普通聊天中，一次用户发送触发一次 Agent Run，也是 UI、Abort、审批和持久化提交的顶层运行身份。
-- `turnId`：Agent Loop 内一次推理及其后续工具执行的边界。工具结果需要再次交给模型时进入下一个 Turn。
-- `llmCallId`：一次真实 provider 请求。自动重试会让同一个 Turn 出现多个 LLM Call。
-- `attempt`：同一 Turn 内的请求尝试序号，从 1 开始。
-
-完整字段与 Trace Schema 见 `agent-observability-trace-model.md`。
-
-## 五层拓扑
+## 总链路
 
 ```text
-Desktop / CLI Client -> Host Adapter -> Agent Runtime -> Bridge -> Agent Loop
-        <- presentation <- Event Sink  <- stream/result <- Agent events
+1. Host input
+   Desktop IPC / CLI argv + stdin
+        ↓
+2. Profile bootstrap + App Bundle Service
+   managed ESM loader + BootedProfile + profile-specific service
+        ↓
+3. Agent semantics
+   Session + Scope + Prompt/Context + AgentLoop
+        ↓
+4. Capability execution
+   LLM Service / Tool Runtime / Host ports
+        ↓
+5. Journal and projection
+   journal.jsonl + durable/live/diagnostic projection
+        ↓
+   Desktop renderer / CLI output
 ```
 
-| 层 | 核心职责 | 输入 | 输出 |
-| --- | --- | --- | --- |
-| Renderer / CLI Client | 收集输入、生成 `agentRunId`、展示流式状态 | 用户交互 | `RunAgentInput` |
-| Host Adapter | 把 Electron、process、TTY 等能力映射为 Runtime Ports | Host 输入 | `RuntimeAgentRunRequest` + Ports |
-| Agent Runtime | Session、Workspace、Context、模型、审批、Abort、提交与 Trace 生命周期 | Runtime request | `AgentRunResult` + stream |
-| Bridge | 翻译内部事件、建立三层归属、聚合产品事件 | Agent deps + Run 参数 | SessionEvent + RuntimeStreamEvent |
-| Agent Loop | 维护真实 Turn / LLM Call、重试、上下文和工具循环 | Context + LLM + Tools | `AgentEvent` |
+## 第一层：Host input
 
-## 1. Renderer / CLI Client
+Host 负责把产品输入转换为稳定的 Runtime 请求，不实现 Agent 内核。
 
-Desktop 通过 `window.actspace.runAgent()` 发起运行，通过唯一的 `agent:stream` 监听消费事件。CLI 使用同一 Runtime contract，经终端 renderer 输出。
+### Desktop
 
-`RunAgentInput` 的主要字段：
+当前入口：
 
-| 字段 | 语义 |
-| --- | --- |
-| `sessionId` | 会话身份 |
-| `agentRunId` | 本次 Agent Run 身份 |
-| `userInput` | 用户消息 |
-| `attachments` | Composer 附件 |
-| `model` / `modelKey` | 模型选择；新路径优先 `modelKey` |
-| `thinkingEnabled` / `reasoningEffort` | 推理选项 |
-| `executionContext` | 首次运行的 Workspace / Branch / Run on 快照 |
+- `apps/desktop/src/main/index.ts`：应用启动、数据目录和 Runtime registry；
+- `apps/desktop/src/main/runtime-v2/runtime-loader.ts`：managed ESM loader；
+- `apps/desktop/src/main/runtime-v2/runtime-registry.ts`：一个 Host 一个 Profile root；
+- `apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`：typed IPC 与固定 renderer adapter；
+- `apps/desktop/src/main/runtime-v2/desktop-host-adapter.ts`：credentials、filesystem、tools、browser 等 Host capability。
 
-Renderer 的运行状态按 `{ sessionId, agentRunId }` 路由。`agent_turn_*` 与 `llm_call_*` 是分析观测的细粒度事件；assistant delta、工具和 usage 可携带真实 `turnId + llmCallId`，但不能用它们替代 Agent Run 的可见状态身份。
+Desktop renderer 只提交结构化请求和显示 Projection，不直接访问 Node、Journal、Cordis 或插件代码。
 
-流式结束后，Renderer 必须在同一次交接中恢复 `SessionRecord`、切换 streaming → persisted 数据源并收尾运行状态。旧 Agent Run 的迟到事件不能覆盖当前会话或当前 Run。
+### CLI
 
-客户端不读取 `.env`、API Key、`session.jsonl` 或 Trace 文件。Desktop 分析观测只调用 typed preload 暴露的 Trace IPC。
+当前入口：
 
-## 2. Host Adapter
+- `apps/cli/src/cli.ts`：命令和退出码；
+- `apps/cli/src/runtime-v2/loader.ts`：managed Runtime loader；
+- `apps/cli/src/runtime-v2/host-adapter.ts`：CLI provider 与 Host capability；
+- `apps/cli/src/runtime-v2/run.ts`、`chat.ts`：one-shot / TTY 产品语义。
 
-Host Adapter 负责宿主差异：
+CLI `run` 默认 ephemeral；`--persist` 和 `--resume` 才使用持久 Session Journal。CLI 不维护第二套 Agent Loop。
 
-- Desktop 注册 IPC，注入 Electron roots、settings、BrowserWindow Event Sink、审批和 Workspace Execution Provider。
-- CLI 解析 argv、stdin、TTY、stdout/stderr、退出码、Session lock 和 runtime assets。
-- Desktop 使用 `persistent + desktop`；`run` 使用 `ephemeral + cli-headless`；`chat` 使用 `persistent + cli-interactive`。
-- Host 只构造 `RuntimeAgentRunRequest` 和 Ports，不复制 Session、Context、Harness 或提交编排。
+## 第二层：Profile Bootstrap 与 App Bundle Service
 
-关键文件：
+`packages/runtime` 负责：
 
-- `packages/desktop/src/main/agent-run.ts`：Desktop 兼容 wrapper，委托统一 Runtime。
-- `packages/desktop/src/main/desktop-agent-runtime.ts`：Electron Host Adapter。
-- `packages/agent-cli/src/runtime-adapter.ts`：CLI Host Adapter。
-- `packages/agent-core/src/runtime/`：唯一运行编排实现。
+- 解析 Profile / Bundle / Patch；
+- 发现 Static Manifest 与 Codec；
+- 激活 Cordis Behavior Entry；
+- 装配 Host capability、LLM、Tool、Prompt、Context、Agent 和 Session service；
+- 暴露当前进程内的 `BootedProfile`；
+- 管理 restart-only 状态和 graceful shutdown。
 
-## 3. Agent Runtime
+应用 Bundle Service 是 Host 的产品操作入口，提供：
 
-Runtime 是唯一 Agent Run 应用编排层：恢复 Session、准备 Workspace、组装 Context、解析模型、创建 Harness 依赖、预写用户输入、创建 Trace Writer、执行 Harness、提交结果、发送终态并清理工具。
+- create / resume / fork / inspect / export Session；
+- run / abort Turn；
+- Inbox、Todo、Compaction；
+- diagnostics、boot manifest 与 runtime state；
+- stop accepting work 与 dispose。
 
-关键不变量：
+Profile Bootstrap 不拥有 renderer 状态，也不允许 Host deep import 领域 package 的内部 `src/`；Session/Agent 操作由当前 Profile 的 App Bundle Service 提供。
 
-- persistent 输入在 Harness 前提交；ephemeral 不创建产品 Session。
-- `agent_run_finished` 只在结果成功提交后发送；写盘失败必须是 `agent_run_failed`。
-- Runtime 负责唯一的 `agent_run_started` 与 terminal event；Bridge 在 Runtime 路径不重复发顶层生命周期事件。
-- 活动状态以 `{ sessionId, agentRunId }` 标识，并属于 Runtime 实例，不能使用跨 Host 的模块全局 Map。
-- Abort 覆盖初始化窗口、Harness、等待审批和 ToolManager dispose。
-- Event Sink、短期日志或 Trace sidecar 失败不能重新执行 Harness；Trace 不可用时必须 fail-soft 并输出诊断事件。
-- 首次运行的 Workspace / Branch 准备失败时，不能写入 `user_message`。
+## 第三层：Agent semantics
 
-## 4. Bridge
+这一层由独立领域 package 共同完成：
 
-Bridge 入口为 `runAgentWithBridge()`，职责包括：
+- `packages/core/agent`：Agent descriptor、registry、Inbox、Todo 和终止语义；
+- `packages/core/scope`：Agent scope 与 disposer；
+- `packages/core/agent-loop`：一次 Agent Run 的循环；
+- `packages/session/*`：Journal、persistence、codec、Surface 与 projection；
+- `packages/context`：Context contributor assembly；
+- `packages/prompt`：Prompt section、Skill 和 request snapshot；
+- `packages/compaction`：Surface compaction；
+- `packages/subagent`：一次性 Agent / Explore child Session。
 
-- 把 `agent_start/end` 映射为 Agent Run 生命周期（兼容直连 Harness；Runtime 路径关闭重复顶层事件）。
-- 把真实 `turn_start/end` 映射为 `agent_turn_started/finished`。
-- 把 `llm_call_start/end` 映射为 `llm_call_started/finished`。
-- 给 assistant、tool、usage 和 SessionEvent 附上正确的 `agentRunId/turnId/llmCallId`。
-- 将每次 LLM Call 的 usage 独立保存，不把重试或多 Turn 压成一个汇总。
-- 把完整但脱敏的请求/响应写入独立 Trace；Trace 写失败不影响 Agent 主流程。
+`AgentLoop.runTurn()` 的核心顺序：
 
-Bridge 不操作 Electron IPC，不拥有 Session 路径，也不决定持久化提交顺序。
+1. 创建 `agentRunId`、`turnId`；
+2. 写 `turn/started`；
+3. 从 Session Surface、Prompt contributor、Context contributor 和 Host facts 组装请求；
+4. 冻结并写 `request/snapshot`；
+5. dispatch LLM；
+6. 收集 Assistant content 或 tool calls；
+7. 工具调用进入 Tool Runtime；
+8. 结果追加到 Journal / Surface；
+9. 没有后续工具时写 `turn/ended` 并返回 snapshot。
 
-## 5. Agent Loop
+Agent Loop 不直接读写 renderer，不直接从环境变量取 Key，也不绕过 Tool Runtime 调用具体 executor。
 
-`runAgentLoop()` 维护模型响应、工具执行与 follow-up 循环。每次进入内层推理生成新的 `turnId`；每次真正调用 `llm.stream()` 前生成新的 `llmCallId` 并递增 `attempt`。
+## 第四层：Capability execution
 
-关键事件顺序：
+### LLM
+
+`packages/llm/service` 管理 route registry、credential port、prepared request、retry 和 usage；`packages/llm/pi-ai` 隔离具体 wire engine。
+
+每次真实 provider 请求使用独立 `requestId`：
 
 ```text
-agent_start
-turn_start
-llm_call_start
-message_delta / message_end
-llm_call_end / llm_retry
-tool_start / tool_end
-turn_end
-agent_end
+request/snapshot
+llm/dispatch-started
+llm/ended | llm/error | llm/aborted
+llm/usage
 ```
 
-Agent Loop 不知道 Session、Electron、IPC 或 Trace 路径；`agentRunId` 由上层持有并在 Bridge 翻译时附加。
+retry 创建新的 request 身份和 snapshot，不能覆盖失败尝试。
 
-## Session 与 Trace 分工
+### Tool
 
-- `session.jsonl`：可恢复的稳定事实，Schema V2；事件必须有 `agentRunId`，细粒度事件按需带 `turnId/llmCallId`。
-- `context-state.json`：可覆盖的当前 Context 视图。
-- `traces/<agentRunId>.jsonl`：完整但脱敏的请求/响应证据，用于分析观测与请求差异。
-- `logs/agent-runs/*.jsonl`：短期开发排障日志，不是产品分析事实源。
-
-旧 Session 不做兼容读取。开发期升级后可显式清理：
-
-```sh
-pnpm reset:session-data -- --data-root /absolute/path/to/actspace --confirm
-```
-
-## Stop / Abort
+`packages/tools/runtime` 管理：
 
 ```text
-Client: Stop
-  -> abortAgentRun { sessionId, agentRunId }
-  -> Runtime 命中 active Agent Run
-  -> Agent.abort() + ApprovalBroker.abortAgentRun()
-  -> Agent Loop 返回 aborted
-  -> Runtime 提交 agent_run_aborted 并发送唯一终态
+definition
+→ argument validation
+→ policy
+→ approval
+→ prepared execution
+→ dispatch checkpoint
+→ body result
+→ ordered commit
 ```
 
-`Stopped` 来自持久化的 `agent_run_aborted`，不是 Renderer 临时占位。Approval 与 Abort 竞态使用 pending entry 先到先得，并在执行工具前再次检查 AbortSignal。
+具体能力位于 `packages/tools/core-tools` 和 `packages/tools/browser-tools`。filesystem、shell、network、artifact、browser 等副作用由 Host port 提供。
 
-## 特殊命令
+### Subagent
 
-`/compact` 与 `/eval` 在普通 Agent Run 前分流。它们可以用 `agentRunId` 做操作关联，但没有进入主 Agent Loop 时不能伪造 `turnId/llmCallId`。
+Agent / Explore 是一次性 Subagent tool：
 
-## 修改检查清单
+- 创建独立 child Session；
+- 使用静态 Preset 与受限工具集；
+- 与父 Session 通过 lineage 和 delegation event 关联；
+- 返回结构化 terminal result；
+- 主 Agent 取消时级联取消 child run。
 
-- [ ] 顶层运行身份是否使用 `agentRunId`，没有复用真实 `turnId`？
-- [ ] 新的 provider 请求是否拥有 `llmCallId + attempt`？
-- [ ] 新 Host 是否只实现 Adapter / Port，没有复制 Runtime 编排？
-- [ ] terminal event 是否仍由 Runtime 在持久化提交后唯一发送？
-- [ ] 新 AgentEvent 是否在 Bridge 中有 RuntimeStreamEvent 映射？
-- [ ] assistant、tool 和 usage 是否关联到正确的三层身份？
-- [ ] SessionEvent 是否为 `schemaVersion: 2`？
-- [ ] 完整上下文是否只进入脱敏 Trace，而不是重复塞进 `session.jsonl`？
-- [ ] Abort 是否覆盖 Agent、等待审批与前台工具执行？
-- [ ] 修改存储或事件契约时，是否同步更新观测模型与存储文档？
+当前 v2 不提供 Team / Room 的长期多 Agent Runtime，也不提供 Kairos。
+
+## 第五层：Journal 与 Projection
+
+持久事实只写：
+
+```text
+sessions-v2/<sessionId>/journal.jsonl
+```
+
+三类输出必须分开：
+
+| 类型 | 用途 | 是否可恢复 |
+| --- | --- | --- |
+| Durable projection | Session、消息、工具、usage、Todo、lineage | 可以由 Journal 重建 |
+| Live progress | streaming delta、当前工具进度 | 进程退出后可丢失 |
+| Diagnostics | boot、plugin、Host capability、restart 状态 | 不进入模型上下文 |
+
+Desktop fixed renderer adapter 把 v2 snapshot 和 Journal event 投影为现有 `SessionRecord`、Context、Usage 和 Analysis DTO。这个 adapter 是 Host 兼容层，不是第二套 Session 模型。
+
+## 身份规则
+
+```text
+sessionId
+└── agentRunId
+    └── turnId
+        └── stepId
+            ├── requestId
+            └── callId
+```
+
+- Agent Run 是一次用户触发的完整运行；
+- Turn 是 Agent Loop 的一次迭代；
+- Step 是可恢复执行边界；
+- Request 是一次 provider 调用；
+- Tool Call 是一次具体工具调用。
+
+旧 renderer DTO 中的 `llmCallId` 当前映射到 v2 `requestId`。新增后端代码应使用 request 语义，不再制造另一套 ID。
+
+## 取消与关闭
+
+- 用户取消：Host 调用当前 Profile 的 App Bundle Service `abortRun(sessionId)`；
+- Agent Loop 把 AbortSignal 传给 LLM、Tool 和 Subagent；
+- 已 dispatch 但未确认终态的副作用在恢复时标为 `outcome-unknown`；
+- 应用退出：先 stop accepting work，再等待 active run、Session flush、artifact finalizer 和 Cordis effect dispose；
+- `dispose()` 必须幂等地返回同一关闭结果。
+
+## 禁止事项
+
+- Host deep import `packages/*/src/**`；
+- renderer 直接读取 Journal 或本地凭据；
+- Agent Loop 直接执行 shell、filesystem、browser 或 provider SDK；
+- 用独立可变 conversation / Context 文件覆盖 Journal；
+- 把动态 `import()` 当作完整插件生命周期；
+- 在运行中热替换 Plugin Entry；
+- 让未来 Team / Room 文档反向定义当前 v2 API。
+
+## 验收
+
+- Desktop 与 CLI 各自通过 `desktop.app` / `headless.runner` 完成 run，并共享同一 Agent 领域语义；
+- 同一 Journal 可以重建 Session、Context、Usage 与 Analysis；
+- 每个 request / tool 都能归属到 Agent Run、Turn 和 Step；
+- abort 与 shutdown 会等待必要的 flush / dispose；
+- Host 与领域 package 只通过公开 exports 和 Service ABI 连接；
+- 当前生产路径不出现旧 monolith、`src/plugins/` 或 v1 Session 文件。

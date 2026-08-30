@@ -11,21 +11,15 @@ export * from "./model-config";
 export * from "./model-resolver";
 export * from "./openrouter-catalog";
 export * from "./image-inspection-config";
+export * from "./browser-bridge";
+export * from "./skills";
 export * from "./settings";
-export * from "./plugins";
 export * from "./context-buckets";
+export * from "./data-root";
 export * from "./session";
 export * from "./session-transcript";
 export * from "./usage-cost";
 export * from "./session-selectors";
-export * from "./kairos-contracts";
-export * from "./kairos-soul-presets";
-export {
-  aggregateKairosEvents,
-  aggregateKairosUsage,
-  accumulateKairosUsage,
-  emptyKairosUsageSummary,
-} from "./kairos-aggregator";
 export {
   createMessageBlocks,
   createSessionDiffSummary,

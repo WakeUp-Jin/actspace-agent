@@ -39,7 +39,7 @@ https://example.com/actspace-agent/images/blog/architecture.png
 因此应该让路径真的指向源码文件：
 
 ```text
-packages/site/
+apps/site/
 ├── src/
 │   ├── assets/blog/source/architecture.png
 │   └── content/blog/article.md

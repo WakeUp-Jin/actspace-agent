@@ -11,7 +11,7 @@
 
 ## 必读文档
 
-- `actspace-agent/docs/design-docs/agent-plugins-fs-watch.md`：文件契约（JSONL schema、state.json、心跳判定、config.json）是唯一事实来源，本 plan 不得偏离。
+- `actspace-agent/docs/design-docs/v1-legacy/agent-plugins-fs-watch.md`：文件契约（JSONL schema、state.json、心跳判定、config.json）是唯一事实来源，本 plan 不得偏离。
 - `actspace-agent/AGENTS.md`（若由子会话执行）。
 
 ## 背景与约束

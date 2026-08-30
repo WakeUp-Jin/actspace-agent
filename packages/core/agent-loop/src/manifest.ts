@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.core.agent-loop", version: "0.1.0", name: "ActSpace Agent Loop", entry: { entryId: "core.agent-loop", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: ["actspace.agent.factory"], contributions: { services: ["core.agent-loop", "agent.loop"], tools: [], prompts: [], events: [] } });

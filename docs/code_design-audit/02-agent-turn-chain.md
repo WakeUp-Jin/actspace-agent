@@ -11,18 +11,18 @@
 - `docs/ARCHITECTURE.md`
 - `docs/CODING_BEHAVIOR.md`
 - `docs/design-docs/agent-runtime/agent-turn-layers.md`
-- `docs/design-docs/agent-runtime/agent-backend-design.md`
+- `docs/design-docs/v1-legacy/agent-runtime-backend-design.md`
 - `docs/design-docs/core-storage-and-observability.md`
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 
 ## 重点代码与文件范围
 
-- `packages/desktop/src/renderer/components/Composer.tsx`
-- `packages/desktop/src/renderer/components/ConversationView.tsx`
-- `packages/desktop/src/main/index.ts`
-- `packages/desktop/src/main/agent-turn.ts`
-- `packages/desktop/src/main/context-compact.ts`
-- `packages/desktop/src/preload/index.ts`
+- `apps/desktop/src/renderer/components/Composer.tsx`
+- `apps/desktop/src/renderer/components/ConversationView.tsx`
+- `apps/desktop/src/main/index.ts`
+- `apps/desktop/src/main/agent-turn.ts`
+- `apps/desktop/src/main/context-compact.ts`
+- `apps/desktop/src/preload/index.ts`
 - `packages/shared/src/`
 - `packages/agent-core/src/engine/bridge.ts`
 - `packages/agent-core/src/engine/agent.ts`
@@ -75,7 +75,7 @@
 
 ### 发现 1：图片附件分析在 Main 进程里绕过 Agent/Bridge 的工具事件模型（待确认）
 
-- 偏移点：`docs/design-docs/agent-runtime/agent-turn-layers.md` 约束 Main Process 做 IPC、依赖装配、session meta 读取和结果持久化，不处理 Agent 内部事件；Bridge/Agent 负责事件翻译、工具执行和结果聚合。当前 `packages/desktop/src/main/agent-turn.ts:248-254` 在进入 `runTurnWithAgent()` 前调用 `analyzeImageAttachmentsForTurn()`，而 `packages/desktop/src/main/media-analysis.ts:1-3` 直接读本地文件并从 `@actspace/agent-core` 调 `analyzeMediaWithKimi()`，`packages/desktop/src/main/media-analysis.ts:81-123` 还手工发送 `tool_started` / `tool_finished` 风格 stream event。
+- 偏移点：`docs/design-docs/agent-runtime/agent-turn-layers.md` 约束 Main Process 做 IPC、依赖装配、session meta 读取和结果持久化，不处理 Agent 内部事件；Bridge/Agent 负责事件翻译、工具执行和结果聚合。当前 `apps/desktop/src/main/agent-turn.ts:248-254` 在进入 `runTurnWithAgent()` 前调用 `analyzeImageAttachmentsForTurn()`，而 `apps/desktop/src/main/media-analysis.ts:1-3` 直接读本地文件并从 `@actspace/agent-core` 调 `analyzeMediaWithKimi()`，`apps/desktop/src/main/media-analysis.ts:81-123` 还手工发送 `tool_started` / `tool_finished` 风格 stream event。
 - 不合理设计：图片分析表现为工具运行流，但不是 Agent loop 的 tool call；`packages/agent-core/src/engine/test/bridge.test.ts:280-345` 明确断言附件分析只落在 `user_message` payload，且不会产生 `tool_call` / `tool_result`。这会让 stream 上看到“工具”，持久化事实里却没有同一工具事件。
 - 可读性问题：读代码时需要同时理解 main 侧预处理、Bridge 的 `formatUserMessageForModel()` 注入、shared 的附件 payload，才能知道图片分析到底算不算一类工具；`packages/agent-core/src/adapters.ts:72-109` 又把附件和分析结果拼回用户消息，进一步弱化了它和普通工具事件的边界。
 - 耦合问题：Main 进程对 Kimi 辅助能力、文件读取、媒体分析 stream preview 产生直接认知，和 Agent 层已有 `analyze_media` tool（`packages/agent-core/src/tools/tools/analyze-media/executor.ts`，搜索确认存在）形成两条能力入口。
@@ -84,8 +84,8 @@
 
 ### 发现 2：Main 忽略 `writeSessionResult()` 的结构化失败，可能让 IPC 返回成功但 session 未完整落盘
 
-- 偏移点：设计要求 Main Process 持久化 `AgentTurnResult` 到 session store，并且 `session.jsonl` 是恢复事实来源。`packages/desktop/src/main/agent-turn.ts:272-287` 拿到 `AgentTurnResult` 后调用 `await writeSessionResult(sessionPaths, result)`，但没有检查返回的 `WriteResult.ok`。
-- 不合理设计：`packages/agent-core/src/persistence/session-store.ts:120-149` 的 `writeSessionResult()` 会把 `appendEvents()`、subagent transcript、meta、`context-state.json` 的失败以 `{ ok: false, error }` 返回；调用方忽略后，`packages/desktop/src/main/agent-turn.ts:288-307` 仍继续记录“turn_result_persisted”、生成标题并返回 result。这样 renderer 可能按本轮完成刷新，但后续 `session:get` 从 `session.jsonl` 恢复时缺事件。
+- 偏移点：设计要求 Main Process 持久化 `AgentTurnResult` 到 session store，并且 `session.jsonl` 是恢复事实来源。`apps/desktop/src/main/agent-turn.ts:272-287` 拿到 `AgentTurnResult` 后调用 `await writeSessionResult(sessionPaths, result)`，但没有检查返回的 `WriteResult.ok`。
+- 不合理设计：`packages/agent-core/src/persistence/session-store.ts:120-149` 的 `writeSessionResult()` 会把 `appendEvents()`、subagent transcript、meta、`context-state.json` 的失败以 `{ ok: false, error }` 返回；调用方忽略后，`apps/desktop/src/main/agent-turn.ts:288-307` 仍继续记录“turn_result_persisted”、生成标题并返回 result。这样 renderer 可能按本轮完成刷新，但后续 `session:get` 从 `session.jsonl` 恢复时缺事件。
 - 可读性问题：`writeSessionResult()` 注释写“所有写入操作返回 WriteResult，错误不抛出”（`packages/agent-core/src/persistence/session-store.ts:1-6`），但调用点像异常式 API 使用，容易误读为失败会 throw。
 - 耦合问题：Bridge 返回的 final result 和 Session Persistence 的事实来源之间缺少显式提交确认，stream/final result/persist 三者边界不够稳定。
 - 死代码/兼容残留：无。
@@ -93,8 +93,8 @@
 
 ### 发现 3：Abort 注册清理没有放在 `finally`，且早期预处理阶段的 abort 可能是空操作
 
-- 偏移点：审查计划要求检查 Abort、stream event、final result 是否职责重叠。当前 `packages/desktop/src/main/agent-turn.ts:237` 先把 `activeTurnAborts` 注册为 `() => abortableDeps.abort?.()`，但 `deps.abort` 到 `packages/agent-core/src/engine/bridge.ts:215` 才由 Bridge 创建 Agent 后赋值。
-- 不合理设计：在 `packages/desktop/src/main/agent-turn.ts:248-254` 的图片附件分析期间，如果 renderer 调 `agent:abort-turn`，`packages/desktop/src/main/agent-turn.ts:127-131` 会返回 true，但实际 `abortableDeps.abort` 仍是 `undefined`，预处理不会被取消。另一个风险是 `activeTurnAborts.delete(turnKey)` 只在 `packages/desktop/src/main/agent-turn.ts:306` 的成功路径执行，中间如果 `runTurnWithAgent()` 后处理或 `writeSessionResult()` 抛出，abort map 可能残留旧 turn。
+- 偏移点：审查计划要求检查 Abort、stream event、final result 是否职责重叠。当前 `apps/desktop/src/main/agent-turn.ts:237` 先把 `activeTurnAborts` 注册为 `() => abortableDeps.abort?.()`，但 `deps.abort` 到 `packages/agent-core/src/engine/bridge.ts:215` 才由 Bridge 创建 Agent 后赋值。
+- 不合理设计：在 `apps/desktop/src/main/agent-turn.ts:248-254` 的图片附件分析期间，如果 renderer 调 `agent:abort-turn`，`apps/desktop/src/main/agent-turn.ts:127-131` 会返回 true，但实际 `abortableDeps.abort` 仍是 `undefined`，预处理不会被取消。另一个风险是 `activeTurnAborts.delete(turnKey)` 只在 `apps/desktop/src/main/agent-turn.ts:306` 的成功路径执行，中间如果 `runTurnWithAgent()` 后处理或 `writeSessionResult()` 抛出，abort map 可能残留旧 turn。
 - 可读性问题：Main 侧暴露的 `abortTurn()` 返回 boolean，但这个 boolean 只表示 map 中有 closure，不表示底层 Agent 或预处理已收到取消信号。
 - 耦合问题：取消能力由 Main map、Bridge 对 `deps.abort` 的副作用赋值、Agent 内部 `AbortController` 三处共同拼成；边界上没有统一的 `AbortSignal` 从 IPC 贯穿到预处理和 Agent loop。
 - 死代码/兼容残留：无。
@@ -102,8 +102,8 @@
 
 ### 发现 4：手动 `/compact` 失败只发 stream，不写入可恢复的失败事实
 
-- 偏移点：`/compact` 已在 renderer 明确分流：`packages/desktop/src/renderer/App.tsx:1066-1107` 对 `text.trim() === "/compact"` 走 `window.actspace.compactContext()`，不构造普通 `RunTurnInput`，这符合设计。但失败路径的持久化边界不稳定。
-- 不合理设计：`packages/agent-core/src/engine/compact-context.ts:90-112` 在异常时发送 `context_compaction_failed` stream event，并返回 `status: "failed"`、`events: []`；`packages/desktop/src/main/context-compact.ts:49-61` 只在 `result.events.length > 0` 时 append events，所以失败不会写 `context_compaction` 或 `error` 到 `session.jsonl`。用户刷新/重启后看不到这次失败。
+- 偏移点：`/compact` 已在 renderer 明确分流：`apps/desktop/src/renderer/App.tsx:1066-1107` 对 `text.trim() === "/compact"` 走 `window.actspace.compactContext()`，不构造普通 `RunTurnInput`，这符合设计。但失败路径的持久化边界不稳定。
+- 不合理设计：`packages/agent-core/src/engine/compact-context.ts:90-112` 在异常时发送 `context_compaction_failed` stream event，并返回 `status: "failed"`、`events: []`；`apps/desktop/src/main/context-compact.ts:49-61` 只在 `result.events.length > 0` 时 append events，所以失败不会写 `context_compaction` 或 `error` 到 `session.jsonl`。用户刷新/重启后看不到这次失败。
 - 可读性问题：`packages/shared/src/session.ts:168-186` 的 `ContextCompactionPayload.status` 支持 `"failed"`，`packages/shared/src/session-selectors.ts:248-280` 也能把 failed compaction 渲染出来，但失败路径实际不产出对应 SessionEvent，类型能力和运行行为不一致。
 - 耦合问题：stream UI 可以表达失败，session recovery 不能表达失败；stream/persist 分层在 `/compact` 失败场景断开。
 - 死代码/兼容残留：`ContextCompactionPayload.status: "failed"` 与 selector 的 failed 分支目前像未被主流程使用的契约残留，除非其他路径会落 failed compaction（待确认）。
@@ -111,7 +111,7 @@
 
 ### 发现 5：Agent Turn 恢复边界基本符合设计，但 persistence 仍导出旧恢复/兼容入口，容易被 Main 误用
 
-- 偏移点：主 turn 当前没有直接调用 `sessionEventsToMessages` / `recoverMessages`：`packages/desktop/src/main/agent-turn.ts:184-203` 只读 meta 并把 `sessionPath` 传给 `createAgentForSession()`；恢复实际在 `packages/agent-core/src/engine/create-agent-deps.ts:289-318` → `ContextManager.createForSession()` → `ConversationContext.createFromSession()`（`packages/agent-core/src/context/manager.ts:105-113`、`packages/agent-core/src/context/modules/conversation.ts:36-40`）。这点和文档一致。
+- 偏移点：主 turn 当前没有直接调用 `sessionEventsToMessages` / `recoverMessages`：`apps/desktop/src/main/agent-turn.ts:184-203` 只读 meta 并把 `sessionPath` 传给 `createAgentForSession()`；恢复实际在 `packages/agent-core/src/engine/create-agent-deps.ts:289-318` → `ContextManager.createForSession()` → `ConversationContext.createFromSession()`（`packages/agent-core/src/context/manager.ts:105-113`、`packages/agent-core/src/context/modules/conversation.ts:36-40`）。这点和文档一致。
 - 不合理设计：`packages/agent-core/src/persistence/index.ts:40-47` 仍公开 `recoverMessages` / `recoverMessageBlocks` / `recoverContextSnapshot` / `recoverDiffSummary`，`packages/agent-core/src/persistence/compat.ts:11-27` 还保留 `readSessionJsonl` / `appendSessionEvent` 旧入口。虽然当前 main turn 未误用，但这些入口和“四层职责”文档中“Main 不调 recoverMessages / sessionEventsToMessages”的约束形成潜在绕路。
 - 可读性问题：同一包同时暴露“session store 正式入口”“单项恢复入口”“deprecated compat 原始 JSONL 入口”，新代码很难一眼判断哪些能用于真实 turn。
 - 耦合问题：恢复能力被多个导出面暴露，削弱了 `createAgentForSession(config, { sessionPath })` 作为唯一恢复入口的约束。
