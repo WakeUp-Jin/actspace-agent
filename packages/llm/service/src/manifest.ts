@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.llm.service", version: "0.1.0", name: "ActSpace LLM Service", entry: { entryId: "llm.service", behavior: "./plugin.js" }, host: { required: [], optional: ["network.provider"] }, frontend: null, injects: ["actspace.host.llm"], contributions: { services: ["llm.service"], tools: [], prompts: [], events: [] } });

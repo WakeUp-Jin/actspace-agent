@@ -6,7 +6,7 @@ Agent 工具可以调用少量成熟 CLI 来完成本地任务，例如 `rg` 用
 
 ## 适用范围
 
-适用于 `packages/agent-core` 内部工具对受控命令的调用，例如：
+适用于 v2 Runtime Core Tools 对受控命令的调用，例如：
 
 - `grep` 调用 `rg` 搜索文件内容。
 - `glob` 调用 `rg --files` 查找文件。
@@ -32,7 +32,7 @@ Agent 工具可以调用少量成熟 CLI 来完成本地任务，例如 `rg` 用
 ## 推荐结构
 
 ```txt
-packages/agent-core/src/tools/subprocess/
+packages/tools/core-tools/src/subprocess/
   run-process.ts       # 通用受控子进程生命周期 helper
   ripgrep-path.ts      # rg 可执行文件解析：显式配置、系统命令、内置二进制
   ripgrep.ts           # rg 专用参数与退出码适配

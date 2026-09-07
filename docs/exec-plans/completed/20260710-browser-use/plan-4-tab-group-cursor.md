@@ -14,11 +14,11 @@
 
 ## 允许修改的文件
 
-- `plugins/browser-bridge/apps/chrome-extension/manifest.json`（追加权限）
-- `plugins/browser-bridge/apps/chrome-extension/src/background.js`（Tab Group 逻辑）
-- `plugins/browser-bridge/apps/chrome-extension/src/content-cursor.js`（新建 — 光标渲染）
-- `plugins/browser-bridge/apps/chrome-extension/src/content-cursor.css`（新建 — 光标样式）
-- `plugins/browser-bridge/apps/cli/session.go`（追加 Tab Group 编排）
+- `browser-bridge/apps/chrome-extension/manifest.json`（追加权限）
+- `browser-bridge/apps/chrome-extension/src/background.js`（Tab Group 逻辑）
+- `browser-bridge/apps/chrome-extension/src/content-cursor.js`（新建 — 光标渲染）
+- `browser-bridge/apps/chrome-extension/src/content-cursor.css`（新建 — 光标样式）
+- `browser-bridge/apps/cli/session.go`（追加 Tab Group 编排）
 - `packages/agent-core/src/tools/tools/browser/definition.ts`（追加 finalize 等工具）
 - `packages/agent-core/src/tools/tools/browser/executor.ts`（追加 executor）
 - 对应测试文件
@@ -196,7 +196,7 @@ case "agent_browser_bridge.open_tab": {
 
 ### 任务 4.3：光标可视化 Content Script
 
-新建 `plugins/browser-bridge/apps/chrome-extension/src/content-cursor.js`：
+新建 `browser-bridge/apps/chrome-extension/src/content-cursor.js`：
 
 ```javascript
 // content-cursor.js — Agent 光标渲染
@@ -290,7 +290,7 @@ case "agent_browser_bridge.open_tab": {
 })();
 ```
 
-新建 `plugins/browser-bridge/apps/chrome-extension/src/content-cursor.css`：
+新建 `browser-bridge/apps/chrome-extension/src/content-cursor.css`：
 
 ```css
 #__actspace-agent-cursor {
@@ -505,8 +505,8 @@ export const browserFinalizeExecutor: ToolExecutorFn = async (args) => {
 
 **Go Bridge 测试**（自动化）：
 ```bash
-cd plugins/browser-bridge && go test ./apps/cli/ -v -run TestTabGroup
-cd plugins/browser-bridge && go test ./apps/cli/ -v -run TestFinalize
+cd browser-bridge && go test ./apps/cli/ -v -run TestTabGroup
+cd browser-bridge && go test ./apps/cli/ -v -run TestFinalize
 ```
 
 测试内容：
@@ -526,7 +526,7 @@ cd packages/agent-core && pnpm vitest run src/tools/tools/browser/test/tab-manag
 
 ## 验证方式
 
-- `cd plugins/browser-bridge && go build ./... && go test ./...` 通过
+- `cd browser-bridge && go build ./... && go test ./...` 通过
 - `pnpm build && pnpm vitest run packages/agent-core/src/tools/tools/browser/` 通过
 - 手动验证 Chrome Extension：
   - 安装 extension → 启动 abb serve → 通过测试客户端发送 open_tab → 看到 Tab Group 出现

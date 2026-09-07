@@ -11,7 +11,7 @@
 - Desktop 的 `This Mac` 允许尚无首次提交的 Git repository 原位运行，并保留 symbolic branch 名称；`New Worktree` 继续要求有效 `HEAD`，且不会自动创建提交。
 - Renderer 不再以 `turn_started` 推断用户输入已经持久化；Turn 抛错后读取 Session 真实事件，未落盘时恢复输入和错误，已落盘时恢复 Session。
 
-设计来源：`docs/design-docs/agent-runtime/agent-host-neutral-runtime-and-cli.md`
+设计来源：`docs/design-docs/v1-legacy/agent-runtime-host-neutral-runtime-and-cli.md`
 
 ## 1. 目标
 
@@ -62,15 +62,15 @@ Runtime 契约与 characterization
 - `docs/REPO_COLLAB_GUIDE.md`
 - `docs/ARCHITECTURE.md`
 - `docs/design-docs/core-beliefs.md`
-- `docs/design-docs/agent-runtime/agent-host-neutral-runtime-and-cli.md`
-- `docs/design-docs/agent-runtime/agent-backend-design.md`
+- `docs/design-docs/v1-legacy/agent-runtime-host-neutral-runtime-and-cli.md`
+- `docs/design-docs/v1-legacy/agent-runtime-backend-design.md`
 - `docs/design-docs/agent-runtime/agent-turn-layers.md`
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`
-- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
+- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
 - `docs/design-docs/core-storage-and-observability.md`
 - `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
-- `docs/design-docs/execution-safety/agent-tool-approval-pause-resume.md`
-- `docs/design-docs/evaluation/agent-evaluation.md`
+- `docs/design-docs/v1-legacy/execution-safety-agent-tool-approval-pause-resume.md`
+- `docs/design-docs/v1-legacy/evaluation-agent-evaluation.md`
 - `docs/CODING_BEHAVIOR.md`
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
@@ -447,8 +447,8 @@ node packages/agent-cli/dist/cli.js run --input "reply with ok" --workspace . --
 实现：
 
 - `actspace-agent chat --workspace <path>`。
-- `--data-dir` > `ACTSPACE_DATA_DIR` > `~/.actspace`，不读取 Electron `userData`。
-- CLI session root 固定为 `<data-dir>/sessions/`。
+- `--data-dir` > `ACTSPACE_DATA_DIR` > 平台默认 `ActSpace` data root；CLI 与 Electron 使用同一个 canonical root。macOS 默认为 `~/Library/Application Support/ActSpace`。
+- CLI v2 session root 固定为 `<dataRoot>/sessions-v2/`；本节中的旧 `<data-dir>/sessions/` 仅是 v1 历史实现记录。
 - 命令名 `chat` 只表示终端交互；V1 默认仍运行 `agent` mode，不映射到无工具的 `ComposerMode = "chat"`。
 - stdin/stdout 必须是 TTY；非 TTY 明确提示改用 `run`。
 - `/new`、`/sessions`、`/resume <session-id>`、`/exit`。
@@ -648,11 +648,11 @@ pnpm test:agent-cli:binary
 
 - `docs/ARCHITECTURE.md`
 - `docs/design-docs/agent-index.md`
-- `docs/design-docs/agent-runtime/agent-host-neutral-runtime-and-cli.md`
+- `docs/design-docs/v1-legacy/agent-runtime-host-neutral-runtime-and-cli.md`
 - `docs/design-docs/agent-runtime/agent-turn-layers.md`
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`
-- `docs/design-docs/agent-runtime/agent-testing.md`
-- `docs/design-docs/evaluation/agent-evaluation.md`
+- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
+- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
+- `docs/design-docs/v1-legacy/evaluation-agent-evaluation.md`
 - `docs/exec-plans/active/20260708-agent-evaluation/README.md`
 - CLI help 与仓库 README 中存在的调用示例。
 

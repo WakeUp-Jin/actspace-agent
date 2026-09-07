@@ -104,10 +104,6 @@ describe("model resolver", () => {
       ok: false,
       reason: "capability_mismatch",
     });
-    expect(resolveConfiguredModel(snapshot, definition.key, "kairos")).toMatchObject({
-      ok: false,
-      reason: "capability_mismatch",
-    });
   });
 
   it("accepts declared tools for chat and image input for vision", () => {

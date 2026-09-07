@@ -10,7 +10,7 @@ Kairos 现有文件监听是简单的轮询快照 + 差集算法。希望把这�
 ## 主要改动
 
 - 首版：新增 `docs/design-docs/agent-sidecar-fs-watch.md`（命名 Sidecar、源码进仓、Kairos 双路径消费）。
-- v2 改版（用户确认后）：重命名为 `docs/design-docs/agent-plugins-fs-watch.md`，删除旧文件；`index.md`、`agent-index.md` 同步。
+- v2 改版（用户确认后）：重命名为 `docs/design-docs/v1-legacy/agent-plugins-fs-watch.md`，删除旧文件；`index.md`、`agent-index.md` 同步。
 
 ## 关键设计决策（v2 定稿）
 
@@ -24,6 +24,6 @@ Kairos 现有文件监听是简单的轮询快照 + 差集算法。希望把这�
 
 ## 受影响文件
 
-- `docs/design-docs/agent-plugins-fs-watch.md`（新增，替代已删除的 `agent-sidecar-fs-watch.md`）
+- `docs/design-docs/v1-legacy/agent-plugins-fs-watch.md`（新增，替代已删除的 `agent-sidecar-fs-watch.md`）
 - `docs/design-docs/index.md`
 - `docs/design-docs/agent-index.md`

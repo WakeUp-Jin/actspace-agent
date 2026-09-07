@@ -1,0 +1,23 @@
+{
+  "name": "@actspace/headless",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" },
+    "./manifest": { "types": "./dist/manifest.d.ts", "import": "./dist/manifest.js", "default": "./dist/manifest.js" },
+    "./plugin": { "types": "./dist/plugin.d.ts", "import": "./dist/plugin.js", "default": "./dist/plugin.js" }
+  },
+  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc --noEmit -p tsconfig.json", "test": "vitest run --globals --passWithNoTests" },
+  "dependencies": {
+    "@actspace/cordis-adapter": "workspace:*",
+    "@actspace/core-agent-loop": "workspace:*",
+    "@actspace/session-persistence": "workspace:*",
+    "@actspace/shared": "workspace:*"
+  },
+  "devDependencies": { "@types/node": "^24.0.3", "typescript": "^5.8.3", "vitest": "^3.2.4" }
+}

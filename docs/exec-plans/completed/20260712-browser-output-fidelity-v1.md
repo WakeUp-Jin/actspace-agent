@@ -24,11 +24,11 @@
 - 相关文档：
   - `docs/design-docs/browser/agent-browser-use-command-surface.md`
   - `docs/design-docs/browser/agent-browser-use-command-implementation.md`
-  - `docs/design-docs/model-context/agent-context-compression.md`
+  - `docs/design-docs/v1-legacy/model-context-context-compression.md`
 - 相关代码路径：
-  - `plugins/browser-bridge/apps/cli/internal/locator/runtime.js`
-  - `plugins/browser-bridge/apps/cli/internal/commands/registry.go`
-  - `plugins/browser-bridge/apps/cli/command_router.go`
+  - `browser-bridge/apps/cli/internal/locator/runtime.js`
+  - `browser-bridge/apps/cli/internal/commands/registry.go`
+  - `browser-bridge/apps/cli/command_router.go`
   - `packages/agent-core/src/tools/tools/browser/{definition,executor,types}.ts`
   - `packages/agent-core/src/{internal-tools.ts,tools/scheduler.ts}`
 - 已知约束：
@@ -55,7 +55,7 @@
 ## 验证方式
 
 - 命令：
-  - `go test ./apps/cli/...`（工作目录 `plugins/browser-bridge`）
+  - `go test ./apps/cli/...`（工作目录 `browser-bridge`）
   - `pnpm --filter @actspace/agent-core exec vitest run src/tools/tools/browser/test/browser-tools.test.ts`
   - `pnpm --filter @actspace/agent-core exec vitest run src/tools/test/output-truncator.test.ts`
   - `pnpm run typecheck`

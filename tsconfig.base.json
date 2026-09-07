@@ -17,11 +17,11 @@
       "@actspace/shared/*": [
         "packages/shared/src/*"
       ],
-      "@actspace/agent-core": [
-        "packages/agent-core/src"
+      "@actspace/cordis-adapter": [
+        "packages/cordis-adapter/src"
       ],
-      "@actspace/agent-core/*": [
-        "packages/agent-core/src/*"
+      "@actspace/cordis-adapter/*": [
+        "packages/cordis-adapter/src/*"
       ]
     }
   }

@@ -169,11 +169,10 @@ Skill catalog 属于系统级上下文，稳定性低于核心 system prompt，�
 
 ## 与现有模块的关系
 
-- `packages/desktop/src/main/agent-runtime-context.ts` 负责装配真实 turn 的 runtime context，应在这里把 Skill catalog 与 AGENTS.md rules 一起注入。
-- `packages/agent-core/src/context/modules/system-prompt.ts` 已支持 `skills` bucket，可直接注册 Skill catalog segment。
-- `packages/agent-core/src/tools/` 已提供 `read_file`、`list_directory`、`grep`、`glob` 等通用读类工具，Skill 正文和资源读取复用这些工具。
-- `packages/shared/src/context-buckets.ts` 已存在 `skills` bucket，不需要新增 bucket 类型。
-- `docs/design-docs/agent-runtime/agent-current-module-map.md` 在实现完成后记录 `skills/` 模块与工具清单。
+- `apps/desktop/src/main/runtime-v2/` 负责装配真实 turn 的 runtime context，应在这里把 Skill catalog 与 AGENTS.md rules 一起注入。
+- `packages/prompt/src/` 提供 v2 的 Prompt Contributor、Skill discovery 和上下文组装边界。
+- `packages/tools/core-tools/` 提供受 Host capability 约束的读类工具，Skill 正文和资源读取复用统一 Tool Runtime。
+- `packages/shared/src/runtime-v2/` 保存 v2 跨进程投影与公共契约，不新增旧版 context bucket。
 
 ## 第一版不做
 

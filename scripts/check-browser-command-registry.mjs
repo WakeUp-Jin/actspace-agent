@@ -7,10 +7,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const cliDir = path.join(repoRoot, "plugins/browser-bridge/apps/cli");
+const cliDir = path.join(repoRoot, "browser-bridge/apps/cli");
 const generatedPath = path.join(
   repoRoot,
-  "packages/agent-core/src/tools/tools/browser/generated-actions.ts",
+  "packages/tools/browser-tools/src/generated-actions.ts",
 );
 const commandSurfacePath = path.join(
   repoRoot,

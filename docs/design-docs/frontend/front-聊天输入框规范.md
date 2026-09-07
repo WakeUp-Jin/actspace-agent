@@ -38,12 +38,12 @@
 - 普通 focus ring 使用高对比中性 token；运行状态可使用 operational green。Context usage 默认保持中性，只有接近阈值时切 warning / danger；Thinking toggle 不再默认使用品牌蓝。
 - workspace、branch、runtime 都应表现为下拉入口；真实交互、Git 和 Worktree 边界统一遵循 `front-workspace-git-worktree-context.md`。
 - Chat / Plan / Agent 不是只改 placeholder 的视觉标签；每次发送都必须把模式作为显式运行参数传入 main 和 Agent Runtime，由工具暴露层强制能力边界。Prompt 只负责行为指导，不承担权限隔离。
-- Slash Command 在普通 Agent Turn 之前分流：`/compact` 触发上下文压缩，`/eval [失败说明]` 触发最近失败 Turn 的回归 Candidate 生成；命令文本不作为普通用户消息显示。可发现菜单、键盘行为、Functions / Skills 分组及 V1 边界统一见 `front-composer-slash-command.md`。
+- Slash Command 在普通 Agent Turn 之前分流：`/compact` 触发上下文压缩，命令文本不作为普通用户消息显示。v2 不提供 `/eval`。可发现菜单、键盘行为、Functions / Skills 分组统一见 `front-composer-slash-command.md`。
 
 ## 草稿与历史输入
 
-- 未发送的文字草稿按 `sessionId` 隔离，并由比 Conversation 页面生命周期更长的 Workbench 内存状态持有；进入设置、Usage、Kairos 等页面，或在会话之间切换后返回时，恢复该会话自己的文字草稿。
-- 草稿只在当前应用运行期间保留，不写入 `session.jsonl`，关闭或刷新应用后不保证恢复。发送开始后清空当前草稿；如果输入尚未持久化就发送失败，继续使用 Composer 的失败恢复机制回填文字和附件，且失败恢复必须校验原会话 ID，不得跨会话回填。
+- 未发送的文字草稿按 `sessionId` 隔离，并由比 Conversation 页面生命周期更长的 Workbench 内存状态持有；进入设置、Usage 等页面，或在会话之间切换后返回时，恢复该会话自己的文字草稿。
+- 草稿只在当前应用运行期间保留，不写入 Session Journal，关闭或刷新应用后不保证恢复。发送开始后清空当前草稿；如果输入尚未持久化就发送失败，继续使用 Composer 的失败恢复机制回填文字和附件，且失败恢复必须校验原会话 ID，不得跨会话回填。
 - 历史输入来自当前会话已经持久化的用户文字消息，按时间从旧到新排列；不恢复消息当时的附件、模型、模式或 Skills，避免重新绑定已经过期的执行配置。
 - 普通输入框为空时，`ArrowUp` 从最近一条历史输入开始向前浏览；浏览期间 `ArrowDown` 向后移动，越过最新一条后恢复为空输入。
 - 新鲜的非空文字和多行文字继续使用 textarea 原生方向键移动光标。Slash Command 菜单打开时方向键优先导航菜单；IME 组词期间不触发历史回溯。
@@ -132,7 +132,7 @@ Initial composer 不显示 follow-up 的 Review strip，也不显示底部 branc
 ### `/` Slash Command 菜单
 
 - 用户在空白草稿中输入 `/` 后，Composer 打开键盘优先的 Slash Command 菜单。
-- 菜单只包含 `Functions` 与 `Skills` 两个一级分组，并复用现有模式回调、Context / Review 入口、`/compact` / `/eval` 路由和 Skill registry。
+- 菜单只包含 `Functions` 与 `Skills` 两个一级分组，并复用现有模式回调、Context / Review 入口、`/compact` 路由和 Skill registry。
 - `/` 与 `+` 是同一批能力的不同发现入口：`+` 偏鼠标、附件和多选，`/` 偏搜索、键盘和快捷调用；两者不要求展示完全相同的项目。
 - Slash 菜单与 `+`、model menu、model options、Context popup 互斥，不新增常驻按钮，也不改变 Composer 默认视觉密度。
 - 完整触发规则、命令清单、选择语义、键盘 / IME、可访问性、视觉和验收要求见 `docs/design-docs/frontend/front-composer-slash-command.md`。
@@ -189,7 +189,7 @@ placeholder 随模式改变，但不代替彩色 pill 和运行时契约：
 - 用户取消时不产生附件、错误消息或空占位。重复选择同一路径时去重。
 - textarea 接收系统剪贴板中的图片文件。PNG、JPEG、WebP 由 Electron main 校验签名后写入应用 `tmpRoot/composer-attachments`，确保附件既有安全预览，也有可供当前轮 Agent 工具读取的真实路径；不把 Base64 当作工具路径。
 - 文件选择由 main 生成有界 `data:` 缩略图；拖放使用当前 renderer 生命周期内的 `blob:` 预览。禁止把本地 `file://` 交给 Vite renderer 加载，也禁止把预览 Base64 持久化到 session 事件。
-- 发送边界必须剥离 `previewUrl`；后续 `session:get` 在 main 进程从已持久化的受信附件路径重新生成有界 `data:` 缩略图，仅丰富本次 IPC 返回值，不修改 `session.jsonl`。源文件不可读时保留附件元数据并安全降级为空预览。
+- 发送边界必须剥离 `previewUrl`；后续 Session Projection 在 main 进程从已持久化的受信附件路径重新生成有界 `data:` 缩略图，仅丰富本次 IPC 返回值，不修改 Session Journal。源文件不可读时保留附件元数据并安全降级为空预览。
 - 选中后显示 `48px` 图片缩略图；点击缩略图在右侧面板打开 Image Tab。发送后的用户消息图片同样是可聚焦的预览按钮，复用同一个 Image Tab 交互，不退化为只能查看缩略图的静态装饰。删除按钮保持紧凑并与预览按钮分离，模式切换不清空已选图片。
 - Image 表示“把本地图片作为用户输入附件”，不是图片生成工具，不依赖 `generate_image` provider 设置。
 - Composer 不根据主模型是否原生支持图片来禁用发送。runtime 根据实际能力路由：原生视觉模型接收图片内容；文本主模型接收附件元数据，并在当前模式与配置允许时调用 `inspect_image`。工具不可用时由模型明确说明限制，不得伪造视觉结论。

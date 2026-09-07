@@ -32,8 +32,8 @@ jobs:
           node-version: 24
           package-manager: pnpm@10.33.0
           build-cmd: pnpm build:site
-          cache-dir: packages/site/node_modules/.astro
-          out-dir: packages/site/dist
+          cache-dir: apps/site/node_modules/.astro
+          out-dir: apps/site/dist
 
   deploy:
     needs: build

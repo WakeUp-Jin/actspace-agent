@@ -1,0 +1,48 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "strict": false,
+    "lib": [
+      "ES2022"
+    ],
+    "outDir": "dist-electron",
+    "baseUrl": ".",
+    "paths": {
+      "@actspace/shared/model-catalog-data": ["../../packages/shared/dist/generated/model-catalog.generated.d.ts"],
+      "@actspace/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@actspace/shared/*": ["../../packages/shared/dist/*"],
+      "@actspace/runtime": ["../../packages/runtime/dist/index.d.ts"],
+      "@actspace/runtime/*": ["../../packages/runtime/dist/*/index.d.ts"]
+    },
+    "rootDir": "src",
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "src/main/index.ts",
+    "src/main/app-paths.ts",
+    "src/main/approval-registry.ts",
+    "src/main/settings-service.ts",
+    "src/main/model-store-service.ts",
+    "src/main/model-runtime-service.ts",
+    "src/main/model-catalog-worker.ts",
+    "src/main/browser-bridge-service.ts",
+    "src/main/workspace-registry-service.ts",
+    "src/main/workspace-fs-service.ts",
+    "src/main/review-coordinator.ts",
+    "src/main/review-git-engine.ts",
+    "src/main/review-git-worker-client.ts",
+    "src/main/review-git-worker.ts",
+    "src/main/review-view-state-service.ts",
+    "src/main/terminal/terminal-session-service.ts",
+    "src/main/terminal/terminal-backend.ts",
+    "src/main/terminal/node-pty-terminal-backend.ts",
+    "src/main/terminal/shell-environment-service.ts",
+    "src/main/terminal/terminal-process-cleanup.ts",
+    "src/main/terminal/terminal-ipc.ts",
+    "src/main/runtime-v2",
+    "src/preload/index.ts"
+  ]
+}

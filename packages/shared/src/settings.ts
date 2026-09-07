@@ -46,15 +46,7 @@ export interface ImageInspectionSettings {
 }
 
 /** 可在设置页保存本地凭据的全部供应商（LLM + 搜索 + 图片生成）。 */
-export type SecretProviderId = LlmProviderId | SearchProviderId | ImageGenerationSecretId;
-
-export type KairosThinkingMode = "auto" | "on" | "off";
-
-/**
- * Kairos 设置页允许的显式模型；null 表示 Kairos 默认 Flash。
- * 当前允许显式 DeepSeek V4 Pro 或 Kimi（Kimi 偏贵，建议配合额度护栏）。
- */
-export type KairosModelId = Extract<ModelId, "deepseek-v4-pro" | "kimi-k2.6" | "kimi-k2.7-code">;
+export type SecretProviderId = LlmProviderId | SearchProviderId | ImageGenerationSecretId | "speech-minimax";
 
 export interface ProviderSettingsView {
   /** 用户已在页面配置该供应商密钥；决定卡片"已连接/可断开"。 */
@@ -129,6 +121,8 @@ export interface ProviderCredentialView extends ProviderCredentialSettings {
 export interface InstalledModelSettings {
   enabled: boolean;
   addedAt: string;
+  /** Optional V4 connection binding; omitted means the provider default connection. */
+  connectionId?: string;
   customLabel?: string;
   /** 缺省使用 provider 默认 Key；有值时引用同 provider 下已保存的额外 Key。 */
   credentialId?: string;
@@ -158,49 +152,6 @@ export interface AgentSettings {
    * 缺 DeepSeek key 时运行时回落主模型，见 docs/design-docs/collaboration/agent-explore-subagent.md。
    */
   exploreModelId: ModelId | null;
-}
-
-export interface KairosSettings {
-  /**
-   * Kairos 产品功能是否可用。
-   *
-   * false / 缺失 = 仅在设置页保留恢复入口，不展示普通工作台入口，也不创建运行时 Controller。
-   * 该字段不表示自治循环正在运行；运行意图仍由 Kairos preferences.enabled 管理。
-   */
-  featureEnabled?: boolean;
-  /**
-   * Kairos 自主模式模型。
-   *
-   * null = Kairos 默认模型 deepseek-v4-flash；显式值当前只允许 deepseek-v4-pro。
-   * 这是设置页与运行时的唯一真来源，持久化在 settings.json。
-   */
-  modelId: KairosModelId | null;
-  /**
-   * 思考链覆写。
-   */
-  thinking: KairosThinkingMode;
-  /**
-   * Kairos 的 Skill 白名单（按 Skill name）。
-   *
-   * 与主 Agent 的黑名单语义相反：默认空数组 = Kairos 一个 Skill 都不加载，
-   * 只有显式列入的 Skill 才会进 Kairos 的 catalog 段并把 Skill 目录并入 allowedRoots。
-   * 变更后 main 会重建 Kairos controller 使其生效。
-   */
-  enabledSkills: string[];
-}
-
-export interface PluginsSettings {
-  /**
-   * 本机 actspace-plugins 仓库的绝对路径（用户 clone 下来的插件源码仓库）。
-   * 设置后插件可以「编译并安装」一键完成 cargo build → 安装 → 启动；null = 未设置，
-   * 仍可退回手动选择二进制安装。
-   */
-  repoRoot: string | null;
-  /** fs-watch 文件监听插件（设计文档 agent-plugins-fs-watch.md）。 */
-  fsWatch: {
-    /** 总开关：开 = app 启动时自动拉起插件进程并守护；关 = 停止进程。 */
-    enabled: boolean;
-  };
 }
 
 export interface SkillsSettings {
@@ -236,17 +187,10 @@ export interface AppSettingsV1 {
   /** 网络搜索供应商的密钥状态（web_search 工具）。 */
   searchProviders: Record<SearchProviderId, ProviderSettingsView>;
   agent: AgentSettings;
-  kairos: KairosSettings;
-  plugins: PluginsSettings;
   skills: SkillsSettings;
 }
 
 export type AgentSettingsV2 = Omit<AgentSettings, "exploreModelId">;
-export type KairosSettingsV2 = Omit<KairosSettings, "modelId" | "featureEnabled"> & {
-  featureEnabled: boolean;
-  modelId: ModelKey | null;
-};
-
 export interface AppSettingsV2 {
   version: 2;
   providers: Record<LlmProviderId, ProviderSettingsView>;
@@ -260,10 +204,150 @@ export interface AppSettingsV2 {
   /** inspect_image 使用的视觉模型与已有 provider 凭据引用。 */
   imageInspection: ImageInspectionSettings;
   agent: AgentSettingsV2;
-  kairos: KairosSettingsV2;
-  plugins: PluginsSettings;
   skills: SkillsSettings;
   shortcuts: ShortcutsSettings;
+}
+
+/**
+ * Settings v4 is the logical namespace contract used by the new Settings Authority.
+ * It is deliberately separate from AppSettingsV2: v2 remains a renderer compatibility
+ * view while v4 is the persisted, provider-qualified shape used by new pages.
+ */
+export type SettingsRevision = string;
+
+export type SettingsV4Namespace =
+  | "general"
+  | "models"
+  | "tools"
+  | "media"
+  | "skills"
+  | "subagents"
+  | "activity";
+
+export interface SettingsV4General {
+  /** Absent in older v4 snapshots. Runtime enablement is never persisted. */
+  englishLearning?: { lastSessionId: string | null };
+  personalization: {
+    displayName: string;
+    responseStyle: string;
+  };
+  agentInstructions: {
+    systemPromptPath: string;
+  };
+  taskDefaults: {
+    temperature: number | null;
+    maxOutputTokens: number | null;
+  };
+  shortcuts: ShortcutsSettings;
+}
+
+export interface SettingsV4ConnectionSettings extends ProviderConnectionSettings {
+  connectionId: string;
+  /** Missing in older settings: preserve Chat Completions behavior. */
+  protocol?: import("./model-config").ModelApi;
+  providerId: LlmProviderId;
+  displayName?: string;
+  defaultModel?: string | null;
+  catalogId?: string;
+}
+
+export interface CustomConnectionInput {
+  providerId: LlmProviderId;
+  protocol?: import("./model-config").ModelApi;
+  connectionId?: string;
+  displayName: string;
+  apiKey: string;
+  baseUrl: string;
+  defaultModel?: string | null;
+  catalogId?: string;
+  proxy?: ProviderProxySettings;
+}
+
+export interface SettingsV4InstalledModelSettings extends InstalledModelSettings {
+  connectionId: string;
+}
+
+export interface SettingsV4Models {
+  connections: Record<string, SettingsV4ConnectionSettings>;
+  definitions: Partial<Record<ModelKey, ModelDefinition>>;
+  installed: Partial<Record<ModelKey, SettingsV4InstalledModelSettings>>;
+  taskBindings: {
+    defaultChat: ModelKey | null;
+    utility: ModelKey | null;
+    explore: ModelKey | null;
+  };
+}
+
+export interface SettingsV4Tools {
+  disabledTools: string[];
+  bash: {
+    alwaysAsk: boolean;
+  };
+  searchProviders: Partial<Record<SearchProviderId, { enabled: boolean }>>;
+}
+
+export interface SettingsV4Media {
+  /** Absent in older v4 snapshots; SettingsService supplies defaults. */
+  speech?: import("./english-learning").SpeechSettings;
+  imageGeneration: {
+    baseUrl: string;
+    model: string;
+  };
+  imageInspection: ImageInspectionSettings;
+}
+
+export interface SettingsV4SubagentRoute {
+  enabled: boolean;
+  model: ModelKey | null;
+}
+
+export interface SettingsV4UsagePreferences {
+  range: "24h" | "7d" | "30d" | "all";
+  status: "all" | "success" | "error" | "aborted" | "unknown";
+  modelFilter: string;
+  showDetails: boolean;
+  activeTab: "requests" | "providers" | "models" | "tools" | "pricing";
+}
+
+export interface SettingsV4 {
+  version: 4;
+  general: SettingsV4General;
+  models: SettingsV4Models;
+  tools: SettingsV4Tools;
+  media: SettingsV4Media;
+  skills: SkillsSettings;
+  subagents: {
+    routes: Record<string, SettingsV4SubagentRoute>;
+  };
+  activity: {
+    usage: SettingsV4UsagePreferences;
+  };
+}
+
+export type SettingsV4NamespacePatch = {
+  [N in SettingsV4Namespace]: {
+    namespace: N;
+    patch: Partial<SettingsV4[N]>;
+  };
+}[SettingsV4Namespace];
+
+export type SettingsV4UpdateInput = SettingsV4NamespacePatch & {
+  expectedRevision: SettingsRevision;
+};
+
+export interface SettingsV4Snapshot {
+  version: 4;
+  revision: SettingsRevision;
+  settings: SettingsV4;
+}
+
+export type SettingsV4UpdateResult =
+  | { ok: true; snapshot: SettingsV4Snapshot }
+  | { ok: false; code: "revision_conflict"; latest: SettingsV4Snapshot; message: string };
+
+export interface SettingsV4ChangedNotification {
+  revision: SettingsRevision;
+  changedNamespaces: SettingsV4Namespace[];
 }
 
 /**
@@ -280,8 +364,6 @@ export interface AppSettings extends Omit<AppSettingsV1, "version" | "providers"
   installedModels?: Partial<Record<ModelKey, InstalledModelSettings>>;
   customModels?: Partial<Record<ModelKey, ModelDefinition>>;
   taskModels?: TaskModelSettings;
-  /** v2 Kairos ModelKey；旧 `kairos.modelId` 仍供当前消费方过渡读取。 */
-  kairosModelKey?: ModelKey | null;
   /** 迁移期可选，旧测试 fixture 缺失时 renderer 使用内置默认值。 */
   imageGeneration?: ImageGenerationSettingsView;
   /** 旧测试 fixture 缺失时 renderer 使用内置默认值。 */
@@ -295,8 +377,6 @@ export interface AppSettings extends Omit<AppSettingsV1, "version" | "providers"
 export type SettingsUpdateInput = Partial<{
   defaultModelId: ModelId | null;
   agent: Partial<AgentSettings>;
-  kairos: Partial<KairosSettings>;
-  plugins: Partial<PluginsSettings>;
   skills: Partial<SkillsSettings>;
   imageInspection: ImageInspectionSettings;
 }>;
@@ -307,9 +387,10 @@ export type SettingsV2UpdateInput = Partial<{
   customModels: Partial<Record<ModelKey, ModelDefinition | null>>;
   taskModels: Partial<TaskModelSettings>;
   agent: Partial<AgentSettingsV2>;
-  kairos: Partial<KairosSettingsV2>;
-  plugins: Partial<PluginsSettings>;
   skills: Partial<SkillsSettings>;
+  imageGeneration: Partial<Pick<ImageGenerationSettingsView, "baseUrl" | "model">>;
+  imageInspection: Partial<ImageInspectionSettings>;
+  shortcuts: Partial<{ quickOpen: Partial<ShortcutsSettings["quickOpen"]> }>;
 }>;
 
 export type QuickOpenShortcutUpdateInput = Partial<{

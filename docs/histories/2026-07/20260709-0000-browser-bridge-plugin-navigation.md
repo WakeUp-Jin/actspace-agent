@@ -16,7 +16,7 @@
 
 **Key Actions:**
 
-- **AGENTS 导航**: 在 `AGENTS.md` 增加相关平级项目说明，明确 `actspace-plugins/plugins/browser-bridge/` 是 Browser Use / Browser Bridge 主位置。
+- **AGENTS 导航**: 在 `AGENTS.md` 增加相关平级项目说明，明确 `actspace-plugins/browser-bridge/` 是 Browser Use / Browser Bridge 主位置。
 - **设计文档同步**: 在 `docs/design-docs/browser/agent-browser-bridge-design.md` 标注 Browser Bridge 主线实现已迁入插件仓，原独立仓保留为迁移来源与历史上下文。
 
 ### 🧠 Design Intent (Why)

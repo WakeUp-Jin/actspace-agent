@@ -1,0 +1,8 @@
+import type { JsonValue, PluginManifest } from "@actspace/cordis-adapter";
+
+export type CompositionEntry = { readonly entryId: string; readonly pluginId: string; readonly pluginVersion: string; readonly module: string; readonly required: boolean; readonly enabled: boolean; readonly config: JsonValue; readonly requiredCapabilities: readonly string[]; readonly optionalCapabilities: readonly string[]; readonly provides: readonly string[]; readonly injects: readonly string[]; readonly frontendRequired: boolean; readonly provenance: string; readonly state: "candidate" | "active" | "skipped" | "failed" };
+export type Bundle = { readonly id: string; readonly version: string; readonly manifests: readonly PluginManifest[]; readonly provenance: string };
+export type Profile = { readonly id: string; readonly runtimeContract: "actspace.runtime.v2"; readonly orderedBundleIds: readonly string[]; readonly patch?: Patch };
+export type PatchOperation = { readonly id: string; readonly kind: "insert"; readonly entry: CompositionEntry; readonly after?: string; readonly optional?: boolean } | { readonly id: string; readonly kind: "replace-config"; readonly target: string; readonly config: JsonValue; readonly optional?: boolean } | { readonly id: string; readonly kind: "disable" | "remove"; readonly target: string; readonly optional?: boolean };
+export type Patch = { readonly id: string; readonly provenance: string; readonly operations: readonly PatchOperation[] };
+export type PatchOperationResult = { readonly operationId: string; readonly patchId: string; readonly state: "applied" | "skipped" | "failed"; readonly message: string };

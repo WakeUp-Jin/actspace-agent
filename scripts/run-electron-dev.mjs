@@ -7,10 +7,11 @@ import { createRequire } from "node:module";
 import { basename, dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { runtimeIntegrityIssue } from "./electron-runtime-integrity.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, "..");
-const desktopRoot = join(repositoryRoot, "packages", "desktop");
+const desktopRoot = join(repositoryRoot, "apps", "desktop");
 const requireFromDesktop = createRequire(join(desktopRoot, "package.json"));
 const electronExecutable = requireFromDesktop("electron");
 const electronVersion = requireFromDesktop("electron/package.json").version;
@@ -69,10 +70,12 @@ async function prepareMacRuntime(identity) {
     }
   };
 
-  if (await pathExists(devExecutable)) {
+  const cacheIssue = await runtimeIntegrityIssue(sourceApp, devApp, identity);
+  if (cacheIssue === null) {
     await registerWithLaunchServices();
     return { devApp, devExecutable };
   }
+  console.log(`[dev-runtime] rebuilding cached Electron: ${cacheIssue}`);
 
   await mkdir(cacheRoot, { recursive: true });
   const stagingApp = join(cacheRoot, `.staging-${process.pid}.app`);
@@ -98,6 +101,11 @@ async function prepareMacRuntime(identity) {
   run("/usr/bin/codesign", ["--force", "--sign", "-", "--timestamp=none", stagedExecutable]);
   run("/usr/bin/codesign", ["--force", "--sign", "-", "--timestamp=none", stagingApp]);
 
+  const stagingIssue = await runtimeIntegrityIssue(sourceApp, stagingApp, identity);
+  if (stagingIssue !== null) {
+    await rm(stagingApp, { recursive: true, force: true });
+    throw new Error(`Prepared Electron runtime is incomplete: ${stagingIssue}. Check the installed Electron package and rebuild it.`);
+  }
   await rm(devApp, { recursive: true, force: true });
   await rename(stagingApp, devApp);
 
@@ -149,6 +157,7 @@ async function main() {
     process.exitCode = 1;
   });
   child.once("exit", (code, signal) => {
+    if (code !== 0 || signal) console.error(`[dev-runtime] Electron exited: code=${code ?? "null"} signal=${signal ?? "none"}`);
     process.exitCode = code ?? (signal ? 1 : 0);
   });
 }

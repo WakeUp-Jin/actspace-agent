@@ -30,4 +30,4 @@ Todo 是当前 AgentRun 的执行状态，不是普通工具日志。把它放�
 - `packages/desktop/src/renderer/components/ConversationView.tsx`
 - `packages/desktop/src/renderer/components/messages/TodoListBlock.tsx`
 - `packages/desktop/src/renderer/test/app-streaming-user-message.test.tsx`
-- `docs/design-docs/tool-system/agent-todo-tools.md`
+- `docs/design-docs/v1-legacy/tool-system-agent-todo-tools.md`

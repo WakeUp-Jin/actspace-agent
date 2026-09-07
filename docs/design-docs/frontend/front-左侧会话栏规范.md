@@ -4,7 +4,7 @@
 
 左侧会话栏是 actspace 桌面端工作台的左侧栏，负责：
 
-- 入口聚合：聊天态新建（New Agent）以及 Usage / Kairos 两个产品入口，外加顶栏窗口控件。Lab 方向暂停，不在公开导航中展示。
+- 入口聚合：聊天态新建（New Agent）以及扩展入口，外加顶栏窗口控件。
 - 会话导航：让用户在大量历史会话之间快速切换。
 - Workspace 操作：围绕已加入侧边栏的本地文件夹，提供打开 IDE、批量归档和从侧边栏移除等轻量管理能力。
 - 状态指示：把当前选中、运行中 turn、待审批和失败等状态集中显示在行首状态点。
@@ -16,30 +16,30 @@
 
 自上而下分四块：
 
-1. **顶部窗口区**（红绿灯 + 折叠按钮 + 搜索按钮）。
-2. **顶部主入口**：`New Agent` / `Usage` / `Kairos`。
+1. **顶部窗口区**（红绿灯 + 折叠按钮 + 会话历史返回/前进）。
+2. **顶部主入口**：`New Agent` / `扩展`。
 3. **分区列表**：`Pinned` → `Workspaces`（父分类 + 多个 Workspace 文件夹）。当前没有定时任务产品能力，因此不展示 `Scheduled` 占位分区。
 4. **底部** `Settings`。
 
 ## 顶部窗口区
 
-- 自左到右：macOS 红绿灯（系统）、折叠按钮（PanelLeft icon）、搜索按钮（Search icon）。这两个按钮放在窗口级 chrome 浮层的左段（`.chrome-left`），不属于 sidebar 内部。
+- 自左到右：macOS 红绿灯（系统）、折叠按钮（PanelLeft icon），以及在 sidebar 顶部右侧对齐的会话历史 Back / Forward。PanelLeft 与导航按钮属于窗口级 chrome，不属于 sidebar 内部；Sidebar 内的 Search 仍保留为会话导航入口。
 - **chrome 按钮由 `WindowChromeBar` 渲染**（参考 Cursor Agent Window 的 `.part.titlebar`）。它是 `position: fixed top:0 left:0 right:0 height:44px z-index:60 pointer-events:none` 的全宽浮层，并使用与 `SplitView` 实际 pane 宽度同步的三列 grid：
-  - `.chrome-left`：红绿灯安全区（`padding-left: 86px`）+ PanelLeft + Search
-  - `.chrome-center`：左对齐的当前 view 标题（chat 时是 session title；lab/usage/kairos 时是对应名）+ 中间栏尾部的 IDE / Environment + 窗口拖动区（`-webkit-app-region: drag`）
+  - `.chrome-left`：红绿灯安全区（`padding-left: 86px`）+ PanelLeft；会话 Back / Forward 作为同一左列内的右对齐导航组
+  - `.chrome-center`：左对齐的当前 view 标题（chat 时是 session title；lab/usage/kairos 时是对应名）+ 中间栏尾部的 Environment + 窗口拖动区（`-webkit-app-region: drag`）
   - `.chrome-right`：右 panel 的对象菜单和 PanelRight toggle；空白区域不恢复 pointer events，避免遮挡右栏 Tab
-- chrome bar 自身透明，只绘制统一的主题感知底部分隔线；sidebar / main / right panel 三栏各自顶部留 `var(--window-chrome-strip-height) = 44px` 的 padding-top，让浮层覆盖到自己顶部时不挡内容，视觉上「三栏直接贯顶 + 标题与操作各归其位」。
+- chrome bar 自身透明；主题感知底部分隔线只绘制在右侧对象面板列，左列与中间列不绘制底线；sidebar / main / right panel 三栏各自顶部留 `var(--window-chrome-strip-height) = 44px` 的 padding-top，让浮层覆盖到自己顶部时不挡内容，视觉上「三栏直接贯顶 + 标题与操作各归其位」。
 - 折叠按钮在 `expanded ↔ hidden` 之间切换；hidden 态时它的 aria-label 变成 `Expand session sidebar`，`aria-pressed=false`。
-- 搜索按钮是图标级别的"操作"按钮，不是导航项；点击触发全局会话/工作区搜索。搜索功能本身在首版可暂未实现，但入口必须保留。
+- 顶部不再放搜索按钮，避免与 Sidebar 内 Search 重复；Sidebar 内 Search 继续承担会话/工作区搜索入口。
+- Back / Forward 只遍历本次 Workbench 已访问的会话历史，不修改 Session Journal；没有对应历史时禁用。切换到新会话后会截断当前位置之后的前进历史。
 - 不再有 main pane 自管的 `.topbar`，所有窗口级 chrome 元素都统一挂在 chrome bar 上。
 
 ## 顶部主入口
 
 - `New Agent`：替代原 `New chat`，承担"开启一次新的 Agent 任务"语义；展示快捷键 `⌘N`。
-- `Usage`：统计页占位（Coming soon），将承载 token / 成本聚合。具体设计见 `front-usage-statistics.md`。
-- `Kairos`：时机引擎占位页（Coming soon）。Kairos 取自希腊语「合适的时刻」，将承载定时任务、事件触发、自主 Agent 的运行边界与节奏。
-- 三个入口共用同一组 hover / active 状态语言；当前 view 视为 active。
-- Lab 的原型和 renderer 代码作为历史设计资产保留，但暂不提供侧栏入口。
+- `扩展`：管理能力、Skills 与 MCP，保留会话侧栏；Usage 位于设置中心的「活动」分组。
+- 两个入口共用同一组 hover / active 状态语言；当前 view 视为 active。
+- Kairos 与 Lab 不属于当前公开导航；历史原型和设计资产见 `docs/design-docs/v1-legacy/`。
 
 ## 分区列表
 
@@ -49,7 +49,7 @@
 
 - 标题文字字号 **12px / weight 500 / `--color-text-faint`**：
   - 字号比主入口（13px）小一档，颜色比主入口的 muted 弱一档（faint）。
-  - **字重和会话行、主入口同样是 500**，靠"字号小一档 + 颜色更浅"区分"导航主入口"和"分组标题"两种语义，而不是用 440 这种非标字重做区分。早期版本曾用「主入口 520 / 分组标题 440」靠字重对比，已纠正，理由见 [全局视觉语言规范.md](./全局视觉语言规范.md) 的「字重与行高」段。
+  - **字重和会话行、主入口同样是 500**，靠"字号小一档 + 颜色更浅"区分"导航主入口"和"分组标题"两种语义，而不是用 440 这种非标字重做区分。早期版本曾用「主入口 520 / 分组标题 440」靠字重对比，已纠正，理由见 [全局视觉语言规范](./front-全局视觉语言规范.md) 的「字重与行高」段。
 - 标题文字左对齐到 sidebar 内 padding-left 8px 起点；前面不再放任何 chevron / icon，文字本身就是分组的视觉锚点。
 - 整个标题区都是点击命中区，点击切换该分组的 `collapsed` 状态。
 - 右侧 `nav-section-actions` 默认全部隐藏，hover / focus 标题区时整体淡入：
@@ -181,6 +181,13 @@
 - 浮层使用现有 Radix Tooltip Portal 和主题 token，默认出现在会话行右侧；宽度上限约 360px，通过 collision 逻辑避免超出窗口。
 - 会话右键菜单打开、进入重命名输入态或会话已离开可见 sidebar 时，Tooltip 必须关闭。
 
+## 扩展切换规则
+
+- 顶部 New Agent 下方新增「扩展」，选中时使用中性高亮。
+- 主区显示「能力 / Skills / MCP」，保留会话侧栏；窄窗选择入口后关闭侧栏覆盖层。
+- 扩展态隐藏聊天右栏及其开关；返回聊天恢复原右栏状态和会话草稿。
+- 原设置里的扩展与 Skills 已迁入此处；能力详情见 [设置中心规范](front-设置中心重构规范.md#66-扩展独立入口)。
+
 ## Settings 切换规则
 
 - 底部 `Settings` 是页面级入口，不是弹窗入口。
@@ -214,7 +221,7 @@
 
 ## 字体
 
-字体栈与 Cursor 对齐，详细约定见 [全局视觉语言规范.md](./全局视觉语言规范.md) 的「字体栈」「字体特性」「字号阶梯」「字重与行高」四段。Sidebar 这里只列与本组件直接相关的字号字重表：
+字体栈与 Cursor 对齐，详细约定见 [全局视觉语言规范](./front-全局视觉语言规范.md) 的「字体栈」「字体特性」「字号阶梯」「字重与行高」四段。Sidebar 这里只列与本组件直接相关的字号字重表：
 
 ```css
 --font-ui:
@@ -227,7 +234,7 @@
 - 不把 `"SF Pro Text"` 写在最前面，让 macOS 通过 `-apple-system` 自动选 San Francisco，与 Cursor `.monaco-workbench.mac:lang(zh-Hans)` 完全一致。
 - **全局 `font-feature-settings: normal`**，**不再开 `cv11/ss01`**——之前开启这两个拉丁 stylistic set 会让英文字形偏离 macOS 系统 UI；body 仅保留 `-webkit-font-smoothing: antialiased`。
 - 字号字重基准（以 sidebar 为例，对齐 Cursor IDE 的"中间档"密度）：
-  - 主入口（New Agent / Usage / Kairos）：`13px / 500 / --color-text-muted`。
+  - 主入口（New Agent / 扩展）：`13px / 500 / --color-text-muted`。
   - 会话标题：`13px / 500`。
   - 会话时间戳：`11px / --color-text-faint`。
   - 分组标题（Pinned / Workspaces 等）：`12px / 500 / --color-text-faint`。靠字号小一档 + 颜色更浅区分语义，而不是用 440 这种非标字重。
@@ -242,10 +249,10 @@
 - `archived?: boolean`：用户归档会话时通过 IPC `session:archive` 更新。
 - `SessionListItem` 同步透出这些字段，让前端按 workspace 分组并标记 pinned / archived。
 - `WorkspaceEntry` 增加可选 `hidden?: boolean`；该字段持久化在 `workspaces.json`，不因 session 反向合并自动清除。
-- 后端 `agent-core` 在创建 session 时根据 `SessionCreateInput.workspaceRoot` 写入 meta；列出时直接透出。
+- v2 Runtime 在创建 Session 时根据 Host 提供的 workspace context 写入 Journal header；列出时由 Runtime Projection 透出。
 - 切换 pin 走 `pinSession({ sessionId, pinned })`，主进程调用 `setSessionPinned` 重写 meta。
 - 重命名走 `renameSession({ sessionId, title })`，主进程调用 `setSessionTitle` 重写既有 `SessionMeta.title`。
-- Fork 走 `forkSession({ sessionId })` / `session:fork`；主进程拒绝 active turn，并调用 agent-core 的 `forkSessionRecord` 创建独立会话目录后返回完整 `SessionRecord`。
+- Fork 走 typed Runtime IPC；主进程拒绝 active turn，并调用 v2 Session store 创建独立 Journal 后返回完整 Session Projection。
 - Copy ID 只使用列表已有 `sessionId`；Copy Transcript 对当前会话复用 renderer 消息，对其他会话按需读取完整 `SessionRecord`，再通过 shared formatter 过滤为 User / Assistant Markdown。
 - 切换 archive 走 `archiveSession({ sessionId, archived })`，主进程调用 `setSessionArchived` 重写 meta；普通 `listSessions()` 默认只返回未归档会话，设置页通过 `listSessions({ archived: true })` 读取归档列表。
 - `Archive All` 在 renderer 中先冻结 Workspace 当前 session id 快照并处理 active session 导航落点，再通过 main-owned 批量归档契约执行；返回值至少包含 `archivedSessionIds` 和 `failedSessionIds`。
@@ -269,5 +276,5 @@
 - 轻量优先：信息密度高、视觉装饰少，不做重卡片。
 - 轻量管理：Workspace 来源仍是本地目录，侧边栏只暴露打开、归档和隐藏三个高频动作，不在导航区引入重命名、排序、迁移等重管理能力。
 - 状态合并：行首点首版只区分 active 和 busy，不细分未读/错误/审批，等业务上有真实区分需求再扩展。
-- 操作克制：顶部主入口要么是当前真正在演进的产品方向（Usage / Kairos），要么是核心操作（New Agent）；暂停的方向不占用公开入口。
+- 操作克制：顶部主入口只保留当前产品入口（扩展）和核心操作（New Agent）；退役或暂停的方向不占用公开入口。
 - 折叠彻底：`hidden` 而非 `rail`，让 main content 真正占满，符合用户对"折叠"的直觉与 Cursor 行为一致；窗口顶部浮动的 chrome row 保证可逆。

@@ -36,5 +36,5 @@
 - `packages/desktop/src/main/context-describe-service.ts`
 - `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`
 - `docs/design-docs/frontend/front-设置页规范.md`
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`

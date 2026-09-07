@@ -1,0 +1,8 @@
+- id: actspace-runtime
+  name: "@actspace/runtime/cordis"
+  inject: [actspace.host]
+- id: core-agent
+  name: "@actspace/core-agent/plugin"
+- id: core-agent-loop
+  name: "@actspace/core-agent-loop/plugin"
+  inject: [core.agent, actspace.agent.factory]

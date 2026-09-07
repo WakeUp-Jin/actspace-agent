@@ -139,6 +139,6 @@ const selectedCardClass = "border-brand bg-brand-soft shadow-... before:...";
 ## 相关 history
 
 - 本次重构：`docs/histories/2026-05/20260528-1632-lab-page-visual-refresh.md`
-- 设计文档反例约束：`docs/design-docs/lab/lab-frontend-page-design.md` "视觉约束" 一节
+- 设计文档反例约束：`docs/design-docs/v1-legacy/lab-frontend-page-design.md` "视觉约束" 一节
 - 全局视觉语言规范：`docs/design-docs/frontend/front-全局视觉语言规范.md`
-- 可独立预览的原型：`docs/design-docs/lab/prototype-refresh.html`
+- 可独立预览的原型：`docs/design-docs/v1-legacy/prototype-refresh.html`

@@ -34,5 +34,5 @@
 - `packages/desktop/src/renderer/test/conversation-view-tooltip.test.tsx`
 - `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
 

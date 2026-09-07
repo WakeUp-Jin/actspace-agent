@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.compaction", version: "0.1.0", name: "ActSpace Surface Compaction", entry: { entryId: "compaction.surface", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: ["llm.service"], contributions: { services: ["compaction.runtime", "compaction.surface"], tools: [], prompts: [], events: ["session/surface-replaced"] } });

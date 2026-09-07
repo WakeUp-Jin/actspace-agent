@@ -1,5 +1,9 @@
 # 前端设计文档
 
+- [设置内使用统计页面更新](front-usage-statistics-refresh.md)：已实施，实机门禁见执行摘要；借鉴 Maka 信息结构，统一 ActSpace 视觉和中文，连接可靠费用投影及本地价目。
+- [英语辅助学习插件设计](../agent-plugin-runtime/agent-english-learning.md)：已实施，实机门禁见执行摘要；扩展能力卡片控制选定会话，通用设置配置 MiniMax 语音。
+- [Agent 工具流式渲染修复设计](front-agent-tool-stream-rendering.md)：已实施，定义工具事件链与实时/历史预览对齐；体验调整见后续计划。
+
 本目录汇总 `actspace` 桌面端 renderer 的视觉语言、主题、工程样式、基础组件、工作台区域、页面规范和设计原型。目录中的 Markdown、HTML 和 PNG 均直接平铺，不再创建资产子目录。
 
 当前产品级设计系统名称为 **ActSpace Editor Design System**，内部视觉方向为 **Ink & Emerald / 墨色与翡翠绿**。总纲见仓库根目录 `DESIGN.md`。
@@ -52,11 +56,12 @@
 - `docs/design-docs/frontend/front-workspace-git-worktree-context.md`：初始 Composer 的 Workspace、Git branch、This Mac 与 New Worktree 执行上下文。
 - `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`：对象启动页、文件预览、Workspace 文件树和 diff。
 - `docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md`：交互式 Terminal 的 PTY 架构、会话归属、背压、进程清理、安全边界与打包签名。
-- `docs/design-docs/frontend/front-设置页规范.md`：设置态布局和导航分组。
-- `docs/design-docs/frontend/front-usage-statistics.md`：Usage Statistics 页面和数据展示规范。
-- `docs/design-docs/frontend/front-agent-analysis-observability.md`：分析观测的产品边界、两栏信息架构、请求详情、上下文对比、主题与 Trace 可靠性规范。
+- `docs/design-docs/frontend/front-设置中心重构规范.md`：当前设置中心的产品信息架构、页面职责、模型连接流程、身份设置、Usage 活动分析和实施边界。后续设置中心实现以本文为准。
+- `docs/design-docs/frontend/front-模型设置页面-Maka重做规范.md`：模型页面的 Maka 风格重做规范，冻结连接列表、目录、配置、详情和模型目录的页面语法与验收标准。
+- `docs/design-docs/frontend/front-设置页规范.md`：重构前设置态的布局和功能基线，仅用于迁移追溯；与当前方案冲突时以 `front-设置中心重构规范.md` 为准。
+- `docs/design-docs/frontend/front-usage-statistics.md`：重构前独立 Usage 仪表盘的历史基线；当前 Usage 以 `front-设置中心重构规范.md` 为准。
 
-Kairos 监控页与 Kairos Runtime 强关联，统一维护在相邻的 `../kairos/` 专题目录。
+Kairos 和 Lab 原型属于已退役/暂停的 v1 设计资产，统一归档在 [`../v1-legacy/`](../v1-legacy/)，不作为当前桌面端页面入口。
 
 ## 当前基线图
 
@@ -91,7 +96,6 @@ Kairos 监控页与 Kairos Runtime 强关联，统一维护在相邻的 `../kair
 - `usage-statistics-prototype.html`：Usage Statistics 高保真原型。
 - `compact-command-states.html`：`/compact` 消息流三态及浅深主题原型。
 - `review-v1-git-review-prototype.html`：Review V1 Git-first 右侧面板历史原型；新 Workbench 以 `../core-review-change-sources.md` 为准。
-- `front-agent-analysis-observability-prototype.html`：分析观测两栏原型，验证 Tools 筛选、用户输入折叠、Turn/LLM Call 切换、请求差异、JSON 与 cURL 信息架构；生产实现以 `front-agent-analysis-observability.md` 为准。
 
 ## 资产约定
 

@@ -16,7 +16,7 @@ import {
   resolveModelSpec,
   resolveModelSpecByApiModel,
 } from "../model-config";
-import { PROVIDER_IDS, PROVIDER_REGISTRY, isProviderId } from "../provider-config";
+import { PROVIDER_CATALOG, PROVIDER_IDS, PROVIDER_REGISTRY, isProviderId } from "../provider-config";
 
 describe("model config", () => {
   it("exposes Kimi as a public model alongside DeepSeek", () => {
@@ -87,6 +87,18 @@ describe("model config", () => {
     expect(isProviderId("openrouter")).toBe(true);
     expect(isProviderId("duckcoding")).toBe(false);
     expect(isProviderId("other")).toBe(false);
+  });
+
+  it("exposes only approved API Key presets and three explicit custom protocols", () => {
+    expect(PROVIDER_CATALOG.map((provider) => provider.id)).toEqual([
+      "minimax", "openai", "anthropic", "zai", "xiaomi", "volcengine-coding-plan",
+      "openai-compatible", "openai-responses-compatible", "anthropic-compatible",
+    ]);
+    expect(PROVIDER_CATALOG.find((provider) => provider.id === "openai")).toMatchObject({
+      protocol: "openai-responses",
+      logoKey: "openai",
+    });
+    expect(PROVIDER_CATALOG.every((provider) => provider.auth.kind === "api-key")).toBe(true);
   });
 
   it("maps every legacy model to a provider-qualified builtin definition", () => {

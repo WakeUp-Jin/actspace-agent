@@ -37,4 +37,4 @@
 - `packages/shared/src/session.ts`
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/desktop/src/renderer/components/messages/BashRunBlock.tsx`
-- `docs/design-docs/execution-safety/agent-bash工具设计文档.md`
+- `docs/design-docs/v1-legacy/execution-safety-agent-bash工具设计文档.md`

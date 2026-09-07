@@ -1,102 +1,75 @@
 # 稳定性与可运维性
 
-这里用来定义 `actspace` 当前的运行质量底线。
+> 状态：当前 v2 运行质量基线。历史 v1 Session、Trace sidecar、Kairos 和旧 Agent Core 的可靠性约定不适用于本页。
 
-## 当前最小可靠性约定
+## 启动与数据目录
 
-- 应用启动时必须能初始化本地数据目录：
-  - `sessions/`
-  - `logs/`
-  - `tmp/`
-- renderer 不能直接访问文件系统；所有文件与 session 读写都必须走 preload + IPC。
-- 应用启动后必须至少能完成两条路径之一：
-  - 恢复本地已有会话
-  - 在没有旧会话时，跑起一次默认 Agent Run
-- `workspaces.json` 等会在启动期执行 reconciliation 的本地 registry，完整读改写流程必须串行化；原子替换使用唯一临时文件，禁止多个并发请求共享固定 `.tmp` 路径。
-- 普通桌面会话通过统一可用模型解析器选择 DeepSeek、Kimi 或已添加的 OpenRouter 模型；连接测试为可选诊断，已保存 Key 且未明确测试失败的 provider 可直接使用。mock 只用于测试、浏览器 fixture 或显式 demo，不允许静默替代 Electron 真实 Agent Run：
-  - 启动应用
-  - 请求 bootstrap state
-  - 读取 session list
-  - 执行或恢复一次 Agent Run
-  - 渲染消息流
-  - 本地落盘
-- 每次真实 Agent Run 的 `session.jsonl` 必须能恢复用户输入、中间执行和最终回复，至少包含 `user_message`、每次模型调用对应的 `llm_usage` 和轻量 `context_snapshot`。SessionEvent V2 必须携带 `agentRunId`，内部 Turn 与真实 provider 请求分别用 `turnId`、`llmCallId` 归属。
-- 每个会话可以维护独立的 `context-state.json`，用于恢复当前 Context 面板展示；该文件是可覆盖视图，不替代 `session.jsonl` 的事实日志。
-- 本机二进制插件升级必须先在唯一临时路径完成探测，再通过原子 `rename` 替换正式路径；禁止原地覆盖可能正在运行的 Native Messaging host。Chrome unpacked extension 必须用 manifest 公开 key 固定 ID，并通过测试校验 Native Host allowlist 默认值与该 ID 一致。插件健康检查必须 single-flight，renderer 只能在上一轮完成后安排下一轮，失败状态需要退避，避免超时探测演变为进程风暴。
+Desktop 启动必须初始化：
 
-## 当前本地排障入口
+- Desktop 与 CLI 默认共享平台目录 `<dataRoot>`（macOS 为 `~/Library/Application Support/ActSpace`）；`--data-dir` / `ACTSPACE_DATA_DIR` 可显式覆盖；
+- `<dataRoot>/sessions-v2/`：持久 Session 目录；
+- `<dataRoot>/tmp/`：可再生的临时文件与工具输出；
+- 开发态仓库 `logs/` 或安装态 `<dataRoot>/logs/`：本地排障日志。
 
-- `pnpm dev`：本地开发启动桌面端。
-- `pnpm dev:log`：本地开发启动桌面端，并把终端 stdout/stderr 同步写入根目录 `logs/dev-*.log`，同时更新 `logs/latest-dev.log` 供 Agent 排障读取。
-- 文件工具默认使用 workspace root，而不是 Electron `userData`。如需指定工作区，设置 `ACTSPACE_WORKSPACE_ROOT`。
-- `web_search` 需要任一搜索 provider key（`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `TINYFISH_API_KEY` / `EXA_API_KEY`）；`web_fetch` 无 key 要求。未配置搜索 key 时 `web_search` 不会注册，避免运行中暴露一个必然失败的能力；executor 内另有缺 key 兜底错误作防御（见 `agent-web-tools.md`）。
-- 多模态输入由模型注册表的 `input` 能力决定。原生支持 `image` 的主模型直接接收图片；text-only 主模型不会自动分析附件，但在已配置 Kimi `kimi-k2.7-code` 或 OpenRouter `openai/gpt-5.6-luna` 时可按需调用 `inspect_image`。工具缺凭据、被禁用或主模型原生支持图片时不注册。
-- `inspect_image` 的外部视觉请求固定 90 秒超时并响应 turn abort；空响应、格式不支持、图片超限和 Provider 错误均映射为稳定错误，不自动重试或跨 Provider fallback。视觉报告最多保留 20,000 字符并明确标记截断，不再经过通用摘要器二次压缩。
-- 如需长期禁用某些工具，可设置 `ACTSPACE_DISABLED_TOOLS=read_file,bash`；工具会在注册阶段直接跳过，不会暴露给模型，也不会出现在运行时工具列表里。
-- `pnpm typecheck`：检查跨包类型契约。
-- `pnpm build`：检查当前桌面端和共享包是否可构建。
-- `pnpm package:desktop`：本地生成当前平台的 desktop archive，便于开源用户从源码自行打包。
-- 安装版 Electron main 进程启动日志位于 `<userData>/logs/main-startup.log`，macOS 默认是 `~/Library/Application Support/actspace/logs/main-startup.log`。排查“Dock 有图标但窗口没出来 / renderer 白屏 / packaged renderer 加载失败”时，优先读取这个文件；每次启动还会生成一份 `main-startup-<timestamp>.log` 归档。
-- 设置页「更新 → 本地更新」：已安装 macOS app 可从已选择的本机源码目录重新打包并替换当前 `.app`。构建阶段当前应用保持打开，页面弹窗显示阶段进度；helper 默认以 `ACTSPACE_MAC_ADHOC_SIGN=true` 生成本地临时签名包，并在退出当前 app 前验证新 `.app` 的 `Info.plist`、主可执行文件和 code signature。验证通过后 helper 报告准备替换，应用才退出、替换并重启；如果复制或打开新 app 失败，helper 会尝试恢复旧版本。更新 helper 日志位于 Electron `userData/tmp/local-update/update.log`，阶段状态位于同目录 `status.json`；如果构建或替换失败，优先看这两个文件。
-- `pnpm run ci`：运行仓库级基础门禁。
+应用数据目录和用户 workspace 必须分离。文件工具默认操作显式 workspace；Session、凭据、运行时诊断和临时产物不得隐式成为 workspace 内容。
 
-## 本地开发日志约定
+## Session Journal
 
-- 根目录 `logs/` 只存本机运行日志，不提交到 Git。
-- `pnpm dev:log` 会保留最近约 2 天的 `*.log`，并自动清理更旧文件。
-- `pnpm dev` 与 `pnpm dev:log` 统一由 `scripts/desktop-dev.mjs` 管理开发进程。监督器为每个受管阶段创建独立进程组，收到 SIGINT / SIGTERM 时把信号转发给整个子进程树，4 秒后仍未退出才升级为 SIGKILL；受管根命令因端口冲突或构建错误自行退出时，也会再次收割残留进程组，避免 Vite、tsc、Electron、`wait-on` 或它们的后代成为孤儿进程。
-- `pnpm dev:log` 不再使用 shell pipeline + `tee`；监督器直接复制子进程 stdout / stderr 到当前终端和 `logs/dev-*.log`，同时更新 `logs/latest-dev.log`。这样日志复制不会改变 Ctrl+C 的所有权和传播路径。
-- Agent 排查启动、构建、Electron 或 provider 问题时，优先读取 `logs/latest-dev.log`。
-- Agent 排查安装版启动问题时，优先读取 `~/Library/Application Support/actspace/logs/main-startup.log`。该日志由 main 进程直接写入，包含 app path 配置、数据目录初始化、窗口创建、renderer 加载成功/失败、renderer console、renderer 进程退出和 main 进程未捕获异常。
-- 排查本地更新时，优先读取设置页显示的 `<userData>/tmp/local-update/status.json` 和 `update.log`；这些文件由外部 helper 写入，替换阶段可能发生在主 app 退出之后。
-- 排查 Browser Bridge 编译安装失败时，先确认构建日志是否已经输出 `Built browser-bridge`，再区分临时二进制 `help` 探测失败、正式路径状态探测超时和 Chrome extension 未重载。若系统进程状态显示为不可中断等待，应先退出插件设置页和应用，停止继续轮询；代码侧不得通过提高 timeout 或重复重试掩盖问题。
-- Agent Run 运行时会向终端即时输出关键链路日志，`pnpm dev:log` 会同步写入 `logs/latest-dev.log`：
-  - `[agent-ipc]`：renderer 调用 main、main 推送 stream event、Agent Run 持久化等 IPC 边界。
-  - `[agent-run]`：Agent loop 生命周期、流式 delta 计数、工具开始/结束、Agent Run 完成状态。
-  - `[renderer-console]`：renderer console 输出转发，方便区分前端渲染错误和后端推送错误。
-- 仓库根目录 `logs/agent-runs/` 会保存最近约 1 天的 Agent Run JSONL 排障文件，每次用户输入到 Agent 最终输出对应一个文件。文件包含完整用户输入、工具调用参数、工具结果、关键 AgentEvent、关键 RuntimeStreamEvent 和最终 AgentRunResult；日志按状态记录，不按流式 chunk 逐行记录：
-  - 模型流式文本聚合为单条 `assistant_text` / `assistant_thinking` 事件，并保留 delta 数量与字符数。
-  - 模型输出的完整工具调用指令记录为单条 `assistant_tool_call`，不记录 `tool_call_delta` 碎片。
-  - 工具真实执行只记录 `tool_event` 的开始和完成。
-  这些状态级记录便于区分：
-  - Agent 运行错误：看 `agent_event` / `tool_event` / `run_failed`。
-  - 后端是否推送给前端：看 `stream_event`。
-  - 会话持久化是否完成：看 `main_event` 的 `persisting_agent_run_result` / `agent_run_result_persisted`。
-- run JSONL 文件只用于本地排障，可能包含敏感输入与工具输出；不要提交到 Git。仓库根目录 `logs/` 已在 `.gitignore` 中忽略。
+- 每个持久 Session 的唯一恢复事实源是 `sessions-v2/<sessionId>/journal.jsonl`。
+- Journal 第一条记录是 Header，后续记录是 append-only Event Envelope。当前 schema、codec、repair、fork 和 compaction 语义以 [`agent-spec-session-format-v1.md`](design-docs/agent-plugin-runtime/agent-spec-session-format-v1.md) 为准。
+- Desktop 和 CLI persistent mode 必须通过各自 Profile Bundle 使用同一 Session service；CLI `run` 默认 ephemeral，只有 `--persist` 或 `--resume` 才写 Journal。
+- 同一 Session 同时只能有一个 writer lease。发现陈旧 lease、尾部撕裂或非法事件时必须进入明确的 repair / forensic 路径，不能静默覆盖原 Journal。
+- 用户输入、Assistant 消息、工具调用、审批结果、request snapshot、LLM usage、重试、Todo、Inbox、Subagent lineage 和 Compaction 都通过 Journal 事件表达；不得再建立可变 conversation 文件作为第二事实源。
+- 写操作返回前只保证对应 API 契约声明的 durability checkpoint。退出流程必须先停止接收新工作，再等待 active turn、Journal flush、artifact finalizer 和 Cordis effect dispose。
 
-## 分析观测 Trace 约定
+## Runtime 与 Host
 
-- 每次 Agent Run 可在 `<userData>/sessions/<sessionId>/traces/<agentRunId>.jsonl` 追加一份长期分析 Trace，记录 Agent Run、内部 Turn、LLM request/response/retry 的层级和关联 ID。
-- 每个 Run 同时维护 `<agentRunId>.summary.json` 原子 sidecar；分析索引只读取 sidecar 与 Session V2 用户输入，完整 JSONL 仅在选中 Run 时懒加载。
-- Trace 与 `session.jsonl` 分工明确：Session 是恢复事实源，Trace 是可删除的分析证据；Trace 丢失不得影响会话恢复。
-- Trace Writer 不接收 provider headers，并在写入前递归脱敏凭据字段、Authorization/Cookie、data URL、长 Base64、签名 URL 参数和不安全错误体。Trace 写入失败必须 fail-soft，不得中断 Agent Run。
-- renderer 禁止直接读取 Trace 文件；只能通过 preload 的 `listAgentTraces/readAgentTrace` 调用 Main。Main 必须校验 ID、普通文件类型、符号链接和每条事件的 `sessionId/agentRunId` 一致性。
-- 单 Run JSONL 上限 64 MiB，Reader 上限 100,000 事件；只忽略文件末尾唯一未完成行，中间坏行视为证据损坏。单个损坏 Run 必须 fail-soft 隔离，不能阻断同 Session 其他 Trace。
-- 应用启动后异步执行 Trace retention：默认保留 30 天、全局最多 512 MiB，只删除最旧终态 Trace并保护 `recording` Run；产品内清理 Trace 不删除 `session.jsonl`。
+- 一个 Host 进程只允许存在一个 ready Profile root。
+- Desktop 与 CLI 共享 `bootRuntime()`、Profile / Bundle / Patch、领域插件和 shutdown 语义，不实现第二套 Agent engine。
+- Cordis 管理插件 Service / Effect 生命周期；Host 管理 credentials、filesystem、shell、browser 和 UI ports。
+- 配置或插件集合变化采用 restart-only。运行中的实例不热替换 Plugin Entry；diagnostics 必须能报告 `restartRequired`。
+- Boot 中途失败时必须按逆序释放已经激活的资源。`dispose()` 应可重复等待同一个关闭结果，不能重复执行 finalizer。
 
-## 当前主要可靠性缺口
+## Provider 与工具
 
-- 结构化 Trace、summary 索引、生产分析页面、体积上限、保留与清理已经接入；仍需真实 Electron 长会话和 Retina 滚动验收。
-- 分析页面已经能展示失败 Run 与脱敏错误块，但跨 provider 的原始 HTTP wire request/stream 仍未采集，当前请求 JSON/cURL 基于 provider-neutral snapshot。
-- 还没有自动化 smoke path 覆盖“启动 -> turn -> 恢复”。
-- Session V2 已直接统一 Agent Run、Turn 与 LLM Call 身份；后续新增消费方必须继续使用这三个不同层级，避免再次把产品标签当作数据身份。
+- Desktop 真实会话使用设置页保存的 provider credential；CLI 使用显式进程环境变量。mock 只允许测试、fixture 或用户显式传入 `--mock`，不得静默代替真实请求。
+- LLM request、retry、usage 与错误必须落到稳定 Journal event；原始 Authorization、Cookie、provider header 和未经脱敏的错误正文不得进入 Journal、Projection 或日志。
+- 工具执行必须经过 definition validation、policy、approval、prepared execution、checkpoint 和 ordered commit。副作用是否发生不确定时，必须返回 outcome-unknown，而不是猜测成功或自动重试。
+- 工具大输出和二进制内容进入 Session-owned artifact；Journal 和 renderer 只持久化结构化摘要与 artifact reference。
+- Browser Bridge 是独立 Host capability。静态构建通过不代表真实 Chrome 可用；扩展、Native Messaging、socket 和只读操作必须作为单独的实机门禁。
 
-## 上线前关键验收清单
+## Projection 与可观测性
 
-- Grep/Glob 不依赖用户本机安装 ripgrep：
-  - 在隔离 `PATH` 的环境中确认系统 `rg` 不可用，不要删除或卸载用户本机命令。
-  - 不设置 `ACTSPACE_RG_PATH`。
-  - 执行 Grep/Glob smoke，或直接验证 `resolveRipgrepCommand()`。
-  - 预期使用 bundled `@vscode/ripgrep`，Grep/Glob 仍可返回结果。
+- Durable Session、live progress 和 diagnostics 是三条不同投影：durable 数据可由 Journal 重建，live progress 允许进程结束后消失，diagnostics 不进入模型上下文。
+- Context 面板、Usage、Analysis 和 Trace 视图当前都从 `request/snapshot`、`llm/usage`、Turn、Tool 与 Compaction Journal event 派生，不读取独立 `context-state` 或 Trace sidecar。
+- `agentRunId -> turnId -> stepId -> requestId` 是运行层级。UI 可以使用 `llmCallId` 作为 request ID 的展示名称，但不得把一次 Agent Run、一次 Turn 和一次 provider request 合并成同一身份。
+- Runtime Projection 必须执行字段白名单、字符串上限、artifact 归一化与 secret redaction；renderer 不直接读取 Session 文件。
 
-## 后续建议维护的内容
+## 本地排障入口
 
-随着真实 provider 和更多工具接入，这里建议继续补这些内容：
+- `pnpm dev:log`：启动 Desktop，并把监督器、构建、Electron main 和 renderer 日志写入 `logs/dev-*.log`，同时更新 `logs/latest-dev.log`。
+- 安装态主进程日志：`<userData>/logs/main-startup.log`。
+- 本地更新 helper：`<userData>/tmp/local-update/status.json` 与 `update.log`。
+- `pnpm check:packages`：校验 workspace package、manifest、behavior、codec 和 lifecycle 边界。
+- `pnpm check:v2-legacy-removal -- --strict`：确认当前生产入口没有回连 v1 engine、旧 Session 或已退役能力。
+- `pnpm typecheck`、`pnpm test`、`pnpm build`：类型、行为与制品构建基线。
 
-- 启动、健康检查和基本可用性要求。
-- 日志、指标、链路的采集和访问约定。
-- timeout、retry、backoff 的默认策略。LLM 可重试错误的自动重试已落地：默认最多 2 次重试、退避 1s → 3s，可通过 `AgentLoopConfig.llmRetry` 配置，详见 `docs/design-docs/agent-runtime/agent-backend-design.md` 的「LLM 错误分类与自动重试」。
-- 本地和 CI 的关键路径验证方式。
-- 常见故障、排查路径和恢复步骤。
+## 发布门禁
 
-CI/CD 流程结构和 release 自动化的默认方案，统一写在 `docs/CICD.md`。
+自动化通过不能替代以下外部验收：
+
+- 真实 DeepSeek、Kimi 或 OpenRouter request / resume；
+- 真实 Electron reload、quit、flush 和 isolated `userData`；
+- Chrome Extension、Native Messaging 与 Browser Bridge；
+- macOS DMG、签名、公证和安装后启动；
+- 用户对固定 renderer 关键页面的人工验收。
+
+任一门禁未完成时，文档必须写“自动化通过、外部门禁待验收”，不能写“发布完成”。
+
+## 当前主要缺口
+
+- `packages/runtime` 的直接 lifecycle / shutdown 测试仍需补强；当前主要由 CLI 和 Host integration 间接覆盖。
+- 真实 Provider、Browser、DMG、签名与公证受当前网络或宿主能力限制，仍未形成最终发布证据。
+- Renderer 主 bundle 及部分大型组件需要后续性能和可维护性拆分，但不属于本轮文档真相修复。
+
+CI/CD 与制品规则见 [`CICD.md`](CICD.md)；供应链边界见 [`SUPPLY_CHAIN_SECURITY.md`](SUPPLY_CHAIN_SECURITY.md)。

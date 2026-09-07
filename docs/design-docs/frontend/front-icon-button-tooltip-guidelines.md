@@ -9,7 +9,7 @@
 当前项目已在 renderer 基础组件层提供：
 
 ```txt
-packages/desktop/src/renderer/components/ui/Tooltip.tsx
+apps/desktop/src/renderer/components/ui/Tooltip.tsx
 ```
 
 业务组件应优先消费这个 wrapper，不要继续新增手写 tooltip 或只依赖浏览器原生 `title`。
@@ -168,52 +168,46 @@ Tooltip 视觉必须来自基础 wrapper，不在业务组件里重复写浮层�
 
 ### P0：高频且纯图标
 
-- `packages/desktop/src/renderer/components/Composer.tsx`
+- `apps/desktop/src/renderer/components/Composer.tsx`
   - Composer 左侧 `+`：添加上下文、工具或附件。
   - 发送 / 停止按钮：发送消息、停止 Agent、输入消息后发送。
   - 附件删除 `X`：移除 `{attachment.name}`。
-- `packages/desktop/src/renderer/components/messages/BashRunBlock.tsx`
+- `apps/desktop/src/renderer/components/messages/BashRunBlock.tsx`
   - Bash 输出三点：更多 Bash 输出操作。
   - Bash 审批三点：更多审批操作。
-- `packages/desktop/src/renderer/components/ContextPopup.tsx`
+- `apps/desktop/src/renderer/components/ContextPopup.tsx`
   - 关闭按钮：关闭上下文用量。
-- `packages/desktop/src/renderer/components/kairos/KairosContextSheet.tsx`
-  - 刷新上下文：刷新上下文 / 正在刷新上下文。
+- 已退役页面与原型不在当前 tooltip 迁移范围；历史资产统一见 `../v1-legacy/`。
 
 ### P1：已有 `title`，应迁到统一 Tooltip
 
-- `packages/desktop/src/renderer/components/WindowChromeBar.tsx`
+- `apps/desktop/src/renderer/components/WindowChromeBar.tsx`
   - 左侧栏折叠 / 展开。
   - 搜索会话。
   - 右侧面板打开 / 关闭。
-- `packages/desktop/src/renderer/components/Sidebar.tsx`
+- `apps/desktop/src/renderer/components/Sidebar.tsx`
   - Pin / Unpin。
   - Archive session。
   - Sort workspaces。
   - Add workspace。
   - New chat in workspace。
-- `packages/desktop/src/renderer/components/RightPanel.tsx`
+- `apps/desktop/src/renderer/components/RightPanel.tsx`
   - 展开 / 收起文件树。
   - 关闭 `{tab.title}`。
   - 所有标签页。
-- `packages/desktop/src/renderer/components/right-panel/RightPanelObjectMenu.tsx`
+- `apps/desktop/src/renderer/components/right-panel/RightPanelObjectMenu.tsx`
   - 新建右侧对象。
-- `packages/desktop/src/renderer/components/right-panel/ReplyHtmlRenderView.tsx`
+- `apps/desktop/src/renderer/components/right-panel/ReplyHtmlRenderView.tsx`
   - 刷新文件列表。
 
 ### P2：低频或已有文字，但可视情况补充
 
-- `packages/desktop/src/renderer/components/settings/SettingsPrimitives.tsx`
+- `apps/desktop/src/renderer/components/settings/SettingsPrimitives.tsx`
   - 数值控件重置、减小、增大。
-- `packages/desktop/src/renderer/components/UsageStatisticsPage.tsx`
+- `apps/desktop/src/renderer/components/UsageStatisticsPage.tsx`
   - 详情弹窗关闭按钮。
   - 成本详情关闭按钮。
-- `packages/desktop/src/renderer/components/LabPage.tsx`
-  - 弹窗关闭按钮。
-  - 实验卡片更多操作按钮。
-- `packages/desktop/src/renderer/pages/KairosPage.tsx`
-  - 分页上一页 / 下一页。
-  - token / 成本折叠按钮。
+- 当前 Analysis / Usage 页面中的关闭、分页和详情操作按同一套规则迁移。
 
 ## 后续建议
 
@@ -223,6 +217,6 @@ Tooltip 视觉必须来自基础 wrapper，不在业务组件里重复写浮层�
 2. 消息区工具块。
 3. Sidebar。
 4. RightPanel。
-5. Settings / Usage / Lab / Kairos 页面。
+5. Settings / Usage / Analysis 页面。
 
 每批都补对应 renderer 测试，避免 tooltip 变成只能靠人工目测的细节。

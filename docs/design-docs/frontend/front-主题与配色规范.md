@@ -204,12 +204,9 @@ text-[rgba(...)]
 - Toggle on = operational。
 - 连接成功 = operational，连接错误 = danger。
 
-### Kairos
+### 已退役页面
 
-- running / healthy = operational。
-- sleep / waiting = neutral。
-- warning = warning，failed = danger。
-- selected row = neutral，不使用绿色或蓝色大面积底色。
+Kairos、Lab 等 v1 页面不属于当前主题契约；历史视觉资产只在 `../v1-legacy/` 中保留，不作为新页面配色参考。
 
 ## 维护纪律
 

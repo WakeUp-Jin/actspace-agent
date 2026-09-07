@@ -10,12 +10,12 @@
 - `docs/REPO_COLLAB_GUIDE.md`
 - `docs/CODING_BEHAVIOR.md`
 - `docs/SECURITY.md`
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/design-docs/tool-system/agent-subprocess-runner-guidelines.md`
 - `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
-- `docs/design-docs/execution-safety/agent-tool-approval-pause-resume.md`
-- `docs/design-docs/execution-safety/agent-bash-policy-allowlist-design.md`
+- `docs/design-docs/v1-legacy/execution-safety-agent-tool-approval-pause-resume.md`
+- `docs/design-docs/v1-legacy/execution-safety-agent-bash-policy-allowlist-design.md`
 - `docs/design-docs/collaboration/agent-subagent-runtime.md`
 - `docs/design-docs/collaboration/agent-explore-subagent.md`
 
@@ -33,8 +33,8 @@
 - `packages/agent-core/src/tools/tools/agent/`
 - `packages/agent-core/src/tools/subprocess/`
 - `packages/agent-core/src/engine/streaming-preview-extractors.ts`
-- `packages/desktop/src/main/approval-registry.ts`
-- `packages/desktop/src/main/test/approval-registry.test.ts`
+- `apps/desktop/src/main/approval-registry.ts`
+- `apps/desktop/src/main/test/approval-registry.test.ts`
 
 ## 审查问题
 
@@ -85,8 +85,8 @@
 
 #### 偏移点
 
-- `docs/design-docs/execution-safety/agent-bash-policy-allowlist-design.md:108-140` 要求 `allow_similar` 携带 `allowPrefixes`、写入 session/user allowlist，并通过 session 事件 replay 恢复；当前 `packages/agent-core/src/tools/scheduler.ts:204-213` 仍把 `allow_similar` 和 `approve_once` 合并为“本次执行”，`packages/desktop/src/main/approval-registry.ts:101-119` 的 `decide()` 也只接收 `ToolApprovalDecisionKind`，没有透传 prefix。
-- `docs/design-docs/execution-safety/agent-bash-policy-allowlist-design.md:56-58` 指出硬编码 allowlist 应迁移为 store；当前 `packages/agent-core/src/tools/tools/bash/permissions.ts:183-220` 仍只查 `isAllowedDevelopmentCommand()` 硬编码前缀。
+- `docs/design-docs/v1-legacy/execution-safety-agent-bash-policy-allowlist-design.md:108-140` 要求 `allow_similar` 携带 `allowPrefixes`、写入 session/user allowlist，并通过 session 事件 replay 恢复；当前 `packages/agent-core/src/tools/scheduler.ts:204-213` 仍把 `allow_similar` 和 `approve_once` 合并为“本次执行”，`apps/desktop/src/main/approval-registry.ts:101-119` 的 `decide()` 也只接收 `ToolApprovalDecisionKind`，没有透传 prefix。
+- `docs/design-docs/v1-legacy/execution-safety-agent-bash-policy-allowlist-design.md:56-58` 指出硬编码 allowlist 应迁移为 store；当前 `packages/agent-core/src/tools/tools/bash/permissions.ts:183-220` 仍只查 `isAllowedDevelopmentCommand()` 硬编码前缀。
 
 #### 不合理设计
 
@@ -114,7 +114,7 @@
 
 #### 偏移点
 
-- `docs/design-docs/execution-safety/agent-bash-policy-allowlist-design.md:156-165` 明确 Phase 1 决定放开 `|` 进入授权拆分；当前 `packages/agent-core/src/tools/tools/bash/permissions.ts:17-18` 的 `UNSUPPORTED_SHELL_SYNTAX_RE = /[|<>`$(){}]/` 仍包含管道，`packages/agent-core/src/tools/tools/bash/permissions.ts:113-124` 会在权限检查早期直接 deny。
+- `docs/design-docs/v1-legacy/execution-safety-agent-bash-policy-allowlist-design.md:156-165` 明确 Phase 1 决定放开 `|` 进入授权拆分；当前 `packages/agent-core/src/tools/tools/bash/permissions.ts:17-18` 的 `UNSUPPORTED_SHELL_SYNTAX_RE = /[|<>`$(){}]/` 仍包含管道，`packages/agent-core/src/tools/tools/bash/permissions.ts:113-124` 会在权限检查早期直接 deny。
 
 #### 不合理设计
 
@@ -141,7 +141,7 @@
 
 #### 偏移点
 
-- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md:7-13` 和 `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md:45-49` 要求 renderer 只消费 `ToolUiPreview`/`MessageBlock`，不按 `toolName` 反推展示；当前 `packages/agent-core/src/engine/streaming-preview-extractors.ts:120-129` 的 `agent` streaming extractor 没有带 `display` 字段，导致 `packages/desktop/src/renderer/App.tsx:408-423` 需要用 `tool.toolName === "explore"` 兜底为 `inline`。
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md:7-13` 和 `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md:45-49` 要求 renderer 只消费 `ToolUiPreview`/`MessageBlock`，不按 `toolName` 反推展示；当前 `packages/agent-core/src/engine/streaming-preview-extractors.ts:120-129` 的 `agent` streaming extractor 没有带 `display` 字段，导致 `apps/desktop/src/renderer/App.tsx:408-423` 需要用 `tool.toolName === "explore"` 兜底为 `inline`。
 
 #### 不合理设计
 
@@ -168,7 +168,7 @@
 
 #### 偏移点
 
-- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md:49` 要求 SubAgent running 更新通过完整 typed `AgentToolPreview`，renderer 不解析 SubAgent 原始工具参数；但 transcript 面板内部在 `packages/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx:151-224` 直接读取 `tool_call.payload.arguments`、按 `toolName` 分支，并从 `modelOutput/truncatedOutput/rawOutput` 计算 resultCount/entryCount（`packages/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx:102-137`）。
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md:49` 要求 SubAgent running 更新通过完整 typed `AgentToolPreview`，renderer 不解析 SubAgent 原始工具参数；但 transcript 面板内部在 `apps/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx:151-224` 直接读取 `tool_call.payload.arguments`、按 `toolName` 分支，并从 `modelOutput/truncatedOutput/rawOutput` 计算 resultCount/entryCount（`apps/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx:102-137`）。
 
 #### 不合理设计
 
@@ -176,7 +176,7 @@
 
 #### 可读性问题
 
-- `toolCallMessage()` 里硬编码 `read_file`、`grep`、`glob`、`list_directory` 四个分支（`packages/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx:162-215`），与 `packages/shared/src/session-selectors.ts:93-246` 的 preview 到 MessageBlock 映射重复。
+- `toolCallMessage()` 里硬编码 `read_file`、`grep`、`glob`、`list_directory` 四个分支（`apps/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx:162-215`），与 `packages/shared/src/session-selectors.ts:93-246` 的 preview 到 MessageBlock 映射重复。
 
 #### 耦合问题
 

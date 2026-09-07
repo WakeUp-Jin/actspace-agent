@@ -1,10 +1,14 @@
 # Agent 形态 — Agent Team 设计规范
 
-## 当前状态
+## 文档状态
 
-本文档是 Agent Team 形态的设计事实来源。Agent Team 是三种 Agent 形态之一（Solo / Team / Room），用于结构化编程开发场景：一个 Leader 与多个团队成员通过共享任务、显式通信和独立上下文协作完成用户目标。
+> 文档等级：future-product-design
+>
+> Agent Team 不属于当前 v2 已交付 Runtime。本文只保留未来 Team 的产品语义、协作不变量和 UI 方向，不是当前 package、Session、Event 或 Host API 的事实来源。
 
-本文档保持单文件维护，同时覆盖核心概念、运行时协议、文件存储、并发写入、上下文隔离和前端交互。实现阶段应以本文定义的不变量为准，不机械复制 Claude Code 的进程、轮询或文件布局细节。
+本文后半部分出现的 `packages/agent-runtime`、旧 Session 文件和 Desktop 接线路径，是 v1 时期的机械实施提案，尚未迁移到当前多包 Plugin Runtime。未来实施前必须基于 `packages/runtime`、`packages/core/*`、`packages/session/*`、`packages/subagent` 和 v2 公共契约重新制定 execution plan，禁止直接复制旧路径。
+
+Agent Team 的目标仍是结构化编程开发场景：一个 Leader 与多个团队成员通过共享任务、显式通信和独立上下文协作完成用户目标。
 
 UI 交互参考原型：`docs/design-docs/collaboration/agent-team-preview.html`
 
@@ -439,8 +443,8 @@ type WriteScope =
 {
   mode: "paths",
   paths: [
-    "packages/agent-core/src/team/**",
-    "packages/agent-core/src/team/test/**"
+    "packages/agent-runtime/src/team/**",
+    "packages/agent-runtime/src/team/test/**"
   ]
 }
 ```
@@ -978,16 +982,16 @@ spawn
 |---------|---------|
 | `packages/shared/src/model-config.ts` | 增加 tier 相关共享类型 |
 | `packages/shared/src/session.ts` | 新增 Team member、Task 和 stream event 类型 |
-| `packages/agent-core/src/engine/loop.ts` | 团队成员复用现有 Agent Loop |
-| `packages/agent-core/src/engine/agent.ts` | 团队成员使用独立 Agent 实例和上下文 |
-| `packages/agent-core/src/engine/bridge.ts` | 增加 Team 编排与消息注入逻辑 |
-| `packages/desktop/src/main/agent-run.ts` | 根据 AgentForm 构建 Team Runtime |
-| `packages/desktop/src/renderer/` | 新增 Team 标签、任务页和成员页 |
+| `packages/agent-runtime/src/engine/loop.ts` | 团队成员复用现有 Agent Loop |
+| `packages/agent-runtime/src/engine/agent.ts` | 团队成员使用独立 Agent 实例和上下文 |
+| `packages/agent-runtime/src/engine/bridge.ts` | 增加 Team 编排与消息注入逻辑 |
+| `apps/desktop/src/main/agent-run.ts` | 根据 AgentForm 构建 Team Runtime |
+| `apps/desktop/src/renderer/` | 新增 Team 标签、任务页和成员页 |
 | IPC `RunAgentInput` | 增加 `agentForm` 字段 |
-| 新增 `packages/agent-core/src/team/` | Team 编排、成员、Task、Mailbox 和恢复逻辑 |
+| 新增 `packages/agent-runtime/src/team/` | Team 编排、成员、Task、Mailbox 和恢复逻辑 |
 
 ```text
-packages/agent-core/src/team/
+packages/agent-runtime/src/team/
 ├── index.ts
 ├── team-runtime.ts
 ├── member-runtime.ts

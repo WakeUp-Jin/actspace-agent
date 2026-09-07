@@ -32,5 +32,5 @@
 - `packages/agent-core/src/engine/bridge.ts`
 - `packages/agent-core/src/engine/test/bridge.test.ts`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
 - `docs/exec-plans/active/20260527-agent-tool-capabilities-breakdown/02-edit-file-delete-semantics.md`

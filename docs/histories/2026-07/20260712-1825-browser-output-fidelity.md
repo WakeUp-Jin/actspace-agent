@@ -25,9 +25,9 @@ DOM 节点、工具协议 schema 和分页列表属于结构事实。通用摘�
 
 ## 关键文件
 
-- `plugins/browser-bridge/apps/cli/internal/locator/runtime.js`
-- `plugins/browser-bridge/apps/cli/internal/commands/registry.go`
-- `plugins/browser-bridge/apps/cli/command_router.go`
+- `browser-bridge/apps/cli/internal/locator/runtime.js`
+- `browser-bridge/apps/cli/internal/commands/registry.go`
+- `browser-bridge/apps/cli/command_router.go`
 - `packages/agent-core/src/tools/tools/browser/executor.ts`
 - `packages/agent-core/src/internal-tools.ts`
 - `packages/agent-core/src/tools/scheduler.ts`

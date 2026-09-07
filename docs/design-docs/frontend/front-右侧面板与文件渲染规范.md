@@ -25,20 +25,19 @@
 
 ## 对象启动页（2026-07-17）
 
-右侧面板没有打开对象时，不默认塞入 Kairos 或其它业务 Tab，而是展示一个参考 Cursor 空面板入口密度的对象启动页。启动页只借用“方块入口 + 大留白”的形式，入口名称与数量由 Actspace 当前真实对象决定。
+右侧面板没有打开对象时，不默认塞入业务 Tab，而是展示一个参考 Cursor 空面板入口密度的对象启动页。启动页只借用“方块入口 + 大留白”的形式，入口名称与数量由 Actspace 当前真实对象决定。
 
-功能默认关闭时展示五个入口；开启 Kairos 后展示六个入口：
+当前固定展示五个入口：
 
 - `Files`：进入 Workspace 文件浏览态，不新增对象 Tab。
 - `Terminal`：创建或聚焦绑定当前会话 workspace / worktree 的交互式 shell；详见 `front-右侧终端与会话生命周期规范.md`。
 - `Review`：打开当前 workspace 的 Review，并创建/聚焦稳定的右侧 Review Tab。
 - `Context`：打开主 Agent 当前会话的完整只读上下文 Tab。
-- `Kairos`：仅在 `settings.kairos.featureEnabled=true` 时出现，打开聊天态 Kairos 紧凑状态 Tab。
 - `Reply`：打开当前会话生成过的可视化回复聚合视图；HTML 是当前内部渲染格式，不进入入口名称。
 
 布局与状态规则：
 
-- 默认宽度下使用双列网格；Kairos 开启时形成 `2 × 3`，关闭时第五个入口自然落在最后一行，不保留空占位。
+- 默认宽度下使用双列网格，第五个入口自然落在最后一行，不保留空占位。
 - 卡片使用中性 surface、语义边框和统一 Lucide 线性图标；当前状态使用中性 selected 层级，focus-visible 使用高对比主题 token，颜色只承担语义状态或数据可视化，不把六个入口做成六种彩色功能卡。
 - 关闭最后一个对象 Tab 后回到启动页；折叠面板时若仍有已打开对象，重新展开继续恢复原 Tab。
 - 启动页和右上角 `+` 菜单打开的是同一组对象语义，不能出现名称或行为漂移。
@@ -64,7 +63,6 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `CSV`：表格预览。2026-07-30 实现（`CsvRenderView`）。
 - `Text`：纯文本或代码文件查看（`CodeRenderView`，见「代码视图能力」）。
 - `Review`：完整代码审阅工作台入口；支持 Git-first scope 与 `Last Turn` Agent 视角，具体契约见 `docs/design-docs/core-review-change-sources.md`。
-- `Kairos`：聊天态右侧紧凑状态视图；具体布局和数据边界见 `docs/design-docs/kairos/front-Kairos监控页规范.md`。
 - `Context`：完整只读上下文视图；见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`。
 - `Reply`：当前会话已生成的可视化回复浏览器（见下文）；内部当前由 HTML 产物承载。
 - `Terminal`：用户交互式 shell；Tab 只保存 terminalId / sessionId / title，不保存 PTY、xterm 实例或输出缓冲。
@@ -72,10 +70,9 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 ## 「+ 新建对象」菜单（2026-05-30，2026-06-04 补 Review）
 
 - 隐藏标题栏 chrome 右段、右侧折叠（PanelRight）按钮**左侧**放一个 `+` 按钮（参考 Cursor 顶栏的 +）。
-- 点开是一个轻量菜单，可往右侧面板新增对象：`工作区文件` / `Terminal` / `Review` / `Reply` / `Context`，并在 `settings.kairos.featureEnabled=true` 时追加 `Kairos`。非 Terminal 对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；Terminal 底层允许每会话多实例，标题按创建顺序区分。`工作区文件` 只切换工作区浏览态，不新增 Tab。
-- 右侧对象启动页遵守同一门控：Kairos 关闭时使用其余 5 个入口，不保留空占位；关闭过程中如果已有 `id="kairos"` Tab，Workbench 立即将其移除。
+- 点开是一个轻量菜单，可往右侧面板新增对象：`工作区文件` / `Terminal` / `Review` / `Reply` / `Context`。非 Terminal 对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；Terminal 底层允许每会话多实例，标题按创建顺序区分。`工作区文件` 只切换工作区浏览态，不新增 Tab。
 - `Review` 入口复用 Composer 的 Review 打开逻辑，首次默认选择当前 workspace 的 Git `Uncommitted` scope；后续打开恢复该 workspace 最近 selection。
-- 菜单与右侧折叠按钮同属 chrome-right，`-webkit-app-region: no-drag`；Kairos 全屏页下与右侧折叠按钮一起隐藏。
+- 菜单与右侧折叠按钮同属 chrome-right，`-webkit-app-region: no-drag`。
 - **`+` 仅在右侧面板打开时显示**（`view === "chat" && isRightPanelOpen`）：`+` 的语义是「往面板里加对象」，面板关着时无意义；面板关闭时 chrome-right 只保留 PanelRight 折叠按钮。
 
 ## Reply 视图（2026-05-30，下拉选择器版；2026-07-17 收口名称）
@@ -113,7 +110,7 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 
 ### 文件新鲜度与重新加载（2026-07-30）
 
-文件内容是打开那一刻的快照，磁盘随后可能被 Agent、外部编辑器或 `git checkout` 改掉。检测用**两级信号**，都不依赖 fs-watch 插件（理由见执行计划决策记录）：
+文件内容是打开那一刻的快照，磁盘随后可能被 Agent、外部编辑器或 `git checkout` 改掉。检测用**两级信号**，不依赖后台文件监听服务：
 
 1. **Agent 编辑事件**（主力，零新增设施）：`edit_diff` / `write_diff` 消息块自带 `filePath`，renderer 本来就实时收到。
 2. **mtime 重校验**（兜底，O(1)）：只在 Tab 激活、窗口重获焦点、turn 结束三个时机各 `statWorkspaceFile` 一次，**不轮询**。
@@ -187,7 +184,7 @@ V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `lo
 呈现由当前 Tab 决定：
 
 - 激活工作区文件 Tab（文件类且有 `relativePath`）时进入 shell。
-- 激活对象 Tab（Kairos / Context / Reply / 聊天生成 HTML 等）时退出 shell，整面板展示对象视图。
+- 激活对象 Tab（Context / Reply / 聊天生成 HTML 等）时退出 shell，整面板展示对象视图。
 - `isFileTreeOpen` 表示显式进入浏览态；`isFileTreeCollapsed` 只折叠树栏，不关闭内容区。
 
 树状态规则（2026-07-30）：
@@ -199,7 +196,7 @@ V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `lo
 
 ### 在外部应用中打开（2026-07-30）
 
-操作栏右侧的外部打开入口复用顶部 chrome 已有的那套工具目录（`workspace-open:list-tools` / `workspace-open:open`），但目标是**当前文件**而不是 workspace 根：`WorkspaceOpenInput` 增了可选 `relativePath`，越界按 `escapes_root` 拒绝 —— 这个入口来自可点 UI，和文件浏览器同一条边界，不因为「只是调 `/usr/bin/open`」就放开整盘。
+操作栏右侧的外部打开入口使用共享的工具目录（`workspace-open:list-tools` / `workspace-open:open`），但目标是**当前文件**而不是 workspace 根：`WorkspaceOpenInput` 增了可选 `relativePath`，越界按 `escapes_root` 拒绝 —— 这个入口来自可点 UI，和文件浏览器同一条边界，不因为「只是调 `/usr/bin/open`」就放开整盘。
 
 不同工具能接受的目标形态不同，main 侧按工具分派，三条各有单测锁住实际参数：
 
@@ -209,7 +206,7 @@ V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `lo
 | Finder | `open -R <文件>` | `-a Finder <文件>` 会用**默认应用运行**这个文件，不是定位它 |
 | Terminal / iTerm2 | 文件的**父目录** | 终端只能接目录，给它文件等于让终端去执行/打开它 |
 
-交互约定：图标点击后先出菜单、选中应用才真正打开，不做「点图标直接用上次的应用打开」—— 这一栏图标很小，误触会直接拉起外部程序。选择记在 localStorage，与顶部 chrome 的打开按钮**共用同一个 key**（同一个偏好不能有两个互相矛盾的值），菜单里用「上次」标出。无 preload 时整个按钮不渲染，而不是渲染一个点了报错的按钮。
+交互约定：图标点击后先出菜单、选中应用才真正打开，不做「点图标直接用上次的应用打开」—— 这一栏图标很小，误触会直接拉起外部程序。选择记在 localStorage，菜单里用「上次」标出。无 preload 时整个按钮不渲染，而不是渲染一个点了报错的按钮。顶部 chrome 不再提供 workspace 外部应用打开入口，避免与右侧文件级入口重复。
 
 IPC 契约：
 
@@ -325,11 +322,11 @@ main 侧服务规则：
 - 映射值域必须都是 highlight.js 真实存在的语言，两侧各有一条防漂移测试锁住：main 侧断言每个映射值 `hljs.getLanguage()` 拿得到，renderer 侧断言按需注册的实例覆盖 main 的全部映射值。否则文件会静默退回纯文本且没人会发现。（这条测试当场抓出 highlight.js 不内置 `hcl`，`.tf` / `.hcl` 因此映射到 `ini` 近似。）
 - `readWorkspaceFile` 与 `statWorkspaceFile` 都返回 `mtimeMs`，供右侧面板的新鲜度比对。
 
-V1 不做写 / 删 / 重命名、`.gitignore` 解析、快速打开、多 root、PDF 预览和 Kairos 配置编辑。V3 若做 Kairos 配置编辑，保存必须走 `kairos:read-config` / `kairos:write-config` 这类带 schema 校验的专用通道。
+V1 不做写 / 删 / 重命名、`.gitignore` 解析、快速打开、多 root 和 PDF 预览。
 
 ## Context 完整只读视图
 
-Context Tab 展示主聊天 agent 当前会话喂给模型的完整上下文。它和 Kairos 上下文 Sheet 是不同组件：数据源不同、入口不同，但视觉语言（竖色条段头、可折叠分区、源文件 chip）保持同源。
+Context Tab 展示主聊天 Agent 当前会话喂给模型的完整上下文。它是只读的独立对象视图，数据来自当前 Runtime request snapshot，视觉语言使用竖色条段头、可折叠分区和源文件 chip。
 
 入口：
 
@@ -339,11 +336,10 @@ Context Tab 展示主聊天 agent 当前会话喂给模型的完整上下文。�
 
 数据来源：
 
-- `@actspace/shared` 的 `ContextState` 与 `ContextStateEntry[]`。
-- 分区顺序和配色来自 `CONTEXT_BUCKET_REGISTRY`。
-- `context-state.json` 持久化只保存 token 统计，逐条正文不落盘。
-- 打开 Context 视图时调用 `context:describe` 现场重算逐条全文，不调用 LLM。
-- describe 结果优先；describe 未返回时退回持久化快照；两者皆无显示空态。
+- v2 Runtime 在每次真实模型请求前形成 request snapshot，Session Journal 持久化足够的请求、usage 与 contributor 事实。
+- Desktop main 通过固定 Projection 从 Journal 派生 Context 视图；renderer 不读取 sidecar，也不自行拼接上下文。
+- 分区顺序来自 Prompt / Context Contributor 的稳定排序，并保留来源、裁剪与 compaction 标记。
+- 当前没有 `context-state.json`，也没有 v1 `context:describe` 双真相回退；无法从 Journal 派生时显示明确空态或不可用状态。
 
 分区顺序：
 
@@ -383,7 +379,7 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 
 - 缓存键 = `messageId | turnId` + `sourceHash`。
 - sidecar 存 HTML、sourceHash、model、generatedAt、usage 和派生 title。
-- renderer 点击 -> IPC -> main 的 `ModelRuntimeService` 解析当前主模型和仅 main 可见的 `ProviderRuntimeConfig` -> agent-core LLM 服务转换 -> main 写 sidecar -> renderer 打开 / 聚焦 HTML Tab。Desktop 路径不得回退到依赖环境变量读取 LLM Key 的旧 builder。
+- renderer 点击 -> typed IPC -> main Host 的 v2 Runtime Projection / LLM service 解析当前模型和仅 main 可见的 credential reference -> Runtime 生成受控 artifact / projection -> renderer 打开或聚焦 HTML Tab。Desktop 路径不得回退到旧 Agent Core builder 或依赖环境变量读取 LLM Key。
 - `visualize:list({ sessionId })` 读取同一 sidecar，供 Reply 聚合视图按 createdAt 倒序浏览本会话全部产物。
 - usage 计入使用统计；缓存命中不新增模型调用。
 
@@ -422,3 +418,9 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 - 不换行时，Diff Canvas 是唯一的横向滚动所有者，行号、增删标记和代码随 Canvas 同步移动；禁止给每个 `<code>` 行单独设置横向滚动。开启 word wrap 后 Canvas 回到面板宽度并由代码列折行。
 - unified/split、上下文折叠、Jump to file、viewed、Review Options 和 Git actions 的完整规则以 `docs/design-docs/core-review-change-sources.md` 为准。
 - 旧 `right-panel-diff-final.png` 和 `review-v1-git-review-prototype.html` 只保留为 V1 历史参考，不再代表目标 Review Workbench。
+
+## Subagents（2026-09-06）
+
+右侧对象面板新增 Subagents tab，按当前 Session 隔离列表，分 Running / Done；任务行显示描述、状态、持续时间。点击在同一个 tab 内打开执行详情，顶部返回列表。聊天中的 Agent 条目也打开此视图；本轮首次出现子任务时自动打开，用户关闭后不因后续更新重复抢焦点。
+
+列表通过 `getSubagents` 每秒更新；详情通过 `getSubAgentTranscript` 读取规范 SessionEvent，运行中每 750ms 更新。组件卸载、切任务或切会话时取消后续刷新，迟到响应不更新新视图。详情复用会话 MessageBlock 渲染，支持正文、Thinking 和工具，不再附着在 Composer 上方。

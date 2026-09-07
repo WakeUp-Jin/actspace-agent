@@ -3,7 +3,7 @@
 | key | value |
 |-----|-------|
 | date | 2026-07-11 |
-| scope | packages/agent-core, packages/desktop, packages/shared, plugins/browser-bridge |
+| scope | packages/agent-core, packages/desktop, packages/shared, browser-bridge |
 | status | completed |
 
 ## 用户诉求
@@ -37,5 +37,5 @@ Browser Use 不是单个低风险函数，而是对用户真实 Chrome 会话的
 - `packages/desktop/src/renderer/components/messages/BrowserApprovalBlock.tsx`
 - `packages/agent-core/src/tools/scheduler.ts`
 - `packages/agent-core/src/tools/tools/browser/permissions.ts`
-- `plugins/browser-bridge/apps/chrome-extension/src/background.js`
+- `browser-bridge/apps/chrome-extension/src/background.js`
 - `docs/design-docs/browser/agent-browser-use-integration-design.md`
