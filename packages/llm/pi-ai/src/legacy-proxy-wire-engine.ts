@@ -1,3 +1,6 @@
+import { catalogProviderForEndpoint, type ModelPricingSnapshot } from "@actspace/shared";
+import { calculateUsageCost } from "@actspace/llm-service";
+import { reasoningPayload } from "./reasoning-options.js";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { providerCodeFromUnknown, retryAfterMsFromUnknown, type LlmFailure, type LlmFailureKind } from "@actspace/llm-service";
@@ -14,12 +17,13 @@ type SdkConstructor = new (options: Record<string, unknown>) => SdkClient;
 export type LegacyProxySdkLoader = (route: PiAiWireRoute) => Promise<SdkConstructor>;
 
 export type LegacyProxyWireEngineOptions = {
+  readonly pricing?: ModelPricingSnapshot | null;
   readonly route: PiAiWireRoute;
   readonly providerId: string;
   readonly modelId?: string;
   readonly baseUrl?: string;
   readonly readArtifact?: PiAiArtifactReader;
-  readonly proxies: ProviderProxyPool;
+  readonly proxies?: ProviderProxyPool;
   readonly loadSdk?: LegacyProxySdkLoader;
 };
 
@@ -32,17 +36,18 @@ type Accumulator = {
   stopReason: string | null;
 };
 
-/** Compatibility backend for the scoped-proxy routes that pi-ai 0.82.1 cannot inject per request. */
+/** Public SDK transport for scoped proxies and OpenRouter raw billed usage. */
 export class LegacyProxyWireEngine implements PiAiEngine {
   readonly #loadSdk: LegacyProxySdkLoader;
   constructor(private readonly options: LegacyProxyWireEngineOptions) { this.#loadSdk = options.loadSdk ?? loadPublicSdk; }
 
   async stream(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
     const proxyUrl = input.credential.proxyUrl;
-    if (proxyUrl === undefined) throw new Error("Legacy proxy backend requires a request-scoped proxy URL.");
     const baseURL = input.credential.baseUrl ?? this.options.baseUrl;
     if (baseURL === undefined) throw new Error(`No base URL is configured for route ${input.request.routeId}.`);
-    const fetch = await this.options.proxies.getFetch(proxyUrl);
+    if (proxyUrl === undefined && catalogProviderForEndpoint(baseURL) !== "openrouter") throw new Error("Legacy proxy backend requires a request-scoped proxy URL.");
+    if (proxyUrl !== undefined && !this.options.proxies) throw new Error("Missing request-scoped proxy pool.");
+    const fetch = proxyUrl === undefined ? undefined : await this.options.proxies!.getFetch(proxyUrl);
     const Constructor = await this.#loadSdk(this.options.route);
     const client = new Constructor({ apiKey: input.credential.apiKey ?? "placeholder", baseURL, maxRetries: 0, fetch, defaultHeaders: input.credential.headers });
     if (this.options.route === "anthropic-messages") return anthropicStream(client, input, this.options);
@@ -60,6 +65,7 @@ async function* completionsStream(client: SdkClient, input: LlmAdapterDispatchIn
       model: options.modelId ?? input.request.model,
       messages: await toOpenAiMessages(input.request.messages, input.request.sessionId, options.readArtifact),
       stream: true,
+      ...reasoningPayload(options.route, options.providerId, input.request.options),
       stream_options: { include_usage: true },
       ...(input.request.options.temperature === undefined ? {} : { temperature: input.request.options.temperature }),
       ...(input.request.options.maxTokens === undefined ? {} : { max_tokens: input.request.options.maxTokens }),
@@ -84,10 +90,10 @@ async function* completionsStream(client: SdkClient, input: LlmAdapterDispatchIn
         terminalSeen = true;
       }
       const usage = chunk.usage as Record<string, unknown> | undefined;
-      if (usage !== undefined) acc.usage = mapOpenAiUsage(usage);
+      if (usage != null) acc.usage = withOpenRouterCost(mapOpenAiUsage(usage), usage, input.credential.baseUrl ?? options.baseUrl);
     }
-    yield terminalSeen ? done(acc) : malformedStream(options.route);
-  } catch (error) { yield terminalFailure(error, input.signal); }
+    yield terminalSeen ? done(acc, options.pricing ?? null) : { ...malformedStream(options.route), usage: calculateUsageCost(acc.usage, options.pricing ?? null) };
+  } catch (error) { yield { ...terminalFailure(error, input.signal), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; }
 }
 
 async function* responsesStream(client: SdkClient, input: LlmAdapterDispatchInput, options: LegacyProxyWireEngineOptions): AsyncGenerator<LlmStreamEvent> {
@@ -100,6 +106,7 @@ async function* responsesStream(client: SdkClient, input: LlmAdapterDispatchInpu
       model: options.modelId ?? input.request.model,
       input: converted.input,
       stream: true,
+      ...reasoningPayload(options.route, options.providerId, input.request.options),
       store: false,
       include: ["reasoning.encrypted_content"],
       ...(converted.instructions ? { instructions: converted.instructions } : {}),
@@ -117,11 +124,11 @@ async function* responsesStream(client: SdkClient, input: LlmAdapterDispatchInpu
       }
       if (type === "response.function_call_arguments.delta") { const index = numberValue(event.output_index); const call = acc.calls.get(index) ?? { callId: String(event.item_id ?? `${input.request.requestId}:${index}`), name: "unknown", arguments: "" }; const delta = String(event.delta ?? ""); call.arguments += delta; acc.calls.set(index, call); yield { type: "tool-call-delta", callId: call.callId, name: call.name, argumentsDelta: delta }; continue; }
       if (type === "response.output_item.done") { const item = event.item as Record<string, unknown>; if (item?.type === "reasoning") { const signature = JSON.stringify(item); acc.signatures.push(signature); const summary = (item.summary as Array<{ text?: string }> | undefined)?.map((part) => part.text ?? "").join("\n") ?? ""; if (summary && acc.reasoning.length === 0) acc.reasoning.push(summary); } continue; }
-      if (type === "response.completed" || type === "response.incomplete") { const response = event.response as Record<string, unknown>; const usage = response?.usage as Record<string, unknown> | undefined; if (usage) acc.usage = mapResponsesUsage(usage); const reason = String((response?.incomplete_details as Record<string, unknown> | undefined)?.reason ?? response?.status ?? "stop"); acc.stopReason = mapStopReason(reason); if (type === "response.incomplete" && reason !== "max_output_tokens") { yield terminalFailure(new Error(`Response incomplete: ${reason}`), input.signal); return; } terminalSeen = true; continue; }
-      if (type === "response.failed" || type === "error") { yield terminalFailure(new Error(responseError(event)), input.signal); return; }
+      if (type === "response.completed" || type === "response.incomplete") { const response = event.response as Record<string, unknown>; const usage = response?.usage as Record<string, unknown> | undefined; if (usage) acc.usage = withOpenRouterCost(mapResponsesUsage(usage), usage, input.credential.baseUrl ?? options.baseUrl); const reason = String((response?.incomplete_details as Record<string, unknown> | undefined)?.reason ?? response?.status ?? "stop"); acc.stopReason = mapStopReason(reason); if (type === "response.incomplete" && reason !== "max_output_tokens") { yield { ...terminalFailure(new Error(`Response incomplete: ${reason}`), input.signal), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; return; } terminalSeen = true; continue; }
+      if (type === "response.failed" || type === "error") { const usage = (event.response as Record<string, unknown> | undefined)?.usage as Record<string, unknown> | undefined; if (usage) acc.usage = withOpenRouterCost(mapResponsesUsage(usage), usage, input.credential.baseUrl ?? options.baseUrl); yield { ...terminalFailure(new Error(responseError(event)), input.signal), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; return; }
     }
-    yield terminalSeen ? done(acc) : malformedStream(options.route);
-  } catch (error) { yield terminalFailure(error, input.signal); }
+    yield terminalSeen ? done(acc, options.pricing ?? null) : { ...malformedStream(options.route), usage: calculateUsageCost(acc.usage, options.pricing ?? null) };
+  } catch (error) { yield { ...terminalFailure(error, input.signal), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; }
 }
 
 async function* anthropicStream(client: SdkClient, input: LlmAdapterDispatchInput, options: LegacyProxyWireEngineOptions): AsyncGenerator<LlmStreamEvent> {
@@ -154,8 +161,8 @@ async function* anthropicStream(client: SdkClient, input: LlmAdapterDispatchInpu
       if (type === "message_delta") { const usage = event.usage as Record<string, unknown> | undefined; if (usage) acc.usage = mapAnthropicUsage(usage, acc.usage); const stop = (event.delta as Record<string, unknown> | undefined)?.stop_reason; if (typeof stop === "string") { acc.stopReason = mapStopReason(stop); terminalSeen = true; } }
       if (type === "message_stop") terminalSeen = true;
     }
-    yield terminalSeen ? done(acc) : malformedStream(options.route);
-  } catch (error) { yield terminalFailure(error, input.signal); }
+    yield terminalSeen ? done(acc, options.pricing ?? null) : { ...malformedStream(options.route), usage: calculateUsageCost(acc.usage, options.pricing ?? null) };
+  } catch (error) { yield { ...terminalFailure(error, input.signal), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; }
 }
 
 async function toOpenAiMessages(messages: readonly LlmMessage[], sessionId?: string, readArtifact?: PiAiArtifactReader): Promise<RuntimeV2JsonValue[]> {
@@ -212,13 +219,13 @@ async function artifactDataUrl(artifactId: string, mimeType: string, sessionId?:
 function anthropicMediaType(value: string): string { return ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(value) ? value : "image/png"; }
 function parseArguments(value: string): RuntimeV2JsonValue { try { return JSON.parse(value) as RuntimeV2JsonValue; } catch { return { $raw: value }; } }
 function accumulator(): Accumulator { return { text: [], reasoning: [], signatures: [], calls: new Map(), usage: unknownUsage(), stopReason: null }; }
-function done(acc: Accumulator): Extract<LlmStreamEvent, { type: "done" }> { const content: LlmContentBlock[] = []; const reasoning = acc.reasoning.join(""); if (reasoning || acc.signatures.length) content.push({ type: "reasoning", text: reasoning, ...(acc.signatures.at(-1) ? { signature: acc.signatures.at(-1) } : {}) }); const text = acc.text.join(""); if (text) content.push({ type: "text", text }); for (const call of [...acc.calls].sort(([left], [right]) => left - right).map(([, value]) => value)) content.push({ type: "tool-call", callId: call.callId, name: call.name, arguments: call.arguments }); return { type: "done", stopReason: acc.calls.size ? "tool-calls" : acc.stopReason, usage: acc.usage, content }; }
-function terminalFailure(error: unknown, signal: AbortSignal): LlmStreamEvent { if (signal.aborted || (error instanceof Error && error.name === "AbortError")) return { type: "aborted", reason: "LLM request aborted." }; return { type: "error", failure: classifyFailure(error) }; }
+function done(acc: Accumulator, pricing: ModelPricingSnapshot | null): Extract<LlmStreamEvent, { type: "done" }> { const content: LlmContentBlock[] = []; const reasoning = acc.reasoning.join(""); if (reasoning || acc.signatures.length) content.push({ type: "reasoning", text: reasoning, ...(acc.signatures.at(-1) ? { signature: acc.signatures.at(-1) } : {}) }); const text = acc.text.join(""); if (text) content.push({ type: "text", text }); for (const call of [...acc.calls].sort(([left], [right]) => left - right).map(([, value]) => value)) content.push({ type: "tool-call", callId: call.callId, name: call.name, arguments: call.arguments }); return { type: "done", stopReason: acc.calls.size ? "tool-calls" : acc.stopReason, usage: calculateUsageCost(acc.usage, pricing), content }; }
+function terminalFailure(error: unknown, signal: AbortSignal): Extract<LlmStreamEvent, { type: "error" | "aborted" }> { if (signal.aborted || (error instanceof Error && error.name === "AbortError")) return { type: "aborted", reason: "LLM request aborted." }; return { type: "error", failure: classifyFailure(error) }; }
 function malformedStream(route: PiAiWireRoute): Extract<LlmStreamEvent, { type: "error" }> { return { type: "error", failure: { kind: "malformed-stream", message: `Provider stream for route ${route} ended without a terminal event.`, retryable: true, attempt: 1 } }; }
 function classifyFailure(error: unknown): LlmFailure { const raw = error instanceof Error ? error.message : String(error); const message = redactLlmText(raw); const status = Number((error as { status?: unknown } | null)?.status ?? /\b(401|402|403|429|5\d\d)\b/.exec(message)?.[1]); const httpStatus = Number.isFinite(status) && status > 0 ? status : undefined; const kind: LlmFailureKind = error instanceof ProviderProxyError ? "proxy" : httpStatus === 401 ? "authentication" : httpStatus === 402 ? "quota" : httpStatus === 403 ? "permission" : httpStatus === 429 ? "rate-limit" : httpStatus !== undefined && httpStatus >= 500 ? "provider" : /context|token limit/i.test(message) ? "context-overflow" : /timeout/i.test(message) ? "timeout" : /network|fetch|socket|ECONN|DNS/i.test(message) ? "network" : /invalid|bad request/i.test(message) ? "invalid-request" : "unknown"; const retryAfterMs = retryAfterMsFromUnknown(error); const providerCode = providerCodeFromUnknown(error); return { kind, message, retryable: ["rate-limit", "provider", "network", "timeout", "proxy"].includes(kind), ...(httpStatus === undefined ? {} : { httpStatus }), ...(retryAfterMs === undefined ? {} : { retryAfterMs }), ...(providerCode === undefined ? {} : { providerCode }), attempt: 1 }; }
 function mapStopReason(value: string): string { if (["tool_calls", "tool_use", "requires_action"].includes(value)) return "tool-calls"; if (["length", "max_tokens", "max_output_tokens", "incomplete"].includes(value)) return "max-tokens"; return value === "end_turn" || value === "completed" ? "stop" : value; }
-function mapOpenAiUsage(usage: Record<string, unknown>): LlmUsage { const input = numberOrNull(usage.prompt_tokens); const output = numberOrNull(usage.completion_tokens); const inputDetails = usage.prompt_tokens_details as Record<string, unknown> | undefined; const outputDetails = usage.completion_tokens_details as Record<string, unknown> | undefined; const cacheRead = numberOrNull(usage.prompt_cache_hit_tokens ?? inputDetails?.cached_tokens ?? usage.cached_tokens); return reportedUsage(input, output, cacheRead, numberOrNull(usage.prompt_cache_write_tokens), numberOrNull(outputDetails?.reasoning_tokens)); }
-function mapResponsesUsage(usage: Record<string, unknown>): LlmUsage { const inputDetails = usage.input_tokens_details as Record<string, unknown> | undefined; const outputDetails = usage.output_tokens_details as Record<string, unknown> | undefined; return reportedUsage(numberOrNull(usage.input_tokens), numberOrNull(usage.output_tokens), numberOrNull(inputDetails?.cached_tokens), numberOrNull(inputDetails?.cache_write_tokens), numberOrNull(outputDetails?.reasoning_tokens)); }
+function mapOpenAiUsage(usage: Record<string, unknown>): LlmUsage { const input = numberOrNull(usage.prompt_tokens); const output = numberOrNull(usage.completion_tokens); const inputDetails = usage.prompt_tokens_details as Record<string, unknown> | undefined; const outputDetails = usage.completion_tokens_details as Record<string, unknown> | undefined; const cacheRead = numberOrNull(usage.prompt_cache_hit_tokens ?? inputDetails?.cached_tokens ?? usage.cached_tokens); const cacheWrite = numberOrNull(usage.prompt_cache_write_tokens ?? inputDetails?.cache_write_tokens); return reportedUsage(input === null ? null : input - (cacheRead ?? 0) - (cacheWrite ?? 0), output, cacheRead, cacheWrite, numberOrNull(outputDetails?.reasoning_tokens)); }
+function mapResponsesUsage(usage: Record<string, unknown>): LlmUsage { const inputDetails = usage.input_tokens_details as Record<string, unknown> | undefined; const outputDetails = usage.output_tokens_details as Record<string, unknown> | undefined; const totalInput = numberOrNull(usage.input_tokens); return reportedUsage(totalInput === null ? null : totalInput - (numberOrNull(inputDetails?.cached_tokens) ?? 0) - (numberOrNull(inputDetails?.cache_write_tokens) ?? 0), numberOrNull(usage.output_tokens), numberOrNull(inputDetails?.cached_tokens), numberOrNull(inputDetails?.cache_write_tokens), numberOrNull(outputDetails?.reasoning_tokens)); }
 function mapAnthropicUsage(usage: Record<string, unknown>, previous: LlmUsage): LlmUsage { return reportedUsage(numberOrNull(usage.input_tokens) ?? previous.inputTokens, numberOrNull(usage.output_tokens) ?? previous.outputTokens, numberOrNull(usage.cache_read_input_tokens) ?? previous.cacheReadTokens, numberOrNull(usage.cache_creation_input_tokens) ?? previous.cacheWriteTokens, previous.reasoningTokens); }
 function reportedUsage(input: number | null, output: number | null, cacheRead: number | null, cacheWrite: number | null, reasoning: number | null): LlmUsage { return { inputTokens: input, outputTokens: output, cacheReadTokens: cacheRead, cacheWriteTokens: cacheWrite, reasoningTokens: reasoning, cost: null, costCurrency: null, source: "provider-reported" }; }
 function unknownUsage(): LlmUsage { return { inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null, cost: null, costCurrency: null, source: "unknown" }; }
@@ -231,4 +238,11 @@ async function loadPublicSdk(route: PiAiWireRoute): Promise<SdkConstructor> {
   const module = await import(packageName) as { readonly default?: SdkConstructor };
   if (typeof module.default !== "function") throw new Error(`${packageName} public default export is unavailable.`);
   return module.default;
+}
+
+/** Only trust a raw billed amount from the documented endpoint, never SDK calculated cost. */
+function withOpenRouterCost(usage: LlmUsage, raw: Record<string, unknown>, baseUrl?: string): LlmUsage {
+  const cost = numberOrNull(raw.cost);
+  if (catalogProviderForEndpoint(baseUrl ?? "") !== "openrouter" || cost === null || cost < 0) return usage;
+  return { ...usage, cost, costCurrency: "USD", costProvenance: { version: 1, basis: "provider-reported", reason: null, pricingSnapshot: null } };
 }

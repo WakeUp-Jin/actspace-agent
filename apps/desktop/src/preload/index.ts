@@ -1,15 +1,7 @@
+import { ENGLISH_LEARNING_CHANNELS } from "@actspace/shared";
 import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 import type {
   AbortAgentRunInput,
-  AgentAnalysisIndexInput,
-  AgentAnalysisIndexResult,
-  AgentAnalysisSessionIndexResult,
-  AgentTraceClearInput,
-  AgentTraceClearResult,
-  AgentTraceListInput,
-  AgentTraceListResult,
-  AgentTraceReadInput,
-  AgentTraceReadResult,
   AgentSystemPromptFile,
   AgentRunResult,
   AppSettings,
@@ -117,6 +109,7 @@ import type {
   TestConnectionResult,
   UsageStatisticsGetInput,
   UsageStatisticsSnapshot,
+  UsageActivitySnapshot,
   ListVisualizationsInput,
   ListVisualizationsResult,
   VisualizeReplyInput,
@@ -178,11 +171,6 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "agent:run": RUNTIME_V2_FIXED_RENDERER_CHANNELS.runAgent,
   "context:compact": RUNTIME_V2_FIXED_RENDERER_CHANNELS.compactContext,
   "agent:abort-run": RUNTIME_V2_FIXED_RENDERER_CHANNELS.abortAgentRun,
-  "agent-trace:list": RUNTIME_V2_FIXED_RENDERER_CHANNELS.listAgentTraces,
-  "agent-trace:read": RUNTIME_V2_FIXED_RENDERER_CHANNELS.readAgentTrace,
-  "agent-analysis:index": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getAgentAnalysisIndex,
-  "agent-analysis:sessions": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getAgentAnalysisSessionIndex,
-  "agent-trace:clear": RUNTIME_V2_FIXED_RENDERER_CHANNELS.clearAgentTraces,
   "dialog:select-files": RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectFiles,
   "dialog:select-images": RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectImages,
   "composer:import-image": RUNTIME_V2_FIXED_RENDERER_CHANNELS.importComposerImage,
@@ -222,9 +210,12 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "context:describe": RUNTIME_V2_FIXED_RENDERER_CHANNELS.describeContext,
   "session:list": RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSessions,
   "session:get": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSession,
+  "session:get-projection-snapshot": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionProjectionSnapshot,
   "session:get-preview": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionPreview,
+  "subagent:list": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSubagents,
   "subagent:get-transcript": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSubAgentTranscript,
   "usage-statistics:get": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getUsageStatistics,
+  "usage-activity:get": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getUsageActivity,
   "deepseek:balance:get": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getDeepSeekBalance,
   "kimi:balance:get": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getKimiBalance,
   "provider:balance:get": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getProviderBalance,
@@ -246,12 +237,17 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "approval:decide": RUNTIME_V2_FIXED_RENDERER_CHANNELS.submitApproval,
   "approval:list-pending": RUNTIME_V2_FIXED_RENDERER_CHANNELS.listPendingApprovals,
   "settings:get": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSettings,
+  "settings:get-v4": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSettingsV4,
   "quick-open:consume": RUNTIME_V2_FIXED_RENDERER_CHANNELS.quickOpenConsume,
   "quick-open:get-status": RUNTIME_V2_FIXED_RENDERER_CHANNELS.quickOpenStatus,
   "quick-open:update": RUNTIME_V2_FIXED_RENDERER_CHANNELS.quickOpenUpdate,
   "settings:read-agent-system-prompt": RUNTIME_V2_FIXED_RENDERER_CHANNELS.readAgentSystemPrompt,
   "settings:write-agent-system-prompt": RUNTIME_V2_FIXED_RENDERER_CHANNELS.writeAgentSystemPrompt,
   "settings:update": RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateSettings,
+  "settings:update-v4": RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateSettingsV4,
+  "settings:create-custom-connection": RUNTIME_V2_FIXED_RENDERER_CHANNELS.createCustomConnection,
+  "settings:remove-custom-connection": RUNTIME_V2_FIXED_RENDERER_CHANNELS.removeCustomConnection,
+  "settings:update-custom-connection": RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateCustomConnection,
   "settings:set-provider-key": RUNTIME_V2_FIXED_RENDERER_CHANNELS.setProviderKey,
   "settings:clear-provider-key": RUNTIME_V2_FIXED_RENDERER_CHANNELS.clearProviderKey,
   "settings:update-image-generation": RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateImageGeneration,
@@ -269,6 +265,8 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "provider-credentials:remove": RUNTIME_V2_FIXED_RENDERER_CHANNELS.removeProviderCredential,
   "models:list-installed": RUNTIME_V2_FIXED_RENDERER_CHANNELS.listInstalledModels,
   "models:list-usable": RUNTIME_V2_FIXED_RENDERER_CHANNELS.listUsableModels,
+  "models:pricing:get": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getPricingCatalog,
+  "models:pricing:refresh": RUNTIME_V2_FIXED_RENDERER_CHANNELS.refreshPricingCatalog,
   "models:catalog:list": RUNTIME_V2_FIXED_RENDERER_CHANNELS.listModelCatalog,
   "models:catalog:reload": RUNTIME_V2_FIXED_RENDERER_CHANNELS.reloadModelCatalog,
   "models:add": RUNTIME_V2_FIXED_RENDERER_CHANNELS.addModel,
@@ -298,16 +296,6 @@ contextBridge.exposeInMainWorld("actspace", {
   compactContext: (input: CompactContextInput) =>
     invokeFixedRenderer("context:compact", input) as Promise<CompactContextResult>,
   abortAgentRun: (input: AbortAgentRunInput) => invokeFixedRenderer("agent:abort-run", input) as Promise<boolean>,
-  listAgentTraces: (input: AgentTraceListInput) =>
-    invokeFixedRenderer("agent-trace:list", input) as Promise<AgentTraceListResult>,
-  readAgentTrace: (input: AgentTraceReadInput) =>
-    invokeFixedRenderer("agent-trace:read", input) as Promise<AgentTraceReadResult>,
-  getAgentAnalysisIndex: (input: AgentAnalysisIndexInput) =>
-    invokeFixedRenderer("agent-analysis:index", input) as Promise<AgentAnalysisIndexResult>,
-  getAgentAnalysisSessionIndex: () =>
-    invokeFixedRenderer("agent-analysis:sessions") as Promise<AgentAnalysisSessionIndexResult>,
-  clearAgentTraces: (input: AgentTraceClearInput) =>
-    invokeFixedRenderer("agent-trace:clear", input) as Promise<AgentTraceClearResult>,
   selectFiles: () => invokeFixedRenderer("dialog:select-files") as Promise<SelectFilesResult>,
   selectImages: () => invokeFixedRenderer("dialog:select-images") as Promise<SelectImagesResult>,
   importComposerImage: (input: ImportComposerImageInput) =>
@@ -387,12 +375,17 @@ contextBridge.exposeInMainWorld("actspace", {
     invokeFixedRenderer("context:describe", input) as Promise<ContextState | null>,
   listSessions: (input?: SessionListInput) => invokeFixedRenderer("session:list", input ?? {}) as Promise<SessionListItem[]>,
   getSession: (input: SessionGetInput) => invokeFixedRenderer("session:get", input) as Promise<SessionRecord | null>,
+  getSessionProjectionSnapshot: (input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) =>
+    invokeFixedRenderer("session:get-projection-snapshot", input) as Promise<import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection>,
   getSessionPreview: (input: SessionPreviewInput) =>
     invokeFixedRenderer("session:get-preview", input) as Promise<SessionPreviewResult | null>,
+  getSubagents: (input: { sessionId: string }) => invokeFixedRenderer("subagent:list", input) as Promise<import("@actspace/shared").MessageBlock[]>,
   getSubAgentTranscript: (input: SubAgentTranscriptGetInput) =>
     invokeFixedRenderer("subagent:get-transcript", input) as Promise<SessionEvent[]>,
   getUsageStatistics: (input: UsageStatisticsGetInput) =>
     invokeFixedRenderer("usage-statistics:get", input) as Promise<UsageStatisticsSnapshot | null>,
+  getUsageActivity: (input: UsageStatisticsGetInput) =>
+    invokeFixedRenderer("usage-activity:get", input) as Promise<UsageActivitySnapshot | null>,
   getDeepSeekBalance: () =>
     invokeFixedRenderer("deepseek:balance:get") as Promise<DeepSeekBalanceSnapshot>,
   getKimiBalance: () =>
@@ -437,6 +430,16 @@ contextBridge.exposeInMainWorld("actspace", {
   listPendingApprovals: (input?: ApprovalListPendingInput) => invokeFixedRenderer("approval:list-pending", input ?? {}) as Promise<PendingApprovalInfo[]>,
 
   getSettings: () => invokeFixedRenderer("settings:get") as Promise<AppSettings>,
+  getEnglishLearningState: () => ipcRenderer.invoke(ENGLISH_LEARNING_CHANNELS.getState),
+  setEnglishLearningTarget: (input: import("@actspace/shared").EnglishLearningTargetInput) => ipcRenderer.invoke(ENGLISH_LEARNING_CHANNELS.setTarget, input),
+  stopEnglishLearningSpeech: () => ipcRenderer.invoke(ENGLISH_LEARNING_CHANNELS.stop),
+  previewEnglishLearningSpeech: () => ipcRenderer.invoke(ENGLISH_LEARNING_CHANNELS.preview),
+  onEnglishLearningStateChanged: (callback: (state: import("@actspace/shared").EnglishLearningState) => void) => {
+    const handler = (_event: unknown, state: import("@actspace/shared").EnglishLearningState) => callback(state);
+    ipcRenderer.on(ENGLISH_LEARNING_CHANNELS.stateChanged, handler);
+    return () => ipcRenderer.removeListener(ENGLISH_LEARNING_CHANNELS.stateChanged, handler);
+  },
+  getSettingsV4: () => invokeFixedRenderer("settings:get-v4") as Promise<import("@actspace/shared").SettingsV4Snapshot>,
   consumeQuickOpenRequest: () => invokeFixedRenderer("quick-open:consume") as Promise<QuickOpenRequest | null>,
   getQuickOpenShortcutStatus: () => invokeFixedRenderer("quick-open:get-status") as Promise<QuickOpenShortcutStatus>,
   updateQuickOpenShortcut: (input: QuickOpenShortcutUpdateInput) =>
@@ -452,6 +455,19 @@ contextBridge.exposeInMainWorld("actspace", {
     invokeFixedRenderer("settings:write-agent-system-prompt", input) as Promise<AgentSystemPromptFile>,
   updateSettings: (input: SettingsUpdateInput) =>
     invokeFixedRenderer("settings:update", input) as Promise<AppSettings>,
+  updateSettingsV4: (input: import("@actspace/shared").SettingsV4UpdateInput) =>
+    invokeFixedRenderer("settings:update-v4", input) as Promise<import("@actspace/shared").SettingsV4UpdateResult>,
+  createCustomConnection: (input: import("@actspace/shared").CustomConnectionInput) =>
+    invokeFixedRenderer("settings:create-custom-connection", input) as Promise<import("@actspace/shared").SettingsV4Snapshot>,
+  removeCustomConnection: (input: { connectionId: string }) =>
+    invokeFixedRenderer("settings:remove-custom-connection", input) as Promise<import("@actspace/shared").SettingsV4Snapshot>,
+  updateCustomConnection: (input: import("@actspace/shared/runtime-v2").RuntimeV2UpdateCustomConnectionInput) =>
+    invokeFixedRenderer("settings:update-custom-connection", input) as Promise<import("@actspace/shared").SettingsV4Snapshot>,
+  onSettingsChangedV4: (callback: (notification: import("@actspace/shared").SettingsV4ChangedNotification) => void) => {
+    const handler = (_: unknown, notification: import("@actspace/shared").SettingsV4ChangedNotification) => callback(notification);
+    ipcRenderer.on(RUNTIME_V2_FIXED_RENDERER_CHANNELS.settingsChangedV4, handler);
+    return () => ipcRenderer.removeListener(RUNTIME_V2_FIXED_RENDERER_CHANNELS.settingsChangedV4, handler);
+  },
   setProviderKey: (input: SetProviderKeyInput) =>
     invokeFixedRenderer("settings:set-provider-key", input) as Promise<SetProviderKeyResult>,
   clearProviderKey: (input: ClearProviderKeyInput) =>
@@ -474,6 +490,8 @@ contextBridge.exposeInMainWorld("actspace", {
   removeProviderCredential: (input: ProviderCredentialInput) => invokeFixedRenderer("provider-credentials:remove", input) as Promise<ProviderCredentialOperationResult>,
   listInstalledModels: () => invokeFixedRenderer("models:list-installed") as Promise<ModelsListInstalledResult>,
   listUsableModels: (input: ModelsListUsableInput) => invokeFixedRenderer("models:list-usable", input) as Promise<ModelsListUsableResult>,
+  getPricingCatalog: () => invokeFixedRenderer("models:pricing:get") as Promise<import("@actspace/shared").ModelCatalogStatus | null>,
+  refreshPricingCatalog: (input?: { force?: boolean }) => invokeFixedRenderer("models:pricing:refresh", input) as Promise<import("@actspace/shared").ModelCatalogStatus | null>,
   listModelCatalog: (input: ModelsCatalogListInput) => invokeFixedRenderer("models:catalog:list", input) as Promise<ModelsCatalogListResult>,
   reloadModelCatalog: (input: ModelsCatalogListInput) => invokeFixedRenderer("models:catalog:reload", input) as Promise<ModelsCatalogListResult>,
   addModel: (input: ModelsAddInput) => invokeFixedRenderer("models:add", input) as Promise<ModelMutationResult>,
@@ -509,6 +527,11 @@ contextBridge.exposeInMainWorld("actspace", {
     return () => {
       ipcRenderer.removeListener(RUNTIME_V2_FIXED_RENDERER_CHANNELS.agentStream, handler);
     };
+  },
+  onSessionLiveEvent: (callback: (event: import("@actspace/shared/runtime-v2").RuntimeV2DesktopLiveEnvelope) => void) => {
+    const handler = (_: unknown, envelope: import("@actspace/shared/runtime-v2").RuntimeV2DesktopLiveEnvelope) => callback(envelope);
+    ipcRenderer.on(RUNTIME_V2_FIXED_RENDERER_CHANNELS.sessionLiveEvent, handler);
+    return () => ipcRenderer.removeListener(RUNTIME_V2_FIXED_RENDERER_CHANNELS.sessionLiveEvent, handler);
   },
 
   // 主进程开始优雅退出时通知 renderer 弹退出遮罩。无 payload。

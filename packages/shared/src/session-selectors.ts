@@ -85,8 +85,10 @@ function messageBlockFromToolPreview(
   eventId: EventId,
   timestamp: string,
   preview: ToolUiPreview,
-  isError?: boolean
+  isError?: boolean,
+  terminalStatus?: unknown
 ): MessageBlock {
+  const status = terminalStatus === "running" ? "running" : terminalStatus === "denied" || terminalStatus === "aborted" || terminalStatus === "outcome-unknown" ? terminalStatus : isError ? "failed" : "completed";
   switch (preview.kind) {
     case "read":
       return {
@@ -95,6 +97,7 @@ function messageBlockFromToolPreview(
         filePath: preview.filePath,
         range: preview.range,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp)
       };
     case "search":
@@ -105,6 +108,7 @@ function messageBlockFromToolPreview(
         scope: preview.scope,
         resultCount: preview.resultCount,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp)
       };
     case "grep":
@@ -115,6 +119,7 @@ function messageBlockFromToolPreview(
         scope: preview.scope,
         resultCount: preview.resultCount,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp)
       };
     case "glob":
@@ -125,6 +130,7 @@ function messageBlockFromToolPreview(
         scope: preview.scope,
         resultCount: preview.resultCount,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp)
       };
     case "web_search":
@@ -135,6 +141,7 @@ function messageBlockFromToolPreview(
         query: preview.query,
         url: preview.url,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp),
         resultUrls: preview.resultUrls,
         contentPreview: preview.contentPreview,
@@ -146,6 +153,7 @@ function messageBlockFromToolPreview(
         mediaName: preview.mediaName,
         mediaKind: preview.mediaKind,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp),
         isError
       };
@@ -172,6 +180,7 @@ function messageBlockFromToolPreview(
         path: preview.path,
         entryCount: preview.entryCount,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp)
       };
     case "edit_diff":
@@ -464,7 +473,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
           : nextRenderKey(event, "tool", getOptionalString(payload, "toolCallId"));
 
         return [withRenderKey(
-          messageBlockFromToolPreview(event.id, event.timestamp, preview, payload.ok === false),
+          messageBlockFromToolPreview(event.id, event.timestamp, preview, payload.ok === false, payload.status),
           renderKey,
         )];
       }

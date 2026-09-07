@@ -10,6 +10,7 @@
 - `apps/cli`：通过 managed ESM loader 暴露 v2 `run` / `chat` 命令、TTY 交互和 stdout/stderr 契约。
 - `packages/runtime`：Host-facing ESM runtime，承载 Cordis boot、Profile/Bundle composition、Profile 生命周期和 shutdown；应用能力由 Headless/Desktop Bundle 提供。
 - `packages/core/`、`packages/session/`、`packages/llm/`、`packages/prompt/`、`packages/tools/`、`packages/subagent/`、`packages/compaction/`：独立领域 workspace packages，每个可装载包拥有自己的 Plugin Entry 与生命周期测试。
+- `packages/english-learning`：Desktop 内置英语辅助学习插件，拥有单会话双语提示词与英文语音队列；凭据、临时文件和系统播放由 Desktop Host 提供。详见[设计](design-docs/agent-plugin-runtime/agent-english-learning.md)。
 - `packages/shared`：IPC contracts、session schema、跨进程共享类型。
 - `apps/site`：Astro 静态官网、公开文档、博客与从 release 文档生成的更新页。
 - `browser-bridge`：Browser Use Go bridge CLI、Chrome Extension 和协议层。
@@ -62,8 +63,7 @@ runtime --(Host capability)--> browser-bridge
 
 - `docs/design-docs/agent-runtime/agent-turn-layers.md`：Agent Run 从 Host 输入到 Journal、Agent Loop、LLM / Tool 与 Projection 的五层职责边界，并定义 `agentRunId → turnId → stepId → requestId` 的运行层级。
 - `docs/design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md`：v2 Runtime、Profile / Bundle / Patch、BootedProfile、Host 和固定前端边界。
-- `docs/design-docs/agent-runtime/agent-observability-trace-model.md`：分析观测的数据契约，解释 Session V2、真实 Turn、LLM Call、重试、Trace 安全边界及读取 IPC。
-- `docs/design-docs/frontend/front-agent-analysis-observability.md`：分析观测生产页面的产品边界、两栏信息架构、请求详情、上下文对比、主题和 Trace 可靠性要求。
+- `docs/design-docs/agent-runtime/agent-observability-trace-model.md`：Journal 观测的数据契约，解释 Session V2、真实 Turn、LLM Call、重试、Trace 安全边界及投影边界。
 - `docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md`：v2 当前架构总图，解释启动、单次任务、Session、Host、Cordis 和 Agent Core 的关系。
 - `docs/design-docs/agent-plugin-runtime/README.md`：v2 后端插件化架构入口，汇总设计证据、决策、公共契约和执行记录。
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`：已落地的多供应商 LLM 架构，统一 DeepSeek / Kimi / OpenRouter 的服务商连接、模型目录、服务商级代理、协议服务和任务模型选择；历史 DuckCoding 设计文档仅用于变更追溯。图片生成仍可独立使用 DuckCoding 的 OpenAI-compatible Images API。

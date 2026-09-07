@@ -13,6 +13,12 @@ export type ResolvedLlmRequest = {
   readonly tools: readonly LlmToolDefinition[];
   readonly options: LlmRequestOptions;
   readonly credentialRef: string;
+  /** Non-secret model facts resolved before dispatch and safe to persist in a request snapshot. */
+  readonly contextWindow?: number | null;
+};
+
+export type LlmRequestModelFacts = {
+  readonly contextWindow: number | null;
 };
 
 export type LlmAdapterDispatchInput = {
@@ -23,6 +29,7 @@ export type LlmAdapterDispatchInput = {
 
 export interface LlmAdapter {
   readonly adapterVersion: string;
+  resolveModelFacts?(model: string): LlmRequestModelFacts;
   dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource>;
   cancel?(requestId: string): Promise<void>;
   dispose?(): Promise<void>;

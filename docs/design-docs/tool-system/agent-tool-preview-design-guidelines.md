@@ -46,8 +46,18 @@
 - 工具调用进行中阶段（`tool_started` 之后、`tool_finished` 之前）所有工具行使用统一的 B 方案 text shimmer：`text-faint` 底字 + `text-main` 墨色扫光，收到 `tool_finished` 后立即停止，不人为延长 running。详见 [中间消息区规范 - 工具执行中态规范](../frontend/front-中间消息区规范.md#工具执行中态规范)。
 - running 阶段后端 `tool_started.preview` 只推送当前能确定的最小字段（filePath / command / query），不传未生成的数值（diff stats、entryCount 等）；完成态字段在 `tool_finished` / 持久化事件中补齐。
 - `tool_finished` 是单个工具调用的完成事实。renderer 必须按 `toolCallId` 立即切换该工具的最终状态，不能为了最短动画时长等待同批其他工具完成；视觉平滑不能延迟真实生命周期状态。
-- **`tool_call_streaming` 事件契约**：bridge 在 LLM 流式输出 `tool_call_delta` 时累积 partial args，按 50ms throttle emit `tool_call_streaming { toolCallId, toolName, isInitial?, preview: ToolUiPreview }`。前端**零解析**直接消费 typed preview，复用与 `tool_started` 相同的渲染分支。`isInitial=true` 是首帧（dispatched 阶段），filePath 此时可能为空字符串，前端用 `Write file…` 等 fallback 文案展示。新工具接入只需在 `engine/streaming-preview-extractors.ts` 注册按 previewKind 的 extractor，前端无需改动。详见 [docs/learnings/2026-05/llm-tool-call-streaming.md](../../learnings/2026-05/llm-tool-call-streaming.md) 的流式协议设计原则。
+- **`tool_call_streaming` 事件契约**：首个参数分片只触发稳定动作占位；prepared 后一次发送完整摘要。Main 不再累积或解析可见 partial args，前端直接消费 typed preview。正文与 Thinking 保持流式，执行状态与结果继续实时更新。
 - **`subagent_event` 事件契约**：Agent 工具执行 SubAgent run 时，bridge emit `subagent_event { toolCallId, transcriptRef, event, preview }`，其中 `preview` 是完整 typed `AgentToolPreview`。renderer 只用它覆盖同一个 Agent block 的 running state，不解析 SubAgent 原始工具参数；最终完成态仍由 `tool_result.uiPreview.kind === "agent"` 持久化恢复。
+
+## v2 实时链路与结果顺序
+
+Core 的工具参数使用独立 `tool-call-delta`，不能复用正文 `assistant-delta`。AgentLoop 在 tool/call append 后发 prepared，在 Tools 真正调用 executor 前发 started，在 tool/result append 后发 finished。审批继续由现有 approvalRegistry 生产。Desktop `FixedRendererStreamAdapter` 经既有 agentStream IPC 发布 typed preview；通用 Session live/revision 不转发工具参数原文。
+
+实时和历史使用同一个 Main preview builder。参数阶段只显示稳定占位；prepared 一次补齐，finished 覆盖结果。正文中的合法 JSON 保持原文。
+
+ToolRuntime 并行 body 结束后立即提交结果；OrderedToolCommitQueue 保留调用顺序，后发先完成的结果仍等待前序提交，但不再等待整批 body 完成。Renderer 收到单个 finished 立即收尾，也允许 finished 直接创建工具条目，迟到的参数、进度和审批不能回退终态。
+
+Read/List/Grep 等轻量组件在失败时显示结果摘要；Bash 保留 denied/cancelled，Write/Edit/Delete 使用已有 failed/denied 组件并保留错误说明。具体实现与验收见 [工具流式渲染设计](../frontend/front-agent-tool-stream-rendering.md)。
 
 ## 内置工具规范
 
@@ -87,7 +97,7 @@
 - `ToolUiPreview.filePath`: 文件名，例如 `index.ts`
 - `ToolUiPreview.additions` / `deletions`: 结构化修改统计。
 - 流式阶段（dispatched → argsProgress → executing）后端持续推 `tool_call_streaming` + `tool_started`，preview.filePath 从空字符串逐渐变为真实文件名，前端 `MessageBlock.status` 一直是 `running`，渲染为单行 `Edit index.ts` + shimmer 闪光，**不显示** chevron、统计或 content 预览。
-- 为什么不流式 content：edit 的 diff 需要「文件原内容 + old_string 定位 + new_string 替换」三者全齐才能生成有定位的 unified diff，LLM 流式只能拿到 old/new 两段无上下文文本，强行展示会误导用户。streaming-preview-extractors 的 `edit_diff` extractor 只提取 path。
+- 为什么不流式 content：edit 的 diff 需要「文件原内容 + old_string 定位 + new_string 替换」三者全齐才能生成有定位的 unified diff，LLM 流式只能拿到 old/new 两段无上下文文本，强行展示会误导用户。Main 共享 preview builder 的 `edit_diff` 分支 只提取 path。
 - 流式 `tool_finished` 后切换为 `status: completed`，渲染折叠态 `Edit index.ts +3 -1 ›`，点击展开完整 diff。
 - diff 由 `diff` 库 `createTwoFilesPatch` 生成（标准 unified diff 格式），包含上下文行。
 - `new_string: ""` 的长期语义是删除唯一匹配文本内容，不是删除文件；多处匹配仍必须提供更多上下文或显式 `replace_all`。
@@ -102,17 +112,11 @@
 
 - `previewKind`: `write`
 - `ToolUiPreview.filePath`: 文件名，例如 `config.ts`
-- `ToolUiPreview.streamingContent?`: 流式阶段从 LLM args.content 累积出来的 partial 文本（仅 running 时存在，completed 时 undefined）。
-- `ToolUiPreview.additions` / `deletions`: 结构化修改统计。
-- 流式 4 阶段：
-  1. dispatched（首个 `tool_call_streaming` `isInitial=true`）：渲染 `Write file…` + shimmer。
-  2. argsProgress：解析出 path 后变为 `Write config.ts`，开始累积 content 时**展开 code preview + 光标动画**（cursor 风格边写边看）。
-  3. executing（`tool_started`）：保持 streamingContent 继续显示，避免闪烁消失（bridge.ts 的 `createToolUiPreview` 在 output 为空时把 args.content 当作 streamingContent 输出）。
-  4. finished（`tool_finished`）：streamingContent 清空，切换为折叠态 `Write config.ts +15 ›`（deletions=0 不展示），点击展开看完整 diff。
-- 流式 code preview 是独立的有界滚动容器：用户仍在底部时，内容增长必须继续自动贴底；用户主动上滚查看早期内容后暂停跟随，滚回底部附近时恢复。
+- 当前 v2 Host 不发送 `streamingContent`，参数生成期间只显示 `Write file…`；prepared 后一次显示完整路径。
+- executing 保持稳定摘要与运行状态；finished 补齐 diff、additions/deletions，并可展开结果。
 - diff 由 `diff` 库 `createTwoFilesPatch` 生成，新建时旧内容为空字符串。
 - 磁盘写入仍在 tool execute 阶段原子写入（tmpfile → fsync → rename），**不**在 LLM 流式期间写盘，避免半文件出现或 LLM 重试导致脏写。
-- diff/统计来源、`status` / `errorMessage` 语义、越界写入审批流程与 `edit_file` 一致（见上）。
+- diff/统计来源、`status` / `errorMessage` 语义、workspace 路径边界检查与 `edit_file` 一致（见上）。
 - 前端复用 `FileDiffBlock` 折叠式组件（与 `edit_file` 共享），`kind: "write_diff"` 区分标题动作词，无 icon。
 
 ### `delete_file`
@@ -176,3 +180,5 @@
 - 前端组件应消费 `MessageBlock` 字段，不直接读取 raw args。
 - 测试至少覆盖一次流式展示和一次持久化恢复展示。
 - 如需流式展示工具 args 的 string 字段（如 content/command），评估是否真的有意义（不会误导用户），有再用 streamingContent 字段；否则只在最终态展示。
+
+默认内置工具操作审批仅保留 Bash；其他工具的参数校验、能力限制与路径边界仍生效。

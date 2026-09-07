@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AgentAnalysisSessionIndexResult, AppSettings, LocalUpdateState, SessionListItem } from "@actspace/shared";
+import type { AppSettings, LocalUpdateState, SessionListItem, SettingsV4Snapshot } from "@actspace/shared";
 import { SettingsPage } from "../components/settings/SettingsPage";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
@@ -85,49 +85,6 @@ describe("SettingsPage", () => {
     path: "/tmp/actspace/prompts/main-agent.md",
     content: input.content,
   }));
-  const analysisSessionIndex: AgentAnalysisSessionIndexResult = {
-    totals: {
-      sessionCount: 1,
-      agentRunCount: 1,
-      turnCount: 2,
-      llmCallCount: 2,
-      inputTokens: 28_000,
-      outputTokens: 817,
-      cacheReadTokens: 17_000,
-      cacheWriteTokens: 0,
-      durationMs: 7_400,
-    },
-    modelNames: ["deepseek-v4-flash"],
-    sessions: [{
-      sessionId: "session-current",
-      title: "Inspect the runtime",
-      updatedAt: "2026-07-29T10:05:00.000Z",
-      status: "completed",
-      agentRunCount: 1,
-      turnCount: 2,
-      llmCallCount: 2,
-      inputTokens: 28_000,
-      outputTokens: 817,
-      cacheReadTokens: 17_000,
-      cacheWriteTokens: 0,
-      durationMs: 7_400,
-      modelNames: ["deepseek-v4-flash"],
-    }],
-  };
-  const getAgentAnalysisSessionIndex = vi.fn(async () => analysisSessionIndex);
-
-  it("renders analysis observability inside the settings content pane", async () => {
-    const onOpenAnalysisSession = vi.fn();
-    renderSettingsPage({ onBack: () => {}, activeSessionId: "session-current", onOpenAnalysisSession });
-    await userEvent.click(await screen.findByRole("button", { name: "分析观测" }));
-    expect(await screen.findByRole("heading", { name: "分析观测", level: 2 })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "分析观测" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("navigation", { name: "设置导航" })).toBeInTheDocument();
-    expect(screen.getByRole("main", { name: "设置内容" })).toHaveClass("overflow-hidden");
-
-    await userEvent.click(screen.getByRole("button", { name: "打开分析会话：Inspect the runtime" }));
-    expect(onOpenAnalysisSession).toHaveBeenCalledWith("session-current");
-  });
   const setProviderKey = vi.fn(async () => ({ ok: true }));
   const clearProviderKey = vi.fn(async () => ({ ok: true }));
   const testProviderConnection = vi.fn(async () => ({ ok: true, message: "连接成功" }));
@@ -266,7 +223,6 @@ describe("SettingsPage", () => {
       updateQuickOpenShortcut,
       setUiZoom,
       setNativeTheme,
-      getAgentAnalysisSessionIndex,
     } as unknown as ActspaceBridge;
   });
 
@@ -276,18 +232,27 @@ describe("SettingsPage", () => {
 
   it("loads settings and renders the general section by default", async () => {
     renderSettingsPage();
-    expect(await screen.findByRole("switch", { name: "自动审查" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "通用", level: 2 })).toBeInTheDocument();
+    expect(screen.getByText("偏好")).toBeInTheDocument();
+    expect(screen.getByText("能力")).toBeInTheDocument();
+    expect(screen.getByText("活动")).toBeInTheDocument();
+    expect(screen.getByText("系统")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "通用" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "扩展" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "模型" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "扩展" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Skills" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "插件" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "服务商" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "智能体" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "快捷键" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "更新" })).toBeInTheDocument();
-    expect(screen.getByLabelText("界面语言")).toBeDisabled();
+    expect(screen.queryByLabelText("界面语言")).not.toBeInTheDocument();
     expect(getLocalUpdateState).not.toHaveBeenCalled();
   });
 
   it("shows the quick open shortcut section and persists its enabled state", async () => {
     renderSettingsPage();
-    await userEvent.click(await screen.findByRole("button", { name: "快捷键" }));
+    await userEvent.click(await screen.findByRole("button", { name: "通用" }));
     const toggle = await screen.findByRole("switch", { name: "启用快速唤起" });
     expect(toggle).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("button", { name: "录制快速唤起快捷键" })).toHaveTextContent("CommandOrControl+Shift+Space");
@@ -297,9 +262,56 @@ describe("SettingsPage", () => {
     expect(updateQuickOpenShortcut).toHaveBeenCalledWith({ enabled: false });
   });
 
+  it("身份偏好通过 v4 general namespace 局部提交并携带 revision", async () => {
+    const snapshot: SettingsV4Snapshot = {
+      version: 4,
+      revision: "revision-1",
+      settings: {
+        version: 4,
+        general: {
+          personalization: { displayName: "", responseStyle: "" },
+          agentInstructions: { systemPromptPath: "/tmp/main-agent.md" },
+          taskDefaults: { temperature: null, maxOutputTokens: null },
+          shortcuts: {
+            quickOpen: {
+              enabled: true,
+              accelerator: "CommandOrControl+Shift+Space",
+              target: { kind: "automatic" },
+            },
+          },
+        },
+        models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, explore: null } },
+        tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: {} },
+        media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" }, imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" } },
+        skills: { disabled: [] },
+        subagents: { routes: {} },
+        activity: { usage: { range: "30d", status: "all", modelFilter: "", showDetails: false, activeTab: "requests" } },
+      },
+    };
+    const getSettingsV4 = vi.fn(async () => snapshot);
+    const updateSettingsV4 = vi.fn(async () => ({ ok: true as const, snapshot: { ...snapshot, revision: "revision-2" } }));
+    window.actspace.getSettingsV4 = getSettingsV4;
+    window.actspace.updateSettingsV4 = updateSettingsV4;
+
+    renderSettingsPage();
+    await screen.findByRole("heading", { name: "通用", level: 2 });
+    await userEvent.click(screen.getByRole("button", { name: "编辑显示名称" }));
+    const displayName = screen.getByLabelText("显示名称");
+    await userEvent.type(displayName, "Jin");
+    await userEvent.click(screen.getByRole("button", { name: "保存显示名称" }));
+
+    await waitFor(() => {
+      expect(updateSettingsV4).toHaveBeenCalledWith({
+        namespace: "general",
+        patch: { personalization: { displayName: "Jin", responseStyle: "" } },
+        expectedRevision: "revision-1",
+      });
+    });
+  });
+
   it("keeps the settings nav fixed while the content pane owns vertical scrolling", async () => {
     renderSettingsPage();
-    expect(await screen.findByRole("switch", { name: "自动审查" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "通用", level: 2 })).toBeInTheDocument();
 
     expect(screen.getByTestId("settings-page-shell")).toHaveClass("h-screen", "overflow-hidden");
     expect(screen.getByRole("navigation", { name: "设置导航" })).not.toHaveClass("overflow-y-auto");
@@ -308,6 +320,7 @@ describe("SettingsPage", () => {
 
   it("toggling 自动审查 calls updateSettings with bashAlwaysAsk", async () => {
     renderSettingsPage();
+    await userEvent.click(await screen.findByRole("button", { name: "工具" }));
     const toggle = await screen.findByRole("switch", { name: "自动审查" });
     await userEvent.click(toggle);
     await waitFor(() => {
@@ -330,7 +343,7 @@ describe("SettingsPage", () => {
       }));
 
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
     await userEvent.click(screen.getByRole("button", { name: "更新" }));
 
@@ -388,7 +401,7 @@ describe("SettingsPage", () => {
       }));
 
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
     await userEvent.click(screen.getByRole("button", { name: "更新" }));
     await userEvent.click(await screen.findByRole("button", { name: "构建并更新" }));
 
@@ -397,11 +410,11 @@ describe("SettingsPage", () => {
     expect(screen.queryByRole("dialog", { name: "本地更新进度" })).not.toBeInTheDocument();
   });
 
-  it("connecting a provider opens the key modal and saves the key", async () => {
+  it("connecting a provider opens the inline setup route and saves the key", async () => {
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
-    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
+    await userEvent.click(screen.getByRole("button", { name: "模型" }));
     await userEvent.click(await screen.findByRole("button", { name: "添加服务" }));
     await userEvent.click(screen.getByRole("button", { name: "选择 DeepSeek" }));
 
@@ -419,15 +432,16 @@ describe("SettingsPage", () => {
     });
   });
 
-  it("服务商卡片显示账户余额并支持手动刷新", async () => {
+  it("连接详情显示账户余额并支持手动刷新", async () => {
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
-    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
-    const balance = await screen.findByLabelText("Kimi 账户余额");
+    await userEvent.click(screen.getByRole("button", { name: "模型" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Moonshot" }));
+    const balance = await screen.findByLabelText("Moonshot 账户余额");
     expect(balance).toHaveTextContent("¥31.11 CNY");
 
-    await userEvent.click(screen.getByRole("button", { name: "刷新 Kimi 账户余额" }));
+    await userEvent.click(screen.getByRole("button", { name: "刷新 Moonshot 账户余额" }));
     await waitFor(() => expect(getProviderBalance).toHaveBeenCalledTimes(2));
   });
 
@@ -440,10 +454,12 @@ describe("SettingsPage", () => {
       },
     }));
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
-    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
-    expect(await screen.findByText("未配置")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "通用" }));
+    expect(await screen.findByRole("heading", { name: "媒体默认", level: 3 })).toBeInTheDocument();
+    expect(screen.getByText("图片生成连接")).toBeInTheDocument();
+    expect(screen.getByText("配置 API Key 后，主 Agent 才能使用图片生成工具。")).toBeInTheDocument();
     expect(screen.queryByLabelText("图片生成服务 API Key")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "配置图片生成服务" }));
@@ -477,10 +493,10 @@ describe("SettingsPage", () => {
       imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" },
     }));
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
-    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
-    expect(await screen.findByText("openai/gpt-5.6-luna")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "通用" }));
+    expect(await screen.findByText(/openai\/gpt-5\.6-luna/)).toBeInTheDocument();
     expect(screen.getByText("可用")).toBeInTheDocument();
 
     await userEvent.click(screen.getByLabelText("图片分析模型"));
@@ -502,9 +518,9 @@ describe("SettingsPage", () => {
       },
     }));
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
-    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
+    await userEvent.click(screen.getByRole("button", { name: "通用" }));
     expect(await screen.findByText("已配置")).toBeInTheDocument();
     expect(screen.getByText("gpt-image-2 · www.duckcoding.ai")).toBeInTheDocument();
 
@@ -531,10 +547,13 @@ describe("SettingsPage", () => {
       },
     });
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
-    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
-    await userEvent.click(await screen.findByRole("button", { name: "编辑" }));
+    await userEvent.click(screen.getByRole("button", { name: "模型" }));
+    await userEvent.click(await screen.findByRole("button", { name: "OpenRouter" }));
+    const modelKeySection = (await screen.findByRole("heading", { name: "模型密钥", level: 4 })).closest("section");
+    expect(modelKeySection).not.toBeNull();
+    await userEvent.click(within(modelKeySection as HTMLElement).getByRole("button", { name: "更换模型密钥" }));
     await userEvent.type(screen.getByLabelText("OpenRouter Management Key"), "sk-or-management");
     await userEvent.click(screen.getByRole("button", { name: "保存" }));
 
@@ -548,7 +567,7 @@ describe("SettingsPage", () => {
 
   it("disabling a tool writes it into disabledTools", async () => {
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
     await userEvent.click(screen.getByRole("button", { name: "工具" }));
     const readToggle = await screen.findByRole("switch", { name: "读取文件" });
@@ -562,7 +581,7 @@ describe("SettingsPage", () => {
 
   it("groups browser tools behind one master switch and collapsed advanced settings", async () => {
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
     await userEvent.click(screen.getByRole("button", { name: "工具" }));
     expect(screen.getByRole("switch", { name: "浏览器" })).toHaveAttribute("aria-checked", "true");
@@ -581,9 +600,10 @@ describe("SettingsPage", () => {
 
   it("editing 主 Agent 系统提示词 saves it through the prompt file", async () => {
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
-    await userEvent.click(screen.getByRole("button", { name: "智能体" }));
+    await userEvent.click(screen.getByRole("button", { name: "通用" }));
+    await userEvent.click(screen.getByRole("button", { name: "编辑 Agent 指令" }));
     const promptInput = await screen.findByLabelText("主 Agent 自定义系统提示词");
     expect(promptInput).toHaveValue("Default main agent prompt");
 
@@ -599,24 +619,79 @@ describe("SettingsPage", () => {
 
   it("separates provider connection state from model task selection", async () => {
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
-
-    await userEvent.click(screen.getByRole("button", { name: "服务商" }));
-    expect(await screen.findByRole("button", { name: "移除 Kimi" })).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
     await userEvent.click(screen.getByRole("button", { name: "模型" }));
+    expect(await screen.findByRole("heading", { name: "模型", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "模型连接", level: 3 })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "模型目录", level: 3 })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "联网搜索", level: 3 })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Moonshot" }));
+    expect(await screen.findByRole("button", { name: "删除" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "工具" }));
+    expect(await screen.findByRole("heading", { name: "工具", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "联网", level: 3 })).toBeInTheDocument();
+    expect(screen.getByText("智谱 Web Search")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "联网搜索", level: 3 })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "通用" }));
     expect(await screen.findByLabelText("默认会话模型")).toBeInTheDocument();
     expect(screen.getByLabelText("轻量任务模型")).toBeInTheDocument();
+  });
+
+  it("keeps one page h2 and uses h3 for settings groups", async () => {
+    renderSettingsPage();
+    await screen.findByRole("heading", { name: "通用", level: 2 });
+    const main = screen.getByRole("main", { name: "设置内容" });
+
+    const assertHeadingContract = async (section: string, pageTitle: string, groupTitles: string[], level: 3 | 4 = 3) => {
+      await userEvent.click(screen.getByRole("button", { name: section }));
+      expect(main.querySelectorAll("h2")).toHaveLength(1);
+      expect(main.querySelector("h2")).toHaveTextContent(pageTitle);
+      for (const title of groupTitles) {
+        expect(within(main).getByRole("heading", { name: title, level })).toBeInTheDocument();
+      }
+    };
+
+    await assertHeadingContract("通用", "通用", ["个人偏好", "Agent 指令", "任务默认", "媒体默认", "快捷键"]);
+    await assertHeadingContract("模型", "模型", ["模型连接"]);
+    await assertHeadingContract("工具", "工具", ["代码库", "终端", "联网", "浏览器", "多媒体"]);
+    await assertHeadingContract("外观", "外观", ["主题", "字体"], 4);
+    expect(within(main).queryByRole("heading", { name: "工具总览" })).not.toBeInTheDocument();
+    expect(within(main).queryByRole("heading", { name: "联网搜索" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a single page h2 across the remaining settings routes", async () => {
+    renderSettingsPage();
+    await screen.findByRole("heading", { name: "通用", level: 2 });
+    const main = screen.getByRole("main", { name: "设置内容" });
+    for (const [section, title] of [
+      ["子 Agent", "子 Agent"],
+      ["归档会话", "归档会话"],
+      ["更新", "更新"],
+    ] as const) {
+      await userEvent.click(screen.getByRole("button", { name: section }));
+      await waitFor(() => expect(main.querySelector("h2")).toHaveTextContent(title));
+      expect(main.querySelectorAll("h2")).toHaveLength(1);
+    }
+
+    await userEvent.click(screen.getByRole("button", { name: "子 Agent" }));
+    expect(screen.getByRole("heading", { name: "路由摘要", level: 4 })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "扩展管理" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Skill 管理" })).not.toBeInTheDocument();
   });
 
   it("归档会话分区加载归档列表并支持恢复", async () => {
     const onArchivedSessionsChange = vi.fn();
     renderSettingsPage({ onBack: () => {}, onArchivedSessionsChange });
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
     await userEvent.click(screen.getByRole("button", { name: "归档会话" }));
 
     expect(await screen.findByText("Archived planning session")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "已归档", level: 3 })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "会话列表" })).not.toBeInTheDocument();
+    expect(screen.getByText("4 次运行")).toBeInTheDocument();
     expect(listSessions).toHaveBeenCalledWith({ archived: true });
 
     await userEvent.click(screen.getByRole("button", { name: "恢复" }));
@@ -628,9 +703,9 @@ describe("SettingsPage", () => {
   });
 
   it("归档会话分区显示空状态", async () => {
-    listSessions.mockResolvedValueOnce([]);
+    listSessions.mockImplementation(async () => []);
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
     await userEvent.click(screen.getByRole("button", { name: "归档会话" }));
 
@@ -639,7 +714,7 @@ describe("SettingsPage", () => {
 
   it("外观分区可改字体与字号并持久化", async () => {
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
     await userEvent.click(screen.getByRole("button", { name: "外观" }));
 
@@ -658,7 +733,7 @@ describe("SettingsPage", () => {
 
   it("外观字号步进器图标按钮有可读 tooltip", async () => {
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
     await userEvent.click(screen.getByRole("button", { name: "外观" }));
     const increaseButton = screen.getByRole("button", { name: "代码字号增大" });
@@ -669,7 +744,7 @@ describe("SettingsPage", () => {
 
   it("外观分区切换主题写 data-theme、同步原生主题并持久化", async () => {
     renderSettingsPage();
-    await screen.findByRole("switch", { name: "自动审查" });
+    await screen.findByRole("heading", { name: "通用", level: 2 });
 
     await userEvent.click(screen.getByRole("button", { name: "外观" }));
 

@@ -1,4 +1,7 @@
-import { app, BrowserWindow, globalShortcut, safeStorage, webContents } from "electron";
+import { ModelCatalogService } from "./model-catalog-service";
+import { DesktopSpeechPlayback } from "./speech-playback";
+import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
+import { app, BrowserWindow, globalShortcut, safeStorage, webContents, net } from "electron";
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { AppDataRoots } from "./app-paths";
@@ -32,10 +35,13 @@ let startupLogPath: string | undefined;
 let mainWindow: BrowserWindow | undefined;
 let runtimeV2Registry: DesktopRuntimeV2Registry | undefined;
 let disposeRuntimeV2Ipc: (() => void) | undefined;
+let disposeEnglishLearningIpc: (() => void) | undefined;
+let speechPlayback: DesktopSpeechPlayback | undefined;
 let disposeRuntimeV2DesktopShell: (() => void) | undefined;
 let fixedRendererIpc: FixedRendererIpcRegistration | undefined;
 let terminalSessionService: TerminalSessionService | undefined;
 let settingsService: SettingsService | undefined;
+let pricingCatalog: ModelCatalogService | undefined;
 let modelRuntimeService: ModelRuntimeService | undefined;
 let providerNetworkService: ProviderNetworkService | undefined;
 let quickOpenShortcutController: QuickOpenShortcutController | undefined;
@@ -146,15 +152,18 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   settingsService = new SettingsService({ dataRoot: roots.dataRoot, crypto: electronSecretCrypto });
   await settingsService.load();
   providerNetworkService = new ProviderNetworkService();
+  pricingCatalog = new ModelCatalogService({ dataRoot: roots.dataRoot, fetch: net.fetch.bind(net) as typeof fetch });
+  await pricingCatalog.load();
   let modelStore: ModelStoreService;
   openRouterCatalogService = new RuntimeV2OpenRouterCatalogService({
     dataRoot: roots.dataRoot,
+    pricingCatalog: () => pricingCatalog!.snapshot(),
     fetchCatalog: (runtime) => providerNetworkService!.fetchOpenRouterCatalog(runtime),
     isAdded: (apiModel) => modelStore?.isCatalogModelAdded(apiModel) ?? false,
   });
   await openRouterCatalogService.load();
   modelStore = new ModelStoreService({ settings: settingsService, findCatalogModel: (apiModel) => openRouterCatalogService?.findModel(apiModel) });
-  modelRuntimeService = new ModelRuntimeService(settingsService, modelStore);
+  modelRuntimeService = new ModelRuntimeService(settingsService, modelStore, () => pricingCatalog!.snapshot());
   const quickOpenSettings = settingsService.getV2().shortcuts.quickOpen;
   quickOpenShortcutController = new QuickOpenShortcutController(globalShortcut, () => {
     const window = getMainWindow();
@@ -173,7 +182,10 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     onReadyToReplace: () => app.quit(),
   });
   await localUpdateService.load();
+  const speech = new DesktopSpeechPlayback(roots.tmpRoot, settingsService);
+  speechPlayback = speech;
   runtimeV2Registry = new DesktopRuntimeV2Registry({
+    speech,
     roots,
     models: modelRuntimeService,
     approvals: approvalRegistry,
@@ -212,12 +224,14 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     terminalUnavailableReason: terminalNativeAvailable ? null : "node-pty is not installed in this build.",
   }).dispose;
   await runtimeV2Registry.boot();
+  disposeEnglishLearningIpc = registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow });
   fixedRendererIpc = registerFixedRendererIpc({
     registry: runtimeV2Registry,
     roots,
     settings: settingsService,
     models: modelStore,
     modelRuntime: modelRuntimeService,
+    pricingCatalog,
     providerNetwork: providerNetworkService,
     catalog: openRouterCatalogService,
     approvals: approvalRegistry,
@@ -261,12 +275,15 @@ app.on("before-quit", (event) => {
       const window = getMainWindow();
       if (window) window.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.appShuttingDown, { reason: "normal" });
       await runtimeV2Registry?.dispose();
+      pricingCatalog?.dispose();
       await providerNetworkService?.dispose();
       quickOpenShortcutController?.dispose();
       terminalSessionService?.disposeAll();
     } catch (error) {
       await logMain("v2 shutdown incomplete", { error: error instanceof Error ? error.message : String(error) });
     } finally {
+      disposeEnglishLearningIpc?.();
+      await speechPlayback?.dispose();
       clearTimeout(timeout);
       disposeRuntimeV2Ipc?.();
       disposeRuntimeV2DesktopShell?.();

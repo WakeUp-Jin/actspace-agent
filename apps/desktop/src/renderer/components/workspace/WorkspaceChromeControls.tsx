@@ -23,12 +23,9 @@ import type {
   MessageBlock,
   WorkspaceEnvironmentSnapshot,
   WorkspaceGitMutationResult,
-  WorkspaceOpenTool,
-  WorkspaceOpenToolId,
 } from "@actspace/shared";
 import type { ComposerReviewSummary } from "../Composer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
-import { OPEN_TOOL_LABELS, readStoredOpenTool, storeOpenTool, toolIcon } from "./workspaceOpenTool";
 
 const BRANCH_PREFIX_KEY = "actspace.workspace.branch-prefix.v1";
 const DEFAULT_BRANCH_PREFIX = "actspace";
@@ -37,8 +34,6 @@ const POPOVER_CLASS =
   "absolute right-0 top-[calc(100%+8px)] z-[90] w-[304px] max-w-[calc(100vw-16px)] overflow-hidden rounded-act-xl border border-line bg-surface-raised shadow-act-popover [-webkit-app-region:no-drag]";
 const ROW_CLASS =
   "flex min-h-8 w-full items-center gap-2 border-0 bg-transparent px-2.5 text-left text-[13px] text-text-main transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring disabled:cursor-default disabled:text-text-faint disabled:hover:bg-transparent";
-const MENU_CLASS =
-  "absolute right-0 top-[calc(100%+6px)] z-[95] min-w-[202px] overflow-hidden rounded-act-lg border border-line bg-surface-raised p-1.5 shadow-act-popover [-webkit-app-region:no-drag]";
 const MENU_ITEM_CLASS =
   "flex min-h-9 w-full items-center gap-2.5 rounded-act-md border-0 bg-transparent px-2.5 text-left text-[13px] text-text-main transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default disabled:text-text-faint disabled:hover:bg-transparent";
 const DIALOG_OVERLAY_CLASS = "fixed inset-0 z-[150] grid place-items-center bg-scrim px-4 [-webkit-app-region:no-drag]";
@@ -126,9 +121,6 @@ export function WorkspaceChromeControls({
   onOpenReview: () => void;
   onWorkspaceChanged?: () => void;
 }) {
-  const [preferredTool, setPreferredTool] = useState<WorkspaceOpenToolId>(readStoredOpenTool);
-  const [tools, setTools] = useState<WorkspaceOpenTool[]>([]);
-  const [toolMenuOpen, setToolMenuOpen] = useState(false);
   const [environmentOpen, setEnvironmentOpen] = useState(false);
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const [environment, setEnvironment] = useState<WorkspaceEnvironmentSnapshot | null>(null);
@@ -136,29 +128,11 @@ export function WorkspaceChromeControls({
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger" | "neutral"; message: string } | null>(null);
   const [dialog, setDialog] = useState<GitDialogState>(null);
-  const toolAnchorRef = useRef<HTMLDivElement>(null);
   const environmentAnchorRef = useRef<HTMLDivElement>(null);
   const branchAnchorRef = useRef<HTMLButtonElement>(null);
   const branchMenuRef = useRef<HTMLDivElement>(null);
-  const toolToggleRef = useRef<HTMLButtonElement>(null);
   const environmentToggleRef = useRef<HTMLButtonElement>(null);
   const sources = useMemo(() => collectSources(workspaceRoot, messages), [messages, workspaceRoot]);
-
-  const loadTools = async () => {
-    const api = window.actspace?.listWorkspaceOpenTools;
-    if (!api) return;
-    try {
-      const result = await api();
-      setTools(result.tools);
-      const selected = result.tools.find((tool) => tool.id === preferredTool);
-      if (selected && !selected.available) {
-        setPreferredTool("finder");
-        storeOpenTool("finder");
-      }
-    } catch (error) {
-      console.error("Failed to list workspace tools", error);
-    }
-  };
 
   const loadEnvironment = async () => {
     const api = window.actspace?.getWorkspaceEnvironment;
@@ -183,15 +157,12 @@ export function WorkspaceChromeControls({
     setDialog(null);
     setEnvironmentOpen(false);
     setBranchMenuOpen(false);
-    setToolMenuOpen(false);
-    void loadTools();
   }, [workspaceRoot]);
 
   useEffect(() => {
-    if (!toolMenuOpen && !environmentOpen) return;
+    if (!environmentOpen) return;
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node;
-      if (!toolAnchorRef.current?.contains(target)) setToolMenuOpen(false);
       const insideBranchMenu = branchMenuRef.current?.contains(target);
       const insideEnvironment = environmentAnchorRef.current?.contains(target);
       if (!insideEnvironment && !insideBranchMenu) {
@@ -208,10 +179,8 @@ export function WorkspaceChromeControls({
         queueMicrotask(() => branchAnchorRef.current?.focus());
         return;
       }
-      const focusTarget = toolMenuOpen ? toolToggleRef.current : environmentToggleRef.current;
-      setToolMenuOpen(false);
       setEnvironmentOpen(false);
-      queueMicrotask(() => focusTarget?.focus());
+      queueMicrotask(() => environmentToggleRef.current?.focus());
     }
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
@@ -219,30 +188,7 @@ export function WorkspaceChromeControls({
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [branchMenuOpen, environmentOpen, toolMenuOpen]);
-
-  const openInTool = async (toolId: WorkspaceOpenToolId) => {
-    const api = window.actspace?.openWorkspaceInTool;
-    if (!api) {
-      setFeedback({ tone: "danger", message: "Opening local apps is available in the desktop app." });
-      return;
-    }
-    setBusy(true);
-    try {
-      const result = await api({ workspaceRoot, toolId });
-      if (!result.ok) {
-        setFeedback({ tone: "danger", message: result.message ?? "Failed to open workspace." });
-        return;
-      }
-      setPreferredTool(toolId);
-      storeOpenTool(toolId);
-      setToolMenuOpen(false);
-    } catch (error) {
-      setFeedback({ tone: "danger", message: error instanceof Error ? error.message : "Failed to open workspace." });
-    } finally {
-      setBusy(false);
-    }
-  };
+  }, [branchMenuOpen, environmentOpen]);
 
   const closeDialog = () => {
     setDialog(null);
@@ -318,67 +264,11 @@ export function WorkspaceChromeControls({
     }
   };
 
-  const preferredToolView = tools.find((tool) => tool.id === preferredTool) ?? {
-    id: preferredTool,
-    label: OPEN_TOOL_LABELS[preferredTool],
-    available: true,
-  };
   const hasChanges = reviewSummary?.status === "changes" || reviewSummary?.status === "partial";
   const canOpenGitPanel = Boolean(environment?.git.repository && !busy);
 
   return (
     <div className="flex items-center gap-1 [-webkit-app-region:no-drag]">
-      <div ref={toolAnchorRef} className="relative flex items-center rounded-act-md border border-line bg-surface/80">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              className="grid h-[24px] w-[26px] place-items-center rounded-l-act-md text-text-muted transition hover:bg-hover-overlay hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
-              aria-label={`Open workspace in ${preferredToolView.label}`}
-              disabled={busy}
-              onClick={() => void openInTool(preferredTool)}
-            >
-              {busy ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : toolIcon(preferredToolView)}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Open in {preferredToolView.label}</TooltipContent>
-        </Tooltip>
-        <button
-          ref={toolToggleRef}
-          type="button"
-          className="grid h-[24px] w-[18px] place-items-center rounded-r-act-md border-0 bg-transparent text-text-faint transition hover:bg-hover-overlay hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-          aria-label="Choose workspace app"
-          aria-haspopup="menu"
-          aria-expanded={toolMenuOpen}
-          onClick={() => {
-            const next = !toolMenuOpen;
-            setToolMenuOpen(next);
-            if (next) void loadTools();
-          }}
-        >
-          <ChevronDown size={12} aria-hidden="true" />
-        </button>
-        {toolMenuOpen ? (
-          <div className={MENU_CLASS} role="menu" aria-label="Workspace apps">
-            {(tools.length ? tools : [preferredToolView]).map((tool) => (
-              <button
-                key={tool.id}
-                type="button"
-                role="menuitem"
-                className={MENU_ITEM_CLASS}
-                disabled={!tool.available}
-                onClick={() => void openInTool(tool.id)}
-              >
-                {toolIcon(tool, 16)}
-                <span className="min-w-0 flex-1 truncate">{tool.label}</span>
-                {!tool.available ? <span className="text-[11px] text-text-faint">Not installed</span> : null}
-                {tool.id === preferredTool && tool.available ? <Check size={13} className="text-success" aria-hidden="true" /> : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
-
       <div ref={environmentAnchorRef} className="relative flex items-center">
         <Tooltip>
           <TooltipTrigger asChild>

@@ -196,7 +196,7 @@ V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `lo
 
 ### 在外部应用中打开（2026-07-30）
 
-操作栏右侧的外部打开入口复用顶部 chrome 已有的那套工具目录（`workspace-open:list-tools` / `workspace-open:open`），但目标是**当前文件**而不是 workspace 根：`WorkspaceOpenInput` 增了可选 `relativePath`，越界按 `escapes_root` 拒绝 —— 这个入口来自可点 UI，和文件浏览器同一条边界，不因为「只是调 `/usr/bin/open`」就放开整盘。
+操作栏右侧的外部打开入口使用共享的工具目录（`workspace-open:list-tools` / `workspace-open:open`），但目标是**当前文件**而不是 workspace 根：`WorkspaceOpenInput` 增了可选 `relativePath`，越界按 `escapes_root` 拒绝 —— 这个入口来自可点 UI，和文件浏览器同一条边界，不因为「只是调 `/usr/bin/open`」就放开整盘。
 
 不同工具能接受的目标形态不同，main 侧按工具分派，三条各有单测锁住实际参数：
 
@@ -206,7 +206,7 @@ V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `lo
 | Finder | `open -R <文件>` | `-a Finder <文件>` 会用**默认应用运行**这个文件，不是定位它 |
 | Terminal / iTerm2 | 文件的**父目录** | 终端只能接目录，给它文件等于让终端去执行/打开它 |
 
-交互约定：图标点击后先出菜单、选中应用才真正打开，不做「点图标直接用上次的应用打开」—— 这一栏图标很小，误触会直接拉起外部程序。选择记在 localStorage，与顶部 chrome 的打开按钮**共用同一个 key**（同一个偏好不能有两个互相矛盾的值），菜单里用「上次」标出。无 preload 时整个按钮不渲染，而不是渲染一个点了报错的按钮。
+交互约定：图标点击后先出菜单、选中应用才真正打开，不做「点图标直接用上次的应用打开」—— 这一栏图标很小，误触会直接拉起外部程序。选择记在 localStorage，菜单里用「上次」标出。无 preload 时整个按钮不渲染，而不是渲染一个点了报错的按钮。顶部 chrome 不再提供 workspace 外部应用打开入口，避免与右侧文件级入口重复。
 
 IPC 契约：
 
@@ -418,3 +418,9 @@ V1 不做增删改、pin、include 切换、source 跳转、搜索过滤和 toke
 - 不换行时，Diff Canvas 是唯一的横向滚动所有者，行号、增删标记和代码随 Canvas 同步移动；禁止给每个 `<code>` 行单独设置横向滚动。开启 word wrap 后 Canvas 回到面板宽度并由代码列折行。
 - unified/split、上下文折叠、Jump to file、viewed、Review Options 和 Git actions 的完整规则以 `docs/design-docs/core-review-change-sources.md` 为准。
 - 旧 `right-panel-diff-final.png` 和 `review-v1-git-review-prototype.html` 只保留为 V1 历史参考，不再代表目标 Review Workbench。
+
+## Subagents（2026-09-06）
+
+右侧对象面板新增 Subagents tab，按当前 Session 隔离列表，分 Running / Done；任务行显示描述、状态、持续时间。点击在同一个 tab 内打开执行详情，顶部返回列表。聊天中的 Agent 条目也打开此视图；本轮首次出现子任务时自动打开，用户关闭后不因后续更新重复抢焦点。
+
+列表通过 `getSubagents` 每秒更新；详情通过 `getSubAgentTranscript` 读取规范 SessionEvent，运行中每 750ms 更新。组件卸载、切任务或切会话时取消后续刷新，迟到响应不更新新视图。详情复用会话 MessageBlock 渲染，支持正文、Thinking 和工具，不再附着在 Composer 上方。

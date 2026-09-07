@@ -53,8 +53,7 @@ export function registerCoreTools(runtime: ToolRuntime, ports: CoreToolPorts): r
 }
 
 function approvalPolicies(name: CoreToolName, definition: ToolDefinition): readonly ToolPolicy[] {
-  const mutates = definition.effects.some((effect) => effect.mode === "write" || effect.mode === "execute");
-  if (!mutates) return [];
+  if (name !== "bash") return [];
   const policies: ToolPolicy[] = [];
   if (name === "bash") policies.push(Object.freeze({
     id: `${CORE_TOOLS_PLUGIN_ID}.hard-reject.bash`,
@@ -74,7 +73,7 @@ function approvalPolicies(name: CoreToolName, definition: ToolDefinition): reado
     evaluate: () => ({
       kind: "require-approval" as const,
       reason: `Allow ${name} to ${definition.effects.some((effect) => effect.mode === "execute") ? "run a process" : "change workspace files"}?`,
-      risk: name === "delete_file" || name === "bash" ? "high" as const : "medium" as const,
+      risk: "high" as const,
     }),
   }));
   return policies;
@@ -106,7 +105,7 @@ export const CORE_TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
   definition("glob", "Find workspace files by name pattern, sorted by modification time.", READ, "read-only", objectSchema({ pattern: stringSchema("Glob pattern, for example **/*.ts."), path: stringSchema("Search directory; defaults to workspace root.") }, ["pattern"])),
   definition("edit_file", "Replace one exact string in a file. Read the file first and include enough context for a unique match.", WRITE, "exclusive", objectSchema({ path: stringSchema("File path."), old_string: stringSchema("Exact text to replace."), new_string: stringSchema("Replacement text."), replace_all: { type: "boolean", default: false } }, ["path", "old_string", "new_string"]), ["/new_string"]),
   definition("write_file", "Write a complete small file atomically. Prefer edit_file for focused changes to existing files.", WRITE, "exclusive", objectSchema({ path: stringSchema("File path."), content: stringSchema("Complete file content.") }, ["path", "content"]), ["/content"]),
-  definition("delete_file", "Delete one regular workspace file after approval. Directories and glob deletion are unsupported.", WRITE, "exclusive", objectSchema({ path: stringSchema("Regular file path.") }, ["path"])),
+  definition("delete_file", "Delete one regular workspace file. Directories and glob deletion are unsupported.", WRITE, "exclusive", objectSchema({ path: stringSchema("Regular file path.") }, ["path"])),
   definition("bash", "Run one non-interactive command in the workspace. Use dedicated file and search tools instead of shell equivalents.", SHELL, "exclusive", objectSchema({ command: stringSchema("Shell command."), cwd: stringSchema("Working directory."), blockMs: { type: "integer", minimum: 0, maximum: 600_000, default: 30_000 }, intent: { type: "string", minLength: 1, maxLength: 120 }, notifyOnOutput: { type: "object", properties: { pattern: stringSchema("Regular expression matched against output lines."), reason: { type: "string", minLength: 1, maxLength: 80 }, debounceMs: { type: "integer", minimum: 5_000, default: 5_000 } }, required: ["pattern", "reason"], additionalProperties: false }, requiredPermissions: { type: "array", items: { type: "string", enum: ["no_sandbox"] }, maxItems: 1 } }, ["command", "intent"]), ["/command"]),
   definition("bash_output", "Read new output or a bounded tail from a background bash task. Do not poll in a loop.", SHELL, "read-only", objectSchema({ taskId: stringSchema("Background task id."), tailLines: integerSchema("Optional tail line count.", 1) }, ["taskId"])),
   definition("bash_kill", "Terminate a background bash task by id.", SHELL, "exclusive", objectSchema({ taskId: stringSchema("Background task id.") }, ["taskId"])),

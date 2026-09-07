@@ -86,6 +86,7 @@ export const TRUSTED_LOADER_ENTRIES = Object.freeze([
   Object.freeze({ id: "agent-runtime", name: "@actspace/runtime/agent-runtime", inject: ["actspace.host.agent", "agent.registry", "agent.loop", "actspace.agent.factory", "session.runtime", "tools.runtime", "subagent.one-shot"] }),
   Object.freeze({ id: "headless-runner", name: "@actspace/headless/plugin", inject: ["actspace.host.headless", "session.runtime", "agent.loop"] }),
   Object.freeze({ id: "desktop-app", name: "@actspace/desktop-app/plugin", inject: ["session.runtime", "agent.runtime", "llm.service", "compaction.runtime"] }),
+  Object.freeze({ id: "english-learning", name: "@actspace/english-learning/plugin", inject: ["agent.registry", "session.runtime"] }),
 ]);
 
 export function resolveRuntimeProfile(profileId: RuntimeProfileId): Profile {

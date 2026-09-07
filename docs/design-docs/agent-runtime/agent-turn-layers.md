@@ -162,7 +162,9 @@ sessions-v2/<sessionId>/journal.jsonl
 | Live progress | streaming delta、当前工具进度 | 进程退出后可丢失 |
 | Diagnostics | boot、plugin、Host capability、restart 状态 | 不进入模型上下文 |
 
-Desktop fixed renderer adapter 把 v2 snapshot 和 Journal event 投影为现有 `SessionRecord`、Context、Usage 和 Analysis DTO。这个 adapter 是 Host 兼容层，不是第二套 Session 模型。
+工具流式内容由 Core 区分正文、思考与工具参数；Main `FixedRendererStreamAdapter` 把 prepared/started/finished 事实转换为既有工具事件，实时和历史共用 preview builder。工具参数不进入正文，结果按 Journal 提交顺序逐个发布。详见 [工具流式渲染](../frontend/front-agent-tool-stream-rendering.md)。
+
+Desktop fixed renderer adapter 把 v2 snapshot 和 Journal event 投影为现有 `SessionRecord`、Context 和 Usage DTO。这个 adapter 是 Host 兼容层，不是第二套 Session 模型。
 
 ## 身份规则
 
@@ -204,7 +206,7 @@ sessionId
 ## 验收
 
 - Desktop 与 CLI 各自通过 `desktop.app` / `headless.runner` 完成 run，并共享同一 Agent 领域语义；
-- 同一 Journal 可以重建 Session、Context、Usage 与 Analysis；
+- 同一 Journal 可以重建 Session、Context、Usage 与 Trajectory；
 - 每个 request / tool 都能归属到 Agent Run、Turn 和 Step；
 - abort 与 shutdown 会等待必要的 flush / dispose；
 - Host 与领域 package 只通过公开 exports 和 Service ABI 连接；

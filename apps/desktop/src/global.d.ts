@@ -13,19 +13,6 @@ declare global {
       abortAgentRun: (
         input: import("@actspace/shared").AbortAgentRunInput
       ) => Promise<boolean>;
-      listAgentTraces?: (
-        input: import("@actspace/shared").AgentTraceListInput
-      ) => Promise<import("@actspace/shared").AgentTraceListResult>;
-      readAgentTrace?: (
-        input: import("@actspace/shared").AgentTraceReadInput
-      ) => Promise<import("@actspace/shared").AgentTraceReadResult>;
-      getAgentAnalysisIndex?: (
-        input: import("@actspace/shared").AgentAnalysisIndexInput
-      ) => Promise<import("@actspace/shared").AgentAnalysisIndexResult>;
-      getAgentAnalysisSessionIndex?: () => Promise<import("@actspace/shared").AgentAnalysisSessionIndexResult>;
-      clearAgentTraces?: (
-        input: import("@actspace/shared").AgentTraceClearInput
-      ) => Promise<import("@actspace/shared").AgentTraceClearResult>;
       selectFiles?: () => Promise<import("@actspace/shared").SelectFilesResult>;
       selectImages?: () => Promise<import("@actspace/shared").SelectImagesResult>;
       importComposerImage?: (
@@ -138,15 +125,22 @@ declare global {
       getSession: (
         input: import("@actspace/shared").SessionGetInput
       ) => Promise<import("@actspace/shared").SessionRecord | null>;
+      getSessionProjectionSnapshot?: (
+        input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput
+      ) => Promise<import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection>;
       getSessionPreview?: (
         input: import("@actspace/shared").SessionPreviewInput
       ) => Promise<import("@actspace/shared").SessionPreviewResult | null>;
+      getSubagents?: (input: { sessionId: string }) => Promise<import("@actspace/shared").MessageBlock[]>;
       getSubAgentTranscript?: (
         input: import("@actspace/shared").SubAgentTranscriptGetInput
       ) => Promise<import("@actspace/shared").SessionEvent[]>;
       getUsageStatistics: (
         input: import("@actspace/shared").UsageStatisticsGetInput
       ) => Promise<import("@actspace/shared").UsageStatisticsSnapshot | null>;
+      getUsageActivity?: (
+        input: import("@actspace/shared").UsageStatisticsGetInput
+      ) => Promise<import("@actspace/shared").UsageActivitySnapshot | null>;
       getDeepSeekBalance: () => Promise<import("@actspace/shared").DeepSeekBalanceSnapshot>;
       getKimiBalance: () => Promise<import("@actspace/shared").KimiBalanceSnapshot>;
       getProviderBalance?: (
@@ -203,6 +197,9 @@ declare global {
       onAgentStream: (
         callback: (event: import("@actspace/shared").RuntimeStreamEvent) => void
       ) => () => void;
+      onSessionLiveEvent?: (
+        callback: (event: import("@actspace/shared/runtime-v2").RuntimeV2DesktopLiveEnvelope) => void
+      ) => () => void;
       submitApproval: (
         input: import("@actspace/shared").ApprovalDecideInput
       ) => Promise<import("@actspace/shared").ApprovalDecideResult>;
@@ -210,6 +207,12 @@ declare global {
         input?: import("@actspace/shared").ApprovalListPendingInput
       ) => Promise<import("@actspace/shared").PendingApprovalInfo[]>;
       getSettings: () => Promise<import("@actspace/shared").AppSettings>;
+      getEnglishLearningState?: import("@actspace/shared").EnglishLearningBridge["getEnglishLearningState"];
+      setEnglishLearningTarget?: import("@actspace/shared").EnglishLearningBridge["setEnglishLearningTarget"];
+      stopEnglishLearningSpeech?: import("@actspace/shared").EnglishLearningBridge["stopEnglishLearningSpeech"];
+      previewEnglishLearningSpeech?: import("@actspace/shared").EnglishLearningBridge["previewEnglishLearningSpeech"];
+      onEnglishLearningStateChanged?: import("@actspace/shared").EnglishLearningBridge["onEnglishLearningStateChanged"];
+      getSettingsV4?: () => Promise<import("@actspace/shared").SettingsV4Snapshot>;
       consumeQuickOpenRequest?: () => Promise<import("@actspace/shared").QuickOpenRequest | null>;
       getQuickOpenShortcutStatus?: () => Promise<import("@actspace/shared").QuickOpenShortcutStatus>;
       updateQuickOpenShortcut?: (
@@ -223,6 +226,15 @@ declare global {
       updateSettings: (
         input: import("@actspace/shared").SettingsUpdateInput
       ) => Promise<import("@actspace/shared").AppSettings>;
+      updateSettingsV4?: (
+        input: import("@actspace/shared").SettingsV4UpdateInput
+      ) => Promise<import("@actspace/shared").SettingsV4UpdateResult>;
+      createCustomConnection?: (input: import("@actspace/shared").CustomConnectionInput) => Promise<import("@actspace/shared").SettingsV4Snapshot>;
+      removeCustomConnection?: (input: { connectionId: string }) => Promise<import("@actspace/shared").SettingsV4Snapshot>;
+      updateCustomConnection?: (input: import("@actspace/shared/runtime-v2").RuntimeV2UpdateCustomConnectionInput) => Promise<import("@actspace/shared").SettingsV4Snapshot>;
+      onSettingsChangedV4?: (
+        callback: (notification: import("@actspace/shared").SettingsV4ChangedNotification) => void
+      ) => () => void;
       setProviderKey: (
         input: import("@actspace/shared").SetProviderKeyInput
       ) => Promise<import("@actspace/shared").SetProviderKeyResult>;
@@ -248,6 +260,8 @@ declare global {
       removeProviderCredential?: (input: import("@actspace/shared").ProviderCredentialInput) => Promise<import("@actspace/shared").ProviderCredentialOperationResult>;
       listInstalledModels?: () => Promise<import("@actspace/shared").ModelsListInstalledResult>;
       listUsableModels?: (input: import("@actspace/shared").ModelsListUsableInput) => Promise<import("@actspace/shared").ModelsListUsableResult>;
+      getPricingCatalog?: () => Promise<import("@actspace/shared").ModelCatalogStatus | null>;
+      refreshPricingCatalog?: (input?: { force?: boolean }) => Promise<import("@actspace/shared").ModelCatalogStatus | null>;
       listModelCatalog?: (input: import("@actspace/shared").ModelsCatalogListInput) => Promise<import("@actspace/shared").ModelsCatalogListResult>;
       reloadModelCatalog?: (input: import("@actspace/shared").ModelsCatalogListInput) => Promise<import("@actspace/shared").ModelsCatalogListResult>;
       addModel?: (input: import("@actspace/shared").ModelsAddInput) => Promise<import("@actspace/shared").ModelMutationResult>;

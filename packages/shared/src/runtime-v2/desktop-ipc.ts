@@ -1,5 +1,5 @@
 import type { RuntimeV2JsonValue } from "./host-dto";
-import type { AgentSystemPromptFile, AppSettingsV2, ProviderConnectionErrorKind, ProviderProxySettings, SearchUsageResult, SecretProviderId, SettingsV2UpdateInput } from "../settings";
+import type { AgentSystemPromptFile, AppSettingsV2, CustomConnectionInput, ProviderConnectionErrorKind, ProviderConnectionSettings, ProviderProxySettings, SearchUsageResult, SecretProviderId, SettingsV2UpdateInput, SettingsV4Snapshot } from "../settings";
 import type { ModelKey } from "../model-config";
 import type { ModelsCatalogListResult, ProviderBalanceSnapshot } from "../ipc";
 import type { ProviderId as LlmProviderId } from "../provider-config";
@@ -94,6 +94,9 @@ export type RuntimeV2ConfigureProviderInput = {
   readonly proxy?: ProviderProxySettings;
   readonly defaultPricingMultiplier?: number;
 };
+export type RuntimeV2CreateCustomConnectionInput = CustomConnectionInput;
+export type RuntimeV2RemoveCustomConnectionInput = { readonly connectionId: string };
+export type RuntimeV2UpdateCustomConnectionInput = CustomConnectionInput & { readonly connectionId: string; readonly apiKey?: string };
 export type RuntimeV2ConfigureSecretInput = {
   readonly provider: SecretProviderId;
   readonly apiKey: string | null;
@@ -119,6 +122,7 @@ export type RuntimeV2ModelUpdateInput = {
   readonly enabled?: boolean;
   readonly customLabel?: string | null;
   readonly credentialId?: string | null;
+  readonly connectionId?: string | null;
 };
 export type RuntimeV2ModelRemoveInput = { readonly modelKey: ModelKey };
 export type RuntimeV2ProviderIdInput = { readonly provider: LlmProviderId };
@@ -186,6 +190,9 @@ export type RuntimeV2DesktopBridge = {
   replayLiveEvents(afterCursor: number): Promise<RuntimeV2LiveReplay>;
   getSettings(): Promise<AppSettingsV2>;
   updateSettings(input: RuntimeV2SettingsUpdateInput): Promise<AppSettingsV2>;
+  createCustomConnection(input: RuntimeV2CreateCustomConnectionInput): Promise<SettingsV4Snapshot>;
+  removeCustomConnection(input: RuntimeV2RemoveCustomConnectionInput): Promise<SettingsV4Snapshot>;
+  updateCustomConnection(input: RuntimeV2UpdateCustomConnectionInput): Promise<SettingsV4Snapshot>;
   configureProvider(input: RuntimeV2ConfigureProviderInput): Promise<AppSettingsV2>;
   configureSecret(input: RuntimeV2ConfigureSecretInput): Promise<AppSettingsV2>;
   addProviderCredential(input: RuntimeV2ProviderCredentialAddInput): Promise<AppSettingsV2>;

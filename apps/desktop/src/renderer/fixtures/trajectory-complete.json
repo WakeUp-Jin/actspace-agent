@@ -1,0 +1,2299 @@
+{
+  "kind": "trajectory",
+  "schemaVersion": 1,
+  "sessionId": "mock-trajectory-session",
+  "throughJournalSeq": 95,
+  "nodes": [
+    {
+      "key": "mock-trajectory-session:0",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 0,
+      "eventType": "session/title-set",
+      "time": "2026-09-03T10:20:00.000Z",
+      "kind": "other",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "title": "Trajectory fixture review"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:1",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 1,
+      "eventType": "turn/start",
+      "time": "2026-09-03T10:20:01.000Z",
+      "kind": "turn",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:2",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 2,
+      "eventType": "user/message",
+      "time": "2026-09-03T10:20:01.100Z",
+      "kind": "user",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "messageId": "user-1",
+        "content": "帮我检查一下这个项目的 Session Journal 结构。",
+        "source": {
+          "kind": "user"
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:3",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 3,
+      "eventType": "step/start",
+      "time": "2026-09-03T10:20:02.000Z",
+      "kind": "step",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-1",
+        "requestId": "request-1-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:4",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 4,
+      "eventType": "request/header",
+      "time": "2026-09-03T10:20:02.100Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-1",
+        "requestId": "request-1-1",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "prompt": {
+          "systemPrompt": "你是 ActSpace 的代码助手。先检查事实，再进行修改；工具输出需要与请求关联。",
+          "tools": [
+            {
+              "name": "read_file",
+              "description": "读取指定文本文件，支持按行分页，返回文件内容和读取范围。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "file_path": {
+                    "type": "string",
+                    "description": "要读取的文件路径。"
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "开始读取的行号，从 1 开始。",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "最多读取的行数。",
+                    "minimum": 1,
+                    "default": 200
+                  }
+                },
+                "required": [
+                  "file_path"
+                ]
+              }
+            },
+            {
+              "name": "bash",
+              "description": "在工作目录中执行 Shell 命令，返回标准输出、标准错误和退出状态。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "需要执行的完整 Shell 命令。"
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "description": "命令执行超时时间，单位为毫秒。",
+                    "minimum": 1,
+                    "default": 120000
+                  }
+                },
+                "required": [
+                  "command"
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.6,
+          "maxTokens": 8192
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:5",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 5,
+      "eventType": "request/context",
+      "time": "2026-09-03T10:20:02.200Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-1",
+        "requestId": "request-1-1",
+        "messageCount": 4,
+        "inputTokens": 2000
+      }
+    },
+    {
+      "key": "mock-trajectory-session:6",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 6,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:20:02.800Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-1",
+        "requestId": "request-1-1",
+        "messageId": "assistant-1-1",
+        "delta": "我先读取相"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:7",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 7,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:20:03.100Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-1",
+        "requestId": "request-1-1",
+        "messageId": "assistant-1-1",
+        "delta": "关文件。"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:8",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 8,
+      "eventType": "assistant/message",
+      "time": "2026-09-03T10:20:04.000Z",
+      "kind": "assistant",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-1",
+        "requestId": "request-1-1",
+        "messageId": "assistant-1-1",
+        "content": [
+          {
+            "type": "thinking",
+            "text": "先核对请求与原始事件，再给出结论。"
+          },
+          {
+            "type": "text",
+            "text": "我先读取相关文件。"
+          },
+          {
+            "type": "tool-call",
+            "callId": "call-1-1-1",
+            "name": "read_file",
+            "arguments": {
+              "file_path": "packages/session/journal/src/core-codecs.ts",
+              "limit": 80
+            }
+          },
+          {
+            "type": "tool-call",
+            "callId": "call-1-1-2",
+            "name": "bash",
+            "arguments": {
+              "command": "pnpm test --filter session-journal"
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 2000,
+          "outputTokens": 173,
+          "reasoningTokens": 82
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:9",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 9,
+      "eventType": "tool/call",
+      "time": "2026-09-03T10:20:04.100Z",
+      "kind": "tool",
+      "state": "started",
+      "callId": "call-1-1-1",
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-1",
+        "requestId": "request-1-1",
+        "callId": "call-1-1-1",
+        "name": "read_file",
+        "arguments": {
+          "file_path": "packages/session/journal/src/core-codecs.ts",
+          "limit": 80
+        },
+        "assistantMessageId": "assistant-1-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:10",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 10,
+      "eventType": "tool/result",
+      "time": "2026-09-03T10:20:05.300Z",
+      "kind": "tool",
+      "state": "completed",
+      "callId": "call-1-1-1",
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-1",
+        "requestId": "request-1-1",
+        "callId": "call-1-1-1",
+        "name": "read_file",
+        "result": "80 lines read",
+        "status": "completed"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:11",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 11,
+      "eventType": "tool/call",
+      "time": "2026-09-03T10:20:05.600Z",
+      "kind": "tool",
+      "state": "started",
+      "callId": "call-1-1-2",
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-1",
+        "requestId": "request-1-1",
+        "callId": "call-1-1-2",
+        "name": "bash",
+        "arguments": {
+          "command": "pnpm test --filter session-journal"
+        },
+        "assistantMessageId": "assistant-1-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:12",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 12,
+      "eventType": "tool/result",
+      "time": "2026-09-03T10:20:06.800Z",
+      "kind": "tool",
+      "state": "completed",
+      "callId": "call-1-1-2",
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-1",
+        "requestId": "request-1-1",
+        "callId": "call-1-1-2",
+        "name": "bash",
+        "result": "18 tests passed",
+        "status": "completed"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:13",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 13,
+      "eventType": "step/end",
+      "time": "2026-09-03T10:20:08.500Z",
+      "kind": "step",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-1",
+        "requestId": "request-1-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:14",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 14,
+      "eventType": "step/start",
+      "time": "2026-09-03T10:20:10.000Z",
+      "kind": "step",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-2",
+        "requestId": "request-1-2"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:15",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 15,
+      "eventType": "request/header",
+      "time": "2026-09-03T10:20:10.100Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-2",
+        "requestId": "request-1-2",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "prompt": {
+          "systemPrompt": "你是 ActSpace 的代码助手。先检查事实，再进行修改；工具输出需要与请求关联。",
+          "tools": [
+            {
+              "name": "read_file",
+              "description": "读取指定文本文件，支持按行分页，返回文件内容和读取范围。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "file_path": {
+                    "type": "string",
+                    "description": "要读取的文件路径。"
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "开始读取的行号，从 1 开始。",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "最多读取的行数。",
+                    "minimum": 1,
+                    "default": 200
+                  }
+                },
+                "required": [
+                  "file_path"
+                ]
+              }
+            },
+            {
+              "name": "bash",
+              "description": "在工作目录中执行 Shell 命令，返回标准输出、标准错误和退出状态。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "需要执行的完整 Shell 命令。"
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "description": "命令执行超时时间，单位为毫秒。",
+                    "minimum": 1,
+                    "default": 120000
+                  }
+                },
+                "required": [
+                  "command"
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.6,
+          "maxTokens": 8192
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:16",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 16,
+      "eventType": "request/context",
+      "time": "2026-09-03T10:20:10.200Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-2",
+        "requestId": "request-1-2",
+        "messageCount": 5,
+        "inputTokens": 2000
+      }
+    },
+    {
+      "key": "mock-trajectory-session:17",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 17,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:20:10.800Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-2",
+        "requestId": "request-1-2",
+        "messageId": "assistant-1-2",
+        "delta": "Journ"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:18",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 18,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:20:11.100Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-2",
+        "requestId": "request-1-2",
+        "messageId": "assistant-1-2",
+        "delta": "al 保留完整观测，展示层把消息与工具结果关联起来。"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:19",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 19,
+      "eventType": "assistant/message",
+      "time": "2026-09-03T10:20:12.000Z",
+      "kind": "assistant",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-2",
+        "requestId": "request-1-2",
+        "messageId": "assistant-1-2",
+        "content": [
+          {
+            "type": "thinking",
+            "text": "先核对请求与原始事件，再给出结论。"
+          },
+          {
+            "type": "text",
+            "text": "Journal 保留完整观测，展示层把消息与工具结果关联起来。"
+          }
+        ],
+        "usage": {
+          "inputTokens": 2000,
+          "outputTokens": 173,
+          "reasoningTokens": 82
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:20",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 20,
+      "eventType": "step/end",
+      "time": "2026-09-03T10:20:13.500Z",
+      "kind": "step",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1",
+        "stepId": "step-1-2",
+        "requestId": "request-1-2"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:21",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 21,
+      "eventType": "turn/end",
+      "time": "2026-09-03T10:20:14.000Z",
+      "kind": "turn",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:22",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 22,
+      "eventType": "turn/start",
+      "time": "2026-09-03T10:21:00.000Z",
+      "kind": "turn",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:23",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 23,
+      "eventType": "user/message",
+      "time": "2026-09-03T10:21:00.100Z",
+      "kind": "user",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "messageId": "user-2",
+        "content": "再帮我看看 projection 和前端轨迹之间的边界。",
+        "source": {
+          "kind": "user"
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:24",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 24,
+      "eventType": "step/start",
+      "time": "2026-09-03T10:21:01.000Z",
+      "kind": "step",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-1",
+        "requestId": "request-2-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:25",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 25,
+      "eventType": "request/header",
+      "time": "2026-09-03T10:21:01.100Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-1",
+        "requestId": "request-2-1",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "prompt": {
+          "systemPrompt": "你是 ActSpace 的代码助手。先检查事实，再进行修改；工具输出需要与请求关联。",
+          "tools": [
+            {
+              "name": "read_file",
+              "description": "读取指定文本文件，支持按行分页，返回文件内容和读取范围。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "file_path": {
+                    "type": "string",
+                    "description": "要读取的文件路径。"
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "开始读取的行号，从 1 开始。",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "最多读取的行数。",
+                    "minimum": 1,
+                    "default": 200
+                  }
+                },
+                "required": [
+                  "file_path"
+                ]
+              }
+            },
+            {
+              "name": "bash",
+              "description": "在工作目录中执行 Shell 命令，返回标准输出、标准错误和退出状态。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "需要执行的完整 Shell 命令。"
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "description": "命令执行超时时间，单位为毫秒。",
+                    "minimum": 1,
+                    "default": 120000
+                  }
+                },
+                "required": [
+                  "command"
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.6,
+          "maxTokens": 8192
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:26",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 26,
+      "eventType": "request/context",
+      "time": "2026-09-03T10:21:01.200Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-1",
+        "requestId": "request-2-1",
+        "messageCount": 7,
+        "inputTokens": 2200
+      }
+    },
+    {
+      "key": "mock-trajectory-session:27",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 27,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:21:01.800Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-1",
+        "requestId": "request-2-1",
+        "messageId": "assistant-2-1",
+        "delta": "我会把原始"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:28",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 28,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:21:02.100Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-1",
+        "requestId": "request-2-1",
+        "messageId": "assistant-2-1",
+        "delta": "事件和展示记录分开整理。"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:29",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 29,
+      "eventType": "assistant/message",
+      "time": "2026-09-03T10:21:03.000Z",
+      "kind": "assistant",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-1",
+        "requestId": "request-2-1",
+        "messageId": "assistant-2-1",
+        "content": [
+          {
+            "type": "thinking",
+            "text": "先核对请求与原始事件，再给出结论。"
+          },
+          {
+            "type": "text",
+            "text": "我会把原始事件和展示记录分开整理。"
+          },
+          {
+            "type": "tool-call",
+            "callId": "call-2-1-1",
+            "name": "bash",
+            "arguments": {
+              "command": "rg assistant/chunk apps/desktop/src/renderer"
+            }
+          },
+          {
+            "type": "tool-call",
+            "callId": "call-2-1-2",
+            "name": "read_file",
+            "arguments": {
+              "file_path": "apps/desktop/src/renderer/components/TrajectoryView.tsx"
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 2200,
+          "outputTokens": 173,
+          "reasoningTokens": 82
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:30",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 30,
+      "eventType": "tool/call",
+      "time": "2026-09-03T10:21:03.100Z",
+      "kind": "tool",
+      "state": "started",
+      "callId": "call-2-1-1",
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-1",
+        "requestId": "request-2-1",
+        "callId": "call-2-1-1",
+        "name": "bash",
+        "arguments": {
+          "command": "rg assistant/chunk apps/desktop/src/renderer"
+        },
+        "assistantMessageId": "assistant-2-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:31",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 31,
+      "eventType": "tool/result",
+      "time": "2026-09-03T10:21:04.300Z",
+      "kind": "tool",
+      "state": "completed",
+      "callId": "call-2-1-1",
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-1",
+        "requestId": "request-2-1",
+        "callId": "call-2-1-1",
+        "name": "bash",
+        "result": "6 matches",
+        "status": "completed"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:32",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 32,
+      "eventType": "tool/call",
+      "time": "2026-09-03T10:21:04.600Z",
+      "kind": "tool",
+      "state": "started",
+      "callId": "call-2-1-2",
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-1",
+        "requestId": "request-2-1",
+        "callId": "call-2-1-2",
+        "name": "read_file",
+        "arguments": {
+          "file_path": "apps/desktop/src/renderer/components/TrajectoryView.tsx"
+        },
+        "assistantMessageId": "assistant-2-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:33",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 33,
+      "eventType": "tool/result",
+      "time": "2026-09-03T10:21:05.800Z",
+      "kind": "tool",
+      "state": "completed",
+      "callId": "call-2-1-2",
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-1",
+        "requestId": "request-2-1",
+        "callId": "call-2-1-2",
+        "name": "read_file",
+        "result": "export function TrajectoryView() { /* semantic ledger */ }",
+        "status": "completed"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:34",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 34,
+      "eventType": "step/end",
+      "time": "2026-09-03T10:21:07.500Z",
+      "kind": "step",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-1",
+        "requestId": "request-2-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:35",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 35,
+      "eventType": "step/start",
+      "time": "2026-09-03T10:21:09.000Z",
+      "kind": "step",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-2",
+        "requestId": "request-2-2"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:36",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 36,
+      "eventType": "request/header",
+      "time": "2026-09-03T10:21:09.100Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-2",
+        "requestId": "request-2-2",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "prompt": {
+          "systemPrompt": "你是 ActSpace 的代码助手。先检查事实，再进行修改；工具输出需要与请求关联。",
+          "tools": [
+            {
+              "name": "read_file",
+              "description": "读取指定文本文件，支持按行分页，返回文件内容和读取范围。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "file_path": {
+                    "type": "string",
+                    "description": "要读取的文件路径。"
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "开始读取的行号，从 1 开始。",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "最多读取的行数。",
+                    "minimum": 1,
+                    "default": 200
+                  }
+                },
+                "required": [
+                  "file_path"
+                ]
+              }
+            },
+            {
+              "name": "bash",
+              "description": "在工作目录中执行 Shell 命令，返回标准输出、标准错误和退出状态。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "需要执行的完整 Shell 命令。"
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "description": "命令执行超时时间，单位为毫秒。",
+                    "minimum": 1,
+                    "default": 120000
+                  }
+                },
+                "required": [
+                  "command"
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.6,
+          "maxTokens": 8192
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:37",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 37,
+      "eventType": "request/context",
+      "time": "2026-09-03T10:21:09.200Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-2",
+        "requestId": "request-2-2",
+        "messageCount": 8,
+        "inputTokens": 2200
+      }
+    },
+    {
+      "key": "mock-trajectory-session:38",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 38,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:21:09.800Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-2",
+        "requestId": "request-2-2",
+        "messageId": "assistant-2-2",
+        "delta": "展示层不应"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:39",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 39,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:21:10.100Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-2",
+        "requestId": "request-2-2",
+        "messageId": "assistant-2-2",
+        "delta": "该逐条呈现模型 chunk，而应该保留最终回复。\n\n| 数据 | 展示 |\n| --- | --- |\n| tool call + result | 一条 TOOL |\n| stream chunks | 一个运行状态 |\n\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:40",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 40,
+      "eventType": "assistant/message",
+      "time": "2026-09-03T10:21:11.000Z",
+      "kind": "assistant",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-2",
+        "requestId": "request-2-2",
+        "messageId": "assistant-2-2",
+        "content": [
+          {
+            "type": "thinking",
+            "text": "先核对请求与原始事件，再给出结论。"
+          },
+          {
+            "type": "text",
+            "text": "展示层不应该逐条呈现模型 chunk，而应该保留最终回复。\n\n| 数据 | 展示 |\n| --- | --- |\n| tool call + result | 一条 TOOL |\n| stream chunks | 一个运行状态 |\n\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n长文本回归：中文、代码标识 `requestId` 与多行说明都应支持滚动预览。\n"
+          }
+        ],
+        "usage": {
+          "inputTokens": 2200,
+          "outputTokens": 173,
+          "reasoningTokens": 82
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:41",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 41,
+      "eventType": "step/end",
+      "time": "2026-09-03T10:21:12.500Z",
+      "kind": "step",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2",
+        "stepId": "step-2-2",
+        "requestId": "request-2-2"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:42",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 42,
+      "eventType": "turn/end",
+      "time": "2026-09-03T10:21:14.000Z",
+      "kind": "turn",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-2"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:43",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 43,
+      "eventType": "turn/start",
+      "time": "2026-09-03T10:22:00.000Z",
+      "kind": "turn",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:44",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 44,
+      "eventType": "user/message",
+      "time": "2026-09-03T10:22:00.100Z",
+      "kind": "user",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "messageId": "user-3",
+        "content": "检查失败、重试和审批后的工具状态。",
+        "source": {
+          "kind": "user"
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:45",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 45,
+      "eventType": "step/start",
+      "time": "2026-09-03T10:22:01.000Z",
+      "kind": "step",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-1",
+        "requestId": "request-3-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:46",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 46,
+      "eventType": "request/header",
+      "time": "2026-09-03T10:22:01.100Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-1",
+        "requestId": "request-3-1",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "prompt": {
+          "systemPrompt": "你是 ActSpace 的代码助手。先检查事实，再进行修改；工具输出需要与请求关联。",
+          "tools": [
+            {
+              "name": "read_file",
+              "description": "读取指定文本文件，支持按行分页，返回文件内容和读取范围。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "file_path": {
+                    "type": "string",
+                    "description": "要读取的文件路径。"
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "开始读取的行号，从 1 开始。",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "最多读取的行数。",
+                    "minimum": 1,
+                    "default": 200
+                  }
+                },
+                "required": [
+                  "file_path"
+                ]
+              }
+            },
+            {
+              "name": "bash",
+              "description": "在工作目录中执行 Shell 命令，返回标准输出、标准错误和退出状态。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "需要执行的完整 Shell 命令。"
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "description": "命令执行超时时间，单位为毫秒。",
+                    "minimum": 1,
+                    "default": 120000
+                  }
+                },
+                "required": [
+                  "command"
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.6,
+          "maxTokens": 8192
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:47",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 47,
+      "eventType": "request/context",
+      "time": "2026-09-03T10:22:01.200Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-1",
+        "requestId": "request-3-1",
+        "messageCount": 10,
+        "inputTokens": 2400
+      }
+    },
+    {
+      "key": "mock-trajectory-session:48",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 48,
+      "eventType": "llm/retry",
+      "time": "2026-09-03T10:22:01.300Z",
+      "kind": "other",
+      "state": "failed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-1",
+        "requestId": "request-3-1",
+        "attempt": 1,
+        "reason": "Temporary provider timeout",
+        "delayMs": 200
+      }
+    },
+    {
+      "key": "mock-trajectory-session:49",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 49,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:22:01.800Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-1",
+        "requestId": "request-3-1",
+        "messageId": "assistant-3-1",
+        "delta": "先运行校验"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:50",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 50,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:22:02.100Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-1",
+        "requestId": "request-3-1",
+        "messageId": "assistant-3-1",
+        "delta": "，再修复发现的问题。"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:51",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 51,
+      "eventType": "assistant/message",
+      "time": "2026-09-03T10:22:03.000Z",
+      "kind": "assistant",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-1",
+        "requestId": "request-3-1",
+        "messageId": "assistant-3-1",
+        "content": [
+          {
+            "type": "thinking",
+            "text": "先核对请求与原始事件，再给出结论。"
+          },
+          {
+            "type": "text",
+            "text": "先运行校验，再修复发现的问题。"
+          },
+          {
+            "type": "tool-call",
+            "callId": "call-3-1-1",
+            "name": "bash",
+            "arguments": {
+              "command": "pnpm run check:docs"
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 2400,
+          "outputTokens": 173,
+          "reasoningTokens": 82
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:52",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 52,
+      "eventType": "tool/call",
+      "time": "2026-09-03T10:22:03.100Z",
+      "kind": "tool",
+      "state": "started",
+      "callId": "call-3-1-1",
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-1",
+        "requestId": "request-3-1",
+        "callId": "call-3-1-1",
+        "name": "bash",
+        "arguments": {
+          "command": "pnpm run check:docs"
+        },
+        "assistantMessageId": "assistant-3-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:53",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 53,
+      "eventType": "approval/asked",
+      "time": "2026-09-03T10:22:03.200Z",
+      "kind": "approval",
+      "state": "started",
+      "callId": "call-3-1-1",
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-1",
+        "requestId": "request-3-1",
+        "callId": "call-3-1-1",
+        "name": "bash",
+        "reason": "Command requires approval"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:54",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 54,
+      "eventType": "approval/decided",
+      "time": "2026-09-03T10:22:03.400Z",
+      "kind": "approval",
+      "state": "completed",
+      "callId": "call-3-1-1",
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-1",
+        "requestId": "request-3-1",
+        "callId": "call-3-1-1",
+        "name": "bash",
+        "decision": "approved"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:55",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 55,
+      "eventType": "tool/result",
+      "time": "2026-09-03T10:22:04.300Z",
+      "kind": "tool",
+      "state": "failed",
+      "callId": "call-3-1-1",
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-1",
+        "requestId": "request-3-1",
+        "callId": "call-3-1-1",
+        "name": "bash",
+        "result": "Missing plan registration",
+        "status": "failed"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:56",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 56,
+      "eventType": "step/end",
+      "time": "2026-09-03T10:22:06.000Z",
+      "kind": "step",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-1",
+        "requestId": "request-3-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:57",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 57,
+      "eventType": "step/start",
+      "time": "2026-09-03T10:22:08.000Z",
+      "kind": "step",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-2",
+        "requestId": "request-3-2"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:58",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 58,
+      "eventType": "request/header",
+      "time": "2026-09-03T10:22:08.100Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-2",
+        "requestId": "request-3-2",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "prompt": {
+          "systemPrompt": "你是 ActSpace 的代码助手。先检查事实，再进行修改；工具输出需要与请求关联。",
+          "tools": [
+            {
+              "name": "read_file",
+              "description": "读取指定文本文件，支持按行分页，返回文件内容和读取范围。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "file_path": {
+                    "type": "string",
+                    "description": "要读取的文件路径。"
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "开始读取的行号，从 1 开始。",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "最多读取的行数。",
+                    "minimum": 1,
+                    "default": 200
+                  }
+                },
+                "required": [
+                  "file_path"
+                ]
+              }
+            },
+            {
+              "name": "bash",
+              "description": "在工作目录中执行 Shell 命令，返回标准输出、标准错误和退出状态。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "需要执行的完整 Shell 命令。"
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "description": "命令执行超时时间，单位为毫秒。",
+                    "minimum": 1,
+                    "default": 120000
+                  }
+                },
+                "required": [
+                  "command"
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.6,
+          "maxTokens": 8192
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:59",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 59,
+      "eventType": "request/context",
+      "time": "2026-09-03T10:22:08.200Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-2",
+        "requestId": "request-3-2",
+        "messageCount": 11,
+        "inputTokens": 2400
+      }
+    },
+    {
+      "key": "mock-trajectory-session:60",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 60,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:22:08.800Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-2",
+        "requestId": "request-3-2",
+        "messageId": "assistant-3-2",
+        "delta": "保留失败证"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:61",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 61,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:22:09.100Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-2",
+        "requestId": "request-3-2",
+        "messageId": "assistant-3-2",
+        "delta": "据，重试后返回结果。"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:62",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 62,
+      "eventType": "assistant/message",
+      "time": "2026-09-03T10:22:10.000Z",
+      "kind": "assistant",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-2",
+        "requestId": "request-3-2",
+        "messageId": "assistant-3-2",
+        "content": [
+          {
+            "type": "thinking",
+            "text": "先核对请求与原始事件，再给出结论。"
+          },
+          {
+            "type": "text",
+            "text": "保留失败证据，重试后返回结果。"
+          },
+          {
+            "type": "tool-call",
+            "callId": "call-3-2-1",
+            "name": "bash",
+            "arguments": {
+              "command": "pnpm run check:frontend-theme"
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 2400,
+          "outputTokens": 173,
+          "reasoningTokens": 82
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:63",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 63,
+      "eventType": "tool/call",
+      "time": "2026-09-03T10:22:10.100Z",
+      "kind": "tool",
+      "state": "started",
+      "callId": "call-3-2-1",
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-2",
+        "requestId": "request-3-2",
+        "callId": "call-3-2-1",
+        "name": "bash",
+        "arguments": {
+          "command": "pnpm run check:frontend-theme"
+        },
+        "assistantMessageId": "assistant-3-2"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:64",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 64,
+      "eventType": "tool/result",
+      "time": "2026-09-03T10:22:11.300Z",
+      "kind": "tool",
+      "state": "completed",
+      "callId": "call-3-2-1",
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-2",
+        "requestId": "request-3-2",
+        "callId": "call-3-2-1",
+        "name": "bash",
+        "result": "theme check passed",
+        "status": "completed"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:65",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 65,
+      "eventType": "step/end",
+      "time": "2026-09-03T10:22:13.000Z",
+      "kind": "step",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "stepId": "step-3-2",
+        "requestId": "request-3-2"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:66",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 66,
+      "eventType": "compaction/completed",
+      "time": "2026-09-03T10:22:14.000Z",
+      "kind": "other",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3",
+        "summary": "压缩早期文件读取，保留用户目标、错误与下一步。",
+        "tokensBefore": 18000,
+        "tokensAfter": 4200
+      }
+    },
+    {
+      "key": "mock-trajectory-session:67",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 67,
+      "eventType": "turn/end",
+      "time": "2026-09-03T10:22:15.000Z",
+      "kind": "turn",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-3"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:68",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 68,
+      "eventType": "turn/start",
+      "time": "2026-09-03T10:23:00.000Z",
+      "kind": "turn",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-4"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:69",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 69,
+      "eventType": "user/message",
+      "time": "2026-09-03T10:23:00.100Z",
+      "kind": "user",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-4",
+        "messageId": "user-4",
+        "content": "模拟用户中止一个正在执行的命令。",
+        "source": {
+          "kind": "user"
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:70",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 70,
+      "eventType": "step/start",
+      "time": "2026-09-03T10:23:01.000Z",
+      "kind": "step",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-4",
+        "stepId": "step-4-1",
+        "requestId": "request-4-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:71",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 71,
+      "eventType": "request/header",
+      "time": "2026-09-03T10:23:01.100Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-4",
+        "stepId": "step-4-1",
+        "requestId": "request-4-1",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "prompt": {
+          "systemPrompt": "你是 ActSpace 的代码助手。先检查事实，再进行修改；工具输出需要与请求关联。",
+          "tools": [
+            {
+              "name": "read_file",
+              "description": "读取指定文本文件，支持按行分页，返回文件内容和读取范围。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "file_path": {
+                    "type": "string",
+                    "description": "要读取的文件路径。"
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "开始读取的行号，从 1 开始。",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "最多读取的行数。",
+                    "minimum": 1,
+                    "default": 200
+                  }
+                },
+                "required": [
+                  "file_path"
+                ]
+              }
+            },
+            {
+              "name": "bash",
+              "description": "在工作目录中执行 Shell 命令，返回标准输出、标准错误和退出状态。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "需要执行的完整 Shell 命令。"
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "description": "命令执行超时时间，单位为毫秒。",
+                    "minimum": 1,
+                    "default": 120000
+                  }
+                },
+                "required": [
+                  "command"
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.6,
+          "maxTokens": 8192
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:72",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 72,
+      "eventType": "request/context",
+      "time": "2026-09-03T10:23:01.200Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-4",
+        "stepId": "step-4-1",
+        "requestId": "request-4-1",
+        "messageCount": 13,
+        "inputTokens": 2600
+      }
+    },
+    {
+      "key": "mock-trajectory-session:73",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 73,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:23:01.800Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-4",
+        "stepId": "step-4-1",
+        "requestId": "request-4-1",
+        "messageId": "assistant-4-1",
+        "delta": "启动命令并"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:74",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 74,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:23:02.100Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-4",
+        "stepId": "step-4-1",
+        "requestId": "request-4-1",
+        "messageId": "assistant-4-1",
+        "delta": "等待结果。"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:75",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 75,
+      "eventType": "assistant/message",
+      "time": "2026-09-03T10:23:03.000Z",
+      "kind": "assistant",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-4",
+        "stepId": "step-4-1",
+        "requestId": "request-4-1",
+        "messageId": "assistant-4-1",
+        "content": [
+          {
+            "type": "thinking",
+            "text": "先核对请求与原始事件，再给出结论。"
+          },
+          {
+            "type": "text",
+            "text": "启动命令并等待结果。"
+          },
+          {
+            "type": "tool-call",
+            "callId": "call-4-1-1",
+            "name": "bash",
+            "arguments": {
+              "command": "pnpm run build"
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 2600,
+          "outputTokens": 173,
+          "reasoningTokens": 82
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:76",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 76,
+      "eventType": "tool/call",
+      "time": "2026-09-03T10:23:03.100Z",
+      "kind": "tool",
+      "state": "started",
+      "callId": "call-4-1-1",
+      "data": {
+        "turnId": "turn-4",
+        "stepId": "step-4-1",
+        "requestId": "request-4-1",
+        "callId": "call-4-1-1",
+        "name": "bash",
+        "arguments": {
+          "command": "pnpm run build"
+        },
+        "assistantMessageId": "assistant-4-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:77",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 77,
+      "eventType": "approval/asked",
+      "time": "2026-09-03T10:23:03.200Z",
+      "kind": "approval",
+      "state": "started",
+      "callId": "call-4-1-1",
+      "data": {
+        "turnId": "turn-4",
+        "stepId": "step-4-1",
+        "requestId": "request-4-1",
+        "callId": "call-4-1-1",
+        "name": "bash",
+        "reason": "Command requires approval"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:78",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 78,
+      "eventType": "approval/decided",
+      "time": "2026-09-03T10:23:03.400Z",
+      "kind": "approval",
+      "state": "completed",
+      "callId": "call-4-1-1",
+      "data": {
+        "turnId": "turn-4",
+        "stepId": "step-4-1",
+        "requestId": "request-4-1",
+        "callId": "call-4-1-1",
+        "name": "bash",
+        "decision": "approved"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:79",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 79,
+      "eventType": "tool/result",
+      "time": "2026-09-03T10:23:04.300Z",
+      "kind": "tool",
+      "state": "aborted",
+      "callId": "call-4-1-1",
+      "data": {
+        "turnId": "turn-4",
+        "stepId": "step-4-1",
+        "requestId": "request-4-1",
+        "callId": "call-4-1-1",
+        "name": "bash",
+        "result": "Cancelled by user",
+        "status": "aborted"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:80",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 80,
+      "eventType": "step/end",
+      "time": "2026-09-03T10:23:06.000Z",
+      "kind": "step",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-4",
+        "stepId": "step-4-1",
+        "requestId": "request-4-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:81",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 81,
+      "eventType": "turn/end",
+      "time": "2026-09-03T10:23:07.000Z",
+      "kind": "turn",
+      "state": "aborted",
+      "callId": null,
+      "data": {
+        "turnId": "turn-4",
+        "reason": "aborted"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:82",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 82,
+      "eventType": "turn/start",
+      "time": "2026-09-03T10:24:00.000Z",
+      "kind": "turn",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-5"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:83",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 83,
+      "eventType": "user/message",
+      "time": "2026-09-03T10:24:00.100Z",
+      "kind": "user",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-5",
+        "messageId": "user-5",
+        "content": "检查旧会话缺失 timing 和 usage 时的显示。",
+        "source": {
+          "kind": "user"
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:84",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 84,
+      "eventType": "step/start",
+      "time": "2026-09-03T10:24:01.000Z",
+      "kind": "step",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-5",
+        "stepId": "step-5-1",
+        "requestId": "request-5-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:85",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 85,
+      "eventType": "request/header",
+      "time": "2026-09-03T10:24:01.100Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-5",
+        "stepId": "step-5-1",
+        "requestId": "request-5-1",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "prompt": {
+          "systemPrompt": "你是 ActSpace 的代码助手。先检查事实，再进行修改；工具输出需要与请求关联。",
+          "tools": [
+            {
+              "name": "read_file",
+              "description": "读取指定文本文件，支持按行分页，返回文件内容和读取范围。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "file_path": {
+                    "type": "string",
+                    "description": "要读取的文件路径。"
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "开始读取的行号，从 1 开始。",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "最多读取的行数。",
+                    "minimum": 1,
+                    "default": 200
+                  }
+                },
+                "required": [
+                  "file_path"
+                ]
+              }
+            },
+            {
+              "name": "bash",
+              "description": "在工作目录中执行 Shell 命令，返回标准输出、标准错误和退出状态。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "需要执行的完整 Shell 命令。"
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "description": "命令执行超时时间，单位为毫秒。",
+                    "minimum": 1,
+                    "default": 120000
+                  }
+                },
+                "required": [
+                  "command"
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.6,
+          "maxTokens": 8192
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:86",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 86,
+      "eventType": "request/context",
+      "time": "2026-09-03T10:24:01.200Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-5",
+        "stepId": "step-5-1",
+        "requestId": "request-5-1",
+        "messageCount": 16,
+        "inputTokens": 2800
+      }
+    },
+    {
+      "key": "mock-trajectory-session:87",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 87,
+      "eventType": "assistant/message",
+      "time": null,
+      "kind": "assistant",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-5",
+        "stepId": "step-5-1",
+        "requestId": "request-5-1",
+        "messageId": "assistant-5-1",
+        "content": [
+          {
+            "type": "text",
+            "text": "这条旧消息没有首 token、完成时间和 token 统计。"
+          }
+        ]
+      }
+    },
+    {
+      "key": "mock-trajectory-session:88",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 88,
+      "eventType": "step/end",
+      "time": "2026-09-03T10:24:04.500Z",
+      "kind": "step",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-5",
+        "stepId": "step-5-1",
+        "requestId": "request-5-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:89",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 89,
+      "eventType": "turn/end",
+      "time": "2026-09-03T10:24:06.000Z",
+      "kind": "turn",
+      "state": "completed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-5"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:90",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 90,
+      "eventType": "turn/start",
+      "time": "2026-09-03T10:25:00.000Z",
+      "kind": "turn",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-6"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:91",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 91,
+      "eventType": "user/message",
+      "time": "2026-09-03T10:25:00.100Z",
+      "kind": "user",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-6",
+        "messageId": "user-6",
+        "content": "现在模拟一个还在运行的回复。",
+        "source": {
+          "kind": "user"
+        }
+      }
+    },
+    {
+      "key": "mock-trajectory-session:92",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 92,
+      "eventType": "step/start",
+      "time": "2026-09-03T10:25:01.000Z",
+      "kind": "step",
+      "state": "started",
+      "callId": null,
+      "data": {
+        "turnId": "turn-6",
+        "stepId": "step-6-1",
+        "requestId": "request-6-1"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:93",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 93,
+      "eventType": "request/header",
+      "time": "2026-09-03T10:25:01.100Z",
+      "kind": "request",
+      "state": "observed",
+      "callId": null,
+      "data": {
+        "turnId": "turn-6",
+        "stepId": "step-6-1",
+        "requestId": "request-6-1",
+        "prompt": {
+          "systemPrompt": "你是 ActSpace 的代码助手。先检查事实，再进行修改；工具输出需要与请求关联。",
+          "tools": [
+            {
+              "name": "read_file",
+              "description": "读取指定文本文件，支持按行分页，返回文件内容和读取范围。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "file_path": {
+                    "type": "string",
+                    "description": "要读取的文件路径。"
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "开始读取的行号，从 1 开始。",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "最多读取的行数。",
+                    "minimum": 1,
+                    "default": 200
+                  }
+                },
+                "required": [
+                  "file_path"
+                ]
+              }
+            },
+            {
+              "name": "bash",
+              "description": "在工作目录中执行 Shell 命令，返回标准输出、标准错误和退出状态。",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "需要执行的完整 Shell 命令。"
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "description": "命令执行超时时间，单位为毫秒。",
+                    "minimum": 1,
+                    "default": 120000
+                  }
+                },
+                "required": [
+                  "command"
+                ]
+              }
+            }
+          ]
+        },
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:94",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 94,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:25:02.000Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-6",
+        "stepId": "step-6-1",
+        "requestId": "request-6-1",
+        "messageId": "assistant-running",
+        "delta": "正在整理"
+      }
+    },
+    {
+      "key": "mock-trajectory-session:95",
+      "sessionId": "mock-trajectory-session",
+      "eventSeq": 95,
+      "eventType": "assistant/chunk",
+      "time": "2026-09-03T10:25:02.100Z",
+      "kind": "assistant",
+      "state": "updated",
+      "callId": null,
+      "data": {
+        "turnId": "turn-6",
+        "stepId": "step-6-1",
+        "requestId": "request-6-1",
+        "messageId": "assistant-running",
+        "delta": "轨迹页面"
+      }
+    }
+  ]
+}

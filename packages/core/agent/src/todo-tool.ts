@@ -97,7 +97,7 @@ function readSchema(): ToolDefinition["inputSchema"] {
 }
 
 function writeSchema(): ToolDefinition["inputSchema"] {
-  return { type: "object", properties: { todos: { type: "array", items: { type: "object", properties: { id: { type: "string" }, content: { type: "string", minLength: 1 }, status: { type: "string", enum: ["pending", "in_progress", "completed"] }, activeForm: { type: "string" } }, required: ["content", "status"], additionalProperties: false } }, merge: { type: "boolean", default: false } }, required: ["todos"], additionalProperties: false };
+  return { type: "object", properties: { todos: { type: "array", items: { type: "object", properties: { id: { type: "string", description: "Omit to create; use the full ID returned by todo_read/todo_write to update." }, content: { type: "string", minLength: 1 }, status: { type: "string", enum: ["pending", "in_progress", "completed"] }, activeForm: { type: "string" } }, required: ["content", "status"], additionalProperties: false } }, merge: { type: "boolean", default: false, description: "False replaces the list; true preserves unmentioned items." } }, required: ["todos"], additionalProperties: false };
 }
 
 function isRecord(value: RuntimeV2JsonValue): value is Readonly<Record<string, RuntimeV2JsonValue>> { return value !== null && typeof value === "object" && !Array.isArray(value); }

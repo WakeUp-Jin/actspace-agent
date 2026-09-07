@@ -2,10 +2,18 @@ import type { ModelApi } from "@actspace/shared";
 
 export type DesktopRuntimeV2ResolvedModel = {
   readonly key: string;
+  readonly connectionId?: string;
+  readonly pricingSnapshot?: import("@actspace/shared").ModelPricingSnapshot | null;
   readonly definition: {
+    readonly source?: import("@actspace/shared").ModelSource;
+    readonly pricing?: import("@actspace/shared").ModelPricing;
     readonly api: ModelApi;
     readonly provider: string;
     readonly apiModel: string;
+    readonly contextWindow: number | null;
+    readonly thinkingDefault?: boolean;
+    readonly requestModelByReasoningEffort?: Partial<Record<import("@actspace/shared").ModelReasoningEffort, string>>;
+    readonly capabilities?: import("@actspace/shared").ModelCapabilities;
   };
   readonly providerRuntime: {
     readonly apiKey?: string;
@@ -20,6 +28,7 @@ export type DesktopRuntimeV2ModelResolution =
   | { readonly ok: false; readonly message: string };
 
 export interface DesktopRuntimeV2ModelPort {
+  resolvePricing?(model: DesktopRuntimeV2ResolvedModel, apiModel: string): import("@actspace/shared").ModelPricingSnapshot | null;
   resolveMainModel(requested?: string | null): DesktopRuntimeV2ModelResolution;
   resolveImageInspectionModel(): DesktopRuntimeV2ModelResolution;
   getToolEnvironment(): {

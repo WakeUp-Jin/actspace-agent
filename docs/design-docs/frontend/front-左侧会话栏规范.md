@@ -4,7 +4,7 @@
 
 左侧会话栏是 actspace 桌面端工作台的左侧栏，负责：
 
-- 入口聚合：聊天态新建（New Agent）以及 Usage 产品入口，外加顶栏窗口控件。
+- 入口聚合：聊天态新建（New Agent）以及扩展入口，外加顶栏窗口控件。
 - 会话导航：让用户在大量历史会话之间快速切换。
 - Workspace 操作：围绕已加入侧边栏的本地文件夹，提供打开 IDE、批量归档和从侧边栏移除等轻量管理能力。
 - 状态指示：把当前选中、运行中 turn、待审批和失败等状态集中显示在行首状态点。
@@ -16,27 +16,28 @@
 
 自上而下分四块：
 
-1. **顶部窗口区**（红绿灯 + 折叠按钮 + 搜索按钮）。
-2. **顶部主入口**：`New Agent` / `Usage`。
+1. **顶部窗口区**（红绿灯 + 折叠按钮 + 会话历史返回/前进）。
+2. **顶部主入口**：`New Agent` / `扩展`。
 3. **分区列表**：`Pinned` → `Workspaces`（父分类 + 多个 Workspace 文件夹）。当前没有定时任务产品能力，因此不展示 `Scheduled` 占位分区。
 4. **底部** `Settings`。
 
 ## 顶部窗口区
 
-- 自左到右：macOS 红绿灯（系统）、折叠按钮（PanelLeft icon）、搜索按钮（Search icon）。这两个按钮放在窗口级 chrome 浮层的左段（`.chrome-left`），不属于 sidebar 内部。
+- 自左到右：macOS 红绿灯（系统）、折叠按钮（PanelLeft icon），以及在 sidebar 顶部右侧对齐的会话历史 Back / Forward。PanelLeft 与导航按钮属于窗口级 chrome，不属于 sidebar 内部；Sidebar 内的 Search 仍保留为会话导航入口。
 - **chrome 按钮由 `WindowChromeBar` 渲染**（参考 Cursor Agent Window 的 `.part.titlebar`）。它是 `position: fixed top:0 left:0 right:0 height:44px z-index:60 pointer-events:none` 的全宽浮层，并使用与 `SplitView` 实际 pane 宽度同步的三列 grid：
-  - `.chrome-left`：红绿灯安全区（`padding-left: 86px`）+ PanelLeft + Search
-  - `.chrome-center`：左对齐的当前 view 标题（chat 时是 session title；lab/usage/kairos 时是对应名）+ 中间栏尾部的 IDE / Environment + 窗口拖动区（`-webkit-app-region: drag`）
+  - `.chrome-left`：红绿灯安全区（`padding-left: 86px`）+ PanelLeft；会话 Back / Forward 作为同一左列内的右对齐导航组
+  - `.chrome-center`：左对齐的当前 view 标题（chat 时是 session title；lab/usage/kairos 时是对应名）+ 中间栏尾部的 Environment + 窗口拖动区（`-webkit-app-region: drag`）
   - `.chrome-right`：右 panel 的对象菜单和 PanelRight toggle；空白区域不恢复 pointer events，避免遮挡右栏 Tab
-- chrome bar 自身透明，只绘制统一的主题感知底部分隔线；sidebar / main / right panel 三栏各自顶部留 `var(--window-chrome-strip-height) = 44px` 的 padding-top，让浮层覆盖到自己顶部时不挡内容，视觉上「三栏直接贯顶 + 标题与操作各归其位」。
+- chrome bar 自身透明；主题感知底部分隔线只绘制在右侧对象面板列，左列与中间列不绘制底线；sidebar / main / right panel 三栏各自顶部留 `var(--window-chrome-strip-height) = 44px` 的 padding-top，让浮层覆盖到自己顶部时不挡内容，视觉上「三栏直接贯顶 + 标题与操作各归其位」。
 - 折叠按钮在 `expanded ↔ hidden` 之间切换；hidden 态时它的 aria-label 变成 `Expand session sidebar`，`aria-pressed=false`。
-- 搜索按钮是图标级别的"操作"按钮，不是导航项；点击触发全局会话/工作区搜索。搜索功能本身在首版可暂未实现，但入口必须保留。
+- 顶部不再放搜索按钮，避免与 Sidebar 内 Search 重复；Sidebar 内 Search 继续承担会话/工作区搜索入口。
+- Back / Forward 只遍历本次 Workbench 已访问的会话历史，不修改 Session Journal；没有对应历史时禁用。切换到新会话后会截断当前位置之后的前进历史。
 - 不再有 main pane 自管的 `.topbar`，所有窗口级 chrome 元素都统一挂在 chrome bar 上。
 
 ## 顶部主入口
 
 - `New Agent`：替代原 `New chat`，承担"开启一次新的 Agent 任务"语义；展示快捷键 `⌘N`。
-- `Usage`：统计页占位（Coming soon），将承载 token / 成本聚合。具体设计见 `front-usage-statistics.md`。
+- `扩展`：管理能力、Skills 与 MCP，保留会话侧栏；Usage 位于设置中心的「活动」分组。
 - 两个入口共用同一组 hover / active 状态语言；当前 view 视为 active。
 - Kairos 与 Lab 不属于当前公开导航；历史原型和设计资产见 `docs/design-docs/v1-legacy/`。
 
@@ -180,6 +181,13 @@
 - 浮层使用现有 Radix Tooltip Portal 和主题 token，默认出现在会话行右侧；宽度上限约 360px，通过 collision 逻辑避免超出窗口。
 - 会话右键菜单打开、进入重命名输入态或会话已离开可见 sidebar 时，Tooltip 必须关闭。
 
+## 扩展切换规则
+
+- 顶部 New Agent 下方新增「扩展」，选中时使用中性高亮。
+- 主区显示「能力 / Skills / MCP」，保留会话侧栏；窄窗选择入口后关闭侧栏覆盖层。
+- 扩展态隐藏聊天右栏及其开关；返回聊天恢复原右栏状态和会话草稿。
+- 原设置里的扩展与 Skills 已迁入此处；能力详情见 [设置中心规范](front-设置中心重构规范.md#66-扩展独立入口)。
+
 ## Settings 切换规则
 
 - 底部 `Settings` 是页面级入口，不是弹窗入口。
@@ -226,7 +234,7 @@
 - 不把 `"SF Pro Text"` 写在最前面，让 macOS 通过 `-apple-system` 自动选 San Francisco，与 Cursor `.monaco-workbench.mac:lang(zh-Hans)` 完全一致。
 - **全局 `font-feature-settings: normal`**，**不再开 `cv11/ss01`**——之前开启这两个拉丁 stylistic set 会让英文字形偏离 macOS 系统 UI；body 仅保留 `-webkit-font-smoothing: antialiased`。
 - 字号字重基准（以 sidebar 为例，对齐 Cursor IDE 的"中间档"密度）：
-  - 主入口（New Agent / Usage）：`13px / 500 / --color-text-muted`。
+  - 主入口（New Agent / 扩展）：`13px / 500 / --color-text-muted`。
   - 会话标题：`13px / 500`。
   - 会话时间戳：`11px / --color-text-faint`。
   - 分组标题（Pinned / Workspaces 等）：`12px / 500 / --color-text-faint`。靠字号小一档 + 颜色更浅区分语义，而不是用 440 这种非标字重。
@@ -268,5 +276,5 @@
 - 轻量优先：信息密度高、视觉装饰少，不做重卡片。
 - 轻量管理：Workspace 来源仍是本地目录，侧边栏只暴露打开、归档和隐藏三个高频动作，不在导航区引入重命名、排序、迁移等重管理能力。
 - 状态合并：行首点首版只区分 active 和 busy，不细分未读/错误/审批，等业务上有真实区分需求再扩展。
-- 操作克制：顶部主入口只保留当前产品入口（Usage）和核心操作（New Agent）；退役或暂停的方向不占用公开入口。
+- 操作克制：顶部主入口只保留当前产品入口（扩展）和核心操作（New Agent）；退役或暂停的方向不占用公开入口。
 - 折叠彻底：`hidden` 而非 `rail`，让 main content 真正占满，符合用户对"折叠"的直觉与 Cursor 行为一致；窗口顶部浮动的 chrome row 保证可逆。

@@ -1,5 +1,7 @@
+import { DEFAULT_SPEECH_SETTINGS, isSpeechModel, type SpeechSettings } from "@actspace/shared";
 /**
- * SettingsService owns non-sensitive settings.json v3 and main-only 0600 secrets.json v2.
+ * SettingsService owns non-sensitive settings.json v4 and main-only 0600 secrets.json v2.
+ * Legacy v1/v2/v3 files are accepted only as migration inputs and retain an on-disk backup.
  * Renderer-facing views contain status only; plaintext keys and runtime transports stay in main.
  */
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
@@ -15,11 +17,14 @@ import {
   PROVIDER_IDS,
   PROVIDER_REGISTRY,
   SEARCH_PROVIDER_IDS,
+  isProviderId,
+  isConnectionProtocol,
   isPublicModelId,
   isImageInspectionModelKey,
   legacyModelIdFromKey,
   normalizeModelKey,
   type AgentSettingsV2,
+  type CustomConnectionInput,
   type AgentSystemPromptFile,
   type AppSettings,
   type AppSettingsV2,
@@ -30,6 +35,7 @@ import {
   type ImageInspectionSettings,
   type LlmProviderId,
   type ModelDefinition,
+  type ModelApi,
   type ModelId,
   type ModelKey,
   type ProviderConnectionSettings,
@@ -41,7 +47,16 @@ import {
   type SearchUsageResult,
   type SecretProviderId,
   type SettingsUpdateInput,
+  type SettingsV4,
+  type SettingsV4ChangedNotification,
+  type SettingsV4InstalledModelSettings,
+  type SettingsV4Models,
+  type SettingsV4Namespace,
+  type SettingsV4Snapshot,
+  type SettingsV4SubagentRoute,
+  type SettingsV4UpdateInput,
   type SettingsV2UpdateInput,
+  type SettingsV4UsagePreferences,
   type SkillsSettings,
   type ShortcutsSettings,
   type TaskModelSettings,
@@ -56,6 +71,7 @@ type ProviderConnectionProbeResult = {
 
 type ProviderRuntimeConfig = {
   readonly provider: LlmProviderId;
+  readonly protocol?: ModelApi;
   readonly apiKey: string;
   readonly baseUrl: string;
   readonly pricingMultiplier: number;
@@ -80,6 +96,8 @@ const SETTINGS_FILE = "settings.json";
 const SETTINGS_V1_BACKUP_FILE = "settings.v1.backup.json";
 const SETTINGS_V2_BACKUP_FILE = "settings.v2.backup.json";
 const SETTINGS_V2_BACKUP_DIGEST_FILE = "settings.v2.backup.sha256";
+const SETTINGS_V3_BACKUP_FILE = "settings.v3.backup.json";
+const SETTINGS_V3_BACKUP_DIGEST_FILE = "settings.v3.backup.sha256";
 const SECRETS_FILE = "secrets.json";
 const BUILTIN_MODEL_ADDED_AT = "2026-07-24T00:00:00.000Z";
 
@@ -141,6 +159,13 @@ export class ProviderSettingsError extends Error {
   }
 }
 
+export class SettingsRevisionConflictError extends Error {
+  constructor(public readonly latest: SettingsV4Snapshot) {
+    super("Settings changed in another window; reload the latest snapshot before retrying.");
+    this.name = "SettingsRevisionConflictError";
+  }
+}
+
 export interface PersistedSettingsV3 {
   version: 3;
   providers: Record<LlmProviderId, ProviderConnectionSettings>;
@@ -158,7 +183,7 @@ export interface PersistedSettingsV3 {
 }
 
 type OpenRouterManagementSecretId = "openrouter-management";
-type PersistedSecretProviderId = LlmProviderId | SearchProviderId | OpenRouterManagementSecretId | "image-generation";
+type PersistedSecretProviderId = LlmProviderId | SearchProviderId | OpenRouterManagementSecretId | "image-generation" | "speech-minimax";
 type PersistedSecretsV1 = {
   version: 1;
   providerCredentials: Record<string, string>;
@@ -182,19 +207,36 @@ interface ReadSecretsResult {
 
 interface ReadSettingsResult {
   settings: PersistedSettingsV3;
+  v4Metadata: SettingsV4Metadata;
   legacySystemPrompt?: string;
-  source: "missing" | "v1" | "v2" | "v3" | "legacy-removed" | "invalid";
+  source: "missing" | "v1" | "v2" | "v3" | "v4" | "legacy-removed" | "invalid";
   rawV1?: string;
   rawV2?: string;
+  rawV3?: string;
   warning?: string;
   blockingError?: string;
 }
+
+type SettingsV4Metadata = Pick<SettingsV4, "general" | "tools" | "subagents" | "activity" | "models"> & { speech: SpeechSettings };
+
+const ALL_SETTINGS_V4_NAMESPACES: SettingsV4Namespace[] = [
+  "general",
+  "models",
+  "tools",
+  "media",
+  "skills",
+  "subagents",
+  "activity",
+];
+
+export type SettingsV4ChangeListener = (notification: SettingsV4ChangedNotification) => void;
 
 const ALL_SECRET_PROVIDER_IDS: readonly PersistedSecretProviderId[] = [
   ...PROVIDER_IDS,
   ...SEARCH_PROVIDER_IDS,
   "openrouter-management",
   "image-generation",
+  "speech-minimax",
 ];
 
 export interface ImageGenerationRuntimeConfig {
@@ -218,10 +260,12 @@ export class SettingsService {
   private readonly createCredentialId: () => string;
 
   private settings: PersistedSettingsV3;
+  private v4Metadata: SettingsV4Metadata;
   private secrets: PersistedSecrets = emptySecrets();
   private credentialStorageIssue?: CredentialStorageIssue;
   private mutationTail: Promise<void> = Promise.resolve();
   private lastLoadError?: string;
+  private readonly v4ChangeListeners = new Set<SettingsV4ChangeListener>();
 
   constructor(options: SettingsServiceOptions) {
     this.dataRoot = options.dataRoot;
@@ -230,6 +274,7 @@ export class SettingsService {
     this.writeJson = options.writeJson ?? writeJsonAtomic;
     this.createCredentialId = options.createCredentialId ?? randomUUID;
     this.settings = defaultSettingsFromEnv(this.dataRoot);
+    this.v4Metadata = defaultSettingsV4Metadata();
   }
 
   async load(): Promise<void> {
@@ -248,6 +293,7 @@ export class SettingsService {
     }
     const loaded = await this.readSettingsFile();
     this.settings = loaded.settings;
+    this.v4Metadata = loaded.v4Metadata;
     this.lastLoadError = loaded.warning;
     if (loaded.blockingError !== undefined) throw new Error(loaded.blockingError);
 
@@ -259,22 +305,70 @@ export class SettingsService {
       } else if (loaded.source === "v2" && loaded.rawV2 !== undefined) {
         await writeSettingsV2Backup(this.dataRoot, loaded.rawV2);
         await this.writeSettingsFile();
+      } else if ((loaded.source === "v3" || loaded.source === "legacy-removed") && loaded.rawV3 !== undefined) {
+        await writeSettingsV3Backup(this.dataRoot, loaded.rawV3);
+        await this.writeSettingsFile();
       } else if (loaded.source === "missing" || loaded.source === "legacy-removed") {
         await this.writeSettingsFile();
       }
     } catch {
       // Never overwrite the original v1/v2/invalid file after a failed migration/write.
       this.settings = defaultSettingsFromEnv(this.dataRoot);
+      this.v4Metadata = defaultSettingsV4Metadata();
       this.lastLoadError = "设置迁移或写入失败，已使用安全默认配置。";
       try {
         await this.ensureAgentSystemPromptFile();
       } catch {
         // Prompt creation failure remains non-fatal for settings load.
       }
-      if (loaded.source === "v2") throw new Error("Settings v2 to v3 migration failed; the original settings file was preserved.");
+      if (loaded.source === "v2") throw new Error("Settings v2 to v4 migration failed; the original settings file was preserved.");
+      if (loaded.source === "v3" || loaded.source === "legacy-removed") {
+        throw new Error("Settings v3 to v4 migration failed; the original settings file was preserved.");
+      }
     }
 
     this.applyToEnv();
+  }
+
+  subscribeV4Changes(listener: SettingsV4ChangeListener): () => void {
+    this.v4ChangeListeners.add(listener);
+    return () => this.v4ChangeListeners.delete(listener);
+  }
+
+  getV4(): SettingsV4Snapshot {
+    const settings = toSettingsV4(this.settings, this.v4Metadata);
+    return {
+      version: 4,
+      revision: computeSettingsRevision(settings),
+      settings,
+    };
+  }
+
+  async updateNamespaceV4(input: SettingsV4UpdateInput): Promise<SettingsV4Snapshot> {
+    return this.enqueueMutation(() => this.applyNamespaceV4(input));
+  }
+
+  private async applyNamespaceV4(input: SettingsV4UpdateInput): Promise<SettingsV4Snapshot> {
+      const current = this.getV4();
+      if (input.expectedRevision !== current.revision) {
+        throw new SettingsRevisionConflictError(current);
+      }
+      const previousSettings = cloneJson(this.settings);
+      const previousMetadata = cloneJson(this.v4Metadata);
+      try {
+        const next = applySettingsV4NamespacePatch(current.settings, input);
+        const normalized = parseSettingsV4(next as unknown as Record<string, unknown>, this.dataRoot);
+        if (!normalized) throw new Error("Settings v4 patch is invalid.");
+        this.settings = normalized.settings;
+        this.v4Metadata = normalized.v4Metadata;
+        await this.writeSettingsFile([input.namespace]);
+        this.applyToEnv();
+        return this.getV4();
+      } catch (error) {
+        this.settings = previousSettings;
+        this.v4Metadata = previousMetadata;
+        throw error;
+      }
   }
 
   getLastLoadError(): string | undefined {
@@ -597,8 +691,14 @@ export class SettingsService {
   getProviderRuntimeConfigForCredential(
     provider: LlmProviderId,
     credentialId?: string,
+    connectionId?: string,
   ): ProviderRuntimeConfig | ProviderRuntimeError {
-    const settings = this.settings.providers[provider];
+    const isCustom = Boolean(connectionId && connectionId !== `${provider}:default`);
+    const connection = isCustom ? this.getV4().settings.models.connections[connectionId!] : undefined;
+    if (isCustom && (!connection || connection.providerId !== provider)) {
+      return { ok: false, code: "credential_missing", message: "模型绑定的连接不存在或不匹配。" };
+    }
+    const settings = connection ?? this.settings.providers[provider];
     if (!settings.enabled) {
       return { ok: false, code: "provider_disabled", message: "该服务商已停用。" };
     }
@@ -608,7 +708,9 @@ export class SettingsService {
     if (credentialId && !credential) {
       return { ok: false, code: "credential_missing", message: "模型绑定的额外 API Key 不存在。" };
     }
-    const apiKey = credentialId
+    const apiKey = isCustom
+      ? this.secrets.providerCredentials[`connection:${connectionId}`]
+      : credentialId
       ? this.getStoredProviderCredential(provider, credentialId)
       : this.getStoredKey(provider);
     if (!apiKey) return credentialId
@@ -636,11 +738,110 @@ export class SettingsService {
 
     return {
       provider,
+      ...(connection && { protocol: connection.protocol ?? "openai-completions" }),
       apiKey,
       baseUrl,
       pricingMultiplier: credential?.pricingMultiplier ?? settings.defaultPricingMultiplier ?? 1,
       ...(proxyUrl && { transport: { proxyUrl } }),
     };
+  }
+
+  async createCustomConnection(input: CustomConnectionInput): Promise<SettingsV4Snapshot> {
+    return this.enqueueMutation(() => this.createCustomConnectionQueued(input));
+  }
+
+  private async createCustomConnectionQueued(input: CustomConnectionInput): Promise<SettingsV4Snapshot> {
+    validateCustomConnection(input);
+    const protocol = input.protocol ?? "openai-completions";
+    const connectionId = input.connectionId?.trim() || `custom-${randomUUID()}`;
+    if (!/^[a-zA-Z0-9._-]{3,80}$/.test(connectionId)) throw new ProviderSettingsError("连接标识无效。", "write_failed");
+    const baseUrl = normalizeBaseUrl(input.baseUrl);
+    const current = this.getV4();
+    if (current.settings.models.connections[connectionId]) throw new ProviderSettingsError("连接标识已存在。", "write_failed");
+    this.assertCredentialStorageWritable();
+    this.secrets.providerCredentials[`connection:${connectionId}`] = input.apiKey.trim();
+    try {
+      await this.writeSecretsFile();
+      return await this.applyNamespaceV4({
+        namespace: "models",
+        expectedRevision: current.revision,
+        patch: {
+          connections: {
+            [connectionId]: {
+              connectionId,
+              providerId: input.providerId,
+              protocol,
+              displayName: input.displayName.trim() || connectionId,
+              defaultModel: input.defaultModel?.trim() || null,
+              ...(input.catalogId?.trim() ? { catalogId: input.catalogId.trim().slice(0, 80) } : {}),
+              enabled: true,
+              baseUrl,
+              proxy: input.proxy ?? { enabled: false, url: null },
+              lastConnection: { status: "untested" },
+              defaultPricingMultiplier: 1,
+              additionalCredentials: [],
+            },
+          },
+          ...connectionModelPatch(input, connectionId, protocol, current.settings.models),
+        },
+      });
+    } catch (error) {
+      delete this.secrets.providerCredentials[`connection:${connectionId}`];
+      await this.writeSecretsFile();
+      throw error;
+    }
+  }
+
+  async removeCustomConnection(connectionId: string): Promise<SettingsV4Snapshot> {
+    return this.enqueueMutation(() => this.removeCustomConnectionQueued(connectionId));
+  }
+
+  private async removeCustomConnectionQueued(connectionId: string): Promise<SettingsV4Snapshot> {
+    const current = this.getV4();
+    if (!current.settings.models.connections[connectionId]) throw new ProviderSettingsError("连接不存在。", "write_failed");
+    const result = await this.applyNamespaceV4({
+      namespace: "models",
+      expectedRevision: current.revision,
+      patch: { connections: { [connectionId]: null } } as Partial<SettingsV4Models>,
+    });
+    delete this.secrets.providerCredentials[`connection:${connectionId}`];
+    await this.writeSecretsFile();
+    return result;
+  }
+
+  async updateCustomConnection(input: CustomConnectionInput & { connectionId: string; apiKey?: string }): Promise<SettingsV4Snapshot> {
+    return this.enqueueMutation(() => this.updateCustomConnectionQueued(input));
+  }
+
+  private async updateCustomConnectionQueued(input: CustomConnectionInput & { connectionId: string; apiKey?: string }): Promise<SettingsV4Snapshot> {
+    const current = this.getV4();
+    const existing = current.settings.models.connections[input.connectionId];
+    if (!existing) throw new ProviderSettingsError("连接不存在。", "write_failed");
+    validateCustomConnection({ ...input, apiKey: "preserved", protocol: input.protocol ?? existing.protocol });
+    if (input.providerId !== existing.providerId || (input.protocol && input.protocol !== (existing.protocol ?? "openai-completions"))) {
+      throw new ProviderSettingsError("连接协议不可更改，请创建新的连接。", "write_failed");
+    }
+    const baseUrl = normalizeBaseUrl(input.baseUrl);
+    const previousSecrets = cloneJson(this.secrets);
+    try {
+    if (input.apiKey?.trim()) {
+      this.assertCredentialStorageWritable();
+      this.secrets.providerCredentials[`connection:${input.connectionId}`] = input.apiKey.trim();
+      await this.writeSecretsFile();
+    }
+    return await this.applyNamespaceV4({
+      namespace: "models",
+      expectedRevision: current.revision,
+      patch: {
+        connections: { [input.connectionId]: { ...existing, protocol: existing.protocol ?? "openai-completions", displayName: input.displayName.trim() || existing.displayName, defaultModel: input.defaultModel?.trim() || null, ...(input.catalogId?.trim() ? { catalogId: input.catalogId.trim().slice(0, 80) } : {}), baseUrl, proxy: input.proxy ?? existing.proxy, lastConnection: { status: "untested" } } },
+        ...connectionModelPatch(input, input.connectionId, existing.protocol ?? "openai-completions", current.settings.models),
+      },
+    });
+    } catch (error) {
+      this.secrets = previousSecrets;
+      if (input.apiKey?.trim()) await this.writeSecretsFile();
+      throw error;
+    }
   }
 
   getImageGenerationRuntimeConfig(): ImageGenerationRuntimeConfig | undefined {
@@ -862,6 +1063,7 @@ export class SettingsService {
 
   /** Compatibility API for the current key modal; all LLM providers share the v2 connection path. */
   async setProviderKey(provider: SecretProviderId, apiKey: string): Promise<{ ok: boolean; error?: string }> {
+    if (provider === "speech-minimax") return this.setSpeechKey(apiKey);
     if (provider === "deepseek" || provider === "kimi" || provider === "openrouter") {
       try {
         await this.updateProviderConnection({ provider, apiKey });
@@ -886,6 +1088,7 @@ export class SettingsService {
   }
 
   async clearProviderKey(provider: SecretProviderId): Promise<{ ok: boolean }> {
+    if (provider === "speech-minimax") return this.setSpeechKey(null);
     if (provider === "deepseek" || provider === "kimi" || provider === "openrouter") {
       try {
         await this.updateProviderConnection({ provider, apiKey: null });
@@ -932,6 +1135,26 @@ export class SettingsService {
     } catch {
       return { ok: false, error: "Tavily 用量查询失败（网络错误或超时）。" };
     }
+  }
+
+  getSpeechSettings(): SpeechSettings { return { ...this.v4Metadata.speech }; }
+
+  private async setSpeechKey(apiKey: string | null): Promise<{ ok: boolean; error?: string }> {
+    return this.enqueueMutation(async () => {
+      const previous = { ...this.secrets };
+      try {
+        this.assertCredentialStorageWritable();
+        if (apiKey?.trim()) this.secrets["speech-minimax"] = apiKey.trim();
+        else delete this.secrets["speech-minimax"];
+        await this.writeSecretsFile();
+      } catch {
+        this.secrets = previous;
+        return { ok: false, error: "语音 Key 保存失败，请检查凭据存储。" };
+      }
+      const notification = { revision: this.getV4().revision, changedNamespaces: ["media" as const] };
+      for (const listener of this.v4ChangeListeners) { try { listener(notification); } catch { /* Storage already committed. */ } }
+      return { ok: true };
+    });
   }
 
   /** Main-only credential boundary. */
@@ -1016,7 +1239,8 @@ export class SettingsService {
       raw = await readFile(filePath, "utf8");
     } catch (error) {
       if (isNotFoundError(error)) {
-        return { settings: defaultSettingsFromEnv(this.dataRoot), source: "missing" };
+        const settings = defaultSettingsFromEnv(this.dataRoot);
+        return { settings, v4Metadata: defaultSettingsV4Metadata(), source: "missing" };
       }
       return blockingSettings(this.dataRoot, "Settings file could not be read safely.");
     }
@@ -1032,22 +1256,32 @@ export class SettingsService {
     }
     if (parsed.version === 1) {
       const migrated = migrateV1Settings(parsed, this.dataRoot, Boolean(this.getStoredKey("deepseek")));
-      return { ...migrated, source: "v1", rawV1: raw };
+      return { ...migrated, v4Metadata: metadataFromSettingsV3(migrated.settings), source: "v1", rawV1: raw };
     }
     if (parsed.version === 2) {
       if (!hasRequiredSettingsSections(parsed)) return blockingSettings(this.dataRoot, "Settings v2 is incomplete and cannot be migrated safely.");
+      const settings = mergePersistedSettingsV3(parsed, this.dataRoot);
       return {
-        settings: mergePersistedSettingsV3(parsed, this.dataRoot),
+        settings,
+        v4Metadata: metadataFromSettingsV3(settings),
         source: "v2",
         rawV2: raw,
       };
     }
     if (parsed.version === 3) {
       if (!hasRequiredSettingsSections(parsed)) return blockingSettings(this.dataRoot, "Settings v3 is incomplete and cannot be used safely.");
+      const settings = mergePersistedSettingsV3(parsed, this.dataRoot);
       return {
-        settings: mergePersistedSettingsV3(parsed, this.dataRoot),
+        settings,
+        v4Metadata: metadataFromSettingsV3(settings),
         source: hasRemovedDuckCodingSettings(parsed) ? "legacy-removed" : "v3",
+        rawV3: raw,
       };
+    }
+    if (parsed.version === 4) {
+      const migrated = parseSettingsV4(parsed, this.dataRoot);
+      if (!migrated) return blockingSettings(this.dataRoot, "Settings v4 is incomplete or contains invalid fields.");
+      return { ...migrated, source: "v4" };
     }
     return blockingSettings(this.dataRoot, "Settings file version is unsupported.");
   }
@@ -1100,8 +1334,20 @@ export class SettingsService {
     return unavailableSecrets("invalid_format", "凭据文件版本不受支持。为避免覆盖现有 Key，Actspace 已暂停凭据修改。");
   }
 
-  private writeSettingsFile(): Promise<void> {
-    return this.writeJson(join(this.dataRoot, SETTINGS_FILE), this.settings);
+  private async writeSettingsFile(changedNamespaces: SettingsV4Namespace[] = ALL_SETTINGS_V4_NAMESPACES): Promise<void> {
+    const next = toSettingsV4(this.settings, this.v4Metadata);
+    await this.writeJson(join(this.dataRoot, SETTINGS_FILE), next);
+    const notification: SettingsV4ChangedNotification = {
+      revision: computeSettingsRevision(next),
+      changedNamespaces: [...new Set(changedNamespaces)],
+    };
+    for (const listener of this.v4ChangeListeners) {
+      try {
+        listener(notification);
+      } catch {
+        // A renderer listener must never make a settings mutation appear failed.
+      }
+    }
   }
 
   private async writeSecretsFile(): Promise<void> {
@@ -1113,7 +1359,7 @@ export class SettingsService {
 
   private async restoreFilesBestEffort(settings: PersistedSettingsV3, secrets: PersistedSecrets): Promise<void> {
     try {
-      await this.writeJson(join(this.dataRoot, SETTINGS_FILE), settings);
+      await this.writeJson(join(this.dataRoot, SETTINGS_FILE), toSettingsV4(settings, this.v4Metadata));
       const secretsPath = join(this.dataRoot, SECRETS_FILE);
       await this.writeJson(secretsPath, secrets, { mode: 0o600 });
       await chmod(secretsPath, 0o600);
@@ -1289,6 +1535,352 @@ function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV3 {
   };
 }
 
+function defaultSettingsV4Metadata(): SettingsV4Metadata {
+  return {
+    speech: { ...DEFAULT_SPEECH_SETTINGS },
+    models: {
+      connections: {},
+      definitions: {},
+      installed: {},
+      taskBindings: { defaultChat: null, utility: null, explore: null },
+    },
+    general: {
+      englishLearning: { lastSessionId: null },
+      personalization: { displayName: "", responseStyle: "" },
+      agentInstructions: { systemPromptPath: "" },
+      taskDefaults: { temperature: null, maxOutputTokens: null },
+      shortcuts: {
+        quickOpen: {
+          enabled: true,
+          accelerator: DEFAULT_QUICK_OPEN_ACCELERATOR,
+          target: { kind: "automatic" },
+        },
+      },
+    },
+    tools: {
+      disabledTools: [],
+      bash: { alwaysAsk: false },
+      searchProviders: Object.fromEntries(SEARCH_PROVIDER_IDS.map((id) => [id, { enabled: true }])),
+    },
+    subagents: { routes: {} },
+    activity: {
+      usage: {
+        range: "30d",
+        status: "all",
+        modelFilter: "",
+        showDetails: false,
+        activeTab: "requests",
+      },
+    },
+  };
+}
+
+function metadataFromSettingsV3(settings: PersistedSettingsV3): SettingsV4Metadata {
+  const defaults = defaultSettingsV4Metadata();
+  return {
+    speech: { ...DEFAULT_SPEECH_SETTINGS },
+    models: {
+      connections: {},
+      definitions: cloneJson(settings.customModels),
+      installed: {},
+      taskBindings: { defaultChat: settings.taskModels.defaultChatModel, utility: settings.taskModels.utilityModel, explore: settings.taskModels.exploreModel },
+    },
+    general: {
+      ...defaults.general,
+      agentInstructions: { systemPromptPath: settings.agent.systemPromptPath },
+      taskDefaults: {
+        temperature: settings.agent.temperature,
+        maxOutputTokens: settings.agent.maxTokens,
+      },
+      shortcuts: cloneJson(settings.shortcuts),
+    },
+    tools: {
+      ...defaults.tools,
+      disabledTools: [...settings.agent.disabledTools],
+      bash: { alwaysAsk: settings.agent.bashAlwaysAsk },
+    },
+    subagents: {
+      routes: settings.taskModels.exploreModel
+        ? { explore: { enabled: true, model: settings.taskModels.exploreModel } }
+        : {},
+    },
+    activity: defaults.activity,
+  };
+}
+
+function metadataFromSettingsV4(settings: SettingsV4): SettingsV4Metadata {
+  return {
+    speech: sanitizeSpeechSettings(settings.media.speech),
+    models: cloneJson(settings.models),
+    general: cloneJson(settings.general),
+    tools: cloneJson(settings.tools),
+    subagents: cloneJson(settings.subagents),
+    activity: cloneJson(settings.activity),
+  };
+}
+
+function toSettingsV4(settings: PersistedSettingsV3, metadata: SettingsV4Metadata): SettingsV4 {
+  const general = cloneJson(metadata.general);
+  if (!general.agentInstructions.systemPromptPath) general.agentInstructions.systemPromptPath = settings.agent.systemPromptPath;
+  if (general.taskDefaults.temperature === null && settings.agent.temperature !== null) general.taskDefaults.temperature = settings.agent.temperature;
+  if (general.taskDefaults.maxOutputTokens === null && settings.agent.maxTokens !== null) general.taskDefaults.maxOutputTokens = settings.agent.maxTokens;
+  const tools = cloneJson(metadata.tools);
+  if (tools.disabledTools.length === 0 && settings.agent.disabledTools.length > 0) tools.disabledTools = [...settings.agent.disabledTools];
+  if (!tools.bash.alwaysAsk && settings.agent.bashAlwaysAsk) tools.bash.alwaysAsk = true;
+  const subagents = cloneJson(metadata.subagents);
+  if (!subagents.routes.explore && settings.taskModels.exploreModel) {
+    subagents.routes.explore = { enabled: true, model: settings.taskModels.exploreModel };
+  }
+  return {
+    version: 4,
+    general,
+    models: {
+      connections: { ...cloneJson(metadata.models.connections), ...Object.fromEntries(PROVIDER_IDS.map((providerId) => [
+        `${providerId}:default`,
+        {
+          connectionId: `${providerId}:default`,
+          providerId,
+          ...cloneJson(settings.providers[providerId]),
+        },
+      ])) },
+      definitions: cloneJson(settings.customModels),
+      installed: Object.fromEntries(Object.entries(settings.installedModels).map(([modelKey, model]) => [
+        modelKey,
+        { connectionId: `${modelKey.split(":")[0]}:default`, ...cloneJson(model) },
+      ])),
+      taskBindings: {
+        defaultChat: settings.taskModels.defaultChatModel,
+        utility: settings.taskModels.utilityModel,
+        explore: settings.taskModels.exploreModel,
+      },
+    },
+    tools,
+    media: {
+      speech: cloneJson(metadata.speech),
+      imageGeneration: cloneJson(settings.imageGeneration),
+      imageInspection: cloneJson(settings.imageInspection),
+    },
+    skills: cloneJson(settings.skills),
+    subagents,
+    activity: cloneJson(metadata.activity),
+  };
+}
+
+function legacySettingsFromV4(settings: SettingsV4, dataRoot: string): PersistedSettingsV3 {
+  const seed = defaultSettingsFromEnv(dataRoot);
+  const providers = Object.fromEntries(PROVIDER_IDS.map((providerId) => {
+    const connection = settings.models.connections[`${providerId}:default`];
+    return [providerId, connection ? sanitizeProviderSettings(connection, seed.providers[providerId], providerId) : seed.providers[providerId]];
+  })) as PersistedSettingsV3["providers"];
+  const installedModels = Object.fromEntries(Object.entries(settings.models.installed as Record<string, SettingsV4InstalledModelSettings>).map(([modelKey, model]) => [modelKey, {
+    enabled: model.enabled,
+    addedAt: model.addedAt,
+    ...(model.connectionId ? { connectionId: model.connectionId } : {}),
+    ...(model.customLabel !== undefined && { customLabel: model.customLabel }),
+    ...(model.credentialId !== undefined && { credentialId: model.credentialId }),
+  }])) as PersistedSettingsV3["installedModels"];
+  const explore = settings.models.taskBindings.explore ?? settings.subagents.routes.explore?.model ?? null;
+  const general = settings.general;
+  return {
+    version: 3,
+    providers,
+    installedModels,
+    customModels: cloneJson(settings.models.definitions),
+    taskModels: {
+      defaultChatModel: settings.models.taskBindings.defaultChat,
+      utilityModel: settings.models.taskBindings.utility,
+      exploreModel: explore,
+    },
+    imageGeneration: sanitizeImageGenerationSettings(settings.media.imageGeneration, seed.imageGeneration),
+    imageInspection: sanitizeImageInspectionSettings(settings.media.imageInspection),
+    agent: sanitizeAgentV2({
+      systemPromptPath: general.agentInstructions.systemPromptPath,
+      temperature: general.taskDefaults.temperature,
+      maxTokens: general.taskDefaults.maxOutputTokens,
+      disabledTools: settings.tools.disabledTools,
+      bashAlwaysAsk: settings.tools.bash.alwaysAsk,
+    }, seed.agent),
+    skills: sanitizeSkills(settings.skills),
+    shortcuts: sanitizeShortcuts(general.shortcuts),
+  };
+}
+
+function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string): {
+  settings: PersistedSettingsV3;
+  v4Metadata: SettingsV4Metadata;
+} | undefined {
+  if (!isRecord(raw.general) || !isRecord(raw.models) || !isRecord(raw.tools) || !isRecord(raw.media) ||
+    !isRecord(raw.skills) || !isRecord(raw.subagents) || !isRecord(raw.activity)) return undefined;
+  const seed = defaultSettingsFromEnv(dataRoot);
+  const general = isRecord(raw.general) ? raw.general : {};
+  const personalization = isRecord(general.personalization) ? general.personalization : {};
+  const instructions = isRecord(general.agentInstructions) ? general.agentInstructions : {};
+  const taskDefaults = isRecord(general.taskDefaults) ? general.taskDefaults : {};
+  const tools = isRecord(raw.tools) ? raw.tools : {};
+  const bash = isRecord(tools.bash) ? tools.bash : {};
+  const searchProviders = isRecord(tools.searchProviders) ? tools.searchProviders : {};
+  const models = isRecord(raw.models) ? raw.models : {};
+  const taskBindings = isRecord(models.taskBindings) ? models.taskBindings : {};
+  const media = isRecord(raw.media) ? raw.media : {};
+  const activity = isRecord(raw.activity) ? raw.activity : {};
+  const usage = isRecord(activity.usage) ? activity.usage : {};
+  const definitions = isRecord(models.definitions) ? models.definitions : {};
+  const installed = (isRecord(models.installed) ? models.installed : {}) as Record<string, unknown>;
+  const connections = (isRecord(models.connections) ? models.connections : {}) as Record<string, unknown>;
+  const routes = (isRecord(raw.subagents) && isRecord(raw.subagents.routes) ? raw.subagents.routes : {}) as Record<string, unknown>;
+  const settings: SettingsV4 = {
+    version: 4,
+    general: {
+      englishLearning: { lastSessionId: isRecord(general.englishLearning) && typeof general.englishLearning.lastSessionId === "string" ? general.englishLearning.lastSessionId.slice(0, 200) : null },
+      personalization: {
+        displayName: typeof personalization.displayName === "string" ? personalization.displayName.slice(0, 60) : "",
+        responseStyle: typeof personalization.responseStyle === "string" ? personalization.responseStyle.slice(0, 500) : "",
+      },
+      agentInstructions: {
+        systemPromptPath: sanitizeSystemPromptPath(instructions.systemPromptPath, seed.agent.systemPromptPath),
+      },
+      taskDefaults: {
+        temperature: sanitizeNullableNumber(taskDefaults.temperature, -0, 2),
+        maxOutputTokens: sanitizeNullableInteger(taskDefaults.maxOutputTokens, 1, 1_000_000),
+      },
+      shortcuts: sanitizeShortcuts(general.shortcuts),
+    },
+    models: {
+      connections: Object.fromEntries(Object.entries(connections).flatMap(([id, value]) => {
+        if (!isRecord(value) || typeof value.providerId !== "string" || !isProviderId(value.providerId)) return [];
+        return [[id, {
+          connectionId: id,
+          providerId: value.providerId,
+          protocol: isConnectionProtocol(value.protocol) ? value.protocol : "openai-completions",
+          ...(typeof value.displayName === "string" ? { displayName: value.displayName.slice(0, 120) } : {}),
+          ...(typeof value.defaultModel === "string" ? { defaultModel: value.defaultModel.slice(0, 200) } : {}),
+          ...(typeof value.catalogId === "string" ? { catalogId: value.catalogId.slice(0, 80) } : {}),
+          ...sanitizeProviderSettings(value, seed.providers[value.providerId], value.providerId),
+        } satisfies SettingsV4["models"]["connections"][string]]];
+      })),
+      definitions: sanitizeCustomModels(definitions),
+      installed: Object.fromEntries(Object.entries(installed).flatMap(([modelKey, value]) => {
+        const normalized = normalizeModelKey(modelKey);
+        if (!normalized || !isRecord(value)) return [];
+        const providerId = normalized.split(":")[0] as LlmProviderId;
+        return [[normalized, {
+          connectionId: typeof value.connectionId === "string" ? value.connectionId : `${providerId}:default`,
+          ...sanitizeInstalledModel(value, seed.installedModels[normalized] ?? { enabled: false, addedAt: BUILTIN_MODEL_ADDED_AT }),
+        } satisfies SettingsV4InstalledModelSettings]];
+      })),
+      taskBindings: {
+        defaultChat: normalizeModelKeyOrNull(taskBindings.defaultChat),
+        utility: normalizeModelKeyOrNull(taskBindings.utility),
+        explore: normalizeModelKeyOrNull(taskBindings.explore),
+      },
+    },
+    tools: {
+      disabledTools: Array.isArray(tools.disabledTools) ? tools.disabledTools.filter((value): value is string => typeof value === "string").slice(0, 200) : [],
+      bash: { alwaysAsk: bash.alwaysAsk === true },
+      searchProviders: Object.fromEntries(SEARCH_PROVIDER_IDS.map((id) => {
+        const provider = isRecord(searchProviders[id]) ? searchProviders[id] : {};
+        return [id, { enabled: provider.enabled !== false }];
+      })),
+    },
+    media: {
+      speech: sanitizeSpeechSettings(media.speech),
+      imageGeneration: sanitizeImageGenerationSettings(media.imageGeneration, seed.imageGeneration),
+      imageInspection: sanitizeImageInspectionSettings(media.imageInspection),
+    },
+    skills: sanitizeSkills(raw.skills),
+    subagents: {
+      routes: Object.fromEntries(Object.entries(routes).flatMap(([id, value]) => {
+        if (!isRecord(value)) return [];
+        return [[id, {
+          enabled: value.enabled !== false,
+          model: normalizeModelKeyOrNull(value.model),
+        } satisfies SettingsV4SubagentRoute]];
+      })),
+    },
+    activity: {
+      usage: sanitizeUsagePreferences(usage),
+    },
+  };
+  return { settings: legacySettingsFromV4(settings, dataRoot), v4Metadata: metadataFromSettingsV4(settings) };
+}
+
+function sanitizeUsagePreferences(value: Record<string, unknown>): SettingsV4UsagePreferences {
+  const range = value.range === "24h" || value.range === "7d" || value.range === "30d" || value.range === "all" ? value.range : "30d";
+  const status = value.status === "success" || value.status === "error" || value.status === "aborted" || value.status === "unknown" ? value.status : "all";
+  const activeTab = value.activeTab === "providers" || value.activeTab === "models" || value.activeTab === "tools" || value.activeTab === "pricing" ? value.activeTab : "requests";
+  return {
+    range,
+    status,
+    modelFilter: typeof value.modelFilter === "string" ? value.modelFilter.slice(0, 200) : "",
+    showDetails: value.showDetails === true,
+    activeTab,
+  };
+}
+
+function normalizeModelKeyOrNull(value: unknown): ModelKey | null {
+  if (typeof value !== "string") return null;
+  return normalizeModelKey(value);
+}
+
+function sanitizeNullableNumber(value: unknown, min: number, max: number): number | null {
+  if (value === null || value === undefined) return null;
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) && number >= min && number <= max ? number : null;
+}
+
+function sanitizeNullableInteger(value: unknown, min: number, max: number): number | null {
+  const number = sanitizeNullableNumber(value, min, max);
+  return number === null ? null : Math.floor(number);
+}
+
+function applySettingsV4NamespacePatch(settings: SettingsV4, input: SettingsV4UpdateInput): SettingsV4 {
+  const next = cloneJson(settings);
+  switch (input.namespace) {
+    case "general":
+      next.general = { ...next.general, ...input.patch, shortcuts: { ...next.general.shortcuts, ...(input.patch.shortcuts ?? {}) } };
+      break;
+    case "models":
+      next.models = {
+        ...next.models,
+        ...input.patch,
+        connections: applyRecordPatch(next.models.connections, input.patch.connections),
+        definitions: { ...next.models.definitions, ...(input.patch.definitions ?? {}) },
+        installed: { ...next.models.installed, ...(input.patch.installed ?? {}) },
+        taskBindings: { ...next.models.taskBindings, ...(input.patch.taskBindings ?? {}) },
+      };
+      break;
+    case "tools":
+      next.tools = { ...next.tools, ...input.patch, bash: { ...next.tools.bash, ...(input.patch.bash ?? {}) }, searchProviders: { ...next.tools.searchProviders, ...(input.patch.searchProviders ?? {}) } };
+      break;
+    case "media":
+      next.media = { ...next.media, ...input.patch, imageGeneration: { ...next.media.imageGeneration, ...(input.patch.imageGeneration ?? {}) }, imageInspection: { ...next.media.imageInspection, ...(input.patch.imageInspection ?? {}) } };
+      break;
+    case "skills":
+      next.skills = { ...next.skills, ...input.patch };
+      break;
+    case "subagents":
+      next.subagents = { ...next.subagents, ...input.patch, routes: { ...next.subagents.routes, ...(input.patch.routes ?? {}) } };
+      break;
+    case "activity":
+      next.activity = { ...next.activity, ...input.patch, usage: { ...next.activity.usage, ...(input.patch.usage ?? {}) } };
+      break;
+  }
+  return next;
+}
+
+function applyRecordPatch<T>(current: Record<string, T>, patch: Record<string, T> | undefined): Record<string, T> {
+  const next = { ...current };
+  for (const [key, value] of Object.entries(patch ?? {})) {
+    if (value === null) delete next[key];
+    else next[key] = value as T;
+  }
+  return next;
+}
+
+function computeSettingsRevision(settings: SettingsV4): string {
+  return createHash("sha256").update(JSON.stringify(settings)).digest("hex");
+}
+
 function safeImageGenerationDefaults(baseUrl: string, model: string): PersistedSettingsV3["imageGeneration"] {
   try {
     return {
@@ -1307,7 +1899,7 @@ function migrateV1Settings(
   raw: Record<string, unknown>,
   dataRoot: string,
   hasDeepSeekKey: boolean,
-): Omit<ReadSettingsResult, "source" | "rawV1"> {
+): Omit<ReadSettingsResult, "source" | "rawV1" | "v4Metadata"> {
   const seed = defaultSettingsFromEnv(dataRoot);
   const agent = isRecord(raw.agent) ? raw.agent : {};
   const defaultModel = isModelId(raw.defaultModelId) ? LEGACY_MODEL_KEY_MAP[raw.defaultModelId] : null;
@@ -1413,7 +2005,13 @@ function hasRequiredSettingsSections(raw: Record<string, unknown>): boolean {
 }
 
 function blockingSettings(dataRoot: string, message: string): ReadSettingsResult {
-  return { settings: defaultSettingsFromEnv(dataRoot), source: "invalid", warning: message, blockingError: message };
+  return {
+    settings: defaultSettingsFromEnv(dataRoot),
+    v4Metadata: defaultSettingsV4Metadata(),
+    source: "invalid",
+    warning: message,
+    blockingError: message,
+  };
 }
 
 function sanitizeImageGenerationSettings(
@@ -1561,6 +2159,7 @@ function providerCredentialSecretId(provider: LlmProviderId, credentialId: strin
 }
 
 function isProviderCredentialSecretId(value: string): boolean {
+  if (value.startsWith("connection:")) return /^[a-zA-Z0-9._-]{3,80}$/.test(value.slice("connection:".length));
   const separator = value.indexOf(":");
   if (separator <= 0 || value.indexOf(":", separator + 1) !== -1) return false;
   const provider = value.slice(0, separator);
@@ -1607,8 +2206,36 @@ function sanitizeInstalledModel(input: unknown, fallback: InstalledModelSettings
   return {
     enabled: typeof value.enabled === "boolean" ? value.enabled : fallback.enabled,
     addedAt: typeof value.addedAt === "string" && value.addedAt ? value.addedAt : fallback.addedAt,
+    ...(typeof value.connectionId === "string" ? { connectionId: value.connectionId } : fallback.connectionId ? { connectionId: fallback.connectionId } : {}),
     ...(typeof value.customLabel === "string" && value.customLabel.trim() && { customLabel: value.customLabel.trim() }),
     ...(isValidCredentialId(value.credentialId) && { credentialId: value.credentialId }),
+  };
+}
+
+function validateCustomConnection(input: CustomConnectionInput): void {
+  if (!isProviderId(input.providerId) || (input.protocol !== undefined && !isConnectionProtocol(input.protocol))) {
+    throw new ProviderSettingsError("连接协议无效。", "write_failed");
+  }
+  if (!input.apiKey?.trim()) throw new ProviderSettingsError("请输入 API Key。", "write_failed");
+  if (!input.defaultModel?.trim() || input.defaultModel.trim().length > 200) {
+    throw new ProviderSettingsError("请输入有效的默认模型 ID（最多 200 字符）。", "write_failed");
+  }
+}
+
+/** Separate keys for identical upstream model IDs on different connections. */
+function connectionModelPatch(input: CustomConnectionInput, connectionId: string, protocol: ModelApi, models: SettingsV4Models): Pick<SettingsV4Models, "definitions" | "installed"> {
+  const apiModel = input.defaultModel!.trim();
+  const key: ModelKey = `${input.providerId}:connection/${encodeURIComponent(connectionId)}/${encodeURIComponent(apiModel)}`;
+  const previous = models.definitions[key];
+  return {
+    definitions: { [key]: {
+      key, provider: input.providerId, api: protocol, apiModel,
+      label: `${input.displayName.trim() || connectionId} · ${apiModel}`,
+      source: "custom" as const, contextWindow: previous?.contextWindow ?? null, maxTokens: previous?.maxTokens ?? null,
+      thinkingDefault: previous?.thinkingDefault ?? false,
+      capabilities: previous?.capabilities ?? { input: ["text"], toolUse: "declared", reasoning: false, thinkingToggle: false },
+    } },
+    installed: { [key]: { enabled: true, addedAt: new Date().toISOString(), ...models.installed[key], connectionId } },
   };
 }
 
@@ -1730,6 +2357,12 @@ async function writeSettingsV2Backup(dataRoot: string, raw: string): Promise<voi
   await writeVerifiedBackup(join(dataRoot, SETTINGS_V2_BACKUP_DIGEST_FILE), `${digest}\n`);
 }
 
+async function writeSettingsV3Backup(dataRoot: string, raw: string): Promise<void> {
+  const digest = createHash("sha256").update(raw).digest("hex");
+  await writeVerifiedBackup(join(dataRoot, SETTINGS_V3_BACKUP_FILE), raw);
+  await writeVerifiedBackup(join(dataRoot, SETTINGS_V3_BACKUP_DIGEST_FILE), `${digest}\n`);
+}
+
 async function writeVerifiedBackup(filePath: string, value: string): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
   try {
@@ -1777,4 +2410,14 @@ function isNotFoundError(error: unknown): boolean {
 
 function isAlreadyExistsError(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === "EEXIST");
+}
+
+function sanitizeSpeechSettings(value: unknown): SpeechSettings {
+  const input = isRecord(value) ? value : {};
+  return {
+    ...DEFAULT_SPEECH_SETTINGS,
+    model: isSpeechModel(input.model) ? input.model : DEFAULT_SPEECH_SETTINGS.model,
+    voiceId: typeof input.voiceId === "string" && input.voiceId.trim() ? input.voiceId.trim().slice(0, 200) : DEFAULT_SPEECH_SETTINGS.voiceId,
+    speed: typeof input.speed === "number" && Number.isFinite(input.speed) && input.speed >= 0.5 && input.speed <= 2 ? input.speed : 1,
+  };
 }

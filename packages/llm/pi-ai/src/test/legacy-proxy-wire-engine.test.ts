@@ -8,6 +8,56 @@ import type { PiAiWireRoute } from "../pi-ai-wire-engine.js";
 const routes: readonly PiAiWireRoute[] = ["openai-completions", "openai-responses", "anthropic-messages"];
 
 describe("LegacyProxyWireEngine", () => {
+  it.each([0, 0.123])("preserves raw OpenRouter billed cost %s on direct requests", async (cost) => {
+    const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "openrouter", baseUrl: "https://openrouter.ai/api/v1",
+      loadSdk: loaderFor("openai-completions", {}, (async function* () {
+        yield { choices: [{ delta: {}, finish_reason: null }], usage: null };
+        yield { choices: [{ delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 100, completion_tokens: 5, cost, prompt_tokens_details: { cached_tokens: 50, cache_write_tokens: 20 } } };
+      })()),
+    });
+    const original = input("openai-completions");
+    const events: LlmStreamEvent[] = [];
+    for await (const event of await engine.stream({ ...original, credential: { apiKey: "fixture" } })) events.push(event);
+    expect(events.at(-1)).toMatchObject({ type: "done", usage: { cost, costCurrency: "USD", inputTokens: 30, cacheReadTokens: 50, cacheWriteTokens: 20, costProvenance: { basis: "provider-reported" } } });
+  });
+  it("does not trust an unrelated endpoint's cost as OpenRouter billing", async () => {
+    const pool = proxyPool();
+    const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "openrouter", baseUrl: "https://proxy.example/v1", proxies: pool,
+      loadSdk: loaderFor("openai-completions", {}, (async function* () { yield { choices: [{ delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 100, completion_tokens: 5, cost: 0.1 } }; })()),
+    });
+    const events: LlmStreamEvent[] = [];
+    for await (const event of await engine.stream(input("openai-completions"))) events.push(event);
+    expect(events.at(-1)).toMatchObject({ usage: { cost: null, costProvenance: { basis: "unknown" } } });
+    await pool.dispose();
+  });
+  it("prices cached input once and preserves the estimate on truncated streams", async () => {
+    const pool = proxyPool();
+    const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "fixture", baseUrl: "https://provider.example/v1", proxies: pool,
+      pricing: { providerId: "fixture", connectionId: null, apiModel: "m", modelKey: "fixture:m", currency: "USD", rates: { input: 2, output: 8, cacheRead: 0.2, cacheWrite: null }, multiplier: 1, source: "configured", contentHash: "fixture", capturedAt: "2026-09-07T00:00:00Z", fetchedAt: "2026-09-07T00:00:00Z", unsupportedBilling: false },
+      loadSdk: loaderFor("openai-completions", {}, (async function* () { yield { choices: [], usage: { prompt_tokens: 3000, completion_tokens: 500, prompt_tokens_details: { cached_tokens: 2000 }, completion_tokens_details: { reasoning_tokens: 400 } } }; })()),
+    });
+    const events: LlmStreamEvent[] = [];
+    for await (const event of await engine.stream(input("openai-completions"))) events.push(event);
+    const terminal = events.at(-1);
+    expect(terminal?.type).toBe("error");
+    if (terminal?.type !== "error") throw new Error("Missing error terminal");
+    expect(terminal.usage?.inputTokens).toBe(1000);
+    expect(terminal.usage?.cost).toBeCloseTo(0.0064, 10);
+    expect(terminal.usage?.costProvenance?.basis).toBe("estimated");
+    await pool.dispose();
+  });
+  it.each([true, false])("sends DeepSeek thinking settings through the proxy (enabled=%s)", async (enabled) => {
+    const observed: { params?: unknown; options?: unknown } = {};
+    const pool = proxyPool();
+    const engine = new LegacyProxyWireEngine({ route: "openai-completions", providerId: "deepseek", baseUrl: "https://provider.example/v1", proxies: pool, loadSdk: loaderFor("openai-completions", observed) });
+    const original = input("openai-completions");
+    for await (const _event of await engine.stream({ ...original, request: { ...original.request, options: { reasoning: enabled, reasoningEffort: "max" } } })) { /* drain */ }
+    expect(observed.params).toMatchObject({ thinking: { type: enabled ? "enabled" : "disabled" } });
+    if (enabled) expect(observed.params).toMatchObject({ reasoning_effort: "max" });
+    else expect(observed.params).not.toHaveProperty("reasoning_effort");
+    await pool.dispose();
+  });
+
   it.each(routes)("maps the scoped proxy stream for %s", async (route) => {
     const observed: { params?: unknown; options?: unknown } = {};
     const pool = new ProviderProxyPool(async () => ({
@@ -73,8 +123,9 @@ describe("LegacyProxyWireEngine", () => {
     const events: LlmStreamEvent[] = [];
     for await (const event of await engine.stream(input("openai-completions"))) events.push(event);
 
-    expect(events.at(-1)).toEqual({
+    expect(events.at(-1)).toMatchObject({
       type: "error",
+      usage: { cost: null, costProvenance: { basis: "unknown" } },
       failure: {
         kind: "proxy",
         message: "Provider proxy connection failed.",

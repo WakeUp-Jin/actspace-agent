@@ -1,3 +1,5 @@
+import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
+import { resolveModelPricing } from "@actspace/shared";
 import type { LlmAdapter, LlmAdapterDispatchInput, LlmStreamSource, LlmStreamEvent } from "@actspace/llm-service";
 import type { PiAiWireRoute } from "@actspace/llm-pi-ai";
 import { LegacyProxyWireEngine, PiAiAdapter, PiAiWireEngine } from "@actspace/llm-pi-ai";
@@ -18,7 +20,9 @@ export class CliV2LlmAdapter implements LlmAdapter {
 
   async dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
     if (this.options.mock) return mockStream(input.signal);
+    const apiModel = this.options.model ?? input.request.model;
     const engineOptions = {
+      pricing: resolveModelPricing(BUILTIN_MODEL_CATALOG, { providerId: this.options.provider.providerId, apiModel, modelKey: input.request.model, baseUrl: input.credential.baseUrl ?? this.options.provider.baseUrl }),
       route: this.options.provider.route,
       providerId: this.options.provider.providerId,
       modelId: this.options.model,
@@ -53,7 +57,7 @@ async function* mockStream(signal: AbortSignal): AsyncGenerator<LlmStreamEvent> 
   }
   const text = "Mock ActSpace Agent response.";
   yield { type: "text-delta", text };
-  yield { type: "done", stopReason: "stop", usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, cost: 0, costCurrency: "USD", source: "estimated" }, content: [{ type: "text", text }] };
+  yield { type: "done", stopReason: "stop", usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, cost: 0, costCurrency: "USD", source: "estimated", costProvenance: { version: 1, basis: "estimated", reason: "mock", pricingSnapshot: null } }, content: [{ type: "text", text }] };
 }
 
 function cancellableDelay(delayMs: number, signal: AbortSignal): Promise<boolean> {

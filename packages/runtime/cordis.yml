@@ -56,3 +56,6 @@
 - id: desktop-app
   name: "@actspace/desktop-app/plugin"
   inject: [session.runtime, agent.runtime, llm.service, compaction.runtime]
+- id: english-learning
+  name: "@actspace/english-learning/plugin"
+  inject: [agent.registry, session.runtime]

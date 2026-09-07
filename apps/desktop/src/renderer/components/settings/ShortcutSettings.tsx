@@ -9,7 +9,7 @@ import {
   type SessionListItem,
   type WorkspaceEntry,
 } from "@actspace/shared";
-import { SectionShell, SettingGroup, SettingRow, SettingsSelect, Toggle } from "./SettingsPrimitives";
+import { SettingGroup, SettingRow, SettingsSelect, Toggle } from "./SettingsPrimitives";
 
 const FALLBACK_QUICK_OPEN_SETTINGS: QuickOpenShortcutSettings = {
   enabled: true,
@@ -125,14 +125,13 @@ export function ShortcutSettings({
   ];
 
   return (
-    <SectionShell title="快捷键" description="从其他应用快速唤起 Actspace。后续快捷动作会继续集中在这里。">
-      <SettingGroup title="快速唤起">
-        <div className="flex items-center gap-3.5 px-4 py-4">
+      <SettingGroup title="快捷键" headingLevel={3} description="从其他应用快速唤起 Actspace。">
+        <div className="flex items-center gap-3.5 px-3.5 py-3.5">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-act-lg bg-surface-subtle text-text-main">
             <Keyboard size={18} strokeWidth={1.8} aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-semibold text-text-main">快速打开 Actspace</div>
+            <div className="text-[13px] font-medium text-text-main">快速打开 Actspace</div>
             <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">唤起紧凑窗口并将焦点放到输入框。</p>
           </div>
           <Toggle checked={quickOpen.enabled} disabled={saving} ariaLabel="启用快速唤起" onChange={(enabled) => void update({ enabled })} />
@@ -229,6 +228,5 @@ export function ShortcutSettings({
           />
         ) : null}
       </SettingGroup>
-    </SectionShell>
   );
 }

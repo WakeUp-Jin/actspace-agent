@@ -1,5 +1,7 @@
 # Agent 插件化 Runtime 重构设计
 
+- [英语辅助学习插件设计](agent-english-learning.md)：已实施的独立能力插件，定义会话级双语提示词注入、英文朗读、Host 播放和固定桌面端入口；[执行计划](../../exec-plans/completed/20260906-actspace-english-learning/README.md)。
+
 > 状态：v2 多包 Plugin Runtime、Cordis adapter、pi-ai adapter、Profile-first Boot 和 `apps/`/`packages/` 边界已经实现并通过自动化验证；真实 Provider、Chrome Extension、签名/公证和 Desktop DMG 仍是发布门禁（2026-08-30）。
 >
 > 本目录同时保存“研究证据”和“目标决策”。阅读时必须先看每份文档顶部的状态，不能用研究稿覆盖后续已确认决策，也不能把待评审字段当成实现规范。
@@ -17,6 +19,8 @@
 > 变更提示（2026-08-29）：新增 [`agent-spec-core-cordis-services.md`](./agent-spec-core-cordis-services.md) 与 [`20260829-actspace-core-cordis-services`](../../exec-plans/completed/20260829-actspace-core-cordis-services/README.md)，定义并落地核心 Service ownership、Definition/Provider/Consumer seam 与 Runtime 收缩边界；Phase 1–5 已完成，真实 Provider/Desktop/Chrome 与发布制品仍属外部人工门禁。
 
 > 变更提示（2026-08-29）：新增 Session Core/Persistence、Service Definition/Provider/Consumer、Profile/Bundle/Patch 和 Contract Matrix 四份后续规范及对应 P1/P2 execution plan。它们承接已完成的 P0，不重新定义 13 个 Session 事件、9 个 Loop 插入点、5 个通知、Cordis Event ABI、Agent Scope 或工具 executor；当前只建立可执行的下一阶段边界。
+
+> 变更提示（2026-08-30）：新增 [`agent-target-session-persistence-projection-architecture.md`](./agent-target-session-persistence-projection-architecture.md) 与独立执行计划，冻结“Session Journal 唯一事实源、Pure Projection、统一 watermark、Session-bound Desktop Store、同源 Trajectory”的长期架构；不改变既有事件、工具 executor 或 JSONL 物理格式。
 
 ## 背景
 
@@ -54,6 +58,7 @@ ActSpace v1 已通过 `v1-final` tag 固定基线，v2 工作位于 `refactor-ds
 | 核心 Cordis Service 化 | P0 已实现；P1-B 继续把 Definition/Provider/Consumer 提升为全域 ABI | [核心 Service 化规范](./agent-spec-core-cordis-services.md) |
 | DSH 核心重构计划 | P0 实现与自动化验证已完成；遗留外部宿主门禁按执行摘要保留 | [DSH Agent Loop / Session / Tool Shell 计划](../../exec-plans/active/20260829-actspace-dsh-core-rebuild/README.md) |
 | Session Core / Persistence | 目标设计已确认，P1-A 待实施 | [Session Core 分离规范](./agent-spec-session-core-persistence-separation.md) |
+| Session 持久化与投影收敛 | 目标设计已确认，P00-P03 待实施 | [Session 持久化与投影架构](./agent-target-session-persistence-projection-architecture.md) |
 | Service Definition / Provider / Consumer | 目标设计已确认，P1-B 待实施 | [Service 三层规范](./agent-spec-service-definition-provider-consumer.md) |
 | Profile / Bundle / Patch | 目标设计已确认，P1-C 待实施 | [组合分层规范](./agent-spec-profile-bundle-patch-layering.md) |
 | Contract Matrix | 目标设计已确认，P2 待实施 | [契约矩阵规范](./agent-spec-contract-matrix-generation.md) |
@@ -94,6 +99,7 @@ ActSpace v1 已通过 `v1-final` tag 固定基线，v2 工作位于 `refactor-ds
 | [Tool Runtime 内核与外壳边界](./agent-spec-tool-runtime-boundary.md) | 保留 ActSpace 工具实现，重写权限、审批、事件、进度和 Host 外壳 |
 | [Tool Name 与 Plugin Namespace 契约](./agent-spec-tool-name-contract.md) | 模型可见扁平 `name`、独立 `pluginId`/`registrationId`、Provider wire、Session 和 projection 一致性 |
 | [Runtime Projection](./agent-spec-runtime-projection.md) | Session / live / diagnostics 投影、generic Tool DTO、renderer allowlist、fallback 和 redaction |
+| [Session 持久化与投影架构](./agent-target-session-persistence-projection-architecture.md) | Journal 唯一事实源、Projection Registry、统一 revision、Session Store、Context/Composer/Trajectory 消费边界 |
 | [Prompt 与 Context Contributor](./agent-spec-prompt-context-contributors.md) | 动态来源、确定性排序、request snapshot、Skills、Host facts 和 Compaction 边界 |
 | [Agent 与 Subagent](./agent-spec-agent-and-subagent.md) | Agent Registry、Scope、静态 Preset、main / Agent / Explore、one-shot Subagent 与 lineage |
 | [Agent 测试策略](./agent-testing.md) | package contract、Cordis lifecycle、领域行为、Runtime/Host 集成与外部门禁分层 |
@@ -134,16 +140,17 @@ ActSpace v1 已通过 `v1-final` tag 固定基线，v2 工作位于 `refactor-ds
 16. [DSH 风格 Runtime 插件组装规范](./agent-spec-dsh-runtime-as-plugin-composition.md)
 17. [核心 Cordis Service 化与能力 seam 规范](./agent-spec-core-cordis-services.md)
 18. [Session Core 与 Persistence Provider 分离规范](./agent-spec-session-core-persistence-separation.md)
-19. [Service Definition / Provider / Consumer 分层规范](./agent-spec-service-definition-provider-consumer.md)
-20. [Profile / Bundle / Patch 分层规范](./agent-spec-profile-bundle-patch-layering.md)
-21. [Agent Contract Matrix 自动生成规范](./agent-spec-contract-matrix-generation.md)
-22. [Session 格式公共契约（物理格式背景）](./agent-spec-session-format-v1.md)
-23. [Tool Runtime 公共契约（内核 ABI 背景）](./agent-spec-tool-runtime-abi.md)
-24. [Runtime Projection 公共契约](./agent-spec-runtime-projection.md)
-25. [Prompt 与 Context Contributor 公共契约](./agent-spec-prompt-context-contributors.md)
-26. [Agent 与 Subagent 公共契约](./agent-spec-agent-and-subagent.md)
-27. [包结构与真实插件包规范](./agent-spec-package-layout-and-plugin-packaging.md)
-28. [Agent 测试策略](./agent-testing.md)
+19. [Session 持久化与投影架构](./agent-target-session-persistence-projection-architecture.md)
+20. [Service Definition / Provider / Consumer 分层规范](./agent-spec-service-definition-provider-consumer.md)
+21. [Profile / Bundle / Patch 分层规范](./agent-spec-profile-bundle-patch-layering.md)
+22. [Agent Contract Matrix 自动生成规范](./agent-spec-contract-matrix-generation.md)
+23. [Session 格式公共契约（物理格式背景）](./agent-spec-session-format-v1.md)
+24. [Tool Runtime 公共契约（内核 ABI 背景）](./agent-spec-tool-runtime-abi.md)
+25. [Runtime Projection 公共契约](./agent-spec-runtime-projection.md)
+26. [Prompt 与 Context Contributor 公共契约](./agent-spec-prompt-context-contributors.md)
+27. [Agent 与 Subagent 公共契约](./agent-spec-agent-and-subagent.md)
+28. [包结构与真实插件包规范](./agent-spec-package-layout-and-plugin-packaging.md)
+29. [Agent 测试策略](./agent-testing.md)
 
 ### 复核研究证据
 

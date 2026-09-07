@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Eye, X } from "lucide-react";
-import type { ContextUsageSnapshot } from "@actspace/shared";
+import type { ContextState, ContextUsageSnapshot } from "@actspace/shared";
 import { getContextBucketDisplay } from "@actspace/shared";
+import { selectRequestContextEstimate } from "@actspace/client/sessions";
+import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 const CONTEXT_POPOVER_CLASS =
-  "context-popover absolute bottom-[calc(100%_+_10px)] right-0 z-20 w-[min(820px,100%)] rounded-2xl border border-line bg-surface-raised px-3.5 pb-3.5 pt-[13px] text-text-main shadow-act-popover";
+  "context-popover absolute bottom-[calc(100%_+_10px)] left-0 right-0 z-20 w-auto rounded-2xl border border-line bg-surface-raised px-3.5 pb-3.5 pt-[13px] text-text-main shadow-act-popover";
 const CONTEXT_ROW_CLASS = "flex items-center justify-between gap-3.5";
 const CONTEXT_CLOSE_CLASS =
   "grid h-6 w-6 place-items-center rounded-full border-0 bg-surface-subtle text-text-muted transition-colors hover:bg-[var(--act-color-hover-overlay)]";
@@ -20,20 +22,35 @@ const CONTEXT_BUCKET_VALUE_CLASS = "font-semibold text-text-main";
 
 export function ContextPopup({
   snapshot,
+  contextState,
   onClose,
   onExpand
 }: {
   snapshot: ContextUsageSnapshot | null;
+  contextState?: ContextState | null;
   onClose: () => void;
   /** 提供时在 ✕ 旁显示「展开完整视图」按钮，点击在右侧面板打开 Context Tab。 */
   onExpand?: () => void;
 }) {
+  const sessionProjection = useOptionalSessionProjection();
+  const projectionCell = sessionProjection?.cell ?? null;
+  const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
+  const projectedSnapshot = projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null;
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
+  const stateSnapshot = contextState ? {
+    totalTokens: contextState.totalEstimatedTokens,
+    maxTokens: contextState.maxTokens,
+    percentUsed: contextState.percentUsed,
+    compressionCount: 0,
+    cumulativeTokens: contextState.totalEstimatedTokens,
+    estimator: contextState.estimator,
+    buckets: contextState.buckets,
+  } satisfies ContextUsageSnapshot : null;
   const safeSnapshot =
-    snapshot ?? {
+    stateSnapshot ?? snapshot ?? projectedSnapshot ?? {
       totalTokens: 0,
-      maxTokens: 200_000,
+      maxTokens: 0,
       percentUsed: 0,
       compressionCount: 0,
       cumulativeTokens: 0,
@@ -45,10 +62,9 @@ export function ContextPopup({
   };
 
   // 有内容但占比不足 1% 时显示「<1」，避免「明明有数据却是 0%」的误解。
-  const percentLabel =
-    safeSnapshot.totalTokens > 0 && safeSnapshot.percentUsed <= 0
+  const percentLabel = safeSnapshot.maxTokens > 0 && safeSnapshot.totalTokens > 0 && safeSnapshot.percentUsed <= 0
       ? "<1"
-      : `${safeSnapshot.percentUsed}`;
+      : `${Math.floor(safeSnapshot.percentUsed)}`;
 
   return (
     <div className={CONTEXT_POPOVER_CLASS} role="dialog" aria-label="Context usage">
@@ -83,7 +99,7 @@ export function ContextPopup({
       <div className={CONTEXT_SUMMARY_CLASS}>
         <span>{percentLabel}% Full</span>
         <span>
-          ~{safeSnapshot.totalTokens.toLocaleString()} / {safeSnapshot.maxTokens.toLocaleString()} Tokens
+          ~{formatTokenCount(safeSnapshot.totalTokens)} / {formatTokenCount(safeSnapshot.maxTokens)} Tokens
         </span>
       </div>
       <div className={CONTEXT_METER_CLASS}>
@@ -105,7 +121,7 @@ export function ContextPopup({
                 opacity: dimmed ? 0.3 : 1
               }}
               aria-pressed={selectedKey === key}
-              aria-label={`${display.label} ${bucket.tokens.toLocaleString()} tokens`}
+              aria-label={`${display.label} ${formatTokenCount(bucket.tokens)} tokens`}
               onClick={() => toggleSelected(key)}
             />
           );
@@ -128,11 +144,18 @@ export function ContextPopup({
             >
               <span className={BUCKET_SWATCH_CLASS} style={{ background: `var(${display.colorVar})` }} />
               <span className="truncate">{display.label}</span>
-              <strong className={CONTEXT_BUCKET_VALUE_CLASS}>{bucket.tokens.toLocaleString()}</strong>
+              <strong className={CONTEXT_BUCKET_VALUE_CLASS}>{formatTokenCount(bucket.tokens)}</strong>
             </button>
           );
         })}
       </div>
     </div>
   );
+}
+
+function formatTokenCount(value: number): string {
+  const safe = Math.max(0, Math.floor(value));
+  if (safe < 1_000) return safe.toLocaleString();
+  if (safe < 1_000_000) return `${Math.floor(safe / 1_000)}K`;
+  return `${Math.floor(safe / 1_000_000)}M`;
 }

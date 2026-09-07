@@ -29,7 +29,7 @@
  *    conversation 内容、composer 等）。三段子元素恢复 pointer-events: auto。
  *  - 唯一窗口拖动区在 .chrome-center；所有按钮 -webkit-app-region: no-drag。
  *  - chrome bar 使用与 SplitView 同步的三列 grid，让标题和操作归属于真实 pane。
- *  - chrome bar 自身无背景，只绘制一条统一的底部分隔线，三栏背景仍从窗口顶端自然贯顶。
+ *  - chrome bar 自身无背景；底部分隔线只属于右侧对象面板列，左列和中间列与内容自然连贯。
  */
 .window-chrome-bar {
   position: fixed;
@@ -45,7 +45,6 @@
   align-items: center;
   z-index: 60;
   pointer-events: none;
-  box-shadow: inset 0 -1px var(--act-color-border);
 }
 
 .chrome-left,
@@ -58,6 +57,7 @@
 }
 
 .chrome-left {
+  justify-content: space-between;
   gap: 6px;
   padding-left: var(--window-chrome-left-padding);
   padding-right: 8px;
@@ -82,6 +82,7 @@
 .chrome-right {
   justify-content: flex-end;
   pointer-events: none;
+  box-shadow: inset 0 -1px var(--act-color-border);
 }
 
 .chrome-center-title {
@@ -89,6 +90,7 @@
   min-width: 0;
   flex: 1 1 auto;
   align-items: center;
+  gap: 6px;
 }
 
 .chrome-center-actions,

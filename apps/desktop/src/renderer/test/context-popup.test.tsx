@@ -77,8 +77,16 @@ describe("ContextPopup", () => {
 
     expect(screen.getByText("<1% Full")).toBeInTheDocument();
     // meter 段宽相对 maxTokens：tools 占 ~0.19%，不再撑满整条。
-    const toolsMeter = screen.getByRole("button", { name: "Tools 1,879 tokens" });
+    const toolsMeter = screen.getByRole("button", { name: "Tools 1K tokens" });
     expect(toolsMeter.style.width).toBe(`${(1_879 / 1_000_000) * 100}%`);
+  });
+
+  it("shows zero for an unknown capacity instead of exposing Unknown", () => {
+    renderContextPopup({ snapshot: { ...makeSnapshot(), maxTokens: 0, percentUsed: 0 }, onClose: vi.fn() });
+
+    expect(screen.getByText("0% Full")).toBeInTheDocument();
+    expect(screen.getByText(/\/ 0 Tokens/)).toBeInTheDocument();
+    expect(screen.queryByText(/Unknown/)).not.toBeInTheDocument();
   });
 
   it("shows an expand button only when onExpand is provided and invokes it", async () => {

@@ -37,6 +37,7 @@ import type {
 } from "@actspace/shared";
 import { WorkbenchLayout } from "./components/WorkbenchLayout";
 import { RightPanelProvider } from "./components/right-panel/RightPanelContext";
+import { SessionProjectionProvider } from "./session";
 import { ShutdownOverlay } from "./components/ShutdownOverlay";
 import { resolvePreferredChatModel } from "./model-selection";
 import type { ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./components/Composer";
@@ -58,8 +59,9 @@ function attachmentForRuntime(attachment: ComposerAttachment): ComposerAttachmen
   return runtimeAttachment;
 }
 
-function getSessionTitle(sessionRecord: SessionRecord | null, sessions: SessionListItem[]): string {
-  const rawTitle = sessionRecord?.meta.title ?? sessions[0]?.title ?? "New chat";
+function getSessionTitle(sessionRecord: SessionRecord | null, sessions: SessionListItem[], sessionId: string | null): string {
+  const selected = sessionId === null ? null : sessions.find((session) => session.id === sessionId);
+  const rawTitle = sessionRecord?.meta.title ?? selected?.title ?? "New chat";
   const normalized = rawTitle.replace(/^Session\s+/i, "").replace(/^session-/i, "");
   if (normalized === rawTitle) {
     return rawTitle;
@@ -135,6 +137,7 @@ type ToolEntry = {
   preview?: ToolUiPreview;
   isError?: boolean;
   finished?: boolean;
+  terminalStatus?: Extract<RuntimeStreamEvent, { type: "tool_finished" }>["status"];
   approvalPending?: boolean;
   approvalRequestId?: string;
   approvalReason?: string;
@@ -189,8 +192,9 @@ function upsertStreamingTool(
 ): void {
   const existing = state.activeTools.get(toolCallId);
   if (existing) {
+    if (existing.terminalStatus) return;
     if (!(preview?.kind === "todo" && isEmptyTodoPreview(preview) && existing.preview?.kind === "todo")) {
-      existing.preview = preview;
+      existing.preview = preview ?? existing.preview;
     }
     existing.toolName = toolName;
     return;
@@ -443,9 +447,9 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       id: blockId,
       filePath: tool.preview.filePath,
       range: tool.preview.range,
-      displayText: getStreamingReadText(tool.preview),
+      displayText: tool.finished ? tool.preview.displayText : getStreamingReadText(tool.preview),
       createdAt: now,
-      status: tool.finished ? "completed" : "running",
+      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
     };
   }
 
@@ -456,9 +460,9 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       query: tool.preview.query,
       scope: tool.preview.scope,
       resultCount: tool.finished ? tool.preview.resultCount : undefined,
-      displayText: getStreamingSearchText(tool.preview),
+      displayText: tool.finished ? tool.preview.displayText : getStreamingSearchText(tool.preview),
       createdAt: now,
-      status: tool.finished ? "completed" : "running",
+      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
     };
   }
 
@@ -469,9 +473,9 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       pattern: tool.preview.pattern,
       scope: tool.preview.scope,
       resultCount: tool.finished ? tool.preview.resultCount : undefined,
-      displayText: getStreamingGrepText(tool.preview),
+      displayText: tool.finished ? tool.preview.displayText : getStreamingGrepText(tool.preview),
       createdAt: now,
-      status: tool.finished ? "completed" : "running",
+      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
     };
   }
 
@@ -482,9 +486,9 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       pattern: tool.preview.pattern,
       scope: tool.preview.scope,
       resultCount: tool.finished ? tool.preview.resultCount : undefined,
-      displayText: getStreamingGlobText(tool.preview),
+      displayText: tool.finished ? tool.preview.displayText : getStreamingGlobText(tool.preview),
       createdAt: now,
-      status: tool.finished ? "completed" : "running",
+      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
     };
   }
 
@@ -497,7 +501,7 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       url: tool.preview.url,
       displayText: getStreamingWebSearchText(tool.preview),
       createdAt: now,
-      status: tool.finished ? "completed" : "running",
+      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
       resultUrls: tool.finished ? tool.preview.resultUrls : undefined,
       contentPreview: tool.finished ? tool.preview.contentPreview : undefined,
     };
@@ -511,7 +515,7 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       mediaKind: tool.preview.mediaKind,
       displayText: getStreamingMediaAnalysisText(tool.preview),
       createdAt: now,
-      status: tool.finished ? "completed" : "running",
+      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
       isError: tool.isError,
     };
   }
@@ -542,9 +546,9 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       id: blockId,
       path: tool.preview.path,
       entryCount: tool.finished ? tool.preview.entryCount : undefined,
-      displayText: getStreamingDirectoryText(tool.preview, tool.finished),
+      displayText: tool.finished ? tool.preview.displayText : getStreamingDirectoryText(tool.preview, tool.finished),
       createdAt: now,
-      status: tool.finished ? "completed" : "running",
+      status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
     };
   }
 
@@ -829,6 +833,11 @@ export function App() {
   const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
   const streamingUserBlockRef = useRef<MessageBlock | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const setActiveSessionId = useCallback((sessionId: string | null) => {
+    activeSessionIdRef.current = sessionId;
+    setSelectedSessionId(sessionId);
+  }, []);
   const activeStreamAgentRunRef = useRef<{ sessionId: string; agentRunId: string } | null>(null);
   const reviewRefreshRequestIdRef = useRef(0);
   const userPickedChatModelRef = useRef(false);
@@ -1072,7 +1081,7 @@ export function App() {
         !hiddenWorkspacePaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
       );
       if (existing) {
-        activeSessionIdRef.current = existing.id;
+        setActiveSessionId(existing.id);
         const restored = await window.actspace.getSession({ sessionId: existing.id });
         setSessionRecord(restored);
         setSelectedWorkspaceRoot(
@@ -1088,7 +1097,7 @@ export function App() {
         return;
       }
 
-      activeSessionIdRef.current = null;
+      setActiveSessionId(null);
       setSessionRecord(null);
       setAgentRunResult(null);
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
@@ -1100,7 +1109,7 @@ export function App() {
 
     bootstrapSession().catch((error: unknown) => {
       console.error("Failed to bootstrap session", error);
-      activeSessionIdRef.current = null;
+      setActiveSessionId(null);
       setSessions([]);
       setSessionRecord(null);
       setAgentRunResult(null);
@@ -1243,12 +1252,17 @@ export function App() {
       }
 
       case "tool_finished": {
+        if (state.activeTools.get(event.toolCallId)?.terminalStatus) break;
+        upsertStreamingTool(state, event.toolCallId, event.toolName, event.preview);
         const tool = state.activeTools.get(event.toolCallId);
         if (tool) {
           if (event.preview) {
             tool.preview = event.preview;
           }
           tool.finished = true;
+          tool.terminalStatus = event.status ?? (event.isError ? "failed" : "completed");
+          tool.approvalPending = false;
+          tool.approvalRequestId = undefined;
           tool.isError = event.isError;
         }
         state.waitingForModel = hasFinishedAllActiveTools(state);
@@ -1283,7 +1297,7 @@ export function App() {
       case "tool_approval_required": {
         state.waitingForModel = false;
         const tool = state.activeTools.get(event.toolCallId);
-        if (tool) {
+        if (tool && !tool.terminalStatus) {
           tool.approvalPending = true;
           tool.approvalRequestId = event.requestId;
           tool.approvalReason = event.reason;
@@ -1313,7 +1327,7 @@ export function App() {
 
       case "tool_approval_resolved": {
         const tool = state.activeTools.get(event.toolCallId);
-        if (tool) {
+        if (tool && !tool.terminalStatus) {
           tool.approvalPending = false;
           if (tool.preview?.kind === "delete" && event.decision === "deny") {
             tool.finished = true;
@@ -1341,16 +1355,23 @@ export function App() {
       }
 
       case "agent_run_finished":
-        state.waitingForModel = false;
-        return;
-
       case "agent_run_aborted":
-        state.waitingForModel = false;
-        return;
-
       case "agent_run_failed":
         state.waitingForModel = false;
-        return;
+        for (const tool of state.activeTools.values()) {
+          if (tool.terminalStatus) continue;
+          tool.finished = true;
+          tool.isError = true;
+          tool.terminalStatus = event.type === "agent_run_aborted" ? "aborted" : "failed";
+          tool.approvalPending = false;
+          tool.approvalRequestId = undefined;
+          if (tool.preview?.kind === "write" || tool.preview?.kind === "edit_diff" || tool.preview?.kind === "delete") {
+            tool.preview = { ...tool.preview, status: "failed" };
+          } else if (tool.preview?.kind === "agent") {
+            tool.preview = { ...tool.preview, status: tool.terminalStatus === "aborted" ? "aborted" : "failed" };
+          }
+        }
+        break;
     }
 
     refreshStreamingBlocks();
@@ -1360,6 +1381,10 @@ export function App() {
     if (!hasActspaceBridge()) return;
 
     return window.actspace.onAgentStream((event) => {
+      const active = activeStreamAgentRunRef.current;
+      if ((event.type === "tool_approval_required" || event.type === "tool_approval_resolved") &&
+        active?.sessionId === event.sessionId && active.agentRunId === event.agentRunId &&
+        streamStateRef.current.activeTools.get(event.toolCallId)?.terminalStatus) return;
       if (event.type === "tool_approval_required") {
         setApprovalPendingForSession(event.sessionId, true);
       } else if (
@@ -1403,7 +1428,7 @@ export function App() {
   const createSessionForInput = useCallback(async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
     if (!hasActspaceBridge()) {
       const created = createLocalEmptySession(input);
-      activeSessionIdRef.current = created.meta.id;
+      setActiveSessionId(created.meta.id);
       setSessionRecord(created);
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
       setLocalSessionRecords((current) => ({ ...current, [created.meta.id]: created }));
@@ -1426,7 +1451,7 @@ export function App() {
         ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
         ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
       });
-      activeSessionIdRef.current = created.meta.id;
+      setActiveSessionId(created.meta.id);
       setSessionRecord(created);
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
       const refreshed = await window.actspace.listSessions();
@@ -1806,7 +1831,7 @@ export function App() {
       streamStateRef.current = createEmptyStreamingState();
       streamingUserBlockRef.current = null;
       setAgentRunResult(null);
-      activeSessionIdRef.current = sessionId;
+      setActiveSessionId(sessionId);
       refreshPendingApprovalStatuses([sessionId]).catch((error: unknown) => {
         console.error("Failed to refresh selected session approvals", error);
       });
@@ -1948,8 +1973,7 @@ export function App() {
       !hiddenWorkspacePaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
     );
   }, [sessions, workspaceRegistry]);
-  const activeSessionId =
-    sessionRecord?.meta.id ?? agentRunResult?.sessionId ?? visibleSessions[0]?.id ?? null;
+  const activeSessionId = selectedSessionId;
   const composerStateKey = activeSessionId ?? "__draft__";
   const activeComposerState = composerStateBySession[composerStateKey] ?? DEFAULT_COMPOSER_STATE;
   const handleComposerModeChange = (mode: ComposerMode) => {
@@ -1971,7 +1995,7 @@ export function App() {
     }));
   };
   const isSessionReady = Boolean(sessionRecord || agentRunResult || streamingBlocks.length > 0 || sessionBootstrapComplete);
-  const title = getSessionTitle(sessionRecord, visibleSessions);
+  const title = getSessionTitle(sessionRecord, visibleSessions, activeSessionId);
   const workspaceOptions = useMemo(
     () => {
       const registryOptions = workspaceRegistry
@@ -2108,7 +2132,7 @@ export function App() {
       }
 
       activeStreamAgentRunRef.current = null;
-      activeSessionIdRef.current = forked.meta.id;
+      setActiveSessionId(forked.meta.id);
       setIsStreaming(false);
       setIsAborting(false);
       setActiveAgentRunId(null);
@@ -2324,7 +2348,7 @@ export function App() {
           : localSessionRecords[fallback.id] ?? null;
         if (!restored) return;
         activeStreamAgentRunRef.current = null;
-        activeSessionIdRef.current = fallback.id;
+        setActiveSessionId(fallback.id);
         setIsStreaming(false);
         setIsAborting(false);
         setActiveAgentRunId(null);
@@ -2384,8 +2408,9 @@ export function App() {
   }, [refreshReviewSummary]);
 
   return (
-    <RightPanelProvider>
-      <WorkbenchLayout
+    <SessionProjectionProvider sessionId={activeSessionId}>
+      <RightPanelProvider>
+        <WorkbenchLayout
         sessions={visibleSessions}
         activeSessionId={activeSessionId}
         title={title}
@@ -2432,8 +2457,9 @@ export function App() {
         reviewSummary={reviewSummary}
         onReviewChanged={handleReviewChanged}
         models={usableChatModels}
-      />
-      <ShutdownOverlay />
-    </RightPanelProvider>
+        />
+        <ShutdownOverlay />
+      </RightPanelProvider>
+    </SessionProjectionProvider>
   );
 }

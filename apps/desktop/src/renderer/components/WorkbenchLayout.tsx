@@ -1,5 +1,5 @@
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
-import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, SessionListItem, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
+import type { AppSettings, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, UsableModelView, WorkspaceEntry } from "@actspace/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlaskConical } from "lucide-react";
 import { ConversationView } from "./ConversationView";
@@ -10,15 +10,16 @@ import { useAgentEditSignals } from "./right-panel/useFileFreshness";
 import { RightPanelObjectMenu } from "./right-panel/RightPanelObjectMenu";
 import { Sidebar, type NewSessionInput, type SessionUiStatusKind, type SidebarMode, type SidebarView } from "./Sidebar";
 import { SplitView } from "./SplitView";
-import { UsageStatisticsPage } from "./UsageStatisticsPage";
 import { WindowChromeBar } from "./WindowChromeBar";
+import type { SessionMainView } from "./SessionViewToggle";
 import { WorkspaceChromeControls } from "./workspace/WorkspaceChromeControls";
 import type { ComposerDraftReader, ComposerDraftRestore, ComposerDraftWriter, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
 import type { SessionPreviewResolver } from "./SessionHoverPreview";
+import { selectComposer, selectProviderUsage, selectRequestContextEstimate, selectSurfaceMessages, selectTrajectory } from "@actspace/client/sessions";
+import { contextEstimateToSnapshot, providerUsageToContextSnapshot, useOptionalSessionProjection } from "../session";
+import { ExtensionsPage } from "./extensions/ExtensionsPage";
 import { SettingsPage } from "./settings/SettingsPage";
 import type { SettingsSectionId } from "./settings/SettingsNav";
-import { AgentAnalysisWorkspace } from "./analysis/AgentAnalysisWorkspace";
-import { createAgentAnalysisSessionIndexViewState } from "./analysis/AgentAnalysisSessionIndex";
 
 type StoredWorkbenchLayout = {
   leftMode?: SidebarMode | "rail";
@@ -198,11 +199,28 @@ export function WorkbenchLayout({
     closePanel: closeRightPanel,
     openTab,
   } = useRightPanel();
+  const sessionProjection = useOptionalSessionProjection();
+  const projectionCell = sessionProjection?.cell ?? null;
+  const projectedSurfaceMessages = projectionCell ? selectSurfaceMessages(projectionCell) : [];
+  const projectedProviderUsage = projectionCell ? selectProviderUsage(projectionCell) : null;
+  const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
+  const projectedComposer = projectionCell ? selectComposer(projectionCell) : null;
+  const projectedTrajectory = projectionCell ? selectTrajectory(projectionCell) : null;
+  const projectedContextSnapshot = projectedContextEstimate
+    ? contextEstimateToSnapshot(projectedContextEstimate)
+    : projectedProviderUsage
+      ? providerUsageToContextSnapshot(projectedProviderUsage)
+      : null;
+  const effectiveContextSnapshot = projectedContextSnapshot ?? contextSnapshot;
+  const projectionSessionReady = projectionCell !== null && projectionCell.status !== "error";
+  const effectiveIsSessionReady = projectedComposer?.phase !== "blank" || isSessionReady || projectionSessionReady;
   const [view, setView] = useState<SidebarView>("chat");
+  const sessionViewByIdRef = useRef(new Map<string, SessionMainView>());
+  const [sessionMainView, setSessionMainView] = useState<SessionMainView>("chat");
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("general");
-  const [analysisSessionId, setAnalysisSessionId] = useState<string | null>(null);
-  const [analysisIndexState, setAnalysisIndexState] = useState(createAgentAnalysisSessionIndexViewState);
+  const [focusSpeech, setFocusSpeech] = useState(false);
   const [usageSnapshot, setUsageSnapshot] = useState<UsageStatisticsSnapshot | null>(null);
+  const [usageActivitySnapshot, setUsageActivitySnapshot] = useState<UsageActivitySnapshot | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState<string | null>(null);
   const sessionHistoryRef = useRef<string[]>([]);
@@ -222,6 +240,20 @@ export function WorkbenchLayout({
     }
     composerDraftsRef.current.set(key, text);
   }, []);
+
+  useEffect(() => {
+    setSessionMainView(activeSessionId ? sessionViewByIdRef.current.get(activeSessionId) ?? "chat" : "chat");
+  }, [activeSessionId]);
+
+  const toggleSessionMainView = useCallback(() => {
+    setSessionMainView((current) => {
+      const next: SessionMainView = current === "chat" ? "trajectory" : "chat";
+      if (activeSessionId) {
+        sessionViewByIdRef.current.set(activeSessionId, next);
+      }
+      return next;
+    });
+  }, [activeSessionId]);
   const isCompactLayout = containerWidth > 0 && containerWidth <= COMPACT_LAYOUT_MAX_WIDTH;
   const isSidebarHidden = leftMode === "hidden";
   const displayedLeftWidth = isSidebarHidden ? 0 : leftWidth;
@@ -293,14 +325,16 @@ export function WorkbenchLayout({
       pendingSessionNavigationRef.current = targetSessionId;
       suppressSessionHistoryRef.current = true;
       setSessionNavigationPending(true);
-      void Promise.resolve(onSelectSession(targetSessionId)).catch(() => {
-        if (pendingSessionNavigationRef.current === targetSessionId) {
-          pendingSessionNavigationRef.current = null;
-          suppressSessionHistoryRef.current = false;
-          sessionHistoryIndexRef.current -= direction;
-          setSessionNavigationPending(false);
-        }
-      });
+      void Promise.resolve()
+        .then(() => onSelectSession(targetSessionId))
+        .catch(() => {
+          if (pendingSessionNavigationRef.current === targetSessionId) {
+            pendingSessionNavigationRef.current = null;
+            suppressSessionHistoryRef.current = false;
+            sessionHistoryIndexRef.current -= direction;
+            setSessionNavigationPending(false);
+          }
+        });
     },
     [onSelectSession, sessionNavigationPending],
   );
@@ -429,46 +463,64 @@ export function WorkbenchLayout({
 
   const handleSelectView = useCallback((next: SidebarView) => {
     setView(next);
+    setCompactSidebarOpen(false);
   }, []);
 
+  const usageLoadSequence = useRef(0);
   const loadUsageStatistics = useCallback(async (
     range: UsageStatisticsSnapshot["range"] = "month",
     requestRowsPage = 1,
+    status: SettingsV4Snapshot["settings"]["activity"]["usage"]["status"] = "all",
+    search = "",
+    kind?: import("@actspace/shared").UsageActivityKind,
   ) => {
-    if (typeof window === "undefined" || !window.actspace?.getUsageStatistics) {
+    if (typeof window === "undefined" || !window.actspace?.getUsageActivity) {
       setUsageSnapshot(null);
       setUsageError(null);
       return;
     }
 
+    const sequence = ++usageLoadSequence.current;
     setUsageLoading(true);
     setUsageError(null);
     try {
       // 不传 sessionId 即走 main 的 global 路径，聚合所有 Session 历史。
-      const snapshot = await window.actspace.getUsageStatistics({
+      const input = {
         range,
+        search,
+        kind,
         scope: "global",
+        ...(status === "all" ? {} : { status }),
         requestRowsPage: { page: requestRowsPage },
-      });
-      setUsageSnapshot(snapshot);
+      } as const;
+      if (!window.actspace.getUsageActivity) throw new Error("使用统计接口不可用，请重新启动应用。");
+      const activitySnapshot = await window.actspace.getUsageActivity(input);
+      if (sequence !== usageLoadSequence.current) return;
+      setUsageActivitySnapshot(activitySnapshot);
     } catch (error) {
+      if (sequence !== usageLoadSequence.current) return;
       console.error("Failed to load usage statistics", error);
-      setUsageSnapshot(null);
-      setUsageError(error instanceof Error ? error.message : "Failed to load usage statistics.");
+      setUsageError(error instanceof Error ? error.message : "使用统计加载失败，请重试。");
     } finally {
-      setUsageLoading(false);
+      if (sequence === usageLoadSequence.current) setUsageLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (view !== "usage") return;
+    if (!(view === "settings" && settingsSection === "usage")) return;
     loadUsageStatistics().catch((error: unknown) => {
       console.error("Failed to bootstrap usage statistics", error);
     });
-  }, [view, loadUsageStatistics]);
+  }, [view, settingsSection, loadUsageStatistics]);
 
   let mainContent;
-  if (view === "lab") {
+  if (view === "extensions") {
+    mainContent = (
+      <div className="h-full min-h-0 pt-[var(--window-chrome-strip-height)]">
+        <ExtensionsPage onSettingsChange={onSettingsChange} onConfigureSpeech={() => { setSettingsSection("general"); setFocusSpeech(true); setView("settings"); }} />
+      </div>
+    );
+  } else if (view === "lab") {
     // Lab 仍在产品设计阶段：原型实现保留在 LabPage.tsx，功能定型后换回 <LabPage />。
     mainContent = (
       <PlaceholderView
@@ -483,23 +535,14 @@ export function WorkbenchLayout({
         icon={<FlaskConical size={22} strokeWidth={1.9} />}
       />
     );
-  } else if (view === "usage") {
-    mainContent = (
-      <UsageStatisticsPage
-        snapshot={usageSnapshot}
-        isLoading={usageLoading}
-        error={usageError}
-        onRefresh={loadUsageStatistics}
-        onRequestPageChange={(page, nextRange) => loadUsageStatistics(nextRange, page)}
-        onBackToChat={() => setView("chat")}
-        workspaces={workspaces}
-      />
-    );
   } else {
     mainContent = (
       <ConversationView
         messages={messages}
-        contextSnapshot={contextSnapshot}
+        contextSnapshot={effectiveContextSnapshot}
+        contextState={contextState}
+        durableSurfaceMessageCount={projectedSurfaceMessages.length > 0 ? projectedSurfaceMessages.length : undefined}
+        composerPhase={projectedComposer?.phase}
         sessionId={activeSessionId}
         isStreaming={isStreaming}
         isAborting={isAborting}
@@ -507,7 +550,7 @@ export function WorkbenchLayout({
         composerFocusRequestId={composerFocusRequestId}
         onSend={onSend}
         onAbort={onAbort}
-        isSessionReady={isSessionReady}
+        isSessionReady={effectiveIsSessionReady}
         defaultModelId={defaultModelId}
         selectedModelId={selectedModelId}
         onSelectedModelChange={onSelectedModelChange}
@@ -526,14 +569,13 @@ export function WorkbenchLayout({
         reviewSummary={reviewSummary}
         onOpenReview={openReviewTab}
         models={models}
+        activeView={sessionMainView}
+        trajectory={projectedTrajectory}
       />
     );
   }
 
-  const chromeTitle =
-    view === "lab" ? "Lab"
-    : view === "usage" ? "Usage"
-    : title;
+  const chromeTitle = view === "extensions" ? "扩展" : view === "lab" ? "Lab" : title;
   const currentSession = view === "chat"
     ? sessions.find((session) => session.id === activeSessionId) ?? null
     : null;
@@ -562,29 +604,22 @@ export function WorkbenchLayout({
       <SettingsPage
         onBack={() => setView("chat")}
         initialSection={settingsSection}
+        focusSpeech={focusSpeech}
+        onSpeechFocused={() => setFocusSpeech(false)}
         onSectionChange={setSettingsSection}
         onSettingsChange={onSettingsChange}
         onArchivedSessionsChange={onArchivedSessionsChange}
-        activeSessionId={activeSessionId}
-        analysisIndexState={analysisIndexState}
-        onAnalysisIndexStateChange={setAnalysisIndexState}
-        onOpenAnalysisSession={(sessionId) => {
-          setAnalysisSessionId(sessionId);
-          setView("analysis");
+        usageSnapshot={usageSnapshot}
+        usageActivitySnapshot={usageActivitySnapshot}
+        usageLoading={usageLoading}
+        usageError={usageError}
+        onUsageRefresh={(nextRange, requestRowsPage, status, search, kind) => {
+          void loadUsageStatistics(nextRange, requestRowsPage, status, search, kind);
         }}
-      />
-    );
-  }
-
-  if (view === "analysis" && analysisSessionId) {
-    return (
-      <AgentAnalysisWorkspace
-        sessionId={analysisSessionId}
-        onBack={() => {
-          setAnalysisSessionId(null);
-          setSettingsSection("analysis");
-          setView("settings");
+        onUsageRequestPageChange={(page, nextRange, status, search, kind) => {
+          void loadUsageStatistics(nextRange, page, status, search, kind);
         }}
+        workspaces={workspaces}
       />
     );
   }
@@ -617,6 +652,8 @@ export function WorkbenchLayout({
   const rightPanel = (
     <RightPanel
       contextState={contextState}
+      contextSnapshot={effectiveContextSnapshot}
+      contextRevision={projectionCell?.snapshot?.throughJournalSeq}
       sessionId={activeSessionId}
       workspaceRoot={selectedWorkspaceRoot ?? undefined}
       fileRevalidateKey={fileRevalidateKey}
@@ -635,20 +672,22 @@ export function WorkbenchLayout({
     <>
       <WindowChromeBar
         leftMode={chromeLeftMode}
-        rightOpen={isRightPanelOpen}
+        rightOpen={view === "chat" && isRightPanelOpen}
         title={chromeTitle}
         leftPaneWidth={displayedLeftWidth}
         rightPaneWidth={rightWidth}
         compactLayout={isCompactLayout}
         onToggleLeft={toggleSidebarMode}
         onToggleRight={toggleRightPanel}
-        canGoBack={canGoBack}
-        canGoForward={canGoForward}
+        canGoBack={view === "chat" && canGoBack}
+        canGoForward={view === "chat" && canGoForward}
         onGoBack={() => navigateSessionHistory(-1)}
         onGoForward={() => navigateSessionHistory(1)}
-        showRightToggle
+        showRightToggle={view === "chat"}
         currentSession={currentSession}
         getSessionPreview={view === "chat" ? getSessionPreview : undefined}
+        sessionView={view === "chat" ? sessionMainView : undefined}
+        onToggleSessionView={view === "chat" ? toggleSessionMainView : undefined}
         centerTrailing={
           view === "chat" && selectedWorkspaceRoot ? (
             <WorkspaceChromeControls

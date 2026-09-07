@@ -1,9 +1,11 @@
+import type { UsageCostProvenance } from "@actspace/shared";
 export type LlmUsage = {
   readonly inputTokens: number | null;
   readonly outputTokens: number | null;
   readonly cacheReadTokens: number | null;
   readonly cacheWriteTokens: number | null;
   readonly reasoningTokens: number | null;
+  readonly costProvenance?: UsageCostProvenance;
   readonly cost: number | null;
   readonly costCurrency: string | null;
   readonly source: "provider-reported" | "estimated" | "unknown";

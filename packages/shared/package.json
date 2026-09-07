@@ -9,6 +9,7 @@
     "dist"
   ],
   "exports": {
+    "./model-catalog-data": { "types": "./dist/generated/model-catalog.generated.d.ts", "import": "./dist/generated/model-catalog.generated.js", "require": "./dist/generated/model-catalog.generated.js", "default": "./dist/generated/model-catalog.generated.js" },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",

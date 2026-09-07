@@ -54,7 +54,9 @@ export async function bootCliV2(options: { readonly kind: "cli-run"; readonly wo
       hostServices,
       toolEnvironment: { workspaceRoot: options.workspace, hostCapabilities: new Set(capabilities), capabilitySet, approvalBroker: approval, createArtifact: (input) => artifacts.create(input) },
       composition,
-      onLiveEvent: (event) => options.onLiveEvent?.({ ...event }),
+      onLiveEvent: (event) => {
+        if (event.kind === "assistant-delta" || event.kind === "reasoning-delta" || event.kind === "run-state") options.onLiveEvent?.({ ...event });
+      },
       ...(testCordis ? { cordis: testCordis } : { cordis: { configPath: runtime.runtimeCordisConfigPath(), admission: await runtime.inspectCordisAdmission() } }),
       disposePlugins: disposeResources,
     });

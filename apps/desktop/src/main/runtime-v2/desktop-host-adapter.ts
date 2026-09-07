@@ -1,3 +1,4 @@
+import type { SpeechHostPort } from "@actspace/english-learning";
 import { join } from "node:path";
 import type { RuntimeV2HostCapability, RuntimeV2HostDescriptor, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { DesktopApprovalBroker } from "./approval-broker";
@@ -10,6 +11,7 @@ import type { DesktopRuntimeV2ModelPort } from "./model-port";
 import type { DesktopRuntimeV2ApprovalPort, DesktopRuntimeV2BrowserPort, DesktopRuntimeV2Roots } from "./host-ports";
 
 export type DesktopRuntimeV2BootOptions = {
+  readonly speech?: SpeechHostPort;
   readonly module: RuntimeV2Module;
   readonly roots: DesktopRuntimeV2Roots;
   readonly models: DesktopRuntimeV2ModelPort;
@@ -28,14 +30,7 @@ export type DesktopRuntimeV2BootOptions = {
     readonly completed?: number;
     readonly total?: number;
   }) => void;
-  readonly onRuntimeLive?: (update: {
-    readonly kind: "assistant-delta" | "reasoning-delta" | "run-state";
-    readonly sessionId: string;
-    readonly agentRunId: string;
-    readonly turnId: string;
-    readonly stepId?: string;
-    readonly message: string;
-  }) => void;
+  readonly onRuntimeLive?: (update: import("@actspace/runtime").AgentLoopLiveEvent) => void;
   readonly disposeCordis?: () => Promise<void>;
   /** Optional forensic/legacy plugin config; default boot never reads plugins.json. */
   readonly legacyPluginsConfigPath?: string;
@@ -88,6 +83,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
     workspaceRoot: options.roots.workspaceRoot,
     toolEnvironment: { hostCapabilities: new Set(capabilities), capabilitySet },
       services: Object.freeze({
+      ...(options.speech ? { "actspace.host.speech": options.speech } : {}),
       "actspace.host.desktop": Object.freeze({ workspaceRoot: options.roots.workspaceRoot }),
       "host.approval": approvalBroker,
       "host.browser": browser,

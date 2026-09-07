@@ -40,7 +40,7 @@ type RunAssembly = {
 
 type RunService = {
   attach(session: SessionHandle): Promise<RunAssembly>;
-  run(sessionId: string, input: { readonly content: RuntimeV2JsonValue; readonly messageId?: string; readonly agentRunId?: string; readonly model?: string; readonly mode?: RuntimeV2RunTurnRequest["mode"]; readonly keepPendingOnAbort?: boolean; readonly selectedSkillIds?: readonly string[] }): Promise<RuntimeV2RunTurnResponse>;
+  run(sessionId: string, input: Omit<RuntimeV2RunTurnRequest, "sessionId">): Promise<RuntimeV2RunTurnResponse>;
   get(sessionId: string): RunAssembly | undefined;
   rebuild(session: SessionHandle): Promise<RunAssembly>;
 };
@@ -126,6 +126,8 @@ export class DesktopAppService implements DesktopAppServiceContract {
       agentRunId: input.agentRunId,
       model: input.model,
       mode: input.mode,
+      thinkingEnabled: input.thinkingEnabled,
+      reasoningEffort: input.reasoningEffort,
       keepPendingOnAbort: input.keepPendingOnAbort,
       selectedSkillIds: input.selectedSkillIds,
     });

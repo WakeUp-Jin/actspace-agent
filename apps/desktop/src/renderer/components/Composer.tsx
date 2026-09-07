@@ -37,6 +37,7 @@ import {
 import type {
   ComposerMode,
   ComposerAttachment,
+  ContextState,
   ContextUsageSnapshot,
   LlmProviderId,
   ModelReasoningEffort,
@@ -63,6 +64,8 @@ import {
   type ComposerSlashFunction,
   type ComposerSlashFunctionId,
 } from "./composer-slash-commands";
+import { selectProviderUsage, selectRequestContextEstimate } from "@actspace/client/sessions";
+import { contextEstimateToSnapshot, providerUsageToContextSnapshot, useOptionalSessionProjection } from "../session";
 
 export type ComposerSendOptions = {
   model: ModelSelectionId;
@@ -446,6 +449,8 @@ function getAttachmentPreviewStyle(attachment: ComposerAttachment): CSSPropertie
 
 export function Composer({
   contextSnapshot,
+  contextState,
+  sessionId,
   isStreaming = false,
   isAborting = false,
   onSend,
@@ -475,6 +480,8 @@ export function Composer({
   models,
 }: {
   contextSnapshot: ContextUsageSnapshot | null;
+  contextState?: ContextState | null;
+  sessionId?: string | null;
   isStreaming?: boolean;
   isAborting?: boolean;
   onSend?: (text: string, options: ComposerSendOptions) => void | Promise<void>;
@@ -506,6 +513,15 @@ export function Composer({
   onOpenReview?: () => void;
   models?: UsableModelView[];
 }) {
+  const sessionProjection = useOptionalSessionProjection();
+  const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && sessionProjection.sessionId === (sessionId ?? sessionProjection.sessionId)
+    ? sessionProjection.cell
+    : null;
+  const projectedProviderUsage = projectionCell ? selectProviderUsage(projectionCell) : null;
+  const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
+  const effectiveContextSnapshot = contextSnapshot
+    ?? (projectedProviderUsage ? providerUsageToContextSnapshot(projectedProviderUsage) : null)
+    ?? (projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null);
   const modelList: ComposerModelOption[] = models === undefined
     ? LEGACY_MODEL_OPTIONS
     : models.map((model) => ({
@@ -613,7 +629,7 @@ export function Composer({
     : modelList.length === 0
       ? "请先在设置中连接模型服务"
       : selectedModelId;
-  const contextUsagePercent = contextSnapshot?.percentUsed ?? 0;
+  const contextUsagePercent = effectiveContextSnapshot?.percentUsed ?? 0;
   const contextRingPercent = Math.max(0, Math.min(100, contextUsagePercent));
   const contextRingColor =
     contextRingPercent >= 90
@@ -622,10 +638,9 @@ export function Composer({
         ? "var(--act-color-warning)"
         : "var(--act-color-text-faint)";
   // 有内容但占比不足 1% 时显示「<1」，避免「明明有数据却是 0%」的误解。
-  const contextPercentLabel =
-    contextSnapshot && contextSnapshot.totalTokens > 0 && contextUsagePercent <= 0
+  const contextPercentLabel = effectiveContextSnapshot && effectiveContextSnapshot.maxTokens > 0 && effectiveContextSnapshot.totalTokens > 0 && contextUsagePercent <= 0
       ? "<1"
-      : `${contextUsagePercent}`;
+      : `${Math.floor(contextUsagePercent)}`;
   // 单行内容用 inline 紧凑布局；内容折行、有附件或 initial surface 切 stacked（参考 Cursor）。
   const resolvedLayout: "inline" | "stacked" =
     surface === "initial" || hasAttachments || isInputMultiline ? "stacked" : "inline";
@@ -2241,7 +2256,8 @@ export function Composer({
     <footer className={getComposerWrapClass(surface)} ref={composerRef}>
       {contextOpen ? (
         <ContextPopup
-          snapshot={contextSnapshot}
+          snapshot={effectiveContextSnapshot}
+          contextState={contextState}
           onClose={() => setContextOpen(false)}
           onExpand={
             onExpandContext

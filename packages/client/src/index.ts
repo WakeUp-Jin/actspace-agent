@@ -8,6 +8,8 @@ export type ClientProjectionBoundary = {
 
 export type ClientLiveEventBoundary = RuntimeV2LiveEvent;
 
+export * from "./sessions/index.js";
+
 export function toClientProjection(snapshot: RuntimeV2SessionSnapshot): ClientProjectionBoundary {
   return Object.freeze({ schemaVersion: 1, sessionId: snapshot.sessionId, snapshot });
 }

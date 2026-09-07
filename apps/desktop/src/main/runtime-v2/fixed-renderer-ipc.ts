@@ -1,3 +1,5 @@
+import { UsageSourceCache } from "./usage-source-cache";
+import { loadDesktopSessionProjection } from "./session-projection";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { dialog, ipcMain, nativeImage, nativeTheme, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
@@ -13,19 +15,25 @@ import {
   type ProviderOperationResult,
   type ProviderTestResult,
   type RunAgentInput,
-  type RuntimeStreamEvent,
   type SessionListItem,
   type SessionRecord,
   type UsageStatisticsGetInput,
   type UsageStatisticsSnapshot,
+  type UsageActivitySnapshot,
+  type SettingsV4ChangedNotification,
+  type SettingsV4Snapshot,
+  type SettingsV4UpdateResult,
+  type SettingsV4UpdateInput,
+  type CustomConnectionInput,
 } from "@actspace/shared";
 import {
   RUNTIME_V2_FIXED_RENDERER_CHANNELS,
-  type RuntimeV2DesktopLiveEnvelope,
   type RuntimeV2JsonValue,
   type RuntimeV2SessionListItem,
   type RuntimeV2SessionSnapshot,
+  type RuntimeV2DesktopSessionProjection,
 } from "@actspace/shared/runtime-v2";
+import type { RuntimeV2UpdateCustomConnectionInput } from "@actspace/shared/runtime-v2";
 import type { AppDataRoots } from "../app-paths";
 import type { PendingApprovalRegistry } from "../approval-registry";
 import { showArtifactContextMenu, showResolvedArtifactContextMenu } from "../artifact-context-menu-service";
@@ -47,14 +55,13 @@ import type { ProviderNetworkService } from "./provider-network-service";
 import type { DesktopRuntimeV2Registry } from "./runtime-registry";
 import { installFixedRendererSkill, listFixedRendererSkills, uninstallFixedRendererSkill } from "./fixed-renderer-skills";
 import {
-  projectAnalysis,
   projectContextSnapshot,
   projectContextState,
   projectFixedRendererEvents,
   projectFixedRendererSession,
   projectSubagentTranscript,
-  projectTrace,
-  projectTraceList,
+  projectSubagentList,
+  projectUsageActivity,
   projectUsageStatistics,
 } from "./fixed-renderer-projection";
 import { listVisualizationsV2, visualizeReplyV2 } from "./fixed-renderer-visualization";
@@ -66,6 +73,7 @@ export type FixedRendererIpcOptions = {
   readonly models: ModelStoreService;
   readonly modelRuntime: ModelRuntimeService;
   readonly providerNetwork: ProviderNetworkService;
+  readonly pricingCatalog?: import("../model-catalog-service").ModelCatalogService;
   readonly catalog: RuntimeV2OpenRouterCatalogService;
   readonly approvals: PendingApprovalRegistry;
   readonly browserBridge: BrowserBridgeService;
@@ -83,6 +91,7 @@ export type FixedRendererIpcRegistration = {
 export function registerFixedRendererIpc(options: FixedRendererIpcOptions): FixedRendererIpcRegistration {
   const channels: string[] = [];
   let pendingQuickOpen = false;
+  let unsubscribeSettingsV4 = () => undefined;
   const handle = <T extends unknown[], R>(
     channel: string,
     listener: (event: IpcMainInvokeEvent, ...args: T) => R | Promise<R>,
@@ -115,13 +124,15 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       return null;
     }
   });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionProjectionSnapshot, async (_event, input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput): Promise<RuntimeV2DesktopSessionProjection> => loadDesktopSessionProjection(options.registry, input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionPreview, async (_event, input: { sessionId: string }) => {
     try {
       const snapshot = await options.registry.inspectSession(input.sessionId);
+      const journal = await options.registry.inspectSessionEvents(input.sessionId);
       return {
         sessionId: snapshot.sessionId,
         workspaceRoot: snapshot.workspaceRoot ?? options.roots.workspaceRoot,
-        contextSnapshot: projectContextSnapshot(snapshot),
+        contextSnapshot: projectContextSnapshot(snapshot, journal),
       };
     } catch {
       return null;
@@ -186,6 +197,8 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       selectedSkillIds: input.selectedSkills,
       model: input.modelKey ?? input.model,
       mode: input.mode,
+      thinkingEnabled: input.thinkingEnabled,
+      reasoningEffort: input.reasoningEffort,
     });
     const snapshot = result.snapshot;
     const record = await loadSessionRecord(options.registry, snapshot.sessionId, options.roots.workspaceRoot);
@@ -199,7 +212,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
         model: input.modelKey ?? input.model ?? "default",
         provider: "runtime-v2",
       } : undefined,
-      contextSnapshot: projectContextSnapshot(snapshot),
+      contextSnapshot: projectContextSnapshot(snapshot, await options.registry.inspectSessionEvents(snapshot.sessionId)),
       status: result.reason === "aborted" ? "aborted" : result.reason === "failed" ? "failed" : "completed",
       ...(result.reason === "failed" ? { error: { code: "AGENT_RUN_FAILED", message: "The v2 Agent run failed." } } : {}),
     };
@@ -210,14 +223,25 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
 
   const unsubscribeLive = options.registry.subscribe((envelope) => {
+    if (envelope.event.kind === "runtime-live") usageSourceCaches.get(options.registry)?.invalidate();
     const target = options.getMainWindow();
     if (target === undefined || target.isDestroyed()) return;
-    for (const event of toRendererStreamEvents(envelope)) {
-      target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.agentStream, event);
-    }
+    target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.sessionLiveEvent, envelope);
+
+  });
+
+  const unsubscribeRendererStream = options.registry.subscribeRendererStream((event) => {
+    const target = options.getMainWindow();
+    if (target !== undefined && !target.isDestroyed()) target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.agentStream, event);
   });
 
   registerFixedRendererSettings(options, handle);
+  unsubscribeSettingsV4 = options.settings.subscribeV4Changes((notification: SettingsV4ChangedNotification) => {
+    const target = options.getMainWindow();
+    if (target !== undefined && !target.isDestroyed()) {
+      target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.settingsChangedV4, notification);
+    }
+  });
   registerFixedRendererHostCapabilities(options, handle);
 
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.quickOpenConsume, () => {
@@ -242,6 +266,9 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   return {
     dispose: () => {
       unsubscribeLive();
+      usageSourceCaches.delete(options.registry);
+      unsubscribeRendererStream();
+      unsubscribeSettingsV4();
       ipcMain.removeListener(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setNativeTheme, themeListener);
       for (const channel of channels) ipcMain.removeHandler(channel);
     },
@@ -262,6 +289,21 @@ type Handle = <T extends unknown[], R>(
 
 function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle: Handle): void {
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSettings, (): AppSettings => options.settings.get());
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSettingsV4, (): SettingsV4Snapshot => options.settings.getV4());
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateSettingsV4, async (_event, input: SettingsV4UpdateInput): Promise<SettingsV4UpdateResult> => {
+    try {
+      return { ok: true, snapshot: await options.settings.updateNamespaceV4(input) };
+    } catch (error) {
+      if (error instanceof Error && error.name === "SettingsRevisionConflictError" && "latest" in error) {
+        const latest = (error as { latest: SettingsV4Snapshot }).latest;
+        return { ok: false, code: "revision_conflict", latest, message: error.message };
+      }
+      throw error;
+    }
+  });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createCustomConnection, (_event, input: CustomConnectionInput) => options.settings.createCustomConnection(input));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.removeCustomConnection, (_event, input: { connectionId: string }) => options.settings.removeCustomConnection(input.connectionId));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateCustomConnection, (_event, input: RuntimeV2UpdateCustomConnectionInput) => options.settings.updateCustomConnection(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateSettings, (_event, input: Parameters<SettingsService["update"]>[0]) => options.settings.update(input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setProviderKey, (_event, input: Parameters<SettingsService["setProviderKey"]>[0] extends never ? never : { provider: Parameters<SettingsService["setProviderKey"]>[0]; apiKey: string }) => options.settings.setProviderKey(input.provider, input.apiKey));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.clearProviderKey, (_event, input: { provider: Parameters<SettingsService["clearProviderKey"]>[0] }) => options.settings.clearProviderKey(input.provider));
@@ -384,6 +426,8 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
 
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listInstalledModels, () => ({ models: options.models.listInstalledModels() }));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listUsableModels, (_event, input: { purpose?: "chat" | "utility" | "explore" | "vision" }) => ({ models: options.modelRuntime.listUsableModels(input?.purpose ?? "chat") }));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getPricingCatalog, () => options.pricingCatalog?.status() ?? null);
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.refreshPricingCatalog, (_event, input: { force?: boolean } = {}) => options.pricingCatalog?.refresh(input.force === true) ?? null);
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listModelCatalog, (_event, input: { query?: string } = {}) => ({ provider: "openrouter", ...options.catalog.list(input.query) }));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.reloadModelCatalog, async () => {
     const runtime = options.settings.getProviderRuntimeConfig("openrouter");
@@ -553,6 +597,10 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     }
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getUsageStatistics, (_event, input: UsageStatisticsGetInput) => createUsageStatistics(options.registry, input));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getUsageActivity, (_event, input: UsageStatisticsGetInput) => createUsageActivity(options.registry, input));
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSubagents, async (_event, input: { sessionId: string }) => {
+    return projectSubagentList(await options.registry.inspectSession(input.sessionId), await options.registry.inspectSessionEvents(input.sessionId));
+  });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSubAgentTranscript, async (_event, input: { transcriptRef: { runId: string } }) => {
     const snapshot = await options.registry.inspectSession(input.transcriptRef.runId);
     const journal = await options.registry.inspectSessionEvents(input.transcriptRef.runId);
@@ -566,20 +614,9 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       agentRunId: input.agentRunId,
       status: result.compacted ? "compacted" : "skipped",
       events: projectFixedRendererEvents(result.snapshot, await options.registry.inspectSessionEvents(input.sessionId)),
-      contextSnapshot: projectContextSnapshot(result.snapshot),
+      contextSnapshot: projectContextSnapshot(result.snapshot, await options.registry.inspectSessionEvents(input.sessionId)),
     };
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listAgentTraces, async (_event, input: { sessionId: string }) => {
-    const snapshot = await options.registry.inspectSession(input.sessionId);
-    return { traces: projectTraceList(snapshot, await options.registry.inspectSessionEvents(input.sessionId)) };
-  });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.readAgentTrace, async (_event, input: { sessionId: string; agentRunId: string }) => {
-    const snapshot = await options.registry.inspectSession(input.sessionId);
-    return projectTrace(snapshot, await options.registry.inspectSessionEvents(input.sessionId), input.agentRunId);
-  });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getAgentAnalysisIndex, async (_event, input: { sessionId: string }) => createSessionAnalysis(options.registry, input.sessionId));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getAgentAnalysisSessionIndex, () => createSessionAnalysisIndex(options.registry));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.clearAgentTraces, () => ({ filesDeleted: 0, bytesFreed: 0 }));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.visualizeReply, (_event, input: Parameters<typeof visualizeReplyV2>[0]) => visualizeReplyV2(input, options.roots, options.registry));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listVisualizations, (_event, input: { sessionId: string }) => listVisualizationsV2(input.sessionId, options.roots, options.registry));
 }
@@ -595,6 +632,8 @@ async function toSessionListItem(item: RuntimeV2SessionListItem, registry: Deskt
     id: item.sessionId,
     title: item.metadata.title ?? "New chat",
     updatedAt: item.updatedAt,
+    accessState: item.accessState,
+    isChildSession: item.lineage !== null,
     agentRunCount,
     workspaceRoot: item.workspaceRoot ?? undefined,
     pinned: item.metadata.pinned,
@@ -625,35 +664,6 @@ async function toRunContent(
     }
   }
   return blocks;
-}
-
-function toRendererStreamEvents(envelope: RuntimeV2DesktopLiveEnvelope): RuntimeStreamEvent[] {
-  const event = envelope.event;
-  const agentRunId = event.agentRunId ?? "unknown";
-  const turnId = event.turnId ?? `turn-${agentRunId}`;
-  const llmCallId = event.stepId ?? `llm-${turnId}`;
-  if (event.kind === "assistant-delta") return [{ type: "assistant_text_delta", sessionId: event.sessionId, agentRunId, turnId, llmCallId, messageId: `assistant-${agentRunId}`, delta: event.message ?? "" }];
-  if (event.kind === "reasoning-delta") return [{ type: "assistant_thinking_delta", sessionId: event.sessionId, agentRunId, turnId, llmCallId, messageId: `thinking-${agentRunId}`, delta: event.message ?? "" }];
-  if (event.kind === "tool-progress" && event.callId) return [{
-    type: "tool_call_streaming",
-    sessionId: event.sessionId,
-    agentRunId,
-    turnId,
-    llmCallId,
-    toolCallId: event.callId,
-    toolName: event.name ?? "tool",
-    preview: { kind: "generic", title: event.name ?? "Tool", content: event.message ?? event.phase ?? "Running" },
-  }];
-  if (event.kind !== "run-state") return [];
-  if (event.message === "started") return [
-    { type: "agent_run_started", sessionId: event.sessionId, agentRunId },
-    { type: "agent_turn_started", sessionId: event.sessionId, agentRunId, turnId, turnIndex: 0 },
-  ];
-  if (event.message === "step-started") return [{ type: "llm_call_started", sessionId: event.sessionId, agentRunId, turnId, turnIndex: 0, llmCallId, attempt: 1 }];
-  if (event.message === "completed") return [{ type: "agent_run_finished", sessionId: event.sessionId, agentRunId, resultEventIds: [] }];
-  if (event.message === "aborted") return [{ type: "agent_run_aborted", sessionId: event.sessionId, agentRunId }];
-  if (event.message === "failed") return [{ type: "agent_run_failed", sessionId: event.sessionId, agentRunId, error: { code: "AGENT_RUN_FAILED", message: "The v2 Agent run failed.", recoverable: true } }];
-  return [];
 }
 
 function workspaceRegistryOptions(roots: AppDataRoots): WorkspaceRegistryOptions {
@@ -726,40 +736,16 @@ async function createUsageStatistics(
   return projectUsageStatistics(sessions, { scope, ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }), range: input.range ?? "month", page: input.requestRowsPage?.page ?? 1 });
 }
 
-async function createSessionAnalysis(registry: DesktopRuntimeV2Registry, sessionId: string) {
-  const snapshot = await registry.inspectSession(sessionId);
-  return projectAnalysis(snapshot, await registry.inspectSessionEvents(sessionId));
-}
+const usageSourceCaches = new WeakMap<DesktopRuntimeV2Registry, UsageSourceCache>();
 
-async function createSessionAnalysisIndex(registry: DesktopRuntimeV2Registry) {
-  const list = await registry.listSessions();
-  const entries = await Promise.all(list.map(async (item) => {
-    const snapshot = await registry.inspectSession(item.sessionId);
-    return { snapshot, analysis: projectAnalysis(snapshot, await registry.inspectSessionEvents(item.sessionId)) };
-  }));
-  const totals = entries.reduce((sum, entry) => ({
-    agentRunCount: sum.agentRunCount + entry.analysis.totals.agentRunCount,
-    turnCount: sum.turnCount + entry.analysis.totals.turnCount,
-    llmCallCount: sum.llmCallCount + entry.analysis.totals.llmCallCount,
-    inputTokens: sum.inputTokens + entry.analysis.totals.inputTokens,
-    outputTokens: sum.outputTokens + entry.analysis.totals.outputTokens,
-    cacheReadTokens: sum.cacheReadTokens + entry.analysis.totals.cacheReadTokens,
-    cacheWriteTokens: sum.cacheWriteTokens + entry.analysis.totals.cacheWriteTokens,
-    durationMs: sum.durationMs + entry.analysis.totals.durationMs,
-  }), { agentRunCount: 0, turnCount: 0, llmCallCount: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, durationMs: 0 });
-  return {
-    totals: { ...totals, sessionCount: entries.length },
-    modelNames: [...new Set(entries.flatMap((entry) => entry.analysis.runs.flatMap((run) => run.modelNames)))].sort(),
-    sessions: entries.map(({ snapshot, analysis }) => ({
-      sessionId: snapshot.sessionId,
-      title: snapshot.metadata.title ?? "New chat",
-      updatedAt: snapshot.updatedAt,
-      workspaceRoot: snapshot.workspaceRoot ?? undefined,
-      status: snapshot.accessState === "read-write" ? analysis.runs.some((run) => run.status === "recording") ? "recording" as const : analysis.runs.some((run) => run.status === "failed") ? "failed" as const : analysis.runs.length === 0 ? "empty" as const : "completed" as const : "unavailable" as const,
-      ...analysis.totals,
-      modelNames: [...new Set(analysis.runs.flatMap((run) => run.modelNames))].sort(),
-    })),
-  };
+async function createUsageActivity(registry: DesktopRuntimeV2Registry, input: UsageStatisticsGetInput): Promise<UsageActivitySnapshot | null> {
+  let cache = usageSourceCaches.get(registry);
+  if (!cache) { cache = new UsageSourceCache(registry); usageSourceCaches.set(registry, cache); }
+  const all = await cache.read();
+  const scope = input.scope ?? (input.sessionId ? "session" : "global");
+  const sessions = scope === "session" ? all.filter(({ snapshot }) => snapshot.sessionId === input.sessionId) : all;
+  if (scope === "session" && !sessions.length) return null;
+  return projectUsageActivity(sessions, { scope, ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }), range: input.range ?? "month", status: input.status ?? "all", search: input.search?.slice(0, 300), kind: input.kind, page: input.requestRowsPage?.page ?? 1 });
 }
 
 async function imagePreviewDataUrl(path: string): Promise<string | undefined> {

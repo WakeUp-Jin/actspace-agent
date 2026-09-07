@@ -12,6 +12,14 @@ import type { SessionHandle } from "./session.js";
 import { SessionWriterLease } from "./writer-lease.js";
 
 export type SessionRecoveryOutcome = "not-started" | "outcome-unknown";
+export type SessionRecoveryAccess = "read-write" | "read-only" | "forensic-required";
+
+/** Maps low-level JSONL inspection to the product recovery posture. */
+export function classifySessionRecoveryAccess(inspection: SessionInspection): SessionRecoveryAccess {
+  if (inspection.accessState === "corrupt" || inspection.header === null || inspection.validation === null) return "forensic-required";
+  if (inspection.tornTail !== null || inspection.accessState === "degraded" || inspection.accessState === "browse-only") return "read-only";
+  return "read-write";
+}
 
 export type SessionRecoveryPlan = {
   readonly repairId: string;

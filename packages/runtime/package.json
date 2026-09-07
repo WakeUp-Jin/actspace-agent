@@ -10,6 +10,7 @@
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" }, "./cordis": { "types": "./dist/cordis.d.ts", "import": "./dist/cordis.js", "default": "./dist/cordis.js" }, "./session": { "types": "./dist/runtime/session-plugin.d.ts", "import": "./dist/runtime/session-plugin.js", "default": "./dist/runtime/session-plugin.js" }, "./agent-factory": { "types": "./dist/runtime/agent-factory-plugin.d.ts", "import": "./dist/runtime/agent-factory-plugin.js", "default": "./dist/runtime/agent-factory-plugin.js" }, "./agent-runtime": { "types": "./dist/runtime/agent-runtime-plugin.d.ts", "import": "./dist/runtime/agent-runtime-plugin.js", "default": "./dist/runtime/agent-runtime-plugin.js" }, "./headless": { "types": "./dist/runtime/headless-plugin.d.ts", "import": "./dist/runtime/headless-plugin.js", "default": "./dist/runtime/headless-plugin.js" }, "./loader": { "types": "./loader.d.cts", "require": "./loader.cjs", "default": "./loader.cjs" } },
   "scripts": { "clean": "rm -rf dist", "build": "tsc -p tsconfig.json", "typecheck": "tsc --noEmit -p tsconfig.json", "test": "vitest run --globals --passWithNoTests" },
   "dependencies": {
+    "@actspace/english-learning": "workspace:*",
     "@actspace/boot": "workspace:*",
     "@actspace/bundle": "workspace:*",
     "@actspace/composition": "workspace:*",

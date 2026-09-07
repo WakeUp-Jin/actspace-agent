@@ -116,7 +116,7 @@ export class AgentLoopService {
     if (!claimed.some((candidate) => candidate.messageId === enqueued.messageId)) throw new Error(`Agent ${agentId} could not claim followup ${enqueued.messageId}.`);
     await this.emit(assembly, "agent/inbox/claimed", { agentId, sessionId: agent.sessionId, messageId: enqueued.messageId, target });
     const { target: _target, messageId: _messageId, ...turnOptions } = options;
-    return assembly.loop.runTurn({ ...turnOptions, content, messageId: enqueued.messageId, inboxClaimed: true });
+    return assembly.loop.runTurn({ ...turnOptions, content, messageId: enqueued.messageId });
   }
 
   quiesce(): void {

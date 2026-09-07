@@ -12,32 +12,64 @@ export function SectionShell({
   title,
   description,
   action,
+  headingLevel = 3,
   children,
 }: {
-  title: string;
+  title?: string;
   description?: string;
   action?: ReactNode;
+  headingLevel?: 3 | 4;
   children: ReactNode;
 }) {
+  const hasHeader = Boolean(title || description || action);
   return (
-    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-7 px-8 py-8 max-[600px]:gap-5 max-[600px]:px-4 max-[600px]:py-5">
-      <header className="flex items-start justify-between gap-5 max-[600px]:flex-col max-[600px]:gap-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="text-[22px] font-bold tracking-tight text-text-main">{title}</h2>
-          {description ? <p className="text-[13px] leading-relaxed text-text-faint">{description}</p> : null}
-        </div>
-        {action ? <div className="shrink-0 pt-0.5 max-[600px]:w-full">{action}</div> : null}
-      </header>
+    <div className="flex min-w-0 w-full flex-col gap-4">
+      {hasHeader ? (
+        <header className="flex items-start justify-between gap-5 px-0.5 max-[600px]:flex-col max-[600px]:gap-2">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            {title ? headingLevel === 4 ? <h4 className="text-[13px] font-medium tracking-tight text-text-main">{title}</h4> : <h3 className="text-[15px] font-semibold tracking-tight text-text-main">{title}</h3> : null}
+            {description ? <p className="max-w-[62ch] text-[12px] leading-relaxed text-text-faint">{description}</p> : null}
+          </div>
+          {action ? <div className="shrink-0 pt-0.5 max-[600px]:w-full">{action}</div> : null}
+        </header>
+      ) : null}
       {children}
     </div>
   );
 }
 
-export function SettingGroup({ title, children }: { title?: string; children: ReactNode }) {
+export function PageShell({
+  title,
+  description,
+  maxWidth = "720",
+  children,
+}: {
+  title: string;
+  description?: string;
+  maxWidth?: "720" | "880";
+  children: ReactNode;
+}) {
   return (
-    <section className="flex flex-col gap-2.5">
-      {title ? <h3 className="px-0.5 text-[12px] font-semibold uppercase tracking-wide text-text-faint">{title}</h3> : null}
-      <div className="divide-y divide-line/80 overflow-hidden rounded-act-lg border border-line bg-surface">
+    <div className={`mx-auto flex w-full ${maxWidth === "880" ? "max-w-[880px]" : "max-w-[760px]"} flex-col gap-8 px-8 py-8 max-[600px]:gap-6 max-[600px]:px-4 max-[600px]:py-5`}>
+      <header className="flex min-w-0 flex-col gap-1 px-0.5">
+        <h2 className="text-[22px] font-semibold tracking-tight text-text-main">{title}</h2>
+        {description ? <p className="max-w-[62ch] text-[13px] leading-relaxed text-text-faint">{description}</p> : null}
+      </header>
+      <div className="flex min-w-0 flex-col gap-8 max-[600px]:gap-6">{children}</div>
+    </div>
+  );
+}
+
+export function SettingGroup({ title, description, headingLevel = 4, children }: { title?: string; description?: ReactNode; headingLevel?: 3 | 4; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-2">
+      {title || description ? (
+        <header className="flex min-w-0 flex-col gap-0.5 px-0.5">
+          {title ? headingLevel === 3 ? <h3 className="text-[12px] font-medium tracking-tight text-text-muted">{title}</h3> : <h4 className="text-[11px] font-medium tracking-tight text-text-faint">{title}</h4> : null}
+          {description ? <p className="max-w-[62ch] text-[12px] leading-relaxed text-text-faint">{description}</p> : null}
+        </header>
+      ) : null}
+      <div className="divide-y divide-line/70 overflow-hidden rounded-act-lg bg-surface-subtle">
         {children}
       </div>
     </section>
@@ -56,9 +88,9 @@ export function SettingRow({
   align?: "center" | "start";
 }) {
   return (
-    <div className={`flex justify-between gap-5 px-4 py-3.5 max-[600px]:flex-col max-[600px]:gap-3 ${align === "start" ? "items-start" : "items-center max-[600px]:items-start"}`}>
+    <div className={`flex min-h-[66px] justify-between gap-5 px-3.5 py-3 max-[600px]:flex-col max-[600px]:gap-3 ${align === "start" ? "items-start" : "items-center max-[600px]:items-start"}`}>
       <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-semibold text-text-main">{title}</div>
+        <div className="text-[13px] font-medium text-text-main">{title}</div>
         {description ? <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">{description}</p> : null}
       </div>
       {control ? <div className="flex shrink-0 items-center max-[600px]:w-full max-[600px]:justify-start">{control}</div> : null}
@@ -86,7 +118,7 @@ export function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={[
-        "relative inline-flex h-[24px] w-[42px] shrink-0 items-center rounded-full transition-colors duration-150",
+        "relative inline-flex h-[24px] w-[42px] shrink-0 items-center rounded-full transition-[background-color,transform] duration-150 active:scale-[0.96]",
         checked ? "bg-operational" : "bg-line-strong",
         disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
       ].join(" ")}

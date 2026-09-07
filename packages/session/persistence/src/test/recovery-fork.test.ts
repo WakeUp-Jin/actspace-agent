@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { createCompactionTransaction, createCoreCodecRegistry } from "@actspace/session-journal";
 import type { SessionEventCandidateV1 } from "@actspace/session-journal";
-import { applySessionRecovery, planSessionRecovery, repairTornJsonlSession } from "../recovery.js";
+import { applySessionRecovery, classifySessionRecoveryAccess, planSessionRecovery, repairTornJsonlSession } from "../recovery.js";
 import { SessionStore } from "../session-store.js";
 
 const roots: string[] = [];
@@ -37,6 +37,15 @@ function headerInput(registry: ReturnType<typeof createCoreCodecRegistry>, sessi
 }
 
 describe("conservative Session recovery", () => {
+  it.each([
+    { accessState: "read-write", tornTail: null, expected: "read-write" },
+    { accessState: "degraded", tornTail: null, expected: "read-only" },
+    { accessState: "corrupt", tornTail: null, expected: "forensic-required" },
+    { accessState: "read-write", tornTail: { offset: 1, bytes: Buffer.from("x") }, expected: "read-only" },
+  ])("classifies $accessState Journal as $expected", ({ accessState, tornTail, expected }) => {
+    expect(classifySessionRecoveryAccess({ header: {} as never, events: [], accessState: accessState as never, diagnostics: [], validation: {} as never, tornTail, rawBytes: Buffer.alloc(0), journalPath: "memory://journal" })).toBe(expected);
+  });
+
   it.each([
     { dispatched: false, expected: "not-started" },
     { dispatched: true, expected: "outcome-unknown" },

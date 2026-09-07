@@ -16,6 +16,15 @@
 
 - ActSpace Profile-first Runtime 精简与 RuntimeHandle 删除（实现完成；真实宿主门禁待执行）：`active/20260830-actspace-profile-first-runtime-simplification/README.md`
 
+- ActSpace 设置中心重构（P0-P5 已交付，P6 人工验收与交付收口）：`active/20260830-actspace-settings-center-refactor/README.md`
+
+- ActSpace 模型设置页面 Maka 风格重做（文档已确认，模型页面实施中）：`active/20260901-actspace-model-settings-maka-redesign/README.md`
+
+- ActSpace Session 持久化事实源与投影收敛（P00/P01 完成候选，P02/P03 基础契约执行中）：`active/20260830-actspace-session-persistence-projection/README.md`
+
+- ActSpace Context 面板与模型能力事实收敛（设计文档已建立，P00/P01 待实施）：`active/20260901-actspace-context-model-facts/README.md`
+
+
 - ActSpace Cordis 事件 ABI 与 CLI run 最终验收计划（待主 Agent 执行）：`active/20260829-actspace-cordis-event-abi-final-acceptance/README.md`
 - ActSpace P0 Agent Scope 模型重构（完成候选，待归档）：`active/20260829-actspace-agent-scope-model/README.md`
 - ActSpace DSH Agent Loop / Session / Tool Shell 核心重构（完成候选，待归档）：`active/20260829-actspace-dsh-core-rebuild/README.md`
@@ -34,6 +43,18 @@
 - 前端 UI 组件基础：`active/frontend-ui-components-foundation.md`
 
 ## 最近完成
+
+- [使用统计页面与费用更新](completed/20260906-actspace-usage-statistics/README.md)（P01–P04 实现完成，真实 Electron / Provider 门禁待验收）：中文与设置视觉统一、本地目录、费用来源修复及按需后台更新。
+
+- [ActSpace 英语辅助学习插件](completed/20260906-actspace-english-learning/README.md)（代码已完成，Electron / MiniMax 实机验收待完成）：选定会话双语提示词注入、英文朗读、扩展控制和通用语音设置。
+
+- Agent 工具体验与轨迹布局调整（实现与自动化完成，Electron/Provider 人工项见摘要）：`completed/20260906-agent-tool-experience/README.md`
+
+- Agent 工具流式渲染修复（实现与自动化完成，Electron/Provider 人工项见摘要）：`completed/20260906-agent-tool-stream-rendering/README.md`
+
+- ActSpace DSH 轨迹页面完整能力迁移（Phase 0–5 完成，真实 Projection/IPC 与隔离 Electron 验收通过）：`completed/20260905-actspace-dsh-trajectory-parity/README.md`
+
+- ActSpace 会话内轨迹视图切换（标题行单按钮，中心 Chat/Trajectory 视图）：`completed/20260901-actspace-trajectory-session-view/README.md`
 
 - ActSpace Cordis 原生事件 ABI 与 EventHub 退役（实现完成；真实 Provider/Desktop 为外部验收边界）：`completed/20260829-actspace-cordis-event-abi-and-eventhub-retirement/README.md`
 - ActSpace DSH 风格 Runtime 全量插件组装（Phase 1–6 自动化实施完成；真实宿主门禁待验收）：`completed/20260829-actspace-dsh-runtime-full-plugin-composition/README.md`

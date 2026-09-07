@@ -13,7 +13,7 @@ import {
 type ToolLogMessage = Extract<MessageBlock, {
   kind: "read" | "search" | "grep" | "glob" | "web_search" | "media_analysis" | "image_generation" | "directory_list" | "delete" | "tool" | "error";
 }>;
-type ToolLogStatus = "running" | "completed" | "failed" | "denied" | undefined;
+type ToolLogStatus = "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown" | undefined;
 
 const TOOL_LOG_LINE_TOOLTIP_CONTAINER_CLASS = "has-overflow-text max-w-full outline-none";
 const TOOL_LOG_LINE_TOOLTIP_OPEN_CLASS = "is-tooltip-open";
@@ -105,7 +105,7 @@ function OverflowToolLine({
 function getToolLogLineClass(status: ToolLogStatus, className?: string) {
   const stateClass = status === "running"
     ? ` ${TOOL_LOG_LINE_RUNNING_CLASS}`
-    : status === "failed" || status === "denied"
+    : status === "failed" || status === "denied" || status === "aborted" || status === "outcome-unknown"
       ? ` ${TOOL_LOG_LINE_ERROR_CLASS}`
       : "";
   return `${TOOL_LOG_LINE_CLASS}${stateClass}${
@@ -180,7 +180,7 @@ function WebToolBlock({
 export function ToolLogLine({ message, className }: { message: ToolLogMessage; className?: string }) {
   if (message.kind === "read") {
     const lineClassName = getToolLogLineClass(message.status, className);
-    const text = `Read ${message.filePath}${message.range ? ` ${message.range}` : ""}`;
+    const text = message.status && message.status !== "running" && message.status !== "completed" ? message.displayText : `Read ${message.filePath}${message.range ? ` ${message.range}` : ""}`;
     return (
       <div className={lineClassName}>
         <span {...getToolLogLineTextProps(message.status, text)}>{text}</span>
@@ -203,7 +203,7 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
       <OverflowToolLine
         className={getToolLogLineClass(message.status, className)}
         status={message.status}
-        text={`Grep ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`}
+        text={message.status && message.status !== "running" && message.status !== "completed" ? message.displayText : `Grep ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`}
       />
     );
   }
@@ -213,7 +213,7 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
       <OverflowToolLine
         className={getToolLogLineClass(message.status, className)}
         status={message.status}
-        text={`Glob ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`}
+        text={message.status && message.status !== "running" && message.status !== "completed" ? message.displayText : `Glob ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`}
       />
     );
   }
@@ -271,7 +271,7 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
   }
 
   if (message.kind === "directory_list") {
-    const text = `Listed ${message.path}${message.entryCount !== undefined ? ` (${message.entryCount} entries)` : ""}`;
+    const text = message.status && message.status !== "running" && message.status !== "completed" ? message.displayText : `Listed ${message.path}${message.entryCount !== undefined ? ` (${message.entryCount} entries)` : ""}`;
     return (
       <div className={getToolLogLineClass(message.status, className)}>
         <span {...getToolLogLineTextProps(message.status, text)}>{text}</span>

@@ -113,11 +113,17 @@ export class SessionHandle {
   }
 
   get projection(): SessionProjection {
-    return createSessionProjection(this.journal.events, this.journal.surface, this.journal.validation.relations);
+    return createSessionProjection(this.header.sessionId, this.journal.events, this.journal.surface, this.journal.validation.relations);
   }
 
   get lastSeq(): number {
     return this.journal.lastSeq;
+  }
+
+  /** Durable write state used by hosts to distinguish runtime failure from persistence failure. */
+  get durabilityState(): "healthy" | "blocked" | "closed" {
+    if (this.#closed) return "closed";
+    return this.#writeBehind.canAccept ? "healthy" : "blocked";
   }
 
   close(): Promise<void> {

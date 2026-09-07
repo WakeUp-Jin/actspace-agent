@@ -1,3 +1,6 @@
+import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
+import { resolveModelPricing, type ModelCatalogSnapshot } from "@actspace/shared";
+import type { DesktopRuntimeV2ResolvedModel } from "./runtime-v2/model-port";
 import {
   DEFAULT_MODEL_KEY,
   normalizeModelKey,
@@ -28,6 +31,7 @@ type LegacyLlmConfig = {
 
 export interface ResolvedRuntimeModel {
   key: ModelKey;
+  connectionId?: string;
   definition: ModelDefinition;
   providerRuntime: ProviderRuntimeConfig;
   llmConfig: LegacyLlmConfig;
@@ -43,7 +47,12 @@ export class ModelRuntimeService {
   constructor(
     private readonly settings: SettingsService,
     private readonly models: ModelStoreService,
+    private readonly catalog: () => ModelCatalogSnapshot = () => BUILTIN_MODEL_CATALOG,
   ) {}
+
+  resolvePricing(model: DesktopRuntimeV2ResolvedModel, apiModel: string) {
+    return resolveModelPricing(this.catalog(), { providerId: model.definition.provider, apiModel, modelKey: model.key, baseUrl: model.providerRuntime.baseUrl ?? "", connectionId: model.connectionId, multiplier: model.providerRuntime.pricingMultiplier, configured: model.definition.source === "custom" && apiModel === model.definition.apiModel ? model.definition.pricing : undefined, configuredAlreadyMultiplied: true });
+  }
 
   listUsableModels(purpose: ModelPurpose): UsableModelView[] {
     return this.models.listUsableModels(purpose);
@@ -138,15 +147,17 @@ export class ModelRuntimeService {
     const runtime = this.settings.getProviderRuntimeConfigForCredential(
       model.definition.provider,
       model.installed.credentialId,
+      model.installed.connectionId,
     );
     if ("code" in runtime) {
       return { ok: false, code: runtime.code, message: runtime.message, modelKey: model.key };
     }
-    const definition = applyPricingMultiplier(model.definition, runtime.pricingMultiplier ?? 1);
+    const definition = applyPricingMultiplier(runtime.protocol ? { ...model.definition, api: runtime.protocol } : model.definition, runtime.pricingMultiplier ?? 1);
     return {
       ok: true,
       model: {
         key: model.key,
+        ...(model.installed.connectionId ? { connectionId: model.installed.connectionId } : {}),
         definition,
         providerRuntime: runtime,
         llmConfig: toLegacyLlmConfig(definition.apiModel, runtime),

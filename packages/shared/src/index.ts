@@ -3,9 +3,19 @@ export * from "./review";
 export {
   PROVIDER_IDS,
   PROVIDER_REGISTRY,
+  PROVIDER_DEFINITIONS,
+  PROVIDER_CATALOG,
+  PROVIDER_CATALOG_ORDER,
+  isConnectionProtocol,
   isProviderId,
   type ProviderId as LlmProviderId,
   type ProviderSpec,
+  type ProviderDefinition,
+  type ProviderFieldDefinition,
+  type ProviderLogoKey,
+  type ProviderCatalogDefinition,
+  type ProviderCategory,
+  type ProviderAuthKind,
 } from "./provider-config";
 export * from "./model-config";
 export * from "./model-resolver";
@@ -26,3 +36,9 @@ export {
   getLatestContextSnapshot,
   normalizeSessionEvents
 } from "./session-selectors";
+
+export * from "./english-learning";
+
+export * from "./model-catalog";
+export * from "./model-catalog-normalize";
+export * from "./model-pricing";

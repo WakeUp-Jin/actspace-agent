@@ -1,3 +1,7 @@
+import { FixedRendererStreamAdapter } from "../../main/runtime-v2/fixed-renderer-stream-adapter";
+import { runToolStreamFixture } from "../../../../../packages/core/agent-loop/src/test/tool-stream-fixture";
+import { projectSessionSnapshot } from "../../../../../packages/runtime/dist/projection/durable-session.js";
+import { projectFixedRendererSession } from "../../main/runtime-v2/fixed-renderer-projection";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AppSettings, BootstrapState, CompactContextInput, ReviewGetSnapshotResult, RunAgentInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
@@ -505,7 +509,7 @@ describe("App streaming user message", () => {
     expect(tooltip).toHaveTextContent(`sessionId: ${sessionId}`);
     expect(tooltip).toHaveTextContent("/tmp/workspace");
     expect(tooltip).toHaveTextContent("DeepSeek V4 Pro");
-    expect(tooltip).toHaveTextContent("42,000 / 100,000");
+    expect(tooltip).toHaveTextContent("42K / 100K");
   });
 
   it("scrolls to the latest message when the user sends a new message", async () => {
@@ -1386,9 +1390,9 @@ sessionId,
     });
   });
 
-  it("renders read tool arguments as soon as tool_started arrives", async () => {
+  it.each([false, true])("renders real loop tools and rehydrates without duplicates (finishOnly=%s)", async (finishOnly) => {
     const sessionId = "session-test";
-    const record = createEmptySessionRecord(sessionId);
+    let record = createEmptySessionRecord(sessionId);
     const sessions: SessionListItem[] = [
       {
         id: sessionId,
@@ -1399,8 +1403,18 @@ sessionId,
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveRunAgent: ((value: Awaited<ReturnType<NonNullable<typeof window.actspace>["runAgent"]>>) => void) | null =
-      null;
+    const adapter = new FixedRendererStreamAdapter();
+    let finishTool!: () => void;
+    let finishText!: () => void;
+    const toolGate = new Promise<void>((resolve) => { finishTool = resolve; });
+    const textGate = new Promise<void>((resolve) => { finishText = resolve; });
+    let lastFinished: Extract<RuntimeStreamEvent, { type: "tool_finished" }> | undefined;
+    adapter.subscribe((event) => {
+      if (event.type === "tool_finished") lastFinished = event;
+      if (finishOnly && (event.type === "tool_call_streaming" || event.type === "tool_started")) return;
+      streamHandler?.(event);
+    });
+
 
     window.actspace = {
       getBootstrapState: async () => bootstrapState,
@@ -1436,26 +1450,16 @@ sessionId,
           }
         };
       },
-      runAgent: (input: RunAgentInput) =>
-        new Promise((resolve) => {
-          streamHandler?.({ type: "agent_run_started", sessionId: input.sessionId, agentRunId: input.agentRunId });
-          streamHandler?.({
-            type: "tool_started",
-            turnId: "turn-stream",
-            llmCallId: "llm-call-stream",
-sessionId: input.sessionId,
-            agentRunId: input.agentRunId,
-            toolCallId: "tool-read-1",
-            toolName: "read_file",
-            argsPreview: "{\"path\":\"src/main.ts\"}",
-            preview: {
-              kind: "read",
-              filePath: "src/main.ts",
-              displayText: "Read src/main.ts",
-            },
-          });
-          resolveRunAgent = resolve;
-        }),
+      runAgent: async (input: RunAgentInput) => {
+        const fixture = await runToolStreamFixture({ sessionId: input.sessionId, agentRunId: input.agentRunId,
+          onLiveEvent: (event) => adapter.accept(event),
+          execute: async () => { await toolGate; return { status: "completed", summary: "Read fixture.txt", modelOutput: [{ type: "text", text: "fixture" }] }; },
+          beforeFinalText: () => textGate,
+        });
+        const snapshot = projectSessionSnapshot({ header: fixture.header, events: fixture.journal, registry: fixture.registry, rendererAllowlist: new Map() });
+        record = projectFixedRendererSession(snapshot, fixture.journal, "/tmp/workspace");
+        return { sessionId: input.sessionId, agentRunId: input.agentRunId, status: "completed", events: record.events, contextSnapshot: { totalTokens: 0, maxTokens: 200_000, percentUsed: 0, buckets: [] }, contextState: null };
+      },
     };
 
     renderApp();
@@ -1464,23 +1468,25 @@ sessionId: input.sessionId,
     await userEvent.type(composer, "read that file");
     await userEvent.click(screen.getByLabelText("Send message"));
 
-    expect(await screen.findByText("Read src/main.ts")).toBeTruthy();
-
+    if (!finishOnly) expect(await screen.findByText("Read fixture.txt")).toHaveAttribute("data-shimmer-text");
+    expect(screen.queryByText(/\{"path"/)).not.toBeInTheDocument();
+    await act(async () => { finishTool(); });
+    await waitFor(() => expect(screen.getByText("Read fixture.txt")).not.toHaveAttribute("data-shimmer-text"));
+    expect(screen.queryByText(/Done\./)).not.toBeInTheDocument();
     await act(async () => {
-      resolveRunAgent?.({
-        sessionId,
-        agentRunId: "turn-read-finished",
-        status: "completed",
-        events: [],
-        contextSnapshot: {
-          totalTokens: 0,
-          maxTokens: 200_000,
-          percentUsed: 0,
-          buckets: [],
-        },
-        contextState: null,
-      });
+      if (!lastFinished) throw new Error("Expected a tool result before final text");
+      streamHandler?.({ ...lastFinished, type: "tool_call_streaming", preview: { kind: "read", filePath: "late.txt", displayText: "late" } });
+      streamHandler?.({ type: "tool_approval_required", sessionId, agentRunId: lastFinished.agentRunId, toolCallId: lastFinished.toolCallId, toolName: "read_file", requestId: "late-approval", summary: "Late", reason: "Late" });
+      streamHandler?.(lastFinished);
     });
+    expect(screen.getByText("Read fixture.txt")).not.toHaveAttribute("data-shimmer-text");
+    expect(screen.queryByText("Read late.txt")).not.toBeInTheDocument();
+    await act(async () => { finishText(); });
+    expect(await screen.findByText(/body JSON/)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: /Worked for/ }));
+    await waitFor(() => expect(screen.getAllByText("Read fixture.txt")).toHaveLength(1));
+    expect(screen.queryByText(/\{"path"/)).not.toBeInTheDocument();
+    adapter.dispose();
   });
 
   it("finishes multiple write tools independently as each tool_finished event arrives", async () => {
@@ -1862,7 +1868,7 @@ sessionId,
         displayBalance: null,
       }),
       listPendingApprovals: async () => [],
-      getSubAgentTranscript: async () => [],
+      getSubAgentTranscript: async () => [{ ...transcriptEvent, type: "tool_result", payload: { toolCallId: "tool-read-app", status: "running", uiPreview: { kind: "read", filePath: "apps/desktop/src/renderer/App.tsx", displayText: "Read apps/desktop/src/renderer/App.tsx" } } }],
       ...settingsApiStub,
       getReviewSnapshot,
       onAgentStream: (callback) => {
@@ -1944,11 +1950,11 @@ sessionId: input.sessionId,
 
     await userEvent.click(screen.getByRole("button", { name: /Open SubAgent transcript for Explore renderer flow/ }));
 
-    const panel = await screen.findByRole("region", { name: /SubAgent transcript: Explore renderer flow/ });
+    const panel = await screen.findByRole("region", { name: "Subagent details" });
     expect(panel).toBeTruthy();
-    expect(within(panel).getByText("Read App.tsx")).toBeTruthy();
+    expect(await within(panel).findByText("Read apps/desktop/src/renderer/App.tsx")).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: /SubAgent transcript: Explore renderer flow/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Review pending changes +7 -2" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review pending changes +7 -2" })).toBeInTheDocument();
 
     await act(async () => {
       resolveRunAgent?.({

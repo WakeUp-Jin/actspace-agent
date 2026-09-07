@@ -5,7 +5,6 @@ import {
   AlignLeft,
   Archive,
   ArrowDownUp,
-  BarChart3,
   ChevronDown,
   ChevronRight,
   Copy,
@@ -18,6 +17,7 @@ import {
   Pin,
   PanelLeftClose,
   Plus,
+  Blocks,
   Settings,
   Sparkles,
   SquarePen,
@@ -26,7 +26,7 @@ import type { SessionListItem, WorkspaceEntry } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 export type SidebarMode = "expanded" | "hidden";
-export type SidebarView = "chat" | "lab" | "usage" | "settings" | "analysis";
+export type SidebarView = "chat" | "lab" | "settings" | "extensions";
 export type NewSessionInput = {
   workspaceId?: string;
   workspaceRoot?: string;
@@ -864,7 +864,6 @@ export function Sidebar({
   onSelectSession?: (sessionId: string) => void;
   onTogglePin?: (sessionId: string, nextPinned: boolean) => void;
   onSelectView?: (next: SidebarView) => void;
-  onOpenSearch?: () => void;
   onRename?: (sessionId: string, title: string) => void;
   onCopySessionId?: (sessionId: string) => void;
   onCopyTranscript?: (sessionId: string) => void;
@@ -934,12 +933,13 @@ export function Sidebar({
           <span className={SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS} aria-hidden="true">⌘N</span>
         </button>
         <button
-          className={`${SIDEBAR_PRIMARY_ACTION_CLASS} ${view === "usage" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
+          className={`${SIDEBAR_PRIMARY_ACTION_CLASS} ${view === "extensions" ? SIDEBAR_PRIMARY_ACTION_ACTIVE_CLASS : ""}`}
           type="button"
-          onClick={() => onSelectView?.("usage")}
+          aria-current={view === "extensions" ? "page" : undefined}
+          onClick={() => onSelectView?.("extensions")}
         >
-          <BarChart3 size={14} strokeWidth={1.9} />
-          <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>Usage</span>
+          <Blocks size={14} strokeWidth={1.9} />
+          <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>扩展</span>
         </button>
       </div>
 

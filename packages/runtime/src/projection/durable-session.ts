@@ -55,6 +55,7 @@ function projectProductFacts(events: readonly SessionEventEnvelopeV1[]): {
   readonly usage: RuntimeV2UsageSummary;
   readonly activity: RuntimeV2SessionActivity;
 } {
+  const usageEvents = selectUsageEventSeqs(events);
   let title: string | null = null; let pinned = false; let archived = false;
   const todos = new Map<string, RuntimeV2TodoItem>();
   const delegations = new Map<string, RuntimeV2DelegationView>();
@@ -69,12 +70,12 @@ function projectProductFacts(events: readonly SessionEventEnvelopeV1[]): {
     if (event.type === "session/archived-set" && typeof data.archived === "boolean") archived = data.archived;
     if (event.type.startsWith("todo/")) projectTodo(todos, event.type, data);
     if (event.type === "delegation/requested" || event.type === "delegation/completed") projectDelegation(delegations, event.type, data);
-    if ((event.type === "assistant/message" || event.type === "step/end") && isRecord(data.usage)) {
+    if (usageEvents.has(event.seq) && isRecord(data.usage)) {
       inputTokens += nonNegativeNumber(data.usage.inputTokens);
       outputTokens += nonNegativeNumber(data.usage.outputTokens);
       cacheReadTokens += nonNegativeNumber(data.usage.cacheReadTokens);
       cacheWriteTokens += nonNegativeNumber(data.usage.cacheWriteTokens);
-      if ((data.usage.costCurrency === "USD" || data.usage.costCurrency === "usd") && typeof data.usage.cost === "number" && Number.isFinite(data.usage.cost)) { totalCost += Math.max(0, data.usage.cost); hasUsdCost = true; }
+      if ((data.usage.costCurrency === "USD" || data.usage.costCurrency === "usd") && typeof data.usage.cost === "number" && Number.isFinite(data.usage.cost) && (data.usage.cost > 0 || (isRecord(data.usage.costProvenance) && data.usage.costProvenance.version === 1 && (data.usage.costProvenance.basis === "estimated" || data.usage.costProvenance.basis === "provider-reported")))) { totalCost += Math.max(0, data.usage.cost); hasUsdCost = true; }
     }
     if (event.type === "turn/start") { turnCount += 1; activeTurnId = stringValue(data.turnId); }
     if (event.type === "turn/end") { completedTurnCount += 1; if (activeTurnId === stringValue(data.turnId)) activeTurnId = null; }
@@ -198,4 +199,24 @@ function pendingInbox(events: readonly SessionEventEnvelopeV1[], registry: Event
     }
   }
   return [...pending].map(([messageId, target]) => ({ messageId, target }));
+}
+
+/** Terminal copies describe one request; retries have their own request identity. */
+function selectUsageEventSeqs(events: readonly SessionEventEnvelopeV1[]): Set<number> {
+  const requestByStep = new Map<string, string>();
+  const selected = new Map<string, { seq: number; assistant: boolean }>();
+  let activeStep: string | null = null;
+  for (const event of events) {
+    if (!isRecord(event.data)) continue;
+    const data = event.data;
+    if (event.type === "step/start") activeStep = stringValue(data.stepId);
+    const step = stringValue(data.stepId) ?? activeStep;
+    if (event.type === "request/header" && step && typeof data.requestId === "string") requestByStep.set(step, data.requestId);
+    if (!["assistant/message", "step/end", "llm/retry"].includes(event.type) || !isRecord(data.usage) || !Object.keys(data.usage).length) continue;
+    const key = stringValue(data.requestId) ?? (step ? requestByStep.get(step) ?? `step:${step}` : `event:${event.seq}`);
+    const previous = selected.get(key);
+    const assistant = event.type === "assistant/message";
+    if (!previous || assistant || !previous.assistant) selected.set(key, { seq: event.seq, assistant });
+  }
+  return new Set([...selected.values()].map((value) => value.seq));
 }

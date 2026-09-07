@@ -18,6 +18,9 @@ importers:
       '@actspace/desktop-app':
         specifier: workspace:*
         version: link:packages/desktop-app
+      '@actspace/english-learning':
+        specifier: workspace:*
+        version: link:packages/english-learning
     devDependencies:
       esbuild:
         specifier: 0.21.5
@@ -59,9 +62,15 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@actspace/client':
+        specifier: workspace:*
+        version: link:../../packages/client
       '@actspace/desktop-app':
         specifier: workspace:*
         version: link:../../packages/desktop-app
+      '@actspace/english-learning':
+        specifier: workspace:*
+        version: link:../../packages/english-learning
       '@actspace/llm-pi-ai':
         specifier: workspace:*
         version: link:../../packages/llm/pi-ai
@@ -74,6 +83,9 @@ importers:
       '@actspace/session-journal':
         specifier: workspace:*
         version: link:../../packages/session/journal
+      '@actspace/session-projection':
+        specifier: workspace:*
+        version: link:../../packages/session/projection
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -89,6 +101,9 @@ importers:
       '@actspace/tools-runtime':
         specifier: workspace:*
         version: link:../../packages/tools/runtime
+      '@radix-ui/react-hover-card':
+        specifier: ^1.1.23
+        version: 1.1.23(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.16(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -482,6 +497,9 @@ importers:
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../cordis-adapter
+      '@actspace/english-learning':
+        specifier: workspace:*
+        version: link:../english-learning
       '@actspace/llm-service':
         specifier: workspace:*
         version: link:../llm/service
@@ -510,6 +528,37 @@ importers:
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../cordis-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/english-learning:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+      '@actspace/core-agent':
+        specifier: workspace:*
+        version: link:../core/agent
+      '@actspace/core-scope':
+        specifier: workspace:*
+        version: link:../core/scope
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../prompt
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session/journal
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -560,6 +609,9 @@ importers:
       '@earendil-works/pi-ai':
         specifier: 0.82.1
         version: 0.82.1(ws@8.21.0)(zod@4.4.3)
+      openai:
+        specifier: 6.26.0
+        version: 6.26.0(ws@8.21.0)(zod@4.4.3)
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -653,6 +705,9 @@ importers:
       '@actspace/diagnostics':
         specifier: workspace:*
         version: link:../diagnostics
+      '@actspace/english-learning':
+        specifier: workspace:*
+        version: link:../english-learning
       '@actspace/headless':
         specifier: workspace:*
         version: link:../headless
@@ -780,6 +835,28 @@ importers:
       '@actspace/session-journal':
         specifier: workspace:*
         version: link:../journal
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/session/projection-cache:
+    dependencies:
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../journal
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -2051,6 +2128,19 @@ packages:
 
   '@radix-ui/react-dismissable-layer@1.1.19':
     resolution: {integrity: sha512-8g4pfOL9HoKKLWGiypT+dphVqjFfmcXO5GBnhsG6zI+lxAx/8feQpr+1LSN8Re3hiZ+XkLNS4O9ztK11/LzQ6w==}
+    peerDependencies:
+      '@types/react': '*'
+      '@types/react-dom': '*'
+      react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+      react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      '@types/react-dom':
+        optional: true
+
+  '@radix-ui/react-hover-card@1.1.23':
+    resolution: {integrity: sha512-H8qONfZd3ltrU3+jHCIgITbWo6e1iTKvP9DHdrvYbX48ooRM5FjEDTn16AMwdfuOGkWdZEhpl3PLL/Wk/AnHDQ==}
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
@@ -6077,6 +6167,23 @@ snapshots:
       '@radix-ui/react-primitive': 2.1.10(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@radix-ui/react-use-callback-ref': 1.1.4(@types/react@18.3.29)(react@18.3.1)
       '@radix-ui/react-use-effect-event': 0.0.5(@types/react@18.3.29)(react@18.3.1)
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+    optionalDependencies:
+      '@types/react': 18.3.29
+      '@types/react-dom': 18.3.7(@types/react@18.3.29)
+
+  '@radix-ui/react-hover-card@1.1.23(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@radix-ui/primitive': 1.1.7
+      '@radix-ui/react-compose-refs': 1.1.5(@types/react@18.3.29)(react@18.3.1)
+      '@radix-ui/react-context': 1.2.2(@types/react@18.3.29)(react@18.3.1)
+      '@radix-ui/react-dismissable-layer': 1.1.19(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@radix-ui/react-popper': 1.3.7(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@radix-ui/react-portal': 1.1.17(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@radix-ui/react-presence': 1.1.10(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@radix-ui/react-primitive': 2.1.10(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@radix-ui/react-use-controllable-state': 1.2.6(@types/react@18.3.29)(react@18.3.1)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
     optionalDependencies:
