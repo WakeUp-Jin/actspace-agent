@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const source = readFileSync(
-  path.join(repoRoot, "plugins/browser-bridge/apps/chrome-extension/src/cursor-overlay.js"),
+  path.join(repoRoot, "browser-bridge/apps/chrome-extension/src/cursor-overlay.js"),
   "utf8",
 );
 

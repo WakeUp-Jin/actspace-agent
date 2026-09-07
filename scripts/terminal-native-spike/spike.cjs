@@ -5,7 +5,7 @@ const path = require("node:path");
 
 const repoRoot = path.resolve(__dirname, "../..");
 const desktopPackagePath =
-  process.env.ACTSPACE_TERMINAL_SPIKE_DESKTOP_PACKAGE || path.join(repoRoot, "packages/desktop/package.json");
+  process.env.ACTSPACE_TERMINAL_SPIKE_DESKTOP_PACKAGE || path.join(repoRoot, "apps/desktop/package.json");
 const desktopRequire = createRequire(desktopPackagePath);
 const pty = desktopRequire("node-pty");
 const resultPath = process.env.ACTSPACE_TERMINAL_SPIKE_RESULT;

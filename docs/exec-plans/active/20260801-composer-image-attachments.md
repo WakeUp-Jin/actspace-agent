@@ -12,7 +12,7 @@
 ## 背景
 
 - 相关文档：`docs/design-docs/frontend/front-聊天输入框规范.md`、`docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`、`docs/design-docs/tool-system/agent-image-inspection-tool.md`、`docs/FRONTEND_VERIFICATION.md`。
-- 相关代码路径：`packages/shared/src/ipc.ts`、`packages/desktop/src/main/index.ts`、`packages/desktop/src/preload/index.ts`、`packages/desktop/src/renderer/components/Composer.tsx`、`packages/agent-core/src/runtime/agent-runtime.ts`。
+- 相关代码路径：`packages/shared/src/ipc.ts`、`apps/desktop/src/main/index.ts`、`apps/desktop/src/preload/index.ts`、`apps/desktop/src/renderer/components/Composer.tsx`、`packages/agent-core/src/runtime/agent-runtime.ts`。
 - 已知约束：renderer 不直接读取文件系统；本地 `file://` 不能作为 Vite renderer 图片来源；`inspect_image` 需要当前轮注册的真实本地路径；当前工作区存在其他未提交改动，必须保留。
 
 ## 风险

@@ -12,7 +12,7 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `packages/agent-core`, `packages/desktop`, and sibling `actspace-plugins/plugins/browser-bridge`
+**Scope:** `packages/agent-core`, `packages/desktop`, and sibling `actspace-plugins/browser-bridge`
 
 **Key Actions:**
 
@@ -33,6 +33,6 @@
 - `packages/agent-core/src/tools/test/analyze-media.test.ts`
 - `packages/desktop/src/main/agent-runtime-context.ts`
 - `packages/desktop/src/main/test/agent-runtime-context.test.ts`
-- `/Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/plugins/browser-bridge/apps/cli/main.go`
-- `/Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/plugins/browser-bridge/apps/cli/main_test.go`
-- `/Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/plugins/browser-bridge/skill/SKILL.md`
+- `/Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/browser-bridge/apps/cli/main.go`
+- `/Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/browser-bridge/apps/cli/main_test.go`
+- `/Users/wakeup-jin/Desktop/code-project/side-project/actspace-plugins/browser-bridge/skill/SKILL.md`

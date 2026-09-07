@@ -54,8 +54,8 @@
 - `packages/agent-core/src/engine/{types,loop,agent,bridge,create-agent-deps}.ts`
 - `packages/desktop/src/main/agent-turn.ts`
 - `packages/shared/src/session.ts`
-- `docs/design-docs/model-context/agent-context-compression.md`
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/v1-legacy/model-context-context-compression.md`
+- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
 - `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
 - `docs/references/llm-agent-dev-skill-fixes/fix-llm-agent-*.md`
 - `docs/SECURITY.md`、`docs/exec-plans/tech-debt-tracker.md`、`docs/exec-plans/active/20260529-context-compression.md`

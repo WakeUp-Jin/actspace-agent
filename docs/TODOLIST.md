@@ -6,20 +6,13 @@
 
 | 事项 | 状态 | 入口 | 下一步 |
 | --- | --- | --- | --- |
-| Agent Team V1 | 待执行 | `docs/exec-plans/active/20260711-agent-team/README.md` | 按共享契约、存储、runtime、工具权限、桌面接入、Team UI 和端到端验收的依赖顺序推进。 |
-| Bash 会话级动态 allowlist | 待执行 | `docs/exec-plans/active/Bash工具和工具权限调度开发计划/README.md` | 完成子命令拆分授权、会话与用户级 allowlist、审批 UI 和 session replay。 |
+| ActSpace v2 多包插件化发布门禁 | 实现完成，外部门禁待验收 | `docs/exec-plans/active/20260824-actspace-v2-package-layout-and-plugin-packaging/README.md` | 继续真实 Provider、Electron、DMG/签名验收；Browser Bridge 按用户要求从本轮分离，后续单独修复。 |
 | 前端 UI 组件基础 | 待执行 | `docs/exec-plans/active/frontend-ui-components-foundation.md` | 先确认组件边界和迁移顺序，再以小切片替换重复实现。 |
-
-## Bash Allowlist 验收重点
-
-- 复合命令必须按子命令拆分授权，危险片段不能被安全前缀掩盖。
-- `Run` 只允许本次执行；`Allow` 的授权范围必须可见并限制在当前会话。
-- 会话级授权需要随 session replay 恢复，升级为用户级授权时必须经过 main 进程持久化。
-- hard reject 仍直接拒绝，不进入可以被用户放行的审核面板。
 
 ## 未来方向
 
-- Bash 全局执行策略选择器和网络隔离以 `docs/design-docs/execution-safety/agent-bash-policy-allowlist-design.md` 的 Phase 2 / Phase 3 为准，Phase 1 完成后再单独立项。
+- Agent Team / Room 保留为 `future-product-design`，不能继续执行已丢弃的 v1 计划；需要时从 v2 Session、Tool ABI 和插件生命周期重新立项。
+- Bash 动态 allowlist 与全局执行策略尚未作为 v2 能力排期；需要时以 `docs/design-docs/execution-safety/README.md` 为当前边界新建计划。
 - 尚未进入 execution plan 的工作继续记录在 `docs/exec-plans/tech-debt-tracker.md`，不要为了占位创建空计划。
 
 ## 维护规则

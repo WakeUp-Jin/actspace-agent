@@ -18,7 +18,7 @@
 - `docs/HISTORY_GUIDE.md`
 - `docs/releases/README.md`
 - `docs/learnings/WRITING_GUIDE.md`
-- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
 
 ## 允许修改的文件
 
@@ -27,7 +27,7 @@
 - `packages/desktop/src/renderer/test/` 下跨页面交互测试
 - `scripts/` 下与本功能直接相关的可重复 smoke 脚本（只有命令无法表达时新增）
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
 - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`
 - `docs/design-docs/frontend/front-设置页规范.md`
 - `docs/ARCHITECTURE.md`

@@ -12,9 +12,9 @@
 
 ## 附加必读
 
-- `docs/design-docs/agent-runtime/agent-backend-design.md`
+- `docs/design-docs/v1-legacy/agent-runtime-backend-design.md`
 - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`
-- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
 - `packages/agent-core/src/llm/types.ts`
 - `packages/agent-core/src/llm/factory.ts`
 - `packages/agent-core/src/llm/services/openai-completions.ts`

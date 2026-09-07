@@ -23,7 +23,7 @@
 - `docs/design-docs/frontend/front-usage-statistics.md`
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 - `docs/design-docs/core-storage-and-observability.md`
-- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
 
 不要读取 `.env` 文件内容；只允许检查字段名、默认值、示例值和运行时错误信息。
 

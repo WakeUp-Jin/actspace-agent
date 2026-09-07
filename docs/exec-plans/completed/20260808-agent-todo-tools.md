@@ -31,7 +31,7 @@
 - `docs/REPO_COLLAB_GUIDE.md`
 - `docs/ARCHITECTURE.md`
 - `docs/design-docs/core-beliefs.md`
-- `docs/design-docs/tool-system/agent-todo-tools.md`
+- `docs/design-docs/v1-legacy/tool-system-agent-todo-tools.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/design-docs/collaboration/agent-form-team.md`
 - `docs/FRONTEND_VERIFICATION.md`

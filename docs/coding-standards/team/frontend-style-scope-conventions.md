@@ -1,6 +1,6 @@
 # 前端样式作用域约定
 
-当前 renderer 的 Tailwind 页面切片迁移已完成收口，旧根部 `styles.css` 与 `legacy-*` 分区已经下线。`packages/desktop/src/renderer/styles/index.css` 是唯一全局样式入口，当前导入顺序是：
+当前 renderer 的 Tailwind 页面切片迁移已完成收口，旧根部 `styles.css` 与 `legacy-*` 分区已经下线。`apps/desktop/src/renderer/styles/index.css` 是唯一全局样式入口，当前导入顺序是：
 
 ```css
 @layer theme, base, chrome, components, utilities;
@@ -70,7 +70,7 @@ const primaryButtonClass =
 4. 用 `rg` 搜索宽泛选择器：
 
 ```sh
-rg -n "button \{|input \{|textarea \{|select \{|a \{|\.split-view button" packages/desktop/src/renderer
+rg -n "button \{|input \{|textarea \{|select \{|a \{|\.split-view button" apps/desktop/src/renderer
 ```
 
 5. 优先收窄污染源选择器。不要为了抢优先级先加 inline style、`!important` 或重复 utility，除非它本身就是数据驱动的一次性样式。

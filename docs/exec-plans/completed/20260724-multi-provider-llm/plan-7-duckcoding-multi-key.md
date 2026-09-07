@@ -4,7 +4,7 @@
 
 依赖：Plan 0-5
 
-设计规范：`docs/design-docs/model-context/agent-duckcoding-multi-key-model-catalog.md`
+设计规范：`docs/design-docs/v1-legacy/model-context-duckcoding-multi-key-model-catalog.md`
 
 ## 目标
 

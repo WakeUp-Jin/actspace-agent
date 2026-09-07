@@ -11,12 +11,12 @@
 
 ## 允许修改的文件
 
-- `plugins/browser-bridge/apps/cli/main.go`（新增 `serve` 子命令入口）
-- `plugins/browser-bridge/apps/cli/server.go`（新建 — socket server 核心）
-- `plugins/browser-bridge/apps/cli/session.go`（新建 — session 生命周期管理）
-- `plugins/browser-bridge/apps/cli/events.go`（新建 — 事件路由和广播）
-- `plugins/browser-bridge/apps/cli/main_test.go`（扩展）
-- `plugins/browser-bridge/apps/cli/server_test.go`（新建）
+- `browser-bridge/apps/cli/main.go`（新增 `serve` 子命令入口）
+- `browser-bridge/apps/cli/server.go`（新建 — socket server 核心）
+- `browser-bridge/apps/cli/session.go`（新建 — session 生命周期管理）
+- `browser-bridge/apps/cli/events.go`（新建 — 事件路由和广播）
+- `browser-bridge/apps/cli/main_test.go`（扩展）
+- `browser-bridge/apps/cli/server_test.go`（新建）
 
 ## 任务清单
 
@@ -50,7 +50,7 @@ abb serve --socket /tmp/actspace-browser-bridge/sess_abc.sock
 
 验证：
 ```bash
-cd plugins/browser-bridge && go build ./apps/cli && ./apps/cli/abb serve --help
+cd browser-bridge && go build ./apps/cli && ./apps/cli/abb serve --help
 ```
 
 ### 任务 1.2：实现 socket server 核心（server.go）
@@ -274,12 +274,12 @@ func (m *mockNativeConn) Send(req protocol.RequestEnvelope) (protocol.ResponseEn
 
 验证命令：
 ```bash
-cd plugins/browser-bridge && go test ./apps/cli/ -v -run TestServer
+cd browser-bridge && go test ./apps/cli/ -v -run TestServer
 ```
 
 ## 验证方式
 
-- `cd plugins/browser-bridge && go build ./apps/cli` 编译通过
+- `cd browser-bridge && go build ./apps/cli` 编译通过
 - `abb serve --socket /tmp/test.sock` 能启动并监听
 - 用 `nc -U /tmp/test.sock` 或简单 Go 客户端发送 ping 请求能收到响应
 - `go test ./apps/cli/ -v` 全部 PASS

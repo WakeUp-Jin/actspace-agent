@@ -30,7 +30,7 @@
 
 - `packages/desktop/src/main/agent-runtime-context.ts`
 - `packages/desktop/src/main/index.ts`
-- `packages/desktop/src/main/plugins/browser-bridge-service.ts`
+- `packages/desktop/src/main/browser-bridge-service.ts`
 - `packages/desktop/src/main/test/agent-runtime-context.test.ts`
 - `packages/desktop/src/main/test/browser-bridge-service.test.ts`
 - `docs/design-docs/browser/agent-browser-bridge-design.md`

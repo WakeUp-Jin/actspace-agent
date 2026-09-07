@@ -3,40 +3,64 @@
   "private": true,
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "overrides": {
+      "@deepseek-ai/cordis": "4.0.1",
+      "@deepseek-ai/cordis-plugin-loader": "1.0.2",
+      "@deepseek-ai/cordis-plugin-include": "1.0.6",
+      "@deepseek-ai/cordis-plugin-group": "1.0.1",
+      "@deepseek-ai/cordis-plugin-timer": "1.1.3"
+    }
+  },
   "scripts": {
-    "clean": "pnpm --filter @actspace/shared clean && pnpm --filter @actspace/agent-core clean && pnpm --filter @actspace/agent-cli clean && pnpm --filter @actspace/desktop clean",
+    "models:generate": "node scripts/generate-model-catalog.mjs",
+    "clean": "pnpm --filter @actspace/shared clean && pnpm --filter @actspace/runtime clean && pnpm --filter @actspace/agent-cli clean && pnpm --filter @actspace/desktop clean",
     "dev": "node scripts/desktop-dev.mjs",
     "dev:log": "node scripts/desktop-dev.mjs --log",
     "dev:stop": "bash ./scripts/kill-dev-ports.sh",
     "dev:site": "pnpm --filter @actspace/site dev",
     "build": "pnpm --filter @actspace/agent-cli build && pnpm --filter @actspace/desktop build",
     "build:site": "pnpm --filter @actspace/site build",
-    "test": "pnpm run test:dev-runner && pnpm run test:repo-stats && pnpm -r --if-present test",
+  "test": "pnpm run test:dev-runner && pnpm run test:repo-stats && pnpm run test:refactor-stats && pnpm run test:package-boundaries && pnpm run test:current-docs && pnpm run test:contract-matrix && pnpm -r --if-present test",
     "test:dev-runner": "node --test scripts/test/dev-process-runner.test.mjs",
     "test:repo-stats": "node --test scripts/test/repo-stats.test.mjs",
+    "test:refactor-stats": "node --test scripts/test/refactor-stats.test.mjs",
+    "test:package-boundaries": "node --test scripts/test/package-boundaries.test.mjs",
+    "test:current-docs": "node --test scripts/test/current-docs.test.mjs",
+    "test:contract-matrix": "node --test scripts/test/contract-matrix.test.mjs",
     "test:site": "pnpm --filter @actspace/site test",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm run typecheck:contracts && pnpm -r typecheck",
+    "typecheck:contracts": "pnpm --filter @actspace/runtime... build",
     "check:site": "pnpm --filter @actspace/site check",
     "ci": "./scripts/ci.sh",
     "check:docs": "./scripts/check-docs.sh",
+    "check:current-docs": "node scripts/check-current-docs.mjs",
     "check:secrets": "./scripts/check-secrets.sh",
+    "check:v2-legacy-removal": "node scripts/check-v2-legacy-removal.mjs",
+    "check:package-cutover": "node scripts/check-package-cutover.mjs",
     "check:repo": "./scripts/check-repo-hygiene.sh",
+    "check:packages": "node scripts/check-package-boundaries.mjs",
+    "gen:contract-matrix": "node scripts/contract-matrix/generate.mjs",
     "check:frontend-theme": "node scripts/check-frontend-theme-colors.mjs",
     "check:actions": "./scripts/check-action-pinning.sh",
     "repo:stats": "node scripts/repo-stats.mjs",
+    "refactor:stats": "node scripts/refactor-stats.mjs",
     "reset:session-data": "node scripts/reset-session-data.mjs",
     "build:browser-locator": "node scripts/build-browser-locator-runtime.mjs",
-    "build:agent-cli:bundle": "node scripts/build-agent-cli-binary.mjs --bundle-only",
-    "build:agent-cli:binary": "node scripts/build-agent-cli-binary.mjs",
-    "test:agent-cli:binary": "node scripts/test-agent-cli-binary.mjs",
-    "check:browser": "node --check plugins/browser-bridge/apps/chrome-extension/src/background.js && node --check plugins/browser-bridge/apps/chrome-extension/src/cursor-overlay.js && pnpm --dir packages/desktop exec tsc -p ../../plugins/browser-bridge/apps/cli/internal/locator/runtime-src/tsconfig.json && node scripts/build-browser-locator-runtime.mjs --check && node scripts/check-browser-command-registry.mjs && node scripts/test-browser-locator-runtime.mjs && node scripts/test-browser-cursor-runtime.mjs && node scripts/test-browser-extension-contract.mjs",
+    "package:agent-cli": "node scripts/package-agent-cli.mjs",
+    "test:agent-cli:package": "node scripts/test-agent-cli-package.mjs",
+    "test:agent-cli:process": "node --test scripts/test/agent-cli-process.test.mjs",
+    "check:browser": "node --check browser-bridge/apps/chrome-extension/src/background.js && node --check browser-bridge/apps/chrome-extension/src/cursor-overlay.js && pnpm --dir apps/desktop exec tsc -p ../../browser-bridge/apps/cli/internal/locator/runtime-src/tsconfig.json && node scripts/build-browser-locator-runtime.mjs --check && node scripts/check-browser-command-registry.mjs && node scripts/test-browser-locator-runtime.mjs && node scripts/test-browser-cursor-runtime.mjs && node scripts/test-browser-extension-contract.mjs",
     "hooks:install": "./scripts/install-git-hooks.sh",
     "package:desktop": "./scripts/release-package.sh",
     "package:desktop:dmg": "./scripts/release-package.sh",
     "release-package": "./scripts/release-package.sh"
   },
+  "dependencies": {
+    "@actspace/english-learning": "workspace:*",
+    "@actspace/desktop-app": "workspace:*"
+  },
   "devDependencies": {
-    "esbuild": "0.21.5",
-    "postject": "1.0.0-alpha.6"
+    "esbuild": "0.21.5"
   }
 }

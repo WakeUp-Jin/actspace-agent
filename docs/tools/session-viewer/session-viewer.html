@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Session Viewer · ActSpace</title>
+    <style>
+      :root {
+        --bg: #181916;
+        --sidebar: #1e1f1c;
+        --surface: #242522;
+        --surface-subtle: #292a26;
+        --selected: #30312d;
+        --hover: #2a2b27;
+        --line: rgba(241, 241, 237, .11);
+        --line-strong: rgba(241, 241, 237, .2);
+        --ink: #f1f1ed;
+        --muted: #b5b5ae;
+        --faint: #85857e;
+        --operational: #36c783;
+        --operational-soft: rgba(54, 199, 131, .14);
+        --warning: #d2a14d;
+        --warning-soft: rgba(210, 161, 77, .14);
+        --danger: #e06b6b;
+        --danger-soft: rgba(224, 107, 107, .12);
+        --danger-border: rgba(224, 107, 107, .45);
+        --info: #6ca6da;
+        --info-soft: rgba(108, 166, 218, .18);
+        --code: #1b1c19;
+        --shadow: 0 18px 42px rgba(0, 0, 0, .2);
+        --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+        --font-mono: "SFMono-Regular", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+        font-family: var(--font-ui);
+      }
+
+      [data-theme="light"] {
+        --bg: #f7f7f5;
+        --sidebar: #efefed;
+        --surface: #ffffff;
+        --surface-subtle: #f1f1ef;
+        --selected: #e4e4e1;
+        --hover: #eaeae7;
+        --line: rgba(32, 32, 30, .12);
+        --line-strong: rgba(32, 32, 30, .22);
+        --ink: #20201e;
+        --muted: #676762;
+        --faint: #92928c;
+        --operational: #087a4b;
+        --operational-soft: rgba(8, 122, 75, .1);
+        --warning: #a87218;
+        --warning-soft: rgba(168, 114, 24, .1);
+        --danger: #c74747;
+        --danger-soft: rgba(199, 71, 71, .1);
+        --danger-border: rgba(199, 71, 71, .4);
+        --info: #3978b8;
+        --info-soft: rgba(57, 120, 184, .16);
+        --code: #f1f1ef;
+        --shadow: 0 12px 30px rgba(20, 21, 18, .1);
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root:not([data-theme="dark"]) {
+          --bg: #f7f7f5;
+          --sidebar: #efefed;
+          --surface: #ffffff;
+          --surface-subtle: #f1f1ef;
+          --selected: #e4e4e1;
+          --hover: #eaeae7;
+          --line: rgba(32, 32, 30, .12);
+          --line-strong: rgba(32, 32, 30, .22);
+          --ink: #20201e;
+          --muted: #676762;
+          --faint: #92928c;
+          --operational: #087a4b;
+          --operational-soft: rgba(8, 122, 75, .1);
+          --warning: #a87218;
+          --warning-soft: rgba(168, 114, 24, .1);
+          --danger: #c74747;
+          --danger-soft: rgba(199, 71, 71, .1);
+          --danger-border: rgba(199, 71, 71, .4);
+          --info: #3978b8;
+          --info-soft: rgba(57, 120, 184, .16);
+          --code: #f1f1ef;
+          --shadow: 0 12px 30px rgba(20, 21, 18, .1);
+        }
+      }
+
+      * { box-sizing: border-box; }
+      html { background: var(--bg); }
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        color: var(--ink);
+        background: var(--bg);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      button, input, select { font: inherit; }
+      button { cursor: pointer; }
+      :focus-visible { outline: 2px solid var(--info); outline-offset: 3px; }
+      .shell { width: min(1440px, calc(100% - 48px)); margin: 0 auto; padding: 30px 0 46px; }
+      .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+      .eyebrow { color: var(--operational); font: 600 11px/1.2 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; }
+      h1 { margin: 8px 0 0; font: 600 clamp(28px, 4vw, 44px)/1.08 var(--font-ui); letter-spacing: -.025em; }
+      .subtitle { max-width: 680px; margin: 12px 0 0; color: var(--muted); font: 14px/1.65 var(--font-ui); }
+      .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font: 12px/1 var(--font-mono); white-space: nowrap; }
+      .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+      .status-pill[data-state="ready"] .status-dot { background: var(--operational); box-shadow: 0 0 0 4px var(--operational-soft); }
+      .status-pill[data-state="error"] .status-dot { background: var(--danger); box-shadow: 0 0 0 4px var(--danger-soft); }
+
+      .drop-card { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(270px, .7fr); overflow: hidden; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); transition: border-color 160ms ease, background-color 160ms ease; }
+      .drop-card.is-dragging { border-color: var(--operational); background: var(--operational-soft); }
+      .dropzone { min-height: 246px; display: flex; flex-direction: column; justify-content: center; padding: 32px; border-right: 1px solid var(--line); transition: background-color 160ms ease, border-color 160ms ease; }
+      .dropzone.is-dragging { background: transparent; border-color: rgba(54, 199, 131, .35); }
+      .drop-kicker { color: var(--operational); font: 600 11px/1.2 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
+      .dropzone h2 { max-width: 640px; margin: 12px 0 10px; font: 600 clamp(24px, 3vw, 36px)/1.12 var(--font-ui); letter-spacing: -.02em; text-wrap: balance; }
+      .drop-copy { max-width: 640px; margin: 0; color: var(--muted); font: 14px/1.65 var(--font-ui); }
+      .drop-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+      .primary, .secondary { min-height: 40px; padding: 9px 14px; border-radius: 8px; font: 600 12px/1 var(--font-ui); transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease; }
+      .primary { border: 1px solid var(--ink); color: var(--bg); background: var(--ink); }
+      .primary:hover { background: var(--muted); border-color: var(--muted); }
+      .secondary { border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface-subtle); }
+      .secondary:hover { background: var(--hover); }
+      .primary:active, .secondary:active { transform: scale(.97); }
+      .file-note { color: var(--faint); font: 11px/1.4 var(--font-mono); }
+      .drop-aside { display: flex; flex-direction: column; justify-content: center; padding: 30px; background: var(--surface-subtle); }
+      .aside-label { margin-bottom: 14px; color: var(--faint); font: 600 10px/1.2 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; }
+      .format-line { display: flex; gap: 11px; align-items: baseline; padding: 11px 0; border-top: 1px solid var(--line); }
+      .format-line strong { min-width: 72px; color: var(--ink); font: 600 12px/1.3 var(--font-mono); }
+      .format-line span { color: var(--muted); font: 12px/1.5 var(--font-ui); }
+
+      .workspace { display: none; margin-top: 20px; animation: rise .25s ease both; }
+      .workspace.is-visible { display: block; }
+      @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+      .overview { display: grid; gap: 14px; margin-bottom: 14px; }
+      .overview-head { display: flex; align-items: end; justify-content: space-between; gap: 18px; padding: 2px 2px 0; }
+      .overview-kicker { margin: 0 0 5px; color: var(--operational); font: 600 10px/1.2 var(--font-mono); letter-spacing: .13em; text-transform: uppercase; }
+      .overview-title { margin: 0; color: var(--ink); font: 600 clamp(20px, 2.5vw, 28px)/1.15 var(--font-ui); letter-spacing: -.02em; }
+      .overview-caption { max-width: 540px; margin: 6px 0 0; color: var(--muted); font: 13px/1.45 var(--font-ui); }
+      .overview-range { color: var(--faint); font: 11px/1.4 var(--font-mono); text-align: right; white-space: nowrap; }
+      .metric-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+      .metric { min-width: 0; padding: 13px 14px 12px; border-right: 1px solid var(--line); }
+      .metric:last-child { border-right: 0; }
+      .metric-label { color: var(--faint); font: 600 10px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+      .metric-value { margin-top: 8px; color: var(--ink); font: 600 22px/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+      .metric-value.operational { color: var(--operational); }
+      .metric-value.danger { color: var(--danger); }
+      .metric-note { margin-top: 5px; overflow: hidden; color: var(--faint); font: 11px/1.3 var(--font-ui); text-overflow: ellipsis; white-space: nowrap; }
+      .path-strip { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; padding: 11px 13px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-subtle); }
+      .path-label { flex: 0 0 auto; color: var(--faint); font: 600 10px/1.2 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; }
+      .path-flow { display: flex; min-width: 0; align-items: center; gap: 6px; overflow: hidden; }
+      .path-chip { flex: 0 0 auto; max-width: 210px; overflow: hidden; padding: 5px 8px; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); background: var(--surface); font: 11px/1.2 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+      .path-arrow { flex: 0 0 auto; color: var(--faint); font: 12px/1 var(--font-mono); }
+      .session-strip { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(130px, .5fr)); overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+      .session-cell { min-width: 0; padding: 13px 14px 12px; border-right: 1px solid var(--line); background: var(--surface); }
+      .session-cell:last-child { border-right: 0; }
+      .session-cell:first-child { background: var(--surface-subtle); }
+      .cell-label { color: var(--faint); font: 600 10px/1.2 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; }
+      .cell-value { overflow: hidden; margin-top: 7px; color: var(--ink); font: 12px/1.3 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+      .cell-value.accent { color: var(--operational); }
+
+      .dashboard { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; margin-top: 20px; }
+      .panel { min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+      .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+      .panel-title { margin: 0; font: 600 15px/1.3 var(--font-ui); letter-spacing: -.01em; }
+      .panel-subtitle { display: block; margin-top: 4px; color: var(--faint); font: 11px/1.3 var(--font-ui); }
+      .panel-meta { color: var(--faint); font: 11px/1.2 var(--font-mono); }
+      .controls { display: grid; gap: 10px; padding: 11px 16px 12px; border-bottom: 1px solid var(--line); }
+      .quick-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+      .quick-filter, .control-action { min-height: 30px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: transparent; font: 11px/1.2 var(--font-ui); transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease; }
+      .quick-filter:hover, .control-action:hover { color: var(--ink); background: var(--hover); }
+      .quick-filter:active, .control-action:active { transform: scale(.97); }
+      .quick-filter.is-active { border-color: var(--operational); color: var(--ink); background: var(--operational-soft); }
+      .control-spacer { flex: 1; }
+      .control-action { color: var(--faint); }
+      .control-fields { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 10px; }
+      .field { width: 100%; min-height: 38px; border: 1px solid var(--line-strong); border-radius: 7px; outline: none; color: var(--ink); background: var(--surface-subtle); padding: 8px 10px; font: 12px/1.3 var(--font-ui); }
+      .field::placeholder { color: var(--faint); }
+      .field:focus { border-color: var(--info); box-shadow: 0 0 0 3px var(--info-soft); }
+      .timeline { min-height: 520px; max-height: calc(100vh - 330px); overflow-y: auto; overflow-x: hidden; padding: 4px 8px 8px; }
+      .event-row, .group-row { position: relative; display: grid; grid-template-columns: 44px 10px minmax(0, 1fr) 72px; gap: 10px; align-items: start; width: 100%; padding: 12px 10px; border: 0; border-bottom: 1px solid var(--line); color: inherit; text-align: left; background: transparent; }
+      .event-row:last-child, .group-row:last-child { border-bottom: 0; }
+      .event-row:hover, .event-row.is-selected, .group-row:hover { border-radius: 7px; background: var(--selected); }
+      .event-seq { color: var(--faint); font: 11px/1.4 var(--font-mono); text-align: right; }
+      .event-marker { width: 8px; height: 8px; margin-top: 4px; border: 1px solid currentColor; border-radius: 50%; color: var(--operational); }
+      .event-marker[data-kind="extension"] { color: var(--info); }
+      .event-marker[data-kind="meta"] { color: var(--warning); }
+      .event-marker[data-kind="error"] { color: var(--danger); }
+      .event-type { display: block; color: var(--ink); font: 600 12px/1.4 var(--font-mono); overflow-wrap: anywhere; }
+      .event-summary { display: block; max-height: 3em; overflow: hidden; margin-top: 4px; color: var(--muted); font: 12px/1.5 var(--font-ui); overflow-wrap: anywhere; word-break: break-word; }
+      .event-time { color: var(--faint); font: 11px/1.4 var(--font-mono); text-align: right; white-space: nowrap; }
+      .timeline-group { border-bottom: 1px solid var(--line); }
+      .timeline-group:last-child { border-bottom: 0; }
+      .group-row { grid-template-columns: 44px 10px minmax(0, 1fr) auto; border-bottom: 0; }
+      .group-row[aria-expanded="true"] { background: var(--surface-subtle); }
+      .group-label { display: block; color: var(--ink); font: 600 12px/1.4 var(--font-mono); }
+      .group-meta { color: var(--faint); font: 11px/1.4 var(--font-mono); white-space: nowrap; }
+      .group-summary { display: block; max-height: 3em; overflow: hidden; margin-top: 4px; color: var(--muted); font: 12px/1.5 var(--font-ui); overflow-wrap: anywhere; }
+      .group-children { padding: 0 0 0 17px; border-left: 1px solid var(--line-strong); margin-left: 40px; }
+      .group-children .event-row { grid-template-columns: 38px 10px minmax(0, 1fr) 68px; padding-block: 9px; }
+      .group-children .event-row:last-child { border-bottom: 0; }
+      .empty { padding: 38px 20px; color: var(--faint); font: 13px/1.6 var(--font-ui); text-align: center; }
+
+      .side-stack { display: grid; gap: 16px; align-content: start; }
+      .details { position: sticky; top: 18px; }
+      .details-body { max-height: calc(100vh - 205px); overflow: auto; padding: 16px 16px 18px; }
+      .detail-lede { margin: 0 0 14px; color: var(--muted); font: 13px/1.55 var(--font-ui); }
+      .detail-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+      .detail-badge { padding: 5px 7px; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); background: var(--surface-subtle); font: 11px/1.2 var(--font-mono); }
+      .detail-badge.accent { border-color: rgba(54, 199, 131, .35); color: var(--operational); background: var(--operational-soft); }
+      .detail-badge.danger { border-color: var(--danger-border); color: var(--danger); background: var(--danger-soft); }
+      .detail-kv { display: grid; grid-template-columns: 66px minmax(0, 1fr); gap: 11px; padding-bottom: 12px; }
+      .detail-kv dt { color: var(--faint); font: 11px/1.4 var(--font-mono); }
+      .detail-kv dd { min-width: 0; margin: 0; overflow: hidden; color: var(--muted); font: 12px/1.4 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+      .detail-kv dd.accent { color: var(--operational); }
+      .raw-label { margin: 4px 0 7px; color: var(--faint); font: 600 10px/1.2 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; }
+      pre { max-height: none; overflow: auto; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--code); font: 12px/1.65 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+      .distribution-panel .panel-head { border-bottom: 1px solid var(--line); }
+      .stats { display: grid; grid-template-columns: repeat(2, 1fr); border-bottom: 1px solid var(--line); }
+      .stat { min-height: 78px; padding: 13px 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface); }
+      .stat:nth-child(2n) { border-right: 0; }
+      .stat:nth-last-child(-n + 2) { border-bottom: 0; }
+      .stat-label { color: var(--faint); font: 600 10px/1.2 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; }
+      .stat-value { margin-top: 9px; color: var(--ink); font: 600 22px/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+      .stat:nth-child(1) .stat-value { color: var(--operational); }
+      .stat:nth-child(4) .stat-value { color: var(--danger); }
+      .bars { padding: 11px 14px 15px; }
+      .bar-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 8px; align-items: center; padding: 6px 0; }
+      .bar-label { overflow: hidden; color: var(--muted); font: 11px/1.3 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+      .bar-count { color: var(--faint); font: 11px/1.3 var(--font-mono); text-align: right; }
+      .bar-track { grid-column: 1 / -1; height: 4px; overflow: hidden; border-radius: 99px; background: var(--selected); }
+      .bar-fill { height: 100%; min-width: 2px; border-radius: inherit; background: var(--operational); }
+      .error-box { display: none; margin-top: 12px; padding: 12px 14px; border: 1px solid var(--danger-border); border-radius: 7px; color: var(--danger); background: var(--danger-soft); font: 12px/1.5 var(--font-ui); }
+      .error-box.is-visible { display: block; }
+      .hidden-input { display: none; }
+      footer { margin-top: 26px; color: var(--faint); font: 11px/1.6 var(--font-ui); }
+      footer a { color: var(--muted); }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+      }
+
+      @media (max-width: 980px) {
+        .drop-card, .dashboard { grid-template-columns: 1fr; }
+        .dropzone { border-right: 0; border-bottom: 1px solid var(--line); }
+        .session-strip { grid-template-columns: repeat(2, 1fr); }
+        .session-cell:first-child { grid-column: 1 / -1; }
+        .session-cell:last-child { grid-column: 1 / -1; border-top: 1px solid var(--line); }
+        .details { position: static; }
+        .details-body { max-height: none; }
+        .metric-grid { grid-template-columns: repeat(3, 1fr); }
+        .metric:nth-child(3) { border-right: 0; }
+        .metric:nth-child(n + 4) { border-top: 1px solid var(--line); }
+      }
+      @media (max-width: 620px) {
+        .shell { width: min(100% - 24px, 1440px); padding-top: 18px; }
+        .topbar { margin-bottom: 22px; }
+        .topbar .status-pill { display: none; }
+        .dropzone, .drop-aside { padding: 24px; }
+        .session-strip { grid-template-columns: 1fr 1fr; }
+        .overview-head { display: block; }
+        .overview-range { margin-top: 8px; text-align: left; white-space: normal; }
+        .metric-grid { grid-template-columns: repeat(2, 1fr); }
+        .metric { border-right: 1px solid var(--line); }
+        .metric:nth-child(2n) { border-right: 0; }
+        .metric:nth-child(n + 3) { border-top: 1px solid var(--line); }
+        .path-strip { align-items: flex-start; flex-direction: column; }
+        .path-flow { width: 100%; overflow-x: auto; padding-bottom: 2px; }
+        .control-fields { grid-template-columns: 1fr; }
+        .quick-filters { gap: 5px; }
+        .primary, .secondary, .quick-filter, .control-action, .field { min-height: 44px; }
+        .control-spacer { display: none; }
+        .timeline { min-height: 420px; max-height: none; }
+        .event-row { grid-template-columns: 36px 9px minmax(0, 1fr); gap: 9px; padding-inline: 8px; }
+        .event-time { grid-column: 3; }
+        .group-row { grid-template-columns: 36px 9px minmax(0, 1fr) auto; gap: 9px; padding-inline: 8px; }
+        .group-children { margin-left: 29px; padding-left: 8px; }
+        .group-children .event-row { grid-template-columns: 32px 9px minmax(0, 1fr); gap: 8px; }
+        .group-children .event-time { grid-column: 3; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">ActSpace / Local Diagnostics</div>
+          <h1>Session Viewer</h1>
+          <p class="subtitle">把一条 append-only Journal 变成可读的运行轨迹。所有解析都在当前浏览器完成，适合快速检查事件顺序与单次 Agent run。</p>
+        </div>
+        <div class="status-pill" id="statusPill" data-state="idle"><span class="status-dot"></span><span id="statusText">等待 Journal</span></div>
+      </header>
+
+      <section class="drop-card" aria-label="导入 Session Journal">
+        <div class="dropzone" id="dropzone" tabindex="0">
+          <div class="drop-kicker">Drop a journal here</div>
+          <h2>拖入 `journal.jsonl`，从事实流开始阅读。</h2>
+          <p class="drop-copy">查看 Session 元数据、核心/扩展事件、时间线和原始 Envelope。不会修改文件，也不会发送到网络。</p>
+          <div class="drop-actions">
+            <button class="primary" id="chooseButton" type="button">选择 JSONL 文件</button>
+            <button class="secondary" id="clearButton" type="button" hidden>清空查看器</button>
+            <span class="file-note" id="fileNote">支持 .jsonl / .ndjson / .json</span>
+          </div>
+          <input class="hidden-input" id="fileInput" type="file" accept=".jsonl,.ndjson,.json,application/json,text/plain" />
+          <div class="error-box" id="errorBox" role="alert"></div>
+        </div>
+        <div class="drop-aside">
+          <div class="aside-label">Envelope anatomy</div>
+          <div class="format-line"><strong>Header</strong><span>Session identity &amp; format contract</span></div>
+          <div class="format-line"><strong>Event</strong><span>seq · type · source · data · surface</span></div>
+          <div class="format-line"><strong>Replay</strong><span>原始行保持不变，仅在页面中投影</span></div>
+        </div>
+      </section>
+
+      <section class="workspace" id="workspace" aria-live="polite">
+        <section class="overview" aria-label="Session overview">
+          <div class="overview-head">
+            <div>
+              <p class="overview-kicker">Session overview</p>
+              <h2 class="overview-title" id="overviewTitle">Session Journal</h2>
+              <p class="overview-caption" id="overviewCaption">先看运行路径，再进入单条 Envelope。</p>
+            </div>
+            <div class="overview-range" id="rangeValue">等待事件时间范围</div>
+          </div>
+          <div class="metric-grid">
+            <div class="metric"><div class="metric-label">Events</div><div class="metric-value operational" id="eventMetric">0</div><div class="metric-note">全部有效记录</div></div>
+            <div class="metric"><div class="metric-label">Turns</div><div class="metric-value" id="turnMetric">0</div><div class="metric-note">Agent 回合</div></div>
+            <div class="metric"><div class="metric-label">Requests</div><div class="metric-value" id="requestMetric">0</div><div class="metric-note">按 requestId 去重</div></div>
+            <div class="metric"><div class="metric-label">Tools</div><div class="metric-value" id="toolMetric">0</div><div class="metric-note">按 toolCallId 去重</div></div>
+            <div class="metric"><div class="metric-label">Errors</div><div class="metric-value danger" id="errorMetric">0</div><div class="metric-note">需要关注的记录</div></div>
+            <div class="metric"><div class="metric-label">Duration</div><div class="metric-value" id="durationMetric">—</div><div class="metric-note">首尾事件间隔</div></div>
+          </div>
+          <div class="path-strip">
+            <span class="path-label">Key path</span>
+            <div class="path-flow" id="pathFlow"><span class="path-chip">导入 Journal 后显示运行路径</span></div>
+          </div>
+        </section>
+
+        <div class="session-strip">
+          <div class="session-cell"><div class="cell-label">Session</div><div class="cell-value accent" id="sessionId">—</div></div>
+          <div class="session-cell"><div class="cell-label">Format</div><div class="cell-value" id="formatValue">—</div></div>
+          <div class="session-cell"><div class="cell-label">Created</div><div class="cell-value" id="createdValue">—</div></div>
+          <div class="session-cell"><div class="cell-label">Source file</div><div class="cell-value" id="sourceValue">—</div></div>
+        </div>
+
+        <div class="dashboard">
+          <section class="panel timeline-panel">
+            <div class="panel-head"><div><h2 class="panel-title">Trace explorer</h2><span class="panel-subtitle">按运行路径阅读，连续流事件会自动合并</span></div><span class="panel-meta" id="resultCount">0 groups / 0 events</span></div>
+            <div class="controls">
+              <div class="quick-filters" role="group" aria-label="快速筛选">
+                <button class="quick-filter is-active" type="button" data-view-filter="all" aria-pressed="true">全部</button>
+                <button class="quick-filter" type="button" data-view-filter="core" aria-pressed="false">核心流程</button>
+                <button class="quick-filter" type="button" data-view-filter="request" aria-pressed="false">请求</button>
+                <button class="quick-filter" type="button" data-view-filter="tool" aria-pressed="false">工具</button>
+                <button class="quick-filter" type="button" data-view-filter="error" aria-pressed="false">异常</button>
+                <button class="quick-filter" type="button" data-view-filter="stream" aria-pressed="false">高频流</button>
+                <span class="control-spacer"></span>
+                <button class="control-action" id="expandAllButton" type="button">展开分组</button>
+                <button class="control-action" id="collapseAllButton" type="button">收起分组</button>
+              </div>
+              <div class="control-fields">
+                <input class="field" id="searchInput" type="search" placeholder="搜索事件类型、seq、source、ID 或 JSON 内容…" autocomplete="off" />
+                <select class="field" id="typeFilter" aria-label="按事件类型过滤"><option value="">全部事件类型</option></select>
+              </div>
+            </div>
+            <div class="timeline" id="timeline"><div class="empty">导入 Journal 后，这里会显示事件时间线。</div></div>
+          </section>
+
+          <aside class="side-stack">
+            <section class="panel details">
+              <div class="panel-head"><h2 class="panel-title">Event detail</h2><span class="panel-meta" id="detailSeq">—</span></div>
+              <div class="details-body">
+                <p class="detail-lede" id="detailLede">选择时间线中的事件，右侧会显示可读字段和完整 Envelope。</p>
+                <div class="detail-badges" id="detailBadges"></div>
+                <dl>
+                  <div class="detail-kv"><dt>Type</dt><dd class="accent" id="detailType">选择一条事件</dd></div>
+                  <div class="detail-kv"><dt>Time</dt><dd id="detailTime">—</dd></div>
+                  <div class="detail-kv"><dt>Source</dt><dd id="detailSource">—</dd></div>
+                  <div class="detail-kv"><dt>Path</dt><dd id="detailPath">—</dd></div>
+                </dl>
+                <div class="raw-label">Raw envelope</div>
+                <pre id="detailJson">点击左侧事件查看完整 Envelope。</pre>
+              </div>
+            </section>
+
+            <section class="panel distribution-panel">
+              <div class="panel-head"><h2 class="panel-title">Event distribution</h2><span class="panel-meta">all records</span></div>
+              <div class="stats">
+                <div class="stat"><div class="stat-label">Events</div><div class="stat-value" id="eventStat">0</div></div>
+                <div class="stat"><div class="stat-label">Core</div><div class="stat-value" id="coreStat">0</div></div>
+                <div class="stat"><div class="stat-label">Extensions</div><div class="stat-value" id="extensionStat">0</div></div>
+                <div class="stat"><div class="stat-label">Invalid lines</div><div class="stat-value" id="invalidStat">0</div></div>
+              </div>
+              <div class="bars" id="bars"><div class="empty">暂无事件分布。</div></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <footer>Offline utility · Read-only · 事件详情可能包含敏感工作区信息，请在分享前先脱敏。</footer>
+    </main>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const CORE_TYPES = new Set([
+          "turn/start", "turn/end", "step/start", "step/end", "user/message", "assistant/chunk", "assistant/message",
+          "tool/call", "tool/result", "todo/write", "request/header", "request/context", "session/end-seed"
+        ]);
+        const META_TYPES = new Set(["session/title-set", "session/pinned-set", "session/archived-set", "session/workspace-set"]);
+        const STREAM_TYPES = new Set(["assistant/chunk", "agent/inbox/spliced"]);
+        const state = { header: null, events: [], invalid: [], selected: null, fileName: "", viewFilter: "all", expandedGroups: new Set() };
+        const $ = (id) => document.getElementById(id);
+        const statusPill = $("statusPill");
+        const statusText = $("statusText");
+        const dropzone = $("dropzone");
+        const dropCard = dropzone.closest(".drop-card");
+        const fileInput = $("fileInput");
+        const workspace = $("workspace");
+        const errorBox = $("errorBox");
+        const timeline = $("timeline");
+        const searchInput = $("searchInput");
+        const typeFilter = $("typeFilter");
+        const quickFilters = [...document.querySelectorAll("[data-view-filter]")];
+        const expandAllButton = $("expandAllButton");
+        const collapseAllButton = $("collapseAllButton");
+
+        function setStatus(text, stateName) {
+          statusText.textContent = text;
+          statusPill.dataset.state = stateName;
+        }
+
+        function escapeText(value) {
+          if (value === null) return "null";
+          if (typeof value === "string") return value;
+          if (typeof value === "undefined") return "—";
+          try { return JSON.stringify(value); } catch { return String(value); }
+        }
+
+        function formatTime(value) {
+          if (!value) return "—";
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) return String(value);
+          return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium" }).format(date);
+        }
+
+        function eventKind(event) {
+          if (CORE_TYPES.has(event.type)) return "core";
+          if (META_TYPES.has(event.type)) return "meta";
+          return "extension";
+        }
+
+        function isErrorEvent(event) {
+          const type = String(event?.type || "").toLowerCase();
+          const status = String(event?.data?.status || event?.data?.reason || "").toLowerCase();
+          return /error|fail|abort|denied|timeout/.test(type) || /error|fail|abort|denied|timeout/.test(status);
+        }
+
+        function eventCategory(event) {
+          if (isErrorEvent(event)) return "error";
+          if (STREAM_TYPES.has(event.type)) return "stream";
+          if (String(event.type || "").startsWith("request/")) return "request";
+          if (String(event.type || "").startsWith("tool/")) return "tool";
+          if (eventKind(event) === "core") return "core";
+          return "extension";
+        }
+
+        function formatNumber(value) {
+          return new Intl.NumberFormat(undefined).format(value);
+        }
+
+        function formatDuration(milliseconds) {
+          if (!Number.isFinite(milliseconds) || milliseconds < 0) return "—";
+          if (milliseconds < 1000) return `${Math.round(milliseconds)}ms`;
+          const seconds = milliseconds / 1000;
+          if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
+          const minutes = Math.floor(seconds / 60);
+          const remainder = Math.round(seconds % 60);
+          return `${minutes}m ${String(remainder).padStart(2, "0")}s`;
+        }
+
+        function countUniqueIds(events, getId, fallback) {
+          const ids = new Set(events.map(getId).filter((value) => value !== null && value !== undefined && value !== "").map(String));
+          return ids.size || fallback;
+        }
+
+        function eventPath(event) {
+          const data = event?.data && typeof event.data === "object" ? event.data : {};
+          return [data.agentRunId && `run ${data.agentRunId}`, data.turnId && `turn ${data.turnId}`, data.stepId && `step ${data.stepId}`, data.requestId && `request ${data.requestId}`].filter(Boolean).join(" / ") || "未提供关联 ID";
+        }
+
+        function eventLabel(event) {
+          return `${escapeText(event.type || "unknown")} · seq ${escapeText(event.seq ?? "—")}`;
+        }
+
+        function shortSummary(event) {
+          const data = event && event.data;
+          if (!data || typeof data !== "object") return "无 data 负载";
+          const keys = Object.keys(data).slice(0, 4);
+          if (!keys.length) return "空 data 负载";
+          return keys.map((key) => `${key}=${escapeText(data[key])}`).join(" · ");
+        }
+
+        function parseJournal(text) {
+          const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
+          let parsedHeader = null;
+          const events = [];
+          const invalid = [];
+          lines.forEach((line, index) => {
+            const lineNumber = index + 1;
+            if (!line.trim()) return;
+            try {
+              const record = JSON.parse(line);
+              if (record && record.recordKind === "header") { if (!parsedHeader) parsedHeader = record; return; }
+              if (record && (record.recordKind === "event" || typeof record.type === "string")) events.push({ ...record, __line: lineNumber });
+              else invalid.push({ line: lineNumber, reason: "不是 Header 或 Event Envelope" });
+            } catch (error) {
+              invalid.push({ line: lineNumber, reason: error instanceof Error ? error.message : "无法解析 JSON" });
+            }
+          });
+          return { header: parsedHeader, events, invalid };
+        }
+
+        function readFileText(file) {
+          if (typeof file.text === "function") return file.text();
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ""));
+            reader.onerror = () => reject(reader.error || new Error("无法读取文件。"));
+            reader.readAsText(file);
+          });
+        }
+
+        function showError(message) {
+          errorBox.textContent = message;
+          errorBox.classList.add("is-visible");
+        }
+
+        function clearError() {
+          errorBox.textContent = "";
+          errorBox.classList.remove("is-visible");
+        }
+
+        function renderHeader() {
+          const header = state.header || {};
+          $("sessionId").textContent = escapeText(header.sessionId || "未提供");
+          $("formatValue").textContent = `${escapeText(header.format || "actspace-session")} v${escapeText(header.formatVersion || "—")}`;
+          $("createdValue").textContent = formatTime(header.createdAt);
+          $("sourceValue").textContent = state.fileName || "—";
+        }
+
+        function renderOverview() {
+          const events = state.events;
+          const timestamps = events.map((event) => new Date(event.time).getTime()).filter(Number.isFinite);
+          const firstTime = timestamps.length ? Math.min(...timestamps) : null;
+          const lastTime = timestamps.length ? Math.max(...timestamps) : null;
+          const duration = firstTime !== null && lastTime !== null ? lastTime - firstTime : NaN;
+          const titleEvent = events.find((event) => event.type === "session/title-set" && event.data?.title);
+          const title = state.header?.title || titleEvent?.data?.title || "Session Journal";
+          const caption = events.length ? `${formatNumber(events.length)} 条事实记录，先看关键路径，再查看原始 Envelope。` : "先导入一份 Journal，再从运行路径开始阅读。";
+          $("overviewTitle").textContent = title;
+          $("overviewCaption").textContent = caption;
+          $("rangeValue").textContent = firstTime === null ? "等待事件时间范围" : `${new Date(firstTime).toLocaleString()} → ${new Date(lastTime).toLocaleString()} · ${formatDuration(duration)}`;
+
+          const turns = events.filter((event) => event.type === "turn/start").length;
+          const requestRecords = events.filter((event) => String(event.type || "").startsWith("request/"));
+          const toolRecords = events.filter((event) => String(event.type || "").startsWith("tool/"));
+          const requests = countUniqueIds(requestRecords, (event) => event.data?.requestId, requestRecords.length);
+          const tools = countUniqueIds(toolRecords, (event) => event.data?.callId ?? event.data?.toolCallId, toolRecords.length);
+          const errors = events.filter(isErrorEvent).length;
+          $("eventMetric").textContent = formatNumber(events.length);
+          $("turnMetric").textContent = formatNumber(turns);
+          $("requestMetric").textContent = formatNumber(requests);
+          $("toolMetric").textContent = formatNumber(tools);
+          $("errorMetric").textContent = formatNumber(errors);
+          $("durationMetric").textContent = formatDuration(duration);
+
+          const seen = new Set();
+          const path = events.filter((event) => !STREAM_TYPES.has(event.type)).map((event) => event.type || "unknown").filter((type) => {
+            if (seen.has(type)) return false;
+            seen.add(type);
+            return true;
+          }).slice(0, 9);
+          const pathFlow = $("pathFlow");
+          if (!path.length) {
+            pathFlow.replaceChildren(Object.assign(document.createElement("span"), { className: "path-chip", textContent: "导入 Journal 后显示运行路径" }));
+            return;
+          }
+          const fragment = document.createDocumentFragment();
+          path.forEach((type, index) => {
+            if (index) {
+              const arrow = document.createElement("span");
+              arrow.className = "path-arrow";
+              arrow.textContent = "→";
+              fragment.append(arrow);
+            }
+            const chip = document.createElement("span");
+            chip.className = "path-chip";
+            chip.textContent = type;
+            fragment.append(chip);
+          });
+          pathFlow.replaceChildren(fragment);
+        }
+
+        function renderFilters() {
+          const current = typeFilter.value;
+          const types = [...new Set(state.events.map((event) => event.type).filter(Boolean))].sort();
+          typeFilter.replaceChildren(new Option("全部事件类型", ""), ...types.map((type) => new Option(type, type)));
+          typeFilter.value = types.includes(current) ? current : "";
+        }
+
+        function filteredEvents() {
+          const query = searchInput.value.trim().toLowerCase();
+          const selectedType = typeFilter.value;
+          return state.events.filter((event) => {
+            if (state.viewFilter !== "all" && eventCategory(event) !== state.viewFilter) return false;
+            if (selectedType && event.type !== selectedType) return false;
+            if (!query) return true;
+            return JSON.stringify(event).toLowerCase().includes(query);
+          });
+        }
+
+        function buildTimelineItems(events) {
+          const items = [];
+          let index = 0;
+          while (index < events.length) {
+            const event = events[index];
+            if (STREAM_TYPES.has(event.type)) {
+              let end = index + 1;
+              while (end < events.length && events[end].type === event.type) end += 1;
+              const groupEvents = events.slice(index, end);
+              if (groupEvents.length >= 2) {
+                items.push({ kind: "group", key: `${event.__line}:${event.type}`, type: event.type, events: groupEvents });
+                index = end;
+                continue;
+              }
+            }
+            items.push({ kind: "event", event });
+            index += 1;
+          }
+          return items;
+        }
+
+        function renderEventRow(event, nested = false) {
+          const row = document.createElement("button");
+          row.type = "button";
+          row.className = `event-row${state.selected === event ? " is-selected" : ""}`;
+          row.setAttribute("aria-label", eventLabel(event));
+          row.addEventListener("click", () => { state.selected = event; renderTimeline(); renderDetails(); });
+          const seq = document.createElement("span"); seq.className = "event-seq"; seq.textContent = escapeText(event.seq ?? "—");
+          const marker = document.createElement("span"); marker.className = "event-marker"; marker.dataset.kind = isErrorEvent(event) ? "error" : eventKind(event);
+          const copy = document.createElement("span");
+          const type = document.createElement("span"); type.className = "event-type"; type.textContent = escapeText(event.type || "unknown");
+          const summary = document.createElement("span"); summary.className = "event-summary"; summary.textContent = shortSummary(event);
+          copy.append(type, summary);
+          const time = document.createElement("time"); time.className = "event-time"; time.textContent = event.time ? new Date(event.time).toLocaleTimeString() : "—";
+          row.append(seq, marker, copy, time);
+          return row;
+        }
+
+        function renderGroup(item) {
+          const wrapper = document.createElement("section");
+          wrapper.className = "timeline-group";
+          const expanded = state.expandedGroups.has(item.key);
+          const first = item.events[0];
+          const last = item.events[item.events.length - 1];
+          const header = document.createElement("button");
+          header.type = "button";
+          header.className = "group-row";
+          header.setAttribute("aria-expanded", String(expanded));
+          header.setAttribute("aria-label", `${item.type}，${item.events.length} 条连续事件`);
+          header.addEventListener("click", () => {
+            if (state.expandedGroups.has(item.key)) state.expandedGroups.delete(item.key);
+            else state.expandedGroups.add(item.key);
+            renderTimeline();
+          });
+          const seq = document.createElement("span"); seq.className = "event-seq"; seq.textContent = `${escapeText(first.seq ?? "—")}–${escapeText(last.seq ?? "—")}`;
+          const marker = document.createElement("span"); marker.className = "event-marker"; marker.dataset.kind = eventCategory(first) === "error" ? "error" : "stream";
+          const copy = document.createElement("span");
+          const label = document.createElement("span"); label.className = "group-label"; label.textContent = item.type;
+          const summary = document.createElement("span"); summary.className = "group-summary"; summary.textContent = shortSummary(first);
+          copy.append(label, summary);
+          const meta = document.createElement("span"); meta.className = "group-meta"; meta.textContent = `${formatNumber(item.events.length)} events · ${first.time ? new Date(first.time).toLocaleTimeString() : "—"}`;
+          header.append(seq, marker, copy, meta);
+          wrapper.append(header);
+          if (expanded) {
+            const children = document.createElement("div");
+            children.className = "group-children";
+            item.events.forEach((event) => children.append(renderEventRow(event, true)));
+            wrapper.append(children);
+          }
+          return wrapper;
+        }
+
+        function renderQuickFilters() {
+          quickFilters.forEach((button) => {
+            const active = button.dataset.viewFilter === state.viewFilter;
+            button.classList.toggle("is-active", active);
+            button.setAttribute("aria-pressed", String(active));
+          });
+        }
+
+        function renderTimeline() {
+          const events = filteredEvents();
+          const items = buildTimelineItems(events);
+          renderQuickFilters();
+          $("resultCount").textContent = `${formatNumber(items.length)} groups / ${formatNumber(events.length)} events`;
+          if (!events.length) {
+            timeline.replaceChildren(Object.assign(document.createElement("div"), { className: "empty", textContent: state.events.length ? "当前筛选没有匹配的事件。" : "导入 Journal 后，这里会显示事件时间线。" }));
+            return;
+          }
+          const fragment = document.createDocumentFragment();
+          items.forEach((item) => fragment.append(item.kind === "group" ? renderGroup(item) : renderEventRow(item.event)));
+          timeline.replaceChildren(fragment);
+        }
+
+        function renderStats() {
+          const counts = new Map();
+          state.events.forEach((event) => counts.set(event.type || "unknown", (counts.get(event.type || "unknown") || 0) + 1));
+          $("eventStat").textContent = String(state.events.length);
+          $("coreStat").textContent = String(state.events.filter((event) => eventKind(event) === "core").length);
+          $("extensionStat").textContent = String(state.events.filter((event) => eventKind(event) === "extension").length);
+          $("invalidStat").textContent = String(state.invalid.length);
+          const max = Math.max(1, ...counts.values());
+          const rows = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+          if (!rows.length) { $("bars").replaceChildren(Object.assign(document.createElement("div"), { className: "empty", textContent: "暂无事件分布。" })); return; }
+          const fragment = document.createDocumentFragment();
+          rows.forEach(([type, count]) => {
+            const row = document.createElement("div"); row.className = "bar-row";
+            const label = document.createElement("span"); label.className = "bar-label"; label.textContent = type;
+            const number = document.createElement("span"); number.className = "bar-count"; number.textContent = String(count);
+            const track = document.createElement("span"); track.className = "bar-track";
+            const fill = document.createElement("span"); fill.className = "bar-fill"; fill.style.width = `${Math.max(3, Math.round(count / max * 100))}%`;
+            track.append(fill); row.append(label, number, track); fragment.append(row);
+          });
+          $("bars").replaceChildren(fragment);
+        }
+
+        function renderDetails() {
+          const event = state.selected;
+          $("detailSeq").textContent = event ? `line ${event.__line}` : "—";
+          $("detailLede").textContent = event ? "当前选中事件的结构化摘要。Raw envelope 保留原始字段，便于回查。" : "选择时间线中的事件，右侧会显示可读字段和完整 Envelope。";
+          $("detailType").textContent = event ? escapeText(event.type || "unknown") : "选择一条事件";
+          $("detailTime").textContent = event ? formatTime(event.time) : "—";
+          $("detailSource").textContent = event ? escapeText(event.source?.ownerPluginId || event.source?.pluginId || "—") : "—";
+          $("detailPath").textContent = event ? eventPath(event) : "—";
+          const badges = $("detailBadges");
+          badges.replaceChildren();
+          if (event) {
+            const category = document.createElement("span");
+            category.className = `detail-badge${isErrorEvent(event) ? " danger" : eventCategory(event) === "core" ? " accent" : ""}`;
+            category.textContent = isErrorEvent(event) ? "异常" : eventCategory(event);
+            badges.append(category);
+            const line = document.createElement("span");
+            line.className = "detail-badge";
+            line.textContent = `line ${event.__line}`;
+            badges.append(line);
+            if (event.data && typeof event.data === "object") {
+              const keys = document.createElement("span");
+              keys.className = "detail-badge";
+              keys.textContent = `${Object.keys(event.data).length} data fields`;
+              badges.append(keys);
+            }
+          }
+          $("detailJson").textContent = event ? JSON.stringify(Object.fromEntries(Object.entries(event).filter(([key]) => key !== "__line")), null, 2) : "点击左侧事件查看完整 Envelope。";
+        }
+
+        function renderAll() {
+          renderHeader(); renderOverview(); renderFilters(); renderStats(); renderTimeline(); renderDetails();
+          workspace.classList.toggle("is-visible", Boolean(state.header || state.events.length));
+          $("clearButton").hidden = !(state.header || state.events.length || state.invalid.length);
+        }
+
+        async function loadFile(file) {
+          if (!file) return;
+          clearError();
+          try {
+            const parsed = parseJournal(await readFileText(file));
+            state.header = parsed.header;
+            state.events = parsed.events;
+            state.invalid = parsed.invalid;
+            state.selected = state.events[0] || null;
+            state.fileName = file.name;
+            state.viewFilter = "all";
+            state.expandedGroups.clear();
+            if (!state.header && !state.events.length) throw new Error("文件中没有可识别的 Header 或 Event Envelope。");
+            setStatus(`${state.events.length} events loaded`, "ready");
+            renderAll();
+            if (state.invalid.length) {
+              const lines = state.invalid.slice(0, 8).map((item) => `第 ${item.line} 行：${item.reason}`).join("；");
+              showError(`已载入有效事件，但发现 ${state.invalid.length} 个异常行。${lines}${state.invalid.length > 8 ? "；…" : ""}`);
+            }
+          } catch (error) {
+            state.header = null; state.events = []; state.invalid = []; state.selected = null;
+            workspace.classList.remove("is-visible");
+            setStatus("读取失败", "error");
+            showError(error instanceof Error ? error.message : "读取文件失败。");
+            renderAll();
+          }
+        }
+
+        $("chooseButton").addEventListener("click", () => fileInput.click());
+        $("clearButton").addEventListener("click", () => {
+          state.header = null; state.events = []; state.invalid = []; state.selected = null; state.fileName = "";
+          state.viewFilter = "all"; state.expandedGroups.clear();
+          fileInput.value = ""; searchInput.value = ""; typeFilter.replaceChildren(new Option("全部事件类型", ""));
+          clearError(); setStatus("等待 Journal", "idle"); renderAll();
+        });
+        fileInput.addEventListener("change", () => loadFile(fileInput.files?.[0]));
+        function isFileDrag(event) {
+          const types = event.dataTransfer?.types;
+          return Boolean(event.dataTransfer?.files?.length || (types && Array.from(types).includes("Files")));
+        }
+
+        function clearDragState() {
+          dropzone.classList.remove("is-dragging");
+          dropCard?.classList.remove("is-dragging");
+        }
+
+        document.addEventListener("dragenter", (event) => {
+          if (!isFileDrag(event)) return;
+          event.preventDefault();
+          dropzone.classList.add("is-dragging");
+          dropCard?.classList.add("is-dragging");
+        });
+        document.addEventListener("dragover", (event) => {
+          if (!isFileDrag(event)) return;
+          event.preventDefault();
+          if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+        });
+        document.addEventListener("dragleave", (event) => {
+          if (!isFileDrag(event)) return;
+          const target = event.target;
+          if (target === document.documentElement || target === document.body) clearDragState();
+        });
+        document.addEventListener("drop", (event) => {
+          if (!isFileDrag(event)) return;
+          event.preventDefault();
+          clearDragState();
+          const file = event.dataTransfer?.files?.[0];
+          if (!file) {
+            setStatus("未读取到文件", "error");
+            showError("检测到文件拖入，但浏览器没有提供可读取的文件对象。请改用“选择 JSONL 文件”按钮重试。");
+            return;
+          }
+          void loadFile(file);
+        });
+        dropzone.addEventListener("keydown", (event) => { if ((event.key === "Enter" || event.key === " ") && event.target === dropzone) { event.preventDefault(); fileInput.click(); } });
+        searchInput.addEventListener("input", renderTimeline);
+        typeFilter.addEventListener("change", renderTimeline);
+        quickFilters.forEach((button) => button.addEventListener("click", () => {
+          state.viewFilter = button.dataset.viewFilter || "all";
+          renderTimeline();
+        }));
+        expandAllButton.addEventListener("click", () => {
+          buildTimelineItems(filteredEvents()).forEach((item) => { if (item.kind === "group") state.expandedGroups.add(item.key); });
+          renderTimeline();
+        });
+        collapseAllButton.addEventListener("click", () => {
+          state.expandedGroups.clear();
+          renderTimeline();
+        });
+      })();
+    </script>
+  </body>
+</html>

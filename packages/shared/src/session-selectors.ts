@@ -1,7 +1,6 @@
 import type {
   AssistantMessagePayload,
   ContextCompactionPayload,
-  EvalCandidatePayload,
   ContextUsageSnapshot,
   ErrorPayload,
   EventId,
@@ -86,8 +85,10 @@ function messageBlockFromToolPreview(
   eventId: EventId,
   timestamp: string,
   preview: ToolUiPreview,
-  isError?: boolean
+  isError?: boolean,
+  terminalStatus?: unknown
 ): MessageBlock {
+  const status = terminalStatus === "running" ? "running" : terminalStatus === "denied" || terminalStatus === "aborted" || terminalStatus === "outcome-unknown" ? terminalStatus : isError ? "failed" : "completed";
   switch (preview.kind) {
     case "read":
       return {
@@ -96,6 +97,7 @@ function messageBlockFromToolPreview(
         filePath: preview.filePath,
         range: preview.range,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp)
       };
     case "search":
@@ -106,6 +108,7 @@ function messageBlockFromToolPreview(
         scope: preview.scope,
         resultCount: preview.resultCount,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp)
       };
     case "grep":
@@ -116,6 +119,7 @@ function messageBlockFromToolPreview(
         scope: preview.scope,
         resultCount: preview.resultCount,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp)
       };
     case "glob":
@@ -126,6 +130,7 @@ function messageBlockFromToolPreview(
         scope: preview.scope,
         resultCount: preview.resultCount,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp)
       };
     case "web_search":
@@ -136,6 +141,7 @@ function messageBlockFromToolPreview(
         query: preview.query,
         url: preview.url,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp),
         resultUrls: preview.resultUrls,
         contentPreview: preview.contentPreview,
@@ -147,6 +153,7 @@ function messageBlockFromToolPreview(
         mediaName: preview.mediaName,
         mediaKind: preview.mediaKind,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp),
         isError
       };
@@ -173,6 +180,7 @@ function messageBlockFromToolPreview(
         path: preview.path,
         entryCount: preview.entryCount,
         displayText: preview.displayText,
+        status,
         createdAt: getDisplayTime(timestamp)
       };
     case "edit_diff":
@@ -465,7 +473,7 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
           : nextRenderKey(event, "tool", getOptionalString(payload, "toolCallId"));
 
         return [withRenderKey(
-          messageBlockFromToolPreview(event.id, event.timestamp, preview, payload.ok === false),
+          messageBlockFromToolPreview(event.id, event.timestamp, preview, payload.ok === false, payload.status),
           renderKey,
         )];
       }
@@ -514,25 +522,6 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
         return workspacePreparationBlock(event).map((block) =>
           withRenderKey(block, nextRenderKey(event, "workspace-preparation")),
         );
-      case "eval_candidate": {
-        const payload = event.payload as EvalCandidatePayload;
-        return [
-          {
-            kind: "status",
-            id: event.id,
-            renderKey: nextRenderKey(event, "eval-candidate"),
-            content: payload.summary,
-            createdAt: getDisplayTime(event.timestamp),
-            tone: payload.status === "failed" ? "error" : "muted",
-          },
-        ];
-      }
-      // Kairos 自治模式专属事件不出现在主 Agent 消息流中；若历史 session 偶然包含也直接跳过。
-      case "kairos_tick_injected":
-      case "kairos_sleep_start":
-      case "kairos_sleep_end":
-      case "kairos_sleep_interrupted":
-        return [];
     }
   });
 }

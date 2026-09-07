@@ -3,7 +3,7 @@
 | key | value |
 |-----|-------|
 | date | 2026-07-10 |
-| scope | plugins/browser-bridge, packages/agent-core, packages/shared |
+| scope | browser-bridge, packages/agent-core, packages/shared |
 | status | Plan 5 M0-M6 completed |
 
 ## 概要
@@ -17,7 +17,7 @@
 - 更新 `.gitignore`、`AGENTS.md`、`ARCHITECTURE.md` 反映新结构
 
 ### Plan 0: 协议契约扩展
-- `plugins/browser-bridge/packages/protocol/protocol.go`：协议版本升级到 0.2.0，新增 20+ 个 method 常量、交互命令类型定义（Click/Fill/PressKey/SelectOption/Scroll/DomCUA/CUA 等）
+- `browser-bridge/packages/protocol/protocol.go`：协议版本升级到 0.2.0，新增 20+ 个 method 常量、交互命令类型定义（Click/Fill/PressKey/SelectOption/Scroll/DomCUA/CUA 等）
 - 新增 `events.go`：定义 CDP/Download/TabClosed/Navigated 4 种推送事件类型
 
 ### Plan 1: Go Socket Server

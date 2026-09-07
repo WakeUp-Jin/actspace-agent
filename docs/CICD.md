@@ -7,7 +7,7 @@
 - `ci.yml`：常驻 CI，覆盖 docs、repo hygiene、GitHub Actions pinning、Markdown、shell 脚本校验，以及 workspace 的依赖安装、类型检查、测试和构建。
 - `supply-chain-security.yml`：在 PR 上做依赖变更检查，并在 PR、定时任务和手动触发时运行 OSV 扫描。
 - `release.yml`：手动触发的 release 流水线，用来打包 unsigned portable 桌面制品、生成 SBOM/provenance，并创建 GitHub Release。
-- `site-pages.yml`：在 `main` 更新或手动触发时构建 `packages/site`，上传静态产物并部署到 GitHub Pages。
+- `site-pages.yml`：在 `main` 更新或手动触发时构建 `apps/site`，上传静态产物并部署到 GitHub Pages。
 
 当前根命令还包括：
 
@@ -35,7 +35,7 @@
 ## 当前现状说明
 
 - `scripts/ci.sh` 当前只做仓库级基础检查：
-  - docs 校验
+  - docs 骨架、active/discarded 生命周期与 current truth zone 校验；current truth zone 会拒绝已删除 v1 路径、已丢弃 active 入口和相对 Markdown 断链
   - repo hygiene
   - GitHub Actions pinning
   - shell 脚本语法检查
@@ -46,7 +46,7 @@
   - 显式执行站点的 `check:site`、`test:site` 和 `build:site`，并使用 GitHub project Pages 的 `/actspace-agent` base path 验证生产构建。
 - workspace 依赖当前允许 `electron` 和 `esbuild` 执行构建脚本；否则 Electron 开发启动无法正确安装运行时。
 - 当前桌面端优先跟随较新的稳定 Electron 版本，以降低 macOS 26 这类新系统上的启动兼容风险。
-- `packages/desktop` 的开发启动依赖 `packages/shared` 和 `packages/agent-core` 的可消费构建产物；如果包边界被改回源码直引，Electron 启动链会再次失稳。
+- `apps/desktop` 的开发启动依赖 `packages/shared`、领域 packages 和 `packages/runtime` 的可消费构建产物；如果包边界被改回源码直引，Electron 启动链会再次失稳。
 - `scripts/release-package.sh` 会先构建 desktop workspace，再用当前平台的 Electron runtime 组装 portable desktop archive；默认不需要付费证书，也不会强制签名。
 
 也就是说，这套 CI/CD 现在已经不再是纯模板：默认 CI 已经能守住真实 TypeScript workspace 的基础健康；release 也已经开始产出真实桌面应用 archive。macOS release 会额外产出本地安装用 `.dmg`，但当前 release 不强依赖 Developer ID 证书，仍不包含正式 notarization 或自动更新。
@@ -70,13 +70,13 @@ macOS 产物会把复制来的 Electron runtime 改成 Actspace 语义：外层 
 
 ## 官网部署
 
-官网是 `packages/site` 下的 Astro 静态站点。默认公开地址为：
+官网是 `apps/site` 下的 Astro 静态站点。默认公开地址为：
 
 ```text
 https://wakeup-jin.github.io/actspace-agent/
 ```
 
-`site-pages.yml` checkout 完整 monorepo，因为更新页在构建时会读取根目录 `docs/releases/feature-release-notes.md`。Astro 官方 Action 从仓库根目录安装 pnpm workspace 依赖，再运行 `pnpm build:site`，上传 `packages/site/dist`，只有 build job 成功后 deploy job 才会发布。
+`site-pages.yml` checkout 完整 monorepo，因为更新页在构建时会读取根目录 `docs/releases/feature-release-notes.md`。Astro 官方 Action 从仓库根目录安装 pnpm workspace 依赖，再运行 `pnpm build:site`，上传 `apps/site/dist`，只有 build job 成功后 deploy job 才会发布。
 
 仓库维护者仍需在 GitHub 的 **Settings → Pages → Build and deployment → Source** 中选择 **GitHub Actions**。Workflow 不能代替这项仓库设置。
 
@@ -86,7 +86,7 @@ https://wakeup-jin.github.io/actspace-agent/
 SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 ```
 
-未来切换自定义域名时，设置 `SITE_URL=https://<domain>` 和 `SITE_BASE=/`，并在域名确定后再添加 `packages/site/public/CNAME`。组件内部链接统一经过 base path helper，不需要逐页修改。
+未来切换自定义域名时，设置 `SITE_URL=https://<domain>` 和 `SITE_BASE=/`，并在域名确定后再添加 `apps/site/public/CNAME`。组件内部链接统一经过 base path helper，不需要逐页修改。
 
 首版不接第三方统计、遥测或运行时后端。站点发布与桌面 release 使用独立 workflow，Pages 失败不会创建或修改桌面 GitHub Release。
 

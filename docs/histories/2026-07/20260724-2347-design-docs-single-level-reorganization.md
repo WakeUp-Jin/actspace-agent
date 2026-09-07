@@ -31,7 +31,7 @@
 - `docs/design-docs/index.md`
 - `docs/design-docs/agent-index.md`
 - `docs/design-docs/frontend/README.md`
-- `docs/design-docs/lab/README.md`
+- `docs/design-docs/v1-legacy/lab-README.md`
 - `docs/design-docs/browser/agent-browser-use-index.md`
 - `docs/ARCHITECTURE.md`
 - `docs/FRONTEND.md`

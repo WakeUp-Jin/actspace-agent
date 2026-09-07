@@ -21,7 +21,7 @@
 - **[列头]**: 新增 4-5% 阶段色背景块 + 左侧 3px 阶段色线作为身份徽章，承担"温和色块帮助区分阶段"的语义，同时不让色彩污染列体。列头数字徽标改 11px text-faint tabular-nums。
 - **[卡片]**: 卡片胶囊高度从 22px 缩到 18px，字号统一 11px；卡片标题从 13px font-semibold 改为 13px font-medium 让视觉更克制；hover 状态去掉 `-translate-y-px` 抖动，回到纯颜色变化；selected 态由"整圈品牌色边框"改为"`border-brand` + `brand-soft/40` 背景 + 左侧 2px 蓝条"。
 - **[空列处理]**: 移除每列 5 个虚线 placeholder 占位框（原本让晋升列变成一片虚框）。空列改为一行 `暂无{阶段名}。` 文本提示，让列自然结束。
-- **[设计文档同步]**: 在 `docs/design-docs/lab/lab-frontend-page-design.md` "视觉约束" 一节加入这次实现决策——白底列 + 列头色块、卡片不染色、不渲染空槽 placeholder，避免后续再回到老做法。
+- **[设计文档同步]**: 在 `docs/design-docs/v1-legacy/lab-frontend-page-design.md` "视觉约束" 一节加入这次实现决策——白底列 + 列头色块、卡片不染色、不渲染空槽 placeholder，避免后续再回到老做法。
 
 ### 🧠 Design Intent (Why)
 
@@ -42,8 +42,8 @@
 
 后续追加：
 
-- **[Prototype]**: 新增 `docs/design-docs/lab/prototype-refresh.html` —— 一个 self-contained HTML 原型，把这次修改后的视觉抽出可独立预览的版本（不依赖 vite dev server），方便后续设计评审和回归对比。保留旧的 `public/lab/prototype.html` 作为对比基线，不覆盖。
-- **[Design Doc 强化]**: `docs/design-docs/lab/lab-frontend-page-design.md` "视觉约束" 一节加入具体实现决策——列底白色 + 列头温和色块 + 不渲染空槽 placeholder，避免后续重写又回到老做法。
+- **[Prototype]**: 新增 `docs/design-docs/v1-legacy/prototype-refresh.html` —— 一个 self-contained HTML 原型，把这次修改后的视觉抽出可独立预览的版本（不依赖 vite dev server），方便后续设计评审和回归对比。保留旧的 `public/lab/prototype.html` 作为对比基线，不覆盖。
+- **[Design Doc 强化]**: `docs/design-docs/v1-legacy/lab-frontend-page-design.md` "视觉约束" 一节加入具体实现决策——列底白色 + 列头温和色块 + 不渲染空槽 placeholder，避免后续重写又回到老做法。
 - **[最终对账]**: React 应用与 HTML 原型并排截图对比，确认 1:1 对齐；跑完完整 typecheck（除 Kairos 历史遗留外干净）+ build + 103/103 测试全绿。
 
 ### 🔁 Follow-up: 卡片"实物感"加固（17:26）
@@ -60,5 +60,5 @@
 ### 📁 Files Modified
 
 - `packages/desktop/src/renderer/components/LabPage.tsx`
-- `docs/design-docs/lab/lab-frontend-page-design.md`
-- `docs/design-docs/lab/prototype-refresh.html`（新增 + 二次同步）
+- `docs/design-docs/v1-legacy/lab-frontend-page-design.md`
+- `docs/design-docs/v1-legacy/prototype-refresh.html`（新增 + 二次同步）

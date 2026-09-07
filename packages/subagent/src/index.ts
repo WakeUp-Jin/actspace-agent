@@ -1,0 +1,11 @@
+export { manifest } from "./manifest.js";
+export { apply, activate } from "./plugin.js";
+export * from "./agent-tool.js";
+export * from "./child-session.js";
+export * from "./descriptor.js";
+export * from "./explore-tool.js";
+export * from "./preset.js";
+export * from "./provider.js";
+export * from "./publication.js";
+export * from "./terminal-result.js";
+export * from "./tool-plugin.js";

@@ -19,7 +19,7 @@
 ```
 actspace-agent/
   plugins/
-    browser-bridge/           ← 从 actspace-plugins/plugins/browser-bridge/ 迁入
+    browser-bridge/           ← 从 actspace-plugins/browser-bridge/ 迁入
       apps/cli/               ← Go CLI (abb)
       apps/chrome-extension/  ← Chrome Extension
       packages/protocol/      ← Go 协议层
@@ -86,14 +86,14 @@ Plan 5 的 7 个设计闸门已于 2026-07-10 全部确认；M0-M6 已完成，6
 - `docs/design-docs/browser/agent-browser-use-integration-design.md`
 - `docs/design-docs/browser/agent-browser-use-command-surface.md`
 - `docs/design-docs/browser/agent-browser-bridge-design.md`
-- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
 - `docs/HISTORY_GUIDE.md`
 
 ## 共享契约
 
-### 协议层（plugins/browser-bridge/packages/protocol/protocol.go）
+### 协议层（browser-bridge/packages/protocol/protocol.go）
 
 所有新增 method 命名空间：`agent_browser_bridge.*`
 

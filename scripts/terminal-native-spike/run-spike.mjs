@@ -8,7 +8,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "../..");
 const electronExecutable = path.join(
   repoRoot,
-  "packages/desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+  "apps/desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
 );
 const spikeEntry = path.join(scriptDir, "spike.cjs");
 const tempRoot = await mkdtemp(path.join(os.tmpdir(), "actspace-terminal-spike-"));

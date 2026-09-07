@@ -46,13 +46,6 @@ describe("settings v2 contract", () => {
         disabledTools: [],
         bashAlwaysAsk: false,
       },
-      kairos: {
-        featureEnabled: false,
-        modelId: "deepseek:deepseek-v4-flash",
-        thinking: "auto",
-        enabledSkills: [],
-      },
-      plugins: { repoRoot: null, fsWatch: { enabled: false } },
       skills: { disabled: [] },
     };
 

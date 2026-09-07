@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.session.journal", version: "0.1.0", name: "ActSpace Session Journal", entry: { entryId: "session.journal", behavior: "./plugin.js", codec: "./codec.js" }, host: { required: ["filesystem.session"], optional: [] }, frontend: null, injects: ["actspace.host.session.codecs"], contributions: { services: ["session.journal"], tools: [], prompts: [], events: ["plugin/actspace.session.journal/session-metadata"] } });

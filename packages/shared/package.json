@@ -9,15 +9,42 @@
     "dist"
   ],
   "exports": {
+    "./model-catalog-data": { "types": "./dist/generated/model-catalog.generated.d.ts", "import": "./dist/generated/model-catalog.generated.js", "require": "./dist/generated/model-catalog.generated.js", "default": "./dist/generated/model-catalog.generated.js" },
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./session-selectors": {
       "types": "./dist/session-selectors.d.ts",
+      "import": "./dist/session-selectors.js",
       "require": "./dist/session-selectors.js",
       "default": "./dist/session-selectors.js"
+    },
+    "./runtime-v2": {
+      "types": "./dist/runtime-v2/index.d.ts",
+      "import": "./dist/runtime-v2/index.js",
+      "require": "./dist/runtime-v2/index.js",
+      "default": "./dist/runtime-v2/index.js"
+    },
+    "./runtime-v2/projection": {
+      "types": "./dist/runtime-v2/projection.d.ts",
+      "import": "./dist/runtime-v2/projection.js",
+      "require": "./dist/runtime-v2/projection.js",
+      "default": "./dist/runtime-v2/projection.js"
+    },
+    "./runtime-v2/runtime": {
+      "types": "./dist/runtime-v2/runtime.d.ts",
+      "import": "./dist/runtime-v2/runtime.js",
+      "require": "./dist/runtime-v2/runtime.js",
+      "default": "./dist/runtime-v2/runtime.js"
+    },
+    "./runtime-v2/desktop-ipc": {
+      "types": "./dist/runtime-v2/desktop-ipc.d.ts",
+      "import": "./dist/runtime-v2/desktop-ipc.js",
+      "require": "./dist/runtime-v2/desktop-ipc.js",
+      "default": "./dist/runtime-v2/desktop-ipc.js"
     }
   },
   "scripts": {

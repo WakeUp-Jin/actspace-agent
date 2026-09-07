@@ -1,10 +1,10 @@
 # DeepSeek + Kimi 混合能力设计
 
-> 本文仍是当前 DeepSeek / Kimi 已落地行为的事实来源。DeepSeek / Kimi / OpenRouter 多供应商目标态见 `docs/design-docs/model-context/agent-multi-provider-llm.md`；本文历史决策中的“只支持两个 provider”仅代表当时阶段边界，不再约束下一阶段设计。
+> 本文保留 DeepSeek / Kimi 的 provider 兼容背景。v2 Runtime 的 Adapter、凭据和调用边界以 `docs/design-docs/agent-plugin-runtime/agent-target-llm-adapter.md` 与 `docs/design-docs/model-context/agent-multi-provider-llm.md` 为准；本文不应覆盖 v2 的 Host / Runtime 事实。
 
 ## 当前状态
 
-本文档是 `actspace` Agent Core 中 DeepSeek 与 Kimi 混合能力接入的设计事实来源。对应 execution plan 为：
+本文档是旧 Agent Core 中 DeepSeek 与 Kimi 混合能力接入的历史设计来源。对应 execution plan 为：
 
 - `docs/exec-plans/completed/actspace-deepseek-kimi-hybrid-capabilities.md`
 
@@ -19,7 +19,7 @@
 - `KimiService`：兼容包装层，只兜底 Kimi 的 provider 默认值；普通对话复用 `OpenAICompletionsService`。
 - `DeepSeekService` / `DeepSeekAnthropicService`：兼容包装层，只兜底 provider 默认值；协议职责归属 `OpenAICompletionsService` / `AnthropicMessagesService`。
 
-2026-07-31 起，DeepSeek 内置模型与 provider 固定走 OpenAI-compatible Chat Completions，默认 Base URL 为 `https://api.deepseek.com`。主 Agent 默认模型仍为 `deepseek-v4-pro`，Kairos 默认模型仍为 `deepseek-v4-flash`；两者默认开启 Thinking，并显式使用 `reasoning_effort=max`。Composer 只提供 `High` / `Max` 两档，不提供 Auto。旧 `DEEPSEEK_API_FORMAT` / `DEEPSEEK_ANTHROPIC_BASE_URL` 已退出运行时配置，精确的官方 `/anthropic` 设置地址会迁移回 provider 默认根地址。
+2026-07-31 起，DeepSeek 内置模型与 provider 固定走 OpenAI-compatible Chat Completions，默认 Base URL 为 `https://api.deepseek.com`。主 Agent 默认模型仍为 `deepseek-v4-pro`；旧 autonomous runtime 的默认模型记录仅用于历史迁移。Composer 只提供 `High` / `Max` 两档，不提供 Auto。旧 `DEEPSEEK_API_FORMAT` / `DEEPSEEK_ANTHROPIC_BASE_URL` 已退出运行时配置，精确的官方 `/anthropic` 设置地址会迁移回 provider 默认根地址。
 
 2026-07-06 起，DeepSeek 的联网搜索不再使用 provider-native server tool `web_search_20250305`。原因：DeepSeek Anthropic 网关在「server 搜索 + 本地工具混用」的轮次会稳定触发 DSML 泄漏（模型的本地工具调用被当正文吐出），导致整轮失败且自动重试无效。移除 server tool 后所有工具调用统一走标准 `tool_use` 链路，泄漏触发器消失。
 
@@ -209,7 +209,7 @@ Formula 可以作为后续扩展方向，但应单独设计“托管工具平台
 
 ## 安全与观测原则
 
-- API Key 只能在 main/agent-core 运行时读取。
+- API Key 只能在 main Host / v2 Runtime 运行时读取。
 - renderer 不接触 Kimi 或 DeepSeek API Key。
 - session 事件不能写入 API Key、Authorization header、base64 大图原文或 encrypted output。
 - 日志可以记录：
@@ -246,8 +246,8 @@ Formula 可以作为后续扩展方向，但应单独设计“托管工具平台
 - 2026-05-24：DeepSeek 专用 Kimi 辅助工具隐含需要 Kimi API Key。缺 key 时不注册这些工具，而不是把失败工具暴露给模型反复调用。
 - 2026-05-24：Kimi 原生 `$web_search` 和多模态输入由 Kimi provider adapter 管理，不进入普通 ToolManager。
 - 2026-05-24：首版 DeepSeek 搜索工具调用 Kimi `$web_search` 并返回自然语言摘要与 sources，不直接消费 Formula `web-search` 的 protected/encrypted 结果。
-- 2026-05-24：Kimi 辅助调用的三个系统提示词作为工具 executor 内部资产独立版本化；2026-05-25 起统一集中到 `packages/agent-core/src/prompt/kimi-assistants/`。
-- 2026-06-08：把 `kimi-k2.6` 提升为公开主模型（`visibility: "public"` + CNY 计价），作为 DeepSeek 降智时的备用模型。Explore 子代理与 Kairos 自主模式也放出 Kimi 选项（默认仍是便宜的 DeepSeek Flash，UI 提示 Kimi 偏贵，Kairos 依赖既有额度护栏控成本）。
+- 2026-05-24：Kimi 辅助调用的三个系统提示词作为工具 executor 内部资产独立版本化；2026-05-25 起统一集中到旧 Runtime 的 `prompt/kimi-assistants/`。
+- 2026-06-08：把 `kimi-k2.6` 提升为公开主模型（`visibility: "public"` + CNY 计价），作为 DeepSeek 降智时的备用模型。Explore 选项仍按调用方能力过滤；v1 autonomous runtime 的 Kimi 选项仅保留为迁移背景。
 - 2026-06-08：Kimi 主模型联网搜索走 provider-native `$web_search`，在 `OpenAICompletionsService` 主入口内部完成回填循环，不经过 ToolManager、不暴露本地 `web_search`，与 DeepSeek server web search 的“原生能力归 service 层”原则一致。
 - 2026-06-08：DeepSeek Anthropic 网关偶发把模型原生 DSML tool-call 标记泄漏成正文（未转成结构化 tool_use），`AnthropicMessagesService` 检测到 `acc.toolCalls 为空但正文含 ｜｜DSML｜｜tool_calls/invoke` 时，按可重试 `server_error` 处理并丢弃裸标记正文（保留 usage），而不是把垃圾正文落库展示。
 - 2026-06-08：Kimi K2.6 的 thinking 与 `$web_search` 互斥（搜索要求禁用 thinking）。主入口按用户 Thinking 开关二选一：开 → `thinking: enabled` 且不挂搜索（思考走 `reasoning_content`）；关 → 挂 `$web_search` 且 `thinking: disabled`。聊天框 Thinking 默认关（`thinkingDefault: false`），即默认带联网搜索，用户可手动切到思考模式。

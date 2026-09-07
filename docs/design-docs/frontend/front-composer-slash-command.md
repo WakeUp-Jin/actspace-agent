@@ -12,7 +12,7 @@ Slash Command 是 Composer 内的键盘优先能力入口。用户在空白输�
 
 它不建立第二套 Agent 能力系统，也不把所有产品导航塞进输入框。第一版只解决三个问题：
 
-1. 让已经存在的 `/compact`、`/eval`、Chat / Plan / Agent、Context 和 Review 能力可发现。
+1. 让已经存在的 `/compact`、Chat / Plan / Agent、Context 和 Review 能力可发现。
 2. 让当前 workspace 的可用 Skills 可以通过键盘快速绑定。
 3. 让 `/` 与 `+` 复用同一套行为和 Skill registry，避免两个入口产生不同状态。
 
@@ -40,13 +40,10 @@ Functions 使用固定顺序，不按字母排序。当前模式项显示勾选�
 | `/plan` | Plan mode | 调用现有 `onModeChange("plan")`，切换为只读计划模式 | 清除 Slash 查询并恢复焦点 |
 | `/agent` | Agent mode | 调用现有 `onModeChange("agent")`，恢复完整 Agent 模式 | 清除 Slash 查询并恢复焦点 |
 | `/compact` | Compact context | 复用现有 `/compact` 发送链，立即发起上下文压缩 | 清除 Slash 查询；不消费已选 Skill 和已有附件 |
-| `/eval` | Capture failed turn | 把输入框替换为 `/eval `，让用户补充失败说明后再发送 | 保留尾部空格并恢复焦点 |
 | `/status` | Context status | 调用现有 `onExpandContext`，打开 Context 视图 | 清除 Slash 查询并恢复焦点 |
 | `/review` | Review changes | 调用现有 `onOpenReview`，打开 Review 视图 | 清除 Slash 查询并恢复焦点 |
 
 选择 `/compact` 是一次明确的立即操作。它只发送命令本身与当前模型运行选项，不把图片、普通文件或 Skill 正文当作压缩命令输入；Composer 中已经附加的内容保持原样，供用户后续正常发送。
-
-选择 `/eval` 不立即执行，因为失败说明会直接影响 Candidate 的可读性和后续评估价值。用户仍可删除说明并发送裸 `/eval`，沿用当前允许无 `reason` 的行为。
 
 ### Skills
 
@@ -63,7 +60,7 @@ Functions 使用固定顺序，不按字母排序。当前模式项显示勾选�
 - 仅当 Composer 可编辑、未处于 streaming 状态，且当前完整草稿匹配 `^/[^/\s]*$` 时打开菜单。
 - `/` 必须是草稿的第一个字符。普通句子、URL、包含后续 `/` 的绝对路径和代码中的 `/` 不触发菜单。
 - `/` 后允许任意不含空白的搜索字符，兼容英文 command、Skill name 和中文关键词；过滤按当前 `/` 后的完整字符串进行。
-- 输入空格、换行或形成普通文本后关闭菜单；例如 `/eval ` 进入参数输入态，不继续显示命令列表。
+- 输入空格、换行或形成普通文本后关闭菜单。
 - 粘贴 `/compact`、`/status` 等完整命令时也应打开并定位到精确匹配项。
 - `Escape` 只关闭当前弹层，不删除已经输入的 `/query`。
 - 点击 Composer 外部关闭菜单；再次改变 Slash 查询时允许重新打开。
@@ -87,13 +84,11 @@ Functions 使用固定顺序，不按字母排序。当前模式项显示勾选�
 
 ## 选择与执行语义
 
-Slash 菜单中的项目分成三种行为，但视觉上仍只属于 `Functions` 或 `Skills` 两组：
+Slash 菜单中的项目分成两种行为，但视觉上仍只属于 `Functions` 或 `Skills` 两组：
 
 1. 状态切换：Chat / Plan / Agent，立即调用现有模式回调。
 2. 产品动作：Compact / Context / Review，立即复用现有动作链。
-3. 输入补全：Eval，把完整命令前缀写回 Composer，等待用户补充并发送。
-
-菜单层不得直接访问文件系统、Skill 文件或 Agent Runtime。Renderer 只传递现有回调、Skill name 和已有命令文本；`/compact`、`/eval` 的真实执行仍由当前 App / IPC 链负责。
+菜单层不得直接访问文件系统、Skill 文件或 Agent Runtime。Renderer 只传递现有回调、Skill name 和已有命令文本；`/compact` 的真实执行仍由当前 App / IPC 链负责。
 
 ## 与 `+` 菜单的关系
 
@@ -102,7 +97,7 @@ Slash 菜单中的项目分成三种行为，但视觉上仍只属于 `Functions
 | Chat / Plan | 保留 | 提供 Chat / Plan / Agent 搜索入口 |
 | Image | 保留 | V1 不重复展示 |
 | Skills | 保留二级菜单和多选 | 提供搜索后单次切换绑定 |
-| Compact / Eval | 不展示 | 提供可发现入口 |
+| Compact | 不展示 | 提供可发现入口 |
 | Context / Review | 使用现有独立入口 | 提供键盘快捷入口 |
 | Model / Reasoning | 使用 Composer 常驻模型入口 | V1 不重复展示 |
 | New chat | 使用 Sidebar / Workspace 入口 | V1 不展示，避免草稿丢失语义进入本计划 |
@@ -152,7 +147,7 @@ Slash 菜单延续 ActSpace Editor Design System 的 Ink & Emerald 方向，重�
 - 不把 Model、Reasoning、Image、New chat 重复塞入 Slash 菜单。
 - 不新增 Skill marketplace、推荐安装、远程搜索或 Composer 内管理能力。
 - 不把所有功能抽象成跨进程通用 Command Registry；V1 只在 renderer 维护小型展示 catalog，并复用现有行为回调。
-- 不改变 `/compact`、`/eval` 的 main / preload / Agent Core 协议。
+- 不改变 `/compact` 的 main / preload / Agent Runtime 协议。
 - 不持久化菜单开关、active item、查询或最近选择。
 
 ## 验收基线
@@ -161,8 +156,8 @@ Slash 菜单延续 ActSpace Editor Design System 的 Ink & Emerald 方向，重�
 
 - Slash 查询解析、过滤、排序和空态有纯函数测试。
 - Composer 测试覆盖打开、关闭、过滤、键盘导航、IME、防误发送和浮层互斥。
-- 模式切换、Context、Review、Compact、Eval 与 Skill 绑定分别有行为测试。
-- `/compact` 与 `/eval` 现有 App 路由测试继续通过，且 Slash 入口不创建普通 user message。
+- 模式切换、Context、Review、Compact 与 Skill 绑定分别有行为测试。
+- `/compact` 现有 App 路由测试继续通过，且 Slash 入口不创建普通 user message。
 - 主题防回流检查通过。
 
 ### 浏览器 Renderer
@@ -174,7 +169,7 @@ Slash 菜单延续 ActSpace Editor Design System 的 Ink & Emerald 方向，重�
 ### Electron 真实验证
 
 - 验证真实 `window.actspace.listSkills` 加载、workspace 切换后的 Skill 刷新和 Retry。
-- 验证 `/compact`、`/eval` 走真实 IPC，但不要求调用付费模型或真实 provider；可以使用已有可控测试环境或由用户手动验收真实 provider 行为。
+- 验证 `/compact` 走真实 IPC，但不要求调用付费模型或真实 provider；可以使用已有可控测试环境或由用户手动验收真实 provider 行为。
 - 自动化和浏览器 renderer 结果不能替代 Electron main / preload / IPC 验收。
 
 ## 已确认决策摘要
@@ -182,7 +177,7 @@ Slash 菜单延续 ActSpace Editor Design System 的 Ink & Emerald 方向，重�
 本规范建议第一版采用以下固定决策：
 
 - 只有 `Functions` 与 `Skills` 两组。
-- Functions 为 Chat、Plan、Agent、Compact、Eval、Context、Review。
+- Functions 为 Chat、Plan、Agent、Compact、Context、Review。
 - Model、Reasoning、Image、New chat 不进入 V1。
 - `/` 与 `+` 复用行为和 Skill registry，但不要求菜单内容完全一致。
 - Compact 立即执行；Eval 进入参数补全；Skill 选择切换绑定并返回输入。

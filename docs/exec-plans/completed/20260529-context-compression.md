@@ -4,7 +4,7 @@
 
 让主 Agent 在工具输出和会话历史两条路径上都具备压缩能力：工具输出回填上下文前按工具语义压缩并保留可回读路径（bash 全量落盘）；长会话在 token 水位达阈值时用 flash 模型摘要旧历史、保留最近 N% 并拼接 `session.jsonl` 路径。最终状态：tool-heavy 与长会话场景都不再撑爆窗口，且模型可按需回看被压缩的内容。
 
-设计事实来源：`docs/design-docs/model-context/agent-context-compression.md`。本计划只回答「谁改哪些文件、按什么顺序、每步如何验证、失败如何回退」。
+设计事实来源：`docs/design-docs/v1-legacy/model-context-context-compression.md`。本计划只回答「谁改哪些文件、按什么顺序、每步如何验证、失败如何回退」。
 
 ## 范围
 
@@ -26,7 +26,7 @@
 ## 背景
 
 - 相关文档：
-  - `docs/design-docs/model-context/agent-context-compression.md`（设计事实来源）
+  - `docs/design-docs/v1-legacy/model-context-context-compression.md`（设计事实来源）
   - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
   - `docs/design-docs/core-storage-and-observability.md`
   - `.agents/skills/llm-agent-dev/references/context/mgmt-compression.md`、`mgmt-token-strategies.md`

@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.llm.pi-ai", version: "0.1.0", name: "ActSpace pi-ai Provider", entry: { entryId: "llm.pi-ai", behavior: "./plugin.js" }, host: { required: ["network.provider"], optional: ["proxy.scoped"] }, frontend: null, injects: ["llm.service"], contributions: { services: ["llm.route.pi-ai"], tools: [], prompts: [], events: [] } });

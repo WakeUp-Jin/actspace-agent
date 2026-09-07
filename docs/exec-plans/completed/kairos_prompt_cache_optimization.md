@@ -21,8 +21,8 @@
 ## 背景
 
 - 必读文档：
-  - `docs/design-docs/kairos/agent-kairos-prompt-cache-optimization.md`（本计划的设计事实来源）
-  - `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
+  - `docs/design-docs/v1-legacy/agent-kairos-prompt-cache-optimization.md`（本计划的设计事实来源）
+  - `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md`
   - `docs/learnings/2026-06/event-replay-must-preserve-block-order.md`（重放保真原则）
 - 相关代码路径：
   - `packages/agent-core/src/kairos/prompt.ts`、`prompt-assembler.ts`、`runner.ts`、`controller.ts`
@@ -101,7 +101,7 @@
     - 脚本聚合 `<kairosRoot>/memory/short-term/*.jsonl` 的 `llm_usage`，确认跨 tick 第 1 次调用不再出现 `hit=640` 模式，命中率 ≥85%；
     - 前端 Kairos 面板可见 thinking 行；
     - 切换 Kimi 模型确认 contextWindow 日志为 256K。
-16. 文档同步：更新 `docs/design-docs/kairos/agent-kairos-autonomous-mode.md` 的 prompt 结构描述；按 `docs/HISTORY_GUIDE.md` 写 history；本 plan 移入 `docs/exec-plans/completed/`。
+16. 文档同步：更新 `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md` 的 prompt 结构描述；按 `docs/HISTORY_GUIDE.md` 写 history；本 plan 移入 `docs/exec-plans/completed/`。
 
 ## 验证方式
 

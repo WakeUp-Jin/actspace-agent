@@ -12,7 +12,7 @@
 
 ### 🛠 Changes Overview
 
-**Scope:** `plugins/browser-bridge`、`packages/agent-core`、Browser Use 设计文档
+**Scope:** `browser-bridge`、`packages/agent-core`、Browser Use 设计文档
 
 **Key Actions:**
 
@@ -29,18 +29,18 @@
 
 ### 📁 Files Modified
 
-- `plugins/browser-bridge/apps/cli/internal/locator/runtime-src/`
-- `plugins/browser-bridge/apps/cli/internal/locator/generated/runtime.js`
-- `plugins/browser-bridge/apps/cli/internal/locator/engine.go`
-- `plugins/browser-bridge/apps/cli/internal/cdp/session.go`
-- `plugins/browser-bridge/apps/cli/internal/commands/`
-- `plugins/browser-bridge/apps/cli/command_router.go`
-- `plugins/browser-bridge/apps/chrome-extension/src/background.js`
-- `plugins/browser-bridge/packages/protocol/protocol.go`
+- `browser-bridge/apps/cli/internal/locator/runtime-src/`
+- `browser-bridge/apps/cli/internal/locator/generated/runtime.js`
+- `browser-bridge/apps/cli/internal/locator/engine.go`
+- `browser-bridge/apps/cli/internal/cdp/session.go`
+- `browser-bridge/apps/cli/internal/commands/`
+- `browser-bridge/apps/cli/command_router.go`
+- `browser-bridge/apps/chrome-extension/src/background.js`
+- `browser-bridge/packages/protocol/protocol.go`
 - `packages/agent-core/src/tools/tools/browser/`
 - `packages/agent-core/src/engine/loop.ts`
 - `packages/agent-core/src/engine/bridge.ts`
-- `plugins/browser-bridge/test-fixtures/acceptance/`
+- `browser-bridge/test-fixtures/acceptance/`
 - `scripts/build-browser-locator-runtime.mjs`
 - `docs/design-docs/agent-browser-use-*.md`
 

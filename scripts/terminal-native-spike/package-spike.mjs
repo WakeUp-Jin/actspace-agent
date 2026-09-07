@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "../..");
-const desktopDir = path.join(repoRoot, "packages/desktop");
+const desktopDir = path.join(repoRoot, "apps/desktop");
 const electronApp = path.join(desktopDir, "node_modules/electron/dist/Electron.app");
 const tempRoot = await mkdtemp(path.join(os.tmpdir(), "actspace-terminal-package-spike-"));
 const deployDir = path.join(tempRoot, "deploy");

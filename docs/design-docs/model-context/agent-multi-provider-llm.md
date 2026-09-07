@@ -7,17 +7,17 @@
 - 当前文字模型供应商：DeepSeek、Kimi、OpenRouter。
 - DuckCoding 文字模型供应商已退役；历史配置会在启动时清理，但图片生成仍使用独立的 `image-generation` 连接配置，默认端点可以继续是 DuckCoding Images API。
 - 对应 execution plan：`docs/exec-plans/completed/20260724-multi-provider-llm/README.md`。
-- 当前实现已贯通 DeepSeek / Kimi / OpenRouter 的 settings v2、动态模型解析、服务商级代理 transport、任务模型 runtime、IPC 与设置页；旧 DuckCoding 文字模型配置会被迁移清理。OpenRouter 真实代理和跨任务模型场景仍按 execution plan 由用户统一手动验收。
+- 当前实现已贯通 DeepSeek / Kimi / OpenRouter 的 settings v3 持久化、`AppSettingsV2` 兼容视图、动态模型解析、服务商级代理 transport、任务模型 runtime、IPC 与设置页；旧 DuckCoding 文字模型配置会被迁移清理。OpenRouter 真实代理和跨任务模型场景仍按 execution plan 由用户统一手动验收。
 
 本文是 actspace 多供应商 LLM、用户模型管理、服务商级代理和任务模型分配的长期设计事实来源。
 
 相关当前实现文档：
 
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`：已落地模块事实。
+- `packages/runtime/`、`packages/llm/` 与 `docs/design-docs/agent-plugin-runtime/`：当前 v2 Runtime、LLM 领域包与插件边界事实。
 - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`：当前 DeepSeek / Kimi 协议与能力边界。
-- `docs/design-docs/frontend/front-设置页规范.md`：设置页信息架构和交互基线。
+- `docs/design-docs/frontend/front-设置中心重构规范.md`：当前设置中心的信息架构、模型统一流程和持久化边界；旧设置页仅作迁移追溯。
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：模型 usage、价格快照和成本统计。
-- `docs/design-docs/model-context/agent-duckcoding-multi-key-model-catalog.md`：已退役的 DuckCoding 文字模型方案，仅供历史追溯。
+- `docs/design-docs/v1-legacy/model-context-duckcoding-multi-key-model-catalog.md`：已退役的 DuckCoding 文字模型方案，仅供历史追溯。
 
 ## 背景
 
@@ -26,7 +26,7 @@
 - `ProviderId`、API Key、Base URL 和设置页供应商列表覆盖 DeepSeek / Kimi / OpenRouter。
 - `buildLLMConfig()` 通过手写 provider Map 选择密钥和端点，新增供应商需要修改多处分支。
 - `MODEL_REGISTRY` 同时承担内置模型清单、公开选择器和能力事实，不支持用户从远端目录添加模型。
-- Composer、Explore、Kairos 等入口各自维护模型范围，新增模型不能自动获得运行时与 UI 一致性。
+- Composer、Explore 等入口各自维护模型范围，新增模型不能自动获得运行时与 UI 一致性。
 - 会话标题、工具输出摘要和上下文压缩默认固定使用 DeepSeek Flash，仍存在隐藏供应商绑定。
 - 网络请求没有服务商级 transport 配置，无法只让 OpenRouter 走代理而保持 DeepSeek / Kimi 直连。
 
@@ -39,7 +39,7 @@
 - 用户可以控制哪些模型出现在主会话和任务模型选择器中。
 - 默认会话模型、轻量任务模型、Explore 模型由用户显式选择。
 - 轻量任务模型用于会话标题、工具输出摘要、上下文压缩等低成本、纯文本任务，不再固定绑定 DeepSeek。
-- Composer、轻量任务、Explore、Kairos 使用统一的可用模型发现逻辑，但按任务能力要求过滤。
+- Composer、轻量任务与 Explore 使用统一的可用模型发现逻辑，但按任务能力要求过滤。
 - 保持协议服务 provider-neutral：文字模型按模型声明复用 Chat Completions / Responses，不在 Agent loop 复制供应商品牌分支。
 - API Key、代理认证等敏感值不进入 renderer、session、日志或普通 settings 文件。
 
@@ -293,7 +293,7 @@ provider.enabled
 | `kairos` | text + toolUse verified/declared |
 | `vision` | image，并叠加调用方自身要求 |
 
-`toolUse: unknown` 的远端模型可以加入本地列表，也可以作为 utility 模型，但不能默认进入主 Agent / Explore / Kairos；用户完成兼容性测试或未来人工覆写后才可提升状态。
+`toolUse: unknown` 的远端模型可以加入本地列表，也可以作为 utility 模型，但不能默认进入主 Agent / Explore；用户完成兼容性测试或未来人工覆写后才可提升状态。v1 autonomous runtime 不再是当前 purpose。
 
 这一解析器必须同时服务于：
 
@@ -301,7 +301,7 @@ provider.enabled
 - 设置页默认会话模型。
 - 轻量任务模型。
 - Explore 模型。
-- Kairos 模型。
+- 其他仍在维护的任务模型。
 - Member / Room 等未来模型配置入口。
 
 禁止各入口继续复制 provider allowlist 或静态 ModelId 子集。
@@ -385,36 +385,26 @@ OpenRouter 连接成功后自动安装少量精选模型，覆盖：
 
 ## 设置页信息架构
 
-设置导航新增“服务商”，原“模型”页收口为模型管理：
+当前设置中心重构后，顶层不再提供“服务商”或“智能体”页面，只保留一个“模型”页面作为 Provider、Connection 和 Model 的统一用户入口。数据层仍然保持三者分离，详细的页面、交互和持久化目标以 [`front-设置中心重构规范.md`](../frontend/front-设置中心重构规范.md) 为准。
 
 ```text
-通用
-服务商
 模型
-智能体
-Kairos
-工具
-...
+├── 模型列表
+├── 添加连接 → 服务商目录 → 连接配置 → 连接详情
+├── 任务模型绑定
+└── 媒体模型（图片生成 / 图片分析）
 ```
 
-### 服务商页
+Kairos 已随 v2 唯一切换移除，不再是当前设置导航或模型分配目标。当前 one-shot Agent / Explore 子代理的模型选择由统一的 Model Resolver 和子 Agent 设置消费。
 
-回答“请求通过谁发出”。
+### 模型页面中的连接入口
 
-页面分组：
+模型页面同时回答两个问题：
 
-1. 模型服务商
-   - 已配置的 DeepSeek / Kimi / OpenRouter 卡片。
-   - 主操作“添加服务”。
-   - 编辑、测试连接、断开。
-   - 展示账户余额、状态、已启用模型数、接入方式、Base URL、代理状态。余额查询通过通用 provider IPC 分发到各服务商适配器，不与 Usage 统计页耦合。
-2. 联网搜索服务
-   - 迁移当前智谱 / Tavily / TinyFish / Exa 配置。
-   - 保持它们属于 ToolManager 搜索通道，不与 LLM Model Registry 混合。
+1. 请求通过哪个 Connection 发出；
+2. 哪些 Model 已添加、启用并可用于特定任务。
 
-“添加服务”只展示尚未配置的三家受支持服务商，不展示尚未实现的供应商。
-
-连接流程：
+连接流程保持：
 
 ```text
 选择服务商
@@ -424,6 +414,10 @@ Kairos
 → 保存并测试
 → available 后安装默认模型
 ```
+
+联网搜索服务仍属于 ToolManager 搜索通道，不与 LLM Model Registry 混合；它们在设置 UI 中归入“工具 → 联网能力”，不再占用独立顶层入口。
+
+“添加连接”只展示尚未配置的三家受支持服务商，不展示尚未实现的供应商。
 
 允许保存但测试失败；此时卡片状态为“连接异常”，模型不可用，用户可以修改配置或重试。状态不能只靠红/绿颜色表达，必须同时有文字与图标。
 
@@ -437,7 +431,7 @@ Kairos
    - 默认会话模型。
    - 轻量任务模型。
    - Explore 模型。
-   - Kairos 保留在 Kairos 页面配置，并提供跳转提示，不建立第二事实源。
+   - v1 autonomous runtime 的旧模型配置不再进入当前设置页事实源；迁移时只读取一次并写入 `models.taskBindings`。
 2. 可用模型
    - 按 provider 分组。
    - 标题显示 `已启用 / 已添加` 数量。
@@ -458,30 +452,33 @@ Composer 只展示 `listUsableModels("chat")`，不会因为远端 catalog 增�
 - 图标按钮必须有 `aria-label`，状态不能仅靠颜色。
 - 所有颜色消费语义 token，浅色、深色、跟随系统三态验证。
 
-界面借鉴“服务商与模型分离、远端目录按需添加”的交互机制，不照搬其他产品的品牌、Claude Code 兼容标签、超大留白或角色映射术语。
+界面借鉴“连接详情与模型目录分层、远端目录按需添加”的交互机制，不照搬其他产品的品牌、Claude Code 兼容标签、超大留白或角色映射术语。
 
 ## Settings 与持久化
 
-目标设置版本升级为 v2。非敏感配置继续落 `<userData>/settings.json`，建议新增：
+当前实现仍兼容 `settings.json` v2 / v3 结构；设置中心重构的目标版本是 `version: 4`。非敏感配置继续落 `<userData>/settings.json`，通过幂等迁移进入逻辑 namespace：
 
-```ts
-interface PersistedSettingsV2 {
-  version: 2;
-  providers: Record<ProviderId, ProviderConnectionSettings>;
-  installedModels: Record<ModelKey, InstalledModelSettings>;
-  customModels: Record<ModelKey, ModelDefinition>;
-  taskModels: TaskModelSettings;
-  // 既有 agent / kairos / plugins / skills 等字段保持
-}
+```text
+settings.json
+├── version: 4
+├── general
+├── models
+├── tools
+├── media
+├── skills
+├── subagents
+└── activity.usage
 ```
+
+其中 `models.connections`、`models.definitions` 和 `models.installed` 使用稳定 ID，`taskBindings` 只保存稳定的 `modelKey` 引用。完整目标结构、v3 → v4 迁移和页面偏好边界见 [`front-设置中心重构规范.md`](../frontend/front-设置中心重构规范.md)。
 
 敏感值：
 
 - Desktop Key 集中写入 main-only `<userData>/secrets.json` v2 明文文件，创建、原子替换和启动读取时都收紧为 `0600`。
 - renderer 的 `AppSettings` 只收到 `hasApiKey`、连接状态和非敏感配置。
-- 明文 key 只在 main / agent-core 创建 runtime config、连接测试和目录请求时短暂使用。
+- 明文 key 只在 main Host / v2 Runtime 创建 runtime config、连接测试和目录请求时短暂使用。
 
-Electron 的真实 turn、上下文压缩、Explore/Kairos、评估候选和回复可视化等直接 LLM 消费路径统一通过 `ModelRuntimeService` 装配显式 `ProviderRuntimeConfig`；不把 Desktop 设置页保存的 LLM Key 回写 `process.env`。环境变量入口继续只保留给 CLI、CI、测试和兼容场景，但新增供应商不应继续扩张散落的手写 Map。
+Electron 的真实 turn、上下文压缩、Explore 和回复可视化等直接 LLM 消费路径统一通过 `ModelRuntimeService` 装配显式 `ProviderRuntimeConfig`；不把 Desktop 设置页保存的 LLM Key 回写 `process.env`。环境变量入口继续只保留给 CLI、CI、测试和兼容场景，但新增供应商不应继续扩张散落的手写 Map。
 
 ## IPC 边界
 
@@ -564,6 +561,7 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 - 每次 `llm_usage` 仍保存当次价格快照与 provider-qualified ModelKey，历史成本不因目录刷新而变化。
 - 目录价格缺失时显示“价格未知”，不能按 0 计费。
 - OpenRouter 同一上游模型与原厂模型分别统计，不按 `apiModel` 合并。
+- Usage 活动行从 Journal request / tool 事件重建，并保留 provider、ModelKey、attempt 和 `costBasis`。当 provider 未返回 usage、currency 或价格来源不完整时，活动行保持 unknown / unavailable，不能用默认价格或零值伪造账单结果。
 
 ## 错误与可观测性
 
@@ -612,7 +610,7 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 3. 现有 `defaultModelId` 映射到 `taskModels.defaultChatModel`。
 4. 现有 `agent.exploreModelId` 映射到 `taskModels.exploreModel`。
 5. 已配置 DeepSeek Key 时，utility 默认映射 DeepSeek Flash；否则为 null。
-6. Kairos 现有 modelId 保持在其单一事实源中，但候选项改用统一 resolver。
+6. 旧 autonomous runtime 的 modelId 仅在迁移读取阶段保留，候选项统一由 v2 resolver 生成。
 7. 旧 session 的 modelId 在读取层映射，不批量重写历史 JSONL。
 
 迁移必须幂等；失败时保留旧文件并输出脱敏诊断，不覆盖用户 secrets。
@@ -651,7 +649,7 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 - 任务模型选择器只显示 purpose 对应候选项，并按供应商分组。
 - OpenRouter catalog 搜索、防抖、虚拟列表、加载、错误、缓存状态。
 - Composer 模型搜索只过滤当前 usable models，并按供应商分组；跨供应商同名模型在折叠态追加供应商名称，同供应商仍重名时追加 API model ID。推理开关与强度选项完全由当前模型能力决定。
-- 默认会话、轻量任务、Explore 与 Kairos 模型选择器使用同一供应商分组和重名消歧规则。
+- 默认会话、轻量任务与 Explore 模型选择器使用同一供应商分组和重名消歧规则。
 - 添加模型和目录能力刷新后，Composer 与任务选择器在同一操作完成后重新拉取候选，不要求页面重挂载。
 - 键盘、焦点、Esc、aria-label、浅色/深色主题。
 - Composer 与设置修改实时同步，不需要重启应用。
@@ -670,27 +668,27 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 
 ## 实施顺序
 
-1. 契约地基：Provider Registry、ModelKey、ModelDefinition、purpose resolver、settings v2 migration。
+1. 契约地基：Provider Registry、ModelKey、ModelDefinition、purpose resolver、settings v2 / v3 migration；后续设置中心重构再由 v3 迁移到 v4 namespace。
 2. 服务商运行配置：OpenRouter key/base URL、provider adapter、代理 transport、连接测试。
 3. 模型管理：installed/custom model、OpenRouter catalog cache、添加/启用/删除。
 4. 任务模型：默认会话、utility、Explore 统一 resolver；标题与 summarizer 去 DeepSeek 固定绑定。
-5. 设置页：新增服务商分区、重构模型分区、目录弹窗、Composer 联动。
-6. Kairos / Member 等消费方迁移到统一 resolver，删除独立 allowlist。
+5. 设置页：将服务商连接、模型目录、模型启用和 Composer 联动收敛到统一的模型页面。
+6. Member 等仍在维护的消费方迁移到统一 resolver，删除独立 allowlist。
 7. 文档、history、测试和真实 provider 验收同步收口。
 
-该改动跨 shared、agent-core、desktop main、preload、renderer 与 settings migration，实施前应单独编写 execution plan。
+该改动跨 shared、v2 Runtime、desktop main、preload、renderer 与 settings migration，实施前应单独编写 execution plan。
 
 ## 已确认决策
 
 - 首批只支持 DeepSeek、Kimi、OpenRouter 三家服务商。
 - 2026-07-27 的 Plan 7 在首批三家之外新增 DuckCoding；现有默认 Key 路径不迁移，额外 Key 采用可选 `credentialId` 渐进扩展。2026-07-28 将模型来源收敛为本地 Codex/Grok 档案和手动兜底。
 - 2026-07-28 的缓存归因探针只在 Responses 对照中确认 Codex 缓存命中，因此 Codex 本地档案使用 `openai-responses`，Grok 与未知手动模型默认保留 `openai-completions`。
-- 服务商与模型在设置页分成两个入口。
+- Provider、Connection 和 Model 在数据层保持分离，在设置页通过一个模型入口完成连续配置流程。
 - 代理按服务商配置，不做全局代理。
 - OpenRouter 采用“精选默认模型 + 远端目录手动添加”。
 - 用户添加模型后默认启用，但仍受 purpose 能力过滤。
 - 轻量任务模型由用户手动选择，候选只来自当前可用模型。
 - utility 不可用时回退主模型，不隐藏选择另一家供应商。
-- Kairos 模型仍在 Kairos 页面配置，但候选项来自统一 resolver。
+- 旧 autonomous runtime 的模型配置只作为迁移输入，不再在当前页面维护第二事实源。
 - 主 Agent 联网能力继续走本地 `web_search` / `web_fetch`，不挂 provider-native 搜索。
 - 具体 OpenRouter 精选模型 ID 在实现阶段基于当时目录和真实兼容性验证确定。

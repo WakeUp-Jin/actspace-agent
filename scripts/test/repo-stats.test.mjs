@@ -63,3 +63,22 @@ test("collects deterministic repository statistics from a tracked-file list", as
     await rm(repoRoot, { recursive: true, force: true });
   }
 });
+
+test("ignores tracked paths removed from the working tree", async () => {
+  const repoRoot = await mkdtemp(resolve(tmpdir(), "actspace-repo-stats-missing-"));
+  try {
+    const stats = await collectRepositoryStats({
+      repoRoot,
+      trackedFiles: ["packages/removed/src/index.ts"],
+    });
+    assert.deepEqual(stats, {
+      sourceFiles: 0,
+      sourceLines: 0,
+      docsFiles: 0,
+      docsCharacters: 0,
+      testFiles: 0,
+    });
+  } finally {
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});

@@ -31,9 +31,9 @@
 - `docs/ARCHITECTURE.md`
 - `docs/CODING_BEHAVIOR.md`
 - `docs/HISTORY_GUIDE.md`
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/agent-runtime/agent-testing.md`
+- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`
 - `.agents/skills/llm-agent-dev/references/tools/overview.md`
 

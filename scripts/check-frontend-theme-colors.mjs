@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const rendererRoot = path.join(repoRoot, "packages/desktop/src/renderer");
+const rendererRoot = path.join(repoRoot, "apps/desktop/src/renderer");
 const tokensPath = path.join(rendererRoot, "styles/tokens.css");
 const tailwindPath = path.join(rendererRoot, "styles/tailwind.css");
 

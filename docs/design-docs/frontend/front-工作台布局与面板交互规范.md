@@ -40,7 +40,8 @@
 - 必须保留最低可用宽度。
 - 左右面板争抢空间时，中间区优先于右侧预览区和左侧展开态。
 - 顶部栏保持单行，不重复展示工作区状态副标题；标题和操作必须归属于真实 pane，而不是相对整窗居中或全部堆到窗口右端。
-- 中间栏顶部左侧展示当前会话标题，右侧放置编辑器选择和 Environment；对象菜单与右侧面板入口只属于右栏。Environment 的本地工作区、Git 与 Sources 规则见 `front-environment-and-git-actions.md`。
+- 中间栏顶部左侧展示当前会话标题；标题前的单个 icon-only 按钮用于在 Chat 与 Trajectory 主视图之间切换，按钮只切换当前会话的中心内容，不建立持久化 tab。Chat 状态显示 Trajectory 入口，Trajectory 状态显示返回 Chat 的消息图标，并提供动态 tooltip / aria label。右侧放置编辑器选择和 Environment；对象菜单与右侧面板入口只属于右栏。左列同时承载 Sidebar 折叠与会话历史 Back / Forward；顶部不再重复渲染 Search，Sidebar 内 Search 保持原有入口。Environment 的本地工作区、Git 与 Sources 规则见 `front-environment-and-git-actions.md`。
+- Trajectory 是 Session Projection 的只读派生视图，不属于右侧对象 Tab，也不应出现在 Sidebar 或右侧对象启动页。切换时保持 `ConversationView` 外壳挂载，使消息会话的 Composer、草稿与右侧 Files / Review / Context / Terminal / Reply 面板不因观察轨迹而重置。
 - 消息流滚动容器应占满中间主区 viewport，让滚动条贴近主区右边界；消息内容和 Composer 再由内层容器限制阅读宽度并居中。
 - 不要用父级 padding 加负 margin 对冲来决定滚动条位置，避免左侧隐藏态、右侧面板和窗口缩放时出现不一致的留白。
 
@@ -48,9 +49,9 @@
 
 桌面端 `WindowChromeBar` 是一条 `position: fixed; top: 0; height: var(--window-chrome-strip-height)` 的浮层，z-index 在所有内容之上。它使用与 `SplitView` 同源的三列 grid：左列宽度等于可见 Sidebar，中列为主工作区，右列宽度等于已打开的对象面板；对应宽度由 `WorkbenchLayout` 注入 CSS 变量。左栏隐藏、右栏关闭或进入紧凑布局时，相应列退回只容纳窗口控制入口的边缘宽度。
 
-`window-chrome-bar` 自身 `pointer-events: none`；左列和中间拖拽区按需恢复命中，右列只有操作按钮组恢复命中，避免整块右栏浮层盖住下方 Tab。中间列标题左对齐，IDE / Environment 在同列尾部；右列只承载对象 `+` 与面板开关。三列共享同一条主题感知底部分隔线。
+`window-chrome-bar` 自身 `pointer-events: none`；左列和中间拖拽区按需恢复命中，右列只有操作按钮组恢复命中，避免整块右栏浮层盖住下方 Tab。中间列标题左对齐，Environment 在同列尾部；右列只承载对象 `+` 与面板开关。底部分隔线只绘制在右侧对象面板列，左列和中间列与下方内容连续衔接。
 
-右栏关闭时，边缘列只保留面板开关的稳定点击区，不额外保留大块水平留白；IDE、Environment 与面板开关在视觉上形成紧凑的顶部工具组。右栏打开后，面板开关仍归属右列右侧，不跨 pane 改变信息归属。
+右栏关闭时，边缘列只保留面板开关的稳定点击区，不额外保留大块水平留白；Environment 与面板开关在视觉上形成紧凑的顶部工具组。右栏打开后，面板开关仍归属右列右侧，不跨 pane 改变信息归属。
 
 > 这意味着 chrome bar **既是视觉遮罩、也是点击劫持源**——任何作为 `SplitView.main` 的根容器，如果不在顶部留出 chrome bar 的高度，第一屏内容会被 chrome bar 视觉覆盖，且右上角区域的按钮 / 表头 / 操作条点击会被 `chrome-right` 的 panel-toggle 按钮拦截。
 
@@ -62,7 +63,7 @@
 - 不要试图改 `WindowChromeBar` 的 `z-index` 或 `pointer-events` 来"避让" chrome bar——chrome bar 浮层语义是这条规范的契约前提。
 - 紧凑布局打开右侧覆盖面板时，中间标题和主工作区操作必须退场，同时关闭中间拖拽命中，让右侧 Tab 可以接收点击；左右窗口级入口仍保持可用。
 
-新增页面（如 Kairos、Lab、Settings 全屏视图）前，先用这条规则自检：**根容器的 y=0 一带是否会出现可交互元素？** 若会，必须先让位。
+新增页面（如 Settings 全屏视图）前，先用这条规则自检：**根容器的 y=0 一带是否会出现可交互元素？** 若会，必须先让位。
 
 ### 右侧对象浏览区
 
@@ -124,7 +125,6 @@ Review 同样遵守上述右侧对象区宽度；宽屏可以扩展为主要工�
 - 快速打开只调整原生窗口 bounds，不写 renderer 的 SplitView 偏好；唤起完成后主区 Composer 必须可立即输入。
 - 紧凑布局中的左右覆盖层支持遮罩关闭与 `Escape` 关闭；右侧覆盖层宽度最大 `640px`，在 480px 窗口下占满主区。
 - 用户布局偏好先落在 renderer 本地，不在首版引入跨进程设置契约。
-- 例外：`Kairos` 全屏监控页不需要窗口 chrome 右上角的右侧对象面板折叠按钮，因为 Kairos 自身已占用完整主工作区，且页面内没有依赖该按钮的对象预览工作流。
 
 ## 未来拖动边界
 
@@ -142,7 +142,7 @@ Review 同样遵守上述右侧对象区宽度；宽屏可以扩展为主要工�
 - 不做 tab 拖动换区。
 - 不做底部 terminal / panel region；用户 Terminal 作为右侧对象 Tab 存在。
 - 不做多编辑区 grid。
-- 不做右侧 rail。
+- 不做右侧 rail，也不把 Trajectory 作为右侧对象 Tab。
 - 不做移动端独立导航模型。
 - 不把设置页塞进聊天态三栏布局。
 
@@ -153,3 +153,7 @@ Review 同样遵守上述右侧对象区宽度；宽屏可以扩展为主要工�
 - 拖动左右分隔条时宽度变化稳定，窗口 resize 后布局仍落在边界内。
 - `480 / 820 / 1120 / 1440px` 下布局都不出现不可达入口或主区横向破版。
 - 工作台文档能清楚说明当前 resize 能力和未来拖动边界。
+
+## 扩展页面
+
+`extensions` 是独立主区视图，入口位于会话侧栏 New Agent 下方。它复用 WindowChromeBar 与 SplitView，主区预留 `--window-chrome-strip-height`，保持会话侧栏可用，隐藏聊天右侧对象区、右栏开关和会话历史前后按钮。返回聊天后恢复已有右栏状态；窄窗选择扩展入口自动关闭侧栏覆盖层。设置页继续保持原来的整页接管。

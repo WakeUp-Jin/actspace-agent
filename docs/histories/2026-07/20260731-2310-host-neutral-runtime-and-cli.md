@@ -46,7 +46,7 @@ Agent 的模型循环、Context 和工具执行属于 Harness；产品级 Sessio
 - `packages/agent-cli/src/binary/`
 - `scripts/build-agent-cli-binary.mjs`
 - `.github/workflows/agent-cli-binaries.yml`
-- `docs/design-docs/agent-runtime/agent-host-neutral-runtime-and-cli.md`
+- `docs/design-docs/v1-legacy/agent-runtime-host-neutral-runtime-and-cli.md`
 
 ## [2026-08-01 09:35] | Task: 修复 Desktop 回归并完善 CLI 默认工作区
 
@@ -91,7 +91,7 @@ Settings 是同一 Workbench 组件的显示分支，不能改变父组件 Hook 
 - `packages/agent-cli/src/args.ts`
 - `packages/agent-cli/src/test/process-smoke.test.ts`
 - `scripts/test-agent-cli-binary.mjs`
-- `docs/design-docs/agent-runtime/agent-host-neutral-runtime-and-cli.md`
+- `docs/design-docs/v1-legacy/agent-runtime-host-neutral-runtime-and-cli.md`
 
 ## [2026-08-01 09:58] | Task: 聚合 CLI Thinking 流式分片
 
@@ -129,6 +129,6 @@ Settings 是同一 Workbench 组件的显示分支，不能改变父组件 Hook 
 
 - `packages/agent-cli/src/terminal-renderer.ts`
 - `packages/agent-cli/src/test/terminal-renderer.test.ts`
-- `docs/design-docs/agent-runtime/agent-host-neutral-runtime-and-cli.md`
+- `docs/design-docs/v1-legacy/agent-runtime-host-neutral-runtime-and-cli.md`
 - `docs/exec-plans/active/20260731-agent-runtime-desktop-cli.md`
 - `docs/learnings/2026-07/agent-harness-runtime-host-adapter-layering.md`

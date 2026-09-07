@@ -21,18 +21,18 @@
 - `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/design-docs/frontend/front-聊天输入框规范.md`
 - `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
-- `docs/design-docs/kairos/front-Kairos监控页规范.md`
-- `docs/design-docs/lab/README.md`
+- `docs/design-docs/v1-legacy/front-Kairos监控页规范.md`
+- `docs/design-docs/v1-legacy/lab-README.md`
 
 ## 重点代码与文件范围
 
-- `packages/desktop/src/renderer/`
-- `packages/desktop/src/renderer/components/`
-- `packages/desktop/src/renderer/components/right-panel/`
-- `packages/desktop/src/renderer/components/settings/`
-- `packages/desktop/src/renderer/pages/`
-- `packages/desktop/src/renderer/state/`
-- `packages/desktop/src/renderer/styles/`
+- `apps/desktop/src/renderer/`
+- `apps/desktop/src/renderer/components/`
+- `apps/desktop/src/renderer/components/right-panel/`
+- `apps/desktop/src/renderer/components/settings/`
+- `apps/desktop/src/renderer/pages/`
+- `apps/desktop/src/renderer/state/`
+- `apps/desktop/src/renderer/styles/`
 - `packages/shared/src/session-selectors.ts`
 - `packages/shared/src/*`
 
@@ -83,16 +83,16 @@
 
 ### 发现 1：左侧折叠态从规范要求的 icon rail 退化为完全隐藏
 
-- 偏移点：`docs/design-docs/frontend/front-工作台布局与面板交互规范.md` 要求左侧会话栏“首版支持折叠为 icon rail，不先做完全隐藏”；但 `packages/desktop/src/renderer/components/Sidebar.tsx:23` 只定义 `SidebarMode = "expanded" | "hidden"`，`packages/desktop/src/renderer/components/WorkbenchLayout.tsx:56-58` 还把旧 `rail` 存储值统一映射成 `hidden`，`packages/desktop/src/renderer/components/WorkbenchLayout.tsx:159-160` / `441-443` 在 hidden 时把左槽宽度置 0 并传给 `SplitView` 完全隐藏。
+- 偏移点：`docs/design-docs/frontend/front-工作台布局与面板交互规范.md` 要求左侧会话栏“首版支持折叠为 icon rail，不先做完全隐藏”；但 `apps/desktop/src/renderer/components/Sidebar.tsx:23` 只定义 `SidebarMode = "expanded" | "hidden"`，`apps/desktop/src/renderer/components/WorkbenchLayout.tsx:56-58` 还把旧 `rail` 存储值统一映射成 `hidden`，`apps/desktop/src/renderer/components/WorkbenchLayout.tsx:159-160` / `441-443` 在 hidden 时把左槽宽度置 0 并传给 `SplitView` 完全隐藏。
 - 不合理设计：折叠态不再保留品牌、新建会话、搜索、设置等高频入口，用户在窄窗口或主动折叠后失去左侧导航 affordance，也和设计文档里的桌面工作台心智不一致。
-- 可读性问题：代码注释同时出现“rail 模式已退役”“hidden 态”等说法（`packages/desktop/src/renderer/components/WorkbenchLayout.tsx:27`、`56`、`58`），但设计文档仍把 rail 当作当前首版能力，读者无法判断真实产品事实。
+- 可读性问题：代码注释同时出现“rail 模式已退役”“hidden 态”等说法（`apps/desktop/src/renderer/components/WorkbenchLayout.tsx:27`、`56`、`58`），但设计文档仍把 rail 当作当前首版能力，读者无法判断真实产品事实。
 - 耦合问题：`WorkbenchLayout` 同时承担存储兼容、宽度 snap、左侧交互语义和 `SplitView` hidden 控制，导致“折叠为 rail”与“完全隐藏 pane”被同一状态吞掉。
-- 死代码/兼容残留：`StoredWorkbenchLayout.leftMode?: SidebarMode | "rail"` 和 `stored.leftMode === "rail"` 的迁移兼容（`packages/desktop/src/renderer/components/WorkbenchLayout.tsx:17-19`、`56-58`）仍保留，但当前类型已无 rail 实现。
+- 死代码/兼容残留：`StoredWorkbenchLayout.leftMode?: SidebarMode | "rail"` 和 `stored.leftMode === "rail"` 的迁移兼容（`apps/desktop/src/renderer/components/WorkbenchLayout.tsx:17-19`、`56-58`）仍保留，但当前类型已无 rail 实现。
 - 建议动作：收敛。要么恢复 `rail` 为 60px icon rail 并同步 `Sidebar` 渲染；要么明确改设计文档，把首版行为改为完全隐藏，并删除 `rail` 兼容分支避免继续误导。
 
 ### 发现 2：多处组件级颜色字面量绕过三态主题语义 token
 
-- 偏移点：主题规范要求组件承载文字、背景、边框时只用语义 token；但 `packages/desktop/src/renderer/components/messages/BashRunBlock.tsx:50-52` 为审批按钮写死 `bg-[#eeeff1]`、`bg-[#2f83c9]` 等浅/深两套 hex，`packages/desktop/src/renderer/components/Composer.tsx:70` 的图片附件占位写死 `#ffffff` / `#dce7f5`，`packages/desktop/src/renderer/components/UsageStatisticsPage.tsx:34` 用 `TOOL_COLORS = ["#2f6fff", ...]` 而不是 `--act-chart-series-*`。
+- 偏移点：主题规范要求组件承载文字、背景、边框时只用语义 token；但 `apps/desktop/src/renderer/components/messages/BashRunBlock.tsx:50-52` 为审批按钮写死 `bg-[#eeeff1]`、`bg-[#2f83c9]` 等浅/深两套 hex，`apps/desktop/src/renderer/components/Composer.tsx:70` 的图片附件占位写死 `#ffffff` / `#dce7f5`，`apps/desktop/src/renderer/components/UsageStatisticsPage.tsx:34` 用 `TOOL_COLORS = ["#2f6fff", ...]` 而不是 `--act-chart-series-*`。
 - 不合理设计：这些颜色分散在业务组件中，主题切换的事实源不再只是 `styles/tokens.css`，后续浅/深/系统主题调色需要逐组件追踪。
 - 可读性问题：合法例外和违规字面量混在一起，例如 `Composer.tsx:97` 的 `bg-brand text-white` 属于品牌底白字例外，而 `Composer.tsx:70` 是附件占位背景；单靠搜索结果难以判断哪些需要迁移。
 - 耦合问题：Usage 图表色与 token 中的 `--act-chart-series-*` 重复维护，Bash 审批按钮又在组件内自带 dark variant，削弱了 token 层对主题的统一控制。
@@ -101,26 +101,26 @@
 
 ### 发现 3：右侧 Workspace 文件树把 IPC 读取、错误降级和 Tab view model 组装混在视图组件里
 
-- 偏移点：右侧面板规范要求 Markdown/HTML/Context/Review/Kairos 等按 view model 分层，renderer 不直接访问文件系统；当前 `WorkspaceFileTree` 虽然经 IPC 而非 FS，但把 `window.actspace.listWorkspaceDir`、`readWorkspaceFile` 调用、`WorkspaceReadFileResult -> RightPanelTab` 转换和 UI 渲染都放在一个组件内（`packages/desktop/src/renderer/components/right-panel/WorkspaceFileTree.tsx:34-58`、`64-89`、`147-164`）。
+- 偏移点：右侧面板规范要求 Markdown/HTML/Context/Review/Kairos 等按 view model 分层，renderer 不直接访问文件系统；当前 `WorkspaceFileTree` 虽然经 IPC 而非 FS，但把 `window.actspace.listWorkspaceDir`、`readWorkspaceFile` 调用、`WorkspaceReadFileResult -> RightPanelTab` 转换和 UI 渲染都放在一个组件内（`apps/desktop/src/renderer/components/right-panel/WorkspaceFileTree.tsx:34-58`、`64-89`、`147-164`）。
 - 不合理设计：视图组件直接知道 IPC 返回错误码、文件 renderKind、Tab 去重 id 和右侧面板对象模型；后续补 PDF/CSV、quick open、多 root 或 V3 Kairos 配置编辑时，会继续扩大这个组件的职责。
 - 可读性问题：`DirView` / `EntryRow` 同时处理懒加载、展开状态、读取状态、错误文案和 tab 打开，文件树本身的交互结构被数据适配细节淹没。
-- 耦合问题：`WorkspaceFileTree` 直接依赖 `useRightPanel().openTab` 与 `RightPanelTab` union（`packages/desktop/src/renderer/components/right-panel/WorkspaceFileTree.tsx:4`、`122`），文件树无法作为纯浏览组件复用，也让右侧 Tab view model 与 IPC 契约强耦合。
+- 耦合问题：`WorkspaceFileTree` 直接依赖 `useRightPanel().openTab` 与 `RightPanelTab` union（`apps/desktop/src/renderer/components/right-panel/WorkspaceFileTree.tsx:4`、`122`），文件树无法作为纯浏览组件复用，也让右侧 Tab view model 与 IPC 契约强耦合。
 - 死代码/兼容残留：无确定死代码。
 - 建议动作：重构。抽出 `useWorkspaceFileBrowser` 或 `workspaceFileViewModel.ts`，集中做 IPC 调用、错误文案和 `RightPanelTab` 派生；组件只消费目录节点、loading/error 状态和 `onOpenFile`。
 
 ### 发现 4：SubAgent transcript 面板仍在 renderer 里直接解析 raw SessionEvent
 
-- 偏移点：消息区规范要求 SubAgent 组件只消费 `MessageBlock.kind === "agent"` 字段，不解析 raw args、raw output 或 transcript 文件路径；但 `packages/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx:73-247` 定义了 `eventPayload`、`toolCallMessage`、`toolResultFallbackMessage`、`usageText` 等 raw `SessionEvent` 解析逻辑，`buildTranscriptSections` 在 `288-367` 直接遍历 `event.type`。
+- 偏移点：消息区规范要求 SubAgent 组件只消费 `MessageBlock.kind === "agent"` 字段，不解析 raw args、raw output 或 transcript 文件路径；但 `apps/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx:73-247` 定义了 `eventPayload`、`toolCallMessage`、`toolResultFallbackMessage`、`usageText` 等 raw `SessionEvent` 解析逻辑，`buildTranscriptSections` 在 `288-367` 直接遍历 `event.type`。
 - 不合理设计：SubAgent transcript 的工具语法派生散落在 renderer，而主消息流主要消费 `@actspace/shared` 的 `MessageBlock`；两套派生逻辑容易在工具 preview、错误摘要、usage 文案和最终回复规则上漂移。
 - 可读性问题：单文件同时承担 transcript 加载、事件归并、raw event 解析、MessageBlock 构造、面板布局和折叠状态，`SubAgentTranscriptModal.tsx` 的阅读跨度过大。
-- 耦合问题：组件依赖 `SessionEvent` payload 内部字段（如 `payload.arguments`、`payload.rawOutput`、`payload.modelOutput`，见 `packages/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx:102-112`、`151-224`），绕过 shared selector / view model 边界。
-- 死代码/兼容残留：`export const SubAgentTranscriptModal = SubAgentTranscriptPanel`（`packages/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx:511`）保留旧 Modal 命名；当前规范已经要求“Composer 上方 panel，不使用全局遮罩弹窗”，命名残留会误导后续使用者。
+- 耦合问题：组件依赖 `SessionEvent` payload 内部字段（如 `payload.arguments`、`payload.rawOutput`、`payload.modelOutput`，见 `apps/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx:102-112`、`151-224`），绕过 shared selector / view model 边界。
+- 死代码/兼容残留：`export const SubAgentTranscriptModal = SubAgentTranscriptPanel`（`apps/desktop/src/renderer/components/messages/SubAgentTranscriptModal.tsx:511`）保留旧 Modal 命名；当前规范已经要求“Composer 上方 panel，不使用全局遮罩弹窗”，命名残留会误导后续使用者。
 - 建议动作：重构。把 transcript sidecar 事件到 `TranscriptSections` / `MessageBlock` 的派生移到 shared selector 或 renderer state selector，并把文件名从 `SubAgentTranscriptModal.tsx` 收敛为 `SubAgentTranscriptPanel.tsx`。
 
 ### 发现 5：Lab 页面确认为 V0 renderer mock，但代码内没有运行时边界提示
 
-- 偏移点：`docs/design-docs/lab/README.md` 明确“V0 renderer mock 已落地；后端 Lab Runtime、IPC 和持久化尚未实现”；实现上 `packages/desktop/src/renderer/components/LabPage.tsx:242-253` 完全用本地 `useState` 管理 cards、completedExperiments、dialog、newTitle 等状态，`281-291` 创建实验也只写本地状态，没有 IPC 或持久化。
-- 不合理设计：页面已作为真实 `SidebarView` 进入主工作台（`packages/desktop/src/renderer/components/WorkbenchLayout.tsx:350-352`），但 UI 中未看到“未接后端 / mock”状态提示，用户可能把本地临时矩阵误认为可追溯实验事实。
+- 偏移点：`docs/design-docs/v1-legacy/lab-README.md` 明确“V0 renderer mock 已落地；后端 Lab Runtime、IPC 和持久化尚未实现”；实现上 `apps/desktop/src/renderer/components/LabPage.tsx:242-253` 完全用本地 `useState` 管理 cards、completedExperiments、dialog、newTitle 等状态，`281-291` 创建实验也只写本地状态，没有 IPC 或持久化。
+- 不合理设计：页面已作为真实 `SidebarView` 进入主工作台（`apps/desktop/src/renderer/components/WorkbenchLayout.tsx:350-352`），但 UI 中未看到“未接后端 / mock”状态提示，用户可能把本地临时矩阵误认为可追溯实验事实。
 - 可读性问题：Lab 组件内部类型名如 `LabCardView`、`LabCompletedExperimentView` 看起来像稳定 view model，但数据全是 renderer 临时状态，和长期设计里的实验事实落盘要求不匹配。
 - 耦合问题：当前未接后端，耦合风险主要是未来 Runtime 接入时需要替换大量本地状态流；状态、弹窗和阶段推进都在单个组件内。
 - 死代码/兼容残留：属于开发期 mock 残留，且文档有标注、代码 UI 未标注。
@@ -128,7 +128,7 @@
 
 ### 发现 6：HTML 预览 iframe 基线主题只在首次渲染解析，系统主题变化后不会同步
 
-- 偏移点：HTML 渲染规范要求注入最小 `color-scheme: light dark` 基线且主题感知；`HtmlRenderView` 用 `resolveTheme()` 读取 `data-theme` / `matchMedia`（`packages/desktop/src/renderer/components/right-panel/HtmlRenderView.tsx:31-43`），但 `const theme = useMemo(resolveTheme, [])` 只在挂载时执行一次（`packages/desktop/src/renderer/components/right-panel/HtmlRenderView.tsx:122`），`srcDoc` 只随 `html/csp/theme` 变化（`124`）。
+- 偏移点：HTML 渲染规范要求注入最小 `color-scheme: light dark` 基线且主题感知；`HtmlRenderView` 用 `resolveTheme()` 读取 `data-theme` / `matchMedia`（`apps/desktop/src/renderer/components/right-panel/HtmlRenderView.tsx:31-43`），但 `const theme = useMemo(resolveTheme, [])` 只在挂载时执行一次（`apps/desktop/src/renderer/components/right-panel/HtmlRenderView.tsx:122`），`srcDoc` 只随 `html/csp/theme` 变化（`124`）。
 - 不合理设计：用户在设置页切换浅/深/跟随系统后，已打开 HTML Tab 的 iframe baseline 仍停留在旧主题，除非重新挂载或重新打开 Tab；这和三态主题“整体翻转”的验收口径不一致。
 - 可读性问题：`resolveTheme` 看起来支持 system，但缺少 `data-theme` / `prefers-color-scheme` 订阅，容易让读者误以为运行时切换已覆盖。
 - 耦合问题：HTML iframe 的主题状态独立于 `appearance/apply.ts` 的主题应用链路，未通过统一 appearance state 或事件同步。

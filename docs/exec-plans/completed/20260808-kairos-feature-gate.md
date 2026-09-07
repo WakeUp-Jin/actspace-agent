@@ -21,8 +21,8 @@
 ## 背景
 
 - 相关文档：
-  - `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
-  - `docs/design-docs/kairos/front-Kairos监控页规范.md`
+  - `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md`
+  - `docs/design-docs/v1-legacy/front-Kairos监控页规范.md`
   - `docs/design-docs/frontend/front-设置页规范.md`
   - `docs/FRONTEND_VERIFICATION.md`
 - 相关代码路径：

@@ -102,6 +102,8 @@ macOS 开发启动不会直接暴露依赖目录里的默认 `Electron.app`。�
 
 Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的 `Electron`。优先使用可读的 `appName`；若自动化工具不接受 display name，就使用同一行日志里的 `appId`。不同 worktree 因此可以并存，自动化也不会被 macOS LaunchServices 路由到另一份源码的 Electron 欢迎页。临时开发身份只改变系统识别与进程名称；main 进程仍使用既有的 `actspace` userData 目录，因此会话和设置不会因 workspace hash 改变。
 
+开发 runtime 缓存复用前，启动器会对照已安装 Electron 检查文件结构、普通资源大小、可执行权限、framework 符号链接和 Info.plist 身份；缺失或损坏时输出 `rebuilding cached Electron` 并自动重建。新副本通过同一检查后才替换旧缓存。此检查用于发现临时目录里的残缺文件，不是安全签名或完整字节哈希验证；不会清理会话、设置或 Chromium 用户缓存。可用 `node scripts/run-electron-dev.mjs --prepare-only` 单独验证缓存准备，回归测试为 `node --test scripts/test/electron-runtime-integrity.test.mjs`（macOS）。
+
 开发启动默认不弹出独立 DevTools 窗口，避免它与主窗口共享应用身份并抢走 Computer Use 焦点。需要 DevTools 时显式运行 `ACTSPACE_OPEN_DEVTOOLS=1 pnpm dev:log`。
 
 需要确认：
@@ -118,7 +120,7 @@ Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的
 
 - Electron 窗口截图。
 - `pnpm dev` 终端日志。
-- 必要时提供本地数据目录里的 `meta.json` 或 `session.jsonl` 摘要。
+- 必要时提供 `sessions-v2/<sessionId>/journal.jsonl` 的脱敏摘要；不要发送完整 Journal、凭据或包含敏感工具输出的原始文件。
 
 ## 默认验收矩阵
 

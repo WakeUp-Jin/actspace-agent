@@ -9,7 +9,7 @@
 - 长期设计：`docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md`
 - 右侧对象面板：`docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`
 - 工作台布局：`docs/design-docs/frontend/front-工作台布局与面板交互规范.md`
-- Agent Bash 边界：`docs/design-docs/execution-safety/agent-bash工具设计文档.md`
+- 历史 Agent Bash 边界：`docs/design-docs/v1-legacy/execution-safety-agent-bash工具设计文档.md`
 - 前端验收：`docs/FRONTEND_VERIFICATION.md`
 
 设计文档回答为什么做、模块边界和行为契约；本计划回答修改哪些文件、执行顺序、验证证据和失败回退。两者冲突时以设计文档为准。

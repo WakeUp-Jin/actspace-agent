@@ -14,17 +14,17 @@
 - `packages/agent-core/src/tools/tools/browser/definition.ts`（追加新工具定义）
 - `packages/agent-core/src/tools/tools/browser/executor.ts`（追加新 executor）
 - `packages/agent-core/src/tools/index.ts`（追加导出）
-- `plugins/browser-bridge/apps/cli/commands.go`（新建 — 高层命令实现）
-- `plugins/browser-bridge/apps/cli/playwright.go`（新建 — Playwright 注入编排）
-- `plugins/browser-bridge/apps/chrome-extension/src/background.js`（扩展命令处理）
-- `plugins/browser-bridge/apps/chrome-extension/src/playwright-injected.js`（新建 — 注入脚本）
+- `browser-bridge/apps/cli/commands.go`（新建 — 高层命令实现）
+- `browser-bridge/apps/cli/playwright.go`（新建 — Playwright 注入编排）
+- `browser-bridge/apps/chrome-extension/src/background.js`（扩展命令处理）
+- `browser-bridge/apps/chrome-extension/src/playwright-injected.js`（新建 — 注入脚本）
 - 对应测试文件
 
 ## 任务清单
 
 ### 任务 3.1：Playwright 选择器引擎注入脚本
 
-新建 `plugins/browser-bridge/apps/chrome-extension/src/playwright-injected.js`。
+新建 `browser-bridge/apps/chrome-extension/src/playwright-injected.js`。
 
 这是注入到目标页面的脚本，提供选择器引擎能力：
 
@@ -124,7 +124,7 @@
 
 ### 任务 3.2：Go bridge 高层命令实现（commands.go）
 
-新建 `plugins/browser-bridge/apps/cli/commands.go`：
+新建 `browser-bridge/apps/cli/commands.go`：
 
 ```go
 // commands.go — 高层交互命令的编排逻辑
@@ -302,7 +302,7 @@ func (sess *Session) cdpEval(tabId int, expression string) (string, error) {
 
 ### 任务 3.5：扩展 Chrome Extension 支持新命令
 
-在 `plugins/browser-bridge/apps/chrome-extension/src/background.js` 的命令路由中：
+在 `browser-bridge/apps/chrome-extension/src/background.js` 的命令路由中：
 
 当前 extension 已支持 `screenshot`、`tabs`、`navigate` 等。需要扩展：
 
@@ -573,7 +573,7 @@ func (sess *Session) waitForPostClick(tabId int) {
 ### 任务 3.9：测试
 
 测试文件：
-- `plugins/browser-bridge/apps/cli/commands_test.go`
+- `browser-bridge/apps/cli/commands_test.go`
 - `packages/agent-core/src/tools/tools/browser/test/interaction.test.ts`
 
 Go 侧测试：
@@ -588,7 +588,7 @@ TS 侧测试：
 
 验证命令：
 ```bash
-cd plugins/browser-bridge && go test ./apps/cli/ -v -run TestCommand
+cd browser-bridge && go test ./apps/cli/ -v -run TestCommand
 cd packages/agent-core && pnpm vitest run src/tools/tools/browser/test/interaction.test.ts
 ```
 

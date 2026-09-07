@@ -29,5 +29,5 @@
 - `packages/agent-core/src/tools/tools/bash/definition.ts`
 - `packages/agent-core/src/tools/tools/bash/permissions.ts`
 - `packages/agent-core/src/tools/test/bash.test.ts`
-- `docs/design-docs/execution-safety/agent-bash工具设计文档.md`
+- `docs/design-docs/v1-legacy/execution-safety-agent-bash工具设计文档.md`
 - `docs/histories/2026-07/20260724-2324-require-bash-intent.md`

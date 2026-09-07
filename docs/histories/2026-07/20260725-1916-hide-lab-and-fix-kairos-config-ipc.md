@@ -34,9 +34,9 @@ Kairos 设置页是创建运行时的前置控制面，不能反过来依赖运�
 - `packages/desktop/src/renderer/components/Sidebar.tsx`
 - `packages/desktop/src/renderer/test/sidebar.test.tsx`
 - `docs/design-docs/frontend/front-左侧会话栏规范.md`
-- `docs/design-docs/kairos/agent-kairos-autonomous-mode.md`
-- `docs/design-docs/lab/README.md`
-- `docs/design-docs/lab/lab-implementation-progress.md`
+- `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md`
+- `docs/design-docs/v1-legacy/lab-README.md`
+- `docs/design-docs/v1-legacy/lab-implementation-progress.md`
 
 ### ✅ Verification
 

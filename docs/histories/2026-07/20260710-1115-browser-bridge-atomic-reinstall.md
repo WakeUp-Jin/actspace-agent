@@ -3,7 +3,7 @@
 | key | value |
 |-----|-------|
 | date | 2026-07-10 |
-| scope | packages/desktop, plugins/browser-bridge, docs |
+| scope | packages/desktop, browser-bridge, docs |
 | status | done |
 
 ## 用户诉求
@@ -32,11 +32,11 @@ Chrome 对 Native Messaging 使用扩展 ID 做 allowlist。未固定 key 的 un
 
 ## 关键文件
 
-- `packages/desktop/src/main/plugins/browser-bridge-service.ts`
+- `packages/desktop/src/main/browser-bridge-service.ts`
 - `packages/desktop/src/main/test/browser-bridge-service.test.ts`
 - `packages/desktop/src/renderer/components/settings/fs-watch-shared.ts`
-- `plugins/browser-bridge/apps/chrome-extension/manifest.json`
-- `plugins/browser-bridge/apps/cli/main.go`
-- `plugins/browser-bridge/apps/cli/main_test.go`
+- `browser-bridge/apps/chrome-extension/manifest.json`
+- `browser-bridge/apps/cli/main.go`
+- `browser-bridge/apps/cli/main_test.go`
 - `docs/design-docs/browser/agent-browser-use-integration-design.md`
 - `docs/RELIABILITY.md`

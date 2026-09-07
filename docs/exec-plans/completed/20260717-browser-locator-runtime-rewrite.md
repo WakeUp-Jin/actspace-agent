@@ -2,7 +2,7 @@
 
 ## 目标
 
-在 `plugins/browser-bridge` 内重写一套 ActSpace 自有的页面 Locator Runtime：不复制 Codex bundle、不依赖 Playwright 运行时，通过结构化 Locator、页面内 DOM/ARIA 语义、自动等待与 actionability 检查，为文本模型提供稳定的元素定位和真实 CDP 交互能力。
+在 `browser-bridge` 内重写一套 ActSpace 自有的页面 Locator Runtime：不复制 Codex bundle、不依赖 Playwright 运行时，通过结构化 Locator、页面内 DOM/ARIA 语义、自动等待与 actionability 检查，为文本模型提供稳定的元素定位和真实 CDP 交互能力。
 
 ## 范围
 
@@ -31,10 +31,10 @@
   - `docs/RELIABILITY.md`
   - `docs/SECURITY.md`
 - 相关代码路径：
-  - `plugins/browser-bridge/apps/cli/internal/locator/`
-  - `plugins/browser-bridge/apps/cli/internal/commands/`
-  - `plugins/browser-bridge/apps/cli/command_router.go`
-  - `plugins/browser-bridge/apps/chrome-extension/src/background.js`
+  - `browser-bridge/apps/cli/internal/locator/`
+  - `browser-bridge/apps/cli/internal/commands/`
+  - `browser-bridge/apps/cli/command_router.go`
+  - `browser-bridge/apps/chrome-extension/src/background.js`
   - `packages/agent-core/src/tools/tools/browser/`
   - `packages/agent-core/src/engine/loop.ts`
 - 已知约束：
@@ -69,7 +69,7 @@
 - 命令：
   - `node scripts/build-browser-locator-runtime.mjs --check`
   - `node scripts/test-browser-locator-runtime.mjs`
-  - `cd plugins/browser-bridge/apps/cli && GOCACHE=/private/tmp/abb-go-cache go test ./...`
+  - `cd browser-bridge/apps/cli && GOCACHE=/private/tmp/abb-go-cache go test ./...`
   - `node scripts/check-browser-command-registry.mjs`
   - `pnpm --filter @actspace/agent-core test`
   - `pnpm typecheck`

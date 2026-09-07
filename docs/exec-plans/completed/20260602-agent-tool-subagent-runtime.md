@@ -24,7 +24,7 @@
 - 设计文档：
   - `docs/design-docs/collaboration/agent-subagent-runtime.md`
   - `docs/design-docs/agent-runtime/agent-turn-layers.md`
-  - `docs/design-docs/agent-runtime/agent-current-module-map.md`
+  - `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
   - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
   - `docs/design-docs/frontend/front-中间消息区规范.md`
   - `docs/design-docs/frontend/front-主题与配色规范.md`
@@ -198,7 +198,7 @@
 
 修改文件：
 
-- `docs/design-docs/agent-runtime/agent-current-module-map.md`
+- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/design-docs/index.md`
