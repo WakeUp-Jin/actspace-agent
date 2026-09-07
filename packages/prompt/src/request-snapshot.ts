@@ -20,6 +20,8 @@ export type PreparedRequestMetadata = {
   readonly adapterVersion: string;
   readonly defaults: RuntimeV2JsonValue;
   readonly retryPolicy: RuntimeV2JsonValue;
+  /** Model context capacity resolved at request preparation time; null means unknown. */
+  readonly contextWindow?: number | null;
 };
 
 export type LogicalRequestSnapshot = LogicalRequestCandidate & {

@@ -7,7 +7,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": ["dist"],
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" } },
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" }, "./sessions": { "types": "./dist/sessions/index.d.ts", "import": "./dist/sessions/index.js", "default": "./dist/sessions/index.js" } },
   "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc --noEmit -p tsconfig.json", "test": "vitest run --globals --passWithNoTests" },
   "dependencies": { "@actspace/shared": "workspace:*" },
   "devDependencies": { "@types/node": "^24.0.3", "typescript": "^5.8.3", "vitest": "^3.2.4" }

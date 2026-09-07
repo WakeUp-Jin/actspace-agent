@@ -41,13 +41,22 @@ export class ModelStoreService {
   getModelSnapshot(): ModelSnapshot {
     const view = this.settings.getV2();
     const stored = this.settings.getModelStorageState();
+    const connections = this.settings.getV4().settings.models.connections;
     const definitions = Object.fromEntries(
       [...BUILTIN_MODEL_LIST, ...CURATED_OPENROUTER_MODEL_LIST, ...Object.values(stored.customModels).filter(isDefined)]
         .map((definition) => {
-          return [definition.key, clone(definition)];
+          const connectionId = stored.installedModels[definition.key]?.connectionId;
+          const connection = connectionId && connectionId !== `${definition.provider}:default` ? connections[connectionId] : undefined;
+          return [definition.key, clone(connection ? { ...definition, api: connection.protocol ?? "openai-completions" } : definition)];
         }),
     ) as ModelSnapshot["definitions"];
     return {
+      connections: Object.fromEntries(Object.values(connections).filter((connection) => connection.connectionId !== `${connection.providerId}:default`).map((connection) => [connection.connectionId, {
+        providerId: connection.providerId,
+        enabled: connection.enabled,
+        hasApiKey: !("code" in this.settings.getProviderRuntimeConfigForCredential(connection.providerId, undefined, connection.connectionId)),
+        lastConnection: connection.lastConnection,
+      }])),
       providers: Object.fromEntries(Object.entries(view.providers).map(([provider, state]) => [provider, {
         enabled: state.enabled ?? true,
         hasApiKey: state.hasApiKey,
@@ -149,7 +158,7 @@ export class ModelStoreService {
 
   async updateModelSettings(
     modelKey: ModelKey,
-    patch: { enabled?: boolean; customLabel?: string | null; credentialId?: string | null },
+    patch: { enabled?: boolean; customLabel?: string | null; credentialId?: string | null; connectionId?: string | null },
   ): Promise<ModelStoreResult> {
     const stored = this.settings.getModelStorageState();
     const current = stored.installedModels[modelKey];
@@ -172,6 +181,8 @@ export class ModelStoreService {
         [modelKey]: {
           ...current,
           enabled: patch.enabled ?? current.enabled,
+          ...(patch.connectionId?.trim() && { connectionId: patch.connectionId.trim() }),
+          ...(patch.connectionId === null && { connectionId: undefined }),
           ...(customLabel && { customLabel }),
           ...(credentialId && { credentialId }),
           ...(!customLabel && { customLabel: undefined }),

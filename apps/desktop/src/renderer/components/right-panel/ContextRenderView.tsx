@@ -5,7 +5,10 @@ import {
   getContextBucketDisplay,
   type ContextState,
   type ContextStateEntry,
+  type ContextUsageSnapshot,
 } from "@actspace/shared";
+import { selectProviderUsage, selectRequestContextEstimate } from "@actspace/client/sessions";
+import { contextEstimateToSnapshot, providerUsageToContextSnapshot, useOptionalSessionProjection } from "../../session";
 
 /**
  * 右侧面板 Context 完整只读视图（见 `front-右侧面板与文件渲染规范.md`）。
@@ -222,11 +225,25 @@ function ContextSection({ section, loading }: { section: Section; loading: boole
 
 export function ContextRenderView({
   contextState,
+  contextSnapshot,
+  contextRevision,
   sessionId,
 }: {
   contextState?: ContextState | null;
+  contextSnapshot?: ContextUsageSnapshot | null;
+  contextRevision?: number;
   sessionId?: string | null;
 }) {
+  const sessionProjection = useOptionalSessionProjection();
+  const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && (sessionId === null || sessionId === undefined || sessionProjection.sessionId === sessionId)
+    ? sessionProjection.cell
+    : null;
+  const projectedProviderUsage = projectionCell ? selectProviderUsage(projectionCell) : null;
+  const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
+  const effectiveContextSnapshot = contextSnapshot
+    ?? (projectedProviderUsage ? providerUsageToContextSnapshot(projectedProviderUsage) : null)
+    ?? (projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null);
+  const effectiveContextRevision = contextRevision ?? projectionCell?.snapshot?.throughJournalSeq;
   // 持久化快照只存 token 统计；打开视图时按需向 main 现场重算逐条全文。
   const [described, setDescribed] = useState<ContextState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -253,7 +270,7 @@ export function ContextRenderView({
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [effectiveContextRevision, sessionId]);
 
   // 现算结果（含逐条全文）优先；未回来时退回持久化快照（仅 token 统计 / 空内容）。
   const effectiveState = described ?? contextState ?? null;
@@ -266,7 +283,13 @@ export function ContextRenderView({
   if (!effectiveState) {
     return (
       <div className={EMPTY_CLASS}>
-        {loading
+        {effectiveContextSnapshot ? (
+          <>
+            <strong className="block text-text-main">Context · {Math.floor(effectiveContextSnapshot.percentUsed)}% Full</strong>
+            <span className="mt-1 block">{Math.floor(effectiveContextSnapshot.totalTokens).toLocaleString()} / {Math.floor(effectiveContextSnapshot.maxTokens).toLocaleString()} Tokens</span>
+            <span className="mt-1 block text-text-faint">等待同一 Session 的逐条上下文投影…</span>
+          </>
+        ) : loading
           ? "正在重建上下文明细…"
           : "当前没有可展示的上下文明细。开始对话后，这里会按分组列出喂给模型的完整上下文。"}
       </div>

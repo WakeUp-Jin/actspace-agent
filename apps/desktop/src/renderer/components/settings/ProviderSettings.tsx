@@ -2,82 +2,56 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
   CircleAlert,
-  Loader2,
-  MoonStar,
+  ChevronRight,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  ArrowLeft,
   Plus,
   RefreshCw,
-  Route,
-  Trash2,
-  Waves,
+  Search,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import {
   PROVIDER_REGISTRY,
+  PROVIDER_DEFINITIONS,
+  PROVIDER_CATALOG,
+  PROVIDER_CATALOG_ORDER,
+  type ProviderCategory,
   type LlmProviderId,
   type BalanceProviderId,
   type CredentialStorageView,
   type ProviderBalanceSnapshot,
   type ProviderSettingsView,
+  type AppSettings,
+  type SettingsV4ConnectionSettings,
+  type ProviderCatalogDefinition,
 } from "@actspace/shared";
 import { SectionShell } from "./SettingsPrimitives";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
+import { ModelSettings } from "./ModelSettings";
+import { ProviderLogo } from "./ProviderLogo";
 
-type ProviderGroup = "direct" | "compatible";
+const PROVIDERS = PROVIDER_DEFINITIONS;
 
-interface ProviderMeta {
-  id: LlmProviderId;
-  label: string;
-  description: string;
-  compatibility: string;
-  group: ProviderGroup;
-  icon: LucideIcon;
-  supportsBalance: boolean;
-}
-
-const PROVIDERS: ProviderMeta[] = [
-  {
-    id: "deepseek",
-    label: "DeepSeek",
-    description: "DeepSeek 官方 API",
-    compatibility: "官方直连",
-    group: "direct",
-    icon: Waves,
-    supportsBalance: true,
-  },
-  {
-    id: "kimi",
-    label: "Kimi",
-    description: "Moonshot 官方 API",
-    compatibility: "官方直连",
-    group: "direct",
-    icon: MoonStar,
-    supportsBalance: true,
-  },
-  {
-    id: "openrouter",
-    label: "OpenRouter",
-    description: "聚合模型目录与 OpenAI 兼容接口",
-    compatibility: "第三方兼容",
-    group: "compatible",
-    icon: Route,
-    supportsBalance: true,
-  },
-];
-
-const GROUPS: Array<{ id: ProviderGroup; label: string }> = [
-  { id: "direct", label: "官方 API（直连）" },
-  { id: "compatible", label: "第三方 / 中转兼容" },
-];
+type AddRoute = { kind: "catalog" } | null;
+type CatalogEntry = (typeof PROVIDERS)[number] & { kind: "builtin" } | ProviderCatalogDefinition & { kind: "compatible" };
 
 const PROVIDER_BALANCE_REFRESH_MS = 5 * 60 * 1000;
 
-export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promise<void> }) {
+export function ProviderSettings({ settings, onChanged }: { settings?: AppSettings | null; onChanged?: () => void | Promise<void> }) {
   const [providers, setProviders] = useState<Partial<Record<LlmProviderId, ProviderSettingsView>>>({});
   const [credentialStorage, setCredentialStorage] = useState<CredentialStorageView>({ status: "ready" });
   const [loaded, setLoaded] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<{ provider: LlmProviderId; restoreToAddButton: boolean } | null>(null);
+  const [adding, setAdding] = useState<AddRoute>(null);
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogCategory, setCatalogCategory] = useState<"all" | ProviderCategory>("all");
+  const [setup, setSetup] = useState<{ provider: LlmProviderId; origin: "list" | "catalog" } | null>(null);
+  const [customSetup, setCustomSetup] = useState<{ catalog?: ProviderCatalogDefinition } | false>(false);
+  const [editingCustom, setEditingCustom] = useState<SettingsV4ConnectionSettings | null>(null);
+  const [detailProvider, setDetailProvider] = useState<LlmProviderId | null>(null);
+  const [customConnections, setCustomConnections] = useState<SettingsV4ConnectionSettings[]>([]);
+  const [customDetail, setCustomDetail] = useState<SettingsV4ConnectionSettings | null>(null);
   const [removing, setRemoving] = useState<LlmProviderId | null>(null);
   const [busy, setBusy] = useState<LlmProviderId | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -109,17 +83,26 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
       const result = await window.actspace.listProviders();
       setProviders(result.providers);
       setCredentialStorage(result.credentialStorage ?? { status: "ready" });
-      await Promise.all(
-        PROVIDERS
-          .filter((provider): provider is ProviderMeta & { id: BalanceProviderId } => provider.supportsBalance && result.providers[provider.id]?.hasApiKey === true)
-          .map((provider) => loadBalance(provider.id)),
-      );
+      if (window.actspace.getSettingsV4) {
+        const v4 = await window.actspace.getSettingsV4();
+        setCustomConnections(Object.values(v4.settings.models.connections).filter((connection) => connection.connectionId !== `${connection.providerId}:default`));
+      }
+      // Balances are remote detail data; they must not hold up the local connection list.
+      for (const provider of PROVIDERS) {
+        if (provider.supportsBalance && result.providers[provider.id]?.hasApiKey === true) {
+          void loadBalance(provider.id as BalanceProviderId);
+        }
+      }
     } finally {
       setLoaded(true);
     }
   }, [loadBalance]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (detailProvider && !providers[detailProvider]) setDetailProvider(null);
+  }, [detailProvider, providers]);
 
   const test = async (provider: LlmProviderId) => {
     if (!window.actspace.testProvider) return;
@@ -168,33 +151,120 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
   }, [connectedBalanceKey, loadBalance, loaded]);
 
   if (!window.actspace?.listProviders) {
-    return <SectionShell title="服务商" description="仅桌面端可配置服务商连接。"><div /></SectionShell>;
+    return <SectionShell title="模型连接" description="仅桌面端可配置模型连接。"><div /></SectionShell>;
+  }
+
+  if (customDetail) {
+    return <CustomConnectionDetail settings={settings} connection={customDetail} onBack={() => setCustomDetail(null)} onEdit={() => { setEditingCustom(customDetail); setCustomSetup({}); setCustomDetail(null); }} onRemove={async () => { await window.actspace.removeCustomConnection?.({ connectionId: customDetail.connectionId }); setCustomDetail(null); await load(); await onChanged?.(); }} />;
+  }
+
+  if (customSetup) {
+    return <CustomConnectionSetup initial={editingCustom ?? undefined} catalog={customSetup.catalog} onBack={() => { setCustomSetup(false); if (editingCustom) setCustomDetail(editingCustom); else setAdding({ kind: "catalog" }); setEditingCustom(null); }} onSaved={async () => { setCustomSetup(false); setAdding(null); setEditingCustom(null); await load(); await onChanged?.(); }} />;
   }
 
   const connectedProviders = PROVIDERS.filter((provider) => isProviderConfigured(providers[provider.id]));
   const providersToAdd = PROVIDERS.filter((provider) => !isProviderConfigured(providers[provider.id]));
-  const canAddProvider = loaded && credentialStorage.status === "ready" && providersToAdd.length > 0;
+  const catalogEntries: CatalogEntry[] = [
+    ...providersToAdd.map((provider) => ({ ...provider, kind: "builtin" as const })),
+    ...PROVIDER_CATALOG.map((provider) => ({ ...provider, kind: "compatible" as const })),
+  ].sort((a, b) => PROVIDER_CATALOG_ORDER.indexOf(a.id as typeof PROVIDER_CATALOG_ORDER[number]) - PROVIDER_CATALOG_ORDER.indexOf(b.id as typeof PROVIDER_CATALOG_ORDER[number]));
+  const canAddProvider = loaded && credentialStorage.status === "ready";
+
+  if (detailProvider) {
+    const detailMeta = PROVIDERS.find((provider) => provider.id === detailProvider);
+    const detailState = providers[detailProvider];
+    if (detailMeta && detailState) {
+      return (
+        <ProviderDetailRoute
+          provider={detailMeta}
+          state={detailState}
+          settings={settings}
+          balance={detailMeta.supportsBalance ? balances[detailProvider as BalanceProviderId] : undefined}
+          balanceLoading={detailMeta.supportsBalance && balanceLoading[detailProvider as BalanceProviderId] === true}
+          balanceError={detailMeta.supportsBalance ? balanceErrors[detailProvider as BalanceProviderId] : undefined}
+          onBack={() => setDetailProvider(null)}
+          onRefreshBalance={() => { if (detailMeta.supportsBalance) void loadBalance(detailProvider as BalanceProviderId); }}
+          onTest={() => void test(detailProvider)}
+          onRefreshModels={async () => {
+            if (detailProvider === "openrouter" && window.actspace.reloadModelCatalog) {
+              await window.actspace.reloadModelCatalog({ provider: "openrouter" });
+              await onChanged?.();
+            }
+          }}
+          onChanged={onChanged}
+          isDefault={getDefaultProviderId(settings?.taskModels?.defaultChatModel) === detailProvider}
+          onEdit={() => {
+            setDetailProvider(null);
+            setSetup({ provider: detailProvider, origin: "list" });
+          }}
+          onRemove={() => {
+            setDetailProvider(null);
+            setRemoving(detailProvider);
+          }}
+        />
+      );
+    }
+  }
+
+  if (adding?.kind === "catalog") {
+    return (
+      <ProviderCatalogRoute
+        providers={catalogEntries}
+        query={catalogQuery}
+        onQueryChange={setCatalogQuery}
+        category={catalogCategory}
+        onCategoryChange={setCatalogCategory}
+        onBack={() => setAdding(null)}
+        onSelect={(provider) => {
+          setAdding(null);
+          if (provider.kind === "builtin") setSetup({ provider: provider.id, origin: "catalog" });
+          else setCustomSetup({ catalog: provider });
+        }}
+      />
+    );
+  }
+
+  if (setup) {
+    const setupMeta = PROVIDERS.find((provider) => provider.id === setup.provider);
+    if (setupMeta) {
+      return (
+        <ProviderSetupRoute
+          provider={setup.provider}
+          current={providers[setup.provider]}
+          onBack={() => {
+            if (setup.origin === "catalog") setAdding({ kind: "catalog" });
+            setSetup(null);
+          }}
+          onSaved={async () => {
+            setSetup(null);
+            await load();
+            await onChanged?.();
+          }}
+        />
+      );
+    }
+  }
 
   return (
     <>
       <SectionShell
-        title="服务商"
-        description="通过 API Key 接入模型服务；代理仅作用于开启它的服务商。"
+        title="模型连接"
         action={
           <button
             ref={addButtonRef}
             type="button"
+            aria-label="添加服务"
             disabled={!canAddProvider}
-            onClick={() => setAdding(true)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-act-pill bg-text-main px-4 text-[13px] font-semibold text-surface transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={() => setAdding({ kind: "catalog" })}
+            className="inline-flex h-9 items-center gap-1.5 rounded-act-md bg-action px-3 text-[13px] font-semibold text-on-action hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Plus size={16} aria-hidden="true" />
-            添加服务
+            添加连接
           </button>
         }
       >
-        <div className="w-full max-w-[720px]">
-          {!loaded ? <ProviderCardsSkeleton /> : null}
+        <div className="w-full">
+          {!loaded ? <ProviderConnectionsSkeleton /> : null}
 
           {loaded && credentialStorage.status === "unavailable" ? (
             <div role="alert" className="mb-4 flex items-start gap-2 rounded-act-md border border-danger-soft bg-danger-soft px-3 py-2.5 text-on-danger">
@@ -206,68 +276,23 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
             </div>
           ) : null}
 
-          {loaded && credentialStorage.status === "ready" && connectedProviders.length === 0 ? (
+          {loaded && credentialStorage.status === "ready" && connectedProviders.length === 0 && customConnections.length === 0 ? (
             <div className="rounded-act-xl border border-dashed border-line bg-surface px-5 py-8 text-center">
               <p className="text-[14px] font-semibold text-text-main">还没有连接模型服务</p>
-              <p className="mt-1 text-[12px] leading-relaxed text-text-faint">点击右上角“添加服务”，选择服务商并配置 API Key。</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-text-faint">点击右上角“添加连接”，选择服务商并配置 API Key。</p>
             </div>
           ) : null}
 
-          {GROUPS.map((group) => {
-            const items = connectedProviders.filter((provider) => provider.group === group.id);
-            if (items.length === 0) return null;
-            return (
-              <section key={group.id} className="mb-6 last:mb-0">
-                <h3 className="mb-2.5 px-0.5 text-[12px] font-semibold text-text-faint">{group.label}</h3>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {items.map((provider) => (
-                    <ProviderCard
-                      key={provider.id}
-                      provider={provider}
-                      state={providers[provider.id]}
-                      balance={provider.supportsBalance ? balances[provider.id as BalanceProviderId] : undefined}
-                      balanceLoading={provider.supportsBalance && balanceLoading[provider.id as BalanceProviderId] === true}
-                      balanceError={provider.supportsBalance ? balanceErrors[provider.id as BalanceProviderId] : undefined}
-                      busy={busy === provider.id}
-                      onRefreshBalance={() => { if (provider.supportsBalance) void loadBalance(provider.id as BalanceProviderId); }}
-                      onTest={() => void test(provider.id)}
-                      onEdit={() => setEditing({ provider: provider.id, restoreToAddButton: false })}
-                      onRemove={() => setRemoving(provider.id)}
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
+          {loaded && customConnections.length > 0 ? <div className="w-full divide-y divide-line border-y border-line">
+            {customConnections.map((connection) => <button key={connection.connectionId} type="button" className="flex min-h-[68px] w-full items-center gap-3 px-3.5 py-3 text-left hover:bg-hover-overlay" onClick={() => setCustomDetail(connection)}><ProviderLogo provider={connection.providerId} logoKey={resolveCatalogLogo(connection.catalogId)} /><span className="min-w-0 flex-1"><span className="block text-[14px] font-semibold text-text-main">{connection.displayName ?? connection.connectionId}</span><span className="mt-0.5 block truncate text-[11px] text-text-faint">{connection.baseUrl} · 自定义连接</span></span><ChevronRight className="shrink-0 text-text-faint" size={17} aria-hidden="true" /></button>)}
+          </div> : null}
+          {loaded && connectedProviders.length > 0 ? <div className="w-full divide-y divide-line border-y border-line">
+            {connectedProviders.map((provider) => <ConnectionRow key={provider.id} provider={provider} state={providers[provider.id]} isDefault={getDefaultProviderId(settings?.taskModels?.defaultChatModel) === provider.id} onOpen={() => setDetailProvider(provider.id)} />)}
+          </div> : null}
 
           {message ? <p role="status" className="mt-3 rounded-act-md bg-surface-subtle px-3 py-2 text-[12px] text-text-muted">{message}</p> : null}
         </div>
       </SectionShell>
-
-      {adding ? (
-        <AddProviderDialog
-          providers={providersToAdd}
-          onClose={() => setAdding(false)}
-          onSelect={(provider) => {
-            setAdding(false);
-            setEditing({ provider, restoreToAddButton: true });
-          }}
-        />
-      ) : null}
-
-      {editing ? (
-        <ProviderDialog
-          provider={editing.provider}
-          current={providers[editing.provider]}
-          restoreFocusTo={editing.restoreToAddButton ? addButtonRef.current : undefined}
-          onClose={() => setEditing(null)}
-          onSaved={async () => {
-            setEditing(null);
-            await load();
-            await onChanged?.();
-          }}
-        />
-      ) : null}
 
       {removing ? (
         <RemoveProviderDialog
@@ -281,75 +306,230 @@ export function ProviderSettings({ onChanged }: { onChanged?: () => void | Promi
   );
 }
 
-function ProviderCard({
+function ConnectionRow({
   provider,
   state,
+  isDefault,
+  onOpen,
+}: {
+  provider: (typeof PROVIDERS)[number];
+  state?: ProviderSettingsView;
+  isDefault: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <button type="button" aria-label={`${provider.label}${isDefault ? "，默认" : ""}`} onClick={onOpen} className="flex min-h-[68px] w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring">
+        <ProviderLogo provider={provider.id} />
+        <span className="min-w-0">
+          <h4 aria-label={provider.label} className="flex items-center gap-2 text-[14px] font-semibold text-text-main"><span>{provider.label}</span>{isDefault ? <span className="rounded-act-pill bg-surface-subtle px-2 py-0.5 text-[10px] font-medium text-text-muted">默认</span> : null}<StatusBadge status={state?.lastConnection?.status ?? "untested"} /></h4>
+          <span className="mt-0.5 block truncate text-[11px] text-text-faint">{provider.description} · {state?.enabledModelCount ?? 0} / {state?.installedModelCount ?? 0} 个模型启用</span>
+        </span>
+        <ChevronRight className="ml-auto shrink-0 text-text-faint" size={17} aria-hidden="true" />
+    </button>
+  );
+}
+
+function CustomConnectionDetail({ settings, connection, onBack, onEdit, onRemove }: { settings?: AppSettings | null; connection: SettingsV4ConnectionSettings; onBack: () => void; onEdit: () => void; onRemove: () => void | Promise<void> }) {
+  const catalog = findCatalogEntry(connection.catalogId);
+  return <div className="w-full"><div className="flex items-center gap-3 pb-6"><RouteBack onBack={onBack} label="返回连接" /><ProviderLogo provider={connection.providerId} logoKey={resolveCatalogLogo(connection.catalogId)} /><div className="min-w-0"><h3 className="text-[16px] font-semibold tracking-tight text-text-main">{connection.displayName ?? connection.connectionId}</h3><p className="mt-0.5 truncate text-[12px] text-text-faint">{catalog?.label ?? "自定义 OpenAI 兼容连接"} · {connection.connectionId}</p></div></div><div className="divide-y divide-line border-y border-line"><DetailSection title="连接" description="密钥只保存在本机。"><DetailRow label="服务地址" description="请求将发送到此地址。" value={connection.baseUrl} action="编辑" onAction={onEdit} /><DetailRow label="默认模型" description="用于模型目录和首次连接测试。" value={connection.defaultModel ?? "未设置"} /></DetailSection>{settings ? <DetailSection title="模型" description="绑定到此连接的模型。"><ModelSettings settings={settings} providerFilter={connection.providerId} connectionFilter={connection.connectionId} embedded embeddedPlain /></DetailSection> : null}</div><div className="mt-7 border-t border-line pt-6"><button type="button" className="h-9 rounded-act-md bg-danger-soft px-3 text-[12px] font-semibold text-on-danger hover:opacity-85" onClick={() => void onRemove()}>删除连接</button></div></div>;
+}
+
+function ProviderSetupRoute({
+  provider,
+  current,
+  onBack,
+  onSaved,
+}: {
+  provider: LlmProviderId;
+  current?: ProviderSettingsView;
+  onBack: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const meta = PROVIDERS.find((item) => item.id === provider)!;
+  return (
+    <div className="w-full" data-provider-route="setup">
+      <div className="mb-7 flex items-center gap-3">
+        <RouteBack onBack={onBack} label="返回模型连接" />
+        <ProviderLogo provider={meta.id} />
+        <div className="min-w-0">
+          <h3 className="text-[16px] font-semibold tracking-tight text-text-main">{isProviderConfigured(current) ? `编辑 ${meta.label}` : `连接 ${meta.label}`}</h3>
+          <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">完成必要配置后，连接会出现在模型页上方。</p>
+        </div>
+      </div>
+      <ProviderConnectionForm provider={provider} current={current} onClose={onBack} onSaved={onSaved} />
+    </div>
+  );
+}
+
+function CustomConnectionSetup({ initial, catalog, onBack, onSaved }: { initial?: SettingsV4ConnectionSettings; catalog?: ProviderCatalogDefinition; onBack: () => void; onSaved: () => void | Promise<void> }) {
+  const [connectionId, setConnectionId] = useState(initial?.connectionId ?? "");
+  const [displayName, setDisplayName] = useState(initial?.displayName ?? catalog?.label ?? "");
+  const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? catalog?.defaultBaseUrl ?? "");
+  const [defaultModel, setDefaultModel] = useState(initial?.defaultModel ?? catalog?.defaultModel ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    setSaving(true); setError(null);
+    try {
+      if (initial) {
+        if (!window.actspace.updateCustomConnection) throw new Error("当前版本不支持编辑连接。");
+        await window.actspace.updateCustomConnection({ providerId: initial.providerId, connectionId, displayName, apiKey: apiKey.trim() || undefined, baseUrl, defaultModel: defaultModel || null, catalogId: initial.catalogId, protocol: initial.protocol ?? "openai-completions" });
+      } else {
+        if (!window.actspace.createCustomConnection) throw new Error("当前版本不支持创建连接。");
+        await window.actspace.createCustomConnection({ providerId: catalog?.runtimeProviderId ?? "openrouter", connectionId: connectionId || undefined, displayName, apiKey: apiKey.trim(), baseUrl, defaultModel: defaultModel || null, catalogId: catalog?.id, protocol: catalog?.protocol ?? "openai-completions" });
+      }
+      await onSaved();
+    } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "保存失败。"); }
+    finally { setSaving(false); }
+  };
+  const inputClass = "h-10 w-full rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20 disabled:opacity-60";
+  return (
+    <div className="w-full" onKeyDown={(event) => { if (event.key === "Escape" && !saving) onBack(); }}>
+      <div className="mb-7 flex items-center gap-3">
+        <RouteBack onBack={onBack} label="返回添加连接" />
+        <ProviderLogo provider={catalog?.runtimeProviderId ?? initial?.providerId ?? "openrouter"} logoKey={catalog?.logoKey ?? resolveCatalogLogo(initial?.catalogId)} />
+        <div className="min-w-0">
+          <h3 className="text-[16px] font-semibold tracking-tight text-text-main">{initial ? `编辑 ${initial.displayName ?? "自定义兼容服务"}` : `连接 ${catalog?.label ?? "自定义兼容服务"}`}</h3>
+          <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">完成必要配置后，连接会出现在模型页上方。</p>
+        </div>
+      </div>
+      <div className="grid gap-5">
+        <ApiKeyField name="API Key" configured={Boolean(initial)} value={apiKey} onChange={setApiKey} />
+        <Field label="显示名称"><input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="例如 公司中转站" className={inputClass} /></Field>
+        <Field label="服务地址 · 必填"><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://example.com/v1" className={inputClass} /></Field>
+        <Field label="默认模型 · 必填">
+          <span className="text-[12px] font-normal leading-relaxed text-text-faint">用于此连接的模型选择和首次请求。</span>
+          <input value={defaultModel} onChange={(event) => setDefaultModel(event.target.value)} placeholder="填写服务商提供的模型 ID" className={inputClass} />
+        </Field>
+        <details className="group"><summary className="flex cursor-pointer list-none items-center justify-between py-2 text-[13px] font-semibold text-text-main">高级连接设置<ChevronDown size={15} className="group-open:rotate-180" aria-hidden="true" /></summary><div className="pt-3"><Field label="连接标识"><input value={connectionId} disabled={Boolean(initial)} onChange={(event) => setConnectionId(event.target.value)} placeholder="自动生成" className={inputClass} /></Field></div></details>
+        {error ? <p role="alert" className="text-[12px] text-on-danger">{error}</p> : null}
+      </div>
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" className="h-9 rounded-act-md px-3 text-[13px] font-medium text-text-main hover:bg-hover-overlay" disabled={saving} onClick={onBack}>取消</button>
+        <button type="button" className="h-9 rounded-act-md bg-action px-3 text-[13px] font-medium text-on-action hover:bg-action-hover disabled:opacity-60" disabled={saving || (!initial && !apiKey.trim()) || !baseUrl.trim() || !defaultModel.trim()} onClick={() => void save()}>{saving ? "保存中…" : "保存供应商"}</button>
+      </div>
+    </div>
+  );
+}
+
+function ProviderDetailRoute({
+  provider,
+  state,
+  settings,
   balance,
   balanceLoading,
   balanceError,
-  busy,
+  onBack,
   onRefreshBalance,
   onTest,
+  onRefreshModels,
+  onChanged,
+  isDefault,
   onEdit,
   onRemove,
 }: {
-  provider: ProviderMeta;
-  state?: ProviderSettingsView;
+  provider: (typeof PROVIDERS)[number];
+  state: ProviderSettingsView;
+  settings?: AppSettings | null;
   balance?: ProviderBalanceSnapshot;
   balanceLoading: boolean;
   balanceError?: string;
-  busy: boolean;
+  onBack: () => void;
   onRefreshBalance: () => void;
   onTest: () => void;
+  onRefreshModels: () => void | Promise<void>;
+  onChanged?: () => void | Promise<void>;
+  isDefault: boolean;
   onEdit: () => void;
   onRemove: () => void;
 }) {
-  const Icon = provider.icon;
-  const address = state?.baseUrl ?? PROVIDER_REGISTRY[provider.id].defaultBaseUrl;
+  const address = state.baseUrl ?? PROVIDER_REGISTRY[provider.id].defaultBaseUrl;
   return (
-    <article className="rounded-act-xl border border-line bg-surface p-3.5">
-      <div className="flex items-start justify-between gap-2.5">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-act-md bg-surface-subtle text-text-main">
-            <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
-          </span>
-          <div className="min-w-0 pt-0.5">
-            <h2 className="text-[14px] font-semibold text-text-main">{provider.label}</h2>
-            <p className="mt-0.5 truncate text-[11px] text-text-faint">{provider.description}</p>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1">
-              <StatusBadge status={state?.lastConnection?.status ?? "untested"} />
-              <span className="inline-flex items-center rounded-act-pill bg-surface-subtle px-1.5 py-0.5 text-[10px] font-medium text-text-faint">
-                {provider.compatibility}
-              </span>
-            </div>
+    <div className="w-full">
+      <div className="flex items-center gap-3 pb-6">
+        <RouteBack onBack={onBack} label="返回模型连接" />
+        <ProviderLogo provider={provider.id} />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-[16px] font-semibold tracking-tight text-text-main">{provider.label}</h3>
+            {isDefault ? <span className="rounded-act-pill bg-surface-subtle px-2 py-0.5 text-[10px] font-medium text-text-muted">默认</span> : null}
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-0">
-          <button
-            type="button"
-            className="inline-flex h-7 min-w-9 items-center justify-center rounded-act-md px-1.5 text-[11px] font-medium text-text-muted hover:bg-surface-subtle hover:text-text-main disabled:opacity-50"
-            onClick={onTest}
-            disabled={busy}
-          >
-            {busy ? <Loader2 className="animate-spin motion-reduce:animate-none" size={14} aria-label="测试中" /> : "测试"}
-          </button>
-          <button type="button" className="h-7 rounded-act-md px-1.5 text-[11px] font-medium text-text-muted hover:bg-surface-subtle hover:text-text-main" onClick={onEdit}>编辑</button>
-          <button type="button" aria-label={`移除 ${provider.label}`} title="移除服务商" className="grid h-7 w-7 place-items-center rounded-act-md text-text-faint hover:bg-danger-soft hover:text-on-danger disabled:opacity-50" onClick={onRemove} disabled={busy}><Trash2 size={14} aria-hidden="true" /></button>
+          <p className="mt-0.5 truncate text-[12px] text-text-faint">{provider.description} · {categoryLabel(provider.category)}</p>
         </div>
       </div>
 
-      {provider.supportsBalance ? (
-        <ProviderBalanceStrip provider={provider} balance={balance} loading={balanceLoading} error={balanceError} onRefresh={onRefreshBalance} />
-      ) : null}
+      <div className="divide-y divide-line border-y border-line">
+        <DetailSection title="连接" description="密钥只保存在本机。">
+          <DetailRow label="模型密钥" description="" value={state.hasApiKey ? "已设置" : "未设置"} action="更换" onAction={onEdit} />
+          {provider.supportsBalance ? <ProviderBalanceRow provider={provider} balance={balance} loading={balanceLoading} error={balanceError} onRefresh={onRefreshBalance} /> : null}
+        </DetailSection>
 
-      <dl className="mt-3 divide-y divide-line/70 overflow-hidden rounded-act-lg bg-surface-subtle px-2.5 text-[11px]">
-        <ProviderFact label="可用模型" value={`${state?.enabledModelCount ?? 0} / ${state?.installedModelCount ?? 0} 启用`} />
-        <ProviderFact label="接入方式" value="API Key" />
-        <ProviderFact label="接入地址" value={compactAddress(address)} title={address} />
-        <ProviderFact label="代理" value={state?.proxy?.enabled ? compactAddress(state.proxy.url ?? "已开启") : "关闭"} title={state?.proxy?.url ?? undefined} />
-      </dl>
-    </article>
+        <DetailSection title="高级连接设置" description="为这个连接设置服务地址和代理。">
+          <DetailRow label="接入地址" description="请求将发送到此地址。" value={compactAddress(address)} action="编辑" onAction={onEdit} />
+          <DetailRow label="代理" description="仅为此服务商启用代理。" value={state.proxy?.enabled ? compactAddress(state.proxy.url ?? "已开启") : "关闭"} action="编辑" onAction={onEdit} />
+        </DetailSection>
+
+        <DetailSection title="模型" description="这些模型会出现在任务的模型选择器中。">
+          <div className="min-w-0">
+            {settings ? <ModelSettings settings={settings} providerFilter={provider.id} embedded embeddedPlain onChanged={onChanged} /> : null}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button type="button" className="h-9 rounded-act-md bg-surface-subtle px-3 text-[12px] font-semibold text-text-main hover:bg-hover-overlay" onClick={onTest}>测试连接</button>
+              <button type="button" className="h-9 rounded-act-md px-3 text-[12px] font-semibold text-text-main hover:bg-hover-overlay disabled:opacity-50" disabled={provider.id !== "openrouter"} onClick={() => void onRefreshModels()}>更新模型目录</button>
+            </div>
+          </div>
+        </DetailSection>
+      </div>
+
+      <div className="mt-7 grid grid-cols-[minmax(0,1fr)_minmax(220px,416px)] gap-6 border-t border-line pt-6 max-[600px]:grid-cols-1 max-[600px]:gap-2">
+        <div>
+          <h4 className="text-[13px] font-semibold text-text-main">删除连接</h4>
+          <p className="mt-1 text-[11px] leading-relaxed text-text-faint">此操作不可撤销。</p>
+        </div>
+        <div>
+          <button type="button" className="h-9 rounded-act-md bg-danger-soft px-3 text-[12px] font-semibold text-on-danger hover:opacity-85" onClick={onRemove}>删除</button>
+        </div>
+      </div>
+    </div>
   );
+}
+
+function DetailSection({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+  return (
+    <section className="grid grid-cols-[minmax(0,1fr)_minmax(220px,416px)] gap-6 py-6 max-[600px]:grid-cols-1 max-[600px]:gap-2">
+      <div>
+        <h4 className="text-[13px] font-semibold text-text-main">{title}</h4>
+        {description ? <p className="mt-1 max-w-[42ch] text-[11px] leading-relaxed text-text-faint">{description}</p> : null}
+      </div>
+      <div className="min-w-0">{children}</div>
+    </section>
+  );
+}
+
+function ProviderBalanceRow({ provider, balance, loading, error, onRefresh }: { provider: (typeof PROVIDERS)[number]; balance?: ProviderBalanceSnapshot; loading: boolean; error?: string; onRefresh: () => void }) {
+  const display = balance?.displayBalance;
+  const value = display ? `${getBalanceSymbol(display.currency)}${display.amount} ${display.currency}` : "--";
+  const helper = loading ? "正在刷新…" : error ? "刷新失败，已保留上次结果" : provider.id === "openrouter" && balance?.isConfigured === false ? "需配置 Management Key" : "每 5 分钟刷新";
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-t border-line py-4">
+      <div className="min-w-0">
+        <h4 className="text-[13px] font-medium text-text-main">账户余额</h4>
+        <p className={`mt-1 text-[11px] leading-relaxed ${error ? "text-on-danger" : "text-text-faint"}`} role={error ? "status" : undefined}>{helper}</p>
+      </div>
+      <div className="flex items-center justify-end gap-3">
+        <span className="text-[15px] font-semibold tabular-nums text-text-main" aria-label={`${provider.label} 账户余额`}>{value}</span>
+        <button type="button" aria-label={`刷新 ${provider.label} 账户余额`} className="grid h-8 w-8 shrink-0 place-items-center rounded-act-md text-text-muted hover:bg-hover-overlay hover:text-text-main disabled:cursor-not-allowed disabled:opacity-50" disabled={loading} onClick={onRefresh}><RefreshCw size={14} className={loading ? "animate-spin motion-reduce:animate-none" : ""} aria-hidden="true" /></button>
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({ label, description, value, action, onAction }: { label: string; description: string; value: string; action?: string; onAction?: () => void }) {
+  return <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-4"><div className="min-w-0"><h4 className="text-[13px] font-medium text-text-main">{label}</h4>{description ? <p className="mt-1 text-[11px] leading-relaxed text-text-faint">{description}</p> : null}</div><div className="flex min-w-0 items-center justify-end gap-3 text-[13px] text-text-main"><span className="max-w-[240px] truncate">{value}</span>{action && onAction ? <button type="button" aria-label={`${action}${label}`} className="shrink-0 font-semibold text-text-main hover:text-action" onClick={onAction}>{action}</button> : null}</div></div>;
+}
+
+function RouteBack({ onBack, label }: { onBack: () => void; label: string }) {
+  return <button type="button" aria-label="返回连接" title={label} onClick={onBack} className="mb-1 inline-flex h-8 w-8 items-center justify-center rounded-act-md text-text-muted hover:bg-hover-overlay hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"><ArrowLeft size={17} aria-hidden="true" /></button>;
 }
 
 function RemoveProviderDialog({
@@ -358,7 +538,7 @@ function RemoveProviderDialog({
   onClose,
   onConfirm,
 }: {
-  provider: ProviderMeta;
+  provider: (typeof PROVIDERS)[number];
   busy: boolean;
   onClose: () => void;
   onConfirm: () => Promise<string | null>;
@@ -385,61 +565,16 @@ function RemoveProviderDialog({
   );
 }
 
-function ProviderBalanceStrip({
-  provider,
-  balance,
-  loading,
-  error,
-  onRefresh,
-}: {
-  provider: ProviderMeta;
-  balance?: ProviderBalanceSnapshot;
-  loading: boolean;
-  error?: string;
-  onRefresh: () => void;
-}) {
-  const label = "账户余额";
-  const display = balance?.displayBalance;
-  const value = display
-    ? `${getBalanceSymbol(display.currency)}${display.amount} ${display.currency}`
-    : "--";
-  const helper = loading
-    ? "正在刷新…"
-    : error
-      ? "刷新失败，已保留上次结果"
-      : provider.id === "openrouter" && balance?.isConfigured === false
-        ? "需配置 Management Key"
-        : "每 5 分钟刷新";
-
-  return (
-    <div className="mt-3 flex min-h-12 items-center justify-between gap-3 rounded-act-lg border border-line/70 bg-surface-subtle px-3 py-2">
-      <div className="min-w-0">
-        <div className="text-[10px] font-medium text-text-faint">{label}</div>
-        <div className="mt-0.5 truncate text-[15px] font-semibold tabular-nums text-text-main" aria-label={`${provider.label} ${label}`}>
-          {value}
-        </div>
-        <div className={`mt-0.5 text-[10px] ${error ? "text-on-danger" : "text-text-faint"}`} role={error ? "status" : undefined} title={error}>
-          {helper}
-        </div>
-      </div>
-      <button
-        type="button"
-        aria-label={`刷新 ${provider.label} ${label}`}
-        className="grid h-8 w-8 shrink-0 place-items-center rounded-act-md text-text-muted transition hover:bg-hover-overlay hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--act-color-focus-ring)] disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={loading}
-        onClick={onRefresh}
-      >
-        <RefreshCw size={14} strokeWidth={2} className={loading ? "animate-spin motion-reduce:animate-none" : ""} aria-hidden="true" />
-      </button>
-    </div>
-  );
-}
-
 function getBalanceSymbol(currency: string): string {
   if (currency === "CNY") return "¥";
   if (currency === "USD") return "$";
   if (currency === "EUR") return "€";
   return "";
+}
+
+function getDefaultProviderId(modelKey?: string | null): LlmProviderId | null {
+  const provider = modelKey?.split(":", 1)[0];
+  return provider === "deepseek" || provider === "kimi" || provider === "openrouter" ? provider : null;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -462,87 +597,111 @@ function ProviderFact({ label, value, title }: { label: string; value: string; t
   );
 }
 
-function ProviderCardsSkeleton() {
+function ProviderConnectionsSkeleton() {
   return (
-    <div className="grid gap-3 md:grid-cols-2" aria-label="正在加载服务商">
-      {[0, 1].map((item) => (
-        <div key={item} className="h-[250px] animate-pulse rounded-act-xl border border-line bg-surface-subtle motion-reduce:animate-none" />
+    <ul className="w-full list-none divide-y divide-line border-y border-line" aria-label="正在加载服务商" aria-busy="true">
+      {[0, 1, 2].map((item) => (
+        <li key={item} aria-hidden="true" className="flex min-h-[68px] items-center gap-3 px-3.5 py-3 motion-safe:animate-pulse">
+          <span className="h-9 w-9 shrink-0 rounded-act-md bg-surface-subtle" />
+          <span className="min-w-0 flex-1 space-y-2">
+            <span className="block h-3.5 w-24 max-w-full rounded-act-sm bg-surface-subtle" />
+            <span className="block h-2.5 w-48 max-w-full rounded-act-sm bg-surface-subtle" />
+          </span>
+          <ChevronRight size={17} className="shrink-0 text-text-subtle" />
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
-function AddProviderDialog({
+function ProviderCatalogRoute({
   providers,
-  onClose,
+  query,
+  onQueryChange,
+  category,
+  onCategoryChange,
+  onBack,
   onSelect,
 }: {
-  providers: ProviderMeta[];
-  onClose: () => void;
-  onSelect: (provider: LlmProviderId) => void;
+  providers: CatalogEntry[];
+  query: string;
+  onQueryChange: (query: string) => void;
+  category: "all" | ProviderCategory;
+  onCategoryChange: (category: "all" | ProviderCategory) => void;
+  onBack: () => void;
+  onSelect: (provider: CatalogEntry) => void;
 }) {
-  const { dialogRef, trapTabKey } = useDialogFocusTrap();
+  const normalized = query.trim().toLocaleLowerCase();
+  const filtered = providers.filter((provider) => (category === "all" || provider.category === category) && [provider.label, provider.description, provider.id]
+    .some((value) => value.toLocaleLowerCase().includes(normalized)));
   return (
-    <div
-      ref={dialogRef}
-      tabIndex={-1}
-      className="fixed inset-0 z-[150] grid place-items-center bg-scrim px-5"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="add-provider-dialog-title"
-      onKeyDown={(event) => { if (event.key === "Escape") onClose(); else trapTabKey(event); }}
-    >
-      <div className="w-full max-w-[560px] rounded-act-xl border border-line bg-surface p-5 shadow-act-float">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 id="add-provider-dialog-title" className="text-[18px] font-semibold text-text-main">添加服务</h2>
-            <p className="mt-1 text-[12px] text-text-faint">选择一个尚未连接的模型服务商。</p>
+    <div className="w-full">
+      <div className="mb-6 flex items-center gap-3">
+        <RouteBack onBack={onBack} label="返回模型连接" />
+        <div>
+          <h3 className="text-[16px] font-semibold tracking-tight text-text-main">添加连接</h3>
+          <p className="mt-0.5 text-[12px] leading-relaxed text-text-faint">选择一个服务商，然后配置 API Key 和连接参数。</p>
+        </div>
+      </div>
+      <div className="w-full">
+        <div className="flex items-center gap-3 max-[600px]:flex-col max-[600px]:items-stretch">
+        <label className="relative block w-[220px] max-[600px]:w-full">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" aria-hidden="true" />
+          <input
+            autoFocus
+            aria-label="搜索模型服务"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder="搜索服务商"
+            className="h-10 w-full rounded-act-md border border-line bg-surface-subtle pl-9 pr-3 text-[13px] text-text-main outline-none placeholder:text-text-subtle focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20"
+          />
+        </label>
+        <select aria-label="服务商类型" value={category} onChange={(event) => onCategoryChange(event.target.value as "all" | ProviderCategory)} className="ml-auto h-10 rounded-act-md border border-line bg-surface px-3 text-[13px] text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20 max-[600px]:ml-0"><option value="all">全部</option><option value="direct">官方直连</option><option value="coding">Coding Plan</option><option value="compatible">第三方兼容</option><option value="custom">自定义</option></select>
+        </div>
+        {filtered.length === 0 ? (
+          <div className="mt-4 border-y border-dashed border-line px-4 py-8 text-center text-[12px] text-text-faint"><p>没有匹配的服务商。</p><button type="button" className="mt-2 rounded-act-md px-3 py-2 text-text-main hover:bg-hover-overlay" onClick={() => { onQueryChange(""); onCategoryChange("all"); }}>清除筛选</button></div>
+        ) : (
+          <div className="mt-4 divide-y divide-line border-y border-line">
+            {filtered.map((provider) => {
+              return (
+                <button
+                  key={provider.id}
+                  type="button"
+                  aria-label={`选择 ${provider.label}`}
+                  onClick={() => onSelect(provider)}
+                  className="flex w-full items-center gap-3 px-2 py-3.5 text-left hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  <ProviderLogo provider={provider.kind === "builtin" ? provider.id : provider.runtimeProviderId ?? "openrouter"} logoKey={provider.logoKey} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold text-text-main">{provider.label}</span>
+                    <span className="mt-0.5 block text-[11px] text-text-faint">{provider.description} · {categoryLabel(provider.category)}</span>
+                  </span>
+                  <ChevronRight className="shrink-0 text-text-faint" size={17} aria-hidden="true" />
+                </button>
+              );
+            })}
           </div>
-          <button type="button" aria-label="关闭添加服务" className="grid h-10 w-10 place-items-center rounded-act-md text-text-faint hover:bg-surface-subtle" onClick={onClose}><X size={18} /></button>
-        </div>
-        <div className="mt-5 grid gap-2.5">
-          {providers.map((provider, index) => {
-            const Icon = provider.icon;
-            return (
-              <button
-                key={provider.id}
-                type="button"
-                autoFocus={index === 0}
-                aria-label={`选择 ${provider.label}`}
-                onClick={() => onSelect(provider.id)}
-                className="flex items-center gap-3 rounded-act-lg border border-line bg-surface px-3.5 py-3 text-left transition hover:border-line-strong hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--act-color-focus-ring)]"
-              >
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-act-lg bg-surface-subtle text-text-main"><Icon size={18} strokeWidth={1.8} aria-hidden="true" /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-semibold text-text-main">{provider.label}</span>
-                  <span className="mt-0.5 block text-[11px] text-text-faint">{provider.description} · {provider.compatibility}</span>
-                </span>
-                <Plus size={17} className="shrink-0 text-text-faint" aria-hidden="true" />
-              </button>
-            );
-          })}
-        </div>
+        )}
       </div>
     </div>
   );
 }
 
-function ProviderDialog({
+function ProviderConnectionForm({
   provider,
   current,
-  restoreFocusTo,
   onClose,
   onSaved,
 }: {
   provider: LlmProviderId;
   current?: ProviderSettingsView;
-  restoreFocusTo?: HTMLElement | null;
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }) {
   const meta = PROVIDERS.find((item) => item.id === provider)!;
   const [apiKey, setApiKey] = useState("");
   const [managementKey, setManagementKey] = useState("");
+  const [showManagementKey, setShowManagementKey] = useState(false);
   const [baseUrl, setBaseUrl] = useState(current?.baseUrl ?? "");
   const [proxyEnabled, setProxyEnabled] = useState(Boolean(current?.proxy?.enabled));
   const [proxyUrl, setProxyUrl] = useState("");
@@ -550,7 +709,6 @@ function ProviderDialog({
   const [error, setError] = useState<string | null>(null);
   const hasDefaultKey = Boolean(current?.hasApiKey);
   const configured = isProviderConfigured(current);
-  const { dialogRef, trapTabKey } = useDialogFocusTrap(restoreFocusTo);
 
   const save = async () => {
     setSaving(true); setError(null);
@@ -564,6 +722,7 @@ function ProviderDialog({
       const result = hasDefaultKey || (configured && !apiKey.trim())
         ? await window.actspace.updateProvider?.({
             provider,
+            ...(apiKey.trim() && { apiKey: apiKey.trim() }),
             ...(provider === "openrouter" && managementKey.trim() && { managementKey: managementKey.trim() }),
             baseUrl: baseUrl || null,
             ...(updateProxy && { proxy: updateProxy }),
@@ -577,34 +736,32 @@ function ProviderDialog({
           });
       if (!result || !result.ok) { setError(result && "error" in result ? result.error.message : "保存失败。"); return; }
       await onSaved();
-    } finally { setSaving(false); }
+    } catch { setError("保存失败，请稍后重试。"); }
+    finally { setSaving(false); }
   };
 
   return (
-    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[150] grid place-items-center bg-scrim px-5" role="dialog" aria-modal="true" aria-labelledby="provider-dialog-title" onKeyDown={(event) => { if (event.key === "Escape") onClose(); else trapTabKey(event); }}>
-      <div className="max-h-[86vh] w-full max-w-[560px] overflow-y-auto rounded-act-xl border border-line bg-surface p-5 shadow-act-float">
-        <div className="flex items-start justify-between gap-4"><div><h2 id="provider-dialog-title" className="text-[18px] font-semibold text-text-main">{configured ? "编辑" : "添加"} {meta.label}</h2><p className="mt-1 text-[12px] text-text-faint">密钥不会回显，只在 main 进程解密使用。</p></div><button type="button" aria-label="关闭" className="grid h-10 w-10 place-items-center rounded-act-md text-text-faint hover:bg-surface-subtle" onClick={onClose}><X size={18} /></button></div>
-        <div className="mt-5 grid gap-4">
-          {!hasDefaultKey ? <Field label={configured ? "默认 API Key（可选）" : "API Key"}><input aria-label={`${meta.label} API Key`} autoFocus type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={configured ? "留空则继续只使用额外 Key" : undefined} className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field> : null}
+    <div className="w-full" onKeyDown={(event) => { if (event.key === "Escape" && !saving) { event.stopPropagation(); onClose(); } }}>
+      <div className="w-full">
+        <div className="grid gap-4">
+          <ApiKeyField name={`${meta.label} API Key`} configured={configured} value={apiKey} onChange={setApiKey} />
+          <details open={configured} className="group">
+            <summary className="flex cursor-pointer list-none items-center justify-between py-2 text-[13px] font-semibold text-text-main"><span><span className="group-open:hidden">展开</span><span className="hidden group-open:inline">收起</span>高级连接设置</span><ChevronDown size={15} className="text-text-faint group-open:rotate-180" aria-hidden="true" /></summary>
+            <div className="grid gap-4 border-t border-line pb-3 pt-3">
           {provider === "openrouter" ? (
             <Field label="Management Key（可选，用于账户余额）">
-              <input
-                aria-label="OpenRouter Management Key"
-                type="password"
-                value={managementKey}
-                onChange={(event) => setManagementKey(event.target.value)}
-                placeholder={current?.hasManagementKey ? "已配置；留空保持不变" : "sk-or-v1-..."}
-                className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]"
-              />
+              <div className="flex"><input aria-label="OpenRouter Management Key" type={showManagementKey ? "text" : "password"} value={managementKey} onChange={(event) => setManagementKey(event.target.value)} placeholder={current?.hasManagementKey ? "已配置；留空保持不变" : "sk-or-v1-..."} className="h-10 min-w-0 flex-1 rounded-l-act-md border border-r-0 border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/20" /><button type="button" aria-label={showManagementKey ? "隐藏 Management Key" : "显示 Management Key"} className="grid h-10 w-10 place-items-center rounded-r-act-md border border-line bg-surface-subtle text-text-faint hover:text-text-main" onClick={() => setShowManagementKey((visible) => !visible)}>{showManagementKey ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>
               <span className="text-[11px] leading-relaxed text-text-faint">只用于 OpenRouter /credits 查询；移除服务商时会一并清除。</span>
             </Field>
           ) : null}
           <Field label="Base URL（可选）"><input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="使用服务商默认地址" className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field>
           <label className="flex min-h-11 items-center justify-between rounded-act-md border border-line px-3"><span className="text-[13px] font-medium text-text-main">仅为此服务商启用代理</span><input type="checkbox" checked={proxyEnabled} onChange={(event) => setProxyEnabled(event.target.checked)} /></label>
           {proxyEnabled ? <Field label="HTTP(S) 代理地址"><input value={proxyUrl} onChange={(event) => setProxyUrl(event.target.value)} placeholder={current?.proxy?.enabled ? "已配置；留空保持不变" : "http://127.0.0.1:7890"} className="h-10 w-full rounded-act-md border border-line bg-surface-subtle px-3 text-[13px] text-text-main outline-none focus:border-line-strong focus:ring-2 focus:ring-[var(--act-color-focus-ring)]" /></Field> : null}
+            </div>
+          </details>
           {error ? <p role="alert" className="text-[12px] text-on-danger">{error}</p> : null}
         </div>
-        <div className="mt-6 flex justify-end gap-2"><button type="button" className="h-10 rounded-act-md border border-line px-4 text-[13px] font-semibold text-text-main hover:bg-surface-subtle" onClick={onClose}>取消</button><button type="button" className="h-10 rounded-act-md bg-text-main px-4 text-[13px] font-semibold text-surface transition-opacity hover:opacity-85 disabled:opacity-40" disabled={saving || (!configured && !apiKey.trim()) || (proxyEnabled && !proxyUrl.trim() && !current?.proxy?.enabled)} onClick={() => void save()}>{saving ? "保存中…" : "保存"}</button></div>
+        <div className="mt-5 flex justify-end gap-2"><button type="button" disabled={saving} className="h-9 rounded-act-md px-3 text-[13px] text-text-main hover:bg-hover-overlay disabled:opacity-60" onClick={onClose}>取消</button><button type="button" aria-label="保存" className="h-9 rounded-act-md bg-action px-4 text-[13px] font-semibold text-on-action transition-colors hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-60" disabled={saving || (!configured && !apiKey.trim()) || (proxyEnabled && !proxyUrl.trim() && !current?.proxy?.enabled)} onClick={() => void save()}>{saving ? "保存中…" : "保存供应商"}</button></div>
       </div>
     </div>
   );
@@ -620,4 +777,28 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function compactAddress(value: string): string {
   return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
+
+function ApiKeyField({ name, configured, value, onChange }: { name: string; configured: boolean; value: string; onChange: (value: string) => void }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <Field label={configured ? "API Key（可选）" : "API Key · 必填"}>
+      <span className="flex rounded-act-md border border-line bg-surface focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring/20">
+        <input aria-label={name} autoFocus type={visible ? "text" : "password"} autoComplete="off" spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} placeholder={configured ? "留空以保留当前 Key" : "输入或粘贴 API Key"} className="h-9 min-w-0 flex-1 rounded-l-act-md bg-transparent px-3 text-[13px] text-text-main outline-none" />
+        <button type="button" aria-label={visible ? "隐藏 API Key" : "显示 API Key"} className="grid h-9 w-10 place-items-center rounded-r-act-md border-l border-line text-text-muted hover:bg-hover-overlay" onClick={() => setVisible((current) => !current)}>{visible ? <EyeOff size={15} /> : <Eye size={15} />}</button>
+      </span>
+    </Field>
+  );
+}
+
+function categoryLabel(category: ProviderCategory): string {
+  return { direct: "官方直连", compatible: "第三方兼容", coding: "Coding Plan", custom: "自定义" }[category];
+}
+
+function findCatalogEntry(catalogId?: string): ProviderCatalogDefinition | undefined {
+  return catalogId ? PROVIDER_CATALOG.find((entry) => entry.id === catalogId) : undefined;
+}
+
+function resolveCatalogLogo(catalogId?: string) {
+  return findCatalogEntry(catalogId)?.logoKey ?? "generic";
 }

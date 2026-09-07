@@ -137,7 +137,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
 
     expect(screen.getByText("New Agent")).toBeInTheDocument();
     expect(screen.queryByText("Lab")).not.toBeInTheDocument();
-    expect(screen.getByText("Usage")).toBeInTheDocument();
+    expect(screen.queryByText("Usage")).not.toBeInTheDocument();
     expect(screen.getByText("⌘N")).toBeInTheDocument();
   });
 
@@ -304,14 +304,6 @@ describe("Sidebar (cursor-aligned layout)", () => {
     await userEvent.click(activeArchive);
 
     expect(onArchive).not.toHaveBeenCalled();
-  });
-
-  it("calls onSelectView for the Usage entry", async () => {
-    const { onSelectView } = renderSidebar();
-
-    await userEvent.click(screen.getByRole("button", { name: "Usage" }));
-
-    expect(onSelectView).toHaveBeenCalledWith("usage");
   });
 
   it("invokes onNewSession when clicking the workspace folder + button", async () => {
@@ -484,6 +476,28 @@ describe("WindowChromeBar", () => {
     expect(screen.queryByRole("combobox", { name: "Select workspace for next message" })).not.toBeInTheDocument();
   });
 
+  it("renders the icon-only Chat / Trajectory toggle beside the session title", async () => {
+    const user = userEvent.setup();
+    const onToggleSessionView = vi.fn();
+    renderChromeBar({ sessionView: "chat", onToggleSessionView });
+
+    const toggle = screen.getByRole("button", { name: "查看 Trajectory" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).toHaveAttribute("title", "查看 Trajectory");
+    expect(screen.queryByText("Trajectory", { selector: "[role=tab]" })).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(onToggleSessionView).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the Chat icon label when the Trajectory view is active", () => {
+    renderChromeBar({ sessionView: "trajectory", onToggleSessionView: vi.fn() });
+
+    const toggle = screen.getByRole("button", { name: "返回 Chat" });
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(toggle).toHaveAttribute("title", "返回 Chat");
+  });
+
   it("aligns the chrome columns to the visible SplitView pane widths", () => {
     const { container } = renderChromeBar({
       leftPaneWidth: 280,
@@ -589,7 +603,7 @@ describe("WindowChromeBar", () => {
     expect(tooltip).toHaveTextContent("/Users/me/Desktop/code-project/side-project/actspace-agent");
     expect(tooltip).toHaveTextContent("DeepSeek V4 Pro");
     expect(tooltip).toHaveTextContent("Context 56%");
-    expect(tooltip).toHaveTextContent("56,000 / 100,000");
+    expect(tooltip).toHaveTextContent("56K / 100K");
     expect(tooltip).not.toHaveTextContent("main");
   });
 

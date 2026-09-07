@@ -34,6 +34,8 @@ export class RunController {
         agentRunId: input.agentRunId,
         model: input.model,
         mode: input.mode,
+        thinkingEnabled: input.thinkingEnabled,
+        reasoningEffort: input.reasoningEffort,
         keepPendingOnAbort: input.keepPendingOnAbort,
         selectedSkillIds: input.selectedSkillIds,
       });

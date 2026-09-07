@@ -16,3 +16,5 @@ export * from "./route-registry.js";
 export * from "./service.js";
 export * from "./stream.js";
 export * from "./usage.js";
+
+export * from "./usage-cost.js";

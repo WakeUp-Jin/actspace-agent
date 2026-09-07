@@ -5,6 +5,7 @@ describe("session projection plugin", () => {
   it("publishes deterministic projection service and disposes", async () => {
     const activation = activate();
     expect(activation.services?.["session.projection"]).toBeDefined();
+    expect(activation.services?.["session.projection"]?.createRegistry()).toBeDefined();
     await activation.dispose();
   });
 });

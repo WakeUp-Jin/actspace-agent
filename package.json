@@ -13,6 +13,7 @@
     }
   },
   "scripts": {
+    "models:generate": "node scripts/generate-model-catalog.mjs",
     "clean": "pnpm --filter @actspace/shared clean && pnpm --filter @actspace/runtime clean && pnpm --filter @actspace/agent-cli clean && pnpm --filter @actspace/desktop clean",
     "dev": "node scripts/desktop-dev.mjs",
     "dev:log": "node scripts/desktop-dev.mjs --log",
@@ -56,6 +57,7 @@
     "release-package": "./scripts/release-package.sh"
   },
   "dependencies": {
+    "@actspace/english-learning": "workspace:*",
     "@actspace/desktop-app": "workspace:*"
   },
   "devDependencies": {

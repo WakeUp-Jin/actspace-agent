@@ -7,7 +7,7 @@
 - 当前文字模型供应商：DeepSeek、Kimi、OpenRouter。
 - DuckCoding 文字模型供应商已退役；历史配置会在启动时清理，但图片生成仍使用独立的 `image-generation` 连接配置，默认端点可以继续是 DuckCoding Images API。
 - 对应 execution plan：`docs/exec-plans/completed/20260724-multi-provider-llm/README.md`。
-- 当前实现已贯通 DeepSeek / Kimi / OpenRouter 的 settings v2、动态模型解析、服务商级代理 transport、任务模型 runtime、IPC 与设置页；旧 DuckCoding 文字模型配置会被迁移清理。OpenRouter 真实代理和跨任务模型场景仍按 execution plan 由用户统一手动验收。
+- 当前实现已贯通 DeepSeek / Kimi / OpenRouter 的 settings v3 持久化、`AppSettingsV2` 兼容视图、动态模型解析、服务商级代理 transport、任务模型 runtime、IPC 与设置页；旧 DuckCoding 文字模型配置会被迁移清理。OpenRouter 真实代理和跨任务模型场景仍按 execution plan 由用户统一手动验收。
 
 本文是 actspace 多供应商 LLM、用户模型管理、服务商级代理和任务模型分配的长期设计事实来源。
 
@@ -15,7 +15,7 @@
 
 - `packages/runtime/`、`packages/llm/` 与 `docs/design-docs/agent-plugin-runtime/`：当前 v2 Runtime、LLM 领域包与插件边界事实。
 - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`：当前 DeepSeek / Kimi 协议与能力边界。
-- `docs/design-docs/frontend/front-设置页规范.md`：设置页信息架构和交互基线。
+- `docs/design-docs/frontend/front-设置中心重构规范.md`：当前设置中心的信息架构、模型统一流程和持久化边界；旧设置页仅作迁移追溯。
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：模型 usage、价格快照和成本统计。
 - `docs/design-docs/v1-legacy/model-context-duckcoding-multi-key-model-catalog.md`：已退役的 DuckCoding 文字模型方案，仅供历史追溯。
 
@@ -385,37 +385,26 @@ OpenRouter 连接成功后自动安装少量精选模型，覆盖：
 
 ## 设置页信息架构
 
-设置导航新增“服务商”，原“模型”页收口为模型管理：
+当前设置中心重构后，顶层不再提供“服务商”或“智能体”页面，只保留一个“模型”页面作为 Provider、Connection 和 Model 的统一用户入口。数据层仍然保持三者分离，详细的页面、交互和持久化目标以 [`front-设置中心重构规范.md`](../frontend/front-设置中心重构规范.md) 为准。
 
 ```text
-通用
-服务商
 模型
-智能体
-工具
-...
+├── 模型列表
+├── 添加连接 → 服务商目录 → 连接配置 → 连接详情
+├── 任务模型绑定
+└── 媒体模型（图片生成 / 图片分析）
 ```
 
-Kairos 已随 v2 唯一切换移除，不再是当前设置导航或模型分配目标。当前 one-shot Agent / Explore 子代理的模型选择由 Agent 设置与 Host 配置消费。
+Kairos 已随 v2 唯一切换移除，不再是当前设置导航或模型分配目标。当前 one-shot Agent / Explore 子代理的模型选择由统一的 Model Resolver 和子 Agent 设置消费。
 
-### 服务商页
+### 模型页面中的连接入口
 
-回答“请求通过谁发出”。
+模型页面同时回答两个问题：
 
-页面分组：
+1. 请求通过哪个 Connection 发出；
+2. 哪些 Model 已添加、启用并可用于特定任务。
 
-1. 模型服务商
-   - 已配置的 DeepSeek / Kimi / OpenRouter 卡片。
-   - 主操作“添加服务”。
-   - 编辑、测试连接、断开。
-   - 展示账户余额、状态、已启用模型数、接入方式、Base URL、代理状态。余额查询通过通用 provider IPC 分发到各服务商适配器，不与 Usage 统计页耦合。
-2. 联网搜索服务
-   - 迁移当前智谱 / Tavily / TinyFish / Exa 配置。
-   - 保持它们属于 ToolManager 搜索通道，不与 LLM Model Registry 混合。
-
-“添加服务”只展示尚未配置的三家受支持服务商，不展示尚未实现的供应商。
-
-连接流程：
+连接流程保持：
 
 ```text
 选择服务商
@@ -425,6 +414,10 @@ Kairos 已随 v2 唯一切换移除，不再是当前设置导航或模型分配
 → 保存并测试
 → available 后安装默认模型
 ```
+
+联网搜索服务仍属于 ToolManager 搜索通道，不与 LLM Model Registry 混合；它们在设置 UI 中归入“工具 → 联网能力”，不再占用独立顶层入口。
+
+“添加连接”只展示尚未配置的三家受支持服务商，不展示尚未实现的供应商。
 
 允许保存但测试失败；此时卡片状态为“连接异常”，模型不可用，用户可以修改配置或重试。状态不能只靠红/绿颜色表达，必须同时有文字与图标。
 
@@ -438,7 +431,7 @@ Kairos 已随 v2 唯一切换移除，不再是当前设置导航或模型分配
    - 默认会话模型。
    - 轻量任务模型。
    - Explore 模型。
-   - v1 autonomous runtime 的旧模型配置不再进入当前设置页事实源；迁移时只读取一次并写入 v2 task model。
+   - v1 autonomous runtime 的旧模型配置不再进入当前设置页事实源；迁移时只读取一次并写入 `models.taskBindings`。
 2. 可用模型
    - 按 provider 分组。
    - 标题显示 `已启用 / 已添加` 数量。
@@ -459,22 +452,25 @@ Composer 只展示 `listUsableModels("chat")`，不会因为远端 catalog 增�
 - 图标按钮必须有 `aria-label`，状态不能仅靠颜色。
 - 所有颜色消费语义 token，浅色、深色、跟随系统三态验证。
 
-界面借鉴“服务商与模型分离、远端目录按需添加”的交互机制，不照搬其他产品的品牌、Claude Code 兼容标签、超大留白或角色映射术语。
+界面借鉴“连接详情与模型目录分层、远端目录按需添加”的交互机制，不照搬其他产品的品牌、Claude Code 兼容标签、超大留白或角色映射术语。
 
 ## Settings 与持久化
 
-目标设置版本升级为 v2。非敏感配置继续落 `<userData>/settings.json`，建议新增：
+当前实现仍兼容 `settings.json` v2 / v3 结构；设置中心重构的目标版本是 `version: 4`。非敏感配置继续落 `<userData>/settings.json`，通过幂等迁移进入逻辑 namespace：
 
-```ts
-interface PersistedSettingsV2 {
-  version: 2;
-  providers: Record<ProviderId, ProviderConnectionSettings>;
-  installedModels: Record<ModelKey, InstalledModelSettings>;
-  customModels: Record<ModelKey, ModelDefinition>;
-  taskModels: TaskModelSettings;
-  // 既有 agent / kairos / plugins / skills 等字段保持
-}
+```text
+settings.json
+├── version: 4
+├── general
+├── models
+├── tools
+├── media
+├── skills
+├── subagents
+└── activity.usage
 ```
+
+其中 `models.connections`、`models.definitions` 和 `models.installed` 使用稳定 ID，`taskBindings` 只保存稳定的 `modelKey` 引用。完整目标结构、v3 → v4 迁移和页面偏好边界见 [`front-设置中心重构规范.md`](../frontend/front-设置中心重构规范.md)。
 
 敏感值：
 
@@ -565,6 +561,7 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 - 每次 `llm_usage` 仍保存当次价格快照与 provider-qualified ModelKey，历史成本不因目录刷新而变化。
 - 目录价格缺失时显示“价格未知”，不能按 0 计费。
 - OpenRouter 同一上游模型与原厂模型分别统计，不按 `apiModel` 合并。
+- Usage 活动行从 Journal request / tool 事件重建，并保留 provider、ModelKey、attempt 和 `costBasis`。当 provider 未返回 usage、currency 或价格来源不完整时，活动行保持 unknown / unavailable，不能用默认价格或零值伪造账单结果。
 
 ## 错误与可观测性
 
@@ -671,11 +668,11 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 
 ## 实施顺序
 
-1. 契约地基：Provider Registry、ModelKey、ModelDefinition、purpose resolver、settings v2 migration。
+1. 契约地基：Provider Registry、ModelKey、ModelDefinition、purpose resolver、settings v2 / v3 migration；后续设置中心重构再由 v3 迁移到 v4 namespace。
 2. 服务商运行配置：OpenRouter key/base URL、provider adapter、代理 transport、连接测试。
 3. 模型管理：installed/custom model、OpenRouter catalog cache、添加/启用/删除。
 4. 任务模型：默认会话、utility、Explore 统一 resolver；标题与 summarizer 去 DeepSeek 固定绑定。
-5. 设置页：新增服务商分区、重构模型分区、目录弹窗、Composer 联动。
+5. 设置页：将服务商连接、模型目录、模型启用和 Composer 联动收敛到统一的模型页面。
 6. Member 等仍在维护的消费方迁移到统一 resolver，删除独立 allowlist。
 7. 文档、history、测试和真实 provider 验收同步收口。
 
@@ -686,7 +683,7 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 - 首批只支持 DeepSeek、Kimi、OpenRouter 三家服务商。
 - 2026-07-27 的 Plan 7 在首批三家之外新增 DuckCoding；现有默认 Key 路径不迁移，额外 Key 采用可选 `credentialId` 渐进扩展。2026-07-28 将模型来源收敛为本地 Codex/Grok 档案和手动兜底。
 - 2026-07-28 的缓存归因探针只在 Responses 对照中确认 Codex 缓存命中，因此 Codex 本地档案使用 `openai-responses`，Grok 与未知手动模型默认保留 `openai-completions`。
-- 服务商与模型在设置页分成两个入口。
+- Provider、Connection 和 Model 在数据层保持分离，在设置页通过一个模型入口完成连续配置流程。
 - 代理按服务商配置，不做全局代理。
 - OpenRouter 采用“精选默认模型 + 远端目录手动添加”。
 - 用户添加模型后默认启用，但仍受 purpose 能力过滤。

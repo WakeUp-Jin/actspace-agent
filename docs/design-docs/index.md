@@ -1,5 +1,9 @@
 # 设计文档索引
 
+- [使用统计页面更新](frontend/front-usage-statistics-refresh.md)与[本地模型目录及使用费用](model-context/agent-model-catalog-and-usage-cost.md)：已实施，实机门禁见执行摘要；统一设置视觉，修正费用来源，定义随包目录、缓存和按需刷新。
+- [英语辅助学习插件设计](agent-plugin-runtime/agent-english-learning.md)：已实施，实机门禁见执行摘要；选定会话注入中英对照提示词、仅英文朗读，以及扩展入口、MiniMax 配置和生命周期边界。
+- [Agent 工具流式渲染修复设计](frontend/front-agent-tool-stream-rendering.md)：已实施的跨 Core、Tools、Desktop 事件链修复设计。
+
 `docs/design-docs/` 集中管理当前 v2 架构设计、产品设计和重要设计决策。已经被 v2 替代、删除或暂停的 v1 设计统一放在 [`v1-legacy/`](v1-legacy/)，避免新任务把历史方案误读成当前默认。
 
 ## 目录硬约束
@@ -27,8 +31,8 @@
 | 目录 | 内容边界 | 入口或代表文档 |
 |---|---|---|
 | `agent-plugin-runtime/` | v2 后端插件化重构的总体架构、研究证据、已确认决策、目标边界、包结构与公共契约 | `docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md`、`docs/design-docs/agent-plugin-runtime/README.md` |
-| `agent-runtime/` | 当前 Agent Run / Turn / LLM Call 分层与分析观测数据契约 | `docs/design-docs/agent-runtime/agent-turn-layers.md`、`docs/design-docs/agent-runtime/agent-observability-trace-model.md` |
-| `model-context/` | 当前模型供应商、模型能力、request snapshot、token usage 和 Context Projection | `docs/design-docs/model-context/agent-multi-provider-llm.md` |
+| `agent-runtime/` | 当前 Agent Run / Turn / LLM Call 分层与 Journal 观测数据契约 | `docs/design-docs/agent-runtime/agent-turn-layers.md`、`docs/design-docs/agent-runtime/agent-observability-trace-model.md` |
+| `model-context/` | 当前模型供应商、模型能力、request snapshot、token usage 和 Context Projection | `docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md` |
 | `tool-system/` | 当前 Skill、Web/图片工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md`、`docs/design-docs/tool-system/agent-image-inspection-tool.md` |
 | `execution-safety/` | v2 Tool Runtime、Host policy、审批、Bash hard guard 和副作用恢复边界 | `docs/design-docs/execution-safety/README.md` |
 | `browser/` | Browser Bridge、ActSpace 集成和 canonical command | `docs/design-docs/browser/agent-browser-use-index.md` |
@@ -44,7 +48,7 @@
 2. `agent-plugin-runtime/README.md`
 3. 涉及 v2 Desktop / CLI 多宿主时读 `agent-plugin-runtime/agent-target-runtime-architecture.md`
 4. `agent-runtime/agent-turn-layers.md`
-5. 涉及分析观测时读 `agent-runtime/agent-observability-trace-model.md`
+5. 涉及 Journal 观测时读 `agent-runtime/agent-observability-trace-model.md`
 6. 根据任务进入 `model-context/`、`tool-system/`、`execution-safety/`、`browser/` 或 `collaboration/`
 
 ### v2 插件化 Runtime 重构设计
@@ -80,7 +84,6 @@
 1. `frontend/README.md`
 2. `frontend/front-全局视觉语言规范.md`
 3. `frontend/front-主题与配色规范.md`
-4. 涉及分析观测页面时读 `frontend/front-agent-analysis-observability.md`
 5. 再进入具体工作台区域、组件或页面规范
 
 ### 官网与公开内容

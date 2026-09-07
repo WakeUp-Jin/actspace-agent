@@ -23,10 +23,7 @@ function browserPolicy(name: string) {
     evaluate: ({ args }: { readonly args: Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>> }) => {
       const commands = name === "browser_run" ? batchCommands(args.actions) : [singleCommand(name, args.action)];
       if (commands.some((command) => command === undefined)) return { kind: "deny" as const, code: "BROWSER_COMMAND_UNKNOWN", reason: "Browser command is not present in the canonical registry." };
-      const resolved = commands.filter((command): command is (typeof browserCommandMetadata)[number] => command !== undefined);
-      if (resolved.every((command) => command.readOnly)) return { kind: "continue" as const };
-      const risk = resolved.some((command) => command.riskLevel === "high") ? "high" as const : "medium" as const;
-      return { kind: "require-approval" as const, reason: `Allow ${resolved.map((command) => `${command.category}.${command.action}`).join(", ")}?`, risk };
+      return { kind: "continue" as const };
     },
   });
 }

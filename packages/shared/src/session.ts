@@ -114,7 +114,7 @@ export type RuntimeStreamEvent =
       preview: ToolUiPreview;
     }
   | { type: "tool_started"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; toolCallId: ToolCallId; toolName: string; argsPreview: string; preview?: ToolUiPreview }
-  | { type: "tool_finished"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; toolCallId: ToolCallId; toolName: string; resultEventId: EventId; isError: boolean; preview?: ToolUiPreview }
+  | { type: "tool_finished"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; toolCallId: ToolCallId; toolName: string; resultEventId: EventId; isError: boolean; status?: "completed" | "failed" | "denied" | "aborted" | "outcome-unknown"; preview?: ToolUiPreview }
   | {
       /** 后台 bash 任务状态更新：turn 内外统一走 agent:stream 推送，前端按 taskId 更新对应块 */
       type: "bash_task_update";
@@ -180,28 +180,6 @@ export type SessionEvent<TPayload = unknown> = {
   timestamp: string;
   schemaVersion: 2;
   payload: TPayload;
-};
-
-export type AgentTraceEventType =
-  | "agent_run_start"
-  | "agent_run_end"
-  | "turn_start"
-  | "turn_end"
-  | "llm_request"
-  | "llm_response"
-  | "llm_retry";
-
-export type AgentTraceEvent = {
-  schemaVersion: 1;
-  timestamp: string;
-  sessionId: SessionId;
-  agentRunId: AgentRunId;
-  turnId?: TurnId;
-  turnIndex?: number;
-  llmCallId?: LlmCallId;
-  attempt?: number;
-  type: AgentTraceEventType;
-  payload: unknown;
 };
 
 export type UserMessagePayload = {
@@ -736,7 +714,7 @@ export type MessageBlock = {
       range?: string;
       displayText: string;
       createdAt: string;
-      status?: "running" | "completed";
+      status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
     }
   | {
       kind: "search";
@@ -746,7 +724,7 @@ export type MessageBlock = {
       resultCount?: number;
       displayText: string;
       createdAt: string;
-      status?: "running" | "completed";
+      status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
     }
   | {
       kind: "grep";
@@ -756,7 +734,7 @@ export type MessageBlock = {
       resultCount?: number;
       displayText: string;
       createdAt: string;
-      status?: "running" | "completed";
+      status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
     }
   | {
       kind: "glob";
@@ -766,7 +744,7 @@ export type MessageBlock = {
       resultCount?: number;
       displayText: string;
       createdAt: string;
-      status?: "running" | "completed";
+      status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
     }
   | {
       kind: "web_search";
@@ -776,7 +754,7 @@ export type MessageBlock = {
       url?: string;
       displayText: string;
       createdAt: string;
-      status?: "running" | "completed";
+      status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
       resultUrls?: string[];
       contentPreview?: string;
     }
@@ -787,7 +765,7 @@ export type MessageBlock = {
       mediaKind: "image" | "video" | "media";
       displayText: string;
       createdAt: string;
-      status?: "running" | "completed";
+      status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
       isError?: boolean;
     }
   | {
@@ -812,7 +790,7 @@ export type MessageBlock = {
       entryCount?: number;
       displayText: string;
       createdAt: string;
-      status?: "running" | "completed";
+      status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
     }
   | {
       kind: "edit_diff";

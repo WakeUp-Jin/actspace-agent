@@ -1,3 +1,4 @@
+import { SubagentsPanel } from "./right-panel/SubagentsPanel";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ChevronDown,
@@ -12,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES } from "@actspace/shared";
-import type { ContextState, TerminalSessionSnapshot } from "@actspace/shared";
+import type { ContextState, ContextUsageSnapshot, TerminalSessionSnapshot } from "@actspace/shared";
 import { CodeRenderView } from "./right-panel/CodeRenderView";
 import { ContextRenderView } from "./right-panel/ContextRenderView";
 import { CsvRenderView } from "./right-panel/CsvRenderView";
@@ -96,6 +97,8 @@ const RIGHT_PANEL_LAUNCHER_ICON_CLASS =
 
 export function RightPanel({
   contextState,
+  contextSnapshot,
+  contextRevision,
   sessionId,
   workspaceRoot,
   fileRevalidateKey,
@@ -104,6 +107,8 @@ export function RightPanel({
   onSendToAgent,
 }: {
   contextState?: ContextState | null;
+  contextSnapshot?: ContextUsageSnapshot | null;
+  contextRevision?: number;
   sessionId?: string | null;
   workspaceRoot?: string;
   /** 递增即触发已打开文件 Tab 的新鲜度重校验（当前会话 turn 结束时由 App 递增）。 */
@@ -148,6 +153,8 @@ export function RightPanel({
             <RightPanelBody
               tab={activeTab}
               contextState={contextState}
+              contextSnapshot={contextSnapshot}
+              contextRevision={contextRevision}
               sessionId={sessionId}
               workspaceRoot={workspaceRoot}
               onOpenReview={onOpenReview}
@@ -503,6 +510,8 @@ function RightPanelTabs() {
 function RightPanelBody({
   tab,
   contextState,
+  contextSnapshot,
+  contextRevision,
   sessionId,
   workspaceRoot,
   onOpenReview,
@@ -511,6 +520,8 @@ function RightPanelBody({
 }: {
   tab: RightPanelTab | null;
   contextState?: ContextState | null;
+  contextSnapshot?: ContextUsageSnapshot | null;
+  contextRevision?: number;
   sessionId?: string | null;
   workspaceRoot?: string;
   onOpenReview?: () => void;
@@ -526,6 +537,8 @@ function RightPanelBody({
       />
     );
   }
+
+  if (tab.kind === "subagents") return <SubagentsPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} selected={tab.sessionId === sessionId ? tab.selected : undefined} />;
 
   if (tab.kind === "replyHtml") {
     return <ReplyHtmlRenderView sessionId={tab.sessionId} />;
@@ -588,7 +601,7 @@ function RightPanelBody({
     return <CodeRenderView content={tab.content} language={tab.language} />;
   }
 
-  return <ContextRenderView contextState={contextState} sessionId={sessionId} />;
+  return <ContextRenderView contextState={contextState} contextSnapshot={contextSnapshot} contextRevision={contextRevision} sessionId={sessionId} />;
 }
 
 /**
@@ -638,6 +651,7 @@ function RightPanelLauncher({
   return (
     <nav className={RIGHT_PANEL_LAUNCHER_CLASS} aria-label="右侧面板对象">
       <div className={RIGHT_PANEL_LAUNCHER_GRID_CLASS}>
+        <LauncherButton label="Subagents" icon={<MessageSquare size={19} />} disabled={!sessionId} onClick={() => sessionId && openTab({ id: "subagents", kind: "subagents", title: "Subagents", sessionId })} />
         <LauncherButton label="Files" icon={<FolderTree size={19} strokeWidth={1.7} />} onClick={openFileTree} />
         <LauncherButton
           label="Review"

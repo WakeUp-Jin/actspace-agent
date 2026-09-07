@@ -394,6 +394,28 @@ describe("image generation presentation", () => {
     expect(reply.compareDocumentPosition(shelf) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("keeps the completed conversation and follow-up composer visible when projection phase lags", () => {
+    const messages: MessageBlock[] = [
+      { kind: "user", id: "user-1", content: "Hello", createdAt: "2026-07-28T00:00:00.000Z" },
+      { kind: "assistant", id: "assistant-1", content: "你好，我已经完成回复。", createdAt: "2026-07-28T00:00:03.000Z" },
+    ];
+
+    render(
+      <RightPanelProvider>
+        <ConversationView
+          messages={messages}
+          contextSnapshot={null}
+          sessionId="session-1"
+          isSessionReady
+          composerPhase="blank"
+        />
+      </RightPanelProvider>,
+    );
+
+    expect(screen.getByText("你好，我已经完成回复。")).toBeInTheDocument();
+    expect(screen.getByLabelText("Message composer")).toBeInTheDocument();
+  });
+
   it("does not publish the artifact shelf before the final reply exists", () => {
     const messages: MessageBlock[] = [
       { kind: "user", id: "user-1", content: "Generate it", createdAt: "2026-07-28T00:00:00.000Z" },

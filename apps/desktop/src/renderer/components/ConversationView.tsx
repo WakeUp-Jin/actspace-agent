@@ -1,6 +1,6 @@
 import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { ComposerAttachment, ComposerMode, ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
+import type { ComposerAttachment, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
 import { Composer, type ComposerDraftReader, type ComposerDraftRestore, type ComposerDraftWriter, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
@@ -14,7 +14,6 @@ import { CompactCommandBlock } from "./messages/CompactCommandBlock";
 import { DeleteFileBlock } from "./messages/DeleteFileBlock";
 import { FileDiffBlock } from "./messages/FileDiffBlock";
 import { TurnOutputArtifacts } from "./messages/TurnOutputArtifacts";
-import { SubAgentTranscriptPanel } from "./messages/SubAgentTranscriptModal";
 import { ThinkingBlock } from "./messages/ThinkingBlock";
 import { TodoListBlock } from "./messages/TodoListBlock";
 import { ToolActivityGroup } from "./messages/ToolActivityGroup";
@@ -24,8 +23,13 @@ import {
   TOOL_LOG_LINE_TEXT_RUNNING_CLASS,
 } from "./messages/toolLogStyles";
 import { UserMessage } from "./messages/UserMessage";
+import type { SessionMainView } from "./SessionViewToggle";
+import { TrajectoryView } from "./TrajectoryView";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 import { formatUsdCost } from "../usage-format";
+import { selectComposer, selectProviderUsage, selectRequestContextEstimate, selectSurfaceMessages } from "@actspace/client/sessions";
+import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
+import { contextEstimateToSnapshot, providerUsageToContextSnapshot, useOptionalSessionProjection } from "../session";
 
 type UserMessageBlock = Extract<MessageBlock, { kind: "user" }>;
 type AssistantMessageBlock = Extract<MessageBlock, { kind: "assistant" }>;
@@ -166,7 +170,7 @@ function getMessageRelationClass(previousMessage: MessageBlock | undefined, mess
   return undefined;
 }
 
-function renderMessage(
+export function renderMessage(
   message: MessageBlock,
   className?: string,
   onOpenAgentTranscript?: (message: AgentMessageBlock) => void,
@@ -692,6 +696,9 @@ function TurnActions({
 export function ConversationView({
   messages,
   contextSnapshot,
+  contextState,
+  durableSurfaceMessageCount,
+  composerPhase,
   sessionId = null,
   isStreaming = false,
   isAborting = false,
@@ -718,9 +725,16 @@ export function ConversationView({
   reviewSummary,
   onOpenReview,
   models,
+  activeView = "chat",
+  trajectory,
 }: {
   messages: MessageBlock[];
   contextSnapshot: ContextUsageSnapshot | null;
+  contextState?: ContextState | null;
+  /** Durable Surface count from ClientSessionStore; prevents the composer from treating a stale local list as blank. */
+  durableSurfaceMessageCount?: number;
+  /** Session-owned phase from ClientSessionStore; local message length is only a fallback for isolated tests. */
+  composerPhase?: "blank" | "engaging" | "active";
   sessionId?: string | null;
   isStreaming?: boolean;
   isAborting?: boolean;
@@ -747,7 +761,20 @@ export function ConversationView({
   writeDraft?: ComposerDraftWriter;
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview?: () => void;
+  activeView?: SessionMainView;
+  trajectory?: RuntimeV2TrajectorySnapshot | null;
 }) {
+  const sessionProjection = useOptionalSessionProjection();
+  const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && (sessionId === null || sessionId === undefined || sessionProjection.sessionId === sessionId)
+    ? sessionProjection.cell
+    : null;
+  const projectedSurfaceMessages = projectionCell ? selectSurfaceMessages(projectionCell) : [];
+  const projectedComposer = projectionCell ? selectComposer(projectionCell) : null;
+  const projectedProviderUsage = projectionCell ? selectProviderUsage(projectionCell) : null;
+  const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
+  const effectiveContextSnapshot = contextSnapshot
+    ?? (projectedProviderUsage ? providerUsageToContextSnapshot(projectedProviderUsage) : null)
+    ?? (projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null);
   const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
   const inputHistory = useMemo(
     () => messages
@@ -759,7 +786,15 @@ export function ConversationView({
     () => createTurnNavigationItems(turns, isStreaming),
     [isStreaming, turns],
   );
-  const isInitialComposer = isSessionReady && messages.length === 0 && !isStreaming;
+  const durableMessageCount = durableSurfaceMessageCount ?? (projectedSurfaceMessages.length > 0 ? projectedSurfaceMessages.length : messages.length);
+  const hasConversationContent = durableMessageCount > 0 || messages.length > 0;
+  const requestedComposerPhase = composerPhase ?? projectedComposer?.phase;
+  const resolvedComposerPhase = requestedComposerPhase === "blank" && hasConversationContent
+    ? "active"
+    : requestedComposerPhase ?? (durableMessageCount === 0 ? "blank" : "active");
+  const projectionSessionReady = projectionCell !== null && projectionCell.status !== "error";
+  const resolvedSessionReady = projectedComposer?.phase !== "blank" || isSessionReady || projectionSessionReady;
+  const isInitialComposer = resolvedSessionReady && resolvedComposerPhase === "blank" && !isStreaming;
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const messageStackRef = useRef<HTMLDivElement | null>(null);
@@ -771,7 +806,7 @@ export function ConversationView({
   const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
   const [turnRailVisible, setTurnRailVisible] = useState(false);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(turnNavigationItems[0]?.id ?? null);
-  const [activeTranscriptMessage, setActiveTranscriptMessage] = useState<AgentMessageBlock | null>(null);
+  const openedSubagentRuns = useRef(new Set<string>());
   const { openTab } = useRightPanel();
   const openContextTab = () => openTab({ id: "context", kind: "context", title: "Context" });
   const openAttachmentPreview = useCallback((attachment: ComposerAttachment) => {
@@ -784,9 +819,17 @@ export function ConversationView({
     });
   }, [openTab]);
 
-  const latestActiveTranscriptMessage = activeTranscriptMessage
-    ? messages.find((message): message is AgentMessageBlock => message.kind === "agent" && message.id === activeTranscriptMessage.id) ?? activeTranscriptMessage
-    : null;
+  const openAgentTranscript = useCallback((message: AgentMessageBlock) => {
+    if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "Subagents", sessionId, selected: message });
+  }, [sessionId, openTab]);
+  useEffect(() => {
+    const turn = turns.at(-1);
+    if (!sessionId || !isStreaming || !turn?.messages.some((message) => message.kind === "agent")) return;
+    const key = `${sessionId}:${turn.id}`;
+    if (openedSubagentRuns.current.has(key)) return;
+    openedSubagentRuns.current.add(key);
+    openTab({ id: "subagents", kind: "subagents", title: "Subagents", sessionId });
+  }, [sessionId, turns, isStreaming, openTab]);
 
   const updateConversationViewport = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -894,7 +937,7 @@ export function ConversationView({
   useLayoutEffect(() => {
     scrollToBottomIfStuck();
     updateConversationViewport();
-  }, [messages, isStreaming, scrollToBottomIfStuck, updateConversationViewport]);
+  }, [messages, scrollToBottomIfStuck, updateConversationViewport]);
 
   // 同一条 running 消息内部变高时（例如 write_file 持续追加 code preview），
   // messages 引用可能不变；观察消息栈尺寸，保持贴底状态继续跟随尾部。
@@ -911,115 +954,114 @@ export function ConversationView({
     observer.observe(viewport);
     if (stack) observer.observe(stack);
     return () => observer.disconnect();
-  }, [messages, isStreaming, scrollToBottomIfStuck, updateConversationViewport]);
+  }, [messages, scrollToBottomIfStuck, updateConversationViewport]);
 
-  useEffect(() => {
-    if (!activeTranscriptMessage) return;
-    const stillPresent = messages.some((message) => message.kind === "agent" && message.id === activeTranscriptMessage.id);
-    if (!stillPresent) {
-      setActiveTranscriptMessage(null);
-    }
-  }, [activeTranscriptMessage, messages]);
+
 
   return (
     <main className={CONVERSATION_SHELL_CLASS}>
       <div className={MESSAGE_VIEWPORT_CLASS}>
-        <section
-          ref={scrollContainerRef}
-          onScroll={handleMessagesScroll}
-          className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS}
-          aria-label="Conversation messages"
+        <div
+          className={activeView === "trajectory" ? "hidden" : "block h-full min-h-0"}
+          aria-hidden={activeView === "trajectory"}
         >
-          {isInitialComposer ? (
-            <div className={INITIAL_COMPOSER_STAGE_CLASS}>
-              <Composer
-                contextSnapshot={contextSnapshot}
-                isStreaming={isStreaming}
-                isAborting={isAborting}
-                onSend={onSend}
-                onAbort={onAbort}
-                surface="initial"
-                defaultModelId={defaultModelId}
-                selectedModelId={selectedModelId}
-                onSelectedModelChange={onSelectedModelChange}
-                mode={composerMode}
-                onModeChange={onComposerModeChange}
-                selectedSkills={selectedSkills}
-                onSelectedSkillsChange={onSelectedSkillsChange}
-                onOpenAttachmentPreview={openAttachmentPreview}
-                onExpandContext={openContextTab}
-                workspaceOptions={workspaceOptions}
-                selectedWorkspaceRoot={selectedWorkspaceRoot}
-                onSelectWorkspace={onSelectWorkspace}
-                executionContext={executionContext}
-                draftRestore={draftRestore}
-                draftKey={draftKey}
-                readDraft={readDraft}
-                writeDraft={writeDraft}
-                inputHistory={inputHistory}
-                focusRequestId={composerFocusRequestId}
-                models={models}
-              />
-            </div>
-          ) : (
-            <div ref={messageStackRef} className={MESSAGE_STACK_CLASS}>
-              {turns.map((turn, turnIndex) => (
-                <section
-                  className={MESSAGE_TURN_CLASS}
-                  key={turn.id}
-                  ref={turn.user ? (element) => setTurnElement(turn.id, element) : undefined}
-                  data-conversation-turn-id={turn.user ? turn.id : undefined}
-                >
-                  <TurnPrompt turn={turn} onOpenAttachmentPreview={openAttachmentPreview} />
-                  <div className={ASSISTANT_TURN_GROUP_CLASS}>
-                    <div className={TURN_BODY_CLASS}>
-                      {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, setActiveTranscriptMessage)}
-                    </div>
-                    {splitTurnMessages(turn.messages).finalReply.length > 0
-                      && (!isStreaming || turnIndex !== turns.length - 1) ? (
-                      <TurnOutputArtifacts
-                        messages={turn.messages}
-                        sessionId={sessionId}
-                        workspaceRoot={selectedWorkspaceRoot}
-                      />
-                    ) : null}
-                    <TurnActions
-                      sessionId={sessionId}
-                      assistantMessages={
-                        splitTurnMessages(turn.messages).finalReply.filter(
-                          (message): message is AssistantMessageBlock => message.kind === "assistant",
-                        )
-                      }
-                    />
-                  </div>
-                </section>
-              ))}
-              <div ref={bottomAnchorRef} aria-hidden="true" />
-            </div>
-          )}
-        </section>
+          <section
+            ref={scrollContainerRef}
+            onScroll={handleMessagesScroll}
+            className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS}
+            aria-label="Conversation messages"
+          >
+              {isInitialComposer ? (
+                <div className={INITIAL_COMPOSER_STAGE_CLASS}>
+                  <Composer
+                    contextSnapshot={effectiveContextSnapshot}
+                    contextState={contextState}
+                    isStreaming={isStreaming}
+                    isAborting={isAborting}
+                    onSend={onSend}
+                    onAbort={onAbort}
+                    surface="initial"
+                    defaultModelId={defaultModelId}
+                    selectedModelId={selectedModelId}
+                    onSelectedModelChange={onSelectedModelChange}
+                    mode={composerMode}
+                    onModeChange={onComposerModeChange}
+                    selectedSkills={selectedSkills}
+                    onSelectedSkillsChange={onSelectedSkillsChange}
+                    onOpenAttachmentPreview={openAttachmentPreview}
+                    onExpandContext={openContextTab}
+                    workspaceOptions={workspaceOptions}
+                    selectedWorkspaceRoot={selectedWorkspaceRoot}
+                    onSelectWorkspace={onSelectWorkspace}
+                    executionContext={executionContext}
+                    draftRestore={draftRestore}
+                    draftKey={draftKey}
+                    readDraft={readDraft}
+                    writeDraft={writeDraft}
+                    inputHistory={inputHistory}
+                    focusRequestId={composerFocusRequestId}
+                    models={models}
+                    sessionId={sessionId}
+                  />
+                </div>
+              ) : (
+                <div ref={messageStackRef} className={MESSAGE_STACK_CLASS}>
+                  {turns.map((turn, turnIndex) => (
+                    <section
+                      className={MESSAGE_TURN_CLASS}
+                      key={turn.id}
+                      ref={turn.user ? (element) => setTurnElement(turn.id, element) : undefined}
+                      data-conversation-turn-id={turn.user ? turn.id : undefined}
+                    >
+                      <TurnPrompt turn={turn} onOpenAttachmentPreview={openAttachmentPreview} />
+                      <div className={ASSISTANT_TURN_GROUP_CLASS}>
+                        <div className={TURN_BODY_CLASS}>
+                          {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, openAgentTranscript)}
+                        </div>
+                        {splitTurnMessages(turn.messages).finalReply.length > 0
+                          && (!isStreaming || turnIndex !== turns.length - 1) ? (
+                          <TurnOutputArtifacts
+                            messages={turn.messages}
+                            sessionId={sessionId}
+                            workspaceRoot={selectedWorkspaceRoot}
+                          />
+                        ) : null}
+                        <TurnActions
+                          sessionId={sessionId}
+                          assistantMessages={
+                            splitTurnMessages(turn.messages).finalReply.filter(
+                              (message): message is AssistantMessageBlock => message.kind === "assistant",
+                            )
+                          }
+                        />
+                      </div>
+                    </section>
+                  ))}
+                  <div ref={bottomAnchorRef} aria-hidden="true" />
+                </div>
+              )}
+          </section>
 
-        {turnRailVisible ? (
-          <ConversationTurnRail
-            items={turnNavigationItems}
-            activeTurnId={activeTurnId}
-            onNavigate={navigateToTurn}
-          />
-        ) : null}
-        {isAwayFromBottom ? <ScrollToBottomButton onClick={scrollToBottom} /> : null}
-      </div>
-
-      {isSessionReady && !isInitialComposer ? (
-        <div className="composer-zone grid min-w-0 w-full gap-3 overflow-visible pb-5">
-          {latestActiveTranscriptMessage ? (
-            <SubAgentTranscriptPanel
-              message={latestActiveTranscriptMessage}
-              open={true}
-              onClose={() => setActiveTranscriptMessage(null)}
+          {turnRailVisible ? (
+            <ConversationTurnRail
+              items={turnNavigationItems}
+              activeTurnId={activeTurnId}
+              onNavigate={navigateToTurn}
             />
           ) : null}
+          {isAwayFromBottom ? <ScrollToBottomButton onClick={scrollToBottom} /> : null}
+        </div>
+        {activeView === "trajectory" ? <div className="flex h-full min-h-0 flex-col">
+          {isStreaming ? <div className="flex shrink-0 justify-end border-b border-line px-4 py-2"><button type="button" className="rounded-act-md border border-line px-3 py-1 text-[12px] text-text-main hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring" onClick={onAbort} disabled={isAborting}>{isAborting ? "Stopping…" : "Stop"}</button></div> : null}
+          <div className="min-h-0 flex-1"><TrajectoryView snapshot={trajectory ?? null} /></div>
+        </div> : null}
+      </div>
+
+      {resolvedSessionReady && !isInitialComposer ? (
+        <div className="composer-zone grid min-w-0 w-full gap-3 overflow-visible pb-5" style={activeView === "trajectory" ? { display: "none" } : undefined} aria-hidden={activeView === "trajectory"}>
           <Composer
-            contextSnapshot={contextSnapshot}
+            contextSnapshot={effectiveContextSnapshot}
+            contextState={contextState}
             isStreaming={isStreaming}
             isAborting={isAborting}
             onSend={onSend}
@@ -1044,9 +1086,10 @@ export function ConversationView({
             writeDraft={writeDraft}
             inputHistory={inputHistory}
             focusRequestId={composerFocusRequestId}
-            reviewSummary={latestActiveTranscriptMessage ? null : reviewSummary}
+            reviewSummary={reviewSummary}
             onOpenReview={onOpenReview}
             models={models}
+            sessionId={sessionId}
           />
         </div>
       ) : null}

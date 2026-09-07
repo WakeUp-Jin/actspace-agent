@@ -7,8 +7,8 @@ export type LlmStreamEvent =
   | { readonly type: "reasoning-delta"; readonly text: string; readonly signature?: string }
   | { readonly type: "tool-call-delta"; readonly callId: string; readonly name: string; readonly argumentsDelta: string }
   | { readonly type: "done"; readonly stopReason: string | null; readonly usage: LlmUsage; readonly content: readonly LlmContentBlock[] }
-  | { readonly type: "error"; readonly failure: LlmFailure }
-  | { readonly type: "aborted"; readonly reason: string };
+  | { readonly type: "error"; readonly usage?: LlmUsage; readonly failure: LlmFailure }
+  | { readonly type: "aborted"; readonly usage?: LlmUsage; readonly reason: string };
 
 export type LlmStreamSource = AsyncIterable<LlmStreamEvent>;
 

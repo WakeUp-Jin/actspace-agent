@@ -1,6 +1,8 @@
 import { BarChart3, Folder, Hash, Sparkles } from "lucide-react";
 import { MODEL_REGISTRY, resolveModelSpecByApiModel } from "@actspace/shared";
 import type { ContextUsageSnapshot, SessionListItem } from "@actspace/shared";
+import { selectProviderUsage, selectRequestContextEstimate } from "@actspace/client/sessions";
+import { contextEstimateToSnapshot, providerUsageToContextSnapshot, useOptionalSessionProjection } from "../session";
 
 export type SessionHoverPreview = {
   sessionId: string;
@@ -31,12 +33,16 @@ function clampPercent(value: number): number {
 }
 
 function formatTokenCount(tokens: number): string {
-  return Number.isFinite(tokens) ? tokens.toLocaleString() : "0";
+  if (!Number.isFinite(tokens)) return "0";
+  const safe = Math.max(0, Math.floor(tokens));
+  if (safe < 1_000) return safe.toLocaleString();
+  if (safe < 1_000_000) return `${Math.floor(safe / 1_000)}K`;
+  return `${Math.floor(safe / 1_000_000)}M`;
 }
 
 function formatContextPercent(snapshot: ContextUsageSnapshot): string {
-  if (snapshot.totalTokens > 0 && snapshot.percentUsed <= 0) return "<1";
-  return `${clampPercent(snapshot.percentUsed)}`;
+  if (snapshot.maxTokens > 0 && snapshot.totalTokens > 0 && snapshot.percentUsed <= 0) return "<1";
+  return `${Math.floor(clampPercent(snapshot.percentUsed))}`;
 }
 
 function resolveModelLabel(preview: SessionHoverPreview | null | undefined): string | null {
@@ -64,10 +70,17 @@ export function SessionHoverPreviewCard({
   preview: SessionHoverPreview | null;
   loading: boolean;
 }) {
+  const sessionProjection = useOptionalSessionProjection();
   const workspaceRoot = preview?.workspaceRoot ?? session.workspaceRoot;
   const modelLabel = resolveModelLabel(preview);
-  const snapshot = preview?.contextSnapshot ?? null;
   const sessionId = preview?.sessionId ?? session.id;
+  const projectionMatchesSession = sessionProjection?.sessionId === sessionId;
+  const projectionCell = projectionMatchesSession ? sessionProjection?.cell ?? null : null;
+  const projectedProviderUsage = projectionCell ? selectProviderUsage(projectionCell) : null;
+  const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
+  const snapshot = preview?.contextSnapshot
+    ?? (projectedProviderUsage ? providerUsageToContextSnapshot(projectedProviderUsage) : null)
+    ?? (projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null);
   const hasDetails = Boolean(sessionId || workspaceRoot || modelLabel || snapshot);
 
   return (

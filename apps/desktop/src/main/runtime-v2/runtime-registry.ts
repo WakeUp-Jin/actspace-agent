@@ -1,3 +1,7 @@
+import type { EnglishLearningService, SpeechHostPort } from "@actspace/english-learning";
+import type { EnglishLearningTargetInput, EnglishLearningState } from "@actspace/shared";
+import { FixedRendererStreamAdapter } from "./fixed-renderer-stream-adapter";
+import { observeSessionRevisions } from "./session-revision-observer";
 import { randomUUID } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
@@ -23,6 +27,7 @@ import type { DesktopRuntimeV2ApprovalPort, DesktopRuntimeV2BrowserPort, Desktop
 import { loadRuntimeV2Module, type RuntimeV2Module } from "./runtime-loader";
 
 export type DesktopRuntimeV2RegistryOptions = {
+  readonly speech?: SpeechHostPort;
   readonly roots: DesktopRuntimeV2Roots;
   readonly models: DesktopRuntimeV2ModelPort;
   readonly approvals: DesktopRuntimeV2ApprovalPort;
@@ -32,6 +37,8 @@ export type DesktopRuntimeV2RegistryOptions = {
 };
 
 export class DesktopRuntimeV2Registry {
+  readonly #streamWorkspaces = new Map<string, string>();
+  readonly #rendererStream = new FixedRendererStreamAdapter((sessionId) => this.#streamWorkspaces.get(sessionId));
   readonly #listeners = new Set<(event: RuntimeV2DesktopLiveEnvelope) => void>();
   #profile: BootedRuntimeProfile | undefined;
   #bootPromise: Promise<void> | undefined;
@@ -145,6 +152,10 @@ export class DesktopRuntimeV2Registry {
 
   async updateSessionMetadata(input: RuntimeV2UpdateSessionMetadataInput) {
     const snapshot = await this.requireApp().updateSessionMetadata(input.sessionId, input);
+    if (input.archived && this.#profile?.context.get?.("english-learning")) {
+      const learning = this.englishLearning();
+      if (learning.getState().targetSessionId === input.sessionId) await learning.disable();
+    }
     this.#emitDurableChanged(input.sessionId, snapshot.throughJournalSeq, "session-metadata-updated");
     return snapshot;
   }
@@ -183,6 +194,8 @@ export class DesktopRuntimeV2Registry {
     return Object.freeze({ artifactId: created.artifactId, mimeType: created.mediaType, name: basename(path).slice(0, 240), sizeBytes: created.size });
   }
 
+  subscribeRendererStream(listener: (event: import("@actspace/shared").RuntimeStreamEvent) => void): () => void { return this.#rendererStream.subscribe(listener); }
+
   subscribe(listener: (event: RuntimeV2DesktopLiveEnvelope) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
@@ -201,10 +214,46 @@ export class DesktopRuntimeV2Registry {
     });
   }
 
+  private learningControl: Promise<unknown> = Promise.resolve();
+  private learningOperation = 0;
+
+  englishLearning(): EnglishLearningService {
+    const service = this.requireProfile().context.get?.("english-learning") as EnglishLearningService | undefined;
+    if (!service) throw new Error("英语辅助学习尚未就绪。");
+    return service;
+  }
+
+  setEnglishLearningTarget(input: EnglishLearningTargetInput, persist: () => Promise<void>): Promise<EnglishLearningState> {
+    const operation = ++this.learningOperation;
+    const execute = async () => {
+      const service = this.englishLearning();
+      if (input.sessionId) {
+        const session = await this.inspectSession(input.sessionId);
+        if (session.lineage !== null || session.metadata.archived || !["read-write", "degraded"].includes(session.accessState)) throw new Error("请选择可用的未归档主会话。");
+        if (input.enabled) await this.requireApp().resumeMainSession(input.sessionId);
+      }
+      if (operation !== this.learningOperation) return service.getState();
+      await persist();
+      if (operation !== this.learningOperation) return service.getState();
+      return input.enabled && input.sessionId ? service.enableSession(input.sessionId) : service.disable();
+    };
+    const result = this.learningControl.then(execute, execute);
+    this.learningControl = result.catch(() => {});
+    return result;
+  }
+
+  #stopSessionRevisions: (() => void) | undefined;
+
   async dispose(): Promise<void> {
+    this.#stopSessionRevisions?.();
+    this.#stopSessionRevisions = undefined;
     const profile = this.#profile;
     if (profile === undefined) return;
+    this.learningOperation++;
+    const learning = profile.context.get?.("english-learning") as EnglishLearningService | undefined;
+    await learning?.dispose();
     await profile.shutdown();
+    this.#rendererStream.dispose();
     if (this.#profile === profile) {
       this.#profile = undefined;
       this.#artifacts = undefined;
@@ -240,6 +289,7 @@ export class DesktopRuntimeV2Registry {
     readonly completed?: number;
     readonly total?: number;
   }): void {
+    this.#rendererStream.progress(update);
     this.#emit({
       kind: "tool-progress",
       sessionId: update.sessionId,
@@ -261,8 +311,13 @@ export class DesktopRuntimeV2Registry {
     this.#emit({ kind: "runtime-live", sessionId, throughJournalSeq, message });
   }
 
-  #emitRuntimeLive(update: { readonly kind: "assistant-delta" | "reasoning-delta" | "run-state"; readonly sessionId: string; readonly agentRunId: string; readonly turnId: string; readonly stepId?: string; readonly message: string }): void {
-    this.#emit({ ...update, throughJournalSeq: 0 });
+  #emitRuntimeLive(update: import("@actspace/runtime").AgentLoopLiveEvent): void {
+    if (update.workspaceRoot) this.#streamWorkspaces.set(update.sessionId, update.workspaceRoot);
+    this.#rendererStream.accept(update);
+    if (update.kind === "run-state" && ["completed", "failed", "aborted", "step-limit"].includes(update.message)) this.#streamWorkspaces.delete(update.sessionId);
+    if (update.kind === "assistant-delta" || update.kind === "reasoning-delta" || update.kind === "run-state") {
+      this.#emit({ ...update, throughJournalSeq: 0 });
+    }
   }
 
   async #boot(): Promise<void> {
@@ -274,11 +329,13 @@ export class DesktopRuntimeV2Registry {
         models: this.options.models,
         approvals: this.options.approvals,
         browser: this.options.browser,
+        speech: this.options.speech,
         invocationId: randomUUID(),
         onToolProgress: (update) => this.#emitToolProgress(update),
         onRuntimeLive: (update) => this.#emitRuntimeLive(update),
       });
       this.#profile = booted.profile;
+      this.#stopSessionRevisions = observeSessionRevisions(booted.profile.context, (sessionId, seq) => this.#emitDurableChanged(sessionId, seq, "journal-advanced"));
       this.#artifacts = booted.artifacts;
       this.#bootError = null;
       this.options.log?.("runtime v2 ready", {

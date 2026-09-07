@@ -25,5 +25,6 @@ export type LlmRequestOptions = {
   readonly temperature?: number;
   readonly maxTokens?: number;
   readonly reasoning?: boolean;
+  readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort;
   readonly responseFormat?: RuntimeV2JsonValue;
 };

@@ -304,3 +304,23 @@ describe("ConversationView tooltips", () => {
     });
   });
 });
+
+it("hides the trajectory composer without losing the draft and keeps Stop available", async () => {
+  const abort = vi.fn();
+  const draft = { id: 1, sessionId: "draft-test", text: "initial draft", attachments: [{ id: "att", kind: "file" as const, name: "notes.txt", path: "/fixture/notes.txt" }] };
+  const view = (activeView: "chat" | "trajectory") => <TooltipProvider><RightPanelProvider><ConversationView messages={messages} contextSnapshot={null} activeView={activeView} draftKey="draft-test" draftRestore={draft} selectedModelId="deepseek-v4-flash" isStreaming onAbort={abort} /></RightPanelProvider></TooltipProvider>;
+  const rendered = render(view("chat"));
+  const input = rendered.container.querySelector("textarea")!;
+  const model = screen.getByRole("button", { name: /DeepSeek/ });
+  expect(screen.getByRole("button", { name: "Remove notes.txt" })).toBeInTheDocument();
+  fireEvent.change(input, { target: { value: "keep this draft" } });
+  rendered.rerender(view("trajectory"));
+  expect(rendered.container.querySelector(".composer-zone")).toHaveStyle({ display: "none" });
+  fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+  expect(abort).toHaveBeenCalledTimes(1);
+  rendered.rerender(view("chat"));
+  expect(rendered.container.querySelector("textarea")).toBe(input);
+  expect(input.value).toBe("keep this draft");
+  expect(screen.getByRole("button", { name: "Remove notes.txt" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /DeepSeek/ })).toBe(model);
+});

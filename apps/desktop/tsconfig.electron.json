@@ -9,6 +9,7 @@
     "outDir": "dist-electron",
     "baseUrl": ".",
     "paths": {
+      "@actspace/shared/model-catalog-data": ["../../packages/shared/dist/generated/model-catalog.generated.d.ts"],
       "@actspace/shared": ["../../packages/shared/dist/index.d.ts"],
       "@actspace/shared/*": ["../../packages/shared/dist/*"],
       "@actspace/runtime": ["../../packages/runtime/dist/index.d.ts"],
@@ -26,6 +27,7 @@
     "src/main/settings-service.ts",
     "src/main/model-store-service.ts",
     "src/main/model-runtime-service.ts",
+    "src/main/model-catalog-worker.ts",
     "src/main/browser-bridge-service.ts",
     "src/main/workspace-registry-service.ts",
     "src/main/workspace-fs-service.ts",

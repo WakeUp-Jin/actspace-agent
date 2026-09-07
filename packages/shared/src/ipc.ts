@@ -197,126 +197,6 @@ export type WorkspaceCreateFolderResult =
   | { ok: true; workspaceId: string; workspaceRoot: string }
   | { ok: false; error: string };
 
-export type AgentTraceListInput = {
-  sessionId: string;
-};
-
-export type AgentTraceReadInput = {
-  sessionId: string;
-  agentRunId: string;
-};
-
-export type AgentTraceTurnSummary = {
-  turnId: string;
-  turnIndex: number;
-  startedAt: string;
-  endedAt?: string;
-  llmCallCount: number;
-  retryCount: number;
-  toolNames: string[];
-  modelNames: string[];
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  durationMs: number;
-};
-
-export type AgentTraceSummary = {
-  schemaVersion: 1;
-  toolSummaryVersion?: 2;
-  sessionId: string;
-  agentRunId: string;
-  startedAt: string;
-  endedAt?: string;
-  status: "recording" | "completed" | "failed";
-  truncated: boolean;
-  turnCount: number;
-  llmCallCount: number;
-  retryCount: number;
-  eventCount: number;
-  toolNames: string[];
-  modelNames: string[];
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  durationMs: number;
-  byteSize: number;
-  turns: AgentTraceTurnSummary[];
-};
-
-export type AgentTraceListResult = {
-  traces: AgentTraceSummary[];
-};
-
-export type AgentTraceReadResult = {
-  trace: AgentTraceSummary;
-  events: import("./session").AgentTraceEvent[];
-};
-
-export type AgentAnalysisTotals = {
-  agentRunCount: number;
-  turnCount: number;
-  llmCallCount: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  durationMs: number;
-};
-
-export type AgentAnalysisRunSummary = AgentTraceSummary & {
-  userMessagePreview: string;
-};
-
-export type AgentAnalysisIndexInput = {
-  sessionId: string;
-};
-
-export type AgentAnalysisIndexResult = {
-  sessionId: string;
-  title: string;
-  totals: AgentAnalysisTotals;
-  toolNames: string[];
-  runs: AgentAnalysisRunSummary[];
-};
-
-export type AgentAnalysisSessionStatus = "recording" | "completed" | "failed" | "empty" | "unavailable";
-
-export type AgentAnalysisSessionSummary = {
-  sessionId: string;
-  title: string;
-  updatedAt: string;
-  workspaceId?: string;
-  workspaceRoot?: string;
-  status: AgentAnalysisSessionStatus;
-  agentRunCount: number;
-  turnCount: number;
-  llmCallCount: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  durationMs: number;
-  modelNames: string[];
-};
-
-export type AgentAnalysisSessionIndexResult = {
-  totals: AgentAnalysisTotals & { sessionCount: number };
-  modelNames: string[];
-  sessions: AgentAnalysisSessionSummary[];
-};
-
-export type AgentTraceClearInput =
-  | { scope: "session"; sessionId: string }
-  | { scope: "all" };
-
-export type AgentTraceClearResult = {
-  filesDeleted: number;
-  bytesFreed: number;
-};
-
 export type CompactContextInput = {
   sessionId: string;
   agentRunId: string;
@@ -372,6 +252,7 @@ export type ProviderConnectInput = {
 
 export type ProviderUpdateInput = {
   provider: ProviderId;
+  apiKey?: string;
   managementKey?: string | null;
   baseUrl?: string | null;
   proxy?: ProviderProxySettings;
@@ -472,6 +353,7 @@ export type ModelsUpdateInput = {
   enabled?: boolean;
   customLabel?: string | null;
   credentialId?: string | null;
+  connectionId?: string | null;
 };
 
 export type ModelsRemoveInput = { modelKey: ModelKey };
@@ -553,6 +435,9 @@ export type PendingApprovalInfo = {
 };
 
 export type SessionListItem = {
+  /** Runtime session admission facts used by optional session capabilities. */
+  accessState?: "read-write" | "degraded" | "browse-only" | "corrupt";
+  isChildSession?: boolean;
   id: string;
   title: string;
   updatedAt: string;
@@ -1019,9 +904,13 @@ export type UsageStatisticsRange = "day" | "week" | "month" | "total";
 export type UsageStatisticsScope = "session" | "global";
 
 export type UsageStatisticsGetInput = {
+  search?: string;
+  kind?: UsageActivityKind;
   /** 仅当 scope==="session" 时必填；scope==="global" 时忽略。 */
   sessionId?: string;
   range?: UsageStatisticsRange;
+  /** Optional event-level activity status filter; omitted / "all" keeps every status. */
+  status?: "all" | "success" | "error" | "aborted" | "unknown";
   /** 默认 "global"（无 sessionId）或 "session"（有 sessionId）。 */
   scope?: UsageStatisticsScope;
   /** 底部会话明细表分页；默认第一页，每页 10 条。 */
@@ -1142,6 +1031,127 @@ export type UsageStatisticsSnapshot = {
   /** 当前页会话明细。完整账本仍参与 summary / distribution / daily 聚合。 */
   requestRows: UsageStatisticsRequestRow[];
   requestRowsPage: UsageStatisticsRequestRowsPage;
+};
+
+/** Journal-derived activity granularity used by the Maka-style Usage page. */
+export type UsageActivityKind = "llm_request" | "tool_invocation";
+
+export type UsageActivityStatus = "running" | "success" | "error" | "aborted" | "unknown";
+
+export type UsageActivityCostBasis = "priced" | "estimated" | "unavailable";
+
+export type UsageActivityTokens = {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  reasoningTokens: number | null;
+  totalTokens: number | null;
+};
+
+export type UsageActivityRow = {
+  sessionTitle?: string;
+  /** Stable across cold Journal rebuilds. */
+  activityId: string;
+  kind: UsageActivityKind;
+  sessionId: string;
+  agentRunId: string;
+  turnId?: string;
+  stepId?: string;
+  requestId?: string;
+  callId?: string;
+  retryId?: string;
+  retryOfRequestId?: string;
+  providerId?: string;
+  /** Provider connection is optional because older Journal snapshots do not carry it. */
+  connectionId?: string;
+  modelKey?: ModelKey;
+  model?: string;
+  toolName?: string;
+  workspaceRoot?: string;
+  startedAt: string;
+  endedAt?: string;
+  durationMs?: number;
+  attempt?: number;
+  tokens: UsageActivityTokens;
+  costUsd: number | null;
+  costBasis: UsageActivityCostBasis;
+  costAmount?: number | null;
+  costCurrency?: string | null;
+  costProvenance?: import("./model-catalog").UsageCostProvenance;
+  historicalUnverified?: boolean;
+  status: UsageActivityStatus;
+  /** Header/call event sequence, useful for evidence links and diagnostics. */
+  sourceEventSeq: number;
+  relatedEventSeqs: number[];
+};
+
+export type UsageActivitySummary = {
+  activityCount: number;
+  requestCount: number;
+  toolCount: number;
+  successCount: number;
+  errorCount: number;
+  abortedCount: number;
+  runningCount: number;
+  unknownCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  reasoningTokens: number;
+  totalTokens: number;
+  costUsd: number | null;
+  costUnavailableCount: number;
+};
+
+export type UsageActivitySourceWatermark = {
+  sessionId: string;
+  throughJournalSeq: number;
+};
+
+export type UsageActivityRowsPage = {
+  page: number;
+  pageSize: number;
+  totalRows: number;
+  totalPages: number;
+};
+
+export type UsageCostSummary = {
+  amountsByCurrency: Record<string, number>;
+  knownCostRequestCount: number;
+  unknownCostRequestCount: number;
+  unverifiedHistoricalRequestCount: number;
+};
+export type UsageActivityAggregate = {
+  key: string;
+  label: string;
+  providerId?: string;
+  connectionId?: string;
+  count: number;
+  errorCount: number;
+  totalTokens: number;
+  durationMs: number;
+  costSummary: UsageCostSummary;
+};
+export type UsageActivitySnapshot = {
+  /** Counts for the selected time window before text/status filtering. */
+  tabCounts?: { requests: number; providers: number; models: number; tools: number };
+  costSummary?: UsageCostSummary;
+  aggregates?: { providers: UsageActivityAggregate[]; models: UsageActivityAggregate[]; tools: UsageActivityAggregate[] };
+
+  schemaVersion: 1;
+  scope: UsageStatisticsScope;
+  sessionId: string | null;
+  title: string;
+  range: UsageStatisticsRange;
+  generatedAt: string;
+  sourceCount: number;
+  sourceWatermarks: UsageActivitySourceWatermark[];
+  summary: UsageActivitySummary;
+  /** Current page, sorted newest activity first. */
+  rows: UsageActivityRow[];
+  rowsPage: UsageActivityRowsPage;
 };
 
 export type ProviderBalanceDisplay = {

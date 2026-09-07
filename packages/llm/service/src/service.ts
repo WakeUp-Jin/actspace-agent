@@ -38,6 +38,7 @@ export class LlmService {
       tools: Object.freeze([...(input.tools ?? [])]),
       options: Object.freeze({ ...registration.defaults, ...input.options }),
       credentialRef: input.credentialRef ?? registration.credentialRef,
+      contextWindow: registration.adapter.resolveModelFacts?.(input.model)?.contextWindow ?? null,
     }, input.signal ?? new AbortController().signal);
   }
 

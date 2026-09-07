@@ -27,6 +27,7 @@ export type RightPanelTab = { id: string } & (
   | ({ kind: "image"; title: string; src: string } & WorkspaceFileMeta)
   | ({ kind: "csv"; title: string; content: string } & WorkspaceFileMeta)
   | ({ kind: "text"; title: string; content: string; language?: string } & WorkspaceFileMeta)
+  | { kind: "subagents"; title: string; sessionId: string; selected?: Extract<import("@actspace/shared").MessageBlock, { kind: "agent" }> }
   | { kind: "context"; title: string }
   | { kind: "review"; title: string; workspaceRoot?: string; scope: "uncommitted"; refreshKey?: number }
   | { kind: "replyHtml"; title: string; sessionId: string | null }

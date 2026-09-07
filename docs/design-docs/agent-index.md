@@ -34,7 +34,7 @@ Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；�
 ## Runtime 观测层
 
 - `agent-runtime/agent-turn-layers.md`：Host、Profile Bootstrap / App Bundle、Agent semantics、capability execution、Journal / Projection 五层职责规范。
-- `agent-runtime/agent-observability-trace-model.md`：Journal 派生的 Agent Run / Turn / request / tool 分析观测契约。
+- `agent-runtime/agent-observability-trace-model.md`：Journal 派生的 Agent Run / Turn / request / tool Journal 观测契约。
 
 ## 模型与上下文
 

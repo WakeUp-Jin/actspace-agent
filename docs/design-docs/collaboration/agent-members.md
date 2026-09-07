@@ -11,7 +11,7 @@
 相关文档：
 
 - `docs/design-docs/collaboration/agent-form-room.md`：Room 如何选择 Member、触发运行、读取 Room Log 和提交消息。
-- `docs/design-docs/frontend/front-设置页规范.md`：设置页整体导航与 Members 分区的信息架构。
+- `docs/design-docs/frontend/front-设置中心重构规范.md`：当前设置页整体导航与 Members 分区的信息架构；旧设置页仅作迁移追溯。
 - `docs/design-docs/agent-plugin-runtime/agent-spec-agent-and-subagent.md`：v2 Agent / Subagent 与 child Session 的公共契约；Member/Room 的实现测试需遵循当前 Runtime 入口。
 
 参考：

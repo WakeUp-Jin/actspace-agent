@@ -115,9 +115,9 @@ describe("Tool Runtime execution contract", () => {
       },
     };
 
-    const [result] = await runtime.executeBatch([call("call-1")], environment(trace, { approvalBroker: broker }));
+    const [result] = await runtime.executeBatch([call("call-1")], { ...environment(trace, { approvalBroker: broker }), onExecutionStarted: () => { trace.push("started"); throw new Error("observer failure"); } });
     expect(result?.status).toBe("completed");
-    expect(trace).toEqual(["before", "policy", "approval", "dispatch:call-1", "checkpoint", "body", "after", "finalizer", "commit:call-1"]);
+    expect(trace).toEqual(["before", "policy", "approval", "dispatch:call-1", "checkpoint", "started", "body", "after", "finalizer", "commit:call-1"]);
   });
 
   it("allows read-only capability use and resolves relative resource paths against the workspace", async () => {
@@ -294,5 +294,23 @@ describe("Tool Runtime execution contract", () => {
     runtime.register({ definition: definition(), executor: { async execute() { return success("direct"); } } });
     expect(runtime.registry.capture("read").definition.name).toBe("read");
     expect(() => runtime.registry.capture("plugin.test/read")).toThrow("Tool plugin.test/read is not active");
+  });
+});
+
+
+describe("incremental tool completion", () => {
+  it("commits a finished tool while a later parallel tool is still running", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute(args) { if (args.value === "slow") await gate; return success(); } } });
+    const commits: ToolExecutionResult[] = [];
+    let firstCommitted!: () => void;
+    const first = new Promise<void>((resolve) => { firstCommitted = resolve; });
+    const env = environment([], { commits });
+    const batch = runtime.executeBatch([call("fast"), call("slow")], { ...env, journal: { ...env.journal, commitResult: async (result) => { await env.journal.commitResult(result); if (result.callId === "fast") firstCommitted(); } } });
+    try { await first; expect(commits.map((result) => result.callId)).toEqual(["fast"]); }
+    finally { release(); await batch; }
+    expect(commits.map((result) => result.callId)).toEqual(["fast", "slow"]);
   });
 });

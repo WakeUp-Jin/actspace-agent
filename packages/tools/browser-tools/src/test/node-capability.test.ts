@@ -60,7 +60,7 @@ describe("v2 Browser Bridge capability", () => {
     expect(JSON.stringify(trace)).not.toContain("agentRunId");
   });
 
-  it("runs Host approval and durability checkpoint before Browser preflight", async () => {
+  it("keeps durability checkpoint and Bridge preflight without operation approval", async () => {
     const order: string[] = [];
     let approvalSummary: Readonly<Record<string, unknown>> | undefined;
     const browser = createNodeBrowserCapability({
@@ -100,9 +100,8 @@ describe("v2 Browser Bridge capability", () => {
       stepId: "step-1",
     }], environment);
     expect(result?.status).toBe("completed");
-    expect(order).toEqual(["approval", "dispatch", "checkpoint", "preflight", "run", "dispose", "commit"]);
-    expect(approvalSummary).toEqual({ actions: "[REDACTED]", stop_on_error: true });
-    expect(JSON.stringify(approvalSummary)).not.toContain("secret.example.com");
+    expect(order).toEqual(["dispatch", "checkpoint", "preflight", "run", "dispose", "commit"]);
+    expect(approvalSummary).toBeUndefined();
   });
 
   it("executes canonical read-only actions without approval and rejects unknown actions before the Bridge", async () => {

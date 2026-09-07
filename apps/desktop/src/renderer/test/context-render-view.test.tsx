@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ContextState } from "@actspace/shared";
 import { ContextRenderView } from "../components/right-panel/ContextRenderView";
 import { mockContextState } from "./fixtures/workbenchFixture";
+import { SessionProjectionProvider } from "../session";
 
 describe("ContextRenderView", () => {
   afterEach(() => {
@@ -44,6 +45,64 @@ describe("ContextRenderView", () => {
   it("shows an empty state when there is no context state", () => {
     render(<ContextRenderView contextState={null} />);
     expect(screen.getByText(/没有可展示的上下文明细/)).toBeInTheDocument();
+  });
+
+  it("shows the Session projection metric while detailed context is rebuilding", () => {
+    render(<ContextRenderView contextState={null} contextSnapshot={{
+      totalTokens: 4_000,
+      maxTokens: 200_000,
+      percentUsed: 2,
+      buckets: [],
+    }} />);
+    expect(screen.getByText(/Context · 2% Full/)).toBeInTheDocument();
+    expect(screen.getByText(/等待同一 Session 的逐条上下文投影/)).toBeInTheDocument();
+  });
+
+  it("falls back to the active Session provider usage selector when no prop is supplied", async () => {
+    (window as { actspace?: unknown }).actspace = {
+      getSessionProjectionSnapshot: async () => ({
+        kind: "session-projection",
+        schemaVersion: 1,
+        sessionId: "session-1",
+        throughJournalSeq: 3,
+        snapshot: {
+          kind: "session-snapshot",
+          schemaVersion: 1,
+          sessionId: "session-1",
+          createdAt: "2026-08-31T00:00:00.000Z",
+          updatedAt: "2026-08-31T00:00:03.000Z",
+          workspaceRoot: null,
+          throughJournalSeq: 3,
+          accessState: "read-write",
+          metadata: { title: null, pinned: false, archived: false },
+          messages: [], tools: [], pendingInbox: [], todos: [], delegations: [],
+          usage: { inputTokens: 1_200, outputTokens: 800, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 2_000, costUsd: null },
+          activity: { turnCount: 1, completedTurnCount: 1, stepCount: 1, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null },
+          lineage: null,
+        },
+        values: {
+          providerUsage: {
+            kind: "provider-usage",
+            schemaVersion: 1,
+            sessionId: "session-1",
+            throughJournalSeq: 3,
+            estimator: { name: "durable-provider-usage", version: "1" },
+            usage: { inputTokens: 1_200, outputTokens: 800, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 2_000, costUsd: null },
+          },
+        },
+      }),
+      onSessionLiveEvent: () => () => undefined,
+      describeContext: undefined,
+    };
+
+    render(
+      <SessionProjectionProvider sessionId="session-1">
+        <ContextRenderView />
+      </SessionProjectionProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText(/Context · 0% Full/)).toBeInTheDocument());
+    expect(screen.getByText(/2,000 \/ 0 Tokens/)).toBeInTheDocument();
   });
 
   it("fills missing previews with on-demand describeContext content when a sessionId is given", async () => {

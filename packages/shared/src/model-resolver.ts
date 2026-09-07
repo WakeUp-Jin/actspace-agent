@@ -26,6 +26,7 @@ export interface ProviderCredentialAvailability {
 
 export interface ModelSnapshot {
   providers: Record<ProviderId, ProviderAvailability>;
+  connections?: Record<string, ProviderAvailability & { providerId: ProviderId }>;
   definitions: Partial<Record<ModelKey, ModelDefinition>>;
   installedModels: Partial<Record<ModelKey, InstalledModelSettings>>;
 }
@@ -76,10 +77,14 @@ export function resolveConfiguredModel(
   const definition = snapshot.definitions[key];
   if (!definition) return { ok: false, key, reason: "model_missing" };
 
-  const provider = snapshot.providers[definition.provider];
-  if (!provider.enabled) return { ok: false, key, definition, reason: "provider_disabled" };
   const installed = snapshot.installedModels[key];
   if (!installed) return { ok: false, key, definition, reason: "model_not_installed" };
+  const customConnection = installed.connectionId && installed.connectionId !== `${definition.provider}:default`;
+  const provider = customConnection ? snapshot.connections?.[installed.connectionId!] : snapshot.providers[definition.provider];
+  if (!provider || (customConnection && "providerId" in provider && provider.providerId !== definition.provider)) {
+    return { ok: false, key, definition, reason: "connection_unavailable" };
+  }
+  if (!provider.enabled) return { ok: false, key, definition, reason: "provider_disabled" };
   if (!installed.enabled) return { ok: false, key, definition, reason: "model_disabled" };
   if (installed.credentialId) {
     const credential = provider.additionalCredentials?.[installed.credentialId];

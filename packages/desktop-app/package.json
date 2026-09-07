@@ -18,6 +18,7 @@
     "test": "vitest run --globals --passWithNoTests"
   },
   "dependencies": {
+    "@actspace/english-learning": "workspace:*",
     "@actspace/bundle": "workspace:*",
     "@actspace/cordis-adapter": "workspace:*",
     "@actspace/compaction": "workspace:*",

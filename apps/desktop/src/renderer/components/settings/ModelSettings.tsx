@@ -1,42 +1,24 @@
-import { useEffect, useState } from "react";
-import { Boxes, Plus, Trash2 } from "lucide-react";
-import { PROVIDER_IDS, PROVIDER_REGISTRY, type AppSettings, type InstalledModelView, type ModelKey, type ProviderSettingsView, type TaskModelSettings, type UsableModelView } from "@actspace/shared";
+import { useEffect, useRef, useState } from "react";
+import { Boxes, Check, ChevronDown, Plus, Search, Trash2 } from "lucide-react";
+import { PROVIDER_IDS, PROVIDER_REGISTRY, type AppSettings, type InstalledModelView, type ModelKey, type ProviderSettingsView, type LlmProviderId } from "@actspace/shared";
 import { SectionShell, Toggle } from "./SettingsPrimitives";
-import { ModelPurposeSelect } from "./ModelPurposeSelect";
 import { OpenRouterModelCatalogDialog } from "./OpenRouterModelCatalogDialog";
 
-const EMPTY_TASK_MODELS: TaskModelSettings = { defaultChatModel: null, utilityModel: null, exploreModel: null };
-
-export function ModelSettings({ settings, onChanged }: { settings: AppSettings; onChanged?: () => void | Promise<void> }) {
+export function ModelSettings({ settings, onChanged, embedded = false, embeddedPlain = false, providerFilter, connectionFilter }: { settings: AppSettings; onChanged?: () => void | Promise<void>; embedded?: boolean; embeddedPlain?: boolean; providerFilter?: LlmProviderId; connectionFilter?: string }) {
   const [installed, setInstalled] = useState<InstalledModelView[]>([]);
-  const [usable, setUsable] = useState<Record<"chat" | "utility" | "explore", UsableModelView[]>>({ chat: [], utility: [], explore: [] });
-  const [taskModels, setTaskModels] = useState<TaskModelSettings>(settings.taskModels ?? EMPTY_TASK_MODELS);
+  const [connections, setConnections] = useState<Array<{ id: string; label: string }>>([]);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    if (!window.actspace.listInstalledModels || !window.actspace.listUsableModels) return;
-    const [installedResult, chat, utility, explore] = await Promise.all([
+    if (!window.actspace.listInstalledModels) return;
+    const [installedResult] = await Promise.all([
       window.actspace.listInstalledModels(),
-      window.actspace.listUsableModels({ purpose: "chat" }),
-      window.actspace.listUsableModels({ purpose: "utility" }),
-      window.actspace.listUsableModels({ purpose: "explore" }),
     ]);
     setInstalled(installedResult.models);
-    setUsable({ chat: chat.models, utility: utility.models, explore: explore.models });
   };
-  useEffect(() => { void load(); }, []);
-  useEffect(() => { if (settings.taskModels) setTaskModels(settings.taskModels); }, [settings.taskModels]);
-
-  const updateTask = async (field: keyof TaskModelSettings, value: ModelKey | null) => {
-    if (!window.actspace.updateTaskModels) return;
-    setError(null);
-    try {
-      const result = await window.actspace.updateTaskModels({ [field]: value });
-      setTaskModels(result.taskModels);
-      await onChanged?.();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "任务模型保存失败。"); }
-  };
+  useEffect(() => { void load(); void window.actspace.refreshPricingCatalog?.({ force: false }).catch(() => undefined); }, []);
+  useEffect(() => { void window.actspace.getSettingsV4?.().then((snapshot) => { if (snapshot) setConnections(Object.values(snapshot.settings.models.connections).map((connection) => ({ id: connection.connectionId, label: connection.displayName ?? connection.connectionId }))); }); }, []);
 
   const toggleModel = async (modelKey: ModelKey, enabled: boolean) => {
     if (!window.actspace.updateModel) return;
@@ -67,24 +49,22 @@ export function ModelSettings({ settings, onChanged }: { settings: AppSettings; 
 
   if (!window.actspace?.listInstalledModels) return <SectionShell title="模型" description="仅桌面端可管理模型。"><div /></SectionShell>;
 
-  return (
-    <>
-      <SectionShell title="模型" description="控制进入主会话的模型，并为轻量任务与 Explore 选择已经连接、启用且能力匹配的模型。">
-        <section className="overflow-hidden rounded-act-lg border border-line bg-surface shadow-act-soft">
-          <ModelPurposeSelect label="默认会话模型" description="新会话与未显式选择模型时使用。不可用时会要求重新选择。" value={taskModels.defaultChatModel} models={usable.chat} onChange={(value) => void updateTask("defaultChatModel", value)} />
-          <ModelPurposeSelect label="轻量任务模型" description="用于标题、工具输出摘要和上下文压缩；不可用时回退当前主模型。" value={taskModels.utilityModel} models={usable.utility} onChange={(value) => void updateTask("utilityModel", value)} />
-          <ModelPurposeSelect label="Explore 模型" description="用于只读代码探索；不可用时回退当前主模型。" value={taskModels.exploreModel} models={usable.explore} onChange={(value) => void updateTask("exploreModel", value)} />
-        </section>
-        <div className="mt-7 flex items-center justify-between gap-4"><div><h2 className="text-[15px] font-semibold text-text-main">已添加模型</h2><p className="mt-1 text-[12px] text-text-faint">停用后会立即从 Composer 与任务模型候选中移除。</p></div><div className="flex flex-wrap justify-end gap-2"><button type="button" className="inline-flex h-10 items-center gap-1.5 rounded-act-md border border-line bg-surface px-3.5 text-[12px] font-semibold text-text-main hover:border-line-strong" onClick={() => setCatalogOpen(true)}><Plus size={16} />从 OpenRouter 添加</button></div></div>
+  const content = <>
+        {!embeddedPlain ? <div className="flex items-center justify-between gap-4"><div><p className="text-[12px] text-text-faint">停用后会立即从 Composer 与任务模型候选中移除。</p></div>{!embedded ? <div className="flex flex-wrap justify-end gap-2"><button type="button" className="inline-flex h-9 items-center gap-1.5 rounded-act-md border border-line bg-surface px-3 text-[12px] font-semibold text-text-main transition-colors hover:border-line-strong hover:bg-hover-overlay active:scale-[0.98]" onClick={() => setCatalogOpen(true)}><Plus size={15} />从 OpenRouter 添加</button></div> : null}</div> : null}
         {error ? <p role="alert" className="mt-3 text-[12px] text-on-danger">{error}</p> : null}
-        <div className="mt-3 grid gap-5">
-          {PROVIDER_IDS.map((provider) => {
-            const models = installed.filter((model) => model.definition.provider === provider);
+        <div className={embeddedPlain ? "grid gap-5" : "mt-3 grid gap-5"}>
+          {PROVIDER_IDS.filter((provider) => !providerFilter || provider === providerFilter).map((provider) => {
+            const models = installed.filter((model) => model.definition.provider === provider && (connectionFilter
+              ? model.settings.connectionId === connectionFilter
+              : !providerFilter || !model.settings.connectionId || model.settings.connectionId === `${provider}:default`));
             if (!models.length) return null;
-            return <section key={provider}><div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-text-main"><Boxes size={15} />{PROVIDER_REGISTRY[provider].label}<span className="text-[11px] font-normal text-text-faint">{models.filter((model) => model.settings.enabled).length} / {models.length} 启用</span></div><div className="overflow-hidden rounded-act-lg border border-line bg-surface">{models.map((model) => <ModelRow key={model.definition.key} model={model} provider={settings.providers[provider]} onToggle={toggleModel} onRemove={removeModel} onCredentialChange={updateCredential} />)}</div></section>;
+              return <section key={provider}>{embeddedPlain ? null : <div className="mb-2 flex items-center gap-2 text-[13px] font-medium text-text-main"><Boxes size={15} />{PROVIDER_REGISTRY[provider].label}<span className="text-[11px] font-normal text-text-faint">{models.filter((model) => model.settings.enabled).length} / {models.length} 启用</span></div>}{embedded ? <ModelMultiSelector models={models} onChange={async (keys) => { const enabled = new Set(keys); await Promise.all(models.map((model) => toggleModel(model.definition.key, enabled.has(model.definition.key)))); }} /> : <div className="divide-y divide-line/70 overflow-hidden rounded-act-lg bg-surface-subtle">{models.map((model) => <ModelRow key={model.definition.key} model={model} provider={settings.providers[provider]} connections={connections.filter((connection) => connection.id.endsWith(":default") || connection.id.startsWith(`${provider}:`) || connection.id === model.settings.connectionId)} onToggle={toggleModel} onRemove={removeModel} onCredentialChange={updateCredential} onConnectionChange={async (key, connectionId) => { if (!window.actspace.updateModel) return; await window.actspace.updateModel({ modelKey: key, connectionId }); await load(); await onChanged?.(); }} />)}</div>}</section>;
           })}
         </div>
-      </SectionShell>
+      </>;
+  return (
+    <>
+      {embedded ? <section className={embeddedPlain ? "" : "mt-7 border-t border-line pt-6"}>{content}</section> : <SectionShell title="模型目录" description="在已连接的服务中发现、启用和管理模型。">{content}</SectionShell>}
       {catalogOpen ? (
         <OpenRouterModelCatalogDialog
           onClose={() => setCatalogOpen(false)}
@@ -96,9 +76,29 @@ export function ModelSettings({ settings, onChanged }: { settings: AppSettings; 
   );
 }
 
-function ModelRow({ model, provider, onToggle, onRemove, onCredentialChange }: { model: InstalledModelView; provider?: ProviderSettingsView; onToggle: (key: ModelKey, enabled: boolean) => void; onRemove: (key: ModelKey) => void; onCredentialChange: (key: ModelKey, credentialId: string | null) => void }) {
+function ModelMultiSelector({ models, onChange }: { models: InstalledModelView[]; onChange: (keys: ModelKey[]) => void | Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement | null>(null);
+  const enabled = models.filter((model) => model.settings.enabled).map((model) => model.definition.key);
+  const filtered = models.filter((model) => `${model.definition.label} ${model.definition.apiModel}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => { if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false); };
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => { document.removeEventListener("pointerdown", onPointerDown); document.removeEventListener("keydown", onKeyDown); };
+  }, [open]);
+  const labels = enabled.map((key) => models.find((model) => model.definition.key === key)?.settings.customLabel ?? models.find((model) => model.definition.key === key)?.definition.label ?? key);
+  const allVisible = filtered.length > 0 && filtered.every((model) => enabled.includes(model.definition.key));
+  const toggle = (key: ModelKey) => { const next = enabled.includes(key) ? enabled.filter((item) => item !== key) : [...enabled, key]; void onChange(next); };
+  return <div ref={ref} className="relative"><button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label="选择启用模型" onClick={() => setOpen((value) => !value)} className="flex h-10 w-full items-center justify-between gap-3 rounded-act-md border border-line bg-surface px-3 text-left text-[13px] text-text-main hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"><span className="min-w-0 truncate">{labels.length ? labels.join(", ") : "选择模型"}</span><ChevronDown size={15} className="shrink-0 text-text-faint" aria-hidden="true" /></button>{open ? <div role="listbox" aria-label="启用模型" className="absolute left-0 right-0 z-20 mt-1 overflow-hidden rounded-act-md border border-line bg-surface shadow-act-float"><label className="relative block border-b border-line"><Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" aria-hidden="true" /><input autoFocus aria-label="搜索模型" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索模型" className="h-9 w-full bg-transparent pl-9 pr-3 text-[12px] text-text-main outline-none placeholder:text-text-faint" /></label><button type="button" role="option" aria-selected={allVisible} onClick={() => { const next = allVisible ? enabled.filter((key) => !filtered.some((model) => model.definition.key === key)) : Array.from(new Set([...enabled, ...filtered.map((model) => model.definition.key)])); void onChange(next); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold text-text-main hover:bg-hover-overlay"><span className={`grid h-5 w-5 place-items-center rounded-act-sm border ${allVisible ? "border-action bg-action text-surface" : "border-line"}`}>{allVisible ? <Check size={13} aria-hidden="true" /> : null}</span>全部启用</button><div className="max-h-56 overflow-y-auto border-t border-line">{filtered.map((model) => { const checked = enabled.includes(model.definition.key); return <button key={model.definition.key} type="button" role="option" aria-selected={checked} onClick={() => toggle(model.definition.key)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-text-main hover:bg-hover-overlay"><span className={`grid h-5 w-5 place-items-center rounded-act-sm border ${checked ? "border-action bg-action text-surface" : "border-line"}`}>{checked ? <Check size={13} aria-hidden="true" /> : null}</span><span className="min-w-0 truncate">{model.settings.customLabel ?? model.definition.label}</span></button>; })}</div></div> : null}</div>;
+}
+
+function ModelRow({ model, provider, connections, onToggle, onRemove, onCredentialChange, onConnectionChange }: { model: InstalledModelView; provider?: ProviderSettingsView; connections: Array<{ id: string; label: string }>; onToggle: (key: ModelKey, enabled: boolean) => void; onRemove: (key: ModelKey) => void; onCredentialChange: (key: ModelKey, credentialId: string | null) => void; onConnectionChange: (key: ModelKey, connectionId: string | null) => void }) {
   const removable = model.definition.source === "provider-catalog" || model.definition.source === "custom";
   const credentials = provider?.additionalCredentials ?? [];
   const selectedCredential = credentials.find((credential) => credential.id === model.settings.credentialId);
-  return <div className="flex min-h-[74px] items-center justify-between gap-4 border-b border-line px-4 py-3 last:border-b-0"><div className="min-w-0 flex-1"><div className="truncate text-[13px] font-semibold text-text-main">{model.settings.customLabel ?? model.definition.label}</div><div className="mt-1 truncate font-mono text-[11px] text-text-faint">{model.definition.apiModel}</div><div className="mt-1 text-[10px] text-text-muted">{model.definition.contextWindow ? `${Math.round(model.definition.contextWindow / 1000)}K context` : "context 未知"} · {model.definition.family ?? model.definition.source} · {model.definition.capabilities.toolUse}</div>{credentials.length > 0 ? <label className="mt-2 flex max-w-[340px] items-center gap-2"><span className="shrink-0 text-[10px] font-medium text-text-muted">调用 Key</span><select aria-label={`${model.definition.label} 调用 Key`} value={model.settings.credentialId ?? ""} onChange={(event) => onCredentialChange(model.definition.key, event.target.value || null)} className="h-8 min-w-0 flex-1 rounded-act-md border border-line bg-surface-subtle px-2 text-[11px] text-text-main outline-none focus:ring-2 focus:ring-[var(--act-color-focus-ring)]"><option value="" disabled={!provider?.hasApiKey}>默认 Key{provider?.hasApiKey ? "" : "（不可用）"}</option>{model.settings.credentialId && !selectedCredential ? <option value={model.settings.credentialId} disabled>已删除的 Key · 不可用</option> : null}{credentials.map((credential) => <option key={credential.id} value={credential.id} disabled={!credential.hasApiKey}>{credential.label}{credential.hasApiKey ? "" : "（不可用）"}</option>)}</select></label> : null}</div><div className="flex shrink-0 items-center gap-2">{removable ? <button type="button" aria-label={`删除 ${model.definition.label}`} className="grid h-10 w-10 place-items-center rounded-act-md text-text-faint hover:bg-danger-soft hover:text-on-danger" onClick={() => onRemove(model.definition.key)}><Trash2 size={16} /></button> : null}<Toggle checked={model.settings.enabled} onChange={(enabled) => onToggle(model.definition.key, enabled)} ariaLabel={`启用 ${model.definition.label}`} /></div></div>;
+  return <div className="flex min-h-[68px] items-center justify-between gap-4 px-3.5 py-3"><div className="min-w-0 flex-1"><div className="truncate text-[13px] font-medium text-text-main">{model.settings.customLabel ?? model.definition.label}</div><div className="mt-1 truncate font-mono text-[11px] text-text-faint">{model.definition.apiModel}</div><div className="mt-1 text-[10px] text-text-muted">{model.definition.contextWindow ? `${Math.round(model.definition.contextWindow / 1000)}K context` : "context 未知"} · {model.definition.family ?? model.definition.source} · {model.definition.capabilities.toolUse}</div>{connections.length > 0 ? <label className="mt-2 flex max-w-[340px] items-center gap-2"><span className="shrink-0 text-[10px] font-medium text-text-muted">连接</span><select aria-label={`${model.definition.label} 连接`} value={model.settings.connectionId ?? `${model.definition.provider}:default`} onChange={(event) => onConnectionChange(model.definition.key, event.target.value)} className="h-8 min-w-0 flex-1 rounded-act-md border border-line bg-surface px-2 text-[11px] text-text-main"><option value={`${model.definition.provider}:default`}>默认连接</option>{connections.filter((connection) => connection.id !== `${model.definition.provider}:default`).map((connection) => <option key={connection.id} value={connection.id}>{connection.label}</option>)}</select></label> : null}{credentials.length > 0 ? <label className="mt-2 flex max-w-[340px] items-center gap-2"><span className="shrink-0 text-[10px] font-medium text-text-muted">调用 Key</span><select aria-label={`${model.definition.label} 调用 Key`} value={model.settings.credentialId ?? ""} onChange={(event) => onCredentialChange(model.definition.key, event.target.value || null)} className="h-8 min-w-0 flex-1 rounded-act-md border border-line bg-surface px-2 text-[11px] text-text-main"><option value="" disabled={!provider?.hasApiKey}>默认 Key{provider?.hasApiKey ? "" : "（不可用）"}</option>{model.settings.credentialId && !selectedCredential ? <option value={model.settings.credentialId} disabled>已删除的 Key · 不可用</option> : null}{credentials.map((credential) => <option key={credential.id} value={credential.id} disabled={!credential.hasApiKey}>{credential.label}{credential.hasApiKey ? "" : "（不可用）"}</option>)}</select></label> : null}</div><div className="flex shrink-0 items-center gap-2">{removable ? <button type="button" aria-label={`删除 ${model.definition.label}`} className="grid h-10 w-10 place-items-center rounded-act-md text-text-faint hover:bg-danger-soft hover:text-on-danger" onClick={() => onRemove(model.definition.key)}><Trash2 size={16} /></button> : null}<Toggle checked={model.settings.enabled} onChange={(enabled) => onToggle(model.definition.key, enabled)} ariaLabel={`启用 ${model.definition.label}`} /></div></div>;
 }

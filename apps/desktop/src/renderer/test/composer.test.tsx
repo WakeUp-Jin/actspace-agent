@@ -178,6 +178,24 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByRole("button", { name: "Context usage 36%" })).toBeInTheDocument();
   });
 
+  it("rounds the context usage status to an integer", () => {
+    renderComposer({
+      contextSnapshot: { ...mockContextSnapshot, percentUsed: 7.6092 },
+    });
+
+    expect(screen.getByRole("button", { name: "Context usage 7%" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Context usage 7.6092%" })).not.toBeInTheDocument();
+  });
+
+  it("shows zero instead of an unknown context percentage", () => {
+    renderComposer({
+      contextSnapshot: { ...mockContextSnapshot, maxTokens: 0, percentUsed: 0 },
+    });
+
+    expect(screen.getByRole("button", { name: "Context usage 0%" })).toBeInTheDocument();
+    expect(screen.queryByText(/Unknown/)).not.toBeInTheDocument();
+  });
+
   it("hides the review action when no review summary is available", () => {
     renderComposer();
 

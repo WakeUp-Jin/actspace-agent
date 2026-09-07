@@ -44,16 +44,6 @@ const messages: MessageBlock[] = [
 function installBridge(overrides: Partial<NonNullable<typeof window.actspace>> = {}) {
   const bridge = {
     getWorkspaceEnvironment: vi.fn(async () => environment),
-    listWorkspaceOpenTools: vi.fn(async () => ({
-      tools: [
-        { id: "vscode" as const, label: "VS Code", available: true, iconDataUrl: "data:image/png;base64,AA==" },
-        { id: "cursor" as const, label: "Cursor", available: false },
-        { id: "finder" as const, label: "Finder", available: true, iconDataUrl: "data:image/png;base64,AQ==" },
-        { id: "terminal" as const, label: "Terminal", available: true },
-        { id: "iterm2" as const, label: "iTerm2", available: true },
-      ],
-    })),
-    openWorkspaceInTool: vi.fn(async (input) => ({ ok: true as const, workspaceRoot: "/tmp/workspace", toolId: input.toolId })),
     createWorkspaceBranch: vi.fn(async (input) => ({
       ok: true as const,
       action: "create_branch" as const,
@@ -134,6 +124,8 @@ describe("WorkspaceChromeControls", () => {
 
     const environmentButton = screen.getByRole("button", { name: "Show workspace environment" });
     expect(environmentButton.querySelector("svg")).toHaveClass("lucide-bookmark");
+    expect(screen.queryByRole("button", { name: /Open workspace in/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Choose workspace app" })).not.toBeInTheDocument();
     await user.click(environmentButton);
     const popover = await screen.findByRole("dialog", { name: "Workspace environment" });
 
@@ -213,25 +205,6 @@ describe("WorkspaceChromeControls", () => {
     const menu = await screen.findByRole("menu", { name: "Branches" });
     expect(within(menu).getByRole("menuitemradio", { name: "main" })).toBeChecked();
     expect(within(menu).getByRole("menuitem", { name: "Create and checkout new branch..." })).toBeInTheDocument();
-  });
-
-  it("lists local apps, disables unavailable apps, and remembers a selection", async () => {
-    const bridge = installBridge();
-    const user = userEvent.setup();
-    renderControls();
-
-    const chooser = screen.getByRole("button", { name: "Choose workspace app" });
-    expect(chooser).not.toHaveClass("border-l");
-    await user.click(chooser);
-    const menu = await screen.findByRole("menu", { name: "Workspace apps" });
-    expect(menu.querySelectorAll("img")).toHaveLength(2);
-    expect(within(menu).getByRole("menuitem", { name: /Cursor/ })).toBeDisabled();
-
-    await user.click(within(menu).getByRole("menuitem", { name: "VS Code" }));
-
-    expect(bridge.openWorkspaceInTool).toHaveBeenCalledWith({ workspaceRoot: "/tmp/workspace", toolId: "vscode" });
-    expect(window.localStorage.getItem("actspace.workspace.open-tool.v1")).toBe("vscode");
-    expect(screen.getByRole("button", { name: "Open workspace in VS Code" })).toBeInTheDocument();
   });
 
   it("creates a branch from detached HEAD", async () => {

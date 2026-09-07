@@ -1,3 +1,7 @@
+import { LegacyProxyWireEngine } from "./legacy-proxy-wire-engine.js";
+import { catalogProviderForEndpoint, type ModelPricingSnapshot } from "@actspace/shared";
+import { calculateUsageCost } from "@actspace/llm-service";
+import { reasoningPayload } from "./reasoning-options.js";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { LlmRuntimeError, providerCodeFromUnknown, retryAfterMsFromUnknown, type LlmFailure, type LlmFailureKind } from "@actspace/llm-service";
@@ -10,6 +14,7 @@ import type { LlmUsage } from "@actspace/llm-service";
 export type PiAiWireRoute = "openai-completions" | "openai-responses" | "anthropic-messages";
 export type PiAiArtifactReader = (sessionId: string, artifactId: string) => Promise<{ readonly data: Uint8Array; readonly mimeType: string }>;
 export type PiAiWireEngineOptions = {
+  readonly pricing?: ModelPricingSnapshot | null;
   readonly route: PiAiWireRoute;
   readonly providerId: string;
   readonly modelId?: string;
@@ -37,6 +42,9 @@ export class PiAiWireEngine implements PiAiEngine {
   constructor(private readonly options: PiAiWireEngineOptions) { this.#load = options.load ?? loadPiAiPublicModules; }
 
   async stream(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
+    if (input.credential.proxyUrl === undefined && catalogProviderForEndpoint(input.credential.baseUrl ?? this.options.baseUrl ?? "") === "openrouter" && this.options.route !== "anthropic-messages") {
+      return new LegacyProxyWireEngine(this.options).stream(input);
+    }
     if (input.credential.proxyUrl !== undefined) throw failure("proxy", "pi-ai 0.82.1 has no accepted request-scoped proxy injection for this route.");
     try {
       const { core, api } = await this.#load(this.options.route);
@@ -50,8 +58,8 @@ export class PiAiWireEngine implements PiAiEngine {
       const resolved = models.getModel(this.options.providerId, modelId);
       if (resolved === undefined) throw failure("invalid-request", `pi-ai did not publish model ${modelId}.`);
       const context = await toPiAiContext(input.request.messages, input.request.tools, input.request.sessionId, this.options.readArtifact);
-      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens, reasoning: input.request.options.reasoning ? "high" : undefined, headers: input.credential.headers } as never);
-      return fromPiAiEvents(events, input.request.requestId);
+      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens, reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), onPayload: (payload: Record<string, unknown>) => ({ ...payload, ...reasoningPayload(this.options.route, this.options.providerId, input.request.options) }), headers: input.credential.headers } as never);
+      return fromPiAiEvents(events, input.request.requestId, this.options.pricing ?? null);
     } catch (error) {
       if (error instanceof LlmRuntimeError) throw error;
       throw new LlmRuntimeError(classifyFailure(error), error);
@@ -108,21 +116,21 @@ async function toPiUserContent(message: LlmMessage, sessionId?: string, readArti
   return content;
 }
 
-async function* fromPiAiEvents(events: AsyncIterable<PiAiEvent>, requestId: string): AsyncGenerator<LlmStreamEvent> {
+async function* fromPiAiEvents(events: AsyncIterable<PiAiEvent>, requestId: string, pricing: ModelPricingSnapshot | null): AsyncGenerator<LlmStreamEvent> {
   const calls = new Map<number, { callId: string; name: string }>();
   for await (const event of events) {
     if (event.type === "text_delta") yield { type: "text-delta", text: event.delta ?? "" };
     else if (event.type === "thinking_delta") yield { type: "reasoning-delta", text: event.delta ?? "" };
     else if (event.type === "toolcall_start") { const block = event.partial?.content[event.contentIndex ?? -1] as { id?: string; name?: string } | undefined; calls.set(event.contentIndex ?? -1, { callId: block?.id ?? `${requestId}:${event.contentIndex ?? 0}`, name: block?.name ?? "unknown" }); }
     else if (event.type === "toolcall_delta") { const call = calls.get(event.contentIndex ?? -1) ?? { callId: `${requestId}:${event.contentIndex ?? 0}`, name: "unknown" }; yield { type: "tool-call-delta", callId: call.callId, name: call.name, argumentsDelta: event.delta ?? "" }; }
-    else if (event.type === "done" && event.message !== undefined) { yield { type: "done", stopReason: mapStopReason(event.message.stopReason), usage: mapUsage(event.message.usage), content: toActSpaceContent(event.message.content) }; return; }
-    else if (event.type === "error") { const terminal = event.error; if (terminal?.stopReason === "aborted") yield { type: "aborted", reason: terminal.errorMessage ?? "pi-ai request aborted" }; else yield { type: "error", failure: classifyFailure(terminal ?? new Error("pi-ai stream failed")) }; return; }
+    else if (event.type === "done" && event.message !== undefined) { yield { type: "done", stopReason: mapStopReason(event.message.stopReason), usage: calculateUsageCost(mapUsage(event.message.usage), pricing), content: toActSpaceContent(event.message.content) }; return; }
+    else if (event.type === "error") { const terminal = event.error; if (terminal?.stopReason === "aborted") yield { type: "aborted", usage: calculateUsageCost(mapUsage(terminal.usage), pricing), reason: terminal.errorMessage ?? "pi-ai request aborted" }; else yield { type: "error", usage: calculateUsageCost(mapUsage(terminal?.usage), pricing), failure: classifyFailure(terminal ?? new Error("pi-ai stream failed")) }; return; }
   }
   yield { type: "error", failure: { kind: "malformed-stream", message: "pi-ai stream ended without a terminal event.", retryable: false, attempt: 1 } };
 }
 
 function toActSpaceContent(content: readonly RuntimeV2JsonValue[]): readonly LlmContentBlock[] { return content.flatMap((raw): LlmContentBlock[] => { const block = raw as { type?: string; text?: string; thinking?: string; thinkingSignature?: string; id?: string; name?: string; arguments?: RuntimeV2JsonValue }; if (block.type === "text") return [{ type: "text", text: block.text ?? "" }]; if (block.type === "thinking") return [{ type: "reasoning", text: block.thinking ?? "", ...(block.thinkingSignature ? { signature: block.thinkingSignature } : {}) }]; if (block.type === "toolCall") return [{ type: "tool-call", callId: block.id ?? "unknown", name: block.name ?? "unknown", arguments: JSON.stringify(block.arguments ?? {}) }]; return []; }); }
-function mapUsage(usage?: PiAiUsage): LlmUsage { return { inputTokens: usage?.input ?? null, outputTokens: usage?.output ?? null, cacheReadTokens: usage?.cacheRead ?? null, cacheWriteTokens: usage?.cacheWrite ?? null, reasoningTokens: usage?.reasoning ?? null, cost: usage?.cost?.total ?? null, costCurrency: usage?.cost?.total === undefined ? null : "USD", source: usage === undefined ? "unknown" : "provider-reported" }; }
+function mapUsage(usage?: PiAiUsage): LlmUsage { return { inputTokens: usage?.input ?? null, outputTokens: usage?.output ?? null, cacheReadTokens: usage?.cacheRead ?? null, cacheWriteTokens: usage?.cacheWrite ?? null, reasoningTokens: usage?.reasoning ?? null, cost: null, costCurrency: null, source: usage === undefined ? "unknown" : "provider-reported" }; }
 function zeroUsage() { return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }; }
 function mapStopReason(reason: string): string { return reason === "toolUse" ? "tool-calls" : reason === "length" ? "max-tokens" : reason; }
 function messageText(message: LlmMessage): string { if (typeof message.content === "string") return message.content; return message.content.map((block) => block.type === "text" ? block.text : block.type === "reasoning" ? block.text : block.type === "tool-result" ? block.content : "").join(""); }

@@ -50,13 +50,17 @@ export class ToolExecutionScheduler {
         }
         const stages: PreparedDispatch[] = [];
         for (const item of group) stages.push(await item.stage());
+        const committing: Promise<ToolExecutionResult>[] = [];
         await runBounded(
           group.map((item, index) => async () => {
             if (stages[index]?.kind === "body") await item.runBody();
+            // Submit as soon as this body is ready. Ordered slots still control durable order.
+            committing[index] = item.execute();
+            void committing[index]!.catch(() => {});
           }),
           this.maxParallel,
         );
-        for (const item of group) results.push(await item.execute());
+        results.push(...await Promise.all(committing));
       }
       return Object.freeze(results);
     } finally {

@@ -46,7 +46,7 @@ export interface ImageInspectionSettings {
 }
 
 /** 可在设置页保存本地凭据的全部供应商（LLM + 搜索 + 图片生成）。 */
-export type SecretProviderId = LlmProviderId | SearchProviderId | ImageGenerationSecretId;
+export type SecretProviderId = LlmProviderId | SearchProviderId | ImageGenerationSecretId | "speech-minimax";
 
 export interface ProviderSettingsView {
   /** 用户已在页面配置该供应商密钥；决定卡片"已连接/可断开"。 */
@@ -121,6 +121,8 @@ export interface ProviderCredentialView extends ProviderCredentialSettings {
 export interface InstalledModelSettings {
   enabled: boolean;
   addedAt: string;
+  /** Optional V4 connection binding; omitted means the provider default connection. */
+  connectionId?: string;
   customLabel?: string;
   /** 缺省使用 provider 默认 Key；有值时引用同 provider 下已保存的额外 Key。 */
   credentialId?: string;
@@ -204,6 +206,148 @@ export interface AppSettingsV2 {
   agent: AgentSettingsV2;
   skills: SkillsSettings;
   shortcuts: ShortcutsSettings;
+}
+
+/**
+ * Settings v4 is the logical namespace contract used by the new Settings Authority.
+ * It is deliberately separate from AppSettingsV2: v2 remains a renderer compatibility
+ * view while v4 is the persisted, provider-qualified shape used by new pages.
+ */
+export type SettingsRevision = string;
+
+export type SettingsV4Namespace =
+  | "general"
+  | "models"
+  | "tools"
+  | "media"
+  | "skills"
+  | "subagents"
+  | "activity";
+
+export interface SettingsV4General {
+  /** Absent in older v4 snapshots. Runtime enablement is never persisted. */
+  englishLearning?: { lastSessionId: string | null };
+  personalization: {
+    displayName: string;
+    responseStyle: string;
+  };
+  agentInstructions: {
+    systemPromptPath: string;
+  };
+  taskDefaults: {
+    temperature: number | null;
+    maxOutputTokens: number | null;
+  };
+  shortcuts: ShortcutsSettings;
+}
+
+export interface SettingsV4ConnectionSettings extends ProviderConnectionSettings {
+  connectionId: string;
+  /** Missing in older settings: preserve Chat Completions behavior. */
+  protocol?: import("./model-config").ModelApi;
+  providerId: LlmProviderId;
+  displayName?: string;
+  defaultModel?: string | null;
+  catalogId?: string;
+}
+
+export interface CustomConnectionInput {
+  providerId: LlmProviderId;
+  protocol?: import("./model-config").ModelApi;
+  connectionId?: string;
+  displayName: string;
+  apiKey: string;
+  baseUrl: string;
+  defaultModel?: string | null;
+  catalogId?: string;
+  proxy?: ProviderProxySettings;
+}
+
+export interface SettingsV4InstalledModelSettings extends InstalledModelSettings {
+  connectionId: string;
+}
+
+export interface SettingsV4Models {
+  connections: Record<string, SettingsV4ConnectionSettings>;
+  definitions: Partial<Record<ModelKey, ModelDefinition>>;
+  installed: Partial<Record<ModelKey, SettingsV4InstalledModelSettings>>;
+  taskBindings: {
+    defaultChat: ModelKey | null;
+    utility: ModelKey | null;
+    explore: ModelKey | null;
+  };
+}
+
+export interface SettingsV4Tools {
+  disabledTools: string[];
+  bash: {
+    alwaysAsk: boolean;
+  };
+  searchProviders: Partial<Record<SearchProviderId, { enabled: boolean }>>;
+}
+
+export interface SettingsV4Media {
+  /** Absent in older v4 snapshots; SettingsService supplies defaults. */
+  speech?: import("./english-learning").SpeechSettings;
+  imageGeneration: {
+    baseUrl: string;
+    model: string;
+  };
+  imageInspection: ImageInspectionSettings;
+}
+
+export interface SettingsV4SubagentRoute {
+  enabled: boolean;
+  model: ModelKey | null;
+}
+
+export interface SettingsV4UsagePreferences {
+  range: "24h" | "7d" | "30d" | "all";
+  status: "all" | "success" | "error" | "aborted" | "unknown";
+  modelFilter: string;
+  showDetails: boolean;
+  activeTab: "requests" | "providers" | "models" | "tools" | "pricing";
+}
+
+export interface SettingsV4 {
+  version: 4;
+  general: SettingsV4General;
+  models: SettingsV4Models;
+  tools: SettingsV4Tools;
+  media: SettingsV4Media;
+  skills: SkillsSettings;
+  subagents: {
+    routes: Record<string, SettingsV4SubagentRoute>;
+  };
+  activity: {
+    usage: SettingsV4UsagePreferences;
+  };
+}
+
+export type SettingsV4NamespacePatch = {
+  [N in SettingsV4Namespace]: {
+    namespace: N;
+    patch: Partial<SettingsV4[N]>;
+  };
+}[SettingsV4Namespace];
+
+export type SettingsV4UpdateInput = SettingsV4NamespacePatch & {
+  expectedRevision: SettingsRevision;
+};
+
+export interface SettingsV4Snapshot {
+  version: 4;
+  revision: SettingsRevision;
+  settings: SettingsV4;
+}
+
+export type SettingsV4UpdateResult =
+  | { ok: true; snapshot: SettingsV4Snapshot }
+  | { ok: false; code: "revision_conflict"; latest: SettingsV4Snapshot; message: string };
+
+export interface SettingsV4ChangedNotification {
+  revision: SettingsRevision;
+  changedNamespaces: SettingsV4Namespace[];
 }
 
 /**

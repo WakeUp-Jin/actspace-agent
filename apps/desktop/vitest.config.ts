@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      "@actspace/shared/model-catalog-data": resolve(__dirname, "../../packages/shared/src/generated/model-catalog.generated.ts"),
       "@actspace/shared/runtime-v2": resolve(__dirname, "../../packages/shared/src/runtime-v2/index.ts"),
       "@actspace/shared": resolve(__dirname, "../../packages/shared/src/index.ts"),
       "@actspace/shared/session-selectors": resolve(__dirname, "../../packages/shared/src/session-selectors.ts"),

@@ -13,6 +13,7 @@ export type RuntimeV2CatalogResult = {
 };
 
 export type RuntimeV2OpenRouterCatalogOptions = {
+  readonly pricingCatalog?: () => import("@actspace/shared").ModelCatalogSnapshot;
   readonly dataRoot: string;
   readonly fetchCatalog: (runtime: ProviderNetworkRuntime) => Promise<ProviderCatalogFetchResult>;
   readonly isAdded: (apiModel: string) => boolean;
@@ -24,6 +25,7 @@ const CACHE_VERSION = 1;
 const DEFAULT_STALE_AFTER_MS = 24 * 60 * 60 * 1_000;
 
 export class RuntimeV2OpenRouterCatalogService {
+  readonly #pricingCatalog?: RuntimeV2OpenRouterCatalogOptions["pricingCatalog"];
   readonly #cachePath: string;
   readonly #fetchCatalog: RuntimeV2OpenRouterCatalogOptions["fetchCatalog"];
   readonly #isAdded: RuntimeV2OpenRouterCatalogOptions["isAdded"];
@@ -32,6 +34,7 @@ export class RuntimeV2OpenRouterCatalogService {
   #cache: OpenRouterCatalogCache | null = null;
 
   constructor(options: RuntimeV2OpenRouterCatalogOptions) {
+    this.#pricingCatalog = options.pricingCatalog;
     this.#cachePath = join(options.dataRoot, "providers", "openrouter", "models-cache.json");
     this.#fetchCatalog = options.fetchCatalog;
     this.#isAdded = options.isAdded;
@@ -53,18 +56,32 @@ export class RuntimeV2OpenRouterCatalogService {
   }
 
   list(query = ""): RuntimeV2CatalogResult {
+    if (!this.#cache && this.#pricingCatalog) {
+      const snapshot = this.#pricingCatalog();
+      const models = snapshot.entries.filter((row) => row.sourceProviderId === "openrouter" && `${row.name} ${row.apiModel}`.toLowerCase().includes(query.toLowerCase().trim())).map((row): CatalogModelView => this.withPricing({ provider: "openrouter", apiModel: row.apiModel, name: row.name, contextWindow: row.contextWindow, maxTokens: row.maxOutput, input: row.input.includes("image") ? ["text", "image"] : ["text"], toolUse: "unknown", reasoning: row.reasoning, isFree: false, added: this.#isAdded(row.apiModel) }));
+      return { state: "fresh", stale: false, fetchedAt: snapshot.generatedAt, models, skippedCount: 0 };
+    }
     if (!this.#cache) return { state: "missing", stale: false, models: [], skippedCount: 0 };
     const normalized = query.trim().toLocaleLowerCase();
     const stale = this.#now().getTime() - Date.parse(this.#cache.fetchedAt) > this.#staleAfterMs;
     const models = this.#cache.models
       .filter((model) => !normalized || model.name.toLocaleLowerCase().includes(normalized) || model.apiModel.toLocaleLowerCase().includes(normalized))
       .map((model) => ({ ...model, input: [...model.input], ...(Array.isArray(model.reasoningEfforts) ? { reasoningEfforts: [...model.reasoningEfforts] } : {}), added: this.#isAdded(model.apiModel) }));
-    return { state: stale ? "stale" : "fresh", fetchedAt: this.#cache.fetchedAt, stale, models, skippedCount: this.#cache.skippedCount };
+    return { state: stale ? "stale" : "fresh", fetchedAt: this.#cache.fetchedAt, stale, models: models.map((row) => this.withPricing(row)), skippedCount: this.#cache.skippedCount };
   }
 
   findModel(apiModel: string): CatalogModelView | undefined {
-    const model = this.#cache?.models.find((item) => item.apiModel === apiModel);
+    const model = this.list().models.find((item) => item.apiModel === apiModel);
     return model ? { ...model, input: [...model.input], added: this.#isAdded(model.apiModel) } : undefined;
+  }
+
+  private withPricing(model: CatalogModelView): CatalogModelView {
+    if (!this.#pricingCatalog) return model;
+    const fact = this.#pricingCatalog().entries.find((row) => row.sourceProviderId === "openrouter" && row.apiModel === model.apiModel);
+    const { pricing: _old, ...rest } = model;
+    const rates = fact?.rates;
+    if (!rates || rates.input === null || rates.output === null || rates.cacheRead === null || fact?.unsupportedBilling) return { ...rest, isFree: false };
+    return { ...rest, isFree: rates.input === 0 && rates.output === 0 && rates.cacheRead === 0 && (rates.cacheWrite === null || rates.cacheWrite === 0), pricing: { currency: fact.currency, inputCacheMissPerMillion: rates.input, outputPerMillion: rates.output, inputCacheHitPerMillion: rates.cacheRead, ...(rates.cacheWrite === null ? {} : { inputCacheWritePerMillion: rates.cacheWrite }) } };
   }
 
   async reload(runtime: ProviderNetworkRuntime): Promise<RuntimeV2CatalogResult> {

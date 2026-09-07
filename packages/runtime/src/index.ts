@@ -48,3 +48,5 @@ export type { ResolvedComposition } from "@actspace/composition";
 export type { BootDiagnostic } from "@actspace/diagnostics";
 export { bootProfile } from "@actspace/boot";
 export type { BootedProfile } from "@actspace/boot";
+
+export type { AgentLoopLiveEvent } from "@actspace/core-agent-loop";

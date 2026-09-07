@@ -80,14 +80,15 @@ reasoningTokens
 cost
 costCurrency
 source
+costProvenance?
 ```
 
 规则：
 
 - provider 有精确值时保存精确值；
-- adapter 只能估算时明确 `source`，不能把估算伪装成 provider 事实；
+- `source` 表示 Token 来源，`costProvenance.basis` 独立表示费用来源，不把 SDK 估算误标成真实扣款；
 - provider 未返回某字段时允许为 unknown / null，Projection 不应凭空补出精确数字；
-- cost 是当次请求的事实结果，价格目录或用户设置中的倍率不是 Session 恢复所需的完整快照；
+- 新请求的 cost 连同 `costProvenance.pricingSnapshot` 保存当时所用模型的价格、币种、倍率及目录来源，不保存完整目录；历史没有依据的零值按未知展示，更新价目不重算历史，详见[目录与费用设计](agent-model-catalog-and-usage-cost.md)；
 - retry 的每次真实 request 都有独立 request ID、snapshot 和 usage，不能把多次尝试覆盖为一条。
 
 Durable Session projection 聚合：
@@ -99,7 +100,26 @@ Durable Session projection 聚合：
 - total；
 - 可确认的 USD cost。
 
-Desktop Usage 页面可以再按 Agent Run、模型和日期聚合，但不能修改 Journal usage。
+Desktop 使用统计页面统一消费 Journal request/tool activity 的摘要、分类聚合与明细；旧统计 IPC 仅为其他兼容消费者保留，两者都不能修改 Journal usage。
+
+事件级 Usage projection 以 `${sessionId}:request:${requestId}` 和 `${sessionId}:tool:${callId}` 作为稳定 activity ID。每个 retry request 保持独立行；`assistant/message` 优先提供终态和 usage，只有缺少 assistant terminal 时才使用对应 `step/end` 的 usage 作为回退。投影同时记录 `throughJournalSeq` 水位，允许冷启动重建并验证重启前后结果一致。
+
+### Usage 页面偏好的持久化边界
+
+设置中心重构后，Usage 页面可以持久化查看偏好，但这些偏好不是 Usage 事实：
+
+```text
+settings.json → activity.usage
+  range / status / modelFilter / showDetails / activeTab
+
+sessions-v2/<sessionId>/journal.jsonl
+  request、model、tool、token、cost、status 等运行事实
+```
+
+- `activity.usage` 由 Main Settings Authority 通过 typed IPC 读写，跨窗口和重启恢复；它不能被解释为计费数据，也不能改变历史聚合结果。
+- Usage 明细继续由 Journal Projection 提供，当前通过 typed `usage-activity:get` IPC 返回事件级快照。当前不引入独立 SQLite 事实库；如果未来增加 `runtime-v2/usage-read-model.sqlite`，它只能是可删除、可重建的查询缓存。
+- 清理或重建 Usage 派生数据不得删除 Session Journal、会话历史、设置或凭据。
+- 页面筛选状态可以改变查询参数，但不能回写 `llm/usage`，也不能用 Context estimate 修正 provider usage。
 
 ## Context Projection
 

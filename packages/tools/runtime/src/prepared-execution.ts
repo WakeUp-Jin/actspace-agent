@@ -48,6 +48,7 @@ export type ToolPreparedEnvironment = {
   readonly approvalBroker?: ApprovalBroker;
   readonly approvalTimeoutMs?: number;
   readonly journal: ToolJournalPort;
+  readonly onExecutionStarted?: (call: { readonly callId: string; readonly name: string }) => void;
   readonly reportProgress?: (update: ToolProgressUpdate & {
     readonly sessionId: string;
     readonly agentRunId: string;
@@ -195,7 +196,10 @@ export class PreparedToolExecution {
       defer: (finalizer) => this.#finalizers.push(finalizer),
     };
     try {
-      const invoke = async () => this.registration.executor.execute(this.#args ?? {}, context);
+      const invoke = async () => {
+        try { this.environment.onExecutionStarted?.({ callId: this.callId, name: this.name }); } catch { /* Observers cannot affect tool execution. */ }
+        return this.registration.executor.execute(this.#args ?? {}, context);
+      };
       if (this.environment.context === undefined) this.#body = await invoke();
       else {
         const intercepted = await waterfallDispatch(this.environment.context, "tools/execute", { context, execute: invoke }, () => ({ context, execute: invoke }), this.environment.eventCarrier);

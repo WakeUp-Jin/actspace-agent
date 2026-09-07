@@ -5,12 +5,13 @@ import type { SessionListItem } from "@actspace/shared";
 import type { SidebarMode } from "./Sidebar";
 import { SessionHoverPreviewCard } from "./SessionHoverPreview";
 import type { SessionHoverPreview, SessionPreviewResolver } from "./SessionHoverPreview";
+import { SessionViewToggle, type SessionMainView } from "./SessionViewToggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 
 const CHROME_TITLE_HOVER_CONTENT_CLASS = "!max-w-[420px] !p-0 !font-normal !leading-normal";
 
 /**
- * 窗口顶部 chrome 浮层，参考 Cursor Agent Window 的 `.part.titlebar` 实现。
+ * 聊天 Workbench 的单行窗口 chrome，参考 Cursor Agent Window 的 `.part.titlebar` 实现。
  *
  * 设计要点（一次性解决过去四轮 sidebar 折叠 bug 的共同根因）：
  *
@@ -20,7 +21,7 @@ const CHROME_TITLE_HOVER_CONTENT_CLASS = "!max-w-[420px] !p-0 !font-normal !lead
  *  - Window drag region 唯一保留在 `.chrome-center`，所有按钮显式 `no-drag`，
  *    避免 Electron 在 macOS 上「父级 drag + 浮层 no-drag」的 hit-test bug 抢点击。
  *  - 桌面布局使用与 SplitView 相同的左 / 中 / 右列宽；面板隐藏或进入紧凑布局时退回窗口边缘控制宽度。
- *  - 中间列承载 session title 与主工作区操作，右列只承载对象面板操作，信息归属不跨 pane。
+ *  - 左列承载 sidebar 收缩与会话历史导航；中间列承载 session title 与主工作区操作；右列只承载对象面板操作。
  *  - chrome bar 自身透明，只绘制统一底部分隔线；下方三栏的背景自然贯顶。
  *
  * 三栏（Sidebar / ConversationView / RightPanel）需要各自顶部留出
@@ -43,8 +44,11 @@ export type WindowChromeBarProps = {
   showRightToggle?: boolean;
   currentSession?: SessionListItem | null;
   getSessionPreview?: SessionPreviewResolver;
-  /** 当前主工作区的尾部控件（如 IDE / Environment），归属于中间栏。 */
+  /** 当前主工作区的尾部控件（如 Environment），归属于中间栏。 */
   centerTrailing?: ReactNode;
+  /** Chat / Trajectory 主视图切换，仅在会话页显示。 */
+  sessionView?: SessionMainView;
+  onToggleSessionView?: () => void;
   /** 渲染在右侧折叠按钮左侧的额外控件（如「+ 新建对象」菜单）。 */
   rightLeading?: ReactNode;
 };
@@ -66,6 +70,8 @@ export function WindowChromeBar({
   currentSession,
   getSessionPreview,
   centerTrailing,
+  sessionView,
+  onToggleSessionView,
   rightLeading,
 }: WindowChromeBarProps) {
   const isLeftHidden = leftMode === "hidden";
@@ -124,6 +130,9 @@ export function WindowChromeBar({
       </div>
       <div className="chrome-center">
         <div className="chrome-center-title">
+          {sessionView && onToggleSessionView ? (
+            <SessionViewToggle view={sessionView} onToggle={onToggleSessionView} />
+          ) : null}
           <ChromeTitle
             title={title}
             currentSession={currentSession ?? null}

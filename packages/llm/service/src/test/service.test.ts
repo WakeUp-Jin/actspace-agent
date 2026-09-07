@@ -18,6 +18,15 @@ function adapter(calls: string[]): LlmAdapter {
 const credentials: CredentialResolver = { resolve: async () => ({ apiKey: "secret", baseUrl: "https://provider.test" }) };
 
 describe("LlmService", () => {
+  it("captures non-secret model context facts during preparation", () => {
+    const routes = new LlmRouteRegistry();
+    const handle = routes.register({ routeId: "facts", providerId: "provider", modelPattern: "*", adapter: { ...adapter([]), resolveModelFacts: () => ({ contextWindow: 1_000_000 }) }, credentialRef: "credential", defaults: {} });
+    const prepared = new LlmService(routes, credentials).prepare({ routeId: "facts", model: "model", messages: [] });
+    expect(prepared.request.contextWindow).toBe(1_000_000);
+    prepared.release();
+    return handle.dispose(100);
+  });
+
   it("captures exact route registration and releases stream lease once", async () => {
     const calls: string[] = [];
     const routes = new LlmRouteRegistry();

@@ -80,7 +80,7 @@ Session Journal / Surface
     ↓ durable projection
 RuntimeV2SessionSnapshot
     ↓ fixed renderer adapter
-SessionRecord / Context / Usage / Analysis
+SessionRecord / Context / Usage
 ```
 
 必须保持以下边界：
@@ -91,7 +91,7 @@ SessionRecord / Context / Usage / Analysis
 - diagnostics 和 live progress 不是持久恢复事实，不能反向覆盖 Journal；
 - Compaction 通过 `surface/replaced` 事务替换有效 Surface 区域，不改写已有历史行。
 
-## Context、Usage 与 Analysis
+## Context、Usage 与 Trajectory
 
 当前 Context 面板没有独立持久化文件。Desktop 从最近一次 `request/snapshot` Journal event 生成 Context entries、bucket 和 token 估算：
 
@@ -101,9 +101,9 @@ SessionRecord / Context / Usage / Analysis
 - `messages` -> Conversation；
 - 最近 Compaction summary -> Summarized Conversation。
 
-Usage 和成本来自 `llm/usage` event。Durable Session projection 聚合 input、output、cache read、cache write 和 USD cost；Desktop Usage 页面再按 Agent Run、模型和日期派生视图。
+Usage 和成本来自 Session Journal 的 request / assistant terminal usage facts。Desktop fixed-renderer projection 额外从 `request/header`、`request/context`、`assistant/message`、`step/end`、`llm/retry`、`tool/call` 和 Tool terminal 事件重建 `UsageActivitySnapshot`，按真实 request / tool invocation 输出稳定 activity ID、状态、延迟、重试链和成本依据。`UsageStatisticsSnapshot` 继续作为旧 UI/调用方的兼容适配器，不能成为第二份事实账本。
 
-Analysis / Trace 页面同样从 Journal 中的 Turn、request snapshot、LLM、Tool 和 retry event 即时派生。当前没有独立 Trace JSONL、summary sidecar 或 retention worker；删除 Journal 就无法重建这些分析视图。
+分析观测页面及专用 Analysis / Trace IPC 已于 2026-09-06 退役。Trajectory 继续从 Journal 派生运行轨迹；当前没有独立 Trace JSONL、summary sidecar 或 retention worker。Journal 仍是聊天恢复、Context、Usage 和 Trajectory 的事实来源。
 
 ## Artifact
 
@@ -137,12 +137,25 @@ Fork 不是复制一个 v1 会话目录。当前 Profile 的 App Bundle Service 
 
 ## 设置与凭据
 
-- `settings.json`：main-owned 非敏感设置，包括 provider 开关、Base URL、代理、模型选择、Prompt、工具开关和快捷键；
+- `settings.json`：main-owned 非敏感设置。P0 后物理写入 `version: 4` 逻辑 namespace，包括 provider/connection、模型选择、Prompt 路径、工具开关和快捷键；v1/v2/v3 只作为迁移输入并保留备份，具体结构见 [`front-设置中心重构规范.md`](frontend/front-设置中心重构规范.md)；
 - `secrets.json` v2：main-only 明文凭据，文件权限收紧为 `0600`；
 - renderer 只接收 `hasApiKey`、连接状态、模型目录和脱敏错误；
 - Desktop provider key 不从仓库 `.env` 读取；CLI 才读取启动进程显式提供的环境变量。
 
 旧 `secrets.json` v1 只允许在 main 内完成全量解密校验后原子迁移。迁移失败时必须保留原文件并禁止用空状态覆盖。
+
+### 设置中心 v4 的持久化边界（已确认，P0–P5 已实现）
+
+设置中心重构采用“UI 统一、存储所有权分层”的方案：
+
+- `settings.json` 仍是单个物理文件，但内部按 `general`、`models`、`tools`、`media`、`skills`、`subagents` 和 `activity.usage` 划分逻辑 namespace；不因为页面分组而拆出多个配置文件。
+- `models` 的 `connections`、`definitions` 和 `installed` 使用稳定 ID，任务默认只保存稳定的 `modelKey` / binding 引用，不通过展示名称关联。
+- `general.personalization` 保存 `displayName` 和 `responseStyle`；System Prompt 正文继续保存在 `<dataRoot>/prompts/main-agent.md`，身份偏好不能覆盖系统约束、项目指令或安全策略。
+- 主题、字体、字号等首屏 Client UI 偏好第一阶段继续保存在 renderer `localStorage`，不进入 Runtime 设置 namespace。
+- `activity.usage` 只保存 Usage 页面筛选和展示偏好，例如时间范围、状态、模型筛选、明细开关和当前 Tab；Token、成本、请求状态和运行轨迹 仍以 Session Journal 为事实来源。
+- 未来可以增加 `runtime-v2/usage-read-model.sqlite` 作为可删除、可重建的查询缓存，但它不能成为恢复事实或第二套 Usage 真相。
+- Renderer 通过 typed IPC 提交 namespace partial patch；Main 校验、合并并原子写入。第一阶段只需要 root revision 和现有 mutation queue，namespace revision、外部编辑热加载和插件自定义 schema 暂缓到确有多写入方需求时再引入。
+- 设置属于 `<dataRoot>` 全局作用域，不跟随 workspace root；未来若需要项目级设置，另行定义显式 scope 和迁移规则。
 
 ## 日志
 
@@ -161,5 +174,5 @@ Fork 不是复制一个 v1 会话目录。当前 Profile 的 App Bundle Service 
 - `packages/runtime/src/runtime/session-controller.ts`：Host-facing Session 操作；
 - `packages/runtime/src/projection/durable-session.ts`：durable snapshot；
 - `apps/desktop/src/main/app-paths.ts`：Desktop data / log / tmp root；
-- `apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts`：Context、Usage 与 Analysis 派生；
+- `apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts`：Context 与 Usage 派生；
 - `apps/desktop/src/main/runtime-v2/artifact-store.ts`：Desktop artifact integrity 与 owner 校验。

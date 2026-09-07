@@ -1,5 +1,7 @@
 # P13：Desktop Host Adapter 与固定 Renderer 接入
 
+> 2026-09-06 范围更新：分析观测功能与专用 Analysis / Trace 接口已退役。下文保留该页面或验收其入口的原计划条目已失效；Journal、聊天、Trajectory、Context 与 Usage 仍保留。
+
 状态：执行中（v2-only Host、固定 renderer 与本地自动化已完成；packaged Electron 和真实环境人工验收未完成）
 
 父计划：[ActSpace v2 插件化 Agent Runtime 完整交付计划](./README.md)

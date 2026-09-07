@@ -1,5 +1,138 @@
 import type { RuntimeV2JsonValue } from "./host-dto";
 
+export const RUNTIME_V2_PROJECTION_SCHEMA_VERSION = 1 as const;
+
+/** Stable identifiers for values that can be projected from one Session Journal. */
+export type RuntimeV2ProjectionKey =
+  | "surface"
+  | "run"
+  | "composer"
+  | "providerUsage"
+  | "requestContextEstimate"
+  | "trajectory"
+  | (string & {});
+
+export type RuntimeV2ProjectionRevision = {
+  readonly schemaVersion: typeof RUNTIME_V2_PROJECTION_SCHEMA_VERSION;
+  readonly sessionId: string;
+  readonly throughJournalSeq: number;
+  readonly projectionKey?: RuntimeV2ProjectionKey;
+  readonly stateVersion?: number;
+  readonly requestId?: string;
+  readonly runtimeInstanceId?: string;
+};
+
+export type RuntimeV2ProjectionValues = Readonly<Partial<Record<RuntimeV2ProjectionKey, RuntimeV2JsonValue>>>;
+
+export type RuntimeV2SessionProjectionSnapshot = {
+  readonly kind: "session-projection";
+  readonly schemaVersion: typeof RUNTIME_V2_PROJECTION_SCHEMA_VERSION;
+  readonly sessionId: string;
+  readonly throughJournalSeq: number;
+  readonly values: RuntimeV2ProjectionValues;
+};
+
+export type RuntimeV2DesktopSessionProjection = {
+  readonly kind: "session-projection";
+  readonly schemaVersion: typeof RUNTIME_V2_PROJECTION_SCHEMA_VERSION;
+  readonly sessionId: string;
+  readonly throughJournalSeq: number;
+  readonly snapshot: RuntimeV2SessionSnapshot;
+  readonly values: RuntimeV2ProjectionValues;
+};
+
+export type RuntimeV2SessionProjectionInput = {
+  readonly sessionId: string;
+  /** Oldest requested Journal sequence; omitted on the first page. */
+  readonly trajectoryFromSeq?: number;
+};
+
+/** Unprefixed alias used by the Session Projection package and execution plans. */
+export type SessionProjectionSnapshot = RuntimeV2SessionProjectionSnapshot;
+
+export type RuntimeV2ProjectionChange = {
+  readonly kind: "projection-change";
+  readonly revision: RuntimeV2ProjectionRevision;
+  readonly changedKeys: readonly RuntimeV2ProjectionKey[];
+  readonly values: RuntimeV2ProjectionValues;
+};
+
+export type ProjectionChange = RuntimeV2ProjectionChange;
+
+export type RuntimeV2ProviderUsageProjection = {
+  readonly kind: "provider-usage";
+  readonly schemaVersion: 1;
+  readonly sessionId: string;
+  readonly throughJournalSeq: number;
+  readonly estimator: { readonly name: "durable-provider-usage"; readonly version: string };
+  readonly usage: RuntimeV2UsageSummary;
+};
+
+export type RuntimeV2RequestContextEstimateProjection = {
+  readonly kind: "request-context-estimate";
+  readonly schemaVersion: 1;
+  readonly sessionId: string;
+  readonly throughJournalSeq: number;
+  readonly requestId: string | null;
+  readonly estimator: { readonly name: "runtime-v2-request-snapshot"; readonly version: string };
+  readonly totalEstimatedTokens: number;
+  readonly maxTokens: number;
+  readonly percentUsed: number;
+};
+
+export type RuntimeV2ComposerProjection = {
+  readonly kind: "composer";
+  readonly schemaVersion: 1;
+  readonly sessionId: string;
+  readonly throughJournalSeq: number;
+  readonly phase: "blank" | "engaging" | "active";
+};
+
+export type RuntimeV2TrajectoryNode = {
+  readonly key: string;
+  readonly sessionId: string;
+  readonly eventSeq: number;
+  readonly eventType: string;
+  readonly time: string;
+  readonly kind: "turn" | "step" | "request" | "user" | "assistant" | "tool" | "approval" | "retry" | "compaction" | "error" | "other";
+  readonly state: "started" | "updated" | "completed" | "failed" | "aborted" | "observed";
+  readonly callId: string | null;
+  readonly data: RuntimeV2JsonValue;
+  readonly surface?: RuntimeV2JsonValue;
+  readonly source?: RuntimeV2JsonValue;
+};
+
+export type RuntimeV2TrajectorySnapshot = {
+  readonly kind: "trajectory";
+  readonly schemaVersion: 1;
+  readonly sessionId: string;
+  readonly throughJournalSeq: number;
+  readonly nodes: readonly RuntimeV2TrajectoryNode[];
+  readonly history?: {
+    readonly fromSeq: number;
+    readonly previousFromSeq: number | null;
+    readonly turnOffset: number;
+    readonly requestOffset?: number;
+  };
+};
+
+export function isRuntimeV2ProjectionRevision(value: unknown): value is RuntimeV2ProjectionRevision {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return candidate.schemaVersion === RUNTIME_V2_PROJECTION_SCHEMA_VERSION
+    && typeof candidate.sessionId === "string"
+    && candidate.sessionId.length > 0
+    && typeof candidate.throughJournalSeq === "number"
+    && Number.isSafeInteger(candidate.throughJournalSeq)
+    && candidate.throughJournalSeq >= -1
+    && (candidate.requestId === undefined || (typeof candidate.requestId === "string" && candidate.requestId.length > 0))
+    && (candidate.runtimeInstanceId === undefined || (typeof candidate.runtimeInstanceId === "string" && candidate.runtimeInstanceId.length > 0));
+}
+
+export function isRuntimeV2ProjectionKey(value: unknown): value is RuntimeV2ProjectionKey {
+  return typeof value === "string" && value.length > 0;
+}
+
 export type RuntimeV2ToolProjectionState = "running" | "completed" | "failed" | "denied" | "aborted";
 export type RuntimeV2ToolRunningPhase = "validating" | "policy" | "awaiting-approval" | "queued" | "executing" | "finalizing" | "committing";
 

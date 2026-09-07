@@ -65,7 +65,7 @@ export function apply(ctx: CordisContext): void {
     const source = await prompt.resolveSource(workspaceRoot);
     const contributors = new ContributorRegistry();
     for (const contributor of prompt.createCoreContributors({ scopeId: scope.identity.scopeId, agent: descriptor, host: host.host, workspaceRoot, instructions: source.instructions, skills: source.skills })) contributors.register(scope, contributor);
-    const assembler = new RequestAssembler({ registry: contributors, prepare: async () => ({ route: descriptor.routeId, model: descriptor.model, registrationId: "cordis-agent", adapterVersion: "cordis-agent", defaults: {}, retryPolicy: {} }) });
+    const assembler = new RequestAssembler({ registry: contributors, prepare: async () => ({ route: descriptor.routeId, model: descriptor.model, registrationId: "cordis-agent", adapterVersion: "cordis-agent", defaults: {}, retryPolicy: {}, contextWindow: null }) });
     const subject: AgentSubject = Object.freeze({ agentId: agentId ?? scope.agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });
     const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), assembler, llm, tools, toolEnvironment: toolEnvironmentFor, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
     if (signal !== undefined) {
@@ -87,7 +87,7 @@ export function apply(ctx: CordisContext): void {
       const source = await prompt.resolveSource(workspaceRoot);
       const contributors = new ContributorRegistry();
       for (const contributor of prompt.createCoreContributors({ scopeId: scope.identity.scopeId, agent: descriptor, host: host.host, workspaceRoot, instructions: source.instructions, skills: source.skills })) contributors.register(scope, contributor);
-      const assembler = new RequestAssembler({ registry: contributors, prepare: async () => ({ route: descriptor.routeId, model: descriptor.model, registrationId: "cordis-agent", adapterVersion: "cordis-agent", defaults: {}, retryPolicy: {} }) });
+      const assembler = new RequestAssembler({ registry: contributors, prepare: async () => ({ route: descriptor.routeId, model: descriptor.model, registrationId: "cordis-agent", adapterVersion: "cordis-agent", defaults: {}, retryPolicy: {}, contextWindow: null }) });
     const loop = new AgentLoop({ descriptor, scope, agentSubject: subject, session, inbox, assembler, llm, tools, toolEnvironment: toolEnvironmentFor, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
       activeSessions.set(session.header.sessionId, session);
       const unpublish = registry.publish({ agentId: `main:${session.header.sessionId}`, descriptor, scope, session, dispose: async () => { loop.quiesce(); activeSessions.delete(session.header.sessionId); await scope.dispose(); } });

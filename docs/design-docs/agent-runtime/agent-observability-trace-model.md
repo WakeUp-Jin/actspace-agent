@@ -1,10 +1,10 @@
-# Agent 分析观测数据模型
+# Agent Journal 观测数据模型
 
-> 状态：当前 v2 设计与实现事实。Analysis / Trace 是 Session Journal 的只读投影，不再由独立 Trace 文件提供第二事实源。
+> 状态：当前 v2 Journal 观测边界。2026-09-06 已删除分析观测页面及专用 Analysis / Trace 投影和 IPC；本文保留公共 Journal、Context、Usage 与 Trajectory 的数据和安全边界。
 
 ## 目标
 
-分析观测需要稳定回答：
+Journal 与公共投影需要稳定回答：
 
 - 一次用户请求对应哪个 Agent Run；
 - Agent Loop 内发生了多少 Turn 和 Step；
@@ -31,11 +31,11 @@ sessionId
 - `requestId`：一次真实 provider request，包括 retry 后的新 request；
 - `callId`：一次工具调用。
 
-固定 renderer 的旧 UI 类型仍可能把 `requestId` 映射为 `llmCallId` 展示。该名称只是 Host projection 兼容层，不能反向改变 Journal 的 request 身份。
+聊天兼容 DTO 仍可能把 `requestId` 映射为 `llmCallId` 展示。该名称只是 Host projection 兼容层，不能反向改变 Journal 的 request 身份。
 
 ## 数据来源
 
-分析视图只消费当前 Session 的：
+公共投影消费当前 Session 的：
 
 ```text
 sessions-v2/<sessionId>/journal.jsonl
@@ -57,7 +57,7 @@ sessions-v2/<sessionId>/journal.jsonl
 - 独立 Trace retention worker；
 - 可删除而不影响分析重建的完整 request/response 副本。
 
-因此“Session 是恢复事实、Trace 是可删除证据”的 v1 说法不适用于当前 v2。当前 Analysis 与 Session 共用同一 Journal 事实。
+因此“Session 是恢复事实、Trace 是可删除证据”的 v1 说法不适用于当前 v2。当前公共投影与 Session 共用同一 Journal 事实。
 
 ## Request 观测
 
@@ -96,18 +96,11 @@ aborted
 outcome-unknown
 ```
 
-Analysis 通过 `callId` 关联 definition、args、dispatch、result、artifact 与 failure。模型输出、renderer detail 和 artifact 必须经过 Tool Runtime redaction 与 Projection allowlist，不能直接把 executor 原始对象透传到 UI。
+公共投影通过 `callId` 关联 definition、args、dispatch、result、artifact 与 failure。模型输出、renderer detail 和 artifact 必须经过 Tool Runtime redaction 与 Projection allowlist，不能直接把 executor 原始对象透传到 UI。
 
 ## Projection
 
-`apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts` 当前提供：
-
-- Agent Run 列表与汇总；
-- Turn 数量、模型调用数、retry 数、工具名和模型名；
-- input / output / cache read / cache write token；
-- request snapshot 派生的 Context 视图；
-- provider-neutral request / response 事件；
-- Usage Statistics 的按 Run、模型与日期聚合。
+`apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts` 提供聊天、Context、Usage 的兼容投影。Trajectory 由 Session projection 提供。专用 Agent Run / Turn 分析汇总与 Trace 读取投影已删除。
 
 投影属于固定 renderer adapter，不属于插件前端。插件只能通过 manifest、service、event 和结构化 renderer hint 提供数据，不能向 renderer 注入任意 HTML / JS / CSS。
 
@@ -117,20 +110,19 @@ Analysis 通过 `callId` 关联 definition、args、dispatch、result、artifact
 - Runtime Projection 对文本、错误、artifact 和 tool detail 执行白名单与截断；
 - renderer 不接收 Journal 文件路径或任意文件读取权限；
 - API Key、Authorization、Cookie、proxy credential、长 Base64 和签名 URL 不得进入 Journal；
-- Analysis 页面显示的 cURL 或请求 JSON 只能基于脱敏的 provider-neutral snapshot 生成。
 
 ## 失败与缺口
 
-- Journal 损坏会同时影响 Session 恢复和 Analysis 重建，因此 writer lease、repair 与 forensic copy 是当前可靠性重点；
+- Journal 损坏会同时影响 Session 恢复和 公共投影重建，因此 writer lease、repair 与 forensic copy 是当前可靠性重点；
 - 当前不会保存 provider 原始 HTTP wire request / response；
 - duration 与部分旧 UI 字段仍可能由 projection 近似或填默认值，必须在 UI 中避免伪装为 provider 精确事实；
-- 长会话、真实 Electron 滚动和跨 provider 分析仍需要人工验收。
+- 长会话、真实 Electron 滚动和跨 provider 展示仍需要人工验收。
 
 ## 验收
 
-- 给定同一份 Journal，Session、Context、Usage 与 Analysis 投影结果确定；
+- 给定同一份 Journal，Session、Context、Usage 与 Trajectory 投影结果确定；
 - 同一 Agent Run 的 Turn、request、tool 和 retry 能通过 ID 完整关联；
 - 进程中断后的已 dispatch request / tool 不会被误判为未执行；
-- renderer 无需直接读取本地文件即可展示分析数据；
-- 删除任何可再生 UI cache 不影响 Journal 与 Analysis 重建；
+- renderer 无需直接读取本地文件即可展示投影数据；
+- 删除任何可再生 UI cache 不影响 Journal 与 公共投影重建；
 - Journal 和 projection 中不出现明文凭据或未经限制的外部响应正文。

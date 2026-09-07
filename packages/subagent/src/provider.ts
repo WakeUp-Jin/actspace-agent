@@ -11,7 +11,7 @@ import type { StaticAgentPreset, StaticPresetRegistry } from "./preset.js";
 import type { SubagentTerminalResult } from "./terminal-result.js";
 
 export type SubagentInvocation = { readonly parentSession: SessionHandle; readonly parentScope: AgentScope; readonly parentCallId: string; readonly presetId: string; readonly task: string; readonly parentVisibleToolIds: readonly string[]; readonly delegationDepth: number; readonly signal?: AbortSignal; readonly isolatedScope?: boolean };
-export interface ParentDelegationPort { recordRequested(input: { invocationId: string; presetId: string; parentCallId: string }): Promise<void>; recordTerminal(result: SubagentTerminalResult): Promise<void>; }
+export interface ParentDelegationPort { recordRequested(input: { invocationId: string; presetId: string; parentCallId: string; childSessionId: string }): Promise<void>; recordTerminal(result: SubagentTerminalResult): Promise<void>; }
 export type ChildLoopFactory = (input: { session: SessionHandle; scope: AgentScope; preset: StaticAgentPreset; allowedToolNames: readonly string[]; signal: AbortSignal; agentId: string }) => AgentLoop | Promise<AgentLoop>;
 
 export class OneShotSubagentProvider {
@@ -36,7 +36,7 @@ export class OneShotSubagentProvider {
     const allowedToolNames = intersectTools(input.parentVisibleToolIds, preset);
     if (preset.readOnly && allowedToolNames.some((name) => !/^(read_file|list_directory|grep|glob)$/.test(name))) throw new Error("Explore preset cannot receive side-effect tools.");
     const parentPort = this.options.parentPort ?? sessionParentPort(input.parentSession);
-    await parentPort.recordRequested({ invocationId, presetId: preset.id, parentCallId: input.parentCallId });
+    await parentPort.recordRequested({ invocationId, presetId: preset.id, parentCallId: input.parentCallId, childSessionId });
     const controller = new AbortController(); this.#active.set(invocationId, controller);
     const timeout = setTimeout(() => controller.abort("subagent-timeout"), preset.maxDurationMs); timeout.unref?.();
     const parentAbort = () => controller.abort(input.signal?.reason);
@@ -94,7 +94,7 @@ function terminal(input: Omit<SubagentTerminalResult, "usage" | "toolUseCount" |
 
 function sessionParentPort(session: SessionHandle): ParentDelegationPort {
   return Object.freeze({
-    recordRequested: async ({ invocationId, presetId, parentCallId }: Parameters<ParentDelegationPort["recordRequested"]>[0]) => { await session.append(core("delegation/requested", { invocationId, presetId, parentCallId })); await session.flush(); },
+    recordRequested: async ({ invocationId, presetId, parentCallId, childSessionId }: Parameters<ParentDelegationPort["recordRequested"]>[0]) => { await session.append(core("delegation/requested", { invocationId, presetId, parentCallId, childSessionId })); await session.flush(); },
     recordTerminal: async (result: SubagentTerminalResult) => { await session.append(core("delegation/completed", { invocationId: result.invocationId, childSessionId: result.childSessionId, presetId: result.presetId, status: result.status })); },
   });
 }
