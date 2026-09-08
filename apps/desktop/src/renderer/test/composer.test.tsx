@@ -109,7 +109,7 @@ describe("Composer follow-up bar", () => {
   it("navigates the current session input history from an empty composer", async () => {
     const user = userEvent.setup();
     renderComposer({ inputHistory: ["first prompt", "second prompt"] });
-    const input = screen.getByLabelText("Message composer");
+    const input = screen.getByLabelText("消息输入框");
 
     await user.click(input);
     await user.keyboard("{ArrowUp}");
@@ -131,7 +131,7 @@ describe("Composer follow-up bar", () => {
   it("keeps native arrow behavior for fresh text and IME composition", async () => {
     const user = userEvent.setup();
     renderComposer({ inputHistory: ["older prompt"] });
-    const input = screen.getByLabelText("Message composer");
+    const input = screen.getByLabelText("消息输入框");
 
     await user.type(input, "current draft");
     await user.keyboard("{ArrowUp}");
@@ -155,7 +155,7 @@ describe("Composer follow-up bar", () => {
       },
     });
 
-    await waitFor(() => expect(screen.getByLabelText("Message composer")).toHaveValue("draft for B"));
+    await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("draft for B"));
   });
 
   it("renders the follow-up shell with review preview and status row", () => {
@@ -167,15 +167,15 @@ describe("Composer follow-up bar", () => {
       },
     });
 
-    const reviewButton = screen.getByRole("button", { name: /Review pending changes/ });
-    const reviewOverflowButton = screen.getByRole("button", { name: "More review actions" });
-    expect(reviewButton).toHaveTextContent("Review+4253-5");
+    const reviewButton = screen.getByRole("button", { name: /审查待处理变更/ });
+    const reviewOverflowButton = screen.getByRole("button", { name: "更多审查操作" });
+    expect(reviewButton).toHaveTextContent("变更审查+4253-5");
     expect(reviewButton).toHaveClass("hover:bg-surface-subtle", "hover:border-line-strong", "hover:text-text-main");
     expect(reviewOverflowButton).toHaveClass("hover:bg-surface-subtle", "hover:border-line-strong", "hover:text-text-main");
-    expect(screen.getByPlaceholderText("Send follow-up")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("继续补充…")).toBeInTheDocument();
     expect(screen.queryByText("main")).not.toBeInTheDocument();
-    expect(screen.getByText("This Mac")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Context usage 36%" })).toBeInTheDocument();
+    expect(screen.getByText("本机")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "上下文用量 36%" })).toBeInTheDocument();
   });
 
   it("rounds the context usage status to an integer", () => {
@@ -183,8 +183,8 @@ describe("Composer follow-up bar", () => {
       contextSnapshot: { ...mockContextSnapshot, percentUsed: 7.6092 },
     });
 
-    expect(screen.getByRole("button", { name: "Context usage 7%" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Context usage 7.6092%" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "上下文用量 7%" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "上下文用量 7.6092%" })).not.toBeInTheDocument();
   });
 
   it("shows zero instead of an unknown context percentage", () => {
@@ -192,15 +192,15 @@ describe("Composer follow-up bar", () => {
       contextSnapshot: { ...mockContextSnapshot, maxTokens: 0, percentUsed: 0 },
     });
 
-    expect(screen.getByRole("button", { name: "Context usage 0%" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "上下文用量 0%" })).toBeInTheDocument();
     expect(screen.queryByText(/Unknown/)).not.toBeInTheDocument();
   });
 
   it("hides the review action when no review summary is available", () => {
     renderComposer();
 
-    expect(screen.queryByRole("button", { name: /Review/ })).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Send follow-up")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /变更审查/ })).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("继续补充…")).toBeInTheDocument();
   });
 
   it("keeps selected images in the attachment area above the input bar", async () => {
@@ -220,24 +220,24 @@ describe("Composer follow-up bar", () => {
 
     renderComposer();
 
-    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    await user.click(screen.getByRole("menuitem", { name: "Image" }));
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    await user.click(screen.getByRole("menuitem", { name: "图片" }));
 
-    const panel = screen.getByLabelText("Message composer panel");
-    const attachmentList = within(panel).getByLabelText("Attached files");
-    const toolbar = screen.getByLabelText("Composer toolbar");
-    const input = screen.getByLabelText("Message composer");
+    const panel = screen.getByLabelText("消息输入面板");
+    const attachmentList = within(panel).getByLabelText("已附加的文件");
+    const toolbar = screen.getByLabelText("输入框工具栏");
+    const input = screen.getByLabelText("消息输入框");
     const toolbarButtons = within(toolbar).getAllByRole("button");
-    expect(within(attachmentList).getByLabelText("Attached image screenshot.png")).toBeInTheDocument();
-    expect(within(attachmentList).getByRole("button", { name: "Preview attached image screenshot.png" }))
+    expect(within(attachmentList).getByLabelText("已附加的图片 screenshot.png")).toBeInTheDocument();
+    expect(within(attachmentList).getByRole("button", { name: "预览附加图片 screenshot.png" }))
       .toHaveStyle({ backgroundImage: 'url("data:image/png;base64,preview")' });
     expect(panel).toContainElement(attachmentList);
     expect(panel).toContainElement(input);
     expect(toolbar).not.toContainElement(input);
-    expect(toolbarButtons[0]).toHaveAccessibleName("Add agents, context, tools");
+    expect(toolbarButtons[0]).toHaveAccessibleName("添加 Agent、上下文或工具");
     expect(toolbarButtons[1]).toHaveAccessibleName(/DeepSeek V4 Pro/i);
     expect(within(panel).queryByRole("button", { name: "Show context usage" })).not.toBeInTheDocument();
-    expect(panel).not.toContainElement(screen.queryByRole("button", { name: /Review pending changes/ }));
+    expect(panel).not.toContainElement(screen.queryByRole("button", { name: /审查待处理变更/ }));
     expect(input).toHaveValue("");
   });
 
@@ -247,9 +247,9 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     renderComposer();
 
-    const panel = screen.getByLabelText("Message composer panel");
+    const panel = screen.getByLabelText("消息输入面板");
     const body = panel.querySelector(".composer-body") as HTMLElement;
-    const input = screen.getByLabelText("Message composer") as HTMLTextAreaElement;
+    const input = screen.getByLabelText("消息输入框") as HTMLTextAreaElement;
 
     // jsdom 不做真实布局，scrollHeight 恒为 0；用 getter 模拟内容高度。
     let mockScrollHeight = 34;
@@ -271,16 +271,16 @@ describe("Composer follow-up bar", () => {
     expect(body.dataset.layout).toBe("inline");
 
     // 切换过程 textarea 是同一个 DOM 节点（不 remount）
-    expect(screen.getByLabelText("Message composer")).toBe(input);
+    expect(screen.getByLabelText("消息输入框")).toBe(input);
   });
 
   it("keeps wrapped content stacked when the wider stacked layout would fit on one line", async () => {
     const user = userEvent.setup();
     renderComposer();
 
-    const panel = screen.getByLabelText("Message composer panel");
+    const panel = screen.getByLabelText("消息输入面板");
     const body = panel.querySelector(".composer-body") as HTMLElement;
-    const input = screen.getByLabelText("Message composer") as HTMLTextAreaElement;
+    const input = screen.getByLabelText("消息输入框") as HTMLTextAreaElement;
 
     Object.defineProperty(input, "scrollHeight", {
       configurable: true,
@@ -313,12 +313,12 @@ describe("Composer follow-up bar", () => {
     setPartialActspaceBridge({ selectImages });
     renderComposer();
 
-    const panel = screen.getByLabelText("Message composer panel");
+    const panel = screen.getByLabelText("消息输入面板");
     const body = panel.querySelector(".composer-body") as HTMLElement;
     expect(body.dataset.layout).toBe("inline");
 
-    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    await user.click(screen.getByRole("menuitem", { name: "Image" }));
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    await user.click(screen.getByRole("menuitem", { name: "图片" }));
 
     expect(body.dataset.layout).toBe("stacked");
   });
@@ -326,7 +326,7 @@ describe("Composer follow-up bar", () => {
   it("renders the send button as an inverse round arrow button", () => {
     renderComposer();
 
-    const sendButton = screen.getByRole("button", { name: "Enter a message to send" });
+    const sendButton = screen.getByRole("button", { name: "输入消息后发送" });
     expect(sendButton.className).toContain("bg-text-main");
     expect(sendButton.className).toContain("text-surface");
     expect(sendButton.className).not.toContain("bg-operational");
@@ -339,11 +339,11 @@ describe("Composer follow-up bar", () => {
       selectedModelId: "deepseek:deepseek-v4-pro",
     });
 
-    await user.type(screen.getByLabelText("Message composer"), "hello");
+    await user.type(screen.getByLabelText("消息输入框"), "hello");
 
     expect(screen.getByText("未连接模型")).toBeInTheDocument();
     const sendButton = screen.getByRole("button", {
-      name: "No available model. Open Settings to connect a provider",
+      name: "暂无可用模型，请在设置中连接服务商",
     });
     expect(sendButton).toHaveAttribute("aria-disabled", "true");
     await user.hover(sendButton);
@@ -354,7 +354,7 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     renderComposer();
 
-    const input = screen.getByLabelText("Message composer") as HTMLTextAreaElement;
+    const input = screen.getByLabelText("消息输入框") as HTMLTextAreaElement;
     // jsdom 不做真实布局，scrollHeight 恒为 0；用 getter 模拟粘贴大段文本后内容撑高。
     let mockScrollHeight = 20;
     Object.defineProperty(input, "scrollHeight", {
@@ -373,16 +373,16 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     renderComposer();
 
-    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
 
-    const menu = screen.getByRole("menu", { name: "Add context and tools" });
-    expect(within(menu).getByText("Choose mode or add context.")).toBeInTheDocument();
+    const menu = screen.getByRole("menu", { name: "添加上下文或工具" });
+    expect(within(menu).getByText("选择模式或添加上下文。")).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Chat" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Plan" })).toBeInTheDocument();
     expect(within(menu).queryByRole("menuitem", { name: "Agent" })).not.toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "Image" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "图片" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Skills" })).toBeInTheDocument();
-    expect(within(menu).queryByText(/Debug|Multitask|Ask|MCP Servers|Models|Attach files/)).not.toBeInTheDocument();
+    expect(within(menu).queryByText(/Debug|Multitask|Ask|MCP Servers|模型|Attach files/)).not.toBeInTheDocument();
   });
 
   it("opens the slash menu with Functions and workspace Skills", async () => {
@@ -391,15 +391,15 @@ describe("Composer follow-up bar", () => {
     setPartialActspaceBridge({ listSkills });
     renderComposer({ selectedWorkspaceRoot: "/work" });
 
-    const input = screen.getByLabelText("Message composer");
+    const input = screen.getByLabelText("消息输入框");
     await user.type(input, "/");
 
-    const menu = await screen.findByRole("listbox", { name: "Slash commands" });
-    expect(within(menu).getByText("Functions")).toBeInTheDocument();
+    const menu = await screen.findByRole("listbox", { name: "斜杠命令" });
+    expect(within(menu).getByText("功能")).toBeInTheDocument();
     const chatCommand = within(menu).getByRole("option", { name: /^chat:/ });
-    expect(chatCommand).toHaveTextContent("chatTalk without tools.");
+    expect(chatCommand).toHaveTextContent("chat直接对话，不使用工具。");
     expect(chatCommand).toHaveClass("min-h-9", "items-center");
-    expect(within(chatCommand).queryByText("Chat mode")).not.toBeInTheDocument();
+    expect(within(chatCommand).queryByText("Chat 模式")).not.toBeInTheDocument();
     const compactCommand = within(menu).getByRole("option", { name: /^compact:/ });
     expect(compactCommand.querySelector("svg")).toHaveClass("lucide-asterisk");
     const statusCommand = within(menu).getByRole("option", { name: /^status:/ });
@@ -417,9 +417,9 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     renderComposer({ surface: "initial" });
 
-    await user.type(screen.getByLabelText("Message composer"), "/");
+    await user.type(screen.getByLabelText("消息输入框"), "/");
 
-    const menu = await screen.findByRole("listbox", { name: "Slash commands" });
+    const menu = await screen.findByRole("listbox", { name: "斜杠命令" });
     expect(menu).toHaveClass(
       "top-[calc(100%_+_8px)]",
       "max-h-[min(280px,calc(50vh_-_90px))]",
@@ -444,7 +444,7 @@ describe("Composer follow-up bar", () => {
     setPartialActspaceBridge({ listSkills });
     const { rerender } = renderComposer({ selectedWorkspaceRoot: "/work/a" });
 
-    await user.type(screen.getByLabelText("Message composer"), "/");
+    await user.type(screen.getByLabelText("消息输入框"), "/");
     await waitFor(() => expect(listSkills).toHaveBeenCalledWith({ workspaceRoot: "/work/a" }));
 
     rerender(
@@ -465,7 +465,7 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     const onModeChange = vi.fn();
     const { onSend } = renderComposer({ mode: "agent", onModeChange });
-    const input = screen.getByLabelText("Message composer");
+    const input = screen.getByLabelText("消息输入框");
 
     await user.type(input, "/");
     expect(input).toHaveAttribute("aria-activedescendant", "composer-slash-function-chat");
@@ -474,7 +474,7 @@ describe("Composer follow-up bar", () => {
     expect(onModeChange).toHaveBeenCalledWith("plan");
     expect(onSend).not.toHaveBeenCalled();
     expect(input).toHaveValue("");
-    expect(screen.queryByRole("listbox", { name: "Slash commands" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox", { name: "斜杠命令" })).not.toBeInTheDocument();
   });
 
   it("runs compact immediately without consuming attachments or selected Skills", async () => {
@@ -493,11 +493,11 @@ describe("Composer follow-up bar", () => {
     });
     const { onSend } = renderComposer({ selectedSkills: ["frontend-design"] });
 
-    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    await user.click(screen.getByRole("menuitem", { name: "Image" }));
-    expect(screen.getByLabelText("Attached image screenshot.png")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    await user.click(screen.getByRole("menuitem", { name: "图片" }));
+    expect(screen.getByLabelText("已附加的图片 screenshot.png")).toBeInTheDocument();
 
-    const input = screen.getByLabelText("Message composer");
+    const input = screen.getByLabelText("消息输入框");
     await user.type(input, "/compact");
     await user.keyboard("{Enter}");
 
@@ -507,8 +507,8 @@ describe("Composer follow-up bar", () => {
       selectedSkills: ["frontend-design"],
       thinkingEnabled: true,
     });
-    expect(screen.getByLabelText("Attached image screenshot.png")).toBeInTheDocument();
-    expect(screen.getByLabelText("Selected Skill frontend-design")).toBeInTheDocument();
+    expect(screen.getByLabelText("已附加的图片 screenshot.png")).toBeInTheDocument();
+    expect(screen.getByLabelText("已选择的 Skill frontend-design")).toBeInTheDocument();
   });
 
   it("opens Context and Review from slash functions and binds a filtered Skill", async () => {
@@ -518,7 +518,7 @@ describe("Composer follow-up bar", () => {
     const onSelectedSkillsChange = vi.fn();
     setPartialActspaceBridge({ listSkills: vi.fn(async () => ({ items: [createSkill()], warnings: [] })) });
     renderComposer({ onExpandContext, onOpenReview, onSelectedSkillsChange });
-    const input = screen.getByLabelText("Message composer");
+    const input = screen.getByLabelText("消息输入框");
 
     await user.type(input, "/status");
     await user.keyboard("{Enter}");
@@ -538,7 +538,7 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     const onModeChange = vi.fn();
     const { onSend } = renderComposer({ onModeChange });
-    const input = screen.getByLabelText("Message composer");
+    const input = screen.getByLabelText("消息输入框");
 
     await user.type(input, "/plan");
     fireEvent.keyDown(input, { key: "Enter", code: "Enter", keyCode: 229, isComposing: true });
@@ -553,8 +553,8 @@ describe("Composer follow-up bar", () => {
     const onModeChange = vi.fn();
     const { rerender } = renderComposer({ mode: "agent", onModeChange });
 
-    expect(screen.queryByRole("button", { name: /Agent mode/i })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    expect(screen.queryByRole("button", { name: /Agent 模式/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
     await user.click(screen.getByRole("menuitem", { name: "Plan" }));
     expect(onModeChange).toHaveBeenCalledWith("plan");
 
@@ -563,9 +563,9 @@ describe("Composer follow-up bar", () => {
         <Composer contextSnapshot={mockContextSnapshot} mode="plan" onModeChange={onModeChange} />
       </TooltipProvider>,
     );
-    const planPill = screen.getByRole("button", { name: "Remove Plan mode" });
+    const planPill = screen.getByRole("button", { name: "移除 Plan 模式" });
     expect(planPill).toHaveClass("bg-warning-soft", "text-on-warning");
-    expect(screen.getByPlaceholderText("Refine the plan...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("继续完善方案…")).toBeInTheDocument();
     await user.click(planPill);
     expect(onModeChange).toHaveBeenLastCalledWith("agent");
   });
@@ -593,7 +593,7 @@ describe("Composer follow-up bar", () => {
       selectedSkills: [],
       onSelectedSkillsChange,
     });
-    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
     await user.hover(screen.getByRole("menuitem", { name: "Skills" }));
     const skillsMenu = await screen.findByRole("menu", { name: "Skills" });
     await user.click(within(skillsMenu).getByRole("menuitemcheckbox", { name: /frontend-design/i }));
@@ -609,14 +609,14 @@ describe("Composer follow-up bar", () => {
         />
       </TooltipProvider>,
     );
-    expect(screen.getByLabelText("Selected Skill frontend-design")).toBeInTheDocument();
+    expect(screen.getByLabelText("已选择的 Skill frontend-design")).toBeInTheDocument();
   });
 
   it("shows a tooltip for the add menu button", async () => {
     const user = userEvent.setup();
     renderComposer();
 
-    await user.hover(screen.getByRole("button", { name: "Add agents, context, tools" }));
+    await user.hover(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("添加上下文、工具或附件");
   });
 
@@ -624,7 +624,7 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     const { onSend } = renderComposer();
 
-    const sendButton = screen.getByRole("button", { name: "Enter a message to send" });
+    const sendButton = screen.getByRole("button", { name: "输入消息后发送" });
     expect(sendButton).toHaveAttribute("aria-disabled", "true");
 
     await user.hover(sendButton);
@@ -650,11 +650,11 @@ describe("Composer follow-up bar", () => {
 
     renderComposer();
 
-    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    await user.click(screen.getByRole("menuitem", { name: "Image" }));
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    await user.click(screen.getByRole("menuitem", { name: "图片" }));
 
     expect(selectImages).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText("Attached image screenshot.png")).toBeInTheDocument();
+    expect(screen.getByLabelText("已附加的图片 screenshot.png")).toBeInTheDocument();
   });
 
   it("opens a selected image preview and keeps the remove control compact", async () => {
@@ -672,12 +672,12 @@ describe("Composer follow-up bar", () => {
     });
     const { onOpenAttachmentPreview } = renderComposer();
 
-    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    await user.click(screen.getByRole("menuitem", { name: "Image" }));
-    await user.click(screen.getByRole("button", { name: "Preview attached image screenshot.png" }));
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    await user.click(screen.getByRole("menuitem", { name: "图片" }));
+    await user.click(screen.getByRole("button", { name: "预览附加图片 screenshot.png" }));
 
     expect(onOpenAttachmentPreview).toHaveBeenCalledWith(attachment);
-    expect(screen.getByRole("button", { name: "Remove screenshot.png" })).toHaveClass("h-[18px]", "w-[18px]");
+    expect(screen.getByRole("button", { name: "移除 screenshot.png" })).toHaveClass("h-[18px]", "w-[18px]");
   });
 
   it("imports pasted images and lets a text-only model send them without persisting preview data", async () => {
@@ -692,7 +692,7 @@ describe("Composer follow-up bar", () => {
     const importComposerImage = vi.fn(async () => ({ ok: true as const, attachment: pastedAttachment }));
     setPartialActspaceBridge({ importComposerImage });
     const { onSend } = renderComposer();
-    const input = screen.getByLabelText("Message composer");
+    const input = screen.getByLabelText("消息输入框");
     const file = new File([new Uint8Array([1, 2, 3])], "image.png", { type: "image/png" });
     Object.defineProperty(file, "arrayBuffer", {
       value: async () => new Uint8Array([1, 2, 3]).buffer,
@@ -705,9 +705,9 @@ describe("Composer follow-up bar", () => {
     });
 
     await waitFor(() => expect(importComposerImage).toHaveBeenCalledTimes(1));
-    expect(await screen.findByLabelText("Attached image pasted-image.png")).toBeInTheDocument();
+    expect(await screen.findByLabelText("已附加的图片 pasted-image.png")).toBeInTheDocument();
     await userEvent.type(input, "看看这张图");
-    await userEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await userEvent.click(screen.getByRole("button", { name: "发送消息" }));
 
     expect(onSend).toHaveBeenCalledWith("看看这张图", expect.objectContaining({
       model: "deepseek-v4-pro",
@@ -727,10 +727,10 @@ describe("Composer follow-up bar", () => {
 
     renderComposer();
 
-    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    await user.click(screen.getByRole("menuitem", { name: "Image" }));
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    await user.click(screen.getByRole("menuitem", { name: "图片" }));
 
-    expect(screen.queryByLabelText("Attached files")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("已附加的文件")).not.toBeInTheDocument();
   });
 
   it("adds dropped files, removes attachments, and sends only remaining attachments", async () => {
@@ -739,7 +739,7 @@ describe("Composer follow-up bar", () => {
     setPartialActspaceBridge({ getPathForFile });
     const { onSend } = renderComposer();
 
-    const panel = screen.getByLabelText("Message composer panel");
+    const panel = screen.getByLabelText("消息输入面板");
     fireEvent.drop(panel, {
       dataTransfer: {
         files: [
@@ -750,18 +750,18 @@ describe("Composer follow-up bar", () => {
       },
     });
 
-    expect(screen.getByLabelText("Attached image photo.png")).toBeInTheDocument();
-    expect(screen.getByLabelText("Attached file report.pdf")).toBeInTheDocument();
+    expect(screen.getByLabelText("已附加的图片 photo.png")).toBeInTheDocument();
+    expect(screen.getByLabelText("已附加的文件 report.pdf")).toBeInTheDocument();
 
-    const removePhoto = screen.getByRole("button", { name: "Remove photo.png" });
+    const removePhoto = screen.getByRole("button", { name: "移除 photo.png" });
     await user.hover(removePhoto);
     expect((await screen.findAllByText("移除 photo.png")).length).toBeGreaterThan(0);
 
     await user.click(removePhoto);
-    expect(screen.queryByLabelText("Attached image photo.png")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("已附加的图片 photo.png")).not.toBeInTheDocument();
 
-    await user.type(screen.getByLabelText("Message composer"), "analyze this");
-    await user.click(screen.getByRole("button", { name: "Send message" }));
+    await user.type(screen.getByLabelText("消息输入框"), "analyze this");
+    await user.click(screen.getByRole("button", { name: "发送消息" }));
 
     expect(onSend).toHaveBeenCalledWith("analyze this", {
       mode: "agent",
@@ -777,27 +777,27 @@ describe("Composer follow-up bar", () => {
         }),
       ],
     });
-    expect(screen.queryByLabelText("Attached file report.pdf")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("已附加的文件 report.pdf")).not.toBeInTheDocument();
   });
 
   it("keeps command menu, model menu, and context popup mutually exclusive", async () => {
     const user = userEvent.setup();
     renderComposer();
 
-    await user.type(screen.getByLabelText("Message composer"), "/");
-    expect(await screen.findByRole("listbox", { name: "Slash commands" })).toBeInTheDocument();
+    await user.type(screen.getByLabelText("消息输入框"), "/");
+    expect(await screen.findByRole("listbox", { name: "斜杠命令" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    expect(screen.queryByRole("listbox", { name: "Slash commands" })).not.toBeInTheDocument();
-    expect(screen.getByRole("menu", { name: "Add context and tools" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    expect(screen.queryByRole("listbox", { name: "斜杠命令" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menu", { name: "添加上下文或工具" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
-    expect(screen.queryByRole("menu", { name: "Add context and tools" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "添加上下文或工具" })).not.toBeInTheDocument();
     expect(screen.getByText("DeepSeek V4 Flash")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Context usage 36%" }));
+    await user.click(screen.getByRole("button", { name: "上下文用量 36%" }));
     expect(screen.queryByText("DeepSeek V4 Flash")).not.toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "Context usage" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "上下文用量" })).toBeInTheDocument();
   });
 
   it("shows edit for deepseek-v4-flash and clicking it does not select another model", async () => {
@@ -806,10 +806,10 @@ describe("Composer follow-up bar", () => {
 
     await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
     await user.hover(screen.getByText("DeepSeek V4 Flash"));
-    await user.click(screen.getByRole("button", { name: "Edit deepseek-v4-flash options" }));
+    await user.click(screen.getByRole("button", { name: "编辑 deepseek-v4-flash 选项" }));
 
     expect(screen.getByLabelText("deepseek-v4-flash Thinking")).toBeInTheDocument();
-    const toolbar = screen.getByLabelText("Composer toolbar");
+    const toolbar = screen.getByLabelText("输入框工具栏");
     expect(toolbar.querySelector(".model-button")).toHaveTextContent("DeepSeek V4 Pro");
   });
 
@@ -820,7 +820,7 @@ describe("Composer follow-up bar", () => {
     await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
 
     const menu = container.querySelector(".model-menu");
-    const selectedEdit = screen.getByRole("button", { name: "Edit deepseek-v4-pro options" });
+    const selectedEdit = screen.getByRole("button", { name: "编辑 deepseek-v4-pro 选项" });
     const selectedRow = selectedEdit.closest(".model-menu-row");
 
     expect(menu).toHaveClass("w-[244px]");
@@ -841,8 +841,8 @@ describe("Composer follow-up bar", () => {
     });
 
     await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
-    const menu = screen.getByRole("menu", { name: "Models" });
-    const search = within(menu).getByRole("searchbox", { name: "Search models" });
+    const menu = screen.getByRole("menu", { name: "模型" });
+    const search = within(menu).getByRole("searchbox", { name: "搜索模型" });
     await user.type(search, "openai/gpt");
 
     expect(within(menu).getByText("GPT-5 High")).toBeInTheDocument();
@@ -863,7 +863,7 @@ describe("Composer follow-up bar", () => {
     expect(modelButton).toHaveTextContent("DeepSeek V4 Pro · DeepSeek");
     await user.click(modelButton);
 
-    const menu = screen.getByRole("menu", { name: "Models" });
+    const menu = screen.getByRole("menu", { name: "模型" });
     const deepSeekGroup = within(menu).getByRole("group", { name: "DeepSeek" });
     const openRouterGroup = within(menu).getByRole("group", { name: "OpenRouter" });
     expect(within(deepSeekGroup).getByRole("button", { name: "DeepSeek V4 Pro" })).toBeInTheDocument();
@@ -885,16 +885,16 @@ describe("Composer follow-up bar", () => {
     const menu = container.querySelector(".model-menu");
     expect(menu).toHaveClass("duration-[140ms]");
 
-    const modelMenu = screen.getByRole("menu", { name: "Models" });
+    const modelMenu = screen.getByRole("menu", { name: "模型" });
     await user.hover(within(modelMenu).getByText("GPT-5 High"));
-    await user.click(screen.getByRole("button", { name: "Edit openrouter:openai/gpt-5 options" }));
+    await user.click(screen.getByRole("button", { name: "编辑 openrouter:openai/gpt-5 选项" }));
     const options = container.querySelector(".model-options-menu");
     expect(options).toHaveClass("duration-[140ms]");
     expect(screen.getByRole("button", { name: "Auto" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "High" }));
 
-    await user.type(screen.getByLabelText("Message composer"), "reason carefully");
-    await user.click(screen.getByRole("button", { name: "Send message" }));
+    await user.type(screen.getByLabelText("消息输入框"), "reason carefully");
+    await user.click(screen.getByRole("button", { name: "发送消息" }));
 
     expect(onSend).toHaveBeenCalledWith("reason carefully", {
       mode: "agent",
@@ -913,9 +913,9 @@ describe("Composer follow-up bar", () => {
     });
 
     await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
-    const modelMenu = screen.getByRole("menu", { name: "Models" });
+    const modelMenu = screen.getByRole("menu", { name: "模型" });
     await user.hover(within(modelMenu).getByText("DeepSeek V4 Pro"));
-    await user.click(screen.getByRole("button", { name: "Edit deepseek:deepseek-v4-pro options" }));
+    await user.click(screen.getByRole("button", { name: "编辑 deepseek:deepseek-v4-pro 选项" }));
 
     expect(screen.queryByRole("button", { name: "Auto" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "High" })).toBeInTheDocument();
@@ -923,8 +923,8 @@ describe("Composer follow-up bar", () => {
     expect(screen.queryByRole("button", { name: "Light" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Medium" })).not.toBeInTheDocument();
 
-    await user.type(screen.getByLabelText("Message composer"), "use maximum reasoning");
-    await user.click(screen.getByRole("button", { name: "Send message" }));
+    await user.type(screen.getByLabelText("消息输入框"), "use maximum reasoning");
+    await user.click(screen.getByRole("button", { name: "发送消息" }));
     expect(onSend).toHaveBeenCalledWith("use maximum reasoning", {
       mode: "agent",
       model: "deepseek:deepseek-v4-pro",
@@ -940,7 +940,7 @@ describe("Composer follow-up bar", () => {
 
     await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
     await user.hover(screen.getByText("DeepSeek V4 Flash"));
-    await user.click(screen.getByRole("button", { name: "Edit deepseek-v4-flash options" }));
+    await user.click(screen.getByRole("button", { name: "编辑 deepseek-v4-flash 选项" }));
 
     const toggle = screen.getByLabelText("deepseek-v4-flash Thinking") as HTMLInputElement;
     const track = toggle.parentElement?.querySelector(".toggle-track");
@@ -960,8 +960,8 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     const { onSend } = renderComposer();
 
-    await user.type(screen.getByLabelText("Message composer"), "continue polishing");
-    await user.click(screen.getByRole("button", { name: "Send message" }));
+    await user.type(screen.getByLabelText("消息输入框"), "continue polishing");
+    await user.click(screen.getByRole("button", { name: "发送消息" }));
 
     expect(onSend).toHaveBeenCalledWith("continue polishing", {
       mode: "agent",
@@ -1012,26 +1012,26 @@ describe("Composer follow-up bar", () => {
         },
       },
     });
-    const panel = screen.getByLabelText("Message composer panel");
-    const toolbar = screen.getByLabelText("Composer toolbar");
-    const input = screen.getByLabelText("Message composer");
+    const panel = screen.getByLabelText("消息输入面板");
+    const toolbar = screen.getByLabelText("输入框工具栏");
+    const input = screen.getByLabelText("消息输入框");
     const toolbarButtons = within(toolbar).getAllByRole("button");
 
-    expect(screen.getByLabelText("Initial composer context selectors")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Select workspace" })).toHaveTextContent("actspace-agent");
-    expect(screen.getByRole("button", { name: "Select branch" })).toHaveTextContent("main");
-    expect(screen.getByRole("button", { name: "Select runtime" })).toHaveTextContent("This Mac");
-    expect(screen.queryByRole("button", { name: "Review pending changes" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Context usage 36%" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("初始工作区与运行位置选择")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "选择工作区" })).toHaveTextContent("actspace-agent");
+    expect(screen.getByRole("button", { name: "选择分支" })).toHaveTextContent("main");
+    expect(screen.getByRole("button", { name: "选择运行位置" })).toHaveTextContent("本机");
+    expect(screen.queryByRole("button", { name: "审查待处理变更" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "上下文用量 36%" })).not.toBeInTheDocument();
     expect(panel).toContainElement(input);
     expect(toolbar).not.toContainElement(input);
-    expect(toolbarButtons[0]).toHaveAccessibleName("Add agents, context, tools");
+    expect(toolbarButtons[0]).toHaveAccessibleName("添加 Agent、上下文或工具");
     expect(toolbarButtons[1]).toHaveAccessibleName(/DeepSeek V4 Pro/i);
     expect(within(panel).queryByRole("button", { name: "Show context usage" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Select workspace" }));
-    const workspaceMenu = screen.getByRole("menu", { name: "actspace-agent options" });
-    expect(screen.getByLabelText("Initial composer context selectors")).toHaveClass("overflow-visible");
+    await user.click(screen.getByRole("button", { name: "选择工作区" }));
+    const workspaceMenu = screen.getByRole("menu", { name: "actspace-agent选项" });
+    expect(screen.getByLabelText("初始工作区与运行位置选择")).toHaveClass("overflow-visible");
     expect(workspaceMenu).toHaveClass("top-[calc(100%_+_8px)]");
     expect(within(workspaceMenu).getByRole("menuitem", { name: "wakeup-Jin-wiki" })).toBeInTheDocument();
     expect(within(workspaceMenu).getByRole("menuitem", { name: "code-tool-work" })).toBeInTheDocument();
@@ -1039,19 +1039,19 @@ describe("Composer follow-up bar", () => {
     expect(onSelectWorkspace).toHaveBeenCalledWith("/work/code-tool-work");
     expect(onSend).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "Select branch" }));
-    const branchMenu = screen.getByRole("menu", { name: "Branch options" });
+    await user.click(screen.getByRole("button", { name: "选择分支" }));
+    const branchMenu = screen.getByRole("menu", { name: "分支选项" });
     expect(branchMenu).toHaveClass("top-[calc(100%_+_8px)]");
     expect(within(branchMenu).getByRole("menuitemradio", { name: "main" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Select runtime" }));
-    const runtimeMenu = screen.getByRole("menu", { name: "Run on options" });
+    await user.click(screen.getByRole("button", { name: "选择运行位置" }));
+    const runtimeMenu = screen.getByRole("menu", { name: "运行位置选项" });
     expect(runtimeMenu).toHaveClass("top-[calc(100%_+_8px)]");
-    expect(within(runtimeMenu).getByRole("menuitemradio", { name: "This Mac" })).toBeInTheDocument();
-    expect(within(runtimeMenu).getByRole("menuitemradio", { name: "New Worktree" })).toBeInTheDocument();
+    expect(within(runtimeMenu).getByRole("menuitemradio", { name: "本机" })).toBeInTheDocument();
+    expect(within(runtimeMenu).getByRole("menuitemradio", { name: "新建工作树" })).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText("Message composer"), "start a new idea");
-    await user.click(screen.getByRole("button", { name: "Send message" }));
+    await user.type(screen.getByLabelText("消息输入框"), "start a new idea");
+    await user.click(screen.getByRole("button", { name: "发送消息" }));
 
     expect(onSend).toHaveBeenCalledWith("start a new idea", {
       mode: "agent",
@@ -1080,12 +1080,12 @@ describe("Composer follow-up bar", () => {
       },
     });
 
-    expect(screen.getByRole("button", { name: "Select branch" })).toHaveTextContent("main");
+    expect(screen.getByRole("button", { name: "选择分支" })).toHaveTextContent("main");
     expect(screen.queryByText("No commits yet")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Select runtime" }));
-    const runtimeMenu = screen.getByRole("menu", { name: "Run on options" });
-    const worktreeEntry = within(runtimeMenu).getByRole("menuitem", { name: /New Worktree Requires commit/i });
+    await user.click(screen.getByRole("button", { name: "选择运行位置" }));
+    const runtimeMenu = screen.getByRole("menu", { name: "运行位置选项" });
+    const worktreeEntry = within(runtimeMenu).getByRole("menuitem", { name: /新建工作树 需要先创建提交/i });
     expect(worktreeEntry).toBeDisabled();
   });
 });

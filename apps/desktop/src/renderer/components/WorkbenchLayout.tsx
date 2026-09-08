@@ -453,7 +453,7 @@ export function WorkbenchLayout({
     openTab({
       id: "review",
       kind: "review",
-      title: "Review",
+      title: "变更审查",
       workspaceRoot: selectedWorkspaceRoot ?? undefined,
       scope: "uncommitted",
       refreshKey,
@@ -718,7 +718,7 @@ export function WorkbenchLayout({
         leftWidth={isCompactLayout ? 0 : displayedLeftWidth}
         leftHidden={isCompactLayout || isSidebarHidden}
         leftBounds={{ minWidth: LEFT_MIN_WIDTH, maxWidth: LEFT_MAX_WIDTH }}
-        leftSeparatorLabel="Resize session sidebar"
+        leftSeparatorLabel="调整会话侧栏宽度"
         main={mainContent}
         minMainWidth={MAIN_MIN_WIDTH}
         onContainerWidthChange={handleContainerWidthChange}
@@ -737,7 +737,7 @@ export function WorkbenchLayout({
         onRightSeparatorDoubleClick={() => setRightWidth(RIGHT_DEFAULT_WIDTH)}
         right={view === "chat" && isRightPanelOpen && !isCompactLayout ? rightPanel : undefined}
         rightBounds={{ minWidth: RIGHT_MIN_WIDTH, maxWidth: rightMaxWidth }}
-        rightSeparatorLabel="Resize preview panel"
+        rightSeparatorLabel="调整预览面板宽度"
         rightWidth={rightWidth}
       />
       {isCompactLayout && compactSidebarOpen ? (
@@ -745,7 +745,7 @@ export function WorkbenchLayout({
           <button
             type="button"
             className="absolute inset-0 border-0 bg-overlay"
-            aria-label="Close session sidebar overlay"
+            aria-label="关闭会话侧栏浮层"
             onClick={() => setCompactSidebarOpen(false)}
           />
           <div className="absolute inset-y-0 left-0 w-[min(360px,calc(100vw-48px))] min-w-[280px] overflow-hidden border-r border-line bg-sidebar shadow-act-float">
@@ -758,7 +758,7 @@ export function WorkbenchLayout({
           <button
             type="button"
             className="absolute inset-0 border-0 bg-overlay"
-            aria-label="Close right panel overlay"
+            aria-label="关闭右侧面板浮层"
             onClick={closeRightPanel}
           />
           <div className="absolute inset-y-0 right-0 w-[min(100%,640px)] overflow-hidden bg-surface shadow-act-float">

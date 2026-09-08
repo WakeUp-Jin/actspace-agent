@@ -77,7 +77,7 @@ export function useReviewWorkspaceStore(input: {
     inFlightDiffs.current.clear();
     inFlightContents.current.clear();
     if (!api) {
-      setState((current) => ({ ...current, loading: false, error: "Review bridge is not available." }));
+      setState((current) => ({ ...current, loading: false, error: "变更审查连接不可用。" }));
       return;
     }
     setState((current) => ({ ...current, selection, loading: true, error: null, feedback: null }));
@@ -112,7 +112,7 @@ export function useReviewWorkspaceStore(input: {
       }));
     } catch (error) {
       if (snapshotRequestId.current !== currentRequest) return;
-      setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "Failed to load Review." }));
+      setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "加载变更审查失败。" }));
     }
   }, [input.sessionId, input.workspaceRoot]);
 
@@ -171,7 +171,7 @@ export function useReviewWorkspaceStore(input: {
         return { ...current, diffs, fileRequests };
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load Review diff.";
+      const message = error instanceof Error ? error.message : "加载变更差异失败。";
       setState((current) => {
         if (current.snapshot?.id !== snapshot.id) return current;
         const fileRequests = new Map(current.fileRequests);
@@ -213,7 +213,7 @@ export function useReviewWorkspaceStore(input: {
     } catch (error) {
       setState((current) => ({
         ...current,
-        feedback: error instanceof Error ? error.message : "Failed to load full file contents.",
+        feedback: error instanceof Error ? error.message : "加载完整文件内容失败。",
       }));
     } finally {
       for (const fileId of requested) inFlightContents.current.delete(fileId);
@@ -229,7 +229,7 @@ export function useReviewWorkspaceStore(input: {
     if (!subscribe) return;
     return subscribe((notification) => {
       if (notification.workspaceId !== stateRef.current.snapshot?.workspaceId) return;
-      setState((current) => ({ ...current, feedback: "Changes updated. Refreshing Review…", diffs: new Map(), fileRequests: new Map(), fileContents: new Map() }));
+      setState((current) => ({ ...current, feedback: "变更已更新，正在刷新审查视图…", diffs: new Map(), fileRequests: new Map(), fileContents: new Map() }));
       void loadSnapshot(stateRef.current.selection);
     });
   }, [loadSnapshot]);
@@ -354,8 +354,8 @@ function displayPreferencePatch(patch: Partial<ReviewWorkspaceState>): Record<st
 }
 
 function mutationFeedback(result: ReviewMutationResult): string {
-  if (result.status === "success") return "Review action completed.";
-  if (result.status === "partialSuccess") return "Some Review actions completed; check the remaining failures.";
-  if (result.status === "stale") return result.message ?? "Review changed before the action could run.";
-  return result.message ?? result.failedSteps[0]?.message ?? "Review action failed.";
+  if (result.status === "success") return "审查操作已完成。";
+  if (result.status === "partialSuccess") return "部分审查操作已完成，请检查剩余失败项。";
+  if (result.status === "stale") return result.message ?? "操作执行前变更内容已更新，请刷新后重试。";
+  return result.message ?? result.failedSteps[0]?.message ?? "审查操作失败。";
 }

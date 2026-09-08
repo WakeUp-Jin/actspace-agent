@@ -79,7 +79,7 @@ describe("TerminalRenderView chrome", () => {
       });
     });
 
-    expect(screen.getByText("exited")).toHaveAttribute("data-terminal-status", "exited");
+    expect(screen.getByText("已退出")).toHaveAttribute("data-terminal-status", "exited");
     expect(screen.getByRole("button", { name: "重启" })).toBeInTheDocument();
   });
 });

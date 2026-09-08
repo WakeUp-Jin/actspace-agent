@@ -13,44 +13,52 @@ export type ComposerSlashFunction = {
   command: `/${string}`;
   label: string;
   description: string;
+  /** Keep existing English discovery terms when the visible copy changes. */
+  searchAliases: string;
 };
 
 export const COMPOSER_SLASH_FUNCTIONS: readonly ComposerSlashFunction[] = [
   {
     id: "chat",
     command: "/chat",
-    label: "Chat mode",
-    description: "Talk without tools.",
+    label: "Chat 模式",
+    description: "直接对话，不使用工具。",
+    searchAliases: "Chat mode Talk without tools.",
   },
   {
     id: "plan",
     command: "/plan",
-    label: "Plan mode",
-    description: "Research and plan with read-only tools.",
+    label: "Plan 模式",
+    description: "使用只读工具进行调研和规划。",
+    searchAliases: "Plan mode Research and plan with read-only tools.",
   },
   {
     id: "agent",
     command: "/agent",
-    label: "Agent mode",
-    description: "Plan and execute with the full tool set.",
+    label: "Agent 模式",
+    description: "使用完整工具集进行规划和执行。",
+    searchAliases: "Agent mode Plan and execute with the full tool set.",
   },
   {
     id: "compact",
     command: "/compact",
-    label: "Compact context",
-    description: "Summarize the conversation and free context space.",
+    label: "压缩上下文",
+    description: "总结会话，释放上下文空间。",
+    searchAliases: "Compact context Summarize the conversation and free context space.",
   },
   {
     id: "status",
     command: "/status",
-    label: "Context status",
-    description: "Show context usage and injected inputs.",
+    label: "上下文状态",
+    description: "查看上下文用量与注入内容。",
+    searchAliases: "Context status Show context usage and injected inputs.",
   },
   {
     id: "review",
     command: "/review",
-    label: "Review changes",
-    description: "Open the current workspace changes.",
+    label: "审查变更",
+    description: "打开当前工作区的变更。",
+    searchAliases: "Review changes Open the current workspace changes.",
   },
 ] as const;
 
@@ -71,7 +79,8 @@ export function filterComposerSlashFunctions(query: string): ComposerSlashFuncti
       matches:
         item.command.slice(1).toLocaleLowerCase().includes(normalizedQuery) ||
         item.label.toLocaleLowerCase().includes(normalizedQuery) ||
-        item.description.toLocaleLowerCase().includes(normalizedQuery),
+        item.description.toLocaleLowerCase().includes(normalizedQuery) ||
+        item.searchAliases.toLocaleLowerCase().includes(normalizedQuery),
     }))
     .filter((entry) => entry.matches)
     .sort((left, right) => Number(right.commandPrefix) - Number(left.commandPrefix) || left.index - right.index)

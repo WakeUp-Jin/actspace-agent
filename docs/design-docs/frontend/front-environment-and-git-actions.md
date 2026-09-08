@@ -1,5 +1,7 @@
 # Environment 与本地 Git 操作规范
 
+> 2026-09-09 文案更新：日常界面展示名称以[中文文案规范](front-desktop-chinese-ui.md)为准；保留 Chat、Plan、Thinking、Effort 和工具执行展示。本文英文名称仍可用于指代内部概念，协议与行为不变。
+
 ## 定位
 
 Environment 是聊天态工作台顶部的本地工作区控制面。它回答三个连续问题：

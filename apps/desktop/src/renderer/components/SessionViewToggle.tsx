@@ -11,7 +11,7 @@ export function SessionViewToggle({
   onToggle: () => void;
 }) {
   const showingTrajectory = view === "trajectory";
-  const label = showingTrajectory ? "返回 Chat" : "查看 Trajectory";
+  const label = showingTrajectory ? "返回对话" : "查看执行轨迹";
 
   return (
     <Tooltip>

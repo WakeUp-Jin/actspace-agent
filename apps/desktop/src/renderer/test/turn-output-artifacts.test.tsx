@@ -413,7 +413,7 @@ describe("image generation presentation", () => {
     );
 
     expect(screen.getByText("你好，我已经完成回复。")).toBeInTheDocument();
-    expect(screen.getByLabelText("Message composer")).toBeInTheDocument();
+    expect(screen.getByLabelText("消息输入框")).toBeInTheDocument();
   });
 
   it("does not publish the artifact shelf before the final reply exists", () => {

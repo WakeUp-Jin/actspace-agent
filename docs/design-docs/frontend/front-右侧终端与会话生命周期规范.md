@@ -1,5 +1,7 @@
 # 右侧终端与会话生命周期规范
 
+> 2026-09-09 文案更新：日常界面展示名称以[中文文案规范](front-desktop-chinese-ui.md)为准；保留 Chat、Plan、Thinking、Effort 和工具执行展示。本文英文名称仍可用于指代内部概念，协议与行为不变。
+
 ## 定位
 
 Terminal 是聊天态工作台右侧对象面板中的用户交互式 shell。它绑定当前 Agent 会话的真实 workspace / Git worktree，让用户在不离开 ActSpace 的情况下运行本机命令、查看服务日志和操作交互式 CLI。

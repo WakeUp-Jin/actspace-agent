@@ -37,8 +37,8 @@ describe("ContextPopup", () => {
   it("renders buckets from the snapshot and omits the footer", () => {
     const { container } = renderContextPopup({ snapshot: makeSnapshot(), onClose: vi.fn() });
 
-    expect(screen.getByText("System prompt")).toBeInTheDocument();
-    expect(screen.getByText("Tools")).toBeInTheDocument();
+    expect(screen.getByText("系统提示词")).toBeInTheDocument();
+    expect(screen.getByText("工具")).toBeInTheDocument();
     expect(container.querySelector(".context-meter")).toHaveClass("bg-[var(--act-color-meter-track)]");
     // 已移除的 footer 文案不应再出现。
     expect(screen.queryByText(/Total used/i)).not.toBeInTheDocument();
@@ -61,7 +61,7 @@ describe("ContextPopup", () => {
     expect(screen.getAllByText("futureThing").length).toBeGreaterThan(0);
   });
 
-  it("shows <1% Full instead of 0% when there is data below one percent", () => {
+  it("shows <1% 已用 instead of 0% when there is data below one percent", () => {
     const snapshot: ContextUsageSnapshot = {
       totalTokens: 2_190,
       maxTokens: 1_000_000,
@@ -75,17 +75,17 @@ describe("ContextPopup", () => {
     };
     renderContextPopup({ snapshot, onClose: vi.fn() });
 
-    expect(screen.getByText("<1% Full")).toBeInTheDocument();
+    expect(screen.getByText("<1% 已用")).toBeInTheDocument();
     // meter 段宽相对 maxTokens：tools 占 ~0.19%，不再撑满整条。
-    const toolsMeter = screen.getByRole("button", { name: "Tools 1K tokens" });
+    const toolsMeter = screen.getByRole("button", { name: "工具 1K Token" });
     expect(toolsMeter.style.width).toBe(`${(1_879 / 1_000_000) * 100}%`);
   });
 
   it("shows zero for an unknown capacity instead of exposing Unknown", () => {
     renderContextPopup({ snapshot: { ...makeSnapshot(), maxTokens: 0, percentUsed: 0 }, onClose: vi.fn() });
 
-    expect(screen.getByText("0% Full")).toBeInTheDocument();
-    expect(screen.getByText(/\/ 0 Tokens/)).toBeInTheDocument();
+    expect(screen.getByText("0% 已用")).toBeInTheDocument();
+    expect(screen.getByText(/\/ 0 Token/)).toBeInTheDocument();
     expect(screen.queryByText(/Unknown/)).not.toBeInTheDocument();
   });
 
@@ -108,7 +108,7 @@ describe("ContextPopup", () => {
     const user = userEvent.setup();
     renderContextPopup({ snapshot: makeSnapshot(), onClose: vi.fn() });
 
-    await user.hover(screen.getByRole("button", { name: "Close context" }));
+    await user.hover(screen.getByRole("button", { name: "关闭上下文" }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("关闭上下文用量");
   });
 
@@ -116,8 +116,8 @@ describe("ContextPopup", () => {
     const user = userEvent.setup();
     renderContextPopup({ snapshot: makeSnapshot(), onClose: vi.fn() });
 
-    const toolsRow = screen.getByRole("button", { name: "Tools 60" });
-    const toolsMeter = screen.getByRole("button", { name: "Tools 60 tokens" });
+    const toolsRow = screen.getByRole("button", { name: "工具 60" });
+    const toolsMeter = screen.getByRole("button", { name: "工具 60 Token" });
 
     expect(toolsRow).toHaveAttribute("aria-pressed", "false");
     expect(toolsMeter).toHaveAttribute("aria-pressed", "false");

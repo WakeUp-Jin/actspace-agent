@@ -13,11 +13,11 @@ it("groups agents and navigates within the panel while rejecting stale transcrip
   const transcript = vi.fn().mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; })).mockResolvedValue([]);
   window.actspace = { ...original, getSubagents: vi.fn().mockResolvedValue([agent("first", "running"), agent("second", "completed")]), getSubAgentTranscript: transcript };
   const { unmount } = render(<TooltipProvider><SubagentsPanel sessionId="parent" /></TooltipProvider>);
-  await screen.findByText("Running · 1");
-  expect(screen.getByText("Done · 1")).toBeInTheDocument();
+  await screen.findByText("运行中 · 1");
+  expect(screen.getByText("已结束 · 1")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /first/ }));
   await waitFor(() => expect(transcript).toHaveBeenCalledTimes(1));
-  fireEvent.click(screen.getByRole("button", { name: "Back to subagents" }));
+  fireEvent.click(screen.getByRole("button", { name: "返回子 Agent 列表" }));
   fireEvent.click(screen.getByRole("button", { name: /second/ }));
   await waitFor(() => expect(transcript).toHaveBeenCalledTimes(2));
   await act(async () => finishOld([]));

@@ -1,5 +1,7 @@
 # 前端设计文档
 
+- [日常桌面界面中文文案](front-desktop-chinese-ui.md)：日常操作中文化，保留模式、思考档位与工具执行名称；验收边界见执行摘要。
+
 - [设置内使用统计页面更新](front-usage-statistics-refresh.md)：已实施，实机门禁见执行摘要；借鉴 Maka 信息结构，统一 ActSpace 视觉和中文，连接可靠费用投影及本地价目。
 - [英语辅助学习插件设计](../agent-plugin-runtime/agent-english-learning.md)：已实施，实机门禁见执行摘要；扩展能力卡片控制选定会话，通用设置配置 MiniMax 语音。
 - [Agent 工具流式渲染修复设计](front-agent-tool-stream-rendering.md)：已实施，定义工具事件链与实时/历史预览对齐；体验调整见后续计划。

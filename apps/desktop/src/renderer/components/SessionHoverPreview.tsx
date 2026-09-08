@@ -35,7 +35,7 @@ function clampPercent(value: number): number {
 function formatTokenCount(tokens: number): string {
   if (!Number.isFinite(tokens)) return "0";
   const safe = Math.max(0, Math.floor(tokens));
-  if (safe < 1_000) return safe.toLocaleString();
+  if (safe < 1_000) return safe.toLocaleString("zh-CN");
   if (safe < 1_000_000) return `${Math.floor(safe / 1_000)}K`;
   return `${Math.floor(safe / 1_000_000)}M`;
 }
@@ -109,7 +109,7 @@ export function SessionHoverPreviewCard({
               <BarChart3 size={14} strokeWidth={1.8} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
               <div className="min-w-0">
                 <div className={SESSION_HOVER_CONTEXT_META_CLASS}>
-                  <span>Context {formatContextPercent(snapshot)}%</span>
+                  <span>上下文 {formatContextPercent(snapshot)}%</span>
                   <span className="whitespace-nowrap font-medium text-text-main">
                     {formatTokenCount(snapshot.totalTokens)} / {formatTokenCount(snapshot.maxTokens)}
                   </span>
@@ -125,7 +125,7 @@ export function SessionHoverPreviewCard({
           ) : null}
         </div>
       ) : null}
-      {loading ? <div className={SESSION_HOVER_LOADING_CLASS}>Loading session details...</div> : null}
+      {loading ? <div className={SESSION_HOVER_LOADING_CLASS}>正在加载会话详情…</div> : null}
     </div>
   );
 }

@@ -60,16 +60,16 @@ export function ReviewToolbar({ snapshot, selection, workspaceRoot, sessionId, f
     document.addEventListener("keydown", escape);
     return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", escape); };
   }, [menu]);
-  const scopeLabel = selection.kind === "lastTurn" ? "Last Turn" : selection.kind === "uncommitted" ? "Uncommitted" : selection.kind === "unstaged" ? "Unstaged" : selection.kind === "staged" ? "Staged" : selection.kind === "commit" ? "Committed" : "Branch";
+  const scopeLabel = selection.kind === "lastTurn" ? "最近一轮" : selection.kind === "uncommitted" ? "未提交" : selection.kind === "unstaged" ? "未暂存" : selection.kind === "staged" ? "已暂存" : selection.kind === "commit" ? "已提交" : "分支";
   const jumpFiles = files.filter((file) => file.path.toLocaleLowerCase().includes(jumpQuery.toLocaleLowerCase())).slice(0, 12);
   const hasFiles = files.length > 0;
-  const fileActionHint = hasFiles ? null : "No changed files in this Review scope";
-  const splitHint = !hasFiles ? fileActionHint : !splitAvailable ? "Widen Review to use split diff" : diffMode === "split" ? "Switch to unified diff" : "Switch to split diff";
+  const fileActionHint = hasFiles ? null : "当前审查范围内没有变更文件";
+  const splitHint = !hasFiles ? fileActionHint : !splitAvailable ? "加宽审查面板后可使用并排差异" : diffMode === "split" ? "切换为单栏差异" : "切换为并排差异";
   return (
-    <div ref={rootRef} className="relative z-20 shrink-0 border-b border-line bg-surface-raised [pointer-events:auto] [-webkit-app-region:no-drag]" aria-label="Review toolbar">
+    <div ref={rootRef} className="relative z-20 shrink-0 border-b border-line bg-surface-raised [pointer-events:auto] [-webkit-app-region:no-drag]" aria-label="审查工具栏">
       <div className="flex min-h-11 min-w-0 items-center gap-1 overflow-x-auto px-2.5 scrollbar-none" data-review-toolbar-scroll>
         <div className="min-w-0 shrink">
-          <button ref={scopeRef} type="button" className="inline-flex h-8 max-w-[140px] items-center gap-1 rounded-act-sm px-1.5 text-[13px] font-medium text-text-main hover:bg-surface-subtle" aria-label="Review scope" aria-haspopup="menu" aria-expanded={menu === "scope"} onClick={() => setMenu(menu === "scope" ? null : "scope")}>
+          <button ref={scopeRef} type="button" className="inline-flex h-8 max-w-[140px] items-center gap-1 rounded-act-sm px-1.5 text-[13px] font-medium text-text-main hover:bg-surface-subtle" aria-label="审查范围" aria-haspopup="menu" aria-expanded={menu === "scope"} onClick={() => setMenu(menu === "scope" ? null : "scope")}>
             <span className="truncate">{scopeLabel}</span><ChevronDown size={13} />
           </button>
           {menu === "scope" ? <AnchoredPopover anchorRef={scopeRef} popoverRef={popoverRef} align="start" className="w-[min(360px,calc(100vw-16px))]"><ReviewScopeMenu selection={selection} sessionId={sessionId} workspaceRoot={workspaceRoot} onSelect={(next) => { onSelectScope(next); setMenu(null); }} /></AnchoredPopover> : null}
@@ -77,31 +77,31 @@ export function ReviewToolbar({ snapshot, selection, workspaceRoot, sessionId, f
         {snapshot && (snapshot.totals.additions > 0 || snapshot.totals.deletions > 0) ? <div className="flex shrink-0 gap-1 text-[12px] tabular-nums">{snapshot.totals.additions > 0 ? <span className="text-success">+{snapshot.totals.additions}</span> : null}{snapshot.totals.deletions > 0 ? <span className="text-danger">-{snapshot.totals.deletions}</span> : null}</div> : null}
         <div className="min-w-2 flex-1" />
         <div className="shrink-0">
-          <Tooltip><TooltipTrigger asChild><button ref={optionsRef} type="button" className={ICON} aria-label="Review options" onClick={() => setMenu(menu === "options" ? null : "options")}><MoreHorizontal size={15} /></button></TooltipTrigger><TooltipContent>Review options</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild><button ref={optionsRef} type="button" className={ICON} aria-label="审查选项" onClick={() => setMenu(menu === "options" ? null : "options")}><MoreHorizontal size={15} /></button></TooltipTrigger><TooltipContent>审查选项</TooltipContent></Tooltip>
           {menu === "options" ? <AnchoredPopover anchorRef={optionsRef} popoverRef={popoverRef} className="w-[220px] p-1.5">
-            <button type="button" className={MENU_ITEM} onClick={() => { onRefresh(); setMenu(null); }}><RefreshCw size={13} />Refresh</button>
-            <Option checked={wrap} label="Enable word wrap" icon={<ArrowRightFromLine size={13} />} onClick={onWrap} />
-            <button type="button" className={MENU_ITEM} onClick={onLoadFullFiles}><File size={13} />{loadFullFiles ? "Don't load full files" : "Load full files"}</button>
-            <Option checked={richPreview} label="Enable rich preview" icon={<Image size={13} />} onClick={onRichPreview} />
-            <Option checked={wordDiff} label="Enable word diffs" icon={<FileDiff size={13} />} onClick={onWordDiff} />
-            <Option checked={!ignoreWhitespaceChanges} label={ignoreWhitespaceChanges ? "Show white space" : "Hide white space"} icon={<Eye size={13} />} onClick={onWhitespace} />
+            <button type="button" className={MENU_ITEM} onClick={() => { onRefresh(); setMenu(null); }}><RefreshCw size={13} />刷新</button>
+            <Option checked={wrap} label="自动换行" icon={<ArrowRightFromLine size={13} />} onClick={onWrap} />
+            <button type="button" className={MENU_ITEM} onClick={onLoadFullFiles}><File size={13} />{loadFullFiles ? "不加载完整文件" : "加载完整文件"}</button>
+            <Option checked={richPreview} label="启用富预览" icon={<Image size={13} />} onClick={onRichPreview} />
+            <Option checked={wordDiff} label="显示词级差异" icon={<FileDiff size={13} />} onClick={onWordDiff} />
+            <Option checked={!ignoreWhitespaceChanges} label={ignoreWhitespaceChanges ? "显示空白差异" : "隐藏空白差异"} icon={<Eye size={13} />} onClick={onWhitespace} />
             <div className="mx-1 my-1 border-t border-line" />
-            <button type="button" disabled={!snapshot} className={`${MENU_ITEM} disabled:opacity-40`} onClick={() => { onCopyApply(); setMenu(null); }}><Clipboard size={13} />Copy git apply command</button>
+            <button type="button" disabled={!snapshot} className={`${MENU_ITEM} disabled:opacity-40`} onClick={() => { onCopyApply(); setMenu(null); }}><Clipboard size={13} />复制 git apply 命令</button>
           </AnchoredPopover> : null}
         </div>
-        <Tooltip><TooltipTrigger asChild><button type="button" className={ICON} aria-label={allExpanded ? (singleFileMode ? "Collapse current diff" : "Collapse all diffs") : (singleFileMode ? "Expand current diff" : "Expand all diffs")} aria-disabled={!hasFiles} onClick={() => { if (hasFiles) onToggleAll(!allExpanded); }}>{allExpanded ? <ListCollapse size={15} /> : <ListTree size={15} />}</button></TooltipTrigger><TooltipContent>{fileActionHint ?? (allExpanded ? (singleFileMode ? "Collapse current diff" : "Collapse all diffs") : (singleFileMode ? "Expand current diff" : "Expand all diffs"))}</TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger asChild><button type="button" className={ICON} aria-label={allExpanded ? (singleFileMode ? "收起当前差异" : "收起全部差异") : (singleFileMode ? "展开当前差异" : "展开全部差异")} aria-disabled={!hasFiles} onClick={() => { if (hasFiles) onToggleAll(!allExpanded); }}>{allExpanded ? <ListCollapse size={15} /> : <ListTree size={15} />}</button></TooltipTrigger><TooltipContent>{fileActionHint ?? (allExpanded ? (singleFileMode ? "收起当前差异" : "收起全部差异") : (singleFileMode ? "展开当前差异" : "展开全部差异"))}</TooltipContent></Tooltip>
         <div className="shrink-0">
-          <Tooltip><TooltipTrigger asChild><button ref={jumpRef} type="button" className={ICON} aria-label="Jump to file" aria-disabled={!hasFiles} onClick={() => { if (hasFiles) setMenu(menu === "jump" ? null : "jump"); }}><Search size={15} /></button></TooltipTrigger><TooltipContent>{fileActionHint ?? "Jump to file"}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild><button ref={jumpRef} type="button" className={ICON} aria-label="跳转到文件" aria-disabled={!hasFiles} onClick={() => { if (hasFiles) setMenu(menu === "jump" ? null : "jump"); }}><Search size={15} /></button></TooltipTrigger><TooltipContent>{fileActionHint ?? "跳转到文件"}</TooltipContent></Tooltip>
           {menu === "jump" ? <AnchoredPopover anchorRef={jumpRef} popoverRef={popoverRef} className="w-[min(320px,calc(100vw-32px))] p-2">
-            <input autoFocus className="h-8 w-full rounded-act-sm border border-line bg-surface px-2 text-[12px] text-text-main outline-none focus:border-focus-ring" value={jumpQuery} onChange={(event) => setJumpQuery(event.target.value)} placeholder="Jump to file…" />
+            <input autoFocus className="h-8 w-full rounded-act-sm border border-line bg-surface px-2 text-[12px] text-text-main outline-none focus:border-focus-ring" value={jumpQuery} onChange={(event) => setJumpQuery(event.target.value)} placeholder="跳转到文件…" />
             <div className="mt-1 max-h-[280px] overflow-auto">{jumpFiles.map((file) => <button key={file.id} type="button" className="flex min-h-8 w-full items-center rounded-act-sm px-2 text-left font-mono text-[11px] text-text-main hover:bg-surface-subtle" onClick={() => { onJump(file.id); setMenu(null); }}>{file.path}</button>)}</div>
           </AnchoredPopover> : null}
         </div>
-        <Tooltip><TooltipTrigger asChild><button type="button" className={`${ICON} ${diffMode === "split" ? "bg-selected text-text-main" : ""}`} aria-label={diffMode === "split" ? "Switch to unified diff" : "Switch to split diff"} aria-pressed={diffMode === "split"} aria-disabled={!hasFiles || !splitAvailable} onClick={() => { if (hasFiles && splitAvailable) onDiffMode(diffMode === "split" ? "unified" : "split"); }}><Columns2 size={15} /></button></TooltipTrigger><TooltipContent>{splitHint}</TooltipContent></Tooltip>
-        <Tooltip><TooltipTrigger asChild><button type="button" className={`${ICON} ${filesVisible ? "bg-selected text-text-main" : ""}`} aria-label={filesVisible ? "Hide files" : "Show files"} aria-pressed={filesVisible} aria-disabled={!hasFiles} onClick={() => { if (hasFiles) onToggleFiles(); }}><Folder size={15} /></button></TooltipTrigger><TooltipContent>{fileActionHint ?? (filesVisible ? "Hide files" : "Show files")}</TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger asChild><button type="button" className={`${ICON} ${diffMode === "split" ? "bg-selected text-text-main" : ""}`} aria-label={diffMode === "split" ? "切换为单栏差异" : "切换为并排差异"} aria-pressed={diffMode === "split"} aria-disabled={!hasFiles || !splitAvailable} onClick={() => { if (hasFiles && splitAvailable) onDiffMode(diffMode === "split" ? "unified" : "split"); }}><Columns2 size={15} /></button></TooltipTrigger><TooltipContent>{splitHint}</TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger asChild><button type="button" className={`${ICON} ${filesVisible ? "bg-selected text-text-main" : ""}`} aria-label={filesVisible ? "隐藏文件列表" : "显示文件列表"} aria-pressed={filesVisible} aria-disabled={!hasFiles} onClick={() => { if (hasFiles) onToggleFiles(); }}><Folder size={15} /></button></TooltipTrigger><TooltipContent>{fileActionHint ?? (filesVisible ? "隐藏文件列表" : "显示文件列表")}</TooltipContent></Tooltip>
         <div className="shrink-0">
-          <button ref={gitRef} type="button" className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-act-sm border border-line bg-surface px-2 text-[12px] font-medium text-text-main hover:bg-surface-subtle" onClick={() => setMenu(menu === "git" ? null : "git")}><GitPullRequestArrow size={14} />Commit or push<ChevronDown size={12} /></button>
-          {menu === "git" ? <AnchoredPopover anchorRef={gitRef} popoverRef={popoverRef} className="w-[190px] p-1.5"><button type="button" className={MENU_ITEM} onClick={() => { onCommitOrPush(); setMenu(null); }}>Commit or push</button><button type="button" className={MENU_ITEM} onClick={() => { onCreatePr(); setMenu(null); }}>Create PR</button></AnchoredPopover> : null}
+          <button ref={gitRef} type="button" className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-act-sm border border-line bg-surface px-2 text-[12px] font-medium text-text-main hover:bg-surface-subtle" onClick={() => setMenu(menu === "git" ? null : "git")}><GitPullRequestArrow size={14} />提交或推送<ChevronDown size={12} /></button>
+          {menu === "git" ? <AnchoredPopover anchorRef={gitRef} popoverRef={popoverRef} className="w-[190px] p-1.5"><button type="button" className={MENU_ITEM} onClick={() => { onCommitOrPush(); setMenu(null); }}>提交或推送</button><button type="button" className={MENU_ITEM} onClick={() => { onCreatePr(); setMenu(null); }}>创建 PR</button></AnchoredPopover> : null}
         </div>
       </div>
       {snapshot?.comparison ? <div className="flex min-h-7 items-center gap-2 border-t border-line/70 px-3 text-[11px] text-text-faint"><span className="truncate">{snapshot.comparison.from}</span><span>→</span><span className="truncate">{snapshot.comparison.to}</span></div> : null}

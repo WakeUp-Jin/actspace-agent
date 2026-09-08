@@ -1,5 +1,7 @@
 # Workspace、Git Branch 与 Worktree 执行上下文规范
 
+> 2026-09-09 文案更新：日常界面展示名称以[中文文案规范](front-desktop-chinese-ui.md)为准；保留 Chat、Plan、Thinking、Effort 和工具执行展示。本文英文名称仍可用于指代内部概念，协议与行为不变。
+
 ## 定位
 
 初始 Composer 顶部的 `Workspace -> Branch -> Run on` 不是三个互不相关的装饰性下拉框，而是一组连续的执行上下文选择器。它需要在用户发送首条消息前回答三个问题：

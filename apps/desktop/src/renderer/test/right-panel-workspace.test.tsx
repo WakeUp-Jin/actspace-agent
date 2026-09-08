@@ -65,7 +65,7 @@ describe("RightPanel 工作区浏览态", () => {
     (window as { actspace?: unknown }).actspace = undefined;
     renderPanel();
 
-    expect(screen.getByText("Objects")).toBeInTheDocument();
+    expect(screen.getByText("对象")).toBeInTheDocument();
 
     // 未进入浏览态：没有操作栏（折叠按钮）也没有树栏。
     expect(screen.queryByRole("button", { name: "收起文件树" })).toBeNull();
@@ -73,7 +73,7 @@ describe("RightPanel 工作区浏览态", () => {
 
     // 进入浏览态：② 操作栏折叠按钮 + ③ 右侧树栏同时出现。
     await user.click(screen.getByRole("button", { name: "probe-toggle" }));
-    expect(screen.getByText("Files")).toBeInTheDocument();
+    expect(screen.getByText("文件")).toBeInTheDocument();
     const collapseBtn = screen.getByRole("button", { name: "收起文件树" });
     expect(collapseBtn).toBeInTheDocument();
     expect(screen.getByText("当前环境不支持文件浏览。")).toBeInTheDocument();
@@ -97,12 +97,12 @@ describe("RightPanel 工作区浏览态", () => {
     renderPanel();
 
     // 先从启动页打开 Context，再进入工作区浏览态：对象 Tab 退居占位。
-    await user.click(screen.getByRole("button", { name: "Context" }));
+    await user.click(screen.getByRole("button", { name: "上下文" }));
     await user.click(screen.getByRole("button", { name: "probe-toggle" }));
     expect(screen.getByRole("heading", { name: "选择文件查看" })).toBeInTheDocument();
 
     // 在 tab 栏点 Context：应退出工作区态、展示自己的视图（占位 + 操作栏 + 树都消失）。
-    await user.click(screen.getByRole("tab", { name: "Context" }));
+    await user.click(screen.getByRole("tab", { name: "上下文" }));
     expect(screen.queryByRole("heading", { name: "选择文件查看" })).toBeNull();
     expect(screen.queryByRole("button", { name: /文件树$/ })).toBeNull();
     expect(screen.getByText(/当前没有可展示的上下文明细/)).toBeInTheDocument();
@@ -129,17 +129,17 @@ describe("RightPanel 工作区浏览态", () => {
     const user = userEvent.setup();
     renderPanel();
 
-    await user.click(screen.getByRole("button", { name: "Context" }));
-    await user.hover(screen.getByRole("button", { name: "关闭 Context" }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("关闭 Context");
+    await user.click(screen.getByRole("button", { name: "上下文" }));
+    await user.hover(screen.getByRole("button", { name: "关闭 上下文" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("关闭 上下文");
   });
 
   it("uses the lighter surface token for the active tab", async () => {
     const user = userEvent.setup();
     renderPanel();
 
-    await user.click(screen.getByRole("button", { name: "Context" }));
-    const activeTab = screen.getByRole("tab", { name: "Context" }).parentElement;
+    await user.click(screen.getByRole("button", { name: "上下文" }));
+    const activeTab = screen.getByRole("tab", { name: "上下文" }).parentElement;
     expect(activeTab).toHaveClass("bg-surface-subtle");
     expect(activeTab).not.toHaveClass("bg-selected");
   });

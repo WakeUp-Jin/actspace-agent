@@ -87,7 +87,7 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
   const footerHeight = singleFileMode ? 34 : 0;
   const canvasWidth = wrap ? "100%" : `max(100%, ${canvasColumns}ch)`;
   return (
-    <main ref={parentRef} className="min-h-0 min-w-0 flex-1 overflow-auto bg-surface" aria-label="Review diff canvas" data-review-horizontal-scroll="canvas">
+    <main ref={parentRef} className="min-h-0 min-w-0 flex-1 overflow-auto bg-surface" aria-label="变更差异视图" data-review-horizontal-scroll="canvas">
       <div className="relative min-w-full" style={{ height: virtualizer.getTotalSize() + footerHeight, width: canvasWidth }} data-review-content-width={canvasWidth} data-review-total-row-count={rows.length} data-review-virtual-row-count={virtualItems.length}>
         {virtualItems.map((item) => {
           const row = rows[item.index];
@@ -122,7 +122,7 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
         })}
         {singleFileMode ? (
           <div className="absolute inset-x-0 flex h-[34px] items-center gap-2 border-t border-line bg-surface px-3 text-[11px] text-text-faint" style={{ top: virtualizer.getTotalSize() }}>
-            <span aria-hidden="true">ⓘ</span><span>This diff is large, showing one file at a time</span>
+            <span aria-hidden="true">ⓘ</span><span>变更较多，每次显示一个文件</span>
           </div>
         ) : null}
       </div>
@@ -168,12 +168,12 @@ function RowView({ row, workspaceRoot, capabilities, selected, expanded, wrap, w
     const file = row.file;
     return (
       <div className={`flex min-h-10 items-center gap-2 border-b border-line bg-surface-raised px-3 ${selected ? "ring-1 ring-inset ring-focus-ring/40" : ""}`} onFocus={onSelect}>
-        <button type="button" className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle" onClick={onToggle} aria-label={`${expanded ? "Collapse" : "Expand"} ${file.path}`}>
+        <button type="button" className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle" onClick={onToggle} aria-label={`${expanded ? "收起" : "展开"} ${file.path}`}>
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
         <button type="button" className="min-w-0 flex-1 truncate text-left font-mono text-[12px] font-medium text-text-main" onClick={onSelect} title={file.path}>{file.path}</button>
         {file.additions > 0 || file.deletions > 0 ? <span className="text-[11px] tabular-nums">{file.additions > 0 ? <span className="text-success">+{file.additions}</span> : null}{file.additions > 0 && file.deletions > 0 ? " " : null}{file.deletions > 0 ? <span className="text-danger">-{file.deletions}</span> : null}</span> : null}
-        <button type="button" className={`inline-flex h-6 w-6 items-center justify-center rounded-act-sm hover:bg-surface-subtle ${file.viewed ? "text-success" : "text-text-faint"}`} onClick={onViewed} aria-label={`${file.viewed ? "Mark unviewed" : "Mark viewed"} ${file.path}`}><Check size={14} /></button>
+        <button type="button" className={`inline-flex h-6 w-6 items-center justify-center rounded-act-sm hover:bg-surface-subtle ${file.viewed ? "text-success" : "text-text-faint"}`} onClick={onViewed} aria-label={`${file.viewed ? "标记为未查看" : "标记为已查看"} ${file.path}`}><Check size={14} /></button>
         <FileActions file={file} capabilities={capabilities} canExpandContext={Boolean(!loadFullFiles && expanded && capabilities.canLoadFullFile && file.renderKind === "text")} onExpandContext={onExpandContext} onMutation={onMutation} />
       </div>
     );
@@ -182,12 +182,12 @@ function RowView({ row, workspaceRoot, capabilities, selected, expanded, wrap, w
   if (row.kind === "line") return <DiffLine line={row.line} side={row.side} wrap={wrap} wordDiff={wordDiff} />;
   if (row.kind === "split-line") return <SplitDiffLine oldLine={row.oldLine} newLine={row.newLine} wrap={wrap} wordDiff={wordDiff} />;
   if (row.state === "image" && richPreview) return <ReviewImageDiff workspaceRoot={workspaceRoot} file={row.file} />;
-  const message = row.state === "loading" ? "Loading structured diff…"
-    : row.state === "binary" ? "Binary file changed. Text diff is unavailable."
-      : row.state === "image" ? "Image changed. Enable rich preview to inspect the current image."
-        : row.state === "empty" ? "No textual diff available."
-          : row.message ?? "Diff failed to load.";
-  return <div className="flex min-h-16 items-center gap-3 border-b border-line px-12 py-4 text-[12px] text-text-faint"><span className="min-w-0 flex-1">{message}</span>{row.state === "failed" ? <button type="button" className="h-7 rounded-act-sm border border-line px-2 text-[11px] text-text-main hover:bg-surface-subtle" onClick={onRetry}>Retry</button> : null}</div>;
+  const message = row.state === "loading" ? "正在加载变更差异…"
+    : row.state === "binary" ? "二进制文件已变更，无法显示文本差异。"
+      : row.state === "image" ? "图片已变更，启用富预览可查看当前图片。"
+        : row.state === "empty" ? "暂无文本差异。"
+          : row.message ?? "加载差异失败。";
+  return <div className="flex min-h-16 items-center gap-3 border-b border-line px-12 py-4 text-[12px] text-text-faint"><span className="min-w-0 flex-1">{message}</span>{row.state === "failed" ? <button type="button" className="h-7 rounded-act-sm border border-line px-2 text-[11px] text-text-main hover:bg-surface-subtle" onClick={onRetry}>重试</button> : null}</div>;
 }
 
 function buildRows(files: ReviewFileSummary[], diffs: Map<string, ReviewFileDiff>, requests: Map<string, ReviewFileRequestState>, contents: Map<string, ReviewFileContents>, expandedIds: Set<string>, mode: ReviewDiffMode, loadFullFiles: boolean, richPreview: boolean): DiffRow[] {
@@ -301,30 +301,30 @@ function ReviewImageDiff({ workspaceRoot, file }: { workspaceRoot?: string; file
     if (file.status === "deleted" || !window.actspace?.readWorkspaceFile) return;
     void window.actspace.readWorkspaceFile({ workspaceRoot, relativePath: file.path }).then((result) => {
       if (!active) return;
-      if (result.error || !result.dataUrl) setError("Current image preview is unavailable.");
+      if (result.error || !result.dataUrl) setError("当前图片预览不可用。");
       else setSrc(result.dataUrl);
     });
     return () => { active = false; };
   }, [file.path, file.status, workspaceRoot]);
-  if (file.status === "deleted") return <div className="px-12 py-5 text-[12px] text-text-muted">Image was deleted. The previous revision is not loaded into the renderer.</div>;
+  if (file.status === "deleted") return <div className="px-12 py-5 text-[12px] text-text-muted">图片已删除，暂未加载历史版本。</div>;
   if (error) return <div className="px-12 py-5 text-[12px] text-text-muted">{error}</div>;
-  if (!src) return <div className="px-12 py-5 text-[12px] text-text-faint">Loading image preview…</div>;
-  return <div className="grid min-h-40 place-items-center bg-surface-subtle p-4"><img src={src} alt={`Current ${file.path}`} className="max-h-[520px] max-w-full rounded-act-sm border border-line bg-surface object-contain" /></div>;
+  if (!src) return <div className="px-12 py-5 text-[12px] text-text-faint">正在加载图片预览…</div>;
+  return <div className="grid min-h-40 place-items-center bg-surface-subtle p-4"><img src={src} alt={`当前版本 ${file.path}`} className="max-h-[520px] max-w-full rounded-act-sm border border-line bg-surface object-contain" /></div>;
 }
 
 function FileActions({ file, capabilities, canExpandContext, onExpandContext, onMutation }: { file: ReviewFileSummary; capabilities: ReviewCapabilities; canExpandContext: boolean; onExpandContext: () => void; onMutation: (mutation: Omit<ReviewMutation, "snapshotId" | "expectedGeneration">) => void }) {
   const source = file.source === "index" ? "index" : "workingTree";
   return <div className="flex items-center gap-0.5">
-    {canExpandContext ? <button type="button" title="Load more context" aria-label={`Load more context for ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main" onClick={onExpandContext}><ListTree size={13} /></button> : null}
-    {capabilities.canStageFile ? <button type="button" title="Stage file" aria-label={`Stage ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main" onClick={() => onMutation({ action: "stage", scope: "file", source, path: file.path })}><ListPlus size={13} /></button> : null}
-    {capabilities.canUnstageFile ? <button type="button" title="Unstage file" aria-label={`Unstage ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main" onClick={() => onMutation({ action: "unstage", scope: "file", source, path: file.path })}><Undo2 size={13} /></button> : null}
-    {capabilities.canRevertFile ? <button type="button" title="Revert file" aria-label={`Revert ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-danger-soft hover:text-danger" onClick={() => { if (window.confirm(`Revert ${file.path}? Untracked files are moved to Trash.`)) onMutation({ action: "revert", scope: "file", source, path: file.path }); }}><RotateCcw size={13} /></button> : null}
+    {canExpandContext ? <button type="button" title="加载更多上下文" aria-label={`加载更多上下文： ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main" onClick={onExpandContext}><ListTree size={13} /></button> : null}
+    {capabilities.canStageFile ? <button type="button" title="暂存文件" aria-label={`暂存 ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main" onClick={() => onMutation({ action: "stage", scope: "file", source, path: file.path })}><ListPlus size={13} /></button> : null}
+    {capabilities.canUnstageFile ? <button type="button" title="取消暂存文件" aria-label={`取消暂存 ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main" onClick={() => onMutation({ action: "unstage", scope: "file", source, path: file.path })}><Undo2 size={13} /></button> : null}
+    {capabilities.canRevertFile ? <button type="button" title="还原文件" aria-label={`还原 ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-danger-soft hover:text-danger" onClick={() => { if (window.confirm(`还原 ${file.path}？未跟踪的文件将移至废纸篓。`)) onMutation({ action: "revert", scope: "file", source, path: file.path }); }}><RotateCcw size={13} /></button> : null}
   </div>;
 }
 
 function HunkHeader({ file, hunk, capabilities, onMutation }: { file: ReviewFileSummary; hunk: ReviewHunk; capabilities: ReviewCapabilities; onMutation: (mutation: Omit<ReviewMutation, "snapshotId" | "expectedGeneration">) => void }) {
   const source = file.source === "index" ? "index" : "workingTree";
-  return <div className="flex min-h-8 items-center gap-2 border-b border-line bg-info-soft px-3 font-mono text-[11px] text-info"><span className="min-w-0 flex-1 truncate">{hunk.header}</span>{capabilities.canStageHunk ? <button type="button" className="rounded-act-sm px-2 py-1 font-sans text-[11px] text-text-muted hover:bg-surface hover:text-text-main" onClick={() => onMutation({ action: "stage", scope: "hunk", source, path: file.path, hunkId: hunk.id, patchFingerprint: hunk.patchFingerprint })}>Stage hunk</button> : null}{capabilities.canUnstageHunk ? <button type="button" className="rounded-act-sm px-2 py-1 font-sans text-[11px] text-text-muted hover:bg-surface hover:text-text-main" onClick={() => onMutation({ action: "unstage", scope: "hunk", source, path: file.path, hunkId: hunk.id, patchFingerprint: hunk.patchFingerprint })}>Unstage hunk</button> : null}</div>;
+  return <div className="flex min-h-8 items-center gap-2 border-b border-line bg-info-soft px-3 font-mono text-[11px] text-info"><span className="min-w-0 flex-1 truncate">{hunk.header}</span>{capabilities.canStageHunk ? <button type="button" className="rounded-act-sm px-2 py-1 font-sans text-[11px] text-text-muted hover:bg-surface hover:text-text-main" onClick={() => onMutation({ action: "stage", scope: "hunk", source, path: file.path, hunkId: hunk.id, patchFingerprint: hunk.patchFingerprint })}>暂存此段变更</button> : null}{capabilities.canUnstageHunk ? <button type="button" className="rounded-act-sm px-2 py-1 font-sans text-[11px] text-text-muted hover:bg-surface hover:text-text-main" onClick={() => onMutation({ action: "unstage", scope: "hunk", source, path: file.path, hunkId: hunk.id, patchFingerprint: hunk.patchFingerprint })}>取消暂存此段变更</button> : null}</div>;
 }
 
 function SplitDiffLine({ oldLine, newLine, wrap, wordDiff }: { oldLine?: ReviewLine; newLine?: ReviewLine; wrap: boolean; wordDiff: boolean }) {

@@ -645,16 +645,16 @@ export function Composer({
   const resolvedLayout: "inline" | "stacked" =
     surface === "initial" || hasAttachments || isInputMultiline ? "stacked" : "inline";
   const placeholder = mode === "chat"
-    ? surface === "initial" ? "Ask anything..." : "Continue the conversation..."
+    ? surface === "initial" ? "有什么想聊的？" : "继续对话…"
     : mode === "plan"
-      ? surface === "initial" ? "Plan and design before coding..." : "Refine the plan..."
+      ? surface === "initial" ? "先规划和设计，再编写代码…" : "继续完善方案…"
       : surface === "initial"
-        ? "Plan, build, or ask..."
-        : "Send follow-up";
+        ? "规划、构建，或提出问题…"
+        : "继续补充…";
   const selectedWorkspaceLabel =
     workspaceOptions.find((workspace) => workspace.value === selectedWorkspaceRoot)?.label ??
     workspaceOptions[0]?.label ??
-    "Workspace";
+    "工作区";
   const gitStatus = executionContext?.gitContext?.status;
   const gitReady = gitStatus === "ready";
   const gitHasBranch = gitReady || gitStatus === "no_head";
@@ -924,7 +924,7 @@ export function Composer({
     if (!window.actspace?.listSkills) {
       skillLoadRequestRef.current += 1;
       setSkillsLoading(false);
-      setSkillsError("Skills are only available in the desktop app.");
+      setSkillsError("请在桌面应用中使用 Skills。");
       return;
     }
     const workspaceKey = selectedWorkspaceRoot ?? "__default__";
@@ -947,7 +947,7 @@ export function Composer({
       if (skillLoadRequestRef.current !== requestId) return;
       skillLoadWorkspaceRef.current = null;
       console.error("Failed to list Skills", error);
-      setSkillsError("Failed to load Skills.");
+      setSkillsError("加载 Skills 失败。");
     } finally {
       if (skillLoadRequestRef.current === requestId) setSkillsLoading(false);
     }
@@ -1189,7 +1189,7 @@ export function Composer({
     return (
       <textarea
         className={surface === "initial" ? COMPOSER_INITIAL_INPUT_CLASS : COMPOSER_INPUT_CLASS}
-        aria-label="Message composer"
+        aria-label="消息输入框"
         aria-autocomplete={slashOpen ? "list" : undefined}
         aria-controls={slashOpen ? SLASH_MENU_ID : undefined}
         aria-expanded={slashOpen}
@@ -1257,19 +1257,19 @@ export function Composer({
     if (!hasAttachments) return null;
 
     return (
-      <div className={COMPOSER_ATTACHMENTS_CLASS} aria-label="Attached files">
+      <div className={COMPOSER_ATTACHMENTS_CLASS} aria-label="已附加的文件">
         {attachments.map((attachment) => {
           if (attachment.kind === "image") {
             return (
               <div
                 className={IMAGE_ATTACHMENT_WRAPPER_CLASS}
-                aria-label={`Attached image ${attachment.name}`}
+                aria-label={`已附加的图片 ${attachment.name}`}
                 key={attachment.id}
               >
                 <button
                   className={IMAGE_ATTACHMENT_CLASS}
                   type="button"
-                  aria-label={`Preview attached image ${attachment.name}`}
+                  aria-label={`预览附加图片 ${attachment.name}`}
                   disabled={!attachment.previewUrl || !onOpenAttachmentPreview}
                   onClick={() => onOpenAttachmentPreview?.(attachment)}
                   style={getAttachmentPreviewStyle(attachment)}
@@ -1280,7 +1280,7 @@ export function Composer({
                     <button
                       className={IMAGE_ATTACHMENT_REMOVE_CLASS}
                       type="button"
-                      aria-label={`Remove ${attachment.name}`}
+                      aria-label={`移除 ${attachment.name}`}
                       onClick={(event) => {
                         event.stopPropagation();
                         removeAttachment(attachment.id);
@@ -1296,7 +1296,7 @@ export function Composer({
           }
 
           return (
-            <div className={FILE_ATTACHMENT_CLASS} aria-label={`Attached file ${attachment.name}`} key={attachment.id}>
+            <div className={FILE_ATTACHMENT_CLASS} aria-label={`已附加的文件 ${attachment.name}`} key={attachment.id}>
               <FileText size={17} strokeWidth={1.9} aria-hidden="true" />
               <span className={FILE_ATTACHMENT_NAME_CLASS}>{attachment.name}</span>
               <Tooltip>
@@ -1304,7 +1304,7 @@ export function Composer({
                   <button
                     className={FILE_ATTACHMENT_REMOVE_CLASS}
                     type="button"
-                    aria-label={`Remove ${attachment.name}`}
+                    aria-label={`移除 ${attachment.name}`}
                     onClick={(event) => {
                       event.stopPropagation();
                       removeAttachment(attachment.id);
@@ -1319,7 +1319,7 @@ export function Composer({
           );
         })}
         {selectedSkills.map((skill) => (
-          <div className={SKILL_PILL_CLASS} aria-label={`Selected Skill ${skill}`} key={skill}>
+          <div className={SKILL_PILL_CLASS} aria-label={`已选择的 Skill ${skill}`} key={skill}>
             <BookOpen size={16} strokeWidth={1.9} aria-hidden="true" />
             <span className="truncate">{skill}</span>
             <Tooltip>
@@ -1327,7 +1327,7 @@ export function Composer({
                 <button
                   className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-lg text-text-faint transition-colors hover:bg-hover-overlay hover:text-text-main"
                   type="button"
-                  aria-label={`Remove Skill ${skill}`}
+                  aria-label={`移除 Skill ${skill}`}
                   onPointerDown={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -1354,12 +1354,12 @@ export function Composer({
           onClick={() => setSkillsOpen(false)}
         >
           <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
-          <span>Back</span>
+          <span>返回</span>
         </button>
-        <div className={COMMAND_MENU_HINT_CLASS}>Available Skills</div>
+        <div className={COMMAND_MENU_HINT_CLASS}>可用 Skills</div>
         {skillsLoading ? (
           <div className="flex items-center gap-2 px-2 py-4 text-sm text-text-faint">
-            <Loader2 className="animate-spin" size={16} aria-hidden="true" /> Loading Skills...
+            <Loader2 className="animate-spin" size={16} aria-hidden="true" /> 正在加载 Skills…
           </div>
         ) : skillsError ? (
           <div className="px-2 py-4 text-sm text-on-danger">
@@ -1369,11 +1369,11 @@ export function Composer({
               type="button"
               onClick={() => void handleOpenSkills(true)}
             >
-              Retry
+              重试
             </button>
           </div>
         ) : skillItems.length === 0 ? (
-          <div className="px-2 py-4 text-sm text-text-faint">No enabled skills</div>
+          <div className="px-2 py-4 text-sm text-text-faint">暂无已启用的 Skills</div>
         ) : skillItems.map((skill) => (
           <button
             className={COMMAND_MENU_BUTTON_CLASS}
@@ -1386,7 +1386,7 @@ export function Composer({
             <BookOpen className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
             <span className="min-w-0 flex-1">
               <span className="block truncate">{skill.name}</span>
-              <span className={SKILL_DESCRIPTION_CLASS}>{skill.description || "No description"}</span>
+              <span className={SKILL_DESCRIPTION_CLASS}>{skill.description || "暂无说明"}</span>
             </span>
             <span className={SKILL_SCOPE_CLASS}>{skill.scope}</span>
             {selectedSkills.includes(skill.name) ? <Check size={15} strokeWidth={2.2} aria-hidden="true" /> : null}
@@ -1419,11 +1419,11 @@ export function Composer({
         id={SLASH_MENU_ID}
         ref={slashMenuRef}
         role="listbox"
-        aria-label="Slash commands"
+        aria-label="斜杠命令"
       >
         {filteredSlashFunctions.length > 0 ? (
           <div role="group" aria-labelledby={SLASH_FUNCTIONS_LABEL_ID}>
-            <div className={SLASH_GROUP_LABEL_CLASS} id={SLASH_FUNCTIONS_LABEL_ID}>Functions</div>
+            <div className={SLASH_GROUP_LABEL_CLASS} id={SLASH_FUNCTIONS_LABEL_ID}>功能</div>
             {filteredSlashFunctions.map((item) => {
               const Icon = SLASH_FUNCTION_ICONS[item.id];
               const commandDisplayName = getSlashCommandDisplayName(item.command);
@@ -1461,18 +1461,18 @@ export function Composer({
             <div className={SLASH_GROUP_LABEL_CLASS} id={SLASH_SKILLS_LABEL_ID}>Skills</div>
             {skillsLoading ? (
               <div className={`${SLASH_STATUS_CLASS} flex items-center gap-2`}>
-                <Loader2 className="animate-spin" size={15} aria-hidden="true" /> Loading Skills...
+                <Loader2 className="animate-spin" size={15} aria-hidden="true" /> 正在加载 Skills…
               </div>
             ) : skillsError ? (
               <div className={SLASH_STATUS_CLASS}>
-                <span>Skills unavailable.</span>
+                <span>Skills 暂不可用。</span>
                 <button
                   className="ml-2 rounded-act-sm px-1.5 py-0.5 font-medium text-text-main hover:bg-hover-overlay"
                   type="button"
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={() => void loadSkills(true)}
                 >
-                  Retry
+                  重试
                 </button>
               </div>
             ) : filteredSlashSkills.length > 0 ? filteredSlashSkills.map((skill) => {
@@ -1485,7 +1485,7 @@ export function Composer({
                   id={optionId}
                   type="button"
                   role="option"
-                  aria-label={`${skill.name}: ${skill.description || "No description"}. ${isSelected ? "Selected" : "Not selected"}`}
+                  aria-label={`${skill.name}: ${skill.description || "暂无说明"}. ${isSelected ? "已选择" : "未选择"}`}
                   aria-selected={isSelected}
                   key={`${skill.scope}:${skill.name}`}
                   onPointerDown={(event) => event.preventDefault()}
@@ -1498,17 +1498,17 @@ export function Composer({
                   <BookOpen className={SLASH_FUNCTION_ICON_CLASS} size={14} strokeWidth={1.9} aria-hidden="true" />
                   <span className={SLASH_SKILL_NAME_CLASS}>{skill.name}</span>
                   {isSelected ? <Check className="shrink-0 text-text-muted" size={13} strokeWidth={2.2} aria-hidden="true" /> : null}
-                  <span className={SLASH_SKILL_DESCRIPTION_CLASS}>{skill.description || "No description"}</span>
+                  <span className={SLASH_SKILL_DESCRIPTION_CLASS}>{skill.description || "暂无说明"}</span>
                 </button>
               );
             }) : (
-              <div className={SLASH_STATUS_CLASS}>No enabled Skills</div>
+              <div className={SLASH_STATUS_CLASS}>暂无已启用的 Skills</div>
             )}
           </div>
         ) : null}
 
         {showTotalEmpty ? (
-          <div className={SLASH_EMPTY_CLASS}>No matching functions or Skills</div>
+          <div className={SLASH_EMPTY_CLASS}>没有匹配的功能或 Skills</div>
         ) : null}
       </div>
     );
@@ -1522,7 +1522,7 @@ export function Composer({
             <button
               className={COMMAND_BUTTON_CLASS}
               type="button"
-              aria-label="Add agents, context, tools"
+              aria-label="添加 Agent、上下文或工具"
               aria-expanded={commandOpen}
               aria-haspopup="menu"
               ref={commandButtonRef}
@@ -1550,9 +1550,9 @@ export function Composer({
             <div
               className={`${COMMAND_MENU_CLASS}${skillsOpen ? " max-[600px]:hidden" : ""}`}
               role="menu"
-              aria-label="Add context and tools"
+              aria-label="添加上下文或工具"
             >
-            <div className={COMMAND_MENU_HINT_CLASS}>Choose mode or add context.</div>
+            <div className={COMMAND_MENU_HINT_CLASS}>选择模式或添加上下文。</div>
               {MODE_MENU_ITEMS.map(renderModeMenuButton)}
               <div className={COMMAND_MENU_SEPARATOR_CLASS} />
               <button
@@ -1562,7 +1562,7 @@ export function Composer({
                 onClick={() => void handleSelectImages()}
               >
                 <Image className={COMMAND_MENU_ICON_CLASS} size={16} strokeWidth={2} aria-hidden="true" />
-                <span>Image</span>
+                <span>图片</span>
               </button>
               <button
                 className={COMMAND_MENU_BUTTON_CLASS}
@@ -1594,7 +1594,7 @@ export function Composer({
         className={`${MODE_BUTTON_BASE_CLASS} ${MODE_BUTTON_CLASS[mode]} [grid-area:mode]`}
         type="button"
         ref={modeButtonRef}
-        aria-label={`Remove ${selectedMode.label} mode`}
+        aria-label={`移除 ${selectedMode.label} 模式`}
         disabled={isStreaming}
         onClick={() => {
           onModeChange?.("agent");
@@ -1653,7 +1653,7 @@ export function Composer({
               }`}
               ref={modelMenuRef}
               role="menu"
-              aria-label="Models"
+              aria-label="模型"
               onScroll={() => setModelOptionsOpen(false)}
             >
               <label className={MODEL_SEARCH_WRAP_CLASS}>
@@ -1663,8 +1663,8 @@ export function Composer({
                   className={MODEL_SEARCH_INPUT_CLASS}
                   type="search"
                   value={modelSearchQuery}
-                  placeholder="Search models"
-                  aria-label="Search models"
+                  placeholder="搜索模型"
+                  aria-label="搜索模型"
                   onChange={(event) => {
                     setModelSearchQuery(event.target.value);
                     setModelOptionsOpen(false);
@@ -1739,7 +1739,7 @@ export function Composer({
                             <button
                               type="button"
                               className={MODEL_EDIT_BUTTON_CLASS}
-                              aria-label={`Edit ${spec.id} options`}
+                              aria-label={`编辑 ${spec.id} 选项`}
                               style={{
                                 opacity: showEdit ? 1 : 0,
                               }}
@@ -1759,7 +1759,7 @@ export function Composer({
                                 setModelOptionsOpen(true);
                               }}
                             >
-                              Edit
+                              编辑
                             </button>
                           ) : null}
                           {spec.id === selectedModelId ? (
@@ -1772,7 +1772,7 @@ export function Composer({
                 </div>
               ))}
               {filteredModelList.length === 0 ? (
-                <div className={MODEL_SEARCH_EMPTY_CLASS}>No matching models.</div>
+                <div className={MODEL_SEARCH_EMPTY_CLASS}>没有匹配的模型。</div>
               ) : null}
             </div>
             {modelOptionsOpen ? (
@@ -1781,7 +1781,7 @@ export function Composer({
                 ref={modelOptionsRef}
                 style={{ top: `${modelOptionsOffset}px` }}
               >
-                <div className={DROPDOWN_LABEL_CLASS}>Options</div>
+                <div className={DROPDOWN_LABEL_CLASS}>选项</div>
                 {editingModelSpec?.supportsThinkingToggle ? (
                   <label className={OPTION_TOGGLE_ROW_CLASS}>
                     <span className={OPTION_TOGGLE_LABEL_CLASS}>Thinking</span>
@@ -1806,7 +1806,7 @@ export function Composer({
                     </span>
                   </label>
                 ) : editingModelSpec?.reasoningMandatory ? (
-                  <div className="px-2 py-1.5 text-[13px] text-text-muted">Thinking is always enabled.</div>
+                  <div className="px-2 py-1.5 text-[13px] text-text-muted">此模型始终启用 Thinking。</div>
                 ) : null}
                 {editingReasoningEfforts.length > 0 ? (
                   <>
@@ -1848,7 +1848,7 @@ export function Composer({
                     ))}
                   </>
                 ) : !editingModelSpec?.supportsThinkingToggle && !editingModelSpec?.reasoningMandatory ? (
-                  <div className={OPTION_EMPTY_CLASS}>No extra options yet.</div>
+                  <div className={OPTION_EMPTY_CLASS}>暂无其他选项。</div>
                 ) : null}
               </div>
             ) : null}
@@ -1869,12 +1869,12 @@ export function Composer({
             ? "发送消息"
             : "输入消息后发送";
     const ariaLabel = isStreaming
-      ? "Stop agent"
+      ? "停止 Agent"
       : modelUnavailable
-          ? "No available model. Open Settings to connect a provider"
+          ? "暂无可用模型，请在设置中连接服务商"
           : canSendMessage
-            ? "Send message"
-            : "Enter a message to send";
+            ? "发送消息"
+            : "输入消息后发送";
 
     return (
       <div className="[grid-area:send] grid">
@@ -1911,7 +1911,7 @@ export function Composer({
   // 同时让 +/模型/发送直接参与外层 grid 的 grid-template-areas 排布。
   function renderToolbar() {
     return (
-      <div className="composer-bar contents" aria-label="Composer toolbar">
+      <div className="composer-bar contents" aria-label="输入框工具栏">
         {renderAddMenuButton()}
         {renderModeSelector()}
         {renderModelSelector()}
@@ -1927,7 +1927,7 @@ export function Composer({
     return (
       <div
         className={`${getComposerPanelClass(surface)}${isDragActive ? ` ${COMPOSER_DROP_ACTIVE_CLASS}` : ""}`}
-        aria-label="Message composer panel"
+        aria-label="消息输入面板"
         onDragOver={(event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -1969,13 +1969,13 @@ export function Composer({
     const isLoading = reviewSummary.status === "loading";
     const ariaLabel =
       showCounts
-        ? `Review pending changes +${reviewSummary.additions ?? 0} -${reviewSummary.deletions ?? 0}`
+        ? `审查待处理变更 +${reviewSummary.additions ?? 0} -${reviewSummary.deletions ?? 0}`
         : reviewSummary.reason === "not_a_repository"
-          ? "Review workspace changes; Git repository is not initialized"
-          : "Review workspace changes";
+          ? "查看工作区变更；Git 仓库尚未初始化"
+          : "查看工作区变更";
 
     return (
-      <div className={COMPOSER_ACTION_STRIP_CLASS} aria-label="Pending review actions">
+      <div className={COMPOSER_ACTION_STRIP_CLASS} aria-label="待处理的审查操作">
         <button
           className={REVIEW_PREVIEW_BUTTON_CLASS}
           type="button"
@@ -1983,7 +1983,7 @@ export function Composer({
           disabled={isLoading}
           onClick={onOpenReview}
         >
-          <span>Review</span>
+          <span>变更审查</span>
           {showCounts ? (
             <>
               <span className={REVIEW_ADDITION_CLASS}>+{reviewSummary.additions ?? 0}</span>
@@ -1991,7 +1991,7 @@ export function Composer({
             </>
           ) : null}
         </button>
-        <button className={REVIEW_OVERFLOW_BUTTON_CLASS} type="button" aria-label="More review actions">
+        <button className={REVIEW_OVERFLOW_BUTTON_CLASS} type="button" aria-label="更多审查操作">
           <MoreHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
         </button>
       </div>
@@ -2007,18 +2007,18 @@ export function Composer({
           {gitHasBranch || executionContext?.locked ? (
             <span className={STATUS_ITEM_CLASS} title={selectedBranch}>
               <GitBranch className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
-              <span className="max-w-[240px] truncate">{selectedBranch ?? "Detached HEAD"}</span>
+              <span className="max-w-[240px] truncate">{selectedBranch ?? "分离的 HEAD"}</span>
             </span>
           ) : null}
           <span className={STATUS_ITEM_CLASS}>
             <Laptop className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
-            <span>{runLocation === "worktree" ? "Worktree" : "This Mac"}</span>
+            <span>{runLocation === "worktree" ? "工作树" : "本机"}</span>
           </span>
         </div>
         <button
           className={STATUS_USAGE_CLASS}
           type="button"
-          aria-label={`Context usage ${contextPercentLabel}%`}
+          aria-label={`上下文用量 ${contextPercentLabel}%`}
           onClick={() => {
             setContextOpen((value) => !value);
             setCommandOpen(false);
@@ -2051,7 +2051,7 @@ export function Composer({
         <button
           className={INITIAL_CONTEXT_SELECTOR_CLASS}
           type="button"
-          aria-label={`Select ${kind}`}
+          aria-label={`选择${kind === "workspace" ? "工作区" : kind === "branch" ? "分支" : "运行位置"}`}
           aria-expanded={contextSelectorOpen === kind}
           aria-haspopup="menu"
           onClick={() => {
@@ -2068,8 +2068,8 @@ export function Composer({
           <ChevronDown size={13} strokeWidth={2.2} aria-hidden="true" />
         </button>
         {contextSelectorOpen === kind && kind === "workspace" ? (
-          <div className={`${INITIAL_DROPDOWN_MENU_CLASS} w-[240px]`} role="menu" aria-label={`${label} options`}>
-            <div className={DROPDOWN_LABEL_CLASS}>Recents</div>
+          <div className={`${INITIAL_DROPDOWN_MENU_CLASS} w-[240px]`} role="menu" aria-label={`${label}选项`}>
+            <div className={DROPDOWN_LABEL_CLASS}>最近使用</div>
             {menuItems.map((item) => (
               <button
                 className={COMMAND_MENU_BUTTON_CLASS}
@@ -2097,7 +2097,7 @@ export function Composer({
               }}
             >
               <FolderOpen className={COMMAND_MENU_ICON_CLASS} size={15} aria-hidden="true" />
-              <span>Use Existing...</span>
+              <span>使用已有文件夹…</span>
             </button>
             {creatingWorkspaceFolder ? (
               <form
@@ -2114,14 +2114,14 @@ export function Composer({
               >
                 <input
                   className="min-w-0 flex-1 rounded-act-sm border border-line bg-surface px-2 py-1 text-sm text-text-main outline-none focus:border-line-strong"
-                  aria-label="New folder name"
+                  aria-label="新文件夹名称"
                   autoFocus
                   value={workspaceFolderName}
                   onChange={(event) => setWorkspaceFolderName(event.target.value)}
-                  placeholder="Folder name"
+                  placeholder="文件夹名称"
                 />
                 <button className="rounded-act-sm px-2 py-1 text-sm text-text-main hover:bg-hover-overlay" type="submit">
-                  Create
+                  创建
                 </button>
               </form>
             ) : (
@@ -2132,14 +2132,14 @@ export function Composer({
                 onClick={() => setCreatingWorkspaceFolder(true)}
               >
                 <FolderPlus className={COMMAND_MENU_ICON_CLASS} size={15} aria-hidden="true" />
-                <span>New Folder</span>
+                <span>新建文件夹</span>
               </button>
             )}
           </div>
         ) : null}
         {contextSelectorOpen === kind && kind === "branch" ? (
-          <div className={`${INITIAL_DROPDOWN_MENU_CLASS} max-h-[320px] w-[300px]`} role="menu" aria-label="Branch options">
-            <div className={DROPDOWN_LABEL_CLASS}>Branches</div>
+          <div className={`${INITIAL_DROPDOWN_MENU_CLASS} max-h-[320px] w-[300px]`} role="menu" aria-label="分支选项">
+            <div className={DROPDOWN_LABEL_CLASS}>分支</div>
             {executionContext?.gitContext?.branches.map((branch) => (
               <button
                 className={COMMAND_MENU_BUTTON_CLASS}
@@ -2159,12 +2159,12 @@ export function Composer({
           </div>
         ) : null}
         {contextSelectorOpen === kind && kind === "runtime" ? (
-          <div className={`${INITIAL_DROPDOWN_MENU_CLASS} w-[240px]`} role="menu" aria-label="Run on options">
-            <div className={DROPDOWN_LABEL_CLASS}>Run on</div>
+          <div className={`${INITIAL_DROPDOWN_MENU_CLASS} w-[240px]`} role="menu" aria-label="运行位置选项">
+            <div className={DROPDOWN_LABEL_CLASS}>运行位置</div>
             <button className={COMMAND_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
               <Cloud className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
-              <span className="flex-1">Cloud</span>
-              <span className="text-[11px] text-text-faint">Coming soon</span>
+              <span className="flex-1">云端</span>
+              <span className="text-[11px] text-text-faint">即将推出</span>
             </button>
             <button
               className={COMMAND_MENU_BUTTON_CLASS}
@@ -2177,13 +2177,13 @@ export function Composer({
               }}
             >
               <Laptop className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
-              <span className="flex-1">This Mac</span>
+              <span className="flex-1">本机</span>
               {runLocation === "this_mac" ? <Check size={15} aria-hidden="true" /> : null}
             </button>
             <button className={COMMAND_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
               <Server className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
-              <span className="flex-1">Remote SSH</span>
-              <span className="text-[11px] text-text-faint">Coming soon</span>
+              <span className="flex-1">远程 SSH</span>
+              <span className="text-[11px] text-text-faint">即将推出</span>
             </button>
             {gitReady ? <div className={COMMAND_MENU_SEPARATOR_CLASS} /> : null}
             {gitReady ? (
@@ -2198,14 +2198,14 @@ export function Composer({
                 }}
               >
                 <Plus className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
-                <span className="flex-1">New Worktree</span>
+                <span className="flex-1">新建工作树</span>
                 {runLocation === "worktree" ? <Check size={15} aria-hidden="true" /> : null}
               </button>
             ) : gitStatus === "no_head" ? (
               <button className={COMMAND_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
                 <Plus className={COMMAND_MENU_ICON_CLASS} size={16} aria-hidden="true" />
-                <span className="flex-1">New Worktree</span>
-                <span className="text-[11px] text-text-faint">Requires commit</span>
+                <span className="flex-1">新建工作树</span>
+                <span className="text-[11px] text-text-faint">需要先创建提交</span>
               </button>
             ) : null}
           </div>
@@ -2218,10 +2218,10 @@ export function Composer({
     if (surface !== "initial") return null;
 
     return (
-      <div className={INITIAL_CONTEXT_ROW_CLASS} aria-label="Initial composer context selectors">
+      <div className={INITIAL_CONTEXT_ROW_CLASS} aria-label="初始工作区与运行位置选择">
         {renderContextSelector("workspace", selectedWorkspaceLabel)}
-        {gitHasBranch ? renderContextSelector("branch", selectedBranch ?? "Detached HEAD", "branch") : null}
-        {renderContextSelector("runtime", runLocation === "worktree" ? "New Worktree" : "This Mac", "runtime")}
+        {gitHasBranch ? renderContextSelector("branch", selectedBranch ?? "分离的 HEAD", "branch") : null}
+        {renderContextSelector("runtime", runLocation === "worktree" ? "新建工作树" : "本机", "runtime")}
       </div>
     );
   }
@@ -2246,7 +2246,7 @@ export function Composer({
           disabled={isStreaming}
           onClick={() => onModeChange?.("plan")}
         >
-          Plan New Idea <span className="ml-1 text-text-faint">⇧Tab</span>
+          规划新想法 <span className="ml-1 text-text-faint">⇧Tab</span>
         </button>
       </div>
     );

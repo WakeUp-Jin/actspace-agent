@@ -102,16 +102,16 @@ function isLocalUpdateActive(state: LocalUpdateState | null): boolean {
 }
 
 function workspaceLabelFromRoot(root: string | undefined): string {
-  if (!root) return "Default workspace";
+  if (!root) return "默认工作区";
   const normalized = root.replace(/\/+$/, "");
   const segments = normalized.split("/").filter(Boolean);
-  return segments[segments.length - 1] ?? "Default workspace";
+  return segments[segments.length - 1] ?? "默认工作区";
 }
 
 function formatUpdatedAt(timestamp: string): string {
   const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return "Unknown time";
-  return new Intl.DateTimeFormat(undefined, {
+  if (Number.isNaN(date.getTime())) return "时间未知";
+  return new Intl.DateTimeFormat("zh-CN", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -1230,7 +1230,7 @@ function formatLocalUpdateTime(timestamp: string | undefined): string | null {
   if (!timestamp) return null;
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat("zh-CN", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -1597,7 +1597,7 @@ function AgentInstructionsSection({ settings }: SectionProps) {
           />
           <div className="flex items-center justify-between gap-3">
             <div className="text-[12px] text-text-faint">
-              {charCount.toLocaleString()} / {AGENT_SYSTEM_PROMPT_MAX_CHARS.toLocaleString()}
+              {charCount.toLocaleString("zh-CN")} / {AGENT_SYSTEM_PROMPT_MAX_CHARS.toLocaleString("zh-CN")}
               {saved && !dirty ? <span className="ml-2 text-on-success">已保存</span> : null}
               {promptError ? <span className="ml-2 text-on-danger">{promptError}</span> : null}
             </div>
@@ -1655,7 +1655,7 @@ function SubagentSection({
           align="start"
         />
         <div className="px-4 py-3 text-[12px] text-text-faint">
-          前往“通用 → 任务默认”修改 Explore 模型；断开连接不会删除历史会话、Journal 或 Usage。
+          前往“通用 → 任务默认”修改 Explore 模型；断开连接不会删除历史会话、事件记录或使用统计。
         </div>
       </SettingGroup>
     </SectionShell>

@@ -222,7 +222,7 @@ export function TerminalRenderView({
               <RotateCcw size={11} strokeWidth={2} />
               {restarting ? "重启中" : "重启"}
             </button>
-            <span data-terminal-status={status}>{status}</span>
+            <span data-terminal-status={status}>{status === "exited" ? "已退出" : "错误"}</span>
           </div>
         </div>
       ) : null}

@@ -35,7 +35,7 @@ export type SessionUiStatusKind = "idle" | "running" | "waiting_approval" | "fai
 type SessionStatusMeta = { label: string; detail: string; dotClass: string; rowClass: string };
 
 const DEFAULT_WORKSPACE_KEY = "__default__";
-const DEFAULT_WORKSPACE_LABEL = "Default workspace";
+const DEFAULT_WORKSPACE_LABEL = "默认工作区";
 const SESSION_VISIBLE_LIMIT = 8;
 const SESSION_CONTEXT_MENU_WIDTH = 184;
 const SESSION_CONTEXT_MENU_MAX_HEIGHT = 220;
@@ -156,26 +156,26 @@ function groupSessionsByWorkspace(sessions: SessionListItem[], workspaces: Works
 
 const SESSION_STATUS_META: Record<SessionUiStatusKind, SessionStatusMeta> = {
   idle: {
-    label: "Idle",
-    detail: "Ready for the next turn.",
+    label: "空闲",
+    detail: "可以开始下一轮对话。",
     dotClass: "bg-text-faint opacity-55",
     rowClass: "",
   },
   running: {
-    label: "Running",
-    detail: "Agent turn is currently running.",
+    label: "运行中",
+    detail: "Agent 正在执行当前轮次。",
     dotClass: "animate-[session-status-pulse_1500ms_ease-in-out_infinite] bg-operational",
     rowClass: "is-busy",
   },
   waiting_approval: {
-    label: "Waiting approval",
-    detail: "A tool call is paused until approval is resolved.",
+    label: "等待审批",
+    detail: "工具调用已暂停，等待审批。",
     dotClass: "animate-[session-status-pulse_1500ms_ease-in-out_infinite] bg-warning",
     rowClass: "is-waiting-approval",
   },
   failed: {
-    label: "Failed",
-    detail: "The latest turn failed or needs attention.",
+    label: "失败",
+    detail: "最近一轮执行失败或需要处理。",
     dotClass: "bg-danger",
     rowClass: "is-failed",
   },
@@ -295,7 +295,7 @@ function NavSectionHeader({ label, collapsed, onToggle, extraActions }: NavSecti
           className={`nav-section-chevron ${NAV_SECTION_ACTION_BUTTON_CLASS}`}
           type="button"
           onClick={onToggle}
-          aria-label={collapsed ? `Expand ${label}` : `Collapse ${label}`}
+          aria-label={collapsed ? `展开 ${label}` : `收起 ${label}`}
         >
           {collapsed
             ? <ChevronRight size={13} strokeWidth={1.9} />
@@ -353,7 +353,7 @@ function SessionStatusButton({ status, dotClass }: { status: unknown; dotClass: 
       <button
         className={SESSION_STATUS_BUTTON_CLASS}
         type="button"
-        aria-label={`Session status: ${meta.label}`}
+        aria-label={`会话状态： ${meta.label}`}
         aria-expanded={open}
         title={meta.label}
         onClick={(event) => {
@@ -390,11 +390,11 @@ function SessionRow({
   const resolvedStatus = resolveSessionStatus(status);
   const statusMeta = SESSION_STATUS_META[resolvedStatus];
   const archiveDisabled = isActive || !onArchive;
-  const archiveLabel = isActive ? "Current session cannot be archived" : "Archive session";
+  const archiveLabel = isActive ? "当前会话无法归档" : "归档会话";
   const forkDisabled = resolvedStatus === "running" || resolvedStatus === "waiting_approval" || !onFork;
   const forkLabel = forkDisabled && onFork
-    ? "Wait for the current turn to finish before forking"
-    : "Fork session";
+    ? "请等待当前轮次结束后再分叉"
+    : "分叉会话";
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [copyMenuOpen, setCopyMenuOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -527,7 +527,7 @@ function SessionRow({
                 ref={inputRef}
                 className={`session-row-rename-input ${SESSION_ROW_RENAME_INPUT_CLASS}`}
                 value={draftTitle}
-                aria-label={`Rename session ${displayTitle}`}
+                aria-label={`重命名会话 ${displayTitle}`}
                 onChange={(event) => setDraftTitle(event.target.value)}
                 onClick={(event) => event.stopPropagation()}
                 onBlur={commitRename}
@@ -549,8 +549,8 @@ function SessionRow({
               <button
                 className={`${SESSION_ROW_PIN_CLASS} ${session.pinned ? SESSION_ROW_PIN_ACTIVE_CLASS : ""}`}
                 type="button"
-                aria-label={session.pinned ? "Unpin session" : "Pin session"}
-                title={session.pinned ? "Unpin session" : "Pin to top"}
+                aria-label={session.pinned ? "取消置顶会话" : "置顶会话"}
+                title={session.pinned ? "取消置顶会话" : "置顶会话"}
                 onClick={(event) => {
                   event.stopPropagation();
                   onTogglePin();
@@ -585,7 +585,7 @@ function SessionRow({
               ref={menuRef}
               className={SESSION_CONTEXT_MENU_CLASS}
               role="menu"
-              aria-label={`Session actions for ${displayTitle}`}
+              aria-label={`会话操作： ${displayTitle}`}
               style={{
                 left: menuPosition.x,
                 top: menuPosition.y,
@@ -609,7 +609,7 @@ function SessionRow({
                   className={SESSION_CONTEXT_MENU_ICON_CLASS}
                   aria-hidden="true"
                 />
-                {session.pinned ? "Unpin" : "Pin"}
+                {session.pinned ? "取消置顶" : "置顶"}
               </button>
               <button
                 className={SESSION_CONTEXT_MENU_ITEM_CLASS}
@@ -624,7 +624,7 @@ function SessionRow({
                   className={SESSION_CONTEXT_MENU_ICON_CLASS}
                   aria-hidden="true"
                 />
-                Rename
+                重命名
               </button>
               <div className="relative" onMouseEnter={() => setCopyMenuOpen(true)}>
                 <button
@@ -648,14 +648,14 @@ function SessionRow({
                   }}
                 >
                   <Copy size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
-                  <span className="flex-1">Copy</span>
+                  <span className="flex-1">复制</span>
                   <ChevronRight size={14} strokeWidth={1.9} className="text-text-faint" aria-hidden="true" />
                 </button>
                 {copyMenuOpen ? (
                   <div
                     className={SESSION_CONTEXT_SUBMENU_CLASS}
                     role="menu"
-                    aria-label={`Copy session ${displayTitle}`}
+                    aria-label={`复制会话 ${displayTitle}`}
                   >
                     <button
                       className={SESSION_CONTEXT_MENU_ITEM_CLASS}
@@ -673,7 +673,7 @@ function SessionRow({
                         className={SESSION_CONTEXT_MENU_ICON_CLASS}
                         aria-hidden="true"
                       />
-                      Copy ID
+                      复制 ID
                     </button>
                     <button
                       className={SESSION_CONTEXT_MENU_ITEM_CLASS}
@@ -691,7 +691,7 @@ function SessionRow({
                         className={SESSION_CONTEXT_MENU_ICON_CLASS}
                         aria-hidden="true"
                       />
-                      Copy Transcript
+                      复制会话记录
                     </button>
                   </div>
                 ) : null}
@@ -713,7 +713,7 @@ function SessionRow({
                   className={SESSION_CONTEXT_MENU_ICON_CLASS}
                   aria-hidden="true"
                 />
-                Fork
+                分叉
               </button>
               <div className={SESSION_CONTEXT_MENU_SEPARATOR_CLASS} role="separator" />
               <button
@@ -733,7 +733,7 @@ function SessionRow({
                   className={SESSION_CONTEXT_MENU_ICON_CLASS}
                   aria-hidden="true"
                 />
-                Archive
+                归档
               </button>
             </div>
           ) : null}
@@ -747,7 +747,7 @@ function SessionRow({
       >
         <span className="block text-[12px] font-medium text-text-main">{displayTitle}</span>
         <span className="mt-0.5 block text-[11px] font-normal text-text-muted [overflow-wrap:anywhere]">
-          {workspaceRoot ?? "Workspace path unavailable"}
+          {workspaceRoot ?? "工作区路径不可用"}
         </span>
       </TooltipContent>
     </Tooltip>
@@ -821,7 +821,7 @@ function CollapsibleSessionList({
           type="button"
           onClick={() => setExpanded((value) => !value)}
         >
-          {expanded ? "See less" : `See more (${sessions.length - SESSION_VISIBLE_LIMIT})`}
+          {expanded ? "收起" : `显示更多（${sessions.length - SESSION_VISIBLE_LIMIT}）`}
         </button>
       ) : null}
     </div>
@@ -929,7 +929,7 @@ export function Sidebar({
           onClick={() => handleNewAgent()}
         >
           <SquarePen size={14} strokeWidth={1.9} />
-          <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>New Agent</span>
+          <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>新建会话</span>
           <span className={SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS} aria-hidden="true">⌘N</span>
         </button>
         <button
@@ -943,11 +943,11 @@ export function Sidebar({
         </button>
       </div>
 
-      <nav className={SESSION_NAV_CLASS} aria-label="Sessions">
+      <nav className={SESSION_NAV_CLASS} aria-label="会话">
         {pinnedSessions.length > 0 ? (
           <section className={`nav-section ${NAV_SECTION_CLASS}`}>
             <NavSectionHeader
-              label="Pinned"
+              label="已置顶"
               collapsed={pinnedCollapsed}
               onToggle={() => setPinnedCollapsed((value) => !value)}
             />
@@ -973,7 +973,7 @@ export function Sidebar({
 
         <section className={`nav-section nav-section-workspaces ${NAV_SECTION_WORKSPACES_CLASS}`}>
           <NavSectionHeader
-            label="Workspaces"
+            label="工作区"
             collapsed={workspacesCollapsed}
             onToggle={() => setWorkspacesCollapsed((value) => !value)}
             extraActions={
@@ -981,16 +981,16 @@ export function Sidebar({
                 <button
                   className={NAV_SECTION_ACTION_BUTTON_CLASS}
                   type="button"
-                  aria-label="Sort workspaces"
-                  title="Sort (coming soon)"
+                  aria-label="排序工作区"
+                  title="排序（即将推出）"
                 >
                   <ArrowDownUp size={13} strokeWidth={1.9} />
                 </button>
                 <button
                   className={NAV_SECTION_ACTION_BUTTON_CLASS}
                   type="button"
-                  aria-label="Add workspace"
-                  title="Add workspace"
+                  aria-label="添加工作区"
+                  title="添加工作区"
                   onClick={(event) => {
                     event.stopPropagation();
                     onAddWorkspace?.();
@@ -1035,7 +1035,7 @@ export function Sidebar({
         onClick={() => onSelectView?.("settings")}
       >
         <Settings size={14} strokeWidth={1.9} />
-        Settings
+        设置
       </button>
     </aside>
   );
@@ -1089,8 +1089,8 @@ function WorkspaceSection({
     return status === "running" || status === "waiting_approval";
   });
   const archiveTitle = archiveDisabled
-    ? allSessions.length === 0 ? "No sessions to archive" : "Wait for running or pending sessions to finish"
-    : "Archive all sessions";
+    ? allSessions.length === 0 ? "没有可归档的会话" : "请等待运行中或待处理的会话结束"
+    : "归档全部会话";
   const removeDisabled = group.workspaceId === workspaces.find((workspace) => workspace.kind === "default")?.id;
 
   useEffect(() => {
@@ -1162,7 +1162,7 @@ function WorkspaceSection({
           className={WORKSPACE_ICON_SLOT_CLASS}
           type="button"
           onClick={() => setCollapsed((value) => !value)}
-          aria-label={collapsed ? `Expand ${group.label}` : `Collapse ${group.label}`}
+          aria-label={collapsed ? `展开 ${group.label}` : `收起 ${group.label}`}
           aria-expanded={!collapsed}
         >
           <Folder size={13} strokeWidth={1.9} className={WORKSPACE_FOLDER_GLYPH_CLASS} aria-hidden="true" />
@@ -1185,12 +1185,12 @@ function WorkspaceSection({
         >
           <span className={WORKSPACE_NAME_CLASS}>{group.label}</span>
         </button>
-        <div className={`nav-section-actions workspace-folder-actions ${WORKSPACE_ACTIONS_CLASS}`} aria-label="Workspace actions">
+        <div className={`nav-section-actions workspace-folder-actions ${WORKSPACE_ACTIONS_CLASS}`} aria-label="工作区操作">
           <button
             className={WORKSPACE_ADD_BUTTON_CLASS}
             type="button"
-            aria-label="New chat in workspace"
-            title="New chat in this workspace"
+            aria-label="在工作区中新建会话"
+            title="在此工作区中新建会话"
             onClick={(event) => {
               event.stopPropagation();
               onNewSession?.({
@@ -1225,7 +1225,7 @@ function WorkspaceSection({
           ref={menuRef}
           className={WORKSPACE_CONTEXT_MENU_CLASS}
           role="menu"
-          aria-label={`Workspace actions for ${group.label}`}
+          aria-label={`工作区操作： ${group.label}`}
           onKeyDown={handleMenuKeyDown}
           style={{ left: menuPosition.x, top: menuPosition.y, width: WORKSPACE_CONTEXT_MENU_WIDTH }}
         >
@@ -1240,7 +1240,7 @@ function WorkspaceSection({
             }}
           >
             <FolderOpen size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
-            Open in IDE
+            在 IDE 中打开
           </button>
           <button
             className={WORKSPACE_CONTEXT_MENU_ITEM_CLASS}
@@ -1254,7 +1254,7 @@ function WorkspaceSection({
             }}
           >
             <Archive size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
-            Archive All
+            归档全部
           </button>
           <div className={SESSION_CONTEXT_MENU_SEPARATOR_CLASS} role="separator" />
           <button
@@ -1262,14 +1262,14 @@ function WorkspaceSection({
             type="button"
             role="menuitem"
             disabled={removeDisabled || !group.workspaceId || !onRemoveWorkspace}
-            title={removeDisabled ? "Default workspace cannot be removed" : "Remove from sidebar"}
+            title={removeDisabled ? "默认工作区无法移除" : "从侧栏移除"}
             onClick={() => {
               closeMenu(true);
               if (!removeDisabled && group.workspaceId) onRemoveWorkspace?.(group.workspaceId, group.workspaceRoot);
             }}
           >
             <PanelLeftClose size={16} strokeWidth={1.9} className="h-4 w-4" aria-hidden="true" />
-            Remove from Sidebar
+            从侧栏移除
           </button>
         </div>,
         document.body,

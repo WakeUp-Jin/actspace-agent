@@ -1,4 +1,5 @@
 import { SubagentsPanel } from "./right-panel/SubagentsPanel";
+import { terminalDisplayTitle } from "./right-panel/terminal-title";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ChevronDown,
@@ -183,7 +184,7 @@ function WorkspaceFileEmpty() {
     <div className={RIGHT_PANEL_BODY_CLASS}>
       <h2 className={RIGHT_PANEL_HEADING_CLASS}>选择文件查看</h2>
       <p className={RIGHT_PANEL_TEXT_CLASS}>
-        在右侧文件树中点击文件，将在这里打开预览。Context、Reply 等对象请关闭「工作区文件」后查看完整视图。
+        在右侧文件树中点击文件，将在这里打开预览。上下文、可视化回复等对象请关闭「工作区文件」后查看完整视图。
       </p>
     </div>
   );
@@ -403,12 +404,12 @@ function RightPanelTabs() {
     <div className={RIGHT_TABS_CLASS} role="tablist" aria-label="右侧面板">
       <div ref={scrollRef} className={RIGHT_TAB_SCROLL_CLASS}>
         {tabs.length === 0 ? (
-          <span className={RIGHT_PANEL_EMPTY_TITLE_CLASS}>{isFileTreeOpen ? "Files" : "Objects"}</span>
+          <span className={RIGHT_PANEL_EMPTY_TITLE_CLASS}>{isFileTreeOpen ? "文件" : "对象"}</span>
         ) : null}
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           const isClosing = closingTabIds.has(tab.id);
-          const tabLabel = isClosing ? "Closing…" : tab.kind === "terminalStarting" ? "Starting…" : tab.title;
+          const tabLabel = isClosing ? "正在关闭…" : tab.kind === "terminalStarting" ? "正在启动…" : tab.title;
           return (
             <span
               key={tab.id}
@@ -461,7 +462,7 @@ function RightPanelTabs() {
               {tabs.map((tab) => {
                 const isActive = tab.id === activeTabId;
                 const isClosing = closingTabIds.has(tab.id);
-                const tabLabel = isClosing ? "Closing…" : tab.kind === "terminalStarting" ? "Starting…" : tab.title;
+                const tabLabel = isClosing ? "正在关闭…" : tab.kind === "terminalStarting" ? "正在启动…" : tab.title;
                 return (
                   <div
                     key={tab.id}
@@ -564,7 +565,7 @@ function RightPanelBody({
           shellName={tab.shellName}
           onRestart={(terminal: TerminalSessionSnapshot) => openTab({
             ...tab,
-            title: terminal.title,
+            title: terminalDisplayTitle(terminal.title),
             terminalId: terminal.id,
             shellName: terminal.shellName,
           })}
@@ -651,21 +652,21 @@ function RightPanelLauncher({
   return (
     <nav className={RIGHT_PANEL_LAUNCHER_CLASS} aria-label="右侧面板对象">
       <div className={RIGHT_PANEL_LAUNCHER_GRID_CLASS}>
-        <LauncherButton label="Subagents" icon={<MessageSquare size={19} />} disabled={!sessionId} onClick={() => sessionId && openTab({ id: "subagents", kind: "subagents", title: "Subagents", sessionId })} />
-        <LauncherButton label="Files" icon={<FolderTree size={19} strokeWidth={1.7} />} onClick={openFileTree} />
+        <LauncherButton label="子 Agent" icon={<MessageSquare size={19} />} disabled={!sessionId} onClick={() => sessionId && openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId })} />
+        <LauncherButton label="文件" icon={<FolderTree size={19} strokeWidth={1.7} />} onClick={openFileTree} />
         <LauncherButton
-          label="Review"
+          label="变更审查"
           icon={<GitBranch size={19} strokeWidth={1.7} />}
           onClick={onOpenReview}
           disabled={!onOpenReview}
         />
         <LauncherButton
-          label="Context"
+          label="上下文"
           icon={<Eye size={19} strokeWidth={1.7} />}
-          onClick={() => openTab({ id: "context", kind: "context", title: "Context" })}
+          onClick={() => openTab({ id: "context", kind: "context", title: "上下文" })}
         />
         <LauncherButton
-          label={creatingTerminal ? "Starting…" : "Terminal"}
+          label={creatingTerminal ? "正在启动…" : "终端"}
           icon={<SquareTerminal size={19} strokeWidth={1.7} />}
           onClick={() => void openTerminal()}
           onPointerEnter={() => void preloadTerminalRenderView()}
@@ -673,9 +674,9 @@ function RightPanelLauncher({
           disabled={!sessionId || creatingTerminal}
         />
         <LauncherButton
-          label="Reply"
+          label="可视化回复"
           icon={<MessageSquare size={19} strokeWidth={1.7} />}
-          onClick={() => openTab({ id: "reply", kind: "replyHtml", title: "Reply", sessionId })}
+          onClick={() => openTab({ id: "reply", kind: "replyHtml", title: "可视化回复", sessionId })}
         />
       </div>
     </nav>
@@ -721,7 +722,7 @@ function TerminalStartingView() {
         <span className="mb-4 inline-flex h-9 w-9 items-center justify-center rounded-act-md border border-line bg-surface-subtle text-text-muted">
           <Loader2 size={17} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
         </span>
-        <h2 className="m-0 text-[13px] font-semibold text-text-main">正在启动 Terminal</h2>
+        <h2 className="m-0 text-[13px] font-semibold text-text-main">正在启动终端</h2>
         <p className="mb-0 mt-1.5 text-[11px] leading-relaxed text-text-faint">正在读取本机 Shell 环境并连接当前工作区。</p>
       </div>
     </section>

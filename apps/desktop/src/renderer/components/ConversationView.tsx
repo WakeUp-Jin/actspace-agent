@@ -243,7 +243,7 @@ function WorkspacePreparationBlock({
     <details className="group/worktree rounded-act-md border border-line bg-surface-subtle/70 px-3 py-2 text-sm text-text-muted" open={!completed}>
       <summary className="flex cursor-pointer list-none items-center gap-2 text-text-main">
         {completed ? <Check size={15} aria-hidden="true" /> : <Loader2 className="animate-spin" size={15} aria-hidden="true" />}
-        <span className="font-medium">{completed ? "Created worktree" : "Creating worktree"}</span>
+        <span className="font-medium">{completed ? "已创建工作树" : "正在创建工作树"}</span>
         {completed && message.durationMs !== undefined ? (
           <span className="text-xs text-text-faint">{Math.max(0, message.durationMs / 1000).toFixed(1)}s</span>
         ) : null}
@@ -251,11 +251,11 @@ function WorkspacePreparationBlock({
       <div className="mt-2 grid gap-1.5 border-t border-line pt-2 text-xs leading-5 text-text-faint">
         <div className="flex items-center gap-1.5 text-text-muted">
           <GitBranch size={13} aria-hidden="true" />
-          <span>{message.branch ?? `from ${message.baseBranch}`}</span>
+          <span>{message.branch ?? `基于 ${message.baseBranch}`}</span>
         </div>
         {message.workspaceRoot ? <code className="break-all font-mono">{message.workspaceRoot}</code> : null}
-        {message.baseCommit ? <span>Base commit {message.baseCommit.slice(0, 8)}</span> : null}
-        {completed ? <span>No local environment setup was run automatically.</span> : null}
+        {message.baseCommit ? <span>基准提交 {message.baseCommit.slice(0, 8)}</span> : null}
+        {completed ? <span>未自动运行本地环境配置。</span> : null}
       </div>
     </details>
   );
@@ -537,7 +537,7 @@ function TurnActions({
   }
 
   const usageLabel = latestAssistantMessage.usage
-    ? `${latestAssistantMessage.usage.totalTokens.toLocaleString()} tokens · ${formatUsdCost(latestAssistantMessage.usage.costUsd)}`
+    ? `${latestAssistantMessage.usage.totalTokens.toLocaleString("zh-CN")} Token · ${formatUsdCost(latestAssistantMessage.usage.costUsd)}`
     : null;
 
   async function handleCopy(value: string) {
@@ -667,13 +667,13 @@ function TurnActions({
           {menuOpen ? (
             <div className={TURN_ACTION_MENU_CLASS} role="menu">
               <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" disabled>
-                Fork Chat
+                分叉会话
               </button>
               <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" onClick={() => void handleCopy(copyText)}>
-                Copy Message
+                复制消息
               </button>
               <button className={TURN_ACTION_MENU_BUTTON_CLASS} type="button" role="menuitem" onClick={() => void handleCopy(latestAssistantMessage.id)}>
-                Copy Request ID
+                复制请求 ID
               </button>
               {visualizeState === "ready" || visualizeState === "error" ? (
                 <button
@@ -808,7 +808,7 @@ export function ConversationView({
   const [activeTurnId, setActiveTurnId] = useState<string | null>(turnNavigationItems[0]?.id ?? null);
   const openedSubagentRuns = useRef(new Set<string>());
   const { openTab } = useRightPanel();
-  const openContextTab = () => openTab({ id: "context", kind: "context", title: "Context" });
+  const openContextTab = () => openTab({ id: "context", kind: "context", title: "上下文" });
   const openAttachmentPreview = useCallback((attachment: ComposerAttachment) => {
     if (!attachment.previewUrl) return;
     openTab({
@@ -820,7 +820,7 @@ export function ConversationView({
   }, [openTab]);
 
   const openAgentTranscript = useCallback((message: AgentMessageBlock) => {
-    if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "Subagents", sessionId, selected: message });
+    if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, selected: message });
   }, [sessionId, openTab]);
   useEffect(() => {
     const turn = turns.at(-1);
@@ -828,7 +828,7 @@ export function ConversationView({
     const key = `${sessionId}:${turn.id}`;
     if (openedSubagentRuns.current.has(key)) return;
     openedSubagentRuns.current.add(key);
-    openTab({ id: "subagents", kind: "subagents", title: "Subagents", sessionId });
+    openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId });
   }, [sessionId, turns, isStreaming, openTab]);
 
   const updateConversationViewport = useCallback(() => {
@@ -969,7 +969,7 @@ export function ConversationView({
             ref={scrollContainerRef}
             onScroll={handleMessagesScroll}
             className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS}
-            aria-label="Conversation messages"
+            aria-label="会话消息"
           >
               {isInitialComposer ? (
                 <div className={INITIAL_COMPOSER_STAGE_CLASS}>
@@ -1052,7 +1052,7 @@ export function ConversationView({
           {isAwayFromBottom ? <ScrollToBottomButton onClick={scrollToBottom} /> : null}
         </div>
         {activeView === "trajectory" ? <div className="flex h-full min-h-0 flex-col">
-          {isStreaming ? <div className="flex shrink-0 justify-end border-b border-line px-4 py-2"><button type="button" className="rounded-act-md border border-line px-3 py-1 text-[12px] text-text-main hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring" onClick={onAbort} disabled={isAborting}>{isAborting ? "Stopping…" : "Stop"}</button></div> : null}
+          {isStreaming ? <div className="flex shrink-0 justify-end border-b border-line px-4 py-2"><button type="button" className="rounded-act-md border border-line px-3 py-1 text-[12px] text-text-main hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring" onClick={onAbort} disabled={isAborting}>{isAborting ? "正在停止…" : "停止"}</button></div> : null}
           <div className="min-h-0 flex-1"><TrajectoryView snapshot={trajectory ?? null} /></div>
         </div> : null}
       </div>

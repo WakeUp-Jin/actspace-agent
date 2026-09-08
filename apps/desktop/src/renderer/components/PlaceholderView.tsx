@@ -36,7 +36,7 @@ export function PlaceholderView({ eyebrow, title, description, bullets, icon }: 
             ))}
           </ul>
         ) : null}
-        <div className={PLACEHOLDER_STATUS_CLASS}>Coming soon</div>
+        <div className={PLACEHOLDER_STATUS_CLASS}>即将推出</div>
       </div>
     </div>
   );

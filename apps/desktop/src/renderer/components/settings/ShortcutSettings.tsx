@@ -180,7 +180,7 @@ export function ShortcutSettings({
         />
         <SettingRow
           title="打开目标"
-          description="目标不可用时自动回到第一个项目；项目为空时打开空白 New chat。"
+          description="目标不可用时自动回到第一个项目；项目为空时打开空白会话。"
           control={
             <SettingsSelect
               value={targetKind}

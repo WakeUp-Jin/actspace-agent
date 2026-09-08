@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useRightPanel } from "./RightPanelContext";
 import { preloadTerminalRenderView } from "./terminal-render-loader";
+import { terminalDisplayTitle } from "./terminal-title";
 
 type PendingTerminalStart = { cancelled: boolean };
 
@@ -29,7 +30,7 @@ export function useOpenTerminal(sessionId: string | null) {
     openTab({
       id: tabId,
       kind: "terminalStarting",
-      title: "Terminal",
+      title: "终端",
       requestId,
       sessionId,
     });
@@ -40,7 +41,7 @@ export function useOpenTerminal(sessionId: string | null) {
           openTab({
             id: tabId,
             kind: "terminalError",
-            title: "Terminal",
+            title: "终端",
             sessionId,
             message: "当前桌面版本尚未加载终端桥接，请重启应用后重试。",
           });
@@ -58,7 +59,7 @@ export function useOpenTerminal(sessionId: string | null) {
           openTab({
             id: tabId,
             kind: "terminalError",
-            title: "Terminal",
+            title: "终端",
             sessionId,
             message: result.error.message,
           });
@@ -77,7 +78,7 @@ export function useOpenTerminal(sessionId: string | null) {
       openTab({
         id: tabId,
         kind: "terminal",
-        title: terminal.title,
+        title: terminalDisplayTitle(terminal.title),
         terminalId: terminal.id,
         sessionId: terminal.sessionId,
         shellName: terminal.shellName,
@@ -88,7 +89,7 @@ export function useOpenTerminal(sessionId: string | null) {
         openTab({
           id: tabId,
           kind: "terminalError",
-          title: "Terminal",
+          title: "终端",
           sessionId,
           message: error instanceof Error ? error.message : String(error),
         });

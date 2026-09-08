@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import type { TerminalSessionSnapshot, WorkspaceDirEntry } from "@actspace/shared";
+import { terminalDisplayTitle } from "./terminal-title";
 
 /**
  * 右侧面板的 Tab 模型。`id` 同时是去重 key：用稳定 id（如 `context`、`html:<agentRunId>`、
@@ -307,7 +308,7 @@ export function RightPanelProvider({
         return existing ?? {
           id: `terminal:${terminal.id}`,
           kind: "terminal",
-          title: terminal.title,
+          title: terminalDisplayTitle(terminal.title),
           terminalId: terminal.id,
           sessionId,
           shellName: terminal.shellName,

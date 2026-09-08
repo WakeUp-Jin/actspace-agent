@@ -63,7 +63,7 @@ export function RightPanelObjectMenu({
       <button
         className="chrome-button"
         type="button"
-        aria-label="New right panel object"
+        aria-label="新建右侧面板对象"
         aria-haspopup="menu"
         aria-expanded={open}
         title="新建对象"
@@ -90,7 +90,7 @@ export function RightPanelObjectMenu({
               onClick={() => pick(onOpenReview)}
             >
               <GitBranch size={15} strokeWidth={2} />
-              Review
+              变更审查
             </button>
           ) : null}
           <button
@@ -106,25 +106,25 @@ export function RightPanelObjectMenu({
             }}
           >
             <SquareTerminal size={15} strokeWidth={2} />
-            {creatingTerminal ? "正在启动…" : "Terminal"}
+            {creatingTerminal ? "正在启动…" : "终端"}
           </button>
           <button
             type="button"
             role="menuitem"
             className={MENU_ITEM_CLASS}
-            onClick={() => pick(() => openTab({ id: "reply", kind: "replyHtml", title: "Reply", sessionId }))}
+            onClick={() => pick(() => openTab({ id: "reply", kind: "replyHtml", title: "可视化回复", sessionId }))}
           >
             <MessageSquare size={15} strokeWidth={2} />
-            Reply
+            可视化回复
           </button>
           <button
             type="button"
             role="menuitem"
             className={MENU_ITEM_CLASS}
-            onClick={() => pick(() => openTab({ id: "context", kind: "context", title: "Context" }))}
+            onClick={() => pick(() => openTab({ id: "context", kind: "context", title: "上下文" }))}
           >
             <Eye size={15} strokeWidth={2} />
-            Context
+            上下文
           </button>
         </div>
       ) : null}

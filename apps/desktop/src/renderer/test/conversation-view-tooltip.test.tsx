@@ -118,7 +118,7 @@ describe("ConversationView tooltips", () => {
         },
       ]);
 
-      const viewport = screen.getByLabelText("Conversation messages");
+      const viewport = screen.getByLabelText("会话消息");
       Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1200 });
       Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 400 });
       Object.defineProperty(viewport, "scrollTop", { configurable: true, writable: true, value: 800 });
@@ -153,8 +153,8 @@ describe("ConversationView tooltips", () => {
   it("renders a hover-revealed turn footer with tokens, USD cost, and copy action", () => {
     renderConversation();
 
-    const usageMeta = screen.getByLabelText("本轮消耗：33,361 tokens · $0.2321");
-    expect(usageMeta).toHaveTextContent("33,361 tokens · $0.2321");
+    const usageMeta = screen.getByLabelText("本轮消耗：33,361 Token · $0.2321");
+    expect(usageMeta).toHaveTextContent("33,361 Token · $0.2321");
     expect(usageMeta.parentElement).toHaveClass("opacity-0");
     expect(usageMeta.parentElement).toHaveClass("group-hover/assistant-turn:opacity-100");
     expect(screen.getByRole("button", { name: "复制回复" })).toBeInTheDocument();
@@ -171,7 +171,7 @@ describe("ConversationView tooltips", () => {
 
   it("shows a turn rail for long conversations, previews the turn, and navigates to it", async () => {
     const { container } = renderConversation(navigationMessages);
-    const viewport = screen.getByLabelText("Conversation messages");
+    const viewport = screen.getByLabelText("会话消息");
     Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1800 });
     Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 500 });
     Object.defineProperty(viewport, "clientWidth", { configurable: true, value: 900 });
@@ -219,7 +219,7 @@ describe("ConversationView tooltips", () => {
 
   it("shows scroll-to-bottom only while away from the bottom and restores sticky following", async () => {
     renderConversation(navigationMessages);
-    const viewport = screen.getByLabelText("Conversation messages");
+    const viewport = screen.getByLabelText("会话消息");
     Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 1800 });
     Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 500 });
     Object.defineProperty(viewport, "clientWidth", { configurable: true, value: 900 });
@@ -312,15 +312,15 @@ it("hides the trajectory composer without losing the draft and keeps Stop availa
   const rendered = render(view("chat"));
   const input = rendered.container.querySelector("textarea")!;
   const model = screen.getByRole("button", { name: /DeepSeek/ });
-  expect(screen.getByRole("button", { name: "Remove notes.txt" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "移除 notes.txt" })).toBeInTheDocument();
   fireEvent.change(input, { target: { value: "keep this draft" } });
   rendered.rerender(view("trajectory"));
   expect(rendered.container.querySelector(".composer-zone")).toHaveStyle({ display: "none" });
-  fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+  fireEvent.click(screen.getByRole("button", { name: "停止" }));
   expect(abort).toHaveBeenCalledTimes(1);
   rendered.rerender(view("chat"));
   expect(rendered.container.querySelector("textarea")).toBe(input);
   expect(input.value).toBe("keep this draft");
-  expect(screen.getByRole("button", { name: "Remove notes.txt" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "移除 notes.txt" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /DeepSeek/ })).toBe(model);
 });

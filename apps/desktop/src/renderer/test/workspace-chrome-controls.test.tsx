@@ -122,14 +122,14 @@ describe("WorkspaceChromeControls", () => {
     const user = userEvent.setup();
     renderControls();
 
-    const environmentButton = screen.getByRole("button", { name: "Show workspace environment" });
+    const environmentButton = screen.getByRole("button", { name: "查看工作区环境" });
     expect(environmentButton.querySelector("svg")).toHaveClass("lucide-bookmark");
     expect(screen.queryByRole("button", { name: /Open workspace in/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Choose workspace app" })).not.toBeInTheDocument();
     await user.click(environmentButton);
-    const popover = await screen.findByRole("dialog", { name: "Workspace environment" });
+    const popover = await screen.findByRole("dialog", { name: "工作区环境" });
 
-    expect(within(popover).getByText("Worktree")).toBeInTheDocument();
+    expect(within(popover).getByText("工作树")).toBeInTheDocument();
     expect(within(popover).getByText("main")).toBeInTheDocument();
     expect(within(popover).getByText("+5")).toHaveClass("text-success");
     expect(within(popover).getByText("-1")).toHaveClass("text-danger");
@@ -156,12 +156,12 @@ describe("WorkspaceChromeControls", () => {
     const user = userEvent.setup();
     renderControls();
 
-    await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
+    await user.click(screen.getByRole("button", { name: "查看工作区环境" }));
     await user.click(await screen.findByRole("button", { name: "main" }));
-    const menu = await screen.findByRole("menu", { name: "Branches" });
+    const menu = await screen.findByRole("menu", { name: "分支" });
     expect(within(menu).getByRole("menuitemradio", { name: /feature\/occupied/ })).toBeDisabled();
 
-    await user.type(within(menu).getByRole("searchbox", { name: "Search branches" }), "codex");
+    await user.type(within(menu).getByRole("searchbox", { name: "搜索分支" }), "codex");
     expect(within(menu).queryByRole("menuitemradio", { name: "main" })).not.toBeInTheDocument();
     await user.click(within(menu).getByRole("menuitemradio", { name: "codex/add-branch-selector" }));
 
@@ -169,7 +169,7 @@ describe("WorkspaceChromeControls", () => {
       workspaceRoot: "/tmp/workspace",
       branchName: "codex/add-branch-selector",
     });
-    expect(await screen.findByText("Switched to codex/add-branch-selector.")).toBeInTheDocument();
+    expect(await screen.findByText("已切换到 codex/add-branch-selector。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "codex/add-branch-selector" })).toBeInTheDocument();
   });
 
@@ -178,15 +178,15 @@ describe("WorkspaceChromeControls", () => {
     const user = userEvent.setup();
     renderControls();
 
-    await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
+    await user.click(screen.getByRole("button", { name: "查看工作区环境" }));
     await user.click(await screen.findByRole("button", { name: "main" }));
-    const menu = await screen.findByRole("menu", { name: "Branches" });
-    await user.click(within(menu).getByRole("menuitem", { name: "Create and checkout new branch..." }));
+    const menu = await screen.findByRole("menu", { name: "分支" });
+    await user.click(within(menu).getByRole("menuitem", { name: "创建并切换到新分支…" }));
 
-    const dialog = await screen.findByRole("dialog", { name: "Create and checkout branch" });
-    expect(within(dialog).getByRole("textbox", { name: "Branch name" })).toHaveValue("actspace/environment-controls");
-    expect(within(dialog).getByRole("button", { name: "Close" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Create and checkout" })).toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog", { name: "创建并切换分支" });
+    expect(within(dialog).getByRole("textbox", { name: "分支名称" })).toHaveValue("actspace/environment-controls");
+    expect(within(dialog).getByRole("button", { name: "关闭" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "创建并切换" })).toBeInTheDocument();
   });
 
   it("keeps the branch menu usable during a dev IPC snapshot version mismatch", async () => {
@@ -199,12 +199,12 @@ describe("WorkspaceChromeControls", () => {
     const user = userEvent.setup();
     renderControls();
 
-    await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
+    await user.click(screen.getByRole("button", { name: "查看工作区环境" }));
     await user.click(await screen.findByRole("button", { name: "main" }));
 
-    const menu = await screen.findByRole("menu", { name: "Branches" });
+    const menu = await screen.findByRole("menu", { name: "分支" });
     expect(within(menu).getByRole("menuitemradio", { name: "main" })).toBeChecked();
-    expect(within(menu).getByRole("menuitem", { name: "Create and checkout new branch..." })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "创建并切换到新分支…" })).toBeInTheDocument();
   });
 
   it("creates a branch from detached HEAD", async () => {
@@ -217,14 +217,14 @@ describe("WorkspaceChromeControls", () => {
     const user = userEvent.setup();
     renderControls();
 
-    await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
-    await user.click(await screen.findByRole("button", { name: "Create branch" }));
-    const dialog = await screen.findByRole("dialog", { name: "Create and checkout branch" });
-    const input = within(dialog).getByRole("textbox", { name: "Branch name" });
+    await user.click(screen.getByRole("button", { name: "查看工作区环境" }));
+    await user.click(await screen.findByRole("button", { name: "创建分支" }));
+    const dialog = await screen.findByRole("dialog", { name: "创建并切换分支" });
+    const input = within(dialog).getByRole("textbox", { name: "分支名称" });
     expect(input).toHaveValue("actspace/environment-controls");
     await user.clear(input);
     await user.type(input, "actspace/new-branch");
-    await user.click(within(dialog).getByRole("button", { name: "Create and checkout" }));
+    await user.click(within(dialog).getByRole("button", { name: "创建并切换" }));
 
     expect(bridge.createWorkspaceBranch).toHaveBeenCalledWith({ workspaceRoot: "/tmp/workspace", branchName: "actspace/new-branch" });
   });
@@ -239,13 +239,13 @@ describe("WorkspaceChromeControls", () => {
     const user = userEvent.setup();
     renderControls();
 
-    await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
-    await user.click(await screen.findByRole("button", { name: "Commit or push" }));
-    const dialog = await screen.findByRole("dialog", { name: "Commit or push" });
-    expect(within(dialog).getByRole("button", { name: /New branch/ })).toBeInTheDocument();
-    expect(within(dialog).getByRole("textbox", { name: "Branch name" })).toHaveValue("actspace/environment-controls");
+    await user.click(screen.getByRole("button", { name: "查看工作区环境" }));
+    await user.click(await screen.findByRole("button", { name: "提交或推送" }));
+    const dialog = await screen.findByRole("dialog", { name: "提交或推送" });
+    expect(within(dialog).getByRole("button", { name: /新分支/ })).toBeInTheDocument();
+    expect(within(dialog).getByRole("textbox", { name: "分支名称" })).toHaveValue("actspace/environment-controls");
 
-    await user.click(within(dialog).getByRole("button", { name: "Commit" }));
+    await user.click(within(dialog).getByRole("button", { name: "提交" }));
     expect(bridge.commitWorkspaceChanges).toHaveBeenCalledWith({
       workspaceRoot: "/tmp/workspace",
       message: undefined,
@@ -259,12 +259,12 @@ describe("WorkspaceChromeControls", () => {
     const user = userEvent.setup();
     renderControls();
 
-    await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
-    await user.click(await screen.findByRole("button", { name: "Commit or push" }));
-    const dialog = await screen.findByRole("dialog", { name: "Commit or push" });
-    expect(within(dialog).getByRole("checkbox", { name: "Include unstaged changes" })).toBeChecked();
-    await user.type(within(dialog).getByRole("textbox", { name: "Commit message" }), "ship environment controls");
-    await user.click(within(dialog).getByRole("button", { name: "Commit" }));
+    await user.click(screen.getByRole("button", { name: "查看工作区环境" }));
+    await user.click(await screen.findByRole("button", { name: "提交或推送" }));
+    const dialog = await screen.findByRole("dialog", { name: "提交或推送" });
+    expect(within(dialog).getByRole("checkbox", { name: "包含未暂存的变更" })).toBeChecked();
+    await user.type(within(dialog).getByRole("textbox", { name: "提交说明" }), "ship environment controls");
+    await user.click(within(dialog).getByRole("button", { name: "提交" }));
 
     expect(bridge.commitWorkspaceChanges).toHaveBeenCalledWith({
       workspaceRoot: "/tmp/workspace",
@@ -272,7 +272,7 @@ describe("WorkspaceChromeControls", () => {
       includeUnstagedChanges: true,
       branchName: undefined,
     });
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Commit or push" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "提交或推送" })).not.toBeInTheDocument());
   });
 
   it("asks for a remote before commit and push when multiple remotes exist", async () => {
@@ -301,13 +301,13 @@ describe("WorkspaceChromeControls", () => {
     const user = userEvent.setup();
     renderControls();
 
-    await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
-    await user.click(await screen.findByRole("button", { name: "Commit or push" }));
-    const commitDialog = await screen.findByRole("dialog", { name: "Commit or push" });
-    await user.type(within(commitDialog).getByRole("textbox", { name: "Commit message" }), "push this");
-    await user.click(within(commitDialog).getByRole("button", { name: "Commit and push" }));
+    await user.click(screen.getByRole("button", { name: "查看工作区环境" }));
+    await user.click(await screen.findByRole("button", { name: "提交或推送" }));
+    const commitDialog = await screen.findByRole("dialog", { name: "提交或推送" });
+    await user.type(within(commitDialog).getByRole("textbox", { name: "提交说明" }), "push this");
+    await user.click(within(commitDialog).getByRole("button", { name: "提交并推送" }));
 
-    const remoteDialog = await screen.findByRole("dialog", { name: "Choose remote" });
+    const remoteDialog = await screen.findByRole("dialog", { name: "选择远程仓库" });
     await user.click(within(remoteDialog).getByRole("button", { name: "backup" }));
 
     const input = { workspaceRoot: "/tmp/workspace", message: "push this", includeUnstagedChanges: true, branchName: undefined };
@@ -332,12 +332,12 @@ describe("WorkspaceChromeControls", () => {
     const user = userEvent.setup();
     renderControls();
 
-    await user.click(screen.getByRole("button", { name: "Show workspace environment" }));
-    await user.click(await screen.findByRole("button", { name: "Commit or push" }));
-    const dialog = await screen.findByRole("dialog", { name: "Commit or push" });
-    await user.type(within(dialog).getByRole("textbox", { name: "Commit message" }), "partial push");
-    await user.click(within(dialog).getByRole("button", { name: "Commit and push" }));
+    await user.click(screen.getByRole("button", { name: "查看工作区环境" }));
+    await user.click(await screen.findByRole("button", { name: "提交或推送" }));
+    const dialog = await screen.findByRole("dialog", { name: "提交或推送" });
+    await user.type(within(dialog).getByRole("textbox", { name: "提交说明" }), "partial push");
+    await user.click(within(dialog).getByRole("button", { name: "提交并推送" }));
 
-    expect(await screen.findByText("Commit partial1 was created. Remote rejected the push.")).toBeInTheDocument();
+    expect(await screen.findByText("已创建提交 partial1。Remote rejected the push.")).toBeInTheDocument();
   });
 });

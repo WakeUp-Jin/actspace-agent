@@ -44,6 +44,9 @@ describe("composer slash commands", () => {
     ]);
     expect(filterComposerSlashFunctions("pla").map((item) => item.id)).toEqual(["plan", "agent"]);
     expect(filterComposerSlashFunctions("CONTEXT").map((item) => item.id)).toEqual(["compact", "status"]);
+    expect(filterComposerSlashFunctions("上下文").map((item) => item.id)).toEqual(["compact", "status"]);
+    expect(filterComposerSlashFunctions("规划").map((item) => item.id)).toEqual(["plan", "agent"]);
+    expect(filterComposerSlashFunctions("只读").map((item) => item.command)).toEqual(["/plan"]);
     expect(filterComposerSlashFunctions("missing")).toEqual([]);
   });
 

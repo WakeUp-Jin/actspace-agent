@@ -9,6 +9,7 @@ import {
 } from "@actspace/shared";
 import { selectProviderUsage, selectRequestContextEstimate } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, providerUsageToContextSnapshot, useOptionalSessionProjection } from "../../session";
+import { contextBucketLabel } from "../../context-labels";
 
 /**
  * 右侧面板 Context 完整只读视图（见 `front-右侧面板与文件渲染规范.md`）。
@@ -104,7 +105,7 @@ function buildSections(state: ContextState | null): Section[] {
     const display = getContextBucketDisplay(bucketKey);
     const totalTokens =
       tokensByBucket.get(bucketKey) ?? entries.reduce((sum, entry) => sum + (entry.estimatedTokens ?? 0), 0);
-    sections.push({ bucketKey, label: display.label, colorVar: display.colorVar, entries, totalTokens });
+    sections.push({ bucketKey, label: contextBucketLabel(bucketKey), colorVar: display.colorVar, entries, totalTokens });
   };
 
   for (const bucket of CONTEXT_BUCKET_REGISTRY) {
@@ -121,11 +122,11 @@ function isExpandable(preview: string): boolean {
 }
 
 function contextToMarkdown(state: ContextState): string {
-  const lines: string[] = [`# Context（${state.sessionId}）`, "", `更新于：${state.updatedAt}`, ""];
+  const lines: string[] = [`# 上下文（${state.sessionId}）`, "", `更新于：${state.updatedAt}`, ""];
   for (const section of buildSections(state)) {
-    lines.push(`## ${section.label}（${section.entries.length} 条 · ~${section.totalTokens} tokens）`, "");
+    lines.push(`## ${section.label}（${section.entries.length} 条 · ~${section.totalTokens} Token）`, "");
     for (const entry of section.entries) {
-      lines.push(`- **${entry.title}** · ~${entry.estimatedTokens} tokens`);
+      lines.push(`- **${entry.title}** · ~${entry.estimatedTokens} Token`);
       if (entry.preview) {
         lines.push(`  > ${entry.preview.replace(/\n/g, "\n  > ")}`);
       }
@@ -161,7 +162,7 @@ function ContextEntryItem({ entry, sectionLabel }: { entry: ContextStateEntry; s
           <span className={ENTRY_TITLE_CLASS} title={entry.title}>
             {entry.title}
           </span>
-          <span className={ENTRY_TOKENS_CLASS}>~{entry.estimatedTokens.toLocaleString()}</span>
+          <span className={ENTRY_TOKENS_CLASS}>~{entry.estimatedTokens.toLocaleString("zh-CN")}</span>
         </div>
       ) : null}
       {preview ? (
@@ -195,7 +196,7 @@ function ContextSection({ section, loading }: { section: Section; loading: boole
         <span className={SECTION_LABEL_CLASS}>{section.label}</span>
         <span className={SECTION_META_CLASS}>
           <span>{section.entries.length} 条</span>
-          <span>~{section.totalTokens.toLocaleString()} tokens</span>
+          <span>~{section.totalTokens.toLocaleString("zh-CN")} Token</span>
           {open ? <ChevronDown size={13} strokeWidth={2.2} /> : <ChevronRight size={13} strokeWidth={2.2} />}
         </span>
       </button>
@@ -285,9 +286,9 @@ export function ContextRenderView({
       <div className={EMPTY_CLASS}>
         {effectiveContextSnapshot ? (
           <>
-            <strong className="block text-text-main">Context · {Math.floor(effectiveContextSnapshot.percentUsed)}% Full</strong>
-            <span className="mt-1 block">{Math.floor(effectiveContextSnapshot.totalTokens).toLocaleString()} / {Math.floor(effectiveContextSnapshot.maxTokens).toLocaleString()} Tokens</span>
-            <span className="mt-1 block text-text-faint">等待同一 Session 的逐条上下文投影…</span>
+            <strong className="block text-text-main">上下文 · {Math.floor(effectiveContextSnapshot.percentUsed)}% 已用</strong>
+            <span className="mt-1 block">{Math.floor(effectiveContextSnapshot.totalTokens).toLocaleString("zh-CN")} / {Math.floor(effectiveContextSnapshot.maxTokens).toLocaleString("zh-CN")} Token</span>
+            <span className="mt-1 block text-text-faint">正在等待当前会话的上下文明细…</span>
           </>
         ) : loading
           ? "正在重建上下文明细…"
@@ -299,7 +300,7 @@ export function ContextRenderView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className={TOOLBAR_CLASS}>
-        <span className={TITLE_CLASS}>Context · {entryCount} 条</span>
+        <span className={TITLE_CLASS}>上下文 · {entryCount} 条</span>
         <span className="flex items-center gap-1.5">
           <button
             type="button"

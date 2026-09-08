@@ -23,7 +23,7 @@ describe("App session copy and fork actions", () => {
     });
 
     render(<App />);
-    await user.click(screen.getByRole("button", { name: "New Agent" }));
+    await user.click(screen.getByRole("button", { name: "新建会话" }));
 
     let sourceRow: HTMLElement | null = null;
     await waitFor(() => {
@@ -34,17 +34,17 @@ describe("App session copy and fork actions", () => {
     expect(sourceSessionId).toBeTruthy();
 
     fireEvent.contextMenu(sourceRow as HTMLElement, { clientX: 120, clientY: 80 });
-    await user.click(screen.getByRole("menuitem", { name: "Copy" }));
-    await user.click(screen.getByRole("menuitem", { name: "Copy ID" }));
+    await user.click(screen.getByRole("menuitem", { name: "复制" }));
+    await user.click(screen.getByRole("menuitem", { name: "复制 ID" }));
     expect(writeText).toHaveBeenLastCalledWith(sourceSessionId);
 
     fireEvent.contextMenu(sourceRow as HTMLElement, { clientX: 120, clientY: 80 });
-    await user.click(screen.getByRole("menuitem", { name: "Copy" }));
-    await user.click(screen.getByRole("menuitem", { name: "Copy Transcript" }));
+    await user.click(screen.getByRole("menuitem", { name: "复制" }));
+    await user.click(screen.getByRole("menuitem", { name: "复制会话记录" }));
     expect(writeText).toHaveBeenLastCalledWith("# New chat\n");
 
     fireEvent.contextMenu(sourceRow as HTMLElement, { clientX: 120, clientY: 80 });
-    await user.click(screen.getByRole("menuitem", { name: "Fork" }));
+    await user.click(screen.getByRole("menuitem", { name: "分叉" }));
 
     let forkRow: HTMLElement | null = null;
     await waitFor(() => {

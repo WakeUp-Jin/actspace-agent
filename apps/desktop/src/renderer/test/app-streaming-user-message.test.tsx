@@ -267,9 +267,9 @@ describe("App streaming user message", () => {
     };
 
     renderApp();
-    await screen.findByRole("button", { name: "Show session details for Active workspace session" });
+    await screen.findByRole("button", { name: "查看会话详情： Active workspace session" });
     fireEvent.contextMenu(screen.getByRole("button", { name: "workspace" }), { clientX: 24, clientY: 60 });
-    await user.click(screen.getByRole("menuitem", { name: "Archive All" }));
+    await user.click(screen.getByRole("menuitem", { name: "归档全部" }));
 
     await waitFor(() => {
       expect(archiveSessions).toHaveBeenCalledWith({ sessionIds: ["session-active", "session-pinned"] });
@@ -321,14 +321,14 @@ describe("App streaming user message", () => {
     };
 
     renderApp();
-    await screen.findByRole("button", { name: "Show session details for Hidden active session" });
+    await screen.findByRole("button", { name: "查看会话详情： Hidden active session" });
     fireEvent.contextMenu(screen.getByRole("button", { name: "workspace" }), { clientX: 24, clientY: 60 });
-    await user.click(screen.getByRole("menuitem", { name: "Remove from Sidebar" }));
+    await user.click(screen.getByRole("menuitem", { name: "从侧栏移除" }));
 
     await waitFor(() => {
       expect(setWorkspaceVisibility).toHaveBeenCalledWith({ workspaceId: "ws_source", hidden: true });
       expect(screen.queryByText("Hidden active session")).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Show session details for Visible fallback session" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "查看会话详情： Visible fallback session" })).toBeInTheDocument();
     });
   });
 
@@ -400,7 +400,7 @@ describe("App streaming user message", () => {
 
     renderApp();
 
-    expect(await screen.findByRole("button", { name: "Review pending changes +7 -2" })).toHaveTextContent("Review+7-2");
+    expect(await screen.findByRole("button", { name: "审查待处理变更 +7 -2" })).toHaveTextContent("变更审查+7-2");
     await waitFor(() => {
       expect(getReviewSnapshot).toHaveBeenCalledWith({
         workspaceRoot: "/tmp/workspace",
@@ -409,9 +409,9 @@ describe("App streaming user message", () => {
       });
     });
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "update files");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     reviewAdditions = 10;
     reviewDeletions = 1;
@@ -431,7 +431,7 @@ describe("App streaming user message", () => {
       });
     });
 
-    expect(await screen.findByRole("button", { name: "Review pending changes +10 -1" })).toHaveTextContent("Review+10-1");
+    expect(await screen.findByRole("button", { name: "审查待处理变更 +10 -1" })).toHaveTextContent("变更审查+10-1");
   });
 
   it("wires the current session hover preview through the App bridge", async () => {
@@ -501,7 +501,7 @@ describe("App streaming user message", () => {
 
     renderApp();
 
-    const titleTrigger = await screen.findByRole("button", { name: "Show session details for Hover preview" });
+    const titleTrigger = await screen.findByRole("button", { name: "查看会话详情： Hover preview" });
     await user.hover(titleTrigger);
 
     const tooltip = await screen.findByRole("tooltip");
@@ -569,9 +569,9 @@ describe("App streaming user message", () => {
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "scroll me");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     await waitFor(() => {
       expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
@@ -653,9 +653,9 @@ describe("App streaming user message", () => {
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "show me immediately");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     expect(await screen.findByText("show me immediately")).toBeTruthy();
 
@@ -741,9 +741,9 @@ describe("App streaming user message", () => {
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "keep this input");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     await waitFor(() => {
       expect(composer).toHaveValue("keep this input");
@@ -811,9 +811,9 @@ describe("App streaming user message", () => {
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "wait for the model");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
 
@@ -1011,9 +1011,9 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "alpha prompt");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
     await waitFor(() => {
       expect(agentRunIds.has(alphaSessionId)).toBe(true);
       expect(streamListeners.size).toBe(1);
@@ -1022,9 +1022,9 @@ sessionId: input.sessionId,
     const betaTitle = await screen.findByText("Beta chat");
     await userEvent.click(betaTitle.closest("button") as HTMLButtonElement);
 
-    const betaComposer = await screen.findByLabelText("Message composer");
+    const betaComposer = await screen.findByLabelText("消息输入框");
     await userEvent.type(betaComposer, "beta prompt");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     expect(await screen.findByText("beta streamed once")).toBeInTheDocument();
     expect(screen.queryByText("beta streamed oncebeta streamed once")).toBeNull();
@@ -1048,7 +1048,7 @@ sessionId: alphaSessionId,
       resolveTurns.get(alphaSessionId)?.();
     });
     expect(await screen.findByText("beta streamed once")).toBeInTheDocument();
-    expect(screen.getByLabelText("Stop agent")).toBeInTheDocument();
+    expect(screen.getByLabelText("停止 Agent")).toBeInTheDocument();
 
     await act(async () => {
       resolveTurns.get(betaSessionId)?.();
@@ -1166,9 +1166,9 @@ sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "handoff prompt");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     const streamingUserNode = (await screen.findByText("handoff prompt")).closest(".message-turn");
     const streamingAssistantNode = (await screen.findByText("handoff reply")).closest(".assistant-reply");
@@ -1258,17 +1258,17 @@ sessionId,
     await userEvent.click(await screen.findByRole("button", { name: /DeepSeek V4 Pro/i }));
     await userEvent.click(screen.getByRole("button", { name: "DeepSeek V4 Flash" }));
 
-    let composer = await screen.findByLabelText("Message composer");
+    let composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "start with flash");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     await waitFor(() => {
       expect(runAgent).toHaveBeenCalledTimes(1);
     });
 
-    composer = await screen.findByLabelText("Message composer");
+    composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "continue with flash");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     await waitFor(() => {
       expect(runAgent).toHaveBeenCalledTimes(2);
@@ -1375,9 +1375,9 @@ sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "/compact");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     await waitFor(() => {
       expect(compactContext).toHaveBeenCalledTimes(1);
@@ -1464,15 +1464,15 @@ sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "read that file");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     if (!finishOnly) expect(await screen.findByText("Read fixture.txt")).toHaveAttribute("data-shimmer-text");
     expect(screen.queryByText(/\{"path"/)).not.toBeInTheDocument();
     await act(async () => { finishTool(); });
     await waitFor(() => expect(screen.getByText("Read fixture.txt")).not.toHaveAttribute("data-shimmer-text"));
-    expect(screen.queryByText(/Done\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/已结束\./)).not.toBeInTheDocument();
     await act(async () => {
       if (!lastFinished) throw new Error("Expected a tool result before final text");
       streamHandler?.({ ...lastFinished, type: "tool_call_streaming", preview: { kind: "read", filePath: "late.txt", displayText: "late" } });
@@ -1572,9 +1572,9 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "write three files");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     for (const filePath of ["first.ts", "second.ts", "third.ts"]) {
       const runningText = await screen.findByText(`Write ${filePath}`);
@@ -1720,9 +1720,9 @@ sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "implement the feature");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     expect(await screen.findByRole("listitem", { name: "In progress: Inspect current behavior" })).toBeInTheDocument();
     expect(screen.getAllByLabelText("Agent Todo list")).toHaveLength(1);
@@ -1940,21 +1940,21 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "delegate exploration");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     expect(await screen.findByText("Explore renderer flow")).toBeTruthy();
     expect(await screen.findByText("Read apps/desktop/src/renderer/App.tsx")).toBeTruthy();
-    expect(await screen.findByRole("button", { name: "Review pending changes +7 -2" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "审查待处理变更 +7 -2" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Open SubAgent transcript for Explore renderer flow/ }));
 
-    const panel = await screen.findByRole("region", { name: "Subagent details" });
+    const panel = await screen.findByRole("region", { name: "子 Agent 详情" });
     expect(panel).toBeTruthy();
     expect(await within(panel).findByText("Read apps/desktop/src/renderer/App.tsx")).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: /SubAgent transcript: Explore renderer flow/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Review pending changes +7 -2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "审查待处理变更 +7 -2" })).toBeInTheDocument();
 
     await act(async () => {
       resolveRunAgent?.({
@@ -2036,7 +2036,7 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Add workspace" }));
+    await userEvent.click(await screen.findByRole("button", { name: "添加工作区" }));
 
     await waitFor(() => {
       expect(selectWorkspaceDirectory).toHaveBeenCalledTimes(1);
@@ -2128,16 +2128,16 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Select workspace" }));
-    const workspaceMenu = await screen.findByRole("menu", { name: /options$/ });
+    await userEvent.click(await screen.findByRole("button", { name: "选择工作区" }));
+    const workspaceMenu = await screen.findByRole("menu", { name: /选项$/ });
     expect(within(workspaceMenu).getByRole("menuitem", { name: "Default workspace" })).toBeInTheDocument();
     await userEvent.click(within(workspaceMenu).getByRole("menuitem", { name: "alt-workspace" }));
 
     expect(setSessionWorkspace).not.toHaveBeenCalled();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "use the alternate workspace");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     await waitFor(() => expect(runAgent).toHaveBeenCalledTimes(1));
     expect(setSessionWorkspace).not.toHaveBeenCalled();
@@ -2237,18 +2237,18 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
-    await userEvent.click(screen.getByRole("button", { name: "Add agents, context, tools" }));
-    await userEvent.click(screen.getByRole("menuitem", { name: "Image" }));
-    expect(await screen.findByLabelText("Attached image screenshot.png")).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: "Preview attached image screenshot.png" }));
+    const composer = await screen.findByLabelText("消息输入框");
+    await userEvent.click(screen.getByRole("button", { name: "添加 Agent、上下文或工具" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "图片" }));
+    expect(await screen.findByLabelText("已附加的图片 screenshot.png")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "预览附加图片 screenshot.png" }));
     expect(await screen.findByRole("img", { name: "预览图片" })).toHaveAttribute(
       "src",
       "data:image/png;base64,preview",
     );
 
     await userEvent.type(composer, "what is in this screenshot?");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     await waitFor(() => {
       expect(capturedInput?.attachments).toEqual([{
@@ -2362,9 +2362,9 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "search the web");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     const webSearchLine = await screen.findByText("Web Search 最新新闻 今天");
     expect(webSearchLine.closest(".tool-log-line")?.classList.contains("is-running")).toBe(true);
@@ -2477,9 +2477,9 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "inspect files");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     expect(await screen.findByText("Grep ToolUiPreview in *.ts")).toBeTruthy();
     expect(await screen.findByText("Glob src/**/*.ts in packages/agent-core")).toBeTruthy();
@@ -2604,11 +2604,11 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "install deps");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
-    expect(await screen.findByRole("button", { name: "Session status: Waiting approval" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "会话状态： 等待审批" })).toBeTruthy();
     expect(screen.getByText("沙盒")).toBeInTheDocument();
 
     await act(async () => {
@@ -2756,9 +2756,9 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "delete notes.md");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     expect(await screen.findByText("Delete file requires approval")).toBeInTheDocument();
     expect(screen.getByText("notes.md")).toBeInTheDocument();
@@ -2895,9 +2895,9 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "看看浏览器标签页");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
     expect(await screen.findByText("允许 ActSpace 在当前会话中使用浏览器？")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "允许" }));
@@ -2987,11 +2987,11 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "fail this turn");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
-    expect(await screen.findByRole("button", { name: "Session status: Failed" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "会话状态： 失败" })).toBeTruthy();
   });
 
   it("only renders grep and glob tooltips when the tool line is truncated", async () => {
@@ -3128,11 +3128,11 @@ sessionId: input.sessionId,
 
     renderApp();
 
-    const composer = await screen.findByLabelText("Message composer");
+    const composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "stop me");
-    await userEvent.click(screen.getByLabelText("Send message"));
+    await userEvent.click(screen.getByLabelText("发送消息"));
 
-    const stopButton = await screen.findByLabelText("Stop agent");
+    const stopButton = await screen.findByLabelText("停止 Agent");
     await userEvent.click(stopButton);
 
     await waitFor(() => {
@@ -3184,7 +3184,7 @@ sessionId: input.sessionId,
 
     expect(await screen.findByText("stop me")).toBeTruthy();
     expect(await screen.findByText("Stopped")).toBeTruthy();
-    expect((screen.getByLabelText("Message composer") as HTMLTextAreaElement).disabled).toBe(false);
+    expect((screen.getByLabelText("消息输入框") as HTMLTextAreaElement).disabled).toBe(false);
     expect(getSessionMock).toHaveBeenCalledTimes(2);
   });
 });

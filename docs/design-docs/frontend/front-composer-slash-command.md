@@ -1,5 +1,7 @@
 # Composer Slash Command 设计规范
 
+> 2026-09-09 文案更新：日常界面展示名称以[中文文案规范](front-desktop-chinese-ui.md)为准；保留 Chat、Plan、Thinking、Effort 和工具执行展示。本文英文名称仍可用于指代内部概念，协议与行为不变。
+
 ## 状态
 
 - 阶段：V1 已实现；自动化与浏览器 Renderer 验证完成，Electron 真实验收待用户执行。

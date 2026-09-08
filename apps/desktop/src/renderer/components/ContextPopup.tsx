@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Eye, X } from "lucide-react";
 import type { ContextState, ContextUsageSnapshot } from "@actspace/shared";
 import { getContextBucketDisplay } from "@actspace/shared";
+import { contextBucketLabel } from "../context-labels";
 import { selectRequestContextEstimate } from "@actspace/client/sessions";
 import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
@@ -67,9 +68,9 @@ export function ContextPopup({
       : `${Math.floor(safeSnapshot.percentUsed)}`;
 
   return (
-    <div className={CONTEXT_POPOVER_CLASS} role="dialog" aria-label="Context usage">
+    <div className={CONTEXT_POPOVER_CLASS} role="dialog" aria-label="上下文用量">
       <header className={`context-popover-header ${CONTEXT_ROW_CLASS}`}>
-        <strong>Context</strong>
+        <strong>上下文</strong>
         <div className="flex items-center gap-1.5">
           {onExpand ? (
             <Tooltip>
@@ -88,7 +89,7 @@ export function ContextPopup({
           ) : null}
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className={CONTEXT_CLOSE_CLASS} type="button" onClick={onClose} aria-label="Close context">
+              <button className={CONTEXT_CLOSE_CLASS} type="button" onClick={onClose} aria-label="关闭上下文">
                 <X size={15} strokeWidth={2.2} aria-hidden="true" />
               </button>
             </TooltipTrigger>
@@ -97,9 +98,9 @@ export function ContextPopup({
         </div>
       </header>
       <div className={CONTEXT_SUMMARY_CLASS}>
-        <span>{percentLabel}% Full</span>
+        <span>{percentLabel}% 已用</span>
         <span>
-          ~{formatTokenCount(safeSnapshot.totalTokens)} / {formatTokenCount(safeSnapshot.maxTokens)} Tokens
+          ~{formatTokenCount(safeSnapshot.totalTokens)} / {formatTokenCount(safeSnapshot.maxTokens)} Token
         </span>
       </div>
       <div className={CONTEXT_METER_CLASS}>
@@ -121,7 +122,7 @@ export function ContextPopup({
                 opacity: dimmed ? 0.3 : 1
               }}
               aria-pressed={selectedKey === key}
-              aria-label={`${display.label} ${formatTokenCount(bucket.tokens)} tokens`}
+              aria-label={`${contextBucketLabel(key)} ${formatTokenCount(bucket.tokens)} Token`}
               onClick={() => toggleSelected(key)}
             />
           );
@@ -143,7 +144,7 @@ export function ContextPopup({
               onClick={() => toggleSelected(key)}
             >
               <span className={BUCKET_SWATCH_CLASS} style={{ background: `var(${display.colorVar})` }} />
-              <span className="truncate">{display.label}</span>
+              <span className="truncate">{contextBucketLabel(key)}</span>
               <strong className={CONTEXT_BUCKET_VALUE_CLASS}>{formatTokenCount(bucket.tokens)}</strong>
             </button>
           );
@@ -155,7 +156,7 @@ export function ContextPopup({
 
 function formatTokenCount(value: number): string {
   const safe = Math.max(0, Math.floor(value));
-  if (safe < 1_000) return safe.toLocaleString();
+  if (safe < 1_000) return safe.toLocaleString("zh-CN");
   if (safe < 1_000_000) return `${Math.floor(safe / 1_000)}K`;
   return `${Math.floor(safe / 1_000_000)}M`;
 }

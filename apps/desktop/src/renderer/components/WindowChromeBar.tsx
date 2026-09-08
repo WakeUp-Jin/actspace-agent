@@ -98,19 +98,19 @@ export function WindowChromeBar({
         <button
           className="chrome-button chrome-toggle-left"
           type="button"
-          aria-label={isLeftHidden ? "Expand session sidebar" : "Collapse session sidebar"}
-          title={isLeftHidden ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={isLeftHidden ? "展开会话侧栏" : "收起会话侧栏"}
+          title={isLeftHidden ? "展开侧栏" : "收起侧栏"}
           aria-pressed={!isLeftHidden}
           onClick={onToggleLeft}
         >
           <PanelLeft size={15} strokeWidth={1.8} />
         </button>
-        <div className="chrome-navigation" aria-label="Session navigation">
+        <div className="chrome-navigation" aria-label="会话导航">
           <button
             className="chrome-button"
             type="button"
-            aria-label="Go back"
-            title="Back"
+            aria-label="后退"
+            title="返回"
             disabled={!canGoBack}
             onClick={onGoBack}
           >
@@ -119,8 +119,8 @@ export function WindowChromeBar({
           <button
             className="chrome-button"
             type="button"
-            aria-label="Go forward"
-            title="Forward"
+            aria-label="前进"
+            title="前进"
             disabled={!canGoForward}
             onClick={onGoForward}
           >
@@ -148,9 +148,9 @@ export function WindowChromeBar({
             <button
               className="chrome-button chrome-toggle-right"
               type="button"
-              aria-label={rightOpen ? "Close panel" : "Open panel"}
+              aria-label={rightOpen ? "关闭面板" : "打开面板"}
               aria-pressed={rightOpen}
-              title={rightOpen ? "Close right panel" : "Open right panel"}
+              title={rightOpen ? "关闭右侧面板" : "打开右侧面板"}
               onClick={onToggleRight}
             >
               <PanelRight size={15} strokeWidth={1.8} />
@@ -220,7 +220,7 @@ function ChromeTitle({
   return (
     <Tooltip delayDuration={250} open={open} onOpenChange={handleOpenChange}>
       <TooltipTrigger asChild>
-        <button className="chrome-title chrome-title-trigger" type="button" aria-label={`Show session details for ${title}`}>
+        <button className="chrome-title chrome-title-trigger" type="button" aria-label={`查看会话详情： ${title}`}>
           {title}
         </button>
       </TooltipTrigger>

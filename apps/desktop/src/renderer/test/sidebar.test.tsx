@@ -135,7 +135,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
   it("renders the stable primary actions", () => {
     renderSidebar();
 
-    expect(screen.getByText("New Agent")).toBeInTheDocument();
+    expect(screen.getByText("新建会话")).toBeInTheDocument();
     expect(screen.queryByText("Lab")).not.toBeInTheDocument();
     expect(screen.queryByText("Usage")).not.toBeInTheDocument();
     expect(screen.getByText("⌘N")).toBeInTheDocument();
@@ -151,7 +151,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
   it("renders a Workspaces parent section above the workspace folders", () => {
     renderSidebar();
 
-    expect(screen.getByRole("button", { name: /^Workspaces$/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^工作区$/ })).toBeInTheDocument();
     // Workspace folders 在 Workspaces 父级下方仍可见
     expect(screen.getByText("actspace-agent")).toBeInTheDocument();
     expect(screen.getByText("agent-harness-dev")).toBeInTheDocument();
@@ -163,19 +163,19 @@ describe("Sidebar (cursor-aligned layout)", () => {
     const workspaceLabel = screen.getByRole("button", { name: "actspace-agent" });
 
     await user.click(workspaceLabel);
-    expect(screen.queryByRole("menu", { name: "Workspace actions for actspace-agent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "工作区操作： actspace-agent" })).not.toBeInTheDocument();
 
     fireEvent.contextMenu(workspaceLabel, { clientX: 24, clientY: 60 });
-    expect(screen.getByRole("menu", { name: "Workspace actions for actspace-agent" })).toBeInTheDocument();
-    await user.click(screen.getByRole("menuitem", { name: "Open in IDE" }));
+    expect(screen.getByRole("menu", { name: "工作区操作： actspace-agent" })).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "在 IDE 中打开" }));
     expect(onOpenWorkspace).toHaveBeenCalledWith("ws-actspace");
 
     fireEvent.contextMenu(workspaceLabel, { clientX: 24, clientY: 60 });
-    await user.click(screen.getByRole("menuitem", { name: "Archive All" }));
+    await user.click(screen.getByRole("menuitem", { name: "归档全部" }));
     expect(onArchiveWorkspace).toHaveBeenCalledWith("ws-actspace", "/Users/me/projects/actspace-agent");
 
     fireEvent.contextMenu(workspaceLabel, { clientX: 24, clientY: 60 });
-    await user.click(screen.getByRole("menuitem", { name: "Remove from Sidebar" }));
+    await user.click(screen.getByRole("menuitem", { name: "从侧栏移除" }));
     expect(onRemoveWorkspace).toHaveBeenCalledWith("ws-actspace", "/Users/me/projects/actspace-agent");
   });
 
@@ -184,25 +184,25 @@ describe("Sidebar (cursor-aligned layout)", () => {
     const workspaceLabel = screen.getByRole("button", { name: "actspace-agent" });
 
     fireEvent.keyDown(workspaceLabel, { key: "F10", shiftKey: true });
-    expect(screen.getByRole("menu", { name: "Workspace actions for actspace-agent" })).toBeInTheDocument();
+    expect(screen.getByRole("menu", { name: "工作区操作： actspace-agent" })).toBeInTheDocument();
   });
 
   it("keeps the chevron dedicated to collapse and disables default workspace removal", async () => {
     const user = userEvent.setup();
     renderSidebar();
 
-    await user.click(screen.getByRole("button", { name: "Collapse actspace-agent" }));
+    await user.click(screen.getByRole("button", { name: "收起 actspace-agent" }));
     expect(screen.queryByText("Conversation context lookup")).not.toBeInTheDocument();
-    expect(screen.queryByRole("menu", { name: "Workspace actions for actspace-agent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "工作区操作： actspace-agent" })).not.toBeInTheDocument();
 
     fireEvent.contextMenu(screen.getByRole("button", { name: "Default workspace" }), { clientX: 24, clientY: 60 });
-    expect(screen.getByRole("menuitem", { name: "Remove from Sidebar" })).toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: "从侧栏移除" })).toBeDisabled();
   });
 
   it("keeps the session list on vertical scrolling only", () => {
     const { container } = renderSidebar();
 
-    expect(screen.getByRole("navigation", { name: "Sessions" })).toHaveClass(
+    expect(screen.getByRole("navigation", { name: "会话" })).toHaveClass(
       "sidebar-scrollbar",
       "overflow-x-hidden",
       "overflow-y-auto",
@@ -214,21 +214,21 @@ describe("Sidebar (cursor-aligned layout)", () => {
     renderSidebar();
 
     expect(screen.getByText("actspace-agent")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /^Workspaces$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^工作区$/ }));
     expect(screen.queryByText("actspace-agent")).not.toBeInTheDocument();
     expect(screen.queryByText("agent-harness-dev")).not.toBeInTheDocument();
   });
 
   it("shows a Pinned section when any session is pinned", () => {
     renderSidebar();
-    expect(screen.getByText("Pinned")).toBeInTheDocument();
+    expect(screen.getByText("已置顶")).toBeInTheDocument();
     expect(screen.getByText("Bash 工具开发与权限调度")).toBeInTheDocument();
   });
 
   it("invokes onTogglePin with the next pinned value when clicking the pin icon", async () => {
     const { onTogglePin } = renderSidebar();
 
-    const pinButtons = screen.getAllByRole("button", { name: "Pin session" });
+    const pinButtons = screen.getAllByRole("button", { name: "置顶会话" });
     expect(pinButtons.length).toBeGreaterThan(0);
     await userEvent.click(pinButtons[0]);
 
@@ -238,7 +238,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
   it("invokes onArchive when clicking the archive button on a session row", async () => {
     const { onArchive } = renderSidebar();
 
-    const archiveButtons = screen.getAllByRole("button", { name: "Archive session" });
+    const archiveButtons = screen.getAllByRole("button", { name: "归档会话" });
     expect(archiveButtons.length).toBeGreaterThan(0);
     await userEvent.click(archiveButtons[0]);
 
@@ -253,8 +253,8 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(row).not.toBeNull();
     fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
 
-    await user.click(screen.getByRole("menuitem", { name: "Rename" }));
-    const input = screen.getByRole("textbox", { name: "Rename session 工具定义格式和命名规范" });
+    await user.click(screen.getByRole("menuitem", { name: "重命名" }));
+    const input = screen.getByRole("textbox", { name: "重命名会话 工具定义格式和命名规范" });
     await user.clear(input);
     await user.type(input, "重命名后的会话{Enter}");
 
@@ -268,13 +268,13 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(row).not.toBeNull();
 
     fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
-    await user.click(screen.getByRole("menuitem", { name: "Copy" }));
-    await user.click(screen.getByRole("menuitem", { name: "Copy ID" }));
+    await user.click(screen.getByRole("menuitem", { name: "复制" }));
+    await user.click(screen.getByRole("menuitem", { name: "复制 ID" }));
     expect(onCopySessionId).toHaveBeenCalledWith("s-actspace-1");
 
     fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
-    await user.hover(screen.getByRole("menuitem", { name: "Copy" }));
-    await user.click(screen.getByRole("menuitem", { name: "Copy Transcript" }));
+    await user.hover(screen.getByRole("menuitem", { name: "复制" }));
+    await user.click(screen.getByRole("menuitem", { name: "复制会话记录" }));
     expect(onCopyTranscript).toHaveBeenCalledWith("s-actspace-1");
   });
 
@@ -283,14 +283,14 @@ describe("Sidebar (cursor-aligned layout)", () => {
     const first = renderSidebar();
     const row = screen.getByText("工具定义格式和命名规范").closest(".session-row");
     fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
-    await user.click(screen.getByRole("menuitem", { name: "Fork" }));
+    await user.click(screen.getByRole("menuitem", { name: "分叉" }));
     expect(first.onFork).toHaveBeenCalledWith("s-actspace-1");
 
     first.unmount();
     const busy = renderSidebar({ busySessionIds: new Set(["s-actspace-1"]) });
     const busyRow = screen.getByText("工具定义格式和命名规范").closest(".session-row");
     fireEvent.contextMenu(busyRow as HTMLElement, { clientX: 120, clientY: 80 });
-    const fork = screen.getByRole("menuitem", { name: "Fork" });
+    const fork = screen.getByRole("menuitem", { name: "分叉" });
     expect(fork).toBeDisabled();
     await user.click(fork);
     expect(busy.onFork).not.toHaveBeenCalled();
@@ -299,7 +299,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
   it("disables archive on the active session row", async () => {
     const { onArchive } = renderSidebar({ activeSessionId: "s-actspace-1" });
 
-    const activeArchive = screen.getByRole("button", { name: "Current session cannot be archived" });
+    const activeArchive = screen.getByRole("button", { name: "当前会话无法归档" });
     expect(activeArchive).toBeDisabled();
     await userEvent.click(activeArchive);
 
@@ -309,7 +309,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
   it("invokes onNewSession when clicking the workspace folder + button", async () => {
     const { onNewSession } = renderSidebar();
 
-    const addButtons = screen.getAllByRole("button", { name: "New chat in workspace" });
+    const addButtons = screen.getAllByRole("button", { name: "在工作区中新建会话" });
     expect(addButtons.length).toBeGreaterThanOrEqual(2); // actspace-agent + agent-harness-dev
     await userEvent.click(addButtons[0]);
 
@@ -331,11 +331,11 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(screen.queryByText("Plan item 0")).toBeInTheDocument();
     expect(screen.queryByText("Plan item 9")).not.toBeInTheDocument();
 
-    const seeMore = screen.getByRole("button", { name: /^See more/ });
+    const seeMore = screen.getByRole("button", { name: /^显示更多/ });
     await userEvent.click(seeMore);
 
     expect(screen.getByText("Plan item 9")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "See less" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收起" })).toBeInTheDocument();
   });
 
   it("renders a status dot for the active session and a busy dot for busy sessions", () => {
@@ -360,14 +360,14 @@ describe("Sidebar (cursor-aligned layout)", () => {
     });
 
     expect(screen.getByText("工具定义格式和命名规范")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Session status: Idle" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "会话状态： 空闲" })).toBeInTheDocument();
   });
 
   it("collapses Pinned section when its label is clicked", async () => {
     renderSidebar();
 
     expect(screen.getByText("Bash 工具开发与权限调度")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /^Pinned$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^已置顶$/ }));
     expect(screen.queryByText("Bash 工具开发与权限调度")).not.toBeInTheDocument();
   });
 
@@ -394,7 +394,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(actions).not.toBeNull();
     expect(time).not.toBeNull();
 
-    const pin = within(actions as HTMLElement).getByRole("button", { name: "Unpin session" });
+    const pin = within(actions as HTMLElement).getByRole("button", { name: "取消置顶会话" });
     expect(children.indexOf(actions as Element)).toBeLessThan(children.indexOf(time as Element));
     expect(time).not.toHaveClass("opacity-0");
     expect(pin).not.toHaveClass("opacity-100");
@@ -427,10 +427,10 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(row).not.toBeNull();
     fireEvent.contextMenu(row as HTMLElement, { clientX: 120, clientY: 80 });
 
-    expect(screen.getByRole("menu", { name: "Session actions for 工具定义格式和命名规范" })).toBeInTheDocument();
+    expect(screen.getByRole("menu", { name: "会话操作： 工具定义格式和命名规范" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("menuitem", { name: "Rename" }));
-    expect(screen.getByRole("textbox", { name: "Rename session 工具定义格式和命名规范" })).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "重命名" }));
+    expect(screen.getByRole("textbox", { name: "重命名会话 工具定义格式和命名规范" })).toBeInTheDocument();
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
@@ -467,10 +467,10 @@ describe("WindowChromeBar", () => {
   it("renders the left toggle, session navigation, and right toggle buttons + the title", () => {
     renderChromeBar({ title: "Workspace > New chat" });
 
-    expect(screen.getByRole("button", { name: "Collapse session sidebar" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Go back" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Go forward" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open panel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收起会话侧栏" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "后退" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "前进" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "打开面板" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Workspace > New chat" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Search sessions" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Select workspace for next message" })).not.toBeInTheDocument();
@@ -481,9 +481,9 @@ describe("WindowChromeBar", () => {
     const onToggleSessionView = vi.fn();
     renderChromeBar({ sessionView: "chat", onToggleSessionView });
 
-    const toggle = screen.getByRole("button", { name: "查看 Trajectory" });
+    const toggle = screen.getByRole("button", { name: "查看执行轨迹" });
     expect(toggle).toHaveAttribute("aria-pressed", "false");
-    expect(toggle).toHaveAttribute("title", "查看 Trajectory");
+    expect(toggle).toHaveAttribute("title", "查看执行轨迹");
     expect(screen.queryByText("Trajectory", { selector: "[role=tab]" })).not.toBeInTheDocument();
 
     await user.click(toggle);
@@ -493,9 +493,9 @@ describe("WindowChromeBar", () => {
   it("uses the Chat icon label when the Trajectory view is active", () => {
     renderChromeBar({ sessionView: "trajectory", onToggleSessionView: vi.fn() });
 
-    const toggle = screen.getByRole("button", { name: "返回 Chat" });
+    const toggle = screen.getByRole("button", { name: "返回对话" });
     expect(toggle).toHaveAttribute("aria-pressed", "true");
-    expect(toggle).toHaveAttribute("title", "返回 Chat");
+    expect(toggle).toHaveAttribute("title", "返回对话");
   });
 
   it("aligns the chrome columns to the visible SplitView pane widths", () => {
@@ -535,7 +535,7 @@ describe("WindowChromeBar", () => {
   it("flips the left toggle aria-label / aria-pressed when sidebar is hidden", () => {
     renderChromeBar({ leftMode: "hidden" });
 
-    const left = screen.getByRole("button", { name: "Expand session sidebar" });
+    const left = screen.getByRole("button", { name: "展开会话侧栏" });
     expect(left).toBeInTheDocument();
     expect(left.getAttribute("aria-pressed")).toBe("false");
   });
@@ -543,7 +543,7 @@ describe("WindowChromeBar", () => {
   it("flips the right toggle aria-label / aria-pressed when right panel is open", () => {
     renderChromeBar({ rightOpen: true });
 
-    const right = screen.getByRole("button", { name: "Close panel" });
+    const right = screen.getByRole("button", { name: "关闭面板" });
     expect(right).toBeInTheDocument();
     expect(right.getAttribute("aria-pressed")).toBe("true");
   });
@@ -554,10 +554,10 @@ describe("WindowChromeBar", () => {
       canGoForward: true,
     });
 
-    await userEvent.click(screen.getByRole("button", { name: "Collapse session sidebar" }));
-    await userEvent.click(screen.getByRole("button", { name: "Go back" }));
-    await userEvent.click(screen.getByRole("button", { name: "Go forward" }));
-    await userEvent.click(screen.getByRole("button", { name: "Open panel" }));
+    await userEvent.click(screen.getByRole("button", { name: "收起会话侧栏" }));
+    await userEvent.click(screen.getByRole("button", { name: "后退" }));
+    await userEvent.click(screen.getByRole("button", { name: "前进" }));
+    await userEvent.click(screen.getByRole("button", { name: "打开面板" }));
 
     expect(onToggleLeft).toHaveBeenCalledTimes(1);
     expect(onGoBack).toHaveBeenCalledTimes(1);
@@ -568,15 +568,15 @@ describe("WindowChromeBar", () => {
   it("disables session navigation when there is no history in that direction", () => {
     renderChromeBar();
 
-    expect(screen.getByRole("button", { name: "Go back" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Go forward" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "后退" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "前进" })).toBeDisabled();
   });
 
   it("can hide the right toggle button for full-page views", () => {
     renderChromeBar({ showRightToggle: false });
 
-    expect(screen.queryByRole("button", { name: "Open panel" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Collapse session sidebar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "打开面板" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收起会话侧栏" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Search sessions" })).not.toBeInTheDocument();
   });
 
@@ -595,14 +595,14 @@ describe("WindowChromeBar", () => {
       getSessionPreview,
     });
 
-    await user.hover(screen.getByRole("button", { name: "Show session details for New chat" }));
+    await user.hover(screen.getByRole("button", { name: "查看会话详情： New chat" }));
     const tooltip = await screen.findByRole("tooltip");
 
     expect(getSessionPreview).toHaveBeenCalledWith(expect.objectContaining({ id: "s-actspace-1" }));
     expect(tooltip).toHaveTextContent("New chat");
     expect(tooltip).toHaveTextContent("/Users/me/Desktop/code-project/side-project/actspace-agent");
     expect(tooltip).toHaveTextContent("DeepSeek V4 Pro");
-    expect(tooltip).toHaveTextContent("Context 56%");
+    expect(tooltip).toHaveTextContent("上下文 56%");
     expect(tooltip).toHaveTextContent("56K / 100K");
     expect(tooltip).not.toHaveTextContent("main");
   });
@@ -618,7 +618,7 @@ describe("WindowChromeBar", () => {
       getSessionPreview,
     });
 
-    fireEvent.focus(screen.getByRole("button", { name: "Show session details for New chat" }));
+    fireEvent.focus(screen.getByRole("button", { name: "查看会话详情： New chat" }));
 
     await waitFor(() => expect(getSessionPreview).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("/Users/me/projects/actspace-agent");
@@ -635,7 +635,7 @@ describe("WindowChromeBar", () => {
       getSessionPreview,
     });
 
-    const trigger = screen.getByRole("button", { name: "Show session details for New chat" });
+    const trigger = screen.getByRole("button", { name: "查看会话详情： New chat" });
     await user.hover(trigger);
     expect(await screen.findByRole("tooltip")).toHaveTextContent("/Users/me/projects/actspace-agent");
     await user.unhover(trigger);

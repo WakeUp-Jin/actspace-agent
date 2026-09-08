@@ -10,7 +10,7 @@ describe("Composer focus requests", () => {
         <Composer contextSnapshot={null} focusRequestId={0} />
       </TooltipProvider>,
     );
-    const input = screen.getByPlaceholderText("Send follow-up");
+    const input = screen.getByPlaceholderText("继续补充…");
     expect(input).not.toHaveFocus();
 
     rerender(

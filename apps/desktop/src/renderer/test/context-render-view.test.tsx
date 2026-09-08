@@ -14,10 +14,10 @@ describe("ContextRenderView", () => {
   it("groups entries into ordered sections with the registry labels", () => {
     render(<ContextRenderView contextState={mockContextState} />);
 
-    expect(screen.getByRole("button", { name: /System prompt/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Tools/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Rules/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Conversation/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /系统提示词/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /工具/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /规则/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /会话内容/ })).toBeInTheDocument();
   });
 
   it("collapses Conversation by default and caps to 20 entries when expanded", async () => {
@@ -27,7 +27,7 @@ describe("ContextRenderView", () => {
     // 默认折叠：会话条目标题不可见。
     expect(screen.queryByText("User · 第 1 轮")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /Conversation/ }));
+    await user.click(screen.getByRole("button", { name: /会话内容/ }));
 
     // 展开后最多 20 条 + 余量提示（mock 有 28 条会话）。
     expect(screen.getByText("User · 第 1 轮")).toBeInTheDocument();
@@ -54,8 +54,8 @@ describe("ContextRenderView", () => {
       percentUsed: 2,
       buckets: [],
     }} />);
-    expect(screen.getByText(/Context · 2% Full/)).toBeInTheDocument();
-    expect(screen.getByText(/等待同一 Session 的逐条上下文投影/)).toBeInTheDocument();
+    expect(screen.getByText(/上下文 · 2% 已用/)).toBeInTheDocument();
+    expect(screen.getByText(/正在等待当前会话的上下文明细/)).toBeInTheDocument();
   });
 
   it("falls back to the active Session provider usage selector when no prop is supplied", async () => {
@@ -101,8 +101,8 @@ describe("ContextRenderView", () => {
       </SessionProjectionProvider>,
     );
 
-    await waitFor(() => expect(screen.getByText(/Context · 0% Full/)).toBeInTheDocument());
-    expect(screen.getByText(/2,000 \/ 0 Tokens/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/上下文 · 0% 已用/)).toBeInTheDocument());
+    expect(screen.getByText(/2,000 \/ 0 Token/)).toBeInTheDocument();
   });
 
   it("fills missing previews with on-demand describeContext content when a sessionId is given", async () => {

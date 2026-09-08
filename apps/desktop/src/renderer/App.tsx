@@ -44,7 +44,7 @@ import type { ComposerDraftRestore, ComposerExecutionContext, ComposerReviewSumm
 import type { NewSessionInput, SessionUiStatusKind } from "./components/Sidebar";
 import { resolveQuickOpenTarget } from "./quick-open-routing";
 
-const DEFAULT_WORKSPACE_LABEL = "Default workspace";
+const DEFAULT_WORKSPACE_LABEL = "默认工作区";
 const DEFAULT_COMPOSER_STATE: { mode: ComposerMode; selectedSkills: string[] } = {
   mode: "agent",
   selectedSkills: [],
@@ -61,7 +61,7 @@ function attachmentForRuntime(attachment: ComposerAttachment): ComposerAttachmen
 
 function getSessionTitle(sessionRecord: SessionRecord | null, sessions: SessionListItem[], sessionId: string | null): string {
   const selected = sessionId === null ? null : sessions.find((session) => session.id === sessionId);
-  const rawTitle = sessionRecord?.meta.title ?? selected?.title ?? "New chat";
+  const rawTitle = sessionRecord?.meta.title ?? selected?.title ?? "新建会话";
   const normalized = rawTitle.replace(/^Session\s+/i, "").replace(/^session-/i, "");
   if (normalized === rawTitle) {
     return rawTitle;

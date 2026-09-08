@@ -79,19 +79,19 @@ describe("WorkbenchLayout narrow window behavior", () => {
     renderWorkbench();
 
     expect(screen.queryByTestId("compact-sidebar-overlay")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Expand session sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "展开会话侧栏" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Choose workspace app" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show workspace environment" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Message composer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看工作区环境" })).toBeInTheDocument();
+    expect(screen.getByLabelText("消息输入框")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Expand session sidebar" }));
+    await user.click(screen.getByRole("button", { name: "展开会话侧栏" }));
 
     const overlay = screen.getByTestId("compact-sidebar-overlay");
     expect(overlay).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Collapse session sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收起会话侧栏" })).toBeInTheDocument();
     expect(within(overlay).getByText("Responsive layout")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Close session sidebar overlay" }));
+    await user.click(screen.getByRole("button", { name: "关闭会话侧栏浮层" }));
     expect(screen.queryByTestId("compact-sidebar-overlay")).not.toBeInTheDocument();
   });
 
@@ -137,11 +137,11 @@ describe("WorkbenchLayout narrow window behavior", () => {
     const user = userEvent.setup();
     renderWorkbench();
 
-    await user.click(screen.getByRole("button", { name: "Open panel" }));
+    await user.click(screen.getByRole("button", { name: "打开面板" }));
 
     expect(screen.getByTestId("compact-right-panel-overlay")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "右侧面板对象" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Message composer")).toBeInTheDocument();
+    expect(screen.getByLabelText("消息输入框")).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
     expect(screen.queryByTestId("compact-right-panel-overlay")).not.toBeInTheDocument();
@@ -152,14 +152,14 @@ describe("WorkbenchLayout narrow window behavior", () => {
     setViewportWidth(1120);
     const { container } = renderWorkbench();
 
-    expect(screen.getByRole("button", { name: "Collapse session sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收起会话侧栏" })).toBeInTheDocument();
     expect(container.querySelector("aside.sidebar")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Open panel" }));
+    await user.click(screen.getByRole("button", { name: "打开面板" }));
 
     expect(screen.queryByTestId("compact-right-panel-overlay")).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "右侧面板对象" })).toBeInTheDocument();
-    expect(screen.getByRole("separator", { name: "Resize preview panel" })).toBeInTheDocument();
+    expect(screen.getByRole("separator", { name: "调整预览面板宽度" })).toBeInTheDocument();
   });
 
   it("restores an unsent draft after visiting Settings", async () => {
@@ -167,40 +167,40 @@ describe("WorkbenchLayout narrow window behavior", () => {
     setViewportWidth(1120);
     renderWorkbench();
 
-    await user.type(screen.getByLabelText("Message composer"), "keep this draft");
-    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.type(screen.getByLabelText("消息输入框"), "keep this draft");
+    await user.click(screen.getByRole("button", { name: "设置" }));
     await user.click(screen.getByRole("button", { name: "返回应用" }));
 
-    expect(screen.getByLabelText("Message composer")).toHaveValue("keep this draft");
+    expect(screen.getByLabelText("消息输入框")).toHaveValue("keep this draft");
   });
 
   it("opens extensions beside the sidebar and restores the chat draft", async () => {
     const user = userEvent.setup();
     setViewportWidth(1440);
     renderWorkbench();
-    await user.type(screen.getByLabelText("Message composer"), "extension draft");
-    await user.click(screen.getByRole("button", { name: "Open panel" }));
+    await user.type(screen.getByLabelText("消息输入框"), "extension draft");
+    await user.click(screen.getByRole("button", { name: "打开面板" }));
     await user.click(screen.getByRole("button", { name: "扩展" }));
     expect(screen.getByRole("main", { name: "扩展内容" })).toBeVisible();
     expect(screen.getByRole("main", { name: "扩展内容" }).parentElement).toHaveClass("pt-[var(--window-chrome-strip-height)]");
-    expect(screen.getByRole("navigation", { name: "Sessions" })).toBeVisible();
-    expect(screen.queryByRole("separator", { name: "Resize preview panel" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open panel" })).not.toBeInTheDocument();
-    await user.click(within(screen.getByRole("navigation", { name: "Sessions" })).getByText("Responsive layout"));
-    expect(screen.getByLabelText("Message composer")).toHaveValue("extension draft");
-    expect(screen.getByRole("separator", { name: "Resize preview panel" })).toBeVisible();
+    expect(screen.getByRole("navigation", { name: "会话" })).toBeVisible();
+    expect(screen.queryByRole("separator", { name: "调整预览面板宽度" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "打开面板" })).not.toBeInTheDocument();
+    await user.click(within(screen.getByRole("navigation", { name: "会话" })).getByText("Responsive layout"));
+    expect(screen.getByLabelText("消息输入框")).toHaveValue("extension draft");
+    expect(screen.getByRole("separator", { name: "调整预览面板宽度" })).toBeVisible();
   });
 
   it("closes the compact sidebar when selecting extensions", async () => {
     const user = userEvent.setup();
     renderWorkbench();
-    await user.click(screen.getByRole("button", { name: "Expand session sidebar" }));
+    await user.click(screen.getByRole("button", { name: "展开会话侧栏" }));
     await user.click(screen.getByRole("button", { name: "扩展" }));
     expect(screen.queryByTestId("compact-sidebar-overlay")).not.toBeInTheDocument();
     expect(screen.getByRole("main", { name: "扩展内容" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Expand session sidebar" }));
-    await user.click(screen.getByRole("button", { name: /New Agent/ }));
-    expect(screen.getByLabelText("Message composer")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "展开会话侧栏" }));
+    await user.click(screen.getByRole("button", { name: "新建会话" }));
+    expect(screen.getByLabelText("消息输入框")).toBeVisible();
   });
 
   it("keeps separate unsent drafts for different sessions", async () => {
@@ -224,16 +224,16 @@ describe("WorkbenchLayout narrow window behavior", () => {
     ];
     const { rerender } = renderWorkbench({ sessions, activeSessionId: "session-a", title: "Session A" });
 
-    await user.type(screen.getByLabelText("Message composer"), "draft for A");
+    await user.type(screen.getByLabelText("消息输入框"), "draft for A");
     rerender(<WorkbenchFixture sessions={sessions} activeSessionId="session-b" title="Session B" />);
-    await waitFor(() => expect(screen.getByLabelText("Message composer")).toHaveValue(""));
+    await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue(""));
 
-    await user.type(screen.getByLabelText("Message composer"), "draft for B");
+    await user.type(screen.getByLabelText("消息输入框"), "draft for B");
     rerender(<WorkbenchFixture sessions={sessions} activeSessionId="session-a" title="Session A" />);
-    await waitFor(() => expect(screen.getByLabelText("Message composer")).toHaveValue("draft for A"));
+    await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("draft for A"));
 
     rerender(<WorkbenchFixture sessions={sessions} activeSessionId="session-b" title="Session B" />);
-    await waitFor(() => expect(screen.getByLabelText("Message composer")).toHaveValue("draft for B"));
+    await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("draft for B"));
   });
 
   it("navigates the visited session history with the chrome back and forward buttons", async () => {
@@ -259,11 +259,11 @@ describe("WorkbenchLayout narrow window behavior", () => {
 
     await user.click(screen.getByRole("button", { name: "B" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Session B" })).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "Go back" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "后退" })).not.toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "Go back" }));
+    await user.click(screen.getByRole("button", { name: "后退" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Session A" })).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "Go forward" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "前进" })).not.toBeDisabled();
   });
 
   it("recalls persisted user messages through the Workbench composer", async () => {
@@ -286,7 +286,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
       ],
     });
 
-    const input = screen.getByLabelText("Message composer");
+    const input = screen.getByLabelText("消息输入框");
     await user.click(input);
     await user.keyboard("{ArrowUp}");
 
@@ -313,28 +313,28 @@ describe("WorkbenchLayout narrow window behavior", () => {
       ],
     });
 
-    const input = screen.getByLabelText("Message composer");
+    const input = screen.getByLabelText("消息输入框");
     await user.type(input, "keep this while inspecting the run");
-    await user.click(screen.getByRole("button", { name: "查看 Trajectory" }));
+    await user.click(screen.getByRole("button", { name: "查看执行轨迹" }));
 
     expect(screen.getByTestId("trajectory-view")).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Conversation messages" })).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Message composer")).toHaveValue("keep this while inspecting the run");
+    expect(screen.queryByRole("region", { name: "会话消息" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("消息输入框")).toHaveValue("keep this while inspecting the run");
 
-    await user.click(screen.getByRole("button", { name: "返回 Chat" }));
-    expect(screen.getByRole("region", { name: "Conversation messages" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Message composer")).toHaveValue("keep this while inspecting the run");
+    await user.click(screen.getByRole("button", { name: "返回对话" }));
+    expect(screen.getByRole("region", { name: "会话消息" })).toBeInTheDocument();
+    expect(screen.getByLabelText("消息输入框")).toHaveValue("keep this while inspecting the run");
   });
 
   it("keeps the blank-session draft available in the bottom trajectory composer", async () => {
     const user = userEvent.setup();
     renderWorkbench();
-    await user.type(screen.getByLabelText("Message composer"), "draft before inspecting");
-    await user.click(screen.getByRole("button", { name: "查看 Trajectory" }));
-    expect(screen.getAllByLabelText("Message composer")).toHaveLength(1);
-    expect(screen.getByLabelText("Message composer")).toHaveValue("draft before inspecting");
-    await user.click(screen.getByRole("button", { name: "返回 Chat" }));
-    expect(screen.getByLabelText("Message composer")).toHaveValue("draft before inspecting");
+    await user.type(screen.getByLabelText("消息输入框"), "draft before inspecting");
+    await user.click(screen.getByRole("button", { name: "查看执行轨迹" }));
+    expect(screen.getAllByLabelText("消息输入框")).toHaveLength(1);
+    expect(screen.getByLabelText("消息输入框")).toHaveValue("draft before inspecting");
+    await user.click(screen.getByRole("button", { name: "返回对话" }));
+    expect(screen.getByLabelText("消息输入框")).toHaveValue("draft before inspecting");
   });
 
   it("remembers the selected main view per session", async () => {
@@ -351,14 +351,14 @@ describe("WorkbenchLayout narrow window behavior", () => {
       messages: [{ kind: "assistant", id: "assistant-view-a", content: "A", createdAt: "2026-08-05T10:00:01.000Z" }],
     });
 
-    await user.click(screen.getByRole("button", { name: "查看 Trajectory" }));
+    await user.click(screen.getByRole("button", { name: "查看执行轨迹" }));
     expect(screen.getByTestId("trajectory-view")).toBeInTheDocument();
 
     rerender(<WorkbenchFixture sessions={sessions} activeSessionId="session-view-b" title="Session View B" messages={[{ kind: "assistant", id: "assistant-view-b", content: "B", createdAt: "2026-08-05T09:00:01.000Z" }]} />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "查看 Trajectory" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "查看执行轨迹" })).toBeInTheDocument());
 
     rerender(<WorkbenchFixture sessions={sessions} activeSessionId="session-view-a" title="Session View A" messages={[{ kind: "assistant", id: "assistant-view-a", content: "A", createdAt: "2026-08-05T10:00:01.000Z" }]} />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "返回 Chat" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "返回对话" })).toBeInTheDocument());
     expect(screen.getByTestId("trajectory-view")).toBeInTheDocument();
   });
 
@@ -367,12 +367,12 @@ describe("WorkbenchLayout narrow window behavior", () => {
     setViewportWidth(2048);
     renderWorkbench();
 
-    await user.click(screen.getByRole("button", { name: "Open panel" }));
+    await user.click(screen.getByRole("button", { name: "打开面板" }));
 
-    expect(screen.getByRole("separator", { name: "Resize preview panel" })).toHaveAttribute("aria-valuemax", "1228");
+    expect(screen.getByRole("separator", { name: "调整预览面板宽度" })).toHaveAttribute("aria-valuemax", "1228");
 
-    await user.click(screen.getByRole("button", { name: "Collapse session sidebar" }));
-    expect(screen.getByRole("separator", { name: "Resize preview panel" })).toHaveAttribute("aria-valuemax", "1488");
+    await user.click(screen.getByRole("button", { name: "收起会话侧栏" }));
+    expect(screen.getByRole("separator", { name: "调整预览面板宽度" })).toHaveAttribute("aria-valuemax", "1488");
   });
 
   it("returns from Settings to chat without an analysis entry", async () => {
@@ -380,12 +380,12 @@ describe("WorkbenchLayout narrow window behavior", () => {
     setViewportWidth(1120);
     renderWorkbench();
 
-    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "设置" }));
     expect(screen.getByRole("navigation", { name: "设置导航" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "分析观测" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "使用统计" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "归档会话" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "返回应用" }));
-    expect(screen.getByLabelText("Message composer")).toBeInTheDocument();
+    expect(screen.getByLabelText("消息输入框")).toBeInTheDocument();
   });
 });
