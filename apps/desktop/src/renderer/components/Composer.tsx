@@ -1983,7 +1983,7 @@ export function Composer({
           disabled={isLoading}
           onClick={onOpenReview}
         >
-          <span>变更审查</span>
+          <span>Review</span>
           {showCounts ? (
             <>
               <span className={REVIEW_ADDITION_CLASS}>+{reviewSummary.additions ?? 0}</span>

@@ -142,11 +142,11 @@ describe("Review workbench", () => {
     window.actspace = reviewBridge(emptySnapshot()) as unknown as Window["actspace"];
     render(<RightPanelProvider initialOpen><WorkbenchLayout sessions={[{ id: "session-review", title: "Review menu", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-review" title="Review menu" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
     await user.click(screen.getByRole("button", { name: "新建右侧面板对象" }));
-    await user.click(screen.getByRole("menuitem", { name: "变更审查" }));
+    await user.click(screen.getByRole("menuitem", { name: "Review" }));
     expect(await screen.findByRole("region", { name: "工作区变更审查" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "变更审查" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Review" })).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveClass("conversation-shell");
-    await user.click(screen.getByRole("button", { name: "关闭 变更审查" }));
+    await user.click(screen.getByRole("button", { name: "关闭 Review" }));
     await waitFor(() => expect(screen.queryByRole("region", { name: "工作区变更审查" })).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "新建右侧面板对象" })).toBeInTheDocument();
   });
@@ -155,7 +155,7 @@ describe("Review workbench", () => {
     const user = userEvent.setup();
     window.actspace = reviewBridge(emptySnapshot()) as unknown as Window["actspace"];
     render(<RightPanelProvider initialOpen><WorkbenchLayout sessions={[{ id: "session-launcher", title: "Review launcher", updatedAt: new Date().toISOString(), agentRunCount: 0, workspaceRoot: "/tmp/workspace" }]} activeSessionId="session-launcher" title="Review launcher" messages={[]} contextSnapshot={null} selectedWorkspaceRoot="/tmp/workspace" /></RightPanelProvider>);
-    await user.click(screen.getByRole("button", { name: "变更审查" }));
+    await user.click(screen.getByRole("button", { name: "Review" }));
     expect(await screen.findByRole("region", { name: "工作区变更审查" })).toBeInTheDocument();
   });
 
@@ -171,12 +171,12 @@ describe("Review workbench", () => {
       contextSnapshot: null,
     };
     const { rerender } = render(<RightPanelProvider initialOpen><WorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-a" /></RightPanelProvider>);
-    await user.click(screen.getByRole("button", { name: "变更审查" }));
+    await user.click(screen.getByRole("button", { name: "Review" }));
     await waitFor(() => expect(bridge.getReviewSnapshot).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-a" })));
 
     rerender(<RightPanelProvider initialOpen><WorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-b" /></RightPanelProvider>);
     await waitFor(() => expect(bridge.getReviewSnapshot).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" })));
-    expect(screen.getAllByRole("tab", { name: "变更审查" })).toHaveLength(1);
+    expect(screen.getAllByRole("tab", { name: "Review" })).toHaveLength(1);
   });
 
   it("keeps capped Review requests scoped to the selected file", async () => {

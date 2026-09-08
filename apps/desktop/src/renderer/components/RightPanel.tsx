@@ -655,7 +655,7 @@ function RightPanelLauncher({
         <LauncherButton label="子 Agent" icon={<MessageSquare size={19} />} disabled={!sessionId} onClick={() => sessionId && openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId })} />
         <LauncherButton label="文件" icon={<FolderTree size={19} strokeWidth={1.7} />} onClick={openFileTree} />
         <LauncherButton
-          label="变更审查"
+          label="Review"
           icon={<GitBranch size={19} strokeWidth={1.7} />}
           onClick={onOpenReview}
           disabled={!onOpenReview}

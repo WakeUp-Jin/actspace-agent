@@ -90,7 +90,7 @@ export function RightPanelObjectMenu({
               onClick={() => pick(onOpenReview)}
             >
               <GitBranch size={15} strokeWidth={2} />
-              变更审查
+              Review
             </button>
           ) : null}
           <button

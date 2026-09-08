@@ -453,7 +453,7 @@ export function WorkbenchLayout({
     openTab({
       id: "review",
       kind: "review",
-      title: "变更审查",
+      title: "Review",
       workspaceRoot: selectedWorkspaceRoot ?? undefined,
       scope: "uncommitted",
       refreshKey,

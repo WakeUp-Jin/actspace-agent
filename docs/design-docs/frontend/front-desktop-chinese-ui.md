@@ -24,7 +24,7 @@
 | Pinned / Workspaces | 已置顶 / 工作区 |
 | Fork / Archive | 分叉 / 归档 |
 | Files / Objects | 文件 / 对象 |
-| Review | 变更审查 |
+| Review | Review（保留英文功能名称） |
 | Context | 上下文 |
 | Terminal | 终端 |
 | Reply | 可视化回复 |
@@ -44,3 +44,5 @@
 相关 renderer 测试覆盖无障碍名称、菜单交互、中英文搜索、未知上下文分类及终端创建/恢复展示。独立预览入口为 `apps/desktop/src/renderer/test/fixtures/chinese-ui-preview.html`，只加载固定样例，不连接模型或持久化数据。
 
 浏览器检查浅深主题和窄布局；真实 Electron 检查主界面与通用设置。具体命令、结果和未覆盖项见执行摘要。
+
+2026-09-09 用户反馈：输入框按钮、右侧入口、对象菜单和页签统一保留 `Review` 名称；说明、状态和操作提示继续使用中文。

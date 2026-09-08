@@ -169,7 +169,7 @@ describe("Composer follow-up bar", () => {
 
     const reviewButton = screen.getByRole("button", { name: /审查待处理变更/ });
     const reviewOverflowButton = screen.getByRole("button", { name: "更多审查操作" });
-    expect(reviewButton).toHaveTextContent("变更审查+4253-5");
+    expect(reviewButton).toHaveTextContent("Review+4253-5");
     expect(reviewButton).toHaveClass("hover:bg-surface-subtle", "hover:border-line-strong", "hover:text-text-main");
     expect(reviewOverflowButton).toHaveClass("hover:bg-surface-subtle", "hover:border-line-strong", "hover:text-text-main");
     expect(screen.getByPlaceholderText("继续补充…")).toBeInTheDocument();
@@ -199,7 +199,7 @@ describe("Composer follow-up bar", () => {
   it("hides the review action when no review summary is available", () => {
     renderComposer();
 
-    expect(screen.queryByRole("button", { name: /变更审查/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Review/ })).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("继续补充…")).toBeInTheDocument();
   });
 

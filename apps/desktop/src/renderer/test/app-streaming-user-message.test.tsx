@@ -400,7 +400,7 @@ describe("App streaming user message", () => {
 
     renderApp();
 
-    expect(await screen.findByRole("button", { name: "审查待处理变更 +7 -2" })).toHaveTextContent("变更审查+7-2");
+    expect(await screen.findByRole("button", { name: "审查待处理变更 +7 -2" })).toHaveTextContent("Review+7-2");
     await waitFor(() => {
       expect(getReviewSnapshot).toHaveBeenCalledWith({
         workspaceRoot: "/tmp/workspace",
@@ -431,7 +431,7 @@ describe("App streaming user message", () => {
       });
     });
 
-    expect(await screen.findByRole("button", { name: "审查待处理变更 +10 -1" })).toHaveTextContent("变更审查+10-1");
+    expect(await screen.findByRole("button", { name: "审查待处理变更 +10 -1" })).toHaveTextContent("Review+10-1");
   });
 
   it("wires the current session hover preview through the App bridge", async () => {
