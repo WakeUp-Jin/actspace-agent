@@ -1,6 +1,6 @@
 # v2 执行安全入口
 
-> 状态：当前 v2 Tool Runtime、审批与 Host capability 安全边界。v1 Bash、动态 allowlist 和 ApprovalGate 文档已归档到 [`../v1-legacy/`](../v1-legacy/README.md)。
+> 状态：当前 v2 Tool Runtime、审批与 Host capability 安全边界。v1 Bash、动态 allowlist 和 ApprovalGate 文档已归档到 [`docs/archive/v1/design-docs/`](../../archive/v1/design-docs/README.md)。
 
 ## 当前事实源
 

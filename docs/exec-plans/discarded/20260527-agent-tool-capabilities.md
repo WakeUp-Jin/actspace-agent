@@ -19,9 +19,9 @@
 - `docs/SECURITY.md`
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
-- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
-- `docs/design-docs/v1-legacy/agent-runtime-backend-design.md`
-- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
+- `docs/archive/v1/design-docs/agent-runtime-current-module-map.md`
+- `docs/archive/v1/design-docs/agent-runtime-backend-design.md`
+- `docs/archive/v1/design-docs/agent-runtime-testing.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`

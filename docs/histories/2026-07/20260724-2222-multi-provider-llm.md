@@ -74,8 +74,8 @@
 - `packages/desktop/src/main/test/` 与 `packages/desktop/src/renderer/test/` 的多供应商回归
 - `docs/exec-plans/active/20260724-multi-provider-llm/`
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`
-- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/agent-runtime-current-module-map.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `docs/ARCHITECTURE.md`、`docs/SECURITY.md`、`docs/RELIABILITY.md`
 - `docs/releases/feature-release-notes.md`
 

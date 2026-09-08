@@ -35,6 +35,6 @@
 - `packages/agent-core/src/llm.ts`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/design-docs/agent-index.md`
-- `docs/design-docs/v1-legacy/agent-runtime-backend-design.md`
+- `docs/archive/v1/design-docs/agent-runtime-backend-design.md`
 - `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/ARCHITECTURE.md`

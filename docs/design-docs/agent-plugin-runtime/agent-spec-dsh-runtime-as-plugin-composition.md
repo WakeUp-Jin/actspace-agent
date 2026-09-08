@@ -1,5 +1,7 @@
 # DSH 风格 Runtime 插件组装规范
 
+> 文档等级：historical-decision。以下保留 v2 演进时的决策上下文；RuntimeHandle、CLI chat、旧 configPath 与阶段状态均属于当时方案，不是当前接口要求。当前实现先读[总体架构](agent-target-overall-architecture.md)和 [Runtime 与 Composition](agent-target-runtime-architecture.md)。
+
 > 状态：已批准；Phase 1–6 自动化实施完成，真实 Provider、Electron/Chrome 和发行宿主门禁待验收。本文件定义从当前“局部 Cordis 接入 + Runtime 手工组装”迁移到“Runtime 能力由 Cordis 插件树组装”的目标规范。
 >
 > 本规范不重新定义 Session 事件、Agent Loop 插入事件或 Tool Runtime 内核。它保留迁移前 Host、Bootstrap、RuntimeHandle 和插件边界的推导；当前实现以 `BootedProfile` 与各 Profile App Bundle Service 为准。

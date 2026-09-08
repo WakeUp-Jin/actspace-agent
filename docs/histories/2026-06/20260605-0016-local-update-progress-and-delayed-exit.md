@@ -46,4 +46,4 @@
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
 - `docs/CICD.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`

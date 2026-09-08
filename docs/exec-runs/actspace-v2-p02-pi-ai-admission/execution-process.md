@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-p02-pi-ai-admission.md`
+- **关联计划**：`docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-p02-pi-ai-admission.md`
 - **当前状态**：public API、三路 ActSpace fixture、双 backend、结构化错误与 lease/retry seam 通过；fresh registry/package、packaged Electron 与真实 provider gate 待外部 registry/credential
 
 ## 已验证

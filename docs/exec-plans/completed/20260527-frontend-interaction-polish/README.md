@@ -36,7 +36,7 @@
 
 - Composer / Context：`docs/design-docs/frontend/front-聊天输入框规范.md`
 - Sidebar / Workspaces / Session status：`docs/design-docs/frontend/front-左侧会话栏规范.md`
-- Settings：`docs/design-docs/frontend/front-设置页规范.md`
+- Settings：`docs/archive/v1/design-docs/front-设置页规范.md`
 - 页面级布局：`docs/design-docs/frontend/front-工作台布局与面板交互规范.md`
 
 补充素材：

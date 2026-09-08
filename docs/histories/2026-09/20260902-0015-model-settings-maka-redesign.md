@@ -41,7 +41,7 @@
 - `apps/desktop/src/renderer/test/provider-model-settings.test.tsx`
 - `apps/desktop/src/renderer/test/settings-page.test.tsx`
 - `docs/design-docs/frontend/front-模型设置页面-Maka重做规范.md`
-- `docs/exec-plans/active/20260901-actspace-model-settings-maka-redesign/README.md`
+- `docs/exec-plans/completed/20260901-actspace-model-settings-maka-redesign/README.md`
 - `docs/exec-runs/20260901-actspace-model-settings-maka-redesign/`
 
 ### 2026-09-03 追加验证

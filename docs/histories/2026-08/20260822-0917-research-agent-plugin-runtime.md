@@ -68,26 +68,26 @@ v2 允许重写整个后端，直接从实现计划开始会把参考系统的�
 - `docs/design-docs/agent-plugin-runtime/agent-spec-prompt-context-contributors.md`
 - `docs/design-docs/agent-plugin-runtime/agent-spec-agent-and-subagent.md`
 - `docs/design-docs/agent-plugin-runtime/agent-research-dsh-architecture.md`
-- `docs/design-docs/agent-plugin-runtime/agent-research-actspace-current-state.md`
+- `docs/archive/v1/design-docs/agent-research-actspace-current-state.md`
 - `docs/design-docs/agent-plugin-runtime/agent-research-capability-disposition.md`
 - `docs/exec-plans/README.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/README.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-p00-contracts-and-esm-island.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-p01-cordis-admission.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-p02-pi-ai-admission.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-p03-trusted-boot-and-composition.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-04-session-journal-and-persistence.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-05-llm-service-and-adapters.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-06-tool-runtime.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-07-runtime-projection.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-08-prompt-skills-and-compaction.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-09-built-in-tools-and-browser.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-10-main-agent-loop-inbox-and-todo.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-11-one-shot-subagent.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-12-base-profile-and-runtime-handle.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-13-desktop-host-and-fixed-renderer.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-14-cli-hosts-and-managed-esm.md`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-15-cutover-and-legacy-retirement.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/README.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-p00-contracts-and-esm-island.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-p01-cordis-admission.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-p02-pi-ai-admission.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-p03-trusted-boot-and-composition.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-04-session-journal-and-persistence.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-05-llm-service-and-adapters.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-06-tool-runtime.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-07-runtime-projection.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-08-prompt-skills-and-compaction.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-09-built-in-tools-and-browser.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-10-main-agent-loop-inbox-and-todo.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-11-one-shot-subagent.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-12-base-profile-and-runtime-handle.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-13-desktop-host-and-fixed-renderer.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-14-cli-hosts-and-managed-esm.md`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-15-cutover-and-legacy-retirement.md`
 
 ### ✅ Validation
 

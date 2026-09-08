@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-12-base-profile-and-runtime-handle.md`
+- **关联计划**：`docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-12-base-profile-and-runtime-handle.md`
 - **执行过程**：`docs/exec-runs/actspace-v2-plan-12-base-profile-and-runtime-handle/execution-process.md`
 - **执行结果**：候选实现完成，外部依赖/制品/前置门禁未完成
 

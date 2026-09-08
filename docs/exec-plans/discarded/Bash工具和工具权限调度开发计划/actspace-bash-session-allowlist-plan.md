@@ -30,7 +30,7 @@
 
 ## 设计来源
 
-- `docs/design-docs/v1-legacy/execution-safety-agent-bash-policy-allowlist-design.md`（本历史计划的设计依据）
+- `docs/archive/v1/design-docs/execution-safety-agent-bash-policy-allowlist-design.md`（本历史计划的设计依据）
 - `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
 - `docs/exec-plans/completed/actspace-tool-permission-scheduler-plan.md`
 - `docs/exec-plans/completed/actspace-tool-pause-session-boundary-plan.md`

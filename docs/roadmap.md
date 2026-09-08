@@ -26,5 +26,5 @@
 
 ## 历史能力
 
-- Kairos 自治模式曾在 v1 完成，已从 v2 产品入口和 Runtime 删除；历史设计保存在 `docs/design-docs/v1-legacy/`。
+- Kairos 自治模式曾在 v1 完成，已从 v2 产品入口和 Runtime 删除；历史设计保存在 `docs/archive/v1/design-docs/`。
 - fs-watch、Lab 和旧 Team / Room Runtime 不属于当前 v2 已交付能力。

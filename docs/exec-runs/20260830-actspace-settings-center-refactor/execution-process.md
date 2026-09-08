@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260830-actspace-settings-center-refactor/README.md`
+- **关联计划**：`docs/exec-plans/completed/20260830-actspace-settings-center-refactor/README.md`
 - **执行模式**：交互
 - **开始时间**：2026-08-30
 - **当前状态**：P0、P1、P2、P3、P4、P5 已完成；P6 待人工验收与交付收口

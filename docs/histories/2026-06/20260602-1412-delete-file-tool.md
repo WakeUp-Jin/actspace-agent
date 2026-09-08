@@ -40,4 +40,4 @@
 - `packages/desktop/src/renderer/components/messages/DeleteFileBlock.tsx`
 - `packages/desktop/src/renderer/components/messages/ToolLogLine.tsx`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
-- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
+- `docs/archive/v1/design-docs/agent-runtime-current-module-map.md`

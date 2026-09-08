@@ -11,7 +11,7 @@
    Desktop IPC / CLI argv + stdin
         ↓
 2. Profile bootstrap + App Bundle Service
-   managed ESM loader + BootedProfile + profile-specific service
+   managed ESM loader + BootedRuntimeProfile + profile-specific service
         ↓
 3. Agent semantics
    Session + Scope + Prompt/Context + AgentLoop
@@ -60,7 +60,7 @@ CLI `run` 默认 ephemeral；`--persist` 和 `--resume` 才使用持久 Session 
 - 发现 Static Manifest 与 Codec；
 - 激活 Cordis Behavior Entry；
 - 装配 Host capability、LLM、Tool、Prompt、Context、Agent 和 Session service；
-- 暴露当前进程内的 `BootedProfile`；
+- 暴露当前进程内的 `BootedRuntimeProfile`；
 - 管理 restart-only 状态和 graceful shutdown。
 
 应用 Bundle Service 是 Host 的产品操作入口，提供：

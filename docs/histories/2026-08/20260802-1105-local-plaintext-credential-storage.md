@@ -38,10 +38,10 @@
 - `packages/desktop/src/renderer/test/settings-page.test.tsx`
 - `docs/SECURITY.md`
 - `docs/QUALITY_SCORE.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
-- `docs/design-docs/v1-legacy/agent-runtime-host-neutral-runtime-and-cli.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
+- `docs/archive/v1/design-docs/agent-runtime-host-neutral-runtime-and-cli.md`
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`
-- `docs/design-docs/v1-legacy/model-context-duckcoding-multi-key-model-catalog.md`
+- `docs/archive/v1/design-docs/model-context-duckcoding-multi-key-model-catalog.md`
 - `docs/design-docs/tool-system/agent-image-generation-tool.md`
 - `docs/design-docs/tool-system/agent-web-tools.md`
 - `docs/releases/feature-release-notes.md`

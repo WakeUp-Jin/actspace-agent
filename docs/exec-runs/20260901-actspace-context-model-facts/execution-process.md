@@ -1,7 +1,7 @@
 # 执行过程：Context 模型事实与 Composer
 
 - 开始时间：2026-09-01（Asia/Shanghai）
-- 执行计划：`docs/exec-plans/active/20260901-actspace-context-model-facts/`
+- 执行计划：`docs/exec-plans/completed/20260901-actspace-context-model-facts/`
 - 交互模式：用户已批准设计与执行，按 P00 → P01 实施
 
 ## 时间线
@@ -38,3 +38,7 @@
 ## 验证记录
 
 待补充：类型检查、聚焦单测、文档检查，以及 Electron/手工视觉验收边界。
+
+## 2026-09-09 文档整理补验
+
+文档整理任务在中文界面任务收口后重跑全仓 typecheck/test，均通过（Desktop 97 文件、651 用例）。同步文档、主题和 diff 检查，G1 完成，计划移入 completed；G2 人工项未执行，原始结果保留。

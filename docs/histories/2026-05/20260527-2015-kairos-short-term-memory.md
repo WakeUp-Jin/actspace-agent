@@ -41,7 +41,7 @@
 - `packages/agent-core/src/kairos/storage/test/{short-memory-store,ring-buffer}.test.ts`（新增 12 单测）
 - `packages/agent-core/src/kairos/context/test/short-term.test.ts`（新增 6 单测）
 - `packages/agent-core/src/kairos/compression/test/compressor.test.ts`（新增 2 单测）
-- `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md`（plan 完成清单更新）
+- `docs/archive/v1/design-docs/agent-kairos-autonomous-mode.md`（plan 完成清单更新）
 
 ### ✅ 验证结果
 

@@ -6,7 +6,7 @@
 
 ## 设计来源
 
-- `docs/design-docs/v1-legacy/agent-runtime-backend-design.md`
+- `docs/archive/v1/design-docs/agent-runtime-backend-design.md`
 - `.agents/skills/llm-agent-dev/references/context/overview.md`（模块导航和阅读顺序）
 - `.agents/skills/llm-agent-dev/references/context/mgmt-context-architecture.md`（核心：Context/Message 类型、SystemPart、ContextManager 编排流程）
 - `.agents/skills/llm-agent-dev/references/context/type-system-prompt.md`（分段式系统提示词）

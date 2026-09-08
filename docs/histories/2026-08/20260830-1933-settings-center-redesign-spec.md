@@ -27,7 +27,7 @@
 ### 📁 Files Modified
 
 - `docs/design-docs/frontend/front-设置中心重构规范.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `docs/design-docs/frontend/README.md`
 - `docs/histories/2026-08/20260830-1933-settings-center-redesign-spec.md`
 
@@ -66,7 +66,7 @@
 
 ### 🛠 Changes Overview
 
-- 新增 `docs/exec-plans/active/20260830-actspace-settings-center-refactor/README.md`。
+- 新增 `docs/exec-plans/completed/20260830-actspace-settings-center-refactor/README.md`。
 - 将执行计划登记到 `docs/exec-plans/README.md` 的当前进行中列表。
 - 冻结 P0-P6 的阶段边界、数据契约、迁移与回退策略、测试矩阵以及 Electron 人工验收门禁。
 
@@ -76,7 +76,7 @@
 
 ### 📁 Files Modified
 
-- `docs/exec-plans/active/20260830-actspace-settings-center-refactor/README.md`
+- `docs/exec-plans/completed/20260830-actspace-settings-center-refactor/README.md`
 - `docs/exec-plans/README.md`
 - `docs/histories/2026-08/20260830-1933-settings-center-redesign-spec.md`
 

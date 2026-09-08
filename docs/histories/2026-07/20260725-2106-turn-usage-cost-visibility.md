@@ -33,4 +33,4 @@ Agent turn 可能包含多次模型调用。只展示最终正文那次调用会
 - `packages/desktop/src/renderer/components/ConversationView.tsx`
 - `packages/desktop/src/renderer/components/UsageStatisticsPage.tsx`
 - `docs/design-docs/frontend/front-中间消息区规范.md`
-- `docs/design-docs/frontend/front-usage-statistics.md`
+- `docs/archive/v1/design-docs/front-usage-statistics.md`

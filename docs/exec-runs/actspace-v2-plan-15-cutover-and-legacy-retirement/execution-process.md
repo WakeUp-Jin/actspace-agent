@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-15-cutover-and-legacy-retirement.md`
+- **关联计划**：`docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-15-cutover-and-legacy-retirement.md`
 - **当前状态**：源码交付完成；真实 Provider、Chrome 扩展与签名发布保留为人工验收边界
 - **检查时间**：2026-08-23
 

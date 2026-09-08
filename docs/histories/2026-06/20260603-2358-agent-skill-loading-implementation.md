@@ -43,6 +43,6 @@ Skill 加载需要让 Agent 知道可用能力，但不能把所有 Skill 正文
 - `packages/desktop/src/main/agent-runtime-context.ts`
 - `packages/desktop/src/main/agent-turn.ts`
 - `packages/desktop/src/main/test/agents-md-service.test.ts`
-- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
+- `docs/archive/v1/design-docs/agent-runtime-current-module-map.md`
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 - `docs/exec-plans/completed/20260603-agent-skill-loading.md`

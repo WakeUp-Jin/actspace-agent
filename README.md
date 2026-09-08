@@ -38,10 +38,10 @@ Actspace 是一个本地优先的 Agent 桌面应用，也是一套可观察、�
 - DeepSeek、Kimi、OpenRouter 模型配置，以及 provider 级代理和 usage 统计。
 - 文件读写、Grep / Glob、Bash、Web、图片分析和图片生成等工具能力。
 - 工具参数校验、策略、审批、执行、结果与 Session-owned artifact。
-- 固定 Desktop renderer，通过 Runtime Projection 展示消息、工具、Context、Usage、诊断和分析数据。
+- 固定 Desktop renderer，通过 Runtime Projection 展示消息、工具、Context、Usage、Trajectory 和诊断数据。
 - Browser Bridge 保留为顶层 Host capability；真实 Chrome 链路仍属于独立发布验收门禁。
 
-Team、Room、Kairos、Lab 和 fs-watch 不属于当前 v2 已交付能力。历史设计保存在 [`docs/design-docs/v1-legacy/`](docs/design-docs/v1-legacy/)，未来能力以 [`docs/roadmap.md`](docs/roadmap.md) 和对应 execution plan 为准。
+Team、Room、Kairos、Lab 和 fs-watch 不属于当前 v2 已交付能力。历史设计保存在 [`docs/archive/v1/design-docs/`](docs/archive/v1/design-docs/)，未来能力以 [`docs/roadmap.md`](docs/roadmap.md) 和对应 execution plan 为准。
 
 ## 开始使用
 
@@ -105,7 +105,7 @@ apps/cli ─────┘              │
 - `apps/desktop`：Electron main、preload 和固定 renderer。
 - `apps/cli`：managed ESM CLI Host。
 - `apps/site`：Astro 官网和公开内容。
-- `packages/runtime`：BootedProfile、Profile / Bundle / Patch、Projection 与 shutdown；Session/Agent 操作由对应 App Bundle Service 提供。
+- `packages/runtime`：BootedRuntimeProfile、Profile / Bundle / Patch、Projection 与 shutdown；Session/Agent 操作由对应 App Bundle Service 提供。
 - `packages/core`、`packages/session`、`packages/llm`、`packages/context`、`packages/prompt`、`packages/tools`、`packages/subagent`、`packages/compaction`：领域 package 与真实 Plugin Entry。
 - `packages/shared`：跨进程和 Host-facing 公共契约。
 - `browser-bridge`：独立 Go / Chrome Extension Host capability，不属于 pnpm workspace plugin 目录。
@@ -118,7 +118,8 @@ apps/cli ─────┘              │
 - [Session 格式](docs/design-docs/agent-plugin-runtime/agent-spec-session-format-v1.md)
 - [Tool Runtime ABI](docs/design-docs/agent-plugin-runtime/agent-spec-tool-runtime-abi.md)
 - [存储与可观测性边界](docs/design-docs/core-storage-and-observability.md)
-- [v1 历史设计归档](docs/design-docs/v1-legacy/README.md)
+- [文档导航](docs/README.md)
+- [v1 历史资料归档](docs/archive/v1/README.md)
 
 ## 一些闲谈
 

@@ -29,9 +29,9 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/v1-legacy/model-context-agent-cache-loss-audit.md`
+- `docs/archive/v1/design-docs/model-context-agent-cache-loss-audit.md`
 - `docs/design-docs/index.md`
-- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
+- `docs/archive/v1/design-docs/agent-runtime-current-module-map.md`
 - `docs/design-docs/core-storage-and-observability.md`
 - `docs/exec-plans/active/actspace-cache-loss-audit-plan.md`
 - `scripts/analyze-cache-audit.mjs`

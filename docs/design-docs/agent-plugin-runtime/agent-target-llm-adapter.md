@@ -1,6 +1,6 @@
 # ActSpace v2 LLM Adapter 目标设计
 
-> 状态：采用 pi-ai 的方向与 ActSpace 所有权边界有条件确认；proxy、结构化错误和 packaged runtime 门禁尚未通过。
+> 状态：pi-ai adapter、路由/代理和结构化错误契约已实施并有自动化记录；真实 Provider 与 packaged lifecycle 仍需对应执行摘要中的外部验收，不因本次文档校准宣称通过。
 
 ## 1. 决策
 

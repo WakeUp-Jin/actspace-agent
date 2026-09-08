@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-状态：参考分析归档。本文是 v1 Bash 工具设计的调研底稿；历史正式设计已移到 `docs/design-docs/v1-legacy/execution-safety-agent-bash工具设计文档.md`，当前 v2 事实来源是 `docs/design-docs/execution-safety/README.md`。
+状态：参考分析归档。本文是 v1 Bash 工具设计的调研底稿；历史正式设计已移到 `docs/archive/v1/design-docs/execution-safety-agent-bash工具设计文档.md`，当前 v2 事实来源是 `docs/design-docs/execution-safety/README.md`。
 
 本文回答三个问题：
 
@@ -12,7 +12,7 @@
 
 与既有设计的分工：
 
-- `docs/design-docs/v1-legacy/execution-safety-agent-bash-policy-allowlist-design.md`：历史上负责“命令能不能跑”的 v1 设计。
+- `docs/archive/v1/design-docs/execution-safety-agent-bash-policy-allowlist-design.md`：历史上负责“命令能不能跑”的 v1 设计。
 - 本文：管"命令怎么跑、输出怎么回、跑不完怎么办"（执行模型、输出管道、后台任务、沙盒执行层）。
 - 两文共享 Phase 3 真沙盒路线，沙盒的**策略入口**在 allowlist 设计里，**执行层机制**在本文里。
 

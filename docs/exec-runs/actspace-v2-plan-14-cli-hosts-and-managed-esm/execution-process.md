@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-14-cli-hosts-and-managed-esm.md`
+- **关联计划**：`docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-14-cli-hosts-and-managed-esm.md`
 - **执行模式**：交互
 - **开始时间**：2026-08-22
 - **当前状态**：v2-only run/chat、TTY/双 SIGINT 与 Host DTO parity 已完成；managed 制品、真实 Provider 和依赖门禁未完成

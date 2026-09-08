@@ -8,6 +8,6 @@
 
 当前入口：
 
-- [设置页规范](front-设置页规范.md)
+- [设置中心规范](front-设置中心重构规范.md)
 - [存储与可观测性](../core-storage-and-observability.md)
 - [Agent Run 与 Turn 分层](../agent-runtime/agent-turn-layers.md)

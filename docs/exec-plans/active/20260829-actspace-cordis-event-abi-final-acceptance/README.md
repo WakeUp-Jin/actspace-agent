@@ -57,7 +57,7 @@ Host 组装、LLM adapter、Runtime boot
   packages/runtime/src/runtime/boot.ts
         |
         v
-RuntimeHandle / Headless / Agent Loop
+Profile Boot / Headless Runner / Agent Loop
   packages/runtime/src/runtime/runtime-handle.ts
   packages/runtime/src/runtime/session-controller.ts
   packages/headless/src/runner.ts
@@ -334,7 +334,7 @@ pnpm run check:packages
 
 通过标准：
 
-- `run` 使用唯一 `RuntimeHandle` 完成 boot、headless run、session flush、`session/end-seed`、dispose 和稳定退出；
+- `run` 使用生产 Profile 与 Headless runner 完成 boot、headless run、session flush、`session/end-seed`、dispose 和稳定退出；
 - 默认 run 是 ephemeral；`--persist` 写入 `dataRoot/sessions-v2/<sessionId>/journal.jsonl`；`--resume <sessionId>` 继续同一 Session；
 - SIGINT 返回 130，保留已经提交的 chunk/result，并且第二次 SIGINT 不留下悬挂进程；
 - CLI stdout 的 JSON/JSONL 是稳定协议，diagnostic 不混入 stdout，observer 失败不改变业务 exit code；
@@ -571,3 +571,9 @@ Next action:
 - 2026-08-29：将原先混在 P05 里的“实现完成”和“最终验收”分开；本计划只负责主 Agent 的证据闭环。
 - 2026-08-29：clean checkout 改为临时隔离副本验证，避免破坏当前工作区；同时明确它不是远端 commit 的证明。
 - 2026-08-29：工具 executor body 保持不动，工具验收只检查 ToolRuntime 外壳、权限/审批、事件和结果 parity。
+
+## 2026-09-09 文档复核
+
+DSH 事件模型中的 seq 起点已按当前 Session Format v1、Journal 与实现证据改为从 0 开始；这项是文档校准，不是 ABI 或数据迁移。旧执行摘要保留当时发现冲突的记录。
+
+P05 deterministic retry/error CLI/process fixture 仍待提供；本次未重跑 P00–P05 或真实 Provider，不改变原验收结果，也不满足最终归档条件。

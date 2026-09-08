@@ -34,7 +34,7 @@
 - `packages/desktop/src/renderer/styles.css`（核心：~30 处字号/字重/letter-spacing 改动 + 全局 body feature-settings）
 - `docs/design-docs/frontend/front-全局视觉语言规范.md`（字体栈、字号阶梯、字重段重写，新增「字体特性」段）
 - `docs/design-docs/frontend/front-左侧会话栏规范.md`（「分组标题统一规范」与「字号基准」段重写）
-- `docs/design-docs/frontend/front-usage-statistics.md`（「字体与数字」段重写）
+- `docs/archive/v1/design-docs/front-usage-statistics.md`（「字体与数字」段重写）
 
 ### ✅ Verification
 

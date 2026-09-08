@@ -41,7 +41,7 @@
 ## 必读
 
 - `AGENTS.md`
-- `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md` 的「架构总览」「Tick 调度规则」「上下文构成」「actspace 版 KAIROS 系统提示词」「与主 Agent 的交互边界」「错误处理与熔断」六章
+- `docs/archive/v1/design-docs/agent-kairos-autonomous-mode.md` 的「架构总览」「Tick 调度规则」「上下文构成」「actspace 版 KAIROS 系统提示词」「与主 Agent 的交互边界」「错误处理与熔断」六章
 - `.agents/skills/llm-agent-dev/references/agent-runtime/cron-job-kaiors.md`（通用 KAIROS 概念）
 - `.agents/skills/llm-agent-dev/examples/kairos-runner.ts`（参考实现伪代码）
 - `packages/agent-core/src/engine/agent.ts`（理解 `createAgentForSession` + `runAgentLoop` 现有形态）

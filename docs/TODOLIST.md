@@ -1,12 +1,15 @@
 # TODO List
 
-这个文件只记录当前需要持续推进的仓库级任务。复杂任务的范围、依赖和验收以 `docs/exec-plans/active/` 中的计划为准。
+这个文件只记录当前需要持续推进的仓库级任务。复杂任务的范围和下一步以 active 计划为准；实现完成后的人工门禁继续在 completed 计划及执行摘要中跟踪。
 
 ## 当前焦点
 
 | 事项 | 状态 | 入口 | 下一步 |
 | --- | --- | --- | --- |
-| ActSpace v2 多包插件化发布门禁 | 实现完成，外部门禁待验收 | `docs/exec-plans/active/20260824-actspace-v2-package-layout-and-plugin-packaging/README.md` | 继续真实 Provider、Electron、DMG/签名验收；Browser Bridge 按用户要求从本轮分离，后续单独修复。 |
+| ActSpace v2 多包插件化发布门禁 | 实现完成，外部门禁待验收 | `docs/exec-plans/completed/20260824-actspace-v2-package-layout-and-plugin-packaging/README.md` | 继续真实 Provider、Electron、DMG/签名验收；Browser Bridge 按用户要求从本轮分离，后续单独修复。 |
+| P1/P2 与 Session Projection 收口 | 部分实施 | [计划索引](exec-plans/README.md) | 完成 G1/G2、最终消息映射和相应回归；不重复启动已交付的 contract slices。 |
+| Cordis 最终验收 | P05 阻塞 | [验收计划](exec-plans/active/20260829-actspace-cordis-event-abi-final-acceptance/README.md) | 补 deterministic retry/error fixture 并完成证据闭环。 |
+| Context 模型事实 | 实现与自动化回归完成，人工待验收 | [Context 计划](exec-plans/completed/20260901-actspace-context-model-facts/README.md) | 完成 Electron、真实 Provider 与截图 G2 人工验收。 |
 | 前端 UI 组件基础 | 待执行 | `docs/exec-plans/active/frontend-ui-components-foundation.md` | 先确认组件边界和迁移顺序，再以小切片替换重复实现。 |
 
 ## 未来方向

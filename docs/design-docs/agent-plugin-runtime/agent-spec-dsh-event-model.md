@@ -1,6 +1,6 @@
 # DSH 风格 Session 事件模型
 
-> 状态：已确认目标设计，等待 execution plan 实施
+> 状态：13 个核心事件与默认 Loop 已实现；最终 CLI retry/error 验收仍待完成。2026-09-09 按 ActSpace 当前 codec / Session Format v1 校准 seq 描述。
 >
 > 日期：2026-08-29
 
@@ -8,7 +8,7 @@
 
 ## 1. 依据与边界
 
-事实来源按以下优先级排列：
+当前事件词汇与 envelope 以 ActSpace `packages/session/journal/src/core-codecs.ts`、默认 Agent Loop 和 [Session Format v1](agent-spec-session-format-v1.md)为准。以下保留 2026-08-29 设计时的参考资料顺序，不覆盖当前实现：
 
 1. `tmp/deepseek-harness/packages/core/session/src/types.ts` 与 `tmp/deepseek-harness/packages/core/agent-loop/src/agent.ts` 的源码行为；
 2. `tmp/deepseek-harness/docs/persistence-catalog.md` 的持久化目录；
@@ -97,7 +97,7 @@ flowchart TD
 
 ```text
 recordKind   = "session-event"
-seq          = 单调递增的 session 内序号（从 1 开始）
+seq          = 从 0 开始严格连续的 session 内序号；Header 不占 seq
 type         = 上述事件名
 eventVersion = 事件 codec 版本，当前从 1 开始
 criticality  = "core" | "extension"
@@ -108,7 +108,7 @@ surface      = "internal" | "user" | "assistant" | "tool-result"
 provenance   = { sourceEventSeqs?, parentSeq?, generatedBy? }
 ```
 
-`seq` 只由 Journal 分配，调用方不得自行生成。`provenance.sourceEventSeqs` 用于把收束后的 `assistant/message` 链回它所聚合的 chunk；任何 projection 都可以依此去重和重建。
+`seq` 只由 Journal 分配，调用方不得自行生成。2026-09-09 按当前 codec、Journal 和 [Session Format v1](agent-spec-session-format-v1.md) 校准起点；此前从 1 开始的描述是文档错误，本次不修改任何事件或用户数据。`provenance.sourceEventSeqs` 用于把收束后的 `assistant/message` 链回它所聚合的 chunk；任何 projection 都可以依此去重和重建。
 
 Journal 的 append 是唯一提交点：先校验 codec 和序号，再写入文件并完成 flush/同步，最后异步发布 `session/event` 通知。通知失败不得回滚已提交事实。
 

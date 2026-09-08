@@ -21,7 +21,7 @@
 - `docs/CODING_BEHAVIOR.md`
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
-- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
+- `docs/archive/v1/design-docs/agent-runtime-testing.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`
 - `.agents/skills/llm-agent-dev/references/llm/llm-service.md`
 - `.agents/skills/llm-agent-dev/references/tools/overview.md`
@@ -409,7 +409,7 @@ packages/agent-core/src/prompt/kimi-assistants/
 - `docs/ARCHITECTURE.md`
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
-- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
+- `docs/archive/v1/design-docs/agent-runtime-testing.md`
 - `.env.example`
 - `README.md`
 - `docs/histories/YYYY-MM/*.md`

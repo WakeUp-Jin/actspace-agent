@@ -1,6 +1,6 @@
 # P2：Agent Contract Matrix 自动生成与漂移门禁
 
-状态：实施中；generator、双产物、`--check`、fixtures 和 CI wiring 已交付。
+状态：部分实施，保留 active。generator、双产物、字节漂移检查与 CI wiring 已交付；2026-09-09 复核发现原计划要求的语义 validator 和负向 fixtures 尚未完整实现。
 
 ## 目标与依赖
 
@@ -71,5 +71,15 @@ P2 回退只删除生成脚本、产物和 CI 门禁，不触碰 P1 Runtime/Sess
 - [x] 建立输入 allowlist 和 schema fixture。
 - [x] 完成 normalizer、validator 和稳定 sourceDigest。
 - [x] 生成 JSON/Markdown 并提供 `--check`。
-- [x] 完成 drift fixtures、CI wiring 和定向验证。
-- [x] 向 release/review 交接产物与人工门禁清单；真实 Provider/宿主与 CLI G1 仍标记为外部/后续门禁。
+- [x] 完成现有确定性、事件计数、重复 ID 与 notification veto 测试及 CI wiring。
+- [ ] 补齐原计划中的语义 validator 与负向 drift fixtures：manifest/inject/provide 一致性、依赖环、Consumer 私有 Provider 依赖、Host ceiling、composition digest 和 sourceRef/public export 有效性。
+- [ ] 完成上述语义门禁后再向 release/review 最终交接；真实 Provider/宿主与 CLI G1 仍独立跟踪。
+
+## 2026-09-09 实施范围复核
+
+- [P1/P2 联合执行摘要](../../../exec-runs/20260829-actspace-p1-session-core-persistence/execution-summary.md)记录了当时 G2 通过；该历史记录保持原样。本次不能仅依据旧摘要和已勾选清单归档。
+- 本次 `pnpm test:contract-matrix` 2/2 通过。首次 `--check` 发现后续 7 个 package 的 exports/dependencies 已变化；使用现有生成器刷新 JSON/Markdown 后，`pnpm run gen:contract-matrix --check` 通过。未修改生成器、allowlist 或产品代码。
+- `validateRows()` 当前只覆盖重复 ID、缺 owner/sourceRefs、绝对路径、缺 provider ID、13/9/5 计数和 notification veto 等基础检查；`parseComposition()` 主要提取声明与固定 Profile 结构，尚未验证最终 ResolvedComposition/BootManifest 的全部语义。
+- 只读内存负向探针将 plugin 的 inject/provide 改为未声明 Service、将 sourceRef 改为不存在的相对路径、加入无效 composition digest，`validateRows()` 均返回 0 个 error。这些探针不是新增仓库测试，也不能证明未探测场景通过。
+- 下一步按上方未完成清单逐项补 validator 与最小负向 fixture，明确哪些校验复用领域 verifier、哪些由 generator 执行；随后重跑 `--check` 和 G2。不能用 sourceDigest 字节变化检测代替语义合法性验证。
+- 当前矩阵只覆盖显式 allowlist；新增包/插件需要同步维护输入。完成后再按生命周期移入 completed，G1 仍由 [总计划](../20260829-actspace-p1-p2-contract-and-composition/README.md)负责。

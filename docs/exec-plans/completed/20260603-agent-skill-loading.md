@@ -52,11 +52,11 @@
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
 - `docs/design-docs/tool-system/agent-skill-loading.md`
-- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
-- `docs/design-docs/v1-legacy/agent-runtime-backend-design.md`
+- `docs/archive/v1/design-docs/agent-runtime-current-module-map.md`
+- `docs/archive/v1/design-docs/agent-runtime-backend-design.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
-- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
+- `docs/archive/v1/design-docs/agent-runtime-testing.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`
 - `.agents/skills/llm-agent-dev/references/foundations/skill-integration.md`
 
@@ -73,7 +73,7 @@
 - `packages/desktop/src/main/test/agents-md-service.test.ts`
 - `packages/desktop/src/main/test/context-describe-service.test.ts`
 - `packages/shared/src/context-buckets.ts`
-- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
+- `docs/archive/v1/design-docs/agent-runtime-current-module-map.md`
 - `docs/histories/`
 
 ## 契约草案
@@ -142,7 +142,7 @@ Agent 读取 `SKILL.md` 后，再以该文件所在目录为基准解析正文�
    - 验证：context/test 或 engine/test 中加入 skills bucket 断言。
 
 5. 文档同步与收尾
-   - 更新 `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`。
+   - 更新 `docs/archive/v1/design-docs/agent-runtime-current-module-map.md`。
    - 如 context state 文档受影响，更新 `docs/design-docs/model-context/agent-token-usage-and-context-state.md`。
    - 按 `docs/HISTORY_GUIDE.md` 记录本次代码变更。
    - 如实现中发现设计变更，回写 `docs/design-docs/tool-system/agent-skill-loading.md` 和本计划决策记录。

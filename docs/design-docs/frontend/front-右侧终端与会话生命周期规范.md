@@ -352,7 +352,7 @@ Terminal 与 Agent Bash 使用独立 registry，但共享“退出时不留孤�
 
 - Unix 优先向 shell 进程组发送温和终止信号，宽限后再强制 kill。
 - 如 `node-pty` 不能稳定终止子孙进程，macOS 可在关闭路径中查询后代并按叶子到根的顺序清理。
-- `before-quit` 必须先收割 Terminal Registry，再等待 RuntimeHandle、provider 和 Host 扩展完成收尾。
+- `before-quit` 必须先收割 Terminal Registry，再等待 Profile shutdown、provider 和 Host 扩展完成收尾。
 - 清理幂等：重复 close、exit 竞态、BrowserWindow 销毁和 App 退出同时发生时不重复发送错误或死锁。
 
 ## 原生模块打包与签名

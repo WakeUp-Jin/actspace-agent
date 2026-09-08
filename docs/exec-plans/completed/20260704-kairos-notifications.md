@@ -1,6 +1,6 @@
 # Kairos 通知中心实施计划
 
-设计依据：`docs/design-docs/v1-legacy/agent-kairos-notifications.md`。
+设计依据：`docs/archive/v1/design-docs/agent-kairos-notifications.md`。
 
 ## M1 agent-core：契约 + 工具 + 存储 + controller 集成
 

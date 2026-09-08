@@ -43,7 +43,7 @@
 - `packages/desktop/src/renderer/components/settings/tool-catalog.ts`
 - `docs/design-docs/browser/agent-browser-use-index.md`
 - `docs/design-docs/browser/agent-browser-use-integration-design.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 
 ### ✅ Verification
 

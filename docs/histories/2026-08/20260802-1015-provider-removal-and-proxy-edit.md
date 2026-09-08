@@ -35,7 +35,7 @@
 - `packages/desktop/src/renderer/test/provider-model-settings.test.tsx`
 - `packages/desktop/src/renderer/test/settings-page.test.tsx`
 - `packages/desktop/src/main/test/settings-service.test.ts`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`
 - `docs/SECURITY.md`
 - `docs/releases/feature-release-notes.md`

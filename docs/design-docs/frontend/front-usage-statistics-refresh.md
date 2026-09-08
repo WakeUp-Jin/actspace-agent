@@ -1,6 +1,6 @@
 # 设置内使用统计页面更新
 
-> 状态：2026-09-07 实现完成；浏览器布局已检查，真实 Electron 验收尚未完成。继承[设置中心规范](front-设置中心重构规范.md)；本文补充使用统计的目标视觉与交互。旧的[独立 Usage 仪表盘](front-usage-statistics.md)仅供历史追溯。
+> 状态：2026-09-07 实现完成；浏览器布局已检查，真实 Electron 验收尚未完成。继承[设置中心规范](front-设置中心重构规范.md)；本文补充使用统计的目标视觉与交互。旧的[独立 Usage 仪表盘](../../archive/v1/design-docs/front-usage-statistics.md)仅供历史追溯。
 > [执行计划](../../exec-plans/completed/20260906-actspace-usage-statistics/README.md) · [目录与费用契约](../model-context/agent-model-catalog-and-usage-cost.md)
 
 ## 问题与参考

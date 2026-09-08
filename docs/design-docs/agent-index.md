@@ -1,6 +1,6 @@
 # Agent 设计文档
 
-本入口汇总 `packages/runtime` 与各领域 workspace package、Agent Run/Turn/LLM Call、模型与上下文、工具系统、权限和协作形态相关的当前 v2 设计原则。这里回答“为什么这么设计、边界在哪里、哪些方案被排除”；具体实施步骤放在 `docs/exec-plans/`。已退役的 v1 Runtime、Kairos、Lab、旧评估和旧工具方案见 [`v1-legacy/`](v1-legacy/)，不作为新功能默认事实来源。
+本入口汇总 `packages/runtime` 与各领域 workspace package、Agent Run/Turn/LLM Call、模型与上下文、工具系统、权限和协作形态相关的当前 v2 设计原则。这里回答“为什么这么设计、边界在哪里、哪些方案被排除”；具体实施步骤放在 `docs/exec-plans/`。已退役的 v1 Runtime、Kairos、Lab、旧评估和旧工具方案见 [v1 归档](../archive/v1/README.md)，不作为新功能默认事实来源。
 
 Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；本入口保留在根层，因为它需要跨越全部 Agent 专题。
 
@@ -13,7 +13,7 @@ Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；�
 - `agent-plugin-runtime/agent-target-agent-core.md`：ActSpace 自有 Agent Core、固定 Boot 边界和核心不变量。
 - `agent-plugin-runtime/agent-target-session-and-context.md`：append-only Session、Surface、Event Codec 和 Context assembly。
 - `agent-plugin-runtime/agent-target-llm-adapter.md`：pi-ai Adapter 边界、proxy/error/usage 门禁。
-- `agent-plugin-runtime/agent-target-runtime-architecture.md`：Profile / Bundle / Patch 的历史目标基线（RuntimeHandle 表述已由 Profile-first 决策替代）。
+- `agent-plugin-runtime/agent-target-runtime-architecture.md`：当前 Profile / Bundle / Patch、生产启动类型、Host 与 shutdown 边界。
 - `agent-plugin-runtime/agent-spec-plugin-runtime-abi.md`：受信任插件来源、manifest / codec / behavior 分离、稳定 identity、Host ceiling、restart-only 和生命周期公共契约。
 - `agent-plugin-runtime/agent-spec-session-format-v1.md`：raw JSONL Session、Header / Event Envelope、Surface、codec、repair、fork、compaction 和 writer lease 规范。
 - `agent-plugin-runtime/agent-spec-tool-runtime-abi.md`：Tool definition / executor、prepared lease、policy、approval、checkpoint、并发和 result 公共契约。
@@ -26,10 +26,10 @@ Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；�
 - `agent-plugin-runtime/agent-spec-profile-bundle-patch-layering.md`：Profile / Bundle / Patch 组合、Host capability ceiling 与唯一 BootManifest。
 - `agent-plugin-runtime/agent-spec-contract-matrix-generation.md`：声明驱动的事件、Service、Composition、package export 契约矩阵生成和漂移门禁。
 - `agent-plugin-runtime/agent-research-dsh-architecture.md`：DSH 的 Cordis 生命周期、配置组合、Agent 语义和 Host / Client 扩展机制。
-- `agent-plugin-runtime/agent-research-actspace-current-state.md`：v1 Runtime、Context、Tools、Persistence、Desktop 与 Kairos 耦合的研究证据；v2 去留以相邻目标文档为准。
+- [v1 后端研究](../archive/v1/design-docs/agent-research-actspace-current-state.md)：v1 Runtime、Context、Tools、Persistence、Desktop 与 Kairos 耦合的研究证据；v2 去留以相邻目标文档为准。
 - `agent-plugin-runtime/agent-research-capability-disposition.md`：现有能力的 Keep / Adapt / Rewrite / Delete / Defer 判断。
 
-该专题已经确定 v2 产品范围和公共语义，并已生成完整交付计划与当前阶段的 [P1/P2 总 execution plan](../exec-plans/active/20260829-actspace-p1-p2-contract-and-composition/README.md)。当前实现入口已经切换到 v2；P1/P2 尚待实施，外部 registry、packaged Electron 和真实 Provider/Browser 验收仍需在可用环境执行。
+该专题已经确定 v2 产品范围和公共语义，并已生成完整交付计划与当前阶段的 [P1/P2 总 execution plan](../exec-plans/active/20260829-actspace-p1-p2-contract-and-composition/README.md)。当前实现入口已经切换到 v2；P1/P2 contract slices 已交付，全域收口仍待验证，外部 registry、packaged Electron 和真实 Provider/Browser 验收仍需在可用环境执行。
 
 ## Runtime 观测层
 
@@ -67,9 +67,9 @@ Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；�
 - `collaboration/agent-subagent-runtime.md`：当前一次性 Subagent 与 child Session 边界。
 - `collaboration/agent-explore-subagent.md`：当前 Explore 静态 Preset 与只读工具限制。
 - `collaboration/agent-members.md`：未来 Room / Team 产品设计中的持久 Agent Member，不是当前 v2 Runtime 事实。
-- `collaboration/agent-form-room.md`：未来 Agent Room 产品设计；实现机械结构尚未迁入 v2。
-- `collaboration/agent-form-team.md`：未来 Agent Team 产品设计；实现机械结构尚未迁入 v2。
+- `collaboration/agent-form-room.md`：未来 Agent Room 产品意图与不变量，完整旧实施稿已归档。
+- `collaboration/agent-form-team.md`：未来 Agent Team 产品意图与不变量，完整旧实施稿已归档。
 
 ## 历史设计
 
-- `v1-legacy/README.md`：v1 旧 Runtime、旧 CLI、Kairos、Lab、旧评估、旧 Todo、fs-watch 和 DuckCoding 文字模型设计的归档规则与替代入口。
+- [v1 归档](../archive/v1/README.md)：v1 旧 Runtime、旧 CLI、Kairos、Lab、旧评估、旧 Todo、fs-watch 和 DuckCoding 文字模型设计的归档规则与替代入口。

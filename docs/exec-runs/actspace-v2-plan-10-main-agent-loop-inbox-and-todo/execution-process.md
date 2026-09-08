@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-10-main-agent-loop-inbox-and-todo.md`
+- **关联计划**：`docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-10-main-agent-loop-inbox-and-todo.md`
 - **执行模式**：交互
 - **开始时间**：2026-08-22 21:15
 - **结束时间**：2026-08-22 21:21

@@ -30,7 +30,7 @@
 
 - `packages/desktop/src/renderer/components/settings/SettingsPage.tsx`
 - `packages/desktop/src/renderer/test/settings-page.test.tsx`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `docs/design-docs/tool-system/agent-image-generation-tool.md`
 
 ### ✅ Validation

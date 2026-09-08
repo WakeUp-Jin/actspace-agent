@@ -168,21 +168,20 @@ Composer 不创建 Service 或 Codec 实例，但必须产出 admission 证据�
 ```text
 Host Adapter
   ├─ 准备 Host ports 和 capability ceiling
-  ├─ 选择 Profile / Patch 输入
-  └─ 调用 Runtime Boot
+  ├─ 选择 Profile / Bundle / Patch 并解析 Composition
+  └─ 调用生产 Runtime Boot（显式 configPath + composition）
 
 Runtime Boot
-  ├─ resolve Profile / Bundle / Patch
-  ├─ 生成 BootManifest
-  ├─ 创建 Cordis root 和 Loader
-  ├─ 等待 settlement / startup validation
-  └─ 发布 RuntimeHandle
+  ├─ codec discovery、创建 Cordis root 和 Loader
+  ├─ 校验 transport、settlement 和 startup candidate
+  └─ 发布 BootedRuntimeProfile
 
-RuntimeHandle
-  └─ 只代理 Session、run、followup、abort、flush、diagnostics
+Host 消费 Profile Context
+  ├─ headless.runner：单次任务
+  └─ desktop.app：Desktop 会话应用操作
 ```
 
-RuntimeHandle 不暴露 `ResolvedComposition.entries` 的可变引用、Cordis Context、Fiber、Provider class 或 Loader handle；只提供只读 manifest/diagnostics 快照。
+组合事实保持不可变；启动结果只持有 Context、root、manifest、state/diagnostics、restart 通知与 shutdown，不持有通用 Session/run API。Context 可由受信任的同进程调用方使用，不跨 IPC/renderer。基础 BootedProfile 与生产 BootedRuntimeProfile 的精确差异见 [Runtime 文档](agent-target-runtime-architecture.md)。
 
 ## 10. Restart-only
 
@@ -203,7 +202,7 @@ Profile、Bundle、Patch、插件代码或 Service Provider 变化都通过完�
 3. required/optional capability、frontend、Service conflict、Codec discovery 和 Patch target 行为有测试。
 4. 生产默认路径不使用 `serviceValues`、手工 core activation 或第二份插件列表。
 5. `cordis.yml` 的 authoring/transport 角色在文件和 diagnostics 中可识别。
-6. restart-only、失败清理、旧 Runtime 不被破坏和 RuntimeHandle 单实例有 contract tests。
+6. restart-only、失败清理、旧 Runtime 不被破坏和 生产 Profile 进程内单实例有 contract tests。
 7. CLI 单次无头 `run` 的 boot → followup → flush → dispose 回归通过。
 
 ## 12. 回退和非目标

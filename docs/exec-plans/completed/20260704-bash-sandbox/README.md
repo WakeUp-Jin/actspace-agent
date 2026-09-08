@@ -6,7 +6,7 @@
 > 结构化结果（backgrounded taskId / sandboxed 均受影响），已通过
 > `ToolResult.structured` 保留原始结构化结果修复，详见 history。
 
-消费 `docs/design-docs/v1-legacy/execution-safety-agent-bash工具设计文档.md` 的 Phase E5（沙盒设计 + 附录 Seatbelt 模板与生成契约），并落实历史 allowlist 设计 Phase 3 中“沙盒落地后权限层放宽”的联动。
+消费 `docs/archive/v1/design-docs/execution-safety-agent-bash工具设计文档.md` 的 Phase E5（沙盒设计 + 附录 Seatbelt 模板与生成契约），并落实历史 allowlist 设计 Phase 3 中“沙盒落地后权限层放宽”的联动。
 
 ## 目标
 

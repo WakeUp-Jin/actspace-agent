@@ -52,7 +52,7 @@
 - `packages/desktop/src/renderer/components/settings/DuckCodingModelDialog.tsx`
 - `scripts/diagnose-duckcoding-cache.ts`
 - `scripts/diagnose-duckcoding-thinking.ts`
-- `docs/design-docs/v1-legacy/model-context-duckcoding-multi-key-model-catalog.md`
+- `docs/archive/v1/design-docs/model-context-duckcoding-multi-key-model-catalog.md`
 - `docs/learnings/2026-07/20260728-prompt-cache-diagnosis-controlled-variable-matrix.md`
 - `docs/learnings/2026-07/20260728-responses-stateless-replay-needs-reasoning-items.md`
 

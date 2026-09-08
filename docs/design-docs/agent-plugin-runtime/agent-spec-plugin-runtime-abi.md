@@ -1,14 +1,14 @@
 # ActSpace v2 插件 Runtime ABI 设计规范
 
-> 状态：v2 公共契约基线；其中 Host-facing `RuntimeHandle` 表述已被 [Profile-first Runtime 决策](./agent-decision-profile-first-headless-desktop.md) superseded，当前由 `BootedProfile` 与 Profile App Bundle Service 承担对应边界。
+> 状态：v2 契约基线，2026-09-08 已按 Profile-first 校准启动与应用职责。当前 API 见 [Runtime 与 Composition](agent-target-runtime-architecture.md)；P1/P2 全域收口仍按 active 计划执行。
 >
-> 本文固定插件 Runtime 的信任边界、组合语义、生命周期和失败行为。字段名、TypeScript API、错误码与 JSON Schema 仍需在实现前做字段级评审，但不得改变本文已经确认的语义。
+> 本文固定插件 Runtime 的信任边界、组合语义、生命周期和失败行为。已实现字段与 TypeScript API 以包 exports/schema 为准，未收口部分仍需在对应计划中验证，但不得改变本文已经确认的语义。
 >
 > 确认日期：2026-08-22。
 
 ## 1. 目标与适用范围
 
-ActSpace v2 使用 DSH 维护发布的 `@deepseek-ai/cordis` 系列承载插件生命周期，在其上定义 ActSpace 自有的插件 ABI。该 ABI 服务于 Desktop 与 CLI headless Profile 的后端 Runtime，不进入 renderer，也不把 Cordis 类型暴露给 Host、Session 或 IPC。
+ActSpace v2 使用 DSH 维护发布的 `@deepseek-ai/cordis` 系列承载插件生命周期，在其上定义 ActSpace 自有的插件 ABI。该 ABI 服务于 Desktop 与 CLI headless Profile 的后端 Runtime，不进入 renderer；受信任的同进程 Host 可持有 Context，但它不跨 IPC 或写入 Session。
 
 本文只规范 v2 后端插件 Runtime：
 
@@ -17,7 +17,7 @@ ActSpace v2 使用 DSH 维护发布的 `@deepseek-ai/cordis` 系列承载插件�
 - Profile / Bundle / Patch 如何得到唯一的启动组合；
 - 插件贡献如何注册、冲突、卸载和诊断；
 - 固定前端、Host capability 和 Runtime restart 如何限制插件；
-- Startup Validation、`RuntimeHandle` 和 shutdown 的共同语义。
+- Startup Validation、Profile 发布和 shutdown 的共同语义。
 
 Session 事件 payload、Tool、Prompt、LLM 和 Agent 的领域 ABI 由各自规范负责。它们必须服从本文的身份、生命周期和 Host ceiling，但不在本文中展开字段。
 
@@ -25,12 +25,12 @@ Session 事件 payload、Tool、Prompt、LLM 和 Agent 的领域 ABI 由各自�
 
 | 层 | 拥有 | 不拥有 |
 |---|---|---|
-| Trusted Boot | 插件 ABI 版本、来源与信任校验、root Cordis Context、组合解析、Startup Validation、诊断、`RuntimeHandle` 发布与关闭 | 具体工具、Prompt、Provider 或产品工作流 |
+| Trusted Boot | 插件 ABI 版本、来源与信任校验、root Cordis Context、组合解析、Startup Validation、诊断、Profile 启动结果发布与关闭 | 具体工具、Prompt、Provider 或产品工作流 |
 | Cordis Runtime | Fiber、Service 依赖、Effect、激活与可等待卸载 | ActSpace Session 格式、Host 权限、安全沙箱或产品兼容策略 |
 | ActSpace 领域 Provider | Session、Prompt、Tools、LLM、Agent Registry、Agent Loop 等领域语义 | 绕过 Trusted Boot 扩大 Host 能力 |
 | Host Adapter | 进程环境、credential resolver、审批交互、TTY / IPC / stdout 和进程退出 | 第二套插件装载器、Agent Loop 或 Session writer |
 
-普通插件不能替换 Trusted Boot、插件 ABI、Host ceiling 或 `RuntimeHandle` 边界。Base Profile 中的领域 Provider 可以替换，但不能无替代地缺失。
+普通插件不能替换 Trusted Boot、插件 ABI、Host ceiling 或 Profile 生命周期边界。Base Profile 中的领域 Provider 可以替换，但不能无替代地缺失。
 
 ## 3. v2 信任模型与允许来源
 
@@ -70,7 +70,7 @@ Browser Bridge 等外部进程是由受信任的同进程 Provider 管理的 Hos
 3. 解析 Profile / Bundle / Patch 和稳定 Entry tree，应用 Host ceiling，再校验最终 JSON-safe 配置、required capability 和身份冲突；
 4. 从 Core 和全部显式登记、受信任且已安装插件的静态元数据中发现并验证 Codec Modules，形成可用 codec catalog；本次组合、Session header 与事件命名空间只确定所需子集，不能作为唯一发现来源，Behavior Entry 最终是否激活也不影响 codec 可用性；
 5. 才允许 import、activate Behavior Entry；
-6. Loader settlement 和 Startup Validation 全部通过后，才发布 `RuntimeHandle`。
+6. Loader settlement 和 Startup Validation 全部通过后，才发布可供 Host 使用的 `BootedRuntimeProfile`。
 
 Codec Module 与 Behavior Entry 分离是恢复前提，不是打包风格偏好。一个需要先激活行为代码才能读取其历史事件的插件不符合本 ABI。
 
@@ -209,24 +209,24 @@ Trusted Boot 必须按顺序完成以下检查：
 8. Base Profile 声明的 Session、Prompt、Tools、LLM、Agent Registry、Agent Loop 等 required Provider 完整；
 9. diagnostics 和脱敏后的 BootManifest 可以生成。
 
-任一步失败都不得向 Host 发布可运行 `RuntimeHandle`。disabled 或因 optional incompatibility 被明确跳过的 Entry 不参与 active Fiber 检查，但必须出现在 manifest 和 diagnostics 中。
+任一步失败都不得向 Host 发布可运行的 Profile 启动结果。disabled 或因 optional incompatibility 被明确跳过的 Entry 不参与 active Fiber 检查，但必须出现在 manifest 和 diagnostics 中。
 
-## 13. `RuntimeHandle` 语义契约
+## 13. Profile 与应用 Service 契约
 
-每个 Host 进程只 boot 一个 Runtime 实例。Desktop、CLI run 和 CLI chat 共享同一 `RuntimeHandle` 语义，但通常各自在自己的进程中持有一个实例。
+每个生产 Host 进程只 boot 一个 Runtime。CLI headless 与 Desktop 各自持有独立的 `BootedRuntimeProfile`，共享领域实现而非同一个业务句柄。
 
-Runtime 内部生命周期是 `booting -> ready -> quiescing -> disposed`。Host 只在 `ready` 后拿到句柄；Boot 失败不会发布半可用句柄。`restartRequired` 是诊断状态，不是允许继续变更组合的生命周期状态。
+基础 `@actspace/boot.bootProfile()` 返回 `BootedProfile`，包含 Context、root、configPath、manifest 和 shutdown。生产 `bootProfileRuntime()` 返回 `BootedRuntimeProfile`，另有 state、diagnostics 和 restart 通知；两者返回类型和 shutdown 结果不同，详见 [Runtime 与 Composition](agent-target-runtime-architecture.md)。
 
-`RuntimeHandle` 至少拥有以下语义能力，最终方法名留到 API 评审：
+生产状态为 `booting → ready → quiescing → disposed`；只在 required Service 与启动校验通过后发布结果。restartRequired 是诊断，不授权在线修改组合。
 
-- 读取当前不可变 BootManifest、Host ceiling 和结构化 diagnostics；
-- 创建、恢复可继续执行的 main Session，以及列出和检查全部可读 Session；一次性 child Session 只允许 inspect / browse / export，run / resume admission 必须拒绝；
-- 启动 turn、向 main Agent 提交 `next-step` / `next-turn` durable input、订阅稳定 Runtime 投影事件、取消 active work；
-- 执行 Session durability flush；
-- 停止接收新工作、进入 quiescence 并完成可等待 dispose；
-- 报告配置或插件变化需要 restart。
+业务操作由应用 Service 持有：
 
-Host 不得通过句柄取得 Cordis root Context、Fiber、Session writer、插件实例或具体 AgentLoop class。
+- CLI 使用 `headless.runner.run()`；
+- Desktop 使用 `desktop.app` 创建、恢复、检查 main Session，执行 run、Inbox、abort、flush 和 metadata 操作；
+- 一次性 child Session 不能通过 main Session continuation 接口恢复为长期 Agent；
+- Host 等待 Profile shutdown，领域 Service 负责其资源与持久化生命周期。
+
+Host 可以在本进程使用 Context 查找 App Service。业务方法不塞回启动结果，也不将 Context、Fiber、writer 或 Service 实例送入 IPC、renderer、Session Journal。
 
 ## 14. Diagnostics 契约
 
@@ -247,7 +247,7 @@ diagnostics 是 Host UI 和 CLI stderr 的来源。它不进入模型上下文�
 
 所有 Host 遵循同一关闭顺序：
 
-1. `RuntimeHandle` 进入 `quiescing`，拒绝新 run、resume 和配置变更；
+1. Profile state 与 Run controller 进入 `quiescing`，应用入口停止接纳新任务；
 2. 级联取消 active turn，并按领域策略等待已经 dispatch 的 Tool / LLM 工作 drain；
 3. 解决或取消 pending approval；
 4. flush Session writer；
@@ -262,13 +262,13 @@ diagnostics 是 Host UI 和 CLI stderr 的来源。它不进入模型上下文�
 - 不支持不可信插件隔离、签名市场或自动更新。
 - 不支持插件前端代码。
 - 不支持生产 HMR、在线 reconcile、live reload 或零中断插件替换。
-- 不把 Cordis Context、Fiber 或 Service object 作为公共 Host / IPC API。
+- 同进程 Host 可以消费 Context 中的应用 Service；Context、Fiber 和 Service object 不进入 IPC、renderer 或 Session 数据。
 - 不允许插件覆盖 Host ceiling、Trusted Boot 或稳定身份冲突规则。
 - v2 主分发采用 managed ESM runtime；strict standalone SEA 不在 v2 范围内。
 
-## 17. 实现前字段级评审清单
+## 17. 字段与剩余验收
 
-以下内容需要在首个 ABI implementation plan 前形成 JSON Schema、golden fixtures 和错误样例；它们不是重新选择架构方向：
+已有 schema、golden fixtures 和错误样例以源码为准；以下范围随 P1/P2 持续校验，不代表仍未开始实现：
 
 - Manifest、Profile、Bundle、Patch、BootManifest 与 diagnostics 的精确字段名和 schema version；
 - plugin / Entry / Service / Event / contribution id 的字符规则与保留命名空间；
@@ -276,6 +276,6 @@ diagnostics 是 Host UI 和 CLI stderr 的来源。它不进入模型上下文�
 - Behavior / Codec module specifier、package exports 和 managed runtime directory 布局；
 - Patch required miss 的 fatal 与 explicit optional miss 的 warning 的精确表示；
 - optional Entry、required capability 和 skip reason 的精确表示；
-- `RuntimeHandle` 方法、事件 DTO、状态枚举和稳定错误码；
+- Profile 启动类型、各 App Service 方法、事件 DTO、状态枚举和稳定错误码；
 - graceful shutdown timeout、第二次信号和强制终止的数值默认值；
 - npm integrity、local-path content identity 和 config dump 的 canonical 编码。

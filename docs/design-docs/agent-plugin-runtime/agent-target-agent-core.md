@@ -1,6 +1,6 @@
 # ActSpace v2 Agent Core 目标边界
 
-> 状态：核心所有权、产品范围、行为不变量、公共语义和 DSH 风格领域包边界已确认；文中的 RuntimeHandle 术语已由 Profile-first 决策中的 `BootedProfile` 与 App Bundle Service 替代。精确 TypeScript 名称与字段实现留给 execution plan。
+> 状态：核心所有权、产品范围、行为不变量、公共语义和 DSH 风格领域包边界已确认；启动与应用职责已按 Profile-first 原位校准；精确 API 以当前 exports 和 execution plan 的实施状态为准。
 >
 > 本文定义“什么必须由 ActSpace 拥有”和“什么允许由插件替换”，不定义实施顺序。
 
@@ -28,7 +28,7 @@ ActSpace Trusted Boot
   - Root Context / ResolvedComposition manifest
   - Loader settlement / Startup Validation
   - Diagnostics / shutdown
-  - RuntimeHandle boundary
+  - Profile lifecycle / App Service boundary
 
 ActSpace Core Primitives and Providers
   - Scope primitive / scope-aware registry rules
@@ -86,7 +86,7 @@ Trusted Boot 不提供具体工具、Provider、Prompt 或产品工作流，也�
 
 checkpoint 失败时禁止下游模型请求或工具副作用。该语义不承诺 exactly-once；崩溃恢复仍需区分 not-started 和 outcome-unknown。
 
-明确标记为 ephemeral 的 Profile 可以关闭 crash durability，但必须在 RuntimeHandle 和诊断中暴露，不得与 persistent Session 混用。
+明确标记为 ephemeral 的 Profile 可以关闭 crash durability，但必须在 Session provenance、应用结果和诊断中暴露，不得与 persistent Session 混用。
 
 ### 4.5 所有贡献均有生命周期所有者
 
@@ -160,7 +160,7 @@ v2 的一次完整切换必须同时提供：
 - 启动时解析的静态 Agent Preset descriptor；
 - 独立 child Session、parent lineage、受限 Scope、工具子集、级联取消和结构化结果；
 - Todo durable events、Skills、Compaction 和全部确认保留的工具；
-- Desktop、CLI run、CLI chat 的同语义入口与稳定投影。
+- Desktop 与 CLI run 复用领域语义，各自通过 App Service / runner 消费稳定投影。
 
 `Agent` 与 `Explore` 不是两套子代理内核：它们是同一个 one-shot Subagent provider 的不同静态 descriptor。Explore 默认只获得只读探索工具；通用 Agent 获得由父 Scope 和 Host ceiling 共同限制的工具子集。
 

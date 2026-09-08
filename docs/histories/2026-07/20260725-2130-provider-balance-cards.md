@@ -41,6 +41,6 @@
 - `packages/desktop/src/main/test/settings-service.test.ts`
 - `packages/desktop/src/renderer/test/settings-page.test.tsx`
 - `packages/desktop/src/renderer/test/usage-statistics-page.test.tsx`
-- `docs/design-docs/frontend/front-设置页规范.md`
-- `docs/design-docs/frontend/front-usage-statistics.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-usage-statistics.md`
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`

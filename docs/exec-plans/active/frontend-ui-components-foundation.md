@@ -1,5 +1,7 @@
 # 前端基础组件层建设计划
 
+状态：部分实施；2026-09-09 复核时 `components/ui/` 已有 Tooltip、HoverCard、Sheet，首批 Button/IconButton/DropdownMenu/Switch/Textarea/Tabs 尚未形成完整公共层。
+
 ## 目标
 
 为 `apps/desktop` renderer 建立一层稳定的基础 UI 组件 wrapper，减少 Composer、Sidebar、ConversationView、RightPanel 等业务组件中重复的按钮、菜单、浮层、开关、输入框和状态样式实现。
@@ -109,7 +111,8 @@ Radix primitives / 原生 HTML
 - [x] 确认基础组件层采用 Radix primitives / 原生 HTML -> 项目 UI wrapper -> 业务组件的分层。
 - [x] 新增 `docs/design-docs/frontend/front-基础组件封装规范.md`。
 - [ ] 盘点现有重复控件和第一批迁移目标。
-- [ ] 新增 `components/ui/Button.tsx`、`IconButton.tsx`、`Tooltip.tsx`。
+- [x] 公共 `components/ui/Tooltip.tsx` 已存在；另有 HoverCard、Sheet。这里只确认文件落地，不代替本计划的统一迁移验收。
+- [ ] 新增 `components/ui/Button.tsx`、`IconButton.tsx`。
 - [ ] 新增 `components/ui/DropdownMenu.tsx`、`Switch.tsx`。
 - [ ] 新增 `components/ui/Textarea.tsx`、`Tabs.tsx`。
 - [ ] 迁移消息操作菜单和右侧 tabs。
@@ -121,3 +124,7 @@ Radix primitives / 原生 HTML
 
 - 2026-05-26：当前阶段不全量采用 `shadcn/ui`，但参考其 Radix wrapper 模式，在项目内建设基础 UI 组件层。这样既保留仓库已确认的 Radix primitives 方向，也能降低业务组件重复实现基础交互和样式的成本。
 - 2026-05-26：`SplitView` 暂不纳入第一批基础组件迁移。它承载工作台布局和 resize 行为，应在基础控件层稳定后单独评估。
+
+## 2026-09-09 下一步
+
+先盘点当前 Composer、消息操作和 RightPanel 中仍重复的按钮、菜单与 tabs，再确定每个 wrapper 的真实复用点。随后按本计划的组件切片实施和验收；不能因为 Tooltip 已存在就把整个基础组件计划归档，也不按 2026-05 的旧页面结构直接批量迁移。

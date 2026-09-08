@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-05-llm-service-and-adapters.md`
+- **关联计划**：`docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-05-llm-service-and-adapters.md`
 - **执行过程**：`docs/exec-runs/actspace-v2-plan-05-llm-service-and-adapters/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：完成实现；pi-ai registry/packaged gate 待 P02

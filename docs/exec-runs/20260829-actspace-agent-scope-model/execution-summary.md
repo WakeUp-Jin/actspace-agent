@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260829-actspace-agent-scope-model/README.md`
+- **关联计划**：`docs/exec-plans/completed/20260829-actspace-agent-scope-model/README.md`
 - **执行过程**：`docs/exec-runs/20260829-actspace-agent-scope-model/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：P00/P01/P02 Scope 范围完成；全仓库回归与真实 Host/Electron/Provider 仍需人工验收

@@ -15,7 +15,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260901-actspace-model-settings-maka-redesign/README.md`
+- **关联计划**：`docs/exec-plans/completed/20260901-actspace-model-settings-maka-redesign/README.md`
 - **执行模式**：交互
 - **开始时间**：2026-09-01
 - **结束时间**：2026-09-02
@@ -34,7 +34,7 @@
 - **操作**：新增模型页面子规范、独立 execution plan、执行过程和摘要文档，并更新设计文档索引与执行计划索引。
 - **影响文件**：
   - `docs/design-docs/frontend/front-模型设置页面-Maka重做规范.md`
-  - `docs/exec-plans/active/20260901-actspace-model-settings-maka-redesign/README.md`
+  - `docs/exec-plans/completed/20260901-actspace-model-settings-maka-redesign/README.md`
   - `docs/exec-runs/20260901-actspace-model-settings-maka-redesign/*`
   - `docs/design-docs/frontend/README.md`
   - `docs/design-docs/frontend/front-设置中心重构规范.md`

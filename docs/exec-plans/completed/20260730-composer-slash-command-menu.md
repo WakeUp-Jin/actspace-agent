@@ -30,7 +30,7 @@
 - `docs/design-docs/frontend/front-主题与配色规范.md`
 - `docs/design-docs/frontend/front-基础组件封装规范.md`
 - `docs/design-docs/tool-system/agent-skill-loading.md`
-- `docs/design-docs/v1-legacy/evaluation-agent-evaluation.md`
+- `docs/archive/v1/design-docs/evaluation-agent-evaluation.md`
 - `.agents/skills/frontend-design/SKILL.md`
 
 ## 范围

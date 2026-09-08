@@ -27,4 +27,4 @@ The original script could show whether prefix or append-only changed, but most l
 ### 📁 Files Modified
 
 - `scripts/analyze-cache-audit.mjs`
-- `docs/design-docs/v1-legacy/model-context-agent-cache-loss-audit.md`
+- `docs/archive/v1/design-docs/model-context-agent-cache-loss-audit.md`

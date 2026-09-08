@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260829-actspace-dsh-core-rebuild/README.md`
+- **关联计划**：`docs/exec-plans/completed/20260829-actspace-dsh-core-rebuild/README.md`
 - **执行过程**：`docs/exec-runs/20260829-actspace-dsh-core-rebuild/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：P00–P05 已完成；计划保留在 active 目录，待后续 clean-checkout 门禁后归档

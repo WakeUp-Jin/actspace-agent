@@ -60,12 +60,10 @@
 - `docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md`：交互式 Terminal 的 PTY 架构、会话归属、背压、进程清理、安全边界与打包签名。
 - `docs/design-docs/frontend/front-设置中心重构规范.md`：当前设置中心的产品信息架构、页面职责、模型连接流程、身份设置、Usage 活动分析和实施边界。后续设置中心实现以本文为准。
 - `docs/design-docs/frontend/front-模型设置页面-Maka重做规范.md`：模型页面的 Maka 风格重做规范，冻结连接列表、目录、配置、详情和模型目录的页面语法与验收标准。
-- `docs/design-docs/frontend/front-设置页规范.md`：重构前设置态的布局和功能基线，仅用于迁移追溯；与当前方案冲突时以 `front-设置中心重构规范.md` 为准。
-- `docs/design-docs/frontend/front-usage-statistics.md`：重构前独立 Usage 仪表盘的历史基线；当前 Usage 以 `front-设置中心重构规范.md` 为准。
 
-Kairos 和 Lab 原型属于已退役/暂停的 v1 设计资产，统一归档在 [`../v1-legacy/`](../v1-legacy/)，不作为当前桌面端页面入口。
+旧设置页、独立 Usage、Kairos 和 Lab 原型属于已退役/暂停的 v1 设计资产，统一归档在 [v1 归档](../../archive/v1/README.md)，不作为当前桌面端页面入口。
 
-## 当前基线图
+## 结构参考图
 
 > 以下 PNG / HTML 记录迁移前的历史实现状态，其中部分仍使用蓝色主强调。结构和交互可以参考；颜色、层级和状态职责以 `DESIGN.md`、全局视觉语言和主题规范为准。
 
@@ -89,13 +87,11 @@ Kairos 和 Lab 原型属于已退役/暂停的 v1 设计资产，统一归档在
 
 ![Review V1 历史基线图](right-panel-diff-final.png)
 
-![设置页定稿图](settings-page-final.png)
 
 ## HTML 原型
 
 - `actspace-deepseek-workbench.html`：工作台高保真原型。
 - `agent-subagent-flow-prototype.html`：Agent 工具与 Subagent 执行流原型。
-- `usage-statistics-prototype.html`：Usage Statistics 高保真原型。
 - `compact-command-states.html`：`/compact` 消息流三态及浅深主题原型。
 - `review-v1-git-review-prototype.html`：Review V1 Git-first 右侧面板历史原型；新 Workbench 以 `../core-review-change-sources.md` 为准。
 

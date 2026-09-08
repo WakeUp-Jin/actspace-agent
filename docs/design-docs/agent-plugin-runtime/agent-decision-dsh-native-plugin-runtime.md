@@ -1,5 +1,7 @@
 # ActSpace DSH-native 插件组装与 Agent Loop 启动规范
 
+> 文档等级：historical-decision。以下保留 v2 演进时的决策上下文；RuntimeHandle、CLI chat、旧 configPath 与阶段状态均属于当时方案，不是当前接口要求。当前实现先读[总体架构](agent-target-overall-architecture.md)和 [Runtime 与 Composition](agent-target-runtime-architecture.md)。
+
 > 状态：历史迁移决策，已被 [Profile-first Runtime 决策](./agent-decision-profile-first-headless-desktop.md) superseded；Cordis-native 组装方向已实现，真实宿主门禁仍待执行。
 >
 > 本文是对当前 ActSpace v2 插件启动方案的变更提案。实现切换完成前，现有 `agent-spec-plugin-runtime-abi.md`、`agent-target-runtime-architecture.md` 和对应 active plan 仍描述当前代码事实；切换完成后，本规范将成为插件启动与 Agent Loop 组装的优先约束。Session 的 durable event 格式和实现不在本规范内。
@@ -312,4 +314,4 @@ Session 轨道未来提供 DSH 对齐的 13 种 durable event（`turn/start`、`
 - Agent Core 领域契约：[`agent-target-agent-core.md`](./agent-target-agent-core.md)
 - DSH 机制研究：[`agent-research-dsh-architecture.md`](./agent-research-dsh-architecture.md)
 - Session 格式（本轮不改）：[`agent-spec-session-format-v1.md`](./agent-spec-session-format-v1.md)
-- 分阶段执行计划：[`../../exec-plans/active/20260829-actspace-dsh-core-rebuild/README.md`](../../exec-plans/active/20260829-actspace-dsh-core-rebuild/README.md)
+- 分阶段执行计划：[`../../exec-plans/completed/20260829-actspace-dsh-core-rebuild/README.md`](../../exec-plans/completed/20260829-actspace-dsh-core-rebuild/README.md)

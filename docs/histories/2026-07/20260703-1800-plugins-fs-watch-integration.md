@@ -16,7 +16,7 @@
 
 **Key Actions:**
 
-- **设计文档**: 新增 `docs/design-docs/v1-legacy/agent-plugins-fs-watch.md`，定义「插件 = 外部二进制进程」模式、文件契约（事件 JSONL / state.json 心跳 / config.json）、Skill 形态与设置页规范。
+- **设计文档**: 新增 `docs/archive/v1/design-docs/agent-plugins-fs-watch.md`，定义「插件 = 外部二进制进程」模式、文件契约（事件 JSONL / state.json 心跳 / config.json）、Skill 形态与设置页规范。
 - **Rust 插件（独立仓库）**: `actspace-plugins/crates/fs-watch`——notify 事件监听、500ms 合并去抖（Coalescer）、按天 JSONL 滚动写入（14 天保留 + 单日熔断）、30s 心跳 + 单实例锁、SIGTERM 优雅退出；针对 macOS FSEvents 的 kind 歧义做了 birthtime/LiveSet 校正。25 个单测全绿。
 - **shared 契约**: `settings.ts` 新增 `PluginsSettings` / `SkillsSettings` / `kairos.enabledSkills`；新文件 `plugins.ts` 定义 fs-watch 状态/配置与 Skill 管理的 IPC 类型。
 - **main 进程**: 新增 `plugins/fs-watch-service.ts`（安装校验 / spawn / 指数退避守护 / 心跳判定 / config 归一化，outDir 强制指向本机 Skill references）与 `skills-service.ts`（list/install/uninstall，仅 `<userData>/skills/` 可卸载）；`index.ts` 挂 IPC、app 启动自动拉起、before-quit 收尾；开启插件时自动把 `fs-watch` 并入 Kairos 白名单。
@@ -43,7 +43,7 @@
 
 ### 📁 Files Modified
 
-- `docs/design-docs/v1-legacy/agent-plugins-fs-watch.md`（新）
+- `docs/archive/v1/design-docs/agent-plugins-fs-watch.md`（新）
 - `docs/exec-plans/completed/20260703-plugins-fs-watch/`（两份 plan，已归档）
 - `packages/shared/src/{settings.ts, plugins.ts, index.ts}`
 - `packages/desktop/src/main/{settings-service.ts, agent-runtime-context.ts, skills-service.ts, plugins/fs-watch-service.ts, index.ts}`

@@ -14,7 +14,7 @@
 
 - `docs/FRONTEND.md`
 - `docs/FRONTEND_VERIFICATION.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `docs/design-docs/frontend/front-聊天输入框规范.md`
 - `docs/design-docs/frontend/front-主题与配色规范.md`
 - `docs/design-docs/frontend/front-全局视觉语言规范.md`

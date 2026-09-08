@@ -48,7 +48,7 @@ actspace-agent/
 │   └── site/                            # Astro 静态官网与公开内容
 │
 ├── packages/
-│   ├── runtime/                         # Profile bootstrap、BootedProfile 与 shutdown 边界
+│   ├── runtime/                         # Profile bootstrap、BootedRuntimeProfile 与 shutdown 边界
 │   ├── cordis-adapter/                  # ActSpace 对 DSH Cordis 的边界封装
 │   ├── boot/                            # Trusted Boot、Startup Validation、shutdown
 │   ├── bundle/                          # Profile / Bundle / Patch schema 与 composer
@@ -184,7 +184,7 @@ flowchart LR
 | `src/tools/`、`src/plugins/core-tools/` | `packages/tools/runtime/`、`packages/tools/core-tools/` | Tool Runtime 契约和具体 executor 分开 |
 | `src/plugins/browser-tools/` | `packages/tools/browser-tools/` | Browser 具体工具成为领域插件，不使用通用 plugins 目录 |
 | `src/agent/` | `packages/core/agent/`、`packages/core/agent-loop/`、`packages/subagent/` | Registry、Loop、Subagent 按独立替换边界拆分 |
-| `src/runtime/`、`src/boot/` | `packages/runtime/`、`packages/boot/` | Runtime 提供 Profile bootstrap/BootedProfile，App Bundle 拥有产品操作，Boot 拥有 root 生命周期 |
+| `src/runtime/`、`src/boot/` | `packages/runtime/`、`packages/boot/` | Runtime 提供生产 BootedRuntimeProfile，App Bundle 拥有产品操作；基础 BootedProfile 由 packages/boot 提供，二者字段和 shutdown 结果不同 |
 | `browser-bridge/` | `browser-bridge/` | 顶层使用产品能力名称，保留独立 Go/Extension 构建边界 |
 
 旧 v1 Session 只保留一份迁移参考数据，不由新 Runtime 读取或导入。新格式只使用 `sessions-v2/<id>/journal.jsonl`。
@@ -216,9 +216,9 @@ flowchart LR
 2. 每个 required core plugin 都能单独运行 manifest、codec（如有）和 behavior contract tests。
 3. Loader 只通过 Static Manifest 发现候选，Behavior Entry 激活由 Cordis Effect 管理，dispose 后没有残留 timer、watcher、subprocess、lease 或 registry contribution。
 4. Session、LLM、Prompt、Tools、Agent Loop 都可以在 Base Profile 中作为独立 Entry 诊断、禁用、替换或恢复；缺少 required provider 时 Boot fail-closed。
-5. Desktop、CLI run、CLI chat 只使用薄 Runtime facade，三者不实现第二套 Agent Loop 或 Session writer。
+5. Desktop 与 CLI run 使用 Profile Boot 和各自的 App Service / runner，不实现第二套 Agent Loop 或 Session writer。
 6. `browser-bridge` 的 Go/Extension 构建仍可独立验证，并通过 Browser Tools Adapter 接入，不依赖前端插件加载。
 7. 旧单包内部路径、通用 `plugins/` 代码入口和废弃 Kairos/fs-watch/eval 可达路径在源码、构建产物和 workspace manifest 中消失。
 8. 现有前端页面截图在浅色、深色和普通工作流下与重构前布局和样式一致；这属于接入验收，不允许用 UI 重设计替代。
 
-详细执行顺序、文件所有权、验证命令和回滚规则见 [包拆分与真实插件包化执行计划](../../exec-plans/active/20260824-actspace-v2-package-layout-and-plugin-packaging/README.md)。
+详细执行顺序、文件所有权、验证命令和回滚规则见 [包拆分与真实插件包化执行计划](../../exec-plans/completed/20260824-actspace-v2-package-layout-and-plugin-packaging/README.md)。

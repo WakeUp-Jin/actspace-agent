@@ -27,7 +27,7 @@
 2. **Ordered composer**：实现 Profile 展开、Bundle provenance/schema 校验、稳定 Entry ID Patch（insert/replace-config/disable/remove）、required/optional target 行为、capability monotonicity、Service/Codec conflict 和 dependency cycle 检查。
 3. **Loader materialization**：使 Composer 不创建 Service/Codec 实例，只生成 admission；当 Cordis Loader 需要文件路径时，由 Boot 从同一结果生成一次受控 transport config，并在 diagnostics 标识 authoring/transport。
 4. **Runtime/CLI unification**：让 CLI、Runtime fixture、Desktop host adapter（若本轮触及）均消费同一 `ResolvedComposition/BootManifest`；默认生产路径移除 `serviceValues`、手工 core activation 和第二份插件列表。显式 diagnostic legacy path 不能被默认 fallback 调用。
-5. **Restart-only lifecycle**：验证 Profile/Bundle/Patch/provider/code 变化通过 abort/drain/flush/dispose/recompose/reboot 生效；失败时不发布 RuntimeHandle，不留下旧 Loader/Context/Fiber。
+5. **Restart-only lifecycle**：验证 Profile/Bundle/Patch/provider/code 变化通过 abort/drain/flush/dispose/recompose/reboot 生效；失败时不发布可用的 Profile 启动结果，不留下旧 Loader/Context/Fiber。
 6. **交接**：输出最终 manifest schema、digest fixture、Host ceiling matrix 和供 P2 读取的 immutable composition metadata。
 
 ## 验收标准
@@ -36,7 +36,7 @@
 - 任一 Profile、Bundle、Patch、Host ceiling、Service/Codec admission 或 loader config 变化都会改变 digest。
 - required/optional capability、frontend、Patch target、duplicate provider、codec discovery 和 cycle 行为有正/负向测试。
 - Patch 不能扩大 Host capability；required target 缺失 fail closed，optional target 记录 skipped diagnostic。
-- restart-only、quiescent shutdown、RuntimeHandle 单实例和 CLI one-shot boot/followup/flush/dispose 回归通过。
+- restart-only、quiescent shutdown、生产 Profile 进程内单实例和 CLI one-shot boot/followup/flush/dispose 回归通过。
 
 ## 定向验证
 

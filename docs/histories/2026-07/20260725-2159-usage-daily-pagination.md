@@ -29,4 +29,4 @@
 
 - `packages/desktop/src/renderer/components/UsageStatisticsPage.tsx`
 - `packages/desktop/src/renderer/test/usage-statistics-page.test.tsx`
-- `docs/design-docs/frontend/front-usage-statistics.md`
+- `docs/archive/v1/design-docs/front-usage-statistics.md`

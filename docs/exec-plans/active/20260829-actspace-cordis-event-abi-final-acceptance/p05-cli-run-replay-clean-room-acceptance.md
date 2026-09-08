@@ -6,7 +6,7 @@
 
 ## 验收目标
 
-证明 CLI 单次无头任务使用唯一 RuntimeHandle 完成 boot → run → flush → dispose，Session 可以从 Journal replay，SIGINT 能稳定退出，并且当前脏工作区不会被破坏性 clean checkout 操作影响。
+证明 CLI 单次无头任务使用唯一生产 Profile 启动结果与 headless.runner 完成 boot → run → flush → dispose，Session 可以从 Journal replay，SIGINT 能稳定退出，并且当前脏工作区不会被破坏性 clean checkout 操作影响。
 
 ## 目标文件
 

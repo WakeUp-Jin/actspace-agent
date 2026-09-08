@@ -25,11 +25,11 @@
 
 ### 📁 Files Modified
 
-- `docs/code_design-audit/01-global-baseline-and-shared-contracts.md`
-- `docs/code_design-audit/02-agent-turn-chain.md`
-- `docs/code_design-audit/03-agent-core-runtime.md`
-- `docs/code_design-audit/04-tools-and-permissions.md`
-- `docs/code_design-audit/05-kairos-autonomous-mode.md`
-- `docs/code_design-audit/06-desktop-ipc-and-storage.md`
-- `docs/code_design-audit/07-renderer-frontend-design.md`
+- `docs/archive/v1/code-design-audit/01-global-baseline-and-shared-contracts.md`
+- `docs/archive/v1/code-design-audit/02-agent-turn-chain.md`
+- `docs/archive/v1/code-design-audit/03-agent-core-runtime.md`
+- `docs/archive/v1/code-design-audit/04-tools-and-permissions.md`
+- `docs/archive/v1/code-design-audit/05-kairos-autonomous-mode.md`
+- `docs/archive/v1/code-design-audit/06-desktop-ipc-and-storage.md`
+- `docs/archive/v1/code-design-audit/07-renderer-frontend-design.md`
 - `docs/histories/2026-06/20260606-1722-code-design-audit-plans.md`

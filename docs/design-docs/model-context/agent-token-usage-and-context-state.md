@@ -26,13 +26,15 @@ Actspace 需要分别回答三类问题：
 sessions-v2/<sessionId>/journal.jsonl
 ```
 
-与本专题相关的关键事件包括：
+当前 Agent Loop 产生的关键事件包括：
 
-- `request/snapshot`：dispatch 前冻结的逻辑请求；
-- `llm/dispatch-started`：请求已经越过副作用边界；
-- `llm/ended` / `llm/error` / `llm/aborted`：请求终态；
-- `llm/usage`：provider usage 与成本；
-- `compaction/started` / `surface/replaced` / `compaction/ended`：Surface 压缩事务。
+- `request/header`：requestId、turnId、stepId、routeId、model、attempt 和 contextWindow；
+- `request/context`：与同一 requestId 关联、dispatch 前冻结的逻辑 request snapshot；
+- `assistant/message`：请求终态与 provider usage；`step/end` 提供步骤终态及工具步骤的 usage 回退；
+- `llm/retry` / `llm/retry-started`：失败尝试与下一次重试；
+- `compaction/start` / `compaction/summary` / `surface/replaced` / `compaction/end`：压缩过程与 Surface 替换。
+
+旧 v2 草案中的 `request/snapshot`、`llm/usage`、`llm/ended` 不是当前默认 Loop 的事件词汇；不能据此新增 producer 或解释当前 Journal。事件目录见 [DSH 事件模型](../agent-plugin-runtime/agent-spec-dsh-event-model.md)。
 
 不存在独立 `context-state` 文件。UI 的 Context 状态可以随当前 Projection 算法升级而变化，但 Journal 事实保持不变。
 
@@ -54,7 +56,7 @@ requestOptions
 compositionDigest
 hostCapabilityDigest
 prepared.route / model / registrationId / adapterVersion
-prepared.defaults / retryPolicy
+prepared.defaults / retryPolicy / contextWindow
 ```
 
 Snapshot 的作用是：
@@ -62,14 +64,42 @@ Snapshot 的作用是：
 - 证明一次 request 使用了哪份 Session Surface；
 - 证明哪些 Prompt / Context contributor 参与组装；
 - 关联 route、model、adapter 和 retry policy；
-- 为 Context、Analysis 和故障恢复提供确定输入；
-- 在 request 已 dispatch 但没有终态时判断 `outcome-unknown`。
+- 为 Context、Trajectory 和故障恢复提供确定输入；
+- 在恢复时结合 request/terminal 关系识别未结束请求；dispatch 的外部效果边界仍由对应恢复契约解释，snapshot 自身不证明请求已发送。
 
 Snapshot 不得包含 API Key、Authorization、Cookie、proxy credential 或其他 secret-like 字段。`packages/prompt/src/request-snapshot.ts` 会拒绝非 JSON 值、非有限数字、过深对象和敏感字段名。
 
+## Request Model Facts
+
+每次真实模型请求越过 dispatch 前，Runtime 必须把以下事实写入 durable request 记录：
+
+```text
+request/header
+  requestId
+  turnId
+  stepId
+  routeId
+  model
+  attempt
+  contextWindow: positive integer | null
+
+request/context.snapshot.prepared
+  route
+  model
+  contextWindow: positive integer | null
+  registrationId
+  adapterVersion
+  defaults
+  retryPolicy
+```
+
+`contextWindow` 是当次请求解析到的模型能力快照，不是当前设置文件的实时查询结果。这样模型目录刷新、设置修改或模型删除都不会改变历史 Session 的解释。
+
+旧 Session 若没有该字段：Projection 与 UI 按容量 `0` 处理，并保留 token 统计；禁止回退到伪造的 `200_000`。
+
 ## Usage 与成本
 
-`llm/usage` 以一次 provider request 为粒度，而不是一次 Agent Run 或 Session 的粗粒度计数。当前字段包括：
+usage 以一次 provider request 为粒度，而不是一次 Agent Run 或 Session 的粗粒度计数。默认 Loop 将 usage 写在 `assistant/message`、`step/end` 和失败尝试的 `llm/retry` 中，聚合器按请求身份去重。当前字段包括：
 
 ```text
 inputTokens
@@ -119,11 +149,11 @@ sessions-v2/<sessionId>/journal.jsonl
 - `activity.usage` 由 Main Settings Authority 通过 typed IPC 读写，跨窗口和重启恢复；它不能被解释为计费数据，也不能改变历史聚合结果。
 - Usage 明细继续由 Journal Projection 提供，当前通过 typed `usage-activity:get` IPC 返回事件级快照。当前不引入独立 SQLite 事实库；如果未来增加 `runtime-v2/usage-read-model.sqlite`，它只能是可删除、可重建的查询缓存。
 - 清理或重建 Usage 派生数据不得删除 Session Journal、会话历史、设置或凭据。
-- 页面筛选状态可以改变查询参数，但不能回写 `llm/usage`，也不能用 Context estimate 修正 provider usage。
+- 页面筛选状态可以改变查询参数，但不能回写 Journal 中的 usage，也不能用 Context estimate 修正 provider usage。
 
 ## Context Projection
 
-当前 Desktop Context 面板从最近一次 `request/snapshot` 派生只读 entries：
+当前 Desktop Context 面板从最近一次 `request/context.snapshot` 派生只读 entries，并从该 snapshot 的 prepared metadata 或关联 `request/header` 读取容量：
 
 | Snapshot 来源 | UI bucket |
 | --- | --- |
@@ -131,14 +161,14 @@ sessions-v2/<sessionId>/journal.jsonl
 | rules contributor | Rules |
 | skills contributor | Skills |
 | `tools` | Tool Definitions |
-| `facts` | Runtime Facts |
+| `facts` | System Prompt 中的 Runtime facts entry |
 | `messages` | Conversation |
 | 最近 Compaction summary | Summarized Conversation |
 
 Context Projection 的 token 数是 UI 估算，不是 provider usage。当前估算器会根据文本字符做近似计算，并展示：
 
 - `totalEstimatedTokens`；
-- `maxTokens`；
+- `maxTokens`：优先取 `snapshot.prepared.contextWindow`，再取关联 `request/header.contextWindow`；只接受正安全整数，缺失或非法时为 `0`；
 - `percentUsed`；
 - bucket tokens；
 - entry preview、included、pinned、removable。
@@ -150,7 +180,7 @@ Provider usage = 已完成请求的真实或 adapter 标注值
 Context estimate = 当前 snapshot 的前端可解释估算
 ```
 
-不能用 Context estimate 回写或修正历史 provider usage。
+不能用 Context estimate 回写或修正历史 provider usage。UI 消费完整 bucket，不再压缩成 provider usage 的两桶适配；未知 bucket 必须有稳定兜底。若新增 MCP/Subagent 专用类别，先扩展 snapshot 分类契约，再接 renderer。弹窗尺寸、数字格式与临时模型选择见 [Context 面板与 Composer](agent-context-model-facts-and-composer.md)。
 
 ## Context assembly 所有权
 
@@ -198,14 +228,14 @@ Compaction 不删除 Journal 历史，而是为有效 Session Surface 追加 rep
 - `packages/context/src/assembly.ts`：contributor 排序、required / optional 语义；
 - `packages/prompt/src/request-snapshot.ts`：snapshot 冻结与 secret-like 字段拒绝；
 - `packages/runtime/src/projection/durable-session.ts`：durable usage 聚合；
-- `apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts`：Context、Usage 与 Analysis 投影；
+- `apps/desktop/src/main/runtime-v2/fixed-renderer-projection.ts`：Context 与 Usage 投影；
 - `packages/compaction/src/plugin.ts`：Surface compaction transaction；
 - `packages/compaction/src/policy.ts`：默认 compaction policy。
 
 ## 验收
 
 - 持久 Session 只写 `sessions-v2/<id>/journal.jsonl`；
-- 每次 dispatch 前存在可关联的 `request/snapshot`；
+- 每次 dispatch 前存在关联同一 requestId 的 `request/header` 与 `request/context`；
 - 每次真实 provider request 的 usage 不被其他 request 覆盖；
 - Context 面板可以仅凭 Journal 重建；
 - 删除派生 UI 状态不会影响 Session 恢复；

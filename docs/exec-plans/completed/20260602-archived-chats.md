@@ -18,7 +18,7 @@
 - `docs/HISTORY_GUIDE.md`
 - `docs/QUALITY_SCORE.md`
 - `docs/design-docs/frontend/front-左侧会话栏规范.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `docs/design-docs/frontend/front-主题与配色规范.md`
 - `docs/design-docs/core-storage-and-observability.md`
 
@@ -73,7 +73,7 @@
   - `packages/desktop/src/renderer/test/settings-page.test.tsx`
 - 文档：
   - `docs/design-docs/frontend/front-左侧会话栏规范.md`
-  - `docs/design-docs/frontend/front-设置页规范.md`
+  - `docs/archive/v1/design-docs/front-设置页规范.md`
   - `docs/histories/`
 
 ## 数据与 IPC 契约
@@ -254,7 +254,7 @@ IPC 通道：
 修改文件：
 
 - `docs/design-docs/frontend/front-左侧会话栏规范.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `docs/histories/YYYY-MM/<timestamp>-archived-chats.md`
 
 任务：

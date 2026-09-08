@@ -33,7 +33,7 @@
 - `packages/desktop/src/main/runtime-v2/`
 - `packages/desktop/src/renderer/RuntimeV2Root.tsx`
 - `packages/agent-cli/src/runtime-v2/`
-- `docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/`
+- `docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/`
 - `docs/exec-runs/actspace-v2-*`
 
 ### Validation

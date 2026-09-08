@@ -1,6 +1,6 @@
 # Service Definition / Provider / Consumer 分层规范
 
-> 状态：目标设计已确认；P1-B contract slice 已实施，核心 Provider 全量迁移仍由后续阶段收口。文中的通用 Runtime facade / `RuntimeHandle` 术语属于迁移前语境，当前入口是 `BootedProfile` 与 Profile App Bundle Service。
+> 状态：目标设计已确认；P1-B contract slice 已实施，核心 Provider 全量迁移仍由后续阶段收口。应用 Service 与 Profile 启动结果分离；精确 API 见 [Runtime 文档](agent-target-runtime-architecture.md)。
 >
 > 本规范把当前已经存在的 Cordis Service 和 `service-contract.ts` 雏形提升为所有核心能力共同遵守的 ABI。它不要求所有 class 都继承 `Service`，也不改变具体工具 executor 的实现逻辑。
 
@@ -16,7 +16,7 @@ Provider    —— 一个可替换实现及其资源所有权
 Consumer    —— 只依赖 Definition 的使用方
 ```
 
-Cordis Context 负责把 Provider 实例注入 Consumer，并负责 Fiber/Effect 生命周期；Runtime 只提供 Host port、Boot、RuntimeHandle 和 shutdown 边界。
+Cordis Context 负责把 Provider 实例注入 Consumer，并负责 Fiber/Effect 生命周期；Runtime 只提供 Host port、Boot、Profile 诊断和 shutdown 边界。
 
 三层不是三个必然独立的 npm package：一个领域包可以同时导出 Definition 和默认 Provider，但公共类型、manifest、测试和依赖方向必须能区分三种角色。
 
@@ -30,21 +30,19 @@ Cordis Context 负责把 Provider 实例注入 Consumer，并负责 Fiber/Effect
 | Runtime Service | 长期状态、registry、协调和生命周期 | 重新实现领域语义或成为中央 service map |
 | Host Port | credential、filesystem、process、browser、approval、TTY 等外部能力 | Agent Loop、Session writer、工具 registry、Provider 私有状态 |
 
-## 3. 当前到目标的差距
+## 3. 当前实现与剩余边界
 
-当前 `@actspace/cordis-adapter` 已提供 `ServiceDefinition`、`ServiceProvider`、`ServiceConsumer` 和稳定 Service ID，但核心包仍存在以下混合形态：
+2026-09-09 按源码复核：`packages/cordis-adapter/src/service-contract.ts` 已提供 Definition/Provider/Consumer 类型、14 个核心 role metadata，以及 Definition、Service graph、manifest consistency 校验。`SessionHandle` 已通过 `SessionPersistenceDriver` 访问后端；默认生产 Boot 的 Profile-first 入口见 Runtime 文档。
 
-- `SessionStoreService` 同时包含 live Session contract 和默认 JSONL fallback；
-- Runtime boot 仍保留 legacy `serviceValues` 与手工实例化路径；
-- 部分 Consumer 通过具体 `LlmService`、`ToolRuntime`、`SessionStore` class 获取能力；
-- manifest 的 `provides/injects`、静态 `ServiceDefinition` 和实际 `ctx.provide()` 没有机械一致性检查；
-- `activate()` 仍存在于多个插件作为兼容外壳。
+不能把实施前的 `serviceValues` 手工组装或缺少 metadata 校验继续描述成当前默认路径。也不能把 metadata 已存在等同于全部 Consumer 完成窄接口迁移：例如 Session Persistence 插件仍导出 `session.persistence.types` 的具体类和 `activate()` 兼容入口，这些要按生产可达性与 Consumer 实际依赖继续核对。
 
-P1-B 只收敛默认 DSH 路径和公共 ABI；明确标记的 legacy/diagnostic 路径由后续收口任务删除，不作为新的 Consumer 入口。
+当前 live-log Service ID 是 `session.store`；`session.core` 是分层设计中的目标称呼，并非当前 `ACTSPACE_SERVICE_IDS` 中已注册的同名 ID。接线须使用真实声明，不能从概念表格推断可调用接口。
+
+本文集中维护当前三层契约与后续约束。[核心 Cordis Service 文档](agent-spec-core-cordis-services.md)保留 P0 Service 化的设计背景和各领域职责推导；重复术语、ownership、生命周期和验收以本文为当前入口。G1 和未完成迁移仍由 [P1-B](../../exec-plans/active/20260829-actspace-p1-service-roles/README.md)及总计划跟踪。
 
 ## 4. Definition contract
 
-每个可替换能力至少声明：
+以下是概念示意；精确泛型、owner/publicSurface、可选 type marker、Provider/Consumer identity 与返回类型以 `service-contract.ts` 的公开类型为准。每个可替换能力至少声明：
 
 ```ts
 interface ServiceDefinition<TService, TConfig> {
@@ -112,7 +110,7 @@ interface ServiceConsumer<TService> {
 
 在领域代码中，Consumer 的推荐形式是：
 
-- `static inject = ["session.core", "llm.service", "tools.runtime"]`；
+- `static inject = ["session.store", "llm.service", "tools.runtime"]`；
 - 从 Context 获取 Definition 对应的窄接口；
 - 不能用 `instanceof JsonlSessionPersistenceService` 决定业务路径；
 - 不能读取 `service.provider`、`service.runtime` 等 Provider 私有字段，除非该字段本身属于 Definition。
@@ -121,7 +119,7 @@ interface ServiceConsumer<TService> {
 
 | Service ID | Definition owner | 默认 Provider | 主要 Consumer |
 | --- | --- | --- | --- |
-| `session.core` / `session.store` | Session Core | Session Core Service | Agent Runtime、Loop、Projection |
+| `session.store`（逻辑 Session Core） | Session Core | Session Core Service | Agent Runtime、Loop、Projection |
 | `session.persistence` | Session Persistence | JSONL Provider | Session Core |
 | `session.journal` | Session Journal | Core Codec/Journal Service | Session Core、Projection |
 | `llm.service` | LLM Service | pi-ai adapter | Agent Loop、Compaction |
@@ -130,9 +128,9 @@ interface ServiceConsumer<TService> {
 | `agent.registry` | Agent Core | Agent Registry | Agent Runtime、Loop |
 | `agent.loop` | Agent Loop | default loop driver | Agent Runtime、Headless |
 | `compaction.runtime` | Compaction | default summarizer | Agent Loop |
-| `agent.runtime` | Runtime orchestration | RunController bridge | RuntimeHandle、CLI |
+| `agent.runtime` | Runtime orchestration | RunController bridge | Desktop App Service、Headless runner |
 
-`session.core` 和 `session.persistence` 必须是不同的 Definition。`session.jsonl` 是 Provider/codec package，不是 Session Core 的替代名称。
+逻辑 Session Core（当前 `session.store`）和 `session.persistence` 必须是不同的 Definition。`session.jsonl` 是 Provider/codec package，不是 Session Core 的替代名称。
 
 ## 8. 依赖方向与禁止环
 
@@ -145,7 +143,7 @@ flowchart TD
   CORE --> CONS[Consumers]
   CONS --> LOOP[Agent Loop]
   LOOP --> RUNTIME[Agent Runtime]
-  RUNTIME --> FACADE[RuntimeHandle]
+  RUNTIME --> APP[Headless Runner / Desktop App Service]
 ```
 
 允许的方向：
@@ -155,13 +153,13 @@ AgentRuntime → AgentRegistry / AgentLoop
 AgentLoop → SessionCore / LLM / Prompt / ToolRuntime / Compaction
 SessionCore → SessionPersistence Definition
 JSONL Provider → Session Journal + detached Session types
-Host → Runtime facade and Host ports
+Host → Profile Boot / App Service / Host ports
 ```
 
 禁止：
 
 - `SessionPersistence → SessionStore` 的业务反向依赖；
-- `AgentRegistry → AgentRuntime` 或 `AgentRegistry → RuntimeHandle`；
+- `AgentRegistry → AgentRuntime` 或 `AgentRegistry → App Service`；
 - Tool executor → Runtime、Journal writer、CLI stdout；
 - Consumer → Provider private class；
 - Provider → 模块级可变 singleton；
@@ -224,7 +222,7 @@ manifest admission
   → DISPOSED
 ```
 
-Provider apply、Config、inject 或 Consumer activation 失败时，不发布 RuntimeHandle；已启动的 Provider 按逆序释放。运行时错误记录结构化 diagnostics，Session 已提交事实仍可 replay。
+Provider apply、Config、inject 或 Consumer activation 失败时，不发布可用的 Profile 启动结果；已启动的 Provider 按逆序释放。运行时错误记录结构化 diagnostics，Session 已提交事实仍可 replay。
 
 ## 12. 验收标准
 
@@ -233,7 +231,7 @@ Provider apply、Config、inject 或 Consumer activation 失败时，不发布 R
 3. manifest、`static inject`、`ctx.provide` 和 Definition metadata 有自动一致性测试。
 4. 缺失 required、重复 Provider、循环依赖、配置非法、Fiber dispose 和 provider failure 都 fail closed。
 5. Tool executor parity fixtures 继续通过，且 executor 不写 stdout、不直接写 Journal。
-6. RuntimeHandle 仍不暴露 Context、Fiber、writer、Provider class 或具体 AgentLoop class。
+6. Context 与 App Service 只在受信任的本进程边界消费，Fiber、writer、Provider class 或 AgentLoop 实例不进入 IPC/renderer。
 7. Cordis lifecycle、Session、Loop、Tool、CLI run 和全仓 typecheck/test 通过。
 
 ## 13. 回退和非目标

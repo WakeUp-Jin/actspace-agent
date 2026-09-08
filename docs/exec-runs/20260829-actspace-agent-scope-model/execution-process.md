@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260829-actspace-agent-scope-model/README.md`
+- **关联计划**：`docs/exec-plans/completed/20260829-actspace-agent-scope-model/README.md`
 - **执行模式**：交互
 - **开始时间**：2026-08-29 00:00
 - **结束时间**：2026-08-29 17:21

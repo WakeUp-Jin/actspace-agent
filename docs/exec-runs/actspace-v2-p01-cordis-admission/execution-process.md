@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-p01-cordis-admission.md`
+- **关联计划**：`docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-p01-cordis-admission.md`
 - **当前状态**：本地 published-build API/lifecycle 通过；fresh registry integrity、lockfile 与 packaged Electron gate 待外部 registry 恢复
 
 ## 已验证

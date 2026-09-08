@@ -27,7 +27,7 @@
   - `docs/design-docs/frontend/compact-command-states.html`
   - `docs/design-docs/frontend/front-中间消息区规范.md`
   - `docs/design-docs/frontend/front-主题与配色规范.md`
-  - `docs/design-docs/v1-legacy/model-context-context-compression.md`
+  - `docs/archive/v1/design-docs/model-context-context-compression.md`
   - `docs/exec-plans/completed/20260529-context-compression.md`
 - 相关代码路径：
   - Shared 契约：`packages/shared/src/session.ts`、`packages/shared/src/ipc.ts`、`packages/shared/src/session-selectors.ts`
@@ -127,7 +127,7 @@
 ### M4 文档、验证与收尾
 
 - [x] T4.1 更新设计规范
-  - 文件：`docs/design-docs/frontend/front-中间消息区规范.md`、`docs/design-docs/v1-legacy/model-context-context-compression.md`、`docs/design-docs/agent-runtime/agent-turn-layers.md`。
+  - 文件：`docs/design-docs/frontend/front-中间消息区规范.md`、`docs/archive/v1/design-docs/model-context-context-compression.md`、`docs/design-docs/agent-runtime/agent-turn-layers.md`。
   - 改动：补 `/compact` 命令消息流规则、手动压缩 IPC、自动/手动共用 `context_compaction` 完成态。
   - 验证：人工通读，确保与 HTML 原型和实现一致。
 

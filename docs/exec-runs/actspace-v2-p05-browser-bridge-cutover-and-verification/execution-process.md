@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260824-actspace-v2-package-layout-and-plugin-packaging/actspace-v2-p05-browser-bridge-cutover-and-verification.md`
+- **关联计划**：`docs/exec-plans/completed/20260824-actspace-v2-package-layout-and-plugin-packaging/actspace-v2-p05-browser-bridge-cutover-and-verification.md`
 - **执行模式**：交互
 - **开始时间**：2026-08-25
 - **结束时间**：未结束（发布门禁进行中）

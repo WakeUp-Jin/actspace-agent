@@ -39,4 +39,4 @@
 - `apps/desktop/src/renderer/test/settings-page.test.tsx`
 - `apps/desktop/src/renderer/test/provider-model-settings.test.tsx`
 - `docs/design-docs/frontend/front-设置中心重构规范.md`
-- `docs/exec-plans/active/20260830-actspace-settings-center-refactor/README.md`
+- `docs/exec-plans/completed/20260830-actspace-settings-center-refactor/README.md`

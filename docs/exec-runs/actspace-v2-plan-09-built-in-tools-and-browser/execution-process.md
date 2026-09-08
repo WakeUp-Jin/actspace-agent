@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-09-built-in-tools-and-browser.md`
+- **关联计划**：`docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-09-built-in-tools-and-browser.md`
 - **执行模式**：交互
 - **开始时间**：2026-08-22 21:06
 - **当前状态**：v2 executor/parity、Browser Go/protocol 与 Bash shutdown 已完成；真实 Chrome/Extension gate 待 P15

@@ -36,7 +36,7 @@ Todo 是当前主 Agent 的局部执行状态，不是多 Agent 共享调度对�
 - `packages/agent-core/src/persistence/recovery.ts`
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/desktop/src/renderer/components/messages/TodoListBlock.tsx`
-- `docs/design-docs/v1-legacy/tool-system-agent-todo-tools.md`
+- `docs/archive/v1/design-docs/tool-system-agent-todo-tools.md`
 
 ### ✅ Validation
 

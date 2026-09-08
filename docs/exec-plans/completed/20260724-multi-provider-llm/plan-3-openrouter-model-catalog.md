@@ -13,7 +13,7 @@
 ## 附加必读
 
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `packages/shared/src/model-config.ts`
 - `packages/desktop/src/main/settings-service.ts`
 - `packages/agent-core/src/usage/cost.ts`

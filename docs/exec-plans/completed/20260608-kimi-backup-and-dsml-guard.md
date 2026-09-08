@@ -36,8 +36,8 @@
   - `docs/REPO_COLLAB_GUIDE.md`
   - `docs/ARCHITECTURE.md`
   - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`（双模型能力事实来源）
-  - `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`
-  - `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md`
+  - `docs/archive/v1/design-docs/agent-runtime-current-module-map.md`
+  - `docs/archive/v1/design-docs/agent-kairos-autonomous-mode.md`
   - `docs/SECURITY.md`
   - `docs/PLANS_GUIDE.md`
 - 相关代码路径：

@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-06-tool-runtime.md`
+- **关联计划**：`docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-06-tool-runtime.md`
 - **执行模式**：交互
 - **开始时间**：2026-08-22 20:28
 - **结束时间**：2026-08-22 20:37

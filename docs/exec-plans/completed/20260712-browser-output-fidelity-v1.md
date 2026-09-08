@@ -24,7 +24,7 @@
 - 相关文档：
   - `docs/design-docs/browser/agent-browser-use-command-surface.md`
   - `docs/design-docs/browser/agent-browser-use-command-implementation.md`
-  - `docs/design-docs/v1-legacy/model-context-context-compression.md`
+  - `docs/archive/v1/design-docs/model-context-context-compression.md`
 - 相关代码路径：
   - `browser-bridge/apps/cli/internal/locator/runtime.js`
   - `browser-bridge/apps/cli/internal/commands/registry.go`

@@ -7,7 +7,7 @@
 ## 当前仓库结构
 
 - `apps/desktop`：Electron main、preload、renderer 所在的桌面端应用。
-- `apps/cli`：通过 managed ESM loader 暴露 v2 `run` / `chat` 命令、TTY 交互和 stdout/stderr 契约。
+- `apps/cli`：通过 managed ESM loader 暴露 v2 `run` 命令、stdin 输入和 stdout/stderr 契约。
 - `packages/runtime`：Host-facing ESM runtime，承载 Cordis boot、Profile/Bundle composition、Profile 生命周期和 shutdown；应用能力由 Headless/Desktop Bundle 提供。
 - `packages/core/`、`packages/session/`、`packages/llm/`、`packages/prompt/`、`packages/tools/`、`packages/subagent/`、`packages/compaction/`：独立领域 workspace packages，每个可装载包拥有自己的 Plugin Entry 与生命周期测试。
 - `packages/english-learning`：Desktop 内置英语辅助学习插件，拥有单会话双语提示词与英文语音队列；凭据、临时文件和系统播放由 Desktop Host 提供。详见[设计](design-docs/agent-plugin-runtime/agent-english-learning.md)。
@@ -30,7 +30,7 @@
   - 负责 argv/stdin、TTY、stdout/stderr 和退出码，不实现第二套 Agent 内核
 - `packages/runtime` 与领域 packages
   - 仅通过公开 exports 暴露 ESM Runtime API
-  - `runtime` 负责 Cordis 生命周期、Profile/Bundle/Patch、Projection 和 BootedProfile；Session、Agent、LLM、Prompt、Tool 语义由独立 package 提供，应用操作由对应 Bundle Service 持有
+  - `runtime` 负责 Cordis 生命周期、Profile/Bundle/Patch、Projection 和生产 BootedRuntimeProfile；Session、Agent、LLM、Prompt、Tool 语义由独立 package 提供，应用操作由对应 Bundle Service 持有
 - `packages/shared`
   - 只放跨进程共享契约和类型
   - 不依赖 `desktop` 或旧版 Agent Core
@@ -48,7 +48,7 @@
 默认依赖方向应保持为：
 
 ```txt
-desktop/cli -> runtime facade -> domain packages -> shared
+desktop/cli -> Profile Boot / App Service -> domain packages -> shared
 runtime --(Host capability)--> browser-bridge
 ```
 
@@ -62,7 +62,7 @@ runtime --(Host capability)--> browser-bridge
 ## 架构阅读路线
 
 - `docs/design-docs/agent-runtime/agent-turn-layers.md`：Agent Run 从 Host 输入到 Journal、Agent Loop、LLM / Tool 与 Projection 的五层职责边界，并定义 `agentRunId → turnId → stepId → requestId` 的运行层级。
-- `docs/design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md`：v2 Runtime、Profile / Bundle / Patch、BootedProfile、Host 和固定前端边界。
+- `docs/design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md`：v2 Runtime、Profile / Bundle / Patch、基础与生产启动类型、Host 和固定前端边界。
 - `docs/design-docs/agent-runtime/agent-observability-trace-model.md`：Journal 观测的数据契约，解释 Session V2、真实 Turn、LLM Call、重试、Trace 安全边界及投影边界。
 - `docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md`：v2 当前架构总图，解释启动、单次任务、Session、Host、Cordis 和 Agent Core 的关系。
 - `docs/design-docs/agent-plugin-runtime/README.md`：v2 后端插件化架构入口，汇总设计证据、决策、公共契约和执行记录。
@@ -100,6 +100,6 @@ runtime --(Host capability)--> browser-bridge
 
 - `ARCHITECTURE.md` 只做顶层导航，不继续堆实现清单。
 - 长期设计原则优先放入 `docs/design-docs/`。
-- 当前 v2 模块边界优先维护在 `docs/design-docs/agent-plugin-runtime/` 与各领域 package 的公共 exports/manifest 中；旧模块地图只在 `docs/design-docs/v1-legacy/` 归档。
+- 当前 v2 模块边界优先维护在 `docs/design-docs/agent-plugin-runtime/` 与各领域 package 的公共 exports/manifest 中；旧模块地图只在 `docs/archive/v1/design-docs/` 归档。
 - 存储、日志和可观测性边界优先维护在 `docs/design-docs/core-storage-and-observability.md`。
 - 只要架构变化会让文档过期，就在同一轮任务里同步更新相关文档。

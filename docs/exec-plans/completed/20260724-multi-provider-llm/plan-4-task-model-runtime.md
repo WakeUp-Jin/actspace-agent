@@ -12,9 +12,9 @@
 
 ## 附加必读
 
-- `docs/design-docs/v1-legacy/model-context-context-compression.md`
+- `docs/archive/v1/design-docs/model-context-context-compression.md`
 - `docs/design-docs/collaboration/agent-explore-subagent.md`
-- `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md`
+- `docs/archive/v1/design-docs/agent-kairos-autonomous-mode.md`
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
 - `packages/agent-core/src/engine/create-agent-deps.ts`
 - `packages/desktop/src/main/agent-run.ts`

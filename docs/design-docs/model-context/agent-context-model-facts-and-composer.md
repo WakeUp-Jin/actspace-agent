@@ -1,6 +1,6 @@
 # Context 面板与模型能力事实规范
 
-状态：已确认设计，P00/P01 已实现，等待全量回归与 Electron 手工验收。
+状态：P00/P01 已实现，2026-09-09 全量类型与测试回归通过；Electron、真实 Provider 和截图人工验收仍待完成。
 
 ## 1. 目标
 
@@ -15,7 +15,9 @@
 
 ActSpace 继续使用自己的 v2 Runtime、Session Journal、SettingsService 和 typed IPC。
 
-## 3. 当前问题
+## 3. 实施前问题（2026-09-01）
+
+以下容量与两桶数据源问题是 P00/P01 的修复背景，已完成代码修复；不能再当作当前缺陷。全量回归与人工验收状态见 [执行计划](../../exec-plans/completed/20260901-actspace-context-model-facts/README.md)。
 
 ### 3.1 Context 容量来源错误
 
@@ -51,57 +53,13 @@ Session Journal
 
 API Key 继续只进入 `<userData>/secrets.json`，不得进入 settings、request snapshot、Journal 或 Projection。
 
-## 5. Request Model Facts Contract
+## 5. 数据契约入口
 
-每次真实模型请求越过 dispatch 前，Runtime 必须把以下事实写入 durable request 记录：
+Request Model Facts、Journal 事件、容量优先级、Usage 与 Context estimate 的区分、完整 bucket 映射统一维护在 [Token Usage 与 Context Projection](agent-token-usage-and-context-state.md)。本页只维护面板交互与模型选择的产品边界，避免两份规范重复定义同一数据契约。
 
-```text
-request/header
-  requestId
-  turnId
-  stepId
-  routeId
-  model
-  attempt
-  contextWindow: positive integer | null
+模型能力快照随实际请求冻结；旧 Session 缺少容量时按 `0` 展示，设置或目录更新不改写历史。这些约束以主规范的 Request Model Facts 和 Context Projection 两节为准。
 
-request/context.snapshot.prepared
-  route
-  model
-  contextWindow: positive integer | null
-  registrationId
-  adapterVersion
-  defaults
-  retryPolicy
-```
-
-`contextWindow` 是当次请求解析到的模型能力快照，不是当前设置文件的实时查询结果。这样模型目录刷新、设置修改或模型删除都不会改变历史 Session 的解释。
-
-旧 Session 若没有该字段：Projection 与 UI 按容量 `0` 处理，并保留 token 统计；禁止回退到伪造的 `200_000`。
-
-## 6. Context Projection Contract
-
-Context 面板的主数据源是最近一次可关联的 `request/header + request/context`：
-
-- bucket 内容和 entry preview 来自 request snapshot；
-- token 数是可解释的 UI estimate；
-- `maxTokens` 来自 request model facts 的 `contextWindow`；
-- provider usage 只用于 Usage 页面和独立的实际消耗语义。
-
-默认 bucket 映射：
-
-| Snapshot 来源 | UI bucket |
-| --- | --- |
-| 核心 system sections | System prompt |
-| tools | Tools |
-| rules contributor | Rules |
-| skills contributor | Skills |
-| compaction summary | Summarized conversation |
-| messages | Conversation |
-
-Projection 必须保留未知 bucket 的稳定兜底，不得因为新增 contributor 让 Context 面板崩溃。未来若要单独显示 MCP dynamic tools、Subagent definitions 等类别，必须先扩展 Journal snapshot 分类契约，不能仅在 renderer 中伪造分类。
-
-## 7. Composer 与 Context Popup 展示规范
+## 6. Composer 与 Context Popup 展示规范
 
 - Context 面板左右边缘与 Composer 输入框完全对齐，宽度跟随 Composer，不使用固定 `820px` 上限；
 - 面板显示 request snapshot 的全部可用 bucket，右侧完整 Context 视图继续显示逐条 entry；
@@ -110,7 +68,7 @@ Projection 必须保留未知 bucket 的稳定兜底，不得因为新增 contri
 - 容量未知时显示 `0 / Tokens` 与 `0%`，不显示固定猜测值；
 - Context bucket 颜色继续使用 `--act-context-*` visualization token，并同时通过浅色、深色主题验证。
 
-## 8. 模型配置与持久化规范
+## 7. 模型配置与持久化规范
 
 ActSpace 的非敏感模型配置继续写入 `<userData>/settings.json`：
 
@@ -121,7 +79,7 @@ ActSpace 的非敏感模型配置继续写入 `<userData>/settings.json`：
 
 输入框临时切换不自动改写默认配置。只有设置页的默认模型操作才修改 `models.taskBindings.defaultChat`。实际请求模型仍以 Session Journal 的 request header 为准。
 
-## 9. 非目标
+## 8. 非目标
 
 - 不把 provider usage 与 Context estimate 合并；
 - 不恢复独立 `context-state` 持久化文件或第二套 Session 事实源；
@@ -129,7 +87,7 @@ ActSpace 的非敏感模型配置继续写入 `<userData>/settings.json`：
 - 不在本轮新增 Context entry 编辑、pin、exclude 或跨 Session memory；
 - 不因为参考项目使用 YAML 就把 ActSpace 的 settings.json 改成 YAML。
 
-## 10. 验收标准
+## 9. 验收标准
 
 - 不同模型的 Context 容量来自当次 request model facts，而不是固定 200K；
 - 仅凭 Session Journal 可以重建 Context bucket、entry preview 和容量；
@@ -138,7 +96,7 @@ ActSpace 的非敏感模型配置继续写入 `<userData>/settings.json`：
 - 浅色和深色主题下 Context bucket、meter、border、text 均符合主题 token 规范；
 - 旧 Session 缺少 contextWindow 时按 0 安全显示，不影响历史恢复。
 
-## 11. 代码事实入口
+## 10. 代码事实入口
 
 - `packages/shared/src/model-config.ts`
 - `packages/shared/src/settings.ts`

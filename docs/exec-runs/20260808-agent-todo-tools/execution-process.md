@@ -12,7 +12,7 @@
 ### 步骤 1：确认契约与接入边界
 
 - **操作**：复核设计、执行计划、Runtime、工具预览、前端主题和验证规范。
-- **影响文件**：`docs/design-docs/v1-legacy/tool-system-agent-todo-tools.md`、`docs/exec-plans/completed/20260808-agent-todo-tools.md`。
+- **影响文件**：`docs/archive/v1/design-docs/tool-system-agent-todo-tools.md`、`docs/exec-plans/completed/20260808-agent-todo-tools.md`。
 - **决定**：Todo 保持 `sessionId + agentRunId` 作用域，Task/TeamTask 不复用此模型；renderer 只消费 `TodoUiPreview`。
 - **验证**：设计与计划不存在 TBD，占位范围与用户批准范围一致。
 

@@ -2947,7 +2947,8 @@
       ],
       "path": "packages/client/package.json",
       "exports": [
-        "."
+        ".",
+        "./sessions"
       ],
       "dependencies": [
         "@actspace/shared"
@@ -3152,16 +3153,20 @@
       "path": "apps/desktop/package.json",
       "exports": [],
       "dependencies": [
+        "@actspace/client",
         "@actspace/desktop-app",
+        "@actspace/english-learning",
         "@actspace/llm-pi-ai",
         "@actspace/llm-service",
         "@actspace/runtime",
         "@actspace/session-journal",
+        "@actspace/session-projection",
         "@actspace/shared",
         "@actspace/tools-approval",
         "@actspace/tools-browser-tools",
         "@actspace/tools-core-tools",
         "@actspace/tools-runtime",
+        "@radix-ui/react-hover-card",
         "@radix-ui/react-tooltip",
         "@tanstack/react-virtual",
         "@xterm/addon-fit",
@@ -3198,6 +3203,7 @@
         "@actspace/bundle",
         "@actspace/compaction",
         "@actspace/cordis-adapter",
+        "@actspace/english-learning",
         "@actspace/llm-service",
         "@actspace/session-journal",
         "@actspace/session-persistence",
@@ -3271,7 +3277,8 @@
         "@actspace/cordis-adapter",
         "@actspace/llm-service",
         "@actspace/shared",
-        "@earendil-works/pi-ai"
+        "@earendil-works/pi-ai",
+        "openai"
       ],
       "packageRole": "domain"
     },
@@ -3357,6 +3364,7 @@
         "@actspace/core-scope",
         "@actspace/desktop-app",
         "@actspace/diagnostics",
+        "@actspace/english-learning",
         "@actspace/headless",
         "@actspace/llm-pi-ai",
         "@actspace/llm-service",
@@ -3466,7 +3474,8 @@
       ],
       "dependencies": [
         "@actspace/cordis-adapter",
-        "@actspace/session-journal"
+        "@actspace/session-journal",
+        "@actspace/shared"
       ],
       "packageRole": "domain"
     },
@@ -3484,6 +3493,7 @@
       "path": "packages/shared/package.json",
       "exports": [
         ".",
+        "./model-catalog-data",
         "./runtime-v2",
         "./runtime-v2/desktop-ipc",
         "./runtime-v2/projection",
@@ -3891,6 +3901,6 @@
       "required": true
     }
   ],
-  "sourceDigest": "133b124fe358ee322857e24a83a4b4b5c0b5d70f00c67f4eeb9ce58d29668e8b",
+  "sourceDigest": "7122d0725f6148152900a5f9f85ab8debb88d5d9610fa96e276fb9e38b4f631e",
   "diagnostics": []
 }

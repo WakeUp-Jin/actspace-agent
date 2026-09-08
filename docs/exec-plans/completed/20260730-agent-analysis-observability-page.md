@@ -36,7 +36,7 @@
   - `docs/design-docs/frontend/front-agent-analysis-observability-prototype.html`
   - `docs/design-docs/agent-runtime/agent-observability-trace-model.md`
   - `docs/design-docs/frontend/front-主题与配色规范.md`
-  - `docs/design-docs/frontend/front-设置页规范.md`
+  - `docs/archive/v1/design-docs/front-设置页规范.md`
   - `docs/FRONTEND_VERIFICATION.md`
   - `docs/RELIABILITY.md`
 - 相关代码路径：
@@ -243,7 +243,7 @@ type AgentAnalysisIndexResult = {
 
 - 同步：
   - `docs/design-docs/agent-runtime/agent-observability-trace-model.md`
-  - `docs/design-docs/frontend/front-设置页规范.md`
+  - `docs/archive/v1/design-docs/front-设置页规范.md`
   - `docs/design-docs/frontend/README.md`
   - `docs/RELIABILITY.md`
   - `docs/QUALITY_SCORE.md`

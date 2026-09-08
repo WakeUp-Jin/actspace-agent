@@ -6,11 +6,11 @@
 
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`
 - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`
-- `docs/design-docs/v1-legacy/model-context-context-compression.md`
-- `docs/design-docs/v1-legacy/model-context-duckcoding-multi-key-model-catalog.md`
+- `docs/archive/v1/design-docs/model-context-context-compression.md`
+- `docs/archive/v1/design-docs/model-context-duckcoding-multi-key-model-catalog.md`
 - `docs/design-docs/collaboration/agent-explore-subagent.md`
-- `docs/design-docs/v1-legacy/agent-kairos-autonomous-mode.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/agent-kairos-autonomous-mode.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 
 最终统一手动验收使用：[多供应商 LLM 最终手动验收清单](manual-acceptance-checklist.md)。
 

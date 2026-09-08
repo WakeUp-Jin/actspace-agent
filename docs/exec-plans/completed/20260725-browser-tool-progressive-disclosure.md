@@ -22,7 +22,7 @@ Browser Bridge 可用时，运行时继续稳定注册全部浏览器 executor�
 - 相关文档：
   - `docs/design-docs/browser/agent-browser-use-index.md`
   - `docs/design-docs/browser/agent-browser-use-integration-design.md`
-  - `docs/design-docs/frontend/front-设置页规范.md`
+  - `docs/archive/v1/design-docs/front-设置页规范.md`
   - `docs/FRONTEND_VERIFICATION.md`
 - 相关代码路径：
   - `packages/agent-core/src/tools/types.ts`

@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-13-desktop-host-and-fixed-renderer.md`
+- **关联计划**：`docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-13-desktop-host-and-fixed-renderer.md`
 - **执行模式**：交互
 - **开始时间**：2026-08-22
 - **当前状态**：v2-only 接入、本地自动化、依赖恢复、制品构建和开发态 Electron 验证完成；真实 Provider/Chrome 仍由用户手动验收

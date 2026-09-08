@@ -6,7 +6,7 @@
 - [英语辅助学习插件设计](agent-plugin-runtime/agent-english-learning.md)：已实施，实机门禁见执行摘要；选定会话注入中英对照提示词、仅英文朗读，以及扩展入口、MiniMax 配置和生命周期边界。
 - [Agent 工具流式渲染修复设计](frontend/front-agent-tool-stream-rendering.md)：已实施的跨 Core、Tools、Desktop 事件链修复设计。
 
-`docs/design-docs/` 集中管理当前 v2 架构设计、产品设计和重要设计决策。已经被 v2 替代、删除或暂停的 v1 设计统一放在 [`v1-legacy/`](v1-legacy/)，避免新任务把历史方案误读成当前默认。
+`docs/design-docs/` 集中管理当前 v2 架构设计、产品设计和重要设计决策。已经被 v2 替代、删除或暂停的 v1 设计统一放在 [v1 归档](../archive/v1/README.md)，避免新任务把历史方案误读成当前默认。
 
 ## 目录硬约束
 
@@ -40,7 +40,6 @@
 | `browser/` | Browser Bridge、ActSpace 集成和 canonical command | `docs/design-docs/browser/agent-browser-use-index.md` |
 | `collaboration/` | 当前一次性 Subagent / Explore，以及尚未迁入 v2 的未来 Member、Room、Team 产品设计 | `docs/design-docs/collaboration/agent-subagent-runtime.md` |
 | `frontend/` | 桌面端视觉、主题、组件、工作台、页面和前端原型 | `README.md` |
-| `v1-legacy/` | 已退役、被 v2 替代或暂停的 v1 设计、研究稿和原型资产；禁止作为新功能事实来源 | `README.md` |
 
 ## 推荐阅读路线
 
@@ -53,40 +52,21 @@
 5. 涉及 Journal 观测时读 `agent-runtime/agent-observability-trace-model.md`
 6. 根据任务进入 `model-context/`、`tool-system/`、`execution-safety/`、`browser/` 或 `collaboration/`
 
-### v2 插件化 Runtime 重构设计
+### v2 插件化 Runtime
 
-1. `agent-plugin-runtime/agent-target-overall-architecture.md`
-2. `agent-plugin-runtime/README.md`
-3. `agent-plugin-runtime/agent-decision-dsh-native-plugin-runtime.md`（本轮 DSH-native 启动提案，待评审）
-4. `agent-plugin-runtime/agent-decisions-v2-foundation.md`
-5. `agent-plugin-runtime/agent-decision-cordis-adoption.md`
-6. `agent-plugin-runtime/agent-target-agent-core.md`
-7. `agent-plugin-runtime/agent-target-session-and-context.md`
-8. `agent-plugin-runtime/agent-target-llm-adapter.md`
-9. `agent-plugin-runtime/agent-target-runtime-architecture.md`
-10. `agent-plugin-runtime/agent-spec-plugin-runtime-abi.md`
-11. `agent-plugin-runtime/agent-spec-dsh-event-model.md`
-12. `agent-plugin-runtime/agent-spec-agent-loop-cordis-surface.md`
-13. `agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md`
-14. `agent-plugin-runtime/agent-spec-dsh-runtime-as-plugin-composition.md`
-15. `agent-plugin-runtime/agent-spec-tool-runtime-boundary.md`
-16. `agent-plugin-runtime/agent-spec-tool-name-contract.md`
-17. `agent-plugin-runtime/agent-spec-session-format-v1.md`
-18. `agent-plugin-runtime/agent-spec-tool-runtime-abi.md`
-19. `agent-plugin-runtime/agent-spec-runtime-projection.md`
-20. `agent-plugin-runtime/agent-spec-prompt-context-contributors.md`
-21. `agent-plugin-runtime/agent-spec-agent-and-subagent.md`
-22. `agent-plugin-runtime/agent-spec-core-cordis-services.md`
-23. 需要复核证据时再读三份 `agent-research-*` 文档
+1. [总体架构](agent-plugin-runtime/agent-target-overall-architecture.md)
+2. [Runtime 与 Composition](agent-plugin-runtime/agent-target-runtime-architecture.md)
+3. [插件组装与 Agent 启动](agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md)
+4. [专题契约与实施状态](agent-plugin-runtime/README.md)
 
-这一专题的产品范围和公共语义已经确认，但仍不是 execution plan，也不授权开始代码重写。当前 v2 实现事实以 `packages/runtime/`、领域 workspace packages、`packages/shared/` 和对应 execution plan 为准；`v1-legacy/` 中的同名旧设计只用于迁移追溯。
+当前实现与部分实施目标按文档状态区分。Profile-first 等决策保留在原目录供追溯；DSH-native 早期提案不再作为首读规范。v1 设计统一从 [归档入口](../archive/v1/README.md) 进入。
 
 ### 前端
 
 1. `frontend/README.md`
 2. `frontend/front-全局视觉语言规范.md`
 3. `frontend/front-主题与配色规范.md`
-5. 再进入具体工作台区域、组件或页面规范
+4. 再进入具体工作台区域、组件或页面规范
 
 ### 官网与公开内容
 

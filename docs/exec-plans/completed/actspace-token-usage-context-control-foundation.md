@@ -20,7 +20,7 @@
 - `docs/FRONTEND_VERIFICATION.md`
 - `docs/QUALITY_SCORE.md`
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`
-- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
+- `docs/archive/v1/design-docs/agent-runtime-testing.md`
 - `.agents/skills/llm-agent-dev/SKILL.md`
 - `.agents/skills/llm-agent-dev/references/context/overview.md`
 - `.agents/skills/llm-agent-dev/references/llm/llm-service.md`

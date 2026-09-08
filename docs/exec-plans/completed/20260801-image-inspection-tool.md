@@ -99,12 +99,12 @@
 3. 使用模型选择器和已有 Key 选择器；当只有默认 Key 时不增加多余步骤。工具启停复用现有 Agent 工具开关，不增加第二个状态源。
 4. Provider 未配置时显示明确不可用原因和前往 Provider 设置入口；不在图片分析区域输入或创建 Key。
 5. 更新 preload 类型、renderer 测试和 Settings IPC 测试。
-6. 按 `docs/design-docs/frontend/front-设置页规范.md` 和主题规范检查布局、文案、键盘操作、焦点、浅色/深色状态。
+6. 按 `docs/archive/v1/design-docs/front-设置页规范.md` 和主题规范检查布局、文案、键盘操作、焦点、浅色/深色状态。
 
 ### 7. 文档、历史与学习判断
 
 1. 实现完成后更新 `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`，删除“没有视觉辅助工具”的过期事实并说明显式委托边界。
-2. 按实际实现更新 `docs/SECURITY.md`、`docs/RELIABILITY.md` 与 `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`。
+2. 按实际实现更新 `docs/SECURITY.md`、`docs/RELIABILITY.md` 与 `docs/archive/v1/design-docs/agent-runtime-current-module-map.md`。
 3. 在 `docs/histories/` 记录功能、配置迁移、验证结果和未完成的真实 Provider 验收。
 4. 对照 `docs/HISTORY_GUIDE.md`、`docs/QUALITY_SCORE.md`，完成脱敏与质量分层检查。
 5. 本任务涉及不可信多模态输入、外部数据发送和工具输出上下文治理，满足学习文档条件；读取 `docs/learnings/WRITING_GUIDE.md` 后沉淀一篇可迁移的设计学习。

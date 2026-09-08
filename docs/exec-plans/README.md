@@ -14,37 +14,34 @@
 
 ## 当前进行中
 
-- ActSpace Profile-first Runtime 精简与 RuntimeHandle 删除（实现完成；真实宿主门禁待执行）：`active/20260830-actspace-profile-first-runtime-simplification/README.md`
+| 计划 | 当前状态与下一步 |
+|---|---|
+| [Cordis 事件 ABI 与 CLI 最终验收](active/20260829-actspace-cordis-event-abi-final-acceptance/README.md) | P00–P04 有通过证据；补 P05 deterministic retry/error fixture 后再闭环。 |
+| [P1/P2 契约与组合](active/20260829-actspace-p1-p2-contract-and-composition/README.md) | contract slices 已交付；G1 跨包回归、P2/G2 语义门禁继续。 |
+| [P1-A Session Core / Persistence](active/20260829-actspace-p1-session-core-persistence/README.md) | slice 已交付；CLI persist/resume 独立验收与 G1 交接待完成。 |
+| [P1-B Service 三层](active/20260829-actspace-p1-service-roles/README.md) | slice 已交付；全域 Provider/Consumer 收口待完成。 |
+| [P1-C Profile / Bundle / Patch](active/20260829-actspace-p1-profile-bundle-patch/README.md) | schema/digest/transport 已交付；restart-only、失败清理及 one-shot 回归待完成。 |
+| [P2 Contract Matrix](active/20260829-actspace-p2-contract-matrix/README.md) | 字节漂移检查已恢复通过；语义 validator 与负向 fixtures 未完整交付，不能归档。 |
+| [Session 持久化与投影](active/20260830-actspace-session-persistence-projection/README.md) | 基础通道与首批消费者已落地；最终消息映射和集成验收待完成。 |
+| [前端基础组件](active/frontend-ui-components-foundation.md) | 仍有组件抽取、迁移与验收工作。 |
 
-- ActSpace 设置中心重构（P0-P5 已交付，P6 人工验收与交付收口）：`active/20260830-actspace-settings-center-refactor/README.md`
-
-- ActSpace 模型设置页面 Maka 风格重做（文档已确认，模型页面实施中）：`active/20260901-actspace-model-settings-maka-redesign/README.md`
-
-- ActSpace Session 持久化事实源与投影收敛（P00/P01 完成候选，P02/P03 基础契约执行中）：`active/20260830-actspace-session-persistence-projection/README.md`
-
-- ActSpace Context 面板与模型能力事实收敛（设计文档已建立，P00/P01 待实施）：`active/20260901-actspace-context-model-facts/README.md`
-
-
-- ActSpace Cordis 事件 ABI 与 CLI run 最终验收计划（待主 Agent 执行）：`active/20260829-actspace-cordis-event-abi-final-acceptance/README.md`
-- ActSpace P0 Agent Scope 模型重构（完成候选，待归档）：`active/20260829-actspace-agent-scope-model/README.md`
-- ActSpace DSH Agent Loop / Session / Tool Shell 核心重构（完成候选，待归档）：`active/20260829-actspace-dsh-core-rebuild/README.md`
-- ActSpace DSH 风格插件组装与 Agent 启动实现（完成候选，旧 composition 外壳待收口）：`active/20260829-actspace-dsh-plugin-assembly-and-agent-startup/README.md`
-- ActSpace P1/P2 Session、Service、Composition 与契约矩阵（已批准，待实施）：`active/20260829-actspace-p1-p2-contract-and-composition/README.md`
-  - P1-A Session Core / Persistence：`active/20260829-actspace-p1-session-core-persistence/README.md`
-  - P1-B Service Definition / Provider / Consumer：`active/20260829-actspace-p1-service-roles/README.md`
-  - P1-C Profile / Bundle / Patch：`active/20260829-actspace-p1-profile-bundle-patch/README.md`
-  - P2 Contract Matrix：`active/20260829-actspace-p2-contract-matrix/README.md`
-- ActSpace Tool Name 全量切换（已完成）：`completed/20260829-actspace-tool-name-contract/README.md`
-- DSH-native Plugin Runtime 旧草案重定向（不单独执行）：`active/20260829-actspace-dsh-native-plugin-runtime/README.md`
-- ActSpace v2 插件化 Agent Runtime 完整交付：`active/20260822-actspace-v2-plugin-runtime/README.md`
-- ActSpace v2 包拆分与真实插件包化：`active/20260824-actspace-v2-package-layout-and-plugin-packaging/README.md`
-- 运行态反馈与图片预览回读修复：`active/20260801-running-feedback-and-attachment-rehydration.md`
-- Composer 图片附件可用性修复：`active/20260801-composer-image-attachments.md`
-- 前端 UI 组件基础：`active/frontend-ui-components-foundation.md`
+2026-09-09 [逐项复核与设计合并清单](../exec-runs/20260908-docs-v1-archive-v2-refresh/followup-audit.md)：初始 10 个 active 入口逐项复核；中文界面任务自行归档后，Context 补齐全仓回归也进入 completed，当前剩余 8 个入口。P2 按语义检查缺口保留 active。
 
 ## 最近完成
 
+- [Context 模型事实](completed/20260901-actspace-context-model-facts/README.md)：2026-09-09 补齐全仓 typecheck/test；G1 通过，Electron/真实 Provider/截图 G2 仍保留人工验收。
+
 - [日常主界面中文统一](completed/20260908-desktop-chinese-ui.md)：保留模式、思考档位和工具执行展示；renderer 验证与 Electron 主界面/设置检查完成，验证范围见摘要。
+
+
+- [Docs v1 归档与 v2 原位校准](completed/20260908-docs-v1-archive-v2-refresh.md)：50 个 v1 文件移动、3 份完整稿归档；v2 原位更新，文档门禁扩展。
+
+2026-09-08 生命周期整理：以下计划实现已完成，人工/宿主门禁仍保留在各自正文和执行摘要中。
+
+- [图片附件](completed/20260801-composer-image-attachments.md)、[运行反馈与附件回读](completed/20260801-running-feedback-and-attachment-rehydration.md)。
+- [v2 完整交付](completed/20260822-actspace-v2-plugin-runtime/README.md)、[包拆分](completed/20260824-actspace-v2-package-layout-and-plugin-packaging/README.md)。
+- [Agent Scope](completed/20260829-actspace-agent-scope-model/README.md)、[DSH Core](completed/20260829-actspace-dsh-core-rebuild/README.md)、[插件组装与启动](completed/20260829-actspace-dsh-plugin-assembly-and-agent-startup/README.md)。
+- [Profile-first](completed/20260830-actspace-profile-first-runtime-simplification/README.md)、[设置中心](completed/20260830-actspace-settings-center-refactor/README.md)、[模型设置 Maka](completed/20260901-actspace-model-settings-maka-redesign/README.md)。
 
 - [使用统计页面与费用更新](completed/20260906-actspace-usage-statistics/README.md)（P01–P04 实现完成，真实 Electron / Provider 门禁待验收）：中文与设置视觉统一、本地目录、费用来源修复及按需后台更新。
 
@@ -82,6 +79,8 @@
 更早的完成记录直接从 `completed/` 按日期或主题检索，不在本页重复维护完整清单。
 
 ## 已丢弃或被替代
+
+- [DSH-native 旧重定向](discarded/20260829-actspace-dsh-native-plugin-runtime/README.md)：无独立任务，当前入口为 Profile-first。
 
 - 旧版 Agent 工具能力总计划：`discarded/20260527-agent-tool-capabilities.md`
 - 已失效的基础 Bug 人工验收计划：`discarded/开发者手动验收-20260529-bugfix-foundation-manual-acceptance.md`

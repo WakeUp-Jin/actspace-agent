@@ -6,7 +6,7 @@
 
 ## 本次变更
 
-- 新建 `docs/design-docs/v1-legacy/`，集中保存旧 Runtime、Kairos、Lab、旧评估、旧 Todo、fs-watch、DuckCoding 文字模型和相关原型资产。
+- 新建 `docs/archive/v1/design-docs/`，集中保存旧 Runtime、Kairos、Lab、旧评估、旧 Todo、fs-watch、DuckCoding 文字模型和相关原型资产。
 - 更新 `docs/design-docs/index.md`、`agent-index.md`、`docs/ARCHITECTURE.md` 以及当前专题文档，把阅读入口切换到 `agent-plugin-runtime/` 和 v2 Runtime / Host / Session 契约。
 - 修正执行计划、history、reference 和 audit 文档中的旧路径，使历史记录仍可追溯到归档文件。
 - 清理现行工具、前端、Usage、Browser、模型和安全文档中的 Kairos/Lab 产品入口及旧 `agent-core` 路径；保留必要的“已删除/历史背景”说明。
@@ -21,4 +21,4 @@
 - 当前总索引：`docs/design-docs/index.md`
 - Agent 专题入口：`docs/design-docs/agent-index.md`
 - v2 Runtime 入口：`docs/design-docs/agent-plugin-runtime/README.md`
-- 历史归档说明：`docs/design-docs/v1-legacy/README.md`
+- 历史归档说明：`docs/archive/v1/design-docs/README.md`

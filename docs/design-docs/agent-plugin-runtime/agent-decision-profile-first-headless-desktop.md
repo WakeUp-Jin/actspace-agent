@@ -1,5 +1,8 @@
 # Profile-first Runtime：Headless 与 Desktop 目标架构
 
+> 文档等级：decision-record。Profile-first 方向已实施；下文保留当时迁移步骤与取舍。实际基础 `BootedProfile` 和生产 `BootedRuntimeProfile` 的字段、调用链与剩余门禁见 [Runtime 与 Composition](agent-target-runtime-architecture.md)，不按旧字段示意重新设计 API。
+
+
 > 状态：已确认，执行中。本文是当前阶段 Headless/Desktop Profile-first 迁移的设计真源。
 > 日期：2026-08-30
 

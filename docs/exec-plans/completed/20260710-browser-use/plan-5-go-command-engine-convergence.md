@@ -75,7 +75,7 @@
 - `docs/design-docs/browser/agent-browser-use-command-implementation.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
-- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
+- `docs/archive/v1/design-docs/agent-runtime-testing.md`
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
 

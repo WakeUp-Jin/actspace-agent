@@ -288,7 +288,7 @@ checkpoint 失败必须 fail closed：不能发送模型请求、不能进入工
 
 ## 12. Writer lease
 
-Desktop、CLI run、CLI chat 或其他 Host 共享 Session root 时，持久 Session 必须使用跨进程 exclusive writer lease：
+Desktop 与显式持久化的 CLI run 共享 Session root 时，持久 Session 必须使用跨进程 exclusive writer lease：
 
 - 成功持有 lease 的进程才可 append、repair、compact 或提交 fork source transaction；
 - lease identity 至少关联 Session、Host process identity 和本次 writer instance；

@@ -18,7 +18,7 @@
 - `docs/QUALITY_SCORE.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/design-docs/frontend/front-中间消息区规范.md`
-- `docs/design-docs/frontend/front-usage-statistics.md`
+- `docs/archive/v1/design-docs/front-usage-statistics.md`
 - `docs/exec-plans/completed/actspace-usage-statistics-session-jsonl-plan.md`
 
 补充素材：
@@ -62,7 +62,7 @@
 - `packages/desktop/src/renderer/App.tsx`
 - `packages/desktop/src/renderer/components/**`
 - `packages/desktop/src/renderer/fixtures/**`
-- `docs/design-docs/frontend/front-usage-statistics.md`
+- `docs/archive/v1/design-docs/front-usage-statistics.md`
 - `docs/design-docs/frontend/front-中间消息区规范.md`
 
 ## 并行边界

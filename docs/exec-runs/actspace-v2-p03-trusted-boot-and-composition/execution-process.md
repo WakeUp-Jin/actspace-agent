@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-p03-trusted-boot-and-composition.md`
+- **关联计划**：`docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-p03-trusted-boot-and-composition.md`
 - **执行模式**：交互
 - **开始时间**：2026-08-22
 - **当前状态**：本地 published-build API/lifecycle 验证完成；registry integrity 与 packaged Electron 门禁未完成

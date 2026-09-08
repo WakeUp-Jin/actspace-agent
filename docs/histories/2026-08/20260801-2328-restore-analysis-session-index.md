@@ -116,5 +116,5 @@
 - `packages/desktop/src/renderer/test/settings-page.test.tsx`
 - `packages/desktop/src/renderer/test/workbench-responsive.test.tsx`
 - `docs/design-docs/frontend/front-agent-analysis-observability.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `docs/learnings/2026-08/diagnostic-interfaces-need-progressive-disclosure.md`

@@ -27,4 +27,4 @@
 
 - `apps/desktop/src/renderer/components/settings/ProviderSettings.tsx`
 - `apps/desktop/src/renderer/test/provider-model-settings.test.tsx`
-- `docs/exec-plans/active/20260830-actspace-settings-center-refactor/README.md`
+- `docs/exec-plans/completed/20260830-actspace-settings-center-refactor/README.md`

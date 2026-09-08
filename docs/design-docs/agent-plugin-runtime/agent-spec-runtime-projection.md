@@ -2,7 +2,7 @@
 
 > 状态：v2 公共契约基线。
 >
-> 本文定义 Runtime 如何把 Session 与工具运行事实投影给固定 Desktop、CLI run 和 CLI chat。它收口 durable Session projection、live progress、runtime diagnostics、generic tool DTO 和 allowlisted renderer 的边界。实现可以调整 IPC channel、类名和缓存结构，但不得把三个平面重新混成一个事件流。
+> 本文定义 Runtime 如何把 Session 与工具运行事实投影给固定 Desktop 与 CLI run。它收口 durable Session projection、live progress、runtime diagnostics、generic tool DTO 和 allowlisted renderer 的边界。实现可以调整 IPC channel、类名和缓存结构，但不得把三个平面重新混成一个事件流。
 
 上位插件与固定前端兼容策略见 [插件 Runtime ABI](./agent-spec-plugin-runtime-abi.md)；工具执行顺序、lease 和 ordered commit 见 [Tool Runtime ABI](./agent-spec-tool-runtime-abi.md)。
 
@@ -10,7 +10,7 @@
 
 ActSpace v2 前端不插件化。后端插件不能向 Desktop renderer 或 CLI Host 注入、安装或执行 JavaScript、React component、CSS、HTML、模板、动态 import URL 或本地模块路径。
 
-三个 Host 共享同一套 Runtime Projection 语义：
+两个 Host 复用同一套 Runtime Projection 语义：
 
 ```text
 Session Journal --------------> Durable Session Projection
@@ -106,13 +106,11 @@ flowchart LR
 
   HA --> D["Desktop fixed renderer"]
   HA --> R["CLI run"]
-  HA --> C["CLI chat"]
 
   D --> AL["Built-in renderer allowlist"]
   AL -->|"known + valid"| SR["Specialized built-in renderer"]
   AL -->|"unknown / invalid"| GR["Generic fallback"]
   R --> GR
-  C --> GR
 ```
 
 Plugin 只能贡献后端定义、执行结果和可选的 JSON-safe renderer hint。Host Adapter 负责传输和展示适配，不重新判断 Tool policy、不修补 Session、不改变 terminal state。
@@ -434,7 +432,7 @@ Tool renderer hint 永远是 optional enhancement，不能声明 required。一�
 
 ### 9.1 Desktop
 
-- Electron main 持有 BootedProfile、Desktop App Service 和 projection subscription；
+- Electron main 持有 BootedRuntimeProfile、Desktop App Service 和 projection subscription；
 - preload 暴露 typed、窄化、可取消的 snapshot / stream IPC；
 - renderer 不接触 Cordis Context、Session 文件、artifact 路径或 executor；
 - renderer reload 执行 snapshot + cursor 握手，不依赖旧 React state 恢复；
@@ -448,14 +446,9 @@ Tool renderer hint 永远是 optional enhancement，不能声明 required。一�
 - diagnostics 写 stderr；
 - 非 TTY 环境不输出 spinner、颜色控制字符或未结构化 progress。
 
-### 9.3 CLI chat
+### 9.3 Host 一致性
 
-- TTY 使用 generic tool line 展示 state、summary 和 duration；
-- approval 通过 Host Broker 单独交互，不能由 renderer hint 定义；
-- `/resume` 先读取 Durable Projection，再接新 live stream；
-- TTY 不支持专用 renderer 时直接使用 generic fallback，不把插件视为 degraded。
-
-三种 Host 可以有不同排版，不能改变 DTO 状态、failure code、model output、Journal cursor 或是否允许执行。
+Desktop 与 CLI run 可以有不同排版，但不能改变 DTO 状态、failure code、model output、Journal cursor 或是否允许执行。当前不另设交互式 CLI 业务入口。
 
 ## 10. 失败、取消、卸载与恢复
 
@@ -663,7 +656,7 @@ Runtime 重启后不恢复旧 live progress。Session repair 根据 Journal：
 - body 先完成但未轮到 ordered commit 时仍显示 running/finalizing；
 - denied、aborted、failed 都生成非 dangling model output；
 - `OUTCOME_UNKNOWN` 永远是 failed 且不提供自动重试；
-- Desktop、CLI run 和 CLI chat 对相同 Journal facts 输出相同语义字段。
+- Desktop 与 CLI run 对相同 Journal facts 输出相同语义字段。
 
 ### 13.4 Renderer allowlist
 

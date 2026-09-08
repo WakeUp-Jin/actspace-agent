@@ -74,3 +74,11 @@ P1-C 需要消费每个 Service 的唯一 provider、config schema、required/ca
 - [x] 完成 lifecycle/manifest consistency verifier 与 Service graph validator。
 - [x] 完成 fake Consumer、负向 fixture 和 provider lifecycle contract tests。
 - [x] 通过定向门禁、全仓 typecheck/test，并向 P1-C/P2 交接 metadata。
+
+## 2026-09-09 剩余工作复核
+
+已有的完成清单表示 contract slice 交付，不表示所有生产 Consumer 完成窄接口迁移。下一步：
+
+- [ ] 以 `ACTSPACE_SERVICE_IDS` / `ACTSPACE_SERVICE_ROLES`、各 package public exports 和实际 `ctx.provide` / inject 为依据，列出核心 Service 的真实 Provider/Consumer 对照；区分逻辑 Session Core 与当前 `session.store` ID。
+- [ ] 核对 `packages/session/persistence/src/plugin.ts` 暴露的具体 types 与 `activate()` 兼容入口的生产消费链，记录必须迁移的 Consumer 和仅属诊断/兼容的路径，避免只凭 metadata 宣称全部分层完成。
+- [ ] 将上述差距与完整 CLI one-shot lifecycle 验收交接到 [G1 总计划](../20260829-actspace-p1-p2-contract-and-composition/README.md)。原始测试结果继续查 [联合执行摘要](../../../exec-runs/20260829-actspace-p1-session-core-persistence/execution-summary.md)。

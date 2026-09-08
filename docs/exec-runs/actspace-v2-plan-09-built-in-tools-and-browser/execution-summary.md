@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-09-built-in-tools-and-browser.md`
+- **关联计划**：`docs/exec-plans/completed/20260822-actspace-v2-plugin-runtime/actspace-v2-plan-09-built-in-tools-and-browser.md`
 - **执行过程**：`docs/exec-runs/actspace-v2-plan-09-built-in-tools-and-browser/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：实现与本地进程验证完成；工作包仅被真实 Chrome/Extension 门禁阻塞

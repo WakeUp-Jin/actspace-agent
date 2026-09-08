@@ -35,9 +35,9 @@
 
 - **写类工具受 workspace 守卫**：`write_file` / `edit_file` / `bash` 的文件/目录写操作必须经 `workspace-guard.ts#guardWritablePath`，禁止 `..` 逃逸、禁止逃出 `workspaceRoot`。
   - **写越界改为用户审批（2026-07-05）**：`write_file` / `edit_file` 目标越界时不再硬拒绝，权限检查器返回 `ask`（medium 风险、不提供 allow_similar），用户批准后 scheduler 以 `sanitizedArgs` 执行，executor 依据其中的 `APPROVED_OUTSIDE_BOUNDARY_ARG` 标记放行该次写入。该标记只由权限检查器写入，模型自行在参数中传入会在检查阶段被剥除，无法绕过审批。bash 的写路径守卫不变。
-- **读类工具边界**：v2 Tool Runtime 由 Host capability、workspace policy 和 plugin manifest 共同约束读写范围；不得沿用 v1 的任意主 Agent 读边界。历史放开读边界的背景见 [`v1-legacy/model-context-context-compression.md`](design-docs/v1-legacy/model-context-context-compression.md)。
+- **读类工具边界**：v2 Tool Runtime 由 Host capability、workspace policy 和 plugin manifest 共同约束读写范围；不得沿用 v1 的任意主 Agent 读边界。历史放开读边界的背景见 [v1 上下文压缩历史设计](archive/v1/design-docs/model-context-context-compression.md)。
 -  - **当前取舍**：需要回读 Session artifact、诊断或工具输出时，通过显式 artifact / projection capability 授权，不把整个 `userData` 目录提升为默认 workspace。
--  - **v1 guard**：旧 scheduler 双校验属于历史实现，已随 v1 产品路径从 v2 删除；迁移背景见 `docs/design-docs/v1-legacy/`。
+-  - **v1 guard**：旧 scheduler 双校验属于历史实现，已随 v1 产品路径从 v2 删除；迁移背景见 `docs/archive/v1/design-docs/`。
   - **后续收口方向**（记入 `docs/exec-plans/tech-debt-tracker.md`）：补「敏感路径 blocklist + 按需读审核」，而不是恢复 workspace 硬限制。
 - v2 Session 数据存储在统一的 `<dataRoot>/sessions-v2/<sessionId>/journal.jsonl`；macOS 默认 `<dataRoot>` 为 `~/Library/Application Support/ActSpace`，CLI 与 Electron 共用；旧 lowercase data root 和 `<dataRoot>/sessions/` 仅作为用户历史数据原位保留，v2 不混读或自动迁移。
 - 本地更新源码目录路径存储在 `<userData>/local-update.json`，不存密钥；该路径可暴露用户本机目录结构，日志或截图外发前应按需脱敏。

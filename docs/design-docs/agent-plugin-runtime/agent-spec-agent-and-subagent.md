@@ -1,6 +1,6 @@
 # ActSpace v2 Agent 与一次性 Subagent 设计规范
 
-> 状态：v2 公共契约基线。Host-facing `RuntimeHandle` 术语已由 Profile-first 决策中的 `BootedProfile` 与 App Bundle Service 替代。
+> 状态：v2 产品与行为契约基线；应用操作通过 Profile App Service，启动生命周期见 [Runtime 与 Composition](agent-target-runtime-architecture.md)。精确事件名以 [DSH 事件模型](agent-spec-dsh-event-model.md)为准；下文 enqueue/claim 等描述表达行为，不新增同名 wire event。
 >
 > 本文固定 v2 的 Agent 产品形态、Preset、子 Agent 生命周期、Session lineage、工具限制、取消和结果提交语义。字段名、TypeScript API、事件名称与预算数值可以在 execution plan 中细化，但不得改变本文已经确认的产品范围。
 >
@@ -38,7 +38,7 @@ main Agent 必须遵守 ActSpace Agent Core 的共同不变量：
 - 从 root Session Surface 和 scoped contributors 组装每次不可变 logical request；
 - Adapter dispatch 前写入 request snapshot 并通过 durability checkpoint；
 - Tool call、result、Turn 和 Step 关系都进入同一 root Session Journal；
-- 一个 Session 只有一个 active turn，Host 只能通过 `RuntimeHandle` run / abort；
+- 一个 Session 只有一个 active turn，Desktop Host 通过 App Service run / abort，headless 通过 runner 和取消端口接入；
 - Subagent 结果作为一种受 Tool Runtime 顺序约束的委派结果回到 main Agent；
 - main Agent 保留如何使用子结果、是否继续调用工具以及何时结束 Turn 的决定权。
 
@@ -73,7 +73,7 @@ Preset 是 JSON-safe、声明式的 Agent 配方。它至少表达以下语义�
 Preset 可以由受信任的后端插件作为 Effect-owned contribution 注册，但 v2 具有以下固定约束：
 
 - Preset 在 Boot / Startup Validation 阶段完成解析、依赖检查和冲突检查；
-- `RuntimeHandle` ready 后，当前 Runtime 中的 Preset descriptor 不再变化；
+- Profile ready 后，当前 Runtime 中的 Preset descriptor 不再变化；
 - 每个 Agent 创建时捕获 preset identity、版本和解析后的策略，并写入 Session provenance；
 - Preset 只引用稳定 contribution / capability identity，不携带运行期 secret 或任意可执行回调；
 - Preset 变化必须重启 Runtime，不能 live reload。

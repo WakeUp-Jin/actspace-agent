@@ -86,6 +86,6 @@
 - `docs/exec-plans/active/Bash工具和工具权限调度开发计划/actspace-bash-session-allowlist-plan.md`
 - `docs/exec-plans/active/frontend-ui-components-foundation.md`
 - `docs/exec-plans/active/lab-v0-frontend-mock-implementation.md`
-- `docs/design-docs/frontend/front-usage-statistics.md`
+- `docs/archive/v1/design-docs/front-usage-statistics.md`
 - `docs/learnings/2026-05/global-css-reset-vs-tailwind.md`
 - `docs/learnings/2026-05/tailwind-page-slice-migration.md`

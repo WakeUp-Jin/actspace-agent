@@ -20,7 +20,7 @@
 - `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`
 - `docs/design-docs/frontend/front-中间消息区规范.md`
 - `docs/design-docs/frontend/front-聊天输入框规范.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `docs/coding-standards/team/frontend-style-scope-conventions.md`
 
 ## 允许修改的文件

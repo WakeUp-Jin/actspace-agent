@@ -33,7 +33,7 @@
 - `packages/desktop/src/renderer/test/composer.test.tsx`
 - `packages/desktop/src/renderer/test/provider-model-settings.test.tsx`
 - `docs/design-docs/frontend/front-聊天输入框规范.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `docs/design-docs/model-context/agent-multi-provider-llm.md`
 
 ### ✅ Validation

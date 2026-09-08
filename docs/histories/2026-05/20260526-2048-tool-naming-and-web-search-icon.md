@@ -73,8 +73,8 @@
 **文档：**
 - `docs/design-docs/frontend/front-中间消息区规范.md`（web_search 纳入"不使用图标"、Search → Web Search）
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`（新增"工具命名约定"章节）
-- `docs/design-docs/v1-legacy/agent-runtime-current-module-map.md`（edit_file 命名声明）
-- `docs/design-docs/v1-legacy/agent-runtime-backend-design.md`（edit-file → edit_file，3 处）
+- `docs/archive/v1/design-docs/agent-runtime-current-module-map.md`（edit_file 命名声明）
+- `docs/archive/v1/design-docs/agent-runtime-backend-design.md`（edit-file → edit_file，3 处）
 - `docs/design-docs/model-context/agent-deepseek-kimi-hybrid-capabilities.md`（举例换成 grep/glob）
 - `docs/design-docs/core-storage-and-observability.md`（edit-file → edit_file）
 - `docs/exec-plans/active/actspace-grep-glob-rg-tools-and-ui.md`（补"已下线 search_files"跟进）

@@ -34,4 +34,4 @@ Repeated `read_file` calls were a direct contributor to context growth and poor 
 - `packages/agent-core/src/tools/manager.ts`
 - `packages/agent-core/src/tools/types.ts`
 - `packages/agent-core/src/tools/test/read-file.test.ts`
-- `docs/design-docs/v1-legacy/model-context-context-compression.md`
+- `docs/archive/v1/design-docs/model-context-context-compression.md`

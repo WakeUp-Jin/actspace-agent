@@ -6,7 +6,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260829-actspace-dsh-plugin-assembly-and-agent-startup/README.md`
+- **关联计划**：`docs/exec-plans/completed/20260829-actspace-dsh-plugin-assembly-and-agent-startup/README.md`
 - **执行过程**：`docs/exec-runs/20260829-actspace-dsh-plugin-assembly-and-agent-startup/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：进行中

@@ -113,7 +113,7 @@
 
 - `docs/design-docs/frontend/front-聊天输入框规范.md`
 - `docs/design-docs/frontend/front-左侧会话栏规范.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `docs/FRONTEND_VERIFICATION.md`（仅当验证方式发生变化）
 - `docs/TODOLIST.md`
 - `docs/exec-plans/README.md`

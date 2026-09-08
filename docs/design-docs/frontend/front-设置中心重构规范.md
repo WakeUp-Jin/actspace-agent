@@ -1197,14 +1197,16 @@ Usage UI
 
 ### Maka 参考实现
 
-- [`settings-nav.ts`](../../../tmp/maka/apps/desktop/src/renderer/settings/settings-nav.ts)
-- [`settings-surface.tsx`](../../../tmp/maka/apps/desktop/src/renderer/settings/settings-surface.tsx)
-- [`settings-section.tsx`](../../../tmp/maka/apps/desktop/src/renderer/settings/settings-section.tsx)
-- [`settings-expandable-row.tsx`](../../../tmp/maka/apps/desktop/src/renderer/settings/settings-expandable-row.tsx)
-- [`providers-panel.tsx`](../../../tmp/maka/apps/desktop/src/renderer/settings/providers-panel.tsx)
-- [`provider-connection-detail.tsx`](../../../tmp/maka/apps/desktop/src/renderer/settings/provider-connection-detail.tsx)
-- [`personalization-settings-section.tsx`](../../../tmp/maka/apps/desktop/src/renderer/settings/personalization-settings-section.tsx)
-- [`usage-settings-page.tsx`](../../../tmp/maka/apps/desktop/src/renderer/settings/usage-settings-page.tsx)
+以下快照不随 Git 仓库分发，路径仅用于追溯本机研究证据；新检出无需具备这些文件。
+
+- settings-nav.ts（历史快照路径：`tmp/maka/apps/desktop/src/renderer/settings/settings-nav.ts`）
+- settings-surface.tsx（历史快照路径：`tmp/maka/apps/desktop/src/renderer/settings/settings-surface.tsx`）
+- settings-section.tsx（历史快照路径：`tmp/maka/apps/desktop/src/renderer/settings/settings-section.tsx`）
+- settings-expandable-row.tsx（历史快照路径：`tmp/maka/apps/desktop/src/renderer/settings/settings-expandable-row.tsx`）
+- providers-panel.tsx（历史快照路径：`tmp/maka/apps/desktop/src/renderer/settings/providers-panel.tsx`）
+- provider-connection-detail.tsx（历史快照路径：`tmp/maka/apps/desktop/src/renderer/settings/provider-connection-detail.tsx`）
+- personalization-settings-section.tsx（历史快照路径：`tmp/maka/apps/desktop/src/renderer/settings/personalization-settings-section.tsx`）
+- usage-settings-page.tsx（历史快照路径：`tmp/maka/apps/desktop/src/renderer/settings/usage-settings-page.tsx`）
 
 ### 外部参考资料
 

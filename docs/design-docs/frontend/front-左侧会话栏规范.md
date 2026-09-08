@@ -41,7 +41,7 @@
 - `New Agent`：替代原 `New chat`，承担"开启一次新的 Agent 任务"语义；展示快捷键 `⌘N`。
 - `扩展`：管理能力、Skills 与 MCP，保留会话侧栏；Usage 位于设置中心的「活动」分组。
 - 两个入口共用同一组 hover / active 状态语言；当前 view 视为 active。
-- Kairos 与 Lab 不属于当前公开导航；历史原型和设计资产见 `docs/design-docs/v1-legacy/`。
+- Kairos 与 Lab 不属于当前公开导航；历史原型和设计资产见 `docs/archive/v1/design-docs/`。
 
 ## 分区列表
 

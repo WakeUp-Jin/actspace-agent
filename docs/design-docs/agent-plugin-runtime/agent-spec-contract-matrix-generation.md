@@ -1,8 +1,14 @@
 # Agent Contract Matrix 自动生成规范
 
-> 状态：目标设计已确认；P2 generator、双产物与 `--check` 已实施，完整全仓 G2 仍待执行。
+> 状态：目标设计已确认；P2 generator、双产物与字节 `--check` 已实施。2026-09-09 源码复核确认语义 validator 与负向 fixtures 不完整，P2 保留 active；不是只剩全仓命令重跑。
 >
 > 本规范定义 P2 的只读审计产物：从插件 manifest、Service Definition、Session Codec、Agent Loop surface、Profile/Bundle/Patch 和 package exports 生成契约矩阵。矩阵用于发现漂移和审查覆盖，不成为 Runtime 的第二套配置或运行时事实源。
+
+## 当前实现边界
+
+`validateRows()` 已检查重复 ID、缺 owner/sourceRefs、绝对路径、缺 Provider ID、13/9/5 事件计数与 notification veto。本文要求的 manifest/inject/provide 一致性、依赖环、Consumer 私有 Provider 依赖、Host ceiling、composition digest 和 sourceRef/public export 语义检查仍需补齐并分别建立负向 fixture。旧执行摘要的 G2 PASS 保留为当时验证结果，不证明下述全部目标已实现。
+
+现有 `--check` 比较重新生成的字节，能发现声明变化后产物未更新；它不能替代语义 validator。具体剩余任务见 [P2 计划](../../exec-plans/active/20260829-actspace-p2-contract-matrix/README.md)。
 
 ## 1. 决策摘要
 

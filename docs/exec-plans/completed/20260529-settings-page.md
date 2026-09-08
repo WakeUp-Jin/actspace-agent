@@ -29,7 +29,7 @@
   - `docs/ARCHITECTURE.md`
   - `docs/SECURITY.md`
   - `docs/FRONTEND.md` 与 `docs/FRONTEND_VERIFICATION.md`
-  - `docs/design-docs/frontend/front-设置页规范.md`
+  - `docs/archive/v1/design-docs/front-设置页规范.md`
   - `docs/design-docs/frontend/front-全局视觉语言规范.md`
   - `docs/coding-standards/team/frontend-style-scope-conventions.md`
 - 相关代码路径：

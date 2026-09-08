@@ -15,7 +15,7 @@
 ## 附加必读
 
 - `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
-- `docs/design-docs/v1-legacy/execution-safety-agent-bash工具设计文档.md`
+- `docs/archive/v1/design-docs/execution-safety-agent-bash工具设计文档.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `packages/agent-core/src/tools/manager.ts`
 - `packages/agent-core/src/tools/scheduler.ts`

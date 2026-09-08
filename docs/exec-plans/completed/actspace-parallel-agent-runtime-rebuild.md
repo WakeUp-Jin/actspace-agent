@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-本计划已被 `docs/design-docs/v1-legacy/agent-runtime-backend-design.md` 拆分为更细的后端并行计划，不再作为 active 执行入口保留。
+本计划已被 `docs/archive/v1/design-docs/agent-runtime-backend-design.md` 拆分为更细的后端并行计划，不再作为 active 执行入口保留。
 
 新的 active 后端计划包括：
 

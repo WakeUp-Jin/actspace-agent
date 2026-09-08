@@ -19,6 +19,8 @@
 
 ## 按任务需要选读
 
+- `docs/README.md`：文档总导航；当前 v2 专题、执行计划和 `docs/archive/v1/` 历史归档的阅读边界。
+
 - `docs/PLANS_GUIDE.md`：什么时候要写 execution plan，怎么维护，两种执行模式。
 - `docs/exec-runs/README.md`：执行计划时的过程记录和验收文档怎么写。
 - `docs/nono-profiles/README.md`：夜间模式的 nono 沙箱配置和启动方式。

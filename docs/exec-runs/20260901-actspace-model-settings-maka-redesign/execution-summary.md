@@ -10,7 +10,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260901-actspace-model-settings-maka-redesign/README.md`
+- **关联计划**：`docs/exec-plans/completed/20260901-actspace-model-settings-maka-redesign/README.md`
 - **执行过程**：`docs/exec-runs/20260901-actspace-model-settings-maka-redesign/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：M1、P2、连接级模型绑定、自定义兼容连接及多连接 UI/持久化已完成；添加连接增量及浏览器 Renderer 预览已完成；真实 Electron 截图验收仍未完成（本轮 CUA 无法识别开发应用，返回 Invalid app）。
@@ -20,7 +20,7 @@
 | 变更 | 影响文件 | 说明 |
 | --- | --- | --- |
 | 模型页 Maka 风格重做规范 | `docs/design-docs/frontend/front-模型设置页面-Maka重做规范.md` | 冻结列表、目录、配置、详情和模型目录的页面语法 |
-| 模型页独立执行计划 | `docs/exec-plans/active/20260901-actspace-model-settings-maka-redesign/README.md` | 规定阶段、边界、风险和验收方式 |
+| 模型页独立执行计划 | `docs/exec-plans/completed/20260901-actspace-model-settings-maka-redesign/README.md` | 规定阶段、边界、风险和验收方式 |
 | 执行记录 | `docs/exec-runs/20260901-actspace-model-settings-maka-redesign/` | 记录实施过程和最终人工验收指引 |
 | 模型连接列表 | `apps/desktop/src/renderer/components/settings/ProviderSettings.tsx` | 扁平连接行、目录筛选、页面内配置和 Maka 风格详情分隔行 |
 | 模型目录嵌入 | `apps/desktop/src/renderer/components/settings/ModelSettings.tsx` | 按 Provider 过滤并在连接详情中展示 |

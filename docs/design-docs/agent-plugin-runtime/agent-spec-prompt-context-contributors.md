@@ -183,7 +183,7 @@ Skill discovery、选择和内容读取仍由 Skill Service 负责。Prompt Cont
 
 Host 只提供一份受限、JSON-safe 的 capability snapshot，例如：
 
-- Host kind：Desktop、CLI run 或 CLI chat；
+- Host surface：Desktop 或 CLI run；
 - workspace root 与当前 cwd；
 - sandbox mode 与允许写入的 roots；
 - approval mode 和可用审批交互；
@@ -245,7 +245,7 @@ Request Assembly 的结构化诊断至少区分：
 7. 插件或 Agent Scope dispose 后，新请求看不到其 Contributor；已准备请求保持不变。
 8. Skill catalog 与 selected body 有清晰 provenance，不能读取未授权路径。
 9. Compaction 只通过 Journal replacement 改变后续 Surface，原始历史仍可审计。
-10. Desktop、CLI run 和 CLI chat 对相同 Composition 使用同一套 assembly 语义。
+10. Desktop 与 CLI run 对相同 Composition 使用同一套 assembly 语义。
 
 ## 15. 与其他规范的关系
 

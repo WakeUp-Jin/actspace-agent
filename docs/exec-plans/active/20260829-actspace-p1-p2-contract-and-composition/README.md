@@ -1,6 +1,6 @@
 # ActSpace P1/P2：Session、Service、Composition 与契约矩阵
 
-状态：实施中；P1-A、P1-B、P1-C、P2 contract slices 已交付，G1/G2 收口待执行。
+状态：实施中；P1-A、P1-B、P1-C、P2 contract slices 已交付，G1 跨包收口待执行；P2 字节漂移检查通过，但完整 G2 语义门禁仍有缺口。
 
 确认日期：2026-08-29
 
@@ -177,11 +177,18 @@ pnpm run gen:contract-matrix --check
 - [x] P1-B Service Roles contract slice 完成；全仓门禁待 G1。
 - [x] P1-C Profile / Bundle / Patch schema、digest、loader transport parity 完成；restart/one-shot 待 G1。
 - [ ] G1 CLI one-shot 跨包回归。
-- [x] P2 Contract Matrix generator、产物、`--check` 和 CI wiring 完成；G2 自动化门禁已通过。
+- [x] P2 Contract Matrix generator、产物、字节 `--check` 和 CI wiring 完成；旧摘要记录当时 G2 通过。
+- [ ] 2026-09-09 复核：补齐 P2 原验收要求的语义 validator 与负向 fixtures 后再完成 G2，不以字节一致性代替语义校验。
 - [x] 更新对应 execution-runs、history 和必要的 learning 文档。
 
-执行记录已按 [exec-runs 规范](../../../exec-runs/README.md) 更新；当前仍保留 G1/G2 未完成边界，不把定向 contract slice 误报为最终运行时验收。
+执行记录已按 [exec-runs 规范](../../../exec-runs/README.md) 更新；当前仍保留 G1 未完成边界；G2 原始通过记录与本次发现的语义检查缺口分别留痕，不把定向 contract slice 误报为最终运行时验收。
 
 ## 13. 交接要求
 
 每个子计划交接时必须提供：修改文件清单、公开 contract diff、定向测试命令及结果、未通过的外部门禁、回滚点和下游消费说明。下一个 Agent 先读本 README、对应设计规范和 `AGENTS.md`，再开始代码修改。
+
+## 2026-09-09 状态复核
+
+P1-A/B/C 的实施记录集中在 [联合执行摘要](../../../exec-runs/20260829-actspace-p1-session-core-persistence/execution-summary.md)。子计划的 contract slice 不等于本计划第 9 节的完整 G1 通过。下一步统一由 G1 收集 fresh/resume、tool/no-tool、retry/error/abort、flush/dispose 证据，避免各子计划重复宣称整体验收完成。
+
+P2 保留 active；字节漂移检查已恢复通过，语义 validator 与负向 fixtures 的剩余工作见 P2 实施范围复核。本轮全仓 typecheck/test 在中文界面任务收口后已通过，详见 [本次文档复核](../../../exec-runs/20260908-docs-v1-archive-v2-refresh/followup-audit.md)；这些通用回归不能替代上方完整 G1 CLI/process 矩阵或 P2 缺失的语义检查。

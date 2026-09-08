@@ -1,12 +1,14 @@
 # 核心 Cordis Service 化与能力 seam 规范
 
-> 状态：P0 已实现；P1-B Service Definition / Provider / Consumer contract 仍按独立计划收口。文中的 Host-facing facade / `RuntimeHandle` 术语属于迁移前语境，当前入口是 `BootedProfile` 与 Profile App Bundle Service。
+> 状态：P0 已实现；P1-B Service Definition / Provider / Consumer contract 仍按独立计划收口。启动与应用职责已按当前 Profile-first 校准；基础 BootedProfile 与生产 BootedRuntimeProfile 的区别见 [Runtime 文档](agent-target-runtime-architecture.md)。
 >
-> 本文承接 ActSpace 已完成的 DSH-native Boot、`cordis.yml`、`apply(ctx, config)`、Session 事件和 AgentLoop 启动工作，专门规定下一轮“核心运行时能力 Service 化”的边界。本文是设计规范，不授权开始代码实施；对应执行步骤见 [核心 Cordis Service 化计划](../../exec-plans/active/20260829-actspace-core-cordis-services/README.md)。
+> 本文承接 ActSpace 已完成的 DSH-native Boot、`cordis.yml`、`apply(ctx, config)`、Session 事件和 AgentLoop 启动工作，专门规定下一轮“核心运行时能力 Service 化”的边界。本文是设计规范，不授权开始代码实施；对应执行步骤见 [核心 Cordis Service 化计划](../../exec-plans/completed/20260829-actspace-core-cordis-services/README.md)。
+
+> 阅读分工（2026-09-09）：本文保留 P0 Service 化的领域职责和历史设计推导；当前三层 ABI、Service ID、ownership 与剩余实施差距统一维护在 [Service Definition / Provider / Consumer](agent-spec-service-definition-provider-consumer.md)。以下迁移措辞和 append 示意属于当时设计，不应覆盖当前 SessionPersistenceDriver 与 write-behind 实现。
 
 ## 1. 决策摘要
 
-ActSpace 采用 DSH 的核心原则：长期存在的运行时能力由 Cordis Service 创建、注入、观测和释放，Bootstrap 只负责启动插件树并返回 `BootedProfile`，产品操作由 Profile App Bundle Service 提供。
+ActSpace 采用 DSH 的核心原则：长期存在的运行时能力由 Cordis Service 创建、注入、观测和释放，Bootstrap 负责启动插件树；生产入口返回 `BootedRuntimeProfile`，产品操作由 Profile App Bundle Service 提供。
 
 这里的“Service 化”不是把所有 class 都改成 `extends Service`，而是把拥有运行时状态、外部资源、事件注册或可替换能力的对象纳入 Cordis 生命周期；纯数据对象、事件值、codec 和具体工具 executor 仍保持普通领域实现。
 
@@ -21,7 +23,7 @@ cordis.yml / Bundle / Patch
         ↓
 Cordis Service graph
         ↓
-RuntimeHandle facade
+Headless Runner / Desktop App Service
         ↓
 CLI / Desktop Host
 ```
@@ -37,7 +39,7 @@ Runtime 不再通过 `new SessionStore()`、`new LlmService()`、`new ToolRuntim
 - `static inject`、`static Config`、`ctx.effect`、错误和 dispose 契约；
 - Session live log 与持久化后端分离；
 - Agent、Subagent、Tool execution 的作用域和资源归属；
-- Runtime Boot、RuntimeHandle 与 Host capability 的收缩边界；
+- Runtime Boot、Profile 生命周期与 Host capability 的收缩边界；
 - 13 个核心 Session 事件、9 个 Agent Loop 干预事件、5 个主要通知在新 Service 图中的位置；
 - 保留 ActSpace 具体工具 executor 的参数、路径、安全和结果行为。
 
@@ -47,7 +49,7 @@ Runtime 不再通过 `new SessionStore()`、`new LlmService()`、`new ToolRuntim
 - 不实现 CLI chat UX、Goal/Schedule producer、在线 HMR 或配置热替换；
 - 不引入不可信插件的签名、市场、远程下载或进程沙箱；
 - 不改变 13 个核心 Session 事件的名字、顺序和恢复语义；
-- 不把 RuntimeHandle 变成可访问 Cordis Context、Session writer 或具体 Service 实例的公共 API；
+- 不将同进程 Context、Session writer 或 Service 实例序列化到 IPC 或 renderer；
 - 不在本规范中承诺 SQLite、远程 Session 或其他未来 Provider 已经实现。
 
 ## 3. 核心概念
@@ -57,10 +59,10 @@ Runtime 不再通过 `new SessionStore()`、`new LlmService()`、`new ToolRuntim
 | Domain object | 纯数据、值对象、一次调用的 prepared state | 否 |
 | Service Definition | 稳定接口、类型、事件和错误契约 | 通常否，作为公共包导出 |
 | Service Provider | 一个可替换实现，例如 JSONL、pi-ai、本地工具执行器 | 是 |
-| Consumer | 使用 Definition 的 AgentLoop、CLI、Projection 或工具 schema | 是或由 Host 使用 facade |
+| Consumer | 使用 Definition 的 AgentLoop、CLI、Projection 或工具 schema | 是或由同进程 Host 消费应用 Service |
 | Runtime Service | 拥有长期状态、注册表、监听器和异步资源的服务实例 | 是 |
 | Bootstrap | 创建 root、安装 Loader、注入 Host、等待 settlement、关闭 root | 固定启动代码，不是业务 Service |
-| RuntimeHandle | Host-facing 的稳定 facade | 由 Bootstrap 在 settlement 后创建 |
+| Profile 启动结果 | Context、manifest、诊断与 shutdown；业务操作属于 App Service | 由 Bootstrap 在 settlement 后发布 |
 
 一个能力只有在 Definition、Provider、Consumer 三者边界足够独立时才称为 seam。一个包可以暂时承担多个角色，但 Consumer 不得依赖 Provider 的私有 class。
 
@@ -73,10 +75,10 @@ Runtime 不再通过 `new SessionStore()`、`new LlmService()`、`new ToolRuntim
 | LLM | `LlmRuntime` | route、model、PreparedCall、stream、failure | pi-ai/provider adapters | AgentLoop、Compaction、title |
 | Prompt / Context | `SystemPrompt` / `ContextAssembler` | contributor、request snapshot、tool schema | prompt/context contributors | AgentLoop、CLI inspect |
 | Tools | `ToolRuntime` | definition、prepared execution、policy、result | core-tools、browser-tools、future providers | AgentLoop、Subagent |
-| Agent | `AgentRegistry` | Agent、scope、inbox、lifecycle | main/subagent registrations | AgentLoop、RuntimeHandle |
+| Agent | `AgentRegistry` | Agent、scope、inbox、lifecycle | main/subagent registrations | AgentLoop、App Service |
 | Loop | `AgentLoop` | turn/step/request contract、9 intervention events | default loop driver | AgentRuntime、Headless runner |
 | Compaction | `Compaction` | policy、region、summary、recovery | basic summarizer/provider | AgentLoop event consumer |
-| Run orchestration | `AgentRuntime` | run/followup/abort/idle facade | headless/subagent drivers | RuntimeHandle、CLI |
+| Run orchestration | `AgentRuntime` | run/followup/abort/idle facade | headless/subagent drivers | App Service、Headless runner |
 
 ### 4.1 不应 Service 化的对象
 
@@ -114,7 +116,7 @@ flowchart TD
   BOOT --> AGENT_RUNTIME[AgentRuntime Service]
   AGENT_RUNTIME --> REGISTRY
   AGENT_RUNTIME --> LOOP
-  BOOT --> FACADE[RuntimeHandle facade]
+  BOOT --> FACADE[Headless Runner / Desktop App Service]
   FACADE --> AGENT_RUNTIME
   FACADE --> SESSION
 ```
@@ -132,7 +134,7 @@ SessionStore → SessionPersistence adapter
 禁止出现：
 
 - `SessionPersistence → SessionStore` 的反向业务依赖；
-- `AgentRegistry → AgentRuntime` 或 `AgentRegistry → RuntimeHandle`；
+- `AgentRegistry → AgentRuntime` 或 `AgentRegistry → App Service`；
 - Tool executor 直接依赖 Runtime、写 Journal 或写 CLI stdout；
 - Runtime 读取 Service 私有字段、绕过 Definition 取得 Provider；
 - Service 之间通过模块级可变 singleton 共享状态。
@@ -167,7 +169,7 @@ import / validate
     → DISPOSED
 ```
 
-Service 激活失败必须让 Loader settlement 失败，并释放已建立的 Effect。不得发布一个缺少 required provider 的半成品 RuntimeHandle。
+Service 激活失败必须让 Loader settlement 失败，并释放已建立的 Effect。不得发布一个缺少 required provider 的半初始化 Profile 启动结果。
 
 ## 7. 各 Service 的边界
 
@@ -247,7 +249,7 @@ Compaction 是可选 Service/Provider，通过 `agent/pre-step` 和 `agent/reque
 
 `AgentRuntime` 是薄的运行编排 Service：管理 main/subagent、RunController、followup、abort、idle/quiescence 和 Host facade 所需查询。它不重新实现 Session、Loop、Tool 或 LLM。
 
-RuntimeHandle 只能调用 `AgentRuntime` 的稳定 facade，不得取得内部 assembly、writer 或 Service class。
+应用 Service 通过已注入的领域契约执行任务；Host 不将内部 assembly、writer 或 Service 实例传入 IPC/renderer。
 
 ## 8. 事件与持久化边界
 
@@ -273,7 +275,7 @@ Waterfall 必须支持真实 `next()` around middleware：listener 可以修改�
 - 注入 Host capability ceiling；
 - 加载 `cordis.yml` / Bundle / Patch；
 - 等待 settlement 和 required Service validation；
-- 创建 RuntimeHandle；
+- 发布生产 BootedRuntimeProfile；
 - 执行 quiesce、flush、dispose 和错误边界。
 
 ### Runtime 不再保留
@@ -292,7 +294,7 @@ Waterfall 必须支持真实 `next()` around middleware：listener 可以修改�
 
 ```text
 import/config/inject/app/settlement failure
-    → 不发布 RuntimeHandle
+    → 不发布可用的 Profile 启动结果
     → dispose partial Context
     → diagnostics 包含 entry、plugin、service 和依赖链
 ```
@@ -321,7 +323,7 @@ import/config/inject/app/settlement failure
 6. 两个 Agent 的 scoped events 不串线，父 scope/child scope 的可见性有测试；
 7. 13 核心事件、9 干预事件、5 通知事件和工具行为 parity 全部保持；
 8. CLI 单次 run 仍然满足 boot → followup → inbox → turn → flush → end-seed → dispose；
-9. RuntimeHandle 不暴露 Context、Fiber、Session writer、Provider class 或具体 AgentLoop class；
+9. Context 只供受信任的同进程调用方消费；Fiber、Session writer、Provider class 和具体 AgentLoop 实例不进入 IPC/renderer；
 10. `pnpm -r typecheck`、`pnpm -r test`、文档/包边界/legacy removal 检查通过。
 
 ## 12. 选择与排除

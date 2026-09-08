@@ -86,7 +86,7 @@ Plan 5 的 7 个设计闸门已于 2026-07-10 全部确认；M0-M6 已完成，6
 - `docs/design-docs/browser/agent-browser-use-integration-design.md`
 - `docs/design-docs/browser/agent-browser-use-command-surface.md`
 - `docs/design-docs/browser/agent-browser-bridge-design.md`
-- `docs/design-docs/v1-legacy/agent-runtime-testing.md`
+- `docs/archive/v1/design-docs/agent-runtime-testing.md`
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`
 - `docs/design-docs/execution-safety/agent-权限设计规则和原则.md`
 - `docs/HISTORY_GUIDE.md`

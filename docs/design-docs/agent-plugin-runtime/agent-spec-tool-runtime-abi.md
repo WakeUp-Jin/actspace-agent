@@ -273,7 +273,7 @@ Policy hook 不得：
 只有 Host Adapter 提供的 Approval Broker 能产生 approval decision：
 
 - Desktop 映射到 IPC 审批 UI；
-- CLI chat 映射到 TTY 审批；
+- 当前 CLI run 不提供交互式审批页面，按 headless 审批结果结束或拒绝执行；
 - CLI run 由显式 permission mode 决定，不能交互时返回稳定拒绝或 `APPROVAL_REQUIRED`；
 - 无 Broker 且 policy 要求审批时 fail-closed。
 

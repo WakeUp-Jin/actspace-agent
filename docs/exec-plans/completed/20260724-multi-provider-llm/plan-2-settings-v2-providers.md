@@ -14,7 +14,7 @@
 
 - `docs/SECURITY.md`
 - `docs/RELIABILITY.md`
-- `docs/design-docs/frontend/front-设置页规范.md`
+- `docs/archive/v1/design-docs/front-设置页规范.md`
 - `packages/desktop/src/main/settings-service.ts`
 - `packages/desktop/src/main/test/settings-service.test.ts`
 - `packages/desktop/src/main/index.ts` 中 settings IPC 与 `testProviderConnection`

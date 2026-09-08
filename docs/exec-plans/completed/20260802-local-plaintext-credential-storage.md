@@ -11,7 +11,7 @@
 
 ## 背景
 
-- 相关文档：`docs/SECURITY.md`、`docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/frontend/front-设置页规范.md`。
+- 相关文档：`docs/SECURITY.md`、`docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/archive/v1/design-docs/front-设置页规范.md`。
 - 相关代码路径：`packages/desktop/src/main/settings-service.ts`、`packages/desktop/src/main/index.ts`、`packages/shared/src/settings.ts`、`packages/desktop/src/renderer/components/settings/ProviderSettings.tsx`。
 - 已知约束：Key 只在 main 进程使用；renderer 只接收配置状态；开发版和安装版固定共用 `~/Library/Application Support/actspace`。
 

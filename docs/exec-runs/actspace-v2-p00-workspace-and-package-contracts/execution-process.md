@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20260824-actspace-v2-package-layout-and-plugin-packaging/actspace-v2-p00-workspace-and-package-contracts.md`
+- **关联计划**：`docs/exec-plans/completed/20260824-actspace-v2-package-layout-and-plugin-packaging/actspace-v2-p00-workspace-and-package-contracts.md`
 - **执行模式**：交互
 - **开始时间**：2026-08-25
 - **结束时间**：2026-08-25
