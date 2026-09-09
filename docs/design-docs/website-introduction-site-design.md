@@ -12,6 +12,8 @@ last_updated: 2026-07-29
 
 本文档定义 ActSpace 对外网站的长期产品、内容、视觉和交付边界。首版工程已在 `apps/site` 落地；后续迭代继续以本文档作为事实与取舍入口。
 
+2026-09-09 视觉探索：已提供 [A / B / C 三版交互 Demo](website-style-demo.html) 与[方向说明](website-style-demo.md)，等待用户选择。该原型独立于 `apps/site`，尚未变更正式网站或替换本文的已落地方向。
+
 网站包含五个主要产品面：
 
 - `/`：ActSpace 产品介绍主页。
