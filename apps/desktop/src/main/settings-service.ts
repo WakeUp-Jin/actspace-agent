@@ -9,6 +9,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { dirname, isAbsolute, join } from "node:path";
 import {
   BUILTIN_MODEL_LIST,
+  DEEPSEEK_FLASH_KEY,
   DEFAULT_IMAGE_GENERATION_BASE_URL,
   DEFAULT_IMAGE_GENERATION_MODEL,
   DEFAULT_IMAGE_INSPECTION_MODEL_KEY,
@@ -1759,7 +1760,7 @@ function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string): {
         } satisfies SettingsV4["models"]["connections"][string]]];
       })),
       definitions: sanitizeCustomModels(definitions),
-      installed: Object.fromEntries(Object.entries(installed).flatMap(([modelKey, value]) => {
+      installed: Object.fromEntries(Object.entries(installed).sort(([a], [b]) => modelKeyMigrationPriority(a) - modelKeyMigrationPriority(b)).flatMap(([modelKey, value]) => {
         const normalized = normalizeModelKey(modelKey);
         if (!normalized || !isRecord(value)) return [];
         const providerId = normalized.split(":")[0] as LlmProviderId;
@@ -2187,13 +2188,18 @@ function sanitizeConnectionState(input: unknown, fallback: ProviderConnectionSta
   };
 }
 
+function modelKeyMigrationPriority(key: string): number {
+  if (key === "deepseek:deepseek-v4-pro" || key === "deepseek-v4-pro") return 0;
+  return key === normalizeModelKey(key) ? 2 : 1;
+}
+
 function sanitizeInstalledModels(
   input: unknown,
   fallback: Partial<Record<ModelKey, InstalledModelSettings>>,
 ): Partial<Record<ModelKey, InstalledModelSettings>> {
   const out = cloneJson(fallback);
   if (!isRecord(input)) return out;
-  for (const [rawKey, value] of Object.entries(input)) {
+  for (const [rawKey, value] of Object.entries(input).sort(([a], [b]) => modelKeyMigrationPriority(a) - modelKeyMigrationPriority(b))) {
     const key = normalizeModelKey(rawKey);
     if (!key || !isRecord(value)) continue;
     out[key] = sanitizeInstalledModel(value, out[key] ?? { enabled: false, addedAt: BUILTIN_MODEL_ADDED_AT });
@@ -2242,9 +2248,11 @@ function connectionModelPatch(input: CustomConnectionInput, connectionId: string
 function sanitizeCustomModels(input: unknown): Partial<Record<ModelKey, ModelDefinition>> {
   const out: Partial<Record<ModelKey, ModelDefinition>> = {};
   if (!isRecord(input)) return out;
-  for (const [rawKey, value] of Object.entries(input)) {
+  for (const [rawKey, value] of Object.entries(input).sort(([a], [b]) => modelKeyMigrationPriority(a) - modelKeyMigrationPriority(b))) {
     const key = normalizeModelKey(rawKey);
-    if (key && isValidModelDefinition(value, key)) out[key] = cloneJson(value);
+    // Official Flash facts replace retired/alias catalog records; connection-specific models keep their own keys.
+    if (key === DEEPSEEK_FLASH_KEY) continue;
+    if (key && isValidModelDefinition(value, key)) out[key] = { ...cloneJson(value), key };
   }
   return out;
 }
@@ -2300,7 +2308,7 @@ function normalizeNullableModelKey(value: unknown): ModelKey | null {
 }
 
 function isModelId(value: unknown): value is ModelId {
-  return typeof value === "string" && isPublicModelId(value);
+  return typeof value === "string" && (isPublicModelId(value) || value === "deepseek-v4-pro");
 }
 
 function isConnectionErrorKind(value: unknown): value is ProviderConnectionState["errorKind"] {

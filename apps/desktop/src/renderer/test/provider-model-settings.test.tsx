@@ -562,7 +562,7 @@ describe("provider and model settings", () => {
     expect(screen.getByRole("heading", { name: "删除连接", level: 4 })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "选择启用模型" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "测试连接" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "更新模型目录" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "更新模型目录" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "测试" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "移除" })).not.toBeInTheDocument();
   });
@@ -759,4 +759,35 @@ describe("provider and model settings", () => {
     fireEvent.keyDown(dialog, { key: "Escape" });
     await waitFor(() => expect(opener).toHaveFocus());
   });
+});
+
+it("refreshes the DeepSeek catalog, reloads installed models, and reports errors without dropping them", async () => {
+  const listInstalledModels = vi.fn(async () => ({ models: [] }));
+  const reloadModelCatalog = vi.fn(async () => ({ provider: "deepseek" as const, state: "fresh" as const, stale: false, models: [{ ...openRouterModel, provider: "deepseek" as const, apiModel: "deepseek-flash" }], skippedCount: 0, fetchedAt: "2026-09-10T05:00:00Z" }));
+  const onChanged = vi.fn();
+  window.actspace = { listProviders: async () => ({ providers: providerViews, credentialStorage: readyCredentialStorage }), listInstalledModels, reloadModelCatalog } as unknown as ActspaceBridge;
+  render(<ProviderSettings settings={{ providers: providerViews } as AppSettings} onChanged={onChanged} />);
+  await userEvent.click(await screen.findByRole("button", { name: /^DeepSeek/ }));
+  const before = listInstalledModels.mock.calls.length;
+  await userEvent.click(screen.getByRole("button", { name: "更新模型目录" }));
+  expect(reloadModelCatalog).toHaveBeenCalledWith({ provider: "deepseek" });
+  await screen.findByText(/已更新 1 个模型/);
+  expect(onChanged).toHaveBeenCalled();
+  expect(listInstalledModels.mock.calls.length).toBeGreaterThan(before);
+  reloadModelCatalog.mockRejectedValueOnce(new Error("network"));
+  await userEvent.click(screen.getByRole("button", { name: "更新模型目录" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("已保留本地目录");
+  expect(screen.getByRole("button", { name: "更新模型目录" })).toBeEnabled();
+});
+
+it("adds a DeepSeek catalog model using its own provider and refreshes consumers", async () => {
+  const onAdded = vi.fn();
+  const listModelCatalog = vi.fn(async () => ({ provider: "deepseek", state: "fresh", stale: false, models: [{ ...openRouterModel, provider: "deepseek", apiModel: "deepseek-flash", name: "DeepSeek V4.1 Flash" }], skippedCount: 0 }));
+  const addModel = vi.fn(async () => ({ ok: true }));
+  window.actspace = { listModelCatalog, addModel } as unknown as ActspaceBridge;
+  render(<OpenRouterModelCatalogDialog provider="deepseek" onAdded={onAdded} onClose={() => {}} />);
+  await userEvent.click(await screen.findByRole("button", { name: "添加" }));
+  expect(addModel).toHaveBeenCalledWith({ provider: "deepseek", apiModel: "deepseek-flash" });
+  expect(onAdded).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: "已添加" })).toBeDisabled();
 });

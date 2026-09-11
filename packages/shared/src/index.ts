@@ -42,3 +42,5 @@ export * from "./english-learning";
 export * from "./model-catalog";
 export * from "./model-catalog-normalize";
 export * from "./model-pricing";
+
+export * from "./deepseek-model-facts";

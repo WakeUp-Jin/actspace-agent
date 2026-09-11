@@ -29,6 +29,8 @@
 
 ## 最近完成
 
+- [DeepSeek V4.1 Flash](completed/20260910-deepseek-v41-flash.md)：模型、目录、图片和价格实现完成；真实图片请求通过，完整设置交互与主题截图边界见摘要。
+
 - [Context 模型事实](completed/20260901-actspace-context-model-facts/README.md)：2026-09-09 补齐全仓 typecheck/test；G1 通过，Electron/真实 Provider/截图 G2 仍保留人工验收。
 
 - [日常主界面中文统一](completed/20260908-desktop-chinese-ui.md)：保留模式、思考档位和工具执行展示；renderer 验证与 Electron 主界面/设置检查完成，验证范围见摘要。

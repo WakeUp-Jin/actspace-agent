@@ -46,6 +46,7 @@ let modelRuntimeService: ModelRuntimeService | undefined;
 let providerNetworkService: ProviderNetworkService | undefined;
 let quickOpenShortcutController: QuickOpenShortcutController | undefined;
 let openRouterCatalogService: RuntimeV2OpenRouterCatalogService | undefined;
+let deepSeekCatalogService: RuntimeV2OpenRouterCatalogService | undefined;
 let browserBridgeService: BrowserBridgeService | undefined;
 let localUpdateService: LocalUpdateService | undefined;
 let shuttingDown = false;
@@ -158,11 +159,16 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   openRouterCatalogService = new RuntimeV2OpenRouterCatalogService({
     dataRoot: roots.dataRoot,
     pricingCatalog: () => pricingCatalog!.snapshot(),
-    fetchCatalog: (runtime) => providerNetworkService!.fetchOpenRouterCatalog(runtime),
+    fetchCatalog: (runtime) => providerNetworkService!.fetchModelCatalog(runtime),
     isAdded: (apiModel) => modelStore?.isCatalogModelAdded(apiModel) ?? false,
   });
-  await openRouterCatalogService.load();
-  modelStore = new ModelStoreService({ settings: settingsService, findCatalogModel: (apiModel) => openRouterCatalogService?.findModel(apiModel) });
+  deepSeekCatalogService = new RuntimeV2OpenRouterCatalogService({
+    provider: "deepseek", dataRoot: roots.dataRoot,
+    fetchCatalog: (runtime) => providerNetworkService!.fetchModelCatalog(runtime),
+    isAdded: (apiModel) => modelStore?.isCatalogModelAdded(apiModel, "deepseek") ?? false,
+  });
+  await Promise.all([openRouterCatalogService.load(), deepSeekCatalogService.load()]);
+  modelStore = new ModelStoreService({ settings: settingsService, findCatalogModel: (apiModel, provider) => (provider === "deepseek" ? deepSeekCatalogService : openRouterCatalogService)?.findModel(apiModel) });
   modelRuntimeService = new ModelRuntimeService(settingsService, modelStore, () => pricingCatalog!.snapshot());
   const quickOpenSettings = settingsService.getV2().shortcuts.quickOpen;
   quickOpenShortcutController = new QuickOpenShortcutController(globalShortcut, () => {
@@ -215,7 +221,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
       log: (message, details) => void logMain(message, details),
     });
   }
-  disposeRuntimeV2Ipc = registerRuntimeV2Ipc({ registry: runtimeV2Registry, settings: settingsService, models: modelStore, providerNetwork: providerNetworkService, quickOpen: quickOpenShortcutController, catalog: openRouterCatalogService, approvals: approvalRegistry, getMainWindow }).dispose;
+  disposeRuntimeV2Ipc = registerRuntimeV2Ipc({ registry: runtimeV2Registry, settings: settingsService, models: modelStore, providerNetwork: providerNetworkService, quickOpen: quickOpenShortcutController, catalog: openRouterCatalogService, deepSeekCatalog: deepSeekCatalogService, approvals: approvalRegistry, getMainWindow }).dispose;
   disposeRuntimeV2DesktopShell = registerRuntimeV2DesktopShell({
     roots,
     getMainWindow,
@@ -233,7 +239,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     modelRuntime: modelRuntimeService,
     pricingCatalog,
     providerNetwork: providerNetworkService,
-    catalog: openRouterCatalogService,
+    catalog: openRouterCatalogService, deepSeekCatalog: deepSeekCatalogService,
     approvals: approvalRegistry,
     browserBridge: browserBridgeService,
     quickOpen: quickOpenShortcutController,

@@ -125,3 +125,28 @@ async function temporaryRoot(): Promise<string> {
   roots.push(root);
   return root;
 }
+
+it("discovers DeepSeek IDs with official facts, isolates caches, and preserves offline data", async () => {
+  const root = await temporaryRoot();
+  let now = new Date("2026-09-10T05:00:00Z");
+  const fetchCatalog = vi.fn(async () => ({ ok: true as const, payload: { data: [{ id: "deepseek-flash" }, { id: "deepseek-v4-flash" }, { id: "deepseek-v4-pro" }, { id: "future-model" }] } }));
+  const options = { provider: "deepseek" as const, dataRoot: root, fetchCatalog, isAdded: (id: string) => id === "deepseek-flash", now: () => now };
+  const service = new RuntimeV2OpenRouterCatalogService(options);
+  const connection = { provider: "deepseek" as const, apiKey: "fixture", baseUrl: "https://api.deepseek.com" };
+  const result = await service.reload(connection);
+  expect(result.models).toHaveLength(2);
+  expect(result.models[0]).toMatchObject({ apiModel: "deepseek-flash", provider: "deepseek", added: true, input: ["text", "image"], reasoningEfforts: ["low", "high", "max"], pricing: { outputPerMillion: 1.2 } });
+  expect(result.models[1]).toMatchObject({ toolUse: "unknown", input: ["text"], contextWindow: null });
+  expect(result.models[1]?.pricing).toBeUndefined();
+  expect(JSON.parse(await readFile(join(root, "providers", "deepseek", "models-cache.json"), "utf8")).models).toHaveLength(2);
+  const other = createService(root, vi.fn(), () => false);
+  expect((await other.load()).models).toEqual([]);
+  now = new Date("2026-09-14T04:00:00Z");
+  expect(service.findModel("deepseek-v4-pro")).toBeUndefined();
+  const offline = new RuntimeV2OpenRouterCatalogService({ ...options, fetchCatalog: async () => ({ ok: false, code: "network", message: "offline" }) });
+  await offline.load();
+  expect(await offline.reload(connection)).toMatchObject({ state: "offline", models: expect.any(Array), error: { code: "network" } });
+  expect(offline.list().models).toHaveLength(2);
+  expect(await service.reload(runtime())).toMatchObject({ error: { code: "invalid_provider" } });
+  expect(fetchCatalog).toHaveBeenCalledTimes(1);
+});

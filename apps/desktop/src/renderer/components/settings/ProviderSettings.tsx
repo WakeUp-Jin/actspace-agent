@@ -1,3 +1,4 @@
+import { OpenRouterModelCatalogDialog } from "./OpenRouterModelCatalogDialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
@@ -18,6 +19,7 @@ import {
   PROVIDER_CATALOG,
   PROVIDER_CATALOG_ORDER,
   type ProviderCategory,
+  type ModelsCatalogListResult,
   type LlmProviderId,
   type BalanceProviderId,
   type CredentialStorageView,
@@ -186,9 +188,10 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
           onRefreshBalance={() => { if (detailMeta.supportsBalance) void loadBalance(detailProvider as BalanceProviderId); }}
           onTest={() => void test(detailProvider)}
           onRefreshModels={async () => {
-            if (detailProvider === "openrouter" && window.actspace.reloadModelCatalog) {
-              await window.actspace.reloadModelCatalog({ provider: "openrouter" });
-              await onChanged?.();
+            if ((detailProvider === "openrouter" || detailProvider === "deepseek") && window.actspace.reloadModelCatalog) {
+              const result = await window.actspace.reloadModelCatalog({ provider: detailProvider });
+              if (!result.error) await onChanged?.();
+              return result;
             }
           }}
           onChanged={onChanged}
@@ -438,12 +441,27 @@ function ProviderDetailRoute({
   onBack: () => void;
   onRefreshBalance: () => void;
   onTest: () => void;
-  onRefreshModels: () => void | Promise<void>;
+  onRefreshModels: () => Promise<ModelsCatalogListResult | undefined>;
   onChanged?: () => void | Promise<void>;
   isDefault: boolean;
   onEdit: () => void;
   onRemove: () => void;
 }) {
+  const [refreshing, setRefreshing] = useState(false);
+  const [catalogStatus, setCatalogStatus] = useState<{ error: boolean; text: string } | null>(null);
+  const [modelRevision, setModelRevision] = useState(0);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const modelsChanged = async () => { setModelRevision((value) => value + 1); await onChanged?.(); };
+  const refreshModels = async () => {
+    setRefreshing(true); setCatalogStatus(null);
+    try {
+      const result = await onRefreshModels();
+      if (!result) throw new Error("unavailable");
+      setCatalogStatus({ error: Boolean(result.error), text: result.error ? `更新失败，保留本地目录：${result.error.message}` : `已更新 ${result.models.length} 个模型 · ${result.fetchedAt ? new Date(result.fetchedAt).toLocaleString("zh-CN") : "本地目录"}` });
+      if (!result.error) setModelRevision((value) => value + 1);
+    } catch { setCatalogStatus({ error: true, text: "更新失败，已保留本地目录。请检查连接后重试。" }); }
+    finally { setRefreshing(false); }
+  };
   const address = state.baseUrl ?? PROVIDER_REGISTRY[provider.id].defaultBaseUrl;
   return (
     <div className="w-full">
@@ -472,11 +490,15 @@ function ProviderDetailRoute({
 
         <DetailSection title="模型" description="这些模型会出现在任务的模型选择器中。">
           <div className="min-w-0">
-            {settings ? <ModelSettings settings={settings} providerFilter={provider.id} embedded embeddedPlain onChanged={onChanged} /> : null}
+            {settings ? <ModelSettings key={modelRevision} settings={settings} providerFilter={provider.id} embedded embeddedPlain onChanged={onChanged} /> : null}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button type="button" className="h-9 rounded-act-md bg-surface-subtle px-3 text-[12px] font-semibold text-text-main hover:bg-hover-overlay" onClick={onTest}>测试连接</button>
-              <button type="button" className="h-9 rounded-act-md px-3 text-[12px] font-semibold text-text-main hover:bg-hover-overlay disabled:opacity-50" disabled={provider.id !== "openrouter"} onClick={() => void onRefreshModels()}>更新模型目录</button>
+              <button type="button" className="h-9 rounded-act-md px-3 text-[12px] font-semibold text-text-main hover:bg-hover-overlay disabled:opacity-50" disabled={!provider.supportsModelDiscovery || refreshing} onClick={() => void refreshModels()}>{refreshing ? "更新中…" : "更新模型目录"}</button>
+              {provider.supportsModelDiscovery ? <button type="button" className="h-9 rounded-act-md px-3 text-[12px] font-semibold text-text-main hover:bg-hover-overlay" onClick={() => setCatalogOpen(true)}>从目录添加</button> : null}
             </div>
+            {catalogStatus ? <p role={catalogStatus.error ? "alert" : "status"} className={`mt-2 text-[12px] ${catalogStatus.error ? "text-on-danger" : "text-text-muted"}`}>{catalogStatus.text}</p> : null}
+            {provider.id === "deepseek" ? <p className="mt-2 text-[12px] leading-relaxed text-text-faint">V4.1 Flash 支持图片理解。费用按官方美元高峰价估算；目录刷新发现模型，价格由 ActSpace 官方档案维护。</p> : null}
+            {catalogOpen && (provider.id === "deepseek" || provider.id === "openrouter") ? <OpenRouterModelCatalogDialog provider={provider.id} onClose={() => setCatalogOpen(false)} onAdded={modelsChanged} onReloaded={modelsChanged} /> : null}
           </div>
         </DetailSection>
       </div>

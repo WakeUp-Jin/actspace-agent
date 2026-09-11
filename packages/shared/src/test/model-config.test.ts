@@ -22,7 +22,6 @@ describe("model config", () => {
   it("exposes Kimi as a public model alongside DeepSeek", () => {
     expect(MODEL_LIST.map((model) => model.id)).toEqual([
       "deepseek-v4-flash",
-      "deepseek-v4-pro",
       "kimi-k2.6",
       "kimi-k2.7-code",
     ]);
@@ -48,8 +47,8 @@ describe("model config", () => {
       api: "openai-completions",
       provider: "deepseek",
       defaultBaseUrl: "https://api.deepseek.com",
-      reasoningEfforts: ["high", "max"],
-      reasoningDefaultEffort: "max",
+      reasoningEfforts: ["low", "high", "max"],
+      reasoningDefaultEffort: "high",
     });
     expect(MODEL_REGISTRY["kimi-k2.6"]).toMatchObject({
       api: "openai-completions",
@@ -103,13 +102,13 @@ describe("model config", () => {
 
   it("maps every legacy model to a provider-qualified builtin definition", () => {
     expect(LEGACY_MODEL_KEY_MAP).toEqual({
-      "deepseek-v4-flash": "deepseek:deepseek-v4-flash",
-      "deepseek-v4-pro": "deepseek:deepseek-v4-pro",
+      "deepseek-v4-flash": "deepseek:deepseek-flash",
+      "deepseek-v4-pro": "deepseek:deepseek-flash",
       "kimi-k2.6": "kimi:kimi-k2.6",
       "kimi-k2.7-code": "kimi:kimi-k2.7-code",
     });
-    expect(DEFAULT_MODEL_KEY).toBe("deepseek:deepseek-v4-pro");
-    expect(BUILTIN_MODEL_LIST).toHaveLength(4);
+    expect(DEFAULT_MODEL_KEY).toBe("deepseek:deepseek-flash");
+    expect(BUILTIN_MODEL_LIST).toHaveLength(3);
     expect(BUILTIN_MODEL_REGISTRY["kimi:kimi-k2.7-code"]).toMatchObject({
       provider: "kimi",
       apiModel: "kimi-k2.7-code",
@@ -124,7 +123,7 @@ describe("model config", () => {
   });
 
   it("normalizes known legacy ids without defaulting unknown values", () => {
-    expect(normalizeModelKey("deepseek-v4-pro")).toBe("deepseek:deepseek-v4-pro");
+    expect(normalizeModelKey("deepseek-v4-pro")).toBe("deepseek:deepseek-flash");
     expect(normalizeModelKey("openrouter:anthropic/claude-example")).toBe(
       "openrouter:anthropic/claude-example",
     );
@@ -136,7 +135,7 @@ describe("model config", () => {
   });
 
   it("resolves new definitions by selection or provider api model", () => {
-    expect(resolveModelDefinition("deepseek-v4-flash")?.key).toBe("deepseek:deepseek-v4-flash");
+    expect(resolveModelDefinition("deepseek-v4-flash")?.key).toBe("deepseek:deepseek-flash");
     expect(resolveModelDefinition("kimi:kimi-k2.6")?.label).toBe("Kimi K2.6");
     expect(resolveModelDefinition("openrouter:anthropic/claude-example")).toBeUndefined();
     expect(resolveModelDefinitionByApiModel("kimi-k2.6", "kimi")?.key).toBe("kimi:kimi-k2.6");

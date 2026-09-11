@@ -32,7 +32,7 @@ import type { SettingsService } from "../settings-service";
 import type { ModelStoreService } from "../model-store-service";
 import type { ProviderNetworkService } from "./provider-network-service";
 import type { QuickOpenShortcutController } from "../quick-open-shortcut-controller";
-import type { RuntimeV2OpenRouterCatalogService } from "./openrouter-catalog-service";
+import { selectModelCatalog, type RuntimeV2OpenRouterCatalogService } from "./openrouter-catalog-service";
 
 type ApprovalRegistryView = {
   readonly listPending: (sessionId?: string) => ReadonlyArray<{
@@ -58,6 +58,7 @@ export function registerRuntimeV2Ipc(options: {
   readonly providerNetwork?: ProviderNetworkService;
   readonly quickOpen?: QuickOpenShortcutController;
   readonly catalog?: RuntimeV2OpenRouterCatalogService;
+  readonly deepSeekCatalog?: RuntimeV2OpenRouterCatalogService;
   readonly approvals?: ApprovalRegistryView;
 }): { readonly dispose: () => void } {
   const channels = Object.values(RUNTIME_V2_DESKTOP_CHANNELS).filter((channel) => channel !== RUNTIME_V2_DESKTOP_CHANNELS.liveEvent && channel !== RUNTIME_V2_DESKTOP_CHANNELS.approvalRequired);
@@ -189,19 +190,23 @@ export function registerRuntimeV2Ipc(options: {
     if (!input || typeof input.content !== "string") throw new Error("System prompt content is invalid.");
     return requireSettings(options.settings).writeAgentSystemPrompt(input.content);
   });
-  handle(RUNTIME_V2_DESKTOP_CHANNELS.listModelCatalog, (_event, input: RuntimeV2ModelCatalogQuery = {}) => ({ provider: "openrouter" as const, ...requireCatalog(options.catalog).list(input.query) }));
-  handle(RUNTIME_V2_DESKTOP_CHANNELS.reloadModelCatalog, async () => {
+  handle(RUNTIME_V2_DESKTOP_CHANNELS.listModelCatalog, (_event, input: RuntimeV2ModelCatalogQuery = {}) => {
+    const { provider, catalog } = selectModelCatalog(input.provider, requireCatalog(options.catalog), options.deepSeekCatalog);
+    return { provider, ...catalog.list(input.query) };
+  });
+  handle(RUNTIME_V2_DESKTOP_CHANNELS.reloadModelCatalog, async (_event, input: RuntimeV2ModelCatalogQuery = {}) => {
     const settings = requireSettings(options.settings);
-    const catalog = requireCatalog(options.catalog);
-    const runtime = settings.getProviderRuntimeConfig("openrouter");
-    if ("code" in runtime) return { provider: "openrouter" as const, ...catalog.list(), error: { code: runtime.code, message: runtime.message } };
+    const { provider, catalog } = selectModelCatalog(input.provider, requireCatalog(options.catalog), options.deepSeekCatalog);
+    const runtime = settings.getProviderRuntimeConfig(provider);
+    if ("code" in runtime) return { provider, ...catalog.list(), error: { code: runtime.code, message: runtime.message } };
     const result = await catalog.reload(runtime);
-    if (!result.error && result.state === "fresh") await requireModels(options.models).refreshInstalledCatalogModels();
-    return { provider: "openrouter" as const, ...result };
+    if (!result.error && result.state === "fresh") await requireModels(options.models).refreshInstalledCatalogModels(provider);
+    return { provider, ...result };
   });
   handle(RUNTIME_V2_DESKTOP_CHANNELS.addCatalogModel, async (_event, input: RuntimeV2AddCatalogModelInput) => {
     if (!input || typeof input.apiModel !== "string" || !input.apiModel.trim()) throw new Error("Catalog model is invalid.");
-    const result = await requireModels(options.models).addCatalogModel("openrouter", input.apiModel.trim());
+    const { provider } = selectModelCatalog(input.provider, requireCatalog(options.catalog), options.deepSeekCatalog);
+    const result = await requireModels(options.models).addCatalogModel(provider, input.apiModel.trim());
     if ("message" in result) throw new Error(result.message);
     return requireSettings(options.settings).getV2();
   });

@@ -329,12 +329,12 @@ export type UsableModelView = {
 export type ModelsListUsableResult = { models: UsableModelView[] };
 
 export type ModelsCatalogListInput = {
-  provider: Extract<ProviderId, "openrouter">;
+  provider: Extract<ProviderId, "openrouter" | "deepseek">;
   query?: string;
 };
 
 export type ModelsCatalogListResult = {
-  provider: "openrouter";
+  provider: "openrouter" | "deepseek";
   state: CatalogCacheState;
   fetchedAt?: string;
   stale: boolean;
@@ -344,7 +344,7 @@ export type ModelsCatalogListResult = {
 };
 
 export type ModelsAddInput = {
-  provider: Extract<ProviderId, "openrouter">;
+  provider: Extract<ProviderId, "openrouter" | "deepseek">;
   apiModel: string;
 };
 

@@ -27,7 +27,7 @@ it("fixes official DeepSeek peak rates independently of the catalog and clock, a
   const peak = resolveModelPricing(catalog, { ...input, now: "2026-09-07T02:00:00Z" });
   expect(peak).toMatchObject({ source: "deepseek-official", strategy: "fixed-peak", currency: "USD", rates: { input: 0.44, output: 1.32, cacheRead: 0.014, cacheWrite: null } });
   expect(resolveModelPricing(catalog, { ...input, now: "2026-09-07T20:00:00Z" })?.rates).toEqual(peak?.rates);
-  expect(resolveModelPricing(catalog, { ...input, multiplier: 2 })?.rates.input).toBe(0.88);
+  expect(resolveModelPricing(catalog, { ...input, multiplier: 2, now: "2026-09-07T20:00:00Z" })?.rates.input).toBe(0.88);
   expect(resolveModelPricing(catalog, { ...input, baseUrl: "https://openrouter.ai/api/v1" })).toBeNull();
   expect(resolveModelPricing(catalog, { ...input, apiModel: "unknown" })).toBeNull();
 });

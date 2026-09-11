@@ -80,8 +80,8 @@ export class ProviderNetworkService {
     }
   }
 
-  async fetchOpenRouterCatalog(runtime: ProviderNetworkRuntime): Promise<ProviderCatalogFetchResult> {
-    if (runtime.provider !== "openrouter") return { ok: false, code: "invalid_provider", message: "Only OpenRouter exposes a remote model catalog." };
+  async fetchModelCatalog(runtime: ProviderNetworkRuntime): Promise<ProviderCatalogFetchResult> {
+    if (runtime.provider !== "openrouter" && runtime.provider !== "deepseek") return { ok: false, code: "invalid_provider", message: "This provider does not expose a supported model catalog." };
     try {
       const response = await this.#request(runtime, `${runtime.baseUrl.replace(/\/+$/, "")}/models`);
       if (!response.ok) {

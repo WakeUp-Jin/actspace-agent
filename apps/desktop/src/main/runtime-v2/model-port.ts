@@ -11,6 +11,7 @@ export type DesktopRuntimeV2ResolvedModel = {
     readonly provider: string;
     readonly apiModel: string;
     readonly contextWindow: number | null;
+    readonly maxTokens?: number | null;
     readonly thinkingDefault?: boolean;
     readonly requestModelByReasoningEffort?: Partial<Record<import("@actspace/shared").ModelReasoningEffort, string>>;
     readonly capabilities?: import("@actspace/shared").ModelCapabilities;

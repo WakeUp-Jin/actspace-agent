@@ -3,7 +3,7 @@ import type { ModelDefinition, ModelReasoningEffort } from "./model-config";
 export type CatalogCacheState = "missing" | "fresh" | "stale" | "offline";
 
 export type CatalogModelView = {
-  provider: "openrouter";
+  provider: "openrouter" | "deepseek";
   apiModel: string;
   name: string;
   contextWindow: number | null;

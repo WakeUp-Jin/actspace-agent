@@ -55,7 +55,7 @@ function createSkill(overrides: Partial<SkillCatalogItem> = {}): SkillCatalogIte
 const reasoningModels: UsableModelView[] = [
   {
     key: "deepseek:deepseek-v4-pro",
-    label: "DeepSeek V4 Pro",
+    label: "deepseek-flash",
     provider: "deepseek",
     apiModel: "deepseek-v4-pro",
     contextWindow: 1_000_000,
@@ -91,7 +91,7 @@ const duplicateNamedModels: UsableModelView[] = [
   reasoningModels[0],
   {
     key: "openrouter:deepseek/deepseek-v4-pro",
-    label: "DeepSeek V4 Pro",
+    label: "deepseek-flash",
     provider: "openrouter",
     apiModel: "deepseek/deepseek-v4-pro",
     contextWindow: 1_000_000,
@@ -235,7 +235,7 @@ describe("Composer follow-up bar", () => {
     expect(panel).toContainElement(input);
     expect(toolbar).not.toContainElement(input);
     expect(toolbarButtons[0]).toHaveAccessibleName("添加 Agent、上下文或工具");
-    expect(toolbarButtons[1]).toHaveAccessibleName(/DeepSeek V4 Pro/i);
+    expect(toolbarButtons[1]).toHaveAccessibleName(/deepseek-flash/i);
     expect(within(panel).queryByRole("button", { name: "Show context usage" })).not.toBeInTheDocument();
     expect(panel).not.toContainElement(screen.queryByRole("button", { name: /审查待处理变更/ }));
     expect(input).toHaveValue("");
@@ -503,7 +503,7 @@ describe("Composer follow-up bar", () => {
 
     expect(onSend).toHaveBeenCalledWith("/compact", {
       mode: "agent",
-      model: "deepseek-v4-pro",
+      model: "deepseek-v4-flash",
       selectedSkills: ["frontend-design"],
       thinkingEnabled: true,
     });
@@ -710,7 +710,7 @@ describe("Composer follow-up bar", () => {
     await userEvent.click(screen.getByRole("button", { name: "发送消息" }));
 
     expect(onSend).toHaveBeenCalledWith("看看这张图", expect.objectContaining({
-      model: "deepseek-v4-pro",
+      model: "deepseek-v4-flash",
       attachments: [{
         id: "pasted-image",
         kind: "image",
@@ -765,7 +765,7 @@ describe("Composer follow-up bar", () => {
 
     expect(onSend).toHaveBeenCalledWith("analyze this", {
       mode: "agent",
-      model: "deepseek-v4-pro",
+      model: "deepseek-v4-flash",
       selectedSkills: [],
       thinkingEnabled: true,
       attachments: [
@@ -782,7 +782,7 @@ describe("Composer follow-up bar", () => {
 
   it("keeps command menu, model menu, and context popup mutually exclusive", async () => {
     const user = userEvent.setup();
-    renderComposer();
+    const { container } = renderComposer();
 
     await user.type(screen.getByLabelText("消息输入框"), "/");
     expect(await screen.findByRole("listbox", { name: "斜杠命令" })).toBeInTheDocument();
@@ -791,12 +791,12 @@ describe("Composer follow-up bar", () => {
     expect(screen.queryByRole("listbox", { name: "斜杠命令" })).not.toBeInTheDocument();
     expect(screen.getByRole("menu", { name: "添加上下文或工具" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
+    await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
     expect(screen.queryByRole("menu", { name: "添加上下文或工具" })).not.toBeInTheDocument();
-    expect(screen.getByText("DeepSeek V4 Flash")).toBeInTheDocument();
+    expect(screen.getAllByText("deepseek-flash").at(-1)!).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "上下文用量 36%" }));
-    expect(screen.queryByText("DeepSeek V4 Flash")).not.toBeInTheDocument();
+    expect(container.querySelector(".model-menu")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "上下文用量" })).toBeInTheDocument();
   });
 
@@ -804,23 +804,23 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     renderComposer();
 
-    await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
-    await user.hover(screen.getByText("DeepSeek V4 Flash"));
+    await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
+    await user.hover(screen.getAllByText("deepseek-flash").at(-1)!);
     await user.click(screen.getByRole("button", { name: "编辑 deepseek-v4-flash 选项" }));
 
     expect(screen.getByLabelText("deepseek-v4-flash Thinking")).toBeInTheDocument();
     const toolbar = screen.getByLabelText("输入框工具栏");
-    expect(toolbar.querySelector(".model-button")).toHaveTextContent("DeepSeek V4 Pro");
+    expect(toolbar.querySelector(".model-button")).toHaveTextContent("deepseek-flash");
   });
 
   it("keeps model rows compact and reveals Edit only on row interaction", async () => {
     const user = userEvent.setup();
     const { container } = renderComposer();
 
-    await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
+    await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
 
     const menu = container.querySelector(".model-menu");
-    const selectedEdit = screen.getByRole("button", { name: "编辑 deepseek-v4-pro 选项" });
+    const selectedEdit = screen.getByRole("button", { name: "编辑 deepseek-v4-flash 选项" });
     const selectedRow = selectedEdit.closest(".model-menu-row");
 
     expect(menu).toHaveClass("w-[244px]");
@@ -840,13 +840,13 @@ describe("Composer follow-up bar", () => {
       defaultModelId: "deepseek:deepseek-v4-pro",
     });
 
-    await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
+    await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
     const menu = screen.getByRole("menu", { name: "模型" });
     const search = within(menu).getByRole("searchbox", { name: "搜索模型" });
     await user.type(search, "openai/gpt");
 
     expect(within(menu).getByText("GPT-5 High")).toBeInTheDocument();
-    expect(within(menu).queryByText("DeepSeek V4 Pro")).not.toBeInTheDocument();
+    expect(within(menu).queryByText("deepseek-flash")).not.toBeInTheDocument();
     expect(search).toHaveFocus();
   });
 
@@ -859,19 +859,19 @@ describe("Composer follow-up bar", () => {
       onSelectedModelChange,
     });
 
-    const modelButton = screen.getByRole("button", { name: /DeepSeek V4 Pro · DeepSeek/i });
-    expect(modelButton).toHaveTextContent("DeepSeek V4 Pro · DeepSeek");
+    const modelButton = screen.getByRole("button", { name: /deepseek-flash · DeepSeek/i });
+    expect(modelButton).toHaveTextContent("deepseek-flash · DeepSeek");
     await user.click(modelButton);
 
     const menu = screen.getByRole("menu", { name: "模型" });
     const deepSeekGroup = within(menu).getByRole("group", { name: "DeepSeek" });
     const openRouterGroup = within(menu).getByRole("group", { name: "OpenRouter" });
-    expect(within(deepSeekGroup).getByRole("button", { name: "DeepSeek V4 Pro" })).toBeInTheDocument();
-    expect(within(openRouterGroup).getByRole("button", { name: "DeepSeek V4 Pro" })).toBeInTheDocument();
+    expect(within(deepSeekGroup).getByRole("button", { name: "deepseek-flash" })).toBeInTheDocument();
+    expect(within(openRouterGroup).getByRole("button", { name: "deepseek-flash" })).toBeInTheDocument();
 
-    await user.click(within(openRouterGroup).getByRole("button", { name: "DeepSeek V4 Pro" }));
+    await user.click(within(openRouterGroup).getByRole("button", { name: "deepseek-flash" }));
     expect(onSelectedModelChange).toHaveBeenCalledWith("openrouter:deepseek/deepseek-v4-pro");
-    expect(modelButton).toHaveTextContent("DeepSeek V4 Pro · OpenRouter");
+    expect(modelButton).toHaveTextContent("deepseek-flash · OpenRouter");
   });
 
   it("sends a supported OpenRouter reasoning effort and animates both popovers", async () => {
@@ -912,9 +912,9 @@ describe("Composer follow-up bar", () => {
       defaultModelId: "deepseek:deepseek-v4-pro",
     });
 
-    await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
+    await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
     const modelMenu = screen.getByRole("menu", { name: "模型" });
-    await user.hover(within(modelMenu).getByText("DeepSeek V4 Pro"));
+    await user.hover(within(modelMenu).getByText("deepseek-flash"));
     await user.click(screen.getByRole("button", { name: "编辑 deepseek:deepseek-v4-pro 选项" }));
 
     expect(screen.queryByRole("button", { name: "Auto" })).not.toBeInTheDocument();
@@ -938,8 +938,8 @@ describe("Composer follow-up bar", () => {
     const user = userEvent.setup();
     renderComposer();
 
-    await user.click(screen.getByRole("button", { name: /DeepSeek V4 Pro/i }));
-    await user.hover(screen.getByText("DeepSeek V4 Flash"));
+    await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
+    await user.hover(screen.getAllByText("deepseek-flash").at(-1)!);
     await user.click(screen.getByRole("button", { name: "编辑 deepseek-v4-flash 选项" }));
 
     const toggle = screen.getByLabelText("deepseek-v4-flash Thinking") as HTMLInputElement;
@@ -965,7 +965,7 @@ describe("Composer follow-up bar", () => {
 
     expect(onSend).toHaveBeenCalledWith("continue polishing", {
       mode: "agent",
-      model: "deepseek-v4-pro",
+      model: "deepseek-v4-flash",
       selectedSkills: [],
       thinkingEnabled: true,
     });
@@ -1026,7 +1026,7 @@ describe("Composer follow-up bar", () => {
     expect(panel).toContainElement(input);
     expect(toolbar).not.toContainElement(input);
     expect(toolbarButtons[0]).toHaveAccessibleName("添加 Agent、上下文或工具");
-    expect(toolbarButtons[1]).toHaveAccessibleName(/DeepSeek V4 Pro/i);
+    expect(toolbarButtons[1]).toHaveAccessibleName(/deepseek-flash/i);
     expect(within(panel).queryByRole("button", { name: "Show context usage" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "选择工作区" }));
@@ -1055,7 +1055,7 @@ describe("Composer follow-up bar", () => {
 
     expect(onSend).toHaveBeenCalledWith("start a new idea", {
       mode: "agent",
-      model: "deepseek-v4-pro",
+      model: "deepseek-v4-flash",
       selectedSkills: [],
       thinkingEnabled: true,
     });

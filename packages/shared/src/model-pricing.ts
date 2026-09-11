@@ -1,3 +1,4 @@
+import { deepSeekPeakPricing, DEEPSEEK_FLASH_RELEASE_AT } from "./deepseek-model-facts";
 import type { ModelPricing } from "./model-config";
 import type { ModelCatalogSnapshot, ModelPricingSnapshot } from "./model-catalog";
 
@@ -17,14 +18,10 @@ export function resolveModelPricing(catalog: ModelCatalogSnapshot, input: { prov
   const configured = input.configured;
   const multiplier = input.multiplier ?? 1;
   if (!Number.isFinite(multiplier) || multiplier < 0) return null;
-  // Product policy: fixed peak USD rates, never select rates by request time.
-  // https://api-docs.deepseek.com/quick_start/pricing/ (verified 2026-09-07)
-  const peak = owner === "deepseek" ? ({
-    "deepseek-v4-flash": { input: 0.44, output: 1.32, cacheRead: 0.014, cacheWrite: null },
-    "deepseek-v4-flash-vision-exp": { input: 0.44, output: 1.32, cacheRead: 0.014, cacheWrite: null },
-    "deepseek-v4-pro": { input: 1.32, output: 3.96, cacheRead: 0.044, cacheWrite: null },
-  } as Record<string, { input: number; output: number; cacheRead: number; cacheWrite: null }>)[input.apiModel] : undefined;
-  if (peak) return { providerId: owner!, connectionId: input.connectionId ?? null, modelKey: input.modelKey, apiModel: input.apiModel, currency: "USD", rates: { input: peak.input * multiplier, output: peak.output * multiplier, cacheRead: peak.cacheRead * multiplier, cacheWrite: null }, multiplier, source: "deepseek-official", strategy: "fixed-peak", contentHash: `deepseek-peak-20260907:${JSON.stringify(peak)}`, fetchedAt: "2026-09-07T00:00:00Z", capturedAt: input.now ?? new Date().toISOString(), unsupportedBilling: false };
+  // Keep fixed peak estimates; release boundaries only change the published model tariff.
+  const capturedAt = input.now ?? new Date().toISOString();
+  const peak = owner === "deepseek" ? deepSeekPeakPricing(input.apiModel, capturedAt) : undefined;
+  if (peak) return { providerId: owner!, connectionId: input.connectionId ?? null, modelKey: input.modelKey, apiModel: input.apiModel, currency: "USD", rates: { input: peak.inputCacheMissPerMillion * multiplier, output: peak.outputPerMillion * multiplier, cacheRead: peak.inputCacheHitPerMillion * multiplier, cacheWrite: null }, multiplier, source: "deepseek-official", strategy: "fixed-peak", contentHash: `deepseek-peak-20260910:${JSON.stringify(peak)}`, fetchedAt: DEEPSEEK_FLASH_RELEASE_AT, capturedAt, unsupportedBilling: false };
   if (!configured && !entry) return null;
   const baseRates = configured ? { input: configured.inputCacheMissPerMillion, output: configured.outputPerMillion, cacheRead: configured.inputCacheHitPerMillion, cacheWrite: configured.inputCacheWritePerMillion ?? null } : entry!.rates;
   const factor = configured && input.configuredAlreadyMultiplied ? 1 : multiplier;

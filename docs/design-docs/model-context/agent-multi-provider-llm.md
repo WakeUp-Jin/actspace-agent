@@ -207,7 +207,7 @@ openrouter:anthropic/claude-...
 
 | Provider | 默认协议 | 默认 Base URL | 远端模型目录 | 默认代理 |
 | --- | --- | --- | --- | --- |
-| DeepSeek | OpenAI-compatible Chat Completions | `https://api.deepseek.com` | 否 | 关闭 |
+| DeepSeek | OpenAI-compatible Chat Completions | `https://api.deepseek.com` | 是，ID 发现 + 本地官方档案 | 关闭 |
 | Kimi | OpenAI-compatible | `https://api.moonshot.cn/v1` | 首版不使用 | 关闭 |
 | OpenRouter | OpenAI-compatible | `https://openrouter.ai/api/v1` | 是 | 关闭，由用户开启 |
 
@@ -220,6 +220,16 @@ Provider adapter 可提供：
 - 模型目录加载与归一化。
 
 当前 `OpenAICompletionsService` 中的 Kimi thinking 分支应逐步下沉到 provider request adapter，避免通用协议层继续增长品牌判断。
+
+### DeepSeek V4.1 目录与兼容（2026-09-10）
+
+- 正式选择身份为 `deepseek:deepseek-flash`，API 名称为 `deepseek-flash`。旧 Flash / Flash Vision / Pro 的 bare ID 和 provider-qualified key 在读取时归一；设置保留 enabled、addedAt、自定义名称、连接及 credentialId。新旧键并存时按正式 Flash > 旧 Flash > Pro 优先，历史 Session Journal 不改写。
+- DeepSeek `/models` 只返回 ID 等基础字段。复用现有目录缓存服务（历史文件名 `openrouter-catalog-service.ts`），按 provider 分目录存储；两套 IPC 验证 provider 后再选择对应服务与凭据。OpenRouter 不受影响。
+- 已知 ID 由 shared 官方档案补齐能力/价格；未知 ID 为 text、toolUse=unknown、价格/上下文未知，不自动进入主 Agent 候选。远端 ID 需由用户点击“从目录添加”，不自动启用新模型；内置 Flash 迁移直接可见。
+- 刷新成功更新已安装目录模型的能力，保留用户状态和任务引用；坏响应、网络失败或缓存写入失败保留最后成功目录。目录刷新仅发现模型，不能自动更新官方价格档案。
+- V4.1 Flash 原生接收图片，1M 上下文、最大 384K 输出。Desktop 将模型事实传到 pi-ai，默认请求预算仍保留 32K，能力上限不作为默认预算。图片复用 Session artifact，Chat Completions 校验 user-role、格式签名、32 MiB 单图、600 张、48 MiB 编码请求体（Composer 自身更严格为 20 MiB）。其余像素限制由官方返回错误处理。
+- 直连 DeepSeek 回放使用正确的 SDK model/provider/api 身份与 `reasoning_content`；代理 Chat Completions 显式保留 reasoning_content，避免工具轮次丢失推理上下文。
+- 按用户 2026-09-11 追加要求，Pro 从内置可选列表和远端目录中移除；旧配置引用映射到 Flash，默认模型改为 Flash。不保留停用日期提示和定时切换逻辑。
 
 ## 服务商级代理
 
@@ -511,7 +521,7 @@ renderer 只调用结构化 IPC：
 
 - OpenRouter → `OpenAICompletionsService`。
 - Kimi → `OpenAICompletionsService`。
-- DeepSeek → `OpenAICompletionsService`，请求适配层发送 `thinking.type=enabled|disabled`；开启时只发送 `reasoning_effort=high|max`，缺省为 `max`。
+- DeepSeek → `OpenAICompletionsService`，请求适配层发送 `thinking.type=enabled|disabled`；开启时支持 `reasoning_effort=low|high|max`；V4.1 Flash 缺省 `high`。
 - 已声明 `openai-responses` 的历史模型仍可由 `OpenAIResponsesService` 处理；当前三家内置供应商默认使用 `OpenAICompletionsService`。
 
 `LLMConfig` 目标扩展：

@@ -48,6 +48,7 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     const pricing = this.models.resolvePricing ? this.models.resolvePricing(pricingModel, requestModel) : resolveModelPricing(BUILTIN_MODEL_CATALOG, { providerId: model.definition.provider, apiModel: requestModel, modelKey: model.key, baseUrl: pricingModel.providerRuntime.baseUrl ?? "", connectionId: model.connectionId, multiplier: runtime.pricingMultiplier, configured: model.definition.source === "custom" && requestModel === model.definition.apiModel ? model.definition.pricing : undefined, configuredAlreadyMultiplied: true });
     const engineOptions = {
       pricing,
+      ...(capabilities?.input ? { modelFacts: { contextWindow: model.definition.contextWindow, maxTokens: model.definition.maxTokens ?? null, input: capabilities.input, reasoning: capabilities.reasoning } } : {}),
       route,
       providerId: model.definition.provider,
       modelId: requestModel,

@@ -508,7 +508,7 @@ describe("App streaming user message", () => {
     expect(getSessionPreview).toHaveBeenCalledWith({ sessionId });
     expect(tooltip).toHaveTextContent(`sessionId: ${sessionId}`);
     expect(tooltip).toHaveTextContent("/tmp/workspace");
-    expect(tooltip).toHaveTextContent("DeepSeek V4 Pro");
+    expect(tooltip).toHaveTextContent("deepseek-flash");
     expect(tooltip).toHaveTextContent("42K / 100K");
   });
 
@@ -1255,8 +1255,8 @@ sessionId,
 
     renderApp();
 
-    await userEvent.click(await screen.findByRole("button", { name: /DeepSeek V4 Pro/i }));
-    await userEvent.click(screen.getByRole("button", { name: "DeepSeek V4 Flash" }));
+    await userEvent.click(await screen.findByRole("button", { name: /deepseek-flash/i }));
+    await userEvent.click(screen.getAllByRole("button", { name: "deepseek-flash" }).at(-1)!);
 
     let composer = await screen.findByLabelText("消息输入框");
     await userEvent.type(composer, "start with flash");

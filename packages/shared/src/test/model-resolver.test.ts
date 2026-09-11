@@ -69,8 +69,7 @@ describe("model resolver", () => {
   it("lists builtin chat models in stable provider order", () => {
     const keys = listUsableModels(makeSnapshot(), "chat").map((model) => model.key);
     expect(keys).toEqual([
-      "deepseek:deepseek-v4-flash",
-      "deepseek:deepseek-v4-pro",
+      "deepseek:deepseek-flash",
       "kimi:kimi-k2.6",
       "kimi:kimi-k2.7-code",
     ]);
@@ -81,9 +80,7 @@ describe("model resolver", () => {
     snapshot.providers.deepseek.lastConnection = { status: "untested" };
 
     expect(resolveConfiguredModel(snapshot, "deepseek-v4-flash", "utility").ok).toBe(true);
-    expect(listUsableModels(snapshot, "chat").map((model) => model.key)).toContain(
-      "deepseek:deepseek-v4-pro",
-    );
+    expect(listUsableModels(snapshot, "chat").map((model) => model.key)).toContain("deepseek:deepseek-flash");
   });
 
   it("allows tool-unknown catalog models for utility but not agent purposes", () => {
@@ -134,19 +131,19 @@ describe("model resolver", () => {
       snapshot.providers.deepseek.lastConnection = { status: "unavailable", checkedAt: now };
     }],
     ["model_not_installed", (snapshot: ModelSnapshot) => {
-      delete snapshot.installedModels["deepseek:deepseek-v4-pro"];
+      delete snapshot.installedModels["deepseek:deepseek-flash"];
     }],
     ["model_disabled", (snapshot: ModelSnapshot) => {
-      snapshot.installedModels["deepseek:deepseek-v4-pro"] = { enabled: false, addedAt: now };
+      snapshot.installedModels["deepseek:deepseek-flash"] = { enabled: false, addedAt: now };
     }],
   ] as const)("returns %s with the configured model preserved", (reason, mutate) => {
     const snapshot = makeSnapshot();
     mutate(snapshot);
     expect(resolveConfiguredModel(snapshot, "deepseek-v4-pro", "chat")).toMatchObject({
       ok: false,
-      key: "deepseek:deepseek-v4-pro",
+      key: "deepseek:deepseek-flash",
       reason,
-      definition: { label: "DeepSeek V4 Pro" },
+      definition: { label: "deepseek-flash" },
     });
   });
 

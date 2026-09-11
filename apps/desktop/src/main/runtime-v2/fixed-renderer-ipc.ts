@@ -50,7 +50,7 @@ import { openWorkspaceInIde } from "../workspace-ide-service";
 import { initializeGitRepository } from "../review-git-service";
 import { commitAndPushWorkspaceChanges, commitWorkspaceChanges, createWorkspaceBranch, getWorkspaceEnvironment, pushWorkspaceBranch, switchWorkspaceBranch } from "../workspace-environment-service";
 import { listWorkspaceOpenTools, openWorkspaceInTool } from "../workspace-open-service";
-import type { RuntimeV2OpenRouterCatalogService } from "./openrouter-catalog-service";
+import { selectModelCatalog, type RuntimeV2OpenRouterCatalogService } from "./openrouter-catalog-service";
 import type { ProviderNetworkService } from "./provider-network-service";
 import type { DesktopRuntimeV2Registry } from "./runtime-registry";
 import { installFixedRendererSkill, listFixedRendererSkills, uninstallFixedRendererSkill } from "./fixed-renderer-skills";
@@ -75,6 +75,7 @@ export type FixedRendererIpcOptions = {
   readonly providerNetwork: ProviderNetworkService;
   readonly pricingCatalog?: import("../model-catalog-service").ModelCatalogService;
   readonly catalog: RuntimeV2OpenRouterCatalogService;
+  readonly deepSeekCatalog?: RuntimeV2OpenRouterCatalogService;
   readonly approvals: PendingApprovalRegistry;
   readonly browserBridge: BrowserBridgeService;
   readonly quickOpen: QuickOpenShortcutController;
@@ -428,17 +429,21 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listUsableModels, (_event, input: { purpose?: "chat" | "utility" | "explore" | "vision" }) => ({ models: options.modelRuntime.listUsableModels(input?.purpose ?? "chat") }));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getPricingCatalog, () => options.pricingCatalog?.status() ?? null);
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.refreshPricingCatalog, (_event, input: { force?: boolean } = {}) => options.pricingCatalog?.refresh(input.force === true) ?? null);
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listModelCatalog, (_event, input: { query?: string } = {}) => ({ provider: "openrouter", ...options.catalog.list(input.query) }));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.reloadModelCatalog, async () => {
-    const runtime = options.settings.getProviderRuntimeConfig("openrouter");
-    if ("code" in runtime) return { provider: "openrouter", ...options.catalog.list(), error: { code: runtime.code, message: runtime.message } };
-    const result = await options.catalog.reload(runtime);
-    if (!result.error && result.state === "fresh") await options.models.refreshInstalledCatalogModels();
-    return { provider: "openrouter", ...result };
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listModelCatalog, (_event, input: { provider?: string; query?: string } = {}) => {
+    const { provider, catalog } = selectModelCatalog(input.provider, options.catalog, options.deepSeekCatalog);
+    return { provider, ...catalog.list(input.query) };
+  });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.reloadModelCatalog, async (_event, input: { provider?: string; query?: string } = {}) => {
+    const { provider, catalog } = selectModelCatalog(input.provider, options.catalog, options.deepSeekCatalog);
+    const runtime = options.settings.getProviderRuntimeConfig(provider);
+    if ("code" in runtime) return { provider, ...catalog.list(), error: { code: runtime.code, message: runtime.message } };
+    const result = await catalog.reload(runtime);
+    if (!result.error && result.state === "fresh") await options.models.refreshInstalledCatalogModels(provider);
+    return { provider, ...result };
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.addModel, async (_event, input: { provider: string; apiModel: string }) => {
-    if (input?.provider !== "openrouter" || typeof input.apiModel !== "string") return { ok: false, error: { code: "invalid_model", message: "模型添加参数无效。" } };
-    return toModelMutationResult(await options.models.addCatalogModel("openrouter", input.apiModel));
+    if ((input?.provider !== "openrouter" && input?.provider !== "deepseek") || typeof input.apiModel !== "string") return { ok: false, error: { code: "invalid_model", message: "模型添加参数无效。" } };
+    return toModelMutationResult(await options.models.addCatalogModel(input.provider, input.apiModel));
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateModel, async (_event, input: { modelKey: string; enabled?: boolean; customLabel?: string | null; credentialId?: string | null }) => {
     const key = normalizeModelKey(input?.modelKey);

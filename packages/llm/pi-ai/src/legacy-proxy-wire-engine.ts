@@ -1,3 +1,4 @@
+import { validateDeepSeekImage, validateDeepSeekImageMessages, validateDeepSeekPayload } from "./deepseek-images.js";
 import { catalogProviderForEndpoint, type ModelPricingSnapshot } from "@actspace/shared";
 import { calculateUsageCost } from "@actspace/llm-service";
 import { reasoningPayload } from "./reasoning-options.js";
@@ -17,6 +18,7 @@ type SdkConstructor = new (options: Record<string, unknown>) => SdkClient;
 export type LegacyProxySdkLoader = (route: PiAiWireRoute) => Promise<SdkConstructor>;
 
 export type LegacyProxyWireEngineOptions = {
+  readonly modelFacts?: import("./pi-ai-wire-engine.js").PiAiWireEngineOptions["modelFacts"];
   readonly pricing?: ModelPricingSnapshot | null;
   readonly route: PiAiWireRoute;
   readonly providerId: string;
@@ -61,16 +63,25 @@ async function* completionsStream(client: SdkClient, input: LlmAdapterDispatchIn
   let terminalSeen = false;
   try {
     const chat = client.chat as { completions: { create(params: unknown, options: unknown): Promise<AsyncIterable<unknown>> } };
-    const stream = await chat.completions.create({
+    const deepseek = options.providerId === "deepseek";
+    if (deepseek) validateDeepSeekImageMessages(input.request.messages, options.modelFacts?.input.includes("image") ?? true);
+    const readArtifact = options.readArtifact;
+    const checkedReader: PiAiArtifactReader | undefined = deepseek && readArtifact ? async (sessionId, artifactId) => {
+      const artifact = await readArtifact(sessionId, artifactId);
+      return { ...artifact, mimeType: validateDeepSeekImage(artifact.data) };
+    } : readArtifact;
+    const body = {
       model: options.modelId ?? input.request.model,
-      messages: await toOpenAiMessages(input.request.messages, input.request.sessionId, options.readArtifact),
+      messages: await toOpenAiMessages(input.request.messages, input.request.sessionId, checkedReader, deepseek),
       stream: true,
       ...reasoningPayload(options.route, options.providerId, input.request.options),
       stream_options: { include_usage: true },
       ...(input.request.options.temperature === undefined ? {} : { temperature: input.request.options.temperature }),
       ...(input.request.options.maxTokens === undefined ? {} : { max_tokens: input.request.options.maxTokens }),
       ...(input.request.tools.length === 0 ? {} : { tools: toOpenAiTools(input.request.tools) }),
-    }, { signal: input.signal });
+    };
+    if (deepseek) validateDeepSeekPayload(body);
+    const stream = await chat.completions.create(body, { signal: input.signal });
     for await (const raw of stream) {
       const chunk = raw as Record<string, unknown>;
       const choice = (chunk.choices as Array<Record<string, unknown>> | undefined)?.[0];
@@ -165,12 +176,12 @@ async function* anthropicStream(client: SdkClient, input: LlmAdapterDispatchInpu
   } catch (error) { yield { ...terminalFailure(error, input.signal), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; }
 }
 
-async function toOpenAiMessages(messages: readonly LlmMessage[], sessionId?: string, readArtifact?: PiAiArtifactReader): Promise<RuntimeV2JsonValue[]> {
+async function toOpenAiMessages(messages: readonly LlmMessage[], sessionId?: string, readArtifact?: PiAiArtifactReader, deepseek = false): Promise<RuntimeV2JsonValue[]> {
   const output: RuntimeV2JsonValue[] = [];
   for (const message of messages) {
     if (message.role === "system") { output.push({ role: "system", content: messageText(message) }); continue; }
     if (message.role === "user") { output.push({ role: "user", content: await toOpenAiUserContent(message, sessionId, readArtifact) }); continue; }
-    if (message.role === "assistant") { const blocks = blocksOf(message); const text = blocks.filter(isText).map((block) => block.text).join(""); const calls = blocks.filter(isToolCall); output.push({ role: "assistant", content: text || null, ...(calls.length ? { tool_calls: calls.map((call) => ({ id: call.callId, type: "function", function: { name: call.name, arguments: call.arguments } })) } : {}) }); continue; }
+    if (message.role === "assistant") { const blocks = blocksOf(message); const text = blocks.filter(isText).map((block) => block.text).join(""); const calls = blocks.filter(isToolCall); output.push({ role: "assistant", content: text || null, ...(deepseek ? { reasoning_content: blocks.filter((block) => block.type === "reasoning").map((block) => block.type === "reasoning" ? block.text : "").join("") } : {}), ...(calls.length ? { tool_calls: calls.map((call) => ({ id: call.callId, type: "function", function: { name: call.name, arguments: call.arguments } })) } : {}) }); continue; }
     output.push({ role: "tool", tool_call_id: message.callId ?? "unknown", content: messageText(message) });
   }
   return output;

@@ -58,3 +58,18 @@ function runtime(provider: ProviderNetworkRuntime["provider"]): ProviderNetworkR
         : "https://openrouter.ai/api/v1",
   };
 }
+
+it("uses the DeepSeek connection and scoped proxy for model discovery, with sanitized failures", async () => {
+  const directFetch = vi.fn(async () => Response.json({ data: [{ id: "deepseek-flash" }] }));
+  const proxyRequest = vi.fn(async () => new Response("secret-upstream", { status: 401 }));
+  const proxyFetch = vi.fn(async () => proxyRequest);
+  const service = new ProviderNetworkService({ directFetch, proxyFetch });
+  expect(await service.fetchModelCatalog(runtime("deepseek"))).toMatchObject({ ok: true, payload: { data: [{ id: "deepseek-flash" }] } });
+  expect(directFetch.mock.calls[0]?.[0]).toBe("https://api.deepseek.com/models");
+  const failure = await service.fetchModelCatalog({ ...runtime("deepseek"), transport: { proxyUrl: "http://localhost:7890" } });
+  expect(proxyFetch).toHaveBeenCalledWith("http://localhost:7890");
+  expect(failure).toMatchObject({ ok: false, code: "auth" });
+  expect(JSON.stringify(failure)).not.toContain("secret-upstream");
+  expect(directFetch).toHaveBeenCalledTimes(1);
+  await service.dispose();
+});

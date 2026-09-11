@@ -601,7 +601,7 @@ describe("WindowChromeBar", () => {
     expect(getSessionPreview).toHaveBeenCalledWith(expect.objectContaining({ id: "s-actspace-1" }));
     expect(tooltip).toHaveTextContent("New chat");
     expect(tooltip).toHaveTextContent("/Users/me/Desktop/code-project/side-project/actspace-agent");
-    expect(tooltip).toHaveTextContent("DeepSeek V4 Pro");
+    expect(tooltip).toHaveTextContent("deepseek-flash");
     expect(tooltip).toHaveTextContent("上下文 56%");
     expect(tooltip).toHaveTextContent("56K / 100K");
     expect(tooltip).not.toHaveTextContent("main");

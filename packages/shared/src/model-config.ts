@@ -1,3 +1,4 @@
+import { DEEPSEEK_FLASH_ALIASES, DEEPSEEK_FLASH_KEY, deepSeekPeakPricing } from "./deepseek-model-facts";
 import type { ProviderId } from "./provider-config";
 
 export type LegacyModelId =
@@ -83,51 +84,29 @@ export interface ModelDefinition {
 export const MODEL_REGISTRY: Record<ModelId, ModelSpec> = {
   "deepseek-v4-flash": {
     id: "deepseek-v4-flash",
-    label: "DeepSeek V4 Flash",
+    label: "deepseek-flash",
     api: "openai-completions",
     provider: "deepseek",
-    apiModel: "deepseek-v4-flash",
+    apiModel: "deepseek-flash",
     defaultBaseUrl: "https://api.deepseek.com",
     thinkingDefault: true,
     supportsThinkingToggle: true,
     reasoning: true,
-    reasoningEfforts: ["high", "max"],
-    reasoningDefaultEffort: "max",
-    input: ["text"],
+    reasoningEfforts: ["low", "high", "max"],
+    reasoningDefaultEffort: "high",
+    input: ["text", "image"],
     contextWindow: 1_000_000,
-    maxTokens: 8192,
+    maxTokens: 393_216,
     visibility: "public",
-    // DeepSeek 国产模型按人民币计价；单价为 CNY/百万 token（由旧 USD 单价按 ≈7.2 一次性换算而来，
-    // 仅作示意，接真实项目时改成 DeepSeek 官网公布的 CNY 价目即可）。
-    pricing: {
-      currency: "CNY",
-      inputCacheHitPerMillion: 0.02016,
-      inputCacheMissPerMillion: 1.008,
-      outputPerMillion: 2.016,
-    },
+    pricing: deepSeekPeakPricing("deepseek-flash"),
   },
+  // Retired ID kept only for legacy session readers; never offered as a separate model.
   "deepseek-v4-pro": {
-    id: "deepseek-v4-pro",
-    label: "DeepSeek V4 Pro",
-    api: "openai-completions",
-    provider: "deepseek",
-    apiModel: "deepseek-v4-pro",
-    defaultBaseUrl: "https://api.deepseek.com",
-    thinkingDefault: true,
-    supportsThinkingToggle: true,
-    reasoning: true,
-    reasoningEfforts: ["high", "max"],
-    reasoningDefaultEffort: "max",
-    input: ["text"],
-    contextWindow: 1_000_000,
-    maxTokens: 8192,
-    visibility: "public",
-    pricing: {
-      currency: "CNY",
-      inputCacheHitPerMillion: 0.0261,
-      inputCacheMissPerMillion: 3.132,
-      outputPerMillion: 6.264,
-    },
+    id: "deepseek-v4-pro", label: "deepseek-flash", api: "openai-completions", provider: "deepseek",
+    apiModel: "deepseek-flash", defaultBaseUrl: "https://api.deepseek.com", thinkingDefault: true,
+    supportsThinkingToggle: true, reasoning: true, reasoningEfforts: ["low", "high", "max"], reasoningDefaultEffort: "high",
+    input: ["text", "image"], contextWindow: 1_000_000, maxTokens: 393_216, visibility: "internal",
+    pricing: deepSeekPeakPricing("deepseek-flash"),
   },
   "kimi-k2.6": {
     id: "kimi-k2.6",
@@ -181,11 +160,11 @@ export const ALL_MODEL_LIST: ModelSpec[] = Object.values(MODEL_REGISTRY);
 /** Public user-facing models. Internal helper models, such as Kimi, stay in MODEL_REGISTRY. */
 export const MODEL_LIST: ModelSpec[] = ALL_MODEL_LIST.filter((spec) => spec.visibility === "public");
 
-export const DEFAULT_MODEL_ID: ModelId = "deepseek-v4-pro";
+export const DEFAULT_MODEL_ID: ModelId = "deepseek-v4-flash";
 
 export const LEGACY_MODEL_KEY_MAP: Record<LegacyModelId, ModelKey> = {
-  "deepseek-v4-flash": "deepseek:deepseek-v4-flash",
-  "deepseek-v4-pro": "deepseek:deepseek-v4-pro",
+  "deepseek-v4-flash": DEEPSEEK_FLASH_KEY,
+  "deepseek-v4-pro": DEEPSEEK_FLASH_KEY,
   "kimi-k2.6": "kimi:kimi-k2.6",
   "kimi-k2.7-code": "kimi:kimi-k2.7-code",
 };
@@ -193,7 +172,7 @@ export const LEGACY_MODEL_KEY_MAP: Record<LegacyModelId, ModelKey> = {
 export const DEFAULT_MODEL_KEY: ModelKey = LEGACY_MODEL_KEY_MAP[DEFAULT_MODEL_ID];
 
 export const BUILTIN_MODEL_REGISTRY: Partial<Record<ModelKey, ModelDefinition>> = Object.fromEntries(
-  ALL_MODEL_LIST.map((spec) => [
+  MODEL_LIST.map((spec) => [
     LEGACY_MODEL_KEY_MAP[spec.id],
     {
       key: LEGACY_MODEL_KEY_MAP[spec.id],
@@ -306,6 +285,8 @@ export const CURATED_OPENROUTER_MODEL_REGISTRY: Partial<Record<ModelKey, ModelDe
 
 export function normalizeModelKey(value: unknown): ModelKey | undefined {
   if (typeof value !== "string") return undefined;
+  if (DEEPSEEK_FLASH_ALIASES.some((alias) => value === alias || value === `deepseek:${alias}`)) return DEEPSEEK_FLASH_KEY;
+  if (value === "deepseek:deepseek-v4-pro") return DEEPSEEK_FLASH_KEY;
   if (value in LEGACY_MODEL_KEY_MAP) return LEGACY_MODEL_KEY_MAP[value as LegacyModelId];
   const separatorIndex = value.indexOf(":");
   if (separatorIndex <= 0 || separatorIndex === value.length - 1) return undefined;
@@ -329,6 +310,7 @@ export function resolveModelDefinitionByApiModel(
   apiModel: string,
   provider?: ProviderId,
 ): ModelDefinition | undefined {
+  if ((!provider || provider === "deepseek") && DEEPSEEK_FLASH_ALIASES.some((alias) => alias === apiModel)) return BUILTIN_MODEL_REGISTRY[DEEPSEEK_FLASH_KEY];
   return BUILTIN_MODEL_LIST.find(
     (definition) => definition.apiModel === apiModel && (!provider || definition.provider === provider),
   );

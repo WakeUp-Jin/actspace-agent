@@ -1,3 +1,4 @@
+import { deepSeekModelDefinition } from "@actspace/shared";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { CatalogCacheState, CatalogModelView, ModelPricing, ModelReasoningEffort, OpenRouterCatalogCache } from "@actspace/shared";
@@ -13,6 +14,7 @@ export type RuntimeV2CatalogResult = {
 };
 
 export type RuntimeV2OpenRouterCatalogOptions = {
+  readonly provider?: "openrouter" | "deepseek";
   readonly pricingCatalog?: () => import("@actspace/shared").ModelCatalogSnapshot;
   readonly dataRoot: string;
   readonly fetchCatalog: (runtime: ProviderNetworkRuntime) => Promise<ProviderCatalogFetchResult>;
@@ -26,6 +28,7 @@ const DEFAULT_STALE_AFTER_MS = 24 * 60 * 60 * 1_000;
 
 export class RuntimeV2OpenRouterCatalogService {
   readonly #pricingCatalog?: RuntimeV2OpenRouterCatalogOptions["pricingCatalog"];
+  readonly #provider: "openrouter" | "deepseek";
   readonly #cachePath: string;
   readonly #fetchCatalog: RuntimeV2OpenRouterCatalogOptions["fetchCatalog"];
   readonly #isAdded: RuntimeV2OpenRouterCatalogOptions["isAdded"];
@@ -34,8 +37,9 @@ export class RuntimeV2OpenRouterCatalogService {
   #cache: OpenRouterCatalogCache | null = null;
 
   constructor(options: RuntimeV2OpenRouterCatalogOptions) {
+    this.#provider = options.provider ?? "openrouter";
     this.#pricingCatalog = options.pricingCatalog;
-    this.#cachePath = join(options.dataRoot, "providers", "openrouter", "models-cache.json");
+    this.#cachePath = join(options.dataRoot, "providers", this.#provider, "models-cache.json");
     this.#fetchCatalog = options.fetchCatalog;
     this.#isAdded = options.isAdded;
     this.#now = options.now ?? (() => new Date());
@@ -45,7 +49,7 @@ export class RuntimeV2OpenRouterCatalogService {
   async load(): Promise<RuntimeV2CatalogResult> {
     try {
       const parsed = JSON.parse(await readFile(this.#cachePath, "utf8")) as unknown;
-      if (!isCatalogCache(parsed)) throw new Error("invalid catalog cache");
+      if (!isCatalogCache(parsed) || parsed.models.some((model) => model.provider !== this.#provider)) throw new Error("invalid catalog cache");
       this.#cache = parsed;
       return this.list();
     } catch (error) {
@@ -56,15 +60,17 @@ export class RuntimeV2OpenRouterCatalogService {
   }
 
   list(query = ""): RuntimeV2CatalogResult {
-    if (!this.#cache && this.#pricingCatalog) {
+    if (!this.#cache && this.#provider === "openrouter" && this.#pricingCatalog) {
       const snapshot = this.#pricingCatalog();
       const models = snapshot.entries.filter((row) => row.sourceProviderId === "openrouter" && `${row.name} ${row.apiModel}`.toLowerCase().includes(query.toLowerCase().trim())).map((row): CatalogModelView => this.withPricing({ provider: "openrouter", apiModel: row.apiModel, name: row.name, contextWindow: row.contextWindow, maxTokens: row.maxOutput, input: row.input.includes("image") ? ["text", "image"] : ["text"], toolUse: "unknown", reasoning: row.reasoning, isFree: false, added: this.#isAdded(row.apiModel) }));
       return { state: "fresh", stale: false, fetchedAt: snapshot.generatedAt, models, skippedCount: 0 };
     }
-    if (!this.#cache) return { state: "missing", stale: false, models: [], skippedCount: 0 };
+    if (!this.#cache) return { state: "missing", stale: false, models: this.#provider === "deepseek"
+      ? ["deepseek-flash"].map((id) => this.withPricing(deepSeekCatalogModel(id, this.#now().toISOString()))).filter((model) => `${model.name} ${model.apiModel}`.toLowerCase().includes(query.trim().toLowerCase())).map((model) => ({ ...model, added: this.#isAdded(model.apiModel) })) : [], skippedCount: 0 };
     const normalized = query.trim().toLocaleLowerCase();
     const stale = this.#now().getTime() - Date.parse(this.#cache.fetchedAt) > this.#staleAfterMs;
     const models = this.#cache.models
+      .filter((model) => this.#provider !== "deepseek" || model.apiModel !== "deepseek-v4-pro")
       .filter((model) => !normalized || model.name.toLocaleLowerCase().includes(normalized) || model.apiModel.toLocaleLowerCase().includes(normalized))
       .map((model) => ({ ...model, input: [...model.input], ...(Array.isArray(model.reasoningEfforts) ? { reasoningEfforts: [...model.reasoningEfforts] } : {}), added: this.#isAdded(model.apiModel) }));
     return { state: stale ? "stale" : "fresh", fetchedAt: this.#cache.fetchedAt, stale, models: models.map((row) => this.withPricing(row)), skippedCount: this.#cache.skippedCount };
@@ -76,6 +82,7 @@ export class RuntimeV2OpenRouterCatalogService {
   }
 
   private withPricing(model: CatalogModelView): CatalogModelView {
+    if (this.#provider === "deepseek") return { ...deepSeekCatalogModel(model.apiModel, this.#now().toISOString()), added: model.added };
     if (!this.#pricingCatalog) return model;
     const fact = this.#pricingCatalog().entries.find((row) => row.sourceProviderId === "openrouter" && row.apiModel === model.apiModel);
     const { pricing: _old, ...rest } = model;
@@ -85,9 +92,10 @@ export class RuntimeV2OpenRouterCatalogService {
   }
 
   async reload(runtime: ProviderNetworkRuntime): Promise<RuntimeV2CatalogResult> {
+    if (runtime.provider !== this.#provider) return this.#refreshFailure("invalid_provider", "模型目录与连接服务商不匹配。");
     const fetched = await this.#fetchCatalog(runtime);
     if ("code" in fetched) return this.#refreshFailure(fetched.code, fetched.message);
-    const normalized = normalizeCatalogPayload(fetched.payload);
+    const normalized = normalizeCatalogPayload(fetched.payload, this.#provider, this.#now().toISOString());
     if (!normalized) return this.#refreshFailure("invalid_payload", "Model catalog response was invalid; the last good catalog was preserved.");
     const fetchedAt = this.#now().toISOString();
     const cache: OpenRouterCatalogCache = { version: CACHE_VERSION, fetchedAt, sourceUrl: `${runtime.baseUrl.replace(/\/+$/, "")}/models`, models: normalized.models, skippedCount: normalized.skippedCount };
@@ -111,14 +119,16 @@ export class RuntimeV2OpenRouterCatalogService {
   }
 }
 
-function normalizeCatalogPayload(value: unknown): { readonly models: CatalogModelView[]; readonly skippedCount: number } | undefined {
+function normalizeCatalogPayload(value: unknown, provider: "openrouter" | "deepseek", now: string): { readonly models: CatalogModelView[]; readonly skippedCount: number } | undefined {
   if (!isRecord(value) || !Array.isArray(value.data)) return undefined;
   const rows = value.data;
   const models: CatalogModelView[] = [];
   let skippedCount = 0;
   for (const row of rows) {
-    const model = normalizeCatalogModel(row);
-    if (model) models.push(model);
+    if (provider === "deepseek" && isRecord(row) && row.id === "deepseek-v4-pro") { skippedCount += 1; continue; }
+    const id = isRecord(row) && typeof row.id === "string" && row.id.length <= 300 && !/[\x00-\x20\x7f]/.test(row.id) ? row.id : undefined;
+    const model = provider === "deepseek" ? id ? deepSeekCatalogModel(id, now) : undefined : normalizeCatalogModel(row);
+    if (model && !models.some((existing) => existing.apiModel === model.apiModel)) models.push(model);
     else skippedCount += 1;
   }
   return rows.length > 0 && models.length === 0 ? undefined : { models, skippedCount };
@@ -195,7 +205,7 @@ function isCatalogModelView(value: unknown): value is CatalogModelView {
   if (!isRecord(value)) return false;
   const input = value.input;
   const efforts = value.reasoningEfforts;
-  return value.provider === "openrouter"
+  return (value.provider === "openrouter" || value.provider === "deepseek")
     && typeof value.apiModel === "string"
     && value.apiModel.length > 0
     && typeof value.name === "string"
@@ -239,4 +249,21 @@ async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
   const temporary = `${path}.tmp-${process.pid}-${Date.now()}`;
   await writeFile(temporary, `${JSON.stringify(value)}\n`, { encoding: "utf8", mode: 0o600 });
   await rename(temporary, path);
+}
+
+function deepSeekCatalogModel(apiModel: string, now: string): CatalogModelView {
+  const fact = deepSeekModelDefinition(apiModel, now);
+  return { provider: "deepseek", apiModel: fact?.apiModel ?? apiModel, name: fact?.label ?? apiModel,
+    contextWindow: fact?.contextWindow ?? null, maxTokens: fact?.maxTokens ?? null,
+    input: fact?.capabilities.input ?? ["text"], toolUse: fact ? "declared" : "unknown",
+    reasoning: fact?.capabilities.reasoning ?? false,
+    ...(fact ? { reasoningEfforts: fact.capabilities.reasoningEfforts, reasoningDefaultEffort: fact.capabilities.reasoningDefaultEffort, reasoningDefaultEnabled: fact.thinkingDefault, pricing: fact.pricing } : {}),
+    isFree: false, added: false };
+}
+
+/** Both IPC surfaces validate the provider before resolving credentials. */
+export function selectModelCatalog(provider: unknown, openrouter: RuntimeV2OpenRouterCatalogService, deepseek?: RuntimeV2OpenRouterCatalogService): { provider: "openrouter" | "deepseek"; catalog: RuntimeV2OpenRouterCatalogService } {
+  if (provider === undefined || provider === "openrouter") return { provider: "openrouter", catalog: openrouter };
+  if (provider === "deepseek" && deepseek) return { provider, catalog: deepseek };
+  throw new Error("模型目录服务商无效或目录不可用。");
 }

@@ -135,8 +135,8 @@ export type RuntimeV2ProviderTestResult = {
   readonly settings: AppSettingsV2;
 };
 export type RuntimeV2WriteAgentSystemPromptInput = { readonly content: string };
-export type RuntimeV2ModelCatalogQuery = { readonly query?: string };
-export type RuntimeV2AddCatalogModelInput = { readonly apiModel: string };
+export type RuntimeV2ModelCatalogQuery = { readonly provider?: "openrouter" | "deepseek"; readonly query?: string };
+export type RuntimeV2AddCatalogModelInput = { readonly provider?: "openrouter" | "deepseek"; readonly apiModel: string };
 export type RuntimeV2AttachmentRef = {
   readonly artifactId: string;
   readonly mimeType: string;
@@ -206,7 +206,7 @@ export type RuntimeV2DesktopBridge = {
   readAgentSystemPrompt(): Promise<AgentSystemPromptFile>;
   writeAgentSystemPrompt(input: RuntimeV2WriteAgentSystemPromptInput): Promise<AgentSystemPromptFile>;
   listModelCatalog(input?: RuntimeV2ModelCatalogQuery): Promise<ModelsCatalogListResult>;
-  reloadModelCatalog(): Promise<ModelsCatalogListResult>;
+  reloadModelCatalog(input?: RuntimeV2ModelCatalogQuery): Promise<ModelsCatalogListResult>;
   addCatalogModel(input: RuntimeV2AddCatalogModelInput): Promise<AppSettingsV2>;
   pickAttachment(sessionId: string): Promise<RuntimeV2AttachmentRef | null>;
   listApprovals(sessionId?: string): Promise<readonly RuntimeV2ApprovalRequest[]>;

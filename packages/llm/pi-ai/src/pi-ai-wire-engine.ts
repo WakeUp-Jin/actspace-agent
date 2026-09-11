@@ -1,3 +1,4 @@
+import { validateDeepSeekImage, validateDeepSeekImageMessages, validateDeepSeekPayload } from "./deepseek-images.js";
 import { LegacyProxyWireEngine } from "./legacy-proxy-wire-engine.js";
 import { catalogProviderForEndpoint, type ModelPricingSnapshot } from "@actspace/shared";
 import { calculateUsageCost } from "@actspace/llm-service";
@@ -14,6 +15,7 @@ import type { LlmUsage } from "@actspace/llm-service";
 export type PiAiWireRoute = "openai-completions" | "openai-responses" | "anthropic-messages";
 export type PiAiArtifactReader = (sessionId: string, artifactId: string) => Promise<{ readonly data: Uint8Array; readonly mimeType: string }>;
 export type PiAiWireEngineOptions = {
+  readonly modelFacts?: { readonly contextWindow: number | null; readonly maxTokens: number | null; readonly input: readonly ("text" | "image")[]; readonly reasoning: boolean };
   readonly pricing?: ModelPricingSnapshot | null;
   readonly route: PiAiWireRoute;
   readonly providerId: string;
@@ -57,8 +59,15 @@ export class PiAiWireEngine implements PiAiEngine {
       const models = core.createModels(); models.setProvider(provider);
       const resolved = models.getModel(this.options.providerId, modelId);
       if (resolved === undefined) throw failure("invalid-request", `pi-ai did not publish model ${modelId}.`);
-      const context = await toPiAiContext(input.request.messages, input.request.tools, input.request.sessionId, this.options.readArtifact);
-      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens, reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), onPayload: (payload: Record<string, unknown>) => ({ ...payload, ...reasoningPayload(this.options.route, this.options.providerId, input.request.options) }), headers: input.credential.headers } as never);
+      const deepseek = this.options.providerId === "deepseek" && this.options.route === "openai-completions";
+      if (deepseek) validateDeepSeekImageMessages(input.request.messages, this.options.modelFacts?.input.includes("image") ?? true);
+      const readArtifact = this.options.readArtifact;
+      const checkedReader: PiAiArtifactReader | undefined = deepseek && readArtifact ? async (sessionId, artifactId) => {
+        const artifact = await readArtifact(sessionId, artifactId);
+        return { ...artifact, mimeType: validateDeepSeekImage(artifact.data) };
+      } : readArtifact;
+      const context = await toPiAiContext(input.request.messages, input.request.tools, input.request.sessionId, checkedReader, deepseek ? { api: this.options.route, provider: this.options.providerId, model: modelId } : undefined);
+      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens ?? Math.min(32_768, this.options.modelFacts?.maxTokens ?? 32_768), reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), onPayload: (payload: Record<string, unknown>) => { const body = { ...payload, ...reasoningPayload(this.options.route, this.options.providerId, input.request.options) }; if (deepseek) validateDeepSeekPayload(body); return body; }, headers: input.credential.headers } as never);
       return fromPiAiEvents(events, input.request.requestId, this.options.pricing ?? null);
     } catch (error) {
       if (error instanceof LlmRuntimeError) throw error;
@@ -75,17 +84,17 @@ async function loadPiAiPublicModules(route: PiAiWireRoute): Promise<{ readonly c
 }
 
 function createModel(options: PiAiWireEngineOptions, model: string, baseUrl: string): RuntimeV2JsonValue {
-  return { id: model, name: model, api: options.route, provider: options.providerId, baseUrl, reasoning: true, input: ["text", "image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 262_144, maxTokens: 32_768 };
+  return { id: model, name: model, api: options.route, provider: options.providerId, baseUrl, ...(options.providerId === "deepseek" && options.route === "openai-completions" ? { compat: { maxTokensField: "max_tokens" } } : {}), reasoning: options.modelFacts?.reasoning ?? true, input: options.modelFacts ? [...options.modelFacts.input] : ["text", "image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: options.modelFacts?.contextWindow ?? 262_144, maxTokens: options.modelFacts?.maxTokens ?? 32_768 };
 }
 
-async function toPiAiContext(messages: readonly LlmMessage[], tools: readonly { readonly name: string; readonly description: string; readonly inputSchema: RuntimeV2JsonValue }[], sessionId?: string, readArtifact?: PiAiArtifactReader): Promise<PiAiContext> {
+async function toPiAiContext(messages: readonly LlmMessage[], tools: readonly { readonly name: string; readonly description: string; readonly inputSchema: RuntimeV2JsonValue }[], sessionId?: string, readArtifact?: PiAiArtifactReader, replay?: { api: string; provider: string; model: string }): Promise<PiAiContext> {
   const systemPrompt = messages.filter((message) => message.role === "system").map(messageText).join("\n\n");
   const names = new Map<string, string>(); const output: RuntimeV2JsonValue[] = [];
   for (const message of messages) {
     if (message.role === "system") continue;
     if (message.role === "assistant") {
-      const content = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content.map((block) => toPiAssistantBlock(block, names));
-      output.push({ role: "assistant", content, api: "replay", provider: "actspace", model: "replay", usage: zeroUsage(), stopReason: content.some((block) => typeof block === "object" && block !== null && (block as { type?: string }).type === "toolCall") ? "toolUse" : "stop", timestamp: 0 });
+      const content = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content.map((block) => toPiAssistantBlock(block, names, Boolean(replay)));
+      output.push({ role: "assistant", content, api: replay?.api ?? "replay", provider: replay?.provider ?? "actspace", model: replay?.model ?? "replay", usage: zeroUsage(), stopReason: content.some((block) => typeof block === "object" && block !== null && (block as { type?: string }).type === "toolCall") ? "toolUse" : "stop", timestamp: 0 });
       continue;
     }
     if (message.role === "tool") {
@@ -97,9 +106,9 @@ async function toPiAiContext(messages: readonly LlmMessage[], tools: readonly { 
   return { ...(systemPrompt ? { systemPrompt } : {}), messages: output, ...(tools.length > 0 ? { tools: tools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.inputSchema })) } : {}) };
 }
 
-function toPiAssistantBlock(block: LlmContentBlock, names: Map<string, string>): RuntimeV2JsonValue {
+function toPiAssistantBlock(block: LlmContentBlock, names: Map<string, string>, deepseek = false): RuntimeV2JsonValue {
   if (block.type === "text") return { type: "text", text: block.text };
-  if (block.type === "reasoning") return { type: "thinking", thinking: block.text, ...(block.signature ? { thinkingSignature: block.signature } : {}) };
+  if (block.type === "reasoning") return { type: "thinking", thinking: block.text, ...(deepseek ? { thinkingSignature: "reasoning_content" } : block.signature ? { thinkingSignature: block.signature } : {}) };
   if (block.type === "tool-call") { names.set(block.callId, block.name); return { type: "toolCall", id: block.callId, name: block.name, arguments: parseArguments(block.arguments) }; }
   if (block.type === "tool-result") return { type: "text", text: block.content };
   return { type: "text", text: block.alt ?? `[image:${block.artifactId}]` };

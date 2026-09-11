@@ -83,9 +83,16 @@ models.dev / OpenRouter public API
 
 ## DeepSeek 固定高峰估算
 
-按用户确认的产品策略，官方 `api.deepseek.com` 端点的 V4 Flash / Flash Vision 使用输入 0.44、输出 1.32、缓存读取 0.014 USD/百万 Token，V4 Pro 使用 1.32 / 3.96 / 0.044。缓存写入单价未提供，保持 null。依据 [DeepSeek 官方定价](https://api-docs.deepseek.com/quick_start/pricing/)，核验于 2026-09-07。
+按用户确认的产品策略，官方 `api.deepseek.com` 端点使用固定高峰 USD 估算，不按每日峰谷时段切换。官方模型档案集中在 `packages/shared/src/deepseek-model-facts.ts`，由设置页、模型定义与请求价格解析共同消费。
 
-规则位于 `model-pricing.ts`，source=deepseek-official、strategy=fixed-peak，优先于第三方目录及该官方模型的自定义价格；连接倍率只应用一次。规则不读取时段、不随目录刷新切换，价格调整通过维护代码完成。只匹配明确的官方端点和模型，不将同名 OpenRouter 或自定义端点套用直连价格。旧请求仍保留原快照。
+| 官方模型 / 请求时间（北京时间） | 输入未命中 | 输出 | 缓存读取（USD/百万 token） |
+|---|---:|---:|---:|
+| V4 Flash / Flash Vision，2026-09-10 12:00 前 | 0.44 | 1.32 | 0.014 |
+| `deepseek-flash` 与旧 Flash 别名，2026-09-10 12:00 起 | 0.30 | 1.20 | 0.006 |
+
+依据 [DeepSeek 官方价格](https://api-docs.deepseek.com/quick_start/pricing/) 和 [V4.1 公告](https://api-docs.deepseek.com/zh-cn/news/news260910)，核验于 2026-09-10。缓存写入单价保持 null；图片按返回的输入 token 计价，不另收一次图片费用。官方实际空闲时段价格为高峰一半，估算不是实际账单。
+
+`model-pricing.ts` 保存 source=deepseek-official、strategy=fixed-peak；连接倍率只应用一次。Pro 已从可选模型和目录中移除，旧配置引用归一到 Flash，不保留 9 月 14 日定时切换；仅 Flash 价目生效日期影响费率，目录刷新不会覆盖官方档案。只匹配明确官方端点；同名 OpenRouter 或自定义端点不套用直连价格。每次请求冻结价格快照，已保存的历史费用不重算。
 
 ## 费用与来源契约
 

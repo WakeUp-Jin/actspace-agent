@@ -8,7 +8,7 @@
 
 - `docs/exec-plans/completed/actspace-deepseek-kimi-hybrid-capabilities.md`
 
-当前仓库的公开主模型为 DeepSeek `deepseek-v4-flash` / `deepseek-v4-pro`，并在 2026-06-08 起把 Kimi `kimi-k2.6` 也提升为公开主模型（`visibility: "public"`），作为 DeepSeek 降智时的备用模型。模型是否支持图片输入只看 `MODEL_REGISTRY.input`：当前 DeepSeek 两档为 `["text"]`，Kimi `kimi-k2.6` 与 `kimi-k2.7-code` 为 `["text", "image"]`。
+2026-09-10 起，DeepSeek 正式 Flash 模型为 `deepseek-flash`（V4.1），原生支持图片；旧 Flash 名称兼容读取。Pro 已按用户要求从可选模型移除，旧 Pro 配置引用映射到 Flash。模型能力以当前 ModelStore 的 shared 官方档案投影为准。Kimi `kimi-k2.6` 与 `kimi-k2.7-code` 仍为公开多模态主模型。
 
 > 历史说明：在 2026-06-08 之前 Kimi 是 `internal` 模型，不出现在公开选择器，仅作为 DeepSeek 的内部 helper。本文部分小节仍保留当时“Kimi 仅内部”的描述作为背景，但权威结论以「当前状态」与「决策记录」最新条目为准。
 
@@ -19,7 +19,7 @@
 - `KimiService`：兼容包装层，只兜底 Kimi 的 provider 默认值；普通对话复用 `OpenAICompletionsService`。
 - `DeepSeekService` / `DeepSeekAnthropicService`：兼容包装层，只兜底 provider 默认值；协议职责归属 `OpenAICompletionsService` / `AnthropicMessagesService`。
 
-2026-07-31 起，DeepSeek 内置模型与 provider 固定走 OpenAI-compatible Chat Completions，默认 Base URL 为 `https://api.deepseek.com`。主 Agent 默认模型仍为 `deepseek-v4-pro`；旧 autonomous runtime 的默认模型记录仅用于历史迁移。Composer 只提供 `High` / `Max` 两档，不提供 Auto。旧 `DEEPSEEK_API_FORMAT` / `DEEPSEEK_ANTHROPIC_BASE_URL` 已退出运行时配置，精确的官方 `/anthropic` 设置地址会迁移回 provider 默认根地址。
+2026-07-31 起，DeepSeek 内置模型与 provider 固定走 OpenAI-compatible Chat Completions，默认 Base URL 为 `https://api.deepseek.com`。2026-09-11 起主 Agent 默认模型为 `deepseek-flash`；旧 autonomous runtime 的默认模型记录仅用于历史迁移。2026-09-10 起 Composer 提供 `Low` / `High` / `Max`，Flash 默认 High。旧 `DEEPSEEK_API_FORMAT` / `DEEPSEEK_ANTHROPIC_BASE_URL` 已退出运行时配置，精确的官方 `/anthropic` 设置地址会迁移回 provider 默认根地址。
 
 2026-07-06 起，DeepSeek 的联网搜索不再使用 provider-native server tool `web_search_20250305`。原因：DeepSeek Anthropic 网关在「server 搜索 + 本地工具混用」的轮次会稳定触发 DSML 泄漏（模型的本地工具调用被当正文吐出），导致整轮失败且自动重试无效。移除 server tool 后所有工具调用统一走标准 `tool_use` 链路，泄漏触发器消失。
 
@@ -82,7 +82,7 @@ DeepSeek 是低成本主力模型。它应看到稳定、供应商无关的工�
 - Thinking 开关映射为 `thinking: { type: "enabled" | "disabled" }`；开启时强度只允许 `reasoning_effort: "high" | "max"`，默认显式发送 `max`。
 - 本地文件工具与 `web_fetch`：默认可见。
 - `web_search`：任一搜索 provider key（智谱 / Tavily / TinyFish / Exa）存在时可见，与 Kimi key 无关（见 `docs/design-docs/tool-system/agent-web-tools.md`）。
-- DeepSeek 当前模型元数据声明为 `input: ["text"]`，不能接收图片附件或 Computer Use 截图。Browser Use / Computer Use 的提示词应根据 `<runtime_model>.input` 选择策略：支持 `image` 时可直接使用截图；text-only 时优先 DOM、accessibility tree、URL、可见文本和结构化状态，必要时请用户切换到 image-capable 模型。
+- DeepSeek V4.1 Flash 声明为 `input: ["text", "image"]`，可以接收图片附件。Pro 不再作为独立可选模型。Browser Use / Computer Use 的提示词应根据 `<runtime_model>.input` 选择策略：支持 `image` 时可直接使用截图；text-only 时优先 DOM、accessibility tree、URL、可见文本和结构化状态，必要时请用户切换到 image-capable 模型。
 
 DeepSeek 不直接处理 Kimi 的内置工具协议，也不直接消费 Kimi Formula 的 encrypted output。
 

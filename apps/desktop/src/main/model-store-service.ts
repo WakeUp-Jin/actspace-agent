@@ -1,5 +1,7 @@
 import {
   BUILTIN_MODEL_LIST,
+  deepSeekModelDefinition,
+  normalizeModelKey,
   CURATED_OPENROUTER_MODEL_LIST,
   listUsableModels,
   resolveConfiguredModel,
@@ -23,13 +25,13 @@ export type ModelStoreResult =
 
 export interface ModelStoreServiceOptions {
   settings: SettingsService;
-  findCatalogModel?: (apiModel: string) => CatalogModelView | undefined;
+  findCatalogModel?: (apiModel: string, provider?: "openrouter" | "deepseek") => CatalogModelView | undefined;
   now?: () => Date;
 }
 
 export class ModelStoreService {
   private readonly settings: SettingsService;
-  private readonly findCatalogModel: (apiModel: string) => CatalogModelView | undefined;
+  private readonly findCatalogModel: (apiModel: string, provider?: "openrouter" | "deepseek") => CatalogModelView | undefined;
   private readonly now: () => Date;
 
   constructor(options: ModelStoreServiceOptions) {
@@ -44,7 +46,8 @@ export class ModelStoreService {
     const connections = this.settings.getV4().settings.models.connections;
     const definitions = Object.fromEntries(
       [...BUILTIN_MODEL_LIST, ...CURATED_OPENROUTER_MODEL_LIST, ...Object.values(stored.customModels).filter(isDefined)]
-        .map((definition) => {
+        .map((original) => {
+          const definition = original.provider === "deepseek" && original.source === "builtin" ? deepSeekModelDefinition(original.apiModel, this.now().toISOString()) ?? original : original;
           const connectionId = stored.installedModels[definition.key]?.connectionId;
           const connection = connectionId && connectionId !== `${definition.provider}:default` ? connections[connectionId] : undefined;
           return [definition.key, clone(connection ? { ...definition, api: connection.protocol ?? "openai-completions" } : definition)];
@@ -102,9 +105,9 @@ export class ModelStoreService {
     }));
   }
 
-  isCatalogModelAdded(apiModel: string): boolean {
+  isCatalogModelAdded(apiModel: string, provider: "openrouter" | "deepseek" = "openrouter"): boolean {
     const snapshot = this.getModelSnapshot();
-    const key = `openrouter:${apiModel}` as ModelKey;
+    const key = normalizeModelKey(`${provider}:${apiModel}`)!;
     return Boolean(snapshot.installedModels[key]);
   }
 
@@ -120,30 +123,30 @@ export class ModelStoreService {
   }
 
   async addCatalogModel(provider: LlmProviderId, apiModel: string): Promise<ModelStoreResult> {
-    if (provider !== "openrouter") {
-      return { ok: false, code: "invalid_provider", message: "首版只支持从 OpenRouter 目录添加模型。" };
+    if (provider !== "openrouter" && provider !== "deepseek") {
+      return { ok: false, code: "invalid_provider", message: "此服务商不支持目录添加。" };
     }
-    const catalog = this.findCatalogModel(apiModel);
+    const catalog = this.findCatalogModel(apiModel, provider);
     if (!catalog) return { ok: false, code: "model_not_found", message: "目录中未找到该模型，请重新加载。" };
-    const key = `openrouter:${catalog.apiModel}` as ModelKey;
+    const key = normalizeModelKey(`${provider}:${catalog.apiModel}`)!;
     const stored = this.settings.getModelStorageState();
     const installed = stored.installedModels[key] ?? { enabled: true, addedAt: this.now().toISOString() };
-    const definition = catalogToDefinition(catalog, this.now().toISOString());
+    const definition = provider === "deepseek" ? deepSeekModelDefinition(catalog.apiModel, this.now().toISOString()) ?? catalogToDefinition(catalog, this.now().toISOString()) : catalogToDefinition(catalog, this.now().toISOString());
     await this.settings.updateModelStorage({
       installedModels: { [key]: installed },
-      customModels: { [key]: definition },
+      ...(definition.source === "builtin" ? {} : { customModels: { [key]: definition } }),
     });
     return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === key) };
   }
 
-  async refreshInstalledCatalogModels(): Promise<number> {
+  async refreshInstalledCatalogModels(provider: "openrouter" | "deepseek" = "openrouter"): Promise<number> {
     const stored = this.settings.getModelStorageState();
     const updates: Partial<Record<ModelKey, ModelDefinition>> = {};
     for (const [rawKey, current] of Object.entries(stored.customModels)) {
       const key = rawKey as ModelKey;
-      if (!current || current.provider !== "openrouter" || current.source !== "provider-catalog") continue;
+      if (!current || current.provider !== provider || current.source !== "provider-catalog") continue;
       if (!stored.installedModels[key]) continue;
-      const catalog = this.findCatalogModel(current.apiModel);
+      const catalog = this.findCatalogModel(current.apiModel, provider);
       if (!catalog) continue;
       updates[key] = catalogToDefinition(catalog, this.now().toISOString());
     }
@@ -228,8 +231,8 @@ function catalogToDefinition(model: CatalogModelView, catalogUpdatedAt: string):
   const thinkingDefault = model.reasoningMandatory || model.reasoningDefaultEnabled === true ||
     (model.reasoningDefaultEnabled === undefined && model.reasoning);
   return {
-    key: `openrouter:${model.apiModel}`,
-    provider: "openrouter",
+    key: normalizeModelKey(`${model.provider}:${model.apiModel}`)!,
+    provider: model.provider,
     api: "openai-completions",
     apiModel: model.apiModel,
     label: model.name,
