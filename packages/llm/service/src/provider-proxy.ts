@@ -22,8 +22,14 @@ export class ProviderProxyPool {
     const url = normalizeProviderProxyUrl(rawUrl);
     const existing = this.#entries.get(url);
     if (existing !== undefined) return existing.fetch;
-    const undici = await this.load();
-    const dispatcher = new undici.ProxyAgent(url);
+    let undici: UndiciModule;
+    let dispatcher: ProxyDispatcher;
+    try {
+      undici = await this.load();
+      dispatcher = new undici.ProxyAgent(url);
+    } catch (cause) {
+      throw new ProviderProxyError({ cause });
+    }
     const fetch: ProviderFetch = async (input, init) => {
       try {
         return await undici.fetch(input, { ...(init as Record<string, unknown> | undefined), dispatcher });

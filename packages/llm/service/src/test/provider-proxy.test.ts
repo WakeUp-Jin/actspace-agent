@@ -27,3 +27,14 @@ describe("ProviderProxyPool", () => {
     expect(() => normalizeProviderProxyUrl("socks5://proxy.example")).toThrow("proxy");
   });
 });
+
+it("loads the production proxy dependency without a mock", async () => {
+  const pool = new ProviderProxyPool();
+  try { expect(await pool.getFetch("http://127.0.0.1:9")).toBeTypeOf("function"); }
+  finally { await pool.dispose(); }
+});
+
+it("classifies dependency initialization failures as proxy errors without exposing internals", async () => {
+  const pool = new ProviderProxyPool(async () => { throw new Error("missing private module path"); });
+  await expect(pool.getFetch("http://127.0.0.1:9")).rejects.toMatchObject({ name: "ProviderProxyError", message: "Provider proxy connection failed." });
+});

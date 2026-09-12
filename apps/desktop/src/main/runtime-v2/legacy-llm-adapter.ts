@@ -50,7 +50,7 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     if (capabilities?.reasoning === false) { delete requestOptions.reasoning; delete requestOptions.reasoningEffort; }
     const requestModel = reasoningEffort ? model.definition.requestModelByReasoningEffort?.[reasoningEffort] ?? model.definition.apiModel : model.definition.apiModel;
     const route = toWireRoute(model.definition.api);
-    const pricingModel = this.purpose === "utility" ? model : { ...model, providerRuntime: { ...runtime, baseUrl: input.credential.baseUrl ?? runtime.baseUrl } };
+    const pricingModel = model;
     const pricing = this.models.resolvePricing ? this.models.resolvePricing(pricingModel, requestModel) : resolveModelPricing(BUILTIN_MODEL_CATALOG, { providerId: model.definition.provider, apiModel: requestModel, modelKey: model.key, baseUrl: pricingModel.providerRuntime.baseUrl ?? "", connectionId: model.connectionId, multiplier: runtime.pricingMultiplier, configured: model.definition.source === "custom" && requestModel === model.definition.apiModel ? model.definition.pricing : undefined, configuredAlreadyMultiplied: true });
     const engineOptions = {
       pricing,
@@ -71,13 +71,12 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     return adapter.dispatch({
       ...input,
       request: { ...input.request, model: requestModel, options: requestOptions },
-      credential: this.purpose === "utility" ? {
-        apiKey: runtime.apiKey, baseUrl: runtime.baseUrl, proxyUrl: runtime.transport?.proxyUrl, pricingMultiplier: runtime.pricingMultiplier,
-      } : {
-        ...input.credential,
-        apiKey: input.credential.apiKey ?? runtime.apiKey,
-        baseUrl: input.credential.baseUrl ?? runtime.baseUrl,
-        ...(input.credential.proxyUrl === undefined && runtime.transport?.proxyUrl === undefined ? {} : { proxyUrl: input.credential.proxyUrl ?? runtime.transport?.proxyUrl }),
+      // Never merge another connection's credentials or proxy into this model.
+      credential: {
+        apiKey: runtime.apiKey,
+        baseUrl: runtime.baseUrl,
+        proxyUrl: runtime.transport?.proxyUrl,
+        pricingMultiplier: runtime.pricingMultiplier,
       },
     });
   }

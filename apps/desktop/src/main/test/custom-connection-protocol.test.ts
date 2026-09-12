@@ -8,6 +8,7 @@ import { ModelStoreService } from "../model-store-service";
 import { ModelRuntimeService } from "../model-runtime-service";
 import type { ModelApi, ModelKey } from "@actspace/shared";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
+import { DesktopCredentialResolver } from "../runtime-v2/credential-resolver";
 import { DesktopLegacyLlmAdapter } from "../runtime-v2/legacy-llm-adapter";
 
 const { wire, dispatch } = vi.hoisted(() => ({ wire: vi.fn(), dispatch: vi.fn(async () => (async function* () {})()) }));
@@ -45,9 +46,10 @@ it.each(protocols)("persists %s with its own model, endpoint and credential with
     definition: { api: protocol, apiModel: "vendor/same-model", contextWindow: null },
     providerRuntime: { apiKey: "fixture-secret", baseUrl: "https://relay.example/api" },
   } });
+  const credential = await new DesktopCredentialResolver(runtime).resolve("desktop:default", new AbortController().signal);
   const adapter = new DesktopLegacyLlmAdapter(runtime, async () => { throw new Error("unused"); });
   try {
-    await adapter.dispatch({ request: { model: modelKey, options: {} }, credential: {}, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);
+    await adapter.dispatch({ request: { model: modelKey, options: {} }, credential, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);
     expect(wire).toHaveBeenLastCalledWith(expect.objectContaining({ route: protocol, modelId: "vendor/same-model", baseUrl: "https://relay.example/api" }));
     expect(dispatch).toHaveBeenLastCalledWith(expect.objectContaining({ credential: expect.objectContaining({ apiKey: "fixture-secret", baseUrl: "https://relay.example/api" }) }));
   } finally { await adapter.dispose(); }
@@ -55,6 +57,24 @@ it.each(protocols)("persists %s with its own model, endpoint and credential with
   const restart = new SettingsService({ dataRoot: root, crypto });
   await restart.load();
   expect(new ModelRuntimeService(restart, new ModelStoreService({ settings: restart })).resolveMainModel(modelKey)).toMatchObject({ ok: false, reason: "model_disabled" });
+});
+
+it("keeps the selected connection intact when the default uses a different key and proxy", async () => {
+  const { settings } = await fixture();
+  await settings.updateProviderConnection({ provider: "deepseek", enabled: true, apiKey: "default-secret", proxy: { enabled: true, url: "http://127.0.0.1:9876" } });
+  await settings.createCustomConnection({ providerId: "openrouter", connectionId: "selected-relay", displayName: "Relay", apiKey: "relay-secret", baseUrl: "https://relay.example/v1", defaultModel: "gpt-model" });
+  const runtime = new ModelRuntimeService(settings, new ModelStoreService({ settings }));
+  const adapter = new DesktopLegacyLlmAdapter(runtime, async () => { throw new Error("unused"); });
+  try {
+    for (const model of ["openrouter:connection/selected-relay/gpt-model", "default"]) {
+      const signal = new AbortController().signal;
+      const credential = await new DesktopCredentialResolver(runtime).resolve("desktop:default", signal);
+      await adapter.dispatch({ request: { model, options: {} }, credential, signal } as unknown as LlmAdapterDispatchInput);
+      expect(dispatch).toHaveBeenLastCalledWith(expect.objectContaining({ credential: model === "default"
+        ? expect.objectContaining({ apiKey: "default-secret", proxyUrl: "http://127.0.0.1:9876" })
+        : { apiKey: "relay-secret", baseUrl: "https://relay.example/v1", proxyUrl: undefined, pricingMultiplier: 1 } }));
+    }
+  } finally { await adapter.dispose(); }
 });
 
 it("isolates duplicate upstream model IDs and never falls back after a connection is deleted", async () => {

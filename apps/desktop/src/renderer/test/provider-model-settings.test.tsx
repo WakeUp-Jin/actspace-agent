@@ -419,11 +419,13 @@ describe("provider and model settings", () => {
     expect(row.querySelector('[data-provider-logo="openai"]')).toBeInTheDocument();
     expect(screen.queryByText("还没有连接模型服务")).not.toBeInTheDocument();
     await userEvent.click(row);
-    await userEvent.click(screen.getByRole("button", { name: "编辑服务地址" }));
+    await userEvent.click(screen.getByRole("button", { name: "编辑服务名称" }));
     expect(screen.getByRole("heading", { name: "编辑 Office API" })).toBeInTheDocument();
     expect(screen.getByLabelText("API Key")).toHaveValue("");
+    await userEvent.clear(screen.getByLabelText("显示名称"));
+    await userEvent.type(screen.getByLabelText("显示名称"), "My Gateway");
     await userEvent.click(screen.getByRole("button", { name: "保存供应商" }));
-    await waitFor(() => expect(updateCustomConnection).toHaveBeenCalledWith(expect.objectContaining({ connectionId: "office", apiKey: undefined })));
+    await waitFor(() => expect(updateCustomConnection).toHaveBeenCalledWith(expect.objectContaining({ connectionId: "office", displayName: "My Gateway", apiKey: undefined })));
   });
 
   it("preserves an existing proxy when editing OpenRouter without re-entering its address", async () => {

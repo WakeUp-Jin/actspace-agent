@@ -6,13 +6,13 @@ import { DesktopLegacyLlmAdapter } from "../runtime-v2/legacy-llm-adapter";
 const { dispatch } = vi.hoisted(() => ({ dispatch: vi.fn(async () => (async function* () {})()) }));
 vi.mock("@actspace/llm-pi-ai", () => ({ PiAiAdapter: class { dispatch = dispatch; }, PiAiWireEngine: class {}, LegacyProxyWireEngine: class {} }));
 beforeEach(() => dispatch.mockClear());
-it("freezes pricing against the credential endpoint and final reasoning model", async () => {
+it("freezes pricing against the selected connection endpoint and final reasoning model", async () => {
   const resolution = { ok: true as const, model: { key: "fixture", definition: { api: "openai-completions" as const, provider: "deepseek", apiModel: "base", contextWindow: 1000, requestModelByReasoningEffort: { high: "actual-high" } }, providerRuntime: { baseUrl: "https://api.deepseek.com" } } };
   const resolvePricing = vi.fn(() => null);
   const adapter = new DesktopLegacyLlmAdapter({ resolvePricing, resolveMainModel: () => resolution, resolveImageInspectionModel: () => resolution, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); });
   try {
     await adapter.dispatch({ request: { model: "fixture", options: { reasoning: true, reasoningEffort: "high" } }, credential: { baseUrl: "https://custom.example/v1" }, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);
-    expect(resolvePricing).toHaveBeenCalledWith(expect.objectContaining({ providerRuntime: expect.objectContaining({ baseUrl: "https://custom.example/v1" }) }), "actual-high");
+    expect(resolvePricing).toHaveBeenCalledWith(expect.objectContaining({ providerRuntime: expect.objectContaining({ baseUrl: "https://api.deepseek.com" }) }), "actual-high");
   } finally { await adapter.dispose(); }
 });
 it.each([

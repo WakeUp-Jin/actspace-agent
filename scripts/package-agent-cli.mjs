@@ -22,6 +22,7 @@ try {
   process.stderr.write("Offline managed CLI deploy failed; retrying with registry access.\n");
   run("pnpm", ["--filter", "@actspace/agent-cli", "deploy", "--legacy", "--prod", packageRoot]);
 }
+run("node", [join(repoRoot, "scripts/check-provider-proxy-package.mjs"), packageRoot]);
 await rm(join(packageRoot, "node_modules", ".pnpm", "node_modules", "@actspace", "agent-cli"), { force: true });
 
 const binDir = join(packageRoot, "bin");

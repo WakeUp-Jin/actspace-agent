@@ -714,3 +714,11 @@ Responses 协议使用本地上下文管理：请求保持 `store: false`，不�
 - 旧 autonomous runtime 的模型配置只作为迁移输入，不再在当前页面维护第二事实源。
 - 主 Agent 联网能力继续走本地 `web_search` / `web_fetch`，不挂 provider-native 搜索。
 - 具体 OpenRouter 精选模型 ID 在实现阶段基于当时目录和真实兼容性验证确定。
+
+## 2026-09-12 连接隔离与生产代理验收
+
+Desktop 通配路由的 `desktop:default` 只表示由 Host 适配器负责解析连接，不预取默认聊天模型的密钥。适配器根据本次请求选中的模型一次解析 API model、协议、Base URL、Key、代理和定价倍率，不能逐字段混入默认连接；自定义连接不依赖内置服务商是否配置。图片辅助模型仍使用独立选择入口。
+
+自定义服务的显示名称、协议格式和稳定 connectionId 分离；详情页提供服务名称编辑入口。重命名不改变连接 ID 或已有模型绑定。服务地址必须是供应商提供的完整 API base（例如包含 `/v1`），不对任意中转服务盲目追加路径。
+
+`@actspace/llm-service` 显式声明 `undici` 生产依赖。Desktop/CLI 生产 deploy 后运行 `scripts/check-provider-proxy-package.mjs <deploy-root>`，从产物自身解析依赖并初始化 ProxyAgent，不发送网络请求；失败阻断打包。初始化失败归类为代理错误，内部异常仅通过 cause 保留。

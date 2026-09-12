@@ -77,6 +77,8 @@ if ! pnpm --filter @actspace/desktop --prod deploy --legacy --offline "${deploy_
   pnpm --filter @actspace/desktop --prod deploy --legacy "${deploy_dir}"
 fi
 
+node "${repo_root}/scripts/check-provider-proxy-package.mjs" "${deploy_dir}"
+
 find "${deploy_dir}" -type d -name test -prune -exec rm -rf {} +
 find "${deploy_dir}" \( -name "*.map" -o -name "*.d.ts" -o -name "*.d.mts" \) -type f -delete
 # pnpm deploy preserves native files but not always executable mode bits. node-pty
