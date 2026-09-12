@@ -237,3 +237,18 @@ async function* anthropicEvents(): AsyncIterable<Record<string, unknown>> {
   yield { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "answer" } };
   yield { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 3 } };
 }
+
+it.each(routes)("uses the same custom reasoning format behind a proxy: %s", async (route) => {
+  for (const effort of [undefined, "high"] as const) {
+    const pool = proxyPool(); const observed: { params?: unknown } = {};
+    const engine = new LegacyProxyWireEngine({ route, providerId: "custom", baseUrl: "https://relay.example/v1", proxies: pool, loadSdk: loaderFor(route, observed) });
+    try {
+      const original = input(route);
+      for await (const _event of await engine.stream({ ...original, request: { ...original.request, options: effort ? { reasoning: true, reasoningEffort: effort } : {} } })) { /* drain */ }
+      if (!effort) { expect(observed.params).not.toHaveProperty("reasoning_effort"); expect(observed.params).not.toHaveProperty("reasoning"); expect(observed.params).not.toHaveProperty("thinking"); }
+      else if (route === "openai-completions") { expect(observed.params).toHaveProperty("reasoning_effort", "high"); expect(observed.params).not.toHaveProperty("reasoning"); }
+      else if (route === "openai-responses") expect(observed.params).toHaveProperty("reasoning.effort", "high");
+      else expect(observed.params).toMatchObject({ thinking: { type: "adaptive" }, output_config: { effort: "high" } });
+    } finally { await pool.dispose(); }
+  }
+});

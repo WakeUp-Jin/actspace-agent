@@ -1089,3 +1089,21 @@ describe("Composer follow-up bar", () => {
     expect(worktreeEntry).toBeDisabled();
   });
 });
+
+it.each([false, true])("sends the configured custom-model default or explicit Auto (auto=%s)", async (auto) => {
+  const user = userEvent.setup();
+  const model: UsableModelView = { ...reasoningModels[1], key: "openrouter:connection/relay/gpt-model", label: "Relay GPT", capabilities: { ...reasoningModels[1].capabilities, reasoningEfforts: ["low", "high"], reasoningDefaultEffort: "high", reasoningMandatory: true, thinkingToggle: false } };
+  const { onSend } = renderComposer({ models: [model], defaultModelId: model.key });
+  if (auto) {
+    await user.click(screen.getByRole("button", { name: /Relay GPT/ }));
+    await user.hover(within(screen.getByRole("menu", { name: "模型" })).getByText("Relay GPT"));
+    await user.click(screen.getByRole("button", { name: `编辑 ${model.key} 选项` }));
+    expect(screen.queryByRole("button", { name: "Max" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Auto" }));
+  }
+  await user.type(screen.getByLabelText("消息输入框"), "test");
+  await user.click(screen.getByRole("button", { name: "发送消息" }));
+  const options = onSend.mock.calls.at(-1)![1];
+  expect(options.thinkingEnabled).toBe(true);
+  expect(options.reasoningEffort).toBe(auto ? undefined : "high");
+});

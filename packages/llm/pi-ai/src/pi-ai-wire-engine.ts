@@ -3,7 +3,7 @@ import { validateDeepSeekImage, validateDeepSeekImageMessages, validateDeepSeekP
 import { LegacyProxyWireEngine } from "./legacy-proxy-wire-engine.js";
 import { catalogProviderForEndpoint, type ModelPricingSnapshot } from "@actspace/shared";
 import { calculateUsageCost } from "@actspace/llm-service";
-import { reasoningPayload } from "./reasoning-options.js";
+import { withReasoningPayload } from "./reasoning-options.js";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { LlmRuntimeError, providerCodeFromUnknown, retryAfterMsFromUnknown, type LlmFailure, type LlmFailureKind } from "@actspace/llm-service";
@@ -69,7 +69,7 @@ export class PiAiWireEngine implements PiAiEngine {
         return { ...artifact, mimeType: validateDeepSeekImage(artifact.data) };
       } : readArtifact;
       const context = await toPiAiContext(messages, input.request.tools, input.request.sessionId, checkedReader, deepseek ? { api: this.options.route, provider: this.options.providerId, model: modelId } : undefined);
-      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens ?? Math.min(32_768, this.options.modelFacts?.maxTokens ?? 32_768), reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), onPayload: (payload: Record<string, unknown>) => { const body = { ...payload, ...reasoningPayload(this.options.route, this.options.providerId, input.request.options) }; if (deepseek) validateDeepSeekPayload(body); return body; }, headers: input.credential.headers } as never);
+      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens ?? Math.min(32_768, this.options.modelFacts?.maxTokens ?? 32_768), reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), onPayload: (payload: Record<string, unknown>) => { const body = withReasoningPayload(payload, this.options.route, this.options.providerId, input.request.options); if (deepseek) validateDeepSeekPayload(body); return body; }, headers: input.credential.headers } as never);
       return fromPiAiEvents(events, input.request.requestId, this.options.pricing ?? null);
     } catch (error) {
       if (error instanceof LlmRuntimeError) throw error;

@@ -1,3 +1,4 @@
+import { applyCustomModelReasoning, validateCustomModelReasoning } from "@actspace/shared";
 import { DEFAULT_SPEECH_SETTINGS, isSpeechModel, type SpeechSettings } from "@actspace/shared";
 /**
  * SettingsService owns non-sensitive settings.json v4 and main-only 0600 secrets.json v2.
@@ -2219,6 +2220,7 @@ function sanitizeInstalledModel(input: unknown, fallback: InstalledModelSettings
 }
 
 function validateCustomConnection(input: CustomConnectionInput): void {
+  if (input.modelReasoning !== undefined) validateCustomModelReasoning(input.modelReasoning);
   if (!isProviderId(input.providerId) || (input.protocol !== undefined && !isConnectionProtocol(input.protocol))) {
     throw new ProviderSettingsError("连接协议无效。", "write_failed");
   }
@@ -2234,13 +2236,14 @@ function connectionModelPatch(input: CustomConnectionInput, connectionId: string
   const key: ModelKey = `${input.providerId}:connection/${encodeURIComponent(connectionId)}/${encodeURIComponent(apiModel)}`;
   const previous = models.definitions[key];
   return {
-    definitions: { [key]: {
+    definitions: { [key]: applyCustomModelReasoning({
+      ...previous,
       key, provider: input.providerId, api: protocol, apiModel,
       label: `${input.displayName.trim() || connectionId} · ${apiModel}`,
       source: "custom" as const, contextWindow: previous?.contextWindow ?? null, maxTokens: previous?.maxTokens ?? null,
       thinkingDefault: previous?.thinkingDefault ?? false,
       capabilities: previous?.capabilities ?? { input: ["text"], toolUse: "declared", reasoning: false, thinkingToggle: false },
-    } },
+    }, input.modelReasoning ?? previous?.reasoningConfig ?? { mode: "auto" }) },
     installed: { [key]: { enabled: true, addedAt: new Date().toISOString(), ...models.installed[key], connectionId } },
   };
 }

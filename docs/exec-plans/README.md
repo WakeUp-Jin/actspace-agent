@@ -16,6 +16,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
 | [Cordis 事件 ABI 与 CLI 最终验收](active/20260829-actspace-cordis-event-abi-final-acceptance/README.md) | P00–P04 有通过证据；补 P05 deterministic retry/error fixture 后再闭环。 |
 | [P1/P2 契约与组合](active/20260829-actspace-p1-p2-contract-and-composition/README.md) | contract slices 已交付；G1 跨包回归、P2/G2 语义门禁继续。 |
 | [P1-A Session Core / Persistence](active/20260829-actspace-p1-session-core-persistence/README.md) | slice 已交付；CLI persist/resume 独立验收与 G1 交接待完成。 |

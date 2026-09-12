@@ -1,5 +1,5 @@
 import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
-import { resolveModelPricing } from "@actspace/shared";
+import { catalogProviderForEndpoint, resolveModelPricing } from "@actspace/shared";
 import type { LlmAdapter, LlmAdapterDispatchInput, LlmRequestModelFacts, LlmStreamSource } from "@actspace/llm-service";
 import type { PiAiWireRoute } from "@actspace/llm-pi-ai";
 import { LegacyProxyWireEngine, PiAiAdapter, PiAiWireEngine } from "@actspace/llm-pi-ai";
@@ -47,16 +47,27 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
       : effort && (capabilities === undefined || capabilities.reasoningEfforts === null || capabilities.reasoningEfforts?.includes(effort)) ? effort
       : capabilities?.reasoningDefaultEffort;
     const requestOptions = { ...requestedOptions, reasoning, reasoningEffort };
+    const customConnection = Boolean(model.connectionId && model.connectionId !== `${model.definition.provider}:default`);
+    if (customConnection && requestedOptions.reasoningEffort && !capabilities?.reasoningEfforts?.includes(requestedOptions.reasoningEffort)) throw new Error("该模型未配置此推理强度，请在模型设置中确认支持的档位。");
+    // Auto is an omitted effort, including when the UI explicitly enables reasoning.
+    if (customConnection && requestedOptions.reasoning !== false && requestedOptions.reasoningEffort === undefined) {
+      delete requestOptions.reasoningEffort;
+      delete requestOptions.reasoning;
+    }
     if (capabilities?.reasoning === false) { delete requestOptions.reasoning; delete requestOptions.reasoningEffort; }
     const requestModel = reasoningEffort ? model.definition.requestModelByReasoningEffort?.[reasoningEffort] ?? model.definition.apiModel : model.definition.apiModel;
     const route = toWireRoute(model.definition.api);
     const pricingModel = model;
     const pricing = this.models.resolvePricing ? this.models.resolvePricing(pricingModel, requestModel) : resolveModelPricing(BUILTIN_MODEL_CATALOG, { providerId: model.definition.provider, apiModel: requestModel, modelKey: model.key, baseUrl: pricingModel.providerRuntime.baseUrl ?? "", connectionId: model.connectionId, multiplier: runtime.pricingMultiplier, configured: model.definition.source === "custom" && requestModel === model.definition.apiModel ? model.definition.pricing : undefined, configuredAlreadyMultiplied: true });
+    const endpointOwner = catalogProviderForEndpoint(runtime.baseUrl ?? "");
+    const wireProvider = !customConnection ? model.definition.provider
+      : endpointOwner === "openrouter" || endpointOwner === "deepseek" ? endpointOwner
+      : endpointOwner === "moonshotai" || endpointOwner === "moonshotai-cn" ? "kimi" : "custom";
     const engineOptions = {
       pricing,
       ...(capabilities?.input ? { modelFacts: { contextWindow: model.definition.contextWindow, maxTokens: model.definition.maxTokens ?? null, input: capabilities.input, reasoning: capabilities.reasoning } } : {}),
       route,
-      providerId: model.definition.provider,
+      providerId: wireProvider,
       modelId: requestModel,
       baseUrl: runtime.baseUrl,
       readArtifact: async (sessionId: string, artifactId: string) => {

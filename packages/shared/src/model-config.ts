@@ -63,6 +63,7 @@ export interface ModelCapabilities {
 }
 
 export interface ModelDefinition {
+  reasoningConfig?: import("./custom-model-reasoning").CustomModelReasoning;
   key: ModelKey;
   provider: ProviderId;
   api: ModelApi;

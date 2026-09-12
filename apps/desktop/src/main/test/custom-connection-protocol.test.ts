@@ -139,3 +139,34 @@ it("serializes simultaneous additions without losing either connection", async (
   await reloaded.load();
   expect(new ModelStoreService({ settings: reloaded }).listUsableModels("chat").filter((model) => model.apiModel === "same-model")).toHaveLength(2);
 });
+
+it("persists per-model manual reasoning across reload and connection rename", async () => {
+  const { root, settings } = await fixture();
+  const input = { providerId: "openrouter" as const, connectionId: "reasoning-relay", displayName: "Relay", apiKey: "secret", baseUrl: "https://relay.example/v1", defaultModel: "gpt-6-astra" };
+  await settings.createCustomConnection(input);
+  const models = new ModelStoreService({ settings });
+  const key = models.listInstalledModels().find((m) => m.settings.connectionId === input.connectionId)!.definition.key;
+  expect(models.getModelSnapshot().definitions[key]?.reasoningConfig).toEqual({ mode: "auto" });
+  const reasoningConfig = { mode: "manual" as const, support: "supported" as const, efforts: ["low", "high"] as const, defaultEffort: "high" as const, allowOff: true };
+  expect(await models.updateModelSettings(key, { reasoningConfig: { ...reasoningConfig, efforts: [...reasoningConfig.efforts] } })).toMatchObject({ ok: true });
+  await settings.updateCustomConnection({ ...input, displayName: "Renamed", apiKey: "" });
+  const reloaded = new SettingsService({ dataRoot: root, crypto }); await reloaded.load();
+  const definition = new ModelStoreService({ settings: reloaded }).getModelSnapshot().definitions[key]!;
+  expect(definition.reasoningConfig).toEqual(reasoningConfig);
+  expect(definition.capabilities).toMatchObject({ reasoning: true, reasoningEfforts: ["low", "high"], reasoningDefaultEffort: "high", thinkingToggle: true });
+  expect(await models.updateModelSettings(key, { reasoningConfig: { ...reasoningConfig, efforts: ["low"] } })).toMatchObject({ ok: false, code: "invalid_model" });
+});
+
+it.each(["low", undefined] as const)("encodes custom Chat with selected effort %s, never OpenRouter identity", async (effort) => {
+  const { settings } = await fixture();
+  await settings.createCustomConnection({ providerId: "openrouter", connectionId: "effort-relay", displayName: "Relay", apiKey: "secret", baseUrl: "https://relay.example/v1", defaultModel: "alias", modelReasoning: { mode: "manual", support: "supported", efforts: ["low", "high"], defaultEffort: "high", allowOff: false } });
+  const runtime = new ModelRuntimeService(settings, new ModelStoreService({ settings }));
+  const adapter = new DesktopLegacyLlmAdapter(runtime, async () => { throw Error("unused"); });
+  try {
+    await adapter.dispatch({ request: { model: "openrouter:connection/effort-relay/alias", options: { reasoning: true, ...(effort ? { reasoningEffort: effort } : {}) } }, credential: {}, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);
+    expect(wire).toHaveBeenLastCalledWith(expect.objectContaining({ providerId: "custom" }));
+    const sent = dispatch.mock.calls.at(-1) as unknown as [LlmAdapterDispatchInput];
+    expect(sent[0].request.options.reasoningEffort).toBe(effort);
+    if (!effort) expect(sent[0].request.options.reasoning).toBeUndefined();
+  } finally { await adapter.dispose(); }
+});

@@ -1,4 +1,6 @@
 import {
+  applyCustomModelReasoning,
+  type CustomModelReasoning,
   BUILTIN_MODEL_LIST,
   deepSeekModelDefinition,
   normalizeModelKey,
@@ -161,13 +163,19 @@ export class ModelStoreService {
 
   async updateModelSettings(
     modelKey: ModelKey,
-    patch: { enabled?: boolean; customLabel?: string | null; credentialId?: string | null; connectionId?: string | null },
+    patch: { reasoningConfig?: CustomModelReasoning; enabled?: boolean; customLabel?: string | null; credentialId?: string | null; connectionId?: string | null },
   ): Promise<ModelStoreResult> {
     const stored = this.settings.getModelStorageState();
     const current = stored.installedModels[modelKey];
     if (!current) return { ok: false, code: "model_not_installed", message: "模型尚未添加。" };
     const definition = this.getModelSnapshot().definitions[modelKey];
     if (!definition) return { ok: false, code: "model_not_found", message: "模型不存在。" };
+    let reasoningModel: ModelDefinition | undefined;
+    if (patch.reasoningConfig !== undefined) {
+      if (definition.source !== "custom") return { ok: false, code: "invalid_model", message: "仅自定义模型可覆盖推理能力。" };
+      try { reasoningModel = applyCustomModelReasoning(definition, patch.reasoningConfig); }
+      catch (error) { return { ok: false, code: "invalid_model", message: error instanceof Error ? error.message : "推理配置无效。" }; }
+    }
     const credentialId = patch.credentialId === undefined
       ? current.credentialId
       : patch.credentialId?.trim() || undefined;
@@ -180,6 +188,7 @@ export class ModelStoreService {
       ? current.customLabel
       : patch.customLabel?.trim() || undefined;
     await this.settings.updateModelStorage({
+      ...(reasoningModel ? { customModels: { [modelKey]: reasoningModel } } : {}),
       installedModels: {
         [modelKey]: {
           ...current,

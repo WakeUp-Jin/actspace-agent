@@ -1,3 +1,5 @@
+import { CustomModelReasoningFields } from "./CustomModelReasoningFields";
+import type { CustomModelReasoning } from "@actspace/shared";
 import { OpenRouterModelCatalogDialog } from "./OpenRouterModelCatalogDialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -370,6 +372,16 @@ function CustomConnectionSetup({ initial, catalog, onBack, onSaved }: { initial?
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? catalog?.defaultBaseUrl ?? "");
   const [defaultModel, setDefaultModel] = useState(initial?.defaultModel ?? catalog?.defaultModel ?? "");
+  const [modelReasoning, setModelReasoning] = useState<CustomModelReasoning>({ mode: "auto" });
+  const [reasoningLoading, setReasoningLoading] = useState(Boolean(initial));
+  useEffect(() => {
+    let active = true;
+    if (initial && window.actspace.getSettingsV4) { setReasoningLoading(true); void window.actspace.getSettingsV4().then((snapshot) => {
+      const key = Object.keys(snapshot.settings.models.installed ?? {}).find((key) => snapshot.settings.models.installed[key]?.connectionId === initial.connectionId && snapshot.settings.models.definitions[key]?.apiModel === defaultModel);
+      if (active) { setModelReasoning(key ? snapshot.settings.models.definitions[key]?.reasoningConfig ?? { mode: "auto" } : { mode: "auto" }); setReasoningLoading(false); }
+    }).catch(() => { if (active) setError("模型配置读取失败，请返回后重试。"); }); } else setReasoningLoading(false);
+    return () => { active = false; };
+  }, [initial?.connectionId, defaultModel]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const save = async () => {
@@ -377,10 +389,10 @@ function CustomConnectionSetup({ initial, catalog, onBack, onSaved }: { initial?
     try {
       if (initial) {
         if (!window.actspace.updateCustomConnection) throw new Error("当前版本不支持编辑连接。");
-        await window.actspace.updateCustomConnection({ providerId: initial.providerId, connectionId, displayName, apiKey: apiKey.trim() || undefined, baseUrl, defaultModel: defaultModel || null, catalogId: initial.catalogId, protocol: initial.protocol ?? "openai-completions" });
+        await window.actspace.updateCustomConnection({ providerId: initial.providerId, connectionId, displayName, modelReasoning, apiKey: apiKey.trim() || undefined, baseUrl, defaultModel: defaultModel || null, catalogId: initial.catalogId, protocol: initial.protocol ?? "openai-completions" });
       } else {
         if (!window.actspace.createCustomConnection) throw new Error("当前版本不支持创建连接。");
-        await window.actspace.createCustomConnection({ providerId: catalog?.runtimeProviderId ?? "openrouter", connectionId: connectionId || undefined, displayName, apiKey: apiKey.trim(), baseUrl, defaultModel: defaultModel || null, catalogId: catalog?.id, protocol: catalog?.protocol ?? "openai-completions" });
+        await window.actspace.createCustomConnection({ providerId: catalog?.runtimeProviderId ?? "openrouter", connectionId: connectionId || undefined, displayName, modelReasoning, apiKey: apiKey.trim(), baseUrl, defaultModel: defaultModel || null, catalogId: catalog?.id, protocol: catalog?.protocol ?? "openai-completions" });
       }
       await onSaved();
     } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "保存失败。"); }
@@ -405,12 +417,13 @@ function CustomConnectionSetup({ initial, catalog, onBack, onSaved }: { initial?
           <span className="text-[12px] font-normal leading-relaxed text-text-faint">用于此连接的模型选择和首次请求。</span>
           <input value={defaultModel} onChange={(event) => setDefaultModel(event.target.value)} placeholder="填写服务商提供的模型 ID" className={inputClass} />
         </Field>
+        <CustomModelReasoningFields apiModel={defaultModel} value={modelReasoning} onChange={setModelReasoning} />
         <details className="group"><summary className="flex cursor-pointer list-none items-center justify-between py-2 text-[13px] font-semibold text-text-main">高级连接设置<ChevronDown size={15} className="group-open:rotate-180" aria-hidden="true" /></summary><div className="pt-3"><Field label="连接标识"><input value={connectionId} disabled={Boolean(initial)} onChange={(event) => setConnectionId(event.target.value)} placeholder="自动生成" className={inputClass} /></Field></div></details>
         {error ? <p role="alert" className="text-[12px] text-on-danger">{error}</p> : null}
       </div>
       <div className="mt-5 flex justify-end gap-2">
         <button type="button" className="h-9 rounded-act-md px-3 text-[13px] font-medium text-text-main hover:bg-hover-overlay" disabled={saving} onClick={onBack}>取消</button>
-        <button type="button" className="h-9 rounded-act-md bg-action px-3 text-[13px] font-medium text-on-action hover:bg-action-hover disabled:opacity-60" disabled={saving || (!initial && !apiKey.trim()) || !baseUrl.trim() || !defaultModel.trim()} onClick={() => void save()}>{saving ? "保存中…" : "保存供应商"}</button>
+        <button type="button" className="h-9 rounded-act-md bg-action px-3 text-[13px] font-medium text-on-action hover:bg-action-hover disabled:opacity-60" disabled={saving || reasoningLoading || (!initial && !apiKey.trim()) || !baseUrl.trim() || !defaultModel.trim()} onClick={() => void save()}>{saving ? "保存中…" : "保存供应商"}</button>
       </div>
     </div>
   );

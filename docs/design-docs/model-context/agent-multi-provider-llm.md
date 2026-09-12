@@ -722,3 +722,13 @@ Desktop 通配路由的 `desktop:default` 只表示由 Host 适配器负责解�
 自定义服务的显示名称、协议格式和稳定 connectionId 分离；详情页提供服务名称编辑入口。重命名不改变连接 ID 或已有模型绑定。服务地址必须是供应商提供的完整 API base（例如包含 `/v1`），不对任意中转服务盲目追加路径。
 
 `@actspace/llm-service` 显式声明 `undici` 生产依赖。Desktop/CLI 生产 deploy 后运行 `scripts/check-provider-proxy-package.mjs <deploy-root>`，从产物自身解析依赖并初始化 ProxyAgent，不发送网络请求；失败阻断打包。初始化失败归类为代理错误，内部异常仅通过 cause 保留。
+
+## 自定义模型推理能力（2026-09-12）
+
+`ModelDefinition.reasoningConfig` 是模型级配置，创建连接时可通过 `modelReasoning` 为默认模型设置，已有自定义模型通过 `models:update.reasoningConfig` 编辑。来源为 `auto` 或 `manual`；手动字段包含 `support`（unknown/supported/unsupported）、有限 `efforts`、可选 `defaultEffort` 和 `allowOff`。默认自动不发送强度；关闭与强度是独立语义。
+
+自动模式只按完整 API ID 或显式 referenceModel 精确匹配内置目录快照及已有精选定义；不联网、不按前缀猜测、不将 reasoning=true 扩展成所有强度。目录冲突返回未知，没有强度元数据返回空档位并提示手动配置。目录声明不是中转验证证明。手动覆盖随模型持久化，连接重命名和原有 provider-catalog 刷新不会重置自定义模型；旧模型不批量迁移，可以从单模型入口编辑。
+
+未知支持状态保留在 reasoningConfig 中，当前运行时保守不注入推理字段。Composer 只展示允许档位，支持配置默认值与显式 Auto，并清除不再允许的本地选择。Host 对显式非法档位报错，防止 UI 与实际请求不一致。
+
+未知中转端点以 generic custom wire identity 使用所选协议，不继承 OpenRouter 品牌字段；已知官方 DeepSeek/Kimi/OpenRouter 端点保留对应适配。Chat 为 reasoning_effort，Responses 为 reasoning.effort；Anthropic 显式档位使用 adaptive thinking + output_config.effort，仅允许 low/medium/high/xhigh/max，具体模型是否支持由用户确认。generic Auto 清除 SDK 推断的 effort/thinking 默认字段；直连与代理共享同一字段生成逻辑。Anthropic 参考：[Effort 官方文档](https://platform.claude.com/docs/en/build-with-claude/effort)。

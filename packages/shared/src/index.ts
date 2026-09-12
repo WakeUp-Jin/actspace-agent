@@ -44,3 +44,5 @@ export * from "./model-catalog-normalize";
 export * from "./model-pricing";
 
 export * from "./deepseek-model-facts";
+
+export * from "./custom-model-reasoning";

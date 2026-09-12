@@ -156,7 +156,7 @@ async function* anthropicStream(client: SdkClient, input: LlmAdapterDispatchInpu
       messages: converted.messages,
       ...(converted.system ? { system: converted.system } : {}),
       ...(input.request.options.temperature === undefined ? {} : { temperature: input.request.options.temperature }),
-      ...(input.request.options.reasoning ? { thinking: { type: "enabled", budget_tokens: Math.min(16_384, Math.max(1_024, (input.request.options.maxTokens ?? 32_768) - 1_024)) } } : {}),
+      ...(options.providerId === "custom" ? reasoningPayload(options.route, options.providerId, input.request.options) : input.request.options.reasoning ? { thinking: { type: "enabled", budget_tokens: Math.min(16_384, Math.max(1_024, (input.request.options.maxTokens ?? 32_768) - 1_024)) } } : {}),
       ...(input.request.tools.length === 0 ? {} : { tools: toAnthropicTools(input.request.tools) }),
     }, { signal: input.signal });
     for await (const raw of stream) {

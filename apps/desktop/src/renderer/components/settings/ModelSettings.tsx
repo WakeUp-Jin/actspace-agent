@@ -1,3 +1,5 @@
+import { CustomModelReasoningFields } from "./CustomModelReasoningFields";
+import type { CustomModelReasoning } from "@actspace/shared";
 import { useEffect, useRef, useState } from "react";
 import { Boxes, Check, ChevronDown, Plus, Search, Trash2 } from "lucide-react";
 import { PROVIDER_IDS, PROVIDER_REGISTRY, type AppSettings, type InstalledModelView, type ModelKey, type ProviderSettingsView, type LlmProviderId } from "@actspace/shared";
@@ -7,6 +9,9 @@ import { OpenRouterModelCatalogDialog } from "./OpenRouterModelCatalogDialog";
 export function ModelSettings({ settings, onChanged, embedded = false, embeddedPlain = false, providerFilter, connectionFilter }: { settings: AppSettings; onChanged?: () => void | Promise<void>; embedded?: boolean; embeddedPlain?: boolean; providerFilter?: LlmProviderId; connectionFilter?: string }) {
   const [installed, setInstalled] = useState<InstalledModelView[]>([]);
   const [connections, setConnections] = useState<Array<{ id: string; label: string }>>([]);
+  const [reasoningModel, setReasoningModel] = useState<InstalledModelView | null>(null);
+  const [reasoningConfig, setReasoningConfig] = useState<CustomModelReasoning>({ mode: "auto" });
+  const [savingReasoning, setSavingReasoning] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,7 +54,19 @@ export function ModelSettings({ settings, onChanged, embedded = false, embeddedP
 
   if (!window.actspace?.listInstalledModels) return <SectionShell title="模型" description="仅桌面端可管理模型。"><div /></SectionShell>;
 
+  const saveReasoning = async () => {
+    if (!reasoningModel || !window.actspace.updateModel) return;
+    setSavingReasoning(true); setError(null);
+    try {
+      const result = await window.actspace.updateModel({ modelKey: reasoningModel.definition.key, reasoningConfig });
+      if ("error" in result) { setError(result.error.message); return; }
+      setReasoningModel(null); await load(); await onChanged?.();
+    } catch (e) { setError(e instanceof Error ? e.message : "保存失败。"); }
+    finally { setSavingReasoning(false); }
+  };
   const content = <>
+    {installed.filter((model) => model.definition.source === "custom" && (!connectionFilter || model.settings.connectionId === connectionFilter) && (!providerFilter || model.definition.provider === providerFilter)).map((model) => <button key={model.definition.key} type="button" className="my-2 block text-[12px] text-text-main hover:text-action" onClick={() => { setReasoningModel(model); setReasoningConfig(model.definition.reasoningConfig ?? { mode: "auto" }); setError(null); }}>配置推理能力：{model.definition.label}</button>)}
+    {reasoningModel ? <div className="grid gap-3 py-3"><h4 className="text-[13px] font-semibold text-text-main">{reasoningModel.definition.label}</h4><CustomModelReasoningFields apiModel={reasoningModel.definition.apiModel} value={reasoningConfig} onChange={setReasoningConfig} /><div className="flex justify-end gap-3"><button type="button" disabled={savingReasoning} onClick={() => setReasoningModel(null)}>取消推理配置</button><button type="button" disabled={savingReasoning} onClick={() => void saveReasoning()}>保存推理配置</button></div></div> : null}
         {!embeddedPlain ? <div className="flex items-center justify-between gap-4"><div><p className="text-[12px] text-text-faint">停用后会立即从输入框与任务模型候选中移除。</p></div>{!embedded ? <div className="flex flex-wrap justify-end gap-2"><button type="button" className="inline-flex h-9 items-center gap-1.5 rounded-act-md border border-line bg-surface px-3 text-[12px] font-semibold text-text-main transition-colors hover:border-line-strong hover:bg-hover-overlay active:scale-[0.98]" onClick={() => setCatalogOpen(true)}><Plus size={15} />从 OpenRouter 添加</button></div> : null}</div> : null}
         {error ? <p role="alert" className="mt-3 text-[12px] text-on-danger">{error}</p> : null}
         <div className={embeddedPlain ? "grid gap-5" : "mt-3 grid gap-5"}>

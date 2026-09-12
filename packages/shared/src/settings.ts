@@ -252,6 +252,7 @@ export interface SettingsV4ConnectionSettings extends ProviderConnectionSettings
 }
 
 export interface CustomConnectionInput {
+  modelReasoning?: import("./custom-model-reasoning").CustomModelReasoning;
   providerId: LlmProviderId;
   protocol?: import("./model-config").ModelApi;
   connectionId?: string;

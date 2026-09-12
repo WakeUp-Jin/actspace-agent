@@ -366,10 +366,16 @@ function isModelEditable(model: ComposerModelOption): boolean {
 function modelDefaultRuntimeOptions(model: ComposerModelOption | undefined): ComposerModelRuntimeOptions {
   return {
     thinkingEnabled: model?.reasoningMandatory || model?.thinkingDefault || false,
-    ...(model?.provider === "deepseek" && model.reasoningDefaultEffort && {
+    ...(model?.reasoningDefaultEffort && {
       reasoningEffort: model.reasoningDefaultEffort,
     }),
   };
+}
+
+function currentModelRuntimeOptions(model: ComposerModelOption | undefined, saved?: ComposerModelRuntimeOptions): ComposerModelRuntimeOptions {
+  if (!saved) return modelDefaultRuntimeOptions(model);
+  const thinkingEnabled = Boolean(model?.reasoningMandatory || ((model && isModelEditable(model)) && saved.thinkingEnabled));
+  return { thinkingEnabled, ...(thinkingEnabled && saved.reasoningEffort && modelReasoningEfforts(model).includes(saved.reasoningEffort) ? { reasoningEffort: saved.reasoningEffort } : {}) };
 }
 
 function reasoningEffortLabel(model: ComposerModelOption | undefined, effort: ModelReasoningEffort): string {
@@ -659,6 +665,8 @@ export function Composer({
   const gitReady = gitStatus === "ready";
   const gitHasBranch = gitReady || gitStatus === "no_head";
   const selectedBranch = executionContext?.selectedBranch ?? executionContext?.gitContext?.currentBranch;
+  const detachedHead = gitReady && Boolean(executionContext?.gitContext?.detachedCommit);
+  const branchLabel = selectedBranch || (detachedHead ? "分离的 HEAD" : undefined);
   const runLocation = executionContext?.runLocation ?? "this_mac";
 
   // 默认模型可能在 Composer 挂载后才异步到达（settings:get）；只在用户尚未手动

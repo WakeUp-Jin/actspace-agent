@@ -349,6 +349,7 @@ export type ModelsAddInput = {
 };
 
 export type ModelsUpdateInput = {
+  reasoningConfig?: import("./custom-model-reasoning").CustomModelReasoning;
   modelKey: ModelKey;
   enabled?: boolean;
   customLabel?: string | null;
