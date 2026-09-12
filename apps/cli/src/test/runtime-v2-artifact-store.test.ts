@@ -1,4 +1,4 @@
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,6 +14,8 @@ describe("CliV2ArtifactStore", () => {
     const ref = await store.create({ bytes: Buffer.from("original"), mediaType: "text/plain", owner: { sessionId: "session-a", callId: "call", pluginId: "plugin", name: "tool" } });
     await expect(store.readForSession("session-a", ref.artifactId)).resolves.toMatchObject({ mediaType: "text/plain" });
     await expect(store.readForSession("session-b", ref.artifactId)).rejects.toThrow("does not belong");
+    await expect(store.resolveForSession("session-a", ref.artifactId)).resolves.toEqual({ path: await realpath(join(store.root, ref.artifactId)), mediaType: "text/plain" });
+    await expect(store.resolveForSession("session-b", ref.artifactId)).rejects.toThrow("does not belong");
     const metadataPath = join(store.root, `${ref.artifactId}.json`);
     const metadata = JSON.parse(await readFile(metadataPath, "utf8")) as Record<string, unknown>;
     await writeFile(metadataPath, `${JSON.stringify({ ...metadata, sha256: "0".repeat(64) })}\n`);

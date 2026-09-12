@@ -2,9 +2,9 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { chmod, lstat, mkdir, readFile, readdir, realpath, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
-import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tools-runtime";
+import type { ToolBodyResult, ToolExecutionContext, SessionArtifactResolver } from "@actspace/tools-runtime";
 import type { CoreToolHandler, CoreToolPorts } from "./plugin.js";
 import { createNodeBashToolPorts } from "./bash/node-bash-ports.js";
 import { createNodeWebToolPorts, type WebSearchCredentials } from "./web/node-web-ports.js";
@@ -26,6 +26,7 @@ const IMAGE_MIME_BY_EXT: Readonly<Record<string, string>> = Object.freeze({
 });
 
 export type NodeCoreToolPortsOptions = {
+  readonly resolveArtifact?: SessionArtifactResolver;
   readonly workspaceRoot: string;
   readonly ripgrepPath?: string;
   readonly tmpRoot?: string;
@@ -44,9 +45,9 @@ export function createNodeCoreToolPorts(options: NodeCoreToolPortsOptions): Core
   const web = createNodeWebToolPorts({ credentials: options.searchCredentials, fetchImpl: options.fetchImpl, resolveHostname: options.resolveHostname });
   const image = createNodeImageToolPorts({ generation: options.imageGeneration, readArtifact: options.readArtifact, inspect: options.inspectImage, fetchImpl: options.fetchImpl, resolveHostname: options.resolveHostname });
   return Object.freeze({
-    read_file: (args, context) => readFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), readCache),
+    read_file: (args, context) => readFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), readCache, options.resolveArtifact),
     list_directory: (args, context) => listDirectoryTool(args, contextWorkspaceRoot(context, options.workspaceRoot)),
-    grep: (args, context) => grepTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), options.ripgrepPath),
+    grep: (args, context) => grepTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), options.ripgrepPath, options.resolveArtifact),
     glob: (args, context) => globTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), options.ripgrepPath),
     edit_file: (args, context) => editFileTool(args, contextWorkspaceRoot(context, options.workspaceRoot)),
     write_file: (args, context) => writeFileTool(args, contextWorkspaceRoot(context, options.workspaceRoot)),
@@ -69,11 +70,12 @@ async function readFileTool(
   context: ToolExecutionContext,
   workspaceRoot: string,
   cache: Map<string, { readonly size: number; readonly mtimeMs: number }>,
+  resolveArtifact?: SessionArtifactResolver,
 ): Promise<ToolBodyResult> {
   const pathArg = stringArg(args, "path");
   if (!pathArg) return failure("INVALID_ARGUMENTS", "path is required");
   try {
-    const filePath = await resolveExistingPath(pathArg, workspaceRoot);
+    const filePath = await resolveReadablePath(pathArg, workspaceRoot, context.sessionId, resolveArtifact);
     const fileStat = await stat(filePath);
     if (!fileStat.isFile()) return failure("NOT_A_FILE", `Path is not a regular file: ${pathArg}`);
     const mimeType = IMAGE_MIME_BY_EXT[extname(filePath).toLowerCase()];
@@ -120,13 +122,13 @@ async function listDirectoryTool(args: Readonly<Record<string, RuntimeV2JsonValu
   }
 }
 
-async function grepTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string, ripgrepPath?: string): Promise<ToolBodyResult> {
+async function grepTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string, ripgrepPath?: string, resolveArtifact?: SessionArtifactResolver): Promise<ToolBodyResult> {
   const pattern = stringArg(args, "pattern");
   if (!pattern) return failure("INVALID_ARGUMENTS", "pattern is required");
   const pathArg = stringArg(args, "path") || ".";
   try {
-    const searchPath = await resolveExistingPath(pathArg, workspaceRoot);
-    const rgArgs = ["--line-number", "--no-heading", "--color", "never", "--max-count", String(MAX_GREP_RESULTS), "--max-filesize", "1M"];
+    const searchPath = await resolveReadablePath(pathArg, workspaceRoot, context.sessionId, resolveArtifact);
+    const rgArgs = ["--line-number", "--no-heading", "--color", "never", "--max-count", String(MAX_GREP_RESULTS), ...(isWithin(workspaceRoot, searchPath) ? ["--max-filesize", "1M"] : [])];
     const glob = stringArg(args, "glob");
     if (glob) rgArgs.push("--glob", glob);
     rgArgs.push("--", pattern, searchPath);
@@ -226,6 +228,16 @@ async function deleteFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>
   } catch (error) {
     return ioFailure("delete file", pathArg, error);
   }
+}
+
+async function resolveReadablePath(input: string, workspaceRoot: string, sessionId: string, resolveArtifact?: SessionArtifactResolver): Promise<string> {
+  const candidate = isAbsolute(input) ? resolve(input) : resolve(workspaceRoot, input);
+  if (isWithin(workspaceRoot, candidate)) return resolveExistingPath(input, workspaceRoot);
+  if (resolveArtifact && isAbsolute(input) && /^[0-9a-f-]{36}$/i.test(basename(candidate))) {
+    const artifact = await resolveArtifact(sessionId, basename(candidate));
+    if (await realpath(candidate) === artifact.path) return artifact.path;
+  }
+  throw new Error(`Path escapes workspace boundary: ${input}`);
 }
 
 async function resolveExistingPath(input: string, workspaceRoot: string): Promise<string> {

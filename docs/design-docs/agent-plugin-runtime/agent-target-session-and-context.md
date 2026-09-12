@@ -213,6 +213,8 @@ v2 唯一规范物理格式为：
 - 不使用压缩 frame、二进制 block 或 SQLite page；
 - attachment / artifact 只保存 durable reference，不把大型二进制嵌入 Journal。
 
+普通文件引用在请求组装时解析成可读路径与回读提示；图片引用保留 image 类型与 artifact ID，仅在 wire adapter 读取字节。`request/context` 保存归一化后的逻辑消息（含本次解析路径），不存 wire Base64。详见[工具输出与引用](../tool-system/agent-tool-output-references.md)。
+
 formatVersion、eventVersion、backendSchemaVersion 和 runtimeContractVersion 分别演进。checksum、`fsync`、writer lock、publish 和 torn-tail 保留证据的具体平台算法留给 execution plan，但必须满足 [Session Format v1 规范](./agent-spec-session-format-v1.md) 的可观察 durability 与 repair 语义。
 
 ## 14. v1 数据策略

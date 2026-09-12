@@ -122,6 +122,8 @@ Artifact 的语义所有权属于 Session / Tool call，但当前 Desktop 与 pe
 4. 重新计算大小和 SHA-256；
 5. 只通过 Host API 返回 bytes 或安全预览。
 
+Agent 的本地文件回读由 Host `resolveForSession` 校验后提供精确路径；`read_file` / `grep` 可读取本会话 artifact，写入工具不获得例外。大 Bash 输出不自动全文展开，图片只在 Provider 请求边界读取；完整契约见[工具输出与引用](tool-system/agent-tool-output-references.md)。
+
 CLI ephemeral run 使用系统临时目录中的一次性 artifact store，并在退出时删除。Journal 只保存 artifact reference，不保存 Base64、Authorization header、远程签名 URL 或不受控绝对路径。
 
 ## Fork 与恢复

@@ -15,6 +15,27 @@ async function workspace(): Promise<string> { const root = await mkdtemp(join(tm
 function context(sessionId = "session", notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>, workspaceRoot = ""): ToolExecutionContext { return { pluginId: "actspace.core-tools", name: "test", callId: "call", sessionId, workspaceRoot, agentRunId: "run", turnId: "turn", stepId: "step", signal: new AbortController().signal, capabilities: { ids: [], has: () => false, get: () => { throw new Error("missing"); } }, reportProgress: () => undefined, createArtifact: async ({ bytes, mediaType }) => ({ artifactId: "artifact", mediaType, size: bytes.byteLength, sha256: "sha" }), defer: () => undefined, ...(notifyAgent === undefined ? {} : { notifyAgent }) }; }
 async function invoke(handler: ((args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>) | undefined, args: Readonly<Record<string, RuntimeV2JsonValue>>, sessionId = "session", notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>, workspaceRoot = "") { if (!handler) throw new Error("handler unavailable"); return handler(args, context(sessionId, notifyAgent, workspaceRoot)); }
 
+it("reads and searches only a Session-owned full-output file outside the workspace", async () => {
+  const root = await workspace(); const managed = await workspace();
+  const artifactId = "12345678-1234-1234-1234-123456789abc";
+  const path = join(managed, artifactId);
+  await writeFile(path, "one\nneedle\nthree\n");
+  const ports = createNodeCoreToolPorts({ workspaceRoot: root, resolveArtifact: async (sessionId, id) => {
+    if (sessionId !== "owner" || id !== artifactId) throw new Error("Artifact does not belong to this Session.");
+    return { path: await import("node:fs/promises").then((fs) => fs.realpath(path)), mediaType: "text/plain" };
+  } });
+  expect(await invoke(ports.read_file, { path, offset: 2, limit: 1 }, "owner")).toMatchObject({ status: "completed" });
+  expect(JSON.stringify(await invoke(ports.read_file, { path, offset: 2, limit: 1, force: true }, "owner"))).toContain("2|needle");
+  expect(JSON.stringify(await invoke(ports.grep, { path, pattern: "needle" }, "owner"))).toContain("needle");
+  expect(await invoke(ports.read_file, { path }, "other")).toMatchObject({ status: "failed" });
+  expect(await invoke(ports.grep, { path, pattern: "needle" }, "other")).toMatchObject({ status: "failed" });
+  expect(await invoke(ports.write_file, { path, content: "overwrite" }, "owner")).toMatchObject({ status: "failed" });
+  await writeFile(path, "padding\n".repeat(150_000) + "large-output-needle\n");
+  const large = await invoke(ports.grep, { path, pattern: "large-output-needle" }, "owner");
+  expect(large.status).toBe("completed");
+  expect(JSON.stringify(large)).toContain("large-output-needle");
+});
+
 describe("native v2 Core Tool ports", () => {
   it("reads numbered ranges, caches unchanged reads and lists deterministically", async () => {
     const root = await workspace(); await mkdir(join(root, "src")); await writeFile(join(root, "src", "b.txt"), "one\ntwo\nthree\n"); await writeFile(join(root, "src", "a.txt"), "alpha\n");

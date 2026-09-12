@@ -55,7 +55,7 @@ export class FixedRendererStreamAdapter {
           this.#calls.delete(key);
         }
         if (event.message === "aborted") this.#emit({ type: "agent_run_aborted", ...ids });
-        else if (event.message === "failed") this.#emit({ type: "agent_run_failed", ...ids, error: { code: "AGENT_RUN_FAILED", message: "The Agent run failed.", recoverable: true } });
+        else if (event.message === "failed") this.#emit({ type: "agent_run_failed", ...ids, error: { code: event.failure?.kind ?? "AGENT_RUN_FAILED", message: event.failure?.message ?? "The Agent run failed.", recoverable: event.failure?.retryable ?? false } });
         else this.#emit({ type: "agent_run_finished", ...ids, resultEventIds: [] });
       }
       return;

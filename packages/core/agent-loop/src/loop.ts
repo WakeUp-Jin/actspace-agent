@@ -4,7 +4,7 @@ import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
 import type { LlmService } from "@actspace/llm-service";
 import type { LlmStreamEvent } from "@actspace/llm-service";
-import { LlmRuntimeError, type LlmFailure } from "@actspace/llm-service";
+import { LlmRuntimeError, redactLlmText, type LlmFailure } from "@actspace/llm-service";
 import { DEFAULT_LLM_RETRY_POLICY, retryDelay, retryPolicySnapshot } from "@actspace/llm-service";
 import type { RequestAssembler } from "@actspace/prompt";
 import type { PreparedRequestMetadata } from "@actspace/prompt";
@@ -35,7 +35,7 @@ type StreamPayload =
   | { readonly kind: "tool-call-delta"; readonly callId: string; readonly name: string; readonly argumentsDelta: string };
 export type AgentLoopLiveEvent = LiveIdentity & (
   | (StreamPayload & { readonly requestId: string; readonly messageId: string })
-  | { readonly kind: "run-state"; readonly message: string; readonly requestId?: string }
+  | { readonly kind: "run-state"; readonly message: string; readonly requestId?: string; readonly failure?: LlmFailure }
   | { readonly kind: "tool-prepared"; readonly requestId: string; readonly callId: string; readonly name: string; readonly arguments: RuntimeV2JsonValue }
   | { readonly kind: "tool-started"; readonly requestId: string; readonly callId: string; readonly name: string }
   | { readonly kind: "tool-finished"; readonly requestId: string; readonly callId: string; readonly name: string; readonly result: ToolExecutionResult; readonly resultEventId: string }
@@ -114,7 +114,7 @@ export class AgentLoop {
         let requestId = randomUUID();
         const requestMessages = Object.freeze([
           ...(candidate.renderedSystemPrompt.length > 0 ? [{ role: "system" as const, content: candidate.renderedSystemPrompt }] : []),
-          ...candidate.messages.map(toMessage),
+          ...await this.requestMessages(candidate.messages),
         ]);
         const requestPlan = await this.waterfall("agent/request", { requestId, turnId, stepId, routeId: this.options.descriptor.routeId, model: input.model ?? this.options.descriptor.model, messages: requestMessages, tools }, controller.signal);
         const requestRecord: Readonly<Record<string, unknown>> = isRecord(requestPlan) ? requestPlan : {};
@@ -134,7 +134,7 @@ export class AgentLoop {
         const retryPolicy = prepared.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY;
         const contextWindow = prepared.request.contextWindow ?? null;
         const metadata: PreparedRequestMetadata = { route: prepared.request.routeId, model: prepared.request.model, registrationId: prepared.registration.registrationId, adapterVersion: prepared.registration.adapter.adapterVersion, defaults: prepared.request.options as RuntimeV2JsonValue, retryPolicy: retryPolicySnapshot(retryPolicy) as unknown as RuntimeV2JsonValue, contextWindow };
-        const snapshot = this.options.assembler.finalize(candidate, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
+        const snapshot = this.options.assembler.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
         try {
           await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: prepared.request.routeId, model: prepared.request.model, contextWindow, attempt: 1 }));
           await this.options.session.append(core("request/context", { requestId, turnId, stepId, snapshot }));
@@ -189,7 +189,7 @@ export class AgentLoop {
           if (isRecord(retryAssembled)) candidate = retryAssembled as typeof candidate;
           requestMessageList = Object.freeze([
             ...(candidate.renderedSystemPrompt.length > 0 ? [{ role: "system" as const, content: candidate.renderedSystemPrompt }] : []),
-            ...candidate.messages.map(toMessage),
+            ...await this.requestMessages(candidate.messages),
           ]);
           requestId = randomUUID();
           activePrepared = this.options.llm.prepareCaptured(prepared.registration, {
@@ -197,7 +197,7 @@ export class AgentLoop {
             requestId,
             messages: requestMessageList,
           }, controller.signal);
-          const retrySnapshot = this.options.assembler.finalize(candidate, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
+          const retrySnapshot = this.options.assembler.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
           await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow, attempt }));
           await this.options.session.append(core("request/context", { requestId, turnId, stepId, snapshot: retrySnapshot }));
           await this.#checkpoint.enforce(this.options.session, "before-llm-dispatch");
@@ -226,15 +226,38 @@ export class AgentLoop {
       this.emitLive({ kind: "run-state", agentRunId, turnId, message: "step-limit" });
       return Object.freeze({ agentRunId, turnId, reason: "step-limit", steps: stepCount, finalText });
     } catch (error) {
+      const cause = error instanceof AgentRuntimeError && isRecord(error.cause) ? error.cause : undefined;
+      const failure = { ...normalizeLlmFailure(error, 1), ...(cause as LlmFailure | undefined), message: redactLlmText(error instanceof Error ? error.message : String(error)).slice(0, 2000) };
       if (!input.keepPendingOnAbort) await this.options.inbox.discardAll(controller.signal.aborted ? "turn-aborted" : "turn-failed");
       const relations = this.options.session.journal.validation.relations;
       if (relations.openStepId !== null && relations.openRequestIds.length === 0 && relations.openToolCallIds.length === 0) await this.options.session.append(core("step/end", { turnId, stepId: relations.openStepId, reason: "interrupted" }));
-      if (this.options.session.journal.validation.relations.openTurnId === turnId && this.options.session.journal.validation.relations.openStepId === null) await this.options.session.append(core("turn/end", { turnId, reason: controller.signal.aborted ? "aborted" : "failed" }));
-      await this.notify("agent/error", { agentRunId, turnId, error: error instanceof Error ? error.message : String(error) });
+      if (this.options.session.journal.validation.relations.openTurnId === turnId && this.options.session.journal.validation.relations.openStepId === null) await this.options.session.append(core("turn/end", { turnId, reason: controller.signal.aborted ? "aborted" : "failed", ...(controller.signal.aborted ? {} : { failure }) }));
+      await this.notify("agent/error", { agentRunId, turnId, error: failure.message });
       await this.notify("agent/status", { agentRunId, turnId, status: controller.signal.aborted ? "aborted" : "failed" });
-      this.emitLive({ kind: "run-state", agentRunId, turnId, message: controller.signal.aborted ? "aborted" : "failed" });
+      this.emitLive({ kind: "run-state", agentRunId, turnId, message: controller.signal.aborted ? "aborted" : "failed", ...(controller.signal.aborted ? {} : { failure }) });
       throw error;
     } finally { this.#active = null; this.#resolveIdle?.(); this.#resolveIdle = null; this.#idle = null; }
+  }
+
+  private async requestMessages(values: readonly RuntimeV2JsonValue[]): Promise<readonly LlmMessage[]> {
+    const paths = new Map<string, string>();
+    const resolveArtifact = this.options.toolEnvironment(this.options.session).resolveArtifact;
+    for (const value of values) {
+      if (!isRecord(value) || !Array.isArray(value.content)) continue;
+      for (const block of value.content) {
+        if (!isRecord(block) || block.type !== "artifact" || !isRecord(block.artifact)) continue;
+        const { artifactId, mediaType } = block.artifact;
+        if (typeof artifactId !== "string" || typeof mediaType !== "string" || mediaType.startsWith("image/") || paths.has(artifactId)) continue;
+        if (resolveArtifact) {
+          try {
+            const file = await resolveArtifact(this.options.session.header.sessionId, artifactId);
+            if (file.mediaType !== mediaType) throw new Error("Artifact media type mismatch.");
+            paths.set(artifactId, `Full output file: ${JSON.stringify(file.path)}. Use read_file with path and offset/limit, or grep with path and pattern. Do not rerun the command just to recover its output.`);
+          } catch { paths.set(artifactId, "Full output file is unavailable; retained output is partial."); }
+        }
+      }
+    }
+    return values.map((value) => toMessage(value, paths));
   }
 
   private toolDefinitions(mode: RuntimeV2AgentMode): readonly LlmToolDefinition[] {
@@ -334,14 +357,14 @@ function surfaceMessage(node: import("@actspace/session-journal").SessionSurface
   if (node.kind === "assistant") return { role: "assistant", content: node.content };
   return { role: "tool", callId: node.callId, content: node.content, isError: node.isError };
 }
-function toMessage(value: RuntimeV2JsonValue): LlmMessage {
+function toMessage(value: RuntimeV2JsonValue, paths: ReadonlyMap<string, string>): LlmMessage {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     const record = value as Readonly<Record<string, RuntimeV2JsonValue>>;
-    if (record.role === "user" || record.role === "assistant" || record.role === "tool") return { role: record.role, content: toLlmContent(record.content), ...(record.role === "tool" && typeof record.callId === "string" ? { callId: record.callId } : {}) };
+    if (record.role === "user" || record.role === "assistant" || record.role === "tool") return { role: record.role, content: toLlmContent(record.content, paths), ...(record.role === "tool" && typeof record.callId === "string" ? { callId: record.callId } : {}) };
   }
   return { role: "user", content: typeof value === "string" ? value : JSON.stringify(value) ?? "null" };
 }
-function toLlmContent(value: RuntimeV2JsonValue | undefined): string | readonly LlmContentBlock[] {
+function toLlmContent(value: RuntimeV2JsonValue | undefined, paths: ReadonlyMap<string, string>): string | readonly LlmContentBlock[] {
   if (typeof value === "string") return value;
   if (!Array.isArray(value)) return JSON.stringify(value ?? null) ?? "null";
   return value.flatMap((item): LlmContentBlock[] => {
@@ -351,7 +374,13 @@ function toLlmContent(value: RuntimeV2JsonValue | undefined): string | readonly 
     if (block.type === "reasoning" && typeof block.text === "string") return [{ type: "reasoning", text: block.text, ...(typeof block.signature === "string" ? { signature: block.signature } : {}) }];
     if (block.type === "tool-call" && typeof block.callId === "string" && typeof block.name === "string") return [{ type: "tool-call", callId: block.callId, name: block.name, arguments: typeof block.arguments === "string" ? block.arguments : JSON.stringify(block.arguments ?? {}) }];
     if (block.type === "json") return [{ type: "text", text: JSON.stringify(block.value ?? null) }];
-    if (block.type === "artifact" && block.artifact !== null && typeof block.artifact === "object" && !Array.isArray(block.artifact)) { const artifact = block.artifact as Readonly<Record<string, RuntimeV2JsonValue>>; if (typeof artifact.artifactId === "string" && typeof artifact.mediaType === "string") return [{ type: "image", artifactId: artifact.artifactId, mimeType: artifact.mediaType, ...(typeof block.label === "string" ? { alt: block.label } : {}) }]; }
+    if (block.type === "artifact" && isRecord(block.artifact)) {
+      const { artifactId, mediaType } = block.artifact;
+      if (typeof artifactId === "string" && typeof mediaType === "string") {
+        if (mediaType.startsWith("image/")) return [{ type: "image", artifactId, mimeType: mediaType, ...(typeof block.label === "string" ? { alt: block.label } : {}) }];
+        return [{ type: "text", text: `${typeof block.label === "string" ? block.label : "File"} (${mediaType}, artifactId=${artifactId}). ${paths.get(artifactId) ?? "File reference only; this Host cannot resolve its read path."}` }];
+      }
+    }
     return [{ type: "text", text: JSON.stringify(block) }];
   });
 }

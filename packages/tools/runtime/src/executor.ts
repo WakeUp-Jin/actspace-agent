@@ -9,6 +9,8 @@ export type ToolArtifactRef = {
   readonly sha256: string;
 };
 
+export type SessionArtifactResolver = (sessionId: string, artifactId: string) => Promise<{ readonly path: string; readonly mediaType: string }>;
+
 export type ToolArtifactOwner = {
   readonly sessionId: string;
   readonly callId: string;

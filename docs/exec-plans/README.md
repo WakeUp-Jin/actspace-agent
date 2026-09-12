@@ -29,6 +29,8 @@
 
 ## 最近完成
 
+- [工具输出引用与失败反馈](completed/20260912-tool-output-references.md)：大 Bash 输出回读、图片协议与失败恢复已修复；自动化通过，安装态与真实 Provider 验收待执行。
+
 - [DeepSeek V4.1 Flash](completed/20260910-deepseek-v41-flash.md)：模型、目录、图片和价格实现完成；真实图片请求通过，完整设置交互与主题截图边界见摘要。
 
 - [Context 模型事实](completed/20260901-actspace-context-model-facts/README.md)：2026-09-09 补齐全仓 typecheck/test；G1 通过，Electron/真实 Provider/截图 G2 仍保留人工验收。

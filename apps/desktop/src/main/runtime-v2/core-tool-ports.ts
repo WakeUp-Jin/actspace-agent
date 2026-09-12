@@ -8,6 +8,7 @@ export type CreateCoreToolPortsOptions = {
   readonly modelRuntime: DesktopRuntimeV2ModelPort;
   readonly llm: unknown;
   readonly readArtifact: SessionArtifactReader;
+  readonly resolveArtifact?: import("@actspace/tools-runtime").SessionArtifactResolver;
 };
 
 export function createDesktopCoreToolPorts(options: CreateCoreToolPortsOptions): CoreToolPorts {
@@ -19,6 +20,7 @@ export function createDesktopCoreToolPorts(options: CreateCoreToolPortsOptions):
     searchCredentials: toolEnvironment.searchCredentials,
     imageGeneration: toolEnvironment.imageGeneration,
     readArtifact: options.readArtifact,
+    resolveArtifact: options.resolveArtifact,
     ...(imageInspection.ok ? { inspectImage: createLlmImageInspector({ llm: options.llm as never, routeId: "default", model: imageInspection.model.key, credentialRef: IMAGE_INSPECTION_CREDENTIAL_REF }) } : {}),
   });
 }

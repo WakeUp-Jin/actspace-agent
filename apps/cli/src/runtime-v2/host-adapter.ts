@@ -42,7 +42,7 @@ export async function bootCliV2(options: { readonly kind: "cli-run"; readonly wo
         "host.approval": approval,
         "host.artifacts": artifacts,
         [runtime.LLM_HOST_PORT_ID]: Object.freeze({ credentials, routes: Object.freeze([{ routeId: "default", providerId: provider.providerId, modelPattern: "*", adapter: llmAdapter, credentialRef: "cli-env", defaults: {} }]) }),
-        [runtime.CORE_TOOLS_HOST_PORT_ID]: Object.freeze({ createPorts: async (llm: unknown) => coreModule?.createCliV2CoreToolPorts({ workspaceRoot: options.workspace, tmpRoot: `${options.dataRoot}/runtime/tmp`, llm, model: options.model ?? "default", readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId) }) ?? {} }),
+        [runtime.CORE_TOOLS_HOST_PORT_ID]: Object.freeze({ createPorts: async (llm: unknown) => coreModule?.createCliV2CoreToolPorts({ workspaceRoot: options.workspace, tmpRoot: `${options.dataRoot}/runtime/tmp`, llm, model: options.model ?? "default", readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId: string, artifactId: string) => artifacts.resolveForSession(sessionId, artifactId) }) ?? {} }),
         [runtime.PROMPT_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspace, resolveSource: async (workspaceRoot: string) => runtime.prepareRuntimePromptSource({ dataRoot: options.dataRoot, workspaceRoot }) }),
         [runtime.HEADLESS_HOST_PORT_ID]: options.headlessInput === undefined
           ? Object.freeze({ enabled: false })
@@ -52,7 +52,7 @@ export async function bootCliV2(options: { readonly kind: "cli-run"; readonly wo
     const profile = await runtime.bootProfileRuntime({
       host, dataRoot: options.dataRoot,
       hostServices,
-      toolEnvironment: { workspaceRoot: options.workspace, hostCapabilities: new Set(capabilities), capabilitySet, approvalBroker: approval, createArtifact: (input) => artifacts.create(input) },
+      toolEnvironment: { workspaceRoot: options.workspace, hostCapabilities: new Set(capabilities), capabilitySet, approvalBroker: approval, createArtifact: (input) => artifacts.create(input), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) },
       composition,
       onLiveEvent: (event) => {
         if (event.kind === "assistant-delta" || event.kind === "reasoning-delta" || event.kind === "run-state") options.onLiveEvent?.({ ...event });

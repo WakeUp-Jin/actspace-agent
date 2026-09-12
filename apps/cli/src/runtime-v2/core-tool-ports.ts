@@ -1,6 +1,6 @@
 import { createLlmImageInspector, createNodeCoreToolPorts, type CoreToolPorts, type SessionArtifactReader, type WebSearchCredentials } from "@actspace/tools-core-tools";
 
-export function createCliV2CoreToolPorts(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly llm: unknown; readonly model: string; readonly readArtifact: SessionArtifactReader }): CoreToolPorts {
+export function createCliV2CoreToolPorts(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly llm: unknown; readonly model: string; readonly readArtifact: SessionArtifactReader; readonly resolveArtifact?: import("@actspace/tools-runtime").SessionArtifactResolver }): CoreToolPorts {
   const keys = Object.freeze({
     zhipu: process.env.ZHIPU_API_KEY,
     tavily: process.env.TAVILY_API_KEY,
@@ -18,6 +18,7 @@ export function createCliV2CoreToolPorts(options: { readonly workspaceRoot: stri
     searchCredentials,
     imageGeneration,
     readArtifact: options.readArtifact,
+    resolveArtifact: options.resolveArtifact,
     inspectImage: createLlmImageInspector({ llm: options.llm as never, routeId: "default", model: options.model }),
   });
 }

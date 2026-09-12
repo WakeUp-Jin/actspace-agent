@@ -141,6 +141,8 @@ Journal 的 append 是唯一提交点：先校验 codec 和序号，再写入文
 
 usage、finish、error、abort 都分别归入 `assistant/chunk`、`assistant/message`、`step/end`/`turn/end` 的结构化字段；重试用 `llm/retry*` 扩展事件表达。
 
+失败回合在 `turn/end(reason=failed)` 的可选 `failure` 中保存脱敏、有界原因；live 与恢复后的 UI 使用同一失败信息。旧记录缺少该字段时展示明确的通用失败提示，`agent/error` 仍是通知，不要求成为独立 Journal 事件。
+
 ## 6. 错误、取消与恢复
 
 - Codec 缺失、Envelope 非法或 `seq` 断裂：fail closed，Journal 不提交该记录并报告结构化诊断。

@@ -3,6 +3,15 @@ import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { RuntimeV2JsonValue, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
 import { projectSubagentList, projectSubagentTranscript, projectContextSnapshot, projectContextState, projectFixedRendererEvents, projectFixedRendererSession, projectUsageActivity } from "../runtime-v2/fixed-renderer-projection";
 
+it("restores a durable failed turn as an error block, including old failures without details", () => {
+  for (const failure of [undefined, { kind: "invalid-request", message: "Cannot send tool image", retryable: false }]) {
+    const journal = [event(0, "turn/start", { turnId: "turn", agentRunId: "run" }), event(1, "turn/end", { turnId: "turn", reason: "failed", ...(failure ? { failure } : {}) })];
+    const restored = projectFixedRendererSession(baseSnapshot(), journal, "/fixture");
+    expect(restored.events.filter((e) => e.type === "error")).toHaveLength(1);
+    expect(restored.messageBlocks).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "error", content: failure?.message ?? "LLM request failed." })]));
+  }
+});
+
 describe("fixed renderer v2 projection", () => {
   it("binds an Inbox claim to the following next-turn run for stable renderer handoff keys", () => {
     const agentRunId = "agent-run-inbox-claim";

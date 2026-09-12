@@ -10,9 +10,12 @@ import { AgentLoop, type AgentLoopLiveEvent } from "../loop.js";
 /** Same real loop fixture is consumed by Core, Main adapter and renderer regressions. */
 export async function runToolStreamFixture(options: {
   deltas?: boolean;
+  resolveArtifact?: import("@actspace/tools-runtime").SessionArtifactResolver;
   thinkingEnabled?: boolean;
   reasoningEffort?: import("@actspace/shared").ModelReasoningEffort;
   onRequest?: (options: import("@actspace/llm-service").LlmRequestOptions) => void;
+  onMessages?: (messages: readonly import("@actspace/llm-service").LlmMessage[]) => void;
+  onJournal?: (events: readonly import("@actspace/session-journal").SessionEventEnvelopeV1[]) => void;
   args?: string;
   sessionId?: string;
   agentRunId?: string;
@@ -38,6 +41,7 @@ export async function runToolStreamFixture(options: {
   const handle = routes.register({ routeId: "test", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: {
     adapterVersion: "test", dispatch: async (input) => (async function* (): AsyncGenerator<LlmStreamEvent> {
       options.onRequest?.(input.request.options);
+      options.onMessages?.(input.request.messages);
       if (requests++ === 0) {
         yield { type: "text-delta", text: "Read now. " };
         if (options.deltas !== false) {
@@ -58,11 +62,11 @@ export async function runToolStreamFixture(options: {
     assembler: new RequestAssembler({ prepare: () => { throw new Error("not used"); } }),
     llm: new LlmService(routes, { resolve: async () => ({ apiKey: "fixture" }) }),
     compositionDigest: "test", hostCapabilityDigest: "test", host: { hostKind: "desktop", capabilityCeiling: [], runtimeContract: "actspace.runtime.v2", invocationId: "test", workspaceRef: "/fixture" },
-    toolEnvironment: () => ({ workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: async () => { throw new Error("not used"); } }),
+    toolEnvironment: () => ({ resolveArtifact: options.resolveArtifact, workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: async () => { throw new Error("not used"); } }),
     onLiveEvent: (event) => { events.push(event); options.onLiveEvent?.(event); },
   });
   try {
     const result = await loop.runTurn({ content: "Read fixture", thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test" });
     return { result, events, journal: [...session.journal.events], header: session.header, registry };
-  } finally { await session.close(); await handle.dispose(100); }
+  } finally { options.onJournal?.([...session.journal.events]); await session.close(); await handle.dispose(100); }
 }

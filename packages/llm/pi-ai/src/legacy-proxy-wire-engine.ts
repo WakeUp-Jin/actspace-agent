@@ -1,3 +1,4 @@
+import { prepareImageMessages } from "./image-messages.js";
 import { validateDeepSeekImage, validateDeepSeekImageMessages, validateDeepSeekPayload } from "./deepseek-images.js";
 import { catalogProviderForEndpoint, type ModelPricingSnapshot } from "@actspace/shared";
 import { calculateUsageCost } from "@actspace/llm-service";
@@ -44,6 +45,7 @@ export class LegacyProxyWireEngine implements PiAiEngine {
   constructor(private readonly options: LegacyProxyWireEngineOptions) { this.#loadSdk = options.loadSdk ?? loadPublicSdk; }
 
   async stream(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
+    input = { ...input, request: { ...input.request, messages: prepareImageMessages(input.request.messages, this.options.modelFacts?.input.includes("image") ?? true, this.options.route === "anthropic-messages") } };
     const proxyUrl = input.credential.proxyUrl;
     const baseURL = input.credential.baseUrl ?? this.options.baseUrl;
     if (baseURL === undefined) throw new Error(`No base URL is configured for route ${input.request.routeId}.`);
@@ -214,7 +216,14 @@ async function toAnthropicMessages(messages: readonly LlmMessage[], sessionId?: 
     if (message.role === "system") continue;
     if (message.role === "user") { const content: RuntimeV2JsonValue[] = []; for (const block of blocksOf(message)) { if (block.type === "text") content.push({ type: "text", text: block.text }); else if (block.type === "image") { const dataUrl = await artifactDataUrl(block.artifactId, block.mimeType, sessionId, readArtifact); content.push({ type: "image", source: { type: "base64", media_type: anthropicMediaType(block.mimeType), data: dataUrl.slice(dataUrl.indexOf(",") + 1) } }); } } output.push({ role: "user", content }); continue; }
     if (message.role === "assistant") { const content: RuntimeV2JsonValue[] = []; for (const block of blocksOf(message)) { if (block.type === "text") content.push({ type: "text", text: block.text }); else if (block.type === "reasoning" && block.signature) content.push({ type: "thinking", thinking: block.text, signature: block.signature }); else if (block.type === "tool-call") content.push({ type: "tool_use", id: block.callId, name: block.name, input: parseArguments(block.arguments) }); } if (content.length) output.push({ role: "assistant", content }); continue; }
-    const result = { type: "tool_result", tool_use_id: message.callId ?? "unknown", content: messageText(message) }; const previous = output.at(-1) as { role?: string; content?: RuntimeV2JsonValue[] } | undefined; if (previous?.role === "user" && Array.isArray(previous.content) && previous.content.every((part) => typeof part === "object" && part !== null && (part as { type?: string }).type === "tool_result")) previous.content.push(result); else output.push({ role: "user", content: [result] });
+    const content: RuntimeV2JsonValue[] = [];
+    for (const block of blocksOf(message)) {
+      if (block.type === "image") {
+        const dataUrl = await artifactDataUrl(block.artifactId, block.mimeType, sessionId, readArtifact);
+        content.push({ type: "image", source: { type: "base64", media_type: anthropicMediaType(block.mimeType), data: dataUrl.slice(dataUrl.indexOf(",") + 1) } });
+      } else if (block.type === "text") content.push({ type: "text", text: block.text });
+    }
+    const result = { type: "tool_result", tool_use_id: message.callId ?? "unknown", content: content.some((block) => (block as { type?: string }).type === "image") ? content : messageText(message) }; const previous = output.at(-1) as { role?: string; content?: RuntimeV2JsonValue[] } | undefined; if (previous?.role === "user" && Array.isArray(previous.content) && previous.content.every((part) => typeof part === "object" && part !== null && (part as { type?: string }).type === "tool_result")) previous.content.push(result); else output.push({ role: "user", content: [result] });
   }
   return { system, messages: output };
 }

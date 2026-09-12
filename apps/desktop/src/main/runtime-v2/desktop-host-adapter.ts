@@ -102,7 +102,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
       [options.module.CORE_TOOLS_HOST_PORT_ID]: Object.freeze({
         createPorts: async (llm: unknown) => {
           const { createDesktopCoreToolPorts } = await import("./core-tool-ports");
-          return createDesktopCoreToolPorts({ workspaceRoot: options.roots.workspaceRoot, tmpRoot: options.roots.tmpRoot, modelRuntime: options.models, llm, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId) });
+          return createDesktopCoreToolPorts({ workspaceRoot: options.roots.workspaceRoot, tmpRoot: options.roots.tmpRoot, modelRuntime: options.models, llm, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) });
         },
       }),
       [options.module.PROMPT_HOST_PORT_ID]: Object.freeze({
@@ -125,6 +125,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
         approvalBroker,
         reportProgress: options.onToolProgress,
         createArtifact: (input) => artifacts.create(input),
+        resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId),
       },
       composition,
       ...(plugins === undefined ? {} : { pluginCodecLoader: plugins.codecLoader }),

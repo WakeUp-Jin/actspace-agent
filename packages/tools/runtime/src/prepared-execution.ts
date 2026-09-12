@@ -42,6 +42,7 @@ export interface ToolJournalPort {
 }
 
 export type ToolPreparedEnvironment = {
+  readonly resolveArtifact?: import("./executor.js").SessionArtifactResolver;
   readonly workspaceRoot: string;
   readonly hostCapabilities: ReadonlySet<string>;
   readonly capabilitySet: ToolCapabilitySet;

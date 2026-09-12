@@ -1,3 +1,4 @@
+import { prepareImageMessages } from "./image-messages.js";
 import { validateDeepSeekImage, validateDeepSeekImageMessages, validateDeepSeekPayload } from "./deepseek-images.js";
 import { LegacyProxyWireEngine } from "./legacy-proxy-wire-engine.js";
 import { catalogProviderForEndpoint, type ModelPricingSnapshot } from "@actspace/shared";
@@ -60,13 +61,14 @@ export class PiAiWireEngine implements PiAiEngine {
       const resolved = models.getModel(this.options.providerId, modelId);
       if (resolved === undefined) throw failure("invalid-request", `pi-ai did not publish model ${modelId}.`);
       const deepseek = this.options.providerId === "deepseek" && this.options.route === "openai-completions";
-      if (deepseek) validateDeepSeekImageMessages(input.request.messages, this.options.modelFacts?.input.includes("image") ?? true);
+      const messages = prepareImageMessages(input.request.messages, this.options.modelFacts?.input.includes("image") ?? true, this.options.route === "anthropic-messages");
+      if (deepseek) validateDeepSeekImageMessages(messages, this.options.modelFacts?.input.includes("image") ?? true);
       const readArtifact = this.options.readArtifact;
       const checkedReader: PiAiArtifactReader | undefined = deepseek && readArtifact ? async (sessionId, artifactId) => {
         const artifact = await readArtifact(sessionId, artifactId);
         return { ...artifact, mimeType: validateDeepSeekImage(artifact.data) };
       } : readArtifact;
-      const context = await toPiAiContext(input.request.messages, input.request.tools, input.request.sessionId, checkedReader, deepseek ? { api: this.options.route, provider: this.options.providerId, model: modelId } : undefined);
+      const context = await toPiAiContext(messages, input.request.tools, input.request.sessionId, checkedReader, deepseek ? { api: this.options.route, provider: this.options.providerId, model: modelId } : undefined);
       const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens ?? Math.min(32_768, this.options.modelFacts?.maxTokens ?? 32_768), reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), onPayload: (payload: Record<string, unknown>) => { const body = { ...payload, ...reasoningPayload(this.options.route, this.options.providerId, input.request.options) }; if (deepseek) validateDeepSeekPayload(body); return body; }, headers: input.credential.headers } as never);
       return fromPiAiEvents(events, input.request.requestId, this.options.pricing ?? null);
     } catch (error) {
@@ -98,7 +100,7 @@ async function toPiAiContext(messages: readonly LlmMessage[], tools: readonly { 
       continue;
     }
     if (message.role === "tool") {
-      output.push({ role: "toolResult", toolCallId: message.callId ?? "unknown", toolName: names.get(message.callId ?? "") ?? "unknown", content: [{ type: "text", text: messageText(message) }], isError: false, timestamp: 0 });
+      output.push({ role: "toolResult", toolCallId: message.callId ?? "unknown", toolName: names.get(message.callId ?? "") ?? "unknown", content: await toPiUserContent({ ...message, content: typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content }, sessionId, readArtifact), isError: false, timestamp: 0 });
       continue;
     }
     output.push({ role: "user", content: await toPiUserContent(message, sessionId, readArtifact), timestamp: 0 });
