@@ -29,3 +29,17 @@ it.each([
     if (!capabilities.reasoning) expect((dispatch.mock.calls[0] as unknown as [LlmAdapterDispatchInput])[0].request.options).not.toHaveProperty("reasoning");
   } finally { await adapter.dispose(); }
 });
+
+it("routes title requests to a text-only utility model with its own connection", async () => {
+  const utility = { ok: true as const, model: { key: "utility", definition: { api: "openai-completions" as const, provider: "kimi", apiModel: "title-model", contextWindow: 1000, capabilities: { toolUse: false, reasoning: false } as ModelCapabilities }, providerRuntime: { apiKey: "fixture-utility-key", baseUrl: "https://utility.example/v1" } } };
+  const resolveMainModel = vi.fn(() => { throw Error("must not validate utility model as chat"); });
+  const resolveUtilityTaskModel = vi.fn(() => utility);
+  const adapter = new DesktopLegacyLlmAdapter({ resolveMainModel, resolveUtilityTaskModel, resolveImageInspectionModel: () => utility, getToolEnvironment: () => ({ searchCredentials: {} }) }, async () => { throw Error("unused"); }, "utility");
+  try {
+    expect(adapter.resolveModelFacts("chosen-main")).toEqual({ contextWindow: 1000 });
+    await adapter.dispatch({ request: { model: "chosen-main", options: {} }, credential: {}, signal: new AbortController().signal } as unknown as LlmAdapterDispatchInput);
+    expect(resolveUtilityTaskModel).toHaveBeenCalledWith("chosen-main");
+    expect(resolveMainModel).not.toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ request: expect.objectContaining({ model: "title-model" }), credential: expect.objectContaining({ apiKey: "fixture-utility-key", baseUrl: "https://utility.example/v1" }) }));
+  } finally { await adapter.dispose(); }
+});

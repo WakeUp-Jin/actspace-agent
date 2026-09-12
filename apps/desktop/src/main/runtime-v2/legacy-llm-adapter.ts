@@ -15,10 +15,16 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
   readonly adapterVersion = "actspace.desktop-pi-ai.v2";
   readonly #proxies = new ProviderProxyPool();
 
-  constructor(private readonly models: DesktopRuntimeV2ModelPort, private readonly readArtifact: SessionArtifactReader) {}
+  constructor(private readonly models: DesktopRuntimeV2ModelPort, private readonly readArtifact: SessionArtifactReader, private readonly purpose: "chat" | "utility" = "chat") {}
+
+  private resolveModel(requested?: string) {
+    return this.purpose === "utility" && this.models.resolveUtilityTaskModel
+      ? this.models.resolveUtilityTaskModel(requested)
+      : this.models.resolveMainModel(requested);
+  }
 
   resolveModelFacts(model: string): LlmRequestModelFacts {
-    const resolution = this.models.resolveMainModel(model === "default" ? undefined : model);
+    const resolution = this.resolveModel(model === "default" ? undefined : model);
     return { contextWindow: "model" in resolution ? resolution.model.definition.contextWindow : null };
   }
 
@@ -26,7 +32,7 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     const requested = input.request.model === "default" ? undefined : input.request.model;
     const resolution = input.request.credentialRef === IMAGE_INSPECTION_CREDENTIAL_REF
       ? this.models.resolveImageInspectionModel()
-      : this.models.resolveMainModel(requested);
+      : this.resolveModel(requested);
     if (!("model" in resolution)) throw new Error(resolution.message);
     const model = resolution.model;
     const runtime = model.providerRuntime;
@@ -44,7 +50,7 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     if (capabilities?.reasoning === false) { delete requestOptions.reasoning; delete requestOptions.reasoningEffort; }
     const requestModel = reasoningEffort ? model.definition.requestModelByReasoningEffort?.[reasoningEffort] ?? model.definition.apiModel : model.definition.apiModel;
     const route = toWireRoute(model.definition.api);
-    const pricingModel = { ...model, providerRuntime: { ...runtime, baseUrl: input.credential.baseUrl ?? runtime.baseUrl } };
+    const pricingModel = this.purpose === "utility" ? model : { ...model, providerRuntime: { ...runtime, baseUrl: input.credential.baseUrl ?? runtime.baseUrl } };
     const pricing = this.models.resolvePricing ? this.models.resolvePricing(pricingModel, requestModel) : resolveModelPricing(BUILTIN_MODEL_CATALOG, { providerId: model.definition.provider, apiModel: requestModel, modelKey: model.key, baseUrl: pricingModel.providerRuntime.baseUrl ?? "", connectionId: model.connectionId, multiplier: runtime.pricingMultiplier, configured: model.definition.source === "custom" && requestModel === model.definition.apiModel ? model.definition.pricing : undefined, configuredAlreadyMultiplied: true });
     const engineOptions = {
       pricing,
@@ -65,7 +71,9 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     return adapter.dispatch({
       ...input,
       request: { ...input.request, model: requestModel, options: requestOptions },
-      credential: {
+      credential: this.purpose === "utility" ? {
+        apiKey: runtime.apiKey, baseUrl: runtime.baseUrl, proxyUrl: runtime.transport?.proxyUrl, pricingMultiplier: runtime.pricingMultiplier,
+      } : {
         ...input.credential,
         apiKey: input.credential.apiKey ?? runtime.apiKey,
         baseUrl: input.credential.baseUrl ?? runtime.baseUrl,

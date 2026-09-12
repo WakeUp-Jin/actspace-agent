@@ -512,6 +512,31 @@ describe("App streaming user message", () => {
     expect(tooltip).toHaveTextContent("42K / 100K");
   });
 
+  it("keeps New chat as a placeholder and refreshes a background generated title", async () => {
+    let record = createEmptySessionRecord("title-session");
+    let notify: ((envelope: { event: { kind: string; sessionId: string; message: string } }) => void) | undefined;
+    const createSession = vi.fn(async () => record);
+    window.actspace = {
+      ...settingsApiStub,
+      getBootstrapState: async () => bootstrapState,
+      listSessions: async () => [{ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0 }],
+      getSession: async () => record,
+      createSession,
+      listPendingApprovals: async () => [],
+      onAgentStream: () => () => {},
+      onSessionLiveEvent: (listener: NonNullable<typeof notify>) => { notify = listener; return () => {}; },
+    } as unknown as NonNullable<typeof window.actspace>;
+    renderApp();
+    await screen.findByRole("button", { name: "查看会话详情： New chat" });
+    await userEvent.click(screen.getByRole("button", { name: "新建会话" }));
+    await waitFor(() => expect(createSession).toHaveBeenCalled());
+    expect(createSession.mock.calls[0]).toEqual([{}]);
+    record = { ...record, meta: { ...record.meta, title: "项目架构分析" } };
+    act(() => notify?.({ event: { kind: "runtime-live", sessionId: record.meta.id, message: "session-title-updated" } }));
+    await screen.findByRole("button", { name: "查看会话详情： 项目架构分析" });
+    expect(document.querySelector('[data-session-id="title-session"]')).toHaveTextContent("项目架构分析");
+  });
+
   it("scrolls to the latest message when the user sends a new message", async () => {
     const sessionId = "session-scroll";
     const record = createEmptySessionRecord(sessionId);

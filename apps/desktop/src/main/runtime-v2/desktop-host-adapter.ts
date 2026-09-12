@@ -97,6 +97,13 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
           adapter: new DesktopLegacyLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId)),
           credentialRef: DEFAULT_CREDENTIAL_REF,
           defaults: {},
+        }, {
+          routeId: "utility",
+          providerId: "desktop",
+          modelPattern: "*",
+          adapter: new DesktopLegacyLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), "utility"),
+          credentialRef: "desktop:utility",
+          defaults: { reasoning: false },
         }]),
       }),
       [options.module.CORE_TOOLS_HOST_PORT_ID]: Object.freeze({

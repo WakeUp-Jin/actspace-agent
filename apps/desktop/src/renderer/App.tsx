@@ -1064,6 +1064,21 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (!hasActspaceBridge() || !window.actspace.onSessionLiveEvent) return;
+    let disposed = false;
+    const unsubscribe = window.actspace.onSessionLiveEvent(({ event }) => {
+      if (event.kind !== "runtime-live" || event.message !== "session-title-updated" || !event.sessionId) return;
+      const sessionId = event.sessionId;
+      void window.actspace.getSession({ sessionId }).then(record => {
+        if (disposed || !record) return;
+        setSessions(current => current.map(item => item.id === sessionId ? { ...item, title: record.meta.title } : item));
+        setSessionRecord(current => current?.meta.id === sessionId ? { ...current, meta: { ...current.meta, title: record.meta.title } } : current);
+      }).catch(error => console.error("Failed to refresh session title", error));
+    });
+    return () => { disposed = true; unsubscribe(); };
+  }, []);
+
+  useEffect(() => {
     if (!hasActspaceBridge()) return;
 
     async function bootstrapSession() {
@@ -1447,7 +1462,6 @@ export function App() {
 
     try {
       const created = await window.actspace.createSession({
-        title: "New chat",
         ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
         ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
       });

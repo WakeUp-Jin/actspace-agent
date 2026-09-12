@@ -335,7 +335,7 @@ export class DesktopRuntimeV2Registry {
         onRuntimeLive: (update) => this.#emitRuntimeLive(update),
       });
       this.#profile = booted.profile;
-      this.#stopSessionRevisions = observeSessionRevisions(booted.profile.context, (sessionId, seq) => this.#emitDurableChanged(sessionId, seq, "journal-advanced"));
+      this.#stopSessionRevisions = observeSessionRevisions(booted.profile.context, (sessionId, seq, titleChanged) => this.#emitDurableChanged(sessionId, seq, titleChanged ? "session-title-updated" : "journal-advanced"));
       this.#artifacts = booted.artifacts;
       this.#bootError = null;
       this.options.log?.("runtime v2 ready", {

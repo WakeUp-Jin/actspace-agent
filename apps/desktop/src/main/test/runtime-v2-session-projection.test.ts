@@ -32,7 +32,7 @@ describe('desktop trajectory projection transport', () => {
     const stop = observeSessionRevisions({ on: (_name, callback) => { listener = callback as typeof listener; return unsubscribe; } }, publish);
     listener.call({ sessionId: 's' }, { seq: 2 }); listener.call({ sessionId: 's' }, { seq: 4 }); listener.call({ sessionId: 'other' }, { seq: 1 });
     vi.advanceTimersByTime(40);
-    expect(publish.mock.calls).toEqual([['s', 4], ['other', 1]]);
+    expect(publish.mock.calls).toEqual([['s', 4, false], ['other', 1, false]]);
     listener.call({ sessionId: 's' }, { seq: 5 }); stop(); vi.runAllTimers();
     expect(publish).toHaveBeenCalledTimes(2); expect(unsubscribe).toHaveBeenCalledOnce();
     vi.useRealTimers();
@@ -48,6 +48,6 @@ it('receives the real Cordis session carrier after a SessionJournal commit', asy
   const event = journal.append({ type: 'turn/start', eventVersion: 1, source: { ownerPluginId: '@actspace/core' }, data: { turnId: 't' }, surface: null });
   await emitContained(context, 'session/event', event, { sessionId: 'committed' });
   await new Promise(resolve => setTimeout(resolve, 60));
-  expect(publish).toHaveBeenCalledWith('committed', 0);
+  expect(publish).toHaveBeenCalledWith('committed', 0, false);
   stop();
 });

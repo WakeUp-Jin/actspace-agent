@@ -9,6 +9,7 @@ export class DesktopCredentialResolver implements CredentialResolver {
 
   async resolve(credentialRef: string, signal: AbortSignal): Promise<LlmCredential> {
     if (signal.aborted) throw signal.reason ?? new Error("Credential resolution aborted.");
+    if (credentialRef === "desktop:utility") return Object.freeze({});
     const requestedModel = credentialRef.startsWith("desktop:model:") ? credentialRef.slice("desktop:model:".length) : undefined;
     const resolution = credentialRef === IMAGE_INSPECTION_CREDENTIAL_REF
       ? this.models.resolveImageInspectionModel()
