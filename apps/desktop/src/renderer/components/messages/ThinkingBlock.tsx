@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 import {
@@ -14,14 +14,23 @@ const THINKING_TOGGLE_CLASS =
 const THINKING_CONTENT_CLASS =
   "thinking-content mt-2 whitespace-pre-wrap font-[inherit] text-sm leading-[1.65] text-text-muted";
 
-export function ThinkingBlock({ message, className }: { message: Extract<MessageBlock, { kind: "thinking" }>; className?: string }) {
-  const [expanded, setExpanded] = useState(!message.collapsedByDefault);
+export function ThinkingBlock({ message, className, replyCompleted = false }: {
+  message: Extract<MessageBlock, { kind: "thinking" }>;
+  className?: string;
+  replyCompleted?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(!replyCompleted && !message.collapsedByDefault);
+  // A thinking segment can finish before the final answer. Collapse once the
+  // whole reply finishes; later rerenders must preserve manual reopening.
+  useEffect(() => {
+    if (replyCompleted) setExpanded(false);
+  }, [replyCompleted]);
   const blockClassName = `${THINKING_BLOCK_CLASS} ${className ?? THINKING_BLOCK_DEFAULT_MARGIN_CLASS}`;
   const running = message.status === "running";
 
   return (
     <article className={blockClassName}>
-      <button className={THINKING_TOGGLE_CLASS} type="button" onClick={() => setExpanded((value) => !value)}>
+      <button className={THINKING_TOGGLE_CLASS} type="button" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
         <span
           className={running ? TOOL_LOG_LINE_TEXT_RUNNING_CLASS : undefined}
           {...(running ? getToolLogRunningTextAttrs(message.title) : {})}

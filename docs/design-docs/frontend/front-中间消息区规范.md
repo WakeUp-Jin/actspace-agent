@@ -357,3 +357,9 @@ Context Compaction 展示上下文压缩生命周期。它可能由用户在 Com
 - approval 使用 warning，failed / error 使用 danger。
 - `+N` / `-N` 和 diff 行继续使用低饱和 addition / removal token，但不复用 Toggle 或危险按钮背景色。
 - 工具流仍以文本流和轻量行视觉为主，不引入彩色 timeline pill 或彩色卡片墙。
+
+## 回合完成后的过程收起
+
+运行中按原顺序平铺 Thinking 与所有工具，不设置 Explored 分组。模型最终回复完成后，整个过程统一折叠为 Worked，最终回复留在组外。再次打开 Worked 时，Thinking 和各工具详情（含失败 Bash）均为收起状态，之后允许用户逐项展开。
+
+Read 文件文字打开右侧预览，不使用 Open file 按钮。打开右侧视图的控件只提升悬浮或键盘聚焦时的文字对比度；原地详情箭头默认隐藏，悬浮或聚焦时显示，展开后保持可见。Thinking 箭头始终只在悬浮或聚焦时显示，编辑记录保留箭头。

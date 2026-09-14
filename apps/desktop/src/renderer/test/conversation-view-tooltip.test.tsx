@@ -91,6 +91,31 @@ afterEach(() => {
 });
 
 describe("ConversationView tooltips", () => {
+  it("keeps Thinking open until the final reply finishes, then collapses Work and Thinking", () => {
+    const thinking: MessageBlock = {
+      kind: "thinking", id: "thinking-1", title: "Thinking...", content: "Long reasoning content",
+      createdAt: messages[0].createdAt, collapsedByDefault: false, status: "running",
+    };
+    const view = (active: boolean, blocks: MessageBlock[]) => (
+      <TooltipProvider><RightPanelProvider>
+        <ConversationView messages={blocks} contextSnapshot={null} sessionId="session-1" isStreaming={active} />
+      </RightPanelProvider></TooltipProvider>
+    );
+    const { rerender } = render(view(true, [messages[0], thinking]));
+    expect(screen.getByText("Long reasoning content")).toBeVisible();
+    const replying: MessageBlock[] = [messages[0], { ...thinking, status: "completed" }, messages[1]];
+    rerender(view(true, replying));
+    expect(screen.getByText("Long reasoning content")).toBeVisible();
+    rerender(view(false, replying));
+    expect(screen.queryByText("Long reasoning content", { selector: "pre" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Worked for/ }));
+    expect(screen.getByRole("button", { name: "Thinking..." })).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(screen.getByRole("button", { name: "Thinking..." }));
+    expect(screen.getByText("Long reasoning content", { selector: "pre" })).toBeVisible();
+    rerender(view(false, [...replying]));
+    expect(screen.getByText("Long reasoning content", { selector: "pre" })).toBeVisible();
+  });
+
   it("keeps the message viewport pinned when streaming content resizes at the bottom", () => {
     let resizeCallback: ResizeObserverCallback | null = null;
     const observe = vi.fn();

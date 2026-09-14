@@ -1,5 +1,6 @@
 import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { ComposerAttachment, ComposerMode, ContextState, ContextUsageSnapshot, MessageBlock, ModelSelectionId, UsableModelView } from "@actspace/shared";
 import { Composer, type ComposerDraftReader, type ComposerDraftRestore, type ComposerDraftWriter, type ComposerExecutionContext, type ComposerReviewSummary, type ComposerSendOptions, type ComposerWorkspaceOption } from "./Composer";
 import { ConversationTurnRail, type ConversationTurnNavigationItem } from "./ConversationTurnRail";
@@ -7,7 +8,6 @@ import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { AssistantReply } from "./messages/AssistantReply";
 import { AgentRunBlock } from "./messages/AgentRunBlock";
-import { ExploreRunBlock } from "./messages/ExploreRunBlock";
 import { BashRunBlock } from "./messages/BashRunBlock";
 import { BrowserApprovalBlock } from "./messages/BrowserApprovalBlock";
 import { CompactCommandBlock } from "./messages/CompactCommandBlock";
@@ -30,10 +30,12 @@ import { formatUsdCost } from "../usage-format";
 import { selectComposer, selectProviderUsage, selectRequestContextEstimate, selectSurfaceMessages } from "@actspace/client/sessions";
 import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import { contextEstimateToSnapshot, providerUsageToContextSnapshot, useOptionalSessionProjection } from "../session";
+import { readFailureTab, tabFromFile } from "./right-panel/workspaceFileTab";
 
 type UserMessageBlock = Extract<MessageBlock, { kind: "user" }>;
 type AssistantMessageBlock = Extract<MessageBlock, { kind: "assistant" }>;
 type AgentMessageBlock = Extract<MessageBlock, { kind: "agent" }>;
+type ReadMessageBlock = Extract<MessageBlock, { kind: "read" }>;
 type TodoMessageBlock = Extract<MessageBlock, { kind: "todo" }>;
 
 type ConversationTurn = {
@@ -87,6 +89,14 @@ const MESSAGE_TIME_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
 function formatMessageTime(timestamp: string): string {
   const date = new Date(timestamp);
   return Number.isNaN(date.getTime()) ? timestamp : MESSAGE_TIME_FORMATTER.format(date);
+}
+
+function isSafeWorkspaceRelativePath(filePath: string): boolean {
+  return filePath.length > 0
+    && filePath !== "."
+    && !filePath.startsWith("/")
+    && !/^[A-Za-z]:[\\/]/.test(filePath)
+    && !filePath.split(/[\\/]+/).includes("..");
 }
 
 const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
@@ -174,6 +184,8 @@ export function renderMessage(
   message: MessageBlock,
   className?: string,
   onOpenAgentTranscript?: (message: AgentMessageBlock) => void,
+  replyCompleted = false,
+  onOpenReadFile?: (message: ReadMessageBlock) => void,
 ) {
   const renderKey = message.renderKey ?? message.id;
 
@@ -183,14 +195,11 @@ export function renderMessage(
     case "assistant":
       return <AssistantReply key={renderKey} message={message} />;
     case "thinking":
-      return <ThinkingBlock key={renderKey} message={message} className={className} />;
+      return <ThinkingBlock key={renderKey} message={message} className={className} replyCompleted={replyCompleted} />;
     case "agent":
-      if (message.display === "inline") {
-        return <ExploreRunBlock key={renderKey} message={message} className={className} />;
-      }
       return <AgentRunBlock key={renderKey} message={message} className={className} onOpenTranscript={onOpenAgentTranscript} />;
     case "bash":
-      return <BashRunBlock key={renderKey} message={message} />;
+      return <BashRunBlock key={renderKey} message={message} replyCompleted={replyCompleted} />;
     case "context_compaction":
       return <CompactCommandBlock key={renderKey} message={message} className={className} />;
     case "workspace_preparation":
@@ -214,7 +223,7 @@ export function renderMessage(
       if (message.kind === "tool" && message.approvalScope === "browser_session" && message.status === "pending") {
         return <BrowserApprovalBlock key={renderKey} message={message} className={className} />;
       }
-      return <ToolLogLine key={renderKey} message={message} className={className} />;
+      return <ToolLogLine key={renderKey} message={message} className={className} onOpenFile={onOpenReadFile} />;
     case "status":
       if (message.id.endsWith(":model-wait") || message.id === "model-wait") {
         return <ModelWaitingStatus key={renderKey} content={message.content} />;
@@ -329,10 +338,11 @@ function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTurn[] {
   return turns;
 }
 
-// 工具活动组：哪些消息算「过程行」（thinking + 工具 + diff），有它才把过程聚合成 Worked for 折叠组。
+// 工具活动组：哪些消息算「过程行」（thinking + 工具 + diff），有它才把过程聚合成活动组。
 const WORK_TOOL_LIKE_KINDS = new Set<MessageBlock["kind"]>([
   ...TOOL_LOG_MESSAGE_KINDS,
   ...DIFF_MESSAGE_KINDS,
+  "thinking",
   "bash",
 ]);
 
@@ -344,7 +354,7 @@ function hasToolLikeItem(messages: MessageBlock[]): boolean {
  * 把一个 turn 的消息拆成「过程」和「最终回复」两段。
  *
  * 最终回复 = turn 末尾、后面不再跟任何工具/thinking 的连续 assistant 块。
- * 其余（thinking / 工具 / 工具间旁白 content）都归到过程段，进 Worked for 折叠组。
+ * 其余（thinking / 工具 / 工具间旁白 content）都归到过程段，统一收进一个 Worked for 活动组。
  */
 function splitTurnMessages(messages: MessageBlock[]): {
   workItems: MessageBlock[];
@@ -396,10 +406,25 @@ function workDurationMs(workItems: MessageBlock[], finalReply: MessageBlock[]): 
 
 type AgentTranscriptHandler = (message: AgentMessageBlock) => void;
 
-function renderMessageList(messages: MessageBlock[], onOpenAgentTranscript?: AgentTranscriptHandler) {
+function renderMessageList(messages: MessageBlock[], onOpenAgentTranscript?: AgentTranscriptHandler, replyCompleted = false, onOpenReadFile?: (message: ReadMessageBlock) => void) {
   return messages.map((message, index) =>
-    renderMessage(message, getMessageRelationClass(messages[index - 1], message), onOpenAgentTranscript),
+    renderMessage(message, getMessageRelationClass(messages[index - 1], message), onOpenAgentTranscript, replyCompleted, onOpenReadFile),
   );
+}
+
+function renderProcessContent(
+  processItems: MessageBlock[],
+  isActive: boolean,
+  finalReply: MessageBlock[],
+  onOpenAgentTranscript?: AgentTranscriptHandler,
+  replyCompleted = false,
+  onOpenReadFile?: (message: ReadMessageBlock) => void,
+): ReactNode[] {
+  return [
+    <ToolActivityGroup key="work" running={isActive} durationMs={workDurationMs(processItems, finalReply)}>
+      {renderMessageList(processItems, onOpenAgentTranscript, replyCompleted, onOpenReadFile)}
+    </ToolActivityGroup>,
+  ];
 }
 
 function getLatestTodoMessage(messages: MessageBlock[]): TodoMessageBlock | undefined {
@@ -437,39 +462,38 @@ function TurnPrompt({
 }
 
 /**
- * 渲染一个 turn 的正文：含工具时把过程聚合进 ToolActivityGroup（执行中滚动视口 / 完成后 Worked for 折叠），
+ * 渲染一个 turn 的正文：含工具时把过程聚合进 ToolActivityGroup（执行中平铺 / 完成后 Worked for 折叠），
  * 最终回复始终留在折叠组外正常渲染；没有工具时回退到原来的平铺渲染。
  */
 function renderTurnBody(
   turn: ConversationTurn,
   isActive: boolean,
   onOpenAgentTranscript?: AgentTranscriptHandler,
+  onOpenReadFile?: (message: ReadMessageBlock) => void,
 ) {
   const { workItems, finalReply } = splitTurnMessages(turn.messages);
+  const replyCompleted = !isActive && finalReply.length > 0;
   const attachTodoToPrompt = Boolean(turn.user);
   const preparationItems = workItems.filter((message) => message.kind === "workspace_preparation");
   const latestTodo = attachTodoToPrompt ? getLatestTodoMessage(workItems) : undefined;
   const processItems = workItems.filter(
     (message) => message.kind !== "workspace_preparation" && (!attachTodoToPrompt || message.kind !== "todo"),
   );
-  const processContent = processItems.length === 0 ? null : hasToolLikeItem(processItems) ? (
-    <ToolActivityGroup
-      running={isActive}
-      durationMs={workDurationMs(processItems, finalReply)}
-    >
-      {renderMessageList(processItems, onOpenAgentTranscript)}
-    </ToolActivityGroup>
-  ) : renderMessageList(processItems, onOpenAgentTranscript);
+  const processContent = processItems.length === 0
+    ? null
+    : hasToolLikeItem(processItems)
+      ? renderProcessContent(processItems, isActive, finalReply, onOpenAgentTranscript, replyCompleted, onOpenReadFile)
+      : renderMessageList(processItems, onOpenAgentTranscript, replyCompleted, onOpenReadFile);
 
   if (!hasToolLikeItem(processItems) && !latestTodo) {
-    return renderMessageList(turn.messages, onOpenAgentTranscript);
+    return renderMessageList(turn.messages, onOpenAgentTranscript, replyCompleted, onOpenReadFile);
   }
 
   return (
     <>
-      {preparationItems.length > 0 ? renderMessageList(preparationItems, onOpenAgentTranscript) : null}
+      {preparationItems.length > 0 ? renderMessageList(preparationItems, onOpenAgentTranscript, false, onOpenReadFile) : null}
       {processContent}
-      {finalReply.length > 0 ? renderMessageList(finalReply, onOpenAgentTranscript) : null}
+      {finalReply.length > 0 ? renderMessageList(finalReply, onOpenAgentTranscript, false, onOpenReadFile) : null}
     </>
   );
 }
@@ -822,6 +846,18 @@ export function ConversationView({
   const openAgentTranscript = useCallback((message: AgentMessageBlock) => {
     if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, selected: message });
   }, [sessionId, openTab]);
+  const openReadFile = useCallback(async (message: ReadMessageBlock) => {
+    const workspaceRoot = selectedWorkspaceRoot?.trim();
+    const relativePath = message.filePath.trim();
+    const api = typeof window !== "undefined" ? window.actspace?.readWorkspaceFile : undefined;
+    if (!workspaceRoot || !api || !isSafeWorkspaceRelativePath(relativePath)) return;
+    try {
+      openTab(tabFromFile(await api({ workspaceRoot, relativePath })));
+    } catch {
+      const title = relativePath.split(/[\\/]/).pop() || relativePath;
+      openTab(readFailureTab(relativePath, title));
+    }
+  }, [openTab, selectedWorkspaceRoot]);
   useEffect(() => {
     const turn = turns.at(-1);
     if (!sessionId || !isStreaming || !turn?.messages.some((message) => message.kind === "agent")) return;
@@ -1016,7 +1052,7 @@ export function ConversationView({
                       <TurnPrompt turn={turn} onOpenAttachmentPreview={openAttachmentPreview} />
                       <div className={ASSISTANT_TURN_GROUP_CLASS}>
                         <div className={TURN_BODY_CLASS}>
-                          {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, openAgentTranscript)}
+                          {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, openAgentTranscript, openReadFile)}
                         </div>
                         {splitTurnMessages(turn.messages).finalReply.length > 0
                           && (!isStreaming || turnIndex !== turns.length - 1) ? (

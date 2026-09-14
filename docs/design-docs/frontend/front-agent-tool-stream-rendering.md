@@ -104,3 +104,7 @@ Journal 保留原有 assistant/chunk 容器；新增工具 kind 时保存 callId
 - 工作空间路径由 Node path.relative 计算：根为 `.`，内部相对路径，外部绝对路径；Raw 与实际调用不改。
 - 轨迹页隐藏整个 composer-zone，但保留挂载；草稿、附件、模型选择不会因切换卸载。运行时顶部保留 Stop。
 - Subagents 使用右侧列表/详情导航。委派 requested 记录 childSessionId；列表每秒刷新，运行中详情每 750ms 刷新，关闭/切换时释放轮询并忽略迟到响应。详情 IPC 返回 SessionEvent，与前端契约一致，展示未提交正文/Thinking chunk 和已准备的运行工具，完成后以持久消息代替 chunk。Todo UI 保持现状。
+
+## 回合过程折叠与点击提示
+
+主会话运行时按原顺序平铺 Thinking、工具和过程旁白，不再设置 `Explored` 分组。Thinking 不因单步 completed 提前收起；模型最终回复全部输出结束后，整个过程统一折叠为一个 `Worked for`，最终回复留在组外。重新展开 Worked 时，Thinking 和所有工具详情均从收起状态开始（包括失败 Bash）；之后允许手动展开，普通重渲染不覆盖用户选择。Thinking 箭头默认隐藏，悬浮或键盘聚焦时显示；其他原地详情箭头收起时隐藏、悬浮或聚焦时显示，展开后保持可见。编辑记录保留箭头。打开右侧视图的入口不使用箭头，只提升悬浮/聚焦文字对比度，Read 文件文字直接打开文件，独立的结果箭头负责原地预览，不显示 Open file 按钮。

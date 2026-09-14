@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { formatWorkedDuration } from "./workedDuration";
 
@@ -28,6 +28,8 @@ export function ToolActivityGroup({
   children: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => { setExpanded(false); }, [running]);
 
   if (running) {
     return <div className={RUNNING_FLOW_CLASS}>{children}</div>;

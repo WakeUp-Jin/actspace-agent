@@ -177,28 +177,50 @@ function WebToolBlock({
   );
 }
 
-export function ToolLogLine({ message, className }: { message: ToolLogMessage; className?: string }) {
+function ResultPreviewBlock({ displayText, status, resultPreview, className, onOpenFile, detail }: {
+  displayText: string;
+  status: ToolLogStatus;
+  resultPreview?: string[];
+  className?: string;
+  onOpenFile?: () => void;
+  detail?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const canOpenFile = onOpenFile && (status === "completed" || status === undefined);
+  const summary = canOpenFile ? (
+    <button className="tool-file-link" type="button" onClick={onOpenFile}>{displayText}</button>
+  ) : <span {...getToolLogLineTextProps(status, displayText)}>{displayText}</span>;
+  const detailItems = status === "completed"
+    ? resultPreview?.length ? resultPreview : detail ? [detail] : []
+    : detail ? [detail] : [];
+  if (status === "running" || !detailItems.length) {
+    return <div className={`${getToolLogLineClass(status, className)} tool-result-line`}>{summary}</div>;
+  }
+  return <article className={`tool-result-disclosure${className ? ` ${className}` : ""}`}>
+    <div className="tool-result-header">
+      {canOpenFile ? summary : null}
+      <button className="tool-result-toggle" type="button" aria-label={canOpenFile ? `Show result for ${displayText}` : undefined} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+        {canOpenFile ? null : <span className="tool-result-summary">{displayText}</span>}
+        {expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />}
+      </button>
+    </div>
+    {expanded ? <ul className="tool-result-list">{detailItems.map((item, index) => <li key={`${item}-${index}`} className="tool-result-item">{item}</li>)}</ul> : null}
+  </article>;
+}
+
+export function ToolLogLine({ message, className, onOpenFile }: { message: ToolLogMessage; className?: string; onOpenFile?: (message: Extract<MessageBlock, { kind: "read" }>) => void }) {
   if (message.kind === "read") {
-    const lineClassName = getToolLogLineClass(message.status, className);
     const text = message.status && message.status !== "running" && message.status !== "completed" ? message.displayText : `Read ${message.filePath}${message.range ? ` ${message.range}` : ""}`;
-    return (
-      <div className={lineClassName}>
-        <span {...getToolLogLineTextProps(message.status, text)}>{text}</span>
-      </div>
-    );
+    return <ResultPreviewBlock displayText={text} status={message.status} resultPreview={message.resultPreview} className={className} onOpenFile={onOpenFile ? () => onOpenFile(message) : undefined} />;
   }
 
   if (message.kind === "search") {
-    const lineClassName = getToolLogLineClass(message.status, className);
     const text = `Searched files ${message.scope ? `${message.scope} ` : ""}for ${message.query}`;
-    return (
-      <div className={lineClassName}>
-        <span {...getToolLogLineTextProps(message.status, text)}>{text}</span>
-      </div>
-    );
+    return <ResultPreviewBlock displayText={text} status={message.status} resultPreview={message.resultPreview} className={className} />;
   }
 
   if (message.kind === "grep") {
+    if (message.resultPreview?.length) return <ResultPreviewBlock displayText={`Grep ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} status={message.status} resultPreview={message.resultPreview} className={className} />;
     return (
       <OverflowToolLine
         className={getToolLogLineClass(message.status, className)}
@@ -209,6 +231,7 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
   }
 
   if (message.kind === "glob") {
+    if (message.resultPreview?.length) return <ResultPreviewBlock displayText={`Glob ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} status={message.status} resultPreview={message.resultPreview} className={className} />;
     return (
       <OverflowToolLine
         className={getToolLogLineClass(message.status, className)}
@@ -272,11 +295,7 @@ export function ToolLogLine({ message, className }: { message: ToolLogMessage; c
 
   if (message.kind === "directory_list") {
     const text = message.status && message.status !== "running" && message.status !== "completed" ? message.displayText : `Listed ${message.path}${message.entryCount !== undefined ? ` (${message.entryCount} entries)` : ""}`;
-    return (
-      <div className={getToolLogLineClass(message.status, className)}>
-        <span {...getToolLogLineTextProps(message.status, text)}>{text}</span>
-      </div>
-    );
+    return <ResultPreviewBlock displayText={text} status={message.status} resultPreview={message.resultPreview} className={className} />;
   }
 
   if (message.kind === "delete") {

@@ -70,12 +70,12 @@ async function submitApproval(requestId: string, decision: ApprovalDecision): Pr
 
 const FINAL_APPROVAL_STATUSES = new Set(["denied", "expired", "cancelled"]);
 
-export function BashRunBlock({ message }: { message: BashMessage }) {
+export function BashRunBlock({ message, replyCompleted = false }: { message: BashMessage; replyCompleted?: boolean }) {
   if (message.status === "pending") {
     return <BashApprovalBlock message={message} />;
   }
 
-  return <BashExecutionBlock message={message} />;
+  return <BashExecutionBlock message={message} replyCompleted={replyCompleted} />;
 }
 
 const BASH_BACKGROUND_BADGE_CLASS =
@@ -108,8 +108,8 @@ function EnvironmentBadge({ sandboxed, notExecuted }: Pick<BashMessage, "sandbox
   return <span className={BASH_REAL_ENV_BADGE_CLASS}>真实环境</span>;
 }
 
-function BashExecutionBlock({ message }: { message: BashMessage }) {
-  const [expanded, setExpanded] = useState(message.status === "failed");
+function BashExecutionBlock({ message, replyCompleted = false }: { message: BashMessage; replyCompleted?: boolean }) {
+  const [expanded, setExpanded] = useState(!replyCompleted && message.status === "failed");
   const chevron = expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />;
   const summary = getExecutionSummary(message);
   // 前台执行中 / 后台仍在跑：标题走 shimmer 高光，让用户看出命令正在执行

@@ -441,10 +441,10 @@ export type ToolPreviewKind =
   | "generic";
 
 export type ToolUiPreview =
-  | { kind: "read"; filePath: string; range?: string; displayText: string }
-  | { kind: "search"; query: string; scope?: string; resultCount?: number; displayText: string }
-  | { kind: "grep"; pattern: string; scope?: string; resultCount?: number; displayText: string }
-  | { kind: "glob"; pattern: string; scope?: string; resultCount?: number; displayText: string }
+  | { kind: "read"; filePath: string; range?: string; displayText: string; resultPreview?: string[] }
+  | { kind: "search"; query: string; scope?: string; resultCount?: number; displayText: string; resultPreview?: string[] }
+  | { kind: "grep"; pattern: string; scope?: string; resultCount?: number; displayText: string; resultPreview?: string[] }
+  | { kind: "glob"; pattern: string; scope?: string; resultCount?: number; displayText: string; resultPreview?: string[] }
   | { kind: "web_search"; mode: "query" | "url"; query?: string; url?: string; displayText: string; resultUrls?: string[]; contentPreview?: string }
   | { kind: "media_analysis"; mediaName: string; mediaKind: "image" | "video" | "media"; displayText: string }
   | {
@@ -460,7 +460,7 @@ export type ToolUiPreview =
       warning?: string;
       errorMessage?: string;
     }
-  | { kind: "directory_list"; path: string; entryCount?: number; displayText: string }
+  | { kind: "directory_list"; path: string; entryCount?: number; displayText: string; resultPreview?: string[] }
   | {
       kind: "edit_diff";
       filePath: string;
@@ -713,6 +713,7 @@ export type MessageBlock = {
       filePath: string;
       range?: string;
       displayText: string;
+      resultPreview?: string[];
       createdAt: string;
       status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
     }
@@ -723,6 +724,7 @@ export type MessageBlock = {
       scope?: string;
       resultCount?: number;
       displayText: string;
+      resultPreview?: string[];
       createdAt: string;
       status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
     }
@@ -733,6 +735,7 @@ export type MessageBlock = {
       scope?: string;
       resultCount?: number;
       displayText: string;
+      resultPreview?: string[];
       createdAt: string;
       status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
     }
@@ -743,6 +746,7 @@ export type MessageBlock = {
       scope?: string;
       resultCount?: number;
       displayText: string;
+      resultPreview?: string[];
       createdAt: string;
       status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
     }
@@ -789,6 +793,7 @@ export type MessageBlock = {
       path: string;
       entryCount?: number;
       displayText: string;
+      resultPreview?: string[];
       createdAt: string;
       status?: "running" | "completed" | "failed" | "denied" | "aborted" | "outcome-unknown";
     }

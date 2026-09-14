@@ -38,6 +38,11 @@ function ActiveTabTitleProbe() {
   return <div data-testid="active-tab-title">{activeTab ? `${activeTab.kind}:${activeTab.title}` : ""}</div>;
 }
 
+function ActiveFileProbe() {
+  const { activeTab } = useRightPanel();
+  return <div data-testid="active-file-tab">{activeTab?.kind === "markdown" ? `${activeTab.relativePath}:${activeTab.source}` : ""}</div>;
+}
+
 afterEach(() => {
   Reflect.deleteProperty(window, "actspace");
 });
@@ -452,5 +457,98 @@ describe("image generation presentation", () => {
 
     expect(screen.getByText("正在整理结果。")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Turn output artifacts" })).not.toBeInTheDocument();
+  });
+});
+
+describe("generic tool result presentation", () => {
+  it("reveals list and glob previews from one consistent disclosure control", async () => {
+    render(
+      <div>
+        <ToolLogLine
+          message={{
+            kind: "glob",
+            id: "evt-glob",
+            pattern: "**/*.md",
+            scope: ".",
+            displayText: "Glob **/*.md",
+            resultPreview: ["README.md", "docs/ARCHITECTURE.md"],
+            status: "completed",
+            createdAt: "2026-07-28T00:00:00.000Z",
+          }}
+        />
+        <ToolLogLine
+          message={{
+            kind: "directory_list",
+            id: "evt-list",
+            path: ".",
+            entryCount: 2,
+            displayText: "Listed . (2 entries)",
+            resultPreview: ["README.md", "src"],
+            status: "completed",
+            createdAt: "2026-07-28T00:00:00.000Z",
+          }}
+        />
+      </div>,
+    );
+
+    const toggles = screen.getAllByRole("button", { name: /Glob|Listed/ });
+    expect(toggles).toHaveLength(2);
+    expect(toggles[0]).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(toggles[0]);
+    expect(screen.getByText("README.md")).toBeInTheDocument();
+    expect(screen.getByText("docs/ARCHITECTURE.md")).toBeInTheDocument();
+    expect(toggles[0]).toHaveAttribute("aria-expanded", "true");
+    expect(document.querySelector(".tool-result-disclosure")).toBeTruthy();
+    expect(document.querySelector(".web-tool-block")).toBeNull();
+  });
+
+  it("exposes a read-file action separately from the result disclosure", async () => {
+    const onOpenFile = vi.fn();
+    const message = {
+      kind: "read" as const,
+      id: "evt-read",
+      filePath: "docs/ARCHITECTURE.md",
+      displayText: "Read docs/ARCHITECTURE.md",
+      resultPreview: ["     1|# Architecture"],
+      status: "completed" as const,
+      createdAt: "2026-07-28T00:00:00.000Z",
+    };
+
+    render(<ToolLogLine message={message} onOpenFile={onOpenFile} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Read docs/ARCHITECTURE.md" }));
+    expect(onOpenFile).toHaveBeenCalledWith(message);
+    expect(screen.getByRole("button", { name: "Show result for Read docs/ARCHITECTURE.md" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("opens a safe workspace read in the existing right-panel file tab", async () => {
+    const readWorkspaceFile = vi.fn(async () => ({
+      relativePath: "docs/ARCHITECTURE.md",
+      renderKind: "markdown" as const,
+      size: 20,
+      mtimeMs: 1,
+      content: "# Architecture",
+    }));
+    Object.defineProperty(window, "actspace", { configurable: true, value: { readWorkspaceFile } });
+    render(
+      <RightPanelProvider>
+        <ConversationView
+          messages={[
+            { kind: "user", id: "user-read", content: "Read it", createdAt: "2026-07-28T00:00:00.000Z" },
+            { kind: "read", id: "read-1", filePath: "docs/ARCHITECTURE.md", displayText: "Read docs/ARCHITECTURE.md", resultPreview: ["# Architecture"], status: "completed", createdAt: "2026-07-28T00:00:01.000Z" },
+          ]}
+          contextSnapshot={null}
+          sessionId="session-1"
+          selectedWorkspaceRoot="/workspace"
+          isSessionReady={false}
+        />
+        <ActiveFileProbe />
+      </RightPanelProvider>,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Worked/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Read docs/ARCHITECTURE.md" }));
+    expect(readWorkspaceFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/ARCHITECTURE.md" });
+    expect(screen.getByTestId("active-file-tab")).toHaveTextContent("docs/ARCHITECTURE.md:# Architecture");
   });
 });
