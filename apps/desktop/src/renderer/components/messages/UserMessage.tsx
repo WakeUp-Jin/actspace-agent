@@ -22,6 +22,7 @@ const USER_IMAGE_ATTACHMENT_CLASS =
 const USER_FILE_ATTACHMENT_CLASS =
   "inline-flex h-9 max-w-[240px] items-center gap-2 rounded-act-md border border-line bg-surface-subtle px-2.5 text-sm font-medium text-text-main";
 const USER_FILE_NAME_CLASS = "truncate";
+const EMPTY_ATTACHMENTS: readonly ComposerAttachment[] = [];
 
 function getAttachmentPreviewStyle(attachment: ComposerAttachment): CSSProperties | undefined {
   return attachment.previewUrl
@@ -92,13 +93,39 @@ export function UserMessage({
   message,
   onOpenAttachmentPreview,
   variant = "standalone",
+  sessionId,
 }: {
   message: Extract<MessageBlock, { kind: "user" }>;
   onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
   variant?: "standalone" | "execution";
+  sessionId?: string | null;
 }) {
-  const attachments = message.attachments ?? [];
+  const attachments = message.attachments ?? EMPTY_ATTACHMENTS;
+  const [previewById, setPreviewById] = useState<Record<string, string>>({});
   const cardClass = variant === "execution" ? USER_EXECUTION_CARD_CLASS : USER_CARD_CLASS;
+
+  useEffect(() => {
+    if (!sessionId || !window.actspace?.readSessionArtifact) return;
+    const pendingImages = attachments.filter((attachment) => attachment.kind === "image" && !attachment.previewUrl);
+    if (pendingImages.length === 0) return;
+    let active = true;
+    void Promise.all(pendingImages.map(async (attachment) => {
+      const result = await window.actspace.readSessionArtifact({ sessionId, artifactPath: attachment.path ?? attachment.id });
+      return result.dataUrl ? [attachment.id, result.dataUrl] as const : null;
+    })).then((entries) => {
+      if (!active) return;
+      setPreviewById((current) => {
+        let next = current;
+        for (const entry of entries) {
+          if (!entry || next[entry[0]] === entry[1]) continue;
+          if (next === current) next = { ...current };
+          next[entry[0]] = entry[1];
+        }
+        return next;
+      });
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [attachments, sessionId]);
 
   return (
     <article className={USER_MESSAGE_CLASS}>
@@ -108,15 +135,16 @@ export function UserMessage({
           <div className={USER_ATTACHMENTS_CLASS} aria-label="Message attachments">
             {attachments.map((attachment) => {
               if (attachment.kind === "image") {
+                const effectiveAttachment = { ...attachment, previewUrl: attachment.previewUrl ?? previewById[attachment.id] };
                 return (
                   <button
                     type="button"
                     className={USER_IMAGE_ATTACHMENT_CLASS}
                     aria-label={`Preview message image ${attachment.name}`}
-                    disabled={!attachment.previewUrl || !onOpenAttachmentPreview}
+                    disabled={!effectiveAttachment.previewUrl || !onOpenAttachmentPreview}
                     key={attachment.id}
-                    onClick={() => onOpenAttachmentPreview?.(attachment)}
-                    style={getAttachmentPreviewStyle(attachment)}
+                    onClick={() => onOpenAttachmentPreview?.(effectiveAttachment)}
+                    style={getAttachmentPreviewStyle(effectiveAttachment)}
                     title={attachment.name}
                   />
                 );
