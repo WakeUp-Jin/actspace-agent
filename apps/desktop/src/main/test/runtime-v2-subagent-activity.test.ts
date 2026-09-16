@@ -52,7 +52,7 @@ describe("subagent operation context", () => {
     ["glob", { pattern: "**/*token*.ts" }, "正在查找 · **/*token*.ts"],
     ["grep", { pattern: "secret=do-not-show" }, "正在搜索"],
     ["grep", { pattern: "Bearer do-not-show" }, "正在搜索"],
-    ["grep", { pattern: "sk-12345678901234567890" }, "正在搜索"],
+    ["grep", { pattern: "sk-test-12345678901234567890" }, "正在搜索"],
   ])("preserves useful %s targets and hides credential values", (name, args, expected) => {
     expect(new SubagentActivity().accept({ ...child, kind: "tool-prepared", callId: "tool", name, arguments: args })).toBe(expected);
   });
