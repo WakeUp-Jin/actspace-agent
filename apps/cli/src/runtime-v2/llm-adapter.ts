@@ -2,7 +2,7 @@ import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
 import { resolveModelPricing } from "@actspace/shared";
 import type { LlmAdapter, LlmAdapterDispatchInput, LlmStreamSource, LlmStreamEvent } from "@actspace/llm-service";
 import type { PiAiWireRoute } from "@actspace/llm-pi-ai";
-import { LegacyProxyWireEngine, PiAiAdapter, PiAiWireEngine } from "@actspace/llm-pi-ai";
+import { DeepSeekFileUploader, LegacyProxyWireEngine, PiAiAdapter, PiAiWireEngine } from "@actspace/llm-pi-ai";
 import { ProviderProxyPool } from "@actspace/llm-service";
 
 export type CliPiAiProvider = {
@@ -16,6 +16,7 @@ export type CliPiAiProvider = {
 export class CliV2LlmAdapter implements LlmAdapter {
   readonly adapterVersion = "actspace.cli-pi-ai.v2";
   readonly #proxies = new ProviderProxyPool();
+  readonly #deepSeekFiles = new DeepSeekFileUploader();
   constructor(private readonly options: { readonly mock: boolean; readonly model?: string; readonly provider: CliPiAiProvider; readonly readArtifact: (sessionId: string, artifactId: string) => Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }> }) {}
 
   async dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
@@ -31,6 +32,7 @@ export class CliV2LlmAdapter implements LlmAdapter {
         const artifact = await this.options.readArtifact(sessionId, artifactId);
         return { data: artifact.bytes, mimeType: artifact.mediaType };
       },
+      deepSeekFiles: this.#deepSeekFiles,
     } as const;
     const adapter = new PiAiAdapter({
       engine: new PiAiWireEngine(engineOptions),
@@ -47,7 +49,7 @@ export class CliV2LlmAdapter implements LlmAdapter {
     });
   }
 
-  dispose(): Promise<void> { return this.#proxies.dispose(); }
+  async dispose(): Promise<void> { this.#deepSeekFiles.clear(); await this.#proxies.dispose(); }
 }
 
 async function* mockStream(signal: AbortSignal): AsyncGenerator<LlmStreamEvent> {

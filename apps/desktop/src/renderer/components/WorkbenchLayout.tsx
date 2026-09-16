@@ -15,8 +15,8 @@ import type { SessionMainView } from "./SessionViewToggle";
 import { WorkspaceChromeControls } from "./workspace/WorkspaceChromeControls";
 import type { ComposerDraftReader, ComposerDraftRestore, ComposerDraftWriter, ComposerExecutionContext, ComposerReviewSummary, ComposerSendOptions, ComposerWorkspaceOption } from "./Composer";
 import type { SessionPreviewResolver } from "./SessionHoverPreview";
-import { selectComposer, selectProviderUsage, selectRequestContextEstimate, selectSurfaceMessages, selectTrajectory } from "@actspace/client/sessions";
-import { contextEstimateToSnapshot, providerUsageToContextSnapshot, useOptionalSessionProjection } from "../session";
+import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages, selectTrajectory } from "@actspace/client/sessions";
+import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
 import { ExtensionsPage } from "./extensions/ExtensionsPage";
 import { SettingsPage } from "./settings/SettingsPage";
 import type { SettingsSectionId } from "./settings/SettingsNav";
@@ -202,16 +202,17 @@ export function WorkbenchLayout({
   const sessionProjection = useOptionalSessionProjection();
   const projectionCell = sessionProjection?.cell ?? null;
   const projectedSurfaceMessages = projectionCell ? selectSurfaceMessages(projectionCell) : [];
-  const projectedProviderUsage = projectionCell ? selectProviderUsage(projectionCell) : null;
   const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
   const projectedComposer = projectionCell ? selectComposer(projectionCell) : null;
   const projectedTrajectory = projectionCell ? selectTrajectory(projectionCell) : null;
   const projectedContextSnapshot = projectedContextEstimate
     ? contextEstimateToSnapshot(projectedContextEstimate)
-    : projectedProviderUsage
-      ? providerUsageToContextSnapshot(projectedProviderUsage)
-      : null;
-  const effectiveContextSnapshot = projectedContextSnapshot ?? contextSnapshot;
+    : null;
+  // The fixed request-context projection shares the popup's complete bucket estimate.
+  const liveContextState = projectedContextEstimate?.contextState;
+  const useLiveContext = liveContextState && (!contextState || (liveContextState.throughJournalSeq ?? -1) > (contextState.throughJournalSeq ?? -1));
+  const effectiveContextState = useLiveContext ? liveContextState : contextState;
+  const effectiveContextSnapshot = useLiveContext ? projectedContextSnapshot : contextSnapshot ?? projectedContextSnapshot;
   const projectionSessionReady = projectionCell !== null && projectionCell.status !== "error";
   const effectiveIsSessionReady = projectedComposer?.phase !== "blank" || isSessionReady || projectionSessionReady;
   const [view, setView] = useState<SidebarView>("chat");
@@ -540,7 +541,7 @@ export function WorkbenchLayout({
       <ConversationView
         messages={messages}
         contextSnapshot={effectiveContextSnapshot}
-        contextState={contextState}
+        contextState={effectiveContextState}
         durableSurfaceMessageCount={projectedSurfaceMessages.length > 0 ? projectedSurfaceMessages.length : undefined}
         composerPhase={projectedComposer?.phase}
         sessionId={activeSessionId}
@@ -651,7 +652,7 @@ export function WorkbenchLayout({
   );
   const rightPanel = (
     <RightPanel
-      contextState={contextState}
+      contextState={effectiveContextState}
       contextSnapshot={effectiveContextSnapshot}
       contextRevision={projectionCell?.snapshot?.throughJournalSeq}
       sessionId={activeSessionId}

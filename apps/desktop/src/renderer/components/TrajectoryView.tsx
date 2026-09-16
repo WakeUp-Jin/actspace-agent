@@ -30,6 +30,20 @@ function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | undefin
 
 export function TrajectoryView({ snapshot }: { snapshot?: RuntimeV2TrajectorySnapshot | null }) {
   const source = useTrajectorySource(snapshot);
+  const [initialError, setInitialError] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const bridge = source.projection?.bridge;
+  const selectedSession = source.projection?.sessionId;
+  useEffect(() => {
+    if (!bridge || !selectedSession || source.isFixture) return;
+    let disposed = false;
+    setInitialLoading(true); setInitialError(null);
+    void bridge.setTrajectoryVisible(selectedSession, true).catch(error => {
+      if (!disposed) setInitialError(error instanceof Error ? error.message : '轨迹加载失败');
+    }).finally(() => { if (!disposed) setInitialLoading(false); });
+    return () => { disposed = true; void bridge.setTrajectoryVisible(selectedSession, false); };
+  }, [bridge, selectedSession, source.isFixture, retry]);
   const [mode, setMode] = useState<TrajectoryTimelineMode>('sequence');
   const runtime = useMemo(() => source.snapshot ? buildTrajectorySnapshot(source.snapshot, mode) : null, [source.snapshot, mode]);
   const [query, setQuery] = useState('');
@@ -106,6 +120,8 @@ export function TrajectoryView({ snapshot }: { snapshot?: RuntimeV2TrajectorySna
         {query && <button type="button" aria-label="Clear trajectory search" onClick={() => setQuery('')}><X size={12} /></button>}
       </div>
     </div>
+    {initialError && <p role="alert" className="px-4 text-xs text-text-muted">{initialError} <button onClick={() => setRetry(n => n + 1)}>重试</button></p>}
+    {initialLoading && !runtime && <p role="status" className="px-4 text-xs text-text-muted">正在加载轨迹…</p>}
     {!runtime || !runtime.records.length ? <p className="m-0 px-4 py-4 text-[12px] text-text-muted">{!runtime ? source.projection?.cell?.status === 'loading' ? '正在加载轨迹…' : source.projection?.cell?.error ?? '当前 Session 暂无可展示的 Agent 轨迹。' : '当前 Session 尚未产生可展示的 Agent Loop 事件。'}</p> : <>
       <TrajectoryTimeline runtime={runtime} selectedId={selectedId} matches={matches} range={range} onRange={setRange} onSelect={select} onFocus={focus} />
       <div className="relative flex min-h-0 flex-1">

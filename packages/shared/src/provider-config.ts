@@ -69,7 +69,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderSpec> = {
     label: "Moonshot",
     defaultBaseUrl: "https://api.moonshot.cn/v1",
     supportedApis: ["openai-completions"],
-    supportsRemoteModelCatalog: false,
+    supportsRemoteModelCatalog: true,
     supportsProxy: true,
   },
   openrouter: {
@@ -110,7 +110,7 @@ export const PROVIDER_DEFINITIONS: readonly ProviderDefinition[] = [
       { key: "baseUrl", label: "Base URL", required: false, advanced: true },
       { key: "proxy", label: "代理", required: false, advanced: true },
     ],
-    supportsModelDiscovery: false,
+    supportsModelDiscovery: true,
     supportsBalance: true,
   },
   {

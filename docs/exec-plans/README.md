@@ -14,8 +14,11 @@
 
 ## 当前进行中
 
+
+
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [会话切换与后台运行](active/20260916-session-background-runs.md) | 按会话隔离 stream、后台工具状态与历史校准，补切换回归与桌面验收。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
 | [Cordis 事件 ABI 与 CLI 最终验收](active/20260829-actspace-cordis-event-abi-final-acceptance/README.md) | P00–P04 有通过证据；补 P05 deterministic retry/error fixture 后再闭环。 |
 | [P1/P2 契约与组合](active/20260829-actspace-p1-p2-contract-and-composition/README.md) | contract slices 已交付；G1 跨包回归、P2/G2 语义门禁继续。 |
@@ -29,6 +32,20 @@
 2026-09-09 [逐项复核与设计合并清单](../exec-runs/20260908-docs-v1-archive-v2-refresh/followup-audit.md)：初始 10 个 active 入口逐项复核；中文界面任务自行归档后，Context 补齐全仓回归也进入 completed，当前剩余 8 个入口。P2 按语义检查缺口保留 active。
 
 ## 最近完成
+
+- [Context 与会话累计 Token](completed/20260916-context-and-session-tokens.md)：统一完整请求统计与压缩预计；顶部累计 Token 简约展示，自动验证通过，真实窗口边界见执行摘要。
+
+- [消息流排版与工具摘要](completed/20260916-tool-stream-typography.md)：统一过程行、邻接间距和 Bash 摘要；自动验证已完成，真实桌面与主题矩阵边界见执行摘要。
+
+- [只读子智能体与实时活动行](completed/20260915-readonly-subagents.md)：只读白名单、300 步收尾与事件驱动翻页卡片已实现，保留真实运行验收。
+
+- [会话与长历史按需加载](completed/20260915-progressive-session-loading.md)：摘要和长消息真分页、大工具详情与轨迹按需；真实交互验收及并行改动的类型检查阻塞见执行摘要。
+
+- [C 方案：工具流与子 Agent 消息布局](completed/20260913-c-tool-stream-layout.md)：Explored 归组、Thought 同组和紧凑 Agent/Explore 右侧详情入口已实现；真实 Electron 交互截图待人工验收。
+
+- [工具进度、文件产物、模型目录与图片链路修复](completed/20260913-tool-artifact-provider-image-ux.md)：Write/Edit 变动行数、右侧文件打开、聊天代码块、Kimi 模型发现、Session Artifact 图片预览和 DeepSeek Files API 已完成；真实 Provider/Electron/截图门禁待人工验收。
+
+- [工具结果交互与后台通知修复](completed/20260913-tool-result-interaction-fixes.md)：通知 provenance、结果 disclosure、Read 右侧打开、Explore 子 Agent 面板和图片错误归一化已完成；真实 Electron/Provider/截图门禁待人工验收。
 
 - [工具输出引用与失败反馈](completed/20260912-tool-output-references.md)：大 Bash 输出回读、图片协议与失败恢复已修复；自动化通过，安装态与真实 Provider 验收待执行。
 

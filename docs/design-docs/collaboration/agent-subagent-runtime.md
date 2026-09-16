@@ -79,7 +79,7 @@ maxDelegationDepth
 
 当前内置：
 
-- `actspace.agent`：通用一次性 Agent，可使用父 Agent 可见工具中除 Agent / Explore 递归入口外的工具；
+- `actspace.agent`：一次性只读分析 Agent，当前只开放 read_file、list_directory、grep、glob 与父可见工具的交集；
 - `actspace.explore`：只读 Explore，只允许 `read_file`、`list_directory`、`grep`、`glob`。
 
 最终工具集是：
@@ -151,3 +151,5 @@ outcome-unknown
 - child Session 不被普通 main Session resume；
 - 父上下文不会包含 child 全量 Journal；
 - child / parent 两侧都不会因失败留下未释放 Scope 或 writer lease。
+
+当前内置 Agent / Explore 均采用 300 步（最后一步无工具总结）与 30 分钟时限。限制原因、部分结果及父子 live 活动关联见 [Explore 与 Agent 只读边界](agent-explore-subagent.md)。

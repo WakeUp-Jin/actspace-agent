@@ -14,7 +14,7 @@
 
 ## 交互模型
 
-- 顶部使用短高度横向 Tab。
+- 顶部使用横向 Tab：在 44px chrome 行内垂直居中，Tab 高 30px、圆角 8px、字号 13px；标题左侧留白与右侧关闭按钮间距均为 10px，相邻 Tab 间距 4px。关闭按钮始终保留位置，悬停显现不改变标签宽度。
 - 每个 Tab 对应一个对象实例，不对应固定页面。
 - 点击消息中的文件、链接、图片或 diff 时，在右侧打开对应 Tab。
 - 支持多个 Tab 并列打开与切换。
@@ -52,7 +52,7 @@ chrome-right 现有两个浮层控件（`+` 新建对象 + PanelRight 折叠）�
 Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cursor 式的三层兜底：
 
 - Tab 保持内容宽度（标题截断到 160px），不挤压成不可读窄条。
-- 激活 Tab 使用 `surface-subtle` 的轻量中性底色和较高字重，不使用更深的全局 `selected` 填充；非激活 Tab 继续透明，hover 才使用 `hover-overlay`。
+- 激活 Tab 使用 `surface-subtle` 的轻量中性底色和 medium 字重，不使用更深的全局 `selected` 填充；非激活 Tab 继续透明，hover 才使用 `hover-overlay`。
 - Tab 行横向可滚动但**隐藏滚动条**（`.scrollbar-none`，见 `electron.css`）；macOS 触控板/滚轮仍可滚动；切换/新增 tab 时激活 tab 自动 `scrollIntoView`。
 - 溢出时（`ResizeObserver` 检测 `scrollWidth > clientWidth`）在 tab 行右侧、预留区左缘显示一个**溢出下拉 ⌄**，列出全部 tab 供点选 / 关闭——这是无滚动条时的可达性兜底。
 
@@ -306,10 +306,12 @@ type SessionArtifactReadResult = {
 ```
 
 - renderer 不能直接加载 `file://`，开发态 HTTP origin 会被 Electron 拒绝，本地绝对路径也不应成为 renderer 文件读取能力。
-- main 同时校验 `sessionId`、目标 realpath 与 `<sessionRoot>/<sessionId>/artifacts/` 边界，拒绝 `..`、绝对路径逃逸和 symlink 逃逸。
-- 只允许 PNG / JPEG / WebP，按文件魔数确认 MIME，单图沿用生成工具 25 MB 上限。
-- data URL 只在用户点击某一产物后按需返回，不在消息恢复或聊天区首屏批量注入。
+- `artifactPath` 是历史字段名，当前实际承载 opaque Artifact ID。main 通过 `DesktopArtifactStore.resolveForSession()` 同时校验 ID、SHA-256、大小、owner session 和真实 store 路径，不接受 renderer 传入任意绝对路径。
+- 只允许 PNG / JPEG / WebP，按 Session 引用的 MIME 与 Artifact metadata 一致性确认，单图沿用生成工具 25 MB 上限。
+- data URL 按需返回：Turn Artifacts 在用户点击时读取；历史 UserMessage 只为缺失预览的图片 attachment 执行 hydration。data URL 不写入 Journal，也不成为恢复事实。
 - 生成图片作为对象 Tab 打开，不带 workspace `relativePath`，避免误进入 Workspace 文件浏览 shell。
+
+完成态 Write/Edit 结果在 tool preview 中携带 workspace root 内的 `outputPath/outputRelativePath`。Turn Artifacts 只用相对路径调用 `readWorkspaceFile()`，并通过共享 `tabFromFile()` 打开右侧 Tab；Assistant Markdown 中无协议的安全相对链接使用同一路径。`..`、工作区外绝对路径和外部 URL 不进入该路由。
 
 main 侧服务规则：
 

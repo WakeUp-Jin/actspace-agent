@@ -2,9 +2,12 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { useState } from "react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkbenchLayout } from "../components/WorkbenchLayout";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
+
+import { SessionProjectionProvider } from "../session";
+import { mockContextSnapshot } from "./fixtures/workbenchFixture";
 
 const originalInnerWidth = window.innerWidth;
 
@@ -72,6 +75,43 @@ describe("WorkbenchLayout narrow window behavior", () => {
     window.localStorage.clear();
     setViewportWidth(originalInnerWidth);
     delete (window as { actspace?: typeof window.actspace }).actspace;
+  });
+
+  it("keeps chrome, footer and popup on the complete estimate instead of the generic projection", async () => {
+    const contextSnapshot = { ...mockContextSnapshot, totalTokens: 49_000, maxTokens: 1_000_000, percentUsed: 4.9, cumulativeTokens: 549000 };
+    const getSessionProjectionSnapshot = vi.fn(async () => ({
+      kind: "session-projection", schemaVersion: 1, sessionId: "session-responsive", throughJournalSeq: 3,
+      snapshot: {
+        kind: "session-snapshot", schemaVersion: 1, sessionId: "session-responsive",
+        createdAt: "2026-09-15T00:00:00Z", updatedAt: "2026-09-15T00:00:03Z",
+        workspaceRoot: null, throughJournalSeq: 3, accessState: "read-write",
+        metadata: { title: null, pinned: false, archived: false },
+        messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], lineage: null,
+        usage: { inputTokens: 549_000, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 549_000, costUsd: null },
+        activity: { turnCount: 1, completedTurnCount: 1, stepCount: 1, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null },
+      },
+      values: {
+        requestContextEstimate: {
+          kind: "request-context-estimate", schemaVersion: 1, sessionId: "session-responsive", throughJournalSeq: 3,
+          requestId: "request-1", estimator: { name: "runtime-v2-request-snapshot", version: "1" },
+          totalEstimatedTokens: 60_000, maxTokens: 1_000_000, percentUsed: 6,
+        },
+      },
+    }));
+    (window as { actspace?: unknown }).actspace = { getSessionProjectionSnapshot, onSessionLiveEvent: () => () => undefined };
+    const user = userEvent.setup();
+    render(
+      <SessionProjectionProvider sessionId="session-responsive">
+        <WorkbenchFixture isSessionReady messages={[{ kind: "user", id: "user-1", content: "hello", createdAt: "2026-09-15T00:00:00Z" }]} contextSnapshot={contextSnapshot} getSessionPreview={() => ({ sessionId: "session-responsive", contextSnapshot })} />
+      </SessionProjectionProvider>,
+    );
+    await waitFor(() => expect(getSessionProjectionSnapshot).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "上下文用量 4%" }));
+    expect(screen.getByText("4% 已用")).toBeVisible();
+    expect(screen.getByText("~49K / 1M Token")).toBeVisible();
+    await user.hover(screen.getByRole("button", { name: "查看会话详情： Responsive layout" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("累计 Token：549K");
+    expect(screen.getByRole("tooltip")).not.toHaveTextContent("上下文");
   });
 
   it("keeps the main conversation full-width and opens the session sidebar as an overlay", async () => {

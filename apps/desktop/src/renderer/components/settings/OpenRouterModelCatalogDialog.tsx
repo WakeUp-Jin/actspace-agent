@@ -13,12 +13,12 @@ export function OpenRouterModelCatalogDialog({
   onAdded,
   onReloaded,
 }: {
-  provider?: "openrouter" | "deepseek";
+  provider?: "openrouter" | "deepseek" | "kimi";
   onClose: () => void;
   onAdded: () => void | Promise<void>;
   onReloaded?: () => void | Promise<void>;
 }) {
-  const providerLabel = provider === "deepseek" ? "DeepSeek" : "OpenRouter";
+  const providerLabel = provider === "deepseek" ? "DeepSeek" : provider === "kimi" ? "Kimi" : "OpenRouter";
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ModelsCatalogListResult | null>(null);
   const [query, setQuery] = useState("");

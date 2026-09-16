@@ -1,3 +1,4 @@
+import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -36,7 +37,7 @@ type SessionStatusMeta = { label: string; detail: string; dotClass: string; rowC
 
 const DEFAULT_WORKSPACE_KEY = "__default__";
 const DEFAULT_WORKSPACE_LABEL = "默认工作区";
-const SESSION_VISIBLE_LIMIT = 8;
+const SESSION_VISIBLE_LIMIT = 10;
 const SESSION_CONTEXT_MENU_WIDTH = 184;
 const SESSION_CONTEXT_MENU_MAX_HEIGHT = 220;
 const SESSION_CONTEXT_MENU_MARGIN = 8;
@@ -793,9 +794,26 @@ function CollapsibleSessionList({
   groupKey,
   workspaces = [],
 }: CollapsibleSessionListProps) {
-  const [expanded, setExpanded] = useState(false);
-  const hasOverflow = sessions.length > SESSION_VISIBLE_LIMIT;
-  const visibleSessions = expanded ? sessions : sessions.slice(0, SESSION_VISIBLE_LIMIT);
+  const browse = useSessionBrowse();
+  const [limit, setLimit] = useState(SESSION_VISIBLE_LIMIT);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const remoteGroups = browse?.groups.filter(g => groupKey === 'pinned' ? g.pinned : !g.pinned && g.workspaceRoot === (sessions[0]?.workspaceRoot ?? '')) ?? [];
+  const remoteMore = remoteGroups.some(g => g.hasMore);
+  const hasOverflow = browse ? remoteMore : sessions.length > limit;
+  const visibleSessions = browse ? sessions : sessions.slice(0, limit);
+  const loadMore = async () => {
+    if (!browse) { setLimit(n => n + 10); return; }
+    if (loading) return;
+    setLoading(true); setError(null);
+    try {
+      for (const group of remoteGroups.filter(g => g.hasMore)) {
+        const last = [...sessions].filter(s => (s.workspaceRoot ?? '') === group.workspaceRoot).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)).at(-1);
+        await browse.loadMore({ workspaceRoot: group.workspaceRoot, pinned: group.pinned, after: last?.id });
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : '会话加载失败'); }
+    finally { setLoading(false); }
+  };
 
   return (
     <div className={SESSION_LIST_CLASS} data-group-key={groupKey}>
@@ -815,13 +833,15 @@ function CollapsibleSessionList({
           onArchive={onArchive ? () => onArchive(session.id) : undefined}
         />
       ))}
+      {error && <p role="alert" className="px-2 text-xs text-text-muted">{error} <button onClick={() => { void loadMore(); }}>重试</button></p>}
       {hasOverflow ? (
         <button
           className={`session-list-toggle ${SESSION_LIST_TOGGLE_CLASS}`}
           type="button"
-          onClick={() => setExpanded((value) => !value)}
+          disabled={loading}
+          onClick={() => { void loadMore(); }}
         >
-          {expanded ? "收起" : `显示更多（${sessions.length - SESSION_VISIBLE_LIMIT}）`}
+          {loading ? "正在加载…" : "Show more"}
         </button>
       ) : null}
     </div>
@@ -887,6 +907,7 @@ export function Sidebar({
     () => sessions.filter((session) => !session.pinned),
     [sessions],
   );
+  const browse = useSessionBrowse();
   const workspaceGroups = useMemo(
     () => groupSessionsByWorkspace(unpinnedSessions, workspaces),
     [unpinnedSessions, workspaces],
@@ -944,6 +965,8 @@ export function Sidebar({
       </div>
 
       <nav className={SESSION_NAV_CLASS} aria-label="会话">
+        {browse?.listLoading && <p role="status" className="px-2 text-xs text-text-muted">正在加载会话…</p>}
+        {browse?.listError && <p role="alert" className="px-2 text-xs text-text-muted">{browse.listError} <button onClick={browse.retryList}>重试</button></p>}
         {pinnedSessions.length > 0 ? (
           <section className={`nav-section ${NAV_SECTION_CLASS}`}>
             <NavSectionHeader

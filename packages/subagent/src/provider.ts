@@ -34,7 +34,7 @@ export class OneShotSubagentProvider {
     if (input.delegationDepth >= preset.maxDelegationDepth) throw new Error("Subagent delegation depth exceeded.");
     const invocationId = randomUUID(); const childSessionId = randomUUID(); const childAgentId = randomUUID(); const started = Date.now();
     const allowedToolNames = intersectTools(input.parentVisibleToolIds, preset);
-    if (preset.readOnly && allowedToolNames.some((name) => !/^(read_file|list_directory|grep|glob)$/.test(name))) throw new Error("Explore preset cannot receive side-effect tools.");
+    if (preset.readOnly && allowedToolNames.some((name) => !/^(read_file|list_directory|grep|glob)$/.test(name))) throw new Error("Read-only subagent preset cannot receive side-effect tools.");
     const parentPort = this.options.parentPort ?? sessionParentPort(input.parentSession);
     await parentPort.recordRequested({ invocationId, presetId: preset.id, parentCallId: input.parentCallId, childSessionId });
     const controller = new AbortController(); this.#active.set(invocationId, controller);
@@ -50,11 +50,17 @@ export class OneShotSubagentProvider {
       scope = input.isolatedScope === true ? input.parentScope.isolatedChild(childAgentId) : input.parentScope.child(childAgentId);
       const loop = await this.options.createLoop({ session: child, scope, preset, allowedToolNames, signal: controller.signal, agentId: childAgentId });
       if (controller.signal.aborted) loop.abort("parent-abort");
-      const turn = await loop.runTurn({ content: input.task });
+      const turn = await loop.runTurn({ content: `${input.task}\n\nSubagent execution boundary: only read_file, list_directory, grep and glob are available. Do not request Bash, edits, approvals or nested delegation. Work only in the inherited workspace. If target files are absent or outside its boundary, stop and report the blocker and partial findings to the parent instead of repeatedly searching unrelated directories.` });
       await child.flush();
-      result = terminal({ invocationId, childAgentId, childSessionId, presetId: preset.id, status: turn.reason === "completed" ? "completed" : turn.reason === "aborted" ? "aborted" : "failed", text: turn.finalText, durationMs: Date.now() - started });
+      const status = controller.signal.aborted || turn.reason === "aborted" ? "aborted" : turn.reason === "completed" ? "completed" : "failed";
+      const failure = controller.signal.reason === "subagent-timeout"
+        ? { code: "SUBAGENT_TIMEOUT", message: "子智能体达到执行时限。", retryable: false }
+        : status === "failed"
+          ? { code: turn.reason === "step-limit" ? "SUBAGENT_STEP_LIMIT" : "SUBAGENT_FAILED", message: turn.reason === "step-limit" ? `达到 ${preset.maxSteps} 步执行上限。请根据已有发现调整任务，勿原样重试。` : `Subagent ended with ${turn.reason}.`, retryable: false }
+          : null;
+      result = terminal({ invocationId, childAgentId, childSessionId, presetId: preset.id, status, text: turn.finalText, durationMs: Date.now() - started, failure });
     } catch (error) {
-      result = terminal({ invocationId, childAgentId, childSessionId, presetId: preset.id, status: controller.signal.aborted ? "aborted" : "failed", text: "", durationMs: Date.now() - started, failure: { code: controller.signal.aborted ? "SUBAGENT_ABORTED" : child === undefined ? "SUBAGENT_SETUP_FAILED" : "SUBAGENT_FAILED", message: error instanceof Error ? error.message : String(error), retryable: false } });
+      result = terminal({ invocationId, childAgentId, childSessionId, presetId: preset.id, status: controller.signal.aborted ? "aborted" : "failed", text: "", durationMs: Date.now() - started, failure: { code: controller.signal.reason === "subagent-timeout" ? "SUBAGENT_TIMEOUT" : controller.signal.aborted ? "SUBAGENT_ABORTED" : child === undefined ? "SUBAGENT_SETUP_FAILED" : "SUBAGENT_FAILED", message: controller.signal.reason === "subagent-timeout" ? "子智能体达到 30 分钟执行时限。" : error instanceof Error ? error.message : String(error), retryable: false } });
     }
     let publicationFailure: unknown;
     if (child !== undefined) {

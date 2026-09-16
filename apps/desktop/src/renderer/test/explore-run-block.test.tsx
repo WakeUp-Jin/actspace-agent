@@ -91,11 +91,11 @@ describe("ExploreRunBlock", () => {
 
     const toggle = screen.getByRole("button", { name: /Explored 1 file/ });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("Read manager.ts")).not.toBeInTheDocument();
+    expect(screen.queryByText("manager.ts")).not.toBeInTheDocument();
 
     await user.click(toggle);
 
-    expect(screen.getByText("Read manager.ts")).toBeInTheDocument();
+    expect(screen.getByText("manager.ts")).toBeInTheDocument();
     expect(screen.queryByText(/Usage Tokens/)).not.toBeInTheDocument();
   });
 
@@ -106,7 +106,7 @@ describe("ExploreRunBlock", () => {
 
     const toggle = screen.getByRole("button", { name: /Exploring/ });
     expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("Read manager.ts")).toBeInTheDocument();
+    expect(screen.getByText("manager.ts")).toBeInTheDocument();
     expect(screen.queryByText(/Usage Tokens/)).not.toBeInTheDocument();
 
     const viewport = container.querySelector(".explore-run-viewport");
@@ -126,6 +126,6 @@ describe("ExploreRunBlock", () => {
     await user.click(screen.getByRole("button", { name: /Explored 1 file/ }));
 
     expect(getSubAgentTranscript).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText("Read manager.ts")).toBeInTheDocument();
+    expect(await screen.findByText("manager.ts")).toBeInTheDocument();
   });
 });

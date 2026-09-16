@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComposerAttachment, SkillCatalogItem, UsableModelView } from "@actspace/shared";
-import { mockContextSnapshot } from "./fixtures/workbenchFixture";
+import { mockContextSnapshot, mockContextState } from "./fixtures/workbenchFixture";
 import { Composer } from "../components/Composer";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
@@ -51,6 +51,35 @@ function createSkill(overrides: Partial<SkillCatalogItem> = {}): SkillCatalogIte
     ...overrides,
   };
 }
+
+describe("Composer Git status evidence", () => {
+  it.each(["not_repository", "failed", "git_not_found", "loading"] as const)(
+    "does not claim detached HEAD for a locked session with %s context",
+    (status) => {
+      renderComposer({ surface: "followup", executionContext: {
+        locked: true, runLocation: "this_mac",
+        gitContext: status === "loading" ? null : { status, workspaceRoot: "/work/notes", branches: [] },
+      } });
+      expect(screen.getByText("本机")).toBeVisible();
+      expect(screen.queryByText("分离的 HEAD")).not.toBeInTheDocument();
+    },
+  );
+
+  it("shows detached HEAD only with confirmed commit evidence", () => {
+    renderComposer({ surface: "followup", executionContext: {
+      locked: true, runLocation: "this_mac",
+      gitContext: { status: "ready", workspaceRoot: "/work/repo", branches: [], detachedCommit: "01234567", headCommit: "0123456789abcdef" },
+    } });
+    expect(screen.getByText("分离的 HEAD")).toBeVisible();
+  });
+
+  it("keeps the known worktree branch while Git context is absent", () => {
+    renderComposer({ surface: "followup", executionContext: {
+      locked: true, runLocation: "worktree", selectedBranch: "actspace/12345678", gitContext: null,
+    } });
+    expect(screen.getByText("actspace/12345678")).toBeVisible();
+  });
+});
 
 const reasoningModels: UsableModelView[] = [
   {
@@ -176,6 +205,17 @@ describe("Composer follow-up bar", () => {
     expect(screen.queryByText("main")).not.toBeInTheDocument();
     expect(screen.getByText("本机")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "上下文用量 36%" })).toBeInTheDocument();
+  });
+
+  it("uses the same request estimate for the footer and popup despite stale usage", async () => {
+    const user = userEvent.setup();
+    renderComposer({
+      contextSnapshot: { ...mockContextSnapshot, totalTokens: 549_000, maxTokens: 1_000_000, percentUsed: 54.9 },
+      contextState: { ...mockContextState, totalEstimatedTokens: 49_000, maxTokens: 1_000_000, percentUsed: 4.9 },
+    });
+    await user.click(screen.getByRole("button", { name: "上下文用量 4%" }));
+    expect(screen.getByText("4% 已用")).toBeVisible();
+    expect(screen.getByText("~49K / 1M Token")).toBeVisible();
   });
 
   it("rounds the context usage status to an integer", () => {

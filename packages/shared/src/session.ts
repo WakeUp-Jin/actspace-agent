@@ -380,6 +380,8 @@ export type AgentToolPreview = {
   description: string;
   status: SubAgentRunStatus;
   subagentType: "explore";
+  /** 主消息行展示的委托类型；缺省时兼容旧事件并按 Explore 处理。 */
+  agentKind?: "agent" | "explore";
   displayText: string;
   summary?: string;
   recentEvents?: AgentToolRecentEvent[];
@@ -389,8 +391,8 @@ export type AgentToolPreview = {
   /**
    * 前端展示形态。
    *
-   * - `panel`（默认/缺省）：通用 `agent` 子代理，点击打开 Composer 上方 transcript Panel。
-   * - `inline`：内置 Explore 聚焦子代理，主消息流内联 `Worked for Xs` 折叠，展开是嵌套真实工具行。
+   * - `panel`（默认/缺省）：点击打开 Composer 上方 transcript Panel。
+   * - `inline`：历史事件兼容值；当前 renderer 对 Agent/Explore 统一使用 panel 入口。
    *
    * 见 docs/design-docs/collaboration/agent-explore-subagent.md。
    */
@@ -470,6 +472,8 @@ export type ToolUiPreview =
       deletions: number;
       diff: string;
       collapsedLines: number;
+      /** Transient generation progress; never a count of bytes saved or diff lines. */
+      generationProgress?: { phase: "generating" | "preparing" | "saving"; characters: number };
       status?: "pending" | "running" | "completed" | "failed" | "denied";
       approvalRequestId?: string;
       /** 失败/拒绝时的错误说明；不复用 diff 字段承载错误文本 */
@@ -484,6 +488,8 @@ export type ToolUiPreview =
       deletions: number;
       diff: string;
       collapsedLines: number;
+      /** Transient generation progress; never a count of bytes saved or diff lines. */
+      generationProgress?: { phase: "generating" | "preparing" | "saving"; characters: number };
       status?: "pending" | "running" | "completed" | "failed" | "denied";
       approvalRequestId?: string;
       /** 失败/拒绝时的错误说明；不复用 diff 字段承载错误文本 */
@@ -575,11 +581,15 @@ export type ContextUsageBucket = {
 };
 
 export type ContextUsageSnapshot = {
+  throughJournalSeq?: number;
+  basis?: "current-request" | "last-request" | "next-request";
+  requestId?: string;
   totalTokens: number;
   maxTokens: number;
   percentUsed: number;
   compressionCount?: number;
   cumulativeTokens?: number;
+  cumulativeUsage?: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
   estimator?: {
     name: string;
     version: string;
@@ -607,6 +617,9 @@ export type ContextStateEntry = {
 };
 
 export type ContextState = {
+  throughJournalSeq?: number;
+  basis?: ContextUsageSnapshot["basis"];
+  requestId?: string;
   sessionId: SessionId;
   activeAgentRunId?: AgentRunId;
   updatedAt: string;
@@ -671,6 +684,7 @@ export type ComposerAttachment = {
 };
 
 export type MessageBlock = {
+  deferredToolDetail?: { sessionId: string; callId: string };
   /**
    * React 展示身份。持久化 event id 保留给数据引用和消息操作，流式状态与持久化状态
    * 则通过同一个 renderKey 复用 DOM，避免 turn 完成时重新播放入场动画。
@@ -807,6 +821,8 @@ export type MessageBlock = {
       deletions: number;
       diff: string;
       collapsedLines: number;
+      /** Transient generation progress; never a count of bytes saved or diff lines. */
+      generationProgress?: { phase: "generating" | "preparing" | "saving"; characters: number };
       createdAt: string;
       status?: "pending" | "running" | "completed" | "failed" | "denied";
       approvalRequestId?: string;
@@ -825,6 +841,8 @@ export type MessageBlock = {
       deletions: number;
       diff: string;
       collapsedLines: number;
+      /** Transient generation progress; never a count of bytes saved or diff lines. */
+      generationProgress?: { phase: "generating" | "preparing" | "saving"; characters: number };
       createdAt: string;
       status?: "pending" | "running" | "completed" | "failed" | "denied";
       approvalRequestId?: string;

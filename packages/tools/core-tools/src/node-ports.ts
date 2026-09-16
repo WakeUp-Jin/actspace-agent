@@ -49,8 +49,8 @@ export function createNodeCoreToolPorts(options: NodeCoreToolPortsOptions): Core
     list_directory: (args, context) => listDirectoryTool(args, contextWorkspaceRoot(context, options.workspaceRoot)),
     grep: (args, context) => grepTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), options.ripgrepPath, options.resolveArtifact),
     glob: (args, context) => globTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot), options.ripgrepPath),
-    edit_file: (args, context) => editFileTool(args, contextWorkspaceRoot(context, options.workspaceRoot)),
-    write_file: (args, context) => writeFileTool(args, contextWorkspaceRoot(context, options.workspaceRoot)),
+    edit_file: (args, context) => editFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)),
+    write_file: (args, context) => writeFileTool(args, context, contextWorkspaceRoot(context, options.workspaceRoot)),
     delete_file: (args, context) => deleteFileTool(args, contextWorkspaceRoot(context, options.workspaceRoot)),
     ...(bash === undefined ? {} : { bash: bash.bash, bash_output: bash.bash_output, bash_kill: bash.bash_kill, dispose: bash.dispose }),
     web_search: web.web_search,
@@ -174,7 +174,7 @@ async function globTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, cont
   }
 }
 
-async function writeFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, workspaceRoot: string): Promise<ToolBodyResult> {
+async function writeFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
   const pathArg = stringArg(args, "path");
   const content = typeof args.content === "string" ? args.content : undefined;
   if (!pathArg || content === undefined) return failure("INVALID_ARGUMENTS", "path and content are required");
@@ -182,16 +182,20 @@ async function writeFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>,
     const filePath = await resolveWritablePath(pathArg, workspaceRoot);
     const oldContent = existsSync(filePath) ? await readFile(filePath, "utf8") : "";
     const created = !existsSync(filePath);
-    await writeTextAtomic(filePath, content);
     const path = displayPath(filePath, workspaceRoot);
+    context.reportProgress({ message: `${created ? "Creating" : "Updating"} ${path}`, additions: 0, deletions: 0 });
+    await writeTextAtomic(filePath, content);
     const diff = createUnifiedDiff(path, oldContent, content);
-    return completed(`${diff}\n\nFile ${created ? "created" : "updated"}: ${path}`, `${created ? "Created" : "Updated"} ${path}`, { type: created ? "create" : "update", path, additions: countDiff(diff, "+"), deletions: countDiff(diff, "-") });
+    const additions = countDiff(diff, "+");
+    const deletions = countDiff(diff, "-");
+    context.reportProgress({ message: `${created ? "Created" : "Updated"} ${path}`, additions, deletions });
+    return completed(`${diff}\n\nFile ${created ? "created" : "updated"}: ${path}`, `${created ? "Created" : "Updated"} ${path}`, { type: created ? "create" : "update", path, additions, deletions });
   } catch (error) {
     return ioFailure("write file", pathArg, error);
   }
 }
 
-async function editFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, workspaceRoot: string): Promise<ToolBodyResult> {
+async function editFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext, workspaceRoot: string): Promise<ToolBodyResult> {
   const pathArg = stringArg(args, "path");
   const oldText = typeof args.old_string === "string" ? args.old_string : undefined;
   const newText = typeof args.new_string === "string" ? args.new_string : undefined;
@@ -205,10 +209,14 @@ async function editFileTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, 
     if (matches === 0) return failure("EDIT_NOT_FOUND", "old_string was not found in the file");
     if (matches > 1 && args.replace_all !== true) return failure("EDIT_NOT_UNIQUE", `old_string matches ${matches} locations; include more context or set replace_all=true`);
     const after = oldText === "" ? newText : args.replace_all === true ? before.split(oldText).join(newText) : replaceOnePreservingLine(before, oldText, newText);
-    await writeTextAtomic(filePath, after);
     const path = displayPath(filePath, workspaceRoot);
+    context.reportProgress({ message: `${exists ? "Updating" : "Creating"} ${path}`, additions: 0, deletions: 0 });
+    await writeTextAtomic(filePath, after);
     const diff = createUnifiedDiff(path, before, after);
-    return completed(`${diff}\n\nFile ${exists ? "updated" : "created"}: ${path}`, `${exists ? "Updated" : "Created"} ${path}`, { type: exists ? "update" : "create", path, additions: countDiff(diff, "+"), deletions: countDiff(diff, "-") });
+    const additions = countDiff(diff, "+");
+    const deletions = countDiff(diff, "-");
+    context.reportProgress({ message: `${exists ? "Updated" : "Created"} ${path}`, additions, deletions });
+    return completed(`${diff}\n\nFile ${exists ? "updated" : "created"}: ${path}`, `${exists ? "Updated" : "Created"} ${path}`, { type: exists ? "update" : "create", path, additions, deletions });
   } catch (error) {
     return ioFailure("edit file", pathArg, error);
   }

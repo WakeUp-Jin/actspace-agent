@@ -1562,6 +1562,7 @@ function defaultSettingsV4Metadata(): SettingsV4Metadata {
     tools: {
       disabledTools: [],
       bash: { alwaysAsk: false },
+      showFileChangeStats: true,
       searchProviders: Object.fromEntries(SEARCH_PROVIDER_IDS.map((id) => [id, { enabled: true }])),
     },
     subagents: { routes: {} },
@@ -1779,6 +1780,7 @@ function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string): {
     tools: {
       disabledTools: Array.isArray(tools.disabledTools) ? tools.disabledTools.filter((value): value is string => typeof value === "string").slice(0, 200) : [],
       bash: { alwaysAsk: bash.alwaysAsk === true },
+      showFileChangeStats: tools.showFileChangeStats !== false,
       searchProviders: Object.fromEntries(SEARCH_PROVIDER_IDS.map((id) => {
         const provider = isRecord(searchProviders[id]) ? searchProviders[id] : {};
         return [id, { enabled: provider.enabled !== false }];

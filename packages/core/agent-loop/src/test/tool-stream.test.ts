@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { runToolStreamFixture } from "./tool-stream-fixture.js";
 
 describe("AgentLoop tool live events", () => {
+  it("reserves the last subagent step for a tool-free summary and preserves lineage", async () => {
+    const tools: string[][] = [];
+    const messages: string[] = [];
+    const { events, result, journal } = await runToolStreamFixture({ subagent: true,
+      onTools: (definitions) => tools.push(definitions.map((tool) => tool.name)),
+      onMessages: (values) => messages.push(JSON.stringify(values)),
+    });
+    expect(tools).toEqual([["read_file"], []]);
+    expect(messages.at(-1)).toContain("Execution budget reached");
+    expect(result).toMatchObject({ reason: "step-limit", steps: 2, finalText: expect.stringContaining("Done.") });
+    expect(events.every((event) => event.parentSessionId === "parent" && event.parentCallId === "delegate")).toBe(true);
+    expect(journal.at(-1)).toMatchObject({ type: "turn/end", data: { reason: "step-limit" } });
+  });
   it.each([true, false])("separates arguments and emits each tool lifecycle (deltas=%s)", async (deltas) => {
     const { events, journal } = await runToolStreamFixture({ deltas });
     expect(events.filter((e) => e.kind === "assistant-delta").map((e) => e.message).join("")).toBe('Read now. Done. {"valid":"body JSON"}');

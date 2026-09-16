@@ -6,7 +6,7 @@ import { createCoreCodecRegistry } from "@actspace/session-journal";
 import { applySessionRecovery, SessionStore } from "@actspace/session-persistence";
 import { EMPTY_LLM_USAGE } from "@actspace/llm-service";
 import { AgentScope } from "@actspace/core-scope";
-import { createBuiltInPresets } from "../preset.js";
+import { createBuiltInPresets, StaticPresetRegistry } from "../preset.js";
 import { OneShotSubagentProvider } from "../provider.js";
 import { publishSubagentTerminal, repairSubagentPublications } from "../publication.js";
 
@@ -32,12 +32,59 @@ describe("one-shot Subagent provider", () => {
     }, createLoop: ({ preset, allowedToolNames, agentId }) => { childAgentIds.push(agentId); return { runTurn: async () => ({ agentRunId: "run", turnId: "turn", reason: "completed", steps: 1, finalText: `${preset.id}:${allowedToolNames.join(",")}` }) } as never; } });
     const agent = await provider.invoke({ parentSession: parent, parentScope, parentCallId: "call-agent", presetId: "actspace.agent", task: "write", parentVisibleToolIds: ["read_file", "write_file"], delegationDepth: 0 });
     const explore = await provider.invoke({ parentSession: parent, parentScope, parentCallId: "call-explore", presetId: "actspace.explore", task: "read", parentVisibleToolIds: ["read_file", "write_file", "grep"], delegationDepth: 0 });
-    expect(agent.text).toContain("write_file");
+    expect(agent.text).toBe("actspace.agent:read_file");
     expect(explore.text).toBe("actspace.explore:grep,read_file");
     expect(links).toEqual([agent.childSessionId, explore.childSessionId]);
     expect(new Set(childAgentIds).size).toBe(2);
     const child = await store.inspect(explore.childSessionId);
     expect(child.header?.lineage).toMatchObject({ parentSessionId: "parent", parentCallId: "call-explore", origin: "delegation", delegationDepth: 1 });
+    await parent.close(); await parentScope.dispose();
+  });
+
+  it("restricts both built-in presets and provides a 300-step budget", () => {
+    const presets = createBuiltInPresets(["read_file", "list_directory", "grep", "glob", "bash", "write_file", "edit_file", "agent", "web_fetch"]);
+    for (const preset of presets.list()) {
+      expect(preset.allowedToolNames).toEqual(["glob", "grep", "list_directory", "read_file"]);
+      expect(preset.readOnly).toBe(true);
+      expect(preset.maxSteps).toBe(300);
+      expect(preset.maxDurationMs).toBe(1_800_000);
+    }
+  });
+
+  it("persists the step-limit reason and partial findings", async () => {
+    const { store, parent, parentScope } = await fixture();
+    const provider = new OneShotSubagentProvider({ store, presets: createBuiltInPresets([]), manifestDigest: "manifest", plugins: [],
+      createLoop: () => ({ runTurn: async () => ({ reason: "step-limit", steps: 300, finalText: "Target files were not found." }) }) as never });
+    const result = await provider.invoke({ parentSession: parent, parentScope, parentCallId: "limit", presetId: "actspace.agent", task: "inspect", parentVisibleToolIds: [], delegationDepth: 0 });
+    expect(result).toMatchObject({ status: "failed", text: "Target files were not found.", failure: { code: "SUBAGENT_STEP_LIMIT", retryable: false } });
+    expect(result.failure?.message).toContain("300");
+    const child = await store.inspect(result.childSessionId);
+    expect(child.events.at(-1)).toMatchObject({ type: "delegation/child-terminal", data: { failure: { code: "SUBAGENT_STEP_LIMIT" }, text: result.text } });
+    await parent.close(); await parentScope.dispose();
+  });
+
+  it("reports timeout separately from cancellation", async () => {
+    const { store, parent, parentScope } = await fixture();
+    const presets = new StaticPresetRegistry();
+    presets.register({ ...createBuiltInPresets([]).get("actspace.agent"), maxDurationMs: 5 });
+    const provider = new OneShotSubagentProvider({ store, presets, manifestDigest: "manifest", plugins: [],
+      createLoop: ({ signal }) => ({ abort: () => undefined, runTurn: async () => {
+        if (!signal.aborted) await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
+        return { reason: "aborted", steps: 1, finalText: "Partial result" };
+      } }) as never });
+    const result = await provider.invoke({ parentSession: parent, parentScope, parentCallId: "timeout", presetId: "actspace.agent", task: "inspect", parentVisibleToolIds: [], delegationDepth: 0 });
+    expect(result).toMatchObject({ status: "aborted", text: "Partial result", failure: { code: "SUBAGENT_TIMEOUT" } });
+    expect(provider.activeCount).toBe(0);
+    await parent.close(); await parentScope.dispose();
+  });
+
+  it("rejects a malformed read-only preset before starting a child", async () => {
+    const { store, parent, parentScope } = await fixture();
+    const presets = new StaticPresetRegistry();
+    presets.register({ ...createBuiltInPresets([]).get("actspace.agent"), allowedToolNames: ["bash"] });
+    const provider = new OneShotSubagentProvider({ store, presets, manifestDigest: "manifest", plugins: [], createLoop: () => { throw new Error("must not start"); } });
+    await expect(provider.invoke({ parentSession: parent, parentScope, parentCallId: "unsafe", presetId: "actspace.agent", task: "inspect", parentVisibleToolIds: ["bash"], delegationDepth: 0 })).rejects.toThrow("Read-only subagent preset cannot receive side-effect tools");
+    expect(await store.listSessionIds()).toEqual(["parent"]);
     await parent.close(); await parentScope.dispose();
   });
 

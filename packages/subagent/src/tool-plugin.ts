@@ -16,7 +16,7 @@ export function registerSubagentTools(
   resolveParent: (sessionId: string) => ParentAgentAssembly | undefined,
 ): readonly SubagentToolRegistration[] {
   return Object.freeze([
-    register("agent", "Delegate a bounded task to a one-shot general-purpose child Agent with its own Session and context.", "actspace.agent"),
+    register("agent", "Delegate a read-only analysis task to a child Agent. Only file reading and search are available; no Bash, edits, or approvals. Report workspace mismatches or blocked work without repeating the same search.", "actspace.agent"),
     register("explore", "Delegate a focused read-only repository investigation to a one-shot child Agent.", "actspace.explore"),
   ]);
 
@@ -52,12 +52,17 @@ export function registerSubagentTools(
             delegationDepth: parent.session.header.lineage?.delegationDepth ?? 0,
             signal: context.signal,
           });
-          if (result.status !== "completed") return failed(result.failure?.code ?? "SUBAGENT_FAILED", result.failure?.message ?? `Subagent ended with ${result.status}.`);
+          const detail = [{ label: "delegation", value: { invocationId: result.invocationId, childAgentId: result.childAgentId, childSessionId: result.childSessionId, presetId: result.presetId, status: result.status, durationMs: result.durationMs } }];
+          if (result.status !== "completed") return {
+            ...failed(result.failure?.code ?? `SUBAGENT_${result.status.toUpperCase()}`, result.failure?.message ?? `Subagent ended with ${result.status}.`),
+            modelOutput: [{ type: "text" as const, text: [result.failure?.message ?? `Subagent ended with ${result.status}.`, result.text && `Partial findings:\n${result.text}`].filter(Boolean).join("\n\n") }],
+            detail,
+          };
           return {
             status: "completed",
             summary: `${localName} completed`,
             modelOutput: [{ type: "text", text: result.text }],
-            detail: [{ label: "delegation", value: { invocationId: result.invocationId, childAgentId: result.childAgentId, childSessionId: result.childSessionId, presetId: result.presetId, durationMs: result.durationMs } }],
+            detail,
           };
         },
       },

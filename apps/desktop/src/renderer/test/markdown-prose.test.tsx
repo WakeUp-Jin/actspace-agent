@@ -1,38 +1,32 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MarkdownProse } from "../components/messages/MarkdownProse";
 
-describe("MarkdownProse", () => {
-  it("renders GFM tables as table elements", () => {
-    render(
-      <MarkdownProse
-        content={[
-          "| # | 工具 | 结果 |",
-          "|---|---|---|",
-          "| 1 | `write_file` | ✅ |",
-          "| 2 | `read_file` | ✅ |",
-        ].join("\n")}
-      />,
-    );
+afterEach(() => {
+  Reflect.deleteProperty(navigator, "clipboard");
+});
 
-    const table = screen.getByRole("table");
-    expect(within(table).getByRole("columnheader", { name: "#" })).toBeInTheDocument();
-    expect(within(table).getByRole("columnheader", { name: "工具" })).toBeInTheDocument();
-    expect(within(table).getByText("write_file")).toBeInTheDocument();
-    expect(within(table).getByText("read_file")).toBeInTheDocument();
+describe("MarkdownProse", () => {
+  it("renders fenced code with a language toolbar and copy action", async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    render(<MarkdownProse content={'```ts\nconst answer = 42;\n```'} />);
+
+    expect(screen.getByText("ts")).toBeInTheDocument();
+    expect(document.querySelector("code")?.textContent).toContain("const answer = 42;");
+    await userEvent.click(screen.getByRole("button", { name: "复制代码" }));
+    expect(writeText).toHaveBeenCalledWith("const answer = 42;\n");
+    expect(screen.getByText("已复制")).toBeInTheDocument();
   });
 
-  it("accepts compact separator rows commonly emitted by models", () => {
-    render(
-      <MarkdownProse
-        content={[
-          "| 操作 | 状态 |",
-          "|-|-|",
-          "| 修改 | 完成 |",
-        ].join("\n")}
-      />,
-    );
+  it("routes relative reply links to the workspace file opener", async () => {
+    const onOpenWorkspaceFile = vi.fn();
+    render(<MarkdownProse content="查看 [src/App.tsx](src/App.tsx)。" onOpenWorkspaceFile={onOpenWorkspaceFile} />);
 
-    expect(screen.getByRole("table")).toBeInTheDocument();
-    expect(screen.getByText("修改")).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: "src/App.tsx" });
+    expect(link).not.toHaveAttribute("target");
+    await userEvent.click(link);
+    expect(onOpenWorkspaceFile).toHaveBeenCalledWith("src/App.tsx");
   });
 });

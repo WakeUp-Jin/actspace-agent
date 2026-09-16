@@ -10,6 +10,19 @@ function snapshot(revision: number): RuntimeV2SessionSnapshot {
 }
 
 describe('desktop trajectory projection transport', () => {
+  it('refreshes current request context when streaming prevents browse cache publication', async () => {
+    const request = { seq: 0, type: 'request/context', time: '', data: { requestId: 'live', snapshot: { prepared: { contextWindow: 1000000 }, messages: [{ role: 'user', content: '中'.repeat(12000) }] } } };
+    const reader = {
+      browseSession: vi.fn(async () => { throw new Error('Session changed while preparing history; retry.'); }),
+      inspectSession: vi.fn(async () => snapshot(0)),
+      inspectSessionEvents: vi.fn(async () => [request] as unknown as import('@actspace/session-journal').SessionEventEnvelopeV1[]),
+    };
+    const result = await loadDesktopSessionProjection(reader, { sessionId: 's' });
+    expect(result.values.requestContextEstimate).toMatchObject({ requestId: 'live', totalEstimatedTokens: 12000 });
+    reader.browseSession.mockRejectedValueOnce(new Error('unrelated failure'));
+    await expect(loadDesktopSessionProjection(reader, { sessionId: 's' })).rejects.toThrow('unrelated failure');
+  });
+
   it('pins a moving Journal to the captured surface revision and rejects incomplete reads', async () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
     const source = { ownerPluginId: '@actspace/core' };
@@ -17,7 +30,7 @@ describe('desktop trajectory projection transport', () => {
     const captured = snapshot(0);
     journal.append({ type: 'turn/end', eventVersion: 1, source, data: { turnId: 't', status: 'completed' }, surface: null });
     const reader = { inspectSession: async () => captured, inspectSessionEvents: async () => journal.events };
-    const result = await loadDesktopSessionProjection(reader, { sessionId: 's' });
+    const result = await loadDesktopSessionProjection(reader, { sessionId: 's', includeTrajectory: true });
     expect(result.values.trajectory).toMatchObject({ throughJournalSeq: 0, nodes: [{ eventSeq: 0 }] });
     expect(Object.values(result.values).map(value => (value as { throughJournalSeq: number }).throughJournalSeq)).toEqual([0, 0, 0, 0]);
     await expect(loadDesktopSessionProjection({ ...reader, inspectSessionEvents: async () => [] }, { sessionId: 's' })).rejects.toThrow('does not cover');
@@ -50,4 +63,14 @@ it('receives the real Cordis session carrier after a SessionJournal commit', asy
   await new Promise(resolve => setTimeout(resolve, 60));
   expect(publish).toHaveBeenCalledWith('committed', 0, false);
   stop();
+});
+
+it('uses only the bounded page for ordinary chat and never produces trajectory', async () => {
+  const captured = snapshot(500);
+  const reader = { browseSession: vi.fn(async () => ({ snapshot: captured, journal: [], history: { before: 400, throughJournalSeq: 500 } })), inspectSession: vi.fn(), inspectSessionEvents: vi.fn() };
+  const result = await loadDesktopSessionProjection(reader, { sessionId: 's' });
+  expect(result.values.trajectory).toBeUndefined();
+  expect(reader.browseSession).toHaveBeenCalledWith('s');
+  expect(reader.inspectSession).not.toHaveBeenCalled();
+  expect(reader.inspectSessionEvents).not.toHaveBeenCalled();
 });

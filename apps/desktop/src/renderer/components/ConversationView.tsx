@@ -1,3 +1,5 @@
+import { messageFlowKind } from "./messages/messageFlowStyles";
+import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { Check, Copy, Eye, GitBranch, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -27,9 +29,9 @@ import type { SessionMainView } from "./SessionViewToggle";
 import { TrajectoryView } from "./TrajectoryView";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 import { formatUsdCost } from "../usage-format";
-import { selectComposer, selectProviderUsage, selectRequestContextEstimate, selectSurfaceMessages } from "@actspace/client/sessions";
+import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages } from "@actspace/client/sessions";
 import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
-import { contextEstimateToSnapshot, providerUsageToContextSnapshot, useOptionalSessionProjection } from "../session";
+import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
 import { readFailureTab, tabFromFile } from "./right-panel/workspaceFileTab";
 
 type UserMessageBlock = Extract<MessageBlock, { kind: "user" }>;
@@ -59,7 +61,7 @@ const TURN_PROMPT_CLASS =
   "turn-prompt sticky top-0 z-12 min-w-0 bg-[image:var(--act-gradient-surface-fade)] py-4";
 const TURN_PROMPT_CARD_CLASS =
   "turn-prompt-card overflow-hidden rounded-act-lg border border-line bg-surface shadow-[0_12px_34px_rgba(31,45,61,0.045)] dark:shadow-[0_12px_34px_rgba(0,0,0,0.3)]";
-const TURN_BODY_CLASS = "turn-body flex min-w-0 flex-col gap-[9px]";
+const TURN_BODY_CLASS = "turn-body message-flow flex min-w-0 flex-col";
 const ASSISTANT_TURN_GROUP_CLASS = "group/assistant-turn min-w-0";
 const TURN_ACTIONS_CLASS =
   "turn-actions mt-1 flex min-h-7 items-center justify-between gap-3 px-[var(--conversation-text-inset)] text-[12px] text-text-faint opacity-0 pointer-events-none transition-opacity duration-[150ms] ease-in-out group-hover/assistant-turn:pointer-events-auto group-hover/assistant-turn:opacity-100 group-focus-within/assistant-turn:pointer-events-auto group-focus-within/assistant-turn:opacity-100";
@@ -74,7 +76,6 @@ const TURN_ACTION_MENU_BUTTON_CLASS =
   "flex min-h-[34px] w-full items-center rounded-act-sm border-0 bg-transparent px-2.5 text-left text-sm font-semibold text-text-main transition-colors duration-[150ms] ease-in-out hover:bg-hover-overlay disabled:cursor-default disabled:text-text-faint";
 const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-[13px] leading-[1.4] text-text-faint";
 const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-on-danger";
-const COMPACT_MESSAGE_RELATION_CLASS = "-mt-1";
 const MODEL_WAITING_DELAY_MS = 300;
 const SCROLL_BOTTOM_THRESHOLD_PX = 80;
 const TURN_RAIL_MIN_TURNS = 3;
@@ -114,7 +115,6 @@ const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
   "error",
 ]);
 const DIFF_MESSAGE_KINDS = new Set<MessageBlock["kind"]>(["edit_diff", "write_diff"]);
-const SYSTEM_MESSAGE_KINDS = new Set<MessageBlock["kind"]>(["context_compaction", "workspace_preparation", "status"]);
 
 function copyWithSelection(value: string) {
   const textArea = document.createElement("textarea");
@@ -144,40 +144,25 @@ async function copyToClipboard(value: string) {
   }
 }
 
-function isToolLogMessage(message: MessageBlock) {
-  return TOOL_LOG_MESSAGE_KINDS.has(message.kind);
-}
-
-function isDiffMessage(message: MessageBlock) {
-  return DIFF_MESSAGE_KINDS.has(message.kind);
-}
-
-function isSystemMessage(message: MessageBlock) {
-  return SYSTEM_MESSAGE_KINDS.has(message.kind);
-}
-
-function getMessageRelationClass(previousMessage: MessageBlock | undefined, message: MessageBlock) {
-  if (!previousMessage) {
-    return undefined;
-  }
-
-  const previousIsTool = isToolLogMessage(previousMessage);
-  const currentIsTool = isToolLogMessage(message);
-  const previousIsDiff = isDiffMessage(previousMessage);
-  const currentIsDiff = isDiffMessage(message);
-
-  if (
-    (previousMessage.kind === "thinking" && currentIsTool) ||
-    (previousIsTool && (currentIsTool || message.kind === "thinking")) ||
-    (previousMessage.kind === "thinking" && currentIsDiff) ||
-    (previousIsDiff && (currentIsDiff || currentIsTool || message.kind === "thinking")) ||
-    (previousIsTool && currentIsDiff) ||
-    (isSystemMessage(previousMessage) && isSystemMessage(message))
-  ) {
-    return COMPACT_MESSAGE_RELATION_CLASS;
-  }
-
-  return undefined;
+function DeferredToolMessage({ message, className, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile }: {
+  message: MessageBlock; className?: string; onOpenAgentTranscript?: (message: AgentMessageBlock) => void; replyCompleted: boolean; onOpenReadFile?: (message: ReadMessageBlock) => void; onOpenWorkspaceFile?: (path: string) => void;
+}) {
+  const [blocks, setBlocks] = useState<MessageBlock[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const load = async () => {
+    if (loading || !message.deferredToolDetail || !window.actspace?.getSessionToolDetail) return;
+    setLoading(true); setError(null);
+    try { setBlocks(await window.actspace.getSessionToolDetail(message.deferredToolDetail)); }
+    catch (e) { setError(e instanceof Error ? e.message : '工具详情加载失败'); }
+    finally { setLoading(false); }
+  };
+  return <div className={className}>
+    {blocks ? blocks.map(block => renderMessage(block, undefined, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)) : <>
+      <button type="button" className="py-1 text-xs text-text-muted" disabled={loading} onClick={() => { void load(); }}>{loading ? '正在加载工具详情…' : '展开完整工具结果'}</button>
+      {error && <p role="alert" className="text-xs text-text-muted">{error}</p>}
+    </>}
+  </div>;
 }
 
 export function renderMessage(
@@ -186,14 +171,16 @@ export function renderMessage(
   onOpenAgentTranscript?: (message: AgentMessageBlock) => void,
   replyCompleted = false,
   onOpenReadFile?: (message: ReadMessageBlock) => void,
+  onOpenWorkspaceFile?: (path: string) => void,
 ) {
   const renderKey = message.renderKey ?? message.id;
+  if (message.deferredToolDetail) return <DeferredToolMessage key={renderKey} message={message} className={className} onOpenAgentTranscript={onOpenAgentTranscript} replyCompleted={replyCompleted} onOpenReadFile={onOpenReadFile} onOpenWorkspaceFile={onOpenWorkspaceFile} />;
 
   switch (message.kind) {
     case "user":
       return <UserMessage key={renderKey} message={message} />;
     case "assistant":
-      return <AssistantReply key={renderKey} message={message} />;
+      return <AssistantReply key={renderKey} message={message} onOpenWorkspaceFile={onOpenWorkspaceFile} />;
     case "thinking":
       return <ThinkingBlock key={renderKey} message={message} className={className} replyCompleted={replyCompleted} />;
     case "agent":
@@ -406,9 +393,11 @@ function workDurationMs(workItems: MessageBlock[], finalReply: MessageBlock[]): 
 
 type AgentTranscriptHandler = (message: AgentMessageBlock) => void;
 
-function renderMessageList(messages: MessageBlock[], onOpenAgentTranscript?: AgentTranscriptHandler, replyCompleted = false, onOpenReadFile?: (message: ReadMessageBlock) => void) {
-  return messages.map((message, index) =>
-    renderMessage(message, getMessageRelationClass(messages[index - 1], message), onOpenAgentTranscript, replyCompleted, onOpenReadFile),
+function renderMessageList(messages: MessageBlock[], onOpenAgentTranscript?: AgentTranscriptHandler, replyCompleted = false, onOpenReadFile?: (message: ReadMessageBlock) => void, onOpenWorkspaceFile?: (path: string) => void) {
+  return messages.map((message) =>
+    <div key={message.renderKey ?? message.id} className="message-flow-item" data-flow-kind={messageFlowKind(message)}>
+      {renderMessage(message, undefined, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)}
+    </div>,
   );
 }
 
@@ -419,10 +408,11 @@ function renderProcessContent(
   onOpenAgentTranscript?: AgentTranscriptHandler,
   replyCompleted = false,
   onOpenReadFile?: (message: ReadMessageBlock) => void,
+  onOpenWorkspaceFile?: (path: string) => void,
 ): ReactNode[] {
   return [
     <ToolActivityGroup key="work" running={isActive} durationMs={workDurationMs(processItems, finalReply)}>
-      {renderMessageList(processItems, onOpenAgentTranscript, replyCompleted, onOpenReadFile)}
+      {renderMessageList(processItems, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)}
     </ToolActivityGroup>,
   ];
 }
@@ -438,9 +428,11 @@ function getLatestTodoMessage(messages: MessageBlock[]): TodoMessageBlock | unde
 function TurnPrompt({
   turn,
   onOpenAttachmentPreview,
+  sessionId,
 }: {
   turn: ConversationTurn;
   onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
+  sessionId?: string | null;
 }) {
   if (!turn.user) return null;
   const latestTodo = getLatestTodoMessage(turn.messages);
@@ -451,6 +443,7 @@ function TurnPrompt({
         <UserMessage
           message={turn.user}
           onOpenAttachmentPreview={onOpenAttachmentPreview}
+          sessionId={sessionId}
           variant="execution"
         />
         {latestTodo && (latestTodo.totalCount > 0 || latestTodo.status === "failed") ? (
@@ -470,6 +463,7 @@ function renderTurnBody(
   isActive: boolean,
   onOpenAgentTranscript?: AgentTranscriptHandler,
   onOpenReadFile?: (message: ReadMessageBlock) => void,
+  onOpenWorkspaceFile?: (path: string) => void,
 ) {
   const { workItems, finalReply } = splitTurnMessages(turn.messages);
   const replyCompleted = !isActive && finalReply.length > 0;
@@ -482,18 +476,18 @@ function renderTurnBody(
   const processContent = processItems.length === 0
     ? null
     : hasToolLikeItem(processItems)
-      ? renderProcessContent(processItems, isActive, finalReply, onOpenAgentTranscript, replyCompleted, onOpenReadFile)
-      : renderMessageList(processItems, onOpenAgentTranscript, replyCompleted, onOpenReadFile);
+      ? renderProcessContent(processItems, isActive, finalReply, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)
+      : renderMessageList(processItems, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile);
 
   if (!hasToolLikeItem(processItems) && !latestTodo) {
-    return renderMessageList(turn.messages, onOpenAgentTranscript, replyCompleted, onOpenReadFile);
+    return renderMessageList(turn.messages, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile);
   }
 
   return (
     <>
-      {preparationItems.length > 0 ? renderMessageList(preparationItems, onOpenAgentTranscript, false, onOpenReadFile) : null}
+      {preparationItems.length > 0 ? renderMessageList(preparationItems, onOpenAgentTranscript, false, onOpenReadFile, onOpenWorkspaceFile) : null}
       {processContent}
-      {finalReply.length > 0 ? renderMessageList(finalReply, onOpenAgentTranscript, false, onOpenReadFile) : null}
+      {finalReply.length > 0 ? <div className={`message-flow${processContent ? " message-flow-final" : ""}`}>{renderMessageList(finalReply, onOpenAgentTranscript, false, onOpenReadFile, onOpenWorkspaceFile)}</div> : null}
     </>
   );
 }
@@ -792,12 +786,12 @@ export function ConversationView({
   const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && (sessionId === null || sessionId === undefined || sessionProjection.sessionId === sessionId)
     ? sessionProjection.cell
     : null;
+  const browse = useSessionBrowse();
+  const historyAnchor = useRef<{ sessionId: string | null | undefined; height: number; top: number } | null>(null);
   const projectedSurfaceMessages = projectionCell ? selectSurfaceMessages(projectionCell) : [];
   const projectedComposer = projectionCell ? selectComposer(projectionCell) : null;
-  const projectedProviderUsage = projectionCell ? selectProviderUsage(projectionCell) : null;
   const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
   const effectiveContextSnapshot = contextSnapshot
-    ?? (projectedProviderUsage ? providerUsageToContextSnapshot(projectedProviderUsage) : null)
     ?? (projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null);
   const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
   const inputHistory = useMemo(
@@ -818,7 +812,7 @@ export function ConversationView({
     : requestedComposerPhase ?? (durableMessageCount === 0 ? "blank" : "active");
   const projectionSessionReady = projectionCell !== null && projectionCell.status !== "error";
   const resolvedSessionReady = projectedComposer?.phase !== "blank" || isSessionReady || projectionSessionReady;
-  const isInitialComposer = resolvedSessionReady && resolvedComposerPhase === "blank" && !isStreaming;
+  const isInitialComposer = !browse?.messageLoading && !browse?.messageError && !browse?.listLoading && resolvedSessionReady && resolvedComposerPhase === "blank" && !isStreaming;
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const messageStackRef = useRef<HTMLDivElement | null>(null);
@@ -858,6 +852,15 @@ export function ConversationView({
       openTab(readFailureTab(relativePath, title));
     }
   }, [openTab, selectedWorkspaceRoot]);
+  const openWorkspaceFile = useCallback((path: string) => {
+    const normalizedPath = path.replace(/^file:\/\//i, "").replace(/\\/g, "/");
+    const root = selectedWorkspaceRoot?.replace(/\\/g, "/").replace(/\/+$/, "");
+    const relativePath = normalizedPath.startsWith(`${root ?? ""}/`)
+      ? normalizedPath.slice((root ?? "").length + 1)
+      : normalizedPath;
+    if (!isSafeWorkspaceRelativePath(relativePath)) return;
+    void openReadFile({ filePath: relativePath } as ReadMessageBlock);
+  }, [openReadFile, selectedWorkspaceRoot]);
   useEffect(() => {
     const turn = turns.at(-1);
     if (!sessionId || !isStreaming || !turn?.messages.some((message) => message.kind === "agent")) return;
@@ -914,9 +917,17 @@ export function ConversationView({
   }, [updateConversationViewport]);
 
   // 用户滚动时统一更新贴底状态、回底按钮和当前轮次。
+  const requestEarlier = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el || !browse?.hasEarlier || browse.earlierLoading) return;
+    stickToBottomRef.current = false;
+    historyAnchor.current = { sessionId, height: el.scrollHeight, top: el.scrollTop };
+    void browse.loadEarlier();
+  }, [browse, sessionId]);
   const handleMessagesScroll = useCallback(() => {
     updateConversationViewport();
-  }, [updateConversationViewport]);
+    if ((scrollContainerRef.current?.scrollTop ?? 1000) < 80 && !browse?.earlierError) requestEarlier();
+  }, [updateConversationViewport, requestEarlier, browse?.earlierError]);
 
   // 流式输出 / 消息增长时，若仍处于贴底状态则跟随滚动到底部。
   const scrollToBottomIfStuck = useCallback(() => {
@@ -967,13 +978,19 @@ export function ConversationView({
   // 切换会话时重置为贴底状态，避免上一会话的「已上滚」状态影响新会话。
   useEffect(() => {
     stickToBottomRef.current = true;
+    historyAnchor.current = null;
     setIsAwayFromBottom(false);
   }, [sessionId]);
 
   useLayoutEffect(() => {
-    scrollToBottomIfStuck();
+    const anchor = historyAnchor.current;
+    const el = scrollContainerRef.current;
+    if (anchor && anchor.sessionId === sessionId && el && !browse?.earlierLoading) {
+      el.scrollTop = anchor.top + el.scrollHeight - anchor.height;
+      historyAnchor.current = null;
+    } else if (!anchor) scrollToBottomIfStuck();
     updateConversationViewport();
-  }, [messages, scrollToBottomIfStuck, updateConversationViewport]);
+  }, [messages, sessionId, browse?.earlierLoading, scrollToBottomIfStuck, updateConversationViewport]);
 
   // 同一条 running 消息内部变高时（例如 write_file 持续追加 code preview），
   // messages 引用可能不变；观察消息栈尺寸，保持贴底状态继续跟随尾部。
@@ -994,6 +1011,12 @@ export function ConversationView({
 
 
 
+  if (browse && messages.length === 0 && (browse.messageLoading || browse.listLoading || browse.messageError)) {
+    return <main className={CONVERSATION_SHELL_CLASS}><p role={browse.messageError ? 'alert' : 'status'} className="px-5 py-4 text-sm text-text-muted">
+      {browse.messageError ?? (browse.messageLoading ? '正在加载消息…' : '正在加载会话…')}
+      {browse.messageError && <button onClick={browse.retryMessages}>重试</button>}
+    </p></main>;
+  }
   return (
     <main className={CONVERSATION_SHELL_CLASS}>
       <div className={MESSAGE_VIEWPORT_CLASS}>
@@ -1007,6 +1030,10 @@ export function ConversationView({
             className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS}
             aria-label="会话消息"
           >
+              {browse?.messageLoading && <p role="status" className="px-5 py-3 text-sm text-text-muted">正在加载消息…</p>}
+              {browse?.messageError && <p role="alert" className="px-5 py-3 text-sm text-text-muted">{browse.messageError} <button onClick={browse.retryMessages}>重试</button></p>}
+              {browse?.hasEarlier && <button type="button" disabled={browse.earlierLoading} className="w-full py-2 text-xs text-text-muted" onClick={requestEarlier}>{browse.earlierLoading ? '正在加载历史消息…' : '加载更早消息'}</button>}
+              {browse?.earlierError && <p role="alert" className="px-5 text-xs text-text-muted">{browse.earlierError} <button onClick={requestEarlier}>重试</button></p>}
               {isInitialComposer ? (
                 <div className={INITIAL_COMPOSER_STAGE_CLASS}>
                   <Composer
@@ -1047,12 +1074,13 @@ export function ConversationView({
                       className={MESSAGE_TURN_CLASS}
                       key={turn.id}
                       ref={turn.user ? (element) => setTurnElement(turn.id, element) : undefined}
+                      style={{ contentVisibility: "auto", containIntrinsicSize: "auto 240px" }}
                       data-conversation-turn-id={turn.user ? turn.id : undefined}
                     >
-                      <TurnPrompt turn={turn} onOpenAttachmentPreview={openAttachmentPreview} />
+                      <TurnPrompt turn={turn} onOpenAttachmentPreview={openAttachmentPreview} sessionId={sessionId} />
                       <div className={ASSISTANT_TURN_GROUP_CLASS}>
                         <div className={TURN_BODY_CLASS}>
-                          {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, openAgentTranscript, openReadFile)}
+                          {renderTurnBody(turn, isStreaming && turnIndex === turns.length - 1, openAgentTranscript, openReadFile, openWorkspaceFile)}
                         </div>
                         {splitTurnMessages(turn.messages).finalReply.length > 0
                           && (!isStreaming || turnIndex !== turns.length - 1) ? (

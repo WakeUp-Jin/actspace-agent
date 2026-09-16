@@ -54,6 +54,9 @@ export type ToolProgressUpdate = {
   readonly message: string;
   readonly completed?: number;
   readonly total?: number;
+  /** Optional live file-change counters used by write/edit previews. */
+  readonly additions?: number;
+  readonly deletions?: number;
 };
 
 export type ToolExecutionContext = {

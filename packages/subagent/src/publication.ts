@@ -62,7 +62,7 @@ export async function repairSubagentPublications(options: {
       const name = string(parentCallData.name);
       if (name === null) continue;
       const failed = terminal.data.status !== "completed";
-      const content = failed ? terminal.data.failure?.message ?? `Subagent ended with ${terminal.data.status}.` : terminal.data.text;
+      const content = failed ? [terminal.data.failure?.message ?? `Subagent ended with ${terminal.data.status}.`, terminal.data.text && `Partial findings:\n${terminal.data.text}`].filter(Boolean).join("\n\n") : terminal.data.text;
       candidates.push(core("tool/result", {
         callId: terminal.data.parentCallId,
         pluginId: string(parentCallData.pluginId) ?? "actspace.subagent",
@@ -71,6 +71,8 @@ export async function repairSubagentPublications(options: {
         summary: failed ? "Subagent failed" : "Subagent completed",
         childSessionId: terminal.data.childSessionId,
         recovered: true,
+        failure: terminal.data.failure,
+        modelOutput: [{ type: "text", text: content }],
       }, [], {
         kind: "append",
         node: {

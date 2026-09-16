@@ -36,6 +36,8 @@ Workspace 是用户长期识别的项目入口，由 workspace registry 持久�
 
 Workspace Recents 只展示用户显式使用过的长期目录。ActSpace 创建的 worktree 不注册为新的顶层 Workspace，也不进入 Recents。
 
+目录选择器成功返回 `{ canceled: false, workspaceRoot }`，取消或空选择返回 `{ canceled: true }`；Main handler 的返回值须显式符合 `SelectWorkspaceDirectoryResult`。普通非 Git 目录也可添加为 Workspace。侧栏添加工作区、使用已有目录、新建文件夹的父目录选择，以及扩展中选择源码目录共用这一契约。
+
 ### Execution Root
 
 Execution Root 是当前会话中 Agent 文件工具和 Git 操作真正使用的目录：
@@ -53,6 +55,8 @@ Branch 在两种运行位置下含义不同：
 - `New Worktree`：创建 worktree 的 base branch。ActSpace 会从该分支当前提交创建新的任务分支。
 
 界面必须通过当前 Run on 状态和辅助文案区分这两种语义，不新增第四个常驻选择器。
+
+Composer 初始选择器与后续状态行共用分支标签：有已知分支时显示分支名；仅 `ready` 且有 `detachedCommit` 时显示“分离的 HEAD”。非 Git、读取失败、Git 不可用或尚未加载时，不把分支缺失当作 detached HEAD。会话锁定本身不是分支证据；已知 worktree 分支在 Git context 缺省时仍可展示。
 
 ### Worktree Context
 

@@ -64,8 +64,8 @@ import {
   type ComposerSlashFunction,
   type ComposerSlashFunctionId,
 } from "./composer-slash-commands";
-import { selectProviderUsage, selectRequestContextEstimate } from "@actspace/client/sessions";
-import { contextEstimateToSnapshot, providerUsageToContextSnapshot, useOptionalSessionProjection } from "../session";
+import { selectRequestContextEstimate } from "@actspace/client/sessions";
+import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
 
 export type ComposerSendOptions = {
   model: ModelSelectionId;
@@ -523,10 +523,16 @@ export function Composer({
   const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && sessionProjection.sessionId === (sessionId ?? sessionProjection.sessionId)
     ? sessionProjection.cell
     : null;
-  const projectedProviderUsage = projectionCell ? selectProviderUsage(projectionCell) : null;
   const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
-  const effectiveContextSnapshot = contextSnapshot
-    ?? (projectedProviderUsage ? providerUsageToContextSnapshot(projectedProviderUsage) : null)
+  const effectiveContextSnapshot: ContextUsageSnapshot | null = (contextState ? {
+    basis: contextState.basis,
+    totalTokens: contextState.totalEstimatedTokens,
+    maxTokens: contextState.maxTokens,
+    percentUsed: contextState.percentUsed,
+    estimator: contextState.estimator,
+    buckets: contextState.buckets,
+  } : null)
+    ?? contextSnapshot
     ?? (projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null);
   const modelList: ComposerModelOption[] = models === undefined
     ? LEGACY_MODEL_OPTIONS
@@ -596,8 +602,8 @@ export function Composer({
     (message.trim() || attachments.length > 0) && selectedModelAvailable,
   );
   const editingModelSpec = modelList.find((spec) => spec.id === editingModelId);
-  const editingModelOptions = modelRuntimeOptions[editingModelId] ?? modelDefaultRuntimeOptions(editingModelSpec);
-  const selectedModelOptions = modelRuntimeOptions[selectedModelId] ?? modelDefaultRuntimeOptions(selectedModelSpec);
+  const editingModelOptions = currentModelRuntimeOptions(editingModelSpec, modelRuntimeOptions[editingModelId]);
+  const selectedModelOptions = currentModelRuntimeOptions(selectedModelSpec, modelRuntimeOptions[selectedModelId]);
   const editingReasoningEfforts = modelReasoningEfforts(editingModelSpec);
   const normalizedModelSearchQuery = modelSearchQuery.trim().toLocaleLowerCase();
   const filteredModelList = normalizedModelSearchQuery
@@ -2012,10 +2018,10 @@ export function Composer({
     return (
       <div className={STATUS_ROW_CLASS}>
         <div className={STATUS_GROUP_CLASS}>
-          {gitHasBranch || executionContext?.locked ? (
+          {branchLabel ? (
             <span className={STATUS_ITEM_CLASS} title={selectedBranch}>
               <GitBranch className={STATUS_ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
-              <span className="max-w-[240px] truncate">{selectedBranch ?? "分离的 HEAD"}</span>
+              <span className="max-w-[240px] truncate">{branchLabel}</span>
             </span>
           ) : null}
           <span className={STATUS_ITEM_CLASS}>
@@ -2228,7 +2234,7 @@ export function Composer({
     return (
       <div className={INITIAL_CONTEXT_ROW_CLASS} aria-label="初始工作区与运行位置选择">
         {renderContextSelector("workspace", selectedWorkspaceLabel)}
-        {gitHasBranch ? renderContextSelector("branch", selectedBranch ?? "分离的 HEAD", "branch") : null}
+        {gitHasBranch && branchLabel ? renderContextSelector("branch", branchLabel, "branch") : null}
         {renderContextSelector("runtime", runLocation === "worktree" ? "新建工作树" : "本机", "runtime")}
       </div>
     );

@@ -56,6 +56,23 @@ describe("image generation presentation", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
+  it("keeps image failures compact until the error disclosure is opened", async () => {
+    render(<ToolLogLine message={{
+      ...imageMessage,
+      id: "evt-image-failed",
+      status: "failed",
+      generatedCount: 0,
+      displayText: "Generate image failed",
+      errorMessage: "Image generation provider returned HTML instead of JSON.",
+      images: undefined,
+    }} />);
+
+    expect(screen.getByRole("button", { name: /Generate image failed/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Image generation provider returned HTML instead of JSON.")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Generate image failed/ }));
+    expect(screen.getByText("Image generation provider returned HTML instead of JSON.")).toBeInTheDocument();
+  });
+
   it("collects generated images and completed write/edit outputs only", () => {
     const outputs = collectTurnOutputArtifacts([
       imageMessage,

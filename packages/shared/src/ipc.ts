@@ -329,12 +329,12 @@ export type UsableModelView = {
 export type ModelsListUsableResult = { models: UsableModelView[] };
 
 export type ModelsCatalogListInput = {
-  provider: Extract<ProviderId, "openrouter" | "deepseek">;
+  provider: Extract<ProviderId, "openrouter" | "deepseek" | "kimi">;
   query?: string;
 };
 
 export type ModelsCatalogListResult = {
-  provider: "openrouter" | "deepseek";
+  provider: "openrouter" | "deepseek" | "kimi";
   state: CatalogCacheState;
   fetchedAt?: string;
   stale: boolean;
@@ -344,7 +344,7 @@ export type ModelsCatalogListResult = {
 };
 
 export type ModelsAddInput = {
-  provider: Extract<ProviderId, "openrouter" | "deepseek">;
+  provider: Extract<ProviderId, "openrouter" | "deepseek" | "kimi">;
   apiModel: string;
 };
 
@@ -454,6 +454,11 @@ export type SessionListItem = {
   /** 用户是否把该会话归档。 */
   archived?: boolean;
 };
+
+export type SessionListPageInput = { workspaceRoot?: string; pinned?: boolean; after?: string };
+export type SessionListPage = { items: SessionListItem[]; groups: { workspaceRoot: string; pinned: boolean; hasMore: boolean }[]; indexing: boolean; failed: number };
+export type SessionMessagePageInput = { sessionId: string; before?: number };
+export type SessionMessagePage = { record: SessionRecord; history: { before: number | null; throughJournalSeq: number } };
 
 export type SessionListInput = {
   /** 缺省为 false：普通会话列表只返回未归档会话。 */

@@ -12,6 +12,7 @@ import type { PiAiEngine } from "./pi-ai-adapter.js";
 import { redactLlmText } from "@actspace/llm-service";
 import type { LlmStreamEvent, LlmStreamSource } from "@actspace/llm-service";
 import type { LlmUsage } from "@actspace/llm-service";
+import type { DeepSeekFileUploader } from "./deepseek-files.js";
 
 export type PiAiWireRoute = "openai-completions" | "openai-responses" | "anthropic-messages";
 export type PiAiArtifactReader = (sessionId: string, artifactId: string) => Promise<{ readonly data: Uint8Array; readonly mimeType: string }>;
@@ -23,6 +24,7 @@ export type PiAiWireEngineOptions = {
   readonly modelId?: string;
   readonly baseUrl?: string;
   readonly readArtifact?: PiAiArtifactReader;
+  readonly deepSeekFiles?: DeepSeekFileUploader;
   readonly load?: PiAiPublicLoader;
 };
 
@@ -45,6 +47,10 @@ export class PiAiWireEngine implements PiAiEngine {
   constructor(private readonly options: PiAiWireEngineOptions) { this.#load = options.load ?? loadPiAiPublicModules; }
 
   async stream(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
+    const hasImage = input.request.messages.some((message) => typeof message.content !== "string" && message.content.some((block) => block.type === "image"));
+    if (hasImage && this.options.providerId === "deepseek" && this.options.route === "openai-completions" && this.options.deepSeekFiles !== undefined) {
+      return new LegacyProxyWireEngine({ ...this.options, deepSeekFiles: this.options.deepSeekFiles }).stream(input);
+    }
     if (input.credential.proxyUrl === undefined && catalogProviderForEndpoint(input.credential.baseUrl ?? this.options.baseUrl ?? "") === "openrouter" && this.options.route !== "anthropic-messages") {
       return new LegacyProxyWireEngine(this.options).stream(input);
     }

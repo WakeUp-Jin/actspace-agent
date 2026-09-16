@@ -1,6 +1,6 @@
 # Explore 内置子代理设计
 
-> 状态：当前 v2 静态 Preset 与工具边界。Explore 与通用 Agent 共用一次性 Subagent provider，只在 Preset、工具权限和 Host 展示上区分。
+> 状态：当前 v2 静态 Preset 与工具边界。Explore 与通用 Agent 共用一次性 Subagent provider，以 Preset 和任务定位区分；当前两个 Preset 均限制为只读研究。
 
 运行时总规范见 [`agent-subagent-runtime.md`](agent-subagent-runtime.md)。
 
@@ -21,8 +21,8 @@
 | --- | --- | --- |
 | 目标 | 通用一次性委托 | 聚焦只读探索 |
 | Session | 独立 child Session | 独立 child Session |
-| 工具 | 父可见工具与 Preset 的交集 | 仅只读文件搜索工具 |
-| `readOnly` | `false` | `true` |
+| 工具 | 四个只读工具与父可见工具的交集 | 相同只读白名单 |
+| `readOnly` | `true` | `true` |
 | 递归深度 | 最大 1 | 最大 1 |
 | 生命周期 | one-shot | one-shot |
 
@@ -30,16 +30,16 @@
 
 ## 只读硬约束
 
-Explore 最终工具集只允许名称以以下能力结尾：
+Agent 与 Explore 最终工具集只允许以下精确名称：
 
 ```text
-/read_file
-/list_directory
-/grep
-/glob
+read_file
+list_directory
+grep
+glob
 ```
 
-Provider 在启动 child 前再次验证工具集合。即使父 Agent 可见 Bash、编辑、Web、Browser 或 Agent 工具，Explore 也不能继承这些能力。
+Provider 在启动 child 前再次验证工具集合。即使父 Agent 可见 Bash、编辑、Web、Browser 或 Agent 工具，两者都不能继承这些能力，不新增权限设置或子任务审批交互。
 
 只读约束由 Preset 与 provider admission 同时执行，不能只依赖 Prompt 描述。
 
@@ -57,7 +57,7 @@ Explore 不继承父 Agent 完整对话。它只获得：
 
 ## 输出
 
-Explore 返回普通 `SubagentTerminalResult`。固定 renderer 可以把 `actspace.explore` 显示为内联折叠块，把通用 `actspace.agent` 显示为独立 Panel；这是 Host projection 差异，不改变后端 Session 或 Tool ABI。
+Explore 返回普通 `SubagentTerminalResult`。固定 renderer 将 `actspace.explore` 与通用 `actspace.agent` 统一显示为可点击的独立 Panel，并在右侧 SubAgent 视图中读取 child Session；主消息区只保留状态与摘要。这是 Host projection 差异，不改变后端 Session 或 Tool ABI。
 
 主 Agent 应消费：
 
@@ -78,9 +78,16 @@ Explore 返回普通 `SubagentTerminalResult`。固定 renderer 可以把 `actsp
 
 ## 验收
 
-- Explore 只能看到四类只读工具；
+- Agent 与 Explore 都只能看到四类只读工具；
 - child Session lineage 正确指向父 Tool Call；
 - 父取消会关闭 child writer lease 和 Scope；
 - 返回摘要不会展开 child 全量执行流；
 - renderer 展示差异不影响后端 Tool / Session 契约；
+- Explore 与通用 Agent 都在主消息区显示紧凑两行入口，不内联展开 transcript；右侧 SubAgent 视图是唯一详情入口；
 - 没有旧单包 Runtime、独立 transcript 文件或 `ContextManager` 依赖。
+
+## 运行预算与实时展示（2026-09-15）
+
+两个内置 Preset 默认 300 步、30 分钟时限。第 300 步不暴露工具，只要求总结已确认事实与阻塞；终态仍是 step-limit，不把预算收尾当作任务成功。父取消继续级联。SUBAGENT_STEP_LIMIT / SUBAGENT_TIMEOUT 与部分发现返回主任务，保留 transcript 入口；不原样自动重试。工作区内找不到目标时应尽早说明，不能将无匹配直接推断为运行系统故障。
+
+主消息流使用主题感知轻边框两行入口。第二行从 child live event 的 parentSessionId / parentCallId 关联父工具调用：思考、分析、读取文件、搜索、并行工具数量、整理回复。正文增量只转换成状态，不展示其内容。重复阶段不重复发布；不同活动即时显示，不再用 400ms 合并丢弃短暂工具详情。工具结束后保留最近操作，例如“正在分析 · 刚读取 ConversationView.tsx”；失败工具显示“刚尝试读取”，并行状态保留最近一个仍在执行的工具对象，正文阶段仍只显示“正在整理回复”。敏感值按凭据形态过滤，不因文件名包含 token 等单词而整条清空。使用 180ms、4px 上移交叉淡入淡出；终态即时显示，reduced motion 禁用位移动画。详情仍在右侧 SubAgent 面板。

@@ -1,4 +1,4 @@
-import { deepSeekModelDefinition } from "@actspace/shared";
+import { deepSeekModelDefinition, MODEL_LIST } from "@actspace/shared";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { CatalogCacheState, CatalogModelView, ModelPricing, ModelReasoningEffort, OpenRouterCatalogCache } from "@actspace/shared";
@@ -14,7 +14,7 @@ export type RuntimeV2CatalogResult = {
 };
 
 export type RuntimeV2OpenRouterCatalogOptions = {
-  readonly provider?: "openrouter" | "deepseek";
+  readonly provider?: "openrouter" | "deepseek" | "kimi";
   readonly pricingCatalog?: () => import("@actspace/shared").ModelCatalogSnapshot;
   readonly dataRoot: string;
   readonly fetchCatalog: (runtime: ProviderNetworkRuntime) => Promise<ProviderCatalogFetchResult>;
@@ -28,7 +28,7 @@ const DEFAULT_STALE_AFTER_MS = 24 * 60 * 60 * 1_000;
 
 export class RuntimeV2OpenRouterCatalogService {
   readonly #pricingCatalog?: RuntimeV2OpenRouterCatalogOptions["pricingCatalog"];
-  readonly #provider: "openrouter" | "deepseek";
+  readonly #provider: "openrouter" | "deepseek" | "kimi";
   readonly #cachePath: string;
   readonly #fetchCatalog: RuntimeV2OpenRouterCatalogOptions["fetchCatalog"];
   readonly #isAdded: RuntimeV2OpenRouterCatalogOptions["isAdded"];
@@ -65,8 +65,29 @@ export class RuntimeV2OpenRouterCatalogService {
       const models = snapshot.entries.filter((row) => row.sourceProviderId === "openrouter" && `${row.name} ${row.apiModel}`.toLowerCase().includes(query.toLowerCase().trim())).map((row): CatalogModelView => this.withPricing({ provider: "openrouter", apiModel: row.apiModel, name: row.name, contextWindow: row.contextWindow, maxTokens: row.maxOutput, input: row.input.includes("image") ? ["text", "image"] : ["text"], toolUse: "unknown", reasoning: row.reasoning, isFree: false, added: this.#isAdded(row.apiModel) }));
       return { state: "fresh", stale: false, fetchedAt: snapshot.generatedAt, models, skippedCount: 0 };
     }
-    if (!this.#cache) return { state: "missing", stale: false, models: this.#provider === "deepseek"
-      ? ["deepseek-flash"].map((id) => this.withPricing(deepSeekCatalogModel(id, this.#now().toISOString()))).filter((model) => `${model.name} ${model.apiModel}`.toLowerCase().includes(query.trim().toLowerCase())).map((model) => ({ ...model, added: this.#isAdded(model.apiModel) })) : [], skippedCount: 0 };
+    if (!this.#cache) {
+      const fallback = this.#provider === "deepseek"
+        ? [this.withPricing(deepSeekCatalogModel("deepseek-flash", this.#now().toISOString()))]
+        : this.#provider === "kimi"
+          ? MODEL_LIST.filter((spec) => spec.provider === "kimi").map((spec): CatalogModelView => ({
+              provider: "kimi",
+              apiModel: spec.apiModel,
+              name: spec.label,
+              contextWindow: spec.contextWindow,
+              maxTokens: spec.maxTokens,
+              input: [...spec.input].filter((item): item is "text" | "image" => item === "text" || item === "image"),
+              toolUse: "declared",
+              reasoning: spec.reasoning,
+              ...(spec.reasoningEfforts ? { reasoningEfforts: [...spec.reasoningEfforts] } : {}),
+              ...(spec.reasoningDefaultEffort ? { reasoningDefaultEffort: spec.reasoningDefaultEffort } : {}),
+              isFree: false,
+              ...(spec.pricing ? { pricing: { ...spec.pricing } } : {}),
+              added: this.#isAdded(spec.apiModel),
+            }))
+          : [];
+      const normalized = query.trim().toLowerCase();
+      return { state: "missing", stale: false, models: fallback.filter((model) => !normalized || `${model.name} ${model.apiModel}`.toLowerCase().includes(normalized)), skippedCount: 0 };
+    }
     const normalized = query.trim().toLocaleLowerCase();
     const stale = this.#now().getTime() - Date.parse(this.#cache.fetchedAt) > this.#staleAfterMs;
     const models = this.#cache.models
@@ -119,7 +140,7 @@ export class RuntimeV2OpenRouterCatalogService {
   }
 }
 
-function normalizeCatalogPayload(value: unknown, provider: "openrouter" | "deepseek", now: string): { readonly models: CatalogModelView[]; readonly skippedCount: number } | undefined {
+function normalizeCatalogPayload(value: unknown, provider: "openrouter" | "deepseek" | "kimi", now: string): { readonly models: CatalogModelView[]; readonly skippedCount: number } | undefined {
   if (!isRecord(value) || !Array.isArray(value.data)) return undefined;
   const rows = value.data;
   const models: CatalogModelView[] = [];
@@ -127,7 +148,7 @@ function normalizeCatalogPayload(value: unknown, provider: "openrouter" | "deeps
   for (const row of rows) {
     if (provider === "deepseek" && isRecord(row) && row.id === "deepseek-v4-pro") { skippedCount += 1; continue; }
     const id = isRecord(row) && typeof row.id === "string" && row.id.length <= 300 && !/[\x00-\x20\x7f]/.test(row.id) ? row.id : undefined;
-    const model = provider === "deepseek" ? id ? deepSeekCatalogModel(id, now) : undefined : normalizeCatalogModel(row);
+    const model = provider === "deepseek" ? id ? deepSeekCatalogModel(id, now) : undefined : provider === "kimi" ? normalizeKimiCatalogModel(row) : normalizeCatalogModel(row);
     if (model && !models.some((existing) => existing.apiModel === model.apiModel)) models.push(model);
     else skippedCount += 1;
   }
@@ -165,6 +186,19 @@ function normalizeCatalogModel(value: unknown): CatalogModelView | undefined {
     ...(pricing ? { pricing } : {}),
     added: false,
   };
+}
+
+function normalizeKimiCatalogModel(value: unknown): CatalogModelView | undefined {
+  if (!isRecord(value)) return undefined;
+  const apiModel = cleanText(value.id, 300);
+  if (!apiModel) return undefined;
+  const modalities = Array.isArray(value.input_modalities) ? value.input_modalities : [];
+  const supportsImage = value.supports_image_in === true || (value.supports_image_in === undefined && modalities.includes("image"));
+  const input: Array<"text" | "image"> = supportsImage ? ["text", "image"] : ["text"];
+  const contextWindow = positiveInteger(value.context_length);
+  const maxTokens = positiveInteger(value.max_output_tokens);
+  const reasoning = value.supports_reasoning === true || (value.supports_reasoning === undefined && /thinking|reasoning/i.test(apiModel));
+  return { provider: "kimi", apiModel, name: cleanText(value.name, 180) || apiModel, contextWindow, maxTokens, input, toolUse: value.supports_tools === true ? "declared" : "unknown", reasoning, isFree: false, added: false };
 }
 
 function normalizeReasoning(value: unknown): { readonly efforts?: ModelReasoningEffort[] | null; readonly defaultEffort?: ModelReasoningEffort; readonly defaultEnabled?: boolean; readonly mandatory?: boolean } | undefined {
@@ -205,7 +239,7 @@ function isCatalogModelView(value: unknown): value is CatalogModelView {
   if (!isRecord(value)) return false;
   const input = value.input;
   const efforts = value.reasoningEfforts;
-  return (value.provider === "openrouter" || value.provider === "deepseek")
+  return (value.provider === "openrouter" || value.provider === "deepseek" || value.provider === "kimi")
     && typeof value.apiModel === "string"
     && value.apiModel.length > 0
     && typeof value.name === "string"
@@ -262,8 +296,9 @@ function deepSeekCatalogModel(apiModel: string, now: string): CatalogModelView {
 }
 
 /** Both IPC surfaces validate the provider before resolving credentials. */
-export function selectModelCatalog(provider: unknown, openrouter: RuntimeV2OpenRouterCatalogService, deepseek?: RuntimeV2OpenRouterCatalogService): { provider: "openrouter" | "deepseek"; catalog: RuntimeV2OpenRouterCatalogService } {
+export function selectModelCatalog(provider: unknown, openrouter: RuntimeV2OpenRouterCatalogService, deepseek?: RuntimeV2OpenRouterCatalogService, kimi?: RuntimeV2OpenRouterCatalogService): { provider: "openrouter" | "deepseek" | "kimi"; catalog: RuntimeV2OpenRouterCatalogService } {
   if (provider === undefined || provider === "openrouter") return { provider: "openrouter", catalog: openrouter };
   if (provider === "deepseek" && deepseek) return { provider, catalog: deepseek };
+  if (provider === "kimi" && kimi) return { provider, catalog: kimi };
   throw new Error("模型目录服务商无效或目录不可用。");
 }

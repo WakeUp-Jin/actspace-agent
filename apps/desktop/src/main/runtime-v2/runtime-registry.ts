@@ -84,6 +84,9 @@ export class DesktopRuntimeV2Registry {
     });
   }
 
+  browseSessions() { return this.requireApp().browseSessions(); }
+  browseToolDetail(sessionId: string, callId: string) { return this.requireApp().browseToolDetail(sessionId, callId); }
+  browseSession(sessionId: string, before?: number) { return this.requireApp().browseSession(sessionId, before); }
   listSessions() { return this.requireApp().listSessions(); }
   inspectSession(sessionId: string) { return this.requireApp().inspectSession(sessionId); }
   inspectSessionEvents(sessionId: string) { return this.requireApp().inspectSessionEvents(sessionId); }

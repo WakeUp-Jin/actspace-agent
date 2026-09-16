@@ -28,6 +28,9 @@ type SessionService = {
   inspect(sessionId: string): Promise<RuntimeV2SessionSnapshot>;
   inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]>;
   list(): Promise<readonly RuntimeV2SessionListItem[]>;
+  browseSessions(): Promise<import("@actspace/shared/runtime-v2").RuntimeV2BrowseList>;
+  browseToolDetail(sessionId: string, callId: string): Promise<DesktopBrowsePage>;
+  browseSession(sessionId: string, before?: number): Promise<DesktopBrowsePage>;
   export(sessionId: string): Promise<string>;
   getOpen(sessionId: string): SessionHandle | undefined;
 };
@@ -49,6 +52,9 @@ type AgentRuntimeService = { readonly runs: RunService };
 
 export type DesktopAppServiceContract = {
   readonly listSessions: () => Promise<readonly RuntimeV2SessionListItem[]>;
+  readonly browseSessions: () => Promise<import("@actspace/shared/runtime-v2").RuntimeV2BrowseList>;
+  readonly browseToolDetail: (sessionId: string, callId: string) => Promise<DesktopBrowsePage>;
+  readonly browseSession: (sessionId: string, before?: number) => Promise<DesktopBrowsePage>;
   readonly inspectSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly inspectSessionEvents: (sessionId: string) => Promise<readonly SessionEventEnvelopeV1[]>;
   readonly exportSession: (sessionId: string) => Promise<string>;
@@ -85,6 +91,9 @@ export class DesktopAppService implements DesktopAppServiceContract {
   }
 
   listSessions() { return this.#sessions.list(); }
+  browseSessions() { return this.#sessions.browseSessions(); }
+  browseToolDetail(sessionId: string, callId: string) { return this.#sessions.browseToolDetail(sessionId, callId); }
+  browseSession(sessionId: string, before?: number) { return this.#sessions.browseSession(sessionId, before); }
   inspectSession(sessionId: string) { return this.#sessions.inspect(sessionId); }
   inspectSessionEvents(sessionId: string) { return this.#sessions.inspectEvents(sessionId); }
   exportSession(sessionId: string) { return this.#sessions.export(sessionId); }
@@ -266,3 +275,5 @@ function textFromContent(value: RuntimeV2JsonValue): string {
 }
 
 function core(type: string, data: RuntimeV2JsonValue): SessionEventCandidateV1 { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
+
+export type DesktopBrowsePage = { deferredToolCalls?: string[]; snapshot: RuntimeV2SessionSnapshot; journal: readonly SessionEventEnvelopeV1[]; history: { before: number | null; throughJournalSeq: number } };

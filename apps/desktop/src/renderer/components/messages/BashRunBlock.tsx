@@ -9,7 +9,7 @@ type ApprovalDecision = "approve_once" | "deny" | "allow_similar";
 
 const BASH_RUN_CLASS = "message-row bash-run max-w-[800px] px-[var(--conversation-text-inset)]";
 const BASH_RUN_TOGGLE_CLASS =
-  "bash-run-toggle flex w-full max-w-full items-center gap-[7px] overflow-hidden border-0 bg-transparent p-0 text-left text-sm font-medium leading-[1.42] text-text-muted";
+  "bash-run-toggle flex w-full max-w-full items-center gap-[7px] overflow-hidden border-0 bg-transparent p-0 text-left text-sm font-normal leading-[22px] text-text-muted";
 const BASH_RUN_SUMMARY_CLASS = "bash-run-summary flex-none whitespace-nowrap";
 const BASH_COMMAND_PREVIEW_CLASS =
   "bash-command-preview min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-normal text-text-faint";
@@ -19,7 +19,7 @@ const BASH_OUTPUT_SHELL_CLASS =
 const BASH_OUTPUT_MENU_CLASS =
   "bash-output-menu absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-hover-overlay hover:text-text-main focus-visible:bg-selected focus-visible:text-text-main";
 const BASH_OUTPUT_TEXT_CLASS =
-  "bash-output-text m-0 min-w-0 whitespace-pre-wrap pt-[10px] pr-[38px] pb-3 pl-[var(--conversation-card-padding)] font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.52] text-text-muted [word-break:break-word]";
+  "bash-output-text m-0 min-w-0 whitespace-pre-wrap pt-[10px] pr-[38px] pb-3 pl-[var(--conversation-card-padding)] font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.6] text-text-muted [word-break:break-word]";
 const BASH_PROMPT_CLASS = "bash-prompt text-text-faint";
 const BASH_APPROVAL_CLASS =
   "message-row bash-approval w-full max-w-[800px] overflow-hidden rounded-act-md border border-line bg-surface";
@@ -68,7 +68,6 @@ async function submitApproval(requestId: string, decision: ApprovalDecision): Pr
   }
 }
 
-const FINAL_APPROVAL_STATUSES = new Set(["denied", "expired", "cancelled"]);
 
 export function BashRunBlock({ message, replyCompleted = false }: { message: BashMessage; replyCompleted?: boolean }) {
   if (message.status === "pending") {
@@ -112,6 +111,7 @@ function BashExecutionBlock({ message, replyCompleted = false }: { message: Bash
   const [expanded, setExpanded] = useState(!replyCompleted && message.status === "failed");
   const chevron = expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />;
   const summary = getExecutionSummary(message);
+  const target = message.commandPreview || message.command || "Bash command";
   // 前台执行中 / 后台仍在跑：标题走 shimmer 高光，让用户看出命令正在执行
   const isActive =
     message.status === "running" &&
@@ -120,7 +120,7 @@ function BashExecutionBlock({ message, replyCompleted = false }: { message: Bash
   return (
     <article className={`${BASH_RUN_CLASS} is-${message.status}`}>
       <button
-        className={BASH_RUN_TOGGLE_CLASS}
+        className={`${BASH_RUN_TOGGLE_CLASS}${["failed", "denied", "expired"].includes(message.status) ? " text-on-danger" : ""}`}
         type="button"
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
@@ -135,9 +135,9 @@ function BashExecutionBlock({ message, replyCompleted = false }: { message: Bash
         ) : (
           <span className={BASH_RUN_SUMMARY_CLASS}>{summary}</span>
         )}
-        {message.commandPreview ? <span className={BASH_COMMAND_PREVIEW_CLASS}>{message.commandPreview}</span> : null}
+        <span className={BASH_COMMAND_PREVIEW_CLASS} title={target}>{target}</span>
         <span className={BASH_RUN_TRAILING_CLASS}>
-          <EnvironmentBadge sandboxed={message.sandboxed} notExecuted={message.notExecuted} />
+          <EnvironmentBadge sandboxed={message.sandboxed === false ? false : undefined} notExecuted={message.notExecuted} />
           {message.backgroundStatus ? (
             <span className={BASH_BACKGROUND_BADGE_CLASS}>{BACKGROUND_BADGE_TEXT[message.backgroundStatus]}</span>
           ) : null}
@@ -163,11 +163,13 @@ function BashExecutionBlock({ message, replyCompleted = false }: { message: Bash
             {message.cwd ? `\n# cwd: ${message.cwd}` : ""}
             {message.backgroundTaskId ? `\n# task: ${message.backgroundTaskId}` : ""}
             {message.outputFilePath ? `\n# output: ${message.outputFilePath}` : ""}
-            {message.exitCode !== undefined ? `\n# exit: ${message.exitCode}` : ""}
-            {message.durationMs !== undefined ? ` (${message.durationMs}ms)` : ""}
-            {message.stdout ? `\n\n${message.stdout.trimEnd()}` : ""}
-            {message.stderr ? `\n\n${message.stderr.trimEnd()}` : ""}
-            {message.reason && FINAL_APPROVAL_STATUSES.has(message.status) ? `\n\n${message.reason}` : ""}
+            {!message.notExecuted && message.exitCode != null ? `\n# exit: ${message.exitCode}` : ""}
+            {!message.notExecuted && message.durationMs !== undefined ? `\n# duration: ${message.durationMs}ms` : ""}
+            {message.notExecuted ? "\n# 未执行" : message.sandboxed === undefined ? "" : `\n# environment: ${message.sandboxed ? "沙盒" : "真实环境"}`}
+            {message.title && message.title !== "Bash command" && message.title !== message.intent ? `\n# summary: ${message.title}` : ""}
+            {!message.notExecuted && message.stdout ? `\n\n${message.stdout.trimEnd()}` : ""}
+            {!message.notExecuted && message.stderr ? `\n\n${message.stderr.trimEnd()}` : ""}
+            {message.reason ? `\n\n${message.reason}` : ""}
           </pre>
         </div>
       ) : null}
@@ -293,21 +295,17 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
 function getExecutionSummary(message: BashMessage): string {
   switch (message.status) {
     case "running":
-      return `Running ${normalizeBashTitle(message.title)}`;
+      return "Running";
     case "failed":
-      return `Failed ${normalizeBashTitle(message.title)}`;
+      return "Failed";
     case "denied":
-      return `Denied ${normalizeBashTitle(message.title)}`;
+      return "Denied";
     case "expired":
-      return `Expired ${normalizeBashTitle(message.title)}`;
+      return "Expired";
     case "cancelled":
-      return `Cancelled ${normalizeBashTitle(message.title)}`;
+      return "Cancelled";
     case "success":
     default:
-      return `Ran ${normalizeBashTitle(message.title)}`;
+      return "Ran";
   }
-}
-
-function normalizeBashTitle(title: string): string {
-  return title.replace(/\s+failed$/i, "");
 }

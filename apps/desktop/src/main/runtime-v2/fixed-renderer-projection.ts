@@ -3,8 +3,7 @@ import { toolPreview } from "./fixed-renderer-tool-preview";
 import {
   createMessageBlocks,
   type ContextUsageSnapshot,
-  type ContextState,
-  type ContextStateEntry,
+  projectContextState,
   type MessageBlock,
   type SessionEvent,
   type SessionRecord,
@@ -87,7 +86,7 @@ export function projectFixedRendererEvents(
     if (event.type === "user/message" || (event.type === "agent/inbox/spliced" && string(data.operation) === "claim")) {
       const node = appendNode(event);
       if (node === null || !activeSurface.messageIds.has(node.messageId)) continue;
-      projectSurfaceNode(projected, node, { ...base, id: eventId(event) }, index);
+      projectSurfaceNode(projected, node, { ...base, id: eventId(event) }, index, string(data.source) ?? undefined);
       continue;
     }
     if (event.type === "assistant/message") {
@@ -172,9 +171,10 @@ function projectSurfaceNode(
   node: NonNullable<SessionEventEnvelopeV1["surface"]>["node"],
   base: SurfaceProjectionBase,
   index: EventIndex,
+  source?: string,
 ): void {
   if (node.kind === "user") {
-    projected.push({ ...base, type: "user_message", payload: { content: contentText(node.content), attachments: attachmentViews(node.content) } });
+    projected.push({ ...base, type: "user_message", payload: { content: contentText(node.content), attachments: attachmentViews(node.content), ...(source === undefined ? {} : { source }) } });
     return;
   }
   if (node.kind !== "assistant") return;
@@ -201,96 +201,23 @@ function indexActiveSurface(snapshot: RuntimeV2SessionSnapshot, journal: readonl
 }
 
 export function projectContextSnapshot(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[] = []): ContextUsageSnapshot {
-  const maxTokens = requestContextWindow(journal);
+  const state = projectContextState(snapshot, journal);
   return {
-    totalTokens: snapshot.usage.totalTokens,
-    maxTokens,
-    percentUsed: maxTokens > 0 ? Math.min(100, snapshot.usage.totalTokens / maxTokens * 100) : 0,
+    throughJournalSeq: state.throughJournalSeq,
+    basis: state.basis,
+    requestId: state.requestId,
+    totalTokens: state.totalEstimatedTokens,
+    maxTokens: state.maxTokens,
+    percentUsed: state.percentUsed,
     compressionCount: snapshot.activity.compactionCount,
-    estimator: { name: "runtime-v2-provider-usage", version: "1" },
-    buckets: [
-      { name: "conversation", label: "Conversation", tokens: snapshot.usage.inputTokens + snapshot.usage.outputTokens },
-      { name: "tools", label: "Tool results", tokens: snapshot.usage.cacheReadTokens + snapshot.usage.cacheWriteTokens },
-    ],
+    cumulativeTokens: snapshot.usage.totalTokens,
+    cumulativeUsage: snapshot.usage,
+    estimator: state.estimator,
+    buckets: state.buckets,
   };
 }
 
-export function projectContextState(
-  snapshot: RuntimeV2SessionSnapshot,
-  journal: readonly SessionEventEnvelopeV1[],
-): ContextState {
-  const latest = [...journal].reverse().find((event) => event.type === "request/context");
-  const request = latest === undefined ? {} : record(record(latest.data).snapshot);
-  const entries: ContextStateEntry[] = [];
-  const push = (kind: ContextStateEntry["kind"], id: string, title: string, value: RuntimeV2JsonValue, pinned = false) => {
-    const preview = contextPreview(value);
-    if (!preview) return;
-    entries.push({ id, kind, title, estimatedTokens: estimateTokens(preview), included: true, pinned, removable: false, preview });
-  };
-
-  for (const [index, section] of array(request.systemSections).entries()) {
-    if (Array.isArray(section)) {
-      for (const [skillIndex, skill] of section.entries()) {
-        const value = record(skill);
-        push("skills", `request-${latest?.seq ?? 0}-skill-${index}-${skillIndex}`, string(value.id) ?? `Skill ${skillIndex + 1}`, value.content ?? skill);
-      }
-      continue;
-    }
-    const value = record(section);
-    if (typeof value.content === "string" && typeof value.title === "string") {
-      push("rules", `request-${latest?.seq ?? 0}-rule-${index}`, value.title, value.content);
-      continue;
-    }
-    push("systemPrompt", `request-${latest?.seq ?? 0}-system-${index}`, index === 0 ? "Core identity" : index === 1 ? "Runtime safety" : `System section ${index + 1}`, section, true);
-  }
-
-  for (const [index, tool] of array(request.tools).entries()) {
-    const value = record(tool);
-    push("toolDefinitions", `request-${latest?.seq ?? 0}-tool-${index}`, string(value.name) ?? `Tool ${index + 1}`, tool);
-  }
-
-  const facts = array(request.facts);
-  if (facts.length > 0) push("systemPrompt", `request-${latest?.seq ?? 0}-facts`, "Runtime facts", facts, true);
-  if (snapshot.activity.lastCompactionSummary) push("summarizedConversation", `session-${snapshot.sessionId}-summary`, "Summarized conversation", snapshot.activity.lastCompactionSummary);
-  for (const [index, message] of array(request.messages).entries()) {
-    const value = record(message);
-    push("conversation", `request-${latest?.seq ?? 0}-message-${index}`, `${string(value.role) ?? "message"} ${index + 1}`, value.content ?? message);
-  }
-
-  const bucketOrder: Array<{ key: NonNullable<ContextState["buckets"][number]["name"]>; label: string; kind: ContextStateEntry["kind"] }> = [
-    { key: "systemPrompt", label: "System prompt", kind: "systemPrompt" },
-    { key: "tools", label: "Tools", kind: "toolDefinitions" },
-    { key: "rules", label: "Rules", kind: "rules" },
-    { key: "skills", label: "Skills", kind: "skills" },
-    { key: "summarizedConversation", label: "Summarized conversation", kind: "summarizedConversation" },
-    { key: "conversation", label: "Conversation", kind: "conversation" },
-  ];
-  const buckets = bucketOrder.map(({ key, label, kind }) => ({ name: key, key, label, tokens: entries.filter((entry) => entry.kind === kind).reduce((sum, entry) => sum + entry.estimatedTokens, 0) }));
-  const totalEstimatedTokens = entries.reduce((sum, entry) => sum + entry.estimatedTokens, 0);
-  const maxTokens = requestContextWindow(journal);
-  return {
-    sessionId: snapshot.sessionId,
-    updatedAt: latest?.time ?? snapshot.updatedAt,
-    estimator: { name: "runtime-v2-request-snapshot", version: "1" },
-    totalEstimatedTokens,
-    maxTokens,
-    percentUsed: maxTokens > 0 ? Math.min(100, totalEstimatedTokens / maxTokens * 100) : 0,
-    buckets,
-    entries,
-  };
-}
-
-function requestContextWindow(journal: readonly SessionEventEnvelopeV1[]): number {
-  const latestContext = [...journal].reverse().find((event) => event.type === "request/context");
-  const contextData = latestContext && record(latestContext.data);
-  const snapshot = contextData ? record(contextData.snapshot) : {};
-  const prepared = record(snapshot.prepared);
-  if (typeof prepared.contextWindow === "number" && Number.isSafeInteger(prepared.contextWindow) && prepared.contextWindow > 0) return prepared.contextWindow;
-  const requestId = string(contextData?.requestId);
-  const latestHeader = [...journal].reverse().find((event) => event.type === "request/header" && (requestId === undefined || string(record(event.data).requestId) === requestId));
-  const header = latestHeader ? record(latestHeader.data) : {};
-  return typeof header.contextWindow === "number" && Number.isSafeInteger(header.contextWindow) && header.contextWindow > 0 ? header.contextWindow : 0;
-}
+export { projectContextState } from "@actspace/shared";
 
 export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): SessionEvent[] {
   const events = projectFixedRendererEvents(snapshot, journal);
@@ -736,18 +663,8 @@ function toolRows(tools: readonly RuntimeV2ToolView[]) { const grouped = new Map
 function appendNode(event: SessionEventEnvelopeV1) { return event.surface?.kind === "append" ? event.surface.node : null; }
 function contentBlocks(value: RuntimeV2JsonValue): readonly EventRecord[] { return Array.isArray(value) ? value.filter(isRecord) : []; }
 function array(value: RuntimeV2JsonValue | undefined): readonly RuntimeV2JsonValue[] { return Array.isArray(value) ? value : []; }
-function contextPreview(value: RuntimeV2JsonValue): string {
-  if (typeof value === "string") return value.trim();
-  const encoded = JSON.stringify(value, null, 2);
-  return encoded === undefined ? "" : encoded.trim();
-}
-function estimateTokens(value: string): number {
-  if (!value) return 0;
-  const ascii = [...value].filter((character) => character.codePointAt(0)! <= 0x7f).length;
-  return Math.max(1, Math.ceil((ascii / 4) + (value.length - ascii)));
-}
 function contentText(value: RuntimeV2JsonValue, includeReasoning = true): string { if (typeof value === "string") return value; if (!Array.isArray(value)) return JSON.stringify(value ?? null, null, 2); return value.flatMap((entry) => { if (typeof entry === "string") return [entry]; if (!isRecord(entry)) return [JSON.stringify(entry)]; if (entry.type === "text" && typeof entry.text === "string") return [entry.text]; if (includeReasoning && entry.type === "reasoning" && typeof entry.text === "string") return [entry.text]; if (entry.type === "image") return [typeof entry.alt === "string" ? `[${entry.alt}]` : "[image]"]; if (entry.type === "artifact") return [typeof entry.label === "string" ? `[${entry.label}]` : "[attachment]"]; return []; }).join(""); }
-function attachmentViews(value: RuntimeV2JsonValue | undefined) { return contentBlocks(value ?? []).filter((entry) => entry.type === "artifact").map((entry, index) => ({ id: string(record(entry.artifact).artifactId) ?? `attachment-${index}`, kind: (string(record(entry.artifact).mediaType)?.startsWith("image/") ? "image" : "file") as "image" | "file", name: string(entry.label) ?? `Attachment ${index + 1}`, mimeType: string(record(entry.artifact).mediaType) ?? undefined })); }
+function attachmentViews(value: RuntimeV2JsonValue | undefined) { return contentBlocks(value ?? []).filter((entry) => entry.type === "artifact").map((entry, index) => { const artifactId = string(record(entry.artifact).artifactId) ?? `attachment-${index}`; return { id: artifactId, path: artifactId, kind: (string(record(entry.artifact).mediaType)?.startsWith("image/") ? "image" : "file") as "image" | "file", name: string(entry.label) ?? `Attachment ${index + 1}`, mimeType: string(record(entry.artifact).mediaType) ?? undefined }; }); }
 function modelOutputText(value: RuntimeV2JsonValue | undefined): string { if (!Array.isArray(value)) return ""; return value.map((entry) => { const block = record(entry); return typeof block.text === "string" ? block.text : block.value === undefined ? "" : JSON.stringify(block.value); }).filter(Boolean).join("\n"); }
 function toolModelOutputText(tool: RuntimeV2ToolView | undefined): string { return tool?.modelOutput?.map((block) => block.type === "text" ? block.text : `${block.alt} (${block.artifactId})`).join("\n") ?? ""; }
 function findCompactionStart(events: readonly SessionEventEnvelopeV1[], id: string | null) { if (!id) return undefined; const event = events.find((candidate) => candidate.type === "compaction/start" && string(record(candidate.data).compactionId) === id); return event === undefined ? undefined : { data: record(event.data) }; }

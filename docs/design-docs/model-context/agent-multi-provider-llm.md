@@ -208,7 +208,7 @@ openrouter:anthropic/claude-...
 | Provider | 默认协议 | 默认 Base URL | 远端模型目录 | 默认代理 |
 | --- | --- | --- | --- | --- |
 | DeepSeek | OpenAI-compatible Chat Completions | `https://api.deepseek.com` | 是，ID 发现 + 本地官方档案 | 关闭 |
-| Kimi | OpenAI-compatible | `https://api.moonshot.cn/v1` | 首版不使用 | 关闭 |
+| Kimi | OpenAI-compatible | `https://api.moonshot.cn/v1`（可改为 `.ai`） | 是，按连接 Base URL 请求 `/models` | 关闭 |
 | OpenRouter | OpenAI-compatible | `https://openrouter.ai/api/v1` | 是 | 关闭，由用户开启 |
 
 Provider adapter 可提供：
@@ -228,6 +228,8 @@ Provider adapter 可提供：
 - 已知 ID 由 shared 官方档案补齐能力/价格；未知 ID 为 text、toolUse=unknown、价格/上下文未知，不自动进入主 Agent 候选。远端 ID 需由用户点击“从目录添加”，不自动启用新模型；内置 Flash 迁移直接可见。
 - 刷新成功更新已安装目录模型的能力，保留用户状态和任务引用；坏响应、网络失败或缓存写入失败保留最后成功目录。目录刷新仅发现模型，不能自动更新官方价格档案。
 - V4.1 Flash 原生接收图片，1M 上下文、最大 384K 输出。Desktop 将模型事实传到 pi-ai，默认请求预算仍保留 32K，能力上限不作为默认预算。图片复用 Session artifact，Chat Completions 校验 user-role、格式签名、32 MiB 单图、600 张、48 MiB 编码请求体（Composer 自身更严格为 20 MiB）。其余像素限制由官方返回错误处理。
+- Kimi 模型目录通过配置连接的 `${baseUrl}/models` 按需刷新，读取供应商返回的 `id`、`context_length`、`max_output_tokens`、`supports_image_in`、`supports_reasoning` 与 `supports_tools`；缓存按 provider 分目录隔离。未刷新或离线时仍保留内置 Kimi 模型，旧静态列表不再是唯一事实源；`api.moonshot.cn/v1` 与 `api.moonshot.ai/v1` 均由连接的 Base URL 决定。
+- 图片发送链路为“本地文件 → Session-owned Artifact → provider wire payload”。普通 OpenAI-compatible / Responses / Anthropic adapter 在请求边界读取 Artifact 并生成受 MIME/大小校验的 base64 data URL；直连 DeepSeek OpenAI Chat 路线调用 Files API（`purpose=user_data`）并发送 `file_id`，按凭据、会话和 artifact 在进程内缓存，过期后从本地 Artifact 重传；Journal 只保存 Artifact 引用。单一供应商的 Files API 不推广到其他 provider。
 - 直连 DeepSeek 回放使用正确的 SDK model/provider/api 身份与 `reasoning_content`；代理 Chat Completions 显式保留 reasoning_content，避免工具轮次丢失推理上下文。
 - 按用户 2026-09-11 追加要求，Pro 从内置可选列表和远端目录中移除；旧配置引用映射到 Flash，默认模型改为 Flash。不保留停用日期提示和定时切换逻辑。
 

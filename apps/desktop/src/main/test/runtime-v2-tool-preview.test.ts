@@ -25,4 +25,27 @@ describe("shared live and durable tool previews", () => {
     }
     expect(toolPreview("bash", undefined, { status: "aborted" }, undefined, undefined, "s", "r")).toMatchObject({ status: "cancelled" });
   });
+  it("routes Explore and Agent transcripts to the shared subagent panel", () => {
+    expect(toolPreview("explore", undefined, { status: "completed" }, { args: { task: "Inspect UI" } }, undefined, "s", "r")).toMatchObject({ kind: "agent", agentKind: "explore", display: "panel" });
+    expect(toolPreview("agent", undefined, { status: "completed" }, { args: { task: "Inspect UI" } }, undefined, "s", "r")).toMatchObject({ kind: "agent", agentKind: "agent", display: "panel" });
+  });
+  it("retains aborted child identity despite a failed tool-body status", () => {
+    expect(toolPreview("agent", undefined, { status: "failed", failure: { message: "Cancelled" }, detail: [{ label: "delegation", value: { childSessionId: "child", status: "aborted" } }] }, { args: { task: "Inspect" } }, undefined, "parent", "run")).toMatchObject({ status: "aborted", error: "Cancelled", transcriptRef: { runId: "child" } });
+  });
+  it("does not turn failed file-tool output into a result preview", () => {
+    expect(toolPreview("glob", undefined, { status: "failed", failure: { message: "SEARCH_FAILED" }, modelOutput: [{ type: "text", text: "SEARCH_FAILED" }] }, { args: { pattern: "**/*.md", path: "." } }, undefined, "s", "r")).toMatchObject({ kind: "glob", resultPreview: undefined });
+  });
+});
+
+describe("compact Bash preview diagnostics", () => {
+  it("retains complete summary in details without promoting it to the title", () => {
+    const preview = toolPreview("bash", undefined, { status: "completed", summary: "Bash completed in 85ms (exit 0, sandboxed=true).", modelOutput: [{ type: "text", text: "file.txt" }] }, { args: { command: "ls", intent: "Inspect files" } }, undefined, "s", "r");
+    expect(preview).toMatchObject({ title: "Bash command", commandPreview: "ls", stdout: "file.txt", reason: "Bash completed in 85ms (exit 0, sandboxed=true).", intent: "Inspect files" });
+    expect(preview).not.toHaveProperty("sandboxed");
+    expect(preview).not.toHaveProperty("exitCode");
+  });
+  it.each(["denied", "failed", "aborted"])("retains %s diagnostics even when output and error differ", (status) => {
+    const preview = toolPreview("bash", undefined, { status, summary: "Command unsuccessful", failure: { message: "Detailed failure reason" }, modelOutput: [{ type: "text", text: "Partial command output" }] }, { args: { command: "run" } }, undefined, "s", "r");
+    expect(preview).toMatchObject({ title: "Bash command", stderr: "Partial command output", reason: "Command unsuccessful\nDetailed failure reason" });
+  });
 });

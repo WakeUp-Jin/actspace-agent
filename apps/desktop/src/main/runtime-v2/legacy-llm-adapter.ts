@@ -2,7 +2,7 @@ import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
 import { catalogProviderForEndpoint, resolveModelPricing } from "@actspace/shared";
 import type { LlmAdapter, LlmAdapterDispatchInput, LlmRequestModelFacts, LlmStreamSource } from "@actspace/llm-service";
 import type { PiAiWireRoute } from "@actspace/llm-pi-ai";
-import { LegacyProxyWireEngine, PiAiAdapter, PiAiWireEngine } from "@actspace/llm-pi-ai";
+import { DeepSeekFileUploader, LegacyProxyWireEngine, PiAiAdapter, PiAiWireEngine } from "@actspace/llm-pi-ai";
 import { ProviderProxyPool } from "@actspace/llm-service";
 import type { ModelApi } from "@actspace/shared";
 import { IMAGE_INSPECTION_CREDENTIAL_REF } from "./credential-resolver";
@@ -14,6 +14,7 @@ type SessionArtifactReader = (sessionId: string, artifactId: string) => Promise<
 export class DesktopLegacyLlmAdapter implements LlmAdapter {
   readonly adapterVersion = "actspace.desktop-pi-ai.v2";
   readonly #proxies = new ProviderProxyPool();
+  readonly #deepSeekFiles = new DeepSeekFileUploader();
 
   constructor(private readonly models: DesktopRuntimeV2ModelPort, private readonly readArtifact: SessionArtifactReader, private readonly purpose: "chat" | "utility" = "chat") {}
 
@@ -74,6 +75,7 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
         const artifact = await this.readArtifact(sessionId, artifactId);
         return { data: artifact.bytes, mimeType: artifact.mediaType };
       },
+      deepSeekFiles: this.#deepSeekFiles,
     } as const;
     const adapter = new PiAiAdapter({
       engine: new PiAiWireEngine(engineOptions),
@@ -92,7 +94,7 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
     });
   }
 
-  dispose(): Promise<void> { return this.#proxies.dispose(); }
+  async dispose(): Promise<void> { this.#deepSeekFiles.clear(); await this.#proxies.dispose(); }
 }
 
 function toWireRoute(api: ModelApi): PiAiWireRoute { return api; }

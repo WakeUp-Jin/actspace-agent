@@ -4,7 +4,7 @@ import { projectSessionSnapshot } from "../../../../../packages/runtime/dist/pro
 import { projectFixedRendererSession } from "../../main/runtime-v2/fixed-renderer-projection";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AppSettings, BootstrapState, CompactContextInput, ReviewGetSnapshotResult, RunAgentInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
+import type { AgentRunResult, AppSettings, BootstrapState, CompactContextInput, ReviewGetSnapshotResult, RunAgentInput, RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
@@ -1496,7 +1496,7 @@ sessionId,
     if (!finishOnly) expect(await screen.findByText("Read fixture.txt")).toHaveAttribute("data-shimmer-text");
     expect(screen.queryByText(/\{"path"/)).not.toBeInTheDocument();
     await act(async () => { finishTool(); });
-    await waitFor(() => expect(screen.getByText("Read fixture.txt")).not.toHaveAttribute("data-shimmer-text"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Read fixture.txt" })).not.toHaveAttribute("data-shimmer-text"));
     expect(screen.queryByText(/已结束\./)).not.toBeInTheDocument();
     await act(async () => {
       if (!lastFinished) throw new Error("Expected a tool result before final text");
@@ -1504,12 +1504,12 @@ sessionId,
       streamHandler?.({ type: "tool_approval_required", sessionId, agentRunId: lastFinished.agentRunId, toolCallId: lastFinished.toolCallId, toolName: "read_file", requestId: "late-approval", summary: "Late", reason: "Late" });
       streamHandler?.(lastFinished);
     });
-    expect(screen.getByText("Read fixture.txt")).not.toHaveAttribute("data-shimmer-text");
+    expect(screen.getByRole("button", { name: "Read fixture.txt" })).not.toHaveAttribute("data-shimmer-text");
     expect(screen.queryByText("Read late.txt")).not.toBeInTheDocument();
     await act(async () => { finishText(); });
     expect(await screen.findByText(/body JSON/)).toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: /Worked for/ }));
-    await waitFor(() => expect(screen.getAllByText("Read fixture.txt")).toHaveLength(1));
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Read fixture.txt" })).toHaveLength(1));
     expect(screen.queryByText(/\{"path"/)).not.toBeInTheDocument();
     adapter.dispose();
   });
@@ -1921,7 +1921,7 @@ sessionId: input.sessionId,
               description: "Explore renderer flow",
               status: "running",
               subagentType: "explore",
-              displayText: "Explore renderer flow",
+              displayText: "正在读取 · App.tsx",
             },
           });
           streamHandler?.({
@@ -1941,7 +1941,7 @@ sessionId: input.sessionId,
               description: "Explore renderer flow",
               status: "running",
               subagentType: "explore",
-              displayText: "Explore renderer flow",
+              displayText: "正在读取 · App.tsx",
               transcriptRef: {
                 kind: "subagent_transcript",
                 sessionId,
@@ -1970,7 +1970,7 @@ sessionId: input.sessionId,
     await userEvent.click(screen.getByLabelText("发送消息"));
 
     expect(await screen.findByText("Explore renderer flow")).toBeTruthy();
-    expect(await screen.findByText("Read apps/desktop/src/renderer/App.tsx")).toBeTruthy();
+    expect(await screen.findByText("正在读取 · App.tsx")).toBeTruthy();
     expect(await screen.findByRole("button", { name: "审查待处理变更 +7 -2" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Open SubAgent transcript for Explore renderer flow/ }));
@@ -3212,4 +3212,267 @@ sessionId: input.sessionId,
     expect((screen.getByLabelText("消息输入框") as HTMLTextAreaElement).disabled).toBe(false);
     expect(getSessionMock).toHaveBeenCalledTimes(2);
   });
+  it('loads only the latest message page and prepends older messages', async () => {
+    const latest = createEmptySessionRecord('paged');
+    latest.meta.title = 'Paged session';
+    latest.events = [{ id: 'v2-20', sessionId: 'paged', agentRunId: 'r2', schemaVersion: 2, timestamp: latest.meta.createdAt, type: 'user_message', payload: { content: 'Latest question' } }];
+    const earlier = { ...latest, events: [{ ...latest.events[0], id: 'v2-0', agentRunId: 'r1', payload: { content: 'Earlier question' } }] } as SessionRecord;
+    const getSession = vi.fn(async () => ({ ...latest, events: [...earlier.events, ...latest.events] }));
+    const getSessionPage = vi.fn(async ({ before }: { sessionId: string; before?: number }) => ({ record: before === undefined ? latest : earlier, history: { before: before === undefined ? 20 : null, throughJournalSeq: 30 } }));
+    const listSessions = vi.fn(async () => []);
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState,
+      listWorkspaces: async () => createWorkspaceRegistryFixture(latest.meta.createdAt),
+      listSessionPage: async () => ({ items: [{ id: 'paged', title: 'Paged session', updatedAt: latest.meta.updatedAt, agentRunCount: 2 }], groups: [], indexing: false, failed: 0 }),
+      listSessions, getSession, getSessionPage,
+      createSession: async () => latest, abortAgentRun: async () => true, submitApproval: async () => ({ ok: true }), pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null, listPendingApprovals: async () => [], ...settingsApiStub,
+      onAgentStream: () => () => {}, runAgent: vi.fn(),
+    } as unknown as Window['actspace'];
+    renderApp();
+    await screen.findByText('Latest question');
+    expect(screen.queryByText('Earlier question')).not.toBeInTheDocument();
+    expect(getSession).not.toHaveBeenCalled(); expect(listSessions).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: '加载更早消息' }));
+    await screen.findByText('Earlier question');
+    expect(getSessionPage).toHaveBeenLastCalledWith({ sessionId: 'paged', before: 20 });
+    expect(screen.getByText('Latest question')).toBeInTheDocument();
+  });
+
+  it('ignores a slow page response after selecting a different session', async () => {
+    const a = createEmptySessionRecord('page-a'); a.meta.title = 'Page A';
+    const b = createEmptySessionRecord('page-b'); b.meta.title = 'Page B';
+    b.events = [{ id: 'v2-1', sessionId: 'page-b', agentRunId: 'rb', schemaVersion: 2, timestamp: b.meta.createdAt, type: 'user_message', payload: { content: 'B visible question' } }];
+    let resolveA!: (page: import('@actspace/shared').SessionMessagePage) => void;
+    window.actspace = {
+      getBootstrapState: async () => bootstrapState, listWorkspaces: async () => createWorkspaceRegistryFixture(a.meta.createdAt),
+      listSessionPage: async () => ({ items: [a, b].map(record => ({ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 0 })), groups: [], indexing: false, failed: 0 }),
+      listSessions: async () => [], getSession: vi.fn(),
+      getSessionPage: ({ sessionId }: { sessionId: string }) => sessionId === 'page-a' ? new Promise(resolve => { resolveA = resolve; }) : Promise.resolve({ record: b, history: { before: null, throughJournalSeq: 1 } }),
+      createSession: async () => a, abortAgentRun: async () => true, submitApproval: async () => ({ ok: true }), pinSession: async () => ({ ok: true }),
+      getUsageStatistics: async () => null, listPendingApprovals: async () => [], ...settingsApiStub,
+      onAgentStream: () => () => {}, runAgent: vi.fn(),
+    } as unknown as Window['actspace'];
+    renderApp();
+    await userEvent.click(await screen.findByText('Page B'));
+    await screen.findByText('B visible question');
+    await act(async () => resolveA({ record: a, history: { before: null, throughJournalSeq: 0 } }));
+    expect(screen.getByText('B visible question')).toBeInTheDocument();
+  });
+
+  function setupBackgroundSessions() {
+    const records = new Map(['background-a', 'background-b'].map(id => {
+      const record = createEmptySessionRecord(id);
+      record.meta.title = id === 'background-a' ? 'Background A' : 'Background B';
+      return [id, record] as const;
+    }));
+    let emit!: (event: RuntimeStreamEvent) => void;
+    const pending = new Map<string, { input: RunAgentInput; resolve: (result: AgentRunResult) => void; reject: (error: Error) => void }>();
+    const abort = vi.fn(async () => true);
+    window.actspace = {
+      ...settingsApiStub,
+      getBootstrapState: async () => bootstrapState,
+      listSessions: async () => [...records.values()].map(r => ({ id: r.meta.id, title: r.meta.title, updatedAt: r.meta.updatedAt, agentRunCount: r.meta.agentRunCount })),
+      getSession: async ({ sessionId }: { sessionId: string }) => records.get(sessionId),
+      createSession: async () => createEmptySessionRecord('background-new'),
+      abortAgentRun: abort, listPendingApprovals: async () => [],
+      onAgentStream: (callback: typeof emit) => { emit = callback; return () => {}; },
+      runAgent: (input: RunAgentInput) => new Promise<AgentRunResult>((resolve, reject) => {
+        pending.set(input.sessionId, { input, resolve, reject });
+        emit({ type: 'agent_run_started', sessionId: input.sessionId, agentRunId: input.agentRunId });
+      }),
+    } as unknown as Window['actspace'];
+    const send = async (text: string) => {
+      await userEvent.type(await screen.findByLabelText('消息输入框'), text);
+      await userEvent.click(screen.getByLabelText('发送消息'));
+    };
+    const select = async (id: string) => {
+      const row = document.querySelector(`[data-session-id="${id}"]`)!;
+      await userEvent.click(within(row as HTMLElement).getByRole('button', { name: id === 'background-a' ? 'Background A' : 'Background B' }));
+    };
+    const event = (id: string, value: Record<string, unknown>) => {
+      emit({ sessionId: id, agentRunId: pending.get(id)!.input.agentRunId, ...value } as RuntimeStreamEvent);
+    };
+    const complete = (id: string) => {
+      const { input, resolve } = pending.get(id)!;
+      const record = records.get(id)!;
+      const events: SessionEvent[] = [
+        { id: 'v2-1', sessionId: id, agentRunId: input.agentRunId, type: 'user_message', timestamp: record.meta.createdAt, schemaVersion: 2, payload: { content: input.userInput } },
+        { id: 'v2-2', sessionId: id, agentRunId: input.agentRunId, type: 'assistant_message', timestamp: record.meta.createdAt, schemaVersion: 2, payload: { content: `${id} finished` } },
+      ];
+      records.set(id, { ...record, events, messageBlocks: createMessageBlocks(events) });
+      event(id, { type: 'agent_run_finished' });
+      resolve({ sessionId: id, agentRunId: input.agentRunId, status: 'completed', events, contextSnapshot: null });
+    };
+    return { records, pending, send, select, event, complete, abort };
+  }
+
+  it('keeps background runs and tool state alive across session switches', async () => {
+    const fixture = setupBackgroundSessions();
+    renderApp();
+    await fixture.send('A running question');
+    await act(async () => fixture.event('background-a', { type: 'assistant_text_delta', delta: 'A partial reply' }));
+    await fixture.select('background-b');
+    expect(screen.queryByText('A partial reply')).not.toBeInTheDocument();
+    expect(within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText('会话状态： 运行中')).toBeInTheDocument();
+    await act(async () => fixture.event('background-a', { type: 'assistant_text_delta', delta: ' continued in background' }));
+    await fixture.send('B running question');
+    await fixture.select('background-a');
+    expect(await screen.findByText('A partial reply continued in background')).toBeInTheDocument();
+    expect(screen.getAllByText('A running question')).toHaveLength(1);
+    expect(screen.queryByText('B running question')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText('停止 Agent'));
+    expect(fixture.abort).toHaveBeenCalledWith({ sessionId: 'background-a', agentRunId: fixture.pending.get('background-a')!.input.agentRunId });
+    await fixture.select('background-b');
+    expect(screen.getByLabelText('停止 Agent')).toBeEnabled();
+    await act(async () => fixture.complete('background-a'));
+    expect(screen.getByLabelText('停止 Agent')).toBeEnabled();
+    expect(screen.queryByText('background-a finished')).not.toBeInTheDocument();
+    await fixture.select('background-a');
+    expect(await screen.findByText('background-a finished')).toBeInTheDocument();
+    expect(screen.queryByLabelText('停止 Agent')).not.toBeInTheDocument();
+  });
+
+  it('retains completed tools and subagent activity when returning to a running session', async () => {
+    const fixture = setupBackgroundSessions();
+    renderApp();
+    await fixture.send('Inspect background tools');
+    const read = { kind: 'read', filePath: '/tmp/background.txt', displayText: 'Read background.txt', resultPreview: 'read result' };
+    await act(async () => fixture.event('background-a', { type: 'tool_started', toolCallId: 'read-a', toolName: 'read_file', preview: read }));
+    await fixture.select('background-b');
+    await act(async () => {
+      fixture.event('background-a', { type: 'tool_finished', toolCallId: 'read-a', toolName: 'read_file', status: 'completed', preview: read });
+      fixture.event('background-a', { type: 'tool_call_streaming', toolCallId: 'read-a', toolName: 'read_file', preview: { ...read, displayText: 'stale tool progress' } });
+      fixture.event('background-a', {
+        type: 'subagent_event', toolCallId: 'child-a',
+        preview: { kind: 'agent', description: 'Background child', status: 'running', agentKind: 'agent', subagentType: 'general', displayText: '正在读取 · background files' },
+        event: { id: 'child-event', sessionId: 'child-session', agentRunId: 'child-run', type: 'assistant_message', schemaVersion: 2, timestamp: new Date().toISOString(), payload: { content: 'Child progress' } },
+      });
+    });
+    // A history response may already include the in-flight turn. It must not duplicate its live overlay.
+    const record = fixture.records.get('background-a')!;
+    const runId = fixture.pending.get('background-a')!.input.agentRunId;
+    record.events = [
+      { id: 'v2-1', sessionId: record.meta.id, agentRunId: runId, type: 'user_message', schemaVersion: 2, timestamp: record.meta.createdAt, payload: { content: 'Inspect background tools' } },
+      { id: 'v2-2', sessionId: record.meta.id, agentRunId: runId, type: 'tool_result', schemaVersion: 2, timestamp: record.meta.createdAt, payload: { toolCallId: 'read-a', uiPreview: read, ok: true } },
+    ];
+    record.messageBlocks = createMessageBlocks(record.events);
+    await fixture.select('background-a');
+    expect(screen.getAllByText('Inspect background tools')).toHaveLength(1);
+    expect(screen.getByText('正在读取 · background files')).toBeInTheDocument();
+    expect(screen.queryByText('stale tool progress')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('停止 Agent')).toBeInTheDocument();
+    expect(document.querySelectorAll('.tool-log-line.is-running')).toHaveLength(0);
+    expect(screen.getAllByText('/tmp/background.txt')).toHaveLength(1);
+  });
+
+  it('keeps background Bash updates after the run settles and isolates equal task IDs', async () => {
+    const fixture = setupBackgroundSessions();
+    renderApp();
+    await fixture.send('Launch background Bash');
+    await fixture.select('background-b');
+    await act(async () => fixture.complete('background-a'));
+    for (const id of ['background-a', 'background-b']) {
+      const record = fixture.records.get(id)!;
+      record.messageBlocks = [{ kind: 'bash', id: `bash-${id}`, title: id, command: 'sleep 1', commandPreview: 'sleep 1', status: 'success', backgroundTaskId: 'task-shared', backgroundStatus: 'running', createdAt: record.meta.createdAt }];
+    }
+    await act(async () => fixture.event('background-a', { type: 'bash_task_update', taskId: 'task-shared', status: 'completed', exitCode: 0 }));
+    await fixture.select('background-a');
+    await userEvent.click(screen.getByRole('button', { name: /^Worked/ }));
+    expect(await screen.findByText('后台完成')).toBeInTheDocument();
+    await fixture.select('background-b');
+    await userEvent.click(screen.getByRole('button', { name: /^Worked/ }));
+    expect(await screen.findByText('后台运行中')).toBeInTheDocument();
+    expect(screen.queryByText('后台完成')).not.toBeInTheDocument();
+  });
+
+  it('restores failed background input without changing another running composer', async () => {
+    const fixture = setupBackgroundSessions();
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderApp();
+    await fixture.send('A failed input');
+    await fixture.select('background-b');
+    await fixture.send('B must continue');
+    await act(async () => fixture.pending.get('background-a')!.reject(new Error('Background preparation failed')));
+    expect(screen.getByLabelText('停止 Agent')).toBeInTheDocument();
+    expect(screen.queryByText('Background preparation failed')).not.toBeInTheDocument();
+    expect(within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText('会话状态： 失败')).toBeInTheDocument();
+    await fixture.select('background-a');
+    expect(screen.getByLabelText('消息输入框')).toHaveValue('A failed input');
+    expect(screen.getByText('Background preparation failed')).toBeInTheDocument();
+    errorLog.mockRestore();
+  });
+
+  it('does not let a delayed stop response change another session stop state', async () => {
+    const fixture = setupBackgroundSessions();
+    let resolveAbort!: (value: boolean) => void;
+    fixture.abort.mockImplementation(() => new Promise(resolve => { resolveAbort = resolve; }));
+    renderApp();
+    await fixture.send('A stop request');
+    await userEvent.click(screen.getByLabelText('停止 Agent'));
+    await fixture.select('background-b');
+    await fixture.send('B stop request');
+    await act(async () => resolveAbort(false));
+    expect(screen.getByLabelText('停止 Agent')).toHaveAttribute('aria-disabled', 'false');
+    await fixture.select('background-a');
+    expect(screen.getByLabelText('停止 Agent')).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('rejects a stale history page after a background run completes', async () => {
+    const fixture = setupBackgroundSessions();
+    renderApp();
+    await fixture.send('A durable question');
+    await fixture.select('background-b');
+    const originalGet = window.actspace.getSession;
+    let resolveStale!: (record: SessionRecord) => void;
+    const stale = { ...fixture.records.get('background-a')!, events: [] };
+    let delayNext = true;
+    window.actspace.getSession = vi.fn(input => {
+      if (input.sessionId === 'background-a' && delayNext) {
+        delayNext = false;
+        return new Promise<SessionRecord>(resolve => { resolveStale = resolve; });
+      }
+      return originalGet(input);
+    });
+    await fixture.select('background-a');
+    expect(screen.getByText('A durable question')).toBeInTheDocument();
+    await act(async () => fixture.complete('background-a'));
+    expect(await screen.findByText('background-a finished')).toBeInTheDocument();
+    await act(async () => resolveStale(stale));
+    expect(screen.getByText('background-a finished')).toBeInTheDocument();
+    expect(screen.getAllByText('A durable question')).toHaveLength(1);
+    expect(screen.queryByLabelText('停止 Agent')).not.toBeInTheDocument();
+  });
+
+  it('keeps a background approval newer than an in-flight approval query', async () => {
+    const fixture = setupBackgroundSessions();
+    renderApp();
+    await fixture.send('A requires approval');
+    await fixture.select('background-b');
+    let resolveApproval!: (items: []) => void;
+    window.actspace.listPendingApprovals = vi.fn(() => new Promise<[]>(resolve => { resolveApproval = resolve; }));
+    await fixture.select('background-a');
+    await act(async () => {
+      fixture.event('background-a', { type: 'tool_started', toolCallId: 'approval-tool', toolName: 'browser_tabs' });
+      fixture.event('background-a', { type: 'tool_approval_required', toolCallId: 'approval-tool', toolName: 'browser_tabs', requestId: 'approval-a', summary: 'Approval required', reason: 'Browser session', approvalScope: 'browser_session' });
+      resolveApproval([]);
+    });
+    expect(within(document.querySelector('[data-session-id="background-a"]') as HTMLElement).getByLabelText('会话状态： 等待审批')).toBeInTheDocument();
+    expect(screen.getByText('允许 ActSpace 在当前会话中使用浏览器？')).toBeInTheDocument();
+  });
+
+  it('keeps a run pinned while more than three other histories are loaded', async () => {
+    const fixture = setupBackgroundSessions();
+    for (const id of ['c', 'd', 'e']) fixture.records.set(id, { ...createEmptySessionRecord(id), meta: { ...createEmptySessionRecord(id).meta, title: `Cache ${id}` } });
+    renderApp();
+    await fixture.send('Pinned live question');
+    await act(async () => fixture.event('background-a', { type: 'assistant_text_delta', delta: 'Pinned reply' }));
+    for (const id of ['c', 'd', 'e']) await userEvent.click(screen.getByRole('button', { name: `Cache ${id}` }));
+    window.actspace.getSession = () => new Promise(() => {});
+    await fixture.select('background-a');
+    expect(screen.getByText('Pinned live question')).toBeInTheDocument();
+    expect(screen.getByText('Pinned reply')).toBeInTheDocument();
+    expect(screen.getByLabelText('停止 Agent')).toBeInTheDocument();
+  });
+
 });

@@ -1,3 +1,5 @@
+import { createEmptyStreamingState, type ToolEntry, type StreamingState, type StreamingSegment, type SessionRunState } from "./session/session-run-state";
+import { SessionBrowseContext } from "./session/SessionBrowseContext";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_QUICK_OPEN_ACCELERATOR,
@@ -27,7 +29,6 @@ import type {
   RunAgentInput,
   RuntimeStreamEvent,
   SessionRunLocation,
-  SessionEvent,
   SessionListItem,
   SessionRecord,
   ToolUiPreview,
@@ -129,48 +130,6 @@ function reviewResultToSummary(result: ReviewGetSnapshotResult): ComposerReviewS
     status: result.snapshot.status === "ready" ? "changes" : result.snapshot.status,
     additions: result.snapshot.totals.additions,
     deletions: result.snapshot.totals.deletions,
-  };
-}
-
-type ToolEntry = {
-  toolName: string;
-  preview?: ToolUiPreview;
-  isError?: boolean;
-  finished?: boolean;
-  terminalStatus?: Extract<RuntimeStreamEvent, { type: "tool_finished" }>["status"];
-  approvalPending?: boolean;
-  approvalRequestId?: string;
-  approvalReason?: string;
-  approvalSummary?: string;
-  approvalScope?: "browser_session";
-  transcriptEvents?: SessionEvent[];
-};
-
-type StreamingSegment =
-  | { type: "thinking"; text: string }
-  | { type: "text"; text: string }
-  | { type: "tool"; toolCallId: string }
-  | { type: "compaction"; agentRunId: string }
-  | { type: "workspace_preparation"; agentRunId: string };
-
-type StreamingState = {
-  segments: StreamingSegment[];
-  activeTools: Map<string, ToolEntry>;
-  activeCompactions: Map<string, Extract<MessageBlock, { kind: "context_compaction" }>>;
-  activeWorkspacePreparations: Map<string, Extract<MessageBlock, { kind: "workspace_preparation" }>>;
-  /** 已发起模型请求、但尚未收到可见回复或工具活动。仅用于当前流式 UI，不写入会话。 */
-  waitingForModel: boolean;
-  /** LLM 可重试错误退避中：显示重试提示；新 delta 到达（重试成功）时清除 */
-  retryNotice?: { attempt: number; maxAttempts: number };
-};
-
-function createEmptyStreamingState(): StreamingState {
-  return {
-    segments: [],
-    activeTools: new Map(),
-    activeCompactions: new Map(),
-    activeWorkspacePreparations: new Map(),
-    waitingForModel: false,
   };
 }
 
@@ -448,6 +407,7 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       filePath: tool.preview.filePath,
       range: tool.preview.range,
       displayText: tool.finished ? tool.preview.displayText : getStreamingReadText(tool.preview),
+      resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
       createdAt: now,
       status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
     };
@@ -461,6 +421,7 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       scope: tool.preview.scope,
       resultCount: tool.finished ? tool.preview.resultCount : undefined,
       displayText: tool.finished ? tool.preview.displayText : getStreamingSearchText(tool.preview),
+      resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
       createdAt: now,
       status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
     };
@@ -474,6 +435,7 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       scope: tool.preview.scope,
       resultCount: tool.finished ? tool.preview.resultCount : undefined,
       displayText: tool.finished ? tool.preview.displayText : getStreamingGrepText(tool.preview),
+      resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
       createdAt: now,
       status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
     };
@@ -487,6 +449,7 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       scope: tool.preview.scope,
       resultCount: tool.finished ? tool.preview.resultCount : undefined,
       displayText: tool.finished ? tool.preview.displayText : getStreamingGlobText(tool.preview),
+      resultPreview: tool.finished ? tool.preview.resultPreview : undefined,
       createdAt: now,
       status: tool.finished ? tool.terminalStatus ?? (tool.isError ? "failed" : "completed") : "running",
     };
@@ -591,6 +554,7 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       deletions: tool.preview.deletions,
       diff: tool.preview.diff,
       collapsedLines: tool.preview.collapsedLines,
+      generationProgress: tool.preview.generationProgress,
       createdAt: now,
       status,
       approvalRequestId: tool.approvalRequestId,
@@ -615,6 +579,7 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       deletions: tool.preview.deletions,
       diff: tool.preview.diff,
       collapsedLines: tool.preview.collapsedLines,
+      generationProgress: tool.preview.generationProgress,
       streamingContent: tool.finished ? undefined : tool.preview.streamingContent,
       createdAt: now,
       status,
@@ -631,15 +596,15 @@ function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: string, agen
       description: tool.preview.description,
       status: tool.finished ? tool.preview.status : "running",
       subagentType: tool.preview.subagentType,
+      agentKind: tool.preview.agentKind,
       displayText: tool.preview.displayText,
       summary: tool.preview.summary,
       recentEvents: tool.preview.recentEvents,
       transcriptRef: tool.preview.transcriptRef,
       stats: tool.preview.stats,
       error: tool.preview.error,
-      // explore 内置子代理首帧（tool_call_streaming）preview 尚未带 display，
-      // 仅靠 toolName 兜底为 inline，避免执行前一瞬被渲染成 agent 工具的 panel 框。
-      display: tool.preview.display ?? (tool.toolName === "explore" ? "inline" : undefined),
+      // 流式首帧也必须沿用统一的右侧 child Session 入口，不能回退到旧 inline transcript。
+      display: tool.preview.display ?? "panel",
       transcriptEvents: tool.transcriptEvents,
       createdAt: now,
     };
@@ -804,6 +769,37 @@ export function App() {
   const [bootstrapState, setBootstrapState] = useState<BootstrapState | null>(null);
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [sessionRecord, setSessionRecord] = useState<SessionRecord | null>(null);
+  const [browseGroups, setBrowseGroups] = useState<import("@actspace/shared").SessionListPage['groups']>([]);
+  const [listLoading, setListLoading] = useState(hasActspaceBridge());
+  const [listError, setListError] = useState<string | null>(null);
+  const [listRetry, setListRetry] = useState(0);
+  const [messageLoading, setMessageLoading] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const [historyBefore, setHistoryBefore] = useState<number | null>(null);
+  const [earlierLoading, setEarlierLoading] = useState(false);
+  const [earlierError, setEarlierError] = useState<string | null>(null);
+  const loadedListPages = useRef(new Map<string, number>());
+  const readSidebarSessions = useCallback(async () => {
+    if (!window.actspace.listSessionPage) return window.actspace.listSessions();
+    const first = await window.actspace.listSessionPage();
+    const items = [...first.items];
+    const groups = [...first.groups];
+    for (const group of first.groups) {
+      const key = JSON.stringify([group.workspaceRoot, group.pinned]);
+      let hasMore = group.hasMore;
+      for (let page = 1; page < (loadedListPages.current.get(key) ?? 1) && hasMore; page++) {
+        const after = items.filter(s => (s.workspaceRoot ?? '') === group.workspaceRoot && !!s.pinned === group.pinned).at(-1)?.id;
+        const next = await window.actspace.listSessionPage({ workspaceRoot: group.workspaceRoot, pinned: group.pinned, after });
+        items.push(...next.items); hasMore = next.groups[0]?.hasMore ?? false;
+      }
+      group.hasMore = hasMore;
+    }
+    setBrowseGroups(groups);
+    return [...new Map(items.map(s => [s.id, s])).values()];
+  }, []);
+  const pageCacheRef = useRef(new Map<string, import("@actspace/shared").SessionMessagePage>());
+  const messageRequestRef = useRef(0);
+  const historyPendingRef = useRef<number | null>(null);
   const [localSessionRecords, setLocalSessionRecords] = useState<Record<string, SessionRecord>>({});
   const [agentRunResult, setAgentRunResult] = useState<AgentRunResult | null>(null);
   const [workspaceRegistry, setWorkspaceRegistry] = useState<WorkspaceListResult | null>(null);
@@ -830,15 +826,38 @@ export function App() {
   const [runLocation, setRunLocation] = useState<SessionRunLocation>("this_mac");
   const [composerDraftRestore, setComposerDraftRestore] = useState<ComposerDraftRestore | null>(null);
   const [reviewSummary, setReviewSummary] = useState<ComposerReviewSummary | null>(null);
-  const streamStateRef = useRef<StreamingState>(createEmptyStreamingState());
-  const streamingUserBlockRef = useRef<MessageBlock | null>(null);
+  const sessionRunsRef = useRef(new Map<string, SessionRunState>());
+  const [busySessionIds, setBusySessionIds] = useState<Set<string>>(() => new Set());
+  const pageVersionsRef = useRef(new Map<string, number>());
+  const approvalVersionsRef = useRef(new Map<string, number>());
+  const draftsRef = useRef(new Map<string, ComposerDraftRestore>());
+  const bashUpdatesRef = useRef(new Map<string, Record<string, { status: BashBackgroundStatus; exitCode?: number | null }>>());
   const activeSessionIdRef = useRef<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const refreshStreamingBlocks = useCallback((sessionId: string | null) => {
+    if (activeSessionIdRef.current !== sessionId) return;
+    const run = sessionId ? sessionRunsRef.current.get(sessionId) : undefined;
+    const blocks = run ? streamingStateToBlocks(run.state, run.agentRunId) : [];
+    setStreamingBlocks(run?.userBlock ? [run.userBlock, ...blocks] : blocks);
+    setIsStreaming(Boolean(run));
+    setIsAborting(run?.aborting ?? false);
+    setActiveAgentRunId(run?.agentRunId ?? null);
+  }, []);
   const setActiveSessionId = useCallback((sessionId: string | null) => {
+    ++messageRequestRef.current;
+    historyPendingRef.current = null;
+    setEarlierLoading(false);
+    setEarlierError(null);
+    setMessageLoading(false);
+    setMessageError(null);
     activeSessionIdRef.current = sessionId;
     setSelectedSessionId(sessionId);
-  }, []);
-  const activeStreamAgentRunRef = useRef<{ sessionId: string; agentRunId: string } | null>(null);
+    setSessionRecord(null);
+    setHistoryBefore(null);
+    setBashTaskUpdates(sessionId ? bashUpdatesRef.current.get(sessionId) ?? {} : {});
+    setComposerDraftRestore(sessionId ? draftsRef.current.get(sessionId) ?? null : null);
+    refreshStreamingBlocks(sessionId);
+  }, [refreshStreamingBlocks]);
   const reviewRefreshRequestIdRef = useRef(0);
   const userPickedChatModelRef = useRef(false);
 
@@ -855,17 +874,9 @@ export function App() {
     return workspaceRegistry?.items.find((workspace) => workspace.path === normalized);
   }, [workspaceRegistry?.items]);
 
-  const refreshStreamingBlocks = useCallback((userBlock?: MessageBlock | null) => {
-    const newStreamBlocks = streamingStateToBlocks(
-      streamStateRef.current,
-      activeStreamAgentRunRef.current?.agentRunId,
-    );
-    const currentUserBlock = userBlock ?? streamingUserBlockRef.current;
-    setStreamingBlocks(currentUserBlock ? [currentUserBlock, ...newStreamBlocks] : newStreamBlocks);
-  }, []);
-
   const setApprovalPendingForSession = useCallback((sessionId: string | null | undefined, pending: boolean) => {
     if (!sessionId) return;
+    approvalVersionsRef.current.set(sessionId, (approvalVersionsRef.current.get(sessionId) ?? 0) + 1);
     setApprovalPendingSessionIds((current) => updateStringSet(current, sessionId, pending));
   }, []);
 
@@ -914,19 +925,21 @@ export function App() {
     if (uniqueSessionIds.length === 0) return;
 
     const results = await Promise.all(uniqueSessionIds.map(async (sessionId) => {
+      const version = (approvalVersionsRef.current.get(sessionId) ?? 0) + 1;
+      approvalVersionsRef.current.set(sessionId, version);
       try {
         const pending = await window.actspace.listPendingApprovals({ sessionId });
-        return { sessionId, hasPending: pending.length > 0 };
+        return { sessionId, version, hasPending: pending.length > 0 };
       } catch (error) {
         console.error("Failed to load pending approvals", error);
-        return { sessionId, hasPending: null };
+        return { sessionId, version, hasPending: null };
       }
     }));
 
     setApprovalPendingSessionIds((current) => {
       let next = current;
       for (const result of results) {
-        if (result.hasPending === null) continue;
+        if (result.hasPending === null || approvalVersionsRef.current.get(result.sessionId) !== result.version) continue;
         next = updateStringSet(next, result.sessionId, result.hasPending);
       }
       return next;
@@ -1069,7 +1082,9 @@ export function App() {
     const unsubscribe = window.actspace.onSessionLiveEvent(({ event }) => {
       if (event.kind !== "runtime-live" || event.message !== "session-title-updated" || !event.sessionId) return;
       const sessionId = event.sessionId;
-      void window.actspace.getSession({ sessionId }).then(record => {
+      void window.actspace.listSessions().then(items => {
+        const item = items.find(s => s.id === sessionId);
+        const record = item ? { meta: { title: item.title } } : null;
         if (disposed || !record) return;
         setSessions(current => current.map(item => item.id === sessionId ? { ...item, title: record.meta.title } : item));
         setSessionRecord(current => current?.meta.id === sessionId ? { ...current, meta: { ...current.meta, title: record.meta.title } } : current);
@@ -1078,16 +1093,109 @@ export function App() {
     return () => { disposed = true; unsubscribe(); };
   }, []);
 
+  const cacheSessionPage = useCallback((sessionId: string, page: import("@actspace/shared").SessionMessagePage) => {
+    pageCacheRef.current.delete(sessionId);
+    pageCacheRef.current.set(sessionId, page);
+    while (pageCacheRef.current.size > 3) pageCacheRef.current.delete(pageCacheRef.current.keys().next().value!);
+    const run = sessionRunsRef.current.get(sessionId);
+    if (run) { run.record = page.record; run.historyBefore = page.history.before; }
+  }, []);
+
+  const readSessionPage = useCallback(async (sessionId: string, restoreCache = false) => {
+    const version = (pageVersionsRef.current.get(sessionId) ?? 0) + 1;
+    pageVersionsRef.current.set(sessionId, version);
+    const visible = () => activeSessionIdRef.current === sessionId;
+    const request = visible() ? ++messageRequestRef.current : messageRequestRef.current;
+    const run = sessionRunsRef.current.get(sessionId);
+    const cached = restoreCache ? pageCacheRef.current.get(sessionId) : undefined;
+    const cachedRecord = cached?.record ?? (restoreCache ? run?.record : null);
+    if (visible()) {
+      historyPendingRef.current = null;
+      setEarlierLoading(false);
+      if (cachedRecord) {
+        setSessionRecord(cachedRecord);
+        setHistoryBefore(cached ? cached.history.before : run?.historyBefore ?? null);
+      }
+      setMessageLoading(!cachedRecord && !run?.record); setMessageError(null); setEarlierError(null);
+    }
+    try {
+      const page = window.actspace.getSessionPage
+        ? await window.actspace.getSessionPage({ sessionId })
+        : { record: await window.actspace.getSession({ sessionId }), history: { before: null, throughJournalSeq: -1 } };
+      if (version !== pageVersionsRef.current.get(sessionId)) return null;
+      if (!page.record) throw new Error('会话读取失败，请重试');
+      cacheSessionPage(sessionId, { record: page.record, history: page.history });
+      if (visible() && request === messageRequestRef.current) {
+        setSessionRecord(current => {
+          if (!current || current.meta.id !== sessionId || !window.actspace.getSessionPage) return page.record;
+          const oldest = Math.min(...page.record!.events.map(e => Number(/^v2-(\d+)/.exec(e.id)?.[1] ?? Infinity)));
+          const earlier = current.events.filter(e => Number(/^v2-(\d+)/.exec(e.id)?.[1] ?? Infinity) < oldest);
+          const events = [...earlier, ...page.record!.events];
+          const deferred = new Map([...(current.messageBlocks ?? []), ...(page.record!.messageBlocks ?? [])].filter(b => b.deferredToolDetail).map(b => [b.id, b.deferredToolDetail]));
+          return { ...page.record!, events, messageBlocks: createMessageBlocks(events).map(b => deferred.has(b.id) ? { ...b, deferredToolDetail: deferred.get(b.id) } : b) };
+        });
+        setHistoryBefore(current => current === null ? page.history.before : page.history.before === null ? null : Math.min(current, page.history.before));
+      }
+      return page.record;
+    } catch (error) {
+      if (version === pageVersionsRef.current.get(sessionId) && visible() && request === messageRequestRef.current) setMessageError(error instanceof Error ? error.message : '消息加载失败');
+      return null;
+    } finally {
+      if (version === pageVersionsRef.current.get(sessionId) && visible() && request === messageRequestRef.current) setMessageLoading(false);
+    }
+  }, [cacheSessionPage]);
+
+  const loadEarlierMessages = useCallback(async () => {
+    const sessionId = activeSessionIdRef.current;
+    if (!sessionId || historyBefore === null || !window.actspace?.getSessionPage || historyPendingRef.current !== null) return;
+    const request = messageRequestRef.current;
+    historyPendingRef.current = request; setEarlierLoading(true); setEarlierError(null);
+    try {
+      const page = await window.actspace.getSessionPage({ sessionId, before: historyBefore });
+      if (request !== messageRequestRef.current || activeSessionIdRef.current !== sessionId) return;
+      setSessionRecord(current => {
+        if (!current || current.meta.id !== sessionId) return current;
+        const ids = new Set(current.events.map(e => e.id));
+        const events = [...page.record.events.filter(e => !ids.has(e.id)), ...current.events];
+        const deferred = new Map([...(page.record.messageBlocks ?? []), ...(current.messageBlocks ?? [])].filter(b => b.deferredToolDetail).map(b => [b.id, b.deferredToolDetail]));
+        return { ...current, events, messageBlocks: createMessageBlocks(events).map(b => deferred.has(b.id) ? { ...b, deferredToolDetail: deferred.get(b.id) } : b) };
+      });
+      setHistoryBefore(page.history.before);
+    } catch (error) { if (request === messageRequestRef.current) setEarlierError(error instanceof Error ? error.message : '历史消息加载失败'); }
+    finally { if (historyPendingRef.current === request) { historyPendingRef.current = null; setEarlierLoading(false); } }
+  }, [historyBefore]);
+
+  const loadMoreSessions = useCallback(async (input: import("@actspace/shared").SessionListPageInput) => {
+    if (!window.actspace?.listSessionPage) return;
+    const page = await window.actspace.listSessionPage(input);
+    const key = JSON.stringify([input.workspaceRoot ?? "", input.pinned === true]);
+    loadedListPages.current.set(key, (loadedListPages.current.get(key) ?? 1) + 1);
+    setSessions(current => { const byId = new Map(current.map(s => [s.id, s])); for (const s of page.items) byId.set(s.id, s); return [...byId.values()]; });
+    setBrowseGroups(current => [...current.filter(g => !page.groups.some(n => n.workspaceRoot === g.workspaceRoot && n.pinned === g.pinned)), ...page.groups]);
+  }, []);
+
   useEffect(() => {
     if (!hasActspaceBridge()) return;
-
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     async function bootstrapSession() {
-      const [listedSessions, registry] = await Promise.all([
-        window.actspace.listSessions(),
+      setListLoading(true); setListError(null);
+      const [page, registry] = await Promise.all([
+        window.actspace.listSessionPage ? window.actspace.listSessionPage() : readSidebarSessions().then(items => ({ items, groups: [], indexing: false, failed: 0 })),
         window.actspace.listWorkspaces?.() ?? Promise.resolve(null),
       ]);
-      setSessions(listedSessions);
+      if (disposed) return;
+      const listedSessions = page.items;
+      setSessions(current => page.indexing ? [...new Map([...current, ...listedSessions].map(s => [s.id, s])).values()] : listedSessions);
+      setBrowseGroups(page.groups);
+      setListLoading(page.indexing);
+      if (page.failed) setListError(`${page.failed} 个会话暂时无法读取，可重试`);
       if (registry) setWorkspaceRegistry(registry);
+      if (page.indexing) {
+        timer = setTimeout(() => { void bootstrapSession().catch(handleBootstrapError); }, 500);
+      }
+      if (activeSessionIdRef.current) { setSessionBootstrapComplete(true); return; }
+      if (page.indexing) return;
 
       const hiddenWorkspaceIds = new Set(registry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.id));
       const hiddenWorkspacePaths = new Set(registry?.items.filter((workspace) => workspace.hidden).map((workspace) => workspace.path));
@@ -1097,8 +1205,9 @@ export function App() {
       );
       if (existing) {
         setActiveSessionId(existing.id);
-        const restored = await window.actspace.getSession({ sessionId: existing.id });
-        setSessionRecord(restored);
+        const restored = await readSessionPage(existing.id, true);
+        if (disposed || activeSessionIdRef.current !== existing.id) return;
+        if (!restored) return;
         setSelectedWorkspaceRoot(
           normalizeWorkspaceRoot(
             restored?.meta.worktree?.sourceWorkspaceRoot ??
@@ -1122,18 +1231,19 @@ export function App() {
       setSessionBootstrapComplete(true);
     }
 
-    bootstrapSession().catch((error: unknown) => {
-      console.error("Failed to bootstrap session", error);
-      setActiveSessionId(null);
-      setSessions([]);
-      setSessionRecord(null);
-      setAgentRunResult(null);
+    function handleBootstrapError(error: unknown) {
+      if (disposed) return;
+      setListLoading(false); setListError(error instanceof Error ? error.message : '会话列表加载失败');
       setSessionBootstrapComplete(true);
-    });
-  }, []);
+    }
+    void bootstrapSession().catch(handleBootstrapError);
+    return () => { disposed = true; if (timer) clearTimeout(timer); };
+  }, [listRetry, readSessionPage]);
 
-  const handleStreamEvent = useCallback((event: RuntimeStreamEvent) => {
-    const state = streamStateRef.current;
+  const handleStreamEvent = useCallback((event: Exclude<RuntimeStreamEvent, { type: "bash_task_update" }>) => {
+    const run = sessionRunsRef.current.get(event.sessionId);
+    if (!run || run.agentRunId !== event.agentRunId) return;
+    const state = run.state;
 
     switch (event.type) {
       case "agent_run_started":
@@ -1284,17 +1394,10 @@ export function App() {
         break;
       }
 
-      case "bash_task_update": {
-        setBashTaskUpdates((current) => ({
-          ...current,
-          [event.taskId]: { status: event.status, exitCode: event.exitCode },
-        }));
-        break;
-      }
-
       case "subagent_event": {
         state.waitingForModel = false;
         const existing = state.activeTools.get(event.toolCallId);
+        if (existing?.terminalStatus) break;
         if (existing) {
           existing.preview = event.preview;
           existing.transcriptEvents = [...(existing.transcriptEvents ?? []), event.event];
@@ -1389,17 +1492,17 @@ export function App() {
         break;
     }
 
-    refreshStreamingBlocks();
+    refreshStreamingBlocks(event.sessionId);
   }, [refreshStreamingBlocks]);
 
   useEffect(() => {
     if (!hasActspaceBridge()) return;
 
     return window.actspace.onAgentStream((event) => {
-      const active = activeStreamAgentRunRef.current;
+      const run = sessionRunsRef.current.get(event.sessionId);
+      if (event.type !== "bash_task_update" && run && run.agentRunId !== event.agentRunId) return;
       if ((event.type === "tool_approval_required" || event.type === "tool_approval_resolved") &&
-        active?.sessionId === event.sessionId && active.agentRunId === event.agentRunId &&
-        streamStateRef.current.activeTools.get(event.toolCallId)?.terminalStatus) return;
+        run?.agentRunId === event.agentRunId && run.state.activeTools.get(event.toolCallId)?.terminalStatus) return;
       if (event.type === "tool_approval_required") {
         setApprovalPendingForSession(event.sessionId, true);
       } else if (
@@ -1420,19 +1523,9 @@ export function App() {
       }
 
       if (event.type === "bash_task_update") {
-        if (event.sessionId === activeSessionIdRef.current) {
-          handleStreamEvent(event);
-        }
-        return;
-      }
-
-      const activeAgentRun = activeStreamAgentRunRef.current;
-      if (
-        !activeAgentRun ||
-        event.sessionId !== activeAgentRun.sessionId ||
-        event.agentRunId !== activeAgentRun.agentRunId ||
-        event.sessionId !== activeSessionIdRef.current
-      ) {
+        const updates = { ...bashUpdatesRef.current.get(event.sessionId), [event.taskId]: { status: event.status, exitCode: event.exitCode } };
+        bashUpdatesRef.current.set(event.sessionId, updates);
+        if (event.sessionId === activeSessionIdRef.current) setBashTaskUpdates(updates);
         return;
       }
 
@@ -1460,15 +1553,18 @@ export function App() {
       return created;
     }
 
+    const selectionRequest = messageRequestRef.current;
     try {
       const created = await window.actspace.createSession({
         ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
         ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
       });
-      setActiveSessionId(created.meta.id);
-      setSessionRecord(created);
-      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
-      const refreshed = await window.actspace.listSessions();
+      if (selectionRequest === messageRequestRef.current) {
+        setActiveSessionId(created.meta.id);
+        setSessionRecord(created);
+        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(created.meta.workspaceRoot ?? bootstrapState?.workspaceRoot));
+      }
+      const refreshed = await readSidebarSessions();
       setSessions(refreshed);
       await refreshWorkspaces();
       return created;
@@ -1487,8 +1583,8 @@ export function App() {
     const createdSession = activeSessionIdRef.current
       ? null
       : await createSessionForInput(selectedWorkspaceRoot ? { workspaceRoot: selectedWorkspaceRoot } : {});
-    const sessionId = activeSessionIdRef.current ?? createdSession?.meta.id;
-    if (!sessionId) return;
+    const sessionId = createdSession?.meta.id ?? activeSessionIdRef.current;
+    if (!sessionId || sessionRunsRef.current.has(sessionId)) return;
     setComposerStateBySession((current) => ({
       ...current,
       [sessionId]: { mode: options.mode, selectedSkills: options.selectedSkills },
@@ -1529,7 +1625,7 @@ export function App() {
           setFailedForSession(sessionId, true);
           return;
         }
-        setSessionRecord((current) => current
+        setSessionRecord((current) => current?.meta.id === sessionId
           ? {
               ...current,
               meta: {
@@ -1546,60 +1642,58 @@ export function App() {
       }
     }
 
-    setIsStreaming(true);
-    setIsAborting(false);
-    setActiveAgentRunId(agentRunId);
-    activeStreamAgentRunRef.current = { sessionId, agentRunId };
-    setComposerDraftRestore(null);
+    if (sessionRunsRef.current.has(sessionId)) return;
+    const run: SessionRunState = {
+      sessionId, agentRunId, state: createEmptyStreamingState(), userBlock: null, aborting: false,
+      record: createdSession ?? sessionRecord, historyBefore,
+    };
+    sessionRunsRef.current.set(sessionId, run);
+    setBusySessionIds(current => updateStringSet(current, sessionId, true));
+    draftsRef.current.delete(sessionId);
+    if (activeSessionIdRef.current === sessionId) setComposerDraftRestore(null);
     setApprovalPendingForSession(sessionId, false);
     setFailedForSession(sessionId, false);
-    streamStateRef.current = createEmptyStreamingState();
 
     if (isCompactCommand) {
-      const pendingBlock = createCompactionBlock({
-        agentRunId,
-        status: "pending",
-        summaryText: "/compact",
-      });
-      upsertCompactionSegment(streamStateRef.current, agentRunId);
-      streamStateRef.current.activeCompactions.set(agentRunId, pendingBlock);
-      streamingUserBlockRef.current = null;
-      setStreamingBlocks([pendingBlock]);
+      const pendingBlock = createCompactionBlock({ agentRunId, status: "pending", summaryText: "/compact" });
+      upsertCompactionSegment(run.state, agentRunId);
+      run.state.activeCompactions.set(agentRunId, pendingBlock);
     } else {
-      const userBlock: MessageBlock = {
-        kind: "user",
-        id: `turn:${agentRunId}:user:0`,
-        content: text,
-        createdAt: new Date().toISOString(),
-        attachments: options.attachments,
+      run.userBlock = {
+        kind: "user", id: `turn:${agentRunId}:user:0`, content: text,
+        createdAt: new Date().toISOString(), attachments: options.attachments,
       };
-      streamingUserBlockRef.current = userBlock;
-      streamStateRef.current.waitingForModel = true;
-      refreshStreamingBlocks(userBlock);
+      run.state.waitingForModel = true;
     }
-    setSendScrollRequestId((value) => value + 1);
+    refreshStreamingBlocks(sessionId);
+    if (activeSessionIdRef.current === sessionId) setSendScrollRequestId(value => value + 1);
 
-    const isCurrentVisibleTurn = () => {
-      const activeAgentRun = activeStreamAgentRunRef.current;
-      return activeAgentRun?.sessionId === sessionId &&
-        activeAgentRun.agentRunId === agentRunId &&
-        activeSessionIdRef.current === sessionId;
+    const isCurrentRun = () => sessionRunsRef.current.get(sessionId) === run;
+    const isCurrentVisibleTurn = () => isCurrentRun() && activeSessionIdRef.current === sessionId;
+    const finishRun = () => {
+      if (!isCurrentRun()) return;
+      sessionRunsRef.current.delete(sessionId);
+      setBusySessionIds(current => updateStringSet(current, sessionId, false));
+      refreshStreamingBlocks(sessionId);
+      if (activeSessionIdRef.current === sessionId && hasActspaceBridge()) void refreshReviewSummary();
     };
-
-    const finishCurrentVisibleTurn = () => {
-      if (!isCurrentVisibleTurn()) return false;
-
-      if (hasActspaceBridge()) {
-        void refreshReviewSummary();
+    const settleResult = async (result: AgentRunResult | Awaited<ReturnType<typeof window.actspace.compactContext>>) => {
+      setApprovalPendingForSession(sessionId, false);
+      setFailedForSession(sessionId, result.status === "failed");
+      const restored = await readSessionPage(sessionId);
+      if (!isCurrentRun()) return;
+      // The result is durable. Invalidate in-flight reads started before settlement.
+      pageVersionsRef.current.set(sessionId, (pageVersionsRef.current.get(sessionId) ?? 0) + 1);
+      if (!restored) {
+        const fallback: SessionRecord = {
+          meta: run.record?.meta ?? { schemaVersion: 2, id: sessionId, title: "New chat", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), agentRunCount: 1 },
+          events: result.events, contextSnapshot: result.contextSnapshot,
+        };
+        cacheSessionPage(sessionId, { record: fallback, history: { before: null, throughJournalSeq: -1 } });
+        if (isCurrentVisibleTurn()) { setSessionRecord(fallback); setHistoryBefore(null); }
       }
-      activeStreamAgentRunRef.current = null;
-      setIsStreaming(false);
-      setIsAborting(false);
-      setActiveAgentRunId(null);
-      setStreamingBlocks([]);
-      streamStateRef.current = createEmptyStreamingState();
-      streamingUserBlockRef.current = null;
-      return true;
+      if (isCurrentVisibleTurn()) { setAgentRunResult(null); setMessageLoading(false); }
+      finishRun();
     };
 
     try {
@@ -1611,28 +1705,8 @@ export function App() {
             ...modelSelectionPayload(options.model),
           };
           const result = await window.actspace.compactContext(input);
-          if (isCurrentVisibleTurn()) {
-            setApprovalPendingForSession(sessionId, false);
-            setFailedForSession(sessionId, result.status === "failed");
-            const restored = await window.actspace.getSession({ sessionId });
-            if (isCurrentVisibleTurn()) {
-              setSessionRecord(restored ?? {
-                meta: {
-                  schemaVersion: 2,
-                  id: result.sessionId,
-                  title: "New chat",
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                  agentRunCount: sessionRecord?.meta.agentRunCount ?? 0,
-                },
-                events: result.events,
-                contextSnapshot: result.contextSnapshot,
-              });
-              setAgentRunResult(null);
-              finishCurrentVisibleTurn();
-            }
-          }
-          const refreshed = await window.actspace.listSessions();
+          await settleResult(result);
+          const refreshed = await readSidebarSessions();
           setSessions(refreshed);
           return;
         }
@@ -1658,72 +1732,51 @@ export function App() {
         };
         const result = await window.actspace.runAgent(input);
 
-        if (isCurrentVisibleTurn()) {
-          setApprovalPendingForSession(sessionId, false);
-          setFailedForSession(sessionId, result.status === "failed");
-          const restored = await window.actspace.getSession({ sessionId });
-          if (isCurrentVisibleTurn()) {
-            setSessionRecord(restored ?? {
-              meta: {
-                schemaVersion: 2,
-                id: result.sessionId,
-                title: "New chat",
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                agentRunCount: 1,
-              },
-              events: result.events,
-              contextSnapshot: result.contextSnapshot,
-            });
-            setAgentRunResult(null);
-            finishCurrentVisibleTurn();
-          }
-        }
-        const refreshed = await window.actspace.listSessions();
+        await settleResult(result);
+        const refreshed = await readSidebarSessions();
         setSessions(refreshed);
       }
     } catch (error) {
       console.error("Failed to run Agent", error);
-      if (isCurrentVisibleTurn()) {
+      if (isCurrentRun()) {
         let restored: SessionRecord | null = null;
         if (hasActspaceBridge() && !isCompactCommand) {
           try {
-            restored = await window.actspace.getSession({ sessionId });
+            restored = await readSessionPage(sessionId);
           } catch (restoreError) {
             console.error("Failed to inspect session after turn error", restoreError);
           }
         }
-        if (!isCurrentVisibleTurn()) return;
+        if (!isCurrentRun()) return;
         const inputPersisted = restored?.events.some(
           (event) => event.agentRunId === agentRunId && event.type === "user_message",
         ) ?? false;
         if (inputPersisted && restored) {
-          setSessionRecord(restored);
+          if (isCurrentVisibleTurn()) setSessionRecord(restored);
         } else if (!isCompactCommand) {
-          setComposerDraftRestore({
+          const draft: ComposerDraftRestore = {
             id: Date.now(),
             sessionId,
             text,
             attachments: options.attachments,
             error: error instanceof Error ? error.message : "Could not prepare the execution context.",
-          });
+          };
+          draftsRef.current.set(sessionId, draft);
+          if (isCurrentVisibleTurn()) setComposerDraftRestore(draft);
         }
         setApprovalPendingForSession(sessionId, false);
         setFailedForSession(sessionId, true);
-      } else {
-        const activeAgentRun = activeStreamAgentRunRef.current;
-        if (!activeAgentRun || activeAgentRun.sessionId !== sessionId) {
-          setFailedForSession(sessionId, true);
-        }
-        refreshPendingApprovalStatuses([sessionId]).catch((refreshError: unknown) => {
-          console.error("Failed to refresh approval status after background turn error", refreshError);
-        });
       }
     } finally {
-      finishCurrentVisibleTurn();
+      finishRun();
     }
   }, [
     isStreaming,
+    sessionRecord,
+    historyBefore,
+    readSessionPage,
+    cacheSessionPage,
+    refreshStreamingBlocks,
     selectedWorkspaceRoot,
     findWorkspaceOption,
     refreshWorkspaces,
@@ -1740,34 +1793,31 @@ export function App() {
 
   const handleAbort = useCallback(async () => {
     const sessionId = activeSessionIdRef.current;
-    if (!hasActspaceBridge() || !activeAgentRunId || !sessionId) return;
+    const run = sessionId ? sessionRunsRef.current.get(sessionId) : undefined;
+    if (!hasActspaceBridge() || !run || !sessionId) return;
 
     const input: AbortAgentRunInput = {
       sessionId,
-      agentRunId: activeAgentRunId,
+      agentRunId: run.agentRunId,
     };
 
     try {
-      setIsAborting(true);
+      run.aborting = true;
+      refreshStreamingBlocks(sessionId);
       const aborted = await window.actspace.abortAgentRun(input);
       if (!aborted) {
-        setIsAborting(false);
+        run.aborting = false;
+        refreshStreamingBlocks(sessionId);
       }
     } catch (error) {
       console.error("Failed to abort turn", error);
-      setIsAborting(false);
+      run.aborting = false;
+      refreshStreamingBlocks(sessionId);
     }
-  }, [activeAgentRunId]);
+  }, [refreshStreamingBlocks]);
 
   const handleCreateSession = useCallback(async (input: NewSessionInput = {}) => {
-    activeStreamAgentRunRef.current = null;
-    setIsStreaming(false);
-    setIsAborting(false);
-    setActiveAgentRunId(null);
     setAgentRunResult(null);
-    setStreamingBlocks([]);
-    streamStateRef.current = createEmptyStreamingState();
-    streamingUserBlockRef.current = null;
     setComposerStateBySession((current) => ({ ...current, __draft__: DEFAULT_COMPOSER_STATE }));
 
     const created = await createSessionForInput(input);
@@ -1837,13 +1887,6 @@ export function App() {
     async (sessionId: string) => {
       if (!sessionId || sessionId === activeSessionIdRef.current) return;
 
-      activeStreamAgentRunRef.current = null;
-      setIsStreaming(false);
-      setIsAborting(false);
-      setActiveAgentRunId(null);
-      setStreamingBlocks([]);
-      streamStateRef.current = createEmptyStreamingState();
-      streamingUserBlockRef.current = null;
       setAgentRunResult(null);
       setActiveSessionId(sessionId);
       refreshPendingApprovalStatuses([sessionId]).catch((error: unknown) => {
@@ -1862,17 +1905,14 @@ export function App() {
         return;
       }
 
-      try {
-        const restored = await window.actspace.getSession({ sessionId });
-        setSessionRecord(restored);
-        setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
-          restored?.meta.worktree?.sourceWorkspaceRoot ?? restored?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
-        ));
-      } catch (error) {
-        console.error("Failed to select session", error);
-      }
+      setSessionRecord(null); setHistoryBefore(null);
+      const restored = await readSessionPage(sessionId, true)
+      if (activeSessionIdRef.current !== sessionId) return;
+      setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
+        restored?.meta.worktree?.sourceWorkspaceRoot ?? restored?.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
+      ));
     },
-    [bootstrapState?.workspaceRoot, localSessionRecords, refreshPendingApprovalStatuses],
+    [bootstrapState?.workspaceRoot, localSessionRecords, refreshPendingApprovalStatuses, readSessionPage],
   );
 
   useEffect(() => {
@@ -1941,7 +1981,7 @@ export function App() {
     const fromRecord = sessionRecord?.messageBlocks;
     if (fromRecord && fromRecord.length > 0) {
       return streamingTurnEventIds
-        ? fromRecord.filter((block) => !streamingTurnEventIds.has(block.id))
+        ? fromRecord.filter((block) => !streamingTurnEventIds.has(block.id) && !block.renderKey?.startsWith(`turn:${streamingAgentRunId}:`))
         : fromRecord;
     }
 
@@ -2047,14 +2087,6 @@ export function App() {
     sessionRecord?.meta.agentRunCount,
     workspaceGitContext,
   ]);
-  const busySessionIds = useMemo<Set<string>>(() => {
-    const set = new Set<string>();
-    if (isStreaming) {
-      const id = activeSessionIdRef.current;
-      if (id) set.add(id);
-    }
-    return set;
-  }, [isStreaming]);
   const sessionStatuses = useMemo<Record<string, SessionUiStatusKind>>(() => {
     const statuses: Record<string, SessionUiStatusKind> = {};
     for (const sessionId of failedSessionIds) {
@@ -2086,7 +2118,7 @@ export function App() {
       let transcriptMessages: MessageBlock[];
       let transcriptTitle = listedSession?.title ?? "Untitled session";
 
-      if (sessionId === activeSessionId) {
+      if (sessionId === activeSessionId && !window.actspace?.getSessionPage) {
         transcriptMessages = messages;
         transcriptTitle = sessionRecord?.meta.title ?? transcriptTitle;
       } else {
@@ -2140,20 +2172,13 @@ export function App() {
           throw new Error("Session fork is not available");
         }
         forked = await window.actspace.forkSession({ sessionId });
-        const refreshed = await window.actspace.listSessions();
+        const refreshed = await readSidebarSessions();
         setSessions(refreshed);
         await refreshWorkspaces();
       }
 
-      activeStreamAgentRunRef.current = null;
       setActiveSessionId(forked.meta.id);
-      setIsStreaming(false);
-      setIsAborting(false);
-      setActiveAgentRunId(null);
       setAgentRunResult(null);
-      setStreamingBlocks([]);
-      streamStateRef.current = createEmptyStreamingState();
-      streamingUserBlockRef.current = null;
       setSessionRecord(forked);
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
         forked.meta.worktree?.sourceWorkspaceRoot ?? forked.meta.workspaceRoot ?? bootstrapState?.workspaceRoot,
@@ -2185,7 +2210,7 @@ export function App() {
 
       try {
         await window.actspace.pinSession({ sessionId, pinned: nextPinned });
-        const refreshed = await window.actspace.listSessions();
+        const refreshed = await readSidebarSessions();
         setSessions(refreshed);
       } catch (error) {
         console.error("Failed to toggle session pin", error);
@@ -2241,7 +2266,7 @@ export function App() {
           return;
         }
 
-        const refreshed = await window.actspace.listSessions();
+        const refreshed = await readSidebarSessions();
         setSessions(refreshed);
         setSessionRecord((current) =>
           current?.meta.id === sessionId
@@ -2271,7 +2296,7 @@ export function App() {
 
       try {
         await window.actspace.archiveSession({ sessionId, archived: true });
-        const refreshed = await window.actspace.listSessions();
+        const refreshed = await readSidebarSessions();
         setSessions(refreshed);
       } catch (error) {
         console.error("Failed to archive session", error);
@@ -2292,7 +2317,8 @@ export function App() {
     if (!workspaceRoot && workspaceId === workspaceRegistry?.defaultWorkspaceId) {
       workspaceRoot = workspaceRegistry.items.find((workspace) => workspace.id === workspaceId)?.path;
     }
-    const targetSessionIds = sessions
+    const archiveCandidates = hasActspaceBridge() ? await window.actspace.listSessions() : sessions;
+    const targetSessionIds = archiveCandidates
       .filter((session) =>
         session.workspaceId === workspaceId ||
         (!session.workspaceId && normalizeWorkspaceRoot(session.workspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)) ||
@@ -2331,7 +2357,7 @@ export function App() {
     }
     if (!window.actspace.archiveSessions) return;
     const result = await window.actspace.archiveSessions({ sessionIds: targetSessionIds });
-    const refreshed = await window.actspace.listSessions();
+    const refreshed = await readSidebarSessions();
     setSessions(refreshed);
     if (!result.ok) {
       console.error("Some workspace sessions could not be archived", result.failedSessionIds);
@@ -2357,20 +2383,13 @@ export function App() {
         !hiddenPaths.has(normalizeWorkspaceRoot(session.workspaceRoot) ?? ""),
       );
       if (fallback) {
-        const restored = hasActspaceBridge()
-          ? await window.actspace.getSession({ sessionId: fallback.id })
-          : localSessionRecords[fallback.id] ?? null;
-        if (!restored) return;
-        activeStreamAgentRunRef.current = null;
         setActiveSessionId(fallback.id);
-        setIsStreaming(false);
-        setIsAborting(false);
-        setActiveAgentRunId(null);
+        const restored = hasActspaceBridge()
+          ? await readSessionPage(fallback.id)
+          : localSessionRecords[fallback.id] ?? null;
+        if (!restored || activeSessionIdRef.current !== fallback.id) return;
         setSessionRecord(restored);
         setAgentRunResult(null);
-        setStreamingBlocks([]);
-        streamStateRef.current = createEmptyStreamingState();
-        streamingUserBlockRef.current = null;
         setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
           restored.meta.workspaceRoot ?? fallback.workspaceRoot ?? bootstrapState?.workspaceRoot,
         ));
@@ -2405,7 +2424,7 @@ export function App() {
     if (!hasActspaceBridge()) return;
 
     try {
-      const refreshed = await window.actspace.listSessions();
+      const refreshed = await readSidebarSessions();
       setSessions(refreshed);
     } catch (error) {
       console.error("Failed to refresh sessions after archived chats changed", error);
@@ -2423,6 +2442,7 @@ export function App() {
 
   return (
     <SessionProjectionProvider sessionId={activeSessionId}>
+      <SessionBrowseContext.Provider value={{ groups: browseGroups, listLoading, listError, retryList: () => setListRetry(n => n + 1), loadMore: loadMoreSessions, messageLoading, messageError, retryMessages: () => { if (activeSessionIdRef.current) void readSessionPage(activeSessionIdRef.current); }, hasEarlier: historyBefore !== null, earlierLoading, earlierError, loadEarlier: loadEarlierMessages }}>
       <RightPanelProvider>
         <WorkbenchLayout
         sessions={visibleSessions}
@@ -2474,6 +2494,7 @@ export function App() {
         />
         <ShutdownOverlay />
       </RightPanelProvider>
+      </SessionBrowseContext.Provider>
     </SessionProjectionProvider>
   );
 }

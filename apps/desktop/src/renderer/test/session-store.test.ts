@@ -137,3 +137,23 @@ it('does not apply a reply after switching Sessions or disposing the bridge', as
   await expect(disposed).rejects.toThrow();
   expect(bridge.store.get('new').snapshot).toBeNull();
 });
+
+it('requests trajectory only while the trajectory surface is open', async () => {
+  const requested: boolean[] = [];
+  let emit: ((event: RuntimeV2LiveEvent) => void) | undefined;
+  let revision = 0;
+  const bridge = createDesktopSessionBridge({
+    getSessionProjectionSnapshot: async ({ sessionId, includeTrajectory }) => {
+      requested.push(includeTrajectory === true);
+      return { kind: 'session-projection', schemaVersion: 1, sessionId, throughJournalSeq: revision, snapshot: { ...snapshot(sessionId), throughJournalSeq: revision }, values: {} };
+    },
+    onSessionLiveEvent: listener => { emit = event => listener({ event }); return () => {}; },
+  });
+  bridge.start(); await bridge.open('s');
+  await bridge.setTrajectoryVisible('s', true);
+  await bridge.setTrajectoryVisible('s', false);
+  revision++; emit?.(live('s', revision));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(requested).toEqual([false, true, false]);
+  bridge.dispose();
+});

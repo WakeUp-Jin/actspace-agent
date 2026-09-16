@@ -40,11 +40,12 @@ export function ContextPopup({
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const stateSnapshot = contextState ? {
+    basis: contextState.basis,
     totalTokens: contextState.totalEstimatedTokens,
     maxTokens: contextState.maxTokens,
     percentUsed: contextState.percentUsed,
     compressionCount: 0,
-    cumulativeTokens: contextState.totalEstimatedTokens,
+    cumulativeTokens: snapshot?.cumulativeTokens,
     estimator: contextState.estimator,
     buckets: contextState.buckets,
   } satisfies ContextUsageSnapshot : null;

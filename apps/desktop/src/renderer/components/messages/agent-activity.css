@@ -1,0 +1,25 @@
+.agent-activity-transition {
+  display: grid;
+  overflow: hidden;
+  min-height: 1.45em;
+}
+.agent-activity-transition > span {
+  grid-area: 1 / 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-activity-out { animation: agent-activity-out 180ms ease-out forwards; }
+.agent-activity-in { animation: agent-activity-in 180ms ease-out both; }
+@keyframes agent-activity-out {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(-4px); opacity: 0; }
+}
+@keyframes agent-activity-in {
+  from { transform: translateY(4px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-activity-out { display: none; animation: none; }
+  .agent-activity-in { animation: none; }
+}

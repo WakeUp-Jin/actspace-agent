@@ -112,12 +112,12 @@ describe("ToolActivityGroup in ConversationView", () => {
 
     // 过程旁白和工具统一折叠。
     expect(screen.queryByText("我要调用读取工具看看。")).not.toBeInTheDocument();
-    expect(screen.queryByText("Read package.json")).not.toBeInTheDocument();
+    expect(screen.queryByText("package.json")).not.toBeInTheDocument();
 
     await user.click(toggle);
 
     expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("Read package.json")).toBeInTheDocument();
+    expect(screen.getByText("package.json")).toBeInTheDocument();
     expect(screen.getByText("Thought 2s")).toBeInTheDocument();
     expect(screen.getByText("Grep ToolActivityGroup")).toBeInTheDocument();
   });
@@ -166,7 +166,7 @@ describe("ToolActivityGroup in ConversationView", () => {
     expect(screen.queryByRole("button", { name: /Worked for/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Tool activity" })).not.toBeInTheDocument();
     expect(screen.getByText("我要调用读取工具看看。")).toBeInTheDocument();
-    expect(screen.getByText("Read package.json")).toBeInTheDocument();
+    expect(screen.getByText("package.json")).toBeInTheDocument();
     expect(screen.getByText("Grep ToolActivityGroup")).toBeInTheDocument();
     expect(screen.getByText("项目是 monorepo 结构，这是最终结论。")).toBeInTheDocument();
   });

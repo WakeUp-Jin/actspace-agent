@@ -82,6 +82,23 @@ describe("fixed renderer v2 projection", () => {
     ]);
   });
 
+  it("preserves task notification provenance so the user projection can hide it", () => {
+    const notification = [
+      event(0, "agent/inbox/spliced", { operation: "enqueue", messageId: "notify-1", target: "next-step", content: "<task_notification>done</task_notification>", source: "task_notification" }),
+      event(1, "agent/inbox/spliced", { operation: "claim", messageId: "notify-1", target: "next-step", source: "task_notification" }, append("user", "notify-1", "<task_notification>done</task_notification>")),
+    ];
+    const snapshot = baseSnapshot({
+      throughJournalSeq: 1,
+      messages: [{ kind: "user", messageId: "notify-1", content: "<task_notification>done</task_notification>" }],
+    });
+
+    const projected = projectFixedRendererSession(snapshot, notification, "/tmp/workspace");
+    const userEvent = projectFixedRendererEvents(snapshot, notification).find((item) => item.type === "user_message");
+
+    expect(userEvent?.payload).toMatchObject({ source: "task_notification" });
+    expect(projected.messageBlocks).toEqual([]);
+  });
+
   it("projects only the effective Surface and places a compaction summary at the shadowed range", () => {
     const journal = [
       event(0, "user/message", { messageId: "user-1", agentRunId: "run-1", turnId: "turn-1" }, append("user", "user-1", "old question")),
@@ -155,6 +172,70 @@ describe("fixed renderer v2 projection", () => {
     ]));
     expect(state.entries.every((entry) => entry.estimatedTokens > 0)).toBe(true);
     expect(state.buckets.find((bucket) => bucket.name === "tools")?.tokens).toBeGreaterThan(0);
+  });
+
+  it("uses latest request context for occupancy independently of cumulative usage", () => {
+    const journal = [event(0, "request/context", {
+      requestId: "latest", snapshot: {
+        prepared: { contextWindow: 1_000_000 },
+        messages: [{ role: "user", content: "x".repeat(196_000) }],
+      },
+    })];
+    const snapshot = baseSnapshot({ usage: { ...baseSnapshot().usage, totalTokens: 549_000 } });
+    const state = projectContextState(snapshot, journal);
+    const context = projectContextSnapshot(snapshot, journal);
+    expect(state.totalEstimatedTokens).toBeGreaterThan(0);
+    expect(context).toMatchObject({
+      totalTokens: state.totalEstimatedTokens, percentUsed: state.percentUsed,
+      maxTokens: state.maxTokens, buckets: state.buckets, estimator: state.estimator,
+      cumulativeTokens: 549_000,
+    });
+    expect(projectContextSnapshot({ ...snapshot, usage: { ...snapshot.usage, totalTokens: 999_000 } }, journal).totalTokens).toBe(context.totalTokens);
+    expect(projectContextSnapshot(snapshot).totalTokens).toBe(0);
+  });
+
+  it("keeps full counters when browse previews are truncated", () => {
+    const snapshot = baseSnapshot();
+    const full = projectContextState(snapshot, [event(0, "request/context", { snapshot: {
+      prepared: { contextWindow: 1_000_000 }, systemSections: ["s".repeat(8000)],
+      messages: Array.from({ length: 52 }, () => ({ role: "user", content: "中".repeat(2000) })),
+    } })]);
+    const bounded = event(0, "request/context", { snapshot: {
+      prepared: { contextWindow: 1_000_000 }, systemSections: ["s".repeat(1000)],
+      messages: Array.from({ length: 20 }, () => ({ role: "user", content: "中".repeat(1000) })),
+    }, browseContextState: JSON.parse(JSON.stringify({ ...full, entries: full.entries.map(e => ({ ...e, preview: e.preview?.slice(0, 1000) })) })) });
+    expect(projectContextSnapshot(snapshot, [bounded]).totalTokens).toBe(full.totalEstimatedTokens);
+    expect(projectContextState(snapshot, [bounded]).buckets).toEqual(full.buckets);
+  });
+
+  it("estimates the compacted surface until the next request without duplicating summaries", () => {
+    const request = event(0, "request/context", { requestId: "old", snapshot: {
+      prepared: { contextWindow: 1000000 }, systemSections: ["system"],
+      messages: [{ role: "user", content: "中".repeat(12000) }],
+    } });
+    const journal = [request,
+      event(1, "surface/replaced", { compactionId: "compact" }, { kind: "replace", start: 0, end: 1, sourceEventSeqs: [0], node: { kind: "user", messageId: "summary", content: "精简摘要" } }),
+      event(2, "compaction/end", { compactionId: "compact" }),
+    ];
+    const before = baseSnapshot({ usage: { ...baseSnapshot().usage, totalTokens: 500000 } });
+    const after = baseSnapshot({ ...before, throughJournalSeq: 2,
+      messages: [{ kind: "user", messageId: "summary", content: "精简摘要" }],
+      activity: { ...before.activity, compactionCount: 1, lastCompactionSummary: "精简摘要" },
+    });
+    const estimated = projectContextState(after, journal);
+    expect(estimated.basis).toBe("next-request");
+    expect(estimated.requestId).toBeUndefined();
+    expect(estimated.totalEstimatedTokens).toBeLessThan(projectContextState(before, [request]).totalEstimatedTokens);
+    expect(estimated.entries.filter(e => e.kind === "summarizedConversation")).toHaveLength(1);
+    expect(estimated.buckets.find(b => b.key === "conversation")?.tokens).toBe(0);
+    expect(projectContextSnapshot(after, journal).cumulativeTokens).toBe(500000);
+    const next = event(3, "request/context", { requestId: "new", snapshot: { prepared: { contextWindow: 1000000 }, systemSections: ["system"], messages: [{ role: "user", content: "精简摘要" }] } });
+    const actual = projectContextState(after, [...journal, next]);
+    expect(actual.basis).toBe("last-request");
+    expect(actual.requestId).toBe("new");
+    expect(actual.totalEstimatedTokens).toBe(estimated.totalEstimatedTokens);
+    expect(actual.entries.filter(e => e.kind === "summarizedConversation")).toHaveLength(1);
+    expect(projectContextState({ ...after, activity: { ...after.activity, activeTurnId: "running" } }, [...journal, next]).basis).toBe("current-request");
   });
 
   it("projects the model context window from request facts and maps legacy sessions to zero", () => {

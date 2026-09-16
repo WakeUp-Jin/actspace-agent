@@ -2,6 +2,7 @@ import { FileText, Image as ImageIcon, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { MessageBlock, WorkspaceReadFileResult } from "@actspace/shared";
 import { useRightPanel, type RightPanelTab } from "../right-panel/RightPanelContext";
+import { tabFromFile } from "../right-panel/workspaceFileTab";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 
 type TurnOutputArtifact = {
@@ -121,29 +122,6 @@ export function collectTurnOutputArtifacts(messages: MessageBlock[]): TurnOutput
   return [...outputs.values()];
 }
 
-function workspaceTab(result: WorkspaceReadFileResult): RightPanelTab | null {
-  if (result.error) return null;
-  const id = `file:${result.relativePath}`;
-  const title = fileName(result.relativePath);
-  switch (result.renderKind) {
-    case "markdown":
-      return { id, kind: "markdown", title, source: result.content ?? "", relativePath: result.relativePath };
-    case "html":
-      return { id, kind: "html", title, html: result.content ?? "", trust: "file", relativePath: result.relativePath };
-    case "image":
-      return { id, kind: "image", title, src: result.dataUrl ?? "", relativePath: result.relativePath };
-    case "text":
-      return {
-        id,
-        kind: "text",
-        title,
-        content: result.content ?? "",
-        language: result.language,
-        relativePath: result.relativePath,
-      };
-  }
-}
-
 function artifactReadError(error: string | undefined): string {
   if (error === "too_large") return "图片过大，无法预览。";
   if (error === "unsupported_format") return "图片格式不受支持。";
@@ -196,7 +174,10 @@ export function TurnOutputArtifacts({
         openTab({
           id: `session-artifact:${sessionId}:${result.relativePath}`,
           kind: "image",
-          title: result.name || artifact.name,
+          // The session-artifact IPC intentionally returns an opaque storage path;
+          // keep the user-facing label from the tool projection instead of exposing
+          // the UUID as a tab title.
+          title: artifact.name,
           src: result.dataUrl,
         });
         return;
@@ -214,12 +195,7 @@ export function TurnOutputArtifacts({
         setError(workspaceReadError(result.error));
         return;
       }
-      const tab = workspaceTab(result);
-      if (!tab) {
-        setError("文件读取失败。");
-        return;
-      }
-      openTab(tab);
+      openTab(tabFromFile(result));
     } catch {
       setError(artifact.kind === "image" ? "图片读取失败。" : "文件读取失败。");
     } finally {

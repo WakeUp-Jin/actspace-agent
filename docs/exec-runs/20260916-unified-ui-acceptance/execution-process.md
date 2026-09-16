@@ -1,0 +1,23 @@
+# 执行过程
+
+- 2026-09-16：定位截图的 8 个会话，读取最后 5 条消息；核对渐进加载、只读子 Agent、排版三个执行摘要。
+- 明确 7 项有实现记录，T05 会话切换只完成定位。历史提交请求不在本轮执行范围。
+- Computer Use 已启用；初次枚举没有正在运行的当前 workspace 开发窗口，开始 `pnpm dev:log`。
+- 创建统一测试矩阵 `test-plan.md`；保留当前暂存区和工作区所有既有修改。
+- 依赖闭包构建通过；首启因沙箱 EPERM 失败，授权重试后确认 5173 已被本 workspace 的 renderer 占用，保留该服务。
+- 单独 `pnpm --filter @actspace/desktop build:electron` 通过，授权启动 `dev:electron:run`；启动器自动重建缺失 crashpad handler 的开发 runtime 缓存。
+- 真实窗口身份：Actspace Dev actspace-agent-2067 / com.actspace.desktop.dev.w2067fa05；HEAD c6e2a6d，测试对象包含既有未提交改动。
+- Computer Use 观察真实旧会话恢复；commerce-agent 的 Show more 从 10 条追加到 20 条，原顺序保留，当前消息不变。
+- Composer Context popup 显示约 7K / 1M、0%，系统/工具/规则等分项可见；完整三处一致性尚未完成。
+- 用户明确授权临时切换主题和写入进度开关，测试后恢复。当前尚未修改这些设置。
+- Computer Use 单次原生操作约 60 秒，首次浏览器绑定约 9 分钟；该工具延迟不作为应用性能数据。
+- 用户“继续测试”后恢复真实 Electron AX：同一旧会话右侧系统提示词为 9,531 Token、工具 3,409 Token，底部仍显示 0%；与此前观察不同，未重新打开 popup，暂不能判定同一时点三处不一致。
+- 后续控制入口不可用：当前工具发现仅能找到独立 node_repl，未提供 cua 控制入口；独立 REPL 中 cua/desktop 均未定义。没有通过其他底层自动化绕开该边界。
+- 补跑 11 个定向测试文件，60/60 通过；再补跑 App/Sidebar/Workbench/Composer/Projection 5 文件，152 通过、2 失败。
+- 两项失败：App 的多文件写入独立完成测试无法找到 `Write first.ts`；添加工作区测试期待 `createSession({ title: 'New chat', workspaceRoot: '/tmp/new-workspace' })` 未匹配。没有修改测试以消除失败，也未作根因确认。
+- Computer Use 恢复后继续真实 Electron：轨迹按钮可在对话与 `Session trajectory` 间切换，轨迹工具栏提供 actual duration、collapse turns、collapse calls 和 search；当前会话空态为“暂无可展示的 Agent 轨迹”。
+- 返回对话后旧消息完整恢复。浅色截图确认代码块、行内代码与中文正文可读；长 URL 在代码块内裁切，没有造成页面级横向溢出。
+- 右侧 Context 面板截图确认 23 条明细、系统提示词 9,531 Token、工具 3,409 Token，条目与“展开全文”操作可见。
+- “新建右侧面板对象”菜单可打开，包含工作区文件、Review、终端、可视化回复、上下文。再次选择已打开的上下文没有重复创建 Tab，保持单一 Context Tab；这是去重行为，不能作为多 Tab 排版通过证据。
+- 继续测试期间 Electron 与 renderer 进程退出；单独启动 Electron 因 5173 不可用超时。随后完整 `pnpm dev:log` 重启成功，依赖构建与 watch typecheck 0 errors，renderer 恢复在 127.0.0.1:5173，开发应用身份保持不变。
+- 重启后 Computer Use 重新绑定，旧会话、首屏 10 条和 Show more 恢复；右侧面板默认关闭，说明重启没有错误恢复一个已打开但失效的 Tab。

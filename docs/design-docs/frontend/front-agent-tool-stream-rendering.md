@@ -6,6 +6,8 @@
 
 Agent 输出期间，正文、思考和工具调用分别渲染。工具从参数生成、审批、执行到结束使用同一条消息，结束后重新读取 Session 时保持同样的工具类型、参数摘要和结果状态。
 
+主会话运行时按原顺序平铺 Thinking、工具和过程旁白，不再设置 `Explored` 分组。Thinking 不因单步 completed 提前收起；模型最终回复全部输出结束后，整个过程统一折叠为一个 `Worked for`，最终回复留在组外。重新展开 Worked 时，Thinking 和所有工具详情均从收起状态开始（包括失败 Bash）；之后允许手动展开，普通重渲染不覆盖用户选择。Thinking 箭头默认隐藏，悬浮或键盘聚焦时显示；其他原地详情箭头收起时隐藏、悬浮或聚焦时显示，展开后保持可见。编辑记录保留箭头。打开右侧视图的入口不使用箭头，只提升悬浮/聚焦文字对比度，Read 文件文字直接打开文件，独立的结果箭头负责原地预览，不显示 Open file 按钮。
+
 2026-09-06 修复前的只读诊断确认：
 
 - `packages/core/agent-loop/src/loop.ts` 的 `collectStream()` 把 `tool-call-delta.argumentsDelta` 作为 `assistant-delta.message` 发出。
@@ -59,11 +61,11 @@ requestId 是模型请求身份；llmCallId 兼容字段映射实际 requestId�
 
 - Read/List/Grep/Glob：参数明确后显示路径或查询摘要；结果到达才显示条目数量。
 - Bash：参数生成时显示稳定占位，prepared 后一次显示 command 摘要；审批与执行状态继续实时更新，结果展示 stdout/stderr。
-- Write/Edit：参数生成只显示动作占位，prepared 后一次显示路径；不发送 streamingContent，diff 与统计在结果到达后补齐。
+- Write/Edit：参数生成时在 Main 增量扫描顶层 `content` / `new_string` 字符串，仅统计解码后的 Unicode 码点，不缓存或发送正文。按 callId 最多每秒发布一次字符量；不足 10 字符显示“正在生成”，千以下向下取整到十，千以上保留一位小数。prepared 后一次显示完整路径和“准备保存”，进入 body 后显示“正在保存”；finished 使用真实 diff 增删行数。`generationProgress` 是临时展示字段，不表示已写盘字节或最终 diff。既有 `showFileChangeStats` 控制字符量与完成态统计的可见性。
 - Delete、Web、图像工具、Todo、Agent/Explore：复用现有 previewKind；未知插件使用明确的 generic fallback。
 - 提取过程中顺带核对映射是否覆盖当前注册表中的规范工具名；只修复本预览映射的遗漏，不进行工具命名迁移。
 - 不直接复用终态默认值：running 不得显示 Tool completed、success、伪造的 diff 或统计；拒绝和中止不能全部映射成普通 failed。没有专用终态枚举的 UI 用失败展示并保留明确原因，不谎报成功。
-- 工具参数增量只触发一次稳定占位，不解析、不缓存 partial JSON；prepared 一次补齐摘要。已移除 50ms 参数合并定时器与 64 KiB 部分参数缓冲；底层工具参数事件与完整参数校验保留。
+- 其他工具参数增量只触发一次稳定占位；Write/Edit 额外使用常量空间扫描器统计指定字符串，跨分片保留转义与代理对状态，不恢复 partial JSON 缓冲。字符量使用每次调用独立的一秒尾随定时器，prepared、started、finished、run 结束与 dispose 均清理；无参数增量时不模拟字符量。底层完整参数校验保留。
 - 不向 renderer 发送未筛选 args/ToolExecutionResult；输出沿用现有 redaction、artifact 和 DTO 边界。正文中的用户合法 JSON 不能被前端正则删除。
 
 工具预览规范中的 `engine/streaming-preview-extractors.ts` 等是旧路径，本次采用上述 Main 模块并同步规范，不恢复旧 engine。
@@ -104,7 +106,10 @@ Journal 保留原有 assistant/chunk 容器；新增工具 kind 时保存 callId
 - 工作空间路径由 Node path.relative 计算：根为 `.`，内部相对路径，外部绝对路径；Raw 与实际调用不改。
 - 轨迹页隐藏整个 composer-zone，但保留挂载；草稿、附件、模型选择不会因切换卸载。运行时顶部保留 Stop。
 - Subagents 使用右侧列表/详情导航。委派 requested 记录 childSessionId；列表每秒刷新，运行中详情每 750ms 刷新，关闭/切换时释放轮询并忽略迟到响应。详情 IPC 返回 SessionEvent，与前端契约一致，展示未提交正文/Thinking chunk 和已准备的运行工具，完成后以持久消息代替 chunk。Todo UI 保持现状。
+- Explore 与通用 Agent 共用右侧 SubAgent 详情入口；主消息区显示紧凑两行入口（状态点、任务名、类型、状态、最新活动），不内联展开 transcript。
+- Read/List/Grep/Glob/Directory List 的终态结果通过 bounded `resultPreview` 进入通用 `tool-result-*` disclosure；Read 仅对当前 workspace 可确认的相对路径提供 main IPC 文件打开动作。
+- 图像生成成功产物由 turn 级 Artifacts 打开右侧 image Tab；失败或 warning 在工具行内通过 disclosure 查看，不以 hover tooltip 作为唯一错误入口。
 
-## 回合过程折叠与点击提示
+### 只读子任务活动（2026-09-15）
 
-主会话运行时按原顺序平铺 Thinking、工具和过程旁白，不再设置 `Explored` 分组。Thinking 不因单步 completed 提前收起；模型最终回复全部输出结束后，整个过程统一折叠为一个 `Worked for`，最终回复留在组外。重新展开 Worked 时，Thinking 和所有工具详情均从收起状态开始（包括失败 Bash）；之后允许手动展开，普通重渲染不覆盖用户选择。Thinking 箭头默认隐藏，悬浮或键盘聚焦时显示；其他原地详情箭头收起时隐藏、悬浮或聚焦时显示，展开后保持可见。编辑记录保留箭头。打开右侧视图的入口不使用箭头，只提升悬浮/聚焦文字对比度，Read 文件文字直接打开文件，独立的结果箭头负责原地预览，不显示 Open file 按钮。
+Child live event 携带 parentSessionId / parentCallId，Main adapter 将事件投影到仍在运行的父 agent/explore 工具行，携带 transcriptRef；同一文本阶段不逐 token 发布父预览，父调用结束后忽略迟到子事件。只开放读取和搜索；消息行使用轻边框与 180ms 上移淡入淡出活动提示（4px，无三维翻转），具体运行预算见 [子代理设计](../collaboration/agent-explore-subagent.md)。

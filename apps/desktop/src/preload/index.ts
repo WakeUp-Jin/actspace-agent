@@ -208,6 +208,9 @@ const FIXED_RENDERER_INVOKE_CHANNELS: Readonly<Record<string, string>> = Object.
   "workspace-open:list-tools": RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaceOpenTools,
   "workspace-open:open": RUNTIME_V2_FIXED_RENDERER_CHANNELS.openWorkspaceInTool,
   "context:describe": RUNTIME_V2_FIXED_RENDERER_CHANNELS.describeContext,
+  "session:list-page": RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSessionPage,
+  "session:tool-detail": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionToolDetail,
+  "session:get-page": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionPage,
   "session:list": RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSessions,
   "session:get": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSession,
   "session:get-projection-snapshot": RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionProjectionSnapshot,
@@ -373,6 +376,9 @@ contextBridge.exposeInMainWorld("actspace", {
     invokeFixedRenderer("workspace-open:open", input) as Promise<WorkspaceOpenResult>,
   describeContext: (input: DescribeContextInput) =>
     invokeFixedRenderer("context:describe", input) as Promise<ContextState | null>,
+  listSessionPage: (input?: import("@actspace/shared").SessionListPageInput) => invokeFixedRenderer("session:list-page", input ?? {}) as Promise<import("@actspace/shared").SessionListPage>,
+  getSessionToolDetail: (input: { sessionId: string; callId: string }) => invokeFixedRenderer("session:tool-detail", input) as Promise<import("@actspace/shared").MessageBlock[]>,
+  getSessionPage: (input: import("@actspace/shared").SessionMessagePageInput) => invokeFixedRenderer("session:get-page", input) as Promise<import("@actspace/shared").SessionMessagePage>,
   listSessions: (input?: SessionListInput) => invokeFixedRenderer("session:list", input ?? {}) as Promise<SessionListItem[]>,
   getSession: (input: SessionGetInput) => invokeFixedRenderer("session:get", input) as Promise<SessionRecord | null>,
   getSessionProjectionSnapshot: (input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput) =>

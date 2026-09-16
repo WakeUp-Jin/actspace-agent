@@ -59,6 +59,7 @@ export function registerRuntimeV2Ipc(options: {
   readonly quickOpen?: QuickOpenShortcutController;
   readonly catalog?: RuntimeV2OpenRouterCatalogService;
   readonly deepSeekCatalog?: RuntimeV2OpenRouterCatalogService;
+  readonly kimiCatalog?: RuntimeV2OpenRouterCatalogService;
   readonly approvals?: ApprovalRegistryView;
 }): { readonly dispose: () => void } {
   const channels = Object.values(RUNTIME_V2_DESKTOP_CHANNELS).filter((channel) => channel !== RUNTIME_V2_DESKTOP_CHANNELS.liveEvent && channel !== RUNTIME_V2_DESKTOP_CHANNELS.approvalRequired);
@@ -191,12 +192,12 @@ export function registerRuntimeV2Ipc(options: {
     return requireSettings(options.settings).writeAgentSystemPrompt(input.content);
   });
   handle(RUNTIME_V2_DESKTOP_CHANNELS.listModelCatalog, (_event, input: RuntimeV2ModelCatalogQuery = {}) => {
-    const { provider, catalog } = selectModelCatalog(input.provider, requireCatalog(options.catalog), options.deepSeekCatalog);
+    const { provider, catalog } = selectModelCatalog(input.provider, requireCatalog(options.catalog), options.deepSeekCatalog, options.kimiCatalog);
     return { provider, ...catalog.list(input.query) };
   });
   handle(RUNTIME_V2_DESKTOP_CHANNELS.reloadModelCatalog, async (_event, input: RuntimeV2ModelCatalogQuery = {}) => {
     const settings = requireSettings(options.settings);
-    const { provider, catalog } = selectModelCatalog(input.provider, requireCatalog(options.catalog), options.deepSeekCatalog);
+    const { provider, catalog } = selectModelCatalog(input.provider, requireCatalog(options.catalog), options.deepSeekCatalog, options.kimiCatalog);
     const runtime = settings.getProviderRuntimeConfig(provider);
     if ("code" in runtime) return { provider, ...catalog.list(), error: { code: runtime.code, message: runtime.message } };
     const result = await catalog.reload(runtime);
@@ -205,7 +206,7 @@ export function registerRuntimeV2Ipc(options: {
   });
   handle(RUNTIME_V2_DESKTOP_CHANNELS.addCatalogModel, async (_event, input: RuntimeV2AddCatalogModelInput) => {
     if (!input || typeof input.apiModel !== "string" || !input.apiModel.trim()) throw new Error("Catalog model is invalid.");
-    const { provider } = selectModelCatalog(input.provider, requireCatalog(options.catalog), options.deepSeekCatalog);
+    const { provider } = selectModelCatalog(input.provider, requireCatalog(options.catalog), options.deepSeekCatalog, options.kimiCatalog);
     const result = await requireModels(options.models).addCatalogModel(provider, input.apiModel.trim());
     if ("message" in result) throw new Error(result.message);
     return requireSettings(options.settings).getV2();

@@ -73,3 +73,19 @@ it("uses the DeepSeek connection and scoped proxy for model discovery, with sani
   expect(directFetch).toHaveBeenCalledTimes(1);
   await service.dispose();
 });
+
+it("uses the configured Kimi-compatible /models endpoint for model discovery", async () => {
+  const directFetch = vi.fn(async () => Response.json({
+    data: [
+      { id: "kimi-k2-thinking", name: "Kimi K2 Thinking", context_length: 256_000, max_output_tokens: 32_768, input_modalities: ["text", "image"], supports_reasoning: true },
+    ],
+  }));
+  const service = new ProviderNetworkService({ directFetch, now: () => NOW });
+
+  await expect(service.fetchModelCatalog({ ...runtime("kimi"), baseUrl: "https://api.moonshot.ai/v1" })).resolves.toMatchObject({
+    ok: true,
+    payload: { data: [expect.objectContaining({ id: "kimi-k2-thinking" })] },
+  });
+  expect(directFetch).toHaveBeenCalledWith("https://api.moonshot.ai/v1/models", expect.objectContaining({ method: "GET" }));
+  await service.dispose();
+});

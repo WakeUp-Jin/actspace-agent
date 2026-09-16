@@ -2,7 +2,7 @@ import { ClientSessionStore, selectTrajectory } from "@actspace/client/sessions"
 import type { RuntimeV2DesktopSessionProjection, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot, RuntimeV2SessionProjectionInput } from "@actspace/shared/runtime-v2";
 
 export type DesktopSessionTransport = {
-  readonly inspectSession: (sessionId: string, trajectoryFromSeq?: number) => Promise<RuntimeV2DesktopSessionProjection>;
+  readonly inspectSession: (sessionId: string, trajectoryFromSeq?: number, includeTrajectory?: boolean) => Promise<RuntimeV2DesktopSessionProjection>;
   readonly subscribeLive: (listener: (event: RuntimeV2LiveEvent) => void) => () => void;
 };
 
@@ -13,7 +13,7 @@ export type DesktopSessionApi = {
 
 export function createDesktopSessionBridge(api: DesktopSessionApi, store = new ClientSessionStore()): DesktopSessionBridge {
   return new DesktopSessionBridge({
-    inspectSession: (sessionId, trajectoryFromSeq) => api.getSessionProjectionSnapshot({ sessionId, ...(trajectoryFromSeq === undefined ? {} : { trajectoryFromSeq }) }),
+    inspectSession: (sessionId, trajectoryFromSeq, includeTrajectory) => api.getSessionProjectionSnapshot({ sessionId, includeTrajectory: includeTrajectory === true, ...(trajectoryFromSeq === undefined ? {} : { trajectoryFromSeq }) }),
     subscribeLive: (listener) => api.onSessionLiveEvent((envelope) => listener(envelope.event)),
   }, store);
 }
@@ -30,6 +30,7 @@ export class DesktopSessionBridge {
   #historyStarts = new Map<string, number>();
   #historyLoads = new Map<string, Promise<void>>();
   #disposed = false;
+  #trajectorySession: string | null = null;
 
   constructor(private readonly transport: DesktopSessionTransport, store = new ClientSessionStore()) {
     this.store = store;
@@ -58,6 +59,13 @@ export class DesktopSessionBridge {
       this.store.markError(sessionId, error, requestGeneration);
       throw error;
     }
+  }
+
+  async setTrajectoryVisible(sessionId: string, visible: boolean): Promise<void> {
+    this.#trajectorySession = visible ? sessionId : null;
+    if (!visible || this.#disposed || this.store.selectedSessionId !== sessionId) return;
+    const generation = this.store.beginRequest(sessionId, { preserveReady: true, notify: false });
+    await this.#load(sessionId, generation, true);
   }
 
   loadEarlierHistory(sessionId: string): Promise<void> {
@@ -105,7 +113,7 @@ export class DesktopSessionBridge {
   }
 
   async #load(sessionId: string, requestGeneration: number, strictSelection: boolean): Promise<RuntimeV2SessionSnapshot> {
-    const envelope = await this.transport.inspectSession(sessionId, this.#historyStarts.get(sessionId));
+    const envelope = await this.transport.inspectSession(sessionId, this.#historyStarts.get(sessionId), this.#trajectorySession === sessionId);
     const snapshot = envelope.snapshot;
     if (this.#disposed || this.store.selectedSessionId !== sessionId) {
       if (strictSelection) throw new Error("Session selection changed while loading.");

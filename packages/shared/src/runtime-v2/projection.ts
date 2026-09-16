@@ -45,6 +45,7 @@ export type RuntimeV2SessionProjectionInput = {
   readonly sessionId: string;
   /** Oldest requested Journal sequence; omitted on the first page. */
   readonly trajectoryFromSeq?: number;
+  readonly includeTrajectory?: boolean;
 };
 
 /** Unprefixed alias used by the Session Projection package and execution plans. */
@@ -69,6 +70,9 @@ export type RuntimeV2ProviderUsageProjection = {
 };
 
 export type RuntimeV2RequestContextEstimateProjection = {
+  readonly contextState?: import("../session").ContextState;
+  readonly cumulativeTokens?: number;
+  readonly cumulativeUsage?: RuntimeV2UsageSummary;
   readonly kind: "request-context-estimate";
   readonly schemaVersion: 1;
   readonly sessionId: string;

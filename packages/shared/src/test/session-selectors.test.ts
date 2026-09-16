@@ -190,6 +190,40 @@ describe("session selectors", () => {
     });
   });
 
+  it("replays file result previews for list-style tools", () => {
+    const [glob, list] = createMessageBlocks([
+      toolResultEvent({
+        toolCallId: "toolu-glob-1",
+        toolName: "glob",
+        ok: true,
+        summary: "Glob **/*.md",
+        uiPreview: {
+          kind: "glob",
+          pattern: "**/*.md",
+          scope: ".",
+          displayText: "Glob **/*.md",
+          resultPreview: ["README.md", "docs/ARCHITECTURE.md"],
+        },
+      }),
+      toolResultEvent({
+        toolCallId: "toolu-list-1",
+        toolName: "directory_list",
+        ok: true,
+        summary: "Listed . (2 entries)",
+        uiPreview: {
+          kind: "directory_list",
+          path: ".",
+          entryCount: 2,
+          displayText: "Listed . (2 entries)",
+          resultPreview: ["README.md", "src"],
+        },
+      }),
+    ]);
+
+    expect(glob).toMatchObject({ resultPreview: ["README.md", "docs/ARCHITECTURE.md"] });
+    expect(list).toMatchObject({ resultPreview: ["README.md", "src"] });
+  });
+
   it("restores write output paths for the turn artifact shelf", () => {
     const [block] = createMessageBlocks([toolResultEvent({
       toolCallId: "toolu-write-1",

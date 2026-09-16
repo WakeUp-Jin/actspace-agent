@@ -190,7 +190,7 @@ export function ProviderSettings({ settings, onChanged }: { settings?: AppSettin
           onRefreshBalance={() => { if (detailMeta.supportsBalance) void loadBalance(detailProvider as BalanceProviderId); }}
           onTest={() => void test(detailProvider)}
           onRefreshModels={async () => {
-            if ((detailProvider === "openrouter" || detailProvider === "deepseek") && window.actspace.reloadModelCatalog) {
+            if (window.actspace.reloadModelCatalog) {
               const result = await window.actspace.reloadModelCatalog({ provider: detailProvider });
               if (!result.error) await onChanged?.();
               return result;
@@ -511,7 +511,7 @@ function ProviderDetailRoute({
             </div>
             {catalogStatus ? <p role={catalogStatus.error ? "alert" : "status"} className={`mt-2 text-[12px] ${catalogStatus.error ? "text-on-danger" : "text-text-muted"}`}>{catalogStatus.text}</p> : null}
             {provider.id === "deepseek" ? <p className="mt-2 text-[12px] leading-relaxed text-text-faint">V4.1 Flash 支持图片理解。费用按官方美元高峰价估算；目录刷新发现模型，价格由 ActSpace 官方档案维护。</p> : null}
-            {catalogOpen && (provider.id === "deepseek" || provider.id === "openrouter") ? <OpenRouterModelCatalogDialog provider={provider.id} onClose={() => setCatalogOpen(false)} onAdded={modelsChanged} onReloaded={modelsChanged} /> : null}
+            {catalogOpen && provider.supportsModelDiscovery ? <OpenRouterModelCatalogDialog provider={provider.id} onClose={() => setCatalogOpen(false)} onAdded={modelsChanged} onReloaded={modelsChanged} /> : null}
           </div>
         </DetailSection>
       </div>

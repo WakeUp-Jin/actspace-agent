@@ -1665,6 +1665,7 @@ function SubagentSection({
 function ToolsSection({ settings, onUpdate, onConnectProvider, onClearProvider, settingsV4, onUpdateNamespace }: SectionProps) {
   const disabled = settingsV4?.settings.tools.disabledTools ?? settings.agent.disabledTools;
   const bashAlwaysAsk = settingsV4?.settings.tools.bash.alwaysAsk ?? settings.agent.bashAlwaysAsk;
+  const showFileChangeStats = settingsV4?.settings.tools.showFileChangeStats !== false;
   const [browserDetailsOpen, setBrowserDetailsOpen] = useState(false);
   const browserDisabled = disabled.includes(BROWSER_TOOL_GROUP) || disabled.includes("browser_help");
   const browserExecutionTools = BROWSER_TOOL_ITEMS.filter((tool) => tool.kind !== "capability");
@@ -1740,6 +1741,23 @@ function ToolsSection({ settings, onUpdate, onConnectProvider, onClearProvider, 
               control={<Toggle checked={!disabled.includes(tool.name)} onChange={(next) => toggleTool(tool.name, next)} ariaLabel={tool.label} />}
             />
           ))}
+          <SettingRow
+            title="显示写入变动"
+            description="生成时每秒更新字符量，完成后显示增删行数，不自动展开内容。"
+            control={
+              <Toggle
+                checked={showFileChangeStats}
+                onChange={(next) => {
+                  if (settingsV4 && settingsV4Available()) {
+                    void onUpdateNamespace({ namespace: "tools", patch: { showFileChangeStats: next } }).catch((error: unknown) => {
+                      console.error("Failed to update file change display settings", error);
+                    });
+                  }
+                }}
+                ariaLabel="显示写入变动"
+              />
+            }
+          />
         </SettingGroup>
 
         <SettingGroup title="终端" headingLevel={3} description="执行工作区命令，并控制 Bash 运行前确认。">

@@ -9,6 +9,8 @@ import { AgentLoop, type AgentLoopLiveEvent } from "../loop.js";
 
 /** Same real loop fixture is consumed by Core, Main adapter and renderer regressions. */
 export async function runToolStreamFixture(options: {
+  subagent?: boolean;
+  onTools?: (tools: readonly import("@actspace/llm-service").LlmToolDefinition[]) => void;
   deltas?: boolean;
   resolveArtifact?: import("@actspace/tools-runtime").SessionArtifactResolver;
   thinkingEnabled?: boolean;
@@ -26,7 +28,7 @@ export async function runToolStreamFixture(options: {
 } = {}) {
   const registry = createCoreCodecRegistry();
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({
-    sessionId: options.sessionId ?? "tool-stream-test", createdAt: "2026-09-06T00:00:00.000Z", lineage: null,
+    sessionId: options.sessionId ?? "tool-stream-test", createdAt: "2026-09-06T00:00:00.000Z", lineage: options.subagent ? { origin: "delegation", parentSessionId: "parent", parentCallId: "delegate", parentBoundarySeq: 0, seedDigest: "fixture", delegationDepth: 1 } : null,
     createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest },
   }) });
   const tools = new ToolRuntime();
@@ -41,6 +43,7 @@ export async function runToolStreamFixture(options: {
   const handle = routes.register({ routeId: "test", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: {
     adapterVersion: "test", dispatch: async (input) => (async function* (): AsyncGenerator<LlmStreamEvent> {
       options.onRequest?.(input.request.options);
+      options.onTools?.(input.request.tools);
       options.onMessages?.(input.request.messages);
       if (requests++ === 0) {
         yield { type: "text-delta", text: "Read now. " };
@@ -58,7 +61,7 @@ export async function runToolStreamFixture(options: {
   } });
   const events: AgentLoopLiveEvent[] = [];
   const loop = new AgentLoop({ session, tools, inbox: new MainAgentInbox(session),
-    descriptor: { ...MAIN_AGENT_DESCRIPTOR, routeId: "test", model: "test" }, scope: new AgentScope("main:test", undefined, "main:test"),
+    descriptor: { ...MAIN_AGENT_DESCRIPTOR, ...(options.subagent ? { kind: "subagent" as const, maxSteps: 2 } : {}), routeId: "test", model: "test" }, scope: new AgentScope("main:test", undefined, "main:test"),
     assembler: new RequestAssembler({ prepare: () => { throw new Error("not used"); } }),
     llm: new LlmService(routes, { resolve: async () => ({ apiKey: "fixture" }) }),
     compositionDigest: "test", hostCapabilityDigest: "test", host: { hostKind: "desktop", capabilityCeiling: [], runtimeContract: "actspace.runtime.v2", invocationId: "test", workspaceRef: "/fixture" },

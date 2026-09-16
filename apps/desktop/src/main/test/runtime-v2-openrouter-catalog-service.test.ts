@@ -150,3 +150,71 @@ it("discovers DeepSeek IDs with official facts, isolates caches, and preserves o
   expect(await service.reload(runtime())).toMatchObject({ error: { code: "invalid_provider" } });
   expect(fetchCatalog).toHaveBeenCalledTimes(1);
 });
+
+it("normalizes Kimi provider model rows instead of using the legacy static list", async () => {
+  const root = await temporaryRoot();
+  const fetchCatalog = vi.fn(async () => ({
+    ok: true as const,
+    payload: {
+      data: [
+        {
+          id: "kimi-k2-thinking",
+          name: "Kimi K2 Thinking",
+          context_length: 256_000,
+          max_output_tokens: 32_768,
+          supports_image_in: true,
+          supports_reasoning: true,
+          supports_tools: true,
+        },
+      ],
+    },
+  }));
+  const service = new RuntimeV2OpenRouterCatalogService({
+    provider: "kimi",
+    dataRoot: root,
+    fetchCatalog,
+    isAdded: (id) => id === "kimi-k2-thinking",
+    now: () => NOW,
+  });
+
+  const result = await service.reload({ provider: "kimi", apiKey: "fixture", baseUrl: "https://api.moonshot.ai/v1" });
+  expect(result.models).toEqual([expect.objectContaining({
+    provider: "kimi",
+    apiModel: "kimi-k2-thinking",
+    name: "Kimi K2 Thinking",
+    contextWindow: 256_000,
+    maxTokens: 32_768,
+    input: ["text", "image"],
+    reasoning: true,
+    toolUse: "declared",
+    added: true,
+  })]);
+  expect(fetchCatalog).toHaveBeenCalledTimes(1);
+});
+
+it("keeps the built-in Kimi models available before the first successful refresh", async () => {
+  const root = await temporaryRoot();
+  const service = new RuntimeV2OpenRouterCatalogService({
+    provider: "kimi",
+    dataRoot: root,
+    fetchCatalog: vi.fn(),
+    isAdded: () => false,
+    now: () => NOW,
+  });
+
+  await service.load();
+  expect(service.list().models.map((model) => model.apiModel)).toEqual(expect.arrayContaining(["kimi-k2.6", "kimi-k2.7-code"]));
+});
+
+it("trusts explicit false capability flags from Kimi", async () => {
+  const root = await temporaryRoot();
+  const service = new RuntimeV2OpenRouterCatalogService({
+    provider: "kimi",
+    dataRoot: root,
+    fetchCatalog: async () => ({ ok: true as const, payload: { data: [{ id: "kimi-thinking", name: "Kimi Thinking", context_length: 128_000, supports_image_in: false, input_modalities: ["image"], supports_reasoning: false }] } }),
+    isAdded: () => false,
+    now: () => NOW,
+  });
+  const result = await service.reload({ provider: "kimi", apiKey: "fixture", baseUrl: "https://api.moonshot.ai/v1" });
+  expect(result.models[0]).toMatchObject({ input: ["text"], reasoning: false });
+});

@@ -150,6 +150,7 @@ function makeAgentBlock(partial: Partial<Extract<MessageBlock, { kind: "agent" }
     description: "Inspect Agent block",
     status: "completed",
     subagentType: "explore",
+    agentKind: "agent",
     displayText: "Inspect Agent block",
     summary: "Found the relevant renderer components.",
     transcriptRef,
@@ -171,28 +172,31 @@ afterEach(() => {
 });
 
 describe("AgentRunBlock", () => {
-  it("shows completed summary and requests the transcript panel", async () => {
+  it("shows a compact completed Agent row and requests the transcript panel", async () => {
     const user = userEvent.setup();
     const onOpenTranscript = vi.fn();
 
     render(<AgentRunBlock message={makeAgentBlock()} onOpenTranscript={onOpenTranscript} />);
 
+    expect(screen.getByText("Inspect Agent block")).toBeInTheDocument();
+    expect(screen.getByText("Agent")).toBeInTheDocument();
+    expect(screen.getByText("已完成")).toBeInTheDocument();
     expect(screen.getByText("Found the relevant renderer components.")).toBeInTheDocument();
-    expect(screen.getByText("Explored 1 files · 2 tools · 4s · 900 tokens")).toBeInTheDocument();
-    expect(screen.queryByText("Completed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Explored 1 files · 2 tools · 4s · 900 tokens")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Open SubAgent transcript/ }));
 
     expect(onOpenTranscript).toHaveBeenCalledWith(makeAgentBlock());
   });
 
-  it("shows recent running transcript summaries", () => {
+  it("shows event-derived activity without streaming model text", () => {
     render(
       <AgentRunBlock
         message={makeAgentBlock({
           status: "running",
           summary: undefined,
           stats: undefined,
+          displayText: "正在读取 · ConversationView.tsx",
           recentEvents: [
             {
               id: "recent-1",
@@ -207,10 +211,34 @@ describe("AgentRunBlock", () => {
     );
 
     expect(screen.queryByText("Running")).not.toBeInTheDocument();
-    const runningSummary = screen.getByText("Read ConversationView.tsx");
+    const runningSummary = screen.getByText("正在读取 · ConversationView.tsx");
     expect(runningSummary).toBeInTheDocument();
-    expect(runningSummary).toHaveClass("tool-log-text-running");
-    expect(runningSummary).toHaveAttribute("data-shimmer-text", "Read ConversationView.tsx");
+    expect(screen.getByRole("status")).toHaveAttribute("aria-label", "正在读取 · ConversationView.tsx");
+    expect(screen.queryByText("Read ConversationView.tsx")).not.toBeInTheDocument();
+  });
+
+  it("shows operation context immediately through rapid updates and terminal errors", () => {
+    vi.useFakeTimers();
+    try {
+      const message = makeAgentBlock({ status: "running", displayText: "正在思考" });
+      const { rerender, unmount } = render(<AgentRunBlock message={message} />);
+      rerender(<AgentRunBlock message={{ ...message, displayText: "正在读取 · a.ts" }} />);
+      expect(screen.getByRole("status")).toHaveAttribute("aria-label", "正在读取 · a.ts");
+      rerender(<AgentRunBlock message={{ ...message, displayText: "正在分析 · 刚读取 a.ts" }} />);
+      expect(screen.getByRole("status")).toHaveAttribute("aria-label", "正在分析 · 刚读取 a.ts");
+      expect(vi.getTimerCount()).toBe(0);
+      rerender(<AgentRunBlock message={{ ...message, displayText: "正在整理回复" }} />);
+      rerender(<AgentRunBlock message={{ ...message, status: "failed", error: "达到 300 步执行上限" }} />);
+      expect(screen.getByRole("status")).toHaveTextContent("达到 300 步执行上限");
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("never uses a running summary as streamed reply text", () => {
+    render(<AgentRunBlock message={makeAgentBlock({ status: "running", summary: "private streamed reply", displayText: "untrusted reply" })} />);
+    expect(screen.getByRole("status")).toHaveAttribute("aria-label", "正在思考");
+    expect(screen.queryByText("private streamed reply")).not.toBeInTheDocument();
   });
 
   it("renders transcript events with the main message grammar", async () => {
@@ -243,7 +271,7 @@ describe("AgentRunBlock", () => {
 
     const process = screen.getByLabelText("SubAgent process");
     expect(await within(process).findByRole("button", { name: "Thinking" })).toBeInTheDocument();
-    expect(await within(process).findByText("Read AgentRunBlock.tsx")).toBeInTheDocument();
+    expect(await within(process).findByText("AgentRunBlock.tsx")).toBeInTheDocument();
     expect(within(process).getByText("Glob apps/desktop/src/renderer/components/messages/*.tsx")).toBeInTheDocument();
     expect(within(process).getByText("Usage Tokens 120 · input 100 · output 20")).toBeInTheDocument();
     expect(within(process).queryByText("The block renders summaries and opens a transcript panel.")).not.toBeInTheDocument();

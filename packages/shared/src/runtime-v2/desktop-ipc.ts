@@ -135,8 +135,8 @@ export type RuntimeV2ProviderTestResult = {
   readonly settings: AppSettingsV2;
 };
 export type RuntimeV2WriteAgentSystemPromptInput = { readonly content: string };
-export type RuntimeV2ModelCatalogQuery = { readonly provider?: "openrouter" | "deepseek"; readonly query?: string };
-export type RuntimeV2AddCatalogModelInput = { readonly provider?: "openrouter" | "deepseek"; readonly apiModel: string };
+export type RuntimeV2ModelCatalogQuery = { readonly provider?: "openrouter" | "deepseek" | "kimi"; readonly query?: string };
+export type RuntimeV2AddCatalogModelInput = { readonly provider?: "openrouter" | "deepseek" | "kimi"; readonly apiModel: string };
 export type RuntimeV2AttachmentRef = {
   readonly artifactId: string;
   readonly mimeType: string;

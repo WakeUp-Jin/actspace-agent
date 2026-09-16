@@ -27,10 +27,15 @@ export function contextEstimateToSnapshot(
   projection: RuntimeV2RequestContextEstimateProjection,
 ): ContextUsageSnapshot {
   return {
+    throughJournalSeq: projection.throughJournalSeq,
+    basis: projection.contextState?.basis,
+    requestId: projection.requestId ?? undefined,
+    cumulativeTokens: projection.cumulativeTokens,
+    cumulativeUsage: projection.cumulativeUsage,
     totalTokens: projection.totalEstimatedTokens,
     maxTokens: projection.maxTokens,
     percentUsed: projection.percentUsed,
     estimator: projection.estimator,
-    buckets: [{ key: "conversation", name: "conversation", label: "Request context", tokens: projection.totalEstimatedTokens }],
+    buckets: projection.contextState?.buckets ?? [{ key: "conversation", name: "conversation", label: "Request context", tokens: projection.totalEstimatedTokens }],
   };
 }

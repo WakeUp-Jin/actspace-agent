@@ -16,8 +16,8 @@ const BLOCK_CLASS = "explore-run flex flex-col gap-[9px]";
 const TOGGLE_CLASS =
   "explore-run-toggle inline-flex w-fit items-center gap-1.5 rounded-act-sm border-0 bg-transparent px-[var(--conversation-text-inset)] py-0.5 text-sm font-normal leading-[1.42] text-text-muted transition-colors duration-[150ms] ease-in-out hover:text-text-main";
 // 执行中：有界滚动窗口，新行钉底；与主流程同底色（无盒子、无隔离感）。
-const RUNNING_VIEWPORT_CLASS = "explore-run-viewport flex max-h-[168px] flex-col gap-[9px] overflow-y-auto";
-const DONE_FLOW_CLASS = "flex flex-col gap-[9px]";
+const RUNNING_VIEWPORT_CLASS = "explore-run-viewport transcript-message-flow flex max-h-[168px] flex-col overflow-y-auto";
+const DONE_FLOW_CLASS = "transcript-message-flow flex flex-col";
 const EMPTY_CLASS = "px-[var(--conversation-text-inset)] text-sm leading-[1.55] text-text-muted";
 
 function exploredLabel(message: ExploreMessage): string {

@@ -172,6 +172,16 @@ describe("native v2 Core Tool ports", () => {
     expect(JSON.stringify(result)).not.toContain("secret-image-key");
   });
 
+  it("normalizes an HTML image-provider response instead of leaking a JSON parser error", async () => {
+    const root = await workspace();
+    const fetchImpl = (async () => new Response("<!doctype html><html><body>Gateway error</body></html>", { status: 200, headers: { "content-type": "text/html" } })) as typeof fetch;
+    const ports = createNodeCoreToolPorts({ workspaceRoot: root, imageGeneration: { apiKey: "secret-image-key", baseUrl: "https://images.example/v1", model: "image-v1" }, fetchImpl });
+    const result = await invoke(ports.generate_image, { prompt: "A precise test image", size: "1024x1024", n: 1 });
+    expect(result).toMatchObject({ status: "failed", failure: { code: "IMAGE_GENERATION_INVALID_RESPONSE" } });
+    expect(JSON.stringify(result)).toContain("returned HTML instead of JSON");
+    expect(JSON.stringify(result)).not.toContain("<!doctype");
+  });
+
   it("inspects only a Session-bound image artifact", async () => {
     const root = await workspace(); const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]); const reads: string[] = []; const inspections: string[] = [];
     const ports = createNodeCoreToolPorts({

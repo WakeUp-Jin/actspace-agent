@@ -81,7 +81,7 @@ export class ProviderNetworkService {
   }
 
   async fetchModelCatalog(runtime: ProviderNetworkRuntime): Promise<ProviderCatalogFetchResult> {
-    if (runtime.provider !== "openrouter" && runtime.provider !== "deepseek") return { ok: false, code: "invalid_provider", message: "This provider does not expose a supported model catalog." };
+    if (runtime.provider !== "openrouter" && runtime.provider !== "deepseek" && runtime.provider !== "kimi") return { ok: false, code: "invalid_provider", message: "This provider does not expose a supported model catalog." };
     try {
       const response = await this.#request(runtime, `${runtime.baseUrl.replace(/\/+$/, "")}/models`);
       if (!response.ok) {

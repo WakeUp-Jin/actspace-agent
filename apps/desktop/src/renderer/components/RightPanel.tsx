@@ -68,11 +68,11 @@ const RIGHT_TAB_SCROLL_CLASS =
 const RIGHT_PANEL_EMPTY_TITLE_CLASS =
   "px-2 text-[13px] font-medium leading-none text-text-muted";
 const RIGHT_TAB_GROUP_BASE =
-  "group inline-flex shrink-0 items-center gap-1 rounded-act-sm pl-2 pr-1 text-[12px] leading-none transition-colors duration-[120ms] ease-in-out [pointer-events:auto] [-webkit-app-region:no-drag]";
+  "group inline-flex h-[30px] shrink-0 items-center gap-2.5 rounded-act-md pl-2.5 pr-1.5 text-[13px] leading-none transition-colors duration-[120ms] ease-in-out [pointer-events:auto] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_INACTIVE_CLASS = "bg-transparent text-text-muted hover:bg-hover-overlay hover:text-text-main";
-const RIGHT_TAB_ACTIVE_CLASS = "bg-surface-subtle font-semibold text-text-main";
+const RIGHT_TAB_ACTIVE_CLASS = "bg-surface-subtle font-medium text-text-main";
 const RIGHT_TAB_LABEL_CLASS =
-  "max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent py-1 text-[inherit] text-[color:inherit] [cursor:pointer] [-webkit-app-region:no-drag]";
+  "h-full max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent text-[inherit] text-[color:inherit] [cursor:pointer] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_CLOSE_CLASS =
   "inline-flex h-4 w-4 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-text-main hover:bg-line [cursor:pointer] [-webkit-app-region:no-drag]";
 const RIGHT_TAB_OVERFLOW_CLASS =

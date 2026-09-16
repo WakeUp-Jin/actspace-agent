@@ -174,7 +174,6 @@ function ChromeTitle({
   const [preview, setPreview] = useState<SessionHoverPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const loadedSessionIdRef = useRef<string | null>(null);
   const loadingSessionIdRef = useRef<string | null>(null);
   const canShowPreview = Boolean(currentSession && getSessionPreview);
 
@@ -182,23 +181,20 @@ function ChromeTitle({
     setOpen(false);
     setPreview(null);
     setLoading(false);
-    loadedSessionIdRef.current = null;
     loadingSessionIdRef.current = null;
   }, [currentSession?.id]);
 
   const loadPreview = async () => {
     if (!currentSession || !getSessionPreview) return;
-    if (loadedSessionIdRef.current === currentSession.id || loadingSessionIdRef.current === currentSession.id) return;
+    if (loadingSessionIdRef.current === currentSession.id) return;
 
     loadingSessionIdRef.current = currentSession.id;
     setLoading(true);
     try {
       setPreview(await getSessionPreview(currentSession));
-      loadedSessionIdRef.current = currentSession.id;
     } catch (error) {
       console.error("Failed to load current session preview", error);
       setPreview(null);
-      loadedSessionIdRef.current = currentSession.id;
     } finally {
       loadingSessionIdRef.current = null;
       setLoading(false);

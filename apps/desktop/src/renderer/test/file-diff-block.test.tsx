@@ -41,7 +41,27 @@ function makeEditBlock(
 }
 
 describe("FileDiffBlock running state", () => {
-  it("shows single-line shimmer for write running without streamingContent", () => {
+  it("rounds generation counts, shows saving, then replaces progress with final diff", () => {
+    const { rerender } = render(<FileDiffBlock message={makeWriteBlock({ status: "running", generationProgress: { phase: "generating", characters: 2499 } })} />);
+    expect(screen.getByText("Write 夜雨.md · 已生成 2.4 千字符")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
+    rerender(<FileDiffBlock message={makeWriteBlock({ status: "running", generationProgress: { phase: "saving", characters: 2499 } })} />);
+    expect(screen.getByText("Write 夜雨.md · 正在保存")).toBeInTheDocument();
+    rerender(<FileDiffBlock message={makeWriteBlock({ additions: 35, generationProgress: { phase: "saving", characters: 2499 } })} />);
+    expect(screen.getByText("+35")).toBeInTheDocument();
+    expect(screen.queryByText(/正在保存|已生成/)).toBeNull();
+  });
+
+  it("hides generation amounts when the existing display setting is disabled", async () => {
+    window.actspace = { getSettingsV4: async () => ({ settings: { tools: { showFileChangeStats: false } } }) } as unknown as Window["actspace"];
+    try {
+      render(<FileDiffBlock message={makeEditBlock({ status: "running", generationProgress: { phase: "generating", characters: 2400 } })} />);
+      expect(await screen.findByText("Edit index.ts · 正在生成")).toBeInTheDocument();
+      expect(screen.queryByText(/字符/)).toBeNull();
+    } finally { delete (window as unknown as { actspace?: unknown }).actspace; }
+  });
+
+  it("shows a single-line shimmer with generation status", () => {
     render(
       <FileDiffBlock
         message={makeWriteBlock({
@@ -54,11 +74,10 @@ describe("FileDiffBlock running state", () => {
       />,
     );
 
-    const runningLine = screen.getByText("Write 夜雨.md");
+    const runningLine = screen.getByText("Write 夜雨.md · 正在生成");
     expect(runningLine).toBeInTheDocument();
     expect(runningLine).toHaveClass("tool-log-text-running");
-    expect(runningLine).toHaveAttribute("data-shimmer-text", "Write 夜雨.md");
-    expect(screen.queryByText(/\+\d+/)).toBeNull();
+    expect(runningLine).toHaveAttribute("data-shimmer-text", "Write 夜雨.md · 正在生成");
   });
 
   it("falls back to 'file…' label when filePath unknown (dispatched stage)", () => {
@@ -78,7 +97,7 @@ describe("FileDiffBlock running state", () => {
     expect(screen.getByText(/Write file/)).toBeInTheDocument();
   });
 
-  it("expands code preview when streamingContent present (cursor-style)", () => {
+  it("does not render file contents while a write is running", () => {
     render(
       <FileDiffBlock
         message={makeWriteBlock({
@@ -92,98 +111,8 @@ describe("FileDiffBlock running state", () => {
       />,
     );
 
-    expect(screen.getByText(/Write 夜雨\.md/)).toBeInTheDocument();
-    expect(screen.getByText(/半夜醒来/)).toBeInTheDocument();
-  });
-
-  it("keeps the streaming write preview pinned to its latest content", () => {
-    const { rerender } = render(
-      <FileDiffBlock
-        message={makeWriteBlock({
-          status: "running",
-          additions: 0,
-          deletions: 0,
-          diff: "",
-          collapsedLines: 0,
-          streamingContent: "line 1",
-        })}
-      />,
-    );
-
-    const preview = screen.getByLabelText("Streaming write preview for 夜雨.md");
-    Object.defineProperty(preview, "scrollHeight", { configurable: true, value: 360 });
-    Object.defineProperty(preview, "clientHeight", { configurable: true, value: 120 });
-    Object.defineProperty(preview, "scrollTop", { configurable: true, writable: true, value: 0 });
-
-    rerender(
-      <FileDiffBlock
-        message={makeWriteBlock({
-          status: "running",
-          additions: 0,
-          deletions: 0,
-          diff: "",
-          collapsedLines: 0,
-          streamingContent: "line 1\nline 2",
-        })}
-      />,
-    );
-
-    expect(preview.scrollTop).toBe(360);
-  });
-
-  it("pauses streaming preview follow while the user reads earlier content and resumes near the bottom", () => {
-    const { rerender } = render(
-      <FileDiffBlock
-        message={makeWriteBlock({
-          status: "running",
-          additions: 0,
-          deletions: 0,
-          diff: "",
-          collapsedLines: 0,
-          streamingContent: "line 1",
-        })}
-      />,
-    );
-
-    const preview = screen.getByLabelText("Streaming write preview for 夜雨.md");
-    Object.defineProperty(preview, "scrollHeight", { configurable: true, value: 360 });
-    Object.defineProperty(preview, "clientHeight", { configurable: true, value: 120 });
-    Object.defineProperty(preview, "scrollTop", { configurable: true, writable: true, value: 0 });
-    fireEvent.scroll(preview);
-
-    rerender(
-      <FileDiffBlock
-        message={makeWriteBlock({
-          status: "running",
-          additions: 0,
-          deletions: 0,
-          diff: "",
-          collapsedLines: 0,
-          streamingContent: "line 1\nline 2",
-        })}
-      />,
-    );
-
-    expect(preview.scrollTop).toBe(0);
-
-    preview.scrollTop = 240;
-    fireEvent.scroll(preview);
-    Object.defineProperty(preview, "scrollHeight", { configurable: true, value: 480 });
-
-    rerender(
-      <FileDiffBlock
-        message={makeWriteBlock({
-          status: "running",
-          additions: 0,
-          deletions: 0,
-          diff: "",
-          collapsedLines: 0,
-          streamingContent: "line 1\nline 2\nline 3",
-        })}
-      />,
-    );
-
-    expect(preview.scrollTop).toBe(480);
+    expect(screen.getByText(/Write 夜雨\.md · 正在生成/)).toBeInTheDocument();
+    expect(screen.queryByText(/半夜醒来/)).toBeNull();
   });
 
   it("edit running state stays single-line even with new_string in args", () => {
@@ -200,7 +129,7 @@ describe("FileDiffBlock running state", () => {
       />,
     );
 
-    expect(screen.getByText("Edit index.ts")).toBeInTheDocument();
+    expect(screen.getByText("Edit index.ts · 正在生成")).toBeInTheDocument();
     expect(screen.queryByRole("article")).toBeNull();
   });
 });
@@ -215,10 +144,15 @@ describe("FileDiffBlock completed state", () => {
     expect(block).toContain("overflow-x: auto");
   });
 
-  it("omits +0 when additions are zero", () => {
+  it("omits zero change counters after a completed no-op", () => {
     render(<FileDiffBlock message={makeWriteBlock({ additions: 0, deletions: 0 })} />);
     expect(screen.queryByText(/\+0/)).toBeNull();
     expect(screen.queryByText(/-0/)).toBeNull();
+  });
+
+  it("shows generation status instead of zero counters while running", () => {
+    render(<FileDiffBlock message={makeWriteBlock({ status: "running", additions: 0, deletions: 0, diff: "", collapsedLines: 0 })} />);
+    expect(screen.getByText("Write 夜雨.md · 正在生成")).toBeInTheDocument();
   });
 
   it("renders +N and -N when both present", () => {

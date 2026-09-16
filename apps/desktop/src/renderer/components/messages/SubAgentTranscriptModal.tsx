@@ -35,7 +35,7 @@ const PANEL_ICON_BUTTON_CLASS =
   "grid h-8 w-8 place-items-center rounded-act-md border-0 bg-transparent text-text-muted transition hover:bg-surface-subtle hover:text-text-main";
 const PANEL_BODY_CLASS = "min-h-0 flex-1 overflow-y-auto";
 const PANEL_CONTENT_CLASS = "min-h-full bg-surface";
-const TRANSCRIPT_FLOW_CLASS = "flex flex-col gap-1.5";
+const TRANSCRIPT_FLOW_CLASS = "transcript-message-flow flex flex-col";
 const EMPTY_CLASS = "px-[var(--conversation-text-inset)] text-sm leading-[1.55] text-text-muted";
 const TASK_INPUT_SECTION_CLASS = "sticky top-0 z-10 bg-surface-raised px-5 py-3";
 const TASK_INPUT_BUTTON_CLASS =
@@ -50,7 +50,7 @@ const WORK_SECTION_CLASS =
 const WORK_HEADER_CLASS = "flex items-center gap-4";
 const WORK_TOGGLE_CLASS =
   "inline-flex items-center gap-2 border-0 bg-transparent p-0 text-[15px] font-medium leading-[1.4] text-text-muted transition hover:text-text-main";
-const WORK_FLOW_CLASS = "mt-4 flex flex-col gap-1.5";
+const WORK_FLOW_CLASS = "transcript-message-flow mt-4 flex flex-col";
 const FINAL_REPORT_SECTION_CLASS = "bg-surface px-6 py-6";
 const FINAL_REPORT_CONTENT_CLASS = "max-w-[840px] text-[15px] leading-[1.7] text-text-main";
 

@@ -39,6 +39,7 @@ const SESSIONS: SessionListItem[] = [
 ];
 
 const HOVER_CONTEXT: ContextUsageSnapshot = {
+  cumulativeTokens: 315000,
   totalTokens: 56_000,
   maxTokens: 100_000,
   percentUsed: 56,
@@ -316,7 +317,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(onNewSession).toHaveBeenCalled();
   });
 
-  it("shows See more when a workspace has more than 8 sessions and expands on click", async () => {
+  it("shows See more when a workspace has more than 10 sessions and loads the next batch on click", async () => {
     const many: SessionListItem[] = Array.from({ length: 12 }, (_, idx) =>
       makeSession({
         id: `s-${idx}`,
@@ -329,13 +330,13 @@ describe("Sidebar (cursor-aligned layout)", () => {
     renderSidebar({ sessions: many });
 
     expect(screen.queryByText("Plan item 0")).toBeInTheDocument();
-    expect(screen.queryByText("Plan item 9")).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan item 10")).not.toBeInTheDocument();
 
-    const seeMore = screen.getByRole("button", { name: /^显示更多/ });
+    const seeMore = screen.getByRole("button", { name: /^Show more/ });
     await userEvent.click(seeMore);
 
     expect(screen.getByText("Plan item 9")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "收起" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
   });
 
   it("renders a status dot for the active session and a busy dot for busy sessions", () => {
@@ -602,8 +603,9 @@ describe("WindowChromeBar", () => {
     expect(tooltip).toHaveTextContent("New chat");
     expect(tooltip).toHaveTextContent("/Users/me/Desktop/code-project/side-project/actspace-agent");
     expect(tooltip).toHaveTextContent("deepseek-flash");
-    expect(tooltip).toHaveTextContent("上下文 56%");
-    expect(tooltip).toHaveTextContent("56K / 100K");
+    expect(tooltip).toHaveTextContent(`累计 Token：${Math.floor(HOVER_CONTEXT.cumulativeTokens! / 1000)}K`);
+    expect(tooltip).not.toHaveTextContent("上下文");
+    expect(tooltip.querySelector("details")).toBeNull();
     expect(tooltip).not.toHaveTextContent("main");
   });
 
@@ -624,25 +626,22 @@ describe("WindowChromeBar", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("/Users/me/projects/actspace-agent");
   });
 
-  it("does not reload the same chrome title preview on repeated hovers", async () => {
+  it("refreshes context when the chrome preview is reopened", async () => {
     const user = userEvent.setup();
     const getSessionPreview = vi.fn(async () => ({
-      sessionId: "s-actspace-1",
-      workspaceRoot: "/Users/me/projects/actspace-agent",
+      sessionId: "s-actspace-1", contextSnapshot: { ...HOVER_CONTEXT, cumulativeTokens: 40000 },
     }));
-    renderChromeBar({
-      currentSession: SESSIONS[1],
-      getSessionPreview,
-    });
-
+    renderChromeBar({ currentSession: SESSIONS[1], getSessionPreview });
     const trigger = screen.getByRole("button", { name: "查看会话详情： New chat" });
-    await user.hover(trigger);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("/Users/me/projects/actspace-agent");
-    await user.unhover(trigger);
-    await user.hover(trigger);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("/Users/me/projects/actspace-agent");
-
-    expect(getSessionPreview).toHaveBeenCalledTimes(1);
+    fireEvent.focus(trigger);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("累计 Token：40K");
+    fireEvent.blur(trigger);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+    getSessionPreview.mockResolvedValue({ sessionId: "s-actspace-1", contextSnapshot: { ...HOVER_CONTEXT, cumulativeTokens: 60000 } });
+    fireEvent.focus(trigger);
+    await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("累计 Token：60K"));
+    expect(getSessionPreview).toHaveBeenCalledTimes(2);
   });
 
   it("declares the chrome strip as a fixed overlay with pointer-events: none on the wrapper", () => {

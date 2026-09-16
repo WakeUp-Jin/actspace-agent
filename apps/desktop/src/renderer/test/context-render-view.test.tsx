@@ -58,7 +58,7 @@ describe("ContextRenderView", () => {
     expect(screen.getByText(/正在等待当前会话的上下文明细/)).toBeInTheDocument();
   });
 
-  it("falls back to the active Session provider usage selector when no prop is supplied", async () => {
+  it("does not present cumulative provider usage as context when no request estimate exists", async () => {
     (window as { actspace?: unknown }).actspace = {
       getSessionProjectionSnapshot: async () => ({
         kind: "session-projection",
@@ -101,8 +101,8 @@ describe("ContextRenderView", () => {
       </SessionProjectionProvider>,
     );
 
-    await waitFor(() => expect(screen.getByText(/上下文 · 0% 已用/)).toBeInTheDocument());
-    expect(screen.getByText(/2,000 \/ 0 Token/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/当前没有可展示的上下文明细/)).toBeInTheDocument());
+    expect(screen.queryByText(/2,000 \/ 0 Token/)).not.toBeInTheDocument();
   });
 
   it("fills missing previews with on-demand describeContext content when a sessionId is given", async () => {

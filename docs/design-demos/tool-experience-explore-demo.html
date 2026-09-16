@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Explore / Tool stream interaction demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f7f5;
+      --panel: #ffffff;
+      --panel-soft: #f1f1ee;
+      --ink: #262623;
+      --muted: #777771;
+      --faint: #a6a69f;
+      --line: #e4e4df;
+      --line-strong: #d3d3cc;
+      --accent: #3d6b54;
+      --accent-soft: #e8f0eb;
+      --warning: #9a6c33;
+      --danger: #a95252;
+      --shadow: 0 18px 55px rgba(38, 38, 35, .08);
+      --radius: 14px;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; background: var(--bg); color: var(--ink); }
+    button { font: inherit; color: inherit; }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+    .app { min-height: 100vh; display: grid; grid-template-columns: 250px minmax(0, 1fr); }
+    .sidebar { padding: 22px 16px; border-right: 1px solid var(--line); background: #f2f2ef; }
+    .brand { display: flex; align-items: center; gap: 9px; padding: 0 10px 24px; font-size: 14px; font-weight: 700; letter-spacing: .01em; }
+    .brand-mark { width: 19px; height: 19px; display: grid; place-items: center; border: 1.5px solid var(--ink); border-radius: 50%; font-size: 11px; }
+    .side-label { padding: 0 10px 8px; color: var(--faint); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+    .side-item { display: flex; align-items: center; gap: 9px; min-height: 35px; padding: 0 10px; border-radius: 9px; color: var(--muted); font-size: 13px; }
+    .side-item.active { background: #e7e7e3; color: var(--ink); }
+    .side-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+    .side-dot.live { background: var(--accent); }
+
+    .workspace { min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 17px 28px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.7); backdrop-filter: blur(16px); }
+    .eyebrow { color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+    .topbar h1 { margin: 4px 0 0; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+    .state-pill { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--panel); font-size: 12px; }
+    .state-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+    .content { min-width: 0; display: grid; grid-template-columns: minmax(0, 760px) minmax(270px, 330px); justify-content: center; gap: 32px; padding: 34px 36px 56px; }
+    .conversation { min-width: 0; }
+    .prompt { max-width: 680px; margin-bottom: 28px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: 0 6px 18px rgba(38,38,35,.035); font-size: 15px; line-height: 1.6; }
+    .prompt small { display: block; margin-bottom: 6px; color: var(--faint); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+    .reply { max-width: 720px; font-size: 15px; line-height: 1.7; }
+    .reply p { margin: 0 0 18px; }
+    .reply strong { font-weight: 680; }
+
+    .variant-switcher { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 26px; }
+    .variant-switcher button { padding: 8px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--muted); cursor: pointer; font-size: 12px; }
+    .variant-switcher button[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .variant-note { margin: -17px 0 24px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+    .stream { display: grid; gap: 10px; padding: 2px 0; }
+    .stream-group { padding: 9px 0 10px; border-top: 1px solid var(--line); }
+    .stream-group:first-child { border-top: 0; }
+    .stream-line { display: flex; min-width: 0; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .stream-line + .stream-line { margin-top: 7px; }
+    .stream-icon { width: 17px; flex: 0 0 17px; color: var(--faint); text-align: center; font-size: 13px; }
+    .stream-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .stream-text code { padding: 1px 4px; border-radius: 4px; background: var(--panel-soft); color: var(--ink); font-size: 12px; }
+    .disclosure { border-top: 1px solid var(--line); padding: 10px 0; }
+    .disclosure summary { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--muted); font-size: 14px; list-style: none; }
+    .disclosure summary::-webkit-details-marker { display: none; }
+    .disclosure summary::before { content: "›"; display: inline-grid; width: 15px; height: 15px; place-items: center; color: var(--faint); transition: transform .16s ease; }
+    .disclosure[open] summary::before { transform: rotate(90deg); }
+    .disclosure .count { color: var(--faint); font-size: 12px; }
+    .disclosure-body { display: grid; gap: 7px; margin: 10px 0 0 23px; padding-left: 11px; border-left: 1px solid var(--line-strong); color: var(--muted); font-size: 12px; }
+    .activity-row { display: flex; min-width: 0; align-items: center; gap: 8px; }
+    .activity-icon { width: 14px; flex: 0 0 14px; color: var(--faint); text-align: center; }
+    .activity-row > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .activity-row.thought { color: var(--faint); }
+
+    .agent-row { width: 100%; display: block; padding: 10px 0 6px; border: 0; border-top: 1px solid var(--line); background: transparent; text-align: left; cursor: pointer; }
+    .agent-row:hover .agent-name { color: var(--accent); }
+    .agent-head { display: flex; min-width: 0; align-items: center; gap: 8px; }
+    .agent-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--accent); }
+    .agent-dot.cancelled { background: var(--faint); }
+    .agent-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: var(--ink); }
+    .agent-kind { color: var(--faint); font-size: 12px; }
+    .agent-status { margin-left: auto; color: var(--muted); font-size: 12px; }
+    .latest-tool { display: flex; min-width: 0; align-items: center; gap: 8px; margin: 7px 0 0 16px; color: var(--muted); font-size: 12px; }
+    .latest-tool .pulse { width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+    .latest-tool .pulse.idle { background: var(--faint); box-shadow: none; }
+    .latest-tool span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .inspector { align-self: start; position: sticky; top: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); overflow: hidden; }
+    .inspector-head { display: flex; align-items: center; justify-content: space-between; padding: 15px 16px; border-bottom: 1px solid var(--line); }
+    .inspector-title { font-size: 14px; font-weight: 650; }
+    .inspector-close { border: 0; background: transparent; color: var(--faint); cursor: pointer; font-size: 18px; line-height: 1; }
+    .inspector-body { padding: 17px 16px 18px; }
+    .inspector-kicker { color: var(--faint); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+    .inspector h2 { margin: 6px 0 10px; font-size: 18px; letter-spacing: -.02em; }
+    .inspector p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .inspector-section { margin-top: 21px; padding-top: 15px; border-top: 1px solid var(--line); }
+    .inspector-section h3 { margin: 0 0 10px; color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+    .inspector-tool { display: flex; gap: 9px; padding: 8px 0; color: var(--muted); font-size: 12px; }
+    .inspector-tool + .inspector-tool { border-top: 1px solid var(--line); }
+    .inspector-tool b { color: var(--ink); font-weight: 550; }
+    .inspector-footer { padding: 12px 16px; background: var(--panel-soft); color: var(--faint); font-size: 11px; line-height: 1.5; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--faint); font-size: 11px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+    .legend i.line { width: 12px; height: 1px; border-radius: 0; background: var(--line-strong); }
+
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .content { grid-template-columns: 1fr; padding: 24px 20px 45px; }
+      .inspector { position: static; }
+      .topbar { padding: 15px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="会话导航">
+      <div class="brand"><span class="brand-mark">A</span><span>ActSpace</span></div>
+      <div class="side-label">Workspace</div>
+      <div class="side-item active"><span class="side-dot live"></span>工具体验讨论</div>
+      <div class="side-item"><span class="side-dot"></span>新会话</div>
+      <div class="side-item"><span class="side-dot"></span>图片生成测试</div>
+      <div class="side-label" style="margin-top:25px">Prototype</div>
+      <div class="side-item"><span class="side-dot"></span>Explore flow</div>
+      <a class="side-item" href="tool-stream-typography-demo.html">消息流排版预览 →</a>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div><div class="eyebrow">Interaction prototype</div><h1>工具流 / Explore 归组方式</h1></div>
+        <div class="state-pill">可点击讨论稿</div>
+      </header>
+
+      <div class="content">
+        <section class="conversation" aria-label="对话原型">
+          <div class="prompt"><small>User request</small>请分析 ARTICLE_GUIDE.md，并找出和内容发布工作台相关的实现。</div>
+          <div class="variant-switcher" role="tablist" aria-label="展示方案">
+            <button role="tab" aria-selected="false" data-variant="codex">A · Clean embedded</button>
+            <button role="tab" aria-selected="false" data-variant="cursor">B · Cursor-like</button>
+            <button role="tab" aria-selected="true" data-variant="hybrid">C · Recommended hybrid</button>
+          </div>
+          <p class="variant-note" id="variant-note">推荐：基础工具内嵌归组；真正的子 Agent 只保留一行状态，点击后在右侧查看详情。</p>
+
+          <article class="reply">
+            <p><strong>我先快速检查项目结构和文章规范。</strong></p>
+            <div class="stream" id="stream"></div>
+            <p style="margin-top:20px">找到相关实现后，我会把关键路径和下一步建议整理出来。</p>
+          </article>
+
+          <div class="legend" aria-label="图例">
+            <span><i></i>子 Agent 状态</span>
+            <span><i class="line"></i>基础工具归组边界</span>
+            <span>Chevron = 展开同一组的 bounded 详情</span>
+          </div>
+        </section>
+
+        <aside class="inspector" aria-label="子 Agent 详情面板">
+          <div class="inspector-head"><span class="inspector-title">Sub Agent</span><button class="inspector-close" id="close-inspector" aria-label="关闭详情">×</button></div>
+          <div class="inspector-body" id="inspector-body"></div>
+          <div class="inspector-footer">主消息区只保留状态和最新工具行；完整 transcript 属于 child Session。</div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const variants = {
+      codex: {
+        note: "A · 干净内嵌：只表达工具事实，不显示 Thinking；适合快速扫过执行过程。",
+        stream: `
+          <div class="stream-group">
+            <details class="disclosure" open>
+              <summary><span class="stream-icon">⌕</span><span>Loaded a tool, read files</span><span class="count">4 actions</span></summary>
+              <div class="disclosure-body">
+                <span class="activity-row"><span class="activity-icon">▱</span><span>Read <code>ARTICLE_GUIDE.md</code></span></span>
+                <span class="activity-row"><span class="activity-icon">⌕</span><span>Glob <code>src/content/posts/**/*.md</code></span></span>
+                <span class="activity-row"><span class="activity-icon">⌕</span><span>Grep <code>TurnOutputArtifacts</code></span></span>
+                <span class="activity-row"><span class="activity-icon">▱</span><span>Read <code>ConversationView.tsx</code></span></span>
+              </div>
+            </details>
+          </div>
+        `,
+        agent: null,
+      },
+      cursor: {
+        note: "B · Cursor-like：Explored 是一个活动归组；Read、Searched、Thought 都属于同一组，收起时只保留摘要。",
+        stream: `
+          <div class="stream-group">
+            <details class="disclosure">
+              <summary><span class="stream-icon">⌕</span><span>Explored <code>ARTICLE_GUIDE.md</code></span><span class="count">1 search</span></summary>
+              <div class="disclosure-body">
+                <span class="activity-row"><span class="activity-icon">▱</span><span>Read <code>ARTICLE_GUIDE.md</code> · L1–87</span></span>
+                <span class="activity-row"><span class="activity-icon">⌕</span><span>Searched files <code>src/content/posts/**/*.md</code></span></span>
+                <span class="activity-row thought"><span class="activity-icon">⋯</span><span>Thought 11s · 正在对齐文章规范和调用链……</span></span>
+              </div>
+            </details>
+          </div>
+        `,
+        agent: null,
+      },
+      hybrid: {
+        note: "C · 推荐混合：基础工具按 Cursor 方式归组（Thought 也在组内）；真正的 Explore/Agent 是独立 child Session，只显示点、名称、类型和最新一行工具信息。",
+        stream: `
+          <div class="stream-group">
+            <details class="disclosure">
+              <summary><span class="stream-icon">⌕</span><span>Explored <code>ARTICLE_GUIDE.md</code></span><span class="count">1 search</span></summary>
+              <div class="disclosure-body">
+                <span class="activity-row"><span class="activity-icon">▱</span><span>Read <code>ARTICLE_GUIDE.md</code> · L1–87</span></span>
+                <span class="activity-row"><span class="activity-icon">⌕</span><span>Searched files <code>src/content/posts/**/*.md</code></span></span>
+                <span class="activity-row thought"><span class="activity-icon">⋯</span><span>Thought 11s · 正在对齐文章规范和调用链……</span></span>
+              </div>
+            </details>
+            <button class="agent-row" data-agent="structure" aria-label="打开探索项目整体结构的子 Agent 详情">
+              <span class="agent-head"><span class="agent-dot"></span><span class="agent-name">探索项目整体结构</span><span class="agent-kind">Explore</span><span class="agent-status">Completed</span></span>
+              <span class="latest-tool"><span class="pulse idle"></span><span>Read <code>ARTICLE_GUIDE.md</code> · L1–87</span></span>
+            </button>
+          </div>
+          <div class="stream-group">
+            <button class="agent-row" data-agent="new" aria-label="打开 New Agent 子 Agent 详情">
+              <span class="agent-head"><span class="agent-dot cancelled"></span><span class="agent-name">New Agent</span><span class="agent-kind">Agent</span><span class="agent-status">Cancelled</span></span>
+              <span class="latest-tool"><span class="pulse idle"></span><span>等待任务开始</span></span>
+            </button>
+          </div>
+        `,
+        agent: "structure",
+      },
+    };
+
+    const inspector = document.getElementById("inspector-body");
+    const note = document.getElementById("variant-note");
+    const stream = document.getElementById("stream");
+    const closeButton = document.getElementById("close-inspector");
+    let selectedAgent = "structure";
+
+    function renderInspector(agent = selectedAgent) {
+      selectedAgent = agent;
+      if (agent === "new") {
+        inspector.innerHTML = `
+          <div class="inspector-kicker">Child Session · Agent</div>
+          <h2>New Agent</h2>
+          <p>该任务在启动前被取消。主消息区只保留最终状态，不复制不存在的 transcript。</p>
+          <div class="inspector-section"><h3>Latest activity</h3><div class="inspector-tool"><span>—</span><span>没有可展示的工具调用</span></div></div>
+        `;
+        return;
+      }
+      inspector.innerHTML = `
+        <div class="inspector-kicker">Child Session · Explore</div>
+        <h2>探索项目整体结构</h2>
+        <p>只读探索任务。完整执行流留在 child Session，主对话只消费摘要和引用。</p>
+        <div class="inspector-section"><h3>Latest activity</h3>
+          <div class="inspector-tool"><span>01</span><span><b>Read</b> ARTICLE_GUIDE.md · L1–87</span></div>
+          <div class="inspector-tool"><span>02</span><span><b>Glob</b> src/content/posts/**/*.md</span></div>
+          <div class="inspector-tool"><span>03</span><span><b>Grep</b> TurnOutputArtifacts</span></div>
+        </div>
+      `;
+    }
+
+    function renderVariant(name) {
+      const value = variants[name];
+      note.textContent = value.note;
+      stream.innerHTML = value.stream;
+      document.querySelectorAll("[role=tab]").forEach((tab) => tab.setAttribute("aria-selected", String(tab.dataset.variant === name)));
+      if (name === "hybrid") {
+        document.querySelectorAll("[data-agent]").forEach((row) => row.addEventListener("click", () => renderInspector(row.dataset.agent)));
+        renderInspector(value.agent || "structure");
+      } else {
+        inspector.innerHTML = `<div class="inspector-kicker">No child Agent selected</div><h2>右侧详情视图</h2><p>切到 C · Recommended hybrid，点击真正的 Explore/Agent 行查看 child Session 详情。</p>`;
+      }
+    }
+
+    document.querySelectorAll("[role=tab]").forEach((tab) => tab.addEventListener("click", () => renderVariant(tab.dataset.variant)));
+    closeButton.addEventListener("click", () => {
+      inspector.innerHTML = `<div class="inspector-kicker">Panel closed</div><h2>详情已关闭</h2><p>再次点击右侧的 Explore/Agent 行即可打开。</p>`;
+    });
+    renderVariant("hybrid");
+  </script>
+</body>
+</html>

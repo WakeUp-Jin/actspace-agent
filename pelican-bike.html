@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>鹈鹕骑自行车 · SVG 2D 动画</title>
+<style>
+  :root { color-scheme: dark; --ink:#eef4ff; --sky:#091426; --panel:#111f36; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:radial-gradient(circle at 50% 15%,#203960,var(--sky) 65%); color:var(--ink); font-family:system-ui,-apple-system,sans-serif; }
+  main { width:min(1000px,96vw); }
+  h1 { margin:0 0 8px; font-size:clamp(20px,3vw,32px); letter-spacing:.04em; }
+  p { margin:0 0 14px; opacity:.75; }
+  .frame { padding:10px; border:1px solid #344968; border-radius:18px; background:#0b172a; box-shadow:0 22px 70px #0008; }
+  svg { display:block; width:100%; height:auto; border-radius:12px; background:#9ed9ef; }
+  .road { animation: road 1.8s linear infinite; }
+  .wheel { transform-box:fill-box; transform-origin:center; animation: spin .65s linear infinite; }
+  .pedal { transform-box:fill-box; transform-origin:center; animation: spin .9s linear infinite reverse; }
+  .rider { transform-box:fill-box; transform-origin:center bottom; animation: bob .55s ease-in-out infinite alternate; }
+  .wing { transform-box:fill-box; transform-origin:20% 20%; animation: flap .7s ease-in-out infinite alternate; }
+  .cloud { animation: cloud 18s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes bob { to { transform:translateY(-5px) rotate(-1deg); } }
+  @keyframes flap { to { transform:rotate(-9deg); } }
+  @keyframes road { to { transform:translateX(-180px); } }
+  @keyframes cloud { to { transform:translateX(720px); } }
+  @media (prefers-reduced-motion:reduce) { .road,.wheel,.pedal,.rider,.wing,.cloud { animation-play-state:paused; } }
+</style>
+</head>
+<body>
+<main>
+<h1>鹈鹕骑自行车</h1><p>内联 SVG 绘制 · 2D 循环动画（支持减少动态效果偏好）</p>
+<div class="frame">
+<svg viewBox="0 0 900 520" role="img" aria-label="一只鹈鹕骑着自行车沿海边道路前进">
+<defs>
+ <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#8ed5ed"/><stop offset="1" stop-color="#d8f2e8"/></linearGradient>
+ <linearGradient id="sea" x2="0" y2="1"><stop stop-color="#56b9c9"/><stop offset="1" stop-color="#b6e5d7"/></linearGradient>
+</defs>
+<rect width="900" height="520" fill="url(#sky)"/><circle cx="740" cy="100" r="52" fill="#ffe9a7" opacity=".9"/>
+<g class="cloud" fill="#fff" opacity=".72"><path d="M80 120c0-22 30-34 48-17 14-31 66-22 67 16 30-7 43 30 19 43H99c-27 0-38-28-19-42z"/><path d="M560 70c0-17 24-27 38-13 12-24 52-17 53 13 24-6 35 24 15 35H575c-22 0-30-22-15-35z"/></g>
+<path d="M0 270 Q150 230 300 270 T600 265 T900 270 V390H0Z" fill="url(#sea)"/><path d="M0 350 Q130 320 270 350 T540 345 T810 350 T1080 345 V520H0Z" fill="#efd49b"/>
+<g class="road" fill="#d2ad72"><path d="M0 425h900v95H0z"/><path d="M-40 470h120v14H-40zm210 0h120v14H170zm210 0h120v14H380zm210 0h120v14H590zm210 0h120v14H800z" fill="#fff5c9"/></g>
+<g class="rider" stroke="#18354b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+ <g fill="none"><circle class="wheel" cx="330" cy="410" r="62" fill="#eaf7f2"/><circle class="wheel" cx="610" cy="410" r="62" fill="#eaf7f2"/><path d="M330 410l120-82 160 82-160 0zM450 328l-10 82M450 328l70-2 60 84M450 328l-20-40" fill="none"/></g>
+ <g class="pedal" fill="none"><circle cx="450" cy="410" r="17"/><path d="M450 410l24-25m-24 25l-25 22"/><path d="M474 385h22m-47 47h-22"/></g>
+ <path d="M430 270q30-52 82-18l-12 54-60 15z" fill="#d8e4df"/>
+ <path class="wing" d="M445 277q-44 16-51 62 47-13 74-45z" fill="#a9c5c0"/>
+ <path d="M485 255q18-48 61-35 31 10 14 45l-30 24-43-13z" fill="#d8e4df"/>
+ <path d="M546 261l82 17-82 22z" fill="#ef9a55"/><circle cx="530" cy="246" r="5" fill="#173149" stroke="none"/>
+ <path d="M470 319l-8 64m48-57l24 48" fill="none"/><path d="M457 383l-23 26m77-35l-12 31" fill="none"/>
+</g>
+<text x="32" y="48" font-size="20" fill="#173149" opacity=".75">COASTAL RIDE · SVG MOTION STUDY</text>
+</svg></div></main>
+</body></html>

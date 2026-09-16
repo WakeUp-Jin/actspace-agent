@@ -50,7 +50,7 @@ export function SubagentsPanel({ sessionId, selected }: { sessionId: string | nu
   if (active) return <section className="flex h-full min-h-0 flex-col" aria-label="子 Agent 详情">
     <header className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-3">
       <button type="button" aria-label="返回子 Agent 列表" className="rounded-act-md p-1.5 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring" onClick={() => setSelection(undefined)}><ArrowLeft size={16} /></button>
-      <div className="min-w-0"><h2 className="m-0 truncate text-[13px] font-medium" title={active.description}>{active.description}</h2><p className="m-0 text-[12px] text-text-muted">{statusLabel(active)}</p></div>
+      <div className="min-w-0"><h2 className="m-0 truncate text-[13px] font-medium" title={active.description}>{active.description}</h2><p className="m-0 text-[12px] text-text-muted">{kindLabel(active)} · {statusLabel(active)}</p></div>
     </header>
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4" aria-label="子 Agent 执行内容">
       {error ? <p role="status" className="text-[12px] text-text-muted">{error}</p> : null}
@@ -77,3 +77,5 @@ export function SubagentsPanel({ sessionId, selected }: { sessionId: string | nu
   </section>;
 }
 function statusLabel(agent: AgentMessage): string { return agent.status === "running" ? "运行中" : agent.status === "completed" ? "已完成" : agent.status === "aborted" ? "已停止" : "失败"; }
+
+function kindLabel(agent: AgentMessage): string { return agent.agentKind === "agent" ? "Agent" : "Explore"; }

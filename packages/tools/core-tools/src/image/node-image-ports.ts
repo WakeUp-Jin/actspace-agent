@@ -78,7 +78,12 @@ async function generateImage(args: Readonly<Record<string, RuntimeV2JsonValue>>,
     const response = await fetchImpl(endpoint, { method: "POST", redirect: "error", signal: combinedSignal(context.signal, IMAGE_REQUEST_TIMEOUT_MS), headers: { Authorization: `Bearer ${credential.apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: credential.model, prompt, size, n: count }) });
     if (!response.ok) return failed(imageHttpCode(response.status), `Image generation provider returned HTTP ${response.status}.`, response.status === 429 || response.status >= 500);
     const raw = await readBounded(response, MAX_PROVIDER_RESPONSE_BYTES);
-    const parsed = JSON.parse(raw.toString("utf8")) as unknown;
+    let parsed: unknown;
+    try {
+      parsed = parseProviderResponse(raw, response.headers.get("content-type"));
+    } catch (error) {
+      return failed("IMAGE_GENERATION_INVALID_RESPONSE", safeMessage(error), false);
+    }
     const payloads = parsePayloads(parsed).slice(0, count);
     if (!payloads.length) return failed("IMAGE_GENERATION_INVALID_RESPONSE", "Image generation provider returned no usable images.", false);
     const artifacts = []; let batchBytes = 0; const failures: string[] = [];
@@ -131,6 +136,18 @@ async function assertPublic(hostname: string, resolver: (hostname: string) => Pr
 async function resolveAddresses(hostname: string): Promise<readonly string[]> { return (await lookup(hostname, { all: true, verbatim: true })).map(({ address }) => address); }
 function privateAddress(address: string): boolean { const value = address.toLowerCase(); if (value === "::" || value === "::1" || value === "0.0.0.0" || value.startsWith("fc") || value.startsWith("fd") || /^fe[89ab]/.test(value)) return true; if (value.startsWith("::ffff:")) return privateAddress(value.slice(7)); const parts = value.split(".").map(Number); if (parts.length !== 4 || parts.some(Number.isNaN)) return false; const [a, b] = parts as [number, number, number, number]; return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127); }
 async function readBounded(response: Response, maxBytes: number): Promise<Buffer> { if (!response.body) return Buffer.alloc(0); const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let total = 0; while (true) { const next = await reader.read(); if (next.done) break; total += next.value.byteLength; if (total > maxBytes) { await reader.cancel(); throw new Error(`Response exceeds ${maxBytes} bytes.`); } chunks.push(next.value); } return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), total); }
+function parseProviderResponse(raw: Uint8Array, contentType: string | null): unknown {
+  const text = Buffer.from(raw).toString("utf8").trim();
+  if (!text) throw new Error("Image generation provider returned an empty response.");
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    if (/html/i.test(contentType ?? "") || /^<!doctype\s+html|^<html[\s>]/i.test(text)) {
+      throw new Error("Image generation provider returned HTML instead of JSON.");
+    }
+    throw new Error("Image generation provider returned invalid JSON.");
+  }
+}
 function sniffImage(bytes: Uint8Array): string | undefined { const value = Buffer.from(bytes); if (value.length >= 8 && value.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "image/png"; if (value.length >= 3 && value[0] === 0xff && value[1] === 0xd8 && value[2] === 0xff) return "image/jpeg"; if (value.length >= 12 && value.toString("ascii", 0, 4) === "RIFF" && value.toString("ascii", 8, 12) === "WEBP") return "image/webp"; return undefined; }
 function imageHttpCode(status: number): string { return status === 401 || status === 403 ? "IMAGE_GENERATION_AUTH" : status === 429 ? "IMAGE_GENERATION_RATE_LIMIT" : status >= 500 ? "IMAGE_GENERATION_PROVIDER" : "IMAGE_GENERATION_INVALID_REQUEST"; }
 function object(value: unknown): Record<string, unknown> | undefined { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined; }

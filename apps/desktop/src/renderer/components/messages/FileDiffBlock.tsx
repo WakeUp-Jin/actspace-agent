@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, type UIEvent } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 import {
@@ -15,8 +15,6 @@ type FileDiffMessage =
   | Extract<MessageBlock, { kind: "write_diff" }>;
 
 type FileDiffDecision = "approve_once" | "deny";
-
-const STREAMING_BOTTOM_THRESHOLD_PX = 24;
 
 const DIFF_APPROVAL_CLASS =
   "message-row file-diff-approval w-full max-w-[800px] overflow-hidden rounded-act-md border border-line bg-surface";
@@ -153,29 +151,21 @@ function FileDiffApprovalCard({
 
 export function FileDiffBlock({ message, className }: { message: FileDiffMessage; className?: string }) {
   const [expanded, setExpanded] = useState(false);
-  const streamingContentRef = useRef<HTMLPreElement | null>(null);
-  const stickToStreamingBottomRef = useRef(true);
+  const [showFileChangeStats, setShowFileChangeStats] = useState(true);
   const actionLabel = message.kind === "write_diff" ? "Write" : "Edit";
   const isRunning = message.status === "running";
   const fileLabel = message.filePath || "file\u2026";
-  const streamingContent =
-    message.kind === "write_diff" ? message.streamingContent : undefined;
+  const changeStats = showFileChangeStats && (message.additions > 0 || message.deletions > 0)
+    ? ` · +${message.additions} -${message.deletions}`
+    : "";
 
-  useLayoutEffect(() => {
-    stickToStreamingBottomRef.current = true;
-  }, [message.id]);
-
-  useLayoutEffect(() => {
-    if (!isRunning || !streamingContent || !stickToStreamingBottomRef.current) return;
-    const element = streamingContentRef.current;
-    if (!element) return;
-    element.scrollTop = element.scrollHeight;
-  }, [isRunning, streamingContent]);
-
-  const handleStreamingScroll = useCallback((event: UIEvent<HTMLPreElement>) => {
-    const element = event.currentTarget;
-    stickToStreamingBottomRef.current =
-      element.scrollHeight - element.scrollTop - element.clientHeight < STREAMING_BOTTOM_THRESHOLD_PX;
+  useEffect(() => {
+    let active = true;
+    if (typeof window === "undefined" || !window.actspace?.getSettingsV4) return;
+    void window.actspace.getSettingsV4().then((snapshot) => {
+      if (active) setShowFileChangeStats(snapshot.settings.tools.showFileChangeStats !== false);
+    }).catch(() => undefined);
+    return () => { active = false; };
   }, []);
 
   if (message.status === "pending") {
@@ -195,7 +185,7 @@ export function FileDiffBlock({ message, className }: { message: FileDiffMessage
   if (message.status === "failed") {
     return (
       <div className={className}>
-        <StatusLine isError text={`${actionLabel} ${fileLabel} failed`} />
+        <StatusLine isError text={`${actionLabel} ${fileLabel}${changeStats} failed`} />
         {message.errorMessage ? (
           <div className={DIFF_ERROR_DETAIL_CLASS}>{message.errorMessage}</div>
         ) : null}
@@ -203,29 +193,14 @@ export function FileDiffBlock({ message, className }: { message: FileDiffMessage
     );
   }
 
-  if (isRunning && streamingContent && streamingContent.length > 0) {
-    return (
-      <article className={`file-diff-block is-streaming${className ? ` ${className}` : ""}`}>
-        <div className="file-diff-streaming-header">
-          <span className={TOOL_LOG_LINE_TEXT_CLASS}>
-            {actionLabel} {fileLabel}
-          </span>
-        </div>
-        <pre
-          ref={streamingContentRef}
-          className="file-diff-content is-streaming-content"
-          aria-label={`Streaming ${actionLabel.toLowerCase()} preview for ${fileLabel}`}
-          onScroll={handleStreamingScroll}
-        >
-          {streamingContent}
-          <span className="streaming-cursor" aria-hidden />
-        </pre>
-      </article>
-    );
-  }
-
   if (isRunning) {
-    const text = `${actionLabel} ${fileLabel}`;
+    const progress = message.generationProgress;
+    const characters = progress?.characters ?? 0;
+    const amount = characters >= 1_000 ? `${(Math.floor(characters / 100) / 10).toFixed(1)} 千字符` : `${Math.floor(characters / 10) * 10} 字符`;
+    const activity = progress?.phase === "saving" ? "正在保存"
+      : progress?.phase === "preparing" ? "准备保存"
+      : showFileChangeStats && characters >= 10 ? `已生成 ${amount}` : "正在生成";
+    const text = `${actionLabel} ${fileLabel} · ${activity}`;
     return (
       <div className={`${TOOL_LOG_LINE_CLASS} ${TOOL_LOG_LINE_RUNNING_CLASS}${className ? ` ${className}` : ""}`}>
         <span
@@ -246,18 +221,13 @@ export function FileDiffBlock({ message, className }: { message: FileDiffMessage
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
       >
-        <span className="file-diff-summary">
-          {actionLabel} {message.filePath}
-          {message.additions > 0 ? (
+        <span className="file-diff-summary tool-summary-parts">
+          <span className="tool-summary-action">{actionLabel}</span>{" "}<span className="tool-summary-target" title={message.filePath}>{message.filePath}</span>{showFileChangeStats && (message.additions > 0 || message.deletions > 0) ? (
             <>
               {" "}
-              <span className="diff-additions">+{message.additions}</span>
-            </>
-          ) : null}
-          {message.deletions > 0 ? (
-            <>
-              {" "}
-              <span className="diff-deletions">-{message.deletions}</span>
+              {message.additions > 0 ? <span className="diff-additions">+{message.additions}</span> : null}
+              {message.additions > 0 && message.deletions > 0 ? " " : null}
+              {message.deletions > 0 ? <span className="diff-deletions">-{message.deletions}</span> : null}
             </>
           ) : null}
         </span>

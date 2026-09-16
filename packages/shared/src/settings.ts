@@ -284,6 +284,8 @@ export interface SettingsV4Tools {
   bash: {
     alwaysAsk: boolean;
   };
+  /** Show live additions/deletions while write/edit tools are running. */
+  showFileChangeStats?: boolean;
   searchProviders: Partial<Record<SearchProviderId, { enabled: boolean }>>;
 }
 

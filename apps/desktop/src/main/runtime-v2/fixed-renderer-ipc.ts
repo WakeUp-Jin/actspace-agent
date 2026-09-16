@@ -1,3 +1,4 @@
+import { paginateSessionSummaries } from "./session-list-page";
 import { UsageSourceCache } from "./usage-source-cache";
 import { loadDesktopSessionProjection } from "./session-projection";
 import { randomUUID } from "node:crypto";
@@ -17,6 +18,7 @@ import {
   type RunAgentInput,
   type SessionListItem,
   type SessionRecord,
+  type SelectWorkspaceDirectoryResult,
   type UsageStatisticsGetInput,
   type UsageStatisticsSnapshot,
   type UsageActivitySnapshot,
@@ -76,6 +78,7 @@ export type FixedRendererIpcOptions = {
   readonly pricingCatalog?: import("../model-catalog-service").ModelCatalogService;
   readonly catalog: RuntimeV2OpenRouterCatalogService;
   readonly deepSeekCatalog?: RuntimeV2OpenRouterCatalogService;
+  readonly kimiCatalog?: RuntimeV2OpenRouterCatalogService;
   readonly approvals: PendingApprovalRegistry;
   readonly browserBridge: BrowserBridgeService;
   readonly quickOpen: QuickOpenShortcutController;
@@ -113,6 +116,25 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     workspaceRoot: options.roots.workspaceRoot,
   }));
 
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSessionPage, async (_event, input: import("@actspace/shared").SessionListPageInput = {}) => {
+    const result = await options.registry.browseSessions();
+    return paginateSessionSummaries(result, input);
+  });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionToolDetail, async (_event, input: { sessionId: string; callId: string }) => {
+    const page = await options.registry.browseToolDetail(input.sessionId, input.callId);
+    return projectFixedRendererSession(page.snapshot, page.journal, options.roots.workspaceRoot).messageBlocks ?? [];
+  });
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getSessionPage, async (_event, input: import("@actspace/shared").SessionMessagePageInput) => {
+    const page = await options.registry.browseSession(input.sessionId, input.before);
+    const record = projectFixedRendererSession(page.snapshot, page.journal, options.roots.workspaceRoot);
+    const deferred = new Set(page.deferredToolCalls);
+    for (const block of record.messageBlocks ?? []) {
+      const source = record.events.find(e => e.id === block.id);
+      const callId = source?.type === 'tool_result' ? (source.payload as { toolCallId?: string })?.toolCallId : undefined;
+      if (callId && deferred.has(callId)) block.deferredToolDetail = { sessionId: input.sessionId, callId };
+    }
+    return { record, history: page.history };
+  });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listSessions, async (_event, input: { archived?: boolean } = {}) => {
     const items = await options.registry.listSessions();
     const selected = items.filter((item) => item.metadata.archived === (input.archived === true));
@@ -430,11 +452,11 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getPricingCatalog, () => options.pricingCatalog?.status() ?? null);
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.refreshPricingCatalog, (_event, input: { force?: boolean } = {}) => options.pricingCatalog?.refresh(input.force === true) ?? null);
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listModelCatalog, (_event, input: { provider?: string; query?: string } = {}) => {
-    const { provider, catalog } = selectModelCatalog(input.provider, options.catalog, options.deepSeekCatalog);
+    const { provider, catalog } = selectModelCatalog(input.provider, options.catalog, options.deepSeekCatalog, options.kimiCatalog);
     return { provider, ...catalog.list(input.query) };
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.reloadModelCatalog, async (_event, input: { provider?: string; query?: string } = {}) => {
-    const { provider, catalog } = selectModelCatalog(input.provider, options.catalog, options.deepSeekCatalog);
+    const { provider, catalog } = selectModelCatalog(input.provider, options.catalog, options.deepSeekCatalog, options.kimiCatalog);
     const runtime = options.settings.getProviderRuntimeConfig(provider);
     if ("code" in runtime) return { provider, ...catalog.list(), error: { code: runtime.code, message: runtime.message } };
     const result = await catalog.reload(runtime);
@@ -442,10 +464,10 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, handle:
     return { provider, ...result };
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.addModel, async (_event, input: { provider: string; apiModel: string }) => {
-    if ((input?.provider !== "openrouter" && input?.provider !== "deepseek") || typeof input.apiModel !== "string") return { ok: false, error: { code: "invalid_model", message: "模型添加参数无效。" } };
+    if ((input?.provider !== "openrouter" && input?.provider !== "deepseek" && input?.provider !== "kimi") || typeof input.apiModel !== "string") return { ok: false, error: { code: "invalid_model", message: "模型添加参数无效。" } };
     return toModelMutationResult(await options.models.addCatalogModel(input.provider, input.apiModel));
   });
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateModel, async (_event, input: { modelKey: string; enabled?: boolean; customLabel?: string | null; credentialId?: string | null }) => {
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.updateModel, async (_event, input: import("@actspace/shared").ModelsUpdateInput) => {
     const key = normalizeModelKey(input?.modelKey);
     if (!key) return { ok: false, error: { code: "invalid_model", message: "模型标识无效。" } };
     return toModelMutationResult(await options.models.updateModelSettings(key, input));
@@ -482,9 +504,9 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     return { canceled: result.canceled, attachments: images };
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.importComposerImage, (_event, input: Parameters<typeof importComposerImage>[0]) => importComposerImage(input, options.roots.tmpRoot, imagePreviewDataUrl));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, async () => {
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, async (): Promise<SelectWorkspaceDirectoryResult> => {
     const result = await dialog.showOpenDialog(options.getMainWindow(), { properties: ["openDirectory"] });
-    return result.canceled || !result.filePaths[0] ? { canceled: true } : { canceled: false, path: result.filePaths[0] };
+    return result.canceled || !result.filePaths[0] ? { canceled: true } : { canceled: false, workspaceRoot: result.filePaths[0] };
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.openWorkspaceInIde, (_event, input: { workspaceId: string }) => openWorkspaceInIde(registryOptions, input.workspaceId));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setWorkspaceVisibility, (_event, input: { workspaceId: string; hidden: boolean }) => setWorkspaceHidden(registryOptions, input.workspaceId, input.hidden));
@@ -492,13 +514,19 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.createWorkspaceFolder, (_event, input: { parentRoot: string; name: string }) => createWorkspaceFolder(registryOptions, input));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.readSessionArtifact, async (_event, input: { sessionId: string; artifactPath: string }) => {
     try {
-      const artifact = await options.registry.readArtifact(input.sessionId, input.artifactPath);
+      const artifact = await options.registry.resolveArtifact(input.sessionId, input.artifactPath);
+      if (!isSupportedSessionImageMime(artifact.mediaType)) {
+        return { name: "", relativePath: "", size: artifact.bytes.byteLength, error: "unsupported_format" as const };
+      }
+      if (artifact.bytes.byteLength > 25 * 1024 * 1024) {
+        return { name: "", relativePath: "", mimeType: artifact.mediaType, size: artifact.bytes.byteLength, error: "too_large" as const };
+      }
       return {
         name: input.artifactPath,
         relativePath: input.artifactPath,
-        mimeType: artifact.mimeType,
-        size: Buffer.byteLength(artifact.bytesBase64, "base64"),
-        dataUrl: `data:${artifact.mimeType};base64,${artifact.bytesBase64}`,
+        mimeType: artifact.mediaType,
+        size: artifact.bytes.byteLength,
+        dataUrl: `data:${artifact.mediaType};base64,${Buffer.from(artifact.bytes).toString("base64")}`,
       };
     } catch {
       return { name: "", relativePath: "", size: 0, error: "not_found" as const };
@@ -627,12 +655,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
 }
 
 async function toSessionListItem(item: RuntimeV2SessionListItem, registry: DesktopRuntimeV2Registry): Promise<SessionListItem> {
-  let agentRunCount = 0;
-  try {
-    agentRunCount = (await registry.inspectSession(item.sessionId)).activity.completedTurnCount;
-  } catch {
-    // Keep damaged/browse-only sessions visible in the navigation list.
-  }
+  const agentRunCount = item.completedTurnCount ?? 0;
   return {
     id: item.sessionId,
     title: item.metadata.title ?? "New chat",

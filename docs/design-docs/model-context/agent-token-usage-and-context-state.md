@@ -173,12 +173,16 @@ Context Projection 的 token 数是 UI 估算，不是 provider usage。当前�
 - bucket tokens；
 - entry preview、included、pinned、removable。
 
+Composer 百分比与 ContextPopup 优先消费同一份完整请求分项估算，面板标题保持「上下文」。`projectContextSnapshot` 从 `projectContextState` 派生总量、容量和 buckets；工作台不能用整体序列化估算覆盖完整分项投影，也不能用 provider usage 代替上下文占用。顶部会话详情每次打开刷新累计 provider usage，仅显示一行「累计 Token：xxx」，不显示上下文占用、进度条、下拉明细或说明文字。
+
 因此必须在 UI 和文档中区分：
 
 ```text
 Provider usage = 已完成请求的真实或 adapter 标注值
 Context estimate = 当前 snapshot 的前端可解释估算
 ```
+
+Context estimate 只表示当前、最近一次或下次请求预计会携带的有效上下文；压缩后有效 Surface 变小，后续请求的 estimate 也应变小。分页浏览缓存只能截短 entry preview，必须保留完整的 bucket 与 total 计数。`Provider usage` 另行作为会话累计用量展示，它聚合每次真实 provider request 的输入、输出及缓存 Token，压缩不会清零，也不参与 Context 的容量百分比。
 
 不能用 Context estimate 回写或修正历史 provider usage。UI 消费完整 bucket，不再压缩成 provider usage 的两桶适配；未知 bucket 必须有稳定兜底。若新增 MCP/Subagent 专用类别，先扩展 snapshot 分类契约，再接 renderer。弹窗尺寸、数字格式与临时模型选择见 [Context 面板与 Composer](agent-context-model-facts-and-composer.md)。
 

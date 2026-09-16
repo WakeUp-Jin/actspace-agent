@@ -1,5 +1,7 @@
 # 中间消息区规范
 
+> 排版基线见[消息流排版与工具摘要规范](front-tool-stream-typography.md)：过程行 14px/22px、400；过程间距 5px、过程与正文 14px、正文之间 23px、最终回复边界 18px。外部间距统一由消息容器负责。
+
 ## 定位
 
 中间区域是主工作区，承载对话、工具流和最终回复。
@@ -12,6 +14,7 @@
 - 一次消息可能包含多轮思考、工具调用、编辑和最终回复。
 - 每种消息类型使用不同组件，但保持同一条消息流里的节奏一致。
 - 同一轮里的 Thinking、Read/Grep/Glob/Web Search、Edit/Write File 和普通回复使用统一左边缘，不保留旧头像占位缩进。
+- 运行时平铺全部过程，完成后统一收进一个 `Worked for`，不再设置 `Explored` 分组；子 Agent 仍可点击打开右侧详情。
 
 ## 消息类型
 
@@ -39,11 +42,12 @@
 - 用户消息中的图片缩略图是可点击、可键盘聚焦的对象入口；激活后在右侧打开 Image Tab，与 Composer 发送前预览保持一致。没有可用预览数据时按钮禁用，不尝试由 renderer 直接读取本地路径。
 - 图片预览恢复只对缺少预览的图片调用会话产物 IPC；无附件或无待加载图片时不更新预览状态，相同恢复结果保持原状态引用，避免纯文本消息触发 effect 反馈循环。
 - 助手普通回复用正常文本块显示，不在消息正文前重复展示头像、产品名或模型名。
-- Thinking 默认折叠，点击后展开完整内容。
+- Markdown 行内代码采用无边框、3px 小圆角与紧凑留白（上下 `0.08em`、左右 `0.25em`），保留等宽字体和随主题翻转的淡底、文字 token，避免密集引用呈现按钮感；代码块继续使用独立容器与工具栏样式。
+- Thinking 运行时按消息默认状态展示，允许手动折叠；最终回复完成后随 Worked 一起收起，再展开 Worked 时 Thinking 详情也保持收起。
 - Read、Grep、Glob 和 Web Search 保持文本流感，不做重边框。
 - Bash 正常执行态保持类似 Read 的轻量日志行；只有展开后的命令输出区域使用单层浅色容器。
 - Bash 审核态可以使用轻量边框块，因为它承载用户操作，不属于普通执行日志。
-- Agent 是聚合执行对象：主消息流显示可点击执行块，块内只展示 SubAgent run 的标题、最近事件、摘要和 stats；不展示额外 logo、机器人图标或全大写状态噪音。完整 transcript 通过 Composer 上方的会话内 panel 展示，不使用全局遮罩弹窗，也不在主消息流原地展开。
+- Agent 是聚合执行对象：主消息流显示可点击的紧凑两行入口，展示状态点、任务名、Agent/Explore 类型、状态和最新一行活动；不展示额外 logo、机器人图标或全大写状态噪音。完整 transcript 通过 Composer 上方的会话内 panel 展示，不使用全局遮罩弹窗，也不在主消息流原地展开。
 - Edit / Write File 与 Read 等保持同样的纯文本工具行节奏，仅在用户主动展开时显示 diff 详情容器。
 - Context Compaction 是系统执行事件，不属于工具调用，也不渲染为 Tool Preview；手动 `/compact` 和未来自动压缩共享同一消息块语法。
 - Final reply 作为收束结果，保持最清晰的阅读层级。
@@ -108,10 +112,10 @@ Thinking 是消息流中的折叠思考行。
 
 ### 交互
 
-- 默认折叠。
+- 运行时遵循消息默认展开状态，手动选择保留到整个回复结束；完成后默认折叠。
 - 点击后展开完整内容。
 - 展开与收起保持同一消息块内的连续性。
-- 折叠态使用向右箭头，展开态使用向下箭头。
+- 折叠态使用向右箭头，展开态使用向下箭头；箭头仅在悬浮或键盘聚焦时可见。
 
 ### 视觉原则
 
@@ -123,9 +127,9 @@ Thinking 是消息流中的折叠思考行。
 
 ![Thinking 定稿图](thinking-final.png)
 
-## Read / Grep / Glob / Web Search 组件
+## 工具活动组与 Read / Grep / Glob / Web Search 组件
 
-Read、Grep、Glob 和 Web Search 是和 Thinking 同级别的工具调用消息。Directory List 也遵循相同形态。
+Read、Search、Grep、Glob、Directory List、Web Search、Thinking、Bash、编辑记录和子 Agent 入口按原顺序统一纳入回合的 Worked 活动组。
 
 ### 结构
 
@@ -136,9 +140,10 @@ Read、Grep、Glob 和 Web Search 是和 Thinking 同级别的工具调用消息
 
 ### 交互
 
-- 默认直接展示，不需要展开。
+- 工具行保持轻量展示，执行中平铺，最终回复完成后整个过程收起为一个 Worked。
 - 作为消息流中的日志条目存在。
-- 与 Thinking 保持同一语法体系，但不从属 Thinking。
+- 重新展开 Worked 后，每个工具的详情与 Thinking 均为收起状态；用户可以逐项展开。
+- 单独出现的工具行与 Thinking 保持同一语法体系，不依赖某一个具体工具组件。
 
 ### 视觉原则
 
@@ -231,9 +236,9 @@ Bash 是命令执行工具，包含正常执行态和审核 pending 态。
 LLM 生成工具调用是一段慢操作（write_file 一千多字符的 content 在国内 LLM 实测约 2–3s）。前端必须区分四个阶段，避免出现「assistant 文本后大段静默 → 突然蹦出完成态卡片」的体验断层：
 
 1. **dispatched**：bridge 收到首个 `tool_call_delta` chunk，emit `tool_call_streaming { isInitial: true, preview }`。此时 `preview.filePath` 等字段可能为空字符串，前端用 `Write file…` 等 fallback 文案展示 + shimmer。
-2. **argsProgress**：bridge 持续累积 partial args，按 50ms throttle emit `tool_call_streaming`。preview 字段逐步填充（filePath 先有、streamingContent 后有）。write_file 出现 `streamingContent` 后立即展开 code preview，cursor 风格边写边看。
-3. **executing**：LLM 完成本次 tool_call 输出，bridge emit `tool_started`。preview 此时仍保留 streamingContent（write 的 `createToolUiPreview` 在 output 为空时把完整 args.content 当作 streamingContent，避免从 argsProgress 切到 executing 时 code preview 突然消失）。仍展示 shimmer。
-4. **finished**：bridge emit `tool_finished`，前端从 result event 里拿到 completed 风格 preview（diff + additions/deletions），streamingContent 清除，切换为折叠态摘要行 `Write 短文.md +35 ›`。
+2. **argsProgress**：Write/Edit 在 Main 增量统计 content/new_string 字符量，每秒至多发布一次 generationProgress；不发送 streamingContent，不自动展开。其他工具保持稳定占位。
+3. **executing**：prepared 后一次补齐路径并显示“准备保存”；通过校验与审批、真正进入 body 后 emit tool_started，显示“正在保存” + shimmer。
+4. **finished**：bridge emit tool_finished，清除临时生成进度，使用真实结果的 diff + additions/deletions，切换为折叠摘要。
 
 前端实现要点：
 
@@ -247,9 +252,8 @@ Agent 是主 Agent 调用的聚合工具，用户可见为一个可点击执行�
 ### 结构
 
 - 顶部显示 `description` 和进入 transcript 的箭头，不额外展示 logo、机器人图标或全大写状态行。
-- running 阶段展示最近 3-5 条 transcript 摘要，使用与工具 running 态一致的 text shimmer。
-- completed 阶段展示最终 summary，控制在 3-4 行内，底部显示 `Explored N files · M tools · Ss` 等 stats。
-- failed / aborted 阶段展示错误摘要，并继续保留 transcript 入口。
+- running / completed / failed / aborted 阶段都使用同一条紧凑两行入口：状态点、description、Agent/Explore 类型、状态和最新一行活动；入口带主题感知轻边框；running 的最新活动由真实 child 工具/模型阶段生成，语义变化即时显示，工具结束后保留“刚读取/刚搜索 + 对象”，使用 180ms、4px 上移交叉淡入淡出过渡，支持 reduced motion；正文生成显示“正在整理回复”，不展示流式正文，失败时最新一行承载具体错误原因。
+- 不在主消息区展示多行 transcript、stats 或独立的 `Explored N files · M tools · Ss` 卡片；完整过程统一进入右侧 SubAgent panel。
 
 ### 交互
 
@@ -289,9 +293,9 @@ Edit File 和 Write File 是文件修改类工具消息。后端工具名为 `ed
 ### 交互
 
 - 工具调用进行中：
-  - dispatched 阶段（filePath 还未解析出来）：显示 `Write file…` + shimmer。
-  - argsProgress 阶段（path 已解析）：显示 `Write 短文.md` + shimmer；write_file 出现 `streamingContent` 后展开 code preview，行尾闪烁光标动画，模拟 cursor 风格写入。
-  - executing 阶段（tool_started 后到 tool_finished 前）：保持 streamingContent 视图，避免闪烁，diff 在工具实际写入完成后才接管显示。
+  - dispatched 阶段（filePath 还未解析出来）：显示 `Write file… · 正在生成` + shimmer；收到内容后每秒至多更新一次已生成字符量，不展示 `+0 -0`。
+  - argsProgress 阶段：保持一行，按一秒节奏显示取整后的已生成字符量；路径在 prepared 后一次补齐。
+  - executing 阶段（tool_started 后到 tool_finished 前）：显示“正在保存”，完成后才展示真实 diff。
   - 整个 running 阶段无 chevron。
 - edit_file running 阶段**不展示** content/diff，只展示单行 `Edit index.ts` + shimmer（因为 partial old_string/new_string 无法生成有定位的 diff）。
 - 工具调用完成后：切换为折叠态 `Write short-story.txt +71 ›`，可点击展开。
@@ -358,8 +362,12 @@ Context Compaction 展示上下文压缩生命周期。它可能由用户在 Com
 - `+N` / `-N` 和 diff 行继续使用低饱和 addition / removal token，但不复用 Toggle 或危险按钮背景色。
 - 工具流仍以文本流和轻量行视觉为主，不引入彩色 timeline pill 或彩色卡片墙。
 
-## 回合完成后的过程收起
+### 工具点击提示
 
-运行中按原顺序平铺 Thinking 与所有工具，不设置 Explored 分组。模型最终回复完成后，整个过程统一折叠为 Worked，最终回复留在组外。再次打开 Worked 时，Thinking 和各工具详情（含失败 Bash）均为收起状态，之后允许用户逐项展开。
+- 打开右侧文件或 SubAgent 视图：文字悬浮或键盘聚焦时提高对比度，不展示箭头或独立 Open file 按钮。
+- 原地展开：箭头默认占位但隐藏，悬浮或键盘聚焦显示，展开后保持可见。编辑记录保留箭头。
+- Thinking 箭头在展开态保持可见，折叠态仅在悬浮或键盘聚焦时显示。浅色加深、深色提亮，使用主题文字 token。
 
-Read 文件文字打开右侧预览，不使用 Open file 按钮。打开右侧视图的控件只提升悬浮或键盘聚焦时的文字对比度；原地详情箭头默认隐藏，悬浮或聚焦时显示，展开后保持可见。Thinking 箭头始终只在悬浮或聚焦时显示，编辑记录保留箭头。
+## 会话浏览加载
+
+列表和长会话的按需读取、真实分页、加载/重试状态与索引边界，见[会话浏览按需加载](front-progressive-session-loading.md)。

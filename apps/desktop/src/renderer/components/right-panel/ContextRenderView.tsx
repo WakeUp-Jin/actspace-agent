@@ -7,8 +7,8 @@ import {
   type ContextStateEntry,
   type ContextUsageSnapshot,
 } from "@actspace/shared";
-import { selectProviderUsage, selectRequestContextEstimate } from "@actspace/client/sessions";
-import { contextEstimateToSnapshot, providerUsageToContextSnapshot, useOptionalSessionProjection } from "../../session";
+import { selectRequestContextEstimate } from "@actspace/client/sessions";
+import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../../session";
 import { contextBucketLabel } from "../../context-labels";
 
 /**
@@ -239,10 +239,8 @@ export function ContextRenderView({
   const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && (sessionId === null || sessionId === undefined || sessionProjection.sessionId === sessionId)
     ? sessionProjection.cell
     : null;
-  const projectedProviderUsage = projectionCell ? selectProviderUsage(projectionCell) : null;
   const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
   const effectiveContextSnapshot = contextSnapshot
-    ?? (projectedProviderUsage ? providerUsageToContextSnapshot(projectedProviderUsage) : null)
     ?? (projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null);
   const effectiveContextRevision = contextRevision ?? projectionCell?.snapshot?.throughJournalSeq;
   // 持久化快照只存 token 统计；打开视图时按需向 main 现场重算逐条全文。

@@ -13,6 +13,7 @@ import { ProviderProxyError, ProviderProxyPool } from "@actspace/llm-service";
 import { redactLlmText } from "@actspace/llm-service";
 import type { LlmStreamEvent, LlmStreamSource } from "@actspace/llm-service";
 import type { LlmUsage } from "@actspace/llm-service";
+import { DeepSeekFileUploader } from "./deepseek-files.js";
 
 type SdkClient = Record<string, unknown>;
 type SdkConstructor = new (options: Record<string, unknown>) => SdkClient;
@@ -26,6 +27,7 @@ export type LegacyProxyWireEngineOptions = {
   readonly modelId?: string;
   readonly baseUrl?: string;
   readonly readArtifact?: PiAiArtifactReader;
+  readonly deepSeekFiles?: DeepSeekFileUploader;
   readonly proxies?: ProviderProxyPool;
   readonly loadSdk?: LegacyProxySdkLoader;
 };
@@ -49,7 +51,8 @@ export class LegacyProxyWireEngine implements PiAiEngine {
     const proxyUrl = input.credential.proxyUrl;
     const baseURL = input.credential.baseUrl ?? this.options.baseUrl;
     if (baseURL === undefined) throw new Error(`No base URL is configured for route ${input.request.routeId}.`);
-    if (proxyUrl === undefined && catalogProviderForEndpoint(baseURL) !== "openrouter") throw new Error("Legacy proxy backend requires a request-scoped proxy URL.");
+    const directDeepSeek = this.options.providerId === "deepseek" && this.options.route === "openai-completions";
+    if (proxyUrl === undefined && catalogProviderForEndpoint(baseURL) !== "openrouter" && !directDeepSeek) throw new Error("Legacy proxy backend requires a request-scoped proxy URL.");
     if (proxyUrl !== undefined && !this.options.proxies) throw new Error("Missing request-scoped proxy pool.");
     const fetch = proxyUrl === undefined ? undefined : await this.options.proxies!.getFetch(proxyUrl);
     const Constructor = await this.#loadSdk(this.options.route);
@@ -74,7 +77,7 @@ async function* completionsStream(client: SdkClient, input: LlmAdapterDispatchIn
     } : readArtifact;
     const body = {
       model: options.modelId ?? input.request.model,
-      messages: await toOpenAiMessages(input.request.messages, input.request.sessionId, checkedReader, deepseek),
+      messages: await toOpenAiMessages(input.request.messages, input.request.sessionId, checkedReader, deepseek, deepseek && options.deepSeekFiles ? async (sessionId, artifactId, artifact) => options.deepSeekFiles!.resolve({ apiKey: input.credential.apiKey ?? "", baseUrl: input.credential.baseUrl ?? options.baseUrl ?? "", sessionId, artifactId, bytes: artifact.data, mimeType: artifact.mimeType as "image/png" | "image/jpeg" | "image/gif" | "image/webp", signal: input.signal, fetchImpl: fetch }) : undefined),
       stream: true,
       ...reasoningPayload(options.route, options.providerId, input.request.options),
       stream_options: { include_usage: true },
@@ -178,23 +181,32 @@ async function* anthropicStream(client: SdkClient, input: LlmAdapterDispatchInpu
   } catch (error) { yield { ...terminalFailure(error, input.signal), usage: calculateUsageCost(acc.usage, options.pricing ?? null) }; }
 }
 
-async function toOpenAiMessages(messages: readonly LlmMessage[], sessionId?: string, readArtifact?: PiAiArtifactReader, deepseek = false): Promise<RuntimeV2JsonValue[]> {
+type OpenAiFileResolver = (sessionId: string, artifactId: string, artifact: { readonly data: Uint8Array; readonly mimeType: string }) => Promise<string>;
+
+async function toOpenAiMessages(messages: readonly LlmMessage[], sessionId?: string, readArtifact?: PiAiArtifactReader, deepseek = false, resolveFileId?: OpenAiFileResolver): Promise<RuntimeV2JsonValue[]> {
   const output: RuntimeV2JsonValue[] = [];
   for (const message of messages) {
     if (message.role === "system") { output.push({ role: "system", content: messageText(message) }); continue; }
-    if (message.role === "user") { output.push({ role: "user", content: await toOpenAiUserContent(message, sessionId, readArtifact) }); continue; }
+    if (message.role === "user") { output.push({ role: "user", content: await toOpenAiUserContent(message, sessionId, readArtifact, resolveFileId) }); continue; }
     if (message.role === "assistant") { const blocks = blocksOf(message); const text = blocks.filter(isText).map((block) => block.text).join(""); const calls = blocks.filter(isToolCall); output.push({ role: "assistant", content: text || null, ...(deepseek ? { reasoning_content: blocks.filter((block) => block.type === "reasoning").map((block) => block.type === "reasoning" ? block.text : "").join("") } : {}), ...(calls.length ? { tool_calls: calls.map((call) => ({ id: call.callId, type: "function", function: { name: call.name, arguments: call.arguments } })) } : {}) }); continue; }
     output.push({ role: "tool", tool_call_id: message.callId ?? "unknown", content: messageText(message) });
   }
   return output;
 }
 
-async function toOpenAiUserContent(message: LlmMessage, sessionId?: string, readArtifact?: PiAiArtifactReader): Promise<RuntimeV2JsonValue> {
+async function toOpenAiUserContent(message: LlmMessage, sessionId?: string, readArtifact?: PiAiArtifactReader, resolveFileId?: OpenAiFileResolver): Promise<RuntimeV2JsonValue> {
   if (typeof message.content === "string") return message.content;
   const output: RuntimeV2JsonValue[] = [];
   for (const block of message.content) {
     if (block.type === "text") output.push({ type: "text", text: block.text });
-    else if (block.type === "image") output.push({ type: "image_url", image_url: { url: await artifactDataUrl(block.artifactId, block.mimeType, sessionId, readArtifact) } });
+    else if (block.type === "image") {
+      if (resolveFileId && sessionId && readArtifact) {
+        const artifact = await readArtifact(sessionId, block.artifactId);
+        output.push({ type: "file", file_id: await resolveFileId(sessionId, block.artifactId, artifact) });
+      } else {
+        output.push({ type: "image_url", image_url: { url: await artifactDataUrl(block.artifactId, block.mimeType, sessionId, readArtifact) } });
+      }
+    }
   }
   return output;
 }

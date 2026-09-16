@@ -1,11 +1,13 @@
 .tool-result-disclosure {
   max-width: 800px;
-  margin: 2px 0 0;
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
   padding: 0 var(--conversation-text-inset);
 }
 
 .tool-result-toggle {
-  display: inline-flex;
+  display: flex;
   max-width: 100%;
   align-items: center;
   gap: 6px;
@@ -16,7 +18,7 @@
   font-family: inherit;
   font-size: 14px;
   font-weight: 400;
-  line-height: 1.42;
+  line-height: 22px;
   cursor: pointer;
   text-align: left;
 }
@@ -42,7 +44,9 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tool-file-link:hover,
@@ -86,7 +90,7 @@
 }
 
 .tool-result-list {
-  margin: 6px 0 0;
+  margin: 7px 0 0;
   padding: 8px 12px;
   overflow-y: auto;
   max-height: 280px;
@@ -113,10 +117,46 @@
 }
 
 :is(.tool-result-header:hover .tool-result-toggle, .tool-result-toggle:hover, .web-tool-toggle:hover, .thinking-toggle:hover, .bash-run-toggle:hover, .tool-result-toggle:focus-visible, .web-tool-toggle:focus-visible, .thinking-toggle:focus-visible, .bash-run-toggle:focus-visible) :is(.lucide-chevron-right, .lucide-chevron-down),
-:is(.tool-result-toggle, .web-tool-toggle, .bash-run-toggle)[aria-expanded="true"] :is(.lucide-chevron-right, .lucide-chevron-down) {
+:is(.tool-result-toggle, .web-tool-toggle, .thinking-toggle, .bash-run-toggle)[aria-expanded="true"] :is(.lucide-chevron-right, .lucide-chevron-down) {
   opacity: 1;
 }
 
 :is(.tool-file-link, .tool-result-toggle, .web-tool-toggle, .thinking-toggle):active {
   transform: translateY(1px);
 }
+
+/* Message-flow owns external spacing; components own only their disclosure body. */
+.message-flow, .transcript-message-flow {
+  --flow-process-gap: 5px;
+  --flow-prose-gap: 14px;
+  --flow-paragraph-gap: 23px;
+  --flow-final-gap: 18px;
+  --flow-detail-tail: 8px;
+}
+.message-flow {
+  gap: 0;
+}
+.message-flow > .message-flow-item { min-width: 0; }
+.message-flow > * + * { margin-top: 9px; }
+.message-flow > [data-flow-kind="process"] + [data-flow-kind="process"] { margin-top: var(--flow-process-gap); }
+.message-flow > [data-flow-kind="process"] + [data-flow-kind="prose"],
+.message-flow > [data-flow-kind="prose"] + [data-flow-kind="process"] { margin-top: var(--flow-prose-gap); }
+.message-flow > [data-flow-kind="prose"] + [data-flow-kind="prose"] { margin-top: var(--flow-paragraph-gap); }
+.message-flow > .message-flow-final { margin-top: var(--flow-final-gap); }
+.message-flow > [data-flow-kind="process"]:has([aria-expanded="true"]) { padding-bottom: var(--flow-detail-tail); }
+/* Diff owns its output rendering; these overrides concern only the tool header. */
+.file-diff-block { margin-top: 0; }
+.file-diff-toggle { display: flex; line-height: 22px; }
+.file-diff-content { margin-top: 7px; }
+.tool-summary-parts { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; max-width: 100%; vertical-align: bottom; }
+.tool-summary-action { flex-shrink: 0; }
+.tool-summary-target { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-faint); }
+.tool-summary-meta { flex-shrink: 0; color: var(--color-text-faint); font-variant-numeric: tabular-nums; }
+.tool-file-link { display: flex; }
+.tool-result-header, .tool-result-line { font-size: 14px; line-height: 22px; }
+
+.transcript-message-flow { gap: var(--flow-process-gap); }
+.transcript-message-flow > :has([aria-expanded="true"]) { padding-bottom: var(--flow-detail-tail); }
+.web-tool-block { margin-top: 0; }
+.web-tool-toggle { display: flex; line-height: 22px; }
+.web-tool-content, .web-tool-url-list { margin-top: 7px; }

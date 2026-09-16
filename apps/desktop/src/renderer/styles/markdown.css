@@ -73,13 +73,13 @@
 }
 
 .markdown-prose code {
-  border: 1px solid var(--act-color-inline-code-border);
-  border-radius: var(--radius-sm);
+  border: 0;
+  border-radius: 3px;
   background: var(--act-color-inline-code-bg);
   color: var(--act-color-inline-code-text);
   font-family: var(--font-mono);
   font-size: 0.9em;
-  padding: 0.12em 0.34em;
+  padding: 0.08em 0.25em;
 }
 
 .markdown-code-block {
@@ -103,6 +103,50 @@
   color: inherit;
   font-size: inherit;
   padding: 0;
+}
+
+.markdown-code-shell {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--act-color-code-border);
+  border-radius: var(--radius-lg);
+  background: var(--act-color-code-bg-bottom);
+}
+
+.markdown-code-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 30px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--act-color-code-border);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.markdown-code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.markdown-code-copy:hover {
+  background: var(--act-color-code-border);
+  color: var(--color-text);
+}
+
+.markdown-code-shell > .markdown-code-block {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .markdown-prose a {

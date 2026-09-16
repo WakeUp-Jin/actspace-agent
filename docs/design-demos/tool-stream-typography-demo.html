@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ActSpace · 消息流排版预览</title><style>
+:root {
+  color: #20201e;
+  background: #f7f7f5;
+
+  --act-font-ui:
+    -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Segoe UI",
+    "Microsoft YaHei",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  --act-font-display: var(--act-font-ui);
+  --act-font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+  /* 代码/等宽字号，由外观设置驱动（代码块 / diff / bash 输出消费）。 */
+  --act-font-mono-size: 13px;
+
+  --act-color-bg: #f7f7f5;
+  --act-color-surface: #ffffff;
+  --act-color-surface-subtle: #f1f1ef;
+  --act-color-surface-raised: #ffffff;
+  --act-color-sidebar: #efefed;
+  --act-color-selected: #e4e4e1;
+  --act-color-sidebar-selected: var(--act-color-selected);
+  --act-color-hover-overlay: #eaeae7;
+
+  --act-color-border: #deded9;
+  --act-color-border-strong: #8c8c85;
+  --act-color-meter-track: #e9e9e5;
+
+  --act-color-text: #20201e;
+  --act-color-text-muted: #676762;
+  --act-color-text-faint: #72726b;
+  --act-color-text-subtle: #85857e;
+
+  --act-color-action: #20201e;
+  --act-color-action-hover: #343430;
+  --act-color-on-action: #ffffff;
+
+  --act-color-operational: #087a4b;
+  --act-color-operational-hover: #06673f;
+  --act-color-operational-soft: #e5f2ea;
+  --act-color-on-operational: #ffffff;
+
+  --act-color-info: #3978b8;
+  --act-color-info-hover: #2f689f;
+  --act-color-info-soft: #e8f1f9;
+  --act-color-on-info: #315f8e;
+
+  --act-color-warning: #91600e;
+  --act-color-warning-soft: #f7eedb;
+  --act-color-on-warning: #7a500a;
+
+  --act-color-danger: #c74747;
+  --act-color-danger-hover: #a93a3a;
+  --act-color-danger-soft: #f8e9e9;
+  --act-color-on-danger: #a93a3a;
+  --act-color-on-danger-solid: #ffffff;
+
+  --act-color-success: #087a4b;
+  --act-color-success-soft: #e5f2ea;
+  --act-color-on-success: #087a4b;
+
+  /* 浮层（卡片/模态/popover 高一层背景）与模态遮罩 */
+  --act-color-overlay: rgba(17, 24, 39, 0.32);
+
+  /* 焦点环 / 选区 / chrome hover 叠加 */
+  --act-color-focus-ring: #4d4d48;
+  --act-color-operational-focus-ring: #087a4b;
+  --act-color-selection: rgba(77, 77, 72, 0.2);
+
+  /* 代码（行内 / 代码块）/ 引用 / 表头等内容呈现色 */
+  --act-color-code-text: #343430;
+  --act-color-code-bg-top: rgba(247, 247, 245, 0.98);
+  --act-color-code-bg-bottom: rgba(241, 241, 239, 0.98);
+  --act-color-code-border: rgba(140, 140, 133, 0.48);
+  --act-color-inline-code-text: #343430;
+  --act-color-inline-code-bg: rgba(241, 241, 239, 0.92);
+  --act-color-inline-code-border: rgba(140, 140, 133, 0.4);
+  --act-color-quote-border: rgba(77, 77, 72, 0.42);
+  --act-color-table-head-bg: rgba(228, 228, 225, 0.78);
+  --act-color-table-head-text: #343430;
+
+  /* diff 增删底/字 */
+  --act-color-diff-add-bg: rgba(44, 168, 105, 0.12);
+  --act-color-diff-add-text: #08784f;
+  --act-color-diff-remove-bg: rgba(225, 70, 86, 0.12);
+  --act-color-diff-remove-text: #a43342;
+  --act-color-diff-streaming-bg: rgba(44, 168, 105, 0.08);
+
+  /* 数据可视化色板（图表 / heatmap / 标签）；浅深各一组 */
+  --act-chart-series-1: #3978b8;
+  --act-chart-series-2: #4b919d;
+  --act-chart-series-3: #7a68ad;
+  --act-chart-series-4: #c06f52;
+  --act-chart-series-5: #087a4b;
+  --act-chart-series-6: #7d858b;
+
+  /*
+   * Context 弹层 bucket 配色（数据可视化色，浅/深各一组）。
+   * 由 @actspace/shared 的 CONTEXT_BUCKET_REGISTRY.colorVar 引用；新增 bucket = 注册表加一行 + 这里加一对 token。
+   * 浅色取较深饱和值以在白底弹层可见；深色取较亮值以在深底弹层可见。
+   */
+  --act-context-system: #7d858b;
+  --act-context-tools: #7a68ad;
+  --act-context-rules: #087a4b;
+  --act-context-skills: #91600e;
+  --act-context-summarized: #a84f7a;
+  --act-context-conversation: #b96831;
+  --act-context-fallback: #8c8c85;
+
+  /* Analysis 数据角色编码：只用于分析页面内容，不作为全局导航或 action 色。 */
+  --act-analysis-canvas: #fbfcfd;
+  --act-analysis-selection-soft: #edf6ff;
+  --act-analysis-user-soft: #f0f7ff;
+  --act-analysis-assistant-soft: #eef9f2;
+  --act-analysis-tool-soft: #f6f2fc;
+  --act-analysis-thinking-soft: #f5f6f7;
+
+  /* 会话顶部「当前轮提问」的贴顶渐隐遮罩（从 surface 渐隐到透明）。 */
+  --act-gradient-surface-fade: linear-gradient(
+    180deg,
+    #fff 0%,
+    rgba(255, 255, 255, 0.96) 78%,
+    rgba(255, 255, 255, 0) 100%
+  );
+
+  --act-radius-xs: 4px;
+  --act-radius-sm: 6px;
+  --act-radius-md: 8px;
+  --act-radius-lg: 12px;
+  --act-radius-xl: 18px;
+  --act-radius-pill: 999px;
+
+  --act-shadow-soft: 0 18px 48px rgba(31, 45, 61, 0.08);
+  --act-shadow-popover: 0 24px 64px rgba(31, 45, 61, 0.14);
+
+  --act-scrollbar-thumb: rgba(171, 177, 186, 0.46);
+  --act-scrollbar-thumb-hover: rgba(146, 153, 164, 0.56);
+  --act-scrollbar-thumb-subtle: rgba(146, 153, 164, 0.3);
+  --act-scrollbar-thumb-subtle-hover: rgba(126, 133, 144, 0.46);
+
+  /*
+   * Legacy alias layer:
+   * old renderer styles still read unprefixed variables while slices migrate
+   * to Tailwind/theme tokens. Keep these aliases here so legacy CSS no longer
+   * needs to redeclare a second :root block.
+   */
+  --font-ui: var(--act-font-ui);
+  --font-display: var(--act-font-display);
+  --font-mono: var(--act-font-mono);
+
+  --color-bg: var(--act-color-bg);
+  --color-surface: var(--act-color-surface);
+  --color-surface-subtle: var(--act-color-surface-subtle);
+  --color-sidebar: var(--act-color-sidebar);
+  --color-sidebar-selected: var(--act-color-sidebar-selected);
+  --color-border: var(--act-color-border);
+  --color-border-strong: var(--act-color-border-strong);
+  --color-text: var(--act-color-text);
+  --color-text-muted: var(--act-color-text-muted);
+  --color-text-faint: var(--act-color-text-faint);
+  --color-text-subtle: var(--act-color-text-subtle);
+  --color-warning: var(--act-color-warning);
+  --color-danger: var(--act-color-danger);
+  --color-success: var(--act-color-success);
+
+  --surface: var(--color-surface);
+  --surface-soft: var(--color-surface-subtle);
+  --line: var(--color-border);
+  --line-strong: var(--color-border-strong);
+  --text: var(--color-text);
+  --text-soft: var(--color-text-muted);
+  --text-faint: var(--color-text-faint);
+  --success: var(--color-success);
+  --danger: var(--color-danger);
+
+  --radius-xs: var(--act-radius-xs);
+  --radius-sm: var(--act-radius-sm);
+  --radius-md: var(--act-radius-md);
+  --radius-lg: var(--act-radius-lg);
+  --radius-pill: var(--act-radius-pill);
+
+  --shadow-soft: var(--act-shadow-soft);
+  --shadow-popover: var(--act-shadow-popover);
+
+  --motion-fast: 120ms;
+  --motion-base: 160ms;
+  --motion-slow: 220ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --window-chrome-strip-height: 44px;
+  --window-chrome-left-padding: 86px;
+  --window-chrome-control-size: 22px;
+  --window-chrome-collapsed-left-width: 146px;
+  --window-chrome-collapsed-right-width: 34px;
+
+  --conversation-inline-padding: 32px;
+  --conversation-content-width: 880px;
+  --conversation-card-padding: 16px;
+  --conversation-text-inset: calc(var(--conversation-card-padding) + 1px);
+
+  --scrollbar-thumb: var(--act-scrollbar-thumb);
+  --scrollbar-thumb-hover: var(--act-scrollbar-thumb-hover);
+}
+
+/*
+ * 深色主题：只覆盖 --act-color-* / --act-shadow-* / --act-scrollbar-* 这组源 token。
+ * 因为 tailwind.css 的 @theme inline 与本文件的 legacy alias 都从 --act-* 派生，
+ * 覆盖源 token 即可让所有用语义类 / 语义变量的区域整体翻转。
+ *
+ * - data-theme="dark"：始终深色。
+ * - data-theme="system"：跟随 OS，OS 深色时走下方 @media。
+ *   两块声明刻意重复（CSS 无 mixin），改色板时两处需同步。
+ */
+:root[data-theme="dark"] {
+  color: #f1f1ed;
+  background: #181916;
+
+  --act-color-bg: #181916;
+  --act-color-surface: #242522;
+  --act-color-surface-subtle: #292a26;
+  --act-color-surface-raised: #30312d;
+  --act-color-sidebar: #1e1f1c;
+  --act-color-selected: #30312d;
+  --act-color-sidebar-selected: var(--act-color-selected);
+  --act-color-hover-overlay: #2a2b27;
+
+  --act-color-border: #353630;
+  --act-color-border-strong: #787870;
+  --act-color-meter-track: #3a3b35;
+
+  --act-color-text: #f1f1ed;
+  --act-color-text-muted: #b5b5ae;
+  --act-color-text-faint: #96968f;
+  --act-color-text-subtle: #787870;
+
+  --act-color-action: #f1f1ed;
+  --act-color-action-hover: #dbdbd5;
+  --act-color-on-action: #181916;
+
+  --act-color-operational: #36c783;
+  --act-color-operational-hover: #55d99a;
+  --act-color-operational-soft: #193a2b;
+  --act-color-on-operational: #102119;
+
+  --act-color-info: #6ca6da;
+  --act-color-info-hover: #8ab9e2;
+  --act-color-info-soft: #1e3345;
+  --act-color-on-info: #a9cbe7;
+
+  --act-color-warning: #d2a14d;
+  --act-color-warning-soft: #3e321c;
+  --act-color-on-warning: #e2ba6b;
+
+  --act-color-danger: #e06b6b;
+  --act-color-danger-hover: #ef8585;
+  --act-color-danger-soft: #452525;
+  --act-color-on-danger: #f08a8a;
+  --act-color-on-danger-solid: #181916;
+
+  --act-color-success: #36c783;
+  --act-color-success-soft: #193a2b;
+  --act-color-on-success: #55d99a;
+
+  --act-color-overlay: rgba(0, 0, 0, 0.55);
+
+  --act-color-focus-ring: #c8c8c0;
+  --act-color-operational-focus-ring: #55d99a;
+  --act-color-selection: rgba(200, 200, 192, 0.2);
+
+  --act-color-code-text: #c6d4e6;
+  --act-color-code-bg-top: #1d2024;
+  --act-color-code-bg-bottom: #191c1f;
+  --act-color-code-border: rgba(255, 255, 255, 0.08);
+  --act-color-inline-code-text: #d4d4cd;
+  --act-color-inline-code-bg: rgba(255, 255, 255, 0.06);
+  --act-color-inline-code-border: rgba(255, 255, 255, 0.1);
+  --act-color-quote-border: rgba(200, 200, 192, 0.4);
+  --act-color-table-head-bg: rgba(200, 200, 192, 0.1);
+  --act-color-table-head-text: #d4d4cd;
+
+  --act-color-diff-add-bg: rgba(53, 193, 135, 0.14);
+  --act-color-diff-add-text: #5fd49b;
+  --act-color-diff-remove-bg: rgba(239, 109, 109, 0.16);
+  --act-color-diff-remove-text: #f08a8a;
+  --act-color-diff-streaming-bg: rgba(53, 193, 135, 0.1);
+
+  --act-chart-series-1: #6ca6da;
+  --act-chart-series-2: #70b5be;
+  --act-chart-series-3: #aa96d7;
+  --act-chart-series-4: #df9477;
+  --act-chart-series-5: #55d99a;
+  --act-chart-series-6: #a2aaa9;
+
+  --act-context-system: #a2aaa9;
+  --act-context-tools: #aa96d7;
+  --act-context-rules: #55d99a;
+  --act-context-skills: #e2ba6b;
+  --act-context-summarized: #dc8db4;
+  --act-context-conversation: #dfa06a;
+  --act-context-fallback: #96968f;
+
+  --act-analysis-canvas: #1d1e1c;
+  --act-analysis-selection-soft: #21303d;
+  --act-analysis-user-soft: #202d38;
+  --act-analysis-assistant-soft: #1d3028;
+  --act-analysis-tool-soft: #2a2535;
+  --act-analysis-thinking-soft: #272825;
+
+  --act-gradient-surface-fade: linear-gradient(
+    180deg,
+    #242522 0%,
+    rgba(36, 37, 34, 0.96) 78%,
+    rgba(36, 37, 34, 0) 100%
+  );
+
+  --act-shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.45);
+  --act-shadow-popover: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+  --act-scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
+  --act-scrollbar-thumb-subtle: rgba(255, 255, 255, 0.11);
+  --act-scrollbar-thumb-subtle-hover: rgba(255, 255, 255, 0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    color: #f1f1ed;
+    background: #181916;
+
+    --act-color-bg: #181916;
+    --act-color-surface: #242522;
+    --act-color-surface-subtle: #292a26;
+    --act-color-surface-raised: #30312d;
+    --act-color-sidebar: #1e1f1c;
+    --act-color-selected: #30312d;
+    --act-color-sidebar-selected: var(--act-color-selected);
+    --act-color-hover-overlay: #2a2b27;
+
+    --act-color-border: #353630;
+    --act-color-border-strong: #787870;
+    --act-color-meter-track: #3a3b35;
+
+    --act-color-text: #f1f1ed;
+    --act-color-text-muted: #b5b5ae;
+    --act-color-text-faint: #96968f;
+    --act-color-text-subtle: #787870;
+
+    --act-color-action: #f1f1ed;
+    --act-color-action-hover: #dbdbd5;
+    --act-color-on-action: #181916;
+
+    --act-color-operational: #36c783;
+    --act-color-operational-hover: #55d99a;
+    --act-color-operational-soft: #193a2b;
+    --act-color-on-operational: #102119;
+
+    --act-color-info: #6ca6da;
+    --act-color-info-hover: #8ab9e2;
+    --act-color-info-soft: #1e3345;
+    --act-color-on-info: #a9cbe7;
+
+    --act-color-warning: #d2a14d;
+    --act-color-warning-soft: #3e321c;
+    --act-color-on-warning: #e2ba6b;
+
+    --act-color-danger: #e06b6b;
+    --act-color-danger-hover: #ef8585;
+    --act-color-danger-soft: #452525;
+    --act-color-on-danger: #f08a8a;
+    --act-color-on-danger-solid: #181916;
+
+    --act-color-success: #36c783;
+    --act-color-success-soft: #193a2b;
+    --act-color-on-success: #55d99a;
+
+    --act-color-overlay: rgba(0, 0, 0, 0.55);
+
+    --act-color-focus-ring: #c8c8c0;
+    --act-color-operational-focus-ring: #55d99a;
+    --act-color-selection: rgba(200, 200, 192, 0.2);
+
+    --act-color-code-text: #c6d4e6;
+    --act-color-code-bg-top: #1d2024;
+    --act-color-code-bg-bottom: #191c1f;
+    --act-color-code-border: rgba(255, 255, 255, 0.08);
+    --act-color-inline-code-text: #d4d4cd;
+    --act-color-inline-code-bg: rgba(255, 255, 255, 0.06);
+    --act-color-inline-code-border: rgba(255, 255, 255, 0.1);
+    --act-color-quote-border: rgba(200, 200, 192, 0.4);
+    --act-color-table-head-bg: rgba(200, 200, 192, 0.1);
+    --act-color-table-head-text: #d4d4cd;
+
+    --act-color-diff-add-bg: rgba(53, 193, 135, 0.14);
+    --act-color-diff-add-text: #5fd49b;
+    --act-color-diff-remove-bg: rgba(239, 109, 109, 0.16);
+    --act-color-diff-remove-text: #f08a8a;
+    --act-color-diff-streaming-bg: rgba(53, 193, 135, 0.1);
+
+    --act-chart-series-1: #6ca6da;
+    --act-chart-series-2: #70b5be;
+    --act-chart-series-3: #aa96d7;
+    --act-chart-series-4: #df9477;
+    --act-chart-series-5: #55d99a;
+    --act-chart-series-6: #a2aaa9;
+
+    --act-context-system: #a2aaa9;
+    --act-context-tools: #aa96d7;
+    --act-context-rules: #55d99a;
+    --act-context-skills: #e2ba6b;
+    --act-context-summarized: #dc8db4;
+    --act-context-conversation: #dfa06a;
+    --act-context-fallback: #96968f;
+
+    --act-analysis-canvas: #1d1e1c;
+    --act-analysis-selection-soft: #21303d;
+    --act-analysis-user-soft: #202d38;
+    --act-analysis-assistant-soft: #1d3028;
+    --act-analysis-tool-soft: #2a2535;
+    --act-analysis-thinking-soft: #272825;
+
+    --act-gradient-surface-fade: linear-gradient(
+      180deg,
+      #242522 0%,
+      rgba(36, 37, 34, 0.96) 78%,
+      rgba(36, 37, 34, 0) 100%
+    );
+
+    --act-shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.45);
+    --act-shadow-popover: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+    --act-scrollbar-thumb: rgba(255, 255, 255, 0.16);
+    --act-scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
+    --act-scrollbar-thumb-subtle: rgba(255, 255, 255, 0.11);
+    --act-scrollbar-thumb-subtle-hover: rgba(255, 255, 255, 0.2);
+  }
+}
+
+:root[data-theme="dark"]{color-scheme:dark}:root[data-theme="light"]{color-scheme:light}@media(prefers-color-scheme:dark){:root[data-theme="system"]{color-scheme:dark}}*{box-sizing:border-box}body{margin:0;background:var(--act-color-surface);color:var(--act-color-text);font-family:var(--act-font-ui);-webkit-font-smoothing:antialiased}button,select{font:inherit;color:inherit}button,summary,select{cursor:pointer}button:active,summary:active{transform:translateY(1px)}:focus-visible{outline:2px solid var(--act-color-focus-ring);outline-offset:4px}button{background:none;border:0}header{position:sticky;top:0;z-index:5;background:var(--act-color-surface);border-bottom:1px solid var(--act-color-border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:13px}.brand{font-weight:600}.controls{display:flex;align-items:center;gap:14px}.segmented{display:flex;background:var(--act-color-surface-subtle);border-radius:7px;padding:3px}.segmented button{padding:5px 10px;border-radius:5px;color:var(--act-color-text-muted)}.segmented button[aria-pressed=true]{background:var(--act-color-surface);color:var(--act-color-text);box-shadow:0 1px 3px var(--act-color-border)}select{border:1px solid var(--act-color-border);border-radius:6px;padding:5px;background:var(--act-color-surface)}.shell{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:calc(100vh - 60px)}aside{background:var(--act-color-sidebar);padding:28px 14px;font-size:13px;color:var(--act-color-text-muted)}.side-title{padding:10px;color:var(--act-color-text-faint);font-size:12px}.side-row{padding:10px;border-radius:7px;margin-bottom:3px}.side-row.selected{background:var(--act-color-selected);color:var(--act-color-text)}.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--act-color-operational);margin-right:9px}main{min-width:0}.conversation{width:min(880px,calc(100% - 64px));margin:32px auto 0;padding-bottom:36px}.prompt{padding:14px 16px;border:1px solid var(--act-color-border);border-radius:12px;font-size:16px;line-height:1.65}.body{padding:18px 17px 0}.duration{color:var(--act-color-text-faint);font-size:13px;line-height:22px;margin-bottom:12px}.stream{display:flex;flex-direction:column;gap:5px}.prose{font-size:16px;line-height:1.65;margin:9px 0}.prose p{margin:0}.prose p+p{margin-top:10px}code{font-family:var(--act-font-mono);font-size:.9em;background:var(--act-color-surface-subtle);border-radius:4px;padding:1px 4px}.row{min-width:0;margin:0;font-size:14px;font-weight:400;line-height:22px}.row summary{display:flex;align-items:center;gap:7px;min-width:0;min-height:22px;list-style:none;border-radius:3px}.row summary::-webkit-details-marker{display:none}.action{flex-shrink:0;color:var(--act-color-text-muted)}.target{color:var(--act-color-text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.meta{color:var(--act-color-text-faint);flex-shrink:0;font-variant-numeric:tabular-nums}.arrow{width:12px;height:12px;flex-shrink:0;color:var(--act-color-text-faint);opacity:0;transition:opacity 120ms}.row:hover .arrow,.row[open] .arrow,.row summary:focus-visible .arrow{opacity:1}.row[open] .arrow{transform:rotate(90deg)}.row summary:hover .target{color:var(--act-color-text-muted)}.thinking .action{color:var(--act-color-text-faint)}.detail{margin:7px 0 8px;padding:10px 12px;background:var(--act-color-surface-subtle);border:1px solid var(--act-color-border);border-radius:7px;color:var(--act-color-text-muted);font:13px/1.6 var(--act-font-mono);white-space:pre-wrap;overflow-wrap:anywhere}.thinking .detail{font:14px/1.65 var(--act-font-ui);background:none;border:0;padding:0}.add{color:var(--act-color-diff-add-text)}.remove{color:var(--act-color-diff-remove-text)}.denied .action{color:var(--act-color-on-danger)}.final{margin-top:13px}.composer{margin-top:26px;border:1px solid var(--act-color-border);border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;color:var(--act-color-text-faint);font-size:14px}.send{background:var(--act-color-action);color:var(--act-color-on-action);border-radius:50%;width:28px;height:28px;text-align:center;line-height:28px}.footnote{font-size:12px;color:var(--act-color-text-faint);line-height:1.6;margin:12px 17px 0}.old-only{display:none}[data-mode=before] .old-only{display:inline}[data-mode=before] .new-only{display:none}[data-mode=before] .stream{gap:9px}[data-mode=before] .row .action,[data-mode=before] .row .target{color:var(--act-color-text-muted)}[data-mode=before] .thinking{margin-bottom:17px}[data-mode=before] .read{font-size:16px}[data-mode=before] .bash .action{font-weight:500}[data-mode=before] .bash .old-only{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}[data-mode=before] .row .arrow{opacity:0}[data-mode=before] .prose{margin:2px 0}[data-mode=before] .target{color:var(--act-color-text-muted)}@media(max-width:900px){aside{display:none}.shell{display:block}}@media(max-width:560px){header{padding:10px 14px;flex-wrap:wrap;gap:9px}.controls{width:100%;justify-content:space-between;gap:8px}.conversation{width:calc(100% - 24px);margin-top:20px}.body{padding:16px 8px 0}.brand{font-size:12px}.meta{max-width:100px;overflow:hidden;text-overflow:ellipsis}.footnote{margin-left:8px}.prompt{padding:12px}.prose{font-size:15px}}@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body data-mode="after">
+<header><div class="brand">ActSpace <span style="font-weight:400;color:var(--act-color-text-faint)"> / 消息流排版预览</span></div><div class="controls"><div class="segmented" aria-label="样式比较"><button data-mode="before" aria-pressed="false">调整前 · 示意</button><button data-mode="after" aria-pressed="true">调整后</button></div><select id="theme" aria-label="主题"><option value="light">浅色</option><option value="dark">深色</option><option value="system">跟随系统</option></select></div></header>
+<div class="shell"><aside><div class="side-row">＋ 新建会话</div><div class="side-title">工作区</div><div class="side-row">⌑ wakeup-wiki</div><div class="side-row selected"><span class="dot"></span>工作区写入工具测试文档</div><div class="side-row">图片内容识别</div><div class="side-row">多种编程语言对比</div></aside><main><div class="conversation"><div class="prompt">生成一个 html 文件吧，我来测试打开看看</div><div class="body"><div class="duration">Worked for 13m 27s</div><div class="stream" id="stream"></div><div class="composer"><span>继续补充…</span><span class="send" aria-hidden="true">↑</span></div></div><p class="footnote">可点击每条 Thinking 和工具查看详情。示例内容用于排版预览；“调整前”为截图风格示意，并非产品实时渲染。</p></div></main></div>
+<script>
+const arrow='<svg class="arrow" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="m4 2 4 4-4 4" stroke="currentColor" stroke-width="1.3"/></svg>';
+const esc=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+function row(kind,action,target,detail,meta='',old='') {return `<details class="row ${kind}"><summary><span class="action ${old?'new-only':''}">${action}</span>${old?`<span class="old-only">${esc(old)}</span>`:''}${target?`<span class="target" title="${esc(target)}">${esc(target)}</span>`:''}${meta?`<span class="meta">${meta}</span>`:''}${arrow}</summary><pre class="detail">${esc(detail)}</pre></details>`}
+const thinking=()=>row('thinking','Thinking','','先检查目录约定，再创建示例页面。完成后读取文件首尾，确认写入结果。');
+const prose=s=>`<div class="prose">${s}</div>`;
+document.querySelector('#stream').innerHTML=[
+thinking(),prose('<p>先看一下 <code>Demos/</code> 的现状和约定，避免放错位置或跟已有演示撞名。</p>'),
+row('','Listed','Demos/','README.md\n写入工具测试页.html\n组件样式对照.html\n……共 25 项','25 entries'),
+row('read','Read','Demos/README.md','演示文件应自包含，支持离线打开，并登记到 README 的单文件演示列表。'),
+thinking(),prose('<p><code>Demos/</code> 的约定是：单文件、可离线直接打开，并登记到 <code>README.md</code> 的「单文件演示」列表。</p><p>我做一个自包含的单文件页面，把 Markdown 的源码与渲染结果左右对照，方便检查标题、列表、表格和代码块。</p>'),
+row('','Write','Demos/写入工具测试页-Markdown样式对照.html','新增文件 · 663 行\n\n<!doctype html>\n<html lang="zh-CN">\n  <head><meta charset="utf-8"></head>\n  <body>Markdown 样式对照</body>\n</html>','<span class="add">+663</span>'),
+thinking(),row('','Edit','Demos/README.md','+ [Markdown 样式对照](写入工具测试页-Markdown样式对照.html)','<span class="add">+1</span>'),
+row('bash denied','Denied','wc -l …/Markdown样式对照.html','命令未执行：审批等待超时。\n\n$ wc -l "Demos/写入工具测试页-Markdown样式对照.html"\n\n没有退出码或输出。','审批超时','Denied Approval timed out.'),
+thinking(),row('bash denied','Denied','wc -c …/Markdown样式对照.html','命令未执行：审批等待超时。\n\n$ wc -c "Demos/写入工具测试页-Markdown样式对照.html"','审批超时','Denied Approval timed out.'),
+thinking(),prose('<p><code>bash</code> 这轮需要审批且超时了，我改用 <code>read_file</code> 直接确认落盘内容：</p>'),
+row('read','Read','Demos/写入工具测试页-Markdown样式对照.html','<!doctype html>\n<html lang="zh-CN">\n<head>\n  <meta charset="utf-8">\n  <title>Markdown 样式对照</title>\n</head>','1–8'),
+row('read','Read','Demos/写入工具测试页-Markdown样式对照.html','……\n<\/script>\n</body>\n</html>','636–665'),
+thinking(),prose('<p>文件已完整落盘，结尾也有 <code>&lt;/html&gt;</code>。页面里原先写了「&lt; 30 KB」，这个数字还没验证，我把它改掉：</p>'),
+row('','Edit','Demos/写入工具测试页-Markdown样式对照.html','- <span>小于 30 KB</span>\n+ <span>单文件 · 离线可用</span>','<span class="add">+1</span> <span class="remove">−1</span>'),
+row('bash','Ran','ls -lt Demos/','演示用成功调用\n\n$ ls -lt Demos/\n写入工具测试页-Markdown样式对照.html\nREADME.md\n\n耗时：85 ms\n退出码：0\n沙箱：启用','','Ran Bash completed in 85ms (exit 0, sandboxed=true).'),
+'<div class="prose final"><p><strong>HTML 文件已生成，并已登记到 README。</strong></p><p>打开 <code>Demos/写入工具测试页-Markdown样式对照.html</code>，就能检查源码与渲染结果。</p></div>'
+].join('');
+document.querySelectorAll('button[data-mode]').forEach(button=>button.addEventListener('click',()=>{document.body.dataset.mode=button.dataset.mode;document.querySelectorAll('button[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)))}));
+document.querySelector('#theme').addEventListener('change',e=>document.documentElement.dataset.theme=e.target.value);
+</script></body></html>

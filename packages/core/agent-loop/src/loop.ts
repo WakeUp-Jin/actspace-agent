@@ -23,6 +23,8 @@ import { type CordisContext, type AgentLoopIntervention, type AgentNotification 
 
 export type RunTurnInput = { readonly content: RuntimeV2JsonValue; readonly messageId?: string; readonly agentRunId?: string; readonly model?: string; readonly mode?: RuntimeV2AgentMode; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly keepPendingOnAbort?: boolean; readonly selectedSkillIds?: readonly string[] };
 type LiveIdentity = {
+  readonly parentSessionId?: string;
+  readonly parentCallId?: string;
   readonly sessionId: string;
   readonly agentRunId: string;
   readonly turnId: string;
@@ -98,7 +100,8 @@ export class AgentLoop {
         const preStep = await this.waterfall("agent/pre-step", { agentRunId, turnId, stepId, stepIndex: stepCount, mode }, controller.signal);
         this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "step-started" });
         await this.options.session.append(core("step/start", { turnId, stepId, agentRunId, stepIndex: stepCount, ...(isRecord(preStep) ? { metadata: preStep as RuntimeV2JsonValue } : {}) }));
-        const tools = this.toolDefinitions(mode);
+        const budgetSummary = this.options.descriptor.kind === "subagent" && stepCount === this.options.descriptor.maxSteps;
+        const tools = budgetSummary ? [] : this.toolDefinitions(mode);
         const visibleToolNames = new Set(tools.map((tool) => tool.name));
         let candidate = await this.options.assembler.assembleCandidate({
           sessionId: this.options.session.header.sessionId,
@@ -115,6 +118,7 @@ export class AgentLoop {
         const requestMessages = Object.freeze([
           ...(candidate.renderedSystemPrompt.length > 0 ? [{ role: "system" as const, content: candidate.renderedSystemPrompt }] : []),
           ...await this.requestMessages(candidate.messages),
+          ...(budgetSummary ? [{ role: "user" as const, content: "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete." }] : []),
         ]);
         const requestPlan = await this.waterfall("agent/request", { requestId, turnId, stepId, routeId: this.options.descriptor.routeId, model: input.model ?? this.options.descriptor.model, messages: requestMessages, tools }, controller.signal);
         const requestRecord: Readonly<Record<string, unknown>> = isRecord(requestPlan) ? requestPlan : {};
@@ -127,7 +131,7 @@ export class AgentLoop {
           routeId: requestRouteId,
           model: requestModel,
           messages: requestMessageList,
-          tools: Array.isArray(requestRecord.tools) ? requestRecord.tools as unknown as readonly LlmToolDefinition[] : tools,
+          tools: budgetSummary ? [] : Array.isArray(requestRecord.tools) ? requestRecord.tools as unknown as readonly LlmToolDefinition[] : tools,
           options: { ...(input.thinkingEnabled === undefined ? {} : { reasoning: input.thinkingEnabled }), ...(input.reasoningEffort === undefined ? {} : { reasoningEffort: input.reasoningEffort }) },
           signal: controller.signal,
         });
@@ -184,12 +188,13 @@ export class AgentLoop {
             surface: this.options.session.journal.surface.entries.map((entry) => surfaceMessage(entry.node)),
             hostFacts: { agentRunId, agentMode: mode, hostKind: this.options.host.hostKind, invocationId: this.options.host.invocationId, workspaceRoot: this.options.session.header.cwd ?? this.options.host.workspaceRef ?? this.options.toolEnvironment(this.options.session).workspaceRoot },
             selectedSkillIds: Object.freeze([...(input.selectedSkillIds ?? [])]),
-          }, this.toolDefinitions(mode) as unknown as RuntimeV2JsonValue[], { routeId: this.options.descriptor.routeId, model: input.model ?? this.options.descriptor.model });
+          }, tools as unknown as RuntimeV2JsonValue[], { routeId: this.options.descriptor.routeId, model: input.model ?? this.options.descriptor.model });
           const retryAssembled = await this.waterfall("system-prompt/assemble", candidate, controller.signal);
           if (isRecord(retryAssembled)) candidate = retryAssembled as typeof candidate;
           requestMessageList = Object.freeze([
             ...(candidate.renderedSystemPrompt.length > 0 ? [{ role: "system" as const, content: candidate.renderedSystemPrompt }] : []),
             ...await this.requestMessages(candidate.messages),
+            ...(budgetSummary ? [{ role: "user" as const, content: "Execution budget reached. No more tools are available. Summarize verified findings, unresolved questions and blockers for the parent now. Do not claim unperformed work is complete." }] : []),
           ]);
           requestId = randomUUID();
           activePrepared = this.options.llm.prepareCaptured(prepared.registration, {
@@ -210,7 +215,7 @@ export class AgentLoop {
         if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames);
         await this.options.session.append(core("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
         await this.#checkpoint.enforce(this.options.session, "before-next-step");
-        if (output.toolCalls.length === 0) {
+        if (output.toolCalls.length === 0 && !budgetSummary) {
           await this.serial("agent/turn-stopping", { agentRunId, turnId, reason: "completed", stepCount }, controller.signal);
           await this.options.session.append(core("turn/end", { turnId, reason: "completed" }));
           const usage = compactionUsage(output.usage);
@@ -268,7 +273,8 @@ export class AgentLoop {
       .map((definition) => ({ name: definition.name, definitionVersion: definition.definitionVersion, definitionDigest: definition.definitionDigest, description: definition.description, inputSchema: definition.inputSchema as RuntimeV2JsonValue }));
   }
   private emitLive(event: WithoutSession<AgentLoopLiveEvent>): void {
-    try { this.options.onLiveEvent?.(Object.freeze({ ...event, sessionId: this.options.session.header.sessionId, workspaceRoot: this.options.toolEnvironment(this.options.session).workspaceRoot })); }
+    const lineage = this.options.session.header.lineage;
+    try { this.options.onLiveEvent?.(Object.freeze({ ...event, sessionId: this.options.session.header.sessionId, ...(lineage?.origin === "delegation" ? { parentSessionId: lineage.parentSessionId, parentCallId: lineage.parentCallId } : {}), workspaceRoot: this.options.toolEnvironment(this.options.session).workspaceRoot })); }
     catch { /* Observers must not change execution or journal outcomes. */ }
   }
   private async notify(type: AgentNotification, payload: unknown): Promise<void> {
@@ -296,7 +302,7 @@ export class AgentLoop {
       onExecutionStarted: (call) => {
         this.emitLive({ kind: "tool-started", ...ids, callId: call.callId, name: call.name });
         try { base.onExecutionStarted?.(call); } catch { /* Isolate optional observers. */ }
-      }, notifyAgent: async (content) => { await this.options.inbox.enqueue(content, "next-step"); }, journal: {
+      }, notifyAgent: async (content) => { await this.options.inbox.enqueue(content, "next-step", undefined, "task_notification"); }, journal: {
       recordDispatch: async (fact) => { await this.options.session.append(core("tool-workflow/run-start", fact)); },
       checkpointBeforeBody: async () => { await this.#checkpoint.enforce(this.options.session, "before-tool-body"); },
       commitResult: async (result) => {

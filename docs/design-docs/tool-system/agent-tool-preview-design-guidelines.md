@@ -96,7 +96,7 @@ Read/List/Grep 等轻量组件在失败时显示结果摘要；Bash 保留 denie
 - `previewKind`: `edit_diff`
 - `ToolUiPreview.filePath`: 文件名，例如 `index.ts`
 - `ToolUiPreview.additions` / `deletions`: 结构化修改统计。
-- 流式阶段（dispatched → argsProgress → executing）后端持续推 `tool_call_streaming` + `tool_started`，preview.filePath 从空字符串逐渐变为真实文件名，前端 `MessageBlock.status` 一直是 `running`，渲染为单行 `Edit index.ts` + shimmer 闪光，**不显示** chevron、统计或 content 预览。
+- 流式阶段（dispatched → argsProgress → executing）后端持续推 `tool_call_streaming` + `tool_started`，preview.filePath 从空字符串逐渐变为真实文件名，前端 `MessageBlock.status` 一直是 `running`，渲染为单行 + shimmer 闪光，生成时每秒至多显示一次 `new_string` 的字符量（不包含 `old_string`），prepared 显示“准备保存”，executing 显示“正在保存”，不显示 chevron、增删统计或 content 预览。
 - 为什么不流式 content：edit 的 diff 需要「文件原内容 + old_string 定位 + new_string 替换」三者全齐才能生成有定位的 unified diff，LLM 流式只能拿到 old/new 两段无上下文文本，强行展示会误导用户。Main 共享 preview builder 的 `edit_diff` 分支 只提取 path。
 - 流式 `tool_finished` 后切换为 `status: completed`，渲染折叠态 `Edit index.ts +3 -1 ›`，点击展开完整 diff。
 - diff 由 `diff` 库 `createTwoFilesPatch` 生成（标准 unified diff 格式），包含上下文行。
@@ -112,8 +112,8 @@ Read/List/Grep 等轻量组件在失败时显示结果摘要；Bash 保留 denie
 
 - `previewKind`: `write`
 - `ToolUiPreview.filePath`: 文件名，例如 `config.ts`
-- 当前 v2 Host 不发送 `streamingContent`，参数生成期间只显示 `Write file…`；prepared 后一次显示完整路径。
-- executing 保持稳定摘要与运行状态；finished 补齐 diff、additions/deletions，并可展开结果。
+- 当前 v2 Host 不发送 `streamingContent`；参数生成期间通过 `generationProgress` 每秒至多更新一次 `content` 的字符量（Unicode 码点），不统计路径或 JSON 编码字符；prepared 后一次显示完整路径。
+- prepared 显示“准备保存”，executing 显示“正在保存”；finished 补齐 diff、additions/deletions，并可展开结果。无增量时显示“正在生成”，不伪造计数。
 - diff 由 `diff` 库 `createTwoFilesPatch` 生成，新建时旧内容为空字符串。
 - 磁盘写入仍在 tool execute 阶段原子写入（tmpfile → fsync → rename），**不**在 LLM 流式期间写盘，避免半文件出现或 LLM 重试导致脏写。
 - diff/统计来源、`status` / `errorMessage` 语义、workspace 路径边界检查与 `edit_file` 一致（见上）。
@@ -136,7 +136,8 @@ Read/List/Grep 等轻量组件在失败时显示结果摘要；Bash 保留 denie
 - 折叠态使用 `commandPreview`。
 - 展示：`Running pnpm test`、`Ran pnpm test`、`Denied rm -rf ...`。
 - 完整 `command` 只在展开态展示。
-- `sandboxed: true / false` 分别展示 `沙盒` / `真实环境` badge；renderer 的实时消息转换和 session 恢复必须透传同一个字段。
+- 完成态的普通 `sandboxed: true` 信息放入详情，`sandboxed: false` 的 `真实环境` badge 仍在主行；pending 审批继续显示计划环境。实时和历史恢复透传同一字段，缺失时不推测。
+- 主行只呈现状态动作和命令，耗时、退出码、完整错误与旧标题保留在详情。Main 使用稳定的 Bash 标题；不从 summary 反解析元数据。未执行时不展示遗留输出或成功退出码。
 - 审批 pending 时 badge 表示计划执行环境，最终 preview 以 executor 返回的实际环境覆盖；权限拒绝使用 `notExecuted: true` 展示 `未执行`。
 - hard reject 的模型回填必须明确说明“执行前拒绝、没有创建审批请求”，不能只返回含糊的 dangerous 文案让模型误以为仍可审批。
 
@@ -157,6 +158,7 @@ Read/List/Grep 等轻量组件在失败时显示结果摘要；Bash 保留 denie
 - completed / partial 产生的本地图片由 turn 级 `Artifacts` 组件聚合；组件必须等当前 `agent_run_finished`、最终回复完成后再发布，工具行只表达执行事实，不承担产物浏览。
 - 点击图片必须通过 main/preload 的 Session Artifact 读取通道，renderer 不拼接 `file://`，不从绝对路径直接读盘。
 - 产物行的完整路径只在悬浮 Tooltip 中显示；右键系统操作必须由 main 侧按 session artifacts 或 workspace realpath 边界重新解析，不信任 renderer 传入的绝对路径。
+- 失败或 warning 使用工具行内 bounded disclosure 展示；hover 只作为辅助，不是查看错误的唯一方式。Provider 返回 HTML 或非法 JSON 时先在 main 侧归一化为稳定的 `IMAGE_GENERATION_INVALID_RESPONSE` 错误，不把原始 HTML body 写入 Journal。
 - `tool_finished` 仍按 `toolCallId` 立即更新该行，但它不是发布 turn 级产物的信号；产物栏只消费 completed / partial 的最终图片引用，并将后续成功 Delete 视为对本轮文件输出的撤销。
 
 ### `agent`
@@ -165,6 +167,7 @@ Read/List/Grep 等轻量组件在失败时显示结果摘要；Bash 保留 denie
 - 对外工具名是 `agent`，用户可见名是 `Agent`。
 - `ToolUiPreview` 必须是 `AgentToolPreview`，包含 `description`、`status`、`subagentType`、`displayText`，执行中可带 `recentEvents` 和 `transcriptRef`，完成态带 `summary`、`stats`、`transcriptRef`。
 - 展示：主消息流渲染为可点击 `AgentRunBlock`，而不是普通单行工具日志；点击打开 Composer 上方的 SubAgent transcript panel。
+- `actspace.explore` 与通用 `actspace.agent` 均使用右侧 SubAgent transcript panel；Explore 不在主消息流内联展开。
 - running 更新来自 `RuntimeStreamEvent.subagent_event.preview`。`recentEvents` 只展示最近 3-5 条 transcript 摘要，完整 transcript 通过 `transcriptRef` 读取。
 - 主 session 只持久化 Agent 工具的 `tool_call` / `tool_result` 和最终 preview，不展开写入 SubAgent transcript 内部事件。
 - `modelOutput` 给主 Agent 使用，必须是短 summary + stats + transcript ref；完整 transcript 只服务 UI 回放和排障。

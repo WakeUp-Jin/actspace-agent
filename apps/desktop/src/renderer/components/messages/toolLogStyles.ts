@@ -1,5 +1,5 @@
 export const TOOL_LOG_LINE_CLASS =
-  "tool-log-line relative flex min-w-0 items-center gap-1.5 px-[var(--conversation-text-inset)] text-sm font-normal leading-[1.42] text-text-muted";
+  "tool-log-line relative flex min-w-0 items-center gap-1.5 px-[var(--conversation-text-inset)] text-sm font-normal leading-[22px] text-text-muted";
 
 export const TOOL_LOG_LINE_RUNNING_CLASS = "is-running text-text-main";
 export const TOOL_LOG_LINE_ERROR_CLASS = "is-error text-danger";

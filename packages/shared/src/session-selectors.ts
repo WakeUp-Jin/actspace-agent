@@ -97,6 +97,7 @@ function messageBlockFromToolPreview(
         filePath: preview.filePath,
         range: preview.range,
         displayText: preview.displayText,
+        resultPreview: preview.resultPreview,
         status,
         createdAt: getDisplayTime(timestamp)
       };
@@ -108,6 +109,7 @@ function messageBlockFromToolPreview(
         scope: preview.scope,
         resultCount: preview.resultCount,
         displayText: preview.displayText,
+        resultPreview: preview.resultPreview,
         status,
         createdAt: getDisplayTime(timestamp)
       };
@@ -119,6 +121,7 @@ function messageBlockFromToolPreview(
         scope: preview.scope,
         resultCount: preview.resultCount,
         displayText: preview.displayText,
+        resultPreview: preview.resultPreview,
         status,
         createdAt: getDisplayTime(timestamp)
       };
@@ -130,6 +133,7 @@ function messageBlockFromToolPreview(
         scope: preview.scope,
         resultCount: preview.resultCount,
         displayText: preview.displayText,
+        resultPreview: preview.resultPreview,
         status,
         createdAt: getDisplayTime(timestamp)
       };
@@ -180,6 +184,7 @@ function messageBlockFromToolPreview(
         path: preview.path,
         entryCount: preview.entryCount,
         displayText: preview.displayText,
+        resultPreview: preview.resultPreview,
         status,
         createdAt: getDisplayTime(timestamp)
       };
@@ -194,6 +199,7 @@ function messageBlockFromToolPreview(
         deletions: preview.deletions,
         diff: preview.diff,
         collapsedLines: preview.collapsedLines,
+      generationProgress: preview.generationProgress,
         status: preview.status ?? (isError ? "failed" : undefined),
         approvalRequestId: preview.approvalRequestId,
         errorMessage: preview.errorMessage,
@@ -210,6 +216,7 @@ function messageBlockFromToolPreview(
         deletions: preview.deletions,
         diff: preview.diff,
         collapsedLines: preview.collapsedLines,
+      generationProgress: preview.generationProgress,
         status: preview.status ?? (isError ? "failed" : undefined),
         approvalRequestId: preview.approvalRequestId,
         errorMessage: preview.errorMessage,
@@ -239,6 +246,7 @@ function messageBlockFromToolPreview(
         title: preview.title,
         command: preview.command,
         commandPreview: preview.commandPreview,
+        intent: preview.intent,
         cwd: preview.cwd,
         stdout: preview.stdout,
         stderr: preview.stderr,
@@ -260,6 +268,7 @@ function messageBlockFromToolPreview(
         description: preview.description,
         status: preview.status,
         subagentType: preview.subagentType,
+        agentKind: preview.agentKind,
         displayText: preview.displayText,
         summary: preview.summary,
         recentEvents: preview.recentEvents,

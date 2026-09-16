@@ -119,6 +119,9 @@ declare global {
       describeContext: (
         input: import("@actspace/shared").DescribeContextInput
       ) => Promise<import("@actspace/shared").ContextState | null>;
+      listSessionPage?: (input?: import("@actspace/shared").SessionListPageInput) => Promise<import("@actspace/shared").SessionListPage>;
+      getSessionToolDetail?: (input: { sessionId: string; callId: string }) => Promise<import("@actspace/shared").MessageBlock[]>;
+      getSessionPage?: (input: import("@actspace/shared").SessionMessagePageInput) => Promise<import("@actspace/shared").SessionMessagePage>;
       listSessions: (
         input?: import("@actspace/shared").SessionListInput
       ) => Promise<import("@actspace/shared").SessionListItem[]>;

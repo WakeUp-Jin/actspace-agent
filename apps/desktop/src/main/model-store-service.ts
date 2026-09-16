@@ -27,13 +27,13 @@ export type ModelStoreResult =
 
 export interface ModelStoreServiceOptions {
   settings: SettingsService;
-  findCatalogModel?: (apiModel: string, provider?: "openrouter" | "deepseek") => CatalogModelView | undefined;
+  findCatalogModel?: (apiModel: string, provider?: LlmProviderId) => CatalogModelView | undefined;
   now?: () => Date;
 }
 
 export class ModelStoreService {
   private readonly settings: SettingsService;
-  private readonly findCatalogModel: (apiModel: string, provider?: "openrouter" | "deepseek") => CatalogModelView | undefined;
+  private readonly findCatalogModel: (apiModel: string, provider?: LlmProviderId) => CatalogModelView | undefined;
   private readonly now: () => Date;
 
   constructor(options: ModelStoreServiceOptions) {
@@ -107,7 +107,7 @@ export class ModelStoreService {
     }));
   }
 
-  isCatalogModelAdded(apiModel: string, provider: "openrouter" | "deepseek" = "openrouter"): boolean {
+  isCatalogModelAdded(apiModel: string, provider: LlmProviderId = "openrouter"): boolean {
     const snapshot = this.getModelSnapshot();
     const key = normalizeModelKey(`${provider}:${apiModel}`)!;
     return Boolean(snapshot.installedModels[key]);
@@ -125,9 +125,6 @@ export class ModelStoreService {
   }
 
   async addCatalogModel(provider: LlmProviderId, apiModel: string): Promise<ModelStoreResult> {
-    if (provider !== "openrouter" && provider !== "deepseek") {
-      return { ok: false, code: "invalid_provider", message: "此服务商不支持目录添加。" };
-    }
     const catalog = this.findCatalogModel(apiModel, provider);
     if (!catalog) return { ok: false, code: "model_not_found", message: "目录中未找到该模型，请重新加载。" };
     const key = normalizeModelKey(`${provider}:${catalog.apiModel}`)!;
@@ -141,7 +138,7 @@ export class ModelStoreService {
     return { ok: true, model: this.listInstalledModels().find((item) => item.definition.key === key) };
   }
 
-  async refreshInstalledCatalogModels(provider: "openrouter" | "deepseek" = "openrouter"): Promise<number> {
+  async refreshInstalledCatalogModels(provider: LlmProviderId = "openrouter"): Promise<number> {
     const stored = this.settings.getModelStorageState();
     const updates: Partial<Record<ModelKey, ModelDefinition>> = {};
     for (const [rawKey, current] of Object.entries(stored.customModels)) {
