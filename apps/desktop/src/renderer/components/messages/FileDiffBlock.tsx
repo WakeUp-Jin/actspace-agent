@@ -149,7 +149,7 @@ function FileDiffApprovalCard({
   );
 }
 
-export function FileDiffBlock({ message, className }: { message: FileDiffMessage; className?: string }) {
+export function FileDiffBlock({ message, className, onExpand }: { message: FileDiffMessage; className?: string; onExpand?: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [showFileChangeStats, setShowFileChangeStats] = useState(true);
   const actionLabel = message.kind === "write_diff" ? "Write" : "Edit";
@@ -219,7 +219,7 @@ export function FileDiffBlock({ message, className }: { message: FileDiffMessage
         className="file-diff-toggle"
         type="button"
         aria-expanded={expanded}
-        onClick={() => setExpanded((value) => !value)}
+        onClick={() => { if (!expanded) onExpand?.(); setExpanded((value) => !value); }}
       >
         <span className="file-diff-summary tool-summary-parts">
           <span className="tool-summary-action">{actionLabel}</span>{" "}<span className="tool-summary-target" title={message.filePath}>{message.filePath}</span>{showFileChangeStats && (message.additions > 0 || message.deletions > 0) ? (

@@ -69,12 +69,12 @@ async function submitApproval(requestId: string, decision: ApprovalDecision): Pr
 }
 
 
-export function BashRunBlock({ message, replyCompleted = false }: { message: BashMessage; replyCompleted?: boolean }) {
+export function BashRunBlock({ message, replyCompleted = false, onExpand }: { message: BashMessage; replyCompleted?: boolean; onExpand?: () => void }) {
   if (message.status === "pending") {
     return <BashApprovalBlock message={message} />;
   }
 
-  return <BashExecutionBlock message={message} replyCompleted={replyCompleted} />;
+  return <BashExecutionBlock message={message} replyCompleted={replyCompleted} onExpand={onExpand} />;
 }
 
 const BASH_BACKGROUND_BADGE_CLASS =
@@ -107,7 +107,7 @@ function EnvironmentBadge({ sandboxed, notExecuted }: Pick<BashMessage, "sandbox
   return <span className={BASH_REAL_ENV_BADGE_CLASS}>真实环境</span>;
 }
 
-function BashExecutionBlock({ message, replyCompleted = false }: { message: BashMessage; replyCompleted?: boolean }) {
+function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { message: BashMessage; replyCompleted?: boolean; onExpand?: () => void }) {
   const [expanded, setExpanded] = useState(!replyCompleted && message.status === "failed");
   const chevron = expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />;
   const summary = getExecutionSummary(message);
@@ -123,7 +123,7 @@ function BashExecutionBlock({ message, replyCompleted = false }: { message: Bash
         className={`${BASH_RUN_TOGGLE_CLASS}${["failed", "denied", "expired"].includes(message.status) ? " text-on-danger" : ""}`}
         type="button"
         aria-expanded={expanded}
-        onClick={() => setExpanded((value) => !value)}
+        onClick={() => { if (!expanded) onExpand?.(); setExpanded((value) => !value); }}
       >
         {isActive ? (
           <span

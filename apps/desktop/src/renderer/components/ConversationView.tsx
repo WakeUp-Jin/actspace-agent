@@ -157,11 +157,11 @@ function DeferredToolMessage({ message, className, onOpenAgentTranscript, replyC
     catch (e) { setError(e instanceof Error ? e.message : '工具详情加载失败'); }
     finally { setLoading(false); }
   };
-  return <div className={className}>
-    {blocks ? blocks.map(block => renderMessage(block, undefined, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)) : <>
-      <button type="button" className="py-1 text-xs text-text-muted" disabled={loading} onClick={() => { void load(); }}>{loading ? '正在加载工具详情…' : '展开完整工具结果'}</button>
-      {error && <p role="alert" className="text-xs text-text-muted">{error}</p>}
-    </>}
+  const visible = blocks ?? [{ ...message, deferredToolDetail: undefined }];
+  return <div className={className} aria-busy={loading}>
+    {visible.map(block => renderMessage({ ...block, renderKey: block.id === message.id ? message.renderKey : block.renderKey }, undefined, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile, blocks ? undefined : () => { void load(); }))}
+    {loading && <p role="status">正在加载工具详情…</p>}
+    {error && <p role="alert" className="text-xs text-text-muted">{error}（收起后重新展开可重试）</p>}
   </div>;
 }
 
@@ -172,9 +172,11 @@ export function renderMessage(
   replyCompleted = false,
   onOpenReadFile?: (message: ReadMessageBlock) => void,
   onOpenWorkspaceFile?: (path: string) => void,
+  onExpand?: () => void,
 ) {
   const renderKey = message.renderKey ?? message.id;
-  if (message.deferredToolDetail) return <DeferredToolMessage key={renderKey} message={message} className={className} onOpenAgentTranscript={onOpenAgentTranscript} replyCompleted={replyCompleted} onOpenReadFile={onOpenReadFile} onOpenWorkspaceFile={onOpenWorkspaceFile} />;
+  // Child-session cards already have a compact summary and their own detail panel.
+  if (message.deferredToolDetail && message.kind !== "agent") return <DeferredToolMessage key={renderKey} message={message} className={className} onOpenAgentTranscript={onOpenAgentTranscript} replyCompleted={replyCompleted} onOpenReadFile={onOpenReadFile} onOpenWorkspaceFile={onOpenWorkspaceFile} />;
 
   switch (message.kind) {
     case "user":
@@ -186,7 +188,7 @@ export function renderMessage(
     case "agent":
       return <AgentRunBlock key={renderKey} message={message} className={className} onOpenTranscript={onOpenAgentTranscript} />;
     case "bash":
-      return <BashRunBlock key={renderKey} message={message} replyCompleted={replyCompleted} />;
+      return <BashRunBlock key={renderKey} message={message} replyCompleted={replyCompleted} onExpand={onExpand} />;
     case "context_compaction":
       return <CompactCommandBlock key={renderKey} message={message} className={className} />;
     case "workspace_preparation":
@@ -210,7 +212,7 @@ export function renderMessage(
       if (message.kind === "tool" && message.approvalScope === "browser_session" && message.status === "pending") {
         return <BrowserApprovalBlock key={renderKey} message={message} className={className} />;
       }
-      return <ToolLogLine key={renderKey} message={message} className={className} onOpenFile={onOpenReadFile} />;
+      return <ToolLogLine key={renderKey} message={message} className={className} onOpenFile={onOpenReadFile} onExpand={onExpand} />;
     case "status":
       if (message.id.endsWith(":model-wait") || message.id === "model-wait") {
         return <ModelWaitingStatus key={renderKey} content={message.content} />;
@@ -225,7 +227,7 @@ export function renderMessage(
       );
     case "edit_diff":
     case "write_diff":
-      return <FileDiffBlock key={renderKey} message={message} className={className} />;
+      return <FileDiffBlock key={renderKey} message={message} className={className} onExpand={onExpand} />;
   }
 }
 

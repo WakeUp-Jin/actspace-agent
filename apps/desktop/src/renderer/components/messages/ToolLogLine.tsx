@@ -129,16 +129,18 @@ function WebToolBlock({
   status,
   resultUrls,
   contentPreview,
+  onExpand,
   className,
 }: {
   displayText: string;
   status: ToolLogStatus;
   resultUrls?: string[];
   contentPreview?: string;
+  onExpand?: () => void;
   className?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const hasContent = (resultUrls && resultUrls.length > 0) || !!contentPreview;
+  const hasContent = (resultUrls && resultUrls.length > 0) || !!contentPreview || !!onExpand;
 
   if (status === "running" || !hasContent) {
     return (
@@ -154,7 +156,7 @@ function WebToolBlock({
         className="web-tool-toggle"
         type="button"
         aria-expanded={expanded}
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => { if (!expanded) onExpand?.(); setExpanded((v) => !v); }}
       >
         <span className="web-tool-summary">{displayText}</span>
         {expanded
@@ -166,7 +168,7 @@ function WebToolBlock({
           <pre className="web-tool-content">{contentPreview}</pre>
         ) : (
           <ul className="web-tool-url-list">
-            {resultUrls!.map((url, i) => (
+            {resultUrls?.map((url, i) => (
               <li key={`${url}-${i}`} className="web-tool-url-item">
                 <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>
               </li>
@@ -182,7 +184,7 @@ function ToolSummary({ action, target, meta }: { action: string; target: string;
   return <span className="tool-summary-parts"><span className="tool-summary-action">{action}</span>{" "}<span className="tool-summary-target" title={target}>{target}</span>{meta ? <> <span className="tool-summary-meta">{meta}</span></> : null}</span>;
 }
 
-function ResultPreviewBlock({ displayText, status, resultPreview, className, onOpenFile, detail, summaryContent }: {
+function ResultPreviewBlock({ displayText, status, resultPreview, className, onOpenFile, detail, summaryContent, onExpand }: {
   displayText: string;
   status: ToolLogStatus;
   resultPreview?: string[];
@@ -190,22 +192,23 @@ function ResultPreviewBlock({ displayText, status, resultPreview, className, onO
   onOpenFile?: () => void;
   detail?: string;
   summaryContent?: ReactNode;
+  onExpand?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const canOpenFile = onOpenFile && (status === "completed" || status === undefined);
   const summary = canOpenFile ? (
     <button className="tool-file-link" type="button" onClick={onOpenFile}>{summaryContent ?? displayText}</button>
   ) : <span {...getToolLogLineTextProps(status, displayText)}>{status === "running" ? displayText : summaryContent ?? displayText}</span>;
-  const detailItems = status === "completed"
+  const detailItems = status === "completed" || status === undefined
     ? resultPreview?.length ? resultPreview : detail ? [detail] : []
     : detail ? [detail] : [];
-  if (status === "running" || !detailItems.length) {
+  if (status === "running" || (!detailItems.length && !onExpand)) {
     return <div className={`${getToolLogLineClass(status, className)} tool-result-line`}>{summary}</div>;
   }
   return <article className={`tool-result-disclosure${className ? ` ${className}` : ""}`}>
     <div className="tool-result-header">
       {canOpenFile ? summary : null}
-      <button className="tool-result-toggle" type="button" aria-label={canOpenFile ? `Show result for ${displayText}` : undefined} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+      <button className="tool-result-toggle" type="button" aria-label={canOpenFile ? `Show result for ${displayText}` : undefined} aria-expanded={expanded} onClick={() => { if (!expanded) onExpand?.(); setExpanded((value) => !value); }}>
         {canOpenFile ? null : <span className="tool-result-summary">{summaryContent ?? displayText}</span>}
         {expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />}
       </button>
@@ -214,19 +217,19 @@ function ResultPreviewBlock({ displayText, status, resultPreview, className, onO
   </article>;
 }
 
-export function ToolLogLine({ message, className, onOpenFile }: { message: ToolLogMessage; className?: string; onOpenFile?: (message: Extract<MessageBlock, { kind: "read" }>) => void }) {
+export function ToolLogLine({ message, className, onOpenFile, onExpand }: { onExpand?: () => void; message: ToolLogMessage; className?: string; onOpenFile?: (message: Extract<MessageBlock, { kind: "read" }>) => void }) {
   if (message.kind === "read") {
     const text = message.status && message.status !== "running" && message.status !== "completed" ? message.displayText : `Read ${message.filePath}${message.range ? ` ${message.range}` : ""}`;
-    return <ResultPreviewBlock displayText={text} summaryContent={(!message.status || message.status === "completed") ? <ToolSummary action="Read" target={message.filePath} meta={message.range} /> : undefined} status={message.status} resultPreview={message.resultPreview} className={className} onOpenFile={onOpenFile ? () => onOpenFile(message) : undefined} />;
+    return <ResultPreviewBlock onExpand={onExpand} displayText={text} summaryContent={(!message.status || message.status === "completed") ? <ToolSummary action="Read" target={message.filePath} meta={message.range} /> : undefined} status={message.status} resultPreview={message.resultPreview} className={className} onOpenFile={onOpenFile ? () => onOpenFile(message) : undefined} />;
   }
 
   if (message.kind === "search") {
     const text = `Searched files ${message.scope ? `${message.scope} ` : ""}for ${message.query}`;
-    return <ResultPreviewBlock displayText={text} summaryContent={<ToolSummary action="Searched files" target={`${message.scope ? `${message.scope} ` : ""}for ${message.query}`} />} status={message.status} resultPreview={message.resultPreview} className={className} />;
+    return <ResultPreviewBlock onExpand={onExpand} displayText={text} summaryContent={<ToolSummary action="Searched files" target={`${message.scope ? `${message.scope} ` : ""}for ${message.query}`} />} status={message.status} resultPreview={message.resultPreview} className={className} />;
   }
 
   if (message.kind === "grep") {
-    if (message.resultPreview?.length) return <ResultPreviewBlock displayText={`Grep ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} summaryContent={<ToolSummary action="Grep" target={`${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} />} status={message.status} resultPreview={message.resultPreview} className={className} />;
+    if (message.resultPreview?.length || onExpand) return <ResultPreviewBlock onExpand={onExpand} displayText={`Grep ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} summaryContent={<ToolSummary action="Grep" target={`${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} />} status={message.status} resultPreview={message.resultPreview} className={className} />;
     return (
       <OverflowToolLine
         className={getToolLogLineClass(message.status, className)}
@@ -237,7 +240,7 @@ export function ToolLogLine({ message, className, onOpenFile }: { message: ToolL
   }
 
   if (message.kind === "glob") {
-    if (message.resultPreview?.length) return <ResultPreviewBlock displayText={`Glob ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} summaryContent={<ToolSummary action="Glob" target={`${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} />} status={message.status} resultPreview={message.resultPreview} className={className} />;
+    if (message.resultPreview?.length || onExpand) return <ResultPreviewBlock onExpand={onExpand} displayText={`Glob ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} summaryContent={<ToolSummary action="Glob" target={`${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} />} status={message.status} resultPreview={message.resultPreview} className={className} />;
     return (
       <OverflowToolLine
         className={getToolLogLineClass(message.status, className)}
@@ -250,6 +253,7 @@ export function ToolLogLine({ message, className, onOpenFile }: { message: ToolL
   if (message.kind === "web_search") {
     return (
       <WebToolBlock
+        onExpand={onExpand}
         displayText={message.displayText}
         status={message.status}
         resultUrls={message.resultUrls}
@@ -290,12 +294,12 @@ export function ToolLogLine({ message, className, onOpenFile }: { message: ToolL
       : message.status === "failed"
         ? "failed"
         : "completed";
-    return <ResultPreviewBlock displayText={text} status={status} detail={message.errorMessage ?? message.warning} className={className} />;
+    return <ResultPreviewBlock onExpand={onExpand} displayText={text} status={status} detail={message.errorMessage ?? message.warning} className={className} />;
   }
 
   if (message.kind === "directory_list") {
     const text = message.status && message.status !== "running" && message.status !== "completed" ? message.displayText : `Listed ${message.path}${message.entryCount !== undefined ? ` (${message.entryCount} entries)` : ""}`;
-    return <ResultPreviewBlock displayText={text} summaryContent={(!message.status || message.status === "completed") ? <ToolSummary action="Listed" target={message.path} meta={message.entryCount !== undefined ? `(${message.entryCount} entries)` : undefined} /> : undefined} status={message.status} resultPreview={message.resultPreview} className={className} />;
+    return <ResultPreviewBlock onExpand={onExpand} displayText={text} summaryContent={(!message.status || message.status === "completed") ? <ToolSummary action="Listed" target={message.path} meta={message.entryCount !== undefined ? `(${message.entryCount} entries)` : undefined} /> : undefined} status={message.status} resultPreview={message.resultPreview} className={className} />;
   }
 
   if (message.kind === "delete") {
