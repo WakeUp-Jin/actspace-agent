@@ -396,7 +396,8 @@ function workDurationMs(workItems: MessageBlock[], finalReply: MessageBlock[]): 
 type AgentTranscriptHandler = (message: AgentMessageBlock) => void;
 
 function renderMessageList(messages: MessageBlock[], onOpenAgentTranscript?: AgentTranscriptHandler, replyCompleted = false, onOpenReadFile?: (message: ReadMessageBlock) => void, onOpenWorkspaceFile?: (path: string) => void) {
-  return messages.map((message) =>
+  // Preserve message/usage data, but do not give empty assistant text a prose gap.
+  return messages.filter((message) => message.kind !== "assistant" || message.content.trim().length > 0).map((message) =>
     <div key={message.renderKey ?? message.id} className="message-flow-item" data-flow-kind={messageFlowKind(message)}>
       {renderMessage(message, undefined, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)}
     </div>,

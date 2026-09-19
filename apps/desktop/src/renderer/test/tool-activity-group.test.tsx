@@ -100,6 +100,26 @@ function renderConversation(messages: MessageBlock[], isStreaming = false) {
 }
 
 describe("ToolActivityGroup in ConversationView", () => {
+  it("keeps tools adjacent to Thinking when a provider emits no assistant text", async () => {
+    const reasoning = "First paragraph.\n\nSecond paragraph.\n";
+    const messages: MessageBlock[] = [
+      toolTurn[0],
+      { ...toolTurn[3], content: reasoning } as MessageBlock,
+      { kind: "assistant", id: "empty-text", content: " \n\t", createdAt: toolTurn[3].createdAt },
+      toolTurn[2],
+      toolTurn[5],
+    ];
+    const { container } = renderConversation(messages);
+    await userEvent.click(screen.getByRole("button", { name: /Worked for/ }));
+    const thinking = screen.getByRole("button", { name: "Thought 2s" });
+    const row = thinking.closest(".message-flow-item")!;
+    expect(row.nextElementSibling?.getAttribute("data-flow-kind")).toBe("process");
+    expect(container.querySelectorAll(".assistant-reply")).toHaveLength(1);
+    await userEvent.click(thinking);
+    expect(row.querySelector("pre")?.textContent).toBe(reasoning);
+    expect(screen.getByText("项目是 monorepo 结构，这是最终结论。").isConnected).toBe(true);
+  });
+
   it("collapses the whole process under one Worked toggle and keeps the final reply outside", async () => {
     const user = userEvent.setup();
     renderConversation(toolTurn);

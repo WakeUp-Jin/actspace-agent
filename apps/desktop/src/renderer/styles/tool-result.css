@@ -143,7 +143,7 @@
 .message-flow > [data-flow-kind="prose"] + [data-flow-kind="process"] { margin-top: var(--flow-prose-gap); }
 .message-flow > [data-flow-kind="prose"] + [data-flow-kind="prose"] { margin-top: var(--flow-paragraph-gap); }
 .message-flow > .message-flow-final { margin-top: var(--flow-final-gap); }
-.message-flow > [data-flow-kind="process"]:has([aria-expanded="true"]) { padding-bottom: var(--flow-detail-tail); }
+.message-flow > [data-flow-kind="process"]:has([aria-expanded="true"]):not(:has(.thinking-block)) { padding-bottom: var(--flow-detail-tail); }
 /* Diff owns its output rendering; these overrides concern only the tool header. */
 .file-diff-block { margin-top: 0; }
 .file-diff-toggle { display: flex; line-height: 22px; }
@@ -156,7 +156,7 @@
 .tool-result-header, .tool-result-line { font-size: 14px; line-height: 22px; }
 
 .transcript-message-flow { gap: var(--flow-process-gap); }
-.transcript-message-flow > :has([aria-expanded="true"]) { padding-bottom: var(--flow-detail-tail); }
+.transcript-message-flow > :has([aria-expanded="true"]):not(.thinking-block):not(:has(.thinking-block)) { padding-bottom: var(--flow-detail-tail); }
 .web-tool-block { margin-top: 0; }
 .web-tool-toggle { display: flex; line-height: 22px; }
 .web-tool-content, .web-tool-url-list { margin-top: 7px; }
