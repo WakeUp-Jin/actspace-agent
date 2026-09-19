@@ -1,47 +1,51 @@
 ---
-title: Skills
-description: 用版本化的 SKILL.md 为 Agent 增加可发现、可阅读和可复用的工作流程。
-group: guides
-order: 2
-updatedAt: 2026-07-27
+title: "Skills"
+description: "将可复用的工作方法放入项目，让 Agent 按需读取和执行。"
+group: "extensions"
+order: 1
+updatedAt: 2026-09-19
 draft: false
 ---
 
-Skill 是一组版本化的工作说明与辅助资产。它告诉 Agent 在某类任务中应该读取什么、遵守哪些步骤，以及优先复用哪些脚本或模板。
+Skill 是一个包含 `SKILL.md` 的目录，用来保存任务说明、参考材料和脚本。适合复用团队约定、报告格式或重复操作流程。
 
-## 为什么使用 Skill
+## 创建一个项目 Skill
 
-把所有规则都塞进系统提示词会增加每次请求的 Token，也会让无关任务受到干扰。Skill 通过“先发现目录，再按任务读取完整说明”的方式，把专业流程延迟到真正需要时加载。
+在工作区中创建 `.agents/skills/project-guide/SKILL.md`：
 
-## 发现位置
+```markdown
+---
+name: project-guide
+description: 阅读项目结构并整理启动与测试方法时使用。
+---
 
-ActSpace 会从约定目录发现 Skills，包括工作区内的 `.actspace/skills`、`.agents/skills` 与 `.claude/skills`。具体优先级由 Runtime 的 skill loader 统一处理。
-
-一个 Skill 的入口是 `SKILL.md`。它可以继续引用：
-
-- `scripts/` 中的可执行辅助程序。
-- `references/` 中的领域资料。
-- `templates/` 或 `assets/` 中的复用资源。
-
-## 渐进式读取
-
-模型先看到 Skill 的名称和简短描述。当任务触发某个 Skill 时，再读取完整 `SKILL.md`，并只按其中的路由打开必要资源。
-
-被选择的说明文件应完整读取，不能只截取一部分规则后开始行动。
-
-## 一个简单结构
-
-```text
-.agents/skills/my-workflow/
-├── SKILL.md
-├── scripts/
-│   └── verify.sh
-└── templates/
-    └── report.md
+先读取 README 和项目配置。
+列出启动命令、测试命令和主要目录。
+无法从文件确认的内容直接标明，不猜测。
 ```
 
-`SKILL.md` 应说明触发场景、工作步骤、输入输出和安全边界。容易漂移的事实应尽量由脚本或仓库文件提供，而不是写死在描述里。
+`name` 和 `description` 是发现 Skill 所需的信息。较长的材料可以放入相邻 `references/`，脚本放入 `scripts/`，由说明文件指出何时读取或执行。
 
-## Skills 与工具
+<figure class="product-shot screenshot-placeholder" data-screenshot="skill-file.png">
+<figcaption><span class="screenshot-label">待补实拍 · 23</span><strong>Skill 文件与指令</strong><code>skill-file.png</code><p>打开前一张所选 Skill 的 SKILL.md，能读清 name、description 和关键指令</p></figcaption>
+</figure>
 
-工具是 Runtime 能执行的原子能力；Skill 是指导 Agent 如何组合能力的流程知识。Skill 可以要求使用 Browser、Bash 或文件工具，但不会绕过这些工具原有的参数验证和审批边界。
+## 放在哪个目录
+
+项目目录支持 `.actspace/skills/`、`.agents/skills/` 和 `.claude/skills/`。用户级目录还包括应用数据目录下的 `skills/`、`.actspace/skills/`，以及用户主目录下的 `.agents/skills/`、`.claude/skills/`。
+
+同名 Skill 按扫描优先级保留一个版本，项目级优先于用户级。每个 Skill 应直接放在扫描根的一级子目录中，避免额外嵌套导致无法发现。
+
+<figure class="product-shot screenshot-placeholder" data-screenshot="skills-library.png">
+<figcaption><span class="screenshot-label">待补实拍 · 22</span><strong>已安装的 Skills</strong><code>skills-library.png</code><p>扩展 → Skills，展示真实已安装 Skill、状态和安装/刷新入口</p></figcaption>
+</figure>
+
+## 在任务中使用
+
+在输入框选择 Skill，或在任务中明确指出要使用的 Skill 和处理对象。Agent 先看到简短描述，需要时才读取完整说明和参考材料，避免每次请求都带入所有内容。
+
+Skill 中写出的要求不会自动扩大工具权限。脚本仍要通过工具执行，受[模式与审批](../tools-and-approvals/)约束。找不到 Skill 时，检查目录层级、文件名和 frontmatter，确认当前会话使用的是正确工作区。
+
+<figure class="product-shot screenshot-placeholder" data-screenshot="skill-invocation.png">
+<figcaption><span class="screenshot-label">待补实拍 · 05</span><strong>选择 Skill 并准备任务</strong><code>skill-invocation.png</code><p>在输入框选中一个已安装的真实 Skill，并写好与它匹配的任务；发送前截图</p></figcaption>
+</figure>

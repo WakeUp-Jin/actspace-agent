@@ -1,0 +1,35 @@
+---
+title: "文件读写与检索"
+description: "让 Agent 按目录、文件名和内容找到目标，再完成有依据的修改。"
+group: "tools-execution"
+order: 1
+updatedAt: 2026-09-19
+draft: false
+---
+
+文件工具围绕当前工作区工作。你可以直接描述要寻找的内容，也可以给出相对路径来缩小范围。
+
+## 先定位，再读取
+
+- 列目录用于了解项目结构。
+- Glob 按文件名和路径模式寻找候选文件，例如 `src/**/*.ts`。
+- Grep 按文本内容检索，适合找函数名、错误文案或配置项。
+- Read 读取目标文件，作为后续分析和修改的依据。
+
+例如：“在 src 里找到处理登录失败的代码，读一下相关函数和测试，先解释原因。”比“看看整个项目哪里有问题”更容易得到可复核的结果。
+
+## 修改文件
+
+Agent 模式可以使用 Write 创建或写入文件，使用 Edit 修改已有内容。执行仍受工作区、模式和权限限制；工具返回拒绝或冲突时，应先重新确认文件和依据。
+
+你与 Agent 同时编辑一个文件时，磁盘内容可能变化。遇到内容不匹配，不要反复要求强行覆盖，让 Agent 重新读取最新文件再调整。
+
+<figure class="product-shot screenshot-placeholder" data-screenshot="tool-execution.png">
+<figcaption><span class="screenshot-label">待补实拍 · 03</span><strong>文件修改与执行过程</strong><code>tool-execution.png</code><p>让 Agent 修改示例文件并运行已有测试，在运行时截取；若很快完成，保留展开的执行过程即可</p></figcaption>
+</figure>
+
+## 查看实际结果
+
+点击工具中的文件入口进入[文件预览](../file-preview/)，修改后到[代码审阅](../review/)查看差异。工具输出过长时，界面可能折叠或提供完整输出回读入口；摘要不能代替完整文件内容。
+
+如果路径不存在，先检查当前[工作区或 Worktree](../workspaces/)是否正确。文件能在你的另一个编辑器中打开，并不代表当前会话正使用同一个目录。

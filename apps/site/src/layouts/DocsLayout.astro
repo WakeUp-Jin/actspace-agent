@@ -1,0 +1,84 @@
+---
+import {render} from 'astro:content';
+import BaseLayout from './BaseLayout.astro';
+import {getPublicDocs,docsGroups,docsHref,type DocsEntry} from '../lib/docs-navigation';
+import {sitePath} from '../lib/site-path';
+import '../styles/prose.css';
+interface Props {entry:DocsEntry; welcome?:boolean;}
+const {entry,welcome=false}=Astro.props;
+const docs=await getPublicDocs();const {Content,headings}=await render(entry);
+---
+<BaseLayout title={`${welcome?'ActSpace 文档':entry.data.title} — ActSpace`} description={entry.data.description}>
+<main id="main-content" class="docs-layout">
+<aside class="docs-sidebar">
+<details open>
+<summary>文档目录</summary>
+<nav aria-label="文档目录">{docsGroups.map(group=>
+<div class="docs-group">
+<p>{group.label}</p>{docs.filter(doc=>doc.data.group===group.id).map(doc=>
+<a href={sitePath(docsHref(doc))} aria-current={doc.id===entry.id?'page':undefined}>{doc.data.title}</a>)}</div>)}</nav>
+</details>
+</aside>
+<article class="docs-article">
+<header>
+<p class="docs-breadcrumb">文档 / {docsGroups.find(g=>g.id===entry.data.group)?.label}</p>
+<h1>{welcome?'ActSpace 文档':entry.data.title}</h1>
+<p class="docs-lead">{entry.data.description}</p>
+</header>
+<div class="docs-prose">
+<Content/>
+</div>
+</article>
+<aside class="docs-toc">
+<nav aria-label="本页目录">{headings.filter(h=>h.depth===2||h.depth===3).map(h=>
+<a href={`#${h.slug}`} class:list={{nested:h.depth===3}}>{h.text}</a>)}</nav>
+<button data-copy-page aria-live="polite">▢ 复制页面</button>
+</aside>
+</main>
+</BaseLayout>
+<script>
+const directory=document.querySelector<HTMLDetailsElement>('.docs-sidebar details');
+const narrowDirectory=matchMedia('(max-width:760px)');
+const syncDirectory=()=>{if(directory)directory.open=!narrowDirectory.matches;};
+syncDirectory();
+narrowDirectory.addEventListener('change',syncDirectory);
+import {initializeDocsCopy} from '../scripts/docs-copy';initializeDocsCopy();
+document.querySelector<HTMLButtonElement>('[data-copy-page]')?.addEventListener('click',async event=>{const button=event.currentTarget as HTMLButtonElement;try{await navigator.clipboard.writeText(document.querySelector<HTMLElement>('.docs-article')?.innerText??'');button.textContent='已复制'}catch{button.textContent='复制失败，请手动选择正文'}setTimeout(()=>button.textContent='▢ 复制页面',2200)});
+</script>
+<style>
+.docs-layout{display:grid;grid-template-columns:240px minmax(0,1fr) 200px;min-height:calc(100vh - var(--site-header-height));max-width:1800px;margin:auto}.docs-sidebar{background:var(--surface);border-right:1px solid var(--line);padding:36px 20px;position:sticky;top:var(--site-header-height);height:calc(100vh - var(--site-header-height));overflow:auto}.docs-sidebar summary{display:none}.docs-group{margin-bottom:40px}.docs-group p{font-size:13px;color:var(--muted);margin:0 10px 14px}.docs-group a{display:block;padding:8px 10px;border-radius:6px;font-size:14px;line-height:1.5}.docs-group a:hover{background:var(--line);text-decoration:none}.docs-group a[aria-current=page]{color:var(--site-focus);font-weight:500}.docs-article{padding:72px clamp(32px,5vw,88px) 100px;min-width:0;width:100%;max-width:1000px;margin:auto}.docs-breadcrumb{font-size:13px;color:var(--muted)}.docs-article h1{font-size:34px;line-height:1.3;font-weight:500;margin:18px 0 36px}.docs-lead{font-size:18px;line-height:1.8;margin-bottom:28px}.docs-toc{position:sticky;top:var(--site-header-height);align-self:start;padding:56px 24px 24px 0;font-size:13px;max-height:calc(100vh - var(--site-header-height));overflow:auto}.docs-toc a{display:block;color:var(--body);padding:8px;border-radius:5px;line-height:1.5}.docs-toc a:hover{background:var(--surface)}.docs-toc .nested{padding-left:20px}.docs-toc button{border:0;border-top:1px solid var(--line);background:none;color:var(--muted);padding:18px 8px;margin-top:20px;text-align:left;width:100%}@media(max-width:1200px){.docs-layout{grid-template-columns:220px minmax(0,1fr)}.docs-toc{grid-column:2;grid-row:1;justify-self:end;position:static;padding:20px 32px 0;z-index:1}.docs-toc nav{display:none}.docs-toc button{margin:0;border:0;padding:0}.docs-article{grid-column:2;grid-row:1;padding-top:96px}}@media(max-width:760px){.docs-layout{display:block}.docs-sidebar{position:static;height:auto;padding:16px 24px;border:0;border-bottom:1px solid var(--line)}.docs-sidebar summary{display:block;cursor:pointer;font-size:14px}.docs-sidebar nav{padding-top:24px}.docs-group{margin-bottom:24px}.docs-article{padding:40px 24px 64px}.docs-toc{padding:0 24px 24px}.docs-article h1{font-size:30px}}
+.docs-sidebar {
+  --sidebar-scroll-thumb: var(--site-line);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sidebar-scroll-thumb) transparent;
+}
+.docs-sidebar:hover,
+.docs-sidebar:focus-within {
+  --sidebar-scroll-thumb: var(--site-line-strong);
+}
+@supports selector(::-webkit-scrollbar) {
+  .docs-sidebar {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+  .docs-sidebar::-webkit-scrollbar { width: 8px; height: 8px; }
+  .docs-sidebar::-webkit-scrollbar-track,
+  .docs-sidebar::-webkit-scrollbar-corner { background: transparent; }
+  .docs-sidebar::-webkit-scrollbar-thumb {
+    background: var(--sidebar-scroll-thumb);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    min-height: 40px;
+  }
+  .docs-sidebar::-webkit-scrollbar-thumb:hover { background-color: var(--site-muted); }
+  .docs-sidebar::-webkit-scrollbar-button { display: none; }
+}
+@media (max-width: 760px) {
+  .docs-sidebar { scrollbar-gutter: auto; }
+}
+@media (forced-colors: active) {
+  .docs-sidebar { scrollbar-color: auto; scrollbar-width: thin; }
+}
+</style>

@@ -1,5 +1,7 @@
 ---
 import "../styles/global.css";
+import "../styles/media.css";
+import MediaViewer from "../components/MediaViewer.astro";
 import SeoHead from "../components/SeoHead.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import SiteHeader from "../components/SiteHeader.astro";
@@ -16,28 +18,22 @@ const { title, description, heroHeader = false, image, type = "website" } = Astr
 ---
 
 <!doctype html>
-<html lang="zh-CN" data-theme="system">
+<html lang="zh-CN" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}brand/favicon.svg`} />
     <SeoHead {title} {description} {image} {type} />
     <slot name="head" />
-    <script is:inline>
-      (() => {
-        document.documentElement.classList.add("js");
-        const storedTheme = localStorage.getItem("actspace-site-theme");
-        const theme = storedTheme === "light" || storedTheme === "dark" ? storedTheme : "system";
-        document.documentElement.dataset.theme = theme;
-      })();
-    </script>
+
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
     <SiteHeader hero={heroHeader} />
     <slot />
-    <SiteFooter />
+    <MediaViewer/>
+    {!Astro.url.pathname.includes('/docs/') && <SiteFooter />}
   </body>
 </html>

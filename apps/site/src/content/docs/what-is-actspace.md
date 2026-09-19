@@ -1,56 +1,39 @@
 ---
-title: ActSpace 是什么
-description: 理解 ActSpace 作为本地 Agent 桌面应用与 Harness 的定位、边界和设计原则。
-group: getting-started
+title: "ActSpace 是什么"
+description: "给模型一个能够读取文件、调用工具并推进任务的本地工作空间。"
+group: "getting-started"
 order: 1
-updatedAt: 2026-07-27
+updatedAt: 2026-09-19
 draft: false
 ---
 
-ActSpace 来自 **Act + Space**：给模型一个能够读取上下文、调用工具并在权限边界内完成工作的运行空间。
+ActSpace 是一个桌面 Agent 应用。选定本地目录、连接模型后，你可以让它理解项目、修改文件、执行命令，再回到工作台检查结果。会话记录保存在本机；模型请求会发送到你配置的服务商。
 
-它既是一个本地桌面应用，也是一个可改造的 Agent Harness。固定前端负责交互与可视化，ActSpace Runtime 负责模型接入、上下文、工具、持久化和执行循环，共享包负责跨进程契约。
+## 从第一项任务开始
 
-## 它解决什么问题
+1. 按[快速开始](../getting-started/)启动应用。
+2. 在[模型设置](../configure-a-model/)中连接服务商，并启用一个对话模型。
+3. 打开工作区，新建会话，描述想完成的任务。
+4. 查看工具执行过程，在需要时批准操作，并检查生成的文件或代码差异。
 
-一个能聊天的模型，不等于一个能可靠工作的 Agent。真正执行任务还需要回答这些问题：
+第一次可以从“读一下这个项目，说明启动方式和主要目录”开始。具体操作见[完成第一个任务](../first-task/)。
 
-- 模型本轮看到了哪些上下文？
-- 哪些工具可以调用，参数如何验证？
-- 高风险动作在哪里暂停并等待用户批准？
-- 流式输出、工具结果和中断状态怎样被持久化？
-- 长会话如何压缩，同时保留可追溯性？
+<figure class="product-shot screenshot-placeholder" data-screenshot="workspace-overview.png">
+<figcaption><span class="screenshot-label">待补实拍 · 01</span><strong>工作区与真实成果</strong><code>workspace-overview.png</code><p>打开示例项目，完成一次小修改；右侧打开修改后的 Markdown 或 HTML 文件</p></figcaption>
+</figure>
 
-ActSpace 把这些 Harness 工程放到一套本地、可阅读、可替换的实现里。
+## 按任务查找功能
 
-## 当前产品形态
+| 你想做什么 | 阅读入口 |
+| --- | --- |
+| 选择目录、隔离代码改动、继续之前的任务 | [工作区与 Worktree](../workspaces/)、[会话管理](../sessions/) |
+| 切换模型、了解上下文和费用 | [模型选择](../model-selection/)、[上下文与压缩](../context/)、[使用统计](../usage/) |
+| 读写文件、运行测试、收集网络资料 | [文件工具](../files-and-search/)、[Bash](../bash/)、[联网工具](../web-tools/) |
+| 审阅变更、预览文件、手动运行命令 | [代码审阅](../review/)、[文件预览](../file-preview/)、[交互式终端](../terminal/) |
+| 复用工作流程、委派研究、练习英语 | [Skills](../skills/)、[子 Agent](../subagents/)、[英语辅助学习](../english-learning/) |
 
-当前主线是面向开发工作的桌面工作台：
+## 当前能力范围
 
-1. 在 Composer 中描述任务并选择模型。
-2. Agent 组装系统规则、历史记录、工具和工作区上下文。
-3. 模型流式回复或发起工具调用。
-4. 工具经过参数校验、权限判断和执行器处理。
-5. 回复、工具事件、用量与 Context 快照写入本地会话。
+当前文档介绍 v2 桌面应用和 CLI。内置子 Agent 用于只读检索与分析；博客中的 Agent Team、Agent Room、Kairos、记忆和评估模块文章包含历史探索或独立项目设计，不表示这些能力已成为桌面应用入口。
 
-除被动响应的主 Agent 外，ActSpace 还包含 Browser Use、Skills 和可审查的 Session / Context / Tool 投影。
-
-## 三条设计原则
-
-### 简约干净
-
-优先使用小而明确的抽象。能由一个清楚边界解决的问题，不为了“架构感”堆叠额外层级。
-
-### 上下文可控
-
-上下文不是不可见的 prompt。Token、缓存、Context 快照和会话状态都应可观察，并能被用户干预。
-
-### 成本可控
-
-模型选择、缓存命中、上下文裁剪与压缩都属于产品体验的一部分。ActSpace 会展示真实用量，并允许为不同任务选择不同模型。
-
-## 本地优先意味着什么
-
-会话、事件、Context 状态与记忆优先写入本机文件。这个选择让数据更容易迁移、审计和排障，但也意味着你需要像管理其他开发数据一样管理本机目录与备份。
-
-下一步可以直接[安装并启动 ActSpace](../getting-started/)，或者从[一次 Agent Turn](../agent-turn/)开始理解运行链路。
+遇到连接或执行问题时，先看[常见问题](../troubleshooting/)。需要修改 ActSpace 本身，进入[开发与贡献](../contributing/)。

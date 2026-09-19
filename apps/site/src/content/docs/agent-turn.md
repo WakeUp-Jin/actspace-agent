@@ -1,57 +1,42 @@
 ---
-title: 一次 Agent Turn
-description: 从用户输入到模型、工具、审批和持久化，理解 ActSpace 的一次完整执行链路。
-group: core-concepts
-order: 1
-updatedAt: 2026-07-27
+title: "一次 Agent 执行"
+description: "从输入到模型请求、工具执行和日志，理解一次任务如何推进。"
+group: "settings-development"
+order: 4
+updatedAt: 2026-09-19
 draft: false
 ---
 
-一次 Agent Turn 是从用户提交消息开始，到回复完成、失败或被中断为止的完整运行单元。
+一次用户任务可能包含多次模型请求：模型先读取已有上下文，决定调用工具，拿到结果后再继续推理，直到给出最终答复、失败或停止。
 
-## 四层职责
+## 从输入开始
 
-### Renderer
+桌面界面收集文字、附件、工作区、模式和模型选择，通过主进程交给运行时。主进程负责本机能力和凭据，界面不直接访问文件系统。
 
-收集用户输入、附件、工作区与模型选择；展示流式文本、工具状态、审批请求和最终消息。Renderer 不直接访问文件系统，也不持有服务商密钥。
+运行时将用户输入写入会话记录，构建模型实际使用的上下文，再发起请求。每次请求都可能有独立的用量和上下文快照，便于事后检查。
 
-### Main Process
+## 工具如何进入循环
 
-管理 Electron 生命周期、IPC、窗口和主进程服务。它把 renderer 的请求交给 Agent Runtime，并把运行事件转回界面。
+1. 模型提出工具调用。
+2. 工具系统校验参数、权限和工作区范围。
+3. 需要审批时暂停，等待用户决定。
+4. 执行后将成功、失败或取消结果记录并交回模型。
+5. 模型依据结果继续，或结束本次任务。
 
-### Bridge
+工具返回失败是执行事实的一部分。最终回复是否解决了问题，需要结合工具结果、文件差异和测试记录判断。
 
-把 UI 侧请求映射为 Agent Runtime 能理解的输入，同时将流事件、审批和中断信号保持在正确的 `sessionId + turnId` 作用域内。
+## 记录与观察
 
-### Agent Runtime
+Session Journal 保存可恢复的运行事实，界面据此呈现消息、工具、用量和上下文。压缩会替换后续请求使用的部分历史摘要，但保留原始 Journal。
 
-负责解析模型用途、构建 Context、调用 provider、执行工具循环、记录用量，并把 session events 持久化。
+在会话顶部切换到 Trajectory，可以沿时间线搜索执行记录，选中工具后检查参数与结果。切回 Chat 后继续原任务。
 
-## 执行状态
+用户需要检查任务时，可以看工具详情、[上下文](../context/)和[审阅](../review/)。开发者继续追踪实现，可从仓库的 `docs/ARCHITECTURE.md` 和 Agent Run 分层文档进入。
 
-一个 Turn 最终必须明确落入以下状态之一：
+<figure class="product-shot screenshot-placeholder" data-screenshot="trajectory-inspector.png">
+<figcaption><span class="screenshot-label">待补实拍 · 07</span><strong>会话轨迹与工具详情</strong><code>trajectory-inspector.png</code><p>在已完成的示例会话切到 Trajectory，选中一个工具调用，打开 Result 或 Payload</p></figcaption>
+</figure>
 
-- `completed`：模型完成回复，所有必要事件已持久化。
-- `failed`：模型或执行链路失败，界面得到可恢复的错误事件。
-- `aborted`：用户停止任务，审批和前台执行也同步取消。
+## 停止与恢复的边界
 
-中间状态不能被伪装成完成。例如 provider 因长度上限停止且仍有写文件工具调用时，安全阀会阻止不完整内容落盘。
-
-## 工具循环
-
-当模型发起工具调用时，Runtime 会：
-
-1. 校验工具名称和参数。
-2. 判断权限级别与执行边界。
-3. 必要时暂停 Turn 等待审批。
-4. 执行工具并产生结构化结果。
-5. 将结果作为 observation 交还模型。
-6. 继续循环，直到得到最终回复或终止状态。
-
-每个工具都由自己的 `toolCallId` 标识。完成事件应立即结束对应工具的运行态，不等待同批其他工具。
-
-## 持久化与恢复
-
-用户消息会先写入持久化事件，再进入长时间运行。工具调用、审批、用量、Context 快照和最终回复也会按事件追加。这样即使应用退出或 Turn 被中断，会话仍能从已经落盘的事实恢复。
-
-继续阅读[上下文管线](../context/)和[工具与审批](../tools-and-approvals/)，可以分别深入这两条关键链路。
+停止会阻止当前任务继续推进，但不会撤销已经产生的效果。应用恢复会话记录也不等于恢复之前所有活跃进程，终端与后台命令应单独确认状态。

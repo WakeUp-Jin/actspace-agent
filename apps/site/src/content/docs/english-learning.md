@@ -1,0 +1,36 @@
+---
+title: "英语辅助学习"
+description: "给指定会话开启英中双语回复，并按需要朗读英文。"
+group: "extensions"
+order: 3
+updatedAt: 2026-09-19
+draft: false
+---
+
+英语辅助学习适合在完成日常任务时顺便阅读英文。开启后，选定会话的后续模型请求会要求每段先英文、后简体中文；回答成功完成后可以朗读英文部分。
+
+## 选择目标会话
+
+打开“扩展 → 能力”，找到英语辅助学习，选择一条主会话并开启。它只绑定选定的会话，切换到其他聊天不会自动更换目标。
+
+已生成的历史回复不会重新翻译，开启之前正在生成的回答也不追溯朗读。应用重启后能力恢复为关闭，需要再次开启；上次会话选择和语音配置会保留。
+
+<figure class="product-shot screenshot-placeholder" data-screenshot="english-learning.png">
+<figcaption><span class="screenshot-label">待补实拍 · 33</span><strong>开启英语辅助学习</strong><code>english-learning.png</code><p>扩展 → 能力，截取英语辅助学习卡片已绑定示例会话且开启的状态。</p></figcaption>
+</figure>
+
+## 配置语音
+
+打开“设置 → 通用 → 语音播放”，配置 MiniMax 中国站 Key、模型、音色和语速。可以先试听，再回到绑定会话发起一条新消息。
+
+语音会把需要朗读的英文发送给 MiniMax。当前本地播放使用 macOS 能力；其他平台可保留双语回复，但不能假定语音播放已可用。
+
+<figure class="product-shot screenshot-placeholder" data-screenshot="english-reply.png">
+<figcaption><span class="screenshot-label">待补实拍 · 34</span><strong>真实英中对照回复</strong><code>english-reply.png</code><p>截取前一张所绑定会话的一次真实英中回复，英文在前、中文在后。</p></figcaption>
+</figure>
+
+## 停止与关闭
+
+停止播放会清空当前语音队列，但保留双语模式。关闭能力则停止播放，并不再向后续请求加入双语要求。模型仍可能受已有双语历史影响，必要时在新消息中说明希望使用的语言。
+
+没有配置语音或合成失败时，双语回复仍可继续。当前功能不包含语音输入、发音评分或自动词汇本。

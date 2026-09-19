@@ -1,52 +1,36 @@
 ---
-title: 上下文管线
-description: 了解系统规则、历史、工具、附件、缓存与压缩如何组成模型真正看到的 Context。
-group: core-concepts
-order: 2
-updatedAt: 2026-07-27
+title: "上下文与压缩"
+description: "查看模型本轮能看到的内容，并在长任务中整理上下文。"
+group: "models-context"
+order: 3
+updatedAt: 2026-09-19
 draft: false
 ---
 
-在 ActSpace 中，Context 是运行时产物，不是一段散落在代码里的字符串。每次模型调用前，系统都会按稳定顺序组合规则、会话历史、工具定义和当前输入。
+模型每次请求看到的上下文包括系统说明、工具定义、规则、Skill 提示、历史消息以及必要的摘要。聊天窗口显示的全部历史，与这次实际发送给模型的内容并不总是相同。
 
-## Context 的主要来源
+## 查看当前上下文
 
-- 主 Agent 系统提示词与当前人格配置。
-- 仓库级 `AGENTS.md` 和关联项目规则。
-- 已持久化的用户、助手、工具与审批事件。
-- 当前可见工具的 schema。
-- 附件、图片和工具产生的多模态 observation。
-- Subagent 的专属运行上下文。
+点击输入框底部的上下文状态，查看占用和分组信息。需要深入检查时，在右侧工作台打开上下文视图，查看对应请求的快照。
 
-Context 查看器使用与真实 Turn 相同的规则加载链路，目的是避免“界面显示一套、模型实际收到另一套”。
+排查“模型为什么不知道这个信息”时，先确认文件或工具结果是否进入该次请求，再看是否经过摘要。附上一个路径并不等于完整文件已经被读取。
 
-## 稳定排序与缓存
+<figure class="product-shot screenshot-placeholder" data-screenshot="context-popup.png">
+<figcaption><span class="screenshot-label">待补实拍 · 08</span><strong>上下文占用与分组</strong><code>context-popup.png</code><p>回到聊天，点击输入框底部上下文占用入口，弹层展开后截图</p></figcaption>
+</figure>
 
-更稳定、复用频率更高的内容应尽量靠前；当前 Turn 的易变输入靠后。这样能提升支持 prompt caching 的服务商命中率，并降低长任务成本。
+<figure class="product-shot screenshot-placeholder" data-screenshot="context-detail.png">
+<figcaption><span class="screenshot-label">待补实拍 · 02</span><strong>当前请求的上下文详情</strong><code>context-detail.png</code><p>在同一会话打开右侧“上下文”，选择有文件读取结果的请求；展开一个消息或工具结果条目</p></figcaption>
+</figure>
 
-Usage 页面会记录 input、output、cache read 与总 Token，并按统一口径估算费用。
+## 上下文占用与累计 Token
 
-## 工具可见性
+上下文占用描述单次请求的内容规模；会话累计 Token 包括多次请求的消耗。前者用于判断离模型容量还有多远，后者用于了解工作成本，两个数字不能互相替代。
 
-工具并不总是一次性全部塞入 Context。以 Browser 为例，每个新 Turn 默认只暴露入口工具；模型明确需要浏览器能力后，再从下一次请求开始披露完整工具组。
+容量依据实际请求对应的模型事实。旧会话缺少容量记录时，可能显示 0，不能据此认定请求没有使用 Token。请求的输入、输出和缓存用量见[使用统计](../usage/)。
 
-这种 progressive disclosure 同时减少 Token 和误调用。
+## 何时压缩
 
-## 压缩
+长任务积累大量消息和工具结果时，可以在输入框执行 `/compact`，把较早内容整理为摘要；运行时也会依据压缩策略处理上下文压力。压缩依赖可用的摘要模型，请先检查相关模型用途配置。
 
-当历史接近模型上下文窗口时，ActSpace 会对旧内容执行压缩。压缩需要保留：
-
-- 用户目标和已经确认的约束。
-- 已完成工作的事实与关键文件路径。
-- 失败原因和未解决风险。
-- 工具结果中影响后续判断的证据。
-
-工具长输出也会单独裁剪或摘要，但应保留原始输出前缀与关键细节，避免只留下失真的概括。
-
-用户可以在会话中使用 `/compact` 主动触发压缩，并看到开始、进度和完成状态。
-
-## Context 状态
-
-每个会话维护可恢复的 Context 状态和快照。它们用于查看当前组成、排查缓存或 Token 异常，以及在评估模式下对比每次模型调用前的输入。
-
-如果你正在排查某个工具为什么出现或消失，下一步阅读[工具与审批](../tools-and-approvals/)和[Browser Use](../browser/)。
+压缩减少后续请求需要携带的历史，但不会删除原始会话日志。摘要仍可能遗漏细节，关键约束最好写入项目文档；压缩后继续任务时，可以补充明确目标，并让 Agent 重新读取需要精确依据的文件。

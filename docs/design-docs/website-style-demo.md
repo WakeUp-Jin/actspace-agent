@@ -1,6 +1,8 @@
 # 官网视觉方向 Demo
 
-状态：2026-09-09，独立交互原型，等待用户选择。没有修改 `apps/site`。
+> 2026-09-19：网站视觉与交互现行规范见 [apps/site/DESIGN.md](../../apps/site/DESIGN.md)。本页早期视觉探索不覆盖新规范。
+
+状态：2026-09-09 历史候选。2026-09-19 已选择新的[黑白直角双主题方向](website-xai-preview.md)，后续评审使用[新样稿](website-xai-preview.html)。本 A/B/C 原型不再等待选择，保留供历史对照；没有修改 `apps/site`。
 
 打开 [HTML Demo](website-style-demo.html)，顶部切换 A / B / C，网站导航切换首页、博客和更新日志。博客卡片可进入文章。HTML 内嵌素材，可直接离线打开。
 

@@ -1,79 +1,49 @@
 ---
-title: 快速开始
-description: 从源码安装依赖、配置环境并启动 ActSpace 桌面应用。
-group: getting-started
+title: "快速开始"
+description: "从源码启动桌面应用，连接模型并打开第一个工作区。"
+group: "getting-started"
 order: 2
-updatedAt: 2026-07-28
+updatedAt: 2026-09-19
 draft: false
 ---
 
-ActSpace 当前以源码运行和本地打包为主。开始前请准备 Git、Node.js 22.12 或更高版本，以及仓库声明的 pnpm 版本。
+准备 Git、Node.js 22.12 或更高版本，以及仓库声明的 pnpm 10.33.0。以下命令都在仓库根目录执行。
 
-## 获取源码
+## 获取并启动
 
 ```sh
 git clone https://github.com/WakeUp-Jin/actspace-agent.git
 cd actspace-agent
 pnpm install
-```
-
-仓库使用 pnpm workspace。请在根目录安装依赖，不要分别进入每个 package 执行安装。
-
-## 配置模型
-
-启动 ActSpace 后，打开「设置 → 服务商」，选择 DeepSeek、Kimi 或 OpenRouter，并填写对应的 API Key。密钥由主进程使用系统安全存储加密保存在本机，不进入 renderer 或会话事件。
-
-服务商连接建立后，在「设置 → 模型」中安装并启用需要的模型。Composer 只展示当前已经启用且可用于主会话的候选模型。
-
-更完整的服务商、代理、模型用途和故障排查说明见[配置模型](../configure-a-model/)。
-
-## 启动开发环境
-
-日常开发推荐使用带日志的启动命令：
-
-```sh
 pnpm dev:log
 ```
 
-终端输出会同步写入根目录 `logs/`。排障时优先查看 `logs/latest-dev.log` 或最近的 `logs/dev-*.log`。
+`dev:log` 启动桌面开发环境，并将输出同步到 `logs/`。遇到启动失败时，保留终端错误，查看 `logs/latest-dev.log`。普通开发也可以运行 `pnpm dev`。
 
-如果不需要写日志，也可以运行：
+## 连接一个模型
 
-```sh
-pnpm dev
-```
+打开左下角设置，进入“模型”，添加服务商连接并填写 API Key。配置后添加或启用要使用的模型，回到聊天输入框确认可以选中它。详细步骤见[配置模型](../configure-a-model/)。
 
-## 启动介绍网站
+桌面应用从应用内设置读取凭据，向仓库 `.env` 写入模型 Key 不会替代这个步骤。
 
-官网是独立的 Astro workspace package：
+<figure class="product-shot screenshot-placeholder" data-screenshot="model-connection.png">
+<figcaption><span class="screenshot-label">待补实拍 · 09</span><strong>模型连接与启用状态</strong><code>model-connection.png</code><p>设置 → 模型，展示一个已连接的服务商、连接入口和已启用模型</p></figcaption>
+</figure>
 
-```sh
-pnpm dev:site
-```
+## 打开工作区
 
-默认地址为 `http://127.0.0.1:8765`。网站不依赖 Electron，可以单独开发和构建。
+在左侧工作区区域添加本地文件夹，再新建会话。先用一个能安全修改的示例项目；普通目录也可以作为工作区，不要求必须有 Git。
 
-## 打包桌面应用
+选择模型和模式后，发送一个范围明确的任务。完整演示见[完成第一个任务](../first-task/)。
+
+<figure class="product-shot screenshot-placeholder" data-screenshot="workspace-overview.png">
+<figcaption><span class="screenshot-label">待补实拍 · 01</span><strong>工作区与真实成果</strong><code>workspace-overview.png</code><p>打开示例项目，完成一次小修改；右侧打开修改后的 Markdown 或 HTML 文件</p></figcaption>
+</figure>
+
+## 本地打包
 
 ```sh
 pnpm package:desktop
 ```
 
-产物输出到根目录 `dist/`。本地 ad-hoc 签名、Developer ID 与 notarization 的边界不同，发布前请阅读仓库内的打包与安全文档。
-
-## 常用验证
-
-```sh
-pnpm check:docs
-pnpm check:frontend-theme
-pnpm test
-pnpm typecheck
-```
-
-完整仓库检查使用：
-
-```sh
-pnpm ci
-```
-
-如果安装完成但还不能发起对话，先继续阅读[配置模型](../configure-a-model/)和[工具与审批](../tools-and-approvals/)。
+产物位于根目录 `dist/`。本地打包与正式签名、公证是不同步骤；当前命令不能代替正式发行验收。开发相关的目录和检查命令见[开发与贡献](../contributing/)。

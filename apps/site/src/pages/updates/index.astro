@@ -7,15 +7,12 @@ const months = groupReleaseNotes(await loadReleaseNotes());
 ---
 
 <BaseLayout title="ActSpace 更新日志" description="ActSpace 的最新功能、改进与问题修复。">
-  <main id="main-content" class="updates-page site-page">
+  <main id="main-content" class="changelog wrap">
     <section aria-label="ActSpace 更新日志">
-      <UpdateTimeline {months} />
+      <header class="changelog-heading">
+<h1>更新日志</h1>
+</header>
+<UpdateTimeline {months} />
     </section>
   </main>
 </BaseLayout>
-
-<style>
-  .updates-page {
-    padding-block: clamp(108px, 12vw, 168px) clamp(112px, 14vw, 190px);
-  }
-</style>
