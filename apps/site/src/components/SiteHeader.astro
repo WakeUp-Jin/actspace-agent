@@ -20,4 +20,4 @@ const active=(path:string)=>path==='/'?Astro.url.pathname===sitePath('/'):Astro.
 <nav id="mobile-menu" class="mobile-menu" hidden aria-label="移动导航">{links.map(([path,label])=>
 <a href={sitePath(path)}>{label}</a>)}</nav>
 </header>
-<script>const button=document.querySelector<HTMLButtonElement>('.menu-button');const menu=document.querySelector<HTMLElement>('#mobile-menu');button?.addEventListener('click',()=>{if(menu){menu.hidden=!menu.hidden;button.setAttribute('aria-expanded',String(!menu.hidden));}});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&menu&&button){menu.hidden=true;button.setAttribute('aria-expanded','false');button.focus();}});</script>
+<script>const button=document.querySelector<HTMLButtonElement>('.menu-button');const menu=document.querySelector<HTMLElement>('#mobile-menu');button?.addEventListener('click',()=>{if(menu){menu.hidden=!menu.hidden;button.setAttribute('aria-expanded',String(!menu.hidden));}});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&menu&&button&&!menu.hidden){menu.hidden=true;button.setAttribute('aria-expanded','false');button.focus();}});</script>

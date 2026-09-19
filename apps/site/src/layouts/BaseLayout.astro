@@ -24,7 +24,9 @@ const { title, description, heroHeader = false, image, type = "website" } = Astr
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
     <meta name="color-scheme" content="light" />
-    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}brand/favicon.svg`} />
+    <link rel="icon" type="image/x-icon" href={`${import.meta.env.BASE_URL}brand/favicon-logo.ico`} />
+    <link rel="icon" type="image/png" sizes="512x512" href={`${import.meta.env.BASE_URL}brand/favicon-logo.png`} />
+    <link rel="apple-touch-icon" sizes="180x180" href={`${import.meta.env.BASE_URL}brand/apple-touch-icon.png`} />
     <SeoHead {title} {description} {image} {type} />
     <slot name="head" />
 

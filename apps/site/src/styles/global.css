@@ -323,25 +323,46 @@ img {
   font-size: 22px;
   font-weight: 500;
 }
+html.media-open { overflow: hidden; }
 .media-dialog {
-  max-width: 94vw;
-  max-height: 94vh;
+  width: fit-content;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 56px 8px 8px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 16px;
   background: var(--canvas);
-  padding: 16px;
+  color: var(--ink);
+  box-shadow: 0 20px 80px var(--site-shadow);
 }
-.media-dialog::backdrop {
-  background: var(--site-overlay);
-}
+.media-dialog::backdrop { background: var(--site-overlay); }
 .media-dialog img {
-  max-height: 82vh;
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 100px);
   width: auto;
+  height: auto;
   object-fit: contain;
+  border-radius: 8px;
 }
-.media-dialog button {
-  margin-bottom: 12px;
+.media-dialog .media-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--site-surface);
+  color: var(--body);
+  cursor: pointer;
 }
+.media-close:hover { color: var(--ink); background: var(--surface); }
+.media-close:active { transform: scale(.94); }
 @media (max-width: 760px) {
   :root {
     --site-header-height: 64px;

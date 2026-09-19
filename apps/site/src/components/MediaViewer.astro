@@ -1,5 +1,5 @@
 <dialog class="media-dialog" aria-label="图片预览">
-  <button type="button" data-close-image>关闭 ×</button>
+  <button type="button" class="media-close" data-close-image aria-label="关闭图片预览" title="关闭（Esc）"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
   <img alt="" />
 </dialog>
 <script>
@@ -26,9 +26,13 @@ document.querySelectorAll<HTMLAnchorElement>('.screenshot-link').forEach(link =>
     expanded.src = link.href;
     expanded.alt = img.alt;
     dialog.showModal();
+    document.documentElement.classList.add('media-open');
   });
 });
 dialog.querySelector('[data-close-image]')?.addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
-dialog.addEventListener('close', () => trigger?.focus({preventScroll:true}));
+dialog.addEventListener('close', () => {
+  document.documentElement.classList.remove('media-open');
+  trigger?.focus({preventScroll:true});
+});
 </script>
