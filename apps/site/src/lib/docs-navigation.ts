@@ -2,9 +2,12 @@ import { getCollection, type CollectionEntry } from "astro:content";
 
 export const docsGroups = [
   { id: "getting-started", label: "开始使用" },
-  { id: "core-concepts", label: "工作原理" },
-  { id: "guides", label: "能力指南" },
-  { id: "contributing", label: "开发者" },
+  { id: "workspace-sessions", label: "工作区与会话" },
+  { id: "models-context", label: "模型与上下文" },
+  { id: "tools-execution", label: "工具与执行" },
+  { id: "workbench", label: "工作台" },
+  { id: "extensions", label: "扩展" },
+  { id: "settings-development", label: "设置与开发" },
 ] as const;
 
 export type DocsEntry = CollectionEntry<"docs">;

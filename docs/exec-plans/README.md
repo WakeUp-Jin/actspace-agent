@@ -33,6 +33,12 @@
 
 ## 最近完成
 
+- [官网功能展示与截图占位](completed/20260919-site-showcase.md)：六组滚动图文、35 张截图对应24篇文档40处占位与浅紫引用完成；真实素材待用户交付。
+
+- [官网内容迁移与功能文档](completed/20260919-site-content-migration.md)：新增 4 篇原文、核对 37 张正文配图，按模块整理 27 页文档；22 处截图占位待人工补充。
+
+- [Site 设计迁移](completed/20260919-site-design-migration.md)：正式 Astro site 接入已确认布局；博客 3:2 封面、折叠多选筛选。自动验证完成，视觉验收见执行摘要。
+
 - [Context 与会话累计 Token](completed/20260916-context-and-session-tokens.md)：统一完整请求统计与压缩预计；顶部累计 Token 简约展示，自动验证通过，真实窗口边界见执行摘要。
 
 - [消息流排版与工具摘要](completed/20260916-tool-stream-typography.md)：统一过程行、邻接间距和 Bash 摘要；自动验证已完成，真实桌面与主题矩阵边界见执行摘要。

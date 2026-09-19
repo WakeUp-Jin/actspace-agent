@@ -1,4 +1,6 @@
 import sitemap from "@astrojs/sitemap";
+import { satteri } from "@astrojs/markdown-satteri";
+import { docsLinks } from "./src/lib/docs-links.mjs";
 import { defineConfig, passthroughImageService } from "astro/config";
 
 const site = process.env.SITE_URL ?? "https://wakeup-jin.github.io";
@@ -17,6 +19,7 @@ export default defineConfig({
   },
   integrations: [sitemap()],
   markdown: {
+    processor: satteri({ mdastPlugins: [docsLinks({ base })] }),
     shikiConfig: {
       themes: {
         light: "github-light",

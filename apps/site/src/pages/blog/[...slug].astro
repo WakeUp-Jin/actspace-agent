@@ -37,242 +37,57 @@ const jsonLd = JSON.stringify({
   image: new URL(sitePath(entry.data.cover), Astro.site ?? Astro.url.origin).toString(),
   mainEntityOfPage: canonical,
 });
+
+import {presentationFor} from "../../lib/blog-presentation";
+import "../../styles/editorial.css";
+const category=presentationFor(entry.id)?.category??entry.data.tags[0];
 ---
-
 <BaseLayout title={`${entry.data.title} — ActSpace 博客`} description={entry.data.description} image={entry.data.cover} type="article">
-  <script slot="head" type="application/ld+json" is:inline set:html={jsonLd}></script>
-  <main id="main-content">
-    <header class="article-masthead site-page">
-      <a class="article-back" href={sitePath("/blog/")}>ActSpace 博客</a>
-
-      <div class="article-intro">
-        <figure class="article-cover">
-          <img
-            src={sitePath(entry.data.cover)}
-            alt={`${entry.data.title}文章封面`}
-            width="1200"
-            height="720"
-            loading="eager"
-            fetchpriority="high"
-            decoding="async"
-          />
-        </figure>
-
-        <div class="article-heading">
-          <h1>{entry.data.title}</h1>
-          <p>{entry.data.description}</p>
-        </div>
-
-        <dl class="article-meta" aria-label="文章信息">
-          <div>
-            <dt>分类</dt>
-            <dd>{entry.data.tags.join(" · ")}</dd>
-          </div>
-          <div>
-            <dt>作者</dt>
-            <dd>{entry.data.authors.join("、")}</dd>
-          </div>
-          <div>
-            <dt>发布日期</dt>
-            <dd><time datetime={entry.data.publishedAt.toISOString()}>{publishedAt}</time></dd>
-          </div>
-          <div>
-            <dt>阅读时间</dt>
-            <dd>{minutes} 分钟</dd>
-          </div>
-        </dl>
-      </div>
-    </header>
-
-    <div class="article-content">
-      <article class="docs-prose article-body site-reading">
-        <Content />
-      </article>
-    </div>
-  </main>
+<script slot="head" type="application/ld+json" is:inline set:html={jsonLd}>
+</script>
+<main id="main-content">
+<article class="post-reading">
+<nav class="post-breadcrumb" aria-label="面包屑">
+<a href={sitePath('/blog/')}>博客</a>
+<span>/</span>
+<span>{entry.data.title}</span>
+</nav>
+<div class="post-intro">
+<header>
+<h1>{entry.data.title}</h1>
+<p class="reading-lead">{entry.data.description}</p>
+</header>
+<aside class="post-meta" aria-label="文章信息">
+<div>
+<span>分类</span>
+<a href={`${sitePath('/blog/')}?category=${encodeURIComponent(category)}`}>{category}</a>
+</div>
+<div>
+<span>产品</span>
+<a href={sitePath('/')}>ActSpace</a>
+</div>
+<div>
+<span>发布日期</span>
+<time datetime={entry.data.publishedAt.toISOString()}>{publishedAt}</time>
+</div>
+<div>
+<span>预计阅读</span>
+<p>{minutes} 分钟</p>
+</div>
+<div>
+<span>分享</span>
+<button id="copy-link" aria-live="polite">复制链接 ↗</button>
+</div>
+</aside>
+</div>
+<div class="reading-body docs-prose">
+<Content/>
+</div>
+<nav class="reading-next">
+<a href={sitePath('/blog/')}>← 返回博客</a>
+<a href={sitePath('/docs/')}>探索文档 →</a>
+</nav>
+</article>
+</main>
 </BaseLayout>
-
-<style>
-  .article-masthead {
-    padding-block: clamp(128px, 14vw, 190px) clamp(76px, 10vw, 124px);
-  }
-
-  .article-back {
-    color: var(--site-muted);
-    text-decoration: none;
-    font-family: var(--site-font-mono);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-  }
-
-  .article-back:hover {
-    color: var(--site-ink);
-  }
-
-  .article-intro {
-    display: grid;
-    grid-template-areas:
-      "cover cover"
-      "heading meta";
-    grid-template-columns: minmax(0, 680px) minmax(170px, 220px);
-    column-gap: clamp(52px, 7vw, 96px);
-    max-width: 1020px;
-    margin: clamp(48px, 7vw, 76px) auto 0;
-  }
-
-  .article-cover {
-    grid-area: cover;
-    width: clamp(172px, 16vw, 212px);
-    margin: 0 0 clamp(38px, 5vw, 58px);
-    overflow: hidden;
-    border: 1px solid var(--site-line);
-    border-radius: 14px;
-    background: var(--site-surface);
-  }
-
-  .article-cover img {
-    display: block;
-    width: 100%;
-    aspect-ratio: 5 / 3;
-    object-fit: cover;
-  }
-
-  .article-heading {
-    grid-area: heading;
-    min-width: 0;
-  }
-
-  h1 {
-    max-width: 760px;
-    margin: 0;
-    font-family: var(--site-font-serif);
-    font-size: clamp(48px, 6.2vw, 72px);
-    font-weight: 500;
-    letter-spacing: -0.06em;
-    line-height: 1.08;
-  }
-
-  .article-heading p {
-    max-width: 660px;
-    margin: 24px 0 0;
-    color: var(--site-body);
-    font-size: 18px;
-    font-style: italic;
-    line-height: 1.7;
-  }
-
-  .article-meta {
-    grid-area: meta;
-    display: grid;
-    align-content: start;
-    gap: 24px;
-    margin: 8px 0 0;
-  }
-
-  .article-meta div {
-    display: grid;
-    gap: 5px;
-  }
-
-  .article-meta dt {
-    color: var(--site-muted);
-    font-family: var(--site-font-mono);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .article-meta dd {
-    margin: 0;
-    color: var(--site-ink);
-    font-size: 13px;
-    line-height: 1.55;
-  }
-
-  .article-content {
-    border-top: 1px solid var(--site-line);
-    padding-top: clamp(74px, 9vw, 116px);
-  }
-
-  .article-body {
-    color: var(--site-ink);
-    font-size: 18px;
-    line-height: 1.78;
-    padding-bottom: clamp(100px, 14vw, 180px);
-  }
-
-  .article-body :global(p:first-child) {
-    color: var(--site-ink);
-    font-family: var(--site-font-sans);
-    font-size: inherit;
-    line-height: inherit;
-  }
-
-  .article-body :global(h2) {
-    font-family: var(--site-font-serif);
-    font-weight: 500;
-  }
-
-  @media (max-width: 900px) {
-    .article-intro {
-      grid-template-areas:
-        "cover"
-        "heading"
-        "meta";
-      grid-template-columns: minmax(0, 680px);
-      justify-content: center;
-    }
-
-    .article-meta {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      max-width: 560px;
-      margin-top: 40px;
-      border-top: 1px solid var(--site-line);
-      padding-top: 28px;
-    }
-  }
-
-  @media (max-width: 640px) {
-    .article-masthead {
-      padding-block: 108px 72px;
-    }
-
-    .article-intro {
-      margin-top: 40px;
-    }
-
-    .article-cover {
-      width: 164px;
-      margin-bottom: 34px;
-      border-radius: 11px;
-    }
-
-    h1 {
-      font-size: clamp(40px, 12vw, 48px);
-      line-height: 1.12;
-    }
-
-    .article-heading p {
-      margin-top: 20px;
-      font-size: 16px;
-    }
-
-    .article-meta {
-      gap: 22px 20px;
-      margin-top: 32px;
-      padding-top: 24px;
-    }
-
-    .article-content {
-      padding-top: 64px;
-    }
-
-    .article-body {
-      font-size: 17px;
-      line-height: 1.76;
-    }
-  }
-</style>
+<script>document.querySelector<HTMLButtonElement>('#copy-link')?.addEventListener('click',async event=>{const button=event.currentTarget as HTMLButtonElement;try{await navigator.clipboard.writeText(location.href);button.textContent='链接已复制'}catch{button.textContent='复制失败，请复制地址栏'}setTimeout(()=>button.textContent='复制链接 ↗',2200)});</script>

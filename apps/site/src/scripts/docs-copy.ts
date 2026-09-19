@@ -4,7 +4,8 @@ export function initializeDocsCopy(): void {
     pre.dataset.copyReady = "true";
 
     const code = pre.querySelector("code");
-    const language = pre.dataset.language ?? code?.className.match(/language-([\w-]+)/)?.[1];
+    const language =
+      pre.dataset.language ?? code?.className.match(/language-([\w-]+)/)?.[1];
     if (language) {
       const label = document.createElement("span");
       label.className = "docs-code-language";
@@ -20,8 +21,12 @@ export function initializeDocsCopy(): void {
 
     button.addEventListener("click", async () => {
       const codeText = code?.textContent ?? "";
-      await navigator.clipboard.writeText(codeText);
-      button.textContent = "已复制";
+      try {
+        await navigator.clipboard.writeText(codeText);
+        button.textContent = "已复制";
+      } catch {
+        button.textContent = "复制失败";
+      }
       window.setTimeout(() => {
         button.textContent = "复制";
       }, 1600);

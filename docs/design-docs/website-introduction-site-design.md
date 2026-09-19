@@ -1,4 +1,6 @@
 ---
+
+> 2026-09-19：网站视觉与交互现行规范见 [apps/site/DESIGN.md](../../apps/site/DESIGN.md)。本页早期视觉探索不覆盖新规范。
 status: v2-content-refresh-needed
 owner: apps/site
 product: ActSpace Website
@@ -12,7 +14,7 @@ last_updated: 2026-07-29
 
 本文档定义 ActSpace 对外网站的长期产品、内容、视觉和交付边界。首版工程已在 `apps/site` 落地；后续迭代继续以本文档作为事实与取舍入口。
 
-2026-09-09 视觉探索：已提供 [A / B / C 三版交互 Demo](website-style-demo.html) 与[方向说明](website-style-demo.md)，等待用户选择。该原型独立于 `apps/site`，尚未变更正式网站或替换本文的已落地方向。
+2026-09-19 视觉方向已确认：下一轮官网采用黑白、直角、等宽展示字，支持 Light / Dark / System，焦点色为 `#33795c`。评审入口为[首页与更新详情样稿](website-xai-preview.html)和[方向说明](website-xai-preview.md)。该样稿独立于 `apps/site`；本文后续 Cloudfield & Ink 章节描述现有实现，待正式改版时同步替换。[A / B / C 探索](website-style-demo.md)保留为历史候选。
 
 网站包含五个主要产品面：
 
@@ -992,3 +994,8 @@ deploy GitHub Pages
 - 具体实现清单不持续堆入本文档，实施步骤放 `docs/exec-plans`，完成记录放 `docs/histories`。
 - 如果未来官网形成至少两份长期强关联设计文档，再评估迁入 `docs/design-docs/website/` 专题目录；在此之前保持根层独立文档。
 - 外部参考、竞品截图和调研底稿放 `docs/references`，不把它们当作 ActSpace 设计事实来源。
+
+
+## 2026-09-19 公开内容整理
+
+公开功能文档按 7 组组织为 27 页，保留已有页面 slug。当前事实来源和页级映射见 [官网内容来源](../../apps/site/CONTENT_SOURCES.md)，截图补充见 [截图清单](../../apps/site/SCREENSHOTS.md)。博客从 Practical 搬入相关工程原文，正文与本地配图分别记录内容摘要；历史文章不作为当前功能承诺。欢迎页文档链接在构建时附加部署基础路径，兼容 /docs/ 与自身文章路由。

@@ -1,0 +1,215 @@
+{
+  "workspace-overview.png": {
+    "number": 1,
+    "instruction": "工作区、会话列表与代码回复",
+    "usage": "首页首屏；ActSpace 是什么、快速开始",
+    "status": "ready"
+  },
+  "context-detail.png": {
+    "number": 2,
+    "instruction": "上下文面板中的系统提示词、工具和规则分组",
+    "usage": "上下文展示；上下文与压缩",
+    "status": "ready"
+  },
+  "tool-execution.png": {
+    "number": 3,
+    "instruction": "读取、写入与编辑记录，以及一次被拒绝的写入",
+    "usage": "工具执行展示；文件读写、首次任务",
+    "status": "ready"
+  },
+  "review-diff.png": {
+    "number": 4,
+    "instruction": "完成小修改后打开右侧 Review，选择有实际差异的范围",
+    "usage": "Review 展示；审阅、首次任务",
+    "status": "missing"
+  },
+  "skill-invocation.png": {
+    "number": 5,
+    "instruction": "在输入框选择 ui Skill 并准备任务",
+    "usage": "Skills 展示；模式与输入、Skills",
+    "status": "ready"
+  },
+  "subagent-running.png": {
+    "number": 6,
+    "instruction": "主会话子任务卡片与右侧运行列表",
+    "usage": "子 Agent 展示；子 Agent 与 Explore",
+    "status": "ready"
+  },
+  "trajectory-inspector.png": {
+    "number": 7,
+    "instruction": "会话时间线、执行记录与选中的用户消息详情",
+    "usage": "会话轨迹展示；一次 Agent 执行",
+    "status": "ready"
+  },
+  "context-popup.png": {
+    "number": 8,
+    "instruction": "输入框上方的上下文占用与分类",
+    "usage": "文档精读配图；可作首页上下文的局部补图",
+    "status": "ready"
+  },
+  "model-connection.png": {
+    "number": 9,
+    "instruction": "模型连接列表与连接状态",
+    "usage": "配置模型：连接步骤之后；快速开始可复用",
+    "status": "ready"
+  },
+  "custom-model-reasoning.png": {
+    "number": 10,
+    "instruction": "自定义连接表单中的模型推理能力配置入口（尚未填写）",
+    "usage": "模型选择与思考设置：自定义模型段",
+    "status": "ready"
+  },
+  "model-picker.png": {
+    "number": 11,
+    "instruction": "当前模型及 Thinking、Effort 菜单",
+    "usage": "模型选择与思考设置：选择模型之后",
+    "status": "ready"
+  },
+  "reasoning-picker.png": {
+    "number": 12,
+    "instruction": "Thinking 开关与 Low、High、Max 思考档位",
+    "usage": "模型选择与思考设置：推理强度之后",
+    "status": "merged",
+    "source": "model-picker.png"
+  },
+  "mode-picker.png": {
+    "number": 13,
+    "instruction": "展开 Chat / Plan / Agent 菜单，保留输入框与模式入口",
+    "usage": "模式与输入：三种模式表之后",
+    "status": "text-only"
+  },
+  "workspace-worktree.png": {
+    "number": 14,
+    "instruction": "Git 项目首次发送前展开环境/分支选择，展示当前分支与 Worktree 入口",
+    "usage": "工作区与 Git Worktree：创建或切换段",
+    "status": "text-only"
+  },
+  "session-management.png": {
+    "number": 15,
+    "instruction": "示例会话的操作菜单展开，侧栏保留项目分组",
+    "usage": "会话管理与分支：菜单操作之后",
+    "status": "text-only"
+  },
+  "background-session.png": {
+    "number": 16,
+    "instruction": "一条示例会话仍运行，切到另一会话，侧栏保留前一会话的运行标识",
+    "usage": "会话管理与分支：后台执行段",
+    "status": "text-only"
+  },
+  "tool-approval.png": {
+    "number": 17,
+    "instruction": "Bash 审批卡片与操作入口（截图中的命令已脱敏）",
+    "usage": "权限与审批：审批步骤之后；从21原图裁剪",
+    "status": "ready"
+  },
+  "bash-background.png": {
+    "number": 18,
+    "instruction": "运行同一安全任务，截取后台执行状态，保留任务标识与输出。",
+    "usage": "Bash 与后台任务：状态对照",
+    "status": "merged",
+    "source": "bash-complete.png"
+  },
+  "bash-complete.png": {
+    "number": 19,
+    "instruction": "截取一次后台命令完成后的记录，保留命令、任务标识、输出和退出状态；不必另拍运行中画面。",
+    "usage": "Bash 与后台任务：命令执行结果",
+    "status": "missing"
+  },
+  "terminal.png": {
+    "number": 20,
+    "instruction": "右侧终端标签与启动后的 shell 提示符",
+    "usage": "交互式终端：打开终端后的初始界面",
+    "status": "ready"
+  },
+  "file-preview.png": {
+    "number": 21,
+    "instruction": "文件页签、Markdown 预览与工作区文件树",
+    "usage": "文件预览：Markdown 文件与文件树；与17共用一张原图",
+    "status": "ready"
+  },
+  "skills-library.png": {
+    "number": 22,
+    "instruction": "Skills 搜索、安装入口与启用开关",
+    "usage": "Skills：管理步骤之后",
+    "status": "ready"
+  },
+  "skill-file.png": {
+    "number": 23,
+    "instruction": "打开前一张所选 Skill 的 SKILL.md，能读清 name、description 和关键指令",
+    "usage": "Skills：目录结构说明之后",
+    "status": "text-only"
+  },
+  "subagent-result.png": {
+    "number": 24,
+    "instruction": "第 06 张任务完成后，右侧显示发现摘要与终态",
+    "usage": "子 Agent 与 Explore：运行与完成对照",
+    "status": "text-only"
+  },
+  "usage.png": {
+    "number": 25,
+    "instruction": "最近24小时的请求、Token、费用与缓存统计",
+    "usage": "Token、缓存与费用：统计入口之后",
+    "status": "ready"
+  },
+  "usage-token-detail.png": {
+    "number": 26,
+    "instruction": "在同一统计页展开 Token 明细，能区分输入、输出、缓存",
+    "usage": "Token、缓存与费用：统计口径段",
+    "status": "merged",
+    "source": "usage.png"
+  },
+  "image-analysis.png": {
+    "number": 27,
+    "instruction": "添加图片附件并输入问题，发送前可确认图片缩略图",
+    "usage": "图片理解与生成：添加图片并提问",
+    "status": "ready"
+  },
+  "image-generation.png": {
+    "number": 28,
+    "instruction": "一次成功生成图片的任务，展示产物入口与右侧实际图片",
+    "usage": "图片理解与生成：生成图片步骤之后",
+    "status": "text-only"
+  },
+  "browser-ready.png": {
+    "number": 29,
+    "instruction": "Browser Bridge 设置中的连接状态与安装入口，或实际 doctor 就绪输出",
+    "usage": "Browser Use：连接检查步骤之后",
+    "status": "text-only"
+  },
+  "browser-task.png": {
+    "number": 30,
+    "instruction": "在公开示例网页完成一次真实读取；保留浏览器工具记录和返回结果",
+    "usage": "Browser Use：首个任务之后；外部浏览器与应用可分两张",
+    "status": "missing"
+  },
+  "web-search-settings.png": {
+    "number": 31,
+    "instruction": "设置 → 工具，展示联网开关与配置状态，密钥遮罩",
+    "usage": "联网搜索与网页读取：配置段",
+    "status": "text-only"
+  },
+  "web-search-result.png": {
+    "number": 32,
+    "instruction": "一次搜索/网页读取完成后展开工具结果，能看到来源标题或链接",
+    "usage": "联网搜索与网页读取：结果检查段",
+    "status": "text-only"
+  },
+  "english-learning.png": {
+    "number": 33,
+    "instruction": "扩展 → 能力，截取英语辅助学习卡片已绑定示例会话且开启的状态。",
+    "usage": "英语辅助学习：开启步骤与实际效果；静态图不声称证明声音播放",
+    "status": "text-only"
+  },
+  "english-reply.png": {
+    "number": 34,
+    "instruction": "在已开启英语辅助学习的会话中，截取一次真实英中回复，英文在前、中文在后。",
+    "usage": "英语辅助学习：开启步骤与实际效果；静态图不声称证明声音播放",
+    "status": "text-only"
+  },
+  "settings-navigation.png": {
+    "number": 35,
+    "instruction": "设置导航与通用设置",
+    "usage": "设置与本地数据：设置入口段",
+    "status": "ready"
+  }
+}

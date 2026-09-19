@@ -1,20 +1,62 @@
 ---
+import Screenshot from "../components/Screenshot.astro";
+import FeatureShowcase from "../components/FeatureShowcase.astro";
+import {moreCapabilities} from "../lib/home-features";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import FinalCta from "../components/home/FinalCta.astro";
-import Hero from "../components/home/Hero.astro";
-import ProductShowcase from "../components/home/ProductShowcase.astro";
-import ProductStory from "../components/home/ProductStory.astro";
+import {sitePath} from "../lib/site-path";
+import {loadReleaseNotes} from "../lib/releases/parse-release-notes";
+const latest=(await loadReleaseNotes())[0];
 ---
+<BaseLayout title="ActSpace — 给模型一个真正能行动的空间" description="在本地工作区连接模型、使用工具、推进任务。">
+<main id="main-content">
+      <section class="hero wrap" aria-labelledby="hero-title">
+        <h1 id="hero-title" tabindex="-1">给模型一个<br>真正能行动的空间</h1>
+        <div class="hero-bottom">
+<p class="hero-copy">让 Agent 在你的本地工作区读取文件、使用工具、推进任务。<br class="preview-extra">从理解上下文到审查结果，每一步都在眼前。</p>
+<div class="hero-actions">
+<a class="button primary" href={sitePath("/docs/getting-started/")}>开始使用 <span class="arrow">↗</span>
+</a>
+<a class="text-link" href={sitePath("/docs/")}>阅读文档 <span class="arrow">↗</span>
+</a>
+</div>
+</div>
+        <div class="hero-media" id="workspace">
+          <Screenshot name="workspace-overview.png" title="工作区、会话与代码回复" eager showCaption={false}/>
+        </div>
 
-<BaseLayout
-  title="ActSpace — 给模型一个真正能行动的空间"
-  description="ActSpace 是一个本地优先的 Agent 桌面应用与 Harness。看见上下文，控制执行，让模型在真实工具和权限边界中完成工作。"
-  heroHeader
->
-  <main id="main-content">
-    <Hero />
-    <ProductStory />
-    <ProductShowcase />
-    <FinalCta />
-  </main>
+      </section>
+      <section class="wrap" aria-labelledby="work-title">
+        <div class="section-intro">
+<h2 id="work-title">从一个任务，<br>到一份看得见的结果。</h2>
+<p class="section-description">打开工作区，把任务交给 Agent。<br>理解资料、调用工具、检查改动，<br>在同一个空间里，把工作向前推进。</p>
+</div>
+        <FeatureShowcase/>
+        <section class="capability-section" aria-labelledby="capability-title">
+          <h2 id="capability-title">让日常工作，顺手一些。</h2>
+          <div class="capability-grid">
+            {moreCapabilities.map(([title, description, slug]) =>
+              <a class="capability-link" href={sitePath(`/docs/${slug}/`)}>
+                <h3>{title}<span aria-hidden="true">↗</span></h3>
+                <p>{description}</p>
+              </a>
+            )}
+          </div>
+        </section>
+        <div class="latest">
+<div>
+<p class="eyebrow">产品更新</p>
+<h3>{latest.title}</h3>
+</div>
+<a class="text-link" href={sitePath(`/updates/#${latest.anchor}`)}>查看更新 <span class="arrow">→</span>
+</a>
+</div>
+        <div class="cta">
+<div>
+<h2>给下一项工作，一个空间</h2>
+</div>
+<a class="button primary" href={sitePath("/docs/getting-started/")}>开始使用 ActSpace <span class="arrow">↗</span>
+</a>
+</div>
+      </section>
+    </main>
 </BaseLayout>

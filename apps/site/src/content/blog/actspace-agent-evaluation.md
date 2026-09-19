@@ -58,7 +58,7 @@ Agent评估可以帮助我们确定Agent开发方向，同时也可以提供有�
 
 我们先从这个模块的输入开始理解吧，这样可能会更容易一些，我设计的这个评估模块总共有三种输入核心：行为评估数据集、内部数据集、外部公开数据集
 
-![Image](https://internal-api-drive-stream.feishu.cn/space/api/box/stream/download/authcode/?code=ZWZmZGZkYzk2ZGM0ZTRjYTA5MTk3NmY0MGU2ZThiNjRfMDQ0ZTljOWI3Yzk4NTI4NmIyODdmOWI4MDZlZWQ4YWRfSUQ6NzY2MzgyMTA2MDk2NTY2NTcyOF8xNzg0NDI4ODY3OjE3ODQ1MTUyNjdfVjM)
+![Image](../../assets/blog/source/evaluation/architecture.png)
 
 
 

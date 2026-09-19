@@ -1,0 +1,304 @@
+{
+  "sourceRepository": "Practical-Guide-to-Context-Engineering",
+  "sourceRevision": "efb7cd843eb9d47f2c52403d6f70c09bb07e07eb",
+  "articles": [
+    {
+      "slug": "bash-tool-design",
+      "source": "docs/工具管理模块/Bash工具实现和安全权限设计细节.md",
+      "sourceSha256": "179f2dd13ee74e33081c3e65940b4e2593140ea367e19f304bed1b763e8406fb",
+      "bodySha256": "9a2c159bb89a9f4e148187223ae713c622cb300b4bfcf828e46bd3d947290944",
+      "dateEvidence": "Git --diff-filter=A current source path: 2026-04-17",
+      "assets": [
+        {
+          "source": "docs/工具管理模块/image/PQdIb1fZeo9wapxu3sycSN2UnDh.png",
+          "target": "src/assets/blog/source/bash-tool-design/01.png",
+          "sha256": "8a0032742cbb6d45886e286ebdebf659314f983c419834a5685ce66e2f653337"
+        },
+        {
+          "source": "docs/工具管理模块/image/LoqZbCLQBoL21qxxxBScLT80nCc.png",
+          "target": "src/assets/blog/source/bash-tool-design/02.png",
+          "sha256": "ae75fc29021a1532739c6099f683bf68cecbba80aa10477f4fa7f3a6cc6fdae0"
+        }
+      ],
+      "adaptations": [
+        "首行 H1 移入 title，新增站点元数据",
+        "仅改本地图片路径",
+        "HTML img 转 Markdown 图片以进入 Astro 资产管线"
+      ]
+    },
+    {
+      "slug": "grep-and-glob",
+      "source": "docs/工具管理模块/Agent文件系统检索核心：Grep和Glob工具.md",
+      "sourceSha256": "316e9c00c3d0a28ecfe698fe8e13e0e88423546308492f599c728f0d0c24c6af",
+      "bodySha256": "1f74095176d9cf8b3b803eec2543afffa5e4dea905d3df10f2727e3262861b56",
+      "dateEvidence": "Git --diff-filter=A current source path: 2026-04-19",
+      "assets": [
+        {
+          "source": "docs/工具管理模块/image/image (73).png",
+          "target": "src/assets/blog/source/grep-and-glob/01.png",
+          "sha256": "0807744851f6f80622c3f4291820b89265a1caced32a74188700935296ab30f4"
+        },
+        {
+          "source": "docs/工具管理模块/image/image (74).png",
+          "target": "src/assets/blog/source/grep-and-glob/02.png",
+          "sha256": "d03c6ad7323c5c2015dafeeba9237bbeaa468f6676ca7fe9436d4224f690e3d7"
+        },
+        {
+          "source": "docs/工具管理模块/image/image (75).png",
+          "target": "src/assets/blog/source/grep-and-glob/03.png",
+          "sha256": "6653c9ebd5fdbb71ee7da7ca323db86dcc29cfb4ec85f4c03fc39997ca173a80"
+        }
+      ],
+      "adaptations": [
+        "首行 H1 移入 title，新增站点元数据",
+        "仅改本地图片路径",
+        "VitePress details 容器转原生 details，内文和代码不变"
+      ]
+    },
+    {
+      "slug": "write-and-edit",
+      "source": "docs/工具管理模块/Write和Edit工具的实现细节.md",
+      "sourceSha256": "3cc8a56b53752ab9e68af985e40142e15ec1f45f63efccd6d795dc5ff9ea5db1",
+      "bodySha256": "1b7e55e5576b16f690fe85e66cb6f76a9c971e651b9eb5bad45cd97c9499f7c6",
+      "dateEvidence": "Git --diff-filter=A current source path: 2026-06-16",
+      "assets": [
+        {
+          "source": "docs/工具管理模块/image/we-1.PNG",
+          "target": "src/assets/blog/source/write-and-edit/01.png",
+          "sha256": "f67a4470733af64f062c9339218e2c29f07762491baa8c02a8182e68729d3414"
+        },
+        {
+          "source": "docs/工具管理模块/image/we-2.PNG",
+          "target": "src/assets/blog/source/write-and-edit/02.png",
+          "sha256": "f29d784701662fb5765b977f3f16a8d04448f2aef617350b993d13879c9725f7"
+        },
+        {
+          "source": "docs/工具管理模块/image/we-3.png",
+          "target": "src/assets/blog/source/write-and-edit/03.png",
+          "sha256": "8170d723ca50bb6ec3a9cb960f3510841099f8ac78e19d9e03622045c09eae5c"
+        }
+      ],
+      "adaptations": [
+        "首行 H1 移入 title，新增站点元数据",
+        "仅改本地图片路径"
+      ]
+    },
+    {
+      "slug": "tool-scheduling-and-permissions",
+      "source": "docs/工具管理模块/工具调度与权限模块的开发.md",
+      "sourceSha256": "8c944c6a7ce9bc5610a9f45827955e76f31f5817c5de7eb75728d6748036328e",
+      "bodySha256": "eede0c6a85b61c0b436cf69a3db4ed469211d7291f1391e1b825fcacaa174053",
+      "dateEvidence": "Git --diff-filter=A current source path: 2026-04-01",
+      "assets": [
+        {
+          "source": "docs/工具管理模块/image/XiqibKuhCo6vHfxflwQcGdq9n73.png",
+          "target": "src/assets/blog/source/tool-scheduling-and-permissions/01.png",
+          "sha256": "fe49376e261102b2499c8eee3dca18ba0410d43722313f51b7ace3a0e8d98f39"
+        },
+        {
+          "source": "docs/工具管理模块/image/Qz9jbUbvXo941oxk3RNcCPLknve.png",
+          "target": "src/assets/blog/source/tool-scheduling-and-permissions/02.png",
+          "sha256": "51301f91f602f40980832f77ea0cc94f7513a8cd77614b5021d9b474578256f7"
+        },
+        {
+          "source": "docs/工具管理模块/image/IZFgblnV0otIZgx7TJEc2f6cnSe.png",
+          "target": "src/assets/blog/source/tool-scheduling-and-permissions/03.png",
+          "sha256": "f62ed9354607e68665cac58b2a1661841c3145a283b8d09b5aa356c8828b240f"
+        },
+        {
+          "source": "docs/工具管理模块/image/Gk1ObQjtHoG1zAxzUD0czw0Onkc.png",
+          "target": "src/assets/blog/source/tool-scheduling-and-permissions/04.png",
+          "sha256": "ca18bcb1bd1197f2f7e4a290f2ed9f80c91d5ed8dbf2bdc74448cef15ba7e4f8"
+        },
+        {
+          "source": "docs/工具管理模块/image/Juw2bmArkogn6txHuPIcbI0dnye.png",
+          "target": "src/assets/blog/source/tool-scheduling-and-permissions/05.png",
+          "sha256": "f98789faddaca02898876d4c9095817bb43bb8661b05b6404cd5233f9ad54215"
+        },
+        {
+          "source": "docs/工具管理模块/image/DILyb8o5wo1Df2xkGckcTAUpnqb.png",
+          "target": "src/assets/blog/source/tool-scheduling-and-permissions/06.png",
+          "sha256": "391f68c1df61241e7991ca36397c718dd7016893e8b340bb8af08193399447a7"
+        }
+      ],
+      "adaptations": [
+        "首行 H1 移入 title，新增站点元数据",
+        "仅改本地图片路径"
+      ]
+    },
+    {
+      "slug": "browser-use-integration",
+      "source": "docs/Agent运行空间/给Agent接入Browser use的设计思路.md",
+      "sourceSha256": "18cfd20c337a6eb53bc217f2f41595bf1239eec56ebcd877e037736bae310a67",
+      "bodySha256": "814cae1f671b46c3f23bc00e74f5a40fce16cfebf8cb2aa11c2d982d5dedab18",
+      "assets": [
+        {
+          "source": "docs/Agent运行空间/image/browser-1.PNG",
+          "target": "src/assets/blog/source/browser-use/browser-1.PNG",
+          "sha256": "accc6fa5e351b91ea7bf3d0d5594e5cae4535a94b9cf66d56c0b0752bfa8098c"
+        },
+        {
+          "source": "docs/Agent运行空间/image/browser-2.png",
+          "target": "src/assets/blog/source/browser-use/browser-2.png",
+          "sha256": "b6786f2a41c8fa80f4f5b27e2135c803af3307ecc064742f7043897d81bf15b3"
+        },
+        {
+          "source": "docs/Agent运行空间/image/browser-3.png",
+          "target": "src/assets/blog/source/browser-use/browser-3.png",
+          "sha256": "3d635f0e22d2b08b617504bfd9a5c674ce624134b8e0693f12aa26fa9439db4e"
+        },
+        {
+          "source": "docs/Agent运行空间/image/browser-4.png",
+          "target": "src/assets/blog/source/browser-use/browser-4.png",
+          "sha256": "e345a0aa59317680ef0511007c7058d9dacdc094a01ceb2c395530d7bdd4dd87"
+        },
+        {
+          "source": "docs/Agent运行空间/image/browser-5.png",
+          "target": "src/assets/blog/source/browser-use/browser-5.png",
+          "sha256": "3272a0507691cdd488306d119bf65913feaba3e674fd1d7e66328f91c7eec177"
+        }
+      ],
+      "adaptations": [
+        "已迁移原文保持不动；此前核对为标题、路径、转义与行尾适配"
+      ]
+    },
+    {
+      "slug": "agent-team-and-agent-room",
+      "source": "docs/Agent形态/多智能体的协作方式-Agent Team和Agent Room.md",
+      "sourceSha256": "1ad234d0ef326e68e24e33e337f3683846030f799fc3951767876b69a96f7ce8",
+      "bodySha256": "7259c15430220add6ae9d55953d41abf6f260e5e8c80162b3661112f4eafcdfa",
+      "assets": [
+        {
+          "source": "docs/.vitepress/dist/assets/AR-AT-1.D3PTLp7_.png",
+          "target": "src/assets/blog/source/team-room/AR-AT-1.png",
+          "sha256": "80d48454dfefa310194247a24d319b0ec73d872b39315795dac41e61c12bbb8f"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/AR-AT-2.DprrLgjX.png",
+          "target": "src/assets/blog/source/team-room/AR-AT-2.png",
+          "sha256": "6935d87041afab00797b2d2f49877fbf2401111ab7614528597ea36934960e5e"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/AR-AT-3.V-M85TBU.png",
+          "target": "src/assets/blog/source/team-room/AR-AT-3.png",
+          "sha256": "75772b0ed510b31dff948a51f58b710021880e2f36665d66452718eb83b8b0a3"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/AR-AT-4.TzVBtXsw.png",
+          "target": "src/assets/blog/source/team-room/AR-AT-4.png",
+          "sha256": "883abc2000db8d42bb43158abaca8147dd6701b2c241d99db24ebf938d184cba"
+        }
+      ],
+      "adaptations": [
+        "已迁移原文保持不动；此前核对为标题、路径、转义与行尾适配"
+      ]
+    },
+    {
+      "slug": "bash-background-and-sandbox",
+      "source": "docs/工具管理模块/Agent Bash 工具工程化：后台运行与沙盒权限设计.md",
+      "sourceSha256": "dec972452315ff787275317073757ba3548ae9d04cd836e6be3dfba59010f0d1",
+      "bodySha256": "81f231b3a30c671431a216f0f542b01afea76eb445173c33eb9e54ed55292cc4",
+      "assets": [
+        {
+          "source": "docs/.vitepress/dist/assets/agentbash1.CNKGD4XT.PNG",
+          "target": "src/assets/blog/source/bash/agentbash1.PNG",
+          "sha256": "f94ce5177b93b8e451660853708850a589c5b5322f1af77182dd62eb736dbe29"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/agentbash2.Dw9yIVjo.PNG",
+          "target": "src/assets/blog/source/bash/agentbash2.PNG",
+          "sha256": "bf9407eafb76740ecc250920d9116a96a760c798a4533e4a68510b02f97ae372"
+        }
+      ],
+      "adaptations": [
+        "已迁移原文保持不动；此前核对为标题、路径、转义与行尾适配"
+      ]
+    },
+    {
+      "slug": "agent-skill-system",
+      "source": "docs/工具管理模块/为你的Agent集成Skill系统.md",
+      "sourceSha256": "414ead7352ae26551c9d9661d12d199fe238ca79ac31f6c9c8ade264d63154f0",
+      "bodySha256": "909f22df7fe07ff8b76ad3ce77acf6e0c52684de37db7285ad7c46e9de70c7cc",
+      "assets": [
+        {
+          "source": "docs/.vitepress/dist/assets/BH9kbQf7GoZGUXx5RHDcrzuDnfh.C8QTNaTo.png",
+          "target": "src/assets/blog/source/skill-system/BH9kbQf7GoZGUXx5RHDcrzuDnfh.png",
+          "sha256": "38c43bde77313668e165c0d7cddb998a79eaf70a3931e4898dad422ae91fb8e7"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/XF5ybPkrbolYg6xGvAfciXZEnvd.C3ajlNAh.png",
+          "target": "src/assets/blog/source/skill-system/XF5ybPkrbolYg6xGvAfciXZEnvd.png",
+          "sha256": "ec7d6b3e164afea153b50da86e166235ec4dba942828893f78ed5337186a4718"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/OtzQbJZakoj0TNxJrWAcdLKFnbb.CAEBZtHQ.png",
+          "target": "src/assets/blog/source/skill-system/OtzQbJZakoj0TNxJrWAcdLKFnbb.png",
+          "sha256": "75c34e79a4c6db4cade9b7bf656be05a8b45fe66d26067cbee14b9b1d9fd1f35"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/UhRmbzL4moEjr6xkx64cYcnOn9d.BBTH1WJp.png",
+          "target": "src/assets/blog/source/skill-system/UhRmbzL4moEjr6xkx64cYcnOn9d.png",
+          "sha256": "e87c32090dbf44c91329129df425a63272a790723a272ba8c4e4485a9cbabdfb"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/Kjujba3FOodXLnxZG4lcnF3YnUh.C8qourqO.png",
+          "target": "src/assets/blog/source/skill-system/Kjujba3FOodXLnxZG4lcnF3YnUh.png",
+          "sha256": "8526e1efe37fa68835fae8e88df554e3bdb808889d51f62259a70100cc6d8ccc"
+        }
+      ],
+      "adaptations": [
+        "已迁移原文保持不动；此前核对为标题、路径、转义与行尾适配"
+      ]
+    },
+    {
+      "slug": "pi-llm-runtime-design",
+      "source": "docs/LLM模块/学习和整理PI的LLM模块.md",
+      "sourceSha256": "ae76622b009496baa7737d69753dd0334de7bc40164e1d510dd5e7b161b0f70c",
+      "bodySha256": "0b95461f8a34f52f2fe4d4d72a99a077b08d43fb17232fee0682fb7d9203946a",
+      "assets": [
+        {
+          "source": "docs/.vitepress/dist/assets/1.B3LGim-L.PNG",
+          "target": "src/assets/blog/source/pi-llm/1.PNG",
+          "sha256": "7f60b0b72b423eebe497442cb36efac4c7cb04d1786f20173d78c0c16f821492"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/2.wnsgt4Z6.PNG",
+          "target": "src/assets/blog/source/pi-llm/2.PNG",
+          "sha256": "a882ea17923ae53e7a50d1eb44192457a48091ecea3ce3f87437bc9c8b01e761"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/3._hJEtvGQ.png",
+          "target": "src/assets/blog/source/pi-llm/3.png",
+          "sha256": "d4d2e8255e16915e6c56373d7ea4e1d8bc8a4dbef92acf36266caad3ddb8ff78"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/4.V7w3oXBc.png",
+          "target": "src/assets/blog/source/pi-llm/4.png",
+          "sha256": "2f09aecd510ae96ecf01a89c6b0c5ec0ef39886d01d1c85ad543a731ddfa6b3a"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/事件流.Bh9u07fS.png",
+          "target": "src/assets/blog/source/pi-llm/事件流.png",
+          "sha256": "7695097c323cba2ebab146d29ae8cf85e629f8a3e0927a46d0fe37065052de3a"
+        },
+        {
+          "source": "docs/.vitepress/dist/assets/6.BfbDP3Q7.png",
+          "target": "src/assets/blog/source/pi-llm/6.png",
+          "sha256": "f497ab2d28eaceb10cfeb44efeac5e70f962181d58758dbc9fefc135cd84c0d6"
+        }
+      ],
+      "adaptations": [
+        "已迁移原文保持不动；此前核对为标题、路径、转义与行尾适配"
+      ]
+    }
+  ],
+  "restoredImages": [
+    {
+      "article": "actspace-agent-evaluation",
+      "target": "src/assets/blog/source/evaluation/architecture.png",
+      "sha256": "4e55782ca165d0b7a87b7cbfc918a565dd14f8efca14be8e26ec04ab7ddc97e0",
+      "source": "User supplied 1280X1280.PNG, 2026-09-19",
+      "reason": "Replace expired authenticated image URL; preserve original article position and prose."
+    }
+  ]
+}

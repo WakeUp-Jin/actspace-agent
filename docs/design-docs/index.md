@@ -29,6 +29,7 @@
 - `core-review-large-diff-loading.md`：Review Standard/capped 双模式、批量 patch、完整文件正文、虚拟渲染和性能验收规范。
 - `agent-index.md`：Agent Runtime 和全部 Agent 专题的总入口。
 - `website-introduction-site-design.md`：`apps/site` 官网、公开文档、博客、更新页、视觉系统和静态部署的长期设计规范。
+- [官网双主题样稿](website-xai-preview.md)：已确认的黑白直角方向，首页与更新详情交互原型；正式网站尚未迁移。
 
 ## 一级专题目录
 
@@ -83,3 +84,5 @@
 - 外部资料、调研底稿和历史快照放在 `docs/references/`。
 - 当前实现变化需要同步设计文档，但不要把逐次实现流水账堆进长期设计入口。
 - `docs/references/llm-agent-dev-skill-fixes/README.md` 是 Skill 修复分析归档，不作为主线架构事实来源。
+
+- [ActSpace 官网专属设计规范](../../apps/site/DESIGN.md)：产品参考取舍、双主题、排版与官网各页面设计方向。

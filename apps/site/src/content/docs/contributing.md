@@ -1,68 +1,49 @@
 ---
-title: 开发与贡献
-description: 了解仓库结构、文档同步、测试、history 和 Pull Request 的默认要求。
-group: contributing
-order: 1
-updatedAt: 2026-07-27
+title: "开发与贡献"
+description: "从仓库导航进入实现，按变更范围同步文档和验证。"
+group: "settings-development"
+order: 5
+updatedAt: 2026-09-19
 draft: false
 ---
 
-ActSpace 是为 Agent-first 开发准备的仓库，但协作规则对人和 Agent 完全相同：重要知识必须落到版本化文件中，行为变化需要同步代码、测试和文档。
+ActSpace 的正式开发知识位于仓库 `docs/`。官网文档面向使用者，设计文档和执行记录面向维护者，修改功能时需要同步对应入口。
 
-## 从仓库导航开始
+## 先读仓库导航
 
-每轮开发先阅读根目录 `AGENTS.md`，再按任务进入对应正式文档：
+开始前阅读根目录 `AGENTS.md`，再进入 `docs/REPO_COLLAB_GUIDE.md`、`docs/ARCHITECTURE.md` 和 `docs/design-docs/core-beliefs.md`。当前 v2 专题是实现入口，`docs/archive/v1/` 用于历史追溯。
 
-- `docs/REPO_COLLAB_GUIDE.md`：提交、验证与协作约定。
-- `docs/ARCHITECTURE.md`：顶层包边界和阅读路线。
-- `docs/design-docs/core-beliefs.md`：Agent-first 的设计出发点。
-- `docs/CODING_BEHAVIOR.md`：改代码时的操作纪律。
+复杂或跨多轮的变更在 `docs/exec-plans/active/` 建计划，执行过程放在 `docs/exec-runs/`，完成后记录 `docs/histories/` 并更新计划状态。
 
-复杂或跨多轮的变更，应在 `docs/exec-plans/active/` 建 execution plan，并在完成后移入 `completed/`。
+## 主要目录
 
-## 仓库结构
+| 目录 | 职责 |
+| --- | --- |
+| `apps/desktop` | Electron 主进程、preload 与界面 |
+| `apps/cli` | 命令行入口和输出契约 |
+| `apps/site` | 官网、公开文档、博客与更新页 |
+| `packages/runtime` | 运行时启动、应用组合和生命周期 |
+| `packages/core`、`session`、`llm`、`tools` 等 | Agent、日志、模型、工具等独立领域包 |
+| `packages/shared` | 跨进程和跨包契约 |
+| `browser-bridge` | Go CLI、Chrome 扩展和浏览器协议 |
 
-```text
-apps/desktop      Electron main、preload 与 renderer
-packages/runtime      Host-facing boot、Profile/Bundle composition、projection 与 shutdown
-packages/core/*       Agent、Scope、Agent Loop 等核心语义插件
-packages/session/*    Journal、JSONL、Persistence 与 Projection 包
-packages/llm/*        LLM service 与 provider adapter 包
-packages/tools/*      Tool runtime、approval、core tools 与 Browser tools
-packages/shared       跨进程契约和共享类型
-apps/site         Astro 官网、文档、博客与更新页
-browser-bridge/       Browser Bridge 外部 Host capability
-docs/                 正式知识库、设计、计划、历史与发布记录
-```
+应用通过运行时与领域包协作，renderer 不直接访问文件系统，凭据由 Host 管理。变更前先确认对应专题约束，不从历史示例推断当前接口。
 
-默认 TypeScript 依赖方向为 `desktop/cli -> runtime facade -> domain packages -> shared`。renderer 不能直接访问文件系统；密钥不进入 renderer 或 Session Journal。
+## 开发与验证
 
-## 修改代码
+桌面开发使用 `pnpm dev:log`。完整检查入口是 `pnpm ci`，也应根据变更范围运行针对性的测试。涉及桌面界面时，按仓库前端验证指南区分自动化、浏览器和真实 Electron 验收。
 
-优先选择小而清晰的抽象。不要大范围重写用户已有修改，也不要把与任务无关的格式化混入 diff。
-
-如果实现让某份文档过期，在同一轮任务中更新它。用户可感知的功能补充 `docs/releases/`，完成的代码变更记录到 `docs/histories/`。
-
-## 验证
-
-Pull Request 前运行：
+官网可以单独运行：
 
 ```sh
-pnpm ci
-```
-
-网站可以单独验证：
-
-```sh
+pnpm dev:site
 pnpm check:site
 pnpm test:site
 pnpm build:site
 ```
 
-涉及界面颜色时必须同时检查浅色、深色和跟随系统三种主题，并运行主题字面量检查。
+默认站点基础路径是 `/actspace-agent`。博客原文和配图放在官网内容与资产目录，维护规范见 `apps/site/CONTENT_SOURCES.md`；截图替换清单见 `apps/site/SCREENSHOTS.md`。
 
-## 提交 Pull Request
+## 提交变更
 
-PR 应保持范围清晰，说明风险、迁移影响和后续待办。上下文复杂时直接链接 execution plan、设计规范或 history，不要假设评审者能从聊天记录还原决策。
-
-项目使用 [Apache License 2.0](https://github.com/WakeUp-Jin/actspace-agent/blob/main/LICENSE)。提交代码即表示你有权按该许可证贡献相应内容。
+保留与任务无关的已有修改，PR 写清具体行为、验证结果和仍需人工确认的范围。项目采用 [Apache License 2.0](https://github.com/WakeUp-Jin/actspace-agent/blob/main/LICENSE)，贡献者应有权提供所提交的代码和材料。

@@ -1,231 +1,69 @@
 ---
-import BaseLayout from "../../layouts/BaseLayout.astro";
-import { blogHref, getPublicPosts, readingTime } from "../../lib/blog";
-import { sitePath } from "../../lib/site-path";
-
-const posts = await getPublicPosts();
-const allTags = Array.from(new Set(posts.flatMap((post) => post.data.tags)));
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import {blogHref,getPublicPosts} from '../../lib/blog';
+import {presentationFor} from '../../lib/blog-presentation';
+import {sitePath} from '../../lib/site-path';
+import '../../styles/blog.css';
+const posts=await getPublicPosts();
+const categories=[...new Set(posts.map(p=>presentationFor(p.id)?.category??p.data.tags[0]))];
+const images=import.meta.glob<{default:ImageMetadata}>('../../assets/blog/covers/*.png',{eager:true});
+import type {ImageMetadata} from 'astro';
 ---
-
-<BaseLayout title="ActSpace 博客" description="关于 Agent、工具、上下文与产品设计的思考。">
-  <main id="main-content">
-    <header class="blog-hero site-page">
-      <p class="site-kicker">Ideas from the runtime</p>
-      <h1>Agent 工程手记</h1>
-      <p>Context、工具、权限、产品设计与真实开发过程。不是公告的延长版，而是把取舍讲清楚。</p>
-    </header>
-
-    <section class="blog-browser site-page" aria-labelledby="all-posts-title">
-      <aside>
-        <p>浏览主题</p>
-        <a href="#all-posts">全部文章 <span>{posts.length}</span></a>
-        {allTags.map((tag) => <a href={`#tag-${tag.toLowerCase().replace(/\s+/g, "-")}`}>{tag}</a>)}
-      </aside>
-
-      <div id="all-posts">
-        <div class="posts-heading">
-          <h2 id="all-posts-title">全部文章</h2>
-          <p>{posts.length} 篇</p>
-        </div>
-        <div class="post-grid">
-          {posts.map((post) => (
-            <article>
-              <a class="cover" href={sitePath(blogHref(post))}>
-                <img src={sitePath(post.data.cover)} alt="" />
-              </a>
-              <div class="post-copy">
-                <div class="meta">
-                  <time datetime={post.data.publishedAt.toISOString()}>{post.data.publishedAt.toLocaleDateString("zh-CN")}</time>
-                  <span>{readingTime(post.body ?? "")} 分钟阅读</span>
-                </div>
-                <h3><a href={sitePath(blogHref(post))}>{post.data.title}</a></h3>
-                <p>{post.data.description}</p>
-                <div class="tags">
-                  {post.data.tags.map((tag) => <span id={`tag-${tag.toLowerCase().replace(/\s+/g, "-")}`}>{tag}</span>)}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  </main>
+<BaseLayout title="ActSpace 博客" description="关于 Agent 的设计、工程与实践。">
+<main id="main-content">
+<h1 class="sr-only">博客</h1>
+<section class="wrap blog-browser">
+<aside class="blog-filters">
+<h2>筛选与排序</h2>
+<label>排序<select id="blog-sort">
+<option value="new">最新发布</option>
+<option value="old">最早发布</option>
+</select>
+</label>
+<details class="blog-filter-group" open>
+<summary>分类</summary>
+<div class="blog-filter-options">{categories.map(category=>
+<label>
+<input type="checkbox" name="blog-category" value={category}/>
+<span>{category}</span>
+</label>)}</div>
+</details>
+<p id="blog-count" aria-live="polite">{posts.length} 篇文章</p>
+</aside>
+<div class="blog-results">
+<div class="blog-toolbar">
+<input id="blog-search" type="search" aria-label="搜索文章" placeholder="搜索文章…"/>
+<div class="blog-views" role="group" aria-label="文章布局">
+<button data-blog-view="grid" aria-pressed="true">▦ 网格</button>
+<button data-blog-view="list" aria-pressed="false">☰ 列表</button>
+</div>
+</div>
+<div class="blog-grid">
+{posts.map(post=>{const meta=presentationFor(post.id);const image=images[`../../assets/blog/covers/character-${meta?.cover}.png`]?.default;return <a class="blog-card" href={sitePath(blogHref(post))} data-category={meta?.category??post.data.tags[0]} data-date={post.data.publishedAt.toISOString()}>
+<div class="blog-cover">
+<img src={image?.src??sitePath(post.data.cover)} width="1254" height="1254" alt="" loading="lazy"/>
+</div>
+<div class="blog-card-copy">
+<time datetime={post.data.publishedAt.toISOString()}>{post.data.publishedAt.toISOString().slice(0,10)}</time>
+<h2>{post.data.title}</h2>
+<p class="blog-card-summary">{post.data.description}</p>
+<span class="blog-category">{meta?.category??post.data.tags[0]}</span>
+</div>
+</a>})}
+</div>
+<p id="blog-empty" hidden>没有匹配的文章，试试其他关键词或分类。</p>
+</div>
+</section>
+</main>
 </BaseLayout>
-
-<style>
-  .blog-hero {
-    padding-block: clamp(140px, 17vw, 250px) clamp(76px, 10vw, 130px);
-  }
-
-  h1 {
-    max-width: 1050px;
-    margin-block: 26px;
-    font-family: var(--site-font-serif);
-    font-size: clamp(60px, 8.5vw, 118px);
-    font-weight: 500;
-    letter-spacing: -0.075em;
-    line-height: 0.98;
-  }
-
-  .blog-hero > p:last-child {
-    max-width: 700px;
-    color: var(--site-body);
-    font-size: 18px;
-    line-height: 1.8;
-  }
-
-  .blog-browser {
-    display: grid;
-    grid-template-columns: 190px minmax(0, 1fr);
-    gap: clamp(46px, 7vw, 100px);
-    padding-bottom: clamp(110px, 15vw, 190px);
-  }
-
-  aside {
-    position: sticky;
-    top: 110px;
-    align-self: start;
-    display: grid;
-  }
-
-  aside > p {
-    border-bottom: 1px solid var(--site-line-strong);
-    margin: 0 0 9px;
-    padding-bottom: 14px;
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  aside a {
-    display: flex;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--site-line);
-    padding-block: 12px;
-    color: var(--site-body);
-    text-decoration: none;
-    font-size: 12px;
-  }
-
-  aside a:hover {
-    color: var(--site-ink);
-  }
-
-  .posts-heading {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    border-bottom: 1px solid var(--site-line-strong);
-    margin-bottom: 28px;
-    padding-bottom: 16px;
-  }
-
-  .posts-heading h2,
-  .posts-heading p {
-    margin: 0;
-  }
-
-  .posts-heading h2 {
-    font-size: 18px;
-  }
-
-  .posts-heading p {
-    color: var(--site-muted);
-    font-family: var(--site-font-mono);
-    font-size: 10px;
-  }
-
-  .post-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 30px 22px;
-  }
-
-  article {
-    overflow: hidden;
-    border: 1px solid var(--site-line);
-    border-radius: 18px;
-    background: var(--site-surface);
-  }
-
-  .cover {
-    display: block;
-    overflow: hidden;
-    aspect-ratio: 5 / 3;
-    background: var(--site-operational-soft);
-  }
-
-  .cover img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 320ms ease;
-  }
-
-  article:hover .cover img {
-    transform: scale(1.015);
-  }
-
-  .post-copy {
-    min-height: 320px;
-    padding: clamp(24px, 3vw, 38px);
-  }
-
-  .meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    color: var(--site-muted);
-    font-family: var(--site-font-mono);
-    font-size: 10px;
-  }
-
-  h3 {
-    margin: 30px 0 16px;
-    font-family: var(--site-font-serif);
-    font-size: clamp(28px, 3vw, 38px);
-    font-weight: 500;
-    letter-spacing: -0.04em;
-    line-height: 1.08;
-  }
-
-  h3 a {
-    text-decoration: none;
-  }
-
-  .post-copy > p {
-    color: var(--site-body);
-    font-size: 14px;
-    line-height: 1.7;
-  }
-
-  .tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 30px;
-  }
-
-  .tags span {
-    border: 1px solid var(--site-line);
-    border-radius: 999px;
-    padding: 5px 9px;
-    color: var(--site-muted);
-    font-size: 10px;
-  }
-
-  @media (max-width: 900px) {
-    .blog-browser {
-      grid-template-columns: 1fr;
-    }
-
-    aside {
-      position: static;
-    }
-  }
-
-  @media (max-width: 680px) {
-    .post-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>
+<script>
+const grid=document.querySelector<HTMLElement>('.blog-grid')!;
+const cards=[...grid.querySelectorAll<HTMLElement>('.blog-card')];
+const search=document.querySelector<HTMLInputElement>('#blog-search')!;
+const sort=document.querySelector<HTMLSelectElement>('#blog-sort')!;
+const checks=[...document.querySelectorAll<HTMLInputElement>('input[name="blog-category"]')];
+function filter(){const selected=checks.filter(c=>c.checked).map(c=>c.value);const query=search.value.trim().toLocaleLowerCase();let count=0;[...cards].sort((a,b)=>(sort.value==='old'?1:-1)*(a.dataset.date??'').localeCompare(b.dataset.date??'')).forEach(card=>{card.hidden=!(selected.length===0||selected.includes(card.dataset.category??''))||!card.textContent?.toLocaleLowerCase().includes(query);if(!card.hidden)count++;grid.append(card)});document.querySelector('#blog-count')!.textContent=count+' 篇文章';document.querySelector<HTMLElement>('#blog-empty')!.hidden=count!==0;}
+checks.forEach(c=>c.addEventListener('change',filter));search.addEventListener('input',filter);sort.addEventListener('change',filter);
+const category=new URLSearchParams(location.search).get('category');if(category){checks.forEach(c=>c.checked=c.value===category);filter();}
+document.querySelectorAll<HTMLButtonElement>('[data-blog-view]').forEach(button=>button.addEventListener('click',()=>{grid.dataset.view=button.dataset.blogView;document.querySelectorAll('[data-blog-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)))}));
+</script>
