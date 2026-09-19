@@ -46,7 +46,7 @@ import type { ModelStoreService, ModelStoreResult } from "../model-store-service
 import type { BrowserBridgeService } from "../browser-bridge-service";
 import type { QuickOpenShortcutController } from "../quick-open-shortcut-controller";
 import type { SettingsService } from "../settings-service";
-import { createWorkspaceFolder, resolveRegisteredWorkspaceSelection, setWorkspaceHidden, type WorkspaceRegistryOptions } from "../workspace-registry-service";
+import { createWorkspaceFolder, resolveWorkspaceSelection, resolveRegisteredWorkspaceSelection, setWorkspaceHidden, type WorkspaceRegistryOptions } from "../workspace-registry-service";
 import { getWorkspaceGitContext } from "../workspace-git-context-service";
 import { openWorkspaceInIde } from "../workspace-ide-service";
 import { initializeGitRepository } from "../review-git-service";
@@ -504,9 +504,13 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     return { canceled: result.canceled, attachments: images };
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.importComposerImage, (_event, input: Parameters<typeof importComposerImage>[0]) => importComposerImage(input, options.roots.tmpRoot, imagePreviewDataUrl));
-  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, async (): Promise<SelectWorkspaceDirectoryResult> => {
+  handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.selectWorkspaceDirectory, async (_event, input: import("@actspace/shared").SelectWorkspaceDirectoryInput = {}): Promise<SelectWorkspaceDirectoryResult> => {
     const result = await dialog.showOpenDialog(options.getMainWindow(), { properties: ["openDirectory"] });
-    return result.canceled || !result.filePaths[0] ? { canceled: true } : { canceled: false, workspaceRoot: result.filePaths[0] };
+    if (result.canceled || !result.filePaths[0]) return { canceled: true };
+    if (!input.registerWorkspace) return { canceled: false, workspaceRoot: result.filePaths[0] };
+    const resolved = await resolveWorkspaceSelection(registryOptions, { workspaceRoot: result.filePaths[0] });
+    if (resolved.ok === false) throw new Error(resolved.error);
+    return { canceled: false, workspaceRoot: resolved.workspaceRoot };
   });
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.openWorkspaceInIde, (_event, input: { workspaceId: string }) => openWorkspaceInIde(registryOptions, input.workspaceId));
   handle(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setWorkspaceVisibility, (_event, input: { workspaceId: string; hidden: boolean }) => setWorkspaceHidden(registryOptions, input.workspaceId, input.hidden));

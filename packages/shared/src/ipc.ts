@@ -400,6 +400,11 @@ export type SkillListInput = {
   workspaceRoot?: string;
 };
 
+export type SelectWorkspaceDirectoryInput = {
+  /** Only workspace adoption registers the chosen folder; auxiliary directory picks do not. */
+  registerWorkspace?: boolean;
+};
+
 export type SelectWorkspaceDirectoryResult = {
   canceled: boolean;
   workspaceRoot?: string;

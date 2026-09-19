@@ -35,6 +35,6 @@ draft: false
 
 任务仍在运行时可以停止。停止会结束当前执行，但不会自动撤销已经写入的文件。要尝试另一种方向，可以[分支会话](../sessions/)，并按需要使用独立 Worktree 隔离后续文件改动。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="review-diff.png">
-<figcaption><span class="screenshot-label">待补实拍 · 04</span><strong>Review 文件差异</strong><code>review-diff.png</code><p>完成小修改后打开右侧 Review，选择有实际差异的范围</p></figcaption>
-</figure>
+![Review 未提交范围中的文件列表与新增行差异](../../assets/screenshots/docs/review-diff.png)
+
+*Review 未提交范围中的文件列表与新增行差异。*

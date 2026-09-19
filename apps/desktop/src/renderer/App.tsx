@@ -1840,7 +1840,7 @@ export function App() {
     }
 
     try {
-      const result = await window.actspace.selectWorkspaceDirectory();
+      const result = await window.actspace.selectWorkspaceDirectory({ registerWorkspace: true });
       if (result.canceled || !result.workspaceRoot) return;
       await handleCreateSession({ workspaceRoot: result.workspaceRoot });
     } catch (error) {
@@ -1851,7 +1851,7 @@ export function App() {
   const handleUseExistingWorkspace = useCallback(async () => {
     if (!hasActspaceBridge() || !window.actspace.selectWorkspaceDirectory) return;
     try {
-      const result = await window.actspace.selectWorkspaceDirectory();
+      const result = await window.actspace.selectWorkspaceDirectory({ registerWorkspace: true });
       if (result.canceled || !result.workspaceRoot) return;
       setSelectedWorkspaceRoot(normalizeWorkspaceRoot(result.workspaceRoot));
     } catch (error) {

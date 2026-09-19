@@ -18,7 +18,7 @@ declare global {
       importComposerImage?: (
         input: import("@actspace/shared").ImportComposerImageInput
       ) => Promise<import("@actspace/shared").ImportComposerImageResult>;
-      selectWorkspaceDirectory?: () => Promise<import("@actspace/shared").SelectWorkspaceDirectoryResult>;
+      selectWorkspaceDirectory?: (input?: import("@actspace/shared").SelectWorkspaceDirectoryInput) => Promise<import("@actspace/shared").SelectWorkspaceDirectoryResult>;
       getPathForFile?: (file: File) => string;
       visualizeReply: (
         input: import("@actspace/shared").VisualizeReplyInput

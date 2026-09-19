@@ -49,6 +49,12 @@ Git repository state 是默认事实来源。`Last Turn` 是 Agent 行为视角�
 
 Renderer 只发送稳定 selection、snapshot id 和用户意图。Main 重新解析 registered workspace，使用固定 argv 调用 Git。Renderer 不运行 Git、不拼 shell、不解析 raw file header。
 
+### 工作区注册与 Git 仓库的边界
+
+工作区注册只把用户选用的目录加入应用数据目录中的 `workspaces.json`，不创建 `.git`、不运行 `git init`，也不提交文件。用户选择“添加工作区”或“使用现有文件夹”时，目录选择 IPC 显式传入 `registerWorkspace: true`；选父目录或能力配置目录时不注册。
+
+Desktop Host 在创建会话前注册其工作区，在启动完成前从持久化会话摘要补齐旧工作区。恢复操作合并已有条目，保留稳定 ID 和隐藏偏好。Review、环境查询和 Git mutation 继续只接受已注册目录，不因查询时收到未知路径就自动注册。已注册的非 Git 目录返回不可用状态，初始化 Git 仍是独立的用户操作。
+
 ### 摘要先行、Diff 按需加载
 
 打开 Review 先返回文件 summary 和 totals。Standard mode 批量读取当前 snapshot 的 patch，并虚拟渲染全部文件；大变更进入 capped mode，只请求和挂载当前选中文件。完整文件正文独立于 patch，按可见范围懒加载。详细规则见 `core-review-large-diff-loading.md`。

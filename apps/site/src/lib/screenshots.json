@@ -19,9 +19,9 @@
   },
   "review-diff.png": {
     "number": 4,
-    "instruction": "完成小修改后打开右侧 Review，选择有实际差异的范围",
+    "instruction": "Review 未提交范围中的文件列表与新增行差异",
     "usage": "Review 展示；审阅、首次任务",
-    "status": "missing"
+    "status": "ready"
   },
   "skill-invocation.png": {
     "number": 5,

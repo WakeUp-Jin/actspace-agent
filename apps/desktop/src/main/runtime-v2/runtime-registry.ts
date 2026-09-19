@@ -1,5 +1,6 @@
 import type { EnglishLearningService, SpeechHostPort } from "@actspace/english-learning";
 import type { EnglishLearningTargetInput, EnglishLearningState } from "@actspace/shared";
+import { readWorkspaceRegistry, resolveWorkspaceSelection } from "../workspace-registry-service";
 import { FixedRendererStreamAdapter } from "./fixed-renderer-stream-adapter";
 import { observeSessionRevisions } from "./session-revision-observer";
 import { randomUUID } from "node:crypto";
@@ -94,7 +95,12 @@ export class DesktopRuntimeV2Registry {
   async exportSession(sessionId: string) { return Object.freeze({ sessionId, jsonl: await this.requireApp().exportSession(sessionId) }); }
 
   async createSession(sessionId?: string, workspaceRoot?: string) {
-    const snapshot = await this.requireApp().createMainSession(sessionId, workspaceRoot);
+    const app = this.requireApp();
+    const resolved = await resolveWorkspaceSelection(this.workspaceRegistryOptions(), {
+      workspaceRoot: workspaceRoot ?? this.options.roots.workspaceRoot,
+    });
+    if (resolved.ok === false) throw new Error(resolved.error);
+    const snapshot = await app.createMainSession(sessionId, resolved.workspaceRoot);
     this.#emitDurableChanged(snapshot.sessionId, snapshot.throughJournalSeq, "session-created");
     return snapshot;
   }
@@ -338,6 +344,17 @@ export class DesktopRuntimeV2Registry {
         onRuntimeLive: (update) => this.#emitRuntimeLive(update),
       });
       this.#profile = booted.profile;
+      // Restore admission from persisted session facts before the desktop starts serving them.
+      await readWorkspaceRegistry({
+        ...this.workspaceRegistryOptions(),
+        sessions: (await this.requireApp().listSessions()).map((session) => ({
+          id: session.sessionId,
+          title: session.metadata.title ?? "New chat",
+          updatedAt: session.updatedAt,
+          agentRunCount: session.completedTurnCount ?? 0,
+          workspaceRoot: session.workspaceRoot ?? undefined,
+        })),
+      });
       this.#stopSessionRevisions = observeSessionRevisions(booted.profile.context, (sessionId, seq, titleChanged) => this.#emitDurableChanged(sessionId, seq, titleChanged ? "session-title-updated" : "journal-advanced"));
       this.#artifacts = booted.artifacts;
       this.#bootError = null;
@@ -351,6 +368,11 @@ export class DesktopRuntimeV2Registry {
       this.options.log?.("runtime v2 boot failed", { error: this.#bootError });
       throw error;
     }
+  }
+
+  private workspaceRegistryOptions() {
+    const roots = this.options.roots;
+    return { dataRoot: roots.dataRoot, defaultWorkspaceRoot: roots.defaultWorkspaceRoot, fallbackWorkspaceRoot: roots.workspaceRoot };
   }
 
   private requireProfile(): BootedRuntimeProfile {

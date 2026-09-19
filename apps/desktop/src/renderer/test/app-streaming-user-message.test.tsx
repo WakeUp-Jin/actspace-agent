@@ -2065,8 +2065,8 @@ sessionId: input.sessionId,
 
     await waitFor(() => {
       expect(selectWorkspaceDirectory).toHaveBeenCalledTimes(1);
+      expect(selectWorkspaceDirectory).toHaveBeenCalledWith({ registerWorkspace: true });
       expect(createSession).toHaveBeenCalledWith({
-        title: "New chat",
         workspaceRoot: "/tmp/new-workspace",
       });
     });

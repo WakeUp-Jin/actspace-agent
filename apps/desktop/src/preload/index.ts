@@ -74,6 +74,7 @@ import type {
   SelectFilesResult,
   SelectImagesResult,
   SkillListInput,
+  SelectWorkspaceDirectoryInput,
   SelectWorkspaceDirectoryResult,
   SessionArchiveInput,
   SessionArchiveManyInput,
@@ -303,8 +304,8 @@ contextBridge.exposeInMainWorld("actspace", {
   selectImages: () => invokeFixedRenderer("dialog:select-images") as Promise<SelectImagesResult>,
   importComposerImage: (input: ImportComposerImageInput) =>
     invokeFixedRenderer("composer:import-image", input) as Promise<ImportComposerImageResult>,
-  selectWorkspaceDirectory: () =>
-    invokeFixedRenderer("dialog:select-workspace-directory") as Promise<SelectWorkspaceDirectoryResult>,
+  selectWorkspaceDirectory: (input?: SelectWorkspaceDirectoryInput) =>
+    invokeFixedRenderer("dialog:select-workspace-directory", input) as Promise<SelectWorkspaceDirectoryResult>,
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   visualizeReply: (input: VisualizeReplyInput) =>
     invokeFixedRenderer("visualize:convert-reply", input) as Promise<VisualizeReplyResult>,

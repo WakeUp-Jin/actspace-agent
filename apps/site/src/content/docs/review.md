@@ -22,9 +22,9 @@ draft: false
 
 可用范围和操作取决于目录是否为 Git 仓库，以及当前是否具备相应比较依据。Last Turn 只描述 Agent 对应一轮的改动，不能代替整个工作区的 Git 状态。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="review-diff.png">
-<figcaption><span class="screenshot-label">待补实拍 · 04</span><strong>Review 文件差异</strong><code>review-diff.png</code><p>完成小修改后打开右侧 Review，选择有实际差异的范围</p></figcaption>
-</figure>
+![Review 未提交范围中的文件列表与新增行差异](../../assets/screenshots/docs/review-diff.png)
+
+*Review 未提交范围中的文件列表与新增行差异。*
 
 ## 检查并处理改动
 
