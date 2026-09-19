@@ -21,17 +21,9 @@ draft: false
 
 分支会话不会回滚或克隆工作区文件。如果两个会话指向同一个目录，仍会看到该目录当前的文件状态。希望同时做互不干扰的代码改动，先了解[Git Worktree](../workspaces/)。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="session-management.png">
-<figcaption><span class="screenshot-label">待补实拍 · 15</span><strong>会话操作菜单</strong><code>session-management.png</code><p>示例会话的操作菜单展开，侧栏保留项目分组</p></figcaption>
-</figure>
-
 ## 切换会话与后台执行
 
 切换到另一条会话后，原会话中已经开始的任务继续运行。通过侧栏运行状态确认任务仍在推进；返回原会话可继续查看工具、子任务和审批状态。切换会话与点击停止是不同操作。
-
-<figure class="product-shot screenshot-placeholder" data-screenshot="background-session.png">
-<figcaption><span class="screenshot-label">待补实拍 · 16</span><strong>切换会话后的后台任务</strong><code>background-session.png</code><p>一条示例会话仍运行，切到另一会话，侧栏保留前一会话的运行标识</p></figcaption>
-</figure>
 
 ## 归档与恢复
 

@@ -15,9 +15,9 @@ draft: false
 
 一个模型是否出现，取决于它是否已安装、启用、具备当前用途所需能力，以及绑定的连接是否可用。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="model-picker.png">
-<figcaption><span class="screenshot-label">待补实拍 · 11</span><strong>选择当前会话模型</strong><code>model-picker.png</code><p>展开输入框模型选择器，显示两个以上实际启用的模型和当前选中项</p></figcaption>
-</figure>
+![当前模型及 Thinking、Effort 菜单](../../assets/screenshots/docs/model-picker.png)
+
+*当前模型及 Thinking、Effort 菜单。*
 
 ## 思考开关和档位
 
@@ -25,17 +25,13 @@ draft: false
 
 更高的思考档位可能增加等待时间和用量。调整后用一个明确的小任务观察结果，再通过[使用统计](../usage/)查看实际请求。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="reasoning-picker.png">
-<figcaption><span class="screenshot-label">待补实拍 · 12</span><strong>模型思考档位</strong><code>reasoning-picker.png</code><p>选择支持推理的模型，展开它的思考档位菜单</p></figcaption>
-</figure>
-
 ## 自定义模型的推理配置
 
 在模型连接详情中编辑自定义模型，可以参考已知模型的能力，或手动设置推理支持、可选档位、默认值和关闭方式。保存后回到输入框检查可选档位；实际支持范围以所连接服务为准。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="custom-model-reasoning.png">
-<figcaption><span class="screenshot-label">待补实拍 · 10</span><strong>自定义模型推理配置</strong><code>custom-model-reasoning.png</code><p>打开自定义模型编辑，展示推理支持、档位和默认配置，密钥不入镜</p></figcaption>
-</figure>
+![自定义连接表单中的模型推理能力配置入口（尚未填写）](../../assets/screenshots/docs/custom-model-reasoning.png)
+
+*自定义连接表单中的模型推理能力配置入口（尚未填写）。*
 
 ## 辅助任务和子任务
 

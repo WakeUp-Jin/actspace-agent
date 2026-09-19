@@ -15,19 +15,11 @@ draft: false
 
 已生成的历史回复不会重新翻译，开启之前正在生成的回答也不追溯朗读。应用重启后能力恢复为关闭，需要再次开启；上次会话选择和语音配置会保留。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="english-learning.png">
-<figcaption><span class="screenshot-label">待补实拍 · 33</span><strong>开启英语辅助学习</strong><code>english-learning.png</code><p>扩展 → 能力，截取英语辅助学习卡片已绑定示例会话且开启的状态。</p></figcaption>
-</figure>
-
 ## 配置语音
 
 打开“设置 → 通用 → 语音播放”，配置 MiniMax 中国站 Key、模型、音色和语速。可以先试听，再回到绑定会话发起一条新消息。
 
 语音会把需要朗读的英文发送给 MiniMax。当前本地播放使用 macOS 能力；其他平台可保留双语回复，但不能假定语音播放已可用。
-
-<figure class="product-shot screenshot-placeholder" data-screenshot="english-reply.png">
-<figcaption><span class="screenshot-label">待补实拍 · 34</span><strong>真实英中对照回复</strong><code>english-reply.png</code><p>截取前一张所绑定会话的一次真实英中回复，英文在前、中文在后。</p></figcaption>
-</figure>
 
 ## 停止与关闭
 

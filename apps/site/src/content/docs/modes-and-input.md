@@ -19,19 +19,15 @@ draft: false
 
 这些模式决定本轮可用能力。Plan 模式下写一句“请直接改文件”，不会因此获得写入工具；要执行方案，需要切换到 Agent。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="mode-picker.png">
-<figcaption><span class="screenshot-label">待补实拍 · 13</span><strong>Chat、Plan 与 Agent 模式</strong><code>mode-picker.png</code><p>展开 Chat / Plan / Agent 菜单，保留输入框与模式入口</p></figcaption>
-</figure>
-
 ## 附件和 Skill
 
 将文件拖入输入框，或使用附件入口。图片会显示缩略图，其他文件显示文件项；发送前可以移除。附件的可用方式取决于文件类型和模型能力，图片的具体路径见[图片理解与生成](../images/)。
 
 需要按既有流程处理任务时，可以选择 [Skill](../skills/)。仍建议在正文里说清楚这次要处理的对象和预期结果。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="skill-invocation.png">
-<figcaption><span class="screenshot-label">待补实拍 · 05</span><strong>选择 Skill 并准备任务</strong><code>skill-invocation.png</code><p>在输入框选中一个已安装的真实 Skill，并写好与它匹配的任务；发送前截图</p></figcaption>
-</figure>
+![在输入框选择 ui Skill 并准备任务](../../assets/screenshots/docs/skill-invocation.png)
+
+*在输入框选择 ui Skill 并准备任务。*
 
 ## 命令、历史和草稿
 

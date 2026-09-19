@@ -15,9 +15,9 @@ draft: false
 
 终端随面板尺寸调整字符行列。程序运行中可以使用常见的 Ctrl+C 中断；交互行为仍由当前 shell 和程序决定。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="terminal.png">
-<figcaption><span class="screenshot-label">待补实拍 · 20</span><strong>工作区交互式终端</strong><code>terminal.png</code><p>右侧终端运行示例项目开发服务，保留终端页签与日志</p></figcaption>
-</figure>
+![右侧终端标签与启动后的 shell 提示符](../../assets/screenshots/docs/terminal.png)
+
+*右侧终端标签与启动后的 shell 提示符。*
 
 ## 离开、关闭和重启
 

@@ -24,9 +24,9 @@ draft: false
 
 官网目前采用固定浅色样式；桌面应用的外观设置是独立功能。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="settings-navigation.png">
-<figcaption><span class="screenshot-label">待补实拍 · 35</span><strong>设置分组与通用页面</strong><code>settings-navigation.png</code><p>设置页完整分组及通用设置顶部</p></figcaption>
-</figure>
+![设置导航与通用设置](../../assets/screenshots/docs/settings-navigation.png)
+
+*设置导航与通用设置。*
 
 ## 三类本地数据
 

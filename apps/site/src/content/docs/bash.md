@@ -21,12 +21,8 @@ Bash 用于在工作区执行测试、构建和命令行工具。让 Agent 运�
 
 看到“后台运行中”时，任务尚未完成。可以要求 Agent 继续读取输出，直到得到退出状态或明确的失败原因。后台任务属于当前应用进程的运行资源，不保证应用退出后继续执行。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="bash-background.png">
-<figcaption><span class="screenshot-label">待补实拍 · 18</span><strong>后台命令运行中</strong><code>bash-background.png</code><p>运行同一安全任务，截取后台执行状态，保留任务标识与输出。</p></figcaption>
-</figure>
-
 <figure class="product-shot screenshot-placeholder" data-screenshot="bash-complete.png">
-<figcaption><span class="screenshot-label">待补实拍 · 19</span><strong>后台命令执行结果</strong><code>bash-complete.png</code><p>前一张任务退出后截图，保留相同任务标识、退出状态与结果。</p></figcaption>
+<figcaption><span class="screenshot-label">待补实拍 · 19</span><strong>后台命令执行结果</strong><code>bash-complete.png</code><p>截取一次后台命令完成后的记录，保留命令、任务标识、输出和退出状态；不必另拍运行中画面。</p></figcaption>
 </figure>
 
 ## 失败、停止与权限

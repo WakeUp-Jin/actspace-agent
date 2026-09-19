@@ -17,13 +17,9 @@ draft: false
 
 时间范围包括最近 24 小时、7 天、30 天和全部。检查某次操作时，注意滚动时间窗口和当前筛选条件。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="usage.png">
-<figcaption><span class="screenshot-label">待补实拍 · 25</span><strong>请求与使用统计</strong><code>usage.png</code><p>使用统计 → 最近 7 天，有真实请求和用量记录</p></figcaption>
-</figure>
+![最近24小时的请求、Token、费用与缓存统计](../../assets/screenshots/docs/usage.png)
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="usage-token-detail.png">
-<figcaption><span class="screenshot-label">待补实拍 · 26</span><strong>输入、输出与缓存明细</strong><code>usage-token-detail.png</code><p>在同一统计页展开 Token 明细，能区分输入、输出、缓存</p></figcaption>
-</figure>
+*最近24小时的请求、Token、费用与缓存统计。*
 
 ## 为什么费用可能不完整
 

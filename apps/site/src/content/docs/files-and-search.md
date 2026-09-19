@@ -24,9 +24,9 @@ Agent 模式可以使用 Write 创建或写入文件，使用 Edit 修改已有�
 
 你与 Agent 同时编辑一个文件时，磁盘内容可能变化。遇到内容不匹配，不要反复要求强行覆盖，让 Agent 重新读取最新文件再调整。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="tool-execution.png">
-<figcaption><span class="screenshot-label">待补实拍 · 03</span><strong>文件修改与执行过程</strong><code>tool-execution.png</code><p>让 Agent 修改示例文件并运行已有测试，在运行时截取；若很快完成，保留展开的执行过程即可</p></figcaption>
-</figure>
+![读取、写入与编辑记录，以及一次被拒绝的写入](../../assets/screenshots/docs/tool-execution.png)
+
+*读取、写入与编辑记录，以及一次被拒绝的写入。*
 
 ## 查看实际结果
 

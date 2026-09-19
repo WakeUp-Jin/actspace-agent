@@ -19,10 +19,6 @@ draft: false
 
 Worktree 从 Git 中的提交状态建立。原目录里尚未提交的修改、忽略文件、依赖目录和本地环境配置不会自动复制过去；开始任务前需要准备新目录自己的依赖和配置。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="workspace-worktree.png">
-<figcaption><span class="screenshot-label">待补实拍 · 14</span><strong>工作目录、分支与 Worktree</strong><code>workspace-worktree.png</code><p>Git 项目首次发送前展开环境/分支选择，展示当前分支与 Worktree 入口</p></figcaption>
-</figure>
-
 ## 会话开始后
 
 第一条消息发送时会确定本会话的实际工作目录，之后环境信息用于查看。要换目录或切换隔离方式，新建会话并重新选择，避免已有对话与文件环境错位。

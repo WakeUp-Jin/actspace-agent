@@ -26,19 +26,15 @@ description: 阅读项目结构并整理启动与测试方法时使用。
 
 `name` 和 `description` 是发现 Skill 所需的信息。较长的材料可以放入相邻 `references/`，脚本放入 `scripts/`，由说明文件指出何时读取或执行。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="skill-file.png">
-<figcaption><span class="screenshot-label">待补实拍 · 23</span><strong>Skill 文件与指令</strong><code>skill-file.png</code><p>打开前一张所选 Skill 的 SKILL.md，能读清 name、description 和关键指令</p></figcaption>
-</figure>
-
 ## 放在哪个目录
 
 项目目录支持 `.actspace/skills/`、`.agents/skills/` 和 `.claude/skills/`。用户级目录还包括应用数据目录下的 `skills/`、`.actspace/skills/`，以及用户主目录下的 `.agents/skills/`、`.claude/skills/`。
 
 同名 Skill 按扫描优先级保留一个版本，项目级优先于用户级。每个 Skill 应直接放在扫描根的一级子目录中，避免额外嵌套导致无法发现。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="skills-library.png">
-<figcaption><span class="screenshot-label">待补实拍 · 22</span><strong>已安装的 Skills</strong><code>skills-library.png</code><p>扩展 → Skills，展示真实已安装 Skill、状态和安装/刷新入口</p></figcaption>
-</figure>
+![Skills 搜索、安装入口与启用开关](../../assets/screenshots/docs/skills-library.png)
+
+*Skills 搜索、安装入口与启用开关。*
 
 ## 在任务中使用
 
@@ -46,6 +42,6 @@ description: 阅读项目结构并整理启动与测试方法时使用。
 
 Skill 中写出的要求不会自动扩大工具权限。脚本仍要通过工具执行，受[模式与审批](../tools-and-approvals/)约束。找不到 Skill 时，检查目录层级、文件名和 frontmatter，确认当前会话使用的是正确工作区。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="skill-invocation.png">
-<figcaption><span class="screenshot-label">待补实拍 · 05</span><strong>选择 Skill 并准备任务</strong><code>skill-invocation.png</code><p>在输入框选中一个已安装的真实 Skill，并写好与它匹配的任务；发送前截图</p></figcaption>
-</figure>
+![在输入框选择 ui Skill 并准备任务](../../assets/screenshots/docs/skill-invocation.png)
+
+*在输入框选择 ui Skill 并准备任务。*

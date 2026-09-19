@@ -26,9 +26,9 @@ pnpm dev:log
 
 桌面应用从应用内设置读取凭据，向仓库 `.env` 写入模型 Key 不会替代这个步骤。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="model-connection.png">
-<figcaption><span class="screenshot-label">待补实拍 · 09</span><strong>模型连接与启用状态</strong><code>model-connection.png</code><p>设置 → 模型，展示一个已连接的服务商、连接入口和已启用模型</p></figcaption>
-</figure>
+![模型连接列表与连接状态](../../assets/screenshots/docs/model-connection.png)
+
+*模型连接列表与连接状态。*
 
 ## 打开工作区
 
@@ -36,9 +36,9 @@ pnpm dev:log
 
 选择模型和模式后，发送一个范围明确的任务。完整演示见[完成第一个任务](../first-task/)。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="workspace-overview.png">
-<figcaption><span class="screenshot-label">待补实拍 · 01</span><strong>工作区与真实成果</strong><code>workspace-overview.png</code><p>打开示例项目，完成一次小修改；右侧打开修改后的 Markdown 或 HTML 文件</p></figcaption>
-</figure>
+![工作区、会话列表与代码回复](../../assets/screenshots/docs/workspace-overview.png)
+
+*工作区、会话列表与代码回复。*
 
 ## 本地打包
 

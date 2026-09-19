@@ -18,9 +18,9 @@ ActSpace 使用你配置的模型服务。桌面应用的连接参数在设置�
 
 可用连接和模型以当前设置界面的目录为准。DeepSeek、Kimi、OpenRouter 等连接各有凭据，连接成功不代表所有模型都已启用。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="model-connection.png">
-<figcaption><span class="screenshot-label">待补实拍 · 09</span><strong>模型连接与启用状态</strong><code>model-connection.png</code><p>设置 → 模型，展示一个已连接的服务商、连接入口和已启用模型</p></figcaption>
-</figure>
+![模型连接列表与连接状态](../../assets/screenshots/docs/model-connection.png)
+
+*模型连接列表与连接状态。*
 
 ## 添加与启用模型
 

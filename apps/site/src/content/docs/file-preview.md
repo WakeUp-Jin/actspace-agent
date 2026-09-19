@@ -21,9 +21,9 @@ draft: false
 
 HTML 预览并不等同于完整开发服务器。页面依赖应用服务、外部网络或特殊权限时，仍可能需要启动项目并在浏览器中检查。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="file-preview.png">
-<figcaption><span class="screenshot-label">待补实拍 · 21</span><strong>文件树与 HTML 预览</strong><code>file-preview.png</code><p>右侧打开真实 HTML 预览，保留文件树与文件页签</p></figcaption>
-</figure>
+![文件页签、Markdown 预览与工作区文件树](../../assets/screenshots/docs/file-preview.png)
+
+*文件页签、Markdown 预览与工作区文件树。*
 
 ## 预览与审阅
 

@@ -46,7 +46,7 @@
 
 ## 截图与实施顺序
 
-完整的 **35 张**逐图要求见 [SCREENSHOTS.md](SCREENSHOTS.md)：首批 8 张足以启动首页与核心文档，后续 27 张补齐细节。用户可分批提供同名原始 PNG。
+截图清单已按实际素材精简：17种画面已接入，重复内容合并、纯操作说明不强制配图，当前仅需补3张。具体文件名与拍摄要求见 [SCREENSHOTS.md](SCREENSHOTS.md)，用户可分批提供原始 PNG。
 
 已同步 DESIGN.md、完成引用块、图片容器和首页图文联动；接下来按收到的图片逐一替换与核验。主要范围：src/pages/index.astro、src/styles/global.css、prose.css、tokens.css、功能展示组件、相关文档及素材目录；不修改桌面端功能。
 

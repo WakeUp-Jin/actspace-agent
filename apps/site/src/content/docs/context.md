@@ -15,13 +15,13 @@ draft: false
 
 排查“模型为什么不知道这个信息”时，先确认文件或工具结果是否进入该次请求，再看是否经过摘要。附上一个路径并不等于完整文件已经被读取。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="context-popup.png">
-<figcaption><span class="screenshot-label">待补实拍 · 08</span><strong>上下文占用与分组</strong><code>context-popup.png</code><p>回到聊天，点击输入框底部上下文占用入口，弹层展开后截图</p></figcaption>
-</figure>
+![输入框上方的上下文占用与分类](../../assets/screenshots/docs/context-popup.png)
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="context-detail.png">
-<figcaption><span class="screenshot-label">待补实拍 · 02</span><strong>当前请求的上下文详情</strong><code>context-detail.png</code><p>在同一会话打开右侧“上下文”，选择有文件读取结果的请求；展开一个消息或工具结果条目</p></figcaption>
-</figure>
+*输入框上方的上下文占用与分类。*
+
+![上下文面板中的系统提示词、工具和规则分组](../../assets/screenshots/docs/context-detail.png)
+
+*上下文面板中的系统提示词、工具和规则分组。*
 
 ## 上下文占用与累计 Token
 

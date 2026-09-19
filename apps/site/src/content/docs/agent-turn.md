@@ -33,9 +33,9 @@ Session Journal 保存可恢复的运行事实，界面据此呈现消息、工�
 
 用户需要检查任务时，可以看工具详情、[上下文](../context/)和[审阅](../review/)。开发者继续追踪实现，可从仓库的 `docs/ARCHITECTURE.md` 和 Agent Run 分层文档进入。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="trajectory-inspector.png">
-<figcaption><span class="screenshot-label">待补实拍 · 07</span><strong>会话轨迹与工具详情</strong><code>trajectory-inspector.png</code><p>在已完成的示例会话切到 Trajectory，选中一个工具调用，打开 Result 或 Payload</p></figcaption>
-</figure>
+![会话时间线、执行记录与选中的用户消息详情](../../assets/screenshots/docs/trajectory-inspector.png)
+
+*会话时间线、执行记录与选中的用户消息详情。*
 
 ## 停止与恢复的边界
 

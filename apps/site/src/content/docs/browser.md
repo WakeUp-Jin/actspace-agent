@@ -29,10 +29,6 @@ Browser Use 通过本地 Browser Bridge 连接 Chrome，提供标签页、页面
 
 当前实现仍需要在实际 Chrome 配置中确认连通性。诊断未就绪时，先修复扩展或 Native Host，不要反复发起网页任务。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="browser-ready.png">
-<figcaption><span class="screenshot-label">待补实拍 · 29</span><strong>浏览器连接就绪</strong><code>browser-ready.png</code><p>Browser Bridge 设置中的连接状态与安装入口，或实际 doctor 就绪输出</p></figcaption>
-</figure>
-
 ## 在会话中使用
 
 连接正常后，明确提供页面地址和目标。例如：“打开这个本地页面，检查导航和博客卡片是否能正常点击，把发现的问题列出来。”日常任务由内置 `browser_*` 工具执行，诊断 CLI 主要用于安装与排障。

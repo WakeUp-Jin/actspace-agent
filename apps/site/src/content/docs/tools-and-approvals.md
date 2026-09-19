@@ -17,9 +17,9 @@ draft: false
 
 批准作用于对应的工具调用。当前机制不提供跨会话永久生效的“允许同类命令”清单；历史博客中讨论的 allowList 属于当时的设计研究。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="tool-approval.png">
-<figcaption><span class="screenshot-label">待补实拍 · 17</span><strong>命令审批卡片</strong><code>tool-approval.png</code><p>普通、安全的命令触发实际审批后，保留完整命令、目录和允许/拒绝按钮</p></figcaption>
-</figure>
+![Bash 审批卡片与操作入口（截图中的命令已脱敏）](../../assets/screenshots/docs/tool-approval.png)
+
+*Bash 审批卡片与操作入口（截图中的命令已脱敏）。*
 
 ## 为什么允许后仍可能失败
 

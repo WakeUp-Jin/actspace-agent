@@ -2,8 +2,8 @@
 import { Image } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 import screenshots from '../lib/screenshots.json';
-interface Props { name: keyof typeof screenshots; title: string; eager?: boolean; }
-const { name, title, eager = false } = Astro.props;
+interface Props { name: keyof typeof screenshots; title: string; eager?: boolean; showCaption?: boolean; }
+const { name, title, eager = false, showCaption = true } = Astro.props;
 const assets = import.meta.glob<{ default: ImageMetadata }>('../assets/screenshots/*.png', { eager: true });
 const source = assets[`../assets/screenshots/${name}`]?.default;
 const shot = screenshots[name];
@@ -13,7 +13,7 @@ const shot = screenshots[name];
     <a class="screenshot-link" href={source.src} aria-label={`放大：${title}`}>
       <Image src={source} alt={title} loading={eager ? 'eager' : 'lazy'} fetchpriority={eager ? 'high' : 'auto'} />
     </a>
-    <figcaption>{title}</figcaption>
+    {showCaption && <figcaption>{title}</figcaption>}
   </> : <>
     <svg class="screenshot-mark" width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true"><rect x="3" y="5" width="30" height="26" rx="4" stroke="currentColor"/><path d="M3 12h30M11 12v19" stroke="currentColor"/><path d="M16 20h11m-11 5h7" stroke="currentColor" stroke-linecap="round"/></svg>
     <figcaption>

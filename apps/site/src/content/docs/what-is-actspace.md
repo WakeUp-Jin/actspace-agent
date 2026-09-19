@@ -18,9 +18,9 @@ ActSpace 是一个桌面 Agent 应用。选定本地目录、连接模型后，�
 
 第一次可以从“读一下这个项目，说明启动方式和主要目录”开始。具体操作见[完成第一个任务](../first-task/)。
 
-<figure class="product-shot screenshot-placeholder" data-screenshot="workspace-overview.png">
-<figcaption><span class="screenshot-label">待补实拍 · 01</span><strong>工作区与真实成果</strong><code>workspace-overview.png</code><p>打开示例项目，完成一次小修改；右侧打开修改后的 Markdown 或 HTML 文件</p></figcaption>
-</figure>
+![工作区、会话列表与代码回复](../../assets/screenshots/docs/workspace-overview.png)
+
+*工作区、会话列表与代码回复。*
 
 ## 按任务查找功能
 
