@@ -172,6 +172,17 @@ afterEach(() => {
 });
 
 describe("AgentRunBlock", () => {
+  it("keeps the child avatar stable across live/history IDs and terminal states", () => {
+    const message = makeAgentBlock({ status: "running" });
+    const { container, rerender } = render(<AgentRunBlock message={message} />);
+    const source = container.querySelector("img")?.getAttribute("src");
+    expect(source).toBeTruthy();
+    for (const status of ["completed", "failed", "aborted"] as const) {
+      rerender(<AgentRunBlock message={{ ...message, id: "history:other-id", status }} />);
+      expect(container.querySelector("img")?.getAttribute("src")).toBe(source);
+    }
+  });
+
   it("shows a compact completed Agent row and requests the transcript panel", async () => {
     const user = userEvent.setup();
     const onOpenTranscript = vi.fn();

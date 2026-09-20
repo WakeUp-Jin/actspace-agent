@@ -1,18 +1,17 @@
 import { useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
 import "./agent-activity.css";
+import { AgentAvatar, AgentStatus } from "./AgentIdentity";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 
 const BLOCK_CLASS = "message-row agent-run max-w-[800px] px-[var(--conversation-text-inset)]";
 const BUTTON_CLASS =
-  "group/agent flex w-full min-w-0 flex-col gap-1 rounded-act-md border border-line bg-surface-subtle px-3 py-2 text-left transition-[background-color,border-color,color,transform] duration-[150ms] ease-in-out hover:border-line-strong hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--act-color-focus-ring)] active:translate-y-px";
+  "group/agent flex w-full min-w-0 items-center gap-3 rounded-act-md border border-line bg-surface-subtle px-3 py-2 text-left transition-[background-color,border-color,color,transform] duration-[150ms] ease-in-out hover:border-line-strong hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--act-color-focus-ring)] active:translate-y-px";
 const HEADER_CLASS = "flex min-w-0 items-center gap-2";
-const DOT_CLASS = "h-2 w-2 shrink-0 rounded-full";
 const NAME_CLASS = "min-w-0 truncate text-[14px] leading-[1.4] text-text-muted group-hover/agent:text-text-main group-focus-visible/agent:text-text-main";
 const TYPE_CLASS = "shrink-0 text-[12px] leading-[1.4] text-text-faint";
-const STATUS_CLASS = "ml-auto shrink-0 text-[12px] leading-[1.4] text-text-muted";
-const LATEST_CLASS = "ml-4 min-w-0 truncate text-[12px] leading-[1.45] text-text-muted";
+const LATEST_CLASS = "min-w-0 truncate text-[12px] leading-[1.45] text-text-muted";
 const ERROR_LATEST_CLASS = "text-on-danger";
 
 function statusLabel(status: AgentMessage["status"]): string {
@@ -53,13 +52,6 @@ function ActivityLine({ text, running }: { text: string; running: boolean }) {
   </span>;
 }
 
-function statusDotClass(status: AgentMessage["status"]): string {
-  if (status === "running") return `${DOT_CLASS} animate-[session-status-pulse_1500ms_ease-in-out_infinite] bg-operational`;
-  if (status === "completed") return `${DOT_CLASS} bg-success`;
-  if (status === "failed") return `${DOT_CLASS} bg-danger`;
-  return `${DOT_CLASS} bg-text-faint`;
-}
-
 export function AgentRunBlock({
   message,
   className,
@@ -81,14 +73,17 @@ export function AgentRunBlock({
         aria-label={`Open SubAgent transcript for ${message.description}`}
         onClick={() => onOpenTranscript?.(message)}
       >
-        <div className={HEADER_CLASS}>
-          <span className={statusDotClass(message.status)} aria-hidden="true" />
-          <span className={NAME_CLASS}>{message.description || message.displayText || kindLabel(message)}</span>
-          <span className={TYPE_CLASS}>{kindLabel(message)}</span>
-          <span className={STATUS_CLASS}>{statusLabel(message.status)}</span>
-        </div>
-        <div className={latestClass}>
-          <ActivityLine text={latest} running={isRunning} />
+        <AgentAvatar message={message} />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className={HEADER_CLASS}>
+            <span className={`${NAME_CLASS} flex-1`} title={message.description}>{message.description || message.displayText || kindLabel(message)}</span>
+            <AgentStatus status={message.status} />
+          </div>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className={TYPE_CLASS}>{kindLabel(message)}</span>
+            <span aria-hidden="true" className="text-[12px] text-text-faint">·</span>
+            <div className={latestClass}><ActivityLine text={latest} running={isRunning} /></div>
+          </div>
         </div>
       </button>
     </article>

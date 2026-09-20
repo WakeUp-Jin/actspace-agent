@@ -106,10 +106,18 @@ Journal 保留原有 assistant/chunk 容器；新增工具 kind 时保存 callId
 - 工作空间路径由 Node path.relative 计算：根为 `.`，内部相对路径，外部绝对路径；Raw 与实际调用不改。
 - 轨迹页隐藏整个 composer-zone，但保留挂载；草稿、附件、模型选择不会因切换卸载。运行时顶部保留 Stop。
 - Subagents 使用右侧列表/详情导航。委派 requested 记录 childSessionId；列表每秒刷新，运行中详情每 750ms 刷新，关闭/切换时释放轮询并忽略迟到响应。详情 IPC 返回 SessionEvent，与前端契约一致，展示未提交正文/Thinking chunk 和已准备的运行工具，完成后以持久消息代替 chunk。Todo UI 保持现状。
-- Explore 与通用 Agent 共用右侧 SubAgent 详情入口；主消息区显示紧凑两行入口（状态点、任务名、类型、状态、最新活动），不内联展开 transcript。
+- Explore 与通用 Agent 共用右侧 SubAgent 详情入口；主消息区显示紧凑两行入口（固定角色头像、任务名、类型、独立状态、最新活动），不内联展开 transcript。
 - Read/List/Grep/Glob/Directory List 的终态结果通过 bounded `resultPreview` 进入通用 `tool-result-*` disclosure；Read 仅对当前 workspace 可确认的相对路径提供 main IPC 文件打开动作。
 - 图像生成成功产物由 turn 级 Artifacts 打开右侧 image Tab；失败或 warning 在工具行内通过 disclosure 查看，不以 hover tooltip 作为唯一错误入口。
 
 ### 只读子任务活动（2026-09-15）
 
 Child live event 携带 parentSessionId / parentCallId，Main adapter 将事件投影到仍在运行的父 agent/explore 工具行，携带 transcriptRef；同一文本阶段不逐 token 发布父预览，父调用结束后忽略迟到子事件。只开放读取和搜索；消息行使用轻边框与 180ms 上移淡入淡出活动提示（4px，无三维翻转），具体运行预算见 [子代理设计](../collaboration/agent-explore-subagent.md)。
+
+
+### 子智能体头像与状态（2026-09-20）
+
+- 消息卡片、右侧列表使用 32px / 8px 圆角头像，详情标题使用同款 28px 头像。九张用户提供的角色图经过逐张裁切，输出 128px WebP；原配色属于媒体内容，不承担状态语义。
+- `AgentIdentity.tsx` 优先以 `transcriptRef.runId`（child Session ID）稳定映射头像，无引用时回退到消息 ID。状态、排序、分页、重新打开不会改变同一 child 的头像；有限头像池允许重复，不建立依赖渲染顺序的分配表。
+- 运行中为旋转指示器加文字，指示器消费 operational token；完成为中性勾号，失败为 danger 警示，停止为中性方块。状态固定宽度，头像始终静态，减少动态效果模式下指示器也停止旋转。
+- 消息卡片头像跨两行，第二行显示类型及原有事件派生活动/结果摘要；右侧列表第二行显示状态、类型、耗时。保留当前点击详情与运行/结束分组行为。

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import type { MessageBlock, SessionEvent, SubAgentTranscriptRef } from "@actspace/shared";
+import { AgentAvatar, AgentStatus } from "./AgentIdentity";
 import { MarkdownProse } from "./MarkdownProse";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolLogLine } from "./ToolLogLine";
@@ -446,7 +447,9 @@ export function SubAgentTranscriptPanel({
   return (
     <section className={PANEL_CLASS} role="region" aria-label={`SubAgent transcript: ${message.description}`}>
       <header className={PANEL_HEADER_CLASS}>
-        <h2 className={PANEL_TITLE_CLASS}>{message.description}</h2>
+        <AgentAvatar message={message} size={28} />
+        <h2 className={`${PANEL_TITLE_CLASS} flex-1`}>{message.description}</h2>
+        <AgentStatus status={message.status} />
         <button ref={closeButtonRef} className={PANEL_ICON_BUTTON_CLASS} type="button" aria-label="Close transcript" onClick={onClose}>
           <X size={15} aria-hidden="true" />
         </button>

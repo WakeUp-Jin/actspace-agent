@@ -9,9 +9,13 @@ import "../../styles/index.css";
 
 const now = "2026-09-06T12:00:00Z";
 const agents: MessageBlock[] = [
-  { kind: "agent", id: "subagent:a", description: "Inspect renderer and streaming events", status: "running", displayText: "Working", subagentType: "explore", display: "panel", createdAt: now, stats: { durationMs: 64000, toolCallCount: 2 }, transcriptRef: { kind: "subagent_transcript", sessionId: "fixture", agentRunId: "run", runId: "a" } },
-  { kind: "agent", id: "subagent:b", description: "Check tool parameter contracts", status: "completed", displayText: "Completed", subagentType: "explore", display: "panel", createdAt: now, stats: { durationMs: 28000, toolCallCount: 3 }, transcriptRef: { kind: "subagent_transcript", sessionId: "fixture", agentRunId: "run", runId: "b" } },
+  { kind: "agent", id: "subagent:a", description: "Inspect renderer and streaming events", status: "running", displayText: "正在读取 · App.tsx", subagentType: "explore", display: "panel", createdAt: now, stats: { durationMs: 64000, toolCallCount: 2 }, transcriptRef: { kind: "subagent_transcript", sessionId: "fixture", agentRunId: "run", runId: "a" } },
+  { kind: "agent", id: "subagent:b", description: "Check tool parameter contracts", status: "completed", displayText: "Completed", summary: "已核对工具参数契约", subagentType: "explore", display: "panel", createdAt: now, stats: { durationMs: 28000, toolCallCount: 3 }, transcriptRef: { kind: "subagent_transcript", sessionId: "fixture", agentRunId: "run", runId: "b" } },
 ];
+agents.push(
+  { ...agents[0], id: "subagent:c", description: "验证失败状态与错误摘要", status: "failed", error: "执行失败 · 连接已断开", transcriptRef: { kind: "subagent_transcript", sessionId: "fixture", agentRunId: "run", runId: "c" } } as MessageBlock,
+  { ...agents[0], id: "subagent:d", description: "验证停止状态以及很长的任务名称在有限空间内的截断表现", status: "aborted", summary: "已停止本次检查", transcriptRef: { kind: "subagent_transcript", sessionId: "fixture", agentRunId: "run", runId: "d" } } as MessageBlock,
+);
 const events: SessionEvent[] = [
   { id: "reply", sessionId: "a", agentRunId: "run", schemaVersion: 2, timestamp: now, type: "assistant_message", payload: { content: "我正在检查流式工具事件和持久化记录之间的对应关系。" } },
   { id: "read", sessionId: "a", agentRunId: "run", schemaVersion: 2, timestamp: now, type: "tool_result", payload: { toolCallId: "r", status: "running", uiPreview: { kind: "read", filePath: "src/renderer/App.tsx", displayText: "Read src/renderer/App.tsx" } } },
