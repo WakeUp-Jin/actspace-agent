@@ -52,4 +52,4 @@
 
 ## 验证
 
-运行 `pnpm check:site`、`pnpm test:site`、`pnpm build:site` 与 `pnpm check:docs`。构建后检查 `/actspace-agent/` 基础路径下的文档链接、图片、博客筛选与文章折叠代码。网站内容验证不代替真实模型、Chrome 或 Electron 功能验收。
+运行 `pnpm check:site`、`pnpm test:site`、`SITE_URL=https://example.com SITE_BASE=/ pnpm build:site` 与 `pnpm check:docs`。构建后检查 Netlify 根路径下的文档链接、图片、博客筛选与文章折叠代码；GitHub Pages 手动备用部署使用 `/actspace-agent/` 基础路径。部署步骤见 [CI/CD 说明](../../docs/CICD.md)。网站内容验证不代替真实模型、Chrome 或 Electron 功能验收。

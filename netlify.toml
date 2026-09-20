@@ -1,0 +1,13 @@
+# Install the pnpm workspace and build from the repository root.
+[build]
+  base = "."
+  command = 'SITE_URL="${SITE_URL:-$URL}" pnpm build:site'
+  publish = "apps/site/dist"
+  # 0 skips; 1 builds. Missing history or equal refs (no cache/retry) also build.
+  ignore = 'test "$CACHED_COMMIT_REF" != "$COMMIT_REF" && git diff --quiet "$CACHED_COMMIT_REF" "$COMMIT_REF" -- apps/site docs/releases/feature-release-notes.md docs/roadmap.md package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc patches netlify.toml || exit 1'
+
+[build.environment]
+  NODE_VERSION = "24"
+  SITE_BASE = "/"
+  # pnpm version is pinned by packageManager in the root package.json.
+  # Set SITE_URL in Netlify only when overriding its primary production URL.

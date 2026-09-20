@@ -1,9 +1,6 @@
-name: 官网部署
+name: 官网部署（GitHub Pages 手动备用）
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:

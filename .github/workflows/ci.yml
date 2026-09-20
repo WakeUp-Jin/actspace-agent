@@ -53,8 +53,8 @@ jobs:
 
       - name: Build site
         env:
-          SITE_URL: https://wakeup-jin.github.io
-          SITE_BASE: /actspace-agent
+          SITE_URL: https://example.com
+          SITE_BASE: /
         run: pnpm build:site
 
       - name: Set up Go for Browser Bridge

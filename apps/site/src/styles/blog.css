@@ -13,7 +13,8 @@
   border-bottom: 1px solid var(--line);
   margin: 0;
 }
-.blog-filters > label {
+.blog-filters > label,
+.blog-sort-field {
   display: block;
   font-size: 13px;
   color: var(--muted);
@@ -269,3 +270,19 @@
     aspect-ratio: 3/2;
   }
 }
+
+.sort-picker { position: relative; margin-top: 12px; z-index: 5; }
+.sort-trigger { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--canvas); color: var(--ink); font-size: 13px; text-align: left; cursor: pointer; }
+.sort-trigger:hover { background: var(--surface); border-color: var(--site-line-strong); }
+.sort-trigger:focus-visible { outline: 2px solid var(--site-line-strong); outline-offset: 2px; }
+.sort-trigger:active { transform: scale(.99); }
+.sort-trigger svg { color: var(--muted); flex-shrink: 0; }
+.sort-trigger[aria-expanded=true] svg { transform: rotate(180deg); }
+.sort-options { position: absolute; top: calc(100% + 6px); left: 0; width: 100%; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--site-surface); box-shadow: 0 4px 16px var(--site-shadow); transform-origin: top; }
+.sort-options[data-side=top] { top: auto; bottom: calc(100% + 6px); transform-origin: bottom; }
+.sort-options button { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 40px; padding: 8px; border: 0; border-radius: 4px; background: transparent; color: var(--ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.sort-options button:hover, .sort-options button:focus { background: var(--surface); outline: none; }
+.sort-options button:active { transform: scale(.98); }
+.sort-options button svg { visibility: hidden; flex-shrink: 0; }
+.sort-options button[aria-selected=true] svg { visibility: visible; }
+@media(max-width:760px) { .sort-options button { min-height: 44px; } }

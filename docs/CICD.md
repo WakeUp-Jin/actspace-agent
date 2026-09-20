@@ -7,7 +7,8 @@
 - `ci.yml`：常驻 CI，覆盖 docs、repo hygiene、GitHub Actions pinning、Markdown、shell 脚本校验，以及 workspace 的依赖安装、类型检查、测试和构建。
 - `supply-chain-security.yml`：在 PR 上做依赖变更检查，并在 PR、定时任务和手动触发时运行 OSV 扫描。
 - `release.yml`：手动触发的 release 流水线，用来打包 unsigned portable 桌面制品、生成 SBOM/provenance，并创建 GitHub Release。
-- `site-pages.yml`：在 `main` 更新或手动触发时构建 `apps/site`，上传静态产物并部署到 GitHub Pages。
+- `netlify.toml`：官网默认部署配置；在 Netlify 连接 GitHub 后，由 Netlify 构建并发布 `apps/site`。
+- `site-pages.yml`：仅手动触发的 GitHub Pages 备用部署，不再随 `main` 更新自动发布。
 
 当前根命令还包括：
 
@@ -43,7 +44,7 @@
   - 用 Corepack 读取根 `package.json` 的 `packageManager` 字段并启用对应 pnpm 版本。
   - 执行 `pnpm install --frozen-lockfile`。
   - 执行 `pnpm typecheck`、`pnpm test`、`pnpm build`。
-  - 显式执行站点的 `check:site`、`test:site` 和 `build:site`，并使用 GitHub project Pages 的 `/actspace-agent` base path 验证生产构建。
+  - 显式执行站点的 `check:site`、`test:site` 和 `build:site`，并使用 Netlify 的 `/` base path 验证生产构建；CI 中的 `https://example.com` 仅用于构建检查，不是官网地址。
 - workspace 依赖当前允许 `electron` 和 `esbuild` 执行构建脚本；否则 Electron 开发启动无法正确安装运行时。
 - 当前桌面端优先跟随较新的稳定 Electron 版本，以降低 macOS 26 这类新系统上的启动兼容风险。
 - `apps/desktop` 的开发启动依赖 `packages/shared`、领域 packages 和 `packages/runtime` 的可消费构建产物；如果包边界被改回源码直引，Electron 启动链会再次失稳。
@@ -70,25 +71,55 @@ macOS 产物会把复制来的 Electron runtime 改成 Actspace 语义：外层 
 
 ## 官网部署
 
-官网是 `apps/site` 下的 Astro 静态站点。默认公开地址为：
+官网是 `apps/site` 下的 Astro 静态站点，默认通过 Netlify 的 Git 集成发布。根目录 `netlify.toml` 是部署配置入口，不需要新增 GitHub Actions 上传流程，也不需要配置 Netlify token 到 GitHub。
+
+### 首次连接 Netlify
+
+1. 先将部署配置提交并推送到 GitHub。
+2. 在 Netlify 创建项目，导入此 GitHub 仓库，Production branch 选择 `main`。
+3. Base directory 使用仓库根目录（配置中的 `.`）；Package directory 可填 `apps/site`。不要把 Base directory 改成 `apps/site`。
+4. 确认读取根目录 `netlify.toml`：构建命令为 `SITE_URL="${SITE_URL:-$URL}" pnpm build:site`，发布目录为 `apps/site/dist`，Node 为 24。pnpm 版本从根 `package.json` 的 `packageManager` 读取。
+5. 触发首次部署，按控制台提示发布站点，检查首页、博客、文档、更新页、开发计划页、图片和 404。
+
+Netlify 从仓库根安装 pnpm workspace 依赖，构建时读取 `docs/releases/feature-release-notes.md` 与 `docs/roadmap.md`；最终仅发布 `apps/site/dist`，不发布整个仓库。当前纯静态站点无需 Netlify Adapter 或服务端函数。
+
+`SITE_BASE=/` 由配置固定。`SITE_URL` 优先使用控制台显式配置的值，未配置时使用 Netlify 内置 `URL`（主站地址，不是单次预览地址），供 canonical、sitemap 和 robots 使用。配置文件本身不展开环境变量，回退在构建命令的 shell 中完成。
+
+连接后，`main` 的相关源码变更会由 Netlify 自动构建发布。`ignore` 规则覆盖站点、两份构建时读取的文档、根依赖配置、patches 和 Netlify 配置；纯桌面端变更跳过官网构建。首次部署或无法比较历史时继续构建。控制台调整域名或环境变量后，应手动触发重新部署。GitHub CI 与 Netlify 部署独立运行；需要 CI 通过才合入主线时，应通过 GitHub 分支保护要求 PR 检查通过。
+
+### 自定义域名
+
+在 Netlify 的 Domain management 添加购买的域名，再按 Pending DNS verification 提示在域名 DNS 服务商（例如阿里云）配置解析，设置主域名并检查 HTTPS。无需添加 GitHub Pages 使用的 `public/CNAME` 文件。绑定后检查 Netlify 内置 `URL` 是否为正式主域名；也可以显式设置构建环境变量 `SITE_URL=https://<domain>`，随后重新部署。
+
+本地模拟根路径构建（示例地址不是实际官网）：
+
+```sh
+SITE_URL=https://example.com SITE_BASE=/ pnpm build:site
+```
+
+真实 Netlify 安装、构建、上线和域名验证需要在连接仓库后完成，本地构建通过不代表线上发布已完成。
+
+参考：[Netlify monorepo](https://docs.netlify.com/build/configure-builds/monorepos/)、[构建跳过规则](https://docs.netlify.com/build/configure-builds/ignore-builds/)、[外部 DNS](https://docs.netlify.com/manage/domains/configure-domains/configure-external-dns/)。
+
+### GitHub Pages 备用部署
+
+`site-pages.yml` 保留为手动备用入口，其发布地址仍为：
 
 ```text
 https://wakeup-jin.github.io/actspace-agent/
 ```
 
-`site-pages.yml` checkout 完整 monorepo，因为更新页在构建时会读取根目录 `docs/releases/feature-release-notes.md`。Astro 官方 Action 从仓库根目录安装 pnpm workspace 依赖，再运行 `pnpm build:site`，上传 `apps/site/dist`，只有 build job 成功后 deploy job 才会发布。
+Astro 官方 Action checkout 完整 monorepo，从仓库根目录安装 pnpm workspace 依赖，再运行 `pnpm build:site`，上传 `apps/site/dist`，只有 build job 成功后 deploy job 才会发布。
 
 仓库维护者仍需在 GitHub 的 **Settings → Pages → Build and deployment → Source** 中选择 **GitHub Actions**。Workflow 不能代替这项仓库设置。
 
-默认构建环境为：
+备用 Pages 构建环境为（也是 Astro 配置未显式传入环境变量时的本地默认值）：
 
 ```sh
 SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 ```
 
-未来切换自定义域名时，设置 `SITE_URL=https://<domain>` 和 `SITE_BASE=/`，并在域名确定后再添加 `apps/site/public/CNAME`。组件内部链接统一经过 base path helper，不需要逐页修改。
-
-首版不接第三方统计、遥测或运行时后端。站点发布与桌面 release 使用独立 workflow，Pages 失败不会创建或修改桌面 GitHub Release。
+组件内部链接统一经过 base path helper，不需要逐页修改。站点发布与桌面 release 独立，官网部署失败不会创建或修改桌面 GitHub Release。
 
 ## 下一步推荐
 
