@@ -14,6 +14,9 @@
 - id: session-runtime
   name: "@actspace/runtime/session"
   inject: [actspace.host.session, session.journal, session.persistence, session.jsonl, session.projection]
+- id: session-checkpoint-policy
+  name: "@actspace/session-checkpoint-policy/plugin"
+  inject: [session.runtime]
 - id: llm-service
   name: "@actspace/llm-service/plugin"
   inject: [actspace.host.llm]

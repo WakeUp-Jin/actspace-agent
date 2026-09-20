@@ -30,6 +30,7 @@
 | `@actspace/core-agent-loop` | `actspace.core.agent-loop` | `core.agent-loop` | required |
 | `@actspace/session-journal` | `actspace.session.journal` | `session.journal` | required |
 | `@actspace/session-persistence` | `actspace.session.persistence` | `session.persistence` | required |
+| `@actspace/session-checkpoint-policy` | `actspace.session.checkpoint-policy` | `session/checkpoint` required handler | required |
 | `@actspace/session-jsonl` | `actspace.session.jsonl` | `session.jsonl` | required |
 | `@actspace/session-projection` | `actspace.session.projection` | `session.projection` | required |
 | `@actspace/llm-service` | `actspace.llm.service` | `llm.service` | required |

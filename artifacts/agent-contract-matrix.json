@@ -666,6 +666,28 @@
     },
     {
       "kind": "event",
+      "id": "intervention:session/checkpoint",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentLoopIntervention"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "intervention",
+      "category": "agent-loop",
+      "eventType": "session/checkpoint",
+      "scope": "agent",
+      "mode": "required",
+      "containment": "fail-closed",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
       "id": "intervention:system-prompt/assemble",
       "owner": "@actspace/cordis-adapter",
       "status": "active",
@@ -811,6 +833,28 @@
       "plane": "notification",
       "category": "notification",
       "eventType": "agent/status",
+      "scope": "agent",
+      "containment": "observer-isolated",
+      "mode": "emit",
+      "codecStatus": "n/a",
+      "producerStatus": "present",
+      "required": true
+    },
+    {
+      "kind": "event",
+      "id": "notification:llm/chunk",
+      "owner": "@actspace/cordis-adapter",
+      "status": "active",
+      "sourceRefs": [
+        "packages/cordis-adapter/src/event-contract.ts#AgentNotification"
+      ],
+      "tests": [
+        "session-journal/core-codec-contract",
+        "cordis-adapter/event-contract"
+      ],
+      "plane": "notification",
+      "category": "notification",
+      "eventType": "llm/chunk",
       "scope": "agent",
       "containment": "observer-isolated",
       "mode": "emit",
@@ -3301,7 +3345,8 @@
       ],
       "dependencies": [
         "@actspace/cordis-adapter",
-        "@actspace/shared"
+        "@actspace/shared",
+        "undici"
       ],
       "packageRole": "domain"
     },
@@ -3369,6 +3414,7 @@
         "@actspace/llm-pi-ai",
         "@actspace/llm-service",
         "@actspace/prompt",
+        "@actspace/session-checkpoint-policy",
         "@actspace/session-journal",
         "@actspace/session-jsonl",
         "@actspace/session-persistence",
@@ -3517,6 +3563,7 @@
       "path": "apps/site/package.json",
       "exports": [],
       "dependencies": [
+        "@astrojs/markdown-satteri",
         "@astrojs/sitemap",
         "astro",
         "mdast-util-to-string",
@@ -3525,6 +3572,7 @@
         "remark-gfm",
         "remark-parse",
         "remark-rehype",
+        "sharp",
         "unified"
       ],
       "packageRole": "host"
@@ -3901,6 +3949,6 @@
       "required": true
     }
   ],
-  "sourceDigest": "7122d0725f6148152900a5f9f85ab8debb88d5d9610fa96e276fb9e38b4f631e",
+  "sourceDigest": "82bc4c58fc05f8f43210a8c28860550f29335a660a77070cf21bdf714c781831",
   "diagnostics": []
 }

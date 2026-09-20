@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createCordisRoot } from "@actspace/cordis-adapter";
 import { runToolStreamFixture } from "./tool-stream-fixture.js";
 
 describe("AgentLoop tool live events", () => {
@@ -41,6 +42,33 @@ describe("AgentLoop tool live events", () => {
     const { events, result } = await runToolStreamFixture({ onLiveEvent: () => { throw new Error("observer failure"); } });
     expect(result.reason).toBe("completed");
     expect(events.filter((e) => e.kind === "tool-finished")).toHaveLength(1);
+  });
+
+  it("emits required durability checkpoints at each real side-effect boundary", async () => {
+    const reasons: string[] = [];
+    const context = {
+      parallel: async (type: string, payload: unknown) => {
+        if (type === "session/checkpoint") reasons.push(String((payload as { reason?: string }).reason));
+      },
+    };
+    await runToolStreamFixture({ context });
+    expect(reasons).toEqual([
+      "before-llm-dispatch",
+      "before-tool-body",
+      "before-next-step",
+      "before-llm-dispatch",
+      "before-next-step",
+      "after-turn-settled",
+    ]);
+  });
+
+  it("does not dispatch the model when the required checkpoint handler is missing", async () => {
+    const root = await createCordisRoot();
+    let requests = 0;
+    try {
+      await expect(runToolStreamFixture({ context: root.context, onRequest: () => { requests += 1; } })).rejects.toThrow();
+      expect(requests).toBe(0);
+    } finally { await root.dispose(); }
   });
 });
 

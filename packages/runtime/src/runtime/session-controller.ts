@@ -51,12 +51,12 @@ export class RuntimeSessionController {
   #indexing = false;
   #closing = false;
   #indexErrors = new Set<string>();
-  constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void> }, store?: SessionStore) { this.store = store ?? new SessionStore({ dataRoot: options.dataRoot, runtimeId: options.runtimeId, registry: options.registry }); }
+  constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>; onCreated?: (sessionId: string) => void | Promise<void>; onDisposed?: (sessionId: string, outcome: { readonly ok: boolean; readonly error?: unknown }) => void | Promise<void> }, store?: SessionStore) { this.store = store ?? new SessionStore({ dataRoot: options.dataRoot, runtimeId: options.runtimeId, registry: options.registry }); }
   private onEvent(sessionId: string): (event: SessionEventEnvelopeV1) => void | Promise<void> { return (event) => { this.#browseIndex?.invalidate(sessionId); return this.options.onEvent?.(sessionId, event); }; }
   private onFlush(sessionId: string): (throughSeq: number) => void | Promise<void> { return (throughSeq) => this.options.onFlush?.(sessionId, throughSeq); }
-  async create(sessionId: string = randomUUID(), cwd?: string): Promise<SessionHandle> { const session = await this.store.create({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: { profileId: this.options.profileId, runtimeContractVersion: "actspace.runtime.v2", manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.registry.digest } }, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); return session; }
-  async createEphemeral(sessionId: string = randomUUID(), cwd?: string): Promise<SessionHandle> { const header = createSessionHeader({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: { profileId: this.options.profileId, runtimeContractVersion: "actspace.runtime.v2", manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.registry.digest } }); const session = RuntimeSessionHandle.createEphemeral({ header, registry: this.options.registry, onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); this.#ephemeral.add(sessionId); return session; }
-  async resume(sessionId: string): Promise<SessionHandle> { const existing = this.#open.get(sessionId); if (existing !== undefined) return existing; const session = await this.store.open(sessionId, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); try { await this.options.beforeRecovery?.(session, this.store); await applySessionRecovery(session); this.#open.set(sessionId, session); return session; } catch (error) { await session.close().catch(() => undefined); throw error; } }
+  async create(sessionId: string = randomUUID(), cwd?: string): Promise<SessionHandle> { const session = await this.store.create({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: { profileId: this.options.profileId, runtimeContractVersion: "actspace.runtime.v2", manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.registry.digest } }, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); await this.options.onCreated?.(sessionId); return session; }
+  async createEphemeral(sessionId: string = randomUUID(), cwd?: string): Promise<SessionHandle> { const header = createSessionHeader({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: { profileId: this.options.profileId, runtimeContractVersion: "actspace.runtime.v2", manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.registry.digest } }); const session = RuntimeSessionHandle.createEphemeral({ header, registry: this.options.registry, onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); this.#ephemeral.add(sessionId); await this.options.onCreated?.(sessionId); return session; }
+  async resume(sessionId: string): Promise<SessionHandle> { const existing = this.#open.get(sessionId); if (existing !== undefined) return existing; const session = await this.store.open(sessionId, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); try { await this.options.beforeRecovery?.(session, this.store); await applySessionRecovery(session); this.#open.set(sessionId, session); await this.options.onCreated?.(sessionId); return session; } catch (error) { await session.close().catch(() => undefined); throw error; } }
   getOpen(sessionId: string): SessionHandle | undefined { return this.#open.get(sessionId); }
   closeOpen(sessionId: string): void { this.#open.delete(sessionId); this.#ephemeral.delete(sessionId); }
   snapshot(session: SessionHandle): RuntimeV2SessionSnapshot { return projectSessionSnapshot({ header: session.header, events: session.journal.events, registry: this.options.registry, rendererAllowlist: this.options.rendererAllowlist }); }
@@ -82,11 +82,14 @@ export class RuntimeSessionController {
     this.#open.clear();
     this.#ephemeral.clear();
     await Promise.all(entries.map(async ([, session]) => {
-      if (session.journal.events.at(-1)?.type !== "session/end-seed") {
-        await session.append({ type: "session/end-seed", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { sessionId: session.header.sessionId, lastSeq: session.lastSeq }, surface: null });
-      }
-      await session.flush();
-      await session.close();
+      let error: unknown;
+      try {
+        if (session.journal.events.at(-1)?.type !== "session/end-seed") await session.append({ type: "session/end-seed", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { sessionId: session.header.sessionId, lastSeq: session.lastSeq }, surface: null });
+        await session.flush();
+        await session.close();
+      } catch (caught) { error = caught; }
+      await this.options.onDisposed?.(session.header.sessionId, error === undefined ? { ok: true } : { ok: false, error });
+      if (error !== undefined) throw error;
     }));
   }
 }

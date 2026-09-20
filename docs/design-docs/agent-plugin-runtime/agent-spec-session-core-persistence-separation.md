@@ -1,5 +1,8 @@
 # Session Core 与 Persistence Provider 分离规范
 
+> 2026-09-20 更新：[Session 事件持久化重构](agent-session-event-persistence-refactor.md)已完成行为切换：write-behind 由 coordinator 持有，Session 暴露 accepted/durable 进度，Loop 使用必需 checkpoint。物理 `@actspace/session-core` 包拆分仍由 P1-A 继续。
+
+
 > 状态：目标设计已确认；P1-A contract slice 已实施，CLI persist/resume 与全量迁移仍由 G1 收口。
 >
 > 本规范承接 P0 已冻结的 13 种 Session 核心事件、Journal replay、`session/event`、`session/flush` 和现有 JSONL 行为。它只重新划分所有权，不改变事件名称、顺序、恢复语义或具体工具 executor。
@@ -58,7 +61,7 @@ DSH 的可迁移机制是：Session 作为 live service，Persistence 作为独�
 | 层 | 负责 | 明确不负责 |
 | --- | --- | --- |
 | Journal | 13 个核心事件、扩展 Codec、连续 seq、关系不变量、Surface fold | 文件、锁、Cordis、Host |
-| Session Core | 创建/恢复 live Session、append、projection 入口、post-commit `session/event`、关闭 | 文件路径、JSONL 编码、`fsync`、跨进程锁 |
+| Session Core | 创建/恢复 live Session、append、projection 入口、accepted `session/event`、关闭 | JSONL 编码、`fsync`、跨进程锁 |
 | Persistence Definition | provider 方法、错误类别、revision、durability 语义 | 具体文件或数据库 |
 | JSONL Provider | locate、create、append、load、inspect、readFrom、list、flush、lease、torn-tail | Agent Loop、工具 policy、通知语义 |
 | Projection | 只读 UI/model DTO | append、repair、持久化副作用 |

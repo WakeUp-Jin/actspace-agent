@@ -62,7 +62,7 @@ describe("raw JSONL Session persistence", () => {
     expect(await readFile(session.layout.journalPath, "utf8")).not.toContain("context-state.json");
   });
 
-  it("fires the session event hook only after the append write completes", async () => {
+  it("fires the session event hook after Journal acceptance and before the append write completes", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
     const order: string[] = [];
@@ -73,11 +73,11 @@ describe("raw JSONL Session persistence", () => {
     });
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await session.flush();
-    expect(order).toEqual(["write", "event"]);
+    expect(order).toEqual(["event", "write"]);
     await session.close();
   });
 
-  it("separates post-commit session/event from the awaited session/flush checkpoint", async () => {
+  it("separates accepted session/event from the awaited session/flush checkpoint", async () => {
     const dataRoot = await temporaryRoot();
     const registry = createCoreCodecRegistry();
     const order: string[] = [];
@@ -89,7 +89,25 @@ describe("raw JSONL Session persistence", () => {
     });
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await session.flush();
-    expect(order).toEqual(["durable-write", "session/event", "session/flush"]);
+    expect(order).toEqual(["session/event", "durable-write", "session/flush"]);
+    await session.close();
+  });
+
+  it("contains observer failures without blocking durable persistence", async () => {
+    const dataRoot = await temporaryRoot();
+    const registry = createCoreCodecRegistry();
+    const failures: unknown[] = [];
+    const store = new SessionStore({ dataRoot, runtimeId: "runtime-1", registry });
+    const session = await store.create(headerInput(registry, "observer-failure"), {
+      onEvent: () => { throw new Error("observer failed"); },
+      onBackgroundFailure: (error) => { failures.push(error); },
+    });
+    await session.append(candidate("turn/start", { turnId: "turn-1" }));
+    await session.flush();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(failures).toHaveLength(1);
+    expect(session.durabilityState).toBe("healthy");
+    expect(session.durableSeq).toBe(0);
     await session.close();
   });
 
@@ -126,6 +144,9 @@ describe("raw JSONL Session persistence", () => {
     });
     await session.append(candidate("turn/start", { turnId: "turn-1" }));
     await expect(session.flush()).rejects.toThrow("Journal append failed");
+    expect(session.durabilityState).toBe("blocked");
+    expect(session.acceptedSeq).toBe(0);
+    expect(session.durableSeq).toBe(-1);
     await expect(session.append(candidate("turn/end", { turnId: "turn-1" }))).rejects.toThrow("blocked");
     await expect(session.close()).rejects.toThrow();
 

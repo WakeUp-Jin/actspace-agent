@@ -71,6 +71,7 @@ export const TRUSTED_LOADER_ENTRIES = Object.freeze([
   Object.freeze({ id: "session-jsonl", name: "@actspace/session-jsonl/plugin", inject: [] }),
   Object.freeze({ id: "session-projection", name: "@actspace/session-projection/plugin", inject: [] }),
   Object.freeze({ id: "session-runtime", name: "@actspace/runtime/session", inject: ["actspace.host.session", "session.journal", "session.persistence", "session.jsonl", "session.projection"] }),
+  Object.freeze({ id: "session-checkpoint-policy", name: "@actspace/session-checkpoint-policy/plugin", inject: ["session.runtime"] }),
   Object.freeze({ id: "llm-service", name: "@actspace/llm-service/plugin", inject: ["actspace.host.llm"] }),
   Object.freeze({ id: "tools-runtime", name: "@actspace/tools-runtime/plugin", inject: ["tools.approval"] }),
   Object.freeze({ id: "tools-approval", name: "@actspace/tools-approval/plugin", inject: [] }),

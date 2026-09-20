@@ -1,6 +1,8 @@
 # P1-A：Session Core 与 Persistence Provider 分离
 
-状态：实施中；Core/Provider contract slice 已交付，CLI persist/resume 独立验收待 G1。
+状态：实施中；contract slice 与事件/检查点行为已交付，物理 `@actspace/session-core` 包迁移仍在本计划。
+
+下一步：在独立变更中迁移 live classes 和 42 个 consumer 导入，不重复修改已由[事件持久化计划](../../completed/20260920-session-event-persistence/README.md)交付的时序语义。
 
 ## 目标与依赖
 

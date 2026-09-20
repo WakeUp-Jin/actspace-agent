@@ -5,6 +5,7 @@ import { SessionHandle } from "@actspace/session-persistence";
 import { RequestAssembler } from "@actspace/prompt";
 import { LlmRouteRegistry, LlmService, EMPTY_LLM_USAGE, type LlmStreamEvent } from "@actspace/llm-service";
 import { ToolRuntime, type ToolBodyResult, type ToolPolicy } from "@actspace/tools-runtime";
+import type { CordisContext } from "@actspace/cordis-adapter";
 import { AgentLoop, type AgentLoopLiveEvent } from "../loop.js";
 
 /** Same real loop fixture is consumed by Core, Main adapter and renderer regressions. */
@@ -25,6 +26,7 @@ export async function runToolStreamFixture(options: {
   execute?: () => Promise<ToolBodyResult>;
   policies?: readonly ToolPolicy[];
   beforeFinalText?: () => Promise<void>;
+  context?: CordisContext;
 } = {}) {
   const registry = createCoreCodecRegistry();
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({
@@ -67,6 +69,7 @@ export async function runToolStreamFixture(options: {
     compositionDigest: "test", hostCapabilityDigest: "test", host: { hostKind: "desktop", capabilityCeiling: [], runtimeContract: "actspace.runtime.v2", invocationId: "test", workspaceRef: "/fixture" },
     toolEnvironment: () => ({ resolveArtifact: options.resolveArtifact, workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: async () => { throw new Error("not used"); } }),
     onLiveEvent: (event) => { events.push(event); options.onLiveEvent?.(event); },
+    context: options.context,
   });
   try {
     const result = await loop.runTurn({ content: "Read fixture", thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test" });

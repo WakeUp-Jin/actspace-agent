@@ -107,4 +107,22 @@ describe("Agent event dispatcher", () => {
     await scope.dispose();
     await root.dispose();
   });
+
+  it("requires a checkpoint handler and propagates its failure", async () => {
+    const root = await createCordisRoot();
+    const scope = new AgentScope("agent-checkpoint");
+    const dispatcher = createAgentEventDispatcher(root.context, scope);
+    await expect(dispatcher.required("session/checkpoint", { sessionId: "session-1", throughSeq: 3, reason: "before-tool-body" })).rejects.toThrow("has no handler");
+    const context = scopeContext(root.context, scope.scopeKey);
+    const seen: unknown[] = [];
+    context.on?.("session/checkpoint", async (payload) => {
+      seen.push(payload);
+      if ((payload as { throughSeq?: number }).throughSeq === 5) throw new Error("checkpoint failed");
+    });
+    await dispatcher.required("session/checkpoint", { sessionId: "session-1", throughSeq: 4, reason: "before-tool-body" });
+    expect(seen).toHaveLength(1);
+    await expect(dispatcher.required("session/checkpoint", { sessionId: "session-1", throughSeq: 5, reason: "before-tool-body" })).rejects.toThrow("checkpoint failed");
+    await scope.dispose();
+    await root.dispose();
+  });
 });

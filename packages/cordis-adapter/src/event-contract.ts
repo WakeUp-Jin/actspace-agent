@@ -7,9 +7,10 @@ export type AgentLoopIntervention =
   | "tools/pre-execute"
   | "tools/execute"
   | "tools/post-execute"
-  | "agent/turn-stopping";
+  | "agent/turn-stopping"
+  | "session/checkpoint";
 
-export type AgentNotification = "agent/session-start" | "agent/status" | "agent/error" | "tools/result" | "session/event";
+export type AgentNotification = "agent/session-start" | "agent/status" | "agent/error" | "tools/result" | "session/event" | "llm/chunk";
 
 export type RuntimeLifecycleEvent =
   | "runtime/booting"
@@ -53,6 +54,8 @@ declare module "@deepseek-ai/cordis" {
     "agent/status": (this: object, payload: AgentSubjectPayload) => unknown;
     "agent/error": (this: object, payload: AgentSubjectPayload) => unknown;
     "tools/result": (this: object, payload: AgentSubjectPayload) => unknown;
+    "llm/chunk": (this: object, payload: AgentSubjectPayload) => unknown;
+    "session/checkpoint": (this: object, payload: AgentSubjectPayload) => unknown;
     "session/event": (payload: unknown) => unknown;
     "session/flush": (payload: unknown) => unknown;
   }

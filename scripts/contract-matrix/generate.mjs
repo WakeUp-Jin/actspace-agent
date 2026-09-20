@@ -53,6 +53,7 @@ const LOOP_META = Object.freeze({
   "tools/execute": { mode: "waterfall", scope: "agent", containment: "wrap-or-replace" },
   "tools/post-execute": { mode: "waterfall", scope: "agent", containment: "result-fail-or-redact" },
   "agent/turn-stopping": { mode: "serial", scope: "agent", containment: "stop-or-continue" },
+  "session/checkpoint": { mode: "required", scope: "agent", containment: "fail-closed" },
 });
 
 const NOTIFICATION_META = Object.freeze({
@@ -61,6 +62,7 @@ const NOTIFICATION_META = Object.freeze({
   "agent/error": { scope: "agent", containment: "observer-isolated" },
   "tools/result": { scope: "tool", containment: "observer-isolated" },
   "session/event": { scope: "session", containment: "post-commit-observer-isolated" },
+  "llm/chunk": { scope: "agent", containment: "observer-isolated" },
 });
 
 const readCache = new Map();
@@ -119,8 +121,8 @@ async function parseEvents() {
   const interventions = extractUnion(eventSource, "AgentLoopIntervention");
   const notifications = extractUnion(eventSource, "AgentNotification");
   if (core.length !== 13) throw new Error(`Expected 13 Session core events, found ${core.length}.`);
-  if (interventions.length !== 9) throw new Error(`Expected 9 Agent Loop interventions, found ${interventions.length}.`);
-  if (notifications.length !== 5) throw new Error(`Expected 5 notifications, found ${notifications.length}.`);
+  if (interventions.length !== 10) throw new Error(`Expected 10 Agent Loop interventions, found ${interventions.length}.`);
+  if (notifications.length !== 6) throw new Error(`Expected 6 notifications, found ${notifications.length}.`);
 
   const rows = [];
   for (const id of core) rows.push(row("event", `session:${id}`, "@actspace/session-journal", "active", [sourceRef(EVENT_SOURCES.sessionCore.path, EVENT_SOURCES.sessionCore.symbol)], { plane: "session", category: "core", eventType: id, scope: "session", surface: SESSION_SURFACES[id] ?? "internal", codecStatus: "present", producerStatus: "present", required: true }));
@@ -301,7 +303,7 @@ export function validateRows(matrix) {
   const core = matrix.events.filter((item) => item.category === "core");
   const interventions = matrix.events.filter((item) => item.category === "agent-loop");
   const notifications = matrix.events.filter((item) => item.category === "notification");
-  if (core.length !== 13 || interventions.length !== 9 || notifications.length !== 5) diagnostics.push({ severity: "error", code: "EVENT_COUNT_DRIFT", message: `Expected 13/9/5 event surfaces, got ${core.length}/${interventions.length}/${notifications.length}.` });
+  if (core.length !== 13 || interventions.length !== 10 || notifications.length !== 6) diagnostics.push({ severity: "error", code: "EVENT_COUNT_DRIFT", message: `Expected 13/10/6 event surfaces, got ${core.length}/${interventions.length}/${notifications.length}.` });
   for (const item of matrix.events.filter((event) => event.category === "notification")) if (item.mode === "waterfall") diagnostics.push({ severity: "error", code: "NOTIFICATION_VETO", message: `${item.eventType} cannot be a waterfall/veto event.` });
   if (requiredServices.size === 0) diagnostics.push({ severity: "warning", code: "NO_REQUIRED_SERVICES", message: "No required Service Definitions were found." });
   return diagnostics;

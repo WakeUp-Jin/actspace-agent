@@ -38,9 +38,9 @@ export function apply(ctx: CordisContext): void {
     registry: journal.registry,
     beforeRecovery: async (parent, store) => { await repairSubagentPublications({ store, parent }); },
     onEvent: async (sessionId, event) => { await emitContained(ctx, "session/event", event, { sessionId }); },
-    onFlush: async (sessionId, throughSeq) => {
-      if (ctx.parallel !== undefined) await ctx.parallel("session/flush", { sessionId, throughSeq });
-    },
+    onFlush: (sessionId, throughSeq) => emitContained(ctx, "session/flush", { sessionId, throughSeq }),
+    onCreated: (sessionId) => emitContained(ctx, "session/created", { sessionId }),
+    onDisposed: (sessionId, outcome) => emitContained(ctx, "session/disposed", { sessionId, outcome }),
   }, sessionStore.store);
   ctx.provide?.("session.runtime", service);
   ctx.effect?.(() => async () => {

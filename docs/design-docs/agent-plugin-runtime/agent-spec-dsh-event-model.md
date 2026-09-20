@@ -1,5 +1,8 @@
 # DSH 风格 Session 事件模型
 
+> 2026-09-20 更新：[Session 事件持久化重构](agent-session-event-persistence-refactor.md)的核心行为已实施。Journal 接纳后先交给 persistence coordinator，再发布 observer 通知；`flush` 是独立 durability barrier。
+
+
 > 状态：13 个核心事件与默认 Loop 已实现；最终 CLI retry/error 验收仍待完成。2026-09-09 按 ActSpace 当前 codec / Session Format v1 校准 seq 描述。
 >
 > 日期：2026-08-29
@@ -23,7 +26,7 @@
 |---|---|---|---|
 | 持久化事实 | `[S]` | 可重放、可恢复、可审计的唯一事实源 | 是，按 `seq` 追加 |
 | Agent Loop 干预 | `[I]` | Cordis waterfall/serial 的运行时插入点 | 否；干预结果通过 `[S]` 事实体现 |
-| 通知 | `[N]` | 低延迟 UI、宿主和观测订阅 | 通常否；`session/event` 只是在提交后广播 `[S]` |
+| 通知 | `[N]` | 低延迟 UI、宿主和观测订阅 | 通常否；`session/event` 在内存接纳并进入持久化队列后广播 `[S]` |
 
 `[I]` 事件不能悄悄改变已提交事实；任何改变都必须在后续持久化事件中可见。`[N]` 事件丢失不影响 Session 恢复，通知消费者必须能从 `[S]` 重建状态。
 
@@ -62,7 +65,7 @@ sequenceDiagram
     A->>J: assistant/chunk × N
     A->>J: assistant/message
     A->>J: step/end
-    A->>N: session/event (post-commit)
+    A->>N: session/event (accepted, queued)
     A->>J: turn/end
     A->>J: session/end-seed (close only)
 ```
@@ -110,7 +113,7 @@ provenance   = { sourceEventSeqs?, parentSeq?, generatedBy? }
 
 `seq` 只由 Journal 分配，调用方不得自行生成。2026-09-09 按当前 codec、Journal 和 [Session Format v1](agent-spec-session-format-v1.md) 校准起点；此前从 1 开始的描述是文档错误，本次不修改任何事件或用户数据。`provenance.sourceEventSeqs` 用于把收束后的 `assistant/message` 链回它所聚合的 chunk；任何 projection 都可以依此去重和重建。
 
-Journal 的 append 是唯一提交点：先校验 codec 和序号，再写入文件并完成 flush/同步，最后异步发布 `session/event` 通知。通知失败不得回滚已提交事实。
+Journal 的 append 是唯一逻辑提交点：先校验 codec 和序号并接纳到内存，再由 coordinator 接收入队，随后发布 `session/event` 通知。`append` 不承诺已经落盘；`flush(throughSeq)` 成功才证明对应连续前缀 durable。通知失败不得回滚事实或阻断 coordinator。
 
 ## 5. DSH 持久化扩展目录
 
@@ -136,7 +139,7 @@ Journal 的 append 是唯一提交点：先校验 codec 和序号，再写入文
 
 - `turn/started`, `turn/completed`, `step/started`, `step/completed`；
 - `request/snapshot`；
-- `llm/chunk`, `llm/usage`, `llm/error`, `llm/aborted`；
+- 旧的持久化 `llm/chunk`、`llm/usage`、`llm/error`、`llm/aborted`；当前同名 `llm/chunk` 仅是非持久化增量通知；
 - 任何把工具权限、审批或 UI 临时状态冒充核心事件的旧名称。
 
 usage、finish、error、abort 都分别归入 `assistant/chunk`、`assistant/message`、`step/end`/`turn/end` 的结构化字段；重试用 `llm/retry*` 扩展事件表达。
@@ -171,6 +174,6 @@ usage、finish、error、abort 都分别归入 `assistant/chunk`、`assistant/me
 1. 13 种核心事件有唯一 codec、schema、golden JSONL 和 replay 测试；
 2. 无工具、含工具、重试、错误、取消五种顺序都能由 `seq` 重放；
 3. 扩展目录中的 codec 不影响核心事件，未知扩展按策略记录诊断或 fail closed；
-4. `session/event` 只能在 append commit 后触发，通知丢失不会破坏恢复；
+4. `session/event` 只能在 Journal 接纳且 coordinator 入队后触发，通知丢失不会破坏恢复；
 5. 任意 projection 只依赖 `surface` 和已提交事件，不读取 Agent Loop 私有状态；
 6. 新格式从空 Session 开始，旧 Session 文件明确视为不可读。

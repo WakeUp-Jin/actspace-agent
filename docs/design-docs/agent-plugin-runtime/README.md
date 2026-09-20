@@ -12,6 +12,8 @@
 
 ## 领域契约
 
+- [Session 事件持久化重构](agent-session-event-persistence-refactor.md)：2026-09-20 核心行为已实施；接纳、observer、durability barrier 与 checkpoint 语义以此为准，[执行记录](../../exec-plans/completed/20260920-session-event-persistence/README.md)。
+
 | 主题 | 规范 |
 |---|---|
 | Plugin 与包边界 | [Plugin ABI](agent-spec-plugin-runtime-abi.md)、[Package layout](agent-spec-package-layout-and-plugin-packaging.md)、[包清单](agent-package-ledger.md) |

@@ -5,6 +5,7 @@ import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, type AgentHandle } from "@actspa
 import { AgentLoop } from "@actspace/core-agent-loop";
 import { RequestAssembler } from "@actspace/prompt";
 import { createCoreCodecRegistry, createSessionHeader } from "@actspace/session-journal";
+import { apply as applySessionCheckpointPolicy } from "@actspace/session-checkpoint-policy/plugin";
 import { SessionHandle } from "@actspace/session-persistence";
 import { LlmRouteRegistry, LlmService, EMPTY_LLM_USAGE, type LlmMessage, type LlmStreamEvent } from "@actspace/llm-service";
 import { ToolRuntime } from "@actspace/tools-runtime";
@@ -26,6 +27,9 @@ describe("English learning real AgentLoop integration", () => {
       })(),
     } });
     const sessions: SessionHandle[] = [];
+    const liveSessions = new Map<string, SessionHandle>();
+    root.context.provide?.("session.runtime", { getOpen: (sessionId: string) => liveSessions.get(sessionId) });
+    applySessionCheckpointPolicy(root.context);
     const scopes: AgentScope[] = [];
     const syntheses: string[] = [];
     const originalFetch = globalThis.fetch;
@@ -37,7 +41,7 @@ describe("English learning real AgentLoop integration", () => {
     const learning = new EnglishLearningService(root.context, { supported: true, settings: () => ({ ...DEFAULT_SPEECH_SETTINGS }), resolveCredential: () => "speech-canary", play, stop: async () => {}, subscribeSettings: () => () => {} });
     const create = (id: string) => {
       const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: id, createdAt: "2026-09-06T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: registry.digest } }), onEvent: (event) => emitContained(root.context, "session/event", event, { sessionId: id }) });
-      const scope = new AgentScope(`main:${id}`); scopes.push(scope); sessions.push(session);
+      const scope = new AgentScope(`main:${id}`); scopes.push(scope); sessions.push(session); liveSessions.set(id, session);
       const descriptor = { ...MAIN_AGENT_DESCRIPTOR, routeId: "fixture", model: "fixture" };
       const agent: AgentHandle = { agentId: scope.agentId, scope, descriptor, session, dispose: () => scope.dispose() };
       const loop = new AgentLoop({ scope, session, descriptor, context: root.context, inbox: new MainAgentInbox(session), tools: new ToolRuntime(), assembler: new RequestAssembler({ prepare: () => { throw new Error("unused"); } }), llm: new LlmService(routes, { resolve: async () => ({ apiKey: "model-canary" }) }), compositionDigest: "fixture", hostCapabilityDigest: "fixture", host: { hostKind: "desktop", invocationId: "test", runtimeContract: "actspace.runtime.v2", capabilityCeiling: [] }, toolEnvironment: () => ({ workspaceRoot: "/same-workspace", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("unused"); } }, createArtifact: async () => { throw new Error("unused"); } }) });

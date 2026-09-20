@@ -1,5 +1,8 @@
 # ActSpace Session 持久化事实源与投影收敛
 
+> 2026-09-20 任务边界：Session 事件时序、live/durable 读取接线已由[事件持久化计划](../../completed/20260920-session-event-persistence/README.md)交付；本计划保留其余 UI 映射及既有验收记录。
+
+
 状态：执行中，P00/P01 已达到验收候选状态，P02/P03 基础通道与首批 renderer consumers 已落地；Desktop 全量消息投影收敛与 G1 外部验收待继续。
 
 ## 1. 目标

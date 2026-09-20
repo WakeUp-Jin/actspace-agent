@@ -3,6 +3,7 @@ import { SessionError } from "@actspace/session-journal";
 import type { CreateSessionHeaderInput } from "@actspace/session-journal";
 import type { SessionInspection } from "@actspace/session-jsonl";
 import { SessionHandle } from "./session.js";
+import { SessionPersistenceCoordinator } from "./coordinator.js";
 import { createJsonlSessionPersistence, createPersistedSessionHeader, type SessionPersistence, type SessionPersistenceCreateOptions, type SessionPersistenceOpenOptions } from "./session-persistence.js";
 import { Service } from "@actspace/cordis-adapter";
 import type { CordisServiceContext } from "@actspace/cordis-adapter";
@@ -26,14 +27,20 @@ export class SessionStore {
   ): Promise<SessionHandle> {
     const header = createPersistedSessionHeader(headerInput, this.options.registry);
     const binding = await this.persistence.create(header, options);
+    const coordinator = new SessionPersistenceCoordinator(binding.driver, binding.events, options.onBackgroundFailure);
+    const reportObserverFailure = options.onBackgroundFailure ?? (() => undefined);
     return SessionHandle.create({
       registry: this.options.registry,
       ...binding,
       seed: binding.events,
       now: options.now,
       onBackgroundFailure: options.onBackgroundFailure,
-      onEvent: options.onEvent,
-      onFlush: options.onFlush,
+      onEvent: (event) => { coordinator.accept(event); void Promise.resolve().then(() => options.onEvent?.(event)).catch(reportObserverFailure); },
+      onEvents: (events) => { coordinator.acceptMany(events); for (const event of events) void Promise.resolve().then(() => options.onEvent?.(event)).catch(reportObserverFailure); },
+      onFlush: async (throughSeq) => { await coordinator.flush(throughSeq); await options.onFlush?.(throughSeq); },
+      onClose: (throughSeq) => coordinator.close(throughSeq),
+      durableSeq: () => coordinator.durableSeq,
+      durabilityBlocked: () => coordinator.blocked,
     });
   }
 
@@ -57,19 +64,26 @@ export class SessionStore {
       throw new SessionError("INVALID_HEADER", "Fork codecSetDigest does not match the boot registry.");
     }
     const binding = await this.persistence.fork(options);
-    return SessionHandle.create({ registry: this.options.registry, ...binding, seed: binding.events });
+    const coordinator = new SessionPersistenceCoordinator(binding.driver, binding.events);
+    return SessionHandle.create({ registry: this.options.registry, ...binding, seed: binding.events, onEvent: (event) => coordinator.accept(event), onEvents: (events) => coordinator.acceptMany(events), onFlush: (throughSeq) => coordinator.flush(throughSeq), onClose: (throughSeq) => coordinator.close(throughSeq), durableSeq: () => coordinator.durableSeq, durabilityBlocked: () => coordinator.blocked });
   }
 
   async open(sessionId: string, options: SessionPersistenceOpenOptions = {}): Promise<SessionHandle> {
     const binding = await this.persistence.open(sessionId, options);
+    const coordinator = new SessionPersistenceCoordinator(binding.driver, binding.events, options.onBackgroundFailure);
+    const reportObserverFailure = options.onBackgroundFailure ?? (() => undefined);
     return SessionHandle.create({
       registry: this.options.registry,
       ...binding,
       seed: binding.events,
       now: options.now,
       onBackgroundFailure: options.onBackgroundFailure,
-      onEvent: options.onEvent,
-      onFlush: options.onFlush,
+      onEvent: (event) => { coordinator.accept(event); void Promise.resolve().then(() => options.onEvent?.(event)).catch(reportObserverFailure); },
+      onEvents: (events) => { coordinator.acceptMany(events); for (const event of events) void Promise.resolve().then(() => options.onEvent?.(event)).catch(reportObserverFailure); },
+      onFlush: async (throughSeq) => { await coordinator.flush(throughSeq); await options.onFlush?.(throughSeq); },
+      onClose: (throughSeq) => coordinator.close(throughSeq),
+      durableSeq: () => coordinator.durableSeq,
+      durabilityBlocked: () => coordinator.blocked,
     });
   }
 }

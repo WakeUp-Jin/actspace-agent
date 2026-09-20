@@ -22,6 +22,7 @@
     "@actspace/session-journal": "workspace:*",
     "@actspace/session-jsonl": "workspace:*",
     "@actspace/session-persistence": "workspace:*",
+    "@actspace/session-checkpoint-policy": "workspace:*",
     "@actspace/llm-service": "workspace:*",
     "@actspace/llm-pi-ai": "workspace:*",
     "@actspace/context": "workspace:*",

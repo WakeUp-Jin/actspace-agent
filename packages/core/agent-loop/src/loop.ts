@@ -9,7 +9,6 @@ import { DEFAULT_LLM_RETRY_POLICY, retryDelay, retryPolicySnapshot } from "@acts
 import type { RequestAssembler } from "@actspace/prompt";
 import type { PreparedRequestMetadata } from "@actspace/prompt";
 import type { AgentScope } from "@actspace/core-scope";
-import { CheckpointPolicy } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
 import type { ToolCallInput, ToolPreparedEnvironment } from "@actspace/tools-runtime";
 import type { ToolRuntime } from "@actspace/tools-runtime";
@@ -66,7 +65,6 @@ export type AgentLoopOptions = {
 };
 
 export class AgentLoop {
-  readonly #checkpoint = new CheckpointPolicy();
   readonly #events: AgentEventDispatcher;
   #active: AbortController | null = null;
   #idle: Promise<void> | null = null;
@@ -142,7 +140,7 @@ export class AgentLoop {
         try {
           await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: prepared.request.routeId, model: prepared.request.model, contextWindow, attempt: 1 }));
           await this.options.session.append(core("request/context", { requestId, turnId, stepId, snapshot }));
-          await this.#checkpoint.enforce(this.options.session, "before-llm-dispatch");
+          await this.checkpoint("before-llm-dispatch");
         } catch (error) { prepared.release(); throw error; }
         let output: Awaited<ReturnType<typeof collectStream>> | undefined;
         let attempt = 1;
@@ -154,7 +152,7 @@ export class AgentLoop {
             output = await collectStream(stream as AsyncIterable<LlmStreamEvent>, controller.signal, async (event) => {
               this.emitLive({ ...event.live, agentRunId, turnId, stepId, requestId, messageId: event.messageId });
               await this.options.session.append(core("assistant/chunk", { messageId: event.messageId, chunkIndex: event.chunkIndex, requestId, turnId, stepId, kind: event.live.kind, content: event.live.kind === "tool-call-delta" ? event.live.argumentsDelta : event.live.message, ...(event.live.kind === "tool-call-delta" ? { callId: event.live.callId, name: event.live.name } : {}) }));
-              await this.serial("llm/stream", event.live, controller.signal);
+              await this.#events.emit("llm/chunk", this.recordPayload(event.live));
             });
           } catch (error) {
             output = failedStreamOutput(normalizeLlmFailure(error, attempt));
@@ -172,13 +170,13 @@ export class AgentLoop {
           const retryId = randomUUID();
           const failedRequestId = requestId;
           await this.options.session.append(core("llm/retry", { requestId: failedRequestId, retryId, attempt, nextAttempt: attempt + 1, delayMs, failure: output.failure, usage: output.usage }));
-          await this.#checkpoint.enforce(this.options.session, "before-llm-dispatch");
+          await this.checkpoint("before-llm-dispatch");
           if (!await cancellableDelay(delayMs, controller.signal)) {
             await this.options.session.append(core("step/end", { turnId, stepId, reason: "aborted" }));
             throw new AgentRuntimeError("TURN_ABORTED", "LLM retry wait aborted.");
           }
           await this.options.session.append(core("llm/retry-started", { requestId: failedRequestId, retryId, attempt: attempt + 1 }));
-          await this.#checkpoint.enforce(this.options.session, "before-llm-dispatch");
+          await this.checkpoint("before-llm-dispatch");
           attempt += 1;
           candidate = await this.options.assembler.assembleCandidate({
             sessionId: this.options.session.header.sessionId,
@@ -205,7 +203,7 @@ export class AgentLoop {
           const retrySnapshot = this.options.assembler.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
           await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow, attempt }));
           await this.options.session.append(core("request/context", { requestId, turnId, stepId, snapshot: retrySnapshot }));
-          await this.#checkpoint.enforce(this.options.session, "before-llm-dispatch");
+          await this.checkpoint("before-llm-dispatch");
           output = undefined;
         }
         if (output.content.length > 0 || output.failure !== null) {
@@ -214,10 +212,11 @@ export class AgentLoop {
         }
         if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames);
         await this.options.session.append(core("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
-        await this.#checkpoint.enforce(this.options.session, "before-next-step");
+        await this.checkpoint("before-next-step");
         if (output.toolCalls.length === 0 && !budgetSummary) {
           await this.serial("agent/turn-stopping", { agentRunId, turnId, reason: "completed", stepCount }, controller.signal);
           await this.options.session.append(core("turn/end", { turnId, reason: "completed" }));
+          await this.checkpoint("after-turn-settled");
           const usage = compactionUsage(output.usage);
           if (usage !== null) await this.options.compaction?.maybeCompact(this.options.session, usage);
           this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "completed" });
@@ -227,19 +226,27 @@ export class AgentLoop {
       }
       await this.serial("agent/turn-stopping", { agentRunId, turnId, reason: "step-limit", stepCount }, controller.signal);
       await this.options.session.append(core("turn/end", { turnId, reason: "step-limit" }));
+      await this.checkpoint("after-turn-settled");
       await this.notify("agent/status", { agentRunId, turnId, status: "step-limit" });
       this.emitLive({ kind: "run-state", agentRunId, turnId, message: "step-limit" });
       return Object.freeze({ agentRunId, turnId, reason: "step-limit", steps: stepCount, finalText });
     } catch (error) {
       const cause = error instanceof AgentRuntimeError && isRecord(error.cause) ? error.cause : undefined;
       const failure = { ...normalizeLlmFailure(error, 1), ...(cause as LlmFailure | undefined), message: redactLlmText(error instanceof Error ? error.message : String(error)).slice(0, 2000) };
-      if (!input.keepPendingOnAbort) await this.options.inbox.discardAll(controller.signal.aborted ? "turn-aborted" : "turn-failed");
-      const relations = this.options.session.journal.validation.relations;
-      if (relations.openStepId !== null && relations.openRequestIds.length === 0 && relations.openToolCallIds.length === 0) await this.options.session.append(core("step/end", { turnId, stepId: relations.openStepId, reason: "interrupted" }));
-      if (this.options.session.journal.validation.relations.openTurnId === turnId && this.options.session.journal.validation.relations.openStepId === null) await this.options.session.append(core("turn/end", { turnId, reason: controller.signal.aborted ? "aborted" : "failed", ...(controller.signal.aborted ? {} : { failure }) }));
+      let settlementFailure: unknown;
+      if (this.options.session.durabilityState !== "blocked") {
+        try {
+          if (!input.keepPendingOnAbort) await this.options.inbox.discardAll(controller.signal.aborted ? "turn-aborted" : "turn-failed");
+          const relations = this.options.session.journal.validation.relations;
+          if (relations.openStepId !== null && relations.openRequestIds.length === 0 && relations.openToolCallIds.length === 0) await this.options.session.append(core("step/end", { turnId, stepId: relations.openStepId, reason: "interrupted" }));
+          if (this.options.session.journal.validation.relations.openTurnId === turnId && this.options.session.journal.validation.relations.openStepId === null) await this.options.session.append(core("turn/end", { turnId, reason: controller.signal.aborted ? "aborted" : "failed", ...(controller.signal.aborted ? {} : { failure }) }));
+          await this.checkpoint("after-turn-settled");
+        } catch (caught) { settlementFailure = caught; }
+      }
       await this.notify("agent/error", { agentRunId, turnId, error: failure.message });
       await this.notify("agent/status", { agentRunId, turnId, status: controller.signal.aborted ? "aborted" : "failed" });
       this.emitLive({ kind: "run-state", agentRunId, turnId, message: controller.signal.aborted ? "aborted" : "failed", ...(controller.signal.aborted ? {} : { failure }) });
+      if (settlementFailure !== undefined) throw new AggregateError([error, settlementFailure], "Agent turn failed and its settlement checkpoint also failed.", { cause: error });
       throw error;
     } finally { this.#active = null; this.#resolveIdle?.(); this.#resolveIdle = null; this.#idle = null; }
   }
@@ -286,6 +293,13 @@ export class AgentLoop {
   private async serial(type: AgentLoopIntervention, payload: unknown, signal: AbortSignal): Promise<unknown> {
     return this.#events.serial(type, this.recordPayload(payload));
   }
+  private async checkpoint(reason: "before-llm-dispatch" | "before-tool-body" | "before-next-step" | "after-turn-settled"): Promise<void> {
+    if (this.options.context === undefined) {
+      await this.options.session.flush(this.options.session.lastSeq);
+      return;
+    }
+    await this.#events.required("session/checkpoint", { sessionId: this.options.session.header.sessionId, throughSeq: this.options.session.lastSeq, reason });
+  }
   private recordPayload<T>(payload: T): Readonly<Record<string, unknown>> { return isRecord(payload) ? payload : {}; }
 
   private async runTools(calls: readonly CollectedToolCall[], ids: { agentRunId: string; turnId: string; stepId: string; requestId: string }, signal: AbortSignal, visibleToolNames: ReadonlySet<string>): Promise<readonly ToolExecutionResult[]> {
@@ -304,7 +318,7 @@ export class AgentLoop {
         try { base.onExecutionStarted?.(call); } catch { /* Isolate optional observers. */ }
       }, notifyAgent: async (content) => { await this.options.inbox.enqueue(content, "next-step", undefined, "task_notification"); }, journal: {
       recordDispatch: async (fact) => { await this.options.session.append(core("tool-workflow/run-start", fact)); },
-      checkpointBeforeBody: async () => { await this.#checkpoint.enforce(this.options.session, "before-tool-body"); },
+      checkpointBeforeBody: async () => { await this.checkpoint("before-tool-body"); },
       commitResult: async (result) => {
         const data = { callId: result.callId, pluginId: result.pluginId, name: result.name, status: result.status, summary: result.summary, modelOutput: result.modelOutput, detail: result.detail, artifacts: result.artifacts, failure: result.failure ?? null, renderer: result.renderer ?? null } as unknown as RuntimeV2JsonValue;
         const surface = { surface: { kind: "append", node: { kind: "tool-result", messageId: `tool-${result.callId}`, callId: result.callId, content: result.modelOutput as unknown as RuntimeV2JsonValue, isError: result.status !== "completed" } } };

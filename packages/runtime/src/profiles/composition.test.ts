@@ -23,5 +23,6 @@ describe("runtime profile composition", () => {
   it("uses the checked-in loader transport for every profile", () => {
     const composition = createProfileComposition(RUNTIME_PROFILE_IDS.desktop, host, { appBundle: DESKTOP_APP_BUNDLE });
     expect(composition.loaderConfig).toEqual({ profileId: RUNTIME_PROFILE_IDS.desktop, entries: TRUSTED_LOADER_ENTRIES });
+    expect(TRUSTED_LOADER_ENTRIES).toContainEqual({ id: "session-checkpoint-policy", name: "@actspace/session-checkpoint-policy/plugin", inject: ["session.runtime"] });
   });
 });

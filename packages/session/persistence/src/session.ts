@@ -6,7 +6,6 @@ import type { SessionHeaderV1 } from "@actspace/session-journal";
 import { SessionJournal } from "@actspace/session-journal";
 import { createSessionProjection, type SessionProjection } from "@actspace/session-projection";
 import type { SessionPersistenceDriver } from "./session-driver.js";
-import { SessionWriteBehind } from "./write-behind.js";
 
 export type ArtifactReferenceV1 = {
   readonly artifactId: string;
@@ -36,16 +35,21 @@ export type CreatePersistentSessionOptions = {
   readonly seed?: readonly SessionEventEnvelopeV1[];
   readonly now?: () => string;
   readonly onBackgroundFailure?: (error: unknown) => void;
-  /** Post-commit firehose. It is called only after the driver append resolves. */
+  /** Post-acceptance firehose. Persistence and observers consume the accepted fact here. */
   readonly onEvent?: (event: SessionEventEnvelopeV1) => void | Promise<void>;
-  /** Durable checkpoint notification. It runs after the queued batch is flushed. */
+  readonly onEvents?: (events: readonly SessionEventEnvelopeV1[]) => void | Promise<void>;
+  /** Durable checkpoint barrier for the accepted event prefix. */
   readonly onFlush?: (throughSeq: number) => void | Promise<void>;
+  /** Optional owner callback for closing the persistence coordinator. */
+  readonly onClose?: (throughSeq: number) => void | Promise<void>;
+  readonly durableSeq?: () => number | null;
+  readonly durabilityBlocked?: () => boolean;
 };
 
 export class SessionHandle {
-  readonly #writeBehind: SessionWriteBehind;
   #mutation: Promise<unknown> = Promise.resolve();
   #closed = false;
+  #blocked: unknown;
   #closePromise: Promise<void> | undefined;
 
   private constructor(
@@ -53,40 +57,39 @@ export class SessionHandle {
     readonly layout: SessionFileLayout,
     readonly journal: SessionJournal,
     private readonly driver: SessionPersistenceDriver,
-    onBackgroundFailure: (error: unknown) => void,
     private readonly onEvent: ((event: SessionEventEnvelopeV1) => void | Promise<void>) | undefined,
+    private readonly onEvents: ((events: readonly SessionEventEnvelopeV1[]) => void | Promise<void>) | undefined,
     private readonly onFlush: ((throughSeq: number) => void | Promise<void>) | undefined,
+    private readonly onClose: ((throughSeq: number) => void | Promise<void>) | undefined,
+    private readonly readDurableSeq: (() => number | null) | undefined,
+    private readonly readDurabilityBlocked: (() => boolean) | undefined,
   ) {
-    this.#writeBehind = new SessionWriteBehind({
-      write: async (events) => {
-        await this.driver.append(events);
-        for (const event of events) {
-          void Promise.resolve(this.onEvent?.(event)).catch(onBackgroundFailure);
-        }
-      },
-      reportBackgroundFailure: onBackgroundFailure,
-    });
   }
 
   static async create(options: CreatePersistentSessionOptions): Promise<SessionHandle> {
     const journal = new SessionJournal({ registry: options.registry, now: options.now, seed: options.seed });
-    return new SessionHandle(options.header, options.layout, journal, options.driver, options.onBackgroundFailure ?? (() => undefined), options.onEvent, options.onFlush);
+    return new SessionHandle(options.header, options.layout, journal, options.driver, options.onEvent, options.onEvents, options.onFlush, options.onClose, options.durableSeq, options.durabilityBlocked);
   }
 
   static createEphemeral(options: { readonly header: SessionHeaderV1; readonly registry: EventCodecRegistry; readonly now?: () => string; readonly onEvent?: (event: SessionEventEnvelopeV1) => void | Promise<void>; readonly onFlush?: (throughSeq: number) => void | Promise<void> }): SessionHandle {
     const journal = new SessionJournal({ registry: options.registry, now: options.now });
     const writer = Object.freeze({ append: async () => undefined, close: async () => undefined });
     const driver = Object.freeze({ assertOwned: async () => undefined, append: writer.append, close: writer.close });
-    return new SessionHandle(options.header, ephemeralSessionLayout(options.header.sessionId), journal, driver, () => undefined, options.onEvent, options.onFlush);
+    return new SessionHandle(options.header, ephemeralSessionLayout(options.header.sessionId), journal, driver, options.onEvent, undefined, options.onFlush, undefined, () => null, () => false);
   }
 
   append(candidate: SessionEventCandidateV1): Promise<SessionEventEnvelopeV1> {
     return this.#serialize(async () => {
       this.#assertOpen();
-      if (!this.#writeBehind.canAccept) throw new SessionError("SESSION_DURABILITY_FAILED", "Session writer is blocked.");
+      this.#assertWritable();
       await this.driver.assertOwned();
       const event = this.journal.append(candidate);
-      this.#writeBehind.enqueue(event);
+      try {
+        await this.onEvent?.(event);
+      } catch (error) {
+        this.#blocked = error;
+        throw error;
+      }
       return event;
     });
   }
@@ -94,10 +97,16 @@ export class SessionHandle {
   appendMany(candidates: readonly SessionEventCandidateV1[]): Promise<readonly SessionEventEnvelopeV1[]> {
     return this.#serialize(async () => {
       this.#assertOpen();
-      if (!this.#writeBehind.canAccept) throw new SessionError("SESSION_DURABILITY_FAILED", "Session writer is blocked.");
+      this.#assertWritable();
       await this.driver.assertOwned();
       const events = this.journal.appendMany(candidates);
-      for (const event of events) this.#writeBehind.enqueue(event);
+      try {
+        if (this.onEvents !== undefined) await this.onEvents(events);
+        else for (const event of events) await this.onEvent?.(event);
+      } catch (error) {
+        this.#blocked = error;
+        throw error;
+      }
       return events;
     });
   }
@@ -105,8 +114,7 @@ export class SessionHandle {
   flush(throughSeq = this.journal.lastSeq): Promise<void> {
     return this.#serialize(async () => {
       this.#assertOpen();
-      await this.#writeBehind.flush();
-      await this.driver.assertOwned();
+      this.#assertWritable();
       if (this.journal.lastSeq < throughSeq) throw new SessionError("INVALID_EVENT", `Cannot flush unknown seq ${throughSeq}.`);
       await this.onFlush?.(throughSeq);
     });
@@ -120,10 +128,13 @@ export class SessionHandle {
     return this.journal.lastSeq;
   }
 
+  get acceptedSeq(): number { return this.journal.lastSeq; }
+  get durableSeq(): number | null { return this.readDurableSeq?.() ?? null; }
+
   /** Durable write state used by hosts to distinguish runtime failure from persistence failure. */
   get durabilityState(): "healthy" | "blocked" | "closed" {
     if (this.#closed) return "closed";
-    return this.#writeBehind.canAccept ? "healthy" : "blocked";
+    return this.#blocked === undefined && this.readDurabilityBlocked?.() !== true ? "healthy" : "blocked";
   }
 
   close(): Promise<void> {
@@ -133,12 +144,13 @@ export class SessionHandle {
       this.#closed = true;
       let failure: unknown;
       try {
-        await this.#writeBehind.close();
+        await this.onFlush?.(this.journal.lastSeq);
       } catch (error) {
         failure = error;
       }
       try {
-        await this.driver.close();
+        if (this.onClose !== undefined) await this.onClose(this.journal.lastSeq);
+        else await this.driver.close();
       } catch (error) {
         failure ??= error;
       }
@@ -155,6 +167,12 @@ export class SessionHandle {
 
   #assertOpen(): void {
     if (this.#closed) throw new SessionError("SESSION_CLOSED", "SessionHandle is closed.");
+  }
+
+  #assertWritable(): void {
+    if (this.#blocked !== undefined || this.readDurabilityBlocked?.() === true) {
+      throw new SessionError("SESSION_DURABILITY_FAILED", "Session writer is blocked after an event consumer failure.", this.#blocked);
+    }
   }
 }
 

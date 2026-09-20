@@ -22,7 +22,7 @@
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
 | [Cordis 事件 ABI 与 CLI 最终验收](active/20260829-actspace-cordis-event-abi-final-acceptance/README.md) | P00–P04 有通过证据；补 P05 deterministic retry/error fixture 后再闭环。 |
 | [P1/P2 契约与组合](active/20260829-actspace-p1-p2-contract-and-composition/README.md) | contract slices 已交付；G1 跨包回归、P2/G2 语义门禁继续。 |
-| [P1-A Session Core / Persistence](active/20260829-actspace-p1-session-core-persistence/README.md) | slice 已交付；CLI persist/resume 独立验收与 G1 交接待完成。 |
+| [P1-A Session Core / Persistence](active/20260829-actspace-p1-session-core-persistence/README.md) | contract 与事件行为已交付；下一步独立迁移物理 `session-core` 包和 consumer imports。 |
 | [P1-B Service 三层](active/20260829-actspace-p1-service-roles/README.md) | slice 已交付；全域 Provider/Consumer 收口待完成。 |
 | [P1-C Profile / Bundle / Patch](active/20260829-actspace-p1-profile-bundle-patch/README.md) | schema/digest/transport 已交付；restart-only、失败清理及 one-shot 回归待完成。 |
 | [P2 Contract Matrix](active/20260829-actspace-p2-contract-matrix/README.md) | 字节漂移检查已恢复通过；语义 validator 与负向 fixtures 未完整交付，不能归档。 |
@@ -32,6 +32,8 @@
 2026-09-09 [逐项复核与设计合并清单](../exec-runs/20260908-docs-v1-archive-v2-refresh/followup-audit.md)：初始 10 个 active 入口逐项复核；中文界面任务自行归档后，Context 补齐全仓回归也进入 completed，当前剩余 8 个入口。P2 按语义检查缺口保留 active。
 
 ## 最近完成
+
+- [Session 事件持久化与检查点重构](completed/20260920-session-event-persistence/README.md)：accepted/durable 分离、persistence coordinator、必需 checkpoint policy 和生命周期通知已实施；物理 `session-core` 包迁移仍由 P1-A 跟踪。
 
 - [官网功能展示与截图占位](completed/20260919-site-showcase.md)：六组滚动图文、35 张截图对应24篇文档40处占位与浅紫引用完成；真实素材待用户交付。
 
