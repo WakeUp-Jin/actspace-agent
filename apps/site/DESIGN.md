@@ -12,10 +12,10 @@
 
 ## 全站骨架
 
-- 桌面页头 68px，窄屏（760px 以下）64px，固定顶部；产品、文档、博客、更新日志与开始使用。切换文档不改变页头结构。页头、文档侧栏和目录的吸顶位置共享 `--site-header-height`；博客筛选栏保留页头下方 32px 间距。
+- 桌面页头 68px，窄屏（760px 以下）64px，固定顶部；Logo 后紧跟产品、文档、博客和更新日志，右侧依次为 GitHub 图标、分隔线与快速开始按钮。切换文档不改变页头结构。页头、文档侧栏和目录的吸顶位置共享 `--site-header-height`；博客筛选栏保留页头下方 32px 间距。
 - 页面最大宽度 1600px，左右内边距随屏宽变化，手机至少 24px。
 - 主按钮黑底白字、圆角胶囊；辅助操作为文字链接。键盘焦点必须清晰。
-- 小屏使用可展开导航，Escape 收起。站点链接经过 `sitePath()`，兼容 GitHub Pages 子路径。
+- 小屏使用可展开导航，Escape 收起；页头保留 Logo、快速开始和菜单，GitHub 入口随站内导航进入菜单。360px 以下隐藏品牌文字以避免操作区拥挤。站点链接经过 `sitePath()`，兼容 GitHub Pages 子路径。
 - 页脚使用 Logo、GitHub、文档、更新日志、开发计划；文档阅读区不追加营销页脚。
 
 ## 首页
@@ -63,6 +63,10 @@ Cursor 式阅读结构：左侧浅灰目录、中央正文、右侧页内目录�
 只显示“更新日志”标题；不添加标题说明或“公开发布记录 / 截至日期”。桌面日期左、内容右，小屏纵向。发布记录由现有 release parser 读取，保留原有图文与视频内容。
 
 ## 资源与验收
+
+截图通过 `Screenshot.astro` 在构建时生成 quality 85 的 WebP 和多宽度 `srcset`，调用方用 `sizes` 描述实际显示宽度；首图 eager/high，其余 lazy。点击放大使用显式生成的全尺寸 PNG，不让缩略图替代细节原图。页头/页脚 Logo 使用 `src/assets/brand/actspace-logo.png`，构建输出 50/100/150px WebP，保持现有显示尺寸。Astro 使用 Sharp 图像服务，不使用跳过处理的 passthrough 服务。
+
+Netlify 对 `/_astro/*` 的内容哈希资源设置一年 immutable 缓存；HTML 和没有内容哈希的 public 文件不使用该规则。验收同时检查产物字节数、移动端图片选择、桌面清晰度及点击放大，不能只看构建成功。
 
 角色封面位于 `src/assets/blog/covers/`，展示分类映射位于 `src/lib/blog-presentation.ts`。正式文章继续使用 Astro content collections，避免把原型中的整篇 HTML 写死到路由。
 

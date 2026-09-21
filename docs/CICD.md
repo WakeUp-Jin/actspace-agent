@@ -83,6 +83,8 @@ macOS 产物会把复制来的 Electron runtime 改成 Actspace 语义：外层 
 
 Netlify 从仓库根安装 pnpm workspace 依赖，构建时读取 `docs/releases/feature-release-notes.md` 与 `docs/roadmap.md`；最终仅发布 `apps/site/dist`，不发布整个仓库。当前纯静态站点无需 Netlify Adapter 或服务端函数。
 
+图片优化由构建时 Sharp 完成，`apps/site` 显式依赖 Sharp；部署后直接提供静态 WebP，不依赖付费图片转换服务。`netlify.toml` 为 `/_astro/*` 内容哈希资源设置 `Cache-Control: public, max-age=31536000, immutable`，HTML 继续使用默认重新验证策略。修改图片内容或转换参数会产生新的资源 URL。Astro 本地 preview 不模拟 Netlify 响应头，上线后仍需验证缓存头。
+
 `SITE_BASE=/` 由配置固定。`SITE_URL` 优先使用控制台显式配置的值，未配置时使用 Netlify 内置 `URL`（主站地址，不是单次预览地址），供 canonical、sitemap 和 robots 使用。配置文件本身不展开环境变量，回退在构建命令的 shell 中完成。
 
 连接后，`main` 的相关源码变更会由 Netlify 自动构建发布。`ignore` 规则覆盖站点、两份构建时读取的文档、根依赖配置、patches 和 Netlify 配置；纯桌面端变更跳过官网构建。首次部署或无法比较历史时继续构建。控制台调整域名或环境变量后，应手动触发重新部署。GitHub CI 与 Netlify 部署独立运行；需要 CI 通过才合入主线时，应通过 GitHub 分支保护要求 PR 检查通过。

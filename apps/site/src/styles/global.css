@@ -120,7 +120,6 @@ img {
 .nav {
   display: flex;
   gap: 24px;
-  margin-left: auto;
   font-size: 14px;
   color: var(--body);
 }
@@ -136,6 +135,31 @@ img {
   display: flex;
   align-items: center;
   gap: 14px;
+  margin-left: auto;
+}
+.github-link {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--body);
+}
+.github-link:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+.github-link:active {
+  transform: scale(0.94);
+}
+.github-link svg {
+  width: 20px;
+  height: 20px;
+}
+.header-separator {
+  width: 1px;
+  height: 24px;
+  background: var(--line);
 }
 .button,
 .site-button {
@@ -173,6 +197,10 @@ img {
 .mobile-menu a {
   display: block;
   padding: 12px;
+}
+.mobile-menu-external {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
 }
 .site-footer {
   border-top: 1px solid var(--line);
@@ -376,6 +404,10 @@ html.media-open { overflow: hidden; }
   .header-tools {
     margin-left: auto;
   }
+  .github-link,
+  .header-separator {
+    display: none;
+  }
   .menu-button {
     display: block;
   }
@@ -477,5 +509,10 @@ html.media-open { overflow: hidden; }
   .blog-views button {
     white-space: nowrap;
     padding-inline: 10px;
+  }
+}
+@media (max-width: 360px) {
+  .site-header .brand span {
+    display: none;
   }
 }

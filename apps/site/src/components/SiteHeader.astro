@@ -1,5 +1,7 @@
 ---
 import {sitePath} from "../lib/site-path";
+import { Image } from 'astro:assets';
+import logo from '../assets/brand/actspace-logo.png';
 interface Props { hero?: boolean; }
 const links=[['/','产品'],['/docs/','文档'],['/blog/','博客'],['/updates/','更新日志']];
 const active=(path:string)=>path==='/'?Astro.url.pathname===sitePath('/'):Astro.url.pathname.startsWith(sitePath(path));
@@ -7,17 +9,23 @@ const active=(path:string)=>path==='/'?Astro.url.pathname===sitePath('/'):Astro.
 <header class="site-header">
 <div class="wrap header-inner">
 <a class="brand" href={sitePath('/')} aria-label="ActSpace 首页">
-<img class="brand-logo" src={sitePath("/media/actspace-logo.png")} alt="" width="600" height="370">
+<Image class="brand-logo" src={logo} alt="" width={150} format="webp" quality={85} widths={[50, 100, 150]} sizes="50px" loading="eager"/>
 <span>ActSpace</span>
 </a>
 <nav class="nav" aria-label="主要导航">{links.map(([path,label])=>
 <a href={sitePath(path)} aria-current={active(path)?'page':undefined}>{label}</a>)}</nav>
 <div class="header-tools">
-<a class="button primary" href={sitePath('/docs/getting-started/')}>开始使用 ↗</a>
+<a class="github-link" href="https://github.com/WakeUp-Jin/actspace-agent" target="_blank" rel="noreferrer noopener" aria-label="在 GitHub 查看 ActSpace" title="GitHub">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.28-.01-1.04-.02-2.04-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1.01-.32 3.3 1.23.96-.27 1.98-.4 3-.41 1.02.01 2.04.14 3 .41 2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.62-5.48 5.92.43.37.81 1.1.81 2.22 0 1.61-.01 2.9-.01 3.29 0 .32.21.69.83.57A12 12 0 0 0 24 12c0-6.63-5.37-12-12-12Z"/></svg>
+</a>
+<span class="header-separator" aria-hidden="true"></span>
+<a class="button primary" href={sitePath('/docs/getting-started/')}>快速开始</a>
 <button class="menu-button" aria-expanded="false" aria-controls="mobile-menu">菜单</button>
 </div>
 </div>
 <nav id="mobile-menu" class="mobile-menu" hidden aria-label="移动导航">{links.map(([path,label])=>
-<a href={sitePath(path)}>{label}</a>)}</nav>
+<a href={sitePath(path)}>{label}</a>)}
+<a class="mobile-menu-external" href="https://github.com/WakeUp-Jin/actspace-agent" target="_blank" rel="noreferrer noopener">GitHub ↗</a>
+</nav>
 </header>
 <script>const button=document.querySelector<HTMLButtonElement>('.menu-button');const menu=document.querySelector<HTMLElement>('#mobile-menu');button?.addEventListener('click',()=>{if(menu){menu.hidden=!menu.hidden;button.setAttribute('aria-expanded',String(!menu.hidden));}});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&menu&&button&&!menu.hidden){menu.hidden=true;button.setAttribute('aria-expanded','false');button.focus();}});</script>

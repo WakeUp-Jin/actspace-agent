@@ -1,17 +1,20 @@
 ---
-import { Image } from 'astro:assets';
+import { Image, getImage } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 import screenshots from '../lib/screenshots.json';
-interface Props { name: keyof typeof screenshots; title: string; eager?: boolean; showCaption?: boolean; }
-const { name, title, eager = false, showCaption = true } = Astro.props;
+interface Props { name: keyof typeof screenshots; title: string; eager?: boolean; showCaption?: boolean; sizes?: string; }
+const { name, title, eager = false, showCaption = true, sizes = '(max-width: 760px) calc(100vw - 48px), 800px' } = Astro.props;
 const assets = import.meta.glob<{ default: ImageMetadata }>('../assets/screenshots/*.png', { eager: true });
 const source = assets[`../assets/screenshots/${name}`]?.default;
 const shot = screenshots[name];
+const widths = source ? [...new Set([480, 800, 1200, 1600, 2400, source.width].filter(width => width <= source.width))] : [];
+// Emit the original explicitly: the image viewer opens it only on demand.
+const original = source ? await getImage({ src: source, format: 'png' }) : undefined;
 ---
 <figure class:list={['product-shot', { 'screenshot-placeholder': !source }]} data-screenshot={name}>
   {source ? <>
-    <a class="screenshot-link" href={source.src} aria-label={`放大：${title}`}>
-      <Image src={source} alt={title} loading={eager ? 'eager' : 'lazy'} fetchpriority={eager ? 'high' : 'auto'} />
+    <a class="screenshot-link" href={original!.src} aria-label={`放大：${title}`}>
+      <Image src={source} alt={title} format="webp" quality={85} widths={widths} sizes={sizes} loading={eager ? 'eager' : 'lazy'} fetchpriority={eager ? 'high' : 'auto'} />
     </a>
     {showCaption && <figcaption>{title}</figcaption>}
   </> : <>

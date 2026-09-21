@@ -222,6 +222,9 @@ importers:
       remark-rehype:
         specifier: 11.1.2
         version: 11.1.2
+      sharp:
+        specifier: 0.35.3
+        version: 0.35.3(@types/node@24.12.4)
       unified:
         specifier: 11.0.5
         version: 11.0.5
@@ -726,6 +729,9 @@ importers:
       '@actspace/prompt':
         specifier: workspace:*
         version: link:../prompt
+      '@actspace/session-checkpoint-policy':
+        specifier: workspace:*
+        version: link:../session/checkpoint-policy
       '@actspace/session-journal':
         specifier: workspace:*
         version: link:../session/journal
@@ -735,9 +741,6 @@ importers:
       '@actspace/session-persistence':
         specifier: workspace:*
         version: link:../session/persistence
-      '@actspace/session-checkpoint-policy':
-        specifier: workspace:*
-        version: link:../session/checkpoint-policy
       '@actspace/shared':
         specifier: workspace:*
         version: link:../shared
@@ -5987,8 +5990,7 @@ snapshots:
     dependencies:
       '@hapi/hoek': 11.0.7
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.3':
     optionalDependencies:
@@ -8877,7 +8879,6 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.3
       '@img/sharp-win32-x64': 0.35.3
       '@types/node': 24.12.4
-    optional: true
 
   shell-quote@1.8.3: {}
 

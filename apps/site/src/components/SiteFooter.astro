@@ -1,10 +1,12 @@
 ---
 import {sitePath} from "../lib/site-path";
+import { Image } from 'astro:assets';
+import logo from '../assets/brand/actspace-logo.png';
 ---
 <footer class="site-footer">
 <div class="wrap footer-inner">
 <a class="brand" href={sitePath('/')}>
-<img class="brand-logo" src={sitePath("/media/actspace-logo.png")} alt="" width="600" height="370">
+<Image class="brand-logo" src={logo} alt="" width={150} format="webp" quality={85} widths={[50, 100, 150]} sizes="50px" loading="lazy"/>
 <span>ActSpace</span>
 </a>
 <nav aria-label="页脚导航">
